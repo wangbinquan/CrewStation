@@ -10,9 +10,15 @@
     "migrate": "bun run src/main.ts migrate"
   },
   "dependencies": {
+    "@crewstation/contracts": "workspace:*",
     "@crewstation/eventbus": "workspace:*",
     "@crewstation/http": "workspace:*",
+    "@crewstation/k8s": "workspace:*",
     "@crewstation/kernel": "workspace:*",
+    "@crewstation/module-config": "workspace:*",
+    "@crewstation/module-data": "workspace:*",
+    "@crewstation/module-egress": "workspace:*",
+    "@crewstation/module-gateway": "workspace:*",
     "@crewstation/module-identity": "workspace:*",
     "@crewstation/module-project": "workspace:*",
     "@crewstation/persistence": "workspace:*",

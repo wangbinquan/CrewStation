@@ -2,7 +2,7 @@ import type { Actor, CreateProjectRequest, ProjectDto, ProjectId, ServiceId } fr
 import { DomainTopic } from '@crewstation/contracts';
 import { conflict, forbidden, newId, validation } from '@crewstation/kernel';
 import type { Project } from '../domain/project';
-import { namespaceFor } from '../domain/project';
+import { RESERVED_SLUGS, namespaceFor } from '../domain/project';
 import type { Service } from '../domain/service';
 import { serviceIdentity } from '../domain/service';
 import type { ProjectUseCaseDeps } from './dependencies';
@@ -12,6 +12,7 @@ import { projectToDto } from './toDto';
 export function createProjectUseCase({ uow, users, settings, clock }: ProjectUseCaseDeps) {
   return async (actor: Actor, input: CreateProjectRequest): Promise<ProjectDto> => {
     if (!actor.isAdmin) throw forbidden('只有管理员可以创建项目');
+    if (RESERVED_SLUGS.includes(input.slug)) throw validation(`slug ${input.slug} 是保留名`, { reserved: RESERVED_SLUGS });
     if (!(await users.getUser(input.ownerUserId))) throw validation(`负责人 ${input.ownerUserId} 不存在`);
     const now = clock.now();
     return uow.run(async (scope) => {

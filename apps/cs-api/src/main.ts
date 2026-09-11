@@ -1,6 +1,7 @@
 // cs-api 进程入口：读取配置、连接数据库、装配模块、启动服务。业务逻辑一律在 modules/*。
 import { eventbusMigrations } from '@crewstation/eventbus';
 import { createApp, serve } from '@crewstation/http';
+import { createK8sClient, loadClusterConfig } from '@crewstation/k8s';
 import { createJsonLogger } from '@crewstation/kernel';
 import { connectDatabase, runMigrations } from '@crewstation/persistence';
 import { queueMigrations } from '@crewstation/queue';
@@ -11,7 +12,8 @@ const name = 'cs-api';
 const logger = createJsonLogger({ service: name });
 const settings = loadSettings();
 const { db, close } = connectDatabase(settings.databaseUrl);
-const assembly = assembleModules(db, settings, logger);
+const k8s = createK8sClient(loadClusterConfig());
+const assembly = assembleModules(db, k8s, settings, logger);
 const command = process.argv[2] ?? 'serve';
 
 if (command === 'migrate') {

@@ -16,6 +16,9 @@ export interface Project {
   readonly updatedAt: Date;
 }
 
+/** 与网关主机模式冲突的保留名（console.<域>、preview.<项目>.<域>、api.<服务域> 等）。 */
+export const RESERVED_SLUGS: readonly string[] = ['console', 'preview', 'dev', 'api', 'www', 'auth', 'crewstation'];
+
 /** 每项目一个命名空间（G18）；前缀固定，便于集群侧按前缀识别平台资源。 */
 export function namespaceFor(slug: string): string {
   return `cs-${slug}`;

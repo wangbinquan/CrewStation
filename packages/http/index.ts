@@ -6,3 +6,5 @@ export { serve } from './serve';
 export type { AppEnv, AppVariables, RequestIdentity } from './identity';
 export { identityFromHeaders, requireService, requireUser } from './identity';
 export { parseBody, parseParams, parseQuery } from './validate';
+export type { HttpActor } from './actor';
+export { actorFrom } from './actor';

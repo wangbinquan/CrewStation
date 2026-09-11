@@ -1,3 +1,3 @@
-export type { SessionModuleApi } from './api/moduleApi';
-export { createSessionModule } from './wiring';
+export type { SessionModuleApi, StoredEventDto } from './api/moduleApi';
+export { createSessionModule, sessionMigrations } from './wiring';
 export type { SessionModule, SessionModuleDeps } from './wiring';

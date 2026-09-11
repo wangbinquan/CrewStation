@@ -1,0 +1,18 @@
+import { integer, jsonb, primaryKey, text, timestamp } from 'drizzle-orm/pg-core';
+import { sessionSchema } from './schema';
+
+export const runnerEvents = sessionSchema.table('runner_events', {
+  taskId: text('task_id').notNull(),
+  seq: integer('seq').notNull(),
+  at: timestamp('at', { withTimezone: true }).notNull(),
+  kind: text('kind').notNull(),
+  agentId: text('agent_id'),
+  event: jsonb('event').notNull(),
+}, (t) => [primaryKey({ columns: [t.taskId, t.seq] })]);
+
+export const connections = sessionSchema.table('connections', {
+  taskId: text('task_id').primaryKey(),
+  replica: text('replica').notNull(),
+  connectedAt: timestamp('connected_at', { withTimezone: true }).notNull(),
+  lastSeenAt: timestamp('last_seen_at', { withTimezone: true }).notNull(),
+});

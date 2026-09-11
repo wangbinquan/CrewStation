@@ -1,0 +1,42 @@
+import type { Actor, RunnerCommand, TaskId } from '@crewstation/contracts';
+import { RunnerCommandSchema } from '@crewstation/contracts';
+import { forbidden, isPlatformError } from '@crewstation/kernel';
+import type { EventSink } from '../domain/runnerConnection';
+import { RunnerConnection } from '../domain/runnerConnection';
+import type { commandDispatch } from './commandDispatch';
+import type { SessionUseCaseDeps } from './dependencies';
+import type { RunnerHub } from './runnerHub';
+
+export interface BrowserStream {
+  /** 浏览器发来的命令帧：校验后派发，结果按 id 回给该浏览器。 */
+  onMessage(raw: unknown): Promise<void>;
+  close(): void;
+}
+
+/** 浏览器（工作台）到某任务的流：先回放持久事件到 sinceSeq 之后，再接实时广播；命令经同一派发口。 */
+export function browserStreams(deps: SessionUseCaseDeps, hub: RunnerHub, dispatch: ReturnType<typeof commandDispatch>) {
+  return {
+    open: async (actor: Actor, taskId: TaskId, sink: EventSink, sinceSeq: number): Promise<BrowserStream> => {
+      if (!(await deps.taskAccess.canOpenStream(actor, taskId))) throw forbidden('无权访问该任务的会话流');
+      const replay = await deps.events.listSince(taskId, sinceSeq, { limit: deps.settings.replayLimit });
+      for (const stored of replay) sink.send(RunnerConnection.frameOf(stored.seq, stored.at.toISOString(), stored.event));
+      const connection = hub.connections.get(taskId);
+      connection?.subscribers.add(sink);
+      sink.send(JSON.stringify({ type: 'streamReady', connected: Boolean(connection), replayed: replay.length }));
+      return {
+        onMessage: async (raw) => {
+          const parsed = RunnerCommandSchema.safeParse(raw);
+          if (!parsed.success) { sink.send(JSON.stringify({ type: 'error', id: (raw as { id?: string })?.id ?? '', code: 'validation', message: '命令帧不合法' })); return; }
+          const command: RunnerCommand = parsed.data;
+          try {
+            const payload = await dispatch.sendCommand(taskId, command);
+            sink.send(JSON.stringify({ type: 'result', id: command.id, payload }));
+          } catch (error) {
+            sink.send(JSON.stringify({ type: 'error', id: command.id, code: isPlatformError(error) ? error.kind : 'internal', message: isPlatformError(error) ? error.message : '内部错误' }));
+          }
+        },
+        close: () => { hub.connections.get(taskId)?.subscribers.delete(sink); },
+      };
+    },
+  };
+}

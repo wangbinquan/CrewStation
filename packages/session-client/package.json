@@ -1,0 +1,9 @@
+{
+  "name": "@crewstation/session-client",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "cs-session 进程间接口的 HTTP 客户端：下发 TaskRunner 命令、读取持久事件、查询连接状态",
+  "exports": { ".": "./index.ts" },
+  "dependencies": { "@crewstation/contracts": "workspace:*", "@crewstation/kernel": "workspace:*" }
+}
