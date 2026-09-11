@@ -275,7 +275,7 @@ metadata:
   name: issue-worker
 spec:
   build:
-    profile: web-service-v1          # 待重评：首版构建 profile
+    profile: web-service-v1          # 首版构建 profile 随最小样例模板语言在评审时确定
     install: [<pkg>, install]
     command: [<pkg>, build]
   development:
@@ -1033,7 +1033,7 @@ crewstation/
 | 编号 | 决策 | 状态／取舍 |
 |---|---|---|
 | D01 | 以 Kubernetes 为目标 | v0.3.0 起仅 Kubernetes，本机 kind 验证；Docker 路径删除 |
-| D02 | 独立网关入口，不使用 cs-api 全流量代理 | 基线；网关同时承担用户鉴权与操作级放行，产品待重评 |
+| D02 | 独立网关入口，不使用 cs-api 全流量代理 | 基线；网关同时承担用户鉴权与操作级放行；产品为 Traefik 加 ForwardAuth，见 §3.1 |
 | D03 | 五个自研常驻服务，内部模块化 | 基线；cs-connector 改为 cs-events；另有两个平台 MCP |
 | D04 | 首版不强制 Istio／Kafka／全套 Knative | 范围决定 |
 | D05 | 一任务一长驻容器，容器内常驻 TaskRunner | v0.3.0 修订；替代 v0.2.0 的多环境关联模型 |
@@ -1042,7 +1042,7 @@ crewstation/
 | D08 | OpenAPI 与运行授权共用规则来源 | 修订：开放策略同时驱动网关放行表与 Swagger 裁剪 |
 | D09 | 事件先到业务服务，不直达 Agent | 用户明确要求 |
 | D10 | 业务数据与 Release 分离、默认保留 | 用户要求 |
-| D11 | PostgreSQL＋S3＋受限 PVC 为首版数据类型 | 建议；Provider 待重评 |
+| D11 | PostgreSQL＋S3＋受限 PVC 为首版数据类型 | 基线；Provider 为 CloudNativePG 与公司 S3 兼容存储，见 §3.1 |
 | D12 | 应用回退、撤权、数据库恢复分开 | 基线 |
 | D13 | 安装器管理阶段，Helm 管组件，Controller 管用户资源 | 建议 |
 | D14 | 知识飞轮 | 作废；由 D37 替代 |
