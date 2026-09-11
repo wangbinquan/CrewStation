@@ -6,3 +6,4 @@ coverage/
 .env
 .env.*
 evidence/tmp/
+.local/
