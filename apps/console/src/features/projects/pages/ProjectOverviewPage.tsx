@@ -48,11 +48,16 @@ export function ProjectOverviewPage(): ReactElement {
       {serviceId === undefined && !isPending ? <p className={styles.note}>{t('projects.overview.noService')}</p> : null}
       {serviceId !== undefined ? <SlotsSection serviceId={serviceId} canSwitch={isOwner} /> : null}
       {project !== undefined ? (
-        <div className={styles.cards}>
-          <MembersCard projectId={projectId} canManage={isOwner} isAdmin={isAdmin} />
-          <QuotaCard projectId={projectId} />
-          {serviceId !== undefined ? <RepositoryCard serviceId={serviceId} /> : null}
-        </div>
+        <>
+          {/* 成员卡里是四列表格＋成员表单，跟两张定义列表卡挤同一行会把操作列挤到卡外，单独占一行。 */}
+          <div className={styles.wideCard}>
+            <MembersCard projectId={projectId} canManage={isOwner} isAdmin={isAdmin} />
+          </div>
+          <div className={styles.cards}>
+            <QuotaCard projectId={projectId} />
+            {serviceId !== undefined ? <RepositoryCard serviceId={serviceId} /> : null}
+          </div>
+        </>
       ) : null}
     </>
   );

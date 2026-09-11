@@ -85,6 +85,12 @@ describe.skipIf(!available)('gateway module', () => {
     // 未登记的调用方连 MCP 也到不了。
     expect((await gateway.api.evaluate({ ...caller, identity: 'ghost/ghost' }, { host: 'mcp-operations.svc.cs.internal', method: 'POST', path: '/mcp' })).allowed).toBe(false);
 
+    // 平台自身的工作负载（cs-events 投递事件）不在放行表里，按操作键判定必然被拒。
+    const platformCaller = { ...caller, identity: 'crewstation/cs-events', kind: 'platform' as const };
+    expect((await gateway.api.evaluate(platformCaller, { host: 'demo.svc.cs.internal', method: 'POST', path: '/events/gitlab' })).allowed).toBe(true);
+    // 同一个主机换成未登记的数字人调用方仍然被拒。
+    expect((await gateway.api.evaluate({ ...caller, identity: 'ghost/ghost' }, { host: 'demo.svc.cs.internal', method: 'POST', path: '/events/gitlab' })).allowed).toBe(false);
+
     expect((await gateway.api.rebuildAllowlist()).version).toBe(2);
   });
 

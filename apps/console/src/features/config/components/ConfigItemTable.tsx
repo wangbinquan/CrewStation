@@ -43,7 +43,11 @@ export function ConfigItemTable({ items, onEdit, onDelete, deletingName }: Confi
                 <ConfigItemValue item={item} />
               </td>
               <td>{item.version}</td>
-              <td className={styles.muted}>{item.updatedBy}</td>
+              <td>
+                <span className={styles.actor} title={item.updatedBy}>
+                  {item.updatedBy}
+                </span>
+              </td>
               <td className={styles.muted}>{formatDateTime(item.updatedAt, locale)}</td>
               <td className={styles.actions}>
                 <Button variant="ghost" onClick={() => onEdit(item)}>

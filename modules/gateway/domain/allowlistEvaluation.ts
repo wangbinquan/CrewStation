@@ -12,8 +12,12 @@ export interface DomainNames { serviceDomain: string }
  * - `api.<serviceDomain>/…` 其余路径 → 平台 API，已登记服务默认可调；
  * - `events.<sd>`、两个 `mcp-*.<sd>` → 平台自身的端点，按条目的 platformHosts 放行，不走操作键；
  * - `<service>.<serviceDomain>/…` → 数字人自身暴露的 API，操作键的 proxy 就是该服务名。
+ *
+ * 平台自身的工作负载（cs-events 投递事件、控制面回调等）不在放行表里：它们不是已登记的数字人，
+ * 按操作键判定必然被拒。平台在系统命名空间里跑的是平台自己的代码，对服务域一律放行。
  */
 export function evaluateServiceCall(doc: AllowlistDocument, caller: WorkloadIdentity, target: EvaluationTarget, names: DomainNames): Evaluation {
+  if (caller.kind === 'platform') return { allowed: true, targetIdentity: `platform-caller:${target.host}` };
   const entry = doc.entries.find((e) => e.caller === caller.identity);
   const granted = new Set([...doc.defaultOpen, ...(entry?.operations ?? [])]);
   const apiHost = `api.${names.serviceDomain}`;

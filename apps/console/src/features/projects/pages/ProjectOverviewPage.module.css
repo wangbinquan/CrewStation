@@ -35,10 +35,13 @@
   text-decoration: none;
 }
 
+.wideCard {
+  margin-bottom: var(--cs-space-4);
+}
+
 .cards {
-  /* 成员卡里是四列表格（成员／邮箱／角色／操作），300px 放不下，操作列会被挤到卡外。 */
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
   gap: var(--cs-space-4);
   align-items: start;
 }
