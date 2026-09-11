@@ -19,6 +19,8 @@ const released: string[] = [];
 const emit = (taskId: string, event: RunnerEvent) => { const list = events.get(taskId) ?? []; list.push({ seq: list.length + 1, at: new Date().toISOString(), event }); events.set(taskId, list); };
 const agentEvent = (agentId: string, type: string, extra: Record<string, unknown> = {}): RunnerEvent => ({ kind: 'agent', event: { agentId, seq: 0, at: new Date().toISOString(), type, ...extra } as never });
 
+let runnerConnected = true;
+
 beforeAll(async () => {
   if (!available) return;
   tdb = await createTestDatabase([eventbusMigrations, businessTaskMigrations]);
@@ -29,7 +31,7 @@ beforeAll(async () => {
       releaseEnvironment: async (taskId) => { released.push(taskId); return { id: taskId, projectId, state: 'released', connected: false, traceId: 't', podName: 'task-1' }; },
       pauseEnvironment: async (taskId) => ({ id: taskId, projectId, state: 'paused', connected: false, traceId: 't', podName: 'task-1' }),
       resumeEnvironment: async (taskId) => ({ id: taskId, projectId, state: 'creating', connected: false, traceId: 't', podName: 'task-1' }),
-      getEnvironment: async (taskId) => ({ id: taskId, projectId, state: 'running', connected: true, traceId: 't', podName: 'task-1' }),
+      getEnvironment: async (taskId) => ({ id: taskId, projectId, state: runnerConnected ? 'running' : 'creating', connected: runnerConnected, traceId: 't', podName: 'task-1' }),
     },
     runner: {
       sendCommand: async (taskId, command) => {
@@ -102,5 +104,21 @@ describe.skipIf(!available)('business-task module', () => {
     expect(released).toEqual([task.id]);
     await expect(bt.api.submitSubtask(caller, task.id, { kind: 'command', name: 'late', command: ['ls'], timeoutSeconds: 10 })).rejects.toMatchObject({ kind: 'precondition' });
     expect((await bt.api.listProjectTasks({ userId: 'usr_0123456789abcdef0123456789abcdef' as never, isAdmin: false }, projectId)).length).toBe(1);
+  });
+
+  test('容器未连接时子任务留在 pending，TaskRunner 连上后补发', async () => {
+    runnerConnected = false;
+    const task = await bt.api.createTask(caller, { labels: {} });
+    const waiting = await bt.api.submitSubtask(caller, task.id, { kind: 'agent', name: 'wait', agentProfile: 'chat-v1', mode: 'oneshot', prompt: '等容器' });
+    expect(waiting.state).toBe('pending');
+    expect(commands.filter((c) => c.type === 'startAgent' && c.initialPrompt === '等容器')).toHaveLength(0);
+
+    runnerConnected = true;
+    expect(await bt.api.dispatchPendingSubtasks(task.id)).toBe(1);
+    expect((await bt.api.getSubtask(caller, task.id, waiting.id)).state).toBe('running');
+    expect(commands.filter((c) => c.type === 'startAgent' && c.initialPrompt === '等容器')).toHaveLength(1);
+    // 再次调用不重复派发。
+    expect(await bt.api.dispatchPendingSubtasks(task.id)).toBe(0);
+    await bt.api.closeTask(caller, task.id);
   });
 });

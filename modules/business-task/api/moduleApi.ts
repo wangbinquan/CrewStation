@@ -10,6 +10,8 @@ export interface BusinessTaskModuleApi {
   resumeTask(caller: ServiceActor, taskId: TaskId): Promise<BusinessTaskDto>;
   submitSubtask(caller: ServiceActor, taskId: TaskId, input: SubmitSubtaskRequest): Promise<SubtaskDto>;
   retrySubtask(caller: ServiceActor, taskId: TaskId, subtaskId: SubtaskId): Promise<SubtaskDto>;
+  /** TaskRunner 连上时由组合根调用：派发等容器就绪的 pending 子任务，返回派发条数。 */
+  dispatchPendingSubtasks(taskId: TaskId): Promise<number>;
   getSubtask(caller: ServiceActor, taskId: TaskId, subtaskId: SubtaskId): Promise<SubtaskDto>;
   listSubtasks(caller: ServiceActor, taskId: TaskId): Promise<SubtaskDto[]>;
   subtaskOutput(caller: ServiceActor, taskId: TaskId, subtaskId: SubtaskId): Promise<string>;

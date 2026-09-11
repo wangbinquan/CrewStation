@@ -42,6 +42,16 @@ export function subtaskUseCases(deps: BusinessTaskUseCaseDeps) {
       await uow.run((scope) => scope.subtasks.insert(run));
       return subtaskToDto(await launch(run));
     },
+    /** TaskRunner 连上时由组合根调用：把等容器的 pending 子任务按提交顺序派发出去。 */
+    dispatchPendingSubtasks: async (taskId: TaskId): Promise<number> => {
+      let dispatched = 0;
+      for (const run of await uow.read.subtasks.listByTask(taskId)) {
+        if (run.state !== 'pending') continue;
+        const launched = await launch(run);
+        if (launched.state !== 'pending') dispatched += 1;
+      }
+      return dispatched;
+    },
     getSubtask: async (caller: ServiceActor, taskId: TaskId, subtaskId: SubtaskId): Promise<SubtaskDto> => {
       await ownedTask(caller, taskId);
       return subtaskToDto(await refresh(await load(taskId, subtaskId)));

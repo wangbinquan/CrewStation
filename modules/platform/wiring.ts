@@ -185,7 +185,16 @@ function composeRuntime(deps: PlatformModuleDeps, core: ReturnType<typeof compos
   const session = createSessionModule({
     db, logger, isAdmin: (id) => isAdmin(id),
     runnerAuth: { verifyRunnerToken: taskRuntime.api.verifyRunnerToken },
-    taskAccess: { canOpenStream: taskRuntime.api.canOpenStream, onRunnerConnected: taskRuntime.api.onRunnerConnected, onRunnerDisconnected: taskRuntime.api.onRunnerDisconnected },
+    taskAccess: {
+      canOpenStream: taskRuntime.api.canOpenStream,
+      // 先把环境标成已连接，再派发等容器就绪的业务子任务：提交子任务时容器往往还没连上。
+      onRunnerConnected: async (taskId) => {
+        await taskRuntime.api.onRunnerConnected(taskId);
+        const dispatched = await businessTask.api.dispatchPendingSubtasks(taskId);
+        if (dispatched > 0) logger.info('dispatched pending subtasks', { taskId, dispatched });
+      },
+      onRunnerDisconnected: taskRuntime.api.onRunnerDisconnected,
+    },
     settings: { selfAddress: settings.selfAddress, commandTimeoutMs: 30_000, runnerStaleMs: 30_000, replayLimit: 2000 },
   });
   return { taskRuntime, devSession, businessTask, events, session, sessionClient: runner };

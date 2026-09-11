@@ -11,7 +11,7 @@ interface ExecResult { execId: string; exitCode: number | null; stdout: string; 
 
 /** 构造与启动子任务：Agent 走 startAgent，命令走 exec(wait) 并在后台收尾。 */
 export function subtaskLaunch(deps: BusinessTaskUseCaseDeps) {
-  const { uow, runner, settings, clock, logger } = deps;
+  const { uow, environments, runner, settings, clock, logger } = deps;
   const { finish } = subtaskRefresh(deps);
 
   const settleCommand = async (run: SubtaskRun, r: ExecResult): Promise<void> => {
@@ -29,7 +29,16 @@ export function subtaskLaunch(deps: BusinessTaskUseCaseDeps) {
   };
 
   return {
+    /**
+     * 容器刚创建时 TaskRunner 还没连上，此时派发必然以「TaskRunner 未连接」失败。
+     * 子任务留在 pending，等 onRunnerConnected 再派发；调用方本来就要轮询子任务状态。
+     */
     launch: async (run: SubtaskRun): Promise<SubtaskRun> => {
+      const env = await environments.getEnvironment(run.taskId);
+      if (!env?.connected) {
+        logger.info('subtask waits for runner', { subtaskId: run.id, taskId: run.taskId, state: env?.state });
+        return run;
+      }
       const started = transition(run, 'running', clock.now(), { startedAt: clock.now() });
       await uow.run((scope) => scope.subtasks.update(started));
       if (run.kind === 'agent' && run.agentProfile) {
