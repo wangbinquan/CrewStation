@@ -14,6 +14,8 @@ export interface ResolvedService {
   projectId: ProjectId;
   serviceId: ServiceId;
   slug: string;
+  name: string;
+  identity: string;
   namespace: string;
   kind: ManifestKind;
 }
@@ -32,6 +34,10 @@ export interface ProjectModuleApi {
   setProjectState(projectId: ProjectId, state: ProjectState, message?: string): Promise<ProjectDto>;
   getService(actor: Actor, serviceId: ServiceId): Promise<ServiceDto>;
   resolveServiceIdentity(identity: string): Promise<ResolvedService | undefined>;
+  /** 无 actor 的内部解析，供网关、发布、任务等模块经端口使用。 */
+  resolveServiceById(serviceId: ServiceId): Promise<ResolvedService | undefined>;
+  listServices(): Promise<ResolvedService[]>;
+  ownerOf(projectId: ProjectId): Promise<UserId | undefined>;
   listMembers(actor: Actor, projectId: ProjectId): Promise<MemberDto[]>;
   setMember(actor: Actor, projectId: ProjectId, input: SetMemberRequest): Promise<MemberDto>;
   removeMember(actor: Actor, projectId: ProjectId, userId: UserId): Promise<void>;

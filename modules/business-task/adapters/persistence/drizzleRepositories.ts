@@ -8,14 +8,13 @@ import type { ContractRepository, SubtaskRepository, TaskRepository } from '../.
 import { contracts, subtasks, tasks } from './tables';
 
 const json = <T>(v: unknown): T => (typeof v === 'string' ? JSON.parse(v) : v) as T;
-const jsonText = (v: unknown): string => JSON.stringify(v);
 
 export function drizzleTaskRepository(db: Executor): TaskRepository {
   const toTask = (r: typeof tasks.$inferSelect): BusinessTask => ({
     id: r.id as TaskId, serviceId: r.serviceId as ServiceId, projectId: r.projectId as ProjectId, callerIdentity: r.callerIdentity, state: r.state as BusinessTaskState, traceId: r.traceId as TraceId,
     volumeMode: r.volumeMode as VolumeMode, profile: r.profile, labels: json<Record<string, string>>(r.labels), ...(r.message ? { message: r.message } : {}), createdAt: r.createdAt, updatedAt: r.updatedAt, ...(r.closedAt ? { closedAt: r.closedAt } : {}),
   });
-  const toRow = (t: BusinessTask): typeof tasks.$inferInsert => ({ ...t, labels: jsonText(t.labels), message: t.message ?? null, closedAt: t.closedAt ?? null });
+  const toRow = (t: BusinessTask): typeof tasks.$inferInsert => ({ ...t, labels: t.labels, message: t.message ?? null, closedAt: t.closedAt ?? null });
   return {
     insert: async (t) => { await db.insert(tasks).values(toRow(t)); },
     update: async (t) => { await db.update(tasks).set(toRow(t)).where(eq(tasks.id, t.id)); },
@@ -38,9 +37,9 @@ export function drizzleSubtaskRepository(db: Executor): SubtaskRepository {
   };
   const toRow = (s: SubtaskRun): typeof subtasks.$inferInsert => ({
     id: s.id, taskId: s.taskId, name: s.name, kind: s.kind, mode: s.mode ?? null, state: s.state, attempt: s.attempt,
-    spec: jsonText({ prompt: s.prompt, cwd: s.cwd, command: s.command, timeoutSeconds: s.timeoutSeconds, agentProfile: s.agentProfile, outputContract: s.outputContract }),
+    spec: ({ prompt: s.prompt, cwd: s.cwd, command: s.command, timeoutSeconds: s.timeoutSeconds, agentProfile: s.agentProfile, outputContract: s.outputContract }) as unknown,
     runnerRef: s.runnerRef ?? null, sessionId: s.sessionId ?? null, exitCode: s.exitCode ?? null, output: s.output ?? null, businessOutcome: s.businessOutcome ?? null,
-    contractResult: s.contractResult ? jsonText(s.contractResult) : null, error: s.error ?? null, createdAt: s.createdAt, startedAt: s.startedAt ?? null, endedAt: s.endedAt ?? null,
+    contractResult: s.contractResult ?? null, error: s.error ?? null, createdAt: s.createdAt, startedAt: s.startedAt ?? null, endedAt: s.endedAt ?? null,
   });
   return {
     insert: async (s) => { await db.insert(subtasks).values(toRow(s)); },
@@ -54,7 +53,7 @@ export function drizzleSubtaskRepository(db: Executor): SubtaskRepository {
 export function drizzleContractRepository(db: Executor): ContractRepository {
   return {
     save: async (c) => {
-      const values = { releaseId: c.releaseId, serviceId: c.serviceId, tag: c.tag, agentProfiles: jsonText(c.agentProfiles), outputContracts: jsonText(c.outputContracts), registeredAt: c.registeredAt };
+      const values = { releaseId: c.releaseId, serviceId: c.serviceId, tag: c.tag, agentProfiles: c.agentProfiles as unknown, outputContracts: c.outputContracts as unknown, registeredAt: c.registeredAt };
       await db.insert(contracts).values(values).onConflictDoUpdate({ target: contracts.releaseId, set: values });
     },
     latest: async (serviceId) => {

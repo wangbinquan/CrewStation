@@ -1,9 +1,10 @@
-import { integer, jsonb, primaryKey, text, timestamp } from 'drizzle-orm/pg-core';
+import { integer, primaryKey, text, timestamp } from 'drizzle-orm/pg-core';
+import { jsonDocument } from '@crewstation/persistence';
 import { gatewaySchema } from './schema';
 
 export const allowlists = gatewaySchema.table('allowlists', {
   version: integer('version').primaryKey(),
-  document: jsonb('document').notNull(),
+  document: jsonDocument('document').notNull(),
   generatedAt: timestamp('generated_at', { withTimezone: true }).notNull(),
 });
 
@@ -23,6 +24,6 @@ export const podIdentities = gatewaySchema.table('pod_identities', {
 
 export const routes = gatewaySchema.table('routes', {
   serviceName: text('service_name').primaryKey(),
-  routes: jsonb('routes').notNull(),
+  routes: jsonDocument('routes').notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
 });

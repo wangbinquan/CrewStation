@@ -1,4 +1,5 @@
-import { integer, jsonb, primaryKey, text, timestamp } from 'drizzle-orm/pg-core';
+import { integer, primaryKey, text, timestamp } from 'drizzle-orm/pg-core';
+import { jsonDocument } from '@crewstation/persistence';
 import { sessionSchema } from './schema';
 
 export const runnerEvents = sessionSchema.table('runner_events', {
@@ -7,7 +8,7 @@ export const runnerEvents = sessionSchema.table('runner_events', {
   at: timestamp('at', { withTimezone: true }).notNull(),
   kind: text('kind').notNull(),
   agentId: text('agent_id'),
-  event: jsonb('event').notNull(),
+  event: jsonDocument('event').notNull(),
 }, (t) => [primaryKey({ columns: [t.taskId, t.seq] })]);
 
 export const connections = sessionSchema.table('connections', {

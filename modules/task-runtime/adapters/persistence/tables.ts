@@ -1,4 +1,5 @@
-import { boolean, integer, jsonb, text, timestamp } from 'drizzle-orm/pg-core';
+import { boolean, integer, text, timestamp } from 'drizzle-orm/pg-core';
+import { jsonDocument } from '@crewstation/persistence';
 import { taskRuntimeSchema } from './schema';
 
 export const environments = taskRuntimeSchema.table('environments', {
@@ -16,8 +17,8 @@ export const environments = taskRuntimeSchema.table('environments', {
   runnerTokenHash: text('runner_token_hash').notNull(),
   connected: boolean('connected').notNull().default(false),
   branch: text('branch'),
-  preview: jsonb('preview'),
-  labels: jsonb('labels').notNull(),
+  preview: jsonDocument('preview'),
+  labels: jsonDocument('labels').notNull(),
   createdBy: text('created_by'),
   message: text('message'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull(),

@@ -1,4 +1,5 @@
-import { integer, jsonb, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core';
+import { integer, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core';
+import { jsonDocument } from '@crewstation/persistence';
 import { releaseSchema } from './schema';
 
 export const releases = releaseSchema.table('releases', {
@@ -11,9 +12,9 @@ export const releases = releaseSchema.table('releases', {
   status: text('status').notNull(),
   targetSlot: text('target_slot').notNull(),
   image: text('image'),
-  manifest: jsonb('manifest'),
+  manifest: jsonDocument('manifest'),
   configVersion: integer('config_version'),
-  pipeline: jsonb('pipeline').notNull(),
+  pipeline: jsonDocument('pipeline').notNull(),
   message: text('message'),
   createdBy: text('created_by').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
@@ -23,8 +24,8 @@ export const releases = releaseSchema.table('releases', {
 export const serviceSlots = releaseSchema.table('service_slots', {
   serviceId: text('service_id').primaryKey(),
   active: text('active').notNull(),
-  blue: jsonb('blue').notNull(),
-  green: jsonb('green').notNull(),
+  blue: jsonDocument('blue').notNull(),
+  green: jsonDocument('green').notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
 });
 

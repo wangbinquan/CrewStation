@@ -4,6 +4,11 @@ import { transition } from '../domain/project';
 import { authorizationUseCases } from './authorization';
 import type { ProjectUseCaseDeps } from './dependencies';
 import { projectToDto, serviceToDto } from './toDto';
+import type { Service } from '../domain/service';
+import type { Project } from '../domain/project';
+
+const resolved = (service: Service, project: Project | undefined) =>
+  project ? { projectId: project.id, serviceId: service.id, slug: project.slug, name: service.name, identity: service.identity, namespace: project.namespace, kind: service.kind } : undefined;
 
 export function queryProjectUseCases(deps: ProjectUseCaseDeps) {
   const { uow, hosts, clock } = deps;
@@ -33,10 +38,23 @@ export function queryProjectUseCases(deps: ProjectUseCaseDeps) {
     /** 供网关与其他模块把 `<project>/<service>` 解析成对象；无 actor，调用方自行保证只在受信路径使用。 */
     resolveServiceIdentity: async (identity: string) => {
       const service = await uow.read.services.getByIdentity(identity);
-      if (!service) return undefined;
-      const project = await uow.read.projects.getById(service.projectId);
-      return project ? { projectId: project.id, serviceId: service.id, slug: project.slug, namespace: project.namespace, kind: service.kind } : undefined;
+      return service ? resolved(service, await uow.read.projects.getById(service.projectId)) : undefined;
     },
+    resolveServiceById: async (serviceId: ServiceId) => {
+      const service = await uow.read.services.getById(serviceId);
+      return service ? resolved(service, await uow.read.projects.getById(service.projectId)) : undefined;
+    },
+    listServices: async () => {
+      const out = [];
+      for (const project of await uow.read.projects.list()) {
+        if (project.state === 'archived') continue;
+        const service = await uow.read.services.getByProject(project.id);
+        const item = service ? resolved(service, project) : undefined;
+        if (item) out.push(item);
+      }
+      return out;
+    },
+    ownerOf: async (projectId: ProjectId) => (await uow.read.projects.getById(projectId))?.ownerUserId,
     /** 控制面在命名空间与首个发布就绪后推进状态；不经 actor。 */
     setProjectState: async (projectId: ProjectId, state: ProjectState, message?: string): Promise<ProjectDto> => uow.run(async (scope) => {
       const project = await scope.projects.getById(projectId);

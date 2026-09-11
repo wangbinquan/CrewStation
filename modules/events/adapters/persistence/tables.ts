@@ -1,17 +1,7 @@
-import { sql } from 'drizzle-orm';
-import { customType, integer, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core';
+import { integer, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core';
+import { jsonDocument } from '@crewstation/persistence';
 import { eventsSchema } from './schema';
 
-/**
- * drizzle 自带的 jsonb 会先 JSON.stringify 再交给 Bun SQL，后者对 jsonb 参数再编码一次，落库成 JSON 字符串；
- * 直接传对象则数字、布尔会带上驱动自己的类型而被 jsonb 列拒绝。这里以 text 参数传 JSON 文本、在库内 ::jsonb 解析，
- * 任何 JSON 值都能原样落库（SQL 侧可直接取字段）。drizzle 对 JS null 不调用 toDriver，落为 SQL NULL。
- */
-const jsonDocument = customType<{ data: unknown; driverData: unknown }>({
-  dataType: () => 'jsonb',
-  toDriver: (value) => sql`${JSON.stringify(value)}::text::jsonb`,
-  fromDriver: (value) => value,
-});
 
 export const producers = eventsSchema.table('producers', {
   producer: text('producer').primaryKey(),

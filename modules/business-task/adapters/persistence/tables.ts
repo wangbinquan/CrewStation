@@ -1,4 +1,5 @@
-import { integer, jsonb, text, timestamp } from 'drizzle-orm/pg-core';
+import { integer, text, timestamp } from 'drizzle-orm/pg-core';
+import { jsonDocument } from '@crewstation/persistence';
 import { businessTaskSchema } from './schema';
 
 export const tasks = businessTaskSchema.table('tasks', {
@@ -10,7 +11,7 @@ export const tasks = businessTaskSchema.table('tasks', {
   traceId: text('trace_id').notNull(),
   volumeMode: text('volume_mode').notNull(),
   profile: text('profile').notNull(),
-  labels: jsonb('labels').notNull(),
+  labels: jsonDocument('labels').notNull(),
   message: text('message'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
@@ -25,13 +26,13 @@ export const subtasks = businessTaskSchema.table('subtasks', {
   mode: text('mode'),
   state: text('state').notNull(),
   attempt: integer('attempt').notNull(),
-  spec: jsonb('spec').notNull(),
+  spec: jsonDocument('spec').notNull(),
   runnerRef: text('runner_ref'),
   sessionId: text('session_id'),
   exitCode: integer('exit_code'),
   output: text('output'),
   businessOutcome: text('business_outcome'),
-  contractResult: jsonb('contract_result'),
+  contractResult: jsonDocument('contract_result'),
   error: text('error'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
   startedAt: timestamp('started_at', { withTimezone: true }),
@@ -42,7 +43,7 @@ export const contracts = businessTaskSchema.table('contracts', {
   releaseId: text('release_id').primaryKey(),
   serviceId: text('service_id').notNull(),
   tag: text('tag').notNull(),
-  agentProfiles: jsonb('agent_profiles').notNull(),
-  outputContracts: jsonb('output_contracts').notNull(),
+  agentProfiles: jsonDocument('agent_profiles').notNull(),
+  outputContracts: jsonDocument('output_contracts').notNull(),
   registeredAt: timestamp('registered_at', { withTimezone: true }).notNull(),
 });
