@@ -188,10 +188,13 @@ function composeRuntime(deps: PlatformModuleDeps, core: ReturnType<typeof compos
     taskAccess: {
       canOpenStream: taskRuntime.api.canOpenStream,
       // 先把环境标成已连接，再派发等容器就绪的业务子任务：提交子任务时容器往往还没连上。
+      // 派发不能 await：这个回调跑在 cs-session 处理 hello 的串行链上，而派发要等 TaskRunner
+      // 的回执——回执要经同一条链回来，等下去必然自锁到命令超时。
       onRunnerConnected: async (taskId) => {
         await taskRuntime.api.onRunnerConnected(taskId);
-        const dispatched = await businessTask.api.dispatchPendingSubtasks(taskId);
-        if (dispatched > 0) logger.info('dispatched pending subtasks', { taskId, dispatched });
+        void businessTask.api.dispatchPendingSubtasks(taskId)
+          .then((dispatched) => { if (dispatched > 0) logger.info('dispatched pending subtasks', { taskId, dispatched }); })
+          .catch((error: unknown) => logger.error('dispatch pending subtasks failed', { taskId, error: error instanceof Error ? error.message : String(error) }));
       },
       onRunnerDisconnected: taskRuntime.api.onRunnerDisconnected,
     },
