@@ -35,6 +35,7 @@ export const trafficSwitches = releaseSchema.table('traffic_switches', {
   fromSlot: text('from_slot').notNull(),
   toSlot: text('to_slot').notNull(),
   releaseId: text('release_id').notNull(),
+  previousReleaseId: text('previous_release_id'),
   actorUserId: text('actor_user_id').notNull(),
   reason: text('reason'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull(),

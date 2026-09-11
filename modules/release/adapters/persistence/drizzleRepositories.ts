@@ -40,6 +40,7 @@ export function drizzleSlotRepository(db: Executor): SlotRepository {
 export function drizzleTrafficSwitchRepository(db: Executor): TrafficSwitchRepository {
   const toRecord = (row: typeof trafficSwitches.$inferSelect): TrafficSwitchRecord => ({
     id: row.id, serviceId: row.serviceId as ServiceId, fromSlot: row.fromSlot as SlotName, toSlot: row.toSlot as SlotName, releaseId: row.releaseId as ReleaseId,
+    ...(row.previousReleaseId ? { previousReleaseId: row.previousReleaseId as ReleaseId } : {}),
     actorUserId: row.actorUserId as UserId, ...(row.reason ? { reason: row.reason } : {}), createdAt: row.createdAt,
   });
   return {

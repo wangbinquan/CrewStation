@@ -22,6 +22,7 @@ export interface TrafficSwitchRecord {
   readonly fromSlot: SlotName;
   readonly toSlot: SlotName;
   readonly releaseId: ReleaseId;
+  readonly previousReleaseId?: ReleaseId;
   readonly actorUserId: UserId;
   readonly reason?: string;
   readonly createdAt: Date;

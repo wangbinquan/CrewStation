@@ -47,6 +47,7 @@ export function switchToDto(record: TrafficSwitchRecord): TrafficSwitchDto {
     fromSlot: record.fromSlot,
     toSlot: record.toSlot,
     releaseId: record.releaseId,
+    ...(record.previousReleaseId ? { previousReleaseId: record.previousReleaseId } : {}),
     actorUserId: record.actorUserId,
     ...(record.reason ? { reason: record.reason } : {}),
     createdAt: record.createdAt.toISOString(),

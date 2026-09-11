@@ -25,8 +25,11 @@ export function switchTrafficUseCase(deps: ReleaseUseCaseDeps) {
       }
       const next = switchTraffic(slots, input.toSlot, input.expectedActiveRelease, now);
       await scope.slots.save(next);
+      // 切流永远是「待命槽接管生产流量」：目标槽切之前的角色是 preview，切之后是 prod。
+      // 记的是发布的迁移，不是物理槽的名字，所以 fromSlot 取目标槽的旧角色而不是当前 active 槽的角色。
       const record = {
-        id: newId('tsw'), serviceId, fromSlot: roleOf(slots, slots.active), toSlot: 'prod' as const, releaseId: next[next.active].releaseId!,
+        id: newId('tsw'), serviceId, fromSlot: roleOf(slots, target), toSlot: roleOf(next, target), releaseId: next[next.active].releaseId!,
+        ...(currentRelease ? { previousReleaseId: currentRelease.id } : {}),
         actorUserId: actor.userId, ...(input.reason ? { reason: input.reason } : {}), createdAt: now,
       };
       await scope.switches.insert(record);

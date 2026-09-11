@@ -99,9 +99,24 @@ describe.skipIf(!available)('release module', () => {
     await expect(release.api.switchTraffic(owner, serviceId, { toSlot: 'preview', expectedActiveRelease: dto.id })).rejects.toMatchObject({ kind: 'precondition' });
     const switched = await release.api.switchTraffic(owner, serviceId, { toSlot: 'preview' });
     expect(switched.releaseId).toBe(dto.id);
+    // 记的是发布从待命槽接管生产流量，不是物理槽名：首次晋级没有上一个发布。
+    expect([switched.fromSlot, switched.toSlot]).toEqual(['preview', 'prod']);
+    expect(switched.previousReleaseId).toBeUndefined();
     expect((await release.api.getSlots(owner, serviceId)).map((s) => [s.name, s.state])).toEqual([['prod', 'ready'], ['preview', 'empty']]);
     expect((await release.api.activeEndpoint(serviceId))?.kubernetesService).toBe('demo-green');
     await expect(release.api.switchTraffic(owner, serviceId, { toSlot: 'preview' })).rejects.toMatchObject({ kind: 'precondition' });
+
+    // 回退：再发一个版本到待命槽后切回去，记录要带上切走前的线上发布。
+    const second = await release.api.publish(owner, serviceId, { branch: 'main', version: 'patch' });
+    await release.api.runPipelineStep(second.id);
+    await markJob(`build-${second.id.slice(-12)}`, true);
+    await release.api.runPipelineStep(second.id);
+    await markDeployment('demo-blue', 1);
+    await release.api.runPipelineStep(second.id);
+    const rolled = await release.api.switchTraffic(owner, serviceId, { toSlot: 'preview', reason: '回退' });
+    expect([rolled.fromSlot, rolled.toSlot]).toEqual(['preview', 'prod']);
+    expect(rolled.releaseId).toBe(second.id);
+    expect(rolled.previousReleaseId).toBe(dto.id);
   });
 
   test('迁移失败不切流；破坏性迁移在非维护窗口被拒', async () => {

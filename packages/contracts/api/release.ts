@@ -48,9 +48,13 @@ export const TrafficSwitchRequestSchema = z.object({
 export const TrafficSwitchDtoSchema = z.object({
   id: z.string(),
   serviceId: ServiceIdSchema,
+  /** 迁走的角色（晋级与回退都是 preview→prod：待命槽接管生产流量）。 */
   fromSlot: SlotNameSchema,
   toSlot: SlotNameSchema,
+  /** 切流后承接生产流量的发布。 */
   releaseId: ReleaseIdSchema,
+  /** 切流前承接生产流量的发布；首次晋级时没有。回滚要知道从哪个版本切走的。 */
+  previousReleaseId: ReleaseIdSchema.optional(),
   actorUserId: UserIdSchema,
   reason: z.string().optional(),
   createdAt: z.iso.datetime(),
