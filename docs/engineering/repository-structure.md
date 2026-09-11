@@ -197,6 +197,8 @@ modules/<name>/
 | L5 | `gateway` | 用户域与服务域路由表、放行表、Pod 身份索引的生成、版本与下发 | identity、project、release、api-catalog |
 | L6 | `observability` | 日志采集入口与查询、部署健康态、告警订阅、execution_events、traceId 索引 | project、task-runtime、release（只读端口） |
 | L6 | `capabilities` | 能力说明聚合：本服务授权、绑定、订阅、配额、套餐、约定表 | 多个模块的公开查询 |
+| L6 | `provisioning` | 项目开通编排：命名空间→仓库→数据→路由→首个标签发布→active；失败留原因可重跑（ADR-0003） | project、scm、data、gateway、release |
+| L7 | `platform` | 组合根：按端口装配全部模块，按进程角色挑选 http 路由、后台工作器与事件订阅（ADR-0003） | 全部模块 |
 
 ```mermaid
 flowchart BT
@@ -210,6 +212,8 @@ flowchart BT
   identity & release & api-catalog --> gateway
   release & task-runtime --> observability
   api-catalog & events & data & config --> capabilities
+  scm & data & gateway & release --> provisioning
+  observability & capabilities & provisioning --> platform
 ```
 
 拆分依据：Design 里每一个有自己状态机的对象簇一个模块。围绕任务的能力刻意拆成四个模块（`task-runtime`、`dev-session`、`business-task`、`session`），因为 agent-workflow 的 `task.ts` 正是把这四件事写进了一个 7780 行的文件。

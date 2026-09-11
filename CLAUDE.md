@@ -56,7 +56,7 @@ Hard caps, enforced with no baseline: 600 lines per file (1000 for tests), 20 so
 | `proposal/plan.md` | How requirements become tasks and evidence | Milestones M0–M6 with gates G0–G6, task rows `Tn.m` kept with 已删除 / 已作废 markers, **acceptance tests AT-01–AT-55 (§10)**, **traceability matrix R01–R53 → Design § → T → AT (§11)**, evidence layout (§12), deferred items (§13) |
 | `proposal/tech-evaluation.md` | Which components and why | E01–E25: constraints, analysis, confirmed choice, alternative, what M0 must verify; confirmation log (§5) |
 | `proposal/reviews/design-gate-2026-09-11.md` | What the gate review found and how the author ruled | Consolidated blockers/important/suggestions, the 25 rulings (§6), seven raw reports in the appendix |
-| `docs/engineering/repository-structure.md` | How the code repository is organised | Root layout, apps/modules/packages classification, the 16 modules with layers, module-internal template, dependency direction, one PostgreSQL schema per module, size caps 600/20/80, `tools/arch` enforcement, decision log |
+| `docs/engineering/repository-structure.md` | How the code repository is organised | Root layout, apps/modules/packages classification, the 18 modules with layers, module-internal template, dependency direction, one PostgreSQL schema per module, size caps 600/20/80, `tools/arch` enforcement, decision log |
 
 The two essays 《从个人提效到组织提效…》 and 《借鉴微信小程序…》 are the polished form of source S1; they are reference material and are intentionally not listed in the Proposal's source table.
 
