@@ -1,0 +1,42 @@
+import type { RouteEntry } from '@crewstation/contracts';
+
+export interface ServiceRoutingInput {
+  projectSlug: string;
+  serviceName: string;
+  namespace: string;
+  prodPhysical: 'blue' | 'green';
+  previewPhysical: 'blue' | 'green';
+  hosts: { prod: string; preview: string; service: string };
+  /** 若该服务是 APIProxy 或暴露了 API，其目录中的 proxy 名；平台 API 主机上的 `/api/<proxy>/` 前缀路由到它。 */
+  proxyName?: string;
+  platformApiHost: string;
+}
+
+export interface GatewayNames {
+  systemNamespace: string;
+  userAuthMiddleware: string;
+  serviceAuthMiddleware: string;
+  dropIdentityHeadersMiddleware: string;
+}
+
+const slotService = (input: ServiceRoutingInput, physical: string): RouteEntry['target'] => ({ namespace: input.namespace, service: `${input.serviceName}-${physical}`, port: 80 });
+
+/** 一个服务的全部路由：用户域的 prod／preview 主机、服务域的服务主机、可选的内部 API 前缀。切流只改 prod／preview 指向的物理槽。 */
+export function planServiceRoutes(input: ServiceRoutingInput, names: GatewayNames): RouteEntry[] {
+  const userMw = [names.dropIdentityHeadersMiddleware, names.userAuthMiddleware];
+  const serviceMw = [names.dropIdentityHeadersMiddleware, names.serviceAuthMiddleware];
+  const routes: RouteEntry[] = [
+    { host: input.hosts.prod, domain: 'user', kind: 'prod', target: slotService(input, input.prodPhysical), middlewares: userMw },
+    { host: input.hosts.preview, domain: 'user', kind: 'preview', target: slotService(input, input.previewPhysical), middlewares: userMw },
+    { host: input.hosts.service, domain: 'service', kind: 'service', target: slotService(input, input.prodPhysical), middlewares: serviceMw },
+  ];
+  if (input.proxyName) {
+    routes.push({ host: input.platformApiHost, pathPrefix: `/api/${input.proxyName}`, domain: 'service', kind: 'internal-api', target: slotService(input, input.prodPhysical), middlewares: [names.dropIdentityHeadersMiddleware, names.serviceAuthMiddleware, `strip-api-${input.proxyName}`] });
+  }
+  return routes;
+}
+
+/** Kubernetes 对象名：稳定、可预测，重复 apply 幂等。 */
+export function routeObjectName(serviceName: string, kind: RouteEntry['kind']): string {
+  return `${serviceName}-${kind}`;
+}

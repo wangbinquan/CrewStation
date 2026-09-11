@@ -12,12 +12,17 @@
   },
   "dependencies": {
     "@crewstation/contracts": "workspace:*",
+    "@crewstation/eventbus": "workspace:*",
+    "@crewstation/http": "workspace:*",
+    "@crewstation/k8s": "workspace:*",
     "@crewstation/kernel": "workspace:*",
     "@crewstation/module-api-catalog": "workspace:*",
     "@crewstation/module-identity": "workspace:*",
     "@crewstation/module-project": "workspace:*",
     "@crewstation/module-release": "workspace:*",
-    "drizzle-orm": "0.45.2"
+    "@crewstation/persistence": "workspace:*",
+    "drizzle-orm": "0.45.2",
+    "hono": "4.13.7"
   },
   "devDependencies": {
     "@crewstation/testkit": "workspace:*"
