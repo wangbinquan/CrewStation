@@ -35,6 +35,8 @@ export const ReleaseRegisteredSchema = z.object({
   tag: z.string(),
   commitSha: z.string(),
   manifest: ManifestSchema,
+  /** exposes 指向的 OpenAPI 文档内容（已解析），由 release 模块从标签处读取。 */
+  openapiDocument: z.unknown().optional(),
 });
 
 export const ReleaseStatusSchema = z.enum(['pending', 'building', 'migrating', 'deploying', 'ready', 'failed', 'superseded']);
