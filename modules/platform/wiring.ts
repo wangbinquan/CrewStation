@@ -22,6 +22,7 @@ import { createReleaseModule } from '@crewstation/module-release';
 import { createScmModule } from '@crewstation/module-scm';
 import { createSessionModule } from '@crewstation/module-session';
 import { createTaskRuntimeModule } from '@crewstation/module-task-runtime';
+import type { TaskRuntimeModuleApi } from '@crewstation/module-task-runtime';
 import type { Database } from '@crewstation/persistence';
 import { eventbusMigrations } from '@crewstation/eventbus';
 import { queueMigrations } from '@crewstation/queue';
@@ -60,7 +61,7 @@ export const SYSTEM_ACTOR: Actor = { userId: 'usr_000000000000000000000000000000
 
 const consumerLifecycle = (consumer: EventConsumer): Lifecycle => ({ start: () => consumer.start(), stop: () => consumer.stop() });
 
-interface Late { project?: ProjectModuleApi; gateway?: GatewayModuleApi }
+interface Late { project?: ProjectModuleApi; gateway?: GatewayModuleApi; taskRuntime?: TaskRuntimeModuleApi }
 
 function composeCore(deps: PlatformModuleDeps, late: Late) {
   const { db, settings, logger } = deps;
@@ -71,6 +72,9 @@ function composeCore(deps: PlatformModuleDeps, late: Late) {
     platformApiHost: () => `api.${settings.serviceDomain}`,
   };
   const projectApi = (): ProjectModuleApi => { if (!late.project) throw new Error('project 尚未装配'); return late.project; };
+  // 配额占用数在 task-runtime（更高层）：project 只声明端口，task-runtime 装配后才有值；
+  // 装配期间（迁移、CLI）读到 0 而不是抛错，因为那时本来就没有任务在跑。
+  const runningTasks = async (projectId: ProjectId): Promise<number> => (late.taskRuntime ? late.taskRuntime.runningTaskCount(projectId) : 0);
   const gatewayApi = (): GatewayModuleApi => { if (!late.gateway) throw new Error('gateway 尚未装配'); return late.gateway; };
 
   const identity = createIdentityModule({
@@ -82,7 +86,7 @@ function composeCore(deps: PlatformModuleDeps, late: Late) {
     workloadLookup: { byIp: (ip) => gatewayApi().lookupByIp(ip) },
     allowlistEvaluator: { evaluate: (caller, target) => gatewayApi().evaluate(caller, target) },
   });
-  const project = createProjectModule({ db, identity: identity.api, hosts, settings: { defaultMaxConcurrentTasks: settings.defaultMaxConcurrentTasks, defaultServicePlan: settings.defaultServicePlan } });
+  const project = createProjectModule({ db, identity: identity.api, hosts, taskUsage: { runningTasks }, settings: { defaultMaxConcurrentTasks: settings.defaultMaxConcurrentTasks, defaultServicePlan: settings.defaultServicePlan } });
   late.project = project.api;
   const isAdmin = (userId: string) => identity.api.isAdmin(userId as UserId);
   const resolveById = (serviceId: ServiceId) => project.api.resolveServiceById(serviceId);
@@ -141,7 +145,7 @@ function composeDelivery(deps: PlatformModuleDeps, core: ReturnType<typeof compo
   return { release, gateway };
 }
 
-function composeRuntime(deps: PlatformModuleDeps, core: ReturnType<typeof composeCore>, delivery: ReturnType<typeof composeDelivery>) {
+function composeRuntime(deps: PlatformModuleDeps, core: ReturnType<typeof composeCore>, delivery: ReturnType<typeof composeDelivery>, late: Late) {
   const { db, k8s, settings, logger } = deps;
   const { project, config, data, scm, isAdmin, resolveById } = core;
   const { release } = delivery;
@@ -152,6 +156,7 @@ function composeRuntime(deps: PlatformModuleDeps, core: ReturnType<typeof compos
     sources: { configEnv: (projectId, env) => config.api.renderEnv(projectId, env), dataEnv: data.api.envFor, taskDataEnv: data.api.envForTask },
     settings: { taskImage: settings.taskImage, systemNamespace: settings.systemNamespace, sessionUrl: settings.sessionRunnerUrl, userDomain: settings.userDomain, serviceDomain: settings.serviceDomain, workerUid: 10001, defaultProfile: settings.defaultTaskProfile, ...(settings.agentEnvSecretName ? { agentEnvSecretName: settings.agentEnvSecretName } : {}) },
   });
+  late.taskRuntime = taskRuntime.api;
   const runner = createSessionClient(settings.sessionInternalUrl);
   const mcp = [{ name: 'capabilities', url: settings.mcp.capabilitiesUrl }, { name: 'operations', url: settings.mcp.operationsUrl }];
   const devSession = createDevSessionModule({
@@ -235,7 +240,7 @@ function composeModules(deps: PlatformModuleDeps) {
   const late: Late = {};
   const core = composeCore(deps, late);
   const delivery = composeDelivery(deps, core, late);
-  const runtime = composeRuntime(deps, core, delivery);
+  const runtime = composeRuntime(deps, core, delivery, late);
   const aggregates = composeAggregates(deps, core, delivery, runtime);
   return { identity: core.identity, project: core.project, config: core.config, egress: core.egress, data: core.data, scm: core.scm, apiCatalog: core.apiCatalog, ...delivery, ...runtime, ...aggregates };
 }

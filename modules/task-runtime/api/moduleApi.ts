@@ -50,6 +50,8 @@ export interface TaskRuntimeModuleApi {
   listEnvironments(actor: Actor, projectId: ProjectId, states?: EnvironmentState[]): Promise<EnvironmentDto[]>;
   findDevSession(projectId: ProjectId): Promise<EnvironmentDto | undefined>;
   listRunningDevSessions(): Promise<EnvironmentDto[]>;
+  /** 已占用的并发任务数（准入计数器的当前值）；配额展示读它。 */
+  runningTaskCount(projectId: ProjectId): Promise<number>;
   listByTrace(traceId: string): Promise<EnvironmentDto[]>;
   verifyRunnerToken(taskId: TaskId, token: string): Promise<{ ok: true; projectId: string } | { ok: false; reason: string }>;
   canOpenStream(actor: Actor, taskId: TaskId): Promise<boolean>;

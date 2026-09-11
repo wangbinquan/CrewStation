@@ -15,6 +15,7 @@ let project: ProjectModule;
 let admin: Actor;
 let owner: Actor;
 let dev: Actor;
+let runningTasks = 0;
 const hosts = { prodHost: (s: string) => `${s}.cs.localhost`, previewHost: (s: string) => `preview.${s}.cs.localhost`, serviceHost: (s: string) => `${s}.svc.cs.internal` };
 
 beforeAll(async () => {
@@ -27,7 +28,7 @@ beforeAll(async () => {
   admin = { userId: a.id, isAdmin: true };
   owner = { userId: o.id, isAdmin: false };
   dev = { userId: d.id, isAdmin: false };
-  project = createProjectModule({ db: tdb.db, identity: identity.api, hosts, settings: { defaultMaxConcurrentTasks: 3, defaultServicePlan: 'standard-small' } });
+  project = createProjectModule({ db: tdb.db, identity: identity.api, hosts, taskUsage: { runningTasks: async () => runningTasks }, settings: { defaultMaxConcurrentTasks: 3, defaultServicePlan: 'standard-small' } });
   await project.api.upsertServicePlan(admin, { name: 'standard-small', cpu: '500m', memory: '512Mi', maxReplicas: 3, description: '' });
 });
 afterAll(async () => { await tdb?.drop(); });
@@ -41,6 +42,12 @@ describe.skipIf(!available)('project module', () => {
     expect(dto).toMatchObject({ slug: 'demo', namespace: 'cs-demo', state: 'provisioning', ownerUserId: owner.userId });
     expect(dto.serviceId).toBeDefined();
     expect((await project.api.getQuota(owner, projectId)).maxConcurrentTasks).toBe(3);
+    // 占用数来自 task-runtime 的准入计数器，不是写死的 0。
+    expect((await project.api.getQuota(owner, projectId)).running).toBe(0);
+    runningTasks = 2;
+    expect((await project.api.getQuota(owner, projectId)).running).toBe(2);
+    expect((await project.api.setQuota(admin, projectId, { maxConcurrentTasks: 5 })).running).toBe(2);
+    runningTasks = 0;
     const events = (await tdb.db.execute(`SELECT topic FROM platform_infra.domain_events`)) as unknown as Array<{ topic: string }>;
     expect(events.map((e) => e.topic)).toEqual(['project.created']);
     const service = await project.api.getService(owner, dto.serviceId!);

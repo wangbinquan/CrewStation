@@ -4,7 +4,7 @@ import { authorizationUseCases } from './authorization';
 import type { ProjectUseCaseDeps } from './dependencies';
 
 export function quotaAndPlanUseCases(deps: ProjectUseCaseDeps) {
-  const { uow } = deps;
+  const { uow, taskUsage } = deps;
   const { authorize } = authorizationUseCases(deps);
   const adminOnly = (actor: Actor): void => {
     if (!actor.isAdmin) throw forbidden('只有管理员可以维护套餐与配额');
@@ -14,13 +14,13 @@ export function quotaAndPlanUseCases(deps: ProjectUseCaseDeps) {
       await authorize(actor, projectId, 'view');
       const quota = await uow.read.quotas.get(projectId);
       if (!quota) throw notFound('配额', projectId);
-      return { maxConcurrentTasks: quota.maxConcurrentTasks, running: 0 };
+      return { maxConcurrentTasks: quota.maxConcurrentTasks, running: await taskUsage.runningTasks(projectId) };
     },
     setQuota: async (actor: Actor, projectId: ProjectId, input: SetQuotaRequest): Promise<QuotaDto> => {
       adminOnly(actor);
       await authorize(actor, projectId, 'manage-quota');
       await uow.run((scope) => scope.quotas.upsert({ projectId, maxConcurrentTasks: input.maxConcurrentTasks }));
-      return { maxConcurrentTasks: input.maxConcurrentTasks, running: 0 };
+      return { maxConcurrentTasks: input.maxConcurrentTasks, running: await taskUsage.runningTasks(projectId) };
     },
     /** 供 task-runtime 原子准入时读取上限。 */
     quotaLimit: async (projectId: ProjectId): Promise<number | undefined> => (await uow.read.quotas.get(projectId))?.maxConcurrentTasks,
