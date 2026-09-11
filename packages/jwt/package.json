@@ -1,0 +1,14 @@
+{
+  "name": "@crewstation/jwt",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "jose 封装：签发、验签、JWKS、密钥轮换重叠期",
+  "exports": {
+    ".": "./index.ts"
+  },
+  "dependencies": {
+    "@crewstation/kernel": "workspace:*",
+    "jose": "6.2.12"
+  }
+}

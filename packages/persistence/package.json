@@ -1,0 +1,14 @@
+{
+  "name": "@crewstation/persistence",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "数据库连接、事务、迁移运行器、outbox 基元；只拥有 platform_infra schema，不含任何领域表",
+  "exports": {
+    ".": "./index.ts"
+  },
+  "dependencies": {
+    "@crewstation/kernel": "workspace:*",
+    "drizzle-orm": "0.45.2"
+  }
+}

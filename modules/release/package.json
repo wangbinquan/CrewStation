@@ -1,0 +1,25 @@
+{
+  "name": "@crewstation/module-release",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Manifest 校验、Release、构建、迁移、DeploymentSlot、TrafficSwitch、发布并发控制；发布 release.registered",
+  "exports": {
+    ".": "./index.ts"
+  },
+  "crewstation": {
+    "layer": 4
+  },
+  "dependencies": {
+    "@crewstation/contracts": "workspace:*",
+    "@crewstation/kernel": "workspace:*",
+    "@crewstation/module-config": "workspace:*",
+    "@crewstation/module-data": "workspace:*",
+    "@crewstation/module-project": "workspace:*",
+    "@crewstation/module-scm": "workspace:*",
+    "drizzle-orm": "0.45.2"
+  },
+  "devDependencies": {
+    "@crewstation/testkit": "workspace:*"
+  }
+}

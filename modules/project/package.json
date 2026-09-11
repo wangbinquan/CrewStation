@@ -1,0 +1,22 @@
+{
+  "name": "@crewstation/module-project",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Project、Service、成员三级角色、preview 测试者、命名空间登记、TaskQuota、ServicePlan、TaskProfile",
+  "exports": {
+    ".": "./index.ts"
+  },
+  "crewstation": {
+    "layer": 2
+  },
+  "dependencies": {
+    "@crewstation/contracts": "workspace:*",
+    "@crewstation/kernel": "workspace:*",
+    "@crewstation/module-identity": "workspace:*",
+    "drizzle-orm": "0.45.2"
+  },
+  "devDependencies": {
+    "@crewstation/testkit": "workspace:*"
+  }
+}

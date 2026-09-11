@@ -1,0 +1,9 @@
+{
+  "name": "@crewstation/cs-controller",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Kubernetes 协调器进程：发布、任务容器、数据供给、路由与放行表下发",
+  "scripts": { "dev": "bun run --watch src/main.ts", "start": "bun run src/main.ts" },
+  "dependencies": { "@crewstation/http": "workspace:*", "@crewstation/kernel": "workspace:*" }
+}

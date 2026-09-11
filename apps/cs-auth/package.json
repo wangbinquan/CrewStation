@@ -1,0 +1,9 @@
+{
+  "name": "@crewstation/cs-auth",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "身份与网关决策进程：登录、ForwardAuth 用户域与服务域、JWKS、凭据服务",
+  "scripts": { "dev": "bun run --watch src/main.ts", "start": "bun run src/main.ts" },
+  "dependencies": { "@crewstation/http": "workspace:*", "@crewstation/kernel": "workspace:*" }
+}

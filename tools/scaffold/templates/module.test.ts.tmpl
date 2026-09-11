@@ -1,0 +1,8 @@
+import { describe, expect, test } from 'bun:test';
+import { create{{pascal}}Module } from '../wiring';
+
+describe('{{name}} module', () => {
+  test('装配后暴露模块名', () => {
+    expect(create{{pascal}}Module({}).api.name).toBe('{{name}}');
+  });
+});

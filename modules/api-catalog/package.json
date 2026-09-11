@@ -1,0 +1,22 @@
+{
+  "name": "@crewstation/module-api-catalog",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "APIProxy 登记、操作键（proxy＋method＋path）、开放策略、APIGrant、APIRequest、Swagger 裁剪",
+  "exports": {
+    ".": "./index.ts"
+  },
+  "crewstation": {
+    "layer": 3
+  },
+  "dependencies": {
+    "@crewstation/contracts": "workspace:*",
+    "@crewstation/kernel": "workspace:*",
+    "@crewstation/module-project": "workspace:*",
+    "drizzle-orm": "0.45.2"
+  },
+  "devDependencies": {
+    "@crewstation/testkit": "workspace:*"
+  }
+}

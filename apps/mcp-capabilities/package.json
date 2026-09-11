@@ -1,0 +1,9 @@
+{
+  "name": "@crewstation/mcp-capabilities",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "能力说明 MCP：经 api-client 读取 cs-api",
+  "scripts": { "dev": "bun run --watch src/main.ts", "start": "bun run src/main.ts" },
+  "dependencies": { "@crewstation/http": "workspace:*", "@crewstation/kernel": "workspace:*" }
+}

@@ -1,0 +1,9 @@
+{
+  "name": "@crewstation/mcp-operations",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "操作 MCP：经 api-client 调用 cs-api",
+  "scripts": { "dev": "bun run --watch src/main.ts", "start": "bun run src/main.ts" },
+  "dependencies": { "@crewstation/http": "workspace:*", "@crewstation/kernel": "workspace:*" }
+}

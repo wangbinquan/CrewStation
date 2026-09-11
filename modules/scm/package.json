@@ -1,0 +1,22 @@
+{
+  "name": "@crewstation/module-scm",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "SourceRepositoryBinding、建仓、代推、标签与保护标签、会话级短期 Git 凭据",
+  "exports": {
+    ".": "./index.ts"
+  },
+  "crewstation": {
+    "layer": 3
+  },
+  "dependencies": {
+    "@crewstation/contracts": "workspace:*",
+    "@crewstation/kernel": "workspace:*",
+    "@crewstation/module-project": "workspace:*",
+    "drizzle-orm": "0.45.2"
+  },
+  "devDependencies": {
+    "@crewstation/testkit": "workspace:*"
+  }
+}

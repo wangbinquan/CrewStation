@@ -1,0 +1,7 @@
+{
+  "name": "@crewstation/console",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "工作台 SPA：React、Vite、TanStack；只依赖 contracts 与 api-client；结构见 docs/engineering/repository-structure.md §8"
+}

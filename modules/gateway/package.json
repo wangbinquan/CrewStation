@@ -1,0 +1,25 @@
+{
+  "name": "@crewstation/module-gateway",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "用户域与服务域路由表、放行表、Pod 身份索引的生成、版本与下发",
+  "exports": {
+    ".": "./index.ts"
+  },
+  "crewstation": {
+    "layer": 5
+  },
+  "dependencies": {
+    "@crewstation/contracts": "workspace:*",
+    "@crewstation/kernel": "workspace:*",
+    "@crewstation/module-api-catalog": "workspace:*",
+    "@crewstation/module-identity": "workspace:*",
+    "@crewstation/module-project": "workspace:*",
+    "@crewstation/module-release": "workspace:*",
+    "drizzle-orm": "0.45.2"
+  },
+  "devDependencies": {
+    "@crewstation/testkit": "workspace:*"
+  }
+}

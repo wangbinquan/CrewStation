@@ -1,0 +1,22 @@
+{
+  "name": "@crewstation/module-data",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "DataResource、DataBinding、TaskDataBinding 三模式与审批、Provider 端口（postgres、s3、pvc）",
+  "exports": {
+    ".": "./index.ts"
+  },
+  "crewstation": {
+    "layer": 3
+  },
+  "dependencies": {
+    "@crewstation/contracts": "workspace:*",
+    "@crewstation/kernel": "workspace:*",
+    "@crewstation/module-project": "workspace:*",
+    "drizzle-orm": "0.45.2"
+  },
+  "devDependencies": {
+    "@crewstation/testkit": "workspace:*"
+  }
+}

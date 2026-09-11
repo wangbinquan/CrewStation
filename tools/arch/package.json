@@ -1,0 +1,7 @@
+{
+  "name": "@crewstation/tools-arch",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "仓库结构规则检查：依赖方向、模块模板、持久化归属、尺寸与命名、环依赖、依赖声明"
+}

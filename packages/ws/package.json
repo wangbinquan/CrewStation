@@ -1,0 +1,9 @@
+{
+  "name": "@crewstation/ws",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "WebSocket 帧、心跳、游标与重连协议；供 cs-session 与 TaskRunner 共用",
+  "exports": { ".": "./index.ts" },
+  "dependencies": { "@crewstation/kernel": "workspace:*", "@crewstation/contracts": "workspace:*" }
+}

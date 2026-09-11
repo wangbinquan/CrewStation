@@ -1,0 +1,9 @@
+{
+  "name": "@crewstation/gitlab-client",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "GitLab 兼容 HTTP 客户端：项目、分支、提交、标签、保护标签、Webhook；纯协议，无平台语义",
+  "exports": { ".": "./index.ts" },
+  "dependencies": { "@crewstation/kernel": "workspace:*" }
+}

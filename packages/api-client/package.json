@@ -1,0 +1,9 @@
+{
+  "name": "@crewstation/api-client",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "由 contracts 生成的平台 API 客户端；console、cli、mcp-* 共用",
+  "exports": { ".": "./index.ts" },
+  "dependencies": { "@crewstation/contracts": "workspace:*" }
+}

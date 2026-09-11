@@ -1,0 +1,25 @@
+{
+  "name": "@crewstation/module-task-runtime",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "TaskEnvironment 生命周期、Pod 与两种持久卷模式、配额原子准入、TaskRunner 归属与协议服务端语义",
+  "exports": {
+    ".": "./index.ts"
+  },
+  "crewstation": {
+    "layer": 4
+  },
+  "dependencies": {
+    "@crewstation/contracts": "workspace:*",
+    "@crewstation/kernel": "workspace:*",
+    "@crewstation/module-config": "workspace:*",
+    "@crewstation/module-data": "workspace:*",
+    "@crewstation/module-egress": "workspace:*",
+    "@crewstation/module-project": "workspace:*",
+    "drizzle-orm": "0.45.2"
+  },
+  "devDependencies": {
+    "@crewstation/testkit": "workspace:*"
+  }
+}

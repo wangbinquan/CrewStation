@@ -1,0 +1,7 @@
+{
+  "name": "@crewstation/tools-scaffold",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "按 docs/engineering/repository-structure.md 的模板生成模块"
+}

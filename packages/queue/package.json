@@ -1,0 +1,9 @@
+{
+  "name": "@crewstation/queue",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "PostgreSQL 表队列：租约、fencing、重试；表位于 platform_infra schema",
+  "exports": { ".": "./index.ts" },
+  "dependencies": { "@crewstation/kernel": "workspace:*", "@crewstation/persistence": "workspace:*" }
+}

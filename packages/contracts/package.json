@@ -1,0 +1,13 @@
+{
+  "name": "@crewstation/contracts",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Manifest、平台 API、事件、放行表、TaskRunner 协议的 zod Schema：唯一跨进程真相；不依赖任何工作区包",
+  "exports": {
+    ".": "./index.ts"
+  },
+  "dependencies": {
+    "zod": "4.6.2"
+  }
+}

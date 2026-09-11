@@ -1,0 +1,22 @@
+{
+  "name": "@crewstation/module-events",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "EventProducer 登记、事件类型、inbox 去重、订阅、投递状态机、死信、推送",
+  "exports": {
+    ".": "./index.ts"
+  },
+  "crewstation": {
+    "layer": 3
+  },
+  "dependencies": {
+    "@crewstation/contracts": "workspace:*",
+    "@crewstation/kernel": "workspace:*",
+    "@crewstation/module-project": "workspace:*",
+    "drizzle-orm": "0.45.2"
+  },
+  "devDependencies": {
+    "@crewstation/testkit": "workspace:*"
+  }
+}

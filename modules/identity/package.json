@@ -1,0 +1,21 @@
+{
+  "name": "@crewstation/module-identity",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "User、登录适配器、用户令牌与 JWKS、服务身份解析（源 Pod IP → 身份）、来源令牌、上游凭据下发",
+  "exports": {
+    ".": "./index.ts"
+  },
+  "crewstation": {
+    "layer": 1
+  },
+  "dependencies": {
+    "@crewstation/contracts": "workspace:*",
+    "@crewstation/kernel": "workspace:*",
+    "drizzle-orm": "0.45.2"
+  },
+  "devDependencies": {
+    "@crewstation/testkit": "workspace:*"
+  }
+}

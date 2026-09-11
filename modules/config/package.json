@@ -1,0 +1,22 @@
+{
+  "name": "@crewstation/module-config",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "ConfigItem、SecretValue、开发与生产两组值、版本快照、注入渲染",
+  "exports": {
+    ".": "./index.ts"
+  },
+  "crewstation": {
+    "layer": 3
+  },
+  "dependencies": {
+    "@crewstation/contracts": "workspace:*",
+    "@crewstation/kernel": "workspace:*",
+    "@crewstation/module-project": "workspace:*",
+    "drizzle-orm": "0.45.2"
+  },
+  "devDependencies": {
+    "@crewstation/testkit": "workspace:*"
+  }
+}

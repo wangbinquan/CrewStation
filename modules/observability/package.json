@@ -1,0 +1,24 @@
+{
+  "name": "@crewstation/module-observability",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "日志采集入口与查询、部署健康态、告警订阅、execution_events、traceId 索引",
+  "exports": {
+    ".": "./index.ts"
+  },
+  "crewstation": {
+    "layer": 6
+  },
+  "dependencies": {
+    "@crewstation/contracts": "workspace:*",
+    "@crewstation/kernel": "workspace:*",
+    "@crewstation/module-project": "workspace:*",
+    "@crewstation/module-release": "workspace:*",
+    "@crewstation/module-task-runtime": "workspace:*",
+    "drizzle-orm": "0.45.2"
+  },
+  "devDependencies": {
+    "@crewstation/testkit": "workspace:*"
+  }
+}

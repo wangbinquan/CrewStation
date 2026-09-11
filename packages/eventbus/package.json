@@ -1,0 +1,9 @@
+{
+  "name": "@crewstation/eventbus",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "进程内类型化事件总线与 outbox 发布；主题与载荷 Schema 来自 contracts",
+  "exports": { ".": "./index.ts" },
+  "dependencies": { "@crewstation/kernel": "workspace:*", "@crewstation/contracts": "workspace:*", "@crewstation/persistence": "workspace:*" }
+}

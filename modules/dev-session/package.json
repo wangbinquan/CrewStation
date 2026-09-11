@@ -1,0 +1,24 @@
+{
+  "name": "@crewstation/module-dev-session",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "一项目一会话、分支与落后提交数、空闲提醒、强制释放、发布入口",
+  "exports": {
+    ".": "./index.ts"
+  },
+  "crewstation": {
+    "layer": 5
+  },
+  "dependencies": {
+    "@crewstation/contracts": "workspace:*",
+    "@crewstation/kernel": "workspace:*",
+    "@crewstation/module-release": "workspace:*",
+    "@crewstation/module-scm": "workspace:*",
+    "@crewstation/module-task-runtime": "workspace:*",
+    "drizzle-orm": "0.45.2"
+  },
+  "devDependencies": {
+    "@crewstation/testkit": "workspace:*"
+  }
+}

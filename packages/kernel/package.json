@@ -1,0 +1,8 @@
+{
+  "name": "@crewstation/kernel",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Result／错误类型、ID、时钟、日志接口、类型工具；零 IO，不依赖任何工作区包",
+  "exports": { ".": "./index.ts" }
+}

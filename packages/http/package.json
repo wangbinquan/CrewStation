@@ -1,0 +1,14 @@
+{
+  "name": "@crewstation/http",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Hono 服务骨架、错误映射、鉴权头解析中间件、OpenAPI 生成",
+  "exports": {
+    ".": "./index.ts"
+  },
+  "dependencies": {
+    "@crewstation/kernel": "workspace:*",
+    "hono": "4.13.7"
+  }
+}

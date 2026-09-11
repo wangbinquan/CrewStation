@@ -1,0 +1,12 @@
+import type { {{pascal}}ModuleApi } from './api/moduleApi';
+
+/** 装配期注入：其他模块的能力以端口形式出现在这里，由应用提供实现。 */
+export type {{pascal}}ModuleDeps = Record<string, never>;
+
+export interface {{pascal}}Module {
+  readonly api: {{pascal}}ModuleApi;
+}
+
+export function create{{pascal}}Module(_deps: {{pascal}}ModuleDeps): {{pascal}}Module {
+  return { api: { name: '{{name}}' } };
+}

@@ -288,6 +288,8 @@ apps/console/src/
 | 桶文件 | `tools/arch`：非根 `index.ts` 直接失败 |
 | 无环 | ESLint `import/no-cycle` |
 
+检查器自带负向夹具测试（`tools/arch/tests/`，夹具以 JSON 存放，避免源码中的 import 字样被当成真实依赖），每条规则至少一个故意违规样例；`bun test` 同时断言真实仓库零违规。模块只能由 `bun run scaffold:module` 生成，模板文件在 `tools/scaffold/templates/*.tmpl`。
+
 不设“基线清单”。规则从第一个提交生效，因此不存在存量违规；后续任何违规都是新引入的，直接修。
 
 ## 11. 增长、拆分与例外

@@ -1,0 +1,23 @@
+{
+  "name": "@crewstation/module-business-task",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "业务任务、SubtaskRun 契约层、oneshot／interactive、attempt、契约校验、文件与结果读取",
+  "exports": {
+    ".": "./index.ts"
+  },
+  "crewstation": {
+    "layer": 5
+  },
+  "dependencies": {
+    "@crewstation/contracts": "workspace:*",
+    "@crewstation/kernel": "workspace:*",
+    "@crewstation/module-release": "workspace:*",
+    "@crewstation/module-task-runtime": "workspace:*",
+    "drizzle-orm": "0.45.2"
+  },
+  "devDependencies": {
+    "@crewstation/testkit": "workspace:*"
+  }
+}
