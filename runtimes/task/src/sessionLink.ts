@@ -16,6 +16,8 @@ export interface SessionLinkOptions {
 
 export interface SessionLink {
   start(): void;
+  /** 等待发送队列写出；退出前调用，尾部事件（agent cancelled、terminalClosed）才不会丢。 */
+  flush(timeoutMs?: number): Promise<boolean>;
   close(): void;
   /** 事件带单调递增 seq 进入重放缓冲；已握手时立即发送，否则等 welcome 后补发。返回该事件的 seq。 */
   emit(event: RunnerEvent): number;
@@ -83,6 +85,11 @@ class WebSocketSessionLink implements SessionLink {
 
   start(): void {
     this.client.connect();
+  }
+
+  /** 等待发送队列写出；退出前调用，尾部事件（agent cancelled、terminalClosed）才不会丢。 */
+  flush(timeoutMs?: number): Promise<boolean> {
+    return this.client.flush(timeoutMs);
   }
 
   close(): void {

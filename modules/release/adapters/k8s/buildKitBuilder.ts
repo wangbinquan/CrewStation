@@ -14,10 +14,15 @@ export function buildKitBuilder(k8s: K8sClient, settings: BuildKitSettings): Ima
   return {
     start: async (spec) => {
       const name = `build-${spec.releaseId.slice(-12)}`;
+      // 刚签发的 GitLab 项目访问令牌偶尔还没在 Git HTTP 认证路径上生效，克隆会以 401 失败；退避重试三次。
       const script = [
         'set -eu',
         'AUTH_URL=$(echo "$REPO_URL" | sed "s#://#://oauth2:${GIT_TOKEN}@#")',
-        'git clone --quiet --depth 1 --branch "$REF" "$AUTH_URL" /work',
+        'for attempt in 1 2 3; do',
+        '  if git clone --quiet --depth 1 --branch "$REF" "$AUTH_URL" /work; then break; fi',
+        '  if [ "$attempt" = 3 ]; then echo "clone failed after 3 attempts" >&2; exit 1; fi',
+        '  sleep $((attempt * 5))',
+        'done',
         'cd /work',
         `buildctl --addr "${settings.buildkitAddress}" build --frontend dockerfile.v0 --local context=. --local dockerfile=. --output type=image,name="$IMAGE",push=true,registry.insecure=true`,
       ].join('\n');

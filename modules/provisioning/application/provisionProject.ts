@@ -4,11 +4,15 @@ import type { ProvisioningSteps } from '../api/steps';
 
 const ORDER = ['ensureNamespace', 'ensureRepository', 'ensureData', 'reconcileRoutes', 'ensureFirstRelease'] as const;
 
-/** 管理员代建项目后的开通链（M1 G1）：命名空间→仓库→数据→路由→首个标签发布→active；失败留 failed 与原因，可重跑。 */
+/**
+ * 管理员代建项目后的开通链（M1 G1）：命名空间→仓库→数据→路由→首个标签发布→active；失败留 failed 与原因，可重跑。
+ * 状态机只允许 failed→provisioning，因此重跑先把项目放回 provisioning，本次失败原因才能写回。
+ */
 export function provisionProjectUseCase(steps: ProvisioningSteps, logger: Logger) {
   return async (projectId: ProjectId): Promise<'active' | 'failed' | 'skipped'> => {
     const facts = await steps.loadProject(projectId);
     if (!facts) return 'skipped';
+    if (facts.state === 'failed') await steps.setProjectState(projectId, 'provisioning');
     for (const step of ORDER) {
       try {
         await steps[step](facts);
@@ -20,7 +24,7 @@ export function provisionProjectUseCase(steps: ProvisioningSteps, logger: Logger
         return 'failed';
       }
     }
-    await steps.setProjectState(projectId, 'active');
+    if (facts.state !== 'active') await steps.setProjectState(projectId, 'active');
     return 'active';
   };
 }

@@ -28,7 +28,12 @@ export const EnvEntrySchema = z.object({
   from: z.enum(['config', 'secret']),
   /** 缺省时取 name 作为配置项键。 */
   key: z.string().min(1).optional(),
-});
+  /**
+   * 生产组尚未维护该键时使用的兜底值：让模板仓库首个标签就能发布，负责人随后在工作台覆盖。
+   * 密钥不允许带默认值——密钥必须由负责人显式提供。
+   */
+  default: z.string().optional(),
+}).refine((e) => !(e.from === 'secret' && e.default !== undefined), { message: '密钥不能声明 default', path: ['default'] });
 
 export const RequestedApiSchema = z.object({
   proxy: SlugSchema,

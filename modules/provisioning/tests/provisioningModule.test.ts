@@ -4,14 +4,17 @@ import { noopLogger } from '@crewstation/kernel';
 import { provisionProjectUseCase } from '../application/provisionProject';
 import type { ProjectFacts, ProvisioningSteps } from '../api/steps';
 
-const facts: ProjectFacts = { projectId: 'prj_0123456789abcdef0123456789abcdef' as ProjectId, serviceId: 'svc_0123456789abcdef0123456789abcdef' as ServiceId, slug: 'demo', name: 'demo', namespace: 'cs-demo', kind: 'DigitalWorker', template: 'minimal-sample' };
+const facts: ProjectFacts = {
+  projectId: 'prj_0123456789abcdef0123456789abcdef' as ProjectId, state: 'provisioning', serviceId: 'svc_0123456789abcdef0123456789abcdef' as ServiceId,
+  slug: 'demo', name: 'demo', namespace: 'cs-demo', kind: 'DigitalWorker', template: 'minimal-sample',
+};
 
 describe('provisioning', () => {
   test('按顺序执行各步并推进 active；某步失败则记 failed 并停止', async () => {
     const calls: string[] = [];
     const states: string[] = [];
-    const make = (failAt?: string): ProvisioningSteps => ({
-      loadProject: async () => facts,
+    const make = (failAt?: string, from: ProjectFacts = facts): ProvisioningSteps => ({
+      loadProject: async () => from,
       ensureNamespace: async () => { calls.push('ns'); },
       ensureRepository: async () => { calls.push('repo'); if (failAt === 'repo') throw new Error('gitlab down'); },
       ensureData: async () => { calls.push('data'); },
@@ -26,5 +29,37 @@ describe('provisioning', () => {
     expect(await provisionProjectUseCase(make('repo'), noopLogger)(facts.projectId)).toBe('failed');
     expect(calls).toEqual(['ns', 'repo']);
     expect(states[0]).toContain('failed:ensureRepository 失败：gitlab down');
+  });
+
+  test('failed 项目重跑：先回到 provisioning，本次失败原因才写得回去', async () => {
+    const states: string[] = [];
+    const failed: ProjectFacts = { ...facts, state: 'failed' };
+    const steps: ProvisioningSteps = {
+      loadProject: async () => failed,
+      ensureNamespace: async () => undefined,
+      ensureRepository: async () => { throw new Error('git 缺失'); },
+      ensureData: async () => undefined,
+      reconcileRoutes: async () => undefined,
+      ensureFirstRelease: async () => undefined,
+      setProjectState: async (_p, state, message) => { states.push(`${state}${message ? `:${message}` : ''}`); },
+    };
+    expect(await provisionProjectUseCase(steps, noopLogger)(failed.projectId)).toBe('failed');
+    expect(states).toEqual(['provisioning', 'failed:ensureRepository 失败：git 缺失']);
+  });
+
+  test('已 active 的项目重跑只做幂等校验，不再重复推进状态', async () => {
+    const states: string[] = [];
+    const active: ProjectFacts = { ...facts, state: 'active' };
+    const steps: ProvisioningSteps = {
+      loadProject: async () => active,
+      ensureNamespace: async () => undefined,
+      ensureRepository: async () => undefined,
+      ensureData: async () => undefined,
+      reconcileRoutes: async () => undefined,
+      ensureFirstRelease: async () => undefined,
+      setProjectState: async (_p, state) => { states.push(state); },
+    };
+    expect(await provisionProjectUseCase(steps, noopLogger)(active.projectId)).toBe('active');
+    expect(states).toEqual([]);
   });
 });

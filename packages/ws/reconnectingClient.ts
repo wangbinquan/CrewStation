@@ -65,6 +65,21 @@ export class ReconnectingWebSocketClient {
     this.socket.send(data);
   }
 
+  /**
+   * 等待已排队的帧真正写出（bufferedAmount 归零），最多等 timeoutMs。
+   * 退出前调用，避免 close() 紧跟 process.exit 把尾部事件丢在发送队列里。
+   */
+  async flush(timeoutMs = 2000): Promise<boolean> {
+    const socket = this.socket;
+    if (socket === undefined) return true;
+    const deadline = Date.now() + Math.max(0, timeoutMs);
+    while (socket.bufferedAmount > 0) {
+      if (Date.now() >= deadline) return false;
+      await Bun.sleep(10);
+    }
+    return true;
+  }
+
   /** 主动丢弃当前连接并按退避重连（例如看门狗判定对端失联）。 */
   reconnectNow(reason = 'reconnect requested'): void {
     if (this.stateValue === 'closed') return;

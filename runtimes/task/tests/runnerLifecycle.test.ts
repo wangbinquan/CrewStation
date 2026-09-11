@@ -129,6 +129,9 @@ describe('shutdown', () => {
     await session.waitForEvent('agent', (e) => e.event.agentId === 'agent-s' && e.event.type === 'status');
     if (session.hellos[0]?.capabilities.pty) await session.call({ id: 's2', type: 'openTerminal', terminalId: 'term-s', cols: 80, rows: 24 });
     expect(await session.call({ id: 's3', type: 'shutdown', graceSeconds: 10 })).toEqual({});
+    // 尾部事件经 socket 传到假 session 端要一个来回：先等它们到达，再断言退出码。
+    await session.waitForEvent('agent', (e) => e.event.agentId === 'agent-s' && e.event.type === 'cancelled');
+    if (session.hellos[0]?.capabilities.pty) await session.waitForEvent('terminalClosed', (e) => e.terminalId === 'term-s');
     await session.waitFor(() => (tr.exitCodes.length > 0 ? true : undefined), 15_000, 'exit hook');
     expect(tr.exitCodes).toEqual([0]);
     const states = session.eventsOf('runnerState').map((e) => e.event.state);

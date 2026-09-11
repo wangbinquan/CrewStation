@@ -25,6 +25,13 @@ describe('Manifest', () => {
     expect(parsed.kind).toBe('DigitalWorker');
     if (parsed.kind === 'DigitalWorker') expect(parsed.spec.tasks?.agentProfiles[0]?.permission).toBe('read-only');
   });
+  test('config 项可带 default，secret 不可', () => {
+    const withDefault = { ...designExample, spec: { ...designExample.spec, env: [{ name: 'GREETING', from: 'config', default: '你好' }] } };
+    const parsed = ManifestSchema.parse(withDefault);
+    if (parsed.kind === 'DigitalWorker') expect(parsed.spec.env[0]?.default).toBe('你好');
+    const secretDefault = { ...designExample, spec: { ...designExample.spec, env: [{ name: 'NOTIFY_TOKEN', from: 'secret', default: 'leak' }] } };
+    expect(ManifestSchema.safeParse(secretDefault).success).toBe(false);
+  });
   test('agentProfiles 重名被拒', () => {
     const bad = structuredClone(designExample);
     bad.spec.tasks.agentProfiles.push({ ...bad.spec.tasks.agentProfiles[0]! });

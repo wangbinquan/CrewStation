@@ -2,6 +2,8 @@ import type { ProjectId, ProjectState, ServiceId } from '@crewstation/contracts'
 
 export interface ProjectFacts {
   projectId: ProjectId;
+  /** 载入时的项目状态：失败重跑要先回到 provisioning，否则失败原因写不回去。 */
+  state: ProjectState;
   serviceId: ServiceId;
   slug: string;
   name: string;

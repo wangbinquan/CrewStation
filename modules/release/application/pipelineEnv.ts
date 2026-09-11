@@ -11,12 +11,16 @@ export async function renderSlotEnv(deps: Pick<ReleaseUseCaseDeps, 'config' | 'd
   const { manifest } = input;
   const keys = manifest.spec.env.map((e) => e.key ?? e.name);
   const { missing } = await deps.config.validate(input.projectId, 'production', keys);
-  if (missing.length > 0) throw validation(`生产组配置缺少 Manifest env 段声明的键：${missing.join('、')}`, { missing });
+  // 声明了 default 的键可以缺席：取 Manifest 里的兜底值；其余缺失键一律拒绝，不进入部署。
+  const defaults = new Map(manifest.spec.env.filter((e) => e.default !== undefined).map((e) => [e.key ?? e.name, e.default as string]));
+  const blocking = missing.filter((key) => !defaults.has(key));
+  if (blocking.length > 0) throw validation(`生产组配置缺少 Manifest env 段声明的键：${blocking.join('、')}`, { missing: blocking });
   const config = await deps.config.render(input.projectId, 'production');
   const data = await deps.data.envFor(input.serviceId, 'production');
   const declared: Record<string, string> = {};
   for (const entry of manifest.spec.env) {
-    const value = config.values[entry.key ?? entry.name];
+    const key = entry.key ?? entry.name;
+    const value = config.values[key] ?? defaults.get(key);
     if (value !== undefined) declared[entry.name] = value;
   }
   const values: Record<string, string> = {

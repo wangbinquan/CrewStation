@@ -141,6 +141,7 @@ class TaskRunner implements RunnerHandle {
     const outcome = await Promise.race([this.stop().then(() => 'drained' as const), deadline]);
     if (outcome === 'timeout') this.logger.error('shutdown grace exceeded, exiting anyway', { graceSeconds });
     this.link.emit({ kind: 'runnerState', state: 'shutting-down' });
+    if (!(await this.link.flush())) this.logger.warn('shutdown flush timed out, tail events may be lost');
     this.link.close();
     (this.hooks.exit ?? ((code: number) => process.exit(code)))(0);
   }

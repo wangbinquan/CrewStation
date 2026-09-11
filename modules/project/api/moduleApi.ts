@@ -18,6 +18,8 @@ export interface ResolvedService {
   identity: string;
   namespace: string;
   kind: ManifestKind;
+  /** 所属项目的状态；开通链据此判断是重跑还是首次开通。 */
+  state: ProjectState;
 }
 
 /** project 模块对外能力；其他模块经 ports 注入其中的子集。 */

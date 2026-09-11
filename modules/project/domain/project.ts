@@ -32,9 +32,14 @@ const TRANSITIONS: Record<ProjectState, readonly ProjectState[]> = {
   archived: [],
 };
 
+/**
+ * message 记录的是「当前状态的原因」，只对 failed 有意义：
+ * 迁到别的状态而未给新原因时必须清掉，否则 active 的项目会一直挂着上一次的失败原因。
+ */
 export function transition(project: Project, next: ProjectState, now: Date, message?: string): Project {
   if (!TRANSITIONS[project.state].includes(next)) {
     throw precondition(`项目 ${project.slug} 不能从 ${project.state} 进入 ${next}`, { from: project.state, to: next });
   }
-  return { ...project, state: next, updatedAt: now, ...(message === undefined ? {} : { message }) };
+  const { message: _dropped, ...rest } = project;
+  return { ...rest, state: next, updatedAt: now, ...(message === undefined ? {} : { message }) };
 }

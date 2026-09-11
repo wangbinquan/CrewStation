@@ -18,6 +18,8 @@ spec:
   env:
     - name: GREETING
       from: config
+      # 生产组尚未维护该键时的兜底值：首个标签即可发布，负责人随后在工作台覆盖。
+      default: 你好，数字人工作站
   apis:
     # 本服务要调用的内部 API 操作（<proxy>:<METHOD>:<path>）；样例不调用任何公司 API。
     requested: []

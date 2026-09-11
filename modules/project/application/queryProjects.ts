@@ -8,7 +8,9 @@ import type { Service } from '../domain/service';
 import type { Project } from '../domain/project';
 
 const resolved = (service: Service, project: Project | undefined) =>
-  project ? { projectId: project.id, serviceId: service.id, slug: project.slug, name: service.name, identity: service.identity, namespace: project.namespace, kind: service.kind } : undefined;
+  project
+    ? { projectId: project.id, serviceId: service.id, slug: project.slug, name: service.name, identity: service.identity, namespace: project.namespace, kind: service.kind, state: project.state }
+    : undefined;
 
 export function queryProjectUseCases(deps: ProjectUseCaseDeps) {
   const { uow, hosts, clock } = deps;

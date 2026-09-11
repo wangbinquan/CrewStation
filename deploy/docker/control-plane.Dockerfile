@@ -1,5 +1,7 @@
 # 控制面镜像：五个 cs-* 进程与两个 MCP 共用同一镜像，靠启动命令区分（同一套代码，不同入口）。
 FROM oven/bun:1.3.13 AS base
+# cs-controller 建仓时以子进程调用 git（clone／commit／push），基础镜像不带它
+RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY package.json bun.lock bunfig.toml tsconfig.base.json tsconfig.json ./
 COPY apps ./apps
