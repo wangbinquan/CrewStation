@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
-import type { ProjectId, ServiceId, WorkloadIdentity } from '@crewstation/contracts';
+import type { ServiceId, WorkloadIdentity } from '@crewstation/contracts';
 import { eventbusMigrations } from '@crewstation/eventbus';
 import type { FakeK8sClient } from '@crewstation/k8s';
 import { createFakeK8sClient } from '@crewstation/k8s';

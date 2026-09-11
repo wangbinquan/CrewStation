@@ -34,3 +34,16 @@ describe.skipIf(!available)('跨进程事件日志', () => {
     }
   });
 });
+
+describe.skipIf(!available)('jsonb 形状', () => {
+  test('载荷以对象而不是字符串落库，SQL 可直接取字段', async () => {
+    const tdb = await createTestDatabase([eventbusMigrations]);
+    try {
+      await publishDomainEvent(tdb.db, DomainTopic.projectArchived, { occurredAt: new Date().toISOString(), projectId });
+      const rows = (await tdb.db.execute(`SELECT jsonb_typeof(payload) AS t, payload->>'projectId' AS pid FROM platform_infra.domain_events`)) as unknown as Array<{ t: string; pid: string }>;
+      expect(rows[0]).toEqual({ t: 'object', pid: projectId });
+    } finally {
+      await tdb.drop();
+    }
+  });
+});

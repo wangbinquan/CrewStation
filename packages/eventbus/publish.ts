@@ -15,7 +15,7 @@ export async function publishDomainEvent<T extends DomainTopicName>(executor: Ex
   const parsed = DomainPayloadSchemas[topic].parse(payload) as DomainPayload<T> & { occurredAt: string; traceId?: string };
   const rows = (await executor.execute(sql`
     INSERT INTO platform_infra.domain_events (topic, payload, trace_id, occurred_at)
-    VALUES (${topic}, ${JSON.stringify(parsed)}::jsonb, ${parsed.traceId ?? null}, ${parsed.occurredAt})
+    VALUES (${topic}, ${parsed as unknown as Record<string, unknown>}, ${parsed.traceId ?? null}, ${parsed.occurredAt})
     RETURNING id`)) as unknown as Array<{ id: number }>;
   return Number(rows[0]?.id);
 }

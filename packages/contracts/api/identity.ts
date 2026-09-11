@@ -15,6 +15,10 @@ export const CurrentUserDtoSchema = z.object({
 
 export const UserDtoSchema = z.object({ id: UserIdSchema, name: z.string(), email: z.string(), isAdmin: z.boolean() });
 
+/** 管理员设置或撤销另一用户的管理员标记。 */
+export const SetAdminRequestSchema = z.object({ isAdmin: z.boolean() });
+
 export type MemberRole = z.infer<typeof MemberRoleSchema>;
 export type CurrentUserDto = z.infer<typeof CurrentUserDtoSchema>;
 export type UserDto = z.infer<typeof UserDtoSchema>;
+export type SetAdminRequest = z.infer<typeof SetAdminRequestSchema>;

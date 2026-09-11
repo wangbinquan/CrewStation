@@ -1,0 +1,33 @@
+openapi: 3.1.0
+info:
+  title: minimal-sample
+  version: 0.1.0
+  description: |
+    CrewStation 最小样例向其他数字人开放的 API。发布时由平台登记进内部 API 目录；
+    调用方经服务域访问，网关按源 Pod IP 识别调用方并注入 x-cs-source-service，本服务不含任何鉴权代码。
+paths:
+  /api/hello:
+    get:
+      operationId: hello
+      summary: 问候调用方
+      description: 返回问候语与网关注入的调用方服务身份，用于验证服务间调用链路。
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message, caller]
+                properties:
+                  message:
+                    type: string
+                    description: 问候语；配置项 GREETING 有值时以它开头
+                  caller:
+                    type: [string, "null"]
+                    description: 请求头 x-cs-source-service 的值（<project>/<service>），缺失时为 null
+              examples:
+                fromAnotherService:
+                  value:
+                    message: "你好，issue-bot/issue-bot！"
+                    caller: "issue-bot/issue-bot"

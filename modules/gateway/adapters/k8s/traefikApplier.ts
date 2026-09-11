@@ -1,4 +1,3 @@
-import type { RouteEntry } from '@crewstation/contracts';
 import type { K8sClient } from '@crewstation/k8s';
 import { LABELS, Resources, ingressRouteObject, stripPrefixMiddleware } from '@crewstation/k8s';
 import { routeObjectName } from '../../domain/routePlan';

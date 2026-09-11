@@ -2,7 +2,7 @@ import type { Manifest, ProjectId, ReleaseId, ReleaseStatus, ServiceId, SlotName
 import type { Executor } from '@crewstation/persistence';
 import { and, desc, eq, inArray } from 'drizzle-orm';
 import { IN_PROGRESS, type Release } from '../../domain/release';
-import type { PhysicalSlot, ServiceSlots, SlotState } from '../../domain/slots';
+import type { PhysicalSlot, SlotState } from '../../domain/slots';
 import type { ReleaseRepository, SlotRepository, TrafficSwitchRecord, TrafficSwitchRepository } from '../../ports/repositories';
 import { releases, serviceSlots, trafficSwitches } from './tables';
 

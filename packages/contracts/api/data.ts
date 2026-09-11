@@ -44,6 +44,12 @@ export const TaskDataBindingDtoSchema = z.object({
 
 export const DecideTaskDataBindingSchema = z.object({ approve: z.boolean(), decision: z.string().max(500).optional() });
 
+export type DataEnv = z.infer<typeof DataEnvSchema>;
+export type DataResourceKind = z.infer<typeof DataResourceKindSchema>;
+export type DataResourceState = z.infer<typeof DataResourceStateSchema>;
 export type DataResourceDto = z.infer<typeof DataResourceDtoSchema>;
+export type TaskDataBindingState = z.infer<typeof TaskDataBindingStateSchema>;
+export type RequestTaskDataBinding = z.infer<typeof RequestTaskDataBindingSchema>;
+export type DecideTaskDataBinding = z.infer<typeof DecideTaskDataBindingSchema>;
 export type TaskDataMode = z.infer<typeof TaskDataModeSchema>;
 export type TaskDataBindingDto = z.infer<typeof TaskDataBindingDtoSchema>;
