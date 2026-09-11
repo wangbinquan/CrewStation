@@ -16,11 +16,11 @@ None exist yet. The confirmed stack is TypeScript on Bun with Bun workspaces, Ho
 
 ## The three documents
 
-| File | Answers | Owns (v0.3.0 numbering for Proposal) |
+| File | Answers | Owns (v0.3.2 numbering) |
 |---|---|---|
-| `proposal/proposal.md` | Why, what, and what not | Sources S1–S8 (§0.1), change tables per version (§0.2), positioning (§2), **capability panorama and integration conventions (§3)**, product principles (§4), scenarios A–F (§5), **requirement baseline R01–R49 (§6)**, scope limits (§7), stack candidates marked 待重评 (§8) |
-| `proposal/design.md` | Objects, interfaces, runtime and data mechanisms | 18 invariants (§1.1), core objects (§1.2), deployment entities (§2), confirmed stack and adapter boundaries (§3), three Manifest kinds / persistence / API (§4), dev session and TaskRunner (§5), tag release (§6), identity and roles (§7), API proxy, open policy and cs-events (§8), data (§9), task containers and business subtask contract (§10), install and upgrade (§11–12), traceability (§14), **decisions D01–D38 (§15.2), open questions Q01–Q19 (§15.3)** |
-| `proposal/plan.md` | How requirements become tasks and evidence | Milestones M0–M6 with gates G0–G6 (renamed in v0.3.0), task rows `Tn.m` kept with 已删除 / 已作废 markers, **acceptance tests AT-01–AT-43 (§10)**, **traceability matrix R01–R49 → Design § → T → AT (§11)**, evidence layout (§12), deferred items (§13) |
+| `proposal/proposal.md` | Why, what, and what not | Sources S1–S9 (§0.1), change tables per version (§0.2), positioning (§2), **capability panorama and integration conventions (§3)**, product principles (§4), scenarios A–F (§5), **requirement baseline R01–R53 (§6)**, scope limits (§7), confirmed stack summary (§8), release and operations model (§9), risks (§10) |
+| `proposal/design.md` | Objects, interfaces, runtime and data mechanisms | 22 invariants (§1.1), core objects (§1.2), deployment entities (§2), confirmed stack and adapter boundaries (§3), three Manifest kinds / persistence / API (§4), dev session and TaskRunner (§5), tag release and blue/green traffic switch (§6), user/service identity and roles (§7), API proxy, open policy and cs-events (§8), data (§9), task containers and business subtask contract (§10), install and upgrade (§11–12), traceability (§14), residual risks (§13.4), **decisions D01–D51 (§15.2), open questions Q01–Q24 (§15.3)** |
+| `proposal/plan.md` | How requirements become tasks and evidence | Milestones M0–M6 with gates G0–G6, task rows `Tn.m` kept with 已删除 / 已作废 markers, **acceptance tests AT-01–AT-55 (§10)**, **traceability matrix R01–R53 → Design § → T → AT (§11)**, evidence layout (§12), deferred items (§13) |
 | `proposal/tech-evaluation.md` | Which components and why | E01–E25: constraints, analysis, confirmed choice, alternative, what M0 must verify; confirmation log (§5) |
 | `proposal/reviews/design-gate-2026-09-11.md` | What the gate review found and how the author ruled | Consolidated blockers/important/suggestions, the 25 rulings (§6), seven raw reports in the appendix |
 
@@ -28,12 +28,12 @@ The two essays 《从个人提效到组织提效…》 and 《借鉴微信小程
 
 ## Conventions when editing the documents
 
-- **Stable, shared identifiers.** R (requirements), S (sources), D (decisions), Q (open questions), `Tn.m` (task m of milestone Mn), G (gates), AT (acceptance tests). Never renumber or reuse a number. A withdrawn item keeps its row with 已删除 or 已作废 plus the replacing numbers (v0.3.0: R06, R20 deleted; R10–R13 superseded by R44–R46). Scenario letters may be re-lettered when one is deleted (v0.3.0 removed old B and shifted C–F to B–E), and every reference must then be updated.
-- **Classify every statement.** Proposal uses 已明确要求 / 建议方案 / 待验证事项; Design uses 要求 / 基线 / 条件性选项 / 待决. Tag decisions with their source (S1–S8). Do not promote a suggestion to a requirement without a source or a new user instruction.
+- **Stable, shared identifiers.** R (requirements), S (sources), D (decisions), Q (open questions), `Tn.m` (task m of milestone Mn), G (gates), AT (acceptance tests). Never renumber or reuse a number. A withdrawn item keeps its row with 已删除 or 已作废 plus the replacing numbers (R06, R20 deleted in v0.3.0; R10–R13 superseded by R44–R47). Scenario letters may be re-lettered when one is deleted (v0.3.0 removed old B and shifted C–F to B–E), and every reference must then be updated.
+- **Classify every statement.** Proposal uses 已明确要求 / 建议方案 / 待验证事项; Design uses 要求 / 基线 / 条件性选项 / 待决. Tag decisions with their source (S1–S9; S9 is the gate review and its rulings G1–G25). Do not promote a suggestion to a requirement without a source or a new user instruction.
 - **No invented numbers or results.** Scale figures in the docs (hundreds of digital workers, hundreds of nodes) are stated design targets, never measurements. Do not write latency, RPO/RTO, success rates, or test outcomes that were not measured. AT entries are tests to be written; all tasks start as 未执行.
 - **Keep the 目录** at the top of each file in sync with headings, and the three headers' version lines in sync when bumping.
 - **Style.** Simplified Chinese prose with English identifiers in backticks; full-width `｜` in the H1, `／` for or/and, `＋` for plus. Cross-document section references use the target document's current numbering.
-- **Work with the author by asking, not guessing.** The author confirmed the v0.3.0 decisions round by round; unresolved design points go to them as questions (see the memory notes for this project) rather than being decided unilaterally.
+- **Work with the author by asking, not guessing.** The author confirmed the v0.3.x decisions and the 25 gate rulings round by round; unresolved design points go to them as questions (see the memory notes for this project) rather than being decided unilaterally.
 
 ## Terminology (use exactly)
 
@@ -46,7 +46,7 @@ The two essays 《从个人提效到组织提效…》 and 《借鉴微信小程
 - **Five resident services**: `cs-api`, `cs-auth` (company login at the gateway, identity injection, workload-identity verification, on-demand upstream credentials), `cs-controller` (task containers, build, release, routing, data provisioning, GitLab management operations), `cs-session` (agent sessions, terminals, file streams), `cs-events` (event distribution center; formerly `cs-connector`). Plus two platform MCP servers: a capability-description MCP and an operations MCP.
 - **Superseded, do not reintroduce:** 主 Agent / coordinator; agent roles; the foreground execution slot and single-writer rule; Checkpoint snapshots; `DevSession` as a separate object; `SandboxLease`; `ServiceEnvironment` as an isolated environment with its own data (now `DeploymentSlot`); `Promotion` (now `TrafficSwitch`); service identity via projected ServiceAccount tokens carried by business code (now source-Pod-IP lookup); per-request ForwardAuth for service calls; `api-docs.read` vs `api-debug.invoke`; ZIP import; the knowledge flywheel (traceability stays, extraction does not); Docker Compose mode; `auto-after-checks` auto-publish and `code-checkpoint`; `cs-connector` as an API Broker; `RunWorkspaceBinding`; `/v1/agent-runs`.
 
-## Architecture as designed (v0.3.0)
+## Architecture as designed (v0.3.2)
 
 ### Scale and platform shape
 Design target: the whole company, hundreds of digital-worker services running concurrently on a Kubernetes cluster of hundreds of nodes; one cluster in v1, multi-cluster deferred; control-plane HA is a v1 requirement. Kubernetes only; local validation runs on the docker-desktop kind cluster. Every component choice is evaluated against this target.
