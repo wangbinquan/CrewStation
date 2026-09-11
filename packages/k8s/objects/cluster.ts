@@ -55,3 +55,29 @@ export function projectNetworkPolicy(spec: { namespace: string; systemNamespace:
     },
   };
 }
+
+/**
+ * 任务容器与构建 Job 的出站放开（临时）：在出站代理（E23）落地前，这两类 Pod 需要直接访问源码托管与模型 API。
+ * NetworkPolicy 取并集，因此只对带对应标签的 Pod 生效；其余业务 Pod 仍受 projectNetworkPolicy 约束。
+ */
+export function taskEgressNetworkPolicy(spec: { namespace: string }): K8sObject {
+  return {
+    apiVersion: 'networking.k8s.io/v1',
+    kind: 'NetworkPolicy',
+    metadata: { name: 'crewstation-task-egress', namespace: spec.namespace, labels: platformLabels() },
+    spec: {
+      podSelector: { matchExpressions: [{ key: 'crewstation.io/workload', operator: 'In', values: ['dev-session', 'business-task'] }] },
+      policyTypes: ['Egress'],
+      egress: [{}],
+    },
+  };
+}
+
+export function buildEgressNetworkPolicy(spec: { namespace: string }): K8sObject {
+  return {
+    apiVersion: 'networking.k8s.io/v1',
+    kind: 'NetworkPolicy',
+    metadata: { name: 'crewstation-build-egress', namespace: spec.namespace, labels: platformLabels() },
+    spec: { podSelector: { matchLabels: { 'app.kubernetes.io/component': 'build' } }, policyTypes: ['Egress'], egress: [{}] },
+  };
+}

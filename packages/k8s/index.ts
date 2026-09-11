@@ -9,6 +9,6 @@ export { createFakeK8sClient } from './fakeClient';
 export { LABELS, MANAGED_BY, platformLabels } from './objects/labels';
 export type { ContainerSpec, EnvVar, ResourceSpec, VolumeSpec, WorkloadSpec } from './objects/workloads';
 export { deploymentObject, jobObject, podObject, podTemplate } from './objects/workloads';
-export { configMapObject, namespaceObject, projectNetworkPolicy, pvcObject, resourceQuotaObject, secretObject, serviceObject } from './objects/cluster';
+export { buildEgressNetworkPolicy, configMapObject, namespaceObject, projectNetworkPolicy, pvcObject, resourceQuotaObject, secretObject, serviceObject, taskEgressNetworkPolicy } from './objects/cluster';
 export type { MiddlewareRef, RouteTarget } from './objects/traefik';
 export { dropIdentityHeadersMiddleware, forwardAuthMiddleware, ingressRouteObject, stripPrefixMiddleware } from './objects/traefik';

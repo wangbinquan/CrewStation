@@ -342,6 +342,7 @@
         "@crewstation/module-identity": "workspace:*",
         "@crewstation/module-observability": "workspace:*",
         "@crewstation/module-project": "workspace:*",
+        "@crewstation/module-provisioning": "workspace:*",
         "@crewstation/module-release": "workspace:*",
         "@crewstation/module-scm": "workspace:*",
         "@crewstation/module-session": "workspace:*",
@@ -372,6 +373,20 @@
       },
       "devDependencies": {
         "@crewstation/queue": "workspace:*",
+        "@crewstation/testkit": "workspace:*",
+      },
+    },
+    "modules/provisioning": {
+      "name": "@crewstation/module-provisioning",
+      "version": "0.0.0",
+      "dependencies": {
+        "@crewstation/contracts": "workspace:*",
+        "@crewstation/eventbus": "workspace:*",
+        "@crewstation/kernel": "workspace:*",
+        "@crewstation/persistence": "workspace:*",
+        "@crewstation/queue": "workspace:*",
+      },
+      "devDependencies": {
         "@crewstation/testkit": "workspace:*",
       },
     },
@@ -697,6 +712,8 @@
     "@crewstation/module-platform": ["@crewstation/module-platform@workspace:modules/platform"],
 
     "@crewstation/module-project": ["@crewstation/module-project@workspace:modules/project"],
+
+    "@crewstation/module-provisioning": ["@crewstation/module-provisioning@workspace:modules/provisioning"],
 
     "@crewstation/module-release": ["@crewstation/module-release@workspace:modules/release"],
 

@@ -28,6 +28,7 @@
     "@crewstation/module-identity": "workspace:*",
     "@crewstation/module-observability": "workspace:*",
     "@crewstation/module-project": "workspace:*",
+    "@crewstation/module-provisioning": "workspace:*",
     "@crewstation/module-release": "workspace:*",
     "@crewstation/module-scm": "workspace:*",
     "@crewstation/module-session": "workspace:*",

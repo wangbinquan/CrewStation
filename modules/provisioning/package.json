@@ -1,0 +1,23 @@
+{
+  "name": "@crewstation/module-provisioning",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "项目开通编排：命名空间与网络策略、建仓、数据供给、路由、首个标签发布、状态推进；全部经端口调用其他模块",
+  "exports": {
+    ".": "./index.ts"
+  },
+  "crewstation": {
+    "layer": 6
+  },
+  "dependencies": {
+    "@crewstation/contracts": "workspace:*",
+    "@crewstation/eventbus": "workspace:*",
+    "@crewstation/kernel": "workspace:*",
+    "@crewstation/persistence": "workspace:*",
+    "@crewstation/queue": "workspace:*"
+  },
+  "devDependencies": {
+    "@crewstation/testkit": "workspace:*"
+  }
+}

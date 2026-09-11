@@ -1,7 +1,7 @@
 import type { Actor, ProjectId, ServiceId, UserId } from '@crewstation/contracts';
 import type { EventConsumer } from '@crewstation/eventbus';
 import type { K8sClient } from '@crewstation/k8s';
-import { secretObject } from '@crewstation/k8s';
+import { buildEgressNetworkPolicy, namespaceObject, projectNetworkPolicy, resourceQuotaObject, secretObject, taskEgressNetworkPolicy } from '@crewstation/k8s';
 import type { Logger } from '@crewstation/kernel';
 import { createApiCatalogModule } from '@crewstation/module-api-catalog';
 import { createBusinessTaskModule } from '@crewstation/module-business-task';
@@ -16,6 +16,7 @@ import type { GatewayModuleApi } from '@crewstation/module-gateway';
 import { createIdentityModule, demoIdentityProvider } from '@crewstation/module-identity';
 import { createObservabilityModule } from '@crewstation/module-observability';
 import { createProjectModule } from '@crewstation/module-project';
+import { createProvisioningModule } from '@crewstation/module-provisioning';
 import type { ProjectModuleApi } from '@crewstation/module-project';
 import { createReleaseModule } from '@crewstation/module-release';
 import { createScmModule } from '@crewstation/module-scm';
@@ -209,7 +210,25 @@ function composeAggregates(deps: PlatformModuleDeps, core: ReturnType<typeof com
       subscriptions: (actor, projectId) => runtime.events.api.listSubscriptions(actor, projectId),
     },
   });
-  return { observability, capabilities };
+  const provisioning = createProvisioningModule({
+    db, logger, workerOwner: `${deps.instance}.provisioning`, consumerName: 'provisioning',
+    steps: {
+      loadProject: async (projectId) => { const s = (await project.api.listServices()).find((x) => x.projectId === projectId); return s ? { projectId, serviceId: s.serviceId, slug: s.slug, name: s.name, namespace: s.namespace, kind: s.kind, template: 'minimal-sample' } : undefined; },
+      ensureNamespace: async (f) => {
+        await k8s.apply(namespaceObject(f.namespace, { 'crewstation.io/project': f.slug }));
+        await k8s.apply(resourceQuotaObject({ name: 'crewstation-project', namespace: f.namespace, hard: { pods: '30', 'requests.cpu': '8', 'requests.memory': '16Gi', persistentvolumeclaims: '20' } }));
+        await k8s.apply(projectNetworkPolicy({ namespace: f.namespace, systemNamespace: settings.systemNamespace }));
+        await k8s.apply(taskEgressNetworkPolicy({ namespace: f.namespace }));
+        await k8s.apply(buildEgressNetworkPolicy({ namespace: f.namespace }));
+      },
+      ensureRepository: async (f) => { await core.scm.api.ensureRepository(f.serviceId, f.projectId, { slug: f.slug, templateName: f.template }); },
+      ensureData: async (f) => { await data.api.ensureServiceData(f.serviceId); },
+      reconcileRoutes: async (f) => { await delivery.gateway.api.reconcileService(f.serviceId); },
+      ensureFirstRelease: async (f) => { if ((await delivery.release.api.listReleases(SYSTEM_ACTOR, f.serviceId)).length === 0) await delivery.release.api.publish(SYSTEM_ACTOR, f.serviceId, { branch: 'main', version: 'v0.1.0' }); },
+      setProjectState: async (projectId, state, message) => { await project.api.setProjectState(projectId, state, message); },
+    },
+  });
+  return { observability, capabilities, provisioning };
 }
 
 function composeModules(deps: PlatformModuleDeps) {
@@ -232,7 +251,7 @@ export function createPlatformModule(deps: PlatformModuleDeps): PlatformModule {
       events: [...m.events.http.ingress],
     },
     background: {
-      controller: [...m.release.workers, ...m.gateway.workers, consumerLifecycle(m.gateway.subscriptions), ...m.taskRuntime.workers, ...m.devSession.workers, ...m.businessTask.workers, consumerLifecycle(m.businessTask.subscriptions), ...m.apiCatalog.subscriptions.map(consumerLifecycle), ...m.observability.workers],
+      controller: [...m.release.workers, ...m.gateway.workers, consumerLifecycle(m.gateway.subscriptions), ...m.taskRuntime.workers, ...m.devSession.workers, ...m.businessTask.workers, consumerLifecycle(m.businessTask.subscriptions), ...m.apiCatalog.subscriptions.map(consumerLifecycle), ...m.observability.workers, ...m.provisioning.workers, consumerLifecycle(m.provisioning.subscriptions)],
       session: [...m.session.workers],
       events: [...m.events.workers, ...m.events.subscriptions.map(consumerLifecycle)],
     },
