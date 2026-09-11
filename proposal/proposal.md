@@ -1,12 +1,13 @@
 # Proposal｜CrewStation 数字人能力平台
 
 > 状态：提案草案，待评审  
-> 文档版本：0.3.0  
+> 文档版本：0.3.1  
 > 整理日期：2026-09-10  
 > 项目工作名：CrewStation；中文定位：数字人能力平台  
 > 修订日期：2026-09-11（v0.2.0：任务级执行环境、代码托管与持续意图修改）  
 > 修订日期：2026-09-11（v0.3.0：平台职责收窄、标签发布、规模目标、网关鉴权、接入容器与事件中心；删除 ZIP 导入与知识飞轮）  
-> 配套文档：[Design](./design.md) · [Plan](./plan.md)（两篇仍为 v0.2.0，待按本版同步修订）
+> 修订日期：2026-09-11（v0.3.1：选型按 tech-evaluation.md 确认并回填 §8）  
+> 配套文档：[Design](./design.md) · [Plan](./plan.md) · [Tech Evaluation](./tech-evaluation.md)
 
 ## 目录
 
@@ -18,7 +19,7 @@
 - [5. 核心用户场景](#5-核心用户场景)
 - [6. 需求基线](#6-需求基线)
 - [7. 范围与首版边界](#7-范围与首版边界)
-- [8. 建议的总体技术路线（待重评）](#8-建议的总体技术路线待重评)
+- [8. 总体技术路线](#8-总体技术路线)
 - [9. 交付与衡量方式](#9-交付与衡量方式)
 - [10. 风险与评审需要确认的事项](#10-风险与评审需要确认的事项)
 - [11. 结论](#11-结论)
@@ -48,7 +49,7 @@
 | S7 | 2026-09-11 与用户逐轮对齐问答 | 规模目标、仅 Kubernetes、网关统一鉴权、一任务一长驻容器与 TaskRunner、删除主 Agent 与角色、意图开发只启动 Agent、标签发布与晋级、持久卷随任务、接入容器与事件中心、能力全景与接入约定、平台角色、删除 ZIP 与知识飞轮 |
 | S8 | 本机 `agent-workflow` 仓库 | Agent 驱动、代码托管客户端等复制改造的代码来源与选型参照；本项目不修改该仓库 |
 
-本次汇总不新增外部调研结论。文档中的组件名称是讨论形成的选型候选，不表示已经核实其最新版本或公司可用性。具体版本、许可证、API、CRD 和部署条件在 Plan 的首个阶段冻结；v0.3.0 起选型按 §8 的说明另行重评。
+本次汇总不新增外部调研结论。文档中的组件名称是讨论形成的选型候选，不表示已经核实其最新版本或公司可用性。具体版本、许可证、API、CRD 和部署条件在 Plan 的首个阶段冻结；选型已在 v0.3.1 按 `proposal/tech-evaluation.md` 确认，见 §8。
 
 ### 0.2 历次变更与旧规则替代
 
@@ -85,6 +86,12 @@
 | 问题单数字人作为平台模板 | 最小样例模板；问题单数字人由业务团队自行开发 |
 | 缺少业务接入抽象 | 能力全景、纯约定接入、模板 `CONTRIBUTING.md`、能力说明 MCP 与工作台页 |
 | 平台角色未定义 | 管理员、项目负责人、开发者三级 |
+
+#### v0.3.1（选型确认）
+
+| 原规则或缺口 | v0.3.1 处理 |
+|---|---|
+| §8 选型全部标待重评 | 按 `tech-evaluation.md` 1.0.0 逐项确认并回填：TypeScript on Bun、Hono 与 zod、PostgreSQL 高可用与 Drizzle、PostgreSQL 表队列、Traefik 加 ForwardAuth、OIDC 与 JWT、projected ServiceAccount token、Kubernetes 原生任务容器且不引入任何额外沙箱、复制 agent-workflow 驱动且 Claude Code 不做单独处理、BuildKit rootless、CloudNativePG、React 与 CodeMirror 与 xterm.js、官方 MCP SDK、OpenTelemetry、Helm 加 Bun 安装器 |
 
 R01–R37 保留编号：R06、R20 标为已删除；R10–R13 标为已作废并由 R44–R46 替代。新增 R38–R49。场景删除原 B 后重排字母：原 C–F 依次改为 B–E，新增场景 F。本文章节因新增 §3 顺延：原 §3–§10 改为 §4–§11，Design 与 Plan 中对本文章节号的引用在其修订时同步。
 
@@ -314,7 +321,7 @@ R01–R37 保留编号：R06、R20 标为已删除；R10–R13 标为已作废�
 
 | 范围 | 首版取舍 |
 |---|---|
-| 应用框架 | 最小样例模板一种，实现语言与框架随 §8 重评确定；其他语言保留容器与约定边界 |
+| 应用框架 | 最小样例模板一种，实现语言在评审时确认；其他语言保留容器与约定边界 |
 | Agent | OpenCode 与 Claude Code 两个驱动，复制改造自 agent-workflow；不接更多 CLI |
 | 任务环境 | 一任务一长驻容器；意图开发多 Agent 并行由使用者协调；业务子任务可并发由业务协调；不做通用 DAG |
 | 源码托管 | 一种公司 GitLab 兼容接入，自动建仓与平台打标签为首版必需；本机验证复用已运行的测试 GitLab |
@@ -329,24 +336,30 @@ R01–R37 保留编号：R06、R20 标为已删除；R10–R13 标为已作废�
 
 不重建公司 SSO、上游 API 管控和基础云；不通过共享高权限账号绕过限制；不编排开发者的开发过程，不管理开发容器内多个 Agent 的工作区共享；不做 ZIP 源码包导入；不做经验提取与知识飞轮，只保留追溯能力；不提供业务接入 SDK，只提供约定；不做 Docker Compose 部署；不做资源级接口授权；不构建固定所有业务步骤的超级工作流；不把应用目录当成完整平台；不首发全套 Istio、Kafka、服务网格和多语言构建生态；不承诺任意有状态应用无停机、无损回退；不把内部工具快速迭代等同于放松商用交付质量。
 
-## 8. 建议的总体技术路线（待重评）
+## 8. 总体技术路线
 
-v0.2.0 的候选基线保留如下，但 v0.3.0 起全部标为**待重评**：将按 R38 的规模目标、R39 的控制面高可用、R42 的双驱动复制改造等约束逐项重新评估，结论写入 `proposal/tech-evaluation.md`，确认后回填本节与 Design §3.1。[S7]
+选型已按 `proposal/tech-evaluation.md` 1.0.0 逐项评估并经用户确认（E01–E22），此处为结论；具体版本在 Plan T0.2 锁定，待验证项对应 M0 原型任务。[S7][S8]
 
-| 范围 | v0.2.0 候选 | 重评时必须考虑的约束 |
+| 范围 | 选型 | 必须验证的部分 |
 |---|---|---|
-| 控制面与开发工具 | TypeScript、Node.js LTS、Fastify、TypeBox、OpenAPI | 复制改造来源 agent-workflow 使用 Bun 与 Hono；控制面多副本 |
-| 控制台 | React、Vite、shadcn/ui | 工作台要素：多 Agent 面板、Web 终端、编辑器、预览、Swagger、能力页 |
-| 元数据与后台任务 | PostgreSQL、Drizzle、pg-boss | 数百任务容器与事件吞吐；控制面多副本下的租约与去重 |
-| 网关与组织部署 | Traefik、Gateway API、Kubernetes、Helm | 用户身份注入、工作负载身份识别、按服务的操作级放行、数百服务的 Host 路由与 WebSocket |
-| 任务容器与 Agent 驱动 | OpenSandbox 候选；驱动复制自 agent-workflow | 长驻容器、TaskRunner 常驻、持久卷两种模式、双驱动、容器内终端 |
-| 源码托管 | 公司 GitLab 兼容服务＋SourceControlProvider | 建仓、受控推送、平台打标签、保护标签；本机复用测试 GitLab |
-| 构建与数据 | BuildKit、CloudNativePG、S3 存储；内置对象存储候选 SeaweedFS | 固定标签 SHA 构建；数据库高可用与单项目恢复 |
-| 事件中心 | 未定 | cs-events 可靠投递、去重、死信、EventProducer 接入 |
-| 公司身份 | 现有体系适配；OIDC/SAML 在可用时优先 | 网关鉴权与令牌签发、cs-auth 凭据服务 |
-| 观测与追溯 | OpenTelemetry；平台事件表 | taskId／traceId／sessionId 关联链 |
+| 控制面语言与运行时 | TypeScript on Bun；Bun workspaces | Bun 长驻多副本服务稳定性、原生模块兼容 |
+| 后端框架与契约 | Hono；zod 统一 Manifest、API、事件 Schema 并生成 OpenAPI | Bun 下 WebSocket 与流式行为 |
+| 元数据与后台任务 | PostgreSQL 高可用；Drizzle；PostgreSQL 表队列加租约与 fencing token 承载后台任务、多副本协调与 cs-events；首版不引入 Kafka 或 Redis | 目标档位吞吐与锁竞争；多副本续接 |
+| 网关 | Traefik 加 ForwardAuth，鉴权与放行决策在 cs-auth；Gateway API | WebSocket 升级；放行决策 p99 时延；备选 Envoy Gateway |
+| 用户身份 | OIDC 对接公司 IdP；平台 JWT 由 jose 签发，JWKS 轮换 | 公司 IdP 协议；令牌格式与有效期 |
+| 服务身份 | projected ServiceAccount token 绑定 audience，cs-auth 校验 | 提取方式与校验时延 |
+| 任务容器 | Kubernetes 原生 Pod、PVC、NetworkPolicy、ResourceQuota，由 cs-controller 直接管理；Pod 与容器即隔离边界，不引入任何额外沙箱层 | Pod 与 PVC 供给时延、预热必要性 |
+| TaskRunner | TypeScript；运行时优先 Bun，PTY 不可用则 Node；出向 WebSocket 连接 cs-session | PTY；数百连接的副本迁移 |
+| Agent 驱动 | 复制 agent-workflow 的 RuntimeDriver、事件泵与进程管理，OpenCode 与 Claude Code 双驱动，运行方式与 agent-workflow 一致 | 六处依赖反转；版本锁定与模型配置注入 |
+| 源码托管 | 公司 GitLab 兼容服务；复制 agent-workflow 的 code-host 客户端并新增建仓、标签、保护标签 API | 公司兼容范围 |
+| 构建 | BuildKit rootless 作 Kubernetes Job | 公司集群对 rootless 构建的允许方式 |
+| 数据供给 | CloudNativePG；公司已有托管 PostgreSQL 优先接入；对象存储优先公司已有 S3 兼容存储，内置候选待核实许可证 | 高可用切换、单项目恢复、预签名与跨桶拒绝 |
+| 控制台 | React、Vite、TanStack Router 与 Query、CodeMirror、xterm.js、嵌入 Swagger UI | 多流式面板与终端并存的性能 |
+| 平台 MCP | 官方 MCP SDK，Streamable HTTP，两个独立服务 | 容器内 Agent 的连接鉴权 |
+| 观测与追溯 | OpenTelemetry SDK 与 Collector；execution_events 表 | OTel SDK 在 Bun 下的兼容 |
+| 发行与安装 | Helm chart；Bun 单文件二进制安装器；本地仅 kind | 离线引导；HA 在多节点集群验证 |
 
-agent-workflow 现有栈为 Bun 1.4、TypeScript、Hono、Drizzle、SQLite 默认并有 PostgreSQL provider、React 与 Vite，是复制改造的直接参照。Knative、OPA、Temporal、Buildpacks、gVisor/Kata、Longhorn 等保留为条件性选项，是否进入生产隔离前置条件依据首轮验证和公司环境决定。[S8]
+agent-workflow 现有栈为 Bun、TypeScript、Hono、Drizzle、SQLite 默认并有 PostgreSQL provider、React 与 Vite，是复制改造的直接参照。Knative、OPA、Temporal、Buildpacks、Longhorn 保留为条件性选项；gVisor、Kata 等额外沙箱不列为选项。[S8]
 
 ## 9. 交付与衡量方式
 
@@ -386,7 +399,7 @@ agent-workflow 现有栈为 Bun 1.4、TypeScript、Hono、Drizzle、SQLite 默�
 | 开发容器接触真实数据或触发线上副作用 | 数据访问三模式与负责人审批；预览关闭生产消费者与通知 |
 | “一键安装”掩盖基础资源缺失 | 明确前置条件与状态；不虚构 IP、权限、磁盘和模型访问 |
 
-评审优先确认：工作名与范围；部署目标与公司接入责任；最小样例模板的实现语言；三类数据资源套餐；生产隔离基线；首版验收边界；`proposal/tech-evaluation.md` 的选型结论。详细待决项见 Design，执行任务见 Plan。
+评审优先确认：工作名与范围；部署目标与公司接入责任；最小样例模板的实现语言；三类数据资源套餐；生产隔离基线；首版验收边界。选型结论已在 `proposal/tech-evaluation.md` 确认。详细待决项见 Design，执行任务见 Plan。
 
 ## 11. 结论
 

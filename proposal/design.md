@@ -1,17 +1,18 @@
 # Design｜CrewStation 数字人能力平台
 
 > 状态：设计草案，待原型与评审验证  
-> 版本：0.3.0 · 整理日期：2026-09-10  
+> 版本：0.3.1 · 整理日期：2026-09-10  
 > 修订日期：2026-09-11（v0.2.0：任务级执行环境、代码托管与持续意图修改）  
 > 修订日期：2026-09-11（v0.3.0：与 Proposal v0.3.0 同步，平台职责收窄、标签发布、网关鉴权、接入容器与事件中心、规模目标；删除 ZIP 与知识飞轮）  
-> 配套文档：[Proposal](./proposal.md) · [Plan](./plan.md)
+> 修订日期：2026-09-11（v0.3.1：选型按 tech-evaluation.md 确认并回填 §3）  
+> 配套文档：[Proposal](./proposal.md) · [Plan](./plan.md) · [Tech Evaluation](./tech-evaluation.md)
 
 ## 目录
 
 - [0. 阅读约定](#0-阅读约定)
 - [1. 架构不变量与领域模型](#1-架构不变量与领域模型)
 - [2. 部署实体与流量路径](#2-部署实体与流量路径)
-- [3. 技术基线与可替换接口（待重评）](#3-技术基线与可替换接口待重评)
+- [3. 技术基线与可替换接口](#3-技术基线与可替换接口)
 - [4. 项目协议、数据对象与接口](#4-项目协议数据对象与接口)
 - [5. 开发会话：容器、Agent、工作台与预览](#5-开发会话容器agent工作台与预览)
 - [6. 标签发布、构建、晋级与路由](#6-标签发布构建晋级与路由)
@@ -30,7 +31,7 @@
 
 需求编号 R01–R49 以 Proposal v0.3.0 §6 为准；Proposal 章节号在 v0.3.0 顺延，本文引用它时使用新编号。本设计以公司 Kubernetes 集群为唯一部署目标，本机验证使用 kind 集群，不再有 Docker Compose 路径。
 
-所有 `cs-*` 名称、平台 API、Manifest、状态机、数据对象和安装命令都是拟议协议，尚不是已存在的产品接口。第三方组件是讨论中的候选，v0.3.0 起全部标为待重评，结论见 `proposal/tech-evaluation.md`；本文不声称任何组件的版本、CRD 或兼容性已经确认。原稿与对话来源见 Proposal §0.1；本文的细化属于待验证的实现建议。
+所有 `cs-*` 名称、平台 API、Manifest、状态机、数据对象和安装命令都是拟议协议，尚不是已存在的产品接口。第三方组件选型已在 v0.3.1 按 `proposal/tech-evaluation.md` 1.0.0 确认，但本文不声称任何组件的版本、CRD 或兼容性已经验证，版本在 Plan T0.2 锁定。原稿与对话来源见 Proposal §0.1；本文的细化属于待验证的实现建议。
 
 文档中区分：**要求**是不得违反的产品约束；**基线**是建议实现；**条件性选项**需要满足前置条件后才启用；**待决**事项必须在交付前关闭或明确限制。
 
@@ -125,7 +126,7 @@ v0.2.0 把执行模型改为 TaskEnvironment → SubtaskRun → AgentRun／Comma
 
 | 实体 | 主要职责 | 关键边界 |
 |---|---|---|
-| 网关（候选 Traefik，待重评） | 统一入口；用户鉴权前置与身份注入；按 Host 与路径转发页面、业务、预览、平台、会话与终端流量；服务对内部 API 的方法加路径级放行与转发 | 不执行平台业务逻辑；多副本；放行规则由平台下发 |
+| 网关（Traefik） | 统一入口；用户鉴权前置与身份注入；按 Host 与路径转发页面、业务、预览、平台、会话与终端流量；服务对内部 API 的方法加路径级放行与转发 | 不执行平台业务逻辑；多副本；放行规则由平台下发 |
 | `cs-api` | 项目、服务、成员与角色、开发会话、发布与晋级请求、接口目录与开放策略、能力说明数据、控制台后端 | 不执行用户代码，不代理业务流量 |
 | `cs-auth` | 企业登录适配与网关鉴权决策、身份头与签名令牌签发、工作负载身份校验、上游凭据服务（按需向 API proxy 下发） | 不向用户代码提供平台长期凭据；密钥轮换有重叠期 |
 | `cs-controller` | 任务容器与持久卷调度、配额准入、构建、发布、晋级、路由、数据供给、GitLab 管理操作模块（建仓、受控推送、创建标签） | 受限集群权限；副作用持久化并在多副本间以租约协调 |
@@ -218,27 +219,31 @@ flowchart TB
 
 路由与放行规则变化由 cs-controller 下发，网关执行；不为每个请求查询 cs-api。网关、cs-auth、cs-session 均多副本并分别测量容量；统一入口不等于只有一个网关 Pod。
 
-## 3. 技术基线与可替换接口（待重评）
+## 3. 技术基线与可替换接口
 
-### 3.1 候选基线，全部待重评
+### 3.1 已确认的技术基线
 
-v0.2.0 的候选保留在下表，但不再作为基线。v0.3.0 的约束是：数百数字人并发与数百节点（R38）、控制面高可用（R39）、双驱动复制改造自 agent-workflow（R42）、网关承担用户鉴权与操作级放行（R40、R45）、任务容器常驻 TaskRunner（R05）。逐项重评的结论写入 `proposal/tech-evaluation.md`，确认后回填本节与 Proposal §8。
+选型已按 `proposal/tech-evaluation.md` 1.0.0 逐项确认，此处为结论与核心验证；版本在 Plan T0.2 锁定，待验证项由 M0 原型核实。
 
-| 部分 | v0.2.0 候选 | 重评约束 |
+| 部分 | 选型 | 核心验证 |
 |---|---|---|
-| 管理面语言与框架 | TypeScript、Node.js LTS、Fastify、TypeBox | 复制来源 agent-workflow 为 Bun 1.4 与 Hono；多副本无状态 |
-| 控制台 | React、Vite、shadcn/ui | 多 Agent 面板、Web 终端、代码编辑器、预览 iframe、Swagger、能力页 |
-| 元数据与后台任务 | PostgreSQL、Drizzle、pg-boss | 高可用；数百任务容器与事件吞吐；多副本租约与去重 |
-| 网关 | Traefik、Gateway API | 鉴权前置、身份注入、工作负载身份识别、按服务的操作级放行、数百 Host 与 WebSocket |
-| 任务容器底座 | OpenSandbox 候选 | 长驻 Pod、持久卷两种模式、容器内 PTY、按配额调度、多 Agent 进程 |
-| Agent 驱动 | 复制自 agent-workflow 的 RuntimeDriver | OpenCode 与 Claude Code；依赖反转；容器内运行 |
-| 源码托管 | 公司 GitLab 兼容服务＋SCM 模块 | 建仓、受控推送、创建与保护标签、标签事件 |
-| 构建与数据 | BuildKit、CloudNativePG、S3；内置对象存储候选 SeaweedFS | 标签 SHA 固定构建；数据库高可用与单项目恢复 |
-| 事件中心 | 未定 | 可靠投递、去重、死信、订阅版本 |
-| 公司身份 | 现有体系适配；OIDC/SAML 优先 | 网关鉴权决策、令牌签发与轮换 |
-| 观测与追溯 | OpenTelemetry；平台事件表 | taskId／traceId／sessionId 关联链 |
+| 管理面语言与框架 | TypeScript on Bun；Bun workspaces；Hono；zod 契约并生成 OpenAPI | 长驻多副本稳定性；WebSocket 与流式 |
+| 控制台 | React、Vite、TanStack Router 与 Query、CodeMirror、xterm.js、嵌入 Swagger UI | 多 Agent 面板与终端并存的性能 |
+| 元数据与队列 | PostgreSQL 高可用；Drizzle；PostgreSQL 表队列加租约与 fencing token | 吞吐与锁竞争；多副本续接 |
+| 网关 | Traefik 加 ForwardAuth 到 cs-auth；Gateway API | WebSocket 升级；放行决策时延；备选 Envoy Gateway |
+| 用户与服务身份 | OIDC 对接公司 IdP；jose 签发 JWT 与 JWKS 轮换；projected ServiceAccount token | 公司 IdP 协议；令牌格式；校验时延 |
+| 任务容器 | Kubernetes 原生 Pod、PVC、NetworkPolicy、ResourceQuota，cs-controller 直接管理；不引入任何额外沙箱层 | 供给时延；预热必要性 |
+| TaskRunner | TypeScript；运行时优先 Bun，PTY 不可用则 Node；出向 WebSocket 连接 cs-session | PTY；连接迁移 |
+| Agent 驱动 | 复制 agent-workflow 的 RuntimeDriver、runner 事件泵与 managedProcess；双驱动；运行方式与 agent-workflow 一致 | 依赖反转；版本锁定与模型配置注入 |
+| 源码托管 | 公司 GitLab 兼容服务；复制 code-host 客户端并新增建仓、标签、保护标签 API | 公司兼容范围（Q11） |
+| 构建 | BuildKit rootless 作 Kubernetes Job | rootless 允许方式（Q04） |
+| 数据供给 | CloudNativePG；公司托管 PostgreSQL 优先；对象存储优先公司已有 S3 兼容存储 | 高可用切换；单项目恢复；预签名与跨桶拒绝 |
+| 事件中心 | PostgreSQL inbox 与 outbox 表加 SKIP LOCKED worker；HTTP 推送 | 目标档位吞吐 |
+| 平台 MCP | 官方 MCP SDK；Streamable HTTP；两个独立服务 | 容器内连接鉴权 |
+| 观测与追溯 | OpenTelemetry SDK 与 Collector；execution_events 表 | OTel SDK 在 Bun 下的兼容 |
+| 发行与安装 | Helm chart；Bun 单文件二进制安装器；本地仅 kind | 离线引导；HA 在多节点集群验证 |
 
-Knative、OPA、Temporal、Kafka、Redis、Istio、gVisor/Kata、Longhorn 仍是条件性选项，不进入首版强制清单。
+Knative、OPA、Temporal、Buildpacks、Longhorn 保留为条件性选项；首版不引入 Kafka、Redis、Istio；gVisor、Kata 等额外沙箱不列为选项。
 
 ### 3.2 适配边界
 
@@ -246,7 +251,7 @@ Knative、OPA、Temporal、Kafka、Redis、Istio、gVisor/Kata、Longhorn 仍是
 - `GatewayPolicy`：向网关下发用户鉴权前置配置、身份注入规则、按服务环境的内部 API 方法加路径放行表与 Host 路由。
 - `WorkloadIdentityVerifier`：把 Pod 的工作负载身份映射为服务环境。
 - `ServiceHost`：服务与接入容器的部署、就绪检查、路由后端和版本退役。
-- `TaskContainerProvider`：任务容器与持久卷的创建、访问、暂停重建（持久模式）、释放、配额准入。
+- `TaskContainerProvider`：任务容器与持久卷的创建、访问、暂停重建（持久模式）、释放、配额准入；首版实现为对 Kubernetes 原生对象的直接管理。
 - `RuntimeDriver`：复制自 agent-workflow 的驱动接口，OpenCode 与 Claude Code 两个实现；事件解析、spawn 计划、会话恢复、取消。
 - `TaskRunner API`：容器内进程对控制面暴露的启动 Agent、执行命令、文件、PTY、预览守护、事件流接口。
 - `SourceControlProvider`：cs-controller 内的模块；建仓、初始化、受控推送、创建 v 标签、保护标签、确认远端 SHA。
@@ -681,11 +686,11 @@ DataResource 不由某个 Release、Pod 或任务级联拥有。preview 与 prod
 - 数据通路直接到数据库／连接池；连接配额、查询超时、池化按套餐实施。
 - 共享池的独立库是逻辑隔离，不是故障域独占；容量若只是告警须明确。
 
-CloudNativePG 作为候选待重评；应用表迁移由项目交付。
+CloudNativePG 为已确认的供给组件，公司已有托管 PostgreSQL 优先接入；应用表迁移由项目交付。
 
 ### 9.3 对象文件存储
 
-附件、报告、上传文件和产物默认用 S3 接口存储。每个环境独立 Bucket 或经验证的受限对象空间，配置存储侧访问策略。支持业务服务直接访问与限时直传地址。内置对象存储候选待重评，企业模式优先适配已有对象存储；租户授权、跨桶拒绝、预签名、删除策略、备份、离线安装必须实测。
+附件、报告、上传文件和产物默认用 S3 接口存储。每个环境独立 Bucket 或经验证的受限对象空间，配置存储侧访问策略。支持业务服务直接访问与限时直传地址。优先适配公司已有 S3 兼容存储，内置候选待核实许可证与维护状态后再定；租户授权、跨桶拒绝、预签名、删除策略、备份、离线安装必须实测。
 
 ### 9.4 卷与部署类型
 
@@ -1021,7 +1026,7 @@ crewstation/
    └─ recovery/
 ```
 
-包管理器与工作区工具随 `tech-evaluation.md` 确定；不是目录中每个包都必须有常驻进程。
+包管理器与工作区为 Bun workspaces；不是目录中每个包都必须有常驻进程。
 
 ### 15.2 设计决策记录
 
@@ -1064,13 +1069,14 @@ crewstation/
 | D35 | 平台角色三级；负责人晋级与数据审批；管理员审批定向 API | 要求（S7） |
 | D36 | 一项目一开发会话；开发者下拉选分支并显示部署落后；预览由 TaskRunner 自动启动 | 要求（S7） |
 | D37 | 执行链路 taskId／traceId／sessionId 追溯；知识提取留待未来 | 要求（S7） |
+| D38 | 选型按 tech-evaluation.md 1.0.0 确认：Bun、Hono、zod、PostgreSQL 表队列、Traefik ForwardAuth、OIDC 与 JWT、projected SA token、Kubernetes 原生任务容器且不引入额外沙箱、复制 agent-workflow 驱动且 Claude Code 不做单独处理、BuildKit、CloudNativePG、React 与 CodeMirror 与 xterm.js、官方 MCP SDK、OpenTelemetry、Helm 加 Bun 安装器 | 要求（S7、S8）；版本在 T0.2 锁定 |
 
 ### 15.3 待决项与退出条件
 
 | 编号 | 待确认事项 | 关闭方式／默认限制 |
 |---|---|---|
 | Q01 | 公司 SSO 与网关鉴权前置的接入模式 | 获得实际接入材料并跑通；否则仅演示身份 |
-| Q02 | 各组件版本组合 | 随 `tech-evaluation.md` 冻结；不宣称兼容未测版本 |
+| Q02 | 各组件版本组合 | 选型已确认；版本在 T0.2 锁定并由 M0 原型验证；不宣称兼容未测版本 |
 | Q03 | 复制改造后的 RuntimeDriver 在容器内运行、依赖反转与双驱动会话恢复 | M0 原型：容器内同时运行两个驱动并恢复会话 |
 | Q04 | 任务容器运行时隔离方式 | 安全验证与节点条件；未通过不开放不可信多租户 |
 | Q05 | PostgreSQL 角色、S3 权限、任务持久卷两种模式的存储类 | 跨租户拒绝、暂停恢复、释放回收实测 |
