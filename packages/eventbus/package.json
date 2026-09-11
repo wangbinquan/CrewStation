@@ -4,6 +4,16 @@
   "private": true,
   "type": "module",
   "description": "进程内类型化事件总线与 outbox 发布；主题与载荷 Schema 来自 contracts",
-  "exports": { ".": "./index.ts" },
-  "dependencies": { "@crewstation/kernel": "workspace:*", "@crewstation/contracts": "workspace:*", "@crewstation/persistence": "workspace:*" }
+  "exports": {
+    ".": "./index.ts"
+  },
+  "dependencies": {
+    "@crewstation/contracts": "workspace:*",
+    "@crewstation/kernel": "workspace:*",
+    "@crewstation/persistence": "workspace:*",
+    "drizzle-orm": "0.45.2"
+  },
+  "devDependencies": {
+    "@crewstation/testkit": "workspace:*"
+  }
 }

@@ -10,5 +10,8 @@
   "dependencies": {
     "@crewstation/kernel": "workspace:*",
     "drizzle-orm": "0.45.2"
+  },
+  "devDependencies": {
+    "@crewstation/testkit": "workspace:*"
   }
 }

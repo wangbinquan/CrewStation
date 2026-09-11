@@ -8,7 +8,9 @@
     ".": "./index.ts"
   },
   "dependencies": {
+    "@crewstation/contracts": "workspace:*",
     "@crewstation/kernel": "workspace:*",
-    "hono": "4.13.7"
+    "hono": "4.13.7",
+    "zod": "4.6.2"
   }
 }

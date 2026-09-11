@@ -1,3 +1,2 @@
-// 测试夹具：临时数据库、假时钟、假 k8s、契约断言
-// 实现随对应里程碑进入；本文件只标记包的公开入口。
-export {};
+export type { TestDatabase } from './database';
+export { DEFAULT_TEST_DATABASE_URL, createTestDatabase, testDatabaseAvailable } from './database';

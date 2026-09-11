@@ -3,3 +3,6 @@ export { createApp } from './createApp';
 export { mapErrorToResponse } from './errorHandler';
 export type { ServeOptions } from './serve';
 export { serve } from './serve';
+export type { AppEnv, AppVariables, RequestIdentity } from './identity';
+export { identityFromHeaders, requireService, requireUser } from './identity';
+export { parseBody, parseParams, parseQuery } from './validate';

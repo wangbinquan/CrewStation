@@ -4,6 +4,15 @@
   "private": true,
   "type": "module",
   "description": "PostgreSQL 表队列：租约、fencing、重试；表位于 platform_infra schema",
-  "exports": { ".": "./index.ts" },
-  "dependencies": { "@crewstation/kernel": "workspace:*", "@crewstation/persistence": "workspace:*" }
+  "exports": {
+    ".": "./index.ts"
+  },
+  "dependencies": {
+    "@crewstation/kernel": "workspace:*",
+    "@crewstation/persistence": "workspace:*",
+    "drizzle-orm": "0.45.2"
+  },
+  "devDependencies": {
+    "@crewstation/testkit": "workspace:*"
+  }
 }
