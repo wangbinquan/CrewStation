@@ -1,12 +1,74 @@
-import type { ScmModuleApi } from './api/moduleApi';
+import { join } from 'node:path';
+import { createGitLabClient } from '@crewstation/gitlab-client';
+import type { AppEnv } from '@crewstation/http';
+import type { Clock } from '@crewstation/kernel';
+import { systemClock } from '@crewstation/kernel';
+import type { ProjectModuleApi } from '@crewstation/module-project';
+import type { Database, MigrationSet } from '@crewstation/persistence';
+import { readMigrationDir } from '@crewstation/persistence';
+import type { Hono } from 'hono';
+import { directoryTemplateSource } from './adapters/fs/directoryTemplateSource';
+import { osScratchDirs } from './adapters/fs/osScratchDirs';
+import { bunGitRunner } from './adapters/git/bunGitRunner';
+import { gitLabGatewayAdapter } from './adapters/gitlab/gitLabGatewayAdapter';
+import { drizzleUnitOfWork } from './adapters/persistence/drizzleUnitOfWork';
+import type { ActorResolver, ScmModuleApi } from './api/moduleApi';
+import { createReleaseTagUseCase } from './application/createReleaseTag';
+import type { ScmUseCaseDeps } from './application/dependencies';
+import { ensureRepositoryUseCase } from './application/ensureRepository';
+import { pushBranchUseCase } from './application/pushBranch';
+import { queryRepositoryUseCases } from './application/queryRepository';
+import { sessionCredentialUseCases } from './application/sessionCredentials';
+import { repositoryRoutes } from './http/repositoryRoutes';
+import type { ScmSettings } from './ports/scmSettings';
 
-/** 装配期注入：其他模块的能力以端口形式出现在这里，由应用提供实现。 */
-export type ScmModuleDeps = Record<string, never>;
+const DEFAULT_BOT_EMAIL = 'bot@crewstation.local';
+
+export interface ScmModuleDeps {
+  db: Database;
+  project: Pick<ProjectModuleApi, 'authorize' | 'isAdmin'>;
+  settings: ScmSettings;
+  /** 业务项目模板所在目录；默认仓库根 `templates/`。 */
+  templatesRoot?: string;
+  clock?: Clock;
+  fetch?: typeof fetch;
+  /** 只供测试与本机调试替换外部系统适配器（GitLab、git、模板、临时目录）。 */
+  overrides?: Partial<Pick<ScmUseCaseDeps, 'gitlab' | 'git' | 'templates' | 'scratch'>>;
+}
 
 export interface ScmModule {
   readonly api: ScmModuleApi;
+  readonly http: Hono<AppEnv>[];
+  readonly migrations: MigrationSet;
 }
 
-export function createScmModule(_deps: ScmModuleDeps): ScmModule {
-  return { api: { name: 'scm' } };
+export const scmMigrations: MigrationSet = {
+  module: 'scm',
+  layer: 3,
+  files: readMigrationDir(join(import.meta.dir, 'adapters', 'persistence', 'migrations')),
+};
+
+export function createScmModule(deps: ScmModuleDeps): ScmModule {
+  const { settings, overrides } = deps;
+  const client = createGitLabClient({ baseUrl: settings.baseUrl, token: settings.platformToken, ...(deps.fetch ? { fetch: deps.fetch } : {}) });
+  const useCaseDeps: ScmUseCaseDeps = {
+    uow: drizzleUnitOfWork(deps.db),
+    gitlab: overrides?.gitlab ?? gitLabGatewayAdapter(client),
+    git: overrides?.git ?? bunGitRunner({ authorName: settings.platformBotName, authorEmail: settings.platformBotEmail ?? DEFAULT_BOT_EMAIL }),
+    templates: overrides?.templates ?? directoryTemplateSource({ templatesRoot: deps.templatesRoot ?? join(import.meta.dir, '..', '..', 'templates') }),
+    scratch: overrides?.scratch ?? osScratchDirs(),
+    authorizer: { authorize: (actor, projectId, action) => deps.project.authorize(actor, projectId, action) },
+    settings,
+    clock: deps.clock ?? systemClock,
+  };
+  const api: ScmModuleApi = {
+    name: 'scm',
+    ensureRepository: ensureRepositoryUseCase(useCaseDeps),
+    ...queryRepositoryUseCases(useCaseDeps),
+    createReleaseTag: createReleaseTagUseCase(useCaseDeps),
+    ...sessionCredentialUseCases(useCaseDeps),
+    pushBranch: pushBranchUseCase(useCaseDeps),
+  };
+  const resolveActor: ActorResolver = async (userId) => ({ userId, isAdmin: await deps.project.isAdmin(userId) });
+  return { api, http: [repositoryRoutes(api, resolveActor)], migrations: scmMigrations };
 }

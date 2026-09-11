@@ -49,7 +49,8 @@ export const RunnerCommandSchema = z.discriminatedUnion('type', [
   StartAgentCommandSchema,
   z.object({ ...cmd('sendMessage'), agentId: z.string().min(1), content: z.string() }),
   z.object({ ...cmd('cancelAgent'), agentId: z.string().min(1) }),
-  z.object({ ...cmd('exec'), execId: z.string().min(1), command: z.array(z.string()).min(1), cwd: z.string().optional(), env: z.record(z.string(), z.string()).default({}), timeoutSeconds: z.number().int().min(1).max(86400).default(3600) }),
+  /** wait=false：立即回 ack，输出以 execOutput/execExited 事件流出；wait=true：结束后一次性回 RunnerResultPayloads.exec（输出有上限）。 */
+  z.object({ ...cmd('exec'), execId: z.string().min(1), command: z.array(z.string()).min(1), cwd: z.string().optional(), env: z.record(z.string(), z.string()).default({}), timeoutSeconds: z.number().int().min(1).max(86400).default(3600), wait: z.boolean().default(false) }),
   z.object({ ...cmd('cancelExec'), execId: z.string().min(1) }),
   z.object({ ...cmd('openTerminal'), terminalId: z.string().min(1), cols: z.number().int().min(1), rows: z.number().int().min(1), cwd: z.string().optional() }),
   z.object({ ...cmd('terminalInput'), terminalId: z.string().min(1), data: z.string() }),
@@ -74,6 +75,8 @@ export const RunnerResultPayloads = {
   writeFile: z.object({ path: z.string(), version: z.string() }),
   previewStatus: z.object({ state: PreviewStateSchema, port: z.number().int().optional(), restarts: z.number().int().min(0), lastError: z.string().optional() }),
   verifyContract: z.object({ ok: z.boolean(), missing: z.array(z.string()), schemaErrors: z.array(z.string()) }),
+  /** exec 且 wait=true 的结果；stdout/stderr 各最多 256 KiB，超出即 truncated。 */
+  exec: z.object({ execId: z.string(), exitCode: z.number().int().nullable(), stdout: z.string(), stderr: z.string(), durationMs: z.number().int().min(0), truncated: z.boolean() }),
   ack: z.object({}),
 } as const;
 

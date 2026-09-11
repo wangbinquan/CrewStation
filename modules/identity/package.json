@@ -12,9 +12,13 @@
   },
   "dependencies": {
     "@crewstation/contracts": "workspace:*",
+    "@crewstation/http": "workspace:*",
+    "@crewstation/jwt": "workspace:*",
     "@crewstation/kernel": "workspace:*",
+    "@crewstation/persistence": "workspace:*",
     "drizzle-orm": "0.45.2",
-    "@crewstation/persistence": "workspace:*"
+    "hono": "4.13.7",
+    "zod": "4.6.2"
   },
   "devDependencies": {
     "@crewstation/testkit": "workspace:*"

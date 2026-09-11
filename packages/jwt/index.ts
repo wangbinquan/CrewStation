@@ -1,3 +1,8 @@
-// jose 封装：签发、验签、JWKS、密钥轮换重叠期
-// 实现随对应里程碑进入；本文件只标记包的公开入口。
-export {};
+export type { SigningKey } from './signingKey';
+export { SIGNING_ALGORITHM, generateSigningKey, holdsPrivateMaterial } from './signingKey';
+export type { KeyRing, KeyRingMaterial, KeyRingOptions, SignOptions, TokenClaims, VerifiedToken, VerifyOptions } from './keyRing';
+export { createKeyRing, rotateKeyRing, verifyWithJwks } from './keyRing';
+export { KEY_RING_FORMAT_VERSION, describeKeyRing, parseKeyRing, serializeKeyRing } from './keyRingSerialization';
+export type { TokenVerificationReason } from './verificationError';
+export { TokenVerificationError, isTokenVerificationError } from './verificationError';
+export type { JSONWebKeySet as JsonWebKeySet, JWK as JsonWebKey } from 'jose';

@@ -44,9 +44,15 @@
       "name": "@crewstation/cs-api",
       "version": "0.0.0",
       "dependencies": {
+        "@crewstation/contracts": "workspace:*",
         "@crewstation/eventbus": "workspace:*",
         "@crewstation/http": "workspace:*",
+        "@crewstation/k8s": "workspace:*",
         "@crewstation/kernel": "workspace:*",
+        "@crewstation/module-config": "workspace:*",
+        "@crewstation/module-data": "workspace:*",
+        "@crewstation/module-egress": "workspace:*",
+        "@crewstation/module-gateway": "workspace:*",
         "@crewstation/module-identity": "workspace:*",
         "@crewstation/module-project": "workspace:*",
         "@crewstation/persistence": "workspace:*",
@@ -199,11 +205,15 @@
       "version": "0.0.0",
       "dependencies": {
         "@crewstation/contracts": "workspace:*",
+        "@crewstation/http": "workspace:*",
         "@crewstation/kernel": "workspace:*",
         "@crewstation/module-release": "workspace:*",
         "@crewstation/module-scm": "workspace:*",
         "@crewstation/module-task-runtime": "workspace:*",
+        "@crewstation/persistence": "workspace:*",
         "drizzle-orm": "0.45.2",
+        "hono": "4.13.7",
+        "zod": "4.6.2",
       },
       "devDependencies": {
         "@crewstation/testkit": "workspace:*",
@@ -233,11 +243,18 @@
       "version": "0.0.0",
       "dependencies": {
         "@crewstation/contracts": "workspace:*",
+        "@crewstation/eventbus": "workspace:*",
+        "@crewstation/http": "workspace:*",
         "@crewstation/kernel": "workspace:*",
         "@crewstation/module-project": "workspace:*",
+        "@crewstation/persistence": "workspace:*",
+        "@crewstation/queue": "workspace:*",
         "drizzle-orm": "0.45.2",
+        "hono": "4.13.7",
+        "zod": "4.6.2",
       },
       "devDependencies": {
+        "@crewstation/module-identity": "workspace:*",
         "@crewstation/testkit": "workspace:*",
       },
     },
@@ -359,9 +376,13 @@
       "version": "0.0.0",
       "dependencies": {
         "@crewstation/contracts": "workspace:*",
+        "@crewstation/http": "workspace:*",
         "@crewstation/kernel": "workspace:*",
         "@crewstation/module-task-runtime": "workspace:*",
+        "@crewstation/persistence": "workspace:*",
         "drizzle-orm": "0.45.2",
+        "hono": "4.13.7",
+        "zod": "4.6.2",
       },
       "devDependencies": {
         "@crewstation/testkit": "workspace:*",
@@ -372,12 +393,18 @@
       "version": "0.0.0",
       "dependencies": {
         "@crewstation/contracts": "workspace:*",
+        "@crewstation/eventbus": "workspace:*",
+        "@crewstation/http": "workspace:*",
+        "@crewstation/k8s": "workspace:*",
         "@crewstation/kernel": "workspace:*",
         "@crewstation/module-config": "workspace:*",
         "@crewstation/module-data": "workspace:*",
         "@crewstation/module-egress": "workspace:*",
         "@crewstation/module-project": "workspace:*",
+        "@crewstation/persistence": "workspace:*",
         "drizzle-orm": "0.45.2",
+        "hono": "4.13.7",
+        "zod": "4.6.2",
       },
       "devDependencies": {
         "@crewstation/testkit": "workspace:*",
@@ -481,6 +508,14 @@
       "name": "@crewstation/secretbox",
       "version": "0.0.0",
     },
+    "packages/session-client": {
+      "name": "@crewstation/session-client",
+      "version": "0.0.0",
+      "dependencies": {
+        "@crewstation/contracts": "workspace:*",
+        "@crewstation/kernel": "workspace:*",
+      },
+    },
     "packages/testkit": {
       "name": "@crewstation/testkit",
       "version": "0.0.0",
@@ -493,7 +528,6 @@
       "name": "@crewstation/ws",
       "version": "0.0.0",
       "dependencies": {
-        "@crewstation/contracts": "workspace:*",
         "@crewstation/kernel": "workspace:*",
       },
     },
@@ -503,6 +537,7 @@
       "dependencies": {
         "@crewstation/contracts": "workspace:*",
         "@crewstation/kernel": "workspace:*",
+        "@crewstation/ws": "workspace:*",
         "ajv": "8.20.0",
       },
     },
@@ -625,6 +660,8 @@
     "@crewstation/queue": ["@crewstation/queue@workspace:packages/queue"],
 
     "@crewstation/secretbox": ["@crewstation/secretbox@workspace:packages/secretbox"],
+
+    "@crewstation/session-client": ["@crewstation/session-client@workspace:packages/session-client"],
 
     "@crewstation/task-runtime": ["@crewstation/task-runtime@workspace:runtimes/task"],
 

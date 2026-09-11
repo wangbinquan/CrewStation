@@ -58,6 +58,8 @@ export const StartDevAgentRequestSchema = z.object({
 export const SendAgentMessageRequestSchema = z.object({ content: z.string().min(1) });
 
 export type DevSessionDto = z.infer<typeof DevSessionDtoSchema>;
+export type OpenDevSessionRequest = z.infer<typeof OpenDevSessionRequestSchema>;
+export type SendAgentMessageRequest = z.infer<typeof SendAgentMessageRequestSchema>;
 export type DevSessionState = z.infer<typeof DevSessionStateSchema>;
 export type BranchDto = z.infer<typeof BranchDtoSchema>;
 export type AgentInstanceDto = z.infer<typeof AgentInstanceDtoSchema>;
