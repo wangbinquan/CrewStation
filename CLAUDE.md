@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository status
 
-CrewStation (数字人能力平台: a platform on which teams build, publish and run "digital worker" business apps with coding agents) now holds **both** the design documents under `proposal/` and a working implementation. The three proposal documents are v0.3.2 and remain the authoritative contract; the code is the first implementation of that contract, verified on the local kind cluster, not a shipped product.
+CrewStation (数字人能力平台: a platform on which teams build, publish and run "digital worker" business apps with coding agents) now holds **both** the design documents under `proposal/` and a working implementation. The three proposal documents are v0.3.3 and remain the authoritative contract; the code is the first implementation of that contract, verified on the local kind cluster, not a shipped product.
 
 What exists in the cluster today (local `docker-desktop` kind node, namespace `crewstation-system`): the five resident services, both platform MCP servers, the workbench, Traefik, PostgreSQL, a registry and BuildKit. Chains that have actually been run end to end and observed, not inferred:
 
@@ -49,7 +49,7 @@ Hard caps, enforced with no baseline: 600 lines per file (1000 for tests), 20 so
 
 ## The three documents
 
-| File | Answers | Owns (v0.3.2 numbering) |
+| File | Answers | Owns (v0.3.3 numbering) |
 |---|---|---|
 | `proposal/proposal.md` | Why, what, and what not | Sources S1–S9 (§0.1), change tables per version (§0.2), positioning (§2), **capability panorama and integration conventions (§3)**, product principles (§4), scenarios A–F (§5), **requirement baseline R01–R53 (§6)**, scope limits (§7), confirmed stack summary (§8), release and operations model (§9), risks (§10) |
 | `proposal/design.md` | Objects, interfaces, runtime and data mechanisms | 22 invariants (§1.1), core objects (§1.2), deployment entities (§2), confirmed stack and adapter boundaries (§3), three Manifest kinds / persistence / API (§4), dev session and TaskRunner (§5), tag release and blue/green traffic switch (§6), user/service identity and roles (§7), API proxy, open policy and cs-events (§8), data (§9), task containers and business subtask contract (§10), install and upgrade (§11–12), traceability (§14), residual risks (§13.4), **decisions D01–D52 (§15.2), open questions Q01–Q24 (§15.3)** |
@@ -80,7 +80,7 @@ The two essays 《从个人提效到组织提效…》 and 《借鉴微信小程
 - **Five resident services**: `cs-api`, `cs-auth` (company login at the gateway, identity injection, workload-identity verification, on-demand upstream credentials), `cs-controller` (task containers, build, release, routing, data provisioning, GitLab management operations), `cs-session` (agent sessions, terminals, file streams), `cs-events` (event distribution center; formerly `cs-connector`). Plus two platform MCP servers: a capability-description MCP and an operations MCP.
 - **Superseded, do not reintroduce:** 主 Agent / coordinator; agent roles; the foreground execution slot and single-writer rule; Checkpoint snapshots; `DevSession` as a separate object; `SandboxLease`; `ServiceEnvironment` as an isolated environment with its own data (now `DeploymentSlot`); `Promotion` (now `TrafficSwitch`); service identity via projected ServiceAccount tokens carried by business code (now source-Pod-IP lookup); per-request ForwardAuth for service calls; `api-docs.read` vs `api-debug.invoke`; ZIP import; the knowledge flywheel (traceability stays, extraction does not); Docker Compose mode; `auto-after-checks` auto-publish and `code-checkpoint`; `cs-connector` as an API Broker; `RunWorkspaceBinding`; `/v1/agent-runs`.
 
-## Architecture as designed (v0.3.2)
+## Architecture as designed (v0.3.3)
 
 ### Scale and platform shape
 Design target: the whole company, hundreds of digital-worker services running concurrently on a Kubernetes cluster of hundreds of nodes; one cluster in v1, multi-cluster deferred; control-plane HA is a v1 requirement. Kubernetes only; local validation runs on the docker-desktop kind cluster. Every component choice is evaluated against this target.
