@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cs-api
+  namespace: crewstation-system
+  labels: { app.kubernetes.io/name: cs-api, app.kubernetes.io/part-of: crewstation, app.kubernetes.io/managed-by: crewstation, crewstation.io/project: platform, crewstation.io/service: cs-api, crewstation.io/workload: platform }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app.kubernetes.io/name: cs-api }
+  template:
+    metadata:
+      labels: { app.kubernetes.io/name: cs-api, app.kubernetes.io/part-of: crewstation, app.kubernetes.io/managed-by: crewstation, crewstation.io/project: platform, crewstation.io/service: cs-api, crewstation.io/workload: platform }
+    spec:
+      serviceAccountName: crewstation-control
+      containers:
+        - name: cs-api
+          image: cs-control-plane:dev
+          imagePullPolicy: IfNotPresent
+          args: ["apps/cs-api/src/main.ts"]
+          ports: [{ name: http, containerPort: 8080 }]
+          envFrom:
+            - configMapRef: { name: crewstation-env }
+            - secretRef: { name: crewstation-secrets }
+          env:
+            - { name: POD_IP, valueFrom: { fieldRef: { fieldPath: status.podIP } } }
+
+          readinessProbe: { httpGet: { path: /healthz, port: 8080 }, periodSeconds: 5 }
+          livenessProbe: { httpGet: { path: /healthz, port: 8080 }, periodSeconds: 15, initialDelaySeconds: 10 }
+          resources: { requests: { cpu: 100m, memory: 256Mi }, limits: { cpu: "1", memory: 1Gi } }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cs-api
+  namespace: crewstation-system
+spec:
+  selector: { app.kubernetes.io/name: cs-api }
+  ports: [{ name: http, port: 8080, targetPort: 8080 }]

@@ -78,6 +78,7 @@ export function createTaskRuntimeModule(deps: TaskRuntimeModuleDeps): TaskRuntim
     describeEnvironment: queries.describeEnvironment,
     listEnvironments: queries.listEnvironments,
     findDevSession: async (projectId) => { const env = await queries.findDevSession(projectId); return env ? environmentToDto(env) : undefined; },
+    listRunningDevSessions: async () => (await queries.listRunningDevSessions()).map(environmentToDto),
     verifyRunnerToken: queries.verifyRunnerToken,
     canOpenStream: queries.canOpenStream,
     reconcile,

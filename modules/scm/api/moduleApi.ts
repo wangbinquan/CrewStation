@@ -24,6 +24,7 @@ export interface ScmModuleApi {
   /** 各分支 HEAD 与两槽部署提交的落后数；未给出某槽的提交时该项为 null。 */
   listBranches(actor: Actor, serviceId: ServiceId, options?: ListBranchesOptions): Promise<BranchDto[]>;
   listTags(actor: Actor, serviceId: ServiceId): Promise<TagDto[]>;
+  readFile(serviceId: ServiceId, ref: string, path: string): Promise<string | undefined>;
   /** 以平台令牌在分支 HEAD 上打 `v<major>.<minor>.<patch>`；业务用户没有打标权。 */
   createReleaseTag(serviceId: ServiceId, input: CreateReleaseTagRequest): Promise<ReleaseTagDto>;
   /** 签发会话级短期 Git 凭据；明文只返回这一次，平台只存哈希。 */

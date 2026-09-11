@@ -1,0 +1,213 @@
+import type { Actor, ProjectId, ServiceId, UserId } from '@crewstation/contracts';
+import type { EventConsumer } from '@crewstation/eventbus';
+import type { K8sClient } from '@crewstation/k8s';
+import { secretObject } from '@crewstation/k8s';
+import type { Logger } from '@crewstation/kernel';
+import { createApiCatalogModule } from '@crewstation/module-api-catalog';
+import { createBusinessTaskModule } from '@crewstation/module-business-task';
+import { createConfigModule } from '@crewstation/module-config';
+import { createDataModule } from '@crewstation/module-data';
+import { createDevSessionModule } from '@crewstation/module-dev-session';
+import { createEgressModule } from '@crewstation/module-egress';
+import { createEventsModule } from '@crewstation/module-events';
+import { createGatewayModule } from '@crewstation/module-gateway';
+import type { GatewayModuleApi } from '@crewstation/module-gateway';
+import { createIdentityModule, demoIdentityProvider } from '@crewstation/module-identity';
+import { createProjectModule } from '@crewstation/module-project';
+import type { ProjectModuleApi } from '@crewstation/module-project';
+import { createReleaseModule } from '@crewstation/module-release';
+import { createScmModule } from '@crewstation/module-scm';
+import { createSessionModule } from '@crewstation/module-session';
+import { createTaskRuntimeModule } from '@crewstation/module-task-runtime';
+import type { Database } from '@crewstation/persistence';
+import { eventbusMigrations } from '@crewstation/eventbus';
+import { queueMigrations } from '@crewstation/queue';
+import { createSessionClient } from '@crewstation/session-client';
+import type { PlatformSettings } from '@crewstation/settings';
+import type { AppEnv } from '@crewstation/http';
+import type { MigrationSet } from '@crewstation/persistence';
+import type { Hono } from 'hono';
+import type { Lifecycle } from './api/moduleApi';
+
+/** 组合根的对外形状：各进程只挑选自己角色的入口；模块实例也暴露出来供 CLI 与测试直接使用。 */
+export interface PlatformModuleApi {
+  readonly name: 'platform';
+  readonly routers: { api: Hono<AppEnv>[]; auth: Hono<AppEnv>[]; session: Hono<AppEnv>[]; events: Hono<AppEnv>[] };
+  readonly background: { controller: Lifecycle[]; session: Lifecycle[]; events: Lifecycle[] };
+  readonly websocket: unknown;
+  readonly migrations: MigrationSet[];
+}
+
+export interface PlatformModuleDeps {
+  db: Database;
+  k8s: K8sClient;
+  settings: PlatformSettings;
+  logger: Logger;
+  /** 工作器租约与事件消费者名的前缀，进程名加主机名。 */
+  instance: string;
+}
+
+export interface PlatformModule {
+  readonly api: PlatformModuleApi;
+  readonly modules: ReturnType<typeof composeModules>;
+}
+
+/** 平台内部调用用的管理员身份：不经成员关系检查的用例入口。 */
+export const SYSTEM_ACTOR: Actor = { userId: 'usr_00000000000000000000000000000000' as UserId, isAdmin: true };
+
+const consumerLifecycle = (consumer: EventConsumer): Lifecycle => ({ start: () => consumer.start(), stop: () => consumer.stop() });
+
+interface Late { project?: ProjectModuleApi; gateway?: GatewayModuleApi }
+
+function composeCore(deps: PlatformModuleDeps, late: Late) {
+  const { db, settings, logger } = deps;
+  const hosts = {
+    prodHost: (slug: string) => `${slug}.${settings.userDomain}`,
+    previewHost: (slug: string) => `preview.${slug}.${settings.userDomain}`,
+    serviceHost: (name: string) => `${name}.${settings.serviceDomain}`,
+    platformApiHost: () => `api.${settings.serviceDomain}`,
+  };
+  const projectApi = (): ProjectModuleApi => { if (!late.project) throw new Error('project 尚未装配'); return late.project; };
+  const gatewayApi = (): GatewayModuleApi => { if (!late.gateway) throw new Error('gateway 尚未装配'); return late.gateway; };
+
+  const identity = createIdentityModule({
+    db, logger,
+    settings: { adminEmails: settings.adminEmails, userDomain: settings.userDomain, cookieDomain: `.${settings.userDomain}`, secure: settings.publicScheme === 'https', sessionTtlSeconds: settings.sessionTtlSeconds },
+    provider: demoIdentityProvider(),
+    previewAccess: { canView: async (userId, slug) => { const r = await projectApi().resolveServiceIdentity(`${slug}/${slug}`); return r ? (await projectApi().roleOf({ userId, isAdmin: await projectApi().isAdmin(userId) }, r.projectId)) !== undefined : false; } },
+    membershipLookup: { membershipsOf: async (userId) => { const actor: Actor = { userId, isAdmin: false }; const out: Array<{ projectId: ProjectId; role: 'owner' | 'developer' | 'tester' }> = []; for (const p of await projectApi().listProjects(actor)) { const role = await projectApi().roleOf(actor, p.id); if (role && role !== 'admin') out.push({ projectId: p.id, role }); } return out; } },
+    workloadLookup: { byIp: (ip) => gatewayApi().lookupByIp(ip) },
+    allowlistEvaluator: { evaluate: (caller, target) => gatewayApi().evaluate(caller, target) },
+  });
+  const project = createProjectModule({ db, identity: identity.api, hosts, settings: { defaultMaxConcurrentTasks: settings.defaultMaxConcurrentTasks, defaultServicePlan: settings.defaultServicePlan } });
+  late.project = project.api;
+  const isAdmin = (userId: string) => identity.api.isAdmin(userId as UserId);
+  const resolveById = (serviceId: ServiceId) => project.api.resolveServiceById(serviceId);
+
+  const config = createConfigModule({ db, project: project.api, settings: { secretKeyBase64: settings.secretKeyBase64 } });
+  const egress = createEgressModule({ db, project: project.api });
+  const data = createDataModule({
+    db, isAdmin: (id) => isAdmin(id), authorizer: project.api,
+    services: { resolveServiceById: async (id) => { const r = await resolveById(id); return r ? { projectId: r.projectId, slug: r.slug } : undefined; } },
+    settings: { defaultPlan: 'db-small', secretKeyBase64: settings.secretKeyBase64, postgres: settings.dataPostgres },
+  });
+  const scm = createScmModule({ db, project: project.api, settings: { baseUrl: settings.gitlab.baseUrl, groupPath: settings.gitlab.groupPath, platformToken: settings.gitlab.platformToken, platformBotName: settings.gitlab.botName, defaultBranch: 'main' } });
+  const apiCatalog = createApiCatalogModule({
+    db, projects: project.api, hosts, logger,
+    services: {
+      resolveService: async (id) => { const r = await resolveById(id); return r ? { projectId: r.projectId, serviceId: r.serviceId, slug: r.slug, identity: r.identity } : undefined; },
+      resolveServiceIdentity: async (identity) => { const r = await project.api.resolveServiceIdentity(identity); return r ? { projectId: r.projectId, serviceId: r.serviceId, slug: r.slug, identity: r.identity } : undefined; },
+    },
+  });
+  return { identity, project, config, egress, data, scm, apiCatalog, hosts, isAdmin, resolveById };
+}
+
+function composeDelivery(deps: PlatformModuleDeps, core: ReturnType<typeof composeCore>, late: Late) {
+  const { db, k8s, settings, logger } = deps;
+  const { project, config, data, scm, apiCatalog, hosts, isAdmin, resolveById } = core;
+  const release = createReleaseModule({
+    db, k8s, hosts, logger, isAdmin: (id) => isAdmin(id), authorizer: project.api, services: { resolveServiceById: resolveById },
+    tagger: { createReleaseTag: (serviceId, { branch, version }) => scm.api.createReleaseTag(serviceId, version.startsWith('v') ? { branch, tag: version } : { branch, bump: version as 'major' | 'minor' | 'patch' }) },
+    repo: {
+      readFile: scm.api.readFile,
+      repositoryUrl: async (serviceId) => {
+        const [binding, svc, credential] = await Promise.all([scm.api.getBinding(SYSTEM_ACTOR, serviceId), resolveById(serviceId), scm.api.issueSessionCredential(serviceId, 180)]);
+        if (!svc) throw new Error(`服务 ${serviceId} 不存在`);
+        const name = `git-cred-${serviceId.slice(-12)}`;
+        await k8s.apply(secretObject({ name, namespace: svc.namespace, stringData: { token: credential.token }, labels: { 'crewstation.io/service': svc.name } }));
+        return { httpUrl: binding.httpUrl, credentialSecretName: name };
+      },
+    },
+    plans: { getServicePlan: async (name) => (await project.api.listServicePlans()).find((p) => p.name === name) },
+    config: {
+      render: async (projectId, env) => ({ values: await config.api.renderEnv(projectId, env), version: await config.api.currentVersion(projectId, env) }),
+      validate: (projectId, env, keys) => config.api.validateManifestEnv(projectId, env, keys.map((name) => ({ name, from: 'config' as const }))),
+    },
+    data: { envFor: data.api.envFor },
+    settings: { userDomain: settings.userDomain, serviceDomain: settings.serviceDomain, registryBase: settings.registryBase, maintenanceWindow: settings.maintenanceWindow, buildTimeoutSeconds: 1800, deployTimeoutSeconds: 600, builderImage: settings.builderImage, buildkitAddress: settings.buildkitAddress, workerOwner: `${deps.instance}.release` },
+  });
+  const listServices = async () => (await project.api.listServices()).map((s) => ({ serviceId: s.serviceId, projectId: s.projectId, projectSlug: s.slug, serviceName: s.name, namespace: s.namespace, identity: s.identity, kind: s.kind }));
+  const gateway = createGatewayModule({
+    db, k8s, hosts, logger, isAdmin: (id) => isAdmin(id),
+    services: { listServices, getService: async (id) => (await listServices()).find((s) => s.serviceId === id), serviceIdOfProject: async (projectId) => (await listServices()).find((s) => s.projectId === projectId)?.serviceId },
+    slots: { slotRoles: release.api.slotRoles },
+    grants: { grantedOperations: apiCatalog.api.grantedOperations, listCallers: async () => [], proxyNameOf: async (serviceId) => (await apiCatalog.api.listProxies(SYSTEM_ACTOR)).find((p) => p.serviceId === serviceId)?.proxy },
+    settings: { systemNamespace: settings.systemNamespace, serviceDomain: settings.serviceDomain, userAuthMiddleware: 'forward-auth-user', serviceAuthMiddleware: 'forward-auth-service', dropIdentityHeadersMiddleware: 'drop-identity-headers', allowlistMaxStaleSeconds: 300, consumerName: 'gateway' },
+  });
+  late.gateway = gateway.api;
+  return { release, gateway };
+}
+
+function composeRuntime(deps: PlatformModuleDeps, core: ReturnType<typeof composeCore>, delivery: ReturnType<typeof composeDelivery>) {
+  const { db, k8s, settings, logger } = deps;
+  const { project, config, data, scm, isAdmin, resolveById } = core;
+  const { release } = delivery;
+  const taskRuntime = createTaskRuntimeModule({
+    db, k8s, logger, isAdmin: (id) => isAdmin(id), authorizer: project.api, quotas: { quotaLimit: project.api.quotaLimit },
+    profiles: { getTaskProfile: async (name) => (await project.api.listTaskProfiles()).find((p) => p.name === name) },
+    services: { resolveServiceById: resolveById },
+    sources: { configEnv: (projectId, env) => config.api.renderEnv(projectId, env), dataEnv: data.api.envFor, taskDataEnv: data.api.envForTask },
+    settings: { taskImage: settings.taskImage, systemNamespace: settings.systemNamespace, sessionUrl: settings.sessionRunnerUrl, userDomain: settings.userDomain, serviceDomain: settings.serviceDomain, workerUid: 10001, defaultProfile: settings.defaultTaskProfile, ...(settings.agentEnvSecretName ? { agentEnvSecretName: settings.agentEnvSecretName } : {}) },
+  });
+  const runner = createSessionClient(settings.sessionInternalUrl);
+  const mcp = [{ name: 'capabilities', url: settings.mcp.capabilitiesUrl }, { name: 'operations', url: settings.mcp.operationsUrl }];
+  const devSession = createDevSessionModule({
+    db, logger, isAdmin: (id) => isAdmin(id), environments: taskRuntime.api, runner, releases: release.api,
+    scm: {
+      listBranches: (serviceId, compare) => scm.api.listBranches(SYSTEM_ACTOR, serviceId, compare),
+      pushUrl: async (serviceId) => { const c = await scm.api.issueSessionCredential(serviceId, 60); return { url: c.httpUrlWithCredentialTemplate.replace('{token}', encodeURIComponent(c.token)), expiresAt: c.expiresAt }; },
+      readFile: scm.api.readFile,
+    },
+    authorizer: { authorize: project.api.authorize, ownerOf: project.api.ownerOf },
+    services: { resolveServiceOfProject: async (projectId) => { const s = (await project.api.listServices()).find((x) => x.projectId === projectId); return s ? { serviceId: s.serviceId, slug: s.slug, name: s.name } : undefined; } },
+    notifier: { notify: async (projectId, users, message, context) => { logger.warn('dev session notice', { projectId, users, message, taskId: context.taskId }); } },
+    settings: { idleMinutes: settings.idleMinutes, userDomain: settings.userDomain, mcp, defaultPreviewPort: 3000 },
+  });
+  const businessTask = createBusinessTaskModule({
+    db, logger, isAdmin: (id) => isAdmin(id), environments: taskRuntime.api, runner, authorizer: project.api,
+    directory: { resolveServiceIdentity: async (identity) => { const r = await project.api.resolveServiceIdentity(identity); return r ? { serviceId: r.serviceId, projectId: r.projectId } : undefined; } },
+    settings: { mcp, outputLimitBytes: 262144, consumerName: 'business-task' },
+  });
+  const events = createEventsModule({
+    db, logger, projects: project.api,
+    services: { resolveService: async (id) => { const r = await resolveById(id); return r ? { projectId: r.projectId, serviceId: r.serviceId, slug: r.slug, identity: r.identity } : undefined; } },
+    endpoints: { resolve: async (serviceId) => { const [ep, svc] = await Promise.all([release.api.activeEndpoint(serviceId), resolveById(serviceId)]); return ep && svc ? { baseUrl: `http://${svc.slug}.${settings.serviceDomain}` } : undefined; } },
+    worker: { owner: `${deps.instance}.events`, concurrency: 4 },
+  });
+  const session = createSessionModule({
+    db, logger, isAdmin: (id) => isAdmin(id),
+    runnerAuth: { verifyRunnerToken: taskRuntime.api.verifyRunnerToken },
+    taskAccess: { canOpenStream: taskRuntime.api.canOpenStream, onRunnerConnected: taskRuntime.api.onRunnerConnected, onRunnerDisconnected: taskRuntime.api.onRunnerDisconnected },
+    settings: { selfAddress: settings.selfAddress, commandTimeoutMs: 30_000, runnerStaleMs: 30_000, replayLimit: 2000 },
+  });
+  return { taskRuntime, devSession, businessTask, events, session };
+}
+
+function composeModules(deps: PlatformModuleDeps) {
+  const late: Late = {};
+  const core = composeCore(deps, late);
+  const delivery = composeDelivery(deps, core, late);
+  const runtime = composeRuntime(deps, core, delivery);
+  return { identity: core.identity, project: core.project, config: core.config, egress: core.egress, data: core.data, scm: core.scm, apiCatalog: core.apiCatalog, ...delivery, ...runtime };
+}
+
+export function createPlatformModule(deps: PlatformModuleDeps): PlatformModule {
+  const m = composeModules(deps);
+  const api: PlatformModuleApi = {
+    name: 'platform',
+    routers: {
+      api: [...m.project.http, ...m.identity.http.users, ...m.config.http, ...m.egress.http, ...m.data.http, ...m.scm.http, ...m.apiCatalog.http, ...m.release.http, ...m.gateway.http, ...m.taskRuntime.http, ...m.devSession.http, m.businessTask.http.service, m.businessTask.http.user, ...m.events.http.query],
+      auth: [...m.identity.http.auth, ...m.identity.http.forwardAuth],
+      session: [m.session.http.runner, m.session.http.stream, m.session.http.internal],
+      events: [...m.events.http.ingress],
+    },
+    background: {
+      controller: [...m.release.workers, ...m.gateway.workers, consumerLifecycle(m.gateway.subscriptions), ...m.taskRuntime.workers, ...m.devSession.workers, ...m.businessTask.workers, consumerLifecycle(m.businessTask.subscriptions), ...m.apiCatalog.subscriptions.map(consumerLifecycle)],
+      session: [...m.session.workers],
+      events: [...m.events.workers, ...m.events.subscriptions.map(consumerLifecycle)],
+    },
+    websocket: m.session.websocket,
+    migrations: [queueMigrations, eventbusMigrations, m.identity.migrations, m.project.migrations, m.config.migrations, m.egress.migrations, m.data.migrations, m.scm.migrations, m.apiCatalog.migrations, m.events.migrations, m.release.migrations, m.taskRuntime.migrations, m.devSession.migrations, m.businessTask.migrations, m.session.migrations, m.gateway.migrations],
+  };
+  return { api, modules: m };
+}

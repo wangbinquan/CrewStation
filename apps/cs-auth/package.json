@@ -6,15 +6,15 @@
   "description": "身份与网关决策进程：登录、ForwardAuth 用户域与服务域、JWKS、凭据服务",
   "scripts": {
     "dev": "bun run --watch src/main.ts",
-    "start": "bun run src/main.ts"
+    "start": "bun run src/main.ts",
+    "migrate": "bun run src/main.ts migrate"
   },
   "dependencies": {
-    "@crewstation/contracts": "workspace:*",
     "@crewstation/http": "workspace:*",
+    "@crewstation/k8s": "workspace:*",
     "@crewstation/kernel": "workspace:*",
-    "@crewstation/module-identity": "workspace:*",
-    "@crewstation/module-project": "workspace:*",
+    "@crewstation/module-platform": "workspace:*",
     "@crewstation/persistence": "workspace:*",
-    "hono": "4.13.7"
+    "@crewstation/settings": "workspace:*"
   }
 }

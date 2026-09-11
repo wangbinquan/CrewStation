@@ -36,6 +36,7 @@ export function gitLabGatewayAdapter(client: GitLabClient): GitLabGateway {
       return branch ? toRemoteBranch(branch) : undefined;
     },
     listTags: async (id) => (await client.listTags(id)).map(toRemoteTag),
+    readFile: async (id, path, ref) => orUndefined(client.getRawFile(id, path, ref)),
     createTag: async (id, input) => toRemoteTag(await client.createTag(id, input)),
     ensureTagProtection: async (id, pattern) => {
       if ((await client.listProtectedTags(id)).some((t) => t.name === pattern)) return;

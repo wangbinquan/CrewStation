@@ -1,0 +1,137 @@
+# 网关中间件与平台自身的路由。业务服务的路由由 gateway 模块按服务生成，不在这里。
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: forward-auth-user
+  namespace: crewstation-system
+spec:
+  forwardAuth:
+    address: http://cs-auth.crewstation-system.svc.cluster.local:8081/forward-auth/user
+    trustForwardHeader: false
+    authResponseHeaders: [x-cs-user-id, x-cs-user-name, x-cs-user-email, x-cs-identity-token, x-cs-request-id, Cookie]
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: forward-auth-service
+  namespace: crewstation-system
+spec:
+  forwardAuth:
+    address: http://cs-auth.crewstation-system.svc.cluster.local:8081/forward-auth/service
+    trustForwardHeader: false
+    authResponseHeaders: [x-cs-source-service, x-cs-source-slot, x-cs-source-token, x-cs-trace-id, x-cs-request-id]
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: drop-identity-headers
+  namespace: crewstation-system
+spec:
+  headers:
+    customRequestHeaders:
+      x-cs-user-id: ""
+      x-cs-user-name: ""
+      x-cs-user-email: ""
+      x-cs-identity-token: ""
+      x-cs-source-service: ""
+      x-cs-source-slot: ""
+      x-cs-source-token: ""
+---
+# 用户域：控制台主机。登录与 JWKS 不鉴权；平台 API 与工作台页面经用户 ForwardAuth。
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: console-auth
+  namespace: crewstation-system
+spec:
+  entryPoints: [web]
+  routes:
+    - match: Host(`console.cs.localhost`) && (PathPrefix(`/auth`) || PathPrefix(`/.well-known`))
+      kind: Rule
+      priority: 100
+      middlewares: [{ name: drop-identity-headers }]
+      services: [{ name: cs-auth, port: 8081 }]
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: console-api
+  namespace: crewstation-system
+spec:
+  entryPoints: [web]
+  routes:
+    - match: Host(`console.cs.localhost`) && PathPrefix(`/v1`)
+      kind: Rule
+      priority: 90
+      middlewares: [{ name: drop-identity-headers }, { name: forward-auth-user }]
+      services: [{ name: cs-api, port: 8080 }]
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: console-stream
+  namespace: crewstation-system
+spec:
+  entryPoints: [web]
+  routes:
+    - match: Host(`console.cs.localhost`) && PathPrefix(`/v1/tasks`) && PathRegexp(`/stream$`)
+      kind: Rule
+      priority: 95
+      middlewares: [{ name: drop-identity-headers }, { name: forward-auth-user }]
+      services: [{ name: cs-session, port: 8083 }]
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: console-app
+  namespace: crewstation-system
+spec:
+  entryPoints: [web]
+  routes:
+    - match: Host(`console.cs.localhost`)
+      kind: Rule
+      priority: 10
+      middlewares: [{ name: drop-identity-headers }, { name: forward-auth-user }]
+      services: [{ name: console, port: 8090 }]
+---
+# 服务域：平台 API 主机。JWKS 公开；其余按源 Pod IP 识别调用方并按放行表放行。
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: platform-api-jwks
+  namespace: crewstation-system
+spec:
+  entryPoints: [web]
+  routes:
+    - match: Host(`api.svc.cs.internal`) && PathPrefix(`/.well-known`)
+      kind: Rule
+      priority: 100
+      services: [{ name: cs-auth, port: 8081 }]
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: platform-api
+  namespace: crewstation-system
+spec:
+  entryPoints: [web]
+  routes:
+    - match: Host(`api.svc.cs.internal`)
+      kind: Rule
+      priority: 10
+      middlewares: [{ name: drop-identity-headers }, { name: forward-auth-service }]
+      services: [{ name: cs-api, port: 8080 }]
+---
+# 服务域：事件中心入口，EventProducer 以自身身份投递。
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: platform-events
+  namespace: crewstation-system
+spec:
+  entryPoints: [web]
+  routes:
+    - match: Host(`events.svc.cs.internal`)
+      kind: Rule
+      middlewares: [{ name: drop-identity-headers }, { name: forward-auth-service }]
+      services: [{ name: cs-events, port: 8084 }]

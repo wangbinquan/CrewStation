@@ -1,0 +1,25 @@
+# 非机密配置；机密（数据库地址、密钥、GitLab 令牌）由 install-platform.sh 写入 Secret crewstation-secrets。
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: crewstation-env
+  namespace: crewstation-system
+data:
+  CS_USER_DOMAIN: cs.localhost
+  CS_SERVICE_DOMAIN: svc.cs.internal
+  CS_SYSTEM_NAMESPACE: crewstation-system
+  CS_PUBLIC_SCHEME: http
+  CS_ADMIN_EMAILS: admin@demo.invalid
+  CS_IDENTITY_PROVIDER: demo
+  CS_REGISTRY_BASE: registry.crewstation-system.svc.cluster.local:5000
+  CS_BUILDER_IMAGE: cs-builder:dev
+  CS_TASK_IMAGE: cs-task-runtime:dev
+  CS_BUILDKIT_ADDRESS: tcp://buildkitd.crewstation-system.svc.cluster.local:1234
+  CS_GITLAB_URL: http://host.docker.internal:8929
+  CS_GITLAB_GROUP: crewstation
+  CS_DATA_POSTGRES_VISIBLE_URL: postgres://postgres.crewstation-system.svc.cluster.local:5432/crewstation
+  CS_SESSION_RUNNER_URL: ws://cs-session.crewstation-system.svc.cluster.local:8083/runner
+  CS_SESSION_INTERNAL_URL: http://cs-session.crewstation-system.svc.cluster.local:8083
+  CS_MCP_CAPABILITIES_URL: http://mcp-capabilities.svc.cs.internal/mcp
+  CS_MCP_OPERATIONS_URL: http://mcp-operations.svc.cs.internal/mcp
+  CS_IDLE_MINUTES: "120"

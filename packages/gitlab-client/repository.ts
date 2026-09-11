@@ -36,6 +36,9 @@ export function repositoryOperations(transport: Transport) {
       return { commitCount: commits.length, commits, compareSameRef: raw.compare_same_ref ?? false, compareTimeout: raw.compare_timeout ?? false };
     },
     getCommit: async (id: GitLabProjectRef, sha: string): Promise<GitLabCommit> => toCommit(await transport.request<RawCommit>('GET', `${repo(id)}/commits/${encodeURIComponent(sha)}`)),
+    /** 标签或分支处的文件原文；不存在时抛 not_found。 */
+    getRawFile: (id: GitLabProjectRef, path: string, ref: string): Promise<string> =>
+      transport.request<string>('GET', `${repo(id)}/files/${encodeURIComponent(path)}/raw`, { query: { ref } }).then((body) => (typeof body === 'string' ? body : JSON.stringify(body))),
     getRepositoryTree: (id: GitLabProjectRef, path: string, options: RepositoryTreeOptions = {}): Promise<GitLabTreeEntry[]> =>
       transport.requestAll<GitLabTreeEntry>(`${repo(id)}/tree`, { path, ref: options.ref, recursive: options.recursive }),
   };

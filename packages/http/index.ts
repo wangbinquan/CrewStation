@@ -8,3 +8,5 @@ export { identityFromHeaders, requireService, requireUser } from './identity';
 export { parseBody, parseParams, parseQuery } from './validate';
 export type { HttpActor } from './actor';
 export { actorFrom } from './actor';
+export type { Stoppable } from './processBootstrap';
+export { installShutdown } from './processBootstrap';

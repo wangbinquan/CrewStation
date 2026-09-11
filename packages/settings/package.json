@@ -1,0 +1,8 @@
+{
+  "name": "@crewstation/settings",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "平台进程的环境变量配置读取：名字统一带 CS_ 前缀，值不进入代码与日志",
+  "exports": { ".": "./index.ts" }
+}

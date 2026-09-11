@@ -1,0 +1,42 @@
+{
+  "name": "@crewstation/module-platform",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "组合根：把全部模块按端口装配成一个平台对象；进程只挑选 http、workers、subscriptions 入口",
+  "exports": {
+    ".": "./index.ts"
+  },
+  "crewstation": {
+    "layer": 7
+  },
+  "dependencies": {
+    "@crewstation/contracts": "workspace:*",
+    "@crewstation/eventbus": "workspace:*",
+    "@crewstation/http": "workspace:*",
+    "@crewstation/k8s": "workspace:*",
+    "@crewstation/kernel": "workspace:*",
+    "@crewstation/module-api-catalog": "workspace:*",
+    "@crewstation/module-business-task": "workspace:*",
+    "@crewstation/module-config": "workspace:*",
+    "@crewstation/module-data": "workspace:*",
+    "@crewstation/module-dev-session": "workspace:*",
+    "@crewstation/module-egress": "workspace:*",
+    "@crewstation/module-events": "workspace:*",
+    "@crewstation/module-gateway": "workspace:*",
+    "@crewstation/module-identity": "workspace:*",
+    "@crewstation/module-project": "workspace:*",
+    "@crewstation/module-release": "workspace:*",
+    "@crewstation/module-scm": "workspace:*",
+    "@crewstation/module-session": "workspace:*",
+    "@crewstation/module-task-runtime": "workspace:*",
+    "@crewstation/persistence": "workspace:*",
+    "@crewstation/queue": "workspace:*",
+    "@crewstation/session-client": "workspace:*",
+    "@crewstation/settings": "workspace:*",
+    "hono": "4.13.7"
+  },
+  "devDependencies": {
+    "@crewstation/testkit": "workspace:*"
+  }
+}

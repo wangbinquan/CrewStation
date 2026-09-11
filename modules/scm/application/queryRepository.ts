@@ -15,6 +15,8 @@ export function queryRepositoryUseCases({ uow, gitlab, authorizer }: ScmUseCaseD
     slotSha === undefined ? null : (await gitlab.countCommitsBehind(remoteProjectId, { from: headSha, to: slotSha })) ?? null;
   return {
     getBinding: async (actor: Actor, serviceId: ServiceId): Promise<RepositoryBindingDto> => bindingToDto(await viewable(actor, serviceId, false)),
+    /** 内部读取（无 actor）：release 取标签处的 Manifest 与 OpenAPI，dev-session 取分支处的预览配置。 */
+    readFile: async (serviceId: ServiceId, ref: string, path: string): Promise<string | undefined> => gitlab.readFile((await loadReadyBinding(uow, serviceId)).remoteProjectId, path, ref),
     /** 逐分支计算落后数：调用量与分支数成正比，故串行而不并发压 GitLab。 */
     listBranches: async (actor: Actor, serviceId: ServiceId, options: ListBranchesOptions = {}): Promise<BranchDto[]> => {
       const binding = await viewable(actor, serviceId, true);

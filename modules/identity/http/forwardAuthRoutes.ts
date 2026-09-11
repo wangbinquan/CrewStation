@@ -24,7 +24,7 @@ export function forwardAuthRoutes(api: IdentityModuleApi): Hono<AppEnv> {
     if (sessionToken && (decision.kind === 'login-redirect' || decision.kind === 'unauthenticated')) {
       deleteCookie(c, api.sessionCookie.name, { domain: api.sessionCookie.domain, path: api.sessionCookie.path });
     }
-    return userResponse(c, decision);
+    return userResponse(c, decision, api.sessionCookie.name);
   });
   r.all('/forward-auth/service', async (c) => {
     const decision = await api.authorizeServiceRequest({
@@ -47,7 +47,7 @@ function requestId(c: Context<AppEnv>): string {
   return c.get('requestId') ?? Bun.randomUUIDv7();
 }
 
-function userResponse(c: Context<AppEnv>, decision: UserAuthDecision): Response {
+function userResponse(c: Context<AppEnv>, decision: UserAuthDecision, sessionCookieName: string): Response {
   switch (decision.kind) {
     case 'allow': {
       c.header(IDENTITY_HEADERS.userId, decision.injected.userId);
@@ -55,6 +55,8 @@ function userResponse(c: Context<AppEnv>, decision: UserAuthDecision): Response 
       c.header(IDENTITY_HEADERS.userEmail, decision.injected.userEmail);
       c.header(IDENTITY_HEADERS.identityToken, decision.injected.identityToken);
       c.header(IDENTITY_HEADERS.requestId, requestId(c));
+      // 网关把本响应头复制进原请求：去掉平台会话 Cookie，业务服务拿不到会话令牌（Design §7.1）。
+      c.header('cookie', withoutSessionCookie(c.req.header('cookie'), sessionCookieName));
       return c.body(null, 200);
     }
     case 'login-redirect':
@@ -76,4 +78,8 @@ function serviceResponse(c: Context<AppEnv>, decision: ServiceAuthDecision): Res
   c.header(IDENTITY_HEADERS.traceId, decision.injected.traceId);
   c.header(IDENTITY_HEADERS.requestId, requestId(c));
   return c.body(null, 200);
+}
+
+function withoutSessionCookie(header: string | undefined, name: string): string {
+  return (header ?? '').split(';').map((part) => part.trim()).filter((part) => part && !part.startsWith(`${name}=`)).join('; ');
 }

@@ -55,6 +55,7 @@ export function fakeGitLab() {
     listBranches: async (id) => [...get(id).branches.values()],
     getBranch: async (id, name) => get(id).branches.get(name),
     listTags: async (id) => [...get(id).tags],
+    readFile: async () => undefined,
     createTag: async (id, { name, ref }) => {
       const project = get(id);
       if (project.tags.some((t) => t.name === name)) throw conflict(`Tag ${name} already exists`);

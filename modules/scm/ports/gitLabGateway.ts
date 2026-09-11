@@ -31,6 +31,8 @@ export interface GitLabGateway {
   listBranches(remoteProjectId: string): Promise<RemoteBranch[]>;
   getBranch(remoteProjectId: string, name: string): Promise<RemoteBranch | undefined>;
   listTags(remoteProjectId: string): Promise<RemoteTag[]>;
+  /** 指定引用处的文件原文；不存在返回 undefined。 */
+  readFile(remoteProjectId: string, path: string, ref: string): Promise<string | undefined>;
   createTag(remoteProjectId: string, input: { name: string; ref: string; message: string }): Promise<RemoteTag>;
   /** 幂等：匹配 `pattern` 的标签只允许维护者（平台）创建。 */
   ensureTagProtection(remoteProjectId: string, pattern: string): Promise<void>;

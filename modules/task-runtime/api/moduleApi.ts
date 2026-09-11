@@ -14,7 +14,9 @@ export interface EnvironmentDto {
   podName: string;
   connected: boolean;
   branch?: string;
+  preview?: { command: string[]; port: number; healthPath: string };
   traceId: string;
+  createdBy?: string;
   message?: string;
   createdAt: string;
   lastActivityAt: string;
@@ -47,6 +49,7 @@ export interface TaskRuntimeModuleApi {
   describeEnvironment(actor: Actor, taskId: TaskId): Promise<EnvironmentDto>;
   listEnvironments(actor: Actor, projectId: ProjectId, states?: EnvironmentState[]): Promise<EnvironmentDto[]>;
   findDevSession(projectId: ProjectId): Promise<EnvironmentDto | undefined>;
+  listRunningDevSessions(): Promise<EnvironmentDto[]>;
   verifyRunnerToken(taskId: TaskId, token: string): Promise<{ ok: true; projectId: string } | { ok: false; reason: string }>;
   canOpenStream(actor: Actor, taskId: TaskId): Promise<boolean>;
   reconcile(): Promise<number>;

@@ -1,0 +1,20 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: crewstation-migrate
+  namespace: crewstation-system
+spec:
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 600
+  template:
+    spec:
+      serviceAccountName: crewstation-control
+      restartPolicy: Never
+      containers:
+        - name: migrate
+          image: cs-control-plane:dev
+          imagePullPolicy: IfNotPresent
+          args: ["apps/cs-api/src/main.ts", "migrate"]
+          envFrom:
+            - configMapRef: { name: crewstation-env }
+            - secretRef: { name: crewstation-secrets }

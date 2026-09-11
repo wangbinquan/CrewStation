@@ -1,0 +1,13 @@
+**/node_modules
+**/dist
+**/coverage
+.git
+.local
+proposal
+docs
+deploy/k8s
+deploy/local
+templates
+integrations
+**/*.test.ts
+**/tests
