@@ -1,0 +1,95 @@
+# ServiceAccount and cluster RBAC for Traefik. Rules copied from the upstream v3.7.13 reference
+#   https://raw.githubusercontent.com/traefik/traefik/v3.7.13/docs/content/reference/dynamic-configuration/kubernetes-crd-rbac.yml
+# with the subject renamed to `traefik` in namespace crewstation-system.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: traefik
+  namespace: crewstation-system
+  labels:
+    app.kubernetes.io/name: traefik
+    app.kubernetes.io/part-of: crewstation
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: crewstation-traefik
+  labels:
+    app.kubernetes.io/name: traefik
+    app.kubernetes.io/part-of: crewstation
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - services
+      - secrets
+      - nodes
+      - configmaps
+    verbs:
+      - get
+      - list
+      - watch
+  # Needed only to inject k8s.pod.uid / k8s.pod.name OTel attributes; kept as upstream.
+  - apiGroups:
+      - ""
+    resources:
+      - pods
+    verbs:
+      - get
+  - apiGroups:
+      - discovery.k8s.io
+    resources:
+      - endpointslices
+    verbs:
+      - list
+      - watch
+  - apiGroups:
+      - extensions
+      - networking.k8s.io
+    resources:
+      - ingresses
+      - ingressclasses
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - extensions
+      - networking.k8s.io
+    resources:
+      - ingresses/status
+    verbs:
+      - update
+  - apiGroups:
+      - traefik.io
+    resources:
+      - middlewares
+      - middlewaretcps
+      - ingressroutes
+      - traefikservices
+      - ingressroutetcps
+      - ingressrouteudps
+      - tlsoptions
+      - tlsstores
+      - serverstransports
+      - serverstransporttcps
+    verbs:
+      - get
+      - list
+      - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: crewstation-traefik
+  labels:
+    app.kubernetes.io/name: traefik
+    app.kubernetes.io/part-of: crewstation
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: crewstation-traefik
+subjects:
+  - kind: ServiceAccount
+    name: traefik
+    namespace: crewstation-system

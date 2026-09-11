@@ -1,0 +1,65 @@
+# Verification B and C: an echo service behind Traefik, reachable as
+#   whoami.cs.localhost      from the host browser / curl (user-domain style host)
+#   whoami.svc.cs.internal   from pods, via the CoreDNS rewrite to Traefik (service-domain style host)
+# Image: docker.io/traefik/whoami:v1.12.0 (arm64).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: whoami
+  namespace: crewstation-verify
+  labels:
+    app: whoami
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: whoami
+  template:
+    metadata:
+      labels:
+        app: whoami
+    spec:
+      containers:
+        - name: whoami
+          image: docker.io/traefik/whoami:v1.12.0
+          imagePullPolicy: IfNotPresent
+          args:
+            - --port=80
+          ports:
+            - name: http
+              containerPort: 80
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 2
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: whoami
+  namespace: crewstation-verify
+  labels:
+    app: whoami
+spec:
+  selector:
+    app: whoami
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: whoami
+  namespace: crewstation-verify
+spec:
+  entryPoints:
+    - web
+  routes:
+    - match: Host(`whoami.cs.localhost`) || Host(`whoami.svc.cs.internal`)
+      kind: Rule
+      services:
+        - name: whoami
+          port: 80

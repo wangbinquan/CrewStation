@@ -1,0 +1,103 @@
+# In-cluster OCI image registry (CNCF Distribution). Plain HTTP, no auth: local profile only.
+#
+# Reachable as
+#   - registry.crewstation-system.svc.cluster.local:5000  from pods (ClusterIP of this Service)
+#   - 127.0.0.1:30500                                     from the node itself (NodePort); containerd
+#     is pointed at it by deploy/local/node-registry-hosts.sh so the kubelet can pull images tagged
+#     with the in-cluster name without cluster DNS.
+#
+# Image: docker.io/library/registry:3.1.1 (multi-arch, arm64 verified).
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: registry-data
+  namespace: crewstation-system
+  labels:
+    app.kubernetes.io/name: registry
+    app.kubernetes.io/part-of: crewstation
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 20Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: registry
+  namespace: crewstation-system
+  labels:
+    app.kubernetes.io/name: registry
+    app.kubernetes.io/part-of: crewstation
+spec:
+  # NodePort Services also get a ClusterIP, so this one Service serves both access paths.
+  type: NodePort
+  selector:
+    app.kubernetes.io/name: registry
+  ports:
+    - name: http
+      port: 5000
+      targetPort: http
+      nodePort: 30500
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: registry
+  namespace: crewstation-system
+  labels:
+    app.kubernetes.io/name: registry
+    app.kubernetes.io/part-of: crewstation
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: registry
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: registry
+        app.kubernetes.io/part-of: crewstation
+    spec:
+      containers:
+        - name: registry
+          image: docker.io/library/registry:3.1.1
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: REGISTRY_HTTP_ADDR
+              value: ":5000"
+            - name: REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY
+              value: /var/lib/registry
+            - name: REGISTRY_STORAGE_DELETE_ENABLED
+              value: "true"
+            - name: REGISTRY_LOG_LEVEL
+              value: info
+          ports:
+            - name: http
+              containerPort: 5000
+          readinessProbe:
+            httpGet:
+              path: /v2/
+              port: http
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /v2/
+              port: http
+            periodSeconds: 15
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              memory: 512Mi
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/registry
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: registry-data

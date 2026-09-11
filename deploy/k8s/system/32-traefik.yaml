@@ -1,0 +1,128 @@
+# Traefik v3 gateway: the single entry for both host classes of the design (user domain and
+# service domain). Local profile: one replica, HTTP only (websecure entrypoint exists, no certs yet).
+#
+# Deliberate settings
+#   - `--entryPoints.*.forwardedHeaders.trustedIPs` is NOT set: Traefik discards incoming
+#     X-Forwarded-* headers and derives X-Forwarded-For / X-Real-Ip from the real TCP peer, which is
+#     what the source-Pod-IP identity lookup (Design Q21) relies on.
+#   - `--providers.kubernetescrd.allowCrossNamespace=true`: IngressRoutes may reference Middlewares
+#     and Services in other namespaces (platform-owned middlewares, per-project namespaces).
+#   - `--api.dashboard=false`, `--log.level=INFO`, `--accesslog=true` as required.
+#   - The container listens on unprivileged ports 8000/8443 as uid 65532; the Service maps 80/443.
+#
+# Service type LoadBalancer: on Docker Desktop, cloud-provider-kind runs an envoy container that
+# publishes the ports on the host, so http://localhost:80 reaches this Service.
+#
+# Image: docker.io/library/traefik:v3.7.13 (multi-arch, arm64 verified).
+apiVersion: networking.k8s.io/v1
+kind: IngressClass
+metadata:
+  name: traefik
+  labels:
+    app.kubernetes.io/name: traefik
+    app.kubernetes.io/part-of: crewstation
+  annotations:
+    ingressclass.kubernetes.io/is-default-class: "true"
+spec:
+  controller: traefik.io/ingress-controller
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: traefik
+  namespace: crewstation-system
+  labels:
+    app.kubernetes.io/name: traefik
+    app.kubernetes.io/part-of: crewstation
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: traefik
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: traefik
+        app.kubernetes.io/part-of: crewstation
+    spec:
+      serviceAccountName: traefik
+      securityContext:
+        runAsUser: 65532
+        runAsGroup: 65532
+        runAsNonRoot: true
+        fsGroup: 65532
+      containers:
+        - name: traefik
+          image: docker.io/library/traefik:v3.7.13
+          imagePullPolicy: IfNotPresent
+          args:
+            - --global.checkNewVersion=false
+            - --global.sendAnonymousUsage=false
+            - --entryPoints.web.address=:8000/tcp
+            - --entryPoints.websecure.address=:8443/tcp
+            - --entryPoints.traefik.address=:9000/tcp
+            - --ping=true
+            - --ping.entryPoint=traefik
+            - --api.dashboard=false
+            - --log.level=INFO
+            - --accesslog=true
+            - --providers.kubernetescrd=true
+            - --providers.kubernetescrd.allowCrossNamespace=true
+            - --providers.kubernetesingress=true
+          ports:
+            - name: web
+              containerPort: 8000
+            - name: websecure
+              containerPort: 8443
+            - name: traefik
+              containerPort: 9000
+          readinessProbe:
+            httpGet:
+              path: /ping
+              port: traefik
+            periodSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /ping
+              port: traefik
+            periodSeconds: 10
+            failureThreshold: 3
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              memory: 512Mi
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: traefik
+  namespace: crewstation-system
+  labels:
+    app.kubernetes.io/name: traefik
+    app.kubernetes.io/part-of: crewstation
+spec:
+  type: LoadBalancer
+  selector:
+    app.kubernetes.io/name: traefik
+  ports:
+    - name: web
+      port: 80
+      targetPort: web
+    - name: websecure
+      port: 443
+      targetPort: websecure

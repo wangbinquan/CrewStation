@@ -1,0 +1,144 @@
+# BuildKit daemon (rootless) used by cs-controller to build release images (Design §6).
+#
+#   - Listens on tcp://0.0.0.0:1234 (Service `buildkitd:1234`) and on the unix socket that the
+#     in-image `buildctl` uses by default, so `kubectl exec ... buildctl` works for checks.
+#   - Rootless mode as in the upstream example examples/kubernetes/deployment+service.rootless.yaml:
+#     seccomp and AppArmor unconfined, uid/gid 1000, `--oci-worker-no-process-sandbox`, no privileged
+#     container. `allowPrivilegeEscalation` must stay at its default because rootlesskit relies on the
+#     setuid newuidmap/newgidmap binaries.
+#   - buildkitd.toml (ConfigMap) declares the in-cluster registry as plain HTTP so pushes work without TLS.
+#   - Build cache lives on a PVC so it survives pod restarts (Deployment uses Recreate: one writer).
+#
+# Image: docker.io/moby/buildkit:v0.33.0-rootless (multi-arch, arm64 verified).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: buildkitd-config
+  namespace: crewstation-system
+  labels:
+    app.kubernetes.io/name: buildkitd
+    app.kubernetes.io/part-of: crewstation
+data:
+  buildkitd.toml: |
+    debug = false
+
+    [worker.oci]
+      enabled = true
+
+    # In-cluster registry: HTTP, no TLS (local profile).
+    [registry."registry.crewstation-system.svc.cluster.local:5000"]
+      http = true
+      insecure = true
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: buildkitd-cache
+  namespace: crewstation-system
+  labels:
+    app.kubernetes.io/name: buildkitd
+    app.kubernetes.io/part-of: crewstation
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 20Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: buildkitd
+  namespace: crewstation-system
+  labels:
+    app.kubernetes.io/name: buildkitd
+    app.kubernetes.io/part-of: crewstation
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: buildkitd
+  ports:
+    - name: grpc
+      port: 1234
+      targetPort: grpc
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: buildkitd
+  namespace: crewstation-system
+  labels:
+    app.kubernetes.io/name: buildkitd
+    app.kubernetes.io/part-of: crewstation
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: buildkitd
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: buildkitd
+        app.kubernetes.io/part-of: crewstation
+    spec:
+      containers:
+        - name: buildkitd
+          image: docker.io/moby/buildkit:v0.33.0-rootless
+          imagePullPolicy: IfNotPresent
+          args:
+            - --addr
+            - unix:///run/user/1000/buildkit/buildkitd.sock
+            - --addr
+            - tcp://0.0.0.0:1234
+            - --oci-worker-no-process-sandbox
+            - --config
+            - /etc/buildkit/buildkitd.toml
+          securityContext:
+            seccompProfile:
+              type: Unconfined
+            appArmorProfile:
+              type: Unconfined
+            runAsUser: 1000
+            runAsGroup: 1000
+          ports:
+            - name: grpc
+              containerPort: 1234
+          readinessProbe:
+            exec:
+              command:
+                - buildctl
+                - debug
+                - workers
+            initialDelaySeconds: 5
+            periodSeconds: 20
+            timeoutSeconds: 10
+          livenessProbe:
+            exec:
+              command:
+                - buildctl
+                - debug
+                - workers
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 10
+          resources:
+            requests:
+              cpu: 200m
+              memory: 512Mi
+            limits:
+              memory: 4Gi
+          volumeMounts:
+            - name: cache
+              mountPath: /home/user/.local/share/buildkit
+            - name: config
+              mountPath: /etc/buildkit
+              readOnly: true
+      volumes:
+        - name: cache
+          persistentVolumeClaim:
+            claimName: buildkitd-cache
+        - name: config
+          configMap:
+            name: buildkitd-config

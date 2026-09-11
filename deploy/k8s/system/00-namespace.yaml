@@ -1,0 +1,8 @@
+# Namespace holding the local platform infrastructure (PostgreSQL, registry, Traefik, BuildKit).
+# Applied first by deploy/local/bootstrap.sh.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: crewstation-system
+  labels:
+    app.kubernetes.io/part-of: crewstation

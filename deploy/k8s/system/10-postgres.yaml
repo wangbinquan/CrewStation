@@ -1,0 +1,133 @@
+# PostgreSQL 17 for the CrewStation control plane (local single-node profile).
+#
+# Credentials come from the Secret `postgres-credentials` (keys: username, password, database,
+# host, port, url). deploy/local/bootstrap.sh creates it with a random password when it is absent
+# and never overwrites it. The Secret is not part of the repository.
+#
+# Image: docker.io/library/postgres:17.11 (multi-arch, arm64 verified on the docker-desktop node).
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: crewstation-system
+  labels:
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/part-of: crewstation
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: postgres
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres
+---
+# Headless Service required by the StatefulSet for stable pod DNS (postgres-0.postgres-headless).
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-headless
+  namespace: crewstation-system
+  labels:
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/part-of: crewstation
+spec:
+  clusterIP: None
+  publishNotReadyAddresses: true
+  selector:
+    app.kubernetes.io/name: postgres
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: crewstation-system
+  labels:
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/part-of: crewstation
+spec:
+  serviceName: postgres-headless
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: postgres
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: postgres
+        app.kubernetes.io/part-of: crewstation
+    spec:
+      # uid/gid 999 is the `postgres` user of the official image; running as it avoids the
+      # root-then-gosu path and works with local-path volumes (created world-writable).
+      securityContext:
+        runAsUser: 999
+        runAsGroup: 999
+        fsGroup: 999
+      containers:
+        - name: postgres
+          image: docker.io/library/postgres:17.11
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: username
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: password
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: database
+            # Sub-directory so that a volume root owned by root / containing lost+found is fine.
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          ports:
+            - name: postgres
+              containerPort: 5432
+          # TCP probe on purpose: during first initialisation the entrypoint runs a temporary
+          # server on the unix socket only, and that phase must not count as ready.
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - pg_isready -h 127.0.0.1 -p 5432 -U "$POSTGRES_USER" -d "$POSTGRES_DB"
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+          livenessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - pg_isready -h 127.0.0.1 -p 5432 -U "$POSTGRES_USER" -d "$POSTGRES_DB"
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            timeoutSeconds: 5
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              memory: 1Gi
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 10Gi

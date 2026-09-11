@@ -1,0 +1,7 @@
+# Throw-away namespace for deploy/local/verify.sh. Deleted at the end of every verification run.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: crewstation-verify
+  labels:
+    app.kubernetes.io/part-of: crewstation
