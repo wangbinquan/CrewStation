@@ -1,0 +1,23 @@
+import type { ServiceId, UserId } from '@crewstation/contracts';
+import { precondition } from '@crewstation/kernel';
+
+export type GrantState = 'granted' | 'revoked';
+
+/** 服务 ↔ 操作键的授权。撤销保留记录；操作被移除时授权保留但不再进入放行表。 */
+export interface ApiGrant {
+  readonly serviceId: ServiceId;
+  readonly operationKey: string;
+  readonly state: GrantState;
+  readonly grantedBy: UserId;
+  readonly grantedAt: Date;
+  readonly revokedAt?: Date;
+}
+
+export function grantOperation(serviceId: ServiceId, operationKey: string, grantedBy: UserId, now: Date): ApiGrant {
+  return { serviceId, operationKey, state: 'granted', grantedBy, grantedAt: now };
+}
+
+export function revokeGrant(grant: ApiGrant, now: Date): ApiGrant {
+  if (grant.state !== 'granted') throw precondition(`授权 ${grant.operationKey} 已被撤销`, { operationKey: grant.operationKey });
+  return { ...grant, state: 'revoked', revokedAt: now };
+}

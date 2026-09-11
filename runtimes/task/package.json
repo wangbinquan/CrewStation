@@ -4,6 +4,14 @@
   "private": true,
   "type": "module",
   "description": "任务容器镜像与 TaskRunner：只依赖 contracts、kernel、ws、agent-drivers；进另一个镜像，不得引入控制面代码",
-  "scripts": { "start": "bun run src/main.ts" },
-  "dependencies": { "@crewstation/kernel": "workspace:*", "@crewstation/contracts": "workspace:*" }
+  "scripts": {
+    "start": "bun run src/main.ts",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@crewstation/contracts": "workspace:*",
+    "@crewstation/kernel": "workspace:*",
+    "@crewstation/ws": "workspace:*",
+    "ajv": "8.20.0"
+  }
 }

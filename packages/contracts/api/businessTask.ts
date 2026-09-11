@@ -79,3 +79,4 @@ export type SubmitSubtaskRequest = z.infer<typeof SubmitSubtaskRequestSchema>;
 export type SubtaskDto = z.infer<typeof SubtaskDtoSchema>;
 export type SubtaskState = z.infer<typeof SubtaskStateSchema>;
 export type SubtaskMode = z.infer<typeof SubtaskModeSchema>;
+export type SubtaskMessageRequest = z.infer<typeof SubtaskMessageRequestSchema>;

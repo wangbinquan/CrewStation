@@ -1,0 +1,14 @@
+# BuildKit 按 <Dockerfile>.dockerignore 裁剪上下文：仓库根很大（node_modules、.git、工作台、模块），只放行镜像需要的几个目录。
+*
+!bunfig.toml
+!packages/contracts
+!packages/kernel
+!packages/ws
+!packages/agent-drivers
+!runtimes/task
+**/node_modules
+**/*.test.ts
+**/tests
+**/.DS_Store
+runtimes/task/Dockerfile
+runtimes/task/Dockerfile.dockerignore
