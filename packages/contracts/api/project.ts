@@ -14,6 +14,8 @@ export const ProjectDtoSchema = z.object({
   ownerUserId: UserIdSchema,
   state: ProjectStateSchema,
   serviceId: ServiceIdSchema.optional(),
+  /** provisioning／failed 等状态的说明，例如开通链失败的步骤与原因。 */
+  message: z.string().optional(),
   createdAt: z.iso.datetime(),
 });
 

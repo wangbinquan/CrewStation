@@ -7,6 +7,7 @@ COPY modules ./modules
 COPY packages ./packages
 COPY runtimes ./runtimes
 COPY tools ./tools
+COPY templates ./templates
 # 控制面不需要前端与任务容器的依赖：删掉它们的 package.json 让 bun 不安装
 RUN rm -rf apps/console runtimes/task && bun install
 ENV NODE_ENV=production

@@ -1,0 +1,58 @@
+import type { AgentInstanceDto, BranchDto, DevSessionDto, OpenDevSessionRequest, ReleaseDto, SendAgentMessageRequest } from '@crewstation/contracts';
+import type { Transport } from '../httpTransport';
+import type { ItemsPage } from '../itemsPage';
+import type { PublishInput, StartDevAgentInput } from '../requestInputs';
+import { segment } from '../requestUrl';
+
+/** DELETE /v1/projects/:projectId/dev-session 的响应：释放后的会话与容器里尚未推送的提交（`<sha> <subject>`）。 */
+export interface ReleaseDevSessionResult {
+  readonly session: DevSessionDto;
+  readonly unpushed: string[];
+}
+
+export interface ReleaseDevSessionOptions {
+  /** 负责人强制释放他人会话时必须为 true。 */
+  readonly force?: boolean;
+}
+
+/** 开发会话：一项目一会话、分支与落后数、并行流式 Agent、从会话发布。 */
+export interface DevSessionResource {
+  /** GET /v1/projects/:projectId/dev-session；没有会话时抛 not_found（404）。 */
+  get(projectId: string): Promise<DevSessionDto>;
+  /** POST /v1/projects/:projectId/dev-session（201） */
+  open(projectId: string, input: OpenDevSessionRequest): Promise<DevSessionDto>;
+  /** DELETE /v1/projects/:projectId/dev-session?force=true */
+  release(projectId: string, options?: ReleaseDevSessionOptions): Promise<ReleaseDevSessionResult>;
+  /** GET /v1/projects/:projectId/branches：各分支 HEAD 与落后两槽的提交数。 */
+  listBranches(projectId: string): Promise<ItemsPage<BranchDto>>;
+  /** POST /v1/projects/:projectId/publish（202）：有未提交更改时 412 precondition，details.uncommitted 列出路径。 */
+  publish(projectId: string, input: PublishInput): Promise<ReleaseDto>;
+  /** GET /v1/tasks/:taskId/agents */
+  listAgents(taskId: string): Promise<ItemsPage<AgentInstanceDto>>;
+  /** POST /v1/tasks/:taskId/agents（201）：启动一个流式交互 Agent。 */
+  startAgent(taskId: string, input: StartDevAgentInput): Promise<AgentInstanceDto>;
+  /** POST /v1/tasks/:taskId/agents/:agentId/messages（204） */
+  sendMessage(taskId: string, agentId: string, input: SendAgentMessageRequest): Promise<void>;
+  /** POST /v1/tasks/:taskId/agents/:agentId/cancel（204） */
+  cancelAgent(taskId: string, agentId: string): Promise<void>;
+  /** POST /v1/tasks/:taskId/touch（204）：刷新活动时间，避免空闲提醒。 */
+  touch(taskId: string): Promise<void>;
+}
+
+export function devSessionResource(transport: Transport): DevSessionResource {
+  const project = (projectId: string) => `/v1/projects/${segment(projectId)}`;
+  const agents = (taskId: string) => `/v1/tasks/${segment(taskId)}/agents`;
+  return {
+    get: (projectId) => transport.request<DevSessionDto>('GET', `${project(projectId)}/dev-session`),
+    open: (projectId, input) => transport.request<DevSessionDto>('POST', `${project(projectId)}/dev-session`, { body: input }),
+    release: (projectId, options) =>
+      transport.request<ReleaseDevSessionResult>('DELETE', `${project(projectId)}/dev-session`, { query: { force: options?.force ? 'true' : undefined } }),
+    listBranches: (projectId) => transport.request<ItemsPage<BranchDto>>('GET', `${project(projectId)}/branches`),
+    publish: (projectId, input) => transport.request<ReleaseDto>('POST', `${project(projectId)}/publish`, { body: input }),
+    listAgents: (taskId) => transport.request<ItemsPage<AgentInstanceDto>>('GET', agents(taskId)),
+    startAgent: (taskId, input) => transport.request<AgentInstanceDto>('POST', agents(taskId), { body: input }),
+    sendMessage: (taskId, agentId, input) => transport.request<void>('POST', `${agents(taskId)}/${segment(agentId)}/messages`, { body: input }),
+    cancelAgent: (taskId, agentId) => transport.request<void>('POST', `${agents(taskId)}/${segment(agentId)}/cancel`),
+    touch: (taskId) => transport.request<void>('POST', `/v1/tasks/${segment(taskId)}/touch`),
+  };
+}

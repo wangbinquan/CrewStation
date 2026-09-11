@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "由 contracts 生成的平台 API 客户端；console、cli、mcp-* 共用",
+  "description": "手写的类型化平台 API 客户端：按 contracts 的 DTO 逐条镜像用户面路由；console、cli、mcp-* 共用",
   "exports": { ".": "./index.ts" },
   "dependencies": { "@crewstation/contracts": "workspace:*" }
 }

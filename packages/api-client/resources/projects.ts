@@ -1,0 +1,41 @@
+import type { MemberDto, ProjectDto, QuotaDto, SetMemberRequest, SetQuotaRequest } from '@crewstation/contracts';
+import type { Transport } from '../httpTransport';
+import type { ItemsPage } from '../itemsPage';
+import type { CreateProjectInput } from '../requestInputs';
+import { segment } from '../requestUrl';
+
+export interface ProjectsResource {
+  /** GET /v1/projects：管理员看全部，成员看自己所在的项目。 */
+  list(): Promise<ItemsPage<ProjectDto>>;
+  /** POST /v1/projects（管理员代建并指定负责人）。 */
+  create(input: CreateProjectInput): Promise<ProjectDto>;
+  /** GET /v1/projects/:projectId */
+  get(projectId: string): Promise<ProjectDto>;
+  /** POST /v1/projects/:projectId/archive */
+  archive(projectId: string): Promise<ProjectDto>;
+  /** GET /v1/projects/:projectId/members */
+  listMembers(projectId: string): Promise<ItemsPage<MemberDto>>;
+  /** PUT /v1/projects/:projectId/members：新增或改角色。 */
+  setMember(projectId: string, input: SetMemberRequest): Promise<MemberDto>;
+  /** DELETE /v1/projects/:projectId/members/:userId */
+  removeMember(projectId: string, userId: string): Promise<void>;
+  /** GET /v1/projects/:projectId/quota */
+  getQuota(projectId: string): Promise<QuotaDto>;
+  /** PUT /v1/projects/:projectId/quota */
+  setQuota(projectId: string, input: SetQuotaRequest): Promise<QuotaDto>;
+}
+
+export function projectsResource(transport: Transport): ProjectsResource {
+  const base = (projectId: string) => `/v1/projects/${segment(projectId)}`;
+  return {
+    list: () => transport.request<ItemsPage<ProjectDto>>('GET', '/v1/projects'),
+    create: (input) => transport.request<ProjectDto>('POST', '/v1/projects', { body: input }),
+    get: (projectId) => transport.request<ProjectDto>('GET', base(projectId)),
+    archive: (projectId) => transport.request<ProjectDto>('POST', `${base(projectId)}/archive`),
+    listMembers: (projectId) => transport.request<ItemsPage<MemberDto>>('GET', `${base(projectId)}/members`),
+    setMember: (projectId, input) => transport.request<MemberDto>('PUT', `${base(projectId)}/members`, { body: input }),
+    removeMember: (projectId, userId) => transport.request<void>('DELETE', `${base(projectId)}/members/${segment(userId)}`),
+    getQuota: (projectId) => transport.request<QuotaDto>('GET', `${base(projectId)}/quota`),
+    setQuota: (projectId, input) => transport.request<QuotaDto>('PUT', `${base(projectId)}/quota`, { body: input }),
+  };
+}

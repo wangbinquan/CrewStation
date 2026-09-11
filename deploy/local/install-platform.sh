@@ -23,8 +23,8 @@ if [[ "${SKIP_BUILD:-}" != "1" ]]; then
 fi
 
 log "机密：crewstation-secrets"
-PG_PASSWORD="$(kubectl -n $NS get secret postgres-credentials -o jsonpath='{.data.POSTGRES_PASSWORD}' | base64 -d)"
-DB_URL="postgres://crewstation:${PG_PASSWORD}@postgres.${NS}.svc.cluster.local:5432/crewstation"
+DB_URL="$(kubectl -n $NS get secret postgres-credentials -o jsonpath='{.data.url}' | base64 -d)"
+[[ -n "$DB_URL" ]] || { echo "postgres-credentials 缺少 url" >&2; exit 1; }
 if kubectl -n $NS get secret crewstation-secrets >/dev/null 2>&1; then
   SECRET_KEY="$(kubectl -n $NS get secret crewstation-secrets -o jsonpath='{.data.CS_SECRET_KEY}' | base64 -d)"
 else

@@ -211,7 +211,7 @@ function composeAggregates(deps: PlatformModuleDeps, core: ReturnType<typeof com
     },
   });
   const provisioning = createProvisioningModule({
-    db, logger, workerOwner: `${deps.instance}.provisioning`, consumerName: 'provisioning',
+    db, logger, workerOwner: `${deps.instance}.provisioning`, consumerName: 'provisioning', isAdmin: (id) => isAdmin(id),
     steps: {
       loadProject: async (projectId) => { const s = (await project.api.listServices()).find((x) => x.projectId === projectId); return s ? { projectId, serviceId: s.serviceId, slug: s.slug, name: s.name, namespace: s.namespace, kind: s.kind, template: 'minimal-sample' } : undefined; },
       ensureNamespace: async (f) => {
@@ -245,7 +245,7 @@ export function createPlatformModule(deps: PlatformModuleDeps): PlatformModule {
   const api: PlatformModuleApi = {
     name: 'platform',
     routers: {
-      api: [...m.project.http, ...m.identity.http.users, ...m.config.http, ...m.egress.http, ...m.data.http, ...m.scm.http, ...m.apiCatalog.http, ...m.release.http, ...m.gateway.http, ...m.taskRuntime.http, ...m.devSession.http, m.businessTask.http.service, m.businessTask.http.user, ...m.events.http.query, ...m.observability.http, ...m.capabilities.http],
+      api: [...m.project.http, ...m.identity.http.users, ...m.config.http, ...m.egress.http, ...m.data.http, ...m.scm.http, ...m.apiCatalog.http, ...m.release.http, ...m.gateway.http, ...m.taskRuntime.http, ...m.devSession.http, m.businessTask.http.service, m.businessTask.http.user, ...m.events.http.query, ...m.observability.http, ...m.capabilities.http, ...m.provisioning.http],
       auth: [...m.identity.http.auth, ...m.identity.http.forwardAuth],
       session: [m.session.http.runner, m.session.http.stream, m.session.http.internal],
       events: [...m.events.http.ingress],

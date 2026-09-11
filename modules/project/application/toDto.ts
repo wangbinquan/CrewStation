@@ -14,6 +14,7 @@ export function projectToDto(project: Project, service: Service | undefined): Pr
     ownerUserId: project.ownerUserId,
     state: project.state,
     ...(service ? { serviceId: service.id } : {}),
+    ...(project.message ? { message: project.message } : {}),
     createdAt: project.createdAt.toISOString(),
   };
 }

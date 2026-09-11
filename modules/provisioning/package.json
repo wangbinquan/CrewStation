@@ -13,9 +13,12 @@
   "dependencies": {
     "@crewstation/contracts": "workspace:*",
     "@crewstation/eventbus": "workspace:*",
+    "@crewstation/http": "workspace:*",
     "@crewstation/kernel": "workspace:*",
     "@crewstation/persistence": "workspace:*",
-    "@crewstation/queue": "workspace:*"
+    "@crewstation/queue": "workspace:*",
+    "hono": "4.13.7",
+    "zod": "4.6.2"
   },
   "devDependencies": {
     "@crewstation/testkit": "workspace:*"
