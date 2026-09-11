@@ -2,10 +2,13 @@ import type { AgentInstanceState, DevSessionState, PreviewState, TaskDataBinding
 import type { BadgeTone } from '../../../shared/ui/Badge';
 import type { StreamStatus } from './taskStreamSocket';
 
-/** 状态到色调的唯一映射：各面板不各写一份 if。 */
+/**
+ * 状态到色调的唯一映射：各面板不各写一份 if。
+ * failed／crashed 用 danger，与「降级但还在跑」的 warning 区分开——两者同色时只能靠读字辨认。
+ */
 export function sessionStateTone(state: DevSessionState): BadgeTone {
   if (state === 'running') return 'success';
-  if (state === 'failed') return 'warning';
+  if (state === 'failed') return 'danger';
   return state === 'creating' || state === 'releasing' ? 'info' : 'neutral';
 }
 
@@ -18,13 +21,13 @@ export function streamStatusTone(status: StreamStatus): BadgeTone {
 export function agentStateTone(state: AgentInstanceState): BadgeTone {
   if (state === 'running' || state === 'starting') return 'info';
   if (state === 'awaiting-input') return 'warning';
-  if (state === 'failed') return 'warning';
+  if (state === 'failed') return 'danger';
   return state === 'completed' ? 'success' : 'neutral';
 }
 
 export function previewStateTone(state: PreviewState): BadgeTone {
   if (state === 'ready') return 'success';
-  if (state === 'crashed') return 'warning';
+  if (state === 'crashed') return 'danger';
   return state === 'starting' ? 'info' : 'neutral';
 }
 

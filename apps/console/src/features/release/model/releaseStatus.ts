@@ -10,6 +10,6 @@ export function isInFlight(status: ReleaseStatus): boolean {
 
 export function releaseStatusTone(status: ReleaseStatus): BadgeTone {
   if (status === 'ready') return 'success';
-  if (status === 'failed') return 'warning';
+  if (status === 'failed') return 'danger';
   return isInFlight(status) ? 'info' : 'neutral';
 }

@@ -1,7 +1,7 @@
 import type { ProjectState, SlotDto } from '@crewstation/contracts';
 import type { BadgeTone } from '../../../shared/ui/Badge';
 
-/** 项目状态色：active 成功、provisioning 进行中、failed 需要处理、暂停与归档中性。 */
+/** 项目状态色：active 成功、provisioning 进行中、failed 用 danger（与降级区分）、暂停与归档中性。 */
 export function projectStateTone(state: ProjectState): BadgeTone {
   switch (state) {
     case 'active':
@@ -9,13 +9,13 @@ export function projectStateTone(state: ProjectState): BadgeTone {
     case 'provisioning':
       return 'info';
     case 'failed':
-      return 'warning';
+      return 'danger';
     default:
       return 'neutral';
   }
 }
 
-/** 部署槽状态色：ready 成功、deploying 进行中、degraded／failed 需要处理、empty 中性。 */
+/** 部署槽状态色：ready 成功、deploying 进行中、degraded 警告、failed 危险、empty 中性。 */
 export function slotStateTone(state: SlotDto['state']): BadgeTone {
   switch (state) {
     case 'ready':
@@ -23,8 +23,9 @@ export function slotStateTone(state: SlotDto['state']): BadgeTone {
     case 'deploying':
       return 'info';
     case 'degraded':
-    case 'failed':
       return 'warning';
+    case 'failed':
+      return 'danger';
     default:
       return 'neutral';
   }
