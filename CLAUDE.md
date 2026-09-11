@@ -4,15 +4,38 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository status
 
-CrewStation (数字人能力平台: a platform on which teams build, publish and run "digital worker" business apps with coding agents) is at the proposal stage. The repository holds Chinese-language design documents under `proposal/` plus two source essays by the author. There is no source code, package manifest, lockfile, CI, or test suite.
+CrewStation (数字人能力平台: a platform on which teams build, publish and run "digital worker" business apps with coding agents) now holds **both** the design documents under `proposal/` and a working implementation. The three proposal documents are v0.3.2 and remain the authoritative contract; the code is the first implementation of that contract, verified on the local kind cluster, not a shipped product.
 
-Everything the documents describe (`cs-*` services, platform APIs, the Manifest, state machines, the `crewstation install|upgrade|status|verify` CLI) is a *proposed* contract, not an existing one. Do not describe any of it as implemented, verified, or company-approved.
+What exists in the cluster today (local `docker-desktop` kind node, namespace `crewstation-system`): five resident services, the workbench, Traefik, PostgreSQL, a registry and BuildKit. The end-to-end chain that has actually been run: administrator creates a project → namespace, quota and network policies → GitLab repository from `templates/minimal-sample` → production data resource → gateway routes → first tag release built and deployed to the preview slot → traffic switch to prod → rollback. Also verified: demo login through the gateway with identity injection, the sample page reading the injected user, a dev session container whose TaskRunner connects to cs-session, and the business subtask contract (the sample's `/chat` creates a business task, runs an agent subtask and returns its output).
 
-**Version state (2026-09-11):** all three documents are v0.3.3 and consistent (v0.3.3 only adds the repository-structure decision D52). v0.3.2 applied the 25 rulings (G1–G25) of the design gate review in `proposal/reviews/design-gate-2026-09-11.md` (seven independent lenses; §6 lists the rulings). `proposal/tech-evaluation.md` (1.1.0) records the confirmed technology choices E01–E25 with their still-unverified points. Exact versions are not locked until Plan T0.2, and everything remains a proposal until M0 prototypes verify it.
+Still incomplete, and it must not be described otherwise: the `stub` agent driver is the only one proven end to end, log paging has no cursor (the first-version source reads the Pod log tail directly), and scale, HA and the installer are untouched (M6).
 
 ## Commands
 
-None exist yet. The confirmed stack is TypeScript on Bun with Bun workspaces, Hono, zod and Drizzle (see `proposal/tech-evaluation.md`), so expect `bun install` and `bun test` style commands once code lands; replace this section with the real ones then. The `crewstation …` commands in Design §11–12 are the future product CLI, not developer tooling.
+```
+bun install                 # Bun 1.3.13 workspaces
+bun run check               # the gate: arch:check → lint → typecheck → typecheck:console → test
+bun run arch:check          # the six architecture rules; no baseline, no exceptions list
+bun test path/to/file.test.ts   # a single test file
+bun run scaffold:module <name>  # the only sanctioned way to create a module
+./deploy/local/bootstrap.sh       # one-time local cluster prerequisites
+./deploy/local/install-platform.sh  # build images, migrate, deploy; idempotent
+./deploy/local/verify.sh            # post-install checks
+```
+
+`bun run check` must pass before any commit. Integration tests that need PostgreSQL or the local GitLab skip themselves when those are unreachable, so a green run on a bare machine does not mean the integration paths ran.
+
+The `crewstation …` commands in Design §11–12 are the product CLI under `apps/cli`, not developer tooling.
+
+## Repository structure and its rules
+
+`docs/engineering/repository-structure.md` (v0.2, confirmed) governs the layout, and `tools/arch/` enforces it mechanically. Read it before adding a file. The rules exist because agent-workflow degraded without them; §0 quantifies that (172 flat files in one directory, an 8170-line schema file imported by 303 files).
+
+Three classes of code: `apps/*` are deployable processes holding wiring only; `modules/*` are domain modules, each with a `layer`, importing only strictly lower layers and only through another module's root `index.ts`; `packages/*` are domain-free libraries. `runtimes/task` is the task container image, `integrations/*` and `templates/*` are standalone project sources rather than workspace members.
+
+Every module follows one fixed template: `api/ domain/ application/ ports/ adapters/ http/ workers/ tests/` plus `wiring.ts` and `index.ts`. One PostgreSQL schema per module; cross-module references are IDs with no foreign keys, and one module never joins another's tables. A module that needs something from a higher layer declares a port and the composition root supplies it (`modules/platform/wiring.ts`).
+
+Hard caps, enforced with no baseline: 600 lines per file (1000 for tests), 20 source files per directory, 80 lines per function. Banned filenames anywhere: `utils.ts`, `helpers.ts`, `common.ts`, `misc.ts`, `shared.ts`, and `types.ts` outside a module's `api/`. Named exports only; the single exception is recorded in ADR-0002. Changing any of this needs a new ADR under `docs/adr/`, not an edit in passing.
 
 ## The three documents
 
@@ -73,5 +96,7 @@ Every task has a platform traceId generated at task creation (or inherited from 
 ### Code reuse
 The copy unit from `~/dev/proj/agent-workflow` (Bun 1.4 + TypeScript, Hono, Drizzle) is: the `RuntimeDriver` drivers under `packages/backend/src/services/runtime/`, `execution/agentInjection`, `agentProcess` and `managedProcess`, and the Agent/Mcp/AgentPermission schemas from `shared`. The DAG orchestration in `runner.ts` is NOT copied; CrewStation writes its own. Do not modify that repository. Two registered deviations from agent-workflow's runtime behavior: dev-session agents run in a streaming interactive mode (both CLIs are one-shot processes there), and Claude Code's built-in sandbox is turned off inside task containers. Public-cloud and internal models are treated identically, as agent-workflow does. The running local `aw-local-gitlab` container (gitlab-ce 19.2.4, HTTP 127.0.0.1:8929, SSH 2222) is the test GitLab; its compose definition is lost and that is a known, deferred gap.
 
-### Planned layout and delivery
-Repository organisation is governed by `docs/engineering/repository-structure.md` (confirmed 2026-09-11) and must be followed for every file added: three classes of code, `apps/*` (deployable processes that only wire modules), `modules/*` (16 domain modules, each declaring a `layer` in package.json and depending only on strictly lower layers: identity → project → scm/config/data/egress/api-catalog/events → release/task-runtime → dev-session/business-task/session/gateway → observability/capabilities), `packages/*` (domain-free libraries: contracts, kernel, persistence, queue, eventbus, http, ws, k8s, gitlab-client, jwt, agent-drivers, api-client, testkit). Fixed module template `api/ domain/ application/ ports/ adapters/ http/ workers/ wiring.ts index.ts`; other modules import only the root `index.ts` (enforced by `exports`). One PostgreSQL schema per module, migrations live with the module, cross-module references are IDs without foreign keys, never join another module's tables. Hard caps enforced by `tools/arch` and lint in CI with no baseline list: 600 lines per source file, 20 files per directory, 80 lines per function; banned grab-bag names (`utils.ts`, `helpers.ts`, `common.ts`, non-root `index.ts`). `runtimes/task` depends only on contracts, kernel, ws and agent-drivers; `apps/console` and `apps/cli` only on contracts and api-client. Task containers are plain Kubernetes Pods with PVCs in per-project namespaces; no sandbox product, no gVisor or Kata. Milestones: M0 constraints, contracts and prototypes (T0.2 scaffolds the repo per the structure doc and locks versions; T0.3 freezes the business integration convention table), M1 project, identity, routing and the minimal sample built from its first tag, M2 stateful apps, tag release and blue/green switch plus config and logs, M3 dev session, TaskRunner and workbench, M4 API proxy, open policy, allow-lists, cs-events and egress allowlist, M5 business contract layer, quotas, tracing, alerts and sample acceptance, M6 installer, HA, scale test, upgrades and restore. Scale and HA are verified once, in M6 (accepted risk).
+### Module layers and delivery
+The 18 modules layer as identity → project → scm/config/data/egress/api-catalog/events → release/task-runtime → dev-session/business-task/session/gateway → observability/capabilities/provisioning, with `platform` as the composition root that assembles all of them. The domain-free packages are contracts, kernel, persistence, queue, eventbus, http, ws, k8s, gitlab-client, jwt, secretbox, settings, session-client, agent-drivers, api-client and testkit. `runtimes/task` depends only on contracts, kernel, ws and agent-drivers; `apps/console` and `apps/cli` only on contracts and api-client. `tools/arch/policy.ts` holds every one of these allowances, so widening one is a visible, reviewable edit.
+
+Task containers are plain Kubernetes Pods with PVCs in per-project namespaces; no sandbox product, no gVisor or Kata. Milestones: M0 constraints, contracts and prototypes, M1 project, identity, routing and the minimal sample built from its first tag, M2 stateful apps, tag release and blue/green switch plus config and logs, M3 dev session, TaskRunner and workbench, M4 API proxy, open policy, allow-lists, cs-events and egress allowlist, M5 business contract layer, quotas, tracing, alerts and sample acceptance, M6 installer, HA, scale test, upgrades and restore. Scale and HA are verified once, in M6 (accepted risk).
