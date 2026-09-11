@@ -1,6 +1,7 @@
 import type { Clock } from '@crewstation/kernel';
 import type { SessionSettings } from '../domain/session';
 import type { AllowlistEvaluator } from '../ports/allowlistEvaluator';
+import type { DevSessionState } from '../ports/devSessionState';
 import type { HostResolver } from '../ports/hostResolver';
 import type { IdentityProvider } from '../ports/identityProvider';
 import type { IdentitySettings } from '../ports/identitySettings';
@@ -23,4 +24,5 @@ export interface IdentityUseCaseDeps {
   workloads: WorkloadLookup;
   allowlist: AllowlistEvaluator;
   memberships: MembershipLookup;
+  devSessions: DevSessionState;
 }

@@ -135,3 +135,30 @@ spec:
       kind: Rule
       middlewares: [{ name: drop-identity-headers }, { name: forward-auth-service }]
       services: [{ name: cs-events, port: 8084 }]
+---
+# 服务域：两个平台 MCP。开发容器内的 Agent 经此连接；网关按源 Pod IP 注入调用方身份，无登录跳转。
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: platform-mcp-capabilities
+  namespace: crewstation-system
+spec:
+  entryPoints: [web]
+  routes:
+    - match: Host(`mcp-capabilities.svc.cs.internal`)
+      kind: Rule
+      middlewares: [{ name: drop-identity-headers }, { name: forward-auth-service }]
+      services: [{ name: mcp-capabilities, port: 8085 }]
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: platform-mcp-operations
+  namespace: crewstation-system
+spec:
+  entryPoints: [web]
+  routes:
+    - match: Host(`mcp-operations.svc.cs.internal`)
+      kind: Rule
+      middlewares: [{ name: drop-identity-headers }, { name: forward-auth-service }]
+      services: [{ name: mcp-operations, port: 8086 }]

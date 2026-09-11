@@ -1,0 +1,65 @@
+import { HOST_PATTERNS, IDENTITY_HEADERS, PLATFORM_ENV, PLATFORM_PATHS, TOKEN_CLAIMS } from '@crewstation/contracts';
+
+const rows = (entries: Readonly<Record<string, string>>): string =>
+  Object.entries(entries).map(([key, value]) => `| \`${key}\` | \`${value}\` |`).join('\n');
+
+/**
+ * 接入约定说明：内容全部由 contracts 的常量生成，平台改名这里跟着变，
+ * 不会出现“文档说一套、网关注一套”的第二真相。
+ */
+export function conventionGuide(): string {
+  return [
+    '# CrewStation 业务接入约定',
+    '',
+    '数字人应用不写登录代码、不持有平台凭据。身份由网关注入，地址由环境变量给出。',
+    '本文档由平台按当前约定生成；具体到本服务的取值见 `cs://capability/*` 各资源。',
+    '',
+    '## 1. 用户域：谁在访问页面',
+    '',
+    '网关在用户域完成公司登录后，把可读身份头与一个绑定本服务的签名令牌注入请求。',
+    '业务只读下列请求头，自己写授权规则（谁能看哪条数据是业务的事）。',
+    '',
+    '| 请求头 | 名称 |',
+    '|---|---|',
+    rows(IDENTITY_HEADERS),
+    '',
+    `令牌可按 \`${PLATFORM_ENV.jwksUrl}\` 指向的 JWKS 验签；声明名为 \`${TOKEN_CLAIMS.kind}\`、\`${TOKEN_CLAIMS.project}\`、\`${TOKEN_CLAIMS.slot}\`、\`${TOKEN_CLAIMS.traceId}\`，签发者固定为 \`${TOKEN_CLAIMS.issuer}\`。`,
+    '',
+    '## 2. 服务域：本服务对外调用',
+    '',
+    '服务域不做登录跳转。调用方身份由网关按源 Pod IP 反查后注入，**业务代码不携带任何凭据**。',
+    '',
+    `- 内部 API：\`${PLATFORM_ENV.internalApiBase}\` ＋ \`<proxy>/<上游路径>\`，即服务域上的 \`${PLATFORM_PATHS.internalApiPrefix}<proxy>/…\`。放行与否由网关按本服务的放行表就地判定。`,
+    `- 平台 API：\`${PLATFORM_ENV.platformApiUrl}\`，用于创建业务任务等以本服务身份发起的调用。`,
+    `- 健康检查：容器必须在 \`${PLATFORM_PATHS.health}\` 返回 200，否则槽不会就绪。`,
+    '',
+    '## 3. 环境变量',
+    '',
+    '平台在部署与开发会话启动时注入下列变量，业务只读它们，不要把地址写死。',
+    '',
+    '| 变量 | 名称 |',
+    '|---|---|',
+    rows(PLATFORM_ENV),
+    '',
+    '## 4. 域名形态',
+    '',
+    '`{project}`、`{service}` 由安装配置的域名后缀补全；preview 与 prod 是同一个生产服务的两个部署槽，',
+    '共用生产数据库、文件、身份与授权，差别只在网关把流量指向哪一个。',
+    '',
+    '| 用途 | 模式 |',
+    '|---|---|',
+    rows(HOST_PATTERNS),
+    '',
+    '## 5. 事件',
+    '',
+    '公司系统的 Webhook 经接入容器进入 cs-events，去重并持久化后，只推送到**当前承接生产流量的槽**的处理路径，',
+    '带来源令牌与 trace_id。处理端点必须幂等：重试与重放都会重复投递同一事件。',
+    '',
+    '## 6. 发布',
+    '',
+    '`git push` 不是发布。只有平台创建的 `v<major>.<minor>.<patch>` 标签触发发布：',
+    '平台检查未提交更改 → 代为推送当前分支 → 打标签 → 按固定 SHA 构建 → 对生产库执行兼容迁移 → 部署到待命槽。',
+    '之后由项目负责人切流，回退即再切回来。用操作 MCP 的 `publish_release` 工具发起，与工作台按钮、CLI 同一条链路。',
+    '',
+  ].join('\n');
+}

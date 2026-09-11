@@ -2,9 +2,13 @@ import { IDENTITY_HEADERS } from '@crewstation/contracts';
 import { forbidden, unauthenticated } from '@crewstation/kernel';
 import type { Context, MiddlewareHandler } from 'hono';
 
-/** 网关注入的请求身份；业务与平台 API 都只从这里取身份，不自己解析 Cookie 或令牌。 */
+/**
+ * 网关注入的请求身份；业务与平台 API 都只从这里取身份，不自己解析 Cookie 或令牌。
+ * 唯一的例外是 devSession：它来自调用方自带并经 cs-api 验签的开发会话令牌，由 devSessionIdentity 填入，
+ * 表示“这个用户是以某个开发会话的名义在调用”，其可用接口被 devSessionScope 限死在本项目内。
+ */
 export type RequestIdentity =
-  | { kind: 'user'; userId: string; name: string; email: string; token?: string }
+  | { kind: 'user'; userId: string; name: string; email: string; token?: string; devSession?: { taskId: string; projectId: string; serviceId: string } }
   | { kind: 'service'; identity: string; project: string; service: string; slot?: string; token?: string };
 
 export interface AppVariables {

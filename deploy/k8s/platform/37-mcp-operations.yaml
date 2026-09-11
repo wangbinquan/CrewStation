@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mcp-operations
+  namespace: crewstation-system
+  labels: { app.kubernetes.io/name: mcp-operations, app.kubernetes.io/part-of: crewstation, app.kubernetes.io/managed-by: crewstation, crewstation.io/project: platform, crewstation.io/service: mcp-operations, crewstation.io/workload: platform }
+spec:
+  # 无状态：每个请求新建 MCP 会话，副本之间不需要粘性，可以随意扩缩。
+  replicas: 1
+  selector:
+    matchLabels: { app.kubernetes.io/name: mcp-operations }
+  template:
+    metadata:
+      labels: { app.kubernetes.io/name: mcp-operations, app.kubernetes.io/part-of: crewstation, app.kubernetes.io/managed-by: crewstation, crewstation.io/project: platform, crewstation.io/service: mcp-operations, crewstation.io/workload: platform }
+    spec:
+      serviceAccountName: crewstation-control
+      containers:
+        - name: mcp-operations
+          image: cs-control-plane:dev
+          imagePullPolicy: IfNotPresent
+          args: ["apps/mcp-operations/src/main.ts"]
+          ports: [{ name: http, containerPort: 8086 }]
+          envFrom:
+            - configMapRef: { name: crewstation-env }
+          env:
+            - { name: POD_IP, valueFrom: { fieldRef: { fieldPath: status.podIP } } }
+            # 直连 cs-api：授权由 cs-api 判定，调用方身份头必须原样到达，不能被网关抹掉。
+            - { name: CS_PLATFORM_API_URL, value: "http://cs-api.crewstation-system.svc.cluster.local:8080" }
+            # 内部 API 反过来必须走网关：放行表就地判定在那里，绕过去等于绕过授权。
+            - { name: CS_INTERNAL_API_BASE, value: "http://api.svc.cs.internal/api/" }
+          readinessProbe: { httpGet: { path: /healthz, port: 8086 }, periodSeconds: 5 }
+          livenessProbe: { httpGet: { path: /healthz, port: 8086 }, periodSeconds: 15, initialDelaySeconds: 10 }
+          resources: { requests: { cpu: 50m, memory: 128Mi }, limits: { cpu: "500m", memory: 512Mi } }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mcp-operations
+  namespace: crewstation-system
+spec:
+  selector: { app.kubernetes.io/name: mcp-operations }
+  ports: [{ name: http, port: 8086, targetPort: 8086 }]

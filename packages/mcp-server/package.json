@@ -1,0 +1,17 @@
+{
+  "name": "@crewstation/mcp-server",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "两个平台 MCP 的协议骨架与资源／工具目录：官方 SDK + Streamable HTTP，无状态，授权一律回到 cs-api",
+  "exports": { ".": "./index.ts" },
+  "dependencies": {
+    "@crewstation/api-client": "workspace:*",
+    "@crewstation/contracts": "workspace:*",
+    "@crewstation/http": "workspace:*",
+    "@crewstation/kernel": "workspace:*",
+    "@modelcontextprotocol/sdk": "1.30.0",
+    "hono": "4.13.7",
+    "zod": "4.6.2"
+  }
+}

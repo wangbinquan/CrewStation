@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mcp-capabilities
+  namespace: crewstation-system
+  labels: { app.kubernetes.io/name: mcp-capabilities, app.kubernetes.io/part-of: crewstation, app.kubernetes.io/managed-by: crewstation, crewstation.io/project: platform, crewstation.io/service: mcp-capabilities, crewstation.io/workload: platform }
+spec:
+  # 无状态：每个请求新建 MCP 会话，副本之间不需要粘性，可以随意扩缩。
+  replicas: 1
+  selector:
+    matchLabels: { app.kubernetes.io/name: mcp-capabilities }
+  template:
+    metadata:
+      labels: { app.kubernetes.io/name: mcp-capabilities, app.kubernetes.io/part-of: crewstation, app.kubernetes.io/managed-by: crewstation, crewstation.io/project: platform, crewstation.io/service: mcp-capabilities, crewstation.io/workload: platform }
+    spec:
+      serviceAccountName: crewstation-control
+      containers:
+        - name: mcp-capabilities
+          image: cs-control-plane:dev
+          imagePullPolicy: IfNotPresent
+          args: ["apps/mcp-capabilities/src/main.ts"]
+          ports: [{ name: http, containerPort: 8085 }]
+          envFrom:
+            - configMapRef: { name: crewstation-env }
+          env:
+            - { name: POD_IP, valueFrom: { fieldRef: { fieldPath: status.podIP } } }
+            # 直连 cs-api：MCP 只是转发者，必须把调用方的身份头原样带过去，
+            # 经网关会被 drop-identity-headers 抹掉，调用方身份就丢了。
+            - { name: CS_PLATFORM_API_URL, value: "http://cs-api.crewstation-system.svc.cluster.local:8080" }
+          readinessProbe: { httpGet: { path: /healthz, port: 8085 }, periodSeconds: 5 }
+          livenessProbe: { httpGet: { path: /healthz, port: 8085 }, periodSeconds: 15, initialDelaySeconds: 10 }
+          resources: { requests: { cpu: 50m, memory: 128Mi }, limits: { cpu: "500m", memory: 512Mi } }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mcp-capabilities
+  namespace: crewstation-system
+spec:
+  selector: { app.kubernetes.io/name: mcp-capabilities }
+  ports: [{ name: http, port: 8085, targetPort: 8085 }]

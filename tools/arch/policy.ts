@@ -53,8 +53,8 @@ export const UNIT_WHITELISTS: Record<string, readonly string[]> = {
   'runtimes/task': ['contracts', 'kernel', 'ws', 'agent-drivers'],
   'apps/console': ['contracts', 'api-client'],
   'apps/cli': ['contracts', 'api-client', 'kernel'],
-  'apps/mcp-capabilities': ['contracts', 'api-client', 'kernel', 'http'],
-  'apps/mcp-operations': ['contracts', 'api-client', 'kernel', 'http'],
+  'apps/mcp-capabilities': ['contracts', 'api-client', 'kernel', 'http', 'mcp-server'],
+  'apps/mcp-operations': ['contracts', 'api-client', 'kernel', 'http', 'mcp-server'],
 };
 
 /** 不依赖任何其他工作区包的叶子技术包。 */

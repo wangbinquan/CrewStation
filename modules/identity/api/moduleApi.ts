@@ -1,4 +1,4 @@
-import type { AuthStatusDto, CurrentUserDto, IdentityProviderKind, JwksDocument, UserDto, UserId, WorkloadIdentity } from '@crewstation/contracts';
+import type { AuthStatusDto, CurrentUserDto, IdentityProviderKind, JwksDocument, ProjectId, ServiceId, TaskId, UserDto, UserId, WorkloadIdentity } from '@crewstation/contracts';
 
 export interface ExternalUser {
   /** 登录适配器给出的稳定外部标识（OIDC sub 或 `demo:<username>`）。 */
@@ -87,6 +87,24 @@ export type ServiceAuthDecision =
   | { kind: 'allow'; caller: WorkloadIdentity; audience: string; traceId: string; injected: InjectedServiceIdentity }
   | { kind: 'forbidden'; message: string; reason?: string };
 
+/** 一枚开发会话令牌绑定的会话、项目、服务与用户；签发与校验两侧共用这一份形状。 */
+export interface DevSessionBinding {
+  readonly taskId: TaskId;
+  readonly projectId: ProjectId;
+  readonly serviceId: ServiceId;
+  readonly userId: UserId;
+}
+
+/** 令牌值只在此处返回一次，交给注入方写进容器；任何日志、响应与错误都不得再出现它。 */
+export interface IssuedDevSessionToken {
+  readonly token: string;
+  readonly expiresAt: string;
+}
+
+export interface ResolvedDevSession extends DevSessionBinding {
+  readonly user: UserDto;
+}
+
 /**
  * identity 模块对外能力。管理面（用户目录与管理员标记）供所有进程；运行面（登录、会话、ForwardAuth、JWKS）供 cs-auth。
  * 其他模块经 ports 注入其中的子集。
@@ -112,6 +130,10 @@ export interface IdentityModuleApi {
   resolveSession(token: string): Promise<UserDto | undefined>;
   authorizeUserRequest(request: UserAuthRequest): Promise<UserAuthDecision>;
   authorizeServiceRequest(request: ServiceAuthRequest): Promise<ServiceAuthDecision>;
+  /** 签发绑定单个开发会话的短期令牌，供平台写进容器里两个 CLI 的远程 MCP 连接头（Design §5.9）。 */
+  issueDevSessionToken(binding: DevSessionBinding): Promise<IssuedDevSessionToken>;
+  /** 校验开发会话令牌：签名、aud、exp 之外还现查会话是否仍在运行；任一不符返回 undefined，不解释原因。 */
+  resolveDevSessionToken(token: string): Promise<ResolvedDevSession | undefined>;
   currentUser(userId: UserId): Promise<CurrentUserDto>;
   jwks(): Promise<JwksDocument>;
   /** 生成新签名钥，旧钥进入重叠期继续验签。 */

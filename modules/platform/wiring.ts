@@ -85,6 +85,12 @@ function composeCore(deps: PlatformModuleDeps, late: Late) {
     membershipLookup: { membershipsOf: async (userId) => { const actor: Actor = { userId, isAdmin: false }; const out: Array<{ projectId: ProjectId; role: 'owner' | 'developer' | 'tester' }> = []; for (const p of await projectApi().listProjects(actor)) { const role = await projectApi().roleOf(actor, p.id); if (role && role !== 'admin') out.push({ projectId: p.id, role }); } return out; } },
     workloadLookup: { byIp: (ip) => gatewayApi().lookupByIp(ip) },
     allowlistEvaluator: { evaluate: (caller, target) => gatewayApi().evaluate(caller, target) },
+    // 开发会话令牌的即时吊销点：每次校验现查环境，释放（releasing／released）即查不到，令牌当场失效。
+    // 与 runningTasks 同理，task-runtime 装配前返回 undefined，也就是一律拒绝。
+    devSessionState: { activeSession: async (taskId) => {
+      const env = await late.taskRuntime?.getEnvironment(taskId);
+      return env && env.kind === 'dev-session' && (env.state === 'creating' || env.state === 'running') ? { projectId: env.projectId } : undefined;
+    } },
   });
   const project = createProjectModule({ db, identity: identity.api, hosts, taskUsage: { runningTasks }, settings: { defaultMaxConcurrentTasks: settings.defaultMaxConcurrentTasks, defaultServicePlan: settings.defaultServicePlan } });
   late.project = project.api;
@@ -180,6 +186,8 @@ function composeRuntime(deps: PlatformModuleDeps, core: ReturnType<typeof compos
     authorizer: { authorize: project.api.authorize, ownerOf: project.api.ownerOf },
     services: { resolveServiceOfProject: async (projectId) => { const s = (await project.api.listServices()).find((x) => x.projectId === projectId); return s ? { serviceId: s.serviceId, slug: s.slug, name: s.name } : undefined; } },
     notifier: { notify: async (projectId, users, message, context) => { logger.warn('dev session notice', { projectId, users, message, taskId: context.taskId }); } },
+    // 注入 Agent 的远程 MCP 连接凭据由 identity 签发：一个签发者、一个密钥环、一份 JWKS。
+    credentials: { issueDevSessionToken: (binding) => core.identity.api.issueDevSessionToken(binding) },
     settings: { idleMinutes: settings.idleMinutes, userDomain: settings.userDomain, mcp, defaultPreviewPort: 3000 },
   });
   const businessTask = createBusinessTaskModule({
@@ -273,7 +281,8 @@ export function createPlatformModule(deps: PlatformModuleDeps): PlatformModule {
   const api: PlatformModuleApi = {
     name: 'platform',
     routers: {
-      api: [...m.project.http, ...m.identity.http.users, ...m.config.http, ...m.egress.http, ...m.data.http, ...m.scm.http, ...m.apiCatalog.http, ...m.release.http, ...m.gateway.http, ...m.taskRuntime.http, ...m.devSession.http, m.businessTask.http.service, m.businessTask.http.user, ...m.events.http.query, ...m.observability.http, ...m.capabilities.http, ...m.provisioning.http],
+      // devSessionGate 只挂中间件不占路径，必须排在最前：Hono 按注册顺序执行，晚于业务路由就来不及改判身份。
+      api: [...m.identity.http.devSessionGate, ...m.project.http, ...m.identity.http.users, ...m.config.http, ...m.egress.http, ...m.data.http, ...m.scm.http, ...m.apiCatalog.http, ...m.release.http, ...m.gateway.http, ...m.taskRuntime.http, ...m.devSession.http, m.businessTask.http.service, m.businessTask.http.user, ...m.events.http.query, ...m.observability.http, ...m.capabilities.http, ...m.provisioning.http],
       auth: [...m.identity.http.auth, ...m.identity.http.forwardAuth],
       session: [m.session.http.runner, m.session.http.stream, m.session.http.internal],
       events: [...m.events.http.ingress],

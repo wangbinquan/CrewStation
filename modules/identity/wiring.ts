@@ -14,6 +14,7 @@ import { authStatusUseCase } from './application/authStatus';
 import { currentUserUseCase } from './application/currentUser';
 import { demoLoginUseCases } from './application/demoLogin';
 import type { IdentityUseCaseDeps } from './application/dependencies';
+import { devSessionTokenUseCases } from './application/devSessionTokens';
 import { ensureUserUseCase } from './application/ensureUser';
 import { forwardAuthServiceUseCase } from './application/forwardAuthService';
 import { forwardAuthUserUseCase } from './application/forwardAuthUser';
@@ -24,9 +25,11 @@ import { resolveHostByPattern } from './domain/hosts';
 import type { SessionSettings } from './domain/session';
 import { sessionCookie, withSessionDefaults } from './domain/session';
 import { authRoutes } from './http/authRoutes';
+import { devSessionGate } from './http/devSessionGate';
 import { forwardAuthRoutes } from './http/forwardAuthRoutes';
 import { userRoutes } from './http/userRoutes';
 import type { AllowlistEvaluator } from './ports/allowlistEvaluator';
+import type { DevSessionState } from './ports/devSessionState';
 import type { HostResolver } from './ports/hostResolver';
 import type { IdentityProvider } from './ports/identityProvider';
 import type { IdentitySettings } from './ports/identitySettings';
@@ -38,6 +41,7 @@ import type { WorkloadLookup } from './ports/workloadLookup';
 // 应用装配需要的端口类型与内置适配器只能经根入口取得，故在此转出。
 export { demoIdentityProvider } from './adapters/provider/demoIdentityProvider';
 export type { AllowlistEvaluator, AllowlistTarget, AllowlistVerdict } from './ports/allowlistEvaluator';
+export type { DevSessionState } from './ports/devSessionState';
 export type { HostResolver } from './ports/hostResolver';
 export type { IdentityProvider, LoginPrincipal, ProviderLoginOutcome, ProviderLoginPage } from './ports/identityProvider';
 export type { IdentitySettings } from './ports/identitySettings';
@@ -58,6 +62,8 @@ export interface IdentityRuntimeDeps {
   workloadLookup?: WorkloadLookup;
   allowlistEvaluator?: AllowlistEvaluator;
   membershipLookup?: MembershipLookup;
+  /** 缺省“查不到任何会话”，即所有开发会话令牌都被拒绝；装配后由 task-runtime 现查。 */
+  devSessionState?: DevSessionState;
   logger?: Logger;
 }
 
@@ -67,11 +73,12 @@ export interface IdentityModuleDeps extends IdentityRuntimeDeps {
   clock?: Clock;
 }
 
-/** cs-auth 挂 auth 与 forwardAuth，cs-api 挂 users。 */
+/** cs-auth 挂 auth 与 forwardAuth；cs-api 挂 users，并把 devSessionGate 排在路由表最前。 */
 export interface IdentityModuleHttp {
   readonly auth: Hono<AppEnv>[];
   readonly forwardAuth: Hono<AppEnv>[];
   readonly users: Hono<AppEnv>[];
+  readonly devSessionGate: Hono<AppEnv>[];
 }
 
 export interface IdentityModule {
@@ -110,23 +117,25 @@ export function createIdentityModule(deps: IdentityModuleDeps): IdentityModule {
     resolveSession: sessionTokenUseCases(useCaseDeps).resolveSession,
     authorizeUserRequest: forwardAuthUserUseCase(useCaseDeps),
     authorizeServiceRequest: forwardAuthServiceUseCase(useCaseDeps),
+    ...devSessionTokenUseCases(useCaseDeps),
     currentUser: currentUserUseCase(useCaseDeps),
     jwks: () => useCaseDeps.tokens.jwks(),
     rotateSigningKey: () => useCaseDeps.tokens.rotate(),
   };
   return {
     api,
-    http: { auth: [authRoutes(api)], forwardAuth: [forwardAuthRoutes(api)], users: [userRoutes(api)] },
+    http: { auth: [authRoutes(api)], forwardAuth: [forwardAuthRoutes(api)], users: [userRoutes(api)], devSessionGate: [devSessionGate(api)] },
     migrations: identityMigrations,
   };
 }
 
-function runtimePorts(deps: IdentityRuntimeDeps, session: SessionSettings): Pick<IdentityUseCaseDeps, 'hosts' | 'previewAccess' | 'workloads' | 'allowlist' | 'memberships'> {
+function runtimePorts(deps: IdentityRuntimeDeps, session: SessionSettings): Pick<IdentityUseCaseDeps, 'hosts' | 'previewAccess' | 'workloads' | 'allowlist' | 'memberships' | 'devSessions'> {
   return {
     hosts: deps.hostResolver ?? { resolveHost: async (host) => resolveHostByPattern(host, session.userDomain) },
     previewAccess: deps.previewAccess ?? { canView: async () => false },
     workloads: deps.workloadLookup ?? { byIp: async () => undefined },
     allowlist: deps.allowlistEvaluator ?? { evaluate: async (_caller, target) => ({ allowed: false, reason: '未配置放行表评估器', targetIdentity: target.host }) },
     memberships: deps.membershipLookup ?? { membershipsOf: async () => [] },
+    devSessions: deps.devSessionState ?? { activeSession: async () => undefined },
   };
 }

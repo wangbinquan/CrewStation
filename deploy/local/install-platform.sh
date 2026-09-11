@@ -49,8 +49,8 @@ if ! kubectl -n $NS wait --for=condition=complete job/crewstation-migrate --time
   kubectl -n $NS logs job/crewstation-migrate --tail=50 || true
   echo "迁移失败" >&2; exit 1
 fi
-for f in 30-cs-api 31-cs-auth 32-cs-controller 33-cs-session 34-cs-events 35-console 40-gateway; do kubectl apply -f "$ROOT/deploy/k8s/platform/$f.yaml" >/dev/null; done
-for d in cs-api cs-auth cs-controller cs-session cs-events console; do
+for f in 30-cs-api 31-cs-auth 32-cs-controller 33-cs-session 34-cs-events 35-console 36-mcp-capabilities 37-mcp-operations 40-gateway; do kubectl apply -f "$ROOT/deploy/k8s/platform/$f.yaml" >/dev/null; done
+for d in cs-api cs-auth cs-controller cs-session cs-events console mcp-capabilities mcp-operations; do
   kubectl -n $NS rollout restart deployment/$d >/dev/null 2>&1 || true
   kubectl -n $NS rollout status deployment/$d --timeout=180s
 done
