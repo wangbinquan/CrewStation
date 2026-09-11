@@ -1,0 +1,13 @@
+.select {
+  min-width: 220px;
+  max-width: 100%;
+  padding: 5px var(--cs-space-2);
+  border: 1px solid var(--cs-color-border);
+  border-radius: var(--cs-radius-md);
+  background: var(--cs-color-surface);
+  color: var(--cs-color-text);
+}
+
+.select:disabled {
+  opacity: 0.6;
+}

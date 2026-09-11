@@ -1,0 +1,10 @@
+.outcome {
+  margin-bottom: var(--cs-space-4);
+}
+
+.commits {
+  margin: var(--cs-space-2) 0 0;
+  padding-left: var(--cs-space-5);
+  max-height: 200px;
+  overflow: auto;
+}

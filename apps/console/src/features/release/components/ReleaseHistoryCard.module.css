@@ -1,0 +1,28 @@
+.polling {
+  color: var(--cs-color-text-muted);
+  font-size: 12px;
+}
+
+.slot {
+  margin-left: var(--cs-space-2);
+  color: var(--cs-color-text-muted);
+  font-family: var(--cs-font-mono);
+  font-size: 12px;
+}
+
+.image {
+  max-width: 320px;
+  overflow-wrap: anywhere;
+  font-family: var(--cs-font-mono);
+  font-size: 12px;
+}
+
+.nowrap {
+  white-space: nowrap;
+  color: var(--cs-color-text-muted);
+}
+
+.failure {
+  color: var(--cs-tone-warning-fg);
+  background: var(--cs-tone-warning-bg);
+}

@@ -1,24 +1,36 @@
+import type { SlotDto } from '@crewstation/contracts';
 import type { ReactElement } from 'react';
 import { useT } from '../../../shared/lib/useT';
 import { Badge } from '../../../shared/ui/Badge';
 import { Card } from '../../../shared/ui/Card';
-import styles from './SlotCard.module.css';
+import { shortSha, slotStateTone } from '../model/projectStateTone';
+import { DefinitionList } from './DefinitionList';
+import type { Fact } from './DefinitionList';
 
-/** 两个部署槽的名字是固定的：preview（待机）与 prod（生产流量）。 */
-export type SlotName = 'preview' | 'prod';
-
-export function SlotCard({ slot }: { readonly slot: SlotName }): ReactElement {
+/** 一个部署槽的现状；两个槽共享生产数据，差别只在网关把用户域流量路由到哪一个。 */
+export function SlotCard({ slot }: { readonly slot: SlotDto }): ReactElement {
   const t = useT();
+  const facts: readonly Fact[] = [
+    { label: t('projects.slot.release'), value: slot.tag ?? t('projects.slot.empty') },
+    { label: t('projects.slot.commit'), value: <code>{shortSha(slot.commitSha)}</code> },
+    { label: t('projects.slot.replicas'), value: t('projects.slot.replicasValue', { ready: slot.readyReplicas, total: slot.replicas }) },
+    { label: t('projects.slot.state'), value: <Badge tone={slotStateTone(slot.state)}>{t(`projects.slotState.${slot.state}`)}</Badge> },
+    {
+      label: t('projects.slot.host'),
+      // 槽的 host 是裸主机名；用协议相对地址跟随当前页面的 http／https。
+      value: (
+        <a href={`//${slot.host}`} target="_blank" rel="noreferrer">
+          {slot.host}
+        </a>
+      ),
+    },
+  ];
   return (
     <Card
-      title={t(`projects.slot.${slot}`)}
-      extra={<Badge tone={slot === 'prod' ? 'success' : 'info'}>{t(`projects.slot.${slot}Role`)}</Badge>}
+      title={t(`projects.slot.${slot.name}`)}
+      extra={<Badge tone={slot.active ? 'success' : 'neutral'}>{t(slot.active ? 'projects.slot.active' : 'projects.slot.standby')}</Badge>}
     >
-      <p className={styles.description}>{t(`projects.slot.${slot}Description`)}</p>
-      <dl className={styles.facts}>
-        <dt>{t('projects.slot.currentRelease')}</dt>
-        <dd>{t('projects.slot.unknown')}</dd>
-      </dl>
+      <DefinitionList facts={facts} />
     </Card>
   );
 }

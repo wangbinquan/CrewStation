@@ -1,0 +1,31 @@
+.trace {
+  font-family: var(--cs-font-mono);
+  font-size: 12px;
+  word-break: break-all;
+}
+
+.time {
+  white-space: nowrap;
+  color: var(--cs-color-text-muted);
+}
+
+.attempts {
+  font-variant-numeric: tabular-nums;
+}
+
+.errorCell {
+  padding-top: 0 !important;
+  color: var(--cs-tone-warning-fg);
+}
+
+.errorLabel {
+  color: var(--cs-color-text-muted);
+  margin-right: var(--cs-space-2);
+}
+
+.errorText {
+  font-family: var(--cs-font-mono);
+  font-size: 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

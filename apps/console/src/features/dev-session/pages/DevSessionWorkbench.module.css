@@ -1,0 +1,25 @@
+/* 1280px 视口下内容区约 1000px：两列足够，终端与 Agent 并排，编辑器整行。 */
+.grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  grid-template-areas:
+    'agents terminal'
+    'editor editor'
+    'preview publish'
+    'data data';
+  gap: var(--cs-space-4);
+  align-items: start;
+}
+
+@media (max-width: 1000px) {
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      'agents'
+      'terminal'
+      'editor'
+      'preview'
+      'publish'
+      'data';
+  }
+}

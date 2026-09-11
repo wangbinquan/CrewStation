@@ -1,0 +1,17 @@
+.description {
+  margin-bottom: var(--cs-space-3);
+  color: var(--cs-color-text-muted);
+}
+
+.form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--cs-space-3);
+  align-items: end;
+  margin-bottom: var(--cs-space-3);
+}
+
+.submit {
+  display: flex;
+  align-items: center;
+}

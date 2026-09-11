@@ -1,0 +1,14 @@
+.block {
+  margin-top: var(--cs-space-2);
+}
+
+.paths {
+  margin: var(--cs-space-2) 0;
+  padding-left: var(--cs-space-5);
+  max-height: 180px;
+  overflow: auto;
+}
+
+.hint {
+  color: var(--cs-color-text-muted);
+}

@@ -1,0 +1,59 @@
+.wrap {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: var(--cs-space-3);
+  background: var(--cs-color-surface-muted);
+  font-size: 13px;
+}
+
+.empty {
+  color: var(--cs-color-text-muted);
+}
+
+.text {
+  margin: 0;
+  font-family: var(--cs-font-mono);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.line {
+  display: flex;
+  gap: var(--cs-space-2);
+  align-items: baseline;
+  margin: var(--cs-space-1) 0;
+  overflow-wrap: anywhere;
+}
+
+.label {
+  flex: none;
+  padding: 0 var(--cs-space-2);
+  border-radius: 999px;
+  background: var(--cs-tone-neutral-bg);
+  color: var(--cs-tone-neutral-fg);
+  font-size: 12px;
+}
+
+.failed .label {
+  background: var(--cs-tone-warning-bg);
+  color: var(--cs-tone-warning-fg);
+}
+
+.body {
+  min-width: 0;
+  font-family: var(--cs-font-mono);
+}
+
+.tailAction {
+  position: absolute;
+  right: var(--cs-space-3);
+  bottom: var(--cs-space-3);
+}

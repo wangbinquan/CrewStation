@@ -1,0 +1,16 @@
+.viewport {
+  max-height: 60vh;
+  min-height: 200px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  border: 1px solid var(--cs-color-border);
+  border-radius: var(--cs-radius-sm);
+  background: var(--cs-color-surface);
+  font-family: var(--cs-font-mono);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.viewport > :last-child {
+  border-bottom: none;
+}

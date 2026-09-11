@@ -1,0 +1,10 @@
+.pane {
+  grid-area: preview;
+}
+
+.link {
+  margin-top: var(--cs-space-3);
+  overflow-wrap: anywhere;
+  font-family: var(--cs-font-mono);
+  font-size: 13px;
+}

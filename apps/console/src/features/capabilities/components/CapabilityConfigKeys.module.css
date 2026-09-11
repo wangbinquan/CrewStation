@@ -1,0 +1,24 @@
+.columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: var(--cs-space-4);
+}
+
+.title {
+  margin-bottom: var(--cs-space-2);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--cs-space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.muted {
+  color: var(--cs-color-text-muted);
+}

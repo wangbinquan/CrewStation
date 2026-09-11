@@ -1,0 +1,61 @@
+.notice {
+  margin-bottom: var(--cs-space-2);
+  padding: var(--cs-space-2) var(--cs-space-3);
+  border-radius: var(--cs-radius-sm);
+  color: var(--cs-tone-info-fg);
+  background: var(--cs-tone-info-bg);
+}
+
+.muted {
+  color: var(--cs-color-text-muted);
+}
+
+.picker {
+  display: flex;
+  align-items: center;
+  gap: var(--cs-space-2);
+  margin: var(--cs-space-3) 0;
+}
+
+.label {
+  color: var(--cs-color-text-muted);
+}
+
+.select {
+  padding: 6px var(--cs-space-2);
+  border: 1px solid var(--cs-color-border);
+  border-radius: var(--cs-radius-sm);
+  background: var(--cs-color-surface);
+  color: var(--cs-color-text);
+  font: inherit;
+}
+
+.error {
+  margin-top: var(--cs-space-2);
+  padding: var(--cs-space-2) var(--cs-space-3);
+  border-radius: var(--cs-radius-sm);
+  color: var(--cs-tone-warning-fg);
+  background: var(--cs-tone-warning-bg);
+}
+
+/*
+ * Swagger UI 自带的是浅色配色（深色要 html.dark-mode，工作台不加这个类）。
+ * 用 color-scheme 固定为浅色并取系统色，深色模式下文字才不会和底色同色；不写裸色值。
+ */
+.swagger {
+  margin-top: var(--cs-space-3);
+  border: 1px solid var(--cs-color-border);
+  border-radius: var(--cs-radius-md);
+  color-scheme: light;
+  background: Canvas;
+  color: CanvasText;
+  overflow: hidden;
+}
+
+.swagger :global(.swagger-ui .topbar) {
+  display: none;
+}
+
+.swagger :global(.swagger-ui .try-out) {
+  display: none;
+}

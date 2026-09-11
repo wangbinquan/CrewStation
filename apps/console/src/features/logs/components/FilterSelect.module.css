@@ -1,0 +1,21 @@
+.field {
+  display: inline-flex;
+  flex-direction: column;
+  gap: var(--cs-space-1);
+  font-size: 12px;
+  color: var(--cs-color-text-muted);
+}
+
+.select {
+  padding: 5px var(--cs-space-2);
+  border: 1px solid var(--cs-color-border);
+  border-radius: var(--cs-radius-sm);
+  background: var(--cs-color-surface);
+  color: var(--cs-color-text);
+  font-size: var(--cs-font-size);
+}
+
+.select:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}

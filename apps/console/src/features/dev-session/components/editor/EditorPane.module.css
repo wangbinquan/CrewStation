@@ -1,0 +1,23 @@
+.pane {
+  grid-area: editor;
+  min-height: 440px;
+}
+
+.path {
+  max-width: 280px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+.dirty {
+  color: var(--cs-tone-warning-fg);
+  font-size: 12px;
+}
+
+.placeholder {
+  flex: 1;
+  padding: var(--cs-space-4);
+  color: var(--cs-color-text-muted);
+}

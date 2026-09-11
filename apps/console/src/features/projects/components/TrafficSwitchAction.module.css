@@ -1,0 +1,23 @@
+.action {
+  display: flex;
+  flex-direction: column;
+  gap: var(--cs-space-2);
+  align-items: flex-start;
+}
+
+.confirm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--cs-space-2);
+  padding: var(--cs-space-3);
+  border: 1px solid var(--cs-color-border);
+  border-radius: var(--cs-radius-md);
+  background: var(--cs-color-surface-muted);
+  max-width: 56ch;
+}
+
+.buttons {
+  display: flex;
+  gap: var(--cs-space-2);
+  flex-wrap: wrap;
+}

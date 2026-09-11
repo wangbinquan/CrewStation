@@ -1,0 +1,51 @@
+.bindings {
+  list-style: none;
+  margin: 0 0 var(--cs-space-3);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--cs-space-2);
+}
+
+.binding {
+  display: flex;
+  align-items: center;
+  gap: var(--cs-space-2);
+  flex-wrap: wrap;
+}
+
+.meta {
+  color: var(--cs-color-text-muted);
+  font-size: 12px;
+}
+
+.field {
+  display: flex;
+  align-items: center;
+  gap: var(--cs-space-2);
+  flex-wrap: wrap;
+  margin-bottom: var(--cs-space-2);
+  color: var(--cs-color-text-muted);
+}
+
+.select,
+.input {
+  flex: 1;
+  min-width: 180px;
+  padding: 5px var(--cs-space-2);
+  border: 1px solid var(--cs-color-border);
+  border-radius: var(--cs-radius-md);
+  background: var(--cs-color-surface);
+  color: var(--cs-color-text);
+  font: inherit;
+}
+
+.input {
+  display: block;
+  width: 100%;
+  margin-bottom: var(--cs-space-3);
+}
+
+.pane {
+  grid-area: data;
+}

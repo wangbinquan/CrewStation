@@ -1,0 +1,17 @@
+.pane {
+  grid-area: terminal;
+  min-height: 420px;
+}
+
+.surface {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  padding: var(--cs-space-2);
+  background: var(--cs-color-surface);
+}
+
+/* xterm 自带的样式表只管画布本身，外层尺寸由这里给。 */
+.surface :global(.xterm) {
+  height: 100%;
+}

@@ -1,0 +1,27 @@
+.level {
+  display: inline-block;
+  width: 5.5ch;
+  font-family: var(--cs-font-mono);
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  text-align: center;
+  border-radius: var(--cs-radius-sm);
+}
+
+.error {
+  color: var(--cs-tone-warning-fg);
+  background: var(--cs-tone-warning-bg);
+  font-weight: 700;
+}
+
+.warn {
+  color: var(--cs-tone-warning-fg);
+}
+
+.info {
+  color: var(--cs-tone-info-fg);
+}
+
+.debug {
+  color: var(--cs-color-text-muted);
+}

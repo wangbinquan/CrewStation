@@ -1,0 +1,9 @@
+.health {
+  margin-bottom: var(--cs-space-4);
+}
+
+.count {
+  color: var(--cs-color-text-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}

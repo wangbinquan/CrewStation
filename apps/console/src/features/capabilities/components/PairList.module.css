@@ -1,0 +1,35 @@
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--cs-space-1);
+  margin: 0;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: minmax(140px, 22ch) 1fr;
+  gap: var(--cs-space-3);
+  align-items: baseline;
+  padding: 2px 0;
+}
+
+.label {
+  color: var(--cs-color-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.value {
+  margin: 0;
+  min-width: 0;
+}
+
+.muted {
+  color: var(--cs-color-text-muted);
+}
+
+@media (max-width: 640px) {
+  .row {
+    grid-template-columns: 1fr;
+    gap: var(--cs-space-1);
+  }
+}

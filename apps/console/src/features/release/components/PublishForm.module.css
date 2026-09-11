@@ -1,0 +1,18 @@
+.form {
+  display: grid;
+  grid-template-columns: minmax(240px, 2fr) minmax(160px, 1fr) auto;
+  gap: var(--cs-space-3);
+  align-items: end;
+  margin-bottom: var(--cs-space-3);
+}
+
+@media (max-width: 720px) {
+  .form {
+    grid-template-columns: 1fr;
+  }
+}
+
+.submit {
+  display: flex;
+  align-items: center;
+}

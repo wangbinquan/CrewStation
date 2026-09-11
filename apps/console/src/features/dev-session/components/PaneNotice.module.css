@@ -1,0 +1,21 @@
+.notice {
+  padding: var(--cs-space-2) var(--cs-space-3);
+  border-radius: var(--cs-radius-sm);
+  word-break: break-word;
+}
+
+.info {
+  color: var(--cs-tone-info-fg);
+  background: var(--cs-tone-info-bg);
+}
+
+.warning {
+  color: var(--cs-tone-warning-fg);
+  background: var(--cs-tone-warning-bg);
+}
+
+.muted {
+  padding-left: 0;
+  padding-right: 0;
+  color: var(--cs-color-text-muted);
+}

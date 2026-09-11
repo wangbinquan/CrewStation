@@ -1,0 +1,19 @@
+.note {
+  padding: var(--cs-space-2) var(--cs-space-3);
+  border-radius: var(--cs-radius-sm);
+}
+
+.error {
+  color: var(--cs-tone-warning-fg);
+  background: var(--cs-tone-warning-bg);
+}
+
+.success {
+  color: var(--cs-tone-success-fg);
+  background: var(--cs-tone-success-bg);
+}
+
+.neutral {
+  color: var(--cs-color-text-muted);
+  background: var(--cs-color-surface-muted);
+}

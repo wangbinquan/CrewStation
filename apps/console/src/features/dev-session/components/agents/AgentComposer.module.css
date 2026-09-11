@@ -1,0 +1,26 @@
+.composer {
+  display: flex;
+  gap: var(--cs-space-2);
+  padding: var(--cs-space-2) var(--cs-space-3);
+  border-top: 1px solid var(--cs-color-border);
+  align-items: flex-end;
+}
+
+.input {
+  flex: 1;
+  min-width: 0;
+  padding: var(--cs-space-2);
+  border: 1px solid var(--cs-color-border);
+  border-radius: var(--cs-radius-md);
+  background: var(--cs-color-surface);
+  color: var(--cs-color-text);
+  font: inherit;
+  font-family: var(--cs-font-mono);
+  resize: vertical;
+}
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--cs-space-2);
+}

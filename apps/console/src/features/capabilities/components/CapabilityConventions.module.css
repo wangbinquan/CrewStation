@@ -1,0 +1,9 @@
+.group + .group {
+  margin-top: var(--cs-space-4);
+}
+
+.title {
+  margin-bottom: var(--cs-space-2);
+  font-size: 14px;
+  font-weight: 600;
+}

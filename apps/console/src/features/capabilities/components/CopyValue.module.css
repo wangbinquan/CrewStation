@@ -1,0 +1,37 @@
+.wrapper {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--cs-space-2);
+  max-width: 100%;
+}
+
+.value {
+  overflow-wrap: anywhere;
+}
+
+.button {
+  padding: 0 var(--cs-space-2);
+  border: 1px solid var(--cs-color-border);
+  border-radius: var(--cs-radius-sm);
+  background: var(--cs-color-surface);
+  color: var(--cs-color-text-muted);
+  font-size: 12px;
+  line-height: 1.7;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.button:hover {
+  background: var(--cs-color-surface-muted);
+  color: var(--cs-color-text);
+}
+
+.hint {
+  min-width: 4em;
+  color: var(--cs-tone-success-fg);
+  font-size: 12px;
+}
+
+.muted {
+  color: var(--cs-color-text-muted);
+}

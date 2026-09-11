@@ -1,0 +1,9 @@
+.title {
+  margin: var(--cs-space-4) 0 var(--cs-space-2);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.muted {
+  color: var(--cs-color-text-muted);
+}
