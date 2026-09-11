@@ -4,6 +4,7 @@ import { conflict, newId, newTraceId, notFound, quotaExceeded, validation } from
 import { hashRunnerToken, newRunnerToken } from '../domain/runnerToken';
 import type { TaskEnvironment } from '../domain/taskEnvironment';
 import { podNameFor, pvcNameFor, transition } from '../domain/taskEnvironment';
+import type { TaskSourceCheckout } from '../ports/cluster';
 import { containerEnv } from './containerEnv';
 import type { TaskRuntimeUseCaseDeps } from './dependencies';
 
@@ -17,6 +18,13 @@ export interface CreateEnvironmentInput {
   createdBy?: UserId;
   preview?: { command: string[]; port: number; healthPath: string };
   labels?: Record<string, string>;
+}
+
+/** 有分支的任务（开发会话）要把源码克隆进工作卷；没有分支或没配检出端口时不挂 init 容器。 */
+export async function sourceOf(deps: TaskRuntimeUseCaseDeps, serviceId: ServiceId, branch: string | undefined): Promise<{ source?: TaskSourceCheckout }> {
+  if (!branch || !deps.checkout) return {};
+  const checkout = await deps.checkout.checkoutFor(serviceId, branch);
+  return checkout ? { source: { ...checkout, branch } } : {};
 }
 
 /** 创建任务容器：配额原子准入→登记→建卷建 Pod；集群失败时回滚准入并标 failed，不留下无主 Pod。 */
@@ -47,7 +55,10 @@ export function createEnvironmentUseCase(deps: TaskRuntimeUseCaseDeps) {
     });
     try {
       await cluster.ensureVolume(env, profile.storage);
-      await cluster.createPod({ env, image: settings.taskImage, envVars: await containerEnv(deps, env, svc, token), resources: { cpu: profile.cpu, memory: profile.memory, storage: profile.storage }, ...(settings.agentEnvSecretName ? { agentEnvSecretName: settings.agentEnvSecretName } : {}) });
+      await cluster.createPod({
+        env, image: settings.taskImage, envVars: await containerEnv(deps, env, svc, token), resources: { cpu: profile.cpu, memory: profile.memory, storage: profile.storage },
+        ...(settings.agentEnvSecretName ? { agentEnvSecretName: settings.agentEnvSecretName } : {}), ...(await sourceOf(deps, env.serviceId, env.branch)),
+      });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       logger.error('task pod creation failed', { taskId: id, error: message });

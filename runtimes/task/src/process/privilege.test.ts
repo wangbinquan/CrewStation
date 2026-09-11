@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { buildChildEnv } from './childEnvironment';
+import { controllingTerminalPrefix } from './launcher';
 import { IsolationUnavailableError, resolveIsolation } from './privilege';
 import { createLineSplitter, splitChunk } from './streamPump';
 
@@ -18,6 +19,15 @@ describe('resolveIsolation', () => {
   test('root 但没有 setpriv 或 worker uid 为 0：拒绝启动', () => {
     expect(() => resolveIsolation({ uid: 10001, gid: 10001, currentUid: 0, which: () => null })).toThrow(IsolationUnavailableError);
     expect(() => resolveIsolation({ uid: 0, gid: 0, currentUid: 0, which: () => '/usr/bin/setpriv' })).toThrow(IsolationUnavailableError);
+  });
+});
+
+describe('controllingTerminalPrefix', () => {
+  test('有 setsid：新会话并把 PTY 设为控制终端，且等子进程结束', () => {
+    expect(controllingTerminalPrefix((b) => (b === 'setsid' ? '/usr/bin/setsid' : null))).toEqual(['/usr/bin/setsid', '--wait', '--ctty']);
+  });
+  test('没有 setsid：空前缀，终端仍可开，只是没有作业控制', () => {
+    expect(controllingTerminalPrefix(() => null)).toEqual([]);
   });
 });
 

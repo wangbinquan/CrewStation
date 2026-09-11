@@ -1,0 +1,32 @@
+.scroll {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.table th {
+  padding: var(--cs-space-2) var(--cs-space-3);
+  border-bottom: 1px solid var(--cs-color-border);
+  color: var(--cs-color-text-muted);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.table td {
+  padding: var(--cs-space-2) var(--cs-space-3);
+  border-bottom: 1px solid var(--cs-color-border);
+  vertical-align: top;
+}
+
+.table tr:last-child td {
+  border-bottom: none;
+}
+
+/* 操作列里的按钮不该被压成竖排的单字。 */
+.table td:last-child {
+  white-space: nowrap;
+}

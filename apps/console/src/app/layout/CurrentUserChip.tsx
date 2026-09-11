@@ -1,16 +1,26 @@
 import type { ReactElement } from 'react';
+import { api } from '../../shared/api/client';
+import { queryKeys } from '../../shared/api/queryKeys';
+import { useApiQuery } from '../../shared/api/useApi';
 import { useT } from '../../shared/lib/useT';
 import styles from './TopBar.module.css';
 
-/** 当前用户占位：身份由网关在用户域注入，接入 cs-auth 后替换为真实用户。 */
+/** 当前用户：身份由网关在用户域注入，工作台只读 /v1/me。 */
 export function CurrentUserChip(): ReactElement {
   const t = useT();
+  const me = useApiQuery(queryKeys.me(), () => api.me.get());
+  const name = me.data?.name ?? (me.isPending ? t('topBar.userLoading') : t('topBar.userUnknown'));
+  const title = me.data === undefined ? t('topBar.userHint') : t('topBar.userTitle', { email: me.data.email, role: me.data.isAdmin ? t('topBar.roleAdmin') : t('topBar.roleMember') });
   return (
-    <div className={styles.user} title={t('topBar.userHint')}>
+    <div className={styles.user} title={title}>
       <span className={styles.avatar} aria-hidden="true">
-        ?
+        {name.slice(0, 1).toUpperCase()}
       </span>
-      <span className={styles.userName}>{t('topBar.userPlaceholder')}</span>
+      <span className={styles.userName}>{name}</span>
+      {me.data?.demoIdentity === true ? <span className={styles.demo}>{t('topBar.demoIdentity')}</span> : null}
+      <a className={styles.logout} href="/auth/logout">
+        {t('topBar.logout')}
+      </a>
     </div>
   );
 }

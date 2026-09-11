@@ -153,6 +153,17 @@ function composeRuntime(deps: PlatformModuleDeps, core: ReturnType<typeof compos
     db, k8s, logger, isAdmin: (id) => isAdmin(id), authorizer: project.api, quotas: { quotaLimit: project.api.quotaLimit },
     profiles: { getTaskProfile: async (name) => (await project.api.listTaskProfiles()).find((p) => p.name === name) },
     services: { resolveServiceById: resolveById },
+    checkout: {
+      // 开发容器的工作卷要先有源码：签一个只读的会话级 Git 令牌，写进项目命名空间的 Secret，
+      // 只挂给 checkout init 容器。推送由平台在发布时完成，长驻容器里不需要写权限。
+      checkoutFor: async (serviceId) => {
+        const [binding, svc, credential] = await Promise.all([core.scm.api.getBinding(SYSTEM_ACTOR, serviceId), resolveById(serviceId), core.scm.api.issueSessionCredential(serviceId, 30)]);
+        if (!svc) return undefined;
+        const name = `git-checkout-${serviceId.slice(-12)}`;
+        await k8s.apply(secretObject({ name, namespace: svc.namespace, stringData: { token: credential.token }, labels: { 'crewstation.io/service': svc.name } }));
+        return { repoUrl: binding.httpUrl, credentialSecretName: name };
+      },
+    },
     sources: { configEnv: (projectId, env) => config.api.renderEnv(projectId, env), dataEnv: data.api.envFor, taskDataEnv: data.api.envForTask },
     settings: { taskImage: settings.taskImage, systemNamespace: settings.systemNamespace, sessionUrl: settings.sessionRunnerUrl, userDomain: settings.userDomain, serviceDomain: settings.serviceDomain, workerUid: 10001, defaultProfile: settings.defaultTaskProfile, ...(settings.agentEnvSecretName ? { agentEnvSecretName: settings.agentEnvSecretName } : {}) },
   });

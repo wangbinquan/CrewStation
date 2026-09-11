@@ -16,6 +16,14 @@ export interface ServiceResolver {
   resolveServiceById(serviceId: ServiceId): Promise<{ projectId: ProjectId; slug: string; name: string; namespace: string } | undefined>;
 }
 
+/**
+ * 由 scm 模块提供：开发会话要把仓库克隆进工作卷，否则开发容器里是空目录。
+ * 只签只读凭据——推送由平台在发布时完成，容器内不需要写权限。
+ */
+export interface SourceCheckoutSource {
+  checkoutFor(serviceId: ServiceId, branch: string): Promise<{ repoUrl: string; credentialSecretName: string } | undefined>;
+}
+
 /** 由 config 与 data 模块提供：开发组配置与开发库／任务级数据访问的环境变量。 */
 export interface EnvironmentSources {
   configEnv(projectId: ProjectId, env: 'development' | 'production'): Promise<Record<string, string>>;

@@ -25,6 +25,8 @@ export interface WorkloadSpec extends ContainerSpec {
   labels: Record<string, string>;
   serviceAccountName?: string;
   automountServiceAccountToken?: boolean;
+  /** 主容器启动前按顺序跑完；凭据只进 init 容器，长驻容器的环境里就没有它。 */
+  initContainers?: ContainerSpec[];
 }
 
 function container(spec: ContainerSpec): Record<string, unknown> {
@@ -64,6 +66,7 @@ export function podTemplate(spec: WorkloadSpec): Record<string, unknown> {
     spec: {
       ...(spec.serviceAccountName ? { serviceAccountName: spec.serviceAccountName } : {}),
       automountServiceAccountToken: spec.automountServiceAccountToken ?? false,
+      ...(spec.initContainers?.length ? { initContainers: spec.initContainers.map(container) } : {}),
       containers: [container(spec)],
       volumes: volumes(spec),
     },

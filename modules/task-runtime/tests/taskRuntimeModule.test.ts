@@ -27,6 +27,7 @@ beforeAll(async () => {
     profiles: { getTaskProfile: async (name) => (name === 'coding-medium' ? { name, cpu: '1', memory: '2Gi', storage: '10Gi' } : undefined) },
     services: { resolveServiceById: async () => ({ projectId, slug: 'demo', name: 'demo', namespace: 'cs-demo' }) },
     sources: { configEnv: async () => ({ GREETING: 'dev-hi' }), dataEnv: async () => ({ CS_DATABASE_URL: 'postgres://dev' }), taskDataEnv: async () => ({}) },
+    checkout: { checkoutFor: async () => ({ repoUrl: 'http://git.local/crewstation/demo.git', credentialSecretName: 'git-checkout-demo' }) },
     isAdmin: async () => false,
     settings: { taskImage: 'cs-task-runtime:dev', systemNamespace: 'crewstation-system', sessionUrl: 'ws://cs-session:8083/runner', userDomain: 'cs.localhost', serviceDomain: 'svc.cs.internal', workerUid: 10001, defaultProfile: 'coding-medium', agentEnvSecretName: 'agent-env' },
   });
@@ -48,6 +49,19 @@ describe.skipIf(!available)('task-runtime module', () => {
     expect(env.CS_ENVIRONMENT).toBe('development');
     expect(env.GREETING).toBe('dev-hi');
     expect(env.CS_PREVIEW_PORT).toBe('3000');
+
+    // 开发会话必须把源码克隆进工作卷，否则容器里是空目录。
+    const devPod = k8s.objects.get(`v1/Pod/cs-demo/${dev.podName}`)!;
+    const init = (devPod.spec as { initContainers?: Array<{ name: string; env: Array<{ name: string; value?: string; valueFrom?: unknown }>; volumeMounts: Array<{ mountPath: string }> }> }).initContainers ?? [];
+    expect(init.map((c) => c.name)).toEqual(['checkout']);
+    const initEnv = Object.fromEntries(init[0]!.env.map((e) => [e.name, e.value]));
+    expect(initEnv.CS_REPO_URL).toBe('http://git.local/crewstation/demo.git');
+    expect(initEnv.CS_BRANCH).toBe('main');
+    // 令牌只以 secretKeyRef 出现，不作为明文值。
+    expect(initEnv.CS_GIT_TOKEN).toBeUndefined();
+    expect(init[0]!.volumeMounts.some((m) => m.mountPath === '/work')).toBe(true);
+    // 长驻容器的环境里没有 Git 令牌。
+    expect(Object.keys(env).some((k) => k.includes('GIT_TOKEN'))).toBe(false);
     expect(env.CS_AGENT_ENV_FILE).toBe('/etc/crewstation/agent.env');
     expect(env.CS_RUNNER_TOKEN!.length).toBeGreaterThan(20);
     await expect(runtime.api.createEnvironment({ serviceId, kind: 'dev-session' })).rejects.toMatchObject({ kind: 'conflict' });

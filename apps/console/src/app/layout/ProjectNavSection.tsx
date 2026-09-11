@@ -37,7 +37,9 @@ export function ProjectNavSection({ projectId }: { readonly projectId: string })
     <div className={styles.section}>
       <div className={styles.sectionTitle}>
         {t('nav.currentProject')}
-        <code className={styles.projectId}>{projectId}</code>
+        <code className={styles.projectId} title={projectId}>
+          {projectId}
+        </code>
       </div>
       <ul className={styles.list}>
         {PROJECT_PAGES.map((item) => (

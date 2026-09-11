@@ -17,7 +17,7 @@ import { environmentQueries, environmentToDto } from './application/queries';
 import { reconcileUseCase } from './application/reconcile';
 import { environmentRoutes } from './http/environmentRoutes';
 import type { TaskCluster } from './ports/cluster';
-import type { EnvironmentSources, ProfileCatalog, ProjectAuthorizer, QuotaSource, ServiceResolver, TaskRuntimeSettings } from './ports/platform';
+import type { EnvironmentSources, ProfileCatalog, ProjectAuthorizer, QuotaSource, ServiceResolver, SourceCheckoutSource, TaskRuntimeSettings } from './ports/platform';
 
 export interface TaskRuntimeModuleDeps {
   db: Database;
@@ -27,6 +27,8 @@ export interface TaskRuntimeModuleDeps {
   profiles: ProfileCatalog;
   services: ServiceResolver;
   sources: EnvironmentSources;
+  /** 开发会话的源码检出；不给则容器里是空工作卷。 */
+  checkout?: SourceCheckoutSource;
   isAdmin: (userId: UserId) => Promise<boolean>;
   settings: TaskRuntimeSettings;
   cluster?: TaskCluster;
@@ -50,12 +52,13 @@ export const taskRuntimeMigrations: MigrationSet = {
 export function createTaskRuntimeModule(deps: TaskRuntimeModuleDeps): TaskRuntimeModule {
   const useCaseDeps: TaskRuntimeUseCaseDeps = {
     uow: drizzleUnitOfWork(deps.db),
-    cluster: deps.cluster ?? kubernetesTaskCluster(deps.k8s),
+    cluster: deps.cluster ?? kubernetesTaskCluster(deps.k8s, deps.settings.workerUid),
     authorizer: deps.authorizer,
     quotas: deps.quotas,
     profiles: deps.profiles,
     services: deps.services,
     sources: deps.sources,
+    ...(deps.checkout ? { checkout: deps.checkout } : {}),
     settings: deps.settings,
     clock: deps.clock ?? systemClock,
     logger: deps.logger ?? noopLogger,

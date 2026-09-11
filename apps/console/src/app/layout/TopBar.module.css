@@ -78,3 +78,21 @@
     display: none;
   }
 }
+
+.demo {
+  padding: 1px 6px;
+  border: 1px solid var(--cs-color-warning-border, #d4a72c);
+  border-radius: 999px;
+  color: var(--cs-color-warning-text, #9a6700);
+  font-size: 11px;
+}
+
+.logout {
+  color: var(--cs-color-text-muted, #57606a);
+  font-size: 12px;
+  text-decoration: none;
+}
+
+.logout:hover {
+  text-decoration: underline;
+}
