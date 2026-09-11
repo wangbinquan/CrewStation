@@ -5,5 +5,11 @@
   "type": "module",
   "description": "crewstation 命令行：与工作台共用同一平台 API",
   "bin": { "crewstation": "./src/main.ts" },
-  "dependencies": { "@crewstation/kernel": "workspace:*" }
+  "scripts": {
+    "start": "bun run src/main.ts"
+  },
+  "dependencies": {
+    "@crewstation/api-client": "workspace:*",
+    "@crewstation/contracts": "workspace:*"
+  }
 }
