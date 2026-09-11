@@ -3,6 +3,9 @@ import type { LayerDir } from './archModel';
 
 export const CAPS = { sourceLines: 600, testLines: 1000, filesPerDir: 20 } as const;
 
+/** 第三方工具要求默认导出的配置文件（vite.config.ts 等），是禁默认导出规则唯一的结构性例外。 */
+export const DEFAULT_EXPORT_ALLOWED = /\.config\.(ts|js|mjs)$/;
+
 export const BANNED_BASENAMES = new Set([
   'utils.ts', 'helpers.ts', 'common.ts', 'misc.ts', 'shared.ts',
   'utils.tsx', 'helpers.tsx', 'common.tsx', 'misc.tsx', 'shared.tsx',

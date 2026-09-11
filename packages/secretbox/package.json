@@ -1,0 +1,8 @@
+{
+  "name": "@crewstation/secretbox",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "静态密文封装：AES-256-GCM，版本化格式 v1:<iv>:<ciphertext>；密钥来自安装配置",
+  "exports": { ".": "./index.ts" }
+}

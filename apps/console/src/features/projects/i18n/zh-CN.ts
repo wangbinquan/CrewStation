@@ -1,0 +1,28 @@
+import type { Messages } from '../../../shared/lib/i18n';
+
+export const messages = {
+  'projects.list.title': '项目',
+  'projects.list.line1': '项目由管理员创建并指定项目负责人；一个项目对应一个数字人服务、一个托管的 GitLab 兼容仓库与一个命名空间。',
+  'projects.list.line2': '选择项目后进入概览、开发会话、发布、配置、接口目录、事件、日志与能力说明。',
+  'projects.list.emptyTitle': '尚无项目',
+  'projects.list.emptyDescription': '项目列表接入平台 API 后在此显示。',
+  'projects.list.sampleLink': '打开示例项目页面（占位 ID：sample）',
+  'projects.overview.title': '概览',
+  'projects.overview.line1': 'preview 与 prod 是同一个生产服务的两个部署槽（蓝绿），共享生产数据库、文件、身份与授权；差别只在网关把流量路由到哪一个槽。',
+  'projects.overview.line2': '发布先部署到待机的 preview 槽，由项目负责人切流到生产；回滚即切回。',
+  'projects.slot.preview': 'preview 槽',
+  'projects.slot.previewRole': '待机',
+  'projects.slot.previewDescription': '新发布先部署到这里，项目成员与指定的 preview 测试者可访问。',
+  'projects.slot.prod': 'prod 槽',
+  'projects.slot.prodRole': '生产流量',
+  'projects.slot.prodDescription': '网关把用户域流量路由到这里；切流后回滚即切回。',
+  'projects.slot.currentRelease': '当前 Release',
+  'projects.slot.unknown': '—',
+  'projects.actions.publish': '发布',
+  'projects.actions.publishHint': '发布入口：工作台按钮、CLI 与操作 MCP 工具。平台打 v<major>.<minor>.<patch> 标签后构建固定 SHA、执行迁移并部署到 preview 槽。',
+  'projects.actions.switchTraffic': '切流',
+  'projects.actions.switchTrafficHint': '由项目负责人执行 TrafficSwitch，把用户域流量切到新发布；回滚即切回。',
+  'projects.releases.title': 'Release',
+  'projects.releases.emptyTitle': '尚无 Release',
+  'projects.releases.emptyDescription': '只有平台创建的 v<major>.<minor>.<patch> 标签才触发发布；手工打的标签不会发布。',
+} satisfies Messages;

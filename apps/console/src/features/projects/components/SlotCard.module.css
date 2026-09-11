@@ -1,0 +1,20 @@
+.description {
+  color: var(--cs-color-text-muted);
+  margin-bottom: var(--cs-space-3);
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--cs-space-1) var(--cs-space-3);
+  margin: 0;
+}
+
+.facts dt {
+  color: var(--cs-color-text-muted);
+}
+
+.facts dd {
+  margin: 0;
+  font-family: var(--cs-font-mono);
+}

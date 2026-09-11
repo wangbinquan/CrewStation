@@ -3,5 +3,26 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "工作台 SPA：React、Vite、TanStack；只依赖 contracts 与 api-client；结构见 docs/engineering/repository-structure.md §8"
+  "description": "工作台 SPA：React、Vite、TanStack；只依赖 contracts 与 api-client；结构见 docs/engineering/repository-structure.md §8",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@crewstation/api-client": "workspace:*",
+    "@crewstation/contracts": "workspace:*",
+    "@tanstack/react-query": "5.102.8",
+    "@tanstack/react-router": "1.170.35",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  },
+  "devDependencies": {
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.1.1",
+    "vite": "8.3.0"
+  }
 }

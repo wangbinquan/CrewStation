@@ -6,13 +6,23 @@ on:
 jobs:
   check:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17.11
+        env:
+          POSTGRES_USER: crewstation
+          POSTGRES_PASSWORD: crewstation-dev
+          POSTGRES_DB: crewstation
+        ports: ['55432:5432']
+        options: >-
+          --health-cmd "pg_isready -U crewstation" --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      CS_TEST_DATABASE_URL: postgres://crewstation:crewstation-dev@127.0.0.1:55432/crewstation
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.3.13
       - run: bun install --frozen-lockfile
-      - run: bun run arch:check
-      - run: bun run lint
-      - run: bun run typecheck
-      - run: bun test
+      - run: bun run check
+      - run: cd apps/console && bun run build

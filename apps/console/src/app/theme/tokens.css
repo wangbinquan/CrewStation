@@ -1,0 +1,77 @@
+/* 设计令牌：颜色、字体、间距、圆角、布局尺寸。组件只引用变量，不写裸色值。 */
+:root {
+  color-scheme: light dark;
+
+  --cs-font-sans: system-ui, -apple-system, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  --cs-font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --cs-font-size: 14px;
+  --cs-line-height: 1.6;
+
+  --cs-color-bg: #f4f5f7;
+  --cs-color-surface: #ffffff;
+  --cs-color-surface-muted: #f0f2f5;
+  --cs-color-border: #dfe3e8;
+  --cs-color-text: #1c2128;
+  --cs-color-text-muted: #5f6b7a;
+  --cs-color-primary: #2563eb;
+  --cs-color-primary-hover: #1d4ed8;
+  --cs-color-on-primary: #ffffff;
+  --cs-color-focus: #93c5fd;
+
+  --cs-tone-neutral-fg: #4b5563;
+  --cs-tone-neutral-bg: #e5e7eb;
+  --cs-tone-info-fg: #1d4ed8;
+  --cs-tone-info-bg: #dbeafe;
+  --cs-tone-success-fg: #15803d;
+  --cs-tone-success-bg: #dcfce7;
+  --cs-tone-warning-fg: #b45309;
+  --cs-tone-warning-bg: #fef3c7;
+
+  --cs-nav-bg: #111827;
+  --cs-nav-text: #cbd5e1;
+  --cs-nav-text-muted: #6b7280;
+  --cs-nav-active-bg: #1f2937;
+  --cs-nav-active-text: #ffffff;
+
+  --cs-space-1: 4px;
+  --cs-space-2: 8px;
+  --cs-space-3: 12px;
+  --cs-space-4: 16px;
+  --cs-space-5: 24px;
+  --cs-space-6: 32px;
+
+  --cs-radius-sm: 4px;
+  --cs-radius-md: 8px;
+  --cs-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
+
+  --cs-nav-width: 224px;
+  --cs-topbar-height: 52px;
+  --cs-content-max-width: 1200px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --cs-color-bg: #0f1419;
+    --cs-color-surface: #161b22;
+    --cs-color-surface-muted: #1f2630;
+    --cs-color-border: #2d3640;
+    --cs-color-text: #e6edf3;
+    --cs-color-text-muted: #9aa4b2;
+    --cs-color-primary: #3b82f6;
+    --cs-color-primary-hover: #60a5fa;
+    --cs-color-focus: #1d4ed8;
+
+    --cs-tone-neutral-fg: #d1d5db;
+    --cs-tone-neutral-bg: #374151;
+    --cs-tone-info-fg: #bfdbfe;
+    --cs-tone-info-bg: #1e3a8a;
+    --cs-tone-success-fg: #bbf7d0;
+    --cs-tone-success-bg: #14532d;
+    --cs-tone-warning-fg: #fde68a;
+    --cs-tone-warning-bg: #78350f;
+
+    --cs-nav-bg: #0b0f14;
+    --cs-nav-active-bg: #1f2937;
+    --cs-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  }
+}

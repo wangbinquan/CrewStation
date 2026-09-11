@@ -1,0 +1,6 @@
+.slots {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--cs-space-4);
+  margin-bottom: var(--cs-space-5);
+}

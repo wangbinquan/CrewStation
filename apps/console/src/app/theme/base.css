@@ -1,0 +1,57 @@
+/* 全局基线：盒模型、字体、链接、代码；页面与组件样式在各自的 CSS Module 中。 */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--cs-font-sans);
+  font-size: var(--cs-font-size);
+  line-height: var(--cs-line-height);
+  color: var(--cs-color-text);
+  background: var(--cs-color-bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+
+a {
+  color: var(--cs-color-primary);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+code {
+  font-family: var(--cs-font-mono);
+  font-size: 0.92em;
+  padding: 1px var(--cs-space-1);
+  border-radius: var(--cs-radius-sm);
+  background: var(--cs-color-surface-muted);
+}
+
+button,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--cs-color-focus);
+  outline-offset: 2px;
+}

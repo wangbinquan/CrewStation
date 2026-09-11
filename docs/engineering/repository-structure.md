@@ -266,7 +266,7 @@ apps/console/src/
 | 函数行数 | 80 行 | lint 报错 |
 | 文件名 | 一个文件一个概念，文件名即概念（`releaseStateMachine.ts`、`switchTraffic.ts`） | 评审 |
 | 禁用文件名 | `utils.ts`、`helpers.ts`、`common.ts`、`misc.ts`、`shared.ts`、`types.ts`（仅 `api/` 内允许）、非模块根与包根的 `index.ts` | CI 失败 |
-| 导出方式 | 只用命名导出，禁止 `export default`（React 组件除外） | lint |
+| 导出方式 | 只用命名导出，禁止 `export default`（React 组件与 `*.config.ts`／`*.config.js` 工具配置文件除外，见 ADR-0002） | lint + `tools/arch` |
 | 生成代码 | 放 `generated/`，加头注释，不手改，不计入尺寸规则 | 检查头注释 |
 | 依赖声明 | 只 import `package.json` 里声明的依赖；禁止 `tsconfig paths` 别名 | lint（`import/no-extraneous-dependencies`） |
 

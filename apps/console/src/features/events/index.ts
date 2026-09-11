@@ -1,0 +1,1 @@
+export { eventsRoute } from './routes';

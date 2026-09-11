@@ -1,0 +1,29 @@
+.badge {
+  display: inline-block;
+  padding: 1px var(--cs-space-2);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.6;
+  white-space: nowrap;
+}
+
+.neutral {
+  color: var(--cs-tone-neutral-fg);
+  background: var(--cs-tone-neutral-bg);
+}
+
+.info {
+  color: var(--cs-tone-info-fg);
+  background: var(--cs-tone-info-bg);
+}
+
+.success {
+  color: var(--cs-tone-success-fg);
+  background: var(--cs-tone-success-bg);
+}
+
+.warning {
+  color: var(--cs-tone-warning-fg);
+  background: var(--cs-tone-warning-bg);
+}
