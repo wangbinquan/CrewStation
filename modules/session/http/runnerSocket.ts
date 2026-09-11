@@ -2,14 +2,13 @@ import type { ServerWebSocket } from 'bun';
 import type { AppEnv } from '@crewstation/http';
 import { Hono } from 'hono';
 import type { UpgradeWebSocket } from 'hono/ws';
-import type { RunnerConnection } from '../domain/runnerConnection';
-import type { RunnerHub } from '../application/runnerHub';
+import type { ActiveRunnerConnection, RunnerHub } from '../application/runnerHub';
 
 /** TaskRunner 出向连接的入口：首帧 hello，之后按协议收发。 */
 export function runnerSocketRoutes(hub: RunnerHub, upgradeWebSocket: UpgradeWebSocket<ServerWebSocket>): Hono<AppEnv> {
   const r = new Hono<AppEnv>();
   r.get('/runner', upgradeWebSocket(() => {
-    let connection: RunnerConnection | undefined;
+    let connection: ActiveRunnerConnection | undefined;
     return {
       onMessage: async (evt, ws) => {
         let raw: unknown;

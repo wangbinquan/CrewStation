@@ -6,7 +6,7 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import type { commandDispatch } from '../application/commandDispatch';
 import type { SessionUseCaseDeps } from '../application/dependencies';
-import { FORWARDED_HEADER } from '../adapters/http/fetchForwarder';
+import { FORWARDED_HEADER } from '../api/internalProtocol';
 
 const eventsQuery = z.object({ sinceSeq: z.coerce.number().int().min(0).default(0), kinds: z.string().optional(), agentId: z.string().optional(), limit: z.coerce.number().int().min(1).max(5000).default(500) });
 

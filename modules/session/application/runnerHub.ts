@@ -76,3 +76,5 @@ export function runnerHub(deps: SessionUseCaseDeps) {
 }
 
 export type RunnerHub = ReturnType<typeof runnerHub>;
+/** http 层只经 application 认识连接对象。 */
+export type ActiveRunnerConnection = RunnerConnection;

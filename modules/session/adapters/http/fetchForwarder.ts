@@ -1,7 +1,6 @@
 import { PlatformError } from '@crewstation/kernel';
+import { FORWARDED_HEADER } from '../../api/internalProtocol';
 import type { CommandForwarder } from '../../ports/forwarding';
-
-export const FORWARDED_HEADER = 'x-cs-forwarded';
 
 /** 副本间转发：只发到本副本不能处理的命令，带 x-cs-forwarded 防止环转。 */
 export function fetchForwarder(fetchImpl: typeof fetch = fetch): CommandForwarder {
