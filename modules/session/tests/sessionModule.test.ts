@@ -87,4 +87,24 @@ describe.skipIf(!available)('session module', () => {
     await expect(session.api.sendCommand(taskId, { id: 'c3', type: 'previewStatus' })).rejects.toMatchObject({ kind: 'unavailable' });
     browser.ws.close(); stranger.ws.close(); bad.ws.close();
   });
+
+  test('hello 之后紧跟的事件帧不会被当成第二个 hello', async () => {
+    const burstTask = 'tsk_00000000000000000000000000000002' as TaskId;
+    const runner = await openSocket(`ws://${base}/runner`);
+    // hello 与随后的事件帧在同一个 tick 里发出：hello 的校验与建连是异步的，
+    // 早期实现会在它落地前把第 2 帧再次当成 hello，以 1008「首帧必须是 hello」断开。
+    const at = new Date().toISOString();
+    runner.ws.send(JSON.stringify({ type: 'hello', protocolVersion: TASKRUNNER_PROTOCOL_VERSION, taskId: burstTask, runnerToken: 'good', workdir: '/work', capabilities: { drivers: ['stub'], pty: false, preview: false } }));
+    for (let seq = 1; seq <= 5; seq += 1) {
+      runner.ws.send(JSON.stringify({ type: 'event', seq, at, event: { kind: 'agent', event: { agentId: 'a1', seq, at, type: 'text', text: `burst ${seq}` } } }));
+    }
+    expect(await runner.next((f) => (f as { type: string }).type === 'welcome')).toMatchObject({ resumeFromSeq: 0 });
+    await Bun.sleep(200);
+    expect(runner.frames.some((f) => (f as { type: string }).type === 'error')).toBe(false);
+    expect(runner.ws.readyState).toBe(WebSocket.OPEN);
+    expect((await session.api.listEvents(burstTask, {})).map((e) => e.seq)).toEqual([1, 2, 3, 4, 5]);
+    runner.ws.close();
+    // 断开回调要写注册表，等它落地再让 afterAll 丢库。
+    await Bun.sleep(150);
+  });
 });
