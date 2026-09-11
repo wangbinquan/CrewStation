@@ -1,11 +1,12 @@
 # Design｜CrewStation 数字人能力平台
 
 > 状态：设计草案，待原型与评审验证  
-> 版本：0.3.2 · 整理日期：2026-09-10  
+> 版本：0.3.3 · 整理日期：2026-09-10  
 > 修订日期：2026-09-11（v0.2.0：任务级执行环境、代码托管与持续意图修改）  
 > 修订日期：2026-09-11（v0.3.0：与 Proposal v0.3.0 同步，平台职责收窄、标签发布、网关鉴权、接入容器与事件中心、规模目标；删除 ZIP 与知识飞轮）  
 > 修订日期：2026-09-11（v0.3.1：选型按 tech-evaluation.md 确认并回填 §3）  
 > 修订日期：2026-09-11（v0.3.2：设计门检视 25 项裁定落文：蓝绿部署槽、源 Pod IP 服务身份、用户域与服务域、网关本地放行表、契约随 Manifest 登记、子任务两种模式、配置与 Secret、日志与告警、每项目命名空间、TaskRunner 独立 UID）  
+> 修订日期：2026-09-11（v0.3.3：§15.1 仓库组织改为指向 `docs/engineering/repository-structure.md`；新增 D52）  
 > 配套文档：[Proposal](./proposal.md) · [Plan](./plan.md) · [Tech Evaluation](./tech-evaluation.md) · [设计门检视](./reviews/design-gate-2026-09-11.md)
 
 ## 目录
@@ -1056,47 +1057,17 @@ OpenTelemetry 覆盖前台交互链路：浏览器、网关、cs-api、业务服
 
 ## 15. 仓库组织、决策记录与待决项
 
-### 15.1 建议目录
+### 15.1 仓库组织
 
-```text
-crewstation/
-├─ proposal/                    # proposal.md、design.md、plan.md、tech-evaluation.md、reviews/、原稿
-├─ apps/
-│  ├─ console/                  # 工作台与控制台
-│  ├─ cli/                      # 项目成员与管理员 CLI
-│  ├─ api/                      # cs-api
-│  ├─ auth/                     # cs-auth（含凭据服务）
-│  ├─ controller/               # cs-controller（含 SCM 模块、放行表与身份索引生成）
-│  ├─ session/                  # cs-session
-│  └─ events/                   # cs-events
-├─ mcp/
-│  ├─ capabilities/             # 能力说明 MCP
-│  └─ operations/               # 操作 MCP
-├─ packages/
-│  ├─ contracts/                # Manifest、API、事件、放行表契约
-│  ├─ runtime-drivers/          # 复制改造：驱动、agentInjection、agentProcess/managedProcess、共享 Schema 子集
-│  ├─ code-host/                # GitLab 兼容客户端（建仓、推送、标签、保护标签）
-│  ├─ gateway-policy/           # 用户域与服务域路由、放行表、身份索引生成
-│  └─ data-providers/
-├─ runtimes/task/               # 任务容器镜像：tini、TaskRunner、CLI、工具链
-├─ integrations/
-│  ├─ gitlab-event-producer/    # 内置 GitLab 格式 EventProducer 项目模板
-│  └─ reference-api-proxy/      # 参考 APIProxy 项目模板
-├─ templates/minimal-sample/
-├─ deploy/
-│  ├─ helm/
-│  ├─ installer/
-│  └─ profiles/
-└─ tests/
-   ├─ contracts/
-   ├─ security/
-   ├─ e2e/
-   ├─ scale/
-   ├─ upgrade/
-   └─ recovery/
-```
+仓库结构、模块划分与依赖原则由 `docs/engineering/repository-structure.md`（v0.2，2026-09-11 已确认）规定，本节只给要点，两处不一致时以该文为准。
 
-工作区为 Bun workspaces。
+- 三类代码：`apps/*` 是可部署进程，只做装配；`modules/*` 是按本文对象簇划分的 16 个领域模块，各自声明 layer；`packages/*` 是删掉业务概念后仍成立的技术库（`contracts`、`kernel`、`persistence`、`queue`、`eventbus`、`http`、`ws`、`k8s`、`gitlab-client`、`jwt`、`agent-drivers`、`api-client`、`testkit`）。
+- 依赖只向下：apps → modules → packages；模块只能依赖 layer 更小的模块；低层需要高层信息只能走端口反转或订阅 `contracts` 中定义的事件。`runtimes/task` 只依赖 `contracts`、`kernel`、`ws`、`agent-drivers`；`apps/console` 与 `apps/cli` 只依赖 `contracts` 与 `api-client`。
+- 模块内部模板固定：`api/`、`domain/`、`application/`、`ports/`、`adapters/`、`http/`、`workers/`、`wiring.ts`、`index.ts`；模块间只 import 根 `index.ts`，由 `package.json` 的 `exports` 强制。
+- 持久化：每模块一个 PostgreSQL schema，迁移随模块；跨模块只存 ID，不建外键，不 join 对方的表。
+- 尺寸硬上限：源码文件 600 行、目录 20 个文件、函数 80 行；由 `tools/arch` 与 lint 在 CI 阻断，不设基线清单。
+- 进程组合：模块的 `wiring.ts` 返回 `http`、`workers`、`subscriptions` 入口，五个 cs-* 进程与两个 MCP 各挂载子集；本机可合并为单进程调试，代码不变。
+- 其余目录：`runtimes/task`、`integrations/{gitlab-event-producer,reference-api-proxy}`、`templates/minimal-sample`、`deploy/`、`tests/`、`tools/`、`docs/`、`proposal/`。
 
 ### 15.2 设计决策记录
 
@@ -1153,6 +1124,7 @@ crewstation/
 | D49 | 内置 GitLab EventProducer 与参考 APIProxy 走项目流程并作验收样本；最小样例含一条事件订阅 | 要求（S9，G11） |
 | D50 | 空闲只提醒不自动释放；模型凭据与获批生产数据绑定进容器为接受风险；规模与 HA 在 M6 一次验证 | 要求（S9，G19、G13、G14、G10） |
 | D51 | CLI 入首版；标签构建与 Release 最小路径前移到 M1 | 要求（S9，G21、G20） |
+| D52 | 仓库按 `docs/engineering/repository-structure.md` 组织：apps／modules／packages 三类、模块 layer 单向依赖、每模块一个 PostgreSQL schema、跨模块只存 ID、尺寸硬上限 600／20／80 由 `tools/arch` 阻断 | 要求（作者 2026-09-11 裁定） |
 
 ### 15.3 待决项与退出条件
 

@@ -1,11 +1,12 @@
 # Plan｜CrewStation 数字人能力平台实施与验收计划
 
 > 状态：待执行的实施计划，不表示任务已经完成  
-> 版本：0.3.2 · 整理日期：2026-09-10  
+> 版本：0.3.3 · 整理日期：2026-09-10  
 > 修订日期：2026-09-11（v0.2.0：任务级执行环境、代码托管与持续意图修改）  
 > 修订日期：2026-09-11（v0.3.0：与 Proposal、Design v0.3.0 同步；开发会话与标签发布；接入容器与事件中心；控制面 HA 与规模目标；删除 ZIP 与知识飞轮）  
 > 修订日期：2026-09-11（v0.3.1：选型确认后 T0.10 结项，版本锁定归 T0.2）  
 > 修订日期：2026-09-11（v0.3.2：设计门检视 25 项裁定落文：蓝绿切流、源 Pod IP 身份、服务域、契约登记、配置与 Secret、日志与告警、命名空间、CLI；新增任务与 AT-44–AT-55）  
+> 修订日期：2026-09-11（v0.3.3：T0.2 增加仓库结构与 `tools/arch` 检查的完成条件；依据 D52）  
 > 配套文档：[Proposal](./proposal.md) · [Design](./design.md) · [Tech Evaluation](./tech-evaluation.md) · [设计门检视](./reviews/design-gate-2026-09-11.md)
 
 ## 目录
@@ -28,7 +29,7 @@
 
 ## 0. 计划依据与执行规则
 
-本计划依据 Proposal v0.3.2 与 Design v0.3.2。需求基线为 R01–R53，其中 R06、R20 已删除，R10–R13 已作废并由 R44–R47 替代；设计决策为 D01–D51，待决项为 Q01–Q24。技术选型已按 `proposal/tech-evaluation.md` 确认，具体版本在 T0.2 锁定并由 M0 原型验证待验证项。设计门检视的 25 项裁定 G1–G25 记录在 `reviews/design-gate-2026-09-11.md` §6。
+本计划依据 Proposal v0.3.3 与 Design v0.3.3。需求基线为 R01–R53，其中 R06、R20 已删除，R10–R13 已作废并由 R44–R47 替代；设计决策为 D01–D52，待决项为 Q01–Q24。技术选型已按 `proposal/tech-evaluation.md` 确认，具体版本在 T0.2 锁定并由 M0 原型验证待验证项。设计门检视的 25 项裁定 G1–G25 记录在 `reviews/design-gate-2026-09-11.md` §6。
 
 角色命名沿用 Proposal：**意图创建与修改 Agent** 由开发者在开发会话中以流式交互启动；**业务执行 Agent** 由业务服务经子任务契约层提交，子任务有一次性与交互两种模式。平台不定义 Agent 角色，也没有主 Agent。M3 交付开发会话所需的任务容器与 TaskRunner 底座，M5 在同一底座上交付业务子任务契约层。
 
@@ -78,7 +79,7 @@
 | 任务 | 内容与边界 | 产出／完成条件 |
 |---|---|---|
 | T0.1 | 评审 R01–R53、D01–D51、Q01–Q24；明确项目、服务、两槽、开发会话、业务任务、接入容器、放行表与数据的身份边界；决定最小样例模板语言 | 决策记录；模板语言与构建 profile 确定 |
-| T0.2 | 建立 Bun workspaces monorepo、CI、格式与类型校验、测试入口、依赖锁与许可证核验；锁定各组件版本；登记 agent-workflow 源 commit 与逐文件复制清单 | 基础流水线实际通过；版本锁定与复制清单记录 |
+| T0.2 | 按 `docs/engineering/repository-structure.md` 建立 Bun workspaces monorepo（apps／modules／packages 三类目录、16 个模块的空模板与 layer 声明、每模块 PostgreSQL schema 约定）、`tools/arch` 依赖与尺寸检查、lint、CI、格式与类型校验、测试入口、依赖锁与许可证核验；锁定各组件版本；登记 agent-workflow 源 commit 与逐文件复制清单 | `tools/arch` 与 lint 在首个提交即阻断违规；基础流水线实际通过；版本锁定与复制清单记录 |
 | T0.3 | 冻结契约第一版：三种 Manifest（含 env、tasks.agentProfiles 与 outputContracts、service.plan 与 replicas、release.migration）、平台 API、事件与 EventDelivery（来源令牌、trace_id、确认语义）、放行表与 Pod 身份索引、TaskRunner 接口（带版本）、**业务接入约定表**（身份头名、令牌头与 JWKS 地址、用户域与服务域地址、`/api/<proxy>/` 前缀、数据库与配置环境变量名、环境标识变量） | Schema 与契约测试；约定表进入最小样例与能力说明 |
 | T0.4 | 原型：任务容器（tini、独立 UID 的 TaskRunner、realpath 文件接口）内同时运行 OpenCode 与 Claude Code 的流式交互 Agent、一个终端、一个命令；会话恢复与会话租约；取消与进程树清理；MCP 连接注入；关闭 Claude 自带沙箱；PTY 在 Bun 下的可用性决定 TaskRunner 运行时；驱动依赖反转与逐文件清单 | 双驱动流式交互可用或登记回退方式；清理可验证；依赖清单成文（Q03、Q13、Q22） |
 | T0.5 | 原型：网关用户域 ForwardAuth 与身份注入（aud 绑定、同名头剥离）；服务域源 Pod IP 反查身份、本地放行表、来源令牌注入；所选 CNI 源 IP 保留验证；放行与身份查表时延 | 业务服务收到身份；伪造头被剥离；未开放操作被拒；源 IP 反查正确（Q16、Q18、Q21） |
