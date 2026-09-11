@@ -1,0 +1,59 @@
+# CrewStation Manifest（拟议协议 crewstation/v1）：平台按它构建、发布、注入配置，并在发布时登记生产方与事件类型。
+# 结构以 packages/contracts/manifest/*.ts 的 zod Schema 为准；发布时平台先校验再构建。
+apiVersion: crewstation/v1
+kind: EventProducer
+spec:
+  # 接入容器和数字人走同一条建仓、开发会话、标签发布与两槽切流的流程；两个槽用同一条命令启动。
+  service:
+    command: ["bun", "run", "src/main.ts"]
+    port: 3000
+    healthPath: /healthz
+    plan: standard-small          # 管理员定义的服务套餐名
+    replicas: 1
+  development:
+    command: ["bun", "run", "--watch", "src/main.ts"]
+    port: 3000
+  # 配置与密钥是平台对象，按开发／生产两组取值以同名环境变量注入。
+  env:
+    # GitLab webhook 上配置的 Secret token。密钥不允许声明 default（EnvEntrySchema 会拒绝）：
+    # 必须由项目负责人在工作台显式提供，没有它本服务拒绝一切 webhook。
+    - name: GITLAB_WEBHOOK_SECRET_TOKEN
+      from: secret
+  # 目录中的生产方名；cs-events 按它核对投递方身份，EventDelivery 信封的 source.producer 也是它。
+  producer: gitlab
+  # 公司 GitLab 的 webhook 指向服务域上的这个路径；与 src/main.ts 的 INGRESS_PATH 一致。
+  ingress:
+    path: /hooks/gitlab
+    verification: gitlab-token
+  # 本接入容器可能产生的全部事件类型，逐条登记；未登记的类型 cs-events 一律拒收（404），
+  # 所以 src/gitlab/eventType.ts 里的映射是封闭集合，两处由 src/gitlab/eventType.test.ts 比对。
+  produces:
+    - eventType: gitlab.push
+    - eventType: gitlab.tag-push
+    - eventType: gitlab.merge-request
+    - eventType: gitlab.merge-request.open
+    - eventType: gitlab.merge-request.close
+    - eventType: gitlab.merge-request.reopen
+    - eventType: gitlab.merge-request.update
+    - eventType: gitlab.merge-request.merge
+    - eventType: gitlab.merge-request.approved
+    - eventType: gitlab.merge-request.unapproved
+    - eventType: gitlab.pipeline
+    - eventType: gitlab.pipeline.created
+    - eventType: gitlab.pipeline.pending
+    - eventType: gitlab.pipeline.running
+    - eventType: gitlab.pipeline.success
+    - eventType: gitlab.pipeline.failed
+    - eventType: gitlab.pipeline.canceled
+    - eventType: gitlab.pipeline.skipped
+    - eventType: gitlab.pipeline.manual
+    - eventType: gitlab.issue
+    - eventType: gitlab.issue.open
+    - eventType: gitlab.issue.close
+    - eventType: gitlab.issue.reopen
+    - eventType: gitlab.issue.update
+  release:
+    migration:
+      compatibility: none         # 无数据库，也没有迁移
+      destructive: false
+      rollback: switch-back

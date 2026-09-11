@@ -1,0 +1,126 @@
+openapi: 3.1.0
+info:
+  title: gitlab-event-producer
+  version: 0.1.0
+  description: |
+    内置 GitLab 格式 EventProducer 接入容器的 HTTP 接口。
+
+    注意：`kind: EventProducer` 的发布**不进内部 API 目录**——modules/api-catalog/application/registerRelease.ts
+    对 EventProducer 直接返回，因此本文档不是可申请调用的操作清单，而是给两类人看的说明：
+    配置 GitLab webhook 的管理员，以及排查投递链路的人。事件类型清单以 crewstation.yaml 的 `spec.produces` 为准。
+
+    三条路径都在服务域上，没有登录，也不接受任何平台令牌；webhook 的真伪只由 `X-Gitlab-Token` 判定。
+paths:
+  /hooks/gitlab:
+    post:
+      operationId: receiveGitlabWebhook
+      summary: 接收 GitLab webhook 并投给 cs-events
+      description: |
+        校验 `X-Gitlab-Token` → 按 `X-Gitlab-Event` 与 payload 推出平台事件类型 →
+        由 `Idempotency-Key`／`X-Gitlab-Event-UUID`／payload 指纹算出稳定去重键 → 以本服务身份投给 cs-events。
+        cs-events 暂时受理不了时返回 5xx，由 GitLab 按自己的策略重投。
+      parameters:
+        - name: X-Gitlab-Token
+          in: header
+          required: true
+          schema: { type: string }
+          description: webhook 上配置的 Secret token，必须与平台注入的 GITLAB_WEBHOOK_SECRET_TOKEN 一致
+        - name: X-Gitlab-Event
+          in: header
+          required: true
+          schema: { type: string }
+          description: 钩子名，例如 `Push Hook`、`Tag Push Hook`、`Merge Request Hook`、`Pipeline Hook`、`Issue Hook`
+        - name: X-Gitlab-Event-UUID
+          in: header
+          required: false
+          schema: { type: string }
+          description: 同一次触发在重投之间保持不变的事件 UUID，用于去重
+        - name: Idempotency-Key
+          in: header
+          required: false
+          schema: { type: string }
+          description: GitLab 16.x 起提供的幂等键；存在时优先用它做去重
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: GitLab webhook 原样的 payload，本服务不改写，整体放进平台事件的 payload 字段
+      responses:
+        "202":
+          description: 已受理（含去重命中），或本接入容器不产生该钩子的事件
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accepted: { type: boolean }
+                  ignored: { type: boolean, description: 该钩子未登记，不产生事件；GitLab 无需重投 }
+                  reason: { type: string }
+                  eventType: { type: string }
+                  eventId: { type: string }
+                  deduplicated: { type: boolean }
+                  deliveries: { type: integer, description: 本次产生的投递数；去重命中时为 0 }
+              examples:
+                produced:
+                  value: { accepted: true, eventType: "gitlab.push", eventId: "evt_0123456789abcdef0123456789abcdef", deduplicated: false, deliveries: 1 }
+                ignored:
+                  value: { accepted: false, ignored: true, reason: "本接入容器不产生 wiki page hook 的事件；已登记的钩子：push hook、tag push hook、merge request hook、pipeline hook、issue hook" }
+        "400":
+          description: 请求体不是 JSON 对象
+          content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+        "401":
+          description: 缺少 `X-Gitlab-Token`，或与配置的密钥不一致
+          content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+        "502":
+          description: cs-events 拒绝了投递（多为事件类型尚未随发布登记）
+          content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+        "503":
+          description: cs-events 暂时不可用；GitLab 应当重投
+          content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+  /:
+    get:
+      operationId: producerStatus
+      summary: 自述状态
+      description: 生产方名、部署槽、投递目标与已登记的事件类型；不含任何密钥。
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  producer: { type: string }
+                  project: { type: [string, "null"] }
+                  service: { type: [string, "null"] }
+                  slot: { type: [string, "null"] }
+                  environment: { type: [string, "null"] }
+                  ingressPath: { type: string }
+                  eventsBaseUrl: { type: [string, "null"] }
+                  webhookSecretConfigured: { type: boolean }
+                  eventTypes: { type: array, items: { type: string } }
+  /healthz:
+    get:
+      operationId: healthz
+      summary: 健康检查
+      description: 网关与探针使用。
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string }
+components:
+  schemas:
+    Error:
+      type: object
+      description: 平台错误信封
+      required: [error, message]
+      properties:
+        error: { type: string }
+        message: { type: string }

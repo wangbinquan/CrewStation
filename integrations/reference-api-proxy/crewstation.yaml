@@ -1,0 +1,39 @@
+# CrewStation Manifest（拟议协议 crewstation/v1）：平台按它构建、发布、注入配置，并把 openapi.yaml 的操作登记进内部 API 目录。
+# 结构以 packages/contracts/manifest/*.ts 的 zod Schema 为准；发布时平台先校验再构建。
+apiVersion: crewstation/v1
+kind: APIProxy
+spec:
+  # 接入容器和数字人走同一条建仓、开发会话、标签发布与两槽切流的流程；两个槽用同一条命令启动。
+  service:
+    command: ["bun", "run", "src/main.ts"]
+    port: 3000
+    healthPath: /healthz
+    plan: standard-small          # 管理员定义的服务套餐名
+    replicas: 1
+  development:
+    command: ["bun", "run", "--watch", "src/main.ts"]
+    port: 3000
+  # 配置与密钥是平台对象，按开发／生产两组取值以同名环境变量注入；代理不在代码里存任何长期凭据。
+  env:
+    # 上游地址。给了 default，首个标签就能发布；负责人随后在工作台按本环境的实际地址覆盖。
+    - name: GITLAB_BASE_URL
+      from: config
+      default: http://host.docker.internal:8929
+    # 上游访问令牌。密钥不允许声明 default（EnvEntrySchema 会拒绝），必须由项目负责人显式提供。
+    - name: GITLAB_TOKEN
+      from: secret
+  # 目录中的代理名，也是服务域上 `/api/<proxy>/` 的前缀；与 src/proxy/catalog.ts 的 PROXY_NAME 一致。
+  # 用 test-gitlab 而不是 gitlab：代理名全平台唯一，别让参考实现占掉将来接真 GitLab 要用的名字。
+  proxy: test-gitlab
+  upstream:
+    # 管理员登记的上游连接名；凭据按 Design §8.1 由 cs-auth 按需下发，目录只记名字。
+    connection: test-gitlab
+  apis:
+    # 发布时平台按 `<proxy>:<METHOD>:<path>` 从这份文档登记操作；目录不接受未经发布登记的操作。
+    exposes:
+      openapi: ./openapi.yaml
+  release:
+    migration:
+      compatibility: none         # 纯转发，无数据库，也没有迁移
+      destructive: false
+      rollback: switch-back

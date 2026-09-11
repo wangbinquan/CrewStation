@@ -1,0 +1,178 @@
+openapi: 3.1.0
+info:
+  title: test-gitlab
+  version: 0.1.0
+  description: |
+    参考 APIProxy 接入容器向内部 API 目录登记的操作：本机测试 GitLab REST API 的一小片。
+
+    **这片接口是刻意选小的**——项目、分支、标签、提交，加一个建分支的写操作用来证明请求体确实原样转发。
+    它的用处是当样板：其他接入容器复制本项目，改 `proxy` 名、上游连接与这份文档即可，转发逻辑照搬。
+    要扩，就在这里加 `paths`、在 src/proxy/catalog.ts 同步补上，然后发布——目录只认发布登记过的操作。
+
+    调用方经服务域访问 `http://api.<serviceDomain>/api/test-gitlab/<path>`，网关剥掉 `/api/test-gitlab` 前缀后
+    转给本代理，本代理再拼成 `<上游>/api/<path>`。调用方**不带任何凭据**：网关按源 Pod IP 识别调用方并按放行表判断；
+    上游凭据由平台按需注入本代理。本代理不做鉴权，资源级范围由上游把关。
+paths:
+  /v4/projects:
+    get:
+      operationId: listProjects
+      summary: 列出项目
+      x-cs-resource-note: 返回调用方令牌可见的全部项目；资源范围由上游按令牌判定
+      parameters:
+        - { name: search, in: query, required: false, schema: { type: string }, description: 按名称模糊搜索 }
+        - { name: per_page, in: query, required: false, schema: { type: integer, default: 20, maximum: 100 } }
+        - { name: page, in: query, required: false, schema: { type: integer, default: 1 } }
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/Project" } }
+        "401": { $ref: "#/components/responses/Upstream4xx" }
+  /v4/projects/{id}:
+    get:
+      operationId: getProject
+      summary: 取单个项目
+      x-cs-resource-note: 单个项目，按 id 或 URL 编码后的 group%2Fproject 定位
+      parameters: [{ $ref: "#/components/parameters/ProjectId" }]
+      responses:
+        "200":
+          description: 成功
+          content: { application/json: { schema: { $ref: "#/components/schemas/Project" } } }
+        "404": { $ref: "#/components/responses/Upstream4xx" }
+  /v4/projects/{id}/repository/branches:
+    get:
+      operationId: listBranches
+      summary: 列出分支
+      x-cs-resource-note: 单个项目的分支列表
+      parameters:
+        - { $ref: "#/components/parameters/ProjectId" }
+        - { name: search, in: query, required: false, schema: { type: string } }
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/Branch" } }
+        "404": { $ref: "#/components/responses/Upstream4xx" }
+    post:
+      operationId: createBranch
+      summary: 建分支
+      description: 本片里唯一的写操作，留作请求体透传的样例。建议管理员把它设为定向开放。
+      x-cs-resource-note: 在单个项目里新建分支；会改上游状态
+      parameters:
+        - { $ref: "#/components/parameters/ProjectId" }
+        - { name: branch, in: query, required: true, schema: { type: string }, description: 新分支名 }
+        - { name: ref, in: query, required: true, schema: { type: string }, description: 起点分支、标签或提交 }
+      responses:
+        "201":
+          description: 已创建
+          content: { application/json: { schema: { $ref: "#/components/schemas/Branch" } } }
+        "400": { $ref: "#/components/responses/Upstream4xx" }
+  /v4/projects/{id}/repository/branches/{branch}:
+    get:
+      operationId: getBranch
+      summary: 取单个分支
+      x-cs-resource-note: 单个项目的单个分支
+      parameters:
+        - { $ref: "#/components/parameters/ProjectId" }
+        - { name: branch, in: path, required: true, schema: { type: string }, description: 分支名（含斜杠时需 URL 编码） }
+      responses:
+        "200":
+          description: 成功
+          content: { application/json: { schema: { $ref: "#/components/schemas/Branch" } } }
+        "404": { $ref: "#/components/responses/Upstream4xx" }
+  /v4/projects/{id}/repository/tags:
+    get:
+      operationId: listTags
+      summary: 列出标签
+      x-cs-resource-note: 单个项目的标签列表；发布标签形如 v<major>.<minor>.<patch>
+      parameters:
+        - { $ref: "#/components/parameters/ProjectId" }
+        - { name: order_by, in: query, required: false, schema: { type: string, enum: [name, updated] } }
+        - { name: sort, in: query, required: false, schema: { type: string, enum: [asc, desc] } }
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/Tag" } }
+        "404": { $ref: "#/components/responses/Upstream4xx" }
+  /v4/projects/{id}/repository/commits:
+    get:
+      operationId: listCommits
+      summary: 列出提交
+      x-cs-resource-note: 单个项目某个 ref 上的提交列表
+      parameters:
+        - { $ref: "#/components/parameters/ProjectId" }
+        - { name: ref_name, in: query, required: false, schema: { type: string } }
+        - { name: since, in: query, required: false, schema: { type: string, format: date-time } }
+        - { name: per_page, in: query, required: false, schema: { type: integer, default: 20, maximum: 100 } }
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/Commit" } }
+        "404": { $ref: "#/components/responses/Upstream4xx" }
+  /v4/projects/{id}/repository/commits/{sha}:
+    get:
+      operationId: getCommit
+      summary: 取单个提交
+      x-cs-resource-note: 单个项目的单个提交
+      parameters:
+        - { $ref: "#/components/parameters/ProjectId" }
+        - { name: sha, in: path, required: true, schema: { type: string }, description: 提交 SHA、分支名或标签名 }
+      responses:
+        "200":
+          description: 成功
+          content: { application/json: { schema: { $ref: "#/components/schemas/Commit" } } }
+        "404": { $ref: "#/components/responses/Upstream4xx" }
+components:
+  parameters:
+    ProjectId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string }
+      description: 项目 ID，或 URL 编码后的 `group%2Fproject` 路径
+  responses:
+    Upstream4xx:
+      description: 上游原样返回的错误；本代理不改写状态码与响应体
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/UpstreamError" }
+  schemas:
+    Project:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        path_with_namespace: { type: string }
+        default_branch: { type: string }
+        web_url: { type: string }
+    Branch:
+      type: object
+      properties:
+        name: { type: string }
+        protected: { type: boolean }
+        commit: { $ref: "#/components/schemas/Commit" }
+    Tag:
+      type: object
+      properties:
+        name: { type: string }
+        target: { type: string }
+        commit: { $ref: "#/components/schemas/Commit" }
+    Commit:
+      type: object
+      properties:
+        id: { type: string }
+        short_id: { type: string }
+        title: { type: string }
+        author_name: { type: string }
+        created_at: { type: string, format: date-time }
+    UpstreamError:
+      type: object
+      properties:
+        message: { type: string }
+        error: { type: string }
