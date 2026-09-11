@@ -1,5 +1,5 @@
 import type { ContainerSpec, K8sClient, K8sObject } from '@crewstation/k8s';
-import { LABELS, Resources, podObject, pvcObject, serviceObject } from '@crewstation/k8s';
+import { LABELS, Resources, ingressRouteObject, podObject, pvcObject, serviceObject } from '@crewstation/k8s';
 import type { TaskCluster, TaskSourceCheckout } from '../../ports/cluster';
 
 type PodObject = K8sObject & { status?: { phase?: string; podIP?: string; message?: string; reason?: string } };
@@ -45,7 +45,7 @@ export function kubernetesTaskCluster(k8s: K8sClient, workerUid: number): TaskCl
       if (existing) return;
       await k8s.create(pvcObject({ name: env.pvcName, namespace: env.namespace, size, labels: { [LABELS.task]: env.id, [LABELS.project]: env.labels[LABELS.project] ?? '' } }));
     },
-    createPod: async ({ env, image, envVars, resources, agentEnvSecretName, source }) => {
+    createPod: async ({ env, image, envVars, resources, agentEnvSecretName, source, previewRoute }) => {
       const pod = podObject({
         name: env.podName, namespace: env.namespace, image, imagePullPolicy: 'IfNotPresent',
         labels: { [LABELS.project]: env.labels[LABELS.project] ?? '', [LABELS.service]: env.labels[LABELS.service] ?? '', [LABELS.workload]: env.kind, [LABELS.task]: env.id },
@@ -62,6 +62,18 @@ export function kubernetesTaskCluster(k8s: K8sClient, workerUid: number): TaskCl
       await k8s.create(pod);
       if (env.preview) {
         await k8s.apply(serviceObject({ name: env.podName, namespace: env.namespace, selector: { [LABELS.task]: env.id }, port: 80, targetPort: env.preview.port, labels: { [LABELS.task]: env.id, [LABELS.workload]: env.kind } }));
+        // 开发预览的路由随 Pod 生灭：目标 Service 是按任务建的，放进 gateway 的按服务重算里对不上生命周期。
+        if (previewRoute) {
+          await k8s.apply(ingressRouteObject({
+            name: env.podName, namespace: env.namespace, host: previewRoute.host,
+            target: { name: env.podName, port: 80, namespace: env.namespace },
+            middlewares: [
+              { name: previewRoute.dropIdentityHeadersMiddleware, namespace: previewRoute.systemNamespace },
+              { name: previewRoute.userAuthMiddleware, namespace: previewRoute.systemNamespace },
+            ],
+            labels: { [LABELS.task]: env.id, [LABELS.workload]: env.kind },
+          }));
+        }
       }
     },
     podPhase: async (env) => {
@@ -72,7 +84,10 @@ export function kubernetesTaskCluster(k8s: K8sClient, workerUid: number): TaskCl
     },
     deletePod: async (env) => {
       await k8s.delete(Resources.Pod!, env.podName, env.namespace, { gracePeriodSeconds: 30 });
-      if (env.preview) await k8s.delete(Resources.Service!, env.podName, env.namespace);
+      if (env.preview) {
+        await k8s.delete(Resources.Service!, env.podName, env.namespace);
+        await k8s.delete(Resources.IngressRoute!, env.podName, env.namespace);
+      }
     },
     deleteVolume: async (env) => { await k8s.delete(Resources.PersistentVolumeClaim!, env.pvcName, env.namespace); },
   };

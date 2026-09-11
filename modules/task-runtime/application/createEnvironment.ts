@@ -4,7 +4,8 @@ import { conflict, newId, newTraceId, notFound, quotaExceeded, validation } from
 import { hashRunnerToken, newRunnerToken } from '../domain/runnerToken';
 import type { TaskEnvironment } from '../domain/taskEnvironment';
 import { podNameFor, pvcNameFor, transition } from '../domain/taskEnvironment';
-import type { TaskSourceCheckout } from '../ports/cluster';
+import type { TaskPodSpec, TaskSourceCheckout } from '../ports/cluster';
+import type { TaskRuntimeSettings } from '../ports/platform';
 import { containerEnv } from './containerEnv';
 import type { TaskRuntimeUseCaseDeps } from './dependencies';
 
@@ -18,6 +19,19 @@ export interface CreateEnvironmentInput {
   createdBy?: UserId;
   preview?: { command: string[]; port: number; healthPath: string };
   labels?: Record<string, string>;
+}
+
+/** 开发预览的用户域主机与所需中间件；没有预览进程就不建路由。 */
+export function previewRouteOf(settings: TaskRuntimeSettings, env: { preview?: unknown }, slug: string): { previewRoute?: TaskPodSpec['previewRoute'] } {
+  if (!env.preview) return {};
+  return {
+    previewRoute: {
+      host: `dev.${slug}.${settings.userDomain}`,
+      userAuthMiddleware: settings.userAuthMiddleware,
+      dropIdentityHeadersMiddleware: settings.dropIdentityHeadersMiddleware,
+      systemNamespace: settings.systemNamespace,
+    },
+  };
 }
 
 /** 有分支的任务（开发会话）要把源码克隆进工作卷；没有分支或没配检出端口时不挂 init 容器。 */
@@ -57,7 +71,7 @@ export function createEnvironmentUseCase(deps: TaskRuntimeUseCaseDeps) {
       await cluster.ensureVolume(env, profile.storage);
       await cluster.createPod({
         env, image: settings.taskImage, envVars: await containerEnv(deps, env, svc, token), resources: { cpu: profile.cpu, memory: profile.memory, storage: profile.storage },
-        ...(settings.agentEnvSecretName ? { agentEnvSecretName: settings.agentEnvSecretName } : {}), ...(await sourceOf(deps, env.serviceId, env.branch)),
+        ...(settings.agentEnvSecretName ? { agentEnvSecretName: settings.agentEnvSecretName } : {}), ...(await sourceOf(deps, env.serviceId, env.branch)), ...previewRouteOf(settings, env, svc.slug),
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);

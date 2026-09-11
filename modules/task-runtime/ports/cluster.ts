@@ -16,6 +16,8 @@ export interface TaskPodSpec {
   /** 模型凭据等只给 Agent 进程的变量文件所在 Secret；不存在则不挂。 */
   agentEnvSecretName?: string;
   source?: TaskSourceCheckout;
+  /** 开发预览的用户域主机与所需中间件；不给则不建路由。 */
+  previewRoute?: { host: string; userAuthMiddleware: string; dropIdentityHeadersMiddleware: string; systemNamespace: string };
 }
 
 export type PodPhase = 'Pending' | 'Running' | 'Succeeded' | 'Failed' | 'Unknown' | 'Missing';

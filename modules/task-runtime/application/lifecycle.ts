@@ -5,7 +5,7 @@ import { hashRunnerToken, newRunnerToken } from '../domain/runnerToken';
 import type { TaskEnvironment } from '../domain/taskEnvironment';
 import { canPause, occupiesQuota, transition } from '../domain/taskEnvironment';
 import { containerEnv } from './containerEnv';
-import { sourceOf } from './createEnvironment';
+import { previewRouteOf, sourceOf } from './createEnvironment';
 import type { TaskRuntimeUseCaseDeps } from './dependencies';
 
 export type ReleaseReason = 'user' | 'owner-force' | 'business' | 'failed' | 'pod-lost';
@@ -87,7 +87,7 @@ export function lifecycleUseCases(deps: TaskRuntimeUseCaseDeps) {
       });
       await cluster.createPod({
         env: resumed, image: settings.taskImage, envVars: await containerEnv(deps, resumed, svc, token), resources: { cpu: profile.cpu, memory: profile.memory, storage: profile.storage },
-        ...(settings.agentEnvSecretName ? { agentEnvSecretName: settings.agentEnvSecretName } : {}), ...(await sourceOf(deps, resumed.serviceId, resumed.branch)),
+        ...(settings.agentEnvSecretName ? { agentEnvSecretName: settings.agentEnvSecretName } : {}), ...(await sourceOf(deps, resumed.serviceId, resumed.branch)), ...previewRouteOf(settings, resumed, svc.slug),
       });
       return resumed;
     },

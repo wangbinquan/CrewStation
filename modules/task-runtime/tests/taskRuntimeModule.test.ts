@@ -29,7 +29,7 @@ beforeAll(async () => {
     sources: { configEnv: async () => ({ GREETING: 'dev-hi' }), dataEnv: async () => ({ CS_DATABASE_URL: 'postgres://dev' }), taskDataEnv: async () => ({}) },
     checkout: { checkoutFor: async () => ({ repoUrl: 'http://git.local/crewstation/demo.git', credentialSecretName: 'git-checkout-demo' }) },
     isAdmin: async () => false,
-    settings: { taskImage: 'cs-task-runtime:dev', systemNamespace: 'crewstation-system', sessionUrl: 'ws://cs-session:8083/runner', userDomain: 'cs.localhost', serviceDomain: 'svc.cs.internal', workerUid: 10001, defaultProfile: 'coding-medium', agentEnvSecretName: 'agent-env' },
+    settings: { taskImage: 'cs-task-runtime:dev', systemNamespace: 'crewstation-system', sessionUrl: 'ws://cs-session:8083/runner', userDomain: 'cs.localhost', serviceDomain: 'svc.cs.internal', workerUid: 10001, defaultProfile: 'coding-medium', agentEnvSecretName: 'agent-env', userAuthMiddleware: 'forward-auth-user', dropIdentityHeadersMiddleware: 'drop-identity-headers' },
   });
 });
 afterAll(async () => { await tdb?.drop(); });
@@ -60,6 +60,13 @@ describe.skipIf(!available)('task-runtime module', () => {
     // 令牌只以 secretKeyRef 出现，不作为明文值。
     expect(initEnv.CS_GIT_TOKEN).toBeUndefined();
     expect(init[0]!.volumeMounts.some((m) => m.mountPath === '/work')).toBe(true);
+
+    // 开发预览的路由随 Pod 建：目标 Service 是按任务建的，放进 gateway 的按服务重算里对不上生命周期。
+    const route = k8s.objects.get(`traefik.io/v1alpha1/IngressRoute/cs-demo/${dev.podName}`)!;
+    const rule = (route.spec as { routes: Array<{ match: string; services: Array<{ name: string }>; middlewares: Array<{ name: string; namespace: string }> }> }).routes[0]!;
+    expect(rule.match).toBe('Host(`dev.demo.cs.localhost`)');
+    expect(rule.services[0]!.name).toBe(dev.podName);
+    expect(rule.middlewares.map((m) => `${m.namespace}/${m.name}`)).toEqual(['crewstation-system/drop-identity-headers', 'crewstation-system/forward-auth-user']);
     // 长驻容器的环境里没有 Git 令牌。
     expect(Object.keys(env).some((k) => k.includes('GIT_TOKEN'))).toBe(false);
     expect(env.CS_AGENT_ENV_FILE).toBe('/etc/crewstation/agent.env');
