@@ -4,6 +4,12 @@ import { buildUrl } from './requestUrl';
 
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE';
 
+/** fetch 的入参；Bun 的类型里没有全局 `RequestInfo`，这里显式写出三种形态。 */
+export type FetchInput = string | URL | Request;
+
+/** fetch 的结构化形状；用它而不是 `typeof fetch`，以免依赖运行时私有属性（Bun 的 `preconnect`）。 */
+export type FetchLike = (input: FetchInput, init?: RequestInit) => Promise<Response>;
+
 export interface RequestOptions {
   readonly query?: Query;
   /** 以 JSON 发送的请求体。 */
@@ -21,14 +27,14 @@ export interface TransportOptions {
   /** 缺省 ''（同源；用户域由网关注入身份）。给出绝对地址时用于 CLI 与 MCP 进程。 */
   readonly baseUrl?: string;
   /** 缺省 globalThis.fetch；测试与 CLI 可注入。 */
-  readonly fetch?: typeof fetch;
+  readonly fetch?: FetchLike;
   /** 附加到每个请求的头（如 CLI 带的令牌头）。 */
   readonly headers?: Readonly<Record<string, string>>;
 }
 
 export function createTransport(options: TransportOptions = {}): Transport {
   const baseUrl = options.baseUrl ?? '';
-  const fetchImpl: typeof fetch = options.fetch ?? ((input, init) => globalThis.fetch(input, init));
+  const fetchImpl: FetchLike = options.fetch ?? ((input, init) => globalThis.fetch(input, init));
   return {
     baseUrl,
     request: async <T>(method: HttpMethod, path: string, request: RequestOptions = {}): Promise<T> => {

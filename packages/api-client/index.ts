@@ -3,6 +3,7 @@ export { createApiClient } from './createApiClient';
 export type { ApiClient, ApiClientOptions, TaskStreamResource } from './createApiClient';
 export { ApiClientError, isApiClientError, kindForStatus, parseErrorEnvelope } from './apiClientError';
 export type { ApiErrorKind } from './apiClientError';
+export type { FetchInput, FetchLike, HttpMethod, RequestOptions, Transport, TransportOptions } from './httpTransport';
 export type { ItemsPage } from './itemsPage';
 export type {
   CreateProjectInput, ListDeliveriesInput, LogQueryInput, PublishInput, RequestTaskDataBindingInput, ServicePlanInput, SetConfigItemInput,

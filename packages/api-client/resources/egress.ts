@@ -5,10 +5,11 @@ import type { Transport } from '../httpTransport';
 import type { ItemsPage } from '../itemsPage';
 import { segment } from '../requestUrl';
 
-export interface EgressProjectQuery {
+/** 用 type 而非 interface：interface 没有隐式索引签名，无法直接作为 `Query` 传给 transport。 */
+export type EgressProjectQuery = {
   /** 管理员不带时看全部；带上时（成员亦可）看全局＋该项目。 */
   readonly projectId?: string;
-}
+};
 
 /** 出站 FQDN 白名单：管理员维护条目与裁定申请，项目成员申请追加并查看被阻请求。 */
 export interface EgressResource {
