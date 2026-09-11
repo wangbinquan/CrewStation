@@ -1,4 +1,6 @@
-/** capabilities 模块对外能力；每个用例在此增加一个方法签名，实现放在 application/。 */
+import type { Actor, CapabilityDescriptionDto, ProjectId } from '@crewstation/contracts';
+
 export interface CapabilitiesModuleApi {
   readonly name: 'capabilities';
+  describe(actor: Actor, projectId: ProjectId): Promise<CapabilityDescriptionDto>;
 }

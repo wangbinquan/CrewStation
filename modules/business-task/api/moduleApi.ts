@@ -17,6 +17,8 @@ export interface BusinessTaskModuleApi {
   cancelSubtask(caller: ServiceActor, taskId: TaskId, subtaskId: SubtaskId): Promise<SubtaskDto>;
   listProjectTasks(actor: Actor, projectId: ProjectId): Promise<BusinessTaskDto[]>;
   listProjectSubtasks(actor: Actor, projectId: ProjectId, taskId: TaskId): Promise<SubtaskDto[]>;
+  /** 内部（无 actor）：追溯聚合使用。 */
+  listProjectSubtasksInternal(taskId: TaskId): Promise<SubtaskDto[]>;
   registerContracts(payload: DomainPayload<'release.registered'>): Promise<void>;
   sweepActive(): Promise<number>;
 }

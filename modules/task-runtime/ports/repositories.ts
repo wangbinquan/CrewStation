@@ -7,6 +7,7 @@ export interface EnvironmentRepository {
   getById(id: TaskId): Promise<TaskEnvironment | undefined>;
   listByProject(projectId: ProjectId, states?: EnvironmentState[]): Promise<TaskEnvironment[]>;
   listByStates(states: EnvironmentState[]): Promise<TaskEnvironment[]>;
+  listByTrace(traceId: string): Promise<TaskEnvironment[]>;
   /** 开发会话：一项目同时只允许一个（D46）。 */
   findDevSession(projectId: ProjectId): Promise<TaskEnvironment | undefined>;
 }

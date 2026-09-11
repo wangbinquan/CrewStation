@@ -39,6 +39,10 @@ export const TraceReplayDtoSchema = z.object({
   events: z.array(z.object({ at: z.iso.datetime(), type: z.string(), taskId: TaskIdSchema.optional(), subtaskId: SubtaskIdSchema.optional(), sessionId: z.string().optional(), otelTraceId: z.string().optional(), summary: z.string().optional() })),
 });
 
+export type LogSource = z.infer<typeof LogSourceSchema>;
+export type HealthState = z.infer<typeof HealthStateSchema>;
+export type AlertType = z.infer<typeof AlertTypeSchema>;
+export type AlertSubscriptionDto = z.infer<typeof AlertSubscriptionDtoSchema>;
 export type LogQuery = z.infer<typeof LogQuerySchema>;
 export type LogEntryDto = z.infer<typeof LogEntryDtoSchema>;
 export type HealthDto = z.infer<typeof HealthDtoSchema>;

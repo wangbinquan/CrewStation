@@ -81,6 +81,7 @@ export function subtaskUseCases(deps: BusinessTaskUseCaseDeps) {
       await deps.authorizer.authorize(actor, projectId, 'view');
       return (await uow.read.subtasks.listByTask(taskId)).map(subtaskToDto);
     },
+    listProjectSubtasksInternal: async (taskId: TaskId): Promise<SubtaskDto[]> => (await uow.read.subtasks.listByTask(taskId)).map(subtaskToDto),
     /** 工作器：推进仍在运行的子任务，避免只靠业务轮询。 */
     sweepActive: async (): Promise<number> => {
       let n = 0;

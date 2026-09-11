@@ -26,3 +26,4 @@ export type { Actor, ServiceActor } from './api/actor';
 export * from './api/scm';
 export * from './api/auth';
 export * from './api/egress';
+export * from './api/capabilities';

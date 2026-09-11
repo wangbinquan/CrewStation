@@ -1,8 +1,34 @@
 import { describe, expect, test } from 'bun:test';
+import type { Actor, ProjectId, ServiceId, UserId } from '@crewstation/contracts';
+import { fixedClock } from '@crewstation/kernel';
 import { createCapabilitiesModule } from '../wiring';
 
+const projectId = 'prj_0123456789abcdef0123456789abcdef' as ProjectId;
+const actor: Actor = { userId: 'usr_0123456789abcdef0123456789abcdef' as UserId, isAdmin: false };
+
 describe('capabilities module', () => {
-  test('装配后暴露模块名', () => {
-    expect(createCapabilitiesModule({}).api.name).toBe('capabilities');
+  test('聚合服务的主机、约定、配置键、数据、操作与订阅', async () => {
+    const { api } = createCapabilitiesModule({
+      isAdmin: async () => false,
+      clock: fixedClock('2026-09-11T00:00:00Z'),
+      settings: { userDomain: 'cs.localhost', serviceDomain: 'svc.cs.internal', mcp: [{ name: 'capabilities', url: 'http://mcp-capabilities.svc.cs.internal/mcp' }], defaultServicePlan: 'standard-small' },
+      sources: {
+        resolveServiceOfProject: async () => ({ serviceId: 'svc_0123456789abcdef0123456789abcdef' as ServiceId, slug: 'demo', name: 'demo', identity: 'demo/demo', namespace: 'cs-demo' }),
+        authorize: async () => undefined,
+        quota: async () => ({ maxConcurrentTasks: 3, running: 1 }),
+        servicePlans: async () => [{ name: 'standard-small', cpu: '500m', memory: '512Mi', maxReplicas: 3, description: '' }],
+        configKeys: async (_a, _p, env) => (env === 'production' ? ['GREETING'] : ['GREETING', 'DEBUG']),
+        dataResources: async () => [],
+        operations: async () => [{ key: 'issues:GET:/v1/issues/{id}', proxy: 'issues', method: 'GET', path: '/v1/issues/{id}', openPolicy: 'default', granted: true }],
+        subscriptions: async () => [],
+      },
+    });
+    const dto = await api.describe(actor, projectId);
+    expect(dto.hosts.dev).toBe('dev.demo.cs.localhost');
+    expect(dto.conventions.identityHeaders['userId']).toBe('x-cs-user-id');
+    expect(dto.config).toEqual({ development: ['GREETING', 'DEBUG'], production: ['GREETING'] });
+    expect(dto.operations[0]?.granted).toBe(true);
+    expect(dto.plan?.name).toBe('standard-small');
+    expect(dto.businessTaskApi.length).toBeGreaterThan(3);
   });
 });

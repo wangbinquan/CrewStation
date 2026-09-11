@@ -5,6 +5,7 @@ import { secretObject } from '@crewstation/k8s';
 import type { Logger } from '@crewstation/kernel';
 import { createApiCatalogModule } from '@crewstation/module-api-catalog';
 import { createBusinessTaskModule } from '@crewstation/module-business-task';
+import { createCapabilitiesModule } from '@crewstation/module-capabilities';
 import { createConfigModule } from '@crewstation/module-config';
 import { createDataModule } from '@crewstation/module-data';
 import { createDevSessionModule } from '@crewstation/module-dev-session';
@@ -13,6 +14,7 @@ import { createEventsModule } from '@crewstation/module-events';
 import { createGatewayModule } from '@crewstation/module-gateway';
 import type { GatewayModuleApi } from '@crewstation/module-gateway';
 import { createIdentityModule, demoIdentityProvider } from '@crewstation/module-identity';
+import { createObservabilityModule } from '@crewstation/module-observability';
 import { createProjectModule } from '@crewstation/module-project';
 import type { ProjectModuleApi } from '@crewstation/module-project';
 import { createReleaseModule } from '@crewstation/module-release';
@@ -180,7 +182,34 @@ function composeRuntime(deps: PlatformModuleDeps, core: ReturnType<typeof compos
     taskAccess: { canOpenStream: taskRuntime.api.canOpenStream, onRunnerConnected: taskRuntime.api.onRunnerConnected, onRunnerDisconnected: taskRuntime.api.onRunnerDisconnected },
     settings: { selfAddress: settings.selfAddress, commandTimeoutMs: 30_000, runnerStaleMs: 30_000, replayLimit: 2000 },
   });
-  return { taskRuntime, devSession, businessTask, events, session };
+  return { taskRuntime, devSession, businessTask, events, session, sessionClient: runner };
+}
+
+function composeAggregates(deps: PlatformModuleDeps, core: ReturnType<typeof composeCore>, delivery: ReturnType<typeof composeDelivery>, runtime: ReturnType<typeof composeRuntime>) {
+  const { db, k8s, settings, logger } = deps;
+  const { project, config, data, apiCatalog, isAdmin } = core;
+  const serviceOfProject = async (projectId: ProjectId) => { const s = (await project.api.listServices()).find((x) => x.projectId === projectId); return s ? { serviceId: s.serviceId, slug: s.slug, name: s.name, identity: s.identity, namespace: s.namespace } : undefined; };
+  const observability = createObservabilityModule({
+    db, k8s, logger, isAdmin: (id) => isAdmin(id), authorizer: project.api, services: { resolveServiceOfProject: serviceOfProject }, slots: delivery.release.api,
+    traces: {
+      tasksByTrace: async (traceId) => (await runtime.taskRuntime.api.listByTrace(traceId)).map((e) => ({ taskId: e.id, kind: e.kind, createdAt: e.createdAt })),
+      subtasksOfTask: (taskId) => runtime.businessTask.api.listProjectSubtasksInternal(taskId),
+      sessionEvents: (taskId) => runtime.sessionClient.listEvents(taskId, { kinds: ['agent', 'execExited', 'previewState'], limit: 2000 }),
+    },
+    notifier: { notify: async (projectId, message) => { logger.warn('alert', { projectId, message }); } },
+    listProjectIds: async () => (await project.api.listServices()).map((s) => s.projectId),
+  });
+  const capabilities = createCapabilitiesModule({
+    isAdmin: (id) => isAdmin(id),
+    settings: { userDomain: settings.userDomain, serviceDomain: settings.serviceDomain, mcp: [{ name: 'capabilities', url: settings.mcp.capabilitiesUrl }, { name: 'operations', url: settings.mcp.operationsUrl }], defaultServicePlan: settings.defaultServicePlan },
+    sources: {
+      resolveServiceOfProject: serviceOfProject, authorize: project.api.authorize, quota: project.api.getQuota, servicePlans: project.api.listServicePlans,
+      configKeys: async (actor, projectId, env) => (await config.api.listItems(actor, projectId, env)).map((i) => i.name),
+      dataResources: data.api.listResources, operations: (actor, serviceId) => apiCatalog.api.listOperations(actor, serviceId),
+      subscriptions: (actor, projectId) => runtime.events.api.listSubscriptions(actor, projectId),
+    },
+  });
+  return { observability, capabilities };
 }
 
 function composeModules(deps: PlatformModuleDeps) {
@@ -188,7 +217,8 @@ function composeModules(deps: PlatformModuleDeps) {
   const core = composeCore(deps, late);
   const delivery = composeDelivery(deps, core, late);
   const runtime = composeRuntime(deps, core, delivery);
-  return { identity: core.identity, project: core.project, config: core.config, egress: core.egress, data: core.data, scm: core.scm, apiCatalog: core.apiCatalog, ...delivery, ...runtime };
+  const aggregates = composeAggregates(deps, core, delivery, runtime);
+  return { identity: core.identity, project: core.project, config: core.config, egress: core.egress, data: core.data, scm: core.scm, apiCatalog: core.apiCatalog, ...delivery, ...runtime, ...aggregates };
 }
 
 export function createPlatformModule(deps: PlatformModuleDeps): PlatformModule {
@@ -196,18 +226,18 @@ export function createPlatformModule(deps: PlatformModuleDeps): PlatformModule {
   const api: PlatformModuleApi = {
     name: 'platform',
     routers: {
-      api: [...m.project.http, ...m.identity.http.users, ...m.config.http, ...m.egress.http, ...m.data.http, ...m.scm.http, ...m.apiCatalog.http, ...m.release.http, ...m.gateway.http, ...m.taskRuntime.http, ...m.devSession.http, m.businessTask.http.service, m.businessTask.http.user, ...m.events.http.query],
+      api: [...m.project.http, ...m.identity.http.users, ...m.config.http, ...m.egress.http, ...m.data.http, ...m.scm.http, ...m.apiCatalog.http, ...m.release.http, ...m.gateway.http, ...m.taskRuntime.http, ...m.devSession.http, m.businessTask.http.service, m.businessTask.http.user, ...m.events.http.query, ...m.observability.http, ...m.capabilities.http],
       auth: [...m.identity.http.auth, ...m.identity.http.forwardAuth],
       session: [m.session.http.runner, m.session.http.stream, m.session.http.internal],
       events: [...m.events.http.ingress],
     },
     background: {
-      controller: [...m.release.workers, ...m.gateway.workers, consumerLifecycle(m.gateway.subscriptions), ...m.taskRuntime.workers, ...m.devSession.workers, ...m.businessTask.workers, consumerLifecycle(m.businessTask.subscriptions), ...m.apiCatalog.subscriptions.map(consumerLifecycle)],
+      controller: [...m.release.workers, ...m.gateway.workers, consumerLifecycle(m.gateway.subscriptions), ...m.taskRuntime.workers, ...m.devSession.workers, ...m.businessTask.workers, consumerLifecycle(m.businessTask.subscriptions), ...m.apiCatalog.subscriptions.map(consumerLifecycle), ...m.observability.workers],
       session: [...m.session.workers],
       events: [...m.events.workers, ...m.events.subscriptions.map(consumerLifecycle)],
     },
     websocket: m.session.websocket,
-    migrations: [queueMigrations, eventbusMigrations, m.identity.migrations, m.project.migrations, m.config.migrations, m.egress.migrations, m.data.migrations, m.scm.migrations, m.apiCatalog.migrations, m.events.migrations, m.release.migrations, m.taskRuntime.migrations, m.devSession.migrations, m.businessTask.migrations, m.session.migrations, m.gateway.migrations],
+    migrations: [queueMigrations, eventbusMigrations, m.identity.migrations, m.project.migrations, m.config.migrations, m.egress.migrations, m.data.migrations, m.scm.migrations, m.apiCatalog.migrations, m.events.migrations, m.release.migrations, m.taskRuntime.migrations, m.devSession.migrations, m.businessTask.migrations, m.session.migrations, m.gateway.migrations, m.observability.migrations],
   };
   return { api, modules: m };
 }

@@ -50,6 +50,7 @@ export interface TaskRuntimeModuleApi {
   listEnvironments(actor: Actor, projectId: ProjectId, states?: EnvironmentState[]): Promise<EnvironmentDto[]>;
   findDevSession(projectId: ProjectId): Promise<EnvironmentDto | undefined>;
   listRunningDevSessions(): Promise<EnvironmentDto[]>;
+  listByTrace(traceId: string): Promise<EnvironmentDto[]>;
   verifyRunnerToken(taskId: TaskId, token: string): Promise<{ ok: true; projectId: string } | { ok: false; reason: string }>;
   canOpenStream(actor: Actor, taskId: TaskId): Promise<boolean>;
   reconcile(): Promise<number>;
