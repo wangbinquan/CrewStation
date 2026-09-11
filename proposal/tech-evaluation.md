@@ -1,7 +1,7 @@
 # Tech Evaluation｜CrewStation 选型重评
 
-> 状态：已确认（2026-09-11，E01–E22），结论已回填 Proposal §8、Design §3.1 与 §15.1；待验证项由 M0 原型核实  
-> 版本：1.0.0 · 日期：2026-09-11  
+> 状态：已确认（2026-09-11，E01–E22）；v1.1.0 依据设计门检视裁定修订 E06、E08、E10、E11、E12、E19 并新增 E23–E25 待定候选；待验证项由 M0 原型核实  
+> 版本：1.1.0 · 日期：2026-09-11  
 > 配套文档：[Proposal](./proposal.md) · [Design](./design.md) · [Plan](./plan.md)
 
 ## 0. 评估方法与约束
@@ -10,7 +10,7 @@
 
 评估维度：与约束的契合度；复制改造成本；在 Kubernetes 多副本下的运维成熟度；必须原型验证的风险。每项给出**建议**与**备选**，并列出**待验证**。所有结论在用户确认前都是建议；本文不断言任何第三方组件的具体版本、许可证状态或未经原型的兼容性，凡涉及都列为待验证。
 
-来自本机 `agent-workflow` 仓库的可核实事实：后端依赖为 hono、drizzle-orm、zod、zod-to-json-schema、jose、@modelcontextprotocol/sdk、ulid、yaml、diff；前端依赖含 react、@tanstack/react-router 与 react-query、codemirror 系列、@xyflow/react、react-markdown、shiki、mermaid；运行时与进程层使用 Bun.spawn、Bun.Subprocess、Bun.sleep、Bun.write、Bun.which、Bun.file 等 Bun 专有 API 约 25 处；仓库内没有 PTY 或终端相关代码；驱动目录 33 个文件约 6955 行，事件泵 runner.ts 2778 行，进程管理 managedProcess.ts 989 行；数据库默认 SQLite 并有 PostgreSQL provider；测试用 bun test 与 vitest。
+来自本机 `agent-workflow` 仓库的可核实事实：后端依赖为 hono、drizzle-orm、zod、zod-to-json-schema、jose、@modelcontextprotocol/sdk、ulid、yaml、diff；前端依赖含 react、@tanstack/react-router 与 react-query、codemirror 系列、@xyflow/react、react-markdown、shiki、mermaid；运行时与进程层使用 Bun.spawn、Bun.Subprocess、Bun.sleep、Bun.write、Bun.which、Bun.file 等 Bun 专有 API 约 25 处；仓库内没有 PTY 或终端相关代码；驱动目录 33 个文件约 6955 行（统计时点早于设计门检视所核对的 HEAD c4965ab，后者为 34 个文件约 7157 行；T0.2 登记最终源 commit），runner.ts 2778 行为 DAG 节点编排而非事件泵，事件泵在 execution/managedProcess.pump 与 agentProcess.ts，进程管理 managedProcess.ts 989 行；数据库默认 SQLite 并有 PostgreSQL provider；测试用 bun test 与 vitest。
 
 ## 1. 结论汇总
 
@@ -21,23 +21,26 @@
 | E03 | 后端框架与契约 | Fastify、TypeBox、OpenAPI | **Hono、zod、由 zod 生成 OpenAPI** | Fastify、TypeBox | Hono 在 Bun 下的 WebSocket 与流式行为 |
 | E04 | 元数据库与 ORM | PostgreSQL、Drizzle | **PostgreSQL 高可用、Drizzle** | 同 | Bun 下的 PostgreSQL 驱动选择 |
 | E05 | 后台任务与多副本协调 | pg-boss | **PostgreSQL 表队列（SKIP LOCKED）＋租约表与 fencing token** | pg-boss（若 Bun 下验证通过） | 多副本控制器续接；吞吐 |
-| E06 | 网关 | Traefik、Gateway API | **Traefik，ForwardAuth 到 cs-auth 做鉴权与放行决策** | Envoy Gateway（ext_authz） | 工作负载身份识别路径；数百服务放行决策时延 |
+| E06 | 网关 | Traefik、Gateway API | **Traefik；用户域经 ForwardAuth 到 cs-auth 鉴权；服务域按源 Pod IP 反查身份并按网关本地放行表放行（G2）** | Envoy Gateway（ext_authz） | 放行表与 Pod 身份索引下发及缓存失效；数百 Host 路由 |
 | E07 | 用户身份与令牌 | 公司体系适配；Keycloak 桥接候选 | **OIDC 对接公司 IdP；平台 JWT 由 jose 签发，JWKS 轮换** | SAML 适配 | 公司 IdP 协议（Q01）；令牌格式（Q16） |
-| E08 | 服务身份 | K8s 工作负载身份（TokenReview） | **Projected ServiceAccount token 绑定 audience，cs-auth 校验** | mTLS／SPIFFE | 网关侧提取与 cs-auth 校验时延 |
+| E08 | 服务身份 | K8s 工作负载身份（TokenReview） | **网关按源 Pod IP 反查工作负载身份，Pod 身份索引由控制面维护并下发；业务代码不携带凭据（G1）。Projected token 只用于 TaskRunner 连接 cs-session** | 业务携带投影令牌；出口 sidecar | 所选 CNI 保留源 IP；NAT 场景；索引更新与缓存失效（Q21） |
 | E09 | 任务容器底座 | OpenSandbox | **Kubernetes 原生：Pod、PVC、NetworkPolicy、ResourceQuota，由 cs-controller 直接管理；Pod 与容器即隔离边界，不引入任何额外沙箱层** | 无 | Pod 与 PVC 供给时延；预热必要性 |
-| E10 | TaskRunner 运行时 | TaskRunner 模块（未定运行时） | **TypeScript；运行时以 PTY 验证结果定：优先 Bun，不可用则 Node** | Go 实现 PTY 侧车 | Bun 的 PTY 能力；node-pty 在容器内 |
-| E11 | TaskRunner 与控制面连接 | 未定 | **TaskRunner 出向 WebSocket 到 cs-session，携带 projected token；副本归属记入 PostgreSQL** | cs-session 入向连接 Pod IP | 数百连接的副本迁移（Q17） |
-| E12 | Agent 驱动 | 首个 OpenCode 适配器 | **复制 agent-workflow 的 RuntimeDriver、runner 事件泵与 managedProcess，双驱动；运行方式与 agent-workflow 一致** | 重写 | 六处内部依赖反转；容器内行为与来源一致 |
+| E10 | TaskRunner 运行时 | TaskRunner 模块（未定运行时） | **TypeScript；运行时以 PTY 验证结果定：优先 Bun，不可用则 Node；独立系统用户运行，文件接口 realpath 校验（G25）；tini 作 PID 1** | Go 实现 PTY 侧车 | Bun 的 PTY 能力；node-pty 在容器内；孤儿进程收割 |
+| E11 | TaskRunner 与控制面连接 | 未定 | **TaskRunner 出向 WebSocket 到 cs-session，携带绑定 cs-session audience 的 projected token；副本归属记入 PostgreSQL 并有租约；cs-controller 指令经 cs-session 转发；协议带版本** | cs-session 入向连接 Pod IP | 心跳、退避、缓冲上限定值；数百连接的副本迁移（Q17） |
+| E12 | Agent 驱动 | 首个 OpenCode 适配器 | **复制单元为 agent-workflow 的 runtime 驱动、execution/agentInjection、agentProcess 与 managedProcess、shared 的 Agent、Mcp、AgentPermission Schema；编排层 runner.ts 不复制而新写；双驱动（G7）。两处登记偏差：开发会话走流式交互（G5），Claude Code 自带沙箱关闭（G6）** | 重写 | 逐文件依赖清单与源 commit；两 CLI 流式交互能力（Q22）；会话恢复并发保护 |
 | E13 | 源码托管客户端 | SourceControlProvider | **复制 agent-workflow 的 code-host 连接与调用层；新增建仓、标签、保护标签 API** | 重写 | 公司 GitLab 兼容范围（Q11） |
 | E14 | 构建 | BuildKit；Buildpacks 后置 | **BuildKit rootless 作 Kubernetes Job** | Buildpacks | 非特权构建在公司集群的允许方式（Q04） |
 | E15 | 数据库供给 | CloudNativePG | **CloudNativePG；公司已有托管 PostgreSQL 优先接入** | 公司托管 PG | 高可用切换与单项目恢复 |
 | E16 | 对象存储 | S3；内置候选 SeaweedFS | **优先公司已有 S3 兼容存储；内置候选待核实许可证与维护状态后定** | 其他 S3 兼容实现 | 许可证；预签名、跨桶拒绝、备份 |
 | E17 | 事件中心 cs-events | 未定 | **PostgreSQL inbox／outbox 表＋SKIP LOCKED 投递 worker＋HTTP 推送** | Kafka（条件性） | 数百服务订阅下的投递吞吐 |
 | E18 | 控制台 | React、Vite、shadcn/ui | **React、Vite、TanStack Router 与 Query、CodeMirror 编辑器、xterm.js 终端、嵌入 Swagger UI** | Monaco 编辑器 | 多 Agent 面板与终端并存的性能 |
-| E19 | 平台 MCP | 未定 | **@modelcontextprotocol/sdk，Streamable HTTP 传输，两个独立服务** | 同 | 容器内 Agent 连接鉴权 |
+| E19 | 平台 MCP | 未定 | **@modelcontextprotocol/sdk，Streamable HTTP 传输，两个独立服务；注入形状已知：OpenCode remote 类型 MCP 配置，Claude Code `--mcp-config` 文件** | 同 | 会话级短期凭据的轮换与清理；agentProfile 权限映射 |
 | E20 | 观测与追溯 | OpenTelemetry；平台事件表 | **OpenTelemetry SDK＋Collector；execution_events 表承载任务链路** | 同 | OTel SDK 在 Bun 下的兼容 |
 | E21 | 发行与安装 | Helm；安装器 | **Helm chart＋Bun 单文件二进制安装器** | 纯 Helm | 离线引导 |
 | E22 | 本地验证 | Docker 与 K8s | **仅 kind；HA 逻辑存在但故障切换在多节点测试集群验证** | — | Q19 |
+| E23 | 出站代理 | 未定 | **按域名执行全局与项目级白名单的出站代理，记录被阻请求（G23）；候选待定** | 仅 L3/4 NetworkPolicy（不能按域名） | 候选选定；与 NetworkPolicy 配合；性能 |
+| E24 | 日志采集与存储 | 未定 | **集群日志采集与存储，供工作台日志页按服务、槽、任务、Job 查询（G9）；候选待定** | 对接公司日志平台 | 数百服务日志量；查询时延 |
+| E25 | 告警通知渠道 | 未定 | **部署健康态与项目级告警订阅（G22）；渠道待定** | 公司 IM／邮件 | Q20 |
 
 ## 2. 逐项评估
 
@@ -149,7 +152,7 @@
 
 约束：双驱动首版必需（R42）；不修改 agent-workflow；驱动在任务容器内运行。
 
-分析：复制 runtime 目录、runner.ts 事件泵与 managedProcess.ts 进程管理，需要反转其对 agent-workflow 后端内部的六处依赖：日志、semver 工具、进程工具、运行时注册表、工作区边界、会话捕获持久化。Claude Code 的启动参数、会话恢复与权限映射与 agent-workflow 的驱动保持一致，不做单独处理；这是用户裁定。OpenCode 的插件文件随镜像分发。
+分析（v1.1.0 按代码核对修订）：复制单元为 runtime 目录的驱动、execution/agentInjection、agentProcess 与 managedProcess，以及 shared 中的 Agent、Mcp、AgentPermission Schema；runner.ts 是 DAG 节点编排（46 字段的 RunNodeOptions，绑定持久化、WebSocket、记忆与信封），不复制而新写。实际依赖远超六处：agentInjection、readonlySqliteDatabase（bun:sqlite）、util/git、safePath、fileTrust、platformExec、sessionEventSink、resourcePolicy、embed.generated 以及 shared Schema，须在 T0.4 逐文件列清单并反转。两个 CLI 在 agent-workflow 中都是一次性无交互进程，开发会话所需的流式交互是登记偏差，T0.4 验证两 CLI 的实现方式，不可用时回退为每条消息以 resume 起新进程。Claude Code 的启动参数、会话恢复与权限映射与 agent-workflow 的驱动保持一致，不做单独处理；这是用户裁定。OpenCode 的插件文件随镜像分发。
 
 建议：复制改造，双驱动，一个任务容器镜像同时含两个 CLI。备选：重写驱动，不建议。
 
@@ -223,8 +226,11 @@
 |---|---|
 | Bun 长驻服务稳定性、PostgreSQL 驱动、WebSocket、OTel 兼容 | T0.2、T0.4 |
 | Bun 的 PTY 或 node-pty 在容器内 | T0.4 |
-| 驱动依赖反转；Claude Code 沙箱在容器内 | T0.4 |
-| ForwardAuth 身份注入、工作负载身份提取、放行决策时延 | T0.5 |
+| 驱动依赖反转与逐文件清单；两 CLI 流式交互模式；关闭 Claude Code 自带沙箱；MCP 注入与凭据轮换；会话恢复并发保护 | T0.4 |
+| Bun 长驻多副本服务、PG 驱动、Hono WebSocket、OTel 兼容 | T0.11 |
+| 源 Pod IP 反查在所选 CNI 下的可行性与索引失效时延 | T0.5 |
+| 出站代理候选、日志采集候选、告警渠道 | T0.8、T0.12 |
+| 用户域 ForwardAuth 身份注入与 aud 绑定、服务域本地放行表与来源令牌 | T0.5 |
 | Pod 与 PVC 供给时延；两种卷模式 | T0.6 |
 | GitLab 建仓、标签、保护标签 API | T0.9 |
 | 队列与事件吞吐、连接迁移 | T5.7、T6.10 |
@@ -236,9 +242,11 @@
 |---|---|---|
 | E01–E03 | 采纳建议：TypeScript on Bun、Bun workspaces、Hono 加 zod 生成 OpenAPI | 2026-09-11 |
 | E04、E05、E15、E17 | 采纳建议：PostgreSQL 高可用加 Drizzle；PostgreSQL 表队列加租约承载后台任务、协调与 cs-events；CloudNativePG；首版不引入 Kafka 或 Redis | 2026-09-11 |
-| E06–E08 | 采纳建议：Traefik 加 ForwardAuth，决策在 cs-auth；OIDC 加 jose JWT 与 JWKS；projected ServiceAccount token | 2026-09-11 |
+| E06–E08 | 采纳建议：Traefik 加 ForwardAuth，决策在 cs-auth；OIDC 加 jose JWT 与 JWKS；projected ServiceAccount token（E06、E08 的服务身份与放行位置后由 G1、G2 修订，见下） | 2026-09-11 |
 | E09 | 采纳并加强：Pod 与容器即隔离边界，不引入任何额外沙箱层 | 2026-09-11 |
 | E10、E11 | 采纳建议：TaskRunner 用 TypeScript，运行时优先 Bun、PTY 不可用则 Node；出向 WebSocket 连接 cs-session | 2026-09-11 |
-| E12 | 采纳并修正：复制 agent-workflow 驱动；Claude Code 不做单独处理，运行方式与 agent-workflow 运行时一致（用户原话写作 agent-space） | 2026-09-11 |
+| E12 | 采纳并修正：复制 agent-workflow 驱动；Claude Code 不做单独处理，运行方式与 agent-workflow 运行时一致（用户原话写作 agent-space；沙箱与交互模式两点后由 G5、G6 修订为登记偏差，见下） | 2026-09-11 |
 | E13、E14、E16 | 采纳建议：复制 code-host 客户端并新增建仓与标签 API；BuildKit rootless；对象存储优先公司已有 S3 兼容存储 | 2026-09-11 |
 | E18–E22 | 采纳建议：React、Vite、TanStack、CodeMirror、xterm.js、Swagger UI；官方 MCP SDK 两个服务；OpenTelemetry 加 execution_events；Helm 加 Bun 安装器；本地仅 kind | 2026-09-11 |
+| E06、E08、E10、E11、E12、E19 修订 | 依据设计门检视裁定 G1、G2、G5、G6、G7、G25 修订：源 Pod IP 身份、本地放行表、流式交互、关闭 Claude 沙箱、复制单元重划、TaskRunner 独立 UID | 2026-09-11 |
+| E23–E25 | 新增待定候选：出站代理、日志采集、告警渠道；结论在 T0.8、T0.12 形成 | 2026-09-11 |
