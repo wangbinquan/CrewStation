@@ -1,12 +1,11 @@
 import type { ApiRequestDto, ApiRequestState } from '@crewstation/contracts';
 import type { ReactElement } from 'react';
-import { errorMessage } from '../../../shared/api/useApi';
-import { formatDateTime } from '../../../shared/lib/dateFormat';
-import { useI18n } from '../../../shared/lib/useI18n';
+import { useDateText } from '../../../shared/lib/useDateText';
 import { useT } from '../../../shared/lib/useT';
 import { Badge } from '../../../shared/ui/Badge';
 import type { BadgeTone } from '../../../shared/ui/Badge';
 import { Card } from '../../../shared/ui/Card';
+import { QueryStatus } from '../../../shared/ui/QueryStatus';
 import type { CatalogActions } from '../hooks/useCatalogActions';
 import { RequestDecisionForm } from './RequestDecisionForm';
 import styles from './RequestsPanel.module.css';
@@ -31,9 +30,8 @@ export function RequestsPanel({ requests, loading, loadError, isAdmin, actions }
   const t = useT();
   return (
     <Card title={t('catalog.requests.title')}>
-      {loading ? <p className={styles.muted}>{t('catalog.requests.loading')}</p> : null}
-      {loadError ? <p className={styles.error}>{t('catalog.error.load', { message: errorMessage(loadError) })}</p> : null}
-      {!loading && requests.length === 0 ? <p className={styles.muted}>{t('catalog.requests.empty')}</p> : null}
+      <QueryStatus isPending={loading} error={loadError} loadingKey="catalog.requests.loading" errorKey="catalog.error.load" />
+      {!loading && loadError === null && requests.length === 0 ? <p className={styles.muted}>{t('catalog.requests.empty')}</p> : null}
       {requests.length > 0 ? (
         <ul className={styles.list}>
           {requests.map((request) => (
@@ -56,7 +54,7 @@ export function RequestsPanel({ requests, loading, loadError, isAdmin, actions }
 /** 一条申请的全部事实：谁申请、理由、状态、谁在什么时候给了什么意见。 */
 function RequestSummary({ request }: { readonly request: ApiRequestDto }): ReactElement {
   const t = useT();
-  const { locale } = useI18n();
+  const dateText = useDateText();
   return (
     <div className={styles.summary}>
       <div className={styles.head}>
@@ -67,7 +65,7 @@ function RequestSummary({ request }: { readonly request: ApiRequestDto }): React
         <dt>{t('catalog.requests.requestedBy')}</dt>
         <dd>{request.requestedBy}</dd>
         <dt>{t('catalog.requests.createdAt')}</dt>
-        <dd>{formatDateTime(request.createdAt, locale)}</dd>
+        <dd>{dateText(request.createdAt)}</dd>
         <dt>{t('catalog.requests.reason')}</dt>
         <dd>{request.reason ?? '—'}</dd>
         {request.state === 'pending' ? null : (
@@ -75,7 +73,7 @@ function RequestSummary({ request }: { readonly request: ApiRequestDto }): React
             <dt>{t('catalog.requests.decidedBy')}</dt>
             <dd>{request.decidedBy ?? '—'}</dd>
             <dt>{t('catalog.requests.decidedAt')}</dt>
-            <dd>{request.decidedAt === undefined ? '—' : formatDateTime(request.decidedAt, locale)}</dd>
+            <dd>{dateText(request.decidedAt)}</dd>
             <dt>{t('catalog.requests.decision')}</dt>
             <dd>{request.decision ?? '—'}</dd>
           </>

@@ -1,32 +1,30 @@
 import type { ReactElement } from 'react';
 import { api } from '../../../shared/api/client';
+import { queryKeys } from '../../../shared/api/queryKeys';
 import { useApiMutation, useApiQuery } from '../../../shared/api/useApi';
-import { formatDateTime } from '../../../shared/lib/dateFormat';
-import { useI18n } from '../../../shared/lib/useI18n';
+import { useDateText } from '../../../shared/lib/useDateText';
 import { useT } from '../../../shared/lib/useT';
 import { Button } from '../../../shared/ui/Button';
 import { Card } from '../../../shared/ui/Card';
+import { QueryStatus } from '../../../shared/ui/QueryStatus';
 import { GatewayRoutesTable } from './GatewayRoutesTable';
-import { MutationError, SectionStatus } from './SectionStatus';
+import { MutationError } from './MutationError';
 import styles from './GatewaySection.module.css';
-
-// queryKeys 里还没有网关的键（路由与放行表是只读的派生状态），这里就地用 gateway 前缀。
-const ROUTES_KEY = ['gateway', 'routes'] as const;
-const ALLOWLIST_KEY = ['gateway', 'allowlist'] as const;
 
 /** 网关状态：路由表、放行表版本与手动重算。 */
 export function GatewaySection(): ReactElement {
   const t = useT();
-  const { locale } = useI18n();
-  const routes = useApiQuery(ROUTES_KEY, () => api.gateway.listRoutes());
-  const allowlist = useApiQuery(ALLOWLIST_KEY, () => api.gateway.allowlist());
-  const reconcile = useApiMutation(() => api.gateway.reconcile(), { invalidate: [['gateway']] });
+  const dateText = useDateText();
+  const routes = useApiQuery(queryKeys.gatewayRoutes(), () => api.gateway.listRoutes());
+  const allowlist = useApiQuery(queryKeys.gatewayAllowlist(), () => api.gateway.allowlist());
+  // 重算同时改路由表与放行表，按 gateway 前缀一次失效两份。
+  const reconcile = useApiMutation(() => api.gateway.reconcile(), { invalidate: [queryKeys.gateway()] });
   const services = routes.data?.items ?? [];
   const facts: readonly { readonly label: string; readonly value: string }[] = [
     { label: t('admin.gateway.allowlistVersion'), value: String(allowlist.data?.version ?? t('admin.none')) },
     { label: t('admin.gateway.allowlistEntries'), value: String(allowlist.data?.entries.length ?? 0) },
     { label: t('admin.gateway.defaultOpen'), value: String(allowlist.data?.defaultOpen.length ?? 0) },
-    { label: t('admin.gateway.generatedAt'), value: allowlist.data?.generatedAt === undefined ? t('admin.none') : formatDateTime(allowlist.data.generatedAt, locale) },
+    { label: t('admin.gateway.generatedAt'), value: allowlist.data?.generatedAt === undefined ? t('admin.none') : dateText(allowlist.data.generatedAt) },
     { label: t('admin.gateway.maxStale'), value: String(allowlist.data?.maxStaleSeconds ?? t('admin.none')) },
   ];
   return (
@@ -51,7 +49,7 @@ export function GatewaySection(): ReactElement {
         ))}
       </dl>
       <p className={styles.subtitle}>{t('admin.gateway.routesTitle')}</p>
-      <SectionStatus
+      <QueryStatus
         isPending={routes.isPending}
         error={routes.error}
         isEmpty={services.length === 0}

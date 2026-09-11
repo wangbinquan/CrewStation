@@ -4,9 +4,10 @@ import { queryKeys } from '../../../shared/api/queryKeys';
 import { useApiMutation, useApiQuery } from '../../../shared/api/useApi';
 import { useT } from '../../../shared/lib/useT';
 import { Card } from '../../../shared/ui/Card';
-import { AdminTable } from './AdminTable';
+import { DataTable } from '../../../shared/ui/DataTable';
+import { QueryStatus } from '../../../shared/ui/QueryStatus';
 import { EgressRequestRow } from './EgressRequestRow';
-import { MutationError, SectionStatus } from './SectionStatus';
+import { MutationError } from './MutationError';
 
 interface DecideInput {
   readonly id: string;
@@ -29,7 +30,7 @@ export function EgressRequestsSection(): ReactElement {
   return (
     <Card title={t('admin.egressRequests.title')} footer={t('admin.egressRequests.hint')}>
       <MutationError error={decide.error} messageKey="admin.egressRequests.decideError" />
-      <SectionStatus
+      <QueryStatus
         isPending={requests.isPending}
         error={requests.error}
         isEmpty={items.length === 0}
@@ -37,7 +38,7 @@ export function EgressRequestsSection(): ReactElement {
         emptyDescription={t('admin.egressRequests.emptyDescription')}
       />
       {items.length > 0 ? (
-        <AdminTable columns={columns}>
+        <DataTable columns={columns}>
           {items.map((request) => (
             <EgressRequestRow
               key={request.id}
@@ -46,7 +47,7 @@ export function EgressRequestsSection(): ReactElement {
               onDecide={(id, approve, decision) => decide.mutate({ id, approve, decision })}
             />
           ))}
-        </AdminTable>
+        </DataTable>
       ) : null}
     </Card>
   );

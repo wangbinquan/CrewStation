@@ -6,9 +6,9 @@ import { useT } from '../../../shared/lib/useT';
 import { Card } from '../../../shared/ui/Card';
 import { EmptyState } from '../../../shared/ui/EmptyState';
 import { PageHeader } from '../../../shared/ui/PageHeader';
+import { QueryStatus } from '../../../shared/ui/QueryStatus';
 import { CreateProjectForm } from '../components/CreateProjectForm';
 import { ProjectTable } from '../components/ProjectTable';
-import { QueryStatus } from '../components/QueryStatus';
 import styles from './ProjectListPage.module.css';
 
 /** 首页：管理员看全部项目并可代建，成员只看自己参与的项目。 */

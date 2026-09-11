@@ -2,6 +2,10 @@ import type { MessagesShapedLike } from '../../shared/lib/i18n';
 import type { messages as zhCN } from './zh-CN';
 
 export const messages: MessagesShapedLike<typeof zhCN> = {
+  'ui.status.loading': 'Loading…',
+  'ui.status.error': 'Failed to load: {message}',
+  'ui.confirm.yes': 'Confirm',
+  'ui.confirm.no': 'Cancel',
   'app.brand': 'CrewStation',
   'app.workbench': 'Workbench',
   'nav.aria': 'Main navigation',

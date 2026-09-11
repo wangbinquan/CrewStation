@@ -1,9 +1,9 @@
 import type { ProjectDto } from '@crewstation/contracts';
 import { Link } from '@tanstack/react-router';
 import type { ReactElement } from 'react';
+import { useDateText } from '../../../shared/lib/useDateText';
 import { useT } from '../../../shared/lib/useT';
 import { Button } from '../../../shared/ui/Button';
-import { useDateText } from '../model/useDateText';
 import { ProjectStateBadge } from './ProjectStateBadge';
 import styles from './ProjectTable.module.css';
 

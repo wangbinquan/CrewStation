@@ -5,9 +5,10 @@ import { useApiMutation, useApiQuery } from '../../../shared/api/useApi';
 import { useT } from '../../../shared/lib/useT';
 import { Badge } from '../../../shared/ui/Badge';
 import { Card } from '../../../shared/ui/Card';
-import { AdminTable } from './AdminTable';
-import { InlineConfirm } from './InlineConfirm';
-import { MutationError, SectionStatus } from './SectionStatus';
+import { DataTable } from '../../../shared/ui/DataTable';
+import { InlineConfirm } from '../../../shared/ui/InlineConfirm';
+import { QueryStatus } from '../../../shared/ui/QueryStatus';
+import { MutationError } from './MutationError';
 
 interface SetAdminInput {
   readonly userId: string;
@@ -23,7 +24,7 @@ export function UsersSection(): ReactElement {
   return (
     <Card title={t('admin.users.title')} footer={t('admin.users.hint')}>
       <MutationError error={setAdmin.error} messageKey="admin.users.saveError" />
-      <SectionStatus
+      <QueryStatus
         isPending={users.isPending}
         error={users.error}
         isEmpty={items.length === 0}
@@ -31,7 +32,7 @@ export function UsersSection(): ReactElement {
         emptyDescription={t('admin.users.emptyDescription')}
       />
       {items.length > 0 ? (
-        <AdminTable columns={[t('admin.users.name'), t('admin.users.email'), t('admin.users.admin'), t('admin.users.actions')]}>
+        <DataTable columns={[t('admin.users.name'), t('admin.users.email'), t('admin.users.admin'), t('admin.users.actions')]}>
           {items.map((user) => (
             <tr key={user.id}>
               <td>{user.name}</td>
@@ -50,7 +51,7 @@ export function UsersSection(): ReactElement {
               </td>
             </tr>
           ))}
-        </AdminTable>
+        </DataTable>
       ) : null}
     </Card>
   );

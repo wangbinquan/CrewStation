@@ -3,20 +3,20 @@ import type { ReactElement } from 'react';
 import { api } from '../../../shared/api/client';
 import { queryKeys } from '../../../shared/api/queryKeys';
 import { errorMessage, useApiMutation, useApiQuery } from '../../../shared/api/useApi';
-import { formatDateTime } from '../../../shared/lib/dateFormat';
-import { useI18n } from '../../../shared/lib/useI18n';
+import { useDateText } from '../../../shared/lib/useDateText';
 import { useT } from '../../../shared/lib/useT';
 import { Badge } from '../../../shared/ui/Badge';
 import { Card } from '../../../shared/ui/Card';
-import { AdminTable } from './AdminTable';
+import { DataTable } from '../../../shared/ui/DataTable';
+import { InlineConfirm } from '../../../shared/ui/InlineConfirm';
+import { QueryStatus } from '../../../shared/ui/QueryStatus';
 import { EgressEntryForm } from './EgressEntryForm';
-import { InlineConfirm } from './InlineConfirm';
-import { MutationError, SectionStatus } from './SectionStatus';
+import { MutationError } from './MutationError';
 
 /** 出站 FQDN 白名单：管理员不带 projectId 查询即看全部条目。 */
 export function EgressEntriesSection(): ReactElement {
   const t = useT();
-  const { locale } = useI18n();
+  const dateText = useDateText();
   const entries = useApiQuery(queryKeys.egressEntries(), () => api.egress.listEntries());
   const add = useApiMutation((input: AddEgressEntryRequest) => api.egress.addEntry(input), { invalidate: [queryKeys.egressEntries()] });
   const remove = useApiMutation((id: string) => api.egress.removeEntry(id), { invalidate: [queryKeys.egressEntries()] });
@@ -25,7 +25,7 @@ export function EgressEntriesSection(): ReactElement {
   return (
     <Card title={t('admin.egress.title')} footer={t('admin.egress.hint')}>
       <MutationError error={remove.error} messageKey="admin.egress.removeError" />
-      <SectionStatus
+      <QueryStatus
         isPending={entries.isPending}
         error={entries.error}
         isEmpty={items.length === 0}
@@ -33,7 +33,7 @@ export function EgressEntriesSection(): ReactElement {
         emptyDescription={t('admin.egress.emptyDescription')}
       />
       {items.length > 0 ? (
-        <AdminTable columns={columns}>
+        <DataTable columns={columns}>
           {items.map((entry) => (
             <tr key={entry.id}>
               <td>
@@ -45,7 +45,7 @@ export function EgressEntriesSection(): ReactElement {
                 </Badge>
               </td>
               <td>{entry.note ?? t('admin.none')}</td>
-              <td>{formatDateTime(entry.createdAt, locale)}</td>
+              <td>{dateText(entry.createdAt)}</td>
               <td>
                 <InlineConfirm
                   label={t('admin.egress.remove')}
@@ -57,7 +57,7 @@ export function EgressEntriesSection(): ReactElement {
               </td>
             </tr>
           ))}
-        </AdminTable>
+        </DataTable>
       ) : null}
       <EgressEntryForm
         busy={add.isPending}

@@ -3,7 +3,7 @@ import { useState } from 'react';
 import type { ReactElement, ReactNode } from 'react';
 import { useT } from '../../../shared/lib/useT';
 import { AdminForm } from './AdminForm';
-import { FormField } from './FormField';
+import { AdminField } from './AdminField';
 
 export interface EgressEntryFormProps {
   readonly onSubmit: (input: AddEgressEntryRequest) => void;
@@ -37,8 +37,8 @@ export function EgressEntryForm({ onSubmit, busy, error }: EgressEntryFormProps)
       note={t('admin.egress.projectIdHint')}
       onSubmit={submit}
     >
-      <FormField label={t('admin.egress.fqdn')} value={fqdn} onChange={setFqdn} placeholder={t('admin.egress.fqdnPlaceholder')} />
-      <FormField
+      <AdminField label={t('admin.egress.fqdn')} value={fqdn} onChange={setFqdn} placeholder={t('admin.egress.fqdnPlaceholder')} />
+      <AdminField
         label={t('admin.egress.scope')}
         value={scope}
         onChange={(next) => setScope(next as EgressScope)}
@@ -47,7 +47,7 @@ export function EgressEntryForm({ onSubmit, busy, error }: EgressEntryFormProps)
           { value: 'project', label: t('admin.egress.scopeProject') },
         ]}
       />
-      <FormField
+      <AdminField
         label={t('admin.egress.projectId')}
         value={projectId}
         onChange={setProjectId}
@@ -55,7 +55,7 @@ export function EgressEntryForm({ onSubmit, busy, error }: EgressEntryFormProps)
         title={t('admin.egress.projectIdHint')}
         placeholder={t('admin.egress.projectIdPlaceholder')}
       />
-      <FormField label={t('admin.egress.note')} value={note} onChange={setNote} />
+      <AdminField label={t('admin.egress.note')} value={note} onChange={setNote} />
     </AdminForm>
   );
 }

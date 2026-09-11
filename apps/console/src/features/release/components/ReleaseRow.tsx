@@ -1,7 +1,7 @@
 import type { ReleaseDto } from '@crewstation/contracts';
 import type { ReactElement } from 'react';
+import { useDateText } from '../../../shared/lib/useDateText';
 import { useT } from '../../../shared/lib/useT';
-import { useDateText } from '../model/useDateText';
 import { ReleaseStatusBadge } from './ReleaseStatusBadge';
 import styles from './ReleaseHistoryCard.module.css';
 

@@ -5,8 +5,8 @@ import { queryKeys } from '../../../shared/api/queryKeys';
 import { errorMessage, useApiMutation, useApiQuery } from '../../../shared/api/useApi';
 import { useT } from '../../../shared/lib/useT';
 import { Card } from '../../../shared/ui/Card';
-import { AdminTable } from './AdminTable';
-import { SectionStatus } from './SectionStatus';
+import { DataTable } from '../../../shared/ui/DataTable';
+import { QueryStatus } from '../../../shared/ui/QueryStatus';
 import { TaskProfileForm } from './TaskProfileForm';
 
 /** 任务容器 profile：开发会话与业务任务容器的规格来源。 */
@@ -17,7 +17,7 @@ export function TaskProfilesSection(): ReactElement {
   const items = profiles.data?.items ?? [];
   return (
     <Card title={t('admin.profiles.title')} footer={t('admin.profiles.hint')}>
-      <SectionStatus
+      <QueryStatus
         isPending={profiles.isPending}
         error={profiles.error}
         isEmpty={items.length === 0}
@@ -25,7 +25,7 @@ export function TaskProfilesSection(): ReactElement {
         emptyDescription={t('admin.profiles.emptyDescription')}
       />
       {items.length > 0 ? (
-        <AdminTable
+        <DataTable
           columns={[t('admin.profiles.name'), t('admin.profiles.cpu'), t('admin.profiles.memory'), t('admin.profiles.storage'), t('admin.profiles.description')]}
         >
           {items.map((profile) => (
@@ -39,7 +39,7 @@ export function TaskProfilesSection(): ReactElement {
               <td>{profile.description === '' ? t('admin.none') : profile.description}</td>
             </tr>
           ))}
-        </AdminTable>
+        </DataTable>
       ) : null}
       <TaskProfileForm
         busy={upsert.isPending}

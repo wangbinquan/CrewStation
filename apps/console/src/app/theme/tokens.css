@@ -26,6 +26,8 @@
   --cs-tone-success-bg: #dcfce7;
   --cs-tone-warning-fg: #b45309;
   --cs-tone-warning-bg: #fef3c7;
+  --cs-tone-danger-fg: #b91c1c;
+  --cs-tone-danger-bg: #fee2e2;
 
   --cs-nav-bg: #111827;
   --cs-nav-text: #cbd5e1;
@@ -69,6 +71,8 @@
     --cs-tone-success-bg: #14532d;
     --cs-tone-warning-fg: #fde68a;
     --cs-tone-warning-bg: #78350f;
+    --cs-tone-danger-fg: #fecaca;
+    --cs-tone-danger-bg: #7f1d1d;
 
     --cs-nav-bg: #0b0f14;
     --cs-nav-active-bg: #1f2937;

@@ -1,20 +1,10 @@
 import type { ItemsPage } from '@crewstation/api-client';
 import type { ApiOperationDto, ApiProxyDto, ApiRequestDto } from '@crewstation/contracts';
-import type { QueryKey, UseQueryResult } from '@tanstack/react-query';
+import type { UseQueryResult } from '@tanstack/react-query';
 import { api } from '../../../shared/api/client';
 import { queryKeys } from '../../../shared/api/queryKeys';
 import { useApiQuery } from '../../../shared/api/useApi';
 import type { ApiClientError } from '../../../shared/api/useApi';
-
-/** 代理清单没有专属的共享键；挂在 operations 前缀下，授权变化时一次失效即可连带刷新。 */
-export function proxiesKey(): QueryKey {
-  return [...queryKeys.operations(), 'proxies'];
-}
-
-/** 裁剪后的 OpenAPI 按“服务＋代理”缓存：同一代理对不同服务裁剪结果不同，不能只用代理名做键。 */
-export function openapiKey(serviceId: string, proxy: string): QueryKey {
-  return queryKeys.operationSpec(`${serviceId}/${proxy}`);
-}
 
 export interface CatalogData {
   readonly operations: UseQueryResult<ItemsPage<ApiOperationDto>, ApiClientError>;
@@ -30,6 +20,6 @@ export function useCatalogData(projectId: string, serviceId: string): CatalogDat
   return {
     operations: useApiQuery(queryKeys.operations(serviceId), () => api.apiCatalog.listOperations({ serviceId })),
     requests: useApiQuery(queryKeys.accessRequests(serviceId), () => api.apiCatalog.listRequests({ projectId })),
-    proxies: useApiQuery(proxiesKey(), () => api.apiCatalog.listProxies()),
+    proxies: useApiQuery(queryKeys.apiProxies(), () => api.apiCatalog.listProxies()),
   };
 }

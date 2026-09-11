@@ -1,7 +1,6 @@
 import type { ConfigVersionDto } from '@crewstation/contracts';
 import type { ReactElement } from 'react';
-import { formatDateTime } from '../../../shared/lib/dateFormat';
-import { useI18n } from '../../../shared/lib/useI18n';
+import { useDateText } from '../../../shared/lib/useDateText';
 import { useT } from '../../../shared/lib/useT';
 import styles from './ConfigVersionList.module.css';
 
@@ -13,7 +12,7 @@ export interface ConfigVersionListProps {
 /** 版本历史：版本号、写入时间与该版本包含的键；值不回显（Secret 无值可回显）。 */
 export function ConfigVersionList({ versions, pending }: ConfigVersionListProps): ReactElement {
   const t = useT();
-  const { locale } = useI18n();
+  const dateText = useDateText();
   if (pending) return <p className={styles.muted}>{t('config.versions.loading')}</p>;
   if (versions.length === 0) return <p className={styles.muted}>{t('config.versions.empty')}</p>;
   return (
@@ -23,7 +22,7 @@ export function ConfigVersionList({ versions, pending }: ConfigVersionListProps)
           <span className={styles.version}>
             {t('config.versions.version')} {version.version}
           </span>
-          <span className={styles.muted}>{formatDateTime(version.createdAt, locale)}</span>
+          <span className={styles.muted}>{dateText(version.createdAt)}</span>
           <span className={styles.keys} title={version.keys.join(', ')}>
             {t('config.versions.keyCount', { count: version.keys.length })}
           </span>

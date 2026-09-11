@@ -3,7 +3,7 @@ import { useState } from 'react';
 import type { ReactElement, ReactNode } from 'react';
 import { useT } from '../../../shared/lib/useT';
 import { AdminForm } from './AdminForm';
-import { FormField } from './FormField';
+import { AdminField } from './AdminField';
 
 export interface ServicePlanFormProps {
   readonly onSubmit: (input: ServicePlanInput) => void;
@@ -30,11 +30,11 @@ export function ServicePlanForm({ onSubmit, busy, error }: ServicePlanFormProps)
       error={error}
       onSubmit={() => onSubmit({ name, cpu, memory, maxReplicas: replicas, description: description === '' ? undefined : description })}
     >
-      <FormField label={t('admin.plans.name')} value={name} onChange={setName} placeholder={t('admin.plans.namePlaceholder')} />
-      <FormField label={t('admin.plans.cpu')} value={cpu} onChange={setCpu} placeholder={t('admin.plans.cpuPlaceholder')} />
-      <FormField label={t('admin.plans.memory')} value={memory} onChange={setMemory} placeholder={t('admin.plans.memoryPlaceholder')} />
-      <FormField label={t('admin.plans.maxReplicas')} value={maxReplicas} onChange={setMaxReplicas} inputMode="numeric" placeholder={t('admin.plans.maxReplicasPlaceholder')} />
-      <FormField label={t('admin.plans.description')} value={description} onChange={setDescription} />
+      <AdminField label={t('admin.plans.name')} value={name} onChange={setName} placeholder={t('admin.plans.namePlaceholder')} />
+      <AdminField label={t('admin.plans.cpu')} value={cpu} onChange={setCpu} placeholder={t('admin.plans.cpuPlaceholder')} />
+      <AdminField label={t('admin.plans.memory')} value={memory} onChange={setMemory} placeholder={t('admin.plans.memoryPlaceholder')} />
+      <AdminField label={t('admin.plans.maxReplicas')} value={maxReplicas} onChange={setMaxReplicas} inputMode="numeric" placeholder={t('admin.plans.maxReplicasPlaceholder')} />
+      <AdminField label={t('admin.plans.description')} value={description} onChange={setDescription} />
     </AdminForm>
   );
 }

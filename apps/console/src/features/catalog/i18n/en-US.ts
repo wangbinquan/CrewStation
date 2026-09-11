@@ -47,8 +47,6 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   'catalog.request.pending': 'Pending',
 
   'catalog.requests.title': 'Access requests from this service',
-  'catalog.requests.operation': 'Operation key',
-  'catalog.requests.state': 'State',
   'catalog.requests.reason': 'Reason',
   'catalog.requests.decision': 'Administrator decision',
   'catalog.requests.requestedBy': 'Requested by',
@@ -65,8 +63,7 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   'catalog.admin.toDefault': 'Make default-open',
   'catalog.admin.toTargeted': 'Make targeted',
   'catalog.admin.revoke': 'Revoke grant',
-  'catalog.admin.revokeConfirm': 'Confirm revoking {key}',
-  'catalog.admin.cancel': 'Cancel',
+  'catalog.admin.revokeConfirm': 'Revoke access to {key}?',
   'catalog.admin.approve': 'Approve',
   'catalog.admin.reject': 'Reject',
   'catalog.admin.decisionPlaceholder': 'Reason for approving or rejecting (returned to the requester)',

@@ -3,9 +3,10 @@ import { useState } from 'react';
 import type { ReactElement } from 'react';
 import { errorMessage, isApiClientError } from '../../../shared/api/useApi';
 import { useT } from '../../../shared/lib/useT';
+import { ActionNote } from '../../../shared/ui/ActionNote';
 import { Badge } from '../../../shared/ui/Badge';
 import { Card } from '../../../shared/ui/Card';
-import { EmptyState } from '../../../shared/ui/EmptyState';
+import { QueryStatus } from '../../../shared/ui/QueryStatus';
 import { useConfigEnv } from '../hooks/useConfigEnv';
 import { ConfigItemForm } from './ConfigItemForm';
 import type { ConfigItemDraft } from './ConfigItemForm';
@@ -40,11 +41,15 @@ export function ConfigEnvPanel({ projectId, env }: ConfigEnvPanelProps): ReactEl
       }
     >
       <p className={styles.note}>{t(`config.env.${env}Note`)}</p>
-      {items.isPending ? <p className={styles.note}>{t('config.items.loading')}</p> : null}
-      {items.error ? <p className={styles.error}>{t('config.error.load', { message: errorMessage(items.error) })}</p> : null}
-      {!items.isPending && items.error === null && list.length === 0 ? (
-        <EmptyState title={t('config.items.emptyTitle')} description={t('config.items.emptyDescription')} />
-      ) : null}
+      <QueryStatus
+        isPending={items.isPending}
+        error={items.error}
+        loadingKey="config.items.loading"
+        errorKey="config.error.load"
+        isEmpty={list.length === 0}
+        emptyTitle={t('config.items.emptyTitle')}
+        emptyDescription={t('config.items.emptyDescription')}
+      />
       {list.length > 0 ? (
         <ConfigItemTable
           items={list}
@@ -70,9 +75,9 @@ function WriteError({ action, error }: { readonly action: string; readonly error
   if (error === null || error === undefined) return null;
   const forbidden = isApiClientError(error) && error.status === 403;
   return (
-    <p className={styles.error}>
+    <ActionNote tone="error">
       {t(action, { message: errorMessage(error) })}
       {forbidden ? ` ${t('config.error.forbidden')}` : ''}
-    </p>
+    </ActionNote>
   );
 }

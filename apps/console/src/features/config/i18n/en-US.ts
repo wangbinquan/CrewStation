@@ -29,7 +29,6 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   'config.items.edit': 'Fill the form',
   'config.items.delete': 'Delete',
   'config.items.confirmDelete': 'Confirm deleting {name}',
-  'config.items.cancel': 'Cancel',
   'config.items.deleting': 'Deleting…',
 
   'config.form.title': 'Add or overwrite an item',
@@ -48,8 +47,6 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   'config.versions.title': 'Version history',
   'config.versions.note': 'A version records the time of the write and the keys it contains; who made the change is shown per item above.',
   'config.versions.version': 'Version',
-  'config.versions.createdAt': 'Time',
-  'config.versions.keys': 'Keys',
   'config.versions.keyCount': '{count} keys',
   'config.versions.loading': 'Loading…',
   'config.versions.empty': 'No versions recorded yet.',

@@ -5,9 +5,6 @@ export const messages = {
   'logs.line1': '服务与任务容器的日志集中聚合到此页；同时显示两个部署槽的健康态。',
   'logs.line2': '按来源与部署槽拉取一页，页内再用关键字过滤；“跟随”打开时每 5 秒取一次最新一页。',
 
-  'logs.status.loading': '载入中…',
-  'logs.status.error': '读取失败：{message}',
-  'logs.none': '—',
 
   'logs.health.title': '部署健康态',
   'logs.health.replicas': '就绪副本',
@@ -46,11 +43,8 @@ export const messages = {
   'logs.list.emptyDescription': '换一个来源或部署槽再试；接口尚未就绪时会显示读取失败。',
   'logs.list.noMatchTitle': '本页没有匹配的行',
   'logs.list.noMatchDescription': '关键字只在已取回的这一页内过滤，清空关键字可看到全部。',
+  'logs.list.noPagingHint': '只能看最新一页：首版日志直接读 Pod 日志尾部，那个接口没有游标；往前翻页要等日志采集与保留落地。',
 
-  'logs.pager.older': '更早一页',
-  'logs.pager.newer': '更新一页',
-  'logs.pager.newest': '回到最新',
-  'logs.pager.followingHint': '跟随时停在最新一页；关闭跟随后可向前翻页。',
 
   'logs.level.error': 'ERROR',
   'logs.level.warn': 'WARN',

@@ -20,13 +20,10 @@
   padding: var(--cs-space-2) var(--cs-space-3);
   border-bottom: 1px solid var(--cs-color-border);
   vertical-align: top;
+  /* 未换行点的长值（FQDN、镜像名、操作键）宁可断开，也不要把表格撑到要横向滚动。 */
+  overflow-wrap: anywhere;
 }
 
-.table tr:last-child td {
+.table tbody tr:last-child td {
   border-bottom: none;
-}
-
-/* 操作列里的按钮不该被压成竖排的单字。 */
-.table td:last-child {
-  white-space: nowrap;
 }

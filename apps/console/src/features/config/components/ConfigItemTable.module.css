@@ -1,29 +1,9 @@
-.wrapper {
-  overflow-x: auto;
-}
-
 /*
  * 六列表格在窄卡片里会被压到每列几像素，值那一列于是一行一个字。
- * 给最小宽度让它溢出并由 .wrapper 横向滚动，而不是把列压没。
+ * 给最小宽度让它溢出并由 DataTable 的容器横向滚动，而不是把列压没。
  */
 .table {
-  width: 100%;
   min-width: 560px;
-  border-collapse: collapse;
-  text-align: left;
-}
-
-.table th,
-.table td {
-  padding: var(--cs-space-2) var(--cs-space-2);
-  border-bottom: 1px solid var(--cs-color-border);
-  vertical-align: top;
-}
-
-.table th {
-  font-weight: 600;
-  color: var(--cs-color-text-muted);
-  white-space: nowrap;
 }
 
 .muted {

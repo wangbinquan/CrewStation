@@ -32,37 +32,6 @@
   color: var(--cs-color-text-muted);
 }
 
-.tableWrapper {
-  overflow-x: auto;
-}
-
-.table {
-  width: 100%;
-  border-collapse: collapse;
-  text-align: left;
-}
-
-.table th,
-.table td {
-  padding: var(--cs-space-2);
-  border-bottom: 1px solid var(--cs-color-border);
-  vertical-align: top;
-}
-
-.table th {
-  color: var(--cs-color-text-muted);
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.key {
-  overflow-wrap: anywhere;
-}
-
-.path {
-  overflow-wrap: anywhere;
-}
-
 .summary {
   margin-top: var(--cs-space-1);
   max-width: 44ch;
@@ -93,16 +62,4 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--cs-space-2);
-}
-
-.muted {
-  color: var(--cs-color-text-muted);
-}
-
-.error {
-  margin-bottom: var(--cs-space-2);
-  padding: var(--cs-space-2) var(--cs-space-3);
-  border-radius: var(--cs-radius-sm);
-  color: var(--cs-tone-warning-fg);
-  background: var(--cs-tone-warning-bg);
 }

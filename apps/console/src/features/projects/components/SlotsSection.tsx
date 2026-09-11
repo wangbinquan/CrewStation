@@ -4,7 +4,7 @@ import { api } from '../../../shared/api/client';
 import { queryKeys } from '../../../shared/api/queryKeys';
 import { useApiQuery } from '../../../shared/api/useApi';
 import { useT } from '../../../shared/lib/useT';
-import { QueryStatus } from './QueryStatus';
+import { QueryStatus } from '../../../shared/ui/QueryStatus';
 import { SlotCard } from './SlotCard';
 import { TrafficSwitchAction } from './TrafficSwitchAction';
 import styles from './SlotsSection.module.css';

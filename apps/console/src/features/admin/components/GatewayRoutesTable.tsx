@@ -2,7 +2,7 @@ import type { GatewayServiceRoutes } from '@crewstation/api-client';
 import type { ReactElement } from 'react';
 import { useT } from '../../../shared/lib/useT';
 import { Badge } from '../../../shared/ui/Badge';
-import { AdminTable } from './AdminTable';
+import { DataTable } from '../../../shared/ui/DataTable';
 
 /** 路由表按服务分组下发，这里摊平成一行一条，便于按 Host 查。 */
 export function GatewayRoutesTable({ services }: { readonly services: readonly GatewayServiceRoutes[] }): ReactElement {
@@ -13,7 +13,7 @@ export function GatewayRoutesTable({ services }: { readonly services: readonly G
   ];
   const rows = services.flatMap((service) => service.routes.map((route) => ({ serviceName: service.serviceName, route })));
   return (
-    <AdminTable columns={columns}>
+    <DataTable columns={columns}>
       {rows.map(({ serviceName, route }) => (
         <tr key={`${serviceName}|${route.host}|${route.pathPrefix ?? ''}|${route.kind}`}>
           <td>
@@ -33,6 +33,6 @@ export function GatewayRoutesTable({ services }: { readonly services: readonly G
           <td>{route.middlewares.length === 0 ? t('admin.none') : route.middlewares.join(', ')}</td>
         </tr>
       ))}
-    </AdminTable>
+    </DataTable>
   );
 }

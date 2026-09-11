@@ -1,8 +1,8 @@
 import type { ReactElement } from 'react';
 import { errorMessage } from '../../../shared/api/useApi';
 import { useT } from '../../../shared/lib/useT';
+import { ActionNote } from '../../../shared/ui/ActionNote';
 import { uncommittedPaths } from '../model/publishPrecondition';
-import { ActionNote } from './ActionNote';
 import styles from './PublishResult.module.css';
 
 export interface PublishResultProps {

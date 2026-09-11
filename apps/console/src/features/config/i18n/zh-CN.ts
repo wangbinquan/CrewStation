@@ -28,7 +28,6 @@ export const messages = {
   'config.items.edit': '填入表单',
   'config.items.delete': '删除',
   'config.items.confirmDelete': '确认删除 {name}',
-  'config.items.cancel': '取消',
   'config.items.deleting': '删除中…',
 
   'config.form.title': '新增或覆盖一项',
@@ -47,8 +46,6 @@ export const messages = {
   'config.versions.title': '版本历史',
   'config.versions.note': '版本记录的是写入时间与该版本包含的键；具体是谁改的，见上方各项的“修改人”。',
   'config.versions.version': '版本',
-  'config.versions.createdAt': '时间',
-  'config.versions.keys': '键',
   'config.versions.keyCount': '{count} 个键',
   'config.versions.loading': '读取中…',
   'config.versions.empty': '还没有版本记录。',

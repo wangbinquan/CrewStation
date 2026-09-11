@@ -1,4 +1,5 @@
 import type { ReactElement, ReactNode } from 'react';
+import { DataTable } from '../../../shared/ui/DataTable';
 import styles from './CapabilityTable.module.css';
 
 export interface TableColumn<T> {
@@ -13,29 +14,18 @@ export interface CapabilityTableProps<T> {
   readonly empty: string;
 }
 
-/** 能力页的通用只读表；各段只给列定义，表头与空态的表现因此完全一致。 */
+/** 能力页的通用只读表：各段只给列定义，表头与空态的表现因此完全一致；表格外观来自 shared 的 DataTable。 */
 export function CapabilityTable<T>({ columns, rows, rowKey, empty }: CapabilityTableProps<T>): ReactElement {
   if (rows.length === 0) return <p className={styles.muted}>{empty}</p>;
   return (
-    <div className={styles.wrapper}>
-      <table className={styles.table}>
-        <thead>
-          <tr>
-            {columns.map((column) => (
-              <th key={column.header}>{column.header}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr key={rowKey(row)}>
-              {columns.map((column) => (
-                <td key={column.header}>{column.cell(row)}</td>
-              ))}
-            </tr>
+    <DataTable columns={columns.map((column) => column.header)}>
+      {rows.map((row) => (
+        <tr key={rowKey(row)}>
+          {columns.map((column) => (
+            <td key={column.header}>{column.cell(row)}</td>
           ))}
-        </tbody>
-      </table>
-    </div>
+        </tr>
+      ))}
+    </DataTable>
   );
 }

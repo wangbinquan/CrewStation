@@ -7,7 +7,7 @@ import { errorMessage } from '../../../shared/api/useApi';
 import { useT } from '../../../shared/lib/useT';
 import { Button } from '../../../shared/ui/Button';
 import type { SessionAccess } from '../model/sessionAccess';
-import { InlineConfirm } from './InlineConfirm';
+import { ConfirmPanel } from './ConfirmPanel';
 import { PaneNotice } from './PaneNotice';
 import styles from './ReleaseControl.module.css';
 
@@ -26,7 +26,7 @@ export function ReleaseControl({ access, release }: ReleaseControlProps): ReactE
   if (!access.canRelease) return null;
   if (asking) {
     return (
-      <InlineConfirm
+      <ConfirmPanel
         question={access.needsForce ? t('devSession.release.confirmForce') : t('devSession.release.confirm')}
         hint={t('devSession.release.hint')}
         confirmLabel={t('devSession.release.submit')}

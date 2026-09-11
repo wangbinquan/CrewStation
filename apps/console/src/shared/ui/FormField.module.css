@@ -24,3 +24,10 @@
   color: var(--cs-color-text);
   font: inherit;
 }
+
+/* 禁用的控件要一眼看出不可填，否则用户会以为是输入没生效。 */
+.field input:disabled,
+.field select:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}

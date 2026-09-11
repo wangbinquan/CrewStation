@@ -8,11 +8,11 @@ import { useI18n } from '../../../shared/lib/useI18n';
 import { useT } from '../../../shared/lib/useT';
 import type { Translate } from '../../../shared/lib/useT';
 import { Badge } from '../../../shared/ui/Badge';
+import { DefinitionList } from '../../../shared/ui/DefinitionList';
+import type { DefinitionItem } from '../../../shared/ui/DefinitionList';
 import type { SessionAccess } from '../model/sessionAccess';
 import { sessionStateTone } from '../model/stateTone';
 import type { StreamState } from '../model/taskStreamSocket';
-import { DetailList } from './DetailList';
-import type { DetailItem } from './DetailList';
 import { PaneNotice } from './PaneNotice';
 import { ReleaseControl } from './ReleaseControl';
 import { StreamStatus } from './StreamStatus';
@@ -25,7 +25,7 @@ export interface SessionCardProps {
   readonly release: UseMutationResult<ReleaseDevSessionResult, ApiClientError, boolean>;
 }
 
-function details(session: DevSessionDto, stream: StreamState, access: SessionAccess, t: Translate, locale: string): DetailItem[] {
+function details(session: DevSessionDto, stream: StreamState, access: SessionAccess, t: Translate, locale: string): DefinitionItem[] {
   return [
     { label: t('devSession.session.taskId'), value: <code>{session.taskId}</code> },
     { label: t('devSession.session.branch'), value: <code>{session.branch}</code> },
@@ -56,7 +56,7 @@ export function SessionCard({ session, stream, access, release }: SessionCardPro
         </div>
         <ReleaseControl access={access} release={release} />
       </header>
-      <DetailList items={details(session, stream, access, t, locale)} />
+      <DefinitionList layout="grid" items={details(session, stream, access, t, locale)} />
       {stream.runnerState !== undefined && stream.runnerState !== 'ready' ? (
         <PaneNotice tone="warning">{t(`devSession.runnerState.${stream.runnerState}`)}</PaneNotice>
       ) : null}

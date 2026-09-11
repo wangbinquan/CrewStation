@@ -1,0 +1,44 @@
+.list {
+  margin: 0;
+}
+
+.stacked {
+  display: flex;
+  flex-direction: column;
+  gap: var(--cs-space-1);
+}
+
+.stacked .row {
+  display: grid;
+  grid-template-columns: minmax(88px, auto) 1fr;
+  gap: var(--cs-space-3);
+  align-items: baseline;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--cs-space-2) var(--cs-space-4);
+}
+
+.grid .row {
+  display: flex;
+  gap: var(--cs-space-2);
+  align-items: baseline;
+  min-width: 0;
+}
+
+/* 分栏时标签不换行，换行的是值那一列。 */
+.grid .label {
+  white-space: nowrap;
+}
+
+.label {
+  color: var(--cs-color-text-muted);
+}
+
+.value {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}

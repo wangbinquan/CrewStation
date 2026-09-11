@@ -1,11 +1,11 @@
 import type { ConfigItemDto } from '@crewstation/contracts';
-import { useState } from 'react';
 import type { ReactElement } from 'react';
-import { formatDateTime } from '../../../shared/lib/dateFormat';
-import { useI18n } from '../../../shared/lib/useI18n';
+import { useDateText } from '../../../shared/lib/useDateText';
 import { useT } from '../../../shared/lib/useT';
 import { Badge } from '../../../shared/ui/Badge';
 import { Button } from '../../../shared/ui/Button';
+import { DataTable } from '../../../shared/ui/DataTable';
+import { InlineConfirm } from '../../../shared/ui/InlineConfirm';
 import styles from './ConfigItemTable.module.css';
 
 export interface ConfigItemTableProps {
@@ -18,68 +18,44 @@ export interface ConfigItemTableProps {
 /** 取值列表；删除走行内两步确认，不使用会冻结页面的 window.confirm。 */
 export function ConfigItemTable({ items, onEdit, onDelete, deletingName }: ConfigItemTableProps): ReactElement {
   const t = useT();
-  const { locale } = useI18n();
-  const [confirming, setConfirming] = useState<string | null>(null);
+  const dateText = useDateText();
+  const columns = [
+    t('config.items.name'), t('config.items.value'), t('config.items.version'),
+    t('config.items.updatedBy'), t('config.items.updatedAt'), t('config.items.actions'),
+  ];
   return (
-    <div className={styles.wrapper}>
-      <table className={styles.table}>
-        <thead>
-          <tr>
-            <th>{t('config.items.name')}</th>
-            <th>{t('config.items.value')}</th>
-            <th>{t('config.items.version')}</th>
-            <th>{t('config.items.updatedBy')}</th>
-            <th>{t('config.items.updatedAt')}</th>
-            <th>{t('config.items.actions')}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {items.map((item) => (
-            <tr key={item.name}>
-              <td>
-                <code>{item.name}</code>
-              </td>
-              <td>
-                <ConfigItemValue item={item} />
-              </td>
-              <td>{item.version}</td>
-              <td>
-                <span className={styles.actor} title={item.updatedBy}>
-                  {item.updatedBy}
-                </span>
-              </td>
-              <td className={styles.muted}>{formatDateTime(item.updatedAt, locale)}</td>
-              <td className={styles.actions}>
-                <Button variant="ghost" onClick={() => onEdit(item)}>
-                  {t('config.items.edit')}
-                </Button>
-                {confirming === item.name ? (
-                  <>
-                    <Button
-                      variant="primary"
-                      disabled={deletingName === item.name}
-                      onClick={() => {
-                        setConfirming(null);
-                        onDelete(item.name);
-                      }}
-                    >
-                      {deletingName === item.name ? t('config.items.deleting') : t('config.items.confirmDelete', { name: item.name })}
-                    </Button>
-                    <Button variant="ghost" onClick={() => setConfirming(null)}>
-                      {t('config.items.cancel')}
-                    </Button>
-                  </>
-                ) : (
-                  <Button variant="ghost" onClick={() => setConfirming(item.name)}>
-                    {t('config.items.delete')}
-                  </Button>
-                )}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <DataTable columns={columns} className={styles.table}>
+      {items.map((item) => (
+        <tr key={item.name}>
+          <td>
+            <code>{item.name}</code>
+          </td>
+          <td>
+            <ConfigItemValue item={item} />
+          </td>
+          <td>{item.version}</td>
+          <td>
+            <span className={styles.actor} title={item.updatedBy}>
+              {item.updatedBy}
+            </span>
+          </td>
+          <td className={styles.muted}>{dateText(item.updatedAt)}</td>
+          <td className={styles.actions}>
+            <Button variant="ghost" onClick={() => onEdit(item)}>
+              {t('config.items.edit')}
+            </Button>
+            <InlineConfirm
+              variant="ghost"
+              label={t('config.items.delete')}
+              question={t('config.items.confirmDelete', { name: item.name })}
+              busy={deletingName === item.name}
+              busyLabel={t('config.items.deleting')}
+              onConfirm={() => onDelete(item.name)}
+            />
+          </td>
+        </tr>
+      ))}
+    </DataTable>
   );
 }
 

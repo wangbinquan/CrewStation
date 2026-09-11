@@ -5,7 +5,9 @@
   flex-wrap: wrap;
 }
 
+/* 问句可能是一整句话；限宽让它换行，而不是把两个按钮挤出可视区。 */
 .question {
   color: var(--cs-color-text-muted);
   font-size: 12px;
+  max-width: 56ch;
 }

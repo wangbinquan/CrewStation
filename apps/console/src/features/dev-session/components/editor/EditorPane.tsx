@@ -3,7 +3,7 @@ import { useT } from '../../../../shared/lib/useT';
 import { Button } from '../../../../shared/ui/Button';
 import type { FileEditorHandle } from '../../hooks/useFileEditor';
 import type { WorkspaceTree } from '../../hooks/useWorkspaceTree';
-import { InlineConfirm } from '../InlineConfirm';
+import { ConfirmPanel } from '../ConfirmPanel';
 import { Pane } from '../Pane';
 import { PaneNotice } from '../PaneNotice';
 import { CodeEditor } from './CodeEditor';
@@ -37,7 +37,7 @@ function Footer({ editor }: { readonly editor: FileEditorHandle }): ReactElement
   const t = useT();
   if (editor.conflict) {
     return (
-      <InlineConfirm
+      <ConfirmPanel
         question={t('devSession.editor.conflict')}
         hint={t('devSession.editor.conflictHint')}
         confirmLabel={t('devSession.editor.conflictReload')}

@@ -21,8 +21,11 @@ export function applyPreviewEvent(current: PreviewStatusResult, event: PreviewSt
   };
 }
 
-/** 预览地址只在有端口且已就绪时给出；开发预览域名由平台在会话上返回。 */
+/**
+ * 预览地址只在已就绪时给出；开发预览域名由平台在会话上返回，是裸主机名。
+ * 用协议相对地址跟随工作台自身的 http／https：本地集群只有 HTTP，写死 https 会得到一个打不开的链接。
+ */
 export function previewUrl(previewHost: string, state: PreviewState): string | undefined {
   if (previewHost.length === 0 || state !== 'ready') return undefined;
-  return /^https?:\/\//i.test(previewHost) ? previewHost : `https://${previewHost}`;
+  return `//${previewHost.replace(/^https?:\/\//i, '')}`;
 }

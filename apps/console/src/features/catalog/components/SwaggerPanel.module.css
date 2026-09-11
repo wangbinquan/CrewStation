@@ -30,14 +30,6 @@
   font: inherit;
 }
 
-.error {
-  margin-top: var(--cs-space-2);
-  padding: var(--cs-space-2) var(--cs-space-3);
-  border-radius: var(--cs-radius-sm);
-  color: var(--cs-tone-warning-fg);
-  background: var(--cs-tone-warning-bg);
-}
-
 /*
  * Swagger UI 自带的是浅色配色（深色要 html.dark-mode，工作台不加这个类）。
  * 用 color-scheme 固定为浅色并取系统色，深色模式下文字才不会和底色同色；不写裸色值。

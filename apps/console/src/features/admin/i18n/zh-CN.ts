@@ -5,11 +5,7 @@ export const messages = {
   'admin.line1': '管理员创建项目并指定项目负责人，接入公司系统（APIProxy／EventProducer 接入容器），维护开放策略并审批定向开放申请。',
   'admin.line2': '还负责用户目录、套餐、任务容器 profile、出站 FQDN 白名单与网关路由。',
 
-  'admin.status.loading': '载入中…',
-  'admin.status.error': '读取失败：{message}',
   'admin.none': '—',
-  'admin.confirm.yes': '确认',
-  'admin.confirm.no': '取消',
   'admin.denied.title': '仅平台管理员可见',
   'admin.denied.description': '本页的用户目录、套餐、出站白名单与网关状态都只对平台管理员开放；需要权限请联系现有管理员。',
 

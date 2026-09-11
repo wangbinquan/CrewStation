@@ -4,6 +4,7 @@ import type { ReactElement } from 'react';
 import { useT } from '../../../shared/lib/useT';
 import { Badge } from '../../../shared/ui/Badge';
 import { Button } from '../../../shared/ui/Button';
+import { InlineConfirm } from '../../../shared/ui/InlineConfirm';
 import type { CatalogActions } from '../hooks/useCatalogActions';
 import { AccessRequestForm } from './AccessRequestForm';
 import styles from './OperationsPanel.module.css';
@@ -20,7 +21,6 @@ export interface OperationActionsProps {
 export function OperationActions({ operation, pendingRequest, isAdmin, actions }: OperationActionsProps): ReactElement {
   const t = useT();
   const [requesting, setRequesting] = useState(false);
-  const [confirmRevoke, setConfirmRevoke] = useState(false);
   const needsRequest = operation.openPolicy === 'targeted' && operation.granted !== true;
   if (requesting) {
     return (
@@ -52,49 +52,14 @@ export function OperationActions({ operation, pendingRequest, isAdmin, actions }
         </Button>
       ) : null}
       {isAdmin && operation.granted === true ? (
-        <RevokeControl
-          operationKey={operation.key}
-          confirming={confirmRevoke}
-          pending={actions.revokeGrant.isPending}
-          onAsk={() => setConfirmRevoke(true)}
-          onCancel={() => setConfirmRevoke(false)}
-          onConfirm={() => {
-            setConfirmRevoke(false);
-            actions.revokeGrant.mutate(operation.key);
-          }}
+        <InlineConfirm
+          variant="ghost"
+          label={t('catalog.admin.revoke')}
+          question={t('catalog.admin.revokeConfirm', { key: operation.key })}
+          busy={actions.revokeGrant.isPending}
+          onConfirm={() => actions.revokeGrant.mutate(operation.key)}
         />
       ) : null}
     </div>
-  );
-}
-
-interface RevokeControlProps {
-  readonly operationKey: string;
-  readonly confirming: boolean;
-  readonly pending: boolean;
-  readonly onAsk: () => void;
-  readonly onCancel: () => void;
-  readonly onConfirm: () => void;
-}
-
-/** 撤销授权的两步确认；不用 window.confirm（会冻结页面）。 */
-function RevokeControl({ operationKey, confirming, pending, onAsk, onCancel, onConfirm }: RevokeControlProps): ReactElement {
-  const t = useT();
-  if (!confirming) {
-    return (
-      <Button variant="ghost" onClick={onAsk}>
-        {t('catalog.admin.revoke')}
-      </Button>
-    );
-  }
-  return (
-    <>
-      <Button variant="primary" disabled={pending} onClick={onConfirm}>
-        {t('catalog.admin.revokeConfirm', { key: operationKey })}
-      </Button>
-      <Button variant="ghost" onClick={onCancel}>
-        {t('catalog.admin.cancel')}
-      </Button>
-    </>
   );
 }

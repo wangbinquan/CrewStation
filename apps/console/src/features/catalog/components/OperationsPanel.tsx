@@ -3,14 +3,14 @@ import { useMemo, useState } from 'react';
 import type { ReactElement } from 'react';
 import { errorMessage } from '../../../shared/api/useApi';
 import { useT } from '../../../shared/lib/useT';
+import { ActionNote } from '../../../shared/ui/ActionNote';
 import { Badge } from '../../../shared/ui/Badge';
 import { Card } from '../../../shared/ui/Card';
-import { EmptyState } from '../../../shared/ui/EmptyState';
+import { QueryStatus } from '../../../shared/ui/QueryStatus';
 import type { CatalogActions } from '../hooks/useCatalogActions';
 import { ALL_PROXIES, OperationFilters } from './OperationFilters';
 import type { OperationFilterValue } from './OperationFilters';
 import { OperationsTable } from './OperationsTable';
-import styles from './OperationsPanel.module.css';
 
 const INITIAL_FILTER: OperationFilterValue = { proxy: ALL_PROXIES, grant: 'all' };
 
@@ -34,14 +34,17 @@ export function OperationsPanel({ operations, requests, loading, loadError, isAd
   return (
     <Card title={t('catalog.operations.title')} extra={isAdmin ? <Badge tone="info">{t('catalog.admin.badge')}</Badge> : undefined}>
       <OperationFilters value={filter} proxies={proxies} count={visible.length} onChange={setFilter} />
-      {loading ? <p className={styles.muted}>{t('catalog.operations.loading')}</p> : null}
-      {loadError ? <p className={styles.error}>{t('catalog.error.load', { message: errorMessage(loadError) })}</p> : null}
-      {writeError ? <p className={styles.error}>{t('catalog.error.write', { message: errorMessage(writeError) })}</p> : null}
-      {!loading && visible.length === 0 ? (
-        <EmptyState title={t('catalog.operations.emptyTitle')} description={t('catalog.operations.emptyDescription')} />
-      ) : (
-        <OperationsTable operations={visible} pendingByKey={pendingByKey} isAdmin={isAdmin} actions={actions} />
-      )}
+      <QueryStatus
+        isPending={loading}
+        error={loadError}
+        loadingKey="catalog.operations.loading"
+        errorKey="catalog.error.load"
+        isEmpty={visible.length === 0}
+        emptyTitle={t('catalog.operations.emptyTitle')}
+        emptyDescription={t('catalog.operations.emptyDescription')}
+      />
+      {writeError ? <ActionNote tone="error">{t('catalog.error.write', { message: errorMessage(writeError) })}</ActionNote> : null}
+      {visible.length > 0 ? <OperationsTable operations={visible} pendingByKey={pendingByKey} isAdmin={isAdmin} actions={actions} /> : null}
     </Card>
   );
 }

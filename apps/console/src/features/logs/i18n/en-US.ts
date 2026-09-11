@@ -6,9 +6,6 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   'logs.line1': 'Logs of the service and its task containers are aggregated on this page, next to the health of both deployment slots.',
   'logs.line2': 'Fetch one page by source and slot, then filter inside it by keyword; with Follow on, the newest page is refetched every 5s.',
 
-  'logs.status.loading': 'Loading…',
-  'logs.status.error': 'Could not load: {message}',
-  'logs.none': '—',
 
   'logs.health.title': 'Deployment health',
   'logs.health.replicas': 'Ready replicas',
@@ -47,11 +44,8 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   'logs.list.emptyDescription': 'Try another source or slot; if the endpoint is not wired yet you will see a load error instead.',
   'logs.list.noMatchTitle': 'Nothing matches on this page',
   'logs.list.noMatchDescription': 'The keyword only filters the page already fetched; clear it to see every line.',
+  'logs.list.noPagingHint': 'Only the latest page is available: the first-version log source reads the Pod log tail, which has no cursor. Paging back arrives with log collection and retention.',
 
-  'logs.pager.older': 'Older page',
-  'logs.pager.newer': 'Newer page',
-  'logs.pager.newest': 'Back to newest',
-  'logs.pager.followingHint': 'Following pins you to the newest page; turn it off to page back.',
 
   'logs.level.error': 'ERROR',
   'logs.level.warn': 'WARN',

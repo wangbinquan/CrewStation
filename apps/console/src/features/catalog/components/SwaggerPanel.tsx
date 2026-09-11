@@ -2,10 +2,11 @@ import type { ApiProxyDto } from '@crewstation/contracts';
 import { useState } from 'react';
 import type { ReactElement } from 'react';
 import { api } from '../../../shared/api/client';
-import { errorMessage, useApiQuery } from '../../../shared/api/useApi';
+import { queryKeys } from '../../../shared/api/queryKeys';
+import { useApiQuery } from '../../../shared/api/useApi';
 import { useT } from '../../../shared/lib/useT';
 import { Card } from '../../../shared/ui/Card';
-import { openapiKey } from '../hooks/useCatalogData';
+import { QueryStatus } from '../../../shared/ui/QueryStatus';
 import { SwaggerSpecView } from './SwaggerSpecView';
 import styles from './SwaggerPanel.module.css';
 
@@ -18,7 +19,7 @@ export interface SwaggerPanelProps {
 export function SwaggerPanel({ serviceId, proxies }: SwaggerPanelProps): ReactElement {
   const t = useT();
   const [proxy, setProxy] = useState('');
-  const spec = useApiQuery(openapiKey(serviceId, proxy), () => api.apiCatalog.openapi(proxy, { serviceId }), { enabled: proxy.length > 0 });
+  const spec = useApiQuery(queryKeys.openapiSpec(serviceId, proxy), () => api.apiCatalog.openapi(proxy, { serviceId }), { enabled: proxy.length > 0 });
   return (
     <Card title={t('catalog.swagger.title')}>
       <p className={styles.notice}>{t('catalog.swagger.tryItOutDisabled')}</p>
@@ -38,8 +39,8 @@ export function SwaggerPanel({ serviceId, proxies }: SwaggerPanelProps): ReactEl
           </select>
         </label>
       )}
-      {proxy.length > 0 && spec.isPending ? <p className={styles.muted}>{t('catalog.swagger.loading')}</p> : null}
-      {spec.error ? <p className={styles.error}>{t('catalog.error.load', { message: errorMessage(spec.error) })}</p> : null}
+      {/* 没选代理时查询是禁用的，isPending 会一直为真，所以先看有没有选中。 */}
+      <QueryStatus isPending={proxy.length > 0 && spec.isPending} error={spec.error} loadingKey="catalog.swagger.loading" errorKey="catalog.error.load" />
       {spec.data !== undefined ? <SwaggerSpecView key={proxy} spec={spec.data} /> : null}
     </Card>
   );

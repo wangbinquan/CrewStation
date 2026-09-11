@@ -12,6 +12,8 @@ export const queryKeys = {
   services: () => ['services'] as const,
   service: (serviceId: string) => ['services', serviceId] as const,
   slots: (serviceId: string) => ['services', serviceId, 'slots'] as const,
+  repository: (serviceId: string) => ['services', serviceId, 'repository'] as const,
+  tags: (serviceId: string) => ['services', serviceId, 'tags'] as const,
   releases: (serviceId: string) => ['services', serviceId, 'releases'] as const,
   release: (releaseId: string) => ['releases', releaseId] as const,
   trafficSwitches: (serviceId: string) => ['services', serviceId, 'traffic-switches'] as const,
@@ -22,12 +24,18 @@ export const queryKeys = {
   dataBindings: (projectId: string) => ['projects', projectId, 'data-bindings'] as const,
   config: (projectId: string, env: string) => ['projects', projectId, 'config', env] as const,
   operations: (serviceId?: string) => (serviceId === undefined ? (['operations'] as const) : (['operations', serviceId] as const)),
-  operationSpec: (operationKey: string) => ['operations', 'spec', operationKey] as const,
+  /** 代理清单挂在 operations 前缀下：授权变化时按前缀一次失效即可连带刷新。 */
+  apiProxies: () => ['operations', 'proxies'] as const,
+  /** 裁剪后的 OpenAPI 按“服务＋代理”缓存：同一代理对不同服务裁剪结果不同。 */
+  openapiSpec: (serviceId: string, proxy: string) => ['operations', 'spec', serviceId, proxy] as const,
   accessRequests: (serviceId?: string) => (serviceId === undefined ? (['access-requests'] as const) : (['access-requests', serviceId] as const)),
   subscriptions: (projectId: string) => ['projects', projectId, 'subscriptions'] as const,
   deliveries: (projectId: string) => ['projects', projectId, 'deliveries'] as const,
+  /** 事件类型目录是平台级的，与项目无关。 */
+  eventTypes: () => ['catalog', 'event-types'] as const,
   logs: (projectId: string) => ['projects', projectId, 'logs'] as const,
-  health: (serviceId: string) => ['services', serviceId, 'health'] as const,
+  /** 健康态的路由是 /v1/projects/:projectId/health，键也按项目定位。 */
+  projectHealth: (projectId: string) => ['projects', projectId, 'health'] as const,
   alerts: (projectId: string) => ['projects', projectId, 'alerts'] as const,
   trace: (traceId: string) => ['traces', traceId] as const,
   capabilities: (projectId: string) => ['projects', projectId, 'capabilities'] as const,
@@ -36,4 +44,8 @@ export const queryKeys = {
   egressBlocked: (projectId: string) => ['egress', 'blocked', projectId] as const,
   servicePlans: () => ['service-plans'] as const,
   taskProfiles: () => ['task-profiles'] as const,
+  /** 网关的只读派生状态；重算后按 gateway 前缀一次失效。 */
+  gateway: () => ['gateway'] as const,
+  gatewayRoutes: () => ['gateway', 'routes'] as const,
+  gatewayAllowlist: () => ['gateway', 'allowlist'] as const,
 } as const;

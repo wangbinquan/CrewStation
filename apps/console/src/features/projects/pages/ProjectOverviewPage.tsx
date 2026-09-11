@@ -2,15 +2,15 @@ import { Link } from '@tanstack/react-router';
 import type { ReactElement } from 'react';
 import { projectRoute } from '../../../app/router/projectRoute';
 import { useT } from '../../../shared/lib/useT';
+import { PageHeader } from '../../../shared/ui/PageHeader';
+import { QueryStatus } from '../../../shared/ui/QueryStatus';
 import { MembersCard } from '../components/MembersCard';
 import { ProjectStateBadge } from '../components/ProjectStateBadge';
 import { QuotaCard } from '../components/QuotaCard';
 import { RepositoryCard } from '../components/RepositoryCard';
 import { SlotsSection } from '../components/SlotsSection';
-import { QueryStatus } from '../components/QueryStatus';
 import { useProjectOwnership } from '../model/useProjectOwnership';
 import { useProjectService } from '../model/useProjectService';
-import { PageHeader } from '../../../shared/ui/PageHeader';
 import styles from './ProjectOverviewPage.module.css';
 
 /** 项目概览：两个部署槽与切流、成员、配额、仓库。 */

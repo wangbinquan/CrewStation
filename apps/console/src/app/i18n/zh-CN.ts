@@ -1,7 +1,11 @@
 import type { Messages } from '../../shared/lib/i18n';
 
-/** app 级文案：导航、顶栏、语言、404。页面文案在各 feature 的 i18n/ 中。 */
+/** app 级文案：导航、顶栏、语言、404，以及 shared/ui 里通用组件的缺省文案。页面文案在各 feature 的 i18n/ 中。 */
 export const messages = {
+  'ui.status.loading': '载入中…',
+  'ui.status.error': '读取失败：{message}',
+  'ui.confirm.yes': '确认',
+  'ui.confirm.no': '取消',
   'app.brand': 'CrewStation',
   'app.workbench': '工作台',
   'nav.aria': '主导航',

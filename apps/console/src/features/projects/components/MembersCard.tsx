@@ -4,13 +4,13 @@ import { api } from '../../../shared/api/client';
 import { queryKeys } from '../../../shared/api/queryKeys';
 import { errorMessage, useApiMutation, useApiQuery } from '../../../shared/api/useApi';
 import { useT } from '../../../shared/lib/useT';
+import { ActionNote } from '../../../shared/ui/ActionNote';
 import { Badge } from '../../../shared/ui/Badge';
 import { Button } from '../../../shared/ui/Button';
 import { Card } from '../../../shared/ui/Card';
-import { ActionNote } from './ActionNote';
-import { DataTable } from './DataTable';
+import { DataTable } from '../../../shared/ui/DataTable';
+import { QueryStatus } from '../../../shared/ui/QueryStatus';
 import { MemberForm } from './MemberForm';
-import { QueryStatus } from './QueryStatus';
 
 export interface MembersCardProps {
   readonly projectId: string;
@@ -23,13 +23,13 @@ export function MembersCard({ projectId, canManage, isAdmin }: MembersCardProps)
   const members = useApiQuery(queryKeys.members(projectId), () => api.projects.listMembers(projectId));
   const remove = useApiMutation((userId: UserId) => api.projects.removeMember(projectId, userId), { invalidate: [queryKeys.members(projectId)] });
   const items = members.data?.items ?? [];
-  const headers = [t('projects.members.columnName'), t('projects.members.columnEmail'), t('projects.members.columnRole'), t('projects.members.columnActions')];
+  const columns = [t('projects.members.columnName'), t('projects.members.columnEmail'), t('projects.members.columnRole'), t('projects.members.columnActions')];
   return (
     <Card title={t('projects.members.title')}>
       <QueryStatus isPending={members.isPending} error={members.error} loadingKey="projects.members.loading" errorKey="projects.members.error" />
       {items.length === 0 && !members.isPending && members.error === null ? <p>{t('projects.members.empty')}</p> : null}
       {items.length > 0 ? (
-        <DataTable headers={headers}>
+        <DataTable columns={columns}>
           {items.map((member) => (
             <tr key={member.userId}>
               <td>{member.name}</td>

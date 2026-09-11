@@ -80,7 +80,6 @@ export const messages = {
   'projects.switch.action': '切流到 {slot}',
   'projects.switch.confirmQuestion': '把用户域流量从 {from} 切到 {to}？两个槽共享生产数据，切错可以立即切回。',
   'projects.switch.confirm': '确认切流',
-  'projects.switch.cancel': '取消',
   'projects.switch.pending': '切流中…',
   'projects.switch.error': '切流失败：{message}',
   'projects.switch.done': '已切流到 {slot}。',

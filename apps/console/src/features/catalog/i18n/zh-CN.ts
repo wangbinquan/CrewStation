@@ -46,8 +46,6 @@ export const messages = {
   'catalog.request.pending': '待审批',
 
   'catalog.requests.title': '本服务的定向开放申请',
-  'catalog.requests.operation': '操作键',
-  'catalog.requests.state': '状态',
   'catalog.requests.reason': '申请理由',
   'catalog.requests.decision': '管理员意见',
   'catalog.requests.requestedBy': '申请人',
@@ -64,8 +62,7 @@ export const messages = {
   'catalog.admin.toDefault': '改为默认开放',
   'catalog.admin.toTargeted': '改为定向开放',
   'catalog.admin.revoke': '撤销授权',
-  'catalog.admin.revokeConfirm': '确认撤销 {key}',
-  'catalog.admin.cancel': '取消',
+  'catalog.admin.revokeConfirm': '撤销 {key} 的授权？',
   'catalog.admin.approve': '批准',
   'catalog.admin.reject': '拒绝',
   'catalog.admin.decisionPlaceholder': '批准或拒绝的理由（会回给申请人）',

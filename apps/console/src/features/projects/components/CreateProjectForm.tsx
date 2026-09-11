@@ -6,11 +6,11 @@ import { api } from '../../../shared/api/client';
 import { queryKeys } from '../../../shared/api/queryKeys';
 import { errorMessage, useApiMutation, useApiQuery } from '../../../shared/api/useApi';
 import { useT } from '../../../shared/lib/useT';
+import { ActionNote } from '../../../shared/ui/ActionNote';
 import { Button } from '../../../shared/ui/Button';
 import { Card } from '../../../shared/ui/Card';
-import { ActionNote } from './ActionNote';
-import { FormField } from './FormField';
-import { QueryStatus } from './QueryStatus';
+import { FormField } from '../../../shared/ui/FormField';
+import { QueryStatus } from '../../../shared/ui/QueryStatus';
 import styles from './CreateProjectForm.module.css';
 
 const KINDS: readonly ManifestKind[] = ['DigitalWorker', 'APIProxy', 'EventProducer'];

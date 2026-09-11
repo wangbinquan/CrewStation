@@ -1,7 +1,6 @@
 import type { DeliveryDto } from '@crewstation/contracts';
 import type { ReactElement } from 'react';
-import { useI18n } from '../../../shared/lib/useI18n';
-import { formatDateTime } from '../../../shared/lib/dateFormat';
+import { useDateText } from '../../../shared/lib/useDateText';
 import { useT } from '../../../shared/lib/useT';
 import { Button } from '../../../shared/ui/Button';
 import { DeliveryStateBadge } from './DeliveryStateBadge';
@@ -18,7 +17,7 @@ export interface DeliveryRowProps {
 /** 一条投递记录；失败的把最后一次错误折到下一行，避免长错误把表格横向撑开。 */
 export function DeliveryRow({ delivery, canReplay, isReplaying, onReplay }: DeliveryRowProps): ReactElement {
   const t = useT();
-  const { locale } = useI18n();
+  const dateText = useDateText();
   const replayable = canReplay && delivery.state === 'dead';
   return (
     <>
@@ -31,8 +30,8 @@ export function DeliveryRow({ delivery, canReplay, isReplaying, onReplay }: Deli
         </td>
         <td className={styles.attempts}>{delivery.attempts}</td>
         <td className={styles.trace}>{delivery.traceId}</td>
-        <td className={styles.time}>{delivery.deliveredAt === undefined ? t('events.none') : formatDateTime(delivery.deliveredAt, locale)}</td>
-        <td className={styles.time}>{delivery.nextAttemptAt === undefined ? t('events.none') : formatDateTime(delivery.nextAttemptAt, locale)}</td>
+        <td className={styles.time}>{dateText(delivery.deliveredAt)}</td>
+        <td className={styles.time}>{dateText(delivery.nextAttemptAt)}</td>
         <td>
           {delivery.state === 'dead' ? (
             <Button disabled={!replayable || isReplaying} title={replayable ? undefined : t('events.deliveries.replayHint')} onClick={() => onReplay(delivery.id)}>

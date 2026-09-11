@@ -6,11 +6,7 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   'admin.line1': 'Administrators create projects and assign owners, integrate company systems (APIProxy / EventProducer projects), maintain the open policy and approve targeted-open requests.',
   'admin.line2': 'They also own the user directory, service plans, task container profiles, the egress FQDN allowlist and gateway routing.',
 
-  'admin.status.loading': 'Loading…',
-  'admin.status.error': 'Could not load: {message}',
   'admin.none': '—',
-  'admin.confirm.yes': 'Confirm',
-  'admin.confirm.no': 'Cancel',
   'admin.denied.title': 'Administrators only',
   'admin.denied.description': 'The user directory, plans, egress allowlist and gateway state on this page are visible to platform administrators only; ask an existing administrator for access.',
 

@@ -4,14 +4,14 @@ import type { ReactElement } from 'react';
 import { api } from '../../../shared/api/client';
 import { queryKeys } from '../../../shared/api/queryKeys';
 import { errorMessage, useApiMutation, useApiQuery } from '../../../shared/api/useApi';
+import { usePollingRefetch } from '../../../shared/lib/usePollingRefetch';
 import { useT } from '../../../shared/lib/useT';
+import { ActionNote } from '../../../shared/ui/ActionNote';
 import { Card } from '../../../shared/ui/Card';
-import { usePollingRefetch } from '../hooks/usePollingRefetch';
+import { DataTable } from '../../../shared/ui/DataTable';
+import { QueryStatus } from '../../../shared/ui/QueryStatus';
 import { DeliveryRow } from './DeliveryRow';
 import { DeliveryStateFilter } from './DeliveryStateFilter';
-import { EventsTable } from './EventsTable';
-import { QueryStatus } from './QueryStatus';
-import styles from './DeliveriesCard.module.css';
 
 const PAGE_SIZE = 50;
 const POLL_MS = 10_000;
@@ -38,11 +38,7 @@ export function DeliveriesCard({ projectId }: { readonly projectId: string }): R
   ];
   return (
     <Card title={t('events.deliveries.title')} extra={<DeliveryStateFilter value={state} onChange={setState} />} footer={t('events.deliveries.replayHint')}>
-      {replay.error === null ? null : (
-        <p className={styles.error} role="alert">
-          {t('events.deliveries.replayError', { message: errorMessage(replay.error) })}
-        </p>
-      )}
+      {replay.error === null ? null : <ActionNote tone="error">{t('events.deliveries.replayError', { message: errorMessage(replay.error) })}</ActionNote>}
       <QueryStatus
         isPending={deliveries.isPending}
         error={deliveries.error}
@@ -51,7 +47,7 @@ export function DeliveriesCard({ projectId }: { readonly projectId: string }): R
         emptyDescription={t('events.deliveries.emptyDescription')}
       />
       {items.length > 0 ? (
-        <EventsTable columns={columns}>
+        <DataTable columns={columns}>
           {items.map((delivery) => (
             <DeliveryRow
               key={delivery.id}
@@ -61,7 +57,7 @@ export function DeliveriesCard({ projectId }: { readonly projectId: string }): R
               onReplay={(deliveryId) => replay.mutate(deliveryId)}
             />
           ))}
-        </EventsTable>
+        </DataTable>
       ) : null}
     </Card>
   );

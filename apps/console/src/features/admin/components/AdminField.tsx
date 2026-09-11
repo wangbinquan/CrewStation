@@ -1,12 +1,12 @@
 import type { ReactElement } from 'react';
-import styles from './FormField.module.css';
+import { FormField } from '../../../shared/ui/FormField';
 
 export interface FieldOption {
   readonly value: string;
   readonly label: string;
 }
 
-export interface FormFieldProps {
+export interface AdminFieldProps {
   readonly label: string;
   readonly value: string;
   readonly onChange: (value: string) => void;
@@ -18,21 +18,14 @@ export interface FormFieldProps {
   readonly inputMode?: 'numeric';
 }
 
-export function FormField({ label, value, onChange, options, placeholder, title, disabled = false, inputMode }: FormFieldProps): ReactElement {
+/** 管理页表单里绑到字符串状态的一格；排版与外观全部来自 shared 的 FormField，这里只决定控件类型。 */
+export function AdminField({ label, value, onChange, options, placeholder, title, disabled = false, inputMode }: AdminFieldProps): ReactElement {
   return (
-    <label className={styles.field} title={title}>
-      {label}
+    <FormField label={label}>
       {options === undefined ? (
-        <input
-          className={styles.control}
-          value={value}
-          placeholder={placeholder}
-          disabled={disabled}
-          inputMode={inputMode}
-          onChange={(event) => onChange(event.target.value)}
-        />
+        <input value={value} placeholder={placeholder} title={title} disabled={disabled} inputMode={inputMode} onChange={(event) => onChange(event.target.value)} />
       ) : (
-        <select className={styles.control} value={value} disabled={disabled} onChange={(event) => onChange(event.target.value)}>
+        <select value={value} title={title} disabled={disabled} onChange={(event) => onChange(event.target.value)}>
           {options.map((option) => (
             <option key={option.value} value={option.value}>
               {option.label}
@@ -40,6 +33,6 @@ export function FormField({ label, value, onChange, options, placeholder, title,
           ))}
         </select>
       )}
-    </label>
+    </FormField>
   );
 }

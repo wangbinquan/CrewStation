@@ -27,3 +27,8 @@
   color: var(--cs-tone-warning-fg);
   background: var(--cs-tone-warning-bg);
 }
+
+.danger {
+  color: var(--cs-tone-danger-fg);
+  background: var(--cs-tone-danger-bg);
+}

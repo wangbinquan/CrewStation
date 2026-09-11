@@ -3,11 +3,10 @@ import type { ReactElement } from 'react';
 import { useT } from '../../../shared/lib/useT';
 import { Card } from '../../../shared/ui/Card';
 import { PageHeader } from '../../../shared/ui/PageHeader';
+import { QueryStatus } from '../../../shared/ui/QueryStatus';
 import { HealthCards } from '../components/HealthCards';
 import { LogFilters } from '../components/LogFilters';
 import { LogList } from '../components/LogList';
-import { LogPager } from '../components/LogPager';
-import { QueryStatus } from '../components/QueryStatus';
 import { useLogFeed } from '../hooks/useLogFeed';
 import styles from './LogsPage.module.css';
 
@@ -27,7 +26,7 @@ export function LogsPage(): ReactElement {
       <Card
         title={t('logs.list.title')}
         extra={<span className={styles.count}>{t('logs.list.count', { shown: feed.entries.length, total: feed.total })}</span>}
-        footer={<LogPager hasOlder={feed.hasOlder} hasNewer={feed.hasNewer} follow={feed.follow} onOlder={feed.goOlder} onNewer={feed.goNewer} />}
+        footer={t('logs.list.noPagingHint')}
       >
         <LogFilters value={feed.filters} onChange={feed.changeFilters} follow={feed.follow} onFollowChange={feed.changeFollow} />
         <QueryStatus

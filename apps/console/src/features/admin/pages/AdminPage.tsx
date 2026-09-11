@@ -1,10 +1,11 @@
 import type { ReactElement } from 'react';
 import { api } from '../../../shared/api/client';
 import { queryKeys } from '../../../shared/api/queryKeys';
-import { errorMessage, useApiQuery } from '../../../shared/api/useApi';
+import { useApiQuery } from '../../../shared/api/useApi';
 import { useT } from '../../../shared/lib/useT';
 import { EmptyState } from '../../../shared/ui/EmptyState';
 import { PageHeader } from '../../../shared/ui/PageHeader';
+import { QueryStatus } from '../../../shared/ui/QueryStatus';
 import { EgressEntriesSection } from '../components/EgressEntriesSection';
 import { EgressRequestsSection } from '../components/EgressRequestsSection';
 import { GatewaySection } from '../components/GatewaySection';
@@ -21,24 +22,12 @@ export function AdminPage(): ReactElement {
   const t = useT();
   const me = useApiQuery(queryKeys.me(), () => api.me.get());
   const header = <PageHeader title={t('admin.title')} description={[t('admin.line1'), t('admin.line2')]} />;
-  if (me.isPending) {
-    return (
-      <>
-        {header}
-        <p className={styles.hint}>{t('admin.status.loading')}</p>
-      </>
-    );
-  }
   if (me.data?.isAdmin !== true) {
     return (
       <>
         {header}
-        {me.error === null ? null : (
-          <p className={styles.error} role="alert">
-            {t('admin.status.error', { message: errorMessage(me.error) })}
-          </p>
-        )}
-        <EmptyState title={t('admin.denied.title')} description={t('admin.denied.description')} />
+        <QueryStatus isPending={me.isPending} error={me.error} />
+        {me.isPending ? null : <EmptyState title={t('admin.denied.title')} description={t('admin.denied.description')} />}
       </>
     );
   }

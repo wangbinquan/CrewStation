@@ -4,13 +4,13 @@ import { useT } from '../../../shared/lib/useT';
 import { Badge } from '../../../shared/ui/Badge';
 import type { BadgeTone } from '../../../shared/ui/Badge';
 
-/** 投递状态的色调：成功一眼可辨，重试中与死信都用 warning（主题里没有更强的色调）。 */
+/** 投递状态的色调：重试中还会自己恢复，用 warning；死信要人工重放，用 danger。 */
 const TONE: Readonly<Record<DeliveryState, BadgeTone>> = {
   pending: 'neutral',
   delivering: 'info',
   delivered: 'success',
   retrying: 'warning',
-  dead: 'warning',
+  dead: 'danger',
 };
 
 export function DeliveryStateBadge({ state }: { readonly state: DeliveryState }): ReactElement {

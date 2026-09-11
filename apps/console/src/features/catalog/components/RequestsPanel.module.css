@@ -71,11 +71,3 @@
 .muted {
   color: var(--cs-color-text-muted);
 }
-
-.error {
-  margin-bottom: var(--cs-space-2);
-  padding: var(--cs-space-2) var(--cs-space-3);
-  border-radius: var(--cs-radius-sm);
-  color: var(--cs-tone-warning-fg);
-  background: var(--cs-tone-warning-bg);
-}

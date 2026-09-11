@@ -2,10 +2,10 @@ import type { ReactElement } from 'react';
 import { useT } from '../../../../shared/lib/useT';
 import { Badge } from '../../../../shared/ui/Badge';
 import { Button } from '../../../../shared/ui/Button';
+import { DefinitionList } from '../../../../shared/ui/DefinitionList';
 import type { PreviewHandle } from '../../hooks/usePreviewStatus';
 import { previewUrl } from '../../model/previewSnapshot';
 import { previewStateTone } from '../../model/stateTone';
-import { DetailList } from '../DetailList';
 import { Pane } from '../Pane';
 import { PaneNotice } from '../PaneNotice';
 import styles from './PreviewPane.module.css';
@@ -35,7 +35,8 @@ export function PreviewPane({ preview, previewHost }: PreviewPaneProps): ReactEl
         </>
       }
     >
-      <DetailList
+      <DefinitionList
+        layout="grid"
         items={[
           { label: t('devSession.preview.state'), value: <Badge tone={previewStateTone(status.state)}>{t(`devSession.previewState.${status.state}`)}</Badge> },
           { label: t('devSession.preview.port'), value: status.port === undefined ? '—' : String(status.port) },
@@ -47,7 +48,7 @@ export function PreviewPane({ preview, previewHost }: PreviewPaneProps): ReactEl
       ) : (
         <p className={styles.link}>
           <a href={url} target="_blank" rel="noreferrer">
-            {url}
+            {previewHost}
           </a>
         </p>
       )}

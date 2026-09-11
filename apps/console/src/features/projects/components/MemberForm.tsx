@@ -5,9 +5,9 @@ import { api } from '../../../shared/api/client';
 import { queryKeys } from '../../../shared/api/queryKeys';
 import { errorMessage, useApiMutation, useApiQuery } from '../../../shared/api/useApi';
 import { useT } from '../../../shared/lib/useT';
+import { ActionNote } from '../../../shared/ui/ActionNote';
 import { Button } from '../../../shared/ui/Button';
-import { ActionNote } from './ActionNote';
-import { FormField } from './FormField';
+import { FormField } from '../../../shared/ui/FormField';
 import styles from './MemberForm.module.css';
 
 const ROLES: readonly MemberRole[] = ['owner', 'developer', 'tester'];

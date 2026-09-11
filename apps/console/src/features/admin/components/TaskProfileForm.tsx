@@ -3,7 +3,7 @@ import { useState } from 'react';
 import type { ReactElement, ReactNode } from 'react';
 import { useT } from '../../../shared/lib/useT';
 import { AdminForm } from './AdminForm';
-import { FormField } from './FormField';
+import { AdminField } from './AdminField';
 
 export interface TaskProfileFormProps {
   readonly onSubmit: (input: TaskProfileInput) => void;
@@ -29,11 +29,11 @@ export function TaskProfileForm({ onSubmit, busy, error }: TaskProfileFormProps)
       error={error}
       onSubmit={() => onSubmit({ name, cpu, memory, storage, description: description === '' ? undefined : description })}
     >
-      <FormField label={t('admin.profiles.name')} value={name} onChange={setName} placeholder={t('admin.profiles.namePlaceholder')} />
-      <FormField label={t('admin.profiles.cpu')} value={cpu} onChange={setCpu} placeholder={t('admin.profiles.cpuPlaceholder')} />
-      <FormField label={t('admin.profiles.memory')} value={memory} onChange={setMemory} placeholder={t('admin.profiles.memoryPlaceholder')} />
-      <FormField label={t('admin.profiles.storage')} value={storage} onChange={setStorage} placeholder={t('admin.profiles.storagePlaceholder')} />
-      <FormField label={t('admin.profiles.description')} value={description} onChange={setDescription} />
+      <AdminField label={t('admin.profiles.name')} value={name} onChange={setName} placeholder={t('admin.profiles.namePlaceholder')} />
+      <AdminField label={t('admin.profiles.cpu')} value={cpu} onChange={setCpu} placeholder={t('admin.profiles.cpuPlaceholder')} />
+      <AdminField label={t('admin.profiles.memory')} value={memory} onChange={setMemory} placeholder={t('admin.profiles.memoryPlaceholder')} />
+      <AdminField label={t('admin.profiles.storage')} value={storage} onChange={setStorage} placeholder={t('admin.profiles.storagePlaceholder')} />
+      <AdminField label={t('admin.profiles.description')} value={description} onChange={setDescription} />
     </AdminForm>
   );
 }

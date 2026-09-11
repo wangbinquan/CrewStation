@@ -5,14 +5,14 @@ import { api } from '../../../shared/api/client';
 import { queryKeys } from '../../../shared/api/queryKeys';
 import { useApiMutation, useApiQuery } from '../../../shared/api/useApi';
 import { useT } from '../../../shared/lib/useT';
+import { ActionNote } from '../../../shared/ui/ActionNote';
 import { Button } from '../../../shared/ui/Button';
 import { Card } from '../../../shared/ui/Card';
+import { FormField } from '../../../shared/ui/FormField';
+import { QueryStatus } from '../../../shared/ui/QueryStatus';
 import { isPublishVersion } from '../model/releaseVersion';
-import { ActionNote } from './ActionNote';
 import { BranchSelect } from './BranchSelect';
-import { FormField } from './FormField';
 import { PublishResult } from './PublishResult';
-import { QueryStatus } from './QueryStatus';
 import styles from './PublishForm.module.css';
 
 export interface PublishFormProps {

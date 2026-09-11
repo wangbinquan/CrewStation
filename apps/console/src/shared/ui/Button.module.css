@@ -9,6 +9,8 @@
   color: var(--cs-color-text);
   line-height: 1.4;
   cursor: pointer;
+  /* 表格的操作列很窄，不禁止换行按钮文字会被压成竖排的单字。 */
+  white-space: nowrap;
 }
 
 .button:hover {

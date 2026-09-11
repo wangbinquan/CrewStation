@@ -81,7 +81,6 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   'projects.switch.action': 'Switch traffic to {slot}',
   'projects.switch.confirmQuestion': 'Route user-domain traffic from {from} to {to}? Both slots share the production data, and a wrong switch can be reversed at once.',
   'projects.switch.confirm': 'Confirm switch',
-  'projects.switch.cancel': 'Cancel',
   'projects.switch.pending': 'Switching…',
   'projects.switch.error': 'Traffic switch failed: {message}',
   'projects.switch.done': 'Traffic now goes to {slot}.',
