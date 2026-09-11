@@ -10,6 +10,11 @@ export const AllowlistEntrySchema = z.object({
   operations: z.array(z.string().min(1)),
   /** 允许调用平台 API（创建业务任务等）；所有已发布服务默认 true。 */
   platformApi: z.boolean().default(true),
+  /**
+   * 可达的平台服务域端点。两个 MCP 对所有已登记服务开放（开发容器内的 Agent 要连）；
+   * 事件入口只对 EventProducer 开放——别的服务不该能凭空造事件。
+   */
+  platformHosts: z.array(z.enum(['platformApi', 'events', 'mcpCapabilities', 'mcpOperations'])).default([]),
 });
 
 export const AllowlistDocumentSchema = z.object({

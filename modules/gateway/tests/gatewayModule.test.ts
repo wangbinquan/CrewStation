@@ -74,6 +74,17 @@ describe.skipIf(!available)('gateway module', () => {
     expect((await at('GET', '/v1/issues/42', 'issues.svc.cs.internal')).allowed).toBe(true);
     expect((await gateway.api.evaluate({ ...caller, identity: 'ghost/ghost' }, { host: 'api.svc.cs.internal', method: 'POST', path: '/v1/business-tasks' })).allowed).toBe(false);
     expect((await at('GET', '/', 'evil.example.com')).allowed).toBe(false);
+
+    // 平台端点不按操作键判定：没人会去登记 `mcp-operations:POST:/mcp` 这种键。
+    expect((await at('POST', '/mcp', 'mcp-capabilities.svc.cs.internal')).allowed).toBe(true);
+    expect((await at('POST', '/mcp', 'mcp-operations.svc.cs.internal')).allowed).toBe(true);
+    // 事件入口只对 EventProducer 开放：DigitalWorker 不能凭空造事件。
+    const produce = await at('POST', '/v1/events/produce', 'events.svc.cs.internal');
+    expect(produce.allowed).toBe(false);
+    expect(produce.reason).toContain('平台端点');
+    // 未登记的调用方连 MCP 也到不了。
+    expect((await gateway.api.evaluate({ ...caller, identity: 'ghost/ghost' }, { host: 'mcp-operations.svc.cs.internal', method: 'POST', path: '/mcp' })).allowed).toBe(false);
+
     expect((await gateway.api.rebuildAllowlist()).version).toBe(2);
   });
 

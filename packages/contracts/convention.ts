@@ -65,7 +65,23 @@ export const HOST_PATTERNS = {
   devPreview: 'dev.{project}.{userDomain}',
   service: '{service}.{serviceDomain}',
   platformApi: 'api.{serviceDomain}',
+  events: 'events.{serviceDomain}',
+  mcpCapabilities: 'mcp-capabilities.{serviceDomain}',
+  mcpOperations: 'mcp-operations.{serviceDomain}',
 } as const;
+
+/**
+ * 服务域上属于平台自身的主机前缀。它们不是数字人暴露的 API，不能按操作键判定：
+ * 按操作键判定会要求有人去登记 `mcp-operations:POST:/mcp` 这种键，而没有任何一方会去登记。
+ */
+export const PLATFORM_SERVICE_HOSTS = {
+  platformApi: 'api',
+  events: 'events',
+  mcpCapabilities: 'mcp-capabilities',
+  mcpOperations: 'mcp-operations',
+} as const;
+
+export type PlatformServiceHost = keyof typeof PLATFORM_SERVICE_HOSTS;
 
 export type IdentityHeaderName = (typeof IDENTITY_HEADERS)[keyof typeof IDENTITY_HEADERS];
 export type PlatformEnvName = (typeof PLATFORM_ENV)[keyof typeof PLATFORM_ENV];

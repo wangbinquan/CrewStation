@@ -3,6 +3,18 @@ import type { Evaluation, EvaluationTarget } from '../domain/allowlistEvaluation
 import { evaluateServiceCall } from '../domain/allowlistEvaluation';
 import type { GatewayUseCaseDeps } from './dependencies';
 
+type ServiceKind = 'DigitalWorker' | 'APIProxy' | 'EventProducer';
+
+/**
+ * 已登记服务可达的平台端点：平台 API 与两个 MCP 对所有服务开放（开发容器内的 Agent 要连 MCP）；
+ * 事件入口只对 EventProducer 开放——别的服务不该能凭空造事件。未登记的调用方一个都到不了。
+ */
+function platformHostsFor(kind: ServiceKind | undefined): AllowlistDocument['entries'][number]['platformHosts'] {
+  if (kind === undefined) return [];
+  const base = ['platformApi', 'mcpCapabilities', 'mcpOperations'] as const;
+  return kind === 'EventProducer' ? [...base, 'events'] : [...base];
+}
+
 /** 放行表带版本整体重算；评估侧只读最新版并短暂缓存，失联时按最后一版继续放行不超过 maxStaleSeconds。 */
 export function allowlistUseCases(deps: GatewayUseCaseDeps) {
   let cached: { doc: AllowlistDocument; at: number } | undefined;
@@ -14,7 +26,8 @@ export function allowlistUseCases(deps: GatewayUseCaseDeps) {
     for (const caller of callers) {
       const granted = await deps.grants.grantedOperations(caller);
       defaultOpen = granted.defaultOpen;
-      entries.push({ caller, operations: granted.operations, platformApi: services.some((s) => s.identity === caller) });
+      const service = services.find((s) => s.identity === caller);
+      entries.push({ caller, operations: granted.operations, platformApi: service !== undefined, platformHosts: platformHostsFor(service?.kind) });
     }
     if (callers.size === 0) defaultOpen = (await deps.grants.grantedOperations('none/none')).defaultOpen;
     const latest = await deps.allowlists.latest();

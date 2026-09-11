@@ -21,9 +21,10 @@ export function subtaskUseCases(deps: BusinessTaskUseCaseDeps) {
     return run;
   };
 
-  const { launch, build } = subtaskLaunch(deps);
+  const { launch, build, dispatchPending } = subtaskLaunch(deps);
 
   return {
+    dispatchPendingSubtasks: dispatchPending,
     submitSubtask: async (caller: ServiceActor, taskId: TaskId, input: SubmitSubtaskRequest): Promise<SubtaskDto> => {
       const task = await ownedTask(caller, taskId);
       if (!acceptsSubtasks(task)) throw precondition(`任务处于 ${task.state}，不能提交子任务`);
@@ -41,16 +42,6 @@ export function subtaskUseCases(deps: BusinessTaskUseCaseDeps) {
       const run = await build(task, spec, previous.attempt + 1);
       await uow.run((scope) => scope.subtasks.insert(run));
       return subtaskToDto(await launch(run));
-    },
-    /** TaskRunner 连上时由组合根调用：把等容器的 pending 子任务按提交顺序派发出去。 */
-    dispatchPendingSubtasks: async (taskId: TaskId): Promise<number> => {
-      let dispatched = 0;
-      for (const run of await uow.read.subtasks.listByTask(taskId)) {
-        if (run.state !== 'pending') continue;
-        const launched = await launch(run);
-        if (launched.state !== 'pending') dispatched += 1;
-      }
-      return dispatched;
     },
     getSubtask: async (caller: ServiceActor, taskId: TaskId, subtaskId: SubtaskId): Promise<SubtaskDto> => {
       await ownedTask(caller, taskId);

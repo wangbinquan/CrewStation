@@ -28,37 +28,48 @@ export function subtaskLaunch(deps: BusinessTaskUseCaseDeps) {
     logger.warn('command subtask failed to run', { subtaskId: run.id, error: String(error) });
   };
 
-  return {
-    /**
-     * 容器刚创建时 TaskRunner 还没连上，此时派发必然以「TaskRunner 未连接」失败。
-     * 子任务留在 pending，等 onRunnerConnected 再派发；调用方本来就要轮询子任务状态。
-     */
-    launch: async (run: SubtaskRun): Promise<SubtaskRun> => {
-      const env = await environments.getEnvironment(run.taskId);
-      if (!env?.connected) {
-        logger.info('subtask waits for runner', { subtaskId: run.id, taskId: run.taskId, state: env?.state });
-        return run;
+  /**
+   * 容器刚创建时 TaskRunner 还没连上，此时派发必然以「TaskRunner 未连接」失败。
+   * 子任务留在 pending，等 onRunnerConnected 再派发；调用方本来就要轮询子任务状态。
+   */
+  const launch = async (run: SubtaskRun): Promise<SubtaskRun> => {
+    const env = await environments.getEnvironment(run.taskId);
+    if (!env?.connected) {
+      logger.info('subtask waits for runner', { subtaskId: run.id, taskId: run.taskId, state: env?.state });
+      return run;
+    }
+    const started = transition(run, 'running', clock.now(), { startedAt: clock.now() });
+    await uow.run((scope) => scope.subtasks.update(started));
+    if (run.kind === 'agent' && run.agentProfile) {
+      try {
+        await runner.sendCommand(run.taskId, {
+          id: `start-${run.runnerRef}`, type: 'startAgent', agentId: run.runnerRef ?? '', driver: run.agentProfile.driver, model: run.agentProfile.model, permission: run.agentProfile.permission,
+          mode: run.mode ?? 'oneshot', ...(run.cwd ? { cwd: run.cwd } : {}), initialPrompt: run.prompt ?? '', mcp: settings.mcp.map((m) => ({ name: m.name, url: m.url, headers: {} })), env: {},
+        });
+      } catch (error) {
+        const failed = transition(started, 'failed', clock.now(), { error: `启动 Agent 失败：${error instanceof Error ? error.message : String(error)}` });
+        await finish(started, failed);
+        return failed;
       }
-      const started = transition(run, 'running', clock.now(), { startedAt: clock.now() });
-      await uow.run((scope) => scope.subtasks.update(started));
-      if (run.kind === 'agent' && run.agentProfile) {
-        try {
-          await runner.sendCommand(run.taskId, {
-            id: `start-${run.runnerRef}`, type: 'startAgent', agentId: run.runnerRef ?? '', driver: run.agentProfile.driver, model: run.agentProfile.model, permission: run.agentProfile.permission,
-            mode: run.mode ?? 'oneshot', ...(run.cwd ? { cwd: run.cwd } : {}), initialPrompt: run.prompt ?? '', mcp: settings.mcp.map((m) => ({ name: m.name, url: m.url, headers: {} })), env: {},
-          });
-        } catch (error) {
-          const failed = transition(started, 'failed', clock.now(), { error: `启动 Agent 失败：${error instanceof Error ? error.message : String(error)}` });
-          await finish(started, failed);
-          return failed;
-        }
-        return started;
-      }
-      const execId = run.runnerRef ?? '';
-      void runner.sendCommand(run.taskId, { id: `exec-${execId}`, type: 'exec', execId, command: run.command ?? [], ...(run.cwd ? { cwd: run.cwd } : {}), env: {}, timeoutSeconds: run.timeoutSeconds ?? 3600, wait: true })
-        .then((result) => settleCommand(run, result as ExecResult))
-        .catch((error: unknown) => failCommand(run, error));
       return started;
+    }
+    const execId = run.runnerRef ?? '';
+    void runner.sendCommand(run.taskId, { id: `exec-${execId}`, type: 'exec', execId, command: run.command ?? [], ...(run.cwd ? { cwd: run.cwd } : {}), env: {}, timeoutSeconds: run.timeoutSeconds ?? 3600, wait: true })
+      .then((result) => settleCommand(run, result as ExecResult))
+      .catch((error: unknown) => failCommand(run, error));
+    return started;
+  };
+
+  return {
+    launch,
+    /** TaskRunner 连上时由组合根调用：把等容器的 pending 子任务按提交顺序派发出去。 */
+    dispatchPending: async (taskId: SubtaskRun['taskId']): Promise<number> => {
+      let dispatched = 0;
+      for (const run of await uow.read.subtasks.listByTask(taskId)) {
+        if (run.state !== 'pending') continue;
+        if ((await launch(run)).state !== 'pending') dispatched += 1;
+      }
+      return dispatched;
     },
     build: async (task: BusinessTask, input: SubmitSubtaskRequest, attempt: number): Promise<SubtaskRun> => {
       const now = clock.now();
