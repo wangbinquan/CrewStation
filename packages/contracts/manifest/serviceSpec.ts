@@ -57,6 +57,7 @@ export const ReleaseSpecSchema = z.object({
   migration: MigrationSpecSchema.default({ compatibility: 'none', destructive: false, rollback: 'switch-back' }),
 });
 
+export type ManifestKind = z.infer<typeof ManifestKindSchema>;
 export type ServiceSpec = z.infer<typeof ServiceSpecSchema>;
 export type EnvEntry = z.infer<typeof EnvEntrySchema>;
 export type RequestedApi = z.infer<typeof RequestedApiSchema>;

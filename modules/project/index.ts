@@ -1,3 +1,3 @@
-export type { ProjectModuleApi } from './api/moduleApi';
-export { createProjectModule } from './wiring';
+export type { EffectiveRole, ProjectAction, ProjectModuleApi, ResolvedService } from './api/moduleApi';
+export { createProjectModule, projectMigrations } from './wiring';
 export type { ProjectModule, ProjectModuleDeps } from './wiring';
