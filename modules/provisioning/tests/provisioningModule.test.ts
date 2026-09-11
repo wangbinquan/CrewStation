@@ -47,7 +47,7 @@ describe('provisioning', () => {
     expect(states).toEqual(['provisioning', 'failed:ensureRepository 失败：git 缺失']);
   });
 
-  test('已 active 的项目重跑只做幂等校验，不再重复推进状态', async () => {
+  test('已 active 的项目重跑：步骤幂等，并把残留的失败原因清掉', async () => {
     const states: string[] = [];
     const active: ProjectFacts = { ...facts, state: 'active' };
     const steps: ProvisioningSteps = {
@@ -60,6 +60,7 @@ describe('provisioning', () => {
       setProjectState: async (_p, state) => { states.push(state); },
     };
     expect(await provisionProjectUseCase(steps, noopLogger)(active.projectId)).toBe('active');
-    expect(states).toEqual([]);
+    // 不带 message 的 active→active：transition 会清掉旧原因。
+    expect(states).toEqual(['active']);
   });
 });

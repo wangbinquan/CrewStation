@@ -24,7 +24,8 @@ export function provisionProjectUseCase(steps: ProvisioningSteps, logger: Logger
         return 'failed';
       }
     }
-    if (facts.state !== 'active') await steps.setProjectState(projectId, 'active');
+    // 无条件推进：对已 active 的项目，这一步把上一次残留的失败原因清掉。
+    await steps.setProjectState(projectId, 'active');
     return 'active';
   };
 }
