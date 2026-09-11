@@ -6,9 +6,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 CrewStation (数字人能力平台: a platform on which teams build, publish and run "digital worker" business apps with coding agents) now holds **both** the design documents under `proposal/` and a working implementation. The three proposal documents are v0.3.2 and remain the authoritative contract; the code is the first implementation of that contract, verified on the local kind cluster, not a shipped product.
 
-What exists in the cluster today (local `docker-desktop` kind node, namespace `crewstation-system`): five resident services, the workbench, Traefik, PostgreSQL, a registry and BuildKit. The end-to-end chain that has actually been run: administrator creates a project → namespace, quota and network policies → GitLab repository from `templates/minimal-sample` → production data resource → gateway routes → first tag release built and deployed to the preview slot → traffic switch to prod → rollback. Also verified: demo login through the gateway with identity injection, the sample page reading the injected user, a dev session container whose TaskRunner connects to cs-session, and the business subtask contract (the sample's `/chat` creates a business task, runs an agent subtask and returns its output).
+What exists in the cluster today (local `docker-desktop` kind node, namespace `crewstation-system`): the five resident services, both platform MCP servers, the workbench, Traefik, PostgreSQL, a registry and BuildKit. Chains that have actually been run end to end and observed, not inferred:
 
-Still incomplete, and it must not be described otherwise: the `stub` agent driver is the only one proven end to end, log paging has no cursor (the first-version source reads the Pod log tail directly), and scale, HA and the installer are untouched (M6).
+- Administrator creates a project, then namespace, quota and network policies, a GitLab repository from `templates/minimal-sample`, a production data resource, gateway routes, and a first tag release built and deployed to the preview slot.
+- Traffic switch to prod and rollback, with both hosts serving and the audit record naming the release it came from.
+- Demo login through the gateway, identity headers injected, the sample page reading the current user.
+- A dev session container whose init container clones the repo at the chosen branch, whose TaskRunner connects to cs-session, and whose web terminal has a real controlling TTY with job control.
+- The business subtask contract: the sample's `/chat` creates a business task, the subtask waits for the container, runs an agent and returns its output.
+- Event delivery: the built-in EventProducer emits, cs-events dedups and fans out, and the sample page lists the delivery with its trace id.
+- Both agent CLIs installed in the task image, launched under the dropped-privilege uid, reporting their native session ids.
+- Both MCP servers reachable from inside a dev container, authenticated by the session-scoped token, returning real platform data.
+
+Not done, and it must not be described otherwise. No agent has produced model output, because no model credentials are configured — the CLIs launch and report "not logged in", which is as far as this environment can go. Log paging has no cursor, since the first-version source reads the Pod log tail directly. Scale, HA and the installer (M6) are untouched, and `apps/cli`'s `install`/`upgrade` report their bundle-dependent phases as not-implemented rather than faking them. Twelve design questions the implementation surfaced are recorded in `docs/engineering/implementation-open-questions.md` and are for the author to rule on, not for an implementer to decide.
 
 ## Commands
 
@@ -20,7 +29,8 @@ bun test path/to/file.test.ts   # a single test file
 bun run scaffold:module <name>  # the only sanctioned way to create a module
 ./deploy/local/bootstrap.sh       # one-time local cluster prerequisites
 ./deploy/local/install-platform.sh  # build images, migrate, deploy; idempotent
-./deploy/local/verify.sh            # post-install checks
+./deploy/local/bootstrap-integrations.sh  # create the two built-in integration projects; idempotent
+./deploy/local/verify.sh            # post-install checks (registry pull, routing, source IP, ForwardAuth)
 ```
 
 `bun run check` must pass before any commit. Integration tests that need PostgreSQL or the local GitLab skip themselves when those are unreachable, so a green run on a bare machine does not mean the integration paths ran.
