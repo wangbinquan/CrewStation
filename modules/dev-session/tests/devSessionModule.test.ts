@@ -17,6 +17,7 @@ const developer: Actor = { userId: 'usr_1123456789abcdef0123456789abcdef' as Use
 const envs = new Map<string, EnvironmentView & { createdBy: UserId; preview?: { command: string[]; port: number; healthPath: string } }>();
 const commands: RunnerCommand[] = [];
 const notices: string[] = [];
+const issued: Array<{ taskId: TaskId; projectId: ProjectId; serviceId: ServiceId; userId: UserId }> = [];
 let dirty = '';
 const published: unknown[] = [];
 const manifest = 'apiVersion: crewstation/v1\nkind: DigitalWorker\nspec:\n  service: { command: [bun, run, src/main.ts], port: 3000, healthPath: /healthz, plan: standard-small }\n  development: { command: [bun, run, --watch, src/main.ts], port: 3000 }\n';
@@ -44,13 +45,18 @@ beforeAll(async () => {
         if (command.type === 'previewStatus') return { state: 'ready', port: 3000, restarts: 0 };
         return {};
       },
-      listEvents: async () => [{ seq: 1, at: new Date().toISOString(), event: { kind: 'agent', event: { agentId: 'agt_1', seq: 0, at: new Date().toISOString(), type: 'completed', sessionId: 's1' } } }],
+      listEvents: async () => [
+        { seq: 1, at: new Date().toISOString(), event: { kind: 'agent', event: { agentId: 'agt_1', seq: 0, at: new Date().toISOString(), type: 'started', spec: { driver: 'claude-code', model: 'anthropic/claude-sonnet-5', permission: 'read-only' } } } },
+        { seq: 2, at: new Date().toISOString(), event: { kind: 'agent', event: { agentId: 'agt_1', seq: 1, at: new Date().toISOString(), type: 'completed', sessionId: 's1' } } },
+        { seq: 3, at: new Date().toISOString(), event: { kind: 'agent', event: { agentId: 'agt_2', seq: 0, at: new Date().toISOString(), type: 'text', text: '没有 started 事件' } } },
+      ],
     },
     scm: { listBranches: async (_s, compare) => [{ name: 'main', headSha: 'abc', isDefault: true, behindPreview: compare.previewSha ? 2 : null, behindProd: null }], pushUrl: async () => ({ url: 'http://oauth2:secret@gitlab/demo.git', expiresAt: new Date().toISOString() }), readFile: async () => manifest },
     releases: { publish: async (_a, _s, input) => { published.push(input); return { id: 'rel_0123456789abcdef0123456789abcdef', serviceId, tag: 'v0.1.1', commitSha: 'abc', branch: input.branch, status: 'pending', createdBy: owner.userId, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() } as never; }, getSlots: async () => [{ name: 'preview', active: false, commitSha: 'p1', replicas: 1, readyReplicas: 1, state: 'ready', host: 'preview.demo.cs.localhost' }, { name: 'prod', active: true, replicas: 0, readyReplicas: 0, state: 'empty', host: 'demo.cs.localhost' }] },
     authorizer: { authorize: async (actor, _p, action) => { if (action === 'force-release-session' && actor.userId !== owner.userId) throw new Error('forbidden'); }, ownerOf: async () => owner.userId },
     services: { resolveServiceOfProject: async () => ({ serviceId, slug: 'demo', name: 'demo' }) },
     notifier: { notify: async (_p, users, message) => { notices.push(`${users.length}:${message}`); } },
+    credentials: { issueDevSessionToken: async (binding) => { issued.push(binding); return { token: `tok-${binding.taskId}`, expiresAt: new Date().toISOString() }; } },
     isAdmin: async () => false,
     settings: { idleMinutes: 30, userDomain: 'cs.localhost', mcp: [{ name: 'capabilities', url: 'http://mcp-capabilities.svc.cs.internal/mcp' }], defaultPreviewPort: 3000 },
     clock: fixedClock('2026-09-11T01:00:00Z'),
@@ -71,8 +77,15 @@ describe.skipIf(!available)('dev-session module', () => {
     const agent = await dev.api.startAgent(developer, created.id, { driver: 'stub', model: 'stub/echo', permission: 'edit', prompt: '你好' });
     const start = commands.find((c) => c.type === 'startAgent');
     expect(start).toMatchObject({ mode: 'interactive', initialPrompt: '你好', mcp: [{ name: 'capabilities' }] });
+    // 会话级短期令牌进了 MCP 连接头，并且绑定的是本会话、本项目、本服务与启动者（Design §5.9）。
+    expect(issued).toEqual([{ taskId: created.id, projectId, serviceId, userId: developer.userId }]);
+    expect(start).toMatchObject({ mcp: [{ headers: { 'x-cs-dev-session-token': `tok-${created.id}` } }] });
     await dev.api.sendMessage(developer, created.id, agent.agentId, { content: '继续' });
-    expect((await dev.api.listAgents(developer, created.id))[0]).toMatchObject({ agentId: 'agt_1', state: 'completed', sessionId: 's1' });
+    const listed = await dev.api.listAgents(developer, created.id);
+    // 驱动、模型与权限来自 started 事件的 spec，不是编出来的。
+    expect(listed[0]).toMatchObject({ agentId: 'agt_1', state: 'completed', sessionId: 's1', driver: 'claude-code', model: 'anthropic/claude-sonnet-5', permission: 'read-only' });
+    // 没有 started 事件时留最小权限的占位，绝不谎称 edit。
+    expect(listed[1]).toMatchObject({ agentId: 'agt_2', permission: 'read-only', model: '' });
 
     dirty = ' M src/main.ts\n?? new.ts\n';
     await expect(dev.api.publish(developer, projectId, { branch: 'main', version: 'patch' })).rejects.toMatchObject({ kind: 'precondition', details: { uncommitted: ['src/main.ts', 'new.ts'] } });

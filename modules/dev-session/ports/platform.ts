@@ -27,6 +27,14 @@ export interface ManifestParser {
   parse(text: string): Manifest;
 }
 
+/**
+ * 由 identity 模块提供：注入 Agent 的远程 MCP 连接凭据（Design §5.9 会话级短期令牌）。
+ * 每次启动 Agent 现签一枚，不续期也不缓存；令牌值只从这里流向 TaskRunner，不落库、不进日志。
+ */
+export interface McpCredentials {
+  issueDevSessionToken(binding: { taskId: TaskId; projectId: ProjectId; serviceId: ServiceId; userId: UserId }): Promise<{ token: string; expiresAt: string }>;
+}
+
 /** 空闲提醒与强制释放通知；实现接 observability 的告警或工作台通知。 */
 export interface Notifier {
   notify(projectId: ProjectId, userIds: UserId[], message: string, context: { taskId: TaskId }): Promise<void>;

@@ -1,4 +1,7 @@
-import type { Actor, AgentInstanceDto, AgentInstanceState, RunnerEvent, SendAgentMessageRequest, StartDevAgentRequest, TaskId } from '@crewstation/contracts';
+import type {
+  Actor, AgentInstanceDto, AgentInstanceState, RunnerEvent, SendAgentMessageRequest, ServiceId, StartDevAgentRequest, TaskId,
+} from '@crewstation/contracts';
+import { IDENTITY_HEADERS } from '@crewstation/contracts';
 import { forbidden, newId, notFound, precondition } from '@crewstation/kernel';
 import type { DevSessionUseCaseDeps } from './dependencies';
 
@@ -17,10 +20,15 @@ export function agentUseCases(deps: DevSessionUseCaseDeps) {
     startAgent: async (actor: Actor, taskId: TaskId, input: StartDevAgentRequest): Promise<AgentInstanceDto> => {
       const env = await guard(actor, taskId);
       const agentId = newId('agt');
+      // 连接头在 spawn 时写死、事后改不了，所以每次启动 Agent 现签一枚，而不是续期旧的（Design §5.9）。
+      const credential = await deps.credentials.issueDevSessionToken({
+        taskId, projectId: env.projectId, serviceId: env.serviceId as ServiceId, userId: actor.userId,
+      });
+      const headers = { [IDENTITY_HEADERS.devSessionToken]: credential.token };
       await runner.sendCommand(taskId, {
         id: `start-${agentId}`, type: 'startAgent', agentId, driver: input.driver, model: input.model, permission: input.permission, mode: 'interactive',
         ...(input.cwd ? { cwd: input.cwd } : {}), initialPrompt: input.prompt, ...(input.resumeSessionId ? { resumeSessionId: input.resumeSessionId } : {}),
-        mcp: settings.mcp.map((m) => ({ name: m.name, url: m.url, headers: {} })), env: {},
+        mcp: settings.mcp.map((m) => ({ name: m.name, url: m.url, headers })), env: {},
       });
       await environments.touch(taskId);
       return { agentId, taskId: env.id, driver: input.driver, model: input.model, permission: input.permission, state: 'starting', startedAt: deps.clock.now().toISOString() };
@@ -42,8 +50,12 @@ export function agentUseCases(deps: DevSessionUseCaseDeps) {
       const agents = new Map<string, AgentInstanceDto>();
       for (const stored of await runner.listEvents(taskId, { kinds: ['agent'], limit: 5000 })) {
         const e = stored.event as Extract<RunnerEvent, { kind: 'agent' }>;
-        const current = agents.get(e.event.agentId) ?? { agentId: e.event.agentId, taskId, driver: 'stub', model: '', permission: 'edit', state: 'starting' as AgentInstanceState, startedAt: stored.at };
-        agents.set(e.event.agentId, { ...current, ...(e.event.sessionId ? { sessionId: e.event.sessionId } : {}), state: stateOf(e.event.type, current.state), ...(isTerminal(e.event.type) ? { endedAt: stored.at } : {}) });
+        // 驱动、模型与权限只在 started 事件的 spec 里；缺了就如实留空，不编造（权限编错尤其误导人）。
+        const current = agents.get(e.event.agentId) ?? { agentId: e.event.agentId, taskId, driver: 'stub' as const, model: '', permission: 'read-only' as const, state: 'starting' as AgentInstanceState, startedAt: stored.at };
+        agents.set(e.event.agentId, {
+          ...current, ...(e.event.spec ?? {}), ...(e.event.sessionId ? { sessionId: e.event.sessionId } : {}),
+          state: stateOf(e.event.type, current.state), ...(isTerminal(e.event.type) ? { endedAt: stored.at } : {}),
+        });
       }
       return [...agents.values()];
     },

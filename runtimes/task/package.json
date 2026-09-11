@@ -9,6 +9,7 @@
     "test": "bun test"
   },
   "dependencies": {
+    "@crewstation/agent-drivers": "workspace:*",
     "@crewstation/contracts": "workspace:*",
     "@crewstation/kernel": "workspace:*",
     "@crewstation/ws": "workspace:*",

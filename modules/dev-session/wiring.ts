@@ -15,7 +15,7 @@ import { idleReminderUseCase } from './application/idleReminder';
 import { publishFromSessionUseCase } from './application/publishFromSession';
 import { sessionLifecycleUseCases } from './application/sessionLifecycle';
 import { devSessionRoutes } from './http/devSessionRoutes';
-import type { DevSessionSettings, Notifier, ProjectAuthorizer, Releases, ServiceResolver, SourceControl } from './ports/platform';
+import type { DevSessionSettings, McpCredentials, Notifier, ProjectAuthorizer, Releases, ServiceResolver, SourceControl } from './ports/platform';
 import type { Environments, Runner } from './ports/runtime';
 
 export interface DevSessionModuleDeps {
@@ -27,6 +27,7 @@ export interface DevSessionModuleDeps {
   authorizer: ProjectAuthorizer;
   services: ServiceResolver;
   notifier: Notifier;
+  credentials: McpCredentials;
   isAdmin: (userId: UserId) => Promise<boolean>;
   settings: DevSessionSettings;
   clock?: Clock;
@@ -49,7 +50,7 @@ export const devSessionMigrations: MigrationSet = {
 export function createDevSessionModule(deps: DevSessionModuleDeps): DevSessionModule {
   const useCaseDeps: DevSessionUseCaseDeps = {
     environments: deps.environments, runner: deps.runner, scm: deps.scm, releases: deps.releases, manifests: yamlManifestParser,
-    authorizer: deps.authorizer, services: deps.services, notifier: deps.notifier, reminders: drizzleReminderRepository(deps.db),
+    authorizer: deps.authorizer, services: deps.services, notifier: deps.notifier, credentials: deps.credentials, reminders: drizzleReminderRepository(deps.db),
     settings: deps.settings, clock: deps.clock ?? systemClock, logger: deps.logger ?? noopLogger,
   };
   const lifecycle = sessionLifecycleUseCases(useCaseDeps);

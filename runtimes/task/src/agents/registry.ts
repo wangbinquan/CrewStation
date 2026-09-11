@@ -1,5 +1,5 @@
 import type { AgentDriver as AgentDriverName } from '@crewstation/contracts';
-import { createCliDriver } from './cliDriver';
+import { createClaudeCodeCliDriver, createOpencodeCliDriver } from './cliDriver';
 import type { AgentDriver } from './driver';
 import { createStubDriver } from './stubDriver';
 
@@ -10,9 +10,9 @@ export interface DriverRegistry {
   names(): AgentDriverName[];
 }
 
-/** 内建驱动：确定性的 stub，加上两个 CLI 的占位驱动；真实 CLI 驱动接入时替换这里的两项即可。 */
+/** 内建驱动：确定性的 stub，加上 `@crewstation/agent-drivers` 的两个真实 CLI 驱动。 */
 export function defaultDrivers(): AgentDriver[] {
-  return [createStubDriver(), createCliDriver({ name: 'claude-code', binary: 'claude' }), createCliDriver({ name: 'opencode', binary: 'opencode' })];
+  return [createStubDriver(), createClaudeCodeCliDriver(), createOpencodeCliDriver()];
 }
 
 export function createDriverRegistry(drivers: AgentDriver[] = defaultDrivers()): DriverRegistry {

@@ -15,8 +15,13 @@ type ReleaseRegistered = DomainPayload<'release.registered'>;
 export function registerReleaseUseCase({ uow, services, clock }: ApiCatalogUseCaseDeps) {
   return async (event: ReleaseRegistered): Promise<void> => {
     const { manifest } = event;
-    if (manifest.kind === 'EventProducer') return;
     const now = clock.now();
+    if (manifest.kind === 'EventProducer') {
+      // EventProducer 不暴露 API，但它的项目是从最小示例模板初始化的，首个发布会按模板的
+      // apis.exposes 登记过一个代理条目。这里直接 return 会把那条留在目录里永远 active。
+      await uow.run((scope) => removeProxiesOf(scope, event.serviceId, undefined, now));
+      return;
+    }
     if (manifest.kind === 'APIProxy') {
       const document = requireDocument(event);
       await uow.run((scope) => register(scope, {

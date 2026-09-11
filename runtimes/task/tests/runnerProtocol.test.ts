@@ -3,6 +3,10 @@ import { mkdir, readFile, stat, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { RunnerResultPayloads, TASKRUNNER_PROTOCOL_VERSION } from '@crewstation/contracts';
+import { createClaudeCodeCliDriver, createOpencodeCliDriver } from '../src/agents/cliDriver';
+import type { DriverRegistry } from '../src/agents/registry';
+import { createDriverRegistry } from '../src/agents/registry';
+import { createStubDriver } from '../src/agents/stubDriver';
 import { contentVersion } from '../src/files/fileCommands';
 import type { FakeSession } from './fakeSession';
 import { CommandFailure, startFakeSession } from './fakeSession';
@@ -14,10 +18,16 @@ afterEach(async () => {
   for (const cleanup of cleanups.splice(0).reverse()) await cleanup();
 });
 
+/** 驱动注册表在测试里固定住：两个 CLI 一律按「二进制不在位」接入，hello 与错误码才不随开发机上装了什么而变。 */
+function testDrivers(): DriverRegistry {
+  const absent = { which: () => null };
+  return createDriverRegistry([createStubDriver(), createClaudeCodeCliDriver(absent), createOpencodeCliDriver(absent)]);
+}
+
 async function boot(): Promise<{ session: FakeSession; tr: TestRunner }> {
   const session = startFakeSession();
   cleanups.push(() => session.stop());
-  const tr = await startTestRunner(session.url);
+  const tr = await startTestRunner(session.url, {}, { registry: testDrivers() });
   cleanups.push(() => tr.dispose());
   await tr.runner.whenConnected();
   return { session, tr };
@@ -203,13 +213,12 @@ describe('stub Agent', () => {
     expect(tr.logLines.some((line) => line.includes('written by stub'))).toBe(false);
   });
 
-  test('CLI 占位驱动：未安装二进制时报 driver binary not installed，否则报尚未接入', async () => {
+  test('CLI 驱动：二进制不在位时报 driver_not_installed，不白建运行目录', async () => {
     const { session } = await boot();
     await session.call({ id: 'd1', type: 'startAgent', agentId: 'agent-3', driver: 'claude-code', model: 'anthropic/claude-sonnet-4', permission: 'edit', mode: 'oneshot', initialPrompt: 'hi' });
     const failure = await session.waitForEvent('agent', (e) => e.event.agentId === 'agent-3' && e.event.type === 'error');
-    const expected = Bun.which('claude') === null ? 'driver_not_installed' : 'driver_not_implemented';
-    expect(failure.event.event.error?.code).toBe(expected);
-    if (expected === 'driver_not_installed') expect(failure.event.event.error?.message).toBe('driver binary not installed: claude');
+    expect(failure.event.event.error?.code).toBe('driver_not_installed');
+    expect(failure.event.event.error?.message).toBe('driver binary not installed: claude');
     await Bun.sleep(20);
     await expectFailure(session.call({ id: 'd2', type: 'cancelAgent', agentId: 'agent-3' }), 'not_found');
   });

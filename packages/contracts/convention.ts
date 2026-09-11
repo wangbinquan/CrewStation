@@ -14,6 +14,12 @@ export const IDENTITY_HEADERS = {
   sourceSlot: 'x-cs-source-slot',
   /** 服务域：平台签名的来源令牌，事件推送与服务间调用都携带。 */
   sourceToken: 'x-cs-source-token',
+  /**
+   * 开发会话级短期令牌（Design §5.9）：平台在容器启动时写进两个 CLI 的远程 MCP 连接头，
+   * 由 Agent 自带、经操作 MCP 透传到 cs-api 验签。与上面几个不同，它不是网关注入的可信明文，
+   * 而是调用方携带的凭据，因此网关不抹掉它，cs-api 也只认签名而不认头本身。
+   */
+  devSessionToken: 'x-cs-dev-session-token',
   traceId: 'x-cs-trace-id',
   requestId: 'x-cs-request-id',
 } as const;
@@ -45,7 +51,7 @@ export const PLATFORM_PATHS = {
   jwks: '/.well-known/jwks.json',
 } as const;
 
-/** JWT 声明名；identity token 与 source token 都遵守。 */
+/** JWT 声明名；identity token、source token 与开发会话令牌都遵守。 */
 export const TOKEN_CLAIMS = {
   issuer: 'crewstation',
   subjectPrefixUser: 'user:',
@@ -53,8 +59,13 @@ export const TOKEN_CLAIMS = {
   audiencePrefixService: 'service:',
   kind: 'cs_kind',
   project: 'cs_project',
+  service: 'cs_service',
   slot: 'cs_slot',
+  taskId: 'cs_task_id',
   traceId: 'cs_trace_id',
+  /** 开发会话令牌的 aud 与 cs_kind：单独一个受众，使它无法冒充身份令牌或来源令牌。 */
+  audienceDevSession: 'dev-session',
+  kindDevSession: 'dev-session',
 } as const;
 
 /** 域名模式；`{project}` 与 `{service}` 由安装配置的域名后缀补全。 */

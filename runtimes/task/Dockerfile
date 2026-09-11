@@ -11,6 +11,21 @@ RUN apt-get update \
 RUN groupadd --gid 10001 worker \
   && useradd --uid 10001 --gid 10001 --home-dir /work --create-home --shell /bin/bash worker
 
+# 两个 Agent CLI：@crewstation/agent-drivers 的驱动拉起的就是它们，缺了 hello 的 capabilities.drivers 就只剩 stub。
+# 用官方安装脚本装原生可执行文件（本镜像没有 node，npm 包那条路走不通）；两个脚本都只装进 root 的家目录，
+# 而 Agent 进程经 setpriv 降到 worker(10001)、/root 不可遍历，所以装完把真正的二进制搬进 /usr/local/bin。
+# 版本显式钉住：这两个号也是 packages/agent-drivers 里 argv／事件形状实测所依据的版本，升级时一并复核。
+ARG CLAUDE_CODE_VERSION=2.1.268
+ARG OPENCODE_VERSION=1.18.29
+RUN curl -fsSL https://claude.ai/install.sh | bash -s "${CLAUDE_CODE_VERSION}" \
+  && install -m 0755 "$(readlink -f /root/.local/bin/claude)" /usr/local/bin/claude \
+  && curl -fsSL https://opencode.ai/install | VERSION="${OPENCODE_VERSION}" bash \
+  && install -m 0755 /root/.opencode/bin/opencode /usr/local/bin/opencode \
+  && rm -rf /root/.local /root/.claude /root/.opencode /root/.cache \
+  && claude --version && opencode --version
+# 两个 CLI 都要一个可写的 HOME（opencode 按 XDG 在 $HOME 下建会话库）。TaskRunner 的 ProcessLauncher
+# 已经为降权子进程把 HOME 设成 worker 的家目录 /work，所以运行期成立；直接 setpriv 而不设 HOME 会失败。
+
 WORKDIR /app
 
 # 只带运行时需要的工作区成员；根 package.json 的 workspaces 列表按实际复制的目录收窄，

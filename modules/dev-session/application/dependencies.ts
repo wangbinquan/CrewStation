@@ -1,5 +1,5 @@
 import type { Clock, Logger } from '@crewstation/kernel';
-import type { DevSessionSettings, ManifestParser, Notifier, ProjectAuthorizer, Releases, ServiceResolver, SourceControl } from '../ports/platform';
+import type { DevSessionSettings, ManifestParser, McpCredentials, Notifier, ProjectAuthorizer, Releases, ServiceResolver, SourceControl } from '../ports/platform';
 import type { Environments, ReminderRepository, Runner } from '../ports/runtime';
 
 export interface DevSessionUseCaseDeps {
@@ -11,6 +11,7 @@ export interface DevSessionUseCaseDeps {
   authorizer: ProjectAuthorizer;
   services: ServiceResolver;
   notifier: Notifier;
+  credentials: McpCredentials;
   reminders: ReminderRepository;
   settings: DevSessionSettings;
   clock: Clock;
