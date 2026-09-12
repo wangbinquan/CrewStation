@@ -1,6 +1,6 @@
 import type { Manifest } from '@crewstation/contracts';
-import { ManifestSchema } from '@crewstation/contracts';
-import { isPlatformError } from '@crewstation/kernel';
+import { ManifestSchema, describeManifestFailure } from '@crewstation/contracts';
+import { isPlatformError, validation } from '@crewstation/kernel';
 import { assertMigrationAllowed } from '../domain/migrationPolicy';
 import type { Release } from '../domain/release';
 import type { ReleaseUseCaseDeps } from './dependencies';
@@ -18,7 +18,10 @@ export function buildSteps(deps: ReleaseUseCaseDeps, ctx: PipelineContext, start
   const loadManifest = async (release: Release): Promise<Manifest> => {
     const text = await deps.repo.readFile(release.serviceId, release.tag, 'crewstation.yaml');
     if (!text) throw new Error('仓库中没有 crewstation.yaml');
-    return ManifestSchema.parse(Bun.YAML.parse(text));
+    const parsed = ManifestSchema.safeParse(Bun.YAML.parse(text));
+    // 与开发会话同一套说法：说清错在哪，也说清改成什么。
+    if (!parsed.success) throw validation(`crewstation.yaml 无效：${describeManifestFailure(parsed.error)}`);
+    return parsed.data;
   };
 
   const afterBuild = async (release: Release, svc: ResolvedService): Promise<StepResult> => {

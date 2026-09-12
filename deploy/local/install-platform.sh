@@ -18,7 +18,13 @@ if [[ "${SKIP_BUILD:-}" != "1" ]]; then
   docker build -q -f "$ROOT/deploy/docker/control-plane.Dockerfile" -t cs-control-plane:dev "$ROOT"
   docker build -q -f "$ROOT/deploy/docker/builder.Dockerfile" -t cs-builder:dev "$ROOT/deploy/docker"
   docker build -q -f "$ROOT/deploy/docker/console.Dockerfile" -t cs-console:dev "$ROOT"
-  [[ -n "$(docker images -q cs-task-runtime:dev)" ]] || docker build -q -f "$ROOT/runtimes/task/Dockerfile" -t cs-task-runtime:dev "$ROOT"
+  # 任务容器镜像默认也重建。以前是「有就不建」，结果改了 runtimes/task 之后集群里跑的还是旧镜像，
+  # 现象是事件里少字段而代码看着没问题——查一轮才发现。慢就慢在这一个镜像，要跳过用 SKIP_TASK_RUNTIME_BUILD=1。
+  if [[ "${SKIP_TASK_RUNTIME_BUILD:-}" == "1" && -n "$(docker images -q cs-task-runtime:dev)" ]]; then
+    log "跳过任务容器镜像构建（SKIP_TASK_RUNTIME_BUILD=1）"
+  else
+    docker build -q -f "$ROOT/runtimes/task/Dockerfile" -t cs-task-runtime:dev "$ROOT"
+  fi
   for img in cs-control-plane:dev cs-builder:dev cs-console:dev cs-task-runtime:dev; do import_image "$img"; done
 fi
 

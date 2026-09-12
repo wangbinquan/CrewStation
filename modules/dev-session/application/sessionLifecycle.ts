@@ -1,5 +1,5 @@
-import type { Actor, BranchDto, DevSessionDto, OpenDevSessionRequest, PreviewState, ProjectId, TaskId } from '@crewstation/contracts';
-import { conflict, notFound, precondition } from '@crewstation/kernel';
+import type { Actor, BranchDto, DevSessionDto, Manifest, OpenDevSessionRequest, PreviewState, ProjectId, TaskId } from '@crewstation/contracts';
+import { conflict, isPlatformError, notFound, precondition } from '@crewstation/kernel';
 import { unpushedCommits } from '../domain/gitStatus';
 import type { DevSessionUseCaseDeps } from './dependencies';
 import type { EnvironmentView } from '../ports/runtime';
@@ -19,6 +19,18 @@ export function sessionLifecycleUseCases(deps: DevSessionUseCaseDeps) {
     try { return ((await runner.sendCommand(env.id, { id: `p-${Date.now()}`, type: 'previewStatus' })) as { state: PreviewState }).state; } catch { return 'stopped'; }
   };
 
+  /** 解析 Manifest；失败不抛，把原因带出去由调用方决定要不要当成失败。 */
+  const readManifest = (text: string | undefined): { manifest?: Manifest; problem?: string } => {
+    if (!text) return {};
+    try {
+      return { manifest: deps.manifests.parse(text) };
+    } catch (error) {
+      const problem = isPlatformError(error) ? error.message : String(error);
+      deps.logger.warn('dev session opened with an invalid manifest', { problem });
+      return { problem };
+    }
+  };
+
   const svcOf = async (projectId: ProjectId) => {
     const svc = await services.resolveServiceOfProject(projectId);
     if (!svc) throw notFound('项目服务', projectId);
@@ -31,13 +43,17 @@ export function sessionLifecycleUseCases(deps: DevSessionUseCaseDeps) {
       const svc = await svcOf(projectId);
       if (await environments.findDevSession(projectId)) throw conflict('该项目已有一个开发会话，请先释放');
       const manifestText = await scm.readFile(svc.serviceId, input.branch, 'crewstation.yaml');
-      const manifest = manifestText ? deps.manifests.parse(manifestText) : undefined;
+      // Manifest 坏了照样把会话开起来，只是没有预览：开发容器正是改这个文件的地方，
+      // 在这里硬失败会把唯一的修复路径也一起关掉（RFC-001 让所有老仓库的 Manifest 一次性失效，实撞）。
+      const loaded = readManifest(manifestText);
+      const manifest = loaded.manifest;
       const dev = manifest?.spec.development;
       const preview = dev
         ? { command: dev.command, port: dev.port ?? manifest?.spec.service.port ?? settings.defaultPreviewPort, healthPath: dev.healthPath ?? manifest?.spec.service.healthPath ?? '/' }
         : manifest ? { command: manifest.spec.service.command, port: manifest.spec.service.port, healthPath: manifest.spec.service.healthPath } : undefined;
       const env = await environments.createEnvironment({ serviceId: svc.serviceId, kind: 'dev-session', branch: input.branch, createdBy: actor.userId, ...(preview ? { preview } : {}), labels: { 'crewstation.io/project': svc.slug, 'crewstation.io/service': svc.name } });
-      return toDto(env, svc.slug, 'starting');
+      const dto = await toDto(env, svc.slug, 'starting');
+      return loaded.problem === undefined ? dto : { ...dto, message: `${loaded.problem}；会话已开启但没有预览，改好 crewstation.yaml 后释放会话再开一次即可` };
     },
     getSession: async (actor: Actor, projectId: ProjectId): Promise<DevSessionDto | undefined> => {
       await authorizer.authorize(actor, projectId, 'view');

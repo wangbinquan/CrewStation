@@ -64,7 +64,6 @@ export function agentUseCases(deps: DevSessionUseCaseDeps) {
       const agents = new Map<string, AgentInstanceDto>();
       for (const stored of await runner.listEvents(taskId, { kinds: ['agent'], limit: 5000 })) {
         const e = stored.event as Extract<RunnerEvent, { kind: 'agent' }>;
-        // 驱动、模型与权限只在 started 事件的 spec 里；缺了就如实留空，不编造（权限编错尤其误导人）。
         // 档位与权限只在 started 事件的 spec 里；缺了就如实留空，不编造（权限编错尤其误导人）。
         const current = agents.get(e.event.agentId) ?? { agentId: e.event.agentId, taskId, compute: '', permission: 'read-only' as const, state: 'starting' as AgentInstanceState, startedAt: stored.at };
         const spec = e.event.spec ? { compute: e.event.spec.compute, permission: e.event.spec.permission } : {};

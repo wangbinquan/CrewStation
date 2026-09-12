@@ -5,3 +5,13 @@ coverage/
 *.log
 .env
 .env.*
+
+# 开发容器里 worker 的 HOME 就是 /work（见 runtimes/task/Dockerfile），所以 CLI 的缓存与会话库
+# 会落在工作区里。不忽略的话，发布前置检查会把平台自己产生的文件当成「未提交的更改」而拒绝发布。
+.bun/
+.cache/
+.claude/
+.opencode/
+.config/
+.local/
+.bash_history

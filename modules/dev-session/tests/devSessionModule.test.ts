@@ -22,6 +22,9 @@ const issued: Array<{ taskId: TaskId; projectId: ProjectId; serviceId: ServiceId
 let dirty = '';
 const published: unknown[] = [];
 const manifest = 'apiVersion: crewstation/v1\nkind: DigitalWorker\nspec:\n  service: { command: [bun, run, src/main.ts], port: 3000, healthPath: /healthz, plan: standard-small }\n  development: { command: [bun, run, --watch, src/main.ts], port: 3000 }\n';
+/** RFC-001 之前的写法：老仓库里还有一大堆。 */
+const legacyManifest = `${manifest}  tasks:\n    profile: coding-medium\n    agentProfiles: [{ name: chat-v1, driver: stub, model: stub/echo, permission: read-only }]\n`;
+let manifestText = manifest;
 
 beforeAll(async () => {
   if (!available) return;
@@ -52,7 +55,7 @@ beforeAll(async () => {
         { seq: 3, at: new Date().toISOString(), event: { kind: 'agent', event: { agentId: 'agt_2', seq: 0, at: new Date().toISOString(), type: 'text', text: '没有 started 事件' } } },
       ],
     },
-    scm: { listBranches: async (_s, compare) => [{ name: 'main', headSha: 'abc', isDefault: true, behindPreview: compare.previewSha ? 2 : null, behindProd: null }], pushUrl: async () => ({ url: 'http://oauth2:secret@gitlab/demo.git', expiresAt: new Date().toISOString() }), readFile: async () => manifest },
+    scm: { listBranches: async (_s, compare) => [{ name: 'main', headSha: 'abc', isDefault: true, behindPreview: compare.previewSha ? 2 : null, behindProd: null }], pushUrl: async () => ({ url: 'http://oauth2:secret@gitlab/demo.git', expiresAt: new Date().toISOString() }), readFile: async () => manifestText },
     releases: { publish: async (_a, _s, input) => { published.push(input); return { id: 'rel_0123456789abcdef0123456789abcdef', serviceId, tag: 'v0.1.1', commitSha: 'abc', branch: input.branch, status: 'pending', createdBy: owner.userId, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() } as never; }, getSlots: async () => [{ name: 'preview', active: false, commitSha: 'p1', replicas: 1, readyReplicas: 1, state: 'ready', host: 'preview.demo.cs.localhost' }, { name: 'prod', active: true, replicas: 0, readyReplicas: 0, state: 'empty', host: 'demo.cs.localhost' }] },
     authorizer: { authorize: async (actor, _p, action) => { if (action === 'force-release-session' && actor.userId !== owner.userId) throw new Error('forbidden'); }, ownerOf: async () => owner.userId },
     services: { resolveServiceOfProject: async () => ({ serviceId, slug: 'demo', name: 'demo' }) },
@@ -133,5 +136,22 @@ describe.skipIf(!available)('dev-session module', () => {
     computeProfiles.push({ name: 'balanced', driver: 'claude-code', model: 'anthropic/claude-sonnet-5' });
 
     await dev.api.releaseSession(owner, projectId, { force: true });
+  });
+
+  test('Manifest 坏了照样能开会话，只是没有预览，并说清该怎么改（RFC-001）', async () => {
+    manifestText = legacyManifest;
+    try {
+      const session = await dev.api.openSession(developer, projectId, { branch: 'main' });
+      expect(session.state).toBe('running');
+      expect(session.message).toContain('Unrecognized keys');
+      // 错误要能照着改：指出换成 compute，并说去哪儿看可用档位。
+      expect(session.message).toContain('compute: <档位名>');
+      expect(session.message).toContain('算力档位');
+      // 没有预览配置：开发容器不会拿着半截 Manifest 去起预览。
+      expect([...envs.values()].at(-1)?.preview).toBeUndefined();
+    } finally {
+      manifestText = manifest;
+      await dev.api.releaseSession(developer, projectId, { force: true });
+    }
   });
 });
