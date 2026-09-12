@@ -1,7 +1,7 @@
 # 仓库结构、模块划分与依赖原则
 
 > 状态：已确认（2026-09-11 作者裁定第 13 节四项），作为 Design §15.1 的展开并进入 Plan T0.2  
-> 版本：0.2 · 日期：2026-09-11  
+> 版本：0.3 · 日期：2026-09-12（0.3：根目录补 RFC／根级说明文件，模块清单补 ADR-0003 的两个模块，§11 指向开发规则）  
 > 适用范围：CrewStation 代码仓（Bun workspaces monorepo）的全部代码，包括控制面、任务容器、工作台、CLI、部署与测试
 
 ## 目录
@@ -58,7 +58,7 @@ crewstation/
 ├─ modules/                      # 领域模块：按限界上下文划分；不知道自己跑在哪个进程里
 │  ├─ identity/  project/  scm/  config/  data/  egress/  api-catalog/  events/
 │  ├─ release/  task-runtime/  dev-session/  business-task/  session/  gateway/
-│  └─ observability/  capabilities/
+│  └─ observability/  capabilities/  provisioning/  platform/
 ├─ packages/                     # 技术库：与领域无关，删掉所有业务概念后仍然成立
 │  ├─ contracts/                 # Manifest、平台 API、事件、放行表、TaskRunner 协议的 zod Schema：唯一跨进程真相
 │  ├─ kernel/                    # Result／错误类型、ID、时钟、日志接口、类型工具；零 IO
@@ -83,13 +83,21 @@ crewstation/
 ├─ deploy/                       # Kubernetes 清单、安装器、profiles、镜像清单
 ├─ tests/                        # 跨模块测试：contracts、e2e、security、scale、upgrade、architecture
 ├─ tools/                        # 仓内工程脚本：arch 规则检查、代码生成、统计；不被任何应用 import
-├─ docs/                         # 工程文档：本文件、ADR、约定
-│  ├─ engineering/
-│  └─ adr/
-└─ proposal/                     # 产品与设计提案（现有）
+├─ docs/                         # 工程文档
+│  ├─ engineering/               # 本文件、开发规则、踩坑记录、实现期待决问题
+│  └─ adr/                       # 架构决策记录：只记「结构规则本身」的决策
+├─ proposal/                     # 产品与设计提案
+│  ├─ proposal.md design.md plan.md tech-evaluation.md   # 基线三件套＋技术评估
+│  ├─ reviews/                   # 设计门检视
+│  └─ rfc/                       # 基线之后的变更：RFC-NNN-{slug}/ 各含三件套
+├─ STATE.md                      # session 之间的接力状态
+├─ AGENTS.md                     # 面向编码 Agent 的开工须知与提交署名
+└─ CLAUDE.md                     # 仓库现状、命令、架构概览、术语
 ```
 
-根目录只允许出现以上目录与工作区配置文件。不设 `src/`、`lib/`、`common/`、`shared/` 这类根级目录。
+根目录只允许出现以上目录、上述根级说明文件与工作区配置文件。不设 `src/`、`lib/`、`common/`、`shared/` 这类根级目录。
+
+模块清单以 §5 为准；上面 `modules/` 一行是示意，新增模块按 §11 走 ADR。
 
 ## 2. 三类代码的判定规则
 
@@ -304,6 +312,9 @@ apps/console/src/
 - **新增 kernel 文件** → 至少三个模块已有相同需求；否则放到需要它的模块里。
 - **例外** → 只接受带过期日期的 ADR（`docs/adr/NNNN-*.md`），`tools/arch` 读取 ADR 中的例外条目并在过期后重新报错。
 - **复制自 agent-workflow 的代码**（`packages/agent-drivers`）同样受全部规则约束；复制时按概念拆到规则允许的尺寸，并在 T0.2 登记源 commit 与逐文件对照表。
+
+**本文管形状，不管流程。** 怎么改（主干开发、提交纪律、门禁、测试要求、RFC 流程）见 `development-rules.md`。
+两者的分工：改产品行为立 RFC，改本文定的结构规则立 ADR，两样都改就两样都要。
 
 ## 12. 与 Design §15.1 的差异
 

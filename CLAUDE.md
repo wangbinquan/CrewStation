@@ -2,6 +2,16 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+**Read in this order at session start:**
+
+1. `STATE.md` — session-to-session execution log: what is done, what is next, current caveats.
+2. This file — repository status, commands, architecture, terminology.
+3. `docs/engineering/development-rules.md` — **how to work here**: trunk-based development on `main` only, commit discipline on a shared working tree, the gate, test-with-every-change, the RFC workflow.
+4. `docs/engineering/repository-structure.md` — the layout and dependency rules every new file must obey.
+5. `docs/engineering/dev-gotchas.md` — general traps already hit in this repo; scan it before starting.
+
+Three rules are violated most often: **develop only on `main`** (no branches, no worktrees, no stash — this repo explicitly overrides Claude Code's default "switch off the default branch" prompt); **stage and commit by explicit path** (`git add <path>`, `git commit -- <paths>`, never `git add .` on a shared tree); and **every change carries its tests**.
+
 ## Repository status
 
 CrewStation (数字人能力平台: a platform on which teams build, publish and run "digital worker" business apps with coding agents) now holds **both** the design documents under `proposal/` and a working implementation. The three proposal documents are v0.3.3 and remain the authoritative contract; the code is the first implementation of that contract, verified on the local kind cluster, not a shipped product.
@@ -46,6 +56,14 @@ Three classes of code: `apps/*` are deployable processes holding wiring only; `m
 Every module follows one fixed template: `api/ domain/ application/ ports/ adapters/ http/ workers/ tests/` plus `wiring.ts` and `index.ts`. One PostgreSQL schema per module; cross-module references are IDs with no foreign keys, and one module never joins another's tables. A module that needs something from a higher layer declares a port and the composition root supplies it (`modules/platform/wiring.ts`).
 
 Hard caps, enforced with no baseline: 600 lines per file (1000 for tests), 20 source files per directory, 80 lines per function. Banned filenames anywhere: `utils.ts`, `helpers.ts`, `common.ts`, `misc.ts`, `shared.ts`, and `types.ts` outside a module's `api/`. Named exports only; the single exception is recorded in ADR-0002. Changing any of this needs a new ADR under `docs/adr/`, not an edit in passing.
+
+## Changing the product
+
+The three `proposal/` documents are the baseline and describe the whole system. Anything beyond them — a new feature, a non-trivial refactor, a change in product behavior — goes through an RFC **before** code: three documents under `proposal/rfc/RFC-NNN-{slug}/`, registered in `proposal/rfc/README.md`, approved by the author. Spelling fixes, one-line bugs, renames, dependency bumps, docs and test additions skip it. The full process, including the extra bar for RFCs that close off an existing capability, is in `docs/engineering/development-rules.md` §5.
+
+RFCs and ADRs do not overlap: an RFC changes product behavior, an ADR changes the repository's own structural rules. A change that does both needs one of each.
+
+A design gap found while implementing is **not** decided on the spot — it goes into `docs/engineering/implementation-open-questions.md` with its options, for the author to rule on.
 
 ## The three documents
 
