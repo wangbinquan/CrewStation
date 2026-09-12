@@ -24,5 +24,12 @@ jobs:
         with:
           bun-version: 1.3.13
       - run: bun install --frozen-lockfile
+      # 模板与两个接入容器有意不在根 workspaces 里（生成出来的项目要能独立安装），
+      # 但它们的测试会被根 `bun test` 收进来。不在这儿装依赖，CI 就会报 Cannot find package 'hono'。
+      - name: install standalone packages
+        run: |
+          for dir in templates/minimal-sample integrations/gitlab-event-producer integrations/reference-api-proxy; do
+            (cd "$dir" && bun install --frozen-lockfile)
+          done
       - run: bun run check
       - run: cd apps/console && bun run build
