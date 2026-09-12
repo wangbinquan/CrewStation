@@ -1,0 +1,10 @@
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--cs-space-4);
+}
+
+.hint {
+  margin: 0 0 var(--cs-space-2);
+  color: var(--cs-color-text-muted);
+}

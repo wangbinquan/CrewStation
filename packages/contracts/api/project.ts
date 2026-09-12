@@ -20,6 +20,21 @@ export const ProjectDtoSchema = z.object({
   createdAt: z.iso.datetime(),
 });
 
+/**
+ * 项目列表的查询参数（RFC-002）。`kind` 是逗号分隔的清单：租户空间只要 `DigitalWorker`，
+ * 管理空间的接入容器页要 `APIProxy,EventProducer`。
+ * 省略时行为不变——返回作用域内全部，现有调用方不破。
+ * 过滤发生在作用域判定之后，`kind` 不是放大可见范围的口子。
+ */
+export const ListProjectsQuerySchema = z.object({
+  kind: z
+    .preprocess(
+      (value) => (typeof value === 'string' ? value.split(',').map((item) => item.trim()).filter((item) => item !== '') : value),
+      z.array(ManifestKindSchema).min(1),
+    )
+    .optional(),
+});
+
 /** 管理员代建项目并指定负责人（G16）。 */
 export const CreateProjectRequestSchema = z.object({
   slug: SlugSchema,
@@ -67,6 +82,7 @@ export const ServiceDtoSchema = z.object({
 });
 
 export type ProjectDto = z.infer<typeof ProjectDtoSchema>;
+export type ListProjectsQuery = z.infer<typeof ListProjectsQuerySchema>;
 export type ProjectState = z.infer<typeof ProjectStateSchema>;
 export type CreateProjectRequest = z.infer<typeof CreateProjectRequestSchema>;
 export type MemberDto = z.infer<typeof MemberDtoSchema>;

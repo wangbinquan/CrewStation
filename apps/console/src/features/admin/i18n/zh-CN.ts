@@ -7,7 +7,29 @@ export const messages = {
 
   'admin.none': '—',
   'admin.denied.title': '仅平台管理员可见',
-  'admin.denied.description': '本页的用户目录、套餐、出站白名单与网关状态都只对平台管理员开放；需要权限请联系现有管理员。',
+  'admin.denied.description': '平台管理空间（用户与权限、算力档位、套餐、接入容器、出站白名单、网关）只对平台管理员开放。这不是页面不存在，是你的账号没有管理员标记；需要权限请联系现有管理员。',
+
+  'admin.denied.back': '回到工作台',
+
+  'admin.overview.open': '打开{page}',
+  'admin.overview.users': '谁是平台管理员：管理员才能创建项目、接入公司系统、裁定开放与出站申请。',
+  'admin.overview.compute': '算力档位：业务只引用档位名，厂商与模型只在这里维护（RFC-001）。',
+  'admin.overview.servicePlans': '服务套餐：数字人服务的 CPU、内存与副本上限，由 Manifest 按名引用。',
+  'admin.overview.taskProfiles': '任务容器套餐：开发会话与业务任务容器的 CPU、内存与存储。',
+  'admin.overview.integrations': '接入容器：APIProxy 与 EventProducer 两类平台项目，不出现在租户的项目列表里。',
+  'admin.overview.egress': '出站白名单：任务容器与构建能访问哪些外部域名。',
+  'admin.overview.gateway': '网关：由项目、发布与开放策略推导出的路由表与放行表。',
+
+  'admin.integrations.title': '接入容器项目',
+  'admin.integrations.hint': '接入公司系统的两类平台项目：APIProxy 纯转发公司 API，EventProducer 把公司 webhook 变成平台事件。它们由管理员代建，和数字人一样走标签发布与蓝绿切换。',
+  'admin.integrations.footer': '在这里点进去就是它们各自的项目页：发布、配置、日志与数字人完全一致。新建仍在工作台的项目列表里做（管理员可见）。',
+  'admin.integrations.name': '名称',
+  'admin.integrations.slug': 'slug',
+  'admin.integrations.kind': '类型',
+  'admin.integrations.state': '状态',
+  'admin.integrations.createdAt': '创建时间',
+  'admin.integrations.emptyTitle': '还没有接入容器项目',
+  'admin.integrations.emptyDescription': '安装器可以代建内置的 GitLab 事件生产者与参考 API 代理；也可以在工作台的项目列表里按 APIProxy／EventProducer 新建。',
 
   'admin.users.title': '用户',
   'admin.users.hint': '管理员标记决定谁能创建项目、接入公司系统与裁定开放申请；用户本身由公司登录带入，工作台不建账号。',

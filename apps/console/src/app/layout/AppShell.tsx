@@ -1,19 +1,23 @@
 import { Outlet } from '@tanstack/react-router';
-import type { ReactElement } from 'react';
+import type { ReactElement, ReactNode } from 'react';
 import styles from './AppShell.module.css';
-import { SideNav } from './SideNav';
 import { TopBar } from './TopBar';
 
-/** 工作台外壳：左侧导航、顶栏、内容区。 */
-export function AppShell(): ReactElement {
+export interface AppShellProps {
+  /** 左栏：租户空间与平台管理空间各自一套（RFC-002）。 */
+  readonly nav: ReactNode;
+  /** 默认渲染子路由；管理空间用它把 Outlet 包在守卫里面。 */
+  readonly children?: ReactNode;
+}
+
+/** 外壳：左栏、顶栏、内容区。左栏由空间决定，外壳本身不知道自己在哪个空间。 */
+export function AppShell({ nav, children }: AppShellProps): ReactElement {
   return (
     <div className={styles.shell}>
-      <SideNav />
+      {nav}
       <TopBar />
       <main className={styles.main}>
-        <div className={styles.content}>
-          <Outlet />
-        </div>
+        <div className={styles.content}>{children ?? <Outlet />}</div>
       </main>
     </div>
   );

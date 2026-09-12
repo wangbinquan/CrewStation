@@ -88,6 +88,17 @@ describe('createApiClient：请求形状', () => {
     expect(await client.devSession.touch('tsk_1')).toBeUndefined();
   });
 
+  test('projects.list 的 kind 过滤拼成逗号分隔的查询参数，省略时不带（RFC-002）', async () => {
+    const { calls, fetchImpl } = fakeFetch(() => json(200, { items: [] }));
+    const client = createApiClient({ fetch: fetchImpl });
+    await client.projects.list(['DigitalWorker']);
+    await client.projects.list(['APIProxy', 'EventProducer']);
+    await client.projects.list();
+    expect(calls[0]?.url).toBe('/v1/projects?kind=DigitalWorker');
+    expect(calls[1]?.url).toBe(`/v1/projects?kind=${encodeURIComponent('APIProxy,EventProducer')}`);
+    expect(calls[2]?.url).toBe('/v1/projects');
+  });
+
   test('额外请求头随每个请求发送', async () => {
     const { calls, fetchImpl } = fakeFetch(() => json(200, { items: [] }));
     const client = createApiClient({ fetch: fetchImpl, headers: { 'x-cs-cli-token': 't' } });

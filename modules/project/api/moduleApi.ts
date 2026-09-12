@@ -1,5 +1,5 @@
 import type {
-  ComputeProfileDto, ComputeProfileSummaryDto, Actor, CreateProjectRequest, ManifestKind, MemberDto, ProjectDto, ProjectId, ProjectState, QuotaDto, ServiceDto,
+  ComputeProfileDto, ComputeProfileSummaryDto, Actor, CreateProjectRequest, ListProjectsQuery, ManifestKind, MemberDto, ProjectDto, ProjectId, ProjectState, QuotaDto, ServiceDto,
   ServiceId, ServicePlanDto, SetMemberRequest, SetQuotaRequest, TaskProfileDto, UserId,
 } from '@crewstation/contracts';
 
@@ -31,7 +31,7 @@ export interface ProjectModuleApi {
   authorize(actor: Actor, projectId: ProjectId, action: ProjectAction): Promise<EffectiveRole>;
   createProject(actor: Actor, input: CreateProjectRequest): Promise<ProjectDto>;
   getProject(actor: Actor, projectId: ProjectId): Promise<ProjectDto>;
-  listProjects(actor: Actor): Promise<ProjectDto[]>;
+  listProjects(actor: Actor, query?: ListProjectsQuery): Promise<ProjectDto[]>;
   archiveProject(actor: Actor, projectId: ProjectId): Promise<ProjectDto>;
   setProjectState(projectId: ProjectId, state: ProjectState, message?: string): Promise<ProjectDto>;
   getService(actor: Actor, serviceId: ServiceId): Promise<ServiceDto>;

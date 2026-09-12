@@ -8,7 +8,29 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
 
   'admin.none': '—',
   'admin.denied.title': 'Administrators only',
-  'admin.denied.description': 'The user directory, plans, egress allowlist and gateway state on this page are visible to platform administrators only; ask an existing administrator for access.',
+  'admin.denied.description': 'The platform admin space (users and roles, compute profiles, plans, integration containers, the egress allowlist and the gateway) is open to platform administrators only. The page exists; your account simply is not marked as an administrator. Ask an existing administrator for access.',
+
+  'admin.denied.back': 'Back to the workbench',
+
+  'admin.overview.open': 'Open {page}',
+  'admin.overview.users': 'Who is a platform administrator: only they create projects, integrate company systems and decide open-policy and egress requests.',
+  'admin.overview.compute': 'Compute profiles: tenants reference only a name; vendor and model live here (RFC-001).',
+  'admin.overview.servicePlans': 'Service plans: CPU, memory and replica ceiling for digital-worker services, referenced by name from the manifest.',
+  'admin.overview.taskProfiles': 'Task container profiles: CPU, memory and storage for dev-session and business task containers.',
+  'admin.overview.integrations': 'Integration containers: APIProxy and EventProducer platform projects, kept out of tenant project lists.',
+  'admin.overview.egress': 'Egress allowlist: which external domains task containers and builds may reach.',
+  'admin.overview.gateway': 'Gateway: the routing and allow tables derived from projects, releases and open policy.',
+
+  'admin.integrations.title': 'Integration container projects',
+  'admin.integrations.hint': 'The two kinds of platform project that integrate company systems: APIProxy forwards company APIs, EventProducer turns company webhooks into platform events. Administrators create them, and they go through tag releases and blue/green switches like any digital worker.',
+  'admin.integrations.footer': 'Opening one lands on its own project pages: release, config and logs are identical to a digital worker. Creating one still happens in the workbench project list (visible to administrators).',
+  'admin.integrations.name': 'Name',
+  'admin.integrations.slug': 'Slug',
+  'admin.integrations.kind': 'Kind',
+  'admin.integrations.state': 'State',
+  'admin.integrations.createdAt': 'Created',
+  'admin.integrations.emptyTitle': 'No integration container projects yet',
+  'admin.integrations.emptyDescription': 'The installer can create the built-in GitLab event producer and the reference API proxy; you can also create one as APIProxy/EventProducer from the workbench project list.',
 
   'admin.users.title': 'Users',
   'admin.users.hint': 'The admin flag decides who may create projects, integrate company systems and decide open requests; users themselves arrive through company login — the workbench creates no accounts.',

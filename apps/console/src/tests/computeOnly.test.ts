@@ -1,20 +1,8 @@
 import { describe, expect, test } from 'bun:test';
-import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { join } from 'node:path';
+import { consoleSources, sourceAt } from './sourceScan';
 
-const CONSOLE_SRC = join(import.meta.dir, '..');
-/** 本文件自己要写出这些词才能断言它们不存在，测试目录必须排除，否则永远红。 */
-const SKIP_DIRS = new Set(['tests', 'node_modules']);
-
-function sourceFiles(dir: string): string[] {
-  return readdirSync(dir).flatMap((entry) => {
-    const full = join(dir, entry);
-    if (statSync(full).isDirectory()) return SKIP_DIRS.has(entry) ? [] : sourceFiles(full);
-    return /\.tsx?$/.test(entry) ? [full] : [];
-  });
-}
-
-const files = sourceFiles(CONSOLE_SRC).map((path) => ({ path: path.slice(CONSOLE_SRC.length + 1), text: readFileSync(path, 'utf8') }));
+const files = consoleSources();
+const tenantFiles = files.filter((file) => !file.path.startsWith('features/admin/'));
 
 /**
  * RFC-001 的验收项「工作台新建 Agent 只有档位下拉，全仓搜不到模型自由文本输入」。
@@ -23,25 +11,18 @@ const files = sourceFiles(CONSOLE_SRC).map((path) => ({ path: path.slice(CONSOLE
  */
 describe('工作台不向租户暴露模型与驱动（RFC-001）', () => {
   test('租户面没有模型输入框：只有管理页可以出现 model 字段', () => {
-    const offenders = files
-      .filter((file) => !file.path.startsWith('features/admin/'))
-      .filter((file) => /\bmodel(Placeholder)?\b\s*[:=]|setModel|'model'|"model"/.test(file.text))
-      .map((file) => file.path);
+    const offenders = tenantFiles.filter((file) => /\bmodel(Placeholder)?\b\s*[:=]|setModel|'model'|"model"/.test(file.code)).map((file) => file.path);
     expect(offenders).toEqual([]);
   });
 
-  test('租户面不出现驱动选择：AGENT_DRIVERS 这类清单只留在管理页', () => {
-    const offenders = files
-      .filter((file) => !file.path.startsWith('features/admin/'))
-      .filter((file) => /AGENT_DRIVERS|COMPUTE_DRIVERS|'claude-code'|"claude-code"/.test(file.text))
-      .map((file) => file.path);
+  test('租户面不出现驱动选择：驱动清单只留在管理页', () => {
+    const offenders = tenantFiles.filter((file) => /AGENT_DRIVERS|COMPUTE_DRIVERS|'claude-code'|"claude-code"/.test(file.code)).map((file) => file.path);
     expect(offenders).toEqual([]);
   });
 
   test('新建 Agent 表单读的是算力档位目录', () => {
-    const form = files.find((file) => file.path.endsWith('agents/StartAgentForm.tsx'));
-    expect(form).toBeDefined();
-    expect(form?.text).toContain('listComputeProfiles()');
-    expect(form?.text).toContain("t('devSession.agents.compute')");
+    const form = sourceAt(files, 'agents/StartAgentForm.tsx');
+    expect(form.code).toContain('listComputeProfiles()');
+    expect(form.code).toContain("t('devSession.agents.compute')");
   });
 });

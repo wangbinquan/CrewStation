@@ -3,3 +3,5 @@ exact = true
 
 [test]
 root = "."
+# CSS Module 在 bun test 里会退化成路径字符串，见该文件的注释。
+preload = ["./apps/console/src/tests/cssModules.ts"]

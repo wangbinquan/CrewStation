@@ -6,6 +6,8 @@ export const queryKeys = {
   me: () => ['me'] as const,
   users: () => ['users'] as const,
   projects: () => ['projects'] as const,
+  /** 按 kind 过滤的项目列表（RFC-002）：挂在 projects 前缀下，建项目后一次失效连带刷新。 */
+  projectsByKind: (kinds: readonly string[]) => ['projects', 'kind', kinds.join(',')] as const,
   project: (projectId: string) => ['projects', projectId] as const,
   members: (projectId: string) => ['projects', projectId, 'members'] as const,
   quota: (projectId: string) => ['projects', projectId, 'quota'] as const,

@@ -1,7 +1,7 @@
 import type { ProjectId, ServiceId, UserId } from '@crewstation/contracts';
-import { CreateProjectRequestSchema, ProjectIdSchema, ServiceIdSchema, SetMemberRequestSchema, SetQuotaRequestSchema, UserIdSchema } from '@crewstation/contracts';
+import { CreateProjectRequestSchema, ListProjectsQuerySchema, ProjectIdSchema, ServiceIdSchema, SetMemberRequestSchema, SetQuotaRequestSchema, UserIdSchema } from '@crewstation/contracts';
 import type { AppEnv } from '@crewstation/http';
-import { parseBody, parseParams } from '@crewstation/http';
+import { parseBody, parseParams, parseQuery } from '@crewstation/http';
 import { Hono } from 'hono';
 import { z } from 'zod';
 import type { ProjectModuleApi } from '../api/moduleApi';
@@ -11,7 +11,7 @@ const projectParams = z.object({ projectId: ProjectIdSchema });
 
 export function projectRoutes(api: ProjectModuleApi): Hono<AppEnv> {
   const r = new Hono<AppEnv>();
-  r.get('/v1/projects', async (c) => c.json({ items: await api.listProjects(await actorFrom(c, api)) }));
+  r.get('/v1/projects', async (c) => c.json({ items: await api.listProjects(await actorFrom(c, api), parseQuery(c, ListProjectsQuerySchema)) }));
   r.post('/v1/projects', async (c) => c.json(await api.createProject(await actorFrom(c, api), await parseBody(c, CreateProjectRequestSchema)), 201));
   r.get('/v1/projects/:projectId', async (c) => c.json(await api.getProject(await actorFrom(c, api), parseParams(c, projectParams).projectId as ProjectId)));
   r.post('/v1/projects/:projectId/archive', async (c) => c.json(await api.archiveProject(await actorFrom(c, api), parseParams(c, projectParams).projectId as ProjectId)));

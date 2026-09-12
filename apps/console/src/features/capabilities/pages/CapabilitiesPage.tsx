@@ -1,6 +1,6 @@
 import type { CapabilityDescriptionDto } from '@crewstation/contracts';
-import { useParams } from '@tanstack/react-router';
 import type { ReactElement } from 'react';
+import { projectRoute } from '../../../app/router/projectRoute';
 import { api } from '../../../shared/api/client';
 import { queryKeys } from '../../../shared/api/queryKeys';
 import { errorMessage, useApiQuery } from '../../../shared/api/useApi';
@@ -21,7 +21,7 @@ import styles from './CapabilitiesPage.module.css';
 export function CapabilitiesPage(): ReactElement {
   const t = useT();
   const { locale } = useI18n();
-  const { projectId } = useParams({ from: '/projects/$projectId' });
+  const { projectId } = projectRoute.useParams();
   const description = useApiQuery(queryKeys.capabilities(projectId), () => api.capabilities.describe(projectId));
   return (
     <>

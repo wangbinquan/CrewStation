@@ -27,6 +27,7 @@
     "swagger-ui-dist": "5.32.15"
   },
   "devDependencies": {
+    "@happy-dom/global-registrator": "20.14.5",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "@types/swagger-ui-dist": "3.30.6",

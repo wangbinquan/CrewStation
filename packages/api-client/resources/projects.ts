@@ -1,12 +1,16 @@
-import type { MemberDto, ProjectDto, QuotaDto, SetMemberRequest, SetQuotaRequest } from '@crewstation/contracts';
+import type { ManifestKind, MemberDto, ProjectDto, QuotaDto, SetMemberRequest, SetQuotaRequest } from '@crewstation/contracts';
 import type { Transport } from '../httpTransport';
 import type { ItemsPage } from '../itemsPage';
 import type { CreateProjectInput } from '../requestInputs';
 import { segment } from '../requestUrl';
 
 export interface ProjectsResource {
-  /** GET /v1/projects：管理员看全部，成员看自己所在的项目。 */
-  list(): Promise<ItemsPage<ProjectDto>>;
+  /**
+   * GET /v1/projects：管理员看全部，成员看自己所在的项目。
+   * `kinds` 在作用域之后再筛一层（RFC-002）：租户空间传 `['DigitalWorker']`，
+   * 管理空间的接入容器页传 `['APIProxy', 'EventProducer']`；省略即不筛。
+   */
+  list(kinds?: readonly ManifestKind[]): Promise<ItemsPage<ProjectDto>>;
   /** POST /v1/projects（管理员代建并指定负责人）。 */
   create(input: CreateProjectInput): Promise<ProjectDto>;
   /** GET /v1/projects/:projectId */
@@ -28,7 +32,7 @@ export interface ProjectsResource {
 export function projectsResource(transport: Transport): ProjectsResource {
   const base = (projectId: string) => `/v1/projects/${segment(projectId)}`;
   return {
-    list: () => transport.request<ItemsPage<ProjectDto>>('GET', '/v1/projects'),
+    list: (kinds) => transport.request<ItemsPage<ProjectDto>>('GET', '/v1/projects', kinds === undefined ? {} : { query: { kind: kinds.join(',') } }),
     create: (input) => transport.request<ProjectDto>('POST', '/v1/projects', { body: input }),
     get: (projectId) => transport.request<ProjectDto>('GET', base(projectId)),
     archive: (projectId) => transport.request<ProjectDto>('POST', `${base(projectId)}/archive`),

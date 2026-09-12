@@ -1,4 +1,4 @@
-import type { Actor, ProjectDto, ProjectId, ProjectState, ServiceDto, ServiceId } from '@crewstation/contracts';
+import type { Actor, ListProjectsQuery, ProjectDto, ProjectId, ProjectState, ServiceDto, ServiceId } from '@crewstation/contracts';
 import { notFound } from '@crewstation/kernel';
 import { transition } from '../domain/project';
 import { authorizationUseCases } from './authorization';
@@ -26,9 +26,16 @@ export function queryProjectUseCases(deps: ProjectUseCaseDeps) {
       const { project, service } = await load(projectId);
       return projectToDto(project, service);
     },
-    listProjects: async (actor: Actor): Promise<ProjectDto[]> => {
+    /**
+     * 先按作用域取（管理员看全部、成员看自己的），再按 kind 过滤（RFC-002）。
+     * 顺序不能反：kind 是视图筛选，不是放大可见范围的口子——普通成员带 `kind=APIProxy`
+     * 也只会在他自己的项目里筛，拿不到别人的接入容器。
+     */
+    listProjects: async (actor: Actor, query?: ListProjectsQuery): Promise<ProjectDto[]> => {
       const projects = actor.isAdmin ? await uow.read.projects.list() : await uow.read.projects.listByIds(await uow.read.memberships.listProjectIdsByUser(actor.userId));
-      return Promise.all(projects.map(async (p) => projectToDto(p, await uow.read.services.getByProject(p.id))));
+      const kinds = query?.kind;
+      const dtos = await Promise.all(projects.map(async (p) => projectToDto(p, await uow.read.services.getByProject(p.id))));
+      return kinds === undefined ? dtos : dtos.filter((dto) => kinds.includes(dto.kind));
     },
     getService: async (actor: Actor, serviceId: ServiceId): Promise<ServiceDto> => {
       const service = await uow.read.services.getById(serviceId);

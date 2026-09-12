@@ -9,13 +9,17 @@ import { PageHeader } from '../../../shared/ui/PageHeader';
 import { QueryStatus } from '../../../shared/ui/QueryStatus';
 import { CreateProjectForm } from '../components/CreateProjectForm';
 import { ProjectTable } from '../components/ProjectTable';
+import { TENANT_KINDS } from '../model/tenantKinds';
 import styles from './ProjectListPage.module.css';
 
-/** 首页：管理员看全部项目并可代建，成员只看自己参与的项目。 */
+/**
+ * 首页：管理员看全部项目并可代建，成员只看自己参与的项目。
+ * 只列数字人（RFC-002）：接入容器是管理员建的平台项目，归平台管理空间，不占租户的列表。
+ */
 export function ProjectListPage(): ReactElement {
   const t = useT();
   const me = useApiQuery(queryKeys.me(), () => api.me.get());
-  const projects = useApiQuery(queryKeys.projects(), () => api.projects.list());
+  const projects = useApiQuery(queryKeys.projectsByKind(TENANT_KINDS), () => api.projects.list(TENANT_KINDS));
   const isAdmin = me.data?.isAdmin === true;
   const items = projects.data?.items ?? [];
   const settled = !projects.isPending && projects.error === null;

@@ -1,5 +1,5 @@
-import { useParams } from '@tanstack/react-router';
 import type { ReactElement } from 'react';
+import { projectRoute } from '../../../app/router/projectRoute';
 import { api } from '../../../shared/api/client';
 import { queryKeys } from '../../../shared/api/queryKeys';
 import { errorMessage, useApiQuery } from '../../../shared/api/useApi';
@@ -11,7 +11,7 @@ import { CatalogContent } from '../components/CatalogContent';
 /** 接口目录：调用方身份是项目的服务，先解析 serviceId，再按它取目录与授权。 */
 export function CatalogPage(): ReactElement {
   const t = useT();
-  const { projectId } = useParams({ from: '/projects/$projectId' });
+  const { projectId } = projectRoute.useParams();
   const project = useApiQuery(queryKeys.project(projectId), () => api.projects.get(projectId));
   const me = useApiQuery(queryKeys.me(), () => api.me.get());
   const serviceId = project.data?.serviceId;

@@ -115,4 +115,30 @@ describe.skipIf(!available)('project module', () => {
     await project.api.deleteComputeProfile(admin, 'balanced');
     expect(await project.api.resolveComputeProfile('balanced')).toBeUndefined();
   });
+
+  test('项目列表按 kind 过滤：先作用域后过滤，成员筛不出别人的接入容器（RFC-002）', async () => {
+    await project.api.createProject(admin, { slug: 'gitlab-events', name: '事件生产者', kind: 'EventProducer', ownerUserId: admin.userId, template: 'minimal-sample' });
+    await project.api.createProject(admin, { slug: 'ref-proxy', name: '参考代理', kind: 'APIProxy', ownerUserId: admin.userId, template: 'minimal-sample' });
+
+    const all = await project.api.listProjects(admin);
+    expect(all.map((p) => p.slug).sort()).toEqual(['demo', 'gitlab-events', 'ref-proxy']);
+    // 省略 kind 时行为与改动前一致。
+    expect((await project.api.listProjects(admin, {})).length).toBe(all.length);
+
+    expect((await project.api.listProjects(admin, { kind: ['DigitalWorker'] })).map((p) => p.slug)).toEqual(['demo']);
+    expect((await project.api.listProjects(admin, { kind: ['APIProxy', 'EventProducer'] })).map((p) => p.slug).sort()).toEqual(['gitlab-events', 'ref-proxy']);
+
+    // dev 是 demo 的成员、不是两个接入容器的成员：带 kind 也只在自己的作用域里筛。
+    expect((await project.api.listProjects(dev, { kind: ['APIProxy', 'EventProducer'] })).map((p) => p.slug)).toEqual([]);
+    expect((await project.api.listProjects(dev, { kind: ['DigitalWorker'] })).map((p) => p.slug)).toEqual(['demo']);
+  });
+
+  test('HTTP 的 kind 是逗号分隔串，非法值 400（RFC-002）', async () => {
+    const app = createApp({ name: 'test' });
+    for (const router of project.http) app.route('/', router);
+    const headers = { [IDENTITY_HEADERS.userId]: admin.userId };
+    const filtered = await app.request('/v1/projects?kind=APIProxy,EventProducer', { headers });
+    expect((await filtered.json() as { items: { slug: string }[] }).items.map((i) => i.slug).sort()).toEqual(['gitlab-events', 'ref-proxy']);
+    expect((await app.request('/v1/projects?kind=Nope', { headers })).status).toBe(400);
+  });
 });
