@@ -44,6 +44,9 @@ export const queryKeys = {
   egressBlocked: (projectId: string) => ['egress', 'blocked', projectId] as const,
   servicePlans: () => ['service-plans'] as const,
   taskProfiles: () => ['task-profiles'] as const,
+  /** 算力档位（RFC-001）：租户投影与管理面全量分开缓存，两者字段不同。 */
+  computeProfiles: () => ['compute-profiles'] as const,
+  computeProfilesFull: () => ['compute-profiles', 'full'] as const,
   /** 网关的只读派生状态；重算后按 gateway 前缀一次失效。 */
   gateway: () => ['gateway'] as const,
   gatewayRoutes: () => ['gateway', 'routes'] as const,

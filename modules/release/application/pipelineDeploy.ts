@@ -15,6 +15,13 @@ export interface DeploySteps {
 }
 
 /** 部署阶段：待命槽换上新发布并标记旧发布 superseded；就绪后登记 Manifest 与 OpenAPI。 */
+/** Manifest 的 tasks.agentProfiles 引用的档位里，哪些在平台目录中不存在。 */
+async function missingComputeProfiles(deps: ReleaseUseCaseDeps, manifest: Manifest): Promise<string[]> {
+  const wanted = manifest.kind === 'DigitalWorker' ? [...new Set((manifest.spec.tasks?.agentProfiles ?? []).map((p) => p.compute))] : [];
+  const found = await Promise.all(wanted.map(async (name) => ({ name, ok: (await deps.plans.getComputeProfile(name)) !== undefined })));
+  return found.filter((f) => !f.ok).map((f) => f.name);
+}
+
 export function deploySteps(deps: ReleaseUseCaseDeps, ctx: PipelineContext): DeploySteps {
   const { uow, clock } = deps;
 
@@ -22,6 +29,12 @@ export function deploySteps(deps: ReleaseUseCaseDeps, ctx: PipelineContext): Dep
     const plan = await deps.plans.getServicePlan(manifest.spec.service.plan);
     if (!plan) return ctx.fail(release, `服务套餐 ${manifest.spec.service.plan} 不存在`);
     if (manifest.spec.service.replicas > plan.maxReplicas) return ctx.fail(release, `副本数 ${manifest.spec.service.replicas} 超过套餐上限 ${plan.maxReplicas}`);
+    // 引用不存在的算力档位就不进部署（RFC-001），与引用不存在的服务套餐同等对待。
+    const missingCompute = await missingComputeProfiles(deps, manifest);
+    if (missingCompute.length > 0) {
+      const available = (await deps.plans.listComputeProfiles()).map((p) => p.name);
+      return ctx.fail(release, `算力档位 ${missingCompute.join('、')} 不存在；当前可用：${available.join('、') || '（空）'}`);
+    }
     const env = await renderSlotEnv(deps, { projectId: release.projectId, serviceId: release.serviceId, projectSlug: svc.slug, serviceName: svc.name, physical: release.targetSlot, manifest });
     await deps.deployer.deploy({ namespace: svc.namespace, projectSlug: svc.slug, serviceName: svc.name, physical: release.targetSlot, releaseId: release.id, image: release.image ?? '', manifest, env: env.values, plan });
     const now = clock.now();

@@ -94,4 +94,25 @@ describe.skipIf(!available)('project module', () => {
     expect(stranger.status).toBe(404);
     expect((await app.request('/v1/projects')).status).toBe(401);
   });
+
+  test('算力档位：按名覆盖、非管理员不能写、租户投影不含驱动与模型（RFC-001）', async () => {
+    await project.api.upsertComputeProfile(admin, { name: 'balanced', driver: 'claude-code', model: 'anthropic/claude-sonnet-5', description: '均衡' });
+    await project.api.upsertComputeProfile(admin, { name: 'balanced', driver: 'claude-code', model: 'anthropic/claude-opus-5', description: '均衡（改）' });
+    expect((await project.api.listComputeProfilesFull(admin)).filter((p) => p.name === 'balanced')).toEqual([
+      { name: 'balanced', driver: 'claude-code', model: 'anthropic/claude-opus-5', description: '均衡（改）' },
+    ]);
+
+    // 租户面只给名字与说明：厂商与模型是平台的采购信息。
+    const summary = (await project.api.listComputeProfiles()).find((p) => p.name === 'balanced')!;
+    expect(summary).toEqual({ name: 'balanced', description: '均衡（改）' });
+
+    await expect(project.api.listComputeProfilesFull(dev)).rejects.toMatchObject({ kind: 'forbidden' });
+    await expect(project.api.upsertComputeProfile(dev, { name: 'x', driver: 'stub', model: 'stub/echo', description: '' })).rejects.toMatchObject({ kind: 'forbidden' });
+    await expect(project.api.deleteComputeProfile(dev, 'balanced')).rejects.toMatchObject({ kind: 'forbidden' });
+
+    expect(await project.api.resolveComputeProfile('balanced')).toMatchObject({ driver: 'claude-code', model: 'anthropic/claude-opus-5' });
+    expect(await project.api.resolveComputeProfile('nope')).toBeUndefined();
+    await project.api.deleteComputeProfile(admin, 'balanced');
+    expect(await project.api.resolveComputeProfile('balanced')).toBeUndefined();
+  });
 });

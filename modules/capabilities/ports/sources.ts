@@ -1,4 +1,4 @@
-import type { Actor, ApiOperationDto, DataResourceDto, ProjectId, QuotaDto, ServiceId, ServicePlanDto, SubscriptionDto } from '@crewstation/contracts';
+import type { ComputeProfileSummaryDto, Actor, ApiOperationDto, DataResourceDto, ProjectId, QuotaDto, ServiceId, ServicePlanDto, SubscriptionDto } from '@crewstation/contracts';
 
 /** 能力说明只读聚合的各来源；全部由已有模块的公开查询提供。 */
 export interface CapabilitySources {
@@ -6,6 +6,8 @@ export interface CapabilitySources {
   authorize(actor: Actor, projectId: ProjectId, action: 'view'): Promise<unknown>;
   quota(actor: Actor, projectId: ProjectId): Promise<QuotaDto>;
   servicePlans(): Promise<ServicePlanDto[]>;
+  /** 本平台可用的算力档位（RFC-001）：只有名字与说明。 */
+  computeProfiles(): Promise<ComputeProfileSummaryDto[]>;
   configKeys(actor: Actor, projectId: ProjectId, env: 'development' | 'production'): Promise<string[]>;
   dataResources(actor: Actor, projectId: ProjectId): Promise<DataResourceDto[]>;
   operations(actor: Actor, serviceId: ServiceId): Promise<ApiOperationDto[]>;

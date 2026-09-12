@@ -19,6 +19,7 @@ egress: { mode: proxy, allowlist: ${allowlist} }
 const BUNDLE_DIRS = ['/bundle', '/bundle/profiles'];
 const PLANS = '- { name: standard-small, cpu: "500m", memory: 512Mi, maxReplicas: 3 }\n';
 const PROFILES = '- { name: coding-medium, cpu: "1", memory: 2Gi, storage: 10Gi }\n';
+const COMPUTE = '- { name: sample-stub, driver: stub, model: stub/echo }\n- { name: balanced, driver: claude-code, model: anthropic/claude-sonnet-5 }\n';
 
 const ADMIN = { id: `usr_${'a'.padEnd(32, '0')}`, name: '管理员', email: 'a@example.com', isAdmin: true, memberships: [], demoIdentity: true };
 const CLUSTER = fakeCluster({ version: clusterOk('{}') });
@@ -29,6 +30,7 @@ function filesFor(allowlist: string, integrations = '{ gitlabEventProducer: { en
     '/bundle/release.lock.yaml': 'version: 0.1.0\n',
     '/bundle/profiles/service-plans.yaml': PLANS,
     '/bundle/profiles/task-profiles.yaml': PROFILES,
+    '/bundle/profiles/compute-profiles.yaml': COMPUTE,
   }, BUNDLE_DIRS);
 }
 
@@ -45,18 +47,21 @@ describe('安装第 5 步：能做的真做', () => {
     const respond = routes({
       'PUT /v1/catalog/service-plans': jsonResponse(200, {}),
       'PUT /v1/catalog/task-profiles': jsonResponse(200, {}),
+      'PUT /v1/catalog/compute-profiles': jsonResponse(200, {}),
       'GET /v1/egress/entries': jsonResponse(200, { items: [] }),
       'POST /v1/egress/entries': jsonResponse(201, {}),
     });
     const { checks, calls } = await initialize(filesFor('[git.example.com]'), respond);
     expect(checks.find((check) => check.label.includes('服务套餐'))?.outcome).toBe('ok');
-    expect(calls.filter((call) => call.url.includes('/catalog/'))).toHaveLength(2);
+    expect(checks.find((check) => check.label === '算力档位')?.detail).toContain('sample-stub、balanced');
+    expect(calls.filter((call) => call.url.includes('/catalog/'))).toHaveLength(4);
   });
 
   test('出站白名单里的占位符被筛掉并点名，结论是受限', async () => {
     const respond = routes({
       'PUT /v1/catalog/service-plans': jsonResponse(200, {}),
       'PUT /v1/catalog/task-profiles': jsonResponse(200, {}),
+      'PUT /v1/catalog/compute-profiles': jsonResponse(200, {}),
       'GET /v1/egress/entries': jsonResponse(200, { items: [{ id: 'e1', fqdn: 'git.example.com', scope: 'global', createdBy: ADMIN.id, createdAt: '2026-09-11T08:00:00.000Z' }] }),
       'POST /v1/egress/entries': jsonResponse(201, {}),
     });
@@ -74,6 +79,7 @@ describe('安装第 5 步：能做的真做', () => {
     const respond = routes({
       'PUT /v1/catalog/service-plans': jsonResponse(200, {}),
       'PUT /v1/catalog/task-profiles': jsonResponse(200, {}),
+      'PUT /v1/catalog/compute-profiles': jsonResponse(200, {}),
       'GET /v1/egress/entries': jsonResponse(200, { items: [] }),
       'POST /v1/egress/entries': jsonResponse(201, {}),
       'GET /v1/me': jsonResponse(200, ADMIN),
@@ -92,6 +98,7 @@ describe('安装第 5 步：能做的真做', () => {
     const respond = routes({
       'PUT /v1/catalog/service-plans': jsonResponse(200, {}),
       'PUT /v1/catalog/task-profiles': jsonResponse(200, {}),
+      'PUT /v1/catalog/compute-profiles': jsonResponse(200, {}),
       'GET /v1/egress/entries': jsonResponse(200, { items: [] }),
       'POST /v1/egress/entries': jsonResponse(201, {}),
       'GET /v1/me': jsonResponse(200, ADMIN),
@@ -108,6 +115,7 @@ describe('安装第 5 步：能做的真做', () => {
     const respond = routes({
       'PUT /v1/catalog/service-plans': jsonResponse(200, {}),
       'PUT /v1/catalog/task-profiles': jsonResponse(200, {}),
+      'PUT /v1/catalog/compute-profiles': jsonResponse(200, {}),
       'GET /v1/egress/entries': jsonResponse(200, { items: [] }),
       'POST /v1/egress/entries': jsonResponse(201, {}),
       'GET /v1/me': jsonResponse(200, { ...ADMIN, isAdmin: false }),
@@ -128,6 +136,7 @@ describe('安装第 5 步：能做的真做', () => {
     const respond = routes({
       'PUT /v1/catalog/service-plans': jsonResponse(200, {}),
       'PUT /v1/catalog/task-profiles': jsonResponse(200, {}),
+      'PUT /v1/catalog/compute-profiles': jsonResponse(200, {}),
       'GET /v1/egress/entries': jsonResponse(200, { items: [] }),
       'POST /v1/egress/entries': jsonResponse(201, {}),
     });
@@ -135,5 +144,26 @@ describe('安装第 5 步：能做的真做', () => {
     const notImplemented = checks.filter((check) => check.outcome === 'not-implemented').map((check) => check.label);
     expect(notImplemented).toContain('最小样例模板');
     expect(notImplemented).toContain('源码托管连接、上游连接与开放策略');
+  });
+
+  test('发行包没有算力档位：单独报 pending-config，不拖累套餐那一行（RFC-001）', async () => {
+    const respond = routes({
+      'PUT /v1/catalog/service-plans': jsonResponse(200, {}),
+      'PUT /v1/catalog/task-profiles': jsonResponse(200, {}),
+      'GET /v1/egress/entries': jsonResponse(200, { items: [] }),
+      'POST /v1/egress/entries': jsonResponse(201, {}),
+    });
+    const files = memoryFiles({
+      '/install.yaml': yaml('[git.example.com]', '{ gitlabEventProducer: { enabled: false }, referenceApiProxy: { enabled: false } }'),
+      '/bundle/release.lock.yaml': 'version: 0.1.0\n',
+      '/bundle/profiles/service-plans.yaml': PLANS,
+      '/bundle/profiles/task-profiles.yaml': PROFILES,
+    }, BUNDLE_DIRS);
+    const { checks, calls } = await initialize(files, respond);
+    expect(checks.find((check) => check.label.includes('服务套餐'))?.outcome).toBe('ok');
+    const compute = checks.find((check) => check.label === '算力档位');
+    expect(compute?.outcome).toBe('pending-config');
+    expect(compute?.detail).toContain('起不了 Agent');
+    expect(calls.filter((call) => call.url.includes('/catalog/compute-profiles'))).toHaveLength(0);
   });
 });

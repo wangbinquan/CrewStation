@@ -1,5 +1,5 @@
 import type {
-  Actor, CreateProjectRequest, ManifestKind, MemberDto, ProjectDto, ProjectId, ProjectState, QuotaDto, ServiceDto,
+  ComputeProfileDto, ComputeProfileSummaryDto, Actor, CreateProjectRequest, ManifestKind, MemberDto, ProjectDto, ProjectId, ProjectState, QuotaDto, ServiceDto,
   ServiceId, ServicePlanDto, SetMemberRequest, SetQuotaRequest, TaskProfileDto, UserId,
 } from '@crewstation/contracts';
 
@@ -49,5 +49,13 @@ export interface ProjectModuleApi {
   listServicePlans(): Promise<ServicePlanDto[]>;
   upsertServicePlan(actor: Actor, plan: ServicePlanDto): Promise<ServicePlanDto>;
   listTaskProfiles(): Promise<TaskProfileDto[]>;
+  /** 租户面：只有名字与说明（RFC-001）。 */
+  listComputeProfiles(): Promise<ComputeProfileSummaryDto[]>;
+  /** 管理面：含驱动与模型；非管理员抛 forbidden。 */
+  listComputeProfilesFull(actor: Actor): Promise<ComputeProfileDto[]>;
+  upsertComputeProfile(actor: Actor, profile: ComputeProfileDto): Promise<ComputeProfileDto>;
+  deleteComputeProfile(actor: Actor, name: string): Promise<void>;
+  /** 档位名 → 具体驱动与模型；不存在返回 undefined，由调用方决定报错文案。 */
+  resolveComputeProfile(name: string): Promise<ComputeProfileDto | undefined>;
   upsertTaskProfile(actor: Actor, profile: TaskProfileDto): Promise<TaskProfileDto>;
 }

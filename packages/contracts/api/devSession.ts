@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { ProjectIdSchema, TaskIdSchema, UserIdSchema } from '../ids';
-import { AgentDriverSchema, AgentPermissionSchema } from '../manifest/tasks';
+import { ProjectIdSchema, SlugSchema, TaskIdSchema, UserIdSchema } from '../ids';
+import { AgentPermissionSchema } from '../manifest/tasks';
 import { PreviewStateSchema } from '../taskrunner/protocol';
 
 export const DevSessionStateSchema = z.enum(['creating', 'running', 'releasing', 'released', 'failed']);
@@ -36,8 +36,8 @@ export const AgentInstanceStateSchema = z.enum(['starting', 'running', 'awaiting
 export const AgentInstanceDtoSchema = z.object({
   agentId: z.string(),
   taskId: TaskIdSchema,
-  driver: AgentDriverSchema,
-  model: z.string(),
+  /** 算力档位名；租户面不展示背后的驱动与模型（RFC-001）。 */
+  compute: z.string(),
   permission: AgentPermissionSchema,
   state: AgentInstanceStateSchema,
   sessionId: z.string().optional(),
@@ -45,10 +45,10 @@ export const AgentInstanceDtoSchema = z.object({
   endedAt: z.iso.datetime().optional(),
 });
 
-/** 开发会话内启动流式交互 Agent；使用者决定用哪个驱动与模型。 */
+/** 开发会话内启动流式交互 Agent；算力由平台按档位分配，使用者不指定驱动与模型。 */
 export const StartDevAgentRequestSchema = z.object({
-  driver: AgentDriverSchema,
-  model: z.string().min(1),
+  /** 管理员定义的算力档位名；省略时用平台默认档（RFC-001）。 */
+  compute: SlugSchema.optional(),
   permission: AgentPermissionSchema.default('edit'),
   prompt: z.string().min(1),
   cwd: z.string().optional(),

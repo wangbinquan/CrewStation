@@ -6,15 +6,19 @@ export const AgentDriverSchema = z.enum(['claude-code', 'opencode', 'stub']);
 export const AgentPermissionSchema = z.enum(['read-only', 'edit', 'full']);
 export const VolumeModeSchema = z.enum(['follow-container', 'persistent']);
 
+/**
+ * Agent 档案（RFC-001）：算力由平台统一提供，业务不声明厂商、模型与驱动，只引用管理员定义的档位名。
+ * `.strict()` 是必需的：zod 默认剥掉未知键，旧写法的 `driver` / `model` 会被静默丢弃，
+ * 业务会以为自己指定了驱动，实际没有；strict 之后会明确报出「无法识别的键 driver」。
+ */
 export const AgentProfileSchema = z.object({
   name: SlugSchema,
-  driver: AgentDriverSchema,
-  /** `<provider>/<model>`，与 agent-workflow 的写法一致。 */
-  model: z.string().min(1),
+  /** 引用管理员定义的算力档位；档位封装「用哪个驱动、哪个模型」。 */
+  compute: SlugSchema,
   permission: AgentPermissionSchema.default('edit'),
   /** 相对仓库根的系统提示文件，可选。 */
   systemPromptFile: z.string().min(1).optional(),
-});
+}).strict();
 
 export const OutputContractSchema = z.object({
   name: SlugSchema,

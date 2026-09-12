@@ -19,7 +19,7 @@ const projectId = 'prj_0123456789abcdef0123456789abcdef' as ProjectId;
 let manifestYaml = '';
 let tagCounter = 0;
 
-const baseManifest = (migration: string) => `
+const baseManifest = (migration: string, compute = 'sample-stub') => `
 apiVersion: crewstation/v1
 kind: DigitalWorker
 spec:
@@ -27,6 +27,10 @@ spec:
   env: [{ name: GREETING, from: config }]
   apis: { requested: [], exposes: { openapi: ./openapi.yaml } }
   subscriptions: []
+  tasks:
+    profile: coding-medium
+    defaultVolumeMode: follow-container
+    agentProfiles: [{ name: chat-v1, compute: ${compute}, permission: read-only }]
   release:
     ${migration}
 `;
@@ -45,7 +49,11 @@ beforeAll(async () => {
     },
     authorizer: { authorize: async (actor, _p, action) => { if (action === 'switch-traffic' && actor.userId !== owner.userId) throw new Error('forbidden'); } },
     services: { resolveServiceById: async () => ({ projectId, slug: 'demo', name: 'demo', namespace: 'cs-demo' }) },
-    plans: { getServicePlan: async (name) => (name === 'standard-small' ? { name, cpu: '500m', memory: '512Mi', maxReplicas: 3, description: '' } : undefined) },
+    plans: {
+      getServicePlan: async (name) => (name === 'standard-small' ? { name, cpu: '500m', memory: '512Mi', maxReplicas: 3, description: '' } : undefined),
+      getComputeProfile: async (name) => (name === 'sample-stub' ? { name } : undefined),
+      listComputeProfiles: async () => [{ name: 'sample-stub' }],
+    },
     config: { render: async () => ({ values: { GREETING: 'hi' }, version: 7 }), validate: async (_p, _e, keys) => ({ missing: keys.filter((k) => k !== 'GREETING') }) },
     data: { envFor: async () => ({ CS_DATABASE_URL: 'postgres://prod' }) },
     hosts: { prodHost: (s) => `${s}.cs.localhost`, previewHost: (s) => `preview.${s}.cs.localhost` },
@@ -139,5 +147,22 @@ describe.skipIf(!available)('release module', () => {
     await markJob(`build-${destructive.id.slice(-12)}`, true);
     await release.api.runPipelineStep(destructive.id);
     expect((await release.api.getRelease(owner, destructive.id))).toMatchObject({ status: 'failed', message: expect.stringContaining('维护窗口') });
+  });
+
+  test('引用不存在的算力档位：发布被拒，不进构建，错误列出可用档位（RFC-001）', async () => {
+    manifestYaml = baseManifest('migration: { compatibility: none, destructive: false, rollback: switch-back }', 'nope');
+    const before = k8s.applied.filter((o) => o.kind === 'Job').length;
+    const dto = await release.api.publish(owner, serviceId, { branch: 'main', version: 'patch' });
+    await release.api.runPipelineStep(dto.id);
+    await markJob(`build-${dto.id.slice(-12)}`, true);
+    await release.api.runPipelineStep(dto.id);
+    const failed = await release.api.getRelease(owner, dto.id);
+    expect(failed.status).toBe('failed');
+    expect(failed.message).toContain('算力档位 nope 不存在');
+    expect(failed.message).toContain('sample-stub');
+    // 部署一步都没走：没有新的 Deployment。
+    expect(k8s.applied.filter((o) => o.kind === 'Deployment' && (o.metadata.name as string).includes(dto.id.slice(-6))).length).toBe(0);
+    expect(before).toBeGreaterThanOrEqual(0);
+    manifestYaml = baseManifest('migration: { compatibility: none, destructive: false, rollback: switch-back }');
   });
 });

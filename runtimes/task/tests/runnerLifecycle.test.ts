@@ -125,7 +125,7 @@ describe('终端', () => {
 describe('shutdown', () => {
   test('回 ack，runnerState draining，取消 Agent、关终端，然后 exit(0)', async () => {
     const { session, tr } = await boot();
-    await session.call({ id: 's1', type: 'startAgent', agentId: 'agent-s', driver: 'stub', model: 'stub/echo', permission: 'edit', mode: 'interactive', initialPrompt: 'stay' });
+    await session.call({ id: 's1', type: 'startAgent', agentId: 'agent-s', compute: 'sample-stub', driver: 'stub', model: 'stub/echo', permission: 'edit', mode: 'interactive', initialPrompt: 'stay' });
     await session.waitForEvent('agent', (e) => e.event.agentId === 'agent-s' && e.event.type === 'status');
     if (session.hellos[0]?.capabilities.pty) await session.call({ id: 's2', type: 'openTerminal', terminalId: 'term-s', cols: 80, rows: 24 });
     expect(await session.call({ id: 's3', type: 'shutdown', graceSeconds: 10 })).toEqual({});

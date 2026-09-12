@@ -60,7 +60,7 @@ class StubAgent implements AgentProcess {
   private async begin(): Promise<void> {
     const { spec } = this;
     this.emit('started', {
-      spec: { driver: 'stub', model: spec.model, permission: spec.permission },
+      spec: { compute: spec.compute, driver: 'stub', model: spec.model, permission: spec.permission },
       raw: { mode: spec.mode, model: spec.model, permission: spec.permission, mcp: spec.mcp.map((m) => m.name), envKeys: Object.keys(this.context.env).sort(), systemPrompt: spec.systemPrompt !== undefined },
     });
     this.emit('session', { sessionId: spec.resumeSessionId ?? `stub-${spec.agentId}` });

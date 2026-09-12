@@ -6,6 +6,7 @@ import { useT } from '../../../shared/lib/useT';
 import { EmptyState } from '../../../shared/ui/EmptyState';
 import { PageHeader } from '../../../shared/ui/PageHeader';
 import { QueryStatus } from '../../../shared/ui/QueryStatus';
+import { ComputeProfilesSection } from '../components/ComputeProfilesSection';
 import { EgressEntriesSection } from '../components/EgressEntriesSection';
 import { EgressRequestsSection } from '../components/EgressRequestsSection';
 import { GatewaySection } from '../components/GatewaySection';
@@ -38,6 +39,7 @@ export function AdminPage(): ReactElement {
         <UsersSection />
         <ServicePlansSection />
         <TaskProfilesSection />
+        <ComputeProfilesSection />
         <EgressEntriesSection />
         <EgressRequestsSection />
         <GatewaySection />

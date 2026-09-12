@@ -1,5 +1,5 @@
 import type {
-  CreateProjectRequest, ListDeliveriesQuery, LogQuery, PublishRequest, RequestTaskDataBinding, ServicePlanDto, SetConfigItemRequest,
+  ComputeProfileDto, CreateProjectRequest, ListDeliveriesQuery, LogQuery, PublishRequest, RequestTaskDataBinding, ServicePlanDto, SetConfigItemRequest,
   StartDevAgentRequest, TaskProfileDto,
 } from '@crewstation/contracts';
 
@@ -19,3 +19,4 @@ export type ListDeliveriesInput = Partial<ListDeliveriesQuery>;
 export type LogQueryInput = WithDefaults<LogQuery, 'limit'>;
 export type ServicePlanInput = WithDefaults<ServicePlanDto, 'description'>;
 export type TaskProfileInput = WithDefaults<TaskProfileDto, 'description'>;
+export type ComputeProfileInput = WithDefaults<ComputeProfileDto, 'description'>;

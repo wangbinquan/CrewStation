@@ -45,6 +45,14 @@ export const servicePlans = projectSchema.table('service_plans', {
   description: text('description').notNull().default(''),
 });
 
+/** 算力档位（RFC-001）：driver 与 model 是平台的采购信息，租户面不返回。 */
+export const computeProfiles = projectSchema.table('compute_profiles', {
+  name: text('name').primaryKey(),
+  driver: text('driver').notNull(),
+  model: text('model').notNull(),
+  description: text('description').notNull().default(''),
+});
+
 export const taskProfiles = projectSchema.table('task_profiles', {
   name: text('name').primaryKey(),
   cpu: text('cpu').notNull(),

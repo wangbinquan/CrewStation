@@ -1,4 +1,4 @@
-import type { ServicePlanInput, TaskProfileInput } from '@crewstation/api-client';
+import type { ComputeProfileInput, ServicePlanInput, TaskProfileInput } from '@crewstation/api-client';
 import { CliFailure } from '../runtime/cliError';
 import type { FileAccess } from '../runtime/commandContext';
 
@@ -11,7 +11,7 @@ export const BUNDLE_ENTRIES: readonly { readonly path: string; readonly dir: boo
   { path: 'templates/minimal-sample', dir: true, purpose: '最小样例模板' },
   { path: 'templates/gitlab-event-producer', dir: true, purpose: '内置 GitLab EventProducer 项目模板' },
   { path: 'templates/reference-api-proxy', dir: true, purpose: '参考 APIProxy 项目模板' },
-  { path: 'profiles', dir: true, purpose: '服务套餐、任务容器规格、数据与配额套餐' },
+  { path: 'profiles', dir: true, purpose: '服务套餐、任务容器规格、算力档位、数据与配额套餐' },
   { path: 'migrations', dir: true, purpose: '平台表结构与资源迁移' },
   { path: 'checks', dir: true, purpose: '预检、安装验收、升级与恢复测试' },
   { path: 'licenses-and-sbom', dir: true, purpose: '许可与 SBOM' },
@@ -48,6 +48,8 @@ export function inspectBundle(files: FileAccess, root: string): ReleaseBundle {
 export interface BundleProfiles {
   readonly servicePlans: readonly ServicePlanInput[];
   readonly taskProfiles: readonly TaskProfileInput[];
+  /** 算力档位（RFC-001）：档位名 → 驱动与模型，只有平台知道这层映射。 */
+  readonly computeProfiles: readonly ComputeProfileInput[];
   readonly notes: readonly string[];
 }
 
@@ -55,7 +57,8 @@ export function readBundleProfiles(files: FileAccess, root: string): BundleProfi
   const notes: string[] = [];
   const servicePlans = readList<ServicePlanInput>(files, join(root, 'profiles/service-plans.yaml'), notes, isServicePlan);
   const taskProfiles = readList<TaskProfileInput>(files, join(root, 'profiles/task-profiles.yaml'), notes, isTaskProfile);
-  return { servicePlans, taskProfiles, notes };
+  const computeProfiles = readList<ComputeProfileInput>(files, join(root, 'profiles/compute-profiles.yaml'), notes, isComputeProfile);
+  return { servicePlans, taskProfiles, computeProfiles, notes };
 }
 
 function readLock(files: FileAccess, root: string): { version: string | undefined; images: readonly string[] } {
@@ -97,6 +100,10 @@ function isServicePlan(value: Record<string, unknown>): boolean {
 
 function isTaskProfile(value: Record<string, unknown>): boolean {
   return typeof value.name === 'string' && typeof value.cpu === 'string' && typeof value.memory === 'string' && typeof value.storage === 'string';
+}
+
+function isComputeProfile(value: Record<string, unknown>): boolean {
+  return typeof value.name === 'string' && typeof value.driver === 'string' && typeof value.model === 'string';
 }
 
 export function join(root: string, rel: string): string {

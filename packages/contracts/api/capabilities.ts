@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { ApiOperationDtoSchema } from './apiCatalog';
 import { DataResourceDtoSchema } from './data';
 import { SubscriptionDtoSchema } from './events';
-import { QuotaDtoSchema, ServicePlanDtoSchema } from './project';
+import { ComputeProfileSummaryDtoSchema, QuotaDtoSchema, ServicePlanDtoSchema } from './project';
 
 /** 能力说明（R48）：一个服务当前可用的一切，工作台能力页与能力说明 MCP 同源。 */
 export const CapabilityDescriptionDtoSchema = z.object({
@@ -16,6 +16,8 @@ export const CapabilityDescriptionDtoSchema = z.object({
   }),
   quota: QuotaDtoSchema.optional(),
   plan: ServicePlanDtoSchema.optional(),
+  /** 本服务可用的算力档位（RFC-001）：只给名字与说明，业务据此在 Manifest 里写 compute。 */
+  computeProfiles: z.array(ComputeProfileSummaryDtoSchema).default([]),
   config: z.object({ development: z.array(z.string()), production: z.array(z.string()) }),
   data: z.array(DataResourceDtoSchema),
   operations: z.array(ApiOperationDtoSchema),

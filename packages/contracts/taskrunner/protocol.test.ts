@@ -4,7 +4,7 @@ import { RunnerCommandSchema, RunnerMessageSchema } from './protocol';
 
 describe('TaskRunner 协议', () => {
   test('startAgent 命令默认值', () => {
-    const cmd = RunnerCommandSchema.parse({ id: 'c1', type: 'startAgent', agentId: 'a1', driver: 'stub', model: 'stub/echo', permission: 'edit', mode: 'interactive' });
+    const cmd = RunnerCommandSchema.parse({ id: 'c1', type: 'startAgent', agentId: 'a1', compute: 'sample-stub', driver: 'stub', model: 'stub/echo', permission: 'edit', mode: 'interactive' });
     expect(cmd.type === 'startAgent' && cmd.mcp).toEqual([]);
   });
   test('未知命令类型被拒', () => {

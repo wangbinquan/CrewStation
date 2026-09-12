@@ -1,5 +1,5 @@
 import type { MemberRole, ProjectId, ServiceId, UserId } from '@crewstation/contracts';
-import type { ServicePlan, TaskProfile } from '../domain/plans';
+import type { ComputeProfile, ServicePlan, TaskProfile } from '../domain/plans';
 import type { Project } from '../domain/project';
 import type { TaskQuota } from '../domain/quota';
 import type { Service } from '../domain/service';
@@ -46,4 +46,10 @@ export interface CatalogRepository {
   listTaskProfiles(): Promise<TaskProfile[]>;
   getTaskProfile(name: string): Promise<TaskProfile | undefined>;
   upsertTaskProfile(profile: TaskProfile): Promise<void>;
+  listComputeProfiles(): Promise<ComputeProfile[]>;
+  getComputeProfile(name: string): Promise<ComputeProfile | undefined>;
+  upsertComputeProfile(profile: ComputeProfile): Promise<void>;
+  deleteComputeProfile(name: string): Promise<void>;
 }
+
+export type { ComputeProfile };

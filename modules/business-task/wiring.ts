@@ -17,9 +17,11 @@ import { subtaskUseCases } from './application/subtasks';
 import { taskLifecycleUseCases } from './application/taskLifecycle';
 import { serviceRoutes } from './http/serviceRoutes';
 import { userRoutes } from './http/userRoutes';
-import type { BusinessTaskSettings, Environments, ProjectAuthorizer, Runner, ServiceDirectory } from './ports/runtime';
+import type { ComputeCatalog, BusinessTaskSettings, Environments, ProjectAuthorizer, Runner, ServiceDirectory } from './ports/runtime';
 
 export interface BusinessTaskModuleDeps {
+  /** 算力档位解析（RFC-001），由组合根接到 project。 */
+  compute: ComputeCatalog;
   db: Database;
   environments: Environments;
   runner: Runner;
@@ -49,7 +51,7 @@ export function createBusinessTaskModule(deps: BusinessTaskModuleDeps): Business
   const logger = deps.logger ?? noopLogger;
   const useCaseDeps: BusinessTaskUseCaseDeps = {
     uow: drizzleUnitOfWork(deps.db), environments: deps.environments, runner: deps.runner, directory: deps.directory, authorizer: deps.authorizer,
-    settings: deps.settings, clock: deps.clock ?? systemClock, logger,
+    compute: deps.compute, settings: deps.settings, clock: deps.clock ?? systemClock, logger,
   };
   const lifecycle = taskLifecycleUseCases(useCaseDeps);
   const subtasks = subtaskUseCases(useCaseDeps);

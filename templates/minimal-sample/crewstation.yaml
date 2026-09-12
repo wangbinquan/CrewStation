@@ -36,8 +36,8 @@ spec:
     defaultVolumeMode: follow-container
     agentProfiles:
       - name: chat-v1
-        driver: stub
-        model: stub/echo
+        # 算力由平台统一提供：这里只引用管理员定义的档位名，不写厂商与模型（RFC-001）。
+        compute: sample-stub
         permission: read-only
     outputContracts: []
   release:

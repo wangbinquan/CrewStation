@@ -42,8 +42,16 @@ export function subtaskLaunch(deps: BusinessTaskUseCaseDeps) {
     await uow.run((scope) => scope.subtasks.update(started));
     if (run.kind === 'agent' && run.agentProfile) {
       try {
+        // 档位名在发布时已校验存在；这里再解析一次是因为管理员可能在此期间删掉它（RFC-001 §5）。
+        const compute = await deps.compute.resolve(run.agentProfile.compute);
+        if (!compute) {
+          // 业务侧只拿得到子任务的 error 字符串（details 不进 SubtaskRun），可选档位必须写进正文。
+          const available = (await deps.compute.list()).map((p) => p.name);
+          throw validation(`算力档位 ${run.agentProfile.compute} 不存在，当前可用：${available.join('、') || '（无）'}`, { available });
+        }
         await runner.sendCommand(run.taskId, {
-          id: `start-${run.runnerRef}`, type: 'startAgent', agentId: run.runnerRef ?? '', driver: run.agentProfile.driver, model: run.agentProfile.model, permission: run.agentProfile.permission,
+          id: `start-${run.runnerRef}`, type: 'startAgent', agentId: run.runnerRef ?? '', compute: compute.name, driver: compute.driver, model: compute.model,
+          permission: run.agentProfile.permission,
           mode: run.mode ?? 'oneshot', ...(run.cwd ? { cwd: run.cwd } : {}), initialPrompt: run.prompt ?? '', mcp: settings.mcp.map((m) => ({ name: m.name, url: m.url, headers: {} })), env: {},
         });
       } catch (error) {

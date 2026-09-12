@@ -61,6 +61,7 @@ export const capabilityDescription = (): CapabilityDescriptionDto => ({
   config: { development: ['GREETING'], production: ['GREETING'] },
   data: [],
   operations: [],
+  computeProfiles: [],
   subscriptions: [],
   mcp: [{ name: 'capabilities', url: 'http://mcp-capabilities.svc.cs.internal/mcp' }],
   businessTaskApi: [{ method: 'POST', path: '/v1/business-tasks', summary: '创建业务任务' }],

@@ -20,6 +20,8 @@ const emit = (taskId: string, event: RunnerEvent) => { const list = events.get(t
 const agentEvent = (agentId: string, type: string, extra: Record<string, unknown> = {}): RunnerEvent => ({ kind: 'agent', event: { agentId, seq: 0, at: new Date().toISOString(), type, ...extra } as never });
 
 let runnerConnected = true;
+/** 可变：用来验证「登记时存在、起子任务时被管理员删掉」的档位（RFC-001）。 */
+let computeProfiles = ['sample-stub'];
 
 beforeAll(async () => {
   if (!available) return;
@@ -44,10 +46,11 @@ beforeAll(async () => {
     },
     directory: { resolveServiceIdentity: async (identity) => (identity === 'demo/demo' ? { serviceId, projectId } : undefined) },
     authorizer: { authorize: async () => undefined },
+    compute: { resolve: async (name: string) => (computeProfiles.includes(name) ? { name, driver: 'stub' as const, model: 'stub/echo' } : undefined), list: async () => computeProfiles.map((name) => ({ name })) },
     isAdmin: async () => false,
     settings: { mcp: [{ name: 'operations', url: 'http://mcp-operations.svc.cs.internal/mcp' }], outputLimitBytes: 65536, consumerName: 'test.business-task' },
   });
-  await bt.api.registerContracts({ occurredAt: new Date().toISOString(), projectId, serviceId, releaseId: 'rel_0123456789abcdef0123456789abcdef' as ReleaseId, tag: 'v0.1.0', commitSha: 'abc', manifest: { apiVersion: 'crewstation/v1', kind: 'DigitalWorker', spec: { service: { command: ['bun'], port: 3000, healthPath: '/healthz', plan: 'p', replicas: 1, releaseMode: 'rolling-compatible' }, env: [], apis: { requested: [] }, subscriptions: [], release: { migration: { compatibility: 'none', destructive: false, rollback: 'switch-back' } }, tasks: { profile: 'coding-medium', defaultVolumeMode: 'follow-container', agentProfiles: [{ name: 'chat-v1', driver: 'stub', model: 'stub/echo', permission: 'read-only' }], outputContracts: [{ name: 'report-v1', required: ['reports/analysis.md'] }, { name: 'strict-v1', required: ['missing.md'] }] } } } });
+  await bt.api.registerContracts({ occurredAt: new Date().toISOString(), projectId, serviceId, releaseId: 'rel_0123456789abcdef0123456789abcdef' as ReleaseId, tag: 'v0.1.0', commitSha: 'abc', manifest: { apiVersion: 'crewstation/v1', kind: 'DigitalWorker', spec: { service: { command: ['bun'], port: 3000, healthPath: '/healthz', plan: 'p', replicas: 1, releaseMode: 'rolling-compatible' }, env: [], apis: { requested: [] }, subscriptions: [], release: { migration: { compatibility: 'none', destructive: false, rollback: 'switch-back' } }, tasks: { profile: 'coding-medium', defaultVolumeMode: 'follow-container', agentProfiles: [{ name: 'chat-v1', compute: 'sample-stub', permission: 'read-only' }], outputContracts: [{ name: 'report-v1', required: ['reports/analysis.md'] }, { name: 'strict-v1', required: ['missing.md'] }] } } } });
 });
 afterAll(async () => { await tdb?.drop(); });
 
@@ -63,7 +66,8 @@ describe.skipIf(!available)('business-task module', () => {
     const agent = await bt.api.submitSubtask(caller, task.id, { kind: 'agent', name: 'analysis', agentProfile: 'chat-v1', outputContract: 'report-v1', mode: 'oneshot', prompt: '分析' });
     const command = await bt.api.submitSubtask(caller, task.id, { kind: 'command', name: 'tests', command: ['bun', 'test'], timeoutSeconds: 60 });
     const start = commands.find((c) => c.type === 'startAgent') as Extract<RunnerCommand, { type: 'startAgent' }>;
-    expect(start).toMatchObject({ driver: 'stub', permission: 'read-only', mode: 'oneshot', initialPrompt: '分析', mcp: [{ name: 'operations' }] });
+    // 档位由平台解析后再下发，业务只登记了档位名（RFC-001）。
+    expect(start).toMatchObject({ compute: 'sample-stub', driver: 'stub', model: 'stub/echo', permission: 'read-only', mode: 'oneshot', initialPrompt: '分析', mcp: [{ name: 'operations' }] });
     await Bun.sleep(50);
     expect((await bt.api.getSubtask(caller, task.id, command.id))).toMatchObject({ state: 'succeeded', exitCode: 0 });
     expect(await bt.api.subtaskOutput(caller, task.id, command.id)).toBe('done\n');
@@ -120,5 +124,21 @@ describe.skipIf(!available)('business-task module', () => {
     // 再次调用不重复派发。
     expect(await bt.api.dispatchPendingSubtasks(task.id)).toBe(0);
     await bt.api.closeTask(caller, task.id);
+  });
+
+  test('登记的档位已被管理员下线：子任务直接失败并列出现有档位，不下发 startAgent（RFC-001）', async () => {
+    const task = await bt.api.createTask(caller, { labels: {} });
+    computeProfiles = ['balanced'];
+    try {
+      // 发布时档位存在才登记得下，这里模拟发布之后被管理员删掉：失败要说清还有哪些档位可用。
+      const orphan = await bt.api.submitSubtask(caller, task.id, { kind: 'agent', name: 'orphan', agentProfile: 'chat-v1', mode: 'oneshot', prompt: '孤儿档位' });
+      expect(orphan.state).toBe('failed');
+      expect(orphan.error).toContain('算力档位 sample-stub 不存在');
+      expect(orphan.error).toContain('balanced');
+      expect(commands.filter((c) => c.type === 'startAgent' && c.initialPrompt === '孤儿档位')).toHaveLength(0);
+    } finally {
+      computeProfiles = ['sample-stub'];
+      await bt.api.closeTask(caller, task.id);
+    }
   });
 });

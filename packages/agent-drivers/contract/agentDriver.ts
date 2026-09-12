@@ -8,6 +8,8 @@ import type { ProcessHost } from './processHost';
 /** 一次 startAgent 剥掉协议外壳后的启动规格（与宿主 AgentSpec 同形，去掉 driver 字段）。 */
 export interface DriverAgentSpec {
   agentId: string;
+  /** 算力档位名（RFC-001）：平台透传，驱动不解释，只在 started 事件里回显。 */
+  compute: string;
   model: string;
   permission: AgentPermission;
   mode: 'oneshot' | 'interactive';

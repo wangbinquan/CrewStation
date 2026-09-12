@@ -31,6 +31,7 @@ function runDir(): string {
 function spec(overrides: Partial<DriverAgentSpec> = {}): DriverAgentSpec {
   return {
     agentId: 'agt-1',
+  compute: 'balanced',
     model: 'anthropic/claude-sonnet-4',
     permission: 'edit',
     mode: 'oneshot',

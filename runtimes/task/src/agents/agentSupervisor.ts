@@ -70,6 +70,7 @@ export function createAgentSupervisor(deps: AgentSupervisorDeps): AgentSuperviso
 function toSpec(command: StartAgentCommand): AgentSpec {
   return {
     agentId: command.agentId,
+    compute: command.compute,
     driver: command.driver,
     model: command.model,
     permission: command.permission,

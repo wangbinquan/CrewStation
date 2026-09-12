@@ -52,7 +52,7 @@ login() {
   log "已登录 $(jq -r '.user.name' "${BODY}")，用户 ${ADMIN_USER_ID}"
 }
 
-# 套餐目录在全新集群上是空的，而建项目会校验套餐存在；PUT 是 upsert，重复执行无副作用。
+# 套餐与算力档位在全新集群上是空的，而建项目会校验套餐存在。种目录只有一处实现：seed-catalog.sh。
 ensure_service_plan() {
   local code
   code="$(api GET /v1/catalog/service-plans)"
@@ -60,10 +60,8 @@ ensure_service_plan() {
     log "服务套餐 ${SERVICE_PLAN} 已存在"
     return 0
   fi
-  jq -nc --arg n "${SERVICE_PLAN}" '{name:$n,cpu:"500m",memory:"512Mi",maxReplicas:3,description:"接入容器默认套餐"}' > "${REQ}"
-  code="$(api PUT /v1/catalog/service-plans with-body)"
-  [ "${code}" = "200" ] || die "登记服务套餐 ${SERVICE_PLAN} 失败：HTTP ${code} $(detail)"
-  log "已登记服务套餐 ${SERVICE_PLAN}"
+  log "平台目录是空的，先跑 seed-catalog.sh"
+  "${ROOT}/deploy/local/seed-catalog.sh"
 }
 
 read_gitlab_env() {

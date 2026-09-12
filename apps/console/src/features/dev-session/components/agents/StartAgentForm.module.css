@@ -15,7 +15,6 @@
 }
 
 .select,
-.input,
 .prompt {
   padding: 5px var(--cs-space-2);
   border: 1px solid var(--cs-color-border);
@@ -25,13 +24,9 @@
   font: inherit;
 }
 
-.input,
 .prompt {
   width: 100%;
   font-family: var(--cs-font-mono);
-}
-
-.prompt {
   resize: vertical;
 }
 

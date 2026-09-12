@@ -1,4 +1,4 @@
-import type { Actor, ProjectId, RunnerCommand, RunnerEvent, ServiceId, TaskId, TraceId, VolumeMode } from '@crewstation/contracts';
+import type { Actor, AgentDriver, ProjectId, RunnerCommand, RunnerEvent, ServiceId, TaskId, TraceId, VolumeMode } from '@crewstation/contracts';
 
 export interface EnvironmentView {
   id: TaskId;
@@ -27,6 +27,15 @@ export interface Runner {
 /** 由 project 提供：服务身份解析与用户视图授权。 */
 export interface ServiceDirectory {
   resolveServiceIdentity(identity: string): Promise<{ serviceId: ServiceId; projectId: ProjectId } | undefined>;
+}
+
+/**
+ * 由 project 模块提供（RFC-001）：算力档位名 → 具体驱动与模型。
+ * 业务子任务引用的是 Manifest 里登记的档位名，解析同样发生在平台侧。
+ */
+export interface ComputeCatalog {
+  resolve(name: string): Promise<{ name: string; driver: AgentDriver; model: string } | undefined>;
+  list(): Promise<Array<{ name: string }>>;
 }
 
 export interface ProjectAuthorizer {

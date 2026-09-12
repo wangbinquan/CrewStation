@@ -19,9 +19,10 @@ export function describeCapabilitiesUseCase(sources: CapabilitySources, settings
     await sources.authorize(actor, projectId, 'view');
     const svc = await sources.resolveServiceOfProject(projectId);
     if (!svc) throw notFound('项目服务', projectId);
-    const [quota, plans, devKeys, prodKeys, data, operations, subscriptions] = await Promise.all([
+    const [quota, plans, computeProfiles, devKeys, prodKeys, data, operations, subscriptions] = await Promise.all([
       sources.quota(actor, projectId).catch(() => undefined),
       sources.servicePlans(),
+      sources.computeProfiles(),
       sources.configKeys(actor, projectId, 'development'),
       sources.configKeys(actor, projectId, 'production'),
       sources.dataResources(actor, projectId),
@@ -34,6 +35,7 @@ export function describeCapabilitiesUseCase(sources: CapabilitySources, settings
       conventions: { identityHeaders: { ...IDENTITY_HEADERS }, env: { ...PLATFORM_ENV }, paths: { ...PLATFORM_PATHS }, eventHeaders: { ...EVENT_HEADERS } },
       ...(quota ? { quota } : {}),
       ...(plans.find((p) => p.name === settings.defaultServicePlan) ? { plan: plans.find((p) => p.name === settings.defaultServicePlan) } : {}),
+      computeProfiles,
       config: { development: devKeys, production: prodKeys },
       data,
       operations,

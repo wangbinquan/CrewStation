@@ -6,7 +6,7 @@ export type { ApiErrorKind } from './apiClientError';
 export type { FetchInput, FetchLike, HttpMethod, RequestOptions, Transport, TransportOptions } from './httpTransport';
 export type { ItemsPage } from './itemsPage';
 export type {
-  CreateProjectInput, ListDeliveriesInput, LogQueryInput, PublishInput, RequestTaskDataBindingInput, ServicePlanInput, SetConfigItemInput,
+  ComputeProfileInput, CreateProjectInput, ListDeliveriesInput, LogQueryInput, PublishInput, RequestTaskDataBindingInput, ServicePlanInput, SetConfigItemInput,
   StartDevAgentInput, TaskProfileInput, WithDefaults,
 } from './requestInputs';
 export { parseTaskStreamFrame, taskStreamUrl } from './stream';

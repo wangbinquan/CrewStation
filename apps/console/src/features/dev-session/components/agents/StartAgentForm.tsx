@@ -1,11 +1,13 @@
-import type { AgentDriver, AgentPermission } from '@crewstation/contracts';
+import type { AgentPermission } from '@crewstation/contracts';
 import { useState } from 'react';
 import type { ReactElement } from 'react';
-import { errorMessage } from '../../../../shared/api/useApi';
+import { api } from '../../../../shared/api/client';
+import { queryKeys } from '../../../../shared/api/queryKeys';
+import { errorMessage, useApiQuery } from '../../../../shared/api/useApi';
 import { useT } from '../../../../shared/lib/useT';
 import { Button } from '../../../../shared/ui/Button';
 import type { DevAgentsHandle } from '../../hooks/useDevAgents';
-import { AGENT_DRIVERS, AGENT_PERMISSIONS } from '../../model/agentOptions';
+import { AGENT_PERMISSIONS } from '../../model/agentOptions';
 import { PaneNotice } from '../PaneNotice';
 import styles from './StartAgentForm.module.css';
 
@@ -15,28 +17,34 @@ export interface StartAgentFormProps {
   readonly onCancel: () => void;
 }
 
-/** 启动一个流式交互 Agent。模型是自由文本：可用模型由平台与驱动决定，工作台不写死清单。 */
+/**
+ * 启动一个流式交互 Agent。算力由平台统一提供（RFC-001）：这里只选管理员定义的档位名，
+ * 厂商、模型与驱动都不出现在租户面——它们是平台的采购信息，业务也无从判断该填什么。
+ */
 export function StartAgentForm({ agents, onStarted, onCancel }: StartAgentFormProps): ReactElement {
   const t = useT();
-  const [driver, setDriver] = useState<AgentDriver>('claude-code');
-  const [model, setModel] = useState('');
+  const profiles = useApiQuery(queryKeys.computeProfiles(), () => api.catalog.listComputeProfiles());
+  const options = profiles.data?.items ?? [];
+  const [compute, setCompute] = useState('');
   const [permission, setPermission] = useState<AgentPermission>('edit');
   const [prompt, setPrompt] = useState('');
-  const ready = model.trim() !== '' && prompt.trim() !== '';
+  // 省略档位就走平台默认档，所以空选项是合法的；只有一个档位都没有时才拦住。
+  const ready = options.length > 0 && prompt.trim() !== '';
   const start = (): void => {
     agents.start.mutate(
-      { driver, model: model.trim(), permission, prompt: prompt.trim() },
+      { ...(compute === '' ? {} : { compute }), permission, prompt: prompt.trim() },
       { onSuccess: (agent) => onStarted(agent.agentId) },
     );
   };
   return (
     <div className={styles.form}>
       <div className={styles.row}>
-        <label htmlFor="agent-driver">{t('devSession.agents.driver')}</label>
-        <select id="agent-driver" className={styles.select} value={driver} onChange={(event) => setDriver(event.target.value as AgentDriver)}>
-          {AGENT_DRIVERS.map((option) => (
-            <option key={option} value={option}>
-              {option}
+        <label htmlFor="agent-compute">{t('devSession.agents.compute')}</label>
+        <select id="agent-compute" className={styles.select} value={compute} onChange={(event) => setCompute(event.target.value)}>
+          <option value="">{t('devSession.agents.computeDefault')}</option>
+          {options.map((option) => (
+            <option key={option.name} value={option.name}>
+              {option.description === '' ? option.name : `${option.name} · ${option.description}`}
             </option>
           ))}
         </select>
@@ -49,13 +57,8 @@ export function StartAgentForm({ agents, onStarted, onCancel }: StartAgentFormPr
           ))}
         </select>
       </div>
-      <input
-        className={styles.input}
-        value={model}
-        placeholder={t('devSession.agents.modelPlaceholder')}
-        aria-label={t('devSession.agents.model')}
-        onChange={(event) => setModel(event.target.value)}
-      />
+      {profiles.isPending ? <PaneNotice tone="info">{t('devSession.agents.computeLoading')}</PaneNotice> : null}
+      {!profiles.isPending && options.length === 0 ? <PaneNotice tone="warning">{t('devSession.agents.computeEmpty')}</PaneNotice> : null}
       <textarea
         className={styles.prompt}
         rows={3}

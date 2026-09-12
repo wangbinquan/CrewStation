@@ -173,7 +173,7 @@ describe('stub Agent', () => {
   test('oneshot：started → session → 回显 text → completed，mcp 名与 env 键被记录', async () => {
     const { session } = await boot();
     const prompt = 'hello stub world';
-    const command = { id: 'a1', type: 'startAgent', agentId: 'agent-1', driver: 'stub', model: 'stub/echo', permission: 'edit', mode: 'oneshot', initialPrompt: prompt, mcp: [{ name: 'ops', url: 'http://ops.svc.cs.internal/mcp' }], env: { STUB_TEST_KEY: 'value-must-not-be-logged' } };
+    const command = { id: 'a1', type: 'startAgent', agentId: 'agent-1', compute: 'sample-stub', driver: 'stub', model: 'stub/echo', permission: 'edit', mode: 'oneshot', initialPrompt: prompt, mcp: [{ name: 'ops', url: 'http://ops.svc.cs.internal/mcp' }], env: { STUB_TEST_KEY: 'value-must-not-be-logged' } };
     expect(await session.call(command)).toEqual({});
     await session.waitForEvent('agent', (e) => e.event.agentId === 'agent-1' && e.event.type === 'completed');
     const events = session.eventsOf('agent').map((e) => e.event.event).filter((e) => e.agentId === 'agent-1');
@@ -186,12 +186,12 @@ describe('stub Agent', () => {
     expect((events[0]?.raw as { envKeys: string[] }).envKeys).not.toContain('CS_RUNNER_TOKEN');
     expect(events[1]?.sessionId).toBe('stub-agent-1');
     expect(events.at(-1)?.result).toMatchObject({ summary: `echoed ${prompt.length} chars`, exitCode: 0 });
-    await expectFailure(session.call({ id: 'a2', type: 'startAgent', agentId: 'agent-x', driver: 'stub', model: 'm', permission: 'edit', mode: 'oneshot', cwd: '../outside' }), 'path_denied');
+    await expectFailure(session.call({ id: 'a2', type: 'startAgent', agentId: 'agent-x', compute: 'sample-stub', driver: 'stub', model: 'm', permission: 'edit', mode: 'oneshot', cwd: '../outside' }), 'path_denied');
   });
 
   test('interactive：WRITE 指令以 worker 身份落盘，sendMessage 回显，cancelAgent 结束', async () => {
     const { session, tr } = await boot();
-    const start = { id: 'b1', type: 'startAgent', agentId: 'agent-2', driver: 'stub', model: 'stub/echo', permission: 'full', mode: 'interactive', initialPrompt: 'WRITE out/hello.txt: written by stub' };
+    const start = { id: 'b1', type: 'startAgent', agentId: 'agent-2', compute: 'sample-stub', driver: 'stub', model: 'stub/echo', permission: 'full', mode: 'interactive', initialPrompt: 'WRITE out/hello.txt: written by stub' };
     await session.call(start);
     await session.waitForEvent('agent', (e) => e.event.agentId === 'agent-2' && e.event.type === 'status' && e.event.status === 'waiting');
     const file = join(tr.workdir, 'out', 'hello.txt');
@@ -215,7 +215,7 @@ describe('stub Agent', () => {
 
   test('CLI 驱动：二进制不在位时报 driver_not_installed，不白建运行目录', async () => {
     const { session } = await boot();
-    await session.call({ id: 'd1', type: 'startAgent', agentId: 'agent-3', driver: 'claude-code', model: 'anthropic/claude-sonnet-4', permission: 'edit', mode: 'oneshot', initialPrompt: 'hi' });
+    await session.call({ id: 'd1', type: 'startAgent', agentId: 'agent-3', compute: 'sample-stub', driver: 'claude-code', model: 'anthropic/claude-sonnet-4', permission: 'edit', mode: 'oneshot', initialPrompt: 'hi' });
     const failure = await session.waitForEvent('agent', (e) => e.event.agentId === 'agent-3' && e.event.type === 'error');
     expect(failure.event.event.error?.code).toBe('driver_not_installed');
     expect(failure.event.event.error?.message).toBe('driver binary not installed: claude');

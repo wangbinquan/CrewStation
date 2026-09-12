@@ -25,7 +25,7 @@ export function AgentRoster({ agents, selected, onSelect }: AgentRosterProps): R
           className={[styles.tab, agent.agentId === selected ? styles.active : ''].filter(Boolean).join(' ')}
           onClick={() => onSelect(agent.agentId)}
         >
-          <span className={styles.driver}>{agent.driver}</span>
+          <span className={styles.compute}>{agent.compute}</span>
           <Badge tone={agentStateTone(agent.state)}>{t(`devSession.agentState.${agent.state}`)}</Badge>
         </button>
       ))}

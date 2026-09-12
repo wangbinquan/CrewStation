@@ -32,6 +32,11 @@ const cmd = <T extends string>(type: T) => ({ id: z.string().min(1), type: z.lit
 export const StartAgentCommandSchema = z.object({
   ...cmd('startAgent'),
   agentId: z.string().min(1),
+  /**
+   * 算力档位名（RFC-001）。平台原样透传，TaskRunner 不解释，只在 started 事件里回显。
+   * 两个档位可以指向同一个模型，从 (driver, model) 反查不出唯一档位名，因此必须透传。
+   */
+  compute: z.string().min(1),
   driver: AgentDriverSchema,
   model: z.string().min(1),
   permission: AgentPermissionSchema,

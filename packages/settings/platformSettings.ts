@@ -9,6 +9,8 @@ export interface PlatformSettings {
   defaultMaxConcurrentTasks: number;
   defaultServicePlan: string;
   defaultTaskProfile: string;
+  /** 开发会话与业务子任务省略 compute 时用的算力档位名（RFC-001）。 */
+  defaultComputeProfile: string;
   dataPostgres: { adminUrl: string; visibleHost: string; visiblePort: number };
   registryBase: string;
   builderImage: string;
@@ -46,6 +48,7 @@ export function loadPlatformSettings(env: Record<string, string | undefined> = p
     defaultMaxConcurrentTasks: num(env.CS_DEFAULT_MAX_CONCURRENT_TASKS, 3),
     defaultServicePlan: env.CS_DEFAULT_SERVICE_PLAN ?? 'standard-small',
     defaultTaskProfile: env.CS_DEFAULT_TASK_PROFILE ?? 'coding-medium',
+    defaultComputeProfile: env.CS_DEFAULT_COMPUTE_PROFILE ?? 'balanced',
     dataPostgres: { adminUrl: dataAdminUrl, visibleHost: visible.hostname, visiblePort: num(visible.port, 5432) },
     registryBase: env.CS_REGISTRY_BASE ?? `registry.${systemNamespace}.svc.cluster.local:5000`,
     builderImage: env.CS_BUILDER_IMAGE ?? 'cs-builder:dev',

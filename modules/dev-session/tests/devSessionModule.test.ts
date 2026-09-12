@@ -15,6 +15,7 @@ const serviceId = 'svc_0123456789abcdef0123456789abcdef' as ServiceId;
 const owner: Actor = { userId: 'usr_0123456789abcdef0123456789abcdef' as UserId, isAdmin: false };
 const developer: Actor = { userId: 'usr_1123456789abcdef0123456789abcdef' as UserId, isAdmin: false };
 const envs = new Map<string, EnvironmentView & { createdBy: UserId; preview?: { command: string[]; port: number; healthPath: string } }>();
+const computeProfiles: Array<{ name: string; driver: 'claude-code' | 'opencode' | 'stub'; model: string }> = [{ name: 'balanced', driver: 'claude-code', model: 'anthropic/claude-sonnet-5' }];
 const commands: RunnerCommand[] = [];
 const notices: string[] = [];
 const issued: Array<{ taskId: TaskId; projectId: ProjectId; serviceId: ServiceId; userId: UserId }> = [];
@@ -46,7 +47,7 @@ beforeAll(async () => {
         return {};
       },
       listEvents: async () => [
-        { seq: 1, at: new Date().toISOString(), event: { kind: 'agent', event: { agentId: 'agt_1', seq: 0, at: new Date().toISOString(), type: 'started', spec: { driver: 'claude-code', model: 'anthropic/claude-sonnet-5', permission: 'read-only' } } } },
+        { seq: 1, at: new Date().toISOString(), event: { kind: 'agent', event: { agentId: 'agt_1', seq: 0, at: new Date().toISOString(), type: 'started', spec: { compute: 'balanced', driver: 'claude-code', model: 'anthropic/claude-sonnet-5', permission: 'read-only' } } } },
         { seq: 2, at: new Date().toISOString(), event: { kind: 'agent', event: { agentId: 'agt_1', seq: 1, at: new Date().toISOString(), type: 'completed', sessionId: 's1' } } },
         { seq: 3, at: new Date().toISOString(), event: { kind: 'agent', event: { agentId: 'agt_2', seq: 0, at: new Date().toISOString(), type: 'text', text: '没有 started 事件' } } },
       ],
@@ -56,9 +57,10 @@ beforeAll(async () => {
     authorizer: { authorize: async (actor, _p, action) => { if (action === 'force-release-session' && actor.userId !== owner.userId) throw new Error('forbidden'); }, ownerOf: async () => owner.userId },
     services: { resolveServiceOfProject: async () => ({ serviceId, slug: 'demo', name: 'demo' }) },
     notifier: { notify: async (_p, users, message) => { notices.push(`${users.length}:${message}`); } },
+    compute: { resolve: async (name: string) => computeProfiles.find((p) => p.name === name), list: async () => computeProfiles.map((p) => ({ name: p.name })) },
     credentials: { issueDevSessionToken: async (binding) => { issued.push(binding); return { token: `tok-${binding.taskId}`, expiresAt: new Date().toISOString() }; } },
     isAdmin: async () => false,
-    settings: { idleMinutes: 30, userDomain: 'cs.localhost', mcp: [{ name: 'capabilities', url: 'http://mcp-capabilities.svc.cs.internal/mcp' }], defaultPreviewPort: 3000 },
+    settings: { idleMinutes: 30, userDomain: 'cs.localhost', mcp: [{ name: 'capabilities', url: 'http://mcp-capabilities.svc.cs.internal/mcp' }], defaultPreviewPort: 3000, defaultComputeProfile: 'balanced' },
     clock: fixedClock('2026-09-11T01:00:00Z'),
   });
 });
@@ -74,7 +76,7 @@ describe.skipIf(!available)('dev-session module', () => {
     expect((await dev.api.getSession(developer, projectId))?.preview).toBe('ready');
     expect((await dev.api.listBranches(developer, projectId))[0]).toMatchObject({ name: 'main', behindPreview: 2 });
 
-    const agent = await dev.api.startAgent(developer, created.id, { driver: 'stub', model: 'stub/echo', permission: 'edit', prompt: '你好' });
+    const agent = await dev.api.startAgent(developer, created.id, { compute: 'balanced', permission: 'edit', prompt: '你好' });
     const start = commands.find((c) => c.type === 'startAgent');
     expect(start).toMatchObject({ mode: 'interactive', initialPrompt: '你好', mcp: [{ name: 'capabilities' }] });
     // 会话级短期令牌进了 MCP 连接头，并且绑定的是本会话、本项目、本服务与启动者（Design §5.9）。
@@ -82,10 +84,12 @@ describe.skipIf(!available)('dev-session module', () => {
     expect(start).toMatchObject({ mcp: [{ headers: { 'x-cs-dev-session-token': `tok-${created.id}` } }] });
     await dev.api.sendMessage(developer, created.id, agent.agentId, { content: '继续' });
     const listed = await dev.api.listAgents(developer, created.id);
-    // 驱动、模型与权限来自 started 事件的 spec，不是编出来的。
-    expect(listed[0]).toMatchObject({ agentId: 'agt_1', state: 'completed', sessionId: 's1', driver: 'claude-code', model: 'anthropic/claude-sonnet-5', permission: 'read-only' });
+    // 档位与权限来自 started 事件的 spec，不是编出来的；租户面不返回厂商与模型（RFC-001）。
+    expect(listed[0]).toMatchObject({ agentId: 'agt_1', state: 'completed', sessionId: 's1', compute: 'balanced', permission: 'read-only' });
+    expect(listed[0]).not.toHaveProperty('model');
+    expect(listed[0]).not.toHaveProperty('driver');
     // 没有 started 事件时留最小权限的占位，绝不谎称 edit。
-    expect(listed[1]).toMatchObject({ agentId: 'agt_2', permission: 'read-only', model: '' });
+    expect(listed[1]).toMatchObject({ agentId: 'agt_2', permission: 'read-only', compute: '' });
 
     dirty = ' M src/main.ts\n?? new.ts\n';
     await expect(dev.api.publish(developer, projectId, { branch: 'main', version: 'patch' })).rejects.toMatchObject({ kind: 'precondition', details: { uncommitted: ['src/main.ts', 'new.ts'] } });
@@ -106,5 +110,28 @@ describe.skipIf(!available)('dev-session module', () => {
     const released = await dev.api.releaseSession(owner, projectId, { force: true });
     expect(released.session.state).toBe('released');
     expect(released.unpushed).toEqual(['abc123 wip']);
+  });
+
+  test('算力档位：省略用默认档、不存在的档位报错并列出可选、默认档缺失报 precondition（RFC-001）', async () => {
+    envs.clear();
+    await dev.api.openSession(developer, projectId, { branch: 'main' });
+    const created = [...envs.values()][0]!;
+    commands.length = 0;
+
+    // 省略 compute → 用平台默认档，命令带上解析后的具体驱动与模型。
+    await dev.api.startAgent(developer, created.id, { permission: 'edit', prompt: '用默认档' });
+    expect(commands.find((c) => c.type === 'startAgent')).toMatchObject({ compute: 'balanced', driver: 'claude-code', model: 'anthropic/claude-sonnet-5' });
+
+    // 不存在的档位：报错里要列出可选项，否则调用方只能去猜。
+    const bad = await dev.api.startAgent(developer, created.id, { compute: 'nope', permission: 'edit', prompt: 'x' }).catch((e: unknown) => e);
+    expect(bad).toMatchObject({ kind: 'validation', details: { available: ['balanced'] } });
+
+    // 默认档没配置时报 precondition，不静默挑一档——静默挑会让业务以为自己拿到了预期算力。
+    computeProfiles.length = 0;
+    const noDefault = await dev.api.startAgent(developer, created.id, { permission: 'edit', prompt: 'y' }).catch((e: unknown) => e);
+    expect(noDefault).toMatchObject({ kind: 'precondition' });
+    computeProfiles.push({ name: 'balanced', driver: 'claude-code', model: 'anthropic/claude-sonnet-5' });
+
+    await dev.api.releaseSession(owner, projectId, { force: true });
   });
 });

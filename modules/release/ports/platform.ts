@@ -10,6 +10,9 @@ export interface ServiceResolver {
 
 export interface PlanCatalog {
   getServicePlan(name: string): Promise<ServicePlanDto | undefined>;
+  /** 算力档位（RFC-001）：发布时校验 Manifest 引用的档位存在，不存在就不进构建。 */
+  getComputeProfile(name: string): Promise<{ name: string } | undefined>;
+  listComputeProfiles(): Promise<Array<{ name: string }>>;
 }
 
 /** 由 config 模块提供：生产组配置渲染为环境变量，并校验 Manifest env 段声明的键存在。 */

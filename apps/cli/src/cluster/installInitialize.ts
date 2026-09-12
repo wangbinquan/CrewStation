@@ -3,6 +3,7 @@ import { isApiClientError } from '@crewstation/api-client';
 import { EgressFqdnPatternSchema } from '@crewstation/contracts';
 import type { CheckLine, OperatorContext } from './installReport';
 import { checkLine as line } from './installReport';
+import type { BundleProfiles } from './releaseBundle';
 import { readBundleProfiles } from './releaseBundle';
 
 /** 已存在（409）按幂等成功处理：安装必须可以重跑。 */
@@ -17,7 +18,7 @@ export async function initializePlatform(ctx: OperatorContext): Promise<readonly
   }
   const api = client();
   return [
-    await seedCatalog(ctx, api),
+    ...(await seedCatalog(ctx, api)),
     await seedEgress(ctx, api),
     await seedIntegrationProjects(ctx, api),
     line('最小样例模板', 'not-implemented', '模板由 cs-controller 建项目时从发行包取；平台 API 没有注册模板的路由'),
@@ -26,8 +27,18 @@ export async function initializePlatform(ctx: OperatorContext): Promise<readonly
   ];
 }
 
-async function seedCatalog(ctx: OperatorContext, api: ApiClient): Promise<CheckLine> {
+/**
+ * 套餐、任务容器规格与算力档位（RFC-001）都来自发行包 profiles/。
+ * 算力档位单独报一行：它缺了会让「开发会话起 Agent」整条路径不可用，而套餐缺了只是建项目时要指定别的，
+ * 两者的严重性不同，混在一行里管理员看不出该先补哪个。
+ */
+async function seedCatalog(ctx: OperatorContext, api: ApiClient): Promise<readonly CheckLine[]> {
   const profiles = readBundleProfiles(ctx.files, ctx.bundle.root);
+  const suffix = profiles.notes.length > 0 ? `（${profiles.notes.join('；')}）` : '';
+  return [await seedPlans(api, profiles, suffix), await seedComputeProfiles(api, profiles, suffix)];
+}
+
+async function seedPlans(api: ApiClient, profiles: BundleProfiles, suffix: string): Promise<CheckLine> {
   const label = '服务套餐与任务容器规格';
   if (profiles.servicePlans.length === 0 && profiles.taskProfiles.length === 0) {
     return line(label, 'pending-config', profiles.notes.join('；') || '发行包 profiles/ 没有可用套餐');
@@ -38,8 +49,18 @@ async function seedCatalog(ctx: OperatorContext, api: ApiClient): Promise<CheckL
   ];
   const failures = results.filter(([, result]) => result.kind === 'failed').map(([name, result]) => `${name}：${result.kind === 'failed' ? result.problem : ''}`);
   if (failures.length > 0) return line(label, 'failed', failures.join('；'));
-  const suffix = profiles.notes.length > 0 ? `（${profiles.notes.join('；')}）` : '';
   return line(label, 'ok', `写入 ${results.length} 条${suffix}`);
+}
+
+async function seedComputeProfiles(api: ApiClient, profiles: BundleProfiles, suffix: string): Promise<CheckLine> {
+  const label = '算力档位';
+  if (profiles.computeProfiles.length === 0) {
+    return line(label, 'pending-config', `发行包没有 profiles/compute-profiles.yaml；在平台管理里补一档之前，开发会话与业务子任务都起不了 Agent${suffix}`);
+  }
+  const results = await Promise.all(profiles.computeProfiles.map(async (item) => [item.name, await attempt(() => api.catalog.upsertComputeProfile(item))] as const));
+  const failures = results.filter(([, result]) => result.kind === 'failed').map(([name, result]) => `${name}：${result.kind === 'failed' ? result.problem : ''}`);
+  if (failures.length > 0) return line(label, 'failed', failures.join('；'));
+  return line(label, 'ok', `写入 ${results.map(([name]) => name).join('、')}${suffix}`);
 }
 
 /** 全局出站白名单：install.yaml 的示例含 `<model-endpoints>` 这类占位符，按契约的 FQDN 规则筛掉并点名。 */

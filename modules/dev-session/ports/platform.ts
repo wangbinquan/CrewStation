@@ -1,4 +1,4 @@
-import type { Actor, BranchDto, Manifest, ProjectId, PublishRequest, ReleaseDto, ServiceId, SlotDto, TaskId, UserId } from '@crewstation/contracts';
+import type { Actor, AgentDriver, BranchDto, Manifest, ProjectId, PublishRequest, ReleaseDto, ServiceId, SlotDto, TaskId, UserId } from '@crewstation/contracts';
 
 export interface ProjectAuthorizer {
   authorize(actor: Actor, projectId: ProjectId, action: 'view' | 'develop' | 'publish' | 'force-release-session'): Promise<unknown>;
@@ -15,6 +15,16 @@ export interface SourceControl {
   /** 供容器内 git push 使用的短期凭据，已拼进 URL；只在命令执行时传入容器，不落库。 */
   pushUrl(serviceId: ServiceId): Promise<{ url: string; expiresAt: string }>;
   readFile(serviceId: ServiceId, ref: string, path: string): Promise<string | undefined>;
+}
+
+/**
+ * 由 project 模块提供（RFC-001）：算力档位名 → 具体驱动与模型。
+ * 解析发生在平台侧，容器拿到的是已经定好的具体值。
+ */
+export interface ComputeCatalog {
+  resolve(name: string): Promise<{ name: string; driver: AgentDriver; model: string } | undefined>;
+  /** 只用于报错时列出可选项。 */
+  list(): Promise<Array<{ name: string }>>;
 }
 
 /** 由 release 模块提供。 */
@@ -46,4 +56,6 @@ export interface DevSessionSettings {
   /** 注入 Agent 的平台 MCP 连接（能力说明、操作）。 */
   readonly mcp: Array<{ name: string; url: string }>;
   readonly defaultPreviewPort: number;
+  /** 起 Agent 时省略 compute 用的默认档位名（RFC-001）。 */
+  readonly defaultComputeProfile: string;
 }

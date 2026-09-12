@@ -54,5 +54,8 @@ for d in cs-api cs-auth cs-controller cs-session cs-events console mcp-capabilit
   kubectl -n $NS rollout restart deployment/$d >/dev/null 2>&1 || true
   kubectl -n $NS rollout status deployment/$d --timeout=180s
 done
+# 套餐与算力档位是建项目、起 Agent 的前置；装完就种上，省得第一次用的时候才发现目录是空的。
+"$ROOT/deploy/local/seed-catalog.sh"
+
 log "完成。控制台：http://console.cs.localhost/  登录：http://console.cs.localhost/auth/login"
 kubectl -n $NS get pods -o wide

@@ -131,7 +131,11 @@ function composeDelivery(deps: PlatformModuleDeps, core: ReturnType<typeof compo
         return { httpUrl: binding.httpUrl, credentialSecretName: name };
       },
     },
-    plans: { getServicePlan: async (name) => (await project.api.listServicePlans()).find((p) => p.name === name) },
+    plans: {
+      getServicePlan: async (name) => (await project.api.listServicePlans()).find((p) => p.name === name),
+      getComputeProfile: (name) => project.api.resolveComputeProfile(name),
+      listComputeProfiles: () => project.api.listComputeProfiles(),
+    },
     config: {
       render: async (projectId, env) => ({ values: await config.api.renderEnv(projectId, env), version: await config.api.currentVersion(projectId, env) }),
       validate: (projectId, env, keys) => config.api.validateManifestEnv(projectId, env, keys.map((name) => ({ name, from: 'config' as const }))),
@@ -175,6 +179,11 @@ function composeRuntime(deps: PlatformModuleDeps, core: ReturnType<typeof compos
   });
   late.taskRuntime = taskRuntime.api;
   const runner = createSessionClient(settings.sessionInternalUrl);
+  // 算力档位解析（RFC-001）：一处实现，dev-session 与 business-task 共用。
+  const computeCatalog = {
+    resolve: (name: string) => project.api.resolveComputeProfile(name),
+    list: () => project.api.listComputeProfiles(),
+  };
   const mcp = [{ name: 'capabilities', url: settings.mcp.capabilitiesUrl }, { name: 'operations', url: settings.mcp.operationsUrl }];
   const devSession = createDevSessionModule({
     db, logger, isAdmin: (id) => isAdmin(id), environments: taskRuntime.api, runner, releases: release.api,
@@ -188,11 +197,13 @@ function composeRuntime(deps: PlatformModuleDeps, core: ReturnType<typeof compos
     notifier: { notify: async (projectId, users, message, context) => { logger.warn('dev session notice', { projectId, users, message, taskId: context.taskId }); } },
     // 注入 Agent 的远程 MCP 连接凭据由 identity 签发：一个签发者、一个密钥环、一份 JWKS。
     credentials: { issueDevSessionToken: (binding) => core.identity.api.issueDevSessionToken(binding) },
-    settings: { idleMinutes: settings.idleMinutes, userDomain: settings.userDomain, mcp, defaultPreviewPort: 3000 },
+    compute: computeCatalog,
+    settings: { idleMinutes: settings.idleMinutes, userDomain: settings.userDomain, mcp, defaultPreviewPort: 3000, defaultComputeProfile: settings.defaultComputeProfile },
   });
   const businessTask = createBusinessTaskModule({
     db, logger, isAdmin: (id) => isAdmin(id), environments: taskRuntime.api, runner, authorizer: project.api,
     directory: { resolveServiceIdentity: async (identity) => { const r = await project.api.resolveServiceIdentity(identity); return r ? { serviceId: r.serviceId, projectId: r.projectId } : undefined; } },
+    compute: computeCatalog,
     settings: { mcp, outputLimitBytes: 262144, consumerName: 'business-task' },
   });
   const events = createEventsModule({
@@ -241,6 +252,7 @@ function composeAggregates(deps: PlatformModuleDeps, core: ReturnType<typeof com
     settings: { userDomain: settings.userDomain, serviceDomain: settings.serviceDomain, mcp: [{ name: 'capabilities', url: settings.mcp.capabilitiesUrl }, { name: 'operations', url: settings.mcp.operationsUrl }], defaultServicePlan: settings.defaultServicePlan },
     sources: {
       resolveServiceOfProject: serviceOfProject, authorize: project.api.authorize, quota: project.api.getQuota, servicePlans: project.api.listServicePlans,
+      computeProfiles: project.api.listComputeProfiles,
       configKeys: async (actor, projectId, env) => (await config.api.listItems(actor, projectId, env)).map((i) => i.name),
       dataResources: data.api.listResources, operations: (actor, serviceId) => apiCatalog.api.listOperations(actor, serviceId),
       subscriptions: (actor, projectId) => runtime.events.api.listSubscriptions(actor, projectId),

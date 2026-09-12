@@ -26,7 +26,7 @@
   border-color: var(--cs-color-primary);
 }
 
-.driver {
+.compute {
   font-family: var(--cs-font-mono);
   font-size: 12px;
 }

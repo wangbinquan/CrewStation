@@ -12,7 +12,7 @@ const designExample = {
     tasks: {
       profile: 'coding-medium',
       defaultVolumeMode: 'follow-container',
-      agentProfiles: [{ name: 'analysis-v1', driver: 'claude-code', model: 'anthropic/claude-sonnet-5', permission: 'read-only' }],
+      agentProfiles: [{ name: 'analysis-v1', compute: 'balanced', permission: 'read-only' }],
       outputContracts: [{ name: 'analysis-report-v1', required: ['reports/analysis.md'], schema: './contracts/analysis-report.schema.json' }],
     },
     release: { migrationCommand: ['bun', 'run', 'db:migrate'], migration: { compatibility: 'expand-only', destructive: false, rollback: 'switch-back' } },
@@ -25,6 +25,19 @@ describe('Manifest', () => {
     expect(parsed.kind).toBe('DigitalWorker');
     if (parsed.kind === 'DigitalWorker') expect(parsed.spec.tasks?.agentProfiles[0]?.permission).toBe('read-only');
   });
+  test('Agent 档案只认 compute：写 driver 或 model 会被拒（RFC-001）', () => {
+    // zod 默认剥掉未知键，旧写法会被静默丢弃、业务以为自己指定了驱动，因此这里必须 strict。
+    const withDriver = structuredClone(designExample);
+    withDriver.spec.tasks.agentProfiles = [{ name: 'a', compute: 'balanced', driver: 'claude-code', permission: 'read-only' } as never];
+    const bad = ManifestSchema.safeParse(withDriver);
+    expect(bad.success).toBe(false);
+    expect(JSON.stringify(bad.error?.issues)).toContain('driver');
+
+    const withModel = structuredClone(designExample);
+    withModel.spec.tasks.agentProfiles = [{ name: 'a', compute: 'balanced', model: 'anthropic/claude-opus-5', permission: 'read-only' } as never];
+    expect(ManifestSchema.safeParse(withModel).success).toBe(false);
+  });
+
   test('config 项可带 default，secret 不可', () => {
     const withDefault = { ...designExample, spec: { ...designExample.spec, env: [{ name: 'GREETING', from: 'config', default: '你好' }] } };
     const parsed = ManifestSchema.parse(withDefault);
