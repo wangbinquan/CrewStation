@@ -17,6 +17,9 @@ will grow out of these manifests. All figures below are observed outputs from th
 | `local/node-registry-hosts.sh` | Writes containerd's `hosts.toml` on the node for the in-cluster registry |
 | `local/verify.sh` | Re-runnable verifications A–D |
 | `local/lib.sh` | Shared helpers, including the guard that ties the context to the node container |
+| `local/install-platform.sh` | Platform layer on top of the infrastructure: builds and imports the four images, writes the platform Secret, applies `k8s/platform/*`, runs migrations, waits for rollout, then seeds the catalog. Set `SKIP_BUILD=1` to skip all image builds, `SKIP_TASK_RUNTIME_BUILD=1` to keep an existing `cs-task-runtime:dev` |
+| `local/seed-catalog.sh` | Seeds the platform catalog as `admin`: one service plan, one task-container profile, and the three compute profiles `sample-stub` / `balanced` / `deep` (RFC-001). Idempotent; called at the end of `install-platform.sh` |
+| `local/bootstrap-integrations.sh` | Creates the two built-in integration-container projects, pushes `integrations/*` into their repositories and releases them to the preview slot |
 
 ## Prerequisites (verified 2026-09-11)
 
@@ -43,6 +46,10 @@ deploy/local/bootstrap.sh --skip-verify  # install only
 deploy/local/verify.sh [--keep]          # re-run checks A–D any time; --keep leaves crewstation-verify in place
 deploy/local/coredns-rewrite.sh          # individual steps, each idempotent
 deploy/local/node-registry-hosts.sh
+
+deploy/local/install-platform.sh         # then the platform itself; seeds the catalog on the way out
+deploy/local/seed-catalog.sh             # re-seed plans and compute profiles on their own
+deploy/local/bootstrap-integrations.sh   # the two built-in integration containers
 ```
 
 Re-running is safe: manifests are `kubectl apply`ed, the Secret is created only when absent, and the
