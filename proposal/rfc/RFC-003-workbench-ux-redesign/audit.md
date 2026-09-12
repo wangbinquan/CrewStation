@@ -56,3 +56,15 @@
 ## 5. 评审限制
 
 本轮未创建新的业务发布或运行真实模型任务；没有模型效果、耗时、成功率或跨角色端到端结果。交互附件是设计示例，不是当前集群状态。生产实现与完整用户旅程的验收在 RFC 获批之后执行。
+
+## 6. 作者澄清后的补充核验（2026-09-13）
+
+本节基线为 `a4a5e1a97d35e4ca0b157638c3682e7e46378c2d`，为源码检查，没有新增真实 Agent／发布实跑。
+
+| 编号 | 源码事实 | 对作者要求的影响 |
+|---|---|---|
+| UX-17 | `packages/agent-drivers/drivers/claudeCode/argv.ts:21–25` 使用 headless JSON；`runtimes/task/src/terminal/terminalSupervisor.ts:47–66` 多 PTY 启动的是普通 shell | 现有多对话＋单终端不能等同于一键多个原生 CLI；需新增平台配置的 CLI 终端启动 |
+| UX-18 | `apps/console/src/features/dev-session/model/terminalSession.ts:61–67` 在组件 dispose 时 closeTerminal | 独立预览切页不能直接沿用卸载终端的生命周期，需分开 detach 显示与 stop 进程 |
+| UX-19 | `modules/scm/application/queryRepository.ts:20–30` 从 GitLab 列远端分支，DTO 仅有 behind；`packages/contracts/api/devSession.ts:25–32` | 无容器当前工作树的双向提交／文件比较，现有分支落后数不能满足生产版本差距要求 |
+
+这三项的具体实现与验收见 [development-workspace.md](./development-workspace.md)，是对 J2 的必要修订。

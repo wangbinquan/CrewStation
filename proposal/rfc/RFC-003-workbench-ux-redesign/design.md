@@ -27,7 +27,7 @@
 |---|---|---|
 | `/` | 数字人项目 | 列表，搜索／筛选在 query 中 |
 | `/projects/$projectId` | 概览 | 带条件主动作与状态摘要 |
-| `/projects/$projectId/dev-session` | 开发 | 保留 URL；`view=preview|code`，`agent=`、`file=` 可定位 |
+| `/projects/$projectId/dev-session` | 开发 | 保留 URL；`view=cli|preview|split|code|diff|conversation`，`agent=`、`file=`、`target=prod|preview` 可定位；默认 cli |
 | `/projects/$projectId/release` | 发布与上线 | 保留 URL；`release=` 选版本，`source=session|repository` 标识来源 |
 | `/projects/$projectId/operations` | 运行与诊断 | `tab=health|logs|deliveries|trace`，按 tab 校验对象参数 |
 | `/projects/$projectId/capabilities` | 能力接入 | `tab=api|events|data|runtime|guide`，`operation=` 可定位 API |
@@ -72,13 +72,15 @@
 
 ### 2.3 开发工作区
 
-桌面布局：全局导航可收窄；工作区顶部一行显示分支、会话连接、数据模式、准备发布。左侧 40% 对话，右侧 60% 预览／代码。右侧比例允许在 35%–65% 范围调整。终端默认收起，展开后在底部提供足够高度；移动端变成“对话／预览／代码／终端”的页面内视图切换。
+作者本轮明确开发主界面为多个原生 CLI 窗口，独立实时预览，以及当前工作树与生产版本差距；这修订首稿的默认聊天布局。完整规格与契约见 [development-workspace.md](./development-workspace.md)。
 
-首次没有 Agent：显示带示例 placeholder 的真实输入框，算力档位与权限可见，提交名为“启动 Agent”。示例不自动发送。已有 Agent：显示该会话的流式输出、当前状态、输入区、中止；“新建 Agent”不替换或中止已有执行。两个 Agent 并排查看是明确入口，其输入与中止只作用于自身。
+顶部常驻容器实际 branch／HEAD 与生产实际 Release／SHA 的对比，分别显示待上线提交、缺少生产提交、未提交文件，远端同步信息另列。点击进入提交与文件 patch；同 SHA 但存在工作区改动不能称为完全一致。
 
-预览有四种可读状态：准备中、可访问、构建／进程失败、状态不可用。刷新页面与重启预览是两个动作，明确作用对象。代码保存继续带 expectedVersion；文件冲突保留用户草稿，提供重新载入／保留草稿，不强行覆盖磁盘。
+默认两列 CLI 平铺，数量可选，一次点击批量启动；首条任务可空。每个窗口是独立 PTY 与 Agent 进程，支持原生输入、Ctrl+C、放大、收起／恢复和显式结束，所有窗口默认共用工作树。数量由资源约束决定，不在 UI 固定只能两个。既有结构化对话模式保留独立入口。
 
-退出工作区与释放开发会话分开。关闭浏览器、切换工具、跳转发布均不释放。会话信息与释放放进“会话详情”，先读工作区事实再确认；未保存编辑器草稿与 Git 未提交／未推送是三类不同状态。
+实时预览可占据独立工作视图、与 CLI 并排或通过真实地址在另一浏览器页签打开。预览反映已保存的工作树文件；是否热更新依赖实际开发命令。代码保存继续带 expectedVersion。预览失败仅影响预览；代码、CLI 和日志继续可用。
+
+detach 显示与结束进程分开。关闭浏览器、切换工具、跳转发布均不发送 closeTerminal／stop；重新进入重新附着既有 PTY。结束指定 Agent 和释放整个会话均是明确操作；释放前读工作区事实，未保存编辑器草稿与 Git 未提交／未推送仍为三类状态。窄屏切换单窗并保留后台执行。
 
 ### 2.4 发布与上线
 
@@ -166,7 +168,7 @@ API 详情上下文包含 projectId／serviceId／operationKey，申请成功更
 
 ### 4.2 工作区检查（本 RFC 新增，P0）
 
-新增 `GET /v1/projects/:projectId/dev-session/workspace-status`，由 dev-session L5 应用用例拥有，沿既有 runner port 读取事实，无写入、无 push、无 tag。仅在准备发布、释放或显式查看变更时触发，不做高频全树轮询。
+新增 `GET /v1/projects/:projectId/dev-session/workspace-status`，由 dev-session L5 应用用例拥有，沿既有 runner port 读取事实，无写入、无 push、无 tag。供准备发布／释放权威预检；开发首屏版本比较共享其工作区读取逻辑，按可见页面与变更事件有界刷新，不做高频全树扫描。
 
 响应采用可区分联合：
 
@@ -201,6 +203,12 @@ dev-session L5 可依赖 api-catalog L3 的公开操作查询，不经深路径�
 
 完整的仓库／数据／模型独立准备进度属于基线目标，但当前响应不足以逐项确定。首个实现切片可如实标未提供；若要给分项进度，必须由 provisioning L6 或 dev-session L5 对其已有步骤结果提供契约，单独验收，不把绿色图标当成实现。
 
+### 4.7 原生 CLI 与工作树版本对比
+
+新增接口和协议详见 [development-workspace.md §5–6](./development-workspace.md#5-cli-启动恢复与失败契约)。CLI 启动不能直接复用现有 headless JSON argv；需补原生终端启动计划、幂等启动名册、detach／attach、显式结束与有界回放。版本比较固定生产实际 SHA 和容器当前 HEAD，覆盖双方独有提交、工作树文件、未推送以及未知／过期状态。
+
+这两项是满足本轮用户需求的实现依赖，不可只做多窗口 CSS 或把远端 BranchDto 换个标题便标为完成。保留业务 Agent oneshot／interactive 契约和 RFC-001 的档位归属。
+
 ## 5. 代码落位与依赖
 
 已按 `docs/engineering/repository-structure.md` §4、§8–§11 对齐。
@@ -209,7 +217,7 @@ dev-session L5 可依赖 api-catalog L3 的公开操作查询，不经深路径�
 |---|---|
 | `apps/console/src/app/router/`、`app/layout/` | 两个空间的路由装配、分组导航、旧路径重定向、项目上下文注入 |
 | `features/projects/` | 列表、开通与概览的项目行为；管理创建入口由 app 装配导出的页面 |
-| `features/dev-session/` | 会话准备、对话／编辑／预览布局、工具视图、工作区状态与释放确认 |
+| `features/dev-session/` | 会话准备、多 CLI 启动与窗口注册、对话兼容入口、独立／并排预览、编辑器、工作树对生产比较与释放确认 |
 | `features/release/` | 唯一发布 UI 状态模型、两种来源表单、版本详情、切流／回退 |
 | `features/logs/`、`features/events/` | 各自拥有健康日志追溯／事件投递与订阅组件；app 装配二级路由，不互相深 import |
 | `features/capabilities/`、`features/catalog/`、`features/config/` | 各自负责说明／API 发现与调试／配置；由 app 装配目标导航 |
@@ -218,10 +226,12 @@ dev-session L5 可依赖 api-catalog L3 的公开操作查询，不经深路径�
 | `shared/api/` | 统一客户端、query keys、作用域读取与缓存封装；不搬进服务端领域决策 |
 | `app/theme/tokens.css` | 唯一主题、颜色、密度与尺寸变量来源 |
 | `packages/contracts/`、`packages/api-client/` | 新增跨进程形状与方法；既有生成目录不手改 |
-| `modules/dev-session/` L5 | 工作区状态与能力调用用例；HTTP 只翻译协议，执行通过 port |
+| `modules/dev-session/` L5 | 工作区状态／部署比较、CLI 启动名册与幂等请求、能力调用；HTTP 只翻译协议，执行通过 port |
 | `modules/project/` L2、`modules/identity/` L1 | 成员候选和项目基础分页的领域归属 |
 | `modules/capabilities/` L6 | 授权项目摘要聚合，调用各模块根导出的查询 |
-| `runtimes/task/` | API 请求原语；继续遵守自身依赖白名单 |
+| `runtimes/task/` | 原生 CLI PTY 与进程监督、终端注册与恢复、Git 工作树读取、API 请求原语；继续遵守依赖白名单 |
+| `packages/agent-drivers/` | 与现有 headless 计划并存的原生 CLI 启动计划，权限／MCP／模型注入沿既有平台契约 |
+| `modules/session/` | 终端输入与 resize 的当前附着控制、按 terminalId 流转与有界恢复；不拥有工作树调度 |
 
 不新增后端模块，不改 layer、数据库跨模块约束、尺寸上限或导出规则，因此目前不需要 ADR。若实施发现不能在现有边界内完成，先补设计与 ADR，不能把业务编排塞进 app 或 shared。
 
