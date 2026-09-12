@@ -12,6 +12,8 @@
 - [GitLab](#gitlab)
 - [进程与终端](#进程与终端)
 - [WebSocket](#websocket)
+- [契约变更](#契约变更)
+- [前端与测试](#前端与测试)
 - [并发开发与 Agent 协作](#并发开发与-agent-协作)
 
 ## 工具链与依赖
@@ -75,6 +77,14 @@ sql`kind = ANY(ARRAY[${sql.join(kinds.map((k) => sql`${k}`), sql`, `)}]::text[])
 
 安装脚本最初从 `postgres-credentials` 里取 `POSTGRES_PASSWORD`，而那个 Secret 暴露的是 `url`，
 迁移 Job 于是 `password authentication failed`。取 Secret 前先 `kubectl get secret -o jsonpath='{.data}'` 看键名。
+
+### 任务容器镜像「有就不重建」会让改动到不了集群
+
+`deploy/local/install-platform.sh` 曾经写成「`docker images -q cs-task-runtime:dev` 非空就跳过构建」。
+改了 `runtimes/task` 之后集群里跑的还是旧镜像，现象是事件里少一个字段而代码看着完全正确——
+从契约查到适配器再查到运行时，绕了一整圈才想起镜像。现在默认重建，要跳过用 `SKIP_TASK_RUNTIME_BUILD=1`。
+
+**凡是「为了快而跳过构建」的条件，都要能在报告里看出它跳过了。**
 
 ### 改了哪个模块，就要重启读它的那些进程
 
@@ -149,6 +159,58 @@ TaskRunner 收到 welcome 后立刻补发重放事件，**本机集群里稳定�
 
 `close()` 紧跟 `process.exit` 会把尾部事件丢在发送队列里。退出前等 `bufferedAmount` 归零
 （有界，本仓 2 秒），否则 agent cancelled、terminalClosed 这些收尾事件到不了对端。
+
+## 契约变更
+
+### 无兼容期的契约变更，先问「改它的那条路径会不会被自己挡住」
+
+RFC-001 一次性把 `agentProfiles` 的 `driver` / `model` 换成 `compute`，并给 Schema 加了 `.strict()`。
+老仓库的 `crewstation.yaml` 于是全部非法——这是预期内的。**预期外的是**：开发会话在开的时候
+硬解析 Manifest，解析不过就不给开，而开发容器正是改这个文件的地方。等于同一次变更既把门锁了，
+又把钥匙收走了。现在会话照开、只是没有预览，发布仍然硬拒。
+
+判据很简单：**列出所有会因这次变更而失败的入口，看其中有没有「修复它本身要走的那一个」。**
+
+### `.strict()` 是必需的，但错误信息要自带出路
+
+zod 默认剥掉未知键：不加 `.strict()`，旧写法的 `driver` / `model` 会被静默丢弃，
+业务以为自己指定了驱动，实际没有。加了之后报 `Unrecognized keys: "driver", "model"`——
+定位准确，但没说该改成什么。`describeManifestFailure` 把「改成 `compute: <档位名>`、
+可用档位去哪儿看」接在后面，发布与开会话共用同一套说法。
+
+### 开发容器的 `HOME` 就是 `/work`
+
+`runtimes/task/Dockerfile` 有意把 worker 的家目录设成工作区挂载点（两个 Agent CLI 都要可写 HOME）。
+代价是 `.bun/`、`.cache/` 这些会落进 git 工作区，而发布前置检查会把它们当成「未提交的更改」
+拒绝发布——平台被自己产生的文件挡住。模板 `.gitignore` 先挡住；真要治本得给 worker 一个
+不在仓库里的家目录。
+
+## 前端与测试
+
+### bun test 里 CSS Module 是一个字符串，不是对象
+
+`import styles from './X.module.css'` 在 bun test 里返回**文件路径字符串**。于是 `styles.link`
+命中 `String.prototype.link`（一个真实存在的遗留方法），React 对着 className 报
+「Invalid value for prop」。`bunfig.toml` 的 `[test] preload` 注册了一个插件，把 CSS Module
+换成「键即类名」的代理。
+
+### 渲染测试要先注册 DOM，再 import react-dom
+
+`@happy-dom/global-registrator` 必须在任何 react-dom 求值之前跑。把注册单独放一个模块
+（`apps/console/src/tests/domSetup.ts`），测试文件把它写成**第一条 import**——ESM 按 import
+顺序求值依赖。同一个文件里还要设 `IS_REACT_ACT_ENVIRONMENT = true`，否则 `act()` 每次都只
+警告一句「not configured to support act」然后什么也不等，测试看起来通过其实没渲染完。
+
+### TanStack Router 的无路径布局路由会进到路由 id 里
+
+`createRoute({ id: 'workbench' })` 不占路径段，`fullPath` 不变；但**子路由的 id** 会变成
+`/workbench/projects/$projectId`。`useParams({ from: '/projects/$projectId' })` 因此编译失败。
+用 `projectRoute.useParams()` 而不是写死 `from` 字符串——本来就不该知道 id 长什么样。
+
+### 源码层断言要先去掉注释
+
+「代码里不许出现 localStorage」这类断言，会被解释「为什么不用 localStorage」的注释绊倒。
+`apps/console/src/tests/sourceScan.ts` 同时给出原文与去注释后的正文，断言用后者。
 
 ## 并发开发与 Agent 协作
 

@@ -36,5 +36,5 @@ proposal/rfc/RFC-NNN-{slug}/
 
 | 编号 | 标题 | 状态 |
 |---|---|---|
-| [RFC-001](./RFC-001-platform-owned-compute/proposal.md) | 算力由平台统一提供：业务只引用管理员定义的档位名，不再声明驱动与模型 | Draft · 2026-09-12 立档，待批准 |
-| [RFC-002](./RFC-002-admin-and-tenant-spaces/proposal.md) | 管理空间与租户空间分离：顶栏切换两个空间，接入容器移出租户项目列表 | Draft · 2026-09-12 立档，待批准 |
+| [RFC-001](./RFC-001-platform-owned-compute/proposal.md) | 算力由平台统一提供：业务只引用管理员定义的档位名，不再声明驱动与模型 | Done · 2026-09-12 实现 `447e374`，实跑修补 `39c8e36`；本机端到端跑通（开通 → 发布 v0.1.4 → 开发会话起 Agent → `/chat`） |
+| [RFC-002](./RFC-002-admin-and-tenant-spaces/proposal.md) | 管理空间与租户空间分离：顶栏切换两个空间，接入容器移出租户项目列表 | Done · 2026-09-12 实现 `72a3e93`；管理员与普通成员两条路径均在浏览器实跑确认 |

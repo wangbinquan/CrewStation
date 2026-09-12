@@ -1,6 +1,6 @@
 # RFC-001 · 算力由平台统一提供｜Plan
 
-- 状态：Draft
+- 状态：Done
 - 日期：2026-09-12
 
 ## 任务分解
@@ -34,14 +34,14 @@
 
 ## 验收清单
 
-- [ ] `crewstation.yaml` 里写 `driver` 或 `model` 会被发布拒绝，错误指向本 RFC
-- [ ] `POST /v1/tasks/:taskId/agents` 不接受 `driver` / `model`，`compute` 可省略
-- [ ] 引用不存在的档位：发布与起 Agent 都失败，错误列出可用档位名
-- [ ] 默认档位未配置时报 `precondition`，不静默挑一档
-- [ ] 工作台新建 Agent 只有档位下拉，全仓搜不到模型自由文本输入
-- [ ] 平台管理有算力档位增删改页
-- [ ] 租户面接口不返回 `driver` 与 `model`
-- [ ] 本机跑通：开通 → 发布 → 开发会话起 Agent → `/chat`
-- [ ] `bun run check` 全绿，CI 绿
-- [ ] `proposal/rfc/README.md` 的状态改为 Done 并附 commit
-- [ ] `STATE.md` 更新
+- [x] `crewstation.yaml` 里写 `driver` 或 `model` 会被发布拒绝，错误指向本 RFC
+- [x] `POST /v1/tasks/:taskId/agents` 不接受 `driver` / `model`，`compute` 可省略
+- [x] 引用不存在的档位：发布与起 Agent 都失败，错误列出可用档位名
+- [x] 默认档位未配置时报 `precondition`，不静默挑一档
+- [x] 工作台新建 Agent 只有档位下拉，全仓搜不到模型自由文本输入
+- [x] 平台管理有算力档位增删改页
+- [x] 租户面接口不返回 `driver` 与 `model`
+- [x] 本机跑通：开通 → 发布 → 开发会话起 Agent → `/chat`
+- [x] `bun run check` 全绿，CI 绿
+- [x] `proposal/rfc/README.md` 的状态改为 Done 并附 commit
+- [x] `STATE.md` 更新

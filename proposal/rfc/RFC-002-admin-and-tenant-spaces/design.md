@@ -1,6 +1,6 @@
 # RFC-002 · 管理空间与租户空间分离｜Design
 
-- 状态：Draft
+- 状态：Done
 - 日期：2026-09-12
 
 ## 1. 落位
@@ -32,14 +32,14 @@
 
 ```
 rootRoute
-├─ workbenchRoute            '/'            布局：租户左栏
+├─ workbenchRoute            （无路径）      布局：租户左栏
 │  ├─ projectListRoute       '/'
 │  └─ projectRoute           'projects/$projectId'
 │     └─ （八个页面，不变）
 └─ adminRoute                '/admin'       布局：管理左栏 ＋ 守卫
    ├─ adminOverviewRoute     '/admin'
    ├─ adminUsersRoute        '/admin/users'
-   ├─ adminComputeRoute      '/admin/compute'        ← RFC-001 填内容，本 RFC 只占位
+   ├─ adminComputeRoute      '/admin/compute'        ← RFC-001 先落，这里直接是真页面，不是占位
    ├─ adminServicePlansRoute '/admin/service-plans'
    ├─ adminTaskProfilesRoute '/admin/task-profiles'
    ├─ adminIntegrationsRoute '/admin/integrations'   ← 接入容器
@@ -115,12 +115,13 @@ kind: z.array(ManifestKindSchema).optional()
 
 ## 6. 与 RFC-001 的关系
 
-两个 RFC 独立，可各自落地：
+两个 RFC 独立，可各自落地。**实际顺序**：RFC-001 先落，它的算力档位分区先挂在当时的单页 `AdminPage` 上；本 RFC 拆页时把它搬进 `/admin/compute`，所以该路由是真页面而不是占位。
 
-- RFC-001 加的「算力档位」管理页需要一个落脚点。本 RFC 的 `/admin/compute` 路由**只占位**（一个说明页），RFC-001 填内容。
-- 若 RFC-001 先落，它的档位页先挂在现有单页 `AdminPage` 上，本 RFC 再搬进 `/admin/compute`。
+## 6.1 实现与本文的差异（落地后回填）
 
-两种顺序都可行，不互相阻塞。
+- `workbenchRoute` 是**无路径布局路由**（`createRoute({ id: 'workbench' })`），不占路径段。副作用：项目内页面的**路由 id** 变成 `/workbench/projects/$projectId`，`useParams({ from: '…' })` 写死字符串的三个页面改用 `projectRoute.useParams()`——这个写法本来就更好，不必知道 id 长什么样。
+- 管理空间实际是**八个**路由：§2.1 的七项之外多一个 `/admin` 总览页。左栏能列出「平台管理有哪些事」，但进管理空间的落地页总得有内容，总览页给每项一张卡片说明它管什么。
+- 原 `AdminPage` 的六个分区在 RFC-001 之后是七个；拆页时出站条目与出站申请合并在 `/admin/egress` 一页——批一条申请紧接着就要看它落成了哪条条目。
 
 ## 7. 偏离与债
 
