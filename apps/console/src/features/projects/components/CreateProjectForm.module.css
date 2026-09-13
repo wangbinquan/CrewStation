@@ -1,17 +1,24 @@
-.description {
-  margin-bottom: var(--cs-space-3);
-  color: var(--cs-color-text-muted);
-}
-
 .form {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
   gap: var(--cs-space-3);
-  align-items: end;
+  align-items: start;
   margin-bottom: var(--cs-space-3);
 }
 
 .submit {
   display: flex;
-  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--cs-space-2);
+  margin-top: var(--cs-space-3);
+}
+
+.steps {
+  display: flex;
+  flex-wrap: wrap;
+  list-style: none;
+  gap: var(--cs-space-2);
+  padding: 0;
+  margin: 0 0 var(--cs-space-3);
 }

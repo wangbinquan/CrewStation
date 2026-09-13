@@ -1,4 +1,5 @@
 import type { ReactElement } from 'react';
+import { Link } from '@tanstack/react-router';
 import { api } from '../../../shared/api/client';
 import { queryKeys } from '../../../shared/api/queryKeys';
 import { useApiQuery } from '../../../shared/api/useApi';
@@ -7,7 +8,6 @@ import { Card } from '../../../shared/ui/Card';
 import { EmptyState } from '../../../shared/ui/EmptyState';
 import { PageHeader } from '../../../shared/ui/PageHeader';
 import { QueryStatus } from '../../../shared/ui/QueryStatus';
-import { CreateProjectForm } from '../components/CreateProjectForm';
 import { ProjectTable } from '../components/ProjectTable';
 import { TENANT_KINDS } from '../model/tenantKinds';
 import styles from './ProjectListPage.module.css';
@@ -28,7 +28,7 @@ export function ProjectListPage(): ReactElement {
       <PageHeader title={t('projects.list.title')} description={[t('projects.list.line1'), t('projects.list.line2')]} />
       {isAdmin ? (
         <div className={styles.create}>
-          <CreateProjectForm />
+          <Link to="/admin/projects/new" search={{ scope: 'digital-worker' }}>{t('projects.wizard.title.digital-worker')}</Link>
         </div>
       ) : null}
       <Card title={t('projects.list.cardTitle')}>

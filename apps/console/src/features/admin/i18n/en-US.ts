@@ -45,7 +45,7 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
 
   'admin.integrations.title': 'Integration container projects',
   'admin.integrations.hint': 'The two kinds of platform project that integrate company systems: APIProxy forwards company APIs, EventProducer turns company webhooks into platform events. Administrators create them, and they go through tag releases and blue/green switches like any digital worker.',
-  'admin.integrations.footer': 'Opening one lands on its own project pages: release, config and logs are identical to a digital worker. Creating one still happens in the workbench project list (visible to administrators).',
+  'admin.integrations.footer': "Create, develop, release and maintain integrations in administration.",
   'admin.integrations.name': 'Name',
   'admin.integrations.slug': 'Slug',
   'admin.integrations.kind': 'Kind',

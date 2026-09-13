@@ -3,6 +3,12 @@ import { adminRoute } from '../../features/admin';
 import { parseCapabilitySearch, parseRequestSearch } from '../../shared/admin/managementSearch';
 import { AdminCapabilitiesPage } from '../admin/AdminCapabilitiesPage';
 import { AdminRequestsPage } from '../admin/AdminRequestsPage';
+import { AdminProjectCreationPage, AdminProjectProvisioningPage } from '../admin/AdminProjectCreationPage';
+
+export const adminProjectCreateRoute = createRoute({ getParentRoute: () => adminRoute, path: 'projects/new', component: AdminProjectCreationPage,
+  validateSearch: (search: Record<string, unknown>): { scope: 'integration' | 'digital-worker' } => ({ scope: search.scope === 'integration' ? 'integration' : 'digital-worker' }),
+});
+export const adminProjectProvisioningRoute = createRoute({ getParentRoute: () => adminRoute, path: 'projects/$projectId/provisioning', component: AdminProjectProvisioningPage });
 
 export const adminCapabilitiesRoute = createRoute({ getParentRoute: () => adminRoute, path: 'capabilities', component: AdminCapabilitiesPage, validateSearch: parseCapabilitySearch });
 export const adminRequestsRoute = createRoute({ getParentRoute: () => adminRoute, path: 'requests', component: AdminRequestsPage, validateSearch: parseRequestSearch });

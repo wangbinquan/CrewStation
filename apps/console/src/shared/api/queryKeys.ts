@@ -48,6 +48,7 @@ export const queryKeys = {
   egressRequests: (projectId?: string) => (projectId === undefined ? (['egress', 'requests'] as const) : (['egress', 'requests', projectId] as const)),
   egressBlocked: (projectId: string) => ['egress', 'blocked', projectId] as const,
   servicePlans: () => ['service-plans'] as const,
+  projectTemplates: () => ['project-templates', 'admin'] as const,
   taskProfiles: () => ['task-profiles'] as const,
   /** 算力档位（RFC-001）：租户投影与管理面全量分开缓存，两者字段不同。 */
   computeProfiles: () => ['compute-profiles'] as const,

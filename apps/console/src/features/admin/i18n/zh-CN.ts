@@ -44,7 +44,7 @@ export const messages = {
 
   'admin.integrations.title': '接入容器项目',
   'admin.integrations.hint': '接入公司系统的两类平台项目：APIProxy 纯转发公司 API，EventProducer 把公司 webhook 变成平台事件。它们由管理员代建，和数字人一样走标签发布与蓝绿切换。',
-  'admin.integrations.footer': '在这里点进去就是它们各自的项目页：发布、配置、日志与数字人完全一致。新建仍在工作台的项目列表里做（管理员可见）。',
+  'admin.integrations.footer': "在管理空间创建、开发、发布和维护接入容器。",
   'admin.integrations.name': '名称',
   'admin.integrations.slug': 'slug',
   'admin.integrations.kind': '类型',

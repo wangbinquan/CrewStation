@@ -3,19 +3,16 @@ import { Link } from '@tanstack/react-router';
 import type { ReactElement } from 'react';
 import { useDateText } from '../../../shared/lib/useDateText';
 import { useT } from '../../../shared/lib/useT';
-import { Button } from '../../../shared/ui/Button';
 import { ProjectStateBadge } from './ProjectStateBadge';
 import styles from './ProjectTable.module.css';
 
 export interface ProjectRowProps {
   readonly project: ProjectDto;
   readonly isAdmin: boolean;
-  readonly retrying: boolean;
-  readonly onRetry: (projectId: string) => void;
 }
 
 /** 一个项目一行；开通失败时紧跟一行说明，把失败的步骤留在原地而不是折进详情页。 */
-export function ProjectRow({ project, isAdmin, retrying, onRetry }: ProjectRowProps): ReactElement {
+export function ProjectRow({ project, isAdmin }: ProjectRowProps): ReactElement {
   const t = useT();
   const dateText = useDateText();
   const failed = project.state === 'failed';
@@ -39,10 +36,8 @@ export function ProjectRow({ project, isAdmin, retrying, onRetry }: ProjectRowPr
         </td>
         <td className={styles.nowrap}>{dateText(project.createdAt)}</td>
         <td>
-          {isAdmin && failed ? (
-            <Button onClick={() => onRetry(project.id)} disabled={retrying}>
-              {retrying ? t('projects.list.retrying') : t('projects.list.retryProvision')}
-            </Button>
+          {isAdmin && (failed || project.state === 'provisioning') ? (
+            <Link to="/admin/projects/$projectId/provisioning" params={{ projectId: project.id }}>{t('projects.provision.title')}</Link>
           ) : null}
         </td>
       </tr>

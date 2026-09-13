@@ -23,7 +23,7 @@ export function IntegrationProjectsSection(): ReactElement {
   const items = projects.data?.items ?? [];
   const columns = [t('admin.integrations.name'), t('admin.integrations.slug'), t('admin.integrations.kind'), t('admin.integrations.state'), t('admin.integrations.createdAt')];
   return (
-    <Card title={t('admin.integrations.title')} footer={t('admin.integrations.footer')}>
+    <Card title={t('admin.integrations.title')} footer={t('admin.integrations.footer')} extra={<Link to="/admin/projects/new" search={{ scope: 'integration' }}>{t('projects.wizard.title.integration')}</Link>}>
       <QueryStatus
         isPending={projects.isPending}
         error={projects.error}
@@ -46,7 +46,7 @@ export function IntegrationProjectsSection(): ReactElement {
               <td>
                 <Badge tone="info">{project.kind}</Badge>
               </td>
-              <td>{project.state}</td>
+              <td>{project.state === 'failed' || project.state === 'provisioning' ? <Link to="/admin/projects/$projectId/provisioning" params={{ projectId: project.id }}>{t(`projects.state.${project.state}`)}</Link> : t(`projects.state.${project.state}`)}</td>
               <td>{dateText(project.createdAt)}</td>
             </tr>
           ))}
