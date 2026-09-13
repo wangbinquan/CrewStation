@@ -9,6 +9,9 @@ import type { Hono } from 'hono';
 import { yamlManifestParser } from './adapters/manifest/yamlManifestParser';
 import { drizzleReminderRepository } from './adapters/persistence/drizzleReminderRepository';
 import { drizzleNativeTerminals } from './adapters/persistence/drizzleNativeTerminals';
+import { drizzleWorkspaceLayouts } from './adapters/persistence/drizzleWorkspaceLayouts';
+import { workspaceLayoutUseCases } from './application/workspaceLayout';
+import { workspaceLayoutRoutes } from './http/workspaceLayoutRoutes';
 import type { DevSessionModuleApi } from './api/moduleApi';
 import { agentUseCases } from './application/agents';
 import { nativeTerminalUseCases } from './application/nativeTerminals';
@@ -64,11 +67,12 @@ export function createDevSessionModule(deps: DevSessionModuleDeps): DevSessionMo
   const lifecycle = sessionLifecycleUseCases(useCaseDeps);
   const agents = agentUseCases(useCaseDeps);
   const remind = idleReminderUseCase(useCaseDeps);
-  const api: DevSessionModuleApi = { name: 'dev-session', ...lifecycle, ...agents, ...nativeTerminalUseCases(useCaseDeps, drizzleNativeTerminals(deps.db)), ...versionComparisonUseCases(useCaseDeps), workspaceStatus: workspaceStatusUseCase(useCaseDeps), publish: publishFromSessionUseCase(useCaseDeps), sendIdleReminders: remind };
+  const terminals = drizzleNativeTerminals(deps.db);
+  const api: DevSessionModuleApi = { name: 'dev-session', ...lifecycle, ...agents, ...nativeTerminalUseCases(useCaseDeps, terminals), ...workspaceLayoutUseCases(useCaseDeps, drizzleWorkspaceLayouts(deps.db), terminals), ...versionComparisonUseCases(useCaseDeps), workspaceStatus: workspaceStatusUseCase(useCaseDeps), publish: publishFromSessionUseCase(useCaseDeps), sendIdleReminders: remind };
   let timer: ReturnType<typeof setInterval> | undefined;
   return {
     api,
-    http: [devSessionRoutes(api, deps.isAdmin), nativeTerminalRoutes(api, deps.isAdmin)],
+    http: [devSessionRoutes(api, deps.isAdmin), nativeTerminalRoutes(api, deps.isAdmin), workspaceLayoutRoutes(api, deps.isAdmin)],
     workers: [{ start: () => { timer ??= setInterval(() => void remind().catch((e: unknown) => useCaseDeps.logger.error('idle reminder failed', { error: String(e) })), 60_000); }, stop: async () => { if (timer) clearInterval(timer); timer = undefined; } }],
     migrations: devSessionMigrations,
   };

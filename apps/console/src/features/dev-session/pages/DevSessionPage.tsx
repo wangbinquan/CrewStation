@@ -23,13 +23,13 @@ export function DevSessionPage(): ReactElement {
   const context = useProjectContext(projectId, session.session);
   return (
     <>
-      <PageHeader title={t('devSession.title')} description={[t('devSession.line1'), t('devSession.line2')]} />
+      {!session.session ? <PageHeader title={t('devSession.title')} description={[t('devSession.line1'), t('devSession.line2')]} /> : null}
       {session.isPending ? <PaneNotice tone="muted">{t('devSession.loading')}</PaneNotice> : null}
       {session.loadError !== null ? <PaneNotice tone="warning">{errorMessage(session.loadError)}</PaneNotice> : null}
       {session.release.data !== undefined ? <ReleaseOutcome result={session.release.data} /> : null}
       {/* 开会话时 Manifest 有问题：会话照样开，但要把原因摆在这儿。轮询回来的会话对象不带它，所以取开会话那次的返回值。 */}
       {session.open.data?.message !== undefined ? <PaneNotice tone="warning">{session.open.data.message}</PaneNotice> : null}
-      {session.session === undefined ? null : (
+      {session.session === undefined || !context.userId ? null : (
         <DevSessionWorkbench
           key={session.session.taskId}
           projectId={projectId}
@@ -37,6 +37,7 @@ export function DevSessionPage(): ReactElement {
           access={context.access}
           canDevelop={context.canDevelop}
           serviceId={context.serviceId}
+          userId={context.userId}
           release={session.release}
         />
       )}

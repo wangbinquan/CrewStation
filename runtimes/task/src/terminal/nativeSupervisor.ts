@@ -127,9 +127,11 @@ export class NativeTerminalSupervisor {
     const entry = this.lookup(terminalId);
     this.assertRunning(entry);
     entry.control.assert(viewId);
-    await entry.screen.resize(cols, rows);
+    const terminalSeq = ++entry.outputSeq;
+    await entry.screen.resize(cols, rows, terminalSeq);
     entry.session!.resize(cols, rows);
     entry.record = { ...entry.record, cols, rows };
+    this.deps.emit({ kind: 'terminalResized', terminalId, runnerId: this.runnerId, terminalSeq, cols, rows });
   }
 
   async stop(agentId: string, runnerId: string): Promise<void> {

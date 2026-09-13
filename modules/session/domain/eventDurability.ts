@@ -5,7 +5,7 @@ export function isDurable(event: RunnerEvent): boolean {
   switch (event.kind) {
     case 'nativeTerminal': case 'agent': case 'execExited': case 'previewState': case 'runnerState': case 'terminalClosed': case 'fileChanged':
       return true;
-    case 'terminalOutput': case 'execOutput':
+    case 'terminalOutput': case 'terminalResized': case 'execOutput':
       return false;
   }
 }

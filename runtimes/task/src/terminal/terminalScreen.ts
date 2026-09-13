@@ -23,8 +23,8 @@ export function createTerminalScreen(cols: number, rows: number) {
       tail = tail.then(() => new Promise<void>((resolve) => terminal.write(data, () => { throughSeq = seq; resolve(); })));
       return tail;
     },
-    resize(nextCols: number, nextRows: number): Promise<void> {
-      tail = tail.then(() => { terminal.resize(nextCols, nextRows); });
+    resize(nextCols: number, nextRows: number, seq?: number): Promise<void> {
+      tail = tail.then(() => { terminal.resize(nextCols, nextRows); if (seq !== undefined) throughSeq = seq; });
       return tail;
     },
     async snapshot() {

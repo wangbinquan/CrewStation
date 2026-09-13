@@ -1,1 +1,1 @@
-export { devSessionRoute } from './routes';
+export { devSessionRoute, historicalConversationsRoute } from './routes';

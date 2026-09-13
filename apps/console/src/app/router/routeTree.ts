@@ -7,7 +7,7 @@ import {
 import { capabilitiesRoute } from '../../features/capabilities';
 import { catalogRoute } from '../../features/catalog';
 import { configRoute } from '../../features/config';
-import { devSessionRoute } from '../../features/dev-session';
+import { devSessionRoute, historicalConversationsRoute } from '../../features/dev-session';
 import { eventsRoute } from '../../features/events';
 import { logsRoute } from '../../features/logs';
 import { projectListRoute, projectOverviewRoute } from '../../features/projects';
@@ -22,6 +22,7 @@ export const routeTree = rootRoute.addChildren([
     projectRoute.addChildren([
       projectOverviewRoute,
       devSessionRoute,
+      historicalConversationsRoute,
       releaseRoute,
       configRoute,
       catalogRoute,

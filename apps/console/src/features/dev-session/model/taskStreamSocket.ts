@@ -19,12 +19,14 @@ export interface StreamState {
   readonly attempt: number;
   /** 最近一次连接回放的事件数。 */
   readonly replayed: number;
+  /** 每次 Runner 可用时自增，面板据此重查快照；不是进程启动次数。 */
+  readonly generation: number;
   readonly error?: string;
 }
 
 export type StreamEventListener = (event: RunnerEvent, seq: number) => void;
 
-export const INITIAL_STREAM_STATE: StreamState = { status: 'connecting', runnerConnected: false, lastSeq: 0, attempt: 0, replayed: 0 };
+export const INITIAL_STREAM_STATE: StreamState = { status: 'connecting', runnerConnected: false, lastSeq: 0, attempt: 0, replayed: 0, generation: 0 };
 
 const MAX_BACKOFF_MS = 30_000;
 const BASE_BACKOFF_MS = 500;
@@ -145,7 +147,13 @@ export class TaskStreamSocket {
         for (const listener of this.eventListeners) listener(frame.event, frame.seq);
         return;
       case 'streamReady':
-        this.patch({ runnerConnected: frame.connected, replayed: frame.replayed });
+        this.patch({ runnerConnected: frame.connected, replayed: frame.replayed, generation: this.state.generation + (frame.connected ? 1 : 0) });
+        return;
+      case 'runnerReconnected':
+        this.patch({ runnerConnected: true, runnerState: undefined, generation: this.state.generation + 1 });
+        return;
+      case 'runnerDisconnected':
+        this.patch({ runnerConnected: false });
         return;
       case 'result':
         this.queue.settle(frame.id, frame.payload);

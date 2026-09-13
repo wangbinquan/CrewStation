@@ -18,12 +18,13 @@ export interface AgentsPaneProps {
   readonly agents: DevAgentsHandle;
   readonly transcripts: TranscriptsByAgent;
   readonly onActivity: () => void;
+  readonly initialAgentId?: string;
 }
 
 /** Agent 面板：并行 Agent 的名册、当前 Agent 的转录与输入框，以及新建入口。 */
-export function AgentsPane({ agents, transcripts, onActivity }: AgentsPaneProps): ReactElement {
+export function AgentsPane({ agents, transcripts, onActivity, initialAgentId }: AgentsPaneProps): ReactElement {
   const t = useT();
-  const [picked, setPicked] = useState<string | undefined>(undefined);
+  const [picked, setPicked] = useState<string | undefined>(initialAgentId);
   const [starting, setStarting] = useState(false);
   // 没选过就看第一个：名册异步到达时不需要在 effect 里补 setState。
   const selected = agents.agents.find((agent) => agent.agentId === picked) ?? agents.agents[0];

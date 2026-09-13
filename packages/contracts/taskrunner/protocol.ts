@@ -115,6 +115,7 @@ export const RunnerEventSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('nativeTerminal'), terminal: NativeTerminalRecordSchema }),
   z.object({ kind: z.literal('agent'), event: AgentEventSchema }),
   z.object({ kind: z.literal('terminalOutput'), terminalId: z.string(), data: z.string(), terminalSeq: z.number().int().nonnegative().optional(), runnerId: z.uuid().optional() }),
+  z.object({ kind: z.literal('terminalResized'), terminalId: z.string(), runnerId: z.uuid(), terminalSeq: z.number().int().nonnegative(), ...TerminalSizeSchema.shape }),
   z.object({ kind: z.literal('terminalClosed'), terminalId: z.string(), exitCode: z.number().int().nullable() }),
   z.object({ kind: z.literal('execOutput'), execId: z.string(), stream: z.enum(['stdout', 'stderr']), data: z.string() }),
   z.object({ kind: z.literal('execExited'), execId: z.string(), exitCode: z.number().int().nullable(), durationMs: z.number().int().min(0) }),

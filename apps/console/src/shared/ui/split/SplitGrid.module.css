@@ -1,0 +1,6 @@
+.grid { display: grid; height: 100%; min-width: 0; min-height: 0; overflow: auto; position: relative; }
+.pane { min-width: 0; min-height: 0; }
+.columnHandle, .rowHandle { background: var(--cs-color-border); touch-action: none; z-index: 1; border-radius: var(--cs-radius-sm); }
+.columnHandle { cursor: col-resize; }
+.rowHandle { cursor: row-resize; }
+.columnHandle:hover, .rowHandle:hover, .columnHandle:focus-visible, .rowHandle:focus-visible { background: var(--cs-color-primary); outline: 2px solid var(--cs-color-primary); outline-offset: 1px; }

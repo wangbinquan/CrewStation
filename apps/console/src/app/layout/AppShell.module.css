@@ -18,6 +18,8 @@
   max-width: var(--cs-content-max-width);
   margin: 0 auto;
 }
+.compact { padding: 8px 12px; }
+.compact > .content { max-width: none; }
 
 @media (max-width: 800px) {
   .shell {
@@ -32,4 +34,5 @@
   .main {
     padding: var(--cs-space-4);
   }
+  .compact { padding: 8px; }
 }

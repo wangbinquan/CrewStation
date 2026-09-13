@@ -19,7 +19,7 @@ export interface DevSessionHandle {
 /** 会话本体：读取、开会话、释放。释放结果里的未推送提交由调用方展示。 */
 export function useDevSession(projectId: string): DevSessionHandle {
   const key = queryKeys.devSession(projectId);
-  const query = useApiQuery(key, () => api.devSession.get(projectId));
+  const query = useApiQuery(key, () => api.devSession.get(projectId), { refetchIntervalMs: 10_000 });
   // 释放之后重新取会得到 404，而 React Query 仍留着上一次成功的数据；
   // 已释放的会话也不算活着。两种情况都按“没有会话”处理，否则会同时渲染工作区与开会话表单。
   const absent = query.error?.kind === 'not_found' || query.data?.state === 'released';

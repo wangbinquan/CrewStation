@@ -1,0 +1,5 @@
+.preview { display: flex; flex-direction: column; height: 100%; min-height: 0; min-width: 0; border: 1px solid var(--cs-color-border); background: var(--cs-color-surface); border-radius: var(--cs-radius-sm); }
+.preview > header { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; font-size: 12px; padding: 4px 8px; border-bottom: 1px solid var(--cs-color-border); }
+.preview > p { font-size: 12px; color: var(--cs-color-text-muted); padding: 4px 8px; margin: 0; }
+.frame { flex: 1; width: 100%; min-height: 200px; border: 0; background: white; }
+.empty { padding: 12px; color: var(--cs-color-text-muted); }

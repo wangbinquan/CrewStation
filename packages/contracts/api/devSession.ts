@@ -65,3 +65,34 @@ export type BranchDto = z.infer<typeof BranchDtoSchema>;
 export type AgentInstanceDto = z.infer<typeof AgentInstanceDtoSchema>;
 export type AgentInstanceState = z.infer<typeof AgentInstanceStateSchema>;
 export type StartDevAgentRequest = z.infer<typeof StartDevAgentRequestSchema>;
+
+/** 个人显示配置；不保存终端输出，不拥有进程生命周期。 */
+const PaneIdSchema = z.string().min(1).max(128);
+const SplitWeightsSchema = z.array(z.number().finite().min(0.01).max(100)).min(1).max(32);
+export const WorkspaceTabSchema = z.object({
+  id: z.uuid(), name: z.string().trim().min(1).max(40), layout: z.enum(['grid', 'rows', 'columns']),
+  paneOrder: z.array(PaneIdSchema).max(32),
+  ratios: z.object({ columns: SplitWeightsSchema, rows: SplitWeightsSchema }).strict(),
+}).strict();
+export const WorkspaceLayoutSchema = z.object({
+  activeTabId: z.uuid(), tabs: z.array(WorkspaceTabSchema).min(1).max(16), hiddenTerminalIds: z.array(PaneIdSchema).max(256),
+  view: z.enum(['cli', 'preview', 'code', 'changes']), previewAlongside: z.boolean(), previewRatio: z.number().min(0.25).max(0.75),
+  selectedTerminalId: PaneIdSchema.nullable(), maximizedTerminalId: PaneIdSchema.nullable(),
+  preferredCompute: SlugSchema.optional(),
+}).strict().superRefine((layout, ctx) => {
+  const ids = layout.tabs.map((tab) => tab.id);
+  if (new Set(ids).size !== ids.length) ctx.addIssue({ code: 'custom', path: ['tabs'], message: '页签 ID 不能重复' });
+  if (!ids.includes(layout.activeTabId)) ctx.addIssue({ code: 'custom', path: ['activeTabId'], message: '当前页签不存在' });
+  const panes = layout.tabs.flatMap((tab) => tab.paneOrder);
+  const all = [...panes, ...layout.hiddenTerminalIds];
+  if (new Set(all).size !== all.length || all.length > 256) ctx.addIssue({ code: 'custom', path: ['tabs'], message: '每个 CLI 只能放在一个位置，最多 256 个' });
+  for (const key of ['selectedTerminalId', 'maximizedTerminalId'] as const) {
+    if (layout[key] && !panes.includes(layout[key])) ctx.addIssue({ code: 'custom', path: [key], message: '显示窗不存在' });
+  }
+});
+export const WorkspaceLayoutDtoSchema = z.object({ revision: z.number().int().min(0), layout: WorkspaceLayoutSchema.nullable(), updatedAt: z.iso.datetime().nullable() });
+export const SaveWorkspaceLayoutRequestSchema = z.object({ expectedRevision: z.number().int().min(0), layout: WorkspaceLayoutSchema }).strict();
+export type WorkspaceTab = z.infer<typeof WorkspaceTabSchema>;
+export type WorkspaceLayout = z.infer<typeof WorkspaceLayoutSchema>;
+export type WorkspaceLayoutDto = z.infer<typeof WorkspaceLayoutDtoSchema>;
+export type SaveWorkspaceLayoutRequest = z.infer<typeof SaveWorkspaceLayoutRequestSchema>;

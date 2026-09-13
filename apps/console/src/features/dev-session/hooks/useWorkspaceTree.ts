@@ -18,7 +18,7 @@ export interface WorkspaceTree {
 }
 
 /** 文件树：按需列目录，容器里文件变化时只重列已经展开过的目录。 */
-export function useWorkspaceTree(channel: TaskStreamChannel): WorkspaceTree {
+export function useWorkspaceTree(channel: TaskStreamChannel, generation = 0, connected = true): WorkspaceTree {
   const [entriesByDir, setEntriesByDir] = useState<Readonly<Record<string, readonly FileEntry[]>>>({});
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set([WORKSPACE_ROOT]));
   const [error, setError] = useState<string | undefined>(undefined);
@@ -41,8 +41,8 @@ export function useWorkspaceTree(channel: TaskStreamChannel): WorkspaceTree {
   );
 
   useEffect(() => {
-    reload(WORKSPACE_ROOT);
-  }, [reload]);
+    if (connected) for (const dir of new Set([WORKSPACE_ROOT, ...loadedRef.current])) reload(dir);
+  }, [reload, generation, connected]);
 
   const toggle = useCallback(
     (dir: string) => {

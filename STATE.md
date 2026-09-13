@@ -27,6 +27,10 @@ T14 `8b2560c` 与队列修复 `0b070a6` 已推上 main；精确 SHA CI `34730928
 
 T13 后端小批：原生启动计划、PTY 名册、数据库幂等受理、控制租约、屏幕快照、显式停止及浏览器流重连已接通；旧 headless Agent 保留。真实 Claude Code 2.1.268 与 OpenCode 1.18.29 在一次性 Linux 验收镜像显示原生 TUI，resize／Ctrl+C／退出可观测；没有注入模型凭据，不宣称模型输出或 T15 轮次事件通过。实跑发现并修复 OpenCode 所选模型不可用时自动回退到其他模型，原生配置现在固定平台模型范围。Linux 真实 PTY 四项定向验证通过；本批全量门禁与提交见 implementation.md。接下来仍需 T15 可靠事件与个人动态、T5 真正的紧凑多 CLI／页签界面。
 
+T13 后端已推送 `7290679dadc5315eae15e11b6f8a4576032779d7`，精确 SHA CI `34733116499` 成功。T5 工作台首批接入原生 CLI、个人页签 CAS、横排／纵排／网格与键盘／拖动分隔线、名册收起恢复、独立／并排预览、代码与差异视图；历史对话移至独立 `/dev-session/conversations`，旧 `view=conversation` 保留 agent 参数接续。原生轮次状态仍如实未确认，T15 尚未实施。普通 shell 保留在旧版会话工具中。
+
+本机 `cs-control-plane:rfc003-layout`、`cs-console:rfc003-layout`、`cs-task-runtime:rfc003-layout` 已构建并导入节点，新表迁移 Job `crewstation-rfc003-layout` 已完成。**尚未滚动更新服务**：自动审批拦截 ConfigMap 与 API／会话／控制器／控制台更新，理由为共享集群范围授权不足，具体授权问题待回复。此 blocker 与之前专用项目首次 prod 切流是两个独立问题；原 QA 会话、未提交文件和 demo 没有被重启／释放。可继续其余实现与自动验证，不能把镜像准备或组件测试当作真实工作台验收完成。
+
 ## 最新设计工作：工作台 UX 重设计（2026-09-13）
 
 作者要求依据原始理念全面重设计第一版原型的功能组织、UX 与使用逻辑。已对照两篇理念文章、基线与 RFC-001／002，检查本机界面与源码，完成 `proposal/rfc/RFC-003-workbench-ux-redesign/`：三件套、26 项可追溯审查／意见、开发工作台专项设计、交互附件与其验证记录。

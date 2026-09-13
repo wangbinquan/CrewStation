@@ -1,10 +1,13 @@
 import type { Actor, AgentInstanceDto, BranchDto, DevSessionDto, OpenDevSessionRequest, ProjectId, PublishRequest, ReleaseDto, SendAgentMessageRequest, StartDevAgentRequest, TaskId, WorkspaceStatusDto } from '@crewstation/contracts';
 import type { ComparisonDetailQuery, ComparisonDetails, ComparisonTarget, VersionComparisonDto } from '@crewstation/contracts';
 import type { NativeTerminalApi } from './nativeTerminalApi';
+import type { SaveWorkspaceLayoutRequest, WorkspaceLayoutDto } from '@crewstation/contracts';
 
 /** dev-session 对外能力：一项目一会话、分支、并行流式 Agent、从会话发布、空闲提醒。 */
 export interface DevSessionModuleApi extends NativeTerminalApi {
   readonly name: 'dev-session';
+  getWorkspaceLayout(actor: Actor, taskId: TaskId): Promise<WorkspaceLayoutDto>;
+  saveWorkspaceLayout(actor: Actor, taskId: TaskId, input: SaveWorkspaceLayoutRequest): Promise<WorkspaceLayoutDto>;
   openSession(actor: Actor, projectId: ProjectId, input: OpenDevSessionRequest): Promise<DevSessionDto>;
   getSession(actor: Actor, projectId: ProjectId): Promise<DevSessionDto | undefined>;
   listBranches(actor: Actor, projectId: ProjectId): Promise<BranchDto[]>;

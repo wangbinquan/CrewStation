@@ -90,3 +90,21 @@
 探针首次发现 OpenCode 在配置模型不可用时自动选 Big Pickle；修复后原生配置含顶层 model／small_model、enabled_providers 和 provider.whitelist，复验显示所选 Claude Sonnet 4.5。配置依据 [OpenCode 官方配置](https://opencode.ai/docs/config/#enabled-providers) 及其 [JSON Schema](https://opencode.ai/config.json)，不是对终端输出做关键词判定。真实 Linux PTY 最终 **4 pass／0 fail、25 assertions**。macOS 无 setsid，Ctrl+C 的进程组用例只在 Linux 执行，其他 PTY 用例仍在本机执行。
 
 本批只交付后端和协议，不把它标为 T5 工作台已完成。本地最终 `bun run check` **710 pass／2 skip／0 fail**，712 tests、112 files、3330 assertions、71.75s；console build 660ms。两项跳过为 opt-in K8s 与仅 Linux 的 Ctrl+C，后者已在实际 Linux 任务镜像单独实跑通过；CI 在 Linux 再验证。本机专用开发 Pod 未配置 `CS_AGENT_ENV_FILE`，也未挂载模型配置 Secret，不能把凭据缺失造成的未执行当作 T15 正常验收。
+
+发布记录：`7290679dadc5315eae15e11b6f8a4576032779d7` 已同步 main；[精确 SHA CI](https://github.com/wangbinquan/CrewStation/actions/runs/34733116499) 成功（check 1m3s）。
+
+## 第五批：T5 原生工作台与个人布局
+
+- 原生工作台替代同时展开六个功能面板的首屏：会话／数据／发布折叠到上下文行，实际版本关系用紧凑摘要，CLI、预览、代码和差异在工作视图中切换。真实预览 iframe 使用现有 previewHost，支持独立打开、刷新和重启；不把预览当成生产部署。
+- 每次新增固定一个 clientRequestId，不要求任务输入。双击锁住同一次调用；明确受理前拒绝允许更改档位，通信结果未确认时重试原请求。真实名册轮询和 nativeTerminal 事件触发核对，某窗失败不清空其余窗口。
+- dev-session 本模块持有个人布局表，GET／PUT 按当前 actor＋taskId 定位，revision 原子 CAS；16 个页签、每页签最多 32 窗、总引用最多 256。校验所属会话、唯一位置和有效页签，不持久化输出或赋予执行状态。保存串行化，迟到回执不覆盖后续编辑，冲突／网络失败保留草稿并提供重新应用或采用远端布局。
+- 新建空页签不启动进程；支持命名、关闭、调整顺序、移动、收起、恢复和放大。Shared SplitGrid 提供横排／纵排／网格、可用宽度换行、最小高度、拖动／方向键调整与均分。布局偏好不会被窄屏自动改写。
+- 终端先订阅再取有界 ANSI 屏幕快照，按 terminalSeq 去重并补接，序号缺口重新附着；输入不自动排队重发。显式取得控制后才接受输入／resize，关闭 UI 只 detach。新增 terminalResized 顺序事件让其他查看者保持真实尺寸；生命周期与本轮状态分离，T15 事件尚未接入时明确显示“进程在线 · 轮次未确认”。
+- 修复前端忽略 Runner 断线／重连帧；Runner 可用代次驱动终端、文件树和预览重新查快照，会话元数据进行有界前台轮询。历史结构化会话独立路由带 L-id，保留消息、新建、取消及旧 shell，原有 `view=conversation` 接续原 agent 参数。
+- 数据名称改为开发数据、生产数据只读、生产数据读写；批准与进程载入／应用选用不再混为一谈。完整 TTL、字段错误、撤销与现有配置接入待后续 T5 继续，未宣称这一分项已完成。
+
+自动验证覆盖真实 PostgreSQL 跨实例 CAS／用户隔离／旧 revision、组件新建关闭页签／双击启动／拒绝恢复／原 UUID 重试、保存中继续编辑／迟到读取／回执丢失／显式冲突恢复、分屏键盘操作、终端附着缓冲／重复／尺寸／断线／缺口与 detach。真实浏览器四窗、两 CLI 模型输出、后台动态和全角色旅程仍待 T12／T15。
+
+本机三个验收镜像已构建并导入 kind，新表迁移 Job `crewstation-rfc003-layout` 成功；滚动更新 API／session／controller／console 及新任务镜像 ConfigMap 被自动审批拒绝，理由为可能影响其他项目与活动会话、缺少集群范围的明确授权。更新尚未执行，已向作者请求该具体操作授权；没有绕过此拒绝，也没有切流或重启旧开发容器。本批浏览器生产实现验收尚未开始，不能以组件测试或设计附件代替。
+
+本地完整门禁 `bun run check`：**723 pass／2 skip／0 fail**，725 tests、117 files、3389 assertions、61.57s；console build 746ms。跳过项仍为 opt-in K8s 与 Linux 专用 Ctrl+C；没有把跳过项目算作已验证。精确提交与 CI 证据在发布后另记。

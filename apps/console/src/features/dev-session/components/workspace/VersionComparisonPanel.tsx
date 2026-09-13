@@ -12,12 +12,16 @@ import { ComparisonDetailsView } from './ComparisonDetailsView';
 import { ComparisonSummary } from './ComparisonSummary';
 import styles from './VersionComparisonPanel.module.css';
 
-export function VersionComparisonPanel({ projectId, taskId, channel, canDevelop }: { readonly projectId: string; readonly taskId: string; readonly channel: TaskStreamChannel; readonly canDevelop: boolean }): ReactElement {
+export function VersionComparisonPanel({ projectId, taskId, channel, canDevelop, compact = false, initiallyExpanded = false }: { readonly projectId: string; readonly taskId: string; readonly channel: TaskStreamChannel; readonly canDevelop: boolean; readonly compact?: boolean; readonly initiallyExpanded?: boolean }): ReactElement {
   const t = useT();
   const date = useDateText();
   const { query, history } = useVersionComparison(projectId, taskId, channel);
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(initiallyExpanded);
   const data = query.data;
+  if (compact) return <section className={styles.strip} aria-label={t('devSession.compare.title')}>
+    {data ? <ComparisonSummary comparison={data} compact /> : <QueryStatus isPending={query.isPending} error={query.error} />}
+    {data && (query.isError || query.isFetching || data.freshness === 'stale') ? <span title={date(data.checkedAt)}>{t('devSession.compare.staleHint')}</span> : null}
+  </section>;
   return <Card compact className={styles.panel} title={t('devSession.compare.title')} extra={<>
     <Button variant="ghost" disabled={query.isFetching || history.isPending} onClick={() => void query.refetch()}>{t(query.isFetching ? 'devSession.compare.refreshing' : 'devSession.workspace.recheck')}</Button>
     <Button variant="ghost" onClick={() => setExpanded(!expanded)} aria-expanded={expanded}>{t(expanded ? 'devSession.compare.collapse' : 'devSession.compare.details')}</Button>

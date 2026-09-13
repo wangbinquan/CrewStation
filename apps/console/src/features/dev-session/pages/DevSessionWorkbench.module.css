@@ -1,25 +1,7 @@
-/* 1280px 视口下内容区约 1000px：两列足够，终端与 Agent 并排，编辑器整行。 */
-.grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
-  grid-template-areas:
-    'agents terminal'
-    'editor editor'
-    'preview publish'
-    'data data';
-  gap: var(--cs-space-4);
-  align-items: start;
-}
-
-@media (max-width: 1000px) {
-  .grid {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-areas:
-      'agents'
-      'terminal'
-      'editor'
-      'preview'
-      'publish'
-      'data';
-  }
-}
+.context { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; min-height: 28px; font-size: 12px; margin-bottom: 4px; }
+.context > strong { font-size: 14px; }
+.disclosure { font-size: 12px; }
+.disclosure > summary { cursor: pointer; padding: 3px 6px; border: 1px solid var(--cs-color-border); border-radius: var(--cs-radius-sm); }
+.disclosure > summary:focus-visible { outline: 2px solid var(--cs-color-primary); }
+.disclosure[open] { flex-basis: 100%; }
+.disclosure > div { margin-top: 8px; }

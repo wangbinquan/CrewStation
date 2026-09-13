@@ -4,3 +4,4 @@
 .meta { color: var(--cs-color-text-muted); font-size: var(--cs-font-size-sm); margin: var(--cs-space-1) 0; }
 .patch { max-height: 340px; overflow: auto; font: var(--cs-font-size-sm)/1.6 var(--cs-font-mono); padding: var(--cs-space-2); background: var(--cs-color-surface-muted); border: 1px solid var(--cs-color-border); }
 .actions { display: flex; gap: var(--cs-space-2); margin-top: var(--cs-space-2); }
+.strip { display: flex; flex-wrap: wrap; gap: 6px; padding: 4px 0; font-size: 12px; border-bottom: 1px solid var(--cs-color-border); margin-bottom: 4px; }

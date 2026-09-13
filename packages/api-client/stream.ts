@@ -45,7 +45,9 @@ export interface TaskStreamErrorFrame {
   readonly message: string;
 }
 
-export type TaskStreamFrame = TaskStreamEventFrame | TaskStreamReadyFrame | TaskStreamResultFrame | TaskStreamErrorFrame;
+export interface TaskStreamConnectionFrame { readonly type: 'runnerReconnected' | 'runnerDisconnected' }
+
+export type TaskStreamFrame = TaskStreamEventFrame | TaskStreamReadyFrame | TaskStreamResultFrame | TaskStreamErrorFrame | TaskStreamConnectionFrame;
 
 /** 结果载荷（contracts `RunnerResultPayloads` 的类型形式）。 */
 export interface ListFilesResult { readonly path: string; readonly entries: FileEntry[] }
@@ -71,6 +73,9 @@ export function parseTaskStreamFrame(raw: unknown): TaskStreamFrame | undefined 
       return typeof frame.seq === 'number' && typeof frame.event === 'object' && frame.event !== null ? (frame as unknown as TaskStreamEventFrame) : undefined;
     case 'streamReady':
       return frame as unknown as TaskStreamReadyFrame;
+    case 'runnerReconnected':
+    case 'runnerDisconnected':
+      return frame as unknown as TaskStreamConnectionFrame;
     case 'result':
       return typeof frame.id === 'string' ? (frame as unknown as TaskStreamResultFrame) : undefined;
     case 'error':
