@@ -4,6 +4,8 @@ import type { UseMutationResult } from '@tanstack/react-query';
 import type { ReactElement } from 'react';
 import { Link } from '@tanstack/react-router';
 import type { ApiClientError } from '../../../shared/api/useApi';
+import { useProjectScope } from '../../../shared/project/ProjectScope';
+import { PROJECT_PATHS } from '../../../shared/project/projectPaths';
 import { useT } from '../../../shared/lib/useT';
 import { DataBindingPane } from '../components/DataBindingPane';
 import { PublishPane } from '../components/PublishPane';
@@ -41,6 +43,7 @@ export interface DevSessionWorkbenchProps {
  */
 export function DevSessionWorkbench({ projectId, session, access, canDevelop, serviceId, userId, release, activityTarget }: DevSessionWorkbenchProps): ReactElement {
   const t = useT();
+  const { space } = useProjectScope();
   const taskId = session.taskId;
   const { state, channel } = useTaskStream(taskId);
   const touch = useActivityTouch(taskId);
@@ -53,7 +56,7 @@ export function DevSessionWorkbench({ projectId, session, access, canDevelop, se
     <>
       <header className={styles.context}><strong>{t('devSession.title')}</strong><StreamStatus state={state} />
         <details className={styles.disclosure}><summary>{t('devSession.data.title')}{data.bindings.some((binding) => binding.mode !== 'development' && ['active', 'approved'].includes(binding.state)) ? ` · ${t('devSession.native.productionAccess')}` : ''}</summary><div><DataBindingPane data={data} /></div></details>
-        <details className={styles.disclosure}><summary>{t('devSession.native.sessionMenu')}</summary><div><SessionCard session={session} stream={state} access={access} release={release} /><Link to="/projects/$projectId/dev-session/conversations" params={{ projectId }}>{t('devSession.native.history')}</Link></div></details>
+        <details className={styles.disclosure}><summary>{t('devSession.native.sessionMenu')}</summary><div><SessionCard session={session} stream={state} access={access} release={release} /><Link to={PROJECT_PATHS[space].conversations} params={{ projectId }}>{t('devSession.native.history')}</Link></div></details>
         <details className={styles.disclosure}><summary>{t('devSession.native.prepareRelease')}</summary><div><PublishPane publish={publish} /></div></details>
       </header>
       <VersionComparisonPanel projectId={projectId} taskId={taskId} channel={channel} canDevelop={canDevelop} compact />

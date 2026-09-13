@@ -1,5 +1,6 @@
 import { Link } from '@tanstack/react-router';
 import type { ReactElement } from 'react';
+import { PROJECT_PATHS } from '../../../shared/project/projectPaths';
 import { useProjectScope } from '../../../shared/project/ProjectScope';
 import { useT } from '../../../shared/lib/useT';
 import { PageHeader } from '../../../shared/ui/PageHeader';
@@ -13,7 +14,7 @@ import styles from './ProjectOverviewPage.module.css';
 /** 项目概览保留运行版本，成员、仓库与资源通过设置入口查看。 */
 export function ProjectOverviewPage(): ReactElement {
   const t = useT();
-  const { projectId } = useProjectScope();
+  const { projectId, space } = useProjectScope();
   const { project, serviceId, isPending, error } = useProjectService(projectId);
   const { isOwner } = useProjectOwnership(projectId);
   return (
@@ -21,7 +22,7 @@ export function ProjectOverviewPage(): ReactElement {
       <PageHeader
         title={project?.name ?? t('projects.overview.title')}
         actions={
-          <Link to="/projects/$projectId/release" params={{ projectId }} className={styles.action}>
+          <Link to={PROJECT_PATHS[space].release} params={{ projectId }} className={styles.action}>
             {t('projects.overview.goRelease')}
           </Link>
         }
@@ -43,9 +44,9 @@ export function ProjectOverviewPage(): ReactElement {
       {serviceId === undefined && !isPending ? <p className={styles.note}>{t('projects.overview.noService')}</p> : null}
       {serviceId !== undefined ? <SlotsSection serviceId={serviceId} canSwitch={isOwner} /> : null}
       <div className={styles.identity}>
-        <Link to="/projects/$projectId/settings" params={{ projectId }} search={{ tab: 'members' }}>{t('settings.tab.members')}</Link>
-        <Link to="/projects/$projectId/settings" params={{ projectId }} search={{ tab: 'repository' }}>{t('settings.tab.repository')}</Link>
-        <Link to="/projects/$projectId/settings" params={{ projectId }} search={{ tab: 'resources' }}>{t('settings.tab.resources')}</Link>
+        <Link to={PROJECT_PATHS[space].settings} params={{ projectId }} search={{ tab: 'members' }}>{t('settings.tab.members')}</Link>
+        <Link to={PROJECT_PATHS[space].settings} params={{ projectId }} search={{ tab: 'repository' }}>{t('settings.tab.repository')}</Link>
+        <Link to={PROJECT_PATHS[space].settings} params={{ projectId }} search={{ tab: 'resources' }}>{t('settings.tab.resources')}</Link>
       </div>
     </>
   );

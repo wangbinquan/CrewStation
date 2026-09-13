@@ -1,7 +1,11 @@
-import { Link } from '@tanstack/react-router';
+import { Link, useLocation, useParams } from '@tanstack/react-router';
 import type { ReactElement } from 'react';
 import { useT } from '../../shared/lib/useT';
 import { NavFrame } from './NavFrame';
+import { ProjectNavSection } from './ProjectNavSection';
+import { api } from '../../shared/api/client';
+import { queryKeys } from '../../shared/api/queryKeys';
+import { useApiQuery } from '../../shared/api/useApi';
 import styles from './SideNav.module.css';
 
 type AdminPagePath =
@@ -34,20 +38,20 @@ const ADMIN_PAGES: readonly AdminPageItem[] = [
 
 export function AdminNav(): ReactElement {
   const t = useT();
+  const { projectId } = useParams({ strict: false }), path = useLocation().pathname;
+  const me = useApiQuery(queryKeys.me(), () => api.me.get());
+  const inProject = path.startsWith('/admin/integrations/') && projectId && !me.error && me.data?.isAdmin === true;
   return (
     <NavFrame subtitleKey="app.adminSpace">
-      <div className={styles.section}>
-        <div className={styles.sectionTitle}>{t('nav.admin.section')}</div>
-        <ul className={styles.list}>
-          {ADMIN_PAGES.map((item) => (
-            <li key={item.to}>
-              <Link to={item.to} className={styles.link} activeProps={{ className: styles.linkActive }} activeOptions={{ exact: item.exact ?? false }}>
-                {t(item.labelKey)}
-              </Link>
-            </li>
-          ))}
-        </ul>
-      </div>
+      {inProject ? <><Link to="/admin/integrations" className={styles.link}>{t('nav.admin.backToIntegrations')}</Link><ProjectNavSection projectId={projectId} space="admin" /></> : null}
+      {inProject ? <details className={styles.globalTools}><summary>{t('nav.admin.section')}</summary><AdminGlobalLinks /></details> : <AdminGlobalLinks />}
     </NavFrame>
   );
+}
+
+function AdminGlobalLinks() {
+  const t = useT();
+  return <ul className={styles.list}>
+    {ADMIN_PAGES.map((item) => <li key={item.to}><Link to={item.to} className={styles.link} activeProps={{ className: styles.linkActive }} activeOptions={{ exact: item.exact ?? false }}>{t(item.labelKey)}</Link></li>)}
+  </ul>;
 }

@@ -2,6 +2,9 @@ import { Link, useLocation, useParams } from '@tanstack/react-router';
 import type { ReactElement } from 'react';
 import { useT } from '../../shared/lib/useT';
 import { useProjectIdentity } from '../../shared/project/useProjectIdentity';
+import { api } from '../../shared/api/client';
+import { queryKeys } from '../../shared/api/queryKeys';
+import { useApiQuery } from '../../shared/api/useApi';
 import { Brand } from '../../shared/ui/Brand';
 import { CurrentUserChip } from './CurrentUserChip';
 import { LocaleSwitch } from './LocaleSwitch';
@@ -13,7 +16,9 @@ import styles from './TopBar.module.css';
 export function TopBar(): ReactElement {
   const t = useT();
   const { projectId } = useParams({ strict: false });
-  const path = useLocation().pathname, inAdmin = path.startsWith('/admin'), inProject = path.startsWith('/projects/');
+  const me = useApiQuery(queryKeys.me(), () => api.me.get());
+  const path = useLocation().pathname, inAdmin = path.startsWith('/admin');
+  const inProject = path.startsWith('/projects/') || path.startsWith('/admin/integrations/') && !me.error && me.data?.isAdmin === true;
   const project = useProjectIdentity(inProject ? projectId : undefined);
   return (
     <header className={styles.bar}>

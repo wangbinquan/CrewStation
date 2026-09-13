@@ -78,6 +78,8 @@ export const messages = {
   'nav.market': '能力市场',
   'nav.projectPages': '项目页面',
   'nav.settings': '项目设置',
+  'projectContext.retry': '重新读取项目',
+  'nav.admin.backToIntegrations': '返回接入容器',
   'nav.admin.section': '平台管理',
   'nav.admin.overview': '总览',
   'nav.admin.users': '用户与权限',

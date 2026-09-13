@@ -11,12 +11,16 @@ import { useApiQuery } from '../../../shared/api/useApi';
 import { useT } from '../../../shared/lib/useT';
 import { useDateText } from '../../../shared/lib/useDateText';
 import { Button } from '../../../shared/ui/Button';
+import { PROJECT_PATHS } from '../../../shared/project/projectPaths';
+import type { ProjectSpace } from '../../../shared/project/projectPaths';
 import styles from './AgentActivityMenu.module.css';
 
 export function AgentActivityMenu(): ReactElement {
   const { store, snapshot } = useAgentActivity(); const t = useT();
   const { projectId: routeProjectId } = useParams({ strict: false });
-  const projectId = useLocation().pathname.startsWith('/projects/') ? routeProjectId : undefined;
+  const me = useApiQuery(queryKeys.me(), () => api.me.get()), pathname = useLocation().pathname;
+  const isAdmin = !me.error && me.data?.isAdmin === true;
+  const projectId = pathname.startsWith('/projects/') || pathname.startsWith('/admin/integrations/') && isAdmin ? routeProjectId : undefined;
   const session = useApiQuery(queryKeys.devSession(projectId ?? ''), () => api.devSession.get(projectId!), { enabled: Boolean(projectId && store), refetchIntervalMs: 10000 });
   const project = useApiQuery(queryKeys.project(projectId ?? ''), () => api.projects.get(projectId!), { enabled: Boolean(projectId && store) });
   const [open, setOpen] = useState(false);
@@ -27,7 +31,8 @@ export function AgentActivityMenu(): ReactElement {
     const outside = (event: PointerEvent) => { if (event.target instanceof Node && !root.current?.contains(event.target)) { setOpen(false); for (const task of store?.getSnapshot().tasks ?? []) store?.resetOlder(task.taskId); } };
     document.addEventListener('pointerdown', outside); return () => document.removeEventListener('pointerdown', outside);
   }, [open, store]);
-  useEffect(() => { if (store && projectId && session.data?.taskId && !session.error) store.register(session.data.taskId, projectId, project.data?.name ?? projectId); }, [store, projectId, project.data?.name, session.data, session.error]);
+  const space = project.data?.kind === 'APIProxy' || project.data?.kind === 'EventProducer' ? 'admin' : 'workbench';
+  useEffect(() => { if (store && projectId && session.data?.taskId && !session.error) store.register(session.data.taskId, projectId, project.data?.name ?? projectId, space); }, [store, projectId, project.data?.name, space, session.data, session.error]);
   useEffect(() => { if (!snapshot.notice || !store) return; const id = snapshot.notice.id, timer = setTimeout(() => store.dismissNotice(id), 7000); return () => clearTimeout(timer); }, [snapshot.notice, store]);
   const counts = snapshot.tasks.reduce((total, task) => { const counts = activityCounts(task); return { pending: total.pending + counts.pending, completions: total.completions + counts.completions }; }, { pending: 0, completions: 0 });
   return <div className={styles.root} ref={root}>
@@ -53,7 +58,7 @@ function ActivityTaskSection({ task, onNavigate }: { readonly task: ActivityTask
     {task.error || task.stale || task.page?.sync !== 'ready' || task.page.connection !== 'connected' ? <p className={styles.warning} role="status">{t(task.page?.sync === 'catching-up' ? 'activity.syncing' : 'activity.stale')}</p> : null}
     {task.page?.historyTruncated ? <small>{t('activity.truncated')}</small> : null}
     {!task.loading && entries.length === 0 ? <p>{t('activity.caughtUp')}</p> : null}
-    {entries.slice(start, start + 50).map((entry) => <ActivityEntryRow key={entry.target.eventId} entry={entry} onNavigate={onNavigate} />)}
+    {entries.slice(start, start + 50).map((entry) => <ActivityEntryRow key={entry.target.eventId} entry={entry} space={task.space ?? 'workbench'} onNavigate={onNavigate} />)}
     <footer>
       {start > 0 ? <Button onClick={() => setOffset(start - 50)}>{t('activity.previous')}</Button> : null}
       {start + 50 < entries.length ? <Button onClick={() => setOffset(start + 50)}>{t('activity.next')}</Button> : null}
@@ -64,13 +69,13 @@ function ActivityTaskSection({ task, onNavigate }: { readonly task: ActivityTask
   </section>;
 }
 
-function ActivityEntryRow({ entry, onNavigate }: { readonly entry: ActivityEntry; readonly onNavigate: () => void }): ReactElement {
+function ActivityEntryRow({ entry, space, onNavigate }: { readonly entry: ActivityEntry; readonly space: ProjectSpace; readonly onNavigate: () => void }): ReactElement {
   const t = useT(), dateText = useDateText(), navigate = useNavigate();
   const { target } = entry;
   return <div className={styles.entry} data-urgent={entry.kind === 'request-opened' || entry.kind === 'process-failed'}>
     <div><strong>CLI {target.agentId.slice(-6)}</strong><span>{t(entry.requestKind ? `activity.request.${entry.requestKind}` : `activity.event.${entry.kind}`)}</span>{entry.unread ? <b className={styles.dot} aria-label={t('activity.unread')}>●</b> : null}<time dateTime={entry.at}>{dateText(entry.at)}</time></div>
     {entry.uncertain ? <small className={styles.warning}>{t('activity.lastKnown')}</small> : null}
     {entry.error ? <small>{entry.error}</small> : null}
-    <Button onClick={() => { void navigate({ to: '/projects/$projectId/dev-session', params: { projectId: target.projectId }, search: { task: target.taskId, agent: target.agentId, terminal: target.terminalId, ...(target.turnId ? { turn: target.turnId } : {}), event: target.eventId, seq: target.seq, focus: crypto.randomUUID() } }); onNavigate(); }}>{t(entry.kind === 'request-opened' || entry.kind === 'process-failed' ? 'activity.handle' : 'activity.result')}</Button>
+    <Button onClick={() => { void navigate({ to: PROJECT_PATHS[space].development, params: { projectId: target.projectId }, search: { task: target.taskId, agent: target.agentId, terminal: target.terminalId, ...(target.turnId ? { turn: target.turnId } : {}), event: target.eventId, seq: target.seq, focus: crypto.randomUUID() } }); onNavigate(); }}>{t(entry.kind === 'request-opened' || entry.kind === 'process-failed' ? 'activity.handle' : 'activity.result')}</Button>
   </div>;
 }

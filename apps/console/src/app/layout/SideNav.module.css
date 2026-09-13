@@ -101,3 +101,6 @@
 }
 
 .projectName { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-transform: none; letter-spacing: 0; color: var(--cs-nav-text); }
+.globalTools { min-width: 0; }
+.globalTools > summary { cursor: pointer; padding: 6px var(--cs-space-2); color: var(--cs-nav-text-muted); }
+.globalTools[open] > summary { margin-bottom: 6px; }

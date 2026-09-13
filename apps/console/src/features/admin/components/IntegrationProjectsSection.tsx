@@ -36,7 +36,7 @@ export function IntegrationProjectsSection(): ReactElement {
           {items.map((project) => (
             <tr key={project.id}>
               <td>
-                <Link to="/projects/$projectId" params={{ projectId: project.id }}>
+                <Link to="/admin/integrations/$projectId" params={{ projectId: project.id }}>
                   {project.name}
                 </Link>
               </td>

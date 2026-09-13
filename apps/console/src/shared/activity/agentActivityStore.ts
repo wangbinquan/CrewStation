@@ -4,6 +4,7 @@ import { isApiClientError } from '@crewstation/api-client';
 
 export interface ActivityTask {
   taskId: string; projectId: string; name: string; page?: AgentActivityPage; terminals?: NativeTerminalList;
+  space?: 'workbench' | 'admin';
   error?: string; stale: boolean; loading: boolean; older?: AgentActivityPage; olderBefore?: number; olderLoading?: boolean;
 }
 export interface ActivitySnapshot { tasks: ActivityTask[]; notice: { id: number; count: number } | null; limited: boolean }
@@ -33,12 +34,12 @@ export class AgentActivityStore {
   private emit(tasks = this.snapshot.tasks) { this.snapshot = { ...this.snapshot, tasks }; for (const listener of this.listeners) listener(); }
   private update(taskId: string, change: Partial<ActivityTask>) { this.emit(this.snapshot.tasks.map((task) => task.taskId === taskId ? { ...task, ...change } : task)); }
 
-  register(taskId: string, projectId: string, name: string): void {
+  register(taskId: string, projectId: string, name: string, space: 'workbench' | 'admin' = 'workbench'): void {
     const previous = this.snapshot.tasks.find((task) => task.taskId === taskId);
-    if (previous) { if (previous.name !== name) this.update(taskId, { name }); return; }
+    if (previous) { if (previous.name !== name || previous.space !== space) this.update(taskId, { name, space }); return; }
     if (this.snapshot.tasks.length >= 16) { this.snapshot = { ...this.snapshot, limited: true }; this.emit(); return; }
     this.tokens.set(taskId, Symbol(taskId));
-    this.emit([...this.snapshot.tasks, { taskId, projectId, name, stale: true, loading: true }]);
+    this.emit([...this.snapshot.tasks, { taskId, projectId, name, space, stale: true, loading: true }]);
     void this.refresh(taskId);
   }
 

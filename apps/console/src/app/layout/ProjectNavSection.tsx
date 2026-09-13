@@ -2,31 +2,26 @@ import { Link } from '@tanstack/react-router';
 import type { ReactElement } from 'react';
 import { useT } from '../../shared/lib/useT';
 import { useProjectIdentity } from '../../shared/project/useProjectIdentity';
+import { PROJECT_PATHS } from '../../shared/project/projectPaths';
+import type { ProjectPage, ProjectSpace } from '../../shared/project/projectPaths';
 import styles from './SideNav.module.css';
 
-type ProjectPagePath =
-  | '/projects/$projectId'
-  | '/projects/$projectId/dev-session'
-  | '/projects/$projectId/release'
-  | '/projects/$projectId/operations'
-  | '/projects/$projectId/settings';
-
 interface ProjectPageItem {
-  readonly to: ProjectPagePath;
+  readonly page: ProjectPage;
   readonly labelKey: string;
   readonly exact?: boolean;
 }
 
 /** 项目内页面入口的顺序即工作台左栏的顺序；路径与各 feature 的 routes.ts 一一对应。 */
 const PROJECT_PAGES: readonly ProjectPageItem[] = [
-  { to: '/projects/$projectId', labelKey: 'nav.overview', exact: true },
-  { to: '/projects/$projectId/dev-session', labelKey: 'nav.devSession' },
-  { to: '/projects/$projectId/release', labelKey: 'nav.release' },
-  { to: '/projects/$projectId/operations', labelKey: 'nav.operations' },
-  { to: '/projects/$projectId/settings', labelKey: 'nav.settings' },
+  { page: 'overview', labelKey: 'nav.overview', exact: true },
+  { page: 'development', labelKey: 'nav.devSession' },
+  { page: 'release', labelKey: 'nav.release' },
+  { page: 'operations', labelKey: 'nav.operations' },
+  { page: 'settings', labelKey: 'nav.settings' },
 ];
 
-export function ProjectNavSection({ projectId }: { readonly projectId: string }): ReactElement {
+export function ProjectNavSection({ projectId, space = 'workbench' }: { readonly projectId: string; readonly space?: ProjectSpace }): ReactElement {
   const t = useT();
   const identity = useProjectIdentity(projectId);
   return (
@@ -37,9 +32,9 @@ export function ProjectNavSection({ projectId }: { readonly projectId: string })
       </div>
       <ul className={styles.list} aria-label={t('nav.projectPages')}>
         {PROJECT_PAGES.map((item) => (
-          <li key={item.to}>
+          <li key={item.page}>
             <Link
-              to={item.to}
+              to={PROJECT_PATHS[space][item.page]}
               params={{ projectId }}
               className={styles.link}
               activeProps={{ className: styles.linkActive }}
