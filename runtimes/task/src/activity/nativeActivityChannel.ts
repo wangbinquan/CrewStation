@@ -1,7 +1,8 @@
 import type { NativeActivityChannel } from '@crewstation/agent-drivers';
 import { OpencodeNativeActivity } from '@crewstation/agent-drivers';
-import type { NativeActivityEvent, NativeActivitySignal } from '@crewstation/contracts';
+import type { NativeActivitySignal } from '@crewstation/contracts';
 import { NativeObservationEnvelopeSchema } from '@crewstation/contracts';
+import { createActivityStamp, type NativeActivityOptions } from './nativeActivityStamp';
 
 export interface NativeActivityObserver {
   options: NativeActivityChannel;
@@ -9,18 +10,8 @@ export interface NativeActivityObserver {
   close(): void;
 }
 
-interface Options {
-  agentId: string;
-  terminalId: string;
-  runnerId: string;
-  emit(activity: NativeActivityEvent): void;
-  /** 探针可指向固定验收镜像；生产缺省由任务镜像预装。 */
-  dependencyDir?: string;
-  leaseMs?: number;
-}
-
 /** 只监听容器环回，每个 CLI 独立令牌和单调源序号。通道失联只降级，不猜测轮次成功。 */
-export function createOpencodeActivityChannel(options: Options): NativeActivityObserver {
+export function createOpencodeActivityChannel(options: NativeActivityOptions): NativeActivityObserver {
   const token = crypto.randomUUID();
   const stamp = createActivityStamp(options);
   const normalizer = new OpencodeNativeActivity(stamp);
@@ -68,18 +59,5 @@ export function createOpencodeActivityChannel(options: Options): NativeActivityO
       server.stop(true);
       stamp({ source: 'opencode/1.18.29', sourceEventId: 'process-ended', kind: 'process-ended', occurredAt: now(), nativeSessionId: null, turnId: null });
     },
-  };
-}
-
-function createActivityStamp(options: Options): (signal: NativeActivitySignal) => void {
-  let sequence = 0, ordinal = 0;
-  const turns = new Map<string, number>();
-  return (signal) => {
-    if (signal.kind === 'turn-started' && signal.turnId && !turns.has(signal.turnId)) {
-      turns.set(signal.turnId, ++ordinal);
-      if (turns.size > 256) turns.delete(turns.keys().next().value!);
-    }
-    const seq = ++sequence;
-    options.emit({ agentId: options.agentId, terminalId: options.terminalId, runnerId: options.runnerId, eventId: crypto.randomUUID(), seq, turnOrdinal: signal.turnId ? turns.get(signal.turnId) ?? 0 : 0, signal });
   };
 }

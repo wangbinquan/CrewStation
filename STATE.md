@@ -39,6 +39,10 @@ T16 首批 `6b2325dedb0b202811e43039c2fdbd2e2d8b2807` 已推送，精确 SHA CI 
 
 续传修复 `b4ba3265b8dfd22abacb9abfca4042c637600e25` 已推送，精确 SHA CI `34738267327` 成功。T15 OpenCode 后续批已接通实际原生插件／严格事件协议／Runner 收集与 session 持久化，补充能力协商及独立状态重放缓冲。正式仓内原生验收在隔离任务镜像通过：1 pass、21 assertions，涵盖完成、中断、提问／撤回、许可和模型错误。源版本或通道不可靠时保留 CLI 并如实降级；撤回后无最终回答显示结果未确认。完整门禁和发布结果续记 implementation.md。**Claude 完整事件归一化、dev-session 投影／个人已读和顶部动态仍需继续，T15 不算完成。** 两个待授权集群操作未执行，没有更新旧 QA Pod 或生产切流。
 
+OpenCode 状态批 `4b2a40901b5b5de05947656fec1a2a91ad65cd03` 已推送，精确 SHA CI `34740556509` 成功。随后 Claude 固定版本状态通道已接入：原生 hooks、OTLP 轮次关联与有界 transcript 证据联合确认，首次中断无确定结果不误报成功，提问／撤回、许可、Stop 继续／继续后取消及 API 错误有正式原生回归。首轮源码挂载验收 1 pass／29 assertions，后续最终镜像与全量门禁记录在 implementation.md。**下一步继续 dev-session 状态投影、个人已读、页签和顶部 Agent 动态；T15 与 RFC-003 整体仍未完成。** 没有执行两个被拦截的集群操作。
+
+Claude 状态批最终门禁 **795 pass／4 skip／0 fail**，console build 成功；最终任务镜像中的两个原生 CLI 与 Linux PTY **7 pass／77 assertions**。三个运行时跳过项已在该 Linux 镜像实际验证，opt-in K8s 仍未运行。本批镜像只在本地构建和验收，没有绕过共享服务更新或 prod 切流的自动审批拒绝。
+
 ## 最新设计工作：工作台 UX 重设计（2026-09-13）
 
 作者要求依据原始理念全面重设计第一版原型的功能组织、UX 与使用逻辑。已对照两篇理念文章、基线与 RFC-001／002，检查本机界面与源码，完成 `proposal/rfc/RFC-003-workbench-ux-redesign/`：三件套、26 项可追溯审查／意见、开发工作台专项设计、交互附件与其验证记录。

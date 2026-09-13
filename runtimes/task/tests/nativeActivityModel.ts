@@ -1,6 +1,6 @@
 import type { Server } from 'bun';
 
-export type NativeProbeScenario = 'normal' | 'cancel' | 'question' | 'question-reject' | 'permission' | 'api-error';
+export type NativeProbeScenario = 'normal' | 'cancel' | 'question' | 'question-reject' | 'permission' | 'api-error' | 'blocked-stop' | 'blocked-stop-cancel';
 interface ModelRequest { stream?: boolean; model?: string; tools?: Array<{ name: string }> }
 
 /** 只供原生 CLI 验收：Anthropic 协议夹具，无外部模型调用、无真实模型凭据。 */
@@ -10,28 +10,35 @@ export class NativeActivityModel {
   private usedTool = false;
   private sequence = 0;
   private requested = Promise.withResolvers<void>();
+  private continued = Promise.withResolvers<void>();
+  private stopCount = 0;
+  private promptRequests = 0;
 
-  constructor(private readonly outsideFile: string) {
+  constructor(private readonly outsideFile: string, private readonly cli: 'claude-code' | 'opencode' = 'opencode') {
     this.server = Bun.serve({ hostname: '127.0.0.1', port: 0, fetch: (request) => this.fetch(request) });
   }
   get base(): string { return `http://127.0.0.1:${this.server.port}/v1`; }
-  setScenario(scenario: NativeProbeScenario): void { this.scenario = scenario; this.usedTool = false; this.requested = Promise.withResolvers<void>(); }
+  setScenario(scenario: NativeProbeScenario): void { this.scenario = scenario; this.usedTool = false; this.stopCount = 0; this.promptRequests = 0; this.requested = Promise.withResolvers<void>(); this.continued = Promise.withResolvers<void>(); }
   whenRequested(): Promise<void> { return this.requested.promise; }
+  whenContinued(): Promise<void> { return this.continued.promise; }
   close(): void { this.server.stop(true); }
 
   private async fetch(request: Request): Promise<Response> {
     const path = new URL(request.url).pathname;
+    if (request.method !== 'POST') return Response.json({});
     const body = await request.json() as ModelRequest;
+    if (path.endsWith('/ask')) return Response.json({ hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'ask', permissionDecisionReason: 'Acceptance permission request' } });
+    if (path.endsWith('/block')) return Response.json(this.scenario.startsWith('blocked-stop') && ++this.stopCount === 1 ? { decision: 'block', reason: 'Acceptance: continue once after this stop.' } : {});
     if (path.endsWith('/count_tokens')) return Response.json({ input_tokens: 10 });
     if (!path.endsWith('/messages')) return new Response(null, { status: 404 });
     const scenario = this.scenario;
-    if (body.tools?.length) this.requested.resolve();
+    if (body.tools?.length) { this.requested.resolve(); if (++this.promptRequests > 1) this.continued.resolve(); }
     if (scenario === 'api-error') return Response.json({ type: 'error', error: { type: 'invalid_request_error', message: 'Scripted acceptance failure' } }, { status: 400 });
-    if (scenario === 'cancel') await Bun.sleep(7000);
-    const name = scenario === 'permission' ? 'read' : 'question';
+    if (scenario === 'cancel' || (scenario === 'blocked-stop-cancel' && this.promptRequests > 1)) await Bun.sleep(7000);
+    const name = this.cli === 'claude-code' ? scenario === 'permission' ? 'Read' : 'AskUserQuestion' : scenario === 'permission' ? 'read' : 'question';
     const useTool = ['question', 'question-reject', 'permission'].includes(scenario) && !this.usedTool && body.tools?.some((tool) => tool.name === name);
     if (useTool) this.usedTool = true;
-    const input = scenario === 'permission' ? { filePath: this.outsideFile } : { questions: [{ question: 'Which acceptance option?', header: 'Probe', options: [{ label: 'Alpha', description: 'First option' }, { label: 'Beta', description: 'Second option' }] }] };
+    const input = scenario === 'permission' ? this.cli === 'claude-code' ? { file_path: this.outsideFile } : { filePath: this.outsideFile } : { questions: [{ question: 'Which acceptance option?', header: 'Probe', options: [{ label: 'Alpha', description: 'First option' }, { label: 'Beta', description: 'Second option' }] }] };
     const sequence = ++this.sequence;
     const content = useTool ? { type: 'tool_use', id: `probe_tool_${sequence}`, name, input } : { type: 'text', text: 'Acceptance response complete.' };
     const message = { id: `probe_message_${sequence}`, type: 'message', role: 'assistant', model: body.model, content: [content], stop_reason: useTool ? 'tool_use' : 'end_turn', stop_sequence: null, usage: { input_tokens: 10, output_tokens: 5 } };

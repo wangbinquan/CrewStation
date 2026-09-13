@@ -5,5 +5,5 @@
   "type": "module",
   "description": "自 agent-workflow 复制改造的 OpenCode／Claude Code 驱动、agentInjection、agentProcess；只供 runtimes/task 使用",
   "exports": { ".": "./index.ts" },
-  "dependencies": { "@crewstation/kernel": "workspace:*", "@crewstation/contracts": "workspace:*" }
+  "dependencies": { "@crewstation/kernel": "workspace:*", "@crewstation/contracts": "workspace:*", "zod": "4.6.2" }
 }

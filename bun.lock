@@ -494,6 +494,7 @@
       "dependencies": {
         "@crewstation/contracts": "workspace:*",
         "@crewstation/kernel": "workspace:*",
+        "zod": "4.6.2",
       },
     },
     "packages/api-client": {

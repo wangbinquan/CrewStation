@@ -1,7 +1,5 @@
 import { expect, test } from 'bun:test';
 import { chown, mkdtemp, rm, writeFile } from 'node:fs/promises';
-import type { NativeActivityEvent, NativeActivityKind } from '@crewstation/contracts';
-import { NativeActivityEventSchema } from '@crewstation/contracts';
 import { prepareNativeTerminal } from '@crewstation/agent-drivers';
 import { noopLogger } from '@crewstation/kernel';
 import { createWorkdirPaths } from '../src/files/workdirPath';
@@ -10,26 +8,7 @@ import { probeCurrentUid, resolveIsolation } from '../src/process/privilege';
 import { createNativePtyBackend } from '../src/terminal/nativePty';
 import { NativeTerminalSupervisor } from '../src/terminal/nativeSupervisor';
 import { NativeActivityModel, type NativeProbeScenario } from './nativeActivityModel';
-
-function activityInbox() {
-  const events: NativeActivityEvent[] = [];
-  const waiters = new Set<() => void>();
-  return {
-    events,
-    emit(event: NativeActivityEvent) { events.push(NativeActivityEventSchema.parse(event)); for (const notify of waiters) notify(); },
-    wait(kind: NativeActivityKind, ordinal?: number): Promise<NativeActivityEvent> {
-      return new Promise((resolve, reject) => {
-        const done = () => {
-          const event = events.find((entry) => entry.signal.kind === kind && (ordinal === undefined || entry.turnOrdinal === ordinal));
-          if (!event) return;
-          clearTimeout(timer); waiters.delete(done); resolve(event);
-        };
-        const timer = setTimeout(() => { waiters.delete(done); reject(new Error(`Missing ${kind}/${ordinal}; observed ${events.map((event) => `${event.turnOrdinal}:${event.signal.kind}`).join(',')}`)); }, 15000);
-        waiters.add(done); done();
-      });
-    },
-  };
-}
+import { nativeActivityInbox } from './nativeActivityInbox';
 
 async function fixture() {
   const work = await mkdtemp('/tmp/cs-native-activity-');
@@ -38,7 +17,7 @@ async function fixture() {
   const currentUid = probeCurrentUid();
   if (currentUid === 0) { await chown(work, 10001, 10001); await chown(outside, 10001, 10001); }
   const model = new NativeActivityModel(outside);
-  const inbox = activityInbox();
+  const inbox = nativeActivityInbox();
   const launcher = createProcessLauncher({ isolation: resolveIsolation({ uid: 10001, gid: 10001, currentUid, which: (binary) => Bun.which(binary) }), processEnv: { PATH: process.env.PATH! }, workerHome: work, logger: noopLogger });
   const native = new NativeTerminalSupervisor({
     backend: createNativePtyBackend(launcher), launcher, paths: await createWorkdirPaths(work), logger: noopLogger,

@@ -148,3 +148,15 @@ OpenCode 1.18.29 的原生插件、严格观察协议、Runner 环回收集与�
 真实镜像验收已使用正式仓内测试，**1 pass／0 fail、21 assertions**，覆盖普通回答、双 Esc 中断、问题答复／撤回、许可确认、模型 HTTP 400 和进程退出。模型为同容器内脚本化 Anthropic SSE 夹具，网络关闭；不是外部模型调用，也不等于后台工作台完成。细节、命令和边界见 [原生事件证据](native-activity-evidence.md)。Claude 的完整归一化、dev-session 投影／个人未读、顶部和页签动态仍未完成；共享集群没有部署本批代码。
 
 最终本地门禁 `bun run check`：**772 pass／3 skip／0 fail**，775 tests、128 files、3599 assertions、64.22s；console build 570ms。跳过项是 opt-in K8s、opt-in 原生 CLI 和 Linux 专用 Ctrl+C；原生 CLI 已在隔离 Linux 镜像显式运行通过。普通门禁包含真实 PostgreSQL 的 nativeActivity 按 agentId／游标查询、真实 HTTP 收集／队列重试、协议兼容、WS 状态保留与真实 PTY 故障降级。最终任务镜像 `cs-task-runtime:rfc003-activity` 为 `sha256:6d6dbf82305b1fb62bb028d5a5f94681b0971c5fa7f3da014a59654182fb0906`，未导入或部署共享集群。
+
+发布记录：`4b2a40901b5b5de05947656fec1a2a91ad65cd03` 已同步 main；[精确 SHA CI](https://github.com/wangbinquan/CrewStation/actions/runs/34740556509) 成功（check 1m16s）。
+
+## 第九批：T15 Claude 原生状态通道
+
+Claude Code 2.1.268 已通过独立原生 hooks／OTLP 接收器、轮次证据归一化及有界 transcript 读取接入既有 nativeActivity 传输。逐 CLI 的随机通道、seq、turnOrdinal 与进程状态分离；旧轮次迟到结果保持原身份。正常完成要求实际交互结束与本轮最终记录相符，Stop 本身不触发成功，保留其他项目 hooks 的继续执行能力。后台投影与通知 UI 不在本批宣称完成。
+
+实跑修正 SessionStart 的 HTTP hook 不受支持问题，改用私有 command，包含带引号路径的真实执行回归。真实许可通过项目自身要求确认的 Read hook 验证；保留正常原生审批方式。问题撤回由已结束轮次撤销待处理，首次模型请求被中断时只显示结果未确认；API 错误和继续后取消分别有对应状态。来源、上限和固定版本内部记录边界见 [原生状态证据](native-activity-evidence.md)。
+
+自动回归覆盖最小字段解析、版本漂移、相同并行工具的关联歧义、主／子会话、旧轮次、trace 乱序／去重／保留边界、半行 UTF-8、文件截断／超大行、真实 HTTP 和心跳失效。已指定的用户 OTEL 目的地或策略不被覆盖，观察不兼容时 CLI 仍可启动。此前真实 `nativeSupervisor`／OpenCode 通道继续沿用，并共享状态编号逻辑。
+
+最终本地 `bun run check`：**795 pass／4 skip／0 fail**，799 tests、136 files、3678 assertions、66.73s；console build 625ms。跳过项是 opt-in K8s、两个 opt-in 原生 CLI 和 Linux 专用 Ctrl+C。最终镜像 `cs-task-runtime:rfc003-claude-activity` 为 `sha256:341fa1b05abfaf5f15824fff89f374ecc7c98cb7f0cbdc4b4f0e75636274f665`，只挂载测试文件而不替换生产源码的镜像验收 **7 pass／0 fail、77 assertions、21.10s**，其中 OpenCode 六场景、Claude 八场景及 Linux PTY 全部通过。镜像未导入或更新共享集群，原有 QA Pod 和生产切流保持待授权；T15 领域投影、个人已读和后台 UI 继续实施。

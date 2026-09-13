@@ -24,5 +24,5 @@ export interface NativeActivityChannel {
   endpoint: string;
   token: string;
   /** 镜像中预装的 SDK 与 npm lock；不覆盖已有用户依赖。 */
-  opencodeDependencies: string;
+  opencodeDependencies?: string;
 }

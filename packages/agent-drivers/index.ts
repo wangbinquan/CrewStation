@@ -29,6 +29,10 @@ export type { DriverAgentProcess, DriverAgentSpec, DriverLaunchContext, CliAgent
 export type { NativeTerminalSpec, PreparedNativeTerminal, NativeActivityChannel } from './contract/nativeTerminal';
 export { prepareNativeTerminal } from './drivers/nativeTerminal';
 export { OpencodeNativeActivity } from './drivers/opencode/nativeActivity';
+export { ClaudeNativeActivity } from './drivers/claudeCode/nativeActivity';
+export { parseClaudeNativeHook, parseClaudeTranscriptNode } from './drivers/claudeCode/nativeObservation';
+export { parseClaudeNativeTelemetry } from './drivers/claudeCode/nativeTelemetry';
+export type { ClaudeTranscriptNode } from './drivers/claudeCode/nativeTurnEvidence';
 export { DriverStateError } from './contract/agentDriver';
 export type {
   DriverChildProcess,

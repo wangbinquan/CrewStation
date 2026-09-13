@@ -13,8 +13,8 @@ export async function setupOpencodeNativeActivity(ctx: AgentSpawnContext, contex
     const version = await ensureOpencodeBinaryVersion(context.host, ctx.head ?? ['opencode'], { cwd: ctx.cwd, env, timeoutMs: 5000 });
     if (version !== '1.18.29') return 'unsupported-version';
     const globalConfig = join(env.XDG_CONFIG_HOME ?? join(env.HOME ?? ctx.cwd, '.config'), 'opencode');
-    await seedOpencodePluginDependencies(channel.opencodeDependencies, globalConfig, context.host);
-    await seedOpencodePluginDependencies(channel.opencodeDependencies, env.OPENCODE_CONFIG_DIR!, context.host);
+    await seedOpencodePluginDependencies(channel.opencodeDependencies ?? '/opt/crewstation-opencode-plugin', globalConfig, context.host);
+    await seedOpencodePluginDependencies(channel.opencodeDependencies ?? '/opt/crewstation-opencode-plugin', env.OPENCODE_CONFIG_DIR!, context.host);
     const plugin = await runDir.write('activity-observer.mjs', renderOpencodeActivityPlugin(channel.endpoint, channel.token));
     const config = JSON.parse(env.OPENCODE_CONFIG_CONTENT!);
     env.OPENCODE_CONFIG_CONTENT = JSON.stringify({ ...config, plugin: [...(config.plugin ?? []), `file://${plugin}`] });

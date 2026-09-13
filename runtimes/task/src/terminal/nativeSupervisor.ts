@@ -6,6 +6,7 @@ import { prepareNativeTerminal } from '@crewstation/agent-drivers';
 import { createProcessHost } from '../agents/cliDriver';
 import type { NativeActivityObserver } from '../activity/nativeActivityChannel';
 import { createOpencodeActivityChannel } from '../activity/nativeActivityChannel';
+import { createClaudeActivityChannel } from '../activity/claudeActivityChannel';
 import { RunnerCommandError, notFound } from '../commandError';
 import type { WorkdirPaths } from '../files/workdirPath';
 import type { ProcessLauncher } from '../process/launcher';
@@ -77,7 +78,7 @@ export class NativeTerminalSupervisor {
     try {
       const cwd = await this.deps.paths.resolveCwd(command.cwd);
       const env = this.deps.launcher.baseEnv({ ...this.deps.agentEnv, ...command.env, TERM: 'xterm-256color', COLUMNS: String(command.cols), LINES: String(command.rows) });
-      if (command.driver === 'opencode') entry.activity = this.observe(entry);
+      entry.activity = this.observe(entry, command.driver);
       const prepared = await (this.deps.prepare ?? prepareNativeTerminal)(command, { cwd, env, host: createProcessHost(this.deps.launcher), logger: this.deps.logger, ...(entry.activity ? { nativeActivity: entry.activity.options } : {}) });
       entry.prepared = prepared;
       if (prepared.activityUnavailable) entry.activity?.unavailable(prepared.activityUnavailable);
@@ -102,13 +103,13 @@ export class NativeTerminalSupervisor {
     }).catch((error: unknown) => this.deps.logger.error('native terminal screen write failed', { agentId: entry.record.agentId, error: String(error) }));
   }
 
-  private observe(entry: NativeEntry): NativeActivityObserver | undefined {
-    try { return (this.deps.activityFactory ?? createOpencodeActivityChannel)({ ...entry.record, emit: (activity) => this.deps.emit({ kind: 'nativeActivity', activity }) }); }
+  private observe(entry: NativeEntry, driver: 'claude-code' | 'opencode'): NativeActivityObserver | undefined {
+    try { return (this.deps.activityFactory ?? (driver === 'claude-code' ? createClaudeActivityChannel : createOpencodeActivityChannel))({ ...entry.record, emit: (activity) => this.deps.emit({ kind: 'nativeActivity', activity }) }); }
     catch {
       this.deps.logger.warn('native activity channel unavailable; CLI remains usable', { agentId: entry.record.agentId });
       this.deps.emit({ kind: 'nativeActivity', activity: {
         agentId: entry.record.agentId, terminalId: entry.record.terminalId, runnerId: this.runnerId, eventId: crypto.randomUUID(), seq: 1, turnOrdinal: 0,
-        signal: { source: 'opencode/1.18.29', sourceEventId: 'channel-unavailable', kind: 'source-unavailable', occurredAt: new Date().toISOString(), nativeSessionId: null, turnId: null, reason: 'source-error' },
+        signal: { source: driver === 'claude-code' ? 'claude-code/2.1.268' : 'opencode/1.18.29', sourceEventId: 'channel-unavailable', kind: 'source-unavailable', occurredAt: new Date().toISOString(), nativeSessionId: null, turnId: null, reason: 'source-error' },
       } });
       return undefined;
     }

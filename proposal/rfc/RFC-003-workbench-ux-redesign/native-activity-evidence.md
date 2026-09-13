@@ -6,7 +6,7 @@
 
 在一次性 `cs-task-runtime:rfc003-layout` 容器中，以 worker 10001 启动真实原生 TUI。容器 `--network none`，使用同容器内 Bun HTTP 服务返回脚本化 Anthropic Messages／SSE 响应，API key 为固定的无效测试字符串。没有读取个人模型凭据，没有调用外部模型，没有连接或更新共享集群。模型响应是夹具；CLI、PTY、原生钩子及其产生的结构化事件是真实执行结果。
 
-本机可复验脚本为 `/private/tmp/crewstation-claude-events-probe.ts`、`/private/tmp/crewstation-claude-cancel-probe.ts`，输出分别为同名 `.log`。这些临时研究脚本尚未作为正式自动门禁，不以手工记录替代后续驱动回归。
+早期本机研究脚本为 `/private/tmp/crewstation-claude-events-probe.ts`、`/private/tmp/crewstation-claude-cancel-probe.ts`，输出分别为同名 `.log`。后续两种驱动都已有仓内正式原生验收，下文分别说明；不以早期手工记录代替自动回归。
 
 ## Claude Code 2.1.268
 
@@ -28,6 +28,20 @@
 OTLP 通过环回 HTTP JSON 收集，logs／traces 以 1 秒周期导出。只需要的生命周期字段应在 Runtime 内归一化；提示词、回答、工具参数和原始 API body 的日志开关保持关闭。用户提示日志的 prompt.id 和 traceId 可将 interaction span 关联回对应轮次；span 自身的 status 为 UNSET，不能拿来判断成功。后续还需验证请求被拒／撤回、工具完成但轮次继续、两轮快速衔接、进程退出和事件通道故障。
 
 来源：[Claude Hooks](https://code.claude.com/docs/en/hooks)、[Claude Monitoring](https://code.claude.com/docs/en/monitoring-usage)。上述结论同时以固定版本的原生实跑核对；不从终端静默时长推断状态。
+
+### Claude 正式运行时接入
+
+2026-09-13 已接入 `ClaudeNativeActivity`、私有 hooks／OTLP 收集器和有界 transcript 读取，正式验收在 `runtimes/task/tests/claudeActivityAcceptance.test.ts`。首次连通发现固定版本**静默忽略 HTTP SessionStart**；[官方事件说明](https://code.claude.com/docs/en/hooks#sessionstart) 也只列 command／mcp_tool。改为私有 command hook 后，真实 SessionStart 可以注册根会话。ConfigChange 同样用 command，其他轮次／工具事件用 HTTP；任何观察响应都不批准、拒绝或修改原生操作。`--settings` 追加 hooks，不改用户或项目设置文件。
+
+归一化由三个独立证据交叉确认：UserPromptSubmit 的 prompt_id 开轮次；用户提示日志与 interaction 的 traceId／spanId 对应后确认轮次已停止；只有 transcript UUID 父链回到本轮显式 human origin、最后 assistant 为 end_turn 且有 turn_duration 才确认成功。读取半行、乱序父节点或更晚到达的旧轮次不能借用当前轮次结果。StopFailure 与匹配的原生 API 错误表示失败，interruptedMessageId 表示中断；首轮提前 Esc 缺少明确结果字段时为已停止／结果未确认。
+
+人工待处理从 PermissionRequest 产生，使用 PreToolUse 的 tool_use_id 和唯一 tool_name／输入摘要匹配。输入原文不进入状态对象。相同输入的多个并行工具无法唯一关联时，明确降级，不按顺序猜测。PostToolUse 解决对应请求，工具完成不算轮次完成；Esc 撤回问题没有 PostToolUseFailure，由已结束的同轮 interaction 撤销仍未解决的请求，不能伪称用户已经回答。模型返回 HTTP 400、Stop 继续一次和继续后取消均有真实回归。
+
+状态通道使用固定版本的 OTLP metrics 每 5 秒心跳，20 秒失联降级；没有以 PTY 或模型输出的静默时间判定结束。logs／traces 每秒导出，内部输入／回答／工具内容日志关闭；仅最小关联字段进入 session。若操作者已设置 OTEL 或遥测策略，保留其配置，仅将平台观察标为不可用。普通 CLI 仍可使用。
+
+上限：128 个原生根会话、128 个轮次、单轮 64 个工具、512 个 trace 关联、8192 个 transcript 结构节点；每个文件每次最多读取 1 MiB，单行最多 2 MiB，每个 HTTP body 最大 2 MiB、最多 16 个待处理请求。文件截断／替换、异常结构、未知版本、关联缺口和超限均降级，不报告成功。transcript 是固定版本内部记录，未来版本必须重新验证；这些上限不是无限离线或任意历史恢复的承诺。
+
+首次正式源码挂载验收 **1 pass／0 fail、29 assertions、13.04s**，八个场景依次为首次中断、正常完成、问题回答、撤回、许可确认、Stop 后继续、继续后取消、API 错误；最后独立验证进程退出。Read 在平台既有 allowedTools 下不会自动产生许可等待，所以验收项目自身的 PreToolUse hook 显式要求一次确认，以验证真实许可链和项目 hooks 的合并。不是由观察器改变生产工具权限。最终镜像与整仓门禁证据续记 `implementation.md`。
 
 ## OpenCode 1.18.29
 
@@ -63,7 +77,7 @@ docker run --rm --network none -e CS_NATIVE_ACTIVITY_ACCEPTANCE=1 \
 
 状态事件经既有 session 存储持久化，包含 agentId 索引；新增 welcome 能力协商使旧 cs-session 不收到不认识的帧。Runner 为原生状态独立保留 256–5000 条事件，终端输出不能挤掉它们；总保留量仍有限，不能承诺无限离线历史。真实 WS 回归先复现开始事件被 PTY 挤掉，再验证按外层 seq 排序、去重和首次基移。
 
-T15 的 Claude 归一化、dev-session 领域投影、个人已读与工作台动态仍待继续，不能把单驱动运行时完成等同于 T15 整体验收通过。
+两种驱动的运行时通道已有正式验收；T15 的 dev-session 领域投影、个人已读与工作台动态仍待继续，不能把驱动运行时完成等同于 T15 整体验收通过。
 
 ## 本批已修复的状态传输断点
 

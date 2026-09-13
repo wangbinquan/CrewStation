@@ -8,6 +8,7 @@ import { createRunDirectory, defaultRunDir } from '../process/runDirectory';
 import { renderClaudeMcpConfig } from './claudeCode/argv';
 import { assembleClaudeEnv } from './claudeCode/env';
 import { buildClaudeNativeArgv } from './claudeCode/nativeArgv';
+import { setupClaudeNativeActivity } from './claudeCode/nativeActivitySetup';
 import { OPENCODE_CONFIG_DIR_NAME } from './opencode/env';
 import { buildOpencodeNativeEnv } from './opencode/nativeEnv';
 import { buildOpencodeNativeArgv } from './opencode/nativeArgv';
@@ -29,7 +30,9 @@ export async function prepareNativeTerminal(spec: NativeTerminalSpec, context: D
       const mcpConfigFile = mcp ? await runDir.write('mcp-config.json', mcp.json) : undefined;
       const nativeSessionId = crypto.randomUUID();
       const cmd = buildClaudeNativeArgv(ctx, { systemPromptFile, ...(mcpConfigFile ? { mcpConfigFile } : {}), mcpServerNames: mcp?.names ?? [] }, nativeSessionId);
-      return { plan: { cmd, cwd: ctx.cwd, env: assembleClaudeEnv(ctx) }, nativeSessionId, dispose: runDir.dispose };
+      const env = assembleClaudeEnv(ctx);
+      const activityUnavailable = await setupClaudeNativeActivity(ctx, context, runDir, env, cmd);
+      return { plan: { cmd, cwd: ctx.cwd, env }, nativeSessionId, ...(activityUnavailable ? { activityUnavailable } : {}), dispose: runDir.dispose };
     }
     const configDir = join(runDir.path, OPENCODE_CONFIG_DIR_NAME);
     await mkdir(join(configDir, 'skills'), { recursive: true, mode: 0o700 });
