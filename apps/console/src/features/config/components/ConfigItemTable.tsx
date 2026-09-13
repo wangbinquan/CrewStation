@@ -13,10 +13,11 @@ export interface ConfigItemTableProps {
   readonly onEdit: (item: ConfigItemDto) => void;
   readonly onDelete: (name: string) => void;
   readonly deletingName: string | undefined;
+  readonly disabled?: boolean;
 }
 
 /** 取值列表；删除走行内两步确认，不使用会冻结页面的 window.confirm。 */
-export function ConfigItemTable({ items, onEdit, onDelete, deletingName }: ConfigItemTableProps): ReactElement {
+export function ConfigItemTable({ items, onEdit, onDelete, deletingName, disabled = false }: ConfigItemTableProps): ReactElement {
   const t = useT();
   const dateText = useDateText();
   const columns = [
@@ -41,15 +42,15 @@ export function ConfigItemTable({ items, onEdit, onDelete, deletingName }: Confi
           </td>
           <td className={styles.muted}>{dateText(item.updatedAt)}</td>
           <td className={styles.actions}>
-            <Button variant="ghost" onClick={() => onEdit(item)}>
+            <Button variant="ghost" disabled={disabled} onClick={() => onEdit(item)}>
               {t('config.items.edit')}
             </Button>
             <InlineConfirm
               variant="ghost"
               label={t('config.items.delete')}
               question={t('config.items.confirmDelete', { name: item.name })}
-              busy={deletingName === item.name}
-              busyLabel={t('config.items.deleting')}
+              busy={disabled || deletingName === item.name}
+              busyLabel={t(deletingName === item.name ? 'config.items.deleting' : 'config.items.delete')}
               onConfirm={() => onDelete(item.name)}
             />
           </td>

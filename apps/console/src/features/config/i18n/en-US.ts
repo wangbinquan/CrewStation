@@ -12,7 +12,7 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   'config.env.developmentRole': 'Dev session',
   'config.env.productionRole': 'Owner maintained',
   'config.env.developmentNote': 'Dev session containers read this set. It is independent of the production database and secrets, so changes never touch the serving slot.',
-  'config.env.productionNote': 'Both deployment slots (preview and prod) share this set. Only the project owner can write; other roles get the server 403 message on submit.',
+  'config.env.productionNote': 'Live and standby versions share production config, maintained by the owner or an administrator. Saving does not change existing processes; a subsequent release receives the new config.',
 
   'config.items.name': 'Key',
   'config.items.value': 'Value',
@@ -55,4 +55,13 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   'config.error.save': 'Could not save: {message}',
   'config.error.delete': 'Could not delete: {message}',
   'config.error.forbidden': 'This identity may not write to this set; the production value set is maintained by the project owner.',
+  'config.refresh': 'Refresh config',
+  'config.error.versions': 'Version history could not be loaded: {message}',
+  'config.form.invalidName': 'Start the key with an uppercase letter; use only uppercase letters, digits or underscores.',
+  'config.form.valueHint': 'An empty string is allowed. Saving blank writes an empty value; it does not preserve the previous value.',
+  'config.form.secretValueHint': 'The old secret cannot be read. Enter a new value; saving blank overwrites it with an empty string.',
+  'config.saved': 'Saved {name} in {env}, version {version}.',
+  'config.deleted': 'Deleted {name} from {env}.',
+  'config.effect.development': 'Existing processes do not reload automatically. New task containers receive development config when created.',
+  'config.effect.production': 'Existing processes do not reload automatically. Subsequent releases use new production config; this does not mean it is deployed or live.',
 };

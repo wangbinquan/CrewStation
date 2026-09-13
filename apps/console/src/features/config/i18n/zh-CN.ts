@@ -11,7 +11,7 @@ export const messages = {
   'config.env.developmentRole': '开发会话',
   'config.env.productionRole': '负责人维护',
   'config.env.developmentNote': '开发会话容器读取这一组；与生产库、生产密钥相互独立，改动不影响正在服务的部署槽。',
-  'config.env.productionNote': 'preview 与 prod 两个部署槽共用这一组；只有项目负责人能写入，其他角色提交时会收到服务端的 403 说明。',
+  'config.env.productionNote': '正式与待验证版本共用生产取值组，由负责人或管理员维护。保存不会自动改变现有进程，下一次发布按新配置注入。',
 
   'config.items.name': '键',
   'config.items.value': '值',
@@ -54,4 +54,13 @@ export const messages = {
   'config.error.save': '保存失败：{message}',
   'config.error.delete': '删除失败：{message}',
   'config.error.forbidden': '当前身份没有写入这一组的权限；生产取值组由项目负责人维护。',
+  'config.refresh': '刷新配置',
+  'config.error.versions': '版本历史读取失败：{message}',
+  'config.form.invalidName': '请填写以大写字母开头、只含大写字母、数字或下划线的键名。',
+  'config.form.valueHint': '允许空字符串；留空保存会写入空值，不是保留原值。',
+  'config.form.secretValueHint': '旧密钥无法读回。输入新的值；留空保存会用空字符串覆盖，不是保留原密钥。',
+  'config.saved': '已保存 {env} 的 {name}，第 {version} 版。',
+  'config.deleted': '已删除 {env} 的 {name}。',
+  'config.effect.development': '现有进程不会自动加载。新的任务容器在创建时注入开发配置。',
+  'config.effect.production': '现有进程不会自动加载。后续发布按新生产配置注入；不等于已经部署或上线。',
 } satisfies Messages;

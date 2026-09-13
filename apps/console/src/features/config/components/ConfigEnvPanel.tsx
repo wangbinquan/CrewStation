@@ -1,11 +1,12 @@
 import type { ConfigEnv } from '@crewstation/contracts';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import type { ReactElement } from 'react';
 import { errorMessage, isApiClientError } from '../../../shared/api/useApi';
 import { useT } from '../../../shared/lib/useT';
 import { ActionNote } from '../../../shared/ui/ActionNote';
 import { Badge } from '../../../shared/ui/Badge';
 import { Card } from '../../../shared/ui/Card';
+import { Button } from '../../../shared/ui/Button';
 import { QueryStatus } from '../../../shared/ui/QueryStatus';
 import { useConfigEnv } from '../hooks/useConfigEnv';
 import { ConfigItemForm } from './ConfigItemForm';
@@ -14,7 +15,7 @@ import { ConfigItemTable } from './ConfigItemTable';
 import { ConfigVersionList } from './ConfigVersionList';
 import styles from './ConfigEnvPanel.module.css';
 
-const NEW_ITEM: ConfigItemDraft = { name: '', isSecret: false, overwrite: false };
+const NEW_ITEM: ConfigItemDraft = { name: '', isSecret: false };
 
 export interface ConfigEnvPanelProps {
   readonly projectId: string;
@@ -27,16 +28,29 @@ export function ConfigEnvPanel({ projectId, env }: ConfigEnvPanelProps): ReactEl
   const { items, versions, save, remove } = useConfigEnv(projectId, env);
   const [draft, setDraft] = useState<ConfigItemDraft>(NEW_ITEM);
   const [draftSeq, setDraftSeq] = useState(0);
+  const writeLock = useRef(false);
   const list = items.data?.items ?? [];
+  const busy = save.isPending || remove.isPending, disabled = items.isPending || !!items.error;
+  const changeItem = async (input: Parameters<typeof save.mutateAsync>[0]) => {
+    if (writeLock.current || disabled) throw new Error('当前无法保存配置');
+    writeLock.current = true;
+    try { return await save.mutateAsync(input); } finally { writeLock.current = false; }
+  };
+  const deleteItem = async (name: string) => {
+    if (writeLock.current || disabled) return;
+    writeLock.current = true;
+    try { await remove.mutateAsync(name); } catch { /* 错误由面板显示。 */ } finally { writeLock.current = false; }
+  };
   return (
     <Card
       title={t(`config.env.${env}`)}
-      extra={<Badge tone={env === 'production' ? 'warning' : 'info'}>{t(`config.env.${env}Role`)}</Badge>}
+      extra={<><Badge tone={env === 'production' ? 'warning' : 'info'}>{t(`config.env.${env}Role`)}</Badge><Button disabled={busy || items.isFetching || versions.isFetching} onClick={() => { void items.refetch(); void versions.refetch(); }}>{t('config.refresh')}</Button></>}
       footer={
         <>
           <h3 className={styles.versionsTitle}>{t('config.versions.title')}</h3>
           <p className={styles.versionsNote}>{t('config.versions.note')}</p>
-          <ConfigVersionList versions={versions.data?.items ?? []} pending={versions.isPending} />
+          <QueryStatus isPending={versions.isPending} error={versions.error} errorKey="config.error.versions" />
+          {!versions.error ? <ConfigVersionList versions={versions.data?.items ?? []} pending={versions.isPending} /> : null}
         </>
       }
     >
@@ -53,18 +67,21 @@ export function ConfigEnvPanel({ projectId, env }: ConfigEnvPanelProps): ReactEl
       {list.length > 0 ? (
         <ConfigItemTable
           items={list}
+          disabled={disabled || busy}
           deletingName={remove.isPending ? remove.variables : undefined}
-          onDelete={(name) => remove.mutate(name)}
+          onDelete={(name) => void deleteItem(name)}
           onEdit={(item) => {
-            setDraft({ name: item.name, isSecret: item.isSecret, overwrite: true });
+            setDraft({ name: item.name, isSecret: item.isSecret, ...(item.isSecret ? {} : { value: item.value ?? '' }) });
             setDraftSeq((seq) => seq + 1);
           }}
         />
       ) : null}
       <WriteError action="config.error.save" error={save.error} />
       <WriteError action="config.error.delete" error={remove.error} />
+      {save.isSuccess ? <ActionNote tone="success">{t('config.saved', { name: save.data.name, version: save.data.version, env: t(`config.env.${env}`) })} {t(`config.effect.${env}`)}</ActionNote> : null}
+      {remove.isSuccess ? <ActionNote tone="success">{t('config.deleted', { name: remove.variables ?? '', env: t(`config.env.${env}`) })} {t(`config.effect.${env}`)}</ActionNote> : null}
       <h3 className={styles.formTitle}>{t('config.form.title')}</h3>
-      <ConfigItemForm key={`${draft.name}:${draftSeq}`} draft={draft} pending={save.isPending} onSubmit={(input) => save.mutate(input)} />
+      <ConfigItemForm key={`${draft.name}:${draftSeq}`} draft={draft} existingNames={list.map((item) => item.name)} pending={save.isPending} disabled={disabled || remove.isPending} onSubmit={changeItem} onReset={() => { setDraft(NEW_ITEM); setDraftSeq((seq) => seq + 1); }} />
     </Card>
   );
 }
