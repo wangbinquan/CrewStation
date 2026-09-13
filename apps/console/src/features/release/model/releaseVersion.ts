@@ -7,3 +7,13 @@ export function isPublishVersion(value: string): boolean {
   const trimmed = value.trim();
   return RELEASE_TAG.test(trimmed) || BUMPS.has(trimmed);
 }
+
+/** 仅供确认页预览；返回标签始终由服务端裁定。用 BigInt 避免大版本号失真。 */
+export function candidateReleaseTag(names: readonly string[], value: string): string | undefined {
+  const version = value.trim(); if (!isPublishVersion(version)) return undefined;
+  if (RELEASE_TAG.test(version)) return version;
+  const all = names.filter((name) => RELEASE_TAG.test(name)).map((name) => name.slice(1).split('.').map(BigInt));
+  all.sort((a, b) => { for (let i = 0; i < 3; i++) { if (a[i]! !== b[i]!) return a[i]! > b[i]! ? -1 : 1; } return 0; });
+  const [major, minor, patch] = all[0] ?? [0n, 0n, 0n];
+  return version === 'major' ? `v${major! + 1n}.0.0` : version === 'minor' ? `v${major}.${minor! + 1n}.0` : `v${major}.${minor}.${patch! + 1n}`;
+}

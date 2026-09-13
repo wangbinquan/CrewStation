@@ -40,7 +40,7 @@ export function editorWorkspaceFixture() {
     else if (path.endsWith('/agent-terminals')) body = { ...f.roster, items: [] };
     else if (path.endsWith('/agent-activity')) body = { ...f.page, states: [], items: [], unread: [] };
     else if (path.endsWith('/version-comparison')) { status = 503; body = { error: 'unavailable', message: '比较暂不可用，编辑器仍可使用' }; }
-    else if (path.endsWith('/workspace-status')) body = { status: 'ready', taskId: activityTaskId, branch: 'main', headSha: 'a'.repeat(40), checkedAt: activityTime, uncommitted: [], uncommittedCount: 0, unpushed: { status: 'ready', count: 0, commits: [] } };
+    else if (path.endsWith('/workspace-status')) body = { status: 'ready', taskId: activityTaskId, branch: 'main', headSha: 'a'.repeat(40), checkedAt: activityTime, shallow: false, fingerprint: 'fp', uncommitted: [], uncommittedCount: 0, uncommittedTruncated: false, unpushed: { status: 'ready', count: 0, commits: [], truncated: false }, upstream: { status: 'missing' } };
     else if (path.endsWith('/dev-session')) body = { taskId: activityTaskId, projectId: activityProjectId, createdBy: activityUserId, branch: 'main', state: 'running', lastActivityAt: activityTime, previewHost: 'preview.localhost' };
     return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
   }) as typeof fetch;

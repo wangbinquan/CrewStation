@@ -10,7 +10,6 @@ import { PROJECT_PATHS } from '../../../shared/project/projectPaths';
 import { UnsavedChangesGuard } from '../../../shared/navigation/UnsavedChangesGuard';
 import { useT } from '../../../shared/lib/useT';
 import { DataBindingPane } from '../components/DataBindingPane';
-import { PublishPane } from '../components/PublishPane';
 import { SessionCard } from '../components/SessionCard';
 import { EditorPane } from '../components/editor/EditorPane';
 import { DevelopmentPreview } from '../components/preview/DevelopmentPreview';
@@ -21,7 +20,6 @@ import { useActivityTouch } from '../hooks/useActivityTouch';
 import { useDataBindings } from '../hooks/useDataBindings';
 import { useFileEditor } from '../hooks/useFileEditor';
 import { usePreviewStatus } from '../hooks/usePreviewStatus';
-import { usePublishForm } from '../hooks/usePublishForm';
 import { useTaskStream } from '../hooks/useTaskStream';
 import { useWorkspaceTree } from '../hooks/useWorkspaceTree';
 import type { SessionAccess } from '../model/sessionAccess';
@@ -53,7 +51,6 @@ export function DevSessionWorkbench({ projectId, session, access, canDevelop, se
   const tree = useWorkspaceTree(channel, state.generation, state.runnerConnected);
   const editor = useFileEditor(channel);
   const preview = usePreviewStatus(channel, state.generation, state.runnerConnected);
-  const publish = usePublishForm(projectId);
   const data = useDataBindings(projectId, taskId, serviceId, { canDevelop, canManage: access.isOwner });
   const [dataDirty, setDataDirty] = useState(false);
   const draftScope = [editor.dirty ? t('devSession.editor.draftScope', { path: editor.file?.path ?? '' }) : '', dataDirty ? t('devSession.data.title') : ''].filter(Boolean).join(' / ');
@@ -66,7 +63,7 @@ export function DevSessionWorkbench({ projectId, session, access, canDevelop, se
       <header className={styles.context}><strong>{t('devSession.title')}</strong><StreamStatus state={state} />
         <details className={styles.disclosure}><summary>{t('devSession.data.title')}{accessSummary ? ` · ${accessSummary}` : ''}{dataDirty ? ` · ${t('devSession.editor.dirty')}` : ''}</summary><div><DataBindingPane data={data} onDirtyChange={setDataDirty} /></div></details>
         <details className={styles.disclosure}><summary>{t('devSession.native.sessionMenu')}</summary><div><SessionCard session={session} stream={state} access={access} release={release} unsavedFile={editor.dirty ? editor.file?.path : undefined} editorBusy={editor.busy} dataAccessDirty={dataDirty} dataAccessBusy={data.busy} /><Link to={PROJECT_PATHS[space].conversations} params={{ projectId }}>{t('devSession.native.history')}</Link></div></details>
-        <details className={styles.disclosure}><summary>{t('devSession.native.prepareRelease')}</summary><div><PublishPane publish={publish} /></div></details>
+        <Link to={PROJECT_PATHS[space].release} params={{ projectId }} search={{ source: 'session' }}>{t('devSession.native.prepareRelease')}</Link>
       </header>
       <VersionComparisonPanel projectId={projectId} taskId={taskId} channel={channel} canDevelop={canDevelop} compact />
       <NativeWorkspace taskId={taskId} userId={userId} channel={channel} stream={state} canDevelop={canDevelop} onActivity={touch} activityTarget={activityTarget} editorDirty={editor.dirty}

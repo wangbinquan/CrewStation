@@ -15,7 +15,7 @@ import styles from './ReleaseHistoryCard.module.css';
 /** 构建／迁移／部署期间的轮询间隔；全部进入终态后停。 */
 const IN_FLIGHT_POLL_MS = 5_000;
 
-export function ReleaseHistoryCard({ serviceId }: { readonly serviceId: string }): ReactElement {
+export function ReleaseHistoryCard({ serviceId, onSelect }: { readonly serviceId: string; readonly onSelect: (releaseId: string) => void }): ReactElement {
   const t = useT();
   const releases = useApiQuery(queryKeys.releases(serviceId), () => api.services.listReleases(serviceId));
   const items = releases.data?.items ?? [];
@@ -34,7 +34,7 @@ export function ReleaseHistoryCard({ serviceId }: { readonly serviceId: string }
       {items.length > 0 ? (
         <DataTable columns={columns}>
           {items.map((release) => (
-            <ReleaseRow key={release.id} release={release} />
+            <ReleaseRow key={release.id} release={release} onSelect={onSelect} />
           ))}
         </DataTable>
       ) : null}

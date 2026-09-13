@@ -74,3 +74,13 @@ test('收起数据访问仍保护申请输入，与编辑器草稿合并一次�
   await page.click('释放会话'); expect(page.text()).toContain('数据访问有未提交的申请或审批输入'); await page.click('取消');
   expect(fixture.writes.some((write) => write.method === 'DELETE')).toBe(false);
 });
+
+test('开发页唯一准备发布入口带会话来源，确认草稿后跳转不推送、不停止 CLI', async () => {
+  fixture = editorWorkspaceFixture(); page = await renderApp(path);
+  expect(page.text()).not.toContain('发布到待命槽'); await page.click('代码'); await page.click('a.ts'); await edit('仅编辑器中的草稿');
+  await page.click('准备发布'); expect(page.path()).toBe(path); await page.click('继续编辑'); expect(content().textContent).toBe('仅编辑器中的草稿');
+  await page.click('准备发布'); await page.click('放弃输入并离开'); expect(page.search().source).toBe('session'); expect(page.path()).toBe(`/projects/${activityProjectId}/release`);
+  await page.click('检查发布来源'); expect(page.text()).toContain('确认版本');
+  expect(fixture.commands.some((command) => ['writeFile', 'closeTerminal', 'stopAgent', 'stopNativeTerminal'].includes(command.type))).toBe(false);
+  expect(fixture.writes.every((write) => write.path.endsWith('/workspace-layout'))).toBe(true);
+});

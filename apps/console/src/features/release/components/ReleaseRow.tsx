@@ -3,17 +3,18 @@ import type { ReactElement } from 'react';
 import { useDateText } from '../../../shared/lib/useDateText';
 import { useT } from '../../../shared/lib/useT';
 import { ReleaseStatusBadge } from './ReleaseStatusBadge';
+import { Button } from '../../../shared/ui/Button';
 import styles from './ReleaseHistoryCard.module.css';
 
 /** 一次发布一行；失败时紧跟一行 message，说明卡在构建、迁移还是部署。 */
-export function ReleaseRow({ release }: { readonly release: ReleaseDto }): ReactElement {
+export function ReleaseRow({ release, onSelect }: { readonly release: ReleaseDto; readonly onSelect: (releaseId: string) => void }): ReactElement {
   const t = useT();
   const dateText = useDateText();
   return (
     <>
       <tr>
         <td>
-          <code>{release.tag}</code>
+          <Button variant="ghost" onClick={() => onSelect(release.id)}>{release.tag}</Button>
         </td>
         <td>
           <ReleaseStatusBadge status={release.status} />
