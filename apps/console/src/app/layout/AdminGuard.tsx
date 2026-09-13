@@ -6,6 +6,7 @@ import { useApiQuery } from '../../shared/api/useApi';
 import { useT } from '../../shared/lib/useT';
 import { EmptyState } from '../../shared/ui/EmptyState';
 import { QueryStatus } from '../../shared/ui/QueryStatus';
+import { Button } from '../../shared/ui/Button';
 
 /**
  * 管理空间的组件级守卫，三态（RFC-002 §2.2）：
@@ -19,7 +20,8 @@ import { QueryStatus } from '../../shared/ui/QueryStatus';
 export function AdminGuard({ children }: { readonly children: ReactNode }): ReactElement {
   const t = useT();
   const me = useApiQuery(queryKeys.me(), () => api.me.get());
-  if (me.isPending || me.error !== null) return <QueryStatus isPending={me.isPending} error={me.error} />;
+  if (me.isPending || me.error !== null) return <><QueryStatus isPending={me.isPending} error={me.error} />
+    {me.error ? <Button disabled={me.isFetching} onClick={() => void me.refetch({ cancelRefetch: false })}>{t('admin.retryIdentity')}</Button> : null}</>;
   if (me.data?.isAdmin !== true) {
     return (
       <EmptyState

@@ -114,6 +114,6 @@ describe('管理空间与租户空间分离（RFC-002）', () => {
     app.unmount();
     requests.length = 0;
     app = await renderApp('/admin/integrations');
-    expect(requests.some((url) => url.includes(`/v1/projects?kind=${encodeURIComponent('APIProxy,EventProducer')}`))).toBe(true);
+    expect(requests.some((url) => url.includes('/v1/projects/page?') && new URL(url, 'http://localhost').searchParams.get('kind') === 'APIProxy,EventProducer')).toBe(true);
   });
 });

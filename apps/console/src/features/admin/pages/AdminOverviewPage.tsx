@@ -3,13 +3,15 @@ import { Link } from '@tanstack/react-router';
 import { useT } from '../../../shared/lib/useT';
 import { AdminSection } from './AdminSection';
 import { AdminOverviewCards } from '../components/AdminOverviewCards';
+import { AdminTodos } from '../components/overview/AdminTodos';
 
-/** /admin：管理空间的首页。只说清这里有哪些事、各自通向哪一页，不重复渲染各页的数据。 */
+/** /admin：当前真实待办和管理入口，待办只导航到现有操作页。 */
 export function AdminOverviewPage(): ReactElement {
   const t = useT();
   return (
-    <AdminSection title={t('admin.title')} description={[t('admin.line1'), t('admin.line2')]}>
+    <AdminSection title={t('nav.admin.overview')} description={t('admin.overview.hint')}>
       <p><Link to="/admin/projects/new" search={{ scope: 'digital-worker' }}>{t('projects.wizard.title.digital-worker')}</Link> · <Link to="/admin/projects/new" search={{ scope: 'integration' }}>{t('projects.wizard.title.integration')}</Link></p>
+      <AdminTodos />
       <AdminOverviewCards />
     </AdminSection>
   );

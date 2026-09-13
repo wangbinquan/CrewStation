@@ -9,6 +9,9 @@ export const queryKeys = {
   projectSummaries: (userId: string, search: unknown) => ['projects', 'summaries', userId, search] as const,
   projectSummary: (projectId: string, userId: string) => ['projects', projectId, 'summary', userId] as const,
   adminProjects: () => ['projects', 'admin'] as const,
+  adminProjectPage: (search: unknown) => ['projects', 'admin', 'page', search] as const,
+  accessRequestPage: (search: unknown) => ['access-requests', 'page', search] as const,
+  egressRequestPage: (search: unknown) => ['egress', 'requests', 'page', search] as const,
   /** 按 kind 过滤的项目列表（RFC-002）：挂在 projects 前缀下，建项目后一次失效连带刷新。 */
   projectsByKind: (kinds: readonly string[]) => ['projects', 'kind', kinds.join(',')] as const,
   project: (projectId: string) => ['projects', projectId] as const,

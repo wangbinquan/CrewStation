@@ -10,6 +10,7 @@ import styles from './SideNav.module.css';
 
 type AdminPagePath =
   | '/admin'
+  | '/admin/projects'
   | '/admin/users'
   | '/admin/compute'
   | '/admin/service-plans'
@@ -28,6 +29,7 @@ interface AdminPageItem {
 /** 管理空间左栏的顺序即 RFC-002 §2.1 的顺序；路径与 features/admin/routes.ts 一一对应。 */
 const ADMIN_PAGES: readonly AdminPageItem[] = [
   { to: '/admin', labelKey: 'nav.admin.overview', exact: true },
+  { to: '/admin/projects', labelKey: 'nav.admin.projects' },
   { to: '/admin/users', labelKey: 'nav.admin.users' },
   { to: '/admin/compute', labelKey: 'nav.admin.compute' },
   { to: '/admin/service-plans', labelKey: 'nav.admin.servicePlans' },

@@ -5,11 +5,12 @@ import { Card } from '../../../shared/ui/Card';
 import styles from './AdminOverviewCards.module.css';
 
 type AdminPagePath =
-  | '/admin/users' | '/admin/compute' | '/admin/service-plans' | '/admin/task-profiles'
+  | '/admin/projects' | '/admin/users' | '/admin/compute' | '/admin/service-plans' | '/admin/task-profiles'
   | '/admin/capabilities' | '/admin/requests' | '/admin/egress' | '/admin/gateway';
 
-/** 与左栏同序、同文案键：两处分别写会漂移，路径与标题都从这一张表来。 */
+/** 与左栏保持相同顺序和文案键，这里附带每个入口的用途。 */
 const ENTRIES: readonly { readonly to: AdminPagePath; readonly labelKey: string; readonly hintKey: string }[] = [
+  { to: '/admin/projects', labelKey: 'nav.admin.projects', hintKey: 'admin.directory.description' },
   { to: '/admin/users', labelKey: 'nav.admin.users', hintKey: 'admin.overview.users' },
   { to: '/admin/compute', labelKey: 'nav.admin.compute', hintKey: 'admin.overview.compute' },
   { to: '/admin/service-plans', labelKey: 'nav.admin.servicePlans', hintKey: 'admin.overview.servicePlans' },
@@ -20,13 +21,13 @@ const ENTRIES: readonly { readonly to: AdminPagePath; readonly labelKey: string;
   { to: '/admin/gateway', labelKey: 'nav.admin.gateway', hintKey: 'admin.overview.gateway' },
 ];
 
-/** 管理空间首页：七个入口各一张卡，说清这一页管的是什么。不在这里渲染各页的数据。 */
+/** 管理目录的紧凑入口；当前待办由独立来源展示。 */
 export function AdminOverviewCards(): ReactElement {
   const t = useT();
   return (
     <div className={styles.grid}>
       {ENTRIES.map((entry) => (
-        <Card key={entry.to} title={t(entry.labelKey)}>
+        <Card compact key={entry.to} title={t(entry.labelKey)}>
           <p className={styles.hint}>{t(entry.hintKey)}</p>
           <Link to={entry.to}>{t('admin.overview.open', { page: t(entry.labelKey) })}</Link>
         </Card>

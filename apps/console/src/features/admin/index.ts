@@ -1,5 +1,5 @@
 export {
-  adminComputeRoute, adminEgressRoute, adminGatewayRoute, adminOverviewRoute,
+  adminComputeRoute, adminEgressRoute, adminGatewayRoute, adminOverviewRoute, adminProjectsRoute,
   adminRoute, adminServicePlansRoute, adminTaskProfilesRoute, adminUsersRoute,
 } from './routes';
 export { AdminIntegrationsPage } from './pages/AdminIntegrationsPage';

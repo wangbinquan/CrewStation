@@ -24,6 +24,9 @@ function fixture(options: { admin?: boolean; meFailure?: boolean; pendingMe?: bo
       if (options.pendingMe) return new Promise<Response>(() => {});
       if (options.meFailure) { status = 503; body = { error: 'unavailable', message: '身份读取失败' }; }
       else body = { id: 'user', name: '管理员', isAdmin: options.admin !== false, memberships: [] };
+    } else if (url.pathname === '/v1/projects/page') {
+      if (state.projectsFailure) { status = 503; body = { error: 'unavailable', message: '项目目录失败' }; }
+      else body = { items: [integration].map((p) => ({ project: { ...p, namespace: `cs-${p.slug}`, ownerUserId: `usr_${'a'.repeat(32)}`, createdAt }, role: 'admin', ownerName: '管理员' })) };
     } else if (url.pathname === '/v1/projects') {
       if (state.projectsFailure) { status = 503; body = { error: 'unavailable', message: '项目目录失败' }; }
       else body = { items: url.searchParams.get('kind')?.includes('APIProxy') ? [integration] : [project, integration] };
@@ -147,7 +150,7 @@ describe('管理员能力与审批入口', () => {
 });
 
 test('管理新入口及兼容地址对非管理员保持拒绝，不读取平台目录和全部申请', async () => {
-  for (const path of ['/admin/capabilities?tab=api', '/admin/requests', '/admin/api-catalog', '/admin/integrations']) {
+  for (const path of ['/admin/capabilities?tab=api', '/admin/requests', '/admin/api-catalog', '/admin/integrations', '/admin/projects']) {
     const f = fixture({ admin: false }); page = await renderApp(path);
     expect(page.text()).toContain('仅平台管理员可见');
     expect(f.calls.every((call) => call.url.pathname === '/v1/me')).toBe(true); page.unmount(); page = undefined;

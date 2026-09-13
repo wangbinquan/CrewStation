@@ -21,7 +21,8 @@ function fixture(options: { admin?: boolean; pendingMe?: boolean; meFailure?: bo
     } else if (url.endsWith(`/v1/projects/${projectId}`)) {
       if (state.projectFailure) { status = 503; body = { error: 'unavailable', message: '项目目录读取失败' }; }
       else body = { ...project, kind: state.digitalWorker ? 'DigitalWorker' : 'APIProxy' };
-    } else if (url.includes('/v1/projects?')) body = { items: [project] };
+    } else if (url.includes('/v1/projects/page?')) body = { items: [{ project: { ...project, ownerUserId: `usr_${'a'.repeat(32)}` }, role: 'admin', ownerName: '管理员' }] };
+    else if (url.includes('/v1/projects?')) body = { items: [project] };
     else if (url.endsWith(`/v1/services/${serviceId}`)) body = { id: serviceId, projectId };
     else if (url.endsWith('/dev-session')) { status = 404; body = { error: 'not_found', message: '当前没有开发会话' }; }
     return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
