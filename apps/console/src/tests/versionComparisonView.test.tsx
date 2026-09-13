@@ -1,7 +1,8 @@
 import './domSetup';
 import { afterEach, expect, test } from 'bun:test';
 import { act } from 'react';
-import type { VersionComparisonDto } from '@crewstation/contracts';
+import type { ComparisonTarget, VersionComparisonDto } from '@crewstation/contracts';
+import { focusManager } from '@tanstack/react-query';
 import { VersionComparisonDtoSchema } from '@crewstation/contracts';
 import { VersionComparisonPanel } from '../features/dev-session/components/workspace/VersionComparisonPanel';
 import type { TaskStreamChannel } from '../features/dev-session/hooks/useTaskStream';
@@ -10,9 +11,10 @@ import { renderElement } from './renderElement';
 
 const originalFetch = globalThis.fetch;
 const requests: string[] = [];
+const historyTargets: unknown[] = [];
 let ui: Awaited<ReturnType<typeof renderElement>> | undefined;
 const channel: TaskStreamChannel = { send: async () => ({}), subscribe: () => () => {} };
-afterEach(() => { ui?.unmount(); ui = undefined; requests.length = 0; globalThis.fetch = originalFetch; });
+afterEach(() => { ui?.unmount(); ui = undefined; requests.length = 0; historyTargets.length = 0; globalThis.fetch = originalFetch; focusManager.setFocused(undefined); });
 
 function comparison(): VersionComparisonDto {
   return VersionComparisonDtoSchema.parse({
@@ -23,10 +25,11 @@ function comparison(): VersionComparisonDto {
   });
 }
 
-async function render(data: VersionComparisonDto, canDevelop = true) {
+async function render(data: VersionComparisonDto, canDevelop = true, target: ComparisonTarget = 'prod', onOpenFile?: (path: string) => void) {
   globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
     const path = String(input);
     requests.push(`${init?.method ?? 'GET'} ${path}`);
+    if (init?.method === 'POST') historyTargets.push(JSON.parse(String(init.body)).target);
     const url = new URL(path, 'http://localhost');
     const body = path.includes('version-comparisons/') ? {
       comparisonId: 'comparison-1', tab: url.searchParams.get('tab'), commits: [], truncated: false,
@@ -35,7 +38,7 @@ async function render(data: VersionComparisonDto, canDevelop = true) {
     } : data;
     return new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } });
   }) as typeof fetch;
-  ui = await renderElement(<VersionComparisonPanel projectId="prj_test" taskId={data.taskId} channel={channel} canDevelop={canDevelop} />, messages);
+  ui = await renderElement(<VersionComparisonPanel projectId="prj_test" taskId={data.taskId} channel={channel} canDevelop={canDevelop} target={target} onOpenFile={onOpenFile} />, messages);
   return ui;
 }
 
@@ -53,6 +56,26 @@ test('提交一致仍显示未提交文件；四种详情、patch 与截断通�
   expect(requests.every((request) => request.startsWith('GET'))).toBe(true);
   await page.click('补齐历史并重算');
   expect(requests.filter((request) => request.startsWith('POST'))).toEqual(['POST /v1/projects/prj_test/dev-session/version-comparison/refresh-history']);
+});
+
+test('待验证版本显示对应差距和详情名称，文件定位与补历史作用于实际目标', async () => {
+  const data = comparison(); data.deployment = { ...data.deployment, target: 'preview' }; data.commits = { status: 'ahead', ahead: 2, behind: 0 };
+  const opened: string[] = [], page = await render(data, true, 'preview', (file) => opened.push(file));
+  expect(page.text()).toContain('工作树与待验证版本'); expect(page.text()).not.toContain('待上线 2');
+  expect(page.text()).toContain('工作树独有 2 个提交'); await page.click('查看差异'); await page.click('相对待验证的文件差异'); await page.click('在代码中打开');
+  expect(opened).toEqual(['file.txt']); expect(requests.some((request) => request.includes('target=preview'))).toBe(true);
+  await page.click('补齐历史并重算'); expect(historyTargets).toEqual(['preview']);
+});
+
+test('查询回执目标不匹配时显示错误，不把生产差距装进待验证视图', async () => {
+  const page = await render(comparison(), true, 'preview');
+  expect(page.text()).toContain('比较回执与当前会话或所选部署不一致'); expect(page.text()).not.toContain('v0.1.0'); expect(page.text()).not.toContain('提交一致');
+});
+
+test('重新聚焦重读比较，不发补历史写请求', async () => {
+  focusManager.setFocused(false); const page = await render(comparison()); const before = requests.length;
+  await act(async () => focusManager.setFocused(true)); await page.settle();
+  expect(requests.length).toBe(before + 1); expect(requests.every((request) => request.startsWith('GET'))).toBe(true);
 });
 
 test('状态未知不显示零差距，只有开发者能补齐历史', async () => {

@@ -23,13 +23,14 @@ export interface ReleaseControlProps {
   readonly editorBusy?: boolean;
   readonly dataAccessDirty?: boolean;
   readonly dataAccessBusy?: boolean;
+  readonly onOpenFile?: (path: string) => void;
 }
 
 /**
  * 释放会话：先就地确认，负责人释放他人会话要额外说明这会带 force。
  * 释放结果（未推送的提交）由页面渲染：会话没了之后本组件已经不在树上。
  */
-export function ReleaseControl({ projectId, taskId, access, release, unsavedFile, editorBusy = false, dataAccessDirty, dataAccessBusy = false }: ReleaseControlProps): ReactElement | null {
+export function ReleaseControl({ projectId, taskId, access, release, unsavedFile, editorBusy = false, dataAccessDirty, dataAccessBusy = false, onOpenFile }: ReleaseControlProps): ReactElement | null {
   const t = useT();
   const [asking, setAsking] = useState(false);
   const inspection = useApiMutation(() => api.devSession.workspaceStatus(projectId));
@@ -57,7 +58,7 @@ export function ReleaseControl({ projectId, taskId, access, release, unsavedFile
         {dataAccessBusy ? <PaneNotice tone="info">{t('devSession.release.dataBusy')}</PaneNotice> : null}
         <QueryStatus isPending={inspection.isPending} error={inspection.error} loadingKey="devSession.workspace.checking" />
         {inspection.error ? <PaneNotice tone="warning">{t('devSession.release.unknown')}</PaneNotice> : null}
-        {inspection.data ? <WorkspaceInspection workspace={inspection.data} /> : null}
+        {inspection.data ? <WorkspaceInspection workspace={inspection.data} onOpenFile={onOpenFile && !editorBusy && !release.isPending && inspection.data.taskId === taskId ? (file) => { setAsking(false); onOpenFile(file); } : undefined} /> : null}
         {inspection.data !== undefined && inspection.data.taskId !== taskId ? <PaneNotice tone="warning">{t('devSession.workspace.sessionChanged')}</PaneNotice> : null}
         <Button variant="ghost" onClick={inspect} disabled={inspection.isPending || release.isPending}>{t('devSession.workspace.recheck')}</Button>
       </ConfirmationPanel>

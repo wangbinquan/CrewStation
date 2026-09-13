@@ -2,6 +2,18 @@ import type { MessagesShapedLike } from '../../../shared/lib/i18n';
 import type { messages as zhCN } from './zh-CN';
 
 export const messages: MessagesShapedLike<typeof zhCN> = {
+  'devSession.location.invalid': 'The linked development session or CLI has changed. Select the current workspace to continue.',
+  'devSession.location.openFile': 'Open in code',
+  'devSession.compare.previewTitle': 'Worktree and candidate version',
+  'devSession.compare.preview': 'Candidate deployment',
+  'devSession.compare.target': 'Comparison target',
+  'devSession.compare.invalidTarget': 'The comparison response does not match the current session or selected deployment. Reload to continue.',
+  'devSession.compare.previewUndeployed': 'No candidate version deployed',
+  'devSession.compare.previewCounts': '{ahead} worktree-only commits · {behind} candidate commits missing',
+  'devSession.compare.previewTab.ahead': 'Worktree-only commits',
+  'devSession.compare.previewTab.behind': 'Missing candidate commits',
+  'devSession.compare.previewTab.files': 'Files against candidate',
+
   'devSession.title': 'Dev session',
   'devSession.line1':
     'A project has at most one dev session at a time: one long-lived dev container with a resident TaskRunner (own UID), bound to the development database by default.',
@@ -177,6 +189,8 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   'devSession.editor.discardHint': 'The editor draft has not been written to the worktree. This action does not stop any agent.',
   'devSession.editor.discardConfirm': 'Discard input and continue',
   'devSession.editor.draftScope': 'Editor “{path}”',
+  'devSession.editor.openQuestion': 'Discard unsaved input in “{from}” and open “{to}”?',
+  'devSession.editor.discardOpen': 'Discard and open “{path}”',
   'devSession.editor.draftLifetime': 'The editor has unsaved input. Workspace views retain it; refreshing, closing the page or releasing the session loses it.',
   'devSession.release.editorDraft': 'This page has unsaved editor input in “{path}”, outside the Git list below. Confirming release will lose it.',
   'devSession.release.editorBusy': 'The editor is reading or writing a file. Wait for the result before confirming release.',

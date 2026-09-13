@@ -20,7 +20,10 @@ export function editorWorkspaceFixture() {
       const command = JSON.parse(data) as TaskStreamCommandInput & { id: string }; commands.push(command);
       let payload: unknown = {};
       if (command.type === 'listFiles') payload = { path: '.', entries: [...files.keys()].map((name) => ({ name, kind: 'file', size: 10, modifiedAt: activityTime })) };
-      else if (command.type === 'readFile') payload = { path: command.path, content: files.get(command.path), version: 'version-1', size: 10 };
+      else if (command.type === 'readFile') {
+        if (!files.has(command.path)) { queueMicrotask(() => this.receive({ type: 'error', id: command.id, code: 'not_found', message: `文件不存在：${command.path}` })); return; }
+        payload = { path: command.path, content: files.get(command.path), version: 'version-1', size: 10 };
+      }
       else if (command.type === 'previewStatus') payload = { state: 'disabled', restarts: 0 };
       else if (command.type === 'writeFile') {
         pendingWrite = () => { files.set(command.path, command.content); this.receive({ type: 'result', id: command.id, payload: { path: command.path, version: 'version-2' } }); };

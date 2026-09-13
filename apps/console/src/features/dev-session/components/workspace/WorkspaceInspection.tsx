@@ -3,11 +3,12 @@ import type { ReactElement } from 'react';
 import { useDateText } from '../../../../shared/lib/useDateText';
 import { useT } from '../../../../shared/lib/useT';
 import { Badge } from '../../../../shared/ui/Badge';
+import { Button } from '../../../../shared/ui/Button';
 import { PaneNotice } from '../PaneNotice';
 import styles from './WorkspaceInspection.module.css';
 
 /** 只展示一次真实预检；未推送相对已知 remote refs，不能称为未上线。 */
-export function WorkspaceInspection({ workspace }: { readonly workspace: WorkspaceStatusDto }): ReactElement {
+export function WorkspaceInspection({ workspace, onOpenFile }: { readonly workspace: WorkspaceStatusDto; readonly onOpenFile?: (path: string) => void }): ReactElement {
   const t = useT();
   const dateText = useDateText();
   if (workspace.status === 'unavailable') return <PaneNotice tone="warning">{t('devSession.workspace.unavailable', { reason: workspace.reason })}</PaneNotice>;
@@ -18,7 +19,7 @@ export function WorkspaceInspection({ workspace }: { readonly workspace: Workspa
       <p className={styles.meta}>{t('devSession.workspace.checked', { at: dateText(workspace.checkedAt) })}</p>
       <p><Badge tone={workspace.uncommittedCount > 0 ? 'warning' : 'neutral'}>{t('devSession.workspace.dirty', { count: workspace.uncommittedCount })}</Badge></p>
       {workspace.uncommitted.length > 0 ? <ul className={styles.list}>
-        {workspace.uncommitted.map((file) => <li key={file.path}><code>{file.index}{file.worktree} {file.originalPath ? `${file.originalPath} → ` : ''}{file.path}</code></li>)}
+        {workspace.uncommitted.map((file) => <li key={file.path}><code>{file.index}{file.worktree} {file.originalPath ? `${file.originalPath} → ` : ''}</code>{onOpenFile && !file.status.includes('D') ? <Button variant="ghost" onClick={() => onOpenFile(file.path)}>{file.path}</Button> : <code>{file.path}</code>}</li>)}
       </ul> : null}
       {workspace.uncommittedTruncated ? <p>{t('devSession.workspace.truncated')}</p> : null}
       {unpushed.status === 'unavailable' ? <PaneNotice tone="warning">{t('devSession.workspace.unpushedUnknown', { reason: unpushed.reason })}</PaneNotice> : <>

@@ -47,6 +47,11 @@ export class FileEditorStore {
     this.update({ draft });
   };
   openFile = (path: string): void => { if (path !== this.state.file?.path) this.request({ type: 'open', path }); };
+  /** 页面导航已经取得放弃确认，避免进入新地址后再问一遍。读失败仍保留旧输入。 */
+  discardAndOpen = (path: string): void => {
+    if (!this.active || this.state.operation === 'write') return;
+    this.update({ pendingAction: undefined }); this.perform({ type: 'open', path });
+  };
   reload = (): void => { if (this.state.file) this.request({ type: 'reload' }); };
   close = (): void => { this.request({ type: 'close' }); };
   cancelDiscard = (): void => { this.update({ pendingAction: undefined }); };

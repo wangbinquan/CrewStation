@@ -31,6 +31,7 @@ export function asListFilesResult(payload: unknown): ListFilesResult {
 
 export function asReadFileResult(payload: unknown): ReadFileResult {
   const value = record(payload, 'readFile');
+  if (typeof value.path !== 'string' || !value.path || typeof value.content !== 'string') throw new StreamCommandError('malformed_result', 'readFile 未返回有效路径与文本，未替换编辑器草稿');
   return { path: text(value.path), content: text(value.content), version: text(value.version), size: count(value.size) };
 }
 

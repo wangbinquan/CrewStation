@@ -17,6 +17,7 @@ export interface FileEditorHandle {
   readonly confirmDiscard: () => void;
   readonly cancelDiscard: () => void;
   readonly openFile: (path: string) => void;
+  readonly discardAndOpen: (path: string) => void;
   readonly change: (next: string) => void;
   readonly save: () => void;
   readonly reload: () => void;
@@ -32,7 +33,7 @@ export function useFileEditor(channel: TaskStreamChannel): FileEditorHandle {
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot);
   return {
     ...state, dirty: state.draft !== state.baseline, busy: Boolean(state.operation),
-    openFile: store.openFile, change: store.change, save: store.save, reload: store.reload,
+    openFile: store.openFile, discardAndOpen: store.discardAndOpen, change: store.change, save: store.save, reload: store.reload,
     dismissConflict: store.dismissConflict, close: store.close,
     confirmDiscard: store.confirmDiscard, cancelDiscard: store.cancelDiscard,
   };

@@ -22,6 +22,7 @@ import { useFileEditor } from '../hooks/useFileEditor';
 import { usePreviewStatus } from '../hooks/usePreviewStatus';
 import { useTaskStream } from '../hooks/useTaskStream';
 import { useWorkspaceTree } from '../hooks/useWorkspaceTree';
+import { useDevelopmentLocation } from '../hooks/layout/useDevelopmentLocation';
 import type { SessionAccess } from '../model/sessionAccess';
 import type { ActivityTarget } from '../../../shared/activity/agentActivityView';
 import { productionAccessModes } from '../model/dataAccessForm';
@@ -50,6 +51,7 @@ export function DevSessionWorkbench({ projectId, session, access, canDevelop, se
   const touch = useActivityTouch(taskId);
   const tree = useWorkspaceTree(channel, state.generation, state.runnerConnected);
   const editor = useFileEditor(channel);
+  const location = useDevelopmentLocation(taskId, editor, state.runnerConnected);
   const preview = usePreviewStatus(channel, state.generation, state.runnerConnected);
   const data = useDataBindings(projectId, taskId, serviceId, { canDevelop, canManage: access.isOwner });
   const [dataDirty, setDataDirty] = useState(false);
@@ -59,17 +61,20 @@ export function DevSessionWorkbench({ projectId, session, access, canDevelop, se
   const accessSummary = data.loadError ? t('devSession.data.unconfirmed') : [productionModes.length ? t('devSession.data.grantedSummary', { modes: productionModes.map((mode) => t(`devSession.data.mode.${mode}`)).join(' / ') }) : '', pendingBindings ? t('devSession.data.pendingCount', { count: pendingBindings }) : ''].filter(Boolean).join(' · ');
   return (
     <>
-      <UnsavedChangesGuard dirty={editor.dirty || dataDirty} scope={draftScope} allowNavigate={(current, next) => current.pathname === next.pathname && !('view' in next.search && next.search.view === 'conversation')} />
+      <UnsavedChangesGuard dirty={editor.dirty || dataDirty} scope={draftScope}
+        isNavigationBusy={(next) => !!location.fileChange(next) && editor.busy}
+        allowNavigate={(current, next) => current.pathname === next.pathname && !('view' in next.search && next.search.view === 'conversation') && (!editor.dirty || !location.fileChange(next))}
+        confirmationForNavigation={(next) => { const file = location.fileChange(next); return file ? { question: t('devSession.editor.openQuestion', { from: editor.file?.path ?? '', to: file }), confirmLabel: t('devSession.editor.discardOpen', { path: file }) } : undefined; }} onDiscard={location.approveFile} />
       <header className={styles.context}><strong>{t('devSession.title')}</strong><StreamStatus state={state} />
         <details className={styles.disclosure}><summary>{t('devSession.data.title')}{accessSummary ? ` · ${accessSummary}` : ''}{dataDirty ? ` · ${t('devSession.editor.dirty')}` : ''}</summary><div><DataBindingPane data={data} onDirtyChange={setDataDirty} /></div></details>
-        <details className={styles.disclosure}><summary>{t('devSession.native.sessionMenu')}</summary><div><SessionCard session={session} stream={state} access={access} release={release} unsavedFile={editor.dirty ? editor.file?.path : undefined} editorBusy={editor.busy} dataAccessDirty={dataDirty} dataAccessBusy={data.busy} /><Link to={PROJECT_PATHS[space].conversations} params={{ projectId }}>{t('devSession.native.history')}</Link></div></details>
+        <details className={styles.disclosure}><summary>{t('devSession.native.sessionMenu')}</summary><div><SessionCard session={session} stream={state} access={access} release={release} unsavedFile={editor.dirty ? editor.file?.path : undefined} editorBusy={editor.busy} dataAccessDirty={dataDirty} dataAccessBusy={data.busy} onOpenFile={location.openFile} /><Link to={PROJECT_PATHS[space].conversations} params={{ projectId }}>{t('devSession.native.history')}</Link></div></details>
         <Link to={PROJECT_PATHS[space].release} params={{ projectId }} search={{ source: 'session' }}>{t('devSession.native.prepareRelease')}</Link>
       </header>
       <VersionComparisonPanel projectId={projectId} taskId={taskId} channel={channel} canDevelop={canDevelop} compact />
-      <NativeWorkspace taskId={taskId} userId={userId} channel={channel} stream={state} canDevelop={canDevelop} onActivity={touch} activityTarget={activityTarget} editorDirty={editor.dirty}
+      <NativeWorkspace taskId={taskId} userId={userId} channel={channel} stream={state} canDevelop={canDevelop} onActivity={touch} activityTarget={activityTarget} editorDirty={editor.dirty} location={location}
         preview={<DevelopmentPreview preview={preview} previewHost={session.previewHost} connected={state.runnerConnected} />}
-        editor={<EditorPane tree={tree} editor={editor} />}
-        changes={<VersionComparisonPanel projectId={projectId} taskId={taskId} channel={channel} canDevelop={canDevelop} initiallyExpanded />} />
+        editor={<EditorPane tree={tree} editor={{ ...editor, openFile: location.openFile }} />}
+        changes={<VersionComparisonPanel projectId={projectId} taskId={taskId} channel={channel} canDevelop={canDevelop} initiallyExpanded target={location.search.target ?? 'prod'} onTargetChange={location.selectTarget} onOpenFile={location.openFile} />} />
     </>
   );
 }

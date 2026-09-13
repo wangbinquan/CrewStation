@@ -57,8 +57,10 @@ test('代码视图隐藏后返回仍确认草稿，取消后恢复原内容；�
   const history = browserHistoryFixture([`/projects/${activityProjectId}/settings?tab=repository`, path]);
   page = await renderApp(path, undefined, history.history);
   await page.click('代码'); await page.click('a.ts'); await edit('返回前的草稿'); await page.click('预览');
+  await page.back(); expect(page.search().view).toBe('code'); expect(content().textContent).toBe('返回前的草稿');
+  await page.back(); await page.back(); expect(page.path()).toBe(path); expect(page.text()).not.toContain('放弃输入并离开');
   await page.back(); expect(page.path()).toBe(path); expect(page.text()).toContain('编辑器「a.ts」有未保存的输入');
-  await page.click('继续编辑'); await page.click('代码 · 未保存'); expect(content().textContent).toBe('返回前的草稿');
+  await page.click('继续编辑'); expect(content().textContent).toBe('返回前的草稿');
   await page.back(); await page.click('放弃输入并离开'); expect(page.path()).toBe(`/projects/${activityProjectId}/settings`);
   expect(fixture.commands.some((command) => ['writeFile', 'closeTerminal', 'stopAgent'].includes(command.type))).toBe(false);
 });

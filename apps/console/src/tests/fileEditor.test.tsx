@@ -122,3 +122,13 @@ test('任务通道改变后旧保存回执和旧草稿不能进入新任务', as
   await first.answer(1, '', 'old-saved-version');
   expect(editor.current().file?.version).toBe('new-version'); expect(editor.current().draft).toBe('新任务'); expect(editor.current().dirty).toBe(false);
 });
+
+test('已确认文件导航仍验证文本回执，不把缺少内容当作空文件清掉旧草稿', async () => {
+  const f = transport(), editor = await mount(f.channel);
+  await editor.act((handle) => handle.openFile('a.ts')); await f.answer(0, '原文', 'version-a'); await editor.act((handle) => handle.change('草稿'));
+  await editor.act((handle) => handle.discardAndOpen('b.ts'));
+  await act(async () => f.calls[1]!.resolve({ path: 'b.ts', version: 'version-b', size: 0 }));
+  expect(editor.current().file?.path).toBe('a.ts'); expect(editor.current().draft).toBe('草稿'); expect(editor.current().error).toContain('未返回有效路径与文本');
+  await editor.act((handle) => handle.discardAndOpen('b.ts')); await f.answer(2, '', 'version-b');
+  expect(editor.current().file?.path).toBe('b.ts'); expect(editor.current().draft).toBe(''); expect(editor.current().dirty).toBe(false);
+});

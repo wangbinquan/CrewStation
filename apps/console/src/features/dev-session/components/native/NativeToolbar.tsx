@@ -12,7 +12,7 @@ import { AGENT_PERMISSIONS } from '../../model/agentOptions';
 import type { useNativeTerminals } from '../../hooks/native/useNativeTerminals';
 import styles from './NativeWorkspace.module.css';
 
-export function NativeToolbar({ layout, store, native, canStart }: { readonly layout: WorkspaceLayout; readonly store: WorkspaceLayoutStore; readonly native: ReturnType<typeof useNativeTerminals>; readonly canStart: boolean }): ReactElement {
+export function NativeToolbar({ layout, store, native, canStart, onPreviewAlongside }: { readonly layout: WorkspaceLayout; readonly store: WorkspaceLayoutStore; readonly native: ReturnType<typeof useNativeTerminals>; readonly canStart: boolean; readonly onPreviewAlongside?: (show: boolean) => void }): ReactElement {
   const t = useT();
   const profiles = useApiQuery(queryKeys.computeProfiles(), () => api.catalog.listComputeProfiles());
   const compute = layout.preferredCompute ?? '';
@@ -27,7 +27,7 @@ export function NativeToolbar({ layout, store, native, canStart }: { readonly la
     <span className={styles.separator} />
     {(['grid', 'columns', 'rows'] as const).map((mode) => <Button key={mode} variant={tab.layout === mode ? 'secondary' : 'ghost'} aria-pressed={tab.layout === mode} onClick={() => store.update((value) => updateWorkspaceTab(value, tab.id, (current) => ({ ...current, layout: mode })))}>{t(`devSession.native.layout.${mode}`)}</Button>)}
     <Button variant="ghost" onClick={() => store.update((value) => updateWorkspaceTab(value, tab.id, (current) => ({ ...current, ratios: { columns: [1, 1], rows: [1, 1] } })))}>{t('devSession.native.equal')}</Button>
-    <Button variant="ghost" aria-pressed={layout.previewAlongside} onClick={() => store.update((value) => ({ ...value, previewAlongside: !value.previewAlongside }))}>{t('devSession.native.previewAlongside')}</Button>
+    <Button variant="ghost" aria-pressed={layout.previewAlongside} onClick={() => onPreviewAlongside ? onPreviewAlongside(!layout.previewAlongside) : store.update((value) => ({ ...value, previewAlongside: !value.previewAlongside }))}>{t('devSession.native.previewAlongside')}</Button>
     <details className={styles.menu}><summary>{t('devSession.native.tabOptions')}</summary><div className={styles.menuBody}>
       <Button variant="ghost" onClick={() => setRename(tab.name)}>{t('devSession.native.rename')}</Button>
       <Button variant="ghost" onClick={() => store.update((value) => closeWorkspaceTab(value, tab.id, t('devSession.native.defaultTab')))}>{t('devSession.native.closeTab')}</Button>

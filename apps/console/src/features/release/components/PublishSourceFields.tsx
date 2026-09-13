@@ -27,9 +27,9 @@ export function PublishSourceFields({ preparation: p, onSource }: { readonly pre
           { label: t('release.publish.branch'), value: workspace.branch ?? t('release.prepare.detached') }, { label: 'HEAD', value: <code>{workspace.headSha ?? t('release.prepare.noHead')}</code> },
           { label: t('release.prepare.files'), value: String(workspace.uncommittedCount) },
         ] : [{ label: t('release.prepare.unknown'), value: workspace.reason }])]} />
-        {workspace.status === 'ready' && workspace.uncommittedCount > 0 ? <><ul>{workspace.uncommitted.map((file) => <li key={file.path}><code>{file.status} {file.path}</code></li>)}</ul>{workspace.uncommittedTruncated ? <p>{t('release.prepare.truncated')}</p> : null}</> : null}
+        {workspace.status === 'ready' && workspace.uncommittedCount > 0 ? <><ul>{workspace.uncommitted.map((file) => <li key={file.path}><code>{file.status} </code>{file.status.includes('D') ? <code>{file.path}</code> : <Link to={PROJECT_PATHS[space].development} params={{ projectId }} search={{ view: 'code', file: file.path, task: workspace.taskId }}>{file.path}</Link>}</li>)}</ul>{workspace.uncommittedTruncated ? <p>{t('release.prepare.truncated')}</p> : null}</> : null}
       </> : null}
-      <Link to={PROJECT_PATHS[space].development} params={{ projectId }} search={{ view: 'changes' }}>{t('release.prepare.openDevelopment')}</Link>
+      <Link to={PROJECT_PATHS[space].development} params={{ projectId }} search={{ view: 'diff' }}>{t('release.prepare.openDevelopment')}</Link>
     </>}
     <Button variant="primary" disabled={p.busy || !p.canPublish} onClick={() => void p.check()}>{t(p.checking ? 'release.prepare.checking' : 'release.prepare.check')}</Button>
   </>;

@@ -1,6 +1,18 @@
 import type { Messages } from '../../../shared/lib/i18n';
 
 export const messages = {
+  'devSession.location.invalid': '链接指定的开发会话或 CLI 已变化，未定位到其他会话。可选择当前工作区继续。',
+  'devSession.location.openFile': '在代码中打开',
+  'devSession.compare.previewTitle': '工作树与待验证版本',
+  'devSession.compare.preview': '待验证部署',
+  'devSession.compare.target': '对比目标',
+  'devSession.compare.invalidTarget': '比较回执与当前会话或所选部署不一致，请重新读取。',
+  'devSession.compare.previewUndeployed': '尚无待验证版本',
+  'devSession.compare.previewCounts': '工作树独有 {ahead} 个提交 · 缺少待验证 {behind} 个提交',
+  'devSession.compare.previewTab.ahead': '工作树独有提交',
+  'devSession.compare.previewTab.behind': '缺少的待验证提交',
+  'devSession.compare.previewTab.files': '相对待验证的文件差异',
+
   'devSession.title': '开发会话',
   'devSession.line1': '一个项目同时最多一个开发会话：一个长期运行的开发容器，内含常驻 TaskRunner（独立 UID），默认连接开发数据库。',
   'devSession.line2': '并行的流式交互 Agent、Web 终端、编辑器与预览共用同一条任务流；会话空闲只触发提醒。',
@@ -174,6 +186,8 @@ export const messages = {
   'devSession.editor.discardHint': '编辑器草稿尚未写入工作树。这个操作不会停止任何 Agent。',
   'devSession.editor.discardConfirm': '放弃输入并继续',
   'devSession.editor.draftScope': '编辑器「{path}」',
+  'devSession.editor.openQuestion': '放弃「{from}」的未保存输入并打开「{to}」？',
+  'devSession.editor.discardOpen': '放弃并打开「{path}」',
   'devSession.editor.draftLifetime': '编辑器有未保存输入；切换工作视图会保留，刷新、关闭页面或释放会话会丢失。',
   'devSession.release.editorDraft': '本页面编辑器「{path}」有未保存输入，未包含在下方 Git 清单中；确认释放会丢失这些输入。',
   'devSession.release.editorBusy': '编辑器正在读写文件，请等待结果后再确认释放。',

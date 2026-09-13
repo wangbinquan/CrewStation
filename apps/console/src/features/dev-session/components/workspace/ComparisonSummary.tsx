@@ -8,11 +8,12 @@ import styles from './VersionComparisonPanel.module.css';
 export function ComparisonSummary({ comparison, compact = false }: { readonly comparison: VersionComparisonDto; readonly compact?: boolean }): ReactElement {
   const t = useT();
   const { workspace, deployment, commits, files } = comparison;
+  const preview = deployment.target === 'preview';
   return <div className={styles.summary}>
     <span>{t('devSession.compare.worktree')}: <code>{workspace.status === 'ready' ? `${workspace.branch ?? t('devSession.workspace.detached')} @ ${workspace.headSha?.slice(0, 10) ?? t('devSession.workspace.unborn')}` : t('devSession.compare.unknown')}</code></span>
-    <span>{t('devSession.compare.production')}: <code>{deployment.status === 'ready' ? `${deployment.tag} @ ${deployment.commitSha.slice(0, 10)}` : t(`devSession.compare.${deployment.status}`)}</code></span>
-    <Badge tone={commits.status === 'equal' ? 'success' : commits.status === 'unavailable' ? 'warning' : 'neutral'}>{t(`devSession.compare.relation.${commits.status}`)}</Badge>
-    {'ahead' in commits ? <span>{t('devSession.compare.counts', { ahead: commits.ahead, behind: commits.behind })}</span> : null}
+    <span>{t(preview ? 'devSession.compare.preview' : 'devSession.compare.production')}: <code>{deployment.status === 'ready' ? `${deployment.tag} @ ${deployment.commitSha.slice(0, 10)}` : t(`devSession.compare.${deployment.status}`)}</code></span>
+    <Badge tone={commits.status === 'equal' ? 'success' : commits.status === 'unavailable' ? 'warning' : 'neutral'}>{t(preview && commits.status === 'undeployed' ? 'devSession.compare.previewUndeployed' : `devSession.compare.relation.${commits.status}`)}</Badge>
+    {'ahead' in commits ? <span>{t(preview ? 'devSession.compare.previewCounts' : 'devSession.compare.counts', { ahead: commits.ahead, behind: commits.behind })}</span> : null}
     {!compact && files.status === 'ready' ? <span>{t('devSession.compare.files', { count: files.count })}</span> : null}
     {workspace.status === 'ready' ? <>
       <span>{t('devSession.workspace.dirty', { count: workspace.uncommittedCount })}</span>

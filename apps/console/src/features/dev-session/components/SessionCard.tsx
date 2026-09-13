@@ -27,6 +27,7 @@ export interface SessionCardProps {
   readonly editorBusy?: boolean;
   readonly dataAccessDirty?: boolean;
   readonly dataAccessBusy?: boolean;
+  readonly onOpenFile?: (path: string) => void;
 }
 
 function details(session: DevSessionDto, stream: StreamState, access: SessionAccess, t: Translate, locale: string): DefinitionItem[] {
@@ -48,7 +49,7 @@ function details(session: DevSessionDto, stream: StreamState, access: SessionAcc
 }
 
 /** 会话摘要：状态、任务、TaskRunner 是否已连、归属与释放入口。 */
-export function SessionCard({ session, stream, access, release, unsavedFile, editorBusy, dataAccessDirty, dataAccessBusy }: SessionCardProps): ReactElement {
+export function SessionCard({ session, stream, access, release, unsavedFile, editorBusy, dataAccessDirty, dataAccessBusy, onOpenFile }: SessionCardProps): ReactElement {
   const t = useT();
   const { locale } = useI18n();
   return (
@@ -58,7 +59,7 @@ export function SessionCard({ session, stream, access, release, unsavedFile, edi
           <Badge tone={sessionStateTone(session.state)}>{t(`devSession.state.${session.state}`)}</Badge>
           <StreamStatus state={stream} />
         </div>
-        <ReleaseControl projectId={session.projectId} taskId={session.taskId} access={access} release={release} unsavedFile={unsavedFile} editorBusy={editorBusy} dataAccessDirty={dataAccessDirty} dataAccessBusy={dataAccessBusy} />
+        <ReleaseControl projectId={session.projectId} taskId={session.taskId} access={access} release={release} unsavedFile={unsavedFile} editorBusy={editorBusy} dataAccessDirty={dataAccessDirty} dataAccessBusy={dataAccessBusy} onOpenFile={onOpenFile} />
       </header>
       <DefinitionList layout="grid" items={details(session, stream, access, t, locale)} />
       {stream.runnerState !== undefined && stream.runnerState !== 'ready' ? (
