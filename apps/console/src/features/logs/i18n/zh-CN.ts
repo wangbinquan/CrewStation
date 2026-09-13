@@ -1,6 +1,17 @@
 import type { Messages } from '../../../shared/lib/i18n';
 
 export const messages = {
+  "logs.filters.clearContext": "清除这一项筛选条件",
+  "logs.health.viewLogs": "查看此版本日志",
+  "logs.trace.hint": "输入完整的 32 位十六进制 Trace ID，仅查询当前项目。",
+  "logs.trace.invalid": "Trace ID 必须是 32 位小写十六进制。",
+  "logs.trace.load": "查询调用链",
+  "logs.trace.empty": "该调用链没有可用的关联记录",
+  "logs.trace.time": "时间",
+  "logs.trace.type": "类型／状态",
+  "logs.trace.detail": "详情与关联对象",
+  "logs.trace.sessions": "关联 Agent 会话",
+
   'logs.title': '日志',
   'logs.line1': '服务与任务容器的日志集中聚合到此页；同时显示两个部署槽的健康态。',
   'logs.line2': '按来源与部署槽拉取一页，页内再用关键字过滤；“跟随”打开时每 5 秒取一次最新一页。',
@@ -21,7 +32,7 @@ export const messages = {
   'logs.filters.source': '来源',
   'logs.filters.slot': '部署槽',
   'logs.filters.slotAll': '全部',
-  'logs.filters.limit': '每页条数',
+  'logs.filters.limit': '显示条数',
   'logs.filters.text': '关键字',
   'logs.filters.textPlaceholder': '在本页内过滤',
   'logs.filters.slotHint': '只有来源为部署槽时生效。',
@@ -43,7 +54,7 @@ export const messages = {
   'logs.list.emptyDescription': '换一个来源或部署槽再试；接口尚未就绪时会显示读取失败。',
   'logs.list.noMatchTitle': '本页没有匹配的行',
   'logs.list.noMatchDescription': '关键字只在已取回的这一页内过滤，清空关键字可看到全部。',
-  'logs.list.noPagingHint': '只能看最新一页：首版日志直接读 Pod 日志尾部，那个接口没有游标；往前翻页要等日志采集与保留落地。',
+  'logs.list.noPagingHint': '仅显示最新日志片段，不代表完整历史。可以调整显示条数，或停止跟随以暂停自动刷新。',
 
 
   'logs.level.error': 'ERROR',

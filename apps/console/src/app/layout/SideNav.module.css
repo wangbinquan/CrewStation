@@ -29,7 +29,6 @@
 }
 
 .sectionTitle {
-  /* 纵向排：项目 ID 有 36 个字符，跟标题挤在一行会把标题压成每行一个字，还会溢出导航栏。 */
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -100,3 +99,5 @@
     flex-wrap: wrap;
   }
 }
+
+.projectName { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-transform: none; letter-spacing: 0; color: var(--cs-nav-text); }

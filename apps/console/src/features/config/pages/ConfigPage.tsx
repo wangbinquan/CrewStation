@@ -1,21 +1,18 @@
 import type { ReactElement } from 'react';
-import { projectRoute } from '../../../app/router/projectRoute';
+import { useProjectScope } from '../../../shared/project/ProjectScope';
 import { useT } from '../../../shared/lib/useT';
-import { PageHeader } from '../../../shared/ui/PageHeader';
+import { Tabs } from '../../../shared/ui/Tabs';
 import { ConfigEnvPanel } from '../components/ConfigEnvPanel';
-import styles from './ConfigPage.module.css';
 
-/** 配置与密钥：两组取值并列，各自独立读写；生产组的写权限由服务端判定。 */
-export function ConfigPage(): ReactElement {
+/** 默认开发组；生产组独立切换，输入按项目与环境隔离。 */
+export function ConfigPage({ env, onEnvironmentChange }: { readonly env: 'development' | 'production'; readonly onEnvironmentChange: (env: 'development' | 'production') => void }): ReactElement {
   const t = useT();
-  const { projectId } = projectRoute.useParams();
+  const { projectId } = useProjectScope();
   return (
     <>
-      <PageHeader title={t('config.title')} description={[t('config.line1'), t('config.line2'), t('config.line3')]} />
-      <div className={styles.columns}>
-        <ConfigEnvPanel projectId={projectId} env="development" />
-        <ConfigEnvPanel projectId={projectId} env="production" />
-      </div>
+      <Tabs label={t('config.title')} value={env} items={(['development', 'production'] as const).map((value) => ({ value, label: t(`config.env.${value}`) }))} onChange={(value) => onEnvironmentChange(value === 'production' ? 'production' : 'development')}>
+        {(['development', 'production'] as const).map((group) => <div key={`${projectId}:${group}`} hidden={env !== group}><ConfigEnvPanel projectId={projectId} env={group} /></div>)}
+      </Tabs>
     </>
   );
 }

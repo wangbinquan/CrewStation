@@ -2,6 +2,9 @@ import type { MessagesShapedLike } from '../../../shared/lib/i18n';
 import type { messages as zhCN } from './zh-CN';
 
 export const messages: MessagesShapedLike<typeof zhCN> = {
+  "catalog.context": "Selected context",
+  "catalog.clearContext": "View all operations",
+
   'catalog.title': 'API catalog',
   'catalog.line1': 'Administrators integrate company systems as APIProxy projects; released proxies register operations keyed by proxy name + method + path, routed by the /api/<proxy>/ prefix and marked default-open or targeted-open (business requests, administrator approves or rejects with a reason).',
   'catalog.line2': 'Digital workers may register their own APIs in the same catalog. The gateway evaluates the per-service allow-list locally, proxies are pure forwarders, and credentials are issued on demand by cs-auth.',

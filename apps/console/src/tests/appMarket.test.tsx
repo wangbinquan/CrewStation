@@ -79,7 +79,7 @@ describe('能力市场与负责人设置真实路由', () => {
     expect(page.text()).not.toContain('已上线'); expect(page.text()).not.toContain('打开正式应用');
   });
   test('指定名单约束首屏展示；空名单字段错误；精确查找去重与取消不保存', async () => {
-    const f = fixture(true); page = await renderApp(`/projects/${projectId}/settings`);
+    const f = fixture(true); page = await renderApp(`/projects/${projectId}/settings?tab=visibility`);
     await input(scopeSelect(), 'selected');
     expect(page.text()).toContain('至少选择一位，最多 200 位'); await page.click('保存可见范围');
     expect(page.text()).toContain('请至少选择一位已注册用户'); expect(f.calls.filter((call) => call.method === 'PUT')).toHaveLength(0);
@@ -89,7 +89,7 @@ describe('能力市场与负责人设置真实路由', () => {
     await page.click('取消修改'); expect(scopeSelect().value).toBe('members'); expect(f.calls.filter((call) => call.method === 'PUT')).toHaveLength(0);
   });
   test('并发保存保留草稿和最新范围，显式采用最新修订后再次保存', async () => {
-    const f = fixture(true); page = await renderApp(`/projects/${projectId}/settings`);
+    const f = fixture(true); page = await renderApp(`/projects/${projectId}/settings?tab=visibility`);
     await input(scopeSelect(), 'authenticated'); f.conflict(true); await page.click('保存可见范围');
     expect(scopeSelect().value).toBe('authenticated'); expect(page.text()).toContain('本地草稿已保留'); expect(page.text()).toContain('第 2 版');
     f.conflict(false); await page.click('使用最新修订，保留本地草稿');
@@ -99,7 +99,7 @@ describe('能力市场与负责人设置真实路由', () => {
     expect(scopeSelect().value).toBe('authenticated');
   });
   test('最新设置读取失败时保留已经输入的草稿，不能把表单卸载清空', async () => {
-    const f = fixture(true); page = await renderApp(`/projects/${projectId}/settings`);
+    const f = fixture(true); page = await renderApp(`/projects/${projectId}/settings?tab=visibility`);
     await input(scopeSelect(), 'authenticated'); f.queryFailure(); await page.click('读取最新设置');
     expect(page.text()).toContain('暂时无法读取设置'); expect(scopeSelect().value).toBe('authenticated');
   });

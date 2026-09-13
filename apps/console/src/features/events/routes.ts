@@ -1,6 +1,10 @@
-import { createRoute } from '@tanstack/react-router';
+import { createRoute, redirect } from '@tanstack/react-router';
 import { projectRoute } from '../../app/router/projectRoute';
-import { EventsPage } from './pages/EventsPage';
+import { parseOperationsSearch } from '../../shared/project/operationsSearch';
 
-/** /projects/$projectId/events：事件 */
-export const eventsRoute = createRoute({ getParentRoute: () => projectRoute, path: 'events', component: EventsPage });
+/** 保留旧链接中的有效上下文，replace 避免浏览器返回循环。 */
+export const eventsRoute = createRoute({
+  getParentRoute: () => projectRoute, path: 'events',
+  validateSearch: (search: Record<string, unknown>) => parseOperationsSearch({ ...search, tab: 'deliveries' }),
+  beforeLoad: ({ params, search }) => { throw redirect({ to: '/projects/$projectId/operations', params, search, replace: true }); },
+});

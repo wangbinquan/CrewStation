@@ -1,6 +1,10 @@
-import { createRoute } from '@tanstack/react-router';
+import { createRoute, redirect } from '@tanstack/react-router';
 import { projectRoute } from '../../app/router/projectRoute';
-import { ConfigPage } from './pages/ConfigPage';
+import { parseSettingsSearch } from '../../shared/project/settingsSearch';
 
-/** /projects/$projectId/config：配置与密钥 */
-export const configRoute = createRoute({ getParentRoute: () => projectRoute, path: 'config', component: ConfigPage });
+/** 保留旧链接中的有效上下文，replace 避免浏览器返回循环。 */
+export const configRoute = createRoute({
+  getParentRoute: () => projectRoute, path: 'config',
+  validateSearch: (search: Record<string, unknown>) => parseSettingsSearch({ ...search, tab: 'config' }),
+  beforeLoad: ({ params, search }) => { throw redirect({ to: '/projects/$projectId/settings', params, search, replace: true }); },
+});

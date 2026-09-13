@@ -42,6 +42,12 @@ async function caught(call: () => Promise<unknown>): Promise<ApiClientError> {
 }
 
 describe('createApiClient：请求形状', () => {
+  test('调用链回放包含项目作用域，两个路径段独立编码', async () => {
+    const { calls, fetchImpl } = fakeFetch(() => json(200, {}));
+    const client = createApiClient({ fetch: fetchImpl });
+    await client.observability.trace('project one', 'trace/two');
+    expect(calls[0]).toMatchObject({ method: 'GET', url: '/v1/projects/project%20one/traces/trace%2Ftwo', body: undefined });
+  });
   test('原生动态按游标取有界页，已读只提交目标 CLI 轮次和已读位置', async () => {
     const { calls, fetchImpl } = fakeFetch(() => json(200, {}));
     const client = createApiClient({ fetch: fetchImpl });

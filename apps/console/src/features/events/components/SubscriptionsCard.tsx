@@ -9,12 +9,13 @@ import { DataTable } from '../../../shared/ui/DataTable';
 import { QueryStatus } from '../../../shared/ui/QueryStatus';
 
 /** 本服务在 Manifest subscriptions 段声明、并在发布登记时生效的订阅。 */
-export function SubscriptionsCard({ projectId }: { readonly projectId: string }): ReactElement {
+export function SubscriptionsCard({ projectId, selected }: { readonly projectId: string; readonly selected?: string }): ReactElement {
   const t = useT();
   const subscriptions = useApiQuery(queryKeys.subscriptions(projectId), () => api.events.listSubscriptions(projectId), { enabled: projectId !== '' });
   const items = subscriptions.data?.items ?? [];
   return (
     <Card title={t('events.subscriptions.title')} footer={t('events.subscriptions.hint')}>
+      {selected ? <p>{t('events.subscriptions.selected')} <code>{selected}</code>{!subscriptions.isPending && !subscriptions.error && !items.some((item) => item.id === selected) ? ` · ${t('events.subscriptions.missing')}` : ''}</p> : null}
       <QueryStatus
         isPending={subscriptions.isPending}
         error={subscriptions.error}
@@ -25,9 +26,9 @@ export function SubscriptionsCard({ projectId }: { readonly projectId: string })
       {items.length > 0 ? (
         <DataTable columns={[t('events.subscriptions.eventType'), t('events.subscriptions.handlerPath'), t('events.subscriptions.state')]}>
           {items.map((subscription) => (
-            <tr key={subscription.id}>
+            <tr key={subscription.id} aria-current={subscription.id === selected ? true : undefined}>
               <td>
-                <code>{subscription.eventType}</code>
+                <code>{subscription.eventType}</code>{subscription.id === selected ? <strong> · {t('events.subscriptions.selected')}</strong> : null}
               </td>
               <td>
                 <code>{subscription.handlerPath}</code>

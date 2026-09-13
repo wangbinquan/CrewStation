@@ -10,9 +10,10 @@ import { configRoute } from '../../features/config';
 import { devSessionRoute, historicalConversationsRoute } from '../../features/dev-session';
 import { eventsRoute } from '../../features/events';
 import { logsRoute } from '../../features/logs';
-import { projectListRoute, projectOverviewRoute, appVisibilityRoute } from '../../features/projects';
+import { projectListRoute, projectOverviewRoute } from '../../features/projects';
 import { releaseRoute } from '../../features/release';
 import { projectRoute } from './projectRoute';
+import { projectSettingsRoute, projectOperationsRoute } from './projectSections';
 import { rootRoute } from './rootRoute';
 import { workbenchRoute } from './workbenchRoute';
 
@@ -24,7 +25,8 @@ export const routeTree = rootRoute.addChildren([
     marketDetailRoute,
     projectRoute.addChildren([
       projectOverviewRoute,
-      appVisibilityRoute,
+      projectSettingsRoute,
+      projectOperationsRoute,
       devSessionRoute,
       historicalConversationsRoute,
       releaseRoute,

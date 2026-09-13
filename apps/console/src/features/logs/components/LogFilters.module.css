@@ -29,3 +29,5 @@
 .follow {
   margin-left: auto;
 }
+.context { max-width: 100%; white-space: normal; text-align: left; overflow-wrap: anywhere; }
+.context span { min-width: 0; }

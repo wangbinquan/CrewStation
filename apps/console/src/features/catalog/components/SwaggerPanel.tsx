@@ -13,12 +13,13 @@ import styles from './SwaggerPanel.module.css';
 export interface SwaggerPanelProps {
   readonly serviceId: string;
   readonly proxies: readonly ApiProxyDto[];
+  readonly initialProxy?: string;
 }
 
 /** 代理选择器＋内嵌 Swagger；文档由服务端按本服务可调范围裁剪。 */
-export function SwaggerPanel({ serviceId, proxies }: SwaggerPanelProps): ReactElement {
+export function SwaggerPanel({ serviceId, proxies, initialProxy }: SwaggerPanelProps): ReactElement {
   const t = useT();
-  const [proxy, setProxy] = useState('');
+  const [proxy, setProxy] = useState(initialProxy ?? '');
   const spec = useApiQuery(queryKeys.openapiSpec(serviceId, proxy), () => api.apiCatalog.openapi(proxy, { serviceId }), { enabled: proxy.length > 0 });
   return (
     <Card title={t('catalog.swagger.title')}>

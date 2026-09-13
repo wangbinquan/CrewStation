@@ -1,18 +1,16 @@
-import type { HealthDto, LogEntryDto } from '@crewstation/contracts';
+import type { HealthDto, LogEntryDto, TraceReplayDto } from '@crewstation/contracts';
 import type { Transport } from '../httpTransport';
 import type { ItemsPage } from '../itemsPage';
 import type { LogQueryInput } from '../requestInputs';
 import { segment } from '../requestUrl';
 
-/**
- * 日志与健康态（observability 模块，路由正在建设中）：形状按 contracts/api/observability.ts；
- * 接口未就绪时服务端回 404，工作台按“日志接口尚未就绪”处理。
- */
+/** observability 模块公开的读取接口。日志来源为 Pod 尾部，不具备全历史分页。 */
 export interface ObservabilityResource {
   /** GET /v1/projects/:projectId/logs?source=&slot=&taskId=&since=&limit=&cursor= */
   logs(projectId: string, query: LogQueryInput): Promise<ItemsPage<LogEntryDto>>;
   /** GET /v1/projects/:projectId/health：两个部署槽的健康态。 */
   health(projectId: string): Promise<ItemsPage<HealthDto>>;
+  trace(projectId: string, traceId: string): Promise<TraceReplayDto>;
 }
 
 export function observabilityResource(transport: Transport): ObservabilityResource {
@@ -20,5 +18,6 @@ export function observabilityResource(transport: Transport): ObservabilityResour
   return {
     logs: (projectId, query) => transport.request<ItemsPage<LogEntryDto>>('GET', `${project(projectId)}/logs`, { query }),
     health: (projectId) => transport.request<ItemsPage<HealthDto>>('GET', `${project(projectId)}/health`),
+    trace: (projectId, traceId) => transport.request<TraceReplayDto>('GET', `${project(projectId)}/traces/${segment(traceId)}`),
   };
 }

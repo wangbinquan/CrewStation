@@ -1,6 +1,9 @@
 import type { Messages } from '../../../shared/lib/i18n';
 
 export const messages = {
+  "catalog.context": "当前定位",
+  "catalog.clearContext": "查看全部接口",
+
   'catalog.title': '接口目录',
   'catalog.line1': '管理员以接入容器（APIProxy 项目）接入公司系统；发布后的代理按“代理名＋方法＋路径”登记操作，经 /api/<proxy>/ 前缀路由，标记为默认开放或定向开放（业务申请，管理员批准或拒绝并给出理由）。',
   'catalog.line2': '数字人也可把自己的 API 登记到同一目录；网关在本地按每服务的允许清单判定，代理只做纯转发，凭据由 cs-auth 按需下发。',

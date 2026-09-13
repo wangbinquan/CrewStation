@@ -1,6 +1,7 @@
 import { Link, useLocation, useParams } from '@tanstack/react-router';
 import type { ReactElement } from 'react';
 import { useT } from '../../shared/lib/useT';
+import { useProjectIdentity } from '../../shared/project/useProjectIdentity';
 import { Brand } from '../../shared/ui/Brand';
 import { CurrentUserChip } from './CurrentUserChip';
 import { LocaleSwitch } from './LocaleSwitch';
@@ -13,6 +14,7 @@ export function TopBar(): ReactElement {
   const t = useT();
   const { projectId } = useParams({ strict: false });
   const path = useLocation().pathname, inAdmin = path.startsWith('/admin'), inProject = path.startsWith('/projects/');
+  const project = useProjectIdentity(inProject ? projectId : undefined);
   return (
     <header className={styles.bar}>
       <div className={styles.context}>
@@ -21,7 +23,7 @@ export function TopBar(): ReactElement {
         {inProject && projectId !== undefined ? (
           <>
             <span className={styles.separator}>/</span>
-            <span className={styles.project}>{t('topBar.project', { projectId })}</span>
+            <span className={styles.project}>{project.data?.name ?? t('nav.currentProject')}</span>
           </>
         ) : null}
       </div>

@@ -1,17 +1,15 @@
 import { Link } from '@tanstack/react-router';
 import type { ReactElement } from 'react';
 import { useT } from '../../shared/lib/useT';
+import { useProjectIdentity } from '../../shared/project/useProjectIdentity';
 import styles from './SideNav.module.css';
 
 type ProjectPagePath =
   | '/projects/$projectId'
   | '/projects/$projectId/dev-session'
   | '/projects/$projectId/release'
-  | '/projects/$projectId/config'
-  | '/projects/$projectId/catalog'
-  | '/projects/$projectId/events'
-  | '/projects/$projectId/logs'
-  | '/projects/$projectId/capabilities';
+  | '/projects/$projectId/operations'
+  | '/projects/$projectId/settings';
 
 interface ProjectPageItem {
   readonly to: ProjectPagePath;
@@ -24,24 +22,20 @@ const PROJECT_PAGES: readonly ProjectPageItem[] = [
   { to: '/projects/$projectId', labelKey: 'nav.overview', exact: true },
   { to: '/projects/$projectId/dev-session', labelKey: 'nav.devSession' },
   { to: '/projects/$projectId/release', labelKey: 'nav.release' },
-  { to: '/projects/$projectId/config', labelKey: 'nav.config' },
-  { to: '/projects/$projectId/catalog', labelKey: 'nav.catalog' },
-  { to: '/projects/$projectId/events', labelKey: 'nav.events' },
-  { to: '/projects/$projectId/logs', labelKey: 'nav.logs' },
-  { to: '/projects/$projectId/capabilities', labelKey: 'nav.capabilities' },
+  { to: '/projects/$projectId/operations', labelKey: 'nav.operations' },
+  { to: '/projects/$projectId/settings', labelKey: 'nav.settings' },
 ];
 
 export function ProjectNavSection({ projectId }: { readonly projectId: string }): ReactElement {
   const t = useT();
+  const identity = useProjectIdentity(projectId);
   return (
     <div className={styles.section}>
       <div className={styles.sectionTitle}>
-        {t('nav.currentProject')}
-        <code className={styles.projectId} title={projectId}>
-          {projectId}
-        </code>
+        <span className={styles.projectName} title={identity.data?.name}>{identity.data?.name ?? t('nav.currentProject')}</span>
+        {identity.data?.slug ? <code className={styles.projectId} title={identity.data.slug}>{identity.data.slug}</code> : null}
       </div>
-      <ul className={styles.list}>
+      <ul className={styles.list} aria-label={t('nav.projectPages')}>
         {PROJECT_PAGES.map((item) => (
           <li key={item.to}>
             <Link
@@ -49,13 +43,12 @@ export function ProjectNavSection({ projectId }: { readonly projectId: string })
               params={{ projectId }}
               className={styles.link}
               activeProps={{ className: styles.linkActive }}
-              activeOptions={{ exact: item.exact ?? false }}
+              activeOptions={{ exact: item.exact ?? false, includeSearch: false }}
             >
               {t(item.labelKey)}
             </Link>
           </li>
         ))}
-        <li><Link to="/projects/$projectId/settings" params={{ projectId }} search={{ tab: 'visibility' }} className={styles.link} activeProps={{ className: styles.linkActive }}>{t('nav.settings')}</Link></li>
       </ul>
     </div>
   );

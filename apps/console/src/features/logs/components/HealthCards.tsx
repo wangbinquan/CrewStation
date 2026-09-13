@@ -1,4 +1,4 @@
-import type { HealthState } from '@crewstation/contracts';
+import type { HealthState, SlotName } from '@crewstation/contracts';
 import type { ReactElement } from 'react';
 import { api } from '../../../shared/api/client';
 import { queryKeys } from '../../../shared/api/queryKeys';
@@ -6,6 +6,7 @@ import { useApiQuery } from '../../../shared/api/useApi';
 import { useDateText } from '../../../shared/lib/useDateText';
 import { useT } from '../../../shared/lib/useT';
 import { Badge } from '../../../shared/ui/Badge';
+import { Button } from '../../../shared/ui/Button';
 import { Card } from '../../../shared/ui/Card';
 import { QueryStatus } from '../../../shared/ui/QueryStatus';
 import type { BadgeTone } from '../../../shared/ui/Badge';
@@ -21,7 +22,7 @@ const TONE: Readonly<Record<HealthState, BadgeTone>> = {
 };
 
 /** 两个部署槽各一块：副本、重启与最近一次状态变化。 */
-export function HealthCards({ projectId }: { readonly projectId: string }): ReactElement {
+export function HealthCards({ projectId, onLogs }: { readonly projectId: string; readonly onLogs?: (slot: SlotName) => void }): ReactElement {
   const t = useT();
   const dateText = useDateText();
   const health = useApiQuery(queryKeys.projectHealth(projectId), () => api.observability.health(projectId), { enabled: projectId !== '' });
@@ -51,6 +52,7 @@ export function HealthCards({ projectId }: { readonly projectId: string }): Reac
                 <dt>{t('logs.health.lastTransitionAt')}</dt>
                 <dd>{dateText(slot.lastTransitionAt)}</dd>
               </dl>
+              {onLogs ? <Button onClick={() => onLogs(slot.slot)}>{t('logs.health.viewLogs')}</Button> : null}
             </div>
           ))}
         </div>

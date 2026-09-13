@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react';
 import { Link, useSearch } from '@tanstack/react-router';
-import { projectRoute } from '../../../app/router/projectRoute';
+import { useProjectScope } from '../../../shared/project/ProjectScope';
 import { useT } from '../../../shared/lib/useT';
 import { PageHeader } from '../../../shared/ui/PageHeader';
 import { QueryStatus } from '../../../shared/ui/QueryStatus';
@@ -21,7 +21,7 @@ function ConversationSession({ taskId, agentId }: { readonly taskId: string; rea
 }
 export function HistoricalConversationsPage(): ReactElement {
   const t = useT();
-  const { projectId } = projectRoute.useParams();
+  const { projectId } = useProjectScope();
   const agent = useSearch({ strict: false, select: (search) => search.agent });
   const session = useDevSession(projectId);
   return <><PageHeader title={t('devSession.native.history')} description={[t('devSession.native.historyHint')]} />

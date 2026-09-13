@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react';
-import { projectRoute } from '../../../app/router/projectRoute';
+import { useProjectScope } from '../../../shared/project/ProjectScope';
 import { useT } from '../../../shared/lib/useT';
 import { PageHeader } from '../../../shared/ui/PageHeader';
 import { QueryStatus } from '../../../shared/ui/QueryStatus';
@@ -13,7 +13,7 @@ import styles from './ReleasePage.module.css';
 /** 发布页：发布控制、发布历史、切流记录与标签列表。 */
 export function ReleasePage(): ReactElement {
   const t = useT();
-  const { projectId } = projectRoute.useParams();
+  const { projectId } = useProjectScope();
   const { serviceId, isPending, error } = useServiceOfProject(projectId);
   return (
     <>

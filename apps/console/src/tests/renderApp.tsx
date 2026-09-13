@@ -9,6 +9,10 @@ import { messages as projectsZh } from '../features/projects/i18n/zh-CN';
 import { messages as releaseZh } from '../features/release/i18n/zh-CN';
 import { messages as devSessionZh } from '../features/dev-session/i18n/zh-CN';
 import { messages as capabilitiesZh } from '../features/capabilities/i18n/zh-CN';
+import { messages as catalogZh } from '../features/catalog/i18n/zh-CN';
+import { messages as configZh } from '../features/config/i18n/zh-CN';
+import { messages as logsZh } from '../features/logs/i18n/zh-CN';
+import { messages as eventsZh } from '../features/events/i18n/zh-CN';
 import { I18nProvider } from '../shared/lib/I18nProvider';
 import { mergeMessages } from '../shared/lib/i18n';
 import type { MessageCatalog } from '../shared/lib/i18n';
@@ -24,6 +28,10 @@ const zh = mergeMessages([
   { source: 'release', messages: releaseZh },
   { source: 'devSession', messages: devSessionZh },
   { source: 'capabilities', messages: capabilitiesZh },
+  { source: 'events', messages: eventsZh },
+  { source: 'logs', messages: logsZh },
+  { source: 'config', messages: configZh },
+  { source: 'catalog', messages: catalogZh },
 ]);
 const catalog: MessageCatalog = { 'zh-CN': zh, 'en-US': zh };
 
@@ -31,6 +39,9 @@ export interface RenderedApp {
   readonly text: () => string;
   readonly html: () => string;
   readonly path: () => string;
+  readonly search: () => Record<string, unknown>;
+  readonly back: () => Promise<void>;
+  readonly navigate: (href: string) => Promise<void>;
   /** 点击第一个文本匹配的按钮或链接；找不到就抛，免得断言在「什么都没发生」上通过。 */
   readonly click: (label: string) => Promise<void>;
   readonly settle: () => Promise<void>;
@@ -38,8 +49,8 @@ export interface RenderedApp {
 }
 
 /** 用真实路由树渲染整个工作台；只有 fetch 是假的。 */
-export async function renderApp(initialPath: string): Promise<RenderedApp> {
-  const router = createRouter({ routeTree, history: createMemoryHistory({ initialEntries: [initialPath] }) });
+export async function renderApp(initialPath: string, previousPath?: string): Promise<RenderedApp> {
+  const router = createRouter({ routeTree, history: createMemoryHistory({ initialEntries: previousPath ? [previousPath, initialPath] : [initialPath] }) });
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
   const host = document.createElement('div');
   document.body.appendChild(host);
@@ -62,6 +73,9 @@ export async function renderApp(initialPath: string): Promise<RenderedApp> {
     text: () => host.textContent ?? '',
     html: () => host.innerHTML,
     path: () => router.state.location.pathname,
+    search: () => router.state.location.search,
+    back: async () => { await act(async () => { router.history.back(); }); await settle(); },
+    navigate: async (href) => { await act(async () => { await router.navigate({ href }); }); await settle(); },
     click: async (label) => {
       const nodes = [...host.querySelectorAll('button, a')];
       const target = nodes.find((node) => (node.textContent ?? '').includes(label));

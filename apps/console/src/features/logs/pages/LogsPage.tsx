@@ -1,28 +1,22 @@
-import { useParams } from '@tanstack/react-router';
 import type { ReactElement } from 'react';
+import { useProjectScope } from '../../../shared/project/ProjectScope';
+import type { OperationsSearch } from '../../../shared/project/operationsSearch';
 import { useT } from '../../../shared/lib/useT';
 import { Card } from '../../../shared/ui/Card';
-import { PageHeader } from '../../../shared/ui/PageHeader';
 import { QueryStatus } from '../../../shared/ui/QueryStatus';
-import { HealthCards } from '../components/HealthCards';
 import { LogFilters } from '../components/LogFilters';
 import { LogList } from '../components/LogList';
 import { useLogFeed } from '../hooks/useLogFeed';
 import styles from './LogsPage.module.css';
 
-export function LogsPage(): ReactElement {
+export function LogsPage({ filters, changeFilters }: { readonly filters: OperationsSearch; readonly changeFilters: (next: OperationsSearch) => void }): ReactElement {
   const t = useT();
-  // 日志页永远挂在 /projects/$projectId 下；strict:false 与顶栏取法一致，缺参数时不发请求。
-  const { projectId = '' } = useParams({ strict: false });
-  const feed = useLogFeed(projectId);
+  const { projectId } = useProjectScope();
+  const feed = useLogFeed(projectId, filters, changeFilters);
   // 整页为空与「关键字把这一页全过滤掉了」是两回事，空态文案要分开。
   const noData = feed.total === 0;
   return (
     <>
-      <PageHeader title={t('logs.title')} description={[t('logs.line1'), t('logs.line2')]} />
-      <div className={styles.health}>
-        <HealthCards projectId={projectId} />
-      </div>
       <Card
         title={t('logs.list.title')}
         extra={<span className={styles.count}>{t('logs.list.count', { shown: feed.entries.length, total: feed.total })}</span>}

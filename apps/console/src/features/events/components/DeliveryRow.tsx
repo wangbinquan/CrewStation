@@ -12,10 +12,11 @@ export interface DeliveryRowProps {
   readonly canReplay: boolean;
   readonly isReplaying: boolean;
   readonly onReplay: (deliveryId: string) => void;
+  readonly onTrace?: (traceId: string) => void;
 }
 
 /** 一条投递记录；失败的把最后一次错误折到下一行，避免长错误把表格横向撑开。 */
-export function DeliveryRow({ delivery, canReplay, isReplaying, onReplay }: DeliveryRowProps): ReactElement {
+export function DeliveryRow({ delivery, canReplay, isReplaying, onReplay, onTrace }: DeliveryRowProps): ReactElement {
   const t = useT();
   const dateText = useDateText();
   const replayable = canReplay && delivery.state === 'dead';
@@ -29,7 +30,7 @@ export function DeliveryRow({ delivery, canReplay, isReplaying, onReplay }: Deli
           <DeliveryStateBadge state={delivery.state} />
         </td>
         <td className={styles.attempts}>{delivery.attempts}</td>
-        <td className={styles.trace}>{delivery.traceId}</td>
+        <td className={styles.trace}>{onTrace ? <Button onClick={() => onTrace(delivery.traceId)}>{delivery.traceId}</Button> : delivery.traceId}</td>
         <td className={styles.time}>{dateText(delivery.deliveredAt)}</td>
         <td className={styles.time}>{dateText(delivery.nextAttemptAt)}</td>
         <td>

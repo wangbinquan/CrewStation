@@ -1,7 +1,7 @@
 import type { ReactElement } from 'react';
 import { useSearch } from '@tanstack/react-router';
 import { activityTargetFromSearch } from '../../../shared/activity/agentActivityView';
-import { projectRoute } from '../../../app/router/projectRoute';
+import { useProjectScope } from '../../../shared/project/ProjectScope';
 import { errorMessage } from '../../../shared/api/useApi';
 import { useT } from '../../../shared/lib/useT';
 import { PageHeader } from '../../../shared/ui/PageHeader';
@@ -19,7 +19,7 @@ import { DevSessionWorkbench } from './DevSessionWorkbench';
  */
 export function DevSessionPage(): ReactElement {
   const t = useT();
-  const { projectId } = projectRoute.useParams();
+  const { projectId } = useProjectScope();
   const search = useSearch({ strict: false });
   const activityTarget = activityTargetFromSearch(projectId, search);
   const session = useDevSession(projectId);

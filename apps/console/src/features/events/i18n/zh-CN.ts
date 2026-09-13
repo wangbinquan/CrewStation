@@ -1,6 +1,11 @@
 import type { Messages } from '../../../shared/lib/i18n';
 
 export const messages = {
+  "events.subscriptions.selected": "当前定位的订阅",
+  "events.subscriptions.missing": "当前项目未找到该订阅",
+  "events.deliveries.subscriptionFilter": "在最近 50 条中筛选订阅：",
+  "events.deliveries.clearFilter": "清除订阅筛选",
+
   'events.title': '事件',
   'events.line1': '公司 webhook 经服务域进入 EventProducer 接入容器，转成平台事件交给 cs-events：去重、持久化，再带来源令牌与 trace_id 经服务域推送到 active prod 槽的处理路径。',
   'events.line2': '这里查看本服务的事件订阅与投递状态；第一版没有业务自定义事件，也没有平台调度器。',

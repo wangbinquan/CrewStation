@@ -40,7 +40,7 @@ export function LogFilters({ value, onChange, follow, onFollowChange }: LogFilte
       <FilterSelect
         label={t('logs.filters.limit')}
         value={String(value.limit)}
-        options={LIMITS.map((limit) => ({ value: String(limit), label: String(limit) }))}
+        options={[...new Set([...LIMITS, value.limit])].sort((a, b) => a - b).map((limit) => ({ value: String(limit), label: String(limit) }))}
         onChange={(next) => onChange({ ...value, limit: Number(next) })}
       />
       <label className={styles.field}>
@@ -62,6 +62,7 @@ export function LogFilters({ value, onChange, follow, onFollowChange }: LogFilte
       >
         {follow ? t('logs.follow.on') : t('logs.follow.off')}
       </Button>
+      {(['taskId', 'releaseId', 'since'] as const).map((field) => value[field] ? <Button key={field} className={styles.context} onClick={() => onChange({ ...value, [field]: undefined })} title={t('logs.filters.clearContext')}><span>{field}: {value[field]} ×</span></Button> : null)}
     </div>
   );
 }

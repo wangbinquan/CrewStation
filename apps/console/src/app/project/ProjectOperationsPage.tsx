@@ -1,0 +1,28 @@
+import { Link, useNavigate, useSearch } from '@tanstack/react-router';
+import { DeliveriesCard } from '../../features/events';
+import { HealthCards, LogsPage, TracePage } from '../../features/logs';
+import { useT } from '../../shared/lib/useT';
+import { useProjectScope } from '../../shared/project/ProjectScope';
+import { OPERATIONS_TABS, parseOperationsSearch } from '../../shared/project/operationsSearch';
+import type { OperationsSearch } from '../../shared/project/operationsSearch';
+import { PageHeader } from '../../shared/ui/PageHeader';
+import { Tabs } from '../../shared/ui/Tabs';
+import styles from './ProjectSections.module.css';
+
+export function ProjectOperationsPage() {
+  const t = useT(), { projectId } = useProjectScope(), navigate = useNavigate();
+  const search = parseOperationsSearch(useSearch({ strict: false })), tab = search.tab ?? 'health';
+  const change = (next: OperationsSearch, replace = false) => { void navigate({ to: '/projects/$projectId/operations', params: { projectId }, search: next, replace }); };
+  return <div className={styles.page}>
+    <PageHeader title={t('nav.operations')} />
+    <Tabs label={t('nav.operations')} value={tab} items={OPERATIONS_TABS.map((value) => ({ value, label: t(`operations.tab.${value}`) }))} onChange={(value) => change({ tab: OPERATIONS_TABS.find((item) => item === value) })}>
+      {tab === 'health' ? <HealthCards key={projectId} projectId={projectId} onLogs={(slot) => change({ tab: 'logs', source: 'slot', slot })} /> : null}
+      {tab === 'logs' ? <LogsPage key={projectId} filters={search} changeFilters={(next) => change({ ...next, tab: 'logs' }, true)} /> : null}
+      {tab === 'trace' ? <TracePage key={`${projectId}:${search.traceId ?? ''}`} projectId={projectId} traceId={search.traceId} onTrace={(traceId) => change({ tab: 'trace', traceId })} /> : null}
+      {tab === 'deliveries' ? <>
+        <div className={styles.actions}><Link to="/projects/$projectId/settings" params={{ projectId }} search={{ tab: 'resources', resource: 'events', subscription: search.subscription }}>{t('operations.viewSubscriptions')}</Link></div>
+        <DeliveriesCard key={`${projectId}:${search.subscription ?? ''}`} projectId={projectId} subscription={search.subscription} onClearSubscription={() => change({ tab })} onTrace={(traceId) => change({ tab: 'trace', traceId })} />
+      </> : null}
+    </Tabs>
+  </div>;
+}

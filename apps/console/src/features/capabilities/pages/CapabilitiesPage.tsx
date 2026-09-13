@@ -1,6 +1,6 @@
 import type { CapabilityDescriptionDto } from '@crewstation/contracts';
 import type { ReactElement } from 'react';
-import { projectRoute } from '../../../app/router/projectRoute';
+import { useProjectScope } from '../../../shared/project/ProjectScope';
 import { api } from '../../../shared/api/client';
 import { queryKeys } from '../../../shared/api/queryKeys';
 import { errorMessage, useApiQuery } from '../../../shared/api/useApi';
@@ -18,14 +18,14 @@ import { CapabilityBusinessTaskApi, CapabilityMcp, CapabilityQuota } from '../co
 import styles from './CapabilitiesPage.module.css';
 
 /** 能力说明：一次取回聚合描述，按它实际包含的段落逐段呈现，值都可复制。 */
-export function CapabilitiesPage(): ReactElement {
+export function CapabilitiesPage({ embedded = false }: { readonly embedded?: boolean }): ReactElement {
   const t = useT();
   const { locale } = useI18n();
-  const { projectId } = projectRoute.useParams();
+  const { projectId } = useProjectScope();
   const description = useApiQuery(queryKeys.capabilities(projectId), () => api.capabilities.describe(projectId));
   return (
     <>
-      <PageHeader
+      {!embedded ? <PageHeader
         title={t('capabilities.title')}
         description={[t('capabilities.line1'), t('capabilities.line2')]}
         actions={
@@ -33,7 +33,7 @@ export function CapabilitiesPage(): ReactElement {
             <Badge tone="neutral">{t('capabilities.generatedAt', { time: formatDateTime(description.data.generatedAt, locale) })}</Badge>
           )
         }
-      />
+      /> : null}
       {description.isPending ? <p className={styles.muted}>{t('capabilities.loading')}</p> : null}
       {description.error ? <EmptyState title={t('capabilities.error', { message: errorMessage(description.error) })} /> : null}
       {description.data !== undefined ? <CapabilitySections description={description.data} /> : null}
