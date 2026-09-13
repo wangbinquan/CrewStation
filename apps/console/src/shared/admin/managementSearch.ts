@@ -12,7 +12,9 @@ export function parseCapabilitySearch(search: Record<string, unknown>): Capabili
   const tab = search.tab === 'api' || search.tab === 'events' ? search.tab : 'integrations';
   if (tab === 'integrations') return { tab, ...parseProjectDirectorySearch(search, true) };
   if (tab !== 'api') return { tab };
-  return { tab, projectId: ProjectIdSchema.safeParse(search.projectId).data, proxy: text(search.proxy, 80), operation: text(search.operation, 2048) };
+  const directory = parseProjectDirectorySearch(search);
+  return { tab, projectId: ProjectIdSchema.safeParse(search.projectId).data, proxy: text(search.proxy, 80), operation: text(search.operation, 2048),
+    ...(directory.q ? { q: directory.q } : {}), ...(directory.cursor ? { cursor: directory.cursor } : {}) };
 }
 
 export function parseRequestSearch(search: Record<string, unknown>): RequestSearch {

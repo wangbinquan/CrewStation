@@ -17,8 +17,9 @@ export function AdminCapabilitiesPage() {
       onChange={(tab) => void navigate({ to: '/admin/capabilities', search: parseCapabilitySearch({ tab }) })}>
       {search.tab === 'integrations' ? <AdminIntegrationsPage embedded /> : null}
       {search.tab === 'api' ? <CatalogManagementPage projectId={search.projectId} proxy={search.proxy} operation={search.operation}
+        q={search.q} cursor={search.cursor} onDirectoryChange={(q, cursor) => void navigate({ to: '/admin/capabilities', search: { ...search, q, cursor } })}
         onProjectChange={(projectId) => void navigate({ to: '/admin/capabilities', search: { ...search, projectId } })}
-        onClearContext={() => void navigate({ to: '/admin/capabilities', search: { tab: 'api', projectId: search.projectId } })} /> : null}
+        onClearContext={() => void navigate({ to: '/admin/capabilities', search: { ...search, proxy: undefined, operation: undefined } })} /> : null}
       {search.tab === 'events' ? <EventTypesCard management /> : null}
     </Tabs>
   </>;

@@ -1,0 +1,8 @@
+.filters, .toolbar { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--cs-space-2); }
+.filters { margin-bottom: var(--cs-space-2); }
+.filters input { box-sizing: border-box; max-width: 100%; min-width: 0; min-height: 32px; padding: var(--cs-space-1) var(--cs-space-2); border: 1px solid var(--cs-color-border); border-radius: var(--cs-radius-sm); background: var(--cs-color-surface); color: var(--cs-color-text); font: inherit; }
+.filters input:focus-visible { outline: 2px solid var(--cs-color-focus); outline-offset: 1px; }
+.toolbar { justify-content: space-between; align-items: center; margin-top: var(--cs-space-2); color: var(--cs-color-text-muted); }
+.toolbar .filters { margin: 0; }
+.selected { margin-top: var(--cs-space-2); overflow-wrap: anywhere; }
+.selected p { margin: var(--cs-space-2) 0; }

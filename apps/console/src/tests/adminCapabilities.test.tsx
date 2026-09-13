@@ -6,8 +6,8 @@ import { parseCapabilitySearch, parseRequestSearch } from '../shared/admin/manag
 
 const originalFetch = globalThis.fetch;
 const projectId = `prj_${'a'.repeat(32)}`, serviceId = `svc_${'b'.repeat(32)}`, integrationId = `prj_${'c'.repeat(32)}`;
-const project = { id: projectId, serviceId, name: '知识助理', slug: 'knowledge', kind: 'DigitalWorker', state: 'active' };
-const integration = { id: integrationId, serviceId: `svc_${'d'.repeat(32)}`, name: '账单接入', slug: 'billing', kind: 'APIProxy', state: 'active' };
+const project = { id: projectId, serviceId, name: '知识助理', slug: 'knowledge', kind: 'DigitalWorker', state: 'active', ownerUserId: `usr_${'a'.repeat(32)}`, namespace: 'cs-knowledge', createdAt: '2026-09-13T01:00:00.000Z' };
+const integration = { id: integrationId, serviceId: `svc_${'d'.repeat(32)}`, name: '账单接入', slug: 'billing', kind: 'APIProxy', state: 'active', ownerUserId: `usr_${'a'.repeat(32)}`, namespace: 'cs-billing', createdAt: '2026-09-13T01:00:00.000Z' };
 const key = 'billing:GET:/invoices', createdAt = '2026-09-13T01:00:00.000Z';
 let page: Awaited<ReturnType<typeof renderApp>> | undefined;
 afterEach(() => { page?.unmount(); page = undefined; globalThis.fetch = originalFetch; });
@@ -26,12 +26,16 @@ function fixture(options: { admin?: boolean; meFailure?: boolean; pendingMe?: bo
       else body = { id: 'user', name: '管理员', isAdmin: options.admin !== false, memberships: [] };
     } else if (url.pathname === '/v1/projects/page') {
       if (state.projectsFailure) { status = 503; body = { error: 'unavailable', message: '项目目录失败' }; }
-      else body = { items: [integration].map((p) => ({ project: { ...p, namespace: `cs-${p.slug}`, ownerUserId: `usr_${'a'.repeat(32)}`, createdAt }, role: 'admin', ownerName: '管理员' })) };
+      else body = { items: [project, integration].filter((p) => url.searchParams.get('kind')?.split(',').includes(p.kind)).map((p) => ({ project: p, role: 'admin', ownerName: '管理员' })) };
     } else if (url.pathname === '/v1/projects') {
       if (state.projectsFailure) { status = 503; body = { error: 'unavailable', message: '项目目录失败' }; }
       else body = { items: url.searchParams.get('kind')?.includes('APIProxy') ? [integration] : [project, integration] };
-    } else if (url.pathname === `/v1/projects/${projectId}`) body = project;
+    } else if (url.pathname === `/v1/projects/${projectId}`) {
+      if (state.projectsFailure) { status = 503; body = { error: 'unavailable', message: '项目目录失败' }; }
+      else body = project;
+    }
     else if (url.pathname === `/v1/projects/${integrationId}`) body = integration;
+    else if (/^\/v1\/projects\/prj_[a-f0-9]{32}$/.test(url.pathname)) { status = 404; body = { error: 'not_found', message: '未找到指定项目' }; }
     else if (url.pathname === '/v1/catalog/operations') {
       if (state.operationsFailure) { status = 503; body = { error: 'unavailable', message: '接口目录失败' }; }
       else body = { items: [{ key, proxy: 'billing', method: 'GET', path: '/invoices', openPolicy: state.policy, granted: url.searchParams.has('serviceId') ? state.grant : undefined }] };

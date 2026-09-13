@@ -3,7 +3,7 @@ import type { ApiRequestPage, EgressRequestPage, ProjectId, ProjectPageEntry, Se
 const userId = `usr_${'a'.repeat(32)}` as UserId, now = '2026-09-14T00:00:00.000Z';
 export function adminDirectoryFixture() {
   const calls: Array<{ url: URL; method: string }> = [];
-  const state = { admin: true, identityError: false, projectError: false, apiError: false, egressError: false, invalidProject: false,
+  const state = { admin: true, identityError: false, projectError: false, detailError: false, apiError: false, egressError: false, invalidProject: false,
     holdApi: undefined as Promise<void> | undefined };
   const projects: ProjectPageEntry[] = Array.from({ length: 48 }, (_, i) => ({ role: 'admin', ownerName: '负责人甲', project: {
     id: `prj_${i.toString(16).padStart(32, '0')}` as ProjectId, serviceId: `svc_${i.toString(16).padStart(32, '0')}` as ServiceId, ownerUserId: userId,
@@ -35,7 +35,12 @@ export function adminDirectoryFixture() {
     } else if (url.pathname === '/v1/egress/requests/page') {
       if (state.egressError) { status = 503; body = { error: 'unavailable', message: '出站待办离线' }; }
       else { const limit = Number(url.searchParams.get('limit') ?? 20); body = { items: egressRequests.slice(0, limit), ...(limit < egressRequests.length ? { nextCursor: 'next-egress' } : {}) }; }
-    } else if (url.pathname.startsWith('/v1/projects/')) body = projects.find((p) => url.pathname === `/v1/projects/${p.project.id}`)?.project ?? { items: [] };
+    } else if (url.pathname.startsWith('/v1/projects/')) {
+      const project = projects.find((p) => url.pathname === `/v1/projects/${p.project.id}`)?.project;
+      if (project && state.detailError) { status = 503; body = { error: 'unavailable', message: '调用方资料离线' }; }
+      else if (project) body = project;
+      else if (/^\/v1\/projects\/prj_[a-f0-9]{32}$/.test(url.pathname)) { status = 404; body = { error: 'not_found', message: '未找到指定项目' }; }
+    }
     return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
   }) as typeof fetch;
   return { calls, state, projects, apiRequests, egressRequests, writes: () => calls.filter((r) => r.method !== 'GET') };

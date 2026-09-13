@@ -1,6 +1,20 @@
 import type { Messages } from '../../../shared/lib/i18n';
 
 export const messages = {
+  "catalog.caller.search": "搜索调用方",
+  "catalog.caller.find": "查询调用方",
+  "catalog.caller.select": "调用方项目",
+  "catalog.caller.clearSearch": "清除搜索",
+  "catalog.caller.clearSelection": "清除调用方",
+  "catalog.caller.first": "第一批调用方",
+  "catalog.caller.next": "下一批调用方",
+  "catalog.caller.count": "本页 {count} 个项目",
+  "catalog.caller.countUnknown": "调用方目录数量未确认",
+  "catalog.caller.noMatches": "没有匹配的项目，可修改名称或标识重新搜索。",
+  "catalog.caller.hint": "每页最多 20 个项目，按名称或标识搜索。当前调用方会一直保留，直到你重新选择。",
+  "catalog.caller.invalidDirectory": "调用方目录或管理身份未确认，请重新读取。",
+  "catalog.caller.invalidProject": "指定调用方资料未确认，请重新读取；未切换到全局策略。",
+
   'catalog.invoke.title': 'API 试调',
   'catalog.invoke.detail': '操作试调',
   'catalog.invoke.open': '试调',

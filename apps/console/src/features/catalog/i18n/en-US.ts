@@ -2,6 +2,20 @@ import type { MessagesShapedLike } from '../../../shared/lib/i18n';
 import type { messages as zhCN } from './zh-CN';
 
 export const messages: MessagesShapedLike<typeof zhCN> = {
+  "catalog.caller.search": "Search callers",
+  "catalog.caller.find": "Find callers",
+  "catalog.caller.select": "Caller project",
+  "catalog.caller.clearSearch": "Clear search",
+  "catalog.caller.clearSelection": "Clear caller",
+  "catalog.caller.first": "First caller page",
+  "catalog.caller.next": "Next caller page",
+  "catalog.caller.count": "{count} projects on this page",
+  "catalog.caller.countUnknown": "Caller directory count unconfirmed",
+  "catalog.caller.noMatches": "No matching projects. Search by a different name or slug.",
+  "catalog.caller.hint": "Up to 20 projects per page. Search by name or slug. The selected caller stays selected until you change it.",
+  "catalog.caller.invalidDirectory": "The caller directory or administrator identity is unconfirmed. Reload to continue.",
+  "catalog.caller.invalidProject": "The selected caller is unconfirmed. Reload to continue; platform policy has not been selected.",
+
   'catalog.invoke.title': 'API test call',
   'catalog.invoke.detail': 'Test operation',
   'catalog.invoke.open': 'Test call',
