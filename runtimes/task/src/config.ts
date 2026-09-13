@@ -1,5 +1,5 @@
 import type { TaskId } from '@crewstation/contracts';
-import { TaskIdSchema } from '@crewstation/contracts';
+import { PLATFORM_ENV, TaskIdSchema } from '@crewstation/contracts';
 import type { Logger } from '@crewstation/kernel';
 
 export interface PreviewConfig {
@@ -14,6 +14,7 @@ export interface RunnerConfig {
   taskId: TaskId;
   runnerToken: string;
   sessionUrl: string;
+  internalApiBase?: string;
   workdir: string;
   workerUid: number;
   workerGid: number;
@@ -47,6 +48,7 @@ export function loadConfigFromEnv(env: Env = process.env): RunnerConfig {
     taskId: taskId.data,
     runnerToken: required(env, 'CS_RUNNER_TOKEN'),
     sessionUrl: required(env, 'CS_SESSION_URL'),
+    internalApiBase: env[PLATFORM_ENV.internalApiBase] || undefined,
     workdir: env.CS_WORKDIR || '/work',
     workerUid: integer(env, 'CS_WORKER_UID', DEFAULT_WORKER_ID),
     workerGid: integer(env, 'CS_WORKER_GID', DEFAULT_WORKER_ID),

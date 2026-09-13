@@ -3,6 +3,7 @@ import { SubtaskIdSchema, TaskIdSchema } from '../ids';
 import { AgentDriverSchema, AgentPermissionSchema, OutputContractSchema } from '../manifest/tasks';
 import { AgentEventSchema } from './agentEvents';
 import { NativeActivityEventSchema } from './nativeActivity';
+import { RunnerApiInvocationSchema, ApiInvocationResultSchema } from './apiInvocation';
 import { RunnerWorkspaceStatusSchema } from './workspace';
 import { ComparisonDetailQuerySchema, ComparisonDetailsSchema, GitObjectIdSchema, RunnerComparisonSchema } from './workspaceComparison';
 import { NativeTerminalRecordSchema, NativeTerminalRosterSchema, TerminalControlSchema, TerminalSizeSchema, TerminalSnapshotSchema } from './nativeTerminal';
@@ -28,6 +29,7 @@ export const RunnerHelloSchema = z.object({
     drivers: z.array(AgentDriverSchema),
     pty: z.boolean(),
     preview: z.boolean(),
+    apiInvocations: z.literal(1).optional(),
   }),
 });
 
@@ -63,6 +65,7 @@ export const StartAgentTerminalCommandSchema = StartAgentCommandSchema.omit({ mo
 export const RunnerCommandSchema = z.discriminatedUnion('type', [
   StartAgentCommandSchema,
   StartAgentTerminalCommandSchema,
+  RunnerApiInvocationSchema.safeExtend({ ...cmd('invokeApi') }),
   z.object({ ...cmd('listAgentTerminals') }),
   z.object({ ...cmd('stopAgentTerminal'), agentId: z.string().min(1), runnerId: z.uuid() }),
   z.object({ ...cmd('attachTerminal'), terminalId: z.string().min(1), runnerId: z.uuid() }),
@@ -94,6 +97,7 @@ export const FileEntrySchema = z.object({ name: z.string(), kind: z.enum(['file'
 export const PreviewStateSchema = z.enum(['disabled', 'stopped', 'starting', 'ready', 'crashed']);
 
 export const RunnerResultPayloads = {
+  invokeApi: ApiInvocationResultSchema,
   startAgentTerminal: NativeTerminalRecordSchema,
   listAgentTerminals: NativeTerminalRosterSchema,
   attachTerminal: TerminalSnapshotSchema,

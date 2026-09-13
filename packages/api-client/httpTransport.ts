@@ -15,6 +15,8 @@ export interface RequestOptions {
   /** 以 JSON 发送的请求体。 */
   readonly body?: unknown;
   readonly signal?: AbortSignal;
+  readonly keepalive?: boolean;
+  readonly redirect?: RequestRedirect;
 }
 
 /** 资源组只依赖它：一次 HTTP 调用，2xx 返回解析后的 JSON（204／空体为 undefined），其余抛 ApiClientError。 */
@@ -41,6 +43,8 @@ export function createTransport(options: TransportOptions = {}): Transport {
       const headers = new Headers({ accept: 'application/json', ...options.headers });
       const init: RequestInit = { method, headers, credentials: 'include' };
       if (request.signal) init.signal = request.signal;
+      if (request.keepalive !== undefined) init.keepalive = request.keepalive;
+      if (request.redirect !== undefined) init.redirect = request.redirect;
       if (request.body !== undefined) {
         headers.set('content-type', 'application/json');
         init.body = JSON.stringify(request.body);

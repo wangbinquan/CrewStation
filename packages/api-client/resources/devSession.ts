@@ -3,6 +3,8 @@ import type { ComparisonDetailQuery, ComparisonDetails, ComparisonTarget, Versio
 import type { NativeTerminalDto, NativeTerminalList, StartNativeTerminalRequest } from '@crewstation/contracts';
 import type { SaveWorkspaceLayoutRequest, WorkspaceLayoutDto } from '@crewstation/contracts';
 import type { AgentActivityPage, AgentActivityQuery, ReadAgentActivityRequest } from '@crewstation/contracts';
+import type { ApiInvocationRequest, ApiInvocationResponse } from '@crewstation/contracts';
+import { API_INVOCATION_TIMEOUT_MS } from '@crewstation/contracts';
 import type { Transport } from '../httpTransport';
 import type { ItemsPage } from '../itemsPage';
 import type { PublishDevSessionInput, StartDevAgentInput } from '../requestInputs';
@@ -25,6 +27,7 @@ export interface ReleaseDevSessionOptions {
 
 /** 开发会话：一项目一会话、分支与落后数、并行流式 Agent、从会话发布。 */
 export interface DevSessionResource {
+  invokeApi(projectId: string, input: ApiInvocationRequest): Promise<ApiInvocationResponse>;
   getAgentActivity(taskId: string, query?: AgentActivityQuery): Promise<AgentActivityPage>;
   readAgentActivity(taskId: string, input: ReadAgentActivityRequest): Promise<{ throughSeq: number }>;
   getWorkspaceLayout(taskId: string): Promise<WorkspaceLayoutDto>;
@@ -64,6 +67,7 @@ export function devSessionResource(transport: Transport): DevSessionResource {
   const agents = (taskId: string) => `/v1/tasks/${segment(taskId)}/agents`;
   const terminals = (taskId: string) => `/v1/tasks/${segment(taskId)}/agent-terminals`;
   return {
+    invokeApi: (projectId, input) => transport.request('POST', `${project(projectId)}/dev-session/api-invocations`, { body: input, keepalive: false, redirect: 'error', signal: AbortSignal.timeout(API_INVOCATION_TIMEOUT_MS + 20_000) }),
     getAgentActivity: (taskId, query) => transport.request('GET', `/v1/tasks/${segment(taskId)}/agent-activity`, { query }),
     readAgentActivity: (taskId, input) => transport.request('POST', `/v1/tasks/${segment(taskId)}/agent-activity/read`, { body: input }),
     getWorkspaceLayout: (taskId) => transport.request('GET', `/v1/tasks/${segment(taskId)}/workspace-layout`),

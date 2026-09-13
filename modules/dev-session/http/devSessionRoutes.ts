@@ -1,6 +1,7 @@
 import type { ProjectId, TaskId, UserId } from '@crewstation/contracts';
 import { OpenDevSessionRequestSchema, ProjectIdSchema, PublishDevSessionRequestSchema, SendAgentMessageRequestSchema, StartDevAgentRequestSchema, TaskIdSchema } from '@crewstation/contracts';
 import { ComparisonDetailQuerySchema, ComparisonTargetSchema } from '@crewstation/contracts';
+import { ApiInvocationRequestSchema } from '@crewstation/contracts';
 import type { AppEnv } from '@crewstation/http';
 import { actorFrom, parseBody, parseParams, parseQuery } from '@crewstation/http';
 import type { Context } from 'hono';
@@ -18,6 +19,7 @@ export function devSessionRoutes(api: DevSessionModuleApi, isAdmin: (userId: Use
   r.get('/v1/projects/:projectId/dev-session', async (c) => { const s = await api.getSession(await actor(c), parseParams(c, projectParams).projectId as ProjectId); return s ? c.json(s) : c.json({ error: 'not_found', message: '没有开发会话' }, 404); });
   r.post('/v1/projects/:projectId/dev-session', async (c) => c.json(await api.openSession(await actor(c), parseParams(c, projectParams).projectId as ProjectId, await parseBody(c, OpenDevSessionRequestSchema)), 201));
   r.get('/v1/projects/:projectId/dev-session/workspace-status', async (c) => c.json(await api.workspaceStatus(await actor(c), parseParams(c, projectParams).projectId as ProjectId)));
+  r.post('/v1/projects/:projectId/dev-session/api-invocations', async (c) => { c.header('cache-control', 'no-store'); return c.json(await api.invokeApi(await actor(c), parseParams(c, projectParams).projectId as ProjectId, await parseBody(c, ApiInvocationRequestSchema))); });
   r.get('/v1/projects/:projectId/dev-session/version-comparison', async (c) => {
     const query = parseQuery(c, z.object({ target: ComparisonTargetSchema.default('prod') }));
     return c.json(await api.versionComparison(await actor(c), parseParams(c, projectParams).projectId as ProjectId, query.target));

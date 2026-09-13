@@ -1,8 +1,9 @@
 import type { Clock, Logger } from '@crewstation/kernel';
-import type { ComputeCatalog, DevSessionSettings, ManifestParser, McpCredentials, Notifier, ProjectAuthorizer, Releases, ServiceResolver, SourceControl } from '../ports/platform';
+import type { ApiInvocationCatalog, ComputeCatalog, DevSessionSettings, ManifestParser, McpCredentials, Notifier, ProjectAuthorizer, Releases, ServiceResolver, SourceControl } from '../ports/platform';
 import type { Environments, ReminderRepository, Runner } from '../ports/runtime';
 
 export interface DevSessionUseCaseDeps {
+  apiCatalog: ApiInvocationCatalog;
   environments: Environments;
   runner: Runner;
   scm: SourceControl;

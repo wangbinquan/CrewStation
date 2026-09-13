@@ -11,6 +11,7 @@ export * from './gateway/allowlist';
 export * from './gateway/routes';
 export * from './taskrunner/agentEvents';
 export * from './taskrunner/protocol';
+export * from './taskrunner/apiInvocation';
 export * from './taskrunner/nativeTerminal';
 export * from './taskrunner/nativeActivity';
 export * from './taskrunner/nativeObservation';

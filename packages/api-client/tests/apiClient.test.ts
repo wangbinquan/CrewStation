@@ -43,6 +43,17 @@ async function caught(call: () => Promise<unknown>): Promise<ApiClientError> {
 }
 
 describe('createApiClient：请求形状', () => {
+  test('API 试调只调用项目的结构化入口，固定会话和参数原样保留，有界且不重复发送', async () => {
+    const requests: Array<{ url: string; init?: RequestInit }> = [];
+    const fetchImpl: FetchLike = async (url, init) => { requests.push({ url: String(url), init }); return json(200, { taskId: 'fixed-task' }); };
+    const input = { expectedTaskId: `tsk_${'a'.repeat(32)}` as TaskId, operationKey: 'crm:POST:/items/{id}', pathParameters: { id: '1' }, query: { label: ['one', 'two'] }, headers: { 'content-type': 'application/json' }, body: '{"name":"test"}' };
+    const client = createApiClient({ fetch: fetchImpl });
+    const received: unknown = await client.devSession.invokeApi('project one', input);
+    expect(received).toEqual({ taskId: 'fixed-task' });
+    expect(requests).toHaveLength(1);
+    expect(requests[0]).toMatchObject({ url: '/v1/projects/project%20one/dev-session/api-invocations', init: { method: 'POST', keepalive: false, redirect: 'error', signal: expect.any(AbortSignal) } });
+    expect(JSON.parse(String(requests[0]!.init!.body))).toEqual(input);
+  });
   test('告警与订阅使用既有项目作用域端点，保存和移除不发送通知测试请求', async () => {
     const { calls, fetchImpl } = fakeFetch((call) => call.method === 'GET' ? json(200, { items: [] }) : new Response(null, { status: 204 }));
     const client = createApiClient({ fetch: fetchImpl });

@@ -208,6 +208,12 @@ dev-session L5 可依赖 api-catalog L3 的公开操作查询，不经深路径�
 
 这不是浏览器直接代理任意 URL；Swagger 的 Execute 与详情试调共用这一条通道。现有终端调用仍保留。
 
+实现契约：请求另带必填 `expectedTaskId`，防止把旧输入发送到新会话；响应固定 `{taskId, operationKey, result}`。路径参数必须与当前模板逐项匹配，query 允许重复值；请求体是可省略的 UTF-8 文本，GET／HEAD 不接受请求体。请求体与响应体各 64 KiB，请求／响应头各 16 KiB，完整 URL 8 KiB；参数／请求头最多 64 项，查询每项最多 16 个值。15 秒包括等待响应头及读取响应流，另给命令传输留 10 秒余量。响应为 UTF-8 文本视图，响应体与头分别提供截断标志；4xx／5xx 与 3xx 原样展示，重定向不跟随。超时、传输中断或回执不合法不能说明业务未执行，禁止自动重试。
+
+新 Runner 命令 `invokeApi` 只接收目录解析出的 proxy、method、path 及有界输入，从既有 `CS_INTERNAL_API_BASE` 经服务网关发出。hello 的可选 `capabilities.apiInvocations:1` 在 socket 派发前检查，老容器／未配置通道保留普通 CLI 并返回明确提示；跨副本转发保留该错误码。Bun 连接复用曾在响应中断后自动重发 POST，试调链中的 HTTP 请求显式关闭连接复用；Runner 的响应中途断线回归验证只调用一次。dev-session 使用注入的 api-catalog 公开查询端口，不读其他模块表；新增两份生产源码后模块为 40 个文件，后续增长须先遵守结构文档 §11。
+
+跨进程自动验收落在结构文档约定的 `tests/e2e/`，纳入根 typecheck；串起真实客户端、HTTP、PostgreSQL 连接注册表、两个 session 副本和 Runner。该测试中的目录与目标 HTTP 服务是夹具，不替代共享集群中源 Pod 身份与实际放行表的 J5 验收。
+
 ### 4.5 有界项目摘要（本 RFC 新增，P1）
 
 为列表提供 `GET /v1/workbench/project-summaries?cursor=&limit=20&q=&state=`：返回项目基础字段、当前用户角色、会话摘要、两槽版本摘要、可用的健康摘要以及 nextCursor。先从 project 公开查询得到授权项目，再做当前页聚合；单项失败分别标 unknown，不导致整页全空。

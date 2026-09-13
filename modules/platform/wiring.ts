@@ -186,6 +186,7 @@ function composeRuntime(deps: PlatformModuleDeps, core: ReturnType<typeof compos
   };
   const mcp = [{ name: 'capabilities', url: settings.mcp.capabilitiesUrl }, { name: 'operations', url: settings.mcp.operationsUrl }];
   const devSession = createDevSessionModule({
+    apiCatalog: core.apiCatalog.api,
     db, logger, isAdmin: (id) => isAdmin(id), environments: taskRuntime.api, runner, releases: release.api,
     scm: {
       listBranches: (serviceId, compare) => scm.api.listBranches(SYSTEM_ACTOR, serviceId, compare),

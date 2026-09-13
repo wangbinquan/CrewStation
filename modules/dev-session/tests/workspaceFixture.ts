@@ -27,6 +27,7 @@ export function workspaceFixture() {
     state: 'running', branch: 'main', podName: 'task-test', createdAt: checkedAt, lastActivityAt: checkedAt, traceId: 'trace', createdBy: workspaceActor.userId,
   });
   const deps: DevSessionUseCaseDeps = {
+    apiCatalog: { listOperations: async () => [] },
     environments: {
       createEnvironment: async () => environment(), getEnvironment: async () => environment(),
       findDevSession: async () => state.missing ? undefined : environment(), listRunningDevSessions: async () => [environment()],

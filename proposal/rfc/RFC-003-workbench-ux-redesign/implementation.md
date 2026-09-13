@@ -402,3 +402,17 @@ release 的既有 tagger 端口经 platform 装配将确认 SHA 传给 scm。scm
 新增 8 项完整路由回归、1 项客户端请求回归、1 项领域上下文回归；既有真实 PostgreSQL 模块测试验证返回实际 slot。界面定向 **8 pass／0 fail、101 assertions**，客户端／模块定向 **22 pass／0 fail、84 assertions**。最终 `bun run check` **953 pass／4 skip／0 fail**，957 tests、165 files、4904 assertions、76.93s；console build 618ms。跳过项与前批相同，没有原生运行时修改。
 
 本批未取得新的实浏览器或共享集群 J4 证据，两个被拦截共享操作仍未执行。完整 T7／T12 旅程与其余 RFC 项继续，下一项实施 T8 从开发容器发出的结构化 API 试调。
+
+发布记录：`61b3c1d30ac3a22b83eadc3a699d32e79624e835` 已同步 main；[精确 SHA CI](https://github.com/wangbinquan/CrewStation/actions/runs/34758815651) 成功。
+
+## 第二十七批：T8 结构化试调后端与跨副本通道
+
+新增项目开发会话的 api-invocations POST、对应客户端与 Runner invokeApi 命令。开发授权先于环境／目录查询；expectedTaskId 固定会话，方法／代理／路径取当前可调用操作，路径参数逐项匹配，查询允许重复值。目录查询后再次检查会话和服务，实际请求只发给固定任务。新 hello 能力在 socket 派发前核对；未配置或旧容器明确拒绝，普通 CLI 不受影响。跨副本转发保留结构化错误码，响应固定 taskId／operationKey；无效回执或传输失败明确结果未知，不自动重发。
+
+TaskRunner 从既有 CS_INTERNAL_API_BASE 发出原生 HTTP 请求，沿服务网关使用所在 Pod 身份；没有命令行拼接、任意目的 URL 或浏览器直调。契约明确请求／响应体各 64 KiB、头各 16 KiB、URL 8 KiB、15 秒包含读流；3xx 不跟随、4xx／5xx 原样返回，文本视图和头分别标注截断，耗时由实际请求测量。响应与参数不写入运行日志。Bun 1.3.13 的真实 TCP 先红用例复现中途断线重复 POST（writes=2）；关闭连接复用后 writes=1，工作台客户端、API 到 session、跨副本转发及 Runner 上游四段均为试调设置有界且不复用的请求。问题与 [Bun 官方仓库报告](https://github.com/oven-sh/bun/issues/28706) 一致，以本仓 TCP 回归为当前版本证据。
+
+新增 18 项回归：输入边界、目录／授权变化、固定会话／服务身份、旧容器无 socket 写入、跨副本拒绝码、响应截断与 15 秒超时、同期 CLI 可读、TCP 断线不重发及客户端准确路径。后端／客户端定向 **33 pass／145 assertions**；真实 Runner HTTP／WS **5 pass／29 assertions**。结构文档预留的 tests/e2e 首次纳入根 typecheck，两个跨进程用例使用隔离 PostgreSQL、两个 session 副本、真实 HTTP 客户端与 TaskRunner；等待断开回调后再删测试库，避免清理与注销争用。
+
+最终 `bun run check` **971 pass／4 skip／0 fail**，975 tests、169 files、5012 assertions、92.79s；console build 613ms。跳过项与前批相同。另以已有 Linux 任务镜像 `sha256:341fa1b05abfaf5f15824fff89f374ecc7c98cb7f0cbdc4b4f0e75636274f665` 只读挂载本批源码、network none，HTTP／WS 回归 **5 pass／29 assertions、15.22s**；包含原生 Bun 的截断、超时与断线不重发。首次镜像验收因只挂载部分新契约缺少 activity 入口失败；补全只读契约挂载后通过，没有把缺模块当作代码成功或部署证据。
+
+本批尚未接详情表单与 Swagger Execute，不宣称 T8 已完成。跨进程自动测试中的目录与目标 HTTP 是夹具；共享集群中的真实源 Pod 身份／放行表、J5／T12 仍待验收。两个被拒绝的共享操作未执行，原 QA 会话保留。

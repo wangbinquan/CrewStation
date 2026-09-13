@@ -3,6 +3,12 @@ import { ProjectIdSchema, SlugSchema, TaskIdSchema, UserIdSchema } from '../ids'
 import { AgentPermissionSchema } from '../manifest/tasks';
 import { PreviewStateSchema } from '../taskrunner/protocol';
 import { PublishRequestSchema } from './release';
+import { ApiInvocationInputSchema, ApiInvocationResultSchema } from '../taskrunner/apiInvocation';
+
+export const ApiInvocationRequestSchema = ApiInvocationInputSchema.extend({ expectedTaskId: TaskIdSchema, operationKey: z.string().min(1).max(8192) }).strict();
+export const ApiInvocationResponseSchema = z.object({ taskId: TaskIdSchema, operationKey: z.string().min(1).max(8192), result: ApiInvocationResultSchema }).strict();
+export type ApiInvocationRequest = z.infer<typeof ApiInvocationRequestSchema>;
+export type ApiInvocationResponse = z.infer<typeof ApiInvocationResponseSchema>;
 
 export const DevSessionStateSchema = z.enum(['creating', 'running', 'releasing', 'released', 'failed']);
 

@@ -1,4 +1,9 @@
-import type { Actor, AgentDriver, BranchDto, Manifest, ProjectId, PublishRequest, ReleaseDto, ServiceId, SlotDto, TaskId, UserId } from '@crewstation/contracts';
+import type { Actor, AgentDriver, ApiOperationDto, BranchDto, Manifest, ProjectId, PublishRequest, ReleaseDto, ServiceId, SlotDto, TaskId, UserId } from '@crewstation/contracts';
+
+/** api-catalog L3 的公开操作查询，由平台装配。 */
+export interface ApiInvocationCatalog {
+  listOperations(actor: Actor, serviceId: ServiceId): Promise<ApiOperationDto[]>;
+}
 
 export interface ProjectAuthorizer {
   authorize(actor: Actor, projectId: ProjectId, action: 'view' | 'develop' | 'publish' | 'force-release-session'): Promise<unknown>;

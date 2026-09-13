@@ -1,4 +1,5 @@
 import { PlatformError } from '@crewstation/kernel';
+import { API_INVOCATION_TIMEOUT_MS, ErrorEnvelopeSchema } from '@crewstation/contracts';
 import { FORWARDED_HEADER } from '../../api/internalProtocol';
 import type { CommandForwarder } from '../../ports/forwarding';
 
@@ -6,9 +7,13 @@ import type { CommandForwarder } from '../../ports/forwarding';
 export function fetchForwarder(fetchImpl: typeof fetch = fetch): CommandForwarder {
   return {
     forward: async (replica, taskId, command) => {
-      const res = await fetchImpl(`${replica}/internal/tasks/${taskId}/commands`, { method: 'POST', headers: { 'content-type': 'application/json', [FORWARDED_HEADER]: '1' }, body: JSON.stringify(command) });
-      const body = (await res.json().catch(() => ({}))) as { payload?: unknown; error?: string; message?: string };
-      if (!res.ok) throw new PlatformError(res.status === 503 ? 'unavailable' : 'internal', body.message ?? `转发到 ${replica} 失败：${res.status}`);
+      const res = await fetchImpl(`${replica}/internal/tasks/${taskId}/commands`, { method: 'POST', headers: { 'content-type': 'application/json', [FORWARDED_HEADER]: '1' }, body: JSON.stringify(command), ...(command.type === 'invokeApi' ? { keepalive: false, redirect: 'error' as const, signal: AbortSignal.timeout(API_INVOCATION_TIMEOUT_MS + 15_000) } : {}) });
+      const body = (await res.json().catch(() => ({}))) as { payload?: unknown };
+      if (!res.ok) {
+        const failure = ErrorEnvelopeSchema.safeParse(body);
+        if (failure.success) throw new PlatformError(failure.data.error, failure.data.message, failure.data.details);
+        throw new PlatformError(res.status === 503 ? 'unavailable' : 'internal', `转发到 ${replica} 失败：${res.status}`);
+      }
       return body.payload;
     },
   };

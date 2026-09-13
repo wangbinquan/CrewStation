@@ -6,10 +6,11 @@ import type { FileCommands } from './files/fileCommands';
 import type { PreviewSupervisor } from './preview/previewSupervisor';
 import type { TerminalSupervisor } from './terminal/terminalSupervisor';
 import type { NativeTerminalSupervisor } from './terminal/nativeSupervisor';
-import type { RunnerWorkspaceStatus } from '@crewstation/contracts';
+import type { ApiInvocationResult, RunnerApiInvocation, RunnerWorkspaceStatus } from '@crewstation/contracts';
 import type { WorkspaceComparisons } from './workspace/workspaceComparison';
 
 export interface CommandTargets {
+  invokeApi: (input: RunnerApiInvocation) => Promise<ApiInvocationResult>;
   agents: AgentSupervisor;
   execs: ExecSupervisor;
   terminals: TerminalSupervisor;
@@ -29,6 +30,7 @@ const ack = (): Record<string, never> => ({});
 /** 协议命令 → 各监督器；无内容的命令统一回 `{}`（RunnerResultPayloads.ack）。 */
 export function buildCommandHandlers(targets: CommandTargets): CommandHandlers {
   return {
+    invokeApi: ({ id: _id, type: _type, ...input }) => targets.invokeApi(input),
     startAgentTerminal: (c) => targets.nativeTerminals.start(c),
     listAgentTerminals: async () => targets.nativeTerminals.list(),
     stopAgentTerminal: (c) => targets.nativeTerminals.stop(c.agentId, c.runnerId).then(ack),

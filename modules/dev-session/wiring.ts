@@ -23,12 +23,14 @@ import { publishFromSessionUseCase } from './application/publishFromSession';
 import { sessionLifecycleUseCases } from './application/sessionLifecycle';
 import { workspaceStatusUseCase } from './application/workspaceStatus';
 import { versionComparisonUseCases } from './application/versionComparison';
+import { apiInvocationUseCase } from './application/apiInvocation';
 import { devSessionRoutes } from './http/devSessionRoutes';
 import { nativeTerminalRoutes } from './http/nativeTerminalRoutes';
-import type { ComputeCatalog, DevSessionSettings, McpCredentials, Notifier, ProjectAuthorizer, Releases, ServiceResolver, SourceControl } from './ports/platform';
+import type { ApiInvocationCatalog, ComputeCatalog, DevSessionSettings, McpCredentials, Notifier, ProjectAuthorizer, Releases, ServiceResolver, SourceControl } from './ports/platform';
 import type { Environments, Runner } from './ports/runtime';
 
 export interface DevSessionModuleDeps {
+  apiCatalog: ApiInvocationCatalog;
   /** 算力档位解析（RFC-001），由组合根接到 project。 */
   compute: ComputeCatalog;
   db: Database;
@@ -62,7 +64,7 @@ export const devSessionMigrations: MigrationSet = {
 export function createDevSessionModule(deps: DevSessionModuleDeps): DevSessionModule {
   const useCaseDeps: DevSessionUseCaseDeps = {
     environments: deps.environments, runner: deps.runner, scm: deps.scm, releases: deps.releases, manifests: yamlManifestParser,
-    authorizer: deps.authorizer,
+    authorizer: deps.authorizer, apiCatalog: deps.apiCatalog,
     compute: deps.compute, services: deps.services, notifier: deps.notifier, credentials: deps.credentials, reminders: drizzleReminderRepository(deps.db),
     settings: deps.settings, clock: deps.clock ?? systemClock, logger: deps.logger ?? noopLogger,
   };
@@ -73,6 +75,7 @@ export function createDevSessionModule(deps: DevSessionModuleDeps): DevSessionMo
   const activity = nativeActivityUseCases(useCaseDeps, drizzleNativeActivity(deps.db));
   const native = nativeTerminalUseCases(useCaseDeps, terminals);
   const api: DevSessionModuleApi = {
+    invokeApi: apiInvocationUseCase(useCaseDeps),
     name: 'dev-session', ...lifecycle, ...agents, ...native, ...activity, ...workspaceLayoutUseCases(useCaseDeps, drizzleWorkspaceLayouts(deps.db), terminals),
     ...versionComparisonUseCases(useCaseDeps), workspaceStatus: workspaceStatusUseCase(useCaseDeps), publish: publishFromSessionUseCase(useCaseDeps), sendIdleReminders: remind,
     async listNativeTerminals(actor, taskId) {

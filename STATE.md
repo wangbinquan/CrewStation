@@ -115,6 +115,10 @@ T10 三步向导已落地：工作台仅留管理入口，管理总览和能力�
 
 当前 platform 告警通知器只记录日志，未按订阅投递个人消息或 Webhook；页面明确配置保存与通知送达不同，本批没有擅自增加通知投递基础设施或发送真实通知。新增 10 项回归，界面 **8 pass／101 assertions**，客户端与模块定向 **22 pass／84 assertions**；完整门禁 **953 pass／4 skip／0 fail**，957 tests、165 files、4904 assertions、76.93s；console build 618ms。未新增实浏览器与共享集群证据，完整 J4／T12 仍待验收。下一项继续 T8 结构化 API 试调；两个共享操作 blocker 与其他未完任务保留。
 
+告警批 `61b3c1d30ac3a22b83eadc3a699d32e79624e835` 已同步 main，精确 SHA CI `34758815651` 成功。T8 结构化试调的后端、客户端、Runner 与跨副本通道已接通：固定会话、当前可调目录解析、15 秒及大小限制、真实状态码／截断、旧容器明确拒绝；接口参数不拼入 shell。实际 TCP 回归发现并阻止 Bun 在读流中断后重复 POST，不能把未取得结果解释为业务未执行。
+
+新增 18 项回归；后端／客户端定向 **33 pass／145 assertions**，真实 Runner HTTP／WS **5 pass／29 assertions**；两个跨进程用例包含实际 PostgreSQL 连接注册表和两个 session 副本。完整门禁 **971 pass／4 skip／0 fail**，975 tests、169 files、5012 assertions、92.79s；console build 613ms。已有 Linux 镜像只读挂载候选源码、无外网，新增 HTTP 回归 **5 pass／29 assertions、15.22s**，并未部署到共享集群。dev-session 现为 40 个生产源码文件，后续增长先按结构规则 §11 处理。下一批接 API 详情表单与 Swagger；当前没有这两处 UI 或共享集群 J5 验收证据，两个共享操作 blocker 保留。
+
 ## 最新设计工作：工作台 UX 重设计（2026-09-13）
 
 作者要求依据原始理念全面重设计第一版原型的功能组织、UX 与使用逻辑。已对照两篇理念文章、基线与 RFC-001／002，检查本机界面与源码，完成 `proposal/rfc/RFC-003-workbench-ux-redesign/`：三件套、26 项可追溯审查／意见、开发工作台专项设计、交互附件与其验证记录。

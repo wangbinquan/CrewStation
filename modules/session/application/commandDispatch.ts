@@ -5,10 +5,12 @@ import type { RunnerHub } from './runnerHub';
 import { commandTimeout } from '../domain/commandTimeout';
 
 /** 命令派发：本副本持有连接就直接发，否则按注册表转发到持有副本；无人持有即 TaskRunner 离线。 */
-export function commandDispatch(deps: SessionUseCaseDeps, hub: RunnerHub) {
+export function commandDispatch(deps: Pick<SessionUseCaseDeps, 'registry' | 'forwarder' | 'settings' | 'clock'>, hub: Pick<RunnerHub, 'connections'>) {
   const sendLocal = (taskId: TaskId, command: RunnerCommand): Promise<unknown> | undefined => {
     const connection = hub.connections.get(taskId);
     if (!connection) return undefined;
+    // 在写入旧 Runner 的 socket 前协商，未知命令不得干扰正在运行的 CLI。
+    if (command.type === 'invokeApi' && connection.hello.capabilities.apiInvocations !== 1) throw new PlatformError('precondition', '当前开发容器不支持 API 试调；请保存工作并在容器更新后重新开启会话', { code: 'api_invocations_unavailable' });
     return new Promise<unknown>((resolve, reject) => {
       connection.pending.add({
         id: command.id, type: command.type, sentAt: deps.clock.now().getTime(), resolve,

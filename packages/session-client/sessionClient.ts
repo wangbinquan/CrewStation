@@ -1,4 +1,5 @@
 import type { RunnerCommand, RunnerEvent, TaskId } from '@crewstation/contracts';
+import { API_INVOCATION_TIMEOUT_MS } from '@crewstation/contracts';
 import { PlatformError } from '@crewstation/kernel';
 
 export interface StoredEvent { seq: number; at: string; event: RunnerEvent }
@@ -19,7 +20,7 @@ export function createSessionClient(baseUrl: string, fetchImpl: typeof fetch = f
     return body;
   };
   return {
-    sendCommand: async (taskId, command) => (await call<{ payload: unknown }>(`/internal/tasks/${taskId}/commands`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(command) })).payload,
+    sendCommand: async (taskId, command) => (await call<{ payload: unknown }>(`/internal/tasks/${taskId}/commands`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(command), ...(command.type === 'invokeApi' ? { keepalive: false, redirect: 'error' as const, signal: AbortSignal.timeout(API_INVOCATION_TIMEOUT_MS + 15_000) } : {}) })).payload,
     listEvents: async (taskId, options = {}) => {
       const params = new URLSearchParams();
       if (options.sinceSeq !== undefined) params.set('sinceSeq', String(options.sinceSeq));

@@ -31,6 +31,7 @@ beforeAll(async () => {
   if (!available) return;
   tdb = await createTestDatabase([devSessionMigrations]);
   dev = createDevSessionModule({
+    apiCatalog: { listOperations: async () => [] },
     db: tdb.db,
     environments: {
       createEnvironment: async (input) => { const env = { id: `tsk_${Bun.randomUUIDv7().replace(/-/g, '')}` as TaskId, projectId, serviceId: input.serviceId, state: 'running' as const, podName: 'task-x', connected: true, branch: input.branch, traceId: 'trace', createdAt: new Date().toISOString(), lastActivityAt: new Date('2026-09-11T00:00:00Z').toISOString(), createdBy: input.createdBy, preview: input.preview }; envs.set(env.id, env); return env; },
