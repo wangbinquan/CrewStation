@@ -1,20 +1,21 @@
 import { api } from '../../../shared/api/client';
 import { queryKeys } from '../../../shared/api/queryKeys';
 import { useApiQuery } from '../../../shared/api/useApi';
+import type { ApiClientError } from '../../../shared/api/useApi';
 
 export interface ProjectOwnership {
   readonly isAdmin: boolean;
-  /** 项目负责人（或平台管理员）：成员管理与切流按钮据此显示。 */
+  /** 当前已确认的项目负责人或平台管理员。 */
   readonly isOwner: boolean;
+  readonly unavailable: boolean;
+  readonly error: ApiClientError | null;
+  readonly reload: () => Promise<unknown>;
 }
 
-/**
- * 只用于决定是否显示写操作入口；真正的授权在服务端。
- * 因此这里判断错了也不会越权，后端返回 403 时页面照常展示原因。
- */
+/** 最新身份读取失败不沿用旧身份提供保存；保留草稿由各设置编辑器负责。 */
 export function useProjectOwnership(projectId: string): ProjectOwnership {
   const me = useApiQuery(queryKeys.me(), () => api.me.get());
-  const isAdmin = me.data?.isAdmin === true;
-  const isOwner = isAdmin || (me.data?.memberships ?? []).some((m) => m.projectId === projectId && m.role === 'owner');
-  return { isAdmin, isOwner };
+  const known = !me.isPending && !me.error, isAdmin = known && me.data?.isAdmin === true;
+  const isOwner = known && (isAdmin || (me.data?.memberships ?? []).some((m) => m.projectId === projectId && m.role === 'owner'));
+  return { isAdmin, isOwner, unavailable: !known || me.isFetching, error: me.error, reload: me.refetch };
 }

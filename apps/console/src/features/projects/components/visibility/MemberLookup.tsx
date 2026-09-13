@@ -8,9 +8,19 @@ import { Button } from '../../../../shared/ui/Button';
 import { FormField } from '../../../../shared/ui/FormField';
 import styles from './Visibility.module.css';
 
+interface MemberLookupProps {
+  readonly projectId: string;
+  readonly onSelect: (user: MemberCandidateDto) => void;
+  readonly actionKey?: string;
+  readonly disabled?: boolean;
+  readonly selectionError?: string;
+  readonly inputState?: { readonly value: string; readonly onChange: (value: string) => void };
+}
+
 /** 精确查询，不请求全局用户目录。查询失败保留输入，变更输入使旧候选立即失效。 */
-export function MemberLookup({ projectId, onSelect, actionKey = 'projects.visibility.addUser', disabled = false, selectionError }: { readonly projectId: string; readonly onSelect: (user: MemberCandidateDto) => void; readonly actionKey?: string; readonly disabled?: boolean; readonly selectionError?: string }) {
-  const t = useT(), id = useId(), [identity, setIdentity] = useState(''), [error, setError] = useState<string>();
+export function MemberLookup({ projectId, onSelect, actionKey = 'projects.visibility.addUser', disabled = false, selectionError, inputState }: MemberLookupProps) {
+  const t = useT(), id = useId(), [localIdentity, setIdentity] = useState(''), [error, setError] = useState<string>();
+  const identity = inputState?.value ?? localIdentity;
   const lookup = useApiMutation((value: string) => api.projects.memberCandidates(projectId, value));
   const search = () => {
     if (disabled || lookup.isPending) return;
@@ -21,7 +31,7 @@ export function MemberLookup({ projectId, onSelect, actionKey = 'projects.visibi
   return <div className={styles.stack}>
     <div className={styles.search}>
       <FormField label={t('projects.visibility.identity')} hint={t('projects.visibility.identityHint')} hintId={`${id}-hint`} error={fieldError} errorId={`${id}-error`}>
-        <input value={identity} disabled={disabled || lookup.isPending} aria-invalid={Boolean(fieldError)} aria-describedby={`${id}-hint${fieldError ? ` ${id}-error` : ''}`} onChange={(event) => { setIdentity(event.target.value); lookup.reset(); setError(undefined); }} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); search(); } }} />
+        <input value={identity} disabled={disabled || lookup.isPending} aria-invalid={Boolean(fieldError)} aria-describedby={`${id}-hint${fieldError ? ` ${id}-error` : ''}`} onChange={(event) => { setIdentity(event.target.value); inputState?.onChange(event.target.value); lookup.reset(); setError(undefined); }} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); search(); } }} />
       </FormField>
       <Button disabled={disabled || lookup.isPending} onClick={search}>{t('projects.visibility.findUser')}</Button>
     </div>

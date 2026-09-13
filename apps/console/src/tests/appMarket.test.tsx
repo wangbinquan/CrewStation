@@ -86,7 +86,8 @@ describe('能力市场与负责人设置真实路由', () => {
     await input(document.querySelector<HTMLInputElement>('input')!, 'lin@example.com'); await page.click('查找账号');
     await page.click('加入指定名单'); await page.click('加入指定名单');
     expect(document.querySelectorAll('ul.people li')).toHaveLength(1);
-    await page.click('取消修改'); expect(scopeSelect().value).toBe('members'); expect(f.calls.filter((call) => call.method === 'PUT')).toHaveLength(0);
+    await page.click('取消修改'); expect(scopeSelect().value).toBe('selected'); await page.click('放弃这份修改');
+    expect(scopeSelect().value).toBe('members'); expect(f.calls.filter((call) => call.method === 'PUT')).toHaveLength(0);
   });
   test('并发保存保留草稿和最新范围，显式采用最新修订后再次保存', async () => {
     const f = fixture(true); page = await renderApp(`/projects/${projectId}/settings?tab=visibility`);

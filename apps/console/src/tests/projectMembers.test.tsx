@@ -8,7 +8,7 @@ let page: Awaited<ReturnType<typeof renderApp>> | undefined;
 afterEach(() => { page?.unmount(); page = undefined; globalThis.fetch = originalFetch; });
 
 function fixture() {
-  const state = { admin: false, role: 'owner', projectState: 'active', failLookup: false, noMatch: false, failRead: false, failWrite: false, hold: undefined as Promise<void> | undefined };
+  const state = { admin: false, role: 'owner', projectState: 'active', failIdentity: false, failLookup: false, noMatch: false, failRead: false, failWrite: false, hold: undefined as Promise<void> | undefined };
   const member = { userId: memberId, name: '小林', email: 'lin@test.invalid', role: 'developer' };
   const calls: Array<{ url: URL; method: string; body?: Record<string, unknown> }> = [];
   globalThis.fetch = (async (raw, init) => {
@@ -20,7 +20,10 @@ function fixture() {
       else if (method === 'DELETE') return new Response(null, { status: 204 });
       else if (url.pathname.endsWith('/archive')) { state.projectState = 'archived'; body = { state: 'archived' }; }
       else { member.role = String(input?.role); body = { ...member, userId: input?.userId }; }
-    } else if (url.pathname === '/v1/me') body = { id: ownerId, name: '负责人甲', email: 'owner@test.invalid', isAdmin: state.admin, memberships: [{ projectId, role: state.role }] };
+    } else if (url.pathname === '/v1/me') {
+      if (state.failIdentity) { status = 503; body = { error: 'unavailable', message: '当前身份读取失败' }; }
+      else body = { id: ownerId, name: '负责人甲', email: 'owner@test.invalid', isAdmin: state.admin, memberships: [{ projectId, role: state.role }] };
+    }
     else if (url.pathname.startsWith('/v1/projects/') && !url.pathname.slice(13).includes('/')) body = { id: url.pathname.split('/').at(-1), serviceId, slug: 'demo', name: '演示应用', kind: 'DigitalWorker', ownerUserId: ownerId, state: state.projectState };
     else if (url.pathname === '/v1/users') body = { items: [{ id: memberId, name: member.name, email: member.email }] };
     else if (url.pathname.endsWith('/member-candidates')) {
@@ -39,7 +42,7 @@ async function input(node: HTMLInputElement | HTMLSelectElement, value: string) 
   await act(async () => { node.focus(); const proto = node instanceof HTMLSelectElement ? HTMLSelectElement.prototype : HTMLInputElement.prototype; Object.getOwnPropertyDescriptor(proto, 'value')!.set!.call(node, value); node.dispatchEvent(new Event(node instanceof HTMLSelectElement ? 'change' : 'input', { bubbles: true })); node.dispatchEvent(new KeyboardEvent('keyup', { key: 'a', bubbles: true })); });
   await page!.settle();
 }
-const field = (name: string) => [...document.querySelectorAll<HTMLLabelElement>('label')].find((label) => label.querySelector('span')?.textContent === name)!.querySelector<HTMLInputElement>('input')!;
+const field = (name: string) => [...document.querySelectorAll<HTMLLabelElement>('label')].find((label) => !label.closest('[hidden]') && label.querySelector('span')?.textContent === name)!.querySelector<HTMLInputElement>('input')!;
 const role = () => document.querySelector<HTMLSelectElement>('select[aria-label="成员角色"]')!;
 async function selectMember() { await input(field('完整邮箱或用户 ID'), 'lin@test.invalid'); await page!.click('查找账号'); await page!.click('选择此成员'); }
 
@@ -76,11 +79,12 @@ test('高级 ID 保留有效直输能力，首屏格式约束、字段错误和�
   const f = fixture(); page = await renderApp(`/projects/${projectId}/settings?tab=members`);
   await page.click('高级：用户 ID'); expect(page.text()).toContain('32 位小写十六进制');
   const id = field('用户 ID'); await input(id, 'usr_bad'); await page.click('添加或改角色');
-  expect(id.getAttribute('aria-invalid')).toBe('true'); expect(document.activeElement).toBe(id); expect(f.writes()).toHaveLength(0);
+  expect(id.getAttribute('aria-invalid')).toBe('true'); expect(document.activeElement === id).toBe(true); expect(f.writes()).toHaveLength(0);
   f.state.failWrite = true; await input(id, memberId); await page.click('添加或改角色');
   expect(f.writes()[0]?.body).toEqual({ userId: memberId, role: 'developer' }); expect(id.value).toBe(memberId);
   expect(f.calls.some((call) => call.url.pathname.endsWith('/member-candidates'))).toBe(false);
-  await page.navigate(`/projects/prj_${'e'.repeat(32)}/settings?tab=members`);
+  await page.requestNavigate(`/projects/prj_${'e'.repeat(32)}/settings?tab=members`);
+  expect(page.path()).toBe(`/projects/${projectId}/settings`); await page.click('放弃输入并离开');
   expect(document.querySelector<HTMLInputElement>('input')?.value).not.toBe(memberId); expect(page.text()).not.toContain('成员写入暂不可用');
 });
 
@@ -135,4 +139,59 @@ test('开通中和已归档项目不提供无效的重复归档动作', async ()
   expect(page.text()).toContain('开通中的项目暂不能归档'); expect([...document.querySelectorAll('button')].some((button) => button.textContent === '归档项目')).toBe(false);
   page.unmount(); f.state.projectState = 'archived'; page = await renderApp(`/projects/${projectId}/settings?tab=lifecycle`);
   expect(page.text()).toContain('项目已归档'); expect([...document.querySelectorAll('button')].some((button) => button.textContent === '归档项目')).toBe(false); expect(f.writes()).toHaveLength(0);
+});
+
+test('成员草稿：查找与 ID 切换保留各自输入，隐藏的 ID 不作为当前查找目标提交', async () => {
+  const f = fixture(); page = await renderApp(`/projects/${projectId}/settings?tab=members`);
+  await input(field('完整邮箱或用户 ID'), 'lin@test.invalid'); await page.click('高级：用户 ID'); await input(field('用户 ID'), memberId);
+  await page.click('按账号查找');
+  // 原 picker 切模式清掉 rawId，且重新挂载查找输入；保留输入后还必须限定当前提交方式。
+  expect(field('完整邮箱或用户 ID').value).toBe('lin@test.invalid');
+  await page.click('添加或改角色'); expect(f.writes()).toHaveLength(0); expect(field('完整邮箱或用户 ID').getAttribute('aria-invalid')).toBe('true');
+  await page.click('高级：用户 ID'); expect(field('用户 ID').value).toBe(memberId); await input(role(), 'tester');
+  await page.click('添加或改角色'); expect(f.writes()[0]?.body).toEqual({ userId: memberId, role: 'tester' });
+  await page.click('仓库'); expect(page.search().tab).toBe('repository');
+});
+
+test('成员草稿：未完成查找和已选角色都保护离开，取消导航无写入，保存后可正常离开', async () => {
+  const f = fixture(); page = await renderApp(`/projects/${projectId}/settings?tab=members`);
+  await input(field('完整邮箱或用户 ID'), 'lin@'); await page.click('仓库');
+  expect(page.search().tab).toBe('members'); await page.click('继续编辑'); expect(field('完整邮箱或用户 ID').value).toBe('lin@');
+  await selectMember(); await input(role(), 'tester'); await page.requestNavigate('/projects');
+  expect(page.path()).toContain('/settings'); expect(document.querySelectorAll('[role="alertdialog"]')).toHaveLength(1); await page.click('继续编辑');
+  expect(role().value).toBe('tester'); expect(f.writes()).toHaveLength(0);
+  await page.click('添加或改角色'); await page.click('仓库'); expect(page.search().tab).toBe('repository');
+});
+
+test('成员草稿：身份读取失败或角色撤销后保留目标和角色，暂停变更，恢复后再显式保存', async () => {
+  const f = fixture(); page = await renderApp(`/projects/${projectId}/settings?tab=members`); await selectMember(); await input(role(), 'tester');
+  f.state.failIdentity = true; await page.click('刷新成员');
+  expect(page.text()).toContain('当前身份读取失败'); expect(role().disabled).toBe(true); expect(role().value).toBe('tester'); expect(page.text()).toContain('已选择 小林');
+  await act(async () => { role().closest('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); }); await page.settle(); expect(f.writes()).toHaveLength(0);
+  f.state.failIdentity = false; f.state.role = 'developer'; await page.click('刷新成员');
+  expect(role().value).toBe('tester'); expect(role().disabled).toBe(true); await page.click('仓库'); expect(page.search().tab).toBe('members'); await page.click('继续编辑');
+  f.state.role = 'owner'; await page.click('刷新成员'); expect(role().disabled).toBe(false); expect(f.writes()).toHaveLength(0);
+  await page.click('添加或改角色'); expect(f.writes()[0]?.body).toEqual({ userId: memberId, role: 'tester' });
+});
+
+test('成员草稿：在途保存保护离开，重复 submit 不增加写入，确认离开后的成功不拉回', async () => {
+  const f = fixture(); let finish!: () => void; f.state.hold = new Promise<void>((resolve) => { finish = resolve; });
+  page = await renderApp(`/projects/${projectId}/settings?tab=members`); await selectMember();
+  await act(async () => { for (let i = 0; i < 2; i++) role().closest('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); }); await page.settle();
+  expect(f.writes()).toHaveLength(1); expect(page.text()).toContain('离开不会撤销已发送的成员变更');
+  await page.requestNavigate('/projects'); expect(page.path()).toContain('/settings'); await page.click('继续编辑'); expect(page.text()).toContain('已选择 小林');
+  await page.requestNavigate('/projects'); await page.click('放弃输入并离开');
+  await act(async () => { finish(); }); await page.settle(); expect(page.path()).toBe('/projects'); expect(f.writes()).toHaveLength(1);
+});
+
+test('成员草稿：转移确认期间失去管理员身份仍保留材料，但负责人角色本身不足以继续转移', async () => {
+  const f = fixture(); f.state.admin = true; page = await renderApp(`/projects/${projectId}/settings?tab=members`);
+  await selectMember(); await input(role(), 'owner'); await page.click('添加或改角色');
+  f.state.admin = false; await page.click('刷新成员');
+  expect(page.text()).toContain('将负责人从负责人甲转移给小林');
+  // 旧确认只检查可管理成员；管理员降为项目负责人后仍显示可提交的转移按钮。
+  const confirm = [...document.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent === '确认转移负责人')!;
+  expect(confirm.disabled).toBe(true); await page.click('确认转移负责人'); expect(f.writes()).toHaveLength(0);
+  f.state.admin = true; await page.click('刷新成员'); await page.click('确认转移负责人');
+  expect(f.writes()[0]?.body).toEqual({ userId: memberId, role: 'owner' });
 });

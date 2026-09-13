@@ -5,26 +5,22 @@ import { queryKeys } from '../../../shared/api/queryKeys';
 import { useApiQuery } from '../../../shared/api/useApi';
 import { useT } from '../../../shared/lib/useT';
 import { Button } from '../../../shared/ui/Button';
-import { Card } from '../../../shared/ui/Card';
 import { PageHeader } from '../../../shared/ui/PageHeader';
 import { QueryStatus } from '../../../shared/ui/QueryStatus';
-import { AppPresentationForm } from '../components/visibility/AppPresentationForm';
-import { AppVisibilityForm } from '../components/visibility/AppVisibilityForm';
-import { VisibilityCheck } from '../components/visibility/VisibilityCheck';
-import styles from '../components/visibility/Visibility.module.css';
+import { AppVisibilitySettings } from '../components/visibility/AppVisibilitySettings';
 
 export function AppVisibilityPage({ embedded = false }: { readonly embedded?: boolean }) {
   const t = useT(), { projectId } = useProjectScope();
   const me = useApiQuery(queryKeys.me(), () => api.me.get());
   const visibility = useApiQuery(['app-visibility', me.data?.id, projectId], () => api.projects.getAppVisibility(projectId), { enabled: Boolean(me.data) });
   const presentation = useApiQuery(['app-presentation', me.data?.id, projectId], () => api.projects.getAppPresentation(projectId), { enabled: Boolean(me.data) });
-  const { refetch: refetchVisibility } = visibility, { refetch: refetchPresentation } = presentation;
-  const reload = useCallback(() => Promise.all([refetchVisibility(), refetchPresentation()]), [refetchVisibility, refetchPresentation]);
+  const { refetch: refetchVisibility } = visibility, { refetch: refetchPresentation } = presentation, { refetch: refetchMe } = me;
+  const reload = useCallback(() => Promise.all([refetchMe(), refetchVisibility(), refetchPresentation()]), [refetchMe, refetchVisibility, refetchPresentation]);
+  const unavailable = me.isPending || visibility.isPending || presentation.isPending || me.isFetching || visibility.isFetching || presentation.isFetching || Boolean(me.error || visibility.error || presentation.error);
+  const canConfigure = Boolean(visibility.data?.canConfigure && (me.data?.isAdmin || me.data?.memberships.some((membership) => membership.projectId === projectId && membership.role === 'owner')));
   return <>
     {!embedded ? <PageHeader title={t('projects.visibility.title')} description={[t('projects.visibility.intro')]} actions={<Button onClick={() => { void reload(); }}>{t('projects.visibility.refresh')}</Button>} /> : <Button onClick={() => { void reload(); }}>{t('projects.visibility.refresh')}</Button>}
     <QueryStatus isPending={me.isPending || visibility.isPending || presentation.isPending} error={me.error ?? visibility.error ?? presentation.error} />
-    <div className={styles.stack}>{visibility.data ? <Card compact title={t('projects.visibility.scope')}><AppVisibilityForm key={projectId} projectId={projectId} saved={visibility.data} reload={reload} /></Card> : null}
-    {presentation.data && visibility.data ? <Card compact title={t('projects.visibility.presentation')}><AppPresentationForm key={projectId} projectId={projectId} saved={presentation.data} canConfigure={visibility.data.canConfigure} reload={reload} /></Card> : null}
-    {visibility.data?.canConfigure && !visibility.error ? <Card compact title={t('projects.visibility.check')}><VisibilityCheck projectId={projectId} revision={visibility.data.revision} /></Card> : null}</div>
+    {visibility.data && presentation.data ? <AppVisibilitySettings key={`${me.data?.id}:${projectId}`} projectId={projectId} visibility={visibility.data} presentation={presentation.data} canConfigure={canConfigure} unavailable={unavailable} reload={reload} /> : null}
   </>;
 }
