@@ -119,6 +119,10 @@ T10 三步向导已落地：工作台仅留管理入口，管理总览和能力�
 
 新增 18 项回归；后端／客户端定向 **33 pass／145 assertions**，真实 Runner HTTP／WS **5 pass／29 assertions**；两个跨进程用例包含实际 PostgreSQL 连接注册表和两个 session 副本。完整门禁 **971 pass／4 skip／0 fail**，975 tests、169 files、5012 assertions、92.79s；console build 613ms。已有 Linux 镜像只读挂载候选源码、无外网，新增 HTTP 回归 **5 pass／29 assertions、15.22s**，并未部署到共享集群。dev-session 现为 40 个生产源码文件，后续增长先按结构规则 §11 处理。下一批接 API 详情表单与 Swagger；当前没有这两处 UI 或共享集群 J5 验收证据，两个共享操作 blocker 保留。
 
+结构化试调通道批 `435019fcc6afbc8378e846e35e59ed7e02df45fe` 已同步 main，精确 SHA CI `34760440343` 成功。T8 详情表单和 Swagger Execute 已接上同一固定会话通道，显示真实 HTTP／容器耗时／截断；角色、会话、目录和文档变化均有明确处理。输入仅存页面内存，收起／失败保留，换操作／代理／文档／离开前确认；在途修改不会被旧响应清掉，其他操作草稿独立保留。
+
+新增 16 项回归，实际路由与安装的 Swagger bundle 定向 **19 pass／0 fail、119 assertions**；修复了 React 版本混用、响应展示与防抖输入生命周期问题。完整门禁 **987 pass／4 skip／0 fail**，991 tests、172 files、5118 assertions、97.83s，console build 521ms。尚无新的实浏览器／共享集群证据，没有执行两个被拦截的共享操作，J5／T12 与其余 RFC 内容继续。
+
 ## 最新设计工作：工作台 UX 重设计（2026-09-13）
 
 作者要求依据原始理念全面重设计第一版原型的功能组织、UX 与使用逻辑。已对照两篇理念文章、基线与 RFC-001／002，检查本机界面与源码，完成 `proposal/rfc/RFC-003-workbench-ux-redesign/`：三件套、26 项可追溯审查／意见、开发工作台专项设计、交互附件与其验证记录。

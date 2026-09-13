@@ -16,6 +16,7 @@ export function CatalogPage({ embedded = false, proxy, operation, onClearContext
   const project = useApiQuery(queryKeys.project(projectId), () => api.projects.get(projectId));
   const me = useApiQuery(queryKeys.me(), () => api.me.get());
   const serviceId = project.data?.serviceId;
+  const canDevelop = !me.error && (me.data?.isAdmin === true || me.data?.memberships.some((item) => item.projectId === projectId && (item.role === 'owner' || item.role === 'developer')) === true);
   return (
     <>
       {!embedded ? <PageHeader title={t('catalog.title')} description={[t('catalog.line1'), t('catalog.line2'), t('catalog.line3')]} /> : null}
@@ -25,7 +26,7 @@ export function CatalogPage({ embedded = false, proxy, operation, onClearContext
         <EmptyState title={t('catalog.service.missingTitle')} description={t('catalog.service.missingDescription')} />
       ) : null}
       {!me.error && me.data?.isAdmin === true ? <p><Link to="/admin/capabilities" search={{ tab: 'api', projectId, proxy, operation }}>{t('catalog.admin.openManagement')}</Link> · <Link to="/admin/requests" search={{ tab: 'api', projectId, state: 'pending' }}>{t('catalog.admin.openRequests')}</Link></p> : null}
-      {serviceId !== undefined ? <CatalogContent key={`${projectId}:${proxy ?? ''}:${operation ?? ''}`} projectId={projectId} serviceId={serviceId} proxy={proxy} operation={operation} onClearContext={onClearContext} /> : null}
+      {serviceId !== undefined ? <CatalogContent key={`${projectId}:${proxy ?? ''}:${operation ?? ''}`} projectId={projectId} serviceId={serviceId} canDevelop={canDevelop && !project.error} proxy={proxy} operation={operation} onClearContext={onClearContext} /> : null}
     </>
   );
 }

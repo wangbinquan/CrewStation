@@ -12,6 +12,7 @@
 
 .picker {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--cs-space-2);
   margin: var(--cs-space-3) 0;
@@ -22,6 +23,8 @@
 }
 
 .select {
+  min-width: 0;
+  max-width: 100%;
   padding: 6px var(--cs-space-2);
   border: 1px solid var(--cs-color-border);
   border-radius: var(--cs-radius-sm);
@@ -30,24 +33,30 @@
   font: inherit;
 }
 
+.controls { display: flex; flex-wrap: wrap; gap: var(--cs-space-2); }
+
 /*
  * Swagger UI 自带的是浅色配色（深色要 html.dark-mode，工作台不加这个类）。
  * 用 color-scheme 固定为浅色并取系统色，深色模式下文字才不会和底色同色；不写裸色值。
  */
 .swagger {
+  min-width: 0;
+  max-width: 100%;
   margin-top: var(--cs-space-3);
   border: 1px solid var(--cs-color-border);
   border-radius: var(--cs-radius-md);
   color-scheme: light;
   background: Canvas;
   color: CanvasText;
-  overflow: hidden;
+  overflow: auto;
 }
 
 .swagger :global(.swagger-ui .topbar) {
   display: none;
 }
 
-.swagger :global(.swagger-ui .try-out) {
-  display: none;
-}
+.swagger :global(.swagger-ui .wrapper) { padding: 0 var(--cs-space-2); }
+.swagger :global(.swagger-ui .info) { margin: var(--cs-space-3) 0; }
+.swagger :global(.swagger-ui .scheme-container) { margin: var(--cs-space-2) 0; padding: var(--cs-space-2) 0; }
+.swagger :global(.swagger-ui .opblock .opblock-section-header) { padding: var(--cs-space-2); }
+.swagger :global(.swagger-ui pre) { max-height: 260px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }

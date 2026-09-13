@@ -416,3 +416,17 @@ TaskRunner 从既有 CS_INTERNAL_API_BASE 发出原生 HTTP 请求，沿服务�
 最终 `bun run check` **971 pass／4 skip／0 fail**，975 tests、169 files、5012 assertions、92.79s；console build 613ms。跳过项与前批相同。另以已有 Linux 任务镜像 `sha256:341fa1b05abfaf5f15824fff89f374ecc7c98cb7f0cbdc4b4f0e75636274f665` 只读挂载本批源码、network none，HTTP／WS 回归 **5 pass／29 assertions、15.22s**；包含原生 Bun 的截断、超时与断线不重发。首次镜像验收因只挂载部分新契约缺少 activity 入口失败；补全只读契约挂载后通过，没有把缺模块当作代码成功或部署证据。
 
 本批尚未接详情表单与 Swagger Execute，不宣称 T8 已完成。跨进程自动测试中的目录与目标 HTTP 是夹具；共享集群中的真实源 Pod 身份／放行表、J5／T12 仍待验收。两个被拒绝的共享操作未执行，原 QA 会话保留。
+
+发布记录：`435019fcc6afbc8378e846e35e59ed7e02df45fe` 已同步 main；[精确 SHA CI](https://github.com/wangbinquan/CrewStation/actions/runs/34760440343) 成功。
+
+## 第二十八批：T8 详情试调、Swagger Execute 与输入生命周期
+
+项目开发资源中的已授权操作新增试调表单：原始路径值、JSON 查询／请求头、可选文本正文；全部约束与字段错误在表单显示，打开或恢复后聚焦输入。开始编辑时核对当前项目的运行中会话并固定 taskId；会话替换、读取失败、目录变化或失去开发权均保留输入并暂停发送，重新检查和绑定是明确动作。响应严格匹配 taskId／operationKey，展示真实 HTTP 状态、容器耗时、文本视图及独立截断标记；失败不清空输入，未知回执不冒充业务未执行。请求进行中防止重复发送，离开时说明业务请求不会撤销，迟到结果不把用户带回原页。
+
+实际 Swagger 5.32.15 的 Try it out 先绑定会话，Execute 使用自身参数序列化后调用同一后端接口。目标地址、路径和方法与当前可调操作核对，拒绝无法表达的文件／form／高级路径输入；目标服务没有浏览器直连。响应在当前 Swagger 操作内也明确会话、容器耗时与截断。Bundle 按需加载，扩展使用它注入的 React 18.3.1，避免工作台 React 19 元素导致真实操作区渲染失败；使用原始生成请求展示，避免缺少浏览器拦截器结果造成响应区崩溃。扩展点对照 [Swagger 源码](https://github.com/swagger-api/swagger-ui/tree/v5.32.15/src/core) 并用实际安装 bundle 验证。
+
+详情和各 Swagger 操作分别记录草稿版本，共用一份离开确认。成功响应只清除该操作已发送的版本；其他操作、详情、在途继续输入都保留保护。先红回归复现了参数防抖未提交时，旧响应清除新输入标记并允许直接离开的故障；改为捕获原生输入事件后通过。收起保留，换操作／代理／重新加载前可取消；后台文档变化或读取失败保留旧文档与输入并暂停 Execute。身份更新调整 Swagger 写入口，恢复后不丢输入。目录卡片和文档收紧间距，文档与长响应使用内部滚动；本批未取得新的实浏览器尺寸测量。
+
+新增 16 项回归：3 项转换／输入边界、6 项真实路由表单、7 项实际 Swagger 组件交互。含真实序列化、业务 422、截断、旧会话、目录错误、错回执、测试者、权限刷新、文档／代理切换、跨操作输入、在途修改与重复 Execute。定向 **19 pass／0 fail、119 assertions**（含既有申请回归）。happy-dom 为 Location 增加与浏览器一致的可枚举字段，点击夹具补实际 focus／blur 过程；未替换 Swagger 序列化器或 Execute。最终 `bun run check` **987 pass／4 skip／0 fail**，991 tests、172 files、5118 assertions、97.83s；console build 521ms。跳过项与前批相同，本批没有改运行时，不重复 Linux 原生验收。构建的 Swagger 独立 chunk 按需加载；Node 专用 absolutePath 导出产生外置 path 提示，调用界面未使用它，输出的 CommonJS 互操作已核对。
+
+本批仍不是实浏览器或共享集群 J5／T12 验收。没有更新共享服务、迁移共享数据库、首次 prod 切流或重启／释放 QA 会话；两个被拦截操作和其他 RFC 任务仍保留。

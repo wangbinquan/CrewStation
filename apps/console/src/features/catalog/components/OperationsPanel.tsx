@@ -24,10 +24,11 @@ export interface OperationsPanelProps {
   readonly proxy?: string;
   readonly operation?: string;
   readonly onClearContext?: () => void;
+  readonly onInvoke?: (operation: ApiOperationDto) => void;
 }
 
 /** 操作列表与筛选；写操作的失败原因原样显示，不吞掉服务端的说明。 */
-export function OperationsPanel({ operations, requests, loading, loadError, actions, proxy, operation, onClearContext }: OperationsPanelProps): ReactElement {
+export function OperationsPanel({ operations, requests, loading, loadError, actions, proxy, operation, onClearContext, onInvoke }: OperationsPanelProps): ReactElement {
   const t = useT();
   const [filter, setFilter] = useState<OperationFilterValue>(INITIAL_FILTER);
   const proxies = useMemo(() => [...new Set(operations.map((operation) => operation.proxy))].sort(), [operations]);
@@ -35,7 +36,7 @@ export function OperationsPanel({ operations, requests, loading, loadError, acti
   const visible = useMemo(() => operations.filter((item) => (!operation || item.key === operation) && (!proxy || item.proxy === proxy) && matches(item, filter)), [operations, filter, operation, proxy]);
   const writeError = actions.requestAccess.error;
   return (
-    <Card title={t('catalog.operations.title')}>
+    <Card compact title={t('catalog.operations.title')}>
       {operation || proxy ? <p>{t('catalog.context')} <code>{operation ?? proxy}</code> <Button onClick={onClearContext}>{t('catalog.clearContext')}</Button></p> : null}
       <OperationFilters value={filter} proxies={proxies} count={visible.length} onChange={setFilter} />
       <QueryStatus
@@ -48,7 +49,7 @@ export function OperationsPanel({ operations, requests, loading, loadError, acti
         emptyDescription={t('catalog.operations.emptyDescription')}
       />
       {writeError ? <ActionNote tone="error">{t('catalog.error.write', { message: errorMessage(writeError) })}</ActionNote> : null}
-      {visible.length > 0 ? <OperationsTable operations={visible} renderActions={(item) => <OperationActions operation={item} pendingRequest={pendingByKey.get(item.key)} actions={actions} />} /> : null}
+      {visible.length > 0 ? <OperationsTable operations={visible} renderActions={(item) => <><OperationActions operation={item} pendingRequest={pendingByKey.get(item.key)} actions={actions} />{onInvoke && item.granted ? <Button disabled={loading || !!loadError} onClick={() => onInvoke(item)}>{t('catalog.invoke.open')}</Button> : null}</>} /> : null}
     </Card>
   );
 }
