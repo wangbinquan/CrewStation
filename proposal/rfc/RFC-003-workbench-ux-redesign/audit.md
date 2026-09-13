@@ -63,8 +63,29 @@
 
 | 编号 | 源码事实 | 对作者要求的影响 |
 |---|---|---|
-| UX-17 | `packages/agent-drivers/drivers/claudeCode/argv.ts:21–25` 使用 headless JSON；`runtimes/task/src/terminal/terminalSupervisor.ts:47–66` 多 PTY 启动的是普通 shell | 现有多对话＋单终端不能等同于一键多个原生 CLI；需新增平台配置的 CLI 终端启动 |
+| UX-17 | `packages/agent-drivers/drivers/claudeCode/argv.ts:21–25` 使用 headless JSON；`runtimes/task/src/terminal/terminalSupervisor.ts:47–66` 多 PTY 启动的是普通 shell | 现有多对话＋单终端不能等同于多个原生 CLI；需新增平台配置的 CLI 终端启动 |
 | UX-18 | `apps/console/src/features/dev-session/model/terminalSession.ts:61–67` 在组件 dispose 时 closeTerminal | 独立预览切页不能直接沿用卸载终端的生命周期，需分开 detach 显示与 stop 进程 |
 | UX-19 | `modules/scm/application/queryRepository.ts:20–30` 从 GitLab 列远端分支，DTO 仅有 behind；`packages/contracts/api/devSession.ts:25–32` | 无容器当前工作树的双向提交／文件比较，现有分支落后数不能满足生产版本差距要求 |
 
 这三项的具体实现与验收见 [development-workspace.md](./development-workspace.md)，是对 J2 的必要修订。
+
+## 7. 密度、页签与状态的补充核验（2026-09-13）
+
+本节区分实际源码与对上一稿附件 `a580712` 的评审，不把附件模拟行为当成产品事实。
+
+| 编号 | 事实／来源 | 设计修订 |
+|---|---|---|
+| UX-20 | `packages/contracts/api/data.ts:21–29` 三种数据模式；`modules/data/application/taskBindings.ts:9, 63–68` 是三个可并存连接；`proposal/design.md:167` 关闭任务不删除数据资源 | 使用开发数据／生产数据只读／生产数据读写；不称关闭即清除的临时数据，不把选择模式当自动切库 |
+| UX-21 | 上版附件窗口标题是“已连接”；`packages/contracts/taskrunner/agentEvents.ts:5–7` 的结构化 permission／status／completed 尚不能证明原生 PTY 有同样语义 | 分开连接、进程和轮次；补原生状态通道，后台页签需处理／完成提示及正确定位 |
+| UX-22 | 作者指出上版附件留白过多，最新取消一次启动三窗，要求逐个启动、页签与可调排布 | 合并上下文与版本状态，移除数量表单／大型等待占位；新增个人页签、分屏比例、跨页签移动与保留进程 |
+
+## 5. 作者追加的市场、会话入口与品牌要求
+
+| 编号 | 新依据／核验 | 设计响应 |
+|---|---|---|
+| UX-23 | 作者明确能力接入仅归管理员；此前附件把它放在项目导航 | 移到管理空间；消费者文档与试调用开发资源承接 |
+| UX-24 | 作者要求市场列出获准查看的应用、负责人配置可见性；queryProjects.ts:24–43 当前只支持管理员／成员项目查询，ProjectDto 无市场字段 | 单列 T16，project 持有可见性，capabilities 聚合应用摘要，见 market-visibility.md |
+| UX-25 | 附件“对话模式”连接另一组独立消息与编号，未说明并非当前 CLI 的展示模式 | 去掉模式切换；旧会话从会话菜单独立进入，CLI 现场保留 |
+| UX-26 | 作者要求直观且有记忆点的系统图标 | 协作舱 C 形＋并行轨道＋终端箭头，交付双色／单色 SVG，见 brand-design.md |
+
+这些是作者意见与附件问题，不将它们伪装成生产界面实跑证据。

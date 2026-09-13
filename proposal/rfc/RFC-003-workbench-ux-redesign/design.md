@@ -17,7 +17,7 @@
 
 ### 1.1 稳定的对象上下文
 
-租户全局是数字人项目列表，项目内固定六个入口。页头只保留项目名称、当前页、主要动作，slug 为辅助定位。切换项目是显式动作，不以浏览器本地缓存推断成员权限。
+工作台全局有能力市场与数字人项目列表，项目内固定五个入口。页头只保留项目名称、当前页、主要动作，slug 为辅助定位。切换项目是显式动作，不以浏览器本地缓存推断成员权限。
 
 `projectId`、当前路由与有效 query 决定页面上下文；API 缓存键至少含 projectId／serviceId，按实际查询另含 taskId／releaseId／slot。切换项目清除前项目的异步动作目标；迟到响应不能覆盖当前项目。技术详情包括完整 ID、SHA、镜像、容器、命名空间与原始错误。
 
@@ -25,27 +25,32 @@
 
 | URL | 导航位置 | 说明 |
 |---|---|---|
-| `/` | 数字人项目 | 列表，搜索／筛选在 query 中 |
+| `/`、`/market` | 能力市场 | 已授权应用列表，名称／用途搜索；详见市场规格 |
+| `/market/$projectId` | 应用详情 | 再次校验可见性，打开真实正式应用 |
+| `/projects` | 数字人项目 | 原列表保留，服务应用建设者 |
 | `/projects/$projectId` | 概览 | 带条件主动作与状态摘要 |
-| `/projects/$projectId/dev-session` | 开发 | 保留 URL；`view=cli|preview|split|code|diff|conversation`，`agent=`、`file=`、`target=prod|preview` 可定位；默认 cli |
+| `/projects/$projectId/dev-session` | 开发 | 保留 URL；`view=cli|preview|split|code|diff`，`agent=`、`file=`、`target=prod|preview` 可定位；默认 cli |
 | `/projects/$projectId/release` | 发布与上线 | 保留 URL；`release=` 选版本，`source=session|repository` 标识来源 |
 | `/projects/$projectId/operations` | 运行与诊断 | `tab=health|logs|deliveries|trace`，按 tab 校验对象参数 |
-| `/projects/$projectId/capabilities` | 能力接入 | `tab=api|events|data|runtime|guide`，`operation=` 可定位 API |
-| `/projects/$projectId/settings` | 项目设置 | `tab=members|config|repository|lifecycle`；`env=development|production` |
-| 旧 `/catalog` | → 能力接入 `tab=api` | 保留 proxy／operation 等有效参数 |
+| 旧 `/projects/$projectId/capabilities` | → 项目设置的开发资源 | 保留各文档／消费能力和 operation 参数；不渲染管理接入 |
+| `/projects/$projectId/dev-session/conversations` | 历史对话会话 | 旧版结构化 Agent 独立页面，可返回原 CLI 布局 |
+| `/projects/$projectId/settings` | 项目设置 | `tab=members|visibility|config|resources|repository|lifecycle`；`env=development|production` |
+| 旧 `/catalog` | → 项目设置 `tab=resources&resource=api` | 保留 proxy／operation 等有效参数 |
 | 旧 `/events` | → 运行诊断 `tab=deliveries` | 保留同屏“查看订阅”入口；有 subscription 参数则定位相应对象 |
 | 旧 `/logs` | → 运行诊断 `tab=logs` | 保留 source、slot、taskId、releaseId、since、limit |
 | 旧 `/config` | → 项目设置 `tab=config` | 保留 env；无 env 默认 development |
+
+旧开发链接 `view=conversation` 重定向到独立历史对话页面，保留原 agent 参数并明确历史对象。
 
 兼容重定向使用 replace，浏览器返回不会在旧／新 URL 之间循环。参数无效时回到该页有效默认值并保留项目，不把未知 releaseId 当成最新发布。
 
 ### 1.3 管理空间
 
-管理总览保留 `/admin`。原有八页路径继续可达，新增 `/admin/projects`、`/admin/api-catalog`、`/admin/requests`。出站待办与 API 申请可在申请页分栏查看，规则维护留在原 `/admin/egress`。
+管理总览保留 `/admin`。原有八页路径继续可达，新增 `/admin/projects`、`/admin/capabilities`、`/admin/requests`。出站待办与 API 申请可在申请页分栏查看，规则维护留在原 `/admin/egress`。
 
-接入容器入口保持 `/admin/integrations`，详情采用 `/admin/integrations/$projectId`，后缀 dev-session／release／operations／settings 对应复用的业务页面。由 app 路由装配注入 projectId 与空间上下文，feature 不硬编码必须在租户 projectRoute 下运行。
+能力接入入口为 `/admin/capabilities?tab=integrations|api|events`；旧 `/admin/integrations` 与 `/admin/api-catalog` 保留重定向到对应分类。接入容器详情采用 `/admin/integrations/$projectId`，后缀 dev-session／release／operations／settings 对应复用的业务页面。由 app 路由装配注入 projectId 与空间上下文，feature 不硬编码必须在租户 projectRoute 下运行。
 
-访问旧 `/projects/$projectId` 下的接入容器时，管理员跳到管理详情；普通用户遵守现有拒绝行为。原来租户页里的平台开放策略按钮迁到管理 API 目录，当前项目目录提供带 operation 上下文的管理链接。
+访问旧 `/projects/$projectId` 下的接入容器时，管理员跳到管理详情；普通用户遵守现有拒绝行为。原来租户页里的平台开放策略按钮迁到管理 API 目录，管理员可从开发资源的文档上下文定位管理目录，普通开发者无该管理入口。
 
 ## 2. 页面布局与交互规格
 
@@ -76,7 +81,11 @@
 
 顶部常驻容器实际 branch／HEAD 与生产实际 Release／SHA 的对比，分别显示待上线提交、缺少生产提交、未提交文件，远端同步信息另列。点击进入提交与文件 patch；同 SHA 但存在工作区改动不能称为完全一致。
 
-默认两列 CLI 平铺，数量可选，一次点击批量启动；首条任务可空。每个窗口是独立 PTY 与 Agent 进程，支持原生输入、Ctrl+C、放大、收起／恢复和显式结束，所有窗口默认共用工作树。数量由资源约束决定，不在 UI 固定只能两个。既有结构化对话模式保留独立入口。
+每次点击“＋ CLI”只启动一个原生 PTY／Agent，首条任务可空；不再提供批量数量。工作页签可新建、命名、关闭，单页签支持横排、纵排、网格和分隔线调整，CLI 可排序／跨页签移动。每页签保存自己的布局，全部 CLI 共用工作树。原生输入、Ctrl+C、放大、收起／恢复、显式结束均保留。旧版结构化会话改由会话菜单的“历史对话会话”独立进入；不再提供“对话模式”切换，也不把历史 L-id 当成当前 CLI AgentId。
+
+开发模式默认紧凑：上下文与版本各一行，工作页签与当前页工具栏紧接其后，终端区域成为主体。桌面四窗 2×2，首屏可见各自输出与输入；不用大标题、重复状态卡片、巨大等待占位。数据访问三类名称、共享范围与接入状态见专项设计 §8。
+
+每个 CLI 区分连接、进程生命周期与本轮执行状态；执行中、需人工处理、本轮完成、已结束明确呈现。页签聚合状态，顶部 Agent 动态跨项目页保留，点击定位而不自动确认／答复。原生状态通道、个人未读与去重契约见专项设计 §9。
 
 实时预览可占据独立工作视图、与 CLI 并排或通过真实地址在另一浏览器页签打开。预览反映已保存的工作树文件；是否热更新依赖实际开发命令。代码保存继续带 expectedVersion。预览失败仅影响预览；代码、CLI 和日志继续可用。
 
@@ -109,23 +118,17 @@ detach 显示与结束进程分开。关闭浏览器、切换工具、跳转发�
 
 停止跟随只停止前端定时刷新；新日志到达时用户可选择回到底部。日志尾部数据不能伪装为全历史。告警订阅与 trace 回放使用已有 HTTP 接口补齐客户端；不新增业务任务编排界面。事件投递详情包含类型、状态、attempt、最近错误、trace、重试结果及关联订阅。
 
-### 2.6 能力接入
+### 2.6 能力市场、开发资源与管理接入
 
-按任务分类，不按后端模块分类：
+能力市场是全局应用入口，项目侧移除“能力接入”。市场显示所有有权查看的应用、负责人、用途和正式状态；负责人维护市场可见性。具体范围、列表／详情一致性与接口见 [market-visibility.md](./market-visibility.md)。
 
-| 分类 | 内容与操作 |
-|---|---|
-| 内部 API | 已可调用／可申请／申请中；按摘要搜索；详情同处展示文档、示例、申请与试调 |
-| 事件 | 可订阅类型、已发布的订阅、处理路径、Manifest 示例；查看投递定位运行诊断 |
-| 数据 | 开发数据、生产共享资源、访问模式与申请状态；会话绑定审批入口 |
-| 算力与配额 | 管理员定义的档位说明、任务并发占用、服务／任务套餐；不展示租户无权获知的驱动／模型 |
-| 平台约定 | 身份、配置注入、业务子任务 I/O 契约、MCP 地址与可复制示例 |
+项目设置的开发资源承接已获准 API 文档／申请／试调、事件订阅、数据说明、档位／配额与平台约定。API 详情保留 projectId／serviceId／operationKey，试调继续使用当前开发会话。
 
-API 详情上下文包含 projectId／serviceId／operationKey，申请成功更新原位置为“待管理员处理”。审核拒绝展示理由和修改申请的实际路径。试调需要已经连接的开发会话，提交前展示方法、路径、参数与请求体；收到的响应才显示成功。不从浏览器直接代替服务身份调用。
+管理员“能力接入”包含接入容器、接口开放策略和事件来源，供给与审批动作只在管理空间出现。市场可见性不等于 APIGrant。
 
 ### 2.7 项目设置与管理空间
 
-项目设置分成员、配置、仓库、生命周期。成员按可辨识名字与已注册账号匹配，角色含完整说明；保留开发者、负责人、preview 测试者。配置默认开发组，切生产组明确显示影响的正式与待验证版本；保存成功同时显示生效条件，不声称已注入正在运行的进程。
+项目设置分成员、应用可见性、配置、开发资源、仓库、生命周期。成员按可辨识名字与已注册账号匹配，角色含完整说明；保留开发者、负责人、preview 测试者。配置默认开发组，切生产组明确显示影响的正式与待验证版本；保存成功同时显示生效条件，不声称已注入正在运行的进程。
 
 创建数字人／接入容器按对象分入口，固定相应 kind 范围，模板与套餐从真实目录选择。第一步名称／负责人，第二步模板／资源，第三步检查与创建；回上一步保留输入，服务器字段错误映射回原字段。开通状态只展示已有事实，未提供阶段明细时写“开通中”，不画全绿的假步骤。
 
@@ -205,9 +208,13 @@ dev-session L5 可依赖 api-catalog L3 的公开操作查询，不经深路径�
 
 ### 4.7 原生 CLI 与工作树版本对比
 
-新增接口和协议详见 [development-workspace.md §5–6](./development-workspace.md#5-cli-启动恢复与失败契约)。CLI 启动不能直接复用现有 headless JSON argv；需补原生终端启动计划、幂等启动名册、detach／attach、显式结束与有界回放。版本比较固定生产实际 SHA 和容器当前 HEAD，覆盖双方独有提交、工作树文件、未推送以及未知／过期状态。
+新增接口和协议详见 [development-workspace.md §5–6](./development-workspace.md#5-cli-启动恢复与失败契约)。CLI 启动不能直接复用现有 headless JSON argv；需补原生终端启动计划、幂等名册、detach／attach、显式结束与有界回放，以及逐轮执行／人工介入／完成状态。个人布局与动态未读契约另见专项设计 §2.2、§9。版本比较固定生产实际 SHA 和容器当前 HEAD，覆盖双方独有提交、工作树文件、未推送以及未知／过期状态。
 
 这两项是满足本轮用户需求的实现依赖，不可只做多窗口 CSS 或把远端 BranchDto 换个标题便标为完成。保留业务 Agent oneshot／interactive 契约和 RFC-001 的档位归属。
+
+### 4.8 能力市场与可见性
+
+新增应用展示与可见性、分页、详情、负责人更新与效果检查见 [market-visibility.md §5](./market-visibility.md#5-接口和代码落位待实现)。这是 T16 的真实接口依赖，不能把成员项目列表当成市场。
 
 ## 5. 代码落位与依赖
 
@@ -216,19 +223,19 @@ dev-session L5 可依赖 api-catalog L3 的公开操作查询，不经深路径�
 | 位置 | 责任 |
 |---|---|
 | `apps/console/src/app/router/`、`app/layout/` | 两个空间的路由装配、分组导航、旧路径重定向、项目上下文注入 |
-| `features/projects/` | 列表、开通与概览的项目行为；管理创建入口由 app 装配导出的页面 |
-| `features/dev-session/` | 会话准备、多 CLI 启动与窗口注册、对话兼容入口、独立／并排预览、编辑器、工作树对生产比较与释放确认 |
+| `features/projects/` | 列表、开通、概览和应用可见性的项目行为；管理创建入口由 app 装配导出的页面 |
+| `features/dev-session/` | 会话准备、逐个 CLI 启动、个人页签／布局、逐窗执行状态与动态定位、数据访问文案、对话／预览／代码与生产比较 |
 | `features/release/` | 唯一发布 UI 状态模型、两种来源表单、版本详情、切流／回退 |
 | `features/logs/`、`features/events/` | 各自拥有健康日志追溯／事件投递与订阅组件；app 装配二级路由，不互相深 import |
-| `features/capabilities/`、`features/catalog/`、`features/config/` | 各自负责说明／API 发现与调试／配置；由 app 装配目标导航 |
+| `features/capabilities/`、`features/catalog/`、`features/config/` | 各自负责应用市场及说明／API 消费和管理员策略／配置；由 app 装配目标导航 |
 | `features/admin/` | 管理总览、申请、套餐／算力／接入目录的入口 |
 | `shared/ui/` | 无业务含义的 Tabs、SplitPane、ContextBar、Disclosure、FieldError、ProgressSteps 等公共原语 |
 | `shared/api/` | 统一客户端、query keys、作用域读取与缓存封装；不搬进服务端领域决策 |
 | `app/theme/tokens.css` | 唯一主题、颜色、密度与尺寸变量来源 |
 | `packages/contracts/`、`packages/api-client/` | 新增跨进程形状与方法；既有生成目录不手改 |
-| `modules/dev-session/` L5 | 工作区状态／部署比较、CLI 启动名册与幂等请求、能力调用；HTTP 只翻译协议，执行通过 port |
-| `modules/project/` L2、`modules/identity/` L1 | 成员候选和项目基础分页的领域归属 |
-| `modules/capabilities/` L6 | 授权项目摘要聚合，调用各模块根导出的查询 |
+| `modules/dev-session/` L5 | 工作区／部署比较、CLI 名册与轮次状态投影、个人布局和已读游标；HTTP 翻译协议，执行通过 port |
+| `modules/project/` L2、`modules/identity/` L1 | 成员候选、市场展示资料／可见范围和项目基础分页的领域归属 |
+| `modules/capabilities/` L6 | 授权项目及市场应用摘要聚合，调用各模块根导出的查询 |
 | `runtimes/task/` | 原生 CLI PTY 与进程监督、终端注册与恢复、Git 工作树读取、API 请求原语；继续遵守依赖白名单 |
 | `packages/agent-drivers/` | 与现有 headless 计划并存的原生 CLI 启动计划，权限／MCP／模型注入沿既有平台契约 |
 | `modules/session/` | 终端输入与 resize 的当前附着控制、按 terminalId 流转与有界恢复；不拥有工作树调度 |
@@ -239,9 +246,10 @@ dev-session L5 可依赖 api-catalog L3 的公开操作查询，不经深路径�
 
 ## 6. 通用交互与视觉系统
 
+- 品牌使用 [协作舱标识](./brand-design.md)，双色与单色资产同源；正式 favicon／登录／顶栏一致。
 - 字体沿用系统中文字体；正文 14px，次级信息 12px，页面标题 22px，行高适合中英混排。以上为待实施设计值。
 - 间距沿用 4／8／12／16／24／32，圆角以 6／8 为主。主动作使用现有蓝色，不用彩色状态装饰空内容。
-- 桌面全局导航约 208px，开发模式可收窄；表格行约 48–56px，轻边界而非每一段一个大卡片。
+- 桌面全局导航约 208px，开发模式约 156px，主区域内边距 8–12px、窗口间隙 8px；终端标题与工具栏约 28–34px，四窗时复用一屏。普通业务表格行约 48–56px，开发页优先终端密度。
 - 所有表单初始展示格式／长度／范围／生效条件；提交时同时展示各无效字段，聚焦首个错误。只用禁用按钮不是完整验证反馈。
 - 新按钮／页签／确认区先扩展 shared 既有组件，不能在 feature 中另写一套同义组件。CSS 使用产品 tokens。
 - 列表使用真实 table 与表头；选择用语义原生控件；键盘可到达所有动作。图标只辅助文字，不依赖 hover 获取必要信息。
