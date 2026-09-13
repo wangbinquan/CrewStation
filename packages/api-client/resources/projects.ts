@@ -1,4 +1,5 @@
 import type { AppPresentationDto, AppVisibilityCheckDto, AppVisibilityDto, ManifestKind, MemberCandidateDto, MemberDto, ProjectDto, QuotaDto, SetAppPresentationRequest, SetAppVisibilityRequest, SetMemberRequest, SetQuotaRequest } from '@crewstation/contracts';
+import type { ProjectPage, ProjectPageQuery } from '@crewstation/contracts';
 import type { Transport } from '../httpTransport';
 import type { ItemsPage } from '../itemsPage';
 import type { CreateProjectInput } from '../requestInputs';
@@ -11,6 +12,7 @@ export interface ProjectsResource {
    * 管理空间的接入容器页传 `['APIProxy', 'EventProducer']`；省略即不筛。
    */
   list(kinds?: readonly ManifestKind[]): Promise<ItemsPage<ProjectDto>>;
+  page(query?: Partial<ProjectPageQuery>): Promise<ProjectPage>;
   /** POST /v1/projects（管理员代建并指定负责人）。 */
   create(input: CreateProjectInput): Promise<ProjectDto>;
   /** GET /v1/projects/:projectId */
@@ -39,6 +41,7 @@ export function projectsResource(transport: Transport): ProjectsResource {
   const base = (projectId: string) => `/v1/projects/${segment(projectId)}`;
   return {
     list: (kinds) => transport.request<ItemsPage<ProjectDto>>('GET', '/v1/projects', kinds === undefined ? {} : { query: { kind: kinds.join(',') } }),
+    page: (query = {}) => transport.request('GET', '/v1/projects/page', { query: { ...query, kind: query.kind?.join(',') } }),
     create: (input) => transport.request<ProjectDto>('POST', '/v1/projects', { body: input }),
     get: (projectId) => transport.request<ProjectDto>('GET', base(projectId)),
     archive: (projectId) => transport.request<ProjectDto>('POST', `${base(projectId)}/archive`),

@@ -1,4 +1,5 @@
 import type {
+  ProjectPage, ProjectPageEntry, ProjectPageQuery,
   ComputeProfileDto, ComputeProfileSummaryDto, Actor, CreateProjectRequest, ListProjectsQuery, ManifestKind, MemberDto, ProjectDto, ProjectId, ProjectState, QuotaDto, ServiceDto,
   ServiceId, ServicePlanDto, SetMemberRequest, SetQuotaRequest, TaskProfileDto, UserId,
   AppVisibilityDto, AppVisibilityCheckDto, SetAppVisibilityRequest, AppPresentationDto, SetAppPresentationRequest, MemberCandidateDto, MarketAppsQuery, MarketAppDto,
@@ -49,6 +50,9 @@ export interface ProjectModuleApi {
   createProject(actor: Actor, input: CreateProjectRequest): Promise<ProjectDto>;
   getProject(actor: Actor, projectId: ProjectId): Promise<ProjectDto>;
   listProjects(actor: Actor, query?: ListProjectsQuery): Promise<ProjectDto[]>;
+  listProjectPage(actor: Actor, query: ProjectPageQuery): Promise<ProjectPage>;
+  readProjectPageEntries(actor: Actor, ids: readonly ProjectId[]): Promise<ProjectPageEntry[]>;
+  getProjectPageEntry(actor: Actor, projectId: ProjectId): Promise<ProjectPageEntry>;
   listMarketListings(actor: Actor, query: MarketAppsQuery): Promise<{ items: MarketListing[]; nextCursor?: string }>;
   getMarketListing(actor: Actor, projectId: ProjectId): Promise<MarketListing>;
   getAppVisibility(actor: Actor, projectId: ProjectId): Promise<AppVisibilityDto>;
@@ -63,6 +67,7 @@ export interface ProjectModuleApi {
   resolveServiceIdentity(identity: string): Promise<ResolvedService | undefined>;
   /** 无 actor 的内部解析，供网关、发布、任务等模块经端口使用。 */
   resolveServiceById(serviceId: ServiceId): Promise<ResolvedService | undefined>;
+  resolveServiceOfProject(projectId: ProjectId): Promise<ResolvedService | undefined>;
   listServices(): Promise<ResolvedService[]>;
   /** 单项目内部查询，不遍历所有项目；缺失或已归档时不再开通。 */
   getProvisioningProject(projectId: ProjectId): Promise<ProvisioningProject | undefined>;

@@ -1,4 +1,4 @@
-import type { CapabilityDescriptionDto, MarketAppDto, MarketAppsPage, MarketAppsQuery } from '@crewstation/contracts';
+import type { CapabilityDescriptionDto, MarketAppDto, MarketAppsPage, MarketAppsQuery, ProjectPageQuery, ProjectSummariesPage, ProjectSummaryDetail } from '@crewstation/contracts';
 import type { Transport } from '../httpTransport';
 import { segment } from '../requestUrl';
 
@@ -8,6 +8,8 @@ export interface CapabilitiesResource {
   describe(projectId: string): Promise<CapabilityDescriptionDto>;
   marketApps(query?: Partial<MarketAppsQuery>): Promise<MarketAppsPage>;
   marketApp(projectId: string): Promise<MarketAppDto>;
+  projectSummaries(query?: Partial<ProjectPageQuery>): Promise<ProjectSummariesPage>;
+  projectSummary(projectId: string): Promise<ProjectSummaryDetail>;
 }
 
 export function capabilitiesResource(transport: Transport): CapabilitiesResource {
@@ -15,5 +17,7 @@ export function capabilitiesResource(transport: Transport): CapabilitiesResource
     describe: (projectId) => transport.request<CapabilityDescriptionDto>('GET', `/v1/projects/${segment(projectId)}/capabilities`),
     marketApps: (query = {}) => transport.request('GET', '/v1/market/apps', { query }),
     marketApp: (id) => transport.request('GET', `/v1/market/apps/${segment(id)}`),
+    projectSummaries: (query = {}) => transport.request('GET', '/v1/workbench/project-summaries', { query: { ...query, kind: query.kind?.join(',') } }),
+    projectSummary: (id) => transport.request('GET', `/v1/workbench/project-summaries/${segment(id)}`),
   };
 }

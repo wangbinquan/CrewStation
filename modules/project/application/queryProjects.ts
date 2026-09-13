@@ -53,6 +53,10 @@ export function queryProjectUseCases(deps: ProjectUseCaseDeps) {
       const service = await uow.read.services.getById(serviceId);
       return service ? resolved(service, await uow.read.projects.getById(service.projectId)) : undefined;
     },
+    resolveServiceOfProject: async (projectId: ProjectId) => {
+      const [service, project] = await Promise.all([uow.read.services.getByProject(projectId), uow.read.projects.getById(projectId)]);
+      return service ? resolved(service, project) : undefined;
+    },
     listServices: async () => {
       const out = [];
       for (const project of await uow.read.projects.list()) {

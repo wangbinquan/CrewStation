@@ -11,6 +11,8 @@ describe('capabilities module', () => {
     const { api } = createCapabilitiesModule({
       isAdmin: async () => false,
       market: { list: async () => ({ items: [] }), get: async () => { throw new Error('unused'); }, slots: async () => [] },
+      projects: { list: async () => ({ items: [] }), read: async () => [], get: async () => { throw new Error('unused'); },
+        session: async () => undefined, slots: async () => [], health: async () => [], releases: async () => [], switches: async () => [] },
       clock: fixedClock('2026-09-11T00:00:00Z'),
       settings: { userDomain: 'cs.localhost', serviceDomain: 'svc.cs.internal', mcp: [{ name: 'capabilities', url: 'http://mcp-capabilities.svc.cs.internal/mcp' }], defaultServicePlan: 'standard-small' },
       sources: {

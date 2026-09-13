@@ -230,6 +230,14 @@ Swagger 5.32.15 使用自身提供的 React 扩展操作与响应，按需加载
 
 聚合落既有 capabilities L6，经各模块公开读 API，低层 project 不反向依赖 release 或 task-runtime。Project 基础分页查询和适配器在 project L2 内补齐。限定当前页、查询并发和缓存过期，后台页不持续轮询，不新增全企业活动仓库或物化视图。字段接口按引用数据的真实可用程度逐项添加，不能为填满卡片捏造数值。
 
+实施契约：基础 `GET /v1/projects/page` 及摘要列表共用 q／state／ownerUserId／kind／cursor／limit，默认 DigitalWorker、20 项，上限 50；q 按名称与 slug 做不区分大小写的文字包含，通配符没有额外含义。project 在本模块 SQL 内联查成员角色、服务与项目，先限制当前成员或管理员范围，再筛选、按 ID 排序并 LIMIT；多取一项判断 nextCursor。游标绑定账号、管理员身份与筛选，改变条件从第一页重新查。负责人名称按当前页去重、最多四个并发查询，名称来源不可用时保留实际负责人 ID，不伪造名字。批量复核只接受最多 50 个项目 ID。
+
+`GET /v1/workbench/project-summaries/:projectId` 返回同一项目摘要，另含最近五笔发布和五笔切流记录；原 release 查询每类最多读取 50 笔，再稳定排序截取。开发摘要从 task-runtime 的当前会话记录读取，仅含 taskId、生命周期、connected、分支、创建者与时间，不调用 Runner，不以连接状态推断原生 CLI 轮次或预览就绪。两槽来自 release，健康来自 observability 真实观察，各自带 checkedAt 和 ready／unknown／restricted。读取失败、重复／错对象回执、缺少版本 SHA、空健康来源均不会显示健康或已部署。
+
+当前页的可选来源读取最多四个同时在途，先读各项目的会话和版本，再读取健康；这段聚合的预算为 2500ms，不包含基础分页与最终作用域复核。达到截止后不再派发剩余读取，尚未完成的项标 unknown；已发出的只读调用可能继续完成，但不会改变已返回的快照或借超时继续扩大并发。返回前通过 project 批量复核当前页；移除的成员项目不返回，降为测试者或服务身份改变时丢弃旧内部材料。测试者仍可看到原项目列表已有的基础信息，其内部摘要标 restricted，沿用既有读取边界。服务端不缓存摘要，两条摘要与基础分页 HTTP 入口均 no-store；客户端刷新与过期展示在 T11 界面批接续。
+
+platform 的单项目服务解析改为 project 的公开定点读取，供摘要健康及既有开发会话使用，不再先列出全平台服务再 find。原无分页 projects.list 继续兼容既有调用方；页面批需将项目列表和管理入口接到有界查询，不能据后端接口完成就标记 T11 完成。
+
 ### 4.6 独立状态与开通进度
 
 本轮不额外造一套生命周期。现有状态来源：ProjectDto state/message、SessionDto state/preview、连接流、AgentInstanceDto、ReleaseDto 与 SlotDto。UI 的就绪行只能展示这些来源明确支持的状态。

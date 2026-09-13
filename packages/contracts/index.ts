@@ -37,3 +37,5 @@ export * from './api/auth';
 export * from './api/egress';
 export * from './api/capabilities';
 export * from './api/market/appListing';
+export * from './api/workbench/projectPage';
+export * from './api/workbench/projectSummary';

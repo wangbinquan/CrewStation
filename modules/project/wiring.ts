@@ -20,6 +20,7 @@ import { projectRoutes } from './http/projectRoutes';
 import { appListingRoutes } from './http/appListingRoutes';
 import { appVisibilityUseCases } from './application/appVisibility';
 import { marketListingUseCases } from './application/marketListings';
+import { projectPageUseCases } from './application/projectPages';
 import type { HostNaming } from './ports/hostNaming';
 import type { ProjectSettings } from './ports/projectSettings';
 import type { TaskUsage } from './ports/taskUsage';
@@ -66,6 +67,7 @@ export function createProjectModule(deps: ProjectModuleDeps): ProjectModule {
     ...quotaAndPlanUseCases(useCaseDeps),
     ...appVisibilityUseCases(useCaseDeps),
     ...marketListingUseCases(useCaseDeps),
+    ...projectPageUseCases(useCaseDeps),
   };
   return { api, http: [projectRoutes(api), catalogRoutes(api), appListingRoutes(api)], migrations: projectMigrations };
 }

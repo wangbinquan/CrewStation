@@ -37,7 +37,7 @@ describe('市场仅聚合正式部署且保留未知', () => {
   });
   test('HTTP 市场接口要求登录，分页有界且响应不缓存', async () => {
     const http = createApp({ name: 'market-http' });
-    http.route('/', marketRoutes({ name: 'capabilities', ...setup(async () => []), describe: async () => { throw new Error('unused'); } }, async () => false));
+    http.route('/', marketRoutes(setup(async () => []), async () => false));
     const headers = { [IDENTITY_HEADERS.userId]: actor.userId };
     expect((await http.request('/v1/market/apps')).status).toBe(401);
     expect((await http.request('/v1/market/apps?limit=51', { headers })).status).toBe(400);

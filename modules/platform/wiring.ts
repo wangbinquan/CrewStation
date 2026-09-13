@@ -194,7 +194,7 @@ function composeRuntime(deps: PlatformModuleDeps, core: ReturnType<typeof compos
       readFile: scm.api.readFile,
     },
     authorizer: { authorize: project.api.authorize, ownerOf: project.api.ownerOf },
-    services: { resolveServiceOfProject: async (projectId) => { const s = (await project.api.listServices()).find((x) => x.projectId === projectId); return s ? { serviceId: s.serviceId, slug: s.slug, name: s.name } : undefined; } },
+    services: { resolveServiceOfProject: project.api.resolveServiceOfProject },
     notifier: { notify: async (projectId, users, message, context) => { logger.warn('dev session notice', { projectId, users, message, taskId: context.taskId }); } },
     // 注入 Agent 的远程 MCP 连接凭据由 identity 签发：一个签发者、一个密钥环、一份 JWKS。
     credentials: { issueDevSessionToken: (binding) => core.identity.api.issueDevSessionToken(binding) },
@@ -237,7 +237,7 @@ function composeRuntime(deps: PlatformModuleDeps, core: ReturnType<typeof compos
 function composeAggregates(deps: PlatformModuleDeps, core: ReturnType<typeof composeCore>, delivery: ReturnType<typeof composeDelivery>, runtime: ReturnType<typeof composeRuntime>) {
   const { db, k8s, settings, logger } = deps;
   const { project, config, data, apiCatalog, isAdmin } = core;
-  const serviceOfProject = async (projectId: ProjectId) => { const s = (await project.api.listServices()).find((x) => x.projectId === projectId); return s ? { serviceId: s.serviceId, slug: s.slug, name: s.name, identity: s.identity, namespace: s.namespace } : undefined; };
+  const serviceOfProject = project.api.resolveServiceOfProject;
   const observability = createObservabilityModule({
     db, k8s, logger, isAdmin: (id) => isAdmin(id), authorizer: project.api, services: { resolveServiceOfProject: serviceOfProject }, slots: delivery.release.api,
     traces: {
@@ -251,6 +251,9 @@ function composeAggregates(deps: PlatformModuleDeps, core: ReturnType<typeof com
   const capabilities = createCapabilitiesModule({
     isAdmin: (id) => isAdmin(id),
     market: { list: project.api.listMarketListings, get: project.api.getMarketListing, slots: (serviceId) => delivery.release.api.getSlots(SYSTEM_ACTOR, serviceId) },
+    projects: { list: project.api.listProjectPage, read: project.api.readProjectPageEntries, get: project.api.getProjectPageEntry,
+      session: runtime.taskRuntime.api.findDevSession, slots: delivery.release.api.getSlots, health: observability.api.health,
+      releases: delivery.release.api.listReleases, switches: delivery.release.api.listTrafficSwitches },
     settings: { userDomain: settings.userDomain, serviceDomain: settings.serviceDomain, mcp: [{ name: 'capabilities', url: settings.mcp.capabilitiesUrl }, { name: 'operations', url: settings.mcp.operationsUrl }], defaultServicePlan: settings.defaultServicePlan },
     sources: {
       resolveServiceOfProject: serviceOfProject, authorize: project.api.authorize, quota: project.api.getQuota, servicePlans: project.api.listServicePlans,

@@ -4,6 +4,7 @@ import type { RepositoryScope, UnitOfWork } from '../../ports/unitOfWork';
 import { drizzleCatalogRepository, drizzleQuotaRepository } from './drizzleCatalogRepositories';
 import { drizzleMembershipRepository, drizzleProjectRepository, drizzleServiceRepository } from './drizzleProjectRepositories';
 import { drizzleAppListings } from './drizzleAppListings';
+import { drizzleProjectPages } from './drizzleProjectPages';
 
 export function scopeOver(executor: Executor): RepositoryScope {
   return {
@@ -13,6 +14,7 @@ export function scopeOver(executor: Executor): RepositoryScope {
     quotas: drizzleQuotaRepository(executor),
     catalog: drizzleCatalogRepository(executor),
     appListings: drizzleAppListings(executor),
+    projectPages: drizzleProjectPages(executor),
     events: { publish: async (topic, payload) => { await publishDomainEvent(executor, topic, payload); } },
   };
 }

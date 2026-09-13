@@ -6,7 +6,7 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import type { CapabilitiesModuleApi } from '../api/moduleApi';
 
-export function marketRoutes(api: CapabilitiesModuleApi, isAdmin: (userId: UserId) => Promise<boolean>): Hono<AppEnv> {
+export function marketRoutes(api: Pick<CapabilitiesModuleApi, 'listMarketApps' | 'getMarketApp'>, isAdmin: (userId: UserId) => Promise<boolean>): Hono<AppEnv> {
   const r = new Hono<AppEnv>();
   r.use('/v1/market/*', async (c, next) => { c.header('Cache-Control', 'private, no-store'); await next(); });
   r.get('/v1/market/apps', async (c) => {

@@ -43,6 +43,19 @@ async function caught(call: () => Promise<unknown>): Promise<ApiClientError> {
 }
 
 describe('createApiClient：请求形状', () => {
+  test('有界项目页与摘要准确传递分页、筛选和详情对象', async () => {
+    const f = fakeFetch(() => json(200, { items: [], nextCursor: 'next' })); const client = createApiClient({ fetch: f.fetchImpl });
+    const filters = { q: '项目 a/b', state: 'failed' as const, kind: ['APIProxy', 'EventProducer'] as const, limit: 20, cursor: 'a+b/=c', ownerUserId: `usr_${'a'.repeat(32)}` as UserId };
+    expect(await client.projects.page({ ...filters, kind: [...filters.kind] })).toEqual({ items: [], nextCursor: 'next' });
+    await client.capabilities.projectSummaries({ ...filters, kind: [...filters.kind] });
+    await client.capabilities.projectSummary('project one');
+    for (const [i, path] of ['/v1/projects/page', '/v1/workbench/project-summaries'].entries()) {
+      const url = new URL(f.calls[i]!.url, 'http://test'); expect(url.pathname).toBe(path);
+      expect(Object.fromEntries(url.searchParams)).toEqual({ ...filters, limit: '20', kind: 'APIProxy,EventProducer' });
+      expect(f.calls[i]!.method).toBe('GET'); expect(f.calls[i]!.body).toBeUndefined();
+    }
+    expect(f.calls[2]!.url).toBe('/v1/workbench/project-summaries/project%20one');
+  });
   test('API 试调只调用项目的结构化入口，固定会话和参数原样保留，有界且不重复发送', async () => {
     const requests: Array<{ url: string; init?: RequestInit }> = [];
     const fetchImpl: FetchLike = async (url, init) => { requests.push({ url: String(url), init }); return json(200, { taskId: 'fixed-task' }); };
