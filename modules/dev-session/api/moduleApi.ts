@@ -2,10 +2,13 @@ import type { Actor, AgentInstanceDto, BranchDto, DevSessionDto, OpenDevSessionR
 import type { ComparisonDetailQuery, ComparisonDetails, ComparisonTarget, VersionComparisonDto } from '@crewstation/contracts';
 import type { NativeTerminalApi } from './nativeTerminalApi';
 import type { SaveWorkspaceLayoutRequest, WorkspaceLayoutDto } from '@crewstation/contracts';
+import type { AgentActivityPage, AgentActivityQuery, ReadAgentActivityRequest } from '@crewstation/contracts';
 
 /** dev-session 对外能力：一项目一会话、分支、并行流式 Agent、从会话发布、空闲提醒。 */
 export interface DevSessionModuleApi extends NativeTerminalApi {
   readonly name: 'dev-session';
+  getAgentActivity(actor: Actor, taskId: TaskId, query: AgentActivityQuery): Promise<AgentActivityPage>;
+  readAgentActivity(actor: Actor, taskId: TaskId, input: ReadAgentActivityRequest): Promise<{ throughSeq: number }>;
   getWorkspaceLayout(actor: Actor, taskId: TaskId): Promise<WorkspaceLayoutDto>;
   saveWorkspaceLayout(actor: Actor, taskId: TaskId, input: SaveWorkspaceLayoutRequest): Promise<WorkspaceLayoutDto>;
   openSession(actor: Actor, projectId: ProjectId, input: OpenDevSessionRequest): Promise<DevSessionDto>;

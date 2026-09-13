@@ -42,6 +42,18 @@ async function caught(call: () => Promise<unknown>): Promise<ApiClientError> {
 }
 
 describe('createApiClient：请求形状', () => {
+  test('原生动态按游标取有界页，已读只提交目标 CLI 轮次和已读位置', async () => {
+    const { calls, fetchImpl } = fakeFetch(() => json(200, {}));
+    const client = createApiClient({ fetch: fetchImpl });
+    await client.devSession.getAgentActivity('task one');
+    await client.devSession.getAgentActivity('task one', { cursor: 18, limit: 30 });
+    const read = { agentId: 'agent/1', turnId: 'turn 2', throughSeq: 35 };
+    await client.devSession.readAgentActivity('task one', read);
+    expect(calls.map((c) => [c.method, c.url])).toEqual([
+      ['GET', '/v1/tasks/task%20one/agent-activity'], ['GET', '/v1/tasks/task%20one/agent-activity?cursor=18&limit=30'], ['POST', '/v1/tasks/task%20one/agent-activity/read'],
+    ]);
+    expect(JSON.parse(calls[2]!.body!)).toEqual(read);
+  });
   test('原生 CLI 的请求 ID 逐字保留，列表和显式结束使用独立资源路径', async () => {
     const { calls, fetchImpl } = fakeFetch(() => json(202, {}));
     const client = createApiClient({ fetch: fetchImpl });

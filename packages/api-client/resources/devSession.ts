@@ -2,6 +2,7 @@ import type { AgentInstanceDto, BranchDto, DevSessionDto, OpenDevSessionRequest,
 import type { ComparisonDetailQuery, ComparisonDetails, ComparisonTarget, VersionComparisonDto } from '@crewstation/contracts';
 import type { NativeTerminalDto, NativeTerminalList, StartNativeTerminalRequest } from '@crewstation/contracts';
 import type { SaveWorkspaceLayoutRequest, WorkspaceLayoutDto } from '@crewstation/contracts';
+import type { AgentActivityPage, AgentActivityQuery, ReadAgentActivityRequest } from '@crewstation/contracts';
 import type { Transport } from '../httpTransport';
 import type { ItemsPage } from '../itemsPage';
 import type { PublishInput, StartDevAgentInput } from '../requestInputs';
@@ -24,6 +25,8 @@ export interface ReleaseDevSessionOptions {
 
 /** 开发会话：一项目一会话、分支与落后数、并行流式 Agent、从会话发布。 */
 export interface DevSessionResource {
+  getAgentActivity(taskId: string, query?: AgentActivityQuery): Promise<AgentActivityPage>;
+  readAgentActivity(taskId: string, input: ReadAgentActivityRequest): Promise<{ throughSeq: number }>;
   getWorkspaceLayout(taskId: string): Promise<WorkspaceLayoutDto>;
   saveWorkspaceLayout(taskId: string, input: SaveWorkspaceLayoutRequest): Promise<WorkspaceLayoutDto>;
   listNativeTerminals(taskId: string): Promise<NativeTerminalList>;
@@ -61,6 +64,8 @@ export function devSessionResource(transport: Transport): DevSessionResource {
   const agents = (taskId: string) => `/v1/tasks/${segment(taskId)}/agents`;
   const terminals = (taskId: string) => `/v1/tasks/${segment(taskId)}/agent-terminals`;
   return {
+    getAgentActivity: (taskId, query) => transport.request('GET', `/v1/tasks/${segment(taskId)}/agent-activity`, { query }),
+    readAgentActivity: (taskId, input) => transport.request('POST', `/v1/tasks/${segment(taskId)}/agent-activity/read`, { body: input }),
     getWorkspaceLayout: (taskId) => transport.request('GET', `/v1/tasks/${segment(taskId)}/workspace-layout`),
     saveWorkspaceLayout: (taskId, input) => transport.request('PUT', `/v1/tasks/${segment(taskId)}/workspace-layout`, { body: input }),
     listNativeTerminals: (taskId) => transport.request('GET', terminals(taskId)),

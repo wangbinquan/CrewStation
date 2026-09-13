@@ -160,3 +160,17 @@ Claude Code 2.1.268 已通过独立原生 hooks／OTLP 接收器、轮次证据�
 自动回归覆盖最小字段解析、版本漂移、相同并行工具的关联歧义、主／子会话、旧轮次、trace 乱序／去重／保留边界、半行 UTF-8、文件截断／超大行、真实 HTTP 和心跳失效。已指定的用户 OTEL 目的地或策略不被覆盖，观察不兼容时 CLI 仍可启动。此前真实 `nativeSupervisor`／OpenCode 通道继续沿用，并共享状态编号逻辑。
 
 最终本地 `bun run check`：**795 pass／4 skip／0 fail**，799 tests、136 files、3678 assertions、66.73s；console build 625ms。跳过项是 opt-in K8s、两个 opt-in 原生 CLI 和 Linux 专用 Ctrl+C。最终镜像 `cs-task-runtime:rfc003-claude-activity` 为 `sha256:341fa1b05abfaf5f15824fff89f374ecc7c98cb7f0cbdc4b4f0e75636274f665`，只挂载测试文件而不替换生产源码的镜像验收 **7 pass／0 fail、77 assertions、21.10s**，其中 OpenCode 六场景、Claude 八场景及 Linux PTY 全部通过。镜像未导入或更新共享集群，原有 QA Pod 和生产切流保持待授权；T15 领域投影、个人已读和后台 UI 继续实施。
+
+发布记录：`3a438766a8e40e1f04f85398089872fa1f981e6d` 已同步 main；[精确 SHA CI](https://github.com/wangbinquan/CrewStation/actions/runs/34742233061) 成功。
+
+## 第十批：T15 状态投影与个人已读接口
+
+dev-session 持有原生活动投影、历史和每位用户的已读位置。通过既有 Runner 端口按需补齐 session 持久事件，不跨同层导入。每次最多四批、每批 500 条、每次源查询 2.5 秒；跨实例按任务事务锁推进游标，重复区间可重放，不能跳过未读取区间。每个 CLI 最多保留 128 个轮次和 128 个待处理请求；动态保留最近 2000 条，截断明确返回，活跃问题及其个人已读不因历史清理消失。
+
+最新轮次按独立 ordinal 选择，旧轮次仍能补齐自己的历史；重复完成、确定结果后迟到的未确认及过期问题不新增动态。结果冲突或源缺口保留状态未知，不制造完成；进程退出独立收拢待处理。实际 Runner 只读往返核对连接与代次，注册表的连接标记不单独当作在线证据。
+
+GET `agent-activity` 提供有界页、最新状态、个人未读计数、截断及同步可信度；POST `agent-activity/read` 严格限定当前用户和指定 CLI／轮次的已有事件。查看不答复或批准原生请求，不清除别人的未读。名册返回状态附加字段；动态查询失败仍保留 CLI 名册，访问拒绝继续返回错误。HTTP 两个活动路径都验证了 no-store。
+
+自动验证涵盖纯状态迁移、真实独立 PostgreSQL 的跨实例去重与 JSON、分页／保留边界、个人已读与未来游标拒绝、真实 Hono 装配／权限／故障隔离、客户端请求形状，以及源挂起后迟到结果不继续写入。第一轮完整门禁 812 pass／4 skip／0 fail 后补充长期待处理的清理边界；最终候选结果续记下面。本批还没有通知 UI 或共享集群部署，T15 整体继续实施。
+
+最终本地 `bun run check`：**813 pass／4 skip／0 fail**，817 tests、140 files、3790 assertions、68.45s；console build 534ms。四项跳过仍为 opt-in K8s、两个原生 CLI 及 Linux Ctrl+C；运行时未改，上一批实际镜像证据仍有效。迁移 `dev_session/0005_native_activity.sql` 只随隔离测试建库应用，未更新共享集群。

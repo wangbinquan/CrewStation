@@ -22,6 +22,7 @@ export * from './api/project';
 export * from './api/release';
 export * from './api/devSession';
 export * from './api/nativeTerminal';
+export * from './api/activity/nativeActivity';
 export * from './api/workspace';
 export * from './api/businessTask';
 export * from './api/config';
