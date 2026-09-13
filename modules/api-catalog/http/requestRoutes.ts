@@ -1,5 +1,5 @@
 import type { ProjectId, ServiceId } from '@crewstation/contracts';
-import { CreateApiRequestSchema, DecideApiRequestSchema, ProjectIdSchema, ServiceIdSchema } from '@crewstation/contracts';
+import { CreateApiRequestSchema, DecideApiRequestSchema, ProjectIdSchema, RequestPageQuerySchema, ServiceIdSchema } from '@crewstation/contracts';
 import type { AppEnv } from '@crewstation/http';
 import { parseBody, parseParams, parseQuery } from '@crewstation/http';
 import { Hono } from 'hono';
@@ -12,6 +12,10 @@ const serviceParams = z.object({ serviceId: ServiceIdSchema });
 /** 定向开放的申请、审批与撤销。 */
 export function requestRoutes(api: ApiCatalogModuleApi): Hono<AppEnv> {
   const r = new Hono<AppEnv>();
+  r.get('/v1/api-requests/page', async (c) => {
+    c.header('cache-control', 'no-store');
+    return c.json(await api.listRequestPage(await actorFrom(c, api), parseQuery(c, RequestPageQuerySchema)));
+  });
   r.post('/v1/services/:serviceId/api-requests', async (c) => {
     const { serviceId } = parseParams(c, serviceParams);
     return c.json(await api.requestAccess(await actorFrom(c, api), serviceId as ServiceId, await parseBody(c, CreateApiRequestSchema)), 201);

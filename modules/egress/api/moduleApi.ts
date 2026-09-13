@@ -1,6 +1,6 @@
 import type {
   Actor, AddEgressEntryRequest, BlockedEgressDto, DecideEgressRequest, EgressEntryDto, EgressPolicyDto, EgressRequestDto, EgressSource, ProjectId,
-  RequestEgressEntryRequest,
+  RequestEgressEntryRequest, RequestPageQuery, EgressRequestPage,
 } from '@crewstation/contracts';
 
 /**
@@ -17,6 +17,7 @@ export interface EgressModuleApi {
   /** 批准即在同一事务内生成项目级条目。 */
   decideRequest(actor: Actor, id: string, input: DecideEgressRequest): Promise<EgressRequestDto>;
   listRequests(actor: Actor, projectId?: ProjectId): Promise<EgressRequestDto[]>;
+  listRequestPage(actor: Actor, query: RequestPageQuery): Promise<EgressRequestPage>;
   /** 全局＋项目级去重后的放行清单；供 task-runtime／控制面下发出站代理。 */
   policyFor(projectId: ProjectId): Promise<EgressPolicyDto>;
   /** 出站代理上报一次被阻请求：按 (project, fqdn) 累加。 */

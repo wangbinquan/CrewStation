@@ -1,5 +1,5 @@
 import type {
-  Actor, ApiOperationDto, ApiProxyDto, ApiRequestDto, CreateApiRequest, DecideApiRequest, OpenPolicy, ProjectId, ServiceId, UserId,
+  Actor, ApiOperationDto, ApiProxyDto, ApiRequestDto, ApiRequestPage, CreateApiRequest, DecideApiRequest, OpenPolicy, ProjectId, RequestPageQuery, ServiceId, UserId,
 } from '@crewstation/contracts';
 
 /** 供 gateway 生成放行表：调用方已获 Grant 且仍在目录中活动的操作键，加上对所有调用方生效的默认开放键。 */
@@ -21,6 +21,7 @@ export interface ApiCatalogModuleApi {
   requestAccess(actor: Actor, serviceId: ServiceId, input: CreateApiRequest): Promise<ApiRequestDto>;
   /** 给出 projectId 时需要该项目 view 权限；不给出时只有管理员能看全部。 */
   listRequests(actor: Actor, projectId?: ProjectId): Promise<ApiRequestDto[]>;
+  listRequestPage(actor: Actor, query: RequestPageQuery): Promise<ApiRequestPage>;
   /** 管理员批准（落 Grant 并发布 api-catalog.grant-changed）或拒绝并给出理由。 */
   decideRequest(actor: Actor, requestId: string, input: DecideApiRequest): Promise<ApiRequestDto>;
   revokeGrant(actor: Actor, serviceId: ServiceId, operationKey: string): Promise<void>;

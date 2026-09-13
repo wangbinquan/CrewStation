@@ -201,3 +201,7 @@ T10 三步向导已落地：工作台仅留管理入口，管理总览和能力�
 4. 本机拉起平台：`./deploy/local/bootstrap.sh`（一次性）→ `./deploy/local/install-platform.sh` → `./deploy/local/verify.sh`；工作台在 `http://console.cs.localhost/`。
 
 T11 列表／概览批最终门禁 **1036 pass／4 skip／0 fail**，1040 tests、177 files、5533 assertions；console build 505ms。已更新与搜索表单冲突的旧创建断言并完成定向和完整验证，36 个源码路径在最终门禁前后保持一致。下一步继续管理员待办与有界管理列表，T12 和先前待授权操作仍保留。
+
+T11 列表／概览本地提交为 `a1a16107bed76891e089198e2bfc9cf1378944b7`，未推送。下一批 T10 申请有界读取已接通 API／出站各自的分页、状态过滤、稳定游标与当前页项目名称；旧全量接口兼容，项目基础查询不逐项取负责人。新增索引只在隔离数据库执行。定向 36 项通过，完整门禁与 UI 接入继续；先前推送和两个共享集群操作的待授权状态未变化。
+
+申请分页底层批最终门禁 **1046 pass／4 skip／0 fail**，1050 tests、179 files、5608 assertions；console build 496ms，26 个源码／迁移候选保持一致。管理总览／项目目录与两类申请列表接线继续。

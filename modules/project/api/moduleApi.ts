@@ -54,6 +54,8 @@ export interface ProjectModuleApi {
   listUserMemberships(userId: UserId): Promise<Array<{ projectId: ProjectId; role: MemberDto['role'] }>>;
   listProjectPage(actor: Actor, query: ProjectPageQuery): Promise<ProjectPage>;
   readProjectPageEntries(actor: Actor, ids: readonly ProjectId[]): Promise<ProjectPageEntry[]>;
+  /** 当前页关联对象的基础资料；最多 50 个 ID，只读本模块一次联查，不逐项查负责人。 */
+  readProjectBasics(actor: Actor, ids: readonly ProjectId[]): Promise<ProjectDto[]>;
   getProjectPageEntry(actor: Actor, projectId: ProjectId): Promise<ProjectPageEntry>;
   listMarketListings(actor: Actor, query: MarketAppsQuery): Promise<{ items: MarketListing[]; nextCursor?: string }>;
   getMarketListing(actor: Actor, projectId: ProjectId): Promise<MarketListing>;

@@ -1,4 +1,4 @@
-import type { EgressScope, ProjectId } from '@crewstation/contracts';
+import type { EgressScope, ProjectId, RequestPageQuery } from '@crewstation/contracts';
 import type { BlockedRecord } from '../domain/blockedRecord';
 import type { EgressEntry } from '../domain/egressEntry';
 import type { EgressRequest } from '../domain/egressRequest';
@@ -19,6 +19,7 @@ export interface EgressRequestRepository {
   update(request: EgressRequest): Promise<void>;
   getById(id: string): Promise<EgressRequest | undefined>;
   list(projectId?: ProjectId): Promise<EgressRequest[]>;
+  listPage(query: Pick<RequestPageQuery, 'projectId' | 'state'> & { limit: number; before?: { createdAt: Date; id: string } }): Promise<EgressRequest[]>;
   findPending(projectId: ProjectId, fqdn: string): Promise<EgressRequest | undefined>;
 }
 

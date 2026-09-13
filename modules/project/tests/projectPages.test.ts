@@ -38,6 +38,14 @@ afterAll(async () => { await db?.drop(); });
 const query = (value: Record<string, unknown> = {}) => ProjectPageQuerySchema.parse(value);
 
 describe.skipIf(!available)('项目有界基础分页', () => {
+  test('关联资料一次接受最多 50 个 ID，保持授权范围、去重和完整基础对象', async () => {
+    expect(await module.api.readProjectBasics(stranger, ids.slice(0, 5))).toEqual([]);
+    const rows = await module.api.readProjectBasics(tester, [ids[0]!, ids[1]!, ids[0]!]);
+    expect(rows.map((p) => p.id)).toEqual([ids[0]!]); expect(rows[0]).toMatchObject({ name: '项目 0', kind: 'DigitalWorker' });
+    expect(rows[0]?.serviceId).toBeDefined();
+    expect(await module.api.readProjectBasics(admin, [])).toEqual([]);
+    await expect(module.api.readProjectBasics(admin, Array.from({ length: 51 }, () => ids[0]!))).rejects.toMatchObject({ kind: 'validation' });
+  });
   test('默认 20 项、按稳定 ID 翻页，角色和服务一次作用域查询，不含接入容器', async () => {
     const first = await module.api.listProjectPage(owner, query());
     expect(first.items).toHaveLength(20); expect(first.nextCursor).toBeDefined();

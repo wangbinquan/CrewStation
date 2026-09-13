@@ -1,6 +1,6 @@
 import type { ApiRequestState, ProjectId, ServiceId, UserId } from '@crewstation/contracts';
 import type { Executor } from '@crewstation/persistence';
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, lt, or } from 'drizzle-orm';
 import type { ApiGrant, GrantState } from '../../domain/apiGrant';
 import type { ApiRequest } from '../../domain/apiRequest';
 import type { ApiGrantRepository, ApiRequestRepository } from '../../ports/repositories';
@@ -37,6 +37,10 @@ export function drizzleRequestRepository(db: Executor): ApiRequestRepository {
       const rows = projectId === undefined ? await query : await query.where(eq(requests.projectId, projectId));
       return rows.map(toRequest);
     },
+    listPage: async (q) => (await db.select().from(requests).where(and(
+      q.projectId ? eq(requests.projectId, q.projectId) : undefined, q.state === 'all' ? undefined : eq(requests.state, q.state),
+      q.before ? or(lt(requests.createdAt, q.before.createdAt), and(eq(requests.createdAt, q.before.createdAt), lt(requests.id, q.before.id))) : undefined,
+    )).orderBy(desc(requests.createdAt), desc(requests.id)).limit(q.limit)).map(toRequest),
   };
 }
 

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import type { TaskId, UserId } from '@crewstation/contracts';
+import type { ProjectId, TaskId, UserId } from '@crewstation/contracts';
 import type { FetchLike, TaskStreamFrame } from '../index';
 import { ApiClientError, createApiClient, isApiClientError, kindForStatus, parseErrorEnvelope, parseTaskStreamFrame, taskStreamUrl } from '../index';
 
@@ -43,6 +43,16 @@ async function caught(call: () => Promise<unknown>): Promise<ApiClientError> {
 }
 
 describe('createApiClient：请求形状', () => {
+  test('两类申请分页保留真实服务端游标、项目和状态，不改旧全量调用', async () => {
+    const f = fakeFetch(() => json(200, { items: [], nextCursor: 'cursor-next' })), client = createApiClient({ baseUrl: 'https://console.test', fetch: f.fetchImpl });
+    const query = { projectId: `prj_${'a'.repeat(32)}` as ProjectId, state: 'pending' as const, limit: 5, cursor: 'opaque/value?x=1' };
+    expect(await client.apiCatalog.listRequestPage(query)).toEqual({ items: [], nextCursor: 'cursor-next' });
+    await client.egress.listRequestPage(query);
+    expect(f.calls.map((c) => new URL(c.url).pathname)).toEqual(['/v1/api-requests/page', '/v1/egress/requests/page']);
+    for (const call of f.calls) { expect(call.method).toBe('GET'); expect(Object.fromEntries(new URL(call.url).searchParams)).toEqual({ ...query, limit: '5' }); }
+    await client.apiCatalog.listRequests(); await client.egress.listRequests();
+    expect(f.calls.slice(2).map((c) => new URL(c.url).pathname)).toEqual(['/v1/api-requests', '/v1/egress/requests']);
+  });
   test('有界项目页与摘要准确传递分页、筛选和详情对象', async () => {
     const f = fakeFetch(() => json(200, { items: [], nextCursor: 'next' })); const client = createApiClient({ fetch: f.fetchImpl });
     const filters = { q: '项目 a/b', state: 'failed' as const, kind: ['APIProxy', 'EventProducer'] as const, limit: 20, cursor: 'a+b/=c', ownerUserId: `usr_${'a'.repeat(32)}` as UserId };

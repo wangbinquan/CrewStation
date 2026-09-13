@@ -25,7 +25,7 @@ export function projectPageUseCases({ uow, users }: ProjectUseCaseDeps) {
   };
   const read = async (actor: Actor, ids: readonly ProjectId[]): Promise<ProjectPageEntry[]> => {
     const parsed = ProjectPageIdsSchema.safeParse(ids); if (!parsed.success) throw validation('一次最多读取 50 个项目');
-    return withOwners(await uow.read.projectPages.list(actor, { q: '', kind: ['DigitalWorker', 'APIProxy', 'EventProducer'], limit: 50, ids: [...new Set(parsed.data)] }));
+    return uow.read.projectPages.list(actor, { q: '', kind: ['DigitalWorker', 'APIProxy', 'EventProducer'], limit: 50, ids: [...new Set(parsed.data)] });
   };
   return {
     listProjectPage: async (actor: Actor, raw: ProjectPageQuery) => {
@@ -36,9 +36,10 @@ export function projectPageUseCases({ uow, users }: ProjectUseCaseDeps) {
       return { items: await withOwners(page), ...(rows.length > query.limit && last
         ? { nextCursor: Buffer.from(JSON.stringify({ scope: scopeOf(actor, query), after: last.project.id })).toString('base64url') } : {}) };
     },
-    readProjectPageEntries: read,
+    readProjectPageEntries: async (actor: Actor, ids: readonly ProjectId[]) => withOwners(await read(actor, ids)),
+    readProjectBasics: async (actor: Actor, ids: readonly ProjectId[]) => (await read(actor, ids)).map((entry) => entry.project),
     getProjectPageEntry: async (actor: Actor, id: ProjectId) => {
-      const entry = (await read(actor, [id]))[0]; if (!entry) throw notFound('项目', id); return entry;
+      const entry = (await withOwners(await read(actor, [id])))[0]; if (!entry) throw notFound('项目', id); return entry;
     },
   };
 }

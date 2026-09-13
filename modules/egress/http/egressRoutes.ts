@@ -1,4 +1,4 @@
-import { AddEgressEntryRequestSchema, DecideEgressRequestSchema, ProjectIdSchema, RequestEgressEntryRequestSchema } from '@crewstation/contracts';
+import { AddEgressEntryRequestSchema, DecideEgressRequestSchema, ProjectIdSchema, RequestEgressEntryRequestSchema, RequestPageQuerySchema } from '@crewstation/contracts';
 import type { AppEnv } from '@crewstation/http';
 import { parseBody, parseParams, parseQuery } from '@crewstation/http';
 import { Hono } from 'hono';
@@ -14,6 +14,10 @@ const projectQuery = z.object({ projectId: ProjectIdSchema.optional() });
 /** 白名单条目（管理员）、追加申请与裁定、被阻请求；用户域路由。 */
 export function egressRoutes(api: EgressModuleApi, actors: ActorResolver): Hono<AppEnv> {
   const r = new Hono<AppEnv>();
+  r.get('/v1/egress/requests/page', async (c) => {
+    c.header('cache-control', 'no-store');
+    return c.json(await api.listRequestPage(await actorFrom(c, actors), parseQuery(c, RequestPageQuerySchema)));
+  });
   r.get('/v1/egress/entries', async (c) => c.json({ items: await api.listEntries(await actorFrom(c, actors), parseQuery(c, projectQuery).projectId) }));
   r.post('/v1/egress/entries', async (c) => c.json(await api.addEntry(await actorFrom(c, actors), await parseBody(c, AddEgressEntryRequestSchema)), 201));
   r.delete('/v1/egress/entries/:id', async (c) => {

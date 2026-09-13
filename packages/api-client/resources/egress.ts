@@ -1,5 +1,5 @@
 import type {
-  AddEgressEntryRequest, BlockedEgressDto, DecideEgressRequest, EgressEntryDto, EgressRequestDto, RequestEgressEntryRequest,
+  AddEgressEntryRequest, BlockedEgressDto, DecideEgressRequest, EgressEntryDto, EgressRequestDto, EgressRequestPage, RequestEgressEntryRequest, RequestPageQuery,
 } from '@crewstation/contracts';
 import type { Transport } from '../httpTransport';
 import type { ItemsPage } from '../itemsPage';
@@ -21,6 +21,7 @@ export interface EgressResource {
   removeEntry(id: string): Promise<void>;
   /** GET /v1/egress/requests?projectId= */
   listRequests(query?: EgressProjectQuery): Promise<ItemsPage<EgressRequestDto>>;
+  listRequestPage(query?: Partial<RequestPageQuery>): Promise<EgressRequestPage>;
   /** GET /v1/projects/:projectId/egress/requests */
   listProjectRequests(projectId: string): Promise<ItemsPage<EgressRequestDto>>;
   /** POST /v1/projects/:projectId/egress/requests（201） */
@@ -38,6 +39,7 @@ export function egressResource(transport: Transport): EgressResource {
     addEntry: (input) => transport.request<EgressEntryDto>('POST', '/v1/egress/entries', { body: input }),
     removeEntry: (id) => transport.request<void>('DELETE', `/v1/egress/entries/${segment(id)}`),
     listRequests: (query) => transport.request<ItemsPage<EgressRequestDto>>('GET', '/v1/egress/requests', { query }),
+    listRequestPage: (query) => transport.request<EgressRequestPage>('GET', '/v1/egress/requests/page', { query }),
     listProjectRequests: (projectId) => transport.request<ItemsPage<EgressRequestDto>>('GET', `${project(projectId)}/requests`),
     requestEntry: (projectId, input) => transport.request<EgressRequestDto>('POST', `${project(projectId)}/requests`, { body: input }),
     decideRequest: (id, input) => transport.request<EgressRequestDto>('POST', `/v1/egress/requests/${segment(id)}/decision`, { body: input }),

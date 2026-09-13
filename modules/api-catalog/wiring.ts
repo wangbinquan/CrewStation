@@ -15,6 +15,7 @@ import { grantUseCases } from './application/decideRequest';
 import type { ApiCatalogUseCaseDeps } from './application/dependencies';
 import { grantedOperationsUseCase } from './application/grantedOperations';
 import { listRequestsUseCase } from './application/listRequests';
+import { requestPageUseCase } from './application/requestPages';
 import { prunedOpenApiUseCase } from './application/prunedOpenApi';
 import { catalogQueryUseCases } from './application/queryCatalog';
 import { registerReleaseUseCase } from './application/registerRelease';
@@ -29,7 +30,7 @@ import type { ServiceResolver } from './ports/serviceResolver';
 export interface ApiCatalogModuleDeps {
   db: Database;
   /** project 模块：管理员标记与项目内授权。 */
-  projects: Pick<ProjectModuleApi, 'isAdmin' | 'authorize'>;
+  projects: Pick<ProjectModuleApi, 'isAdmin' | 'authorize' | 'readProjectBasics'>;
   /** 服务 ID／服务身份 → 归属；由应用基于 project 模块装配。 */
   services: ServiceResolver;
   hosts: HostNaming;
@@ -55,7 +56,7 @@ export function createApiCatalogModule(deps: ApiCatalogModuleDeps): ApiCatalogMo
   const useCaseDeps: ApiCatalogUseCaseDeps = {
     uow: drizzleUnitOfWork(deps.db),
     services: deps.services,
-    projects: { isAdmin: (id) => deps.projects.isAdmin(id), authorize: (actor, projectId, action) => deps.projects.authorize(actor, projectId, action) },
+    projects: { isAdmin: (id) => deps.projects.isAdmin(id), authorize: (actor, projectId, action) => deps.projects.authorize(actor, projectId, action), readProjectBasics: (actor, ids) => deps.projects.readProjectBasics(actor, ids) },
     hosts: deps.hosts,
     clock: deps.clock ?? systemClock,
   };
@@ -66,6 +67,7 @@ export function createApiCatalogModule(deps: ApiCatalogModuleDeps): ApiCatalogMo
     setOpenPolicy: setOpenPolicyUseCase(useCaseDeps),
     requestAccess: requestAccessUseCase(useCaseDeps),
     listRequests: listRequestsUseCase(useCaseDeps),
+    listRequestPage: requestPageUseCase(useCaseDeps),
     ...grantUseCases(useCaseDeps),
     grantedOperations: grantedOperationsUseCase(useCaseDeps),
     prunedOpenApi: prunedOpenApiUseCase(useCaseDeps),

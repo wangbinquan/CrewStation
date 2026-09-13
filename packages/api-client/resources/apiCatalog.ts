@@ -1,5 +1,5 @@
 import type {
-  ApiOperationDto, ApiProxyDto, ApiRequestDto, CreateApiRequest, DecideApiRequest, SetOpenPolicyRequest,
+  ApiOperationDto, ApiProxyDto, ApiRequestDto, ApiRequestPage, CreateApiRequest, DecideApiRequest, RequestPageQuery, SetOpenPolicyRequest,
 } from '@crewstation/contracts';
 import type { Transport } from '../httpTransport';
 import type { ItemsPage } from '../itemsPage';
@@ -19,6 +19,7 @@ export interface ApiCatalogResource {
   requestAccess(serviceId: string, input: CreateApiRequest): Promise<ApiRequestDto>;
   /** GET /v1/api-requests?projectId=：不带 projectId 只有管理员能看全部。 */
   listRequests(query?: { readonly projectId?: string }): Promise<ItemsPage<ApiRequestDto>>;
+  listRequestPage(query?: Partial<RequestPageQuery>): Promise<ApiRequestPage>;
   /** POST /v1/api-requests/:id/decision（管理员批准或拒绝并给出理由） */
   decideRequest(id: string, input: DecideApiRequest): Promise<ApiRequestDto>;
   /** DELETE /v1/services/:serviceId/grants/:key（204） */
@@ -34,6 +35,7 @@ export function apiCatalogResource(transport: Transport): ApiCatalogResource {
       transport.request<ApiOperationDto>('PUT', `/v1/catalog/operations/${segment(operationKey)}/policy`, { body: input }),
     requestAccess: (serviceId, input) => transport.request<ApiRequestDto>('POST', `/v1/services/${segment(serviceId)}/api-requests`, { body: input }),
     listRequests: (query) => transport.request<ItemsPage<ApiRequestDto>>('GET', '/v1/api-requests', { query }),
+    listRequestPage: (query) => transport.request<ApiRequestPage>('GET', '/v1/api-requests/page', { query }),
     decideRequest: (id, input) => transport.request<ApiRequestDto>('POST', `/v1/api-requests/${segment(id)}/decision`, { body: input }),
     revokeGrant: (serviceId, operationKey) => transport.request<void>('DELETE', `/v1/services/${segment(serviceId)}/grants/${segment(operationKey)}`),
   };

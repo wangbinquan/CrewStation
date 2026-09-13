@@ -13,13 +13,14 @@ import type { EgressUseCaseDeps } from './application/dependencies';
 import { policyUseCases } from './application/egressPolicy';
 import { entryUseCases } from './application/manageEntries';
 import { requestUseCases } from './application/requestEntries';
+import { requestPageUseCase } from './application/requestPages';
 import { egressRoutes } from './http/egressRoutes';
 import { internalEgressRoutes } from './http/internalRoutes';
 
 export interface EgressModuleDeps {
   db: Database;
   /** 角色表判定与管理员标记都来自 project 模块。 */
-  project: Pick<ProjectModuleApi, 'authorize' | 'isAdmin'>;
+  project: Pick<ProjectModuleApi, 'authorize' | 'isAdmin' | 'readProjectBasics'>;
   clock?: Clock;
 }
 
@@ -39,13 +40,14 @@ export const egressMigrations: MigrationSet = {
 export function createEgressModule(deps: EgressModuleDeps): EgressModule {
   const useCaseDeps: EgressUseCaseDeps = {
     uow: drizzleUnitOfWork(deps.db),
-    authorizer: { authorize: (actor, projectId, action) => deps.project.authorize(actor, projectId, action) },
+    authorizer: { authorize: (actor, projectId, action) => deps.project.authorize(actor, projectId, action), readProjectBasics: (actor, ids) => deps.project.readProjectBasics(actor, ids) },
     clock: deps.clock ?? systemClock,
   };
   const api: EgressModuleApi = {
     name: 'egress',
     ...entryUseCases(useCaseDeps),
     ...requestUseCases(useCaseDeps),
+    listRequestPage: requestPageUseCase(useCaseDeps),
     ...policyUseCases(useCaseDeps),
     ...blockedUseCases(useCaseDeps),
   };

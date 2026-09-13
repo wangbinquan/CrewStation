@@ -1,4 +1,4 @@
-import type { ProjectId, ServiceId } from '@crewstation/contracts';
+import type { ProjectId, RequestPageQuery, ServiceId } from '@crewstation/contracts';
 import type { ApiGrant } from '../domain/apiGrant';
 import type { ApiOperation } from '../domain/apiOperation';
 import type { ApiProxy } from '../domain/apiProxy';
@@ -33,4 +33,5 @@ export interface ApiRequestRepository {
   findPending(serviceId: ServiceId, operationKey: string): Promise<ApiRequest | undefined>;
   /** 不给 projectId 时列出全部；按创建时间倒序。 */
   list(projectId?: ProjectId): Promise<ApiRequest[]>;
+  listPage(query: Pick<RequestPageQuery, 'projectId' | 'state'> & { limit: number; before?: { createdAt: Date; id: string } }): Promise<ApiRequest[]>;
 }

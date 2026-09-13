@@ -1,6 +1,6 @@
 import type { EgressRequestState, EgressScope, EgressSource, ProjectId, UserId } from '@crewstation/contracts';
 import type { Executor } from '@crewstation/persistence';
-import { and, eq, or } from 'drizzle-orm';
+import { and, desc, eq, lt, or } from 'drizzle-orm';
 import type { BlockedRecord } from '../../domain/blockedRecord';
 import type { EgressEntry } from '../../domain/egressEntry';
 import type { EgressRequest } from '../../domain/egressRequest';
@@ -33,6 +33,10 @@ export function drizzleEgressRequestRepository(db: Executor): EgressRequestRepos
         : await db.select().from(requests).where(eq(requests.projectId, projectId)).orderBy(requests.createdAt, requests.id);
       return rows.map(toRequest);
     },
+    listPage: async (q) => (await db.select().from(requests).where(and(
+      q.projectId ? eq(requests.projectId, q.projectId) : undefined, q.state === 'all' ? undefined : eq(requests.state, q.state),
+      q.before ? or(lt(requests.createdAt, q.before.createdAt), and(eq(requests.createdAt, q.before.createdAt), lt(requests.id, q.before.id))) : undefined,
+    )).orderBy(desc(requests.createdAt), desc(requests.id)).limit(q.limit)).map(toRequest),
     findPending: (projectId, fqdn) => db.select().from(requests).where(and(eq(requests.projectId, projectId), eq(requests.fqdn, fqdn), eq(requests.state, 'pending'))).then(first),
   };
 }
