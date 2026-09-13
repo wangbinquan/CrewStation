@@ -43,15 +43,16 @@ export function withSlot(slots: ServiceSlots, state: SlotState, now: Date): Serv
   return { ...slots, [state.physical]: state, updatedAt: now };
 }
 
-/** 切流：待命槽必须就绪；给了 expectedActiveRelease 就必须与当前 active 槽一致（迟到切流不覆盖，R36）。 */
-export function switchTraffic(slots: ServiceSlots, toRole: SlotName, expectedActiveRelease: ReleaseId | undefined, now: Date): ServiceSlots {
+/** 确认当前与目标身份后检查就绪；null 是明确的空正式版本，不等于省略检查。 */
+export function switchTraffic(slots: ServiceSlots, toRole: SlotName, expectedActiveRelease: ReleaseId | null | undefined, now: Date, expectedTargetRelease?: ReleaseId): ServiceSlots {
   const target = physicalOf(slots, toRole);
   if (target === slots.active) throw precondition(`${toRole} 已经是当前线上槽`);
   const standby = slots[target];
-  if (standby.state !== 'ready' || !standby.releaseId) throw precondition('待命槽尚未就绪，不能切流', { state: standby.state });
   const current = slots[slots.active];
-  if (expectedActiveRelease && current.releaseId !== expectedActiveRelease) {
-    throw precondition('当前线上发布已变化，请刷新后再切流', { expected: expectedActiveRelease, actual: current.releaseId });
+  if (expectedActiveRelease !== undefined && (current.releaseId ?? null) !== expectedActiveRelease) {
+    throw precondition('当前线上发布已变化，请刷新后再切流', { expected: expectedActiveRelease, actual: current.releaseId ?? null });
   }
+  if (expectedTargetRelease !== undefined && standby.releaseId !== expectedTargetRelease) throw precondition('待命发布已变化，请重新确认上线目标', { expected: expectedTargetRelease, actual: standby.releaseId ?? null });
+  if (standby.state !== 'ready' || !standby.releaseId) throw precondition('待命槽尚未就绪，不能切流', { state: standby.state });
   return { ...slots, active: target, updatedAt: now };
 }

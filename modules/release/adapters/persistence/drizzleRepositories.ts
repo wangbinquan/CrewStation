@@ -20,14 +20,15 @@ export function drizzleReleaseRepository(db: Executor): ReleaseRepository {
   };
 }
 
-export function drizzleSlotRepository(db: Executor): SlotRepository {
+export function drizzleSlotRepository(db: Executor, lockForUpdate = false): SlotRepository {
   const slot = (raw: unknown): SlotState => {
     const v = (typeof raw === 'string' ? JSON.parse(raw) : raw) as SlotState & { updatedAt: string };
     return { ...v, updatedAt: new Date(v.updatedAt) };
   };
   return {
     get: async (serviceId) => {
-      const row = (await db.select().from(serviceSlots).where(eq(serviceSlots.serviceId, serviceId)))[0];
+      const query = db.select().from(serviceSlots).where(eq(serviceSlots.serviceId, serviceId));
+      const row = (await (lockForUpdate ? query.for('update') : query))[0];
       return row ? { serviceId: row.serviceId as ServiceId, active: row.active as PhysicalSlot, blue: slot(row.blue), green: slot(row.green), updatedAt: row.updatedAt } : undefined;
     },
     save: async (s) => {

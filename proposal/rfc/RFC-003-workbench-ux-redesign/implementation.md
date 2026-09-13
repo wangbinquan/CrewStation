@@ -362,3 +362,15 @@ release 的既有 tagger 端口经 platform 装配将确认 SHA 传给 scm。scm
 受理后定位到真实 releaseId，详情单独读该发布并在进行中刷新。未知 ID、读取失败或错服务记录不选择最新发布替代；状态文案区分受理／构建／迁移／部署／历史就绪，没有计时器模拟进度。历史标签可重新选择，构建与迁移日志携带精确 releaseId，接入项目始终保持管理路径。两槽并列、就绪试用入口与具名上线／回退仍在下一批，不把当前详情当成 J3 完成。
 
 新增 8 项向导／详情路由回归及 1 项真实工作台入口回归，后者使用 TaskStreamSocket 与 CodeMirror，验证草稿确认、session 来源接续和零停止／零推送命令。目录恢复、全部字段错误、重复标签、实际请求、失败保留、迟到回执、角色、管理空间、未知记录和焦点刷新后陈旧来源均覆盖。定向 **13 pass／0 fail、154 assertions**；最终 `bun run check` **926 pass／4 skip／0 fail**，930 tests、159 files、4654 assertions、76.01s；console build 成功。跳过项与前批相同。本批没有新的实浏览器证据或共享集群变更，RFC 保持实施中。
+
+发布记录：`0a2d3ca67f6be80720f1488c73e5d51f36779099` 已同步 main；[精确 SHA CI](https://github.com/wangbinquan/CrewStation/actions/runs/34755994609) 成功。该批 console build 727ms。
+
+## 第二十四批：T6 上线确认的两个版本与并发一致性
+
+原 expectedActiveRelease 只检查 truthy 值，不能表达首次上线时“仍无正式版本”；请求也没有锁定待命槽里的具体发布。现在 null 明确表示确认过空正式版本，expectedTargetRelease 固定目标，两者都在领域函数中核对；省略字段仍兼容旧 CLI／MCP。确认已失效时先返回 precondition，不进入迁移兼容性判断或写入，界面可刷新后重新让用户确认。权限、物理槽角色和破坏性迁移策略没有修改。
+
+实际 PostgreSQL 回归还复现了两个事务同时读到旧槽状态、第二个请求越过确认的问题。UnitOfWork 的事务 scope 读取 service_slots 时使用 FOR UPDATE；普通 read scope 仍是无更新锁查询。同一行的确认、更新、切换记录和领域事件处于原事务中，第二次请求等前一个提交后再读取事实。已有发布、部署、失败处理的槽更新均从事务 scope 先读再写，继续使用当前状态。
+
+新增两个领域边界、一个契约和一个真实数据库并发用例。并发用例只在测试库暂停第一事务，直接观察 PostgreSQL 锁等待后继续，验证普通查询仍可读、最终一成功一 precondition、仅一条切换记录和一个事件；没有用重跑或概率断言掩盖并发结果。原完整发布→部署→上线→回退模块用例也验证首次空值和固定目标。定向 **8 pass／0 fail、71 assertions**；最终 `bun run check` **930 pass／4 skip／0 fail**，934 tests、161 files、4670 assertions、75.08s；console build 621ms。跳过项与前批相同。
+
+本批只完善既有切流接口的确认保证，尚未完成两槽并列、具名上线／回退 UI 或真实 J3 旅程。没有新的实浏览器证据、共享集群写入、生产切流或 QA 会话变更；后续接入统一发布页。

@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
-import type { Actor, ProjectId, ServiceId, UserId } from '@crewstation/contracts';
+import type { Actor, ProjectId, ReleaseId, ServiceId, UserId } from '@crewstation/contracts';
 import { eventbusMigrations } from '@crewstation/eventbus';
 import type { FakeK8sClient } from '@crewstation/k8s';
 import { Resources, createFakeK8sClient } from '@crewstation/k8s';
@@ -106,7 +106,8 @@ describe.skipIf(!available)('release module', () => {
 
     await expect(release.api.switchTraffic({ userId: 'usr_ffffffffffffffffffffffffffffffff' as UserId, isAdmin: false }, serviceId, { toSlot: 'preview' })).rejects.toThrow('forbidden');
     await expect(release.api.switchTraffic(owner, serviceId, { toSlot: 'preview', expectedActiveRelease: dto.id })).rejects.toMatchObject({ kind: 'precondition' });
-    const switched = await release.api.switchTraffic(owner, serviceId, { toSlot: 'preview' });
+    await expect(release.api.switchTraffic(owner, serviceId, { toSlot: 'preview', expectedActiveRelease: null, expectedTargetRelease: 'rel_ffffffffffffffffffffffffffffffff' as ReleaseId })).rejects.toMatchObject({ kind: 'precondition' });
+    const switched = await release.api.switchTraffic(owner, serviceId, { toSlot: 'preview', expectedActiveRelease: null, expectedTargetRelease: dto.id });
     expect(switched.releaseId).toBe(dto.id);
     // 记的是发布从待命槽接管生产流量，不是物理槽名：首次晋级没有上一个发布。
     expect([switched.fromSlot, switched.toSlot]).toEqual(['preview', 'prod']);

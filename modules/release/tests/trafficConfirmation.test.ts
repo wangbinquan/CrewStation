@@ -1,0 +1,52 @@
+import { expect, test } from 'bun:test';
+import type { Actor, ProjectId, ReleaseId, ServiceId, UserId } from '@crewstation/contracts';
+import { eventbusMigrations } from '@crewstation/eventbus';
+import { fixedClock } from '@crewstation/kernel';
+import { createTestDatabase, testDatabaseAvailable } from '@crewstation/testkit';
+import { drizzleUnitOfWork } from '../adapters/persistence/drizzleUnitOfWork';
+import { switchTrafficUseCase } from '../application/switchTraffic';
+import { initialSlots } from '../domain/slots';
+import type { UnitOfWork } from '../ports/unitOfWork';
+import { releaseMigrations } from '../wiring';
+
+const available = await testDatabaseAvailable(), now = new Date('2026-09-13T01:00:00Z');
+const serviceId = `svc_${'a'.repeat(32)}` as ServiceId, projectId = `prj_${'b'.repeat(32)}` as ProjectId, releaseId = `rel_${'c'.repeat(32)}` as ReleaseId;
+const actor: Actor = { userId: `usr_${'d'.repeat(32)}` as UserId, isAdmin: false };
+function signal() { let resolve!: () => void; const promise = new Promise<void>((done) => { resolve = done; }); return { promise, resolve }; }
+
+test.skipIf(!available)('两个首次上线请求读取同一服务时串行核对；只落一次切换和事件，普通查询仍可读', async () => {
+  const db = await createTestDatabase([eventbusMigrations, releaseMigrations]), uow = drizzleUnitOfWork(db.db);
+  const firstRead = signal(), firstMayProceed = signal(), secondStarted = signal(); let reads = 0, secondSettled = false;
+  const pending: Array<Promise<unknown>> = [];
+  try {
+    await uow.run(async (scope) => {
+      const initial = initialSlots(serviceId, now);
+      await scope.slots.save({ ...initial, green: { ...initial.green, releaseId, state: 'ready', replicas: 1, readyReplicas: 1 } });
+      await scope.releases.insert({ id: releaseId, serviceId, projectId, tag: 'v0.1.0', commitSha: 'a'.repeat(40), branch: 'main', status: 'ready', targetSlot: 'green', pipeline: { step: 4 }, createdBy: actor.userId, createdAt: now, updatedAt: now });
+    });
+    const observed: UnitOfWork = { read: uow.read, run: (action) => uow.run((scope) => action({ ...scope, slots: { ...scope.slots, get: async (id) => {
+      const order = ++reads; if (order === 2) secondStarted.resolve();
+      const slots = await scope.slots.get(id);
+      if (order === 1) { firstRead.resolve(); await firstMayProceed.promise; }
+      return slots;
+    } } })) };
+    const switchTraffic = switchTrafficUseCase({ uow: observed, authorizer: { authorize: async () => {} }, services: { resolveServiceById: async () => ({ projectId, slug: 'demo', name: 'demo', namespace: 'cs-demo' }) }, clock: fixedClock(now.toISOString()) });
+    const input = { toSlot: 'preview' as const, expectedActiveRelease: null, expectedTargetRelease: releaseId };
+    pending.push(switchTraffic(actor, serviceId, input)); await firstRead.promise;
+    pending.push(switchTraffic(actor, serviceId, input).finally(() => { secondSettled = true; })); await secondStarted.promise;
+    // 直接观察 PostgreSQL 的锁等待；原查询不锁行，第二次请求会越过确认并提交。
+    let blocked = false; const deadline = Date.now() + 10_000;
+    while (!blocked && !secondSettled && Date.now() < deadline) {
+      const rows = await db.handle.client`SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE datname = current_database() AND pid <> pg_backend_pid() AND wait_event_type = 'Lock' AND query LIKE '%service_slots%') AS blocked`;
+      blocked = Boolean(rows[0]?.blocked); if (!blocked && !secondSettled) await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    expect(blocked).toBe(true); expect(secondSettled).toBe(false);
+    expect((await uow.read.slots.get(serviceId))?.active).toBe('blue');
+    firstMayProceed.resolve(); const results = await Promise.allSettled(pending);
+    expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+    expect(results.find((result) => result.status === 'rejected')).toMatchObject({ reason: { kind: 'precondition' } });
+    expect(await uow.read.switches.listByService(serviceId, 10)).toHaveLength(1);
+    const events = await db.handle.client`SELECT topic FROM platform_infra.domain_events WHERE topic = 'release.traffic-switched'`;
+    expect(events).toHaveLength(1);
+  } finally { firstMayProceed.resolve(); await Promise.allSettled(pending); await db.drop(); }
+}, 20_000);

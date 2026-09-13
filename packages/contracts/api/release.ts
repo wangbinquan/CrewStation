@@ -43,8 +43,10 @@ export const SlotDtoSchema = z.object({
 
 export const TrafficSwitchRequestSchema = z.object({
   toSlot: SlotNameSchema,
-  /** 与当前 active 槽的 Release 不一致时拒绝（迟到切流不覆盖）。 */
-  expectedActiveRelease: ReleaseIdSchema.optional(),
+  /** null 明确表示确认时尚无正式版本；省略保留旧客户端语义。 */
+  expectedActiveRelease: ReleaseIdSchema.nullable().optional(),
+  /** 待命版本被后来发布替换时拒绝，不把旧确认应用到新目标。 */
+  expectedTargetRelease: ReleaseIdSchema.optional(),
   reason: z.string().max(500).optional(),
 });
 
