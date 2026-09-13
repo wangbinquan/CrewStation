@@ -1,5 +1,5 @@
 import type { ProjectId, TaskId, UserId } from '@crewstation/contracts';
-import { OpenDevSessionRequestSchema, ProjectIdSchema, PublishRequestSchema, SendAgentMessageRequestSchema, StartDevAgentRequestSchema, TaskIdSchema } from '@crewstation/contracts';
+import { OpenDevSessionRequestSchema, ProjectIdSchema, PublishDevSessionRequestSchema, SendAgentMessageRequestSchema, StartDevAgentRequestSchema, TaskIdSchema } from '@crewstation/contracts';
 import { ComparisonDetailQuerySchema, ComparisonTargetSchema } from '@crewstation/contracts';
 import type { AppEnv } from '@crewstation/http';
 import { actorFrom, parseBody, parseParams, parseQuery } from '@crewstation/http';
@@ -35,7 +35,7 @@ export function devSessionRoutes(api: DevSessionModuleApi, isAdmin: (userId: Use
     return c.json(await api.releaseSession(await actor(c), parseParams(c, projectParams).projectId as ProjectId, { force: force === 'true', ...(expectedTaskId ? { expectedTaskId: expectedTaskId as TaskId } : {}) }));
   });
   r.get('/v1/projects/:projectId/branches', async (c) => c.json({ items: await api.listBranches(await actor(c), parseParams(c, projectParams).projectId as ProjectId) }));
-  r.post('/v1/projects/:projectId/publish', async (c) => c.json(await api.publish(await actor(c), parseParams(c, projectParams).projectId as ProjectId, await parseBody(c, PublishRequestSchema)), 202));
+  r.post('/v1/projects/:projectId/publish', async (c) => c.json(await api.publish(await actor(c), parseParams(c, projectParams).projectId as ProjectId, await parseBody(c, PublishDevSessionRequestSchema)), 202));
   r.get('/v1/tasks/:taskId/agents', async (c) => c.json({ items: await api.listAgents(await actor(c), parseParams(c, z.object({ taskId: TaskIdSchema })).taskId as TaskId) }));
   r.post('/v1/tasks/:taskId/agents', async (c) => c.json(await api.startAgent(await actor(c), parseParams(c, z.object({ taskId: TaskIdSchema })).taskId as TaskId, await parseBody(c, StartDevAgentRequestSchema)), 201));
   r.post('/v1/tasks/:taskId/agents/:agentId/messages', async (c) => { const p = parseParams(c, agentParams); await api.sendMessage(await actor(c), p.taskId as TaskId, p.agentId, await parseBody(c, SendAgentMessageRequestSchema)); return c.body(null, 204); });

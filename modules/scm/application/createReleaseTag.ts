@@ -15,6 +15,7 @@ export function createReleaseTagUseCase({ uow, gitlab }: ScmUseCaseDeps) {
     if (tags.some((t) => t.name === name)) throw conflict(`标签 ${name} 已存在`, { tag: name });
     const branch = await gitlab.getBranch(binding.remoteProjectId, input.branch);
     if (!branch) throw notFound('分支', input.branch);
+    if (input.expectedCommitSha && input.expectedCommitSha !== branch.headSha) throw conflict('远端分支已变化，请重新确认发布来源', { branch: input.branch, expected: input.expectedCommitSha, actual: branch.headSha });
     const created = await gitlab.createTag(binding.remoteProjectId, { name, ref: branch.headSha, message: `CrewStation release ${name}` });
     return { tag: created.name, commitSha: created.commitSha };
   };

@@ -1,4 +1,4 @@
-import type { Actor, AgentInstanceDto, BranchDto, DevSessionDto, OpenDevSessionRequest, ProjectId, PublishRequest, ReleaseDto, SendAgentMessageRequest, StartDevAgentRequest, TaskId, WorkspaceStatusDto } from '@crewstation/contracts';
+import type { Actor, AgentInstanceDto, BranchDto, DevSessionDto, OpenDevSessionRequest, ProjectId, PublishDevSessionRequest, ReleaseDto, SendAgentMessageRequest, StartDevAgentRequest, TaskId, WorkspaceStatusDto } from '@crewstation/contracts';
 import type { ComparisonDetailQuery, ComparisonDetails, ComparisonTarget, VersionComparisonDto } from '@crewstation/contracts';
 import type { NativeTerminalApi } from './nativeTerminalApi';
 import type { SaveWorkspaceLayoutRequest, WorkspaceLayoutDto } from '@crewstation/contracts';
@@ -23,7 +23,7 @@ export interface DevSessionModuleApi extends NativeTerminalApi {
   sendMessage(actor: Actor, taskId: TaskId, agentId: string, input: SendAgentMessageRequest): Promise<void>;
   cancelAgent(actor: Actor, taskId: TaskId, agentId: string): Promise<void>;
   listAgents(actor: Actor, taskId: TaskId): Promise<AgentInstanceDto[]>;
-  publish(actor: Actor, projectId: ProjectId, input: PublishRequest): Promise<ReleaseDto>;
+  publish(actor: Actor, projectId: ProjectId, input: PublishDevSessionRequest): Promise<ReleaseDto>;
   touch(taskId: TaskId): Promise<void>;
   sendIdleReminders(): Promise<number>;
 }

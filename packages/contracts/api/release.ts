@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { ReleaseStatusSchema, SlotNameSchema } from '../events/topics';
 import { ReleaseIdSchema, ServiceIdSchema, UserIdSchema } from '../ids';
+import { FullCommitShaSchema } from './scm';
 
 export const ReleaseDtoSchema = z.object({
   id: ReleaseIdSchema,
@@ -21,6 +22,8 @@ export const ReleaseDtoSchema = z.object({
 /** 发布：平台检查未提交内容→代推→打标签→构建→兼容迁移→待命槽。 */
 export const PublishRequestSchema = z.object({
   branch: z.string().min(1),
+  /** 已向用户展示并确认的来源；远端分支变化需重新确认。 */
+  expectedCommitSha: FullCommitShaSchema.optional(),
   /** 明确版本号或递增级别；缺省为 patch 递增。 */
   version: z.union([z.string().regex(/^v\d+\.\d+\.\d+$/), z.enum(['major', 'minor', 'patch'])]).default('patch'),
   message: z.string().max(500).optional(),

@@ -42,7 +42,7 @@ beforeAll(async () => {
   manifestYaml = baseManifest('migration: { compatibility: none, destructive: false, rollback: switch-back }');
   release = createReleaseModule({
     db: tdb.db, k8s,
-    tagger: { createReleaseTag: async () => { tagCounter += 1; return { tag: `v0.1.${tagCounter}`, commitSha: `sha${tagCounter}` }; } },
+    tagger: { createReleaseTag: async (_service, input) => { tagCounter += 1; return { tag: `v0.1.${tagCounter}`, commitSha: input.expectedCommitSha ?? `sha${tagCounter}` }; } },
     repo: {
       readFile: async (_s, _ref, path) => (path === 'crewstation.yaml' ? manifestYaml : path === 'openapi.yaml' ? 'openapi: 3.1.0\npaths: {}\n' : undefined),
       repositoryUrl: async () => ({ httpUrl: 'http://gitlab.local/crewstation/demo.git', credentialSecretName: 'demo-git' }),
@@ -68,8 +68,9 @@ const markDeployment = async (name: string, ready: number) => k8s.mergePatch(Res
 
 describe.skipIf(!available)('release module', () => {
   test('发布→构建→部署待命槽→就绪→切流→回退', async () => {
-    const dto = await release.api.publish(owner, serviceId, { branch: 'main', version: 'patch' });
+    const dto = await release.api.publish(owner, serviceId, { branch: 'main', version: 'patch', expectedCommitSha: 'a'.repeat(40) });
     expect(dto.status).toBe('pending');
+    expect(dto.commitSha).toBe('a'.repeat(40));
     await expect(release.api.publish(owner, serviceId, { branch: 'main', version: 'patch' })).rejects.toMatchObject({ kind: 'conflict' });
 
     expect(await release.api.runPipelineStep(dto.id)).toEqual({ done: false, retryAfterSeconds: 5 });

@@ -102,6 +102,8 @@ detach 显示与结束进程分开。关闭浏览器、切换工具、跳转发�
 | 当前开发会话 | 显示当前会话 taskId 的可读关联、实际分支、HEAD、未提交文件；不能用另一个下拉分支偷偷承接当前 HEAD | `api.devSession.publish`，保留服务端未提交检查和代推 |
 | 已推送分支 | 从远端分支选择；明确“只包含远端已推送提交”；显示远端 SHA；不声称已检查容器 | `api.services.publish`，保留无开发会话发布能力 |
 
+来源确认采用 `expectedCommitSha`（完整 40／64 位 SHA）；开发来源另带 `expectedTaskId`。两字段可选以兼容既有 CLI／MCP，新工作台始终发送。开发发布先核对会话和实际 HEAD，再推送固定 SHA 到已确认分支，不在推送命令里重新取 HEAD；release 经原 tagger 端口把 SHA 传给 scm，scm 核对远端分支后按固定 SHA 打标签。检查时来源变化返回 precondition／conflict，保留输入并要求重新检查；检查后分支继续前进也不能把标签改打到后来提交。该修正分别落在现有 contracts、dev-session L5、release L4、scm L3 和 platform 装配，不新增模块或改变层级。
+
 版本递增仍发送已有 major／minor／patch；UI 计算的下一标签只是候选，服务端返回的 tag／SHA 是事实。版本冲突时保留输入并刷新已存在标签，不能静默换版本重发。
 
 发布进行中自动定位到该 releaseId，用户离开后从概览／历史可继续查看。返回 202 只代表已受理，不能显示“发布成功”。构建、迁移、部署步骤以后端状态为准；没有状态数据的细分步骤显示待查询，不用计时器模拟进度。

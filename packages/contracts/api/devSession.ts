@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { ProjectIdSchema, SlugSchema, TaskIdSchema, UserIdSchema } from '../ids';
 import { AgentPermissionSchema } from '../manifest/tasks';
 import { PreviewStateSchema } from '../taskrunner/protocol';
+import { PublishRequestSchema } from './release';
 
 export const DevSessionStateSchema = z.enum(['creating', 'running', 'releasing', 'released', 'failed']);
 
@@ -21,6 +22,8 @@ export const DevSessionDtoSchema = z.object({
 });
 
 export const OpenDevSessionRequestSchema = z.object({ branch: z.string().min(1) });
+export const PublishDevSessionRequestSchema = PublishRequestSchema.extend({ expectedTaskId: TaskIdSchema.optional() });
+export type PublishDevSessionRequest = z.infer<typeof PublishDevSessionRequestSchema>;
 
 /** 分支列表：各分支 HEAD 与两槽部署提交的落后数，供开会话前选择。 */
 export const BranchDtoSchema = z.object({

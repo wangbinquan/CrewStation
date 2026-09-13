@@ -5,7 +5,7 @@ import type { SaveWorkspaceLayoutRequest, WorkspaceLayoutDto } from '@crewstatio
 import type { AgentActivityPage, AgentActivityQuery, ReadAgentActivityRequest } from '@crewstation/contracts';
 import type { Transport } from '../httpTransport';
 import type { ItemsPage } from '../itemsPage';
-import type { PublishInput, StartDevAgentInput } from '../requestInputs';
+import type { PublishDevSessionInput, StartDevAgentInput } from '../requestInputs';
 import { segment } from '../requestUrl';
 
 /** DELETE /v1/projects/:projectId/dev-session 的响应：释放后的会话与容器里尚未推送的提交（`<sha> <subject>`）。 */
@@ -46,7 +46,7 @@ export interface DevSessionResource {
   /** GET /v1/projects/:projectId/branches：各分支 HEAD 与落后两槽的提交数。 */
   listBranches(projectId: string): Promise<ItemsPage<BranchDto>>;
   /** POST /v1/projects/:projectId/publish（202）：有未提交更改时 412 precondition，details.uncommitted 列出路径。 */
-  publish(projectId: string, input: PublishInput): Promise<ReleaseDto>;
+  publish(projectId: string, input: PublishDevSessionInput): Promise<ReleaseDto>;
   /** GET /v1/tasks/:taskId/agents */
   listAgents(taskId: string): Promise<ItemsPage<AgentInstanceDto>>;
   /** POST /v1/tasks/:taskId/agents（201）：启动一个流式交互 Agent。 */

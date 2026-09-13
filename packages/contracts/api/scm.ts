@@ -27,6 +27,8 @@ export const RepositoryBindingDtoSchema = z.object({
 export const TagDtoSchema = z.object({ name: z.string(), commitSha: z.string(), createdAt: z.iso.datetime(), protected: z.boolean() });
 
 export const CommitShaSchema = z.string().regex(/^[0-9a-f]{7,64}$/, 'commit sha 必须是 7–64 位十六进制');
+/** 发布确认不能使用可能歧义的缩写提交。 */
+export const FullCommitShaSchema = z.string().regex(/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/, '发布确认必须使用完整 40 或 64 位提交 SHA');
 
 /** 分支列表查询：给出两槽当前部署的提交，服务端据此计算各分支的落后数。 */
 export const ListBranchesQuerySchema = z.object({ previewSha: CommitShaSchema.optional(), prodSha: CommitShaSchema.optional() });
@@ -39,6 +41,7 @@ export const TagBumpSchema = z.enum(['major', 'minor', 'patch']);
 /** 发布打标：按 bump 递增最新标签，或显式指定完整标签名；二者只能给一个。 */
 export const CreateReleaseTagRequestSchema = z.object({
   branch: z.string().min(1),
+  expectedCommitSha: FullCommitShaSchema.optional(),
   bump: TagBumpSchema.optional(),
   tag: ReleaseTagNameSchema.optional(),
 }).refine((v) => (v.bump === undefined) !== (v.tag === undefined), { message: 'bump 与 tag 必须且只能指定一个' });

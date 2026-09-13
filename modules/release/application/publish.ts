@@ -15,7 +15,7 @@ export function publishUseCase(deps: ReleaseUseCaseDeps) {
     await authorizer.authorize(actor, svc.projectId, 'publish');
     const inProgress = await uow.read.releases.findInProgress(serviceId);
     if (inProgress) throw conflict(`发布 ${inProgress.tag} 仍在进行中（${inProgress.status}）`, { releaseId: inProgress.id });
-    const { tag, commitSha } = await tagger.createReleaseTag(serviceId, { branch: input.branch, version: input.version });
+    const { tag, commitSha } = await tagger.createReleaseTag(serviceId, { branch: input.branch, version: input.version, ...(input.expectedCommitSha ? { expectedCommitSha: input.expectedCommitSha } : {}) });
     const now = clock.now();
     const dto = await uow.run(async (scope) => {
       const slots = (await scope.slots.get(serviceId)) ?? initialSlots(serviceId, now);

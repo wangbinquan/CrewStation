@@ -120,7 +120,7 @@ function composeDelivery(deps: PlatformModuleDeps, core: ReturnType<typeof compo
   const { project, config, data, scm, apiCatalog, hosts, isAdmin, resolveById } = core;
   const release = createReleaseModule({
     db, k8s, hosts, logger, isAdmin: (id) => isAdmin(id), authorizer: project.api, services: { resolveServiceById: resolveById },
-    tagger: { createReleaseTag: (serviceId, { branch, version }) => scm.api.createReleaseTag(serviceId, version.startsWith('v') ? { branch, tag: version } : { branch, bump: version as 'major' | 'minor' | 'patch' }) },
+    tagger: { createReleaseTag: (serviceId, { branch, version, expectedCommitSha }) => scm.api.createReleaseTag(serviceId, { branch, ...(expectedCommitSha ? { expectedCommitSha } : {}), ...(version.startsWith('v') ? { tag: version } : { bump: version as 'major' | 'minor' | 'patch' }) }) },
     repo: {
       readFile: scm.api.readFile,
       repositoryUrl: async (serviceId) => {

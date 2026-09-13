@@ -1,6 +1,6 @@
 import type {
   ComputeProfileDto, CreateProjectRequest, ListDeliveriesQuery, LogQuery, PublishRequest, RequestTaskDataBinding, ServicePlanDto, SetConfigItemRequest,
-  StartDevAgentRequest, TaskProfileDto,
+  PublishDevSessionRequest, StartDevAgentRequest, TaskProfileDto,
 } from '@crewstation/contracts';
 
 /**
@@ -11,6 +11,7 @@ export type WithDefaults<T, K extends keyof T> = Omit<T, K> & Partial<Pick<T, K>
 
 export type CreateProjectInput = WithDefaults<CreateProjectRequest, 'kind' | 'template'>;
 export type PublishInput = WithDefaults<PublishRequest, 'version'>;
+export type PublishDevSessionInput = WithDefaults<PublishDevSessionRequest, 'version'>;
 export type StartDevAgentInput = WithDefaults<StartDevAgentRequest, 'permission'>;
 /** 路径已带 env，请求体里的 env 由客户端按路径补齐。 */
 export type SetConfigItemInput = WithDefaults<Omit<SetConfigItemRequest, 'env'>, 'isSecret'>;

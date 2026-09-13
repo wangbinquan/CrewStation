@@ -154,7 +154,9 @@ describe.skipIf(!available)('scm × 本机 GitLab', () => {
     const protection = (await client.listProtectedTags(id)).find((t) => t.name === 'v*');
     expect(protection?.createAccessLevels.map((l) => l.accessLevel)).toEqual([40]);
     const main = await client.getBranch(id, 'main');
-    expect(await scm.api.createReleaseTag(serviceId, { branch: 'main', bump: 'minor' })).toEqual({ tag: 'v0.1.0', commitSha: main.commit.id });
+    await expect(scm.api.createReleaseTag(serviceId, { branch: 'main', bump: 'minor', expectedCommitSha: 'f'.repeat(40) })).rejects.toMatchObject({ kind: 'conflict', details: { actual: main.commit.id } });
+    expect((await scm.api.listTags(actor, serviceId))).toHaveLength(0);
+    expect(await scm.api.createReleaseTag(serviceId, { branch: 'main', bump: 'minor', expectedCommitSha: main.commit.id })).toEqual({ tag: 'v0.1.0', commitSha: main.commit.id });
     expect((await scm.api.createReleaseTag(serviceId, { branch: 'main', bump: 'patch' })).tag).toBe('v0.1.1');
     await expect(scm.api.createReleaseTag(serviceId, { branch: 'main', tag: 'v0.1.1' })).rejects.toMatchObject({ kind: 'conflict' });
     await expect(scm.api.createReleaseTag(serviceId, { branch: 'no-such-branch', bump: 'patch' })).rejects.toMatchObject({ kind: 'not_found' });

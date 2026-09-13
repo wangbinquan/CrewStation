@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import type { UserId } from '@crewstation/contracts';
+import type { TaskId, UserId } from '@crewstation/contracts';
 import type { FetchLike, TaskStreamFrame } from '../index';
 import { ApiClientError, createApiClient, isApiClientError, kindForStatus, parseErrorEnvelope, parseTaskStreamFrame, taskStreamUrl } from '../index';
 
@@ -43,6 +43,17 @@ async function caught(call: () => Promise<unknown>): Promise<ApiClientError> {
 }
 
 describe('createApiClient：请求形状', () => {
+  test('两个发布来源均保留确认 SHA，开发来源另保留会话 ID，仍调用各自真实端点', async () => {
+    const { calls, fetchImpl } = fakeFetch(() => json(202, {}));
+    const client = createApiClient({ fetch: fetchImpl });
+    const input = { branch: 'main', expectedCommitSha: 'a'.repeat(40), expectedTaskId: `tsk_${'b'.repeat(32)}` as TaskId };
+    await client.devSession.publish('project one', input);
+    await client.services.publish('service two', { branch: input.branch, expectedCommitSha: input.expectedCommitSha });
+    expect(calls.map((call) => [call.method, call.url])).toEqual([['POST', '/v1/projects/project%20one/publish'], ['POST', '/v1/services/service%20two/releases']]);
+    expect(JSON.parse(calls[0]!.body!)).toEqual(input);
+    expect(JSON.parse(calls[1]!.body!)).toEqual({ branch: 'main', expectedCommitSha: input.expectedCommitSha });
+  });
+
   test('创建向导从真实模板目录读取，模板与套餐选择原样发给创建接口', async () => {
     const { calls, fetchImpl } = fakeFetch(() => json(200, { items: [] }));
     const client = createApiClient({ fetch: fetchImpl });

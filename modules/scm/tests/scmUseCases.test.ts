@@ -111,6 +111,20 @@ describe('ensureRepository', () => {
 });
 
 describe('createReleaseTag', () => {
+  test('远端分支已离开确认 SHA 时拒绝打标；确认后前进仍只给确认提交打标', async () => {
+    const h = harness(); await h.ensure(serviceId, projectId, input);
+    const confirmed = h.gitlab.get('100').branches.get('main')!.headSha;
+    await expect(h.tag(serviceId, { branch: 'main', bump: 'patch', expectedCommitSha: 'f'.repeat(40) })).rejects.toMatchObject({ kind: 'conflict', details: { actual: confirmed } });
+    expect(h.gitlab.get('100').tags).toHaveLength(0);
+    const create = h.gitlab.gateway.createTag;
+    h.gitlab.gateway.createTag = async (id, value) => {
+      h.gitlab.setBranch(id, 'main', 'b'.repeat(40));
+      return create(id, value);
+    };
+    expect(await h.tag(serviceId, { branch: 'main', bump: 'patch', expectedCommitSha: confirmed })).toEqual({ tag: 'v0.0.1', commitSha: confirmed });
+    expect(h.gitlab.get('100').branches.get('main')?.headSha).toBe('b'.repeat(40));
+  });
+
   test('无标签 minor→v0.1.0；patch→v0.1.1；显式 v2.0.0；手工标签被忽略；已存在→conflict；分支不存在→not_found', async () => {
     const h = harness();
     await h.ensure(serviceId, projectId, input);
