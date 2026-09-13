@@ -8,20 +8,19 @@ import { Card } from '../../../shared/ui/Card';
 import { FormField } from '../../../shared/ui/FormField';
 import { DefinitionList } from '../../../shared/ui/DefinitionList';
 import { QueryStatus } from '../../../shared/ui/QueryStatus';
-import { UnsavedChangesGuard } from '../../../shared/navigation/UnsavedChangesGuard';
 import type { PublishSource } from '../../../shared/project/releaseSearch';
 import { usePublishPreparation } from '../model/usePublishPreparation';
+import type { ReleaseActions } from '../model/useReleaseActions';
 import { PublishSourceFields } from './PublishSourceFields';
 import styles from './PublishForm.module.css';
 
-export interface PublishFormProps { readonly serviceId: string; readonly projectId: string; readonly source: PublishSource; readonly canPublish: boolean; readonly onSource: (source: PublishSource) => void; readonly onClose: () => void; readonly onAccepted: (release: ReleaseDto) => void }
+export interface PublishFormProps { readonly serviceId: string; readonly projectId: string; readonly source: PublishSource; readonly canPublish: boolean; readonly actions: ReleaseActions; readonly onSource: (source: PublishSource) => void; readonly onClose: () => void; readonly onAccepted: (release: ReleaseDto) => void }
 /** 唯一发布准备：来源、只读检查、明确发布；202 交给实际 releaseId 详情继续观察。 */
-export function PublishForm({ serviceId, projectId, source, canPublish, onSource, onClose, onAccepted }: PublishFormProps) {
+export function PublishForm({ serviceId, projectId, source, canPublish, actions, onSource, onClose, onAccepted }: PublishFormProps) {
   const t = useT(), date = useDateText(), id = useId(), form = useRef<HTMLFormElement>(null);
-  const p = usePublishPreparation(projectId, serviceId, source, canPublish, onAccepted);
+  const p = usePublishPreparation(projectId, serviceId, source, canPublish && actions.busy !== 'traffic', actions, onAccepted);
   useEffect(() => { if (Object.keys(p.errors).length) form.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus(); }, [p.errors]);
   return <Card compact title={t('release.prepare.title')} extra={<Button disabled={p.busy} onClick={onClose}>{t('release.prepare.close')}</Button>}>
-    <UnsavedChangesGuard dirty={p.dirty || p.busy} scope={t('release.prepare.title')} allowNavigate={(current, next) => p.accepted.current || (!p.busy && current.pathname === next.pathname && 'source' in next.search && !!next.search.source)} />
     <ol className={styles.steps}>{['source', 'check', 'version'].map((step, index) => <li key={step} aria-current={p.step === index ? 'step' : undefined}>{index + 1}. {t(`release.prepare.step.${step}`)}</li>)}</ol>
     {!canPublish ? <ActionNote tone="neutral">{t('release.prepare.noPermission')}</ActionNote> : null}
     {p.step === 0 ? <PublishSourceFields preparation={p} onSource={onSource} /> : <>
@@ -47,7 +46,7 @@ export function PublishForm({ serviceId, projectId, source, canPublish, onSource
         {p.tags.error ? <Button disabled={p.busy || p.tags.isFetching} onClick={() => void p.tags.refetch()}>{t('release.prepare.refreshTags')}</Button> : null}
         <ActionNote tone="neutral">{t('release.prepare.productionWarning')}</ActionNote>
         <Button disabled={p.busy} onClick={() => p.setStep(1)}>{t('release.prepare.back')}</Button>
-        <Button type="submit" variant="primary" disabled={p.busy || !canPublish || p.tags.isPending || !!p.tags.error || p.stale}>{t(p.busy ? 'release.publish.submitting' : 'release.prepare.submit')}</Button>
+        <Button type="submit" variant="primary" disabled={p.busy || !!actions.busy || !canPublish || p.tags.isPending || !!p.tags.error || p.stale}>{t(p.busy ? 'release.publish.submitting' : 'release.prepare.submit')}</Button>
       </form>}
     </>}
     {p.error ? <ActionNote tone="error">{p.error} {t('release.prepare.recheck')}</ActionNote> : null}

@@ -18,6 +18,9 @@ export function switchTrafficUseCase(deps: Pick<ReleaseUseCaseDeps, 'uow' | 'aut
       const slots = await scope.slots.get(serviceId);
       if (!slots) throw precondition('服务尚无任何部署');
       const next = switchTraffic(slots, input.toSlot, input.expectedActiveRelease, now, input.expectedTargetRelease);
+      // publish 在同一槽锁内登记目标；流水线结束前不能把它将覆盖的待命槽变成线上。
+      const inProgress = await scope.releases.findInProgress(serviceId);
+      if (inProgress) throw precondition(`发布 ${inProgress.tag} 仍在进行中（${inProgress.status}），请等待结束后重新确认上线或回退`, { releaseId: inProgress.id });
       const target = physicalOf(slots, input.toSlot);
       const currentRelease = slots[slots.active].releaseId ? await scope.releases.getById(slots[slots.active].releaseId!) : undefined;
       const targetRelease = slots[target].releaseId ? await scope.releases.getById(slots[target].releaseId!) : undefined;

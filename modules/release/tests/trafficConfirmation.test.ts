@@ -50,3 +50,30 @@ test.skipIf(!available)('两个首次上线请求读取同一服务时串行核�
     expect(events).toHaveLength(1);
   } finally { firstMayProceed.resolve(); await Promise.allSettled(pending); await db.drop(); }
 }, 20_000);
+
+test.skipIf(!available)('旧待命版本仍就绪时，进行中的发布阻止切流；发布失败后可重新确认原版本', async () => {
+  const db = await createTestDatabase([eventbusMigrations, releaseMigrations]), uow = drizzleUnitOfWork(db.db);
+  const pendingId = `rel_${'e'.repeat(32)}` as ReleaseId;
+  try {
+    await uow.run(async (scope) => {
+      const initial = initialSlots(serviceId, now);
+      await scope.slots.save({ ...initial, green: { ...initial.green, releaseId, state: 'ready', replicas: 1, readyReplicas: 1 } });
+      const base = { serviceId, projectId, commitSha: 'a'.repeat(40), branch: 'main', targetSlot: 'green' as const, pipeline: { step: 0 }, createdBy: actor.userId, createdAt: now, updatedAt: now };
+      await scope.releases.insert({ ...base, id: releaseId, tag: 'v0.1.0', status: 'ready' });
+      await scope.releases.insert({ ...base, id: pendingId, tag: 'v0.2.0', status: 'pending' });
+    });
+    const change = switchTrafficUseCase({ uow, authorizer: { authorize: async () => {} }, services: { resolveServiceById: async () => ({ projectId, slug: 'demo', name: 'demo', namespace: 'cs-demo' }) }, clock: fixedClock(now.toISOString()) });
+    const input = { toSlot: 'preview' as const, expectedActiveRelease: null, expectedTargetRelease: releaseId };
+    for (const status of ['pending', 'building', 'migrating', 'deploying'] as const) {
+      await uow.run(async (scope) => { const release = (await scope.releases.getById(pendingId))!; await scope.releases.update({ ...release, status }); });
+      await expect(change(actor, serviceId, input)).rejects.toMatchObject({ kind: 'precondition', details: { releaseId: pendingId } });
+      expect((await uow.read.slots.get(serviceId))?.active).toBe('blue');
+    }
+    expect(await uow.read.switches.listByService(serviceId, 10)).toHaveLength(0);
+    const events = await db.handle.client`SELECT topic FROM platform_infra.domain_events WHERE topic = 'release.traffic-switched'`;
+    expect(events).toHaveLength(0);
+    await uow.run(async (scope) => { const release = (await scope.releases.getById(pendingId))!; await scope.releases.update({ ...release, status: 'failed' }); });
+    expect((await change(actor, serviceId, input)).releaseId).toBe(releaseId);
+    expect(await uow.read.switches.listByService(serviceId, 10)).toHaveLength(1);
+  } finally { await db.drop(); }
+});

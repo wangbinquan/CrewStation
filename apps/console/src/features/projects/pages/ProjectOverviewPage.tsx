@@ -7,7 +7,6 @@ import { PageHeader } from '../../../shared/ui/PageHeader';
 import { QueryStatus } from '../../../shared/ui/QueryStatus';
 import { ProjectStateBadge } from '../components/ProjectStateBadge';
 import { SlotsSection } from '../components/SlotsSection';
-import { useProjectOwnership } from '../model/useProjectOwnership';
 import { useProjectService } from '../model/useProjectService';
 import styles from './ProjectOverviewPage.module.css';
 
@@ -16,7 +15,6 @@ export function ProjectOverviewPage(): ReactElement {
   const t = useT();
   const { projectId, space } = useProjectScope();
   const { project, serviceId, isPending, error } = useProjectService(projectId);
-  const { isOwner } = useProjectOwnership(projectId);
   return (
     <>
       <PageHeader
@@ -42,7 +40,7 @@ export function ProjectOverviewPage(): ReactElement {
       ) : null}
       <QueryStatus isPending={isPending} error={error} loadingKey="projects.overview.loading" errorKey="projects.overview.error" />
       {serviceId === undefined && !isPending ? <p className={styles.note}>{t('projects.overview.noService')}</p> : null}
-      {serviceId !== undefined ? <SlotsSection serviceId={serviceId} canSwitch={isOwner} /> : null}
+      {serviceId !== undefined ? <SlotsSection serviceId={serviceId} /> : null}
       <div className={styles.identity}>
         <Link to={PROJECT_PATHS[space].settings} params={{ projectId }} search={{ tab: 'members' }}>{t('settings.tab.members')}</Link>
         <Link to={PROJECT_PATHS[space].settings} params={{ projectId }} search={{ tab: 'repository' }}>{t('settings.tab.repository')}</Link>

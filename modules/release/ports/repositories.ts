@@ -12,6 +12,8 @@ export interface ReleaseRepository {
 }
 
 export interface SlotRepository {
+  /** 首次发布建行；遇到已有行不覆盖它的版本、状态或 active 位置。 */
+  initialize(slots: ServiceSlots): Promise<void>;
   get(serviceId: ServiceId): Promise<ServiceSlots | undefined>;
   save(slots: ServiceSlots): Promise<void>;
 }

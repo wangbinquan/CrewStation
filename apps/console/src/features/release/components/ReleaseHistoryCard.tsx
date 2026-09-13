@@ -12,15 +12,15 @@ import { isInFlight } from '../model/releaseStatus';
 import { ReleaseRow } from './ReleaseRow';
 import styles from './ReleaseHistoryCard.module.css';
 
-/** 构建／迁移／部署期间的轮询间隔；全部进入终态后停。 */
-const IN_FLIGHT_POLL_MS = 5_000;
+/** 当前页前台有界刷新，以发现其他人新发起的发布；后台暂停。 */
+const HISTORY_POLL_MS = 5_000;
 
 export function ReleaseHistoryCard({ serviceId, onSelect }: { readonly serviceId: string; readonly onSelect: (releaseId: string) => void }): ReactElement {
   const t = useT();
   const releases = useApiQuery(queryKeys.releases(serviceId), () => api.services.listReleases(serviceId));
   const items = releases.data?.items ?? [];
   const running = items.some((release) => isInFlight(release.status));
-  usePollingRefetch(releases.refetch, IN_FLIGHT_POLL_MS, running);
+  usePollingRefetch(releases.refetch, HISTORY_POLL_MS);
   const columns = [
     t('release.history.columnTag'), t('release.history.columnStatus'), t('release.history.columnCommit'),
     t('release.history.columnBranch'), t('release.history.columnImage'), t('release.history.columnCreatedAt'),

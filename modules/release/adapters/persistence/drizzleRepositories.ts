@@ -26,6 +26,7 @@ export function drizzleSlotRepository(db: Executor, lockForUpdate = false): Slot
     return { ...v, updatedAt: new Date(v.updatedAt) };
   };
   return {
+    initialize: async (s) => { await db.insert(serviceSlots).values(s).onConflictDoNothing({ target: serviceSlots.serviceId }); },
     get: async (serviceId) => {
       const query = db.select().from(serviceSlots).where(eq(serviceSlots.serviceId, serviceId));
       const row = (await (lockForUpdate ? query.for('update') : query))[0];
