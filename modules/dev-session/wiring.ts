@@ -8,8 +8,10 @@ import { readMigrationDir } from '@crewstation/persistence';
 import type { Hono } from 'hono';
 import { yamlManifestParser } from './adapters/manifest/yamlManifestParser';
 import { drizzleReminderRepository } from './adapters/persistence/drizzleReminderRepository';
+import { drizzleNativeTerminals } from './adapters/persistence/drizzleNativeTerminals';
 import type { DevSessionModuleApi } from './api/moduleApi';
 import { agentUseCases } from './application/agents';
+import { nativeTerminalUseCases } from './application/nativeTerminals';
 import type { DevSessionUseCaseDeps } from './application/dependencies';
 import { idleReminderUseCase } from './application/idleReminder';
 import { publishFromSessionUseCase } from './application/publishFromSession';
@@ -17,6 +19,7 @@ import { sessionLifecycleUseCases } from './application/sessionLifecycle';
 import { workspaceStatusUseCase } from './application/workspaceStatus';
 import { versionComparisonUseCases } from './application/versionComparison';
 import { devSessionRoutes } from './http/devSessionRoutes';
+import { nativeTerminalRoutes } from './http/nativeTerminalRoutes';
 import type { ComputeCatalog, DevSessionSettings, McpCredentials, Notifier, ProjectAuthorizer, Releases, ServiceResolver, SourceControl } from './ports/platform';
 import type { Environments, Runner } from './ports/runtime';
 
@@ -61,11 +64,11 @@ export function createDevSessionModule(deps: DevSessionModuleDeps): DevSessionMo
   const lifecycle = sessionLifecycleUseCases(useCaseDeps);
   const agents = agentUseCases(useCaseDeps);
   const remind = idleReminderUseCase(useCaseDeps);
-  const api: DevSessionModuleApi = { name: 'dev-session', ...lifecycle, ...agents, ...versionComparisonUseCases(useCaseDeps), workspaceStatus: workspaceStatusUseCase(useCaseDeps), publish: publishFromSessionUseCase(useCaseDeps), sendIdleReminders: remind };
+  const api: DevSessionModuleApi = { name: 'dev-session', ...lifecycle, ...agents, ...nativeTerminalUseCases(useCaseDeps, drizzleNativeTerminals(deps.db)), ...versionComparisonUseCases(useCaseDeps), workspaceStatus: workspaceStatusUseCase(useCaseDeps), publish: publishFromSessionUseCase(useCaseDeps), sendIdleReminders: remind };
   let timer: ReturnType<typeof setInterval> | undefined;
   return {
     api,
-    http: [devSessionRoutes(api, deps.isAdmin)],
+    http: [devSessionRoutes(api, deps.isAdmin), nativeTerminalRoutes(api, deps.isAdmin)],
     workers: [{ start: () => { timer ??= setInterval(() => void remind().catch((e: unknown) => useCaseDeps.logger.error('idle reminder failed', { error: String(e) })), 60_000); }, stop: async () => { if (timer) clearInterval(timer); timer = undefined; } }],
     migrations: devSessionMigrations,
   };

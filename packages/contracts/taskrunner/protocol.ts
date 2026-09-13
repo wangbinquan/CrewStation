@@ -4,6 +4,7 @@ import { AgentDriverSchema, AgentPermissionSchema, OutputContractSchema } from '
 import { AgentEventSchema } from './agentEvents';
 import { RunnerWorkspaceStatusSchema } from './workspace';
 import { ComparisonDetailQuerySchema, ComparisonDetailsSchema, GitObjectIdSchema, RunnerComparisonSchema } from './workspaceComparison';
+import { NativeTerminalRecordSchema, NativeTerminalRosterSchema, TerminalControlSchema, TerminalSizeSchema, TerminalSnapshotSchema } from './nativeTerminal';
 
 /** TaskRunner ↔ cs-session 协议版本；不兼容变更递增，双方在 hello 时校验。 */
 export const TASKRUNNER_PROTOCOL_VERSION = 1;
@@ -52,16 +53,28 @@ export const StartAgentCommandSchema = z.object({
   env: z.record(z.string(), z.string()).default({}),
 });
 
+export const StartAgentTerminalCommandSchema = StartAgentCommandSchema.omit({ mode: true, initialPrompt: true, resumeSessionId: true }).extend({
+  type: z.literal('startAgentTerminal'), driver: z.enum(['claude-code', 'opencode']),
+  terminalId: z.string().min(1), runnerId: z.uuid(), requestFingerprint: z.string().min(1),
+  ...TerminalSizeSchema.shape,
+});
+
 export const RunnerCommandSchema = z.discriminatedUnion('type', [
   StartAgentCommandSchema,
+  StartAgentTerminalCommandSchema,
+  z.object({ ...cmd('listAgentTerminals') }),
+  z.object({ ...cmd('stopAgentTerminal'), agentId: z.string().min(1), runnerId: z.uuid() }),
+  z.object({ ...cmd('attachTerminal'), terminalId: z.string().min(1), runnerId: z.uuid() }),
+  z.object({ ...cmd('claimTerminalControl'), terminalId: z.string().min(1), viewId: z.string().min(1), runnerId: z.uuid() }),
+  z.object({ ...cmd('detachTerminal'), terminalId: z.string().min(1), viewId: z.string().min(1) }),
   z.object({ ...cmd('sendMessage'), agentId: z.string().min(1), content: z.string() }),
   z.object({ ...cmd('cancelAgent'), agentId: z.string().min(1) }),
   /** wait=false：立即回 ack，输出以 execOutput/execExited 事件流出；wait=true：结束后一次性回 RunnerResultPayloads.exec（输出有上限）。 */
   z.object({ ...cmd('exec'), execId: z.string().min(1), command: z.array(z.string()).min(1), cwd: z.string().optional(), env: z.record(z.string(), z.string()).default({}), timeoutSeconds: z.number().int().min(1).max(86400).default(3600), wait: z.boolean().default(false) }),
   z.object({ ...cmd('cancelExec'), execId: z.string().min(1) }),
   z.object({ ...cmd('openTerminal'), terminalId: z.string().min(1), cols: z.number().int().min(1), rows: z.number().int().min(1), cwd: z.string().optional() }),
-  z.object({ ...cmd('terminalInput'), terminalId: z.string().min(1), data: z.string() }),
-  z.object({ ...cmd('terminalResize'), terminalId: z.string().min(1), cols: z.number().int().min(1), rows: z.number().int().min(1) }),
+  z.object({ ...cmd('terminalInput'), terminalId: z.string().min(1), data: z.string().max(65536), viewId: z.string().optional() }),
+  z.object({ ...cmd('terminalResize'), terminalId: z.string().min(1), cols: z.number().int().min(1), rows: z.number().int().min(1), viewId: z.string().optional() }),
   z.object({ ...cmd('closeTerminal'), terminalId: z.string().min(1) }),
   z.object({ ...cmd('listFiles'), path: z.string().default('.') }),
   z.object({ ...cmd('readFile'), path: z.string().min(1) }),
@@ -80,6 +93,10 @@ export const FileEntrySchema = z.object({ name: z.string(), kind: z.enum(['file'
 export const PreviewStateSchema = z.enum(['disabled', 'stopped', 'starting', 'ready', 'crashed']);
 
 export const RunnerResultPayloads = {
+  startAgentTerminal: NativeTerminalRecordSchema,
+  listAgentTerminals: NativeTerminalRosterSchema,
+  attachTerminal: TerminalSnapshotSchema,
+  claimTerminalControl: TerminalControlSchema,
   workspaceStatus: RunnerWorkspaceStatusSchema,
   compareWorkspace: RunnerComparisonSchema,
   workspaceComparisonDetails: ComparisonDetailsSchema,
@@ -95,8 +112,9 @@ export const RunnerResultPayloads = {
 } as const;
 
 export const RunnerEventSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('nativeTerminal'), terminal: NativeTerminalRecordSchema }),
   z.object({ kind: z.literal('agent'), event: AgentEventSchema }),
-  z.object({ kind: z.literal('terminalOutput'), terminalId: z.string(), data: z.string() }),
+  z.object({ kind: z.literal('terminalOutput'), terminalId: z.string(), data: z.string(), terminalSeq: z.number().int().nonnegative().optional(), runnerId: z.uuid().optional() }),
   z.object({ kind: z.literal('terminalClosed'), terminalId: z.string(), exitCode: z.number().int().nullable() }),
   z.object({ kind: z.literal('execOutput'), execId: z.string(), stream: z.enum(['stdout', 'stderr']), data: z.string() }),
   z.object({ kind: z.literal('execExited'), execId: z.string(), exitCode: z.number().int().nullable(), durationMs: z.number().int().min(0) }),
@@ -124,6 +142,7 @@ export type McpConnection = z.infer<typeof McpConnectionSchema>;
 export type RunnerHello = z.infer<typeof RunnerHelloSchema>;
 export type RunnerCommand = z.infer<typeof RunnerCommandSchema>;
 export type StartAgentCommand = z.infer<typeof StartAgentCommandSchema>;
+export type StartAgentTerminalCommand = z.infer<typeof StartAgentTerminalCommandSchema>;
 export type RunnerEvent = z.infer<typeof RunnerEventSchema>;
 export type RunnerMessage = z.infer<typeof RunnerMessageSchema>;
 export type SessionMessage = z.infer<typeof SessionMessageSchema>;

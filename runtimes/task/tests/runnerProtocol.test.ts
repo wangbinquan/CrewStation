@@ -45,6 +45,16 @@ async function expectFailure(promise: Promise<unknown>, code: string): Promise<C
 }
 
 describe('握手与心跳', () => {
+  test('原生名册与失败启动通过真实 WS 回包；关闭视图不会删除 CLI 记录', async () => {
+    const { session } = await boot();
+    const roster = RunnerResultPayloads.listAgentTerminals.parse(await session.call({ id: 'native-list', type: 'listAgentTerminals' }));
+    expect(roster.terminals).toEqual([]);
+    const result = await session.call({ id: 'native-start', type: 'startAgentTerminal', agentId: 'native-bad', terminalId: 'native-terminal', runnerId: roster.runnerId, requestFingerprint: 'start-one', driver: 'claude-code', compute: 'balanced', model: 'model', permission: 'edit', cwd: 'directory-that-does-not-exist', cols: 80, rows: 24 });
+    expect(RunnerResultPayloads.startAgentTerminal.parse(result)).toMatchObject({ lifecycle: 'failed', reason: 'start-failed' });
+    await session.call({ id: 'native-close-view', type: 'closeTerminal', terminalId: 'native-terminal' });
+    expect(RunnerResultPayloads.listAgentTerminals.parse(await session.call({ id: 'native-list-again', type: 'listAgentTerminals' })).terminals).toHaveLength(1);
+    expect(RunnerResultPayloads.attachTerminal.parse(await session.call({ id: 'native-attach', type: 'attachTerminal', terminalId: 'native-terminal', runnerId: roster.runnerId }))).toMatchObject({ data: '', throughSeq: 0 });
+  });
   test('首帧 hello 合协议，welcome 后收到 seq=1 的 runnerState ready，ping 得到 pong，无效命令帧按 id 回 invalid_command', async () => {
     const { session, tr } = await boot();
     const hello = await session.waitFor(() => session.hellos[0]);

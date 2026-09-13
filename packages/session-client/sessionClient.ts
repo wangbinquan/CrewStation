@@ -14,8 +14,8 @@ export interface SessionClient {
 export function createSessionClient(baseUrl: string, fetchImpl: typeof fetch = fetch): SessionClient {
   const call = async <T>(path: string, init?: RequestInit): Promise<T> => {
     const res = await fetchImpl(`${baseUrl}${path}`, init);
-    const body = (await res.json().catch(() => ({}))) as T & { error?: PlatformError['kind']; message?: string };
-    if (!res.ok) throw new PlatformError(body.error ?? 'unavailable', body.message ?? `cs-session 返回 ${res.status}`);
+    const body = (await res.json().catch(() => ({}))) as T & { error?: PlatformError['kind']; message?: string; details?: Record<string, unknown> };
+    if (!res.ok) throw new PlatformError(body.error ?? 'unavailable', body.message ?? `cs-session 返回 ${res.status}`, body.details);
     return body;
   };
   return {

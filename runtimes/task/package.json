@@ -13,6 +13,8 @@
     "@crewstation/contracts": "workspace:*",
     "@crewstation/kernel": "workspace:*",
     "@crewstation/ws": "workspace:*",
+    "@xterm/addon-serialize": "0.14.0",
+    "@xterm/headless": "6.0.0",
     "ajv": "8.20.0"
   }
 }

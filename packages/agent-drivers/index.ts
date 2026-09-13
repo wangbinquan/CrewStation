@@ -26,6 +26,8 @@
 //  - 错误一律用 @crewstation/kernel 的 validation() 等助手，不再用 agent-workflow 的错误类型。
 
 export type { DriverAgentProcess, DriverAgentSpec, DriverLaunchContext, CliAgentDriver } from './contract/agentDriver';
+export type { NativeTerminalSpec, PreparedNativeTerminal } from './contract/nativeTerminal';
+export { prepareNativeTerminal } from './drivers/nativeTerminal';
 export { DriverStateError } from './contract/agentDriver';
 export type {
   DriverChildProcess,

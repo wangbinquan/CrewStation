@@ -10,6 +10,7 @@ export type RunnerOpenResult = { ok: true; connection: RunnerConnection } | { ok
 /** TaskRunner 出向连接的服务端语义：hello 校验令牌、welcome 给出续接 seq、事件去重落库并广播、结果关联命令。 */
 export function runnerHub(deps: SessionUseCaseDeps) {
   const connections = new Map<TaskId, RunnerConnection>();
+  const subscribers = new Map<TaskId, Set<EventSink>>();
   const { logger } = deps;
 
   const onHello = async (raw: unknown, socket: EventSink): Promise<RunnerOpenResult> => {
@@ -19,15 +20,16 @@ export function runnerHub(deps: SessionUseCaseDeps) {
     const auth = await deps.runnerAuth.verifyRunnerToken(hello.taskId, hello.runnerToken);
     if (!auth.ok) return { ok: false, code: 'unauthorized', message: auth.reason };
     const previous = connections.get(hello.taskId);
-    if (previous) { previous.pending.failAll('TaskRunner 重新连接'); previous.broadcast(JSON.stringify({ type: 'runnerReconnected' })); }
+    if (previous) previous.pending.failAll('TaskRunner 重新连接');
     const resumeFromSeq = await deps.events.maxSeq(hello.taskId);
     const now = deps.clock.now();
     const connection = new RunnerConnection(hello, socket, resumeFromSeq, deps.settings.commandTimeoutMs, now.getTime());
-    if (previous) for (const sub of previous.subscribers) connection.subscribers.add(sub);
+    for (const sub of subscribers.get(hello.taskId) ?? []) connection.subscribers.add(sub);
     connections.set(hello.taskId, connection);
     await deps.registry.claim(hello.taskId, deps.settings.selfAddress, now);
     socket.send(JSON.stringify({ type: 'welcome', protocolVersion: TASKRUNNER_PROTOCOL_VERSION, resumeFromSeq }));
     await deps.taskAccess.onRunnerConnected(hello.taskId);
+    connection.broadcast(JSON.stringify({ type: 'runnerReconnected' }));
     logger.info('runner connected', { taskId: hello.taskId, resumeFromSeq, drivers: hello.capabilities.drivers });
     return { ok: true, connection };
   };
@@ -72,7 +74,18 @@ export function runnerHub(deps: SessionUseCaseDeps) {
     }
   };
 
-  return { connections, onHello, onMessage, onClose, tick };
+  const subscribe = (taskId: TaskId, sink: EventSink) => {
+    const set = subscribers.get(taskId) ?? new Set<EventSink>();
+    subscribers.set(taskId, set);
+    set.add(sink);
+    connections.get(taskId)?.subscribers.add(sink);
+    return () => {
+      set.delete(sink);
+      if (set.size === 0) subscribers.delete(taskId);
+      connections.get(taskId)?.subscribers.delete(sink);
+    };
+  };
+  return { connections, subscribe, onHello, onMessage, onClose, tick };
 }
 
 export type RunnerHub = ReturnType<typeof runnerHub>;

@@ -6,6 +6,7 @@ import { RunnerConnection } from '../domain/runnerConnection';
 import type { commandDispatch } from './commandDispatch';
 import type { SessionUseCaseDeps } from './dependencies';
 import type { RunnerHub } from './runnerHub';
+import { terminalViewCommand } from '../domain/terminalViews';
 
 export interface BrowserStream {
   /** 浏览器发来的命令帧：校验后派发，结果按 id 回给该浏览器。 */
@@ -21,7 +22,9 @@ export function browserStreams(deps: SessionUseCaseDeps, hub: RunnerHub, dispatc
       const replay = await deps.events.listSince(taskId, sinceSeq, { limit: deps.settings.replayLimit });
       for (const stored of replay) sink.send(RunnerConnection.frameOf(stored.seq, stored.at.toISOString(), stored.event));
       const connection = hub.connections.get(taskId);
-      connection?.subscribers.add(sink);
+      const unsubscribe = hub.subscribe(taskId, sink);
+      const viewId = crypto.randomUUID();
+      const controlled = new Set<string>();
       sink.send(JSON.stringify({ type: 'streamReady', connected: Boolean(connection), replayed: replay.length }));
       return {
         onMessage: async (raw) => {
@@ -29,13 +32,19 @@ export function browserStreams(deps: SessionUseCaseDeps, hub: RunnerHub, dispatc
           if (!parsed.success) { sink.send(JSON.stringify({ type: 'error', id: (raw as { id?: string })?.id ?? '', code: 'validation', message: '命令帧不合法' })); return; }
           const command: RunnerCommand = parsed.data;
           try {
-            const payload = await dispatch.sendCommand(taskId, command);
+            const scoped = terminalViewCommand(command, viewId);
+            if (scoped.type === 'claimTerminalControl') controlled.add(scoped.terminalId);
+            const payload = await dispatch.sendCommand(taskId, scoped);
+            if (scoped.type === 'detachTerminal') controlled.delete(scoped.terminalId);
             sink.send(JSON.stringify({ type: 'result', id: command.id, payload }));
           } catch (error) {
             sink.send(JSON.stringify({ type: 'error', id: command.id, code: isPlatformError(error) ? error.kind : 'internal', message: isPlatformError(error) ? error.message : '内部错误' }));
           }
         },
-        close: () => { hub.connections.get(taskId)?.subscribers.delete(sink); },
+        close: () => {
+          unsubscribe();
+          for (const terminalId of controlled) void dispatch.sendCommand(taskId, { id: crypto.randomUUID(), type: 'detachTerminal', terminalId, viewId }).catch(() => undefined);
+        },
       };
     },
   };

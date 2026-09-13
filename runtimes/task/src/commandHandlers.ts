@@ -5,6 +5,7 @@ import type { ExecSupervisor } from './exec/execSupervisor';
 import type { FileCommands } from './files/fileCommands';
 import type { PreviewSupervisor } from './preview/previewSupervisor';
 import type { TerminalSupervisor } from './terminal/terminalSupervisor';
+import type { NativeTerminalSupervisor } from './terminal/nativeSupervisor';
 import type { RunnerWorkspaceStatus } from '@crewstation/contracts';
 import type { WorkspaceComparisons } from './workspace/workspaceComparison';
 
@@ -12,6 +13,7 @@ export interface CommandTargets {
   agents: AgentSupervisor;
   execs: ExecSupervisor;
   terminals: TerminalSupervisor;
+  nativeTerminals: NativeTerminalSupervisor;
   files: FileCommands;
   preview: PreviewSupervisor;
   verifyContract: ContractVerifier;
@@ -27,15 +29,21 @@ const ack = (): Record<string, never> => ({});
 /** 协议命令 → 各监督器；无内容的命令统一回 `{}`（RunnerResultPayloads.ack）。 */
 export function buildCommandHandlers(targets: CommandTargets): CommandHandlers {
   return {
+    startAgentTerminal: (c) => targets.nativeTerminals.start(c),
+    listAgentTerminals: async () => targets.nativeTerminals.list(),
+    stopAgentTerminal: (c) => targets.nativeTerminals.stop(c.agentId, c.runnerId).then(ack),
+    attachTerminal: (c) => targets.nativeTerminals.attach(c.terminalId, c.runnerId),
+    claimTerminalControl: async (c) => targets.nativeTerminals.claim(c.terminalId, c.viewId, c.runnerId),
+    detachTerminal: async (c) => { targets.nativeTerminals.detach(c.terminalId, c.viewId); return ack(); },
     startAgent: (c) => targets.agents.start(c).then(ack),
     sendMessage: (c) => targets.agents.send(c.agentId, c.content).then(ack),
     cancelAgent: (c) => targets.agents.cancel(c.agentId).then(ack),
     exec: (c) => targets.execs.run(c),
     cancelExec: (c) => targets.execs.cancel(c.execId).then(ack),
     openTerminal: (c) => targets.terminals.open(c).then(ack),
-    terminalInput: (c) => targets.terminals.input(c).then(ack),
-    terminalResize: (c) => targets.terminals.resize(c).then(ack),
-    closeTerminal: (c) => targets.terminals.close(c).then(ack),
+    terminalInput: async (c) => { if (targets.nativeTerminals.has(c.terminalId)) targets.nativeTerminals.input(c.terminalId, c.data, c.viewId); else await targets.terminals.input(c); return ack(); },
+    terminalResize: async (c) => { if (targets.nativeTerminals.has(c.terminalId)) await targets.nativeTerminals.resize(c.terminalId, c.cols, c.rows, c.viewId); else await targets.terminals.resize(c); return ack(); },
+    closeTerminal: async (c) => { if (!targets.nativeTerminals.has(c.terminalId)) await targets.terminals.close(c); return ack(); },
     listFiles: (c) => targets.files.list(c),
     readFile: (c) => targets.files.read(c),
     writeFile: (c) => targets.files.write(c),

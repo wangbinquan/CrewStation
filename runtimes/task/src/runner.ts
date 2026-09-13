@@ -26,6 +26,7 @@ import type { SessionLink } from './sessionLink';
 import { createSessionLink } from './sessionLink';
 import type { TerminalSupervisor } from './terminal/terminalSupervisor';
 import { createTerminalSupervisor } from './terminal/terminalSupervisor';
+import { NativeTerminalSupervisor } from './terminal/nativeSupervisor';
 import { createGitCommand } from './workspace/gitCommand';
 import { readWorkspaceStatus } from './workspace/workspaceStatus';
 import { createWorkspaceComparisons } from './workspace/workspaceComparison';
@@ -70,6 +71,7 @@ class TaskRunner implements RunnerHandle {
     private readonly agents: AgentSupervisor,
     private readonly execs: ExecSupervisor,
     private readonly terminals: TerminalSupervisor,
+    private readonly nativeTerminals: NativeTerminalSupervisor,
     private readonly preview: PreviewSupervisor,
   ) {}
 
@@ -89,13 +91,14 @@ class TaskRunner implements RunnerHandle {
     const agents = createAgentSupervisor({ registry, launcher, paths, agentEnv, emit, logger: logger.child({ component: 'agents' }) });
     const execs = createExecSupervisor({ launcher, paths, emit, logger: logger.child({ component: 'exec' }) });
     const terminals = createTerminalSupervisor({ choice: config.terminalBackend, launcher, paths, emit, logger: logger.child({ component: 'terminal' }) });
+    const nativeTerminals = new NativeTerminalSupervisor({ backend: terminals.backend, launcher, paths, agentEnv, emit, logger: logger.child({ component: 'native-terminal' }) });
     const preview = createPreviewSupervisor({ config: config.preview, policy: config.previewPolicy, launcher, workdir: paths.root, emit, logger: logger.child({ component: 'preview' }) });
     const files = createFileCommands({ paths, launcher, emit, logger: logger.child({ component: 'files' }) });
     const verifyContract = createContractVerifier({ paths, logger: logger.child({ component: 'contract' }) });
     const git = createGitCommand(execs);
     const comparisons = createWorkspaceComparisons({ git, paths, launcher });
     const runnerRef: { current?: TaskRunner } = {};
-    const handlers = buildCommandHandlers({ agents, execs, terminals, files, preview, verifyContract, workspaceStatus: () => readWorkspaceStatus(git, paths), comparisons, fetchComparisonHistory: (url, sha) => fetchComparisonHistory(git, url, sha), requestShutdown: (grace) => void runnerRef.current?.shutdown(grace) });
+    const handlers = buildCommandHandlers({ agents, execs, terminals, nativeTerminals, files, preview, verifyContract, workspaceStatus: () => readWorkspaceStatus(git, paths), comparisons, fetchComparisonHistory: (url, sha) => fetchComparisonHistory(git, url, sha), requestShutdown: (grace) => void runnerRef.current?.shutdown(grace) });
     const hello = (): RunnerHello => ({
       type: 'hello',
       protocolVersion: TASKRUNNER_PROTOCOL_VERSION,
@@ -117,7 +120,7 @@ class TaskRunner implements RunnerHandle {
     linkRef.current = link;
     const dispatcher = createCommandDispatcher(handlers, link, logger.child({ component: 'dispatch' }));
     dispatcherRef.current = dispatcher;
-    const runner = new TaskRunner(config, parts.hooks, logger, paths, launcher, link, dispatcher, agents, execs, terminals, preview);
+    const runner = new TaskRunner(config, parts.hooks, logger, paths, launcher, link, dispatcher, agents, execs, terminals, nativeTerminals, preview);
     runnerRef.current = runner;
     return runner;
   }
@@ -156,7 +159,7 @@ class TaskRunner implements RunnerHandle {
     this.logger.info('draining', { agents: this.agents.size, execs: this.execs.size, terminals: this.terminals.size });
     this.link.emit({ kind: 'runnerState', state: 'draining' });
     this.dispatcher.refuseNew();
-    await Promise.allSettled([this.agents.cancelAll(), this.terminals.closeAll(), this.execs.cancelAll(), this.preview.stop()]);
+    await Promise.allSettled([this.agents.cancelAll(), this.terminals.closeAll(), this.nativeTerminals.closeAll(), this.execs.cancelAll(), this.preview.stop()]);
     await this.dispatcher.drain();
     this.logger.info('drained');
   }

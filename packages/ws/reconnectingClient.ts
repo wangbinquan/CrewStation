@@ -62,7 +62,8 @@ export class ReconnectingWebSocketClient {
 
   send(data: string | ArrayBufferLike | Uint8Array): void {
     if (this.stateValue !== 'open' || this.socket === undefined) throw new Error(`WebSocket 未连接（状态 ${this.stateValue}）`);
-    this.socket.send(data);
+    // WebSocket 的浏览器类型只接受 ArrayBuffer；保留调用方的共享缓冲支持，发送独立字节快照。
+    this.socket.send(typeof data === 'string' ? data : (data instanceof Uint8Array ? data : new Uint8Array(data)).slice());
   }
 
   /**

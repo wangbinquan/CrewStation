@@ -41,7 +41,7 @@ export function browserSocketRoutes(streams: ReturnType<typeof browserStreams>, 
         chain = chain.then(() => stream?.onMessage(raw)).catch(() => undefined);
       },
       onClose: () => {
-        stream?.close();
+        void chain.finally(() => stream?.close());
       },
     };
   }));

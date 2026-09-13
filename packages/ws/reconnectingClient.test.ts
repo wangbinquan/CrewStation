@@ -41,6 +41,22 @@ afterEach(() => {
 });
 
 describe('ReconnectingWebSocketClient', () => {
+  test('共享二进制缓冲与子视图按发送时的字节快照写入，不扩大为整个 backing buffer', async () => {
+    const server = startEchoServer();
+    servers.push(server);
+    const client = new ReconnectingWebSocketClient({ url: `ws://127.0.0.1:${server.port}/ws` });
+    clients.push(client);
+    client.connect();
+    await waitFor(() => client.state === 'open');
+    const buffer = new SharedArrayBuffer(4);
+    const bytes = new Uint8Array(buffer);
+    bytes.set([65, 66, 67, 68]);
+    client.send(buffer);
+    client.send(bytes.subarray(1, 3));
+    bytes.fill(88);
+    await waitFor(() => server.received.length === 2);
+    expect(server.received).toEqual(['ABCD', 'BC']);
+  });
   test('连接、收发、断线后按退避重连到同一端口、close 后不再重连', async () => {
     const first = startEchoServer();
     servers.push(first);

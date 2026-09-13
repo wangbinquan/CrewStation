@@ -71,3 +71,22 @@
 本机 cs-auth／console 已更新：真实顶栏图标加载完成，favicon 指向同一资源；320px 整页宽度为 320px，管理员空间切换、语言与登出正常换行；真实 `/auth/login` 图标与 favicon 内嵌且加载完成，图标尺寸 40px。品牌组件、无图文字重复播报、两空间字标导航、登录资源一致性均有自动回归。完整工作台密度仍归 T5，不用品牌替换代替该任务。
 
 本地 `bun run check`：688 pass／1 skip／0 fail，689 tests、105 files、3198 assertions、71.35s；console build 695ms。跳过项仍为 opt-in 真实 K8s 用例。
+
+发布记录：`18748285328f924b5ec2ca0b451a630b08d6ad44` 已同步 main；[精确 SHA CI](https://github.com/wangbinquan/CrewStation/actions/runs/34731416147) 成功。
+
+## 第四批：T13 原生 CLI 后端与恢复
+
+- `POST／GET /v1/tasks/:taskId/agent-terminals` 与单窗 `/stop` 接入 dev-session。启动按调用者、taskId、clientRequestId 持久化，数据库事务串行同一任务的受理；同 ID 异配置冲突，Runner 端再次幂等。已受理而响应丢失返回 unknown，原请求可查询／重放；容器身份更换只标结束不可恢复。
+- 平台仍解析档位与现签 MCP 凭据，不接收租户 driver／model／flags；凭据不写入启动记录。原生计划和既有 headless 计划并存，默认原生输入可空，所有 CLI 使用同一工作目录、同一降权出口。原生入口明确拒绝 stub 和不支持 resize 的回退 PTY。
+- Runner 注册表保留 256 条启动记录、最多 32 个同时运行；控制租约 30 秒，只允许取得控制的视图发送输入和 resize。浏览器视图标识由 cs-session 生成；关闭视图只 detach，显式 stop 结束一窗，释放容器停止全部。原生创建／结束不能经浏览器流绕过名册接口。
+- `@xterm/headless` 6.0.0 与 serialize 0.14.0 保存解析后的 ANSI 屏幕；正常／备用屏幕、颜色、光标可恢复，回放含 throughSeq。每窗保留 500 行滚动历史；超过 2 MiB 的序列化结果缩至当前屏幕并标截断。不是截断原始 ANSI 后直接回显。
+- 进程状态和连接状态分别返回；离线运行状态为 unknown，已知退出事实仍保留。状态 revision 防止迟到响应覆盖已结束记录。轮次开始／等待／完成不从 PTY 猜测，仍属 T15。
+- 修复原浏览器在 Runner 未连上时订阅、或 Runner 断线再连后丢失广播的问题。连接关闭释放其输入租约，保留进程。session-client 保留 Runner 错误 code，明确拒绝与通信超时可区分；WS 二进制共享缓冲按发送快照兼容 DOM 类型。
+
+自动验证：`nativeTerminal.test.ts` 验证两种计划、权限／MCP／Git 环境；`nativeSupervisor.test.ts` 用真实 PTY 验证并行、幂等、输入、尺寸、detach、单窗／整体结束和失败保留；`terminalScreen.test.ts` 做屏幕恢复而非字符串自证；`nativeTerminals.test.ts` 与 PostgreSQL persistence 测试验证受理、跨实例并发、丢回包、旧状态及重启；`terminalStreams.test.ts`、Runner WS 与 API-client 测试验证协议和流恢复。
+
+真实镜像探针：2026-09-13，独立 `cs-task-runtime:rfc003-native`，worker 10001，临时工作目录，实际 Claude Code **2.1.268**／OpenCode **1.18.29**。Claude 默认交互界面接受系统提示文件与独立 session UUID，resize 从 100×30 到 120×40 后 Ctrl+C 显示再次退出提示；显式 stop 的退出码 129。OpenCode 显示原生 TUI、平台 agent 与固定模型，Ctrl+C 退出码 0。未注入模型凭据，没有模型产出，因此不构成 UX-AT-29 或 T15 的完整验收。
+
+探针首次发现 OpenCode 在配置模型不可用时自动选 Big Pickle；修复后原生配置含顶层 model／small_model、enabled_providers 和 provider.whitelist，复验显示所选 Claude Sonnet 4.5。配置依据 [OpenCode 官方配置](https://opencode.ai/docs/config/#enabled-providers) 及其 [JSON Schema](https://opencode.ai/config.json)，不是对终端输出做关键词判定。真实 Linux PTY 最终 **4 pass／0 fail、25 assertions**。macOS 无 setsid，Ctrl+C 的进程组用例只在 Linux 执行，其他 PTY 用例仍在本机执行。
+
+本批只交付后端和协议，不把它标为 T5 工作台已完成。本地最终 `bun run check` **710 pass／2 skip／0 fail**，712 tests、112 files、3330 assertions、71.75s；console build 660ms。两项跳过为 opt-in K8s 与仅 Linux 的 Ctrl+C，后者已在实际 Linux 任务镜像单独实跑通过；CI 在 Linux 再验证。本机专用开发 Pod 未配置 `CS_AGENT_ENV_FILE`，也未挂载模型配置 Secret，不能把凭据缺失造成的未执行当作 T15 正常验收。

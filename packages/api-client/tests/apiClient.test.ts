@@ -42,6 +42,18 @@ async function caught(call: () => Promise<unknown>): Promise<ApiClientError> {
 }
 
 describe('createApiClient：请求形状', () => {
+  test('原生 CLI 的请求 ID 逐字保留，列表和显式结束使用独立资源路径', async () => {
+    const { calls, fetchImpl } = fakeFetch(() => json(202, {}));
+    const client = createApiClient({ fetch: fetchImpl });
+    const input = { clientRequestId: crypto.randomUUID(), cols: 80, rows: 24, permission: 'edit' as const };
+    await client.devSession.startNativeTerminal('task one', input);
+    await client.devSession.listNativeTerminals('task one');
+    await client.devSession.stopNativeTerminal('task one', 'agent/1');
+    expect(calls.map((c) => [c.method, c.url])).toEqual([
+      ['POST', '/v1/tasks/task%20one/agent-terminals'], ['GET', '/v1/tasks/task%20one/agent-terminals'], ['POST', '/v1/tasks/task%20one/agent-terminals/agent%2F1/stop'],
+    ]);
+    expect(JSON.parse(calls[0]!.body!)).toEqual(input);
+  });
   test('工作树预检是独立 GET，释放携带用户确认的会话 ID', async () => {
     const { calls, fetchImpl } = fakeFetch(() => json(200, {}));
     const client = createApiClient({ fetch: fetchImpl });
