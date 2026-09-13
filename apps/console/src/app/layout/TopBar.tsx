@@ -5,6 +5,7 @@ import { Brand } from '../../shared/ui/Brand';
 import { CurrentUserChip } from './CurrentUserChip';
 import { LocaleSwitch } from './LocaleSwitch';
 import { SpaceSwitch } from './SpaceSwitch';
+import { AgentActivityMenu } from './activity/AgentActivityMenu';
 import styles from './TopBar.module.css';
 
 /** 顶栏：当前空间与位置、空间切换（仅管理员）、界面语言、当前用户。 */
@@ -25,6 +26,7 @@ export function TopBar(): ReactElement {
         ) : null}
       </div>
       <div className={styles.right}>
+        <AgentActivityMenu />
         <SpaceSwitch />
         <LocaleSwitch />
         <CurrentUserChip />

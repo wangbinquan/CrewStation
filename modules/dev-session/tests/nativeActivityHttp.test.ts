@@ -33,6 +33,10 @@ describe.skipIf(!available)('动态资源实际装配与 HTTP', () => {
     expect(roster).toMatchObject({ activitySync: 'ready', items: [{ lifecycle: 'running', activity: { source: 'ready' } }] });
     expect((await app.request(`${url}?limit=101`, { headers })).status).toBe(400);
     expect((await app.request(`${url}?cursor=1.5`, { headers })).status).toBe(400);
+    expect((await app.request(`${url}?unread=true&before=2`, { headers })).status).toBe(200);
+    expect((await app.request(`${url}?unread=false`, { headers })).status).toBe(200);
+    expect((await app.request(`${url}?unread=maybe`, { headers })).status).toBe(400);
+    expect((await app.request(`${url}?before=2&cursor=0`, { headers })).status).toBe(400);
     const read = await app.request(`${url}/read`, { method: 'POST', headers, body: JSON.stringify({ agentId: record.agentId, turnId: 'missing', throughSeq: 1 }) });
     expect(read.status).toBe(400); expect(read.headers.get('cache-control')).toBe('no-store');
     expect((await app.request(url)).status).toBe(401);

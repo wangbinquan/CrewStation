@@ -10,19 +10,24 @@ import type { WorkspaceLayoutStore } from '../../model/layout/workspaceLayoutSto
 import { moveTerminal, reorderTerminal } from '../../model/layout/workspaceLayout';
 import { NativeTerminalView } from './NativeTerminalView';
 import styles from './NativeWorkspace.module.css';
+import type { ActivityTask } from '../../../../shared/activity/agentActivityStore';
+import { activityStatus } from '../../../../shared/activity/agentActivityView';
 
-export function NativeTerminalCard({ terminalId, terminal, layout, store, channel, stream, onStop, onActivity, canDevelop }: {
+export function NativeTerminalCard({ terminalId, terminal, layout, store, channel, stream, onStop, onActivity, canDevelop, activity, activitySync }: {
   readonly terminalId: string; readonly terminal: NativeTerminalDto | undefined; readonly layout: WorkspaceLayout; readonly store: WorkspaceLayoutStore;
   readonly channel: TaskStreamChannel; readonly stream: StreamState; readonly onStop: (id: string) => void; readonly onActivity: () => void; readonly canDevelop: boolean;
+  readonly activity?: ActivityTask;
+  readonly activitySync?: 'ready' | 'catching-up' | 'unavailable';
 }): ReactElement {
   const t = useT();
   const [stopping, setStopping] = useState(false);
   const tabId = layout.tabs.find((tab) => tab.paneOrder.includes(terminalId))?.id ?? layout.activeTabId;
   const label = `CLI ${terminal?.agentId.slice(-6) ?? terminalId.slice(-6)}`;
-  const state = !stream.runnerConnected || !terminal ? 'unknown' : terminal.lifecycle;
-  return <section className={styles.terminalCard} onFocusCapture={() => store.update((value) => value.selectedTerminalId === terminalId ? value : { ...value, selectedTerminalId: terminalId })}>
+  const state = activityStatus(terminal, activity?.page?.states.find((state) => state.terminalId === terminalId) ?? terminal?.activity, activity?.page ?? { sync: activitySync ?? 'unavailable', connection: terminal?.connection ?? 'unknown' }, activity?.stale || !stream.runnerConnected);
+  return <section className={styles.terminalCard} data-native-terminal={terminalId} tabIndex={-1} onFocusCapture={() => store.update((value) => value.selectedTerminalId === terminalId ? value : { ...value, selectedTerminalId: terminalId })}>
     <header className={styles.terminalHeader}>
-      <strong title={terminal?.agentId}>{label}</strong><span className={styles.lifecycle}>{t(`devSession.native.lifecycle.${state}`)}</span>
+      <strong title={terminal?.agentId}>{label}</strong><span className={styles.lifecycle} data-activity={state}>{t(`activity.status.${state}`)}</span>
+      {terminal?.lifecycle === 'running' && terminal.connection === 'connected' && stream.runnerConnected && state !== 'ended' ? <small className={styles.lifecycle}>{t('activity.processOnline')}</small> : null}
       <span className={styles.compute}>{terminal?.compute}</span>
       <Button variant="ghost" aria-label={t('devSession.native.zoom', { id: label })} onClick={() => store.update((value) => ({ ...value, maximizedTerminalId: value.maximizedTerminalId === terminalId ? null : terminalId }))}>{layout.maximizedTerminalId === terminalId ? '↙' : '↗'}</Button>
       <details className={styles.menu}><summary aria-label={t('devSession.native.options', { id: label })}>···</summary><div className={styles.menuBody}>

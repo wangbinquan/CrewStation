@@ -53,6 +53,9 @@ describe('createApiClient：请求形状', () => {
       ['GET', '/v1/tasks/task%20one/agent-activity'], ['GET', '/v1/tasks/task%20one/agent-activity?cursor=18&limit=30'], ['POST', '/v1/tasks/task%20one/agent-activity/read'],
     ]);
     expect(JSON.parse(calls[2]!.body!)).toEqual(read);
+    await client.devSession.getAgentActivity('task one', { unread: true, before: 18, limit: 30 });
+    const query = new URL(calls[3]!.url, 'http://client.test').searchParams;
+    expect(Object.fromEntries(query)).toEqual({ unread: 'true', before: '18', limit: '30' });
   });
   test('原生 CLI 的请求 ID 逐字保留，列表和显式结束使用独立资源路径', async () => {
     const { calls, fetchImpl } = fakeFetch(() => json(202, {}));

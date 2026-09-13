@@ -1,7 +1,7 @@
 import type { AgentActivityItem, AgentActivityQuery, ReadAgentActivityRequest, TaskId, UserId } from '@crewstation/contracts';
 import { precondition, validation } from '@crewstation/kernel';
 import type { Database, Executor } from '@crewstation/persistence';
-import { and, asc, desc, eq, gt, inArray, lte, max, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, inArray, lt, lte, max, sql } from 'drizzle-orm';
 import { activityNotifies, initialNativeActivity, projectNativeActivity, projectNativeLifecycle } from '../../domain/nativeActivityProjection';
 import type { NativeActivityRepository, NativeActivityRead, StoredNativeEvent } from '../../ports/nativeActivity';
 import { activityItems as items, activityProgress as progress, activityReads as reads, activityStates as states } from './nativeActivityTables';
@@ -71,6 +71,11 @@ async function readPage(db: Executor, taskId: TaskId, userId: UserId, query: Age
   const projections = (await db.select().from(states).where(eq(states.taskId, taskId)).limit(256)).map((row) => row.projection.state);
   const conditions = [eq(items.taskId, taskId)];
   if (query.cursor !== undefined) conditions.push(gt(items.seq, query.cursor));
+  if (query.before !== undefined) conditions.push(lt(items.seq, query.before));
+  if (query.unread) {
+    const latestResults = db.select({ seq: max(items.seq) }).from(items).where(and(eq(items.taskId, taskId), inArray(items.kind, RESULTS))).groupBy(items.agentId, items.turnId);
+    conditions.push(inArray(items.seq, latestResults), sql`${items.seq} > coalesce((SELECT ${reads.throughSeq} FROM ${reads} WHERE ${reads.taskId} = ${items.taskId} AND ${reads.agentId} = ${items.agentId} AND ${reads.turnId} = ${items.turnId} AND ${reads.userId} = ${userId}), 0)`);
+  }
   const rows = await db.select().from(items).where(and(...conditions)).orderBy(query.cursor === undefined ? desc(items.seq) : asc(items.seq)).limit(query.limit + 1);
   const pruned = (await db.select().from(progress).where(scope(taskId)))[0]?.prunedThroughSeq ?? 0;
   const readRows = await db.select().from(reads).where(and(eq(reads.taskId, taskId), eq(reads.userId, userId))).limit(RETAINED_ITEMS + MAX_PENDING);
@@ -84,6 +89,7 @@ async function readPage(db: Executor, taskId: TaskId, userId: UserId, query: Age
   return {
     items: page, states: projections.map((state) => ({ ...state, pending: state.pending.map((request) => ({ ...request, unread: request.seq > (cursors.get(`${state.agentId}:${request.turnId}`) ?? 0) })) })), unread: await unreadCounts(db, taskId, userId), throughSeq,
     nextCursor: more ? page.at(-1)!.seq : throughSeq, hasMore: more,
+    ...(query.cursor === undefined && rows.length > query.limit ? { previousCursor: page[0]!.seq } : {}),
     historyTruncated: (query.cursor ?? 0) < pruned,
   };
 }

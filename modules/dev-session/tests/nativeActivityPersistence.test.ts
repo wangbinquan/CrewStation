@@ -97,6 +97,12 @@ describe.skipIf(!available)('原生动态投影和个人已读的真实数据库
     expect(catchup.items[0]?.seq).toBe(60); expect(catchup.hasMore).toBe(true); expect(catchup.historyTruncated).toBe(true);
     const count = await database.db.execute(sql`select count(*)::integer as n from dev_session.native_activity_items where task_id = ${f.taskId}`);
     expect(count[0]?.n).toBe(2000);
+    const unread = await f.repo.read(f.taskId, f.user, { unread: true, limit: 2 });
+    expect(unread.items.map((item) => item.turnId)).toEqual(['turn-1001', 'turn-1002']);
+    const older = await f.repo.read(f.taskId, f.user, { unread: true, before: unread.previousCursor, limit: 2 });
+    expect(older.items.map((item) => item.turnId)).toEqual(['turn-999', 'turn-1000']);
+    await f.repo.markRead(f.taskId, f.user, { agentId: f.agentId, turnId: 'turn-1002', throughSeq: cursor });
+    expect((await f.repo.read(f.taskId, f.user, { unread: true, limit: 2 })).items.map((item) => item.turnId)).toEqual(['turn-1000', 'turn-1001']);
     await expect(f.repo.read(f.taskId, f.user, { cursor: cursor + 1, limit: 10 })).rejects.toThrow('游标超过');
   }, 15000);
 

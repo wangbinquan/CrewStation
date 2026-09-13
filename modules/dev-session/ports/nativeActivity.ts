@@ -1,7 +1,7 @@
 import type { AgentActivityPage, AgentActivityQuery, ReadAgentActivityRequest, RunnerEvent, TaskId, UserId } from '@crewstation/contracts';
 
 export interface StoredNativeEvent { seq: number; at: string; event: RunnerEvent }
-export type NativeActivityRead = Pick<AgentActivityPage, 'items' | 'states' | 'unread' | 'nextCursor' | 'hasMore' | 'throughSeq' | 'historyTruncated'>;
+export type NativeActivityRead = Pick<AgentActivityPage, 'items' | 'states' | 'unread' | 'nextCursor' | 'hasMore' | 'previousCursor' | 'throughSeq' | 'historyTruncated'>;
 
 export interface NativeActivityRepository {
   cursor(taskId: TaskId): Promise<number>;

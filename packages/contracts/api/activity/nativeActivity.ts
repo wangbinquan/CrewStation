@@ -27,14 +27,18 @@ export const AgentActivityItemSchema = z.object({
 export const AgentActivityQuerySchema = z.object({
   /** 缺省取最近一页；指定后按持久序号升序补齐，不跳过中间页。 */
   cursor: z.coerce.number().int().min(0).max(Number.MAX_SAFE_INTEGER).optional(),
+  /** 动态面板向前翻阅；与断线续传 cursor 互斥。 */
+  before: z.coerce.number().int().min(1).max(Number.MAX_SAFE_INTEGER).optional(),
+  /** 只取本人尚未查看的轮次结果；待处理问题始终通过 states 返回。 */
+  unread: z.union([z.boolean(), z.enum(['true', 'false']).transform((value) => value === 'true')]).optional(),
   limit: z.coerce.number().int().min(1).max(100).default(50),
-}).strict();
+}).strict().refine((query) => query.cursor === undefined || query.before === undefined, 'cursor 与 before 不能同时使用');
 export const ReadAgentActivityRequestSchema = z.object({ agentId: id, turnId: id, throughSeq: sequence }).strict();
 export const AgentActivityPageSchema = z.object({
   taskId: TaskIdSchema, projectId: ProjectIdSchema,
   items: z.array(AgentActivityItemSchema).max(100), states: z.array(AgentActivityStateSchema).max(256),
   unread: z.array(z.object({ agentId: id, completions: sequence, issues: sequence }).strict()).max(256),
-  nextCursor: sequence, hasMore: z.boolean(), throughSeq: sequence, historyTruncated: z.boolean(),
+  nextCursor: sequence, hasMore: z.boolean(), previousCursor: sequence.optional(), throughSeq: sequence, historyTruncated: z.boolean(),
   sync: z.enum(['ready', 'catching-up', 'unavailable']), connection: z.enum(['connected', 'disconnected', 'unknown']),
   checkedAt: z.iso.datetime(),
 }).strict();

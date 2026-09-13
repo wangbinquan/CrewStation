@@ -21,6 +21,7 @@ import { usePublishForm } from '../hooks/usePublishForm';
 import { useTaskStream } from '../hooks/useTaskStream';
 import { useWorkspaceTree } from '../hooks/useWorkspaceTree';
 import type { SessionAccess } from '../model/sessionAccess';
+import type { ActivityTarget } from '../../../shared/activity/agentActivityView';
 import styles from './DevSessionWorkbench.module.css';
 
 export interface DevSessionWorkbenchProps {
@@ -31,13 +32,14 @@ export interface DevSessionWorkbenchProps {
   readonly serviceId: string | undefined;
   readonly userId: string;
   readonly release: UseMutationResult<ReleaseDevSessionResult, ApiClientError, boolean>;
+  readonly activityTarget?: ActivityTarget;
 }
 
 /**
  * 有会话时的工作区：一条任务流供四个面板共用，外加发布与数据绑定。
  * 所有面板都只拿 channel，不各自开连接。
  */
-export function DevSessionWorkbench({ projectId, session, access, canDevelop, serviceId, userId, release }: DevSessionWorkbenchProps): ReactElement {
+export function DevSessionWorkbench({ projectId, session, access, canDevelop, serviceId, userId, release, activityTarget }: DevSessionWorkbenchProps): ReactElement {
   const t = useT();
   const taskId = session.taskId;
   const { state, channel } = useTaskStream(taskId);
@@ -55,7 +57,7 @@ export function DevSessionWorkbench({ projectId, session, access, canDevelop, se
         <details className={styles.disclosure}><summary>{t('devSession.native.prepareRelease')}</summary><div><PublishPane publish={publish} /></div></details>
       </header>
       <VersionComparisonPanel projectId={projectId} taskId={taskId} channel={channel} canDevelop={canDevelop} compact />
-      <NativeWorkspace taskId={taskId} userId={userId} channel={channel} stream={state} canDevelop={canDevelop} onActivity={touch}
+      <NativeWorkspace taskId={taskId} userId={userId} channel={channel} stream={state} canDevelop={canDevelop} onActivity={touch} activityTarget={activityTarget}
         preview={<DevelopmentPreview preview={preview} previewHost={session.previewHost} connected={state.runnerConnected} />}
         editor={<EditorPane tree={tree} editor={editor} />}
         changes={<VersionComparisonPanel projectId={projectId} taskId={taskId} channel={channel} canDevelop={canDevelop} initiallyExpanded />} />

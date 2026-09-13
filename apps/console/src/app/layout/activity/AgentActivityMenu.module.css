@@ -1,0 +1,20 @@
+.root { position: relative; min-width: 0; }
+.root > button { font-size: 12px; min-height: 30px; padding: 4px 7px; gap: 6px; flex-wrap: wrap; }
+.warning { color: var(--cs-tone-warning-fg); }
+.success { color: var(--cs-tone-success-fg); }
+.panel { position: absolute; right: 0; top: calc(100% + 8px); z-index: 30; width: 440px; max-width: calc(100vw - 20px); max-height: min(70dvh, 620px); overflow: auto; background: var(--cs-color-surface); border: 1px solid var(--cs-color-border); border-radius: 10px; box-shadow: 0 12px 36px #0003; padding: 10px; font-size: 12px; }
+.panel header { display: flex; gap: 8px; align-items: center; justify-content: space-between; min-width: 0; }
+.panel header strong { overflow-wrap: anywhere; }
+.panel button { min-height: 26px; padding: 3px 7px; font-size: 12px; flex-shrink: 0; }
+.panel p { margin: 6px 0; }
+.hint, .panel small, .panel time { color: var(--cs-color-text-muted); }
+.task { border-top: 1px solid var(--cs-color-border); padding-top: 7px; margin-top: 8px; }
+.entry { border-top: 1px solid var(--cs-color-border); padding: 7px 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 8px; }
+.entry > div { display: flex; align-items: center; flex-wrap: wrap; gap: 5px 8px; }
+.entry small { grid-column: 1; overflow-wrap: anywhere; }
+.entry button { grid-column: 2; grid-row: 1 / 3; align-self: center; }
+.entry[data-urgent="true"] { border-left: 2px solid var(--cs-tone-warning-fg); padding-left: 6px; }
+.dot { color: var(--cs-color-primary); font-size: 8px; }
+.panel footer { display: flex; gap: 6px; flex-wrap: wrap; }
+.toast { position: fixed; right: 12px; bottom: 14px; z-index: 35; display: flex; align-items: center; gap: 10px; max-width: calc(100vw - 24px); background: var(--cs-color-surface); border: 1px solid var(--cs-color-border); box-shadow: 0 5px 18px #0002; border-radius: 8px; padding: 8px 10px; font-size: 13px; }
+@media (max-width: 600px) { .panel { position: fixed; left: 10px; right: 10px; top: 90px; width: auto; } .root > button { max-width: 220px; } }

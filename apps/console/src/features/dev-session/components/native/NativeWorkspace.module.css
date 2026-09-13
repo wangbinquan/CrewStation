@@ -9,6 +9,9 @@
 .terminalCard:focus-within { border-color: var(--cs-color-primary); }
 .terminalHeader { flex-wrap: wrap; border-bottom: 1px solid var(--cs-color-border); padding: 2px 6px; font-size: 12px; flex-shrink: 0; }
 .lifecycle { color: var(--cs-color-text-muted); font-size: 12px; }
+.waiting, .lifecycle[data-activity="waiting"], .lifecycle[data-activity="failed"] { color: var(--cs-tone-warning-fg); }
+.completed, .lifecycle[data-activity="completed"] { color: var(--cs-tone-success-fg); }
+.lifecycle[data-activity="running"] { color: var(--cs-color-primary); }
 .compute { color: var(--cs-color-text-muted); margin-left: auto; max-width: 100px; overflow: hidden; text-overflow: ellipsis; }
 .controlLine { flex-shrink: 0; flex-wrap: wrap; padding: 0 6px; color: var(--cs-color-text-muted); font-size: 11px; }
 .controlLine button { padding: 0 4px; min-height: 22px; margin-left: auto; }

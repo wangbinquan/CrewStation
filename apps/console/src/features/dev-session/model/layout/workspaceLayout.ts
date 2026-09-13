@@ -52,3 +52,13 @@ export function reorderTerminal(layout: WorkspaceLayout, tabId: string, terminal
     return { ...tab, paneOrder: order };
   });
 }
+
+/** 定位只恢复显示，已有页签内不重排，不取得终端输入控制。 */
+export function revealActivityTerminal(layout: WorkspaceLayout, terminalId: string, tabName: string): WorkspaceLayout {
+  const current = layout.tabs.find((tab) => tab.paneOrder.includes(terminalId));
+  if (current) return layout.view === 'cli' && layout.activeTabId === current.id && layout.selectedTerminalId === terminalId && (!layout.maximizedTerminalId || layout.maximizedTerminalId === terminalId) ? layout : { ...layout, view: 'cli', activeTabId: current.id, selectedTerminalId: terminalId, maximizedTerminalId: null };
+  const target = layout.tabs.find((tab) => tab.id === layout.activeTabId && tab.paneOrder.length < 32) ?? layout.tabs.find((tab) => tab.paneOrder.length < 32);
+  const next = target ? layout : addWorkspaceTab(layout, tabName);
+  const targetId = target?.id ?? next.activeTabId;
+  return { ...moveTerminal(next, terminalId, targetId), activeTabId: targetId, view: 'cli', maximizedTerminalId: null };
+}
