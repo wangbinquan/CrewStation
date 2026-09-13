@@ -72,7 +72,7 @@ export function DevSessionWorkbench({ projectId, session, access, canDevelop, se
       </header>
       <VersionComparisonPanel projectId={projectId} taskId={taskId} channel={channel} canDevelop={canDevelop} compact />
       <NativeWorkspace taskId={taskId} userId={userId} channel={channel} stream={state} canDevelop={canDevelop} onActivity={touch} activityTarget={activityTarget} editorDirty={editor.dirty} location={location}
-        preview={<DevelopmentPreview preview={preview} previewHost={session.previewHost} connected={state.runnerConnected} />}
+        preview={<DevelopmentPreview preview={preview} previewHost={session.previewHost} connected={state.runnerConnected} logs={<Link to={PROJECT_PATHS[space].operations} params={{ projectId }} search={{ tab: 'logs', source: 'dev-session', taskId }}>{t('devSession.preview.logs')}</Link>} />}
         editor={<EditorPane tree={tree} editor={{ ...editor, openFile: location.openFile }} />}
         changes={<VersionComparisonPanel projectId={projectId} taskId={taskId} channel={channel} canDevelop={canDevelop} initiallyExpanded target={location.search.target ?? 'prod'} onTargetChange={location.selectTarget} onOpenFile={location.openFile} />} />
     </>

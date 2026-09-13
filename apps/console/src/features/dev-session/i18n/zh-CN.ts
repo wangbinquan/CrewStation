@@ -193,6 +193,8 @@ export const messages = {
   'devSession.release.editorBusy': '编辑器正在读写文件，请等待结果后再确认释放。',
 
   'devSession.preview.title': '预览',
+  'devSession.preview.logs': '查看开发会话日志',
+  'devSession.preview.restartUnconfirmed': '上次预览重启结果未确认：{reason}。可刷新状态后再决定是否重启。',
   'devSession.preview.state': '状态',
   'devSession.preview.port': '端口',
   'devSession.preview.restarts': '重启次数',

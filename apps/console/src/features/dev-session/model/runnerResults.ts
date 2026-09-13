@@ -44,7 +44,8 @@ const PREVIEW_STATES: readonly PreviewState[] = ['disabled', 'stopped', 'startin
 
 export function asPreviewStatusResult(payload: unknown): PreviewStatusResult {
   const value = record(payload, 'previewStatus');
-  const state = PREVIEW_STATES.find((candidate) => candidate === value.state) ?? 'disabled';
+  const state = PREVIEW_STATES.find((candidate) => candidate === value.state);
+  if (!state || !Number.isSafeInteger(value.restarts) || Number(value.restarts) < 0) throw new StreamCommandError('malformed_result', 'previewStatus 未返回有效预览状态，结果未确认');
   const port = typeof value.port === 'number' ? { port: value.port } : {};
   const lastError = typeof value.lastError === 'string' ? { lastError: value.lastError } : {};
   return { state, restarts: count(value.restarts), ...port, ...lastError };

@@ -196,6 +196,8 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   'devSession.release.editorBusy': 'The editor is reading or writing a file. Wait for the result before confirming release.',
 
   'devSession.preview.title': 'Preview',
+  'devSession.preview.logs': 'View development session logs',
+  'devSession.preview.restartUnconfirmed': 'The last preview restart was not confirmed: {reason}. Refresh its status before deciding whether to restart again.',
   'devSession.preview.state': 'State',
   'devSession.preview.port': 'Port',
   'devSession.preview.restarts': 'Restarts',

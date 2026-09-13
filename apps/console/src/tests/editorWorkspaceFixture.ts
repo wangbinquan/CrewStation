@@ -1,10 +1,11 @@
-import type { TaskStreamCommandInput } from '@crewstation/api-client';
+import type { PreviewStatusResult, TaskStreamCommandInput } from '@crewstation/api-client';
 import { activityFixture, activityProjectId, activityTaskId, activityUserId, activityTime } from './agentActivityFixture';
 
 /** 测真实路由、任务流与 CodeMirror；仅替代服务端 HTTP／WS 的确定性边界。 */
 export function editorWorkspaceFixture() {
   const f = activityFixture(), commands: Array<TaskStreamCommandInput & { id: string }> = [], writes: Array<{ path: string; method: string }> = [];
   const files = new Map([['a.ts', '磁盘原文'], ['b.ts', '第二个文件']]);
+  const preview: PreviewStatusResult = { state: 'disabled', restarts: 0 };
   const originalFetch = globalThis.fetch, originalSocket = globalThis.WebSocket, originalHref = window.location.href;
   window.location.href = 'http://localhost/';
   let pendingWrite: (() => void) | undefined;
@@ -24,7 +25,7 @@ export function editorWorkspaceFixture() {
         if (!files.has(command.path)) { queueMicrotask(() => this.receive({ type: 'error', id: command.id, code: 'not_found', message: `文件不存在：${command.path}` })); return; }
         payload = { path: command.path, content: files.get(command.path), version: 'version-1', size: 10 };
       }
-      else if (command.type === 'previewStatus') payload = { state: 'disabled', restarts: 0 };
+      else if (command.type === 'previewStatus') payload = preview;
       else if (command.type === 'writeFile') {
         pendingWrite = () => { files.set(command.path, command.content); this.receive({ type: 'result', id: command.id, payload: { path: command.path, version: 'version-2' } }); };
         return;
@@ -47,5 +48,5 @@ export function editorWorkspaceFixture() {
     else if (path.endsWith('/dev-session')) body = { taskId: activityTaskId, projectId: activityProjectId, createdBy: activityUserId, branch: 'main', state: 'running', lastActivityAt: activityTime, previewHost: 'preview.localhost' };
     return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
   }) as typeof fetch;
-  return { commands, writes, files, finishWrite: () => { const finish = pendingWrite; pendingWrite = undefined; finish?.(); }, restore: () => { globalThis.fetch = originalFetch; globalThis.WebSocket = originalSocket; window.location.href = originalHref; } };
+  return { commands, writes, files, preview, finishWrite: () => { const finish = pendingWrite; pendingWrite = undefined; finish?.(); }, restore: () => { globalThis.fetch = originalFetch; globalThis.WebSocket = originalSocket; window.location.href = originalHref; } };
 }
