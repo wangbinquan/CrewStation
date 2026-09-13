@@ -1,0 +1,24 @@
+.filters, .toolbar, .actions { display: flex; flex-wrap: wrap; align-items: end; gap: var(--cs-space-2); }
+.filters { margin-bottom: var(--cs-space-3); }
+.filters label { display: grid; gap: var(--cs-space-1); font-size: var(--cs-font-size-sm); }
+.filters label:first-child { flex: 1 1 200px; }
+.filters input, .filters select { box-sizing: border-box; min-width: 0; min-height: 32px; padding: var(--cs-space-1) var(--cs-space-2); border: 1px solid var(--cs-color-border); border-radius: var(--cs-radius-sm); background: var(--cs-color-surface); color: var(--cs-color-text); }
+.filters input:focus-visible, .filters select:focus-visible { outline: 2px solid var(--cs-color-focus); outline-offset: 1px; }
+.toolbar { align-items: center; justify-content: space-between; margin-block: var(--cs-space-2); }
+.fact { display: flex; flex-direction: column; align-items: flex-start; gap: var(--cs-space-1); overflow-wrap: anywhere; }
+.fact code { font-size: var(--cs-font-size-sm); }
+.muted { color: var(--cs-color-text-muted); font-size: var(--cs-font-size-sm); }
+.identity { min-width: 170px; max-width: 280px; overflow-wrap: anywhere; }
+.identity details { margin-top: var(--cs-space-1); font-size: var(--cs-font-size-sm); }
+.identity summary { cursor: pointer; }
+.table { min-width: 800px; }
+.table td { vertical-align: top; padding: var(--cs-space-2); }
+.table th { padding: var(--cs-space-2); }
+.grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--cs-space-2); }
+.stack { display: grid; gap: var(--cs-space-3); }
+.primary { display: inline-flex; padding: var(--cs-space-1) var(--cs-space-3); border-radius: var(--cs-radius-sm); background: var(--cs-color-primary); color: var(--cs-color-on-primary); text-decoration: none; font-weight: 600; }
+.primary:hover { background: var(--cs-color-primary-hover); }
+.failure { color: var(--cs-tone-danger-fg); overflow-wrap: anywhere; }
+.activity { display: grid; gap: var(--cs-space-2); padding: 0; margin: 0; list-style: none; }
+.activity li { display: flex; justify-content: space-between; flex-wrap: wrap; gap: var(--cs-space-2); padding-block: var(--cs-space-1); border-bottom: 1px solid var(--cs-color-border); }
+@media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }

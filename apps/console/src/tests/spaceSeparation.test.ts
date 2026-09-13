@@ -42,8 +42,9 @@ describe('两个空间的结构约定（RFC-002）', () => {
   });
 
   test('租户项目列表按 kind 过滤发生在服务端调用上，不是前端 filter', () => {
-    const page = sourceAt(files, 'features/projects/pages/ProjectListPage.tsx');
-    expect(page.code).toContain('api.projects.list(TENANT_KINDS)');
+    const page = sourceAt(files, 'features/projects/model/useProjectSummaries.ts');
+    expect(page.code).toContain('api.capabilities.projectSummaries');
+    expect(page.code).toContain("kind: ['DigitalWorker']");
     expect(page.code).not.toMatch(/\.filter\([^)]*kind/);
   });
 });

@@ -109,7 +109,7 @@ describe('管理空间与租户空间分离（RFC-002）', () => {
   test('租户项目列表只要数字人；管理空间的接入容器页要另外两类', async () => {
     asAdmin();
     app = await renderApp('/projects');
-    expect(requests.some((url) => url.includes('/v1/projects?kind=DigitalWorker'))).toBe(true);
+    expect(requests.some((url) => url.includes('/v1/workbench/project-summaries?') && url.includes('kind=DigitalWorker'))).toBe(true);
     expect(requests.some((url) => url.includes('APIProxy'))).toBe(false);
     app.unmount();
     requests.length = 0;

@@ -1,4 +1,4 @@
-import type { Actor, ListProjectsQuery, ProjectDto, ProjectId, ProjectState, ServiceDto, ServiceId } from '@crewstation/contracts';
+import type { Actor, ListProjectsQuery, ProjectDto, ProjectId, ProjectState, ServiceDto, ServiceId, UserId } from '@crewstation/contracts';
 import { notFound } from '@crewstation/kernel';
 import { transition } from '../domain/project';
 import { authorizationUseCases } from './authorization';
@@ -26,6 +26,7 @@ export function queryProjectUseCases(deps: ProjectUseCaseDeps) {
       const { project, service } = await load(projectId);
       return projectToDto(project, service);
     },
+    listUserMemberships: async (userId: UserId) => (await uow.read.memberships.listByUser(userId)).map(({ projectId, role }) => ({ projectId, role })),
     /**
      * 先按作用域取（管理员看全部、成员看自己的），再按 kind 过滤（RFC-002）。
      * 顺序不能反：kind 是视图筛选，不是放大可见范围的口子——普通成员带 `kind=APIProxy`

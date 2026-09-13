@@ -86,4 +86,14 @@ describe.skipIf(!available)('项目有界基础分页', () => {
     expect(await module.api.resolveServiceOfProject(id)).toMatchObject({ projectId: id, state: 'archived' });
     expect(await module.api.resolveServiceOfProject(`prj_${'0'.repeat(32)}` as ProjectId)).toBeUndefined();
   });
+  test('身份成员投影保留完整角色与范围，撤销即时移除', async () => {
+    expect(await module.api.listUserMemberships(stranger.userId)).toEqual([]);
+    expect(await module.api.listUserMemberships(tester.userId)).toEqual([{ projectId: ids[0]!, role: 'tester' }]);
+    expect((await module.api.listUserMemberships(owner.userId))).toHaveLength(24);
+    expect((await module.api.listUserMemberships(owner.userId)).every((row) => row.role === 'owner')).toBe(true);
+    await module.api.setMember(admin, ids[2]!, { userId: member.userId, role: 'tester' });
+    const before = await module.api.listUserMemberships(member.userId); expect(before.find((row) => row.projectId === ids[2]!)?.role).toBe('tester');
+    await module.api.removeMember(admin, ids[2]!, member.userId);
+    expect((await module.api.listUserMemberships(member.userId)).some((row) => row.projectId === ids[2]!)).toBe(false);
+  });
 });

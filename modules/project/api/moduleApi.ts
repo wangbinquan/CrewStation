@@ -50,6 +50,8 @@ export interface ProjectModuleApi {
   createProject(actor: Actor, input: CreateProjectRequest): Promise<ProjectDto>;
   getProject(actor: Actor, projectId: ProjectId): Promise<ProjectDto>;
   listProjects(actor: Actor, query?: ListProjectsQuery): Promise<ProjectDto[]>;
+  /** 身份组合根读取当前账号的完整成员关系，避免逐项目加载服务和角色。 */
+  listUserMemberships(userId: UserId): Promise<Array<{ projectId: ProjectId; role: MemberDto['role'] }>>;
   listProjectPage(actor: Actor, query: ProjectPageQuery): Promise<ProjectPage>;
   readProjectPageEntries(actor: Actor, ids: readonly ProjectId[]): Promise<ProjectPageEntry[]>;
   getProjectPageEntry(actor: Actor, projectId: ProjectId): Promise<ProjectPageEntry>;

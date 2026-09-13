@@ -82,7 +82,7 @@ function composeCore(deps: PlatformModuleDeps, late: Late) {
     settings: { adminEmails: settings.adminEmails, userDomain: settings.userDomain, cookieDomain: `.${settings.userDomain}`, secure: settings.publicScheme === 'https', sessionTtlSeconds: settings.sessionTtlSeconds },
     provider: demoIdentityProvider(),
     previewAccess: { canView: async (userId, slug) => { const r = await projectApi().resolveServiceIdentity(`${slug}/${slug}`); return r ? (await projectApi().roleOf({ userId, isAdmin: await projectApi().isAdmin(userId) }, r.projectId)) !== undefined : false; } },
-    membershipLookup: { membershipsOf: async (userId) => { const actor: Actor = { userId, isAdmin: false }; const out: Array<{ projectId: ProjectId; role: 'owner' | 'developer' | 'tester' }> = []; for (const p of await projectApi().listProjects(actor)) { const role = await projectApi().roleOf(actor, p.id); if (role && role !== 'admin') out.push({ projectId: p.id, role }); } return out; } },
+    membershipLookup: { membershipsOf: (userId) => projectApi().listUserMemberships(userId) },
     workloadLookup: { byIp: (ip) => gatewayApi().lookupByIp(ip) },
     allowlistEvaluator: { evaluate: (caller, target) => gatewayApi().evaluate(caller, target) },
     // 开发会话令牌的即时吊销点：每次校验现查环境，释放（releasing／released）即查不到，令牌当场失效。

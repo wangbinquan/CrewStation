@@ -44,6 +44,8 @@ export function drizzleMembershipRepository(db: Executor): MembershipRepository 
       await db.delete(memberships).where(and(eq(memberships.projectId, projectId), eq(memberships.userId, userId)));
     },
     listProjectIdsByUser: async (userId) => (await db.select({ projectId: memberships.projectId }).from(memberships).where(eq(memberships.userId, userId))).map((r) => r.projectId as ProjectId),
+    listByUser: async (userId) => (await db.select({ member: memberships }).from(memberships).innerJoin(projects, eq(projects.id, memberships.projectId))
+      .where(eq(memberships.userId, userId)).orderBy(projects.createdAt, projects.id)).map((row) => toMembership(row.member)),
   };
 }
 

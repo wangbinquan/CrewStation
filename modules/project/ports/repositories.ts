@@ -32,6 +32,7 @@ export interface MembershipRepository {
   upsert(membership: Membership): Promise<void>;
   remove(projectId: ProjectId, userId: UserId): Promise<void>;
   listProjectIdsByUser(userId: UserId): Promise<ProjectId[]>;
+  listByUser(userId: UserId): Promise<Membership[]>;
 }
 
 export interface QuotaRepository {

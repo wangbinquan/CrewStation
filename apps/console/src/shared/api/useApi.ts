@@ -7,8 +7,9 @@ export type { ApiClientError };
 export { isApiClientError };
 
 /** 读：键 + 取数函数；错误类型固定为 ApiClientError，页面据此区分 403 与 404。 */
-export function useApiQuery<T>(key: QueryKey, fetcher: () => Promise<T>, options: { enabled?: boolean; refetchIntervalMs?: number } = {}): UseQueryResult<T, ApiClientError> {
-  return useQuery<T, ApiClientError>({ queryKey: key, queryFn: fetcher, enabled: options.enabled ?? true, refetchInterval: options.refetchIntervalMs ?? false, refetchIntervalInBackground: false });
+export function useApiQuery<T>(key: QueryKey, fetcher: () => Promise<T>, options: { enabled?: boolean; refetchIntervalMs?: number; staleTimeMs?: number } = {}): UseQueryResult<T, ApiClientError> {
+  return useQuery<T, ApiClientError>({ queryKey: key, queryFn: fetcher, enabled: options.enabled ?? true, refetchInterval: options.refetchIntervalMs ?? false, refetchIntervalInBackground: false,
+    ...(options.staleTimeMs === undefined ? {} : { staleTime: options.staleTimeMs }) });
 }
 
 /** 写：成功后按前缀失效给定的键。 */

@@ -56,9 +56,11 @@ async function field(name: string, value: string) {
 }
 
 test('新建入口归管理空间，工作台不再内嵌平台创建表单', async () => {
-  fixture(); page = await renderApp('/projects');
+  const f = fixture(); page = await renderApp('/projects');
   // 原版把所有 kind 和原始模板输入放在工作台日常列表上方。
-  expect(document.querySelector('form')).toBeNull();
+  expect(document.querySelectorAll('[name="name"], [name="slug"], [name="template"], [name="kind"]').length).toBe(0);
+  expect(document.querySelectorAll('form').length).toBe(1);
+  expect(f.writes()).toHaveLength(0);
   await page.click('新建数字人'); expect(page.path()).toBe('/admin/projects/new');
   expect(page.text()).toContain('基本信息'); expect(document.querySelector('[name="kind"]')).toBeNull();
 });
