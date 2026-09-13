@@ -1,5 +1,15 @@
 import { z } from 'zod';
-import { ServiceIdSchema } from '../ids';
+import { ManifestKindSchema } from '../manifest/serviceSpec';
+import { ServiceIdSchema, SlugSchema } from '../ids';
+
+/** 当前控制面实际可复制的模板，不把发布包设计或不存在的模板当成可选项。 */
+export const ProjectTemplateDtoSchema = z.object({
+  name: SlugSchema,
+  kind: ManifestKindSchema,
+  servicePlan: SlugSchema,
+  requiredConfig: z.array(z.object({ name: z.string(), from: z.enum(['config', 'secret']) })),
+});
+export type ProjectTemplateDto = z.infer<typeof ProjectTemplateDtoSchema>;
 
 /** 每逻辑服务唯一的源码仓库绑定（R32）。 */
 export const RepositoryBindingDtoSchema = z.object({

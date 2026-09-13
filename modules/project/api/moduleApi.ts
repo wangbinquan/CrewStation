@@ -23,6 +23,19 @@ export interface ResolvedService {
   state: ProjectState;
 }
 
+/** 控制面开通的输入事实；初始选择与当前仓库／生产部署配置不是同一件事。 */
+export interface ProvisioningProject {
+  projectId: ProjectId;
+  serviceId: ServiceId;
+  slug: string;
+  name: string;
+  namespace: string;
+  kind: ManifestKind;
+  state: ProjectState;
+  template: string;
+  initialPlan?: string;
+}
+
 /** 供 L6 聚合正式状态；serviceId 仅供模块间定位，HTTP 市场响应显式投影。 */
 export type MarketListing = Omit<MarketAppDto, 'production'> & { serviceId?: ServiceId };
 
@@ -51,6 +64,8 @@ export interface ProjectModuleApi {
   /** 无 actor 的内部解析，供网关、发布、任务等模块经端口使用。 */
   resolveServiceById(serviceId: ServiceId): Promise<ResolvedService | undefined>;
   listServices(): Promise<ResolvedService[]>;
+  /** 单项目内部查询，不遍历所有项目；缺失或已归档时不再开通。 */
+  getProvisioningProject(projectId: ProjectId): Promise<ProvisioningProject | undefined>;
   ownerOf(projectId: ProjectId): Promise<UserId | undefined>;
   listMembers(actor: Actor, projectId: ProjectId): Promise<MemberDto[]>;
   setMember(actor: Actor, projectId: ProjectId, input: SetMemberRequest): Promise<MemberDto>;

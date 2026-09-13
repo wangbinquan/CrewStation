@@ -10,6 +10,7 @@ export const projects = projectSchema.table('projects', {
   ownerUserId: text('owner_user_id').notNull(),
   state: text('state').notNull(),
   template: text('template').notNull(),
+  initialPlan: text('initial_plan'),
   message: text('message'),
   createdBy: text('created_by').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull(),

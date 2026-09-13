@@ -51,12 +51,13 @@ function toProject(row: typeof projects.$inferSelect): Project {
   return {
     id: row.id as ProjectId, slug: row.slug, name: row.name, kind: row.kind as ManifestKind, namespace: row.namespace,
     ownerUserId: row.ownerUserId as UserId, state: row.state as ProjectState, template: row.template,
+    ...(row.initialPlan === null ? {} : { initialPlan: row.initialPlan }),
     ...(row.message ? { message: row.message } : {}), createdBy: row.createdBy as UserId, createdAt: row.createdAt, updatedAt: row.updatedAt,
   };
 }
 
 function toProjectRow(project: Project): typeof projects.$inferInsert {
-  return { ...project, message: project.message ?? null };
+  return { ...project, initialPlan: project.initialPlan ?? null, message: project.message ?? null };
 }
 
 function toService(row: typeof services.$inferSelect): Service {

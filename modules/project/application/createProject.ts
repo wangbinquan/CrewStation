@@ -12,16 +12,16 @@ import { projectToDto } from './toDto';
 export function createProjectUseCase({ uow, users, settings, clock }: ProjectUseCaseDeps) {
   return async (actor: Actor, input: CreateProjectRequest): Promise<ProjectDto> => {
     if (!actor.isAdmin) throw forbidden('只有管理员可以创建项目');
-    if (RESERVED_SLUGS.includes(input.slug)) throw validation(`slug ${input.slug} 是保留名`, { reserved: RESERVED_SLUGS });
-    if (!(await users.getUser(input.ownerUserId))) throw validation(`负责人 ${input.ownerUserId} 不存在`);
+    if (RESERVED_SLUGS.includes(input.slug)) throw validation(`slug ${input.slug} 是保留名`, { field: 'slug', reserved: RESERVED_SLUGS });
+    if (!(await users.getUser(input.ownerUserId))) throw validation(`负责人 ${input.ownerUserId} 不存在`, { field: 'ownerUserId' });
     const now = clock.now();
     return uow.run(async (scope) => {
-      if (await scope.projects.getBySlug(input.slug)) throw conflict(`项目 ${input.slug} 已存在`, { slug: input.slug });
+      if (await scope.projects.getBySlug(input.slug)) throw conflict(`项目 ${input.slug} 已存在`, { field: 'slug', slug: input.slug });
       const planName = input.plan ?? settings.defaultServicePlan;
-      if (!(await scope.catalog.getServicePlan(planName))) throw validation(`服务套餐 ${planName} 不存在`);
+      if (!(await scope.catalog.getServicePlan(planName))) throw validation(`服务套餐 ${planName} 不存在`, { field: 'plan' });
       const project: Project = {
         id: newId('prj') as ProjectId, slug: input.slug, name: input.name, kind: input.kind, namespace: namespaceFor(input.slug),
-        ownerUserId: input.ownerUserId, state: 'provisioning', template: input.template, createdBy: actor.userId, createdAt: now, updatedAt: now,
+        ownerUserId: input.ownerUserId, state: 'provisioning', template: input.template, initialPlan: planName, createdBy: actor.userId, createdAt: now, updatedAt: now,
       };
       const service: Service = { id: newId('svc') as ServiceId, projectId: project.id, name: input.slug, kind: input.kind, identity: serviceIdentity(input.slug, input.slug), createdAt: now };
       await scope.projects.insert(project);

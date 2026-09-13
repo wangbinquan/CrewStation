@@ -141,4 +141,26 @@ describe.skipIf(!available)('project module', () => {
     expect((await filtered.json() as { items: { slug: string }[] }).items.map((i) => i.slug).sort()).toEqual(['gitlab-events', 'ref-proxy']);
     expect((await app.request('/v1/projects?kind=Nope', { headers })).status).toBe(400);
   });
+
+  test('开通读取创建时的模板、套餐和名称；默认套餐也落库，重试不会丢失', async () => {
+    await project.api.upsertServicePlan(admin, { name: 'standard-large', cpu: '2', memory: '4Gi', maxReplicas: 4, description: '大套餐' });
+    const dto = await project.api.createProject(admin, { slug: 'custom-init', name: '自定义开通', kind: 'DigitalWorker', ownerUserId: owner.userId,
+      template: 'custom-template', plan: 'standard-large', maxConcurrentTasks: 7 });
+    // 原实现只校验 plan 后丢弃；异步开通拿不到用户确认过的初始套餐。
+    const rows = await tdb.db.execute("SELECT to_jsonb(p) AS row FROM project.projects p WHERE slug = 'custom-init'") as unknown as Array<{ row: { initial_plan?: string } }>;
+    expect(rows[0]?.row.initial_plan).toBe('standard-large');
+    expect(await project.api.getProvisioningProject(dto.id)).toMatchObject({ projectId: dto.id, serviceId: dto.serviceId, state: 'provisioning',
+      name: '自定义开通', template: 'custom-template', initialPlan: 'standard-large' });
+    expect((await project.api.getQuota(admin, dto.id)).maxConcurrentTasks).toBe(7);
+    await project.api.setProjectState(dto.id, 'failed', 'first attempt failed');
+    await project.api.setProjectState(dto.id, 'provisioning');
+    expect(await project.api.getProvisioningProject(dto.id)).toMatchObject({ initialPlan: 'standard-large', template: 'custom-template' });
+    const defaults = await project.api.createProject(admin, { slug: 'default-init', name: '默认', kind: 'DigitalWorker', ownerUserId: owner.userId, template: 'minimal-sample' });
+    expect(await project.api.getProvisioningProject(defaults.id)).toMatchObject({ initialPlan: 'standard-small' });
+    await tdb.db.execute("UPDATE project.projects SET initial_plan = NULL WHERE slug = 'default-init'");
+    await project.api.setProjectState(defaults.id, 'failed', 'legacy retry');
+    expect(await project.api.getProvisioningProject(defaults.id)).not.toHaveProperty('initialPlan');
+    expect(await project.api.getProvisioningProject(`prj_${'0'.repeat(32)}` as ProjectId)).toBeUndefined();
+    expect(await project.api.getProvisioningProject(projectId)).toBeUndefined();
+  });
 });

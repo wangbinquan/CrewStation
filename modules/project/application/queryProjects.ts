@@ -63,6 +63,14 @@ export function queryProjectUseCases(deps: ProjectUseCaseDeps) {
       }
       return out;
     },
+    getProvisioningProject: async (projectId: ProjectId) => {
+      const project = await uow.read.projects.getById(projectId);
+      if (!project || project.state === 'archived') return undefined;
+      const service = await uow.read.services.getByProject(projectId);
+      if (!service) return undefined;
+      return { projectId, serviceId: service.id, slug: project.slug, name: project.name, namespace: project.namespace, kind: project.kind,
+        state: project.state, template: project.template, ...(project.initialPlan === undefined ? {} : { initialPlan: project.initialPlan }) };
+    },
     ownerOf: async (projectId: ProjectId) => (await uow.read.projects.getById(projectId))?.ownerUserId,
     /** 控制面在命名空间与首个发布就绪后推进状态；不经 actor。 */
     setProjectState: async (projectId: ProjectId, state: ProjectState, message?: string): Promise<ProjectDto> => uow.run(async (scope) => {

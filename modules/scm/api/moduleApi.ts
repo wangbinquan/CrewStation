@@ -1,10 +1,11 @@
 import type {
-  Actor, BranchDto, CreateReleaseTagRequest, ProjectId, ReleaseTagDto, RepositoryBindingDto, ServiceId, SessionCredentialDto, TagDto, UserId,
+  Actor, BranchDto, CreateReleaseTagRequest, ProjectId, ProjectTemplateDto, ReleaseTagDto, RepositoryBindingDto, ServiceId, SessionCredentialDto, TagDto, UserId,
 } from '@crewstation/contracts';
 
 export interface EnsureRepositoryInput {
   readonly slug: string;
   readonly templateName: string;
+  readonly initialPlan?: string;
 }
 
 export interface ListBranchesOptions {
@@ -18,6 +19,7 @@ export type ActorResolver = (userId: UserId) => Promise<Actor>;
 /** scm 模块对外能力；不带 actor 的方法只供平台内部（控制面、其他模块）调用。 */
 export interface ScmModuleApi {
   readonly name: 'scm';
+  listTemplates(actor: Actor): Promise<ProjectTemplateDto[]>;
   /** 幂等建仓：已有绑定直接返回；远端路径被占且不属于本服务时抛 conflict，绝不接管（R32）。 */
   ensureRepository(serviceId: ServiceId, projectId: ProjectId, input: EnsureRepositoryInput): Promise<RepositoryBindingDto>;
   getBinding(actor: Actor, serviceId: ServiceId): Promise<RepositoryBindingDto>;

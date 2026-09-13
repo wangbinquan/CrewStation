@@ -52,7 +52,7 @@ export function drizzleAppListings(db: Executor): AppListingRepository {
 function toVisibleApplication(row: { project: typeof projects.$inferSelect; service: typeof services.$inferSelect | null; listing: typeof appListings.$inferSelect | null; role: string | null }): VisibleApplication {
   const p = row.project, s = row.service;
   return {
-    project: { ...p, id: p.id as ProjectId, kind: 'DigitalWorker', state: p.state as ProjectState, ownerUserId: p.ownerUserId as UserId, createdBy: p.createdBy as UserId, ...(p.message ? { message: p.message } : { message: undefined }) },
+    project: { ...p, initialPlan: p.initialPlan ?? undefined, id: p.id as ProjectId, kind: 'DigitalWorker', state: p.state as ProjectState, ownerUserId: p.ownerUserId as UserId, createdBy: p.createdBy as UserId, ...(p.message ? { message: p.message } : { message: undefined }) },
     service: s ? { ...s, id: s.id as ServiceId, projectId: s.projectId as ProjectId, kind: 'DigitalWorker' } : undefined,
     listing: row.listing ? asListing(row.listing) : defaultAppListing(p.id as ProjectId), role: row.role as MemberRole | undefined ?? undefined,
   };

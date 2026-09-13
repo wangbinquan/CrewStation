@@ -110,6 +110,7 @@ export function fakeGit(gitlab?: ReturnType<typeof fakeGitLab>) {
 export function fakeTemplates(known: string[] = ['minimal-sample']) {
   const materialized: Array<{ templateName: string; targetDir: string }> = [];
   const source: TemplateSource = {
+    list: async () => known.map((name) => ({ name, kind: 'DigitalWorker', servicePlan: 'standard-small', requiredConfig: [] })),
     materialize: async (templateName, targetDir) => {
       if (!known.includes(templateName)) throw notFound('模板', templateName);
       materialized.push({ templateName, targetDir });

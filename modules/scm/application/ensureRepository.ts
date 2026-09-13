@@ -34,7 +34,7 @@ export function ensureRepositoryUseCase(deps: ScmUseCaseDeps) {
       : newBinding({ serviceId, projectId, remoteProjectId: project.id, pathWithNamespace: path, httpUrl, defaultBranch: settings.defaultBranch, now });
     await uow.run((scope) => scope.bindings.upsert(binding));
     try {
-      await populate(deps, binding, input.templateName, remote !== undefined);
+      await populate(deps, binding, input, remote !== undefined);
       binding = transition(binding, 'ready', clock.now());
     } catch (error) {
       binding = transition(binding, 'failed', clock.now(), describeFailure(error));
@@ -56,13 +56,14 @@ async function claimRemote(deps: ScmUseCaseDeps, path: string, existing: Reposit
 }
 
 /** 默认分支已存在（重试场景）就不再推模板，只补标签保护。 */
-async function populate(deps: ScmUseCaseDeps, binding: RepositoryBinding, templateName: string, remoteExisted: boolean): Promise<void> {
+async function populate(deps: ScmUseCaseDeps, binding: RepositoryBinding, input: EnsureRepositoryInput, remoteExisted: boolean): Promise<void> {
   const { gitlab, git, templates, scratch, settings } = deps;
+  const { templateName, initialPlan } = input;
   const hasDefaultBranch = remoteExisted && (await gitlab.getBranch(binding.remoteProjectId, binding.defaultBranch)) !== undefined;
   if (!hasDefaultBranch) {
     const dir = await scratch.create('cs-scm-init');
     try {
-      await templates.materialize(templateName, dir.path);
+      await templates.materialize(templateName, dir.path, initialPlan);
       await git.initAndPush({
         workdir: dir.path,
         remoteUrlWithCredential: withCredential(binding.httpUrl, PLATFORM_PUSH_USERNAME, settings.platformToken),

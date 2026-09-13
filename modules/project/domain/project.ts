@@ -10,6 +10,8 @@ export interface Project {
   readonly ownerUserId: UserId;
   readonly state: ProjectState;
   readonly template: string;
+  /** 创建时确认的服务套餐，只用于首次建仓；旧项目未知，不冒充当前部署套餐。 */
+  readonly initialPlan?: string;
   readonly message?: string;
   readonly createdBy: UserId;
   readonly createdAt: Date;

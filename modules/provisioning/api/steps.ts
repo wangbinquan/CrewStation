@@ -10,6 +10,8 @@ export interface ProjectFacts {
   namespace: string;
   kind: 'DigitalWorker' | 'APIProxy' | 'EventProducer';
   template: string;
+  /** 仅生成首次仓库 Manifest；旧项目未记录时保留模板原值。 */
+  initialPlan?: string;
 }
 
 /** 每一步都必须幂等：开通任务可能因任一步失败而整体重跑。 */

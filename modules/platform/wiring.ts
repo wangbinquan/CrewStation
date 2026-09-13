@@ -262,7 +262,7 @@ function composeAggregates(deps: PlatformModuleDeps, core: ReturnType<typeof com
   const provisioning = createProvisioningModule({
     db, logger, workerOwner: `${deps.instance}.provisioning`, consumerName: 'provisioning', isAdmin: (id) => isAdmin(id),
     steps: {
-      loadProject: async (projectId) => { const s = (await project.api.listServices()).find((x) => x.projectId === projectId); return s ? { projectId, state: s.state, serviceId: s.serviceId, slug: s.slug, name: s.name, namespace: s.namespace, kind: s.kind, template: 'minimal-sample' } : undefined; },
+      loadProject: project.api.getProvisioningProject,
       ensureNamespace: async (f) => {
         await k8s.apply(namespaceObject(f.namespace, { 'crewstation.io/project': f.slug }));
         await k8s.apply(resourceQuotaObject({ name: 'crewstation-project', namespace: f.namespace, hard: { pods: '30', 'requests.cpu': '8', 'requests.memory': '16Gi', persistentvolumeclaims: '20' } }));
@@ -270,7 +270,7 @@ function composeAggregates(deps: PlatformModuleDeps, core: ReturnType<typeof com
         await k8s.apply(taskEgressNetworkPolicy({ namespace: f.namespace }));
         await k8s.apply(buildEgressNetworkPolicy({ namespace: f.namespace }));
       },
-      ensureRepository: async (f) => { await core.scm.api.ensureRepository(f.serviceId, f.projectId, { slug: f.slug, templateName: f.template }); },
+      ensureRepository: async (f) => { await core.scm.api.ensureRepository(f.serviceId, f.projectId, { slug: f.slug, templateName: f.template, ...(f.initialPlan === undefined ? {} : { initialPlan: f.initialPlan }) }); },
       ensureData: async (f) => { await data.api.ensureServiceData(f.serviceId); },
       reconcileRoutes: async (f) => { await delivery.gateway.api.reconcileService(f.serviceId); },
       ensureFirstRelease: async (f) => { if ((await delivery.release.api.listReleases(SYSTEM_ACTOR, f.serviceId)).length === 0) await delivery.release.api.publish(SYSTEM_ACTOR, f.serviceId, { branch: 'main', version: 'v0.1.0' }); },

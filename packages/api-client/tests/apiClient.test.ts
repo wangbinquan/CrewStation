@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test';
+import type { UserId } from '@crewstation/contracts';
 import type { FetchLike, TaskStreamFrame } from '../index';
 import { ApiClientError, createApiClient, isApiClientError, kindForStatus, parseErrorEnvelope, parseTaskStreamFrame, taskStreamUrl } from '../index';
 
@@ -42,6 +43,16 @@ async function caught(call: () => Promise<unknown>): Promise<ApiClientError> {
 }
 
 describe('createApiClient：请求形状', () => {
+  test('创建向导从真实模板目录读取，模板与套餐选择原样发给创建接口', async () => {
+    const { calls, fetchImpl } = fakeFetch(() => json(200, { items: [] }));
+    const client = createApiClient({ fetch: fetchImpl });
+    await client.catalog.listProjectTemplates();
+    const input = { name: '财务助手', slug: 'finance', kind: 'DigitalWorker' as const, ownerUserId: `usr_${'a'.repeat(32)}` as UserId,
+      template: 'custom-template', plan: 'standard-large', maxConcurrentTasks: 7 };
+    await client.projects.create(input);
+    expect(calls.map((call) => [call.method, call.url])).toEqual([['GET', '/v1/catalog/project-templates'], ['POST', '/v1/projects']]);
+    expect(JSON.parse(calls[1]!.body!)).toEqual(input);
+  });
   test('调用链回放包含项目作用域，两个路径段独立编码', async () => {
     const { calls, fetchImpl } = fakeFetch(() => json(200, {}));
     const client = createApiClient({ fetch: fetchImpl });

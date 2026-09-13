@@ -18,6 +18,7 @@ import type { ScmUseCaseDeps } from './application/dependencies';
 import { ensureRepositoryUseCase } from './application/ensureRepository';
 import { pushBranchUseCase } from './application/pushBranch';
 import { queryRepositoryUseCases } from './application/queryRepository';
+import { listTemplatesUseCase } from './application/listTemplates';
 import { sessionCredentialUseCases } from './application/sessionCredentials';
 import { repositoryRoutes } from './http/repositoryRoutes';
 import type { ScmSettings } from './ports/scmSettings';
@@ -30,6 +31,8 @@ export interface ScmModuleDeps {
   settings: ScmSettings;
   /** 业务项目模板所在目录；默认仓库根 `templates/`。 */
   templatesRoot?: string;
+  /** 开发源码中的 integrations/；自定义 templatesRoot 时不隐式混入仓内模板。 */
+  integrationTemplatesRoot?: string;
   clock?: Clock;
   fetch?: typeof fetch;
   /** 只供测试与本机调试替换外部系统适配器（GitLab、git、模板、临时目录）。 */
@@ -55,7 +58,8 @@ export function createScmModule(deps: ScmModuleDeps): ScmModule {
     uow: drizzleUnitOfWork(deps.db),
     gitlab: overrides?.gitlab ?? gitLabGatewayAdapter(client),
     git: overrides?.git ?? bunGitRunner({ authorName: settings.platformBotName, authorEmail: settings.platformBotEmail ?? DEFAULT_BOT_EMAIL }),
-    templates: overrides?.templates ?? directoryTemplateSource({ templatesRoot: deps.templatesRoot ?? join(import.meta.dir, '..', '..', 'templates') }),
+    templates: overrides?.templates ?? directoryTemplateSource({ templatesRoot: deps.templatesRoot ?? join(import.meta.dir, '..', '..', 'templates'),
+      ...(deps.integrationTemplatesRoot ? { integrationTemplatesRoot: deps.integrationTemplatesRoot } : deps.templatesRoot === undefined ? { integrationTemplatesRoot: join(import.meta.dir, '..', '..', 'integrations') } : {}) }),
     scratch: overrides?.scratch ?? osScratchDirs(),
     authorizer: { authorize: (actor, projectId, action) => deps.project.authorize(actor, projectId, action) },
     settings,
@@ -63,6 +67,7 @@ export function createScmModule(deps: ScmModuleDeps): ScmModule {
   };
   const api: ScmModuleApi = {
     name: 'scm',
+    listTemplates: listTemplatesUseCase(useCaseDeps.templates),
     ensureRepository: ensureRepositoryUseCase(useCaseDeps),
     ...queryRepositoryUseCases(useCaseDeps),
     createReleaseTag: createReleaseTagUseCase(useCaseDeps),
