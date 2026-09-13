@@ -2,6 +2,24 @@ import type { Messages } from '../../shared/lib/i18n';
 
 /** app 级文案：导航、顶栏、语言、404，以及 shared/ui 里通用组件的缺省文案。页面文案在各 feature 的 i18n/ 中。 */
 export const messages = {
+  'ui.requestPage.label': '{scope}分页',
+  'ui.requestPage.count': '本页 {count} 项',
+  'ui.requestPage.unknown': '本页数量未确认',
+  'ui.requestPage.updated': '读取于 {time}',
+  'ui.requestPage.first': '回到第一页',
+  'ui.requestPage.next': '下一页',
+  'ui.requestPage.nextFor': '{scope}：下一页',
+  'ui.requestPage.hint': '每页最多 20 项，最新申请在前。切页签保留意见；翻页、改变筛选或离开前，会提示处理未提交意见。',
+  'ui.requestPage.invalid': '申请分页返回无效或不属于当前范围的记录，请重新读取。',
+  'ui.requestPage.invalidDecision': '审批结果无法核对，请刷新申请确认；请求可能已经执行，本次不会自动重试。',
+  'ui.requestPage.decisionError': '裁定未确认：{message}',
+  'ui.requestPage.decided': '{target} 申请{state}。',
+  'ui.requestDraft.title': '保留的意见',
+  'ui.requestDraft.scope': '审批意见',
+  'ui.requestDraft.hint': '这些申请不在当前返回的待审批记录中，输入副本已保留供核对。审批结果以最新申请记录为准，可复制后清除。',
+  'ui.requestDraft.value': '保留的意见：{id}',
+  'ui.requestDraft.discard': '清除这条意见',
+
   "nav.admin.projects": "项目管理",
 
   'nav.admin.capabilities': '能力接入',

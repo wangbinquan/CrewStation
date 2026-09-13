@@ -13,15 +13,16 @@ const TONE: Readonly<Record<EgressRequestState, BadgeTone>> = { pending: 'warnin
 export interface EgressRequestRowProps {
   readonly request: EgressRequestDto;
   readonly busy: boolean;
+  readonly decision: string;
+  readonly onDecisionChange: (value: string) => void;
   readonly projectLabel?: string;
   readonly projectLink?: ReactNode;
   readonly onDecide: (id: string, approve: boolean, decision: string) => void;
 }
 
 /** 裁定理由在首次显示时说明约束；无效提交逐字段反馈，服务错误保留输入。 */
-export function EgressRequestRow({ request, busy, projectLabel, projectLink, onDecide }: EgressRequestRowProps): ReactElement {
+export function EgressRequestRow({ request, busy, decision, onDecisionChange, projectLabel, projectLink, onDecide }: EgressRequestRowProps): ReactElement {
   const t = useT();
-  const [decision, setDecision] = useState('');
   const [submitted, setSubmitted] = useState(false), id = useId();
   const valid = decision.trim().length > 0 && decision.trim().length <= 500;
   const send = (approve: boolean) => { setSubmitted(true); if (valid && !busy) onDecide(request.id, approve, decision.trim()); };
@@ -48,7 +49,7 @@ export function EgressRequestRow({ request, busy, projectLabel, projectLink, onD
               value={decision}
               disabled={busy} aria-invalid={submitted && !valid} aria-describedby={`${id}-hint`} aria-errormessage={submitted && !valid ? `${id}-error` : undefined}
               placeholder={t('admin.egressRequests.decisionPlaceholder')}
-              onChange={(event) => setDecision(event.target.value)}
+              onChange={(event) => onDecisionChange(event.target.value)}
             /></FormField>
             <Button variant="primary" disabled={busy} onClick={() => send(true)}>
               {busy ? t('admin.egressRequests.deciding') : t('admin.egressRequests.approve')}

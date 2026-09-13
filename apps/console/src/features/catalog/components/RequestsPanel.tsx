@@ -23,14 +23,15 @@ export interface RequestsPanelProps {
   readonly title?: string;
   readonly empty?: string;
   readonly renderService?: (serviceId: string) => ReactNode;
-  readonly management?: { readonly busy: boolean; readonly onDecide: (id: string, approve: boolean, decision?: string) => void };
+  readonly management?: { readonly busy: boolean; readonly onDecide: (id: string, approve: boolean, decision?: string) => void;
+    readonly decisionFor: (id: string) => string; readonly onDecisionChange: (id: string, value: string) => void };
 }
 
 /** 申请事实供项目和管理页复用；只有管理入口注入审批动作。 */
 export function RequestsPanel({ requests, loading, loadError, title, empty, renderService, management }: RequestsPanelProps): ReactElement {
   const t = useT();
   return (
-    <Card title={title ?? t('catalog.requests.title')}>
+    <Card compact={!!management} title={title ?? t('catalog.requests.title')}>
       <QueryStatus isPending={loading} error={loadError} loadingKey="catalog.requests.loading" errorKey="catalog.error.load" />
       {!loading && loadError === null && requests.length === 0 ? <p className={styles.muted}>{empty ?? t('catalog.requests.empty')}</p> : null}
       {requests.length > 0 ? (
@@ -41,6 +42,7 @@ export function RequestsPanel({ requests, loading, loadError, title, empty, rend
               {management && request.state === 'pending' ? (
                 <RequestDecisionForm
                   pending={management.busy}
+                  decision={management.decisionFor(request.id)} onChange={(value) => management.onDecisionChange(request.id, value)}
                   onDecide={(approve, decision) => management.onDecide(request.id, approve, decision)}
                 />
               ) : null}

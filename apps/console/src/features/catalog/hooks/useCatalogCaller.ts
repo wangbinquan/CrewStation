@@ -18,12 +18,13 @@ export function useCatalogCaller(projectId: string | undefined, q = '', cursor?:
     const result = ProjectDtoSchema.safeParse(await api.projects.get(projectId!));
     if (!result.success || result.data.id !== projectId) throw new Error(t('catalog.caller.invalidProject')); return result.data;
   }, !!projectId);
+  const { refetch: readIdentity } = list.me, { refetch: readList } = list.query, { refetch: readSelected } = selected.query, userId = list.me.data?.id;
   const refresh = useCallback(async () => {
-    const identity = await list.me.refetch({ cancelRefetch: false });
-    if (!identity.error && identity.data?.isAdmin && identity.data.id === list.me.data?.id) await Promise.all([
-      list.query.refetch({ cancelRefetch: false }), ...(projectId ? [selected.query.refetch({ cancelRefetch: false })] : []),
+    const identity = await readIdentity({ cancelRefetch: false });
+    if (!identity.error && identity.data?.isAdmin && identity.data.id === userId) await Promise.all([
+      readList({ cancelRefetch: false }), ...(projectId ? [readSelected({ cancelRefetch: false })] : []),
     ]);
-  }, [list.me.refetch, list.me.data?.id, list.query.refetch, selected.query.refetch, projectId]);
+  }, [readIdentity, userId, readList, readSelected, projectId]);
   const project = projectId && selected.query.data?.id === projectId ? selected.query.data : undefined;
   return { list: list.query, selected: selected.query, project, refresh, busy: list.busy || selected.busy,
     ready: !projectId || !!project?.serviceId && !selected.query.error && !selected.query.isPending && !selected.busy };

@@ -15,7 +15,7 @@ afterEach(() => { page?.unmount(); page = undefined; globalThis.fetch = original
 function fixture(options: { admin?: boolean; meFailure?: boolean; pendingMe?: boolean } = {}) {
   const calls: Array<{ url: URL; method: string; body?: Record<string, unknown> }> = [];
   const state = { projectsFailure: false, operationsFailure: false, apiFailure: false, egressFailure: false, decisionFailure: false, grant: true, policy: 'targeted', requestState: 'pending', decision: undefined as string | undefined };
-  const request = () => ({ id: 'api-1', serviceId, operationKey: key, state: state.requestState, reason: '查询账单', requestedBy: 'user', createdAt, decision: state.decision });
+  const request = () => ({ id: 'api-1', serviceId, operationKey: key, state: state.requestState, reason: '查询账单', requestedBy: project.ownerUserId, createdAt, decision: state.decision });
   globalThis.fetch = (async (raw, init) => {
     const url = new URL(String(raw), 'http://localhost'), method = init?.method ?? 'GET';
     const data = init?.body ? JSON.parse(String(init.body)) as Record<string, unknown> : undefined;
@@ -42,15 +42,20 @@ function fixture(options: { admin?: boolean; meFailure?: boolean; pendingMe?: bo
     } else if (url.pathname.endsWith('/policy')) {
       state.policy = String(data!.openPolicy); body = { key, openPolicy: state.policy };
     } else if (method === 'DELETE') { state.grant = false; return new Response(null, { status: 204 }); }
-    else if (url.pathname === '/v1/api-requests') {
+    else if (url.pathname === '/v1/api-requests/page') {
+      if (state.apiFailure) { status = 503; body = { error: 'unavailable', message: 'API 申请读取失败' }; }
+      else body = { items: [request(), { ...request(), id: 'api-2', operationKey: 'history-operation', state: 'approved' }]
+        .filter((r) => url.searchParams.get('state') === 'all' || r.state === url.searchParams.get('state')).map((r) => ({ ...r, projectId, project })) };
+    } else if (url.pathname === '/v1/api-requests') {
       if (state.apiFailure) { status = 503; body = { error: 'unavailable', message: 'API 申请读取失败' }; }
       else body = { items: [request(), { ...request(), id: 'api-2', operationKey: 'history-operation', state: 'approved' }] };
     } else if (url.pathname === '/v1/api-requests/api-1/decision') {
       if (state.decisionFailure) { status = 503; body = { error: 'unavailable', message: '审批服务失败' }; }
       else { state.requestState = data!.approve ? 'approved' : 'rejected'; state.decision = data!.decision as string; body = request(); }
-    } else if (url.pathname === '/v1/egress/requests') {
+    } else if (url.pathname === '/v1/egress/requests' || url.pathname === '/v1/egress/requests/page') {
       if (state.egressFailure) { status = 503; body = { error: 'unavailable', message: '出站申请读取失败' }; }
-      else body = { items: [{ id: 'egress-1', projectId, fqdn: 'example.invalid', reason: '模型调用', state: 'pending', createdAt, requestedBy: 'user' }] };
+      else body = { items: [{ id: 'egress-1', projectId, project, fqdn: 'example.invalid', reason: '模型调用', state: 'pending', createdAt, requestedBy: project.ownerUserId }]
+        .filter((r) => url.pathname !== '/v1/egress/requests/page' || url.searchParams.get('state') === 'all' || r.state === url.searchParams.get('state')) };
     } else if (url.pathname === '/v1/catalog/event-types') body = { items: [{ eventType: 'billing.changed', producer: 'billing-events', producerProject: integrationId }] };
     else if (url.pathname.endsWith('/dev-session')) { status = 404; body = { error: 'not_found', message: '没有开发会话' }; }
     return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
@@ -117,6 +122,7 @@ describe('管理员能力与审批入口', () => {
     expect(visible<HTMLTextAreaElement>('textarea').value).toBe('用途尚需补充');
     f.state.decisionFailure = false; await page.click('拒绝'); expect(f.writes().at(-1)!.body).toEqual({ approve: false, decision: '用途尚需补充' });
     expect(page.text()).toContain('申请已拒绝'); await input(document.querySelector('select option[value="all"]')!.parentElement as HTMLSelectElement, 'all');
+    expect(page.text()).toContain('审批意见有未保存的输入'); await page.click('放弃输入并离开');
     expect(page.text()).toContain('history-operation'); expect(page.text()).toContain('用途尚需补充');
     await page.navigate(`/projects/${projectId}/settings?tab=resources&resource=api`);
     expect(page.text()).toContain('已拒绝'); expect([...document.querySelectorAll('button')].some((node) => node.textContent === '批准')).toBe(false);

@@ -1,0 +1,6 @@
+.notice { margin: var(--cs-space-3) 0; padding: var(--cs-space-3); border: 1px solid var(--cs-color-border); border-radius: var(--cs-radius-sm); background: var(--cs-color-surface); overflow-wrap: anywhere; }
+.notice h3 { margin: 0; font-size: var(--cs-font-size); }
+.notice p { margin: var(--cs-space-2) 0; color: var(--cs-color-text-muted); }
+.draft { display: grid; gap: var(--cs-space-1); margin-top: var(--cs-space-3); min-width: 0; }
+.draft textarea { width: 100%; box-sizing: border-box; resize: vertical; padding: var(--cs-space-2); border: 1px solid var(--cs-color-border); border-radius: var(--cs-radius-sm); color: var(--cs-color-text); background: var(--cs-color-bg); font: inherit; }
+.draft button { justify-self: start; }

@@ -1,0 +1,3 @@
+.bar, .actions { display: flex; align-items: center; flex-wrap: wrap; gap: var(--cs-space-2); }
+.bar { justify-content: space-between; margin: var(--cs-space-2) 0; color: var(--cs-color-text-muted); overflow-wrap: anywhere; }
+.time { font-size: var(--cs-font-size-sm); }

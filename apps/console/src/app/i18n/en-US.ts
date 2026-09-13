@@ -2,6 +2,24 @@ import type { MessagesShapedLike } from '../../shared/lib/i18n';
 import type { messages as zhCN } from './zh-CN';
 
 export const messages: MessagesShapedLike<typeof zhCN> = {
+  'ui.requestPage.label': '{scope} pages',
+  'ui.requestPage.count': '{count} requests on this page',
+  'ui.requestPage.unknown': 'Page count unconfirmed',
+  'ui.requestPage.updated': 'Read at {time}',
+  'ui.requestPage.first': 'First page',
+  'ui.requestPage.next': 'Next page',
+  'ui.requestPage.nextFor': '{scope}: next page',
+  'ui.requestPage.hint': 'Up to 20 requests per page, newest first. Switching tabs keeps your opinions. Paging, changing filters, or leaving prompts you to handle unsent opinions.',
+  'ui.requestPage.invalid': 'The request page contains invalid records or records outside this scope. Reload to continue.',
+  'ui.requestPage.invalidDecision': 'The decision result could not be verified. Refresh the requests to confirm; the action may have completed and will not be retried automatically.',
+  'ui.requestPage.decisionError': 'Decision unconfirmed: {message}',
+  'ui.requestPage.decided': '{target}: request {state}.',
+  'ui.requestDraft.title': 'Retained opinions',
+  'ui.requestDraft.scope': 'Request opinions',
+  'ui.requestDraft.hint': 'These requests are absent from the current pending records. Copies of your input are retained for reference. Check the latest request records for decision results; you can copy this input before clearing.',
+  'ui.requestDraft.value': 'Retained opinion: {id}',
+  'ui.requestDraft.discard': 'Clear this opinion',
+
   "nav.admin.projects": "Projects",
 
   'nav.admin.capabilities': 'Capability integrations',

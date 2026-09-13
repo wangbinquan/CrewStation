@@ -1,43 +1,43 @@
 import { useRef } from 'react';
 import { Link } from '@tanstack/react-router';
 import type { ReactElement } from 'react';
-import { api } from '../../../shared/api/client';
-import { queryKeys } from '../../../shared/api/queryKeys';
-import { useApiMutation, useApiQuery } from '../../../shared/api/useApi';
+import { errorMessage } from '../../../shared/api/useApi';
 import { useT } from '../../../shared/lib/useT';
 import { Card } from '../../../shared/ui/Card';
 import { DataTable } from '../../../shared/ui/DataTable';
 import { QueryStatus } from '../../../shared/ui/QueryStatus';
 import { Button } from '../../../shared/ui/Button';
 import { ActionNote } from '../../../shared/ui/ActionNote';
-import type { RequestStatus } from '../../../shared/admin/managementSearch';
+import type { RequestReviewPageProps } from '../../../shared/admin/requestPageState';
+import { RequestDraftNotice } from '../../../shared/admin/RequestDraftNotice';
+import { RequestPageControls } from '../../../shared/admin/RequestPageControls';
+import { useRequestDrafts } from '../../../shared/admin/useRequestDrafts';
+import { useEgressRequestReview } from '../hooks/useEgressRequestReview';
 import { EgressRequestRow } from './EgressRequestRow';
-import { MutationError } from './MutationError';
 import styles from './EgressRequestsSection.module.css';
 
-interface DecideInput {
-  readonly id: string;
-  readonly approve: boolean;
-  readonly decision: string;
-}
-
 /** 项目发起的放行申请：批准即生成一条项目范围条目，因此连同白名单键一起失效。 */
-export function EgressRequestsSection({ projectId, state = 'all' }: { readonly projectId?: string; readonly state?: RequestStatus }): ReactElement {
-  const t = useT(), busy = useRef(false);
-  const requests = useApiQuery(queryKeys.egressRequests(projectId), () => api.egress.listRequests(projectId ? { projectId } : undefined));
-  const projects = useApiQuery(queryKeys.adminProjects(), () => api.projects.list());
-  const decide = useApiMutation((input: DecideInput) => api.egress.decideRequest(input.id, { approve: input.approve, decision: input.decision }), {
-    invalidate: [queryKeys.egressRequests(), queryKeys.egressEntries()],
-  });
-  const items = (requests.data?.items ?? []).filter((item) => state === 'all' || item.state === state);
+export function EgressRequestsSection({ projectId, state, cursor, active, onPage, onDirtyChange }: RequestReviewPageProps): ReactElement {
+  const t = useT(), busy = useRef(false), review = useEgressRequestReview({ projectId, state, cursor }, active);
+  const { requests, decide } = review, drafts = useRequestDrafts(decide.isPending, onDirtyChange), items = requests.data?.items ?? [];
   const forbidden = [401, 403, 404].includes(requests.error?.status ?? 0);
+  const shown = forbidden ? [] : items, paused = !active || review.busy || decide.isPending || !!requests.error;
+  const submit = (id: string, approve: boolean, decision: string) => {
+    const request = shown.find((item) => item.id === id && item.state === 'pending');
+    if (busy.current || paused || !request) return; busy.current = true;
+    const sentValue = drafts.read(id);
+    decide.mutate({ request, approve, decision }, { onSuccess: () => drafts.discard(id, sentValue), onSettled: () => { busy.current = false; } });
+  };
   const columns = [
     t('admin.egressRequests.fqdn'), t('admin.egressRequests.project'), t('admin.egressRequests.reason'),
     t('admin.egressRequests.state'), t('admin.egressRequests.decision'), t('admin.egressRequests.actions'),
   ];
   return (
-    <Card title={t('admin.egressRequests.title')} footer={t('admin.egressRequests.hint')} extra={<Button disabled={requests.isFetching || decide.isPending} onClick={() => void requests.refetch()}>{t('admin.requests.refreshEgress')}</Button>}>
-      <MutationError error={decide.error} messageKey="admin.egressRequests.decideError" />
+    <Card compact title={t('admin.egressRequests.title')} footer={t('admin.egressRequests.hint')} extra={<Button disabled={review.busy || decide.isPending} onClick={() => void requests.refetch({ cancelRefetch: false })}>{t('admin.requests.refreshEgress')}</Button>}>
+      <RequestPageControls scope={t('admin.requests.egress')} cursor={cursor} nextCursor={requests.data?.nextCursor} busy={review.busy || decide.isPending}
+        count={requests.isPending || requests.error ? undefined : items.length} updatedAt={requests.dataUpdatedAt} onPage={onPage} />
+      {decide.error ? <ActionNote tone="error">{t('ui.requestPage.decisionError', { message: errorMessage(decide.error) })}</ActionNote> : null}
+      {decide.isSuccess ? <ActionNote tone="success">{t('ui.requestPage.decided', { target: decide.data.fqdn, state: t(`admin.egressRequestState.${decide.data.state}`) })}</ActionNote> : null}
       <QueryStatus
         isPending={requests.isPending}
         error={requests.error}
@@ -46,23 +46,21 @@ export function EgressRequestsSection({ projectId, state = 'all' }: { readonly p
         emptyDescription={t('admin.egressRequests.emptyDescription')}
       />
       {requests.error && items.length > 0 && !forbidden ? <ActionNote tone="neutral">{t('admin.requests.lastRecords')}</ActionNote> : null}
-      {!forbidden && items.length > 0 ? (
+      {shown.length > 0 ? (
         <DataTable columns={columns} className={styles.table}>
-          {items.map((request) => (
+          {shown.map((request) => (
             <EgressRequestRow
               key={request.id}
               request={request}
-              projectLabel={projects.error ? undefined : projects.data?.items.find((project) => project.id === request.projectId)?.name}
+              projectLabel={request.project ? `${request.project.name} · ${request.project.slug}` : undefined}
               projectLink={<Link to="/admin/requests" search={{ tab: 'egress', state, projectId: request.projectId }}>{t('admin.requests.filterProject')}</Link>}
-              busy={decide.isPending || requests.isFetching || !!requests.error}
-              onDecide={(id, approve, decision) => {
-                if (busy.current || requests.isFetching || requests.error) return; busy.current = true;
-                decide.mutate({ id, approve, decision }, { onSettled: () => { busy.current = false; } });
-              }}
+              busy={paused} decision={drafts.read(request.id)} onDecisionChange={(value) => drafts.change(request.id, `${request.project?.name ?? request.projectId} · ${request.fqdn}`, value)}
+              onDecide={submit}
             />
           ))}
         </DataTable>
       ) : null}
+      <RequestDraftNotice drafts={drafts.entries} pendingIds={shown.filter((r) => r.state === 'pending').map((r) => r.id)} busy={decide.isPending} onDiscard={drafts.discard} />
     </Card>
   );
 }
