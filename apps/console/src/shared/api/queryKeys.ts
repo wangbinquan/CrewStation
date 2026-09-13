@@ -42,6 +42,7 @@ export const queryKeys = {
   /** 健康态的路由是 /v1/projects/:projectId/health，键也按项目定位。 */
   projectHealth: (projectId: string) => ['projects', projectId, 'health'] as const,
   alerts: (projectId: string) => ['projects', projectId, 'alerts'] as const,
+  alertSubscriptions: (projectId: string) => ['projects', projectId, 'alert-subscriptions'] as const,
   trace: (traceId: string) => ['traces', traceId] as const,
   capabilities: (projectId: string) => ['projects', projectId, 'capabilities'] as const,
   egressEntries: (projectId?: string) => (projectId === undefined ? (['egress', 'entries'] as const) : (['egress', 'entries', projectId] as const)),

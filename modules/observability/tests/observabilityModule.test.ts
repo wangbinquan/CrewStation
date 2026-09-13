@@ -4,6 +4,7 @@ import { createFakeK8sClient } from '@crewstation/k8s';
 import type { TestDatabase } from '@crewstation/testkit';
 import { createTestDatabase, testDatabaseAvailable } from '@crewstation/testkit';
 import { healthOf } from '../domain/health';
+import { slotOfAlert } from '../domain/alertRules';
 import type { ObservabilityModule } from '../wiring';
 import { createObservabilityModule, observabilityMigrations } from '../wiring';
 
@@ -38,6 +39,12 @@ beforeAll(async () => {
 afterAll(async () => { await tdb?.drop(); });
 
 describe('健康态判定', () => {
+  test('告警仅用已知规则 key 定位槽，未知关联不猜正式版本', () => {
+    expect(slotOfAlert('health-failing', 'health-failing:preview')).toBe('preview');
+    expect(slotOfAlert('crash-loop', 'crash-loop:prod')).toBe('prod');
+    expect(slotOfAlert('task-failed', 'task-failed:prod')).toBeUndefined();
+    expect(slotOfAlert('health-failing', 'health-failing:unknown')).toBeUndefined();
+  });
   test('崩溃循环、降级、不健康、健康', () => {
     expect(healthOf({ replicas: 2, readyReplicas: 2, restarts: 5, lastRestartAgeSeconds: 30 })).toBe('crash-looping');
     expect(healthOf({ replicas: 2, readyReplicas: 1, restarts: 0 })).toBe('degraded');
@@ -53,7 +60,7 @@ describe.skipIf(!available)('observability module', () => {
     expect((await obs.api.queryLogs(actor, projectId, { source: 'slot', slot: 'prod', limit: 100 }))[0]?.message).toBe('hello');
     expect(await obs.api.sweepProject(projectId)).toBe(1);
     expect(await obs.api.sweepProject(projectId)).toBe(0);
-    expect((await obs.api.listAlerts(actor, projectId))[0]).toMatchObject({ type: 'health-failing', state: 'firing' });
+    expect((await obs.api.listAlerts(actor, projectId))[0]).toMatchObject({ type: 'health-failing', state: 'firing', slot: 'prod' });
     expect(notices).toHaveLength(1);
     ready = 1;
     expect(await obs.api.sweepProject(projectId)).toBe(1);

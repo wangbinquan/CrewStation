@@ -2,7 +2,7 @@ import { LogQuerySchema, LogSourceSchema, ReleaseIdSchema, TaskIdSchema, TraceId
 import type { LogSource, SlotName } from '@crewstation/contracts';
 import { searchText } from './settingsSearch';
 
-export const OPERATIONS_TABS = ['health', 'logs', 'deliveries', 'trace'] as const;
+export const OPERATIONS_TABS = ['health', 'alerts', 'logs', 'deliveries', 'trace'] as const;
 export interface OperationsSearch {
   readonly tab?: typeof OPERATIONS_TABS[number];
   readonly source?: LogSource;
@@ -13,10 +13,13 @@ export interface OperationsSearch {
   readonly limit?: number;
   readonly subscription?: string;
   readonly traceId?: string;
+  readonly alertId?: string;
+  readonly alertState?: 'all' | 'firing' | 'resolved';
 }
 
 export function parseOperationsSearch(raw: Record<string, unknown>): OperationsSearch {
   const tab = OPERATIONS_TABS.find((value) => value === raw.tab) ?? 'health';
+  if (tab === 'alerts') return { tab, alertId: searchText(raw.alertId, 128), alertState: raw.alertState === 'firing' || raw.alertState === 'resolved' ? raw.alertState : 'all' };
   if (tab === 'trace') return { tab, traceId: TraceIdSchema.safeParse(raw.traceId).data };
   if (tab === 'deliveries') return { tab, subscription: searchText(raw.subscription) };
   if (tab !== 'logs') return { tab };

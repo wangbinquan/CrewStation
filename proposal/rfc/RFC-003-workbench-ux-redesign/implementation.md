@@ -388,3 +388,17 @@ release 的既有 tagger 端口经 platform 装配将确认 SHA 传给 scm。scm
 新增 10 项发布页路由／真实查询回归、1 项后台轮询回归、2 项 PostgreSQL 回归。覆盖首次空版本、固定双 SHA、迁移拒绝、陈旧确认、缺副本／错身份／错回执、草稿和角色、管理路径、在途双操作、比较失效以及进行中发布定位。前端定向 **24 pass／0 fail、262 assertions**；后端定向 **6 pass／0 fail、68 assertions**。最终 `bun run check` **943 pass／4 skip／0 fail**，947 tests、164 files、4797 assertions、73.60s；console build 603ms。跳过项与前批相同，本批未改原生运行时。
 
 上述界面证据是实际路由与 React 组件、HTTP 边界夹具，不是实浏览器或共享集群 J3 验收。没有执行被拦截的共享服务更新和 QA 首次 prod 切流，没有变更 QA 会话。T6 完整旅程及其他 RFC 项继续，下一批补 T7 告警／订阅入口。
+
+发布记录：`7d561808b3ea8c16d5f1d31980b9c4295629cec1` 已同步 main；[精确 SHA CI](https://github.com/wangbinquan/CrewStation/actions/runs/34757872066) 成功。
+
+## 第二十六批：T7 告警、通知订阅与诊断接续
+
+运行与诊断新增告警页签，调用既有项目级 alerts 与 alert-subscriptions 端点。最近 100 条明确限定范围，触发中／已恢复筛选和 alertId 进入 URL；查询失败、错项目和未知记录不伪装空态或改成最新告警。详情只显示真实触发／恢复时间。健康告警从本模块已写入的标准 key 导出可选 slot，未识别的 key 或其他告警类型不从 detail 文字猜关联；对应入口打开该角色当前日志并说明没有当时 releaseId。接入项目保留管理空间。
+
+通知订阅按成员姓名／邮箱选择并显示完整 User ID，旧手填 ID 能力保留；编辑已存在订阅固定对象，每用户／项目仍是一份配置。工作台／Webhook 渠道、地址和完整 ID 的要求可见，全部错误同时显示并定位；保存前重读并显示原配置与新配置，移除具名确认当前用户与渠道。取消、失败、收起、内部筛选和放弃换编辑对象都保留草稿；离开诊断页签或项目先确认。读取失败保留表单并停写，双击检查／写入使用同步锁；保存后再读取失败与保存失败分别呈现。已发出请求离开后仍可能完成，但回执不会改变当前页面。
+
+现场源码核对 `modules/platform/wiring.ts` 的 composeAggregates：Notifier 只有 logger.warn，没有按订阅发个人消息或 Webhook。页面据此明确通知投递尚未接通，204 只说明订阅配置保存，不提供假发送／送达状态。T7 沿用已有接口而未新增通知传输基础设施；新请求 Schema 只是把原 HTTP 请求体形状收进 contracts，路径与授权动作不变。生产资料和现有订阅没有被实际修改，也未通过工具发送任何通知。
+
+新增 8 项完整路由回归、1 项客户端请求回归、1 项领域上下文回归；既有真实 PostgreSQL 模块测试验证返回实际 slot。界面定向 **8 pass／0 fail、101 assertions**，客户端／模块定向 **22 pass／0 fail、84 assertions**。最终 `bun run check` **953 pass／4 skip／0 fail**，957 tests、165 files、4904 assertions、76.93s；console build 618ms。跳过项与前批相同，没有原生运行时修改。
+
+本批未取得新的实浏览器或共享集群 J4 证据，两个被拦截共享操作仍未执行。完整 T7／T12 旅程与其余 RFC 项继续，下一项实施 T8 从开发容器发出的结构化 API 试调。

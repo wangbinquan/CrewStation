@@ -1,4 +1,5 @@
 import type { AlertDto, AlertType, ProjectId, UserId } from '@crewstation/contracts';
+import { slotOfAlert } from '../domain/alertRules';
 
 export interface AlertRecord {
   id: string;
@@ -27,5 +28,6 @@ export interface AlertSubscriptionRepository {
 }
 
 export function alertToDto(a: AlertRecord): AlertDto {
-  return { id: a.id, projectId: a.projectId, type: a.type, state: a.state, detail: a.detail, firedAt: a.firedAt.toISOString(), ...(a.resolvedAt ? { resolvedAt: a.resolvedAt.toISOString() } : {}) };
+  const slot = slotOfAlert(a.type, a.key);
+  return { id: a.id, projectId: a.projectId, type: a.type, state: a.state, detail: a.detail, firedAt: a.firedAt.toISOString(), ...(a.resolvedAt ? { resolvedAt: a.resolvedAt.toISOString() } : {}), ...(slot ? { slot } : {}) };
 }

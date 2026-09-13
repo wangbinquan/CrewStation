@@ -16,6 +16,7 @@ export const messages = {
   "settings.resource.api": "API 文档与申请",
   "settings.resource.events": "事件与订阅",
   "operations.tab.health": "健康状态",
+  "operations.tab.alerts": "告警与通知",
   "operations.tab.logs": "日志",
   "operations.tab.deliveries": "事件投递",
   "operations.tab.trace": "调用链回放",

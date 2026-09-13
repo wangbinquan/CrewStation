@@ -1,0 +1,5 @@
+.stack { display: flex; flex-direction: column; gap: var(--cs-space-3); min-width: 0; overflow-wrap: anywhere; }
+.tools { display: flex; align-items: center; flex-wrap: wrap; gap: var(--cs-space-2); }
+.form { display: flex; flex-direction: column; gap: var(--cs-space-2); margin-block: var(--cs-space-3); max-width: 42rem; }
+.form > button { align-self: flex-start; }
+.detail { white-space: pre-wrap; overflow-wrap: anywhere; }

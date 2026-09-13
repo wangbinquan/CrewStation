@@ -1,6 +1,12 @@
-import type { AlertType, HealthState } from '@crewstation/contracts';
+import type { AlertType, HealthState, SlotName } from '@crewstation/contracts';
 
 export interface AlertCandidate { type: AlertType; key: string; detail: string }
+
+/** 只解码本模块写入的健康规则 key；不能从自由文本 detail 猜测日志目标。 */
+export function slotOfAlert(type: AlertType, key: string): SlotName | undefined {
+  if (!['crash-loop', 'health-failing'].includes(type)) return undefined;
+  return (['prod', 'preview'] as const).find((slot) => key === `${type}:${slot}`);
+}
 
 /** 从健康态与业务事实推导告警候选；同 key 已触发则不重复。 */
 export function alertsFromHealth(slot: string, state: HealthState): AlertCandidate[] {
