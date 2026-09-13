@@ -14,7 +14,6 @@ export function NavFrame({ subtitleKey, children }: NavFrameProps): ReactElement
   return (
     <nav className={styles.nav} aria-label={t('nav.aria')}>
       <div className={styles.brand}>
-        <span className={styles.brandName}>{t('app.brand')}</span>
         <span className={styles.brandSub}>{t(subtitleKey)}</span>
       </div>
       {children}

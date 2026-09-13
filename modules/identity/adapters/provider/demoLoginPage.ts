@@ -1,4 +1,5 @@
 import { LOGIN_PATH } from '../../domain/session';
+import { brandMarkDataUrl } from './brandMark';
 
 export interface DemoLoginPageInput {
   /** 已由用例层校验过的跳转地址。 */
@@ -13,10 +14,11 @@ export function renderDemoLoginPage({ returnTo }: DemoLoginPageInput): string {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>CrewStation 演示登录</title>
+<link rel="icon" type="image/svg+xml" href="${brandMarkDataUrl}">
 <style>
   body { font-family: system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; background: #f5f6f8; color: #1f2328; margin: 0; padding: 24px; }
   main { max-width: 420px; margin: 8vh auto; background: #fff; border: 1px solid #d8dee4; border-radius: 12px; padding: 28px; }
-  h1 { font-size: 20px; margin: 0 0 12px; }
+  h1 { display: flex; align-items: center; gap: 10px; font-size: 20px; margin: 0 0 12px; }
   .notice { background: #fff4d6; border: 1px solid #f0c36d; border-radius: 8px; padding: 10px 12px; font-size: 14px; line-height: 1.5; }
   label { display: block; margin: 14px 0 4px; font-size: 14px; }
   input { width: 100%; box-sizing: border-box; padding: 8px 10px; border: 1px solid #b8c0c8; border-radius: 6px; font-size: 15px; }
@@ -26,7 +28,7 @@ export function renderDemoLoginPage({ returnTo }: DemoLoginPageInput): string {
 </head>
 <body>
 <main>
-  <h1>CrewStation</h1>
+  <h1><img src="${brandMarkDataUrl}" alt="" width="40" height="40">CrewStation</h1>
   <p class="notice"><strong>演示身份</strong>：此登录方式仅用于本地演示与开发，不接入企业账号；以此身份创建的内容在工作台里都会标注为演示身份。</p>
   <form method="post" action="${LOGIN_PATH}">
     <label for="username">用户名</label>

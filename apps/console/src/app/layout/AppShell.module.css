@@ -1,7 +1,7 @@
 .shell {
   display: grid;
   grid-template-columns: var(--cs-nav-width) minmax(0, 1fr);
-  grid-template-rows: var(--cs-topbar-height) minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
   grid-template-areas:
     'nav topbar'
     'nav main';
@@ -22,7 +22,7 @@
 @media (max-width: 800px) {
   .shell {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto var(--cs-topbar-height) minmax(0, 1fr);
+    grid-template-rows: auto auto minmax(0, 1fr);
     grid-template-areas:
       'nav'
       'topbar'

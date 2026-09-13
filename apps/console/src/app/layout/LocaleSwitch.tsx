@@ -13,7 +13,7 @@ export function LocaleSwitch(): ReactElement {
   return (
     <label className={styles.locale}>
       <span className={styles.localeLabel}>{t('locale.label')}</span>
-      <select className={styles.localeSelect} value={locale} onChange={onChange}>
+      <select className={styles.localeSelect} aria-label={t('locale.label')} value={locale} onChange={onChange}>
         {LOCALES.map((option) => (
           <option key={option} value={option}>
             {t(`locale.${option}`)}

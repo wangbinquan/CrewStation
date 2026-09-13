@@ -1,6 +1,6 @@
 # RFC-003｜CrewStation 品牌标识
 
-> Draft · 2026-09-13。作者要求系统图标直观、有辨识度、容易记住。本稿交付可直接用于后续实现的矢量原稿，生产图标尚未替换。
+> In Progress · 2026-09-13。协作舱已接入真实顶栏、favicon 与演示登录页，代码与验收记录见 implementation.md。
 
 ## 协作舱
 
@@ -15,6 +15,6 @@ C 形工作站对应 CrewStation，容纳三个独立并行轨道；右侧终端
 | [crewstation-mark.svg](./crewstation-mark.svg) | 应用图标、登录页、产品顶栏；64×64 viewBox，透明圆角外部 |
 | [crewstation-mark-mono.svg](./crewstation-mark-mono.svg) | 单色字标组合、印刷与主题背景 |
 
-顶栏使用 28px 图标配 CrewStation 字标。可点击标识查看 16／24／32／64／128px 和单色预览；交互附件未修改浏览器真实 favicon。后续把品牌资产放入 console 的 public 品牌目录，favicon／登录页／顶栏使用同一原稿，避免重新描摹出多个近似图标。图标与名称相邻时视为装饰，独立图标有 CrewStation 可访问名称。
+顶栏使用 28px 图标配 CrewStation 字标，点击返回工作台。彩色／单色生产原稿在 console 的 public/brand 目录；favicon／登录页／顶栏使用同一原稿。登录页在尚未鉴权时也要显示图标，因此内嵌原稿，并以逐字节测试验证部署副本一致。图标与名称相邻时视为装饰，独立图标有 CrewStation 可访问名称。16／24／32／64／128px 和单色预览仍可在交互附件里查看。
 
 验收关注小尺寸轮廓、单色识别、深浅背景和顶栏密度；不以视觉稿冒充已完成生产品牌替换。

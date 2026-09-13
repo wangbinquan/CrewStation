@@ -16,14 +16,9 @@
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-.brandName {
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--cs-nav-active-text);
-}
-
 .brandSub {
-  font-size: 12px;
+  font-size: var(--cs-font-size);
+  font-weight: 600;
   color: var(--cs-nav-text-muted);
 }
 

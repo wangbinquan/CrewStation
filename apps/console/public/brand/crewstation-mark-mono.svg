@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title desc">
+  <title id="title">CrewStation · 协作舱单色标</title>
+  <desc id="desc">C 形工作站、三条并行轨道和交付箭头。</desc>
+  <g fill="none" stroke="currentColor" stroke-linecap="round">
+    <path d="M43 16H29C20.16 16 13 23.16 13 32s7.16 16 16 16h14" stroke-width="7"/>
+    <path d="M29 24h8M26 32h14M29 40h8" stroke-width="4"/>
+    <path d="m46 25 7 7-7 7" stroke-width="4" stroke-linejoin="round"/>
+  </g>
+</svg>

@@ -1,6 +1,7 @@
-import { useLocation, useParams } from '@tanstack/react-router';
+import { Link, useLocation, useParams } from '@tanstack/react-router';
 import type { ReactElement } from 'react';
 import { useT } from '../../shared/lib/useT';
+import { Brand } from '../../shared/ui/Brand';
 import { CurrentUserChip } from './CurrentUserChip';
 import { LocaleSwitch } from './LocaleSwitch';
 import { SpaceSwitch } from './SpaceSwitch';
@@ -14,11 +15,12 @@ export function TopBar(): ReactElement {
   return (
     <header className={styles.bar}>
       <div className={styles.context}>
-        <span>{t(inAdmin ? 'app.adminSpace' : 'app.workbench')}</span>
+        <Link to="/" className={styles.brand}><Brand name={t('app.brand')} /></Link>
+        <span className={styles.space}>{t(inAdmin ? 'app.adminSpace' : 'app.workbench')}</span>
         {!inAdmin && projectId !== undefined ? (
           <>
             <span className={styles.separator}>/</span>
-            <span>{t('topBar.project', { projectId })}</span>
+            <span className={styles.project}>{t('topBar.project', { projectId })}</span>
           </>
         ) : null}
       </div>

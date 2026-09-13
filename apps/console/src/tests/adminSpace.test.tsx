@@ -37,6 +37,15 @@ afterEach(() => {
 });
 
 describe('管理空间与租户空间分离（RFC-002）', () => {
+  test('两空间共用协作舱品牌入口，点击字标回工作台', async () => {
+    asAdmin();
+    app = await renderApp('/admin');
+    expect(app.html()).toContain('src="/brand/crewstation-mark.svg"');
+    await app.click('CrewStation');
+    expect(app.path()).toBe('/');
+    expect(app.html()).toContain('src="/brand/crewstation-mark.svg"');
+  });
+
   test('普通成员：顶栏没有空间切换，左栏没有任何管理入口', async () => {
     asMember();
     app = await renderApp('/');
