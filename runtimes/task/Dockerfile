@@ -23,6 +23,10 @@ RUN curl -fsSL https://claude.ai/install.sh | bash -s "${CLAUDE_CODE_VERSION}" \
   && install -m 0755 /root/.opencode/bin/opencode /usr/local/bin/opencode \
   && rm -rf /root/.local /root/.claude /root/.opencode /root/.cache \
   && claude --version && opencode --version
+# 原生插件初始化会等待 SDK 依赖；预装 npm lock，开发容器启动时不再为平台插件联网安装。
+RUN mkdir -p /opt/crewstation-opencode-plugin \
+  && cd /opt/crewstation-opencode-plugin \
+  && bun x --bun npm@11.6.2 install --save-exact --ignore-scripts "@opencode-ai/plugin@${OPENCODE_VERSION}"
 # 两个 CLI 都要一个可写的 HOME（opencode 按 XDG 在 $HOME 下建会话库）。TaskRunner 的 ProcessLauncher
 # 已经为降权子进程把 HOME 设成 worker 的家目录 /work，所以运行期成立；直接 setpriv 而不设 HOME 会失败。
 

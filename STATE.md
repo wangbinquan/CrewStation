@@ -37,6 +37,8 @@ T5 首批 `897c3037de03b75b58b26a07cbc7f0eb5b940e4f` 已推送，精确 SHA CI `
 
 T16 首批 `6b2325dedb0b202811e43039c2fdbd2e2d8b2807` 已推送，精确 SHA CI `34737114376` 成功。T15 继续实施：已实测 Claude 正常、Stop 要求继续、取消和继续后取消的原生结构化事件；发现单独 Stop／interaction end 不能判定正常完成，HTTP Stop block 的聚合计数在固定版本也不可靠。具体记录在 `native-activity-evidence.md`。同时修复历史／实时交界丢帧、有界分页补齐、新 Runner 序号被旧历史吞掉和旧连接污染状态；完整门禁 750 pass／2 skip／0 fail，console build 成功。OpenCode 插件初始化、轮次归一化、领域投影和个人后台动态仍未完成。
 
+续传修复 `b4ba3265b8dfd22abacb9abfca4042c637600e25` 已推送，精确 SHA CI `34738267327` 成功。T15 OpenCode 后续批已接通实际原生插件／严格事件协议／Runner 收集与 session 持久化，补充能力协商及独立状态重放缓冲。正式仓内原生验收在隔离任务镜像通过：1 pass、21 assertions，涵盖完成、中断、提问／撤回、许可和模型错误。源版本或通道不可靠时保留 CLI 并如实降级；撤回后无最终回答显示结果未确认。完整门禁和发布结果续记 implementation.md。**Claude 完整事件归一化、dev-session 投影／个人已读和顶部动态仍需继续，T15 不算完成。** 两个待授权集群操作未执行，没有更新旧 QA Pod 或生产切流。
+
 ## 最新设计工作：工作台 UX 重设计（2026-09-13）
 
 作者要求依据原始理念全面重设计第一版原型的功能组织、UX 与使用逻辑。已对照两篇理念文章、基线与 RFC-001／002，检查本机界面与源码，完成 `proposal/rfc/RFC-003-workbench-ux-redesign/`：三件套、26 项可追溯审查／意见、开发工作台专项设计、交互附件与其验证记录。

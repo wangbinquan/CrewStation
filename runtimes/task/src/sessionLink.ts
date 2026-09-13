@@ -38,6 +38,7 @@ export function createSessionLink(options: SessionLinkOptions): SessionLink {
 
 class WebSocketSessionLink implements SessionLink {
   private buffer: ReplayBuffer<string>;
+  private activityBuffer: ReplayBuffer<string>;
   private readonly pendingReplies: string[] = [];
   private readonly client: ReconnectingWebSocketClient;
   private readonly watchdog: IdleWatchdog;
@@ -47,10 +48,12 @@ class WebSocketSessionLink implements SessionLink {
   private seq = 0;
   private welcomedValue = false;
   private hasWelcomed = false;
+  private nativeActivitySupported = false;
 
   constructor(private readonly options: SessionLinkOptions) {
     this.logger = options.logger;
     this.buffer = new ReplayBuffer<string>(options.replayCapacity);
+    this.activityBuffer = new ReplayBuffer<string>(Math.min(5000, Math.max(256, options.replayCapacity)));
     this.ready = new Promise<void>((resolve) => {
       this.resolveReady = resolve;
     });
@@ -106,7 +109,8 @@ class WebSocketSessionLink implements SessionLink {
     this.seq += 1;
     const frame = encodeFrame({ type: 'event', seq: this.seq, at: new Date().toISOString(), event });
     this.buffer.push(this.seq, frame);
-    if (this.welcomedValue) this.sendRaw(frame);
+    if (event.kind === 'nativeActivity') this.activityBuffer.push(this.seq, frame);
+    if (this.welcomedValue && (event.kind !== 'nativeActivity' || this.nativeActivitySupported)) this.sendRaw(frame);
     return this.seq;
   }
 
@@ -133,7 +137,7 @@ class WebSocketSessionLink implements SessionLink {
     }
     const message: SessionMessage = decoded.value;
     if (message.type === 'welcome') {
-      this.onWelcome(message.resumeFromSeq);
+      this.onWelcome(message.resumeFromSeq, message.nativeActivityVersion === 1);
       return;
     }
     if (message.type === 'ping') {
@@ -144,7 +148,8 @@ class WebSocketSessionLink implements SessionLink {
     this.options.onCommand(message);
   }
 
-  private onWelcome(resumeFromSeq: number): void {
+  private onWelcome(resumeFromSeq: number, nativeActivitySupported: boolean): void {
+    this.nativeActivitySupported = nativeActivitySupported;
     if (!this.hasWelcomed) {
       this.hasWelcomed = true;
       this.rebaseInitialEvents(resumeFromSeq);
@@ -153,8 +158,13 @@ class WebSocketSessionLink implements SessionLink {
     if (!this.buffer.canReplayFrom(resumeFromSeq)) {
       this.logger.warn('replay gap: events before the buffer start were evicted', { resumeFromSeq, firstBuffered: this.buffer.firstSeq });
     }
-    const entries = this.buffer.since(resumeFromSeq);
-    for (const entry of entries) this.sendRaw(entry.item);
+    // 轮次事件使用独立有界保留量；PTY 输出风暴不能把待处理或完成状态挤掉。
+    const bySeq = new Map([...this.buffer.since(resumeFromSeq), ...this.activityBuffer.since(resumeFromSeq)].map((entry) => [entry.seq, entry]));
+    const entries = [...bySeq.values()].sort((a, b) => a.seq - b.seq);
+    for (const entry of entries) {
+      // 旧 cs-session 不认识新增的判别类型；能力协商允许先更新任一端而不破坏原 CLI。
+      if (this.nativeActivitySupported || (JSON.parse(entry.item) as { event: RunnerEvent }).event.kind !== 'nativeActivity') this.sendRaw(entry.item);
+    }
     for (const frame of this.pendingReplies.splice(0)) this.sendRaw(frame);
     this.logger.info('welcome received', { resumeFromSeq, replayed: entries.length, lastSeq: this.seq });
     if (this.options.idleTimeoutMs > 0) this.watchdog.start();
@@ -165,14 +175,19 @@ class WebSocketSessionLink implements SessionLink {
   /** 新进程的 seq 从 0 开始；首次握手前还未发送的帧必须接到服务端已有历史之后。 */
   private rebaseInitialEvents(resumeFromSeq: number): void {
     if (resumeFromSeq === 0) return;
-    const initial = this.buffer.since(0);
-    this.buffer = new ReplayBuffer<string>(this.options.replayCapacity);
-    for (const entry of initial) {
-      const frame = JSON.parse(entry.item) as { seq: number };
-      frame.seq = entry.seq + resumeFromSeq;
-      this.buffer.push(frame.seq, encodeFrame(frame));
-    }
+    this.buffer = this.rebaseBuffer(this.buffer, resumeFromSeq);
+    this.activityBuffer = this.rebaseBuffer(this.activityBuffer, resumeFromSeq);
     this.seq += resumeFromSeq;
+  }
+
+  private rebaseBuffer(buffer: ReplayBuffer<string>, offset: number): ReplayBuffer<string> {
+    const rebased = new ReplayBuffer<string>(buffer.capacity);
+    for (const entry of buffer.since(0)) {
+      const frame = JSON.parse(entry.item) as { seq: number };
+      frame.seq = entry.seq + offset;
+      rebased.push(frame.seq, encodeFrame(frame));
+    }
+    return rebased;
   }
 
   private rejectFrame(raw: RawFrame, reason: string): void {

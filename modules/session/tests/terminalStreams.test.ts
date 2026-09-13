@@ -1,5 +1,6 @@
 import { expect, test } from 'bun:test';
 import type { RunnerCommand, RunnerEvent, TaskId, UserId } from '@crewstation/contracts';
+import type { StoredRunnerEvent } from '../ports/repositories';
 import { TASKRUNNER_PROTOCOL_VERSION } from '@crewstation/contracts';
 import { fixedClock, noopLogger } from '@crewstation/kernel';
 import { browserStreams } from '../application/browserStreams';
@@ -14,11 +15,12 @@ const at = '2026-09-13T00:00:00.000Z';
 
 function fixture() {
   const durable: RunnerEvent[] = [];
+  const records: StoredRunnerEvent[] = [];
   const commands: RunnerCommand[] = [];
   const deps: SessionUseCaseDeps = {
     clock: fixedClock(at), logger: noopLogger,
     settings: { commandTimeoutMs: 1000, runnerStaleMs: 30000, replayLimit: 100, selfAddress: 'http://session' },
-    events: { append: async (e) => { durable.push(e.event); }, maxSeq: async () => 0, listSince: async () => [] },
+    events: { append: async (e) => { durable.push(e.event); records.push(e); }, maxSeq: async () => 0, listSince: async (_taskId, since, options) => records.filter((event) => event.seq > since).slice(0, options.limit) },
     registry: { claim: async () => {}, release: async () => {}, heartbeat: async () => {}, lookup: async () => undefined },
     runnerAuth: { verifyRunnerToken: async () => ({ ok: true, projectId: 'p' }) },
     taskAccess: { canOpenStream: async () => true, onRunnerConnected: async () => {}, onRunnerDisconnected: async () => {} },
@@ -50,6 +52,19 @@ test('浏览器先开而 Runner 尚未连接，之后连接／断线／重连均
   const before = frames.length;
   await f.hub.onMessage(second.connection, { type: 'event', seq: 3, at, event: { kind: 'terminalOutput', terminalId: 't', data: 'detached' } });
   expect(frames).toHaveLength(before);
+});
+
+test('后台原生状态在没有浏览器订阅时仍持久化，稍后按游标回放身份与请求状态', async () => {
+  const f = fixture(); const connected = await f.hub.onHello(f.hello, { send: () => {} });
+  if (!connected.ok) throw new Error(connected.message);
+  const activity = { agentId: 'a', terminalId: 't', runnerId: crypto.randomUUID(), eventId: crypto.randomUUID(), seq: 2, turnOrdinal: 1, signal: { source: 'opencode/1.18.29', sourceEventId: 'request', kind: 'request-opened', occurredAt: at, nativeSessionId: 'session', turnId: 'turn', request: { id: 'question-1', kind: 'question' } } };
+  await f.hub.onMessage(connected.connection, { type: 'event', seq: 1, at, event: { kind: 'nativeActivity', activity } });
+  await f.hub.onMessage(connected.connection, { type: 'event', seq: 2, at, event: { kind: 'terminalOutput', terminalId: 't', data: 'transient' } });
+  expect(f.durable).toHaveLength(1);
+  const frames: unknown[] = [];
+  const stream = await f.streams.open(actor, taskId, { send: (raw) => frames.push(JSON.parse(raw)) }, 0);
+  expect(frames[0]).toMatchObject({ type: 'event', seq: 1, event: { kind: 'nativeActivity', activity } });
+  stream.close();
 });
 
 test('控制租约绑定服务端视图，断开只 detach；不同连接不能复用客户端伪造的 viewId', async () => {

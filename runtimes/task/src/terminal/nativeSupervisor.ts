@@ -4,6 +4,8 @@ import type { Logger } from '@crewstation/kernel';
 import type { PreparedNativeTerminal } from '@crewstation/agent-drivers';
 import { prepareNativeTerminal } from '@crewstation/agent-drivers';
 import { createProcessHost } from '../agents/cliDriver';
+import type { NativeActivityObserver } from '../activity/nativeActivityChannel';
+import { createOpencodeActivityChannel } from '../activity/nativeActivityChannel';
 import { RunnerCommandError, notFound } from '../commandError';
 import type { WorkdirPaths } from '../files/workdirPath';
 import type { ProcessLauncher } from '../process/launcher';
@@ -19,6 +21,7 @@ export interface NativeSupervisorDeps {
   emit: (event: RunnerEvent) => void;
   logger: Logger;
   prepare?: typeof prepareNativeTerminal;
+  activityFactory?: typeof createOpencodeActivityChannel;
 }
 
 interface NativeEntry {
@@ -30,6 +33,7 @@ interface NativeEntry {
   outputSeq: number;
   session?: PtySession;
   prepared?: PreparedNativeTerminal;
+  activity?: NativeActivityObserver;
   stopped: boolean;
 }
 
@@ -73,14 +77,17 @@ export class NativeTerminalSupervisor {
     try {
       const cwd = await this.deps.paths.resolveCwd(command.cwd);
       const env = this.deps.launcher.baseEnv({ ...this.deps.agentEnv, ...command.env, TERM: 'xterm-256color', COLUMNS: String(command.cols), LINES: String(command.rows) });
-      const prepared = await (this.deps.prepare ?? prepareNativeTerminal)(command, { cwd, env, host: createProcessHost(this.deps.launcher), logger: this.deps.logger });
+      if (command.driver === 'opencode') entry.activity = this.observe(entry);
+      const prepared = await (this.deps.prepare ?? prepareNativeTerminal)(command, { cwd, env, host: createProcessHost(this.deps.launcher), logger: this.deps.logger, ...(entry.activity ? { nativeActivity: entry.activity.options } : {}) });
       entry.prepared = prepared;
+      if (prepared.activityUnavailable) entry.activity?.unavailable(prepared.activityUnavailable);
       const session = this.deps.backend!.open({ ...prepared.plan, cols: command.cols, rows: command.rows, onData: (data) => this.output(entry, data) });
       entry.session = session;
       entry.record = { ...entry.record, lifecycle: 'running', ...(prepared.nativeSessionId ? { nativeSessionId: prepared.nativeSessionId } : {}) };
       this.emit(entry);
       void session.exited.then((code) => this.exited(entry, code));
     } catch (error) {
+      entry.activity?.close();
       entry.prepared?.dispose();
       entry.record = { ...entry.record, lifecycle: 'failed', endedAt: new Date().toISOString(), reason: 'start-failed', error: error instanceof Error ? error.message : 'CLI 启动失败' };
       this.emit(entry);
@@ -95,9 +102,22 @@ export class NativeTerminalSupervisor {
     }).catch((error: unknown) => this.deps.logger.error('native terminal screen write failed', { agentId: entry.record.agentId, error: String(error) }));
   }
 
+  private observe(entry: NativeEntry): NativeActivityObserver | undefined {
+    try { return (this.deps.activityFactory ?? createOpencodeActivityChannel)({ ...entry.record, emit: (activity) => this.deps.emit({ kind: 'nativeActivity', activity }) }); }
+    catch {
+      this.deps.logger.warn('native activity channel unavailable; CLI remains usable', { agentId: entry.record.agentId });
+      this.deps.emit({ kind: 'nativeActivity', activity: {
+        agentId: entry.record.agentId, terminalId: entry.record.terminalId, runnerId: this.runnerId, eventId: crypto.randomUUID(), seq: 1, turnOrdinal: 0,
+        signal: { source: 'opencode/1.18.29', sourceEventId: 'channel-unavailable', kind: 'source-unavailable', occurredAt: new Date().toISOString(), nativeSessionId: null, turnId: null, reason: 'source-error' },
+      } });
+      return undefined;
+    }
+  }
+
   private exited(entry: NativeEntry, exitCode: number | null): void {
     entry.record = { ...entry.record, lifecycle: 'ended', exitCode, endedAt: new Date().toISOString(), reason: entry.stopped ? 'stopped' : 'exited' };
     entry.prepared?.dispose();
+    entry.activity?.close();
     this.emit(entry);
     this.deps.emit({ kind: 'terminalClosed', terminalId: entry.record.terminalId, exitCode });
   }

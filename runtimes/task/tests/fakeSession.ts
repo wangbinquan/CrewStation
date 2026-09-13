@@ -14,6 +14,7 @@ export interface FakeSessionOptions {
   port?: number;
   /** 每次收到 hello 时决定 welcome 的 resumeFromSeq。 */
   resumeFromSeq?: () => number;
+  nativeActivity?: boolean;
 }
 
 export class CommandFailure extends Error {
@@ -61,7 +62,7 @@ export function startFakeSession(options: FakeSessionOptions = {}): FakeSession 
         frames.push(frame);
         if (frame.type === 'hello') {
           hellos.push(frame);
-          ws.send(JSON.stringify({ type: 'welcome', protocolVersion: TASKRUNNER_PROTOCOL_VERSION, resumeFromSeq: options.resumeFromSeq?.() ?? 0 }));
+          ws.send(JSON.stringify({ type: 'welcome', protocolVersion: TASKRUNNER_PROTOCOL_VERSION, resumeFromSeq: options.resumeFromSeq?.() ?? 0, ...(options.nativeActivity === false ? {} : { nativeActivityVersion: 1 }) }));
         }
       },
       close(ws) {

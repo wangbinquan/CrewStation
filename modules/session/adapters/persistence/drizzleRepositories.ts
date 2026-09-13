@@ -8,7 +8,7 @@ export function drizzleRunnerEventStore(db: Executor): RunnerEventStore {
   const toStored = (row: typeof runnerEvents.$inferSelect): StoredRunnerEvent => ({ taskId: row.taskId as TaskId, seq: row.seq, at: row.at, event: (typeof row.event === 'string' ? JSON.parse(row.event) : row.event) as RunnerEvent });
   return {
     append: async (e) => {
-      const agentId = e.event.kind === 'agent' ? e.event.event.agentId : null;
+      const agentId = e.event.kind === 'agent' ? e.event.event.agentId : e.event.kind === 'nativeActivity' ? e.event.activity.agentId : null;
       await db.insert(runnerEvents).values({ taskId: e.taskId, seq: e.seq, at: e.at, kind: e.event.kind, agentId, event: e.event }).onConflictDoNothing();
     },
     maxSeq: async (taskId) => Number((await db.select({ m: max(runnerEvents.seq) }).from(runnerEvents).where(eq(runnerEvents.taskId, taskId)))[0]?.m ?? 0),

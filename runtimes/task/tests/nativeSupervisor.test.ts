@@ -7,13 +7,13 @@ import { noopLogger } from '@crewstation/kernel';
 import { createWorkdirPaths } from '../src/files/workdirPath';
 import { createProcessLauncher } from '../src/process/launcher';
 import { probeCurrentUid, resolveIsolation } from '../src/process/privilege';
-import { NativeTerminalSupervisor } from '../src/terminal/nativeSupervisor';
+import { NativeTerminalSupervisor, type NativeSupervisorDeps } from '../src/terminal/nativeSupervisor';
 import { createNativePtyBackend } from '../src/terminal/nativePty';
 
 const cleanups: Array<() => Promise<void>> = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
 
-async function fixture() {
+async function fixture(activityFactory?: NativeSupervisorDeps['activityFactory']) {
   const root = await mkdtemp(join(tmpdir(), 'cs-native-pty-'));
   if (probeCurrentUid() === 0) await chown(root, 10001, 10001);
   cleanups.push(() => rm(root, { recursive: true, force: true }));
@@ -26,6 +26,7 @@ async function fixture() {
   const native = new NativeTerminalSupervisor({
     backend: createNativePtyBackend(launcher), launcher, paths, agentEnv: {}, logger: noopLogger,
     emit: (e) => events.push(e),
+    ...(activityFactory ? { activityFactory } : {}),
     prepare: async (_spec, context) => {
       launches++;
       return { plan: { cmd: ['bash', '--noprofile', '--norc'], cwd: context.cwd, env: { ...context.env, PS1: 'test-ready> ' } }, dispose: () => { disposed++; } };
@@ -35,6 +36,14 @@ async function fixture() {
   const command = (id: string): StartAgentTerminalCommand => ({ id, type: 'startAgentTerminal', agentId: id, terminalId: `terminal-${id}`, runnerId: native.runnerId, requestFingerprint: id, compute: 'balanced', driver: 'claude-code', model: 'model', permission: 'edit', cols: 80, rows: 24, mcp: [], env: {} });
   return { native, command, root: paths.root, events, launches: () => launches, disposed: () => disposed };
 }
+
+test('状态监听器故障只标记未确认，原生进程仍能启动并使用', async () => {
+  const f = await fixture(() => { throw new Error('port unavailable'); });
+  const record = await f.native.start({ ...f.command('observer-failure'), driver: 'opencode' });
+  expect(record.lifecycle).toBe('running');
+  expect(f.events.find((event) => event.kind === 'nativeActivity')).toMatchObject({ activity: { signal: { kind: 'source-unavailable', reason: 'source-error' } } });
+  await outputContains(f, record.terminalId, 'test-ready>');
+});
 
 async function outputContains(f: Awaited<ReturnType<typeof fixture>>, terminalId: string, text: string) {
   const deadline = Date.now() + 3000;

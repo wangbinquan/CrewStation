@@ -23,6 +23,8 @@
 
 观察到的本地结构化记录：正常完成和 block 后正常完成各自有 `system / turn_duration`；block 后取消产生带同一 `promptId` 和 `interruptedMessageId` 的用户记录，没有 turn_duration。这些是**版本相关的内部 transcript 形状**，尚未验证全部工具／权限／错误／并发场景，不直接承诺为稳定公共接口。若采用，必须固定版本、校验关联、限制读取与缓冲，并在未知形状时降级，不允许根据文案关键词识别。
 
+补充实测 `/private/tmp/crewstation-claude-requests-probe.ts`：AskUserQuestion 的 PreToolUse／PermissionRequest／PostToolUse 均带同一 prompt_id，Pre／Post 带 tool_use_id，而 PermissionRequest 不带。正常回答有 PostToolUse 和后续 end_turn 消息；Esc 撤回问题没有 PostToolUseFailure，transcript 中出现 tool_result/is_error，**仍然有 turn_duration**。因此单独 turn_duration 也不能证明成功，必须结合对应轮次的最终 assistant 和图关系；不能把 tool_result/is_error 任意解释为整轮失败。新会话首次请求在模型返回前直接 Esc 没有 interruptedMessageId 或 turn_duration，只观察到 interaction 结束。尚无可靠分类字段时只能报告已停止但结果未确认。
+
 OTLP 通过环回 HTTP JSON 收集，logs／traces 以 1 秒周期导出。只需要的生命周期字段应在 Runtime 内归一化；提示词、回答、工具参数和原始 API body 的日志开关保持关闭。用户提示日志的 prompt.id 和 traceId 可将 interaction span 关联回对应轮次；span 自身的 status 为 UNSET，不能拿来判断成功。后续还需验证请求被拒／撤回、工具完成但轮次继续、两轮快速衔接、进程退出和事件通道故障。
 
 来源：[Claude Hooks](https://code.claude.com/docs/en/hooks)、[Claude Monitoring](https://code.claude.com/docs/en/monitoring-usage)。上述结论同时以固定版本的原生实跑核对；不从终端静默时长推断状态。
@@ -31,7 +33,37 @@ OTLP 通过环回 HTTP JSON 收集，logs／traces 以 1 秒周期导出。只�
 
 已核对固定标签的 [插件接口](https://github.com/anomalyco/opencode/blob/v1.18.29/packages/plugin/src/index.ts)、[插件装配](https://github.com/anomalyco/opencode/blob/v1.18.29/packages/opencode/src/plugin/index.ts) 与 [会话状态](https://github.com/anomalyco/opencode/blob/v1.18.29/packages/opencode/src/session/status.ts)。候选来源是 chat.message 的稳定用户消息 ID，加上 session.status、message.updated、permission／question 的成对事件。idle 同时另发兼容的 session.idle，不应重复通知；仅 idle 不能区分正常完成与取消／错误。
 
-隔离插件探针正在排查初始化阶段，尚未取得本轮正常模型响应与完整事件序列。当前不能把其静态接口或 T13 的 TUI 启动证据当作 T15 通过。最终实现仍须给出两种 CLI 的真实开始、等待、解决、完成、取消及退出证据。
+初始化已解决并接入生产代码。该版本会等待插件依赖安装；仅有 node_modules 和 bun.lock 仍会进入 npm 安装。其 [Npm.install](https://github.com/anomalyco/opencode/blob/v1.18.29/packages/core/src/npm.ts) 还读取 package-lock.json 的根依赖。任务镜像现预装固定 SDK 与 npm lock，首次准备只填充空目录，已有用户依赖保持原样。
+
+真实 CLI、PTY、生成的观察插件与 Runner 状态通道已经连在一起验证：
+
+| 场景 | 归一化后的实际结果 |
+|---|---|
+| 普通回答 | turn-started → 最终 assistant 的 finish=stop／time.completed ＋ session.status idle → turn-completed；进程仍运行 |
+| 等待模型时双 Esc | 原生 MessageAbortedError；idle 可能先于错误消息，最终为 turn-cancelled，没有成功通知 |
+| question 工具并回答 | request-opened 与 request-resolved 使用相同 requestId；模型继续后才 turn-completed |
+| 撤回 question | 明确 request-resolved/rejected；原生回到 idle 且没有最终回答，保留 turn-unconfirmed/no-outcome，不算成功 |
+| 工作目录外的夹具文件读取 | 原生 permission.asked → 用户在 TUI 确认 → permission.replied；读取和模型后续完成，不把许可本身当成完成 |
+| 模型 HTTP 400 | turn-failed；进程保留，可以继续输入 |
+| 显式 stop | 独立 process-ended，与本轮完成分离 |
+
+正式可复验用例为 `runtimes/task/tests/nativeActivityAcceptance.test.ts`，模型夹具在同目录 `nativeActivityModel.ts`。2026-09-13 在 `cs-task-runtime:rfc003-activity` 实跑 **1 pass／0 fail、21 assertions、8.29s**。常规门禁不安装或调用真实 CLI，该例显式启用；上述仍是脚本化模型响应，不宣称外部模型或共享集群旅程通过。
+
+```sh
+docker build -f runtimes/task/Dockerfile -t cs-task-runtime:rfc003-activity .
+# 生产镜像不包含 tests；运行时验收也不加载前端 CSS preload。
+printf '[test]\n' > /tmp/crewstation-native-test.toml
+docker run --rm --network none -e CS_NATIVE_ACTIVITY_ACCEPTANCE=1 \
+  --mount type=bind,source=/tmp/crewstation-native-test.toml,target=/app/bunfig.toml,readonly \
+  --mount type=bind,source="$PWD/runtimes/task/tests",target=/app/runtimes/task/tests,readonly \
+  cs-task-runtime:rfc003-activity bun test ./runtimes/task/tests/nativeActivityAcceptance.test.ts
+```
+
+插件只发送状态字段，不传提示词、回答、工具参数和问题内容；先按原生会话父子关系过滤子 Agent，再用用户消息 ID／assistant.parentID／请求工具 messageID 关联。重复兼容事件、旧 assistant、重复消息和旧轮次不能覆盖当前轮次。128 个会话、128 个轮次、单轮 64 个请求、2048 个去重 ID／4096 个消息关联均有界，超限降级。插件串行发送，队列 256 条；每 5 秒心跳，20 秒失联或序号缺口标记 source-unavailable。未知版本、监听或准备失败保留原生 CLI，只降级状态来源。
+
+状态事件经既有 session 存储持久化，包含 agentId 索引；新增 welcome 能力协商使旧 cs-session 不收到不认识的帧。Runner 为原生状态独立保留 256–5000 条事件，终端输出不能挤掉它们；总保留量仍有限，不能承诺无限离线历史。真实 WS 回归先复现开始事件被 PTY 挤掉，再验证按外层 seq 排序、去重和首次基移。
+
+T15 的 Claude 归一化、dev-session 领域投影、个人已读与工作台动态仍待继续，不能把单驱动运行时完成等同于 T15 整体验收通过。
 
 ## 本批已修复的状态传输断点
 

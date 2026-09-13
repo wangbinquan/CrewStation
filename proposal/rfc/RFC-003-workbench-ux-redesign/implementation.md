@@ -136,3 +136,15 @@
 真实 Claude 2.1.268 在无外网的一次性容器中接受脚本化模型响应，已验证正常、Stop 要求继续、直接取消、继续后取消。观察到 Stop 和 interaction end 各自不足以判定正常完成；HTTP Stop 的 block 计数还与实际继续行为不一致。没有把上述不可靠信号接成完成通知。OpenCode 观察插件初始化仍在排查，领域投影、个人已读与后台动态待继续，T15 不算完成。
 
 本批最终 `bun run check`：**750 pass／2 skip／0 fail**，752 tests、123 files、3525 assertions、60.05s；console build 621ms。定向回归覆盖历史读取中真实事件到达、重复／临时帧排序、分页、缓冲溢出、失败释放订阅、迟到旧连接、握手前命令与过期命令，以及真实 WS 的新 Runner／同进程重连序号。跳过项仍为 opt-in K8s 与 Linux 专用 Ctrl+C；本批未更新共享集群。
+
+发布记录：`b4ba3265b8dfd22abacb9abfca4042c637600e25` 已同步 main；[精确 SHA CI](https://github.com/wangbinquan/CrewStation/actions/runs/34738267327) 成功（check 1m13s）。
+
+## 第八批：T15 OpenCode 原生状态通道
+
+OpenCode 1.18.29 的原生插件、严格观察协议、Runner 环回收集与序号归一化已接通，状态作为持久事件传到 session。正常完成以最终消息和 idle 联合确认；工具结束不会直接发完成，中断、模型失败、问题／许可的打开与解决分别呈现。撤回问题后没有最终回答时保留“结果未确认”，后续轮次的 busy 不会把旧轮次重新标成执行。父子会话、旧消息与重复帧有独立回归。
+
+未知版本和通道失败只降级来源，原生进程仍可使用；模型与操作权限维持既有计划。镜像预装固定 SDK 与 npm lock，准备空私有／全局依赖目录时不覆盖已有用户配置；修正 recursive mkdir 新父目录仍归 root 造成 worker 无法访问的问题。新增 welcome 能力协商保留与旧 cs-session 的基本交互。状态帧有独立有界重放保留量，真实 WS 测试先红后绿复现并修复 PTY 输出挤掉开始事件。
+
+真实镜像验收已使用正式仓内测试，**1 pass／0 fail、21 assertions**，覆盖普通回答、双 Esc 中断、问题答复／撤回、许可确认、模型 HTTP 400 和进程退出。模型为同容器内脚本化 Anthropic SSE 夹具，网络关闭；不是外部模型调用，也不等于后台工作台完成。细节、命令和边界见 [原生事件证据](native-activity-evidence.md)。Claude 的完整归一化、dev-session 投影／个人未读、顶部和页签动态仍未完成；共享集群没有部署本批代码。
+
+最终本地门禁 `bun run check`：**772 pass／3 skip／0 fail**，775 tests、128 files、3599 assertions、64.22s；console build 570ms。跳过项是 opt-in K8s、opt-in 原生 CLI 和 Linux 专用 Ctrl+C；原生 CLI 已在隔离 Linux 镜像显式运行通过。普通门禁包含真实 PostgreSQL 的 nativeActivity 按 agentId／游标查询、真实 HTTP 收集／队列重试、协议兼容、WS 状态保留与真实 PTY 故障降级。最终任务镜像 `cs-task-runtime:rfc003-activity` 为 `sha256:6d6dbf82305b1fb62bb028d5a5f94681b0971c5fa7f3da014a59654182fb0906`，未导入或部署共享集群。

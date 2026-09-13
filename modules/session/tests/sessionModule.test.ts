@@ -6,6 +6,7 @@ import type { TestDatabase } from '@crewstation/testkit';
 import { createTestDatabase, testDatabaseAvailable } from '@crewstation/testkit';
 import type { SessionModule } from '../wiring';
 import { createSessionModule, sessionMigrations } from '../wiring';
+import { drizzleRunnerEventStore } from '../adapters/persistence/drizzleRepositories';
 
 const available = await testDatabaseAvailable();
 let tdb: TestDatabase;
@@ -42,6 +43,18 @@ beforeAll(async () => {
 afterAll(async () => { server?.stop(true); await tdb?.drop(); });
 
 describe.skipIf(!available)('session module', () => {
+  test('原生状态写入 agent 索引，可按单 CLI 和游标分页读取，不混入其他会话', async () => {
+    const store = drizzleRunnerEventStore(tdb.db);
+    const task = 'tsk_abcdefabcdefabcdefabcdefabcdefab' as TaskId;
+    for (let seq = 1; seq <= 3; seq++) {
+      const event = { kind: 'nativeActivity' as const, activity: { agentId: seq === 2 ? 'other' : 'native', terminalId: 'terminal', runnerId: crypto.randomUUID(), eventId: crypto.randomUUID(), seq, turnOrdinal: 0, signal: { source: 'opencode/1.18.29' as const, sourceEventId: `event-${seq}`, kind: 'source-ready' as const, occurredAt: new Date().toISOString(), nativeSessionId: null, turnId: null } } };
+      await store.append({ taskId: task, seq, at: new Date(), event });
+    }
+    const result = await session.api.listEvents(task, { kinds: ['nativeActivity'], agentId: 'native', sinceSeq: 1, limit: 1 });
+    expect(result.map((event) => event.seq)).toEqual([3]);
+    expect(result[0]?.event).toMatchObject({ activity: { agentId: 'native' } });
+  });
+
   test('hello 令牌错误被拒；正确则 welcome 并回调 task-runtime', async () => {
     const bad = await openSocket(`ws://${base}/runner`);
     bad.ws.send(JSON.stringify({ type: 'hello', protocolVersion: TASKRUNNER_PROTOCOL_VERSION, taskId, runnerToken: 'bad', workdir: '/work', capabilities: { drivers: ['stub'], pty: false, preview: false } }));

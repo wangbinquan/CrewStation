@@ -16,5 +16,13 @@ export interface PreparedNativeTerminal {
   /** 必须挂入 PTY；没有 headless stdin／JSON 流模式。 */
   plan: DriverLaunchSpec;
   nativeSessionId?: string;
+  activityUnavailable?: 'unsupported-version' | 'source-error';
   dispose(): void;
+}
+
+export interface NativeActivityChannel {
+  endpoint: string;
+  token: string;
+  /** 镜像中预装的 SDK 与 npm lock；不覆盖已有用户依赖。 */
+  opencodeDependencies: string;
 }

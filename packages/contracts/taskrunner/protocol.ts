@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { SubtaskIdSchema, TaskIdSchema } from '../ids';
 import { AgentDriverSchema, AgentPermissionSchema, OutputContractSchema } from '../manifest/tasks';
 import { AgentEventSchema } from './agentEvents';
+import { NativeActivityEventSchema } from './nativeActivity';
 import { RunnerWorkspaceStatusSchema } from './workspace';
 import { ComparisonDetailQuerySchema, ComparisonDetailsSchema, GitObjectIdSchema, RunnerComparisonSchema } from './workspaceComparison';
 import { NativeTerminalRecordSchema, NativeTerminalRosterSchema, TerminalControlSchema, TerminalSizeSchema, TerminalSnapshotSchema } from './nativeTerminal';
@@ -112,6 +113,7 @@ export const RunnerResultPayloads = {
 } as const;
 
 export const RunnerEventSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('nativeActivity'), activity: NativeActivityEventSchema }),
   z.object({ kind: z.literal('nativeTerminal'), terminal: NativeTerminalRecordSchema }),
   z.object({ kind: z.literal('agent'), event: AgentEventSchema }),
   z.object({ kind: z.literal('terminalOutput'), terminalId: z.string(), data: z.string(), terminalSeq: z.number().int().nonnegative().optional(), runnerId: z.uuid().optional() }),
@@ -136,7 +138,7 @@ export const RunnerMessageSchema = z.discriminatedUnion('type', [
 export const SessionMessageSchema = z.union([
   RunnerCommandSchema,
   z.object({ type: z.literal('ping'), at: z.iso.datetime() }),
-  z.object({ type: z.literal('welcome'), protocolVersion: z.literal(TASKRUNNER_PROTOCOL_VERSION), resumeFromSeq: z.number().int().min(0) }),
+  z.object({ type: z.literal('welcome'), protocolVersion: z.literal(TASKRUNNER_PROTOCOL_VERSION), resumeFromSeq: z.number().int().min(0), nativeActivityVersion: z.literal(1).optional() }),
 ]);
 
 export type McpConnection = z.infer<typeof McpConnectionSchema>;

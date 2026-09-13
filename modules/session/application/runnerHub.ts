@@ -27,7 +27,7 @@ export function runnerHub(deps: SessionUseCaseDeps) {
     for (const sub of subscribers.get(hello.taskId) ?? []) connection.subscribers.add(sub);
     connections.set(hello.taskId, connection);
     await deps.registry.claim(hello.taskId, deps.settings.selfAddress, now);
-    socket.send(JSON.stringify({ type: 'welcome', protocolVersion: TASKRUNNER_PROTOCOL_VERSION, resumeFromSeq }));
+    socket.send(JSON.stringify({ type: 'welcome', protocolVersion: TASKRUNNER_PROTOCOL_VERSION, resumeFromSeq, nativeActivityVersion: 1 }));
     await deps.taskAccess.onRunnerConnected(hello.taskId);
     connection.broadcast(JSON.stringify({ type: 'runnerReconnected' }));
     logger.info('runner connected', { taskId: hello.taskId, resumeFromSeq, drivers: hello.capabilities.drivers });

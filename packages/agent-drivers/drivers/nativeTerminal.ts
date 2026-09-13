@@ -11,6 +11,7 @@ import { buildClaudeNativeArgv } from './claudeCode/nativeArgv';
 import { OPENCODE_CONFIG_DIR_NAME } from './opencode/env';
 import { buildOpencodeNativeEnv } from './opencode/nativeEnv';
 import { buildOpencodeNativeArgv } from './opencode/nativeArgv';
+import { setupOpencodeNativeActivity } from './opencode/nativeActivitySetup';
 
 /** 只准备原生 argv 与配置；所有进程仍由 Runtime 的降权 PTY 后端拉起。 */
 export async function prepareNativeTerminal(spec: NativeTerminalSpec, context: DriverLaunchContext, head?: string[]): Promise<PreparedNativeTerminal> {
@@ -35,6 +36,7 @@ export async function prepareNativeTerminal(spec: NativeTerminalSpec, context: D
     await context.host.chownToWorker(configDir);
     await context.host.chownToWorker(join(configDir, 'skills'));
     const env = buildOpencodeNativeEnv(ctx, configDir);
-    return { plan: { cmd: buildOpencodeNativeArgv(ctx), cwd: ctx.cwd, env }, dispose: runDir.dispose };
+    const activityUnavailable = await setupOpencodeNativeActivity(ctx, context, runDir, env);
+    return { plan: { cmd: buildOpencodeNativeArgv(ctx), cwd: ctx.cwd, env }, ...(activityUnavailable ? { activityUnavailable } : {}), dispose: runDir.dispose };
   } catch (error) { runDir.dispose(); throw error; }
 }

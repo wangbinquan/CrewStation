@@ -12,6 +12,8 @@ export * from './gateway/routes';
 export * from './taskrunner/agentEvents';
 export * from './taskrunner/protocol';
 export * from './taskrunner/nativeTerminal';
+export * from './taskrunner/nativeActivity';
+export * from './taskrunner/nativeObservation';
 export * from './taskrunner/workspace';
 export * from './taskrunner/workspaceComparison';
 export * from './api/envelope';

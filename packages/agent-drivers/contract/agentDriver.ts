@@ -4,6 +4,7 @@
 import type { AgentDriver as AgentDriverName, AgentEvent, AgentPermission, McpConnection } from '@crewstation/contracts';
 import type { Logger } from '@crewstation/kernel';
 import type { ProcessHost } from './processHost';
+import type { NativeActivityChannel } from './nativeTerminal';
 
 /** 一次 startAgent 剥掉协议外壳后的启动规格（与宿主 AgentSpec 同形，去掉 driver 字段）。 */
 export interface DriverAgentSpec {
@@ -29,6 +30,7 @@ export interface DriverLaunchContext {
   runDir?: string;
   gitUserName?: string | null;
   gitUserEmail?: string | null;
+  nativeActivity?: NativeActivityChannel;
 }
 
 export interface DriverAgentProcess {
