@@ -1,0 +1,4 @@
+.tabs, .panel { min-width: 0; }
+.list { display: flex; gap: var(--cs-space-1); overflow-x: auto; border-bottom: 1px solid var(--cs-color-border); padding-bottom: var(--cs-space-2); }
+.list > button { flex: 0 0 auto; white-space: nowrap; }
+.panel { padding-top: var(--cs-space-2); }

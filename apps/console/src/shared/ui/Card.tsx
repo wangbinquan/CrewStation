@@ -6,12 +6,13 @@ export interface CardProps {
   readonly extra?: ReactNode;
   readonly footer?: ReactNode;
   readonly className?: string;
+  readonly compact?: boolean;
   readonly children: ReactNode;
 }
 
-export function Card({ title, extra, footer, className, children }: CardProps): ReactElement {
+export function Card({ title, extra, footer, className, compact = false, children }: CardProps): ReactElement {
   return (
-    <section className={[styles.card, className].filter(Boolean).join(' ')}>
+    <section className={[styles.card, compact && styles.compact, className].filter(Boolean).join(' ')}>
       {title !== undefined || extra !== undefined ? (
         <header className={styles.header}>
           <h2 className={styles.title}>{title}</h2>

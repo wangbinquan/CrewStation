@@ -4,13 +4,15 @@ import type { WorkdirPaths } from '../files/workdirPath';
 import type { GitCommand } from './gitCommand';
 import { parseCount, parseWorkspaceCommits, parseWorkspaceFiles } from './gitStatus';
 import { workspaceFingerprint } from './workspaceFingerprint';
+import { gitWithin } from './gitCommand';
 
 export const WORKSPACE_FILE_LIMIT = 500;
 export const WORKSPACE_COMMIT_LIMIT = 100;
 const statusArgs = ['status', '--porcelain=v2', '-z', '--branch', '--untracked-files=all'];
 
 /** 一次非原子的只读检查；期间 Git HEAD/index/路径状态变化则拒绝把混合结果标为 ready。 */
-export async function readWorkspaceStatus(git: GitCommand, paths: WorkdirPaths): Promise<RunnerWorkspaceStatus> {
+export async function readWorkspaceStatus(source: GitCommand, paths: WorkdirPaths): Promise<RunnerWorkspaceStatus> {
+  const git = gitWithin(source, 30_000);
   try {
     const raw = await git.checked(statusArgs);
     const files = parseWorkspaceFiles(raw);
@@ -21,7 +23,7 @@ export async function readWorkspaceStatus(git: GitCommand, paths: WorkdirPaths):
     const headSha = oid === '(initial)' ? null : oid;
     const branch = branchName === '(detached)' ? null : branchName;
     const shallow = (await git.checked(['rev-parse', '--is-shallow-repository'])).trim() === 'true';
-    const fingerprint = await workspaceFingerprint(paths, raw, files);
+    const fingerprint = await workspaceFingerprint(paths, raw, files, git.deadline);
     const [unpushed, upstream] = await Promise.all([readUnpushed(git, headSha, shallow), readUpstream(git, headSha, header('upstream'), shallow)]);
     if (raw !== await git.checked(statusArgs)) throw new RunnerCommandError('workspace_changed', '检查期间工作树发生变化，请重新检查');
     return {

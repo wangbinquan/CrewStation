@@ -12,6 +12,7 @@ export * from './gateway/routes';
 export * from './taskrunner/agentEvents';
 export * from './taskrunner/protocol';
 export * from './taskrunner/workspace';
+export * from './taskrunner/workspaceComparison';
 export * from './api/envelope';
 export * from './api/identity';
 export * from './api/project';

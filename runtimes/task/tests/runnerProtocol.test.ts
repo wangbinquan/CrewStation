@@ -74,6 +74,9 @@ describe('exec', () => {
     const init = RunnerResultPayloads.exec.parse(await session.call({ id: 'ws-init', type: 'exec', execId: 'ws-init', command: ['git', 'init', '-b', 'main'], wait: true }));
     expect(init.exitCode).toBe(0);
     expect(RunnerResultPayloads.workspaceStatus.parse(await session.call({ id: 'ws-2', type: 'workspaceStatus' }))).toMatchObject({ status: 'ready', branch: 'main', headSha: null, uncommittedCount: 0 });
+    const comparison = RunnerResultPayloads.compareWorkspace.parse(await session.call({ id: 'ws-3', type: 'compareWorkspace' }));
+    expect(comparison.commits.status).toBe('undeployed');
+    expect(RunnerResultPayloads.workspaceComparisonDetails.parse(await session.call({ id: 'ws-4', type: 'workspaceComparisonDetails', comparisonId: comparison.comparisonId, tab: 'uncommitted' }))).toMatchObject({ files: [], truncated: false });
   });
   test('输出分流、退出码与耗时；cwd 相对工作目录；超时与取消杀进程树；重复与未知 id 报错', async () => {
     const { session, tr } = await boot();

@@ -1,4 +1,5 @@
 import type { AgentInstanceDto, BranchDto, DevSessionDto, OpenDevSessionRequest, ReleaseDto, SendAgentMessageRequest, WorkspaceStatusDto } from '@crewstation/contracts';
+import type { ComparisonDetailQuery, ComparisonDetails, ComparisonTarget, VersionComparisonDto } from '@crewstation/contracts';
 import type { Transport } from '../httpTransport';
 import type { ItemsPage } from '../itemsPage';
 import type { PublishInput, StartDevAgentInput } from '../requestInputs';
@@ -25,6 +26,9 @@ export interface DevSessionResource {
   get(projectId: string): Promise<DevSessionDto>;
   /** 只读、无副作用的释放／发布前检查；无会话 404，断线或 Git 失败返回 unavailable。 */
   workspaceStatus(projectId: string): Promise<WorkspaceStatusDto>;
+  versionComparison(projectId: string, target?: ComparisonTarget): Promise<VersionComparisonDto>;
+  versionComparisonDetails(projectId: string, comparisonId: string, query: ComparisonDetailQuery): Promise<ComparisonDetails>;
+  refreshComparisonHistory(projectId: string, target?: ComparisonTarget): Promise<VersionComparisonDto>;
   /** POST /v1/projects/:projectId/dev-session（201） */
   open(projectId: string, input: OpenDevSessionRequest): Promise<DevSessionDto>;
   /** DELETE /v1/projects/:projectId/dev-session?force=true */
@@ -51,6 +55,9 @@ export function devSessionResource(transport: Transport): DevSessionResource {
   return {
     get: (projectId) => transport.request<DevSessionDto>('GET', `${project(projectId)}/dev-session`),
     workspaceStatus: (projectId) => transport.request<WorkspaceStatusDto>('GET', `${project(projectId)}/dev-session/workspace-status`),
+    versionComparison: (projectId, target) => transport.request<VersionComparisonDto>('GET', `${project(projectId)}/dev-session/version-comparison`, { query: { target } }),
+    versionComparisonDetails: (projectId, comparisonId, query) => transport.request<ComparisonDetails>('GET', `${project(projectId)}/dev-session/version-comparisons/${segment(comparisonId)}`, { query }),
+    refreshComparisonHistory: (projectId, target = 'prod') => transport.request<VersionComparisonDto>('POST', `${project(projectId)}/dev-session/version-comparison/refresh-history`, { body: { target } }),
     open: (projectId, input) => transport.request<DevSessionDto>('POST', `${project(projectId)}/dev-session`, { body: input }),
     release: (projectId, options) =>
       transport.request<ReleaseDevSessionResult>('DELETE', `${project(projectId)}/dev-session`, { query: { force: options?.force ? 'true' : undefined, expectedTaskId: options?.expectedTaskId } }),

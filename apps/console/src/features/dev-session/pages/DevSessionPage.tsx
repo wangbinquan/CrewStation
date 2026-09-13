@@ -35,6 +35,7 @@ export function DevSessionPage(): ReactElement {
           projectId={projectId}
           session={session.session}
           access={context.access}
+          canDevelop={context.canDevelop}
           serviceId={context.serviceId}
           release={session.release}
         />

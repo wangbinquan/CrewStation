@@ -10,6 +10,7 @@ import { AgentsPane } from '../components/agents/AgentsPane';
 import { EditorPane } from '../components/editor/EditorPane';
 import { PreviewPane } from '../components/preview/PreviewPane';
 import { TerminalPane } from '../components/terminal/TerminalPane';
+import { VersionComparisonPanel } from '../components/workspace/VersionComparisonPanel';
 import { useActivityTouch } from '../hooks/useActivityTouch';
 import { useAgentTranscripts } from '../hooks/useAgentTranscripts';
 import { useDataBindings } from '../hooks/useDataBindings';
@@ -26,6 +27,7 @@ export interface DevSessionWorkbenchProps {
   readonly projectId: string;
   readonly session: DevSessionDto;
   readonly access: SessionAccess;
+  readonly canDevelop: boolean;
   readonly serviceId: string | undefined;
   readonly release: UseMutationResult<ReleaseDevSessionResult, ApiClientError, boolean>;
 }
@@ -34,7 +36,7 @@ export interface DevSessionWorkbenchProps {
  * 有会话时的工作区：一条任务流供四个面板共用，外加发布与数据绑定。
  * 所有面板都只拿 channel，不各自开连接。
  */
-export function DevSessionWorkbench({ projectId, session, access, serviceId, release }: DevSessionWorkbenchProps): ReactElement {
+export function DevSessionWorkbench({ projectId, session, access, canDevelop, serviceId, release }: DevSessionWorkbenchProps): ReactElement {
   const taskId = session.taskId;
   const { state, channel } = useTaskStream(taskId);
   const touch = useActivityTouch(taskId);
@@ -48,6 +50,7 @@ export function DevSessionWorkbench({ projectId, session, access, serviceId, rel
   return (
     <>
       <SessionCard session={session} stream={state} access={access} release={release} />
+      <VersionComparisonPanel projectId={projectId} taskId={taskId} channel={channel} canDevelop={canDevelop} />
       <div className={styles.grid}>
         <AgentsPane agents={agents} transcripts={transcripts} onActivity={touch} />
         <TerminalPane channel={channel} onActivity={touch} />

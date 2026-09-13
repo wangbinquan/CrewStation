@@ -6,6 +6,7 @@ import type { FileCommands } from './files/fileCommands';
 import type { PreviewSupervisor } from './preview/previewSupervisor';
 import type { TerminalSupervisor } from './terminal/terminalSupervisor';
 import type { RunnerWorkspaceStatus } from '@crewstation/contracts';
+import type { WorkspaceComparisons } from './workspace/workspaceComparison';
 
 export interface CommandTargets {
   agents: AgentSupervisor;
@@ -15,6 +16,8 @@ export interface CommandTargets {
   preview: PreviewSupervisor;
   verifyContract: ContractVerifier;
   workspaceStatus: () => Promise<RunnerWorkspaceStatus>;
+  comparisons: WorkspaceComparisons;
+  fetchComparisonHistory: (url: string, targetSha?: string) => Promise<void>;
   /** 先回 ack，再异步进入排空；由 runner 实现。 */
   requestShutdown: (graceSeconds: number) => void;
 }
@@ -37,6 +40,9 @@ export function buildCommandHandlers(targets: CommandTargets): CommandHandlers {
     readFile: (c) => targets.files.read(c),
     writeFile: (c) => targets.files.write(c),
     workspaceStatus: () => targets.workspaceStatus(),
+    compareWorkspace: (c) => targets.comparisons.compare(c.targetSha),
+    workspaceComparisonDetails: (c) => targets.comparisons.details(c.comparisonId, c),
+    fetchComparisonHistory: (c) => targets.fetchComparisonHistory(c.url, c.targetSha).then(ack),
     previewStatus: async () => targets.preview.status(),
     restartPreview: () => targets.preview.restart().then(ack),
     verifyContract: (c) => targets.verifyContract(c),

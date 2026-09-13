@@ -2,6 +2,7 @@ import type { RunnerCommand, TaskId } from '@crewstation/contracts';
 import { PlatformError } from '@crewstation/kernel';
 import type { SessionUseCaseDeps } from './dependencies';
 import type { RunnerHub } from './runnerHub';
+import { commandTimeout } from '../domain/commandTimeout';
 
 /** 命令派发：本副本持有连接就直接发，否则按注册表转发到持有副本；无人持有即 TaskRunner 离线。 */
 export function commandDispatch(deps: SessionUseCaseDeps, hub: RunnerHub) {
@@ -11,6 +12,7 @@ export function commandDispatch(deps: SessionUseCaseDeps, hub: RunnerHub) {
     return new Promise<unknown>((resolve, reject) => {
       connection.pending.add({
         id: command.id, type: command.type, sentAt: deps.clock.now().getTime(), resolve,
+        ...commandTimeout(command),
         reject: (error) => reject(new PlatformError(error.code === 'timeout' ? 'unavailable' : 'precondition', error.message, { code: error.code })),
       });
       try { connection.socket.send(JSON.stringify(command)); } catch (error) { connection.pending.settle(command.id, { ok: false, code: 'send_failed', message: String(error) }); }

@@ -83,8 +83,9 @@ test('浅历史、非 Git 目录、失败退出码和截断不会伪装为干净
   const head = await f.commit('base');
   await Bun.write(join(f.root, '.git/shallow'), `${head}\n`);
   expect(await f.status()).toMatchObject({ status: 'ready', shallow: true, unpushed: { status: 'unavailable' } });
-  const failure = await readWorkspaceStatus({ checked: async () => { throw new Error('truncated'); }, run: f.git.run }, f.paths);
-  expect(failure).toMatchObject({ status: 'unavailable', reason: 'truncated' });
+  const failure = await readWorkspaceStatus({ checked: f.git.checked, run: async () => ({ stdout: '', stderr: '', exitCode: 0, truncated: true }) }, f.paths);
+  expect(failure).toMatchObject({ status: 'unavailable' });
+  expect(failure.status === 'unavailable' && failure.reason).toContain('超过读取上限');
 });
 
 test('清单有界，但完整文件数量保留；未提交文件不会增加提交数量', async () => {

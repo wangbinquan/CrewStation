@@ -28,6 +28,8 @@ import type { TerminalSupervisor } from './terminal/terminalSupervisor';
 import { createTerminalSupervisor } from './terminal/terminalSupervisor';
 import { createGitCommand } from './workspace/gitCommand';
 import { readWorkspaceStatus } from './workspace/workspaceStatus';
+import { createWorkspaceComparisons } from './workspace/workspaceComparison';
+import { fetchComparisonHistory } from './workspace/fetchComparisonHistory';
 
 export interface RunnerHooks {
   /** shutdown 排空完成后调用；缺省 process.exit。测试注入以免真的退出。 */
@@ -91,8 +93,9 @@ class TaskRunner implements RunnerHandle {
     const files = createFileCommands({ paths, launcher, emit, logger: logger.child({ component: 'files' }) });
     const verifyContract = createContractVerifier({ paths, logger: logger.child({ component: 'contract' }) });
     const git = createGitCommand(execs);
+    const comparisons = createWorkspaceComparisons({ git, paths, launcher });
     const runnerRef: { current?: TaskRunner } = {};
-    const handlers = buildCommandHandlers({ agents, execs, terminals, files, preview, verifyContract, workspaceStatus: () => readWorkspaceStatus(git, paths), requestShutdown: (grace) => void runnerRef.current?.shutdown(grace) });
+    const handlers = buildCommandHandlers({ agents, execs, terminals, files, preview, verifyContract, workspaceStatus: () => readWorkspaceStatus(git, paths), comparisons, fetchComparisonHistory: (url, sha) => fetchComparisonHistory(git, url, sha), requestShutdown: (grace) => void runnerRef.current?.shutdown(grace) });
     const hello = (): RunnerHello => ({
       type: 'hello',
       protocolVersion: TASKRUNNER_PROTOCOL_VERSION,

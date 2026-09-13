@@ -1,5 +1,6 @@
 import type { ProjectId, TaskId, UserId } from '@crewstation/contracts';
 import { OpenDevSessionRequestSchema, ProjectIdSchema, PublishRequestSchema, SendAgentMessageRequestSchema, StartDevAgentRequestSchema, TaskIdSchema } from '@crewstation/contracts';
+import { ComparisonDetailQuerySchema, ComparisonTargetSchema } from '@crewstation/contracts';
 import type { AppEnv } from '@crewstation/http';
 import { actorFrom, parseBody, parseParams, parseQuery } from '@crewstation/http';
 import type { Context } from 'hono';
@@ -17,6 +18,18 @@ export function devSessionRoutes(api: DevSessionModuleApi, isAdmin: (userId: Use
   r.get('/v1/projects/:projectId/dev-session', async (c) => { const s = await api.getSession(await actor(c), parseParams(c, projectParams).projectId as ProjectId); return s ? c.json(s) : c.json({ error: 'not_found', message: '没有开发会话' }, 404); });
   r.post('/v1/projects/:projectId/dev-session', async (c) => c.json(await api.openSession(await actor(c), parseParams(c, projectParams).projectId as ProjectId, await parseBody(c, OpenDevSessionRequestSchema)), 201));
   r.get('/v1/projects/:projectId/dev-session/workspace-status', async (c) => c.json(await api.workspaceStatus(await actor(c), parseParams(c, projectParams).projectId as ProjectId)));
+  r.get('/v1/projects/:projectId/dev-session/version-comparison', async (c) => {
+    const query = parseQuery(c, z.object({ target: ComparisonTargetSchema.default('prod') }));
+    return c.json(await api.versionComparison(await actor(c), parseParams(c, projectParams).projectId as ProjectId, query.target));
+  });
+  r.get('/v1/projects/:projectId/dev-session/version-comparisons/:comparisonId', async (c) => {
+    const params = parseParams(c, projectParams.extend({ comparisonId: z.string().min(1).max(2048) }));
+    return c.json(await api.versionComparisonDetails(await actor(c), params.projectId as ProjectId, params.comparisonId, parseQuery(c, ComparisonDetailQuerySchema)));
+  });
+  r.post('/v1/projects/:projectId/dev-session/version-comparison/refresh-history', async (c) => {
+    const input = await parseBody(c, z.object({ target: ComparisonTargetSchema.default('prod') }));
+    return c.json(await api.refreshComparisonHistory(await actor(c), parseParams(c, projectParams).projectId as ProjectId, input.target));
+  });
   r.delete('/v1/projects/:projectId/dev-session', async (c) => {
     const { force, expectedTaskId } = parseQuery(c, z.object({ force: z.enum(['true', 'false']).optional(), expectedTaskId: TaskIdSchema.optional() }));
     return c.json(await api.releaseSession(await actor(c), parseParams(c, projectParams).projectId as ProjectId, { force: force === 'true', ...(expectedTaskId ? { expectedTaskId: expectedTaskId as TaskId } : {}) }));

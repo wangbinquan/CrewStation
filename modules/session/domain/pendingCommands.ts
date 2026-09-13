@@ -3,6 +3,7 @@ export interface PendingCommand {
   readonly id: string;
   readonly type: string;
   readonly sentAt: number;
+  readonly timeoutMs?: number;
   resolve(payload: unknown): void;
   reject(error: { code: string; message: string }): void;
 }
@@ -36,7 +37,7 @@ export class PendingCommands {
   expire(now: number): number {
     let n = 0;
     for (const [id, command] of this.pending) {
-      if (now - command.sentAt > this.timeoutMs) {
+      if (now - command.sentAt > (command.timeoutMs ?? this.timeoutMs)) {
         this.pending.delete(id);
         command.reject({ code: 'timeout', message: `命令 ${command.type} 超时` });
         n += 1;

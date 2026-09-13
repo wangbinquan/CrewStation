@@ -1,4 +1,5 @@
 .card {
+  min-width: 0;
   display: flex;
   flex-direction: column;
   border: 1px solid var(--cs-color-border);
@@ -25,7 +26,11 @@
   display: flex;
   align-items: center;
   gap: var(--cs-space-2);
+  flex-wrap: wrap;
 }
+
+.compact > .header, .compact > .body, .compact > .footer { padding: var(--cs-space-2) var(--cs-space-3); }
+.compact > .header { flex-wrap: wrap; gap: var(--cs-space-2); }
 
 .body {
   padding: var(--cs-space-4);

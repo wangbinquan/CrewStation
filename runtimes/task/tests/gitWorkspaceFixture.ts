@@ -29,5 +29,5 @@ export async function gitWorkspaceFixture(initialize = true) {
     await git.checked(['-c', 'commit.gpgsign=false', 'commit', '--allow-empty', '-m', subject]);
     return (await git.checked(['rev-parse', 'HEAD'])).trim();
   };
-  return { root, paths, git, write, commit, status: () => readWorkspaceStatus(git, paths), dispose: async () => { await execs.cancelAll(); await rm(root, { recursive: true, force: true }); } };
+  return { root, paths, git, launcher, write, commit, status: () => readWorkspaceStatus(git, paths), dispose: async () => { await execs.cancelAll(); await rm(root, { recursive: true, force: true }); } };
 }

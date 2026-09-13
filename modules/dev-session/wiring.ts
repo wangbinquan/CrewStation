@@ -15,6 +15,7 @@ import { idleReminderUseCase } from './application/idleReminder';
 import { publishFromSessionUseCase } from './application/publishFromSession';
 import { sessionLifecycleUseCases } from './application/sessionLifecycle';
 import { workspaceStatusUseCase } from './application/workspaceStatus';
+import { versionComparisonUseCases } from './application/versionComparison';
 import { devSessionRoutes } from './http/devSessionRoutes';
 import type { ComputeCatalog, DevSessionSettings, McpCredentials, Notifier, ProjectAuthorizer, Releases, ServiceResolver, SourceControl } from './ports/platform';
 import type { Environments, Runner } from './ports/runtime';
@@ -60,7 +61,7 @@ export function createDevSessionModule(deps: DevSessionModuleDeps): DevSessionMo
   const lifecycle = sessionLifecycleUseCases(useCaseDeps);
   const agents = agentUseCases(useCaseDeps);
   const remind = idleReminderUseCase(useCaseDeps);
-  const api: DevSessionModuleApi = { name: 'dev-session', ...lifecycle, ...agents, workspaceStatus: workspaceStatusUseCase(useCaseDeps), publish: publishFromSessionUseCase(useCaseDeps), sendIdleReminders: remind };
+  const api: DevSessionModuleApi = { name: 'dev-session', ...lifecycle, ...agents, ...versionComparisonUseCases(useCaseDeps), workspaceStatus: workspaceStatusUseCase(useCaseDeps), publish: publishFromSessionUseCase(useCaseDeps), sendIdleReminders: remind };
   let timer: ReturnType<typeof setInterval> | undefined;
   return {
     api,

@@ -3,11 +3,14 @@ import { createReadStream } from 'node:fs';
 import { lstat, readlink } from 'node:fs/promises';
 import type { WorkspaceFile } from '@crewstation/contracts';
 import type { WorkdirPaths } from '../files/workdirPath';
+import { RunnerCommandError } from '../commandError';
 
 /** 版本指纹包含 index blob 与实际 dirty／untracked 内容，同样行数的编辑也会失效。 */
-export async function workspaceFingerprint(paths: WorkdirPaths, status: string, files: WorkspaceFile[]): Promise<string> {
+export async function workspaceFingerprint(paths: WorkdirPaths, status: string, files: WorkspaceFile[], deadline = Date.now() + 30_000): Promise<string> {
   const hash = createHash('sha256').update(status);
+  const checkTime = () => { if (Date.now() >= deadline) throw new RunnerCommandError('workspace_timeout', '工作树内容读取超时'); };
   for (const file of files) {
+    checkTime();
     hash.update(JSON.stringify(file));
     const absolute = `${paths.root}/${file.path}`;
     const info = await lstat(absolute).catch((error: unknown) => {
@@ -19,7 +22,7 @@ export async function workspaceFingerprint(paths: WorkdirPaths, status: string, 
     if (!info.isFile()) { hash.update(`directory:${info.mtimeMs}`); continue; }
     // resolveRelative 拦截父目录经符号链接离开 workdir；只读且流式，不把大文件搬进内存。
     await paths.resolveRelative(file.path);
-    for await (const chunk of createReadStream(absolute)) hash.update(chunk);
+    for await (const chunk of createReadStream(absolute)) { checkTime(); hash.update(chunk); }
   }
   return hash.digest('hex');
 }
