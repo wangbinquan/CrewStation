@@ -1,4 +1,4 @@
-import type { AgentInstanceDto, BranchDto, DevSessionDto, OpenDevSessionRequest, ReleaseDto, SendAgentMessageRequest } from '@crewstation/contracts';
+import type { AgentInstanceDto, BranchDto, DevSessionDto, OpenDevSessionRequest, ReleaseDto, SendAgentMessageRequest, WorkspaceStatusDto } from '@crewstation/contracts';
 import type { Transport } from '../httpTransport';
 import type { ItemsPage } from '../itemsPage';
 import type { PublishInput, StartDevAgentInput } from '../requestInputs';
@@ -7,18 +7,24 @@ import { segment } from '../requestUrl';
 /** DELETE /v1/projects/:projectId/dev-session 的响应：释放后的会话与容器里尚未推送的提交（`<sha> <subject>`）。 */
 export interface ReleaseDevSessionResult {
   readonly session: DevSessionDto;
-  readonly unpushed: string[];
+  /** null 表示无法确认，不能把它当作已全部推送。 */
+  readonly unpushed: string[] | null;
+  readonly workspace: WorkspaceStatusDto;
 }
 
 export interface ReleaseDevSessionOptions {
   /** 负责人强制释放他人会话时必须为 true。 */
   readonly force?: boolean;
+  /** 只释放用户刚刚确认的会话；期间被替换时返回 precondition。 */
+  readonly expectedTaskId?: string;
 }
 
 /** 开发会话：一项目一会话、分支与落后数、并行流式 Agent、从会话发布。 */
 export interface DevSessionResource {
   /** GET /v1/projects/:projectId/dev-session；没有会话时抛 not_found（404）。 */
   get(projectId: string): Promise<DevSessionDto>;
+  /** 只读、无副作用的释放／发布前检查；无会话 404，断线或 Git 失败返回 unavailable。 */
+  workspaceStatus(projectId: string): Promise<WorkspaceStatusDto>;
   /** POST /v1/projects/:projectId/dev-session（201） */
   open(projectId: string, input: OpenDevSessionRequest): Promise<DevSessionDto>;
   /** DELETE /v1/projects/:projectId/dev-session?force=true */
@@ -44,9 +50,10 @@ export function devSessionResource(transport: Transport): DevSessionResource {
   const agents = (taskId: string) => `/v1/tasks/${segment(taskId)}/agents`;
   return {
     get: (projectId) => transport.request<DevSessionDto>('GET', `${project(projectId)}/dev-session`),
+    workspaceStatus: (projectId) => transport.request<WorkspaceStatusDto>('GET', `${project(projectId)}/dev-session/workspace-status`),
     open: (projectId, input) => transport.request<DevSessionDto>('POST', `${project(projectId)}/dev-session`, { body: input }),
     release: (projectId, options) =>
-      transport.request<ReleaseDevSessionResult>('DELETE', `${project(projectId)}/dev-session`, { query: { force: options?.force ? 'true' : undefined } }),
+      transport.request<ReleaseDevSessionResult>('DELETE', `${project(projectId)}/dev-session`, { query: { force: options?.force ? 'true' : undefined, expectedTaskId: options?.expectedTaskId } }),
     listBranches: (projectId) => transport.request<ItemsPage<BranchDto>>('GET', `${project(projectId)}/branches`),
     publish: (projectId, input) => transport.request<ReleaseDto>('POST', `${project(projectId)}/publish`, { body: input }),
     listAgents: (taskId) => transport.request<ItemsPage<AgentInstanceDto>>('GET', agents(taskId)),

@@ -5,6 +5,7 @@
   --cs-font-sans: system-ui, -apple-system, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
   --cs-font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --cs-font-size: 14px;
+  --cs-font-size-sm: 12px;
   --cs-line-height: 1.6;
 
   --cs-color-bg: #f4f5f7;

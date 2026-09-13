@@ -6,6 +6,7 @@ import { createTestDatabase, testDatabaseAvailable } from '@crewstation/testkit'
 import type { EnvironmentView } from '../ports/runtime';
 import type { DevSessionModule } from '../wiring';
 import { createDevSessionModule, devSessionMigrations } from '../wiring';
+import { readyWorkspace } from './workspaceFixture';
 
 const available = await testDatabaseAvailable();
 let tdb: TestDatabase;
@@ -43,8 +44,8 @@ beforeAll(async () => {
     runner: {
       sendCommand: async (_t, command) => {
         commands.push(command);
-        if (command.type === 'exec' && command.command.join(' ') === 'git status --porcelain') return { exitCode: 0, stdout: dirty, stderr: '' };
-        if (command.type === 'exec' && command.command[0] === 'sh') return { exitCode: 0, stdout: '', stderr: '' };
+        if (command.type === 'workspaceStatus') return { ...readyWorkspace(), uncommittedCount: dirty ? 2 : 0, uncommitted: dirty ? [{ path: 'src/main.ts', status: '.M', index: '.', worktree: 'M' }, { path: 'new.ts', status: 'untracked', index: '?', worktree: '?' }] : [], unpushed: { status: 'ready', commits: [{ sha: 'abc123', subject: 'wip' }], count: 1, truncated: false } };
+        if (command.type === 'exec' && command.command[0] === 'sh') return { execId: command.execId, exitCode: 0, stdout: '', stderr: '', durationMs: 1, truncated: false };
         if (command.type === 'exec') return { exitCode: 0, stdout: 'abc123 wip', stderr: '' };
         if (command.type === 'previewStatus') return { state: 'ready', port: 3000, restarts: 0 };
         return {};

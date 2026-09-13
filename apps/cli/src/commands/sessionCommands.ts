@@ -33,6 +33,7 @@ export async function releaseSession(ctx: CommandContext): Promise<void> {
   const result = await api.devSession.release(project.id, { force: boolFlag(ctx, 'force') });
   if (ctx.json) return ctx.emit.json(result);
   ctx.emit.success(`开发会话已释放：${result.session.taskId}（${result.session.state}）`);
+  if (result.unpushed === null) return ctx.emit.warn('释放前无法确认未推送提交；检查失败不代表代码已保存到远端');
   if (result.unpushed.length === 0) return ctx.emit.note('没有未推送的提交');
   ctx.emit.warn(`容器里有 ${result.unpushed.length} 个未推送的提交：`);
   for (const commit of result.unpushed) ctx.emit.line('  ' + commit);

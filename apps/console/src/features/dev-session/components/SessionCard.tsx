@@ -54,7 +54,7 @@ export function SessionCard({ session, stream, access, release }: SessionCardPro
           <Badge tone={sessionStateTone(session.state)}>{t(`devSession.state.${session.state}`)}</Badge>
           <StreamStatus state={stream} />
         </div>
-        <ReleaseControl access={access} release={release} />
+        <ReleaseControl projectId={session.projectId} taskId={session.taskId} access={access} release={release} />
       </header>
       <DefinitionList layout="grid" items={details(session, stream, access, t, locale)} />
       {stream.runnerState !== undefined && stream.runnerState !== 'ready' ? (

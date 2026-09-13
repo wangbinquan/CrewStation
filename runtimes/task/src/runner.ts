@@ -26,6 +26,8 @@ import type { SessionLink } from './sessionLink';
 import { createSessionLink } from './sessionLink';
 import type { TerminalSupervisor } from './terminal/terminalSupervisor';
 import { createTerminalSupervisor } from './terminal/terminalSupervisor';
+import { createGitCommand } from './workspace/gitCommand';
+import { readWorkspaceStatus } from './workspace/workspaceStatus';
 
 export interface RunnerHooks {
   /** shutdown 排空完成后调用；缺省 process.exit。测试注入以免真的退出。 */
@@ -88,8 +90,9 @@ class TaskRunner implements RunnerHandle {
     const preview = createPreviewSupervisor({ config: config.preview, policy: config.previewPolicy, launcher, workdir: paths.root, emit, logger: logger.child({ component: 'preview' }) });
     const files = createFileCommands({ paths, launcher, emit, logger: logger.child({ component: 'files' }) });
     const verifyContract = createContractVerifier({ paths, logger: logger.child({ component: 'contract' }) });
+    const git = createGitCommand(execs);
     const runnerRef: { current?: TaskRunner } = {};
-    const handlers = buildCommandHandlers({ agents, execs, terminals, files, preview, verifyContract, requestShutdown: (grace) => void runnerRef.current?.shutdown(grace) });
+    const handlers = buildCommandHandlers({ agents, execs, terminals, files, preview, verifyContract, workspaceStatus: () => readWorkspaceStatus(git, paths), requestShutdown: (grace) => void runnerRef.current?.shutdown(grace) });
     const hello = (): RunnerHello => ({
       type: 'hello',
       protocolVersion: TASKRUNNER_PROTOCOL_VERSION,

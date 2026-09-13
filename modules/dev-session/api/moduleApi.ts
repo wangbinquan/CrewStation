@@ -1,4 +1,4 @@
-import type { Actor, AgentInstanceDto, BranchDto, DevSessionDto, OpenDevSessionRequest, ProjectId, PublishRequest, ReleaseDto, SendAgentMessageRequest, StartDevAgentRequest, TaskId } from '@crewstation/contracts';
+import type { Actor, AgentInstanceDto, BranchDto, DevSessionDto, OpenDevSessionRequest, ProjectId, PublishRequest, ReleaseDto, SendAgentMessageRequest, StartDevAgentRequest, TaskId, WorkspaceStatusDto } from '@crewstation/contracts';
 
 /** dev-session 对外能力：一项目一会话、分支、并行流式 Agent、从会话发布、空闲提醒。 */
 export interface DevSessionModuleApi {
@@ -6,7 +6,8 @@ export interface DevSessionModuleApi {
   openSession(actor: Actor, projectId: ProjectId, input: OpenDevSessionRequest): Promise<DevSessionDto>;
   getSession(actor: Actor, projectId: ProjectId): Promise<DevSessionDto | undefined>;
   listBranches(actor: Actor, projectId: ProjectId): Promise<BranchDto[]>;
-  releaseSession(actor: Actor, projectId: ProjectId, options?: { force?: boolean }): Promise<{ session: DevSessionDto; unpushed: string[] }>;
+  workspaceStatus(actor: Actor, projectId: ProjectId): Promise<WorkspaceStatusDto>;
+  releaseSession(actor: Actor, projectId: ProjectId, options?: { force?: boolean; expectedTaskId?: TaskId }): Promise<{ session: DevSessionDto; unpushed: string[] | null; workspace: WorkspaceStatusDto }>;
   startAgent(actor: Actor, taskId: TaskId, input: StartDevAgentRequest): Promise<AgentInstanceDto>;
   sendMessage(actor: Actor, taskId: TaskId, agentId: string, input: SendAgentMessageRequest): Promise<void>;
   cancelAgent(actor: Actor, taskId: TaskId, agentId: string): Promise<void>;

@@ -29,6 +29,6 @@ export function useDevSession(projectId: string): DevSessionHandle {
     missing: absent,
     loadError: absent ? null : query.error,
     open: useApiMutation((branch: string) => api.devSession.open(projectId, { branch }), { invalidate: [key] }),
-    release: useApiMutation((force: boolean) => api.devSession.release(projectId, { force }), { invalidate: [key] }),
+    release: useApiMutation((force: boolean) => api.devSession.release(projectId, { force, ...(query.data ? { expectedTaskId: query.data.taskId } : {}) }), { invalidate: [key] }),
   };
 }

@@ -68,6 +68,13 @@ describe('握手与心跳', () => {
 });
 
 describe('exec', () => {
+  test('workspaceStatus 经真实 Runner 协议读取；非 Git 目录不可用，初始化后是尚无提交', async () => {
+    const { session } = await boot();
+    expect(RunnerResultPayloads.workspaceStatus.parse(await session.call({ id: 'ws-1', type: 'workspaceStatus' }))).toMatchObject({ status: 'unavailable' });
+    const init = RunnerResultPayloads.exec.parse(await session.call({ id: 'ws-init', type: 'exec', execId: 'ws-init', command: ['git', 'init', '-b', 'main'], wait: true }));
+    expect(init.exitCode).toBe(0);
+    expect(RunnerResultPayloads.workspaceStatus.parse(await session.call({ id: 'ws-2', type: 'workspaceStatus' }))).toMatchObject({ status: 'ready', branch: 'main', headSha: null, uncommittedCount: 0 });
+  });
   test('输出分流、退出码与耗时；cwd 相对工作目录；超时与取消杀进程树；重复与未知 id 报错', async () => {
     const { session, tr } = await boot();
     expect(await session.call({ id: 'c1', type: 'exec', execId: 'x1', command: ['sh', '-c', 'echo out; echo err 1>&2; exit 3'] })).toEqual({});

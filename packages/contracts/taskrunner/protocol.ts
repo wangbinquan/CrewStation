@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { SubtaskIdSchema, TaskIdSchema } from '../ids';
 import { AgentDriverSchema, AgentPermissionSchema, OutputContractSchema } from '../manifest/tasks';
 import { AgentEventSchema } from './agentEvents';
+import { RunnerWorkspaceStatusSchema } from './workspace';
 
 /** TaskRunner ↔ cs-session 协议版本；不兼容变更递增，双方在 hello 时校验。 */
 export const TASKRUNNER_PROTOCOL_VERSION = 1;
@@ -64,6 +65,7 @@ export const RunnerCommandSchema = z.discriminatedUnion('type', [
   z.object({ ...cmd('listFiles'), path: z.string().default('.') }),
   z.object({ ...cmd('readFile'), path: z.string().min(1) }),
   z.object({ ...cmd('writeFile'), path: z.string().min(1), content: z.string(), expectedVersion: z.string().optional() }),
+  z.object({ ...cmd('workspaceStatus') }),
   z.object({ ...cmd('previewStatus') }),
   z.object({ ...cmd('restartPreview') }),
   z.object({ ...cmd('verifyContract'), subtaskId: SubtaskIdSchema, contract: OutputContractSchema, cwd: z.string().optional() }),
@@ -74,6 +76,7 @@ export const FileEntrySchema = z.object({ name: z.string(), kind: z.enum(['file'
 export const PreviewStateSchema = z.enum(['disabled', 'stopped', 'starting', 'ready', 'crashed']);
 
 export const RunnerResultPayloads = {
+  workspaceStatus: RunnerWorkspaceStatusSchema,
   listFiles: z.object({ path: z.string(), entries: z.array(FileEntrySchema) }),
   /** version 为内容 sha256，写入时用 expectedVersion 做乐观并发。 */
   readFile: z.object({ path: z.string(), content: z.string(), version: z.string(), size: z.number().int().min(0) }),

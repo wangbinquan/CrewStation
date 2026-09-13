@@ -1,7 +1,7 @@
 # RFC-003｜交互、状态与实现设计
 
-> 状态：Draft · 2026-09-13 · 与 [proposal.md](./proposal.md) 同批评审\
-> 所有“新增”均为本 RFC 的待批准方案；源码现状见 [audit.md](./audit.md)。
+> 状态：In Progress · 2026-09-13 · 作者已批准完整实现\
+> “新增”描述本 RFC 的目标；设计时源码基线见 [audit.md](./audit.md)，实现与验收进度见 [plan.md](./plan.md)。
 
 ## 目录
 

@@ -9,7 +9,15 @@
 
 ## 进行中的 RFC
 
-**RFC-003 工作台 UX 重设计处于 Draft，待作者批准具体方案。** RFC-001 与 RFC-002 都已 Done，见 `proposal/rfc/README.md` 的索引表。
+**RFC-003 工作台 UX 重设计处于 In Progress，作者已要求完整实现并提交上库。** RFC-001 与 RFC-002 都已 Done，见 `proposal/rfc/README.md` 的索引表。
+
+## 正在实施：RFC-003（2026-09-13）
+
+设计基线 `1f40fa8` 已获批准。T4 第一批代码与自动测试完成：TaskRunner 只读 `workspaceStatus` 读取实际 HEAD、分支、暂存／未暂存／未跟踪路径、全本地分支未推送与上游关系；Git 错误／浅历史保留 unknown。释放面板先查清单再确认，取消不释放；确认附带会话 ID 防止释放已替换的对象。发布重新做权威检查，Git 失败与分支变化不会继续推送。受控确认面板收进 shared。
+
+本地 `bun run check`：661 pass／1 skip／0 fail（662 tests、98 files、3091 assertions），console build 成功；跳过的是 opt-in 真实 K8s 用例。真实 Git 临时仓库、Runner WebSocket 协议、开发会话用例与工作台释放交互均有自动验证。尚未把此批部署进本机集群，未宣称 UX-AT 真实旅程验收通过。实现证据见 RFC 的 `implementation.md`。
+
+下一步完成 T14 的工作树对实际部署版本比较，再接 T13／T15 原生 CLI 与轮次事件、T3／T5 紧凑开发工作台。其余任务与 UX-AT-01–52 全部保留；下面设计阶段的记录保留为历史证据。
 
 ## 最新设计工作：工作台 UX 重设计（2026-09-13）
 

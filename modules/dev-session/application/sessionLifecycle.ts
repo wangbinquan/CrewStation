@@ -1,6 +1,6 @@
-import type { Actor, BranchDto, DevSessionDto, Manifest, OpenDevSessionRequest, PreviewState, ProjectId, TaskId } from '@crewstation/contracts';
+import type { Actor, BranchDto, DevSessionDto, Manifest, OpenDevSessionRequest, PreviewState, ProjectId, TaskId, WorkspaceStatusDto } from '@crewstation/contracts';
 import { conflict, isPlatformError, notFound, precondition } from '@crewstation/kernel';
-import { unpushedCommits } from '../domain/gitStatus';
+import { inspectWorkspace } from './workspaceStatus';
 import type { DevSessionUseCaseDeps } from './dependencies';
 import type { EnvironmentView } from '../ports/runtime';
 
@@ -71,23 +71,20 @@ export function sessionLifecycleUseCases(deps: DevSessionUseCaseDeps) {
       return scm.listBranches(svc.serviceId, { ...(previewSha ? { previewSha } : {}), ...(prodSha ? { prodSha } : {}) });
     },
     /** 释放前列出未推送提交（AT-33）；负责人可强制释放他人会话（G19）。 */
-    releaseSession: async (actor: Actor, projectId: ProjectId, options: { force?: boolean } = {}): Promise<{ session: DevSessionDto; unpushed: string[] }> => {
+    releaseSession: async (actor: Actor, projectId: ProjectId, options: { force?: boolean; expectedTaskId?: TaskId } = {}): Promise<{ session: DevSessionDto; unpushed: string[] | null; workspace: WorkspaceStatusDto }> => {
       const env = await environments.findDevSession(projectId);
       if (!env) throw notFound('开发会话', projectId);
       const mine = (env as { createdBy?: string }).createdBy === actor.userId;
       await authorizer.authorize(actor, projectId, mine ? 'develop' : 'force-release-session');
+      if (options.expectedTaskId && options.expectedTaskId !== env.id) throw precondition('开发会话已变化，请重新确认释放对象');
       if (!mine && !options.force) throw precondition('释放他人的会话需要 force=true');
-      let unpushed: string[] = [];
-      if (env.connected) {
-        try {
-          const out = (await runner.sendCommand(env.id, { id: `u-${Date.now()}`, type: 'exec', execId: `u-${Date.now()}`, command: ['git', 'log', '--branches', '--not', '--remotes', '--oneline'], timeoutSeconds: 60, env: {}, wait: true })) as { stdout?: string } | null;
-          unpushed = unpushedCommits(out?.stdout ?? '');
-        } catch { unpushed = []; }
-      }
+      const workspace = await inspectWorkspace(deps, env);
+      const unpushed = workspace.status === 'ready' && workspace.unpushed.status === 'ready'
+        ? workspace.unpushed.commits.map((commit) => `${commit.sha} ${commit.subject}`) : null;
       const released = await environments.releaseEnvironment(env.id, mine ? 'user' : 'owner-force');
       const svc = await svcOf(projectId);
-      deps.logger.info('dev session released', { taskId: env.id, by: actor.userId, forced: !mine, unpushed: unpushed.length, at: clock.now().toISOString() });
-      return { session: await toDto(released, svc.slug, 'stopped'), unpushed };
+      deps.logger.info('dev session released', { taskId: env.id, by: actor.userId, forced: !mine, unpushed: unpushed?.length ?? 'unknown', at: clock.now().toISOString() });
+      return { session: await toDto(released, svc.slug, 'stopped'), unpushed, workspace };
     },
     touch: (taskId: TaskId) => environments.touch(taskId),
   };

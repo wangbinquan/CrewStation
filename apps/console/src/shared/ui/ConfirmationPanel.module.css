@@ -1,0 +1,12 @@
+.confirm {
+  min-width: 0;
+  max-width: 100%;
+  padding: var(--cs-space-3);
+  border: 1px solid var(--cs-color-border);
+  border-radius: var(--cs-radius-md);
+  background: var(--cs-color-surface-muted);
+  overflow-wrap: anywhere;
+}
+.question { font-weight: 600; }
+.hint { margin-top: var(--cs-space-1); color: var(--cs-color-text-muted); }
+.actions { display: flex; flex-wrap: wrap; gap: var(--cs-space-2); margin-top: var(--cs-space-3); }

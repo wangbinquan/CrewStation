@@ -5,6 +5,7 @@ import type { ExecSupervisor } from './exec/execSupervisor';
 import type { FileCommands } from './files/fileCommands';
 import type { PreviewSupervisor } from './preview/previewSupervisor';
 import type { TerminalSupervisor } from './terminal/terminalSupervisor';
+import type { RunnerWorkspaceStatus } from '@crewstation/contracts';
 
 export interface CommandTargets {
   agents: AgentSupervisor;
@@ -13,6 +14,7 @@ export interface CommandTargets {
   files: FileCommands;
   preview: PreviewSupervisor;
   verifyContract: ContractVerifier;
+  workspaceStatus: () => Promise<RunnerWorkspaceStatus>;
   /** 先回 ack，再异步进入排空；由 runner 实现。 */
   requestShutdown: (graceSeconds: number) => void;
 }
@@ -34,6 +36,7 @@ export function buildCommandHandlers(targets: CommandTargets): CommandHandlers {
     listFiles: (c) => targets.files.list(c),
     readFile: (c) => targets.files.read(c),
     writeFile: (c) => targets.files.write(c),
+    workspaceStatus: () => targets.workspaceStatus(),
     previewStatus: async () => targets.preview.status(),
     restartPreview: () => targets.preview.restart().then(ack),
     verifyContract: (c) => targets.verifyContract(c),

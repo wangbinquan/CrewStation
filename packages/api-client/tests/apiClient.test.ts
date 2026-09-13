@@ -42,6 +42,14 @@ async function caught(call: () => Promise<unknown>): Promise<ApiClientError> {
 }
 
 describe('createApiClient：请求形状', () => {
+  test('工作树预检是独立 GET，释放携带用户确认的会话 ID', async () => {
+    const { calls, fetchImpl } = fakeFetch(() => json(200, {}));
+    const client = createApiClient({ fetch: fetchImpl });
+    await client.devSession.workspaceStatus('prj_1');
+    await client.devSession.release('prj_1', { expectedTaskId: 'tsk_1' });
+    expect(calls[0]).toMatchObject({ url: '/v1/projects/prj_1/dev-session/workspace-status', method: 'GET' });
+    expect(calls[1]).toMatchObject({ url: '/v1/projects/prj_1/dev-session?expectedTaskId=tsk_1', method: 'DELETE' });
+  });
   test('GET /v1/me 同源、带 Cookie、accept json', async () => {
     const me = { id: `usr_${'0'.repeat(32)}`, name: 'a', email: 'a@x', isAdmin: false, memberships: [], demoIdentity: true };
     const { calls, fetchImpl } = fakeFetch(() => json(200, me));
