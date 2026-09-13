@@ -35,6 +35,7 @@ export function runnerHub(deps: SessionUseCaseDeps) {
   };
 
   const onMessage = async (connection: RunnerConnection, raw: unknown): Promise<void> => {
+    if (connections.get(connection.hello.taskId) !== connection) return;
     const parsed = RunnerMessageSchema.safeParse(raw);
     if (!parsed.success) { logger.warn('invalid runner frame', { taskId: connection.hello.taskId }); return; }
     const message: RunnerMessage = parsed.data;

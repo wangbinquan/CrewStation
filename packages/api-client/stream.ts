@@ -29,6 +29,9 @@ export interface TaskStreamReadyFrame {
   readonly connected: boolean;
   /** 本次连接回放的持久事件数。 */
   readonly replayed: number;
+  /** false 时本次只回放一页，客户端必须续接且不得发送命令；旧服务未提供时按完整处理。 */
+  readonly replayComplete?: boolean;
+  readonly resumeFromSeq?: number;
 }
 
 export interface TaskStreamResultFrame {
@@ -70,9 +73,12 @@ export function parseTaskStreamFrame(raw: unknown): TaskStreamFrame | undefined 
   const frame = value as Record<string, unknown>;
   switch (frame.type) {
     case 'event':
-      return typeof frame.seq === 'number' && typeof frame.event === 'object' && frame.event !== null ? (frame as unknown as TaskStreamEventFrame) : undefined;
+      return Number.isSafeInteger(frame.seq) && Number(frame.seq) > 0 && typeof frame.event === 'object' && frame.event !== null ? (frame as unknown as TaskStreamEventFrame) : undefined;
     case 'streamReady':
-      return frame as unknown as TaskStreamReadyFrame;
+      return typeof frame.connected === 'boolean' && Number.isSafeInteger(frame.replayed) && Number(frame.replayed) >= 0
+        && (frame.replayComplete === undefined || typeof frame.replayComplete === 'boolean')
+        && (frame.replayComplete !== false || (Number.isSafeInteger(frame.resumeFromSeq) && Number(frame.resumeFromSeq) >= 0))
+        ? frame as unknown as TaskStreamReadyFrame : undefined;
     case 'runnerReconnected':
     case 'runnerDisconnected':
       return frame as unknown as TaskStreamConnectionFrame;

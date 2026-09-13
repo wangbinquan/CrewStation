@@ -1,7 +1,7 @@
 import { parseTaskStreamFrame } from '@crewstation/api-client';
 import type { TaskStreamCommandInput, TaskStreamFrame } from '@crewstation/api-client';
 import type { RunnerEvent } from '@crewstation/contracts';
-import { StreamCommandError, StreamCommandQueue } from './streamCommandQueue';
+import { COMMAND_TIMEOUT_MS, StreamCommandError, StreamCommandQueue } from './streamCommandQueue';
 
 export type StreamStatus = 'connecting' | 'open' | 'reconnecting' | 'closed';
 
@@ -53,7 +53,7 @@ export class TaskStreamSocket {
   private state: StreamState = INITIAL_STREAM_STATE;
 
   /** endpoint 每次连接时按最后 seq 重新求值，因此重连自带续传。 */
-  constructor(private readonly endpoint: (sinceSeq: number) => string) {}
+  constructor(private readonly endpoint: (sinceSeq: number) => string, private readonly commandTimeoutMs = COMMAND_TIMEOUT_MS) {}
 
   readonly getState = (): StreamState => this.state;
 
@@ -75,11 +75,11 @@ export class TaskStreamSocket {
   readonly send = (input: TaskStreamCommandInput): Promise<unknown> => {
     if (this.stopped) return Promise.reject(new StreamCommandError('closed', '连接已关闭'));
     const id = this.queue.nextId();
-    const promise = this.queue.register(id);
+    const promise = this.queue.register(id, this.commandTimeoutMs);
     const socket = this.socket;
-    if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ ...input, id }));
+    if (socket?.readyState === WebSocket.OPEN && this.state.status === 'open') socket.send(JSON.stringify({ ...input, id }));
     else this.outbox.push({ id, input });
-    return promise;
+    return promise.finally(() => { this.outbox = this.outbox.filter((entry) => entry.id !== id); });
   };
 
   start(): void {
@@ -96,22 +96,21 @@ export class TaskStreamSocket {
     const socket = this.socket;
     this.socket = undefined;
     socket?.close();
-    this.patch({ status: 'closed' });
+    this.patch({ status: 'closed', runnerConnected: false });
   }
 
   private open(): void {
     const socket = new WebSocket(this.endpoint(this.state.lastSeq));
     this.socket = socket;
-    socket.onopen = () => this.drain(socket);
-    socket.onmessage = (message: MessageEvent<unknown>) => this.receive(message.data);
-    socket.onerror = () => this.patch({ error: '连接出错' });
+    socket.onmessage = (message: MessageEvent<unknown>) => { if (this.socket === socket && !this.stopped) this.receive(message.data); };
+    socket.onerror = () => { if (this.socket === socket && !this.stopped) this.patch({ error: '连接出错' }); };
     socket.onclose = () => this.handleClose(socket);
   }
 
   private drain(socket: WebSocket): void {
     const queued = this.outbox;
     this.outbox = [];
-    for (const entry of queued) socket.send(JSON.stringify({ ...entry.input, id: entry.id }));
+    for (const entry of queued) if (this.queue.has(entry.id)) socket.send(JSON.stringify({ ...entry.input, id: entry.id }));
     this.patch({ status: 'open', attempt: 0, error: undefined });
   }
 
@@ -136,9 +135,23 @@ export class TaskStreamSocket {
     this.dispatch(frame);
   }
 
+  /** 分页仅续接读取，没有命令发出；保留尚未送出的查询，不重放已经发出的输入。 */
+  private continueReplay(resumeFromSeq: number, replayed: number): void {
+    const previous = this.socket;
+    this.socket = undefined;
+    previous?.close();
+    this.patch({ status: 'reconnecting', runnerConnected: false, lastSeq: Math.max(this.state.lastSeq, resumeFromSeq), replayed, error: '正在补齐历史事件' });
+    this.retryTimer = setTimeout(() => {
+      if (this.stopped) return;
+      this.patch({ status: 'connecting' });
+      this.open();
+    }, 20);
+  }
+
   private dispatch(frame: TaskStreamFrame): void {
     switch (frame.type) {
       case 'event':
+        if (frame.seq <= this.state.lastSeq) return;
         // runnerState 是整条流的状态而不是某个面板的事件，顺手记进快照，各处不必各订一份。
         this.patch({
           lastSeq: Math.max(this.state.lastSeq, frame.seq),
@@ -147,7 +160,9 @@ export class TaskStreamSocket {
         for (const listener of this.eventListeners) listener(frame.event, frame.seq);
         return;
       case 'streamReady':
+        if (frame.replayComplete === false) { this.continueReplay(frame.resumeFromSeq!, frame.replayed); return; }
         this.patch({ runnerConnected: frame.connected, replayed: frame.replayed, generation: this.state.generation + (frame.connected ? 1 : 0) });
+        if (this.socket) this.drain(this.socket);
         return;
       case 'runnerReconnected':
         this.patch({ runnerConnected: true, runnerState: undefined, generation: this.state.generation + 1 });

@@ -2,7 +2,7 @@ import type { Actor, RunnerCommand, TaskId } from '@crewstation/contracts';
 import { RunnerCommandSchema } from '@crewstation/contracts';
 import { forbidden, isPlatformError } from '@crewstation/kernel';
 import type { EventSink } from '../domain/runnerConnection';
-import { RunnerConnection } from '../domain/runnerConnection';
+import { openBrowserReplay } from './browserReplay';
 import type { commandDispatch } from './commandDispatch';
 import type { SessionUseCaseDeps } from './dependencies';
 import type { RunnerHub } from './runnerHub';
@@ -19,18 +19,15 @@ export function browserStreams(deps: SessionUseCaseDeps, hub: RunnerHub, dispatc
   return {
     open: async (actor: Actor, taskId: TaskId, sink: EventSink, sinceSeq: number): Promise<BrowserStream> => {
       if (!(await deps.taskAccess.canOpenStream(actor, taskId))) throw forbidden('无权访问该任务的会话流');
-      const replay = await deps.events.listSince(taskId, sinceSeq, { limit: deps.settings.replayLimit });
-      for (const stored of replay) sink.send(RunnerConnection.frameOf(stored.seq, stored.at.toISOString(), stored.event));
-      const connection = hub.connections.get(taskId);
-      const unsubscribe = hub.subscribe(taskId, sink);
+      const { complete, unsubscribe } = await openBrowserReplay(deps, hub, taskId, sink, sinceSeq);
       const viewId = crypto.randomUUID();
       const controlled = new Set<string>();
-      sink.send(JSON.stringify({ type: 'streamReady', connected: Boolean(connection), replayed: replay.length }));
       return {
         onMessage: async (raw) => {
           const parsed = RunnerCommandSchema.safeParse(raw);
           if (!parsed.success) { sink.send(JSON.stringify({ type: 'error', id: (raw as { id?: string })?.id ?? '', code: 'validation', message: '命令帧不合法' })); return; }
           const command: RunnerCommand = parsed.data;
+          if (!complete) { sink.send(JSON.stringify({ type: 'error', id: command.id, code: 'replay_pending', message: '历史事件尚未补齐，请等待连接就绪' })); return; }
           try {
             const scoped = terminalViewCommand(command, viewId);
             if (scoped.type === 'claimTerminalControl') controlled.add(scoped.terminalId);

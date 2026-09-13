@@ -31,6 +31,8 @@ export class StreamCommandQueue {
     return `c${this.counter}-${Math.random().toString(36).slice(2, 8)}`;
   }
 
+  has(id: string): boolean { return this.pending.has(id); }
+
   /** 登记一条待回执命令；超时后自动失败并从表中移除。 */
   register(id: string, timeoutMs: number = COMMAND_TIMEOUT_MS): Promise<unknown> {
     return new Promise<unknown>((resolve, reject) => {

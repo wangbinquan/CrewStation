@@ -2,6 +2,7 @@ import type { ServerWebSocket } from 'bun';
 import type { TaskId, UserId } from '@crewstation/contracts';
 import type { AppEnv } from '@crewstation/http';
 import { requireUser } from '@crewstation/http';
+import { isPlatformError } from '@crewstation/kernel';
 import { Hono } from 'hono';
 import type { UpgradeWebSocket } from 'hono/ws';
 import type { BrowserStream, browserStreams } from '../application/browserStreams';
@@ -25,10 +26,11 @@ export function browserSocketRoutes(streams: ReturnType<typeof browserStreams>, 
         const socket = ws as unknown as ServerWebSocket;
         chain = chain.then(async () => {
           const actor = { userId: user.userId as UserId, isAdmin: await isAdmin(user.userId as UserId) };
-          stream = await streams.open(actor, taskId, { send: (frame) => socket.send(frame) }, Number.isFinite(sinceSeq) ? sinceSeq : 0);
+          stream = await streams.open(actor, taskId, { send: (frame) => socket.send(frame) }, Number.isSafeInteger(sinceSeq) && sinceSeq >= 0 ? sinceSeq : 0);
         }).catch((error: unknown) => {
-          socket.send(JSON.stringify({ type: 'error', id: 'open', code: 'forbidden', message: error instanceof Error ? error.message : String(error) }));
-          socket.close(1008, 'forbidden');
+          const denied = isPlatformError(error) && error.kind === 'forbidden';
+          socket.send(JSON.stringify({ type: 'error', id: 'open', code: denied ? 'forbidden' : 'unavailable', message: denied ? error.message : '会话历史暂时无法读取，正在重新连接' }));
+          socket.close(denied ? 1008 : 1013, denied ? 'forbidden' : 'replay unavailable');
         });
       },
       onMessage: (evt) => {

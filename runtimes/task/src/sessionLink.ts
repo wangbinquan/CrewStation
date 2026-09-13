@@ -37,7 +37,7 @@ export function createSessionLink(options: SessionLinkOptions): SessionLink {
 }
 
 class WebSocketSessionLink implements SessionLink {
-  private readonly buffer: ReplayBuffer<string>;
+  private buffer: ReplayBuffer<string>;
   private readonly pendingReplies: string[] = [];
   private readonly client: ReconnectingWebSocketClient;
   private readonly watchdog: IdleWatchdog;
@@ -46,6 +46,7 @@ class WebSocketSessionLink implements SessionLink {
   private resolveReady: (() => void) | undefined;
   private seq = 0;
   private welcomedValue = false;
+  private hasWelcomed = false;
 
   constructor(private readonly options: SessionLinkOptions) {
     this.logger = options.logger;
@@ -144,6 +145,10 @@ class WebSocketSessionLink implements SessionLink {
   }
 
   private onWelcome(resumeFromSeq: number): void {
+    if (!this.hasWelcomed) {
+      this.hasWelcomed = true;
+      this.rebaseInitialEvents(resumeFromSeq);
+    }
     this.welcomedValue = true;
     if (!this.buffer.canReplayFrom(resumeFromSeq)) {
       this.logger.warn('replay gap: events before the buffer start were evicted', { resumeFromSeq, firstBuffered: this.buffer.firstSeq });
@@ -155,6 +160,19 @@ class WebSocketSessionLink implements SessionLink {
     if (this.options.idleTimeoutMs > 0) this.watchdog.start();
     this.resolveReady?.();
     this.resolveReady = undefined;
+  }
+
+  /** 新进程的 seq 从 0 开始；首次握手前还未发送的帧必须接到服务端已有历史之后。 */
+  private rebaseInitialEvents(resumeFromSeq: number): void {
+    if (resumeFromSeq === 0) return;
+    const initial = this.buffer.since(0);
+    this.buffer = new ReplayBuffer<string>(this.options.replayCapacity);
+    for (const entry of initial) {
+      const frame = JSON.parse(entry.item) as { seq: number };
+      frame.seq = entry.seq + resumeFromSeq;
+      this.buffer.push(frame.seq, encodeFrame(frame));
+    }
+    this.seq += resumeFromSeq;
   }
 
   private rejectFrame(raw: RawFrame, reason: string): void {

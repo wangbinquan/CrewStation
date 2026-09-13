@@ -125,3 +125,14 @@
 隔离浏览器排版验收：用实际 React／路由／样式与 `/private/tmp/crewstation-market-visual.mjs` 的内存夹具在 `127.0.0.1:8768` 实点；不访问共享集群。1280×720 六张应用卡片完整可见；390px 市场、390／320px 设置的 document scrollWidth 与 clientWidth 相等。指定名单空提交提示、精确查找、添加与保存第 1 版反馈已实点确认，浏览器无 error 日志。修正暂停应用同时显示“已上线”的误导，保留正式版本记录并隐藏打开入口。**这些只验证界面和排版，不能替代真实登录角色、prod 地址与配置持久化的集群旅程**；该旅程仍受已报告的服务更新授权阻塞。
 
 最终本地门禁 `bun run check`：**740 pass／2 skip／0 fail**，742 tests、120 files、3491 assertions、63.21s；console build 628ms。首轮唯一失败是 RFC-002 的旧“我的项目”文案结构断言，已更新为 RFC-003 的两个全局入口；实际空间守卫与完整路由旅程继续通过。两项跳过仍是 opt-in K8s 和 Linux 专用 Ctrl+C。隔离视觉服务及临时页签已关闭，默认视口已恢复。本批尚未构建／部署到共享集群；不能与上一批 `rfc003-layout` 镜像混称已发布运行。
+
+
+发布记录：`6b2325dedb0b202811e43039c2fdbd2e2d8b2807` 已同步 main；[精确 SHA CI](https://github.com/wangbinquan/CrewStation/actions/runs/34737114376) 成功。
+
+## 第七批：T15 状态来源实测与会话续传
+
+修复历史回放与实时订阅之间的丢帧窗口，分页续接不再跳过未读取的历史；暂存溢出、读取失败均有明确恢复路径。浏览器命令等待完整握手，过期未发命令不会晚到执行；旧连接和重复帧不污染当前状态。新 Runner 启动时衔接原有事件序号，同一进程重连保持原序号。详见 [原生轮次事件实测记录](native-activity-evidence.md)。
+
+真实 Claude 2.1.268 在无外网的一次性容器中接受脚本化模型响应，已验证正常、Stop 要求继续、直接取消、继续后取消。观察到 Stop 和 interaction end 各自不足以判定正常完成；HTTP Stop 的 block 计数还与实际继续行为不一致。没有把上述不可靠信号接成完成通知。OpenCode 观察插件初始化仍在排查，领域投影、个人已读与后台动态待继续，T15 不算完成。
+
+本批最终 `bun run check`：**750 pass／2 skip／0 fail**，752 tests、123 files、3525 assertions、60.05s；console build 621ms。定向回归覆盖历史读取中真实事件到达、重复／临时帧排序、分页、缓冲溢出、失败释放订阅、迟到旧连接、握手前命令与过期命令，以及真实 WS 的新 Runner／同进程重连序号。跳过项仍为 opt-in K8s 与 Linux 专用 Ctrl+C；本批未更新共享集群。
