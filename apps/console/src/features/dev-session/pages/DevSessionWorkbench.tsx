@@ -1,6 +1,7 @@
 import type { ReleaseDevSessionResult } from '@crewstation/api-client';
 import type { DevSessionDto } from '@crewstation/contracts';
 import type { UseMutationResult } from '@tanstack/react-query';
+import { useState } from 'react';
 import type { ReactElement } from 'react';
 import { Link } from '@tanstack/react-router';
 import type { ApiClientError } from '../../../shared/api/useApi';
@@ -25,6 +26,7 @@ import { useTaskStream } from '../hooks/useTaskStream';
 import { useWorkspaceTree } from '../hooks/useWorkspaceTree';
 import type { SessionAccess } from '../model/sessionAccess';
 import type { ActivityTarget } from '../../../shared/activity/agentActivityView';
+import { productionAccessModes } from '../model/dataAccessForm';
 import styles from './DevSessionWorkbench.module.css';
 
 export interface DevSessionWorkbenchProps {
@@ -52,13 +54,18 @@ export function DevSessionWorkbench({ projectId, session, access, canDevelop, se
   const editor = useFileEditor(channel);
   const preview = usePreviewStatus(channel, state.generation, state.runnerConnected);
   const publish = usePublishForm(projectId);
-  const data = useDataBindings(projectId, taskId, serviceId);
+  const data = useDataBindings(projectId, taskId, serviceId, { canDevelop, canManage: access.isOwner });
+  const [dataDirty, setDataDirty] = useState(false);
+  const draftScope = [editor.dirty ? t('devSession.editor.draftScope', { path: editor.file?.path ?? '' }) : '', dataDirty ? t('devSession.data.title') : ''].filter(Boolean).join(' / ');
+  const productionModes = productionAccessModes(data.bindings, data.checkedAt);
+  const pendingBindings = data.bindings.filter((binding) => binding.state === 'requested').length;
+  const accessSummary = data.loadError ? t('devSession.data.unconfirmed') : [productionModes.length ? t('devSession.data.grantedSummary', { modes: productionModes.map((mode) => t(`devSession.data.mode.${mode}`)).join(' / ') }) : '', pendingBindings ? t('devSession.data.pendingCount', { count: pendingBindings }) : ''].filter(Boolean).join(' · ');
   return (
     <>
-      <UnsavedChangesGuard dirty={editor.dirty} scope={t('devSession.editor.draftScope', { path: editor.file?.path ?? '' })} allowNavigate={(current, next) => current.pathname === next.pathname && !('view' in next.search && next.search.view === 'conversation')} />
+      <UnsavedChangesGuard dirty={editor.dirty || dataDirty} scope={draftScope} allowNavigate={(current, next) => current.pathname === next.pathname && !('view' in next.search && next.search.view === 'conversation')} />
       <header className={styles.context}><strong>{t('devSession.title')}</strong><StreamStatus state={state} />
-        <details className={styles.disclosure}><summary>{t('devSession.data.title')}{data.bindings.some((binding) => binding.mode !== 'development' && ['active', 'approved'].includes(binding.state)) ? ` · ${t('devSession.native.productionAccess')}` : ''}</summary><div><DataBindingPane data={data} /></div></details>
-        <details className={styles.disclosure}><summary>{t('devSession.native.sessionMenu')}</summary><div><SessionCard session={session} stream={state} access={access} release={release} unsavedFile={editor.dirty ? editor.file?.path : undefined} editorBusy={editor.busy} /><Link to={PROJECT_PATHS[space].conversations} params={{ projectId }}>{t('devSession.native.history')}</Link></div></details>
+        <details className={styles.disclosure}><summary>{t('devSession.data.title')}{accessSummary ? ` · ${accessSummary}` : ''}{dataDirty ? ` · ${t('devSession.editor.dirty')}` : ''}</summary><div><DataBindingPane data={data} onDirtyChange={setDataDirty} /></div></details>
+        <details className={styles.disclosure}><summary>{t('devSession.native.sessionMenu')}</summary><div><SessionCard session={session} stream={state} access={access} release={release} unsavedFile={editor.dirty ? editor.file?.path : undefined} editorBusy={editor.busy} dataAccessDirty={dataDirty} dataAccessBusy={data.busy} /><Link to={PROJECT_PATHS[space].conversations} params={{ projectId }}>{t('devSession.native.history')}</Link></div></details>
         <details className={styles.disclosure}><summary>{t('devSession.native.prepareRelease')}</summary><div><PublishPane publish={publish} /></div></details>
       </header>
       <VersionComparisonPanel projectId={projectId} taskId={taskId} channel={channel} canDevelop={canDevelop} compact />

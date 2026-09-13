@@ -34,6 +34,8 @@ export const TaskDataBindingDtoSchema = z.object({
   taskId: TaskIdSchema,
   mode: TaskDataModeSchema,
   state: TaskDataBindingStateSchema,
+  /** 申请时保存的期限；旧服务未返回时界面保留未知，不冒充默认时长。 */
+  ttlMinutes: z.number().int().min(5).max(1440).optional(),
   reason: z.string().optional(),
   decision: z.string().optional(),
   requestedBy: UserIdSchema,

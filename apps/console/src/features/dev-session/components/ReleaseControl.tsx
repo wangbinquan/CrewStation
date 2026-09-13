@@ -21,13 +21,15 @@ export interface ReleaseControlProps {
   readonly release: UseMutationResult<ReleaseDevSessionResult, ApiClientError, boolean>;
   readonly unsavedFile?: string;
   readonly editorBusy?: boolean;
+  readonly dataAccessDirty?: boolean;
+  readonly dataAccessBusy?: boolean;
 }
 
 /**
  * 释放会话：先就地确认，负责人释放他人会话要额外说明这会带 force。
  * 释放结果（未推送的提交）由页面渲染：会话没了之后本组件已经不在树上。
  */
-export function ReleaseControl({ projectId, taskId, access, release, unsavedFile, editorBusy = false }: ReleaseControlProps): ReactElement | null {
+export function ReleaseControl({ projectId, taskId, access, release, unsavedFile, editorBusy = false, dataAccessDirty, dataAccessBusy = false }: ReleaseControlProps): ReactElement | null {
   const t = useT();
   const [asking, setAsking] = useState(false);
   const inspection = useApiMutation(() => api.devSession.workspaceStatus(projectId));
@@ -41,9 +43,9 @@ export function ReleaseControl({ projectId, taskId, access, release, unsavedFile
         confirmLabel={t('devSession.release.submit')}
         cancelLabel={t('devSession.release.cancel')}
         busy={release.isPending}
-        confirmDisabled={editorBusy || inspection.isPending || (inspection.data !== undefined && inspection.data.taskId !== taskId)}
+        confirmDisabled={editorBusy || dataAccessBusy || inspection.isPending || (inspection.data !== undefined && inspection.data.taskId !== taskId)}
         onConfirm={() => {
-          if (editorBusy || inspection.isPending || release.isPending || (inspection.data !== undefined && inspection.data.taskId !== taskId)) return;
+          if (editorBusy || dataAccessBusy || inspection.isPending || release.isPending || (inspection.data !== undefined && inspection.data.taskId !== taskId)) return;
           setAsking(false);
           release.mutate(access.needsForce);
         }}
@@ -51,6 +53,8 @@ export function ReleaseControl({ projectId, taskId, access, release, unsavedFile
       >
         {unsavedFile ? <PaneNotice tone="warning">{t('devSession.release.editorDraft', { path: unsavedFile })}</PaneNotice> : null}
         {editorBusy ? <PaneNotice tone="info">{t('devSession.release.editorBusy')}</PaneNotice> : null}
+        {dataAccessDirty ? <PaneNotice tone="warning">{t('devSession.release.dataDraft')}</PaneNotice> : null}
+        {dataAccessBusy ? <PaneNotice tone="info">{t('devSession.release.dataBusy')}</PaneNotice> : null}
         <QueryStatus isPending={inspection.isPending} error={inspection.error} loadingKey="devSession.workspace.checking" />
         {inspection.error ? <PaneNotice tone="warning">{t('devSession.release.unknown')}</PaneNotice> : null}
         {inspection.data ? <WorkspaceInspection workspace={inspection.data} /> : null}

@@ -69,10 +69,12 @@ describe.skipIf(!available)('data module', () => {
 
     const ro = await data.api.requestTaskBinding(dev, { taskId, serviceId }, { mode: 'diagnostic-readonly', reason: '看日志表', ttlMinutes: 30 });
     expect(ro.state).toBe('requested');
+    expect(ro.ttlMinutes).toBe(30);
     expect(await data.api.listProjectBindings(owner, projectId, ['requested'])).toHaveLength(1);
     await expect(data.api.decideTaskBinding(dev, ro.id, { approve: true })).rejects.toThrow('forbidden');
     const approved = await data.api.decideTaskBinding(owner, ro.id, { approve: true, decision: '同意 30 分钟' });
     expect(approved.state).toBe('active');
+    expect(approved.ttlMinutes).toBe(30);
     const env = await data.api.envForTask(taskId);
     expect(await canQuery(env.CS_PROD_READONLY_DATABASE_URL!, 'SELECT count(*) FROM t')).toBe(true);
     expect(await canQuery(env.CS_PROD_READONLY_DATABASE_URL!, 'INSERT INTO t VALUES (1)')).toBe(false);

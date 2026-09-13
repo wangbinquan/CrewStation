@@ -62,3 +62,15 @@ test('代码视图隐藏后返回仍确认草稿，取消后恢复原内容；�
   await page.back(); await page.click('放弃输入并离开'); expect(page.path()).toBe(`/projects/${activityProjectId}/settings`);
   expect(fixture.commands.some((command) => ['writeFile', 'closeTerminal', 'stopAgent'].includes(command.type))).toBe(false);
 });
+
+test('收起数据访问仍保护申请输入，与编辑器草稿合并一次确认；释放前也明确提示', async () => {
+  fixture = editorWorkspaceFixture(); page = await renderApp(path);
+  const reason = [...document.querySelectorAll('label')].find((node) => node.textContent?.startsWith('申请理由'))!.querySelector('textarea')!;
+  await act(async () => { reason.focus(); Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!.call(reason, '排错草稿'); reason.dispatchEvent(new Event('input', { bubbles: true })); reason.dispatchEvent(new KeyboardEvent('keyup', { key: 'a', bubbles: true })); });
+  await page.settle(); expect(page.text()).toContain('数据访问 · 未保存');
+  await page.click('代码'); await page.click('a.ts'); await edit('代码草稿');
+  await page.requestNavigate(`/projects/${activityProjectId}/release`); expect(document.querySelectorAll('[role="alertdialog"]')).toHaveLength(1); expect(page.text()).toContain('编辑器「a.ts」 / 数据访问有未保存的输入');
+  await page.click('继续编辑'); expect(reason.value).toBe('排错草稿'); expect(content().textContent).toBe('代码草稿');
+  await page.click('释放会话'); expect(page.text()).toContain('数据访问有未提交的申请或审批输入'); await page.click('取消');
+  expect(fixture.writes.some((write) => write.method === 'DELETE')).toBe(false);
+});

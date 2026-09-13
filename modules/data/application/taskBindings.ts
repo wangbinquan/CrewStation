@@ -82,7 +82,7 @@ export function taskBindingUseCases(deps: DataUseCaseDeps) {
 
 export function toBindingDto(b: TaskDataBinding): TaskDataBindingDto {
   return {
-    id: b.id, taskId: b.taskId, mode: b.mode, state: b.state, ...(b.reason ? { reason: b.reason } : {}), ...(b.decision ? { decision: b.decision } : {}),
+    id: b.id, taskId: b.taskId, mode: b.mode, state: b.state, ttlMinutes: b.ttlMinutes, ...(b.reason ? { reason: b.reason } : {}), ...(b.decision ? { decision: b.decision } : {}),
     requestedBy: b.requestedBy, ...(b.decidedBy ? { decidedBy: b.decidedBy } : {}), ...(b.expiresAt ? { expiresAt: b.expiresAt.toISOString() } : {}), createdAt: b.createdAt.toISOString(),
   };
 }
