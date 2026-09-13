@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'bun:test';
+import { describe, expect, setSystemTime, test } from 'bun:test';
 import { createTestDatabase, testDatabaseAvailable } from '@crewstation/testkit';
 import { claimJobs, completeJob, enqueueJob, failJob, getJobState, queueMigrations } from './jobs';
 import { createWorker } from './worker';
@@ -42,5 +42,19 @@ describe.skipIf(!available)('PostgreSQL 表队列', () => {
     } finally {
       await tdb.drop();
     }
+  });
+
+  test('立即任务用数据库时间，不因调用进程时钟超前而被当成延时任务', async () => {
+    const tdb = await createTestDatabase([queueMigrations]);
+    try {
+      const future = new Date(Date.now() + 60_000);
+      try {
+        setSystemTime(future);
+        await enqueueJob(tdb.db, 'clock', { immediate: true });
+        await enqueueJob(tdb.db, 'clock', { immediate: false }, { runAt: future });
+      } finally { setSystemTime(); }
+      const claimed = await claimJobs(tdb.db, ['clock'], 'clock-test', 30, 5);
+      expect(claimed.map((job) => job.payload)).toEqual([{ immediate: true }]);
+    } finally { await tdb.drop(); }
   });
 });
