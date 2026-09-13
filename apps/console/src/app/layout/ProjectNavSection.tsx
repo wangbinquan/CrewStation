@@ -55,6 +55,7 @@ export function ProjectNavSection({ projectId }: { readonly projectId: string })
             </Link>
           </li>
         ))}
+        <li><Link to="/projects/$projectId/settings" params={{ projectId }} search={{ tab: 'visibility' }} className={styles.link} activeProps={{ className: styles.linkActive }}>{t('nav.settings')}</Link></li>
       </ul>
     </div>
   );

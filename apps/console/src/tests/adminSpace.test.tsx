@@ -51,7 +51,7 @@ describe('管理空间与租户空间分离（RFC-002）', () => {
     app = await renderApp('/');
     expect(app.text()).not.toContain('进入平台管理');
     expect(app.html()).not.toContain('href="/admin');
-    expect(app.text()).toContain('我的项目');
+    expect(app.text()).toContain('能力市场');
   });
 
   test('普通成员访问 /admin/users：拒绝页而不是 404，且有回工作台的链接', async () => {
@@ -93,7 +93,7 @@ describe('管理空间与租户空间分离（RFC-002）', () => {
       expect(app.text()).toContain(label);
     }
     // 管理空间的左栏里没有租户入口。
-    expect(app.text()).not.toContain('我的项目');
+    expect(app.text()).not.toContain('能力市场');
   });
 
   test('空间往返保持项目上下文', async () => {
@@ -108,7 +108,7 @@ describe('管理空间与租户空间分离（RFC-002）', () => {
 
   test('租户项目列表只要数字人；管理空间的接入容器页要另外两类', async () => {
     asAdmin();
-    app = await renderApp('/');
+    app = await renderApp('/projects');
     expect(requests.some((url) => url.includes('/v1/projects?kind=DigitalWorker'))).toBe(true);
     expect(requests.some((url) => url.includes('APIProxy'))).toBe(false);
     app.unmount();

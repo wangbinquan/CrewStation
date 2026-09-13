@@ -3,6 +3,7 @@ import type { Database, Executor } from '@crewstation/persistence';
 import type { RepositoryScope, UnitOfWork } from '../../ports/unitOfWork';
 import { drizzleCatalogRepository, drizzleQuotaRepository } from './drizzleCatalogRepositories';
 import { drizzleMembershipRepository, drizzleProjectRepository, drizzleServiceRepository } from './drizzleProjectRepositories';
+import { drizzleAppListings } from './drizzleAppListings';
 
 export function scopeOver(executor: Executor): RepositoryScope {
   return {
@@ -11,6 +12,7 @@ export function scopeOver(executor: Executor): RepositoryScope {
     memberships: drizzleMembershipRepository(executor),
     quotas: drizzleQuotaRepository(executor),
     catalog: drizzleCatalogRepository(executor),
+    appListings: drizzleAppListings(executor),
     events: { publish: async (topic, payload) => { await publishDomainEvent(executor, topic, payload); } },
   };
 }

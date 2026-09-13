@@ -17,13 +17,16 @@ import { quotaAndPlanUseCases } from './application/manageQuotaAndPlans';
 import { queryProjectUseCases } from './application/queryProjects';
 import { catalogRoutes } from './http/catalogRoutes';
 import { projectRoutes } from './http/projectRoutes';
+import { appListingRoutes } from './http/appListingRoutes';
+import { appVisibilityUseCases } from './application/appVisibility';
+import { marketListingUseCases } from './application/marketListings';
 import type { HostNaming } from './ports/hostNaming';
 import type { ProjectSettings } from './ports/projectSettings';
 import type { TaskUsage } from './ports/taskUsage';
 
 export interface ProjectModuleDeps {
   db: Database;
-  identity: Pick<IdentityModuleApi, 'isAdmin' | 'getUser'>;
+  identity: Pick<IdentityModuleApi, 'isAdmin' | 'getUser' | 'findByEmail'>;
   hosts: HostNaming;
   settings: ProjectSettings;
   /** 并发任务占用数；缺省恒为 0（无任务运行时的单元测试与 CLI）。 */
@@ -46,7 +49,7 @@ export const projectMigrations: MigrationSet = {
 export function createProjectModule(deps: ProjectModuleDeps): ProjectModule {
   const useCaseDeps: ProjectUseCaseDeps = {
     uow: drizzleUnitOfWork(deps.db),
-    users: { isAdmin: (id) => deps.identity.isAdmin(id), getUser: (id) => deps.identity.getUser(id) },
+    users: { isAdmin: (id) => deps.identity.isAdmin(id), getUser: (id) => deps.identity.getUser(id), findByEmail: (email) => deps.identity.findByEmail(email) },
     hosts: deps.hosts,
     settings: deps.settings,
     taskUsage: deps.taskUsage ?? { runningTasks: async () => 0 },
@@ -61,6 +64,8 @@ export function createProjectModule(deps: ProjectModuleDeps): ProjectModule {
     ...queryProjectUseCases(useCaseDeps),
     ...memberUseCases(useCaseDeps),
     ...quotaAndPlanUseCases(useCaseDeps),
+    ...appVisibilityUseCases(useCaseDeps),
+    ...marketListingUseCases(useCaseDeps),
   };
-  return { api, http: [projectRoutes(api), catalogRoutes(api)], migrations: projectMigrations };
+  return { api, http: [projectRoutes(api), catalogRoutes(api), appListingRoutes(api)], migrations: projectMigrations };
 }

@@ -11,13 +11,13 @@ import styles from './TopBar.module.css';
 export function TopBar(): ReactElement {
   const t = useT();
   const { projectId } = useParams({ strict: false });
-  const inAdmin = useLocation().pathname.startsWith('/admin');
+  const path = useLocation().pathname, inAdmin = path.startsWith('/admin'), inProject = path.startsWith('/projects/');
   return (
     <header className={styles.bar}>
       <div className={styles.context}>
         <Link to="/" className={styles.brand}><Brand name={t('app.brand')} /></Link>
         <span className={styles.space}>{t(inAdmin ? 'app.adminSpace' : 'app.workbench')}</span>
-        {!inAdmin && projectId !== undefined ? (
+        {inProject && projectId !== undefined ? (
           <>
             <span className={styles.separator}>/</span>
             <span className={styles.project}>{t('topBar.project', { projectId })}</span>

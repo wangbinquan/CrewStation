@@ -15,7 +15,8 @@
 }
 
 .field input,
-.field select {
+.field select,
+.field textarea {
   width: 100%;
   padding: 6px var(--cs-space-2);
   border: 1px solid var(--cs-color-border);
@@ -27,7 +28,10 @@
 
 /* 禁用的控件要一眼看出不可填，否则用户会以为是输入没生效。 */
 .field input:disabled,
-.field select:disabled {
+.field select:disabled,
+.field textarea:disabled {
   opacity: 0.55;
   cursor: not-allowed;
 }
+.error { color: var(--cs-color-danger); font-size: 12px; }
+.field textarea { resize: vertical; min-height: 72px; }

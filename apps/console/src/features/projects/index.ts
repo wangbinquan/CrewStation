@@ -1,1 +1,1 @@
-export { projectListRoute, projectOverviewRoute } from './routes';
+export { projectListRoute, projectOverviewRoute, appVisibilityRoute } from './routes';

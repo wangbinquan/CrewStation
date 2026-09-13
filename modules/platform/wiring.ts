@@ -249,6 +249,7 @@ function composeAggregates(deps: PlatformModuleDeps, core: ReturnType<typeof com
   });
   const capabilities = createCapabilitiesModule({
     isAdmin: (id) => isAdmin(id),
+    market: { list: project.api.listMarketListings, get: project.api.getMarketListing, slots: (serviceId) => delivery.release.api.getSlots(SYSTEM_ACTOR, serviceId) },
     settings: { userDomain: settings.userDomain, serviceDomain: settings.serviceDomain, mcp: [{ name: 'capabilities', url: settings.mcp.capabilitiesUrl }, { name: 'operations', url: settings.mcp.operationsUrl }], defaultServicePlan: settings.defaultServicePlan },
     sources: {
       resolveServiceOfProject: serviceOfProject, authorize: project.api.authorize, quota: project.api.getQuota, servicePlans: project.api.listServicePlans,

@@ -32,3 +32,4 @@ export * from './api/scm';
 export * from './api/auth';
 export * from './api/egress';
 export * from './api/capabilities';
+export * from './api/market/appListing';

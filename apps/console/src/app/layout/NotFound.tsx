@@ -13,7 +13,7 @@ export function NotFound(): ReactElement {
       <EmptyState
         title={t('notFound.title')}
         description={t('notFound.description')}
-        action={<Link to="/">{t('notFound.backToProjects')}</Link>}
+        action={<Link to="/projects">{t('notFound.backToProjects')}</Link>}
       />
     </AppShell>
   );

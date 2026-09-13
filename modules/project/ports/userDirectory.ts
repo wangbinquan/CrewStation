@@ -4,4 +4,5 @@ import type { UserId } from '@crewstation/contracts';
 export interface UserDirectory {
   isAdmin(userId: UserId): Promise<boolean>;
   getUser(userId: UserId): Promise<{ id: UserId; name: string; email: string } | undefined>;
+  findByEmail(email: string): Promise<{ id: UserId; name: string; email: string } | undefined>;
 }

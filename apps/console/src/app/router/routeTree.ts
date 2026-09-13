@@ -4,13 +4,13 @@ import {
   adminComputeRoute, adminEgressRoute, adminGatewayRoute, adminIntegrationsRoute, adminOverviewRoute,
   adminRoute, adminServicePlansRoute, adminTaskProfilesRoute, adminUsersRoute,
 } from '../../features/admin';
-import { capabilitiesRoute } from '../../features/capabilities';
+import { capabilitiesRoute, marketHomeRoute, marketRoute, marketDetailRoute } from '../../features/capabilities';
 import { catalogRoute } from '../../features/catalog';
 import { configRoute } from '../../features/config';
 import { devSessionRoute, historicalConversationsRoute } from '../../features/dev-session';
 import { eventsRoute } from '../../features/events';
 import { logsRoute } from '../../features/logs';
-import { projectListRoute, projectOverviewRoute } from '../../features/projects';
+import { projectListRoute, projectOverviewRoute, appVisibilityRoute } from '../../features/projects';
 import { releaseRoute } from '../../features/release';
 import { projectRoute } from './projectRoute';
 import { rootRoute } from './rootRoute';
@@ -19,8 +19,12 @@ import { workbenchRoute } from './workbenchRoute';
 export const routeTree = rootRoute.addChildren([
   workbenchRoute.addChildren([
     projectListRoute,
+    marketHomeRoute,
+    marketRoute,
+    marketDetailRoute,
     projectRoute.addChildren([
       projectOverviewRoute,
+      appVisibilityRoute,
       devSessionRoute,
       historicalConversationsRoute,
       releaseRoute,

@@ -1,5 +1,6 @@
 import type { DomainPayload, DomainTopicName } from '@crewstation/contracts';
 import type { CatalogRepository, MembershipRepository, ProjectRepository, QuotaRepository, ServiceRepository } from './repositories';
+import type { AppListingRepository } from './appListings';
 
 export interface DomainEventPublisher {
   publish<T extends DomainTopicName>(topic: T, payload: DomainPayload<T>): Promise<void>;
@@ -12,6 +13,7 @@ export interface RepositoryScope {
   readonly memberships: MembershipRepository;
   readonly quotas: QuotaRepository;
   readonly catalog: CatalogRepository;
+  readonly appListings: AppListingRepository;
   readonly events: DomainEventPublisher;
 }
 

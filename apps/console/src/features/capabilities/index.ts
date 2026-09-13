@@ -1,1 +1,1 @@
-export { capabilitiesRoute } from './routes';
+export { capabilitiesRoute, marketHomeRoute, marketRoute, marketDetailRoute } from './routes';

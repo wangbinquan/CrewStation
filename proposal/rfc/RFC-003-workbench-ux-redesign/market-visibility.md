@@ -1,6 +1,6 @@
 # RFC-003｜能力市场与应用可见性
 
-> Draft · 2026-09-13。作者最新要求：能力接入属于管理员；能力市场显示当前用户有权查看的应用；应用负责人配置可见性。本规格替代此前“租户能力接入”和“不建设应用市场”的范围描述。仅更新设计与交互附件。
+> 已获批准，实施中 · 2026-09-13。作者最新要求：能力接入属于管理员；能力市场显示当前用户有权查看的应用；应用负责人配置可见性。本规格替代此前“租户能力接入”和“不建设应用市场”的范围描述。代码与验收证据见 `implementation.md`，不能把隔离数据的排版验收当作真实集群权限旅程。
 
 ## 1. 入口和职责
 
@@ -44,7 +44,7 @@
 
 以上是源码事实，不是新增市场接口已经实现的证据。
 
-## 5. 接口和代码落位（待实现）
+## 5. 接口和代码落位
 
 应用展示资料及可见范围属于 project L2。建议增加本模块的 application listing／visibility 记录，保存 projectId、description、icon 引用、mode、指定 UserId、revision 与更新时间；不新增独立后端模块，不跨模块 join 表。
 
@@ -55,10 +55,13 @@
 | GET `/v1/projects/:projectId/app-visibility` | 有项目 view 的成员读取当前 mode、指定用户及 revision；非项目市场访客不取得名单 |
 | PUT `/v1/projects/:projectId/app-visibility` | 负责人提交 `{mode, userIds, expectedRevision}`，成功返回保存结果；冲突 409，普通开发者／测试者 403 |
 | GET `/v1/projects/:projectId/app-visibility/check?userId=` | 仅有配置权者检查指定注册用户；返回基于已保存 revision 的 visible 和依据，不扩成普通用户任意查询 |
+| GET／PUT `/v1/projects/:projectId/app-presentation` | GET 供成员读取用途与图标；PUT 由负责人提交 `{description, icon, expectedRevision}`，和可见范围共用 listing revision，冲突不覆盖其他字段 |
 
 展示元数据与可见性查询在 project L2 公开 API 内完成。正式版本和运行摘要由 capabilities L6 调用 project、release 等公开读接口聚合，不能让 project 反向依赖 release；每个状态标记 freshness 和 unknown。列表有界，缓存含当前用户及范围修订；变更范围／成员／登录身份后重新校验，后台旧响应不能覆盖新范围。打开详情和后续请求均再次裁定，不能只靠前端隐藏卡片。
 
 前端由 features/capabilities 承接市场列表／详情，features/projects 承接应用可见性，features/admin 承接能力接入；features/catalog 保留消费者文档／申请／试调和管理员策略各自导出入口，由 app 路由装配，features 不互相内部 import。服务端 API 文档与 MCP 描述继续同源；人员匹配沿 RFC 的 member-candidates 查询实现。
+
+首批实现界限：用途最多 400 字；图标是固定本地矢量引用 `station|assistant|workflow|book|chart|spark`；指定名单最多 200 人；市场每页默认 20、最多 50 项，无隐藏应用总数。游标绑定当前用户和搜索词，SQL 先按范围过滤再搜索；聚合并发最多 4、单个部署来源截止 2.5 秒。正式状态来自部署槽记录，不把它当成即时 Pod 健康探针。精确人员定位支持完整邮箱或 UserId；邮箱非唯一时返回无唯一候选，不随机选人。
 
 ## 6. 验收
 

@@ -22,4 +22,12 @@ describe.skipIf(!available)('identity module', () => {
     expect((await api.findByEmail('BOB@example.com'))?.id).toBe(bob.id);
     expect((await api.listUsers()).length).toBe(3);
   });
+  test('重复邮箱不能被精确查询任意选中；用户 ID 仍然稳定定位', async () => {
+    const { api } = createIdentityModule({ db: tdb.db, settings: { adminEmails: [] } });
+    const first = await api.ensureUser({ externalId: 'duplicate:one', name: 'One', email: 'duplicate@example.com' });
+    await api.ensureUser({ externalId: 'duplicate:two', name: 'Two', email: 'DUPLICATE@example.com' });
+    // 成员候选只返回唯一匹配，不能把同邮箱的另一个身份悄悄选入指定名单。
+    expect(await api.findByEmail('duplicate@example.com')).toBeUndefined();
+    expect(await api.getUser(first.id)).toMatchObject({ name: 'One' });
+  });
 });

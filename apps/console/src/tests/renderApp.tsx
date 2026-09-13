@@ -8,6 +8,7 @@ import { messages as adminZh } from '../features/admin/i18n/zh-CN';
 import { messages as projectsZh } from '../features/projects/i18n/zh-CN';
 import { messages as releaseZh } from '../features/release/i18n/zh-CN';
 import { messages as devSessionZh } from '../features/dev-session/i18n/zh-CN';
+import { messages as capabilitiesZh } from '../features/capabilities/i18n/zh-CN';
 import { I18nProvider } from '../shared/lib/I18nProvider';
 import { mergeMessages } from '../shared/lib/i18n';
 import type { MessageCatalog } from '../shared/lib/i18n';
@@ -22,6 +23,7 @@ const zh = mergeMessages([
   { source: 'projects', messages: projectsZh },
   { source: 'release', messages: releaseZh },
   { source: 'devSession', messages: devSessionZh },
+  { source: 'capabilities', messages: capabilitiesZh },
 ]);
 const catalog: MessageCatalog = { 'zh-CN': zh, 'en-US': zh };
 
