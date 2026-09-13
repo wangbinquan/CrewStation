@@ -2,6 +2,8 @@ import type { Messages } from '../../shared/lib/i18n';
 
 /** app 级文案：导航、顶栏、语言、404，以及 shared/ui 里通用组件的缺省文案。页面文案在各 feature 的 i18n/ 中。 */
 export const messages = {
+  'nav.admin.capabilities': '能力接入',
+  'nav.admin.requests': '申请审批',
   "nav.operations": "运行与诊断",
   "settings.tab.members": "成员",
   "settings.tab.visibility": "应用可见性",

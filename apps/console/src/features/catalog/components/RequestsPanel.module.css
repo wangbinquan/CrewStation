@@ -17,6 +17,8 @@
 
 .summary {
   flex: 1 1 320px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .head {
@@ -33,7 +35,7 @@
 
 .facts {
   display: grid;
-  grid-template-columns: max-content 1fr;
+  grid-template-columns: max-content minmax(0, 1fr);
   gap: var(--cs-space-1) var(--cs-space-3);
   margin: 0;
 }
@@ -52,6 +54,8 @@
   flex-direction: column;
   gap: var(--cs-space-2);
   flex: 1 1 260px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .textarea {

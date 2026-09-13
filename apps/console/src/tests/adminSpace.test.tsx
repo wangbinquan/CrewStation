@@ -84,12 +84,12 @@ describe('管理空间与租户空间分离（RFC-002）', () => {
     expect(app.text()).not.toContain('仅平台管理员可见');
   });
 
-  test('管理员：顶栏有空间切换，管理左栏七项齐全', async () => {
+  test('管理员：顶栏有空间切换，管理供给与审批入口齐全', async () => {
     asAdmin();
     app = await renderApp('/admin');
     // 已经在管理空间，切换控件指回工作台。
     expect(app.text()).toContain('回到工作台');
-    for (const label of ['用户与权限', '算力档位', '服务套餐', '任务容器套餐', '接入容器', '出站白名单', '网关']) {
+    for (const label of ['用户与权限', '算力档位', '服务套餐', '任务容器套餐', '能力接入', '申请审批', '出站白名单', '网关']) {
       expect(app.text()).toContain(label);
     }
     // 管理空间的左栏里没有租户入口。

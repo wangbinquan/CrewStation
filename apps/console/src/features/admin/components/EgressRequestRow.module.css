@@ -5,13 +5,4 @@
   flex-wrap: wrap;
 }
 
-.reason {
-  padding: 5px var(--cs-space-2);
-  border: 1px solid var(--cs-color-border);
-  border-radius: var(--cs-radius-sm);
-  background: var(--cs-color-surface);
-  color: var(--cs-color-text);
-  font-size: var(--cs-font-size);
-  min-width: 180px;
-  flex: 1 1 180px;
-}
+.decide > label { flex: 1 1 100%; min-width: 180px; }

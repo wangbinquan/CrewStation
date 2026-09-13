@@ -1,12 +1,11 @@
 import type { ApiRequestDto, ApiRequestState } from '@crewstation/contracts';
-import type { ReactElement } from 'react';
+import type { ReactElement, ReactNode } from 'react';
 import { useDateText } from '../../../shared/lib/useDateText';
 import { useT } from '../../../shared/lib/useT';
 import { Badge } from '../../../shared/ui/Badge';
 import type { BadgeTone } from '../../../shared/ui/Badge';
 import { Card } from '../../../shared/ui/Card';
 import { QueryStatus } from '../../../shared/ui/QueryStatus';
-import type { CatalogActions } from '../hooks/useCatalogActions';
 import { RequestDecisionForm } from './RequestDecisionForm';
 import styles from './RequestsPanel.module.css';
 
@@ -21,26 +20,28 @@ export interface RequestsPanelProps {
   readonly requests: readonly ApiRequestDto[];
   readonly loading: boolean;
   readonly loadError: unknown;
-  readonly isAdmin: boolean;
-  readonly actions: CatalogActions;
+  readonly title?: string;
+  readonly empty?: string;
+  readonly renderService?: (serviceId: string) => ReactNode;
+  readonly management?: { readonly busy: boolean; readonly onDecide: (id: string, approve: boolean, decision?: string) => void };
 }
 
-/** 本服务提交过的定向开放申请，含管理员的批准／拒绝理由；管理员在此直接审批。 */
-export function RequestsPanel({ requests, loading, loadError, isAdmin, actions }: RequestsPanelProps): ReactElement {
+/** 申请事实供项目和管理页复用；只有管理入口注入审批动作。 */
+export function RequestsPanel({ requests, loading, loadError, title, empty, renderService, management }: RequestsPanelProps): ReactElement {
   const t = useT();
   return (
-    <Card title={t('catalog.requests.title')}>
+    <Card title={title ?? t('catalog.requests.title')}>
       <QueryStatus isPending={loading} error={loadError} loadingKey="catalog.requests.loading" errorKey="catalog.error.load" />
-      {!loading && loadError === null && requests.length === 0 ? <p className={styles.muted}>{t('catalog.requests.empty')}</p> : null}
+      {!loading && loadError === null && requests.length === 0 ? <p className={styles.muted}>{empty ?? t('catalog.requests.empty')}</p> : null}
       {requests.length > 0 ? (
         <ul className={styles.list}>
           {requests.map((request) => (
             <li key={request.id} className={styles.item}>
-              <RequestSummary request={request} />
-              {isAdmin && request.state === 'pending' ? (
+              <div className={styles.summary}>{renderService?.(request.serviceId)}<RequestSummary request={request} /></div>
+              {management && request.state === 'pending' ? (
                 <RequestDecisionForm
-                  pending={actions.decide.isPending}
-                  onDecide={(approve, decision) => actions.decide.mutate({ id: request.id, approve, decision })}
+                  pending={management.busy}
+                  onDecide={(approve, decision) => management.onDecide(request.id, approve, decision)}
                 />
               ) : null}
             </li>

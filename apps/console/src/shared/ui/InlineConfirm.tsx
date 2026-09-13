@@ -39,6 +39,7 @@ export function InlineConfirm({ label, question, variant = 'secondary', confirmL
       <span className={styles.question}>{question}</span>
       <Button
         variant="primary"
+        disabled={busy}
         onClick={() => {
           setArmed(false);
           onConfirm();
@@ -46,7 +47,7 @@ export function InlineConfirm({ label, question, variant = 'secondary', confirmL
       >
         {confirmLabel ?? t('ui.confirm.yes')}
       </Button>
-      <Button variant="ghost" onClick={() => setArmed(false)}>
+      <Button variant="ghost" disabled={busy} onClick={() => setArmed(false)}>
         {t('ui.confirm.no')}
       </Button>
     </span>

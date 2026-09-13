@@ -1,0 +1,2 @@
+.filters { display: flex; flex-wrap: wrap; align-items: end; gap: var(--cs-space-3); margin-bottom: var(--cs-space-3); }
+.filters p { margin: 0; overflow-wrap: anywhere; }

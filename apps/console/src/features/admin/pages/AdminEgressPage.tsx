@@ -1,16 +1,16 @@
 import type { ReactElement } from 'react';
+import { Link } from '@tanstack/react-router';
 import { useT } from '../../../shared/lib/useT';
 import { EgressEntriesSection } from '../components/EgressEntriesSection';
-import { EgressRequestsSection } from '../components/EgressRequestsSection';
 import { AdminSection } from './AdminSection';
 
-/** 白名单条目与待裁定的申请放在同一页：批一条申请紧接着就要看它落成了哪条条目。 */
+/** 本页维护规则，申请审批有单独入口并可返回这里核对规则。 */
 export function AdminEgressPage(): ReactElement {
   const t = useT();
   return (
     <AdminSection title={t('nav.admin.egress')} description={t('admin.egress.hint')}>
       <EgressEntriesSection />
-      <EgressRequestsSection />
+      <p><Link to="/admin/requests" search={{ tab: 'egress', state: 'pending' }}>{t('admin.requests.openEgress')}</Link></p>
     </AdminSection>
   );
 }

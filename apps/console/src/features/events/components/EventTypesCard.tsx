@@ -1,4 +1,5 @@
 import type { ReactElement } from 'react';
+import { Link } from '@tanstack/react-router';
 import { api } from '../../../shared/api/client';
 import { queryKeys } from '../../../shared/api/queryKeys';
 import { useApiQuery } from '../../../shared/api/useApi';
@@ -8,7 +9,7 @@ import { DataTable } from '../../../shared/ui/DataTable';
 import { QueryStatus } from '../../../shared/ui/QueryStatus';
 
 /** 平台事件类型目录：由 EventProducer 接入容器发布时登记，订阅只能引用其中的类型。 */
-export function EventTypesCard(): ReactElement {
+export function EventTypesCard({ management = false }: { readonly management?: boolean }): ReactElement {
   const t = useT();
   const eventTypes = useApiQuery(queryKeys.eventTypes(), () => api.events.listEventTypes());
   const items = eventTypes.data?.items ?? [];
@@ -32,7 +33,7 @@ export function EventTypesCard(): ReactElement {
               </td>
               <td>{eventType.producer}</td>
               <td>
-                <code>{eventType.producerProject}</code>
+                {management ? <Link to="/admin/integrations/$projectId" params={{ projectId: eventType.producerProject }}>{eventType.producer}</Link> : <code>{eventType.producerProject}</code>}
               </td>
               <td>{eventType.schemaRef ?? t('events.none')}</td>
             </tr>

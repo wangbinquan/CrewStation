@@ -1,4 +1,5 @@
 import type { ReactElement } from 'react';
+import { Link } from '@tanstack/react-router';
 import { useProjectScope } from '../../../shared/project/ProjectScope';
 import { api } from '../../../shared/api/client';
 import { queryKeys } from '../../../shared/api/queryKeys';
@@ -23,7 +24,8 @@ export function CatalogPage({ embedded = false, proxy, operation, onClearContext
       {!project.isPending && project.error === null && serviceId === undefined ? (
         <EmptyState title={t('catalog.service.missingTitle')} description={t('catalog.service.missingDescription')} />
       ) : null}
-      {serviceId !== undefined ? <CatalogContent key={`${projectId}:${proxy ?? ''}:${operation ?? ''}`} projectId={projectId} serviceId={serviceId} isAdmin={me.data?.isAdmin === true} proxy={proxy} operation={operation} onClearContext={onClearContext} /> : null}
+      {!me.error && me.data?.isAdmin === true ? <p><Link to="/admin/capabilities" search={{ tab: 'api', projectId, proxy, operation }}>{t('catalog.admin.openManagement')}</Link> · <Link to="/admin/requests" search={{ tab: 'api', projectId, state: 'pending' }}>{t('catalog.admin.openRequests')}</Link></p> : null}
+      {serviceId !== undefined ? <CatalogContent key={`${projectId}:${proxy ?? ''}:${operation ?? ''}`} projectId={projectId} serviceId={serviceId} proxy={proxy} operation={operation} onClearContext={onClearContext} /> : null}
     </>
   );
 }

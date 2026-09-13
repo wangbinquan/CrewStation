@@ -16,9 +16,9 @@ describe('两个空间的结构约定（RFC-002）', () => {
     expect(nav.code).toContain("t('nav.projects')");
   });
 
-  test('管理左栏七项与守卫都在管理布局这一侧', () => {
+  test('管理左栏的供给与审批入口及守卫都在管理布局这一侧', () => {
     const nav = sourceAt(files, 'layout/AdminNav.tsx');
-    for (const path of ['/admin/users', '/admin/compute', '/admin/service-plans', '/admin/task-profiles', '/admin/integrations', '/admin/egress', '/admin/gateway']) {
+    for (const path of ['/admin/users', '/admin/compute', '/admin/service-plans', '/admin/task-profiles', '/admin/capabilities', '/admin/requests', '/admin/egress', '/admin/gateway']) {
       expect(nav.code).toContain(`'${path}'`);
     }
     expect(sourceAt(files, 'layout/AdminLayout.tsx').code).toContain('<AdminGuard>');

@@ -4,7 +4,6 @@ import { AdminLayout } from '../../app/layout/AdminLayout';
 import { AdminComputePage } from './pages/AdminComputePage';
 import { AdminEgressPage } from './pages/AdminEgressPage';
 import { AdminGatewayPage } from './pages/AdminGatewayPage';
-import { AdminIntegrationsPage } from './pages/AdminIntegrationsPage';
 import { AdminOverviewPage } from './pages/AdminOverviewPage';
 import { AdminServicePlansPage } from './pages/AdminServicePlansPage';
 import { AdminTaskProfilesPage } from './pages/AdminTaskProfilesPage';
@@ -18,6 +17,5 @@ export const adminUsersRoute = createRoute({ getParentRoute: () => adminRoute, p
 export const adminComputeRoute = createRoute({ getParentRoute: () => adminRoute, path: 'compute', component: AdminComputePage });
 export const adminServicePlansRoute = createRoute({ getParentRoute: () => adminRoute, path: 'service-plans', component: AdminServicePlansPage });
 export const adminTaskProfilesRoute = createRoute({ getParentRoute: () => adminRoute, path: 'task-profiles', component: AdminTaskProfilesPage });
-export const adminIntegrationsRoute = createRoute({ getParentRoute: () => adminRoute, path: 'integrations', component: AdminIntegrationsPage });
 export const adminEgressRoute = createRoute({ getParentRoute: () => adminRoute, path: 'egress', component: AdminEgressPage });
 export const adminGatewayRoute = createRoute({ getParentRoute: () => adminRoute, path: 'gateway', component: AdminGatewayPage });

@@ -43,7 +43,7 @@ describe('管理接入容器复用业务页面', () => {
     await page.click('配置与密钥'); await page.click('生产取值组');
     expect(page.search()).toMatchObject({ tab: 'config', env: 'production' });
     expect(page.path()).toBe(`/admin/integrations/${projectId}/settings`);
-    await page.click('返回接入容器'); expect(page.path()).toBe('/admin/integrations');
+    await page.click('返回接入容器'); expect(page.path()).toBe('/admin/capabilities'); expect(page.search().tab).toBe('integrations');
   });
 
   test('旧租户日志链接逐级 replace 到管理诊断，任务条件和返回栈保持', async () => {

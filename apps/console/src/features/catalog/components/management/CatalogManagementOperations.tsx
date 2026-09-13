@@ -1,0 +1,36 @@
+import { useState } from 'react';
+import { api } from '../../../../shared/api/client';
+import { queryKeys } from '../../../../shared/api/queryKeys';
+import { errorMessage, useApiQuery } from '../../../../shared/api/useApi';
+import { useT } from '../../../../shared/lib/useT';
+import { ActionNote } from '../../../../shared/ui/ActionNote';
+import { Button } from '../../../../shared/ui/Button';
+import { Card } from '../../../../shared/ui/Card';
+import { QueryStatus } from '../../../../shared/ui/QueryStatus';
+import { useCatalogManagementActions } from '../../hooks/useCatalogManagementActions';
+import { OperationFilters } from '../OperationFilters';
+import type { OperationFilterValue } from '../OperationFilters';
+import { OperationsTable } from '../OperationsTable';
+import { CatalogPolicyActions } from './CatalogPolicyActions';
+
+export function CatalogManagementOperations({ serviceId, projectName, proxy, operation, onClearContext }: {
+  readonly serviceId?: string; readonly projectName?: string; readonly proxy?: string; readonly operation?: string; readonly onClearContext: () => void;
+}) {
+  const t = useT(), actions = useCatalogManagementActions();
+  const query = useApiQuery(serviceId ? queryKeys.operations(serviceId) : ['operations', 'admin'], () => api.apiCatalog.listOperations(serviceId ? { serviceId } : undefined));
+  const [filter, setFilter] = useState<OperationFilterValue>({ proxy: '', grant: 'all' });
+  const operations = query.data?.items ?? [], proxies = [...new Set(operations.map((item) => item.proxy))].sort();
+  const visible = operations.filter((item) => (!operation || item.key === operation) && (!proxy || item.proxy === proxy) && (!filter.proxy || item.proxy === filter.proxy)
+    && (!serviceId || filter.grant === 'all' || (filter.grant === 'granted' ? item.granted === true : item.granted !== true)));
+  const error = actions.setPolicy.error ?? actions.revoke.error;
+  return <Card title={t('catalog.admin.operationsTitle')}>
+    {operation || proxy ? <p>{t('catalog.context')} <code>{operation ?? proxy}</code> <Button onClick={onClearContext}>{t('catalog.clearContext')}</Button></p> : null}
+    <OperationFilters value={filter} proxies={proxies} count={visible.length} onChange={setFilter} showGrant={!!serviceId} />
+    <QueryStatus isPending={query.isPending} error={query.error} isEmpty={visible.length === 0} emptyTitle={t('catalog.operations.emptyTitle')} emptyDescription={t('catalog.operations.emptyDescription')} />
+    {query.error ? <Button onClick={() => void query.refetch()}>{t('catalog.admin.retry')}</Button> : null}
+    {error ? <ActionNote tone="error">{t('catalog.error.write', { message: errorMessage(error) })}</ActionNote> : null}
+    {actions.setPolicy.isSuccess ? <ActionNote tone="success">{t('catalog.admin.policySaved', { key: actions.setPolicy.data.key, policy: t(`catalog.policy.${actions.setPolicy.data.openPolicy}`) })}</ActionNote> : null}
+    {actions.revoke.isSuccess ? <ActionNote tone="success">{t('catalog.admin.revoked', { key: actions.revoke.variables.operationKey })}</ActionNote> : null}
+    {!query.error && visible.length > 0 ? <OperationsTable operations={visible} serviceContext={!!serviceId} renderActions={(item) => <CatalogPolicyActions operation={item} serviceId={serviceId} projectName={projectName} actions={actions} />} /> : null}
+  </Card>;
+}

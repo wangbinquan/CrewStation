@@ -1,0 +1,5 @@
+.table { min-width: 900px; }
+.table td:nth-child(1) { min-width: 140px; }
+.table td:nth-child(2) { min-width: 180px; max-width: 220px; }
+.table td:nth-child(3) { min-width: 120px; }
+.table td:last-child { min-width: 240px; }

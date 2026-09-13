@@ -14,7 +14,8 @@ type AdminPagePath =
   | '/admin/compute'
   | '/admin/service-plans'
   | '/admin/task-profiles'
-  | '/admin/integrations'
+  | '/admin/capabilities'
+  | '/admin/requests'
   | '/admin/egress'
   | '/admin/gateway';
 
@@ -31,7 +32,8 @@ const ADMIN_PAGES: readonly AdminPageItem[] = [
   { to: '/admin/compute', labelKey: 'nav.admin.compute' },
   { to: '/admin/service-plans', labelKey: 'nav.admin.servicePlans' },
   { to: '/admin/task-profiles', labelKey: 'nav.admin.taskProfiles' },
-  { to: '/admin/integrations', labelKey: 'nav.admin.integrations' },
+  { to: '/admin/capabilities', labelKey: 'nav.admin.capabilities' },
+  { to: '/admin/requests', labelKey: 'nav.admin.requests' },
   { to: '/admin/egress', labelKey: 'nav.admin.egress' },
   { to: '/admin/gateway', labelKey: 'nav.admin.gateway' },
 ];
@@ -43,7 +45,7 @@ export function AdminNav(): ReactElement {
   const inProject = path.startsWith('/admin/integrations/') && projectId && !me.error && me.data?.isAdmin === true;
   return (
     <NavFrame subtitleKey="app.adminSpace">
-      {inProject ? <><Link to="/admin/integrations" className={styles.link}>{t('nav.admin.backToIntegrations')}</Link><ProjectNavSection projectId={projectId} space="admin" /></> : null}
+      {inProject ? <><Link to="/admin/capabilities" search={{ tab: 'integrations' }} className={styles.link}>{t('nav.admin.backToIntegrations')}</Link><ProjectNavSection projectId={projectId} space="admin" /></> : null}
       {inProject ? <details className={styles.globalTools}><summary>{t('nav.admin.section')}</summary><AdminGlobalLinks /></details> : <AdminGlobalLinks />}
     </NavFrame>
   );

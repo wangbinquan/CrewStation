@@ -16,10 +16,11 @@ export interface OperationFiltersProps {
   readonly proxies: readonly string[];
   readonly count: number;
   readonly onChange: (value: OperationFilterValue) => void;
+  readonly showGrant?: boolean;
 }
 
 /** 代理与授权两个筛选条件；筛选只作用于已取回的列表，不改变请求。 */
-export function OperationFilters({ value, proxies, count, onChange }: OperationFiltersProps): ReactElement {
+export function OperationFilters({ value, proxies, count, onChange, showGrant = true }: OperationFiltersProps): ReactElement {
   const t = useT();
   return (
     <div className={styles.filters}>
@@ -34,14 +35,14 @@ export function OperationFilters({ value, proxies, count, onChange }: OperationF
           ))}
         </select>
       </label>
-      <label className={styles.filter}>
+      {showGrant ? <label className={styles.filter}>
         <span className={styles.filterLabel}>{t('catalog.filters.grant')}</span>
         <select className={styles.select} value={value.grant} onChange={(e) => onChange({ ...value, grant: e.target.value as GrantFilter })}>
           <option value="all">{t('catalog.filters.allGrants')}</option>
           <option value="granted">{t('catalog.filters.grantedOnly')}</option>
           <option value="not-granted">{t('catalog.filters.notGranted')}</option>
         </select>
-      </label>
+      </label> : null}
       <span className={styles.count}>{t('catalog.filters.count', { count })}</span>
     </div>
   );

@@ -1,7 +1,7 @@
 // 路由树装配：app/ 只负责骨架，页面路由由各 feature 的 index.ts 导出。
 // 两棵子树（RFC-002）：workbenchRoute 是租户空间，adminRoute 是平台管理空间。
 import {
-  adminComputeRoute, adminEgressRoute, adminGatewayRoute, adminIntegrationsRoute, adminOverviewRoute,
+  adminComputeRoute, adminEgressRoute, adminGatewayRoute, adminOverviewRoute,
   adminRoute, adminServicePlansRoute, adminTaskProfilesRoute, adminUsersRoute,
 } from '../../features/admin';
 import { capabilitiesRoute, marketHomeRoute, marketRoute, marketDetailRoute } from '../../features/capabilities';
@@ -14,6 +14,7 @@ import { projectListRoute, projectOverviewRoute } from '../../features/projects'
 import { releaseRoute } from '../../features/release';
 import { projectRoute } from './projectRoute';
 import { adminProjectRoutes } from './adminProjectRoutes';
+import { adminCapabilitiesRoute, adminRequestsRoute, adminIntegrationsLegacyRoute, adminCatalogLegacyRoute } from './adminGlobalRoutes';
 import { projectSettingsRoute, projectOperationsRoute } from './projectSections';
 import { rootRoute } from './rootRoute';
 import { workbenchRoute } from './workbenchRoute';
@@ -45,7 +46,10 @@ export const routeTree = rootRoute.addChildren([
     adminComputeRoute,
     adminServicePlansRoute,
     adminTaskProfilesRoute,
-    adminIntegrationsRoute,
+    adminCapabilitiesRoute,
+    adminRequestsRoute,
+    adminIntegrationsLegacyRoute,
+    adminCatalogLegacyRoute,
     adminEgressRoute,
     adminGatewayRoute,
   ]),

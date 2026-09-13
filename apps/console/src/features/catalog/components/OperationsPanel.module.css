@@ -63,3 +63,9 @@
   flex-wrap: wrap;
   gap: var(--cs-space-2);
 }
+
+.operationsTable { min-width: 760px; }
+.operationsTable .methodCell { white-space: nowrap; }
+.proxyCell { min-width: 90px; }
+.pathCell { min-width: 130px; }
+.actionsCell { width: 32%; min-width: 210px; max-width: 360px; }

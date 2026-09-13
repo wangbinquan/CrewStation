@@ -1,0 +1,18 @@
+import { ProjectIdSchema } from '@crewstation/contracts';
+
+export type CapabilityTab = 'integrations' | 'api' | 'events';
+export type RequestStatus = 'pending' | 'approved' | 'rejected' | 'all';
+export interface CapabilitySearch { tab: CapabilityTab; projectId?: string; proxy?: string; operation?: string }
+export interface RequestSearch { tab: 'api' | 'egress'; projectId?: string; state: RequestStatus }
+const text = (value: unknown, limit: number) => typeof value === 'string' && value.length > 0 && value.length <= limit && !/[\u0000-\u001f]/u.test(value) ? value : undefined;
+
+export function parseCapabilitySearch(search: Record<string, unknown>): CapabilitySearch {
+  const tab = search.tab === 'api' || search.tab === 'events' ? search.tab : 'integrations';
+  if (tab !== 'api') return { tab };
+  return { tab, projectId: ProjectIdSchema.safeParse(search.projectId).data, proxy: text(search.proxy, 80), operation: text(search.operation, 2048) };
+}
+
+export function parseRequestSearch(search: Record<string, unknown>): RequestSearch {
+  return { tab: search.tab === 'egress' ? 'egress' : 'api', projectId: ProjectIdSchema.safeParse(search.projectId).data,
+    state: search.state === 'all' || search.state === 'approved' || search.state === 'rejected' ? search.state : 'pending' };
+}
