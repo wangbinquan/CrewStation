@@ -115,7 +115,8 @@ describe('诊断、订阅与配置的上下文', () => {
   test('同一设置路由切换项目会换上下文，上一项目草稿不进入新项目', async () => {
     fixture(); page = await renderApp(`/projects/${projectId}/settings?tab=config`);
     await input(document.querySelector<HTMLInputElement>('input[placeholder="DATABASE_URL"]')!, 'OLD_PROJECT_DRAFT');
-    await page.navigate(`/projects/prj_${'f'.repeat(32)}/settings?tab=config`);
+    await page.requestNavigate(`/projects/prj_${'f'.repeat(32)}/settings?tab=config`);
+    expect(page.path()).toBe(`/projects/${projectId}/settings`); await page.click('放弃输入并离开');
     expect(page.text()).toContain('另一个应用'); expect(page.text()).not.toContain('团队知识助理');
     expect([...document.querySelectorAll<HTMLInputElement>('input')].some((node) => node.value === 'OLD_PROJECT_DRAFT')).toBe(false);
   });

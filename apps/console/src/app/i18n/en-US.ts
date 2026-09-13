@@ -119,4 +119,8 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   'notFound.title': 'Page not found',
   'notFound.description': 'This address does not match any workbench page.',
   'notFound.backToProjects': 'Back to projects',
+  "ui.draft.question": "{scope} has unsaved input. Discard it and leave?",
+  "ui.draft.hint": "Unsent changes will not be saved. Requests already sent may still complete; refresh when you return to check the result.",
+  "ui.draft.leave": "Discard input and leave",
+  "ui.draft.stay": "Keep editing",
 };

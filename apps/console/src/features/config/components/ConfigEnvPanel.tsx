@@ -1,5 +1,5 @@
 import type { ConfigEnv } from '@crewstation/contracts';
-import { useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import type { ReactElement } from 'react';
 import { errorMessage, isApiClientError } from '../../../shared/api/useApi';
 import { useT } from '../../../shared/lib/useT';
@@ -7,6 +7,7 @@ import { ActionNote } from '../../../shared/ui/ActionNote';
 import { Badge } from '../../../shared/ui/Badge';
 import { Card } from '../../../shared/ui/Card';
 import { Button } from '../../../shared/ui/Button';
+import { ConfirmationPanel } from '../../../shared/ui/ConfirmationPanel';
 import { QueryStatus } from '../../../shared/ui/QueryStatus';
 import { useConfigEnv } from '../hooks/useConfigEnv';
 import { ConfigItemForm } from './ConfigItemForm';
@@ -20,14 +21,19 @@ const NEW_ITEM: ConfigItemDraft = { name: '', isSecret: false };
 export interface ConfigEnvPanelProps {
   readonly projectId: string;
   readonly env: ConfigEnv;
+  readonly onDirtyChange: (env: ConfigEnv, dirty: boolean) => void;
 }
 
 /** 一组取值的完整面板：列表、新增／覆盖表单、版本历史。生产组的 403 由服务端说明原样呈现。 */
-export function ConfigEnvPanel({ projectId, env }: ConfigEnvPanelProps): ReactElement {
+export function ConfigEnvPanel({ projectId, env, onDirtyChange }: ConfigEnvPanelProps): ReactElement {
   const t = useT();
   const { items, versions, save, remove } = useConfigEnv(projectId, env);
   const [draft, setDraft] = useState<ConfigItemDraft>(NEW_ITEM);
   const [draftSeq, setDraftSeq] = useState(0);
+  const [dirty, setDirty] = useState(false), [nextDraft, setNextDraft] = useState<ConfigItemDraft>();
+  const dirtyChanged = useCallback((value: boolean) => { setDirty(value); onDirtyChange(env, value); }, [env, onDirtyChange]);
+  const replaceDraft = (next: ConfigItemDraft) => { setDraft(next); setDraftSeq((seq) => seq + 1); setNextDraft(undefined); };
+  const selectDraft = (next: ConfigItemDraft) => { if (dirty) setNextDraft(next); else replaceDraft(next); };
   const writeLock = useRef(false);
   const list = items.data?.items ?? [];
   const busy = save.isPending || remove.isPending, disabled = items.isPending || !!items.error;
@@ -71,8 +77,7 @@ export function ConfigEnvPanel({ projectId, env }: ConfigEnvPanelProps): ReactEl
           deletingName={remove.isPending ? remove.variables : undefined}
           onDelete={(name) => void deleteItem(name)}
           onEdit={(item) => {
-            setDraft({ name: item.name, isSecret: item.isSecret, ...(item.isSecret ? {} : { value: item.value ?? '' }) });
-            setDraftSeq((seq) => seq + 1);
+            selectDraft({ name: item.name, isSecret: item.isSecret, ...(item.isSecret ? {} : { value: item.value ?? '' }) });
           }}
         />
       ) : null}
@@ -81,7 +86,8 @@ export function ConfigEnvPanel({ projectId, env }: ConfigEnvPanelProps): ReactEl
       {save.isSuccess ? <ActionNote tone="success">{t('config.saved', { name: save.data.name, version: save.data.version, env: t(`config.env.${env}`) })} {t(`config.effect.${env}`)}</ActionNote> : null}
       {remove.isSuccess ? <ActionNote tone="success">{t('config.deleted', { name: remove.variables ?? '', env: t(`config.env.${env}`) })} {t(`config.effect.${env}`)}</ActionNote> : null}
       <h3 className={styles.formTitle}>{t('config.form.title')}</h3>
-      <ConfigItemForm key={`${draft.name}:${draftSeq}`} draft={draft} existingNames={list.map((item) => item.name)} pending={save.isPending} disabled={disabled || remove.isPending} onSubmit={changeItem} onReset={() => { setDraft(NEW_ITEM); setDraftSeq((seq) => seq + 1); }} />
+      {nextDraft ? <ConfirmationPanel question={t('config.draft.replace', { env: t(`config.env.${env}`), name: nextDraft.name || t('config.draft.blank') })} confirmLabel={t('config.draft.discard')} cancelLabel={t('ui.draft.stay')} busy={busy} onConfirm={() => replaceDraft(nextDraft)} onCancel={() => setNextDraft(undefined)} /> : null}
+      <ConfigItemForm key={`${draft.name}:${draftSeq}`} draft={draft} existingNames={list.map((item) => item.name)} pending={save.isPending} disabled={disabled || remove.isPending || Boolean(nextDraft)} onSubmit={changeItem} onReset={() => selectDraft(NEW_ITEM)} onDirtyChange={dirtyChanged} />
     </Card>
   );
 }

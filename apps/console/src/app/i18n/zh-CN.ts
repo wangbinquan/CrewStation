@@ -119,4 +119,8 @@ export const messages = {
   'notFound.title': '页面不存在',
   'notFound.description': '该地址不对应工作台中的任何页面。',
   'notFound.backToProjects': '返回项目列表',
+  "ui.draft.question": "{scope}有未保存的输入，要放弃并离开吗？",
+  "ui.draft.hint": "未发出的修改不会保存；已经发出的请求仍可能完成，返回后请刷新确认结果。",
+  "ui.draft.leave": "放弃输入并离开",
+  "ui.draft.stay": "继续编辑",
 } satisfies Messages;

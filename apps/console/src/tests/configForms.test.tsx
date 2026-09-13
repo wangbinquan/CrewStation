@@ -2,6 +2,7 @@ import './domSetup';
 import { afterEach, expect, test } from 'bun:test';
 import { act } from 'react';
 import { renderApp } from './renderApp';
+import { browserHistoryFixture } from './browserHistoryFixture';
 
 const originalFetch = globalThis.fetch, projectId = `prj_${'a'.repeat(32)}`, serviceId = `svc_${'b'.repeat(32)}`, userId = `usr_${'c'.repeat(32)}`;
 let page: Awaited<ReturnType<typeof renderApp>> | undefined;
@@ -90,4 +91,39 @@ test('保存进行中防止清空、切编辑项、重复保存与删除；暂�
   await click('保存'); expect(f.writes).toHaveLength(1);
   f.state.failRead = false; f.state.failVersions = true; await click('刷新配置'); expect(page.text()).toContain('历史服务暂不可用');
   expect(visible<HTMLInputElement>('input[placeholder="写入后生效于下一次注入"]').disabled).toBe(false); await click('保存'); expect(f.writes).toHaveLength(2);
+});
+
+test('编辑另一配置或离开设置前可保留未保存输入，确认放弃后才跳转', async () => {
+  fixture(); page = await renderApp(`/projects/${projectId}/settings?tab=config`);
+  await input(visible('input[placeholder="DATABASE_URL"]'), 'DRAFT_KEY');
+  await input(visible('input[placeholder="写入后生效于下一次注入"]'), '不可丢的草稿'); await click('填入表单');
+  // 旧界面直接换 key 重挂表单，未保存值随组件被销毁。
+  expect(visible<HTMLInputElement>('input[placeholder="写入后生效于下一次注入"]').value).toBe('不可丢的草稿');
+  await click('继续编辑'); await page.click('仓库');
+  expect(page.search().tab).toBe('config'); expect(page.text()).toContain('未保存的输入');
+  await click('继续编辑'); expect(visible<HTMLInputElement>('input[placeholder="写入后生效于下一次注入"]').value).toBe('不可丢的草稿');
+  await page.click('仓库'); await click('放弃输入并离开'); expect(page.search().tab).toBe('repository');
+});
+
+test('放弃载入与清空都明确确认；成功保存后的空值不再被误判为未保存', async () => {
+  const f = fixture(); page = await renderApp(`/projects/${projectId}/settings?tab=config`);
+  await input(visible('input[placeholder="DATABASE_URL"]'), 'FIRST_DRAFT'); await click('填入表单'); await click('放弃输入并载入');
+  expect(visible<HTMLInputElement>('input[placeholder="写入后生效于下一次注入"]').value).toBe('当前值');
+  await input(visible('input[placeholder="写入后生效于下一次注入"]'), '新值'); await click('清空'); expect(page.text()).toContain('空白表单'); await click('继续编辑');
+  expect(visible<HTMLInputElement>('input[placeholder="写入后生效于下一次注入"]').value).toBe('新值');
+  await click('保存'); await page.click('仓库'); expect(page.search().tab).toBe('repository'); expect(f.writes).toHaveLength(1);
+});
+
+test('后台环境草稿也会阻止离开；一次只确认第一个目的地，取消和返回均不写入', async () => {
+  const f = fixture(), initial = `/projects/${projectId}/settings?tab=config`;
+  const browser = browserHistoryFixture(['/projects', initial]); page = await renderApp(initial, undefined, browser.history);
+  await input(visible('input[placeholder="DATABASE_URL"]'), 'DEV_HIDDEN'); await page.click('生产取值组');
+  await page.click('仓库'); await page.click('成员');
+  expect(document.querySelectorAll('[role="alertdialog"]')).toHaveLength(1); expect(page.search().tab).toBe('config');
+  await click('放弃输入并离开'); expect(page.search().tab).toBe('repository'); expect(f.writes).toHaveLength(0);
+  await page.back(); expect(page.search().tab).toBe('config');
+  await input(visible('input[placeholder="DATABASE_URL"]'), 'PROD_BACK'); await page.back(); expect(page.search().env).toBe('development');
+  await page.back(); expect(page.search().tab).toBe('config'); await click('继续编辑'); expect(f.writes).toHaveLength(0);
+  expect(browser.beforeUnload()).toBe(false);
+  await page.back(); await click('放弃输入并离开'); expect(page.path()).toBe('/projects');
 });

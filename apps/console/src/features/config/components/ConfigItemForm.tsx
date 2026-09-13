@@ -1,6 +1,6 @@
 import type { SetConfigItemInput } from '@crewstation/api-client';
 import { ConfigNameSchema } from '@crewstation/contracts';
-import { useId, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import type { FormEvent, ReactElement } from 'react';
 import { useT } from '../../../shared/lib/useT';
 import { Button } from '../../../shared/ui/Button';
@@ -20,19 +20,23 @@ export interface ConfigItemFormProps {
   readonly existingNames: readonly string[];
   readonly onSubmit: (input: SetConfigItemInput) => Promise<unknown>;
   readonly onReset: () => void;
+  readonly onDirtyChange: (dirty: boolean) => void;
 }
 
 /** 请求成功后才清空值；失败、目录暂不可用和环境切换保留当前输入。 */
-export function ConfigItemForm({ draft, pending, disabled = false, existingNames, onSubmit, onReset }: ConfigItemFormProps): ReactElement {
+export function ConfigItemForm({ draft, pending, disabled = false, existingNames, onSubmit, onReset, onDirtyChange }: ConfigItemFormProps): ReactElement {
   const t = useT(), id = useId(), busy = useRef(false), nameInput = useRef<HTMLInputElement>(null);
   const [name, setName] = useState(draft.name), [value, setValue] = useState(draft.isSecret ? '' : draft.value ?? '');
   const [isSecret, setIsSecret] = useState(draft.isSecret), [nameError, setNameError] = useState<string>();
+  const [baseline, setBaseline] = useState({ name: draft.name, value: draft.isSecret ? '' : draft.value ?? '', isSecret: draft.isSecret });
+  const dirty = name !== baseline.name || value !== baseline.value || isSecret !== baseline.isSecret;
+  useEffect(() => { onDirtyChange(dirty); return () => onDirtyChange(false); }, [dirty, onDirtyChange]);
   const submit = async (event: FormEvent): Promise<void> => {
     event.preventDefault();
     if (busy.current || pending || disabled) return;
     if (!ConfigNameSchema.safeParse(name.trim()).success) { setNameError(t('config.form.invalidName')); nameInput.current?.focus(); return; }
     busy.current = true; setNameError(undefined);
-    try { await onSubmit({ name: name.trim(), value, isSecret }); setValue(''); }
+    try { await onSubmit({ name: name.trim(), value, isSecret }); setValue(''); setBaseline({ name, value: '', isSecret }); }
     catch { /* 父组件显示服务端错误；输入保持原样。 */ }
     finally { busy.current = false; }
   };
