@@ -221,6 +221,8 @@ export const messages = {
   "projects.wizard.config.secret": "密钥",
   "projects.wizard.config.config": "配置",
   "projects.wizard.creationEffect": "确认后将创建项目，按所选模板建立仓库，并发起开通与首个发布。正式流量切换仍需负责人明确操作。",
+  "projects.wizard.pendingNote": "正在创建项目，离开不会撤销创建或开通。返回后请先在项目列表核对实际结果。",
+  "projects.wizard.resultUnknown": "创建结果无法与本次输入对应，可能已创建项目。输入已保留，请先在项目列表按名称和标识核对，再决定是否重试。",
   "projects.provision.title": "项目开通状态",
   "projects.provision.refresh": "刷新开通状态",
   "projects.provision.provisioning": "开通中。此状态来自服务器，当前接口不提供逐阶段进度。",

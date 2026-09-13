@@ -2,6 +2,7 @@ import type { ProjectDto } from '@crewstation/contracts';
 import { useEffect, useRef } from 'react';
 import { useT } from '../../../shared/lib/useT';
 import { errorMessage } from '../../../shared/api/useApi';
+import { UnsavedChangesGuard } from '../../../shared/navigation/UnsavedChangesGuard';
 import { ActionNote } from '../../../shared/ui/ActionNote';
 import { Badge } from '../../../shared/ui/Badge';
 import { Button } from '../../../shared/ui/Button';
@@ -20,7 +21,9 @@ export function CreateProjectForm({ scope, onCreated }: { scope: CreationScope; 
   const { draft, step, errors, catalog, create, users, templates, plans } = state;
   useEffect(() => { form.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus(); }, [errors, step]);
   const fields = { draft, errors, catalog, scope, disabled: create.isPending, setField: state.setField };
-  return <Card compact title={t(`projects.wizard.step${step + 1}`)} extra={<Button disabled={create.isPending} onClick={() => { void users.refetch(); void templates.refetch(); void plans.refetch(); }}>{t('projects.wizard.refreshCatalog')}</Button>}>
+  return <>
+    <UnsavedChangesGuard dirty={state.dirty} scope={t(`projects.wizard.title.${scope}`)} />
+    <Card compact title={t(`projects.wizard.step${step + 1}`)} extra={<Button disabled={create.isPending || users.isFetching || templates.isFetching || plans.isFetching} onClick={() => { void Promise.all([users.refetch(), templates.refetch(), plans.refetch()]); }}>{t('projects.wizard.refreshCatalog')}</Button>}>
     <ol className={styles.steps} aria-label={t('projects.wizard.steps')}>
       {[0, 1, 2].map((item) => <li key={item} aria-current={step === item ? 'step' : undefined}><Badge tone={step === item ? 'info' : 'neutral'}>{item + 1} · {t(`projects.wizard.step${item + 1}`)}</Badge></li>)}
     </ol>
@@ -29,10 +32,12 @@ export function CreateProjectForm({ scope, onCreated }: { scope: CreationScope; 
     <form ref={form} noValidate onSubmit={(event) => { event.preventDefault(); if (step === 2) void state.submit(); else state.next(); }}>
       {step === 0 ? <CreationBasics {...fields} /> : step === 1 ? <CreationResources {...fields} /> : <CreationReview draft={draft} catalog={catalog} />}
       {create.isError ? <ActionNote tone="error">{t('projects.create.error', { message: errorMessage(create.error) })}</ActionNote> : null}
+      {state.resultError ? <ActionNote tone="error">{state.resultError}</ActionNote> : null}
+      {create.isPending ? <ActionNote tone="neutral">{t('projects.wizard.pendingNote')}</ActionNote> : null}
       <div className={styles.submit}>
         {step > 0 ? <Button disabled={create.isPending} onClick={state.back}>{t('projects.wizard.back')}</Button> : null}
         <Button type="submit" variant="primary" disabled={create.isPending || !state.available}>{t(create.isPending ? 'projects.create.submitting' : step === 2 ? 'projects.create.submit' : 'projects.wizard.next')}</Button>
       </div>
     </form>
-  </Card>;
+  </Card></>;
 }

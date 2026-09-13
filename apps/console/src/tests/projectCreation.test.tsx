@@ -2,6 +2,7 @@ import './domSetup';
 import { afterEach, expect, test } from 'bun:test';
 import { act } from 'react';
 import { renderApp } from './renderApp';
+import { browserHistoryFixture } from './browserHistoryFixture';
 
 const originalFetch = globalThis.fetch;
 const userId = `usr_${'a'.repeat(32)}`, projectId = `prj_${'b'.repeat(32)}`;
@@ -11,7 +12,7 @@ afterEach(() => { page?.unmount(); page = undefined; globalThis.fetch = original
 function fixture(admin = true) {
   const requests: Array<{ path: string; method: string; body?: Record<string, unknown> }> = [];
   const state = { catalogFailure: false, createFailure: false, projectFailure: false, retryFailure: false, status: 'provisioning', kind: 'APIProxy',
-    holdCreate: undefined as Promise<void> | undefined, noTemplates: false };
+    holdCreate: undefined as Promise<void> | undefined, noTemplates: false, resultOverride: undefined as Record<string, unknown> | undefined };
   globalThis.fetch = (async (raw, init) => {
     const path = new URL(String(raw), 'http://localhost').pathname, method = init?.method ?? 'GET';
     const body = init?.body ? JSON.parse(String(init.body)) as Record<string, unknown> : undefined;
@@ -30,7 +31,7 @@ function fixture(admin = true) {
     else if (path === '/v1/projects' && method === 'POST') {
       if (state.holdCreate) await state.holdCreate;
       if (state.createFailure) { status = 409; result = { error: 'conflict', message: '项目标识已占用', details: { field: 'slug' } }; }
-      else { state.kind = String(body!.kind); result = { ...body, id: projectId, state: state.status }; }
+      else { state.kind = String(body!.kind); result = { ...body, id: projectId, namespace: 'cs-billing', createdAt: '2026-09-13T00:00:00.000Z', state: state.status, ...state.resultOverride }; }
     } else if (path === `/v1/projects/${projectId}`) {
       if (state.projectFailure) { status = 503; result = { error: 'unavailable', message: '状态暂时无法读取' }; }
       else result = { id: projectId, kind: state.kind, name: '账单接入', slug: 'billing', state: state.status, message: state.status === 'failed' ? 'ensureFirstRelease 失败：缺少 GITLAB_TOKEN' : undefined };
@@ -140,6 +141,55 @@ test('创建在途不能重复提交或回退修改；目录为空显示明确�
   f.state.noTemplates = true; await page.navigate('/admin/projects/new');
   await field('name', '新数字人'); await field('slug', 'new-worker'); await field('ownerUserId', userId); await page.click('下一步');
   expect(page.text()).toContain('当前类型暂无可用模板');
-  const before = f.requests.length; await page.navigate('/admin/projects/invalid/provisioning');
+  const before = f.requests.length; await page.requestNavigate('/admin/projects/invalid/provisioning'); await page.click('放弃输入并离开');
   expect(page.text()).toContain('项目标识无效'); expect(f.requests.slice(before).some((r) => r.path === '/v1/projects/invalid')).toBe(false);
+});
+
+test('创建草稿：返回管理入口和切换创建类型先确认，取消保留，确认后才清空且不会串输入', async () => {
+  const f = fixture(); page = await renderApp('/admin/projects/new'); await field('name', '尚未完成的数字人');
+  // 旧向导离开直接卸载；再次进入时名称和模板选择全部消失。
+  await page.click('返回管理总览'); expect(page.path()).toBe('/admin/projects/new'); await page.click('继续编辑');
+  expect(document.querySelector<HTMLInputElement>('[name="name"]')?.value).toBe('尚未完成的数字人');
+  await page.requestNavigate('/admin/projects/new?scope=integration'); expect(page.search().scope).not.toBe('integration');
+  await page.click('放弃输入并离开'); expect(page.search().scope).toBe('integration'); expect(document.querySelector<HTMLInputElement>('[name="name"]')?.value).toBe('');
+  expect(document.querySelector<HTMLSelectElement>('[name="kind"]')?.value).toBe('APIProxy'); expect(f.writes()).toHaveLength(0);
+});
+
+test('创建草稿：目录和创建失败不清除离开保护，空白向导可直接返回', async () => {
+  const f = fixture(); page = await renderApp('/admin/projects/new');
+  await page.click('返回管理总览'); expect(page.path()).toBe('/admin'); await page.navigate('/admin/projects/new'); await readyToCreate();
+  f.state.catalogFailure = true; await page.click('重新读取目录'); await page.click('返回管理总览');
+  expect(page.path()).toBe('/admin/projects/new'); await page.click('继续编辑');
+  f.state.catalogFailure = false; await page.click('重新读取目录'); f.state.createFailure = true; await page.click('创建项目');
+  await page.click('返回管理总览'); expect(page.path()).toBe('/admin/projects/new'); await page.click('继续编辑');
+  expect(document.querySelector<HTMLInputElement>('[name="name"]')?.value).toBe('新数字人'); expect(f.writes()).toHaveLength(1);
+  f.state.createFailure = false; await field('slug', 'retry-worker'); await page.click('下一步'); await page.click('下一步'); await page.click('创建项目');
+  expect(page.path()).toBe(`/admin/projects/${projectId}/provisioning`); expect(document.querySelector('[role="alertdialog"]')).toBeNull();
+});
+
+test('创建草稿：在途离开需确认，重复 submit 只写一次，迟到创建成功不抢回当前页面', async () => {
+  const f = fixture(); let finish!: () => void; f.state.holdCreate = new Promise<void>((resolve) => { finish = resolve; });
+  page = await renderApp('/admin/projects/new'); await readyToCreate(); const form = document.querySelector('form')!;
+  await act(async () => { for (let i = 0; i < 2; i++) form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); }); await page.settle();
+  expect(f.writes()).toHaveLength(1); expect(page.text()).toContain('离开不会撤销创建或开通');
+  await page.requestNavigate('/admin/service-plans'); expect(page.path()).toBe('/admin/projects/new'); await page.click('继续编辑'); expect(page.text()).toContain('新数字人');
+  await page.requestNavigate('/admin/service-plans'); await page.click('放弃输入并离开'); expect(page.path()).toBe('/admin/service-plans');
+  await act(async () => { finish(); }); await page.settle(); expect(page.path()).toBe('/admin/service-plans'); expect(f.writes()).toHaveLength(1);
+});
+
+test('创建草稿：不匹配或无效创建回执保留复核材料，不导航到错误项目也不自动重试', async () => {
+  const f = fixture(); f.state.resultOverride = { kind: 'APIProxy' }; page = await renderApp('/admin/projects/new'); await readyToCreate(); await page.click('创建项目');
+  expect(page.path()).toBe('/admin/projects/new'); expect(page.text()).toContain('创建结果无法与本次输入对应'); expect(page.text()).toContain('新数字人'); expect(f.writes()).toHaveLength(1);
+  await page.click('上一步'); expect(document.querySelector<HTMLSelectElement>('[name="template"]')?.value).toBe('minimal-sample'); await page.click('下一步');
+  f.state.resultOverride = { id: 'invalid-project' }; await page.click('创建项目'); expect(page.path()).toBe('/admin/projects/new'); expect(f.writes()).toHaveLength(2);
+  await page.click('返回管理总览'); expect(document.querySelector('[role="alertdialog"]')).not.toBeNull(); await page.click('继续编辑');
+});
+
+test('创建草稿：浏览器返回保留资源选择，取消不写入，成功接续后返回历史不再次提交', async () => {
+  const f = fixture(), browser = browserHistoryFixture(['/admin', '/admin/projects/new']);
+  page = await renderApp('/admin/projects/new', undefined, browser.history); await readyToCreate();
+  await page.back(); expect(page.path()).toBe('/admin/projects/new'); await page.click('继续编辑');
+  expect(browser.beforeUnload()).toBe(false); expect(page.text()).toContain('minimal-sample'); expect(f.writes()).toHaveLength(0);
+  await page.click('创建项目'); expect(page.path()).toBe(`/admin/projects/${projectId}/provisioning`);
+  await page.back(); expect(page.path()).toBe('/admin'); expect(f.writes()).toHaveLength(1);
 });

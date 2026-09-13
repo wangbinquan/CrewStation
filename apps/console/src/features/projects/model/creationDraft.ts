@@ -1,7 +1,7 @@
 import type { CreateProjectInput } from '@crewstation/api-client';
 import { isApiClientError } from '@crewstation/api-client';
-import type { ManifestKind, ProjectTemplateDto, ServicePlanDto, UserDto } from '@crewstation/contracts';
-import { SlugSchema } from '@crewstation/contracts';
+import type { ManifestKind, ProjectDto, ProjectTemplateDto, ServicePlanDto, UserDto } from '@crewstation/contracts';
+import { ProjectDtoSchema, SlugSchema } from '@crewstation/contracts';
 
 export type CreationScope = 'digital-worker' | 'integration';
 export interface CreationDraft { name: string; slug: string; ownerUserId: string; kind: ManifestKind; template: string; plan: string; maxConcurrentTasks: string }
@@ -33,6 +33,15 @@ export function creationInput(draft: CreationDraft, catalog: CreationCatalog): C
   if (!owner) throw new Error('负责人尚未确认');
   return { name: draft.name.trim(), slug: draft.slug.trim(), ownerUserId: owner.id, kind: draft.kind, template: draft.template, plan: draft.plan,
     ...(draft.maxConcurrentTasks.trim() === '' ? {} : { maxConcurrentTasks: Number(draft.maxConcurrentTasks) }) };
+}
+
+/** 开通页只接续本次请求对应的有效项目；不把未知回执解释成已经创建成功。 */
+export function confirmedCreationResult(result: unknown, input: CreateProjectInput): ProjectDto | undefined {
+  const parsed = ProjectDtoSchema.safeParse(result);
+  if (!parsed.success) return undefined;
+  const project = parsed.data;
+  if (project.name !== input.name || project.slug !== input.slug || project.kind !== (input.kind ?? 'DigitalWorker') || project.ownerUserId !== input.ownerUserId) return undefined;
+  return project;
 }
 
 /** 保留服务端字段信息；未知错误留在表单级，不猜测失败字段。 */

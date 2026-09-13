@@ -222,6 +222,8 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   'projects.wizard.config.secret': 'secret',
   'projects.wizard.config.config': 'config',
   'projects.wizard.creationEffect': 'Confirmation creates the project and repository from your template, then starts provisioning and the first release. The owner must explicitly switch production traffic.',
+  'projects.wizard.pendingNote': 'Creating the project. Leaving does not cancel creation or provisioning. Check the actual result in the project list when you return.',
+  'projects.wizard.resultUnknown': 'The creation result does not match this request; the project may have been created. Your input is preserved. Check the name and slug in the project list before deciding whether to retry.',
   'projects.provision.title': 'Project provisioning',
   'projects.provision.refresh': 'Refresh provisioning status',
   'projects.provision.provisioning': 'Provisioning. This is the server state; the API does not provide progress for each stage.',
