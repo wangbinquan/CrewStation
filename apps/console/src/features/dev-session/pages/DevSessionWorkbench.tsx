@@ -6,6 +6,7 @@ import { Link } from '@tanstack/react-router';
 import type { ApiClientError } from '../../../shared/api/useApi';
 import { useProjectScope } from '../../../shared/project/ProjectScope';
 import { PROJECT_PATHS } from '../../../shared/project/projectPaths';
+import { UnsavedChangesGuard } from '../../../shared/navigation/UnsavedChangesGuard';
 import { useT } from '../../../shared/lib/useT';
 import { DataBindingPane } from '../components/DataBindingPane';
 import { PublishPane } from '../components/PublishPane';
@@ -54,13 +55,14 @@ export function DevSessionWorkbench({ projectId, session, access, canDevelop, se
   const data = useDataBindings(projectId, taskId, serviceId);
   return (
     <>
+      <UnsavedChangesGuard dirty={editor.dirty} scope={t('devSession.editor.draftScope', { path: editor.file?.path ?? '' })} allowNavigate={(current, next) => current.pathname === next.pathname && !('view' in next.search && next.search.view === 'conversation')} />
       <header className={styles.context}><strong>{t('devSession.title')}</strong><StreamStatus state={state} />
         <details className={styles.disclosure}><summary>{t('devSession.data.title')}{data.bindings.some((binding) => binding.mode !== 'development' && ['active', 'approved'].includes(binding.state)) ? ` · ${t('devSession.native.productionAccess')}` : ''}</summary><div><DataBindingPane data={data} /></div></details>
-        <details className={styles.disclosure}><summary>{t('devSession.native.sessionMenu')}</summary><div><SessionCard session={session} stream={state} access={access} release={release} /><Link to={PROJECT_PATHS[space].conversations} params={{ projectId }}>{t('devSession.native.history')}</Link></div></details>
+        <details className={styles.disclosure}><summary>{t('devSession.native.sessionMenu')}</summary><div><SessionCard session={session} stream={state} access={access} release={release} unsavedFile={editor.dirty ? editor.file?.path : undefined} editorBusy={editor.busy} /><Link to={PROJECT_PATHS[space].conversations} params={{ projectId }}>{t('devSession.native.history')}</Link></div></details>
         <details className={styles.disclosure}><summary>{t('devSession.native.prepareRelease')}</summary><div><PublishPane publish={publish} /></div></details>
       </header>
       <VersionComparisonPanel projectId={projectId} taskId={taskId} channel={channel} canDevelop={canDevelop} compact />
-      <NativeWorkspace taskId={taskId} userId={userId} channel={channel} stream={state} canDevelop={canDevelop} onActivity={touch} activityTarget={activityTarget}
+      <NativeWorkspace taskId={taskId} userId={userId} channel={channel} stream={state} canDevelop={canDevelop} onActivity={touch} activityTarget={activityTarget} editorDirty={editor.dirty}
         preview={<DevelopmentPreview preview={preview} previewHost={session.previewHost} connected={state.runnerConnected} />}
         editor={<EditorPane tree={tree} editor={editor} />}
         changes={<VersionComparisonPanel projectId={projectId} taskId={taskId} channel={channel} canDevelop={canDevelop} initiallyExpanded />} />

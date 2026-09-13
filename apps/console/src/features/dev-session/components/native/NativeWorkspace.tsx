@@ -19,10 +19,11 @@ import { activityCounts, activityStatus } from '../../../../shared/activity/agen
 import type { ActivityTarget } from '../../../../shared/activity/agentActivityView';
 import { useActivityTarget } from '../../hooks/native/useActivityTarget';
 
-export function NativeWorkspace({ taskId, userId, channel, stream, canDevelop, onActivity, preview, editor, changes, activityTarget }: {
+export function NativeWorkspace({ taskId, userId, channel, stream, canDevelop, onActivity, preview, editor, changes, activityTarget, editorDirty = false }: {
   readonly taskId: string; readonly userId: string; readonly channel: TaskStreamChannel; readonly stream: StreamState; readonly canDevelop: boolean;
   readonly onActivity: () => void; readonly preview: ReactNode; readonly editor: ReactNode; readonly changes: ReactNode;
   readonly activityTarget?: ActivityTarget;
+  readonly editorDirty?: boolean;
 }): ReactElement {
   const t = useT();
   const { store, state } = useWorkspaceLayout(taskId, userId, t('devSession.native.defaultTab'));
@@ -49,7 +50,7 @@ export function NativeWorkspace({ taskId, userId, channel, stream, canDevelop, o
     {state.phase === 'loading' ? <p role="status">{t('devSession.native.layoutLoading')}</p> : null}
     {targetError ? <p className={styles.error} role="status">{t(targetError)}</p> : null}
     {state.error ? <div className={styles.error} role="status">{state.error}<Button onClick={() => void (state.loaded ? store.reapply() : store.load())}>{t('devSession.native.reapply')}</Button>{state.loaded ? <Button onClick={() => void store.useRemote()}>{t('devSession.native.useRemote')}</Button> : null}</div> : null}
-    <Tabs label={t('devSession.native.tabs')} value={layout.view === 'cli' ? layout.activeTabId : layout.view} items={[...layout.tabs.map((tab) => { const counts = activityCounts(task, tab.paneOrder); return { value: tab.id, label: <span>{tab.name} · {tab.paneOrder.length}{counts.pending ? <b className={styles.waiting}> · {t('activity.pendingCount', { count: counts.pending })}</b> : null}{counts.completions ? <b className={styles.completed}> · {t('activity.completedCount', { count: counts.completions })}</b> : null}{counts.running ? <span> · {t('activity.runningCount', { count: counts.running })}</span> : null}</span> }; }), ...(['preview', 'code', 'changes'] as const).map((value) => ({ value, label: t(`devSession.native.view.${value}`) }))]}
+    <Tabs label={t('devSession.native.tabs')} value={layout.view === 'cli' ? layout.activeTabId : layout.view} items={[...layout.tabs.map((tab) => { const counts = activityCounts(task, tab.paneOrder); return { value: tab.id, label: <span>{tab.name} · {tab.paneOrder.length}{counts.pending ? <b className={styles.waiting}> · {t('activity.pendingCount', { count: counts.pending })}</b> : null}{counts.completions ? <b className={styles.completed}> · {t('activity.completedCount', { count: counts.completions })}</b> : null}{counts.running ? <span> · {t('activity.runningCount', { count: counts.running })}</span> : null}</span> }; }), ...(['preview', 'code', 'changes'] as const).map((value) => ({ value, label: `${t(`devSession.native.view.${value}`)}${value === 'code' && editorDirty ? ` · ${t('devSession.editor.dirty')}` : ''}` }))]}
       onChange={(value) => store.update((current) => current.tabs.some((tab) => tab.id === value) ? { ...current, activeTabId: value, view: 'cli' } : { ...current, view: value as 'preview' | 'code' | 'changes' })}
       extra={<><Button variant="ghost" disabled={!state.loaded || layout.tabs.length >= 16} onClick={() => store.update((value) => addWorkspaceTab(value, t('devSession.native.numberedTab', { count: value.tabs.length + 1 })))}>{t('devSession.native.addTab')}</Button><details className={styles.menu}><summary>{t('devSession.native.roster', { count: roster?.length ?? 0 })}</summary><div className={styles.roster}>
         {roster?.map((terminal) => <div key={terminal.terminalId}><code>CLI {terminal.agentId.slice(-6)}</code><span>{terminal.compute} · {t(`activity.status.${activityStatus(terminal, task?.page?.states.find((state) => state.terminalId === terminal.terminalId) ?? terminal.activity, task?.page, task?.stale)}`)}</span><Button onClick={() => store.update((value) => ({ ...moveTerminal(value, terminal.terminalId, value.activeTabId), view: 'cli' }))}>{t('devSession.native.restore')}</Button></div>)}
@@ -61,6 +62,6 @@ export function NativeWorkspace({ taskId, userId, channel, stream, canDevelop, o
         <div className={styles.stage}>{visible.length === 0 ? <div className={styles.empty}><strong>{t('devSession.native.empty')}</strong><p>{t('devSession.native.emptyHint')}</p></div> : layout.previewAlongside ? <SplitGrid items={[{ id: 'terminals', content: screen }, { id: 'preview', content: preview }]} mode="columns" ratios={{ columns: [layout.previewRatio, 1 - layout.previewRatio], rows: [1] }} separatorLabel={(axis, index) => t(`devSession.native.resize.${axis}`, { index })} onResize={(ratios) => store.update((value) => ({ ...value, previewRatio: Math.max(0.25, Math.min(0.75, ratios.columns[0] ?? 0.5)) }))} /> : screen}</div>
       </> : <div className={styles.stage}>{layout.view === 'preview' ? preview : layout.view === 'code' ? editor : changes}</div>}
     </Tabs>
-    <footer className={styles.footer}><span>{t('devSession.native.sharedHint')}</span><span>{state.phase === 'saving' || state.dirty && !state.error ? t('devSession.native.savingLayout') : state.loaded && !state.error && state.revision > 0 ? t('devSession.native.personalLayout') : ''}</span></footer>
+    <footer className={styles.footer}><span>{editorDirty ? t('devSession.editor.draftLifetime') : t('devSession.native.sharedHint')}</span><span>{state.phase === 'saving' || state.dirty && !state.error ? t('devSession.native.savingLayout') : state.loaded && !state.error && state.revision > 0 ? t('devSession.native.personalLayout') : ''}</span></footer>
   </section>;
 }

@@ -23,6 +23,8 @@ export interface SessionCardProps {
   readonly stream: StreamState;
   readonly access: SessionAccess;
   readonly release: UseMutationResult<ReleaseDevSessionResult, ApiClientError, boolean>;
+  readonly unsavedFile?: string;
+  readonly editorBusy?: boolean;
 }
 
 function details(session: DevSessionDto, stream: StreamState, access: SessionAccess, t: Translate, locale: string): DefinitionItem[] {
@@ -44,7 +46,7 @@ function details(session: DevSessionDto, stream: StreamState, access: SessionAcc
 }
 
 /** 会话摘要：状态、任务、TaskRunner 是否已连、归属与释放入口。 */
-export function SessionCard({ session, stream, access, release }: SessionCardProps): ReactElement {
+export function SessionCard({ session, stream, access, release, unsavedFile, editorBusy }: SessionCardProps): ReactElement {
   const t = useT();
   const { locale } = useI18n();
   return (
@@ -54,7 +56,7 @@ export function SessionCard({ session, stream, access, release }: SessionCardPro
           <Badge tone={sessionStateTone(session.state)}>{t(`devSession.state.${session.state}`)}</Badge>
           <StreamStatus state={stream} />
         </div>
-        <ReleaseControl projectId={session.projectId} taskId={session.taskId} access={access} release={release} />
+        <ReleaseControl projectId={session.projectId} taskId={session.taskId} access={access} release={release} unsavedFile={unsavedFile} editorBusy={editorBusy} />
       </header>
       <DefinitionList layout="grid" items={details(session, stream, access, t, locale)} />
       {stream.runnerState !== undefined && stream.runnerState !== 'ready' ? (

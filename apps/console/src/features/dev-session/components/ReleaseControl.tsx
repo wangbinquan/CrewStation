@@ -19,13 +19,15 @@ export interface ReleaseControlProps {
   readonly taskId: string;
   readonly access: SessionAccess;
   readonly release: UseMutationResult<ReleaseDevSessionResult, ApiClientError, boolean>;
+  readonly unsavedFile?: string;
+  readonly editorBusy?: boolean;
 }
 
 /**
  * 释放会话：先就地确认，负责人释放他人会话要额外说明这会带 force。
  * 释放结果（未推送的提交）由页面渲染：会话没了之后本组件已经不在树上。
  */
-export function ReleaseControl({ projectId, taskId, access, release }: ReleaseControlProps): ReactElement | null {
+export function ReleaseControl({ projectId, taskId, access, release, unsavedFile, editorBusy = false }: ReleaseControlProps): ReactElement | null {
   const t = useT();
   const [asking, setAsking] = useState(false);
   const inspection = useApiMutation(() => api.devSession.workspaceStatus(projectId));
@@ -39,13 +41,16 @@ export function ReleaseControl({ projectId, taskId, access, release }: ReleaseCo
         confirmLabel={t('devSession.release.submit')}
         cancelLabel={t('devSession.release.cancel')}
         busy={release.isPending}
-        confirmDisabled={inspection.isPending || (inspection.data !== undefined && inspection.data.taskId !== taskId)}
+        confirmDisabled={editorBusy || inspection.isPending || (inspection.data !== undefined && inspection.data.taskId !== taskId)}
         onConfirm={() => {
+          if (editorBusy || inspection.isPending || release.isPending || (inspection.data !== undefined && inspection.data.taskId !== taskId)) return;
           setAsking(false);
           release.mutate(access.needsForce);
         }}
         onCancel={() => setAsking(false)}
       >
+        {unsavedFile ? <PaneNotice tone="warning">{t('devSession.release.editorDraft', { path: unsavedFile })}</PaneNotice> : null}
+        {editorBusy ? <PaneNotice tone="info">{t('devSession.release.editorBusy')}</PaneNotice> : null}
         <QueryStatus isPending={inspection.isPending} error={inspection.error} loadingKey="devSession.workspace.checking" />
         {inspection.error ? <PaneNotice tone="warning">{t('devSession.release.unknown')}</PaneNotice> : null}
         {inspection.data ? <WorkspaceInspection workspace={inspection.data} /> : null}

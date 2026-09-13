@@ -11,6 +11,7 @@ interface NodesProps {
   readonly depth: number;
   readonly openPath: string | undefined;
   readonly onOpen: (path: string) => void;
+  readonly disabled?: boolean;
 }
 
 function Node({ entry, path, props }: { readonly entry: FileEntry; readonly path: string; readonly props: NodesProps }): ReactElement {
@@ -28,6 +29,7 @@ function Node({ entry, path, props }: { readonly entry: FileEntry; readonly path
         className={[styles.node, path === openPath ? styles.active : ''].filter(Boolean).join(' ')}
         style={{ paddingLeft: `calc(var(--cs-space-2) + ${depth} * var(--cs-space-3))` }}
         onClick={activate}
+        disabled={!isDir && props.disabled}
       >
         <span className={styles.marker} aria-hidden="true">
           {isDir ? (expanded ? '▾' : '▸') : '·'}
@@ -51,11 +53,11 @@ function Nodes(props: NodesProps): ReactElement {
 }
 
 /** 工作目录文件树：目录按需展开，点文件在右侧打开。 */
-export function FileTree({ tree, openPath, onOpen }: Omit<NodesProps, 'dir' | 'depth'>): ReactElement {
+export function FileTree({ tree, openPath, onOpen, disabled }: Omit<NodesProps, 'dir' | 'depth'>): ReactElement {
   const t = useT();
   return (
     <nav className={styles.tree} aria-label={t('devSession.editor.treeLabel')}>
-      <Nodes tree={tree} dir={WORKSPACE_ROOT} depth={0} openPath={openPath} onOpen={onOpen} />
+      <Nodes tree={tree} dir={WORKSPACE_ROOT} depth={0} openPath={openPath} onOpen={onOpen} disabled={disabled} />
     </nav>
   );
 }

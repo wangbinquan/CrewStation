@@ -1,15 +1,9 @@
-import { useCallback, useRef, useState } from 'react';
-import { isVersionConflict, streamErrorMessage } from '../model/runnerErrors';
-import { asReadFileResult, asWriteFileResult } from '../model/runnerResults';
+import { useEffect, useMemo, useSyncExternalStore } from 'react';
+import { FileEditorStore } from '../model/editor/fileEditorStore';
+import type { EditorDiscardAction, EditorFile } from '../model/editor/fileEditorStore';
 import type { TaskStreamChannel } from './useTaskStream';
 
-export interface EditorFile {
-  readonly path: string;
-  /** readFile 返回的内容 sha256，写回时作 expectedVersion。 */
-  readonly version: string;
-  /** 每次从磁盘读入自增；编辑器据此重置文档，保存成功不重置。 */
-  readonly revision: number;
-}
+export type { EditorFile } from '../model/editor/fileEditorStore';
 
 export interface FileEditorHandle {
   readonly file: EditorFile | undefined;
@@ -19,6 +13,9 @@ export interface FileEditorHandle {
   /** 磁盘上的版本与打开时不同：提示重新载入，绝不覆盖。 */
   readonly conflict: boolean;
   readonly error: string | undefined;
+  readonly pendingAction: EditorDiscardAction | undefined;
+  readonly confirmDiscard: () => void;
+  readonly cancelDiscard: () => void;
   readonly openFile: (path: string) => void;
   readonly change: (next: string) => void;
   readonly save: () => void;
@@ -30,84 +27,13 @@ export interface FileEditorHandle {
 
 /** 单文件编辑：读入、改、按 expectedVersion 写回；冲突只提示不覆盖。 */
 export function useFileEditor(channel: TaskStreamChannel): FileEditorHandle {
-  const [file, setFile] = useState<EditorFile | undefined>(undefined);
-  const [draft, setDraft] = useState('');
-  const [baseline, setBaseline] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [conflict, setConflict] = useState(false);
-  const [error, setError] = useState<string | undefined>(undefined);
-  const revisionRef = useRef(0);
-  // 连续点两个文件时，后发的请求才算数，先回来的旧结果要丢掉。
-  const requestRef = useRef(0);
-
-  const read = useCallback(
-    (path: string) => {
-      const ticket = requestRef.current + 1;
-      requestRef.current = ticket;
-      setBusy(true);
-      channel
-        .send({ type: 'readFile', path })
-        .then(asReadFileResult)
-        .then((result) => {
-          if (requestRef.current !== ticket) return;
-          revisionRef.current += 1;
-          setFile({ path: result.path || path, version: result.version, revision: revisionRef.current });
-          setDraft(result.content);
-          setBaseline(result.content);
-          setConflict(false);
-          setError(undefined);
-        })
-        .catch((cause: unknown) => {
-          if (requestRef.current === ticket) setError(streamErrorMessage(cause));
-        })
-        .finally(() => {
-          if (requestRef.current === ticket) setBusy(false);
-        });
-    },
-    [channel],
-  );
-
-  const save = useCallback(() => {
-    if (file === undefined) return;
-    setBusy(true);
-    channel
-      .send({ type: 'writeFile', path: file.path, content: draft, expectedVersion: file.version })
-      .then(asWriteFileResult)
-      .then((result) => {
-        setFile((current) => (current === undefined ? current : { ...current, version: result.version }));
-        setBaseline(draft);
-        setError(undefined);
-      })
-      .catch((cause: unknown) => {
-        if (isVersionConflict(cause)) setConflict(true);
-        else setError(streamErrorMessage(cause));
-      })
-      .finally(() => setBusy(false));
-  }, [channel, draft, file]);
-
-  const close = useCallback(() => {
-    requestRef.current += 1;
-    setFile(undefined);
-    setDraft('');
-    setBaseline('');
-    setConflict(false);
-    setError(undefined);
-  }, []);
-
+  const store = useMemo(() => new FileEditorStore(channel), [channel]);
+  useEffect(() => { store.activate(); return store.deactivate; }, [store]);
+  const state = useSyncExternalStore(store.subscribe, store.getSnapshot);
   return {
-    file,
-    draft,
-    dirty: draft !== baseline,
-    busy,
-    conflict,
-    error,
-    openFile: read,
-    change: setDraft,
-    save,
-    reload: useCallback(() => {
-      if (file !== undefined) read(file.path);
-    }, [file, read]),
-    dismissConflict: useCallback(() => setConflict(false), []),
-    close,
+    ...state, dirty: state.draft !== state.baseline, busy: Boolean(state.operation),
+    openFile: store.openFile, change: store.change, save: store.save, reload: store.reload,
+    dismissConflict: store.dismissConflict, close: store.close,
+    confirmDiscard: store.confirmDiscard, cancelDiscard: store.cancelDiscard,
   };
 }
