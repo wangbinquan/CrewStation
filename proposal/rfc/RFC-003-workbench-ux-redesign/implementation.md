@@ -1208,3 +1208,17 @@ CUA 本轮仍报告 Mac 锁定，当前完整历史创建／继续／返回的�
 20:06:27Z files 的 HEAD 仍 e4741df、未推送 0，但 legacy CLI 增加两个 `.npm/_cacache/` 未跟踪文件，fingerprint=`6ca6c87f7b9df146267bc5838357789b78c8d941572f8d44e9367b5262d6bf8e`，不能描述为干净工作树。20:09:57Z 原两份 QA Pod UID、Running／ready／restartCount=0，以及旧比较文件、files 首页和各自 Git 配置四个摘要均保持；节点剩余 1,560,313,856 bytes。没有读取、清理或提交缓存内容，不再向旧 rfc003-ux 发模型轮次；新历史 Agent 与原 CLI 草稿均保留用于后续复验。
 
 本批源码限于 ComparisonSummary 与其视图测试，完整本地门禁 **1146 pass／4 skip／0 fail**（1150 tests／194 files／6384 assertions／110.07s），console build **599ms**；两份候选摘要保持。实际旧任务故障可用于更新后的提示复验，源码提交、精确 SHA CI 与仅 console 更新继续；API ebaa730 和 controller cc93104 无需改动。临时证据为 batch58 的 red／targeted／check／console-build／candidate、files-ui-api／ui-runtime、terminal-snapshot，以及 batch57 的 history-ui-api。累计 **18／52**；I9／I14／I15 与成员范围保持待答复，RFC-004 不提前启动。
+
+### 第五十八批上库、部署与页面复验
+
+已发布 `927da4d212ecd643bee5529838e3d1f1bc3bceed`，精确 SHA [CI 34891820268](https://github.com/wangbinquan/CrewStation/actions/runs/34891820268)／job 104136121014 于 20:17:44Z 成功：**1142 pass／8 skip／0 fail**（1150 tests／194 files／6343 assertions／66.35s），console build **1.01s**，本批三项新视图用例实际执行。
+
+在已核对的 4d1859a 基底上仅覆盖 console 编译产物，以断网、不拉取方式构建 rfc003-927da4d，imageID=`sha256:485eff945ba104a626690b32055135ae3f569f6921f662d81876cfa886332723`。七份运行文件（含未变的 serve.ts）在临时镜像逐份核对；226,469,909 bytes 内容仅新增 3,712,021 bytes，流式导入完成，20:18:10Z 节点剩余 1,584,771,072 bytes，无 tar、无数据清理。
+
+在 UID／generation=27／replicas=1／容器名及旧镜像前置条件下仅更新 console。20:22:55Z 核对 generation=28／1／1，Pod `console-7d54894696-8pcd7`／UID `a4060566-367a-4a68-a485-704981b0faed`／restartCount=0，实际镜像与七份摘要一致；20:23:00Z 普通已登录 HTTP 六份产物均 200 且字节及 SHA256 一致。API ebaa730／generation=25、controller cc93104／generation=20 保持各 1／1。
+
+真实 rfc003-ux “差异”页面 reload 后已实看新内容：顶部紧凑摘要和展开详情各一次 `Git 结果超过读取上限，无法给出完整检查结果`，精确文本 DOM 总数为 2；两处仍显示未知／暂不可比较及实际生产 v0.1.0 @ a10027cda8，没有零差距冒充结果。20:24:42Z 正常 API 复核，files 的两份 npm 缓存／模型后 fingerprint、HEAD e4741df／未推送 0、新历史 Agent awaiting-input 和原单个原生 CLI／活动状态均与 UI 后快照相同，旧任务仍如实 unavailable。
+
+终端诊断另以只读任务 WS 查询尝试获取原始输出／resize 历史，该持久回放中数量为 0，不能据此重建完整屏幕；现有 snapshot 仍是有效复现。将其在同版本 headless 再次序列化，字符行不变、光标横坐标从 27 到 26，尚不足以确认为错位根因。后续需要受控现场输出或隔离最小复现，不能直接改快照尺寸或以强制获取输入控制掩盖只读恢复问题。
+
+明细为 batch58 的 source-publication／source-ci、image-context／build／import-budget／import、console-patch／verified／http-verified 和 runtime-after-deploy。两份源码自有效门禁后没有再变化，纯证据补记沿用该结果；最终文档提交 CI 单独核对。累计仍 **18／52**；RFC-004 等待 RFC-003 正式完结。

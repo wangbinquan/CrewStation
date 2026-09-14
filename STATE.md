@@ -15,7 +15,9 @@
 
 第五十八批已用 CUA 内置浏览器完成真实历史 OpenCode 的页面启动／继续、等待提示和返回操作。旧 rfc003-ux 原历史 Agent 接续第三轮；新 files QA 历史 Agent `agt_01a0a18645f770009e298c7f2f5e12b4` 在只读档位完成两轮口令接续，返回后原单个 CLI／页签／未发送草稿／未读完成状态保持。但原 CLI 重新附着画面错位，正常 API 取得的屏幕快照也复现，UX-AT-52 保持未完成，继续定位；不能把对象与输入保留当作完整通过。
 
-旧任务继续运行后 Git 输出超过读取上限，页面真实显示未知，但同一原因在每份摘要重复三次。已去重相同原因并保留不同原因、未知状态及实际部署；回归先 **8 pass／2 fail**，修复后 **10 pass／0 fail／44 assertions**。最终完整门禁 **1146 pass／4 skip／0 fail**（1150 tests／194 files／6384 assertions／110.07s），console build **599ms**，两份候选文件保持，发布与 console 更新继续。
+旧任务继续运行后 Git 输出超过读取上限，页面真实显示未知，但同一原因在每份摘要重复三次。已去重相同原因并保留不同原因、未知状态及实际部署；回归先 **8 pass／2 fail**，修复后 **10 pass／0 fail／44 assertions**。最终完整门禁 **1146 pass／4 skip／0 fail**（1150 tests／194 files／6384 assertions／110.07s），console build **599ms**，两份候选文件保持。已发布 `927da4d212ecd643bee5529838e3d1f1bc3bceed`，精确 SHA [CI 34891820268](https://github.com/wangbinquan/CrewStation/actions/runs/34891820268) 成功：1142 pass／8 skip／0 fail，console build 1.01s。
+
+console 已更新 rfc003-927da4d／generation=28／1／1，20:22:55Z 实际镜像与七份文件、20:23:00Z 正常 HTTP 六份产物均匹配。真实旧任务故障页面已刷新复验：顶部与详情各一次相同原因，仍显示未知与实际生产 v0.1.0。20:24:42Z 原单个 CLI／新历史 Agent awaiting-input／files 模型后工作树均保持；API ebaa730、controller cc93104 不变。新增镜像内容 3,712,021 bytes，无数据清理。下一步继续已复现的原生终端屏幕恢复问题；当前源码未再变化，纯证据补记复用有效门禁。
 
 20:09:57Z 原两份 QA Pod 均 Running／ready／restartCount=0，原业务文件及 Git 配置摘要保持。files 新增两个未跟踪 npm 缓存文件，HEAD e4741df／未推送 0，不能称工作树仍干净；未读取或清理缓存内容。旧 QA 也不再继续发模型轮次。节点剩余 1,560,313,856 bytes。累计仍 **18／52**；I9／I14／I15 与成员范围待答复，RFC-004 等待 RFC-003 完结。
 
