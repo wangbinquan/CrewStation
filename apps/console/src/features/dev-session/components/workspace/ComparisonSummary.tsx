@@ -9,6 +9,12 @@ export function ComparisonSummary({ comparison, compact = false }: { readonly co
   const t = useT();
   const { workspace, deployment, commits, files } = comparison;
   const preview = deployment.target === 'preview';
+  const warnings = new Set([
+    workspace.status === 'unavailable' ? workspace.reason : null,
+    deployment.status === 'unavailable' ? deployment.reason : null,
+    commits.status === 'unavailable' ? commits.reason : null,
+    files.status === 'unavailable' && deployment.status === 'ready' ? files.reason : null,
+  ].filter((reason): reason is string => reason !== null));
   return <div className={styles.summary}>
     <span>{t('devSession.compare.worktree')}: <code>{workspace.status === 'ready' ? `${workspace.branch ?? t('devSession.workspace.detached')} @ ${workspace.headSha?.slice(0, 10) ?? t('devSession.workspace.unborn')}` : t('devSession.compare.unknown')}</code></span>
     <span>{t(preview ? 'devSession.compare.preview' : 'devSession.compare.production')}: <code>{deployment.status === 'ready' ? `${deployment.tag} @ ${deployment.commitSha.slice(0, 10)}` : t(`devSession.compare.${deployment.status}`)}</code></span>
@@ -19,9 +25,7 @@ export function ComparisonSummary({ comparison, compact = false }: { readonly co
       <span>{t('devSession.workspace.dirty', { count: workspace.uncommittedCount })}</span>
       <span>{workspace.unpushed.status === 'ready' ? t('devSession.workspace.unpushed', { count: workspace.unpushed.count }) : t('devSession.compare.upstreamUnknown')}</span>
       {!compact ? <span>{workspace.upstream.status === 'ready' ? t('devSession.compare.upstream', { name: workspace.upstream.name, ahead: workspace.upstream.ahead, behind: workspace.upstream.behind }) : t(`devSession.compare.upstream.${workspace.upstream.status}`)}</span> : null}
-    </> : <PaneNotice tone="warning">{workspace.reason}</PaneNotice>}
-    {deployment.status === 'unavailable' ? <PaneNotice tone="warning">{deployment.reason}</PaneNotice> : null}
-    {commits.status === 'unavailable' ? <PaneNotice tone="warning">{commits.reason}</PaneNotice> : null}
-    {files.status === 'unavailable' && deployment.status === 'ready' ? <PaneNotice tone="warning">{files.reason}</PaneNotice> : null}
+    </> : null}
+    {[...warnings].map((reason) => <PaneNotice key={reason} tone="warning">{reason}</PaneNotice>)}
   </div>;
 }

@@ -25,7 +25,7 @@ function comparison(): VersionComparisonDto {
   });
 }
 
-async function render(data: VersionComparisonDto, canDevelop = true, target: ComparisonTarget = 'prod', onOpenFile?: (path: string) => void) {
+async function render(data: VersionComparisonDto, canDevelop = true, target: ComparisonTarget = 'prod', onOpenFile?: (path: string) => void, compact = false) {
   globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
     const path = String(input);
     requests.push(`${init?.method ?? 'GET'} ${path}`);
@@ -38,7 +38,7 @@ async function render(data: VersionComparisonDto, canDevelop = true, target: Com
     } : data;
     return new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } });
   }) as typeof fetch;
-  ui = await renderElement(<VersionComparisonPanel projectId="prj_test" taskId={data.taskId} channel={channel} canDevelop={canDevelop} target={target} onOpenFile={onOpenFile} />, messages);
+  ui = await renderElement(<VersionComparisonPanel projectId="prj_test" taskId={data.taskId} channel={channel} canDevelop={canDevelop} target={target} onOpenFile={onOpenFile} compact={compact} />, messages);
   return ui;
 }
 
@@ -87,6 +87,27 @@ test('状态未知不显示零差距，只有开发者能补齐历史', async ()
   expect(page.text()).not.toContain('待上线 0');
   await page.click('查看差异');
   expect(page.button('补齐历史并重算').disabled).toBe(true);
+});
+
+test.each([false, true])('工作树故障传到提交和文件比较时只解释一次，紧凑模式=%s', async (compact) => {
+  const data = comparison(), reason = 'Git 结果超过读取上限，无法给出完整检查结果';
+  data.workspace = { status: 'unavailable', reason, checkedAt: data.checkedAt };
+  data.commits = { status: 'unavailable', reason }; data.files = { status: 'unavailable', reason };
+  const page = await render(data, true, 'prod', undefined, compact);
+  // 实机 Git 输出超限时，同一上游原因曾在顶部条和详情摘要内各重复三次。
+  expect(page.text().split(reason).length - 1).toBe(1);
+  expect(page.text()).toContain('暂不可比较'); expect(page.text()).toContain('v0.1.0');
+  expect(page.text()).not.toContain('未提交文件 0'); expect(page.text()).not.toContain('待上线 0');
+});
+
+test('比较摘要仍保留不同失败原因，去重不隐藏独立问题', async () => {
+  const data = comparison();
+  data.workspace = { status: 'unavailable', reason: '工作树读取失败', checkedAt: data.checkedAt };
+  data.commits = { status: 'unavailable', reason: '历史对象缺失' };
+  data.files = { status: 'unavailable', reason: '文件差异读取失败' };
+  const page = await render(data);
+  for (const reason of ['工作树读取失败', '历史对象缺失', '文件差异读取失败']) expect(page.text().split(reason).length - 1).toBe(1);
+  expect(page.text()).toContain('暂不可比较');
 });
 
 test('共享页签支持方向键，选中标签与面板名称关联', async () => {

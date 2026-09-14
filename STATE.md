@@ -11,11 +11,21 @@
 
 **RFC-003 工作台 UX 重设计处于 In Progress，作者已要求完整实现并提交上库。** RFC-001 与 RFC-002 都已 Done，见 `proposal/rfc/README.md` 的索引表。
 
+## 最新接力：页面历史续聊与重复故障提示（2026-09-15）
+
+第五十八批已用 CUA 内置浏览器完成真实历史 OpenCode 的页面启动／继续、等待提示和返回操作。旧 rfc003-ux 原历史 Agent 接续第三轮；新 files QA 历史 Agent `agt_01a0a18645f770009e298c7f2f5e12b4` 在只读档位完成两轮口令接续，返回后原单个 CLI／页签／未发送草稿／未读完成状态保持。但原 CLI 重新附着画面错位，正常 API 取得的屏幕快照也复现，UX-AT-52 保持未完成，继续定位；不能把对象与输入保留当作完整通过。
+
+旧任务继续运行后 Git 输出超过读取上限，页面真实显示未知，但同一原因在每份摘要重复三次。已去重相同原因并保留不同原因、未知状态及实际部署；回归先 **8 pass／2 fail**，修复后 **10 pass／0 fail／44 assertions**。最终完整门禁 **1146 pass／4 skip／0 fail**（1150 tests／194 files／6384 assertions／110.07s），console build **599ms**，两份候选文件保持，发布与 console 更新继续。
+
+20:09:57Z 原两份 QA Pod 均 Running／ready／restartCount=0，原业务文件及 Git 配置摘要保持。files 新增两个未跟踪 npm 缓存文件，HEAD e4741df／未推送 0，不能称工作树仍干净；未读取或清理缓存内容。旧 QA 也不再继续发模型轮次。节点剩余 1,560,313,856 bytes。累计仍 **18／52**；I9／I14／I15 与成员范围待答复，RFC-004 等待 RFC-003 完结。
+
 ## 最新接力：事件死信重放与队列衔接（2026-09-15）
 
 第五十七批检查 UX-AT-14，四个既有 QA 项目的死信均为 0；没有向共享订阅扇出验收事件。隔离的真实 PostgreSQL／HTTP／队列回归复现并发重放旧快照覆盖 pending／delivered，导致订阅者再次收到同一事件，初次 **0 pass／3 fail**。重放改为授权后在同一事务中锁行重读、改状态和入队；已被另一请求处理则返回 412。随后又复现旧 worker 已写 dead、队列任务尚未结束时，去重吞掉重放而 HTTP 仍成功、记录永久 pending。现入队冲突回滚并明确稍后重试，旧任务收尾后能正常送达。
 
-新队列回归 **3 pass／1 fail**，最终定向 **14 pass／0 fail／111 assertions**。此前候选门禁已绿，新增实际修复改变候选后才再跑；最终完整门禁 **1143 pass／4 skip／0 fail**（1147 tests／194 files／6370 assertions／103.83s），七份候选摘要保持。console 源码和依赖未改，沿用第五十六批有效 build。提交、精确 SHA CI 和仅 cs-api 更新随后核验；本次隔离运行不替代真实项目的死信到日志页面旅程，累计 **18／52**。Mac 仍锁定，I9／I14／I15 与成员范围待答复，RFC-004 继续排队。
+新队列回归 **3 pass／1 fail**，最终定向 **14 pass／0 fail／111 assertions**。此前候选门禁已绿，新增实际修复改变候选后才再跑；最终完整门禁 **1143 pass／4 skip／0 fail**（1147 tests／194 files／6370 assertions／103.83s），七份候选摘要保持。console 源码和依赖未改，沿用第五十六批有效 build。已发布 `ebaa73014657692eafb32728feb3232dfcc8ebd3`，精确 SHA [CI 34888522477](https://github.com/wangbinquan/CrewStation/actions/runs/34888522477) 成功：1139 pass／8 skip／0 fail，console build 910ms。
+
+仅 cs-api 更新为 rfc003-ebaa730／generation=25／1／1，19:55:20Z 实际镜像与七份源码摘要一致，console 4d1859a／controller cc93104 保持。增量导入只新增 56,474 bytes；原两份 QA 工作树、历史 Agent awaiting-input 与原单个原生 CLI 身份均保留。CUA 内置浏览器已能正常登录并打开历史转录，页面验收恢复进行；原生 Mac 锁定不再是该通道的阻碍。本次隔离运行不替代真实项目的死信到日志页面旅程，累计 **18／52**。I9／I14／I15 与成员范围待答复，RFC-004 继续排队。
 
 ## 最新接力：历史新建 Agent 输入保护（2026-09-15）
 

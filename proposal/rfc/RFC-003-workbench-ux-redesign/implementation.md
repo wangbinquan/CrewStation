@@ -1183,4 +1183,28 @@ CUA 本轮仍报告 Mac 锁定，当前完整历史创建／继续／返回的�
 
 现 events 的入队适配器在该冲突时返回 precondition／412，事务回滚完整死信记录并说明稍后重试；旧任务结束后同一投递可正常重新入队并实际送达。没有修改公共 queue 包的去重／租约规则。最终定向三文件 **14 pass／0 fail／111 assertions／1.10s**，涵盖四项新增场景和原有模块／状态机。新增修复改变了候选，重新执行最终完整 `bun run check` **1143 pass／4 skip／0 fail**（1147 tests／194 files／6370 assertions／103.83s）；七份候选摘要保持。console 源码／依赖未变，沿用第五十六批有效 build，未重复构建。
 
-落位限于 events application、persistence／queue adapters、两个端口说明和本模块测试，没有迁移或新跨模块依赖。用户域重放接口由 cs-api 提供，本批只需更新该部署；源码发布、精确 SHA CI 与实际镜像核对继续。临时证据为 events-preflight 和 batch57 的 red／targeted／check、queue-red／targeted-final／check-final、两版 candidate。累计仍 **18／52**，I9／I14／I15、具体成员范围与 Mac 解锁仍待答复，RFC-004 等待 RFC-003 完结。
+落位限于 events application、persistence／queue adapters、两个端口说明和本模块测试，没有迁移或新跨模块依赖。用户域重放接口由 cs-api 提供，本批只更新该部署。临时证据为 events-preflight 和 batch57 的 red／targeted／check、queue-red／targeted-final／check-final、两版 candidate。
+
+### 第五十七批上库与共享部署复核
+
+已发布 `ebaa73014657692eafb32728feb3232dfcc8ebd3`，精确 SHA [CI 34888522477](https://github.com/wangbinquan/CrewStation/actions/runs/34888522477)／job 104125079111 于 19:47:24Z 成功：**1139 pass／8 skip／0 fail**（1147 tests／194 files／6329 assertions／66.17s），console build **910ms**。四项新并发／队列回归实际执行；八项环境专属跳过仍独立列示。
+
+基于已核对的 c712aa7 镜像，只覆盖七份候选文件，以 `--network=none --pull=false` 构建 `cs-control-plane:rfc003-ebaa730`，imageID=`sha256:ad2335358fa15fcec09c31825fe7d877a627f9c1cc6e30b3d51f9f4ac68716a4`。没有重装依赖；517,475,482 bytes 内容仅新增 56,474 bytes，流式导入成功，不落 tar、不清理数据。19:45:58Z 节点剩余 1,623,515,136 bytes。
+
+使用原 UID、generation=24、replicas=1、容器名和旧镜像的 JSON Patch test，只更新 cs-api。19:55:20Z 为 generation=25／1／1，Pod `cs-api-5cdc48c6b7-gx5wl`／UID `34036e0c-296d-4ac1-b2d3-05fc755d56b4`、restartCount=0；实际 imageID 与七份运行文件摘要全部一致。console rfc003-4d1859a／generation=27 与 controller rfc003-cc93104／generation=20 均保持 1／1。
+
+19:55:22Z 正常 API 前后对比：files 工作树 e4741df／未提交 0／未推送 0，旧历史 QA 的模型后指纹／未提交 1395，原历史 Agent awaiting-input，以及原单个原生 CLI／Runner 身份均保持。CUA 内置浏览器随后成功以原 admin 登录并打开实际历史转录，继续页面验收；未宣称 Mac 已解锁。部署和 API 证据为 batch57 的 source-ci、api-patch／verified、runtime-before／after。死信页面旅程仍未执行，累计 **18／52**；I9／I14／I15 和具体成员范围仍待答复，RFC-004 等待 RFC-003 完结。源码未再改，纯证据补记复用有效门禁。
+
+## 第五十八批：历史页面接续与故障摘要
+
+内置浏览器已恢复实际页面操作，以原 admin／admin@demo.invalid 登录共享 console 4d1859a。会话菜单打开独立“历史对话会话”，明确 L-id 与 CLI 是不同对象，没有“对话模式”按钮。旧 rfc003-ux 中实际看到原 Agent L-8de687 的两轮口令、原生会话及“等待输入”；填写待发送消息后切换新建，选择 rfc003-verify-opencode／只读并写入临时首条指令，收起和重开时两份草稿及选择均保留。实际发送第三轮，页面返回 `RFC003_HISTORY_ONE 和 RFC003_HISTORY_TWO。RFC003_HISTORY_UI` 后恢复等待，发送成功清空该条输入。返回 CLI 前新写一条验收草稿，共享离开确认可继续编辑并保留原对象；随后显式放弃仅本次两份临时草稿，回到原“差异”页签。
+
+旧任务工作树从模型后 1395 项变为接口 `unavailable`，原因是 `Git 结果超过读取上限，无法给出完整检查结果`；页面撤下旧计数和一致结论，显示未知／暂不可比较。但工作树、提交和文件分别透传相同原因，顶部条及详情摘要内各重复三次。已有实际页面截图与正常 API 事实，新增 compact=false／true 两条回归先得到 **8 pass／2 fail／36 assertions／737ms**，均为同文案出现 3 次而非 1 次。现在 ComparisonSummary 按原条件收集原因并按完整文本去重，不同失败仍逐条展示；未知和真实 v0.1.0 不变。新增独立原因回归同时保持通过，修复后 **10 pass／0 fail／44 assertions／735ms**。
+
+为验证同一项目的正向往返，在原 files 单个 CLI 上取得输入控制，1280×720 画面实际可见本轮完成、进程在线及输入区；写入 `RFC003_CLI_RETURN_DRAFT`，没有按回车或发送模型任务。从该会话菜单打开历史页面，新建且仅新建一个只读 OpenCode：`agt_01a0a18645f770009e298c7f2f5e12b4`，原生会话 `ses_f5e79b124ffeVT9sLgT1Kg7ND4`，task 仍 `tsk_01a09ff07aeb7000897fd0eda1e16cd2`。20:05:26.660Z／seq26331 started；20:05:37.389Z／26718 session；20:05:37.465Z／26722 输出 `RFC003_FILES_HISTORY`；20:05:37.717Z／26731 waiting。页面继续时不重复首轮口令，20:06:05.532Z／27599 正确输出 `RFC003_FILES_HISTORY RFC003_FILES_CONTINUED`，20:06:05.681Z／27603 再次 waiting；页面明确显示同一 L-5e12b4／等待输入，两轮期间没有工具调用。
+
+返回后原 CLI `agt_01a09ff2f4f97000b13dde63dc4b96e7`／terminal `pty_01a09ff2f4f97001bb9f6208c42dc089`／Runner `9992bfd0-2491-49a3-81c1-39268cdb900d`、数量 1、原工作区页签、网格、未读完成 1 和原未发送草稿均保留。可是只读重新附着的终端画面发生错位，等待回放完成后仍在；通过普通任务 WS 的 attachTerminal 取得 cols=150／rows=30／throughSeq=1647／9,880 bytes 的原屏幕快照，在隔离 headless 终端复原也出现错位。因此 UX-AT-52 仍未通过，后续须定位屏幕恢复；不以输入和身份仍在掩盖该缺陷。该只读取证没有发送 CLI 输入、claim、resize 或创建进程。
+
+20:06:27Z files 的 HEAD 仍 e4741df、未推送 0，但 legacy CLI 增加两个 `.npm/_cacache/` 未跟踪文件，fingerprint=`6ca6c87f7b9df146267bc5838357789b78c8d941572f8d44e9367b5262d6bf8e`，不能描述为干净工作树。20:09:57Z 原两份 QA Pod UID、Running／ready／restartCount=0，以及旧比较文件、files 首页和各自 Git 配置四个摘要均保持；节点剩余 1,560,313,856 bytes。没有读取、清理或提交缓存内容，不再向旧 rfc003-ux 发模型轮次；新历史 Agent 与原 CLI 草稿均保留用于后续复验。
+
+本批源码限于 ComparisonSummary 与其视图测试，完整本地门禁 **1146 pass／4 skip／0 fail**（1150 tests／194 files／6384 assertions／110.07s），console build **599ms**；两份候选摘要保持。实际旧任务故障可用于更新后的提示复验，源码提交、精确 SHA CI 与仅 console 更新继续；API ebaa730 和 controller cc93104 无需改动。临时证据为 batch58 的 red／targeted／check／console-build／candidate、files-ui-api／ui-runtime、terminal-snapshot，以及 batch57 的 history-ui-api。累计 **18／52**；I9／I14／I15 与成员范围保持待答复，RFC-004 不提前启动。
