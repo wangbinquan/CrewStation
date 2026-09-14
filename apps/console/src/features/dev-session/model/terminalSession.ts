@@ -2,7 +2,7 @@ import type { TaskStreamCommandInput } from '@crewstation/api-client';
 import { FitAddon } from '@xterm/addon-fit';
 import { Terminal } from '@xterm/xterm';
 import { streamErrorMessage } from './runnerErrors';
-import { terminalLook } from './terminalTheme';
+import { terminalLook, watchTerminalTheme } from './terminalTheme';
 
 /** 终端回滚行数：够翻一次构建日志，又不至于把内存吃满。 */
 const SCROLLBACK = 5_000;
@@ -55,11 +55,13 @@ export function openTerminalSession(options: TerminalSessionOptions): TerminalSe
   });
   const observer = new ResizeObserver(() => fitQuietly(fit));
   observer.observe(container);
+  const stopTheme = watchTerminalTheme(container, (theme) => { terminal.options.theme = theme; });
 
   return {
     terminal,
     dispose(): void {
       observer.disconnect();
+      stopTheme();
       input.dispose();
       resized.dispose();
       // 关闭指令尽力而为：连接可能已随页面一起关掉。

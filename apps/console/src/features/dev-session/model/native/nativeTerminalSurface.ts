@@ -2,14 +2,14 @@ import type { TerminalSnapshot } from '@crewstation/contracts';
 import { FitAddon } from '@xterm/addon-fit';
 import { Terminal } from '@xterm/xterm';
 import type { NativeTerminalSink } from './nativeTerminalAttachment';
-import { terminalLook } from '../terminalTheme';
+import { terminalLook, watchTerminalTheme } from '../terminalTheme';
 
 /** xterm 的生命周期只拥有 DOM；所有 PTY 命令由 attachment 控制。 */
 export class NativeTerminalSurface implements NativeTerminalSink {
   private terminal?: Terminal;
   private fit?: FitAddon;
   private observer?: ResizeObserver;
-  private themeObserver?: MutationObserver;
+  private stopTheme?: () => void;
   private timer?: ReturnType<typeof setTimeout>;
   private tail: Promise<void> = Promise.resolve();
   private controlled = false;
@@ -25,8 +25,7 @@ export class NativeTerminalSurface implements NativeTerminalSink {
       this.timer = setTimeout(() => resize(cols, rows), 80);
     });
     this.observer = new ResizeObserver(() => this.fitVisible()); this.observer.observe(container);
-    this.themeObserver = new MutationObserver(() => { terminal.options.theme = terminalLook(container).theme; });
-    this.themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme', 'class', 'style'] });
+    this.stopTheme = watchTerminalTheme(container, (theme) => { terminal.options.theme = theme; });
   }
   setControlled(controlled: boolean): void {
     this.controlled = controlled;
@@ -58,7 +57,8 @@ export class NativeTerminalSurface implements NativeTerminalSink {
   }
   dispose(): void {
     if (this.timer) clearTimeout(this.timer);
-    this.observer?.disconnect(); this.themeObserver?.disconnect(); this.terminal?.dispose();
+    this.observer?.disconnect(); this.stopTheme?.(); this.terminal?.dispose();
+    this.stopTheme = undefined;
     this.terminal = undefined; this.fit = undefined; this.controlled = false; this.tail = Promise.resolve();
   }
 }

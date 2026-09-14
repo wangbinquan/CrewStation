@@ -1256,3 +1256,17 @@ CUA 内置浏览器以 admin 在该项目逐个启动一个只读 rfc003-verify-
 21:27:05Z 新任务 HEAD／未推送 0 保持，但历史驱动新增十个未跟踪 `.npm/_cacache/` 项，fingerprint=`dbb42f6e8d8f9a9e87d968ce34425c036e0183bb6bffe14314afd4af032ad6b2`；仅取得 Git 元数据，没有读取、忽略、提交或清理缓存内容。21:29:58Z console=927da4d／generation=28、API=ebaa730／32、controller=cc93104／21 均 1／1。旧 files／rfc003-ux Pod 身份、ready／restartCount=0，四份原业务文件与 Git 配置摘要均保持；失败 workbench Pod 与 Bound 工作卷 UID 也保持。节点剩余 1,451,814,912 bytes，未做四窗压力实验，旧 Runner 仍运行各自原镜像。
 
 证据为 batch59 的 red、targeted、check、wide-red-final、targeted-final、check-final、两版 candidate、source-ci、image-build／image-import、task-image-rollout、qa-session-final-create、qa-pod-verified、native-before／native-after、两份 terminal snapshot 与 final-runtime。纯证据更新复用有效完整门禁；I9／I14／I15 和成员范围仍待答复，RFC-004 保持已批准、等待 RFC-003 完结，Hook 未开工。
+
+## 第六十批：已有终端跟随系统主题
+
+沿 UX-AT-26／51 检查主题接线：tokens.css 通过 prefers-color-scheme 的 CSS 媒体条件切换配色，切换本身不产生根元素属性变化。原生 NativeTerminalSurface 仅观察 data-theme／class／style；普通 openTerminalSession 只在创建时读取一次，因此已有 xterm 会保留旧配色。
+
+新增回归挂载两条真实生产入口和实际 xterm DOM，不替换终端渲染器；用受控媒体 change 事件和产品色 token 验证已绘制背景。修复前 **1 pass／5 fail／9 assertions／304ms**，原生属性路径原本通过，系统切换两入口、普通终端属性路径以及监听清理均失败。复用 terminalTheme 的 watchTerminalTheme，同时监听系统媒体条件和根元素覆盖；回调仅赋值 terminal.options.theme，不重建实例、不发送输入／resize 等 PTY 命令。每个实例独立移除监听，关闭一个不影响另一份终端。
+
+连同原有附着回归，最终定向 **9 pass／0 fail／34 assertions／372ms**；完整 `bun run check` **1156 pass／4 skip／0 fail**（1160 tests／195 files／6432 assertions／105.61s），console build **479ms**。四份源码／测试候选为 terminalTheme.ts、terminalSession.ts、nativeTerminalSurface.ts、terminalTheme.test.ts，门禁后摘要仍相同；没有新增模块或改变 PTY 协议。
+
+本次 CUA 实际 delivery QA 仍为原 CLI 1937fa／OpenCode，未发新模型轮次。390、320、768×720 下 document.scrollWidth 分别等于对应视口宽；中文草稿 `RFC003_SNAPSHOT_DRAFT 未发送草稿`、本轮完成／进程在线、工作区 1 和未读完成 1 保留。三个尺寸均通过页面外缘滚动看见终端底部输入区；320 下工具栏换行，页签列在自身区域裁切，不让整页横向滚动。没有把闭合 details 内的布局测量当作可见元素溢出。初次视口切换后的 AX 附图出现旧尺寸缩略图，使用后续正常 tab.screenshot 与实际 DOM 尺寸核验，不采用错误缩略图作为证据。视口覆盖已撤销。
+
+该浏览器没有提供系统主题模拟能力，因此媒体事件自动回归不等于真实系统明暗切换；也没有将单个开发页的三种尺寸视为全站五尺寸通过。UX-AT-25／26／37／51 继续保留，累计 **19／52**。22:08:43Z 部署前 console rfc003-927da4d／generation=28、API ebaa730／32、controller cc93104／21 均 1／1，节点剩余 1,421,168,640 bytes。本批仅需更新 console，旧任务运行时不变。
+
+证据为临时目录 batch60-theme-red、theme-targeted、check、build、candidate 和 deploy-before。源码发布、精确 SHA CI 与本机 console 部署继续；I9／I14／I15 及成员范围仍待答复，RFC-004 不提前开工。

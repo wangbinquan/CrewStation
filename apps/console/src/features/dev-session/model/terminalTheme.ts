@@ -26,3 +26,18 @@ export function terminalLook(element: HTMLElement): TerminalLook {
     fontSize: 13,
   };
 }
+
+/** CSS 媒体条件变化不产生属性 mutation；已有终端须同时跟随系统主题与根元素主题覆盖。 */
+export function watchTerminalTheme(element: HTMLElement, apply: (theme: ITheme) => void): () => void {
+  let active = true;
+  const update = (): void => { if (active) apply(terminalLook(element).theme); };
+  const observer = new MutationObserver(update);
+  observer.observe(element.ownerDocument.documentElement, { attributes: true, attributeFilter: ['data-theme', 'class', 'style'] });
+  const preference = element.ownerDocument.defaultView?.matchMedia('(prefers-color-scheme: dark)');
+  preference?.addEventListener('change', update);
+  return () => {
+    active = false;
+    observer.disconnect();
+    preference?.removeEventListener('change', update);
+  };
+}
