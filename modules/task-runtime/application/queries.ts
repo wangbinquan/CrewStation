@@ -45,7 +45,7 @@ export function environmentQueries(deps: TaskRuntimeUseCaseDeps) {
       await authorizer.authorize(actor, env.projectId, 'view');
       return environmentToDto(env);
     },
-    findDevSession: (projectId: ProjectId) => uow.read.environments.findDevSession(projectId),
+    findDevSession: (projectId: ProjectId, options?: { includeLatestFailure?: boolean }) => uow.read.environments.findDevSession(projectId, options),
     listRunningDevSessions: async () => (await uow.read.environments.listByStates(['creating', 'running'])).filter((e) => e.kind === 'dev-session'),
     verifyRunnerToken: async (taskId: TaskId, token: string): Promise<{ ok: true; projectId: string } | { ok: false; reason: string }> => {
       const env = await uow.read.environments.getById(taskId);

@@ -59,7 +59,7 @@ export function SessionCard({ session, stream, access, release, unsavedFile, edi
           <Badge tone={sessionStateTone(session.state)}>{t(`devSession.state.${session.state}`)}</Badge>
           <StreamStatus state={stream} />
         </div>
-        <ReleaseControl projectId={session.projectId} taskId={session.taskId} access={access} release={release} unsavedFile={unsavedFile} editorBusy={editorBusy} dataAccessDirty={dataAccessDirty} dataAccessBusy={dataAccessBusy} onOpenFile={onOpenFile} />
+        {session.state !== 'failed' ? <ReleaseControl projectId={session.projectId} taskId={session.taskId} access={access} release={release} unsavedFile={unsavedFile} editorBusy={editorBusy} dataAccessDirty={dataAccessDirty} dataAccessBusy={dataAccessBusy} onOpenFile={onOpenFile} /> : null}
       </header>
       <DefinitionList layout="grid" items={details(session, stream, access, t, locale)} />
       {stream.runnerState !== undefined && stream.runnerState !== 'ready' ? (

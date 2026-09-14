@@ -9,7 +9,7 @@ export interface EnvironmentRepository {
   listByStates(states: EnvironmentState[]): Promise<TaskEnvironment[]>;
   listByTrace(traceId: string): Promise<TaskEnvironment[]>;
   /** 开发会话：一项目同时只允许一个（D46）。 */
-  findDevSession(projectId: ProjectId): Promise<TaskEnvironment | undefined>;
+  findDevSession(projectId: ProjectId, options?: { includeLatestFailure?: boolean }): Promise<TaskEnvironment | undefined>;
 }
 
 /** 配额准入表：一行一项目，UPDATE … WHERE running < limit 原子判定（AT-19、AT-39）。 */

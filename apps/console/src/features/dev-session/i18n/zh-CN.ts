@@ -23,6 +23,13 @@ export const messages = {
   'devSession.state.releasing': '释放中',
   'devSession.state.released': '已释放',
   'devSession.state.failed': '失败',
+  'devSession.failed.notice': '开发会话 {taskId} 已失败；不会自动恢复原 CLI。',
+  'devSession.failed.worktree': '未推送的提交和文件不能从远端自动恢复。请先由管理员核对原工作卷及保留内容；新建会话不会复用原工作树。',
+  'devSession.failed.open': '从远端分支新建',
+  'devSession.failed.question': '从远端分支「{branch}」新建开发会话，离开失败会话 {taskId}？',
+  'devSession.failed.newWorkspace': '将使用新的工作树和容器，页面中的未保存输入会丢失。原工作卷不会被本次新建删除，原 CLI 不会自动重启。',
+  'devSession.failed.confirm': '确认新建工作树',
+  'devSession.failed.cancel': '保留当前工作区',
 
   'devSession.stream.connecting': '连接中',
   'devSession.stream.open': '已连接',
@@ -46,7 +53,7 @@ export const messages = {
   'devSession.session.idleReminder': '已于 {at} 发出空闲提醒；空闲只提醒，不会自动释放。',
 
   'devSession.open.title': '开一个开发会话',
-  'devSession.open.hint': '选一个分支创建开发容器。一个项目同时只能有一个会话，容器里的 TaskRunner 用独立 UID 运行。',
+  'devSession.open.hint': '选一个远端分支创建开发容器。一个项目同时只能有一个运行中的开发会话。',
   'devSession.open.branch': '分支',
   'devSession.open.submit': '开会话',
   'devSession.open.pending': '创建中…',

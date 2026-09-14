@@ -11,6 +11,14 @@
 
 **RFC-003 工作台 UX 重设计处于 In Progress，作者已要求完整实现并提交上库。** RFC-001 与 RFC-002 都已 Done，见 `proposal/rfc/README.md` 的索引表。
 
+## 最新接力：四窗 OOM 与故障会话展示（2026-09-14）
+
+已在原工作区逐个新增 OpenCode D／E，四个在线 CLI 使用 1 CPU／2Gi 任务套餐；专用 Pod `task-01a09eb4f03f` 于 `2026-09-14T10:50:58Z` OOMKilled／137。原 B／Claude 与新增 D／E 都已不可连接，不能沿用下文故障前的“原进程在线”。失败工作卷仍 Bound，一次只读挂载确认 HEAD=`1aa2db9f9578edfce15dbf314f74302ac523de83`、仅原 `?? .claude.json`，首页 SHA256=`248034cbabdd0d319d2a6c5c0aaf08a2ca2a0bf754a3cf442f16a4413f8c18c6`。只读检查 Job 已清理，原 Pod／卷保留。旧 `rfc003-ux` Pod UID 与 ux-comparison.txt 摘要不变，workbench 两生产槽均就绪。
+
+实机链路暴露两处缺陷：平台仅记录“容器 已Failed”，开发会话查询把 failed 过滤成 404。本批修复容器／init 容器原因与退出码保存；只读查询可返回最近失败记录，活跃会话优先，后续会话已释放不重新翻出旧失败。创建、释放和准入原语保持既有行为。页面首屏显示失败任务和原因，保留原工作区及草稿；显式从远端新建先说明新工作树与未保存输入，取消／失败保留，旧卷不因新建被删除。新增九项回归，定向 33 pass／224 assertions；最终完整门禁 **1107 pass／4 skip／0 fail**（1111 tests、188 files、6134 assertions、109.10s），console build **547ms**。
+
+本批记录时修复尚未部署，共享 console 仍 49e64cc，其余服务及任务镜像仍 3d1ce51。Chrome 仍在运行，但 CUA 仅返回窗口标题且无截图，用户恢复窗口的问题待答复；没有将其推断为 Mac 锁屏。15／52 项历史实机通过记录保留，剩余仍 37 项；UX-AT-28／34／35／37 的 OOM 保护、恢复与尺寸验收未完成。保留工作树重建失败开发容器的生命周期方案登记为 [I14](docs/engineering/implementation-open-questions.md#i14-失败开发容器的工作卷恢复)，方案选择待作者答复，未执行恢复、释放或资源扩容。此前成员／市场范围的具体授权问题仍待答复。RFC-004 保持已批准且等待 RFC-003 完结，未实施 Hook。详见 implementation 第四十六批。
+
 ## 最新接力：离线实机复验与原生问题闭环（2026-09-14）
 
 离线修复已发布 `49e64ccc76f9b8b966cc34f0a9a422ecbb5a412e`，精确 SHA [CI 34831866868](https://github.com/wangbinquan/CrewStation/actions/runs/34831866868) 成功：1094 pass／8 skip／0 fail，1102 tests／186 files，console build 960ms。共享 console 已单独更新为 `cs-console:rfc003-49e64cc`，Pod `console-5f98b6d899-65kc5` 就绪，实际 imageID=`sha256:e9cfe51131b6ddda36fb8469a92b1ad5322895a5a75430894920c28e99aedcda`；原 QA Pod、文件和三个 Agent 身份保留。

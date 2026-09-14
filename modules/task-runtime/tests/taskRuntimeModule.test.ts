@@ -107,4 +107,26 @@ describe.skipIf(!available)('task-runtime module', () => {
     const rows = (await tdb.db.execute(`SELECT running FROM task_runtime.admissions`)) as unknown as Array<{ running: number }>;
     expect(rows[0]!.running).toBeLessThanOrEqual(2);
   });
+
+  test('只读会话查询保留最新失败，显式新建与释放后不复活旧失败记录', async () => {
+    quota = 5;
+    const failed = await runtime.api.createEnvironment({ serviceId, kind: 'dev-session', branch: 'main' });
+    const pod = k8s.objects.get(`v1/Pod/cs-demo/${failed.podName}`)!;
+    await k8s.apply({ ...pod, status: { phase: 'Failed', containerStatuses: [{ name: failed.podName, state: { terminated: { reason: 'OOMKilled', exitCode: 137 } } }] } } as typeof pod);
+    await runtime.api.reconcile();
+    // 实机 OOM 后 active-only 查询变成 404，失败原因、个人布局和未推送工作一起从开发页消失。
+    const visible = await runtime.api.findDevSession(projectId, { includeLatestFailure: true });
+    expect(visible).toMatchObject({ id: failed.id, state: 'failed', connected: false });
+    expect(visible?.message).toContain('OOMKilled');
+    expect(await runtime.api.findDevSession(projectId)).toBeUndefined();
+    const oldVolume = `v1/PersistentVolumeClaim/cs-demo/task-${failed.id.slice(4, 16)}-work`;
+    expect(k8s.objects.has(oldVolume)).toBe(true);
+    const replacement = await runtime.api.createEnvironment({ serviceId, kind: 'dev-session', branch: 'main' });
+    expect(replacement.id).not.toBe(failed.id);
+    expect(await runtime.api.findDevSession(projectId, { includeLatestFailure: true })).toMatchObject({ id: replacement.id });
+    await runtime.api.releaseEnvironment(replacement.id, 'user');
+    expect(await runtime.api.findDevSession(projectId, { includeLatestFailure: true })).toBeUndefined();
+    expect(k8s.objects.has(oldVolume)).toBe(true);
+    expect(await runtime.api.getEnvironment(failed.id)).toMatchObject({ state: 'failed' });
+  });
 });

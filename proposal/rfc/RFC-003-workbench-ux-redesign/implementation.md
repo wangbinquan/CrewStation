@@ -771,3 +771,48 @@ Mac 随后恢复可操作，CUA 读取 Chrome 成功，锁屏 blocker 已解除�
 临时结构化证据为 `crewstation-rfc003-question-before-answer.json`、`question-after-answer.json`、`question-dismissed.json`、`release-background-before.json`（该次查询时第三轮已经完成）、`question-final.json`。实机文字／画面来自本轮 CUA 记录。预览内部业务表单在切回 CLI 后会随 iframe 重新挂载，本批不将其作为跨视图草稿持久化证明；后台完成期间保留当前草稿和 CLI 原生输入的判据仍分别使用 E13／本批证据。
 
 结合第四十批受控 resize／中断，UX-AT-29 的真实 CLI 原定条件按作者明确选择的 OpenCode 完成；Claude 外部模型配置限制继续如实记录，不将登录页当作模型成功。UX-AT-39 三种后台位置已覆盖，UX-AT-40 的查看／回答／拒绝闭环完成。本批新增 29／39／40，加第四十四批 23，累计 15 项通过、37 项仍待验收。没有新增生产代码，沿用第四十四批有效本地完整门禁；角色／市场范围授权仍待此前具体问题的答复，RFC-004 保持已批准、等待 RFC-003 完结后开工。
+
+## 第四十六批：四窗 OOM、工作树保全与失败会话展示
+
+本批基线为已同步的 `ae6c1c7bce4f1c68b16c60a469145e7f6c9328c6`；精确 SHA [CI 34834410502](https://github.com/wangbinquan/CrewStation/actions/runs/34834410502) 于 10:45:05Z 成功，1094 pass／8 skip／0 fail、1102 tests／186 files，console build 991ms。共享 console 为 49e64cc，后端与任务镜像为 3d1ce51。
+
+### 四窗启动与真实失败
+
+将个人布局切回原“工作区 1”，用“＋ CLI”逐个新增 D、E；没有批量启动或发送模型任务：
+
+| CLI | agentId／terminalId | startedAt |
+|---|---|---|
+| D | agt_01a09f8a7bdc70009938b5c204bcc0a5／pty_01a09f8a7bdc7001a7b47db1f33d5623 | 2026-09-14T10:50:48.162Z |
+| E | agt_01a09f8a90b3700090e3d96fce232e40／pty_01a09f8a90b370018d2b94ec1a23628f | 2026-09-14T10:50:53.497Z |
+
+两者 source-ready 分别为 seq=17432／17447，均未开始模型轮次。布局 revision=71，原工作区为 [B, Claude, D, E]；人工输入验收页签仍为已结束 C，原 A 仍收起。页面曾显示四个窗和六条名册，但尚未完成 1280×720 的实际尺寸量测。原生 AX 的工作页签点击最初未生效，按实际截图坐标点击后切换成功，此工具交互现象没有被当成产品缺陷修改。
+
+任务 Pod `cs-rfc003-verify-workbench/task-01a09eb4f03f` 于 `2026-09-14T10:50:58Z` 终止：reason=OOMKilled、exitCode=137、restartCount=0；UID 仍 `724ecb83-9fbd-4a36-9ad3-8266c6d84a42`。requests／limits 都是 1 CPU、2Gi memory、10Gi ephemeral storage。原 B／Claude 与新增 D／E 随任务失联，名册 lifecycle=unknown；原 A／C 仍有正常 ended 历史。不能再沿用前批“原 B 在线”的当时结论。没有把四窗短暂出现算作 UX-AT-35 通过，也没有通过调高资源后忽略这次故障。
+
+### 工作树与原环境保全
+
+TaskEnvironment 已 failed／connected=false，原服务端 message 只有“容器 已Failed”；原 GET dev-session 为 404。PVC `task-01a09eb4f03f-work`／UID `31042273-699a-4888-912b-06d9babadc72` 仍 Bound。创建一次性 Job `rfc003-worktree-inspect-20260914`，只读挂载该卷，以 worker UID 10001 运行 Git 只读命令和指定首页的 sha256sum；不启动 Runner、不挂载凭据、不读取认证文件内容。实际结果：
+
+- HEAD：`1aa2db9f9578edfce15dbf314f74302ac523de83`；
+- status：只有原 `?? .claude.json`；
+- `src/pages/home.ts` SHA256：`248034cbabdd0d319d2a6c5c0aaf08a2ca2a0bf754a3cf442f16a4413f8c18c6`。
+
+Job 成功后已清理，失败 Pod 与工作卷保留；没有释放、重建、导出／提交认证文件或改写 QA 工作树。旧 `rfc003-ux` Pod 仍 Running，UID=`4920b2aa-880e-49c3-a782-8575bbf9a42e`；`ux-comparison.txt` 摘要仍 `ee05185cb39c025d4968f1922cbd0218cc152a08e9cafb2c624522b9fba26dd3`。workbench 正式 v0.1.0、待验证 v0.1.1 的 releaseId／SHA 保持第四十二批记录，均 ready／1／1。
+
+### 已实现的故障展示修复
+
+TaskCluster 在实际 Failed 时提取当前主容器与 init 容器的原因、退出码，保留 Pod 的 reason／message；不把 Running 的 lastState 旧故障或成功退出容器误报为当前 OOM，不编造缺失字段。对账保存可读的失败说明，仍不自动恢复任务。历史上已经写入的模糊 message 不通过数据库补写伪造成当时就采集完整。
+
+只读 `findDevSession` 增加可选 includeLatestFailure，开发页、项目摘要、工作树预检与版本比较的读取采用；失败工作树明确 unavailable，不再被当成没有会话。单次 SQL 限定当前项目／开发 kind、活跃优先，再按实际时间和 ID 查询最近一条。后续会话已释放时不翻出更旧 failed。创建／发布／释放与配额逻辑继续使用原活跃查询；用户仍能显式创建新任务，旧卷不会因此删除。
+
+页面首屏显示失败 taskId 与已记录原因，原工作区保持同一 key，编辑器草稿与焦点不因失败刷新消失；失败状态优先于过时的已连接帧，暂停原 CLI 启动。新建沿既有远端分支接口，必须明确确认新工作树、原 CLI 不自动重启及页面未保存输入将丢失，默认聚焦保留当前工作区；取消与创建失败保持旧输入，不调用释放。失败对象没有可成功执行的释放入口，因此菜单不展示那个原来必然 404 的动作。当前没有新增保卷重建能力。
+
+新增九项回归：五项 Pod 状态、一个真实 PostgreSQL 查询／生命周期、一个 dev-session 用例、两个真实工作台路由／编辑器。修复前定向复现 6 fail；修复后补验发布预检与版本比较，发现同一失败记录仍被当成 404；增加先红断言并修复两处只读查询。最终定向 **33 pass／0 fail／224 assertions**；因候选代码改变而重新完成门禁，最终 **1107 pass／4 skip／0 fail**，1111 tests／188 files／6134 assertions／109.10s，console build **547ms**。源码在该有效门禁后未改。日志为临时 `crewstation-rfc003-batch46-{red,targeted,check,build}.log`，关键结果已在此持久记录。
+
+### 尚未完成的条件
+
+Chrome 仍在运行，CUA 此时只能返回“CrewStation 工作台”窗口标题而无页面或截图；getState 曾超时并重置工具内核。已向用户请求恢复可见窗口，未收到答复，未声称锁屏，也未把浏览器不可读取归因为 Pod OOM。没有取得本批候选的实浏览器视觉证据。此前成员／市场范围具体授权同样待答复，未绕过已拒绝的 UI 权限变更入口。
+
+开发会话保卷重建在现有 lifecycle 中没有可调用路径；正常 release 会删除 follow-container 卷。已将实际证据及两种恢复方向登记为 [I14](../../../docs/engineering/implementation-open-questions.md#i14-失败开发容器的工作卷恢复)，建议显式保留工作树重建并让旧 CLI 保持不可恢复，等待作者选择后再补该生命周期方案。未执行恢复或扩容。
+
+本批不新增完整 UX-AT 通过项：累计仍 15／52，剩余 37。UX-AT-28 的新增失败隔离、34 的容器失效后完整界面、35／37 的真实四窗与五尺寸均继续；已有正常旅程证据保留其当时条件。本批修复尚未部署，发布／共享更新的实际结果另记。RFC-004 与 ADR-0004 已批准，继续等待 RFC-003 完结，T2–T9 未开始。

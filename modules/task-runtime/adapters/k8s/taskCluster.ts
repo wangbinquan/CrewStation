@@ -2,7 +2,25 @@ import type { ContainerSpec, K8sClient, K8sObject } from '@crewstation/k8s';
 import { LABELS, Resources, ingressRouteObject, podObject, pvcObject, serviceObject } from '@crewstation/k8s';
 import type { TaskCluster, TaskSourceCheckout } from '../../ports/cluster';
 
-type PodObject = K8sObject & { status?: { phase?: string; podIP?: string; message?: string; reason?: string } };
+interface ContainerStatus {
+  name: string;
+  state?: { terminated?: { reason?: string; exitCode?: number } };
+}
+type PodObject = K8sObject & { status?: { phase?: string; podIP?: string; message?: string; reason?: string; containerStatuses?: ContainerStatus[]; initContainerStatuses?: ContainerStatus[] } };
+
+function podMessage(pod: PodObject): string | undefined {
+  const status = pod.status;
+  const parts = [status?.reason, status?.message].filter((part): part is string => !!part);
+  if (status?.phase === 'Failed') {
+    for (const container of [...(status.initContainerStatuses ?? []), ...(status.containerStatuses ?? [])]) {
+      const ended = container.state?.terminated;
+      if (!ended || (ended.exitCode === 0 && (!ended.reason || ended.reason === 'Completed'))) continue;
+      const details = [ended.reason, ended.exitCode === undefined ? undefined : `退出码 ${ended.exitCode}`].filter(Boolean).join('，');
+      if (details) parts.push(`${container.name}：${details}`);
+    }
+  }
+  return [...new Set(parts)].join('；') || undefined;
+}
 
 /** 任务容器 = 项目命名空间里一个 restartPolicy Never 的 Pod + 一个工作卷；标签供网关 Pod 身份索引识别。 */
 /**
@@ -80,7 +98,8 @@ export function kubernetesTaskCluster(k8s: K8sClient, workerUid: number): TaskCl
       const pod = await k8s.get<PodObject>(Resources.Pod!, env.podName, env.namespace);
       if (!pod) return { phase: 'Missing' };
       const phase = (pod.status?.phase ?? 'Unknown') as Exclude<Awaited<ReturnType<TaskCluster['podPhase']>>['phase'], 'Missing'>;
-      return { phase, ...(pod.status?.podIP ? { ip: pod.status.podIP } : {}), ...(pod.status?.message ? { message: pod.status.message } : pod.status?.reason ? { message: pod.status.reason } : {}) };
+      const message = podMessage(pod);
+      return { phase, ...(pod.status?.podIP ? { ip: pod.status.podIP } : {}), ...(message ? { message } : {}) };
     },
     deletePod: async (env) => {
       await k8s.delete(Resources.Pod!, env.podName, env.namespace, { gracePeriodSeconds: 30 });

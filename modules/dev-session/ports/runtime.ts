@@ -19,7 +19,7 @@ export interface Environments {
   createEnvironment(input: { serviceId: ServiceId; kind: 'dev-session'; branch: string; createdBy: UserId; traceId?: TraceId; preview?: { command: string[]; port: number; healthPath: string }; labels?: Record<string, string> }): Promise<EnvironmentView>;
   releaseEnvironment(taskId: TaskId, reason: 'user' | 'owner-force'): Promise<EnvironmentView>;
   getEnvironment(taskId: TaskId): Promise<EnvironmentView | undefined>;
-  findDevSession(projectId: ProjectId): Promise<EnvironmentView | undefined>;
+  findDevSession(projectId: ProjectId, options?: { includeLatestFailure?: boolean }): Promise<EnvironmentView | undefined>;
   listRunningDevSessions(): Promise<EnvironmentView[]>;
   touch(taskId: TaskId): Promise<void>;
   canOpenStream(actor: Actor, taskId: TaskId): Promise<boolean>;

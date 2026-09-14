@@ -80,7 +80,7 @@ export function createTaskRuntimeModule(deps: TaskRuntimeModuleDeps): TaskRuntim
     getEnvironment: async (taskId) => { const env = await queries.getEnvironment(taskId); return env ? environmentToDto(env) : undefined; },
     describeEnvironment: queries.describeEnvironment,
     listEnvironments: queries.listEnvironments,
-    findDevSession: async (projectId) => { const env = await queries.findDevSession(projectId); return env ? environmentToDto(env) : undefined; },
+    findDevSession: async (projectId, options) => { const env = await queries.findDevSession(projectId, options); return env ? environmentToDto(env) : undefined; },
     listRunningDevSessions: async () => (await queries.listRunningDevSessions()).map(environmentToDto),
     runningTaskCount: (projectId) => useCaseDeps.uow.read.admissions.running(projectId),
     listByTrace: async (traceId) => (await useCaseDeps.uow.read.environments.listByTrace(traceId)).map(environmentToDto),

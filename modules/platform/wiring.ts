@@ -252,7 +252,7 @@ function composeAggregates(deps: PlatformModuleDeps, core: ReturnType<typeof com
     isAdmin: (id) => isAdmin(id),
     market: { list: project.api.listMarketListings, get: project.api.getMarketListing, slots: (serviceId) => delivery.release.api.getSlots(SYSTEM_ACTOR, serviceId) },
     projects: { list: project.api.listProjectPage, read: project.api.readProjectPageEntries, get: project.api.getProjectPageEntry,
-      session: runtime.taskRuntime.api.findDevSession, slots: delivery.release.api.getSlots, health: observability.api.health,
+      session: (projectId) => runtime.taskRuntime.api.findDevSession(projectId, { includeLatestFailure: true }), slots: delivery.release.api.getSlots, health: observability.api.health,
       releases: delivery.release.api.listReleases, switches: delivery.release.api.listTrafficSwitches },
     settings: { userDomain: settings.userDomain, serviceDomain: settings.serviceDomain, mcp: [{ name: 'capabilities', url: settings.mcp.capabilitiesUrl }, { name: 'operations', url: settings.mcp.operationsUrl }], defaultServicePlan: settings.defaultServicePlan },
     sources: {

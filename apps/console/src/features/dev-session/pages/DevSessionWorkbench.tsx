@@ -47,7 +47,8 @@ export function DevSessionWorkbench({ projectId, session, access, canDevelop, se
   const t = useT();
   const { space } = useProjectScope();
   const taskId = session.taskId;
-  const { state, channel } = useTaskStream(taskId);
+  const { state: connection, channel } = useTaskStream(taskId);
+  const state = session.state === 'failed' ? { ...connection, runnerConnected: false } : connection;
   const touch = useActivityTouch(taskId);
   const tree = useWorkspaceTree(channel, state.generation, state.runnerConnected);
   const editor = useFileEditor(channel);
@@ -71,7 +72,7 @@ export function DevSessionWorkbench({ projectId, session, access, canDevelop, se
         <Link to={PROJECT_PATHS[space].release} params={{ projectId }} search={{ source: 'session' }}>{t('devSession.native.prepareRelease')}</Link>
       </header>
       <VersionComparisonPanel projectId={projectId} taskId={taskId} channel={channel} canDevelop={canDevelop} compact />
-      <NativeWorkspace taskId={taskId} userId={userId} channel={channel} stream={state} canDevelop={canDevelop} onActivity={touch} activityTarget={activityTarget} editorDirty={editor.dirty} location={location}
+      <NativeWorkspace taskId={taskId} userId={userId} channel={channel} stream={state} canDevelop={canDevelop && session.state !== 'failed'} onActivity={touch} activityTarget={activityTarget} editorDirty={editor.dirty} location={location}
         preview={<DevelopmentPreview preview={preview} previewHost={session.previewHost} connected={state.runnerConnected} logs={<Link to={PROJECT_PATHS[space].operations} params={{ projectId }} search={{ tab: 'logs', source: 'dev-session', taskId }}>{t('devSession.preview.logs')}</Link>} />}
         editor={<EditorPane tree={tree} editor={{ ...editor, openFile: location.openFile }} />}
         changes={<VersionComparisonPanel projectId={projectId} taskId={taskId} channel={channel} canDevelop={canDevelop} initiallyExpanded target={location.search.target ?? 'prod'} onTargetChange={location.selectTarget} onOpenFile={location.openFile} />} />

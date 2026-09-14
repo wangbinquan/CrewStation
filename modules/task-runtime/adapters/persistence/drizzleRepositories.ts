@@ -1,6 +1,6 @@
 import type { ProjectId, ServiceId, TaskId, TaskKind, TraceId, UserId, VolumeMode } from '@crewstation/contracts';
 import type { Executor } from '@crewstation/persistence';
-import { and, eq, inArray, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import type { EnvironmentState, TaskEnvironment } from '../../domain/taskEnvironment';
 import type { AdmissionRepository, EnvironmentRepository } from '../../ports/repositories';
 import { admissions, environments } from './tables';
@@ -23,9 +23,13 @@ export function drizzleEnvironmentRepository(db: Executor): EnvironmentRepositor
     listByProject: async (projectId, states) => (await db.select().from(environments).where(states?.length ? and(eq(environments.projectId, projectId), inArray(environments.state, states)) : eq(environments.projectId, projectId)).orderBy(environments.createdAt)).map(toEnv),
     listByStates: async (states) => (await db.select().from(environments).where(inArray(environments.state, states))).map(toEnv),
     listByTrace: async (traceId) => (await db.select().from(environments).where(eq(environments.traceId, traceId)).orderBy(environments.createdAt)).map(toEnv),
-    findDevSession: async (projectId) => {
-      const row = (await db.select().from(environments).where(and(eq(environments.projectId, projectId), eq(environments.kind, 'dev-session'), inArray(environments.state, ['creating', 'running', 'releasing']))))[0];
-      return row ? toEnv(row) : undefined;
+    findDevSession: async (projectId, options) => {
+      const scope = and(eq(environments.projectId, projectId), eq(environments.kind, 'dev-session'));
+      const active = inArray(environments.state, ['creating', 'running', 'releasing']);
+      // 只读展示最近一次失败；后续会话已释放时，不重新翻出更旧的失败冒充当前会话。
+      const row = (await db.select().from(environments).where(and(scope, options?.includeLatestFailure ? undefined : active))
+        .orderBy(sql`CASE WHEN ${active} THEN 0 ELSE 1 END`, desc(environments.createdAt), desc(environments.id)).limit(1))[0];
+      return row && ['creating', 'running', 'releasing', 'failed'].includes(row.state) ? toEnv(row) : undefined;
     },
   };
 }

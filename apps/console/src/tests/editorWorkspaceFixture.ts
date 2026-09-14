@@ -6,6 +6,7 @@ export function editorWorkspaceFixture() {
   const f = activityFixture(), commands: Array<TaskStreamCommandInput & { id: string }> = [], writes: Array<{ path: string; method: string }> = [];
   const files = new Map([['a.ts', '磁盘原文'], ['b.ts', '第二个文件']]);
   const preview: PreviewStatusResult = { state: 'disabled', restarts: 0 };
+  const sessionState: { state: 'running' | 'failed'; message?: string } = { state: 'running' };
   const originalFetch = globalThis.fetch, originalSocket = globalThis.WebSocket, originalHref = window.location.href;
   window.location.href = 'http://localhost/';
   let pendingWrite: ((failure?: { code: string; message: string }) => void) | undefined;
@@ -48,9 +49,9 @@ export function editorWorkspaceFixture() {
     else if (path.endsWith('/agent-activity')) body = { ...f.page, states: [], items: [], unread: [] };
     else if (path.endsWith('/version-comparison')) { status = 503; body = { error: 'unavailable', message: '比较暂不可用，编辑器仍可使用' }; }
     else if (path.endsWith('/workspace-status')) body = { status: 'ready', taskId: activityTaskId, branch: 'main', headSha: 'a'.repeat(40), checkedAt: activityTime, shallow: false, fingerprint: 'fp', uncommitted: [], uncommittedCount: 0, uncommittedTruncated: false, unpushed: { status: 'ready', count: 0, commits: [], truncated: false }, upstream: { status: 'missing' } };
-    else if (path.endsWith('/dev-session')) body = { taskId: activityTaskId, projectId: activityProjectId, createdBy: activityUserId, branch: 'main', state: 'running', lastActivityAt: activityTime, previewHost: 'preview.localhost' };
+    else if (path.endsWith('/dev-session')) body = { taskId: activityTaskId, projectId: activityProjectId, createdBy: activityUserId, branch: 'main', ...sessionState, lastActivityAt: activityTime, previewHost: 'preview.localhost' };
     return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
   }) as typeof fetch;
   const finishWrite = (failure?: { code: string; message: string }) => { const finish = pendingWrite; pendingWrite = undefined; finish?.(failure); };
-  return { commands, writes, files, preview, finishWrite, restore: () => { globalThis.fetch = originalFetch; globalThis.WebSocket = originalSocket; window.location.href = originalHref; } };
+  return { commands, writes, files, preview, sessionState, finishWrite, restore: () => { globalThis.fetch = originalFetch; globalThis.WebSocket = originalSocket; window.location.href = originalHref; } };
 }

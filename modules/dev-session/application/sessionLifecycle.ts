@@ -57,7 +57,7 @@ export function sessionLifecycleUseCases(deps: DevSessionUseCaseDeps) {
     },
     getSession: async (actor: Actor, projectId: ProjectId): Promise<DevSessionDto | undefined> => {
       await authorizer.authorize(actor, projectId, 'view');
-      const env = await environments.findDevSession(projectId);
+      const env = await environments.findDevSession(projectId, { includeLatestFailure: true });
       if (!env) return undefined;
       const svc = await svcOf(projectId);
       return toDto(env, svc.slug, await previewOf(env), await deps.reminders.lastReminder(env.id));

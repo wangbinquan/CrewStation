@@ -8,7 +8,8 @@ export function reconcileUseCase(deps: TaskRuntimeUseCaseDeps, lifecycle: Return
     for (const env of await deps.uow.read.environments.listByStates(['creating', 'running'])) {
       const { phase, message } = await deps.cluster.podPhase(env);
       if (phase === 'Failed' || phase === 'Succeeded' || phase === 'Missing') {
-        await lifecycle.markFailed(env.id, `容器 ${phase === 'Missing' ? '不存在' : `已${phase}`}${message ? `：${message}` : ''}`);
+        const summary = phase === 'Missing' ? '容器不存在' : phase === 'Failed' ? '容器运行失败' : '容器已退出';
+        await lifecycle.markFailed(env.id, `${summary}${message ? `：${message}` : ''}`);
         changed += 1;
       }
     }

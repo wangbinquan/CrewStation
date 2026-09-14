@@ -25,6 +25,13 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   'devSession.state.releasing': 'Releasing',
   'devSession.state.released': 'Released',
   'devSession.state.failed': 'Failed',
+  'devSession.failed.notice': 'Dev session {taskId} failed. Its original CLIs will not restart automatically.',
+  'devSession.failed.worktree': 'Unpushed commits and files cannot be recovered from the remote repository. Ask an administrator to check the original volume and its contents first. A new session uses a new worktree.',
+  'devSession.failed.open': 'Create from remote branch',
+  'devSession.failed.question': 'Create a new dev session from remote branch “{branch}” and leave failed session {taskId}?',
+  'devSession.failed.newWorkspace': 'This creates a new worktree and container. Unsaved inputs on this page will be lost. Creating the session will not delete the original volume or restart the original CLIs.',
+  'devSession.failed.confirm': 'Confirm new worktree',
+  'devSession.failed.cancel': 'Keep current workspace',
 
   'devSession.stream.connecting': 'Connecting',
   'devSession.stream.open': 'Connected',
@@ -48,7 +55,7 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   'devSession.session.idleReminder': 'An idle reminder was sent at {at}; idle sessions are only reminded, never released automatically.',
 
   'devSession.open.title': 'Open a dev session',
-  'devSession.open.hint': 'Pick a branch to create the dev container. A project has one session at a time, and its TaskRunner runs under its own UID.',
+  'devSession.open.hint': 'Pick a remote branch to create a dev container. A project can have one running dev session at a time.',
   'devSession.open.branch': 'Branch',
   'devSession.open.submit': 'Open session',
   'devSession.open.pending': 'Creating…',

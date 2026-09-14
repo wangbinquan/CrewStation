@@ -9,7 +9,7 @@ import { inspectWorkspace } from './workspaceStatus';
 export function versionComparisonUseCases(deps: DevSessionUseCaseDeps) {
   const context = async (actor: Actor, projectId: ProjectId, action: 'view' | 'develop' = 'view') => {
     await deps.authorizer.authorize(actor, projectId, action);
-    const env = await deps.environments.findDevSession(projectId);
+    const env = await deps.environments.findDevSession(projectId, { includeLatestFailure: action === 'view' });
     if (!env) throw notFound('开发会话', projectId);
     const service = await deps.services.resolveServiceOfProject(projectId);
     if (!service) throw notFound('项目服务', projectId);

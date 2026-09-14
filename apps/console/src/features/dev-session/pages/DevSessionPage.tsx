@@ -34,6 +34,10 @@ export function DevSessionPage(): ReactElement {
       {session.release.data !== undefined ? <ReleaseOutcome result={session.release.data} /> : null}
       {/* 开会话时 Manifest 有问题：会话照样开，但要把原因摆在这儿。轮询回来的会话对象不带它，所以取开会话那次的返回值。 */}
       {session.open.data?.message !== undefined ? <PaneNotice tone="warning">{session.open.data.message}</PaneNotice> : null}
+      {session.session?.state === 'failed' ? <>
+        <PaneNotice tone="warning">{t('devSession.failed.notice', { taskId: session.session.taskId })} {session.session.message} {t('devSession.failed.worktree')}</PaneNotice>
+        {context.canDevelop ? <OpenSessionForm branches={branches} open={session.open} previousTaskId={session.session.taskId} /> : null}
+      </> : null}
       {session.session === undefined || !context.userId ? null : (
         <DevSessionWorkbench
           key={session.session.taskId}

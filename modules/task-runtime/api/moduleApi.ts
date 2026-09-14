@@ -48,7 +48,8 @@ export interface TaskRuntimeModuleApi {
   getEnvironment(taskId: TaskId): Promise<EnvironmentDto | undefined>;
   describeEnvironment(actor: Actor, taskId: TaskId): Promise<EnvironmentDto>;
   listEnvironments(actor: Actor, projectId: ProjectId, states?: EnvironmentState[]): Promise<EnvironmentDto[]>;
-  findDevSession(projectId: ProjectId): Promise<EnvironmentDto | undefined>;
+  /** 只读展示可含最近一次失败；创建／释放等既有操作仍只查当前活跃会话。 */
+  findDevSession(projectId: ProjectId, options?: { includeLatestFailure?: boolean }): Promise<EnvironmentDto | undefined>;
   listRunningDevSessions(): Promise<EnvironmentDto[]>;
   /** 已占用的并发任务数（准入计数器的当前值）；配额展示读它。 */
   runningTaskCount(projectId: ProjectId): Promise<number>;

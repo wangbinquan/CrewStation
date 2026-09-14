@@ -8,7 +8,7 @@ import type { DevSessionUseCaseDeps } from './dependencies';
 export function workspaceStatusUseCase(deps: DevSessionUseCaseDeps) {
   return async (actor: Actor, projectId: ProjectId): Promise<WorkspaceStatusDto> => {
     await deps.authorizer.authorize(actor, projectId, 'view');
-    const env = await deps.environments.findDevSession(projectId);
+    const env = await deps.environments.findDevSession(projectId, { includeLatestFailure: true });
     if (!env) throw notFound('开发会话', projectId);
     return inspectWorkspace(deps, env);
   };
@@ -17,6 +17,7 @@ export function workspaceStatusUseCase(deps: DevSessionUseCaseDeps) {
 /** 发布／释放可在自己的动作授权之后复用；不做 push、fetch、tag 或文件写入。 */
 export async function inspectWorkspace(deps: DevSessionUseCaseDeps, env: EnvironmentView): Promise<WorkspaceStatusDto> {
   const unavailable = (reason: string): WorkspaceStatusDto => ({ status: 'unavailable', taskId: env.id, reason, checkedAt: deps.clock.now().toISOString() });
+  if (env.state === 'failed') return unavailable(`开发容器已失败，无法检查工作树${env.message ? `：${env.message}` : ''}`);
   if (!env.connected) return unavailable('开发容器未连接，无法检查工作树');
   try {
     const raw = await deps.runner.sendCommand(env.id, { id: `workspace-${crypto.randomUUID()}`, type: 'workspaceStatus' });

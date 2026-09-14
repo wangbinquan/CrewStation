@@ -37,7 +37,7 @@ beforeAll(async () => {
       createEnvironment: async (input) => { const env = { id: `tsk_${Bun.randomUUIDv7().replace(/-/g, '')}` as TaskId, projectId, serviceId: input.serviceId, state: 'running' as const, podName: 'task-x', connected: true, branch: input.branch, traceId: 'trace', createdAt: new Date().toISOString(), lastActivityAt: new Date('2026-09-11T00:00:00Z').toISOString(), createdBy: input.createdBy, preview: input.preview }; envs.set(env.id, env); return env; },
       releaseEnvironment: async (taskId) => { const env = envs.get(taskId)!; envs.delete(taskId); return { ...env, state: 'released' }; },
       getEnvironment: async (taskId) => envs.get(taskId),
-      findDevSession: async () => [...envs.values()][0],
+      findDevSession: async (_projectId, options) => [...envs.values()].find((env) => ['creating', 'running', 'releasing'].includes(env.state)) ?? (options?.includeLatestFailure ? [...envs.values()].at(-1) : undefined),
       listRunningDevSessions: async () => [...envs.values()],
       touch: async (taskId) => { const env = envs.get(taskId); if (env) env.lastActivityAt = new Date().toISOString(); },
       canOpenStream: async () => true,
@@ -155,5 +155,25 @@ describe.skipIf(!available)('dev-session module', () => {
       manifestText = manifest;
       await dev.api.releaseSession(developer, projectId, { force: true });
     }
+  });
+
+  test('失败会话读取保留 taskId 与原因，不调用旧 Runner，也不阻止用户显式创建新会话', async () => {
+    envs.clear();
+    const first = await dev.api.openSession(developer, projectId, { branch: 'main' });
+    const failed = envs.get(first.taskId)!;
+    Object.assign(failed, { state: 'failed', connected: false, message: '容器运行失败：OOMKilled，退出码 137' });
+    const commandsBefore = commands.length;
+    // GET 只读展示故障；不能将其视为从未开过会话，也不能为展示状态启动或重连旧进程。
+    expect(await dev.api.getSession(developer, projectId)).toMatchObject({ taskId: first.taskId, state: 'failed', preview: 'stopped', message: failed.message });
+    const workspace = await dev.api.workspaceStatus(developer, projectId);
+    expect(workspace).toMatchObject({ taskId: first.taskId, status: 'unavailable' });
+    expect(workspace.status === 'unavailable' && workspace.reason).toContain('OOMKilled');
+    expect(await dev.api.versionComparison(developer, projectId)).toMatchObject({ taskId: first.taskId, workspace: { status: 'unavailable' }, commits: { status: 'unavailable' } });
+    expect(commands).toHaveLength(commandsBefore);
+    const second = await dev.api.openSession(developer, projectId, { branch: 'main' });
+    expect(second.taskId).not.toBe(first.taskId);
+    expect(envs.get(first.taskId)?.state).toBe('failed');
+    expect((await dev.api.getSession(developer, projectId))?.taskId).toBe(second.taskId);
+    envs.clear();
   });
 });
