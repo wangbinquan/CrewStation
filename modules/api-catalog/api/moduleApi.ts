@@ -15,6 +15,8 @@ export interface ApiCatalogModuleApi {
   /** 目录中的活动操作；给出 serviceId 时附带该服务是否已可调（默认开放视为已授权），并要求对其项目有 view 权限。 */
   listOperations(actor: Actor, serviceId?: ServiceId): Promise<ApiOperationDto[]>;
   listProxies(actor: Actor): Promise<ApiProxyDto[]>;
+  /** 供 gateway 解析该服务当前活动的代理名；退役记录仍可在目录历史中查看，但不参与路由。 */
+  activeProxyNameOf(serviceId: ServiceId): Promise<string | undefined>;
   /** 管理员把操作标为默认开放（所有业务可调）或定向开放（业务申请、管理员审批）。 */
   setOpenPolicy(actor: Actor, operationKey: string, policy: OpenPolicy): Promise<ApiOperationDto>;
   /** 业务为自己的服务申请定向开放的操作；需要服务所属项目的 develop 权限。 */

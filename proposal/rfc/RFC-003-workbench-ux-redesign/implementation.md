@@ -1011,3 +1011,15 @@ console 使用此前已核对并导入的 `cs-console:rfc003-cbe2825`。API 新�
 15:16:50Z 再次核对：files 任务／单个 OpenCode／Runner、旧 rfc003-ux Pod UID、首页及 Git 配置摘要保持；工作树 `e4741df56b440d776b7c25ff5a4978b3d5822f46`、未提交 0／未推送 0、preview v0.1.4／正式为空均不变。files-green 和 workbench-blue 仍 generation=11／1／1；workbench 正式 green 仍 generation=1／v0.1.0／1／1。PostgreSQL 原 UID 保持、ready=true／restartCount=9，节点余量 **334,888KiB**。当前没有临时调零副本或未恢复的故障命令。
 
 临时证据为 batch50 的 source-ci、console-verified、image-build／content／import-budget／import、api-verified、api-logs-observed／verified、migration-log-resource、final-environment JSON 和相关日志，关键结果已在此持久记录。尝试继续浏览器验收时 CUA 再次明确报告 Mac 锁定、无法自动解锁。I14／I15、成员范围和解锁仍待答复；没有新增完整页面通过项，累计 **18／52**。RFC-004 仍按已批准的顺序等待 RFC-003 完结。此次只补部署与验收事实，沿用未变候选的本地完整门禁。
+
+## 第五十一批：真实 API 试调与目录路由一致性
+
+15:33:05Z 经普通 `api-invocations` API，从原 files QA 任务 `tsk_01a09ff07aeb7000897fd0eda1e16cd2` 调用默认开放的 `test-gitlab:GET:/v4/projects/{id}/repository/commits/{sha}`，只读取自己的 GitLab 项目 114／提交 `e4741df56b440d776b7c25ff5a4978b3d5822f46`。平台 HTTP 200，容器实测目标 HTTP 404／text/plain／7ms。源 Pod UID=`fa4dcc5e-3eb6-4557-a6bf-b6301dca4160`、IP=`10.244.0.248`，`CS_INTERNAL_API_BASE` 与裁剪 OpenAPI 都指向共享服务网关；没有启动 Agent、改调用授权或开放策略。
+
+只读检查发现服务 `svc_01a0915af70b70018eeac75d94c708f4` 同时保留 removed 的 `reference-api-proxy` 和 active 的 `test-gitlab`。组合根原先从目录列表取该服务的首条记录，实际 IngressRoute 仍匹配 `/api/reference-api-proxy`，与请求 `/api/test-gitlab` 不一致。改为 api-catalog 的服务定点活动代理查询，不删除目录历史。另一个确定性回归证明：网关先消费发布事件会使用旧目录，目录随后更新而网关游标已推进，实际路由不会再次刷新。目录登记事务提交后，经组合根注入的回调执行既有 reconcileService／rebuildAllowlist，失败保留事件消费重试；没有模块反向依赖或新增 HTTP 接口。
+
+新增 `modules/platform/tests/gatewayCatalogRoutes.test.ts`，使用隔离 PostgreSQL、真实组合根和事件消费者、Fake K8s 检查实际应用的 IngressRoute。首组修复前 0 pass／2 fail，顺序回归修复前 2 pass／1 fail；最终定向 **21 pass／0 fail／158 assertions**（四文件、1298ms）。完整门禁最初缺少测试 ReleaseId 的品牌类型，已补齐；随后一次沙箱执行无法绑定本机端口或连接测试库，出现 38 fail／143 skip，不作为有效验证。正常本机权限下的最终 `bun run check` 为 **1122 pass／4 skip／0 fail**，1126 tests／191 files／6202 assertions／107.29s；新增三项组合根回归均执行，五个候选文件摘要与门禁前一致。console 源码及依赖未变，沿用第四十九批有效 build 566ms；没有重复已通过候选的完整门禁。提交后的精确 SHA CI 与部署结果单独核验。
+
+15:43:10Z 参考代理 `prj_01a0915af70b7000a571b0724160a057` 的正式槽为空；preview green 为 ready／1／1，v0.1.2=`rel_01a0915ec42a700096cd2e21d9d3e9d0`／`7dee80be75906e6265094bf852866a2ceb96bd0e`，当前内部路由仍指向不存在的 blue。后续先发布验证过的控制面修复、按作者本机更新授权更新实际读取代码的 cs-api 与 cs-controller，再通过普通上线动作及网关重算验证默认开放 GET。没有以直连预览替代正式服务路由。
+
+临时证据为 batch51 的 invocation、catalog-preflight、operation-spec、route-preflight、proxy-runtime、proxy-delivery-preflight JSON 与 red、order-red、targeted、check 日志。Mac 解锁、I14／I15 与成员范围问题仍待答复；页面完整旅程不因 API 定位而记通过，累计仍 **18／52**。RFC-004 继续等待 RFC-003 完结。

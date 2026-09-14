@@ -7,6 +7,8 @@ import { operationToDto, proxyToDto } from './toDto';
 /** 目录读侧：对所有登录用户开放（工作台内嵌 Swagger 用），带 serviceId 时要求对其项目可见。 */
 export function catalogQueryUseCases({ uow, services, projects }: ApiCatalogUseCaseDeps) {
   return {
+    activeProxyNameOf: async (serviceId: ServiceId): Promise<string | undefined> =>
+      (await uow.read.proxies.listByService(serviceId)).find((proxy) => proxy.state === 'active')?.proxy,
     listOperations: async (actor: Actor, serviceId?: ServiceId): Promise<ApiOperationDto[]> => {
       const operations = await uow.read.operations.listActive();
       if (serviceId === undefined) return operations.map((op) => operationToDto(op));

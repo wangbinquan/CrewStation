@@ -1,4 +1,5 @@
 import { join } from 'node:path';
+import type { ServiceId } from '@crewstation/contracts';
 import { DomainTopic } from '@crewstation/contracts';
 import type { EventConsumer } from '@crewstation/eventbus';
 import { createEventConsumer } from '@crewstation/eventbus';
@@ -34,6 +35,8 @@ export interface ApiCatalogModuleDeps {
   /** 服务 ID／服务身份 → 归属；由应用基于 project 模块装配。 */
   services: ServiceResolver;
   hosts: HostNaming;
+  /** 目录事务提交后更新依赖它的投影；失败沿现有事件消费机制重试，登记本身保持幂等。 */
+  onCatalogChanged?: (serviceId: ServiceId) => Promise<void>;
   clock?: Clock;
   logger?: Logger;
 }
@@ -75,6 +78,9 @@ export function createApiCatalogModule(deps: ApiCatalogModuleDeps): ApiCatalogMo
   // 登记在自己的事务里原子落库（消费者对处理器抛错不回滚，不能借用游标事务）；至少一次投递靠登记的幂等性吸收，超过重试次数进入死信。
   const registerRelease = registerReleaseUseCase(useCaseDeps);
   const consumer = createEventConsumer({ db: deps.db, consumer: 'api-catalog', ...(deps.logger ? { logger: deps.logger } : {}) })
-    .on(DomainTopic.releaseRegistered, (event) => registerRelease(event.payload));
+    .on(DomainTopic.releaseRegistered, async (event) => {
+      await registerRelease(event.payload);
+      await deps.onCatalogChanged?.(event.payload.serviceId);
+    });
   return { api, http: [catalogRoutes(api), requestRoutes(api)], subscriptions: [consumer], migrations: apiCatalogMigrations };
 }

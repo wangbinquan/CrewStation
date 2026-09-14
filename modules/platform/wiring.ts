@@ -107,6 +107,10 @@ function composeCore(deps: PlatformModuleDeps, late: Late) {
   const scm = createScmModule({ db, project: project.api, settings: { baseUrl: settings.gitlab.baseUrl, groupPath: settings.gitlab.groupPath, platformToken: settings.gitlab.platformToken, platformBotName: settings.gitlab.botName, defaultBranch: 'main' } });
   const apiCatalog = createApiCatalogModule({
     db, projects: project.api, hosts, logger,
+    onCatalogChanged: async (serviceId) => {
+      await gatewayApi().reconcileService(serviceId);
+      await gatewayApi().rebuildAllowlist();
+    },
     services: {
       resolveService: async (id) => { const r = await resolveById(id); return r ? { projectId: r.projectId, serviceId: r.serviceId, slug: r.slug, identity: r.identity } : undefined; },
       resolveServiceIdentity: async (identity) => { const r = await project.api.resolveServiceIdentity(identity); return r ? { projectId: r.projectId, serviceId: r.serviceId, slug: r.slug, identity: r.identity } : undefined; },
@@ -148,7 +152,7 @@ function composeDelivery(deps: PlatformModuleDeps, core: ReturnType<typeof compo
     db, k8s, hosts, logger, isAdmin: (id) => isAdmin(id),
     services: { listServices, getService: async (id) => (await listServices()).find((s) => s.serviceId === id), serviceIdOfProject: async (projectId) => (await listServices()).find((s) => s.projectId === projectId)?.serviceId },
     slots: { slotRoles: release.api.slotRoles },
-    grants: { grantedOperations: apiCatalog.api.grantedOperations, listCallers: async () => [], proxyNameOf: async (serviceId) => (await apiCatalog.api.listProxies(SYSTEM_ACTOR)).find((p) => p.serviceId === serviceId)?.proxy },
+    grants: { grantedOperations: apiCatalog.api.grantedOperations, listCallers: async () => [], proxyNameOf: apiCatalog.api.activeProxyNameOf },
     settings: { systemNamespace: settings.systemNamespace, serviceDomain: settings.serviceDomain, userAuthMiddleware: 'forward-auth-user', serviceAuthMiddleware: 'forward-auth-service', dropIdentityHeadersMiddleware: 'drop-identity-headers', allowlistMaxStaleSeconds: 300, consumerName: 'gateway' },
   });
   late.gateway = gateway.api;
