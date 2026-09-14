@@ -1269,4 +1269,14 @@ CUA 内置浏览器以 admin 在该项目逐个启动一个只读 rfc003-verify-
 
 该浏览器没有提供系统主题模拟能力，因此媒体事件自动回归不等于真实系统明暗切换；也没有将单个开发页的三种尺寸视为全站五尺寸通过。UX-AT-25／26／37／51 继续保留，累计 **19／52**。22:08:43Z 部署前 console rfc003-927da4d／generation=28、API ebaa730／32、controller cc93104／21 均 1／1，节点剩余 1,421,168,640 bytes。本批仅需更新 console，旧任务运行时不变。
 
-证据为临时目录 batch60-theme-red、theme-targeted、check、build、candidate 和 deploy-before。源码发布、精确 SHA CI 与本机 console 部署继续；I9／I14／I15 及成员范围仍待答复，RFC-004 不提前开工。
+### 发布、部署及保留核对
+
+已发布 `c9905a63decd7a2bdb5f34bfc981beaadcc45974`，精确 SHA [CI 34902926774](https://github.com/wangbinquan/CrewStation/actions/runs/34902926774)／job 104172854777 于 22:14:51Z 成功：**1152 pass／8 skip／0 fail**（1160 tests／195 files／69.25s），console build 1.02s。本地门禁后的四份源码／测试候选未变。
+
+以已部署 rfc003-927da4d 为基底构建 console，只覆盖 dist／serve.ts。新 imageID=`sha256:a0a6312555d42597d36f7a0f2f9692989f02fa733ce887292ac7731b6268d73b`，七份文件逐份核对；总镜像内容 230,165,488 bytes，按已有 digest 只新增 **3,718,128 bytes**，流式导入，无 tar 落盘或数据清理。之后仅滚动 console：23:31:00Z generation=29、1／1，Pod `console-6b5888d97b-9l8xs`／UID `3ab28d7b-79d4-4a00-9561-8462224d83f5`、restartCount=0；实际 imageID 和七份文件再次核对。23:31:57Z 普通 HTTP 六份静态产物摘要／大小一致。
+
+CUA 刷新真实 delivery 页面载入 `/assets/index-C2niefU7.js`，恢复连接与回放后仍一个 CLI 1937fa，原工作区／网格、`RFC003_SNAPSHOT_DRAFT 未发送草稿`、本轮完成／进程在线与未读完成 1 保持；取得输入控制后可输入，没有提交草稿或新模型请求。正常 1280×720 下画面无错位，整页 scrollWidth=1280，产品 surface 与终端默认背景均为白色。原生系统设置入口后来可读取，点击外观后再次读取仍在通用页，没有实际更改或验证系统明暗；不据此关闭主题验收。
+
+23:33:31Z readonly 核对：三个原 QA 的 taskId、native DTO、历史 Agent、活动及工作树内容均保持；checkedAt 正常更新，另有会话闲置提醒／活跃时间推进，不称完整 session DTO 逐字节相同。delivery HEAD ea10bd3／未提交 10／未推送 0、files e4741df／未提交 2／未推送 0 及两份原指纹一致；旧 rfc003-ux 仍是 Git 输出超限，没有读取或清理缓存。四份原业务文件与 Git 配置摘要匹配，三个健康任务 UID／ready／restartCount=0、失败任务和 Bound 工作卷 UID 保留。API ebaa730／generation=32、controller cc93104／21 仍 1／1，节点剩余 1,360,252,928 bytes。
+
+证据为临时目录 batch60-theme-red、theme-targeted、check、build、candidate、deploy-before、source-publication／source-ci、image-context／built／budget／import、console-rollout、http-assets、qa-before／qa-after／qa-comparison、final-runtime。最后仅补证据，复用有效完整门禁；I9／I14／I15 及成员范围仍待答复，RFC-004 不提前开工。

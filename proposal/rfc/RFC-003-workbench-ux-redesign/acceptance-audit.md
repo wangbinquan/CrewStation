@@ -1,6 +1,6 @@
 # RFC-003｜验收证据核对
 
-> 2026-09-15；共享 console 为 `927da4d212ecd643bee5529838e3d1f1bc3bceed`、cs-api 为 `ebaa73014657692eafb32728feb3232dfcc8ebd3`，cs-controller 为 `cc931041503cd2794c3145172b728ac24303a08a`。新任务镜像已更新至 `fc0688e9c0bc5e4b444c4cad2c26f2e840615fca`；缩窄快照修复通过完整门禁、精确 SHA CI、实际镜像核对与真实页面历史往返，UX-AT-52 已完成。旧业务文件与工作卷保留，新 delivery QA 的十个 npm 缓存项另行记录。参考代理 v0.1.2 已正常上线，请求到达正确代理，但访问 GitLab 被现有出站规则阻断，I9 待作者裁定。四窗 OOM、保卷恢复和具体成员范围仍待处理。任务和标准沿用 [plan.md](plan.md)，没有删减范围。
+> 2026-09-15；共享 console 为 `c9905a63decd7a2bdb5f34bfc981beaadcc45974`、cs-api 为 `ebaa73014657692eafb32728feb3232dfcc8ebd3`，cs-controller 为 `cc931041503cd2794c3145172b728ac24303a08a`。新任务镜像已更新至 `fc0688e9c0bc5e4b444c4cad2c26f2e840615fca`；缩窄快照修复已通过真实页面历史往返，UX-AT-52 已完成。已有终端的系统主题监听已修复、发布并部署，当前明暗完整旅程仍待验收。旧业务文件与工作卷保留，新 delivery QA 的十个 npm 缓存项另行记录。参考代理 v0.1.2 已正常上线，请求到达正确代理，但访问 GitLab 被现有出站规则阻断，I9 待作者裁定。四窗 OOM、保卷恢复和具体成员范围仍待处理。任务和标准沿用 [plan.md](plan.md)，没有删减范围。
 
 ## 1. 判据和环境
 
@@ -51,7 +51,7 @@
 - E31 实际历史页面往返：[implementation 第五十八批](implementation.md#第五十八批历史页面接续与故障摘要)。内置浏览器完成旧历史第三轮、同项目新历史 OpenCode 的两轮接续与返回，实际等待、创建草稿收起保留和离开确认均可见；原 CLI／页签／原生输入草稿／未读状态保留。发现重新附着画面错位，原始屏幕快照亦能复现，仍需修复；旧任务 Git 输出超限和重复原因也如实记录。重复提示修复已完成先红后绿、完整门禁、精确 SHA CI、部署及真实故障页面复验。
 - E32 终端可见列快照：[implementation 第五十九批](implementation.md#第五十九批终端缩窄快照边界)、[屏幕回归](../../../runtimes/task/tests/terminalScreen.test.ts)。缩窄后旧侧栏和半个宽字符的错位修复通过先红后绿、完整门禁、精确 SHA CI、Linux 镜像回归和新 QA 容器源码核对。实际从 1280 缩至 1024、通过菜单进入历史 OpenCode 并接续 42／43 后返回，原 CLI／页签／中文草稿／完成及未读状态保留，快照 114×30／throughSeq=947／4,277 bytes 前后完全一致，画面无错位，恢复宽屏也正常。
 
-- E33 已挂载终端主题：[implementation 第六十批](implementation.md#第六十批已有终端跟随系统主题)、[真实 xterm DOM 回归](../../../apps/console/src/tests/terminalTheme.test.ts)。复现系统媒体条件变化不触发属性监听，修复原生与普通终端；验证双向变色、原实例／PTY 保持、卸载与多实例互不影响，完整门禁和 build 已通过。真实 delivery 开发页在 390／320／768 像素无整页横向溢出，原中文输入可滚动到；未将单页或模拟媒体事件视为全部页面和实际系统明暗旅程。
+- E33 已挂载终端主题：[implementation 第六十批](implementation.md#第六十批已有终端跟随系统主题)、[真实 xterm DOM 回归](../../../apps/console/src/tests/terminalTheme.test.ts)。复现系统媒体条件变化不触发属性监听，修复原生与普通终端；验证双向变色、原实例／PTY 保持、卸载与多实例互不影响，完整门禁、build、精确 SHA CI 和 console 实际部署均通过。真实 delivery 开发页在 390／320／768 像素无整页横向溢出，原中文输入可滚动到；更新后正常 HTTP／页面新产物与原 CLI、草稿、完成／未读状态已复核。未将单页或模拟媒体事件视为全部页面和实际系统明暗旅程。
 
 ## 3. UX-AT-01–52 逐项结论
 

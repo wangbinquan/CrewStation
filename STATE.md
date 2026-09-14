@@ -17,7 +17,9 @@
 
 定向 **9 pass／0 fail／34 assertions**，最终完整门禁 **1156 pass／4 skip／0 fail**（1160 tests／195 files／6432 assertions／105.61s），console build **479ms**，四份源码／测试候选保持。实际 delivery QA 在 390／320／768 像素下均无整页横向溢出，页面可滚动到原中文草稿与输入区；原 CLI、完成状态、未读提示保持，视口覆盖已撤销。这是单个开发页面和自动主题回归，不能替代全部页面／实际系统明暗切换的完整验收，累计仍 **19／52**。
 
-本机 console 更新和精确 SHA CI 继续；22:08:43Z console=927da4d／generation=28、API=ebaa730／32、controller=cc93104／21 均 1／1，节点剩余 1,421,168,640 bytes。此次只有 console 运行内容变化。I9／I14／I15 与成员范围仍待答复，RFC-004 等待 RFC-003 完结。
+已发布 `c9905a63decd7a2bdb5f34bfc981beaadcc45974`，精确 SHA [CI 34902926774](https://github.com/wangbinquan/CrewStation/actions/runs/34902926774) 成功：1152 pass／8 skip／0 fail，console build 1.02s。本机 console 已更新 rfc003-c9905a6／generation=29／1／1，23:31:00Z 实际 imageID 与七份文件匹配，正常 HTTP 六份产物一致。浏览器刷新载入 index-C2niefU7.js，原单 CLI、中文草稿、完成／未读状态保持，已恢复输入控制。
+
+23:33:31Z 三个 QA 的 taskId、原生 CLI、历史 Agent、活动状态与工作树结果均保持（查询时间另计）；原业务文件／Git 配置摘要及失败工作卷 UID 保留。API ebaa730／generation=32、controller cc93104／21 均 1／1，未改变运行镜像。增量导入新增 3,718,128 bytes，无数据清理，节点剩余 1,360,252,928 bytes。原生系统设置一度可读，但没有完成真实主题切换；仍以自动回归和已完成单页尺寸证据为限。源码候选未再改变，纯证据补记复用有效门禁；I9／I14／I15 与成员范围仍待答复，RFC-004 等待 RFC-003 完结。
 
 ## 最新接力：终端缩窄快照边界（2026-09-15）
 
