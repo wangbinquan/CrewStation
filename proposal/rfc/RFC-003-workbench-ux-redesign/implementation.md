@@ -1237,4 +1237,22 @@ CUA 本轮仍报告 Mac 锁定，当前完整历史创建／继续／返回的�
 
 20:48:49Z 节点 allocatable CPU 10 核、内存 32810996Ki，已有请求 9550m／13602Mi，MemoryPressure／DiskPressure 均 False。现有任务套餐只有 coding-medium（1 核、2Gi、10Gi），再加同规格不可调度；计划用单独 250m／2Gi 验收规格保持原所有会话和预览，不做四窗压力实验。此时尚未写套餐、改任务镜像配置或新建验收任务。先完成上库、精确 SHA CI 和镜像核对，再用新任务验证。旧 files CLI／草稿、新历史 Agent、旧 rfc003-ux 和原失败工作卷均保留；不能将新镜像代码通过说成旧 Runner 已热更新。
 
-证据为 batch59 的 red、targeted、check、wide-red-final、targeted-final、check-final、两版 candidate、task-image-preflight 和 resource-preflight。当前源码验证不替代实机往返；UX-AT-52 仍待新运行时复验，累计 **18／52**。RFC-004 保持已批准、等待 RFC-003 完结。
+### 发布、部署及实机复验
+
+已发布 `fc0688e9c0bc5e4b444c4cad2c26f2e840615fca`，精确 SHA [CI 34895624526](https://github.com/wangbinquan/CrewStation/actions/runs/34895624526)／job 104148744595 于 20:55:50Z 成功：**1145 pass／8 skip／0 fail**（1153 tests／194 files／68.96s），console build 1.29s。三份源码候选在实机验收结束后仍匹配最终门禁记录。
+
+基于已部署任务镜像覆盖四份必要文件，构建 `cs-task-runtime:rfc003-fc0688e`，imageID=`sha256:eaca018e3b2d01c366ede44363c6de6d3cc73196a52c25e502d6d74d58323657`。RootFS 旧层、入口和命令均保留，四份文件摘要／大小全部匹配。任务镜像没有 console 的 CSS 测试预加载文件，使用临时只读 bunfig 挂载去掉该测试专用依赖后，镜像内终端回归 **6 pass／0 fail／41 assertions／109ms**；挂载不进入部署镜像。逐 digest 预算为总内容 1,026,370,653 bytes、只新增 **56,413 bytes**，流式导入后剩余 1,539,403,776 bytes，没有 tar 落盘或数据清理。
+
+21:06:46Z 已更新 crewstation-env 的 CS_TASK_IMAGE，并逐个滚动 API／controller 读取；它们的源码镜像仍 ebaa730／cc93104。管理员套餐 `rfc003-59-snapshot`（250m CPU、2Gi 内存、10Gi 存储）经正常目录接口创建，既有 coding-medium 不变。当前开发入口不支持每次选择资源套餐，因此仅临时覆盖 API 的 CS_DEFAULT_TASK_PROFILE，为现有 delivery QA 项目创建一个会话后恢复。滚动交接出现 502／504／连接超时：第一次写请求失败后正常接口与集群均确认未创建任务，后续未就绪时不提交写请求；一次恢复补丁被并发状态 resourceVersion 拦住，核对相同 spec 后以 UID／generation／目标值保护完成恢复。最终正常 POST 于 21:14:39.571Z 创建 `tsk_01a0a1c5a4537000b2f81b4324357c76`，API generation=32 且无临时默认值覆盖，全局默认仍 coding-medium。
+
+新任务位于 cs-rfc003-verify-delivery，Pod `task-01a0a1c5a453`／UID `f6c62e09-80f4-4d3b-b43c-8229781cd488`。21:15:15Z Running／ready／restartCount=0，实际 imageID 与四份文件再次核对，requests／limits 均 250m／2Gi／10Gi。预览 ready，分支 main，HEAD=`ea10bd3ab67501b301ec87d6bc85eaa215fdfa8e`，生产尚未部署。本批没有发布 QA 新版本。
+
+CUA 内置浏览器以 admin 在该项目逐个启动一个只读 rfc003-verify-opencode 原生 CLI：Agent `agt_01a0a1c7d9857000ab50c7cec01937fa`、terminal `pty_01a0a1c7d985700181bb81b6edc9248b`、Runner `f9aed72a-0582-4ef3-9f26-7b100351f7cc`，OpenCode 1.18.29／Big Pickle。首轮模型连接重试后正常返回 RFC003_SNAPSHOT_NATIVE_OK，21:18:22.883Z 开始、21:19:09.777Z 完成，activity throughSeq=1146；页面准确显示执行中→本轮完成／进程在线、未读完成 1。新旧任务出站规则／代理配置一致，对官方站点的只读连通检查有 DNS 超时但 HTTPS 200，没有改网络规则。
+
+原生输入留下 `RFC003_SNAPSHOT_DRAFT 未发送草稿`，将浏览器从 1280×720 缩到 1024×720。通过“会话→历史对话会话”进入同项目独立历史路径，新建只读 Agent `agt_01a0a1cdcb1b7000aa880eb29e04060d`（L-04060d），原生 sessionId=`ses_f5e320e01ffeDeikdVPUKLaghT`。第一条口令式验收文本被模型拒绝，但 waiting 状态正常；随后页面发送普通算术题得到 42，再只要求上一答案加 1 得到 43。真实事件 seq=6528／21:25:00.248Z 与 seq=7484／21:25:45.536Z，三个回合末均 waiting，没有重建 Agent／sessionId，没有工具调用。
+
+从页面“返回 CLI 工作区”返回：仍一个 CLI 1937fa，工作区 1／网格、原中文草稿、本轮完成／进程在线及未读完成 1 全部保留。1024 像素下实际画面无旧侧栏错行；切换前后的普通 WS attachTerminal 均返回 **114×30、throughSeq=947、4,277 bytes，data 逐字节完全相同**，原 native identity 与 activity 也逐项一致。再次取得输入控制并恢复正常 1280×720 后，侧栏、草稿和输出正常，viewport override 已撤销。这次完整旅程关闭 UX-AT-52，累计 **19／52 通过、33 项待完成**。
+
+21:27:05Z 新任务 HEAD／未推送 0 保持，但历史驱动新增十个未跟踪 `.npm/_cacache/` 项，fingerprint=`dbb42f6e8d8f9a9e87d968ce34425c036e0183bb6bffe14314afd4af032ad6b2`；仅取得 Git 元数据，没有读取、忽略、提交或清理缓存内容。21:29:58Z console=927da4d／generation=28、API=ebaa730／32、controller=cc93104／21 均 1／1。旧 files／rfc003-ux Pod 身份、ready／restartCount=0，四份原业务文件与 Git 配置摘要均保持；失败 workbench Pod 与 Bound 工作卷 UID 也保持。节点剩余 1,451,814,912 bytes，未做四窗压力实验，旧 Runner 仍运行各自原镜像。
+
+证据为 batch59 的 red、targeted、check、wide-red-final、targeted-final、check-final、两版 candidate、source-ci、image-build／image-import、task-image-rollout、qa-session-final-create、qa-pod-verified、native-before／native-after、两份 terminal snapshot 与 final-runtime。纯证据更新复用有效完整门禁；I9／I14／I15 和成员范围仍待答复，RFC-004 保持已批准、等待 RFC-003 完结，Hook 未开工。

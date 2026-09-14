@@ -17,7 +17,13 @@
 
 首次完整门禁后补查又复现中文右边界：半个宽字符会挤走下一行，最终红回归 **4 pass／2 fail**。现以同样式空格显示该不完整字符的边缘，原字符保留在原缓冲；定向 **6 pass／0 fail／41 assertions**，最终完整门禁 **1149 pass／4 skip／0 fail**（1153 tests／194 files／6406 assertions／106.24s），三份候选文件保持。console 未变，沿用第五十八批有效 build。
 
-准备更新新任务镜像并用独立验收会话复验，旧会话／工作卷与原 CLI 均保留。当前节点 CPU 请求 9550m／10 核，既有任务规格只有 1 核／2Gi；新验证拟用 250m／2Gi 专用规格，不做四窗压力实验。现行 CS_TASK_IMAGE 仍 rfc003-3d1ce51，API／controller 分别 ebaa730／cc93104，配置未改。上库、精确 SHA CI、任务镜像及实机续验继续；UX-AT-52 尚未通过，累计 **18／52**，RFC-004 不提前启动。
+已发布 `fc0688e9c0bc5e4b444c4cad2c26f2e840615fca`，精确 SHA [CI 34895624526](https://github.com/wangbinquan/CrewStation/actions/runs/34895624526) 成功：1145 pass／8 skip／0 fail，console build 1.29s。新任务镜像 rfc003-fc0688e 的实际 imageID 为 `sha256:eaca018e3b2d01c366ede44363c6de6d3cc73196a52c25e502d6d74d58323657`，四份文件匹配；Linux 容器内六项终端回归也通过。只新增 56,413 bytes 镜像内容，CS_TASK_IMAGE 已更新，旧 Runner 未热更新。
+
+管理员专用套餐 rfc003-59-snapshot（250m／2Gi／10Gi）已创建。开发入口只能用平台默认套餐，因此短暂覆盖 API 默认值，通过正常接口创建 delivery QA 会话后恢复 coding-medium；网关滚动交接的 502／504／超时均未当作成功或重复提交，恢复补丁的状态版本冲突也已处理。新任务 `tsk_01a0a1c5a4537000b2f81b4324357c76`／Pod UID `f6c62e09-80f4-4d3b-b43c-8229781cd488` 实际使用新镜像与专用规格，Running／ready／restartCount=0。21:29:58Z API generation=32／controller=21／console=28 均 1／1；源码镜像仍分别 ebaa730／cc93104／927da4d，默认套餐已恢复。
+
+真实浏览器中逐个启动一个只读 OpenCode，完成一轮后保留中文草稿，并从 1280×720 缩到 1024×720。通过会话菜单新建并接续同项目历史 Agent，后两轮回答 42／43，原生 sessionId 不变；返回原 CLI 后数量 1、工作区 1、网格、草稿、完成状态及未读提示完整保留，画面无错位。返回前后 114×30、throughSeq=947、4,277 bytes 的快照逐字节一致；恢复宽屏后原侧栏与草稿正常。**UX-AT-52 已通过，累计 19／52，33 项待完成。**
+
+新 QA 的 HEAD ea10bd3／未推送 0 保持，历史驱动新增十个 npm 缓存项，未读取或清理内容。旧两份健康任务／原业务文件与 Git 配置摘要、原 files CLI 草稿和失败工作卷保留；节点剩余 1,451,814,912 bytes。源码候选未再变化，纯证据提交沿用有效门禁。I9／I14／I15 与成员范围待答复，RFC-004 继续等待 RFC-003 完结。
 
 ## 最新接力：页面历史续聊与重复故障提示（2026-09-15）
 
