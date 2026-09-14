@@ -19,7 +19,11 @@
 
 QA 应用提交为 `a80dbc102e8b6db71e778d0092e5d78865330d4d`，只改 home.ts 一行。其 main 被 GitLab 保护拒绝后，没有提权或改保护；从普通应用开发分支 codex/rfc003-files 正常发布 `rel_01a0a006547c7000906f933ff49b6d96`／v0.1.1，实际预览显示新标题，正式槽仍空。CrewStation 主仓一直 main。两次构建前临时调零的 QA preview 全部恢复 1／1；workbench 正式 v0.1.0 未动，节点剩余约 873MiB，后续构建仍需核对容量。
 
-最终复查发现 URL 代推成功没有更新本地 remote refs，界面仍显示“未推送提交 1”。已在原发布用例修复：临时 cs-publish remote 按成功回执更新独立跟踪引用，既有 Runner 即可正确统计，不改 origin／upstream／持久配置。真实 Git 回归先红后绿，覆盖后来提交和远端拒绝；定向 15 pass／4 skip／0 fail，完整本地门禁 **1108 pass／4 skip／0 fail**（1112 tests／188 files／6162 assertions／105.63s），console build **606ms**。三个源码／测试候选哈希未变。修复尚未发布／部署，不能声称共享计数已修复。
+最终复查发现 URL 代推成功没有更新本地 remote refs，界面仍显示“未推送提交 1”。已在原发布用例修复：临时 cs-publish remote 按成功回执更新独立跟踪引用，既有 Runner 即可正确统计，不改 origin／upstream／持久配置。真实 Git 回归先红后绿，覆盖后来提交和远端拒绝；完整本地门禁 **1108 pass／4 skip／0 fail**（1112 tests／188 files／6162 assertions／105.63s），console build **606ms**，三个源码／测试候选哈希未变。修复已发布 `9642e23fb4ed0e033d32eeb9ae938ffb276380d2`，精确 SHA [CI 34849087951](https://github.com/wangbinquan/CrewStation/actions/runs/34849087951) 成功：1104 pass／8 skip／0 fail、console build 1.14s。
+
+仅 cs-api 更新至 rfc003-9642e23，generation=21，Pod `cs-api-645c665469-s8dtw`／UID `68888c03-cff4-478d-8a6b-bc67735e4019` 就绪，实际 imageID=`sha256:9b4eb107decd4eea51baf740fb90b03d26fe80e3581e6381cf65acdfe269ee22`，源码摘要与候选一致。原 QA 会话通过正常发布 API 从同一 SHA 发布 v0.1.2=`rel_01a0a02027f67000ad506c35e7e40836`，真实构建／preview ready／HTTP 200；未提交 0、未推送从 1 变 0，原任务／OpenCode／文件及 Git 配置摘要保持。该次构建临时调零的两个 QA preview 最终 generation=7、均 1／1，原正式槽不变；节点仅余 401,764KiB，继续构建前须复核空间。
+
+CUA 随后明确报告 Mac 锁定且无法自动解锁，已请求手动解锁；该次 v0.1.2 使用正常 API 验证，未冒充界面验收。解锁后先复验共享开发页未推送计数与原工作区，再继续其他界面旅程。下文此前“浏览器已恢复”是故障前记录。
 
 累计 **18／52 项实机验收通过，34 项待完成**；详见 acceptance-audit 与 implementation 第四十八批。四窗资源保护、I14 保卷恢复方案、具体成员／市场范围授权和其余角色／尺寸／失败路径仍未完成。RFC-004／ADR-0004 已批准，继续等待 RFC-003 完结后启动，T2–T9 未开始。
 

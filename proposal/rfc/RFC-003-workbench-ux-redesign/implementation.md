@@ -920,3 +920,17 @@ Chrome 原生 CUA 已恢复页面与截图读取，第四十六批的浏览器�
 新增 UX-AT-01／05／07，累计 **18／52 通过、34 项仍待完成**。UX-AT-32 等发布后版本提示保留本次缺陷及修复待部署状态，UX-AT-52 只实看历史入口，没有把普通终端提交算作历史 Agent 对话接续。临时证据为 `crewstation-rfc003-files-{preview-fault.log,preview-recovery-logs.json,release-after.json,final-runtime.json,final-session.json}` 与 batch48 回归日志。I14 与具体成员／市场范围问题仍待答复；RFC-004／ADR-0004 已批准，T2–T9 等待 RFC-003 完结后启动。
 
 第四十八批完整本地门禁 **1108 pass／4 skip／0 fail**，1112 tests／188 files／6162 assertions／105.63s；console build **606ms**。完整门禁可访问隔离测试数据库和本机测试 GitLab，定向中跳过的 dev-session 四项在完整门禁中已执行；最后四项跳过仍是 opt-in K8s、两个原生 CLI 与 Linux Ctrl+C。三个源码／测试文件与门禁前 candidate.json 哈希一致。文档相对链接、52 个唯一验收编号和 18／34 计数通过检查，尚无本批精确 SHA CI 或部署证据。
+
+### 第四十八批发布、API 部署与原会话复验
+
+六个精确路径已发布为 `9642e23fb4ed0e033d32eeb9ae938ffb276380d2`，主干推后同步且工作树／索引干净。精确 SHA [CI 34849087951](https://github.com/wangbinquan/CrewStation/actions/runs/34849087951)／job 103992178602 于 13:27:13Z 成功：**1104 pass／8 skip／0 fail**，1112 tests／188 files／66.27s，console build **1.14s**。没有重跑未变的本地候选完整门禁。
+
+官方 control-plane Dockerfile 构建 `cs-control-plane:rfc003-9642e23`，revision 为完整源码 SHA，镜像流式导入节点、没有 tar 留存。只更新 cs-api 唯一 image 字段，补丁先 test UID／generation／容器名／旧镜像；Deployment UID `b29a07a4-f251-46d4-8b67-d6c456c85749` 不变、generation 20→21，Pod `cs-api-645c665469-s8dtw`／UID `68888c03-cff4-478d-8a6b-bc67735e4019` Running／ready／restartCount=0。实际 imageID 与构建均为 `sha256:9b4eb107decd4eea51baf740fb90b03d26fe80e3581e6381cf65acdfe269ee22`；容器内 publishFromSession.ts 的 SHA256=`641b6cd5924f55adf511f1cf17d4389a2d593b3e995373fd3a65178d7c0617e1`，与门禁候选一致。console 仍 10455cc，cs-controller 仍 03d1572，其余服务／任务镜像／配置／迁移不变。
+
+这时 CUA 明确报告 Mac 锁定且不能自动解锁，已请求用户手动解锁，没有把继续的接口取证描述成界面实看。先通过平台 SCM 只读确认远端 codex/rfc003-files 已为 a80dbc1、main 仍 a643183；不使用工作区已失效的克隆凭据反复重试，也不手动 fetch 或设置 upstream。现存新任务保持同一 taskId、干净工作树和确认 SHA，再通过正常 `POST /v1/projects/:id/publish` 发布明确版本 v0.1.2，仅验证该修复，未改源码或切正式流量。
+
+实际 HTTP 202 返回 `rel_01a0a02027f67000ad506c35e7e40836`，创建于 13:34:17.076Z，build Job `build-6c35e7e40836` 于 13:34:27Z Complete／Succeeded=1，发布 13:34:32.654Z ready；preview green 为 v0.1.2／同一 a80dbc102e8b6db71e778d0092e5d78865330d4d，正式仍空。实际预览 HTTP 200 且新标题存在。这不补齐 UX-AT-09 的测试者／202 阶段界面条件。
+
+13:34:45Z 与 13:35:54Z 原会话 workspace-status 都为未提交 0／未推送 0，upstream 仍 missing。Git 实际新增 `refs/remotes/cs-publish/codex/rfc003-files` 指向 a80dbc1；`.git/config` 摘要前后为 `43df3f42910e5957f451c451f1f516bb481f425490ca9939eb7876c41503f41c`，home.ts 摘要仍 3e6ba15d…。原 Pod UID／restartCount=0、OpenCode agentId／terminalId／Runner／startedAt、completed 轮次和 throughSeq=2004 都保持。本次未重建任务容器或创建额外 Agent。
+
+构建前同样暂调零的 files-green／workbench-blue 已再次全部恢复，13:35:56Z 两者 generation=7、desired=ready=1；files 控制器部署 v0.1.2，workbench 蓝槽仍旧 v0.1.1。原 workbench 正式 green 的 UID／generation=1／release／1／1 均保持。PostgreSQL 原 Pod 仍 ready／restartCount=9，最终节点仅余 **401,764KiB**，未将容量描述为已根治。证据为 batch48 的 api-after、v012-started、workspace-after、final-api、final-runtime JSON 及构建／导入／CI／rollout 日志。界面计数和其余实机旅程待解锁继续，累计仍 **18／52**；RFC-004 继续排队，Hook 未开工。
