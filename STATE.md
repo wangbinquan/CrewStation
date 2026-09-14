@@ -15,7 +15,9 @@
 
 第五十六批核对历史新建表单，复现返回后丢首条指令／档位、同次渲染连续点击启动两个 Agent，以及返回旧对话后迟到成功切走输入对象。新增四项真实路由／HTTP 回归，修复前 **1 pass／3 fail**。草稿移到当前会话的 feature hook，收起保留，启动时同步锁定并固定输入；失败保留且不自动重发，离开复用同一份草稿确认，在途不能确认放弃。成功只清新建草稿，用户已回到原对话时保留其选择与焦点。
 
-初次定向 **14 pass／0 fail／121 assertions**；补充焦点断言后最终完整门禁 **1139 pass／4 skip／0 fail**（1143 tests／193 files／6338 assertions／104.87s），console build **502ms**，七份候选摘要保持。源码提交、精确 SHA CI 与仅 console 更新随后核验；API、controller、运行时与 RFC-004 Hook 没有改动。Mac 仍锁定，I9／I14／I15 与具体成员范围仍待答复；累计 **18／52**，不将自动回归计为完整浏览器旅程。
+初次定向 **14 pass／0 fail／121 assertions**；补充焦点断言后最终完整门禁 **1139 pass／4 skip／0 fail**（1143 tests／193 files／6338 assertions／104.87s），console build **502ms**，七份候选摘要保持。已发布 `4d1859a2a8f50bc1f05d7baf7fdf39c7798f775e`，精确 SHA [CI 34884257972](https://github.com/wangbinquan/CrewStation/actions/runs/34884257972) 成功：1135 pass／8 skip／0 fail、console build 1.33s，四项新回归实际执行。
+
+console 已更新 rfc003-4d1859a／generation=27／1／1，实际镜像和七份文件、正常 HTTP 的六份产物全部匹配。19:09:48Z 两个 QA 工作树、原历史 Agent awaiting-input 与原单个原生 CLI 身份保持；API c712aa7／controller cc93104 版本保持。增量导入只新增 3,709,825 bytes，没有清理数据。Mac 仍锁定，I9／I14／I15 与具体成员范围仍待答复；累计 **18／52**，RFC-004 不提前启动，最后纯证据补记沿用有效门禁。
 
 ## 最新接力：历史页面实时名册刷新（2026-09-15）
 

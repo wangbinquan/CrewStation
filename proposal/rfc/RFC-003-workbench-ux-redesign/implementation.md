@@ -1158,3 +1158,15 @@ console 使用此前已核对并导入的 `cs-console:rfc003-cbe2825`。API 新�
 初次定向两文件 **14 pass／0 fail／121 assertions／1.61s**，随后补充回执前继续输入和焦点保持断言。最终完整 `bun run check` **1139 pass／4 skip／0 fail**（1143 tests／193 files／6338 assertions／104.87s），console build **502ms**。七份源码／测试摘要记录在 batch56-candidate.json，完整门禁后逐份核对未变；没有重复运行同一完整门禁。本批复用原表单／提示／离开确认，没有新增后端路由、模型配置或原生 CLI 启动步骤。
 
 CUA 本轮仍报告 Mac 锁定，当前完整历史创建／继续／返回的浏览器旅程没有补齐。已有历史 OpenCode 和原生 CLI 保留，没有再次发模型提示。I9／I14／I15、具体成员范围及解锁问题保持待答复，累计仍 **18／52**；RFC-004 继续按已批准顺序等待 RFC-003 完结。源码发布、精确 SHA CI 与仅 console 更新继续核验。
+
+### 第五十六批上库与控制台部署
+
+十一份精确路径已发布 `4d1859a2a8f50bc1f05d7baf7fdf39c7798f775e`，19:00:29Z fetch 后 main 与 origin/main 一致，工作树／索引干净。精确 SHA [CI 34884257972](https://github.com/wangbinquan/CrewStation/actions/runs/34884257972)／job `104110846448` 于 19:03:00Z 成功：**1135 pass／8 skip／0 fail**，1143 tests／193 files／6297 assertions／69.90s，新增四项创建回归实际执行；console build **1.33s**。
+
+控制台镜像 `cs-console:rfc003-4d1859a` 以已验证 c5d6eec 为基底，仅替换已构建的六份 dist。依赖清单、锁文件、标准镜像配方与 serve.ts 均无变化；构建使用 --network=none／--pull=false，没有重新安装依赖。实际 imageID=`sha256:1c67dd6a62f1bdce70f19a5a43a048a584ac2b35bf70d4ea217aa3623e9774a8`，无网络容器中七份文件摘要一致。逐 digest 扫描镜像总内容 222,778,241 bytes，实际只新增 **3,709,825 bytes**；流式 save／import 退出均为 0，没有 tar 或数据清理。导入瞬时可用空间为 1,771,974,656 bytes，完成后 1,754,218,496 bytes；此前读数较低，不将空间增长归因于本批操作。
+
+部署补丁先校验 console 的原 UID、generation=26、replicas=1、容器名和旧镜像，再仅替换镜像。19:08:59Z 实际 generation=27、1／1，Pod `console-8d7cdfb59-rkspr`／UID `383ec166-8bdc-4a86-b5ef-bbcb88f556c7`、restartCount=0；运行 imageID 与全部七份文件一致。cs-api c712aa7／generation=24、cs-controller cc93104／generation=20 均保持 1／1。正常已登录 HTTP 逐份取得首页、CSS、两个 JS 与两份品牌 SVG，六份全部 200 且字节数／摘要匹配。
+
+19:09:48Z 对部署前 19:03:01Z 的正常 API 快照复核：files 工作树 e4741df／未提交 0／未推送 0、旧历史 QA 的模型后指纹／未提交 1395 保持；原历史 Agent 完整 DTO 仍 awaiting-input，原单个原生 CLI／Runner 身份保持。本批没有新增模型请求、创建任务容器或变更角色／市场范围。CUA 在更新后仍报告 Mac 锁定；当前页面实际创建、继续和返回的完整旅程仍未执行，不增加 UX-AT-52 通过结论。
+
+证据保存为 batch56 的 candidate、red／targeted／check／console-build、source-publication／ci、console-preflight、image-context／build／import-budget／import、console-patch／verified／http-verified、runtime-before／verified；关键结论已落此文。七份源码候选自完整门禁后未变，纯证据补记复用该有效门禁，最终文档 SHA 的 hosted CI 单独核对。累计 **18／52**；I9／I14／I15、成员范围及解锁问题仍待答复，RFC-004 继续等待 RFC-003 完结。

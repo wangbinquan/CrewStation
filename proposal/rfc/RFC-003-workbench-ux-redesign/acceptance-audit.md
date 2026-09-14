@@ -45,7 +45,7 @@
 - E27 真实历史对话与等待状态：[implementation 第五十四批](implementation.md#第五十四批真实历史-opencode-与等待状态)、[名册回归](../../../modules/dev-session/tests/devSessionModule.test.ts)。原健康 QA 的单个历史 OpenCode 完成两轮实际模型对话，第二轮接续相同原生会话；真实 waiting 事件被错误投影为 running，修复已通过先红后绿、完整门禁、精确 SHA CI 和 API 部署，原会话已正确返回 awaiting-input，身份和权限不变。旧任务镜像新增 CLI 缓存，原文件摘要保持但工作树计数已变化；更新后没有进一步变化。浏览器仍锁定，不把 API／WS 取证计作返回 CLI 的完整旅程。
 - E28 历史名册实时刷新：[implementation 第五十五批](implementation.md#第五十五批历史页面实时名册刷新)、[真实路由回归](../../../apps/console/src/tests/historicalConversations.test.tsx)。补齐明确等待／运行、权限及旧驱动下一轮首次输出的重读，后续连续片段不重复查询；后台变化保留当前选择、草稿和焦点。先红后绿、完整门禁、build、精确 SHA CI 与 console 部署均完成，运行 Pod 和正常 HTTP 产物一致；尚非真实浏览器旅程。
 
-- E29 历史新建输入与启动回执：[implementation 第五十六批](implementation.md#第五十六批历史新建-agent-输入保护)、[真实路由回归](../../../apps/console/src/tests/historicalAgentCreation.test.tsx)。复现返回丢首条指令、重复启动和迟到成功误选对象；草稿按当前会话保留，启动同步防重并固定输入，失败不自动重发，离开共用确认，成功不清其他消息或抢回焦点。四项新增回归、完整门禁和 build 已通过；实际浏览器旅程仍待解锁。
+- E29 历史新建输入与启动回执：[implementation 第五十六批](implementation.md#第五十六批历史新建-agent-输入保护)、[真实路由回归](../../../apps/console/src/tests/historicalAgentCreation.test.tsx)。复现返回丢首条指令、重复启动和迟到成功误选对象；草稿按当前会话保留，启动同步防重并固定输入，失败不自动重发，离开共用确认，成功不清其他消息或抢回焦点。四项新增回归、完整门禁、build、精确 SHA CI 和 console 部署均已通过，实际 Pod／HTTP 产物匹配，原有会话及工作树保持；实际浏览器旅程仍待解锁。
 
 ## 3. UX-AT-01–52 逐项结论
 
