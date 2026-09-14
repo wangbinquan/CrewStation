@@ -102,7 +102,7 @@ describe.skipIf(!available)('dev-session module', () => {
     const release = await dev.api.publish(developer, projectId, { branch: 'main', version: 'patch' });
     expect(release.tag).toBe('v0.1.1');
     const push = commands.find((c) => c.type === 'exec' && c.command[0] === 'sh') as Extract<RunnerCommand, { type: 'exec' }>;
-    expect(push.env.CS_PUSH_URL).toContain('oauth2:');
+    expect(push.env.GIT_CONFIG_VALUE_0).toContain('oauth2:');
     expect(push.command.join(' ')).not.toContain('secret');
     expect(published).toHaveLength(1);
 

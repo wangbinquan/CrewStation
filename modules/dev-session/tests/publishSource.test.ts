@@ -17,7 +17,7 @@ test('确认后会话或 HEAD 已变化：不推送、不打标签，旧来源�
   expect(state.published).toBe(false);
 });
 
-test('检查后 HEAD 前进时只推送已确认 SHA，release 收到同一 SHA；兼容旧调用方也冻结检查结果', async () => {
+test('真实代推只发送确认的 SHA，成功同步推送记录；拒绝不改记录且不打标签', async () => {
   const root = await mkdtemp(join(tmpdir(), 'cs-publish-source-'));
   const work = join(root, 'work'), remote = join(root, 'remote.git');
   const git = async (args: string[], cwd = work) => {
@@ -30,6 +30,9 @@ test('检查后 HEAD 前进时只推送已确认 SHA，release 收到同一 SHA�
     await writeFile(join(work, 'draft.txt'), 'confirmed\n'); await git(['add', 'draft.txt']);
     await git(['-c', 'user.name=Test', '-c', 'user.email=test@example.com', 'commit', '-qm', 'confirmed']);
     const confirmed = await git(['rev-parse', 'HEAD']);
+    await git(['remote', 'add', 'origin', 'https://example.invalid/read-only.git']);
+    await git(['update-ref', 'refs/remotes/origin/main', confirmed]);
+    const configBefore = await Bun.file(join(work, '.git/config')).text();
     const { deps, state } = workspaceFixture(); let published: PublishRequest | undefined;
     state.result = { ...readyWorkspace(), headSha: confirmed };
     deps.scm.pushUrl = async () => {
@@ -51,5 +54,26 @@ test('检查后 HEAD 前进时只推送已确认 SHA，release 收到同一 SHA�
     expect(await git(['rev-parse', 'HEAD'])).not.toBe(confirmed);
     expect(published).toMatchObject({ branch: 'main', expectedCommitSha: confirmed });
     expect(published).not.toHaveProperty('expectedTaskId');
+    // 实机 URL 代推已成功，工作台却仍报未推送：必须由 Git 成功回执更新跟踪引用。
+    expect(await git(['rev-parse', 'refs/remotes/cs-publish/main'])).toBe(confirmed);
+    expect(await git(['rev-list', '--count', 'HEAD', '--branches', '--not', '--remotes'])).toBe('1');
+    deps.scm.pushUrl = async () => ({ url: remote, expiresAt: '2026-09-13T01:00:00.000Z' });
+    const later = await git(['rev-parse', 'HEAD']);
+    state.result = { ...readyWorkspace(), headSha: later };
+    await publishFromSessionUseCase(deps)(workspaceActor, workspaceProject, { branch: 'main', version: 'patch', expectedCommitSha: later });
+    expect(await git(['rev-parse', 'refs/remotes/cs-publish/main'])).toBe(later);
+    expect(await git(['rev-list', '--count', 'HEAD', '--branches', '--not', '--remotes'])).toBe('0');
+    await writeFile(join(remote, 'hooks/pre-receive'), '#!/bin/sh\nexit 1\n', { mode: 0o755 });
+    await writeFile(join(work, 'draft.txt'), 'rejected\n');
+    await git(['-c', 'user.name=Test', '-c', 'user.email=test@example.com', 'commit', '-qam', 'rejected']);
+    state.result = { ...readyWorkspace(), headSha: await git(['rev-parse', 'HEAD']) };
+    state.published = false;
+    await expect(publishFromSessionUseCase(deps)(workspaceActor, workspaceProject, { branch: 'main', version: 'patch' })).rejects.toMatchObject({ kind: 'precondition' });
+    expect(state.published).toBe(false);
+    expect(await git(['rev-parse', 'refs/heads/main'], remote)).toBe(later);
+    expect(await git(['rev-parse', 'refs/remotes/cs-publish/main'])).toBe(later);
+    expect(await git(['rev-list', '--count', 'HEAD', '--branches', '--not', '--remotes'])).toBe('1');
+    expect(await git(['rev-parse', 'refs/remotes/origin/main'])).toBe(confirmed);
+    expect(await Bun.file(join(work, '.git/config')).text()).toBe(configBefore);
   } finally { await rm(root, { recursive: true, force: true }); }
 }, 20_000);

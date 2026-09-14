@@ -28,7 +28,12 @@ export function publishFromSessionUseCase(deps: DevSessionUseCaseDeps) {
     if (input.expectedCommitSha && status.headSha !== input.expectedCommitSha) throw precondition('工作树 HEAD 已经变化，请重新确认发布来源', { expected: input.expectedCommitSha, actual: status.headSha });
     if (status.branch !== null && status.branch !== input.branch) throw precondition('当前工作树分支已经变化，请重新确认发布来源', { branch: status.branch, headSha: status.headSha });
     const { url } = await scm.pushUrl(svc.serviceId);
-    const push = await exec(env.id, ['sh', '-c', 'git push "$CS_PUSH_URL" "$CS_PUSH_SHA:refs/heads/$CS_PUSH_BRANCH"'], { CS_PUSH_URL: url, CS_PUSH_SHA: status.headSha, CS_PUSH_BRANCH: input.branch, GIT_TERMINAL_PROMPT: '0' });
+    // URL 直推不更新远端跟踪记录；临时具名 remote 让 Git 按成功回执同步平台引用。
+    const push = await exec(env.id, ['sh', '-c', 'git push cs-publish "$CS_PUSH_SHA:refs/heads/$CS_PUSH_BRANCH"'], {
+      GIT_CONFIG_COUNT: '2', GIT_CONFIG_KEY_0: 'remote.cs-publish.url', GIT_CONFIG_VALUE_0: url,
+      GIT_CONFIG_KEY_1: 'remote.cs-publish.fetch', GIT_CONFIG_VALUE_1: '+refs/heads/*:refs/remotes/cs-publish/*',
+      CS_PUSH_SHA: status.headSha, CS_PUSH_BRANCH: input.branch, GIT_TERMINAL_PROMPT: '0',
+    });
     if ((push.exitCode ?? 1) !== 0) throw precondition(`推送失败，未打标签：${(push.stderr ?? '').split('\n').filter((l) => !l.includes('@')).join(' ').slice(0, 500)}`);
     await environments.touch(env.id);
     return releases.publish(actor, svc.serviceId, { ...releaseInput, expectedCommitSha: status.headSha });

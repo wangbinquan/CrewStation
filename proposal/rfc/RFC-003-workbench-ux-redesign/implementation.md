@@ -870,3 +870,53 @@ Chrome 原生 CUA 已恢复页面与截图读取，第四十六批的浏览器�
 完整本地门禁 **1108 pass／4 skip／0 fail**，1112 tests／188 files／6151 assertions／109.27s，console build **781ms**。七个源码／测试文件哈希在门禁前保存，门禁开始后未改。临时证据为 `crewstation-rfc003-batch47-{red,targeted,check,build}.log` 及 candidate.json；关键结果在此持久记录。上一笔文档 HEAD `f8f04b697edcdd0aabedb906b775b4e2cfb0f7a3` 的精确 SHA CI 34841092272 已成功；本批提交、精确 SHA CI 和共享 console 更新待实际完成后补记。
 
 状态显示修复不等于四窗资源保护或失败容器保卷恢复通过。累计仍 **15／52**，UX-AT-28／34／35／37 保留未完成；I14 和具体角色／市场范围问题仍待答复。RFC-004／ADR-0004 保持已批准、等待 RFC-003 完结，未开始 Hook 实现。
+
+### 第四十七批发布、部署与共享页面复验
+
+源码与上述记录已发布为 `10455cc61faea17a88ca3216a7db27f2e813b5eb`，精确 SHA [CI 34843959775](https://github.com/wangbinquan/CrewStation/actions/runs/34843959775) 于 2026-09-14T12:34:29Z 成功：**1104 pass／8 skip／0 fail**，1112 tests／188 files／60.04s，console build **1.17s**。提交前七个源码／测试文件与完整门禁候选哈希一致，推后 main 与 origin/main 同步。
+
+只更新共享 console：`cs-console:rfc003-10455cc`，OCI revision 为完整上述 SHA；构建及实际 Pod imageID 都为 `sha256:ed0ddb412d76b5b2931d223f1ca5d15660ffabd26ef2d49e9163397c01ad0bb1`。镜像流式导入 desktop-control-plane，没有遗留导出 tar。Deployment UID 保持 `c4874a0e-6415-4c2b-b141-74ac25ea10ed`、generation 22→23；Pod `console-6488b6b76d-wr4tn`／UID `76204c7c-36aa-4237-9d1b-5623805b9b46` Running／ready／restartCount=0。cs-api／cs-controller 仍 03d1572，其余后端与任务镜像仍 3d1ce51，没有迁移或改配置。
+
+共享页面实看失败工作台顶栏及摘要均为“失败”，历史回放不再变绿；六条名册、个人布局与独立生产 v0.1.0 保留。新建确认默认聚焦保留原工作区，取消未创建／释放任务。旧 rfc003-ux 完成回放后正确“已连接”，原 taskId／Pod UID、main／生产 SHA、未提交文件 1 及 ux-comparison.txt 摘要不变。候选 :8768 Vite 已停止。本轮没有恢复 OOM 任务或把其旧进程标为在线。
+
+## 第四十八批：搜索、预览故障恢复与当前工作树发布
+
+### 实际名称和 slug 搜索
+
+共享项目列表分别搜索 `rfc003-ux` 与中文名称 `RFC-003 验收`，均得到对应唯一结果。点击“继续开发”直接回到 `tsk_01a0985a8624700090ea5b5ecd4fca86`，Runner 连接就绪；未创建新任务。浏览器返回保留中文查询。这补齐 UX-AT-01 原定的名称／slug 与原会话接续；不替代 UX-AT-24 的全部旧链接／两空间历史验收。
+
+### 专用文件与预览项目
+
+按已授权的 rfc003-verify-* 验收范围，新建 `rfc003-verify-files`／`prj_01a09fecbba97000843701962d998a7a`，负责人仍为既有 admin；服务 `svc_01a09fecbbac7000905703a66e255046`，没有成员或可见性变更。minimal-sample 初始 HEAD `a643183db07916908c63254e8186d44c8b7445ce`，首个 preview v0.1.0=`rel_01a09fecc4d77000afd79cb1ac0dc206`，正式槽为空。
+
+新开发任务 `tsk_01a09ff07aeb7000897fd0eda1e16cd2` 于 12:42:12.587Z 创建；Pod `cs-rfc003-verify-files/task-01a09ff07aeb`／UID `fa4dcc5e-3eb6-4557-a6bf-b6301dca4160`，原 3d1ce51 任务镜像、1 CPU／2Gi 内存。只新增一个真实 OpenCode：Agent `agt_01a09ff2f4f97000b13dde63dc4b96e7`、终端 `pty_01a09ff2f4f97001bb9f6208c42dc089`、Runner `9992bfd0-2491-49a3-81c1-39268cdb900d`，startedAt=12:44:54.922Z，使用已有 rfc003-verify-opencode 档位／OpenCode 1.18.29／Big Pickle。
+
+### 预览崩溃、日志、编辑与重启
+
+故障注入只作用该新项目 worker 的预览进程：核对 uid=10001、cwd=/work 和完整 argv `bun run --watch src/main.ts`，最多终止六个实际 PID、总时限 90 秒，覆盖 supervisor 的五次退避重启。TaskRunner 和 OpenCode 均未终止；12:48:13.979Z 预览达到 crashed／SIGKILL，UI 仅在预览区报错，开发连接与 CLI 保持可用。
+
+实际点击“查看开发会话日志”进入精确 taskId 的运行与诊断页，preview 关键词定位到 attempt 5／16 秒退避、attempt 6 与 crashed 记录；返回 CLI 后原未发送 `RFC003_PREVIEW_DRAFT_KEEP` 仍在。清理本次验收草稿后要求 Agent 只回复 `RFC003_PREVIEW_ISOLATED`，不调用工具或修改文件。真实轮次于 12:49:32.110Z–12:50:41.871Z 完成，期间预览仍崩溃；完成事件 `cc09922b-8d66-48bb-935a-3db0ff05771e`／seq=2004，原进程保持在线。
+
+预览崩溃期间，通过编辑器将 `src/pages/home.ts` 的 h1 从“CrewStation 最小样例”改为“RFC003 预览恢复验收”，保存成功；Git diff 只有该行 +1／−1，文件 SHA256=`3e6ba15db51c1ff971b0e762586bb38e10510e596acf01f1987ac390a8e74022`。实际点击一次重启，dispatch=`c15-3tkk1d`；12:51:50.617Z starting、50.657Z listening、51.125Z ready。iframe 显示新标题、development 环境，旧 SIGKILL 错误清除。taskId、Pod、Runner、Agent、terminalId 和 startedAt 均保持，UX-AT-05 完整通过。
+
+### 未提交拦截、手动提交与真实发布
+
+“当前开发工作区”来源显示 main／a643183／未提交文件 1。点击检查明确列出 home.ts 和定位入口，提示“尚未发起发布”，历史仍只有 v0.1.0。实际文件链接回到该任务、该文件和新标题。会话菜单进入独立的历史对话页面，再使用普通终端自行验证和提交；没有把历史对话等同于原生 CLI。
+
+样例应用 `bun test` 返回 `No tests found!`，不算测试通过。首次 bundle 因 node_modules 缺 Hono 失败；`bun install --frozen-lockfile` 成功安装五包后，`bun build src/main.ts` 实际成功，33 modules／8ms／68,273 bytes。Git 仍只改 home.ts。首次提交明确报 `Author identity unknown`；随后仅本条命令指定 RFC003 QA／rfc003-qa@demo.invalid 的作者与 Codex co-author，未改全局 Git 身份。精确提交 home.ts 为 `a80dbc102e8b6db71e778d0092e5d78865330d4d`，一行改动、工作树干净；这是专用样例应用提交，不是 CrewStation 主仓提交。
+
+重新检查来源通过。首次从该样例 main 发布被 GitLab 受保护分支拒绝，界面显示“推送失败，未打标签”，说明草稿保留、没有新 release；既有 Developer 会话凭据与 main 保护保持。这符合原设计推送失败停止的契约，不提权或绕过。随后仅在独立 QA 应用从同一 SHA 创建普通开发分支 `codex/rfc003-files`；CrewStation 主仓始终 main。界面重新确认真实分支／SHA 后发布 v0.1.1。
+
+实际 release=`rel_01a0a006547c7000906f933ff49b6d96`，13:06:04.537Z 创建、13:06:25.364Z ready，build Job `build-933ff49b6d96` Succeeded。preview green 就绪 1／1，SHA 为 a80dbc102e8b6db71e778d0092e5d78865330d4d；v0.1.0 标为已被替代，正式槽仍为空。点击“试用待验证版本”实际打开 preview.rfc003-verify-files.cs.localhost，显示新标题、CS_SLOT=green、CS_ENVIRONMENT=production、正确项目 slug。UX-AT-07 的未提交拦截→定位→用户提交→重新确认→发布闭环通过；不声称受保护 main 推送成功。
+
+### 资源恢复与发布后计数缺陷
+
+节点请求 CPU 为 9550m／10 CPU，构建需要 1000m。只临时将 files-green 和原 workbench-blue 两个专用 QA 的非正式 preview 调为 0；main 推送失败后先全部恢复，再为普通开发分支发布作同样临时调整。每个补丁都核对 Deployment UID／generation／原副本数／release，未调整活动正式槽。13:12:29Z 最终两者均 generation=5、desired=ready=1：files-green 已由控制器换到上述新 v0.1.1，workbench-blue 仍原 rel_01a09f181c8d7000b2f2654113a1e737；workbench 正式 green 的 UID／generation=1／v0.1.0／1／1 未变。新开发 Pod UID 不变、Running／restartCount=0。节点仅余 893,884KiB，容量问题未根治。
+
+13:12:57Z 最终读取发现工作树虽干净、v0.1.1 已实际部署，`unpushed.count` 仍为 1／a80dbc1；共享开发页面也实看“未推送提交 1”。原因是发布用临时 URL 直推，Git 不更新任何本地 remote ref，而工作树统计按已知 remote refs 计算；新分支没有上游不等于尚未推送。没有手动 fetch 或设 upstream 消除故障证据。
+
+修复留在 dev-session L5 的原发布用例：通过仅本进程有效的 `GIT_CONFIG_COUNT` 配置具名 cs-publish remote，让 Git 成功回执更新 `refs/remotes/cs-publish/*`；不更改 origin、branch upstream 或持久 Git 配置，短期 URL 不写配置文件。工作树统计沿用现有 Runner，无需重建开发容器。配置方式见 [Git 官方文档](https://git-scm.com/docs/git-config#Documentation/git-config.txt-GITCONFIGCOUNT)。真实临时 Git 仓库回归先 **1 pass／1 fail**，稳定复现缺少 tracking ref；修复后验证只推确认 SHA、后来提交继续计为未推送、下次成功清为 0，以及 pre-receive 拒绝不更新记录、不打标签。定向四文件 **15 pass／4 skip／0 fail／60 assertions**，4 skip 为当前隔离连接条件下未执行的数据库用例；完整本地门禁和修复发布／实机复验继续。
+
+新增 UX-AT-01／05／07，累计 **18／52 通过、34 项仍待完成**。UX-AT-32 等发布后版本提示保留本次缺陷及修复待部署状态，UX-AT-52 只实看历史入口，没有把普通终端提交算作历史 Agent 对话接续。临时证据为 `crewstation-rfc003-files-{preview-fault.log,preview-recovery-logs.json,release-after.json,final-runtime.json,final-session.json}` 与 batch48 回归日志。I14 与具体成员／市场范围问题仍待答复；RFC-004／ADR-0004 已批准，T2–T9 等待 RFC-003 完结后启动。
+
+第四十八批完整本地门禁 **1108 pass／4 skip／0 fail**，1112 tests／188 files／6162 assertions／105.63s；console build **606ms**。完整门禁可访问隔离测试数据库和本机测试 GitLab，定向中跳过的 dev-session 四项在完整门禁中已执行；最后四项跳过仍是 opt-in K8s、两个原生 CLI 与 Linux Ctrl+C。三个源码／测试文件与门禁前 candidate.json 哈希一致。文档相对链接、52 个唯一验收编号和 18／34 计数通过检查，尚无本批精确 SHA CI 或部署证据。

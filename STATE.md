@@ -11,6 +11,18 @@
 
 **RFC-003 工作台 UX 重设计处于 In Progress，作者已要求完整实现并提交上库。** RFC-001 与 RFC-002 都已 Done，见 `proposal/rfc/README.md` 的索引表。
 
+## 最新接力：预览恢复与工作树发布（2026-09-14）
+
+第四十七批 `10455cc61faea17a88ca3216a7db27f2e813b5eb` 已推 main，精确 SHA [CI 34843959775](https://github.com/wangbinquan/CrewStation/actions/runs/34843959775) 成功（1104 pass／8 skip／0 fail；console build 1.17s）。共享 console 已单独更新为 rfc003-10455cc，generation=23，实际 imageID=`sha256:ed0ddb412d76b5b2931d223f1ca5d15660ffabd26ef2d49e9163397c01ad0bb1`。失败和正常会话的连接状态、原布局保留、取消新建均在共享页面复验；候选 :8768 已停止。
+
+第四十八批新增三项完整实机证明：实际名称／slug 搜索继续旧 rfc003-ux；新专用 rfc003-verify-files 预览崩溃后定位日志、保持原 OpenCode 草稿和真实模型轮次、保存文件并一次重启恢复；dirty 来源拦截后只提交 QA 首页，重检并发布至真实 v0.1.1。新项目 `prj_01a09fecbba97000843701962d998a7a`、任务 `tsk_01a09ff07aeb7000897fd0eda1e16cd2`、Pod UID `fa4dcc5e-3eb6-4557-a6bf-b6301dca4160` 保持 Running／restartCount=0，原单个 OpenCode 身份保持。
+
+QA 应用提交为 `a80dbc102e8b6db71e778d0092e5d78865330d4d`，只改 home.ts 一行。其 main 被 GitLab 保护拒绝后，没有提权或改保护；从普通应用开发分支 codex/rfc003-files 正常发布 `rel_01a0a006547c7000906f933ff49b6d96`／v0.1.1，实际预览显示新标题，正式槽仍空。CrewStation 主仓一直 main。两次构建前临时调零的 QA preview 全部恢复 1／1；workbench 正式 v0.1.0 未动，节点剩余约 873MiB，后续构建仍需核对容量。
+
+最终复查发现 URL 代推成功没有更新本地 remote refs，界面仍显示“未推送提交 1”。已在原发布用例修复：临时 cs-publish remote 按成功回执更新独立跟踪引用，既有 Runner 即可正确统计，不改 origin／upstream／持久配置。真实 Git 回归先红后绿，覆盖后来提交和远端拒绝；定向 15 pass／4 skip／0 fail，完整本地门禁 **1108 pass／4 skip／0 fail**（1112 tests／188 files／6162 assertions／105.63s），console build **606ms**。三个源码／测试候选哈希未变。修复尚未发布／部署，不能声称共享计数已修复。
+
+累计 **18／52 项实机验收通过，34 项待完成**；详见 acceptance-audit 与 implementation 第四十八批。四窗资源保护、I14 保卷恢复方案、具体成员／市场范围授权和其余角色／尺寸／失败路径仍未完成。RFC-004／ADR-0004 已批准，继续等待 RFC-003 完结后启动，T2–T9 未开始。
+
 ## 最新接力：会话连接状态与真实容器状态（2026-09-14）
 
 浏览器已恢复可读。共享 `03d1572` 页面实看失败任务、六条 CLI 名册、原个人布局和独立生产版本；从远端新建的确认默认聚焦保留当前工作区，取消未创建或释放任何任务。发现顶栏与会话摘要仍显示绿色“已连接”：浏览器 WebSocket 可以回放历史，不代表失败开发容器仍可连接。
