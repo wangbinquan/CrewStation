@@ -1,16 +1,22 @@
 import type { ReactElement } from 'react';
+import type { DevSessionState } from '@crewstation/contracts';
 import { useT } from '../../../shared/lib/useT';
 import { Badge } from '../../../shared/ui/Badge';
-import { streamStatusTone } from '../model/stateTone';
+import { sessionStateTone, streamStatusTone } from '../model/stateTone';
 import type { StreamState } from '../model/taskStreamSocket';
 import styles from './StreamStatus.module.css';
 
-/** 浏览器到任务的连接状态；重连次数与回放条数一起给出，断线时用户知道发生了什么。 */
-export function StreamStatus({ state }: { readonly state: StreamState }): ReactElement {
+/** 会话与容器状态优先于浏览器通道；能读回历史不代表开发容器仍可连接。 */
+export function StreamStatus({ state, sessionState }: { readonly state: StreamState; readonly sessionState: DevSessionState }): ReactElement {
   const t = useT();
+  const lifecycle = sessionState !== 'running';
+  const runnerMissing = state.status === 'open' && !state.runnerConnected;
+  const runnerStopping = state.status === 'open' && state.runnerConnected && state.runnerState && state.runnerState !== 'ready' ? state.runnerState : undefined;
+  const tone = lifecycle ? sessionStateTone(sessionState) : runnerMissing || runnerStopping ? 'warning' : streamStatusTone(state.status);
+  const label = lifecycle ? t(`devSession.state.${sessionState}`) : runnerMissing ? t('devSession.stream.runnerOff') : t(`devSession.stream.${runnerStopping ?? state.status}`);
   return (
     <span className={styles.status}>
-      <Badge tone={streamStatusTone(state.status)}>{t(`devSession.stream.${state.status}`)}</Badge>
+      <Badge tone={tone}>{label}</Badge>
       {state.attempt > 0 ? <span className={styles.meta}>{t('devSession.stream.attempt', { count: state.attempt })}</span> : null}
       {state.replayed > 0 ? <span className={styles.meta}>{t('devSession.stream.replayed', { count: state.replayed })}</span> : null}
       {state.error !== undefined ? <span className={styles.error}>{state.error}</span> : null}

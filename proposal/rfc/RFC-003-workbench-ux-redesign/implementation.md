@@ -850,3 +850,23 @@ Chrome 仍在运行，CUA 此时只能返回“CrewStation 工作台”窗口标
 镜像标签清理后实际可用仍为 0，因此进一步按描述 `crewstation-console-build`、本 RFC 执行时间、Reclaimable=true、Shared=false 筛出九份旧编译缓存，再用完整锚定 ID 过滤重读，核对精确集合一致后才清理：`0uoqiokttjrzyersirn94ywzy`、`5gmvtt5l30nkzxturt5wccku9`、`gpyj4oft4z7mc88k6mzsxle2n`、`gqa8om5davmmc13v5bm5mjonl`、`ixvtxepxm445mso62cj22qsqc`、`jd3it3isks6fr1e1qk1lwuo5o`、`meg1ialf8tj9g0h6ivtlbdj4c`、`ni0z5tcn4mwxdw6o5jhomosii`、`wo9r7vrnilwmw132wh2x4ry9e`。实际回收 **1.059GB**，更早和本次候选缓存未清理。
 
 没有重启或删除数据库 Pod，没有改数据库、用户文件、卷或节点设置。Kubernetes 事件等待确认原 PostgreSQL 自行恢复：startedAt=11:52:44Z，restartCount=9，ready=true；恢复后才完成上面的实际登录及业务读取。11:55:43Z 最终节点可用 **1,165,242,368 bytes（约 1.09GiB）**，旧 QA 文件和失败工作卷再次核对一致。空间仍有限，后续构建前须核对容量；不把本次有限清理记作整机容量问题已经根治。跨 RFC 排查要点已补入 dev-gotchas。
+
+## 第四十七批：会话连接状态与真实容器状态
+
+### 实机复现与修复
+
+Chrome 原生 CUA 已恢复页面与截图读取，第四十六批的浏览器阻塞解除。共享 `03d1572` 的失败工作台可看到原任务、六条原生 CLI 名册、个人四窗布局及独立生产 v0.1.0。会话菜单没有释放入口；从远端新建的内联确认说明新工作树、未保存输入和旧 CLI 不自动恢复，默认焦点在保留当前工作区。实际取消后仍留在原失败工作区，本批没有发送创建／释放任务或启动 Agent。
+
+同时复现：失败提示存在，顶栏及会话摘要却仍显示绿色“已连接”，摘要内 TaskRunner 又是未连接。原因是 StreamStatus 只使用浏览器 WebSocket 的 open；失败 Runner 不妨碍服务端回放历史。现改为任务 lifecycle 优先，其次判断 Runner 失联／收尾／关闭，最后才采用通道状态；顶栏和摘要共用同一组件，不再叠加相互矛盾的状态。连接变化不改任务生命周期、不重建编辑器。
+
+动态菜单“待处理 2”实际列出未读的中断 A 和结果未确认 C，并有实时状态未确认说明，不是仍可回答的两个 pending 问题。本批没有修改活动记录、未读计数或发送答案。
+
+### 先红后绿与候选实看
+
+两条既有失败会话回归先加断言，再新增真实协议断连／恢复路径。初始 **1 pass／2 fail**；最终四文件定向 **16 pass／0 fail／137 assertions／2.42s**。测试覆盖 WebSocket open 期间 Runner 失联、恢复、收尾／关闭，失败后迟到的 runnerReconnected，以及 CodeMirror 节点、草稿、焦点保持和没有创建／释放写入。HTTP／WebSocket 边界仍是夹具，不冒充容器真实断连旅程。
+
+候选 Vite 仅监听 127.0.0.1:8768，以 `console.cs.localhost:8768` 使用正常同域认证代理到共享真实后端。失败项目顶栏与会话摘要实看都为红色“失败”，历史补齐至 560 条仍保持失败、Runner 未连接；六条名册与原布局保留。再打开旧 `rfc003-ux`，回放最终 1475 条后顶栏及摘要正确显示“已连接”，任务仍 `tsk_01a0985a8624700090ea5b5ecd4fca86`，TaskRunner 已连接 cs-session；工作树 main／生产 v0.1.0 都是 a10027cda8，未提交文件 1、未推送 0。仅做只读页面观察，没有修改旧 QA 工作文件。
+
+完整本地门禁 **1108 pass／4 skip／0 fail**，1112 tests／188 files／6151 assertions／109.27s，console build **781ms**。七个源码／测试文件哈希在门禁前保存，门禁开始后未改。临时证据为 `crewstation-rfc003-batch47-{red,targeted,check,build}.log` 及 candidate.json；关键结果在此持久记录。上一笔文档 HEAD `f8f04b697edcdd0aabedb906b775b4e2cfb0f7a3` 的精确 SHA CI 34841092272 已成功；本批提交、精确 SHA CI 和共享 console 更新待实际完成后补记。
+
+状态显示修复不等于四窗资源保护或失败容器保卷恢复通过。累计仍 **15／52**，UX-AT-28／34／35／37 保留未完成；I14 和具体角色／市场范围问题仍待答复。RFC-004／ADR-0004 保持已批准、等待 RFC-003 完结，未开始 Hook 实现。

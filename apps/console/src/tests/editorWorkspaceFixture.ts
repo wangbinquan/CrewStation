@@ -10,12 +10,13 @@ export function editorWorkspaceFixture() {
   const originalFetch = globalThis.fetch, originalSocket = globalThis.WebSocket, originalHref = window.location.href;
   window.location.href = 'http://localhost/';
   let pendingWrite: ((failure?: { code: string; message: string }) => void) | undefined;
+  const sockets: Socket[] = [];
   class Socket {
     static OPEN = 1;
     readyState = 1;
     onmessage?: (message: { data: string }) => void;
     onclose?: () => void;
-    constructor() { queueMicrotask(() => this.receive({ type: 'streamReady', connected: true, replayed: 0 })); }
+    constructor() { sockets.push(this); queueMicrotask(() => this.receive({ type: 'streamReady', connected: true, replayed: 0 })); }
     receive(frame: object) { if (this.readyState === 1) this.onmessage?.({ data: JSON.stringify(frame) }); }
     close() { this.readyState = 3; this.onclose?.(); }
     send(data: string) {
@@ -53,5 +54,6 @@ export function editorWorkspaceFixture() {
     return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
   }) as typeof fetch;
   const finishWrite = (failure?: { code: string; message: string }) => { const finish = pendingWrite; pendingWrite = undefined; finish?.(failure); };
-  return { commands, writes, files, preview, sessionState, finishWrite, restore: () => { globalThis.fetch = originalFetch; globalThis.WebSocket = originalSocket; window.location.href = originalHref; } };
+  const receive = (frame: object) => { for (const socket of sockets) socket.receive(frame); };
+  return { commands, writes, files, preview, sessionState, finishWrite, receive, restore: () => { globalThis.fetch = originalFetch; globalThis.WebSocket = originalSocket; window.location.href = originalHref; } };
 }

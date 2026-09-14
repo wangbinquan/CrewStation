@@ -33,6 +33,9 @@ export const messages = {
 
   'devSession.stream.connecting': '连接中',
   'devSession.stream.open': '已连接',
+  'devSession.stream.runnerOff': '开发容器未连接',
+  'devSession.stream.draining': '正在收尾',
+  'devSession.stream.shutting-down': '正在关闭',
   'devSession.stream.reconnecting': '重连中',
   'devSession.stream.closed': '已断开',
   'devSession.stream.attempt': '第 {count} 次重连',

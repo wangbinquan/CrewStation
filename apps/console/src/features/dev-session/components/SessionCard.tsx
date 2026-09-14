@@ -11,7 +11,6 @@ import { Badge } from '../../../shared/ui/Badge';
 import { DefinitionList } from '../../../shared/ui/DefinitionList';
 import type { DefinitionItem } from '../../../shared/ui/DefinitionList';
 import type { SessionAccess } from '../model/sessionAccess';
-import { sessionStateTone } from '../model/stateTone';
 import type { StreamState } from '../model/taskStreamSocket';
 import { PaneNotice } from './PaneNotice';
 import { ReleaseControl } from './ReleaseControl';
@@ -56,8 +55,7 @@ export function SessionCard({ session, stream, access, release, unsavedFile, edi
     <section className={styles.card}>
       <header className={styles.header}>
         <div className={styles.identity}>
-          <Badge tone={sessionStateTone(session.state)}>{t(`devSession.state.${session.state}`)}</Badge>
-          <StreamStatus state={stream} />
+          <StreamStatus state={stream} sessionState={session.state} />
         </div>
         {session.state !== 'failed' ? <ReleaseControl projectId={session.projectId} taskId={session.taskId} access={access} release={release} unsavedFile={unsavedFile} editorBusy={editorBusy} dataAccessDirty={dataAccessDirty} dataAccessBusy={dataAccessBusy} onOpenFile={onOpenFile} /> : null}
       </header>

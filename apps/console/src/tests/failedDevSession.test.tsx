@@ -30,6 +30,9 @@ test('失败会话在首屏显示真实对象和原因，新建需明确确认�
   const notice = [...document.querySelectorAll('[role="alert"]')].find((node) => node.textContent?.includes(activityTaskId) && node.textContent.includes('OOMKilled'));
   expect(notice).toBeDefined(); expect(notice!.closest('details')).toBeNull();
   expect(page.text()).toContain('不会自动恢复原 CLI'); expect(page.text()).toContain('未推送');
+  // 实机 OOM 后 WebSocket 仍可回放历史；顶栏不能因此把失败会话标成绿色已连接。
+  const status = [...document.querySelectorAll('header')].find((node) => node.querySelector('strong')?.textContent === '开发会话')!.querySelector('span')!;
+  expect(status.textContent).toBe('失败');
   await page.click('从远端分支新建');
   expect(document.querySelector('[role="alertdialog"]')?.textContent).toContain('main');
   expect(page.text()).toContain('页面中的未保存输入'); expect(starts).toHaveLength(0);
@@ -45,6 +48,9 @@ test('运行中收到失败状态不卸载编辑器草稿，明确新建失败�
   await act(async () => { view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: 'OOM 前尚未保存的内容' } }); editor.focus(); });
   f.sessionState.state = 'failed'; f.sessionState.message = '容器运行失败：OOMKilled（退出码 137）';
   await act(async () => { focusManager.setFocused(false); focusManager.setFocused(true); }); await page.settle();
+  await act(async () => { f.receive({ type: 'runnerReconnected' }); }); await page.settle();
+  const status = [...document.querySelectorAll('header')].find((node) => node.querySelector('strong')?.textContent === '开发会话')!.querySelector('span')!;
+  expect(status.textContent).toBe('失败');
   expect(document.querySelector('.cm-content')).toBe(editor); expect(editor.textContent).toBe('OOM 前尚未保存的内容');
   expect(document.activeElement).toBe(editor);
   await page.click('从远端分支新建'); await page.click('确认新建工作树');
@@ -53,4 +59,28 @@ test('运行中收到失败状态不卸载编辑器草稿，明确新建失败�
   expect(editor.textContent).toBe('OOM 前尚未保存的内容');
   expect(f.files.get('a.ts')).toBe('磁盘原文');
   expect(f.writes.some((write) => write.method === 'DELETE')).toBe(false);
+});
+
+test('浏览器通道保持打开时，容器断连和恢复在原工作区显示且不重新创建会话', async () => {
+  const { f, starts } = setup(); page = await renderApp(path);
+  const status = [...document.querySelectorAll('header')].find((node) => node.querySelector('strong')?.textContent === '开发会话')!.querySelector('span')!;
+  expect(status.textContent).toBe('已连接');
+  await page.click('代码'); await page.click('a.ts');
+  const editor = document.querySelector<HTMLElement>('.cm-content')!, view = EditorView.findFromDOM(editor)!;
+  await act(async () => { view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: '容器断连期间保留的输入' } }); editor.focus(); });
+  await act(async () => { f.receive({ type: 'runnerDisconnected' }); }); await page.settle();
+  // 浏览器连接和容器连接是独立的：前者 open 不能掩盖后者已经失联。
+  expect(status.textContent).toBe('开发容器未连接');
+  expect(document.querySelector('.cm-content')).toBe(editor); expect(editor.textContent).toBe('容器断连期间保留的输入');
+  expect(document.activeElement).toBe(editor); expect(starts).toHaveLength(0);
+  await act(async () => { f.receive({ type: 'runnerReconnected' }); }); await page.settle();
+  expect(status.textContent).toBe('已连接');
+  expect(document.querySelector('.cm-content')).toBe(editor); expect(editor.textContent).toBe('容器断连期间保留的输入');
+  expect(starts).toHaveLength(0); expect(f.writes.some((write) => write.method === 'DELETE')).toBe(false);
+  await act(async () => { f.receive({ type: 'event', seq: 1, event: { kind: 'runnerState', state: 'draining' } }); }); await page.settle();
+  expect(status.textContent).toBe('正在收尾');
+  await act(async () => { f.receive({ type: 'event', seq: 2, event: { kind: 'runnerState', state: 'shutting-down' } }); }); await page.settle();
+  expect(status.textContent).toBe('正在关闭');
+  await act(async () => { f.receive({ type: 'runnerReconnected' }); }); await page.settle();
+  expect(status.textContent).toBe('已连接'); expect(editor.textContent).toBe('容器断连期间保留的输入');
 });

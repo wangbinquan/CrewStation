@@ -35,6 +35,9 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
 
   'devSession.stream.connecting': 'Connecting',
   'devSession.stream.open': 'Connected',
+  'devSession.stream.runnerOff': 'Development container disconnected',
+  'devSession.stream.draining': 'Finishing work',
+  'devSession.stream.shutting-down': 'Shutting down',
   'devSession.stream.reconnecting': 'Reconnecting',
   'devSession.stream.closed': 'Disconnected',
   'devSession.stream.attempt': 'retry {count}',
