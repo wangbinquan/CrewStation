@@ -15,7 +15,9 @@
 
 第四十九批在原 files QA 的单个 OpenCode 空闲时，只给 crewstation.yaml 加一次输出固定标记并 exit 42 的 migrationCommand，不访问数据库。正常发布 v0.1.3=`rel_01a0a03773bf7000a6d00e16f132a40d`／`490c30d676a6e4d3908415df5c0117fb8501fd79`，实际迁移 Job 失败，预览保持 v0.1.2，正式仍空。随后只移除该命令，恢复提交 `e4741df56b440d776b7c25ff5a4978b3d5822f46` 的整棵树与故障前一致；正常发布 v0.1.4=`rel_01a0a0426f4c7000b7ce58ff67c80bc8`，14:11:54.631Z ready、预览 HTTP 200。失败记录和标记保留；原 Pod／OpenCode 身份、首页和 Git 配置摘要保持，未提交 0／未推送 0，工作树与预览相同。两轮临时调零的 QA preview 全恢复 1／1、generation=11；原 workbench 正式 green 仍 generation=1／v0.1.0。
 
-真实标记发生于 13:59:54.295718172Z，旧 API 却返回每次查询时间并标成 stdout。本批修复请求实际时间戳、严格解析和未知时间、混合输出的中性级别、读取失败不伪装为空；完整日志页保留接口顺序，避免缺失时间导致崩溃。新增十项回归，最终定向 27 pass／2 skip／0 fail，113 assertions；完整本地门禁 **1118 pass／4 skip／0 fail**（1122 tests／190 files／6189 assertions／105.67s），console build **566ms**。12 个源码／测试候选保持一致。提交及精确 SHA CI 继续；共享代码此刻仍 API 9642e23／console 10455cc，尚不能声称新日志语义已部署。
+真实标记发生于 13:59:54.295718172Z，旧 API 却返回每次查询时间并标成 stdout。本批修复请求实际时间戳、严格解析和未知时间、混合输出的中性级别、读取失败不伪装为空；完整日志页保留接口顺序，避免缺失时间导致崩溃。新增十项回归，完整本地门禁 **1118 pass／4 skip／0 fail**（1122 tests／190 files／6189 assertions／105.67s），console build **566ms**，12 个源码／测试候选保持一致。已发布 `cbe28250607aa4084d74556c32aff650a9347783`，精确 SHA [CI 34856194400](https://github.com/wangbinquan/CrewStation/actions/runs/34856194400) 成功：1114 pass／8 skip／0 fail、console build 1.24s。
+
+两镜像以已部署基底和已验证源码／dist 构建，实际镜像内容逐项匹配；流式导入已完成。首次容量审批拒绝后，逐 digest 证明只新增 3,995,723 bytes，复核允许，导入后余量 368,848,896 bytes，无 tar 或数据清理。console 更新随后仍被自动审批拒绝；即使核对原八服务和专用验收的明确“授权”，复核也不接受会话文件作为此次部署依据。已请求具体批准 console／cs-api 更新为 rfc003-cbe2825，待回复。两个 Deployment 补丁都未执行，仍 API 9642e23／console 10455cc，不把镜像准备算作已部署；详情和镜像 ID 见 implementation 第四十九批。
 
 当前单 CLI 容器的只读资源检查确认 memory.oom.group=1 且 cgroup 挂载只读，逐 CLI 没有硬隔离。[I15](docs/engineering/implementation-open-questions.md#i15-同一工作树中多个-cli-的资源隔离) 已列独立 Pod／委派子 cgroup 两种方向并请求作者选择，未实施；I14 保卷恢复和具体角色范围问题仍待答复。Mac 仍锁定，以上为真实 API／集群取证，不计 UX-AT-13 的完整页面旅程，累计仍 **18／52，34 项待完成**。RFC-004 保持已批准、等待 RFC-003 完结，Hook 未开工。
 

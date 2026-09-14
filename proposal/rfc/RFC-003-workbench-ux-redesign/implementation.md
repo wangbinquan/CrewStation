@@ -968,3 +968,18 @@ Mac 此时仍锁定；本批故障、恢复和日志结果来自实际 API／集
 
 
 第四十九批最终完整本地门禁 **1118 pass／4 skip／0 fail**，1122 tests／190 files／6189 assertions／105.67s，console build **566ms**。定向中受连接条件跳过的 observability 集成用例在完整门禁已执行；最后四项为 opt-in K8s、两个原生 CLI 与 Linux Ctrl+C。十二个源码／测试文件的 SHA256 与最终门禁前 candidate.json 一致。此前两次类型阶段失败未被记作有效完整门禁。本段记录时尚未提交、部署新日志修复；源基线 293a7d0 与 origin/main 同步。
+
+
+### 第四十九批上库、镜像和当前部署边界
+
+17 个精确路径已发布为 `cbe28250607aa4084d74556c32aff650a9347783`，推后 main 与 origin/main 同步、工作树与索引干净。精确 SHA [CI 34856194400](https://github.com/wangbinquan/CrewStation/actions/runs/34856194400)／job `104016262371` 成功：**1114 pass／8 skip／0 fail**，1122 tests／190 files／61.71s，console build **1.24s**，终态时间 14:34:03Z。纯证据补记不重复未变的本地完整门禁。
+
+节点仅余约 370MiB，因此本次镜像复用经过核对的已部署基底。控制面基于 `cs-control-plane:rfc003-9642e23`，仅覆盖 observability 模块、contracts 与 k8s 包；基底 revision、源锁文件、全部包清单及原构建配方与本次源依赖一致。原标准 Dockerfile 删除 console／task 两个 workspace 后的 bun install 会重写镜像内 lock，不能误要求其摘要等于源 lock。本次没有重新解析或安装依赖。console 基于 `cs-console:rfc003-10455cc`，继承同一 serve.ts 和启动命令，仅替换最终本地门禁生成的 dist，清除镜像层中的旧 dist 后复制六个当前产物；不删除主机或卷内容。临时构建目录为 `/private/tmp/crewstation-rfc003-batch49-images-t2evjh5v`，不是 Git checkout，没有改仓内 Dockerfile。
+
+两镜像 revision 均为完整 cbe2825：控制面 imageID=`sha256:6afe80c20228060f26c7263527c2fea0416f704b25eda46dd78b2a047208dbed`，console imageID=`sha256:42715cdf7e4b89916547a96d9f478b3812d855cc7ac0f17c85b22a201ff62a2a`。无网络临时容器中，三个后端改动源码和全部六个 console 文件逐项 SHA256 与候选一致，未残留旧静态文件。
+
+首次导入被自动审批按镜像总大小约 688MB／节点余量约 373MB 拒绝。随后仅只读扫描实际导出归档与节点 content digest：console 共 211,705,906 bytes，其中 208,006,144 已存在，仅缺 3,699,762；后端共 517,326,873 bytes，其中 517,030,912 已存在，仅缺 295,961。新增共 **3,995,723 bytes**。据此同一导入经复核获准，始终流式传输、无 tar 落盘，每步检查余量高于 300MiB；两镜像 import 都退出 0，导入后剩余 **368,848,896 bytes**。没有清理任何镜像、构建缓存或卷。
+
+随后 console 滚动更新被自动审批拒绝。已从当前任务原始记录核对当时明确询问的八服务更新、专用 RFC 完整验收和用户“授权”回复，但复核仍不接受会话文件作为此次具体部署授权，要求重新确认。现已提出只更新 `console → cs-console:rfc003-cbe2825`、`cs-api → cs-control-plane:rfc003-cbe2825` 的具体问题，待答复；**两 Deployment 补丁均未执行**。14:39:29Z 实际 console 仍 generation=23／10455cc，cs-api 仍 generation=21／9642e23，均 1／1；PostgreSQL 原 UID 不变、ready=true／restartCount=9。镜像已导入不等于代码已部署，新的日志时间和中性级别尚无共享环境复验。
+
+后续收到本次更新确认后，先 console 再 cs-api，分别验证原 UID／generation／唯一镜像和 rollout，再用保留的 v0.1.3 失败记录核对同一时间戳、来源及 releaseId 过滤。浏览器仍待解锁；具体成员授权、I14 与 I15 也待答复。当前没有临时调零的 QA 副本、运行中的候选 Vite 或未恢复的验收命令。RFC-003 仍 **18／52**，RFC-004 继续排队。
