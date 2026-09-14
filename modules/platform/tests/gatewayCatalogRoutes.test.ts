@@ -96,4 +96,66 @@ describe.skipIf(!available)('平台装配的目录与网关路由', () => {
     const ingress = await k8s.get(Resources.IngressRoute!, 'reference-proxy-internal-api', 'cs-reference-proxy');
     expect(ingress?.spec).toMatchObject({ routes: [{ match: 'Host(`api.svc.cs.internal`) && PathPrefix(`/api/test-gitlab`)' }] });
   });
+
+  test('目录更新后，较早开始而迟到的发布消费者不能把旧代理路由写回来', async () => {
+    const { gateway, apiCatalog } = platform.modules;
+    await register(worker(true));
+    await gateway.subscriptions.runOnce();
+    const apply = k8s.apply;
+    let pause!: () => void;
+    let resume!: () => void;
+    const paused = new Promise<void>((resolve) => { pause = resolve; });
+    const resumed = new Promise<void>((resolve) => { resume = resolve; });
+    k8s.apply = async (object) => {
+      if (object.metadata.name === 'reference-proxy-internal-api' && JSON.stringify(object.spec).includes('/api/reference-proxy')) {
+        pause();
+        await resumed;
+      }
+      return apply(object);
+    };
+    await publishRelease(proxy);
+    const earlier = gateway.subscriptions.runOnce();
+    try {
+      // 两个消费者的游标行锁彼此独立；旧计划可能在目录提交后的新计划应用完才返回。
+      await Promise.race([paused, earlier]);
+      await apiCatalog.subscriptions[0]!.runOnce();
+      resume();
+      await earlier;
+      const ingress = await k8s.get(Resources.IngressRoute!, 'reference-proxy-internal-api', 'cs-reference-proxy');
+      expect(ingress?.spec).toMatchObject({ routes: [{ match: 'Host(`api.svc.cs.internal`) && PathPrefix(`/api/test-gitlab`)' }] });
+    } finally {
+      resume();
+      await earlier;
+      k8s.apply = apply;
+    }
+  });
+
+  test('目录已提交而网关应用失败时，消费重试会修复路由且不重复登记操作', async () => {
+    const { gateway, apiCatalog } = platform.modules;
+    await register(worker(true));
+    await gateway.subscriptions.runOnce();
+    const apply = k8s.apply;
+    let fail = true;
+    k8s.apply = async (object) => {
+      if (fail && object.metadata.name === 'reference-proxy-internal-api') {
+        fail = false;
+        throw new Error('Kubernetes 暂时不可用');
+      }
+      return apply(object);
+    };
+    try {
+      await publishRelease(proxy);
+      expect(await apiCatalog.subscriptions[0]!.runOnce()).toBe(0);
+      expect(await apiCatalog.api.activeProxyNameOf(target.serviceId)).toBe('test-gitlab');
+      const beforeRetry = await k8s.get(Resources.IngressRoute!, 'reference-proxy-internal-api', 'cs-reference-proxy');
+      expect(beforeRetry?.spec).toMatchObject({ routes: [{ match: 'Host(`api.svc.cs.internal`) && PathPrefix(`/api/reference-proxy`)' }] });
+      // 目录事务已经提交，派生路由失败不能推进事件游标；恢复后重放同一事件即可补齐。
+      expect(await apiCatalog.subscriptions[0]!.runOnce()).toBe(1);
+      const recovered = await k8s.get(Resources.IngressRoute!, 'reference-proxy-internal-api', 'cs-reference-proxy');
+      expect(recovered?.spec).toMatchObject({ routes: [{ match: 'Host(`api.svc.cs.internal`) && PathPrefix(`/api/test-gitlab`)' }] });
+      expect((await apiCatalog.api.listOperations(actor)).map((item) => item.key)).toEqual(['test-gitlab:GET:/items']);
+    } finally {
+      k8s.apply = apply;
+    }
+  });
 });

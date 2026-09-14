@@ -70,11 +70,11 @@ export function createGatewayModule(deps: GatewayModuleDeps): GatewayModule {
   const allowlist = allowlistUseCases(useCaseDeps);
   const pods = podIdentityUseCases(useCaseDeps);
   const api: GatewayModuleApi = { name: 'gateway', ...routes, ...allowlist, evaluate: allowlist.evaluate, lookupByIp: pods.lookupByIp };
+  // 发布登记的投影由目录提交后的组合根回调刷新；再独立消费同一发布会让迟到的旧计划覆盖新路由。
   const subscriptions = createEventConsumer({ db: deps.db, consumer: deps.settings.consumerName, logger })
     .on(DomainTopic.projectCreated, async (e) => { const id = await deps.services.serviceIdOfProject(e.payload.projectId); if (id) await routes.reconcileService(id); })
     .on(DomainTopic.projectArchived, async (e) => { const id = await deps.services.serviceIdOfProject(e.payload.projectId); if (id) await routes.removeService(id); })
     .on(DomainTopic.trafficSwitched, async (e) => { await routes.reconcileService(e.payload.serviceId); })
-    .on(DomainTopic.releaseRegistered, async (e) => { await routes.reconcileService(e.payload.serviceId); await allowlist.rebuildAllowlist(); })
     .on(DomainTopic.grantChanged, async () => { await allowlist.rebuildAllowlist(); });
   return {
     api,

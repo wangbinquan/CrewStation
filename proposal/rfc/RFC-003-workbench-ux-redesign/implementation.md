@@ -1041,3 +1041,13 @@ console 使用此前已核对并导入的 `cs-console:rfc003-cbe2825`。API 新�
 16:10:26Z 原 files 工作树仍 `e4741df56b440d776b7c25ff5a4978b3d5822f46`、未提交 0／未推送 0，原单个 OpenCode／Runner 身份与 throughSeq=2004、两份 QA Pod UID、首页及 Git 配置摘要均保持；files preview v0.1.4、workbench 两槽及数据库原 UID／restartCount=9 均保持，节点余量 324,152KiB。没有临时调零副本或新 Agent。证据为 batch51 的 source-ci、image-build／import-budget／import、cs-api／cs-controller-verified、proxy-readiness／promotion、route-verified、invocation-after、upstream-trace／connectivity、final-environment JSON 与相关日志。
 
 本次只补部署与实机证据，源码候选与已通过完整门禁一致。Mac 解锁、I9／I14／I15 和具体成员范围仍待答复，UX-AT-15 与完整 J5 保留未通过，累计 **18／52**；RFC-004 继续严格等待 RFC-003 完结。
+
+## 第五十二批：发布登记投影的并发迟到
+
+继续核对上一批的顺序保证：`packages/eventbus/consumer.ts` 只串行相同 consumer 的游标，gateway 与 api-catalog 的处理可以重叠。新增组合根回归在旧代理 IngressRoute 应用前暂停 gateway，让 api-catalog 提交新目录并应用新路由，再恢复较早的 gateway 调用；旧计划确实覆盖了新 `/api/test-gitlab`。修复前 **3 pass／1 fail／12 assertions**（四测试、1118ms），不是用时间等待或随机网络延迟模拟概率。
+
+发布登记后的投影统一由 api-catalog 完成登记后的组合根回调触发，gateway 移除对同一 `release.registered` 的重复消费，避免读旧目录的额外写入。项目创建／归档、切流和授权变化继续走既有 gateway 事件路径。新增失败恢复回归：目录事务已经提交而 K8s 首次应用失败，游标不推进；重试同一事件后路由恢复、操作只登记一份。没有新的表、锁、HTTP 接口或模块反向依赖。
+
+最终定向 **23 pass／0 fail／165 assertions**，四文件、1440ms；完整本地 `bun run check` 为 **1124 pass／4 skip／0 fail**，1128 tests／191 files／6209 assertions／150.53s，两个候选文件摘要保持。console 源码和依赖未变化，沿用前批有效 build，提交后的精确 SHA CI 另行核验。实际启动 gateway 消费者的进程是 cs-controller，本次只需更新它；其他进程的 HTTP／任务协议未变。
+
+本轮 CUA 已恢复可操作，不再把 Mac 锁定列为当前阻塞。原演示管理员重新登录到 files 工作区，实际看到 `codex/rfc003-files @ e4741df56b`、未提交 0／未推送 0、已启动 1、未读完成 1，确认已部署的发布计数修复在页面生效。会话元数据中的“分支 main”是创建时分支，仍需改为明确的来源标注。历史入口跳转到独立 conversations 页面，该项目旧版 Agent 列表为空，没有把普通终端当作历史 Agent 接续通过。I9／I14／I15、成员范围及其他页面验收继续，当前仍 **18／52**；RFC-004 未提前启动。
