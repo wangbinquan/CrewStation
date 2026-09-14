@@ -6,6 +6,7 @@ import { Button } from '../../../../shared/ui/Button';
 import { UnsavedChangesGuard } from '../../../../shared/navigation/UnsavedChangesGuard';
 import type { DevAgentsHandle } from '../../hooks/useDevAgents';
 import { useHistoricalMessages } from '../../hooks/useHistoricalMessages';
+import { useHistoricalStart } from '../../hooks/useHistoricalStart';
 import type { TranscriptsByAgent } from '../../model/agentTranscript';
 import { agentAcceptsInput } from '../../model/stateTone';
 import { Pane } from '../Pane';
@@ -27,37 +28,34 @@ export interface AgentsPaneProps {
 export function AgentsPane({ agents, transcripts, onActivity, initialAgentId }: AgentsPaneProps): ReactElement {
   const t = useT();
   const [choice, setChoice] = useState<{ source?: string; agentId?: string }>({});
-  const [starting, setStarting] = useState(false);
   const messages = useHistoricalMessages(agents.sendMessage);
   const picked = choice.source === initialAgentId ? choice.agentId : initialAgentId;
   const setPicked = (agentId: string) => setChoice({ source: initialAgentId, agentId });
+  const creation = useHistoricalStart(agents.start, (agentId, showResult) => {
+    if (showResult) setPicked(agentId);
+    onActivity();
+  });
   // 没选过就看第一个：名册异步到达时不需要在 effect 里补 setState。
   const selected = picked === undefined ? agents.agents[0] : agents.agents.find((agent) => agent.agentId === picked);
   const draft = selected === undefined ? undefined : messages.drafts[selected.agentId];
   const lines = selected === undefined ? [] : (transcripts[selected.agentId] ?? []);
   return (
-    <><UnsavedChangesGuard dirty={messages.dirty || messages.busy} scope={t('devSession.agents.draftScope')}
-      allowNavigate={(current, next) => current.pathname === next.pathname} isNavigationBusy={() => messages.busy} />
+    <><UnsavedChangesGuard dirty={messages.dirty || messages.busy || creation.dirty || creation.busy} scope={t('devSession.agents.draftScope')}
+      allowNavigate={(current, next) => current.pathname === next.pathname} isNavigationBusy={() => messages.busy || creation.busy} />
     <Pane
       title={t('devSession.agents.title')}
       className={styles.pane}
       flush
       extra={
-        <Button onClick={() => setStarting((value) => !value)}>{starting ? t('devSession.agents.startCancel') : t('devSession.agents.start')}</Button>
+        <Button onClick={() => creation.setOpen(!creation.open)}>{creation.open ? t('devSession.agents.startCancel') : t('devSession.agents.start')}</Button>
       }
     >
       <div className={styles.layout}>
         {messages.busy ? <PaneNotice tone="info">{t('devSession.agents.sendingHint')}</PaneNotice> : null}
-        {starting ? (
-          <StartAgentForm
-            agents={agents}
-            onCancel={() => setStarting(false)}
-            onStarted={(agentId) => {
-              setPicked(agentId);
-              setStarting(false);
-              onActivity();
-            }}
-          />
+        {creation.busy ? <PaneNotice tone="info">{t('devSession.agents.startingHint')}</PaneNotice> : null}
+        {creation.error ? <PaneNotice tone="warning">{creation.error}</PaneNotice> : null}
+        {creation.open ? (
+          <StartAgentForm creation={creation} />
         ) : (
           <>
             <AgentRoster agents={agents.agents} selected={selected?.agentId} onSelect={setPicked} />

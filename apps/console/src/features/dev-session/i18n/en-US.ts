@@ -137,6 +137,7 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   'devSession.agents.startCancel': 'Back',
   'devSession.agents.startSubmit': 'Start',
   'devSession.agents.starting': 'Starting…',
+  'devSession.agents.startingHint': 'The Agent is starting with the submitted first instruction. You can view existing conversations; wait for the result before leaving.',
   'devSession.agents.compute': 'Compute profile',
   'devSession.agents.computeDefault': 'Platform default',
   'devSession.agents.computeLoading': 'Loading profiles…',

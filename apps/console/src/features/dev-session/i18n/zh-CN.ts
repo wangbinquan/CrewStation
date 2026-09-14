@@ -135,6 +135,7 @@ export const messages = {
   'devSession.agents.startCancel': '返回',
   'devSession.agents.startSubmit': '启动',
   'devSession.agents.starting': '启动中…',
+  'devSession.agents.startingHint': 'Agent 正在启动，首条指令已固定。可继续查看已有对话，收到结果后才可离开。',
   'devSession.agents.compute': '算力档位',
   'devSession.agents.computeDefault': '平台默认档位',
   'devSession.agents.computeLoading': '读取档位中…',

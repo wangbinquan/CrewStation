@@ -1148,3 +1148,13 @@ console 使用此前已核对并导入的 `cs-console:rfc003-cbe2825`。API 新�
 18:27:09Z 最终只读核对：API c712aa7／generation=24、controller cc93104／generation=20 保持 1／1。原历史 Agent 的整个 awaiting-input DTO 与第五十四批部署后相同，files 原单个 OpenCode／Runner／seq=2004、工作树 e4741df／未提交 0／未推送 0、四份已核对文件摘要及所有原部署槽均保持。旧历史 QA 模型结束后的指纹和 1395 未提交项没有进一步变化；三份 QA Pod、失败工作卷和 PostgreSQL 身份／状态保持，节点余量 **546,484,224 bytes**。没有额外模型输入、重启任务容器、临时调零副本或未恢复的故障命令。
 
 明细为 batch55 的 source-ci、console-preflight／image-build／import-budget／import／verified／http-verified 和 final-environment。源码与运行内容没有再改，纯证据补记沿用有效本地门禁；最终文档提交 CI 单独核对。完整实机验收仍 **18／52**，Mac 解锁和 I9／I14／I15／具体成员范围仍待答复，RFC-004 按批准顺序排队。
+
+## 第五十六批：历史新建 Agent 输入保护
+
+继续核对 UX-AT-52 的历史入口发现：StartAgentForm 持有本地 state，收起即卸载，因此首条指令、所选档位和权限全部丢失；既有离开保护只包含发给已有 Agent 的消息。启动按钮只依赖异步 pending，React 重渲染前连续点击会实际发送两个 POST；成功回调也不检查用户是否已返回其他对话，会把输入对象切到新 Agent。
+
+新增真实历史路由／HTTP 边界回归先得到 **1 pass／3 fail／8 assertions**，三个失败分别锁住输入丢失、实际两个请求和迟到回执误选对象。现用 dev-session feature 下的 useHistoricalStart 持有当前会话的新建输入及可见状态，复用 AgentsPane 的既有离开确认。收起不丢输入，启动同步锁定当次参数，默认档位仍省略；在途禁止修改这些参数和确认离开，但可继续查看／输入已有对话。失败保留完整草稿，错误在表单收起后仍可见，不自动重发。成功清新建草稿；只在仍显示新建表单时接续新对象，否则保留用户的原选择、草稿与焦点。当前 taskId 更换或离开后的回执不再调整已卸载页面。
+
+初次定向两文件 **14 pass／0 fail／121 assertions／1.61s**，随后补充回执前继续输入和焦点保持断言。最终完整 `bun run check` **1139 pass／4 skip／0 fail**（1143 tests／193 files／6338 assertions／104.87s），console build **502ms**。七份源码／测试摘要记录在 batch56-candidate.json，完整门禁后逐份核对未变；没有重复运行同一完整门禁。本批复用原表单／提示／离开确认，没有新增后端路由、模型配置或原生 CLI 启动步骤。
+
+CUA 本轮仍报告 Mac 锁定，当前完整历史创建／继续／返回的浏览器旅程没有补齐。已有历史 OpenCode 和原生 CLI 保留，没有再次发模型提示。I9／I14／I15、具体成员范围及解锁问题保持待答复，累计仍 **18／52**；RFC-004 继续按已批准顺序等待 RFC-003 完结。源码发布、精确 SHA CI 与仅 console 更新继续核验。
