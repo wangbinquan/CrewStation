@@ -11,6 +11,16 @@
 
 **RFC-003 工作台 UX 重设计处于 In Progress，作者已要求完整实现并提交上库。** RFC-001 与 RFC-002 都已 Done，见 `proposal/rfc/README.md` 的索引表。
 
+## 最新接力：离线实机复验与原生问题闭环（2026-09-14）
+
+离线修复已发布 `49e64ccc76f9b8b966cc34f0a9a422ecbb5a412e`，精确 SHA [CI 34831866868](https://github.com/wangbinquan/CrewStation/actions/runs/34831866868) 成功：1094 pass／8 skip／0 fail，1102 tests／186 files，console build 960ms。共享 console 已单独更新为 `cs-console:rfc003-49e64cc`，Pod `console-5f98b6d899-65kc5` 就绪，实际 imageID=`sha256:e9cfe51131b6ddda36fb8469a92b1ad5322895a5a75430894920c28e99aedcda`；原 QA Pod、文件和三个 Agent 身份保留。
+
+Mac 已恢复可操作，锁屏不再阻塞。本批在共享页面复验无开发会话提示、离线发布未发送与联网后保留说明；真实断网刷新出现 `ERR_INTERNET_DISCONNECTED`，恢复后原三个 CLI 重新附着，轮次事件和 throughSeq=10248 不变，发布仍只有原两条，未自动创建或重发。UX-AT-23 通过。
+
+新建个人页签“人工输入验收”，只新增一个真实 OpenCode C：`agt_01a09f711c177000bb21fad5a2e2e872`／`pty_01a09f711c177001937474875e4c7596`。三轮分别验证问题选择、问题拒绝、发布页后台完成：查看不代答，Green 的明确回答恢复执行；Escape 使问题失效，缺少确定轮次结果时如实未确认；发布说明的焦点与草稿在后台完成后保留，点击结果先保护草稿，再精确定位第三轮。C 于 10:32:54.748Z 经真实 Ctrl+C 退出（exitCode=0），原 B／Claude／A 不变，QA HEAD 和原 `.claude.json` 未改。UX-AT-29／39／40 通过；按作者指定使用 OpenCode 完成原定真实 CLI 条件，未把 Claude 登录页当成外部模型成功。
+
+累计 **15／52 项实机验收通过，剩余 37 项**，详见 acceptance-audit 和 implementation 第四十四至四十五批。本批只补实机证据和文档，生产源码未变，沿用第四十四批有效完整本地门禁。具体成员角色／市场范围写入仍待此前自动审批要求的具体授权；未执行这些写入。RFC-004 与 ADR-0004 已批准，仍等 RFC-003 完结后启动，T2–T9 未开始。
+
 ## 最新接力：离线读取提示与未发送操作（2026-09-14）
 
 第四十三批最终记录已发布 `50a5251e4c0f490d95b5e52557c7150c80ad6045`，精确 SHA CI 34829419313 成功，1089 pass／8 skip／0 fail、console build 966ms。本轮修复上一批真实 Offline 复现的缺口：两空间外壳用同一请求在线状态解释读取暂停与旧数据；网络状态变化不重挂载页面、不抢焦点。正常在线不增加常驻提示。

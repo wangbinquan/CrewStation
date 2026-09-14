@@ -747,3 +747,27 @@ B 执行时留下未发送 `RFC003_UNSENT_DRAFT_KEEP_0914`，切到独立预览�
 新增五项回归：普通页面的离线／联网、搜索草稿与焦点；两空间各自初次暂停与恢复；离线发布不排队且保留草稿后显式重试；已发送发布丢失回执后保持未知且只写一次。测试用真实路由、React Query 和 window online／offline 事件，HTTP 边界使用既有 fixture，不能冒充真实服务器写入或实浏览器验收。初始 **13 pass／4 fail**；修复后定向 **17 pass／0 fail／212 assertions**。最终完整门禁 **1098 pass／4 skip／0 fail**，1102 tests／186 files／6083 assertions／103.80s，console build **829ms**。候选九个源码／测试文件的哈希在门禁前记录，后续保持一致。
 
 临时证据为 `crewstation-rfc003-batch44-red.log`、`crewstation-rfc003-batch44-recovery-red.log`、`crewstation-rfc003-batch44-targeted.log`、`crewstation-rfc003-batch44-check.log`、`crewstation-rfc003-batch44-build.log` 和 candidate.json。没有再启动候选 Vite 或更改验收账号权限。此处记录时共享 console 仍为 baf850b，新修复的真实离线与重进验证待 Mac 解锁；UX-AT-23 保持未完成，总计仍 11 项通过、41 项保留。RFC-004 保持已批准，严格等 RFC-003 完结后启动。
+
+后续发布／部署与实机复验：源码提交 `49e64ccc76f9b8b966cc34f0a9a422ecbb5a412e` 已同步 origin/main，精确 SHA [CI 34831866868](https://github.com/wangbinquan/CrewStation/actions/runs/34831866868)／job `103936810347` 于 10:12:57Z 成功：1094 pass／8 skip／0 fail，1102 tests／186 files／56.00s，console build 960ms。本地有效完整门禁后九个源码／测试文件哈希保持一致，没有重复启动完整门禁。
+
+镜像 `cs-console:rfc003-49e64cc` 以完整 revision 标签构建并导入本地节点，等待 CI 后用 UID／generation／原镜像条件的 JSON Patch 只更新 console。Deployment UID `c4874a0e-6415-4c2b-b141-74ac25ea10ed`、generation=21，Pod `console-5f98b6d899-65kc5`／UID `8dcd2f94-c8c9-4c2f-8839-6f423dcaf62b` 就绪，实际 imageID=`sha256:e9cfe51131b6ddda36fb8469a92b1ad5322895a5a75430894920c28e99aedcda`。10:15:45Z 对比其余 Deployment、旧 QA Pod／文件 hash、新 QA 原三 Agent 名册、delivery 无会话 404 和两槽状态均不变。证明保存为 `/private/tmp/crewstation-console-49e64cc-after.json`；导入后的所属镜像 tar 已清理。
+
+Mac 随后恢复可操作，CUA 读取 Chrome 成功，锁屏 blocker 已解除。原候选标签改为实际共享地址，先复验 delivery 项目的“当前开发会话”来源：明确尚未开启、进入开发页与重新检查，重复检查不报故障。再选择真实远端 main／ea10bd3，保留说明 `RFC003 offline draft keep 0914`，在 DevTools 对本标签设 Offline。界面立即说明离线与旧数据；点击发布只提示本次未发送，不要求核对已创建发布。恢复 No throttling 后不自动发送；显式重新检查／确认版本仍保留说明，release API 仍只有 v0.1.0／v0.1.1。未点击在线最终发布，所属说明已清空，网络工具已关闭。
+
+开发页实机断线：原三个 CLI 均已确认后，在该验收标签设 Offline 并刷新，真实请求出现 `ERR_INTERNET_DISCONNECTED`。恢复 No throttling 后重载原 URL，名册从待确认恢复已启动 3，B 仍本轮完成／进程在线，Claude 仍原登录进程，原 A 仍结束；再进发布页并用浏览器返回，实际 v0.1.0／v0.1.1 和原工作树 1aa2db9 保持。10:21:37Z 对比 agentId／terminalId／lifecycle／startedAt 完全相同，活动条目完全相同，throughSeq 前后均 10248，没有新轮次或新 release。临时证明 `crewstation-rfc003-offline-agent-before.json`／`after.json`。UX-AT-23 由此通过；状态通道不可用／乱序补发等 UX-AT-42 额外分支继续保留。
+
+## 第四十五批：真实问题拒绝与发布页后台完成
+
+在原 `rfc003-verify-workbench` 的个人布局新增“人工输入验收”页签，空页签没有启动进程；点击一次“＋ CLI”新增 OpenCode C：`agt_01a09f711c177000bb21fad5a2e2e872`、终端 `pty_01a09f711c177001937474875e4c7596`、同 Runner `2536e3ca-3630-4c01-9c5e-621ef9735cca`，startedAt=`2026-09-14T10:23:05.248Z`。使用已有管理员档位 rfc003-verify-opencode／OpenCode 1.18.29／Big Pickle，等待任务后取得输入控制。原三 Agent 保留；每次输入均在真实 TUI 中，不使用脚本模型回复。
+
+第一轮 `ses_f608e5cb8ffeUzfsiuy1zRnrEk:msg_09f71a3620011m69lDwhOoVF4z` 于 10:23:39.874Z 开始，要求交互询问 Blue／Green。切到预览后工作页签显示待处理 1、顶部待处理 1→2；提示短暂消息消失后，顶部动态与页签仍可定位。动态的“前往处理”跳到 C、原 terminal／turn／event `d7b8c762-4122-4935-8eee-483cd78176dc`／seq=14879，原生问题仍等待回答。只读 API 证明请求 `que_09f71bedc0010WG2ZlseaI1qmz` 的 pending 保留、unread=false，查看没有代答。取得输入控制后 Down＋Enter 显式选择 Green，10:24:59.032Z 产生 answered／seq=14950；10:25:01.725Z 同轮 completed／seq=15018。原生画面实际显示 `RFC003_QUESTION_Green_DONE`。
+
+第二轮 `ses_f608e5cb8ffeUzfsiuy1zRnrEk:msg_09f73f2e1001ae4tpunTcm4moW` 于 10:26:11.297Z 开始，实际询问 Keep／Discard。后台页签和动态持续显示需处理；问题 `que_09f73fb94001pymc3n14O6Rnc1` 的 opened 为 seq=15130。再次定位后原问题保留。Escape 于 10:27:18.025Z 产生 request-resolved=rejected／seq=15175，原问题选项关闭，pending=[]，没有继续提交旧问题的入口。该 CLI 随后 idle 但没有确定轮次终态，平台于 10:27:18.273Z 发出 turn-unconfirmed／seq=15181，画面“本轮结果未确认”；不能记作正常完成。此边界与现有 `nativeActivityAcceptance.test.ts` 的 question-reject 判据相符，后续新输入开启第三轮。
+
+第三轮 `ses_f608e5cb8ffeUzfsiuy1zRnrEk:msg_09f76d9e2001X3lI00fSz49YpM` 于 10:29:21.506Z 开始，请求不使用工具，输出编号清单用于观察后台流式完成。进入发布页选择已推送 main／6af30245c4，说明中输入 `RFC003 release background draft keep` 并保持焦点。10:30:03.573Z 真实完成，event=`5ec1fb4f-ced7-40a0-b626-cf405021f6f4`／seq=16539；顶部未读完成从 4→5，说明仍完整、焦点仍在同一文本框。查看该结果先出现发布未保存输入确认且默认聚焦“继续编辑”；取消跳转后原说明保留。清空所属验收说明后再次查看，携带精确第三轮标识回到原 C，真实画面显示清单末尾和 `RFC003_RELEASE_BACKGROUND_DONE`，仅这条完成标为已读（5→4）。没有创建发布。
+
+最后重新取得 C 输入控制，真实 Ctrl+C 于 10:32:54.748Z 只结束 C，exitCode=0／reason=exited／processEnded=true；当前第三轮仍为 completed，退出没有改写轮次结果。结束时实际 PTY 为 212×41。10:33:41Z 核对原 Claude／B／A 的四个身份字段均不变；QA HEAD 仍 `1aa2db9f9578edfce15dbf314f74302ac523de83`，工作区仅原 `?? .claude.json`，没有读取或更改此文件。C 保留在新页签与原生名册供查看，没有释放／重建任务容器。
+
+临时结构化证据为 `crewstation-rfc003-question-before-answer.json`、`question-after-answer.json`、`question-dismissed.json`、`release-background-before.json`（该次查询时第三轮已经完成）、`question-final.json`。实机文字／画面来自本轮 CUA 记录。预览内部业务表单在切回 CLI 后会随 iframe 重新挂载，本批不将其作为跨视图草稿持久化证明；后台完成期间保留当前草稿和 CLI 原生输入的判据仍分别使用 E13／本批证据。
+
+结合第四十批受控 resize／中断，UX-AT-29 的真实 CLI 原定条件按作者明确选择的 OpenCode 完成；Claude 外部模型配置限制继续如实记录，不将登录页当作模型成功。UX-AT-39 三种后台位置已覆盖，UX-AT-40 的查看／回答／拒绝闭环完成。本批新增 29／39／40，加第四十四批 23，累计 15 项通过、37 项仍待验收。没有新增生产代码，沿用第四十四批有效本地完整门禁；角色／市场范围授权仍待此前具体问题的答复，RFC-004 保持已批准、等待 RFC-003 完结后开工。
