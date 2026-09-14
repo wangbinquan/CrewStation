@@ -1,6 +1,6 @@
 # RFC-003｜验收证据核对
 
-> 2026-09-15；共享 console 保持 `cbe28250607aa4084d74556c32aff650a9347783`、cs-api 保持 e26515e，cs-controller 已更新为 `cc931041503cd2794c3145172b728ac24303a08a`，精确 SHA CI、实际 imageID 和源码核对通过。第五十三批修复历史消息草稿、发送回执和离开确认，完整本地门禁与 console build 已通过，上库部署继续。参考代理 v0.1.2 已正常上线，请求到达正确代理，但访问 GitLab 被现有出站规则阻断，I9 待作者裁定。CUA 曾恢复并核对 files 页面未提交 0／未推送 0，随后再次报告 Mac 锁定，已请求解锁。四窗 OOM、保卷恢复和具体成员范围仍待处理。任务和标准沿用 [plan.md](plan.md)，没有删减范围。
+> 2026-09-15；共享 console 已更新为 `7e8dc7f9a38fc6f88e00cfd21673ee680770a61b`、cs-api 保持 e26515e，cs-controller 已更新为 `cc931041503cd2794c3145172b728ac24303a08a`。第五十三批历史消息草稿、发送回执和离开确认修复的完整本地门禁、build、精确 SHA CI 均通过；运行 Pod 与正常 HTTP 的全部静态产物摘要一致。参考代理 v0.1.2 已正常上线，请求到达正确代理，但访问 GitLab 被现有出站规则阻断，I9 待作者裁定。CUA 曾恢复并核对 files 页面未提交 0／未推送 0，随后再次报告 Mac 锁定，已请求解锁。四窗 OOM、保卷恢复和具体成员范围仍待处理。任务和标准沿用 [plan.md](plan.md)，没有删减范围。
 
 ## 1. 判据和环境
 
@@ -41,7 +41,7 @@
 - E23 全部部署槽筛选：[implementation 第五十批](implementation.md#第五十批全部部署槽日志筛选)、[模块 API 回归](../../../modules/observability/tests/observabilityModule.test.ts)，修复未传 slot 仍默认正式槽的后端行为。全部槽限定服务部署工作负载，明确槽保持角色映射。先红后绿、完整本地门禁、精确 SHA CI 和实际 API 部署均完成；真实查询全部槽返回蓝绿两条、prod／preview 分别只返回 green／blue，排除失败开发容器，时间与原始容器日志一致且两次查询相同。页面复验仍待解锁，不增加 UX 通过项。
 - E24 活动代理与目录更新顺序：[implementation 第五十一批](implementation.md#第五十一批真实-api-试调与目录路由一致性)、[组合根回归](../../../modules/platform/tests/gatewayCatalogRoutes.test.ts)。files QA 的默认开放 GET 原返回 404，活动代理选择与目录提交后刷新已修复并通过本地／精确 SHA CI、实际部署核对。参考代理 v0.1.2 正常上线后，请求到达正确代理；后续上游连接超时，系统与项目命名空间的 DNS／TCP 对照定位至已有 I9 出站缺口，待作者选择方案。没有修改 grants，不把到达代理视为完整调用或 UX-AT-15 通过。
 - E25 发布消费者并发与失败重试：[implementation 第五十二批](implementation.md#第五十二批发布登记投影的并发迟到)。可控暂停旧请求复现迟到覆盖，发布投影统一由目录消费者完成后触发；K8s 失败后同一事件可重试恢复且无重复操作。新增两个组合根回归、完整本地门禁与精确 SHA CI 通过，cs-controller 已更新、镜像和源码核对一致，原路由与 QA 会话保持。files 计数曾在页面复验，但不代替 UX-AT-32 的全部文件类型分支。
-- E26 历史对话草稿与发送回执：[implementation 第五十三批](implementation.md#第五十三批历史对话输入与发送回执)、[真实路由回归](../../../apps/console/src/tests/historicalConversations.test.tsx)。复现并修复跨对象草稿、失败即清空、快捷键重复发送、返回丢输入和错误链接选中另一对象；覆盖并行回执及发送期间新输入。仍须实际历史 Agent 与返回 CLI 的浏览器旅程，不据隔离 HTTP 夹具增加通过项。
+- E26 历史对话草稿与发送回执：[implementation 第五十三批](implementation.md#第五十三批历史对话输入与发送回执)、[真实路由回归](../../../apps/console/src/tests/historicalConversations.test.tsx)。复现并修复跨对象草稿、失败即清空、快捷键重复发送、返回丢输入和错误链接选中另一对象；覆盖并行回执及发送期间新输入。完整门禁、精确 SHA CI、console 实际部署和 HTTP 产物核对已完成，原 QA 会话／版本保留。仍须实际历史 Agent 与返回 CLI 的浏览器旅程，不据隔离 HTTP 夹具增加通过项。
 
 ## 3. UX-AT-01–52 逐项结论
 

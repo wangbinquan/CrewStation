@@ -15,7 +15,9 @@
 
 第五十二批已发布 `cc931041503cd2794c3145172b728ac24303a08a`，两个精确 SHA CI 34869427269／34869427360 均成功。只更新 cs-controller 至 rfc003-cc93104，generation=20、1／1、restartCount=0，实际 imageID 和两份源码摘要一致。精确回收本 RFC 的一项旧 console 编译缓存 118MB 后，按 digest 核对仅新增 45,029 bytes 并流式导入；没有清理镜像或数据卷。16:51:39Z 两份健康 QA Pod、原单个 OpenCode、e4741df／未提交 0／未推送 0 和文件摘要保持，参考代理路由仍指向正式 green，节点余量 655,147,008 bytes。
 
-第五十三批修复历史消息的跨 Agent 草稿串用、失败即清空、快捷键重复发送和离开丢输入。按 AgentId 独立保存，成功回执只清当时版本；失败保留且不重试，返回 CLI 复用输入确认，缺失链接不误选另一对象。会话元数据标为“创建时分支／Initial branch”。新增五项回归修复前 0 pass／5 fail；定向 **25 pass／0 fail／209 assertions**。最终完整门禁 **1129 pass／4 skip／0 fail**（1133 tests／192 files／6247 assertions／101.64s），console build **577ms**，七个候选文件摘要保持。当前 SVG 原稿还完成四种尺寸／双主题／单色的渲染复核，图见 brand-design.md；不是新一轮浏览器检查。提交、精确 SHA CI 和本机 console 更新继续。
+第五十三批修复历史消息的跨 Agent 草稿串用、失败即清空、快捷键重复发送和离开丢输入。按 AgentId 独立保存，成功回执只清当时版本；失败保留且不重试，返回 CLI 复用输入确认，缺失链接不误选另一对象。会话元数据标为“创建时分支／Initial branch”。新增五项回归修复前 0 pass／5 fail；定向 **25 pass／0 fail／209 assertions**。最终完整门禁 **1129 pass／4 skip／0 fail**（1133 tests／192 files／6247 assertions／101.64s），console build **577ms**，七个候选文件摘要保持。当前 SVG 原稿还完成四种尺寸／双主题／单色的渲染复核，图见 brand-design.md；不是新一轮浏览器检查。
+
+该批已发布 `7e8dc7f9a38fc6f88e00cfd21673ee680770a61b`，精确 SHA [CI 34872812553](https://github.com/wangbinquan/CrewStation/actions/runs/34872812553) 成功：1125 pass／8 skip／0 fail，console build 1.19s。console 已更新至 rfc003-7e8dc7f／generation=25／1／1，实际 imageID、六份静态产物与 serve.ts 在运行 Pod 内一致，外部正常 HTTP 也逐份匹配六个产物。17:14:13Z 原 OpenCode／Runner、工作树和 QA 文件摘要保持，files preview v0.1.4、workbench 正式 v0.1.0／preview v0.1.1、参考代理 v0.1.2 均保持；失败 Pod／工作卷和 PostgreSQL 原 UID 保留。节点余量 631,484,416 bytes，无临时调零副本或未恢复的故障命令。源码及运行内容未再变化，本次证据补记沿用有效门禁。
 
 本轮浏览器短暂恢复后，CUA 再次报告 Mac 锁定，已请求解锁；下文此前“已恢复”是当时事实。files 和旧健康 QA 均无历史结构化 Agent，本批没有另启模型任务。I9／I14／I15 和具体成员范围仍待答复，累计 **18／52**，不将自动回归当作页面旅程完成；RFC-004 继续等待 RFC-003 完结。
 

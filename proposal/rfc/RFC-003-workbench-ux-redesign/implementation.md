@@ -1075,3 +1075,17 @@ console 使用此前已核对并导入的 `cs-console:rfc003-cbe2825`。API 新�
 使用当前生产彩色／单色 SVG 与 tokens 中真实明暗背景／文字色，以 rsvg-convert 按 16／24／32／64px 渲染并目视检查；C 形、平行轨道和箭头在四种尺寸可区分，单色在两主题均可见。产物 [brand-size-check.png](brand-size-check.png) 与原稿摘要、渲染方式记录在 [brand-design.md](brand-design.md)。这验证当前资产本身，不能冒充锁屏期间重新操作了顶栏、favicon 或登录页。
 
 提交、精确 SHA CI 和本机 console 更新单独记录。此处的隔离路由测试不替代真实历史 Agent 继续及返回的浏览器旅程；Mac 解锁、I9／I14／I15 和具体成员范围仍待答复，累计仍 **18／52**，RFC-004 按批准顺序排队。
+
+### 第五十三批上库与控制台部署
+
+十四个精确路径已发布为 `7e8dc7f9a38fc6f88e00cfd21673ee680770a61b`，main 与 origin/main 同步、工作树与索引干净。精确 SHA [CI 34872812553](https://github.com/wangbinquan/CrewStation/actions/runs/34872812553)／job `104072616079` 成功，终态 17:11:24Z：**1125 pass／8 skip／0 fail**，1133 tests／192 files／6206 assertions／66.26s，五项新增历史页面回归实际执行，console build **1.19s**。
+
+镜像 `cs-console:rfc003-7e8dc7f` 复用已验证 cbe2825 基底，源锁文件、包清单、标准配方与 serve.ts 均未变。本次仅替换已通过构建的六份 dist 文件，旧 dist 的清除只发生在临时镜像层内，没有删除主机或卷内容，也没有重新安装依赖。实际 imageID=`sha256:187f17881592968d6fa53090ff1d138f9ab2f99d083c6c0020150ed4649f9f13`，无网络临时容器中六份产物与 serve.ts 全部一致，未保留旧静态文件。逐 digest 扫描总内容 215,395,923 bytes，只需新增 **3,703,891 bytes**；流式 save／import 均退出 0，未落盘 tar，余量由 622,989,312 变为 615,464,960 bytes。
+
+按既有 UID／generation=24／唯一容器名／旧镜像的 JSON Patch test 校验后，仅更新 console。17:12:03Z rollout 完成，generation=25、1／1，Pod `console-84cc49cd5c-qtlxs`／UID `89768689-497f-4604-85b8-1fc92aea3d06`，restartCount=0。运行 Pod 的 imageID 和全部七个文件摘要再次匹配。17:12:57Z 经正常已登录 HTTP 会话读取 console 首页、两个 JS、CSS 与两份品牌 SVG，全部 HTTP 200、字节数及 SHA256 与候选一致；index／brand 为 no-cache，带内容摘要的 assets 为 immutable。HTTP 产物验证不能替代当前浏览器渲染或输入旅程。
+
+17:14:13Z 最终只读核对：cs-api e26515e／generation=23、cs-controller cc93104／generation=20 和 console 7e8dc7f／generation=25 均 1／1。files 与旧 rfc003-ux Pod UID 保持，ready／restartCount=0；files 的原单个 OpenCode／Runner、完成事件 seq=2004、工作树 e4741df／未提交 0／未推送 0 不变。首页、Git 配置和旧 QA 未跟踪文件摘要一致；files preview v0.1.4／正式空，workbench 正式 v0.1.0／preview v0.1.1 及参考代理正式 v0.1.2 均保持。实际 IngressRoute `reference-api-proxy-internal-api`／UID `e223957c-2632-4e92-8fdc-75b6292677ea` 匹配 `/api/test-gitlab`，指向 green:80，与目录一致。
+
+原 OOM Pod 仍是 Failed／137，原工作卷 UID 保持 Bound／10Gi，未假称已恢复。PostgreSQL 原 UID 保持 ready／restartCount=9；节点余量 **631,484,416 bytes**。没有临时调零副本、在运行的候选 Vite 或尚未恢复的验收命令。本批没有新增真实 Agent、模型提示、发布版本、切流或 grants；受 I9 阻断的调用没有重复尝试。
+
+临时证据为 batch53 的 candidate、red／targeted／check／console-build、source-ci、console-preflight／image-build／import-budget／import／verified／http-verified 和 final-environment；关键事实已在此落档。再次检查 CUA 仍明确报告 Mac 锁定，解锁问题保持待答复。完整真实旅程仍 **18／52**，I9／I14／I15 与成员范围继续待裁定；RFC-004 不提前启动。源码候选和部署内容未再修改，纯证据补记沿用有效本地门禁，最终文档提交的 CI 单独核对。
