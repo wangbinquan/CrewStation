@@ -1124,3 +1124,15 @@ console 使用此前已核对并导入的 `cs-console:rfc003-cbe2825`。API 新�
 17:59:26Z 经正常已登录 API 再读原历史 Agent，只把 state 从 running 改为 awaiting-input，其余整个 DTO 与第二轮结束后的记录相同，没有 endedAt；未发送新提示或重新启动 Agent。18:01:05Z 原 files 单个原生 OpenCode／Runner／seq=2004、工作树 e4741df／未提交 0／未推送 0、文件摘要、files preview v0.1.4 和其他 QA／代理槽均与更新前一致。旧 rfc003-ux 保持模型结束后的指纹 c53f8b3／未提交 1395，没有进一步变化；原比较文件和 Git 配置摘要仍相同。三份 QA Pod、失败工作卷、PostgreSQL 身份及状态保持，节点余量 **573,718,528 bytes**。没有临时调零副本或未恢复的故障命令。
 
 本批 source-ci、image-context／build／import-budget／import、api-verified、history-verified 与 final-environment 保存本机明细。上述 API／WS、运行镜像和完整门禁证明不替代浏览器输入／返回旅程，UX 通过数仍 **18／52**，RFC-004 不提前启动。源码和部署内容没有再改，纯证据补记复用有效本地门禁；最终文档提交 CI 独立核对。
+
+## 第五十五批：历史页面实时名册刷新
+
+第五十四批最终证据提交 `cbf9e1532b514ad14091e662c445fbf0a74f27ec` 的精确 SHA [CI 34878667789](https://github.com/wangbinquan/CrewStation/actions/runs/34878667789) 成功，18:09:21Z 终态：1126 pass／8 skip／0 fail，1134 tests／192 files／6213 assertions／65.06s，console build 1.04s。
+
+沿真实历史页面继续核对刷新链：HistoricalConversationsPage 把 agents.refresh 交给 useAgentTranscripts，但 isLifecycleEvent 只包含 started／session／completed／cancelled／error。因此即使 API 已正确投影 waiting，打开的页面仍可能一直保留初次读取的运行中；permission 同样遗漏。旧 OpenCode 下一轮直接发 text，没有独立 started，单加 waiting 也无法刷新后续执行态。
+
+现将明确 waiting／running、permission 纳入即时重读。每个 Agent 分别记录是否已经进入本轮输出；首条实际 text／thinking／tool-start／tool-end 触发一次重读，同轮连续输出不逐帧请求。等待、权限或结束重置对应标记，其他 Agent 的标记不受影响；说明性 status 不推测执行。标记只控制查询次数，状态和身份始终来自 API，刷新不选中后台对象、不改变消息草稿，也不发送模型输入。
+
+在既有历史真实路由夹具上仅扩展 HTTP 名册回执和规范 WS 事件输入。新增五项回归：等待与后台权限事件后读回真实标签，当前选择／草稿／焦点保持；四种旧驱动输出分别恢复执行态，连续 30 段只读取一次，下一轮等待后可再次读取；完成态禁用输入并保留未发送内容。修复前 **5 pass／5 fail／43 assertions／1.046s**，修复后连同后端状态投影定向 **15 pass／0 fail／131 assertions／1.341s**。最终完整 `bun run check` **1135 pass／4 skip／0 fail**（1139 tests／192 files／6301 assertions／100.65s），console build **501ms**，四份候选摘要保持。
+
+18:16:47Z console 仍是 7e8dc7f／generation=25，已只读核对基底 imageID、UID 和节点余量 554,688,512 bytes；本批只需更新 console，已修复的 API c712aa7 保持。没有新增模型轮次、CLI、发布版本、切流或权限变化。上库、精确 SHA CI、实际镜像／HTTP 产物核对继续。Mac 仍锁定，完整页面继续／返回旅程不以此次自动回归代替；累计 **18／52**，I9／I14／I15 与成员范围待裁定，RFC-004 仍排队。

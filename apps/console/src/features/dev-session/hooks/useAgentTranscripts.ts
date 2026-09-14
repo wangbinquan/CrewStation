@@ -1,6 +1,6 @@
 import type { AgentEvent } from '@crewstation/contracts';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { appendAgentEvents, isLifecycleEvent } from '../model/agentTranscript';
+import { appendAgentEvents, isExecutionEvent, isLifecycleEvent } from '../model/agentTranscript';
 import type { TranscriptsByAgent } from '../model/agentTranscript';
 import { useStreamEvent } from './useStreamEvent';
 import type { TaskStreamChannel } from './useTaskStream';
@@ -13,6 +13,7 @@ export function useAgentTranscripts(channel: TaskStreamChannel, onLifecycle: (ev
   const [transcripts, setTranscripts] = useState<TranscriptsByAgent>({});
   const bufferRef = useRef<AgentEvent[]>([]);
   const lifecycleRef = useRef(onLifecycle);
+  const executingRef = useRef(new Set<string>());
 
   useEffect(() => {
     lifecycleRef.current = onLifecycle;
@@ -23,8 +24,12 @@ export function useAgentTranscripts(channel: TaskStreamChannel, onLifecycle: (ev
     'agent',
     useCallback((frame) => {
       bufferRef.current.push(frame.event);
-      // 只有会改变名册状态的事件才通知外层重读；文本与工具事件太密，不触发。
-      if (isLifecycleEvent(frame.event)) lifecycleRef.current(frame.event);
+      const lifecycle = isLifecycleEvent(frame.event), executing = isExecutionEvent(frame.event);
+      const refresh = lifecycle || executing && !executingRef.current.has(frame.event.agentId);
+      if (executing) executingRef.current.add(frame.event.agentId);
+      else if (lifecycle) executingRef.current.delete(frame.event.agentId);
+      // 等待／权限立即刷新；再次输出只触发一次，名册状态仍由 API 提供。
+      if (refresh) lifecycleRef.current(frame.event);
     }, []),
   );
 

@@ -1,4 +1,5 @@
 import { AgentInstanceDtoSchema } from '@crewstation/contracts';
+import type { AgentEvent } from '@crewstation/contracts';
 import { activityTaskId, activityTime } from './agentActivityFixture';
 import { editorWorkspaceFixture } from './editorWorkspaceFixture';
 
@@ -9,13 +10,19 @@ export function historicalConversationFixture() {
   const f = editorWorkspaceFixture(), base = globalThis.fetch;
   const agents = [historyAgentA, historyAgentB].map((agentId) => AgentInstanceDtoSchema.parse({ agentId, taskId: activityTaskId, compute: 'standard', permission: 'edit', state: 'awaiting-input', startedAt: activityTime }));
   const sends: Array<{ agentId: string; content: string; resolve: (response: Response) => void }> = [];
+  const rosterRequests: string[] = [];
+  let eventSequence = 1;
   globalThis.fetch = (async (raw, init) => {
     const path = new URL(String(raw), 'http://localhost').pathname;
-    if (path.endsWith('/agents') && (init?.method ?? 'GET') === 'GET') return Response.json({ items: agents });
+    if (path.endsWith('/agents') && (init?.method ?? 'GET') === 'GET') { rosterRequests.push(path); return Response.json({ items: agents }); }
     const target = path.match(/\/agents\/([^/]+)\/messages$/);
     if (target && init?.method === 'POST') return new Promise<Response>((resolve) => sends.push({ agentId: target[1]!, content: JSON.parse(String(init.body)).content, resolve }));
     return base(raw, init);
   }) as typeof fetch;
   const finish = (index: number, failed = false) => sends[index]!.resolve(failed ? Response.json({ error: 'unavailable', message: '上游未确认发送结果', details: {} }, { status: 503 }) : new Response(null, { status: 204 }));
-  return { ...f, sends, finish, restore: () => { for (const [index] of sends.entries()) finish(index, true); f.restore(); } };
+  const receiveAgent = (event: Omit<AgentEvent, 'seq' | 'at'>) => {
+    const seq = eventSequence++;
+    f.receive({ type: 'event', seq, at: activityTime, event: { kind: 'agent', event: { ...event, seq, at: activityTime } } });
+  };
+  return { ...f, agents, rosterRequests, receiveAgent, sends, finish, restore: () => { for (const [index] of sends.entries()) finish(index, true); f.restore(); } };
 }

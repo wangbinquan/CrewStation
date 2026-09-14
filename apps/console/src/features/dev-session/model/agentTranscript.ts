@@ -62,9 +62,15 @@ export function appendAgentEvents(current: TranscriptsByAgent, events: readonly 
   return events.reduce(appendAgentEvent, current);
 }
 
-/** 会改变 Agent 名册状态的事件。工具调用也不是文本，但一次运行能来几十条，不值得为它重读名册。 */
-const LIFECYCLE_TYPES: ReadonlySet<AgentEventType> = new Set<AgentEventType>(['started', 'session', 'completed', 'cancelled', 'error']);
+/** 显式生命周期和等待信号应及时重读名册；说明性的 status 不推测执行。 */
+const LIFECYCLE_TYPES: ReadonlySet<AgentEventType> = new Set<AgentEventType>(['started', 'session', 'permission', 'completed', 'cancelled', 'error']);
+const EXECUTION_TYPES: ReadonlySet<AgentEventType> = new Set<AgentEventType>(['started', 'session', 'text', 'thinking', 'tool-start', 'tool-end']);
 
 export function isLifecycleEvent(event: AgentEvent): boolean {
-  return LIFECYCLE_TYPES.has(event.type);
+  return LIFECYCLE_TYPES.has(event.type) || event.type === 'status' && (event.status === 'waiting' || event.status === 'running');
+}
+
+/** 旧驱动下一轮可能直接输出文本或工具事件；只在开始输出时刷新，不能每个片段都查询。 */
+export function isExecutionEvent(event: AgentEvent): boolean {
+  return EXECUTION_TYPES.has(event.type) || event.type === 'status' && event.status === 'running';
 }

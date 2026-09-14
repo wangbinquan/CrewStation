@@ -1,6 +1,7 @@
 import './domSetup';
 import { afterEach, expect, test } from 'bun:test';
 import { act } from 'react';
+import type { AgentEvent } from '@crewstation/contracts';
 import { activityProjectId } from './agentActivityFixture';
 import { historicalConversationFixture, historyAgentA, historyAgentB } from './historicalConversationFixture';
 import { renderApp } from './renderApp';
@@ -18,6 +19,8 @@ async function select(agentId: string) {
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>('[role="tab"]')].find((node) => node.textContent?.startsWith(`L-${agentId.slice(-6)}`))!.click()); await page!.settle();
 }
 async function finish(index: number, failed = false) { await act(async () => fixture!.finish(index, failed)); await page!.settle(); }
+async function receive(...events: Array<Omit<AgentEvent, 'seq' | 'at'>>) { await act(async () => { for (const event of events) fixture!.receiveAgent(event); }); await page!.settle(); }
+const rosterTab = (agentId: string) => [...document.querySelectorAll<HTMLButtonElement>('[role="tab"]')].find((node) => node.textContent?.startsWith(`L-${agentId.slice(-6)}`))!;
 
 test('历史 Agent 草稿按对象保留，切换、新建取消与发送失败均不清空或发给另一对象', async () => {
   fixture = historicalConversationFixture(); page = await renderApp(`${path}?agent=${historyAgentA}`);
@@ -65,5 +68,43 @@ test('未知历史链接不回落到另一 Agent，选择已有对象和同页�
   expect(document.querySelectorAll('[role="tab"][aria-selected="true"]')).toHaveLength(0);
   await select(historyAgentA); await edit('A 的独立输入'); await page.navigate(`${path}?agent=${historyAgentB}`); expect(input().value).toBe('');
   await edit('B 的独立输入'); await page.navigate(`${path}?agent=${historyAgentA}`); expect(input().value).toBe('A 的独立输入');
+  expect(fixture.sends).toHaveLength(0);
+});
+
+test('历史等待和权限事件刷新对应名册，后台 Agent 状态变化保留当前草稿和焦点', async () => {
+  fixture = historicalConversationFixture();
+  const [a, b] = fixture.agents; a!.state = 'running'; b!.state = 'running';
+  page = await renderApp(`${path}?agent=${historyAgentA}`); await edit('等待状态到达前的草稿');
+  let reads = fixture.rosterRequests.length;
+  a!.state = 'awaiting-input';
+  await receive({ agentId: historyAgentA, type: 'status', status: 'waiting' });
+  // API 已正确返回 awaiting-input，原页面忽略 waiting 事件，仍沿用初次读取的执行中标签。
+  expect(rosterTab(historyAgentA).textContent).toContain('等待输入'); expect(fixture.rosterRequests).toHaveLength(++reads);
+  await receive({ agentId: historyAgentA, type: 'status', status: 'diagnostic information' });
+  expect(fixture.rosterRequests).toHaveLength(reads);
+  b!.state = 'awaiting-input'; await receive({ agentId: historyAgentB, type: 'permission', text: '请确认后继续' });
+  expect(rosterTab(historyAgentB).textContent).toContain('等待输入'); expect(fixture.rosterRequests).toHaveLength(++reads);
+  expect(rosterTab(historyAgentA).getAttribute('aria-selected')).toBe('true');
+  expect(input().value).toBe('等待状态到达前的草稿'); expect(document.activeElement).toBe(input());
+  a!.state = 'running'; await receive({ agentId: historyAgentA, type: 'status', status: 'running' });
+  expect(rosterTab(historyAgentA).textContent).toContain('运行中'); expect(fixture.rosterRequests).toHaveLength(++reads);
+  await receive(...Array.from({ length: 30 }, () => ({ agentId: historyAgentA, type: 'text' as const, text: '片段' })));
+  expect(fixture.rosterRequests).toHaveLength(reads);
+  a!.state = 'completed'; await receive({ agentId: historyAgentA, type: 'completed' });
+  expect(rosterTab(historyAgentA).textContent).toContain('已完成'); expect(input().disabled).toBe(true);
+  expect(input().value).toBe('等待状态到达前的草稿'); expect(fixture.sends).toHaveLength(0);
+});
+
+test.each(['text', 'thinking', 'tool-start', 'tool-end'] as const)('旧驱动下一轮从 %s 开始也刷新执行态，连续输出只重读一次', async (type) => {
+  fixture = historicalConversationFixture(); page = await renderApp(path);
+  let reads = fixture.rosterRequests.length;
+  const event = { agentId: historyAgentA, type, text: '实际输出', tool: { name: 'read' } };
+  fixture.agents[0]!.state = 'running'; await receive(event);
+  expect(rosterTab(historyAgentA).textContent).toContain('运行中'); expect(fixture.rosterRequests).toHaveLength(++reads);
+  await receive(...Array.from({ length: 30 }, () => event)); expect(fixture.rosterRequests).toHaveLength(reads);
+  fixture.agents[0]!.state = 'awaiting-input'; await receive({ agentId: historyAgentA, type: 'status', status: 'waiting' });
+  expect(rosterTab(historyAgentA).textContent).toContain('等待输入'); expect(fixture.rosterRequests).toHaveLength(++reads);
+  fixture.agents[0]!.state = 'running'; await receive(event);
+  expect(rosterTab(historyAgentA).textContent).toContain('运行中'); expect(fixture.rosterRequests).toHaveLength(++reads);
   expect(fixture.sends).toHaveLength(0);
 });
