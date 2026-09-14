@@ -816,3 +816,37 @@ Chrome 仍在运行，CUA 此时只能返回“CrewStation 工作台”窗口标
 开发会话保卷重建在现有 lifecycle 中没有可调用路径；正常 release 会删除 follow-container 卷。已将实际证据及两种恢复方向登记为 [I14](../../../docs/engineering/implementation-open-questions.md#i14-失败开发容器的工作卷恢复)，建议显式保留工作树重建并让旧 CLI 保持不可恢复，等待作者选择后再补该生命周期方案。未执行恢复或扩容。
 
 本批不新增完整 UX-AT 通过项：累计仍 15／52，剩余 37。UX-AT-28 的新增失败隔离、34 的容器失效后完整界面、35／37 的真实四窗与五尺寸均继续；已有正常旅程证据保留其当时条件。本批修复尚未部署，发布／共享更新的实际结果另记。RFC-004 与 ADR-0004 已批准，继续等待 RFC-003 完结，T2–T9 未开始。
+
+### 发布、共享部署与实际接口复验
+
+源码提交 `03d15721f3e6682d10480c1e65d26a163fc8191b` 已精确提交 28 个所属文件并推送；主干 fetch 后确认 0／0。精确 SHA [CI 34838535851](https://github.com/wangbinquan/CrewStation/actions/runs/34838535851)／job `103957866651` 于 11:32:32Z 成功：**1103 pass／8 skip／0 fail**，1111 tests／188 files／64.44s，console build **1.27s**。候选生产源码／测试未再变动，下面只是部署和证据记录，不重复完整本地门禁。
+
+最初 cs-api 镜像补丁被自动审批拦截，理由是没有识别共享服务更新授权，补丁当时未执行。随后用当前任务的原始消息核对：此前明确列出 docker-desktop／crewstation-system 八个服务、短暂重连影响和保留 QA 工作树的确认之后，作者于 `01a09ea8-3b5e-73a0-95f7-df0ea3a79f12` 回复“授权”。附上该原始记录重试同一精确命令后通过，没有改用旁路或再次索要同一授权。本次仅在原范围内更新 cs-api、cs-controller、console，逐个 rollout 成功，补丁先 test 对象 UID／generation／容器名／旧镜像，再替换唯一 image 字段。
+
+| Deployment | 新 generation／实际 Pod | 新镜像及实际 imageID |
+|---|---|---|
+| cs-api | 20／cs-api-6c79545844-c547x | cs-control-plane:rfc003-03d1572／sha256:5aafd53024c14373b0d0b623db869d9fd26d1ee29a5c44a10017647b6d6b5b0c |
+| cs-controller | 18／cs-controller-5f44554cf5-ncplw | cs-control-plane:rfc003-03d1572／sha256:5aafd53024c14373b0d0b623db869d9fd26d1ee29a5c44a10017647b6d6b5b0c |
+| console | 22／console-744c8d5757-h45dq | cs-console:rfc003-03d1572／sha256:d96e491272b2c3855caf6391688626039a21ce5c8efa48a613cc9354ccce5fae |
+
+上述实际 Pod 均 Running／ready=true／restartCount=0，imageID 与带完整 revision 的本次构建一致。cs-auth／cs-session／cs-events／两 MCP 的 generation 和 3d1ce51 镜像保持；没有迁移、修改配置或更新任务镜像。
+
+11:54:02Z 在数据库恢复后，实际 admin 登录并只读复验：
+
+- workbench GET dev-session 从原 404 变为 200，返回原 `tsk_01a09eb4f03f7000ba011a517772cc09`／state=failed／message=“容器 已Failed”。历史 message 未伪造补写。
+- workspace-status 为 200／unavailable，带原 taskId 和实际已记录原因；没有调用失败 Runner 得到虚假干净工作树。
+- version-comparison 为 200，仍列出真实生产 `v0.1.0`／`6af30245c4f5dc0537bdae2c3a44aa2b3fd62d29`，workspace／commits／files 分别 unavailable；不将工作树不可读混同为未部署。
+- workbench 正式 `rel_01a09eb30d3370009d26fd52ceeaa013`、预览 `rel_01a09f181c8d7000b2f2654113a1e737` 均保持 ready／1／1。delivery 仍从未开会话，GET 404；preview 仍是 `rel_01a09f2cfcf370008be553b3f3f81479`／ea10bd3，ready／1／1，正式 empty。
+- 旧 QA 仍返回原任务 running；原 Pod UID、比较文件 SHA256 和 failed PVC UID／Bound 状态均与本批前值一致。没有释放失败任务、新建容器或修改角色／可见性。
+
+临时取证文件为 `crewstation-rfc003-batch46-deployments-before.json`、`deployments-after.json`、`api-after.json`、`disk-recovery.json` 和 image-ids.json；已导入且 imageID 核实完成的本批镜像 tar 已清理。CUA 仍只有窗口标题，未取得新页面或截图；这些 API 结果不替代实际界面、OOM 隔离或工作卷恢复通过，累计仍 15／52。
+
+### 同期节点磁盘故障及恢复
+
+服务更新后首次登录请求超时。只读检查发现原 PostgreSQL Pod `8af25faa-c488-4591-a37b-94f170063294` 自 11:35:33Z 起不就绪，早于本次三个服务补丁；启动日志明确 `FATAL: could not write lock file "postmaster.pid": No space left on device`。节点总量约 118GiB，可用空间为 0。这里只确认直接故障原因，不把发生时序推断成某个镜像或容器造成全部磁盘增长。
+
+数据库卷约 160MiB，QA 工作卷均保留。处理仅针对本任务可重建产物，先查所有 Docker／Kubernetes 容器引用以及完整镜像 ID，再清理十个已经被新版取代的旧标签：console 的 baf850b／64f37c3／layout，control-plane 的 project-creation／layout，task-runtime 的 claude-activity／activity／events-probe／layout／native；均为 rfc003 前缀。当前 03d1572、立即回退 49e64cc、仍在使用的 3d1ce51／dev 及全部业务镜像保留。随后仅清理其中五个无任何 CRI 容器引用的节点副本（console 三个、control-plane layout、task-runtime layout），没有全局 image／volume prune。
+
+镜像标签清理后实际可用仍为 0，因此进一步按描述 `crewstation-console-build`、本 RFC 执行时间、Reclaimable=true、Shared=false 筛出九份旧编译缓存，再用完整锚定 ID 过滤重读，核对精确集合一致后才清理：`0uoqiokttjrzyersirn94ywzy`、`5gmvtt5l30nkzxturt5wccku9`、`gpyj4oft4z7mc88k6mzsxle2n`、`gqa8om5davmmc13v5bm5mjonl`、`ixvtxepxm445mso62cj22qsqc`、`jd3it3isks6fr1e1qk1lwuo5o`、`meg1ialf8tj9g0h6ivtlbdj4c`、`ni0z5tcn4mwxdw6o5jhomosii`、`wo9r7vrnilwmw132wh2x4ry9e`。实际回收 **1.059GB**，更早和本次候选缓存未清理。
+
+没有重启或删除数据库 Pod，没有改数据库、用户文件、卷或节点设置。Kubernetes 事件等待确认原 PostgreSQL 自行恢复：startedAt=11:52:44Z，restartCount=9，ready=true；恢复后才完成上面的实际登录及业务读取。11:55:43Z 最终节点可用 **1,165,242,368 bytes（约 1.09GiB）**，旧 QA 文件和失败工作卷再次核对一致。空间仍有限，后续构建前须核对容量；不把本次有限清理记作整机容量问题已经根治。跨 RFC 排查要点已补入 dev-gotchas。

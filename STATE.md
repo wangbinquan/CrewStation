@@ -17,7 +17,11 @@
 
 实机链路暴露两处缺陷：平台仅记录“容器 已Failed”，开发会话查询把 failed 过滤成 404。本批修复容器／init 容器原因与退出码保存；只读查询可返回最近失败记录，活跃会话优先，后续会话已释放不重新翻出旧失败。创建、释放和准入原语保持既有行为。页面首屏显示失败任务和原因，保留原工作区及草稿；显式从远端新建先说明新工作树与未保存输入，取消／失败保留，旧卷不因新建被删除。新增九项回归，定向 33 pass／224 assertions；最终完整门禁 **1107 pass／4 skip／0 fail**（1111 tests、188 files、6134 assertions、109.10s），console build **547ms**。
 
-本批记录时修复尚未部署，共享 console 仍 49e64cc，其余服务及任务镜像仍 3d1ce51。Chrome 仍在运行，但 CUA 仅返回窗口标题且无截图，用户恢复窗口的问题待答复；没有将其推断为 Mac 锁屏。15／52 项历史实机通过记录保留，剩余仍 37 项；UX-AT-28／34／35／37 的 OOM 保护、恢复与尺寸验收未完成。保留工作树重建失败开发容器的生命周期方案登记为 [I14](docs/engineering/implementation-open-questions.md#i14-失败开发容器的工作卷恢复)，方案选择待作者答复，未执行恢复、释放或资源扩容。此前成员／市场范围的具体授权问题仍待答复。RFC-004 保持已批准且等待 RFC-003 完结，未实施 Hook。详见 implementation 第四十六批。
+修复已发布 `03d15721f3e6682d10480c1e65d26a163fc8191b`，精确 SHA [CI 34838535851](https://github.com/wangbinquan/CrewStation/actions/runs/34838535851) 成功：1103 pass／8 skip／0 fail，1111 tests／188 files，console build 1.27s。核实原始共享环境授权后，cs-api／cs-controller／console 已逐个更新至 `rfc003-03d1572`，实际 Pod imageID 与构建一致；其余服务及任务镜像仍 3d1ce51。真实 HTTP 已复验失败会话 200／failed、工作树 unavailable，以及生产 v0.1.0 仍独立可查；未把旧 message 补写成新采集的原因。
+
+部署后接口检查另发现数据库因节点磁盘满而 CrashLoop，错误为 `No space left on device`；11:35 起不就绪，早于本次服务更新。只精确清理本 RFC 十个无引用旧镜像、其中五个节点副本和九份不共享的旧 console 编译缓存，没有全局清理、修改或删除数据卷。原 PostgreSQL Pod 于 11:52:44Z 自行恢复并重新就绪；11:55:43Z 节点可用空间为 1,165,242,368 bytes（约 1.09GiB），后续构建前仍需先核对容量。workbench 两槽、delivery 无会话与预览、旧 QA Pod／文件和失败工作卷均复核保留。
+
+Chrome 仍在运行，但 CUA 仅返回窗口标题且无截图，用户恢复窗口的问题待答复；没有将其推断为 Mac 锁屏。15／52 项历史实机通过记录保留，剩余仍 37 项；UX-AT-28／34／35／37 的 OOM 保护、恢复与尺寸验收未完成。保留工作树重建失败开发容器的生命周期方案登记为 [I14](docs/engineering/implementation-open-questions.md#i14-失败开发容器的工作卷恢复)，方案选择待作者答复，未执行恢复、释放或资源扩容。此前成员／市场范围的具体授权问题仍待答复。RFC-004 保持已批准且等待 RFC-003 完结，未实施 Hook。详见 implementation 第四十六批。
 
 ## 最新接力：离线实机复验与原生问题闭环（2026-09-14）
 

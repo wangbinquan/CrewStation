@@ -160,6 +160,17 @@ TaskRunner 收到 welcome 后立刻补发重放事件，**本机集群里稳定�
 `close()` 紧跟 `process.exit` 会把尾部事件丢在发送队列里。退出前等 `bufferedAmount` 归零
 （有界，本仓 2 秒），否则 agent cancelled、terminalClosed 这些收尾事件到不了对端。
 
+### Docker 节点磁盘满时，业务服务 Ready 不代表数据库可用
+
+2026-09-14 的 RFC-003 实机验收中，API／控制器／console 均 Ready，但登录超时。
+PostgreSQL 原 Pod 已 CrashLoop，启动错误为 `could not write lock file "postmaster.pid": No space left on device`；
+节点 `df` 显示可用空间为 0。数据库卷实际只占约 160MiB，不能据此去删数据库内容或重建卷。
+
+构建／导入前核对 Docker 节点实际可用空间；发生此类故障，先查数据库 Ready 和端点、启动错误及磁盘容量。
+精确盘点本任务产物时，交叉核对 Docker 与节点运行时的容器／镜像引用；镜像标签清理也不等于构建缓存已释放。
+本次只清理已被新版取代的自有镜像和九个精确 ID、可回收且不共享的旧 console 编译缓存，保留当前／回退镜像与所有卷。
+原数据库 Pod 随后自行恢复。用事件等待确认 Ready 后，还需重新走真实登录及业务读取，不能仅以 rollout 成功作为恢复证明。
+
 ## 契约变更
 
 ### 无兼容期的契约变更，先问「改它的那条路径会不会被自己挡住」
