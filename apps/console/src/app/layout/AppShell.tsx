@@ -2,6 +2,7 @@ import { Outlet, useRouterState } from '@tanstack/react-router';
 import type { ReactElement, ReactNode } from 'react';
 import styles from './AppShell.module.css';
 import { TopBar } from './TopBar';
+import { ConnectionNotice } from './ConnectionNotice';
 
 export interface AppShellProps {
   /** 左栏：租户空间与平台管理空间各自一套（RFC-002）。 */
@@ -18,7 +19,7 @@ export function AppShell({ nav, children }: AppShellProps): ReactElement {
       {nav}
       <TopBar />
       <main className={[styles.main, compact && styles.compact].filter(Boolean).join(' ')}>
-        <div className={styles.content}>{children ?? <Outlet />}</div>
+        <div className={styles.content}><ConnectionNotice />{children ?? <Outlet />}</div>
       </main>
     </div>
   );

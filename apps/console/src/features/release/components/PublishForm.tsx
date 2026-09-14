@@ -49,7 +49,7 @@ export function PublishForm({ serviceId, projectId, source, canPublish, actions,
         <Button type="submit" variant="primary" disabled={p.busy || !!actions.busy || !canPublish || p.tags.isPending || !!p.tags.error || p.stale}>{t(p.busy ? 'release.publish.submitting' : 'release.prepare.submit')}</Button>
       </form>}
     </>}
-    {p.error ? <ActionNote tone="error">{p.error} {t('release.prepare.recheck')}</ActionNote> : null}
+    {p.error ? <ActionNote tone="error">{p.error} {p.showHistoryReminder ? t('release.prepare.recheck') : null}</ActionNote> : null}
     {p.failedPaths.length ? <ul>{p.failedPaths.map((path) => <li key={path}><code>{path}</code></li>)}</ul> : null}
     <p>{t('release.prepare.draftLifetime')}</p>
   </Card>;

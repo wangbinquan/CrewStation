@@ -1,13 +1,13 @@
 import './domSetup';
 import { afterEach, expect, test } from 'bun:test';
 import { act } from 'react';
-import { focusManager } from '@tanstack/react-query';
+import { focusManager, onlineManager } from '@tanstack/react-query';
 import { renderApp } from './renderApp';
 
 const projectId = `prj_${'a'.repeat(32)}`, serviceId = `svc_${'b'.repeat(32)}`, userId = `usr_${'c'.repeat(32)}`, taskId = `tsk_${'d'.repeat(32)}`, releaseId = `rel_${'e'.repeat(32)}`;
 const sha = 'a'.repeat(40), time = '2026-09-13T01:00:00.000Z', originalFetch = globalThis.fetch;
 let page: Awaited<ReturnType<typeof renderApp>> | undefined;
-afterEach(() => { page?.unmount(); page = undefined; globalThis.fetch = originalFetch; focusManager.setFocused(undefined); });
+afterEach(() => { page?.unmount(); page = undefined; globalThis.fetch = originalFetch; focusManager.setFocused(undefined); onlineManager.setOnline(true); });
 function fixture() {
   const state = { role: 'owner', admin: false, kind: 'DigitalWorker', dirty: false, noSession: false, workspaceError: 0, failBranches: false, failTags: false, failPublish: false, responseMismatch: false, releaseMissing: false, hold: undefined as Promise<void> | undefined, sha };
   const writes: Array<{ path: string; body: Record<string, unknown> }> = [], reads: string[] = [];
@@ -42,6 +42,31 @@ async function input(name: string, value: string) {
   await act(async () => { field.focus(); Object.getOwnPropertyDescriptor(prototype, 'value')!.set!.call(field, value); field.dispatchEvent(new Event('input', { bubbles: true })); field.dispatchEvent(new KeyboardEvent('keyup', { key: 'a', bubbles: true })); }); await page!.settle();
 }
 async function review() { await click('检查发布来源'); await click('确认版本'); }
+
+test('离线确认发布不会排队到联网后自动发送，保留草稿供用户重新确认', async () => {
+  const f = fixture(); page = await renderApp(`/projects/${projectId}/release?source=repository`); await review();
+  await input('version', 'v2.3.4'); await input('message', '离线保留的说明');
+  await act(async () => window.dispatchEvent(new Event('offline'))); await page.settle();
+  await click('确认发布到待验证版本'); expect(f.writes).toHaveLength(0);
+  await act(async () => window.dispatchEvent(new Event('online'))); await page.settle();
+  // 默认 mutation 队列曾在恢复联网时才发出离线期间点击的发布，绕过重新检查。
+  expect(f.writes).toHaveLength(0); expect(page.text()).toContain('本次操作未发送'); expect(page.search().release).toBeUndefined();
+  expect(page.text()).not.toContain('请核对发布历史');
+  await review(); expect(document.querySelector<HTMLInputElement>('[name="version"]')?.value).toBe('v2.3.4');
+  expect(document.querySelector<HTMLTextAreaElement>('[name="message"]')?.value).toBe('离线保留的说明');
+  await click('确认发布到待验证版本'); expect(f.writes).toHaveLength(1); expect(page.search().release).toBe(releaseId);
+});
+
+test('发布已经发出后断网丢失回执，不声称未发送，也不会在联网后重复发布', async () => {
+  const f = fixture(); page = await renderApp(`/projects/${projectId}/release?source=repository`); await review();
+  await input('message', '已发送但回执未知'); let reject: (error: Error) => void;
+  f.state.hold = new Promise<void>((_resolve, fail) => { reject = fail; }); await click('确认发布到待验证版本'); expect(f.writes).toHaveLength(1);
+  await act(async () => { window.dispatchEvent(new Event('offline')); reject!(new TypeError('回执连接已中断')); }); await page.settle();
+  expect(page.text()).toContain('回执连接已中断'); expect(page.text()).toContain('请核对发布历史'); expect(page.text()).not.toContain('本次操作未发送');
+  f.state.hold = undefined; await act(async () => window.dispatchEvent(new Event('online'))); await page.settle();
+  expect(f.writes).toHaveLength(1); expect(page.search().release).toBeUndefined(); await review();
+  expect(document.querySelector<HTMLTextAreaElement>('[name="message"]')?.value).toBe('已发送但回执未知'); expect(f.writes).toHaveLength(1);
+});
 
 test('尚无开发会话是可恢复空态，重复检查不报故障，也不自动创建或发布', async () => {
   const f = fixture(); f.state.noSession = true; page = await renderApp(`/projects/${projectId}/release?source=session`);

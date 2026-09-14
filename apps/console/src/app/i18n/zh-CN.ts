@@ -44,6 +44,8 @@ export const messages = {
 
   'ui.status.loading': '载入中…',
   'ui.status.error': '读取失败：{message}',
+  'ui.connection.offline': '当前离线，读取已暂停；已有数据可能过期。联网后会继续读取，已发出的操作仍需核对结果。',
+  'ui.connection.notSent': '操作时处于离线状态，本次操作未发送。联网后请重新检查并操作。',
   'ui.confirm.yes': '确认',
   'ui.confirm.no': '取消',
   'app.brand': 'CrewStation',

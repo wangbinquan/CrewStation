@@ -731,3 +731,19 @@ B 执行时留下未发送 `RFC003_UNSENT_DRAFT_KEEP_0914`，切到独立预览�
 09:38:07Z 只读复核：旧 QA Pod UID `4920b2aa-880e-49c3-a782-8575bbf9a42e`、ux-comparison.txt SHA256 `ee05185cb39c025d4968f1922cbd0218cc152a08e9cafb2c624522b9fba26dd3` 保持；workbench QA Pod UID `724ecb83-9fbd-4a36-9ad3-8266c6d84a42` 保持，原 Claude／B／A 的 agentId、terminalId 和 startedAt 不变，A 仍 ended，B 与 Claude 仍 running。负责人仍是原 admin，未发生待批准角色写入。delivery 无会话 404、正式 empty、preview v0.1.1 ready 1／1 均保持。
 
 准备在共享地址重看修复时，CUA 返回“The Mac is locked and automatic unlock could not unlock it”，动作未执行。已请用户手动解锁；没有通过其他浏览器控制手段绕过。候选控制台的真实后端页面已验证，但共享更新后的再次页面观察保持待完成，不冒充通过。所属 Vite PID 67618 与 Bun PID 67617 已结束，已导入镜像的临时 tar 已清理。最终取证摘要为 `/private/tmp/crewstation-console-baf850b-after.json`，核心值如上。
+
+## 第四十四批：离线读取提示与未发送操作
+
+第四十三批最终文档提交 `50a5251e4c0f490d95b5e52557c7150c80ad6045` 已同步 origin/main，精确 SHA [CI 34829419313](https://github.com/wangbinquan/CrewStation/actions/runs/34829419313)／job `103928973183` 于 09:45:04Z 成功：1089 pass／8 skip／0 fail，1097 tests／185 files／63.58s，console build 966ms。开始本批时再次 fetch 核对干净主干；上一轮属于完成代码、发布和新增实机证据的进展，不是仅复述状态。
+
+本轮 CUA 再次返回 Mac 锁屏、自动解锁失败，手动解锁请求仍待回复。继续处理上一批真实观察到的 Offline 暂停缺口，不通过其他浏览器自动化手段绕过。源码确认 shared Query 使用默认在线模式；离线事件使请求进入 paused，而原外壳没有对应说明。
+
+新 `ConnectionNotice` 放在两个空间共用的 AppShell 内容顶部，直接订阅与请求队列相同的 onlineManager，复用 ActionNote 与两语言文案。离线时明确说明读取暂停、已有数据可能过期和已发出操作仍需核对；联网时移除提示，不声称后端健康或所有查询已成功。组件不重挂载页面、不主动聚焦，正常在线不增加高度。初次身份查询暂停时，管理空间守卫外也能看到原因。
+
+进一步的真实路由回归发现：离线点击已确认的发布时，默认 mutation 先暂停，联网事件随后实际发出一次 POST。虽然不是两次 POST，但绕过了用户联网后重新检查／操作的机会。先红用例稳定得到“期待零次写入，实际一次”。共享 `useApiMutation` 现使用非排队模式，并在真正调用 API 之前按同一在线状态拒绝离线操作，返回 status=0、unavailable、requestSent=false 的本地错误；明确 retry=0。已发出的请求不会被后来离线状态改写为“未发送”，不改变它的真实成功／失败回执。
+
+发布向导保留版本和说明，未发送的离线操作在联网后仍等待用户重新检查和确认。错误文案使用过去时，恢复在线后仍能准确描述该次失败；仅在请求可能已经发出时附加“核对发布历史”，来源只读检查失败及明确未发送不混用。另一个先红断言复现了此前未发送错误仍要求检查发布历史，修正后通过。请求已发出而回执中断时，仍保留实际连接错误与历史核对提醒，不标成功，不自动重发。
+
+新增五项回归：普通页面的离线／联网、搜索草稿与焦点；两空间各自初次暂停与恢复；离线发布不排队且保留草稿后显式重试；已发送发布丢失回执后保持未知且只写一次。测试用真实路由、React Query 和 window online／offline 事件，HTTP 边界使用既有 fixture，不能冒充真实服务器写入或实浏览器验收。初始 **13 pass／4 fail**；修复后定向 **17 pass／0 fail／212 assertions**。最终完整门禁 **1098 pass／4 skip／0 fail**，1102 tests／186 files／6083 assertions／103.80s，console build **829ms**。候选九个源码／测试文件的哈希在门禁前记录，后续保持一致。
+
+临时证据为 `crewstation-rfc003-batch44-red.log`、`crewstation-rfc003-batch44-recovery-red.log`、`crewstation-rfc003-batch44-targeted.log`、`crewstation-rfc003-batch44-check.log`、`crewstation-rfc003-batch44-build.log` 和 candidate.json。没有再启动候选 Vite 或更改验收账号权限。此处记录时共享 console 仍为 baf850b，新修复的真实离线与重进验证待 Mac 解锁；UX-AT-23 保持未完成，总计仍 11 项通过、41 项保留。RFC-004 保持已批准，严格等 RFC-003 完结后启动。

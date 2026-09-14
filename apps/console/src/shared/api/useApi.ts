@@ -1,7 +1,7 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { onlineManager, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { QueryKey, UseMutationResult, UseQueryResult } from '@tanstack/react-query';
-import { isApiClientError } from '@crewstation/api-client';
-import type { ApiClientError } from '@crewstation/api-client';
+import { ApiClientError, isApiClientError } from '@crewstation/api-client';
+import { useT } from '../lib/useT';
 
 export type { ApiClientError };
 export { isApiClientError };
@@ -19,8 +19,15 @@ export function useApiMutation<TInput, TResult>(
   options: { invalidate?: readonly QueryKey[]; onSuccess?: (result: TResult) => void } = {},
 ): UseMutationResult<TResult, ApiClientError, TInput> {
   const queryClient = useQueryClient();
+  const t = useT();
   return useMutation<TResult, ApiClientError, TInput>({
-    mutationFn: mutate,
+    // 离线点击不加入恢复队列；已发出的请求仍保留其真实回执，失败不自动重发。
+    networkMode: 'always',
+    retry: 0,
+    mutationFn: (input) => {
+      if (!onlineManager.isOnline()) throw new ApiClientError(0, { error: 'unavailable', message: t('ui.connection.notSent'), details: { reason: 'offline', requestSent: false } });
+      return mutate(input);
+    },
     onSuccess: async (result) => {
       for (const key of options.invalidate ?? []) await queryClient.invalidateQueries({ queryKey: key });
       options.onSuccess?.(result);

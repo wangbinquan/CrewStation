@@ -19,6 +19,7 @@ export function usePublishPreparation(projectId: string, serviceId: string, sour
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   const [branch, setBranch] = useState(''), [version, setVersion] = useState('patch'), [message, setMessage] = useState('');
   const [snapshot, setSnapshot] = useState<PublishSnapshot>(), [step, setStep] = useState(0), [checking, setChecking] = useState(false), [error, setError] = useState<string>();
+  const [showHistoryReminder, setShowHistoryReminder] = useState(false);
   const [errors, setErrors] = useState<{ version?: string; message?: string }>({});
   const [failedPaths, setFailedPaths] = useState<readonly string[]>([]);
   const branches = useApiQuery([...queryKeys.branches(projectId), 'publish-source'], () => api.services.listBranches(serviceId), { enabled: source === 'repository' });
@@ -31,9 +32,9 @@ export function usePublishPreparation(projectId: string, serviceId: string, sour
   const dirty = !complete && (branch !== '' || version !== 'patch' || message !== ''), { markDraft } = actions;
   useEffect(() => { markDraft('publish', !accepted.current && (dirty || busy)); return () => markDraft('publish', false); }, [dirty, busy, markDraft]);
   const stale = !!current && (!!(source === 'session' ? workspace.error : branches.error) || !publishSourceStillMatches(current, workspace.data, branches.data?.items ?? []));
-  const resetCheck = () => { if (lock.current) return false; setSnapshot(undefined); setStep(0); setError(undefined); setFailedPaths([]); return true; };
+  const resetCheck = () => { if (lock.current) return false; setSnapshot(undefined); setStep(0); setError(undefined); setShowHistoryReminder(false); setFailedPaths([]); return true; };
   const check = async () => {
-    if (lock.current || !canPublish || !actions.begin('publish')) return; lock.current = true; setChecking(true); setError(undefined); setFailedPaths([]); setSnapshot(undefined); setStep(0);
+    if (lock.current || !canPublish || !actions.begin('publish')) return; lock.current = true; setChecking(true); setError(undefined); setShowHistoryReminder(false); setFailedPaths([]); setSnapshot(undefined); setStep(0);
     try {
       const result = source === 'session' ? await workspace.refetch() : await branches.refetch();
       if (result.error || !result.data) throw result.error ?? new Error(t('release.prepare.unknown'));
@@ -53,11 +54,11 @@ export function usePublishPreparation(projectId: string, serviceId: string, sour
       const parsed = ReleaseDtoSchema.safeParse(result);
       if (!parsed.success || parsed.data.serviceId !== serviceId || parsed.data.commitSha !== current.commitSha) throw new Error(t('release.prepare.responseUnknown'));
       accepted.current = true; setComplete(true); markDraft('publish', false); actions.finish('publish'); if (mounted.current) onAccepted(parsed.data);
-    } catch (cause) { setError(errorMessage(cause)); setFailedPaths(uncommittedPaths(cause) ?? []); setSnapshot(undefined); setStep(0); void tags.refetch(); if (source === 'repository') void branches.refetch(); }
+    } catch (cause) { setError(errorMessage(cause)); setShowHistoryReminder(!(isApiClientError(cause) && cause.status === 0 && cause.details.requestSent === false)); setFailedPaths(uncommittedPaths(cause) ?? []); setSnapshot(undefined); setStep(0); void tags.refetch(); if (source === 'repository') void branches.refetch(); }
     finally { lock.current = false; actions.finish('publish'); }
   };
   return { source, branches, workspace, tags, selected, branch, version, message, setVersion, setMessage, setBranch, step: current ? step : 0, setStep, snapshot: current, resetCheck, check, submit, busy, checking, error, errors, setErrors, failedPaths, canPublish, stale,
-    dirty, accepted, sessionMissing,
+    dirty, accepted, sessionMissing, showHistoryReminder,
     candidate: tags.data && !tags.error ? candidateReleaseTag(tags.data.items.map((tag) => tag.name), version) : undefined };
 }
 export type PublishPreparation = ReturnType<typeof usePublishPreparation>;
