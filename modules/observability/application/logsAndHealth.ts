@@ -16,8 +16,9 @@ export function logsAndHealthUseCases(deps: ObservabilityUseCaseDeps) {
     queryLogs: async (actor: Actor, projectId: ProjectId, query: LogQuery): Promise<LogEntryDto[]> => {
       const svc = await svcOf(actor, projectId);
       const roles = await slots.slotRoles(svc.serviceId);
+      const slotSelector = query.slot ? `,crewstation.io/slot=${roles ? roles[query.slot] : 'blue'}` : ',crewstation.io/workload=service';
       const selector = query.source === 'slot'
-        ? `crewstation.io/service=${svc.name},crewstation.io/slot=${roles ? roles[query.slot ?? 'prod'] : 'blue'}`
+        ? `crewstation.io/service=${svc.name}${slotSelector}`
         : query.source === 'build' || query.source === 'migration'
           ? `app.kubernetes.io/component=${query.source},crewstation.io/release=${query.releaseId ?? ''}`
           : `crewstation.io/task=${query.taskId ?? ''}`;

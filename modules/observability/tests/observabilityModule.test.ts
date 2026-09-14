@@ -15,6 +15,7 @@ const projectId = 'prj_0123456789abcdef0123456789abcdef' as ProjectId;
 const actor: Actor = { userId: 'usr_0123456789abcdef0123456789abcdef' as UserId, isAdmin: false };
 let ready = 0;
 const notices: string[] = [];
+const logSelectors: string[] = [];
 
 beforeAll(async () => {
   if (!available) return;
@@ -26,7 +27,10 @@ beforeAll(async () => {
     slots: { slotRoles: async () => ({ prod: 'blue', preview: 'green' }) },
     cluster: {
       observeDeployment: async (_ns, name) => (name === 'demo-blue' ? { replicas: 1, readyReplicas: ready, restarts: 0, lastTransitionAt: '2026-09-11T00:00:00Z' } : undefined),
-      tailLogs: async () => [{ ts: '2026-09-11T00:00:00.000Z', source: 'slot', stream: 'stdout', message: 'hello' }],
+      tailLogs: async (_namespace, selector) => {
+        logSelectors.push(selector);
+        return [{ ts: '2026-09-11T00:00:00.000Z', source: 'slot', stream: 'stdout', message: 'hello' }];
+      },
     },
     traces: {
       tasksByTrace: async () => [{ taskId: 'tsk_0123456789abcdef0123456789abcdef' as TaskId, kind: 'business', createdAt: '2026-09-11T00:00:00Z' }],
@@ -54,6 +58,20 @@ describe('健康态判定', () => {
 });
 
 describe.skipIf(!available)('observability module', () => {
+  test('日志全部部署槽不退回正式槽或混入任务，显式槽仍按当前角色选择', async () => {
+    const start = logSelectors.length;
+    const all = await obs.api.queryLogs(actor, projectId, { source: 'slot', limit: 100 });
+    await obs.api.queryLogs(actor, projectId, { source: 'slot', slot: 'prod', limit: 100 });
+    await obs.api.queryLogs(actor, projectId, { source: 'slot', slot: 'preview', limit: 100 });
+    // UI 的“全部槽”已省略 slot，旧用例却以 query.slot ?? 'prod' 悄悄缩窄了实际日志。
+    expect(logSelectors.slice(start)).toEqual([
+      'crewstation.io/service=demo,crewstation.io/workload=service',
+      'crewstation.io/service=demo,crewstation.io/slot=blue',
+      'crewstation.io/service=demo,crewstation.io/slot=green',
+    ]);
+    expect(all[0]?.slot).toBeUndefined();
+  });
+
   test('健康与日志、告警触发与恢复、traceId 回放', async () => {
     ready = 0;
     expect((await obs.api.health(actor, projectId)).map((h) => [h.slot, h.state])).toEqual([['prod', 'unhealthy'], ['preview', 'unknown']]);

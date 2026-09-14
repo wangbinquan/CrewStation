@@ -983,3 +983,15 @@ Mac 此时仍锁定；本批故障、恢复和日志结果来自实际 API／集
 随后 console 滚动更新被自动审批拒绝。已从当前任务原始记录核对当时明确询问的八服务更新、专用 RFC 完整验收和用户“授权”回复，但复核仍不接受会话文件作为此次具体部署授权，要求重新确认。现已提出只更新 `console → cs-console:rfc003-cbe2825`、`cs-api → cs-control-plane:rfc003-cbe2825` 的具体问题，待答复；**两 Deployment 补丁均未执行**。14:39:29Z 实际 console 仍 generation=23／10455cc，cs-api 仍 generation=21／9642e23，均 1／1；PostgreSQL 原 UID 不变、ready=true／restartCount=9。镜像已导入不等于代码已部署，新的日志时间和中性级别尚无共享环境复验。
 
 后续收到本次更新确认后，先 console 再 cs-api，分别验证原 UID／generation／唯一镜像和 rollout，再用保留的 v0.1.3 失败记录核对同一时间戳、来源及 releaseId 过滤。浏览器仍待解锁；具体成员授权、I14 与 I15 也待答复。当前没有临时调零的 QA 副本、运行中的候选 Vite 或未恢复的验收命令。RFC-003 仍 **18／52**，RFC-004 继续排队。
+
+## 第五十批：全部部署槽日志筛选
+
+日志界面的“全部部署槽”已经省略 slot，但 `modules/observability/application/logsAndHealth.ts` 仍以 `query.slot ?? 'prod'` 选择物理槽，实际结果被缩窄为正式槽。修复仅在明确传入 prod／preview 时按当前角色选择 blue／green；省略 slot 时在原项目命名空间内按服务名及 `crewstation.io/workload=service` 查询，避免混入同服务的开发任务。发布／迁移／任务日志来源和原有尾部上限保持。
+
+新增模块 API 回归覆盖全部、正式与待验证三种选择，并检查全部槽记录不被标成某个查询角色。修复前 **3 pass／1 fail**，明确复现全部槽仍选 blue；最终与 Kubernetes 日志和完整日志页回归合跑 **22 pass／0 fail／102 assertions**（三文件、1097ms）。完整本地 `bun run check` **1119 pass／4 skip／0 fail**，1123 tests／190 files／6191 assertions／102.42s；两项候选源码／测试的 SHA256 与门禁前记录一致。console 源码和依赖没有变化，沿用第四十九批有效 build 566ms，不重复完整门禁。
+
+只读查询 `cs-rfc003-verify-workbench` 中真实 Pod 标签：单用服务名匹配 blue、green 和原失败 `task-01a09eb4f03f`；增加 workload=service 后只匹配 blue UID=`0f0d1e02-e85a-4ba2-9f9b-104715c7dc58`、green UID=`eb118c64-96e6-4f8d-9594-d7e4ad97eab2`，两者 Running。任务 UID=`724ecb83-9fbd-4a36-9ad3-8266c6d84a42`／workload=dev-session 被排除。未修改任何 Pod、标签、部署或工作卷；这是实际选择器证据，不是已部署 API 或完整页面验收。
+
+临时证据为 `crewstation-rfc003-batch50-{red,targeted,check}.log`、candidate.json 和 live-selector.json；关键结果已在此落档。此前纯证据提交 `6ecef0b3852425f34c1ef74f3796100d2adb85bb` 的精确 SHA [CI 34857895769](https://github.com/wangbinquan/CrewStation/actions/runs/34857895769) 已成功：1114 pass／8 skip／0 fail，1122 tests／190 files／6148 assertions／55.35s，console build 993ms，终态 14:49:37Z。本批提交后的精确 SHA CI 另行核验。
+
+第四十九批 rfc003-cbe2825 两镜像的具体滚动更新授权仍待回复；其中不含本批全部槽修复，未重标镜像或重试被拒绝的部署。Mac 解锁、I14／I15 和成员范围问题也仍待答复。验收维持 **18／52**，RFC-003 In Progress；RFC-004／ADR-0004 已批准，T2–T9 严格等待 RFC-003 完结后启动。

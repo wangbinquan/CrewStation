@@ -11,6 +11,12 @@
 
 **RFC-003 工作台 UX 重设计处于 In Progress，作者已要求完整实现并提交上库。** RFC-001 与 RFC-002 都已 Done，见 `proposal/rfc/README.md` 的索引表。
 
+## 最新接力：全部部署槽日志筛选（2026-09-14）
+
+第五十批修复“全部部署槽”在界面省略 slot 后，后端仍默认只读正式槽的问题。未指定槽时，按当前项目命名空间、服务名和 workload=service 读取部署日志；明确 prod／preview 时继续按当前角色映射 blue／green。只读集群核对显示，单用服务标签还会匹配原失败开发容器，新增工作负载条件后仅保留真实蓝绿两槽。新增模块 API 回归先红后绿，定向 **22 pass／0 fail／102 assertions**；完整本地门禁 **1119 pass／4 skip／0 fail**（1123 tests／190 files／6191 assertions／102.42s），两个源码／测试候选摘要未变。console 源码和依赖未改，沿用上一批有效 build。提交后的精确 SHA CI 单独核验。
+
+上一批证据提交 `6ecef0b3852425f34c1ef74f3796100d2adb85bb` 的 [CI 34857895769](https://github.com/wangbinquan/CrewStation/actions/runs/34857895769) 已成功：1114 pass／8 skip／0 fail、console build 993ms。共享 API／console 更新为 rfc003-cbe2825 的具体授权仍待回复；该镜像仅含第四十九批，**不含本批全部槽修复**，没有重标或替换已准备的镜像。Mac 解锁、I14／I15 与成员范围问题仍待答复。本批没有新增部署或页面旅程，验收仍 **18／52**；RFC-004 已批准，继续等待 RFC-003 完结。
+
 ## 最新接力：迁移失败、恢复发布与日志事实（2026-09-14）
 
 第四十九批在原 files QA 的单个 OpenCode 空闲时，只给 crewstation.yaml 加一次输出固定标记并 exit 42 的 migrationCommand，不访问数据库。正常发布 v0.1.3=`rel_01a0a03773bf7000a6d00e16f132a40d`／`490c30d676a6e4d3908415df5c0117fb8501fd79`，实际迁移 Job 失败，预览保持 v0.1.2，正式仍空。随后只移除该命令，恢复提交 `e4741df56b440d776b7c25ff5a4978b3d5822f46` 的整棵树与故障前一致；正常发布 v0.1.4=`rel_01a0a0426f4c7000b7ce58ff67c80bc8`，14:11:54.631Z ready、预览 HTTP 200。失败记录和标记保留；原 Pod／OpenCode 身份、首页和 Git 配置摘要保持，未提交 0／未推送 0，工作树与预览相同。两轮临时调零的 QA preview 全恢复 1／1、generation=11；原 workbench 正式 green 仍 generation=1／v0.1.0。
