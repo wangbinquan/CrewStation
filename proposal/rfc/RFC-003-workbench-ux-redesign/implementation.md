@@ -1023,3 +1023,21 @@ console 使用此前已核对并导入的 `cs-console:rfc003-cbe2825`。API 新�
 15:43:10Z 参考代理 `prj_01a0915af70b7000a571b0724160a057` 的正式槽为空；preview green 为 ready／1／1，v0.1.2=`rel_01a0915ec42a700096cd2e21d9d3e9d0`／`7dee80be75906e6265094bf852866a2ceb96bd0e`，当前内部路由仍指向不存在的 blue。后续先发布验证过的控制面修复、按作者本机更新授权更新实际读取代码的 cs-api 与 cs-controller，再通过普通上线动作及网关重算验证默认开放 GET。没有以直连预览替代正式服务路由。
 
 临时证据为 batch51 的 invocation、catalog-preflight、operation-spec、route-preflight、proxy-runtime、proxy-delivery-preflight JSON 与 red、order-red、targeted、check 日志。Mac 解锁、I14／I15 与成员范围问题仍待答复；页面完整旅程不因 API 定位而记通过，累计仍 **18／52**。RFC-004 继续等待 RFC-003 完结。
+
+### 第五十一批上库、部署与 I9 出站阻塞
+
+十个精确路径已发布为 `e26515eb6dbb67fc5cf894bb9996b1885144e788`，推后 main 与 origin/main 同步、工作树和索引干净。精确 SHA [CI 34865123328](https://github.com/wangbinquan/CrewStation/actions/runs/34865123328)／job `104046908815` 成功：**1118 pass／8 skip／0 fail**，1126 tests／191 files／6161 assertions／68.43s，三个新增组合根回归实际执行，console build **1.10s**，终态 15:55:58Z。
+
+新镜像 `cs-control-plane:rfc003-e26515e` 使用已验证的 80d1020 基底，只覆盖五个候选文件共 40,069 bytes，未重新安装依赖。实际 imageID=`sha256:18aaf0125899a350d3d6cecdb8eccfd0a059df40016bf9498fcd1770cb3cbfe4`，无网络容器内五个文件摘要匹配。逐 digest 计算导入仅新增 73,709 bytes，流式导入退出 0、未落盘 tar；余量由 326,750,208 变为 326,578,176 bytes，没有清理镜像、缓存或卷。
+
+按作者明确的本机服务更新授权，UID／generation／唯一容器名／旧镜像经 JSON Patch test 核对后，仅依次更新读取本次代码的 cs-api 与 cs-controller。API 16:01:06Z 为 generation=23，Pod `cs-api-64b95ff4d5-94x44`／UID=`ade1cb6c-28ed-4dbc-82a7-6543c96d2f31`；controller 16:01:12Z 为 generation=19，Pod `cs-controller-6dfc9fdf76-5zcnp`／UID=`78fdc61d-434c-4f15-afa6-1ec07f5410ae`。两者 1／1、restartCount=0，实际 imageID 与五个源码摘要逐项一致；console 保持 cbe2825／generation=24。
+
+参考代理预览的 healthz 与状态页均 HTTP 200，上游地址／令牌显示已配置。16:02:12Z 经普通负责人切流 API，指定 `expectedActiveRelease=null` 和精确目标 v0.1.2，取得 `tsw_01a0a0a7976c70009c3228353aec2dec`；该版本成为正式 green／1／1，原为空的 blue 成为预览。随后普通管理员网关重算成功，实际 IngressRoute 与存储路由均匹配 `/api/test-gitlab` 并指向 `reference-api-proxy-green`，保留原身份校验与前缀剥离。证据脚本曾把重算返回的数字当数组、把分组路由当平铺结果；通过只读 GET 及 Kubernetes 实体重新核对，没有重复切流或重算。
+
+16:04:29Z 从原 files QA 任务只重试一次同一默认开放 GET，平台在 15 秒后 HTTP 412，不能记为调用成功。代理 Pod `reference-api-proxy-green-689c98dc64-kc5cq`／UID=`615ec717-f72e-4609-ab11-dcae43871f97` 于 16:04:59.982750341Z 记录完全匹配的上游路径 `/api/v4/projects/114/repository/commits/e4741df56b440d776b7c25ff5a4978b3d5822f46`、status=0，证明请求已到达正确代理，阻塞发生在继续访问上游。该请求没有自动重发。
+
+16:08:40Z 同一 DNS／TCP 对照确认：系统 API Pod 和代理 Pod 均解析到 `192.168.65.254`／`fdc4:f303:9324::254`；前者连 GitLab 8929 端口 3ms 成功，后者 ETIMEDOUT。代理的 workload=service 不匹配额外任务／构建放行，现有默认 NetworkPolicy 只允许系统命名空间与 DNS，且仅配置 GitLab 地址，没有出口代理环境变量。这与已有 [I9](../../../docs/engineering/implementation-open-questions.md#i9-项目命名空间到公司系统的出站) 一致：接入容器到公司系统的出站模式尚待作者裁定。已呈同一份白名单／按上游连接定向开放／系统出口代理三种选择；没有借修改策略、绕过网关或改 grants 来冒充 J5 成功。
+
+16:10:26Z 原 files 工作树仍 `e4741df56b440d776b7c25ff5a4978b3d5822f46`、未提交 0／未推送 0，原单个 OpenCode／Runner 身份与 throughSeq=2004、两份 QA Pod UID、首页及 Git 配置摘要均保持；files preview v0.1.4、workbench 两槽及数据库原 UID／restartCount=9 均保持，节点余量 324,152KiB。没有临时调零副本或新 Agent。证据为 batch51 的 source-ci、image-build／import-budget／import、cs-api／cs-controller-verified、proxy-readiness／promotion、route-verified、invocation-after、upstream-trace／connectivity、final-environment JSON 与相关日志。
+
+本次只补部署与实机证据，源码候选与已通过完整门禁一致。Mac 解锁、I9／I14／I15 和具体成员范围仍待答复，UX-AT-15 与完整 J5 保留未通过，累计 **18／52**；RFC-004 继续严格等待 RFC-003 完结。

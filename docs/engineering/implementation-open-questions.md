@@ -97,6 +97,8 @@
 
 **可选做法**：(a) 代理项目的出站也走同一份白名单，由管理员维护；(b) `APIProxy` 类项目的命名空间默认放行其 `upstream.connection` 指向的地址；(c) 上游一律经由系统命名空间里的出口代理。
 
+**2026-09-15 复验（RFC-003 第五十一批，仍待裁定）**：参考代理 v0.1.2 已正常上线，活动目录与网关路由修复已部署；原 files QA 的默认开放 GET 确实到达代理，但代理转发 GitLab 未取得响应。16:08:40Z 的只读对照中，两命名空间把 `host.docker.internal` 解析到相同地址；系统 API Pod 连 8929 端口用时 3ms，代理 Pod 返回 ETIMEDOUT。代理 workload=service，当前规则仅允许到系统命名空间与 DNS，额外的任务／构建规则不匹配它；未配置出口代理变量。已把上述三种方案再次呈作者选择，没有借本机服务更新授权替代此产品设计裁定，也没有更改网络策略。证据见 [RFC-003 implementation](../../proposal/rfc/RFC-003-workbench-ux-redesign/implementation.md#第五十一批上库部署与-i9-出站阻塞)。
+
 ## I10. 上游凭据的按需下发
 
 **现状**：cs-auth 没有「按需下发上游凭据」的接口，参考代理只能从 Manifest 的密钥里取长期令牌。

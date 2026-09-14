@@ -11,11 +11,15 @@
 
 **RFC-003 工作台 UX 重设计处于 In Progress，作者已要求完整实现并提交上库。** RFC-001 与 RFC-002 都已 Done，见 `proposal/rfc/README.md` 的索引表。
 
-## 最新接力：活动代理与目录路由一致性（2026-09-14）
+## 最新接力：活动代理与目录路由一致性（2026-09-15）
 
-第五十一批继续真实 API 试调：原 files QA 任务读取已默认开放的 GitLab 项目 114／当前提交，容器返回 HTTP 404。定位为网关取到了已退役模板代理名，并复现网关先消费发布事件、目录随后更新导致路由不刷新的顺序问题。已改为服务定点活动代理查询，目录提交后经组合根刷新路由和放行表；新增组合根回归先红后绿，定向 **21 pass／0 fail／158 assertions**。最终完整本地门禁 **1122 pass／4 skip／0 fail**（1126 tests／191 files／6202 assertions／107.29s），五个候选文件摘要保持。console 源码与依赖未变，沿用有效 build；前一次沙箱无法绑定本机端口、连接测试库的失败不作为有效验证。精确 SHA CI 与部署另行核验。
+第五十一批继续真实 API 试调：原 files QA 任务读取已默认开放的 GitLab 项目 114／当前提交，容器返回 HTTP 404。定位为网关取到了已退役模板代理名，并复现网关先消费发布事件、目录随后更新导致路由不刷新的顺序问题。已改为服务定点活动代理查询，目录提交后经组合根刷新路由和放行表；新增组合根回归先红后绿，定向 **21 pass／0 fail／158 assertions**。最终完整本地门禁 **1122 pass／4 skip／0 fail**（1126 tests／191 files／6202 assertions／107.29s），五个候选文件摘要保持。console 源码与依赖未变，沿用有效 build；前一次沙箱无法绑定本机端口、连接测试库的失败不作为有效验证。精确 SHA CI 与部署结果见下文。
 
-参考代理目前 preview v0.1.2 ready／1／1、正式为空；后续按作者已明确的本机服务更新授权部署 cs-api／cs-controller 修复，再沿普通上线／重算入口验证真实 GET。没有修改 API grants、成员范围或启动新 Agent。浏览器、I14／I15 与成员范围问题仍待答复，验收仍 **18／52**，RFC-004 继续等待 RFC-003 完结。
+修复已发布 `e26515eb6dbb67fc5cf894bb9996b1885144e788`，精确 SHA [CI 34865123328](https://github.com/wangbinquan/CrewStation/actions/runs/34865123328) 成功：1118 pass／8 skip／0 fail，console build 1.10s。本机 cs-api／cs-controller 已依授权更新至 rfc003-e26515e，generation=23／19、各 1／1，实际 imageID 与五个源码摘要核对一致。console 保持 cbe2825／generation=24。参考代理 v0.1.2 经普通负责人切流成为正式 green，重算后的实际路由与目录一致。
+
+真实 GET 已从原开发容器到达参考代理，但 15 秒后平台 HTTP 412，代理在 30 秒处记录上游未响应。系统 API Pod 与代理 Pod DNS 相同，连 GitLab 8929 前者 3ms 成功、后者 ETIMEDOUT；代理 workload=service 的现有规则没有到上游的出站路径。已将已有 [I9](docs/engineering/implementation-open-questions.md#i9-项目命名空间到公司系统的出站) 的三种设计选择呈作者，未修改策略或 grants。16:10:26Z 原单个 OpenCode／Runner、两份 QA Pod 与文件摘要、工作树 e4741df／未提交 0／未推送 0、QA 各槽和数据库均保持，节点余量 324,152KiB。
+
+本次实际推进不替代页面验收。Mac 解锁、I9／I14／I15 与具体成员范围仍待答复，验收仍 **18／52**，RFC-004 继续等待 RFC-003 完结。详细镜像／Pod／路由／连接及 CI 证据见 implementation 第五十一批。
 
 ## 最新接力：全部部署槽日志筛选（2026-09-14）
 
