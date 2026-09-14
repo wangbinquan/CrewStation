@@ -1222,3 +1222,19 @@ CUA 本轮仍报告 Mac 锁定，当前完整历史创建／继续／返回的�
 终端诊断另以只读任务 WS 查询尝试获取原始输出／resize 历史，该持久回放中数量为 0，不能据此重建完整屏幕；现有 snapshot 仍是有效复现。将其在同版本 headless 再次序列化，字符行不变、光标横坐标从 27 到 26，尚不足以确认为错位根因。后续需要受控现场输出或隔离最小复现，不能直接改快照尺寸或以强制获取输入控制掩盖只读恢复问题。
 
 明细为 batch58 的 source-publication／source-ci、image-context／build／import-budget／import、console-patch／verified／http-verified 和 runtime-after-deploy。两份源码自有效门禁后没有再变化，纯证据补记沿用该结果；最终文档提交 CI 单独核对。累计仍 **18／52**；RFC-004 等待 RFC-003 正式完结。
+
+## 第五十九批：终端缩窄快照边界
+
+继续第五十八批的真实屏幕错位。源码检查发现 @xterm/addon-serialize 的 BaseSerializeHandler 在非末行按 line.length 读取；headless 的备用屏幕缩窄后行容量仍可保留旧宽度。最小实验不启动模型：40×8 的每行第 30 列写 OLDn，缩到 20×8，再在第 1 列写 rown／unsent draft。真实模拟器可见行正确，快照恢复却出现 LD3／row4 O／LD4 等错行，与实际 OpenCode 旧侧栏插入画面的形态一致。
+
+新增回归修复前 **3 pass／1 fail／20 assertions／63ms**，七行被屏幕外文字挤乱，草稿仍在但位置不可信。现通过 terminalSnapshotView 给原 SerializeAddon 提供只读缓冲视图，line.length／getCell 不超过当前列数；没有修改第三方依赖、真实缓冲或协议。终端本体的方法和属性仍委托原对象，Addon 生命周期仍随模型关闭。第一版定向 **4 pass／0 fail／29 assertions／64ms**，验证颜色、光标、粘贴模式、throughSeq 和重新放宽后的旧内容，第一次完整门禁 **1147 pass／4 skip／0 fail**（1151 tests／194 files／6394 assertions／101.32s）。
+
+门禁后针对中文边界继续做定点实验：当双宽字符从第 20 列开始、窗口缩至 20 列时，单纯限制列数仍会把它写到下一行，second 变成“界”，后续草稿下移。最终两条无色／有色红回归 **4 pass／2 fail／31 assertions／195ms**。现只有这一不完整边缘字符在快照中用同样式空格占位；整个原字符仍在原缓冲。占位使用独立 cell 视图，避免破坏序列化器交替复用 cell 的身份和后续颜色比较。最终定向 **6 pass／0 fail／41 assertions／198ms**，两个问题均得到真实解析器恢复断言。
+
+新修复改变候选后重新执行最终完整 `bun run check`：**1149 pass／4 skip／0 fail**（1153 tests／194 files／6406 assertions／106.24s）。三份候选为 terminalScreen.ts、terminalSnapshotView.ts 和 terminalScreen.test.ts，摘要保存在 batch59-candidate；首版候选另存 candidate-first，没有因 HEAD 移动重跑。console 代码及依赖未变，沿用第五十八批有效 build。
+
+新任务镜像基底 rfc003-3d1ce51 的实际 imageID 已核对为 `sha256:cfabcc77f07ccdf075e47aa7b0d27ad79607c032cdca71af40cb3ccc5ab6ae1e`；该运行子集相对当前已发布主干仅多一份已发布的 contracts/api/observability.ts 差异，后续镜像应一并覆盖以保持运行子集一致，无需重装依赖。20:41:43Z crewstation-env 的 CS_TASK_IMAGE 仍为旧基底，UID `11ccf270-ef66-474d-888f-f33351f1ee35`／resourceVersion 528946；API generation=25 与 controller=20 从该 ConfigMap 读取，新任务创建由 API 路径、恢复／业务任务由 controller 使用同一配置。
+
+20:48:49Z 节点 allocatable CPU 10 核、内存 32810996Ki，已有请求 9550m／13602Mi，MemoryPressure／DiskPressure 均 False。现有任务套餐只有 coding-medium（1 核、2Gi、10Gi），再加同规格不可调度；计划用单独 250m／2Gi 验收规格保持原所有会话和预览，不做四窗压力实验。此时尚未写套餐、改任务镜像配置或新建验收任务。先完成上库、精确 SHA CI 和镜像核对，再用新任务验证。旧 files CLI／草稿、新历史 Agent、旧 rfc003-ux 和原失败工作卷均保留；不能将新镜像代码通过说成旧 Runner 已热更新。
+
+证据为 batch59 的 red、targeted、check、wide-red-final、targeted-final、check-final、两版 candidate、task-image-preflight 和 resource-preflight。当前源码验证不替代实机往返；UX-AT-52 仍待新运行时复验，累计 **18／52**。RFC-004 保持已批准、等待 RFC-003 完结。

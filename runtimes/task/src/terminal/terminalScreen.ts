@@ -1,7 +1,7 @@
 import { createRequire } from 'node:module';
-import type { ITerminalAddon } from '@xterm/headless';
 import type * as XtermHeadless from '@xterm/headless';
 import { SerializeAddon } from '@xterm/addon-serialize';
+import { terminalSnapshotView } from './terminalSnapshotView';
 
 // 6.0.0 的 module 字段指向缺失的文件；官方 main 是有效的 CJS 入口。
 const { Terminal } = createRequire(import.meta.url)('@xterm/headless') as typeof XtermHeadless;
@@ -12,7 +12,10 @@ const MAX_SNAPSHOT_BYTES = 2 * 1024 * 1024;
 export function createTerminalScreen(cols: number, rows: number) {
   const terminal = new Terminal({ cols, rows, scrollback: TERMINAL_SCROLLBACK_LIMIT, allowProposedApi: true });
   const serialize = new SerializeAddon();
-  terminal.loadAddon(serialize as unknown as ITerminalAddon);
+  terminal.loadAddon({
+    activate: () => serialize.activate(terminalSnapshotView(terminal) as unknown as Parameters<SerializeAddon['activate']>[0]),
+    dispose: () => serialize.dispose(),
+  });
   let tail: Promise<void> = Promise.resolve();
   let throughSeq = 0;
   let truncated = false;
