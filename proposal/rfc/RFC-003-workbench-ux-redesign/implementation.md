@@ -721,3 +721,13 @@ B 执行时留下未发送 `RFC003_UNSENT_DRAFT_KEEP_0914`，切到独立预览�
 为专用 `rfc003-verify-workbench` 准备 owner 转移时，自动审批拒绝“添加或改角色”入口，理由为缺少具体受益账号、角色和资源范围授权。源码证明第一次点击只展示本地确认面板、不会提交 API；在只打开面板的范围获准后，已实看“将负责人从 admin 转移给 rfc003-owner，原负责人变为开发者”，但未点击“确认转移负责人”。没有改用 API 绕过权限写入阻止。
 
 已向用户提出同一具体项目内转移 owner、添加 developer／tester，以及由 owner 验证三种市场可见性和 visitor 名单的完整问题。回复前这些写入保持待执行，其他独立验收继续。当前新增 UX-AT-08／21，共 **11 项通过、41 项保留**；RFC-003 仍 In Progress。RFC-004 与 ADR-0004 已批准，继续严格等待 RFC-003 完结后开发。
+
+### 第四十三批发布与共享更新
+
+上述五个修复／测试文件和三份记录精确提交为 `baf850bd0934cb0b41d13bf26ebba120e95ff494`，Co-Authored-By 为 OpenAI Codex；推送前后 fetch 均核对远端 ancestry，推送后工作树／暂存区干净且 main 与 origin/main 一致。精确 SHA [CI 34828315511](https://github.com/wangbinquan/CrewStation/actions/runs/34828315511)／job `103925468152` 于 09:34:10Z 完成，**1089 pass／8 skip／0 fail**，1097 tests／185 files／61.46s，console build **823ms** 成功。后续仅增补部署证据，候选源码哈希未改变，不重复完整本地门禁。
+
+按既有共享环境授权构建 `cs-console:rfc003-baf850b`，OCI revision 为完整源码 SHA；导入 desktop-control-plane 后，JSON patch 先 test console Deployment UID／generation／容器名／旧镜像，再替换唯一 image 字段。rollout 成功，generation 19→20，Deployment UID 保持 `c4874a0e-6415-4c2b-b141-74ac25ea10ed`；实际 Pod `console-68c67b885-wl4wr`／UID `cf560b9c-ebc1-4238-9636-dd38c25ed474`，imageID=`sha256:d408b3d73993029ca0aac0c155425ed56fc7c7f1358313710a2a6e33f71c6a0b`，与构建镜像一致且 ready=true。没有变更其他服务或任务镜像。
+
+09:38:07Z 只读复核：旧 QA Pod UID `4920b2aa-880e-49c3-a782-8575bbf9a42e`、ux-comparison.txt SHA256 `ee05185cb39c025d4968f1922cbd0218cc152a08e9cafb2c624522b9fba26dd3` 保持；workbench QA Pod UID `724ecb83-9fbd-4a36-9ad3-8266c6d84a42` 保持，原 Claude／B／A 的 agentId、terminalId 和 startedAt 不变，A 仍 ended，B 与 Claude 仍 running。负责人仍是原 admin，未发生待批准角色写入。delivery 无会话 404、正式 empty、preview v0.1.1 ready 1／1 均保持。
+
+准备在共享地址重看修复时，CUA 返回“The Mac is locked and automatic unlock could not unlock it”，动作未执行。已请用户手动解锁；没有通过其他浏览器控制手段绕过。候选控制台的真实后端页面已验证，但共享更新后的再次页面观察保持待完成，不冒充通过。所属 Vite PID 67618 与 Bun PID 67617 已结束，已导入镜像的临时 tar 已清理。最终取证摘要为 `/private/tmp/crewstation-console-baf850b-after.json`，核心值如上。

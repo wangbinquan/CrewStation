@@ -15,7 +15,9 @@
 
 新专用项目 `rfc003-verify-delivery`（`prj_01a09f2abfbc7000be464c171bcb8f3c`）完全未创建开发会话，已从远端 main 发布 v0.1.1：`rel_01a09f2cfcf370008be553b3f3f81479`／`ea10bd3ab67501b301ec87d6bc85eaa215fdfa8e`，实际预览就绪 1／1 并打开成功，正式槽仍为空。构建曾因节点只余 950m CPU 而 Pending；只将该专用项目的旧预览暂调至 0，随后发布控制器部署新版本并恢复 1／1，没有遗留停用副本。UX-AT-08 通过。
 
-实机发现无会话来源把正常 404 报成读取失败，且跳去查看不存在的工作树改动。本批已改为明确空态和开发入口，保留重新检查、403／503 真错误、陈旧确认阻止及发布草稿；候选 :8768 连接真实后端实看通过。新增四项回归，定向 12 pass／154 assertions；完整门禁 1093 pass／4 skip／0 fail（1097 tests、185 files、6025 assertions、101.54s），console build 566ms 成功。共享 console 当前仍为 64f37c3，待本批发布后更新复核。
+实机发现无会话来源把正常 404 报成读取失败，且跳去查看不存在的工作树改动。本批已改为明确空态和开发入口，保留重新检查、403／503 真错误、陈旧确认阻止及发布草稿；候选 :8768 连接真实后端实看通过。新增四项回归，定向 12 pass／154 assertions；完整门禁 1093 pass／4 skip／0 fail（1097 tests、185 files、6025 assertions、101.54s），console build 566ms 成功。源码已发布 `baf850bd0934cb0b41d13bf26ebba120e95ff494`，[精确 SHA CI 34828315511](https://github.com/wangbinquan/CrewStation/actions/runs/34828315511) 成功，1089 pass／8 skip／0 fail、console build 823ms。
+
+共享 console 已更新为 `cs-console:rfc003-baf850b`，实际 imageID=`sha256:d408b3d73993029ca0aac0c155425ed56fc7c7f1358313710a2a6e33f71c6a0b`，Pod=`console-68c67b885-wl4wr`，就绪 1／1。只改唯一 console 镜像，旧 QA Pod／比较文件、新 QA Pod／原三 Agent 身份及 delivery 无会话状态均复核保留。随后 CUA 报告 Mac 锁屏且不能自动解锁，已请求用户手动解锁；更新后共享页面复验待该动作，候选页面实看证据仍有效。临时 :8768 Vite 已结束，不保留候选后台服务。
 
 新注册的专用访客 `rfc003-visitor@demo.invalid` 在独立无痕窗口实看无项目、筛空、真实请求失败及恢复。DevTools 仅阻断该页项目摘要请求，页面显示加载失败／本页数量未确认；移除规则并刷新后恢复，窗口已关闭。UX-AT-21 通过，累计 11 项，剩余 41 项。浏览器 Offline 模式会暂停查询且未解释暂停原因，已记入 UX-AT-23 待续；不能将单接口失败恢复当作完整断线旅程。
 
