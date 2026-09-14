@@ -625,3 +625,25 @@ B 执行时留下未发送 `RFC003_UNSENT_DRAFT_KEEP_0914`，切到独立预览�
 独立中断验收再次让 B 与 A 同时执行：B 第 3 轮 07:33:31.270Z 开始，A 第 2 轮 07:33:42.372Z 开始，页签显示执行中 2。按 A 原生 TUI 的提示连续 Escape 后，07:33:52.661Z 产生 `turn-cancelled`／seq=4842，UI 显示“本轮已中断／进程在线”，B 继续输出。A 空输入下 Ctrl+C 退出，07:34:02.125Z 产生 `process-ended`／seq=5012，名册 lifecycle=ended、exitCode=0，UI 明确“进程已结束”并禁用输入。B 仍在原进程中完成 300 行，最终 `RFC003_SURVIVOR_B_DONE`，07:34:03.331Z `turn-completed`／seq=5015；其 agentId、terminalId 和 07:15:08.933Z 的 startedAt 均保持。
 
 本批因此关闭 UX-AT-02／03／04／36／41，与原 UX-AT-10 共六项；其余 46 项仍按原条件保留。没有把 admin 一种身份、当前截图或 OpenCode 一种可用模型当作完整角色／五种 CSS 视口／双主题／两驱动验证。结束的是本次新建专用 A 进程，开发容器、B、旧 QA 任务及其保留文件未释放；后续浏览器默认仍是专用项目三窗，A 已结束，B 已完成，Claude 停在登录选择。详细只读快照为临时目录中的 `opencode-parallel-live.json` 与 `opencode-isolation-after.json`，核心 ID／时序与结论已在此持久记录。
+
+## 第四十一批：真实 Agent 文件修改、预览与编辑器冲突提示
+
+第四十批记录已发布为 `17270815b3db4d26a3feb9dba639baef2398a2e9`，精确 SHA [CI 34818899139](https://github.com/wangbinquan/CrewStation/actions/runs/34818899139) 成功：1082 pass／8 skip／0 fail，1090 tests／185 files／63.90s，console build 通过。继续使用原专用项目 `prj_01a09eb302d67000a680835da140f993`、task `tsk_01a09eb4f03f7000ba011a517772cc09` 与实际 OpenCode B＝`agt_01a09ec50bff7000b944bb4b69ba964a`／`pty_01a09ec50bff700193b2cc8426e6c67b`。
+
+在已授权的专用项目发布页将初始 v0.1.0 设为生产比较基准，切流 `tsw_01a09ee1d86670008abfb4e209ad131e` 于 2026-09-14T07:46:36.258Z 完成。正式 release `rel_01a09eb30d3370009d26fd52ceeaa013`／SHA `6af30245c4f5dc0537bdae2c3a44aa2b3fd62d29` 就绪 1／1，preview 为空；实际正式地址 `http://rfc003-verify-workbench.cs.localhost/` 返回 production／green 及原始 h1“CrewStation 最小样例”。
+
+浏览器编辑器先留下未保存 `// RFC003UNSAVEDEDITORDRAFT`。真实 OpenCode B 第 4 轮只将 `src/pages/home.ts:36` 的 h1 改为“RFC003 Agent 实时预览”，于 07:49:01.103Z 开始、07:49:33.863Z 完成，轮次 `ses_f6139ff9fffem3ilM8is1IfEkT:msg_09ee40e2f001R5ti003to7Mb3H`、完成事件 `1db77373-1d32-441e-81a8-81e03f3c1363`／seq=6495。实际 Git diff 只有这一行。曾要求 Agent 运行样例测试，但该 Agent 的现有编辑权限没有 shell 工具，TUI 明确说明未执行；不能把其本轮完成当作测试成功。
+
+编辑器保存正确返回磁盘版本冲突，既未覆盖 Agent 改动也未丢掉草稿；但警告位于整屏代码之后，当前可视区看不到，保存后未聚焦恢复动作。显式重新载入的确认同样落在下方。代码中另发现冲突状态会遮住随后重新读取失败的真实错误。
+
+三个回归先稳定失败，再修复：复用 Pane 增加标题下方的 notice 区，冲突、保存错误和放弃确认都先于滚动代码区；新冲突默认聚焦“继续编辑”，错误聚焦说明，后续输入不会重复抢焦点；冲突和重新读取失败同时保留显示。终端原有 footer 语义保持。完整工作台定向验证 **8 pass／0 fail／71 assertions**，包含草稿、期望版本、失败不自动重发及回读失败。
+
+修复后启动仅监听本机的候选 Vite 控制台 `http://console.cs.localhost:8768`，通过原认证网关连接同一真实后端和 Runner；不是内存夹具，未替换共享集群 console。浏览器留下第二份 `// RFC003 NOTICE DRAFT`，原 B 第 5 轮将 h1 再精确改为“RFC003 Agent 实时预览已更新”。该轮 08:12:50.189Z 开始、08:13:08.550Z 完成，turn=`ses_f6139ff9fffem3ilM8is1IfEkT:msg_09ef9dc8d001pJGh74Qq5s0cRY`，event=`35cbf6ab-e7d3-4ea1-a22f-d539eee2e2ad`，seq=7907。
+
+点击保存后，黄色冲突提示实际出现在保存工具栏下方，焦点为“继续编辑”，草稿在代码区可见；点击继续编辑收起提示且保留草稿。重新载入显示同一位置的明确放弃确认，默认焦点仍为保留操作；只有点击“放弃输入并继续”后才载入磁盘版本。两份测试草稿均未写入文件，最终实际 diff 仍只有 Agent 的 h1 一行。
+
+共享控制台独立预览已看到第一次新标题，候选控制台也看到第二次新标题。实际开发地址返回 200、development 和“RFC003 Agent 实时预览已更新”；正式地址浏览器刷新仍为原 h1，随后 HTTP／槽／版本比较复核正式 SHA、releaseId 与 v0.1.0 都未变。工作树 HEAD 与生产提交相同，未提交 2（home.ts 与既有 .claude.json）、未推送 0；界面没有把未提交改动误计成已部署。这关闭 UX-AT-33；当前完整通过共七项。UX-AT-06 候选界面已取得实机证据，共享 console 更新复核仍待完成，其他 44 项照原标准保留。
+
+有效本地完整门禁 **1089 pass／4 skip／0 fail**，1093 tests／185 files／5977 assertions／105.07s，console build 516ms 成功。此前默认沙箱内运行因本地监听端口和进程权限限制失败，未视为有效门禁；确认没有等价完整门禁运行后，以所需本机权限重跑上述结果。生产源码在有效门禁后未再变动。实机只读快照保存在环境证据目录的 `agent-edit-baseline.json` 与 `editor-notice-after.json`，关键身份、时序和结论在此持久记录。
+
+同期作者将运行配置指定为平台 beforeStart 的两个通用动作：管理员定义文件／路径和初始化脚本。RFC-004 三件套、ADR-0004、I13 已据此修订为 25 项验收；作者随后批准，并要求 RFC-003 完结后启动开发。本批仅更新获批方案，没有创建新模块或实现 Hook 代码，不因新 RFC 获批而缩减 RFC-003。

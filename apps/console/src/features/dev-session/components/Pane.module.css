@@ -42,6 +42,13 @@
   overflow: auto;
 }
 
+.notice {
+  flex-shrink: 0;
+  padding: var(--cs-space-2) var(--cs-space-3);
+  border-bottom: 1px solid var(--cs-color-border);
+  background: var(--cs-color-surface);
+}
+
 .bodyFlush {
   flex: 1;
   min-height: 0;

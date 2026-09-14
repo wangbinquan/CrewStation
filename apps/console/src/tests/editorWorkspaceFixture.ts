@@ -8,7 +8,7 @@ export function editorWorkspaceFixture() {
   const preview: PreviewStatusResult = { state: 'disabled', restarts: 0 };
   const originalFetch = globalThis.fetch, originalSocket = globalThis.WebSocket, originalHref = window.location.href;
   window.location.href = 'http://localhost/';
-  let pendingWrite: (() => void) | undefined;
+  let pendingWrite: ((failure?: { code: string; message: string }) => void) | undefined;
   class Socket {
     static OPEN = 1;
     readyState = 1;
@@ -27,7 +27,10 @@ export function editorWorkspaceFixture() {
       }
       else if (command.type === 'previewStatus') payload = preview;
       else if (command.type === 'writeFile') {
-        pendingWrite = () => { files.set(command.path, command.content); this.receive({ type: 'result', id: command.id, payload: { path: command.path, version: 'version-2' } }); };
+        pendingWrite = (failure) => {
+          if (failure) { this.receive({ type: 'error', id: command.id, ...failure }); return; }
+          files.set(command.path, command.content); this.receive({ type: 'result', id: command.id, payload: { path: command.path, version: 'version-2' } });
+        };
         return;
       }
       queueMicrotask(() => this.receive({ type: 'result', id: command.id, payload }));
@@ -48,5 +51,6 @@ export function editorWorkspaceFixture() {
     else if (path.endsWith('/dev-session')) body = { taskId: activityTaskId, projectId: activityProjectId, createdBy: activityUserId, branch: 'main', state: 'running', lastActivityAt: activityTime, previewHost: 'preview.localhost' };
     return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
   }) as typeof fetch;
-  return { commands, writes, files, preview, finishWrite: () => { const finish = pendingWrite; pendingWrite = undefined; finish?.(); }, restore: () => { globalThis.fetch = originalFetch; globalThis.WebSocket = originalSocket; window.location.href = originalHref; } };
+  const finishWrite = (failure?: { code: string; message: string }) => { const finish = pendingWrite; pendingWrite = undefined; finish?.(failure); };
+  return { commands, writes, files, preview, finishWrite, restore: () => { globalThis.fetch = originalFetch; globalThis.WebSocket = originalSocket; window.location.href = originalHref; } };
 }

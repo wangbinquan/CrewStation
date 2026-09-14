@@ -16,6 +16,10 @@ async function edit(text: string) {
   await act(async () => view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: text } }));
   await page!.settle();
 }
+async function save() {
+  const button = [...document.querySelectorAll<HTMLButtonElement>('button')].find((node) => node.textContent?.trim() === '保存')!;
+  await act(async () => button.click()); await page!.settle();
+}
 
 test('真实工作台的 CodeMirror 草稿跨预览／CLI 保留；离开确认不停止任何 CLI', async () => {
   fixture = editorWorkspaceFixture(); page = await renderApp(path);
@@ -85,4 +89,49 @@ test('开发页唯一准备发布入口带会话来源，确认草稿后跳转�
   await page.click('检查发布来源'); expect(page.text()).toContain('确认版本');
   expect(fixture.commands.some((command) => ['writeFile', 'closeTerminal', 'stopAgent', 'stopNativeTerminal'].includes(command.type))).toBe(false);
   expect(fixture.writes.every((write) => write.path.endsWith('/workspace-layout'))).toBe(true);
+});
+
+test('保存冲突在代码区之前提示并聚焦继续编辑，后续输入不再被抢焦点', async () => {
+  fixture = editorWorkspaceFixture(); page = await renderApp(path);
+  await page.click('代码'); await page.click('a.ts'); await edit('我的未保存草稿');
+  fixture.files.set('a.ts', 'Agent 新内容');
+  await save();
+  await act(async () => fixture!.finishWrite({ code: 'version_conflict', message: '磁盘版本已变更' })); await page.settle();
+  const warning = [...document.querySelectorAll('[role="alert"]')].find((node) => node.textContent?.includes('磁盘上的文件已经变了'))!;
+  expect(warning).toBeDefined();
+  // 实机并发保存冲突曾藏在整屏代码下方，且没有把焦点交给保留草稿的恢复动作。
+  expect(Boolean(warning.compareDocumentPosition(content()) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);
+  expect(document.activeElement?.textContent).toBe('继续编辑');
+  expect(content().textContent).toBe('我的未保存草稿'); expect(fixture.files.get('a.ts')).toBe('Agent 新内容');
+  await act(async () => content().focus()); await edit('冲突后继续输入');
+  expect(document.activeElement).toBe(content());
+  await page.click('继续编辑'); expect(content().textContent).toBe('冲突后继续输入');
+  expect(fixture.commands.filter((command) => command.type === 'writeFile')).toHaveLength(1);
+});
+
+test('保存失败的真实原因在代码区之前获得焦点，不自动重发或清掉草稿', async () => {
+  fixture = editorWorkspaceFixture(); page = await renderApp(path);
+  await page.click('代码'); await page.click('a.ts'); await edit('断线前的草稿'); await save();
+  await act(async () => fixture!.finishWrite({ code: 'disconnected', message: '保存回执未取得，请重新连接' })); await page.settle();
+  const warning = [...document.querySelectorAll('[role="alert"]')].find((node) => node.textContent?.includes('保存回执未取得'))!;
+  // 保存失败必须在当前代码区可见，不能只留下页尾错误或静默重复写入。
+  expect(Boolean(warning.compareDocumentPosition(content()) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);
+  expect(document.activeElement?.contains(warning)).toBe(true);
+  expect(content().textContent).toBe('断线前的草稿'); expect(fixture.files.get('a.ts')).toBe('磁盘原文');
+  expect(fixture.commands.filter((command) => command.type === 'writeFile')).toHaveLength(1);
+});
+
+test('冲突后重新载入失败仍显示读取错误和原草稿，放弃确认位于代码区之前', async () => {
+  fixture = editorWorkspaceFixture(); page = await renderApp(path);
+  await page.click('代码'); await page.click('a.ts'); await edit('需要保留的草稿'); await save();
+  await act(async () => fixture!.finishWrite({ code: 'version_conflict', message: 'Agent 已修改' })); await page.settle();
+  await page.click('重新载入');
+  const confirmation = document.querySelector('[role="alertdialog"]')!;
+  expect(Boolean(confirmation.compareDocumentPosition(content()) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);
+  expect(document.activeElement?.textContent).toBe('继续编辑');
+  fixture.files.delete('a.ts'); await page.click('放弃输入并继续');
+  // 冲突标记仍存在时，过去的提前返回会吞掉重新载入失败的真实原因。
+  expect(page.text()).toContain('文件不存在：a.ts'); expect(page.text()).toContain('磁盘上的文件已经变了');
+  expect(content().textContent).toBe('需要保留的草稿');
+  expect(document.activeElement?.textContent).toContain('文件不存在：a.ts');
 });

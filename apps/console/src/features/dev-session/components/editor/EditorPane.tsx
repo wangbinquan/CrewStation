@@ -1,4 +1,4 @@
-import type { ReactElement } from 'react';
+import { useEffect, useRef, type ReactElement } from 'react';
 import { useT } from '../../../../shared/lib/useT';
 import { Button } from '../../../../shared/ui/Button';
 import type { FileEditorHandle } from '../../hooks/useFileEditor';
@@ -33,30 +33,36 @@ function Toolbar({ editor }: { readonly editor: FileEditorHandle }): ReactElemen
   );
 }
 
-function Footer({ editor }: { readonly editor: FileEditorHandle }): ReactElement | null {
+function EditorNotice({ editor }: { readonly editor: FileEditorHandle }): ReactElement | null {
   const t = useT();
+  const notice = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (editor.pendingAction) return;
+    const element = notice.current;
+    const target = editor.error !== undefined ? element : element?.querySelector<HTMLButtonElement>('button:last-child');
+    target?.focus({ preventScroll: true });
+    element?.scrollIntoView?.({ block: 'nearest' });
+  }, [editor.conflict, editor.error, editor.pendingAction]);
   if (editor.pendingAction) return <EditorDiscardPrompt editor={editor} />;
-  if (editor.conflict) {
-    return <PaneNotice tone="warning"><strong>{t('devSession.editor.conflict')}</strong> {t('devSession.editor.conflictHint')}
+  return <div ref={notice} tabIndex={-1}>
+    {editor.conflict ? <PaneNotice tone="warning"><strong>{t('devSession.editor.conflict')}</strong> {t('devSession.editor.conflictHint')}
       <Button disabled={editor.busy} onClick={editor.reload}>{t('devSession.editor.conflictReload')}</Button>
       <Button disabled={editor.busy} onClick={editor.dismissConflict}>{t('devSession.editor.conflictKeep')}</Button>
-    </PaneNotice>;
-  }
-  if (editor.error !== undefined) return <PaneNotice tone="warning">{editor.error}</PaneNotice>;
-  return null;
+    </PaneNotice> : null}
+    {editor.error !== undefined ? <PaneNotice tone="warning">{editor.error}</PaneNotice> : null}
+  </div>;
 }
 
 /** 编辑器：左树右编辑区，保存带 expectedVersion；磁盘上变了就提示重载，不覆盖。 */
 export function EditorPane({ tree, editor }: EditorPaneProps): ReactElement {
   const t = useT();
-  const footer = <Footer editor={editor} />;
   return (
     <Pane
       title={t('devSession.editor.title')}
       className={styles.pane}
       flush
       extra={<Toolbar editor={editor} />}
-      footer={editor.pendingAction || editor.conflict || editor.error !== undefined ? footer : undefined}
+      notice={editor.pendingAction || editor.conflict || editor.error !== undefined ? <EditorNotice editor={editor} /> : undefined}
     >
       <FileTree tree={tree} openPath={editor.file?.path} onOpen={editor.openFile} disabled={editor.busy || Boolean(editor.pendingAction)} />
       {editor.file === undefined ? (

@@ -11,6 +11,16 @@
 
 **RFC-003 工作台 UX 重设计处于 In Progress，作者已要求完整实现并提交上库。** RFC-001 与 RFC-002 都已 Done，见 `proposal/rfc/README.md` 的索引表。
 
+## 最新接力：启动前 Hook 方案与编辑器冲突复验（2026-09-14）
+
+作者指定两个管理员注入点：配置文件内容与容器存放路径、Shell／Python／JS 等初始化脚本，统一属于 Agent 启动前 Hook。[RFC-004](proposal/rfc/RFC-004-admin-agent-runtime/proposal.md)、design／plan、ADR-0004 与 I13 已按此修订：步骤可排序，每次实际启动 Agent 进程前执行；明确环境输出传递、解释器、路径占用、失败／超时／取消与未知结果不自动重跑。验收扩为 25 项。供应方连接以原生模板或脚本产物表达，管理 UI 不再另拆重复表单。作者随后明确“批准RFC-004，在RFC-003完结后启动开发”；方案及关联 ADR 已批准，保持 Draft 表示待开工，T1 完成、T2–T9 未开始。RFC-003 完整收口后按本批准直接实施，无需重复确认；此前历史记录中的 RFC-004 待审状态已被此批准取代。
+
+RFC-003 第四十批已发布 `17270815b3db4d26a3feb9dba639baef2398a2e9`，精确 SHA CI 34818899139 成功，1082 pass／8 skip／0 fail。续验中，专用项目 rfc003-verify-workbench 初始 v0.1.0 已作为生产基准；真实 OpenCode 在原 B 进程修改 src/pages/home.ts，开发预览显示新标题，正式应用及生产 SHA 保持原值。原编辑器保存冲突正确阻止覆盖，但说明在代码区域下方难以看到。
+
+已修复冲突／保存错误／放弃确认的位置与焦点，并补三个先红后绿回归；重新载入失败时保留冲突及真实错误。候选控制台通过本机 :8768 连接同一真实后端／Runner，第二次实际 OpenCode 修改后实看提示置顶、继续编辑保留草稿和显式放弃后载入。共享集群 console 仍是 3d1ce51，候选修复尚未替换该 Deployment。UX-AT-33 新增完整实机证据，共七项通过；UX-AT-06 候选已通过，待共享控制台更新复核，其余 44 项也继续保留。详见 implementation 第四十一批及 acceptance-audit。
+
+最终有效本地完整门禁 1089 pass／4 skip／0 fail（1093 tests、185 files、5977 assertions、105.07s），console build 516ms 成功；此前沙箱内运行因本地监听／进程限制失败，不计有效门禁。源码在有效门禁后未修改。RFC-004 方案与批准记录单独提交为 `529fd106669b9696327146cc2f2ba8c6786c4c4a`。旧 QA 容器和 ux-comparison.txt 未改；新 QA 保留 B 进程与单行未提交标题改动，另有原 Claude .claude.json，未提交这些 QA 工作树文件。
+
 ## 最新接力：实机环境更新与管理员运行配置（2026-09-14）
 
 此前十笔提交 `4d15e8c` 至 `3d1ce5181a11787e3629fea4021f0130e734912d` 已获明确授权并全部推上 main；精确 SHA [CI 34810918306](https://github.com/wangbinquan/CrewStation/actions/runs/34810918306) 成功，1082 pass／8 skip／0 fail，console build 通过。当前记录前 fetch 确认本地与 origin/main 为 0／0。下文历史批次的“未推送／待授权”不再代表这些提交的当前状态。
