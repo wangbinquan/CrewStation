@@ -15,7 +15,9 @@
 
 第五十五批继续核对实际页面接线，发现历史转录订阅只在启动／结束时刷新名册，漏掉 waiting、权限请求，以及旧驱动下一轮的首次文本／思考／工具输出。已补显式状态刷新，并按 Agent 分别记录本轮是否已开始输出；同轮后续片段不逐帧查询，状态仍取平台 DTO。新增五项真实路由／HTTP／WS 回归修复前 **5 pass／5 fail**，修复后连同后端定向 **15 pass／0 fail／131 assertions**；后台变化保持当前选择、草稿和焦点，连续 30 段不额外读取。
 
-最终完整门禁 **1135 pass／4 skip／0 fail**（1139 tests／192 files／6301 assertions／100.65s），console build **501ms**，四份候选摘要保持。上一批最终证据提交 `cbf9e1532b514ad14091e662c445fbf0a74f27ec` 的精确 SHA CI 34878667789 也已成功；本批上库、精确 SHA CI 和 console 更新继续。没有再启动模型轮次或任务容器；Mac 解锁及 I9／I14／I15／成员范围仍待答复，累计 **18／52**，RFC-004 不提前启动。
+最终完整门禁 **1135 pass／4 skip／0 fail**（1139 tests／192 files／6301 assertions／100.65s），console build **501ms**，四份候选摘要保持。已发布 `c5d6eecf1398c145f6270a397c634782e1867ea0`，精确 SHA [CI 34880255845](https://github.com/wangbinquan/CrewStation/actions/runs/34880255845) 成功：1131 pass／8 skip／0 fail、console build 1.06s，五项新增页面回归实际执行。上一批最终证据 cbf9e15 的 CI 34878667789 同样成功。
+
+console 已更新为 rfc003-c5d6eec／generation=26／1／1，实际 Pod 镜像及七份文件摘要一致，六份静态产物经正常 HTTP 逐份匹配。只新增 3,706,603 bytes 并流式导入，无清理数据。18:27:09Z API c712aa7、controller cc93104、原历史 Agent awaiting-input、files 原单个 OpenCode／工作树／文件摘要及发布槽保持，旧历史 QA 未提交 1395 的模型后指纹未再变化；原失败工作卷、Pod 与数据库保持，节点余量 546,484,224 bytes。没有再启动模型轮次或任务容器。CUA 再次确认 Mac 锁定，解锁及 I9／I14／I15／成员范围仍待答复，累计 **18／52**，RFC-004 不提前启动；最后纯证据补记沿用有效门禁。
 
 ## 最新接力：真实历史 OpenCode 与等待状态（2026-09-15）
 

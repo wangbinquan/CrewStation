@@ -1136,3 +1136,15 @@ console 使用此前已核对并导入的 `cs-console:rfc003-cbe2825`。API 新�
 在既有历史真实路由夹具上仅扩展 HTTP 名册回执和规范 WS 事件输入。新增五项回归：等待与后台权限事件后读回真实标签，当前选择／草稿／焦点保持；四种旧驱动输出分别恢复执行态，连续 30 段只读取一次，下一轮等待后可再次读取；完成态禁用输入并保留未发送内容。修复前 **5 pass／5 fail／43 assertions／1.046s**，修复后连同后端状态投影定向 **15 pass／0 fail／131 assertions／1.341s**。最终完整 `bun run check` **1135 pass／4 skip／0 fail**（1139 tests／192 files／6301 assertions／100.65s），console build **501ms**，四份候选摘要保持。
 
 18:16:47Z console 仍是 7e8dc7f／generation=25，已只读核对基底 imageID、UID 和节点余量 554,688,512 bytes；本批只需更新 console，已修复的 API c712aa7 保持。没有新增模型轮次、CLI、发布版本、切流或权限变化。上库、精确 SHA CI、实际镜像／HTTP 产物核对继续。Mac 仍锁定，完整页面继续／返回旅程不以此次自动回归代替；累计 **18／52**，I9／I14／I15 与成员范围待裁定，RFC-004 仍排队。
+
+### 第五十五批上库与控制台部署
+
+八个精确路径已发布为 `c5d6eecf1398c145f6270a397c634782e1867ea0`，18:21:03Z fetch 证明 main 与 origin/main 同步，工作树／索引干净。精确 SHA [CI 34880255845](https://github.com/wangbinquan/CrewStation/actions/runs/34880255845)／job `104097504840` 成功，终态 18:23:14Z：**1131 pass／8 skip／0 fail**，1139 tests／192 files／6260 assertions／64.67s，五项新增状态／读取次数回归实际执行；console build **1.06s**。
+
+镜像 `cs-console:rfc003-c5d6eec` 基于已验证 7e8dc7f；锁文件、包清单、标准镜像配方和 serve.ts 未变，只替换本批六份已构建产物。旧 dist 的移除仅发生在临时镜像层，主机和数据卷没有清理。实际 imageID=`sha256:6b9e673909dc46003f1c80474a43fc405ec0932c81bc48047b90d1713d47678a`；无网络临时容器内产物集合精确为六份，七份文件摘要均匹配。逐 digest 核对总内容 219,086,571 bytes，只新增 **3,706,603 bytes**；流式导入退出 0，余量由 557,838,336 变为 550,305,792 bytes，没有落盘 tar。
+
+使用原 Deployment UID、generation=25、replicas=1、容器名与旧镜像的 JSON Patch test，仅更新 console。18:25:36Z 核对为 generation=26／1／1，Pod `console-5b45648b5d-59p68`／UID `7d9083cd-afa8-4b68-9850-3bd885f23ca2`，restartCount=0；实际 imageID 与七份运行文件摘要一致。18:25:40Z 经正常已登录 HTTP 逐份读取首页、两个 JS、CSS 与两份品牌 SVG，全部 200，字节数及 SHA256 一致；index／brand no-cache，assets immutable。CUA 随后仍明确报告 Mac 锁定，没有把 HTTP 产物核对当成浏览器交互。
+
+18:27:09Z 最终只读核对：API c712aa7／generation=24、controller cc93104／generation=20 保持 1／1。原历史 Agent 的整个 awaiting-input DTO 与第五十四批部署后相同，files 原单个 OpenCode／Runner／seq=2004、工作树 e4741df／未提交 0／未推送 0、四份已核对文件摘要及所有原部署槽均保持。旧历史 QA 模型结束后的指纹和 1395 未提交项没有进一步变化；三份 QA Pod、失败工作卷和 PostgreSQL 身份／状态保持，节点余量 **546,484,224 bytes**。没有额外模型输入、重启任务容器、临时调零副本或未恢复的故障命令。
+
+明细为 batch55 的 source-ci、console-preflight／image-build／import-budget／import／verified／http-verified 和 final-environment。源码与运行内容没有再改，纯证据补记沿用有效本地门禁；最终文档提交 CI 单独核对。完整实机验收仍 **18／52**，Mac 解锁和 I9／I14／I15／具体成员范围仍待答复，RFC-004 按批准顺序排队。
