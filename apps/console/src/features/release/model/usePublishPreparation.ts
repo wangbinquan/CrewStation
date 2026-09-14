@@ -4,7 +4,7 @@ import type { PublishDevSessionInput } from '@crewstation/api-client';
 import type { ReleaseDto } from '@crewstation/contracts';
 import { api } from '../../../shared/api/client';
 import { queryKeys } from '../../../shared/api/queryKeys';
-import { errorMessage, useApiMutation, useApiQuery } from '../../../shared/api/useApi';
+import { errorMessage, isApiClientError, useApiMutation, useApiQuery } from '../../../shared/api/useApi';
 import { useT } from '../../../shared/lib/useT';
 import type { PublishSource } from '../../../shared/project/releaseSearch';
 import { candidateReleaseTag, isPublishVersion } from './releaseVersion';
@@ -23,6 +23,7 @@ export function usePublishPreparation(projectId: string, serviceId: string, sour
   const [failedPaths, setFailedPaths] = useState<readonly string[]>([]);
   const branches = useApiQuery([...queryKeys.branches(projectId), 'publish-source'], () => api.services.listBranches(serviceId), { enabled: source === 'repository' });
   const workspace = useApiQuery([...queryKeys.devSession(projectId), 'workspace-status'], async () => WorkspaceStatusDtoSchema.parse(await api.devSession.workspaceStatus(projectId)), { enabled: source === 'session' });
+  const sessionMissing = source === 'session' && isMissingSession(workspace.error);
   const tags = useApiQuery(queryKeys.tags(serviceId), () => api.services.listTags(serviceId));
   const selected = branch || branches.data?.items.find((entry) => entry.isDefault)?.name || branches.data?.items[0]?.name || '';
   const publication = useApiMutation((input: PublishDevSessionInput) => source === 'session' ? api.devSession.publish(projectId, input) : api.services.publish(serviceId, input), { invalidate: [queryKeys.releases(serviceId), queryKeys.slots(serviceId), queryKeys.tags(serviceId), queryKeys.branches(projectId)] });
@@ -39,7 +40,7 @@ export function usePublishPreparation(projectId: string, serviceId: string, sour
       const checked = 'items' in result.data ? repositoryPublishSnapshot(result.data.items, selected || result.data.items.find((entry) => entry.isDefault)?.name || result.data.items[0]?.name || '', new Date().toISOString()) : sessionPublishSnapshot(result.data);
       if (!checked.snapshot) { setError(checked.problem?.startsWith('release.') ? t(checked.problem) : checked.problem); return; }
       setSnapshot(checked.snapshot); setStep(1);
-    } catch (cause) { setError(errorMessage(cause)); } finally { lock.current = false; setChecking(false); actions.finish('publish'); }
+    } catch (cause) { if (source !== 'session' || !isMissingSession(cause)) setError(errorMessage(cause)); } finally { lock.current = false; setChecking(false); actions.finish('publish'); }
   };
   const submit = async () => {
     if (lock.current || !canPublish || !current || step !== 2 || tags.error || tags.isPending || stale) return;
@@ -56,7 +57,11 @@ export function usePublishPreparation(projectId: string, serviceId: string, sour
     finally { lock.current = false; actions.finish('publish'); }
   };
   return { source, branches, workspace, tags, selected, branch, version, message, setVersion, setMessage, setBranch, step: current ? step : 0, setStep, snapshot: current, resetCheck, check, submit, busy, checking, error, errors, setErrors, failedPaths, canPublish, stale,
-    dirty, accepted,
+    dirty, accepted, sessionMissing,
     candidate: tags.data && !tags.error ? candidateReleaseTag(tags.data.items.map((tag) => tag.name), version) : undefined };
 }
 export type PublishPreparation = ReturnType<typeof usePublishPreparation>;
+
+function isMissingSession(error: unknown): boolean {
+  return isApiClientError(error) && error.status === 404 && error.kind === 'not_found';
+}

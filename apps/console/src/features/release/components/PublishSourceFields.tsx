@@ -15,7 +15,7 @@ export function PublishSourceFields({ preparation: p, onSource }: { readonly pre
   return <>
     <div>{(['repository', 'session'] as const).map((source) => <Button key={source} aria-pressed={p.source === source} disabled={p.busy} onClick={() => { if (p.resetCheck()) onSource(source); }}>{t(`release.prepare.source.${source}`)}</Button>)}</div>
     <p>{t(`release.prepare.hint.${p.source}`)}</p>
-    <QueryStatus isPending={query.isPending} error={query.error} />
+    <QueryStatus isPending={query.isPending} error={p.sessionMissing ? null : query.error} isEmpty={p.sessionMissing} emptyTitle={t('release.prepare.noSession')} emptyDescription={t('release.prepare.noSessionHint')} />
     {p.source === 'repository' ? <FormField label={t('release.publish.branch')} hint={t('release.prepare.branchHint')}>
       <select name="branch" value={p.selected} disabled={p.busy || p.branches.isPending || !!p.branches.error} onChange={(event) => { if (p.resetCheck()) p.setBranch(event.target.value); }}>
         {!p.branches.data?.items.length ? <option value="">{t(p.branches.isPending || p.branches.error ? 'release.prepare.unknown' : 'release.publish.branchEmpty')}</option> : null}
@@ -29,7 +29,7 @@ export function PublishSourceFields({ preparation: p, onSource }: { readonly pre
         ] : [{ label: t('release.prepare.unknown'), value: workspace.reason }])]} />
         {workspace.status === 'ready' && workspace.uncommittedCount > 0 ? <><ul>{workspace.uncommitted.map((file) => <li key={file.path}><code>{file.status} </code>{file.status.includes('D') ? <code>{file.path}</code> : <Link to={PROJECT_PATHS[space].development} params={{ projectId }} search={{ view: 'code', file: file.path, task: workspace.taskId }}>{file.path}</Link>}</li>)}</ul>{workspace.uncommittedTruncated ? <p>{t('release.prepare.truncated')}</p> : null}</> : null}
       </> : null}
-      <Link to={PROJECT_PATHS[space].development} params={{ projectId }} search={{ view: 'diff' }}>{t('release.prepare.openDevelopment')}</Link>
+      <Link to={PROJECT_PATHS[space].development} params={{ projectId }} search={p.sessionMissing ? {} : { view: 'diff' }}>{t(p.sessionMissing ? 'release.prepare.enterDevelopment' : 'release.prepare.openDevelopment')}</Link>
     </>}
     <Button variant="primary" disabled={p.busy || !p.canPublish} onClick={() => void p.check()}>{t(p.checking ? 'release.prepare.checking' : 'release.prepare.check')}</Button>
   </>;

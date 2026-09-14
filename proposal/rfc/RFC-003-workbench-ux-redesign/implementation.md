@@ -676,3 +676,48 @@ B 执行时留下未发送 `RFC003_UNSENT_DRAFT_KEEP_0914`，切到独立预览�
 最终正式 v0.1.0、待验证 v0.1.1 均就绪；两个发布故意使用相同远端 SHA，验证的是发布身份、蓝绿路由和回退，不宣称两版源码存在差异。开发仍保留本地标题提交和原 .claude.json。临时取证文件包括 `crewstation-console-64f37c3-after.json`、`crewstation-rfc003-shared-editor-after.json`、`crewstation-rfc003-manual-commit.json`、`crewstation-rfc003-release-cancel-after.json`、`crewstation-rfc003-v011-promoted.json`、`crewstation-rfc003-v011-rollback.json`；核心数据已在此持久记录。
 
 本批新增 UX-AT-06／19，共九项完整通过、43 项保留。UX-AT-07 的干净会话发布、08 的完全无会话分支、09 的测试者身份、11 的禁止回退和历史候选、12 的双人并发，以及其余角色／尺寸／失败恢复仍需继续。RFC-004 与 ADR-0004 已批准，但按用户指定等待 RFC-003 完结，Hook 代码尚未开始。
+
+## 第四十三批：无会话发布、空态修复与访客故障恢复
+
+第四十二批记录已发布为 `743619ac2af5dacb8fafbbd00643e096387e96cc`，精确 SHA [CI 34825203168](https://github.com/wangbinquan/CrewStation/actions/runs/34825203168) 成功，1085 pass／8 skip／0 fail、1093 tests／185 files／64.01s，console build 1.26s 成功。本批开始及提交前 fetch 均确认 main 与 origin/main 一致，暂存区为空；没有创建分支或工作树。
+
+### 完全无开发会话的实际发布
+
+从管理向导创建独立项目“RFC-003 发布与故障验收”，slug=`rfc003-verify-delivery`，project=`prj_01a09f2abfbc7000be464c171bcb8f3c`，service=`svc_01a09f2abfbc7001aa24e44fbdc610e9`，namespace=`cs-rfc003-verify-delivery`。使用最小模板、standard-small 套餐，任务并发留空沿用平台默认。09:06:14.074Z 创建，初始 v0.1.0／`rel_01a09f2acd4a70008cf58274aeb27483` 于 09:06:33.236Z 就绪。整个旅程未创建开发会话，接口返回 404／“没有开发会话”。
+
+发布页显式选“已推送分支”，重新确认 main 和完整 `ea10bd3ab67501b301ec87d6bc85eaa215fdfa8e`；填 v0.1.1 与 `RFC003 QA remote release without dev session.`，只提交一次。09:08:40.817Z 受理 release=`rel_01a09f2cfcf370008be553b3f3f81479`。实看发布中禁用、定位精确 release、构建中及固定 SHA；新版本未就绪期间，仍显示旧 v0.1.0 的实际部署，没有提前把 v0.1.1 标成可试用。
+
+构建 Pod `build-53b3f3f81479-8lwp9` 因 `Insufficient cpu` Pending：节点 allocatable=10000m、已请求 9050m，构建需要 1000m。临时只把该新专用项目的 `rfc003-verify-delivery-green` 从 1 副本调为 0，释放调度所缺资源；未修改节点、套餐或其他项目。构建随后完成，发布控制器更新同一 preview 槽为 v0.1.1 并恢复 replicas=1；09:17:54.027Z release ready，实际 Deployment／Pod 和 API 都为 1／1。没有把临时操作间未观察到的副本不足界面算成通过。
+
+浏览器点击“试用待验证版本”，实际最小样例显示 admin、project=`rfc003-verify-delivery`、CS_SLOT=green、CS_ENVIRONMENT=production。09:18:50Z 再查 dev-session 仍 404；正式槽仍 empty，preview 是上述 v0.1.1／SHA。因此 UX-AT-08 完整通过。历史 v0.1.0 已 superseded，实际点击其详情显示“历史记录不代表当前仍可访问或回退”，顶部实际版本及试用链接仍属于 v0.1.1；UX-AT-11 的历史分支通过，禁止回退仍待执行。摘要分别保存在临时 `crewstation-rfc003-delivery-created.json` 和 `crewstation-rfc003-delivery-release.json`，核心 ID 和结果在此留存。
+
+### 无会话提示修复
+
+真实共享发布页切到“当前开发会话”时，原来显示“读取失败：开发会话 prj_… 不存在”，且链接为“到开发页查看改动”。这是正常资源尚未创建，不是仓库读取故障。新增两项先红回归稳定复现；另加 403／503 两个保留真实错误的恢复用例。
+
+修复仅在 workspace-status 返回 API 404／not_found 时使用既有 QueryStatus／EmptyState，提示“尚未开启开发会话，可以选择已推送分支发布，或进入开发页开启会话”；开发入口不再携带 diff。重复检查仍可发现后来开启的会话；已确认会话消失后旧确认继续失效，不显示残留 HEAD，切远端后保留版本与说明。403／503 及其他错误不当成空态；没有自动创建、提交或发布。
+
+仅监听 127.0.0.1:8768 的候选 Vite 用 `console.cs.localhost:8768` 复用正常同域登录，代理到原真实后端。浏览器实看空态布局、重复检查无故障、点击“进入开发页”仅显示 main 和“开会话”按钮；没有实际创建会话。首次使用 127.0.0.1 地址因不同 cookie 域显示未登录，改用同域后成功，未修改认证配置。定向 **12 pass／0 fail／154 assertions**；完整门禁 **1093 pass／4 skip／0 fail**，1097 tests／185 files／6025 assertions／101.54s，console build **566ms**。门禁后候选源码未变。本段记录时共享 console 仍为 64f37c3，后续发布与部署核对另补实际结果。
+
+### 访客空态、筛空与请求失败恢复
+
+通过官方演示登录注册四个专用账号，初始均 isAdmin=false、memberships=[]。只保存不含 Cookie／token 的身份摘要，没有授予平台管理员身份：
+
+| 演示账号 | 用户 ID | 本批权限结果 |
+|---|---|---|
+| rfc003-owner@demo.invalid | usr_01a09f273a777000b0e97645b212380e | 未设置项目角色 |
+| rfc003-developer@demo.invalid | usr_01a09f273a95700185d408ca143e2a45 | 未设置项目角色 |
+| rfc003-tester@demo.invalid | usr_01a09f273aa77000b51e2c90a1e44626 | 未设置项目角色 |
+| rfc003-visitor@demo.invalid | usr_01a09f273abd7000b6c7dd831b41a87a | 普通访客，无项目成员身份 |
+
+在新建 Chrome 无痕窗口正常登录 visitor，数字人项目显示“尚无项目”、复制开通需求及管理员创建说明；搜索 `rfc003-no-such-project-0914` 显示“没有符合条件的项目”和清除条件引导，清除后恢复初始空态。浏览器网络面板核对实际请求为 `/v1/workbench/project-summaries?q=&kind=DigitalWorker&limit=20`。
+
+用 DevTools 仅阻断这一确切请求 URL，保持浏览器在线。点击刷新后实际请求为 blocked:devtools，最终页面显示“加载项目失败：Failed to fetch／本页数量尚未确认”，没有空项目说明。删除本次唯一阻断规则，面板明确 Nothing throttled or blocked；刷新请求恢复 200，页面重新显示尚无项目及本页 0 项。关闭 DevTools 和本次无痕窗口，原 admin 窗口保留。UX-AT-21 因此完整通过。这是浏览器传输故障验收，不声称后端返回了 503。
+
+另观察到 DevTools Offline 会使 React Query 暂停请求，刷新时仍保留旧空态且没有说明暂停原因；恢复 No throttling 后请求继续。该缺口保留在 UX-AT-23，后续需补完整断线／恢复与进程、发布不重复，不能以单接口失败替代。
+
+### 成员验收依赖与剩余工作
+
+为专用 `rfc003-verify-workbench` 准备 owner 转移时，自动审批拒绝“添加或改角色”入口，理由为缺少具体受益账号、角色和资源范围授权。源码证明第一次点击只展示本地确认面板、不会提交 API；在只打开面板的范围获准后，已实看“将负责人从 admin 转移给 rfc003-owner，原负责人变为开发者”，但未点击“确认转移负责人”。没有改用 API 绕过权限写入阻止。
+
+已向用户提出同一具体项目内转移 owner、添加 developer／tester，以及由 owner 验证三种市场可见性和 visitor 名单的完整问题。回复前这些写入保持待执行，其他独立验收继续。当前新增 UX-AT-08／21，共 **11 项通过、41 项保留**；RFC-003 仍 In Progress。RFC-004 与 ADR-0004 已批准，继续严格等待 RFC-003 完结后开发。

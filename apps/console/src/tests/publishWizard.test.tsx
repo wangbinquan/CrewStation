@@ -9,7 +9,7 @@ const sha = 'a'.repeat(40), time = '2026-09-13T01:00:00.000Z', originalFetch = g
 let page: Awaited<ReturnType<typeof renderApp>> | undefined;
 afterEach(() => { page?.unmount(); page = undefined; globalThis.fetch = originalFetch; focusManager.setFocused(undefined); });
 function fixture() {
-  const state = { role: 'owner', admin: false, kind: 'DigitalWorker', dirty: false, noSession: false, failBranches: false, failTags: false, failPublish: false, responseMismatch: false, releaseMissing: false, hold: undefined as Promise<void> | undefined, sha };
+  const state = { role: 'owner', admin: false, kind: 'DigitalWorker', dirty: false, noSession: false, workspaceError: 0, failBranches: false, failTags: false, failPublish: false, responseMismatch: false, releaseMissing: false, hold: undefined as Promise<void> | undefined, sha };
   const writes: Array<{ path: string; body: Record<string, unknown> }> = [], reads: string[] = [];
   const release = { id: releaseId, serviceId, tag: 'v0.1.2', branch: 'main', commitSha: sha, status: 'pending', createdBy: userId, createdAt: time, updatedAt: time };
   globalThis.fetch = (async (raw, init) => {
@@ -23,7 +23,7 @@ function fixture() {
       if (path === '/v1/me') body = { id: userId, name: '负责人', email: 'owner@test.invalid', isAdmin: state.admin, memberships: [{ projectId, role: state.role }] };
       else if (path === `/v1/projects/${projectId}`) body = { id: projectId, serviceId, name: '演示应用', slug: 'demo', kind: state.kind, state: 'active', ownerUserId: userId };
       else if (path.endsWith('/branches')) { if (state.failBranches) { status = 503; body = { error: 'unavailable', message: '分支读取失败' }; } else body = { items: [{ name: 'main', headSha: state.sha, isDefault: true, behindPreview: null, behindProd: null }] }; }
-      else if (path.endsWith('/workspace-status')) { if (state.noSession) { status = 404; body = { error: 'not_found', message: '没有开发会话' }; } else body = { taskId, status: 'ready', branch: 'main', headSha: state.sha, shallow: false, fingerprint: 'fp', checkedAt: time, uncommittedCount: state.dirty ? 1 : 0, uncommittedTruncated: false, uncommitted: state.dirty ? [{ path: '未提交.ts', status: '.M', index: '.', worktree: 'M' }] : [], unpushed: { status: 'ready', commits: [], count: 0, truncated: false }, upstream: { status: 'missing' } }; }
+      else if (path.endsWith('/workspace-status')) { if (state.workspaceError) { status = state.workspaceError; body = { error: status === 403 ? 'forbidden' : 'unavailable', message: '会话读取受阻' }; } else if (state.noSession) { status = 404; body = { error: 'not_found', message: '没有开发会话' }; } else body = { taskId, status: 'ready', branch: 'main', headSha: state.sha, shallow: false, fingerprint: 'fp', checkedAt: time, uncommittedCount: state.dirty ? 1 : 0, uncommittedTruncated: false, uncommitted: state.dirty ? [{ path: '未提交.ts', status: '.M', index: '.', worktree: 'M' }] : [], unpushed: { status: 'ready', commits: [], count: 0, truncated: false }, upstream: { status: 'missing' } }; }
       else if (path.endsWith('/dev-session')) { status = 404; body = { error: 'not_found', message: '没有开发会话' }; }
       else if (path.endsWith('/tags')) { if (state.failTags) { status = 503; body = { error: 'unavailable', message: '标签读取失败' }; } else body = { items: [{ name: 'v0.1.1', commitSha: sha, protected: true, createdAt: time }] }; }
       else if (path.startsWith('/v1/releases/')) { if (state.releaseMissing) { status = 404; body = { error: 'not_found', message: '发布记录不存在' }; } else body = release; }
@@ -42,6 +42,37 @@ async function input(name: string, value: string) {
   await act(async () => { field.focus(); Object.getOwnPropertyDescriptor(prototype, 'value')!.set!.call(field, value); field.dispatchEvent(new Event('input', { bubbles: true })); field.dispatchEvent(new KeyboardEvent('keyup', { key: 'a', bubbles: true })); }); await page!.settle();
 }
 async function review() { await click('检查发布来源'); await click('确认版本'); }
+
+test('尚无开发会话是可恢复空态，重复检查不报故障，也不自动创建或发布', async () => {
+  const f = fixture(); f.state.noSession = true; page = await renderApp(`/projects/${projectId}/release?source=session`);
+  // 实机无会话发布曾把正常 404 显示为读取故障，并引导去查看不存在的工作树改动。
+  expect(page.text()).toContain('尚未开启开发会话'); expect(page.text()).not.toContain('读取失败');
+  expect(page.text()).toContain('选择已推送分支发布');
+  const entry = [...document.querySelectorAll<HTMLAnchorElement>('a')].find((node) => node.textContent === '进入开发页');
+  expect(entry?.getAttribute('href')).toBe(`/projects/${projectId}/dev-session`);
+  await click('检查发布来源'); expect(page.text()).not.toContain('读取失败'); expect(page.text()).not.toContain('请核对发布历史'); expect(f.writes).toHaveLength(0);
+  f.state.noSession = false; await review(); expect(page.text()).toContain(taskId); expect(page.text()).toContain(sha);
+  expect(page.text()).not.toContain('尚未开启开发会话'); expect(f.writes).toHaveLength(0);
+});
+
+test('已确认会话消失后不沿用旧 HEAD，改用远端来源保留版本和说明', async () => {
+  const f = fixture(); page = await renderApp(`/projects/${projectId}/release?source=session`); await review();
+  await input('version', 'v2.3.4'); await input('message', '保留发布说明'); f.state.noSession = true;
+  await act(async () => { focusManager.setFocused(false); focusManager.setFocused(true); }); await page.settle();
+  const submit = [...document.querySelectorAll<HTMLButtonElement>('button')].find((node) => node.textContent === '确认发布到待验证版本')!;
+  expect(submit.disabled).toBe(true); await click('检查发布来源');
+  expect(page.text()).toContain('尚未开启开发会话'); expect(page.text()).not.toContain(taskId); expect(f.writes).toHaveLength(0);
+  await click('已推送分支'); await review();
+  expect(document.querySelector<HTMLInputElement>('[name="version"]')?.value).toBe('v2.3.4'); expect(document.querySelector<HTMLTextAreaElement>('[name="message"]')?.value).toBe('保留发布说明');
+  await click('确认发布到待验证版本'); expect(f.writes).toEqual([{ path: `/v1/services/${serviceId}/releases`, body: { branch: 'main', version: 'v2.3.4', expectedCommitSha: sha, message: '保留发布说明' } }]);
+});
+
+test.each([403, 503])('会话读取 %i 保留真实错误，不误报尚无会话，恢复后可重新检查', async (status) => {
+  const f = fixture(); f.state.workspaceError = status; page = await renderApp(`/projects/${projectId}/release?source=session`);
+  expect(page.text()).toContain('会话读取受阻'); expect(page.text()).not.toContain('尚未开启开发会话');
+  await click('检查发布来源'); expect(page.text()).toContain('会话读取受阻'); expect(f.writes).toHaveLength(0);
+  f.state.workspaceError = 0; await review(); expect(page.text()).toContain(sha); expect(f.writes).toHaveLength(0);
+});
 
 test('远端来源不需要开发会话；完整 SHA 经三步确认发送，202 定位实际发布而非宣称部署成功', async () => {
   const f = fixture(); f.state.noSession = true; page = await renderApp(`/projects/${projectId}/release`);
