@@ -647,3 +647,32 @@ B 执行时留下未发送 `RFC003_UNSENT_DRAFT_KEEP_0914`，切到独立预览�
 有效本地完整门禁 **1089 pass／4 skip／0 fail**，1093 tests／185 files／5977 assertions／105.07s，console build 516ms 成功。此前默认沙箱内运行因本地监听端口和进程权限限制失败，未视为有效门禁；确认没有等价完整门禁运行后，以所需本机权限重跑上述结果。生产源码在有效门禁后未再变动。实机只读快照保存在环境证据目录的 `agent-edit-baseline.json` 与 `editor-notice-after.json`，关键身份、时序和结论在此持久记录。
 
 同期作者将运行配置指定为平台 beforeStart 的两个通用动作：管理员定义文件／路径和初始化脚本。RFC-004 三件套、ADR-0004、I13 已据此修订为 25 项验收；作者随后批准，并要求 RFC-003 完结后启动开发。本批仅更新获批方案，没有创建新模块或实现 Hook 代码，不因新 RFC 获批而缩减 RFC-003。
+
+## 第四十二批：共享控制台冲突复验、未推送清单与发布回退
+
+第四十一批源码与记录已发布为 `64f37c31f48e6bf0610a1860462569bfa7401671`，精确 SHA [CI 34822560250](https://github.com/wangbinquan/CrewStation/actions/runs/34822560250) 成功，1085 pass／8 skip／0 fail、1093 tests／185 files／58.40s，console build 1.23s 成功。本批没有生产源码变化，沿用第四十一批 1089 pass／4 skip／0 fail 的有效本地完整门禁，另核对文档链接、验收编号和状态计数。
+
+按已有共享环境更新授权，只重建并替换 console 镜像。构建 OCI revision 为上述完整 SHA，Docker imageID 与实际 Pod imageID 均为 `sha256:2b9084c9e4f028f1aeb2c20cd7470b2e594a093d4600db80dddef7c4d6600b92`，标签 `cs-console:rfc003-64f37c3`。使用 `desktop-linux` Docker 和 `docker-desktop` K8s 上下文，将镜像导入 `desktop-control-plane` 的 containerd；JSON patch 先核对 Deployment UID、generation、容器名与旧镜像，再替换唯一 image 字段。console UID `c4874a0e-6415-4c2b-b141-74ac25ea10ed` 不变、generation 18→19，新 Pod `console-7bbdbc7557-4ldt6`／UID `9fdc6baa-a4ff-4ecd-a890-96e4ccc11690` 就绪，rollout 完成。没有更新其余七个服务、任务镜像、配置或迁移。
+
+更新后旧 QA Pod UID 和 `/work/ux-comparison.txt` 的 SHA256 保持第三十九批值；新 QA Pod `task-01a09eb4f03f` UID `724ecb83-9fbd-4a36-9ad3-8266c6d84a42` 保持，原 Claude、已结束 A 和在线 B 名册没有新增或重建。共享 Chrome 页面刷新后连接新 console，临时 :8768 页签关闭，所属 Vite／Bun 进程结束。
+
+共享编辑器先留未保存 `// RFC003 SHARED CONFLICT DRAFT`，原 OpenCode B 第 6 轮仅把 `src/pages/home.ts` 的 h1 从“RFC003 Agent 实时预览已更新”改为“RFC003 Agent 发布验收”。该轮 `ses_f6139ff9fffem3ilM8is1IfEkT:msg_09f12288f001BMj9M10BTZx2jr` 于 2026-09-14T08:39:22.511Z 开始、08:40:07.019Z 完成；事件 `c7ff690c-d87b-437c-8204-3cb2545ebb99`／seq=10248，原 Agent／terminal／Runner 身份及 startedAt 均保持。
+
+点击保存后实看黄色冲突说明在代码区上方，焦点为“继续编辑”，测试草稿保留。继续编辑后提示收起、内容仍在；重新载入先显示具名放弃确认，默认焦点仍为继续编辑。只有显式点击“放弃输入并继续”后，草稿才消失并载入实际 Agent 标题。随后独立开发预览及 HTTP 都显示新标题；生产仍为原 h1。磁盘 diff 仍只有 Agent 的一行，草稿没有写入工作树。UX-AT-06 因此补齐共享部署复验。
+
+从“准备发布”进入当前开发会话来源，实看 main／完整 HEAD、home.ts 与 .claude.json 两项清单；检查明确表示未发起发布。点击 home.ts 链接携带原 taskId，连接后打开同一文件。随后在历史会话页面的普通终端手动精确提交 home.ts，得到 QA 应用提交 `1aa2db9f9578edfce15dbf314f74302ac523de83`，说明 `test: verify RFC-003 live Agent title`，署名 OpenAI Codex，只有一行增、一行删。该 SHA 不是 CrewStation 主仓提交；没有自动替用户提交或推送功能。
+
+返回开发页显示实际工作树 `main @ 1aa2db9f95`、生产 `v0.1.0 @ 6af30245c4`、待上线 1、缺少生产 0、未提交 1、未推送 1。释放前的确认区列出具体未推送 SHA 和提交说明，并明确未推送不等于生产差距。取消后 API 复核原 task 仍 running，B 同一进程在线，HEAD／未推送提交保留，没有增加发布记录。UX-AT-19 因此通过。重新进入发布来源，home.ts 已从未提交清单消失，只有原 .claude.json；检查仍明确阻止发布。没有读取、提交、删除或通过忽略规则藏起该认证状态文件，worker HOME 问题仍按 plan §5 保留。
+
+发布旅程改为单独验证“已推送分支”这一既有来源。页面明确不包含容器本地文件，并重新读取远端 main 的完整 `6af30245c4f5dc0537bdae2c3a44aa2b3fd62d29`；没有把 QA 本地 `1aa2db9` 冒充远端。填 v0.1.1 与明确说明后仅提交一次，实看发布中、禁止重复操作；下一次观察时已为就绪并定位 release=`rel_01a09f181c8d7000b2f2654113a1e737`。该发布 08:45:52.650Z 创建、08:46:03.248Z 就绪，preview 1／1；admin 实际打开待验证地址，响应为 production／blue 和原始 h1。未观察到短暂的 202 受理界面，不以此补齐 UX-AT-09 的全部阶段。
+
+在发布页核对 v0.1.0→v0.1.1、两个完整 SHA 与具名说明，再执行专用项目上线；随后核对仍在待命槽的 v0.1.0 回退。界面明确回退只切流量、不恢复数据；两个动作均先受理、随后实际 HTTP 复核网关。
+
+| 动作 | 切流 ID／UTC 时间 | previousReleaseId → releaseId | 实际正式／待验证槽 |
+|---|---|---|---|
+| 上线 v0.1.1 | tsw_01a09f191e6d7000a4dd35484cf9bb1a／08:46:58.666Z | rel_01a09eb30d3370009d26fd52ceeaa013 → rel_01a09f181c8d7000b2f2654113a1e737 | blue／green |
+| 回退 v0.1.0 | tsw_01a09f1a9e737000836b9fbd31fbfea4／08:48:36.976Z | rel_01a09f181c8d7000b2f2654113a1e737 → rel_01a09eb30d3370009d26fd52ceeaa013 | green／blue |
+
+最终正式 v0.1.0、待验证 v0.1.1 均就绪；两个发布故意使用相同远端 SHA，验证的是发布身份、蓝绿路由和回退，不宣称两版源码存在差异。开发仍保留本地标题提交和原 .claude.json。临时取证文件包括 `crewstation-console-64f37c3-after.json`、`crewstation-rfc003-shared-editor-after.json`、`crewstation-rfc003-manual-commit.json`、`crewstation-rfc003-release-cancel-after.json`、`crewstation-rfc003-v011-promoted.json`、`crewstation-rfc003-v011-rollback.json`；核心数据已在此持久记录。
+
+本批新增 UX-AT-06／19，共九项完整通过、43 项保留。UX-AT-07 的干净会话发布、08 的完全无会话分支、09 的测试者身份、11 的禁止回退和历史候选、12 的双人并发，以及其余角色／尺寸／失败恢复仍需继续。RFC-004 与 ADR-0004 已批准，但按用户指定等待 RFC-003 完结，Hook 代码尚未开始。

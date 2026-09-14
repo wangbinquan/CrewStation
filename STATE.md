@@ -11,6 +11,16 @@
 
 **RFC-003 工作台 UX 重设计处于 In Progress，作者已要求完整实现并提交上库。** RFC-001 与 RFC-002 都已 Done，见 `proposal/rfc/README.md` 的索引表。
 
+## 最新接力：共享编辑器复验、未推送提醒与发布回退（2026-09-14）
+
+第四十一批编辑器修复已发布 `64f37c31f48e6bf0610a1860462569bfa7401671`，精确 SHA [CI 34822560250](https://github.com/wangbinquan/CrewStation/actions/runs/34822560250) 成功，1085 pass／8 skip／0 fail，console build 通过。共享 console 已单独更新至 `cs-console:rfc003-64f37c3`，实际 Pod imageID 为 `sha256:2b9084c9e4f028f1aeb2c20cd7470b2e594a093d4600db80dddef7c4d6600b92`；其余服务和任务容器仍用第三十九批镜像。旧 QA Pod／比较文件及新 QA 原 Agent 进程均保留。本机候选 Vite 已结束。
+
+共享控制台经原 OpenCode B 第 6 轮实际改同一文件后，冲突提示置顶、默认聚焦继续编辑、草稿保留及显式放弃后重载均复验通过。专用项目 `rfc003-verify-workbench` 的首页改动随后通过普通终端精确提交为 `1aa2db9f9578edfce15dbf314f74302ac523de83`，只含 home.ts 一行；这是 QA 应用提交，不是 CrewStation 主仓提交。工作树领先生产 1、未推送 1；释放前显示具体提交，取消后原会话和进程完整。原 `.claude.json` 仍未跟踪，未读取、提交或删除，当前会话发布如实被这一个文件挡住。
+
+从已推送 main／`6af30245c4f5dc0537bdae2c3a44aa2b3fd62d29` 实际发布 `v0.1.1`，release=`rel_01a09f181c8d7000b2f2654113a1e737`；试用、上线、回退及 HTTP／槽记录核对完成。当前正式仍为 v0.1.0，待验证 v0.1.1，两者同 SHA、均就绪；开发预览为本地提交的“RFC003 Agent 发布验收”。UX-AT-06／19 新增完整通过，累计九项，剩余 43 项保持；无会话发布、测试者试用、禁止回退和双人冲突等未执行分支继续登记，不能将这次 admin 旅程算作全部通过。详见 implementation 第四十二批及 acceptance-audit。
+
+本批仅补实机证据和文档，生产源码未变，沿用第四十一批有效本地完整门禁。RFC-004 已批准且仍等待 RFC-003 完结，未启动 Hook 实现；下文此前“待批准／共享 console 未更新”的记录保留为历史，不代表当前状态。
+
 ## 最新接力：启动前 Hook 方案与编辑器冲突复验（2026-09-14）
 
 作者指定两个管理员注入点：配置文件内容与容器存放路径、Shell／Python／JS 等初始化脚本，统一属于 Agent 启动前 Hook。[RFC-004](proposal/rfc/RFC-004-admin-agent-runtime/proposal.md)、design／plan、ADR-0004 与 I13 已按此修订：步骤可排序，每次实际启动 Agent 进程前执行；明确环境输出传递、解释器、路径占用、失败／超时／取消与未知结果不自动重跑。验收扩为 25 项。供应方连接以原生模板或脚本产物表达，管理 UI 不再另拆重复表单。作者随后明确“批准RFC-004，在RFC-003完结后启动开发”；方案及关联 ADR 已批准，保持 Draft 表示待开工，T1 完成、T2–T9 未开始。RFC-003 完整收口后按本批准直接实施，无需重复确认；此前历史记录中的 RFC-004 待审状态已被此批准取代。
