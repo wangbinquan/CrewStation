@@ -15,11 +15,13 @@ export const LogQuerySchema = z.object({
 });
 
 export const LogEntryDtoSchema = z.object({
-  ts: z.iso.datetime(),
+  /** 容器日志的发生时间；缺失时不能用查询时间补造。 */
+  ts: z.iso.datetime().optional(),
   source: LogSourceSchema,
   slot: SlotNameSchema.optional(),
   pod: z.string().optional(),
-  stream: z.enum(['stdout', 'stderr']),
+  /** combined 表示来源未逐行区分标准输出和标准错误。 */
+  stream: z.enum(['stdout', 'stderr', 'combined']),
   message: z.string(),
 });
 

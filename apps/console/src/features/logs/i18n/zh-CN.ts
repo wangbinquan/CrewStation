@@ -132,4 +132,6 @@ export const messages = {
   'logs.level.warn': 'WARN',
   'logs.level.info': 'INFO',
   'logs.level.debug': 'DEBUG',
+  'logs.level.log': 'LOG',
+  'logs.timeUnknown': '时间未知',
 } satisfies Messages;

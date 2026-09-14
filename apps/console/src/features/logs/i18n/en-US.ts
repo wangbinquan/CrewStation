@@ -133,4 +133,6 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   'logs.level.warn': 'WARN',
   'logs.level.info': 'INFO',
   'logs.level.debug': 'DEBUG',
+  'logs.level.log': 'LOG',
+  'logs.timeUnknown': 'Unknown time',
 };

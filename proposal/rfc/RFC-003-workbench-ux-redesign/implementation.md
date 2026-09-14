@@ -934,3 +934,37 @@ Chrome 原生 CUA 已恢复页面与截图读取，第四十六批的浏览器�
 13:34:45Z 与 13:35:54Z 原会话 workspace-status 都为未提交 0／未推送 0，upstream 仍 missing。Git 实际新增 `refs/remotes/cs-publish/codex/rfc003-files` 指向 a80dbc1；`.git/config` 摘要前后为 `43df3f42910e5957f451c451f1f516bb481f425490ca9939eb7876c41503f41c`，home.ts 摘要仍 3e6ba15d…。原 Pod UID／restartCount=0、OpenCode agentId／terminalId／Runner／startedAt、completed 轮次和 throughSeq=2004 都保持。本次未重建任务容器或创建额外 Agent。
 
 构建前同样暂调零的 files-green／workbench-blue 已再次全部恢复，13:35:56Z 两者 generation=7、desired=ready=1；files 控制器部署 v0.1.2，workbench 蓝槽仍旧 v0.1.1。原 workbench 正式 green 的 UID／generation=1／release／1／1 均保持。PostgreSQL 原 Pod 仍 ready／restartCount=9，最终节点仅余 **401,764KiB**，未将容量描述为已根治。证据为 batch48 的 api-after、v012-started、workspace-after、final-api、final-runtime JSON 及构建／导入／CI／rollout 日志。界面计数和其余实机旅程待解锁继续，累计仍 **18／52**；RFC-004 继续排队，Hook 未开工。
+
+
+## 第四十九批：迁移失败、恢复发布与日志事实
+
+### 真实迁移失败与原版本保持
+
+原 files QA 任务 `tsk_01a09ff07aeb7000897fd0eda1e16cd2` 保持一个 OpenCode，轮次 completed、无 pending。工作树 a80dbc1 干净。只在 crewstation.yaml 的 spec.release 下加入 `migrationCommand: ["bun", "-e", "console.error('RFC003_MIGRATION_FAILURE'); process.exit(42)"]`；通过实际 ManifestSchema 校验，仅输出标记和退出，不连接数据库。精确提交 `490c30d676a6e4d3908415df5c0117fb8501fd79` 只有该文件 +1 行；未改变持久 Git 配置。
+
+正常平台 API 发布 v0.1.3=`rel_01a0a03773bf7000a6d00e16f132a40d`，13:59:43.805Z 受理、13:59:59.138Z failed，消息为“迁移失败，未切流：Job has reached the specified backoff limit”。Job `migrate-0e16f132a40d`／UID `9e4f8595-edc9-40d0-a0f5-adef65bf6bc5` 于 13:59:56Z Failed；Pod `migrate-0e16f132a40d-ckgkz`／UID `eeb58b0d-b924-43cb-86e7-b71c12dbc0ef` 真实 exitCode=42。Kubernetes 原始时间戳为 `2026-09-14T13:59:54.295718172Z RFC003_MIGRATION_FAILURE`。
+
+14:02:36Z API 读取失败记录和相同 releaseId 的 migration 日志；v0.1.2 的迁移日志为空。实际预览仍 v0.1.2／a80dbc102e8b6db71e778d0092e5d78865330d4d、ready 1／1，正式槽空。工作树 490c30d 已推送、未提交 0／未推送 0，但对预览仍领先 1、差异文件 1，正确区分“已推送的失败发布”与“实际部署”。
+
+### 恢复与保全核对
+
+只移除本次验收命令，精确恢复提交 `e4741df56b440d776b7c25ff5a4978b3d5822f46` 只有 crewstation.yaml −1 行。完整 tree=`7ea392dae01a5a4e100d9ac4f413a8852293970e`，与故障前 a80dbc1 相同。通过正常 API 发布 v0.1.4=`rel_01a0a0426f4c7000b7ce58ff67c80bc8`，14:11:43.562Z 受理、14:11:54.631Z ready。14:13:18Z 实际预览 HTTP 200 且原标题存在；工作树与预览 SHA 相同、差异 0、未提交 0／未推送 0，新版本无迁移日志，v0.1.3 失败历史和标记保留。
+
+两次构建均因 9550m／10 CPU 的资源请求，暂调零 files-green 和 workbench-blue 专用预览，所有补丁核对 UID／generation／副本数／release。失败周期恢复到 generation=9，恢复周期最终到 generation=11，均 desired=ready=1；workbench-blue 仍 v0.1.1。workbench 正式 green 的 UID `05b18ca7-b4e2-4116-b834-0ec5516cddb7`／generation=1／v0.1.0 不变。原 files Pod UID `fa4dcc5e-3eb6-4557-a6bf-b6301dca4160`、Running／restartCount=0，OpenCode agentId／terminalId／Runner／startedAt 及 throughSeq=2004 均保持。首页 SHA256=`3e6ba15db51c1ff971b0e762586bb38e10510e596acf01f1987ac390a8e74022`，Git 配置 SHA256=`43df3f42910e5957f451c451f1f516bb481f425490ca9939eb7876c41503f41c`，与故障前一致。
+
+### 日志元数据缺陷与修复
+
+同一固定标记在旧 API 中先返回 14:02:36.707Z、后返回 14:13:18.608Z，都标成 stdout；发生时间被查询时间替换，console.error 也没有真实来源信息。原因是 K8sClient 没有 timestamps 参数，clusterObserver 宽松 Date.parse 正文首词并以当前时间兜底，还吞掉单个 Pod 的读取错误。修复请求 `timestamps=true`，严格验证时间前缀并规范到毫秒，缺失或非法时 ts 缺省且保留完整正文；默认混合日志为 stream=combined。界面显示未知时间、保留完整时间提示，混合输出无明确级别时用中性 LOG；原 stdout／stderr 继续兼容。完整日志页不再对缺失 ts 调 localeCompare，按接口顺序过滤显示。读取失败如实报错，不返回假空记录或不完整的成功页。
+
+依据为 [Kubernetes 日志时间戳选项](https://kubernetes.io/docs/reference/kubectl/generated/kubectl_logs/) 与 [容器日志流说明](https://kubernetes.io/docs/concepts/cluster-administration/logging/#container-log-streams)。本批没有启用分流 feature gate、改节点日志配置或新增日志存储；来源选择、releaseId／taskId 约束和尾部上限保持原接口。
+
+最初两文件七项回归结果为 2 pass／5 fail；补完整路由的缺失时间用例也先稳定失败，再修 useLogFeed。最终两文件九项加路由一项，共新增十项，定向五文件 27 pass／2 skip／0 fail、113 assertions／1.426s；两个 skip 是当前隔离连接下未执行的 observability 数据库用例和 opt-in K8s 用例。完整门禁先后在新代码的类型收窄／夹具默认命名空间、前端缺失时间排序处停止，均已修复，两类类型检查通过；最终完整门禁与发布结果待完成后补记。原始临时证据为 batch49 的 migration-failed、recovery、feed-red、targeted、candidate 与 check 系列文件。
+
+### 未完成的实机与方案选择
+
+只读核对当前单 CLI 容器的 cgroup：memory.max=2147483648、memory.oom.group=1、memory.current=899342336，oom 相关计数为 0，挂载只读；没有对当前任务施压。I15 已记录逐 CLI 独立 Pod 与委派子 cgroup 两个完整方向及模块影响，等待作者选择，不把容器资源调大视为故障隔离。I14 保卷恢复与具体测试成员／市场授权也仍待答复。
+
+Mac 此时仍锁定；本批故障、恢复和日志结果来自实际 API／集群，不替代失败发布到日志的一跳界面旅程。UX-AT-13 保留未通过，累计仍 **18／52，34 项待完成**。RFC-004／ADR-0004 保持已批准，严格等待 RFC-003 完结后启动，Hook 代码未开始。
+
+
+第四十九批最终完整本地门禁 **1118 pass／4 skip／0 fail**，1122 tests／190 files／6189 assertions／105.67s，console build **566ms**。定向中受连接条件跳过的 observability 集成用例在完整门禁已执行；最后四项为 opt-in K8s、两个原生 CLI 与 Linux Ctrl+C。十二个源码／测试文件的 SHA256 与最终门禁前 candidate.json 一致。此前两次类型阶段失败未被记作有效完整门禁。本段记录时尚未提交、部署新日志修复；源基线 293a7d0 与 origin/main 同步。

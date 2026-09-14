@@ -17,7 +17,7 @@ export function LogRow({ entry, formatTime }: LogRowProps): ReactElement {
   const origin = entry.slot === undefined ? source : `${source}·${entry.slot}`;
   return (
     <div className={styles.row}>
-      <span className={styles.time}>{formatTime(entry.ts)}</span>
+      <span className={styles.time} title={entry.ts}>{entry.ts === undefined ? t('logs.timeUnknown') : formatTime(entry.ts)}</span>
       <LogLevelBadge level={logLevelOf(entry)} />
       <span className={styles.origin} title={entry.pod ?? origin}>
         {origin}

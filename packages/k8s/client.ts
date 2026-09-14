@@ -7,7 +7,7 @@ import { readWatchStream } from './watch';
 export interface ListOptions { labelSelector?: string; fieldSelector?: string; limit?: number }
 export interface DeleteOptions { propagationPolicy?: 'Background' | 'Foreground' | 'Orphan'; gracePeriodSeconds?: number }
 export interface WatchOptions { labelSelector?: string; resourceVersion?: string; timeoutSeconds?: number; signal?: AbortSignal }
-export interface LogOptions { container?: string; follow?: boolean; sinceSeconds?: number; tailLines?: number; signal?: AbortSignal }
+export interface LogOptions { container?: string; follow?: boolean; timestamps?: boolean; sinceSeconds?: number; tailLines?: number; signal?: AbortSignal }
 
 /** 平台只需要的 API Server 操作；模块通过它而不是 kubectl 管理对象。 */
 export interface K8sClient {
@@ -81,6 +81,7 @@ export function createK8sClient(config: ClusterConfig, fetchImpl: typeof fetch =
       const params = new URLSearchParams();
       if (options.container) params.set('container', options.container);
       if (options.follow) params.set('follow', 'true');
+      if (options.timestamps !== undefined) params.set('timestamps', String(options.timestamps));
       if (options.sinceSeconds) params.set('sinceSeconds', String(options.sinceSeconds));
       if (options.tailLines !== undefined) params.set('tailLines', String(options.tailLines));
       const res = await request('GET', `/api/v1/namespaces/${namespace}/pods/${pod}/log?${params}`, options.signal ? { signal: options.signal } : {});

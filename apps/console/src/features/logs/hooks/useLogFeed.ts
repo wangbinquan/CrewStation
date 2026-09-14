@@ -58,11 +58,10 @@ export function useLogFeed(projectId: string, selected: OperationsSearch, onChan
 
   const items = query.data?.items;
   const needle = filters.text.trim().toLowerCase();
-  // ISO 时间串按字典序即按时间序，最新的排在最后，跟随时滚到底就是最新一条。
+  // 保留服务端的有界合并顺序；未知时间不能在前端重新猜测或参与字符串排序。
   const entries = useMemo(() => {
     const page = items ?? [];
-    const matched = needle === '' ? page : page.filter((entry) => entry.message.toLowerCase().includes(needle));
-    return [...matched].sort((left, right) => left.ts.localeCompare(right.ts));
+    return needle === '' ? page : page.filter((entry) => entry.message.toLowerCase().includes(needle));
   }, [items, needle]);
 
   const changeFilters = useCallback((next: LogFilterValues) => {

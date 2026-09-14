@@ -11,7 +11,7 @@ const project = { id: projectId, serviceId, name: '团队知识助理', slug: 't
 let page: Awaited<ReturnType<typeof renderApp>> | undefined;
 afterEach(() => { page?.unmount(); page = undefined; globalThis.fetch = originalFetch; });
 
-function fixture() {
+function fixture(logItems?: unknown[]) {
   const calls: Array<{ url: URL; method: string }> = [];
   let logFailure = false;
   globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
@@ -25,7 +25,7 @@ function fixture() {
     else if (url.pathname.endsWith('/dev-session')) { status = 404; body = { error: 'not_found', message: '没有开发会话' }; }
     else if (url.pathname.endsWith('/health')) body = { items: [{ slot: 'prod', state: 'unknown', readyReplicas: 0, replicas: 1, restarts: 2, lastTransitionAt: '2026-09-13T01:00:00.000Z' }] };
     else if (url.pathname.endsWith('/logs') && logFailure) { status = 503; body = { error: 'unavailable', message: '读取 Pod 日志失败' }; }
-    else if (url.pathname.endsWith('/logs')) body = { items: [{ ts: '2026-09-13T01:01:00.000Z', source: 'build', stream: 'stderr', message: 'build fixture line' }] };
+    else if (url.pathname.endsWith('/logs')) body = { items: logItems ?? [{ ts: '2026-09-13T01:01:00.000Z', source: 'build', stream: 'stderr', message: 'build fixture line' }] };
     else if (url.pathname.includes('/openapi')) { status = 503; body = { error: 'unavailable', message: '文档暂不可用' }; }
     else if (url.pathname.endsWith('/operations')) body = { items: [
       { key: 'billing.getInvoice', proxy: 'billing', method: 'GET', path: '/invoices/{id}', openPolicy: 'default', granted: true },
@@ -85,6 +85,20 @@ describe('五个项目入口与旧链接兼容', () => {
     await input(slot, ''); expect(page.search().slot).toBe('all');
     const last = f.calls.filter((call) => call.url.pathname.endsWith('/logs')).at(-1)!;
     expect(last.url.searchParams.has('slot')).toBe(false); expect(last.url.searchParams.has('taskId')).toBe(false);
+  });
+
+  test('完整日志页面接收未知时间而不崩溃，过滤后保留接口顺序与精确发布条件', async () => {
+    const f = fixture([
+      { ts: '2026-09-14T13:59:54.295Z', source: 'migration', stream: 'combined', message: 'migration known' },
+      { source: 'migration', stream: 'combined', message: 'migration unknown' },
+    ]);
+    page = await renderApp(`/projects/${projectId}/operations?tab=logs&source=migration&releaseId=${releaseId}`);
+    // useLogFeed 曾对每条 ts 调 localeCompare；未知时间必须贯穿整个页面，不能只在 LogRow 兼容。
+    expect([...document.querySelectorAll('[role="log"] .message')].map((node) => node.textContent)).toEqual(['migration known', 'migration unknown']);
+    expect(page.text()).toContain('时间未知');
+    expect(f.calls.filter((call) => call.url.pathname.endsWith('/logs')).every((call) => call.url.searchParams.get('releaseId') === releaseId)).toBe(true);
+    await input(document.querySelector<HTMLInputElement>('input[placeholder="在本页内过滤"]')!, 'unknown');
+    expect([...document.querySelectorAll('[role="log"] .message')].map((node) => node.textContent)).toEqual(['migration unknown']);
   });
 
   test('健康状态可定位对应槽日志，查询失败保留错误而不显示正常', async () => {

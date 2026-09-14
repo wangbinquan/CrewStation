@@ -23,6 +23,7 @@
 - [I12. Claude Code 流式输入帧的形状](#i12-claude-code-流式输入帧的形状)
 - [I13. 管理员配置 Agent 运行环境并供租户使用](#i13-管理员配置-agent-运行环境并供租户使用)
 - [I14. 失败开发容器的工作卷恢复](#i14-失败开发容器的工作卷恢复)
+- [I15. 同一工作树中多个 CLI 的资源隔离](#i15-同一工作树中多个-cli-的资源隔离)
 
 ## I1. 操作 MCP 的「以本服务身份调用内部 API」用的是谁的身份
 
@@ -144,3 +145,24 @@
 - (b) 维持新建独立工作树，提供管理员取回指定未推送提交／文件的流程，再由用户决定如何带入新会话；不导出或提交认证文件。取回完成前保留原卷，避免把一次容器故障变成代码丢失。
 
 **建议与边界**：建议 (a)，当前待作者裁定，尚未实现或执行。它涉及开发会话生命周期，按开发规则 §5.7 先确认再补方案；不是提前实施 RFC-004 Hook。本条不取消 RFC-003 对新增 CLI 资源不足时保护已有窗口的要求，四窗 OOM 的防护和实机复验仍是未完工作。
+
+## I15. 同一工作树中多个 CLI 的资源隔离
+
+**原定要求**：RFC-003 `development-workspace.md:81` 要求新增 CLI 资源不足只影响该次窗口，UX-AT-28／35 要求真实多 CLI 和四窗验收。I14 处理故障后的工作树恢复，不能替代故障前的隔离。
+
+**当前证据（2026-09-14T13:54:46Z）**：主仓基线 `293a7d0124c4e1b34397a25ccce22f89b3aa6502`；现存 QA Pod `cs-rfc003-verify-files/task-01a09ff07aeb`／UID `fa4dcc5e-3eb6-4557-a6bf-b6301dca4160` 的 requests=limits 为 1 CPU／2Gi，实际 `memory.max=2147483648`、`memory.oom.group=1`、`memory.current=899342336`；该正常单 CLI 容器的 oom／oom_kill／oom_group_kill 计数都是 0。`/sys/fs/cgroup` 挂载为 `ro,nosuid,nodev,noexec,relatime`，当前环境没有可供 Runner 写入的子 cgroup。此处只记录现存容器事实，不伪造已终止旧 Pod 的 cgroup 读数，也未再次对活跃任务施加压力。临时原始记录为 `crewstation-rfc003-batch49-resource-facts.json`。
+
+源码只限制 256 条名册／32 个运行中进程（`runtimes/task/src/terminal/nativeSupervisor.ts:41–64`）；所有 CLI 通过同一个 launcher／PTY backend 启动于当前开发容器（`:79–85`）。`modules/task-runtime/adapters/k8s/taskCluster.ts:66–74` 只给整个任务容器分配 resources；原生名册只有一个 runnerId（`packages/contracts/taskrunner/nativeTerminal.ts:15`），启动输入没有独立执行环境／资源额度（`packages/contracts/api/nativeTerminal.ts:7–10`）。没有逐 CLI 的资源准入或硬上限。
+
+[Linux cgroup v2 文档](https://docs.kernel.org/admin-guide/cgroup-v2.html#memory-interface-files) 说明 memory.oom.group 启用时按组终止任务；在子 cgroup 内触发的 OOM 不跨出该组。[Kubelet 配置文档](https://kubernetes.io/docs/reference/config-api/kubelet-config.v1beta1/) 说明 cgroup v2 的 singleProcessOOMKill 默认 false。因此仅捕获子进程退出、扩大当前套餐、设置窗口个数或轮询剩余内存，不能证明“新增失败不影响已有 CLI”；修改节点全局 OOM 行为也不是本 RFC 已批准的隔离实现。
+
+**待裁定的两种完整实现方向**：
+
+| 方向 | 执行与额度 | 对当前实现的影响 |
+|---|---|---|
+| (a) 每个 CLI 独立执行 Pod，同一工作树 | 保留开发工作区及预览；逐个 CLI 按管理员额度通过平台准入，子 Pod 有独立 requests／limits，超额启动只失败该 CLI。多个 CLI 挂载同一工作卷，按卷访问模式处理同节点约束或共享存储支持 | task-runtime 管执行子环境和工作卷引用；dev-session 管父会话、子执行环境与 agentId／terminalId 映射；session 按实际 Runner 转发输入／resize／事件。现有单 Runner 名册／活动投影需明确兼容与迁移，子环境结束不得删除共享工作卷 |
+| (b) 保留单开发容器，逐 CLI 委派子 cgroup | 为 Runner／编辑／预览预留额度，CLI 及其准备进程、后代放入各自受限 cgroup，额度总和受容器上限约束；并发启动先原子预留，失败释放 | 保留当前 UI 对象与主 Runner；部署环境须实际支持受控 cgroup 委派，当前只读挂载不具备。需明确额度的管理员配置归属、跨环境支持、创建／取消／退出清理与异常补偿，不能静默降级为无硬隔离 |
+
+两种方向都保持逐个启动、个人页签／分屏、同工作树编辑、独立预览和原 CLI 身份语义。所需额度和准入结果由平台解释，租户不填写窗口数量表单；没有可用额度时保留原工作区与进程。都须用受限环境实际验证新增进程耗尽内存、并发启动、子进程退出／重试、会话释放及 Runner／其他 CLI 存活，最后完成原四窗与尺寸验收。
+
+**建议与边界**：建议 (a)，利用平台现有 Kubernetes 额度与独立容器边界，避免把部署前提隐藏在 TaskRunner 中；需要同步设计共享工作卷和多 Runner 路由。本条是按开发规则 §5.7 提交的实现期方案选择，等待作者裁定后补全 RFC-003 的相应设计再开发；尚未实施任何隔离策略、调整节点配置、增加容器权限或取消原验收条件。RFC-004 仍等待 RFC-003 完结，其两个启动前 Hook 不先行实施。

@@ -1,4 +1,5 @@
 import type { LogEntryDto } from '@crewstation/contracts';
+import { LogEntryDtoSchema } from '@crewstation/contracts';
 import type { K8sClient, K8sObject } from '@crewstation/k8s';
 import { Resources } from '@crewstation/k8s';
 import type { ClusterObserver } from '../../ports/sources';
@@ -27,17 +28,26 @@ export function kubernetesClusterObserver(k8s: K8sClient): ClusterObserver {
       const pods = await k8s.list<Pod>(Resources.Pod!, namespace, { labelSelector: selector });
       const entries: LogEntryDto[] = [];
       for (const pod of pods) {
-        const stream = await k8s.logs(namespace, pod.metadata.name, { tailLines: options.tailLines, ...(options.sinceSeconds ? { sinceSeconds: options.sinceSeconds } : {}) }).catch(() => undefined);
-        if (!stream) continue;
+        const stream = await k8s.logs(namespace, pod.metadata.name, { timestamps: true, tailLines: options.tailLines, ...(options.sinceSeconds ? { sinceSeconds: options.sinceSeconds } : {}) });
         const text = await new Response(stream).text();
         for (const line of text.split('\n')) {
           if (!line) continue;
-          const space = line.indexOf(' ');
-          const ts = space > 0 && !Number.isNaN(Date.parse(line.slice(0, space))) ? line.slice(0, space) : new Date().toISOString();
-          entries.push({ ts: new Date(ts).toISOString(), source: 'slot', pod: pod.metadata.name, stream: 'stdout', message: space > 0 && ts !== line.slice(0, space) ? line : line.slice(space + 1) });
+          entries.push(logEntry(line, pod.metadata.name));
         }
       }
-      return entries.sort((a, b) => a.ts.localeCompare(b.ts)).slice(-options.tailLines);
+      // 未知时间保留读取顺序，放在已知时间之后，不伪造其与其他 Pod 的时间关系。
+      return entries.sort((a, b) => a.ts === undefined ? (b.ts === undefined ? 0 : 1) : b.ts === undefined ? -1 : a.ts.localeCompare(b.ts)).slice(-options.tailLines);
     },
+  };
+}
+
+function logEntry(line: string, pod: string): LogEntryDto {
+  const space = line.indexOf(' ');
+  const timestamp = LogEntryDtoSchema.shape.ts.safeParse(space > 0 ? line.slice(0, space) : '');
+  const value = timestamp.success ? timestamp.data : undefined;
+  return {
+    ...(value === undefined ? {} : { ts: new Date(value).toISOString() }),
+    source: 'slot', pod, stream: 'combined',
+    message: value === undefined ? line : line.slice(space + 1),
   };
 }
