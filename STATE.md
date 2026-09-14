@@ -15,9 +15,11 @@
 
 第五十四批在旧健康 rfc003-ux 专用任务里，用已有 rfc003-verify-opencode 档位创建一个只读历史 Agent，真实 OpenCode 完成两轮口令对话；第二轮没有重给第一轮口令，仍正确接续。Agent `agt_01a0a0fe05327000bf97088b148de687`、原生会话 `ses_f5f01f2a4ffeK5bad0yVcuk6x5` 保持。两轮均有明确 waiting 事件，API 名册却仍为 running，已修复这段持久事件投影；等待不记结束时间，实际继续执行保留身份，说明性状态不推测执行。
 
-新增回归修复前 **4 pass／1 fail**，修复后连同历史页面定向 **10 pass／0 fail／84 assertions**。首次完整门禁停在新增测试的字面量类型，修正后最终 **1130 pass／4 skip／0 fail**（1134 tests／192 files／6254 assertions／99.93s），两份候选摘要保持。console 未改，沿用上一批有效 build。上库、精确 SHA CI 与仅 cs-api 更新继续。
+新增回归修复前 **4 pass／1 fail**，修复后连同历史页面定向 **10 pass／0 fail／84 assertions**。首次完整门禁停在新增测试的字面量类型，修正后最终 **1130 pass／4 skip／0 fail**（1134 tests／192 files／6254 assertions／99.93s），两份候选摘要保持。已发布 `c712aa77912e5f0dab2fb92ccec4bf17c6f6ef23`，精确 SHA [CI 34877572645](https://github.com/wangbinquan/CrewStation/actions/runs/34877572645) 成功：1126 pass／8 skip／0 fail、console build 1.26s。仅 cs-api 更新至 rfc003-c712aa7／generation=24／1／1，实际 imageID 与三份源码摘要一致；17:59:26Z 原历史 Agent 已返回 awaiting-input，身份、档位及权限保持，无 endedAt。
 
 17:45:16Z 原 Pod UID／ready／restartCount=0、HEAD a10027c 和旧比较文件／Git 配置摘要保持，但旧任务镜像把 OpenCode 缓存与快照写进 /work，未提交项由 1 增为 1395，接口明确截断；不能称工作树未变。没有删除、读取或提交这些缓存内容，保留该历史会话供后续页面验收。Mac 仍锁定，I9／I14／I15 与成员范围仍待答复；累计仍 **18／52**，RFC-004 不提前启动。具体事件和保全边界见 implementation 第五十四批。
+
+18:01:05Z 更新后核对：files 原单个 OpenCode／Runner、工作树 e4741df／未提交 0／未推送 0、文件摘要和原部署槽均保持；旧历史 QA 的工作树指纹与模型运行后相同，未再增加更改。原失败 Pod／工作卷和 PostgreSQL 身份、状态保持。增量镜像仅新增 58,925 bytes，流式导入成功，节点余量 573,718,528 bytes；没有清理数据或重启任务容器。最后的纯证据补记沿用有效门禁，文档提交 CI 单独核验。
 
 ## 最新接力：历史对话输入与控制器更新（2026-09-15）
 

@@ -1112,3 +1112,15 @@ console 使用此前已核对并导入的 `cs-console:rfc003-cbe2825`。API 新�
 17:45:16Z 只读保全核对：旧 QA Pod UID `4920b2aa-880e-49c3-a782-8575bbf9a42e`、Running／ready／restartCount=0，HEAD `a10027cda8470ca4088780ed79081d07dd2b8e0b`，unpushed=0。原 `ux-comparison.txt` SHA256=`ee05185cb39c025d4968f1922cbd0218cc152a08e9cafb2c624522b9fba26dd3`，`.git/config` SHA256=`1006427aae9926b67a725f90e98efcf69325ad55275dd88c80f3a0e92afae500`，均与启动前相同。**工作树指纹没有保持**：旧镜像的 HOME=/work，实际新增 `.cache/opencode` 与 `.local/share/opencode` 缓存／快照，未提交由 1 增为 1395，接口返回 uncommittedTruncated=true；只读目录统计分别 4548／8804 KiB。没有读取、删除、忽略或提交缓存内容，也没有把 read-only Agent 解释为 CLI 不会写自身缓存。这个已知旧运行时问题见 dev-gotchas 的 HOME 记录，当前保留现场。
 
 观察器结束只关闭订阅，没有取消历史 Agent，原会话保留供页面接续。临时证据为 batch54 的 history-preflight／compute／run／after-run、red／targeted／check 和 candidate。完整门禁通过后继续上库、精确 SHA CI 和 API 更新。Mac 仍锁定，真实页面继续／返回及 CLI 草稿旅程尚缺，累计仍 **18／52**；I9／I14／I15 与具体成员范围待裁定，RFC-004 仍排队。
+
+### 第五十四批上库与 API 复验
+
+六个精确路径已发布为 `c712aa77912e5f0dab2fb92ccec4bf17c6f6ef23`，17:54:35Z fetch 证明 main 与 origin/main 同步且工作树／索引干净。精确 SHA [CI 34877572645](https://github.com/wangbinquan/CrewStation/actions/runs/34877572645)／job `104088465996` 成功，终态 17:57:26Z：**1126 pass／8 skip／0 fail**，1134 tests／192 files／6213 assertions／67.05s，新增历史等待回归实际执行；console build **1.26s**。
+
+镜像 `cs-control-plane:rfc003-c712aa7` 基于已验证 cc93104，控制面完整差异只有本批 agents.ts 与 devSessionModule.test.ts；console 与文档差异不在该进程执行。只覆盖这两份已验证文件，无依赖安装、迁移或任务镜像变化。实际 imageID=`sha256:7dd1c1c92acad59f15e03f99632f72b93ac2e390c2078be88c54f14e58d32c3c`，无网络临时容器内两份文件摘要一致。逐 digest 核对总内容 517,447,213 bytes，只新增 **58,925 bytes**；流式 save／import 均退出 0，导入前后余量 578,781,184／578,498,560 bytes，无落盘 tar 或清理操作。
+
+用原 UID、generation=23、replicas=1、唯一容器名和旧镜像作为 JSON Patch test，仅替换 cs-api 镜像。17:59:00Z rollout 已完成，generation=24、1／1；Pod `cs-api-78b9c5f656-rdm4r`／UID `89634ec6-8757-4b7c-8103-df3560330e99`，restartCount=0。实际 imageID、两份候选源码以及沿用的 gateway/wiring.ts 摘要全部匹配。cs-controller cc93104／generation=20 和 console 7e8dc7f／generation=25 保持。
+
+17:59:26Z 经正常已登录 API 再读原历史 Agent，只把 state 从 running 改为 awaiting-input，其余整个 DTO 与第二轮结束后的记录相同，没有 endedAt；未发送新提示或重新启动 Agent。18:01:05Z 原 files 单个原生 OpenCode／Runner／seq=2004、工作树 e4741df／未提交 0／未推送 0、文件摘要、files preview v0.1.4 和其他 QA／代理槽均与更新前一致。旧 rfc003-ux 保持模型结束后的指纹 c53f8b3／未提交 1395，没有进一步变化；原比较文件和 Git 配置摘要仍相同。三份 QA Pod、失败工作卷、PostgreSQL 身份及状态保持，节点余量 **573,718,528 bytes**。没有临时调零副本或未恢复的故障命令。
+
+本批 source-ci、image-context／build／import-budget／import、api-verified、history-verified 与 final-environment 保存本机明细。上述 API／WS、运行镜像和完整门禁证明不替代浏览器输入／返回旅程，UX 通过数仍 **18／52**，RFC-004 不提前启动。源码和部署内容没有再改，纯证据补记复用有效本地门禁；最终文档提交 CI 独立核对。
