@@ -1,5 +1,5 @@
 import type {
-  Actor, AgentInstanceDto, AgentInstanceState, RunnerEvent, SendAgentMessageRequest, ServiceId, StartDevAgentRequest, TaskId,
+  Actor, AgentEvent, AgentInstanceDto, AgentInstanceState, RunnerEvent, SendAgentMessageRequest, ServiceId, StartDevAgentRequest, TaskId,
 } from '@crewstation/contracts';
 import { IDENTITY_HEADERS } from '@crewstation/contracts';
 import { forbidden, newId, notFound, precondition, validation } from '@crewstation/kernel';
@@ -69,7 +69,7 @@ export function agentUseCases(deps: DevSessionUseCaseDeps) {
         const spec = e.event.spec ? { compute: e.event.spec.compute, permission: e.event.spec.permission } : {};
         agents.set(e.event.agentId, {
           ...current, ...spec, ...(e.event.sessionId ? { sessionId: e.event.sessionId } : {}),
-          state: stateOf(e.event.type, current.state), ...(isTerminal(e.event.type) ? { endedAt: stored.at } : {}),
+          state: stateOf(e.event, current.state), ...(isTerminal(e.event.type) ? { endedAt: stored.at } : {}),
         });
       }
       return [...agents.values()];
@@ -77,9 +77,13 @@ export function agentUseCases(deps: DevSessionUseCaseDeps) {
   };
 }
 
-function stateOf(type: string, current: AgentInstanceState): AgentInstanceState {
-  switch (type) {
-    case 'started': case 'session': case 'text': case 'thinking': case 'tool-start': case 'tool-end': case 'status': return 'running';
+function stateOf(event: AgentEvent, current: AgentInstanceState): AgentInstanceState {
+  switch (event.type) {
+    case 'status':
+      if (event.status === 'waiting') return 'awaiting-input';
+      if (event.status === 'running') return 'running';
+      return current;
+    case 'started': case 'session': case 'text': case 'thinking': case 'tool-start': case 'tool-end': return 'running';
     case 'permission': return 'awaiting-input';
     case 'completed': return 'completed';
     case 'error': return 'failed';

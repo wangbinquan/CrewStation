@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
-import type { Actor, ProjectId, RunnerCommand, ServiceId, TaskId, UserId } from '@crewstation/contracts';
+import type { Actor, AgentEvent, ProjectId, RunnerCommand, RunnerEvent, ServiceId, TaskId, UserId } from '@crewstation/contracts';
 import { fixedClock } from '@crewstation/kernel';
 import type { TestDatabase } from '@crewstation/testkit';
 import { createTestDatabase, testDatabaseAvailable } from '@crewstation/testkit';
@@ -18,6 +18,7 @@ const developer: Actor = { userId: 'usr_1123456789abcdef0123456789abcdef' as Use
 const envs = new Map<string, EnvironmentView & { createdBy: UserId; preview?: { command: string[]; port: number; healthPath: string } }>();
 const computeProfiles: Array<{ name: string; driver: 'claude-code' | 'opencode' | 'stub'; model: string }> = [{ name: 'balanced', driver: 'claude-code', model: 'anthropic/claude-sonnet-5' }];
 const commands: RunnerCommand[] = [];
+let agentEvents: Array<{ seq: number; at: string; event: RunnerEvent }> | undefined;
 const notices: string[] = [];
 const issued: Array<{ taskId: TaskId; projectId: ProjectId; serviceId: ServiceId; userId: UserId }> = [];
 let dirty = '';
@@ -51,7 +52,7 @@ beforeAll(async () => {
         if (command.type === 'previewStatus') return { state: 'ready', port: 3000, restarts: 0 };
         return {};
       },
-      listEvents: async () => [
+      listEvents: async () => agentEvents ?? [
         { seq: 1, at: new Date().toISOString(), event: { kind: 'agent', event: { agentId: 'agt_1', seq: 0, at: new Date().toISOString(), type: 'started', spec: { compute: 'balanced', driver: 'claude-code', model: 'anthropic/claude-sonnet-5', permission: 'read-only' } } } },
         { seq: 2, at: new Date().toISOString(), event: { kind: 'agent', event: { agentId: 'agt_1', seq: 1, at: new Date().toISOString(), type: 'completed', sessionId: 's1' } } },
         { seq: 3, at: new Date().toISOString(), event: { kind: 'agent', event: { agentId: 'agt_2', seq: 0, at: new Date().toISOString(), type: 'text', text: '没有 started 事件' } } },
@@ -175,5 +176,44 @@ describe.skipIf(!available)('dev-session module', () => {
     expect(envs.get(first.taskId)?.state).toBe('failed');
     expect((await dev.api.getSession(developer, projectId))?.taskId).toBe(second.taskId);
     envs.clear();
+  });
+
+  test('历史 OpenCode 等待下一轮时显示待输入，继续对话保留同一身份且不提前结束', async () => {
+    const session = await dev.api.openSession(developer, projectId, { branch: 'main' });
+    agentEvents = [];
+    const append = (event: Omit<AgentEvent, 'agentId' | 'seq' | 'at'>) => {
+      const seq = agentEvents!.length;
+      const at = new Date(Date.UTC(2026, 8, 14, 17, 36, seq)).toISOString();
+      agentEvents!.push({ seq, at, event: { kind: 'agent', event: { agentId: 'agt_history', seq, at, ...event } } });
+      return at;
+    };
+    try {
+      const startedAt = append({ type: 'started', spec: { compute: 'qa-opencode', driver: 'opencode', model: 'opencode/big-pickle', permission: 'read-only' } });
+      append({ type: 'session', sessionId: 'ses_history' });
+      append({ type: 'text', text: 'RFC003_HISTORY_ONE' });
+      append({ type: 'status', status: 'waiting' });
+      // 实机两轮均发出 waiting，但原投影把所有 status 当 running，页面一直显示执行中。
+      const identity = { agentId: 'agt_history', taskId: session.taskId, sessionId: 'ses_history', compute: 'qa-opencode', permission: 'read-only', startedAt } as const;
+      expect(await dev.api.listAgents(developer, session.taskId)).toEqual([{ ...identity, state: 'awaiting-input' }]);
+
+      for (const status of ['diagnostic information', undefined]) {
+        append({ type: 'status', status });
+        expect(await dev.api.listAgents(developer, session.taskId)).toEqual([{ ...identity, state: 'awaiting-input' }]);
+      }
+      append({ type: 'status', status: 'running' });
+      expect(await dev.api.listAgents(developer, session.taskId)).toEqual([{ ...identity, state: 'running' }]);
+      append({ type: 'status', status: 'waiting' });
+      append({ type: 'text', text: 'RFC003_HISTORY_ONE RFC003_HISTORY_TWO' });
+      expect(await dev.api.listAgents(developer, session.taskId)).toEqual([{ ...identity, state: 'running' }]);
+      append({ type: 'status', status: 'waiting' });
+      expect(await dev.api.listAgents(developer, session.taskId)).toEqual([{ ...identity, state: 'awaiting-input' }]);
+
+      const endedAt = append({ type: 'completed' });
+      append({ type: 'status', status: 'diagnostic information' });
+      expect(await dev.api.listAgents(developer, session.taskId)).toEqual([{ ...identity, state: 'completed', endedAt }]);
+    } finally {
+      agentEvents = undefined;
+      envs.clear();
+    }
   });
 });

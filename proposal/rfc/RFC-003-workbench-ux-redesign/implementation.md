@@ -1089,3 +1089,26 @@ console 使用此前已核对并导入的 `cs-console:rfc003-cbe2825`。API 新�
 原 OOM Pod 仍是 Failed／137，原工作卷 UID 保持 Bound／10Gi，未假称已恢复。PostgreSQL 原 UID 保持 ready／restartCount=9；节点余量 **631,484,416 bytes**。没有临时调零副本、在运行的候选 Vite 或尚未恢复的验收命令。本批没有新增真实 Agent、模型提示、发布版本、切流或 grants；受 I9 阻断的调用没有重复尝试。
 
 临时证据为 batch53 的 candidate、red／targeted／check／console-build、source-ci、console-preflight／image-build／import-budget／import／verified／http-verified 和 final-environment；关键事实已在此落档。再次检查 CUA 仍明确报告 Mac 锁定，解锁问题保持待答复。完整真实旅程仍 **18／52**，I9／I14／I15 与成员范围继续待裁定；RFC-004 不提前启动。源码候选和部署内容未再修改，纯证据补记沿用有效本地门禁，最终文档提交的 CI 单独核对。
+
+## 第五十四批：真实历史 OpenCode 与等待状态
+
+在旧健康 rfc003-ux 项目 `prj_01a09859a1bc7000b8622726e24f34b2`／任务 `tsk_01a0985a8624700090ea5b5ecd4fca86`，经普通 API 使用已有 `rfc003-verify-opencode` 档位创建一个 permission=read-only 的历史结构化 Agent。该任务此前无历史 Agent、无原生 CLI；files QA 原单个原生 OpenCode 未再收到提示，也未启动重复 CLI。本次沿用户指定的 OpenCode 验收，未实现 RFC-004 Hook 或改模型接入配置。
+
+实际 Agent `agt_01a0a0fe05327000bf97088b148de687`，OpenCode 1.18.29／opencode/big-pickle，原生会话 `ses_f5f01f2a4ffeK5bad0yVcuk6x5`。POST 启动返回 201；第一轮只请求回复 `RFC003_HISTORY_ONE`。第二轮仅要求回忆上一轮口令再接 `RFC003_HISTORY_TWO`，未在提示里重复第一轮口令，回执 204。真实持久流记录如下：
+
+| seq | UTC 时间 | 事件 |
+|---|---|---|
+| 82198 | 17:36:37.684Z | started |
+| 82199 | 17:36:47.633Z | session，原生会话 ID 如上 |
+| 82200 | 17:36:47.782Z | text：RFC003_HISTORY_ONE |
+| 82201 | 17:36:47.989Z | status：waiting |
+| 82202 | 17:36:52.662Z | text：RFC003_HISTORY_ONE RFC003_HISTORY_TWO |
+| 82203 | 17:36:53.026Z | status：waiting |
+
+两轮等待后 `GET /v1/tasks/:taskId/agents` 都仍返回 state=running。定位到 `modules/dev-session/application/agents.ts` 的 stateOf 仅看事件 type，把所有 status 当作执行。现读取完整 AgentEvent：明确 waiting → awaiting-input，明确 running → running，其他说明性 status 保持已有状态；文本等实际执行事件继续恢复 running。等待不设置 endedAt，compute／permission／startedAt／sessionId 保持，真正 completed／error／cancelled 才写结束时间。该 HTTP 路由由 cs-api 装配，controller 不提供它，因此本批只需更新 cs-api。
+
+新增模块 API 回归用两轮实机事件顺序验证等待、再次执行、身份保留、未知状态及真正结束；修复前 **4 pass／1 fail／40 assertions**，失败点恰为 waiting 被还原为 running。修复后与既有历史页面定向 **10 pass／0 fail／84 assertions／1.51s**。首次完整门禁在测试 identity.permission 的宽字符串类型停止，固定字面量后最终 `bun run check` **1130 pass／4 skip／0 fail**（1134 tests／192 files／6254 assertions／99.93s）。两份源码／测试候选摘要保持；console 源码和依赖未改，沿用第五十三批有效 build。
+
+17:45:16Z 只读保全核对：旧 QA Pod UID `4920b2aa-880e-49c3-a782-8575bbf9a42e`、Running／ready／restartCount=0，HEAD `a10027cda8470ca4088780ed79081d07dd2b8e0b`，unpushed=0。原 `ux-comparison.txt` SHA256=`ee05185cb39c025d4968f1922cbd0218cc152a08e9cafb2c624522b9fba26dd3`，`.git/config` SHA256=`1006427aae9926b67a725f90e98efcf69325ad55275dd88c80f3a0e92afae500`，均与启动前相同。**工作树指纹没有保持**：旧镜像的 HOME=/work，实际新增 `.cache/opencode` 与 `.local/share/opencode` 缓存／快照，未提交由 1 增为 1395，接口返回 uncommittedTruncated=true；只读目录统计分别 4548／8804 KiB。没有读取、删除、忽略或提交缓存内容，也没有把 read-only Agent 解释为 CLI 不会写自身缓存。这个已知旧运行时问题见 dev-gotchas 的 HOME 记录，当前保留现场。
+
+观察器结束只关闭订阅，没有取消历史 Agent，原会话保留供页面接续。临时证据为 batch54 的 history-preflight／compute／run／after-run、red／targeted／check 和 candidate。完整门禁通过后继续上库、精确 SHA CI 和 API 更新。Mac 仍锁定，真实页面继续／返回及 CLI 草稿旅程尚缺，累计仍 **18／52**；I9／I14／I15 与具体成员范围待裁定，RFC-004 仍排队。

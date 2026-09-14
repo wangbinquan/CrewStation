@@ -11,6 +11,14 @@
 
 **RFC-003 工作台 UX 重设计处于 In Progress，作者已要求完整实现并提交上库。** RFC-001 与 RFC-002 都已 Done，见 `proposal/rfc/README.md` 的索引表。
 
+## 最新接力：真实历史 OpenCode 与等待状态（2026-09-15）
+
+第五十四批在旧健康 rfc003-ux 专用任务里，用已有 rfc003-verify-opencode 档位创建一个只读历史 Agent，真实 OpenCode 完成两轮口令对话；第二轮没有重给第一轮口令，仍正确接续。Agent `agt_01a0a0fe05327000bf97088b148de687`、原生会话 `ses_f5f01f2a4ffeK5bad0yVcuk6x5` 保持。两轮均有明确 waiting 事件，API 名册却仍为 running，已修复这段持久事件投影；等待不记结束时间，实际继续执行保留身份，说明性状态不推测执行。
+
+新增回归修复前 **4 pass／1 fail**，修复后连同历史页面定向 **10 pass／0 fail／84 assertions**。首次完整门禁停在新增测试的字面量类型，修正后最终 **1130 pass／4 skip／0 fail**（1134 tests／192 files／6254 assertions／99.93s），两份候选摘要保持。console 未改，沿用上一批有效 build。上库、精确 SHA CI 与仅 cs-api 更新继续。
+
+17:45:16Z 原 Pod UID／ready／restartCount=0、HEAD a10027c 和旧比较文件／Git 配置摘要保持，但旧任务镜像把 OpenCode 缓存与快照写进 /work，未提交项由 1 增为 1395，接口明确截断；不能称工作树未变。没有删除、读取或提交这些缓存内容，保留该历史会话供后续页面验收。Mac 仍锁定，I9／I14／I15 与成员范围仍待答复；累计仍 **18／52**，RFC-004 不提前启动。具体事件和保全边界见 implementation 第五十四批。
+
 ## 最新接力：历史对话输入与控制器更新（2026-09-15）
 
 第五十二批已发布 `cc931041503cd2794c3145172b728ac24303a08a`，两个精确 SHA CI 34869427269／34869427360 均成功。只更新 cs-controller 至 rfc003-cc93104，generation=20、1／1、restartCount=0，实际 imageID 和两份源码摘要一致。精确回收本 RFC 的一项旧 console 编译缓存 118MB 后，按 digest 核对仅新增 45,029 bytes 并流式导入；没有清理镜像或数据卷。16:51:39Z 两份健康 QA Pod、原单个 OpenCode、e4741df／未提交 0／未推送 0 和文件摘要保持，参考代理路由仍指向正式 green，节点余量 655,147,008 bytes。
