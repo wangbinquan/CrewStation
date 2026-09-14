@@ -1170,3 +1170,17 @@ CUA 本轮仍报告 Mac 锁定，当前完整历史创建／继续／返回的�
 19:09:48Z 对部署前 19:03:01Z 的正常 API 快照复核：files 工作树 e4741df／未提交 0／未推送 0、旧历史 QA 的模型后指纹／未提交 1395 保持；原历史 Agent 完整 DTO 仍 awaiting-input，原单个原生 CLI／Runner 身份保持。本批没有新增模型请求、创建任务容器或变更角色／市场范围。CUA 在更新后仍报告 Mac 锁定；当前页面实际创建、继续和返回的完整旅程仍未执行，不增加 UX-AT-52 通过结论。
 
 证据保存为 batch56 的 candidate、red／targeted／check／console-build、source-publication／ci、console-preflight、image-context／build／import-budget／import、console-patch／verified／http-verified、runtime-before／verified；关键结论已落此文。七份源码候选自完整门禁后未变，纯证据补记复用该有效门禁，最终文档 SHA 的 hosted CI 单独核对。累计 **18／52**；I9／I14／I15、成员范围及解锁问题仍待答复，RFC-004 继续等待 RFC-003 完结。
+
+## 第五十七批：死信重放并发与队列收尾
+
+本轮继续 UX-AT-14。19:24:09Z 经正常已登录 API 读取 history／files／workbench／delivery 四个既有 QA 项目，各有一个订阅，dead 记录均为 0。保留其现场，没有发送会向共享订阅扇出的事件；CUA 仍明确报告 Mac 锁定。以下均是隔离测试数据库和临时 HTTP 订阅者的实跑，不作为已完成真实项目页面旅程。
+
+源码中 replayDelivery 在事务外读 dead，授权返回后直接写入旧快照。新增三项真实 PostgreSQL／HTTP 查询和队列回归，控制两个请求通过授权的顺序。初次 **0 pass／3 fail／10 assertions／875ms**：迟到请求仍返回 200；先到请求已送达时，实际订阅者收到三次请求（原始失败、第一次重放成功、错误的重复重放），应只有前两次；同时通过授权的两个请求也都被受理。
+
+现授权之后在原 events UnitOfWork 中重新点查并锁行，使用当前状态执行转换，状态写入与入队同一事务提交。普通 uow.read 不加写锁；并发请求按实际 pending／delivered 返回 412，不覆盖真实送达结果。初次定向 **13 pass／0 fail／101 assertions／1.268s**，该候选完整门禁 **1142 pass／4 skip／0 fail**（1146 tests／194 files／6360 assertions／100.71s）。
+
+随后核对实际入队语义，发现旧 worker 已把投递写为 dead、尚未完成 running 队列任务的窗口：enqueueJob 按活动 dedupKey 去重返回，适配器忽略该结果；重放返回成功并把投递改为 pending，但旧任务收尾后队列没有任何可执行任务。新增回归让真实 worker 停在两步之间，结果 **3 pass／1 fail／24 assertions／939ms**，明确观察到 pending 且 runOnce=0。
+
+现 events 的入队适配器在该冲突时返回 precondition／412，事务回滚完整死信记录并说明稍后重试；旧任务结束后同一投递可正常重新入队并实际送达。没有修改公共 queue 包的去重／租约规则。最终定向三文件 **14 pass／0 fail／111 assertions／1.10s**，涵盖四项新增场景和原有模块／状态机。新增修复改变了候选，重新执行最终完整 `bun run check` **1143 pass／4 skip／0 fail**（1147 tests／194 files／6370 assertions／103.83s）；七份候选摘要保持。console 源码／依赖未变，沿用第五十六批有效 build，未重复构建。
+
+落位限于 events application、persistence／queue adapters、两个端口说明和本模块测试，没有迁移或新跨模块依赖。用户域重放接口由 cs-api 提供，本批只需更新该部署；源码发布、精确 SHA CI 与实际镜像核对继续。临时证据为 events-preflight 和 batch57 的 red／targeted／check、queue-red／targeted-final／check-final、两版 candidate。累计仍 **18／52**，I9／I14／I15、具体成员范围与 Mac 解锁仍待答复，RFC-004 等待 RFC-003 完结。

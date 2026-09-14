@@ -10,11 +10,14 @@ export function replayDeliveryUseCase({ uow, projects, clock }: EventsUseCaseDep
     const delivery = await uow.read.deliveries.getById(deliveryId);
     if (!delivery) throw notFound('投递', deliveryId);
     await projects.authorize(actor, delivery.projectId, 'manage-production-config');
-    const replayed = replayDelivery(delivery, clock.now());
-    await uow.run(async (scope) => {
+    return uow.run(async (scope) => {
+      // 授权期间另一请求可能已重放甚至投递成功；锁内读当前状态，不能用外部旧快照覆盖。
+      const current = await scope.deliveries.getById(deliveryId);
+      if (!current) throw notFound('投递', deliveryId);
+      const replayed = replayDelivery(current, clock.now());
       await scope.deliveries.update(replayed);
       await scope.scheduler.schedule(replayed.id);
+      return deliveryToDto(replayed);
     });
-    return deliveryToDto(replayed);
   };
 }

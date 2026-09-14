@@ -9,13 +9,13 @@ export interface UnitOfWorkOptions {
   readonly jobMaxAttempts: number;
 }
 
-export function scopeOver(executor: Executor, options: UnitOfWorkOptions): RepositoryScope {
+export function scopeOver(executor: Executor, options: UnitOfWorkOptions, lockDeliveries = false): RepositoryScope {
   return {
     producers: drizzleProducerRepository(executor),
     eventTypes: drizzleEventTypeRepository(executor),
     subscriptions: drizzleSubscriptionRepository(executor),
     inbox: drizzleInboxRepository(executor),
-    deliveries: drizzleDeliveryRepository(executor),
+    deliveries: drizzleDeliveryRepository(executor, lockDeliveries),
     scheduler: queueDeliveryScheduler(executor, options.jobMaxAttempts),
   };
 }
@@ -23,6 +23,6 @@ export function scopeOver(executor: Executor, options: UnitOfWorkOptions): Repos
 export function drizzleUnitOfWork(db: Database, options: UnitOfWorkOptions): UnitOfWork {
   return {
     read: scopeOver(db, options),
-    run: (fn) => db.transaction((tx) => fn(scopeOver(tx, options))),
+    run: (fn) => db.transaction((tx) => fn(scopeOver(tx, options, true))),
   };
 }

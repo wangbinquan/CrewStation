@@ -23,12 +23,13 @@ export function drizzleInboxRepository(db: Executor): InboxRepository {
   };
 }
 
-export function drizzleDeliveryRepository(db: Executor): DeliveryRepository {
+export function drizzleDeliveryRepository(db: Executor, lockForUpdate = false): DeliveryRepository {
   return {
     insert: async (delivery) => { await db.insert(deliveries).values(toDeliveryRow(delivery)); },
     update: async (delivery) => { await db.update(deliveries).set(toDeliveryRow(delivery)).where(eq(deliveries.id, delivery.id)); },
     getById: async (id) => {
-      const row = (await db.select().from(deliveries).where(eq(deliveries.id, id)))[0];
+      const query = db.select().from(deliveries).where(eq(deliveries.id, id));
+      const row = (await (lockForUpdate ? query.for('update') : query))[0];
       return row ? toDelivery(row) : undefined;
     },
     listByProject: async (projectId, state, limit) => {

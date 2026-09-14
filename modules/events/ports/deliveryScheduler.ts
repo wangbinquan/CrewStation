@@ -5,7 +5,7 @@ export interface DeliverJobPayload {
   readonly deliveryId: string;
 }
 
-/** 把一次投递排入队列，与投递记录同一事务；同一 deliveryId 处于待执行状态时不重复入队。 */
+/** 与投递记录同一事务入队；已有活动任务时抛冲突，调用方回滚，不能把去重当作重放成功。 */
 export interface DeliveryScheduler {
   schedule(deliveryId: string): Promise<void>;
 }

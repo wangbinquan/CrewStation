@@ -35,6 +35,7 @@ export interface InboxRepository {
 export interface DeliveryRepository {
   insert(delivery: Delivery): Promise<void>;
   update(delivery: Delivery): Promise<void>;
+  /** uow.run 内按行锁定至事务结束；uow.read 为普通快照读取。 */
   getById(id: string): Promise<Delivery | undefined>;
   /** 按创建时间倒序。 */
   listByProject(projectId: ProjectId, state: DeliveryState | undefined, limit: number): Promise<Delivery[]>;
