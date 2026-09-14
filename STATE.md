@@ -15,7 +15,11 @@
 
 第五十批修复“全部部署槽”在界面省略 slot 后，后端仍默认只读正式槽的问题。未指定槽时，按当前项目命名空间、服务名和 workload=service 读取部署日志；明确 prod／preview 时继续按当前角色映射 blue／green。只读集群核对显示，单用服务标签还会匹配原失败开发容器，新增工作负载条件后仅保留真实蓝绿两槽。新增模块 API 回归先红后绿，定向 **22 pass／0 fail／102 assertions**；完整本地门禁 **1119 pass／4 skip／0 fail**（1123 tests／190 files／6191 assertions／102.42s），两个源码／测试候选摘要未变。console 源码和依赖未改，沿用上一批有效 build。提交后的精确 SHA CI 单独核验。
 
-上一批证据提交 `6ecef0b3852425f34c1ef74f3796100d2adb85bb` 的 [CI 34857895769](https://github.com/wangbinquan/CrewStation/actions/runs/34857895769) 已成功：1114 pass／8 skip／0 fail、console build 993ms。共享 API／console 更新为 rfc003-cbe2825 的具体授权仍待回复；该镜像仅含第四十九批，**不含本批全部槽修复**，没有重标或替换已准备的镜像。Mac 解锁、I14／I15 与成员范围问题仍待答复。本批没有新增部署或页面旅程，验收仍 **18／52**；RFC-004 已批准，继续等待 RFC-003 完结。
+本批已发布 `80d1020195f456ca010d43265926f0b1e7403f79`，精确 SHA [CI 34859748456](https://github.com/wangbinquan/CrewStation/actions/runs/34859748456) 成功：1115 pass／8 skip／0 fail、console build 1.32s。作者随后明确“你可以自由更新本机上部署的服务”，此前服务更新确认已解决，后续同类更新直接按授权推进。
+
+console 已更新至 rfc003-cbe2825／generation=24，cs-api 已更新至 rfc003-80d1020／generation=22，均 1／1；实际 Pod imageID、六个控制台产物及五个 API 相关文件摘要核对通过。API 镜像在已核对 cbe2825 基底上只覆盖两个候选文件，新增导入内容 39,925 bytes，没有重新安装依赖或清理数据。真实 API 的全部槽返回蓝绿两 Pod，prod／preview 分别只返回 green／blue；两次查询时间相同，逐行匹配实际容器时间且 stream=combined。原迁移 Job／Pod 已不存在，默认一小时保留期已过，失败发布历史仍保留；不能再用它复验原固定标记，UX-AT-13 的新故障页面旅程仍待执行。
+
+15:16:50Z 原单个 OpenCode、两份 QA Pod UID、工作树 `e4741df`、首页／Git 配置摘要、预览 v0.1.4 和正式槽状态均保持；未提交／未推送 0。节点余量 334,888KiB。再次尝试页面验收时 CUA 明确报告 Mac 仍锁定；I14／I15 与成员范围问题仍待答复。本批真实部署／API 验证不替代页面旅程，验收仍 **18／52**；RFC-004 已批准，继续等待 RFC-003 完结。下文服务更新“待授权”均为本次明确授权前的历史记录。
 
 ## 最新接力：迁移失败、恢复发布与日志事实（2026-09-14）
 

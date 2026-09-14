@@ -995,3 +995,19 @@ Mac 此时仍锁定；本批故障、恢复和日志结果来自实际 API／集
 临时证据为 `crewstation-rfc003-batch50-{red,targeted,check}.log`、candidate.json 和 live-selector.json；关键结果已在此落档。此前纯证据提交 `6ecef0b3852425f34c1ef74f3796100d2adb85bb` 的精确 SHA [CI 34857895769](https://github.com/wangbinquan/CrewStation/actions/runs/34857895769) 已成功：1114 pass／8 skip／0 fail，1122 tests／190 files／6148 assertions／55.35s，console build 993ms，终态 14:49:37Z。本批提交后的精确 SHA CI 另行核验。
 
 第四十九批 rfc003-cbe2825 两镜像的具体滚动更新授权仍待回复；其中不含本批全部槽修复，未重标镜像或重试被拒绝的部署。Mac 解锁、I14／I15 和成员范围问题也仍待答复。验收维持 **18／52**，RFC-003 In Progress；RFC-004／ADR-0004 已批准，T2–T9 严格等待 RFC-003 完结后启动。
+
+### 第五十批上库、明确部署授权与实际复验
+
+本批六个精确路径已发布为 `80d1020195f456ca010d43265926f0b1e7403f79`，推后 main 与 origin/main 同步、工作树与索引干净。精确 SHA [CI 34859748456](https://github.com/wangbinquan/CrewStation/actions/runs/34859748456)／job `104028517997` 成功：**1115 pass／8 skip／0 fail**，1123 tests／190 files／6150 assertions／67.38s，console build **1.32s**，终态 15:06:49Z。作者随后明确“你可以自由更新本机上部署的服务”，先前本机服务更新的待确认已解决；没有将这条服务更新授权扩大成成员角色变更或 I14／I15 的方案裁定。
+
+console 使用此前已核对并导入的 `cs-console:rfc003-cbe2825`。API 新构建 `cs-control-plane:rfc003-80d1020`，基于实际 imageID=`sha256:6afe80c20228060f26c7263527c2fea0416f704b25eda46dd78b2a047208dbed` 的 cbe2825 基底，只覆盖本批两个源码／测试文件；源依赖和锁文件没有变化，没有重新安装依赖。临时增量上下文 `/private/tmp/crewstation-rfc003-batch50-image-rpb_cf_x` 不是 Git checkout。API 新 imageID=`sha256:7ceb696e459aaf821fd96ff92487e1d7627737a9cd4fdc3742f29b02c81a8413`，revision 为完整 80d1020，五个相关文件在无网络临时容器中逐项匹配。导出流与节点 content digest 对照确认仅新增 **39,925 bytes**；流式导入退出 0、无 tar 落盘，余量由 349,319,168 变为 349,196,288 bytes，没有清理镜像、缓存或卷。
+
+按原 Deployment UID／generation／唯一容器名／旧镜像的 JSON Patch test 校验，先 console、后 cs-api，只替换镜像并等待 rollout 完成。console 15:07:01Z 就绪，generation=24、Pod `console-694d6b9dcb-sq4fj`／UID `1e91a44c-51bd-435c-a52d-d7e492164a19`，实际 imageID=`sha256:42715cdf7e4b89916547a96d9f478b3812d855cc7ac0f17c85b22a201ff62a2a`，六个静态文件摘要匹配。API 15:12:13Z 就绪，generation=22、Pod `cs-api-6b7d5b677c-mwsrc`／UID `a48eedd9-bcd9-49f0-b315-8fb3da2703cd`，实际 imageID 为上述 7ceb696e，五个文件再次在运行 Pod 内核对。均 1／1、restartCount=0。初次校验工具使用 app=console 及未规范化的容器镜像名称，未匹配到 Pod；改为真实 Deployment selector 和 imageID 后取得上述证明，没有把空匹配当作通过。
+
+15:15:08Z 的真实工作台 API 查询：全部槽返回 blue／green 两 Pod，prod 只返回 green、preview 只返回 blue，没有包含原失败开发容器。两条记录时间分别为 `2026-09-14T06:55:45.390Z`、`2026-09-14T14:12:30.333Z`，两次查询完全相同，与直接 kubectl 容器日志规范到毫秒后的值逐条一致，source=slot／stream=combined。明确角色的记录带该查询角色，全部槽没有伪造角色。
+
+原 v0.1.3 失败发布仍为 failed，但 migration 日志为空；直接读取确认其 Job 和 Pod 都已不存在。`modules/release/adapters/k8s/migrationJob.ts:11` 使用 `jobObject`，`packages/k8s/objects/workloads.ts:109` 默认 `ttlSecondsAfterFinished=3600`；故障发生于 13:59:54Z，到本次复验已经超过该保留期。未人为删除或重建这些对象，也没有把留存的历史日志文件冒充当前 API 返回。此次用仍在运行的蓝绿 Pod 验证实际时间与流元数据；UX-AT-13 仍需在新故障日志可查时完成页面旅程，不扩大现有日志保留承诺。
+
+15:16:50Z 再次核对：files 任务／单个 OpenCode／Runner、旧 rfc003-ux Pod UID、首页及 Git 配置摘要保持；工作树 `e4741df56b440d776b7c25ff5a4978b3d5822f46`、未提交 0／未推送 0、preview v0.1.4／正式为空均不变。files-green 和 workbench-blue 仍 generation=11／1／1；workbench 正式 green 仍 generation=1／v0.1.0／1／1。PostgreSQL 原 UID 保持、ready=true／restartCount=9，节点余量 **334,888KiB**。当前没有临时调零副本或未恢复的故障命令。
+
+临时证据为 batch50 的 source-ci、console-verified、image-build／content／import-budget／import、api-verified、api-logs-observed／verified、migration-log-resource、final-environment JSON 和相关日志，关键结果已在此持久记录。尝试继续浏览器验收时 CUA 再次明确报告 Mac 锁定、无法自动解锁。I14／I15、成员范围和解锁仍待答复；没有新增完整页面通过项，累计 **18／52**。RFC-004 仍按已批准的顺序等待 RFC-003 完结。此次只补部署与验收事实，沿用未变候选的本地完整门禁。
