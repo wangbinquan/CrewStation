@@ -602,3 +602,26 @@ Chrome 原生 CUA 恢复且 Mac 已解锁，使用已有 admin 演示身份 `usr
 本轮续验 OpenCode 1.18.29：从档位下拉选择已保存的专用项，单次 ＋CLI 新增 `agt_01a09ec50bff7000b944bb4b69ba964a`／`pty_01a09ec50bff700193b2cc8426e6c67b`（显示名 CLI ba964a），原 Claude 窗口保留。OpenCode 显示 Big Pickle 与“等待任务”；取得右窗控制后提交固定文本 `Reply exactly RFC003_OPENCODE_READY. Do not use tools or read files.`，界面转为“执行中”，真实回复 `RFC003_OPENCODE_READY`，TUI 耗时 4.7s。这次调用不是脚本化模型或 stub。
 
 切到独立预览后，真实 iframe 为 `dev.rfc003-verify-workbench.cs.localhost`，应用显示 environment=development；工作区页签和顶栏均显示未读完成 1，焦点仍在预览页签。“Agent 动态”中列出 CLI ba964a 本轮完成；点击“查看结果”返回原 Agent／terminal，并携带轮次 `ses_f6139ff9fffem3ilM8is1IfEkT:msg_09ec6007a0011fNtou8ipTylG4`、事件 `094575a5-d1a6-4d78-8b90-75b205dd409d`、seq=950，原屏幕中可见真实答复，本人未读清除。状态明确为“本轮完成／进程在线”，不是进程结束。此次切预览时已出现完成通知，尚未据此证明所有后台完成时序、输入草稿以及双真实模型并行场景。
+
+## 第四十批：双 OpenCode 并行、页签恢复与独立中断退出
+
+RFC-004 与 ADR-0004 的待审方案、第三十九批记录已发布为 `6c24aaec1f52f56c7cded7a67ef9e5259f4045ed`。精确 SHA [CI 34817433462](https://github.com/wangbinquan/CrewStation/actions/runs/34817433462) 成功：1082 pass／8 skip／0 fail，1090 tests／185 files／65.41s，console build 通过。本批没有生产代码变化，不重复相同源码候选的本地完整门禁；RFC-004 保持 Draft，审批问题已提出，未获得回复。
+
+继续使用第三十九批新专用项目、原 taskId 与 Runner `2536e3ca-3630-4c01-9c5e-621ef9735cca`。真实浏览器 ＋页签得到空工作区，已启动数量仍为 2；重命名为“OpenCode 并行验收”，再点一次 ＋CLI，数量为 3。新的 CLI 5557a0 为 `agt_01a09ecb8fdc7000910df419595557a0`／`pty_01a09ecb8fdc700195415b8e5fca23d1`，与既有 CLI ba964a 同为 OpenCode 1.18.29、专用 Big Pickle 档位；Claude b86fec 仍在原登录页。
+
+两次固定文本请求明确“不用工具、不读文件”，要求分别输出带 A／B 标记的编号行。A 开始执行后切回另一页签启动 B，两个页签同时显示“执行中 1”。原生持久化事件证明执行区间重叠（下列时间均为 UTC）：
+
+| 窗口／轮次 | 开始 | 完成 | 完成事件／seq |
+|---|---|---|---|
+| A＝5557a0，第 1 轮 | 2026-09-14T07:27:32.675Z | 07:28:42.649Z | 5a24eea7-0531-416b-b9ff-84c2f397b261／3736 |
+| B＝ba964a，第 2 轮 | 2026-09-14T07:27:50.812Z | 07:28:05.966Z | 4c7243b6-6a01-4615-bf68-994e613409da／2733 |
+
+B 执行时留下未发送 `RFC003_UNSENT_DRAFT_KEEP_0914`，切到独立预览；预览输入框另外留下未发送 `RFC003_PREVIEW_UNSENT_0914`。B 完成后显示未读 1，随后 A 在该输入框仍聚焦期间完成，顶栏未读变 2，两个后台页签各为未读完成 1；焦点及预览草稿保持。动态中选 B 的查看结果，实际 URL 包含原 task／agent／terminal、轮次 `ses_f6139ff9fffem3ilM8is1IfEkT:msg_09ed0ac1c001ILf3Qh8IxWipP4`、上述事件与 seq=2733；恢复的屏幕同时显示 `RFC003_PARALLEL_B_DONE` 与未发送草稿。代码页签往返后仍为相同输出和草稿。
+
+将 B 移入 A 的页签，两窗分别显示 `RFC003_BACKGROUND_A_DONE` 与 `RFC003_PARALLEL_B_DONE`；B 草稿不变。键盘调整左右分隔线 50→56、拖动至 43，切纵排后取得两窗输入控制，实际两窗均显示输出末尾和输入区。此处不能笼统宣称只读窗口自动适配：现有控制租约明确只允许控制方发送 resize，只读窗口保持原 PTY 尺寸，较小窗口需内部滚动或取得控制。后续名册证明 B 为 212×18、A 为 104×18，CLI 对象及原 startedAt 未改变。
+
+关闭“OpenCode 并行验收”页签后，两个显示窗收起、已启动仍为 3，未读 A 仍在顶部。动态中查看 A 恢复原终端，URL 轮次为 `ses_f612f9adfffeblbmRGE0m6aavF:msg_09ed06543001qzUUtn6dcZLkhY`、event=5a24eea7…／seq=3736，本人未读清除；名册把 B 放回当前页签，草稿及输出完整。放大 B 再恢复保留对象；只有完成草稿保留验收后，才在 B 的输入框用 Ctrl+U 清掉本次验收文字。
+
+独立中断验收再次让 B 与 A 同时执行：B 第 3 轮 07:33:31.270Z 开始，A 第 2 轮 07:33:42.372Z 开始，页签显示执行中 2。按 A 原生 TUI 的提示连续 Escape 后，07:33:52.661Z 产生 `turn-cancelled`／seq=4842，UI 显示“本轮已中断／进程在线”，B 继续输出。A 空输入下 Ctrl+C 退出，07:34:02.125Z 产生 `process-ended`／seq=5012，名册 lifecycle=ended、exitCode=0，UI 明确“进程已结束”并禁用输入。B 仍在原进程中完成 300 行，最终 `RFC003_SURVIVOR_B_DONE`，07:34:03.331Z `turn-completed`／seq=5015；其 agentId、terminalId 和 07:15:08.933Z 的 startedAt 均保持。
+
+本批因此关闭 UX-AT-02／03／04／36／41，与原 UX-AT-10 共六项；其余 46 项仍按原条件保留。没有把 admin 一种身份、当前截图或 OpenCode 一种可用模型当作完整角色／五种 CSS 视口／双主题／两驱动验证。结束的是本次新建专用 A 进程，开发容器、B、旧 QA 任务及其保留文件未释放；后续浏览器默认仍是专用项目三窗，A 已结束，B 已完成，Claude 停在登录选择。详细只读快照为临时目录中的 `opencode-parallel-live.json` 与 `opencode-isolation-after.json`，核心 ID／时序与结论已在此持久记录。

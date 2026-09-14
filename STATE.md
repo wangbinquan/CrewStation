@@ -21,11 +21,13 @@ Chrome 原生通道恢复，已实看新市场、五个项目入口、管理空�
 
 新建专用项目 `rfc003-verify-workbench`／`prj_01a09eb302d67000a680835da140f993` 已 active，服务 `svc_01a09eb302d670019d1303d81a5bea94`，首个 preview `rel_01a09eb30d3370009d26fd52ceeaa013`／`6af30245c4f5dc0537bdae2c3a44aa2b3fd62d29` 就绪。新会话 `tsk_01a09eb4f03f7000ba011a517772cc09`、Pod `task-01a09eb4f03f` 使用新 runtime imageID；原生 Claude Code 已显示 TUI、取得输入控制并完成主题选择，但未挂载模型配置，停在登录选择页，未完成模型轮次。
 
-作者要求“你用 opencode”，已在实际容器读取模型目录，并经管理 UI 新增独立档位 `rfc003-verify-opencode`（opencode／opencode/big-pickle）。未改 balanced／deep／sample-stub；档位保存成功不等于已证明模型调用。紧接着作者明确运行配置应由管理员维护、租户使用；已完成 [RFC-004 三件套](proposal/rfc/RFC-004-admin-agent-runtime/proposal.md) 与 [ADR-0004](docs/adr/0004-agent-runtime-module.md) Draft，待方案批准，尚未修改生产代码。RFC-003 验收仍继续；当前浏览器可能停在算力档位选择菜单，操作前重读状态。
+作者要求“你用 opencode”，已在实际容器读取模型目录，并经管理 UI 新增独立档位 `rfc003-verify-opencode`（opencode／opencode/big-pickle）。未改 balanced／deep／sample-stub；模型调用的真实证据见下文。紧接着作者明确运行配置应由管理员维护、租户使用；已完成 [RFC-004 三件套](proposal/rfc/RFC-004-admin-agent-runtime/proposal.md) 与 [ADR-0004](docs/adr/0004-agent-runtime-module.md) Draft，待方案批准，尚未修改生产代码。方案及首批记录已发布为 `6c24aaec1f52f56c7cded7a67ef9e5259f4045ed`，[精确 SHA CI 34817433462](https://github.com/wangbinquan/CrewStation/actions/runs/34817433462) 成功，1082 pass／8 skip／0 fail，console build 通过。审批问题已提出，未获回复前继续既有 RFC-003 独立验收。
 
 本机环境方案和详细快照保存在 `/private/tmp/crewstation-rfc003-3d1ce51-environment/`（临时证据，不作为唯一持久记录）；持久验收摘要见 RFC-003 implementation 第三十九批及 acceptance-audit。此前共享部署／首次切流审批 blocker 已解除，不再重复申请同一授权。
 
 续验：OpenCode 1.18.29 已经真实完成模型调用，原生 Agent `agt_01a09ec50bff7000b944bb4b69ba964a`／终端 `pty_01a09ec50bff700193b2cc8426e6c67b` 返回固定文本 `RFC003_OPENCODE_READY`，显示“本轮完成／进程在线”。切至独立预览可访问真实 development 应用，顶部和工作页签显示未读完成 1；动态中的“查看结果”携带 task／agent／terminal／turn／event／seq 定位原 OpenCode 窗口并清除本人未读。Claude 原窗口仍停在登录选择，未受第二个 CLI 启动影响。此项只证明一次 OpenCode 真实轮次与对应通知／定位，不替代双 Agent 并行执行等剩余验收。
+
+最新续验已补双真实 OpenCode：A＝`agt_01a09ecb8fdc7000910df419595557a0` 与 B＝上述 ba964a 的实际执行时间重叠，预览后台完成时未读 1→2，输入草稿和焦点不变；动态定位、CLI 草稿经代码／预览／跨页签／关闭恢复均实看。取得控制后 PTY 可按纵排和分隔线适配；只读窗保持原 PTY 尺寸，此边界和未验证尺寸继续保留。再次并行执行时，A 经 Escape 中断，再 Ctrl+C 于 07:34:02.125Z 退出（exitCode=0）；B 保持原对象，于 07:34:03.331Z 正常完成。浏览器现为专用项目三窗：Claude 登录选择、A 已结束、B 本轮完成。没有释放容器／B／旧 QA。完整时序与 ID 见 implementation 第四十批；UX-AT-02／03／04／10／36／41 共六项通过，其余 46 项和 RFC-003 整体保持未完成。
 
 ## 正在实施：RFC-003（2026-09-13）
 
