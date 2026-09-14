@@ -120,10 +120,10 @@
 
 ## I13. 管理员配置 Agent 运行环境并供租户使用
 
-**现状**：算力档位只有 driver／model；平台通过 `CS_AGENT_ENV_SECRET` 挂载一个环境文件，Runner 创建时读取一次（`packages/settings/platformSettings.ts:63`、`runtimes/task/src/runner.ts:85`）。2026-09-14 新镜像实机验收中的 Claude Code 进入登录选择，专用 Pod 未挂载模型配置；OpenCode 已安装且可读取模型目录，但目录可读不等于模型调用成功。
+**现状**：算力档位只有 driver／model；平台通过 `CS_AGENT_ENV_SECRET` 挂载一个环境文件，Runner 创建时读取一次（`packages/settings/platformSettings.ts:63`、`runtimes/task/src/runner.ts:85`）。2026-09-14 新镜像实机验收中的 Claude Code 进入登录选择，专用 Pod 未挂载模型配置；随后专用 OpenCode 档位已用无需认证的供应方完成真实模型轮次，但尚无管理员运行环境管理流程。
 
-**作者已裁定**：配置由管理员完成，租户使用；当前验收改用 OpenCode。尚待确认的是具体运行配置版本、下发、生效和兼容方案。
+**作者已裁定**：配置由管理员完成、租户使用；采用两个注入点：（1）管理员定义配置文件及容器存放路径，启动 Agent 前预置；（2）管理员提供 Shell／Python／JS 等脚本，启动 Agent 前执行。两者统一为 Agent 启动前 Hook。当前实机验收使用 OpenCode。2026-09-14 已批准修订后的 RFC-004，并明确在 RFC-003 完结后启动开发。
 
 **可选做法**：(a) 只给全局 Secret 增加编辑表单，仍需重建容器且无法按 Agent 配不同环境；(b) 管理员维护可验证、可启用的运行配置，算力档位引用，每次启动固定快照；(c) 租户在每个 CLI 自行登录，与作者职责要求不符。
 
-已将方案 (b) 写成 [RFC-004](../../proposal/rfc/RFC-004-admin-agent-runtime/proposal.md) 与 [ADR-0004](../adr/0004-agent-runtime-module.md) 供审阅，尚未实现。RFC-003 的实际 UX 验收继续，不用这份新草案宣称其完成。
+已将方案 (b) 按作者两个 Hook 动作重写为获批的 [RFC-004](../../proposal/rfc/RFC-004-admin-agent-runtime/proposal.md) 与 [ADR-0004](../adr/0004-agent-runtime-module.md)，共 25 个验收案例，尚未实现。模板／脚本是主要配置入口，不再另做一套重复的供应方连接表单。RFC-003 的原定开发与实际 UX 验收完成后，再按已获批准的方案实施 RFC-004。
