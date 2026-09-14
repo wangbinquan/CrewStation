@@ -117,3 +117,13 @@
 **为什么是问题**：形状若不对，交互式 Agent 会静默不响应。这是移植时登记的残余风险，链式回退路径已实现。
 
 **可选做法**：(a) 在 M0／T0.4 用真实 CLI 实测确认，形状不符就改；(b) 交互模式一律走链式回退，放弃常驻进程；(c) 两种模式都保留，按 CLI 版本选择。
+
+## I13. 管理员配置 Agent 运行环境并供租户使用
+
+**现状**：算力档位只有 driver／model；平台通过 `CS_AGENT_ENV_SECRET` 挂载一个环境文件，Runner 创建时读取一次（`packages/settings/platformSettings.ts:63`、`runtimes/task/src/runner.ts:85`）。2026-09-14 新镜像实机验收中的 Claude Code 进入登录选择，专用 Pod 未挂载模型配置；OpenCode 已安装且可读取模型目录，但目录可读不等于模型调用成功。
+
+**作者已裁定**：配置由管理员完成，租户使用；当前验收改用 OpenCode。尚待确认的是具体运行配置版本、下发、生效和兼容方案。
+
+**可选做法**：(a) 只给全局 Secret 增加编辑表单，仍需重建容器且无法按 Agent 配不同环境；(b) 管理员维护可验证、可启用的运行配置，算力档位引用，每次启动固定快照；(c) 租户在每个 CLI 自行登录，与作者职责要求不符。
+
+已将方案 (b) 写成 [RFC-004](../../proposal/rfc/RFC-004-admin-agent-runtime/proposal.md) 与 [ADR-0004](../adr/0004-agent-runtime-module.md) 供审阅，尚未实现。RFC-003 的实际 UX 验收继续，不用这份新草案宣称其完成。

@@ -572,3 +572,33 @@ API 与出站审批接到各自真实分页客户端，只读活动页签的当�
 新增 [验收证据核对](acceptance-audit.md)，逐项保留 UX-AT-01–52 的现有证据与未完成证明。只读确认现有共享服务为 1／1 就绪、仍显示可变 `:dev` 镜像标签，不能证明包含本候选。没有再次尝试浏览器超时操作、main 推送、共享更新或生产切流；T12 开始证据核对但完整实机旅程仍未完成。
 
 最终 `bun run check` **1086 pass／4 skip／0 fail**，1090 tests、185 files、5958 assertions、98.12s；console build 成功。10 个源码候选在门禁前后逐文件哈希一致，lint 无错误或警告；跳过项与前批相同，未改原生运行时。验收表的 52 个编号与 plan 完全一致，新增及相关文档本地链接均存在。所有结果仍为本地候选证据，未部署、未推送、无本候选远端 CI。
+
+## 第三十九批：已授权发布、环境更新与首批完整实机证据
+
+作者“授权批准上库”后，十笔提交 `4d15e8c` 至 `3d1ce5181a11787e3629fea4021f0130e734912d` 已发布。精确 SHA [CI 34810918306](https://github.com/wangbinquan/CrewStation/actions/runs/34810918306) 成功：1082 pass／8 skip／0 fail、1090 tests／185 files，控制台构建通过。8 个 skip 为 opt-in K8s、两种原生 CLI 状态验收和五项本机 GitLab；Linux Ctrl+C 在 CI 通过。未重复运行已通过且源码未变的本地门禁。
+
+之后作者对可审阅的环境方案 A 和专用验收 B 回复“授权”。执行前重新核对 Docker／K8s 上下文、三个镜像 ID／完整 revision 标签／arm64、八个 Deployment UID／generation／旧镜像、任务镜像配置键、迁移账本及旧 QA 保留文件。导入新标签后，独立迁移 Job 于 2026-09-14T06:49:56Z 应用五份迁移成功；原 37 份校验和一致，现账本 42 份。只修改 `crewstation-env.CS_TASK_IMAGE`，八个带前提校验的镜像补丁逐个滚动成功，console 最后更新。
+
+| 运行组件 | 当前镜像 | 实际 Pod imageID |
+|---|---|---|
+| cs-api、cs-auth、cs-session、cs-controller、cs-events、两个 MCP | cs-control-plane:rfc003-3d1ce51 | sha256:a10b28e3d8324abaf1f73b3e4cfe3c0f8cfff26c8100b7a7fa37aed8a6a75974 |
+| console | cs-console:rfc003-3d1ce51 | sha256:315f7bdaf598e95bc12e21a7b2589f89b93c180fa40cc6c2cd4dfd00bc510499 |
+| 新专用开发容器 | cs-task-runtime:rfc003-3d1ce51 | sha256:cfabcc77f07ccdf075e47aa7b0d27ad79607c032cdca71af40cb3ccc5ab6ae1e |
+
+旧 QA Pod `task-01a0985a8624` 的 UID `4920b2aa-880e-49c3-a782-8575bbf9a42e`、文件 `/work/ux-comparison.txt` 的 SHA256 `ee05185cb39c025d4968f1922cbd0218cc152a08e9cafb2c624522b9fba26dd3` 均保持。没有重建旧任务、改普通 demo 或覆盖其他配置。
+
+Chrome 原生 CUA 恢复且 Mac 已解锁，使用已有 admin 演示身份 `usr_01a090f6f03a7000a1d23edcaf824aaf`。实际新市场展示已上线 demo、尚未上线 rfc003-ux；随后在专用项目发布页读取正式空版本与精确待验证 v0.1.0，展开当前→目标确认、填写具名验收原因后上线。切流 ID `tsw_01a09eb0740a70009559d622bd194c80`，发生于 2026-09-14T06:52:39.301Z，目标 `rel_01a09859aa5b7000a780d546a80468cb`／`a10027cda8470ca4088780ed79081d07dd2b8e0b`。页面显示正式就绪，实际打开 `http://rfc003-ux.cs.localhost/` 成功，应用返回项目身份与 production 环境；正式路由及槽 API 复核相同 releaseId／SHA，preview 为空。UX-AT-10 在本次候选获得通过证据；回退／并发切流尚未执行。
+
+从发布页回开发，原 taskId 重连，显示实际 HEAD `main @ a10027cda8` 对生产 v0.1.0，双向提交数 0／0、未提交文件 1、未推送 0；进入未提交页展示 `ux-comparison.txt` 为 untracked／+1 −0，patch 与磁盘保留内容一致。市场再次读取时 rfc003-ux 显示已上线并提供正式地址。此证据补充 UX-AT-30／31／32／49 的部分分支，不宣称这些多分支条目完整通过。
+
+管理空间新建 `rfc003-verify-workbench` 时先验证空提交：名称、slug、负责人三项错误均显示，焦点到名称。选择 admin、minimal-sample、standard-small 并保持任务额度空值，审核页明确平台默认；创建后显示真实开通中，实际项目 `prj_01a09eb302d67000a680835da140f993` 转 active。服务 `svc_01a09eb302d670019d1303d81a5bea94` 的首个 preview `rel_01a09eb30d3370009d26fd52ceeaa013`／`6af30245c4f5dc0537bdae2c3a44aa2b3fd62d29` 于 06:55:50Z 就绪，未切该项目正式流量。
+
+选择 main 新建会话 `tsk_01a09eb4f03f7000ba011a517772cc09`；Pod `task-01a09eb4f03f` UID `724ecb83-9fbd-4a36-9ad3-8266c6d84a42` 使用上表新镜像，预览 API 返回 ready。点击一次 ＋CLI 后只出现一个 CLI（显示名 CLI b86fec），真实 Claude Code 2.1.268 的 TUI 展示首次主题菜单，取得该窗输入控制后可移动并选择 Light mode。初次 Down／Return 操作曾被自动审批以焦点／TUI 未确认拒绝；重新只读截图与 AX 确认焦点为该 Terminal input、截图明确是主题菜单后，分别执行选择和确认成功，没有绕过审批。CLI 随后进入登录方式选择，未注入凭据、未完成真实模型轮次。
+
+实机核对新 Pod 没有 CS_AGENT_ENV_FILE／agent-env 挂载。作者要求改用 OpenCode，worker 下 `opencode models` 实际列出包括 opencode/big-pickle 的目录；管理员 UI 创建独立 `rfc003-verify-opencode` 档位，既有档位保留。OpenCode 尚未完成真实模型调用。作者进一步明确运行配置由管理员维护并供租户使用，缺口另记 I13 与 RFC-004 Draft，不将新档位保存或模型目录可读记作 J2／T15 通过。
+
+本轮截图和 AX 是当前部署真实界面，但尚未完成五种 CSS 视口与主题的统一量测。浏览器页签 API 仍没有新的成功证据，原生 Chrome 可继续使用；异常 AX 索引通过重读／已见截图坐标处理。剩余 J1–J6 与 52 项的未关闭部分继续登记在 acceptance-audit，不缩减验收范围。
+
+本轮续验 OpenCode 1.18.29：从档位下拉选择已保存的专用项，单次 ＋CLI 新增 `agt_01a09ec50bff7000b944bb4b69ba964a`／`pty_01a09ec50bff700193b2cc8426e6c67b`（显示名 CLI ba964a），原 Claude 窗口保留。OpenCode 显示 Big Pickle 与“等待任务”；取得右窗控制后提交固定文本 `Reply exactly RFC003_OPENCODE_READY. Do not use tools or read files.`，界面转为“执行中”，真实回复 `RFC003_OPENCODE_READY`，TUI 耗时 4.7s。这次调用不是脚本化模型或 stub。
+
+切到独立预览后，真实 iframe 为 `dev.rfc003-verify-workbench.cs.localhost`，应用显示 environment=development；工作区页签和顶栏均显示未读完成 1，焦点仍在预览页签。“Agent 动态”中列出 CLI ba964a 本轮完成；点击“查看结果”返回原 Agent／terminal，并携带轮次 `ses_f6139ff9fffem3ilM8is1IfEkT:msg_09ec6007a0011fNtou8ipTylG4`、事件 `094575a5-d1a6-4d78-8b90-75b205dd409d`、seq=950，原屏幕中可见真实答复，本人未读清除。状态明确为“本轮完成／进程在线”，不是进程结束。此次切预览时已出现完成通知，尚未据此证明所有后台完成时序、输入草稿以及双真实模型并行场景。

@@ -11,6 +11,22 @@
 
 **RFC-003 工作台 UX 重设计处于 In Progress，作者已要求完整实现并提交上库。** RFC-001 与 RFC-002 都已 Done，见 `proposal/rfc/README.md` 的索引表。
 
+## 最新接力：实机环境更新与管理员运行配置（2026-09-14）
+
+此前十笔提交 `4d15e8c` 至 `3d1ce5181a11787e3629fea4021f0130e734912d` 已获明确授权并全部推上 main；精确 SHA [CI 34810918306](https://github.com/wangbinquan/CrewStation/actions/runs/34810918306) 成功，1082 pass／8 skip／0 fail，console build 通过。当前记录前 fetch 确认本地与 origin/main 为 0／0。下文历史批次的“未推送／待授权”不再代表这些提交的当前状态。
+
+作者再次授权具体共享环境方案与专用项目验收。三个 `rfc003-3d1ce51` 镜像已导入 docker-desktop 节点，独立 Job `crewstation-rfc003-3d1ce51-migrate` 成功应用五份追加式迁移，账本 37 → 42；仅更新任务镜像配置键和八个 Deployment 镜像，逐个 rollout 成功。实际 Pod imageID 均核对一致，console 最后更新。旧 QA Pod UID 与 `/work/ux-comparison.txt` SHA256 保持原值，未释放／重建。
+
+Chrome 原生通道恢复，已实看新市场、五个项目入口、管理空间与新建向导。`rfc003-ux` 已在发布页首次上线 `v0.1.0`／`a10027cda8470ca4088780ed79081d07dd2b8e0b`，切流 `tsw_01a09eb0740a70009559d622bd194c80`；实际正式地址打开成功。原开发会话显示与生产提交一致、未提交文件 1，并能查看保留文件的真实 diff。UX-AT-10 获得完整本次实机证据，其余项目按 acceptance-audit 继续，不能宣称 52 项完成。
+
+新建专用项目 `rfc003-verify-workbench`／`prj_01a09eb302d67000a680835da140f993` 已 active，服务 `svc_01a09eb302d670019d1303d81a5bea94`，首个 preview `rel_01a09eb30d3370009d26fd52ceeaa013`／`6af30245c4f5dc0537bdae2c3a44aa2b3fd62d29` 就绪。新会话 `tsk_01a09eb4f03f7000ba011a517772cc09`、Pod `task-01a09eb4f03f` 使用新 runtime imageID；原生 Claude Code 已显示 TUI、取得输入控制并完成主题选择，但未挂载模型配置，停在登录选择页，未完成模型轮次。
+
+作者要求“你用 opencode”，已在实际容器读取模型目录，并经管理 UI 新增独立档位 `rfc003-verify-opencode`（opencode／opencode/big-pickle）。未改 balanced／deep／sample-stub；档位保存成功不等于已证明模型调用。紧接着作者明确运行配置应由管理员维护、租户使用；已完成 [RFC-004 三件套](proposal/rfc/RFC-004-admin-agent-runtime/proposal.md) 与 [ADR-0004](docs/adr/0004-agent-runtime-module.md) Draft，待方案批准，尚未修改生产代码。RFC-003 验收仍继续；当前浏览器可能停在算力档位选择菜单，操作前重读状态。
+
+本机环境方案和详细快照保存在 `/private/tmp/crewstation-rfc003-3d1ce51-environment/`（临时证据，不作为唯一持久记录）；持久验收摘要见 RFC-003 implementation 第三十九批及 acceptance-audit。此前共享部署／首次切流审批 blocker 已解除，不再重复申请同一授权。
+
+续验：OpenCode 1.18.29 已经真实完成模型调用，原生 Agent `agt_01a09ec50bff7000b944bb4b69ba964a`／终端 `pty_01a09ec50bff700193b2cc8426e6c67b` 返回固定文本 `RFC003_OPENCODE_READY`，显示“本轮完成／进程在线”。切至独立预览可访问真实 development 应用，顶部和工作页签显示未读完成 1；动态中的“查看结果”携带 task／agent／terminal／turn／event／seq 定位原 OpenCode 窗口并清除本人未读。Claude 原窗口仍停在登录选择，未受第二个 CLI 启动影响。此项只证明一次 OpenCode 真实轮次与对应通知／定位，不替代双 Agent 并行执行等剩余验收。
+
 ## 正在实施：RFC-003（2026-09-13）
 
 设计基线 `1f40fa8` 已获批准。T4 第一批代码与自动测试完成：TaskRunner 只读 `workspaceStatus` 读取实际 HEAD、分支、暂存／未暂存／未跟踪路径、全本地分支未推送与上游关系；Git 错误／浅历史保留 unknown。释放面板先查清单再确认，取消不释放；确认附带会话 ID 防止释放已替换的对象。发布重新做权威检查，Git 失败与分支变化不会继续推送。受控确认面板收进 shared。
