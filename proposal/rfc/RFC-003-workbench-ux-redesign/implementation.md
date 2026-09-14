@@ -1051,3 +1051,27 @@ console 使用此前已核对并导入的 `cs-console:rfc003-cbe2825`。API 新�
 最终定向 **23 pass／0 fail／165 assertions**，四文件、1440ms；完整本地 `bun run check` 为 **1124 pass／4 skip／0 fail**，1128 tests／191 files／6209 assertions／150.53s，两个候选文件摘要保持。console 源码和依赖未变化，沿用前批有效 build，提交后的精确 SHA CI 另行核验。实际启动 gateway 消费者的进程是 cs-controller，本次只需更新它；其他进程的 HTTP／任务协议未变。
 
 本轮 CUA 已恢复可操作，不再把 Mac 锁定列为当前阻塞。原演示管理员重新登录到 files 工作区，实际看到 `codex/rfc003-files @ e4741df56b`、未提交 0／未推送 0、已启动 1、未读完成 1，确认已部署的发布计数修复在页面生效。会话元数据中的“分支 main”是创建时分支，仍需改为明确的来源标注。历史入口跳转到独立 conversations 页面，该项目旧版 Agent 列表为空，没有把普通终端当作历史 Agent 接续通过。I9／I14／I15、成员范围及其他页面验收继续，当前仍 **18／52**；RFC-004 未提前启动。
+
+### 第五十二批上库与控制器部署
+
+七个精确路径已发布为 `cc931041503cd2794c3145172b728ac24303a08a`，main 与 origin/main 同步、工作树和索引干净。该精确 SHA 的两个 push CI 均终态成功：[34869427269](https://github.com/wangbinquan/CrewStation/actions/runs/34869427269)／job `104061366311`（16:36:27Z）与 [34869427360](https://github.com/wangbinquan/CrewStation/actions/runs/34869427360)／job `104061367171`（16:36:35Z）。前者完整日志为 **1120 pass／8 skip／0 fail**，1128 tests／191 files／6168 assertions／61.35s，console build **1.21s**。两个新增组合根用例实际执行。
+
+镜像 `cs-control-plane:rfc003-cc93104` 基于已核对的 e26515e，只覆盖两个候选文件共 13,567 bytes，依赖未变；实际 imageID=`sha256:daa019e509d0a215714c246eb1a0599b11786ae4e0a2e674365de7644034c25d`，两文件在无网络临时容器中核对一致。首次导入因余量 313,344,000 bytes 低于既有 300MiB 加新增内容的预算而没有执行。随后精确回收本 RFC 旧 console 构建的一项可回收、非共享缓存 `w497c9ve1xeaxeemage6yddfp`，创建时间 2026-09-14 11:30:58Z、命令包含 crewstation-console-build。采用锚定 ID filter，命令报告回收 118MB，执行前／后余量 519,168,000／663,851,008 bytes；执行前余量已自行恢复，不能将全部差额归因于该清理。没有删除镜像、其他项目缓存或数据卷。
+
+16:48:41Z 重新核对镜像与节点 content digest，仅缺 **45,029 bytes**，流式导入 save／import 都退出 0，无 tar 落盘，余量由 658,300,928 变为 658,087,936 bytes。按原 UID／generation=19／唯一容器名／旧镜像的 JSON Patch test，仅更新 cs-controller。16:49:39Z rollout 完成，generation=20、1／1，Pod `cs-controller-55b497779d-r8wkj`／UID `dd14ec92-39e1-41c5-9078-74ba6d74c67b`，restartCount=0，实际 imageID 和两份源码摘要再次一致。cs-api 保持 e26515e／generation=23，console 保持 cbe2825／generation=24。
+
+16:51:39Z 只读复查原 files 与旧 rfc003-ux 两任务：Pod UID 保持、Running／ready／restartCount=0。files 的单个原 OpenCode／Runner 和最后完成事件 seq=2004 保持，工作树 `e4741df56b440d776b7c25ff5a4978b3d5822f46`、未提交 0／未推送 0，首页与 Git 配置摘要一致。参考代理正式 green 仍 v0.1.2／1／1，实际网关路由仍为 `/api/test-gitlab → reference-api-proxy-green`。没有再次调用已知受 I9 阻断的上游，也没有改 grants。节点余量 **655,147,008 bytes**。临时证据为 batch52 的 source-ci、image-build／import-budget／import、cache-cleanup、controller-verified、final-environment JSON。
+
+后续继续页面验收时 CUA 再次明确报告 Mac 已锁定、无法自动解锁，已请求手动解锁；此前恢复记录不再代表当前可操作。两份健康 QA 的历史结构化 Agent 名册均为空，未创建新 Agent 或发送新模型任务。第五十二批实际修复、发布与控制器更新已经完成，但没有增加完整 UX 通过项。
+
+## 第五十三批：历史对话输入与发送回执
+
+沿 UX-AT-52 检查历史入口发现：AgentComposer 的单一草稿跨对象复用，切换 Agent 会带入另一对象的输入；发送调用后立即清空，即使请求失败也没有原文或错误反馈；Ctrl／Cmd+Enter 又能绕过发送中按钮的禁用。返回 CLI 直接卸载输入，缺失的 agent 链接还会默默选择列表第一项。
+
+现将消息草稿和发送状态放到 feature hook，按历史 AgentId 独立保留；同步拦截同一对象的重复派发，不限制其他对象并行发送。成功回执只清除发出时的草稿版本，失败显示原错误、保留输入且不自动重试；切换 Agent、暂时打开新建表单以及回执期间继续编辑均保留对应内容。历史页面复用共享离开确认，在途时不能确认放弃；同页对象链接保留各自草稿，缺失对象明确提示。会话摘要的 branch 改为中英“创建时分支／Initial branch”，当前工作树仍读取真实容器状态。
+
+新增真实路由／mutation 测试，通过可控 HTTP 回执验证对象隔离、失败、同步快捷键、并行回执、迟到成功、返回确认和错误链接。修复前 **0 pass／5 fail**；修复后的定向四文件 **25 pass／0 fail／209 assertions／2.96s**。首次完整门禁停在测试夹具 TaskId 品牌类型，改用实际 AgentInstanceDtoSchema 校验夹具后，最终 `bun run check` **1129 pass／4 skip／0 fail**（1133 tests／192 files／6247 assertions／101.64s），console build **577ms**；七个源码／测试候选摘要保持。仅夹具类型修正没有改变已构建的生产内容，未重复 build。
+
+使用当前生产彩色／单色 SVG 与 tokens 中真实明暗背景／文字色，以 rsvg-convert 按 16／24／32／64px 渲染并目视检查；C 形、平行轨道和箭头在四种尺寸可区分，单色在两主题均可见。产物 [brand-size-check.png](brand-size-check.png) 与原稿摘要、渲染方式记录在 [brand-design.md](brand-design.md)。这验证当前资产本身，不能冒充锁屏期间重新操作了顶栏、favicon 或登录页。
+
+提交、精确 SHA CI 和本机 console 更新单独记录。此处的隔离路由测试不替代真实历史 Agent 继续及返回的浏览器旅程；Mac 解锁、I9／I14／I15 和具体成员范围仍待答复，累计仍 **18／52**，RFC-004 按批准顺序排队。

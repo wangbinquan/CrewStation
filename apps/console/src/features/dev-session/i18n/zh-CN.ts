@@ -45,7 +45,7 @@ export const messages = {
   'devSession.runnerState.shutting-down': 'TaskRunner 正在关闭：容器即将销毁，请确认改动已提交并推送。',
 
   'devSession.session.taskId': '任务',
-  'devSession.session.branch': '分支',
+  'devSession.session.branch': '创建时分支',
   'devSession.session.runner': 'TaskRunner',
   'devSession.session.runnerOn': '已连接 cs-session',
   'devSession.session.runnerOff': '未连接',
@@ -150,6 +150,9 @@ export const messages = {
   'devSession.agents.messagePlaceholder': '发一条消息（Ctrl／Cmd＋Enter 发送）',
   'devSession.agents.send': '发送',
   'devSession.agents.sending': '发送中…',
+  'devSession.agents.draftScope': '历史对话输入',
+  'devSession.agents.sendingHint': '消息发送中。收到结果后才可确认离开；其他历史 Agent 仍可继续输入。',
+  'devSession.agents.missingTarget': '指定的历史 Agent 不存在或当前不可访问，请从名册选择已有对象。',
   'devSession.agents.cancel': '中止',
 
   'devSession.agentState.starting': '启动中',

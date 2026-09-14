@@ -11,6 +11,14 @@
 
 **RFC-003 工作台 UX 重设计处于 In Progress，作者已要求完整实现并提交上库。** RFC-001 与 RFC-002 都已 Done，见 `proposal/rfc/README.md` 的索引表。
 
+## 最新接力：历史对话输入与控制器更新（2026-09-15）
+
+第五十二批已发布 `cc931041503cd2794c3145172b728ac24303a08a`，两个精确 SHA CI 34869427269／34869427360 均成功。只更新 cs-controller 至 rfc003-cc93104，generation=20、1／1、restartCount=0，实际 imageID 和两份源码摘要一致。精确回收本 RFC 的一项旧 console 编译缓存 118MB 后，按 digest 核对仅新增 45,029 bytes 并流式导入；没有清理镜像或数据卷。16:51:39Z 两份健康 QA Pod、原单个 OpenCode、e4741df／未提交 0／未推送 0 和文件摘要保持，参考代理路由仍指向正式 green，节点余量 655,147,008 bytes。
+
+第五十三批修复历史消息的跨 Agent 草稿串用、失败即清空、快捷键重复发送和离开丢输入。按 AgentId 独立保存，成功回执只清当时版本；失败保留且不重试，返回 CLI 复用输入确认，缺失链接不误选另一对象。会话元数据标为“创建时分支／Initial branch”。新增五项回归修复前 0 pass／5 fail；定向 **25 pass／0 fail／209 assertions**。最终完整门禁 **1129 pass／4 skip／0 fail**（1133 tests／192 files／6247 assertions／101.64s），console build **577ms**，七个候选文件摘要保持。当前 SVG 原稿还完成四种尺寸／双主题／单色的渲染复核，图见 brand-design.md；不是新一轮浏览器检查。提交、精确 SHA CI 和本机 console 更新继续。
+
+本轮浏览器短暂恢复后，CUA 再次报告 Mac 锁定，已请求解锁；下文此前“已恢复”是当时事实。files 和旧健康 QA 均无历史结构化 Agent，本批没有另启模型任务。I9／I14／I15 和具体成员范围仍待答复，累计 **18／52**，不将自动回归当作页面旅程完成；RFC-004 继续等待 RFC-003 完结。
+
 ## 最新接力：发布投影的并发迟到与浏览器恢复（2026-09-15）
 
 第五十二批通过可控交错复现了上一批仍有的缺口：网关读取旧目录后暂停，目录提交并应用新路由，旧网关请求恢复后把新路由覆盖。新增回归修复前 3 pass／1 fail；现将发布登记后的路由／放行表刷新统一归目录消费者，移除 gateway 对同一 release.registered 的重复处理，项目／切流事件保持原路径。另验证目录已提交、K8s 首次失败时游标不推进，重试恢复路由且不重复操作。定向 **23 pass／0 fail／165 assertions**，完整本地门禁 **1124 pass／4 skip／0 fail**（1128 tests／191 files／6209 assertions／150.53s）；两个候选文件保持一致。console 源码／依赖未变，沿用有效 build。提交、精确 SHA CI 和仅 controller 更新继续。

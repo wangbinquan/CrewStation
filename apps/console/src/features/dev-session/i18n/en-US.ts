@@ -47,7 +47,7 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   'devSession.runnerState.shutting-down': 'The TaskRunner is shutting down: the container is about to go away, so commit and push what you need.',
 
   'devSession.session.taskId': 'Task',
-  'devSession.session.branch': 'Branch',
+  'devSession.session.branch': 'Initial branch',
   'devSession.session.runner': 'TaskRunner',
   'devSession.session.runnerOn': 'Connected to cs-session',
   'devSession.session.runnerOff': 'Not connected',
@@ -152,6 +152,9 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   'devSession.agents.messagePlaceholder': 'Send a message (Ctrl/Cmd+Enter)',
   'devSession.agents.send': 'Send',
   'devSession.agents.sending': 'Sending…',
+  'devSession.agents.draftScope': 'Historical conversation messages',
+  'devSession.agents.sendingHint': 'A message is being sent. Wait for its result before confirming navigation. You can still write to other historical Agents.',
+  'devSession.agents.missingTarget': 'The requested historical Agent is missing or inaccessible. Select an existing Agent from the roster.',
   'devSession.agents.cancel': 'Cancel run',
 
   'devSession.agentState.starting': 'Starting',

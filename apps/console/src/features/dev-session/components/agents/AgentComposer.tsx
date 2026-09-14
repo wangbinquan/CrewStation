@@ -1,26 +1,26 @@
-import { useState } from 'react';
 import type { KeyboardEvent, ReactElement } from 'react';
 import { useT } from '../../../../shared/lib/useT';
 import { Button } from '../../../../shared/ui/Button';
+import { PaneNotice } from '../PaneNotice';
 import styles from './AgentComposer.module.css';
 
 export interface AgentComposerProps {
   readonly disabled: boolean;
   readonly sending: boolean;
-  readonly onSend: (content: string) => void;
+  readonly draft: string;
+  readonly error?: string;
+  readonly onDraftChange: (draft: string) => void;
+  readonly onSend: () => void;
   readonly onCancel: () => void;
   readonly canCancel: boolean;
 }
 
 /** 给流式 Agent 追加一条消息；Ctrl／Cmd＋Enter 发送，Enter 仍是换行。 */
-export function AgentComposer({ disabled, sending, onSend, onCancel, canCancel }: AgentComposerProps): ReactElement {
+export function AgentComposer({ disabled, sending, draft, error, onDraftChange, onSend, onCancel, canCancel }: AgentComposerProps): ReactElement {
   const t = useT();
-  const [draft, setDraft] = useState('');
   const send = (): void => {
-    const content = draft.trim();
-    if (content === '' || disabled) return;
-    onSend(content);
-    setDraft('');
+    if (draft.trim() === '' || disabled || sending) return;
+    onSend();
   };
   const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>): void => {
     if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
@@ -29,6 +29,7 @@ export function AgentComposer({ disabled, sending, onSend, onCancel, canCancel }
     }
   };
   return (
+    <>{error ? <PaneNotice tone="warning">{error}</PaneNotice> : null}
     <div className={styles.composer}>
       <textarea
         className={styles.input}
@@ -37,7 +38,7 @@ export function AgentComposer({ disabled, sending, onSend, onCancel, canCancel }
         disabled={disabled}
         placeholder={t('devSession.agents.messagePlaceholder')}
         aria-label={t('devSession.agents.message')}
-        onChange={(event) => setDraft(event.target.value)}
+        onChange={(event) => onDraftChange(event.target.value)}
         onKeyDown={onKeyDown}
       />
       <div className={styles.actions}>
@@ -48,6 +49,6 @@ export function AgentComposer({ disabled, sending, onSend, onCancel, canCancel }
           {t('devSession.agents.cancel')}
         </Button>
       </div>
-    </div>
+    </div></>
   );
 }
