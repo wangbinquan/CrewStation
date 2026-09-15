@@ -9,7 +9,7 @@ let page: Awaited<ReturnType<typeof renderApp>> | undefined;
 afterEach(() => { page?.unmount(); page = undefined; globalThis.fetch = originalFetch; });
 
 function fixture() {
-  const state = { failSave: false, failRead: false, failVersions: false, hold: undefined as Promise<void> | undefined };
+  const state = { failSave: false, failRead: false, failVersions: false, failIdentity: false, role: 'owner' as 'owner' | 'developer', admin: false, hold: undefined as Promise<void> | undefined };
   const writes: Array<{ path: string; method: string; body?: Record<string, unknown> }> = [];
   const item = { name: 'GREETING', value: '当前值', isSecret: false, version: 3, env: 'development', updatedBy: userId, updatedAt: '2026-09-13T01:00:00.000Z' };
   globalThis.fetch = (async (raw, init) => {
@@ -21,7 +21,10 @@ function fixture() {
       if (state.failSave) { status = 503; body = { error: 'unavailable', message: '配置服务暂不可用' }; }
       else if (method === 'DELETE') return new Response(null, { status: 204 });
       else body = { ...item, ...input, version: 4 };
-    } else if (path === '/v1/me') body = { id: userId, name: '负责人', email: 'owner@test.invalid', isAdmin: false, memberships: [{ projectId, role: 'owner' }] };
+    } else if (path === '/v1/me') {
+      if (state.failIdentity) { status = 503; body = { error: 'unavailable', message: '身份读取失败' }; }
+      else body = { id: userId, name: '当前成员', email: 'member@test.invalid', isAdmin: state.admin, memberships: [{ projectId, role: state.role }] };
+    }
     else if (path === `/v1/projects/${projectId}`) body = { id: projectId, serviceId, slug: 'demo', name: '演示应用', kind: 'DigitalWorker', ownerUserId: userId, state: 'active' };
     else if (/\/config\/(development|production)$/.test(path)) {
       if (state.failRead) { status = 503; body = { error: 'unavailable', message: '配置读取失败' }; }
@@ -42,6 +45,29 @@ async function click(label: string) {
   const button = [...document.querySelectorAll<HTMLButtonElement>('button')].find((element) => !element.closest('[hidden]') && element.textContent === label)!;
   expect(button).toBeDefined(); await act(async () => { button.click(); }); await page!.settle();
 }
+
+test('真实开发者可编辑开发组；生产组只读且不显示保存、填入或删除入口', async () => {
+  const f = fixture(); f.state.role = 'developer'; page = await renderApp(`/projects/${projectId}/settings?tab=config&env=production`);
+  // 实机普通开发者看到了“负责人维护”下仍可输入和保存的生产表单。
+  expect(visible('input[placeholder="DATABASE_URL"]') === undefined).toBe(true);
+  expect(page.text()).toContain('只有项目负责人或管理员可以修改生产取值组');
+  expect([...document.querySelectorAll('button')].filter((node) => !node.closest('[hidden]')).map((node) => node.textContent)).not.toContain('填入表单');
+  expect([...document.querySelectorAll('button')].filter((node) => !node.closest('[hidden]')).map((node) => node.textContent)).not.toContain('删除');
+  expect(page.text()).toContain('当前值'); expect(page.text()).toContain('••••••••');
+  await page.click('开发取值组'); await input(visible('input[placeholder="DATABASE_URL"]'), 'DEV_ALLOWED'); await click('保存');
+  expect(f.writes).toHaveLength(1); expect(f.writes[0]?.path).toBe(`/v1/projects/${projectId}/config/development`);
+});
+
+test('管理员仍可维护生产组；身份刷新失败保护草稿并禁写，恢复后可继续', async () => {
+  const f = fixture(); f.state.role = 'developer'; f.state.admin = true; page = await renderApp(`/projects/${projectId}/settings?tab=config&env=production`);
+  await input(visible('input[placeholder="DATABASE_URL"]'), 'ADMIN_VALUE');
+  await input(visible('input[placeholder="写入后生效于下一次注入"]'), '保留的生产草稿'); f.state.failIdentity = true; await click('刷新配置');
+  expect(page.text()).toContain('身份读取失败');
+  expect(visible<HTMLInputElement>('input[placeholder="写入后生效于下一次注入"]').value).toBe('保留的生产草稿');
+  await click('保存'); expect(f.writes).toHaveLength(0);
+  f.state.failIdentity = false; await click('刷新配置'); await click('保存');
+  expect(f.writes).toHaveLength(1); expect(f.writes[0]?.path).toBe(`/v1/projects/${projectId}/config/production`);
+});
 
 test('配置保存失败保留值；成功后才清空输入并反馈真实版本和生效条件', async () => {
   const f = fixture(); f.state.failSave = true; page = await renderApp(`/projects/${projectId}/settings?tab=config`);

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { Actor, ProjectId, ProjectPageEntry, ProjectPageQuery, ProjectSummary, ProjectSummaryDetail } from '@crewstation/contracts';
-import { DevelopmentSummarySchema, ProjectPageQuerySchema, ProjectSummaryDetailSchema, ProjectSummarySchema, ReleaseDtoSchema, TrafficSwitchDtoSchema } from '@crewstation/contracts';
+import { DevelopmentSummarySchema, ProjectPageQuerySchema, ProjectSummaryDetailSchema, ProjectSummarySchema, ReleaseDtoSchema, TesterPreviewSlotSchema, TrafficSwitchDtoSchema } from '@crewstation/contracts';
 import type { Clock } from '@crewstation/kernel';
 import { notFound, validation } from '@crewstation/kernel';
 import type { ProjectSummarySources } from '../ports/projectSummaries';
@@ -9,11 +9,13 @@ import { readPart, runSummaryReads, SummaryHealthSchema, SummarySlotsSchema, una
 export function projectSummaryUseCases(sources: ProjectSummarySources, clock: Clock, budgetMs = 2500) {
   const initial = (entry: ProjectPageEntry): ProjectSummaryDetail => {
     const part = entry.role === 'tester' ? { status: 'restricted' as const, checkedAt: clock.now().toISOString() } : unavailablePart(clock);
-    return { ...entry, development: part, slots: part, health: part, releases: part, switches: part, checkedAt: clock.now().toISOString() };
+    return { ...entry, ...(entry.role === 'tester' ? { preview: unavailablePart(clock) } : {}), development: part, slots: part, health: part, releases: part, switches: part, checkedAt: clock.now().toISOString() };
   };
   const collect = (actor: Actor, item: ProjectSummaryDetail, detail: boolean) => {
-    if (item.role === 'tester') return [];
     const { id, serviceId } = item.project;
+    if (item.role === 'tester') return [async () => {
+      item.preview = serviceId ? await readPart(TesterPreviewSlotSchema.nullable(), () => sources.preview(actor, serviceId), clock) : unavailablePart(clock, 'not-provided');
+    }];
     const jobs = [async () => { item.development = await readPart(DevelopmentSummarySchema.nullable(), async () => {
       const env = await sources.session(id); if (!env) return null;
       if (env.projectId !== id || env.serviceId !== serviceId || env.kind !== 'dev-session') return undefined;
@@ -46,7 +48,7 @@ export function projectSummaryUseCases(sources: ProjectSummarySources, clock: Cl
       const fresh = current.find((entry) => entry.project.id === item.project.id);
       if (!fresh) return [];
       // 返回前重新读取当前页的作用域和角色；清除已失去读取权或服务身份改变的旧材料。
-      const result = fresh.role === 'tester' || fresh.project.serviceId !== item.project.serviceId ? initial(fresh) : { ...item, ...fresh };
+      const result = fresh.role !== item.role || fresh.project.serviceId !== item.project.serviceId ? initial(fresh) : { ...item, ...fresh };
       return [ProjectSummaryDetailSchema.parse({ ...result, checkedAt: clock.now().toISOString() })];
     });
   };

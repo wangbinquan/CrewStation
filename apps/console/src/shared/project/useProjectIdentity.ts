@@ -1,8 +1,19 @@
 import { api } from '../api/client';
 import { queryKeys } from '../api/queryKeys';
 import { useApiQuery } from '../api/useApi';
+import { ProjectSummaryDetailSchema } from '@crewstation/contracts';
 
 /** 只用于项目页面的可读名称；市场上下文不读取项目内部数据。 */
 export function useProjectIdentity(projectId: string | undefined) {
-  return useApiQuery(queryKeys.project(projectId ?? ''), () => api.projects.get(projectId!), { enabled: Boolean(projectId) });
+  const me = useApiQuery(queryKeys.me(), () => api.me.get());
+  const previewOnly = me.data?.isAdmin !== true && !!me.data?.memberships?.some((member) => member.projectId === projectId && member.role === 'tester');
+  const query = useApiQuery(queryKeys.projectIdentity(projectId ?? '', me.data?.id ?? '', previewOnly), async () => {
+    if (!previewOnly) return api.projects.get(projectId!);
+    const summary = ProjectSummaryDetailSchema.parse(await api.capabilities.projectSummary(projectId!));
+    if (summary.project.id !== projectId) throw new Error('项目回执不匹配');
+    return summary.project;
+  }, { enabled: Boolean(projectId) && me.isSuccess && !me.error });
+  return { ...query, previewOnly, error: query.error ?? (!query.data ? me.error : null),
+    isPending: !me.error && (me.isPending || query.isPending),
+    refetch: async () => { const result = await me.refetch(); if (!result.error) await query.refetch(); } };
 }

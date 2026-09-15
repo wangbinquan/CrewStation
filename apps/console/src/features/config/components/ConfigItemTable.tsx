@@ -14,15 +14,16 @@ export interface ConfigItemTableProps {
   readonly onDelete: (name: string) => void;
   readonly deletingName: string | undefined;
   readonly disabled?: boolean;
+  readonly readOnly?: boolean;
 }
 
 /** 取值列表；删除走行内两步确认，不使用会冻结页面的 window.confirm。 */
-export function ConfigItemTable({ items, onEdit, onDelete, deletingName, disabled = false }: ConfigItemTableProps): ReactElement {
+export function ConfigItemTable({ items, onEdit, onDelete, deletingName, disabled = false, readOnly = false }: ConfigItemTableProps): ReactElement {
   const t = useT();
   const dateText = useDateText();
   const columns = [
     t('config.items.name'), t('config.items.value'), t('config.items.version'),
-    t('config.items.updatedBy'), t('config.items.updatedAt'), t('config.items.actions'),
+    t('config.items.updatedBy'), t('config.items.updatedAt'), ...(!readOnly ? [t('config.items.actions')] : []),
   ];
   return (
     <DataTable columns={columns} className={styles.table}>
@@ -41,7 +42,7 @@ export function ConfigItemTable({ items, onEdit, onDelete, deletingName, disable
             </span>
           </td>
           <td className={styles.muted}>{dateText(item.updatedAt)}</td>
-          <td className={styles.actions}>
+          {!readOnly ? <td className={styles.actions}>
             <Button variant="ghost" disabled={disabled} onClick={() => onEdit(item)}>
               {t('config.items.edit')}
             </Button>
@@ -53,7 +54,7 @@ export function ConfigItemTable({ items, onEdit, onDelete, deletingName, disable
               busyLabel={t(deletingName === item.name ? 'config.items.deleting' : 'config.items.delete')}
               onConfirm={() => onDelete(item.name)}
             />
-          </td>
+          </td> : null}
         </tr>
       ))}
     </DataTable>

@@ -2,6 +2,11 @@ import type { MessagesShapedLike } from '../../../shared/lib/i18n';
 import type { messages as zhCN } from './zh-CN';
 
 export const messages: MessagesShapedLike<typeof zhCN> = {
+  'projects.preview.title': 'Try a version',
+  'projects.preview.refresh': 'Check again',
+  'projects.preview.role': 'You are a tester for this project and can try its preview. Development, releases, configuration and diagnostics are managed by project developers or owners.',
+  'projects.preview.data': 'Preview and production share production data. Trying a preview can change that data.',
+  'projects.preview.back': 'Back to projects',
   'projects.summary.attention': 'Needs attention or confirmation',
   'projects.summary.checkHealth': 'Check current runtime health',
   'projects.summary.fixHealth': 'Review replica or restart issues',

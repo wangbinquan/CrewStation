@@ -102,6 +102,7 @@ export const messages = {
   'nav.projects': '数字人项目',
   'nav.market': '能力市场',
   'nav.projectPages': '项目页面',
+  'nav.preview': '版本试用',
   'nav.settings': '项目设置',
   'projectContext.retry': '重新读取项目',
   'nav.admin.backToIntegrations': '返回接入容器',

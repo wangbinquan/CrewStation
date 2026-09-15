@@ -24,6 +24,7 @@ const PROJECT_PAGES: readonly ProjectPageItem[] = [
 export function ProjectNavSection({ projectId, space = 'workbench' }: { readonly projectId: string; readonly space?: ProjectSpace }): ReactElement {
   const t = useT();
   const identity = useProjectIdentity(projectId);
+  const pages = identity.previewOnly ? [{ page: 'overview' as const, labelKey: 'nav.preview', exact: false }] : PROJECT_PAGES;
   return (
     <div className={styles.section}>
       <div className={styles.sectionTitle}>
@@ -31,7 +32,7 @@ export function ProjectNavSection({ projectId, space = 'workbench' }: { readonly
         {identity.data?.slug ? <code className={styles.projectId} title={identity.data.slug}>{identity.data.slug}</code> : null}
       </div>
       <ul className={styles.list} aria-label={t('nav.projectPages')}>
-        {PROJECT_PAGES.map((item) => (
+        {pages.map((item) => (
           <li key={item.page}>
             <Link
               to={PROJECT_PATHS[space][item.page]}

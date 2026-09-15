@@ -102,6 +102,7 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   'nav.projects': 'Digital worker projects',
   'nav.market': 'App market',
   'nav.projectPages': 'Project pages',
+  'nav.preview': 'Try a version',
   'nav.settings': 'Project settings',
   'projectContext.retry': 'Reload project',
   'nav.admin.backToIntegrations': 'Back to integrations',

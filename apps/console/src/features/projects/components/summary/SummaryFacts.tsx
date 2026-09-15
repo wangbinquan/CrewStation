@@ -25,8 +25,18 @@ export function DevelopmentFact({ item }: { readonly item: ProjectSummary }) {
 }
 export function DeploymentFact({ item, name, canOpen = true }: { readonly item: ProjectSummary; readonly name: 'prod' | 'preview'; readonly canOpen?: boolean }) {
   const t = useT(), part = item.slots;
+  if (name === 'preview' && item.role === 'tester') {
+    const preview = item.preview;
+    if (!preview) return <span className={styles.muted}>{t('projects.summary.unknown')}</span>;
+    if (preview.status !== 'ready' || !summaryIsFresh(preview)) return <SummaryUnavailable part={preview} />;
+    return <DeploymentSlotFact slot={preview.value ?? undefined} name={name} canOpen={canOpen} />;
+  }
   if (part.status !== 'ready' || !summaryIsFresh(part)) return <SummaryUnavailable part={part} />;
   const slot = part.value.find((s) => s.name === name);
+  return <DeploymentSlotFact slot={slot} name={name} canOpen={canOpen} />;
+}
+function DeploymentSlotFact({ slot, name, canOpen }: { readonly slot: SlotDto | undefined; readonly name: 'prod' | 'preview'; readonly canOpen: boolean }) {
+  const t = useT();
   if (!slot || slot.state === 'empty') return <span className={styles.muted}>{t('projects.summary.notDeployed')}</span>;
   const ready = slot.state === 'ready' && slot.readyReplicas > 0 && slot.releaseId && slot.tag && slot.commitSha;
   return <div className={styles.fact}><span><strong>{slot.tag}</strong> <code title={slot.commitSha}>{shortSha(slot.commitSha)}</code></span>

@@ -1,7 +1,9 @@
 import type { ConfigEnv } from '@crewstation/contracts';
 import { useCallback, useRef, useState } from 'react';
 import type { ReactElement } from 'react';
-import { errorMessage, isApiClientError } from '../../../shared/api/useApi';
+import { errorMessage, isApiClientError, useApiQuery } from '../../../shared/api/useApi';
+import { api } from '../../../shared/api/client';
+import { queryKeys } from '../../../shared/api/queryKeys';
 import { useT } from '../../../shared/lib/useT';
 import { ActionNote } from '../../../shared/ui/ActionNote';
 import { Badge } from '../../../shared/ui/Badge';
@@ -24,9 +26,12 @@ export interface ConfigEnvPanelProps {
   readonly onDirtyChange: (env: ConfigEnv, dirty: boolean) => void;
 }
 
-/** 一组取值的完整面板：列表、新增／覆盖表单、版本历史。生产组的 403 由服务端说明原样呈现。 */
+/** 写入入口按当前身份和取值组展示；身份重读失败时保留草稿并停写。 */
 export function ConfigEnvPanel({ projectId, env, onDirtyChange }: ConfigEnvPanelProps): ReactElement {
   const t = useT();
+  const me = useApiQuery(queryKeys.me(), () => api.me.get());
+  const role = me.data?.memberships.find((member) => member.projectId === projectId)?.role;
+  const editable = me.data?.isAdmin === true || role === 'owner' || env === 'development' && role === 'developer';
   const { items, versions, save, remove } = useConfigEnv(projectId, env);
   const [draft, setDraft] = useState<ConfigItemDraft>(NEW_ITEM);
   const [draftSeq, setDraftSeq] = useState(0);
@@ -36,7 +41,7 @@ export function ConfigEnvPanel({ projectId, env, onDirtyChange }: ConfigEnvPanel
   const selectDraft = (next: ConfigItemDraft) => { if (dirty) setNextDraft(next); else replaceDraft(next); };
   const writeLock = useRef(false);
   const list = items.data?.items ?? [];
-  const busy = save.isPending || remove.isPending, disabled = items.isPending || !!items.error;
+  const busy = save.isPending || remove.isPending, disabled = items.isPending || !!items.error || me.isPending || me.isFetching || !!me.error || !editable;
   const changeItem = async (input: Parameters<typeof save.mutateAsync>[0]) => {
     if (writeLock.current || disabled) throw new Error('当前无法保存配置');
     writeLock.current = true;
@@ -50,7 +55,7 @@ export function ConfigEnvPanel({ projectId, env, onDirtyChange }: ConfigEnvPanel
   return (
     <Card
       title={t(`config.env.${env}`)}
-      extra={<><Badge tone={env === 'production' ? 'warning' : 'info'}>{t(`config.env.${env}Role`)}</Badge><Button disabled={busy || items.isFetching || versions.isFetching} onClick={() => { void items.refetch(); void versions.refetch(); }}>{t('config.refresh')}</Button></>}
+      extra={<><Badge tone={env === 'production' ? 'warning' : 'info'}>{t(`config.env.${env}Role`)}</Badge><Button disabled={busy || me.isFetching || items.isFetching || versions.isFetching} onClick={() => { void me.refetch(); void items.refetch(); void versions.refetch(); }}>{t('config.refresh')}</Button></>}
       footer={
         <>
           <h3 className={styles.versionsTitle}>{t('config.versions.title')}</h3>
@@ -61,6 +66,8 @@ export function ConfigEnvPanel({ projectId, env, onDirtyChange }: ConfigEnvPanel
       }
     >
       <p className={styles.note}>{t(`config.env.${env}Note`)}</p>
+      <QueryStatus isPending={me.isPending} error={me.error} />
+      {!editable && !me.isPending && !me.error ? <ActionNote tone="neutral">{t(`config.readOnly.${env}`)}</ActionNote> : null}
       <QueryStatus
         isPending={items.isPending}
         error={items.error}
@@ -68,11 +75,12 @@ export function ConfigEnvPanel({ projectId, env, onDirtyChange }: ConfigEnvPanel
         errorKey="config.error.load"
         isEmpty={list.length === 0}
         emptyTitle={t('config.items.emptyTitle')}
-        emptyDescription={t('config.items.emptyDescription')}
+        emptyDescription={editable ? t('config.items.emptyDescription') : t(`config.readOnly.${env}`)}
       />
       {list.length > 0 ? (
         <ConfigItemTable
           items={list}
+          readOnly={!editable}
           disabled={disabled || busy}
           deletingName={remove.isPending ? remove.variables : undefined}
           onDelete={(name) => void deleteItem(name)}
@@ -85,14 +93,16 @@ export function ConfigEnvPanel({ projectId, env, onDirtyChange }: ConfigEnvPanel
       <WriteError action="config.error.delete" error={remove.error} />
       {save.isSuccess ? <ActionNote tone="success">{t('config.saved', { name: save.data.name, version: save.data.version, env: t(`config.env.${env}`) })} {t(`config.effect.${env}`)}</ActionNote> : null}
       {remove.isSuccess ? <ActionNote tone="success">{t('config.deleted', { name: remove.variables ?? '', env: t(`config.env.${env}`) })} {t(`config.effect.${env}`)}</ActionNote> : null}
+      <div hidden={!editable}>
       <h3 className={styles.formTitle}>{t('config.form.title')}</h3>
       {nextDraft ? <ConfirmationPanel question={t('config.draft.replace', { env: t(`config.env.${env}`), name: nextDraft.name || t('config.draft.blank') })} confirmLabel={t('config.draft.discard')} cancelLabel={t('ui.draft.stay')} busy={busy} onConfirm={() => replaceDraft(nextDraft)} onCancel={() => setNextDraft(undefined)} /> : null}
       <ConfigItemForm key={`${draft.name}:${draftSeq}`} draft={draft} existingNames={list.map((item) => item.name)} pending={save.isPending} disabled={disabled || remove.isPending || Boolean(nextDraft)} onSubmit={changeItem} onReset={() => selectDraft(NEW_ITEM)} onDirtyChange={dirtyChanged} />
+      </div>
     </Card>
   );
 }
 
-/** 写失败的说明；403 另加一句“生产组由负责人维护”，控件保持可见而不是被藏起来。 */
+/** 请求在途时权限仍可能变化，保留服务端拒绝与原始错误说明。 */
 function WriteError({ action, error }: { readonly action: string; readonly error: unknown }): ReactElement | null {
   const t = useT();
   if (error === null || error === undefined) return null;

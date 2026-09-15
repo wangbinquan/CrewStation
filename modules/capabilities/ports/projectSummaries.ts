@@ -9,6 +9,7 @@ export interface ProjectSummarySources {
     id: string; projectId: ProjectId; serviceId: string; kind: 'dev-session' | 'business'; createdBy?: string;
   }) | undefined>;
   slots(actor: Actor, serviceId: ServiceId): Promise<SlotDto[]>;
+  preview(actor: Actor, serviceId: ServiceId): Promise<SlotDto | null>;
   health(actor: Actor, projectId: ProjectId): Promise<HealthDto[]>;
   releases(actor: Actor, serviceId: ServiceId): Promise<ReleaseDto[]>;
   switches(actor: Actor, serviceId: ServiceId): Promise<TrafficSwitchDto[]>;

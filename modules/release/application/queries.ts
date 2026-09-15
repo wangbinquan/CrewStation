@@ -7,7 +7,7 @@ import { releaseToDto, slotToDto, switchToDto } from './toDto';
 
 export interface ActiveEndpoint { physical: PhysicalSlot; namespace: string; kubernetesService: string; port: number }
 
-export function releaseQueries(deps: ReleaseUseCaseDeps) {
+export function releaseQueries(deps: Pick<ReleaseUseCaseDeps, 'uow' | 'authorizer' | 'services' | 'hosts'>) {
   const { uow, authorizer, services, hosts } = deps;
   const svcOf = async (serviceId: ServiceId) => {
     const svc = await services.resolveServiceById(serviceId);
@@ -39,6 +39,14 @@ export function releaseQueries(deps: ReleaseUseCaseDeps) {
         if (release) releases.set(release.id, release);
       }
       return [slotToDto(slots, slots.active, releases, svc.slug, hosts), slotToDto(slots, slots.active === 'blue' ? 'green' : 'blue', releases, svc.slug, hosts)];
+    },
+    getPreviewSlot: async (actor: Actor, serviceId: ServiceId): Promise<SlotDto | null> => {
+      const svc = await svcOf(serviceId);
+      await authorizer.authorize(actor, svc.projectId, 'view-preview');
+      const slots = await uow.read.slots.get(serviceId); if (!slots) return null;
+      const physical = slots.active === 'blue' ? 'green' : 'blue', id = slots[physical].releaseId;
+      const release = id ? await uow.read.releases.getById(id) : undefined;
+      return slotToDto(slots, physical, new Map(release ? [[release.id, release]] : []), svc.slug, hosts);
     },
     listTrafficSwitches: async (actor: Actor, serviceId: ServiceId): Promise<TrafficSwitchDto[]> => {
       const svc = await svcOf(serviceId);

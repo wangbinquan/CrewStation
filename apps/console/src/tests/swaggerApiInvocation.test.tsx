@@ -105,10 +105,11 @@ test('Swagger 在途修改保留新输入，另一个 Execute 不会并发发送
   await page.requestNavigate('/projects'); await invocationClick(page, '继续编辑'); expect(post.querySelector<HTMLInputElement>('input[placeholder="id"]')!.value).toBe('new-value');
 });
 
-test('测试者的实际 Swagger 只有文档，无会话时不能进入 Try it out', async () => {
+test('测试者不挂载开发工具；开发者无会话时不能执行实际 Swagger', async () => {
   const f = apiInvocationFixture(); f.state.role = 'tester'; page = await renderApp(`${invocationRoute}&proxy=crm`);
-  await act(async () => { (await until('.opblock-post .opblock-summary-control')).click(); });
-  await until('.opblock-post .parameters-container'); expect(document.querySelector('.try-out__btn')).toBeNull(); expect(f.calls).toHaveLength(0);
+  expect(page.text()).toContain('你是此项目的测试者');
+  expect(document.querySelector('.swagger-ui') === null).toBe(true); expect(f.calls).toHaveLength(0);
+  expect(f.reads.some((url) => /\/catalog\/|\/openapi|\/dev-session/.test(url))).toBe(false);
   page.unmount(); page = undefined; f.state.role = 'developer'; f.state.sessionFailure = true;
   page = await renderApp(`${invocationRoute}&proxy=crm`); await expand();
   expect(page.text()).toContain('没有已确认'); expect(document.querySelector('.opblock-post .execute')).toBeNull(); expect(f.calls).toHaveLength(0);
@@ -116,10 +117,11 @@ test('测试者的实际 Swagger 只有文档，无会话时不能进入 Try it 
 
 test('当前身份刷新后调整 Swagger 写入口，恢复开发权限时保留此前输入', async () => {
   const f = apiInvocationFixture(); f.state.role = 'tester'; page = await renderApp(`${invocationRoute}&proxy=crm`);
-  await act(async () => { (await until('.opblock-post .opblock-summary-control')).click(); }); await until('.opblock-post .parameters-container');
-  expect(document.querySelector('.try-out__btn')).toBeNull();
-  f.state.role = 'developer'; await refreshInvocationQueries(page); await until('.opblock-post .try-out__btn'); await invocationClick(page, 'Try it out', document.querySelector('.opblock-post')!);
+  expect(page.text()).toContain('你是此项目的测试者'); expect(document.querySelector('.try-out__btn') === null).toBe(true);
+  f.state.role = 'developer'; await refreshInvocationQueries(page); await expand();
   await invocationInput(page, document.querySelector<HTMLInputElement>('.opblock-post input[placeholder="id"]')!, 'role-draft');
-  f.state.role = 'tester'; await refreshInvocationQueries(page); expect(document.querySelector('.opblock-post .execute')).toBeNull();
+  f.state.role = 'tester'; await refreshInvocationQueries(page); expect(page.text()).toContain('你是此项目的测试者');
+  expect(document.querySelector('.opblock-post')?.closest('[hidden]') !== null).toBe(true);
+  expect(document.querySelector('.opblock-post .execute') === null).toBe(true);
   f.state.role = 'developer'; await refreshInvocationQueries(page); await until('.opblock-post .execute'); expect(document.querySelector<HTMLInputElement>('.opblock-post input[placeholder="id"]')!.value).toBe('role-draft'); expect(f.calls).toHaveLength(0);
 });

@@ -1773,3 +1773,41 @@ Agent 动态的“更早未读”请求在途时关闭面板，resetOlder 原来
 **累计仍 25／52 通过、27 项待完成**；本批不替代 UX-AT-42 的实机乱序／通道恢复条件。具体切流答复、此前浏览器审批阻断、I9／I14／I15 与具体成员范围均待处理；RFC-003 保持 In Progress，RFC-004 按已批准顺序等待完结，Hook 未开工。三份源码／测试与 STATE.md、本文件、acceptance-audit.md 精确提交，最终 SHA 托管 CI 独立核对。
 
 证据在 /private/tmp/crewstation-rfc003-batch73-*：activity-red／activity-green、source-candidate／check、console-build、image-context／built／budget／import、console-before／rollout-intent／rollout、http-assets、runtime-before／final-runtime、qa-after／comparison。该批为已复现缺陷的修复和部署进展，连续无进展阻塞计数清零；完整 RFC 目标仍在执行。
+
+## 第七十四批：真实角色、可见性冲突与测试者试用入口
+
+主仓基线为 2f61a64f38ce62b52dd19162215ebfca0234e31f。作者在既有具体切流、角色和 I9／I14／I15 方案后明确“授权你所有动作，赶紧做”；原审批阻断解除，已执行以下真实动作，不能继续把这些项目写为待授权。
+
+### 正式版本与成员、市场旅程
+
+- files QA svc_01a09fecbbac7000905703a66e255046：在实际发布页重读并确认 rel_01a0a27cc00e700090b5d576e6078408／v0.1.8／5719c033e3ac781eb6e3efcdf1c8e6da02018f34 上线。正式 v0.1.8、preview 空，切流记录 1 条。tab 22 原比较页面自动更新到 **分叉 1／3、未提交 2、未推送 1、未设置上游**，当前 f04fd60 工作树及原两项缓存保持；实际正式应用显示“RFC003 预览恢复验收”、green／production 与第 62 批配置值。
+- workbench QA prj_01a09eb302d67000a680835da140f993：管理员将负责人转给既有 rfc003-owner，admin 成为项目 developer，平台管理员身份保持。owner 在独立 Chrome 隐身窗口精确邮箱匹配并添加 rfc003-developer 为 developer、rfc003-tester 为 tester。二者实际登录并进入各自可用区域，developer 可准备发布但不能切流；tester 实际打开 preview.rfc003-verify-workbench.cs.localhost，页面身份、blue／production 与 v0.1.1 槽一致。
+- owner 在默认 revision=0／项目成员下，空指定名单得到字段错误和焦点；选 visitor 后取消，确认放弃，保存结果不变。owner 保存全部登录用户为 revision=1；admin 旧 revision=0 的指定 visitor 草稿提交冲突，草稿保留且显示最新范围，使用“最新修订，保留本地草稿”后再提交成为 revision=2。visitor 实际市场可见且无进入项目入口。admin 恢复项目成员为 revision=3，visitor 旧详情“重新检查”清除旧材料并显示不可见，返回市场为空。
+
+本批关闭 UX-AT-17 的实际负责人添加注册成员及成员访问条件；精确查找无匹配／目录故障／高级 ID 等回归沿用 E8。**累计 26／52 通过、26 项待完成**。没有把一次真实试用等同于 UX-AT-09 的全部发布阶段，也未把 admin 与 owner 的共同操作说成 owner 独立保存三种范围。
+
+### 本次实际缺陷与修复
+
+开发者生产配置页面一面写“负责人维护”，一面仍给编辑、保存、填入和删除入口。ConfigEnvPanel 现在用当前 /me 与环境分组裁定编辑状态，生产组仅 owner／admin 可写，开发者保留开发组；身份读取失败禁写并保留草稿。只读表格去掉动作列；服务端在途拒绝继续显示。配置新回归先 7 pass／2 fail，再 9 pass／0 fail；此前 Bun 打印失败 DOM 对象的 SIGTRAP 用布尔断言避免，未作为产品通过证据。
+
+测试者原列表全部为受限，点击名称又得到“角色 tester 不能执行 view”，虽然直接预览域已有权限。release L4 新增内部 getPreviewSlot 查询，只按既有 view-preview 授权取实际待验证物理槽；capabilities L6 聚合 tester 专用 preview，内部开发／正式槽／发布记录仍 restricted。返回前重读成员与服务身份，权限撤销或对象变化清除旧结果；无部署、无效 SHA、错误槽与依赖失败均单独测试。隔离真实 PostgreSQL 的 previewQuery 用例 1 pass／20 assertions，验证正式切换后目标正确、撤销后拒绝。
+
+控制台按角色提供试用页面和导航，旧开发、设置、发布深链接均给“测试者”说明、准确版本及完整 SHA；未就绪、读取失败和空槽无旧链接。曾打开的内部页面在同一路径暂时失权时隐藏而保留草稿；新路径重新核对，首次测试者不挂载内部工具。原 Swagger 角色恢复草稿回归继续通过，初始 tester 的旧测试夹具改为与真实基线一致的试用摘要，并断言没有内部目录或发布请求。
+
+第一候选完整门禁为 1209 pass／4 skip／5 fail，定位到上述五条旧 tester 夹具与切换行为；随后候选的 lint 阶段指出 effect 内同步 setState，改为有条件记录首次打开，未放宽 lint。最终角色定向 48 pass／498 assertions，路径保留调整后定向 28 pass／267 assertions；最终完整 **1214 pass／4 skip／0 fail**（1218 tests／200 files／6690 assertions，测试 108.37s、命令 126.95s），09:58:37Z 通过，console build 609ms。最终 37 份源码／测试候选此后保持；先前失败候选、日志与镜像元数据均保留在临时证据中。
+
+10:01:03Z 通过正常 /auth/login 分别读取既有 owner／developer／tester／visitor：前两者各自角色摘要 200；tester 专用 preview=rel_01a09f181c8d7000b2f2654113a1e737／v0.1.1／6af30245c4f5dc0537bdae2c3a44aa2b3fd62d29／1 就绪，五项内部来源全部 restricted；visitor 项目摘要 404。没有借用平台管理员身份作角色结论，也没有记录会话 Cookie。
+
+### 部署与后续
+
+仅更新本机 cs-api 和 console。API 镜像 cs-control-plane:rfc003-b74-b5ff869b64，Docker 配置摘要 3448a3702dc4b67c110931fef9c984e97c83d62e491043e64b661495f118f1ff，generation 34→35；10:00:09Z 运行索引→清单→配置及七份实际文件均匹配，Pod UID c99d1510-9622-439d-8d2b-3f8de5c8958c，restartCount=0。API 导入新增 105,419 bytes；控制台导入新增 3,728,053 bytes，无数据清理。
+
+控制台镜像 cs-console:rfc003-b74-29e0eb1c5b，generation 45→46／1／1，Pod UID 2c61702f-7a7f-4c5e-bc89-800c71f94759，restartCount=0。10:03:17Z 摘要链与七份文件一致；10:03:36Z 正常 HTTP 六份产物匹配。实际 IAB tab 24 刷新后管理设置可用，仍为 revision=3／项目成员，未修改草稿或旧终端。
+
+10:03:38Z delivery／files／legacy 的 taskId、native、activity、历史 Agent 和 workspace 与第七十三批逐项一致；只变化空闲提醒时间或 files 活动时间。10:04:55Z 原 Pod UID／状态、受保护文件 hash、失败 Bound 卷、原业务槽和 integration 两槽均保持，controller cc93104／21 未变；节点 Ready=True、无内存或磁盘压力，剩余 1,573,146,624 bytes。这里的业务槽保持指实际 Deployment；files 逻辑正式切流已在前文单独登记。
+
+本批后段 Mac 锁屏，已请求手动解锁，真实 Chrome 多账号新界面复验尚未完成；IAB 管理页面仍可读，未操作旧终端输入。此前 reviewer 容量和权限拒绝不再是当前 blocker。I9／I14／I15 按作者委托分别选择 (a)：管理员现有白名单扩展到代理出站、固定原任务／工作卷重建、独立 CLI Pod 共享工作卷；选择已写入 implementation-open-questions.md，尚未实施，不把扩大单容器内存当作隔离。
+
+RFC-003 保持 In Progress，RFC-004 仍等待其完结，Hook 未开工。原失败 PVC 不释放，原 QA f04fd60 分叉提交不推送／合并。后续优先实现这三项实际能力，再补余下角色、发布、事件和多窗口旅程。
+
+证据：/private/tmp/crewstation-rfc003-batch74-evidence.json、live-roles.json、config-red-readable／targeted3／role-targeted／role-final、initial-check／lint-candidate-check／check、source-candidate、console-build、api-image-*／image-* 与各 rollout 记录。浏览器事实与正常 HTTP、隔离测试、最终 Git SHA CI 分开登记。

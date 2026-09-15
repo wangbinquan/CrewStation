@@ -64,9 +64,10 @@ test('读取失败、失去授权与错会话响应不会显示成功或清空�
   expect(page.text()).toContain('响应无法匹配'); expect(page.text()).not.toContain('最近一次试调响应'); expect(invocationField('路径参数 id').value).toBe('preserved');
 });
 
-test('测试者只看目录，无开发会话时明确说明且不打开试调表单', async () => {
+test('测试者深链接回到版本试用；开发者无会话时明确说明且不打开试调表单', async () => {
   const f = apiInvocationFixture(); f.state.role = 'tester'; page = await renderApp(invocationRoute);
-  expect([...document.querySelectorAll('button')].some((node) => node.textContent === '试调')).toBe(false); expect(f.calls).toHaveLength(0); expect(page.text()).toContain('当前身份可查看文档');
+  expect([...document.querySelectorAll('button')].some((node) => node.textContent === '试调')).toBe(false); expect(f.calls).toHaveLength(0); expect(page.text()).toContain('你是此项目的测试者');
+  expect(f.reads.some((url) => /\/catalog\/|\/dev-session/.test(url))).toBe(false);
   page.unmount(); page = undefined; f.state.role = 'developer'; f.state.malformedSession = true; page = await renderApp(invocationRoute); await invocationClick(page, '试调');
   expect(page.text()).toContain('没有已确认'); expect(document.querySelector('textarea')).toBeNull(); expect(f.calls).toHaveLength(0);
 });

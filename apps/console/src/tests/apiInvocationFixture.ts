@@ -3,6 +3,7 @@ import { focusManager } from '@tanstack/react-query';
 import type { ApiInvocationRequest, ApiOperationDto } from '@crewstation/contracts';
 import { ApiInvocationRequestSchema, TaskIdSchema } from '@crewstation/contracts';
 import type { RenderedApp } from './renderApp';
+import { testerSummaryFixture } from './projectSummaryFixture';
 
 export const invocationProjectId = `prj_${'a'.repeat(32)}`, invocationTaskId = TaskIdSchema.parse(`tsk_${'c'.repeat(32)}`);
 const serviceId = `svc_${'b'.repeat(32)}`, userId = `usr_${'d'.repeat(32)}`;
@@ -27,6 +28,7 @@ export function apiInvocationFixture() {
     }
     reads.push(url);
     if (url.endsWith('/v1/me')) return Response.json({ id: userId, name: '开发者', isAdmin: false, memberships: [{ projectId: invocationProjectId, role: state.role }] });
+    if (url.endsWith(`/v1/workbench/project-summaries/${invocationProjectId}`)) return Response.json(testerSummaryFixture(invocationProjectId, serviceId));
     if (url.endsWith(`/v1/projects/${invocationProjectId}`)) return Response.json({ id: invocationProjectId, serviceId, name: '知识助理', slug: 'knowledge', kind: 'DigitalWorker', state: 'active' });
     if (url.endsWith('/dev-session')) {
       if (state.sessionFailure) return Response.json({ error: 'unavailable', message: '会话目录暂不可用' }, { status: 503 });

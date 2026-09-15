@@ -1,4 +1,5 @@
 import type { ReleaseDto, SlotDto } from '@crewstation/contracts';
+import { testerSummaryFixture } from './projectSummaryFixture';
 
 export const projectId = `prj_${'a'.repeat(32)}`, serviceId = `svc_${'b'.repeat(32)}`, userId = `usr_${'c'.repeat(32)}`;
 export const prodId = `rel_${'d'.repeat(32)}`, targetId = `rel_${'e'.repeat(32)}`, historyId = `rel_${'f'.repeat(32)}`;
@@ -25,6 +26,7 @@ export function releaseDeliveryFixture() {
     } else {
       reads.push(path);
       if (path === '/v1/me') body = { id: userId, name: '负责人', email: 'owner@test.invalid', isAdmin: state.admin, memberships: [{ projectId, role: state.role }] };
+      else if (path === `/v1/workbench/project-summaries/${projectId}`) body = testerSummaryFixture(projectId, serviceId);
       else if (path === `/v1/projects/${projectId}`) body = { id: projectId, serviceId, name: '演示应用', slug: 'demo', kind: state.admin ? 'APIProxy' : 'DigitalWorker', state: 'active', ownerUserId: userId };
       else if (path.endsWith('/slots')) { if (state.failSlots) { status = 503; body = { error: 'unavailable', message: '部署读取失败' }; } else body = { items: state.slots }; }
       else if (path.startsWith('/v1/releases/')) { const item = releases.find((release) => path.endsWith(release.id)); body = state.badRelease ? { ...item, serviceId: `svc_${'f'.repeat(32)}` } : item; }

@@ -10,8 +10,15 @@ export function summaryFixtureItem(n = 1): ProjectSummaryDetail {
     health: { status: 'unknown', reason: 'not-provided', checkedAt: time }, releases: { ...part, value: [] }, switches: { ...part, value: [] }, checkedAt: time };
 }
 
+export function testerSummaryFixture(projectId: string, serviceId: string): ProjectSummaryDetail {
+  const item = summaryFixtureItem(), restricted = { status: 'restricted' as const, checkedAt: item.checkedAt };
+  return { ...item, project: { ...item.project, id: projectId as ProjectSummaryDetail['project']['id'], serviceId: serviceId as ProjectSummaryDetail['project']['serviceId'] },
+    role: 'tester', development: restricted, slots: restricted, health: restricted, releases: restricted, switches: restricted,
+    preview: { status: 'ready', value: null, checkedAt: item.checkedAt } };
+}
+
 export function summaryFixture() {
-  const state = { item: summaryFixtureItem(), admin: true, meError: false, error: false, invalid: false, empty: false, hang: false, calls: [] as string[], writes: [] as string[] };
+  const state = { item: summaryFixtureItem(), admin: true, meError: false, projectDenied: false, error: false, invalid: false, empty: false, hang: false, calls: [] as string[], writes: [] as string[] };
   globalThis.fetch = (async (raw, init) => {
     const url = new URL(String(raw), 'http://test'); state.calls.push(url.pathname + url.search);
     if (init?.method && init.method !== 'GET') state.writes.push(url.pathname);
@@ -27,7 +34,10 @@ export function summaryFixture() {
       else if (url.pathname.endsWith(state.item.project.id)) body = state.item;
       else body = { items: state.empty ? [] : url.searchParams.has('cursor') ? [summaryFixtureItem(2)] : [state.item], ...(url.searchParams.has('cursor') || state.empty ? {} : { nextCursor: 'next-page' }) };
     } else if (url.pathname.endsWith('/dev-session')) { status = 404; body = { error: 'not_found', message: '没有开发会话' }; }
-    else if (url.pathname === `/v1/projects/${state.item.project.id}`) body = state.item.project;
+    else if (url.pathname === `/v1/projects/${state.item.project.id}`) {
+      if (state.projectDenied) { status = 403; body = { error: 'forbidden', message: '角色 tester 不能执行 view' }; }
+      else body = state.item.project;
+    }
     else if (url.pathname === `/v1/services/${state.item.project.serviceId}`) body = { id: state.item.project.serviceId, projectId: state.item.project.id };
     return Response.json(body, { status });
   }) as typeof fetch;

@@ -17,7 +17,7 @@ async function fixture(admin = false) {
   const f = activityFixture(), calls: string[] = [];
   globalThis.fetch = (async (input) => {
     const url = String(input); calls.push(url); let body: unknown = {};
-    if (url.endsWith('/v1/me')) body = { id: activityUserId, name: '开发者', memberships: [], isAdmin: admin };
+    if (url.endsWith('/v1/me')) body = { id: activityUserId, name: '开发者', memberships: [{ projectId: activityProjectId, role: 'developer' }], isAdmin: admin };
     else if (url.endsWith('/dev-session')) body = { taskId: activityTaskId, state: 'running' };
     else if (url.includes('/agent-activity')) body = f.page;
     else if (url.endsWith('/agent-terminals')) body = f.roster;

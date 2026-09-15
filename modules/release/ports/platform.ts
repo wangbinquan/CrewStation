@@ -1,7 +1,7 @@
 import type { Actor, ConfigEnv, ProjectId, ServiceId, ServicePlanDto } from '@crewstation/contracts';
 
 export interface ProjectAuthorizer {
-  authorize(actor: Actor, projectId: ProjectId, action: 'publish' | 'switch-traffic' | 'view'): Promise<unknown>;
+  authorize(actor: Actor, projectId: ProjectId, action: 'publish' | 'switch-traffic' | 'view' | 'view-preview'): Promise<unknown>;
 }
 
 export interface ServiceResolver {

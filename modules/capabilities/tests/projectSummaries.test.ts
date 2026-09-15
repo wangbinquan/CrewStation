@@ -22,10 +22,29 @@ const session = { id: `tsk_${'c'.repeat(32)}`, projectId: first.project.id, serv
   state: 'running' as const, connected: false, branch: 'main', createdBy: actor.userId, createdAt: time, lastActivityAt: time };
 function setup(override: Partial<ProjectSummarySources> = {}, budgetMs = 2500) {
   const sources: ProjectSummarySources = { list: async () => ({ items: [first] }), read: async () => [first], get: async () => first,
-    session: async () => session, slots: async () => slots, health: async () => health, releases: async () => [], switches: async () => [], ...override };
+    session: async () => session, slots: async () => slots, preview: async () => slots[1]!, health: async () => health, releases: async () => [], switches: async () => [], ...override };
   return projectSummaryUseCases(sources, clock, budgetMs);
 }
 const query = (value: Record<string, unknown> = {}) => ProjectPageQuerySchema.parse(value);
+
+test('测试者仅聚合待验证槽；内部状态仍受限，读取失败和错误槽不提供假就绪', async () => {
+  const tester = { ...first, role: 'tester' as const }; let privateReads = 0, previewReads = 0;
+  const api = setup({ list: async () => ({ items: [tester] }), get: async () => tester, read: async () => [tester],
+    session: async () => { privateReads++; return session; }, slots: async () => { privateReads++; return slots; },
+    health: async () => { privateReads++; return health; }, releases: async () => { privateReads++; return []; },
+    preview: async (who, id) => { expect(who).toEqual(actor); expect(id).toBe(first.project.serviceId!); previewReads++; return slots[1]!; } });
+  const result = await api.getProjectSummary(actor, first.project.id);
+  // 实际测试者只能读试用，但项目入口却全部受限，无法找到已经就绪的待验证版本。
+  expect(result.preview).toMatchObject({ status: 'ready', value: { name: 'preview', tag: 'v1.0.0', host: 'preview.app.test' } });
+  expect(result.slots.status).toBe('restricted'); expect(result.development.status).toBe('restricted'); expect(result.releases.status).toBe('restricted');
+  expect(privateReads).toBe(0); expect(previewReads).toBe(1);
+  expect((await api.listProjectSummaries(actor, query())).items[0]?.preview?.status).toBe('ready');
+  for (const load of [async () => slots[0]!, async () => ({ ...slots[1]!, commitSha: undefined }), async () => { throw new Error('preview unavailable'); }]) {
+    const failed = await setup({ get: async () => tester, read: async () => [tester], preview: load }).getProjectSummary(actor, first.project.id);
+    expect(failed.preview?.status).toBe('unknown'); expect(failed.slots.status).toBe('restricted');
+  }
+  expect((await setup({ get: async () => tester, read: async () => [tester], preview: async () => null }).getProjectSummary(actor, first.project.id)).preview).toMatchObject({ status: 'ready', value: null });
+});
 
 describe('当前页项目摘要聚合', () => {
   test('会话记录与连接分开、实际两槽与健康分开；列表不读取发布历史', async () => {

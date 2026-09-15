@@ -17,6 +17,8 @@ export interface ReleaseModuleApi {
   listReleases(actor: Actor, serviceId: ServiceId): Promise<ReleaseDto[]>;
   getRelease(actor: Actor, releaseId: ReleaseId): Promise<ReleaseDto>;
   getSlots(actor: Actor, serviceId: ServiceId): Promise<SlotDto[]>;
+  /** 既有测试角色的只读试用入口；不授予项目 view。 */
+  getPreviewSlot(actor: Actor, serviceId: ServiceId): Promise<SlotDto | null>;
   listTrafficSwitches(actor: Actor, serviceId: ServiceId): Promise<TrafficSwitchDto[]>;
   activeEndpoint(serviceId: ServiceId): Promise<ActiveEndpoint | undefined>;
   slotRoles(serviceId: ServiceId): Promise<{ prod: PhysicalSlot; preview: PhysicalSlot } | undefined>;

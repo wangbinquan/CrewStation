@@ -12,6 +12,8 @@ export const messages = {
   'config.env.productionRole': '负责人维护',
   'config.env.developmentNote': '开发会话容器读取这一组；与生产库、生产密钥相互独立，改动不影响正在服务的部署槽。',
   'config.env.productionNote': '正式与待验证版本共用生产取值组，由负责人或管理员维护。保存不会自动改变现有进程，下一次发布按新配置注入。',
+  'config.readOnly.production': '当前为只读；只有项目负责人或管理员可以修改生产取值组。',
+  'config.readOnly.development': '当前为只读；开发取值组由项目开发者、负责人或管理员维护。',
 
   'config.items.name': '键',
   'config.items.value': '值',
