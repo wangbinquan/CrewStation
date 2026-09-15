@@ -1450,3 +1450,43 @@ API ebaa730／generation=32、controller cc93104／21 均 1／1，原任务运�
 workbench-blue／delivery-green／files-green 保持 generation=21／13／13、原 releaseId、1／1，workbench 正式 green 保持 generation=1。API ebaa730／32、controller cc93104／21 均 1／1，原任务运行时没有更新。节点 Ready=True、MemoryPressure／DiskPressure=False，剩余 1,861,398,528 bytes。
 
 证据为 batch65 的 branch-source、summary-branch-red／summary-branch-targeted、browser-before／browser-final、check-readable／build-readable、source-candidate、image-context／built／budget／import、console-rollout、http-assets、wizard-not-created、qa-before／qa-after／qa-comparison、final-runtime；前期候选以 initial／five-rem 前缀保留。源码和三份证据文档精确提交，最终 SHA CI 独立核对。**累计仍 22／52 通过、30 项待完成**；T12 保持进行中，资源总览密度和其余尺寸／键盘／真实主题旅程继续，I9／I14／I15 与具体成员范围仍待答复，RFC-004 等待 RFC-003 完结。
+
+## 第六十六批：资源长内容与复制反馈
+
+继续 UX-AT-25／26，批前 main／origin/main 同为 `b13eaa47a18995daa3a911571ff230621d280cf6`，工作树和索引为空。该 SHA 的 [CI 34925412408](https://github.com/wangbinquan/CrewStation/actions/runs/34925412408) 于 03:35:23Z 成功，1167 pass／8 skip／0 fail、1175 tests／195 files／64.03s，console build 1.17s。原批准范围内继续现有 admin／files QA 的开发资源页面，未新建项目或模型会话。
+
+### 实机原因与修复
+
+第六十五批已量测到资源总览的异常长行。本批在同一 index-wC8asuB4.js／320px 页面直接量测，确认 CapabilityTable 复用 DataTable，并非另一种不受共享样式影响的表。问题在 [CopyValue.module.css](../../../apps/console/src/features/capabilities/components/CopyValue.module.css)：原 wrapper 不换行 inline-flex、max-width=100%，[CopyValue.tsx](../../../apps/console/src/features/capabilities/components/CopyValue.tsx) 的空 role=status 元素仍有 4em 最小宽度。实际复制单元格宽 145.76px，其中按钮 42px、空提示 48px，长 code 只有 15.76px，连一个词都放不下。
+
+保留原组件、按钮、复制逻辑及 live region，只调整 CopyValue CSS：inline-grid 的两列分别是 minmax(16ch, 1fr) 和 auto，反馈跨两列放在下方，没有横向占位；空反馈高度为 0，不增加行间隙。文本继续允许断行，实际代码阅读宽度为 141.09px。320px 前后各表最大行高如下（px）：
+
+| 表格 | 修复前 | 最终修复后 |
+| --- | ---: | ---: |
+| 数据资源 | 328.64 | 40.11 |
+| 可调用的操作 | 1297.28 | 122.55 |
+| 事件订阅 | 307.53 | 39.61 |
+| 平台 MCP | 905.70 | 81.33 |
+| 业务子任务接口 | 1194.23 | 151.39 |
+
+比较的是同一张表的最大行高，业务子任务表修复后的最高行已是较长说明，而非旧的逐字路径；没有把不同最高行声称为同一行的逐项变化。多列仍由原 DataTable 外层横向滚动，320px 外层宽 254px，正文没有被表格撑宽。
+
+### 真实浏览器验证
+
+最终 index-DU8WKN7b.js 在中文、英文各检查 1280／1024／768／390／320×720，共十次页面量测；documentWidth 均等于视口。操作表最大行高按五种宽度为 81.33／101.94／101.94／122.55／122.55px，长 code 最小实测宽度始终 141.09px。英文量测在实际出现 Operation key／Method／Path／Open policy 后取得，切换语言后尚未完成加载的首轮记录未当作英文证据。
+
+实际点击“复制 test-gitlab:GET:/v4/projects/{id}/repository/branches/{branch}”，正常剪贴板内容与完整操作键相同。反馈由空变“已复制”，code 宽／高保持 141.09／105.05px，按钮相对左边界 149.09px、宽 42px，wrapper 宽 191.09px，均未移动；反馈从 code 下方开始。英文同一操作显示 Copied，内容同样准确。两次均恢复原剪贴板；初次原剪贴板无 item，工具不接受空数组，随即用空文本恢复，没有遗留测试操作键。
+
+Tab 从操作键复制进入右側路径复制时，表格 scrollLeft=382，按钮 [139.19, 181.19] 完整位于 [33, 287] 的滚动容器；Shift+Tab 返回原复制按钮，scrollLeft=55，按钮 [139.09, 181.09] 完整可见。两次均有蓝色 2px 焦点，不依赖颜色传递复制结果。实际截图已查看长操作表以及英文 Copied 状态。最后重新选中文并等到“项目设置”标题可见，viewport.reset 完成；没有读取或修改配置值、授权、订阅或发布。
+
+### 门禁、部署与原状态
+
+唯一源码候选为 CopyValue.module.css，03:39:54Z 固定摘要 `87dff41b6e4e07e9c7a78faddad41db3e4cf1f9d827f0526a04d8fd1bcc7e7db`，此后保持。这是可逆样式修复，以真实 DOM 的前后布局、实际复制和键盘交互验证，没有新增只复述 CSS 声明的测试。正常本机权限的一次完整 `bun run check` 为 **1171 pass／4 skip／0 fail**（1175 tests／195 files／6514 assertions／118.68s），console build **654ms**。纯文档补记复用该有效候选，不重复门禁。
+
+镜像 `cs-console:rfc003-b66-b7f9840041`，imageID=`sha256:b9e5326debd21d9261189a0b400a1066e6cca570d43d136687efad66ced2bb9f`；按实际缺少的内容计算，导入新增 3,719,861 bytes。03:44:42Z 原 console Deployment UID 保持、generation=37、1／1；Pod `console-778bc8b4c9-fh2s5`／UID `672eadaf-9d93-4101-9fec-63b30b8f9aa9`、restartCount=0，实际 imageID／七份文件匹配。03:48:50Z 正常 HTTP 六份静态产物也与构建一致。
+
+03:48:50Z 对照 03:39:53Z 批前快照，delivery／files／旧 rfc003-ux 的 taskId、native、历史 Agent、activity、workspace 均相同，仅排除 checkedAt；会话活跃时间另计。03:49:17Z 原三个健康任务及失败任务 UID／容器状态／restartCount、四份业务文件及 Git 配置摘要、失败 Bound 工作卷 UID 保持；工作树已有缓存不读取或清理，原 CLI 草稿未发送。
+
+API ebaa730／generation=32、controller cc93104／21 均 1／1，任务运行时未变。workbench-blue／delivery-green／files-green 仍 generation=21／13／13、原 releaseId、1／1；workbench 正式 green 仍 generation=1。节点 Ready=True、MemoryPressure／DiskPressure=False，剩余 1,838,116,864 bytes。本批仅滚动 console，没有临时调零其他副本或清理镜像／数据。
+
+证据为 batch66 的 browser-before／browser-final、check、build、source-candidate、image-context／built／budget／import、deploy-before／console-rollout、http-assets、qa-before／qa-after／qa-comparison、final-runtime。源码与三份文档精确提交，最终 SHA 托管 CI 单独核对。资源总览已复现的密度缺陷关闭；**累计仍 22／52 通过、30 项待完成**，其余关键页面、角色和实际系统明暗旅程继续，I9／I14／I15 与具体成员范围仍待答复，RFC-004 等待 RFC-003 完结。

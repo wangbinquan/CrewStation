@@ -1,11 +1,13 @@
 .wrapper {
-  display: inline-flex;
+  display: inline-grid;
+  grid-template-columns: minmax(16ch, 1fr) auto;
   align-items: baseline;
-  gap: var(--cs-space-2);
+  column-gap: var(--cs-space-2);
   max-width: 100%;
 }
 
 .value {
+  min-width: 0;
   overflow-wrap: anywhere;
 }
 
@@ -27,7 +29,8 @@
 }
 
 .hint {
-  min-width: 4em;
+  /* 反馈单独占行，不让空提示或复制结果把操作键挤成逐字换行。 */
+  grid-column: 1 / -1;
   color: var(--cs-tone-success-fg);
   font-size: 12px;
 }
