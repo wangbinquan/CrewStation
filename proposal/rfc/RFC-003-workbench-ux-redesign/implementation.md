@@ -1280,3 +1280,29 @@ CUA 刷新真实 delivery 页面载入 `/assets/index-C2niefU7.js`，恢复连�
 23:33:31Z readonly 核对：三个原 QA 的 taskId、native DTO、历史 Agent、活动及工作树内容均保持；checkedAt 正常更新，另有会话闲置提醒／活跃时间推进，不称完整 session DTO 逐字节相同。delivery HEAD ea10bd3／未提交 10／未推送 0、files e4741df／未提交 2／未推送 0 及两份原指纹一致；旧 rfc003-ux 仍是 Git 输出超限，没有读取或清理缓存。四份原业务文件与 Git 配置摘要匹配，三个健康任务 UID／ready／restartCount=0、失败任务和 Bound 工作卷 UID 保留。API ebaa730／generation=32、controller cc93104／21 仍 1／1，节点剩余 1,360,252,928 bytes。
 
 证据为临时目录 batch60-theme-red、theme-targeted、check、build、candidate、deploy-before、source-publication／source-ci、image-context／built／budget／import、console-rollout、http-assets、qa-before／qa-after／qa-comparison、final-runtime。最后仅补证据，复用有效完整门禁；I9／I14／I15 及成员范围仍待答复，RFC-004 不提前开工。
+
+## 第六十一批：真实迁移日志隔离与恢复发布
+
+继续 UX-AT-13 的当前部署页面旅程。第四十九批迁移 Job 已过一小时保留期，故使用既有专用 GitLab 项目 114／crewstation/rfc003-verify-files 的现有分支 codex/rfc003-files。通过正常文件 API 和 last_commit_id 条件逐次提交，只变更 crewstation.yaml，逐笔核对父提交、单文件差异与署名；没有新建分支或修改原任务 checkout。故障命令只输出固定文本后 exit 42，不使用数据库。原文件及两份候选均用实际 ManifestSchema／Bun.YAML.parse 校验，除 migrationCommand 外的结构一致。
+
+三个实际发布如下；时间均为 UTC，三次在页面选择已有远端分支、重新核对完整 SHA、填写版本和说明后单次确认，没有自动重发：
+
+| 版本 | 完整提交 | releaseId | 最终结果 |
+| --- | --- | --- | --- |
+| v0.1.5 | 23c909ffe3b68270243c7991667200f4683c1d8f | rel_01a0a25712ce7000ad4fb9f7d8ad6b91 | 2026-09-14T23:53:41.327Z failed |
+| v0.1.6 | 5e96d930dc7c5b79e7c0d56396e9e67c9259ac9f | rel_01a0a25c21d57000a388dcc9502a683e | 2026-09-14T23:59:12.497Z failed |
+| v0.1.7 | 5719c033e3ac781eb6e3efcdf1c8e6da02018f34 | rel_01a0a260df2b7000ba1fd5194233576c | 2026-09-15T00:04:23.466Z ready |
+
+前两次均显示“迁移失败，未切流：Job has reached the specified backoff limit”；对应迁移 Pod exitCode=42、restartCount=0，原 v0.1.4 预览在故障期间保持就绪，正式槽仍空。首条原始记录为 `2026-09-14T23:53:36.474570259Z RFC003_BATCH61_MIGRATION_FAILURE`，第二条为 `2026-09-14T23:59:07.640345926Z RFC003_BATCH61_OTHER_MIGRATION_FAILURE`。API 分别返回 23:53:36.474Z／23:59:07.640Z，source=migration、stream=combined，与容器时间一致。
+
+真实 admin 浏览器从首个失败详情点击一次“本次迁移日志”，直接进入 `/projects/prj_01a09fecbba97000843701962d998a7a/operations?tab=logs&source=migration&releaseId=rel_01a0a25712ce7000ad4fb9f7d8ad6b91&limit=200`。保留该页跟随，再发布第二个不同标记的故障版本，通过相同入口一次进入第二 releaseId 的日志页。两个失败记录同时存在时，两个页面均显示正确来源与完整版本筛选、1／1 日志，分别只有自己的标记；界面本地时间为 07:53:36／07:59:07。实际 1280×720 截图检查了筛选行、版本标签和日志行，未见错位。00:01:45Z 的普通 API 与 K8s 原始日志对照另存 batch61-log-isolation，不以 API 代替上述真实点击路径。
+
+第三笔正常提交只移除故障命令：manifest 摘要恢复 `cf631b15062adf5b68bd3b27c4f3bf3b12ea8edade32db7ac437d78efc96263c`，GitLab 对故障前 e4741df56b440d776b7c25ff5a4978b3d5822f46 与 5719c033 的整树比较 diffs=[]。历史保留这三笔 QA 提交，没有改写历史。v0.1.7 就绪后，实际打开 preview.rfc003-verify-files.cs.localhost，仍为“RFC003 预览恢复验收”首页、admin 身份、green 槽；再从该发布详情点击迁移日志，准确带恢复 releaseId，显示 0／0／尚无日志，两次失败标记没有混入。
+
+节点当时已有 CPU requests 9800m／10 核，构建 Job 需要 1 核。每次管线期间，仅将两个既有专用非正式 preview（workbench-blue、delivery-green）暂时由 1 调至 0，管线终态后立即恢复；补丁核对 UID／generation／原副本数／release 标签。00:12:56Z 两者原 Deployment UID、版本均保持，generation 分别 17／9，均 1／1。files-green 只在正常 v0.1.7 发布时更新，原 UID 保持、generation=12、1／1；workbench 正式 green 原 UID／generation=1／v0.1.0 不变。所有临时副本已恢复，没有遗留运行中的故障命令或改变正式切流。
+
+00:06:17Z 对照发布前快照，delivery／files／旧 rfc003-ux 的 taskId、native DTO、历史 Agent、活动与工作树均保持，checkedAt 查询时间另计。原 files checkout 仍 e4741df／未提交 2／未推送 0，远端分支已是内容相同的恢复提交 5719c033，不能称其本地 HEAD 同步更新；delivery ea10bd3／未提交 10／未推送 0，旧 rfc003-ux 仍如实报告 Git 输出超限。既有缓存未读取、清理或提交，未发模型轮次，原 CLI 草稿保留。00:12:56Z 三个健康任务 UID／ready／restartCount=0、四份原业务文件／Git 配置摘要和失败工作卷 UID 全部保持。
+
+平台源码与镜像未变，console c9905a6／generation=29、API ebaa730／32、controller cc93104／21 均 1／1，节点 Ready=True、MemoryPressure／DiskPressure=False，剩余 1,447,006,208 bytes。前一批文档提交 10e9aed854287bd82ce641159044d6963d581d03 的精确 SHA [CI 34909648473](https://github.com/wangbinquan/CrewStation/actions/runs/34909648473) 于 2026-09-14T23:39:04Z 成功：1152 pass／8 skip／0 fail、console build 1.03s。本次主仓仅记录验收，复用第六十批有效完整门禁和 build，最终文档 SHA 的 CI 单独核对。
+
+证据为 batch61 的 environment、remote-before、三份 manifest、failure／second-failure／recovery-commit、三轮 started／scaled／restored、first-failure-k8s、first-log-api、log-isolation、qa-before／qa-after／qa-comparison、final-runtime／final-slots。UX-AT-13 已完成，累计 **20／52 通过、32 项待完成**；I9／I14／I15 和具体成员范围仍待答复，RFC-004 继续等待 RFC-003 完结，Hook 未开工。
