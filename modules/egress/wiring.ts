@@ -16,11 +16,15 @@ import { requestUseCases } from './application/requestEntries';
 import { requestPageUseCase } from './application/requestPages';
 import { egressRoutes } from './http/egressRoutes';
 import { internalEgressRoutes } from './http/internalRoutes';
+import { forwardHttpUseCase } from './application/forwardHttp';
+import { fetchHttpEgress } from './adapters/http-client/httpEgress';
+import type { HttpEgressTransport } from './ports/httpEgress';
 
 export interface EgressModuleDeps {
   db: Database;
   /** 角色表判定与管理员标记都来自 project 模块。 */
-  project: Pick<ProjectModuleApi, 'authorize' | 'isAdmin' | 'readProjectBasics'>;
+  project: Pick<ProjectModuleApi, 'authorize' | 'isAdmin' | 'readProjectBasics' | 'resolveServiceIdentity'>;
+  outbound?: HttpEgressTransport;
   clock?: Clock;
 }
 
@@ -50,6 +54,7 @@ export function createEgressModule(deps: EgressModuleDeps): EgressModule {
     listRequestPage: requestPageUseCase(useCaseDeps),
     ...policyUseCases(useCaseDeps),
     ...blockedUseCases(useCaseDeps),
+    forwardHttp: forwardHttpUseCase(useCaseDeps, { resolve: (identity) => deps.project.resolveServiceIdentity(identity) }, deps.outbound ?? fetchHttpEgress()),
   };
   return { api, http: [egressRoutes(api, { isAdmin: (userId) => deps.project.isAdmin(userId) }), internalEgressRoutes(api)], migrations: egressMigrations };
 }

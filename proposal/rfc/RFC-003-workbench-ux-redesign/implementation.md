@@ -1925,3 +1925,29 @@ OOM 窗 D 的“重新启动一窗”只创建 E（agt_01a0a57112517001ae1959d89
 15:00:51Z A／C／E／G 四 Pod 均 Running、restart 0、各 400m／2Gi；B 和 D 的 Pod 已消失，原五任务与七份业务／Git 摘要保持。新增 E／G Pod UID 分别 cf626460-c339-4d8f-a698-f8a568aa760a、8e33b24a-529d-43c2-aba7-c64492e8a222；A／C 保留原身份。证据为 batch79-start-idempotency.json、batch79-final-api-reconnected.json、batch79-final-preserved.json 及对应 CUA 旅程。
 
 **UX-AT-28 通过，累计 28／52，剩余 24 项。** 四窗输入与最终密度、布局持久化及其余角色／失败旅程继续，不据当前只读窗口补齐 UX-AT-35。RFC-003 仍 In Progress；RFC-004 继续按批准顺序等待。原 files／delivery 浏览器草稿未操作或发送。
+
+## 第八十批：代理出站与真实消费者调用
+
+第七十九批 0738692ac8c7f650cd56d98096b549046552e744 已推送，[CI 34985845854](https://github.com/wangbinquan/CrewStation/actions/runs/34985845854)／job 104437598158 于 15:05:55Z 成功。
+
+按 I9(a) 实现服务域 `POST /internal/egress/http`，由网关确定实际 APIProxy 身份，再从目录解析项目；每次读取管理员全局及该代理项目的域名规则，被阻记录为该项目 `source=slot`。参考代理采用已有 `CS_PLATFORM_API_URL`，上游状态、业务头与二进制体保留。请求 1 MiB、响应 4 MiB、头 32 KiB、URL 8 KiB、上游总期限 8 秒，不跟随重定向或自动重试；无新增 NetworkPolicy 放行。具体落位及已有任务／构建出口边界见 proxy-egress.md。
+
+新增真实数据库路由回归先得到预期失败（6 pass／1 fail，缺路由 404），代理通道回归先为 13 pass／1 fail；实现后使用独立 egress 测试库避免污染既有 project 夹具。最终定向 24 pass／0 fail／150 assertions，包含批准／撤销／项目隔离、来源归属、响应分页头、二进制 POST、307 不跟随、慢响应体超时和容量限制。十四份源码候选完整门禁于 15:21:30Z 通过：**1287 pass／4 skip／0 fail**（1291 tests／216 files／7163 assertions，测试 127.19s、命令 148.52s），console build **540ms**，候选摘要保持。
+
+15:24:53／56Z API 和 controller 更新至 cs-control-plane:rfc003-b80-415023304a60，imageID sha256:3350030abd17d9239c69f3c947f224e6107ef04ecde37b77bcb40ed777a10f38；generation=48／32，各十四份运行源码一致。Pod UID 分别 d0d1894c-124c-4778-b7ac-f0877bf7f6a0、f2a60556-3340-4349-bb5e-69b9ecfbcd0c，均 1／1、restart 0。增量导入仅 198,123 bytes；session、console 和任务镜像保持。
+
+专用 GitLab 项目 147 的 main 以正常 Commits API 更新三份代理文件，保留原 manifest、目录与代理名，原 SHA 201fe8ef 的直接子提交为 **8d1d05e2433adb792e2a3cb9b3bbfba91515ee17**。普通发布 v0.1.4（rel_01a0a5ae63fd7000bee93132adb48b2b）构建就绪。原生产配置故意指向 127.0.0.1:9，管理员通过配置 API 将 GITLAB_BASE_URL 保存为本机 host.docker.internal:8929，第 3 版；再正常发布同源码 v0.1.5（rel_01a0a5b7485a7000ade53f0c105d4aed），15:37:37Z 实际就绪。15:41:30Z 使用当前与目标 releaseId 双确认正常切流，tsw_01a0a5bafd817000bf8295028dc1d8df；其他业务项目槽位没有改变。
+
+节点 CPU 预约已满，两次构建临时把四个闲置 QA CLI 的 requests／limits 从 400m 调至 150m，内存不变；只调 requests 的 server dry-run 因 QoS 变化拒绝，未生效。首次均已于 15:34:01Z 恢复，第二次构建完成后在 finally 中于 15:37:33Z 恢复；资源更新按 UID 和原资源值核对，避免 Pod 状态 resourceVersion 自然变化造成无关冲突。没有重启四个 CLI。15:49:48Z 原五任务、四个子 Pod 与七份业务／Git 文件摘要全部保持。
+
+### 同一代理、同一消费者的真实调用
+
+新版代理进程经服务域出站，未批准时返回 **403／egress_blocked**，记录正确属于 prj_01a0a3bf1d2c700090f54cd03306dd6d。正常申请 egq_01a0a5b8ad8a700095026272d87a6c71 获批后取得 GitLab **200**，响应 `[]`、分页头 1／1／0；删除该项目条目后立即 403，恢复项目条目 egr_01a0a5b8b3797000b74ce71139c9a5e7 后再次 200。没有全局条目变更，也没有使用 GitLab 令牌。
+
+实际 rfc003-developer（usr_01a09f273a95700185d408ca143e2a45）从原 workbench 项目申请 `rfc003-integration-qa:GET:/v4/projects`，请求前试调明确 403。第一次申请 req_01a0a5bca5ff7000b697fb8272481cca 被 admin 拒绝，开发者读取准确理由；补充用途的 req_01a0a5bca6377000b20654bf01fa4cde 获 admin 批准。策略仍为 targeted，只授权当前服务的这一个 GET；其裁剪 Swagger 仅有 `/v4/projects`。
+
+批准后第一次调用早于网关快照下发，普通试调 API 回传真实 403，没有伪报上游成功。下发后 15:43:48Z 同一开发者、原 task tsk_01a09eb4f03f7000ba011a517772cc09 经 TaskRunner／共享网关发起的只读 GET 返回 **200／342ms**，trace 01a0a5bd166f700099e822b2b7bf9e88，分页和 GitLab 响应保持。不是从控制面替消费者发起的请求。
+
+工作台能力接口与 Swagger 指向同一操作。裸父 Pod 没有 Agent 会话令牌，MCP 读取如预期拒绝；随后以既有 OpenCode E 的 UID 10001 使用其已经注入的 MCP 连接，在同一容器请求 `cs://capability/operations`，15:49:48Z 返回同一操作且 granted=true。令牌只在原容器内供原目的端点使用，不输出或落盘，不手工构造服务身份头。
+
+证据为 `/private/tmp/crewstation-rfc003-batch80-` 的 candidate／gate-result／proxy-release-v015／proxy-config／proxy-traffic／proxy-egress-cycle／consumer-journey／consumer-invocation／consumer-mcp-configured／final-preserved 等记录。IAB 当前开发页和 API 消费页可读，代理筛选确实可选；鼠标点击及键盘输入仍在控制工具派发前超时，没有把这种工具故障描述成产品按钮失败。原 files／delivery 未发送草稿保持。**完整浏览器试调与申请衔接尚未补齐，累计仍 28／52；RFC-004 继续按约定等待。**

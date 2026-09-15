@@ -13,6 +13,7 @@ import { createEgressModule, egressMigrations } from '../wiring';
 const available = await testDatabaseAvailable();
 let tdb: TestDatabase;
 let egress: EgressModule;
+let projects: ReturnType<typeof createProjectModule>;
 let admin: Actor;
 let owner: Actor;
 let dev: Actor;
@@ -32,6 +33,7 @@ beforeAll(async () => {
   owner = { userId: o.id, isAdmin: false };
   dev = { userId: d.id, isAdmin: false };
   const project = createProjectModule({ db: tdb.db, identity: identity.api, hosts, settings: { defaultMaxConcurrentTasks: 3, defaultServicePlan: 'standard-small' } });
+  projects = project;
   await project.api.upsertServicePlan(admin, { name: 'standard-small', cpu: '500m', memory: '512Mi', maxReplicas: 3, description: '' });
   projectId = (await project.api.createProject(admin, { slug: 'demo', name: '演示', kind: 'DigitalWorker', ownerUserId: owner.userId, template: 'minimal-sample' })).id;
   otherProjectId = (await project.api.createProject(admin, { slug: 'other', name: '其他', kind: 'DigitalWorker', ownerUserId: owner.userId, template: 'minimal-sample' })).id;
@@ -42,6 +44,38 @@ afterAll(async () => { await tdb?.drop(); });
 
 describe.skipIf(!available)('egress module', () => {
   let projectEntryId: string;
+
+  test('代理运行时采用本项目白名单：被阻、批准、实际发送与撤销；其他项目不串用', async () => {
+    const isolated = await createTestDatabase([egressMigrations]);
+    try {
+    const proxy = await projects.api.createProject(admin, { slug: 'egress-proxy', name: '出站代理验收', kind: 'APIProxy', ownerUserId: owner.userId, template: 'reference-api-proxy' });
+    await projects.api.setProjectState(proxy.id, 'active');
+    const calls: string[] = [];
+    const runtime = createEgressModule({ db: isolated.db, project: projects.api, outbound: { send: async (input) => { calls.push(input.url); return new Response('公司系统响应', { status: 201, headers: { 'x-total': '7' } }); } } });
+    const app = createApp({ name: 'proxy-egress' }); for (const router of runtime.http) app.route('/', router);
+    const payload = { url: 'https://company.example.org/api/changes', method: 'POST', headers: {}, bodyBase64: btoa('once') };
+    const invoke = (identity = 'egress-proxy/egress-proxy', body = payload) => app.request('/internal/egress/http', { method: 'POST', headers: { [IDENTITY_HEADERS.sourceService]: identity, 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    // 白名单不能只有管理页面；真实调用必须先被阻、批准后放行、撤销后再次被阻。
+    expect((await invoke()).status).toBe(403); expect(calls).toHaveLength(0);
+    expect(await runtime.api.listBlocked(owner, proxy.id)).toEqual([expect.objectContaining({ fqdn: 'company.example.org', source: 'slot', count: 1 })]);
+    await runtime.api.addEntry(admin, { fqdn: 'company.example.org', scope: 'project', projectId: otherProjectId });
+    expect((await invoke()).status).toBe(403);
+    const requested = await runtime.api.requestEntry(owner, proxy.id, { fqdn: 'company.example.org' });
+    await runtime.api.decideRequest(admin, requested.id, { approve: true, decision: '允许此代理访问公司系统' });
+    const response = await invoke(); expect(response.status).toBe(201); expect(response.headers.get('x-total')).toBe('7'); expect(await response.text()).toBe('公司系统响应'); expect(calls).toEqual([payload.url]);
+    const entry = (await runtime.api.listEntries(owner, proxy.id)).find((e) => e.fqdn === 'company.example.org')!;
+    await runtime.api.removeEntry(admin, entry.id); expect((await invoke()).status).toBe(403); expect(calls).toHaveLength(1);
+    const global = await runtime.api.addEntry(admin, { fqdn: '*.example.org', scope: 'global' });
+    expect((await invoke()).status).toBe(201); expect(calls).toHaveLength(2);
+    expect((await invoke('egress-proxy/egress-proxy', { ...payload, url: 'https://example.org/api' })).status).toBe(403);
+    await projects.api.setProjectState(proxy.id, 'paused'); expect((await invoke()).status).toBe(403); expect(calls).toHaveLength(2);
+    await projects.api.setProjectState(proxy.id, 'active'); await runtime.api.removeEntry(admin, global.id);
+    expect((await invoke('demo/demo')).status).toBe(403);
+    expect((await invoke('missing/missing')).status).toBe(403);
+    expect((await app.request('/internal/egress/http', { method: 'POST', headers: { [IDENTITY_HEADERS.userId]: admin.userId, 'content-type': 'application/json' }, body: JSON.stringify(payload) })).status).toBe(403);
+    expect((await invoke('egress-proxy/egress-proxy', { ...payload, projectId: otherProjectId } as typeof payload)).status).toBe(400);
+    } finally { await isolated.drop(); }
+  });
 
   test('管理员维护全局与项目级条目；作用域与 projectId 一致；重复冲突；非管理员被拒', async () => {
     const global = await egress.api.addEntry(admin, { fqdn: 'registry.npmjs.org', scope: 'global' });

@@ -24,6 +24,17 @@ function recorder(given: () => Response): { calls: Seen[]; fetch: FetchLike } {
 }
 
 describe('转发', () => {
+  test('部署后经平台出站通道发送一次；管理员拒绝原样返回，不回退直连', async () => {
+    const rec = recorder(() => new Response('管理员未批准出站', { status: 403 }));
+    const app = createApp({ env: { ...baseEnv, CS_PLATFORM_API_URL: 'http://api.svc.cs.internal' }, upstreamFetch: rec.fetch, log: quiet });
+    const response = await app.request('/v4/projects?search=demo', { method: 'POST', body: '验收请求', headers: { 'content-type': 'text/plain' } });
+    // 原来直接从代理 Pod 请求公司系统，白名单和被阻记录没有任何执行点。
+    expect(rec.calls).toHaveLength(1); expect(rec.calls[0]?.url).toBe('http://api.svc.cs.internal/internal/egress/http');
+    const body = JSON.parse(rec.calls[0]!.body);
+    expect(body).toMatchObject({ url: 'http://gitlab.test:8929/api/v4/projects?search=demo', method: 'POST', headers: { 'private-token': TOKEN } });
+    expect(Buffer.from(body.bodyBase64, 'base64').toString()).toBe('验收请求');
+    expect(response.status).toBe(403); expect(await response.text()).toBe('管理员未批准出站');
+  });
   test('方法、路径、查询串原样带到上游，并在上游地址后补 /api', async () => {
     const rec = recorder(() => Response.json([{ id: 1 }]));
     const app = createApp({ env: baseEnv, upstreamFetch: rec.fetch, log: quiet });

@@ -10,6 +10,7 @@ export const PLATFORM_ENV = {
   /** production｜development：两个槽都是 production，开发会话是 development。 */
   environment: 'CS_ENVIRONMENT',
   port: 'PORT',
+  platformApiUrl: 'CS_PLATFORM_API_URL',
 } as const;
 
 /** crewstation.yaml `spec.env` 声明的配置项；平台按当前取值组注入为同名环境变量。 */
@@ -32,6 +33,7 @@ export interface DeploymentInfo {
   /** 未配置令牌时为 null：仍然转发，由上游按匿名身份决定给什么——代理不代替上游做判断。 */
   upstreamToken: string | null;
   port: number;
+  platformApiUrl: string | null;
 }
 
 export function readDeploymentInfo(env: Record<string, string | undefined>): DeploymentInfo {
@@ -44,6 +46,7 @@ export function readDeploymentInfo(env: Record<string, string | undefined>): Dep
     upstreamBaseUrl: optional(env[CONFIG_ENV.upstreamBaseUrl])?.replace(/\/+$/, '') ?? null,
     upstreamToken: optional(env[CONFIG_ENV.upstreamToken]),
     port: Number.isInteger(port) && port > 0 ? port : DEFAULT_PORT,
+    platformApiUrl: optional(env[PLATFORM_ENV.platformApiUrl]),
   };
 }
 

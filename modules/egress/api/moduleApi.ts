@@ -1,6 +1,6 @@
 import type {
   Actor, AddEgressEntryRequest, BlockedEgressDto, DecideEgressRequest, EgressEntryDto, EgressPolicyDto, EgressRequestDto, EgressSource, ProjectId,
-  RequestEgressEntryRequest, RequestPageQuery, EgressRequestPage,
+  RequestEgressEntryRequest, RequestPageQuery, EgressRequestPage, ForwardEgressHttpRequest,
 } from '@crewstation/contracts';
 
 /**
@@ -23,4 +23,6 @@ export interface EgressModuleApi {
   /** 出站代理上报一次被阻请求：按 (project, fqdn) 累加。 */
   recordBlocked(projectId: ProjectId, fqdn: string, source?: EgressSource): Promise<BlockedEgressDto>;
   listBlocked(actor: Actor, projectId: ProjectId): Promise<BlockedEgressDto[]>;
+  /** 来源由服务域网关注入；当前项目白名单决定每次代理 HTTP 出站。 */
+  forwardHttp(sourceIdentity: string, input: ForwardEgressHttpRequest): Promise<Response>;
 }

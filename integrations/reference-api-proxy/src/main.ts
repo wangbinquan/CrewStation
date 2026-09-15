@@ -12,6 +12,7 @@ import { PROXY_NAME } from './proxy/catalog';
 import { TRACE_HEADER } from './proxy/upstreamRequest';
 import { proxyError } from './proxy/upstreamResponse';
 import { CONFIG_ENV, readDeploymentInfo } from './platform/environment';
+import { platformEgressFetch } from './platform/egressTransport';
 
 export type LogFn = (msg: string, fields: Record<string, unknown>) => void;
 
@@ -27,6 +28,7 @@ export interface AppOptions {
 
 export function createApp(options: AppOptions = {}): Hono {
   const deployment = readDeploymentInfo(options.env ?? process.env);
+  const upstreamFetch = deployment.platformApiUrl ? platformEgressFetch(deployment.platformApiUrl, options.upstreamFetch) : options.upstreamFetch;
   const log = options.log ?? logJsonLine;
   const app = new Hono();
 
@@ -53,7 +55,7 @@ export function createApp(options: AppOptions = {}): Hono {
     const outcome = await forward(c.req.raw, {
       upstreamBaseUrl: deployment.upstreamBaseUrl,
       upstreamToken: deployment.upstreamToken,
-      ...(options.upstreamFetch ? { fetch: options.upstreamFetch } : {}),
+      ...(upstreamFetch ? { fetch: upstreamFetch } : {}),
       ...(options.timeoutMs === undefined ? {} : { timeoutMs: options.timeoutMs }),
     });
     log('forwarded', { method: c.req.method, upstreamPath: outcome.upstreamPath, status: outcome.status, traceId });
