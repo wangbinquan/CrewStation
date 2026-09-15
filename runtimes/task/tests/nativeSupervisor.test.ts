@@ -13,7 +13,7 @@ import { createNativePtyBackend } from '../src/terminal/nativePty';
 const cleanups: Array<() => Promise<void>> = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
 
-async function fixture(activityFactory?: NativeSupervisorDeps['activityFactory']) {
+async function fixture(activityFactory?: NativeSupervisorDeps['activityFactory'], runnerId?: string) {
   const root = await mkdtemp(join(tmpdir(), 'cs-native-pty-'));
   if (probeCurrentUid() === 0) await chown(root, 10001, 10001);
   cleanups.push(() => rm(root, { recursive: true, force: true }));
@@ -24,7 +24,7 @@ async function fixture(activityFactory?: NativeSupervisorDeps['activityFactory']
   let disposed = 0;
   const paths = await createWorkdirPaths(root);
   const native = new NativeTerminalSupervisor({
-    backend: createNativePtyBackend(launcher), launcher, paths, agentEnv: {}, logger: noopLogger,
+    backend: createNativePtyBackend(launcher), launcher, paths, agentEnv: {}, logger: noopLogger, runnerId,
     emit: (e) => events.push(e),
     ...(activityFactory ? { activityFactory } : {}),
     prepare: async (_spec, context) => {
@@ -36,6 +36,16 @@ async function fixture(activityFactory?: NativeSupervisorDeps['activityFactory']
   const command = (id: string): StartAgentTerminalCommand => ({ id, type: 'startAgentTerminal', agentId: id, terminalId: `terminal-${id}`, runnerId: native.runnerId, requestFingerprint: id, compute: 'balanced', driver: 'claude-code', model: 'model', permission: 'edit', cols: 80, rows: 24, mcp: [], env: {} });
   return { native, command, root: paths.root, events, launches: () => launches, disposed: () => disposed };
 }
+
+test('独立执行容器采用受理时的 Runner 身份，并拒绝其他实例的启动请求', async () => {
+  const runnerId = crypto.randomUUID(), f = await fixture(undefined, runnerId);
+  expect(f.native.list()).toEqual({ runnerId, terminals: [] });
+  expect(() => f.native.start({ ...f.command('wrong-runner'), runnerId: crypto.randomUUID() })).toThrow('进程已更换');
+  expect(f.launches()).toBe(0);
+  const record = await f.native.start(f.command('owned-runner'));
+  expect(record).toMatchObject({ runnerId, lifecycle: 'running' });
+  await outputContains(f, record.terminalId, 'test-ready>');
+});
 
 test('状态监听器故障只标记未确认，原生进程仍能启动并使用', async () => {
   const f = await fixture(() => { throw new Error('port unavailable'); });

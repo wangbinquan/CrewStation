@@ -10,6 +10,7 @@ import type { TaskRuntimeUseCaseDeps } from './dependencies';
 import { runnerLifecycle } from './runnerLifecycle';
 import { failEnvironment } from './failEnvironment';
 import { rebuildIsActive } from '../domain/environmentRebuild';
+import { deferWorkspaceRelease } from './nativeExecution';
 
 export type ReleaseReason = 'user' | 'owner-force' | 'business' | 'failed' | 'pod-lost';
 
@@ -30,11 +31,13 @@ export function lifecycleUseCases(deps: TaskRuntimeUseCaseDeps) {
       if (current.state === 'released') return current;
       const rebuild = current.rebuildId ? await scope.rebuilds.get(current.rebuildId) : undefined;
       if (rebuild && rebuildIsActive(rebuild)) throw precondition('环境正在重建，请等待完成后再释放');
+      const deferred = await deferWorkspaceRelease(scope, current, clock.now(), reason);
+      if (deferred) return deferred;
       if (current.state === 'releasing') throw precondition('环境正在释放，请稍后查看');
       await scope.environments.update(transition(current, 'releasing', clock.now(), { connected: false }));
       return current;
     });
-    if (env.state === 'released') return env;
+    if (env.state === 'released' || env.native || env.release) return env;
     const occupied = occupiesQuota(env.state);
     const releasing = transition(env, 'releasing', clock.now(), { connected: false });
     await cluster.deletePod(env);

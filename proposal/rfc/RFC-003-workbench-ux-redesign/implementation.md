@@ -1841,3 +1841,21 @@ task-runtime 持久化恢复记录和队列，项目行锁串行化准入／释�
 发布前按模块上限将 dev-session 的恢复用例归入现有 sessionLifecycle，保持 40 个生产源码文件；task-runtime 为 38 个／1500 行。归并首检发现一处旧测试 import，修正后接口 2 pass／类型检查通过；最终 68 份源码候选完整门禁 **1240 pass／4 skip／0 fail**（1244 tests／208 files／6870 assertions，测试 120.91s、命令 144.38s），console build **544ms**。控制台七份产物与既有最终部署逐字节一致，复用 generation=49。实际刷新重新进入后，CLI a7130d 仍为同一进程，原模型输出保持，输入控制入口可用。
 
 最终归并只追加更新 API：cs-control-plane:rfc003-b75-publish2-229a686b71／generation=40／1／1，Pod UID 8c290aa2-7415-4ec8-a4bc-e8d0a0e0da83；48 份实际运行文件摘要与最终候选一致，滚动策略恢复。controller／console／session 保持上述 24／49／15，归并没有改变恢复行为或重新启动开发容器。
+
+第七十五批最终提交为 2f3647d5d0488593534ff7747dfdeefd7430f8ff，main 与 origin/main 同步；[精确 SHA CI 34965343584](https://github.com/wangbinquan/CrewStation/actions/runs/34965343584)／job 104368350710 已成功，终态 2026-09-15T11:51:36Z，1236 pass／8 skip／0 fail，console build 1.30s。
+
+## 第七十六批：逐 CLI 独立执行环境底层
+
+I15 按已经选定的独立 Pod 方案继续实现，契约见 [cli-isolation.md](cli-isolation.md)。本批交付 task-runtime 的完整执行生命周期和 Runner 身份配置，工作台启动入口与动态聚合在下一批接线。尚未把当前“＋ CLI”改成新路径，不以底层测试代替完整四窗体验。
+
+每个子环境冻结 parentTaskId、原 Pod／PVC UID、节点、资源套餐、镜像和 agentId／terminalId／runnerId。登记、并发配额与队列在同一项目事务中提交；相同请求返回同一个环境，不重复占额，配置变更不能套用旧执行标识。子环境使用独立 Pod／Secret，沿用原工作卷，不克隆、不建卷、不启动预览。Kubernetes requests／limits 分别限制每个 CLI，单位规范化可接受，实质资源变化会拒绝。
+
+准备作业核对原卷和父 Pod，创建回执丢失后采用同一实例；租约转移的旧执行不能提交就绪。等待期间呈现真实调度原因，五分钟未连接则进入清理。清理意图和凭据失效先持久化，确认 Pod 已消失才回收本次配额；清理失败即使耗尽队列重试，也由协调器接续。异主对象不覆盖或删除，清理未完成不能当作额度空闲。
+
+父释放先阻止新 CLI，并等待所有子环境清理后才删除父 Pod／原策略下的卷；重复释放只减一次配额。父容器失败不结束仍在运行的子 CLI；I14 的保卷恢复保存活跃子环境所在节点，并将同一 RWO 卷的新父容器交由调度器安排到该节点。ReadWriteOncePod 在准入前明确拒绝共享。子 Runner 的连接身份通过 CS_RUNNER_TASK_ID／CS_RUNNER_NATIVE_ID 固定，Agent 的 CS_TASK_ID 和任务数据访问仍属于原工作区。
+
+新增 15 条真实数据库／假集群回归与 2 条 Runner／真实 PTY 回归，覆盖正常、并发、OOM、超时、父释放／恢复、响应丢失、租约接管、卷替换和资源规范化。定向先 25 pass／1 skip／0 fail，后补单位／调度检查的故障组 9 pass／0 fail；Linux PTY 的平台专属分支不算本机已跑。首检曾发现未声明 zod、TaskId 标记类型和函数长度，均修正后类型、lint、结构通过；合并恢复集群端口后 task-runtime 为 40 个生产源码／1900 行，没有豁免模块上限。
+
+首轮完整门禁为 **1256 pass／4 skip／1 fail**（1261 tests／210 files／6971 assertions，测试 134.65s、命令 163.00s）。唯一失败发生在本机 GitLab 新会话令牌的第一次普通分支推送，报 terminal prompts disabled；此前建仓、平台推送、标签与分支比较已通过。没有据此认定凭据配置错误或改写宿主机配置。同一源码下独立重跑该 GitLab 文件 **5 pass／0 fail／43 assertions，36.19s**，本次临时测试项目 id 157 已由测试清理；首轮项目 id 156 也已清理。控制台构建 564ms，产物名仍与第七十五批一致。
+
+最终完整门禁于 12:31:26Z 通过：**1257 pass／4 skip／0 fail**（1261 tests／210 files／6977 assertions，测试 124.99s、命令 148.30s），console build **535ms**；37 份源码候选与首轮逐字节一致，原 GitLab 失败未复现，没有修改生产凭据逻辑或删掉用例。精确提交和 SHA CI 另行核对。原失败日志保留在 /private/tmp/crewstation-rfc003-batch76-check.log；候选、复验与最终记录采用 batch76、batch76-scm-recheck、batch76-final 前缀。本批尚未部署或更新任务镜像，未操作旧 CLI、未发送草稿、工作卷或业务切流。下一批接算力档位套餐、启动派发、多 Runner 终端／动态及末屏，随后完成实机隔离与四窗验收。**累计仍 27／52**，RFC-004 不提前开始。

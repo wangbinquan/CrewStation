@@ -1,5 +1,5 @@
 import type { TaskId } from '@crewstation/contracts';
-import { PLATFORM_ENV, TaskIdSchema } from '@crewstation/contracts';
+import { NativeTerminalRosterSchema, PLATFORM_ENV, TaskIdSchema } from '@crewstation/contracts';
 import type { Logger } from '@crewstation/kernel';
 
 export interface PreviewConfig {
@@ -12,6 +12,7 @@ export type TerminalBackendChoice = 'auto' | 'native' | 'script';
 
 export interface RunnerConfig {
   taskId: TaskId;
+  nativeRunnerId?: string;
   runnerToken: string;
   sessionUrl: string;
   internalApiBase?: string;
@@ -42,10 +43,11 @@ export class RunnerConfigError extends Error {
 type Env = Record<string, string | undefined>;
 
 export function loadConfigFromEnv(env: Env = process.env): RunnerConfig {
-  const taskId = TaskIdSchema.safeParse(required(env, 'CS_TASK_ID'));
+  const taskId = TaskIdSchema.safeParse(env.CS_RUNNER_TASK_ID ?? required(env, 'CS_TASK_ID'));
   if (!taskId.success) throw new RunnerConfigError('CS_TASK_ID 不是合法的任务 ID（tsk_<32 位十六进制>）');
   return {
     taskId: taskId.data,
+    ...(env.CS_RUNNER_NATIVE_ID ? { nativeRunnerId: NativeTerminalRosterSchema.shape.runnerId.parse(env.CS_RUNNER_NATIVE_ID) } : {}),
     runnerToken: required(env, 'CS_RUNNER_TOKEN'),
     sessionUrl: required(env, 'CS_SESSION_URL'),
     internalApiBase: env[PLATFORM_ENV.internalApiBase] || undefined,

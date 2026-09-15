@@ -8,7 +8,7 @@ export async function containerEnv(deps: Pick<TaskRuntimeUseCaseDeps, 'sources' 
   const [config, data, taskData] = await Promise.all([
     deps.sources.configEnv(env.projectId, environment),
     deps.sources.dataEnv(env.serviceId, environment),
-    deps.sources.taskDataEnv(env.id),
+    deps.sources.taskDataEnv(env.native?.parentTaskId ?? env.id),
   ]);
   const values: Record<string, string> = {
     ...config,
@@ -22,13 +22,17 @@ export async function containerEnv(deps: Pick<TaskRuntimeUseCaseDeps, 'sources' 
     [PLATFORM_ENV.platformApiUrl]: `http://api.${deps.settings.serviceDomain}`,
     [PLATFORM_ENV.internalApiBase]: `http://api.${deps.settings.serviceDomain}/api/`,
     [PLATFORM_ENV.jwksUrl]: `http://api.${deps.settings.serviceDomain}/.well-known/jwks.json`,
-    [PLATFORM_ENV.taskId]: env.id,
+    [PLATFORM_ENV.taskId]: env.native?.parentTaskId ?? env.id,
     [PLATFORM_ENV.traceId]: env.traceId,
     CS_RUNNER_TOKEN: runnerToken,
     CS_SESSION_URL: deps.settings.sessionUrl,
     CS_WORKDIR: '/work',
     CS_WORKER_UID: String(deps.settings.workerUid),
   };
+  if (env.native) {
+    values.CS_RUNNER_TASK_ID = env.id;
+    values.CS_RUNNER_NATIVE_ID = env.native.runnerId;
+  }
   if (env.preview) {
     values.CS_PREVIEW_COMMAND = JSON.stringify(env.preview.command);
     values.CS_PREVIEW_PORT = String(env.preview.port);

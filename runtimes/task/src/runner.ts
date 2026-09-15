@@ -92,7 +92,7 @@ class TaskRunner implements RunnerHandle {
     const agents = createAgentSupervisor({ registry, launcher, paths, agentEnv, emit, logger: logger.child({ component: 'agents' }) });
     const execs = createExecSupervisor({ launcher, paths, emit, logger: logger.child({ component: 'exec' }) });
     const terminals = createTerminalSupervisor({ choice: config.terminalBackend, launcher, paths, emit, logger: logger.child({ component: 'terminal' }) });
-    const nativeTerminals = new NativeTerminalSupervisor({ backend: terminals.backend, launcher, paths, agentEnv, emit, logger: logger.child({ component: 'native-terminal' }) });
+    const nativeTerminals = new NativeTerminalSupervisor({ backend: terminals.backend, launcher, paths, agentEnv, emit, runnerId: config.nativeRunnerId, logger: logger.child({ component: 'native-terminal' }) });
     const preview = createPreviewSupervisor({ config: config.preview, policy: config.previewPolicy, launcher, workdir: paths.root, emit, logger: logger.child({ component: 'preview' }) });
     const files = createFileCommands({ paths, launcher, emit, logger: logger.child({ component: 'files' }) });
     const verifyContract = createContractVerifier({ paths, logger: logger.child({ component: 'contract' }) });

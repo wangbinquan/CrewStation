@@ -12,6 +12,7 @@ export interface EnvironmentRebuild {
   readonly pvcName: string;
   readonly secretName: string;
   readonly image: string;
+  readonly nodeName?: string;
   readonly state: DevSessionRebuildDto['state'];
   readonly podUid?: string;
   readonly secretUid?: string;

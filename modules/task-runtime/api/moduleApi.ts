@@ -14,6 +14,7 @@ export interface EnvironmentDto {
   profile: string;
   podName: string;
   connected: boolean;
+  native?: { parentTaskId: TaskId; agentId: string; terminalId: string; runnerId: string; state: 'queued' | 'starting' | 'running' | 'cleaning' | 'finished'; profile: { name: string; cpu: string; memory: string; storage: string } };
   branch?: string;
   preview?: { command: string[]; port: number; healthPath: string };
   traceId: string;
@@ -35,10 +36,22 @@ export interface CreateEnvironmentInput {
   labels?: Record<string, string>;
 }
 
+export interface CreateNativeExecutionInput {
+  id: TaskId;
+  parentTaskId: TaskId;
+  createdBy: UserId;
+  agentId: string;
+  terminalId: string;
+  runnerId: string;
+  fingerprint: string;
+  profile?: string;
+}
+
 /** task-runtime 对外能力：环境生命周期与配额；授权由 dev-session／business-task 在调用前完成，这里只做准入与集群操作。 */
 export interface TaskRuntimeModuleApi {
   readonly name: 'task-runtime';
   createEnvironment(input: CreateEnvironmentInput): Promise<EnvironmentDto>;
+  createNativeExecution(input: CreateNativeExecutionInput): Promise<EnvironmentDto>;
   releaseEnvironment(taskId: TaskId, reason: ReleaseReason): Promise<EnvironmentDto>;
   pauseEnvironment(taskId: TaskId): Promise<EnvironmentDto>;
   resumeEnvironment(taskId: TaskId): Promise<EnvironmentDto>;

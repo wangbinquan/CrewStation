@@ -1,6 +1,6 @@
 import type { ProjectId, ServiceId, TaskId, TaskKind, TraceId, UserId, VolumeMode } from '@crewstation/contracts';
 import type { Executor } from '@crewstation/persistence';
-import { and, desc, eq, inArray, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import type { EnvironmentState, TaskEnvironment } from '../../domain/taskEnvironment';
 import type { AdmissionRepository, EnvironmentRepository } from '../../ports/repositories';
 import { admissions, environments } from './tables';
@@ -14,8 +14,9 @@ export function drizzleEnvironmentRepository(db: Executor): EnvironmentRepositor
     runnerTokenHash: r.runnerTokenHash, connected: r.connected, ...(r.branch ? { branch: r.branch } : {}), ...(r.preview ? { preview: json<TaskEnvironment['preview']>(r.preview) } : {}),
     labels: json<Record<string, string>>(r.labels), ...(r.createdBy ? { createdBy: r.createdBy as UserId } : {}), ...(r.message ? { message: r.message } : {}),
     createdAt: r.createdAt, updatedAt: r.updatedAt, lastActivityAt: r.lastActivityAt, ...(r.rebuildId ? { rebuildId: r.rebuildId } : {}),
+    ...(r.native ? { native: json<TaskEnvironment['native']>(r.native) } : {}), ...(r.release ? { release: json<TaskEnvironment['release']>(r.release) } : {}),
   });
-  const toRow = (e: TaskEnvironment): typeof environments.$inferInsert => ({ ...e, branch: e.branch ?? null, preview: e.preview ?? null, createdBy: e.createdBy ?? null, message: e.message ?? null, rebuildId: e.rebuildId ?? null });
+  const toRow = (e: TaskEnvironment): typeof environments.$inferInsert => ({ ...e, branch: e.branch ?? null, preview: e.preview ?? null, createdBy: e.createdBy ?? null, message: e.message ?? null, rebuildId: e.rebuildId ?? null, native: e.native ?? null, release: e.release ?? null });
   return {
     insert: async (e) => { await db.insert(environments).values(toRow(e)); },
     update: async (e) => { await db.update(environments).set(toRow(e)).where(eq(environments.id, e.id)); },
@@ -23,8 +24,10 @@ export function drizzleEnvironmentRepository(db: Executor): EnvironmentRepositor
     listByProject: async (projectId, states) => (await db.select().from(environments).where(states?.length ? and(eq(environments.projectId, projectId), inArray(environments.state, states)) : eq(environments.projectId, projectId)).orderBy(environments.createdAt)).map(toEnv),
     listByStates: async (states) => (await db.select().from(environments).where(inArray(environments.state, states))).map(toEnv),
     listByTrace: async (traceId) => (await db.select().from(environments).where(eq(environments.traceId, traceId)).orderBy(environments.createdAt)).map(toEnv),
+    listChildren: async (parentTaskId) => (await db.select().from(environments).where(sql`${environments.native}->>'parentTaskId' = ${parentTaskId}`).orderBy(environments.createdAt)).map(toEnv),
+    pendingExecutions: async () => (await db.select().from(environments).where(sql`${environments.native}->>'state' IN ('queued', 'cleaning') OR (${environments.state} = 'releasing' AND ${environments.release} IS NOT NULL)`)).map(toEnv),
     findDevSession: async (projectId, options) => {
-      const scope = and(eq(environments.projectId, projectId), eq(environments.kind, 'dev-session'));
+      const scope = and(eq(environments.projectId, projectId), eq(environments.kind, 'dev-session'), isNull(environments.native));
       const active = inArray(environments.state, ['creating', 'running', 'releasing']);
       // 只读展示最近一次失败；后续会话已释放时，不重新翻出更旧的失败冒充当前会话。
       const row = (await db.select().from(environments).where(and(scope, options?.includeLatestFailure ? undefined : active))

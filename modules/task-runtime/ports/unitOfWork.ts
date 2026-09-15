@@ -1,4 +1,4 @@
-import type { DomainPayload, DomainTopicName } from '@crewstation/contracts';
+import type { DomainPayload, DomainTopicName, TaskId } from '@crewstation/contracts';
 import type { AdmissionRepository, EnvironmentRepository } from './repositories';
 import type { RebuildQueue, RebuildRepository } from './rebuilds';
 
@@ -12,6 +12,7 @@ export interface RepositoryScope {
   readonly events: DomainEventPublisher;
   readonly rebuilds: RebuildRepository;
   readonly rebuildQueue: RebuildQueue;
+  readonly nativeQueue: { enqueue(taskId: TaskId): Promise<void> };
 }
 
 export interface UnitOfWork {

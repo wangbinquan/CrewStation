@@ -1,5 +1,6 @@
 import { boolean, integer, text, timestamp } from 'drizzle-orm/pg-core';
 import { jsonDocument } from '@crewstation/persistence';
+import type { TaskEnvironment } from '../../domain/taskEnvironment';
 import { taskRuntimeSchema } from './schema';
 
 export const environments = taskRuntimeSchema.table('environments', {
@@ -22,6 +23,8 @@ export const environments = taskRuntimeSchema.table('environments', {
   createdBy: text('created_by'),
   message: text('message'),
   rebuildId: text('rebuild_id'),
+  native: jsonDocument('native').$type<TaskEnvironment['native']>(),
+  release: jsonDocument('release').$type<TaskEnvironment['release']>(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
   lastActivityAt: timestamp('last_activity_at', { withTimezone: true }).notNull(),

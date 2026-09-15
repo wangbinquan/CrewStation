@@ -8,7 +8,7 @@ import { sql } from 'drizzle-orm';
 import { createTaskRuntimeModule, taskRuntimeMigrations } from '../wiring';
 import { drizzleUnitOfWork } from '../adapters/persistence/drizzleUnitOfWork';
 
-export async function rebuildFixture() {
+export async function rebuildFixture(options: { running?: boolean } = {}) {
   const tdb = await createTestDatabase([eventbusMigrations, queueMigrations, taskRuntimeMigrations]);
   const k8s = createFakeK8sClient();
   const projectId = `prj_${'a'.repeat(32)}` as ProjectId, serviceId = `svc_${'a'.repeat(32)}` as ServiceId;
@@ -25,9 +25,10 @@ export async function rebuildFixture() {
   const uow = drizzleUnitOfWork(tdb.db), env = (await uow.read.environments.getById(initial.id))!;
   const pod = (await k8s.get(Resources.Pod!, env.podName, env.namespace))!;
   const token = (pod.spec as { containers: Array<{ env: Array<{ name: string; value: string }> }> }).containers[0]!.env.find((v) => v.name === 'CS_RUNNER_TOKEN')!.value;
-  await k8s.mergePatch(Resources.Pod!, env.podName, env.namespace, { status: { phase: 'Failed', reason: 'OOMKilled' } });
+  await k8s.mergePatch(Resources.Pod!, env.podName, env.namespace, { spec: { nodeName: 'worker-one' }, status: options.running ? { phase: 'Running' } : { phase: 'Failed', reason: 'OOMKilled' } });
   await k8s.mergePatch(Resources.PersistentVolumeClaim!, env.pvcName, env.namespace, { status: { phase: 'Bound', capacity: { storage: '10Gi' } } });
-  await runtime.api.markFailed(env.id, 'OOMKilled');
+  if (options.running) await runtime.api.onRunnerConnected(env.id, token);
+  else await runtime.api.markFailed(env.id, 'OOMKilled');
   const request = async (): Promise<RebuildDevSessionRequest> => {
     const check = await runtime.api.inspectRebuild(projectId), profile = check.profiles[1]!;
     return { requestId: crypto.randomUUID(), expectedTaskId: env.id, expectedUpdatedAt: check.updatedAt, expectedPodUid: check.podUid, expectedVolumeUid: check.volume.uid,
@@ -35,5 +36,7 @@ export async function rebuildFixture() {
   };
   const nextAttempt = async () => { await tdb.db.execute(sql`UPDATE platform_infra.jobs SET run_at = now() - interval '1 second'`); return (runtime.workers[0] as Worker).runOnce(); };
   return { tdb, k8s, runtime, state, env, token, uow, projectId, serviceId, request, nextAttempt,
+    runNative: () => (runtime.workers[1] as Worker).runOnce(),
+    nextNativeAttempt: async () => { await tdb.db.execute(sql`UPDATE platform_infra.jobs SET run_at = now() - interval '1 second'`); return (runtime.workers[1] as Worker).runOnce(); },
     advance: (ms: number) => { time += ms; }, run: () => (runtime.workers[0] as Worker).runOnce(), close: () => tdb.drop() };
 }

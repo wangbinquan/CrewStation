@@ -40,6 +40,16 @@ describe('parseEnvLines', () => {
 
 describe('loadConfigFromEnv', () => {
   const base = { CS_TASK_ID: 'tsk_0123456789abcdef0123456789abcdef', CS_RUNNER_TOKEN: 't', CS_SESSION_URL: 'ws://cs-session.crewstation-system:8083/runner' };
+  test('独立 CLI 连接使用执行身份，父工作区身份和原容器缺省行为保持', () => {
+    const execution = 'tsk_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', runnerId = crypto.randomUUID();
+    const env = { ...base, CS_RUNNER_TASK_ID: execution, CS_RUNNER_NATIVE_ID: runnerId };
+    expect(loadConfigFromEnv(env)).toMatchObject({ taskId: execution, nativeRunnerId: runnerId });
+    expect(env.CS_TASK_ID).toBe(base.CS_TASK_ID);
+    expect(loadConfigFromEnv(base)).toMatchObject({ taskId: base.CS_TASK_ID });
+    expect(loadConfigFromEnv(base).nativeRunnerId).toBeUndefined();
+    expect(() => loadConfigFromEnv({ ...env, CS_RUNNER_TASK_ID: 'invalid' })).toThrow();
+    expect(() => loadConfigFromEnv({ ...env, CS_RUNNER_NATIVE_ID: 'invalid' })).toThrow();
+  });
   test('缺省值与预览命令解析', () => {
     const config = loadConfigFromEnv(base);
     expect(config).toMatchObject({ workdir: '/work', workerUid: 10001, workerGid: 10001, terminalBackend: 'auto', replayCapacity: 5000 });

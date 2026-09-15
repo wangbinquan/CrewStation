@@ -8,9 +8,13 @@ export interface EnvironmentRepository {
   listByProject(projectId: ProjectId, states?: EnvironmentState[]): Promise<TaskEnvironment[]>;
   listByStates(states: EnvironmentState[]): Promise<TaskEnvironment[]>;
   listByTrace(traceId: string): Promise<TaskEnvironment[]>;
+  listChildren(parentTaskId: TaskId): Promise<TaskEnvironment[]>;
+  pendingExecutions(): Promise<TaskEnvironment[]>;
   /** 开发会话：一项目同时只允许一个（D46）。 */
   findDevSession(projectId: ProjectId, options?: { includeLatestFailure?: boolean }): Promise<TaskEnvironment | undefined>;
 }
+
+export const NATIVE_EXECUTION_JOB_KIND = 'task-runtime.native-execution';
 
 /** 配额准入表：一行一项目，UPDATE … WHERE running < limit 原子判定（AT-19、AT-39）。 */
 export interface AdmissionRepository {

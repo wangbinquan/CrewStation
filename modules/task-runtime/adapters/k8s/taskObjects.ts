@@ -31,7 +31,7 @@ function checkoutContainer(image: string, source: TaskSourceCheckout, uid: numbe
 }
 
 
-export function taskPodObject({ env, image, envVars, resources, agentEnvSecretName, source, envSecretName }: TaskPodSpec, workerUid: number): K8sObject {
+export function taskPodObject({ env, image, envVars, resources, agentEnvSecretName, source, envSecretName, nodeName }: TaskPodSpec, workerUid: number): K8sObject {
   const pod = podObject({
     name: env.podName, namespace: env.namespace, image, imagePullPolicy: 'IfNotPresent',
     labels: { [LABELS.project]: env.labels[LABELS.project] ?? '', [LABELS.service]: env.labels[LABELS.service] ?? '', [LABELS.workload]: env.kind, [LABELS.task]: env.id },
@@ -46,6 +46,8 @@ export function taskPodObject({ env, image, envVars, resources, agentEnvSecretNa
     spec.containers[0]!.volumeMounts.push({ name: 'agent-env', mountPath: '/etc/crewstation', readOnly: true });
   }
   if (env.rebuildId) pod.metadata.labels!['crewstation.io/rebuild'] = env.rebuildId;
+  if (env.native) pod.metadata.labels!['crewstation.io/workspace-task'] = env.native.parentTaskId;
+  if (nodeName) (pod.spec as Record<string, unknown>).affinity = { nodeAffinity: { requiredDuringSchedulingIgnoredDuringExecution: { nodeSelectorTerms: [{ matchFields: [{ key: 'metadata.name', operator: 'In', values: [nodeName] }] }] } } };
   if (envSecretName) (pod.spec as { containers: Array<Record<string, unknown>> }).containers[0]!.envFrom = [{ secretRef: { name: envSecretName } }];
   return pod;
 }

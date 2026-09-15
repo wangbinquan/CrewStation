@@ -13,10 +13,12 @@ export function runnerLifecycle(deps: TaskRuntimeUseCaseDeps) {
         await scope.admissions.lock(original.projectId);
         const env = await scope.environments.getById(taskId);
         if (!env || !['creating', 'running'].includes(env.state) || !tokenMatches(token, env.runnerTokenHash)) return false;
+        if (env.native && !['starting', 'running'].includes(env.native.state)) return false;
         const record = env.rebuildId ? await scope.rebuilds.get(env.rebuildId) : undefined;
         if (record && !['starting', 'ready'].includes(record.state)) return false;
         const now = deps.clock.now();
-        await scope.environments.update(env.state === 'creating' ? transition(env, 'running', now, { connected: true, lastActivityAt: now, message: '环境已连接' }) : { ...env, connected: true, lastActivityAt: now, updatedAt: now });
+        const patch = { connected: true, lastActivityAt: now, updatedAt: now, ...(env.native ? { native: { ...env.native, state: 'running' as const } } : {}) };
+        await scope.environments.update(env.state === 'creating' ? transition(env, 'running', now, { ...patch, message: '环境已连接' }) : { ...env, ...patch });
         if (record?.state === 'starting') await scope.rebuilds.update({ ...record, state: 'ready', updatedAt: now, message: '原工作树已恢复；需要的 CLI 请逐个手动启动' });
         return true;
       });

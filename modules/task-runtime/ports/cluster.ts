@@ -18,8 +18,16 @@ export interface TaskPodSpec {
   /** 模型凭据等只给 Agent 进程的变量文件所在 Secret；不存在则不挂。 */
   agentEnvSecretName?: string;
   source?: TaskSourceCheckout;
+  /** 共享 RWO 工作卷的执行容器与恢复容器由调度器安排在原节点。 */
+  nodeName?: string;
   /** 开发预览的用户域主机与所需中间件；不给则不建路由。 */
   previewRoute?: { host: string; userAuthMiddleware: string; dropIdentityHeadersMiddleware: string; systemNamespace: string };
+}
+
+export interface NativeExecutionCluster {
+  inspectWorkspace(parent: TaskEnvironment): Promise<{ podUid: string; pvcUid: string; nodeName: string }>;
+  prepare(env: TaskEnvironment, values: () => Promise<Record<string, string>>): Promise<{ podUid: string; secretUid: string; token: string }>;
+  cleanup(env: TaskEnvironment): Promise<void>;
 }
 
 export type PodPhase = 'Pending' | 'Running' | 'Succeeded' | 'Failed' | 'Unknown' | 'Missing';

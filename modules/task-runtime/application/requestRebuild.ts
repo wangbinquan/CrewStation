@@ -1,6 +1,6 @@
 import type { DevSessionRebuildDto, ProjectId, RebuildDevSessionRequest, TaskId } from '@crewstation/contracts';
 import { RebuildDevSessionRequestSchema } from '@crewstation/contracts';
-import { conflict, quotaExceeded } from '@crewstation/kernel';
+import { conflict, precondition, quotaExceeded } from '@crewstation/kernel';
 import type { EnvironmentRebuild } from '../domain/environmentRebuild';
 import { rebuildToDto } from '../domain/environmentRebuild';
 import { hashRunnerToken, newRunnerToken } from '../domain/runnerToken';
@@ -20,13 +20,17 @@ export function rebuildUseCases(deps: RebuildDependencies) {
       }
       const env = await failedDevSession(scope, projectId);
       await validateRebuild(deps, env, input);
+      const children = (await scope.environments.listChildren(env.id)).filter((child) => child.native?.state !== 'finished');
+      const nodes = new Set(children.map((child) => child.native!.nodeName));
+      if (nodes.size > 1 || children.some((child) => child.native!.pvcUid !== input.expectedVolumeUid)) throw precondition('现有 CLI 的工作卷或节点不一致，请先由管理员检查');
+      const nodeName = [...nodes][0];
       const limit = (await deps.quotas.quotaLimit(projectId)) ?? 0;
       if (!(await scope.admissions.tryAcquire(projectId, limit))) throw quotaExceeded('项目并发任务配额已满，工作卷保持不变');
       const now = deps.clock.now();
       const podName = `task-${env.id.slice(4, 16)}-r-${input.requestId.replaceAll('-', '').slice(0, 12)}`;
       const record: EnvironmentRebuild = { id: input.requestId, taskId: env.id, projectId, input, namespace: env.namespace,
         originalPodName: env.podName, podName, pvcName: env.pvcName, secretName: `${podName}-runner`, image: deps.settings.taskImage,
-        state: 'queued', createdAt: now, updatedAt: now };
+        state: 'queued', createdAt: now, updatedAt: now, ...(nodeName ? { nodeName } : {}) };
       await scope.rebuilds.insert(record);
       // 即刻失效旧 Runner；替换 Pod 只复用原工作卷，不重新检出仓库。
       await scope.environments.update(transition(env, 'creating', now, { rebuildId: record.id, podName, profile: input.profile.name,

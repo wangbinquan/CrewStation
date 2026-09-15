@@ -3,6 +3,26 @@ import { precondition } from '@crewstation/kernel';
 
 export type EnvironmentState = 'creating' | 'running' | 'paused' | 'releasing' | 'released' | 'failed';
 
+/** 一个原生 CLI 的独立执行实例；工作卷与数据绑定仍由父开发会话拥有。 */
+export interface NativeExecution {
+  readonly parentTaskId: TaskId;
+  readonly parentPodUid: string;
+  readonly pvcUid: string;
+  readonly nodeName: string;
+  readonly agentId: string;
+  readonly terminalId: string;
+  readonly runnerId: string;
+  readonly fingerprint: string;
+  readonly requestedProfile: string | null;
+  readonly profile: { name: string; cpu: string; memory: string; storage: string };
+  readonly image: string;
+  readonly state: 'queued' | 'starting' | 'running' | 'cleaning' | 'finished';
+  readonly podUid?: string;
+  readonly secretUid?: string;
+  readonly failureReason?: string;
+  readonly preparedAt?: string;
+}
+
 /** 一项任务一个长驻容器（R05、R29）；开发会话与业务任务共用这个对象，只是 kind 与卷模式不同。 */
 export interface TaskEnvironment {
   readonly id: TaskId;
@@ -25,6 +45,8 @@ export interface TaskEnvironment {
   readonly createdBy?: UserId;
   readonly message?: string;
   readonly rebuildId?: string;
+  readonly native?: NativeExecution;
+  readonly release?: { reason: 'user' | 'owner-force' | 'business' | 'failed' | 'pod-lost'; occupied: boolean };
   readonly createdAt: Date;
   readonly updatedAt: Date;
   readonly lastActivityAt: Date;

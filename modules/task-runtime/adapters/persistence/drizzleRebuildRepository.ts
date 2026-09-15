@@ -7,12 +7,12 @@ import type { RebuildRepository } from '../../ports/rebuilds';
 import { environmentRebuilds } from './rebuildTables';
 
 export function drizzleRebuildRepository(db: Executor): RebuildRepository {
-  const row = (record: EnvironmentRebuild): typeof environmentRebuilds.$inferInsert => ({ ...record, podUid: record.podUid ?? null, secretUid: record.secretUid ?? null, message: record.message ?? null, failureReason: record.failureReason ?? null });
+  const row = (record: EnvironmentRebuild): typeof environmentRebuilds.$inferInsert => ({ ...record, nodeName: record.nodeName ?? null, podUid: record.podUid ?? null, secretUid: record.secretUid ?? null, message: record.message ?? null, failureReason: record.failureReason ?? null });
   const fromRow = (item: typeof environmentRebuilds.$inferSelect): EnvironmentRebuild => {
-    const { podUid, secretUid, message, failureReason, ...rest } = item;
+    const { podUid, secretUid, message, failureReason, nodeName, ...rest } = item;
     return { ...rest, taskId: item.taskId as TaskId, projectId: item.projectId as ProjectId, state: item.state as EnvironmentRebuild['state'],
       input: RebuildDevSessionRequestSchema.parse(typeof item.input === 'string' ? JSON.parse(item.input) : item.input),
-      ...(podUid ? { podUid } : {}), ...(secretUid ? { secretUid } : {}), ...(message ? { message } : {}), ...(failureReason ? { failureReason } : {}) };
+      ...(podUid ? { podUid } : {}), ...(secretUid ? { secretUid } : {}), ...(message ? { message } : {}), ...(failureReason ? { failureReason } : {}), ...(nodeName ? { nodeName } : {}) };
   };
   return {
     get: async (id) => {

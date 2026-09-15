@@ -15,6 +15,7 @@ import { createTerminalControl } from './terminalControl';
 import { createTerminalScreen } from './terminalScreen';
 
 export interface NativeSupervisorDeps {
+  runnerId?: string;
   backend: PtyBackend | undefined;
   launcher: ProcessLauncher;
   paths: WorkdirPaths;
@@ -43,10 +44,10 @@ const MAX_RUNNING_TERMINALS = 32;
 
 /** 注册表的寿命等于 Runner；进程退出保留名册与有界屏幕，断开显示连接不改变进程。 */
 export class NativeTerminalSupervisor {
-  readonly runnerId = crypto.randomUUID();
+  readonly runnerId: string;
   private readonly entries = new Map<string, NativeEntry>();
   private readonly byTerminal = new Map<string, NativeEntry>();
-  constructor(private readonly deps: NativeSupervisorDeps) {}
+  constructor(private readonly deps: NativeSupervisorDeps) { this.runnerId = deps.runnerId ?? crypto.randomUUID(); }
 
   has(terminalId: string): boolean { return this.byTerminal.has(terminalId); }
   list() { return { runnerId: this.runnerId, terminals: [...this.entries.values()].map((e) => ({ ...e.record })) }; }

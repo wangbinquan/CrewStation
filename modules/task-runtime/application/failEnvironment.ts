@@ -4,6 +4,7 @@ import { rebuildIsActive } from '../domain/environmentRebuild';
 import { occupiesQuota, transition } from '../domain/taskEnvironment';
 import type { EnvironmentState } from '../domain/taskEnvironment';
 import type { TaskRuntimeUseCaseDeps } from './dependencies';
+import { scheduleExecutionCleanup } from './nativeExecution';
 
 export function failEnvironment(deps: TaskRuntimeUseCaseDeps) {
   return async (taskId: TaskId, message: string, expectedPodName?: string, expectedState?: EnvironmentState): Promise<void> => {
@@ -15,6 +16,7 @@ export function failEnvironment(deps: TaskRuntimeUseCaseDeps) {
       if (!env || ['released', 'failed', 'releasing'].includes(env.state) || (expectedPodName && expectedPodName !== env.podName)) return;
       if (expectedState && env.state !== expectedState) return;
       const now = deps.clock.now();
+      if (env.native) { await scheduleExecutionCleanup(scope, env, now, message); return; }
       const record = env.rebuildId ? await scope.rebuilds.get(env.rebuildId) : undefined;
       if (record && rebuildIsActive(record)) {
         // 尚在准备新 Pod 时，对账看见 Missing 不是失败；启动失败则先补偿后释放配额。

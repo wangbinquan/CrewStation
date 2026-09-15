@@ -1,15 +1,16 @@
 import { createHash } from 'node:crypto';
+import { isDeepStrictEqual } from 'node:util';
 import type { K8sClient, K8sObject } from '@crewstation/k8s';
 import { LABELS, Resources, secretObject } from '@crewstation/k8s';
 import { isPlatformError, precondition } from '@crewstation/kernel';
 import type { EnvironmentRebuild } from '../../domain/environmentRebuild';
 import { podNameFor } from '../../domain/taskEnvironment';
-import type { RebuildProvisioner } from '../../ports/rebuildProvisioner';
+import type { RebuildProvisioner } from '../../ports/recoveryCluster';
 import { assertRebuildObject, rebuildLabel, removeRebuildObject } from './rebuildObjects';
 import { ensureTaskPreview, taskPodObject } from './taskObjects';
 
 type Secret = K8sObject & { data?: Record<string, string>; stringData?: Record<string, string>; immutable?: boolean };
-const fingerprint = (record: EnvironmentRebuild) => createHash('sha256').update(JSON.stringify({ requestId: record.id, taskId: record.taskId, volume: record.input.expectedVolumeUid, profile: record.input.profile, image: record.image, secret: record.secretName })).digest('hex');
+const fingerprint = (record: EnvironmentRebuild) => createHash('sha256').update(JSON.stringify({ requestId: record.id, taskId: record.taskId, volume: record.input.expectedVolumeUid, profile: record.input.profile, image: record.image, secret: record.secretName, ...(record.nodeName ? { nodeName: record.nodeName } : {}) })).digest('hex');
 
 async function readOrCreateSecret(k8s: K8sClient, record: EnvironmentRebuild, values: () => Promise<Record<string, string>>): Promise<Secret> {
   const found = await k8s.get<Secret>(Resources.Secret!, record.secretName, record.namespace);
@@ -28,11 +29,12 @@ async function readOrCreateSecret(k8s: K8sClient, record: EnvironmentRebuild, va
 
 function validatePod(pod: K8sObject, record: EnvironmentRebuild): string {
   const uid = assertRebuildObject(pod, record, record.podUid);
-  const spec = pod.spec as { containers?: Array<{ image?: string; envFrom?: Array<{ secretRef?: { name?: string } }> }>; volumes?: Array<{ persistentVolumeClaim?: { claimName?: string } }>; initContainers?: unknown[] };
+  const spec = pod.spec as { containers?: Array<{ image?: string; envFrom?: Array<{ secretRef?: { name?: string } }> }>; volumes?: Array<{ persistentVolumeClaim?: { claimName?: string } }>; initContainers?: unknown[]; affinity?: unknown };
   if (pod.metadata.deletionTimestamp || pod.metadata.annotations?.['crewstation.io/rebuild-intent'] !== fingerprint(record)
     || spec.containers?.length !== 1 || spec.containers[0]?.image !== record.image || spec.initContainers?.length
     || spec.containers[0]?.envFrom?.[0]?.secretRef?.name !== record.secretName
-    || !spec.volumes?.some((volume) => volume.persistentVolumeClaim?.claimName === record.pvcName)) throw precondition('新容器与已确认的恢复方案不一致');
+    || !spec.volumes?.some((volume) => volume.persistentVolumeClaim?.claimName === record.pvcName)
+    || (record.nodeName && !isDeepStrictEqual(spec.affinity, { nodeAffinity: { requiredDuringSchedulingIgnoredDuringExecution: { nodeSelectorTerms: [{ matchFields: [{ key: 'metadata.name', operator: 'In', values: [record.nodeName] }] }] } } }))) throw precondition('新容器与已确认的恢复方案不一致');
   return uid;
 }
 

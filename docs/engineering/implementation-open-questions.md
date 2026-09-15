@@ -156,6 +156,8 @@
 
 **2026-09-15 授权后的选择**：按作者本次全权委托选择 (a)，每个 CLI 独立 Pod，挂载同一工作树，使用平台配额和资源上限。进入多 Runner、卷引用和准入契约实现；不能用单容器扩大内存代替独立隔离。
 
+**第七十六批实施进度**：已补全 [cli-isolation.md](../../proposal/rfc/RFC-003-workbench-ux-redesign/cli-isolation.md)；task-runtime 已实现独立执行容器、冻结资源、原卷引用、项目原子准入、持久准备／清理、父释放等待子环境、父恢复同节点，以及实际 Runner 身份绑定。数据库／假集群和真实 PTY 的相应自动验证已执行。当前工作台“＋ CLI”入口仍使用旧路径，管理员套餐绑定、多 Runner 终端与动态聚合、末屏和真实四窗／OOM 验收继续；未据此宣称完整隔离已上线。
+
 **原定要求**：RFC-003 `development-workspace.md:81` 要求新增 CLI 资源不足只影响该次窗口，UX-AT-28／35 要求真实多 CLI 和四窗验收。I14 处理故障后的工作树恢复，不能替代故障前的隔离。
 
 **当前证据（2026-09-14T13:54:46Z）**：主仓基线 `293a7d0124c4e1b34397a25ccce22f89b3aa6502`；现存 QA Pod `cs-rfc003-verify-files/task-01a09ff07aeb`／UID `fa4dcc5e-3eb6-4557-a6bf-b6301dca4160` 的 requests=limits 为 1 CPU／2Gi，实际 `memory.max=2147483648`、`memory.oom.group=1`、`memory.current=899342336`；该正常单 CLI 容器的 oom／oom_kill／oom_group_kill 计数都是 0。`/sys/fs/cgroup` 挂载为 `ro,nosuid,nodev,noexec,relatime`，当前环境没有可供 Runner 写入的子 cgroup。此处只记录现存容器事实，不伪造已终止旧 Pod 的 cgroup 读数，也未再次对活跃任务施加压力。临时原始记录为 `crewstation-rfc003-batch49-resource-facts.json`。
@@ -173,4 +175,4 @@
 
 两种方向都保持逐个启动、个人页签／分屏、同工作树编辑、独立预览和原 CLI 身份语义。所需额度和准入结果由平台解释，租户不填写窗口数量表单；没有可用额度时保留原工作区与进程。都须用受限环境实际验证新增进程耗尽内存、并发启动、子进程退出／重试、会话释放及 Runner／其他 CLI 存活，最后完成原四窗与尺寸验收。
 
-**执行边界**：选择 (a)，利用平台现有 Kubernetes 额度与独立容器边界，避免把部署前提隐藏在 TaskRunner 中；同步设计共享工作卷和多 Runner 路由。本条按开发规则 §5.7 补全 RFC-003 的相应设计再开发；尚未实施任何隔离策略、调整节点配置、增加容器权限或取消原验收条件。RFC-004 仍等待 RFC-003 完结，其两个启动前 Hook 不先行实施。
+**执行边界**：选择 (a)，利用平台现有 Kubernetes 额度与独立容器边界。本条按开发规则 §5.7 补全 RFC-003 后实施，底层与工作台接线的状态按上文区分；不调整节点配置、增加容器权限或取消原验收条件。RFC-004 仍等待 RFC-003 完结，其两个启动前 Hook 不先行实施。
