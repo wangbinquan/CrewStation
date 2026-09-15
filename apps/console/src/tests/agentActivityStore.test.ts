@@ -72,3 +72,40 @@ test('更早未读页同样刷新本人已读；错误身份响应不覆盖现�
   await f.store.refresh(activityTaskId);
   expect(f.store.getSnapshot().tasks[0]).toMatchObject({ stale: true, error: 'activity.identityMismatch', page: { projectId: activityProjectId } });
 });
+
+test('关闭动态后可立即重新翻页，旧请求的迟到响应不覆盖新页', async () => {
+  const f = activityFixture(); await f.register();
+  let finish!: (page: AgentActivityPage) => void;
+  f.source.page = () => new Promise((resolve) => { finish = resolve; });
+  const old = f.store.older(activityTaskId, 20);
+  f.store.resetOlder(activityTaskId);
+  // 关闭时必须解除旧页的等待，否则重新打开后按钮仍被旧请求锁住。
+  expect(f.store.getSnapshot().tasks[0]?.olderLoading).toBe(false);
+  f.source.page = async () => ({ ...f.page, previousCursor: 5 });
+  await f.store.older(activityTaskId, 10);
+  finish({ ...f.page, previousCursor: 15 }); await old;
+  expect(f.store.getSnapshot().tasks[0]).toMatchObject({ olderBefore: 10, older: { previousCursor: 5 }, olderLoading: false });
+});
+
+test('回到最新后，旧历史页的后台读取失败不把最新动态降级', async () => {
+  const f = activityFixture(); await f.register(); await f.store.older(activityTaskId, 20);
+  let fail!: (reason: Error) => void;
+  f.source.page = async (_task, before) => before === undefined ? structuredClone(f.page) : new Promise((_resolve, reject) => { fail = reject; });
+  const refreshing = f.store.refresh(activityTaskId);
+  f.store.resetOlder(activityTaskId); fail(new Error('old page offline')); await refreshing;
+  // 最新页已经读取成功，已离开的历史页错误不能覆盖当前视图的可信度。
+  expect(f.store.getSnapshot().tasks[0]).toMatchObject({ stale: false, olderLoading: false, error: undefined, older: undefined });
+});
+
+test('重新打开同一历史页后，之前发出的轮询不会覆盖这次读取', async () => {
+  const f = activityFixture(); await f.register(); await f.store.older(activityTaskId, 20);
+  let finish!: (page: AgentActivityPage) => void;
+  f.source.page = async (_task, before) => before === undefined ? structuredClone(f.page) : new Promise((resolve) => { finish = resolve; });
+  const refreshing = f.store.refresh(activityTaskId);
+  f.store.resetOlder(activityTaskId);
+  f.source.page = async () => ({ ...f.page, previousCursor: 5 });
+  await f.store.older(activityTaskId, 20);
+  finish({ ...f.page, previousCursor: 15 }); await refreshing;
+  // 游标相同也可能属于重新打开后的新读取，不能仅比较 before 值。
+  expect(f.store.getSnapshot().tasks[0]).toMatchObject({ olderBefore: 20, older: { previousCursor: 5 }, stale: false, olderLoading: false });
+});

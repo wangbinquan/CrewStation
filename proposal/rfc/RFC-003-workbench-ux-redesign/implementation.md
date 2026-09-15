@@ -1747,3 +1747,29 @@ files 项目 prj_01a09fecbba97000843701962d998a7a，实际 serviceId 从 release
 主仓仅精确提交 STATE.md、本文件和 acceptance-audit.md。源码与已验证的 63e5031 相同，复用第七十一批完整门禁 1204 pass／4 skip／0 fail，不为纯证据文档重复全量；最终文档 SHA 的托管 CI 单独核对。RFC-003 保持 In Progress，RFC-004 继续排队。
 
 证据在 /private/tmp/crewstation-rfc003-batch72-*：comparisons-before、files-before、git-before、readme-fixture、dirty-comparison、divergence-commit（失败）／divergence-commit-with-identity（成功）、diverged-comparison、browser-before／approval-blockers、layout、qa-after／comparison、final-runtime。恢复后先核对作者对具体切流的答复与浏览器可用性，再重读真实确认对象和当前分叉；不得把未执行的切流或旧的浏览器记录计为已通过。
+
+## 第七十三批：动态历史翻页与关闭后的恢复
+
+本批检查 UX-AT-42 周边的读取恢复，主仓从 db30123e296b9d103d85d9bee0bca5a7a25678d6 开始，main 与 origin/main 同步、初始工作树和暂存区为空。没有重试此前被拒的正式切流或浏览器页面读取，继续完成可独立验证的前端修复。
+
+### 复现与修复
+
+Agent 动态的“更早未读”请求在途时关闭面板，resetOlder 原来只清历史数据，没有清等待状态或使请求失效。迟到响应会重新装回旧页，再次打开直接显示历史；原请求未结束时还会锁住重新翻页。后台同时读取最新与历史页时，已离开的旧页失败也会覆盖最新页的成功结果，使其显示过期。
+
+新增真实 React 菜单／正常客户端 HTTP 回归与两条状态存储回归，修复前 **9 pass／3 fail**。仅修改 shared/activity/agentActivityStore.ts：独立记录历史请求归属，关闭、移除任务和退出清除；响应仅更新仍选中的历史读取，关闭立即解除旧页等待，旧历史错误不污染最新页。另补同一游标重新打开时，旧轮询不能覆盖这次读取的回归。实际通知去重、原生进程状态、个人已读协议和身份切换沿用原实现。
+
+最终三个文件候选的定向检查 **16 pass／0 fail／60 assertions**，完整 `bun run check` **1208 pass／4 skip／0 fail**（1212 tests／198 files／6608 assertions，测试 110.28s、命令 130.05s），08:49:58Z 完成；console build **592ms**。最初门禁尚未启动就被 sandbox 拒绝 ps 读取，在获准的正常权限下执行完整检查；没有重复完整门禁。最终候选摘要此后保持。
+
+### 本机更新与证据边界
+
+基于已有 b63 console 镜像，以 --pull=false／--network=none 构建 cs-console:rfc003-b73-b908c094f7，未重新安装依赖。Docker 配置摘要为 sha256:d9e619841ada3bcd32e80fa1d8c2479f62cbddc14b2b5df5db32fba36c471d43，流式导入只新增 **3,723,444 bytes**，save／import 均退出 0，没有 tar 落盘或数据清理。
+
+仅一次 JSON Patch 更新 console，Deployment 原 UID c4874a0e-6415-4c2b-b141-74ac25ea10ed 保持、generation 44→45，1／1；Pod console-868b9469c8-5wx2r／UID f81417fe-7a19-4fd8-be92-e922482f6f97，restartCount=0。首次部署后断言把 containerd 的索引摘要与 Docker 配置摘要直接比较而失败，rollout 当时已经完成，没有重新补丁或回滚。08:53:10Z 只读确认运行索引 sha256:24b787c3035153a92a42596fd4785d3bf31e3e24e83b8918d7cb2063f36dcda6 包含清单 sha256:0bbfd127cb0eae65d3b845eeb7841ab7cf7fcb1576a47ea7eb239213ce9e331e，清单引用上述配置；七份实际运行文件摘要全部匹配。资源和策略保持。
+
+普通匿名 HTTP 读取静态产物返回 401，正常使用既有 admin 演示登录后，08:55:05Z 六份静态产物摘要／大小全部匹配，入口 index-C60BdeDC.js。这是部署产物检查，不是浏览器交互验证。既有页签 6／16／17／18／19／20／21／22 只重设接力标记，没有读取页面、刷新、输入或更改布局；原 tab 17 草稿未操作，没有把前批截图当作本批证据。
+
+08:53:45Z delivery／files／legacy 的 taskId、session、native、历史 Agent、activity 与 workspace 均和第七十二批相同（checkedAt 另计）；files 的 f04fd60 分叉样例保留。08:54:23Z 原任务 UID／状态、受保护文件摘要、失败 Bound 工作卷及业务槽位保持；API 第七十一批／34、controller cc93104／21 均 1／1，节点 Ready=True、MemoryPressure／DiskPressure=False，剩余 1,657,032,704 bytes。
+
+**累计仍 25／52 通过、27 项待完成**；本批不替代 UX-AT-42 的实机乱序／通道恢复条件。具体切流答复、此前浏览器审批阻断、I9／I14／I15 与具体成员范围均待处理；RFC-003 保持 In Progress，RFC-004 按已批准顺序等待完结，Hook 未开工。三份源码／测试与 STATE.md、本文件、acceptance-audit.md 精确提交，最终 SHA 托管 CI 独立核对。
+
+证据在 /private/tmp/crewstation-rfc003-batch73-*：activity-red／activity-green、source-candidate／check、console-build、image-context／built／budget／import、console-before／rollout-intent／rollout、http-assets、runtime-before／final-runtime、qa-after／comparison。该批为已复现缺陷的修复和部署进展，连续无进展阻塞计数清零；完整 RFC 目标仍在执行。

@@ -27,6 +27,7 @@ export class AgentActivityStore {
   private pending = new Map<string, Promise<void>>();
   private seen = new Map<string, Set<string>>();
   private tokens = new Map<string, symbol>();
+  private olderTokens = new Map<string, symbol>();
   private noticeId = 0;
   constructor(private readonly source: ActivitySource) {}
   getSnapshot = () => this.snapshot;
@@ -54,7 +55,7 @@ export class AgentActivityStore {
   }
 
   private async load(task: ActivityTask): Promise<void> {
-    const token = this.tokens.get(task.taskId);
+    const token = this.tokens.get(task.taskId), olderToken = this.olderTokens.get(task.taskId);
     const [activity, terminals, older] = await Promise.allSettled([bounded(this.source.page(task.taskId)), bounded(this.source.terminals(task.taskId)), task.older ? bounded(this.source.page(task.taskId, task.olderBefore)) : Promise.resolve(undefined)]);
     if (this.tokens.get(task.taskId) !== token) return;
     const rejected = [activity, terminals, older].find((result) => result.status === 'rejected' && isApiClientError(result.reason) && [401, 403, 404].includes(result.reason.status));
@@ -64,11 +65,12 @@ export class AgentActivityStore {
       if (activity.status === 'rejected') { this.update(task.taskId, { ...(roster ? { terminals: roster } : {}), loading: false, stale: true, error: activity.reason instanceof Error ? activity.reason.message : String(activity.reason) }); return; }
       const page = AgentActivityPageSchema.parse(activity.value);
       if (page.taskId !== task.taskId || page.projectId !== task.projectId) throw new Error('activity.identityMismatch');
-      const old = older.status === 'fulfilled' && older.value ? AgentActivityPageSchema.parse(older.value) : undefined;
+      const samePage = task.older && this.olderTokens.get(task.taskId) === olderToken && this.snapshot.tasks.find((item) => item.taskId === task.taskId)?.olderBefore === task.olderBefore;
+      const old = samePage && older.status === 'fulfilled' && older.value ? AgentActivityPageSchema.parse(older.value) : undefined;
       if (old && (old.taskId !== task.taskId || old.projectId !== task.projectId)) throw new Error('activity.identityMismatch');
       this.announce(task.taskId, page, roster);
-      const samePage = task.older && this.snapshot.tasks.find((item) => item.taskId === task.taskId)?.olderBefore === task.olderBefore;
-      this.update(task.taskId, { page, ...(roster ? { terminals: roster } : {}), ...(samePage && old ? { older: old } : {}), loading: false, stale: older.status === 'rejected', error: older.status === 'rejected' ? 'activity.olderUnavailable' : undefined });
+      const olderFailed = Boolean(samePage && older.status === 'rejected');
+      this.update(task.taskId, { page, ...(roster ? { terminals: roster } : {}), ...(samePage && old ? { older: old } : {}), loading: false, stale: olderFailed, error: olderFailed ? 'activity.olderUnavailable' : undefined });
     } catch (error) { this.update(task.taskId, { loading: false, stale: true, error: error instanceof Error ? error.message : String(error) }); }
   }
 
@@ -100,20 +102,21 @@ export class AgentActivityStore {
   async older(taskId: string, before?: number): Promise<void> {
     const task = this.snapshot.tasks.find((item) => item.taskId === taskId);
     if (!task || task.olderLoading) return;
-    const token = this.tokens.get(taskId);
+    const token = this.tokens.get(taskId), olderToken = Symbol(taskId);
+    this.olderTokens.set(taskId, olderToken);
     this.update(taskId, { olderLoading: true });
     try {
       const page = AgentActivityPageSchema.parse(await bounded(this.source.page(taskId, before)));
       if (page.taskId !== taskId || page.projectId !== task.projectId) throw new Error('activity.identityMismatch');
-      if (this.tokens.get(taskId) === token) this.update(taskId, { older: page, olderBefore: before, olderLoading: false, error: undefined });
+      if (this.tokens.get(taskId) === token && this.olderTokens.get(taskId) === olderToken) this.update(taskId, { older: page, olderBefore: before, olderLoading: false, error: undefined });
     } catch (error) {
       if (this.tokens.get(taskId) !== token) return;
       if (isApiClientError(error) && [401, 403, 404].includes(error.status)) this.forget(taskId);
-      else this.update(taskId, { olderLoading: false, error: error instanceof Error ? error.message : String(error) });
+      else if (this.olderTokens.get(taskId) === olderToken) this.update(taskId, { olderLoading: false, error: error instanceof Error ? error.message : String(error) });
     }
   }
-  resetOlder(taskId: string) { this.update(taskId, { older: undefined, olderBefore: undefined }); }
+  resetOlder(taskId: string) { this.olderTokens.delete(taskId); this.update(taskId, { older: undefined, olderBefore: undefined, olderLoading: false }); }
   dismissNotice(id: number) { if (this.snapshot.notice?.id === id) { this.snapshot = { ...this.snapshot, notice: null }; this.emit(); } }
-  forget(taskId: string) { this.tokens.delete(taskId); this.pending.delete(taskId); this.seen.delete(taskId); this.emit(this.snapshot.tasks.filter((task) => task.taskId !== taskId)); }
-  dispose() { this.tokens.clear(); this.pending.clear(); this.seen.clear(); this.snapshot = { tasks: [], notice: null, limited: false }; }
+  forget(taskId: string) { this.tokens.delete(taskId); this.olderTokens.delete(taskId); this.pending.delete(taskId); this.seen.delete(taskId); this.emit(this.snapshot.tasks.filter((task) => task.taskId !== taskId)); }
+  dispose() { this.tokens.clear(); this.olderTokens.clear(); this.pending.clear(); this.seen.clear(); this.snapshot = { tasks: [], notice: null, limited: false }; }
 }

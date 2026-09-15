@@ -66,3 +66,18 @@ test('较早未读使用独立向前游标，不把历史结果当作当前轮�
   expect(f.calls.some((url) => url.includes('unread=true') && url.includes('before=20'))).toBe(true);
   expect(rendered!.text()).toContain('回到最新');
 });
+
+test('翻页在途关闭菜单，迟到的历史响应不改变再次打开的最新动态', async () => {
+  const f = await fixture(); f.page.previousCursor = 20;
+  await rendered!.click('Agent 动态待处理 1'); await rendered!.click('刷新');
+  const fetchLatest = globalThis.fetch;
+  let finish!: (response: Response) => void;
+  globalThis.fetch = (async (input, init) => String(input).includes('before=20') ? new Promise<Response>((resolve) => { finish = resolve; }) : fetchLatest(input, init)) as typeof fetch;
+  await rendered!.click('更早未读'); await rendered!.click('关闭');
+  await act(async () => { finish(new Response(JSON.stringify({ ...f.page, previousCursor: 10 }), { headers: { 'content-type': 'application/json' } })); });
+  await rendered!.settle(); await rendered!.click('Agent 动态待处理 1');
+  // 关闭会清除历史选择；在途响应曾把旧页重新装回，掩盖最新结果。
+  expect(rendered!.text()).not.toContain('回到最新');
+  expect(Array.from(rendered!.host.querySelectorAll('button')).find((button) => button.textContent === '更早未读')?.disabled).toBe(false);
+  expect(rendered!.text()).toContain('等待回答');
+});
