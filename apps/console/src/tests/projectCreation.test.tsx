@@ -79,6 +79,9 @@ test('逐步校验所有字段，返回保留草稿；按真实 kind 过滤模�
   await page.click('下一步'); expect(document.querySelector('[name="maxConcurrentTasks"]')!.getAttribute('aria-invalid')).toBe('true');
   await field('maxConcurrentTasks', '7'); await page.click('下一步');
   expect(page.text()).toContain('GITLAB_TOKEN'); expect(page.text()).toContain('不会自动提供这些值');
+  // 首个发布在项目 active 后异步失败；重新开通不会为已有发布重新打标签。
+  expect(page.text()).toContain('若首个发布失败，在“发布与上线”使用新版本号重新发布');
+  expect(page.text()).not.toContain('再重新开通');
   await page.click('上一步'); expect(document.querySelector<HTMLInputElement>('[name="maxConcurrentTasks"]')!.value).toBe('7');
   await page.click('上一步'); expect(document.querySelector<HTMLInputElement>('[name="name"]')!.value).toBe('  账单接入  ');
   await page.click('下一步'); await page.click('下一步'); await page.click('创建项目');

@@ -3,12 +3,12 @@ import { LogEntryDtoSchema } from '@crewstation/contracts';
 import { createK8sClient } from '@crewstation/k8s';
 import { kubernetesClusterObserver } from '../adapters/k8s/clusterObserver';
 
-function fixture(logs: Record<string, string | number>) {
+function fixture(logs: Record<string, string | number>, podStatus: Record<string, unknown> = {}) {
   const requests: URL[] = [];
   const fetcher = (async (input: string | URL | Request) => {
     const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url);
     requests.push(url);
-    if (url.pathname.endsWith('/pods')) return Response.json({ items: Object.keys(logs).map((name) => ({ metadata: { name, namespace: 'cs-qa' } })) });
+    if (url.pathname.endsWith('/pods')) return Response.json({ items: Object.keys(logs).map((name) => ({ metadata: { name, namespace: 'cs-qa' }, status: podStatus[name] })) });
     const value = logs[url.pathname.split('/').at(-2)!];
     if (typeof value === 'number') return Response.json({ message: 'Pod 日志暂不可读' }, { status: value });
     return new Response(value ?? '');
@@ -17,6 +17,35 @@ function fixture(logs: Record<string, string | number>) {
 }
 
 describe('Kubernetes 日志事实', () => {
+  test('尚未调度的构建明确给出等待原因，不显示尚无日志', async () => {
+    const f = fixture({ 'build-waiting': '' }, { 'build-waiting': { phase: 'Pending', conditions: [
+      { type: 'PodScheduled', status: 'False', reason: 'Unschedulable', message: '0/1 nodes are available: 1 Insufficient cpu.' },
+    ] } });
+    // 实机项目已 active，构建等待 CPU 时日志接口却返回空列表，管理员无法定位阻塞。
+    await expect(f.observer.tailLogs('cs-qa', 'app.kubernetes.io/component=build', { tailLines: 200 })).rejects.toMatchObject({
+      kind: 'unavailable', message: expect.stringContaining('Insufficient cpu'),
+      details: { pod: 'build-waiting', reason: 'Unschedulable' },
+    });
+    expect(f.requests).toHaveLength(1);
+  });
+
+  test('未知调度说明如实保留，不能猜测成资源不足或构建失败', async () => {
+    const f = fixture({ 'waiting-pod': '' }, { 'waiting-pod': { phase: 'Pending', conditions: [{ type: 'PodScheduled', status: 'False' }] } });
+    await expect(f.observer.tailLogs('cs-qa', 'app=qa', { tailLines: 200 })).rejects.toMatchObject({
+      kind: 'unavailable', message: 'Pod waiting-pod 尚未调度，容器日志暂不可用；等待调度器提供原因。', details: { pod: 'waiting-pod' },
+    });
+  });
+
+  test('已调度或正在运行的 Pod 继续读取真实日志，不按 Pending 字样推断失败', async () => {
+    const f = fixture({ scheduled: '2026-09-15T06:30:00Z initializing\n', running: '2026-09-15T06:30:01Z ready\n' }, {
+      scheduled: { phase: 'Pending', conditions: [{ type: 'PodScheduled', status: 'True' }] },
+      running: { phase: 'Running', conditions: [{ type: 'PodScheduled', status: 'False', message: 'stale condition' }] },
+    });
+    const entries = await f.observer.tailLogs('cs-qa', 'app=qa', { tailLines: 200 });
+    expect(entries.map((entry) => entry.message)).toEqual(['initializing', 'ready']);
+    expect(f.requests).toHaveLength(3);
+  });
+
   test('请求容器时间戳并保留固定故障时间，混合日志不标成 stdout', async () => {
     const f = fixture({ 'migrate-failed': '2026-09-14T13:59:54.295718172Z RFC003_MIGRATION_FAILURE\n' });
     const entries = await f.observer.tailLogs('cs-qa', 'crewstation.io/release=release-a', { tailLines: 200, sinceSeconds: 60 });

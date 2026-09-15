@@ -1620,3 +1620,51 @@ delivery 的上线预检确认区、远端来源检查与最终发布版本表�
 另只读核对 UX-AT-27 的实际五个数字人摘要及 limit=20 范围。现有未知健康来自未部署槽，不能当作来源读取故障；该条仍待真实局部故障与恢复证据。**UX-AT-32 已通过，累计 24／52，28 项待完成**；I9／I14／I15 与具体成员范围待答复，RFC-004 继续按批准顺序等待 RFC-003 完结。
 
 证据保存在 batch69 的 preflight、summaries-before、qa-before／after／comparison、layout-before／after、fixtures／deletion／restored、各 Runner intent／result、dirty-comparisons／dirty-history-ready／restored-comparison、status-red／refresh-red／refresh-targeted-final、source-candidate／check／build、三版镜像与部署记录、http-assets、browser-final 和 final-runtime。八份源码／测试及三份文档精确提交，最终 SHA 托管 CI 单独核对。
+
+## 第七十批：管理接入全程与构建等待原因
+
+本批完成 UX-AT-20，并修复管理员真实创建／首发流程中的两处误导。页面链路始终在 /admin 下，旧项目、授权和会话保持原状。
+
+### 实际问题与修复
+
+1. 创建确认原文让用户补齐配置后“重新开通”。[provisionProject.ts](../../../modules/provisioning/application/provisionProject.ts) 在开通步骤受理后设置 active；[platform/wiring.ts:284](../../../modules/platform/wiring.ts#L284) 的 ensureFirstRelease 只在尚无发布时首发。真实 06:26:48Z 发布受理后，项目已 active，随后发布才因缺配置失败。中英文现明确补齐生产配置后，使用新版本号重新发布。最终页面两种语言均核对，检查草稿已显式放弃，未创建 rfc003-copy-check。
+2. 首次构建 Pod 为 Pending／PodScheduled=False／Unschedulable／Insufficient cpu，但日志返回 HTTP 200、items=[]，页面显示“尚无日志”。[clusterObserver.ts](../../../modules/observability/adapters/k8s/clusterObserver.ts) 现在保留真实调度 reason／message，返回 unavailable；原因尚未提供时明确等待原因，不推断资源不足或构建失败。已调度的 Pending、Running 仍正常读取日志，原始时间不伪造。实际同一构建在新 API 下 HTTP 503／页面 alert 给出 CPU 不足，恢复调度后正常显示 57／57 条构建日志。
+
+回归先 **18 pass／3 fail／155 assertions**，最终定向 **21 pass／0 fail／164 assertions**。五份最终源码／测试候选的完整 `bun run check` **1200 pass／4 skip／0 fail**（1204 tests／198 files／6585 assertions，测试 110.19s、命令 129.94s），06:34:57Z 完成；console build **670ms**。候选随后未改变，纯证据文档复用该门禁。
+
+### 专用接入项目的真实旅程
+
+| 阶段 | 对象与结果 |
+|---|---|
+| 创建 | 06:26:46Z 管理页创建 APIProxy“RFC-003 管理接入验收”，slug rfc003-verify-integration，project prj_01a0a3bf1d2c700090f54cd03306dd6d，service svc_01a0a3bf1d2c700197334a7c63e347dc；负责人仍为已有 admin |
+| 开通与首发 | GitLab 项目 147／crewstation/rfc003-verify-integration；main 初始 1bde5640d46469d557f69d88a507d2647734c426，v0.1.0 为 rel_01a0a3bf27af70008353e545958b1951。开通完成，构建从等待 CPU 恢复成功，发布明确因缺 GITLAB_TOKEN 失败 |
+| 开发 | 从管理页开 main 会话 tsk_01a0a3cd169b7000b830f632b20cf694，实际代码编辑器保存 crewstation.yaml；正常 Runner 通道补齐唯一代理名、说明和回归。未启动原生 Agent CLI |
+| 配置 | 实际设置页保存生产 GITLAB_BASE_URL=http://127.0.0.1:9 与空字符串 GITLAB_TOKEN，版本 1→2；密钥值不回显，没有注入真实上游凭据 |
+| 源码验证 | 现有模板未带测试文件；正常安装锁定依赖后，新增的身份／健康、未配置上游和 Manifest 一致性回归 **3 pass／0 fail／9 assertions**，没有请求真实上游 |
+| 提交 | GitLab 原 main 仍受保护，已有管理员正常 Commits API 精确提交六份 QA 源码为 018627a17889e219ae34ae7753bb8170796c3f2c，父提交为初始 SHA；没有改保护规则。平台正常“补齐历史”取得对象后，核对本地六份内容一致并在 main 快进；index／工作树均为空 |
+| 发布 | 管理页选择当前开发会话，预检确认上述完整 SHA／main／未提交 0；07:07:16Z 一次提交 v0.1.1，受理 rel_01a0a3e433b47000a9ea3d814323e9b5。正常发布将已知远端同步为当前提交，未推送也为 0 |
+| 就绪与返回 | 07:10:03Z v0.1.1 ready，生产配置第 2 版、待验证 green 槽 1／1；07:11:36Z 已登录的正常预览 HTTP 200 返回 rfc003-integration-qa 身份，环境 production／slot green。07:12:09Z 返回管理接入列表，可见新项目已开通；正式槽仍未部署、没有切流记录 |
+
+六份 QA 提交路径为 .gitignore、README.md、crewstation.yaml、openapi.yaml、src/proxy/catalog.ts、src/integrationQa.test.ts，实际摘要在 integration-commit.json。它是本机 GitLab 验收仓库提交，与 CrewStation 主仓源码提交分开。一次新建分支命令被自动审批按 main-only 规则拒绝且未执行；后续仅在现有 main 上完成，未改历史。TaskRunner 没有拿到管理员 token。
+
+### 资源调整与验收边界
+
+节点原 CPU requests 已用 9800m／10000m。正常管理 API 新增独立 rfc003-integration-qa 服务套餐（100m／512Mi／最多 1 副本）和同名任务套餐（100m／2Gi／2Gi）；Manifest 实际使用服务套餐。当前开会话入口只选分支，仍使用平台默认任务资源，新增任务套餐没有被选用，不能称其已生效。
+
+通过 Kubernetes 已提供的 pods/resize，只调整本批新建且尚未调度的 v0.1.0、v0.1.1 构建 Pod 和新开发 Pod CPU 1→100m，分别校验 UID、resourceVersion、原资源和 Pending／无节点；内存与存储未改。开发 Pod 的 checkout init 仍为 200m。发布受理后，真实释放确认显示 main@018627a／未提交 0／未推送 0／已启动 0，没有草稿或未保存编辑；正常“确认释放”结束该新会话，平台删除其临时容器与工作卷。腾出资源后第二个构建成功，最终服务采用 100m 套餐。没有缩容旧工作负载或清理旧卷。
+
+APIProxy 开发预览自身 HTTP 200 返回 JSON；本机嵌入浏览器却为空／about:blank，尚未定位。最终预览响应无 Content-Disposition、CSP 或 X-Frame-Options，不能直接归因于这些头；没有把 HTTP 成功当作可视预览成功。当前已释放专用会话，源码完整在 GitLab，后续可正常重开继续诊断。此条不替代 UX-AT-15 的真实上游调用，也不关闭 UX-AT-44 的其余角色入口。
+
+### 本机部署、保留与结论
+
+API 镜像 cs-control-plane:rfc003-b70-6d1ae2d769 基于此前 ebaa730，仅覆盖 clusterObserver.ts；imageID=sha256:f787b8cfc4de1d89a43e1838d1bc00f9047e5eb9d29ebf1ffe2fecaf0c1c5650，generation=33，实际 Pod cs-api-c866b558b-l8hk7／UID 32fda0e7-67aa-47e4-8b02-469b2c3775ff。06:38:17Z 文件摘要与候选匹配。
+
+Console 镜像 cs-console:rfc003-b70-6d6f89a540，imageID=sha256:700d2ddc2755863ac4a7fa9762e898f101dff224772642b531b4a5e158f34290，generation=44，Pod console-666d5d49c4-dfsg4／UID 580f8c5d-d9d8-47e9-aa5e-ab2ba0770331。06:38:18Z 七份文件、07:00:24Z HTTP 六份产物一致，实际页面 index-o1ul1hnN.js。增量导入 API 38,952 bytes／console 3,723,445 bytes；两者均 1／1、restartCount=0，controller cc93104／generation=21 保持。
+
+07:13:42Z 相对上一批最终快照，三个旧 QA 的 taskId、native、历史 Agent、activity 和 workspace 保持，仅查询时间另计；delivery 的空闲提醒与 files 的活跃时间更新。两份个人布局内容和 revision 12／14 保持。原 tab 17 没有重载，截图仍有中文 RFC003_SNAPSHOT_DRAFT 未发送草稿、可输入、CLI 1937fa、工作区 1／网格／未读完成 1；xterm 草稿在截图可见，DOM 摘要不包含该正文。语言恢复中文，未设置新视口覆盖。
+
+07:14:16Z 原任务 UID／状态／四份受保护文件摘要、失败 Bound 工作卷及旧预览／正式槽保持。新服务 Deployment rfc003-verify-integration-green／UID e6fb6e64-6649-4d2f-9659-c67080fde079／generation=1／1／1，旧服务未动。节点 Ready=True、MemoryPressure／DiskPressure=False，剩余 1,480,384,512 bytes。
+
+**UX-AT-20 已通过，累计 25／52，27 项待完成**。RFC-003 保持 In Progress；I9／I14／I15、具体成员范围和其余旅程继续，RFC-004 按批准顺序等待 RFC-003 完结，Hook 未开工。
+
+证据位于 /private/tmp/crewstation-rfc003-batch70-*：runtime-before、capacity、created、build-log-before／fixed、两个 build-resize、dev-created／resized、profiles-created、Runner intent／result、integration-source／commit／history／main-sync／ready、source-candidate／targeted-red／check、API／console image-built／import／rollout、http-assets、browser-final、final-projects、qa-after／comparison、layout-after、final-runtime。五份源码／测试与三份文档精确提交，最终 SHA 托管 CI 独立核对。

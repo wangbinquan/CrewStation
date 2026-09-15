@@ -293,7 +293,7 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   'projects.wizard.quotaError': 'Enter an integer from 1 to 100, or leave blank for the platform default.',
   'projects.wizard.replicas': 'Up to {count} replicas',
   'projects.wizard.platformDefault': 'Use platform default',
-  'projects.wizard.requiredConfig': 'Before the first release, this template needs: {keys}. Set them in production config after creation, then retry provisioning. This selection does not supply these values.',
+  'projects.wizard.requiredConfig': 'Before the first release, this template needs: {keys}. Set them in production config after creation. If the first release fails, publish again with a new version under Releases and rollout. This selection does not supply these values.',
   'projects.wizard.config.secret': 'secret',
   'projects.wizard.config.config': 'config',
   'projects.wizard.creationEffect': 'Confirmation creates the project and repository from your template, then starts provisioning and the first release. The owner must explicitly switch production traffic.',

@@ -292,7 +292,7 @@ export const messages = {
   "projects.wizard.quotaError": "请填写 1–100 的整数，或留空采用平台默认值。",
   "projects.wizard.replicas": "最多 {count} 个副本",
   "projects.wizard.platformDefault": "采用平台默认值",
-  "projects.wizard.requiredConfig": "此模板首发前还需配置：{keys}。创建后在生产配置中补齐，再重新开通；当前选择不会自动提供这些值。",
+  "projects.wizard.requiredConfig": "此模板首发前还需配置：{keys}。创建后在生产配置中补齐；若首个发布失败，在“发布与上线”使用新版本号重新发布。当前选择不会自动提供这些值。",
   "projects.wizard.config.secret": "密钥",
   "projects.wizard.config.config": "配置",
   "projects.wizard.creationEffect": "确认后将创建项目，按所选模板建立仓库，并发起开通与首个发布。正式流量切换仍需负责人明确操作。",

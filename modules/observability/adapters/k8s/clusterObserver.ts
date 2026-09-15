@@ -1,11 +1,16 @@
 import type { LogEntryDto } from '@crewstation/contracts';
 import { LogEntryDtoSchema } from '@crewstation/contracts';
+import { PlatformError } from '@crewstation/kernel';
 import type { K8sClient, K8sObject } from '@crewstation/k8s';
 import { Resources } from '@crewstation/k8s';
 import type { ClusterObserver } from '../../ports/sources';
 
 type Deployment = K8sObject & { spec?: { replicas?: number }; status?: { replicas?: number; readyReplicas?: number; conditions?: Array<{ type: string; lastTransitionTime?: string }> } };
-type Pod = K8sObject & { status?: { containerStatuses?: Array<{ restartCount?: number; lastState?: { terminated?: { finishedAt?: string } } }> } };
+type Pod = K8sObject & { status?: {
+  phase?: string;
+  conditions?: Array<{ type: string; status: string; reason?: string; message?: string }>;
+  containerStatuses?: Array<{ restartCount?: number; lastState?: { terminated?: { finishedAt?: string } } }>;
+} };
 
 /** 直接读集群：Deployment 状态与按标签选中的 Pod 的日志尾部。 */
 export function kubernetesClusterObserver(k8s: K8sClient): ClusterObserver {
@@ -28,6 +33,7 @@ export function kubernetesClusterObserver(k8s: K8sClient): ClusterObserver {
       const pods = await k8s.list<Pod>(Resources.Pod!, namespace, { labelSelector: selector });
       const entries: LogEntryDto[] = [];
       for (const pod of pods) {
+        assertLogsAvailable(pod);
         const stream = await k8s.logs(namespace, pod.metadata.name, { timestamps: true, tailLines: options.tailLines, ...(options.sinceSeconds ? { sinceSeconds: options.sinceSeconds } : {}) });
         const text = await new Response(stream).text();
         for (const line of text.split('\n')) {
@@ -39,6 +45,17 @@ export function kubernetesClusterObserver(k8s: K8sClient): ClusterObserver {
       return entries.sort((a, b) => a.ts === undefined ? (b.ts === undefined ? 0 : 1) : b.ts === undefined ? -1 : a.ts.localeCompare(b.ts)).slice(-options.tailLines);
     },
   };
+}
+
+/** 未分配节点时 Kubernetes 可能返回空日志；保留调度原因，不能把等待解释成空记录。 */
+function assertLogsAvailable(pod: Pod): void {
+  if (pod.status?.phase !== 'Pending') return;
+  const waiting = pod.status.conditions?.find((condition) => condition.type === 'PodScheduled' && condition.status === 'False');
+  if (!waiting) return;
+  const detail = [waiting.reason, waiting.message].filter(Boolean).join('：');
+  throw new PlatformError('unavailable', `Pod ${pod.metadata.name} 尚未调度，容器日志暂不可用；${detail || '等待调度器提供原因。'}`, {
+    pod: pod.metadata.name, ...(waiting.reason ? { reason: waiting.reason } : {}),
+  });
 }
 
 function logEntry(line: string, pod: string): LogEntryDto {
