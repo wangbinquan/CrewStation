@@ -1,4 +1,5 @@
 import type { Actor, ProjectId, RunnerCommand, RunnerEvent, ServiceId, TaskId, TraceId, UserId } from '@crewstation/contracts';
+import type { DevSessionRebuildDto, DevSessionRebuildInspection, RebuildDevSessionRequest } from '@crewstation/contracts';
 
 export interface EnvironmentView {
   id: TaskId;
@@ -16,6 +17,9 @@ export interface EnvironmentView {
 
 /** 由 task-runtime 提供。 */
 export interface Environments {
+  inspectRebuild(projectId: ProjectId): Promise<DevSessionRebuildInspection>;
+  requestRebuild(projectId: ProjectId, input: RebuildDevSessionRequest): Promise<DevSessionRebuildDto>;
+  getRebuild(taskId: TaskId): Promise<DevSessionRebuildDto | undefined>;
   createEnvironment(input: { serviceId: ServiceId; kind: 'dev-session'; branch: string; createdBy: UserId; traceId?: TraceId; preview?: { command: string[]; port: number; healthPath: string }; labels?: Record<string, string> }): Promise<EnvironmentView>;
   releaseEnvironment(taskId: TaskId, reason: 'user' | 'owner-force'): Promise<EnvironmentView>;
   getEnvironment(taskId: TaskId): Promise<EnvironmentView | undefined>;

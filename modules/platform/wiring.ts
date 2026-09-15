@@ -165,7 +165,7 @@ function composeRuntime(deps: PlatformModuleDeps, core: ReturnType<typeof compos
   const { release } = delivery;
   const taskRuntime = createTaskRuntimeModule({
     db, k8s, logger, isAdmin: (id) => isAdmin(id), authorizer: project.api, quotas: { quotaLimit: project.api.quotaLimit },
-    profiles: { getTaskProfile: async (name) => (await project.api.listTaskProfiles()).find((p) => p.name === name) },
+    profiles: { listTaskProfiles: project.api.listTaskProfiles, getTaskProfile: async (name) => (await project.api.listTaskProfiles()).find((p) => p.name === name) },
     services: { resolveServiceById: resolveById },
     checkout: {
       // 开发容器的工作卷要先有源码：签一个只读的会话级 Git 令牌，写进项目命名空间的 Secret，
@@ -225,8 +225,8 @@ function composeRuntime(deps: PlatformModuleDeps, core: ReturnType<typeof compos
       // 先把环境标成已连接，再派发等容器就绪的业务子任务：提交子任务时容器往往还没连上。
       // 派发不能 await：这个回调跑在 cs-session 处理 hello 的串行链上，而派发要等 TaskRunner
       // 的回执——回执要经同一条链回来，等下去必然自锁到命令超时。
-      onRunnerConnected: async (taskId) => {
-        await taskRuntime.api.onRunnerConnected(taskId);
+      onRunnerConnected: taskRuntime.api.onRunnerConnected,
+      onRunnerReady: (taskId) => {
         void businessTask.api.dispatchPendingSubtasks(taskId)
           .then((dispatched) => { if (dispatched > 0) logger.info('dispatched pending subtasks', { taskId, dispatched }); })
           .catch((error: unknown) => logger.error('dispatch pending subtasks failed', { taskId, error: error instanceof Error ? error.message : String(error) }));

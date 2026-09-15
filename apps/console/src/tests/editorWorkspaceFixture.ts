@@ -1,4 +1,5 @@
 import type { PreviewStatusResult, TaskStreamCommandInput } from '@crewstation/api-client';
+import type { DevSessionRebuildDto } from '@crewstation/contracts';
 import { activityFixture, activityProjectId, activityTaskId, activityUserId, activityTime } from './agentActivityFixture';
 
 /** 测真实路由、任务流与 CodeMirror；仅替代服务端 HTTP／WS 的确定性边界。 */
@@ -6,7 +7,7 @@ export function editorWorkspaceFixture() {
   const f = activityFixture(), commands: Array<TaskStreamCommandInput & { id: string }> = [], writes: Array<{ path: string; method: string }> = [];
   const files = new Map([['a.ts', '磁盘原文'], ['b.ts', '第二个文件']]);
   const preview: PreviewStatusResult = { state: 'disabled', restarts: 0 };
-  const sessionState: { state: 'running' | 'failed'; message?: string } = { state: 'running' };
+  const sessionState: { state: 'running' | 'failed' | 'creating'; message?: string; rebuild?: DevSessionRebuildDto } = { state: 'running' };
   const originalFetch = globalThis.fetch, originalSocket = globalThis.WebSocket, originalHref = window.location.href;
   window.location.href = 'http://localhost/';
   let pendingWrite: ((failure?: { code: string; message: string }) => void) | undefined;

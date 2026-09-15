@@ -13,9 +13,9 @@ export function drizzleEnvironmentRepository(db: Executor): EnvironmentRepositor
     volumeMode: r.volumeMode as VolumeMode, profile: r.profile, namespace: r.namespace, podName: r.podName, pvcName: r.pvcName, traceId: r.traceId as TraceId,
     runnerTokenHash: r.runnerTokenHash, connected: r.connected, ...(r.branch ? { branch: r.branch } : {}), ...(r.preview ? { preview: json<TaskEnvironment['preview']>(r.preview) } : {}),
     labels: json<Record<string, string>>(r.labels), ...(r.createdBy ? { createdBy: r.createdBy as UserId } : {}), ...(r.message ? { message: r.message } : {}),
-    createdAt: r.createdAt, updatedAt: r.updatedAt, lastActivityAt: r.lastActivityAt,
+    createdAt: r.createdAt, updatedAt: r.updatedAt, lastActivityAt: r.lastActivityAt, ...(r.rebuildId ? { rebuildId: r.rebuildId } : {}),
   });
-  const toRow = (e: TaskEnvironment): typeof environments.$inferInsert => ({ ...e, branch: e.branch ?? null, preview: e.preview ?? null, createdBy: e.createdBy ?? null, message: e.message ?? null });
+  const toRow = (e: TaskEnvironment): typeof environments.$inferInsert => ({ ...e, branch: e.branch ?? null, preview: e.preview ?? null, createdBy: e.createdBy ?? null, message: e.message ?? null, rebuildId: e.rebuildId ?? null });
   return {
     insert: async (e) => { await db.insert(environments).values(toRow(e)); },
     update: async (e) => { await db.update(environments).set(toRow(e)).where(eq(environments.id, e.id)); },
@@ -36,6 +36,10 @@ export function drizzleEnvironmentRepository(db: Executor): EnvironmentRepositor
 
 export function drizzleAdmissionRepository(db: Executor): AdmissionRepository {
   return {
+    lock: async (projectId) => {
+      await db.insert(admissions).values({ projectId, running: 0 }).onConflictDoNothing();
+      await db.select().from(admissions).where(eq(admissions.projectId, projectId)).for('update');
+    },
     tryAcquire: async (projectId, limit) => {
       await db.insert(admissions).values({ projectId, running: 0 }).onConflictDoNothing();
       const rows = await db.update(admissions).set({ running: sql`${admissions.running} + 1` }).where(and(eq(admissions.projectId, projectId), sql`${admissions.running} < ${limit}`)).returning({ running: admissions.running });

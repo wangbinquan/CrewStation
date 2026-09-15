@@ -5,7 +5,12 @@ import { refOf, resourcePath } from './resources';
 import { readWatchStream } from './watch';
 
 export interface ListOptions { labelSelector?: string; fieldSelector?: string; limit?: number }
-export interface DeleteOptions { propagationPolicy?: 'Background' | 'Foreground' | 'Orphan'; gracePeriodSeconds?: number }
+export interface DeleteOptions {
+  propagationPolicy?: 'Background' | 'Foreground' | 'Orphan';
+  gracePeriodSeconds?: number;
+  /** API Server 原子确认实例，避免删除同名但已经替换的对象。 */
+  preconditions?: { uid?: string; resourceVersion?: string };
+}
 export interface WatchOptions { labelSelector?: string; resourceVersion?: string; timeoutSeconds?: number; signal?: AbortSignal }
 export interface LogOptions { container?: string; follow?: boolean; timestamps?: boolean; sinceSeconds?: number; tailLines?: number; signal?: AbortSignal }
 

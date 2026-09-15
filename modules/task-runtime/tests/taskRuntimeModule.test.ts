@@ -24,7 +24,7 @@ beforeAll(async () => {
     db: tdb.db, k8s,
     authorizer: { authorize: async () => undefined },
     quotas: { quotaLimit: async () => quota },
-    profiles: { getTaskProfile: async (name) => (name === 'coding-medium' ? { name, cpu: '1', memory: '2Gi', storage: '10Gi' } : undefined) },
+    profiles: { listTaskProfiles: async () => [{ name: 'coding-medium', cpu: '1', memory: '2Gi', storage: '10Gi', description: '' }], getTaskProfile: async (name) => (name === 'coding-medium' ? { name, cpu: '1', memory: '2Gi', storage: '10Gi' } : undefined) },
     services: { resolveServiceById: async () => ({ projectId, slug: 'demo', name: 'demo', namespace: 'cs-demo' }) },
     sources: { configEnv: async () => ({ GREETING: 'dev-hi' }), dataEnv: async () => ({ CS_DATABASE_URL: 'postgres://dev' }), taskDataEnv: async () => ({}) },
     checkout: { checkoutFor: async () => ({ repoUrl: 'http://git.local/crewstation/demo.git', credentialSecretName: 'git-checkout-demo' }) },
@@ -75,7 +75,7 @@ describe.skipIf(!available)('task-runtime module', () => {
 
     expect(await runtime.api.verifyRunnerToken(dev.id, 'nope')).toMatchObject({ ok: false });
     expect(await runtime.api.verifyRunnerToken(dev.id, env.CS_RUNNER_TOKEN!)).toEqual({ ok: true, projectId });
-    await runtime.api.onRunnerConnected(dev.id);
+    await runtime.api.onRunnerConnected(dev.id, env.CS_RUNNER_TOKEN!);
     expect(await runtime.api.getEnvironment(dev.id)).toMatchObject({ state: 'running', connected: true });
 
     const biz = await runtime.api.createEnvironment({ serviceId, kind: 'business', volumeMode: 'persistent' });
@@ -89,7 +89,7 @@ describe.skipIf(!available)('task-runtime module', () => {
     expect((await runtime.api.createEnvironment({ serviceId, kind: 'business' })).state).toBe('creating');
     expect(await runtime.api.verifyRunnerToken(dev.id, env.CS_RUNNER_TOKEN!)).toMatchObject({ ok: false });
 
-    await runtime.api.onRunnerConnected(biz.id);
+    await runtime.api.onRunnerConnected(biz.id, podEnv(biz.podName).CS_RUNNER_TOKEN!);
     const paused = await runtime.api.pauseEnvironment(biz.id);
     expect(paused.state).toBe('paused');
     expect(k8s.objects.has(`v1/PersistentVolumeClaim/cs-demo/${biz.id.slice(4, 16) ? `task-${biz.id.slice(4, 16)}-work` : ''}`)).toBe(true);

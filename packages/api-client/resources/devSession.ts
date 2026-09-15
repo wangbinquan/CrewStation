@@ -4,6 +4,7 @@ import type { NativeTerminalDto, NativeTerminalList, StartNativeTerminalRequest 
 import type { SaveWorkspaceLayoutRequest, WorkspaceLayoutDto } from '@crewstation/contracts';
 import type { AgentActivityPage, AgentActivityQuery, ReadAgentActivityRequest } from '@crewstation/contracts';
 import type { ApiInvocationRequest, ApiInvocationResponse } from '@crewstation/contracts';
+import type { DevSessionRebuildDto, DevSessionRebuildInspection, RebuildDevSessionRequest } from '@crewstation/contracts';
 import { API_INVOCATION_TIMEOUT_MS } from '@crewstation/contracts';
 import type { Transport } from '../httpTransport';
 import type { ItemsPage } from '../itemsPage';
@@ -27,6 +28,8 @@ export interface ReleaseDevSessionOptions {
 
 /** 开发会话：一项目一会话、分支与落后数、并行流式 Agent、从会话发布。 */
 export interface DevSessionResource {
+  inspectRebuild(projectId: string): Promise<DevSessionRebuildInspection>;
+  rebuild(projectId: string, input: RebuildDevSessionRequest): Promise<DevSessionRebuildDto>;
   invokeApi(projectId: string, input: ApiInvocationRequest): Promise<ApiInvocationResponse>;
   getAgentActivity(taskId: string, query?: AgentActivityQuery): Promise<AgentActivityPage>;
   readAgentActivity(taskId: string, input: ReadAgentActivityRequest): Promise<{ throughSeq: number }>;
@@ -67,6 +70,8 @@ export function devSessionResource(transport: Transport): DevSessionResource {
   const agents = (taskId: string) => `/v1/tasks/${segment(taskId)}/agents`;
   const terminals = (taskId: string) => `/v1/tasks/${segment(taskId)}/agent-terminals`;
   return {
+    inspectRebuild: (projectId) => transport.request('GET', `${project(projectId)}/dev-session/rebuild`),
+    rebuild: (projectId, input) => transport.request('POST', `${project(projectId)}/dev-session/rebuild`, { body: input }),
     invokeApi: (projectId, input) => transport.request('POST', `${project(projectId)}/dev-session/api-invocations`, { body: input, keepalive: false, redirect: 'error', signal: AbortSignal.timeout(API_INVOCATION_TIMEOUT_MS + 20_000) }),
     getAgentActivity: (taskId, query) => transport.request('GET', `/v1/tasks/${segment(taskId)}/agent-activity`, { query }),
     readAgentActivity: (taskId, input) => transport.request('POST', `/v1/tasks/${segment(taskId)}/agent-activity/read`, { body: input }),

@@ -1,4 +1,4 @@
-import type { Actor, ProjectId, ServiceId, TaskId } from '@crewstation/contracts';
+import type { Actor, ProjectId, ServiceId, TaskId, TaskProfileDto } from '@crewstation/contracts';
 
 export interface ProjectAuthorizer {
   authorize(actor: Actor, projectId: ProjectId, action: 'view' | 'develop' | 'force-release-session'): Promise<unknown>;
@@ -9,6 +9,7 @@ export interface QuotaSource {
 }
 
 export interface ProfileCatalog {
+  listTaskProfiles(): Promise<TaskProfileDto[]>;
   getTaskProfile(name: string): Promise<{ name: string; cpu: string; memory: string; storage: string } | undefined>;
 }
 

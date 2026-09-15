@@ -14,6 +14,8 @@ export interface EnvironmentRepository {
 
 /** 配额准入表：一行一项目，UPDATE … WHERE running < limit 原子判定（AT-19、AT-39）。 */
 export interface AdmissionRepository {
+  /** 事务内先锁项目，再读会话／变更配额，串行化创建、释放和恢复。 */
+  lock(projectId: ProjectId): Promise<void>;
   tryAcquire(projectId: ProjectId, limit: number): Promise<boolean>;
   release(projectId: ProjectId): Promise<void>;
   running(projectId: ProjectId): Promise<number>;

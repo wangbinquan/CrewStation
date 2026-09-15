@@ -50,8 +50,12 @@ export function createFakeK8sClient(): FakeK8sClient {
       objects.set(key, merged);
       return merged as never;
     },
-    delete: async (ref, name, namespace) => {
+    delete: async (ref, name, namespace, options) => {
       const key = keyFor(ref, name, namespace);
+      const current = objects.get(key);
+      if (current && Object.entries(options?.preconditions ?? {}).some(([field, value]) => value !== undefined && current.metadata[field as 'uid' | 'resourceVersion'] !== value)) {
+        throw conflict(`${ref.kind} ${name} 删除前置条件不匹配`);
+      }
       deleted.push(key);
       return objects.delete(key);
     },

@@ -4,10 +4,13 @@ import type { NativeTerminalApi } from './nativeTerminalApi';
 import type { SaveWorkspaceLayoutRequest, WorkspaceLayoutDto } from '@crewstation/contracts';
 import type { AgentActivityPage, AgentActivityQuery, ReadAgentActivityRequest } from '@crewstation/contracts';
 import type { ApiInvocationRequest, ApiInvocationResponse } from '@crewstation/contracts';
+import type { DevSessionRebuildDto, DevSessionRebuildInspection, RebuildDevSessionRequest } from '@crewstation/contracts';
 
 /** dev-session 对外能力：一项目一会话、分支、并行流式 Agent、从会话发布、空闲提醒。 */
 export interface DevSessionModuleApi extends NativeTerminalApi {
   readonly name: 'dev-session';
+  inspectSessionRebuild(actor: Actor, projectId: ProjectId): Promise<DevSessionRebuildInspection>;
+  rebuildSession(actor: Actor, projectId: ProjectId, input: RebuildDevSessionRequest): Promise<DevSessionRebuildDto>;
   invokeApi(actor: Actor, projectId: ProjectId, input: ApiInvocationRequest): Promise<ApiInvocationResponse>;
   getAgentActivity(actor: Actor, taskId: TaskId, query: AgentActivityQuery): Promise<AgentActivityPage>;
   readAgentActivity(actor: Actor, taskId: TaskId, input: ReadAgentActivityRequest): Promise<{ throughSeq: number }>;

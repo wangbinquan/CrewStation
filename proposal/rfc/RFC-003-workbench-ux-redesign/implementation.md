@@ -1811,3 +1811,33 @@ Agent 动态的“更早未读”请求在途时关闭面板，resetOlder 原来
 RFC-003 保持 In Progress，RFC-004 仍等待其完结，Hook 未开工。原失败 PVC 不释放，原 QA f04fd60 分叉提交不推送／合并。后续优先实现这三项实际能力，再补余下角色、发布、事件和多窗口旅程。
 
 证据：/private/tmp/crewstation-rfc003-batch74-evidence.json、live-roles.json、config-red-readable／targeted3／role-targeted／role-final、initial-check／lint-candidate-check／check、source-candidate、console-build、api-image-*／image-* 与各 rollout 记录。浏览器事实与正常 HTTP、隔离测试、最终 Git SHA CI 分开登记。
+
+## 第七十五批：保留原工作树恢复开发环境
+
+本批实现 I14 已选方案 (a)：失败开发会话先检查原任务、Pod、Bound 工作卷及管理员任务套餐，再显式受理恢复。原 taskId、工作卷、分支、个人布局和历史 Agent 身份保持；旧 CLI 不自动重跑。原“从远端另建工作树”作为次要入口保留。恢复契约见 [workspace-recovery.md](workspace-recovery.md)。
+
+task-runtime 持久化恢复记录和队列，项目行锁串行化准入／释放；相同 requestId 重放同一结果，确认对象或套餐变化须重新检查。新容器采用独立名称和新 Runner 凭据，不运行 checkout；Kubernetes 创建回执丢失后核对原实例接续，失败只补偿本次 Pod／Secret，保留工作卷、释放一次额度。旧 Runner 迟到握手不能污染当前连接；预览沿用原路由。新容器 5 分钟未连接时明确失败，不把受理或 Pod 创建当作就绪。
+
+### 真实恢复与发现的缺陷
+
+原任务 tsk_01a09eb4f03f7000ba011a517772cc09 的失败 Pod 曾为 OOMKilled／137。11:12:09Z 第一次恢复选择 coding-medium（1 CPU／2Gi），实际因节点 CPU 请求已占 9900m／10000m 无法调度。请求 91370dee-17be-4977-9bc0-056f907f28f1 在 11:17:23Z 超时补偿完成；新 Pod／Secret 清理，原 PVC UID 31042273-699a-4888-912b-06d9babadc72、10Gi／Bound 保持。这同时暴露了两处问题：创建即声称“已挂载”；已确认失败后页面仍锁在“未知回执／重试同一请求”。回归先 8 pass／2 fail，修复后定向 15 pass／0 fail；现显示等待调度，超时包含调度或镜像等待原因，确定失败可重新检查并换套餐。
+
+11:21:07Z 正常界面重新检查后选择已有 rfc003-integration-qa（100m CPU／2Gi／2Gi 临时存储），请求 7939bf9d-209e-4f8a-8109-990e782a35f8 在 11:21:12Z 就绪。新 Pod task-01a09eb4f03f-r-7939bf9d209e／UID 7ee4b0ff-7bc3-448e-9471-7afa7b143bfc，Runner 93ed42e7-beec-479c-b52b-01a2f0a03db2。原工作卷 UID／10Gi、HEAD 1aa2db9f9578edfce15dbf314f74302ac523de83 以及七份源码／Git 元数据摘要全部匹配；无 init checkout。未推送提交 1 和原 .claude.json 保留，未读取该文件内容。
+
+原六条 CLI 历史全部保留，四个被 OOM 中断的进程变为 ended／runner-restarted，两个原已退出的记录仍为 exited；恢复本身没有启动新 CLI，个人布局 revision=71 保持。实机明确提示原进程不可恢复。随后手动新建“工作区 3”，逐次按钮仅启动一个 OpenCode：agt_01a0a4cfd4867000b5be42e2d2a7130d／pty_01a0a4cfd4867001ae87c98b24d83bd6。Big Pickle 真实回复 RFC003_RECOVERY_OK_0915；独立预览显示原“RFC003 Agent 发布验收”应用和 development 环境；工作树对生产 v0.1.0／6af30245 的领先 1、未推送 1 正常显示。
+
+新 CLI 的状态源实际报告 unsupported-version，页面如实显示轮次未确认，不能把该次模型回复计作完成通知通过。运行日志的版本探测到原生启动相隔约 5.15 秒，源码探针固定 5 秒、未知版本也映射 unsupported-version；尚需区分探测失败和实际版本不支持。低 CPU 下工作树读取也曾在检查期间变化／超时，未伪报一致。该问题继续随 I15／UX-AT-42 处理，不影响原卷恢复结论。
+
+### 门禁、部署和边界
+
+第一候选完整门禁 1238 pass／4 skip／0 fail 后进行了真实恢复；发现上述两个产品问题才修改并重验。实机修复的 69 份源码／测试候选完整门禁 **1240 pass／4 skip／0 fail**（1244 tests／208 files／6870 assertions，测试 124.87s、命令 148.88s）；console build **635ms**，候选摘要保持。新增真实数据库恢复、并发／重试／补偿／旧连接测试与界面草稿／未知回执／失败重查回归。跳过项仍为显式集群开关和隔离原生 CLI 测试，不冒称这些自动执行。
+
+本机 task_runtime/0003_environment_rebuilds.sql 由专用迁移 Job 应用成功。cs-session 更新到首个本批镜像／generation=15；最终 controller／API／console 分别为 generation=24／38／49，全部 1／1。最终控制面与工作台标签分别为 cs-control-plane:rfc003-b75-final-19272ba002 和 cs-console:rfc003-b75-final-19272ba002，实际 Pod 文件摘要全部匹配；11:34:07Z 正常 HTTP 六份控制台产物一致。CPU 已满时逐个替换这三个自有服务，临时使用 maxSurge=0／maxUnavailable=1，完成后恢复各自原滚动策略。没有停止其他开发任务或业务应用。
+
+增量镜像构建曾先缺 queue 工作区链接、后触及 Docker 层数上限，均在部署前修正构建方法；最终合并目录复制并通过容器内实际模块导入。不是源码门禁失败，也没有重装任务容器或覆盖其运行目录。11:34:07Z delivery／files／legacy 原 Pod UID、进程启动时间、受保护文件全部保持；节点 Ready，无内存、磁盘或 PID 压力。
+
+结合 E17 的真实重新附着和单进程终止证据，本批补齐容器恢复后旧进程不可伪称在线，**UX-AT-34 通过，累计 27／52**。I15 独立 CLI Pod、四窗隔离、I9 出站及其他验收继续；RFC-003 仍 In Progress，RFC-004 按批准顺序排队。证据在 /private/tmp/crewstation-rfc003-batch75-*；最终提交和精确 SHA CI 另行核对。
+
+发布前按模块上限将 dev-session 的恢复用例归入现有 sessionLifecycle，保持 40 个生产源码文件；task-runtime 为 38 个／1500 行。归并首检发现一处旧测试 import，修正后接口 2 pass／类型检查通过；最终 68 份源码候选完整门禁 **1240 pass／4 skip／0 fail**（1244 tests／208 files／6870 assertions，测试 120.91s、命令 144.38s），console build **544ms**。控制台七份产物与既有最终部署逐字节一致，复用 generation=49。实际刷新重新进入后，CLI a7130d 仍为同一进程，原模型输出保持，输入控制入口可用。
+
+最终归并只追加更新 API：cs-control-plane:rfc003-b75-publish2-229a686b71／generation=40／1／1，Pod UID 8c290aa2-7415-4ec8-a4bc-e8d0a0e0da83；48 份实际运行文件摘要与最终候选一致，滚动策略恢复。controller／console／session 保持上述 24／49／15，归并没有改变恢复行为或重新启动开发容器。

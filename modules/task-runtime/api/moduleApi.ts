@@ -1,4 +1,5 @@
 import type { Actor, ProjectId, ServiceId, TaskId, TaskKind, TraceId, UserId, VolumeMode } from '@crewstation/contracts';
+import type { DevSessionRebuildDto, DevSessionRebuildInspection, RebuildDevSessionRequest } from '@crewstation/contracts';
 
 export type EnvironmentState = 'creating' | 'running' | 'paused' | 'releasing' | 'released' | 'failed';
 export type ReleaseReason = 'user' | 'owner-force' | 'business' | 'failed' | 'pod-lost';
@@ -43,8 +44,11 @@ export interface TaskRuntimeModuleApi {
   resumeEnvironment(taskId: TaskId): Promise<EnvironmentDto>;
   markFailed(taskId: TaskId, message: string): Promise<void>;
   touch(taskId: TaskId): Promise<void>;
-  onRunnerConnected(taskId: TaskId): Promise<void>;
-  onRunnerDisconnected(taskId: TaskId): Promise<void>;
+  onRunnerConnected(taskId: TaskId, token: string): Promise<boolean>;
+  onRunnerDisconnected(taskId: TaskId, token: string): Promise<void>;
+  inspectRebuild(projectId: ProjectId): Promise<DevSessionRebuildInspection>;
+  requestRebuild(projectId: ProjectId, input: RebuildDevSessionRequest): Promise<DevSessionRebuildDto>;
+  getRebuild(taskId: TaskId): Promise<DevSessionRebuildDto | undefined>;
   getEnvironment(taskId: TaskId): Promise<EnvironmentDto | undefined>;
   describeEnvironment(actor: Actor, taskId: TaskId): Promise<EnvironmentDto>;
   listEnvironments(actor: Actor, projectId: ProjectId, states?: EnvironmentState[]): Promise<EnvironmentDto[]>;

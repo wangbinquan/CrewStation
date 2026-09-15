@@ -1,16 +1,26 @@
-import type { ContainerSpec, K8sClient, K8sObject } from '@crewstation/k8s';
-import { LABELS, Resources, ingressRouteObject, podObject, pvcObject, serviceObject } from '@crewstation/k8s';
-import type { TaskCluster, TaskSourceCheckout } from '../../ports/cluster';
+import type { K8sClient, K8sObject } from '@crewstation/k8s';
+import { LABELS, Resources, pvcObject } from '@crewstation/k8s';
+import type { TaskCluster } from '../../ports/cluster';
+import { podNameFor } from '../../domain/taskEnvironment';
+import { ensureTaskPreview, taskPodObject } from './taskObjects';
+import { removeTaskPod } from './taskRemoval';
 
 interface ContainerStatus {
   name: string;
-  state?: { terminated?: { reason?: string; exitCode?: number } };
+  state?: { terminated?: { reason?: string; exitCode?: number }; waiting?: { reason?: string } };
 }
-type PodObject = K8sObject & { status?: { phase?: string; podIP?: string; message?: string; reason?: string; containerStatuses?: ContainerStatus[]; initContainerStatuses?: ContainerStatus[] } };
+type PodObject = K8sObject & { status?: { phase?: string; podIP?: string; message?: string; reason?: string; conditions?: Array<{ type: string; status: string; reason?: string; message?: string }>; containerStatuses?: ContainerStatus[]; initContainerStatuses?: ContainerStatus[] } };
 
 function podMessage(pod: PodObject): string | undefined {
   const status = pod.status;
   const parts = [status?.reason, status?.message].filter((part): part is string => !!part);
+  if (status?.phase === 'Pending') {
+    const scheduling = status.conditions?.find((condition) => condition.type === 'PodScheduled' && condition.status === 'False');
+    if (scheduling?.message || scheduling?.reason) parts.push(scheduling.message ?? scheduling.reason!);
+    for (const container of [...(status.initContainerStatuses ?? []), ...(status.containerStatuses ?? [])]) {
+      if (container.state?.waiting?.reason) parts.push(`${container.name}：${container.state.waiting.reason}`);
+    }
+  }
   if (status?.phase === 'Failed') {
     for (const container of [...(status.initContainerStatuses ?? []), ...(status.containerStatuses ?? [])]) {
       const ended = container.state?.terminated;
@@ -22,39 +32,6 @@ function podMessage(pod: PodObject): string | undefined {
   return [...new Set(parts)].join('；') || undefined;
 }
 
-/** 任务容器 = 项目命名空间里一个 restartPolicy Never 的 Pod + 一个工作卷；标签供网关 Pod 身份索引识别。 */
-/**
- * 源码检出 init 容器：按分支浅克隆进工作卷。
- * 只读凭据只出现在这里，长驻容器的环境里没有它——推送由平台在发布时完成，容器内不需要写权限。
- * 卷已有内容时跳过：持久卷模式下容器会重建，重跑不该覆盖开发者未提交的改动。
- */
-function checkoutContainer(image: string, source: TaskSourceCheckout, uid: number): ContainerSpec {
-  const script = [
-    'set -eu',
-    'if [ -e /work/.git ]; then echo "工作卷已有仓库，跳过克隆"; exit 0; fi',
-    'AUTH_URL=$(echo "$CS_REPO_URL" | sed "s#://#://oauth2:${CS_GIT_TOKEN}@#")',
-    'for attempt in 1 2 3; do',
-    '  if git clone --quiet --depth 50 --branch "$CS_BRANCH" "$AUTH_URL" /work; then break; fi',
-    '  if [ "$attempt" = 3 ]; then echo "克隆失败，已重试 3 次" >&2; exit 1; fi',
-    '  sleep $((attempt * 5))',
-    'done',
-    // 凭据不落盘：远端改回不带令牌的地址，容器里 git remote -v 也看不到它。
-    'git -C /work remote set-url origin "$CS_REPO_URL"',
-    `chown -R ${uid}:${uid} /work`,
-  ].join('\n');
-  return {
-    name: 'checkout',
-    image,
-    command: ['sh', '-c', script],
-    env: [
-      { name: 'CS_REPO_URL', value: source.repoUrl },
-      { name: 'CS_BRANCH', value: source.branch },
-      { name: 'CS_GIT_TOKEN', valueFrom: { secretKeyRef: { name: source.credentialSecretName, key: 'token' } } },
-    ],
-    volumes: [{ name: 'work', mountPath: '/work' }],
-    resources: { cpu: '200m', memory: '256Mi' },
-  };
-}
 
 export function kubernetesTaskCluster(k8s: K8sClient, workerUid: number): TaskCluster {
   return {
@@ -63,36 +40,9 @@ export function kubernetesTaskCluster(k8s: K8sClient, workerUid: number): TaskCl
       if (existing) return;
       await k8s.create(pvcObject({ name: env.pvcName, namespace: env.namespace, size, labels: { [LABELS.task]: env.id, [LABELS.project]: env.labels[LABELS.project] ?? '' } }));
     },
-    createPod: async ({ env, image, envVars, resources, agentEnvSecretName, source, previewRoute }) => {
-      const pod = podObject({
-        name: env.podName, namespace: env.namespace, image, imagePullPolicy: 'IfNotPresent',
-        labels: { [LABELS.project]: env.labels[LABELS.project] ?? '', [LABELS.service]: env.labels[LABELS.service] ?? '', [LABELS.workload]: env.kind, [LABELS.task]: env.id },
-        env: Object.entries(envVars).map(([name, value]) => ({ name, value })),
-        resources: { cpu: resources.cpu, memory: resources.memory, ephemeralStorage: resources.storage },
-        volumes: [{ name: 'work', mountPath: '/work', pvc: env.pvcName }],
-        ...(source ? { initContainers: [checkoutContainer(image, source, workerUid)] } : {}),
-      });
-      if (agentEnvSecretName) {
-        const spec = pod.spec as { volumes: unknown[]; containers: Array<{ volumeMounts: unknown[] }> };
-        spec.volumes.push({ name: 'agent-env', secret: { secretName: agentEnvSecretName, defaultMode: 0o400, optional: true } });
-        spec.containers[0]!.volumeMounts.push({ name: 'agent-env', mountPath: '/etc/crewstation', readOnly: true });
-      }
-      await k8s.create(pod);
-      if (env.preview) {
-        await k8s.apply(serviceObject({ name: env.podName, namespace: env.namespace, selector: { [LABELS.task]: env.id }, port: 80, targetPort: env.preview.port, labels: { [LABELS.task]: env.id, [LABELS.workload]: env.kind } }));
-        // 开发预览的路由随 Pod 生灭：目标 Service 是按任务建的，放进 gateway 的按服务重算里对不上生命周期。
-        if (previewRoute) {
-          await k8s.apply(ingressRouteObject({
-            name: env.podName, namespace: env.namespace, host: previewRoute.host,
-            target: { name: env.podName, port: 80, namespace: env.namespace },
-            middlewares: [
-              { name: previewRoute.dropIdentityHeadersMiddleware, namespace: previewRoute.systemNamespace },
-              { name: previewRoute.userAuthMiddleware, namespace: previewRoute.systemNamespace },
-            ],
-            labels: { [LABELS.task]: env.id, [LABELS.workload]: env.kind },
-          }));
-        }
-      }
+    createPod: async (spec) => {
+      await k8s.create(taskPodObject(spec, workerUid));
+      await ensureTaskPreview(k8s, spec);
     },
     podPhase: async (env) => {
       const pod = await k8s.get<PodObject>(Resources.Pod!, env.podName, env.namespace);
@@ -102,10 +52,11 @@ export function kubernetesTaskCluster(k8s: K8sClient, workerUid: number): TaskCl
       return { phase, ...(pod.status?.podIP ? { ip: pod.status.podIP } : {}), ...(message ? { message } : {}) };
     },
     deletePod: async (env) => {
-      await k8s.delete(Resources.Pod!, env.podName, env.namespace, { gracePeriodSeconds: 30 });
+      await removeTaskPod(k8s, env);
       if (env.preview) {
-        await k8s.delete(Resources.Service!, env.podName, env.namespace);
-        await k8s.delete(Resources.IngressRoute!, env.podName, env.namespace);
+        const routeName = env.rebuildId ? podNameFor(env.id) : env.podName;
+        await k8s.delete(Resources.Service!, routeName, env.namespace);
+        await k8s.delete(Resources.IngressRoute!, routeName, env.namespace);
       }
     },
     deleteVolume: async (env) => { await k8s.delete(Resources.PersistentVolumeClaim!, env.pvcName, env.namespace); },

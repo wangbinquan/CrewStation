@@ -12,6 +12,8 @@ export interface TaskPodSpec {
   env: TaskEnvironment;
   image: string;
   envVars: Record<string, string>;
+  /** 重建时持久化于专用 Secret，允许创建响应丢失后复用同一份环境。 */
+  envSecretName?: string;
   resources: { cpu: string; memory: string; storage: string };
   /** 模型凭据等只给 Agent 进程的变量文件所在 Secret；不存在则不挂。 */
   agentEnvSecretName?: string;

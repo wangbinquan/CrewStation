@@ -62,6 +62,7 @@ export function createEnvironmentUseCase(deps: TaskRuntimeUseCaseDeps) {
       ...(input.createdBy ? { createdBy: input.createdBy } : {}), createdAt: now, updatedAt: now, lastActivityAt: now,
     };
     await uow.run(async (scope) => {
+      await scope.admissions.lock(svc.projectId);
       if (input.kind === 'dev-session' && (await scope.environments.findDevSession(svc.projectId))) throw conflict('该项目已有一个开发会话在运行', { projectId: svc.projectId });
       if (!(await scope.admissions.tryAcquire(svc.projectId, limit))) throw quotaExceeded(`并发任务已达配额上限 ${limit}`, { projectId: svc.projectId, limit });
       await scope.environments.insert(env);

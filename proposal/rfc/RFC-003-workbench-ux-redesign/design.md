@@ -289,6 +289,8 @@ platform 的单项目服务解析改为 project 的公开定点读取，供摘�
 
 ### 4.7 原生 CLI 与工作树版本对比
 
+失败开发容器的保卷恢复按已选定 I14 (a) 实施，具体接口、原子准入、持久队列、UID 绑定及补偿见 [workspace-recovery.md](./workspace-recovery.md)。
+
 新增接口和协议详见 [development-workspace.md §5–6](./development-workspace.md#5-cli-启动恢复与失败契约)。CLI 启动不能直接复用现有 headless JSON argv；需补原生终端启动计划、幂等名册、detach／attach、显式结束与有界回放，以及逐轮执行／人工介入／完成状态。个人布局与动态未读契约另见专项设计 §2.2、§9。版本比较固定生产实际 SHA 和容器当前 HEAD，覆盖双方独有提交、工作树文件、未推送以及未知／过期状态。
 
 这两项是满足本轮用户需求的实现依赖，不可只做多窗口 CSS 或把远端 BranchDto 换个标题便标为完成。保留业务 Agent oneshot／interactive 契约和 RFC-001 的档位归属。

@@ -9,6 +9,8 @@ export interface TaskAccess {
   /** 开发会话的成员、业务任务所属服务的成员；管理员放行。 */
   canOpenStream(actor: Actor, taskId: TaskId): Promise<boolean>;
   /** 连接建立与断开的回调，task-runtime 据此维护环境状态与空闲计时。 */
-  onRunnerConnected(taskId: TaskId): Promise<void>;
-  onRunnerDisconnected(taskId: TaskId): Promise<void>;
+  onRunnerConnected(taskId: TaskId, token: string): Promise<boolean | void>;
+  onRunnerDisconnected(taskId: TaskId, token: string): Promise<void>;
+  /** 本地连接及注册表准备好之后才可派发任务；调用方不能等待 Runner 回执。 */
+  onRunnerReady?(taskId: TaskId): void;
 }

@@ -1,4 +1,4 @@
-import type { Actor, BranchDto, DevSessionDto, Manifest, OpenDevSessionRequest, PreviewState, ProjectId, TaskId, WorkspaceStatusDto } from '@crewstation/contracts';
+import type { Actor, BranchDto, DevSessionDto, Manifest, OpenDevSessionRequest, PreviewState, ProjectId, RebuildDevSessionRequest, TaskId, WorkspaceStatusDto } from '@crewstation/contracts';
 import { conflict, isPlatformError, notFound, precondition } from '@crewstation/kernel';
 import { inspectWorkspace } from './workspaceStatus';
 import type { DevSessionUseCaseDeps } from './dependencies';
@@ -12,6 +12,7 @@ export function sessionLifecycleUseCases(deps: DevSessionUseCaseDeps) {
     taskId: env.id, projectId: env.projectId, state: env.state === 'paused' ? 'running' : env.state, branch: env.branch ?? '', ...(env.podName ? { podName: env.podName } : {}),
     previewHost: `dev.${slug}.${settings.userDomain}`, preview, createdBy: (env as { createdBy?: DevSessionDto['createdBy'] }).createdBy ?? ('usr_00000000000000000000000000000000' as DevSessionDto['createdBy']),
     createdAt: env.createdAt, lastActivityAt: env.lastActivityAt, ...(reminderAt ? { idleReminderSentAt: reminderAt.toISOString() } : {}), ...(env.message ? { message: env.message } : {}),
+    rebuild: await environments.getRebuild(env.id),
   });
 
   const previewOf = async (env: EnvironmentView): Promise<PreviewState> => {
@@ -87,5 +88,19 @@ export function sessionLifecycleUseCases(deps: DevSessionUseCaseDeps) {
       return { session: await toDto(released, svc.slug, 'stopped'), unpushed, workspace };
     },
     touch: (taskId: TaskId) => environments.touch(taskId),
+  };
+}
+
+/** 与新建一样使用 develop 权限；固定任务、卷和套餐的校验由运行时原子执行。 */
+export function rebuildSessionUseCases({ authorizer, environments }: DevSessionUseCaseDeps) {
+  return {
+    inspectSessionRebuild: async (actor: Actor, projectId: ProjectId) => {
+      await authorizer.authorize(actor, projectId, 'develop');
+      return environments.inspectRebuild(projectId);
+    },
+    rebuildSession: async (actor: Actor, projectId: ProjectId, input: RebuildDevSessionRequest) => {
+      await authorizer.authorize(actor, projectId, 'develop');
+      return environments.requestRebuild(projectId, input);
+    },
   };
 }

@@ -7,6 +7,9 @@ import { canPause, occupiesQuota, transition } from '../domain/taskEnvironment';
 import { containerEnv } from './containerEnv';
 import { previewRouteOf, sourceOf } from './createEnvironment';
 import type { TaskRuntimeUseCaseDeps } from './dependencies';
+import { runnerLifecycle } from './runnerLifecycle';
+import { failEnvironment } from './failEnvironment';
+import { rebuildIsActive } from '../domain/environmentRebuild';
 
 export type ReleaseReason = 'user' | 'owner-force' | 'business' | 'failed' | 'pod-lost';
 
@@ -18,14 +21,22 @@ export function lifecycleUseCases(deps: TaskRuntimeUseCaseDeps) {
     if (!env) throw notFound('任务', taskId);
     return env;
   };
-  const save = (env: TaskEnvironment): Promise<void> => uow.run((scope) => scope.environments.update(env));
 
   const releaseEnvironment = async (taskId: TaskId, reason: ReleaseReason): Promise<TaskEnvironment> => {
-    const env = await load(taskId);
+    const original = await load(taskId);
+    const env = await uow.run(async (scope) => {
+      await scope.admissions.lock(original.projectId);
+      const current = (await scope.environments.getById(taskId))!;
+      if (current.state === 'released') return current;
+      const rebuild = current.rebuildId ? await scope.rebuilds.get(current.rebuildId) : undefined;
+      if (rebuild && rebuildIsActive(rebuild)) throw precondition('环境正在重建，请等待完成后再释放');
+      if (current.state === 'releasing') throw precondition('环境正在释放，请稍后查看');
+      await scope.environments.update(transition(current, 'releasing', clock.now(), { connected: false }));
+      return current;
+    });
     if (env.state === 'released') return env;
     const occupied = occupiesQuota(env.state);
     const releasing = transition(env, 'releasing', clock.now(), { connected: false });
-    await save(releasing);
     await cluster.deletePod(env);
     if (env.volumeMode === 'follow-container') await cluster.deleteVolume(env);
     const now = clock.now();
@@ -41,26 +52,14 @@ export function lifecycleUseCases(deps: TaskRuntimeUseCaseDeps) {
 
   return {
     releaseEnvironment,
-    onRunnerConnected: async (taskId: TaskId): Promise<void> => {
-      const env = await load(taskId);
-      const now = clock.now();
-      await save(env.state === 'creating' ? transition(env, 'running', now, { connected: true, lastActivityAt: now }) : { ...env, connected: true, lastActivityAt: now, updatedAt: now });
-    },
-    onRunnerDisconnected: async (taskId: TaskId): Promise<void> => {
-      const env = await uow.read.environments.getById(taskId);
-      if (env && env.connected) await save({ ...env, connected: false, updatedAt: clock.now() });
-    },
+    ...runnerLifecycle(deps),
+    markFailed: failEnvironment(deps),
     touch: async (taskId: TaskId): Promise<void> => {
-      const env = await load(taskId);
-      await save({ ...env, lastActivityAt: clock.now(), updatedAt: clock.now() });
-    },
-    markFailed: async (taskId: TaskId, message: string): Promise<void> => {
-      const env = await load(taskId);
-      if (env.state === 'released' || env.state === 'failed') return;
-      const failed = transition(env, 'failed', clock.now(), { message, connected: false });
+      const original = await load(taskId);
       await uow.run(async (scope) => {
-        await scope.environments.update(failed);
-        if (occupiesQuota(env.state)) await scope.admissions.release(env.projectId);
+        await scope.admissions.lock(original.projectId);
+        const env = (await scope.environments.getById(taskId))!;
+        if (env.state === 'running') await scope.environments.update({ ...env, lastActivityAt: clock.now(), updatedAt: clock.now() });
       });
     },
     pauseEnvironment: async (taskId: TaskId): Promise<TaskEnvironment> => {

@@ -35,6 +35,9 @@ beforeAll(async () => {
     apiCatalog: { listOperations: async () => [] },
     db: tdb.db,
     environments: {
+      getRebuild: async () => undefined,
+      inspectRebuild: async () => { throw new Error("恢复预检未设置"); },
+      requestRebuild: async () => { throw new Error("恢复请求未设置"); },
       createEnvironment: async (input) => { const env = { id: `tsk_${Bun.randomUUIDv7().replace(/-/g, '')}` as TaskId, projectId, serviceId: input.serviceId, state: 'running' as const, podName: 'task-x', connected: true, branch: input.branch, traceId: 'trace', createdAt: new Date().toISOString(), lastActivityAt: new Date('2026-09-11T00:00:00Z').toISOString(), createdBy: input.createdBy, preview: input.preview }; envs.set(env.id, env); return env; },
       releaseEnvironment: async (taskId) => { const env = envs.get(taskId)!; envs.delete(taskId); return { ...env, state: 'released' }; },
       getEnvironment: async (taskId) => envs.get(taskId),

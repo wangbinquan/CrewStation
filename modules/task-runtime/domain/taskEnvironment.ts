@@ -24,6 +24,7 @@ export interface TaskEnvironment {
   readonly labels: Record<string, string>;
   readonly createdBy?: UserId;
   readonly message?: string;
+  readonly rebuildId?: string;
   readonly createdAt: Date;
   readonly updatedAt: Date;
   readonly lastActivityAt: Date;

@@ -19,16 +19,17 @@ export function runnerHub(deps: SessionUseCaseDeps) {
     const hello = parsed.data;
     const auth = await deps.runnerAuth.verifyRunnerToken(hello.taskId, hello.runnerToken);
     if (!auth.ok) return { ok: false, code: 'unauthorized', message: auth.reason };
+    const resumeFromSeq = await deps.events.maxSeq(hello.taskId);
+    if (await deps.taskAccess.onRunnerConnected(hello.taskId, hello.runnerToken) === false) return { ok: false, code: 'unauthorized', message: '环境已变化，请由当前容器重新连接' };
     const previous = connections.get(hello.taskId);
     if (previous) previous.pending.failAll('TaskRunner 重新连接');
-    const resumeFromSeq = await deps.events.maxSeq(hello.taskId);
     const now = deps.clock.now();
     const connection = new RunnerConnection(hello, socket, resumeFromSeq, deps.settings.commandTimeoutMs, now.getTime());
     for (const sub of subscribers.get(hello.taskId) ?? []) connection.subscribers.add(sub);
     connections.set(hello.taskId, connection);
     await deps.registry.claim(hello.taskId, deps.settings.selfAddress, now);
     socket.send(JSON.stringify({ type: 'welcome', protocolVersion: TASKRUNNER_PROTOCOL_VERSION, resumeFromSeq, nativeActivityVersion: 1 }));
-    await deps.taskAccess.onRunnerConnected(hello.taskId);
+    deps.taskAccess.onRunnerReady?.(hello.taskId);
     connection.broadcast(JSON.stringify({ type: 'runnerReconnected' }));
     logger.info('runner connected', { taskId: hello.taskId, resumeFromSeq, drivers: hello.capabilities.drivers });
     return { ok: true, connection };
@@ -61,7 +62,7 @@ export function runnerHub(deps: SessionUseCaseDeps) {
     connection.pending.failAll('TaskRunner 连接已断开');
     connection.broadcast(JSON.stringify({ type: 'runnerDisconnected' }));
     await deps.registry.release(connection.hello.taskId, deps.settings.selfAddress);
-    await deps.taskAccess.onRunnerDisconnected(connection.hello.taskId);
+    await deps.taskAccess.onRunnerDisconnected(connection.hello.taskId, connection.hello.runnerToken);
     logger.info('runner disconnected', { taskId: connection.hello.taskId });
   };
 

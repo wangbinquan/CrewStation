@@ -20,7 +20,7 @@ import { nativeTerminalUseCases } from './application/nativeTerminals';
 import type { DevSessionUseCaseDeps } from './application/dependencies';
 import { idleReminderUseCase } from './application/idleReminder';
 import { publishFromSessionUseCase } from './application/publishFromSession';
-import { sessionLifecycleUseCases } from './application/sessionLifecycle';
+import { rebuildSessionUseCases, sessionLifecycleUseCases } from './application/sessionLifecycle';
 import { workspaceStatusUseCase } from './application/workspaceStatus';
 import { versionComparisonUseCases } from './application/versionComparison';
 import { apiInvocationUseCase } from './application/apiInvocation';
@@ -77,6 +77,7 @@ export function createDevSessionModule(deps: DevSessionModuleDeps): DevSessionMo
   const api: DevSessionModuleApi = {
     invokeApi: apiInvocationUseCase(useCaseDeps),
     name: 'dev-session', ...lifecycle, ...agents, ...native, ...activity, ...workspaceLayoutUseCases(useCaseDeps, drizzleWorkspaceLayouts(deps.db), terminals),
+    ...rebuildSessionUseCases(useCaseDeps),
     ...versionComparisonUseCases(useCaseDeps), workspaceStatus: workspaceStatusUseCase(useCaseDeps), publish: publishFromSessionUseCase(useCaseDeps), sendIdleReminders: remind,
     async listNativeTerminals(actor, taskId) {
       const pageQuery = activity.getAgentActivity(actor, taskId, { limit: 1 }).catch((error: unknown) => {

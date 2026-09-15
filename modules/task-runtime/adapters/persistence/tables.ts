@@ -21,6 +21,7 @@ export const environments = taskRuntimeSchema.table('environments', {
   labels: jsonDocument('labels').notNull(),
   createdBy: text('created_by'),
   message: text('message'),
+  rebuildId: text('rebuild_id'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
   lastActivityAt: timestamp('last_activity_at', { withTimezone: true }).notNull(),

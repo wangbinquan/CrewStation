@@ -5,11 +5,19 @@ import type { lifecycleUseCases } from './lifecycle';
 export function reconcileUseCase(deps: TaskRuntimeUseCaseDeps, lifecycle: ReturnType<typeof lifecycleUseCases>) {
   return async (): Promise<number> => {
     let changed = 0;
+    // 作业崩溃或补偿重试耗尽后仍有持久化意图：去重补投，不丢失恢复。
+    for (const record of await deps.uow.read.rebuilds.pending()) await deps.uow.read.rebuildQueue.enqueue(record.id);
     for (const env of await deps.uow.read.environments.listByStates(['creating', 'running'])) {
+      const rebuild = env.rebuildId ? await deps.uow.read.rebuilds.get(env.rebuildId) : undefined;
+      if (rebuild && ['queued', 'replacing'].includes(rebuild.state)) continue;
       const { phase, message } = await deps.cluster.podPhase(env);
+      if (rebuild?.state === 'starting' && env.state === 'creating' && deps.clock.now().getTime() - rebuild.updatedAt.getTime() >= 5 * 60_000) {
+        await lifecycle.markFailed(env.id, `新环境启动超过 5 分钟仍未连接，原工作卷保留；请检查套餐和容器镜像后重试${message ? `；${message}` : ''}`, env.podName, 'creating');
+        changed += 1; continue;
+      }
       if (phase === 'Failed' || phase === 'Succeeded' || phase === 'Missing') {
         const summary = phase === 'Missing' ? '容器不存在' : phase === 'Failed' ? '容器运行失败' : '容器已退出';
-        await lifecycle.markFailed(env.id, `${summary}${message ? `：${message}` : ''}`);
+        await lifecycle.markFailed(env.id, `${summary}${message ? `：${message}` : ''}`, env.podName);
         changed += 1;
       }
     }

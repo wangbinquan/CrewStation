@@ -43,3 +43,10 @@ test('缺少诊断信息时不编造 OOM 或退出码，Pod 消失仍为 Missing
   expect(k8s.deleted).toHaveLength(0);
   expect(await k8s.get(Resources.Pod!, env.podName, env.namespace)).toBeUndefined();
 });
+
+test('启动等待保留调度和镜像等待原因，恢复后不沿用旧等待状态', async () => {
+  const waiting = { name: 'task-qa', state: { waiting: { reason: 'ImagePullBackOff' } } };
+  expect(await phase({ phase: 'Pending', conditions: [{ type: 'PodScheduled', status: 'False', reason: 'Unschedulable', message: 'Insufficient cpu' }], containerStatuses: [waiting] }))
+    .toEqual({ phase: 'Pending', message: 'Insufficient cpu；task-qa：ImagePullBackOff' });
+  expect(await phase({ phase: 'Running', conditions: [{ type: 'PodScheduled', status: 'True' }] })).toEqual({ phase: 'Running' });
+});

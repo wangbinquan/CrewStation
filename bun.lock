@@ -480,6 +480,7 @@
         "@crewstation/module-egress": "workspace:*",
         "@crewstation/module-project": "workspace:*",
         "@crewstation/persistence": "workspace:*",
+        "@crewstation/queue": "workspace:*",
         "drizzle-orm": "0.45.2",
         "hono": "4.13.7",
         "zod": "4.6.2",

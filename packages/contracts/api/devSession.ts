@@ -4,6 +4,7 @@ import { AgentPermissionSchema } from '../manifest/tasks';
 import { PreviewStateSchema } from '../taskrunner/protocol';
 import { PublishRequestSchema } from './release';
 import { ApiInvocationInputSchema, ApiInvocationResultSchema } from '../taskrunner/apiInvocation';
+import { DevSessionRebuildDtoSchema } from './devSessionRecovery';
 
 export const ApiInvocationRequestSchema = ApiInvocationInputSchema.extend({ expectedTaskId: TaskIdSchema, operationKey: z.string().min(1).max(8192) }).strict();
 export const ApiInvocationResponseSchema = z.object({ taskId: TaskIdSchema, operationKey: z.string().min(1).max(8192), result: ApiInvocationResultSchema }).strict();
@@ -25,6 +26,7 @@ export const DevSessionDtoSchema = z.object({
   lastActivityAt: z.iso.datetime(),
   idleReminderSentAt: z.iso.datetime().optional(),
   message: z.string().optional(),
+  rebuild: DevSessionRebuildDtoSchema.optional(),
 });
 
 export const OpenDevSessionRequestSchema = z.object({ branch: z.string().min(1) });

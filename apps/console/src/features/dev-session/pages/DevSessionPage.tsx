@@ -8,6 +8,7 @@ import { PageHeader } from '../../../shared/ui/PageHeader';
 import { OpenSessionForm } from '../components/OpenSessionForm';
 import { PaneNotice } from '../components/PaneNotice';
 import { ReleaseOutcome } from '../components/ReleaseOutcome';
+import { RebuildSessionControl } from '../components/RebuildSessionControl';
 import { useBranches } from '../hooks/useBranches';
 import { useDevSession } from '../hooks/useDevSession';
 import { useProjectContext } from '../hooks/useProjectContext';
@@ -36,8 +37,9 @@ export function DevSessionPage(): ReactElement {
       {session.open.data?.message !== undefined ? <PaneNotice tone="warning">{session.open.data.message}</PaneNotice> : null}
       {session.session?.state === 'failed' ? <>
         <PaneNotice tone="warning">{t('devSession.failed.notice', { taskId: session.session.taskId })} {session.session.message} {t('devSession.failed.worktree')}</PaneNotice>
-        {context.canDevelop ? <OpenSessionForm branches={branches} open={session.open} previousTaskId={session.session.taskId} /> : null}
       </> : null}
+      {session.session && context.canDevelop && (session.session.state === 'failed' || session.session.rebuild) ? <RebuildSessionControl key={`rebuild-${session.session.taskId}`} projectId={projectId} session={session.session}
+        newSession={<OpenSessionForm branches={branches} open={session.open} previousTaskId={session.session.taskId} />} /> : null}
       {session.session === undefined || !context.userId ? null : (
         <DevSessionWorkbench
           key={session.session.taskId}

@@ -8,6 +8,8 @@ import type { Database, MigrationSet } from '@crewstation/persistence';
 import { readMigrationDir } from '@crewstation/persistence';
 import type { Hono } from 'hono';
 import { kubernetesTaskCluster } from './adapters/k8s/taskCluster';
+import { kubernetesTaskRecoveryCluster } from './adapters/k8s/taskRecoveryCluster';
+import { kubernetesRebuildProvisioner } from './adapters/k8s/rebuildProvisioner';
 import { drizzleUnitOfWork } from './adapters/persistence/drizzleUnitOfWork';
 import type { TaskRuntimeModuleApi } from './api/moduleApi';
 import { createEnvironmentUseCase } from './application/createEnvironment';
@@ -15,6 +17,8 @@ import type { TaskRuntimeUseCaseDeps } from './application/dependencies';
 import { lifecycleUseCases } from './application/lifecycle';
 import { environmentQueries, environmentToDto } from './application/queries';
 import { reconcileUseCase } from './application/reconcile';
+import { rebuildUseCases } from './application/requestRebuild';
+import { rebuildWorker } from './workers/rebuildWorker';
 import { environmentRoutes } from './http/environmentRoutes';
 import type { TaskCluster } from './ports/cluster';
 import type { EnvironmentSources, ProfileCatalog, ProjectAuthorizer, QuotaSource, ServiceResolver, SourceCheckoutSource, TaskRuntimeSettings } from './ports/platform';
@@ -67,8 +71,11 @@ export function createTaskRuntimeModule(deps: TaskRuntimeModuleDeps): TaskRuntim
   const lifecycle = lifecycleUseCases(useCaseDeps);
   const queries = environmentQueries(useCaseDeps);
   const reconcile = reconcileUseCase(useCaseDeps, lifecycle);
+  const recoveryDeps = { ...useCaseDeps, recoveryCluster: kubernetesTaskRecoveryCluster(deps.k8s), provisioner: kubernetesRebuildProvisioner(deps.k8s, deps.settings.workerUid) };
+  const rebuild = rebuildUseCases(recoveryDeps);
   const api: TaskRuntimeModuleApi = {
     name: 'task-runtime',
+    ...rebuild,
     createEnvironment: async (input) => environmentToDto(await create(input)),
     releaseEnvironment: async (taskId, reason) => environmentToDto(await lifecycle.releaseEnvironment(taskId, reason)),
     pauseEnvironment: async (taskId) => environmentToDto(await lifecycle.pauseEnvironment(taskId)),
@@ -92,7 +99,7 @@ export function createTaskRuntimeModule(deps: TaskRuntimeModuleDeps): TaskRuntim
   return {
     api,
     http: [environmentRoutes(api, deps.isAdmin)],
-    workers: [{ start: () => { timer ??= setInterval(() => void reconcile().catch((e: unknown) => useCaseDeps.logger.error('reconcile failed', { error: String(e) })), 15000); }, stop: async () => { if (timer) clearInterval(timer); timer = undefined; } }],
+    workers: [rebuildWorker(deps.db, recoveryDeps), { start: () => { timer ??= setInterval(() => void reconcile().catch((e: unknown) => useCaseDeps.logger.error('reconcile failed', { error: String(e) })), 15000); }, stop: async () => { if (timer) clearInterval(timer); timer = undefined; } }],
     migrations: taskRuntimeMigrations,
   };
 }
