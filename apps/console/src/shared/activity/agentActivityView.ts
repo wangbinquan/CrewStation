@@ -1,9 +1,9 @@
 import type { AgentActivityItem, AgentActivityPage, AgentActivityState, NativeTerminalDto } from '@crewstation/contracts';
 import type { ActivityTask } from './agentActivityStore';
 
-export type ActivityStatus = 'starting' | 'start-failed' | 'running' | 'waiting' | 'completed' | 'cancelled' | 'failed' | 'ended' | 'unknown' | 'idle' | 'unconfirmed';
+export type ActivityStatus = 'starting' | 'start-failed' | 'runtime-failed' | 'running' | 'waiting' | 'completed' | 'cancelled' | 'failed' | 'ended' | 'unknown' | 'idle' | 'unconfirmed';
 export interface ActivityTarget { projectId: string; taskId: string; agentId: string; terminalId: string; turnId: string | null; eventId: string; seq: number; navigationId?: string }
-export interface ActivityEntry { target: ActivityTarget; kind: AgentActivityItem['kind'] | 'process-failed'; at: string; unread: boolean; uncertain: boolean; requestKind?: 'question' | 'permission'; error?: string }
+export interface ActivityEntry { target: ActivityTarget; kind: AgentActivityItem['kind'] | 'process-failed'; at: string; unread: boolean; uncertain: boolean; requestKind?: 'question' | 'permission'; error?: string; runtimeFailure?: boolean }
 
 export function activityTargetFromSearch(projectId: string, search: Record<string, unknown>): ActivityTarget | undefined {
   if (![search.task, search.agent, search.terminal, search.event].every((value) => typeof value === 'string' && value.length > 0) || !Number.isSafeInteger(search.seq) || Number(search.seq) < 0) return undefined;
@@ -11,7 +11,7 @@ export function activityTargetFromSearch(projectId: string, search: Record<strin
 }
 
 export function activityStatus(terminal: NativeTerminalDto | undefined, state?: AgentActivityState, page?: Pick<AgentActivityPage, 'connection' | 'sync'>, stale = false): ActivityStatus {
-  if (terminal?.lifecycle === 'failed') return terminal.reason === 'environment-failed' ? 'failed' : 'start-failed';
+  if (terminal?.lifecycle === 'failed') return terminal.reason === 'environment-failed' ? 'runtime-failed' : 'start-failed';
   if (terminal?.lifecycle === 'ended' || state?.processEnded) return 'ended';
   if (terminal?.execution && terminal.lifecycle === 'starting' && ['queued', 'starting'].includes(terminal.execution.state)) return 'starting';
   const connection = state?.connection ?? page?.connection, sync = state?.sync ?? page?.sync;
@@ -27,7 +27,7 @@ export function taskEntries(task: ActivityTask): ActivityEntry[] {
   const uncertain = task.stale || page?.sync !== 'ready' || page.connection !== 'connected';
   const target = (agentId: string, terminalId: string, turnId: string | null, eventId: string, seq: number): ActivityTarget => ({ projectId: task.projectId, taskId: task.taskId, agentId, terminalId, turnId, eventId, seq });
   const pending: ActivityEntry[] = page?.states.flatMap((state) => state.processEnded ? [] : state.pending.map((request) => ({ target: target(state.agentId, state.terminalId, request.turnId, request.eventId, request.seq), kind: 'request-opened', at: request.openedAt, unread: request.unread ?? false, uncertain: task.stale || (state.connection ? state.connection !== 'connected' || state.sync !== 'ready' : uncertain) || state.source !== 'ready', requestKind: request.kind }))) ?? [];
-  const failures: ActivityEntry[] = task.terminals?.items.filter((terminal) => terminal.lifecycle === 'failed').map((terminal) => ({ target: target(terminal.agentId, terminal.terminalId, null, `failed:${terminal.agentId}:${terminal.revision}`, 0), kind: 'process-failed', at: terminal.endedAt ?? terminal.startedAt, unread: false, uncertain: false, error: terminal.error })) ?? [];
+  const failures: ActivityEntry[] = task.terminals?.items.filter((terminal) => terminal.lifecycle === 'failed').map((terminal) => ({ target: target(terminal.agentId, terminal.terminalId, null, `failed:${terminal.agentId}:${terminal.revision}`, 0), kind: 'process-failed', at: terminal.endedAt ?? terminal.startedAt, unread: false, uncertain: false, error: terminal.error, runtimeFailure: terminal.reason === 'environment-failed' })) ?? [];
   const results: ActivityEntry[] = (task.older ?? page)?.items.filter((item) => item.unread && item.turnId && item.kind.startsWith('turn-') && item.kind !== 'turn-started').map((item) => ({ target: target(item.agentId, item.terminalId, item.turnId, item.eventId, item.seq), kind: item.kind, at: item.occurredAt, unread: item.unread, uncertain: task.stale })) ?? [];
   return [...pending, ...failures, ...results.reverse()];
 }

@@ -24,7 +24,8 @@ export function VersionComparisonPanel({ projectId, taskId, channel, canDevelop,
   const data = query.data;
   if (compact) return <section className={styles.strip} aria-label={t('devSession.compare.title')}>
     {data ? <ComparisonSummary comparison={data} compact /> : <QueryStatus isPending={query.isPending} error={query.error} />}
-    {data && (query.isError || query.isFetching || data.freshness === 'stale') ? <span title={date(data.checkedAt)}>{t('devSession.compare.staleHint')}</span> : null}
+    <Button variant="ghost" disabled={query.isFetching || history.isPending} onClick={() => void query.refetch()}>{t(query.isFetching ? 'devSession.compare.refreshing' : 'devSession.workspace.recheck')}</Button>
+    {data && (query.isError || data.freshness === 'stale') ? <span title={`${date(data.checkedAt)} · ${t('devSession.compare.staleHint')}`}>{t('devSession.compare.staleShort')}</span> : null}
   </section>;
   return <Card compact className={styles.panel} title={t(target === 'preview' ? 'devSession.compare.previewTitle' : 'devSession.compare.title')} extra={<>
     {onTargetChange ? <select aria-label={t('devSession.compare.target')} value={target} disabled={history.isPending} onChange={(e) => onTargetChange(e.target.value as ComparisonTarget)}>

@@ -56,6 +56,18 @@ test('管理接入容器的动态离开项目后仍保留，前往处理回到�
   expect(f.calls.some((url) => url.endsWith('/read'))).toBe(false);
 });
 
+test('运行中容器 OOM 在后台提示运行失败，保留原窗口定位且不冒充模型轮次或启动失败', async () => {
+  const f = await fixture();
+  Object.assign(f.terminal, { lifecycle: 'failed', reason: 'environment-failed', endedAt: activityTime, error: 'OOMKilled，退出码 137' });
+  f.page.states[0]!.processEnded = true; f.page.states[0]!.pending = []; f.page.states[0]!.currentTurn = null;
+  await rendered!.click('Agent 动态待处理 1'); await rendered!.click('刷新');
+  expect(rendered!.text()).toContain('CLI 运行失败'); expect(rendered!.text()).toContain('OOMKilled，退出码 137');
+  expect(rendered!.text()).not.toContain('CLI 启动失败'); expect(rendered!.text()).not.toContain('本轮失败');
+  await rendered!.click('前往处理');
+  expect(f.router.state.location.search).toMatchObject({ task: activityTaskId, agent: f.terminal.agentId, terminal: f.terminal.terminalId, seq: 0 });
+  expect(f.router.state.location.search.turn).toBeUndefined();
+});
+
 test('较早未读使用独立向前游标，不把历史结果当作当前轮次', async () => {
   const f = await fixture();
   f.page.previousCursor = 20; f.page.unread = [{ agentId: f.terminal.agentId, completions: 2, issues: 0 }];

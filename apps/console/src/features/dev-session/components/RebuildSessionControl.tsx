@@ -25,6 +25,8 @@ export function RebuildSessionControl({ projectId, session, newSession }: { proj
     wasOpen.current = Boolean(recovery.inspection);
   }, [recovery.inspection, startId]);
   const receipt = session.rebuild?.requestId === recovery.submitted?.requestId ? session.rebuild : recovery.submit.data ?? session.rebuild;
+  // 恢复成功后的状态留在工作区工具栏，避免长期占据一整行通知。
+  if (session.state === 'running' && receipt?.state === 'ready') return null;
   if (session.state !== 'failed' || (receipt && receipt.requestId === recovery.submitted?.requestId && receipt.state !== 'failed')) {
     return receipt ? <PaneNotice tone={receipt.state === 'failed' ? 'warning' : 'info'}>{t(`devSession.rebuild.${receipt.state}`)} · {receipt.message}</PaneNotice> : null;
   }

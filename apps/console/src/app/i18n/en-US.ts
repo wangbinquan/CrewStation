@@ -88,6 +88,7 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   'activity.status.cancelled': "Turn cancelled",
   'activity.status.failed': "Failed",
   'activity.status.start-failed': "Failed to start",
+  'activity.status.runtime-failed': "CLI runtime failed",
   'activity.status.ended': "Process ended",
   'activity.status.unknown': "Turn status unconfirmed",
   'activity.status.idle': "Ready for a task",

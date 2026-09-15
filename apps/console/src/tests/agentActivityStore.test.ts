@@ -43,7 +43,7 @@ test('父工作区断线不掩盖独立 CLI 的运行和等待；单窗断线只
   await f.register(); expect(taskEntries(f.store.getSnapshot().tasks[0]!)[0]?.uncertain).toBe(false);
   state.connection = 'unknown'; expect(activityStatus(f.terminal, state, f.page)).toBe('unknown');
   expect(activityStatus({ ...f.terminal, lifecycle: 'starting', connection: 'disconnected', execution: { taskId: f.terminal.taskId, state: 'queued' } }, undefined, f.page)).toBe('starting');
-  expect(activityStatus({ ...f.terminal, lifecycle: 'failed', reason: 'environment-failed' }, state, f.page)).toBe('failed');
+  expect(activityStatus({ ...f.terminal, lifecycle: 'failed', reason: 'environment-failed' }, state, f.page)).toBe('runtime-failed');
 });
 
 test('请求合并、失败保留上次记录并降级，查看资格撤销时立即移除该任务', async () => {

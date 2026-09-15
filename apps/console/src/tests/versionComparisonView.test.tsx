@@ -156,6 +156,21 @@ test.each([false, true])('工作树故障传到提交和文件比较时只解释
   expect(page.text()).not.toContain('未提交文件 0'); expect(page.text()).not.toContain('待上线 0');
 });
 
+test('顶部比较条保留未知状态和可展开原因，能直接重试读取且不触发补历史', async () => {
+  const data = comparison(), reason = '开发容器正在重连';
+  data.workspace = { status: 'unavailable', reason, checkedAt: data.checkedAt };
+  data.commits = { status: 'unavailable', reason }; data.files = { status: 'unavailable', reason };
+  const page = await render(data, true, 'prod', undefined, true);
+  expect(page.text()).toContain('暂不可比较'); expect(page.text()).toContain('v0.1.0');
+  const details = page.host.querySelector('details')!;
+  expect(details.open).toBe(false); expect(details.textContent).toContain(reason);
+  await act(async () => details.querySelector('summary')!.click()); expect(details.open).toBe(true);
+  const previous = requests.length;
+  Object.assign(data, comparison()); await page.click('重新检查');
+  expect(requests.length).toBe(previous + 1); expect(requests.every((request) => request.startsWith('GET'))).toBe(true);
+  expect(page.text()).toContain('提交一致'); expect(page.text()).not.toContain(reason);
+});
+
 test('比较摘要仍保留不同失败原因，去重不隐藏独立问题', async () => {
   const data = comparison();
   data.workspace = { status: 'unavailable', reason: '工作树读取失败', checkedAt: data.checkedAt };

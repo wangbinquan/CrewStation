@@ -136,6 +136,8 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   'devSession.compare.collapse': 'Collapse differences',
   'devSession.compare.refreshing': 'Updating…',
   'devSession.compare.staleHint': 'Previous results may be stale. Check again for current differences.',
+  'devSession.compare.staleShort': 'Refresh needed',
+  'devSession.compare.reasonDetails': 'Show reasons',
   'devSession.compare.history': 'Fetch history and compare',
   'devSession.compare.historyPending': 'Fetching history…',
   'devSession.compare.historyHint': 'Requires developer access. Only Git objects and comparison refs are fetched; your branch, index and files stay in place.',

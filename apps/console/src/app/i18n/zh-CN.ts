@@ -88,6 +88,7 @@ export const messages = {
   'activity.status.cancelled': "本轮已中断",
   'activity.status.failed': "本轮失败",
   'activity.status.start-failed': "启动失败",
+  'activity.status.runtime-failed': "CLI 运行失败",
   'activity.status.ended': "进程已结束",
   'activity.status.unknown': "轮次状态未确认",
   'activity.status.idle': "等待任务",

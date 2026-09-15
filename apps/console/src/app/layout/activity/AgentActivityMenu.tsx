@@ -74,7 +74,7 @@ function ActivityEntryRow({ entry, space, onNavigate }: { readonly entry: Activi
   const t = useT(), dateText = useDateText(), navigate = useNavigate();
   const { target } = entry;
   return <div className={styles.entry} data-urgent={entry.kind === 'request-opened' || entry.kind === 'process-failed'}>
-    <div><strong>CLI {target.agentId.slice(-6)}</strong><span>{t(entry.requestKind ? `activity.request.${entry.requestKind}` : `activity.event.${entry.kind}`)}</span>{entry.unread ? <b className={styles.dot} aria-label={t('activity.unread')}>●</b> : null}<time dateTime={entry.at}>{dateText(entry.at)}</time></div>
+    <div><strong>CLI {target.agentId.slice(-6)}</strong><span>{t(entry.runtimeFailure ? 'activity.status.runtime-failed' : entry.requestKind ? `activity.request.${entry.requestKind}` : `activity.event.${entry.kind}`)}</span>{entry.unread ? <b className={styles.dot} aria-label={t('activity.unread')}>●</b> : null}<time dateTime={entry.at}>{dateText(entry.at)}</time></div>
     {entry.uncertain ? <small className={styles.warning}>{t('activity.lastKnown')}</small> : null}
     {entry.error ? <small>{entry.error}</small> : null}
     <Button onClick={() => { void navigate({ to: PROJECT_PATHS[space].development, params: { projectId: target.projectId }, search: { task: target.taskId, agent: target.agentId, terminal: target.terminalId, ...(target.turnId ? { turn: target.turnId } : {}), event: target.eventId, seq: target.seq, focus: crypto.randomUUID() } }); onNavigate(); }}>{t(entry.kind === 'request-opened' || entry.kind === 'process-failed' ? 'activity.handle' : 'activity.result')}</Button>

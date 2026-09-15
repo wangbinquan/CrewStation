@@ -134,6 +134,8 @@ export const messages = {
   'devSession.compare.collapse': '收起差异',
   'devSession.compare.refreshing': '更新中…',
   'devSession.compare.staleHint': '旧结果可能已过期，请重新检查后查看当前差异。',
+  'devSession.compare.staleShort': '结果待刷新',
+  'devSession.compare.reasonDetails': '查看原因',
   'devSession.compare.history': '补齐历史并重算',
   'devSession.compare.historyPending': '正在补齐历史…',
   'devSession.compare.historyHint': '补齐历史需要开发权限，只下载 Git 对象到比较引用，保留当前分支、暂存区和文件。',

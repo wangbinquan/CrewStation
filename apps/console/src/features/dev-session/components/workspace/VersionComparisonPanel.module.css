@@ -1,8 +1,13 @@
 .panel { margin-bottom: var(--cs-space-2); }
-.summary { display: flex; flex-wrap: wrap; gap: var(--cs-space-1) var(--cs-space-3); align-items: center; min-width: 0; }
+.summary { display: flex; flex-wrap: wrap; gap: var(--cs-space-1) var(--cs-space-3); align-items: center; min-width: 0; position: relative; }
 .summary > span { overflow-wrap: anywhere; }
 .meta { color: var(--cs-color-text-muted); font-size: var(--cs-font-size-sm); margin: var(--cs-space-1) 0; }
 .patch { max-height: 340px; overflow: auto; font: var(--cs-font-size-sm)/1.6 var(--cs-font-mono); padding: var(--cs-space-2); background: var(--cs-color-surface-muted); border: 1px solid var(--cs-color-border); }
 .actions { display: flex; gap: var(--cs-space-2); margin-top: var(--cs-space-2); }
 .filePath { max-width: 100%; white-space: normal; overflow-wrap: anywhere; text-align: left; }
 .strip { display: flex; flex-wrap: wrap; gap: 6px; padding: 4px 0; font-size: 12px; border-bottom: 1px solid var(--cs-color-border); margin-bottom: 4px; }
+.strip > .summary { flex: 1; }
+.strip > button { padding: 2px 6px; min-height: 24px; font-size: 12px; }
+.reasons > summary { cursor: pointer; color: var(--cs-tone-warning-fg); }
+.reasons > summary:focus-visible { outline: 2px solid var(--cs-color-primary); }
+.reasons > div { position: absolute; z-index: 8; left: 0; right: 0; top: 100%; padding: 6px; background: var(--cs-color-surface); border: 1px solid var(--cs-color-border); border-radius: var(--cs-radius-sm); box-shadow: var(--cs-shadow-sm); }

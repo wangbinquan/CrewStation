@@ -26,6 +26,7 @@ export function ComparisonSummary({ comparison, compact = false }: { readonly co
       <span>{workspace.unpushed.status === 'ready' ? t('devSession.workspace.unpushed', { count: workspace.unpushed.count }) : t('devSession.compare.upstreamUnknown')}</span>
       {!compact ? <span>{workspace.upstream.status === 'ready' ? t('devSession.compare.upstream', { name: workspace.upstream.name, ahead: workspace.upstream.ahead, behind: workspace.upstream.behind }) : t(`devSession.compare.upstream.${workspace.upstream.status}`)}</span> : null}
     </> : null}
-    {[...warnings].map((reason) => <PaneNotice key={reason} tone="warning">{reason}</PaneNotice>)}
+    {compact && warnings.size ? <details className={styles.reasons}><summary>{t('devSession.compare.reasonDetails')}</summary><div>{[...warnings].map((reason) => <PaneNotice key={reason} tone="warning">{reason}</PaneNotice>)}</div></details>
+      : [...warnings].map((reason) => <PaneNotice key={reason} tone="warning">{reason}</PaneNotice>)}
   </div>;
 }

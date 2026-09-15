@@ -1874,3 +1874,28 @@ I15 按已经选定的独立 Pod 方案继续实现，契约见 [cli-isolation.m
 新增 17 条用例覆盖管理员资源绑定、独立派发、回执丢失、停止／创建竞争、父断线、OOM、末屏期限／持久化、跨实例串行、相同来源序号、历史迁移及真实 React 多窗连接。首轮后端定向 35 pass；新增持久化组首次 4 pass／1 fail，检出末屏状态被双重 JSON 编码，改用 to_jsonb(text) 后专项 16 pass（含关联 UI）；双窗 DOM 初检因 about:blank 不能解析 WS 相对地址失败，显式设置测试页面地址后 3 pass，未改生产 URL 逻辑。
 
 唯一完整候选门禁于 13:15:22Z 通过：**1274 pass／4 skip／0 fail**，1278 tests／214 files／7076 assertions，测试 115.59s、命令 137.38s；console **644ms**。52 份源码候选保持，日志和摘要位于 /private/tmp/crewstation-rfc003-batch77-*。本批尚未部署或操作旧 CLI；真实四窗／OOM 与后续旅程继续，**累计仍 27／52**。RFC-004 仍未开工。
+
+
+## 第七十八批：独立四窗实跑、OOM 隔离与紧凑工作台
+
+第七十七批已推送 4b9bf0001b8ff08d2f9ed79b354b617a69b93e5f，精确 SHA [CI 34974881386](https://github.com/wangbinquan/CrewStation/actions/runs/34974881386) 于 13:28:24Z 成功。13:31:30Z 三项迁移完成，13:33:44–55Z session／controller／API／console 顺序滚动成功，generation 分别 17／26／42／51；各控制面 1050 份文件和 console 七份摘要均匹配。新任务镜像 cs-task-runtime:rfc003-b77-4b9bf00。原五个任务 Pod UID、phase 和重启数保持。
+
+为本机四窗调度，将四个专用 QA 业务应用的 CPU requests 从 500m 调为 50m、limits 保留 500m，释放 1800m 预约；版本、内存、流量选择及原滚动策略保持。正常管理员 API 新增 rfc003-cli-isolated（400m／2Gi／2Gi），workbench 并发上限 3→5；实际管理页面把 rfc003-verify-opencode 绑定该套餐。没有提前引入 RFC-004 配置 Hook。
+
+### 真实并行与故障
+
+在 workbench 原会话中新建“工作区 4”，空页签没有启动进程；逐次点击四次“＋ CLI”生成四个独立执行 Pod，每个使用同一原 PVC、独立 Runner／PTY、400m／2Gi。agent 后缀 e5c49a、5ef526、73df52、22ba53，完整身份见 /private/tmp/crewstation-rfc003-batch77-four-cli.json。原 CLI a7130d 与其他页签保持。
+
+A 实际 Big Pickle 轮次 13:44:03.826–13:45:06.656Z，B 为 13:44:25.667–13:44:40.073Z，重叠 14.406 秒；真实 TUI 分别返回 RFC003_ISOLATED_A_0915 和 RFC003_ISOLATED_B_0915。A 首次模型连接重试后正常完成，首次 MCP 状态曾报告 FileSystem 错误，不能据此声称实际 MCP 调用通过。C 在 13:48:11.973–13:48:26.576Z 完成 RFC003_BG_0915，用户视图留在独立预览，全局未读 6→7、该页签未读 2→3，没有跳回 CLI。
+
+D 没有模型轮次或未发送草稿。对其精确 Pod UID 00b6206a-895b-4593-bf06-d5727ff043d8 注入受限内存故障，内核于 13:49:23Z 记录 OOMKilled／137；13:49:31.973Z 平台标记 environment-failed，随后 Pod 删除、额度 5→4。其余三窗同一 agent／PTY／Runner／startedAt 继续连接，父环境与原卷保持；前往处理定位原 D，未自动重跑，末屏明确不可用。14:12:05Z 再核对原五个任务及七份业务／Git 摘要不变，记录见 batch78-protected-after-oom.json。
+
+### 实机修复与当前界限
+
+原失败窗把运行期 OOM 写成“本轮失败”，全局入口写成“CLI 启动失败”；现按 environment-failed 显示“CLI 运行失败”，模型轮次失败和启动失败保持各自语义。恢复成功提示改为工具栏摘要、完整说明在 title；紧凑版本比较将原因放进可展开区域，保留直接重新检查；长档位名单行省略。实际更新后页面已显示新文案和工具栏恢复状态。
+
+新增三项回归覆盖运行期故障精确定位、比较错误展开及只读重新检查、恢复成功摘要且不自动开 CLI；定向 35 pass／0 fail／165 assertions。完整门禁 14:07:21Z **1277 pass／4 skip／0 fail**（1281 tests／214 files／7094 assertions，测试 127.03s、命令 150.62s），console build **531ms**；16 份源码候选保持。仅更新 console 为 cs-console:rfc003-b78-d5774d13901f，generation=53，Pod console-77b8867474-5s4p2／89741741-1817-475f-82bc-bcfdd3ea8f4f；imageID sha256:862a7baaea3294c13b85ed5f39dca5dfd38b60238caf0a22121581eb3f513c5a，七份实际文件一致。
+
+旧界面在 1280×720 首窗距顶约 277px，存在密度缺陷；新版四窗的最终量测继续，不提前关闭 UX-AT-35。工作树原 100m CPU 下指纹检查因 97,231,220 bytes 的 .npm 缓存耗时 18.657 秒；Git 状态本身约 1.15 秒。另有普通 API 50 秒超时，14:13Z 读 session.connections 发现 selfAddress 含 Kubernetes 注入的 tcp://ServiceIP:8083，待修正地址解析并验证，不能仅归因 CPU。上述缓存内容未读取或删除，.claude.json 内容未读取。
+
+累计保持 **27／52**，独立环境实跑不能替代新增失败幂等、四窗密度及其余完整条件。RFC-003 In Progress，RFC-004 继续等待。候选、门禁、镜像、迁移、逐窗活动及故障原始证据均在 /private/tmp/crewstation-rfc003-batch77-* 和 batch78-*；本批精确提交 SHA 与托管 CI 另核对。

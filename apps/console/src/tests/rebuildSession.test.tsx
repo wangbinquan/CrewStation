@@ -79,3 +79,13 @@ test('已受理恢复随后失败时直接重新检查，不锁在未知回执�
   expect(document.querySelector<HTMLSelectElement>('select[aria-label="环境资源套餐"]')?.disabled).toBe(false);
   await page.click('确认保留工作树重建'); expect(sent[1]?.requestId).not.toBe(sent[0]?.requestId);
 });
+
+test('恢复完成仅在工作区工具栏显示成功，详情仍保留说明且不重复启动 CLI', async () => {
+  const { f } = setup(); f.sessionState.state = 'running';
+  f.sessionState.message = '原工作树已恢复；需要的 CLI 请逐个手动启动';
+  f.sessionState.rebuild = { requestId: crypto.randomUUID(), taskId: TaskIdSchema.parse(activityTaskId), profile: { name: 'medium', cpu: '1', memory: '2Gi', storage: '10Gi' }, state: 'ready', createdAt: activityTime, updatedAt: activityTime, message: f.sessionState.message };
+  page = await renderApp(`/projects/${activityProjectId}/dev-session`);
+  const result = [...document.querySelectorAll('span')].find((node) => node.textContent === '原工作树已恢复');
+  expect(result?.closest('header')).not.toBeNull(); expect(result?.title).toContain('需要的 CLI 请逐个手动启动');
+  expect(f.commands.some((command) => ['startAgentTerminal', 'closeTerminal', 'stopAgent'].includes(command.type))).toBe(false);
+});
