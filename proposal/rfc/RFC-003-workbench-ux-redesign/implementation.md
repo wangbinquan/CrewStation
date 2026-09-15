@@ -1967,3 +1967,21 @@ workbench 由真实 rfc003-owner（usr_01a09f273a777000b0e97645b212380e）先切
 IAB tab 26 实看当前操作已可调、两条申请的理由／拒绝与批准意见；代理筛选可操作，一次会话重新绑定按钮成功，其余试调点击未成功派发，不能据此关闭 UX-AT-15。临时视口已 reset。重建控制连接后 `cua.getState()` 明确返回 Mac 锁定、自动解锁失败，浏览器连接 `nodeRepl.fetch request failed`；已请用户手动解锁并恢复连接，没有绕过锁屏。原 tab 16／17 的 CLI 草稿未发送／清除，原任务保留；恢复连接后续接完整交互。
 
 16:19:30Z 原五任务、四个 CLI UID／Running／restart 0／400m CPU 及七份受保护文件摘要保持。本批对 UX-AT-11／12／31／38 增补真实服务端和运行证据，完整页面条件仍待补齐，**累计仍 28／52**。RFC-004 按明确顺序等待 RFC-003 完结。本批纯证据文档复用第八十批不变的源码门禁，发布后另核对精确 SHA CI。
+
+## 第八十二批：破坏性迁移与生产版本差距
+
+第八十一批已发布 2b26eff50e00f26759d4ec5c260af4955f09a49c，[CI 34994499199](https://github.com/wangbinquan/CrewStation/actions/runs/34994499199) 成功。本批开工 fetch 后 main／origin/main 0／0、共享树与索引干净。平台源码及依赖保持第八十批有效候选，继续补已批准的实际运行验收。
+
+delivery QA 项目 prj_01a09f2abfbc7000be464c171bcb8f3c／服务 svc_01a09f2abfbc7001aa24e44fbdc610e9 原正式槽为空、预览 v0.1.1 就绪。GitLab 108／crewstation/rfc003-verify-delivery 的 main 为 ea10bd3ab67501b301ec87d6bc85eaa215fdfa8e；只读 SQL 确认生产数据库 cs_rfc003_verify_delivery 中验收表尚不存在。通过正常 GitLab Commits API 精确更新 crewstation.yaml 并新增 migrations/rfc003_b82_empty_probe.ts，提交 cb58ea979235b68b9160f46a5650aebdeb46a9f5，父提交准确且带 Codex co-author；没有修改原开发工作树。
+
+迁移脚本先验证数据库、专属表注释与零行条件，在事务内创建 rfc003_migration_probe_0916_b82 的 id／obsolete 两列并仅删除 obsolete；重复运行只接受同一专属零行表、id 单列的已完成状态。Manifest 明确 compatibility=destructive、destructive=true、rollback=switch-back，便于区分破坏性迁移与显式配置禁止回退。Bun 编译检查通过，随后实际发布 Job 执行了该脚本；没有操作应用表或数据行。
+
+本机节点原 CPU requests 为 10／10 核，正常 API 检查八个项目没有进行中的发布。临时将四个闲置 CLI requests／limits 400m→150m，按 UID／容器身份核对后原地调整；专用旧 green 槽预约 50m→25m，新增管理员套餐 rfc003-delivery-qa 为 25m／512Mi／最多 1 副本，两个 QA 业务槽最终仍共用原先 50m 预约。旧 green 限额 500m 和全部其他套餐保持；新 blue 的 requests／limits 均为套餐 25m。这只是专用验收部署调优，不声明为动态套餐产品能力。
+
+16:44:28Z 先以 tsw_01a0a5f4a4217000ab07278d5adc1217 将原 v0.1.1 上线，建立待命回退目标。临时给本机 cs-controller 设置 CS_MAINTENANCE_WINDOW=true 并顺序滚动，16:44:34Z 正常发布返回 202／rel_01a0a5f4bd34700086684156f43c0f3b／v0.1.2／上述 cb58ea9。构建 build-4156f43c0f3b 成功后，迁移 migrate-4156f43c0f3b（UID 1eb11c7f-8620-4fc3-93c7-592376320f9b）于 16:44:49Z Complete；真实日志给出 beforeColumns=[id,obsolete]、afterColumns=[id]、rows=0，16:44:56Z 发布 ready。finally 恢复 controller 原 spec 和四 CLI 400m；controller generation=34、镜像仍 cs-control-plane:rfc003-b80-415023304a60，原 UID 保持，恢复后 1／1。
+
+16:46:15Z 通过正常切流 tsw_01a0a5f647247000a98ddde121d8c3b7 将 v0.1.2 上线，v0.1.1 留在待命槽。带双 releaseId 请求回退，返回 **412／当前版本 v0.1.2 含破坏性迁移，不能切回旧版本 v0.1.1**；16:47:06Z 最终核对拒绝前后两槽和切流历史完全相同，历史仍两条，两地址 /healthz 均为 HTTP 200／status=ok。第一次验收脚本在此之后误断言健康响应的 ok 属性，按既有样例契约修正为 status=ok，保留初始错误证据，未重复发布或切流、未改产品。空表、正式 v0.1.2 和旧待命 v0.1.1 保留供后续浏览器拒绝旅程。
+
+16:48:14Z 原五任务、四个 CLI UID／Running／restart 0 和七份文件摘要保持，节点 CPU requests 仍为 10 核。delivery 当前工作树仍为 ea10bd3／main、十项未跟踪缓存、未推送 0。生产目标刚变更时容器缺 cb58ea9 对象，比较如实不可用；16:49:02Z 经正常 refresh-history 接口补齐，返回 behind／ahead=0／behind=1，文件差异 12 项（含原十项缓存），本地 HEAD、原未提交路径和未推送数保持。没有把 fetch 目标对象等同于更新本地文件或 origin/main 引用。
+
+证据位于 /private/tmp/crewstation-rfc003-batch82- 的 delivery-source-before／delivery-commit／migration-journey／destructive-rollback-initial／destructive-rollback-final／runtime-final／comparison-refresh／final-preserved 等文件。CUA 再次 getState 超时并重置内核，手动解锁及恢复连接的询问仍待答复；未向 tab 16／17 原 CLI 草稿发送输入。**完整界面累计仍 28／52，RFC-003 保持 In Progress；RFC-004 按约定等待。** 本批只提交三份证据文档，复用不变生产候选的本地门禁，托管 CI 按最终提交另核对。
