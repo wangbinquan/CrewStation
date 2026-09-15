@@ -1524,3 +1524,58 @@ API ebaa730／generation=32、controller cc93104／21 均 1／1，任务运行�
 04:38:05Z 原三个健康任务及失败任务 UID／容器状态／restartCount、四份原文件及 Git 配置摘要、失败 Bound 工作卷 UID 均保持；各预览／正式槽的 UID、generation、releaseId、1／1 与批前相同。API ebaa730／generation=32、controller cc93104／21 均 1／1；节点 Ready=True、MemoryPressure／DiskPressure=False，剩余 1,785,839,616 bytes。本批仅更新 console，未清理数据或调零其他副本。
 
 临时证据为 batch67 的 language-red、scroll-red、final-targeted、initial／scroll-only／最终 check 和 build、source-candidate、image-context／built／budget／import、deploy-before／console-rollout、http-assets、qa-before／after／comparison、layout-before／after、browser-final、final-runtime。源码与三份文档精确提交，最终 SHA 托管 CI 单独核对。**累计仍 22／52 通过、30 项待完成**；创建接入／开通页面、长标签阅读及完整键盘／实际系统主题等余项继续，角色及故障恢复不由这些尺寸证据替代。I9／I14／I15 与具体成员范围待答复，RFC-004 等待 RFC-003 完结。
+
+## 第六十八批：长页签与响应式验收收口
+
+批前 main／origin/main 同为 `d2ba2138186b21fe3b0933b475cdb1a2e0fb2de2`，树和索引为空。该 SHA 的 [CI 34929989314](https://github.com/wangbinquan/CrewStation/actions/runs/34929989314) 于 04:46:44Z 成功：1173 pass／8 skip／0 fail，1181 tests／197 files／6499 assertions／65.26s，console build 1.24s。本批继续既有 admin 与专用 QA 的正常界面验收。
+
+### 长页签的实际缺陷和修复
+
+历史 L-04060d 页签在 320px 的边界为 [29, 357.43]，标签条为 [17, 303]，内侧可用宽度 262px。按右键确实可以横向移动，scrollLeft 0→52，但左侧变为 -23px，名称开头与“等待输入”不能同时显示；没有把这项缺陷描述为完全不能滚动。英文原生工作区标签“工作区 1 · 1 · 1 unread results”宽 183.60px，标签条仅 169.19px，最后的 results 被截去。
+
+[Tabs.module.css](../../../apps/console/src/shared/ui/Tabs.module.css) 限制单个标签不超过标签条，并允许内部换行；[AgentRoster.module.css](../../../apps/console/src/features/dev-session/components/agents/AgentRoster.module.css) 同样约束历史标签，允许名称和状态排列成两行，长算力名可断行。没有改变标签选择、会话、状态或横向浏览逻辑。
+
+最终脚本 index-CbQU6d-3.js 下，两组长标签分别实测 1280／1024／768／390／320×720，整页宽度均等于视口。历史 320px 页签完整落在 [29, 291]，高 56.39px；其余四种尺寸仍高 29.20px、宽 328.43px。英文原生 320px 页签完整落在 [8, 177.19]，高 41.59px，宽屏仍高 28px。截图确认名称与状态同时可读，没有用仅有 aria 文本冒充视觉阅读。
+
+真实键盘 End 转到“Changes”时标签条 scrollLeft=184、选中项 [111.47, 177.20]；Home 回到原工作区时 scrollLeft=0、选中项 [8, 177.19]，均有蓝色 2px 焦点框。历史页签方向键焦点同样可见。开发资源、诊断、管理员能力接入三类共享标签调用方重新完成五尺寸检查，普通短标签的阅读尺寸保持。
+
+### 创建、确认和错误路径
+
+两类接入创建在初始页直接显示名称／slug／负责人限制。空提交产生三个关联字段错误并聚焦名称；资源页缺少模板／套餐和并发值 101 时三个错误均可见并聚焦模板。一次工具 fill 空字符串未清掉受控数字框，实际仍停在 101 的错误步骤，该记录保留为错误状态；使用全选、Backspace 后值确认为空，才进入真正的确认页，没有将工具未清空视为产品故障。
+
+临时名称为 78 字，slug 为 rfc003-layout-only-20260915；选择已有 admin、reference-api-proxy／standard-small 后，确认页完整显示长名称、平台默认并发及所需 GITLAB_TOKEN 键名。返回改成 EventProducer 时旧模板清空；选 gitlab-event-producer 后确认页显示相应 GITLAB_WEBHOOK_SECRET_TOKEN 键名。未读取或填写密钥值，未点击创建。离开保护默认聚焦“继续编辑”，明确放弃后重新打开表单，名称／slug／负责人均为空。05:05:01Z 普通项目 API 确认仍为 7 项（5 DigitalWorker、1 APIProxy、1 EventProducer），没有临时 slug。
+
+现有参考代理的开通页明确显示已开通与发布就绪的区别，并提供管理空间内后续入口。实际登录页检查字段、说明、按钮与品牌，没有提交另一身份；未知地址的“返回项目列表”实际回到列表。两者都完成五尺寸，登录为静态认证页面，没有将它算作加载 console 模块脚本。
+
+delivery 的上线预检确认区、远端来源检查与最终发布版本表单也完成五尺寸。320px 下 Shift+Tab 可达“确认上线 v0.1.1”，边界 [29, 157.75]、纵向 [343.41, 377]；Tab 可达“确认发布到待验证版本”，边界 [105, 279]、纵向 [343.08, 376.67]，2px 焦点框可见，长 SHA 和中文说明不重叠。没有激活提交按钮，检查后取消并离开。05:12:51Z 正常 API 仍只有原 v0.1.0／v0.1.1、0 条切流记录。
+
+### UX-AT-25 的范围与结论
+
+本轮共有 **20 个页面状态 × 5 种尺寸 = 100 次检查**，实际视口、整页宽度全部一致，可见控件越界为 0，显示错误均有对应字段关联。其中 12 个页面状态来自修复前 index-CroDSPeQ.js，另有静态登录页；最终镜像上的 7 个状态为中文 CLI、开发资源、健康、能力接入、上线确认、发布来源检查及最终版本表单。另有 16 次长标签／选中项量测。两份 CSS 修复影响的原生／历史标签已在最终部署重新验证，不把本轮所有记录都称作最终镜像记录。
+
+结合当前路由树逐类核对已有实机证据：
+
+| 页面与关键交互 | 已完成尺寸证据 |
+|---|---|
+| 市场、应用详情、项目列表与概览 | 第六十四、六十五、六十七批 |
+| CLI、会话／数据菜单、预览、代码、差异、历史 | 第六十七批；本批补长标签和键盘显露 |
+| 发布准备、版本详情、日志、上线确认与最终表单 | 第六十四、六十七批；本批补确认区 |
+| 健康、告警、投递、调用链与字段错误 | 第六十四、六十五批；本批复验共享标签 |
+| 成员、可见性、两组配置、开发资源、仓库、生命周期 | 第六十五批；第六十六批修复长内容密度，本批复验资源 |
+| 管理总览、项目／用户、算力、两类套餐、能力、审批、出站、网关 | 第六十五批；第六十七批补管理接入项目内路径 |
+| 数字人／APIProxy／EventProducer 创建、确认、放弃与开通 | 第六十五批与本批 |
+| 登录、未知地址；旧路径的实际落地页 | 本批；第六十三批导航与后续目标页面尺寸 |
+
+表格、只读 CLI 与代码内容已有真实滚动和键盘到达证据；长内容不会依靠整页横向滚动阅读。上述证据满足 plan 的关键动作可达、无整页横向溢出、长名称与中文错误不重叠，**UX-AT-25 已通过，累计 23／52，29 项待完成**。多角色、四窗密度、分屏完整交互与实际系统明暗分别仍属 UX-AT-22／35／37／26／51，保留其未完成状态。
+
+### 门禁、部署与状态保留
+
+两份 CSS 候选固定后，完整 `bun run check` **1177 pass／4 skip／0 fail**（1181 tests／197 files／6540 assertions，测试 108.17s，命令 127.24s），console build **489ms**。低影响样式修复使用真实前后尺寸与键盘验证，没有新增复述 CSS 字符串的测试；候选后续保持，纯证据文档不重复完整门禁。
+
+仅更新 console 为 `cs-console:rfc003-b68-2048ebc047`，imageID=`sha256:abcb716bede8111af36491c6fec70e2647139fb157e35148ce1edc76f1d9cb69`。05:05:22Z 原 Deployment UID 保持、generation=40、1／1；Pod `console-6945595795-bg7ws`／UID `bc6a2123-c883-4507-8da5-299ee152f76d`、restartCount=0，实际 imageID 与七份文件一致。05:07:57Z HTTP 六份静态资源匹配。增量导入 3,721,394 bytes，没有清理数据或临时调零其他服务。
+
+05:11:20Z 与 04:50:04Z 批前正常 API 比较，三个 QA 的 taskId／native／历史 Agent／activity／workspace 相同，仅排除 checkedAt；session 单独比较，只有 delivery.lastActivityAt 更新。个人布局内容完全恢复，正常 Home／End 导航使修订 10→12；原 tab 17 保持上一批已加载脚本，未重载、未夺取输入控制。实际截图仍见单 CLI 1937fa、工作区 1／网格、可输入、未读完成 1 和 `RFC003_SNAPSHOT_DRAFT 未发送草稿`。tab 22 返回 files 资源总览，语言 zh-CN、viewport.reset 后实际为 1100×908、整页宽 1100。
+
+05:11:37Z 原任务 UID／容器状态／restartCount、四份原文件／Git 配置摘要、失败 Bound 工作卷和各 preview／正式槽均保持；API ebaa730／generation=32、controller cc93104／21 均 1／1。节点 Ready=True、MemoryPressure／DiskPressure=False，剩余 1,760,190,464 bytes。
+
+证据为 batch68 的 source-candidate、check／build、image-context／built／budget／import、deploy-before／console-rollout、http-assets、browser-final、project-list／release-preserved、qa-before／after／comparison、layout-before／after、final-runtime；CUA 记录保留逐项尺寸和截图。两份源码及三份文档精确提交，最终 SHA 托管 CI 单独核对。T12 继续；I9／I14／I15 与具体成员范围待答复，RFC-004 按批准顺序等待 RFC-003 完结，Hook 未开工。

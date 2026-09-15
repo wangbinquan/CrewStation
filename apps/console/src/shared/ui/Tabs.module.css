@@ -3,5 +3,5 @@
 .list { flex: 1; min-width: 0; }
 .extra { flex-shrink: 0; display: flex; gap: var(--cs-space-1); }
 .list { display: flex; gap: var(--cs-space-1); overflow-x: auto; border-bottom: 1px solid var(--cs-color-border); padding-bottom: var(--cs-space-2); }
-.list > button { flex: 0 0 auto; white-space: nowrap; }
+.list > button { flex: 0 0 auto; min-width: 0; max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
 .panel { padding-top: var(--cs-space-2); }
