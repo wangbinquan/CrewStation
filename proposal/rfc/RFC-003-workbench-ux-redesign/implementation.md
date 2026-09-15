@@ -1668,3 +1668,46 @@ Console 镜像 cs-console:rfc003-b70-6d6f89a540，imageID=sha256:700d2ddc2755863
 **UX-AT-20 已通过，累计 25／52，27 项待完成**。RFC-003 保持 In Progress；I9／I14／I15、具体成员范围和其余旅程继续，RFC-004 按批准顺序等待 RFC-003 完结，Hook 未开工。
 
 证据位于 /private/tmp/crewstation-rfc003-batch70-*：runtime-before、capacity、created、build-log-before／fixed、两个 build-resize、dev-created／resized、profiles-created、Runner intent／result、integration-source／commit／history／main-sync／ready、source-candidate／targeted-red／check、API／console image-built／import／rollout、http-assets、browser-final、final-projects、qa-after／comparison、layout-after、final-runtime。五份源码／测试与三份文档精确提交，最终 SHA 托管 CI 独立核对。
+
+## 第七十一批：禁止回退原因与拒绝后恢复
+
+本批继续 UX-AT-11，完成专用管理接入的实际策略拒绝和非维护窗口发布失败，并修复误报原因。没有将声明破坏性迁移等同于实际执行迁移，也未将自动回归等同于完整浏览器旅程。
+
+### 原因修复与回归
+
+[migrationPolicy.ts](../../../modules/release/domain/migrationPolicy.ts) 的 rollbackBlockedBy 同时接受 destructive=true 和 rollback=blocked；[switchTraffic.ts](../../../modules/release/application/switchTraffic.ts) 却把两种拒绝都写成“含破坏性迁移”。现在仅修改原因选择：真实声明破坏性迁移时保留原提示，单独禁止回退时提示“的发布配置明确禁止回退”。目标版本、权限、迁移判定、事务及切流规则保持。
+
+[trafficConfirmation.test.ts](../../../modules/release/tests/trafficConfirmation.test.ts) 新增四条隔离 PostgreSQL 回归：单独 blocked 原因准确、破坏性迁移原原因保持、兼容版本正常回退、blocked 不妨碍上线较新版本；逐项核对槽位、切流记录及 domain_events，拒绝不产生写入。稳定复现为 **5 pass／1 fail／32 assertions**；修复后连同既有 console 发布确认回归 **16 pass／0 fail／138 assertions**。
+
+最终两份源码／测试候选的完整 `bun run check` **1204 pass／4 skip／0 fail**（1208 tests／198 files／6601 assertions，测试 154.76s、命令 177.59s），07:36:38Z 完成，源码之后保持。没有 console 源码变更；此次未重建或滚动 console，最终托管 CI 仍执行其构建。
+
+### 专用发布与实际拒绝
+
+使用第七十批的 APIProxy 项目 prj_01a0a3bf1d2c700090f54cd03306dd6d、服务 svc_01a0a3bf1d2c700197334a7c63e347dc、GitLab 项目 147／crewstation/rfc003-verify-integration。没有新建开发会话或 CLI。
+
+| 版本／阶段 | 实际结果 |
+|---|---|
+| v0.1.1 基线 | 浏览器确认完整 SHA 018627a17889e219ae34ae7753bb8170796c3f2c 后首次上线，release rel_01a0a3e433b47000a9ea3d814323e9b5；正式 green／1／1，第一条切流记录指向该版本 |
+| v0.1.2 声明 | 已有管理员通过正常 GitLab Commits API 仅提交 crewstation.yaml，SHA a01e2856a7f61254a5e33b31e128c766e5b4f745、父 018627a；仅改 migration 为 destructive／true／blocked，没有 migrationCommand。真实 Schema 校验通过，原 main 保护不变 |
+| v0.1.2 拒绝 | 浏览器确认并发布 rel_01a0a40378447000b9dec06cf85ba651。构建完成后 07:42:22Z failed，“破坏性迁移只能在维护窗口内发布”。07:43:41Z 只有 build-c06cf85ba651，无迁移 Job；正式仍 v0.1.1，首页 HTTP 200／green |
+| v0.1.3 策略 | 正常 Commits API 再仅改 migration 为 none／false／blocked，SHA 201fe8ef5cf05b707cb361a68f878b39090e8419、父 a01e285；仍无 migrationCommand。浏览器发布 rel_01a0a40714ec70009b52939fcf68cc4a，就绪后确认完整 SHA 并上线；采用生产配置第 2 版 |
+| 旧 API 回退 | 07:53:33Z 浏览器确认 v0.1.3→v0.1.1，保留说明 RFC003_ROLLBACK_REASON_KEEP 禁止回退原因验收；点击一次后实际误报“含破坏性迁移”。说明仍在、确认按钮消失，页面给出重查及发布修复版本的恢复动作 |
+| 新 API 回退 | 部署后 07:55:06Z 显式重新核对两个版本，原说明无需重填；点击一次后准确显示“当前版本 v0.1.3 的发布配置明确禁止回退，不能切回旧版本 v0.1.1”。说明仍保留、旧确认清除，最终截图可读 |
+
+07:54:21Z 与 07:55:50Z 正常 API 分别核对两次已明确拒绝后的记录：发布、两槽及全部切流记录与 07:48:18Z 基线完全相同，始终仅两次正常上线，没有失败回退记录。最终正式为 v0.1.3／201fe8e／blue，待命为 v0.1.1／018627a／green，均 1／1；两个正常用户域首页均 HTTP 200，返回唯一 QA 代理身份及对应物理槽。没有请求真实上游。
+
+07:40:28Z 只读核实运行中 controller 的 maintenanceWindow=false。该设置影响全平台，本批保持原值；v0.1.2 的声明没有产生实际破坏性命令。UX-AT-11 仍缺“含破坏性迁移的已上线版本在浏览器拒绝回退”分支，当前数据库回归及非维护窗口拒绝均单独记证，不提前关闭该项。
+
+### 本机资源、部署与保留
+
+专用 rfc003-integration-qa 服务套餐 CPU 100m→50m，memory=512Mi、maxReplicas=1 与说明保持，正常管理 API 验证其余套餐不变。验收 green Deployment UID e6fb6e64-6649-4d2f-9659-c67080fde079／generation 1→2，仅将 CPU 调到同一值；新 blue UID 6c7bb05b-092a-4f05-9363-60e0e8bf2a00／generation=1 自动采用 50m 套餐。两个槽合计 100m，旧业务资源未调整。前批新增的同名任务套餐仍未被选用。
+
+两次新建 Pending 构建 Pod 分别为 build-c06cf85ba651-hm576／UID 4ef8914e-b92b-4338-826d-9a606daff78c，以及 build-939fcf68cc4a-jcqz8／UID 6665c1ff-eb06-457a-b711-1c58f263dcd1。只在各自未调度且资源／UID／resourceVersion 核对后，通过 pods/resize 把 CPU 1→100m；内存保持 2Gi，随后两个构建均完成。
+
+API 镜像 cs-control-plane:rfc003-b71-72bbbd23ce 基于第七十批，只覆盖 /app/modules/release/application/switchTraffic.ts；imageID=sha256:4457520013c9c4920ae5ba6e733f0976cc6b41773e0448c9ba874cf975de936e，新增导入 38,308 bytes。07:54:37Z cs-api generation 33→34／1／1，Pod cs-api-8564bcc6d8-vp97w／UID b166df60-86a2-4b34-b4e2-1b32d11ce849／restartCount=0，实际镜像和文件 SHA-256 72bbbd23ceaaacf19f2e5d983217f50335282be9eebd85666abdcd31de57e840 与候选一致。部署资源及策略保持。
+
+Console 第七十批／generation=44、controller cc93104／21 均保持 1／1。07:55:51Z 三个旧 QA 的 taskId、session、native、历史 Agent、activity 与 workspace 和前批相同（checkedAt 另计）；07:56:21Z 原任务 UID／状态、四份受保护文件摘要、失败 Bound 工作卷及旧业务发布槽保持。节点 Ready=True、MemoryPressure／DiskPressure=False，剩余 1,464,143,872 bytes。原 tab 17 未重载，截图确认 CLI 1937fa、可输入、未读完成 1 与 RFC003_SNAPSHOT_DRAFT 未发送草稿保持；原有验收页签已保留，本批未调整个人布局、语言或视口。
+
+**累计仍 25／52 通过、27 项待完成**。RFC-003 保持 In Progress；I9／I14／I15、具体成员范围及其余旅程继续。RFC-004 按批准顺序等待 RFC-003 完结，Hook 未开工。
+
+证据在 /private/tmp/crewstation-rfc003-batch71-*：rollback-red／targeted／source-candidate／check、maintenance-before、qa-plan／qa-green-resources、两个 Manifest／commit 与 build-resize、v012-rejected、v013-before、rollback-before／old-rejected／fixed-rejected、API image-built／import／rollout、browser-final、qa-after／comparison、final-runtime。两份源码／测试与三份文档按精确路径提交，最终 SHA 托管 CI 独立核对。

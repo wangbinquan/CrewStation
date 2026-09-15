@@ -1,5 +1,6 @@
 import { expect, test } from 'bun:test';
-import type { Actor, ProjectId, ReleaseId, ServiceId, UserId } from '@crewstation/contracts';
+import type { Actor, MigrationSpec, ProjectId, ReleaseId, ServiceId, UserId } from '@crewstation/contracts';
+import { ManifestSchema } from '@crewstation/contracts';
 import { eventbusMigrations } from '@crewstation/eventbus';
 import { fixedClock } from '@crewstation/kernel';
 import { createTestDatabase, testDatabaseAvailable } from '@crewstation/testkit';
@@ -75,5 +76,41 @@ test.skipIf(!available)('旧待命版本仍就绪时，进行中的发布阻止�
     await uow.run(async (scope) => { const release = (await scope.releases.getById(pendingId))!; await scope.releases.update({ ...release, status: 'failed' }); });
     expect((await change(actor, serviceId, input)).releaseId).toBe(releaseId);
     expect(await uow.read.switches.listByService(serviceId, 10)).toHaveLength(1);
+  } finally { await db.drop(); }
+});
+
+const rollbackCases: Array<{ name: string; migration: MigrationSpec; newer?: boolean; denial?: string }> = [
+  { name: '配置禁止回退不冒充破坏性迁移', migration: { compatibility: 'none', destructive: false, rollback: 'blocked' }, denial: '的发布配置明确禁止回退' },
+  { name: '破坏性迁移保留实际禁止原因', migration: { compatibility: 'destructive', destructive: true, rollback: 'switch-back' }, denial: '含破坏性迁移' },
+  { name: '兼容版本仍可回退', migration: { compatibility: 'none', destructive: false, rollback: 'switch-back' } },
+  { name: '禁止回退不阻止上线较新版本', migration: { compatibility: 'none', destructive: false, rollback: 'blocked' }, newer: true },
+];
+for (const scenario of rollbackCases) test.skipIf(!available)(scenario.name, async () => {
+  const db = await createTestDatabase([eventbusMigrations, releaseMigrations]), uow = drizzleUnitOfWork(db.db);
+  const targetId = `rel_${'f'.repeat(32)}` as ReleaseId;
+  try {
+    const manifest = ManifestSchema.parse({ apiVersion: 'crewstation/v1', kind: 'DigitalWorker', spec: {
+      service: { command: ['bun', 'run', 'src/main.ts'], port: 3000, plan: 'standard-small' }, release: { migration: scenario.migration },
+    } });
+    await uow.run(async (scope) => {
+      const initial = initialSlots(serviceId, now);
+      await scope.slots.save({ ...initial,
+        blue: { ...initial.blue, releaseId, state: 'ready', replicas: 1, readyReplicas: 1 },
+        green: { ...initial.green, releaseId: targetId, state: 'ready', replicas: 1, readyReplicas: 1 },
+      });
+      const base = { serviceId, projectId, commitSha: 'a'.repeat(40), branch: 'main', status: 'ready' as const, pipeline: { step: 4 }, createdBy: actor.userId, updatedAt: now };
+      await scope.releases.insert({ ...base, id: releaseId, tag: 'v0.2.0', targetSlot: 'blue', manifest, createdAt: new Date(now.getTime() - 10_000) });
+      await scope.releases.insert({ ...base, id: targetId, tag: scenario.newer ? 'v0.3.0' : 'v0.1.0', targetSlot: 'green', createdAt: new Date(now.getTime() - (scenario.newer ? 5_000 : 20_000)) });
+    });
+    const change = switchTrafficUseCase({ uow, authorizer: { authorize: async () => {} }, services: { resolveServiceById: async () => ({ projectId, slug: 'demo', name: 'demo', namespace: 'cs-demo' }) }, clock: fixedClock(now.toISOString()) });
+    const input = { toSlot: 'preview' as const, expectedActiveRelease: releaseId, expectedTargetRelease: targetId };
+    if (scenario.denial) {
+      // rollback: blocked 可以单独声明；拒绝时不能虚报发生了破坏性迁移，也不能落切流记录。
+      await expect(change(actor, serviceId, input)).rejects.toMatchObject({ kind: 'precondition', message: `当前版本 v0.2.0 ${scenario.denial}，不能切回旧版本 v0.1.0` });
+    } else expect((await change(actor, serviceId, input)).releaseId).toBe(targetId);
+    expect((await uow.read.slots.get(serviceId))?.active).toBe(scenario.denial ? 'blue' : 'green');
+    expect(await uow.read.switches.listByService(serviceId, 10)).toHaveLength(scenario.denial ? 0 : 1);
+    const events = await db.handle.client`SELECT topic FROM platform_infra.domain_events WHERE topic = 'release.traffic-switched'`;
+    expect(events).toHaveLength(scenario.denial ? 0 : 1);
   } finally { await db.drop(); }
 });

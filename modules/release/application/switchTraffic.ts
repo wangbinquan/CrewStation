@@ -25,7 +25,8 @@ export function switchTrafficUseCase(deps: Pick<ReleaseUseCaseDeps, 'uow' | 'aut
       const currentRelease = slots[slots.active].releaseId ? await scope.releases.getById(slots[slots.active].releaseId!) : undefined;
       const targetRelease = slots[target].releaseId ? await scope.releases.getById(slots[target].releaseId!) : undefined;
       if (currentRelease?.manifest && targetRelease && targetRelease.createdAt < currentRelease.createdAt && rollbackBlockedBy(currentRelease.manifest.spec.release.migration)) {
-        throw precondition(`当前版本 ${currentRelease.tag} 含破坏性迁移，不能切回旧版本 ${targetRelease.tag}`);
+        const restriction = currentRelease.manifest.spec.release.migration.destructive ? '含破坏性迁移' : '的发布配置明确禁止回退';
+        throw precondition(`当前版本 ${currentRelease.tag} ${restriction}，不能切回旧版本 ${targetRelease.tag}`);
       }
       await scope.slots.save(next);
       // 切流永远是「待命槽接管生产流量」：目标槽切之前的角色是 preview，切之后是 prod。
