@@ -1579,3 +1579,44 @@ delivery 的上线预检确认区、远端来源检查与最终发布版本表�
 05:11:37Z 原任务 UID／容器状态／restartCount、四份原文件／Git 配置摘要、失败 Bound 工作卷和各 preview／正式槽均保持；API ebaa730／generation=32、controller cc93104／21 均 1／1。节点 Ready=True、MemoryPressure／DiskPressure=False，剩余 1,760,190,464 bytes。
 
 证据为 batch68 的 source-candidate、check／build、image-context／built／budget／import、deploy-before／console-rollout、http-assets、browser-final、project-list／release-preserved、qa-before／after／comparison、layout-before／after、final-runtime；CUA 记录保留逐项尺寸和截图。两份源码及三份文档精确提交，最终 SHA 托管 CI 单独核对。T12 继续；I9／I14／I15 与具体成员范围待答复，RFC-004 按批准顺序等待 RFC-003 完结，Hook 未开工。
+
+## 第六十九批：文件差异状态、阅读位置与真实 Git 验收
+
+本批完成 UX-AT-32，并修复真实验收遇到的三处界面问题：
+
+- 列表原来直接显示 MM／MD，未跟踪行重复显示英文 untracked。现在用“暂存区：修改 · 工作区：修改／删除”解释两列 Git 状态，保留原始状态的 title；单项提交差异、重命名、冲突、未知状态和英文均有独立处理。
+- 原生按钮的 nowrap 让长文件路径撑出 1356.40px 表格，宽屏也难以同时看到文件与状态。路径按钮现在在列内换行；最终 CSS 的中英文五尺寸实测表宽为 1074／818／726／348／336px（英文 320px 为 339.19px），前四尺寸与容器等宽，320px 使用原表格内滚动，整页均未溢出。
+- 比较每 10 秒更新 comparisonId 时，详情以该 id 为 React key，正在看的页签和 Patch 被重置。现在按项目／任务／对比目标保留阅读位置，并对新快照清除旧分页游标、重新读取当前文件；文件已不在新差异中时仍可返回列表。换项目／任务／目标仍重置上下文。
+
+状态回归先 10 pass／1 fail；刷新两条回归分别稳定复现页签退回首项，另补文件消失的返回路径。错误用例的 HTTP 信封按现有契约修正后，最终定向 **30 pass／0 fail／82 assertions**。八份最终源码／测试候选完整门禁 **1197 pass／4 skip／0 fail**（1201 tests／198 files／6578 assertions，测试 103.25s、命令 121.83s），console build **494ms**。此前两个候选分别通过后，实机发现路径排版和自动刷新问题，因候选改变才重跑；旧门禁和部署证据保留在 pre-path-wrap／pre-refresh 文件中。
+
+### 专用 QA 的真实差异
+
+使用 files 原任务 tsk_01a09ff07aeb7000897fd0eda1e16cd2 的正常 Runner exec 通道，以 uid 10001 操作。开始时 index 为空、HEAD 为 e4741df56b440d776b7c25ff5a4978b3d5822f46，只有两个原有 npm 缓存文件未跟踪。README 原文先在容器 /tmp 备份并记录 SHA256；只暂存本批标记，再追加未暂存标记，另建三个本批文本／二进制样例。未提交 QA 代码、未推送、未发布。
+
+| 场景 | 实际界面证据 |
+|---|---|
+| 同一文件已暂存与未暂存修改 | README 的 739 字符 Patch 分为 Staged 与 Unstaged；各自增加不同标记，列表显示两种状态，净增三行 |
+| 未跟踪文本 | 254 字符 Patch 从 /dev/null 新增一行，状态只显示“未跟踪” |
+| 二进制 | 240 字符 Patch 显示 Binary files … differ，明确“二进制文件”，不提供文本编辑器入口 |
+| 删除 | 校验本批工作区与 index 摘要后临时删除 README；状态为暂存修改／工作区删除，净减原文 75 行。4082 字符 Patch 包含独立暂存修改与工作区删除的 77 行，不提供不存在文件的编辑入口 |
+| 大 Patch | 4096 行样例显示到 65536 字符、末行为第 1419 行的部分内容，同时明确“Patch 超过 64 KiB，仅展示前一部分”；不假称完整 |
+| 自动更新 | 最终页面 05:58:35Z 至 05:59:27Z，检查时间由 13:58 更新到 13:59，仍选中未提交页签并保留同一 4082 字符删除 Patch |
+
+同文件修改最初在 b68 和本批首个 console 验证；最终 index-Dk6dzdsp.js 再次核对删除、未跟踪、二进制、截断与刷新保持。十次路径尺寸量测来自本批第二个 console，其 CSS 与最终镜像相同。没有把载入中的空 Patch 算作成功或产品故障。
+
+待验证 v0.1.8 的 Git 对象最初缺失，页面如实显示未知。通过“补齐历史并重算”正常补对象后，真实结果为工作树独有 0／缺少待验证 3 个提交、未提交文件 6、未推送提交 0；生产仍尚未部署。05:59:48Z 校验并恢复 README 原文、通过精确 git add -- README.md 清除本批暂存差异，只删除本批三个摘要匹配的样例。最终 index 为空、原始 porcelain 状态逐字一致，README SHA256 恢复为 0e54bf847caa7a68f24d50c63c112bf00edf3379c1cedba3e008793a98bbf209。容器 /tmp 原文备份保留。
+
+06:00:24Z API 及随后真实页面确认未提交回到原有 2 项、未推送仍为 0，HEAD、部署 releaseId／SHA 和双向提交数 0／3 保持。补历史只新增比较所需 Git 对象与引用，没有 checkout／pull 或修改业务源码。未提交文件没有算进提交差距，未推送没有冒充未上线。
+
+### 部署、保留与结论
+
+最终仅更新 console 为 cs-console:rfc003-b69-eb9e06268c，generation=43／1／1，imageID=sha256:a5b3ae7f0a4eae00f6db8ce719c513d91cf07b8fab7b7e044134aaa420ea4f67。05:57:26Z 实际 Pod 七份文件、05:59:10Z 正常 HTTP 六份资源均匹配本批构建。每次导入新增 3,722,933 bytes，未清理数据或调零其他服务。
+
+06:01:24Z 三个 QA 的 taskId、native、历史 Agent、活动和工作树与批前一致（仅 checkedAt 另计）。files 的 lastActivityAt／idleReminderSentAt 和 legacy 的 idleReminderSentAt 更新；原进程状态未改变。两份个人布局内容恢复，delivery 修订保持 12、files 正常导航 12→14。原 tab 17 未重载，中文未发送草稿、可输入、单 CLI、未读完成 1 保持；tab 22 返回 files 工作区，原草稿可见且未获取输入控制。语言和临时视口恢复。
+
+06:01:57Z 原任务 UID／状态／四份受保护文件摘要、失败 Bound 工作卷及预览／正式槽保持；API ebaa730／32、controller cc93104／21 均 1／1。节点 Ready=True、无内存／磁盘压力，剩余 1,568,153,600 bytes。
+
+另只读核对 UX-AT-27 的实际五个数字人摘要及 limit=20 范围。现有未知健康来自未部署槽，不能当作来源读取故障；该条仍待真实局部故障与恢复证据。**UX-AT-32 已通过，累计 24／52，28 项待完成**；I9／I14／I15 与具体成员范围待答复，RFC-004 继续按批准顺序等待 RFC-003 完结。
+
+证据保存在 batch69 的 preflight、summaries-before、qa-before／after／comparison、layout-before／after、fixtures／deletion／restored、各 Runner intent／result、dirty-comparisons／dirty-history-ready／restored-comparison、status-red／refresh-red／refresh-targeted-final、source-candidate／check／build、三版镜像与部署记录、http-assets、browser-final 和 final-runtime。八份源码／测试及三份文档精确提交，最终 SHA 托管 CI 单独核对。

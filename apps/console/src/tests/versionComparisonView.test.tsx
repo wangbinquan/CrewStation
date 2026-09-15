@@ -14,6 +14,7 @@ const requests: string[] = [];
 const historyTargets: unknown[] = [];
 let ui: Awaited<ReturnType<typeof renderElement>> | undefined;
 const channel: TaskStreamChannel = { send: async () => ({}), subscribe: () => () => {} };
+const defaultFiles = [{ path: 'file.txt', status: 'M', additions: 1, deletions: 1, binary: false, untracked: false }];
 afterEach(() => { ui?.unmount(); ui = undefined; requests.length = 0; historyTargets.length = 0; globalThis.fetch = originalFetch; focusManager.setFocused(undefined); });
 
 function comparison(): VersionComparisonDto {
@@ -25,16 +26,16 @@ function comparison(): VersionComparisonDto {
   });
 }
 
-async function render(data: VersionComparisonDto, canDevelop = true, target: ComparisonTarget = 'prod', onOpenFile?: (path: string) => void, compact = false) {
+async function render(data: VersionComparisonDto, canDevelop = true, target: ComparisonTarget = 'prod', onOpenFile?: (path: string) => void, compact = false, details: { files?: typeof defaultFiles; nextCursor?: string } = {}) {
   globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
     const path = String(input);
     requests.push(`${init?.method ?? 'GET'} ${path}`);
     if (init?.method === 'POST') historyTargets.push(JSON.parse(String(init.body)).target);
     const url = new URL(path, 'http://localhost');
     const body = path.includes('version-comparisons/') ? {
-      comparisonId: 'comparison-1', tab: url.searchParams.get('tab'), commits: [], truncated: false,
-      files: [{ path: 'file.txt', status: 'M', additions: 1, deletions: 1, binary: false, untracked: false }], checkedAt: data.checkedAt,
-      ...(url.searchParams.has('path') ? { patch: { path: 'file.txt', text: '-old\n+new', binary: false, truncated: true } } : {}),
+      comparisonId: data.comparisonId, tab: url.searchParams.get('tab'), commits: [], truncated: false,
+      files: details.files ?? defaultFiles, nextCursor: details.nextCursor, checkedAt: data.checkedAt,
+      ...(url.searchParams.has('path') ? { patch: { path: 'file.txt', text: `-old\n+new\n${data.comparisonId}`, binary: false, truncated: true } } : {}),
     } : data;
     return new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } });
   }) as typeof fetch;
@@ -56,6 +57,61 @@ test('提交一致仍显示未提交文件；四种详情、patch 与截断通�
   expect(requests.every((request) => request.startsWith('GET'))).toBe(true);
   await page.click('补齐历史并重算');
   expect(requests.filter((request) => request.startsWith('POST'))).toEqual(['POST /v1/projects/prj_test/dev-session/version-comparison/refresh-history']);
+});
+
+test('未提交列表解释暂存区与工作区，未跟踪和二进制不混入提交差距', async () => {
+  const files = [
+    { ...defaultFiles[0]!, path: 'both.txt', status: 'MM' },
+    { ...defaultFiles[0]!, path: 'deleted.txt', status: 'MD' },
+    { ...defaultFiles[0]!, path: 'new.bin', status: 'untracked', untracked: true, binary: true },
+  ];
+  const page = await render(comparison(), true, 'prod', () => {}, false, { files });
+  await page.click('查看差异'); await page.click('未提交改动');
+  const rows = [...page.host.querySelectorAll('tbody tr')];
+  // 实机 MM 曾裸露在列表中；读者应能直接知道哪些改动已暂存、哪些仍在工作区。
+  expect(rows[0]?.children[1]?.textContent).toBe('暂存区：修改 · 工作区：修改');
+  expect(rows[0]?.children[1]?.getAttribute('title')).toBe('Git: MM');
+  expect(rows[1]?.children[1]?.textContent).toBe('暂存区：修改 · 工作区：删除');
+  expect(rows[1]?.textContent).not.toContain('在代码中打开');
+  expect(rows[2]?.children[1]?.textContent).toBe('未跟踪');
+  expect(rows[2]?.textContent).toContain('二进制文件');
+  expect(rows[2]?.textContent).not.toContain('在代码中打开');
+  expect(page.text()).toContain('提交一致'); expect(page.text()).not.toContain('待上线 3');
+});
+
+test('比较重查后保留正在阅读的文件，加载新快照的 Patch', async () => {
+  const data = comparison(), page = await render(data);
+  await page.click('查看差异'); await page.click('未提交改动'); await page.click('file.txt');
+  data.comparisonId = 'comparison-2'; await page.click('重新检查');
+  // 实机十秒重查曾因 comparisonId 作为 React key，强制退回第一个页签并关闭 Patch。
+  expect(page.host.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe('未提交改动');
+  expect(page.text()).toContain('comparison-2');
+  expect(requests.at(-1)).toContain('version-comparisons/comparison-2?tab=uncommitted');
+  expect(requests.at(-1)).toContain('path=file.txt');
+});
+
+test('新比较保留详情页签，但不能复用上一个快照的分页游标', async () => {
+  const data = comparison(), details: { nextCursor?: string } = { nextCursor: 'old-cursor' };
+  const page = await render(data, true, 'prod', undefined, false, details);
+  await page.click('查看差异'); await page.click('相对生产的文件差异'); await page.click('下一页');
+  expect(requests.at(-1)).toContain('cursor=old-cursor');
+  data.comparisonId = 'comparison-2'; delete details.nextCursor; await page.click('重新检查');
+  expect(page.host.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe('相对生产的文件差异');
+  expect(requests.at(-1)).toContain('version-comparisons/comparison-2?tab=files');
+  expect(requests.at(-1)).not.toContain('cursor=');
+});
+
+test('正在看的文件从新比较中移除时，仍能返回文件列表', async () => {
+  const data = comparison(), page = await render(data);
+  await page.click('查看差异'); await page.click('相对生产的文件差异'); await page.click('file.txt');
+  const previousFetch = globalThis.fetch;
+  globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => String(input).includes('comparison-2?') && new URL(String(input), 'http://localhost').searchParams.get('path') === 'file.txt'
+    ? new Response(JSON.stringify({ error: 'not_found', message: '文件已不在差异中' }), { status: 404, headers: { 'content-type': 'application/json' } })
+    : previousFetch(input, init)) as typeof fetch;
+  data.comparisonId = 'comparison-2'; await page.click('重新检查');
+  expect(page.text()).toContain('文件已不在差异中'); expect(page.text()).not.toContain('+new');
+  await page.click('返回文件列表'); expect(page.text()).toContain('file.txt');
+  expect(page.text()).not.toContain('文件已不在差异中');
 });
 
 test('待验证版本显示对应差距和详情名称，文件定位与补历史作用于实际目标', async () => {

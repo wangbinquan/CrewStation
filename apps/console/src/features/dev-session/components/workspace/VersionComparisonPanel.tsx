@@ -41,7 +41,7 @@ export function VersionComparisonPanel({ projectId, taskId, channel, canDevelop,
         <p className={styles.meta}>{t('devSession.compare.historyHint')}</p>
         <Button onClick={() => history.mutate(undefined)} disabled={!canDevelop || history.isPending || query.isFetching}>{t(history.isPending ? 'devSession.compare.historyPending' : 'devSession.compare.history')}</Button>
         <QueryStatus isPending={false} error={history.error} />
-        {data.comparisonId && data.freshness === 'current' ? <ComparisonDetailsView key={data.comparisonId} projectId={projectId} comparisonId={data.comparisonId} comparison={data} onOpenFile={onOpenFile} /> : <PaneNotice tone="warning">{t('devSession.compare.staleHint')}</PaneNotice>}
+        {data.comparisonId && data.freshness === 'current' ? <ComparisonDetailsView key={`${projectId}:${taskId}:${target}`} projectId={projectId} comparisonId={data.comparisonId} comparison={data} onOpenFile={onOpenFile} /> : <PaneNotice tone="warning">{t('devSession.compare.staleHint')}</PaneNotice>}
       </> : null}
     </> : null}
   </Card>;
