@@ -17,6 +17,7 @@ export interface ComputeProfile {
   readonly name: string;
   readonly driver: AgentDriver;
   readonly model: string;
+  readonly taskProfile?: string;
   readonly description: string;
 }
 

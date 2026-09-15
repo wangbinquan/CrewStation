@@ -29,6 +29,7 @@ export function workspaceFixture() {
   const deps: DevSessionUseCaseDeps = {
     apiCatalog: { listOperations: async () => [] },
     environments: {
+      createNativeExecution: async () => { throw new Error('独立执行未设置'); },
       getRebuild: async () => undefined,
       inspectRebuild: async () => { throw new Error("恢复预检未设置"); },
       requestRebuild: async () => { throw new Error("恢复请求未设置"); },

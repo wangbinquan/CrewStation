@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { SlugSchema, TaskIdSchema, UserIdSchema } from '../ids';
 import { AgentPermissionSchema } from '../manifest/tasks';
-import { NativeTerminalRecordSchema, TerminalSizeSchema } from '../taskrunner/nativeTerminal';
+import { NativeTerminalRecordSchema, TerminalSizeSchema, TerminalSnapshotSchema } from '../taskrunner/nativeTerminal';
 import { AgentActivityStateSchema } from './activity/nativeActivity';
 
 export const StartNativeTerminalRequestSchema = TerminalSizeSchema.extend({
@@ -14,7 +14,11 @@ export const NativeTerminalDtoSchema = NativeTerminalRecordSchema.extend({
   lifecycle: z.enum(['starting', 'running', 'ended', 'failed', 'unknown']),
   connection: z.enum(['connected', 'disconnected', 'unknown']),
   activity: AgentActivityStateSchema.optional(),
+  execution: z.object({ taskId: TaskIdSchema, state: z.enum(['queued', 'starting', 'running', 'cleaning', 'finished']), message: z.string().optional(),
+    profile: z.object({ name: z.string(), cpu: z.string(), memory: z.string(), storage: z.string() }).optional() }).optional(),
+  finalScreen: z.enum(['pending', 'available', 'unavailable']).optional(),
 });
+export const NativeTerminalSnapshotDtoSchema = z.object({ status: z.enum(['pending', 'available', 'unavailable']), snapshot: TerminalSnapshotSchema.optional() });
 export const NativeTerminalListSchema = z.object({
   items: z.array(NativeTerminalDtoSchema), connection: z.enum(['connected', 'disconnected', 'unknown']),
   runnerId: z.uuid().nullable(), checkedAt: z.iso.datetime(), message: z.string().optional(),
@@ -24,3 +28,4 @@ export const NativeTerminalListSchema = z.object({
 export type StartNativeTerminalRequest = z.infer<typeof StartNativeTerminalRequestSchema>;
 export type NativeTerminalDto = z.infer<typeof NativeTerminalDtoSchema>;
 export type NativeTerminalList = z.infer<typeof NativeTerminalListSchema>;
+export type NativeTerminalSnapshotDto = z.infer<typeof NativeTerminalSnapshotDtoSchema>;

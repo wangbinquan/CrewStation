@@ -64,6 +64,8 @@ export const ComputeProfileDtoSchema = z.object({
   driver: AgentDriverSchema,
   /** `<provider>/<model>`。 */
   model: z.string().min(1),
+  /** 每个原生 CLI 的资源套餐；省略时使用平台默认任务套餐。 */
+  taskProfile: SlugSchema.optional(),
   description: z.string().default(''),
 });
 

@@ -1,6 +1,6 @@
 import type { AgentInstanceDto, BranchDto, DevSessionDto, OpenDevSessionRequest, ReleaseDto, SendAgentMessageRequest, WorkspaceStatusDto } from '@crewstation/contracts';
 import type { ComparisonDetailQuery, ComparisonDetails, ComparisonTarget, VersionComparisonDto } from '@crewstation/contracts';
-import type { NativeTerminalDto, NativeTerminalList, StartNativeTerminalRequest } from '@crewstation/contracts';
+import type { NativeTerminalDto, NativeTerminalList, NativeTerminalSnapshotDto, StartNativeTerminalRequest } from '@crewstation/contracts';
 import type { SaveWorkspaceLayoutRequest, WorkspaceLayoutDto } from '@crewstation/contracts';
 import type { AgentActivityPage, AgentActivityQuery, ReadAgentActivityRequest } from '@crewstation/contracts';
 import type { ApiInvocationRequest, ApiInvocationResponse } from '@crewstation/contracts';
@@ -38,6 +38,7 @@ export interface DevSessionResource {
   listNativeTerminals(taskId: string): Promise<NativeTerminalList>;
   startNativeTerminal(taskId: string, input: StartNativeTerminalRequest): Promise<NativeTerminalDto>;
   stopNativeTerminal(taskId: string, agentId: string): Promise<void>;
+  getNativeTerminalSnapshot(taskId: string, agentId: string): Promise<NativeTerminalSnapshotDto>;
   /** GET /v1/projects/:projectId/dev-session；没有会话时抛 not_found（404）。 */
   get(projectId: string): Promise<DevSessionDto>;
   /** 只读、无副作用的释放／发布前检查；无会话 404，断线或 Git 失败返回 unavailable。 */
@@ -80,6 +81,7 @@ export function devSessionResource(transport: Transport): DevSessionResource {
     listNativeTerminals: (taskId) => transport.request('GET', terminals(taskId)),
     startNativeTerminal: (taskId, input) => transport.request('POST', terminals(taskId), { body: input }),
     stopNativeTerminal: (taskId, agentId) => transport.request('POST', `${terminals(taskId)}/${segment(agentId)}/stop`),
+    getNativeTerminalSnapshot: (taskId, agentId) => transport.request('GET', `${terminals(taskId)}/${segment(agentId)}/snapshot`),
     get: (projectId) => transport.request<DevSessionDto>('GET', `${project(projectId)}/dev-session`),
     workspaceStatus: (projectId) => transport.request<WorkspaceStatusDto>('GET', `${project(projectId)}/dev-session/workspace-status`),
     versionComparison: (projectId, target) => transport.request<VersionComparisonDto>('GET', `${project(projectId)}/dev-session/version-comparison`, { query: { target } }),

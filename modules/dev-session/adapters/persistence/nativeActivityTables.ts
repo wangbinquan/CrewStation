@@ -1,4 +1,4 @@
-import { bigint, index, primaryKey, text, uniqueIndex } from 'drizzle-orm/pg-core';
+import { bigint, boolean, index, primaryKey, text, uniqueIndex } from 'drizzle-orm/pg-core';
 import type { AgentActivityItem } from '@crewstation/contracts';
 import { jsonDocument } from '@crewstation/persistence';
 import type { NativeActivityProjection } from '../../domain/nativeActivityProjection';
@@ -8,6 +8,9 @@ export const activityProgress = devSessionSchema.table('native_activity_progress
   taskId: text('task_id').primaryKey(), throughSeq: bigint('through_seq', { mode: 'number' }).notNull().default(0),
   prunedThroughSeq: bigint('pruned_through_seq', { mode: 'number' }).notNull().default(0),
 });
+export const activitySources = devSessionSchema.table('native_activity_sources', {
+  taskId: text('task_id').notNull(), sourceTaskId: text('source_task_id').notNull(), throughSeq: bigint('through_seq', { mode: 'number' }).notNull().default(0), complete: boolean('complete').notNull().default(false),
+}, (t) => [primaryKey({ columns: [t.taskId, t.sourceTaskId] })]);
 export const activityStates = devSessionSchema.table('native_activity_states', {
   taskId: text('task_id').notNull(), agentId: text('agent_id').notNull(),
   projection: jsonDocument('projection').$type<NativeActivityProjection>().notNull(),

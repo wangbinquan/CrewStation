@@ -51,6 +51,7 @@ export const computeProfiles = projectSchema.table('compute_profiles', {
   name: text('name').primaryKey(),
   driver: text('driver').notNull(),
   model: text('model').notNull(),
+  taskProfile: text('task_profile'),
   description: text('description').notNull().default(''),
 });
 

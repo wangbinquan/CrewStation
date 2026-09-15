@@ -17,10 +17,11 @@ export const AgentActivityStateSchema = z.object({
   source: z.enum(['unknown', 'ready', 'unavailable']), sourceReason: NativeActivitySignalSchema.shape.reason.optional(),
   currentTurn: AgentTurnSummarySchema.nullable(), pending: z.array(AgentPendingRequestSchema).max(128),
   processEnded: z.boolean(), updatedAt: z.iso.datetime(),
+  connection: z.enum(['connected', 'disconnected', 'unknown']).optional(), sync: z.enum(['ready', 'catching-up', 'unavailable']).optional(),
 }).strict();
 export const AgentActivityItemSchema = z.object({
   eventId: id, agentId: id, terminalId: id, runnerId: z.uuid(),
-  /** task 的持久事件序号；与 Runner 单 CLI 的内部源 seq 不同。 */
+  /** 工作区统一的持久投影序号；与各执行容器及单 CLI 的源 seq 不同。 */
   seq: sequence, turnId: id.nullable(), kind: NativeActivitySignalSchema.shape.kind,
   occurredAt: z.iso.datetime(), request: NativeActivitySignalSchema.shape.request.unwrap().extend({ resolvedByEventId: id.optional() }).optional(), unread: z.boolean(),
 }).strict();

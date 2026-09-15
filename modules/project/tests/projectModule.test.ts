@@ -116,6 +116,20 @@ describe.skipIf(!available)('project module', () => {
     expect(await project.api.resolveComputeProfile('balanced')).toBeUndefined();
   });
 
+  test('管理员绑定 CLI 资源套餐并可恢复默认；不存在的套餐不覆盖原配置', async () => {
+    await project.api.upsertTaskProfile(admin, { name: 'cli-large', cpu: '2', memory: '4Gi', storage: '2Gi', description: 'CLI' });
+    const input = { name: 'cli-bound', driver: 'opencode' as const, model: 'opencode/big-pickle', taskProfile: 'cli-large', description: '并行开发' };
+    await project.api.upsertComputeProfile(admin, input);
+    expect(await project.api.resolveComputeProfile(input.name)).toEqual(input);
+    expect((await project.api.listComputeProfiles()).find((p) => p.name === input.name)).toEqual({ name: input.name, description: input.description });
+    await expect(project.api.upsertComputeProfile(dev, input)).rejects.toMatchObject({ kind: 'forbidden' });
+    await expect(project.api.upsertComputeProfile(admin, { ...input, taskProfile: 'missing' })).rejects.toMatchObject({ kind: 'not_found' });
+    expect((await project.api.resolveComputeProfile(input.name))?.taskProfile).toBe('cli-large');
+    await project.api.upsertComputeProfile(admin, { ...input, taskProfile: undefined });
+    expect(await project.api.resolveComputeProfile(input.name)).not.toHaveProperty('taskProfile');
+    await project.api.deleteComputeProfile(admin, input.name);
+  });
+
   test('项目列表按 kind 过滤：先作用域后过滤，成员筛不出别人的接入容器（RFC-002）', async () => {
     await project.api.createProject(admin, { slug: 'gitlab-events', name: '事件生产者', kind: 'EventProducer', ownerUserId: admin.userId, template: 'minimal-sample' });
     await project.api.createProject(admin, { slug: 'ref-proxy', name: '参考代理', kind: 'APIProxy', ownerUserId: admin.userId, template: 'minimal-sample' });

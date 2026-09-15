@@ -158,11 +158,13 @@
 
 **第七十六批实施进度**：已补全 [cli-isolation.md](../../proposal/rfc/RFC-003-workbench-ux-redesign/cli-isolation.md)；task-runtime 已实现独立执行容器、冻结资源、原卷引用、项目原子准入、持久准备／清理、父释放等待子环境、父恢复同节点，以及实际 Runner 身份绑定。数据库／假集群和真实 PTY 的相应自动验证已执行。当前工作台“＋ CLI”入口仍使用旧路径，管理员套餐绑定、多 Runner 终端与动态聚合、末屏和真实四窗／OOM 验收继续；未据此宣称完整隔离已上线。
 
+**第七十七批实施进度**：管理员任务套餐绑定、持久启动派发、每窗独立连接、分来源游标与统一动态序号、末屏按需读取已接通。完整门禁 1274 pass／4 skip／0 fail，console 644ms；本机部署、真实资源不足／OOM 与四窗验收仍需继续，未推进 RFC-004。
+
 **原定要求**：RFC-003 `development-workspace.md:81` 要求新增 CLI 资源不足只影响该次窗口，UX-AT-28／35 要求真实多 CLI 和四窗验收。I14 处理故障后的工作树恢复，不能替代故障前的隔离。
 
-**当前证据（2026-09-14T13:54:46Z）**：主仓基线 `293a7d0124c4e1b34397a25ccce22f89b3aa6502`；现存 QA Pod `cs-rfc003-verify-files/task-01a09ff07aeb`／UID `fa4dcc5e-3eb6-4557-a6bf-b6301dca4160` 的 requests=limits 为 1 CPU／2Gi，实际 `memory.max=2147483648`、`memory.oom.group=1`、`memory.current=899342336`；该正常单 CLI 容器的 oom／oom_kill／oom_group_kill 计数都是 0。`/sys/fs/cgroup` 挂载为 `ro,nosuid,nodev,noexec,relatime`，当前环境没有可供 Runner 写入的子 cgroup。此处只记录现存容器事实，不伪造已终止旧 Pod 的 cgroup 读数，也未再次对活跃任务施加压力。临时原始记录为 `crewstation-rfc003-batch49-resource-facts.json`。
+**历史证据（2026-09-14T13:54:46Z）**：主仓基线 `293a7d0124c4e1b34397a25ccce22f89b3aa6502`；现存 QA Pod `cs-rfc003-verify-files/task-01a09ff07aeb`／UID `fa4dcc5e-3eb6-4557-a6bf-b6301dca4160` 的 requests=limits 为 1 CPU／2Gi，实际 `memory.max=2147483648`、`memory.oom.group=1`、`memory.current=899342336`；该正常单 CLI 容器的 oom／oom_kill／oom_group_kill 计数都是 0。`/sys/fs/cgroup` 挂载为 `ro,nosuid,nodev,noexec,relatime`，当前环境没有可供 Runner 写入的子 cgroup。此处只记录现存容器事实，不伪造已终止旧 Pod 的 cgroup 读数，也未再次对活跃任务施加压力。临时原始记录为 `crewstation-rfc003-batch49-resource-facts.json`。
 
-源码只限制 256 条名册／32 个运行中进程（`runtimes/task/src/terminal/nativeSupervisor.ts:41–64`）；所有 CLI 通过同一个 launcher／PTY backend 启动于当前开发容器（`:79–85`）。`modules/task-runtime/adapters/k8s/taskCluster.ts:66–74` 只给整个任务容器分配 resources；原生名册只有一个 runnerId（`packages/contracts/taskrunner/nativeTerminal.ts:15`），启动输入没有独立执行环境／资源额度（`packages/contracts/api/nativeTerminal.ts:7–10`）。没有逐 CLI 的资源准入或硬上限。
+当时源码只限制 256 条名册／32 个运行中进程（`runtimes/task/src/terminal/nativeSupervisor.ts:41–64`）；所有 CLI 通过同一个 launcher／PTY backend 启动于当前开发容器（`:79–85`）。`modules/task-runtime/adapters/k8s/taskCluster.ts:66–74` 只给整个任务容器分配 resources；原生名册只有一个 runnerId（`packages/contracts/taskrunner/nativeTerminal.ts:15`），启动输入没有独立执行环境／资源额度（`packages/contracts/api/nativeTerminal.ts:7–10`）。没有逐 CLI 的资源准入或硬上限。
 
 [Linux cgroup v2 文档](https://docs.kernel.org/admin-guide/cgroup-v2.html#memory-interface-files) 说明 memory.oom.group 启用时按组终止任务；在子 cgroup 内触发的 OOM 不跨出该组。[Kubelet 配置文档](https://kubernetes.io/docs/reference/config-api/kubelet-config.v1beta1/) 说明 cgroup v2 的 singleProcessOOMKill 默认 false。因此仅捕获子进程退出、扩大当前套餐、设置窗口个数或轮询剩余内存，不能证明“新增失败不影响已有 CLI”；修改节点全局 OOM 行为也不是本 RFC 已批准的隔离实现。
 

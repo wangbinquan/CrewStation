@@ -1,4 +1,5 @@
 import type { NativeTerminalDto } from '@crewstation/contracts';
+import { NativeTerminalSnapshotDtoSchema } from '@crewstation/contracts';
 import { useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
 import type { ReactElement } from 'react';
 import { useT } from '../../../../shared/lib/useT';
@@ -9,8 +10,32 @@ import { NativeTerminalAttachment } from '../../model/native/nativeTerminalAttac
 import { NativeTerminalSurface } from '../../model/native/nativeTerminalSurface';
 import styles from './NativeWorkspace.module.css';
 import '@xterm/xterm/css/xterm.css';
+import { api } from '../../../../shared/api/client';
+import { errorMessage, useApiQuery } from '../../../../shared/api/useApi';
 
-export function NativeTerminalView({ terminal, channel, stream, onActivity, canDevelop }: { readonly terminal: NativeTerminalDto; readonly channel: TaskStreamChannel; readonly stream: StreamState; readonly onActivity: () => void; readonly canDevelop: boolean }): ReactElement {
+interface NativeTerminalViewProps { readonly terminal: NativeTerminalDto; readonly channel: TaskStreamChannel; readonly stream: StreamState; readonly onActivity: () => void; readonly canDevelop: boolean }
+
+export function NativeTerminalView(props: NativeTerminalViewProps): ReactElement {
+  return props.terminal.execution && ['ended', 'failed'].includes(props.terminal.lifecycle) ? <SavedNativeTerminalView terminal={props.terminal} /> : <LiveNativeTerminalView {...props} />;
+}
+
+function SavedNativeTerminalView({ terminal }: Pick<NativeTerminalViewProps, 'terminal'>): ReactElement {
+  const t = useT(), host = useRef<HTMLDivElement>(null), surface = useMemo(() => new NativeTerminalSurface(), []);
+  const screen = useApiQuery(['tasks', terminal.taskId, 'native-screen', terminal.agentId], async () => {
+    const result = NativeTerminalSnapshotDtoSchema.parse(await api.devSession.getNativeTerminalSnapshot(terminal.taskId, terminal.agentId));
+    if (result.snapshot && (result.snapshot.terminalId !== terminal.terminalId || result.snapshot.runnerId !== terminal.runnerId)) throw new Error(t('devSession.native.screenMismatch'));
+    return result;
+  }, { refetchIntervalMs: terminal.finalScreen === 'pending' ? 2000 : undefined });
+  useEffect(() => { if (host.current) surface.mount(host.current, () => {}, () => {}); return () => surface.dispose(); }, [surface]);
+  useEffect(() => { if (screen.data?.snapshot) void surface.restore(screen.data.snapshot); }, [surface, screen.data]);
+  return <>
+    <div className={styles.controlLine}><span>{t(`devSession.native.finalScreen.${screen.data?.status ?? 'pending'}`)}</span>{screen.data?.snapshot?.truncated ? <span title={t('devSession.native.scrollback')}>{t('devSession.native.bounded')}</span> : null}</div>
+    {screen.error ? <p className={styles.error} role="status">{errorMessage(screen.error)}<Button onClick={() => void screen.refetch()}>{t('devSession.native.reattach')}</Button></p> : null}
+    <div className={styles.terminalSurface} ref={host} role="region" tabIndex={0} aria-label={t('devSession.native.screen', { id: terminal.agentId.slice(-6) })} />
+  </>;
+}
+
+function LiveNativeTerminalView({ terminal, channel, stream, onActivity, canDevelop }: NativeTerminalViewProps): ReactElement {
   const t = useT();
   const host = useRef<HTMLDivElement>(null);
   const activity = useRef(onActivity);

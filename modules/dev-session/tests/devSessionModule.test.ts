@@ -35,6 +35,7 @@ beforeAll(async () => {
     apiCatalog: { listOperations: async () => [] },
     db: tdb.db,
     environments: {
+      createNativeExecution: async () => { throw new Error('独立执行未设置'); },
       getRebuild: async () => undefined,
       inspectRebuild: async () => { throw new Error("恢复预检未设置"); },
       requestRebuild: async () => { throw new Error("恢复请求未设置"); },

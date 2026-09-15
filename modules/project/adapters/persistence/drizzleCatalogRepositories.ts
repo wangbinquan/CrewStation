@@ -35,12 +35,13 @@ export function drizzleCatalogRepository(db: Executor): CatalogRepository {
       return row ? toComputeProfile(row) : undefined;
     },
     upsertComputeProfile: async (profile) => {
-      await db.insert(computeProfiles).values(profile).onConflictDoUpdate({ target: computeProfiles.name, set: { driver: profile.driver, model: profile.model, description: profile.description } });
+      const value = { ...profile, taskProfile: profile.taskProfile ?? null };
+      await db.insert(computeProfiles).values(value).onConflictDoUpdate({ target: computeProfiles.name, set: { driver: value.driver, model: value.model, description: value.description, taskProfile: value.taskProfile } });
     },
     deleteComputeProfile: async (name) => { await db.delete(computeProfiles).where(eq(computeProfiles.name, name)); },
   };
 }
 
 function toComputeProfile(row: typeof computeProfiles.$inferSelect): ComputeProfile {
-  return { name: row.name, driver: row.driver as ComputeProfile['driver'], model: row.model, description: row.description };
+  return { name: row.name, driver: row.driver as ComputeProfile['driver'], model: row.model, description: row.description, ...(row.taskProfile ? { taskProfile: row.taskProfile } : {}) };
 }

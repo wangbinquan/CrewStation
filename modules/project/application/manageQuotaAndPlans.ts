@@ -45,7 +45,10 @@ export function quotaAndPlanUseCases(deps: ProjectUseCaseDeps) {
     },
     upsertComputeProfile: async (actor: Actor, profile: ComputeProfileDto): Promise<ComputeProfileDto> => {
       adminOnly(actor);
-      await uow.run((scope) => scope.catalog.upsertComputeProfile(profile));
+      await uow.run(async (scope) => {
+        if (profile.taskProfile && !await scope.catalog.getTaskProfile(profile.taskProfile)) throw notFound('CLI 任务套餐', profile.taskProfile);
+        await scope.catalog.upsertComputeProfile(profile);
+      });
       return profile;
     },
     deleteComputeProfile: async (actor: Actor, name: string): Promise<void> => {

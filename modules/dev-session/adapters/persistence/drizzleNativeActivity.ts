@@ -1,10 +1,11 @@
+import { createHash } from 'node:crypto';
 import type { AgentActivityItem, AgentActivityQuery, ReadAgentActivityRequest, TaskId, UserId } from '@crewstation/contracts';
 import { precondition, validation } from '@crewstation/kernel';
 import type { Database, Executor } from '@crewstation/persistence';
 import { and, asc, desc, eq, gt, inArray, lt, lte, max, sql } from 'drizzle-orm';
 import { activityNotifies, initialNativeActivity, projectNativeActivity, projectNativeLifecycle } from '../../domain/nativeActivityProjection';
 import type { NativeActivityRepository, NativeActivityRead, StoredNativeEvent } from '../../ports/nativeActivity';
-import { activityItems as items, activityProgress as progress, activityReads as reads, activityStates as states } from './nativeActivityTables';
+import { activityItems as items, activityProgress as progress, activityReads as reads, activityStates as states, activitySources as sources } from './nativeActivityTables';
 import { nativeTerminalStarts as starts } from './nativeTerminalTable';
 
 const RETAINED_ITEMS = 2000;
@@ -13,20 +14,27 @@ const RESULTS = ['turn-completed', 'turn-failed', 'turn-cancelled', 'turn-unconf
 const scope = (taskId: TaskId) => eq(progress.taskId, taskId);
 const lock = (db: Executor, taskId: TaskId) => db.execute(sql`select pg_advisory_xact_lock(hashtext('dev_session.native_activity'), hashtext(${taskId}))`);
 const cursor = async (db: Executor, taskId: TaskId) => (await db.select().from(progress).where(scope(taskId)))[0]?.throughSeq ?? 0;
+const sourceKey = (taskId: TaskId, sourceTaskId: TaskId) => and(eq(sources.taskId, taskId), eq(sources.sourceTaskId, sourceTaskId));
+const sourceCursor = async (db: Executor, taskId: TaskId, sourceTaskId: TaskId) => (await db.select().from(sources).where(sourceKey(taskId, sourceTaskId)))[0]?.throughSeq ?? 0;
 
 export function drizzleNativeActivity(db: Database): NativeActivityRepository {
   return {
-    cursor: (taskId) => cursor(db, taskId),
-    apply: (taskId, sinceSeq, events) => db.transaction(async (tx) => {
+    cursor: (taskId, sourceTaskId = taskId) => sourceCursor(db, taskId, sourceTaskId),
+    completedSources: async (taskId) => (await db.select({ id: sources.sourceTaskId }).from(sources).where(and(eq(sources.taskId, taskId), eq(sources.complete, true)))).map((r) => r.id as TaskId),
+    async completeSource(taskId, sourceTaskId) { await db.insert(sources).values({ taskId, sourceTaskId, complete: true }).onConflictDoUpdate({ target: [sources.taskId, sources.sourceTaskId], set: { complete: true } }); },
+    apply: (taskId, sinceSeq, events, sourceTaskId = taskId) => db.transaction(async (tx) => {
       await lock(tx, taskId);
-      const throughSeq = await cursor(tx, taskId);
+      const throughSeq = await sourceCursor(tx, taskId, sourceTaskId);
       if (sinceSeq > throughSeq) throw precondition('状态投影不能越过未读取的源区间');
       if (events.length > 500 || events.some((event, i) => !Number.isSafeInteger(event.seq) || event.seq <= sinceSeq || (i > 0 && event.seq <= events[i - 1]!.seq))) throw validation('状态来源批次必须有界且按序号递增');
       const batch = events.filter((event) => event.seq > throughSeq);
       if (!batch.length) return throughSeq;
-      await applyEvents(tx, taskId, batch);
+      let projectionSeq = await cursor(tx, taskId);
+      const projected = batch.map((entry) => ({ ...entry, seq: projectionSeq = Math.max(projectionSeq + 1, entry.seq) }));
+      await applyEvents(tx, taskId, projected, sourceTaskId);
       const next = batch.at(-1)!.seq;
-      await tx.insert(progress).values({ taskId, throughSeq: next }).onConflictDoUpdate({ target: progress.taskId, set: { throughSeq: next } });
+      await tx.insert(sources).values({ taskId, sourceTaskId, throughSeq: next }).onConflictDoUpdate({ target: [sources.taskId, sources.sourceTaskId], set: { throughSeq: next } });
+      await tx.insert(progress).values({ taskId, throughSeq: projectionSeq }).onConflictDoUpdate({ target: progress.taskId, set: { throughSeq: projectionSeq } });
       await trim(tx, taskId);
       return next;
     }),
@@ -35,17 +43,18 @@ export function drizzleNativeActivity(db: Database): NativeActivityRepository {
   };
 }
 
-async function applyEvents(db: Executor, taskId: TaskId, events: StoredNativeEvent[]): Promise<void> {
-  const known = new Map((await db.select().from(starts).where(eq(starts.taskId, taskId)).limit(256)).map((row) => [row.agentId, row]));
+async function applyEvents(db: Executor, taskId: TaskId, events: StoredNativeEvent[], sourceTaskId: TaskId): Promise<void> {
+  const known = new Map((await db.select({ agentId: starts.agentId, record: starts.record, executionTaskId: starts.executionTaskId }).from(starts).where(eq(starts.taskId, taskId)).limit(256)).map((row) => [row.agentId, row]));
   const projections = new Map((await db.select().from(states).where(eq(states.taskId, taskId)).limit(256)).map((row) => [row.agentId, row.projection]));
   const changed = new Set<string>(), additions: Array<typeof items.$inferInsert> = [];
   for (const { event, seq, at } of events) {
     if (event.kind !== 'nativeActivity' && event.kind !== 'nativeTerminal') continue;
     const record = event.kind === 'nativeActivity' ? event.activity : event.terminal;
     const start = known.get(record.agentId);
-    if (!start || start.record.runnerId !== record.runnerId || start.record.terminalId !== record.terminalId) continue;
+    if (!start || (start.executionTaskId ?? taskId) !== sourceTaskId || start.record.runnerId !== record.runnerId || start.record.terminalId !== record.terminalId) continue;
     const previous = projections.get(record.agentId) ?? initialNativeActivity(start.record);
-    const result = event.kind === 'nativeActivity' ? projectNativeActivity(previous, event.activity, seq) : projectNativeLifecycle(previous, event.terminal, seq, at);
+    const activity = event.kind === 'nativeActivity' ? { ...event.activity, eventId: sourceTaskId === taskId ? event.activity.eventId : `execution:${createHash('sha256').update(JSON.stringify([sourceTaskId, event.activity.eventId])).digest('hex')}` } : undefined;
+    const result = activity ? projectNativeActivity(previous, activity, seq) : projectNativeLifecycle(previous, record as typeof start.record, seq, at);
     projections.set(record.agentId, result.projection); changed.add(record.agentId);
     if (result.item) additions.push({ taskId, seq, eventId: result.item.eventId, agentId: record.agentId, turnId: result.item.turnId, kind: result.item.kind, item: result.item });
   }

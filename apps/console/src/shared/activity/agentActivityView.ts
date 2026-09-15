@@ -11,9 +11,11 @@ export function activityTargetFromSearch(projectId: string, search: Record<strin
 }
 
 export function activityStatus(terminal: NativeTerminalDto | undefined, state?: AgentActivityState, page?: Pick<AgentActivityPage, 'connection' | 'sync'>, stale = false): ActivityStatus {
-  if (terminal?.lifecycle === 'failed') return 'start-failed';
+  if (terminal?.lifecycle === 'failed') return terminal.reason === 'environment-failed' ? 'failed' : 'start-failed';
   if (terminal?.lifecycle === 'ended' || state?.processEnded) return 'ended';
-  if (stale || terminal?.connection !== 'connected' || page && (page.connection !== 'connected' || page.sync !== 'ready')) return 'unknown';
+  if (terminal?.execution && terminal.lifecycle === 'starting' && ['queued', 'starting'].includes(terminal.execution.state)) return 'starting';
+  const connection = state?.connection ?? page?.connection, sync = state?.sync ?? page?.sync;
+  if (stale || terminal?.connection !== 'connected' || connection && connection !== 'connected' || sync && sync !== 'ready') return 'unknown';
   if (terminal?.lifecycle === 'starting') return 'starting';
   if (!state || state.source !== 'ready') return 'unknown';
   if (state.pending.length) return 'waiting';
@@ -24,7 +26,7 @@ export function taskEntries(task: ActivityTask): ActivityEntry[] {
   const page = task.page;
   const uncertain = task.stale || page?.sync !== 'ready' || page.connection !== 'connected';
   const target = (agentId: string, terminalId: string, turnId: string | null, eventId: string, seq: number): ActivityTarget => ({ projectId: task.projectId, taskId: task.taskId, agentId, terminalId, turnId, eventId, seq });
-  const pending: ActivityEntry[] = page?.states.flatMap((state) => state.processEnded ? [] : state.pending.map((request) => ({ target: target(state.agentId, state.terminalId, request.turnId, request.eventId, request.seq), kind: 'request-opened', at: request.openedAt, unread: request.unread ?? false, uncertain: uncertain || state.source !== 'ready', requestKind: request.kind }))) ?? [];
+  const pending: ActivityEntry[] = page?.states.flatMap((state) => state.processEnded ? [] : state.pending.map((request) => ({ target: target(state.agentId, state.terminalId, request.turnId, request.eventId, request.seq), kind: 'request-opened', at: request.openedAt, unread: request.unread ?? false, uncertain: task.stale || (state.connection ? state.connection !== 'connected' || state.sync !== 'ready' : uncertain) || state.source !== 'ready', requestKind: request.kind }))) ?? [];
   const failures: ActivityEntry[] = task.terminals?.items.filter((terminal) => terminal.lifecycle === 'failed').map((terminal) => ({ target: target(terminal.agentId, terminal.terminalId, null, `failed:${terminal.agentId}:${terminal.revision}`, 0), kind: 'process-failed', at: terminal.endedAt ?? terminal.startedAt, unread: false, uncertain: false, error: terminal.error })) ?? [];
   const results: ActivityEntry[] = (task.older ?? page)?.items.filter((item) => item.unread && item.turnId && item.kind.startsWith('turn-') && item.kind !== 'turn-started').map((item) => ({ target: target(item.agentId, item.terminalId, item.turnId, item.eventId, item.seq), kind: item.kind, at: item.occurredAt, unread: item.unread, uncertain: task.stale })) ?? [];
   return [...pending, ...failures, ...results.reverse()];

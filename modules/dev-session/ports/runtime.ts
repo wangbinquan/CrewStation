@@ -8,6 +8,7 @@ export interface EnvironmentView {
   state: 'creating' | 'running' | 'paused' | 'releasing' | 'released' | 'failed';
   podName: string;
   connected: boolean;
+  native?: { parentTaskId: TaskId; agentId: string; terminalId: string; runnerId: string; state: 'queued' | 'starting' | 'running' | 'cleaning' | 'finished'; profile: { name: string; cpu: string; memory: string; storage: string }; failureReason?: string };
   branch?: string;
   traceId: string;
   message?: string;
@@ -17,6 +18,7 @@ export interface EnvironmentView {
 
 /** 由 task-runtime 提供。 */
 export interface Environments {
+  createNativeExecution(input: { id: TaskId; parentTaskId: TaskId; createdBy: UserId; agentId: string; terminalId: string; runnerId: string; fingerprint: string; profile?: string }): Promise<EnvironmentView>;
   inspectRebuild(projectId: ProjectId): Promise<DevSessionRebuildInspection>;
   requestRebuild(projectId: ProjectId, input: RebuildDevSessionRequest): Promise<DevSessionRebuildDto>;
   getRebuild(taskId: TaskId): Promise<DevSessionRebuildDto | undefined>;

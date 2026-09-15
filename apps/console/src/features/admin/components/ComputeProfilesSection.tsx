@@ -19,10 +19,11 @@ export function ComputeProfilesSection(): ReactElement {
   const t = useT();
   const invalidate = [queryKeys.computeProfiles()];
   const profiles = useApiQuery(queryKeys.computeProfilesFull(), () => api.catalog.listComputeProfilesFull());
+  const tasks = useApiQuery(queryKeys.taskProfiles(), () => api.catalog.listTaskProfiles());
   const upsert = useApiMutation((input: ComputeProfileInput) => api.catalog.upsertComputeProfile(input), { invalidate });
   const remove = useApiMutation((name: string) => api.catalog.deleteComputeProfile(name), { invalidate });
   const items = profiles.data?.items ?? [];
-  const columns = [t('admin.compute.name'), t('admin.compute.driver'), t('admin.compute.model'), t('admin.compute.description'), t('admin.compute.actions')];
+  const columns = [t('admin.compute.name'), t('admin.compute.driver'), t('admin.compute.model'), t('admin.compute.taskProfile'), t('admin.compute.description'), t('admin.compute.actions')];
   return (
     <Card title={t('admin.compute.title')} footer={t('admin.compute.hint')}>
       <MutationError error={remove.error} messageKey="admin.compute.removeError" />
@@ -44,6 +45,7 @@ export function ComputeProfilesSection(): ReactElement {
               <td>
                 <code>{profile.model}</code>
               </td>
+              <td>{profile.taskProfile ?? t('admin.compute.defaultTaskProfile')}</td>
               <td>{profile.description === '' ? t('admin.none') : profile.description}</td>
               <td>
                 <InlineConfirm
@@ -59,6 +61,7 @@ export function ComputeProfilesSection(): ReactElement {
         </DataTable>
       ) : null}
       <ComputeProfileForm
+        taskProfiles={tasks.data?.items ?? []} profilesUnavailable={!tasks.data || !!tasks.error}
         busy={upsert.isPending}
         error={upsert.error === null ? undefined : t('admin.compute.saveError', { message: errorMessage(upsert.error) })}
         onSubmit={(input) => upsert.mutate(input)}

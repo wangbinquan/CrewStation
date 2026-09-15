@@ -227,6 +227,7 @@ function composeRuntime(deps: PlatformModuleDeps, core: ReturnType<typeof compos
       // 的回执——回执要经同一条链回来，等下去必然自锁到命令超时。
       onRunnerConnected: taskRuntime.api.onRunnerConnected,
       onRunnerReady: (taskId) => {
+        void devSession.api.dispatchPendingNativeExecution(taskId).catch(() => logger.error('dispatch native execution failed', { taskId }));
         void businessTask.api.dispatchPendingSubtasks(taskId)
           .then((dispatched) => { if (dispatched > 0) logger.info('dispatched pending subtasks', { taskId, dispatched }); })
           .catch((error: unknown) => logger.error('dispatch pending subtasks failed', { taskId, error: error instanceof Error ? error.message : String(error) }));

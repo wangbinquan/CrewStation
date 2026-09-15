@@ -34,6 +34,18 @@ test('未知来源和断线不呈现本轮成功；确定进程退出仍显示�
   f.page.states[0]!.currentTurn!.status = 'failed'; expect(activityStatus(f.terminal, f.page.states[0], f.page)).toBe('failed');
 });
 
+test('父工作区断线不掩盖独立 CLI 的运行和等待；单窗断线只降级该窗', async () => {
+  const f = activityFixture();
+  f.terminal.execution = { taskId: f.terminal.taskId, state: 'running' };
+  f.page.connection = 'disconnected'; f.page.sync = 'unavailable';
+  const state = f.page.states[0]!; state.connection = 'connected'; state.sync = 'ready';
+  expect(activityStatus(f.terminal, state, f.page)).toBe('waiting');
+  await f.register(); expect(taskEntries(f.store.getSnapshot().tasks[0]!)[0]?.uncertain).toBe(false);
+  state.connection = 'unknown'; expect(activityStatus(f.terminal, state, f.page)).toBe('unknown');
+  expect(activityStatus({ ...f.terminal, lifecycle: 'starting', connection: 'disconnected', execution: { taskId: f.terminal.taskId, state: 'queued' } }, undefined, f.page)).toBe('starting');
+  expect(activityStatus({ ...f.terminal, lifecycle: 'failed', reason: 'environment-failed' }, state, f.page)).toBe('failed');
+});
+
 test('请求合并、失败保留上次记录并降级，查看资格撤销时立即移除该任务', async () => {
   const f = activityFixture(); await f.register();
   f.source.page = async () => { throw new Error('offline'); };

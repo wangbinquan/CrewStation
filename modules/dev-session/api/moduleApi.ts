@@ -1,14 +1,23 @@
 import type { Actor, AgentInstanceDto, BranchDto, DevSessionDto, OpenDevSessionRequest, ProjectId, PublishDevSessionRequest, ReleaseDto, SendAgentMessageRequest, StartDevAgentRequest, TaskId, WorkspaceStatusDto } from '@crewstation/contracts';
 import type { ComparisonDetailQuery, ComparisonDetails, ComparisonTarget, VersionComparisonDto } from '@crewstation/contracts';
-import type { NativeTerminalApi } from './nativeTerminalApi';
+import type { NativeTerminalDto, NativeTerminalList, NativeTerminalSnapshotDto, StartNativeTerminalRequest } from '@crewstation/contracts';
 import type { SaveWorkspaceLayoutRequest, WorkspaceLayoutDto } from '@crewstation/contracts';
 import type { AgentActivityPage, AgentActivityQuery, ReadAgentActivityRequest } from '@crewstation/contracts';
 import type { ApiInvocationRequest, ApiInvocationResponse } from '@crewstation/contracts';
 import type { DevSessionRebuildDto, DevSessionRebuildInspection, RebuildDevSessionRequest } from '@crewstation/contracts';
 
 /** dev-session 对外能力：一项目一会话、分支、并行流式 Agent、从会话发布、空闲提醒。 */
+export interface NativeTerminalApi {
+  startNativeTerminal(actor: Actor, taskId: TaskId, input: StartNativeTerminalRequest): Promise<NativeTerminalDto>;
+  listNativeTerminals(actor: Actor, taskId: TaskId): Promise<NativeTerminalList>;
+  stopNativeTerminal(actor: Actor, taskId: TaskId, agentId: string): Promise<void>;
+  getNativeTerminalSnapshot(actor: Actor, taskId: TaskId, agentId: string): Promise<NativeTerminalSnapshotDto>;
+}
+
 export interface DevSessionModuleApi extends NativeTerminalApi {
   readonly name: 'dev-session';
+  dispatchPendingNativeExecution(executionTaskId: TaskId): Promise<void>;
+  reconcileNativeExecutions(): Promise<void>;
   inspectSessionRebuild(actor: Actor, projectId: ProjectId): Promise<DevSessionRebuildInspection>;
   rebuildSession(actor: Actor, projectId: ProjectId, input: RebuildDevSessionRequest): Promise<DevSessionRebuildDto>;
   invokeApi(actor: Actor, projectId: ProjectId, input: ApiInvocationRequest): Promise<ApiInvocationResponse>;

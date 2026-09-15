@@ -12,6 +12,7 @@ function fixture() {
   const accesses: string[] = [];
   let through = 0;
   const repository: NativeActivityRepository = {
+    completedSources: async () => [], completeSource: async () => {},
     cursor: async () => through,
     apply: async (_task, _since, events) => { through = events.at(-1)?.seq ?? through; return through; },
     read: async (_task, user) => { accesses.push(user); return structuredClone(data); },

@@ -72,7 +72,7 @@ export function createDevSessionModule(deps: DevSessionModuleDeps): DevSessionMo
   const agents = agentUseCases(useCaseDeps);
   const remind = idleReminderUseCase(useCaseDeps);
   const terminals = drizzleNativeTerminals(deps.db);
-  const activity = nativeActivityUseCases(useCaseDeps, drizzleNativeActivity(deps.db));
+  const activity = nativeActivityUseCases(useCaseDeps, drizzleNativeActivity(deps.db), terminals);
   const native = nativeTerminalUseCases(useCaseDeps, terminals);
   const api: DevSessionModuleApi = {
     invokeApi: apiInvocationUseCase(useCaseDeps),
@@ -90,10 +90,12 @@ export function createDevSessionModule(deps: DevSessionModuleDeps): DevSessionMo
     },
   };
   let timer: ReturnType<typeof setInterval> | undefined;
+  let executionTimer: ReturnType<typeof setInterval> | undefined;
   return {
     api,
     http: [devSessionRoutes(api, deps.isAdmin), nativeTerminalRoutes(api, deps.isAdmin), workspaceLayoutRoutes(api, deps.isAdmin)],
-    workers: [{ start: () => { timer ??= setInterval(() => void remind().catch((e: unknown) => useCaseDeps.logger.error('idle reminder failed', { error: String(e) })), 60_000); }, stop: async () => { if (timer) clearInterval(timer); timer = undefined; } }],
+    workers: [{ start: () => { timer ??= setInterval(() => void remind().catch((e: unknown) => useCaseDeps.logger.error('idle reminder failed', { error: String(e) })), 60_000); }, stop: async () => { if (timer) clearInterval(timer); timer = undefined; } },
+      { start: () => { executionTimer ??= setInterval(() => void native.reconcileNativeExecutions().catch(() => useCaseDeps.logger.error('native execution reconciliation failed')), 2000); }, stop: async () => { if (executionTimer) clearInterval(executionTimer); executionTimer = undefined; } }],
     migrations: devSessionMigrations,
   };
 }

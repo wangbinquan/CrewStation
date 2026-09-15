@@ -9,7 +9,7 @@ export const NativeTerminalRecordSchema = TerminalSizeSchema.extend({
   lifecycle: z.enum(['starting', 'running', 'ended', 'failed']),
   startedAt: z.iso.datetime(), endedAt: z.iso.datetime().optional(),
   nativeSessionId: z.string().optional(), exitCode: z.number().int().nullable().optional(),
-  reason: z.enum(['exited', 'stopped', 'start-failed', 'runner-restarted']).optional(),
+  reason: z.enum(['exited', 'stopped', 'start-failed', 'runner-restarted', 'environment-failed']).optional(),
   error: z.string().optional(),
 });
 export const NativeTerminalRosterSchema = z.object({ runnerId: z.uuid(), terminals: z.array(NativeTerminalRecordSchema) });

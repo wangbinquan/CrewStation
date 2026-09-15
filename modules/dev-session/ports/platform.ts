@@ -27,7 +27,7 @@ export interface SourceControl {
  * 解析发生在平台侧，容器拿到的是已经定好的具体值。
  */
 export interface ComputeCatalog {
-  resolve(name: string): Promise<{ name: string; driver: AgentDriver; model: string } | undefined>;
+  resolve(name: string): Promise<{ name: string; driver: AgentDriver; model: string; taskProfile?: string } | undefined>;
   /** 只用于报错时列出可选项。 */
   list(): Promise<Array<{ name: string }>>;
 }

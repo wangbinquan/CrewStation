@@ -17,21 +17,21 @@ export interface TaskStreamHandle {
 }
 
 /**
- * 一个开发会话一条 WebSocket。
+ * 每个执行身份一条 WebSocket；旧 CLI 共享父工作区，新 CLI 使用独立执行身份。
  * 状态用 useSyncExternalStore 从连接对象读快照：面板订阅的是同一个连接，不会各开一条。
  * channel 的身份只随 taskId 变化，因此订阅事件的 effect 不会被状态刷新反复重建。
  */
-export function useTaskStream(taskId: string): TaskStreamHandle {
+export function useTaskStream(taskId: string, enabled = true): TaskStreamHandle {
   const socket = useMemo(
     () => new TaskStreamSocket((sinceSeq) => resolveStreamEndpoint(api.stream.taskStreamUrl(taskId, sinceSeq), window.location.href)),
     [taskId],
   );
   useEffect(() => {
-    socket.start();
+    if (enabled) socket.start();
     return () => {
       socket.stop();
     };
-  }, [socket]);
+  }, [socket, enabled]);
   const state = useSyncExternalStore(socket.subscribeState, socket.getState);
   const channel = useMemo<TaskStreamChannel>(() => ({ send: socket.send, subscribe: socket.subscribeEvents }), [socket]);
   return { state, channel };
