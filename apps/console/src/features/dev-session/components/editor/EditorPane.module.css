@@ -1,6 +1,21 @@
 .pane {
   grid-area: editor;
-  min-height: 440px;
+  height: 100%;
+  container-type: inline-size;
+}
+
+.content {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+@container (max-width: 600px) {
+  .content {
+    flex-direction: column;
+  }
 }
 
 .path {

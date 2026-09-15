@@ -1490,3 +1490,37 @@ Tab 从操作键复制进入右側路径复制时，表格 scrollLeft=382，按�
 API ebaa730／generation=32、controller cc93104／21 均 1／1，任务运行时未变。workbench-blue／delivery-green／files-green 仍 generation=21／13／13、原 releaseId、1／1；workbench 正式 green 仍 generation=1。节点 Ready=True、MemoryPressure／DiskPressure=False，剩余 1,838,116,864 bytes。本批仅滚动 console，没有临时调零其他副本或清理镜像／数据。
 
 证据为 batch66 的 browser-before／browser-final、check、build、source-candidate、image-context／built／budget／import、deploy-before／console-rollout、http-assets、qa-before／qa-after／qa-comparison、final-runtime。源码与三份文档精确提交，最终 SHA 托管 CI 单独核对。资源总览已复现的密度缺陷关闭；**累计仍 22／52 通过、30 项待完成**，其余关键页面、角色和实际系统明暗旅程继续，I9／I14／I15 与具体成员范围仍待答复，RFC-004 等待 RFC-003 完结。
+
+## 第六十七批：开发面板、菜单与只读滚动
+
+继续 UX-AT-25／26／37，批前 main／origin/main 为 `67e8a70fa4dfbf9f279b5428695e4ec235f3850d`，工作树和索引为空。该 SHA 的 [CI 34926758620](https://github.com/wangbinquan/CrewStation/actions/runs/34926758620) 于 03:56:33Z 成功：1167 pass／8 skip／0 fail，1175 tests／195 files／6473 assertions／63.50s，console build 1.00s。沿用原 admin 和既有 QA，不启动新模型轮次。
+
+### 实机缺陷与修复
+
+- [EditorPane](../../../apps/console/src/features/dev-session/components/editor/EditorPane.tsx) 原先只有最小高度，文件树固定 220px。320px 的同一 README 编辑器仅 82px、文字区 57.14px，文档挤成长列且随内容撑高。现在面板使用工作区既定高度，内容区独立布局；容器小于 600px 时文件树置顶、最多 128px 并可滚动，编辑器占整行。最终五尺寸编辑器宽 878／622／530／372／302px、高 445／445／445／293／257px；320px 文字区 277.14px。键盘可到达文档尾部，保存始终禁用，没有修改 README。
+- [NativeWorkspace.module.css](../../../apps/console/src/features/dev-session/components/native/NativeWorkspace.module.css) 的菜单以窄 summary 为定位基准，summary 换行到左边时弹出层向左跑出页面。真实 320px 页签设置边界 [-175.69, 80.31]、窗口操作 [-174.83, 81.17]；现相对整条工具栏／窗口标题定位，并限制容器宽度，最终分别 [52, 312]／[51, 311]。中文设置／窗口菜单、英文设置／高级菜单与名册分别完成五尺寸检查。Tab 可到达重命名按钮，[61, 303]、2px 焦点框可见，未执行关闭或结束进程。
+- 只读 CLI 保留原 PTY 尺寸，外层 scrollWidth=1088、clientWidth=302，却在正文上无法滚动；改在 4px 边缘滚动可以到 786，证明 xterm 内层拦截是实际原因。[NativeTerminalSurface](../../../apps/console/src/features/dev-session/model/native/nativeTerminalSurface.ts) 现仅在只读且对应方向存在外层溢出时，于捕获阶段阻止事件进入 xterm，保留浏览器默认滚动；取得控制或没有外层溢出时仍由 xterm 处理，卸载移除监听。只读画面增加 region、Tab 入口和内侧焦点框。最终正文滚动至右下角 786／56.5，Tab 从“获取输入控制”进入画面、左方向键使 scrollLeft 786→746；没有点击控制按钮或向终端发键。
+- 历史页面的 [TerminalPane](../../../apps/console/src/features/dev-session/components/terminal/TerminalPane.module.css) 只有 min-height，FitAddon 随父内容高度反复增大。五尺寸观察到 xterm 高 18990／19200／19485／19740／19890px。补上原设计的 420px 定高后，五尺寸画面均为 351.41px，320px 整页高 1416px，普通终端提示符与输入区可见。没有重开终端或执行 shell 命令。
+- [I18nProvider](../../../apps/console/src/shared/lib/I18nProvider.tsx) 现在同步 html.lang，并在卸载恢复宿主声明。旧页面文案已是英文而语言仍中文；真实控件回归验证中英切换、输入／焦点保持及卸载，最终部署也核对 en-US→zh-CN 和同一 CLI 保留。
+
+### 验收边界与证据
+
+本批有 25 组五尺寸记录（1280／1024／768／390／320×720），包括修复前、中间候选和最终候选，不能把 125 次全部称作修复后的通过。新增范围为 CLI、会话／数据菜单、既有实时预览、代码、差异清单／提交、历史转录；管理接入的概览、无会话开发入口、发布及真实 v0.1.2 详情、健康、成员、无历史会话，以及已上线市场详情。所有记录的整页宽度等于请求视口，但历史终端高度及正文滚动正是在这个条件下发现的问题，因此不以无横向溢出代替可用性。
+
+初期量测错误地把关闭 details 的子控件和可横向滚动的未选中标签列作越界，后续明确排除并实际打开两个问题菜单。另有一次复用 tab 22 的 viewport 句柄去检查 tab 17，五次实际都仍为 1280px；这组无效记录丢弃，后续每次断言实际宽度等于请求值。320px 英文原生页签（183.60px／169.19px 标签条）及历史长页签仍大于自身标签条，完整横向阅读路径尚未验收，没有声称所有标签均完全显露。
+
+原 tab 17 在批初登录过期，reload 后通过原 demo admin 正常登录返回同一任务；原中文草稿存在。尺寸检查使用 tab 22 作为第二个只读查看者。最终 tab 22 返回 files 开发资源页、撤销 viewport，tab 17 加载最终脚本并通过正常按钮恢复原输入控制：CLI 1937fa、工作区 1／网格、未读完成 1、`RFC003_SNAPSHOT_DRAFT 未发送草稿` 均在实际截图中保持。
+
+语言回归先 **0 pass／2 fail／6 assertions**；滚动回归先 **1 pass／3 fail／6 assertions**，真实 xterm 与外层几何共同验证事件归属，涵盖横／纵滚动、无溢出及控制权往返。最终定向为 **13 pass／0 fail／52 assertions**。样式尺寸采用真实浏览器前后与键盘验证，没有新增复述 CSS 的测试。
+
+### 最终门禁、部署与保留状态
+
+首个六文件候选完整检查 **1173 pass／4 skip／0 fail**、build 502ms，部署为 b67-2e27cec857／generation=38。随后正文滚动的新增修复改变候选，九文件候选检查 **1177 pass／4 skip／0 fail**、build 494ms；该检查执行期间又发现历史高度问题，等检查完成后补定高，没有中途改变候选。最终十文件候选完整 `bun run check` **1177 pass／4 skip／0 fail**（1181 tests／197 files／6540 assertions，测试阶段 107.09s，命令共 125.36s），console build **441ms**。三轮结果分别保留为 initial、scroll-only 和最终记录；最终摘要此后保持，纯文档不重复检查。
+
+最终镜像 `cs-console:rfc003-b67-b5d4ba5f9d`，imageID=`sha256:1bd35c17b01f8e325bc964d5aa8d184880b63504180395bd6fed906a316b968c`，新增导入 3,720,885 bytes（中间部署另增 3,720,373 bytes）。04:33:29Z 原 Deployment UID 保持、generation=39、1／1；Pod `console-69df94cbb9-bgpgp`／UID `1cd31b06-b454-4459-9eeb-d965dcea29c4`、restartCount=0，实际 imageID 和七份文件匹配。04:37:48Z 正常 HTTP 六份资源一致，实际页面为 index-CroDSPeQ.js；最终再验原生只读、编辑器、历史页五尺寸及菜单 320px／语言往返。
+
+04:37:48Z 普通 API 对比批前 04:02:44Z，delivery／files／旧 rfc003-ux 的 taskId、native、activity、历史 agents、workspace 相同，仅排除 checkedAt；session 单独比较，只有 delivery.lastActivityAt 更新。个人布局内容完全恢复，正常导航保存使 revision 3→10。没有读取 npm 缓存内容或发送原草稿。
+
+04:38:05Z 原三个健康任务及失败任务 UID／容器状态／restartCount、四份原文件及 Git 配置摘要、失败 Bound 工作卷 UID 均保持；各预览／正式槽的 UID、generation、releaseId、1／1 与批前相同。API ebaa730／generation=32、controller cc93104／21 均 1／1；节点 Ready=True、MemoryPressure／DiskPressure=False，剩余 1,785,839,616 bytes。本批仅更新 console，未清理数据或调零其他副本。
+
+临时证据为 batch67 的 language-red、scroll-red、final-targeted、initial／scroll-only／最终 check 和 build、source-candidate、image-context／built／budget／import、deploy-before／console-rollout、http-assets、qa-before／after／comparison、layout-before／after、browser-final、final-runtime。源码与三份文档精确提交，最终 SHA 托管 CI 单独核对。**累计仍 22／52 通过、30 项待完成**；创建接入／开通页面、长标签阅读及完整键盘／实际系统主题等余项继续，角色及故障恢复不由这些尺寸证据替代。I9／I14／I15 与具体成员范围待答复，RFC-004 等待 RFC-003 完结。

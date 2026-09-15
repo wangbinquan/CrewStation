@@ -64,12 +64,14 @@ export function EditorPane({ tree, editor }: EditorPaneProps): ReactElement {
       extra={<Toolbar editor={editor} />}
       notice={editor.pendingAction || editor.conflict || editor.error !== undefined ? <EditorNotice editor={editor} /> : undefined}
     >
-      <FileTree tree={tree} openPath={editor.file?.path} onOpen={editor.openFile} disabled={editor.busy || Boolean(editor.pendingAction)} />
-      {editor.file === undefined ? (
-        <p className={styles.placeholder}>{tree.error ?? t('devSession.editor.placeholder')}</p>
-      ) : (
-        <CodeEditor file={editor.file} draft={editor.draft} onChange={editor.change} onSave={editor.save} />
-      )}
+      <div className={styles.content}>
+        <FileTree tree={tree} openPath={editor.file?.path} onOpen={editor.openFile} disabled={editor.busy || Boolean(editor.pendingAction)} />
+        {editor.file === undefined ? (
+          <p className={styles.placeholder}>{tree.error ?? t('devSession.editor.placeholder')}</p>
+        ) : (
+          <CodeEditor file={editor.file} draft={editor.draft} onChange={editor.change} onSave={editor.save} />
+        )}
+      </div>
     </Pane>
   );
 }

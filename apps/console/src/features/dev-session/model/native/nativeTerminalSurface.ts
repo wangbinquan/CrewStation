@@ -10,6 +10,7 @@ export class NativeTerminalSurface implements NativeTerminalSink {
   private fit?: FitAddon;
   private observer?: ResizeObserver;
   private stopTheme?: () => void;
+  private stopScroll?: () => void;
   private timer?: ReturnType<typeof setTimeout>;
   private tail: Promise<void> = Promise.resolve();
   private controlled = false;
@@ -18,6 +19,15 @@ export class NativeTerminalSurface implements NativeTerminalSink {
     const terminal = new Terminal({ ...look, fontSize: 12, cursorBlink: true, scrollback: 500, disableStdin: true });
     const fit = new FitAddon(); terminal.loadAddon(fit); terminal.open(container);
     this.terminal = terminal; this.fit = fit;
+    const readOnlyScroll = (event: WheelEvent): void => {
+      if (this.controlled) return;
+      const horizontal = (event.deltaX !== 0 || event.shiftKey) && container.scrollWidth > container.clientWidth;
+      const vertical = event.deltaY !== 0 && !event.shiftKey && container.scrollHeight > container.clientHeight;
+      // xterm 的内部滚轮处理会取消默认滚动；只读小窗让浏览器滚动外层原尺寸画面。
+      if (horizontal || vertical) event.stopPropagation();
+    };
+    container.addEventListener('wheel', readOnlyScroll, { capture: true });
+    this.stopScroll = () => container.removeEventListener('wheel', readOnlyScroll, { capture: true });
     terminal.onData(input);
     terminal.onResize(({ cols, rows }) => {
       if (!this.controlled) return;
@@ -57,8 +67,8 @@ export class NativeTerminalSurface implements NativeTerminalSink {
   }
   dispose(): void {
     if (this.timer) clearTimeout(this.timer);
-    this.observer?.disconnect(); this.stopTheme?.(); this.terminal?.dispose();
-    this.stopTheme = undefined;
+    this.observer?.disconnect(); this.stopTheme?.(); this.stopScroll?.(); this.terminal?.dispose();
+    this.stopTheme = undefined; this.stopScroll = undefined;
     this.terminal = undefined; this.fit = undefined; this.controlled = false; this.tail = Promise.resolve();
   }
 }

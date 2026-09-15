@@ -39,6 +39,6 @@ export function NativeTerminalView({ terminal, channel, stream, onActivity, canD
       {state.phase === 'error' ? <Button variant="ghost" onClick={() => void attachment.refresh()}>{t('devSession.native.reattach')}</Button> : null}
     </div>
     {state.error ? <p className={styles.error} role="status">{state.error}</p> : null}
-    <div className={styles.terminalSurface} ref={host} aria-label={t('devSession.native.screen', { id: terminal.agentId.slice(-6) })} />
+    <div className={styles.terminalSurface} ref={host} role="region" tabIndex={state.controlled ? -1 : 0} aria-label={t('devSession.native.screen', { id: terminal.agentId.slice(-6) })} />
   </>;
 }
