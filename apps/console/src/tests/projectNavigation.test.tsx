@@ -11,14 +11,14 @@ const project = { id: projectId, serviceId, name: '团队知识助理', slug: 't
 let page: Awaited<ReturnType<typeof renderApp>> | undefined;
 afterEach(() => { page?.unmount(); page = undefined; globalThis.fetch = originalFetch; });
 
-function fixture(logItems?: unknown[]) {
+function fixture(logItems?: unknown[], admin = false) {
   const calls: Array<{ url: URL; method: string }> = [];
   let logFailure = false;
   globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
     const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url, 'http://localhost');
     calls.push({ url, method: init?.method ?? 'GET' });
     let status = 200, body: unknown = { items: [] };
-    if (url.pathname === '/v1/me') body = { id: 'user', name: '小林', isAdmin: false, memberships: [{ projectId, role: 'owner' }] };
+    if (url.pathname === '/v1/me') body = { id: 'user', name: '小林', isAdmin: admin, memberships: [{ projectId, role: 'owner' }] };
     else if (url.pathname === `/v1/projects/${projectId}`) body = project;
     else if (url.pathname === `/v1/projects/prj_${'f'.repeat(32)}`) body = { ...project, id: `prj_${'f'.repeat(32)}`, name: '另一个应用', slug: 'another-app' };
     else if (url.pathname === `/v1/services/${serviceId}`) body = { id: serviceId, projectId };
@@ -126,6 +126,29 @@ describe('五个项目入口与旧链接兼容', () => {
 });
 
 describe('诊断、订阅与配置的上下文', () => {
+  test('同路径切到生产配置后，空间往返恢复最新分组', async () => {
+    const f = fixture(undefined, true); page = await renderApp(`/projects/${projectId}/config`);
+    await page.click('生产取值组'); expect(page.search().env).toBe('production');
+    await page.click('进入平台管理'); await page.click('回到工作台');
+    // 同一 pathname 的 query 也必须更新返回位置，不能沿用开发组或默认成员分类。
+    expect(page.path()).toBe(`/projects/${projectId}/settings`);
+    expect(page.search()).toEqual({ tab: 'config', env: 'production' });
+    expect([...document.querySelectorAll('[role="tab"][aria-selected="true"]')].map((node) => node.textContent)).toContain('生产取值组');
+    expect(f.calls.some((call) => call.method !== 'GET')).toBe(false);
+  });
+
+  test('空间往返保留日志发布与时间筛选，回程仍读取原版本', async () => {
+    const f = fixture(undefined, true), since = '2026-09-13T01:00:00.000Z';
+    page = await renderApp(`/projects/${projectId}/logs?source=migration&releaseId=${releaseId}&since=${encodeURIComponent(since)}&limit=700`);
+    await page.click('进入平台管理'); await page.click('回到工作台');
+    // 原实现回到 operations 默认健康页，丢掉用于排查单次发布的完整条件。
+    expect(page.path()).toBe(`/projects/${projectId}/operations`);
+    expect(page.search()).toEqual({ tab: 'logs', source: 'migration', releaseId, since, limit: 700 });
+    const lastLogRequest = f.calls.filter((call) => call.url.pathname.endsWith('/logs')).at(-1)!;
+    expect(Object.fromEntries(lastLogRequest.url.searchParams)).toEqual({ source: 'migration', releaseId, since, limit: '700' });
+    expect(page.text()).toContain('build fixture line'); expect(f.calls.some((call) => call.method !== 'GET')).toBe(false);
+  });
+
   test('同一设置路由切换项目会换上下文，上一项目草稿不进入新项目', async () => {
     fixture(); page = await renderApp(`/projects/${projectId}/settings?tab=config`);
     await input(document.querySelector<HTMLInputElement>('input[placeholder="DATABASE_URL"]')!, 'OLD_PROJECT_DRAFT');

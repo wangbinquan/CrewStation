@@ -1,5 +1,6 @@
 import './domSetup';
 import { afterEach, describe, expect, test } from 'bun:test';
+import { rememberWorkbenchPath } from '../app/layout/spaceMemory';
 import { renderApp } from './renderApp';
 
 const originalFetch = globalThis.fetch;
@@ -73,6 +74,33 @@ describe('管理接入容器复用业务页面', () => {
     expect(page.search().tab).toBe('members'); expect(page.text()).not.toContain('应用可见性');
     expect(f.calls.some((url) => url.includes('/app-visibility') || url.includes('/app-presentation'))).toBe(false);
   });
+});
+
+test('旧租户接入链接不能覆盖原工作台返回位置', async () => {
+  fixture(); page = await renderApp('/projects?q=return-project');
+  await page.navigate(`/projects/${projectId}/logs?source=slot&slot=prod&limit=300`);
+  expect(page.path()).toBe(`/admin/integrations/${projectId}/operations`);
+  await page.click('回到工作台');
+  // 实机把旧租户地址记进返回位置，按钮回程又被项目类型边界重定向到管理页。
+  expect(page.path()).toBe('/projects'); expect(page.search().q).toBe('return-project');
+});
+
+test('直接打开旧接入链接时，返回工作台使用初始位置，不在两空间循环', async () => {
+  rememberWorkbenchPath('/'); // 模拟整页载入时空间记忆的初始值。
+  fixture(); page = await renderApp(`/projects/${projectId}/settings?tab=repository`);
+  expect(page.path()).toBe(`/admin/integrations/${projectId}/settings`);
+  await page.click('回到工作台');
+  expect(page.path()).toBe('/'); expect(page.text()).toContain('能力市场');
+});
+
+test('旧接入项目读取失败再恢复，不会把待识别地址保存成工作台返回位置', async () => {
+  const f = fixture({ projectFailure: true }); page = await renderApp('/projects?q=keep-on-error');
+  await page.navigate(`/projects/${projectId}/settings?tab=repository`);
+  expect(page.text()).toContain('项目目录读取失败');
+  f.state.projectFailure = false; await page.click('重新读取项目');
+  expect(page.path()).toBe(`/admin/integrations/${projectId}/settings`);
+  await page.click('回到工作台');
+  expect(page.path()).toBe('/projects'); expect(page.search().q).toBe('keep-on-error');
 });
 
 describe('管理详情保持守卫的加载、失败与拒绝语义', () => {

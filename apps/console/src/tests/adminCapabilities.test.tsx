@@ -36,6 +36,7 @@ function fixture(options: { admin?: boolean; meFailure?: boolean; pendingMe?: bo
     }
     else if (url.pathname === `/v1/projects/${integrationId}`) body = integration;
     else if (/^\/v1\/projects\/prj_[a-f0-9]{32}$/.test(url.pathname)) { status = 404; body = { error: 'not_found', message: '未找到指定项目' }; }
+    else if (url.pathname.endsWith('/openapi')) { status = 503; body = { error: 'unavailable', message: '文档暂不可用' }; }
     else if (url.pathname === '/v1/catalog/operations') {
       if (state.operationsFailure) { status = 503; body = { error: 'unavailable', message: '接口目录失败' }; }
       else body = { items: [{ key, proxy: 'billing', method: 'GET', path: '/invoices', openPolicy: state.policy, granted: url.searchParams.has('serviceId') ? state.grant : undefined }] };
@@ -157,6 +158,33 @@ describe('管理员能力与审批入口', () => {
     expect(f.writes()).toHaveLength(0); f.state.egressFailure = false; await page.click('刷新出站申请');
     expect(visible<HTMLInputElement>('input').value).toBe('保留出站意见'); expect(visible<HTMLInputElement>('input').disabled).toBe(false);
   });
+});
+
+test('从指定 API 文档进入管理再返回，恢复原分类与接口而不是成员页', async () => {
+  const f = fixture(); page = await renderApp(`/projects/${projectId}/catalog?proxy=billing&operation=${encodeURIComponent(key)}`);
+  await page.click('管理接口开放策略');
+  expect(page.path()).toBe('/admin/capabilities');
+  expect(page.search()).toMatchObject({ tab: 'api', projectId, proxy: 'billing', operation: key });
+  await page.click('回到工作台');
+  // 实机只记 pathname，回程把 settings 的分类和操作丢掉，误落到默认成员页。
+  expect(page.path()).toBe(`/projects/${projectId}/settings`);
+  expect(page.search()).toEqual({ tab: 'resources', resource: 'api', proxy: 'billing', operation: key });
+  expect(document.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe('开发资源');
+  expect(page.text()).toContain(key); expect(f.writes()).toHaveLength(0);
+  await page.back(); expect(page.path()).toBe('/admin/capabilities');
+  await page.back(); expect(page.search()).toMatchObject({ resource: 'api', operation: key });
+});
+
+test('旧接入列表保留搜索、类型、状态、负责人及翻页位置', async () => {
+  const f = fixture(), ownerUserId = project.ownerUserId, cursor = 'next-page-cursor';
+  page = await renderApp(`/admin/integrations?q=${encodeURIComponent('账单')}&kind=APIProxy&state=active&ownerUserId=${ownerUserId}&cursor=${cursor}`, '/projects');
+  // 实机旧路由只传固定 tab，带筛选的书签被改成全部接入容器。
+  expect(page.path()).toBe('/admin/capabilities');
+  expect(page.search()).toEqual({ tab: 'integrations', q: '账单', kind: 'APIProxy', state: 'active', ownerUserId, cursor });
+  const request = f.calls.find((call) => call.url.pathname === '/v1/projects/page')!;
+  expect(Object.fromEntries(request.url.searchParams)).toMatchObject({ q: '账单', kind: 'APIProxy', state: 'active', ownerUserId, cursor });
+  expect(visible<HTMLInputElement>('input').value).toBe('账单'); expect(f.writes()).toHaveLength(0);
+  await page.back(); expect(page.path()).toBe('/projects');
 });
 
 test('管理新入口及兼容地址对非管理员保持拒绝，不读取平台目录和全部申请', async () => {

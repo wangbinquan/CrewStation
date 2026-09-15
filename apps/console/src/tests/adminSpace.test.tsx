@@ -5,6 +5,7 @@ import { renderApp } from './renderApp';
 
 interface Handler {
   readonly match: string;
+  readonly exactPath?: boolean;
   readonly status?: number;
   readonly body?: unknown;
   /** 不解析：用来验证 pending 态。 */
@@ -21,7 +22,7 @@ const MEMBER = { ...ADMIN, id: 'usr_m', name: '普通成员', isAdmin: false };
 globalThis.fetch = (async (input: string | URL | Request) => {
   const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
   requests.push(url);
-  const handler = handlers.find((h) => url.includes(h.match));
+  const handler = handlers.find((h) => h.exactPath ? new URL(url, 'http://localhost').pathname === h.match : url.includes(h.match));
   if (handler?.hang === true) return new Promise<Response>(() => undefined);
   if (handler === undefined) return new Response(JSON.stringify({ items: [] }), { status: 200, headers: { 'content-type': 'application/json' } });
   return new Response(JSON.stringify(handler.body ?? {}), { status: handler.status ?? 200, headers: { 'content-type': 'application/json' } });
@@ -98,12 +99,15 @@ describe('管理空间与租户空间分离（RFC-002）', () => {
 
   test('空间往返保持项目上下文', async () => {
     asAdmin();
-    app = await renderApp('/projects/prj_1/release');
-    expect(app.path()).toBe('/projects/prj_1/release');
+    const projectId = `prj_${'a'.repeat(32)}`;
+    handlers.push({ match: `/v1/projects/${projectId}`, exactPath: true,
+      body: { id: projectId, serviceId: `svc_${'b'.repeat(32)}`, name: '数字人', slug: 'worker', kind: 'DigitalWorker', state: 'active' } });
+    app = await renderApp(`/projects/${projectId}/release`);
+    expect(app.path()).toBe(`/projects/${projectId}/release`);
     await app.click('进入平台管理');
     expect(app.path()).toBe('/admin');
     await app.click('回到工作台');
-    expect(app.path()).toBe('/projects/prj_1/release');
+    expect(app.path()).toBe(`/projects/${projectId}/release`);
   });
 
   test('租户项目列表只要数字人；管理空间的接入容器页要另外两类', async () => {

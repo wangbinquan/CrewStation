@@ -1334,3 +1334,45 @@ CUA 刷新真实 delivery 页面载入 `/assets/index-C2niefU7.js`，恢复连�
 平台运行镜像及其 generation 仍 console c9905a6／29、API ebaa730／32、controller cc93104／21，均 1／1；节点 Ready=True、MemoryPressure／DiskPressure=False，余量 1,586,561,024 bytes。前一批 f22a2289b5d127d63797264e7755ea2c94e63e39 的精确 SHA [CI 34912548791](https://github.com/wangbinquan/CrewStation/actions/runs/34912548791) 于 00:21:30Z 成功：1152 pass／8 skip／0 fail，1160 tests／195 files／66.46s，console build 通过。本批主仓仅补实际验收证据，复用第六十批有效完整门禁和 build，最终文档 SHA 的 CI 单独核对。
 
 证据为 batch62 的 baseline、environment、remote、qa-before／qa-after／qa-comparison、rejected-publish、pinned-startup-review、publish-scope-proof、两轮 scaled／restored、release-started／release-result、runtime-config、final-runtime。UX-AT-18 已完成，累计 **21／52 通过、31 项待完成**；I9／I14／I15 和具体成员范围仍待答复，RFC-004 保持已批准、等待 RFC-003 完结。
+
+## 第六十三批：旧链接和两空间返回
+
+继续 UX-AT-24，在现有 admin／files QA 和参考 API 代理上走真实旧链接。批前主仓为 `f93f420596ed611d7396d90aeb4d44aace27ccfd`、与 origin/main 一致，工作树和暂存区为空；该 SHA 的 [CI 34914479859](https://github.com/wangbinquan/CrewStation/actions/runs/34914479859) 于 00:51:04Z 成功，1152 pass／8 skip／0 fail、1160 tests／195 files／69.20s，console build 通过。本批没有启动模型轮次、提交发布表单、执行 API 试调或改变角色／配置。
+
+### 实机缺陷与修复
+
+从 files 的旧 catalog 链接打开既有 `test-gitlab:GET:/v4/projects/{id}/repository/commits/{sha}`，点击“管理接口开放策略”再点“回到工作台”，原页面误落到 settings 默认成员分类。SpaceSwitch 只记录 pathname，丢失 query 中的资源分类、操作和筛选；现记录完整 href，随同路径 query 变化更新，并用 href 返回。三个真实路由回归覆盖指定 API 操作、开发切生产配置和带 releaseId／since／limit 的迁移日志，修复前 **23 pass／3 fail／156 assertions**。文档夹具显式返回不可用，避免默认空对象被 Swagger 当成错误入口；没有以文档夹具替代实际 API 调用。
+
+第二处是旧 `/admin/integrations?q=reference-api-proxy&kind=APIProxy&state=active` 只保留固定 tab，实际显示两项而不是唯一匹配项。旧路由现复用 parseCapabilitySearch 校验并传递 search。新增用例证明 q、kind、state、ownerUserId、cursor 到达 `/v1/projects/page`，以及替换式旧路由的浏览器返回；修复前 **12 pass／1 fail／91 assertions**。实机再加入 admin 的实际 ownerUserId，旧链接、筛选控件和唯一参考代理行均一致，进入详情后返回仍保留条件。
+
+第三处在前两项修复部署后实机发现：旧租户参考代理日志地址正确进入管理接入项目，但“回到工作台”又回到同一管理页。TopBar 在项目类型确认前记住了中间租户地址，返回后被类型边界再次重定向。现复用 TopBar 已有项目查询，确认数字人项目后才允许 SpaceSwitch 记录；非项目位置保持原行为。三个回归覆盖先前列表筛选、直接打开旧接入链接、项目读取失败后恢复，修复前 **9 pass／3 fail／48 assertions**。既有空间往返夹具补为实际结构的 DigitalWorker，不以无项目种类的空对象作为成功读取。
+
+### 真实页面接续
+
+以下对象来自正常 API 和已有页面，经 CUA 实际导航／点击／返回及前进核对，没有伪造未存在的项目或发布：
+
+| 入口／操作 | 页面结果 |
+| --- | --- |
+| files 旧 catalog、管理员旧 api-catalog | 原 proxy／operation 与调用项目保留，准确显示一项 GET；查看全部接口后才恢复 13 项，未点击 Execute |
+| files 旧 events，subscriptionId=`sbs_01a09fecf16c7000a04f28815490793c` | 进入投递分类并保留订阅，明确近 50 条中的 0 条；“查看订阅”定位 gitlab.push／events/gitlab 生效行，返回／前进保持原订阅 |
+| 旧 view=conversation 和 agent=`agt_01a0a18645f770009e298c7f2f5e12b4` | 独立 conversations 路径显示 L-5e12b4／rfc003-verify-opencode／等待输入，与原 sessionId 一致；返回／前进接续该对象 |
+| 旧 config，再同路径选择生产取值组 | 管理往返恢复 production，仍显示预览 v0.1.8／配置第 2 版，没有落到默认成员页 |
+| 旧 build 日志，v0.1.8／since=00:34:39.755Z／limit=700 | operations 的 logs 分类保留完整发布、来源、时间与条数；管理往返和浏览器返回／前进保持同一条件 |
+| 旧开发会话日志，files taskId／since=00:00Z／limit=100 | 原任务筛选保留；通过控件改成部署槽和全部槽时清除不适用 taskId，保留时间／条数，slot=all |
+| 历史发布 v0.1.6／`rel_01a0a25c21d57000a388dcc9502a683e`／source=repository | 管理往返仍选择该历史发布及 5e96d930 提交，没有跳到最新 v0.1.8；未提交发布 |
+| 旧接入列表，名称／APIProxy／active／实际 admin 负责人 | 迁移后查询、控件及唯一参考代理行一致，进入详情再返回保留四项条件 |
+| 旧租户参考代理日志，source=slot／slot=prod／limit=300 | 管理接入项目的日志筛选保留，最终修复后“回到工作台”正常进入 `/` 能力市场，不再循环 |
+
+第六十二批末 navigation-preparation 另有配置分组返回／前进、精确发布日志、接入项目日志和返回接入容器入口证据。前两项修复部署后完成上表主要路径，第三项修复的最终部署再次核对 API 文档→管理→返回 resources/api 原操作、生产配置→管理→返回 production、旧接入列表四项筛选和旧租户接入日志返回市场，实际脚本为 index-CR5gHbTt.js。当前目录只有两个接入项目，未冒称真实第二页；cursor 保留另由路由与实际请求边界回归证明。
+
+### 门禁、部署与原状态保留
+
+最终四文件定向回归 **47 pass／0 fail／256 assertions**。首轮完整检查停在新增测试使 describe 超出行数限制，移出该组后通过；之后每次仅因新实机缺陷修复使候选改变才重跑。最终 `bun run check` **1163 pass／4 skip／0 fail**（1167 tests／195 files／6467 assertions／111.07s），console build **508ms**。七份源码／测试候选在 01:24:56Z 固定，此后未改变；不为纯文档更新重跑完整门禁，最终提交 SHA 托管 CI 单独核对。
+
+最终 console 镜像 `cs-console:rfc003-b63-6e1f7d451f` 以已核对 c9905a6 为基底，仅覆盖 dist／serve.ts，imageID=`sha256:65986ad319e13f9f3146a660bb2f3bf6e91b6055a5dd53c8a7cacd6912b5afd7`。01:28:04Z Deployment UID 保持，generation=31、1／1；Pod `console-65b67d8588-zvglf`／UID `d13a255d-2a67-4dae-9859-fd4a5edcfd26`、restartCount=0，实际 imageID 和七份文件摘要／大小一致。01:34:50Z 正常 HTTP 六份静态资源匹配最终构建。三次小候选流式导入共新增 11,151,606 bytes 内容，最终候选 3,717,200 bytes；只有第二、第三候选实际滚动 console，没有清理数据或调零副本。
+
+01:34:50Z 与 00:58:15Z 批前快照逐项比较，delivery／files／旧 rfc003-ux 的 taskId、native、历史 Agent、activity、workspace 全部相同，只排除 checkedAt 查询时间；会话活跃时间不计作逐字节不变。原 delivery 中文草稿和 files 草稿未发送，历史访问未启动新模型轮次。01:35:41Z 三个健康任务及原失败任务的 UID／容器状态／restartCount、四份原业务文件及 Git 配置摘要、失败 Bound 工作卷 UID 均保持；CLI 缓存未读取或清理。
+
+API ebaa730／generation=32、controller cc93104／21 均 1／1，原任务运行时保持。workbench-blue／delivery-green／files-green 分别 generation=21／13／13，各自 releaseId、原 Deployment UID、1／1 均与上批一致；workbench 正式 green 保持 generation=1。节点 Ready=True、MemoryPressure／DiskPressure=False，剩余 1,763,966,976 bytes。本批仅 console 发生部署更新。
+
+证据为 batch63 的 navigation-before／navigation-final、navigation-objects／catalog-objects、三组 red、loop-targeted、check-navigation-final、build-navigation-final、source-candidate、image-context／built／budget／import、console-rollout、http-assets、qa-before／qa-after／qa-comparison、final-runtime；前两候选以 initial／pre-loop 前缀保留。UX-AT-24 已通过，累计 **22／52 通过、30 项待完成**。T12 仍进行中；I9／I14／I15 和具体成员范围仍待答复，RFC-004 已批准、继续等待 RFC-003 完结，Hook 未开工。

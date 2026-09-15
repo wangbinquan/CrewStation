@@ -34,7 +34,8 @@ export function TopBar(): ReactElement {
       </div>
       <div className={styles.right}>
         <AgentActivityMenu />
-        <SpaceSwitch />
+        {/* 接入项目的旧租户地址会跳到管理空间，不能记录成工作台返回位置。 */}
+        <SpaceSwitch rememberLocation={!inProject || project.data?.kind === 'DigitalWorker'} />
         <LocaleSwitch />
         <CurrentUserChip />
       </div>
