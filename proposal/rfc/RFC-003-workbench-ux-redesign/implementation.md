@@ -1306,3 +1306,31 @@ CUA 刷新真实 delivery 页面载入 `/assets/index-C2niefU7.js`，恢复连�
 平台源码与镜像未变，console c9905a6／generation=29、API ebaa730／32、controller cc93104／21 均 1／1，节点 Ready=True、MemoryPressure／DiskPressure=False，剩余 1,447,006,208 bytes。前一批文档提交 10e9aed854287bd82ce641159044d6963d581d03 的精确 SHA [CI 34909648473](https://github.com/wangbinquan/CrewStation/actions/runs/34909648473) 于 2026-09-14T23:39:04Z 成功：1152 pass／8 skip／0 fail、console build 1.03s。本次主仓仅记录验收，复用第六十批有效完整门禁和 build，最终文档 SHA 的 CI 单独核对。
 
 证据为 batch61 的 environment、remote-before、三份 manifest、failure／second-failure／recovery-commit、三轮 started／scaled／restored、first-failure-k8s、first-log-api、log-isolation、qa-before／qa-after／qa-comparison、final-runtime／final-slots。UX-AT-13 已完成，累计 **20／52 通过、32 项待完成**；I9／I14／I15 和具体成员范围仍待答复，RFC-004 继续等待 RFC-003 完结，Hook 未开工。
+
+## 第六十二批：开发／生产配置与实际生效
+
+继续 UX-AT-18，使用既有 files 专用项目／admin，不改成员或市场范围。上一批末已在实际页面验证空键提交的字段错误关联和焦点、两组不同草稿切换保留、离开确认默认聚焦“继续编辑”；撤销所有临时输入后，00:22:48Z 两组配置及版本历史仍为空。该预检查留在 batch61-config-preparation。本批 00:26:22Z 重新核对同样基线：现有预览 v0.1.7／5719c033／配置第 0 版，GREETING 为“你好，数字人工作站”；原开发任务的 GREETING 未设置。
+
+页面初次即显示大写蛇形键名、空字符串覆盖语义、Secret 只写不读以及两组生效条件。生产组先保存 GREETING，再保存明确不用于认证的 RFC003_CONFIG_TEST_SECRET。开发组以 wrong-key 尝试保存，错误紧贴字段，aria-invalid／aria-errormessage 关联成立并聚焦该键，已输入值保留；改成 GREETING 后单次保存成功。实际持久结果如下，时间均为 2026-09-15 UTC：
+
+| 取值组 | 键 | 配置项版本 | 保存时间 | 实际结果 |
+| --- | --- | --- | --- | --- |
+| production | GREETING | 1 | 00:27:12.962Z | RFC003 第62批生产配置验收 |
+| production | RFC003_CONFIG_TEST_SECRET | 2 | 00:27:26.230Z | isSecret=true；HTTP DTO 无 value 字段 |
+| development | GREETING | 1 | 00:28:02.464Z | RFC003 第62批开发配置验收 |
+
+正常刷新配置后，开发普通值“填入表单”能读回正确内容；生产 Secret 行只显示占位符，填回表单后实际 password input 的 valueLength=0，页面文本不含测试值。开发第 1 版与生产第 2 版分别保留，Secret 没有出现在开发组。整页刷新后生产组仍显示同样两项和版本历史，新增表单为空，没有从缓存或历史重新填入旧 Secret。本批保留这些明确命名的专用 QA 取值供后续核验，没有改任何真实模型认证。
+
+保存生产配置后，设置页立即准确显示“当前已保存第 2 版”，而待验证 v0.1.7 仍“记录为第 0 版／已有更新的配置；后续发布才会采用”。实际刷新 preview.rfc003-verify-files.cs.localhost 后，GREETING 仍是原默认值，不能把保存成功当作现有进程已加载。发布源仍为既有远端 codex/rfc003-files／5719c033e3ac781eb6e3efcdf1c8e6da02018f34，Manifest 摘要 cf631b15062adf5b68bd3b27c4f3bf3b12ea8edade32db7ac437d78efc96263c；本批没有 QA 源码提交。
+
+实际发布准备逐步固定完整 SHA、填写 v0.1.8 和配置验收说明。第一次点击被自动审批按通用的“可能迁移／共用生产数据”警示拒绝，00:31:50Z 普通 API 确认没有创建 v0.1.8，临时暂停的两个预览立即恢复。随后读取固定提交的 Manifest、Dockerfile 和启动入口，确认没有 migrationCommand、compatibility=none／destructive=false、入口不执行数据库初始化；实际 cs-controller 中 pipelineBuild.ts／pipelineDeploy.ts 摘要与所查源码一致，缺迁移命令直接进入待命槽部署。基于这些实际影响证据，原页面点击获准并正常受理，没有另走写入接口。
+
+唯一新发布为 `rel_01a0a27cc00e700090b5d576e6078408`／v0.1.8，同一源码 5719c033，00:34:39.755Z 创建，00:36:11.032Z ready、slot=preview、configVersion=2。初始构建 Pod `build-d576e6078408-mbb95` 因 Insufficient cpu 等待，按已核对 UID／generation／版本的补丁临时暂停 workbench-blue 与 delivery-green，构建随后完成。此次只有 build-d576e6078408 Job，没有对应迁移 Job；正式槽继续 empty，没有切流。
+
+实际刷新试用页面显示“RFC003 第62批生产配置验收”，首页、admin 身份和 green 槽保持。设置页点击“刷新版本对照”后显示 v0.1.8／5719c033、记录为第 2 版、与当前保存版本一致；整页刷新后结论仍成立，1280×720 实际截图已检查。00:38:15Z files-green Deployment 原 UID 保持、generation=13、1／1；新 Pod `rfc003-verify-files-green-7668c7fdf7-8lvbm`／UID `4ea20b56-186f-47b1-a44a-bbece71fdd63`、restartCount=0，实际 imageID=`registry.crewstation-system.svc.cluster.local:5000/rfc003-verify-files@sha256:25586d773c4266c5e54938a112f35dd3a10e0a92a6841bfd93561dc4d021e3eb`。容器内只读 GREETING 与页面新值一致，CS_ENVIRONMENT=production；Manifest 只引用 GREETING，未引用的测试 Secret 没有注入。原开发容器仍 GREETING 未设置／development，与“新任务容器创建时注入”说明一致。
+
+00:36:40Z 两个暂时暂停的预览已经全部恢复原 UID／版本、1／1：workbench-blue generation=21、delivery-green=13；它们包含初次拒绝后恢复和实际构建后恢复两轮。00:39:12Z 三个 QA 的 taskId、native DTO、历史 Agent、活动和工作树对照均保持，checkedAt 查询时间另计。00:40:05Z 健康任务 UID／ready／restartCount=0、四份原业务文件／Git 配置摘要、原失败 Pod 与 Bound 工作卷 UID 保留；原 workbench 正式版本仍 v0.1.0／generation=1。没有发模型轮次或清理缓存内容。
+
+平台运行镜像及其 generation 仍 console c9905a6／29、API ebaa730／32、controller cc93104／21，均 1／1；节点 Ready=True、MemoryPressure／DiskPressure=False，余量 1,586,561,024 bytes。前一批 f22a2289b5d127d63797264e7755ea2c94e63e39 的精确 SHA [CI 34912548791](https://github.com/wangbinquan/CrewStation/actions/runs/34912548791) 于 00:21:30Z 成功：1152 pass／8 skip／0 fail，1160 tests／195 files／66.46s，console build 通过。本批主仓仅补实际验收证据，复用第六十批有效完整门禁和 build，最终文档 SHA 的 CI 单独核对。
+
+证据为 batch62 的 baseline、environment、remote、qa-before／qa-after／qa-comparison、rejected-publish、pinned-startup-review、publish-scope-proof、两轮 scaled／restored、release-started／release-result、runtime-config、final-runtime。UX-AT-18 已完成，累计 **21／52 通过、31 项待完成**；I9／I14／I15 和具体成员范围仍待答复，RFC-004 保持已批准、等待 RFC-003 完结。
