@@ -1711,3 +1711,39 @@ Console 第七十批／generation=44、controller cc93104／21 均保持 1／1�
 **累计仍 25／52 通过、27 项待完成**。RFC-003 保持 In Progress；I9／I14／I15、具体成员范围及其余旅程继续。RFC-004 按批准顺序等待 RFC-003 完结，Hook 未开工。
 
 证据在 /private/tmp/crewstation-rfc003-batch71-*：rollback-red／targeted／source-candidate／check、maintenance-before、qa-plan／qa-green-resources、两个 Manifest／commit 与 build-resize、v012-rejected、v013-before、rollback-before／old-rejected／fixed-rejected、API image-built／import／rollout、browser-final、qa-after／comparison、final-runtime。两份源码／测试与三份文档按精确路径提交，最终 SHA 托管 CI 独立核对。
+
+## 第七十二批：真实 Git 分叉样例与待授权切流
+
+本批继续 UX-AT-30 的完整版本关系验收，准备了可由现有页面读取的真实 Git 分叉，主仓没有生产源码或测试变更。初始 fetch 确认 main 与 origin/main 同为 63e5031028f6dfd085b7dd1745fddf58f8a239f5，工作树与暂存区为空；上一批该 SHA 的 CI 34944744674 已成功。
+
+### 当前基线与被拒操作
+
+files 项目 prj_01a09fecbba97000843701962d998a7a，实际 serviceId 从 release 读取为 svc_01a09fecbbac7000905703a66e255046。此前一次使用接力摘要中的错误 serviceId 得到 404，未发生写入；后续均使用实际返回的 ID。开发任务仍为 tsk_01a09ff07aeb7000897fd0eda1e16cd2，现有 codex/rfc003-files 分支 HEAD=e4741df56b440d776b7c25ff5a4978b3d5822f46。
+
+待验证 v0.1.8 为 rel_01a0a27cc00e700090b5d576e6078408／5719c033e3ac781eb6e3efcdf1c8e6da02018f34／配置第 2 版／1／1；正式槽为空，切流记录为空。真实 Git rev-list 为 0／3，两个提交的文件树相同，三条目标独有提交是此前迁移日志故障及恢复样例。08:12:52Z 实际开发差异页明确“尚无生产版本”，未提交 2、未推送 0，没有拿远端分支冒充当前 HEAD。
+
+08:13:25Z 在另一已有发布页签完成“尚未部署→v0.1.8”核对，完整 SHA 与说明可见，拟用于建立生产比较基准。点击“确认上线”被自动审批拒绝：认为上库与更新本机服务授权没有明确包含这一次生产切流。已通过待回答问题向作者说明具体项目、版本、SHA 与用途，未改用 API 或其他方式执行。随后一次只读 getAXState 又被拒，原因是审批服务 `Selected model is at capacity`；它不是页面报错，也不是已完成点击的证据。没有再次访问被拒页面；仅保存此前取得的记录和页签接力标记。
+
+### 真实分叉准备及接口证据
+
+正常 Runner 通道先校验固定 HEAD、现有分支、空 index 和 README 原摘要 0e54bf847caa7a68f24d50c63c112bf00edf3379c1cedba3e008793a98bbf209。仅在文件尾追加四行“RFC-003 工作树分叉验收”说明，原字节前缀保持，index 未变。08:18:38Z 正常 version-comparison?target=preview 返回 HEAD 不变、behind／0／3、未提交 3、未推送 0，证明未提交文件没有进入提交差。
+
+随后精确暂存 README.md。第一次 commit 明确因 `Author identity unknown` 失败，没有生成提交；该普通 exec 没有 Agent 启动计划中的 Git 身份，不据此认定原生 Agent 提交失败。复核唯一暂存路径与 4／0 行差异后，只为本次命令使用已登录的 admin／admin@demo.invalid 作者，不改全局或仓库配置，正常提交成功：
+
+- QA 提交 f04fd60af6f387cbd904be70fcace50fcfbb0622，父 e4741df56b440d776b7c25ff5a4978b3d5822f46；只含 README.md，带真实 Codex co-author；现有分支未变，index 为空。
+- README 新摘要 50eff46078d21d75a4c2ced98c7e2b82a99e63e26d8287bbfb940c9a0b68727e，原内容前缀完整保留；应用代码与 Manifest 未改。
+- 实际 Git 为 1／3；08:21:32Z 正常比较 API 为 diverged／ahead=1／behind=3，未推送 1，未提交恢复为原有两项 npm 缓存。
+- 正常 ahead 详情只有 f04fd60；behind 详情精确为 5719c033、5e96d930dc7c5b79e7c0d56396e9e67c9259ac9f、23c909ffe3b68270243c7991667200f4683c1d8f，数量和实际 Git 一致。
+- slots 和 traffic-switches 再次确认正式仍为空、待验证仍 v0.1.8、切流记录仍空。此 QA 提交尚未合并或推送，保留分叉以待真实页面验证；不要用覆盖工作树或改写历史将其消除。
+
+以上来自真实工作树、运行中的 Runner 和普通平台接口；浏览器分叉画面未取得，生产目标关系、浅历史／无共同历史等分支也未关闭。**UX-AT-30 保持待验，累计仍 25／52 通过、27 项待完成。**
+
+### 保留与接续
+
+08:23:33Z 三个旧 QA 的 taskId、native、历史 Agent、activity 保持；delivery／legacy 工作树保持，files 只增加本批文档提交和未推送数，原两项缓存完全相同。files.lastActivityAt 与 legacy.idleReminderSentAt 按正常活动更新。08:25:32Z files 个人布局仅 view 从 cli 改为 changes、revision 14→15，原页签、窗口顺序、比例及 terminalId 保持；这是此前正常点击差异视图的结果，当前保留以便接续。原 tab 17 未操作、未重载；本批没有再次读取其截图，不把前批草稿截图标成本批新验收。
+
+08:24:12Z 原任务 UID／状态、其余受保护文件、失败 Bound 工作卷和所有业务槽位保持，README 按上述新摘要核对。API 第七十一批／34、console 第七十批／44、controller cc93104／21 均 1／1，节点 Ready=True、MemoryPressure／DiskPressure=False，剩余 1,431,932,928 bytes。本批未部署镜像、启动模型或调整资源。
+
+主仓仅精确提交 STATE.md、本文件和 acceptance-audit.md。源码与已验证的 63e5031 相同，复用第七十一批完整门禁 1204 pass／4 skip／0 fail，不为纯证据文档重复全量；最终文档 SHA 的托管 CI 单独核对。RFC-003 保持 In Progress，RFC-004 继续排队。
+
+证据在 /private/tmp/crewstation-rfc003-batch72-*：comparisons-before、files-before、git-before、readme-fixture、dirty-comparison、divergence-commit（失败）／divergence-commit-with-identity（成功）、diverged-comparison、browser-before／approval-blockers、layout、qa-after／comparison、final-runtime。恢复后先核对作者对具体切流的答复与浏览器可用性，再重读真实确认对象和当前分叉；不得把未执行的切流或旧的浏览器记录计为已通过。
