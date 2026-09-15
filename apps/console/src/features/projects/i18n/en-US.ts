@@ -46,6 +46,7 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   "projects.summary.connected": "Connected",
   "projects.summary.disconnected": "Disconnected",
   "projects.summary.branchUnknown": "Branch unknown",
+  "projects.summary.createdBranch": "Branch at creation: ",
   "projects.summary.session.creating": "Session starting",
   "projects.summary.session.running": "Session running",
   "projects.summary.session.paused": "Session paused",

@@ -8,6 +8,11 @@
   text-align: left;
 }
 
+.table th, .table td {
+  /* 窄屏曾把套餐说明压成逐字的长列；保留阅读宽度，多列由外层滚动。 */
+  min-width: 7rem;
+}
+
 .table th {
   padding: var(--cs-space-2) var(--cs-space-3);
   border-bottom: 1px solid var(--cs-color-border);

@@ -19,7 +19,8 @@ export function DevelopmentFact({ item }: { readonly item: ProjectSummary }) {
   if (part.status !== 'ready' || !summaryIsFresh(part)) return <SummaryUnavailable part={part} />;
   const session = part.value;
   return session ? <div className={styles.fact}><span>{t(`projects.summary.session.${session.state}`)}</span>
-    <small>{t(session.connected ? 'projects.summary.connected' : 'projects.summary.disconnected')}</small><code>{session.branch ?? t('projects.summary.branchUnknown')}</code>
+    <small>{t(session.connected ? 'projects.summary.connected' : 'projects.summary.disconnected')}</small>
+    <small>{t('projects.summary.createdBranch')}<code>{session.branch ?? t('projects.summary.branchUnknown')}</code></small>
     {session.message ? <small>{session.message}</small> : null}</div> : <span className={styles.muted}>{t('projects.summary.noSession')}</span>;
 }
 export function DeploymentFact({ item, name, canOpen = true }: { readonly item: ProjectSummary; readonly name: 'prod' | 'preview'; readonly canOpen?: boolean }) {

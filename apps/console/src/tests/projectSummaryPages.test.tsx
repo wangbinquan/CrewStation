@@ -78,6 +78,23 @@ describe('项目列表的真实分页与独立状态', () => {
   });
 });
 
+test.each(['列表', '概览'])('%s 的会话分支明确标为创建时记录，缺失保持未知且不额外查询工作树', async (view) => {
+  const f = summaryFixture(), time = new Date().toISOString();
+  const session = { taskId: `tsk_${'c'.repeat(32)}` as TaskId, state: 'running' as const, connected: true, branch: 'main', createdAt: time, lastActivityAt: time };
+  f.item.development = { status: 'ready', checkedAt: time, value: session };
+  page = await renderApp(view === '列表' ? '/projects' : `/projects/${f.item.project.id}`);
+  const branch = [...document.querySelectorAll('code')].find((node) => node.textContent === 'main')!;
+  // 实机已切到 codex/rfc003-files，摘要仍显示创建时 main；不能把元数据冒充当前工作树。
+  expect(branch.parentElement?.textContent).toBe('创建时分支：main');
+  f.item.development.value = { ...session, branch: undefined };
+  await page.click(view === '列表' ? '刷新项目' : '刷新概览');
+  expect(page.text()).toContain('创建时分支：分支未知');
+  // 概览顶栏仍可读取会话元数据；摘要不为分支文字追加容器工作树请求。
+  expect(f.calls.some((url) => url.includes('workspace-status') || url.includes('version-comparison'))).toBe(false);
+  if (view === '列表') expect(f.calls.some((url) => /\/dev-session|\/tasks\//.test(url))).toBe(false);
+  expect(f.writes).toEqual([]);
+});
+
 describe('概览按实际状态选择下一步', () => {
   test('两个访问入口只指向实际就绪主机，降级与读取失败不沿用旧链接，诊断保留项目上下文', async () => {
     const f = summaryFixture(), time = new Date().toISOString();

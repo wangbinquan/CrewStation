@@ -1408,3 +1408,45 @@ API ebaa730／generation=32、controller cc93104／21 均 1／1，原任务运�
 02:34:29Z 三个健康任务及原失败任务 UID／容器状态／restartCount、四份业务文件及 Git 配置摘要、失败 Bound 工作卷 UID 保持。workbench-blue／delivery-green／files-green 仍为 generation=21／13／13、原 releaseId、1／1，workbench 正式 green 仍 generation=1。API ebaa730／generation=32、controller cc93104／21 均 1／1，任务运行时未更新。节点 Ready=True、MemoryPressure／DiskPressure=False，剩余 1,765,412,864 bytes。
 
 证据为 batch64 的 browser-subset／browser-final、tabs-geometry-red／tabs-resize-red／trace-focus-red-normal、final-targeted-complete、check-authorized、build-complete、source-candidate、image-context／built／budget／import、console-rollout、http-assets、qa-before／qa-after／qa-comparison、final-runtime。前两候选保存在 initial／pre-trace 前缀，沙箱失败和非正常测试进程输出分别留档。**累计仍 22／52 通过、30 项待完成**，T12 保持进行中；I9／I14／I15 与具体成员范围仍待答复，RFC-004 等待 RFC-003 完结，Hook 未开工。
+
+## 第六十五批：创建时分支与窄屏表格密度
+
+继续 UX-AT-25／26，批前 main 与 origin/main 同为 `0d56720699dfe34073174a00dcf0ec20887a2e4b`，树和索引为空；精确 SHA [CI 34921985145](https://github.com/wangbinquan/CrewStation/actions/runs/34921985145) 于 02:41:24Z 成功，1165 pass／8 skip／0 fail、1173 tests／195 files／71.28s，console build 1.19s。本批使用现有 admin 与 QA 对象，没有启动模型轮次或修改能力授权。
+
+### 分支来源与真实回归
+
+实际 files 概览在“当前开发”下显示 main，但 02:47:08Z 正常 workspace-status 为 codex/rfc003-files／HEAD e4741df56b440d776b7c25ff5a4978b3d5822f46；同次 summary 的 development.value.branch 是 main。来源追到 task-runtime 的 findDevSession／createEnvironment，它记录创建环境时的分支，不读取容器 Git。design §4 已明确该信息必须标为“创建时分支”，并要求摘要不额外查 Runner。
+
+共享 DevelopmentFact 现为列表与概览显示“创建时分支：main”，英文为“Branch at creation: main”；缺失仍显示“创建时分支：分支未知”。两个真实路由回归初次 **10 pass／2 fail／78 assertions**，修复后同时证明缺失状态、不额外查询 workspace-status／version-comparison、不发生写入。列表也不额外读 dev-session／tasks；概览原 TopBar 的元数据读取保持。初版测试错误禁止了概览已有读取，修正测试边界后最终两文件定向 **32 pass／0 fail／200 assertions／2.34s**。
+
+真实 UI 切换中英文均显示正确标签，随后恢复中文；列表四个匹配项目同样明确标注创建时分支。英文实机来自中间 index-CkFSlu82.js，最终 index-wC8asuB4.js 再次核对中文概览和列表；两次 SummaryFacts 与语言文件摘要一致。实际当前分支仍来自独立工作树状态，不将摘要读取时间新鲜等同于容器分支新鲜。
+
+### 表格与页面量测
+
+320px 的任务套餐表外层宽 262px，原表宽 347.20px，前五列只有约 52px；coding-medium 行高 128.99px，rfc003-59-snapshot 的说明逐字挤成 397.27px。共享 DataTable 增加单元格最小阅读宽度，继续使用原外层 overflow-x:auto。5rem 实机长行仍为 218.09px，因此依据新观察调整到最终 7rem；六列各 112px、表宽 672px，两行分别 **61.80px／128.49px**。
+
+正常 Tab 能进入实际溢出容器，方向键可横向滚动，蓝色 2px 焦点可见；没有为浏览器已有行为新增监听器。生产版本对照最终宽 262px、内容宽 374px，方向键使 scrollLeft=112；套餐表右侧编辑按钮可由键盘到达，边界 [191, 253]，没有激活编辑。CSS 的低影响可逆改动以真实前后尺寸与交互验证，没有增加只复述样式字符串的测试。
+
+最终部署覆盖以下 **30 个页面状态 × 5 个宽度 = 150 次量测**，宽度为 1280／1024／768／390／320，均高 720px。每次 documentWidth 等于视口，选中标签可见，脚本均为 index-wC8asuB4.js：
+
+- 设置：成员、应用可见性、开发配置、生产配置、资源总览、API、事件、仓库、生命周期，共九项。
+- 运行诊断：健康、全部告警、投递，共三项。
+- 管理：总览、项目、用户、算力、服务套餐、任务套餐、接入、接口策略、事件源、API 申请、出站申请、出站规则、网关，共十三项。
+- 新建数字人：必填错误、模板与资源、最终确认，共三种状态。
+- files 项目概览、筛选 rfc003 的项目列表，共两项。
+
+表格数字只统计可见表，配置页挂载的隐藏取值组不算可见结果。资源总览的能力表格也复用 DataTable，但 320px 部分行仍高 906／1194／1297px；尚须继续定位内容布局为何抵消了阅读宽度，已保留为下一批明确可读性缺陷。当前五尺寸无整页溢出只是几何证据，不代表全部关键页面或全部表格密度已经验收。
+
+新建向导空提交显示三项就地错误并聚焦名称。临时名称“RFC003 第65批布局检查”、slug rfc003-layout-review-65、既有 admin 负责人只用于表单；选择 minimal-sample／standard-small 和默认任务套餐后查看最终确认，没有点击“创建项目”。返回时确认放弃输入，重开向导两个文本框为空；03:27:39Z 正常项目分页查询该 slug 返回 items=[]。没有保存角色／可见性／资源／网关配置，没有提交授权申请、API Execute 或事件订阅。最终语言为中文，viewport.reset 已完成。
+
+### 候选门禁、部署与保全
+
+最终五份源码／测试候选于 03:07:09Z 固定，此后保持。完整门禁 **1171 pass／4 skip／0 fail**（1175 tests／195 files／6514 assertions／110.85s），console build **521ms**。分支标签单独候选和 5rem 中间候选的有效检查分别留档；只有后续真实尺寸观察导致源码改变才重跑，最终候选不为文档补记重跑完整门禁。
+
+最终 console 镜像 `cs-console:rfc003-b65-231ca0b09f`，imageID=`sha256:cea0758bd0137d72b3918344fd39fdea6862bd46cf256758ac07dd0eb0ed64da`。03:10:43Z 原 Deployment UID 保持、generation=36、1／1；Pod `console-77d7fcd9fb-8slx7`／UID `58288380-2655-44d0-8fca-153aa55f497a`、restartCount=0，实际 imageID 与七份运行文件摘要一致。03:27:39Z 正常 HTTP 六份静态资源与最终构建一致。本批导入两份小候选，共新增 7,439,722 bytes；最初仅含分支标签的镜像未导入或部署，没有清理数据或调零其他副本。
+
+03:25:38Z 与 02:45:36Z 批前快照逐项比较，delivery／files／旧 rfc003-ux 的 taskId、native、历史 Agent、activity、workspace 均相同，仅排除 checkedAt；不声称整个 session DTO 逐字节不变。03:27:08Z 三个健康任务及原失败任务 UID／容器状态／restartCount、四份原业务文件及 Git 配置摘要、失败 Bound 工作卷 UID 保持。原 CLI 草稿未发送，历史会话没有新增模型轮次。
+
+workbench-blue／delivery-green／files-green 保持 generation=21／13／13、原 releaseId、1／1，workbench 正式 green 保持 generation=1。API ebaa730／32、controller cc93104／21 均 1／1，原任务运行时没有更新。节点 Ready=True、MemoryPressure／DiskPressure=False，剩余 1,861,398,528 bytes。
+
+证据为 batch65 的 branch-source、summary-branch-red／summary-branch-targeted、browser-before／browser-final、check-readable／build-readable、source-candidate、image-context／built／budget／import、console-rollout、http-assets、wizard-not-created、qa-before／qa-after／qa-comparison、final-runtime；前期候选以 initial／five-rem 前缀保留。源码和三份证据文档精确提交，最终 SHA CI 独立核对。**累计仍 22／52 通过、30 项待完成**；T12 保持进行中，资源总览密度和其余尺寸／键盘／真实主题旅程继续，I9／I14／I15 与具体成员范围仍待答复，RFC-004 等待 RFC-003 完结。

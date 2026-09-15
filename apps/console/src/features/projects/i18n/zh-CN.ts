@@ -45,6 +45,7 @@ export const messages = {
   "projects.summary.connected": "已连接",
   "projects.summary.disconnected": "连接已断开",
   "projects.summary.branchUnknown": "分支未知",
+  "projects.summary.createdBranch": "创建时分支：",
   "projects.summary.session.creating": "会话创建中",
   "projects.summary.session.running": "会话运行中",
   "projects.summary.session.paused": "会话已暂停",
