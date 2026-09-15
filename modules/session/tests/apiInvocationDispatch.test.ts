@@ -59,3 +59,17 @@ test('实际转发适配器保留旧容器拒绝码，同时禁用底层重发�
   expect(requests).toHaveLength(1);
   expect(requests[0]).toMatchObject({ keepalive: false, redirect: 'error', signal: expect.any(AbortSignal) });
 });
+
+test('工作树等普通转发也有截止时间，错误副本地址在发出前拒绝', async () => {
+  const requests: Array<RequestInit | undefined> = [];
+  const fetchImpl = Object.assign(async (_url: string | URL | Request, init?: RequestInit) => {
+    requests.push(init); return Response.json({ payload: { status: 'ready' } });
+  }, { preconnect: fetch.preconnect });
+  const forwarder = fetchForwarder(fetchImpl);
+  const workspace: RunnerCommand = { id: 'workspace', type: 'workspaceStatus' };
+  // 实机 UI 超过 50 秒仍等待；转发本身必须有预算，不能仅依赖目标副本清理 pending。
+  expect(await forwarder.forward('http://owner', taskId, workspace)).toEqual({ status: 'ready' });
+  expect(requests[0]?.signal).toBeInstanceOf(AbortSignal);
+  await expect(forwarder.forward('http://10.244.0.106:tcp://10.96.116.44:8083', taskId, workspace)).rejects.toThrow();
+  expect(requests).toHaveLength(1);
+});

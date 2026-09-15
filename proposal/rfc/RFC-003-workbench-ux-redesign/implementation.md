@@ -1899,3 +1899,29 @@ D 没有模型轮次或未发送草稿。对其精确 Pod UID 00b6206a-895b-4593
 旧界面在 1280×720 首窗距顶约 277px，存在密度缺陷；新版四窗的最终量测继续，不提前关闭 UX-AT-35。工作树原 100m CPU 下指纹检查因 97,231,220 bytes 的 .npm 缓存耗时 18.657 秒；Git 状态本身约 1.15 秒。另有普通 API 50 秒超时，14:13Z 读 session.connections 发现 selfAddress 含 Kubernetes 注入的 tcp://ServiceIP:8083，待修正地址解析并验证，不能仅归因 CPU。上述缓存内容未读取或删除，.claude.json 内容未读取。
 
 累计保持 **27／52**，独立环境实跑不能替代新增失败幂等、四窗密度及其余完整条件。RFC-003 In Progress，RFC-004 继续等待。候选、门禁、镜像、迁移、逐窗活动及故障原始证据均在 /private/tmp/crewstation-rfc003-batch77-* 和 batch78-*；本批精确提交 SHA 与托管 CI 另核对。
+
+## 第七十九批：版本比较、活动超时与单窗恢复
+
+第七十八批 89c9f5b7017a71a2933c5af870f9d5876472cac6 已推送，[CI 34980482125](https://github.com/wangbinquan/CrewStation/actions/runs/34980482125)／job 104419183540 于 14:23:17Z 成功。
+
+session 的 selfAddress 改为复用监听端口解析，避免 CS_SESSION_PORT 被 Kubernetes 自动注入的 tcp:// 地址污染；有效的显式地址／端口仍保留。内部 session client 和跨副本转发按命令期限加传输余量，URL 先验证、超时不能返回空成功。该地址缺陷已确证，但当前单副本 API 使用服务地址，不能把所有 502 都归因于它。
+
+初始六文件候选门禁 1281 pass／4 skip／0 fail，14:23:23Z 完成，console 740ms，随后部署。父工作区读取约 97 MB npm 缓存指纹，在原 100m CPU 下直接耗时 18.657 秒。14:28:13Z 原地把该专用 QA 父 Pod CPU requests／limits 提高至 300m，UID 7ee4b0ff-7bc3-448e-9471-7afa7b143bfc 和容器 eab7bdff0c06…、重启数 0、内存及工作树保持；正常 workspace-status 随后 0.911 秒返回。冻结套餐目录仍为原值，此次为本机操作，不是新增动态调参产品功能。
+
+之后实际名册／活动组合查询出现持续 502，而分别读取父 Runner 和四个子 Runner 只需 34–37ms；冷组合调用会等待，先读活动再读名册的独立进程能正常完成。没有生产数据库锁的直接证据，不据此断言 Bun SQL 池缺陷。源码查明活动补齐仅给 HTTP 设限，completedSources／cursor／apply 等存储阶段和 pending 任务整体无期限，卡住后可长期拖住名册。
+
+新增永不返回的 completedSources 与真实 PostgreSQL 表锁回归，首次 5 pass／2 fail；修复为补齐整体 2 秒、名册中的活动查询 2.5 秒，先释放 pending 再允许下次同步，迟到结果不继续发起新投影写入，持久读取另有期限。已提交给数据库的 SQL 不声称能够取消。第一版相同期限出现恢复竞争，补齐提前到期后，真正连接数据库的定向组 9 pass／0 fail／64 assertions；沙箱内 6 pass／3 skip 不作为数据库证据。
+
+最终十文件候选完整门禁于 14:53:32Z 通过：**1282 pass／4 skip／0 fail**（1286 tests／215 files／7111 assertions，测试 120.85s、命令 144.69s），console **492ms**，十份摘要保持。新旧候选分别留在 batch79 与 batch79-final 日志，不复用初始门禁覆盖后续修改。
+
+14:54:31–14:55:39Z 三个控制服务更新 cs-control-plane:rfc003-b79-final-43caf7d73d62，imageID sha256:f889bb8ba234685e02659afc34260b3278ce9e0556c12a929001218cee08c741。session／API／controller generation=21／46／30，Pod UID 分别 4801e818-99e8-4a80-a571-fefb3083e491、f540ff2c-83c8-4d95-9417-46f1bdc6c34d、1424fddb-a2f6-4c00-b872-265692e9a6a9；每项十份实际文件匹配。仅导入 182,534 bytes 新内容，console 和任务镜像不变。滚动后的约两分钟重连期间仍出现 502；原 Runner 自动恢复后，14:57:03Z 正常 API 名册 **26ms／14 项／ready**、活动 **21ms／ready**，版本比较 **6.127 秒**，当前 1aa2db9 对正式 v0.1.0／6af3024，ahead 1／behind 0、未提交 143／未推送 1。实际页面显示对应状态和原 A／C 的完成文本。
+
+### 单窗失败、停止和重开
+
+OOM 窗 D 的“重新启动一窗”只创建 E（agt_01a0a57112517001ae1959d89b5c8bef，14:20:48.725Z）。项目已达 5／5 时真实双击“＋ CLI”，名册 12→13，仅登记 F（agt_01a0a572686670019d441dae6e43a95c），界面明确“项目并发额度已满，本次 CLI 未启动，已有窗口保持运行”。正常 API 以相同 clientRequestId 531439ed-e1a8-4af6-816b-162e7a4578bc 重复 POST 两次均 202 返回原 F，无自动重启。
+
+对 B 的窗口菜单明确确认“结束进程”，14:23:11.497Z 记录 stopped，页面展示“进程已结束”和退出时只读末屏，包含原 OpenCode 会话继续命令。释放额度后，从失败 F 的菜单手动重开 G（agt_01a0a574acd270018de43b5576b9b2b9，14:24:44.161Z）；总记录 14，没有删除失败历史。正常 API 最终确认 A／C／E／G 四窗 running／connected，B 末屏 available，D 与 F 分别 environment-failed／start-failed。
+
+15:00:51Z A／C／E／G 四 Pod 均 Running、restart 0、各 400m／2Gi；B 和 D 的 Pod 已消失，原五任务与七份业务／Git 摘要保持。新增 E／G Pod UID 分别 cf626460-c339-4d8f-a698-f8a568aa760a、8e33b24a-529d-43c2-aba7-c64492e8a222；A／C 保留原身份。证据为 batch79-start-idempotency.json、batch79-final-api-reconnected.json、batch79-final-preserved.json 及对应 CUA 旅程。
+
+**UX-AT-28 通过，累计 28／52，剩余 24 项。** 四窗输入与最终密度、布局持久化及其余角色／失败旅程继续，不据当前只读窗口补齐 UX-AT-35。RFC-003 仍 In Progress；RFC-004 继续按批准顺序等待。原 files／delivery 浏览器草稿未操作或发送。

@@ -31,6 +31,17 @@ describe.skipIf(!available)('动态资源实际装配与 HTTP', () => {
     expect(AgentActivityPageSchema.parse(await response.json())).toMatchObject({ sync: 'ready', connection: 'connected', throughSeq: 1, states: [{ source: 'ready' }] });
     const roster = await module.api.listNativeTerminals(workspaceActor, taskId);
     expect(roster).toMatchObject({ activitySync: 'ready', items: [{ lifecycle: 'running', activity: { source: 'ready' } }] });
+    let unlock!: () => void, locked!: () => void;
+    const ready = new Promise<void>((resolve) => { locked = resolve; }), hold = new Promise<void>((resolve) => { unlock = resolve; });
+    const blocked = db.db.transaction(async (tx) => { await tx.execute(sql`lock table dev_session.native_activity_sources in access exclusive mode`); locked(); await hold; });
+    await ready;
+    let timer: ReturnType<typeof setTimeout>;
+    try {
+      const response = await Promise.race([module.api.listNativeTerminals(workspaceActor, taskId), new Promise<string>((resolve) => { timer = setTimeout(() => resolve('still waiting'), 3200); })]);
+      // 活动存储等待不能拖住健康终端的名册；降级后保留原进程身份。
+      expect(response).toMatchObject({ activitySync: 'unavailable', items: [{ agentId: record.agentId, lifecycle: 'running' }] });
+    } finally { clearTimeout(timer!); unlock(); await blocked; }
+    expect((await module.api.listNativeTerminals(workspaceActor, taskId)).activitySync).toBe('ready');
     expect((await app.request(`${url}?limit=101`, { headers })).status).toBe(400);
     expect((await app.request(`${url}?cursor=1.5`, { headers })).status).toBe(400);
     expect((await app.request(`${url}?unread=true&before=2`, { headers })).status).toBe(200);

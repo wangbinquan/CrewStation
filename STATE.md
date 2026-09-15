@@ -11,6 +11,16 @@
 
 **RFC-003 工作台 UX 重设计处于 In Progress，作者已要求完整实现并提交上库。** RFC-001 与 RFC-002 都已 Done，见 `proposal/rfc/README.md` 的索引表。
 
+## 最新接力：版本比较、活动超时与单窗恢复（2026-09-15）
+
+第七十八批已发布 89c9f5b7017a71a2933c5af870f9d5876472cac6，[CI 34980482125](https://github.com/wangbinquan/CrewStation/actions/runs/34980482125) 于 14:23:17Z 成功。第七十九批修正 Kubernetes 自动注入的端口变量污染 session 地址、内部 HTTP 无期限等待，以及活动同步卡住后长期占住任务的问题。活动存储等待不再阻止健康 CLI 列表，超时后可重新同步；迟到补齐不继续发起投影写入。
+
+最终 10 份源码候选门禁 **1282 pass／4 skip／0 fail**（1286 tests／215 files／7111 assertions，14:53:32Z），console build **492ms**，摘要保持。真实数据库锁等待／解锁恢复回归通过。三个控制服务已更新 cs-control-plane:rfc003-b79-final-43caf7d73d62，session／API／controller generation=21／46／30，各十份运行文件匹配；console 保持第七十八批。14:57:03Z 普通 API 名册 26ms、活动 21ms，均 ready，原 CLI 身份保持；完整版本比较 6.127 秒返回工作树领先 1、未提交 143、未推送 1。
+
+真实页面完成 OOM 窗手动重开、配额已满时双击只登记一次失败、正常结束另一窗并保存末屏、释放额度后手动重开；同一失败请求重复 POST 两次仍返回原失败身份，没有额外进程。15:00:51Z 四个子 Pod 正常、原五任务和七份文件摘要保持。**UX-AT-28 通过，累计 28／52，剩余 24 项。** 四窗输入与最终密度、布局、多角色等继续；RFC-004 等 RFC-003 完结，不提前实施 Hook。
+
+本机 QA 父 Pod 已原地把 CPU 100m 调为 300m，原 UID／容器／进程及内存保持；这是已授权的本机调优，目录中的冻结套餐仍为原值，不冒称动态资源产品能力。滚动时旧 Runner 约两分钟重连，期间短暂 502 未作为成功证据。完整过程、初始与最终候选区别见 implementation 第七十九批；提交与精确 SHA CI 随发布核对。
+
 ## 最新接力：独立四窗实跑与紧凑界面（2026-09-15）
 
 第七十七批已发布 4b9bf0001b8ff08d2f9ed79b354b617a69b93e5f，[CI 34974881386](https://github.com/wangbinquan/CrewStation/actions/runs/34974881386) 于 13:28:24Z 成功。三项追加迁移已应用；session／controller／API／console 顺序更新为第七十七批，实际源码摘要匹配，原五个任务和工作卷保持。

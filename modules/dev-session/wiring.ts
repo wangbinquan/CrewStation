@@ -11,7 +11,7 @@ import { drizzleReminderRepository } from './adapters/persistence/drizzleReminde
 import { drizzleNativeTerminals } from './adapters/persistence/drizzleNativeTerminals';
 import { drizzleWorkspaceLayouts } from './adapters/persistence/drizzleWorkspaceLayouts';
 import { drizzleNativeActivity } from './adapters/persistence/drizzleNativeActivity';
-import { nativeActivityUseCases } from './application/nativeActivity';
+import { boundedNativeRead, nativeActivityUseCases } from './application/nativeActivity';
 import { workspaceLayoutUseCases } from './application/workspaceLayout';
 import { workspaceLayoutRoutes } from './http/workspaceLayoutRoutes';
 import type { DevSessionModuleApi } from './api/moduleApi';
@@ -80,7 +80,7 @@ export function createDevSessionModule(deps: DevSessionModuleDeps): DevSessionMo
     ...rebuildSessionUseCases(useCaseDeps),
     ...versionComparisonUseCases(useCaseDeps), workspaceStatus: workspaceStatusUseCase(useCaseDeps), publish: publishFromSessionUseCase(useCaseDeps), sendIdleReminders: remind,
     async listNativeTerminals(actor, taskId) {
-      const pageQuery = activity.getAgentActivity(actor, taskId, { limit: 1 }).catch((error: unknown) => {
+      const pageQuery = boundedNativeRead(activity.getAgentActivity(actor, taskId, { limit: 1 })).catch((error: unknown) => {
         if (isPlatformError(error) && ['forbidden', 'unauthenticated', 'not_found'].includes(error.kind)) throw error;
         useCaseDeps.logger.warn('native activity query unavailable', { taskId });
         return undefined;

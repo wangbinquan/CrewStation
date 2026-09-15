@@ -61,7 +61,7 @@ export function loadPlatformSettings(env: Record<string, string | undefined> = p
     maintenanceWindow: env.CS_MAINTENANCE_WINDOW === 'true',
     idleMinutes: num(env.CS_IDLE_MINUTES, 120),
     agentEnvSecretName: env.CS_AGENT_ENV_SECRET || undefined,
-    selfAddress: env.CS_SELF_ADDRESS ?? `http://${env.POD_IP ?? '127.0.0.1'}:${env.CS_CS_SESSION_PORT ?? env.CS_SESSION_PORT ?? '8083'}`,
+    selfAddress: env.CS_SELF_ADDRESS ?? `http://${env.POD_IP ?? '127.0.0.1'}:${portFrom(env, 'cs-session', 8083)}`,
     identityProvider: env.CS_IDENTITY_PROVIDER === 'oidc' ? 'oidc' : 'demo',
     sessionTtlSeconds: num(env.CS_SESSION_TTL_SECONDS, 28800),
   };

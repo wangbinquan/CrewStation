@@ -7,9 +7,9 @@ import { initialNativeActivity } from '../domain/nativeActivityProjection';
 import type { DevSessionUseCaseDeps } from './dependencies';
 import { nativeEnvironment } from './nativeTerminalAccess';
 
-async function bounded<T>(promise: Promise<T>): Promise<T> {
+export async function boundedNativeRead<T>(promise: Promise<T>, timeoutMs = 2500): Promise<T> {
   let timer: ReturnType<typeof setTimeout>;
-  try { return await Promise.race([promise, new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error('Activity source timeout')), 2500); })]); }
+  try { return await Promise.race([promise, new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error('Activity source timeout')), timeoutMs); })]); }
   finally { clearTimeout(timer!); }
 }
 type Sync = AgentActivityPage['sync'];
@@ -18,11 +18,13 @@ type Connection = { state: AgentActivityPage['connection']; roster?: NativeTermi
 class NativeActivityQueries {
   private readonly pending = new Map<TaskId, Promise<Map<TaskId, Sync>>>();
   constructor(private readonly deps: DevSessionUseCaseDeps, private readonly repository: NativeActivityRepository, private readonly terminals?: Pick<NativeTerminalRepository, 'list'>) {}
-  private async synchronizeSource(taskId: TaskId, sourceId: TaskId): Promise<Sync> {
+  private async synchronizeSource(taskId: TaskId, sourceId: TaskId, attempt: { active: boolean }): Promise<Sync> {
     try {
       let cursor = await this.repository.cursor(taskId, sourceId);
       for (let page = 0; page < 4; page++) {
-        const events = await bounded(this.deps.runner.listEvents(sourceId, { sinceSeq: cursor, kinds: ['nativeActivity', 'nativeTerminal'], limit: 500 }));
+        if (!attempt.active) return 'unavailable';
+        const events = await boundedNativeRead(this.deps.runner.listEvents(sourceId, { sinceSeq: cursor, kinds: ['nativeActivity', 'nativeTerminal'], limit: 500 }));
+        if (!attempt.active) return 'unavailable';
         cursor = await this.repository.apply(taskId, cursor, events, sourceId);
         if (events.length < 500) return 'ready';
       }
@@ -33,24 +35,27 @@ class NativeActivityQueries {
     let operation = this.pending.get(taskId);
     if (operation) return operation;
     if (this.pending.size >= 256) return Promise.resolve(new Map<TaskId, Sync>([[taskId, 'unavailable']]));
+    const attempt = { active: true };
     const run = async () => {
       const completed = new Set(await this.repository.completedSources(taskId));
+      if (!attempt.active) return new Map<TaskId, Sync>([[taskId, 'unavailable']]);
       const sources = [taskId, ...new Set(starts.flatMap((start) => start.execution ? [start.execution.taskId] : []))];
       const results = new Map<TaskId, Sync>();
       // 完成的子来源只读持久投影；多个活跃来源使用各自游标，避免跨 Runner 跳过序号。
       for (let i = 0; i < sources.length; i += 8) await Promise.all(sources.slice(i, i + 8).map(async (source) => {
-        const status = completed.has(source) ? 'ready' : await this.synchronizeSource(taskId, source);
+        const status = completed.has(source) ? 'ready' : await this.synchronizeSource(taskId, source, attempt);
         results.set(source, status);
-        if (source !== taskId && status === 'ready' && starts.find((start) => start.execution?.taskId === source)?.execution?.finalized) await this.repository.completeSource(taskId, source);
+        if (attempt.active && !completed.has(source) && source !== taskId && status === 'ready' && starts.find((start) => start.execution?.taskId === source)?.execution?.finalized) await this.repository.completeSource(taskId, source);
       }));
       return results;
     };
-    operation = run().finally(() => { this.pending.delete(taskId); });
+    // 补齐先到期，留出读取持久历史的时间，并在名册总期限前释放 pending。
+    operation = boundedNativeRead(run(), 2000).catch(() => new Map<TaskId, Sync>([[taskId, 'unavailable']])).finally(() => { attempt.active = false; this.pending.delete(taskId); });
     this.pending.set(taskId, operation); return operation;
   }
   private async connection(taskId: TaskId, connected: boolean): Promise<Connection> {
     if (!connected) return { state: 'disconnected' };
-    try { return { state: 'connected', roster: RunnerResultPayloads.listAgentTerminals.parse(await bounded(this.deps.runner.sendCommand(taskId, { id: newId('cmd'), type: 'listAgentTerminals' }))) }; }
+    try { return { state: 'connected', roster: RunnerResultPayloads.listAgentTerminals.parse(await boundedNativeRead(this.deps.runner.sendCommand(taskId, { id: newId('cmd'), type: 'listAgentTerminals' }))) }; }
     catch { return { state: 'unknown' }; }
   }
   private async connections(taskId: TaskId, connected: boolean, starts: NativeTerminalStart[]) {
@@ -67,7 +72,7 @@ class NativeActivityQueries {
     const query = AgentActivityQuerySchema.parse(input), env = await nativeEnvironment(this.deps, actor, taskId, 'view');
     const starts = await this.terminals?.list(taskId) ?? [];
     const [statuses, connections] = await Promise.all([this.sync(taskId, starts), this.connections(taskId, env.connected, starts)]);
-    const result = await this.repository.read(taskId, actor.userId, query);
+    const result = await boundedNativeRead(this.repository.read(taskId, actor.userId, query));
     const projected = [...result.states, ...starts.filter((start) => !result.states.some((state) => state.agentId === start.record.agentId)).map((start) => initialNativeActivity(start.record).state)];
     const states = projected.map((state) => {
       const start = starts.find((item) => item.record.agentId === state.agentId), sourceId = start?.execution?.taskId ?? taskId;

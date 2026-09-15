@@ -54,6 +54,21 @@ test('卡住的源查询有界返回；迟到结果不会在超时后继续写�
   expect(applied).toBe(0);
 }, 4000);
 
+test('补齐前的存储查询卡住也不能永久占住任务；恢复后可重新同步', async () => {
+  const f = fixture(); let release!: (sources: typeof workspaceTask[]) => void, reads = 0, calls = 0;
+  f.repository.completedSources = async () => ++reads === 1 ? new Promise((resolve) => { release = resolve; }) : [];
+  f.deps.runner.listEvents = async () => { calls++; return []; };
+  let timer: ReturnType<typeof setTimeout>;
+  try {
+    const page = await Promise.race([f.api.getAgentActivity(workspaceActor, workspaceTask, { limit: 10 }), new Promise<string>((resolve) => { timer = setTimeout(() => resolve('still waiting'), 3200); })]);
+    // 实机名册等待同一个补齐 Promise，网络已返回仍反复 502；存储阶段也必须释放等待归属。
+    expect(page).toMatchObject({ sync: 'unavailable', connection: 'connected' });
+    expect((await f.api.getAgentActivity(workspaceActor, workspaceTask, { limit: 10 })).sync).toBe('ready');
+    expect(calls).toBe(1);
+  } finally { clearTimeout(timer!); release([]); await Promise.resolve(); await Promise.resolve(); }
+  expect(calls).toBe(1);
+}, 4500);
+
 test('Runner 代次变化和实际退出压过旧等待，但历史结果不被改写', async () => {
   const f = fixture();
   const state: AgentActivityState = { agentId: 'agent', terminalId: 'terminal', runnerId: crypto.randomUUID(), throughSeq: 3, source: 'ready', currentTurn: { turnId: 'turn', ordinal: 1, status: 'waiting', startedAt: checkedAt, updatedAt: checkedAt }, pending: [{ id: 'q', eventId: 'e', turnId: 'turn', kind: 'question', openedAt: checkedAt, seq: 3 }], processEnded: false, updatedAt: checkedAt };
