@@ -1951,3 +1951,19 @@ OOM 窗 D 的“重新启动一窗”只创建 E（agt_01a0a57112517001ae1959d89
 工作台能力接口与 Swagger 指向同一操作。裸父 Pod 没有 Agent 会话令牌，MCP 读取如预期拒绝；随后以既有 OpenCode E 的 UID 10001 使用其已经注入的 MCP 连接，在同一容器请求 `cs://capability/operations`，15:49:48Z 返回同一操作且 granted=true。令牌只在原容器内供原目的端点使用，不输出或落盘，不手工构造服务身份头。
 
 证据为 `/private/tmp/crewstation-rfc003-batch80-` 的 candidate／gate-result／proxy-release-v015／proxy-config／proxy-traffic／proxy-egress-cycle／consumer-journey／consumer-invocation／consumer-mcp-configured／final-preserved 等记录。IAB 当前开发页和 API 消费页可读，代理筛选确实可选；鼠标点击及键盘输入仍在控制工具派发前超时，没有把这种工具故障描述成产品按钮失败。原 files／delivery 未发送草稿保持。**完整浏览器试调与申请衔接尚未补齐，累计仍 28／52；RFC-004 继续按约定等待。**
+
+## 第八十一批：真实角色切流与数据访问
+
+第八十批已发布 fc10d203eef13bd532f03276021262d522f55b4c，[CI 34991673665](https://github.com/wangbinquan/CrewStation/actions/runs/34991673665)／job 104457603375 于 2026-09-15 15:58:04Z 成功。提交包含 21 个精确路径，签名已核对，main／origin/main 同步；本批只补真实运行证据，没有新生产源码、依赖或部署变化。系统 Git 突然要求 Xcode 许可，改用本机既有独立 Git 2.53.0；推送按命令临时复用已登录的 gh credential helper，没有接受协议或改全局凭据配置。
+
+专用代理当前 v0.1.5 的 manifest 明确禁止回退。带当前／目标双 releaseId 请求切回 v0.1.3，普通 API 返回 412 和“发布配置明确禁止回退”的原因，前后槽位与切流历史完全相同。此项证明配置阻断分支，不冒充破坏性迁移分支已执行。
+
+workbench 由真实 rfc003-owner（usr_01a09f273a777000b0e97645b212380e）先切至已有 v0.1.1；admin 使用原 v0.1.0 确认再次提交，返回 412，details 精确给出 expected／actual releaseId，没有产生第二次切流。首轮脚本误期待 409，finally 已恢复原 v0.1.0；查明现有 slots 契约是 precondition 后纠正验收断言，不改产品。最终轮 16:10:00Z 的 tsw_01a0a5d5162170009c3b4cd516b74b6c 后，普通版本比较返回 v0.1.1／rel_01a09f181c8d7000b2f2654113a1e737；16:10:01Z 以 tsw_01a0a5d51a797000919938e7aecb51b2 恢复原 v0.1.0／rel_01a09eb30d3370009d26fd52ceeaa013。两槽源码同为 6af30245，比较采用新发布身份，不能只以相同 commitSha 判断目标未变。
+
+16:16:00Z 实际 developer（usr_01a09f273a95700185d408ca143e2a45）分别申请五分钟 diagnostic-readonly／production-change，得到 tdb_01a0a5da94ee700098e2d50642829185、tdb_01a0a5da951d7000a410325ce7f71263。其本人决定接口返回 403；由 owner 批准后均为 active、期限到 16:21:00Z、审批人及理由准确。原开发容器只具备 CS_DATABASE_URL，两组生产连接变量仍不存在；验收进程明确选择默认连接后，实际 SQL 返回数据库 cs_rfc003_verify_workbench_dev。没有执行生产 SQL，不能把批准当作旧进程已加载凭据或应用已切换。finally 中 owner 撤销两项，均为 revoked；撤销用例同步回收临时角色。
+
+原 workbench／files／delivery 三个 QA 的现有订阅均为 gitlab.push，目前没有死信；未向所有订阅者广播新的验收事件。事件重放完整分支继续待执行。证据位于 batch81-rollback-blocked.json、batch81-traffic-conflict.json（初始断言）、batch81-traffic-conflict-final.json、batch81-data-access.json、batch81-events-before.json。
+
+IAB tab 26 实看当前操作已可调、两条申请的理由／拒绝与批准意见；代理筛选可操作，一次会话重新绑定按钮成功，其余试调点击未成功派发，不能据此关闭 UX-AT-15。临时视口已 reset。重建控制连接后 `cua.getState()` 明确返回 Mac 锁定、自动解锁失败，浏览器连接 `nodeRepl.fetch request failed`；已请用户手动解锁并恢复连接，没有绕过锁屏。原 tab 16／17 的 CLI 草稿未发送／清除，原任务保留；恢复连接后续接完整交互。
+
+16:19:30Z 原五任务、四个 CLI UID／Running／restart 0／400m CPU 及七份受保护文件摘要保持。本批对 UX-AT-11／12／31／38 增补真实服务端和运行证据，完整页面条件仍待补齐，**累计仍 28／52**。RFC-004 按明确顺序等待 RFC-003 完结。本批纯证据文档复用第八十批不变的源码门禁，发布后另核对精确 SHA CI。
