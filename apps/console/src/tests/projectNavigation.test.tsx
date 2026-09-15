@@ -184,12 +184,74 @@ describe('诊断、订阅与配置的上下文', () => {
 
   test('调用链格式约束首屏出现，错误输入不查询；用户确认有效 ID 才查', async () => {
     const f = fixture(); page = await renderApp(`/projects/${projectId}/operations?tab=trace&traceId=invalid`);
-    expect(page.text()).toContain('32 位十六进制'); await page.click('查询调用链');
-    expect(document.querySelector('input[aria-invalid="true"]')).not.toBeNull();
+    expect(page.text()).toContain('32 位十六进制');
+    await input(document.querySelector<HTMLInputElement>('input[aria-invalid]')!, 'invalid-trace');
+    await act(async () => document.querySelector<HTMLButtonElement>('button[type="submit"]')!.focus());
+    await page.click('查询调用链');
+    const invalidField = document.querySelector<HTMLInputElement>('input[aria-invalid="true"]')!;
+    expect(invalidField).not.toBeNull(); expect(invalidField.value).toBe('invalid-trace');
+    // 实机点击提交后焦点仍留在按钮上，错误字段虽然标红却不能直接继续更正。
+    expect(document.activeElement === invalidField).toBe(true);
+    expect(document.getElementById(invalidField.getAttribute('aria-errormessage')!)?.textContent).toContain('32 位小写十六进制');
     expect(f.calls.some((call) => call.url.pathname.includes('/traces/'))).toBe(false);
     await input(document.querySelector<HTMLInputElement>('input[aria-invalid]')!, traceId); await page.click('查询调用链');
     expect(page.text()).toContain('runner.connected'); expect(page.search().traceId).toBe(traceId);
   });
+});
+
+test.each([
+  { from: 'logs', to: 'deliveries', start: 2, end: 3, key: 'ArrowRight', before: 0, after: 70 },
+  { from: 'trace', to: 'health', start: 4, end: 0, key: 'Home', before: 178, after: 0 },
+  { from: 'health', to: 'trace', start: 0, end: 4, key: 'End', before: 0, after: 178 },
+  { from: 'health', to: 'trace', start: 0, end: 4, key: 'ArrowLeft', before: 0, after: 178 },
+  { from: 'trace', to: 'health', start: 4, end: 0, key: 'ArrowRight', before: 178, after: 0 },
+])('窄屏键盘 $key / $from → $to 保留焦点滚动', async ({ from, to, start, end, key, before, after }) => {
+  fixture(); page = await renderApp(`/projects/${projectId}/operations?tab=${from}`, undefined, undefined, { scrollRestoration: true });
+  const list = document.querySelector<HTMLElement>('[role="tablist"][aria-label="运行与诊断"]')!;
+  const tabs = [...list.querySelectorAll<HTMLButtonElement>('[role="tab"]')];
+  const source = tabs[start]!, target = tabs[end]!;
+  // 实机 320px 的标签条 [16, 304]；Happy DOM 没有布局，只注入这些量测值。
+  const offsets = [0, 94, 202, 268, 362], widths = [90, 104, 62, 90, 104];
+  Object.defineProperty(list, 'clientWidth', { value: 288 });
+  list.getBoundingClientRect = () => new DOMRect(16, 0, 288, 42);
+  tabs.forEach((tab, index) => { tab.getBoundingClientRect = () => new DOMRect(16 + offsets[index]! - list.scrollLeft, 0, widths[index]!, 34); });
+  list.scrollLeft = before; list.dispatchEvent(new Event('scroll', { bubbles: true }));
+  await act(async () => { source.focus(); source.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true })); });
+  await page.settle();
+  expect(page.search().tab).toBe(to); expect(document.activeElement).toBe(target);
+  expect(target.getAttribute('aria-selected')).toBe('true');
+  // 实机 320px 下，导航先记旧位置再 focus，内容切换后标签条回到 0，焦点标签被裁切。
+  expect(list.scrollLeft).toBe(after);
+  expect(target.getBoundingClientRect().left).toBeGreaterThanOrEqual(list.getBoundingClientRect().left);
+  expect(target.getBoundingClientRect().right).toBeLessThanOrEqual(list.getBoundingClientRect().right);
+});
+
+test('缩窄后选中页签完整可见，不抢正文焦点，卸载停止观察', async () => {
+  const originalObserver = globalThis.ResizeObserver, callbacks = new Map<Element, () => void>();
+  globalThis.ResizeObserver = class implements ResizeObserver {
+    private readonly targets = new Set<Element>();
+    constructor(private readonly callback: ResizeObserverCallback) {}
+    observe(target: Element) { this.targets.add(target); callbacks.set(target, () => this.callback([], this)); }
+    unobserve(target: Element) { this.targets.delete(target); callbacks.delete(target); }
+    disconnect() { for (const target of this.targets) callbacks.delete(target); this.targets.clear(); }
+  };
+  try {
+    fixture(); page = await renderApp(`/projects/${projectId}/operations?tab=trace`);
+    const list = document.querySelector<HTMLElement>('[role="tablist"][aria-label="运行与诊断"]')!;
+    const selected = list.querySelector<HTMLButtonElement>('[aria-selected="true"]')!;
+    const field = document.querySelector<HTMLInputElement>('input')!;
+    let width = 500;
+    Object.defineProperty(list, 'clientWidth', { get: () => width });
+    list.getBoundingClientRect = () => new DOMRect(16, 0, width, 42);
+    selected.getBoundingClientRect = () => new DOMRect(378 - list.scrollLeft, 0, 104, 34);
+    await act(async () => field.focus());
+    width = 288; await act(async () => callbacks.get(list)?.());
+    // 实机选中末尾页签后缩到 320px，原标签仍在 [378, 482]，整项藏在 [16, 304] 之外。
+    expect(list.scrollLeft).toBe(178);
+    expect(selected.getBoundingClientRect().right).toBeLessThanOrEqual(list.getBoundingClientRect().right);
+    expect(document.activeElement).toBe(field); expect(page.search().tab).toBe('trace');
+    page.unmount(); page = undefined; expect(callbacks.has(list)).toBe(false);
+  } finally { globalThis.ResizeObserver = originalObserver; }
 });
 
 test('分类参数只接受有效且相关的值，未知对象不降级为另一个对象', () => {

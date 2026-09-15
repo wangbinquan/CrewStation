@@ -1376,3 +1376,35 @@ CUA 刷新真实 delivery 页面载入 `/assets/index-C2niefU7.js`，恢复连�
 API ebaa730／generation=32、controller cc93104／21 均 1／1，原任务运行时保持。workbench-blue／delivery-green／files-green 分别 generation=21／13／13，各自 releaseId、原 Deployment UID、1／1 均与上批一致；workbench 正式 green 保持 generation=1。节点 Ready=True、MemoryPressure／DiskPressure=False，剩余 1,763,966,976 bytes。本批仅 console 发生部署更新。
 
 证据为 batch63 的 navigation-before／navigation-final、navigation-objects／catalog-objects、三组 red、loop-targeted、check-navigation-final、build-navigation-final、source-candidate、image-context／built／budget／import、console-rollout、http-assets、qa-before／qa-after／qa-comparison、final-runtime；前两候选以 initial／pre-loop 前缀保留。UX-AT-24 已通过，累计 **22／52 通过、30 项待完成**。T12 仍进行中；I9／I14／I15 和具体成员范围仍待答复，RFC-004 已批准、继续等待 RFC-003 完结，Hook 未开工。
+
+## 第六十四批：窄屏页签与错误字段焦点
+
+继续 UX-AT-25／26。批前 main 与 origin/main 同为 `35c5067fe0c19c0eae83ea1f96ca6b0fe90bf244`，树和索引为空；其精确 SHA [CI 34918433770](https://github.com/wangbinquan/CrewStation/actions/runs/34918433770) 已成功，1159 pass／8 skip／0 fail、1167 tests／195 files／69.44s，console build 955ms。本批沿用既有 admin 与 QA 对象检查页面布局、键盘和字段反馈。
+
+### 实机缺陷和回归
+
+320px 的“运行与诊断”标签条实际边界为 [16, 304]，宽 288、内容宽 466。从“日志”按右方向键后内容和 aria-selected 已进入“事件投递”，但 scrollLeft 仍 0，目标 [284, 374] 被裁切；1280px 选中末尾“调用链回放”后缩到 320px，目标仍在 [378, 482]，完全隐藏。
+
+初次回归模拟原生 focus 的滚动，发现 Router 会恢复导航前位置；把聚焦移到导航前后测试通过，但首个部署实看仍未显露目标，因此没有把这轮测试绿视为修复完成。随后回归使用实测边界，仅补 Happy DOM 缺少的布局；右键、Home、End、左右首尾循环五项正常失败，**14 pass／5 fail／97 assertions**。共享 Tabs 增加按边界调整自身 scrollLeft 的逻辑，焦点／键盘先显露再导航，避免路由恢复旧位置。另一项缩放回归先 **19 pass／1 fail／108 assertions**，补 useLayoutEffect 和 ResizeObserver 后，选中项在挂载、变化与缩窄时完整可见，同时保持正文焦点，卸载断开监听。
+
+实际中文错误检查另发现：输入 invalid-trace 并点击查询，字段已经标错但焦点仍在按钮上，不能直接继续改输入。TracePage 增加输入 ref，校验失败后聚焦字段。测试显式先聚焦真实提交按钮，再点击提交，证明草稿、错误关联、无无效请求和有效查询路径。初次直接比较两个 DOM 节点的失败输出进程退出 133、未产生正常断言汇总，不作为正常红证据；将比较结果断言为布尔值后正常复现 **19 pass／1 fail／111 assertions**，修复后通过。最终四文件定向 **55 pass／0 fail／305 assertions／3.02s**。
+
+### 浏览器量测和最终复验
+
+使用 CUA 实际浏览器、既有对象和页面控件。市场、项目列表、files 项目概览、发布准备、带 v0.1.8 完整 releaseId／since／limit 的日志，分别检查 1280、1024、768、390、320px；接入列表和发布详情另有 320px 记录。27 次量测的 documentWidth 均等于视口，正常宽度正文为 1056／800px，窄屏正文随视口；中文控件、长筛选项和空结果可见。发布准备仅展开并收起，日志已超过保留期显示空，未把空日志当作新的业务日志验收。
+
+修复后的真实 320px 标签条中，右键切“事件投递”为 scrollLeft=70、目标 [214, 304]；End／左键循环到“调用链回放”为 178、目标 [200, 304]；Home／右键循环回“健康状态”为 0、目标 [16, 106]。六项键盘／缩放记录均 selected=true、焦点蓝色 2px 轮廓可见、目标完整位于标签条。该轮脚本为 index-wkMMZQSB.js，共享 Tabs 的最终源码此后未变。
+
+包含 TracePage 修复的最终部署载入 index-DN3puaAl.js。实际提交 invalid-trace 后显示“Trace ID 必须是 32 位小写十六进制。”，输入和焦点保留、aria-invalid=true、字段错误关联正确。保持这份输入连续切换五种宽度，焦点仍在输入框、文本和错误不丢、选中末尾标签完整可见；390／320px 标签条分别滚到 108／178。清空临时输入并刷新后字段为空、invalid=false，视口覆盖 reset 完成。这里补足已量测页面与实际键盘子集，不把它当作全部关键页面、完整键盘操作或实际系统明暗旅程通过。
+
+### 门禁、部署与状态保留
+
+最终四份源码／测试候选于 02:28:40Z 固定。受限沙箱检查的静态步骤通过，但临时监听端口和 PostgreSQL 不可访问，测试结果 985 pass／150 skip／38 fail，不属于有效完整门禁；正常本机权限下执行同一 `bun run check`，最终 **1169 pass／4 skip／0 fail**（1173 tests／195 files／6505 assertions／112.58s），console build **746ms**。此前检查仅在实际页面发现新问题并改变候选后重跑；最终有效候选不因文档变化再跑完整门禁。
+
+最终镜像 `cs-console:rfc003-b64-6184b66141` 的 tag 取四份候选摘要，以已核对的 b63 镜像为基底覆盖 dist／serve.ts；imageID=`sha256:5a73faede3ab15279bf87cc27324310f79cd1fbb7e9ca6df950372130057b9e6`。02:32:38Z console Deployment 原 UID 保持、generation=34、1／1；Pod `console-58bd77f7ff-27mfq`／UID `6a17555a-3831-4740-9583-4216b1fb653f`、restartCount=0，实际 imageID 和七份文件摘要匹配。02:34:05Z 正常 HTTP 六份静态产物与最终构建一致。三轮小候选导入新增内容共 11,157,535 bytes，其中最终候选 3,719,349 bytes；只滚动 console，未调零其他副本或清理数据。
+
+02:34:04Z 与 01:52:48Z 批前快照比较，delivery／files／旧 rfc003-ux 的 taskId、native、历史 Agent、activity、workspace 均保持，仅 checkedAt 查询时间另计；不声称整个 session DTO 逐字节不变。原 CLI 草稿保持未发送，本批没有模型轮次或 QA 发布／配置／授权写入。
+
+02:34:29Z 三个健康任务及原失败任务 UID／容器状态／restartCount、四份业务文件及 Git 配置摘要、失败 Bound 工作卷 UID 保持。workbench-blue／delivery-green／files-green 仍为 generation=21／13／13、原 releaseId、1／1，workbench 正式 green 仍 generation=1。API ebaa730／generation=32、controller cc93104／21 均 1／1，任务运行时未更新。节点 Ready=True、MemoryPressure／DiskPressure=False，剩余 1,765,412,864 bytes。
+
+证据为 batch64 的 browser-subset／browser-final、tabs-geometry-red／tabs-resize-red／trace-focus-red-normal、final-targeted-complete、check-authorized、build-complete、source-candidate、image-context／built／budget／import、console-rollout、http-assets、qa-before／qa-after／qa-comparison、final-runtime。前两候选保存在 initial／pre-trace 前缀，沙箱失败和非正常测试进程输出分别留档。**累计仍 22／52 通过、30 项待完成**，T12 保持进行中；I9／I14／I15 与具体成员范围仍待答复，RFC-004 等待 RFC-003 完结，Hook 未开工。
