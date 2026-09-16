@@ -1,4 +1,4 @@
-import type { NativeTerminalRecord, NativeTerminalSnapshotDto, StartNativeTerminalRequest, TaskId, UserId } from '@crewstation/contracts';
+import type { NativeTerminalRecord, NativeTerminalSnapshotDto, RuntimeRevisionRef, StartNativeTerminalRequest, TaskId, UserId } from '@crewstation/contracts';
 
 export interface NativeTerminalStart {
   taskId: TaskId;
@@ -8,6 +8,8 @@ export interface NativeTerminalStart {
   input: StartNativeTerminalRequest;
   driver: 'claude-code' | 'opencode';
   model: string;
+  /** RFC-004：受理时固定的运行环境版本；重试与后台派发只用它，不再看当前最新。 */
+  runtime?: RuntimeRevisionRef;
   record: NativeTerminalRecord;
   execution?: { taskId: TaskId; taskProfile?: string; stopRequested?: boolean; finalized?: boolean; screen?: 'available' | 'unavailable' };
 }

@@ -16,6 +16,7 @@ import { createRunDirectory, defaultRunDir } from '../../process/runDirectory';
 import type { CliAdapterOptions, CliRuntimeAdapter, PreparedRuntime } from '../cliRuntimeAdapter';
 import { createCliAgentDriver } from '../cliAgentDriver';
 import { buildClaudeSpawn, renderClaudeMcpConfig } from './argv';
+import { readManagedClaudeSettings, writeMergedClaudeSettings } from './managedSettings';
 import { detectClaudeSessionNotFound, parseEvent } from './events';
 import { claudeUserMessageFrame } from './streamInput';
 
@@ -43,10 +44,13 @@ async function prepareClaude(spec: DriverAgentSpec, context: DriverLaunchContext
   const systemPromptFile = await runDir.write('system.md', spec.systemPrompt ?? '');
   const mcp = renderClaudeMcpConfig(base);
   const mcpConfigFile = mcp === null ? undefined : await runDir.write('mcp-config.json', mcp.json);
+  // RFC-004：管理员 settings.json 经唯一的 --settings 传入；headless 没有平台观测 hooks 要合成。
+  const settingsFile = await writeMergedClaudeSettings(runDir, await readManagedClaudeSettings(context.managed), undefined);
   const files = {
     systemPromptFile,
     ...(mcpConfigFile === undefined ? {} : { mcpConfigFile }),
     mcpServerNames: mcp?.names ?? [],
+    ...(settingsFile === undefined ? {} : { settingsFile }),
   };
   return {
     plan: (input) =>
@@ -79,5 +83,6 @@ function baseContext(spec: DriverAgentSpec, context: DriverLaunchContext, runDir
     baseEnv: context.env,
     gitUserName: context.gitUserName ?? null,
     gitUserEmail: context.gitUserEmail ?? null,
+    ...(context.managed ? { managed: context.managed } : {}),
   };
 }

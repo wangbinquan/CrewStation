@@ -1,0 +1,27 @@
+{
+  "name": "@crewstation/module-agent-runtime",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "管理员运行环境：Agent 启动前 Hook 步骤、不可变版本、凭据引用、检查记录与启动材料解析（RFC-004）",
+  "exports": {
+    ".": "./index.ts"
+  },
+  "crewstation": {
+    "layer": 3
+  },
+  "dependencies": {
+    "@crewstation/contracts": "workspace:*",
+    "@crewstation/http": "workspace:*",
+    "@crewstation/kernel": "workspace:*",
+    "@crewstation/persistence": "workspace:*",
+    "@crewstation/queue": "workspace:*",
+    "@crewstation/secretbox": "workspace:*",
+    "drizzle-orm": "0.45.2",
+    "hono": "4.13.7",
+    "zod": "4.6.2"
+  },
+  "devDependencies": {
+    "@crewstation/testkit": "workspace:*"
+  }
+}

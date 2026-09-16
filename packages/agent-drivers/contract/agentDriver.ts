@@ -1,10 +1,11 @@
 // 驱动对外契约。与 `runtimes/task/src/agents/driver.ts` 的 AgentDriver／AgentProcess 结构一致，
 // 但不能直接 import 它（技术包不依赖运行时），于是在这里重新声明；宿主的 cliDriver.ts 做适配。
 
-import type { AgentDriver as AgentDriverName, AgentEvent, AgentPermission, McpConnection } from '@crewstation/contracts';
+import type { AgentDriver as AgentDriverName, AgentEvent, AgentPermission, McpConnection, RuntimeRevisionRef } from '@crewstation/contracts';
 import type { Logger } from '@crewstation/kernel';
 import type { ProcessHost } from './processHost';
 import type { NativeActivityChannel } from './nativeTerminal';
+import type { ManagedRuntimeContext } from './managedRuntime';
 
 /** 一次 startAgent 剥掉协议外壳后的启动规格（与宿主 AgentSpec 同形，去掉 driver 字段）。 */
 export interface DriverAgentSpec {
@@ -18,6 +19,8 @@ export interface DriverAgentSpec {
   resumeSessionId?: string;
   systemPrompt?: string;
   mcp: McpConnection[];
+  /** RFC-004：固定的运行环境版本，只在 started 事件里回显。 */
+  runtime?: RuntimeRevisionRef;
 }
 
 export interface DriverLaunchContext {
@@ -31,6 +34,8 @@ export interface DriverLaunchContext {
   gitUserName?: string | null;
   gitUserEmail?: string | null;
   nativeActivity?: NativeActivityChannel;
+  /** RFC-004：启动前 Hook 已成功时的托管上下文；缺省为部署配置模式。 */
+  managed?: ManagedRuntimeContext;
 }
 
 export interface DriverAgentProcess {

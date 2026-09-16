@@ -41,7 +41,8 @@ export function isolatedNativeFixture() {
       const previous = roster.terminals.find((item) => item.agentId === command.agentId); if (previous) return structuredClone(previous);
       if (command.runnerId !== roster.runnerId) throw precondition('wrong runner');
       const record: NativeTerminalRecord = { agentId: command.agentId, terminalId: command.terminalId, runnerId: command.runnerId, compute: command.compute, permission: command.permission,
-        lifecycle: 'running', revision: 2, cols: command.cols, rows: command.rows, startedAt: f.deps.clock.now().toISOString() };
+        lifecycle: 'running', revision: 2, cols: command.cols, rows: command.rows, startedAt: f.deps.clock.now().toISOString(),
+        ...(command.runtime ? { runtime: { configId: command.runtime.configId, revision: command.runtime.revision } } : {}) };
       roster.terminals.push(record); steps.push(`start:${taskId}`);
       if (controls.loseStart) { controls.loseStart = false; throw new Error('lost start receipt'); }
       return structuredClone(record);

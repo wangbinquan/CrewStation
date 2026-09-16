@@ -19,7 +19,7 @@ export function streamStatusTone(status: StreamStatus): BadgeTone {
 }
 
 export function agentStateTone(state: AgentInstanceState): BadgeTone {
-  if (state === 'running' || state === 'starting') return 'info';
+  if (state === 'running' || state === 'starting' || state === 'preparing') return 'info';
   if (state === 'awaiting-input') return 'warning';
   if (state === 'failed') return 'danger';
   return state === 'completed' ? 'success' : 'neutral';
@@ -37,7 +37,7 @@ export function bindingStateTone(state: TaskDataBindingState): BadgeTone {
   return state === 'rejected' ? 'warning' : 'neutral';
 }
 
-/** Agent 是否还能收消息：结束态的输入框禁用。 */
+/** Agent 是否还能收消息：结束态禁用；preparing 期间 Runner 会以 agent_preparing 拒收，也禁用。 */
 export function agentAcceptsInput(state: AgentInstanceState): boolean {
   return state === 'running' || state === 'starting' || state === 'awaiting-input';
 }

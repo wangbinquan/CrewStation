@@ -4,7 +4,7 @@
 FROM oven/bun:1.3.13
 
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends tini git util-linux bash curl ca-certificates procps \
+  && apt-get install -y --no-install-recommends tini git util-linux bash python3 curl ca-certificates procps \
   && rm -rf /var/lib/apt/lists/*
 
 # worker：所有 Agent 进程的身份；家目录即工作目录挂载点 /work。

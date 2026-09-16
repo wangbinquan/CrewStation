@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { SlotNameSchema } from '../events/topics';
+import { SlotNameSchema, TaskKindSchema } from '../events/topics';
 import { ProjectIdSchema, SubtaskIdSchema, TaskIdSchema, TraceIdSchema, UserIdSchema } from '../ids';
 
 export const LogSourceSchema = z.enum(['slot', 'dev-session', 'business-task', 'build', 'migration']);
@@ -36,7 +36,7 @@ export const SetAlertSubscriptionRequestSchema = AlertSubscriptionDtoSchema.omit
 /** 按 traceId 回放：任务、子任务、Agent 会话、命令、产物与日志引用。 */
 export const TraceReplayDtoSchema = z.object({
   traceId: TraceIdSchema,
-  tasks: z.array(z.object({ taskId: TaskIdSchema, kind: z.enum(['dev-session', 'business']), createdAt: z.iso.datetime() })),
+  tasks: z.array(z.object({ taskId: TaskIdSchema, kind: TaskKindSchema, createdAt: z.iso.datetime() })),
   subtasks: z.array(z.object({ subtaskId: SubtaskIdSchema, taskId: TaskIdSchema, name: z.string(), state: z.string(), sessionId: z.string().optional() })),
   sessionIds: z.array(z.string()),
   events: z.array(z.object({ at: z.iso.datetime(), type: z.string(), taskId: TaskIdSchema.optional(), subtaskId: SubtaskIdSchema.optional(), sessionId: z.string().optional(), otelTraceId: z.string().optional(), summary: z.string().optional() })),

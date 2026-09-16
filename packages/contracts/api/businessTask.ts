@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { ServiceIdSchema, SlugSchema, SubtaskIdSchema, TaskIdSchema, TraceIdSchema } from '../ids';
 import { VolumeModeSchema } from '../manifest/tasks';
+import { RuntimeRevisionRefSchema } from '../taskrunner/beforeStart';
 
 export const BusinessTaskStateSchema = z.enum(['creating', 'running', 'paused', 'closing', 'closed', 'failed']);
 
@@ -65,6 +66,8 @@ export const SubtaskDtoSchema = z.object({
   sessionId: z.string().optional(),
   exitCode: z.number().int().optional(),
   contractResult: z.object({ ok: z.boolean(), missing: z.array(z.string()), schemaErrors: z.array(z.string()) }).optional(),
+  /** RFC-004：本次 Agent 子任务固定使用的运行环境版本；部署配置模式没有它。 */
+  runtime: RuntimeRevisionRefSchema.optional(),
   startedAt: z.iso.datetime().optional(),
   endedAt: z.iso.datetime().optional(),
   error: z.string().optional(),

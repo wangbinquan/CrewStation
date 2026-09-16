@@ -52,11 +52,14 @@ export class NativeExecutionLifecycle {
   }
   private async startCommand(start: NativeTerminalStart, env: EnvironmentView) {
     const credential = await this.deps.credentials.issueDevSessionToken({ taskId: start.taskId, projectId: env.projectId, serviceId: env.serviceId as ServiceId, userId: start.createdBy });
+    // 受理时固定的运行环境版本：后台重试与迟到派发都用它，不重新解析“当前最新”（RFC-004 §5）。
+    const runtime = start.runtime ? await this.deps.compute.runtimeMaterial(start.runtime) : undefined;
     const record = RunnerResultPayloads.startAgentTerminal.parse(await this.deps.runner.sendCommand(env.id, {
       id: newId('cmd'), type: 'startAgentTerminal', agentId: start.record.agentId, terminalId: start.record.terminalId, runnerId: start.record.runnerId,
       requestFingerprint: start.fingerprint, compute: start.record.compute, driver: start.driver, model: start.model, permission: start.record.permission,
       cols: start.input.cols, rows: start.input.rows, ...(start.input.cwd ? { cwd: start.input.cwd } : {}),
       mcp: this.deps.settings.mcp.map((m) => ({ ...m, headers: { [IDENTITY_HEADERS.devSessionToken]: credential.token } })), env: {},
+      ...(runtime ? { runtime, processAttemptId: `${start.record.agentId}:1` } : {}),
     }));
     await this.repo.saveRecord(start.taskId, record);
     await this.deps.environments.touch(start.taskId);

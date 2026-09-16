@@ -99,12 +99,12 @@ describe.skipIf(!available)('project module', () => {
     await project.api.upsertComputeProfile(admin, { name: 'balanced', driver: 'claude-code', model: 'anthropic/claude-sonnet-5', description: '均衡' });
     await project.api.upsertComputeProfile(admin, { name: 'balanced', driver: 'claude-code', model: 'anthropic/claude-opus-5', description: '均衡（改）' });
     expect((await project.api.listComputeProfilesFull(admin)).filter((p) => p.name === 'balanced')).toEqual([
-      { name: 'balanced', driver: 'claude-code', model: 'anthropic/claude-opus-5', description: '均衡（改）' },
+      { name: 'balanced', driver: 'claude-code', model: 'anthropic/claude-opus-5', description: '均衡（改）', revision: 2 },
     ]);
 
-    // 租户面只给名字与说明：厂商与模型是平台的采购信息。
+    // 租户面只给名字、说明与可用性：厂商与模型是平台的采购信息；未绑定运行环境即部署配置模式。
     const summary = (await project.api.listComputeProfiles()).find((p) => p.name === 'balanced')!;
-    expect(summary).toEqual({ name: 'balanced', description: '均衡（改）' });
+    expect(summary).toEqual({ name: 'balanced', description: '均衡（改）', mode: 'legacy', available: true });
 
     await expect(project.api.listComputeProfilesFull(dev)).rejects.toMatchObject({ kind: 'forbidden' });
     await expect(project.api.upsertComputeProfile(dev, { name: 'x', driver: 'stub', model: 'stub/echo', description: '' })).rejects.toMatchObject({ kind: 'forbidden' });
@@ -120,8 +120,8 @@ describe.skipIf(!available)('project module', () => {
     await project.api.upsertTaskProfile(admin, { name: 'cli-large', cpu: '2', memory: '4Gi', storage: '2Gi', description: 'CLI' });
     const input = { name: 'cli-bound', driver: 'opencode' as const, model: 'opencode/big-pickle', taskProfile: 'cli-large', description: '并行开发' };
     await project.api.upsertComputeProfile(admin, input);
-    expect(await project.api.resolveComputeProfile(input.name)).toEqual(input);
-    expect((await project.api.listComputeProfiles()).find((p) => p.name === input.name)).toEqual({ name: input.name, description: input.description });
+    expect(await project.api.resolveComputeProfile(input.name)).toEqual({ ...input, revision: 1 });
+    expect((await project.api.listComputeProfiles()).find((p) => p.name === input.name)).toEqual({ name: input.name, description: input.description, mode: 'legacy', available: true });
     await expect(project.api.upsertComputeProfile(dev, input)).rejects.toMatchObject({ kind: 'forbidden' });
     await expect(project.api.upsertComputeProfile(admin, { ...input, taskProfile: 'missing' })).rejects.toMatchObject({ kind: 'not_found' });
     expect((await project.api.resolveComputeProfile(input.name))?.taskProfile).toBe('cli-large');

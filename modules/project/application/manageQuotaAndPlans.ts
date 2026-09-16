@@ -1,4 +1,4 @@
-import type { Actor, ComputeProfileDto, ComputeProfileSummaryDto, ProjectId, QuotaDto, ServicePlanDto, SetQuotaRequest, TaskProfileDto } from '@crewstation/contracts';
+import type { Actor, ProjectId, QuotaDto, ServicePlanDto, SetQuotaRequest, TaskProfileDto } from '@crewstation/contracts';
 import { forbidden, notFound } from '@crewstation/kernel';
 import { authorizationUseCases } from './authorization';
 import type { ProjectUseCaseDeps } from './dependencies';
@@ -9,6 +9,7 @@ export function quotaAndPlanUseCases(deps: ProjectUseCaseDeps) {
   const adminOnly = (actor: Actor): void => {
     if (!actor.isAdmin) throw forbidden('只有管理员可以维护套餐与配额');
   };
+  // 算力档位的用例在 manageComputeProfiles.ts（RFC-004 之后含绑定与就绪投影）。
   return {
     getQuota: async (actor: Actor, projectId: ProjectId): Promise<QuotaDto> => {
       await authorize(actor, projectId, 'view');
@@ -36,26 +37,5 @@ export function quotaAndPlanUseCases(deps: ProjectUseCaseDeps) {
       await uow.run((scope) => scope.catalog.upsertTaskProfile(profile));
       return profile;
     },
-    /** 租户面投影：只给名字与说明，不泄露厂商与模型标识符（RFC-001）。 */
-    listComputeProfiles: async (): Promise<ComputeProfileSummaryDto[]> =>
-      (await uow.read.catalog.listComputeProfiles()).map((p) => ({ name: p.name, description: p.description })),
-    listComputeProfilesFull: async (actor: Actor): Promise<ComputeProfileDto[]> => {
-      adminOnly(actor);
-      return uow.read.catalog.listComputeProfiles();
-    },
-    upsertComputeProfile: async (actor: Actor, profile: ComputeProfileDto): Promise<ComputeProfileDto> => {
-      adminOnly(actor);
-      await uow.run(async (scope) => {
-        if (profile.taskProfile && !await scope.catalog.getTaskProfile(profile.taskProfile)) throw notFound('CLI 任务套餐', profile.taskProfile);
-        await scope.catalog.upsertComputeProfile(profile);
-      });
-      return profile;
-    },
-    deleteComputeProfile: async (actor: Actor, name: string): Promise<void> => {
-      adminOnly(actor);
-      await uow.run((scope) => scope.catalog.deleteComputeProfile(name));
-    },
-    /** 供 dev-session、business-task、release 解析档位名 → 具体驱动与模型。 */
-    resolveComputeProfile: (name: string): Promise<ComputeProfileDto | undefined> => uow.read.catalog.getComputeProfile(name),
   };
 }

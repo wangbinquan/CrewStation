@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
-import type { ProjectId, ReleaseId, RunnerCommand, RunnerEvent, ServiceActor, ServiceId, TaskId } from '@crewstation/contracts';
+import type { ProjectId, ReleaseId, RunnerCommand, RunnerEvent, RuntimeRevisionRef, ServiceActor, ServiceId, TaskId } from '@crewstation/contracts';
 import { eventbusMigrations } from '@crewstation/eventbus';
 import type { TestDatabase } from '@crewstation/testkit';
 import { createTestDatabase, testDatabaseAvailable } from '@crewstation/testkit';
@@ -22,6 +22,9 @@ const agentEvent = (agentId: string, type: string, extra: Record<string, unknown
 let runnerConnected = true;
 /** 可变：用来验证「登记时存在、起子任务时被管理员删掉」的档位（RFC-001）。 */
 let computeProfiles = ['sample-stub'];
+/** RFC-004：设置后档位视为托管，子任务在构造时固定该版本。 */
+let managedRuntime: RuntimeRevisionRef | undefined;
+const materialRequests: RuntimeRevisionRef[] = [];
 
 beforeAll(async () => {
   if (!available) return;
@@ -46,7 +49,7 @@ beforeAll(async () => {
     },
     directory: { resolveServiceIdentity: async (identity) => (identity === 'demo/demo' ? { serviceId, projectId } : undefined) },
     authorizer: { authorize: async () => undefined },
-    compute: { resolve: async (name: string) => (computeProfiles.includes(name) ? { name, driver: 'stub' as const, model: 'stub/echo' } : undefined), list: async () => computeProfiles.map((name) => ({ name })) },
+    compute: { resolve: async (name: string) => (computeProfiles.includes(name) ? { name, driver: 'stub' as const, model: 'stub/echo', ...(managedRuntime ? { runtime: managedRuntime } : {}) } : undefined), runtimeMaterial: async (ref) => { materialRequests.push(ref); return { configId: ref.configId, configName: 'gw', revision: ref.revision, driver: 'opencode', contentHash: 'h', steps: [], vars: {}, secrets: { KEY: 'sk-business' }, configFile: { kind: 'none' }, captureOutput: false }; }, list: async () => computeProfiles.map((name) => ({ name })) },
     isAdmin: async () => false,
     settings: { mcp: [{ name: 'operations', url: 'http://mcp-operations.svc.cs.internal/mcp' }], outputLimitBytes: 65536, consumerName: 'test.business-task' },
   });
@@ -140,5 +143,28 @@ describe.skipIf(!available)('business-task module', () => {
       computeProfiles = ['sample-stub'];
       await bt.api.closeTask(caller, task.id);
     }
+  });
+  test('托管档位：子任务在构造时固定运行版本，启动按该版本取材料并带 attempt，DTO 只暴露版本引用（RFC-004）', async () => {
+    managedRuntime = { configId: 'arc_' + 'a'.repeat(32), revision: 7 };
+    try {
+      const task = await bt.api.createTask(caller, { labels: {} });
+      const sub = await bt.api.submitSubtask(caller, task.id, { kind: 'agent', name: 'managed', agentProfile: 'chat-v1', mode: 'oneshot', prompt: '分析' });
+      expect(sub.runtime).toEqual(managedRuntime);
+      const start = commands.filter((c) => c.type === 'startAgent').at(-1) as Extract<RunnerCommand, { type: 'startAgent' }>;
+      expect(start.runtime).toMatchObject({ revision: 7, secrets: { KEY: 'sk-business' } });
+      expect(start.processAttemptId).toBe(`${start.agentId}:1`);
+      expect(materialRequests.at(-1)).toEqual(managedRuntime);
+      expect(JSON.stringify(sub)).not.toContain('sk-business');
+      // 已启用版本随后变化：已受理的 attempt 不换版本；重试是新 attempt，按当时的已启用版本固定。
+      managedRuntime = { configId: managedRuntime.configId, revision: 8 };
+      emit(task.id, agentEvent(start.agentId, 'error', { error: { message: 'boom' } }));
+      expect((await bt.api.getSubtask(caller, task.id, sub.id)).state).toBe('failed');
+      const retried = await bt.api.retrySubtask(caller, task.id, sub.id);
+      expect(retried).toMatchObject({ attempt: 2, runtime: { revision: 8 } });
+      const retryStart = commands.filter((c) => c.type === 'startAgent').at(-1) as Extract<RunnerCommand, { type: 'startAgent' }>;
+      expect(retryStart.processAttemptId).toBe(`${retryStart.agentId}:2`);
+      expect(retryStart.runtime?.revision).toBe(8);
+      await bt.api.closeTask(caller, task.id);
+    } finally { managedRuntime = undefined; }
   });
 });

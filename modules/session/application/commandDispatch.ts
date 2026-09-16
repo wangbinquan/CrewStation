@@ -1,8 +1,9 @@
-import type { RunnerCommand, TaskId } from '@crewstation/contracts';
+import type { RunnerCommand, RunnerHello, TaskId } from '@crewstation/contracts';
 import { PlatformError } from '@crewstation/kernel';
 import type { SessionUseCaseDeps } from './dependencies';
 import type { RunnerHub } from './runnerHub';
 import { commandTimeout } from '../domain/commandTimeout';
+import { assertRuntimeSupported } from '../domain/runtimeNegotiation';
 
 /** 命令派发：本副本持有连接就直接发，否则按注册表转发到持有副本；无人持有即 TaskRunner 离线。 */
 export function commandDispatch(deps: Pick<SessionUseCaseDeps, 'registry' | 'forwarder' | 'settings' | 'clock'>, hub: Pick<RunnerHub, 'connections'>) {
@@ -11,6 +12,7 @@ export function commandDispatch(deps: Pick<SessionUseCaseDeps, 'registry' | 'for
     if (!connection) return undefined;
     // 在写入旧 Runner 的 socket 前协商，未知命令不得干扰正在运行的 CLI。
     if (command.type === 'invokeApi' && connection.hello.capabilities.apiInvocations !== 1) throw new PlatformError('precondition', '当前开发容器不支持 API 试调；请保存工作并在容器更新后重新开启会话', { code: 'api_invocations_unavailable' });
+    assertRuntimeSupported(command, connection.hello.capabilities);
     return new Promise<unknown>((resolve, reject) => {
       connection.pending.add({
         id: command.id, type: command.type, sentAt: deps.clock.now().getTime(), resolve,
@@ -36,9 +38,9 @@ export function commandDispatch(deps: Pick<SessionUseCaseDeps, 'registry' | 'for
       if (!local) throw new PlatformError('unavailable', 'TaskRunner 未连接到本副本', { taskId });
       return local;
     },
-    connectionStatus: async (taskId: TaskId): Promise<{ connected: boolean; replica?: string; lastSeq?: number; drivers?: string[] }> => {
+    connectionStatus: async (taskId: TaskId): Promise<{ connected: boolean; replica?: string; lastSeq?: number; drivers?: string[]; capabilities?: RunnerHello['capabilities'] }> => {
       const local = hub.connections.get(taskId);
-      if (local) return { connected: true, replica: deps.settings.selfAddress, lastSeq: local.lastSeq, drivers: local.hello.capabilities.drivers };
+      if (local) return { connected: true, replica: deps.settings.selfAddress, lastSeq: local.lastSeq, drivers: local.hello.capabilities.drivers, capabilities: local.hello.capabilities };
       const owner = await deps.registry.lookup(taskId);
       return owner ? { connected: true, replica: owner.replica } : { connected: false };
     },

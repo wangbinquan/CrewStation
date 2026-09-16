@@ -1,6 +1,6 @@
 # 0004. Agent 运行配置拥有独立领域模块
 
-- 状态：已接受，待 RFC-003 完结后随 RFC-004 实施
+- 状态：已接受，2026-09-16 已实施（`modules/agent-runtime` 已创建，随 RFC-004 落地）
 - 日期：2026-09-14
 - 关联：[RFC-004](../../proposal/rfc/RFC-004-admin-agent-runtime/proposal.md)
 
@@ -23,4 +23,4 @@ dev-session 与 business-task 经统一 compute 解析端口获得快照，task-
 - 不提高源码／函数／目录尺寸上限，不引入门禁例外。
 - 旧 Secret 与旧档位的兼容行为由 RFC-004 明确约束，不能借结构调整删除既有运行能力。
 
-2026-09-14 作者批准 RFC-004，并明确在 RFC-003 完结后启动开发；关联的新模块及职责边界随方案接受。当前模块尚未创建，结构文档／机械规则在后续实施时更新。
+2026-09-14 作者批准 RFC-004，并明确在 RFC-003 完结后启动开发；关联的新模块及职责边界随方案接受。2026-09-16 作者以会话目标要求立即落地：`modules/agent-runtime`（L3，`agent_runtime` schema）经 `bun run scaffold:module` 创建，检查执行器与档位引用两个端口由 `modules/platform/wiring.ts` 回填，结构文档模块表／依赖图已同步；`tools/arch` 六项规则在本批全部通过，未新增例外。

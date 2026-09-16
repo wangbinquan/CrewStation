@@ -1,4 +1,4 @@
-import type { AgentPermission, McpConnection } from '@crewstation/contracts';
+import type { AgentPermission, McpConnection, RuntimeRevisionRef } from '@crewstation/contracts';
 import type { DriverLaunchSpec } from './processHost';
 
 /** 平台解析后的原生终端规格；不是租户可传入的 CLI flags。 */
@@ -10,6 +10,7 @@ export interface NativeTerminalSpec {
   permission: AgentPermission;
   systemPrompt?: string;
   mcp: McpConnection[];
+  runtime?: RuntimeRevisionRef;
 }
 
 export interface PreparedNativeTerminal {

@@ -7,6 +7,7 @@ import { RunnerApiInvocationSchema, ApiInvocationResultSchema } from './apiInvoc
 import { RunnerWorkspaceStatusSchema } from './workspace';
 import { ComparisonDetailQuerySchema, ComparisonDetailsSchema, GitObjectIdSchema, RunnerComparisonSchema } from './workspaceComparison';
 import { NativeTerminalRecordSchema, NativeTerminalRosterSchema, TerminalControlSchema, TerminalSizeSchema, TerminalSnapshotSchema } from './nativeTerminal';
+import { AgentRuntimeMaterialSchema, BeforeStartExecutionSchema, RunnerInterpreterSchema } from './beforeStart';
 
 /** TaskRunner ↔ cs-session 协议版本；不兼容变更递增，双方在 hello 时校验。 */
 export const TASKRUNNER_PROTOCOL_VERSION = 1;
@@ -30,6 +31,10 @@ export const RunnerHelloSchema = z.object({
     pty: z.boolean(),
     preview: z.boolean(),
     apiInvocations: z.literal(1).optional(),
+    /** RFC-004：能执行管理员启动前 Hook 并按 runtime 材料合成 CLI 配置；旧 Runner 没有它，平台在写 socket 前拒绝。 */
+    agentRuntimeConfig: z.literal(1).optional(),
+    /** 容器内实际可用的脚本解释器清单；缺少所需语言的启动在执行前被拒。 */
+    interpreters: z.array(RunnerInterpreterSchema).optional(),
   }),
 });
 
@@ -54,6 +59,10 @@ export const StartAgentCommandSchema = z.object({
   mcp: z.array(McpConnectionSchema).default([]),
   /** 追加到 Agent 进程的环境变量名值对；模型凭据也经此进入（接受的残余风险）。 */
   env: z.record(z.string(), z.string()).default({}),
+  /** RFC-004：管理员运行环境的固定版本材料；缺省走旧的 agentEnvFile 路径，二者不混合。 */
+  runtime: AgentRuntimeMaterialSchema.optional(),
+  /** 同一 Agent 每次真实创建 CLI 进程的尝试标识；重发同一 attempt 只恢复原执行结果，不重跑脚本。 */
+  processAttemptId: z.string().min(1).optional(),
 });
 
 export const StartAgentTerminalCommandSchema = StartAgentCommandSchema.omit({ mode: true, initialPrompt: true, resumeSessionId: true }).extend({
@@ -120,6 +129,7 @@ export const RunnerEventSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('nativeActivity'), activity: NativeActivityEventSchema }),
   z.object({ kind: z.literal('nativeTerminal'), terminal: NativeTerminalRecordSchema }),
   z.object({ kind: z.literal('agent'), event: AgentEventSchema }),
+  z.object({ kind: z.literal('beforeStart'), execution: BeforeStartExecutionSchema }),
   z.object({ kind: z.literal('terminalOutput'), terminalId: z.string(), data: z.string(), terminalSeq: z.number().int().nonnegative().optional(), runnerId: z.uuid().optional() }),
   z.object({ kind: z.literal('terminalResized'), terminalId: z.string(), runnerId: z.uuid(), terminalSeq: z.number().int().nonnegative(), ...TerminalSizeSchema.shape }),
   z.object({ kind: z.literal('terminalClosed'), terminalId: z.string(), exitCode: z.number().int().nullable() }),

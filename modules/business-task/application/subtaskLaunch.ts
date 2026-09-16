@@ -49,10 +49,13 @@ export function subtaskLaunch(deps: BusinessTaskUseCaseDeps) {
           const available = (await deps.compute.list()).map((p) => p.name);
           throw validation(`算力档位 ${run.agentProfile.compute} 不存在，当前可用：${available.join('、') || '（无）'}`, { available });
         }
+        // 托管档位：材料按本 attempt 在构造时固定的版本取，重发同一 attempt 不重跑脚本（RFC-004 §5）。
+        const runtime = run.runtime ? await deps.compute.runtimeMaterial(run.runtime) : undefined;
         await runner.sendCommand(run.taskId, {
           id: `start-${run.runnerRef}`, type: 'startAgent', agentId: run.runnerRef ?? '', compute: compute.name, driver: compute.driver, model: compute.model,
           permission: run.agentProfile.permission,
           mode: run.mode ?? 'oneshot', ...(run.cwd ? { cwd: run.cwd } : {}), initialPrompt: run.prompt ?? '', mcp: settings.mcp.map((m) => ({ name: m.name, url: m.url, headers: {} })), env: {},
+          ...(runtime ? { runtime, processAttemptId: `${run.runnerRef}:${run.attempt}` } : {}),
         });
       } catch (error) {
         const failed = transition(started, 'failed', clock.now(), { error: `启动 Agent 失败：${error instanceof Error ? error.message : String(error)}` });
@@ -88,7 +91,9 @@ export function subtaskLaunch(deps: BusinessTaskUseCaseDeps) {
       if (!profile) throw validation(`agentProfile ${input.agentProfile} 未在该服务的发布中登记`, { registered: registration?.agentProfiles.map((p) => p.name) ?? [] });
       const contract = input.outputContract ? resolveContract(registration, input.outputContract) : undefined;
       if (input.outputContract && !contract) throw validation(`outputContract ${input.outputContract} 未在该服务的发布中登记`);
-      return { ...base, kind: 'agent', mode: input.mode, prompt: input.prompt, agentProfile: profile, ...(contract ? { outputContract: contract } : {}), runnerRef: newId('agt') };
+      // 每个 attempt 在构造时固定运行环境版本（RFC-004）；档位此时不存在则留给启动时按原有路径报错。
+      const compute = await deps.compute.resolve(profile.compute);
+      return { ...base, kind: 'agent', mode: input.mode, prompt: input.prompt, agentProfile: profile, ...(contract ? { outputContract: contract } : {}), ...(compute?.runtime ? { runtime: compute.runtime } : {}), runnerRef: newId('agt') };
     },
   };
 }

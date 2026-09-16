@@ -1,4 +1,4 @@
-import type { Actor, AgentDriver, ApiOperationDto, BranchDto, Manifest, ProjectId, PublishRequest, ReleaseDto, ServiceId, SlotDto, TaskId, UserId } from '@crewstation/contracts';
+import type { Actor, AgentDriver, AgentRuntimeMaterial, ApiOperationDto, BranchDto, Manifest, ProjectId, PublishRequest, ReleaseDto, RuntimeRevisionRef, ServiceId, SlotDto, TaskId, UserId } from '@crewstation/contracts';
 
 /** api-catalog L3 的公开操作查询，由平台装配。 */
 export interface ApiInvocationCatalog {
@@ -26,8 +26,19 @@ export interface SourceControl {
  * 由 project 模块提供（RFC-001）：算力档位名 → 具体驱动与模型。
  * 解析发生在平台侧，容器拿到的是已经定好的具体值。
  */
+export interface ResolvedCompute {
+  name: string;
+  driver: AgentDriver;
+  model: string;
+  taskProfile?: string;
+  /** RFC-004：受理时固定的运行环境版本；未绑定即部署配置模式。解析本身在托管配置未就绪时抛 precondition。 */
+  runtime?: RuntimeRevisionRef;
+}
+
 export interface ComputeCatalog {
-  resolve(name: string): Promise<{ name: string; driver: AgentDriver; model: string; taskProfile?: string } | undefined>;
+  resolve(name: string): Promise<ResolvedCompute | undefined>;
+  /** 固定版本的启动材料（含解密凭据）：只在下发命令时取，不落库、不进日志、不进事件。 */
+  runtimeMaterial(ref: RuntimeRevisionRef): Promise<AgentRuntimeMaterial>;
   /** 只用于报错时列出可选项。 */
   list(): Promise<Array<{ name: string }>>;
 }

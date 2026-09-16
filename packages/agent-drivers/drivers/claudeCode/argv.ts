@@ -71,6 +71,8 @@ export interface ClaudeArgvInput {
   mcpConfigFile?: string;
   /** 注入的 MCP 名字，用来拼 `--allowedTools mcp__<name>__*`。 */
   mcpServerNames: readonly string[];
+  /** RFC-004：管理员 settings.json 与平台观测 hooks 合成后的唯一 `--settings` 文件。 */
+  settingsFile?: string;
 }
 
 /** 组装 argv。顺序与源一致：命令头 → 传输基线 → 权限段 → 模型 → system prompt → MCP → resume。 */
@@ -95,6 +97,7 @@ export function buildClaudeArgv(input: ClaudeArgvInput): string[] {
   if (model !== undefined) cmd.push('--model', model);
   cmd.push('--append-system-prompt-file', input.systemPromptFile);
   if (input.mcpConfigFile !== undefined) cmd.push('--mcp-config', input.mcpConfigFile);
+  if (input.settingsFile !== undefined) cmd.push('--settings', input.settingsFile);
   if (ctx.resumeSessionId !== undefined && ctx.resumeSessionId.length > 0) cmd.push('--resume', ctx.resumeSessionId);
   return cmd;
 }
@@ -103,6 +106,7 @@ export interface ClaudeSpawnFiles {
   systemPromptFile: string;
   mcpConfigFile?: string;
   mcpServerNames: readonly string[];
+  settingsFile?: string;
 }
 
 /** argv ＋ env ＋ stdin 约定。交互式用常驻流，oneshot 沿用源的「写一次 prompt 后关闭 stdin」。 */

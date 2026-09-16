@@ -46,7 +46,7 @@ export interface TaskEnvironment {
   readonly message?: string;
   readonly rebuildId?: string;
   readonly native?: NativeExecution;
-  readonly release?: { reason: 'user' | 'owner-force' | 'business' | 'failed' | 'pod-lost'; occupied: boolean };
+  readonly release?: { reason: 'user' | 'owner-force' | 'business' | 'failed' | 'pod-lost' | 'runtime-check'; occupied: boolean };
   readonly createdAt: Date;
   readonly updatedAt: Date;
   readonly lastActivityAt: Date;

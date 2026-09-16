@@ -67,7 +67,7 @@ beforeAll(async () => {
     authorizer: { authorize: async (actor, _p, action) => { if (action === 'force-release-session' && actor.userId !== owner.userId) throw new Error('forbidden'); }, ownerOf: async () => owner.userId },
     services: { resolveServiceOfProject: async () => ({ serviceId, slug: 'demo', name: 'demo' }) },
     notifier: { notify: async (_p, users, message) => { notices.push(`${users.length}:${message}`); } },
-    compute: { resolve: async (name: string) => computeProfiles.find((p) => p.name === name), list: async () => computeProfiles.map((p) => ({ name: p.name })) },
+    compute: { resolve: async (name: string) => computeProfiles.find((p) => p.name === name), runtimeMaterial: async () => { throw new Error('运行材料未设置'); }, list: async () => computeProfiles.map((p) => ({ name: p.name })) },
     credentials: { issueDevSessionToken: async (binding) => { issued.push(binding); return { token: `tok-${binding.taskId}`, expiresAt: new Date().toISOString() }; } },
     isAdmin: async () => false,
     settings: { idleMinutes: 30, userDomain: 'cs.localhost', mcp: [{ name: 'capabilities', url: 'http://mcp-capabilities.svc.cs.internal/mcp' }], defaultPreviewPort: 3000, defaultComputeProfile: 'balanced' },

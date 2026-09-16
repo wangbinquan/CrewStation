@@ -198,6 +198,19 @@ zod 默认剥掉未知键：不加 `.strict()`，旧写法的 `driver` / `model`
 
 ## 前端与测试
 
+### happy-dom 里 React 的 onChange 走 IE 时代的 input 事件 polyfill：先 focus，再 keyup
+
+对受控 `<input>` 只 `dispatchEvent(new Event('input'))`，React 一次 onChange 都不触发；而先 `focus()` 再写值再派发 `keyup` 就能触发。
+原因是 happy-dom 没有让 React 的 `isEventSupported('input')` 通过，React 退回 IE9 polyfill：只在 `focusin` 时记住活动元素，
+只在 `keyup`／`keydown`／`selectionchange` 时比对该元素的值跟踪器。判据：不 focus 直接 keyup，触发的是**上一次聚焦过的**那个输入框的 onChange，
+而 `event.target` 却是当前元素——`apps/console/src/tests/resourceCatalog.test.tsx` 的 `input()` 助手就是这样写的，新测试照抄它，不要自己简化。
+
+### `bun test` 要在仓库根运行，`apps/console` 目录下没有 CSS Module 预加载
+
+根 `bunfig.toml` 的 `[test] preload` 把 `*.module.css` 换成“键即类名”的代理。在 `apps/console` 里跑 `bun test`，
+`styles.level` 这类类名变成 `undefined`，`styles.link`／`styles.sub` 命中 `String.prototype` 上的同名方法，React 报 `Invalid value for prop className`，
+按类名断言的测试成片失败（`logMetadata`、`splitGrid`、`projectNavigation`…），看起来像是自己改坏了。先看运行目录，再怀疑代码。
+
 ### bun test 里 CSS Module 是一个字符串，不是对象
 
 `import styles from './X.module.css'` 在 bun test 里返回**文件路径字符串**。于是 `styles.link`

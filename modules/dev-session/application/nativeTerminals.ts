@@ -23,8 +23,8 @@ class NativeTerminals {
     const profile = await nativeCompute(this.deps, input.compute);
     return this.repository.reserve({
       taskId, createdBy: actor.userId, clientRequestId: input.clientRequestId, fingerprint: fingerprintOf(input), input,
-      driver: profile.driver, model: profile.model, execution: { taskId: newId('tsk') as TaskId, taskProfile: profile.taskProfile },
-      record: { agentId: newId('agt'), terminalId: newId('pty'), runnerId: crypto.randomUUID(), compute: profile.name, permission: input.permission, revision: 0, lifecycle: 'starting', startedAt: this.deps.clock.now().toISOString(), cols: input.cols, rows: input.rows },
+      driver: profile.driver, model: profile.model, ...(profile.runtime ? { runtime: profile.runtime } : {}), execution: { taskId: newId('tsk') as TaskId, taskProfile: profile.taskProfile },
+      record: { agentId: newId('agt'), terminalId: newId('pty'), runnerId: crypto.randomUUID(), compute: profile.name, permission: input.permission, revision: 0, lifecycle: 'starting', startedAt: this.deps.clock.now().toISOString(), cols: input.cols, rows: input.rows, ...(profile.runtime ? { runtime: profile.runtime } : {}) },
     });
   }
   async start(actor: Actor, taskId: TaskId, input: StartNativeTerminalRequest): Promise<NativeTerminalDto> {
@@ -45,11 +45,14 @@ class NativeTerminals {
     if (nativeEnded(start.record) || start.record.runnerId !== roster.runnerId || roster.terminals.some((r) => r.agentId === start.record.agentId)) return this.reconcile(start, roster, 'connected');
     try {
       const credential = await this.deps.credentials.issueDevSessionToken({ taskId, projectId: env.projectId, serviceId: env.serviceId as ServiceId, userId: actor.userId });
+      // 托管档位：按受理时固定的版本取材料，同一 agentId 只有一个 attempt，重发只恢复原执行结果（RFC-004 §5.2）。
+      const runtime = start.runtime ? await this.deps.compute.runtimeMaterial(start.runtime) : undefined;
       const record = RunnerResultPayloads.startAgentTerminal.parse(await this.deps.runner.sendCommand(taskId, {
         id: newId('cmd'), type: 'startAgentTerminal', agentId: start.record.agentId, terminalId: start.record.terminalId,
         runnerId: start.record.runnerId, requestFingerprint: start.fingerprint, compute: start.record.compute, driver: start.driver, model: start.model,
         permission: start.record.permission, cols: start.input.cols, rows: start.input.rows, ...(start.input.cwd ? { cwd: start.input.cwd } : {}),
         mcp: this.deps.settings.mcp.map((m) => ({ ...m, headers: { [IDENTITY_HEADERS.devSessionToken]: credential.token } })), env: {},
+        ...(runtime ? { runtime, processAttemptId: `${start.record.agentId}:1` } : {}),
       }));
       await this.repository.saveRecord(taskId, record);
       await this.deps.environments.touch(taskId);

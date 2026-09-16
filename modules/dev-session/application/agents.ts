@@ -1,5 +1,5 @@
 import type {
-  Actor, AgentEvent, AgentInstanceDto, AgentInstanceState, RunnerEvent, SendAgentMessageRequest, ServiceId, StartDevAgentRequest, TaskId,
+  Actor, AgentEvent, AgentInstanceDto, AgentInstanceState, BeforeStartExecution, RunnerEvent, SendAgentMessageRequest, ServiceId, StartDevAgentRequest, TaskId,
 } from '@crewstation/contracts';
 import { IDENTITY_HEADERS } from '@crewstation/contracts';
 import { forbidden, newId, notFound, precondition, validation } from '@crewstation/kernel';
@@ -19,6 +19,7 @@ export function agentUseCases(deps: DevSessionUseCaseDeps) {
   /**
    * 档位名 → 具体驱动与模型（RFC-001）。省略时用平台默认档。
    * 默认档不存在时报 precondition 而不是随便挑一档：静默挑会让业务以为自己拿到了预期算力。
+   * 托管档位（RFC-004）在这里固定运行环境版本；配置未就绪由目录直接抛 precondition，文案指向管理员。
    */
   const resolveCompute = async (name: string | undefined) => {
     const wanted = name ?? settings.defaultComputeProfile;
@@ -38,14 +39,17 @@ export function agentUseCases(deps: DevSessionUseCaseDeps) {
       });
       const headers = { [IDENTITY_HEADERS.devSessionToken]: credential.token };
       const compute = await resolveCompute(input.compute);
+      // 材料只在这一次下发里出现；每个 headless Agent 只创建一次 CLI 进程，attempt 固定为 1。
+      const runtime = compute.runtime ? await deps.compute.runtimeMaterial(compute.runtime) : undefined;
       await runner.sendCommand(taskId, {
         id: `start-${agentId}`, type: 'startAgent', agentId, compute: compute.name, driver: compute.driver, model: compute.model,
         permission: input.permission, mode: 'interactive',
         ...(input.cwd ? { cwd: input.cwd } : {}), initialPrompt: input.prompt, ...(input.resumeSessionId ? { resumeSessionId: input.resumeSessionId } : {}),
         mcp: settings.mcp.map((m) => ({ name: m.name, url: m.url, headers })), env: {},
+        ...(runtime ? { runtime, processAttemptId: `${agentId}:1` } : {}),
       });
       await environments.touch(taskId);
-      return { agentId, taskId: env.id, compute: compute.name, permission: input.permission, state: 'starting', startedAt: deps.clock.now().toISOString() };
+      return { agentId, taskId: env.id, compute: compute.name, permission: input.permission, state: runtime ? 'preparing' : 'starting', ...(compute.runtime ? { runtime: compute.runtime } : {}), startedAt: deps.clock.now().toISOString() };
     },
     sendMessage: async (actor: Actor, taskId: TaskId, agentId: string, input: SendAgentMessageRequest): Promise<void> => {
       await guard(actor, taskId);
@@ -62,11 +66,12 @@ export function agentUseCases(deps: DevSessionUseCaseDeps) {
       if (!env) throw notFound('开发会话', taskId);
       await authorizer.authorize(actor, env.projectId, 'view');
       const agents = new Map<string, AgentInstanceDto>();
-      for (const stored of await runner.listEvents(taskId, { kinds: ['agent'], limit: 5000 })) {
+      for (const stored of await runner.listEvents(taskId, { kinds: ['agent', 'beforeStart'], limit: 5000 })) {
+        if (stored.event.kind === 'beforeStart') { applyBeforeStart(agents, taskId, stored.event.execution, stored.at); continue; }
         const e = stored.event as Extract<RunnerEvent, { kind: 'agent' }>;
         // 档位与权限只在 started 事件的 spec 里；缺了就如实留空，不编造（权限编错尤其误导人）。
         const current = agents.get(e.event.agentId) ?? { agentId: e.event.agentId, taskId, compute: '', permission: 'read-only' as const, state: 'starting' as AgentInstanceState, startedAt: stored.at };
-        const spec = e.event.spec ? { compute: e.event.spec.compute, permission: e.event.spec.permission } : {};
+        const spec = e.event.spec ? { compute: e.event.spec.compute, permission: e.event.spec.permission, ...(e.event.spec.runtime ? { runtime: e.event.spec.runtime } : {}) } : {};
         agents.set(e.event.agentId, {
           ...current, ...spec, ...(e.event.sessionId ? { sessionId: e.event.sessionId } : {}),
           state: stateOf(e.event, current.state), ...(isTerminal(e.event.type) ? { endedAt: stored.at } : {}),
@@ -75,6 +80,17 @@ export function agentUseCases(deps: DevSessionUseCaseDeps) {
       return [...agents.values()];
     },
   };
+}
+
+/** 启动前 Hook 的进度只影响“环境准备中／准备失败”，不会被显示成 Agent 正在执行任务（RFC-004）。 */
+function applyBeforeStart(agents: Map<string, AgentInstanceDto>, taskId: TaskId, execution: BeforeStartExecution, at: string): void {
+  const current = agents.get(execution.agentId) ?? { agentId: execution.agentId, taskId, compute: '', permission: 'read-only' as const, state: 'preparing' as AgentInstanceState, startedAt: at };
+  const running = execution.steps.find((s) => s.stepId === execution.currentStepId) ?? execution.steps.find((s) => s.state === 'running');
+  const failed = execution.steps.find((s) => s.state === 'failed');
+  const beforeStart = { executionId: execution.executionId, state: execution.state, ...(running ? { currentStep: running.name } : {}), ...(failed ? { failedStep: failed.name } : {}), ...(execution.error ? { error: execution.error.message } : {}) };
+  const preparing = execution.state === 'queued' || execution.state === 'running';
+  const state: AgentInstanceState = preparing ? 'preparing' : execution.state === 'failed' ? 'failed' : execution.state === 'cancelled' ? 'cancelled' : current.state === 'preparing' ? 'starting' : current.state;
+  agents.set(execution.agentId, { ...current, runtime: execution.runtime, beforeStart, state, ...(execution.state === 'failed' || execution.state === 'cancelled' ? { endedAt: execution.endedAt ?? at } : {}) });
 }
 
 function stateOf(event: AgentEvent, current: AgentInstanceState): AgentInstanceState {

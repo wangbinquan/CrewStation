@@ -1,4 +1,4 @@
-import type { Actor, ProjectId, ServiceId, TaskId, TaskProfileDto } from '@crewstation/contracts';
+import type { Actor, ProjectId, RunnerCommand, RunnerEvent, RunnerHello, ServiceId, TaskId, TaskProfileDto } from '@crewstation/contracts';
 
 export interface ProjectAuthorizer {
   authorize(actor: Actor, projectId: ProjectId, action: 'view' | 'develop' | 'force-release-session'): Promise<unknown>;
@@ -44,4 +44,14 @@ export interface TaskRuntimeSettings {
   /** 开发预览是用户域主机，路由要挂网关的这两个系统中间件。 */
   readonly userAuthMiddleware: string;
   readonly dropIdentityHeadersMiddleware: string;
+}
+
+/**
+ * 由 session-client 提供（RFC-004 检查执行）：向检查任务的 TaskRunner 下发命令、读持久事件、读握手能力。
+ * task-runtime 平时不需要它；只有运行环境检查在这里等待 Hook 与模型结果。
+ */
+export interface CheckRunner {
+  sendCommand(taskId: TaskId, command: RunnerCommand): Promise<unknown>;
+  listEvents(taskId: TaskId, options?: { sinceSeq?: number; kinds?: RunnerEvent['kind'][]; agentId?: string; limit?: number }): Promise<Array<{ seq: number; at: string; event: RunnerEvent }>>;
+  connectionStatus(taskId: TaskId): Promise<{ connected: boolean; capabilities?: RunnerHello['capabilities'] }>;
 }

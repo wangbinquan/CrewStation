@@ -39,4 +39,4 @@ proposal/rfc/RFC-NNN-{slug}/
 | [RFC-001](./RFC-001-platform-owned-compute/proposal.md) | 算力由平台统一提供：业务只引用管理员定义的档位名，不再声明驱动与模型 | Done · 2026-09-12 实现 `447e374`，实跑修补 `39c8e36`；本机端到端跑通（开通 → 发布 v0.1.4 → 开发会话起 Agent → `/chat`） |
 | [RFC-002](./RFC-002-admin-and-tenant-spaces/proposal.md) | 管理空间与租户空间分离：顶栏切换两个空间，接入容器移出租户项目列表 | Done · 2026-09-12 实现 `72a3e93`；管理员与普通成员两条路径均在浏览器实跑确认 |
 | [RFC-003](./RFC-003-workbench-ux-redesign/proposal.md) | 工作台 UX：能力市场与五个项目入口、逐个 CLI／页签分屏／后台状态、独立实时预览、工作树与生产版本对比、发布上线与管理供给 | In Progress · 2026-09-13 作者已批准完整实现并提交上库；设计基线 `1f40fa8`，生产实现与 52 项验收按 plan 逐项推进 |
-| [RFC-004](./RFC-004-admin-agent-runtime/proposal.md) | 管理员定义 Agent 启动前 Hook：预置配置文件与执行初始化脚本；租户按算力档位使用 | Draft · 2026-09-14 已批准三件套与 ADR-0004，共 25 项验收；按作者要求，RFC-003 完结后启动开发 |
+| [RFC-004](./RFC-004-admin-agent-runtime/proposal.md) | 管理员定义 Agent 启动前 Hook：预置配置文件与执行初始化脚本；租户按算力档位使用 | In Progress · 2026-09-14 已批准三件套与 ADR-0004，共 25 项验收；2026-09-16 作者以会话目标“完整落地RFC-004并提交上库”要求实施，覆盖原“RFC-003 完结后启动”的排期，生产代码与测试已提交 main；AR 实机验收待续（见 plan.md 实施说明） |

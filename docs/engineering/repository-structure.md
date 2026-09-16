@@ -56,7 +56,7 @@ crewstation/
 │  ├─ console/                   # 工作台 SPA（React）
 │  └─ cli/                       # crewstation 命令行
 ├─ modules/                      # 领域模块：按限界上下文划分；不知道自己跑在哪个进程里
-│  ├─ identity/  project/  scm/  config/  data/  egress/  api-catalog/  events/
+│  ├─ identity/  project/  scm/  config/  data/  egress/  api-catalog/  events/  agent-runtime/
 │  ├─ release/  task-runtime/  dev-session/  business-task/  session/  gateway/
 │  └─ observability/  capabilities/  provisioning/  platform/
 ├─ packages/                     # 技术库：与领域无关，删掉所有业务概念后仍然成立
@@ -197,6 +197,7 @@ modules/<name>/
 | L3 | `egress` | 全局与项目级出站白名单、追加申请、被阻请求记录 | project |
 | L3 | `api-catalog` | APIProxy 登记、操作键（proxy＋method＋path）、开放策略、APIGrant、APIRequest、Swagger 裁剪 | project |
 | L3 | `events` | EventProducer 登记、事件类型、inbox 去重、订阅、投递状态机、死信、推送 | project |
+| L3 | `agent-runtime` | 管理员运行环境（RFC-004）：启动前 Hook 步骤、不可变版本、凭据引用、检查记录、解析服务；检查执行器与档位引用经 ports 由 platform 回填（ADR-0004） | —（不 import 其他模块） |
 | L4 | `release` | Manifest 校验、Release、构建、迁移、DeploymentSlot、TrafficSwitch、发布并发控制；发布 `release.registered` | project、scm、config、data |
 | L4 | `task-runtime` | TaskEnvironment 生命周期、Pod 与两种持久卷模式、配额原子准入、TaskRunner 归属与协议服务端语义 | project、config、data、egress |
 | L5 | `dev-session` | 一项目一会话、分支与落后提交数、空闲提醒、强制释放、发布入口 | task-runtime、release、scm |
@@ -221,10 +222,11 @@ flowchart BT
   release & task-runtime --> observability
   api-catalog & events & data & config --> capabilities
   scm & data & gateway & release --> provisioning
+  agent-runtime --> platform
   observability & capabilities & provisioning --> platform
 ```
 
-拆分依据：Design 里每一个有自己状态机的对象簇一个模块。围绕任务的能力刻意拆成四个模块（`task-runtime`、`dev-session`、`business-task`、`session`），因为 agent-workflow 的 `task.ts` 正是把这四件事写进了一个 7780 行的文件。
+拆分依据：Design 里每一个有自己状态机的对象簇一个模块。围绕任务的能力刻意拆成四个模块（`task-runtime`、`dev-session`、`business-task`、`session`），因为 agent-workflow 的 `task.ts` 正是把这四件事写进了一个 7780 行的文件。管理员运行环境有自己的版本／检查／启用状态机，因此按 ADR-0004 单独成 `agent-runtime`，而不塞进已有 39／40 个源码文件的 `project` 或 `dev-session`。
 
 ## 6. 进程组合：哪个模块跑在哪个应用里
 

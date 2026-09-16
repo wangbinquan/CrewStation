@@ -7,9 +7,11 @@ import { toMcpServerSpec } from '../contract/spawnPlan';
 import { createRunDirectory, defaultRunDir } from '../process/runDirectory';
 import { renderClaudeMcpConfig } from './claudeCode/argv';
 import { assembleClaudeEnv } from './claudeCode/env';
+import { readManagedClaudeSettings, writeMergedClaudeSettings } from './claudeCode/managedSettings';
 import { buildClaudeNativeArgv } from './claudeCode/nativeArgv';
 import { setupClaudeNativeActivity } from './claudeCode/nativeActivitySetup';
 import { OPENCODE_CONFIG_DIR_NAME } from './opencode/env';
+import { materializeOpencodeConfig } from './opencode/managedConfig';
 import { buildOpencodeNativeEnv } from './opencode/nativeEnv';
 import { buildOpencodeNativeArgv } from './opencode/nativeArgv';
 import { setupOpencodeNativeActivity } from './opencode/nativeActivitySetup';
@@ -22,6 +24,7 @@ export async function prepareNativeTerminal(spec: NativeTerminalSpec, context: D
     mcps: spec.mcp.map(toMcpServerSpec), cwd: context.cwd, runDir: runDir.path, baseEnv: context.env,
     ...(head ? { head } : {}), ...(spec.systemPrompt ? { systemPrompt: spec.systemPrompt } : {}),
     gitUserName: context.gitUserName ?? null, gitUserEmail: context.gitUserEmail ?? null,
+    ...(context.managed ? { managed: context.managed } : {}),
   };
   try {
     if (spec.driver === 'claude-code') {
@@ -29,9 +32,13 @@ export async function prepareNativeTerminal(spec: NativeTerminalSpec, context: D
       const mcp = renderClaudeMcpConfig(ctx);
       const mcpConfigFile = mcp ? await runDir.write('mcp-config.json', mcp.json) : undefined;
       const nativeSessionId = crypto.randomUUID();
-      const cmd = buildClaudeNativeArgv(ctx, { systemPromptFile, ...(mcpConfigFile ? { mcpConfigFile } : {}), mcpServerNames: mcp?.names ?? [] }, nativeSessionId);
       const env = assembleClaudeEnv(ctx);
-      const activityUnavailable = await setupClaudeNativeActivity(ctx, context, runDir, env, cmd);
+      // 管理员 settings.json 先读（读不到即配置无效），再与平台观测 hooks 合成为唯一的 --settings 文件。
+      const admin = await readManagedClaudeSettings(context.managed);
+      const activity = await setupClaudeNativeActivity(ctx, context, runDir, env);
+      const settingsFile = await writeMergedClaudeSettings(runDir, admin, activity && 'hooks' in activity ? activity.hooks : undefined);
+      const cmd = buildClaudeNativeArgv(ctx, { systemPromptFile, ...(mcpConfigFile ? { mcpConfigFile } : {}), mcpServerNames: mcp?.names ?? [], ...(settingsFile ? { settingsFile } : {}) }, nativeSessionId);
+      const activityUnavailable = activity && 'unavailable' in activity ? activity.unavailable : undefined;
       return { plan: { cmd, cwd: ctx.cwd, env }, nativeSessionId, ...(activityUnavailable ? { activityUnavailable } : {}), dispose: runDir.dispose };
     }
     const configDir = join(runDir.path, OPENCODE_CONFIG_DIR_NAME);
@@ -40,6 +47,7 @@ export async function prepareNativeTerminal(spec: NativeTerminalSpec, context: D
     await context.host.chownToWorker(join(configDir, 'skills'));
     const env = buildOpencodeNativeEnv(ctx, configDir);
     const activityUnavailable = await setupOpencodeNativeActivity(ctx, context, runDir, env);
+    await materializeOpencodeConfig(env, context.managed, runDir);
     return { plan: { cmd: buildOpencodeNativeArgv(ctx), cwd: ctx.cwd, env }, ...(activityUnavailable ? { activityUnavailable } : {}), dispose: runDir.dispose };
   } catch (error) { runDir.dispose(); throw error; }
 }

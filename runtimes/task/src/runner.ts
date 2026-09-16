@@ -32,6 +32,8 @@ import { readWorkspaceStatus } from './workspace/workspaceStatus';
 import { createWorkspaceComparisons } from './workspace/workspaceComparison';
 import { fetchComparisonHistory } from './workspace/fetchComparisonHistory';
 import { createApiInvoker } from './http/apiInvocation';
+import { BeforeStartRunner } from './beforeStart/beforeStartRunner';
+import { detectInterpreters } from './beforeStart/interpreters';
 
 export interface RunnerHooks {
   /** shutdown 排空完成后调用；缺省 process.exit。测试注入以免真的退出。 */
@@ -89,10 +91,14 @@ class TaskRunner implements RunnerHandle {
     const emit = (event: Parameters<SessionLink['emit']>[0]): void => {
       linkRef.current?.emit(event);
     };
-    const agents = createAgentSupervisor({ registry, launcher, paths, agentEnv, emit, logger: logger.child({ component: 'agents' }) });
+    // RFC-004：启动前 Hook 的解释器清单在启动时探测一次并写进 hello；执行器同一容器串行。
+    const interpreters = await detectInterpreters(launcher, (b) => Bun.which(b));
+    const beforeStart = new BeforeStartRunner({ launcher, interpreters, emit, logger: logger.child({ component: 'before-start' }), ...(config.agentRunDir ? { baseDir: config.agentRunDir } : {}) });
+    logger.info('before-start interpreters detected', { interpreters: interpreters.list.map((i) => `${i.language}=${i.version ?? '?'}`) });
+    const agents = createAgentSupervisor({ registry, launcher, paths, agentEnv, beforeStart, emit, logger: logger.child({ component: 'agents' }) });
     const execs = createExecSupervisor({ launcher, paths, emit, logger: logger.child({ component: 'exec' }) });
     const terminals = createTerminalSupervisor({ choice: config.terminalBackend, launcher, paths, emit, logger: logger.child({ component: 'terminal' }) });
-    const nativeTerminals = new NativeTerminalSupervisor({ backend: terminals.backend, launcher, paths, agentEnv, emit, runnerId: config.nativeRunnerId, logger: logger.child({ component: 'native-terminal' }) });
+    const nativeTerminals = new NativeTerminalSupervisor({ backend: terminals.backend, launcher, paths, agentEnv, beforeStart, emit, runnerId: config.nativeRunnerId, logger: logger.child({ component: 'native-terminal' }) });
     const preview = createPreviewSupervisor({ config: config.preview, policy: config.previewPolicy, launcher, workdir: paths.root, emit, logger: logger.child({ component: 'preview' }) });
     const files = createFileCommands({ paths, launcher, emit, logger: logger.child({ component: 'files' }) });
     const verifyContract = createContractVerifier({ paths, logger: logger.child({ component: 'contract' }) });
@@ -107,7 +113,7 @@ class TaskRunner implements RunnerHandle {
       taskId: config.taskId,
       runnerToken: config.runnerToken,
       workdir: paths.root,
-      capabilities: { drivers: registry.available(), pty: terminals.backend !== undefined, preview: preview.enabled, ...(apiInvoker.enabled ? { apiInvocations: 1 as const } : {}) },
+      capabilities: { drivers: registry.available(), pty: terminals.backend !== undefined, preview: preview.enabled, ...(apiInvoker.enabled ? { apiInvocations: 1 as const } : {}), agentRuntimeConfig: 1 as const, interpreters: interpreters.list },
     });
     const dispatcherRef: { current?: CommandDispatcher } = {};
     const link = createSessionLink({

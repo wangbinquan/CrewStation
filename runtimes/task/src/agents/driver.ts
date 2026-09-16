@@ -1,4 +1,5 @@
-import type { AgentDriver as AgentDriverName, AgentEvent, AgentEventType, AgentPermission, McpConnection } from '@crewstation/contracts';
+import type { AgentDriver as AgentDriverName, AgentEvent, AgentEventType, AgentPermission, McpConnection, RuntimeRevisionRef } from '@crewstation/contracts';
+import type { ManagedRuntimeContext } from '@crewstation/agent-drivers';
 import type { Logger } from '@crewstation/kernel';
 import type { ProcessLauncher } from '../process/launcher';
 
@@ -15,6 +16,8 @@ export interface AgentSpec {
   resumeSessionId?: string;
   systemPrompt?: string;
   mcp: McpConnection[];
+  /** RFC-004：固定的运行环境版本，只在 started 事件里回显。 */
+  runtime?: RuntimeRevisionRef;
 }
 
 /** 由 TaskRunner 提供给驱动的宿主能力：已解析的 cwd、含凭据的完整环境（绝不记录）、降权拉起器。 */
@@ -23,6 +26,8 @@ export interface AgentLaunchContext {
   env: Record<string, string>;
   launcher: ProcessLauncher;
   logger: Logger;
+  /** RFC-004：启动前 Hook 成功后的托管上下文（私有 HOME、绑定的 CLI 配置文件）。 */
+  managed?: ManagedRuntimeContext;
 }
 
 export interface AgentProcess {

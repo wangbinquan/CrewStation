@@ -36,7 +36,7 @@ export type PodPhase = 'Pending' | 'Running' | 'Succeeded' | 'Failed' | 'Unknown
 export interface TaskCluster {
   ensureVolume(env: TaskEnvironment, size: string): Promise<void>;
   createPod(spec: TaskPodSpec): Promise<void>;
-  podPhase(env: TaskEnvironment): Promise<{ phase: PodPhase; message?: string; ip?: string }>;
+  podPhase(env: TaskEnvironment): Promise<{ phase: PodPhase; message?: string; ip?: string; imageId?: string }>;
   deletePod(env: TaskEnvironment): Promise<void>;
   deleteVolume(env: TaskEnvironment): Promise<void>;
 }

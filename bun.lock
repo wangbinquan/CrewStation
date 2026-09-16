@@ -131,6 +131,24 @@
         "@crewstation/mcp-server": "workspace:*",
       },
     },
+    "modules/agent-runtime": {
+      "name": "@crewstation/module-agent-runtime",
+      "version": "0.0.0",
+      "dependencies": {
+        "@crewstation/contracts": "workspace:*",
+        "@crewstation/http": "workspace:*",
+        "@crewstation/kernel": "workspace:*",
+        "@crewstation/persistence": "workspace:*",
+        "@crewstation/queue": "workspace:*",
+        "@crewstation/secretbox": "workspace:*",
+        "drizzle-orm": "0.45.2",
+        "hono": "4.13.7",
+        "zod": "4.6.2",
+      },
+      "devDependencies": {
+        "@crewstation/testkit": "workspace:*",
+      },
+    },
     "modules/api-catalog": {
       "name": "@crewstation/module-api-catalog",
       "version": "0.0.0",
@@ -345,6 +363,7 @@
         "@crewstation/http": "workspace:*",
         "@crewstation/k8s": "workspace:*",
         "@crewstation/kernel": "workspace:*",
+        "@crewstation/module-agent-runtime": "workspace:*",
         "@crewstation/module-api-catalog": "workspace:*",
         "@crewstation/module-business-task": "workspace:*",
         "@crewstation/module-capabilities": "workspace:*",
@@ -738,6 +757,8 @@
     "@crewstation/mcp-operations": ["@crewstation/mcp-operations@workspace:apps/mcp-operations"],
 
     "@crewstation/mcp-server": ["@crewstation/mcp-server@workspace:packages/mcp-server"],
+
+    "@crewstation/module-agent-runtime": ["@crewstation/module-agent-runtime@workspace:modules/agent-runtime"],
 
     "@crewstation/module-api-catalog": ["@crewstation/module-api-catalog@workspace:modules/api-catalog"],
 

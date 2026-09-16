@@ -1,4 +1,4 @@
-import { ComputeProfileDtoSchema, ServicePlanDtoSchema, SlugSchema, TaskProfileDtoSchema } from '@crewstation/contracts';
+import { ComputeProfileWriteRequestSchema, ServicePlanDtoSchema, SlugSchema, TaskProfileDtoSchema } from '@crewstation/contracts';
 import type { AppEnv } from '@crewstation/http';
 import { parseBody, parseParams } from '@crewstation/http';
 import { Hono } from 'hono';
@@ -24,7 +24,7 @@ export function catalogRoutes(api: ProjectModuleApi): Hono<AppEnv> {
     if (!actor.isAdmin) return c.json({ items: await api.listComputeProfiles() });
     return c.json({ items: await api.listComputeProfilesFull(actor) });
   });
-  r.put('/v1/catalog/compute-profiles', async (c) => c.json(await api.upsertComputeProfile(await actorFrom(c, api), await parseBody(c, ComputeProfileDtoSchema))));
+  r.put('/v1/catalog/compute-profiles', async (c) => c.json(await api.upsertComputeProfile(await actorFrom(c, api), await parseBody(c, ComputeProfileWriteRequestSchema))));
   r.delete('/v1/catalog/compute-profiles/:name', async (c) => {
     await api.deleteComputeProfile(await actorFrom(c, api), parseParams(c, z.object({ name: SlugSchema })).name);
     return c.body(null, 204);

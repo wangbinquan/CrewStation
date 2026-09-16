@@ -17,6 +17,7 @@ import type { CliAdapterOptions, CliRuntimeAdapter, PreparedRuntime } from '../c
 import { createCliAgentDriver } from '../cliAgentDriver';
 import { OPENCODE_AGENT_NAME, buildOpencodeArgv } from './argv';
 import { OPENCODE_CONFIG_DIR_NAME, OPENCODE_INLINE_CONFIG_WARN_BYTES, buildOpencodeEnv } from './env';
+import { materializeOpencodeConfig } from './managedConfig';
 import { parseEvent } from './events';
 import { detectOpencodeSessionNotFound, ensureOpencodeBinaryVersion } from './probe';
 
@@ -50,6 +51,8 @@ async function prepareOpencode(spec: DriverAgentSpec, context: DriverLaunchConte
   if (inlineConfigBytes > OPENCODE_INLINE_CONFIG_WARN_BYTES) {
     context.logger.warn('opencode 内联配置偏大', { bytes: inlineConfigBytes, limit: OPENCODE_INLINE_CONFIG_WARN_BYTES });
   }
+  // RFC-004：管理员 opencode 配置为底、平台叠加层在上，合成为 OPENCODE_CONFIG 指向的单个文件。
+  await materializeOpencodeConfig(env, context.managed, runDir);
   // auto-approve flag 的拼写在 1.18.0 改过，拼错会让每次拉起都只剩一整块 usage ＋ exit 1，所以先探版本。
   const binaryVersion = await ensureOpencodeBinaryVersion(context.host, head, { cwd: context.cwd, env: context.env, logger: context.logger });
   return {
@@ -86,5 +89,6 @@ function baseContext(spec: DriverAgentSpec, context: DriverLaunchContext, runDir
     baseEnv: context.env,
     gitUserName: context.gitUserName ?? null,
     gitUserEmail: context.gitUserEmail ?? null,
+    ...(context.managed ? { managed: context.managed } : {}),
   };
 }

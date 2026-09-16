@@ -1,4 +1,4 @@
-import type { Actor, AgentDriver, ProjectId, RunnerCommand, RunnerEvent, ServiceId, TaskId, TraceId, VolumeMode } from '@crewstation/contracts';
+import type { Actor, AgentDriver, AgentRuntimeMaterial, ProjectId, RunnerCommand, RunnerEvent, RuntimeRevisionRef, ServiceId, TaskId, TraceId, VolumeMode } from '@crewstation/contracts';
 
 export interface EnvironmentView {
   id: TaskId;
@@ -34,7 +34,10 @@ export interface ServiceDirectory {
  * 业务子任务引用的是 Manifest 里登记的档位名，解析同样发生在平台侧。
  */
 export interface ComputeCatalog {
-  resolve(name: string): Promise<{ name: string; driver: AgentDriver; model: string } | undefined>;
+  /** 托管档位（RFC-004）带回受理时固定的运行环境版本；配置未就绪时抛 precondition。 */
+  resolve(name: string): Promise<{ name: string; driver: AgentDriver; model: string; runtime?: RuntimeRevisionRef } | undefined>;
+  /** 固定版本的启动材料，只在下发 startAgent 时取。 */
+  runtimeMaterial(ref: RuntimeRevisionRef): Promise<AgentRuntimeMaterial>;
   list(): Promise<Array<{ name: string }>>;
 }
 

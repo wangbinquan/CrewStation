@@ -60,7 +60,7 @@ export abstract class AgentRunBase implements DriverAgentProcess {
   protected emitStarted(): void {
     this.push(this.emit('started', {
       // spec 是契约字段：工作台的 Agent 列表按持久事件还原，没有它只能编造驱动名、模型与权限。
-      spec: { compute: this.spec.compute, driver: this.driverName, model: this.spec.model, permission: this.spec.permission },
+      spec: { compute: this.spec.compute, driver: this.driverName, model: this.spec.model, permission: this.spec.permission, ...(this.spec.runtime ? { runtime: this.spec.runtime } : {}) },
       raw: {
         driver: this.driverName,
         mode: this.spec.mode,

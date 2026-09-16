@@ -1,9 +1,11 @@
 import type { RunnerEvent, StartAgentCommand } from '@crewstation/contracts';
 import type { Logger } from '@crewstation/kernel';
+import type { BeforeStartRunner } from '../beforeStart/beforeStartRunner';
 import { RunnerCommandError, alreadyExists, notFound } from '../commandError';
 import type { WorkdirPaths } from '../files/workdirPath';
 import type { ProcessLauncher } from '../process/launcher';
 import type { AgentProcess, AgentSpec } from './driver';
+import { ManagedAgentProcess } from './managedAgent';
 import type { DriverRegistry } from './registry';
 
 export interface AgentSupervisor {
@@ -18,8 +20,10 @@ export interface AgentSupervisorDeps {
   registry: DriverRegistry;
   launcher: ProcessLauncher;
   paths: WorkdirPaths;
-  /** 来自 CS_AGENT_ENV_FILE 的模型凭据；只进 Agent 进程。 */
+  /** 来自 CS_AGENT_ENV_FILE 的模型凭据；只进部署配置模式的 Agent 进程，托管 Agent 不读它。 */
   agentEnv: Record<string, string>;
+  /** RFC-004：启动前 Hook 执行器；缺省表示本容器不支持托管启动。 */
+  beforeStart?: BeforeStartRunner;
   emit: (event: RunnerEvent) => void;
   logger: Logger;
 }
@@ -27,7 +31,7 @@ export interface AgentSupervisorDeps {
 /** 多个 Agent 并行运行（开发会话的多个流式交互 Agent）；每个 Agent 的事件流独立泵入 RunnerEvent。 */
 export function createAgentSupervisor(deps: AgentSupervisorDeps): AgentSupervisor {
   const running = new Map<string, AgentProcess>();
-  const pump = async (agentId: string, agent: AgentProcess): Promise<void> => {
+  const pump = async (agentId: string, agent: AgentProcess, managed: boolean): Promise<void> => {
     try {
       for await (const event of agent.events) deps.emit({ kind: 'agent', event });
     } catch (error) {
@@ -35,6 +39,7 @@ export function createAgentSupervisor(deps: AgentSupervisorDeps): AgentSuperviso
       deps.emit({ kind: 'agent', event: { agentId, seq: 0, at: new Date().toISOString(), type: 'error', error: { code: 'driver_failed', message: '驱动事件流异常终止' } } });
     } finally {
       if (running.get(agentId) === agent) running.delete(agentId);
+      if (managed) deps.beforeStart?.release(agentId);
       deps.logger.info('agent finished', { agentId });
     }
   };
@@ -49,12 +54,19 @@ export function createAgentSupervisor(deps: AgentSupervisorDeps): AgentSuperviso
       const driver = deps.registry.get(command.driver);
       if (!driver) throw new RunnerCommandError('driver_unknown', `未知驱动 ${command.driver}`);
       const cwd = await deps.paths.resolveCwd(command.cwd);
-      const env = deps.launcher.baseEnv({ ...deps.agentEnv, ...command.env });
       const logger = deps.logger.child({ agentId: command.agentId, driver: command.driver });
-      const agent = driver.start(toSpec(command), { cwd, env, launcher: deps.launcher, logger });
+      let agent: AgentProcess;
+      if (command.runtime) {
+        if (!deps.beforeStart) throw new RunnerCommandError('agent_runtime_unavailable', '本容器不支持管理员运行环境');
+        // 托管：不读旧 agentEnv 文件；Hook 成功后才创建 CLI 进程（RFC-004）。
+        agent = new ManagedAgentProcess(toSpec(command), { driver, beforeStart: deps.beforeStart, launcher: deps.launcher, cwd, commandEnv: command.env, material: command.runtime, processAttemptId: command.processAttemptId ?? `${command.agentId}:1`, logger });
+      } else {
+        const env = deps.launcher.baseEnv({ ...deps.agentEnv, ...command.env });
+        agent = driver.start(toSpec(command), { cwd, env, launcher: deps.launcher, logger });
+      }
       running.set(command.agentId, agent);
-      logger.info('agent started', { mode: command.mode, model: command.model, mcp: command.mcp.length, envKeys: Object.keys(command.env).length });
-      void pump(command.agentId, agent);
+      logger.info('agent started', { mode: command.mode, model: command.model, mcp: command.mcp.length, envKeys: Object.keys(command.env).length, managed: command.runtime !== undefined, ...(command.runtime ? { runtimeRevision: `${command.runtime.configId}@${command.runtime.revision}` } : {}) });
+      void pump(command.agentId, agent, command.runtime !== undefined);
     },
     send: (agentId, content) => lookup(agentId).send(content),
     cancel: (agentId) => lookup(agentId).cancel(),
@@ -79,5 +91,6 @@ function toSpec(command: StartAgentCommand): AgentSpec {
     resumeSessionId: command.resumeSessionId,
     systemPrompt: command.systemPrompt,
     mcp: command.mcp,
+    ...(command.runtime ? { runtime: { configId: command.runtime.configId, revision: command.runtime.revision } } : {}),
   };
 }

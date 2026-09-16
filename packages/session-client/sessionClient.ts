@@ -1,9 +1,9 @@
-import type { RunnerCommand, RunnerEvent, TaskId } from '@crewstation/contracts';
+import type { RunnerCommand, RunnerEvent, RunnerHello, TaskId } from '@crewstation/contracts';
 import { API_INVOCATION_TIMEOUT_MS, COMPARISON_COMMAND_TIMEOUT_MS, COMPARISON_HISTORY_TIMEOUT_MS, WORKSPACE_COMMAND_TIMEOUT_MS } from '@crewstation/contracts';
 import { PlatformError } from '@crewstation/kernel';
 
 export interface StoredEvent { seq: number; at: string; event: RunnerEvent }
-export interface ConnectionStatus { connected: boolean; replica?: string; lastSeq?: number; drivers?: string[] }
+export interface ConnectionStatus { connected: boolean; replica?: string; lastSeq?: number; drivers?: string[]; capabilities?: RunnerHello['capabilities'] }
 
 /** 与 cs-session 的 internal 路由一一对应；只在系统命名空间内调用。 */
 export interface SessionClient {

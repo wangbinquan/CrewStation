@@ -21,7 +21,7 @@ describe('capabilities module', () => {
         quota: async () => ({ maxConcurrentTasks: 3, running: 1 }),
         servicePlans: async () => [{ name: 'standard-small', cpu: '500m', memory: '512Mi', maxReplicas: 3, description: '' }],
 
-        computeProfiles: async () => [{ name: 'sample-stub', description: '样例' }],
+        computeProfiles: async () => [{ name: 'sample-stub', description: '样例', mode: 'legacy' as const, available: true }],
         configKeys: async (_a, _p, env) => (env === 'production' ? ['GREETING'] : ['GREETING', 'DEBUG']),
         dataResources: async () => [],
         operations: async () => [{ key: 'issues:GET:/v1/issues/{id}', proxy: 'issues', method: 'GET', path: '/v1/issues/{id}', openPolicy: 'default', granted: true }],

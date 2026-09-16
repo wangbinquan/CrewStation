@@ -4,8 +4,9 @@ import type { TaskRuntimeUseCaseDeps } from './dependencies';
 
 /** 任务容器的环境：平台约定变量＋所属环境的配置与数据＋任务级数据绑定＋TaskRunner 自身参数。明文令牌只在这里出现一次。 */
 export async function containerEnv(deps: Pick<TaskRuntimeUseCaseDeps, 'sources' | 'settings'>, env: TaskEnvironment, svc: { slug: string; name: string }, runnerToken: string): Promise<Record<string, string>> {
-  const environment = env.kind === 'dev-session' ? 'development' : 'production';
-  const [config, data, taskData] = await Promise.all([
+  const environment = env.kind === 'dev-session' || env.kind === 'runtime-check' ? 'development' : 'production';
+  // 运行环境检查是平台任务：不属于任何项目，不带租户配置、数据或任务级数据绑定（RFC-004 §7）。
+  const [config, data, taskData] = env.kind === 'runtime-check' ? [{}, {}, {}] : await Promise.all([
     deps.sources.configEnv(env.projectId, environment),
     deps.sources.dataEnv(env.serviceId, environment),
     deps.sources.taskDataEnv(env.native?.parentTaskId ?? env.id),
@@ -39,6 +40,6 @@ export async function containerEnv(deps: Pick<TaskRuntimeUseCaseDeps, 'sources' 
     values.CS_PREVIEW_HEALTH_PATH = env.preview.healthPath;
     values[PLATFORM_ENV.port] = String(env.preview.port);
   }
-  if (deps.settings.agentEnvSecretName) values.CS_AGENT_ENV_FILE = '/etc/crewstation/agent.env';
+  if (deps.settings.agentEnvSecretName && env.kind !== 'runtime-check') values.CS_AGENT_ENV_FILE = '/etc/crewstation/agent.env';
   return values;
 }

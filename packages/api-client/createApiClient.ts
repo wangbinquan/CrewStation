@@ -1,5 +1,7 @@
 import type { TransportOptions } from './httpTransport';
 import { createTransport } from './httpTransport';
+import type { AgentRuntimeResource } from './resources/agentRuntime';
+import { agentRuntimeResource } from './resources/agentRuntime';
 import type { ApiCatalogResource } from './resources/apiCatalog';
 import { apiCatalogResource } from './resources/apiCatalog';
 import type { CapabilitiesResource } from './resources/capabilities';
@@ -54,6 +56,8 @@ export interface ApiClient {
   readonly gateway: GatewayResource;
   readonly observability: ObservabilityResource;
   readonly capabilities: CapabilitiesResource;
+  /** RFC-004：管理员运行环境。 */
+  readonly agentRuntime: AgentRuntimeResource;
   readonly stream: TaskStreamResource;
 }
 
@@ -76,6 +80,7 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
     gateway: gatewayResource(transport),
     observability: observabilityResource(transport),
     capabilities: capabilitiesResource(transport),
+    agentRuntime: agentRuntimeResource(transport),
     stream: { taskStreamUrl: (taskId, sinceSeq = 0) => taskStreamUrl(transport.baseUrl, taskId, sinceSeq) },
   };
 }

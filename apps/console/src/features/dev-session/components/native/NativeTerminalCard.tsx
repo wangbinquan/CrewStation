@@ -56,6 +56,7 @@ function NativeTerminalFrame({ terminalId, terminal, layout, store, channel, str
       <strong title={terminal?.agentId}>{label}</strong><span className={styles.lifecycle} data-activity={state}>{t(`activity.status.${state}`)}</span>
       {terminal?.lifecycle === 'running' && terminal.connection === 'connected' && stream.runnerConnected && state !== 'ended' ? <small className={styles.lifecycle}>{t('activity.processOnline')}</small> : null}
       <span className={styles.compute}>{terminal?.compute}</span>
+      {terminal?.runtime ? <small title={terminal.runtime.configId}>{t('devSession.agents.runtimeRevision', { revision: terminal.runtime.revision })}</small> : null}
       {terminal?.execution?.profile ? <small title={t('devSession.native.resourcesHint')}>CPU {terminal.execution.profile.cpu} · {terminal.execution.profile.memory}</small> : null}
       <Button variant="ghost" aria-label={t('devSession.native.zoom', { id: label })} onClick={() => store.update((value) => ({ ...value, maximizedTerminalId: value.maximizedTerminalId === terminalId ? null : terminalId }))}>{layout.maximizedTerminalId === terminalId ? '↙' : '↗'}</Button>
       <details className={styles.menu}><summary aria-label={t('devSession.native.options', { id: label })}>···</summary><div className={styles.menuBody}>
@@ -69,6 +70,8 @@ function NativeTerminalFrame({ terminalId, terminal, layout, store, channel, str
     </header>
     {stopping && terminal ? <ConfirmationPanel question={t('devSession.native.stopQuestion', { id: label })} hint={t('devSession.native.stopHint')} confirmLabel={t('devSession.native.stop')} cancelLabel={t('devSession.release.cancel')} onCancel={() => setStopping(false)} onConfirm={() => { onStop(terminal.agentId); setStopping(false); }} /> : null}
     {terminal?.error ? <p className={styles.error}>{terminal.error}</p> : null}
+    {terminal?.beforeStart && (terminal.beforeStart.state === 'queued' || terminal.beforeStart.state === 'running') ? <div className={styles.controlLine} role="status">{terminal.beforeStart.state === 'queued' ? t('devSession.native.preparingQueued') : t('devSession.native.preparing', { step: terminal.beforeStart.currentStep ?? '' })}</div> : null}
+    {terminal?.beforeStart?.state === 'failed' ? <p className={styles.error}>{t('devSession.native.preparationFailed', { step: terminal.beforeStart.failedStep ?? '' })}</p> : null}
     {terminal?.execution && !['running', 'finished'].includes(terminal.execution.state) && !['ended', 'failed'].includes(terminal.lifecycle) ? <div className={styles.controlLine} role="status">{terminal.execution.message ?? t(`devSession.native.execution.${terminal.execution.state}`)}</div> : null}
     {terminal ? <NativeTerminalView terminal={terminal} channel={channel} stream={stream} onActivity={onActivity} canDevelop={canDevelop} /> : <p className={styles.error}>{t('devSession.native.missing')}</p>}
   </section>;

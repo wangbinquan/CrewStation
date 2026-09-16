@@ -6,7 +6,7 @@ export type { ApiErrorKind } from './apiClientError';
 export type { FetchInput, FetchLike, HttpMethod, RequestOptions, Transport, TransportOptions } from './httpTransport';
 export type { ItemsPage } from './itemsPage';
 export type {
-  ComputeProfileInput, CreateProjectInput, ListDeliveriesInput, LogQueryInput, PublishDevSessionInput, PublishInput, RequestTaskDataBindingInput, ServicePlanInput, SetConfigItemInput,
+  ComputeProfileInput, CreateProjectInput, CreateRuntimeConfigInput, ListDeliveriesInput, LogQueryInput, PublishDevSessionInput, PublishInput, RequestTaskDataBindingInput, SaveRuntimeDraftInput, ServicePlanInput, SetConfigItemInput,
   StartDevAgentInput, TaskProfileInput, WithDefaults,
 } from './requestInputs';
 export { parseTaskStreamFrame, taskStreamUrl } from './stream';
@@ -28,3 +28,4 @@ export type { EventsResource } from './resources/events';
 export type { GatewayAllowlistDto, GatewayReconcileResult, GatewayResource, GatewayServiceRoutes } from './resources/gateway';
 export type { ObservabilityResource } from './resources/observability';
 export type { CapabilitiesResource } from './resources/capabilities';
+export type { AgentRuntimeResource } from './resources/agentRuntime';

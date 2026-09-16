@@ -58,6 +58,8 @@ export function environmentQueries(deps: TaskRuntimeUseCaseDeps) {
     canOpenStream: async (actor: Actor, taskId: TaskId): Promise<boolean> => {
       const env = await uow.read.environments.getById(taskId);
       if (!env) return false;
+      // 检查任务不属于任何项目：只有管理员能看它的流。
+      if (env.kind === 'runtime-check') return actor.isAdmin;
       try { await authorizer.authorize(actor, env.projectId, env.kind === 'dev-session' ? 'develop' : 'view'); return true; } catch { return false; }
     },
   };

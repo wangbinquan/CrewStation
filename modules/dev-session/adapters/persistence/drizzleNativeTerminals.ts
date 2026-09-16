@@ -6,9 +6,9 @@ import type { NativeTerminalRepository, NativeTerminalStart } from '../../ports/
 import { nativeTerminalStarts as table } from './nativeTerminalTable';
 
 const requestKey = (taskId: TaskId, actorId: UserId, requestId: string) => and(eq(table.taskId, taskId), eq(table.createdBy, actorId), eq(table.clientRequestId, requestId));
-const selection = { taskId: table.taskId, createdBy: table.createdBy, clientRequestId: table.clientRequestId, fingerprint: table.fingerprint, input: table.input, driver: table.driver, model: table.model, record: table.record, execution: table.execution };
+const selection = { taskId: table.taskId, createdBy: table.createdBy, clientRequestId: table.clientRequestId, fingerprint: table.fingerprint, input: table.input, driver: table.driver, model: table.model, runtime: table.runtime, record: table.record, execution: table.execution };
 type StartRow = Pick<typeof table.$inferSelect, keyof typeof selection>;
-const toStart = (row: StartRow): NativeTerminalStart => ({ ...row, taskId: row.taskId as TaskId, createdBy: row.createdBy as UserId, execution: row.execution ?? undefined });
+const toStart = (row: StartRow): NativeTerminalStart => ({ ...row, taskId: row.taskId as TaskId, createdBy: row.createdBy as UserId, runtime: row.runtime ?? undefined, execution: row.execution ?? undefined });
 const agentKey = (taskId: TaskId, agentId: string) => and(eq(table.taskId, taskId), eq(table.agentId, agentId));
 
 export function drizzleNativeTerminals(db: Database): NativeTerminalRepository {
@@ -28,7 +28,7 @@ export function drizzleNativeTerminals(db: Database): NativeTerminalRepository {
         if (existing) return toStart(existing);
         const total = (await tx.select({ total: count() }).from(table).where(eq(table.taskId, input.taskId)))[0]?.total ?? 0;
         if (total >= 256) throw quotaExceeded('本开发会话的 CLI 名册达到 256 条上限');
-        const inserted = (await tx.insert(table).values({ ...input, agentId: input.record.agentId, executionTaskId: input.execution?.taskId }).returning(selection))[0]!;
+        const inserted = (await tx.insert(table).values({ ...input, runtime: input.runtime ?? null, agentId: input.record.agentId, executionTaskId: input.execution?.taskId }).returning(selection))[0]!;
         return toStart(inserted);
       });
     },

@@ -67,11 +67,12 @@ function toDriverSpec(spec: AgentSpec): DriverAgentSpec {
     ...(spec.resumeSessionId === undefined ? {} : { resumeSessionId: spec.resumeSessionId }),
     ...(spec.systemPrompt === undefined ? {} : { systemPrompt: spec.systemPrompt }),
     mcp: spec.mcp,
+    ...(spec.runtime === undefined ? {} : { runtime: spec.runtime }),
   };
 }
 
 function toDriverContext(context: AgentLaunchContext): DriverLaunchContext {
-  return { cwd: context.cwd, env: context.env, logger: context.logger, host: createProcessHost(context.launcher) };
+  return { cwd: context.cwd, env: context.env, logger: context.logger, host: createProcessHost(context.launcher), ...(context.managed ? { managed: context.managed, runDir: context.managed.runDir } : {}) };
 }
 
 /** 把 ProcessLauncher 与本运行时的进程／流工具包成驱动包声明的 ProcessHost 端口。 */

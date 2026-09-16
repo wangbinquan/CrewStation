@@ -27,6 +27,11 @@
 
 export type { DriverAgentProcess, DriverAgentSpec, DriverLaunchContext, CliAgentDriver } from './contract/agentDriver';
 export type { NativeTerminalSpec, PreparedNativeTerminal, NativeActivityChannel } from './contract/nativeTerminal';
+export type { ManagedRuntimeContext } from './contract/managedRuntime';
+export { CLI_CONFIG_INVALID } from './contract/managedRuntime';
+export { mergeClaudeSettings, readManagedClaudeSettings, writeMergedClaudeSettings } from './drivers/claudeCode/managedSettings';
+export { materializeOpencodeConfig, mergeOpencodeConfig, readManagedOpencodeConfig } from './drivers/opencode/managedConfig';
+export { stripJsonComments } from './process/jsonc';
 export { prepareNativeTerminal } from './drivers/nativeTerminal';
 export { OpencodeNativeActivity } from './drivers/opencode/nativeActivity';
 export { ClaudeNativeActivity } from './drivers/claudeCode/nativeActivity';

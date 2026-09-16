@@ -60,6 +60,10 @@ export const queryKeys = {
   /** 算力档位（RFC-001）：租户投影与管理面全量分开缓存，两者字段不同。 */
   computeProfiles: () => ['compute-profiles'] as const,
   computeProfilesFull: () => ['compute-profiles', 'full'] as const,
+  /** 管理员运行环境（RFC-004）：列表、详情与检查分别缓存；检查在运行中按短间隔轮询。 */
+  runtimeConfigs: () => ['runtime-configs'] as const,
+  runtimeConfig: (id: string) => ['runtime-configs', id] as const,
+  runtimeCheck: (id: string, checkId: string) => ['runtime-configs', id, 'checks', checkId] as const,
   /** 网关的只读派生状态；重算后按 gateway 前缀一次失效。 */
   gateway: () => ['gateway'] as const,
   gatewayRoutes: () => ['gateway', 'routes'] as const,

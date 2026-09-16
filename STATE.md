@@ -5,11 +5,29 @@
 
 ## 一句话
 
-基线三件套（v0.3.3）的第一轮实现已在本机 kind 集群上跑通并推上 main；**RFC-001（算力归平台）与 RFC-002（管理空间与租户空间分离）已实现、实跑确认并推上 main**。
+基线三件套（v0.3.3）的第一轮实现已在本机 kind 集群上跑通并推上 main；**RFC-001（算力归平台）与 RFC-002（管理空间与租户空间分离）已实现、实跑确认并推上 main；RFC-004（管理员定义 Agent 启动前 Hook）的生产代码与测试已于 2026-09-16 提交 main，实机验收未做**。
 
 ## 进行中的 RFC
 
-**RFC-003 工作台 UX 重设计处于 In Progress，作者已要求完整实现并提交上库。** RFC-001 与 RFC-002 都已 Done，见 `proposal/rfc/README.md` 的索引表。
+**RFC-003 工作台 UX 重设计处于 In Progress，作者已要求完整实现并提交上库。RFC-004 于 2026-09-16 按作者会话目标“完整落地RFC-004并提交上库”提前启动并完成代码落地，状态 In Progress（实机验收待续）。** RFC-001 与 RFC-002 都已 Done，见 `proposal/rfc/README.md` 的索引表。
+
+## 最新接力：RFC-004 代码落地（2026-09-16）
+
+本批开工时 main 为 **d494ac870bfa3af79573553082b7f6027906da5e**（与 origin/main 同步，工作树干净）。作者以 `/goal 完整落地RFC-004并提交上库` 覆盖原“RFC-003 完结后启动”的排期，本批只做生产代码、自动化测试与文档，没有部署或实机验收。
+
+落地范围（均随测试）：
+- **契约**：`packages/contracts/taskrunner/beforeStart.ts`／`beforeStartTemplate.ts`（两类步骤、模板语法、`CS_HOOK_ENV_OUT` 输出协议、启动材料、执行记录、限额）；Runner 协议 hello `agentRuntimeConfig`／`interpreters`、`startAgent.runtime`／`processAttemptId`、`beforeStart` 事件；管理员 API `api/agentRuntime/*`；档位 `runtimeConfigId`／`revision`／`expectedRevision` 与租户投影 `{mode, available, reason}`；`AgentInstanceState` 新增 `preparing`；`TaskKind` 新增 `runtime-check`。
+- **新模块 `modules/agent-runtime`（L3，ADR-0004）**：运行环境、不可变版本、凭据（SecretBox 加密，keep／replace／clear，GET 不含原值）、检查记录、草稿 CAS、启用只接受同版本同内容哈希的通过检查、停用保留启用版本；管理员路由 `/v1/admin/agent-runtime-configs…`；检查作业经 `packages/queue` 工作器执行。
+- **档位与统一解析**：`modules/project` 档位绑定与 CAS、`RuntimeConfigDirectory` 端口；`modules/platform/wiring.ts` 的 `computeCatalogFor` 在受理时固定已启用版本，dev-session／business-task 只在下发命令时按固定版本取材料；驱动不一致报 `runtime_driver_mismatch`。
+- **Runner**：`runtimes/task/src/beforeStart/*`（原子写、共享路径登记、bash／python3／bun／自定义解释器、进程组终止、输出协议、按 `processAttemptId` 幂等、每容器串行）；托管 Agent 私有 HOME；`Dockerfile` 加 `python3`（镜像未重建）。
+- **CLI 合成**：`packages/agent-drivers` Claude `CLAUDE_CONFIG_DIR`＋唯一 `--settings` 合成、OpenCode `OPENCODE_CONFIG` 合成保留 provider options。
+- **检查执行**：`modules/task-runtime` 的 `runtime-check` 任务（平台命名空间、哨兵项目准入上限 4、oneshot Agent、固定回文标记、镜像 digest／CLI 版本／解释器上下文、容器或 Runner 丢失记 unknown 不自动重跑）；`modules/session` 在写入前拒绝不支持的 Runner。
+- **控制台**：`/admin/compute` 双页签（算力档位｜运行环境，查询串直达 `tab`／`config`）、运行环境列表与建档、步骤表与文件／脚本编辑器（路径预览、示例脚本、排序／复制）、变量与凭据、配置绑定与模型、检查时间线与启用／停用确认、草稿冲突保留；档位表单可绑定运行环境并显示就绪；租户面不可用档位禁选并给出原因，`preparing`／准备失败状态可见。
+
+门禁与构建：`bun run check` 于 2026-09-16T03:54:20Z 通过，**1325 pass／4 skip／0 fail**（1329 tests／227 files／7455 assertions）；`tools/arch` 六项规则通过、无新增例外；console `bun run build` **494ms** 成功。提交与 CI 见本节末尾。
+
+未完成（不据自动化结果宣称已可用）：任务镜像重建与平台重新部署（含 `agent_runtime` 迁移）、真实运行环境检查、两类 CLI 经 Hook 的真实模型轮次、管理 UX 多分辨率／主题／键盘验收，以及 RFC-004 plan.md 中全部 AR 的实机证据。RFC-003 的剩余验收不受本批影响，继续按其 implementation 记录推进。
+
 
 ## 最新接力：破坏性迁移与生产版本差距（2026-09-16）
 

@@ -1,8 +1,11 @@
-import type { Actor, ProjectId, ServiceId, UserId } from '@crewstation/contracts';
+import type { Actor, ProjectId, RuntimeRevisionRef, ServiceId, UserId } from '@crewstation/contracts';
+import { precondition } from '@crewstation/kernel';
 import type { EventConsumer } from '@crewstation/eventbus';
 import type { K8sClient } from '@crewstation/k8s';
 import { buildEgressNetworkPolicy, namespaceObject, projectNetworkPolicy, resourceQuotaObject, secretObject, taskEgressNetworkPolicy } from '@crewstation/k8s';
 import type { Logger } from '@crewstation/kernel';
+import { createAgentRuntimeModule } from '@crewstation/module-agent-runtime';
+import type { AgentRuntimeModuleApi } from '@crewstation/module-agent-runtime';
 import { createApiCatalogModule } from '@crewstation/module-api-catalog';
 import { createBusinessTaskModule } from '@crewstation/module-business-task';
 import { createCapabilitiesModule } from '@crewstation/module-capabilities';
@@ -61,7 +64,7 @@ export const SYSTEM_ACTOR: Actor = { userId: 'usr_000000000000000000000000000000
 
 const consumerLifecycle = (consumer: EventConsumer): Lifecycle => ({ start: () => consumer.start(), stop: () => consumer.stop() });
 
-interface Late { project?: ProjectModuleApi; gateway?: GatewayModuleApi; taskRuntime?: TaskRuntimeModuleApi }
+interface Late { project?: ProjectModuleApi; gateway?: GatewayModuleApi; taskRuntime?: TaskRuntimeModuleApi; agentRuntime?: AgentRuntimeModuleApi }
 
 function composeCore(deps: PlatformModuleDeps, late: Late) {
   const { db, settings, logger } = deps;
@@ -92,13 +95,23 @@ function composeCore(deps: PlatformModuleDeps, late: Late) {
       return env && env.kind === 'dev-session' && (env.state === 'creating' || env.state === 'running') ? { projectId: env.projectId } : undefined;
     } },
   });
-  const project = createProjectModule({ db, identity: identity.api, hosts, taskUsage: { runningTasks }, settings: { defaultMaxConcurrentTasks: settings.defaultMaxConcurrentTasks, defaultServicePlan: settings.defaultServicePlan } });
+  // 运行环境目录在 agent-runtime（L3，晚于 project 装配）：装配前一律回答“不存在”，即只允许部署配置模式（RFC-004）。
+  const project = createProjectModule({ db, identity: identity.api, hosts, taskUsage: { runningTasks }, settings: { defaultMaxConcurrentTasks: settings.defaultMaxConcurrentTasks, defaultServicePlan: settings.defaultServicePlan },
+    runtimeConfigs: { describe: async (configId) => late.agentRuntime?.describeConfig(configId) } });
   late.project = project.api;
   const isAdmin = (userId: string) => identity.api.isAdmin(userId as UserId);
   const resolveById = (serviceId: ServiceId) => project.api.resolveServiceById(serviceId);
 
   const config = createConfigModule({ db, project: project.api, settings: { secretKeyBase64: settings.secretKeyBase64 } });
   const egress = createEgressModule({ db, project: project.api });
+  // 检查执行器在 task-runtime（L4）：由这里回填，agent-runtime 只依赖端口（ADR-0004）。
+  const agentRuntime = createAgentRuntimeModule({
+    db, logger, isAdmin: (id) => identity.api.isAdmin(id),
+    executor: { run: (input, report, heartbeat) => { if (!late.taskRuntime) throw new Error('task-runtime 尚未装配'); return late.taskRuntime.runRuntimeCheck(input, report, heartbeat); } },
+    references: { listReferencing: (configId) => project.api.listComputeProfilesReferencing(configId) },
+    settings: { secretKeyBase64: settings.secretKeyBase64 },
+  });
+  late.agentRuntime = agentRuntime.api;
   const data = createDataModule({
     db, isAdmin: (id) => isAdmin(id), authorizer: project.api,
     services: { resolveServiceById: async (id) => { const r = await resolveById(id); return r ? { projectId: r.projectId, slug: r.slug } : undefined; } },
@@ -116,7 +129,7 @@ function composeCore(deps: PlatformModuleDeps, late: Late) {
       resolveServiceIdentity: async (identity) => { const r = await project.api.resolveServiceIdentity(identity); return r ? { projectId: r.projectId, serviceId: r.serviceId, slug: r.slug, identity: r.identity } : undefined; },
     },
   });
-  return { identity, project, config, egress, data, scm, apiCatalog, hosts, isAdmin, resolveById };
+  return { identity, project, config, egress, data, scm, apiCatalog, agentRuntime, hosts, isAdmin, resolveById };
 }
 
 function composeDelivery(deps: PlatformModuleDeps, core: ReturnType<typeof composeCore>, late: Late) {
@@ -159,12 +172,33 @@ function composeDelivery(deps: PlatformModuleDeps, core: ReturnType<typeof compo
   return { release, gateway };
 }
 
+/**
+ * 算力档位解析（RFC-001）：一处实现，dev-session 与 business-task 共用。
+ * RFC-004：托管档位在受理时固定已启用版本；材料只在下发命令时按固定版本解密取出。
+ */
+function computeCatalogFor(project: ProjectModuleApi, agentRuntime: AgentRuntimeModuleApi) {
+  return {
+    resolve: async (name: string) => {
+      const profile = await project.resolveComputeProfile(name);
+      if (!profile) return undefined;
+      const base = { name: profile.name, driver: profile.driver, model: profile.model, ...(profile.taskProfile ? { taskProfile: profile.taskProfile } : {}) };
+      if (!profile.runtimeConfigId) return base;
+      const material = await agentRuntime.resolveActive(profile.runtimeConfigId);
+      if (material.driver !== profile.driver) throw precondition(`档位 ${profile.name} 的驱动与运行环境 ${material.configName} 不一致，请管理员改绑`, { code: 'runtime_driver_mismatch' });
+      return { ...base, runtime: { configId: material.configId, revision: material.revision } satisfies RuntimeRevisionRef };
+    },
+    runtimeMaterial: (ref: RuntimeRevisionRef) => agentRuntime.resolveRevision(ref.configId, ref.revision),
+    list: () => project.listComputeProfiles(),
+  };
+}
+
 function composeRuntime(deps: PlatformModuleDeps, core: ReturnType<typeof composeCore>, delivery: ReturnType<typeof composeDelivery>, late: Late) {
   const { db, k8s, settings, logger } = deps;
   const { project, config, data, scm, isAdmin, resolveById } = core;
   const { release } = delivery;
+  const checkRunner = createSessionClient(settings.sessionInternalUrl);
   const taskRuntime = createTaskRuntimeModule({
-    db, k8s, logger, isAdmin: (id) => isAdmin(id), authorizer: project.api, quotas: { quotaLimit: project.api.quotaLimit },
+    db, k8s, logger, isAdmin: (id) => isAdmin(id), authorizer: project.api, quotas: { quotaLimit: project.api.quotaLimit }, checkRunner,
     profiles: { listTaskProfiles: project.api.listTaskProfiles, getTaskProfile: async (name) => (await project.api.listTaskProfiles()).find((p) => p.name === name) },
     services: { resolveServiceById: resolveById },
     checkout: {
@@ -183,11 +217,7 @@ function composeRuntime(deps: PlatformModuleDeps, core: ReturnType<typeof compos
   });
   late.taskRuntime = taskRuntime.api;
   const runner = createSessionClient(settings.sessionInternalUrl);
-  // 算力档位解析（RFC-001）：一处实现，dev-session 与 business-task 共用。
-  const computeCatalog = {
-    resolve: (name: string) => project.api.resolveComputeProfile(name),
-    list: () => project.api.listComputeProfiles(),
-  };
+  const computeCatalog = computeCatalogFor(project.api, core.agentRuntime.api);
   const mcp = [{ name: 'capabilities', url: settings.mcp.capabilitiesUrl }, { name: 'operations', url: settings.mcp.operationsUrl }];
   const devSession = createDevSessionModule({
     apiCatalog: core.apiCatalog.api,
@@ -295,7 +325,7 @@ function composeModules(deps: PlatformModuleDeps) {
   const delivery = composeDelivery(deps, core, late);
   const runtime = composeRuntime(deps, core, delivery, late);
   const aggregates = composeAggregates(deps, core, delivery, runtime);
-  return { identity: core.identity, project: core.project, config: core.config, egress: core.egress, data: core.data, scm: core.scm, apiCatalog: core.apiCatalog, ...delivery, ...runtime, ...aggregates };
+  return { identity: core.identity, project: core.project, config: core.config, egress: core.egress, data: core.data, scm: core.scm, apiCatalog: core.apiCatalog, agentRuntime: core.agentRuntime, ...delivery, ...runtime, ...aggregates };
 }
 
 export function createPlatformModule(deps: PlatformModuleDeps): PlatformModule {
@@ -304,18 +334,18 @@ export function createPlatformModule(deps: PlatformModuleDeps): PlatformModule {
     name: 'platform',
     routers: {
       // devSessionGate 只挂中间件不占路径，必须排在最前：Hono 按注册顺序执行，晚于业务路由就来不及改判身份。
-      api: [...m.identity.http.devSessionGate, ...m.project.http, ...m.identity.http.users, ...m.config.http, ...m.egress.http, ...m.data.http, ...m.scm.http, ...m.apiCatalog.http, ...m.release.http, ...m.gateway.http, ...m.taskRuntime.http, ...m.devSession.http, m.businessTask.http.service, m.businessTask.http.user, ...m.events.http.query, ...m.observability.http, ...m.capabilities.http, ...m.provisioning.http],
+      api: [...m.identity.http.devSessionGate, ...m.project.http, ...m.identity.http.users, ...m.config.http, ...m.agentRuntime.http, ...m.egress.http, ...m.data.http, ...m.scm.http, ...m.apiCatalog.http, ...m.release.http, ...m.gateway.http, ...m.taskRuntime.http, ...m.devSession.http, m.businessTask.http.service, m.businessTask.http.user, ...m.events.http.query, ...m.observability.http, ...m.capabilities.http, ...m.provisioning.http],
       auth: [...m.identity.http.auth, ...m.identity.http.forwardAuth],
       session: [m.session.http.runner, m.session.http.stream, m.session.http.internal],
       events: [...m.events.http.ingress],
     },
     background: {
-      controller: [...m.release.workers, ...m.gateway.workers, consumerLifecycle(m.gateway.subscriptions), ...m.taskRuntime.workers, ...m.devSession.workers, ...m.businessTask.workers, consumerLifecycle(m.businessTask.subscriptions), ...m.apiCatalog.subscriptions.map(consumerLifecycle), ...m.observability.workers, ...m.provisioning.workers, consumerLifecycle(m.provisioning.subscriptions)],
+      controller: [...m.release.workers, ...m.gateway.workers, consumerLifecycle(m.gateway.subscriptions), ...m.taskRuntime.workers, ...m.agentRuntime.workers, ...m.devSession.workers, ...m.businessTask.workers, consumerLifecycle(m.businessTask.subscriptions), ...m.apiCatalog.subscriptions.map(consumerLifecycle), ...m.observability.workers, ...m.provisioning.workers, consumerLifecycle(m.provisioning.subscriptions)],
       session: [...m.session.workers],
       events: [...m.events.workers, ...m.events.subscriptions.map(consumerLifecycle)],
     },
     websocket: m.session.websocket,
-    migrations: [queueMigrations, eventbusMigrations, m.identity.migrations, m.project.migrations, m.config.migrations, m.egress.migrations, m.data.migrations, m.scm.migrations, m.apiCatalog.migrations, m.events.migrations, m.release.migrations, m.taskRuntime.migrations, m.devSession.migrations, m.businessTask.migrations, m.session.migrations, m.gateway.migrations, m.observability.migrations],
+    migrations: [queueMigrations, eventbusMigrations, m.identity.migrations, m.project.migrations, m.config.migrations, m.agentRuntime.migrations, m.egress.migrations, m.data.migrations, m.scm.migrations, m.apiCatalog.migrations, m.events.migrations, m.release.migrations, m.taskRuntime.migrations, m.devSession.migrations, m.businessTask.migrations, m.session.migrations, m.gateway.migrations, m.observability.migrations],
   };
   return { api, modules: m };
 }

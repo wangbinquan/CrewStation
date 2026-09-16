@@ -2,6 +2,7 @@ import { join } from 'node:path';
 import type { UserId } from '@crewstation/contracts';
 import type { AppEnv } from '@crewstation/http';
 import type { K8sClient } from '@crewstation/k8s';
+import { LABELS } from '@crewstation/k8s';
 import type { Clock, Logger } from '@crewstation/kernel';
 import { noopLogger, systemClock } from '@crewstation/kernel';
 import type { Database, MigrationSet } from '@crewstation/persistence';
@@ -22,9 +23,13 @@ import { rebuildUseCases } from './application/requestRebuild';
 import { rebuildWorker } from './workers/rebuildWorker';
 import { nativeExecutionWorker } from './workers/nativeExecutionWorker';
 import { createNativeExecutionUseCase } from './application/nativeExecution';
+import { createCheckEnvironmentUseCase } from './application/checkEnvironment';
+import { RUNTIME_CHECK_LABELS } from './domain/runtimeCheckEnvironment';
+import { runRuntimeCheckUseCase } from './application/runtimeCheck';
+import type { RuntimeCheckTiming } from './application/runtimeCheck';
 import { environmentRoutes } from './http/environmentRoutes';
 import type { TaskCluster } from './ports/cluster';
-import type { EnvironmentSources, ProfileCatalog, ProjectAuthorizer, QuotaSource, ServiceResolver, SourceCheckoutSource, TaskRuntimeSettings } from './ports/platform';
+import type { CheckRunner, EnvironmentSources, ProfileCatalog, ProjectAuthorizer, QuotaSource, ServiceResolver, SourceCheckoutSource, TaskRuntimeSettings } from './ports/platform';
 
 export interface TaskRuntimeModuleDeps {
   db: Database;
@@ -36,6 +41,9 @@ export interface TaskRuntimeModuleDeps {
   sources: EnvironmentSources;
   /** 开发会话的源码检出；不给则容器里是空工作卷。 */
   checkout?: SourceCheckoutSource;
+  /** 运行环境检查用的 Runner 通道（RFC-004）；不给则检查报“未配置执行通道”。 */
+  checkRunner?: CheckRunner;
+  checkTiming?: Partial<RuntimeCheckTiming>;
   isAdmin: (userId: UserId) => Promise<boolean>;
   settings: TaskRuntimeSettings;
   cluster?: TaskCluster;
@@ -78,6 +86,8 @@ export function createTaskRuntimeModule(deps: TaskRuntimeModuleDeps): TaskRuntim
   const executionDeps = { ...useCaseDeps, nativeCluster: kubernetesNativeExecutions(deps.k8s, deps.settings.workerUid, deps.settings.agentEnvSecretName) };
   const createNative = createNativeExecutionUseCase(executionDeps);
   const rebuild = rebuildUseCases(recoveryDeps);
+  const createCheckEnvironment = createCheckEnvironmentUseCase(useCaseDeps);
+  const runRuntimeCheck = runRuntimeCheckUseCase(useCaseDeps, { createCheck: (input) => createCheckEnvironment({ ...input, labels: { [LABELS.project]: RUNTIME_CHECK_LABELS.project, [LABELS.service]: RUNTIME_CHECK_LABELS.service, ...input.labels } }), release: (taskId) => lifecycle.releaseEnvironment(taskId, 'runtime-check'), ...(deps.checkRunner ? { checkRunner: deps.checkRunner } : {}), ...(deps.checkTiming ? { timing: deps.checkTiming } : {}) });
   const api: TaskRuntimeModuleApi = {
     name: 'task-runtime',
     ...rebuild,
@@ -100,6 +110,7 @@ export function createTaskRuntimeModule(deps: TaskRuntimeModuleDeps): TaskRuntim
     verifyRunnerToken: queries.verifyRunnerToken,
     canOpenStream: queries.canOpenStream,
     reconcile,
+    runRuntimeCheck,
   };
   let timer: ReturnType<typeof setInterval> | undefined;
   return {

@@ -49,8 +49,10 @@ export interface CatalogRepository {
   upsertTaskProfile(profile: TaskProfile): Promise<void>;
   listComputeProfiles(): Promise<ComputeProfile[]>;
   getComputeProfile(name: string): Promise<ComputeProfile | undefined>;
-  upsertComputeProfile(profile: ComputeProfile): Promise<void>;
+  /** 新增或覆盖；给了 expectedRevision 且与当前不符时不写入，返回 undefined。写入后 revision 加一。 */
+  upsertComputeProfile(profile: Omit<ComputeProfile, 'revision'>, expectedRevision?: number): Promise<ComputeProfile | undefined>;
   deleteComputeProfile(name: string): Promise<void>;
+  listComputeProfilesByRuntimeConfig(runtimeConfigId: string): Promise<ComputeProfile[]>;
 }
 
 export type { ComputeProfile };

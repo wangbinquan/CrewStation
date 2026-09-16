@@ -7,6 +7,7 @@ import { removeTaskPod } from './taskRemoval';
 
 interface ContainerStatus {
   name: string;
+  imageID?: string;
   state?: { terminated?: { reason?: string; exitCode?: number }; waiting?: { reason?: string } };
 }
 type PodObject = K8sObject & { status?: { phase?: string; podIP?: string; message?: string; reason?: string; conditions?: Array<{ type: string; status: string; reason?: string; message?: string }>; containerStatuses?: ContainerStatus[]; initContainerStatuses?: ContainerStatus[] } };
@@ -49,7 +50,8 @@ export function kubernetesTaskCluster(k8s: K8sClient, workerUid: number): TaskCl
       if (!pod) return { phase: 'Missing' };
       const phase = (pod.status?.phase ?? 'Unknown') as Exclude<Awaited<ReturnType<TaskCluster['podPhase']>>['phase'], 'Missing'>;
       const message = podMessage(pod);
-      return { phase, ...(pod.status?.podIP ? { ip: pod.status.podIP } : {}), ...(message ? { message } : {}) };
+      const imageId = pod.status?.containerStatuses?.[0]?.imageID;
+      return { phase, ...(pod.status?.podIP ? { ip: pod.status.podIP } : {}), ...(message ? { message } : {}), ...(imageId ? { imageId } : {}) };
     },
     deletePod: async (env) => {
       await removeTaskPod(k8s, env);

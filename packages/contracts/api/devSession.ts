@@ -5,6 +5,7 @@ import { PreviewStateSchema } from '../taskrunner/protocol';
 import { PublishRequestSchema } from './release';
 import { ApiInvocationInputSchema, ApiInvocationResultSchema } from '../taskrunner/apiInvocation';
 import { DevSessionRebuildDtoSchema } from './devSessionRecovery';
+import { BeforeStartStateSchema, RuntimeRevisionRefSchema } from '../taskrunner/beforeStart';
 
 export const ApiInvocationRequestSchema = ApiInvocationInputSchema.extend({ expectedTaskId: TaskIdSchema, operationKey: z.string().min(1).max(8192) }).strict();
 export const ApiInvocationResponseSchema = z.object({ taskId: TaskIdSchema, operationKey: z.string().min(1).max(8192), result: ApiInvocationResultSchema }).strict();
@@ -42,7 +43,8 @@ export const BranchDtoSchema = z.object({
   behindProd: z.number().int().min(0).nullable(),
 });
 
-export const AgentInstanceStateSchema = z.enum(['starting', 'running', 'awaiting-input', 'completed', 'failed', 'cancelled']);
+/** preparing：启动前 Hook 正在执行（RFC-004），不能显示成 Agent 正在执行任务。 */
+export const AgentInstanceStateSchema = z.enum(['starting', 'preparing', 'running', 'awaiting-input', 'completed', 'failed', 'cancelled']);
 
 export const AgentInstanceDtoSchema = z.object({
   agentId: z.string(),
@@ -52,6 +54,9 @@ export const AgentInstanceDtoSchema = z.object({
   permission: AgentPermissionSchema,
   state: AgentInstanceStateSchema,
   sessionId: z.string().optional(),
+  /** RFC-004：此 Agent 固定使用的运行环境版本。 */
+  runtime: RuntimeRevisionRefSchema.optional(),
+  beforeStart: z.object({ executionId: z.string().min(1), state: BeforeStartStateSchema, currentStep: z.string().optional(), failedStep: z.string().optional(), error: z.string().optional() }).optional(),
   startedAt: z.iso.datetime(),
   endedAt: z.iso.datetime().optional(),
 });

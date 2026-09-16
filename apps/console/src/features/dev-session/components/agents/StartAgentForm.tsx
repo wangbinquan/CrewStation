@@ -23,8 +23,9 @@ export function StartAgentForm({ creation }: StartAgentFormProps): ReactElement 
   const profiles = useApiQuery(queryKeys.computeProfiles(), () => api.catalog.listComputeProfiles());
   const options = profiles.data?.items ?? [];
   const { compute, permission, prompt, busy, edit, start } = creation;
-  // 省略档位就走平台默认档，所以空选项是合法的；只有一个档位都没有时才拦住。
-  const ready = options.length > 0 && prompt.trim() !== '';
+  // 省略档位就走平台默认档，所以空选项是合法的；只有一个可用档位都没有时才拦住。
+  const usable = options.filter((option) => option.available);
+  const ready = usable.length > 0 && prompt.trim() !== '' && (compute === '' || usable.some((option) => option.name === compute));
   return (
     <div className={styles.form}>
       <div className={styles.row}>
@@ -32,8 +33,8 @@ export function StartAgentForm({ creation }: StartAgentFormProps): ReactElement 
         <select id="agent-compute" className={styles.select} value={compute} disabled={busy} onChange={(event) => edit({ compute: event.target.value })}>
           <option value="">{t('devSession.agents.computeDefault')}</option>
           {options.map((option) => (
-            <option key={option.name} value={option.name}>
-              {option.description === '' ? option.name : `${option.name} · ${option.description}`}
+            <option key={option.name} value={option.name} disabled={!option.available}>
+              {!option.available ? t('devSession.agents.computeUnavailable', { name: option.name, reason: option.reason ?? '' }) : option.description === '' ? option.name : `${option.name} · ${option.description}`}
             </option>
           ))}
         </select>
@@ -48,6 +49,7 @@ export function StartAgentForm({ creation }: StartAgentFormProps): ReactElement 
       </div>
       {profiles.isPending ? <PaneNotice tone="info">{t('devSession.agents.computeLoading')}</PaneNotice> : null}
       {!profiles.isPending && options.length === 0 ? <PaneNotice tone="warning">{t('devSession.agents.computeEmpty')}</PaneNotice> : null}
+      {options.length > 0 && usable.length < options.length ? <PaneNotice tone="warning">{t('devSession.agents.computeUnavailableHint')}</PaneNotice> : null}
       <textarea
         className={styles.prompt}
         rows={3}

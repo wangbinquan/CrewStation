@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { AgentDriverSchema, AgentPermissionSchema } from '../manifest/tasks';
+import { RuntimeRevisionRefSchema } from './beforeStart';
 
 /** 驱动层把两个 CLI 的输出归一为这一种事件；工作台流式面板与 execution_events 都消费它。 */
 export const AgentEventTypeSchema = z.enum([
@@ -17,7 +18,7 @@ export const AgentEventSchema = z.object({
    * `started` 事件带上这次运行的规格。工作台的 Agent 列表是按持久事件还原的，
    * 没有它就只能编造驱动名、模型与权限——权限编错尤其误导人。
    */
-  spec: z.object({ compute: z.string(), driver: AgentDriverSchema, model: z.string(), permission: AgentPermissionSchema }).optional(),
+  spec: z.object({ compute: z.string(), driver: AgentDriverSchema, model: z.string(), permission: AgentPermissionSchema, runtime: RuntimeRevisionRefSchema.optional() }).optional(),
   text: z.string().optional(),
   tool: z.object({ callId: z.string().optional(), name: z.string(), input: z.unknown().optional(), output: z.unknown().optional(), isError: z.boolean().optional() }).optional(),
   status: z.string().optional(),

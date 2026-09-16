@@ -3,6 +3,7 @@
 // 一并合并为单一形状：CrewStation 没有对拍需求，也没有工作区边界（沙箱关闭，见 index.ts）。
 
 import type { AgentPermission, McpConnection } from '@crewstation/contracts';
+import type { ManagedRuntimeContext } from './managedRuntime';
 
 /** MCP 服务器的注入形状；CrewStation 的 McpConnection 只有 remote 一种，local 保留给将来的本地 MCP。 */
 export type McpServerSpec =
@@ -50,4 +51,6 @@ export interface AgentSpawnContext {
   baseEnv: Record<string, string>;
   gitUserName?: string | null;
   gitUserEmail?: string | null;
+  /** RFC-004：托管运行环境；决定 CLAUDE_CONFIG_DIR／OPENCODE_CONFIG 与配置合成。 */
+  managed?: ManagedRuntimeContext;
 }

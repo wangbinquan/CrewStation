@@ -20,8 +20,10 @@ export interface RunnerConfig {
   workerUid: number;
   workerGid: number;
   preview?: PreviewConfig;
-  /** root 专属 0600 文件，`KEY=VALUE` 行；只注入 Agent 进程（模型凭据）。 */
+  /** root 专属 0600 文件，`KEY=VALUE` 行；只注入部署配置模式的 Agent 进程（模型凭据）。 */
   agentEnvFile?: string;
+  /** 托管 Agent 私有目录的根（RFC-004）；缺省 <tmpdir>/crewstation-agents，测试注入临时目录。 */
+  agentRunDir?: string;
   terminalBackend: TerminalBackendChoice;
   replayCapacity: number;
   /** 超过该时长没有收到 cs-session 的任何帧（含 ping）即主动重连；0 表示关闭看门狗。 */

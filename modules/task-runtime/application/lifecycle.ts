@@ -12,7 +12,7 @@ import { failEnvironment } from './failEnvironment';
 import { rebuildIsActive } from '../domain/environmentRebuild';
 import { deferWorkspaceRelease } from './nativeExecution';
 
-export type ReleaseReason = 'user' | 'owner-force' | 'business' | 'failed' | 'pod-lost';
+export type ReleaseReason = 'user' | 'owner-force' | 'business' | 'failed' | 'pod-lost' | 'runtime-check';
 
 /** 运行、释放、暂停、恢复与连接回调；释放即回收 Pod、跟随卷与配额（R14、R29）。 */
 export function lifecycleUseCases(deps: TaskRuntimeUseCaseDeps) {

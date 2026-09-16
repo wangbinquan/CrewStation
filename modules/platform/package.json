@@ -16,6 +16,7 @@
     "@crewstation/http": "workspace:*",
     "@crewstation/k8s": "workspace:*",
     "@crewstation/kernel": "workspace:*",
+    "@crewstation/module-agent-runtime": "workspace:*",
     "@crewstation/module-api-catalog": "workspace:*",
     "@crewstation/module-business-task": "workspace:*",
     "@crewstation/module-capabilities": "workspace:*",

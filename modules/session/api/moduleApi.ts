@@ -1,4 +1,4 @@
-import type { RunnerCommand, RunnerEvent, TaskId } from '@crewstation/contracts';
+import type { RunnerCommand, RunnerEvent, RunnerHello, TaskId } from '@crewstation/contracts';
 
 export interface StoredEventDto { seq: number; at: string; event: RunnerEvent }
 
@@ -7,5 +7,5 @@ export interface SessionModuleApi {
   readonly name: 'session';
   sendCommand(taskId: TaskId, command: RunnerCommand): Promise<unknown>;
   listEvents(taskId: TaskId, options: { sinceSeq?: number; kinds?: RunnerEvent['kind'][]; agentId?: string; limit?: number }): Promise<StoredEventDto[]>;
-  connectionStatus(taskId: TaskId): Promise<{ connected: boolean; replica?: string; lastSeq?: number; drivers?: string[] }>;
+  connectionStatus(taskId: TaskId): Promise<{ connected: boolean; replica?: string; lastSeq?: number; drivers?: string[]; capabilities?: RunnerHello['capabilities'] }>;
 }

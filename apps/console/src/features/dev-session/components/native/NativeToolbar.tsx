@@ -16,13 +16,15 @@ export function NativeToolbar({ layout, store, native, canStart, onPreviewAlongs
   const t = useT();
   const profiles = useApiQuery(queryKeys.computeProfiles(), () => api.catalog.listComputeProfiles());
   const compute = layout.preferredCompute ?? '';
+  // 选中的档位已被管理员停用或未就绪时不许启动：服务端会拒绝，前端先把原因摆出来。
+  const computeUnavailable = compute !== '' && profiles.data !== undefined && !profiles.data.items.some((p) => p.name === compute && p.available);
   const [permission, setPermission] = useState<AgentPermission>('edit');
   const [rename, setRename] = useState<string | null>(null);
   const tab = layout.tabs.find((tab) => tab.id === layout.activeTabId)!;
   const nameInvalid = rename !== null && (!rename.trim() || rename.trim().length > 40);
   return <div className={styles.toolbar}>
-    <Button variant="primary" disabled={!canStart || native.start.isPending || profiles.isPending || profiles.isError || tab.paneOrder.length >= 32} onClick={() => native.launch(compute, permission)}>{t(native.start.isPending ? 'devSession.agents.starting' : native.retryingOriginal ? 'devSession.native.retryStart' : 'devSession.native.add')}</Button>
-    <select aria-label={t('devSession.agents.compute')} value={compute} disabled={native.start.isPending || native.retryingOriginal} onChange={(event) => store.update((value) => ({ ...value, preferredCompute: event.target.value || undefined }))}><option value="">{t('devSession.agents.computeDefault')}</option>{profiles.data?.items.map((p) => <option key={p.name} value={p.name}>{p.name}</option>)}</select>
+    <Button variant="primary" disabled={!canStart || native.start.isPending || profiles.isPending || profiles.isError || computeUnavailable || tab.paneOrder.length >= 32} onClick={() => native.launch(compute, permission)}>{t(native.start.isPending ? 'devSession.agents.starting' : native.retryingOriginal ? 'devSession.native.retryStart' : 'devSession.native.add')}</Button>
+    <select aria-label={t('devSession.agents.compute')} value={compute} disabled={native.start.isPending || native.retryingOriginal} onChange={(event) => store.update((value) => ({ ...value, preferredCompute: event.target.value || undefined }))}><option value="">{t('devSession.agents.computeDefault')}</option>{profiles.data?.items.map((p) => <option key={p.name} value={p.name} disabled={!p.available}>{p.available ? p.name : t('devSession.agents.computeUnavailable', { name: p.name, reason: p.reason ?? '' })}</option>)}</select>
     <details className={styles.menu}><summary>{t('devSession.native.advanced')}</summary><div className={styles.menuBody}><label>{t('devSession.agents.permission')}<select value={permission} disabled={native.start.isPending || native.retryingOriginal} onChange={(event) => setPermission(event.target.value as AgentPermission)}>{AGENT_PERMISSIONS.map((p) => <option key={p} value={p}>{t(`devSession.agentPermission.${p}`)}</option>)}</select></label></div></details>
     <span className={styles.separator} />
     {(['grid', 'columns', 'rows'] as const).map((mode) => <Button key={mode} variant={tab.layout === mode ? 'secondary' : 'ghost'} aria-pressed={tab.layout === mode} onClick={() => store.update((value) => updateWorkspaceTab(value, tab.id, (current) => ({ ...current, layout: mode })))}>{t(`devSession.native.layout.${mode}`)}</Button>)}
@@ -38,5 +40,6 @@ export function NativeToolbar({ layout, store, native, canStart, onPreviewAlongs
       <small id="tab-name-hint">{t('devSession.native.nameHint')}</small><Button type="submit">{t('devSession.native.saveName')}</Button><Button onClick={() => setRename(null)}>{t('devSession.release.cancel')}</Button>
     </form> : null}
     {profiles.error ? <p className={styles.error}>{errorMessage(profiles.error)}</p> : null}
+    {computeUnavailable ? <p className={styles.error}>{t('devSession.agents.computeUnavailableHint')}</p> : null}
   </div>;
 }

@@ -5,9 +5,10 @@
 //    已经剔除过 runner 私有变量（CS_RUNNER_TOKEN 等）并按降权设置了 HOME/USER；
 //  - 不注入 `IS_SANDBOX`：CrewStation 在任务容器内关闭 Claude 内置沙箱（已登记的偏离），
 //    但仍**剔除**环境里任何大小写形式的 IS_SANDBOX，让默认关闭状态是确定的（源的同一条理由）；
-//  - 同源：设置 `PWD`；Git 身份两项同时非空时才注入四个变量；不设置 `CLAUDE_CONFIG_DIR`
-//    （子进程沿用操作者自己的配置根）。
+//  - 同源：设置 `PWD`；Git 身份两项同时非空时才注入四个变量；部署配置模式不设置 `CLAUDE_CONFIG_DIR`
+//    （子进程沿用操作者自己的配置根）；RFC-004 托管模式把它指向私有家目录。
 
+import { join } from 'node:path';
 import type { AgentSpawnContext } from '../../contract/spawnPlan';
 
 export function assembleClaudeEnv(ctx: AgentSpawnContext): Record<string, string> {
@@ -17,6 +18,8 @@ export function assembleClaudeEnv(ctx: AgentSpawnContext): Record<string, string
     env[key] = value;
   }
   env.PWD = ctx.cwd;
+  // RFC-004：托管 Agent 的配置根指向私有家目录下的 .claude，认证缓存不再写进 /work。
+  if (ctx.managed) env.CLAUDE_CONFIG_DIR = join(ctx.managed.home, '.claude');
   applyGitIdentity(env, ctx.gitUserName, ctx.gitUserEmail);
   return env;
 }

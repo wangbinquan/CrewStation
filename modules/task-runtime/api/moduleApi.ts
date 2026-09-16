@@ -1,8 +1,14 @@
 import type { Actor, ProjectId, ServiceId, TaskId, TaskKind, TraceId, UserId, VolumeMode } from '@crewstation/contracts';
 import type { DevSessionRebuildDto, DevSessionRebuildInspection, RebuildDevSessionRequest } from '@crewstation/contracts';
+import type { AgentRuntimeMaterial, RuntimeCheckContext, RuntimeCheckStage, RuntimeDriver } from '@crewstation/contracts';
+
+/** 运行环境检查（RFC-004）：输入为固定版本的启动材料与探针提示，进度按阶段上报，结局四态；unknown 表示环境中途丢失。 */
+export interface RuntimeCheckInput { checkId: string; driver: RuntimeDriver; model: string; material: AgentRuntimeMaterial; prompt: string; expectedReply: string }
+export interface RuntimeCheckProgress { context?: Partial<RuntimeCheckContext>; stages?: RuntimeCheckStage[] }
+export interface RuntimeCheckOutcome { state: 'succeeded' | 'failed' | 'cancelled' | 'unknown'; error?: string; context?: Partial<RuntimeCheckContext>; stages: RuntimeCheckStage[] }
 
 export type EnvironmentState = 'creating' | 'running' | 'paused' | 'releasing' | 'released' | 'failed';
-export type ReleaseReason = 'user' | 'owner-force' | 'business' | 'failed' | 'pod-lost';
+export type ReleaseReason = 'user' | 'owner-force' | 'business' | 'failed' | 'pod-lost' | 'runtime-check';
 
 export interface EnvironmentDto {
   id: TaskId;
@@ -74,4 +80,6 @@ export interface TaskRuntimeModuleApi {
   verifyRunnerToken(taskId: TaskId, token: string): Promise<{ ok: true; projectId: string } | { ok: false; reason: string }>;
   canOpenStream(actor: Actor, taskId: TaskId): Promise<boolean>;
   reconcile(): Promise<number>;
+  /** RFC-004：在平台专属检查任务里执行完整 Hook 与一次最小模型调用，结束后清理任务；供 agent-runtime 的执行器端口。 */
+  runRuntimeCheck(input: RuntimeCheckInput, report: (progress: RuntimeCheckProgress) => Promise<void>, heartbeat: () => Promise<boolean>): Promise<RuntimeCheckOutcome>;
 }

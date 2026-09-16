@@ -53,6 +53,9 @@ export const computeProfiles = projectSchema.table('compute_profiles', {
   model: text('model').notNull(),
   taskProfile: text('task_profile'),
   description: text('description').notNull().default(''),
+  /** RFC-004：绑定的运行环境；null 即部署配置模式。 */
+  runtimeConfigId: text('runtime_config_id'),
+  revision: integer('revision').notNull().default(0),
 });
 
 export const taskProfiles = projectSchema.table('task_profiles', {

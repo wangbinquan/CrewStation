@@ -1,0 +1,116 @@
+.layout {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) minmax(0, 2fr);
+  gap: var(--cs-space-4);
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .layout { grid-template-columns: 1fr; }
+}
+
+.fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--cs-space-3);
+  align-items: start;
+}
+
+.wide { grid-column: 1 / -1; }
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--cs-space-2);
+  align-items: center;
+}
+
+.rowActions {
+  display: flex;
+  gap: var(--cs-space-2);
+  flex-wrap: wrap;
+}
+
+.selected { background: var(--cs-color-surface-muted); }
+
+.preview {
+  margin: 0;
+  font-family: var(--cs-font-mono);
+  font-size: var(--cs-font-size-sm);
+  color: var(--cs-color-text-muted);
+  word-break: break-all;
+}
+
+.sub {
+  display: grid;
+  gap: var(--cs-space-2);
+  padding-top: var(--cs-space-3);
+  border-top: 1px solid var(--cs-color-border);
+}
+
+.sub h3 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.hint {
+  margin: 0;
+  color: var(--cs-color-text-muted);
+  font-size: var(--cs-font-size-sm);
+}
+
+.credential {
+  display: grid;
+  grid-template-columns: minmax(140px, 1fr) auto minmax(160px, 2fr) auto;
+  gap: var(--cs-space-2);
+  align-items: center;
+}
+
+@media (max-width: 700px) {
+  .credential { grid-template-columns: 1fr; }
+}
+
+.timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--cs-space-2);
+}
+
+.stage {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--cs-space-2);
+  align-items: start;
+  padding: var(--cs-space-2);
+  border: 1px solid var(--cs-color-border);
+  border-radius: var(--cs-radius-sm);
+}
+
+.stageBody {
+  display: grid;
+  gap: var(--cs-space-2);
+  min-width: 0;
+}
+
+.detail {
+  margin: 0;
+  color: var(--cs-color-text-muted);
+  font-size: var(--cs-font-size-sm);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.log {
+  margin: 0;
+  padding: var(--cs-space-2);
+  font-family: var(--cs-font-mono);
+  font-size: var(--cs-font-size-sm);
+  background: var(--cs-color-surface-muted);
+  border-radius: var(--cs-radius-sm);
+  max-height: 200px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
