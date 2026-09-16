@@ -9,6 +9,8 @@ import { temporaryRoleUseCases } from './temporaryRoles';
 const ENV_BY_MODE = { development: 'CS_DATABASE_URL', 'diagnostic-readonly': 'CS_PROD_READONLY_DATABASE_URL', 'production-change': 'CS_PROD_DATABASE_URL' } as const;
 
 /** 三种模式：development 默认直接生效；诊断只读与生产变更由负责人批准，批准后建带到期时间的临时角色（G14 接受容器内共享的风险）。 */
+import { withRequesterNames } from './requesterNames';
+
 export function taskBindingUseCases(deps: DataUseCaseDeps) {
   const { bindings, authorizer, services, cipher, clock } = deps;
   const data = serviceDataUseCases(deps);
@@ -54,11 +56,11 @@ export function taskBindingUseCases(deps: DataUseCaseDeps) {
     listTaskBindings: async (actor: Actor, taskId: TaskId): Promise<TaskDataBindingDto[]> => {
       const list = await bindings.listByTask(taskId);
       if (list[0]) await authorizer.authorize(actor, list[0].projectId as ProjectId, 'view');
-      return list.map(toBindingDto);
+      return withRequesterNames(deps.users, list.map(toBindingDto));
     },
     listProjectBindings: async (actor: Actor, projectId: ProjectId, states?: TaskDataBinding['state'][]): Promise<TaskDataBindingDto[]> => {
       await authorizer.authorize(actor, projectId, 'view');
-      return (await bindings.listByProject(projectId, states)).map(toBindingDto);
+      return withRequesterNames(deps.users, (await bindings.listByProject(projectId, states)).map(toBindingDto));
     },
     /** 任务容器启动或续期时读取：只含仍有效的绑定。 */
     envForTask: async (taskId: TaskId): Promise<Record<string, string>> => {

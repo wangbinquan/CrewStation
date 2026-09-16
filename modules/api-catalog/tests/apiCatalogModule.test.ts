@@ -78,6 +78,7 @@ beforeAll(async () => {
   catalog = createApiCatalogModule({
     db: tdb.db,
     projects: project.api,
+    users: { displayName: async (id) => id === dev.userId ? '开发者小李' : id === admin.userId ? '管理员老王' : undefined },
     services: {
       resolveService: async (serviceId) => {
         const s = await project.api.getService(admin, serviceId).catch(() => undefined);
@@ -136,13 +137,16 @@ describe.skipIf(!available)('api-catalog module', () => {
     requestId = request.id;
     expect(request).toMatchObject({ state: 'pending', serviceId: demo.serviceId, operationKey: detailKey, reason: '同步工单', requestedBy: dev.userId });
     await expect(catalog.api.requestAccess(dev, demo.serviceId, { operationKey: detailKey })).rejects.toMatchObject({ kind: 'conflict' });
-    expect((await catalog.api.listRequests(owner, demo.projectId)).map((r) => r.id)).toEqual([requestId]);
+    const listed = await catalog.api.listRequests(owner, demo.projectId);
+    expect(listed.map((r) => r.id)).toEqual([requestId]);
+    expect(listed[0]).toMatchObject({ requestedByName: '开发者小李' }); expect(listed[0]?.decidedByName).toBeUndefined();
     await expect(catalog.api.listRequests(dev)).rejects.toMatchObject({ kind: 'forbidden' });
     expect((await catalog.api.listRequests(admin)).length).toBe(1);
     await expect(catalog.api.decideRequest(dev, requestId, { approve: true })).rejects.toMatchObject({ kind: 'forbidden' });
     const decided = await catalog.api.decideRequest(admin, requestId, { approve: true, decision: '同意' });
     expect(decided).toMatchObject({ state: 'approved', decidedBy: admin.userId, decision: '同意' });
     expect(decided.decidedAt).toBeDefined();
+    expect((await catalog.api.listRequests(admin))[0]).toMatchObject({ requestedByName: '开发者小李', decidedByName: '管理员老王' });
     await expect(catalog.api.decideRequest(admin, requestId, { approve: false })).rejects.toMatchObject({ kind: 'precondition' });
     await expect(catalog.api.requestAccess(dev, demo.serviceId, { operationKey: detailKey })).rejects.toMatchObject({ kind: 'conflict' });
     expect(await catalog.api.grantedOperations('demo/demo')).toEqual({ operations: [detailKey], defaultOpen: [listKey] });

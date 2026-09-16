@@ -108,7 +108,7 @@ sql`kind = ANY(ARRAY[${sql.join(kinds.map((k) => sql`${k}`), sql`, `)}]::text[])
 ### 节点 CPU 预约 10／10 时滚动更新排不进新 Pod
 
 控制面每个部署请求 100m，RollingUpdate 默认先起新再停旧，节点满额时新 Pod 一直 Pending，`rollout status` 超时。
-两种做法都用过：单副本服务改 `strategy: Recreate`（console 先改，2026-09-16 cs-api 卡死后 `rollout restart` 的新 Pod Pending 了六分钟，七个平台部署的清单全部写回 Recreate）；发布构建 Job 的 Pod 请求 1 CPU，节点占满时它会一直 Pending、发布停在“正在构建”（2026-09-16 v0.1.2 等了 11 分钟，缩四个 CLI Pod 到 150m 后 20 秒内完成）；或临时把闲置 CLI Pod 原地缩到 150m 再恢复——
+两种做法都用过：单副本服务改 `strategy: Recreate`（console 先改，2026-09-16 cs-api 卡死后 `rollout restart` 的新 Pod Pending 了六分钟，七个平台部署的清单全部写回 Recreate）；发布构建 Job 的 Pod 请求 1 CPU，节点占满时它会一直 Pending、发布停在“正在构建”（2026-09-16 v0.1.2 等了 11 分钟，缩四个 CLI Pod 到 150m 后 20 秒内完成）；新版本的 Deployment 按部署时的套餐请求 CPU（v0.1.2 的 preview Pod 500m，正式槽 50m），随后 cs-api／console 的 Recreate 又因此 Pending 10 分钟——重建平台镜像前先看 `kubectl describe node` 的 cpu 请求余量；或临时把闲置 CLI Pod 原地缩到 150m 再恢复——
 `kubectl patch pod … --subresource resize`，requests 与 limits 要一起改，否则 Guaranteed QoS 变化会被拒绝；容器名等于 Pod 名。
 
 
@@ -252,6 +252,7 @@ ForwardAuth 带到演示登录页后用 `form.requestSubmit()` 提交用户名�
 的 `outline-style`；`Page.captureScreenshot` 留证。踩过的坑：`Target.createTarget` 的 `width/height` 只对上下文里第一个窗口有效，
 第二个页面再传会报 “Target position can only be set for new windows”；页面就绪要等 `main h1` 且正文里没有“载入中／读取中”，
 只等 `loadEventFired` 拿到的是骨架。
+演示登录用 `displayName ?? username` 覆盖用户名字：脚本反复以 `admin` 登录后管理员显示名变成了“admin”，登录请求要带 `displayName`。
 
 ### Chrome 扩展量窄屏：窗口压不到 500px 以下，用同源 iframe 模拟视口
 

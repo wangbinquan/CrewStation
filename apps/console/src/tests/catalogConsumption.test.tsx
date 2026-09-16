@@ -20,7 +20,7 @@ function fixture(admin = false) {
       writes.push({ url, body: JSON.parse(String(init.body)) });
       if (state.failure) { status = 503; body = { error: 'unavailable', message: '申请服务暂不可用' }; }
       else { state.requested = true; body = { id: 'request', serviceId, operationKey: 'billing:GET:/invoices', state: 'pending', reason: '查询账单', requestedBy: 'user', createdAt: '2026-09-13T01:00:00.000Z' }; }
-    } else if (url.includes('/api-requests') && state.requested) body = { items: [{ id: 'request', serviceId, operationKey: 'billing:GET:/invoices', state: 'pending', reason: '查询账单', requestedBy: 'user', createdAt: '2026-09-13T01:00:00.000Z' }] };
+    } else if (url.includes('/api-requests') && state.requested) body = { items: [{ id: 'request', serviceId, operationKey: 'billing:GET:/invoices', state: 'pending', reason: '查询账单', requestedBy: 'user', requestedByName: '开发者小李', createdAt: '2026-09-13T01:00:00.000Z' }] };
     return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
   }) as typeof fetch;
   return { writes, state };
@@ -44,6 +44,8 @@ test('申请失败保留打开的表单与理由，重试成功才收起并显�
   f.state.failure = false; await page.click('提交申请');
   expect(f.writes).toHaveLength(2); expect(f.writes[1]!.body).toEqual({ operationKey: 'billing:GET:/invoices', reason: '查询账单' });
   expect(document.querySelector('textarea')).toBeNull(); expect(page.text()).toContain('待审批');
+  // 申请人显示可辨识名字而不是原始用户 ID（ID 保留在 title 里）。
+  expect(page.text()).toContain('开发者小李'); expect(page.html()).toContain('title="user"');
 });
 
 test('管理员在项目消费页也不出现平台写操作，只给保留项目上下文的管理入口', async () => {

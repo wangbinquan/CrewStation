@@ -39,7 +39,10 @@ export const TaskDataBindingDtoSchema = z.object({
   reason: z.string().optional(),
   decision: z.string().optional(),
   requestedBy: UserIdSchema,
+  /** 申请人与审批人的可辨识名字；服务端查不到目录时省略，界面回退到 ID。 */
+  requestedByName: z.string().optional(),
   decidedBy: UserIdSchema.optional(),
+  decidedByName: z.string().optional(),
   expiresAt: z.iso.datetime().optional(),
   createdAt: z.iso.datetime(),
 });

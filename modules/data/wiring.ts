@@ -14,11 +14,14 @@ import type { DataModuleApi } from './api/moduleApi';
 import type { DataUseCaseDeps } from './application/dependencies';
 import { serviceDataUseCases } from './application/serviceData';
 import { taskBindingUseCases } from './application/taskBindings';
+import type { UserDirectory } from './ports/userDirectory';
 import { dataRoutes } from './http/dataRoutes';
 import type { DataSettings, ProjectAuthorizer, ServiceResolver } from './ports/platform';
 import type { PostgresProvider } from './ports/providers';
 
 export interface DataModuleDeps {
+  /** 申请人／审批人名字来源；缺省时绑定 DTO 只带 ID。 */
+  users?: UserDirectory;
   db: Database;
   authorizer: ProjectAuthorizer;
   services: ServiceResolver;
@@ -52,6 +55,7 @@ export function createDataModule(deps: DataModuleDeps): DataModule {
     settings: deps.settings,
     clock: deps.clock ?? systemClock,
     logger: deps.logger ?? noopLogger,
+    ...(deps.users ? { users: deps.users } : {}),
   };
   const service = serviceDataUseCases(useCaseDeps);
   const bindings = taskBindingUseCases(useCaseDeps);

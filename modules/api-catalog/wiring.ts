@@ -25,6 +25,7 @@ import { setOpenPolicyUseCase } from './application/setOpenPolicy';
 import { catalogRoutes } from './http/catalogRoutes';
 import { requestRoutes } from './http/requestRoutes';
 import type { HostNaming } from './ports/hostNaming';
+import type { UserDirectory } from './ports/userDirectory';
 import type { ServiceResolver } from './ports/serviceResolver';
 
 /** 装配期注入：其他模块的能力以端口形式出现在这里，由应用提供实现。 */
@@ -37,6 +38,8 @@ export interface ApiCatalogModuleDeps {
   hosts: HostNaming;
   /** 目录事务提交后更新依赖它的投影；失败沿现有事件消费机制重试，登记本身保持幂等。 */
   onCatalogChanged?: (serviceId: ServiceId) => Promise<void>;
+  /** 申请人／审批人名字来源；缺省时申请 DTO 只带 ID。 */
+  users?: UserDirectory;
   clock?: Clock;
   logger?: Logger;
 }
@@ -62,6 +65,7 @@ export function createApiCatalogModule(deps: ApiCatalogModuleDeps): ApiCatalogMo
     projects: { isAdmin: (id) => deps.projects.isAdmin(id), authorize: (actor, projectId, action) => deps.projects.authorize(actor, projectId, action), readProjectBasics: (actor, ids) => deps.projects.readProjectBasics(actor, ids) },
     hosts: deps.hosts,
     clock: deps.clock ?? systemClock,
+    ...(deps.users ? { users: deps.users } : {}),
   };
   const api: ApiCatalogModuleApi = {
     name: 'api-catalog',

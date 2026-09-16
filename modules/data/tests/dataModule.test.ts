@@ -25,6 +25,7 @@ beforeAll(async () => {
   const url = new URL(adminUrl);
   data = createDataModule({
     db: tdb.db,
+    users: { displayName: async (id) => id === dev.userId ? '开发者小李' : id === owner.userId ? '负责人小周' : undefined },
     authorizer: { authorize: async (actor, _p, action) => { if (action === 'approve-data-access' && actor.userId !== owner.userId) throw new Error('forbidden'); } },
     services: { resolveServiceById: async () => ({ projectId, slug }) },
     isAdmin: async () => false,
@@ -70,7 +71,8 @@ describe.skipIf(!available)('data module', () => {
     const ro = await data.api.requestTaskBinding(dev, { taskId, serviceId }, { mode: 'diagnostic-readonly', reason: '看日志表', ttlMinutes: 30 });
     expect(ro.state).toBe('requested');
     expect(ro.ttlMinutes).toBe(30);
-    expect(await data.api.listProjectBindings(owner, projectId, ['requested'])).toHaveLength(1);
+    const requestedList = await data.api.listProjectBindings(owner, projectId, ['requested']);
+    expect(requestedList).toHaveLength(1); expect(requestedList[0]).toMatchObject({ requestedByName: '开发者小李' });
     await expect(data.api.decideTaskBinding(dev, ro.id, { approve: true })).rejects.toThrow('forbidden');
     const approved = await data.api.decideTaskBinding(owner, ro.id, { approve: true, decision: '同意 30 分钟' });
     expect(approved.state).toBe('active');

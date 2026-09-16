@@ -11,11 +11,19 @@
 
 **RFC-003 工作台 UX 重设计处于 In Progress，作者已要求完整实现并提交上库。RFC-004 于 2026-09-16 按作者会话目标“完整落地RFC-004并提交上库”提前启动并完成代码落地，状态 In Progress（实机验收待续）。** RFC-001 与 RFC-002 都已 Done，见 `proposal/rfc/README.md` 的索引表。
 
+## 最新接力：申请人与审批人显示名字（2026-09-16）
+
+本批开工时 main 为 **c0feef8fe499f87fe81d6a35ff439d05eace29e3**（第九十二批已上库，CI 成功）。`ApiRequestDto`／`TaskDataBindingDto` 增加可选 `requestedByName`／`decidedByName`，api-catalog 与 data 各自声明 `UserDirectory` 端口由 platform 用 identity 实现；工作台申请列表与数据访问记录显示名字、ID 留在 title。实看：developer 看到“申请人 rfc003-developer · 审批人 admin”。四处回归。累计仍 **45／52**。
+
+环境：重建后 cs-api／console 的 Recreate 新 Pod 因 v0.1.2 的 preview Deployment 请求 500m 而 Pending 约 10 分钟，四个 QA CLI Pod 再缩到 150m 后就绪并保持 150m（节点请求 9450m／10）；演示登录会用 `displayName ?? username` 覆盖名字，管理员显示名已改回“CrewStation Admin”。
+
+未做：其余 7 项 UX-AT 需故障注入或专门历史构造（见上一节）。门禁：`bun run check` 2026-09-16T09:08:32Z **1344 pass／4 skip／0 fail**（1348 tests／233 files），arch 六项通过。本批提交与 CI 见本节末尾。
+
 ## 最新接力：浏览器发布补丁版本到就绪（2026-09-16）
 
 本批开工时 main 为 **85534646535fe5330d90fdee40a23d0dd1cce227**（第九十一批已上库，CI 成功）。owner 从已推送分支 main（6af30245c4）发布 v0.1.2：向导三步、候选标签 v0.1.2、受理（08:30:18Z）→构建→部署→就绪（701 秒），其中构建 Pod 因节点 CPU 请求 10／10 满额 Pending 11 分钟，四个 QA CLI Pod 原地缩到 150m 后 20 秒内完成，事后恢复 400m（UID、重启数不变）。现在 preview 为 v0.1.2、v0.1.1 superseded、正式仍 v0.1.0；tester 在列表、详情与 preview 主机看到新版本。UX-AT-09 通过，累计 **45／52**。无生产代码改动。
 
-未做：其余 7 项 UX-AT（11 破坏性拒绝／14 死信／27 局部来源故障／30 浅历史等分支／42 乱序补发／48 查询失败恢复／49 状态未知），都需要故障注入或专门的历史构造。门禁：`bun run check` 2026-09-16T08:46:34Z **1344 pass／4 skip／0 fail**（1348 tests／233 files），arch 六项通过。本批提交与 CI 见本节末尾。
+未做：其余 7 项 UX-AT（11 破坏性拒绝／14 死信／27 局部来源故障／30 浅历史等分支／42 乱序补发／48 查询失败恢复／49 状态未知），都需要故障注入或专门的历史构造。门禁：`bun run check` 2026-09-16T08:46:34Z **1344 pass／4 skip／0 fail**（1348 tests／233 files），arch 六项通过。本批提交 **c0feef8fe499f87fe81d6a35ff439d05eace29e3**（6 files，+33／−11），[CI 35075691178](https://github.com/wangbinquan/CrewStation/actions/runs/35075691178) 于 2026-09-16T08:50:13Z 成功。
 
 ## 最新接力：浏览器里的 API 试调（2026-09-16）
 

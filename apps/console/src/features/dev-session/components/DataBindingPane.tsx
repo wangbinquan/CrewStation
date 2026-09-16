@@ -37,7 +37,7 @@ export function DataBindingPane({ data, onDirtyChange = ignoreDirty }: { readonl
         <DefinitionList items={[
           { label: t('devSession.data.bindingId'), value: <code>{binding.id}</code> },
           { label: t('devSession.data.created'), value: formatDateTime(binding.createdAt, locale) },
-          { label: t('devSession.data.requestedBy'), value: <code>{binding.requestedBy}</code> },
+          { label: t('devSession.data.requestedBy'), value: binding.requestedByName ? <span title={binding.requestedBy}>{binding.requestedByName}</span> : <code>{binding.requestedBy}</code> },
           ...(binding.mode !== 'development' ? [{ label: t('devSession.data.ttl'), value: binding.ttlMinutes === undefined ? t('devSession.data.durationUnknown') : String(binding.ttlMinutes) }] : []),
           ...(binding.reason ? [{ label: t('devSession.data.reason'), value: binding.reason }] : []),
           ...(binding.decision ? [{ label: t('devSession.data.opinion'), value: binding.decision }] : []),

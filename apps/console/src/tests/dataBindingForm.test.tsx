@@ -13,7 +13,7 @@ const originalFetch = globalThis.fetch;
 let page: Awaited<ReturnType<typeof renderElement>> | undefined;
 afterEach(() => { page?.unmount(); page = undefined; globalThis.fetch = originalFetch; });
 function Harness({ canDevelop = true, canManage = true, service = serviceId }: { readonly canDevelop?: boolean; readonly canManage?: boolean; readonly service?: string | null }) { return <DataBindingPane data={useDataBindings(projectId, taskId, service ?? undefined, { canDevelop, canManage })} />; }
-const record = (id: string, patch: Partial<TaskDataBindingDto> = {}): TaskDataBindingDto => ({ id, taskId: taskId as TaskDataBindingDto['taskId'], mode: 'diagnostic-readonly', state: 'requested', ttlMinutes: 30, requestedBy: `usr_${'d'.repeat(32)}` as TaskDataBindingDto['requestedBy'], createdAt: '2026-09-13T00:00:00.000Z', ...patch });
+const record = (id: string, patch: Partial<TaskDataBindingDto> = {}): TaskDataBindingDto => ({ id, taskId: taskId as TaskDataBindingDto['taskId'], mode: 'diagnostic-readonly', state: 'requested', ttlMinutes: 30, requestedBy: `usr_${'d'.repeat(32)}` as TaskDataBindingDto['requestedBy'], requestedByName: '开发者小李', createdAt: '2026-09-13T00:00:00.000Z', ...patch });
 function setup(items: TaskDataBindingDto[] = []) {
   const requests: Array<{ path: string; body?: Record<string, unknown> }> = [];
   const state = { items, failRead: false, failWrite: false, hold: undefined as Promise<void> | undefined };

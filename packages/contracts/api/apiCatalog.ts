@@ -42,7 +42,10 @@ export const ApiRequestDtoSchema = z.object({
   state: ApiRequestStateSchema,
   reason: z.string().optional(),
   requestedBy: UserIdSchema,
+  /** 申请人的可辨识名字；服务端查不到目录时省略，界面回退到 ID。 */
+  requestedByName: z.string().optional(),
   decidedBy: UserIdSchema.optional(),
+  decidedByName: z.string().optional(),
   decision: z.string().optional(),
   createdAt: z.iso.datetime(),
   decidedAt: z.iso.datetime().optional(),

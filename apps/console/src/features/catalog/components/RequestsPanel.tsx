@@ -66,7 +66,7 @@ function RequestSummary({ request }: { readonly request: ApiRequestDto }): React
       </div>
       <dl className={styles.facts}>
         <dt>{t('catalog.requests.requestedBy')}</dt>
-        <dd>{request.requestedBy}</dd>
+        <dd title={request.requestedBy}>{request.requestedByName ?? request.requestedBy}</dd>
         <dt>{t('catalog.requests.createdAt')}</dt>
         <dd>{dateText(request.createdAt)}</dd>
         <dt>{t('catalog.requests.reason')}</dt>
@@ -74,7 +74,7 @@ function RequestSummary({ request }: { readonly request: ApiRequestDto }): React
         {request.state === 'pending' ? null : (
           <>
             <dt>{t('catalog.requests.decidedBy')}</dt>
-            <dd>{request.decidedBy ?? '—'}</dd>
+            <dd title={request.decidedBy}>{request.decidedByName ?? request.decidedBy ?? '—'}</dd>
             <dt>{t('catalog.requests.decidedAt')}</dt>
             <dd>{dateText(request.decidedAt)}</dd>
             <dt>{t('catalog.requests.decision')}</dt>

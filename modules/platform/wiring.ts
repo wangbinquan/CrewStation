@@ -100,6 +100,8 @@ function composeCore(deps: PlatformModuleDeps, late: Late) {
     runtimeConfigs: { describe: async (configId) => late.agentRuntime?.describeConfig(configId) } });
   late.project = project.api;
   const isAdmin = (userId: string) => identity.api.isAdmin(userId as UserId);
+  // 申请人／审批人在申请、绑定列表里显示可辨识名字；查不到就让界面回退到 ID。
+  const userDirectory = { displayName: async (userId: UserId) => (await identity.api.getUser(userId))?.name };
   const resolveById = (serviceId: ServiceId) => project.api.resolveServiceById(serviceId);
 
   const config = createConfigModule({ db, project: project.api, settings: { secretKeyBase64: settings.secretKeyBase64 } });
@@ -113,13 +115,13 @@ function composeCore(deps: PlatformModuleDeps, late: Late) {
   });
   late.agentRuntime = agentRuntime.api;
   const data = createDataModule({
-    db, isAdmin: (id) => isAdmin(id), authorizer: project.api,
+    db, isAdmin: (id) => isAdmin(id), authorizer: project.api, users: userDirectory,
     services: { resolveServiceById: async (id) => { const r = await resolveById(id); return r ? { projectId: r.projectId, slug: r.slug } : undefined; } },
     settings: { defaultPlan: 'db-small', secretKeyBase64: settings.secretKeyBase64, postgres: settings.dataPostgres },
   });
   const scm = createScmModule({ db, project: project.api, settings: { baseUrl: settings.gitlab.baseUrl, groupPath: settings.gitlab.groupPath, platformToken: settings.gitlab.platformToken, platformBotName: settings.gitlab.botName, defaultBranch: 'main' } });
   const apiCatalog = createApiCatalogModule({
-    db, projects: project.api, hosts, logger,
+    db, projects: project.api, hosts, logger, users: userDirectory,
     onCatalogChanged: async (serviceId) => {
       await gatewayApi().reconcileService(serviceId);
       await gatewayApi().rebuildAllowlist();

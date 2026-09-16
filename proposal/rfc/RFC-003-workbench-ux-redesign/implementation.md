@@ -2215,4 +2215,23 @@ UX-AT-09（新版列表／详情的多账号复验与完整 202 受理阶段）�
 
 ### 门禁
 
-`bun run check` 于 2026-09-16T08:46:34Z 通过，**1344 pass／4 skip／0 fail**（1348 tests／233 files，179.12s）。提交与精确 SHA CI 见 STATE.md 本批一节。
+`bun run check` 于 2026-09-16T08:46:34Z 通过，**1344 pass／4 skip／0 fail**（1348 tests／233 files，179.12s）。本批提交 **c0feef8fe499f87fe81d6a35ff439d05eace29e3**，[CI 35075691178](https://github.com/wangbinquan/CrewStation/actions/runs/35075691178) 于 2026-09-16T08:50:13Z 成功。
+
+## 第九十三批：申请人与审批人显示可辨识名字
+
+第八十九批实机观察到定向开放申请列表与审批页把申请人／审批人显示为 `usr_…` 原始 ID，而成员页按 design.md §2.7 显示可辨识名字。本批补齐：
+
+- `ApiRequestDto` 与 `TaskDataBindingDto` 各增加可选 `requestedByName`／`decidedByName`；api-catalog 与 data 两个模块各自声明 `UserDirectory` 端口（`displayName(userId)`），由 platform 组合根用 `identity.api.getUser` 实现并注入；`listRequests`、申请分页与两处绑定列表在映射 DTO 后统一补名字（去重后并发查，目录缺失、查不到或出错时省略字段，界面回退到 ID）。
+- console：申请列表与数据访问记录显示名字，原始 ID 保留在 `title` 里以便核对。
+- 回归：`apiCatalogModule.test.ts`（申请人名字、批准后审批人名字）、`dataModule.test.ts`（绑定列表申请人名字）、`catalogConsumption.test.tsx`、`dataBindingForm.test.tsx`。
+
+实看：developer 的开发资源目录里两条历史申请显示“申请人 rfc003-developer · 审批人 admin”，`title` 分别为对应用户 ID；开发页数据访问记录的“申请用户”显示 rfc003-developer。
+
+### 本批部署的两个环境教训
+
+- `cs-control-plane:dev` 与 `cs-console:rfc003-b93` 重建后 cs-api 与 console 的 Recreate 新 Pod 都 `Insufficient cpu` Pending 约 10 分钟——第九十二批发布的 v0.1.2 让 preview 槽的新 Deployment 请求 500m（正式槽仍 50m，同一 Manifest 但套餐在部署时解析），把此前留出的余量吃掉了。再次把四个 QA CLI Pod 缩到 150m 后两个 Pod 立即就绪；节点请求现在 9450m／10，CLI Pod 保持 150m（都是空闲 QA 进程），不再恢复 400m。这段时间 API 与工作台不可用，是本机单节点环境的代价，写入 dev-gotchas。
+- 演示登录每次都用 `displayName ?? username` 更新用户名字，无头脚本以 `admin` 登录几十次后把管理员显示名从“CrewStation Admin”改成了“admin”；用带 displayName 的登录改回。演示适配器的这个行为保留，实机脚本以后带 displayName。
+
+### 门禁
+
+`bun run check` 于 2026-09-16T09:08:32Z 通过，**1344 pass／4 skip／0 fail**（1348 tests／233 files，133.82s），arch、lint、两处 typecheck 无告警。提交与精确 SHA CI 见 STATE.md 本批一节。
