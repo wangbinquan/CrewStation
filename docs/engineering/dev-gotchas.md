@@ -83,6 +83,18 @@ sql`kind = ANY(ARRAY[${sql.join(kinds.map((k) => sql`${k}`), sql`, `)}]::text[])
 **任何 `pg_advisory_xact_lock` 都要问：等待有没有上限、读路径是不是也在排队。** 顺带：Bun SQL 里 `= any(${array}::int[])`
 传数组参数会报 `insufficient data left in message`（08P01），和上面“malformed array literal”是同一个坑。
 
+### 池子卡死但服务端一切空闲：健康检查必须走同一个连接池
+
+2026-09-16 第三次 cs-api 卡死（07:25Z）与第一次不同：`pg_stat_activity` 里十条连接全部 idle、没有锁，CPU 五秒只用 16ms，
+容器内 `/healthz` 200、无 cookie 的 `/v1/me` 401 都是 4ms，但任何要查库的请求都挂到 Bun 服务器 10s `idleTimeout` 后被网关 502。
+这是数据库**客户端**（Bun SQL 池）认为连接都在忙；服务端和进程指标都看不出来，原来的 `/healthz` 也看不出来。
+
+处理：`createApp({ readiness: () => databaseReady(db) })`——`/healthz` 走同一连接池做 `select 1`，3s 内无回应即 503；
+五份清单的探针补 `timeoutSeconds: 5`（默认 1s，慢查询会误判）。同类卡死 15s 内 NotReady、约 45s 由 liveness 重启。
+排查顺序：先 `curl` 带身份的 `/v1/me` 计时，再看 `pg_stat_activity` 是不是全 idle，再进容器打 `/healthz`——三者都“正常”而外部 502，就是这个坑。
+触发条件未复现（本机八种事务形态压测阴性），运行时／驱动的取舍见 `implementation-open-questions.md` I16。
+**重启前先把 `kubectl logs` 存下来**：Recreate 会把旧 Pod 连日志一起删掉，第三次的现场就这样丢了。
+
 ## Kubernetes 与本机集群
 
 ### 反复导入镜像会把 docker-desktop 的 118G 磁盘填满，先崩的是 PostgreSQL

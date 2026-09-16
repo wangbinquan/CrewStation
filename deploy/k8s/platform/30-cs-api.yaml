@@ -27,8 +27,8 @@ spec:
           env:
             - { name: POD_IP, valueFrom: { fieldRef: { fieldPath: status.podIP } } }
 
-          readinessProbe: { httpGet: { path: /healthz, port: 8080 }, periodSeconds: 5 }
-          livenessProbe: { httpGet: { path: /healthz, port: 8080 }, periodSeconds: 15, initialDelaySeconds: 10 }
+          readinessProbe: { httpGet: { path: /healthz, port: 8080 }, periodSeconds: 5, timeoutSeconds: 5 }
+          livenessProbe: { httpGet: { path: /healthz, port: 8080 }, periodSeconds: 15, initialDelaySeconds: 10, timeoutSeconds: 5 }
           resources: { requests: { cpu: 100m, memory: 256Mi }, limits: { cpu: "1", memory: 1Gi } }
 ---
 apiVersion: v1

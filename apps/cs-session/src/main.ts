@@ -4,7 +4,7 @@ import { createApp, installShutdown, serve } from '@crewstation/http';
 import { createK8sClient, loadClusterConfig } from '@crewstation/k8s';
 import { createJsonLogger } from '@crewstation/kernel';
 import { createPlatformModule } from '@crewstation/module-platform';
-import { connectDatabase, runMigrations } from '@crewstation/persistence';
+import { connectDatabase, databaseReady, runMigrations } from '@crewstation/persistence';
 import { loadPlatformSettings, portFrom } from '@crewstation/settings';
 
 const name = 'cs-session';
@@ -21,7 +21,7 @@ if (process.argv[2] === 'migrate') {
   process.exit(0);
 }
 
-const app = createApp({ name });
+const app = createApp({ name, readiness: () => databaseReady(db) });
 for (const router of platform.api.routers.session) app.route('/', router);
 const background = platform.api.background.session;
 for (const item of background) item.start();

@@ -2101,3 +2101,21 @@ owner 与 developer 各在自己的上下文打开同一开发会话页，徽标
 ### 部署与门禁
 
 console `cs-console:rfc003-b85`（07:13:16Z）。门禁：`bun run check` 于 2026-09-16T07:22:46Z 通过，**1341 pass／4 skip／0 fail**（1345 tests／232 files，131.21s），arch、lint、两处 typecheck 无告警。提交与精确 SHA CI 见 STATE.md 本批一节。
+
+## 第八十六批：分屏与页签实机、第三次 API 卡死与走连接池的健康检查
+
+### 分屏、键盘调整与五尺寸（UX-AT-37）
+
+owner 的真实会话（两个窗口，1280×720）：三种排布切换生效——“纵排”两卡上下堆叠（y 205／454，宽 1100），“横排”“网格”并排各 547px，`aria-pressed` 与接口 `tabs[0].layout` 同步（`rows`／`columns`／`grid`）；聚焦“调整第 1 个左右分隔线”后按 5 次 ArrowRight，比例 1／1 → 0.65／0.35，首窗 547 → 711px，刷新后仍为 711px（个人布局第 27 版）；“均分”把比例复位为 1／1（第 28 版）。同一事件循环内连点横排→纵排→网格→横排四次，界面与接口都只落到最后一次（一次保存，无冲突提示），之后再点仍生效。页签：“＋ 页签”新建“工作区 2”，卡片里的“移至页签”把窗口移过去（两页签各 1 个，页签标题计数同步），切到新页签能看到该窗口，再移回并“关闭页签”，刷新后仍是一个页签两个窗口（第 31 → 37 版）。五个视口 1280×720／1024×768／768×1024／390×844／320×568 的 `scrollWidth` 都等于视口宽，两卡始终可见，最窄卡 547／419／373／374／304px；390 与 320 下第一张卡顶部在 529／647px，页头与工具栏占了半屏，记为移动端的后续观察而不是本项缺陷（design.md §7“移动端不是缩小桌面四个面板”）。UX-AT-37 记为通过，累计 **37／52**。脚本层的一个教训：`scrollIntoView` 后立刻取坐标点击会点空，用直接点击复核后才确认按钮本身正常。
+
+### 第三次 API 卡死与走连接池的健康检查
+
+07:25:56Z（分屏旅程进行中）网关再次记录成批 502：`agent-terminals` 20.8s、`dev-session`／`compute-profiles`／`version-comparison`／`workspace-layout` 8.8–11.6s，之后每个带身份的请求都在约 10s 后 502（Bun 服务器 `idleTimeout` 默认 10s 断开），`/v1/me` 也不例外。与第八十四批不同，这次 `pg_stat_activity` 里 cs-api 的十条连接全部 `idle`、没有任何锁；容器 CPU 5 秒仅用 16ms、内存 152MB／1GiB；容器内直接访问 `/healthz` 200、无 cookie 的 `/v1/me` 401 均 4ms。也就是进程活着、服务端空闲，只有要用数据库的请求全部挂起——数据库客户端（Bun SQL 连接池）认为连接都在忙。07:31:22Z `rollout restart`（Recreate）后恢复。旧 Pod 日志随 Recreate 丢失，只留下之前抓到的 `Activity source timeout`（`read` 超过 2.5s，说明当时查询已排不上连接）。
+
+本机复现为阴性：`cs-dev-pg` 上 10 连接／40 并发，事务内 JS 抛错、SQL 错误、提前返回、try 锁轮询、`repeatable read` 只读、外层超时放弃、savepoint 内抛错、超过池子的并发抛错八种形态之后，20 条并发 `select 1` 都在 20ms 内返回，无残留。Bun 1.4／1.4.1／1.4.2（2026-08-20 至 09-05）的发布页摘要没有提到 SQL 修复。触发条件未定位，记入 [`implementation-open-questions.md` I16](../../../docs/engineering/implementation-open-questions.md#i16-bun-sql-连接池偶发挂死运行时与驱动的选择)。
+
+能落地的是让平台自愈：`createApp` 的 `/healthz` 现在接受 `readiness`，五个 cs-* 进程传入走同一连接池的 `databaseReady(db)`（`select 1`），3s 内没有回应即 503 并带原因；五份部署清单的 readiness／liveness 探针补 `timeoutSeconds: 5`（默认 1s 会在慢查询时误判）。同类卡死下 15s 内摘出路由、约 45s 由 liveness 重启，而不是像今天两次那样等人发现。回归：`packages/http/http.test.ts`（通过 200、拒绝 503、挂起按 50ms 超时 503）、`connection.test.ts` 在真实库上跑 `databaseReady`。`cs-control-plane:dev` 于 07:38Z 重建并重启五个服务，容器内 `/healthz` 返回 `{"ok":true,"service":"cs-api"}`，探针已带 5s 超时。
+
+### 门禁
+
+`bun run check` 于 2026-09-16T07:42:52Z 通过，**1342 pass／4 skip／0 fail**（1346 tests／232 files，131.52s），arch、lint、两处 typecheck 无告警。提交与精确 SHA CI 见 STATE.md 本批一节。

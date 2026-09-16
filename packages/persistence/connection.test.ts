@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { DEFAULT_TEST_DATABASE_URL, testDatabaseAvailable } from '@crewstation/testkit';
-import { SESSION_OPTIONS, connectDatabase, withSessionDefaults } from './connection';
+import { SESSION_OPTIONS, connectDatabase, databaseReady, withSessionDefaults } from './connection';
 
 const available = await testDatabaseAvailable();
 
@@ -28,6 +28,7 @@ describe.skipIf(!available)('connectDatabase 的会话默认值在真实 Postgre
     try {
       const rows = await handle.client`show idle_in_transaction_session_timeout` as Array<{ idle_in_transaction_session_timeout: string }>;
       expect(rows[0]?.idle_in_transaction_session_timeout).toBe('1min');
+      await databaseReady(handle.db);
     } finally { await handle.close(); }
   });
 });

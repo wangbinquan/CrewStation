@@ -1,4 +1,5 @@
 import { SQL } from 'bun';
+import { sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sql';
 
 export type Database = ReturnType<typeof drizzle>;
@@ -32,6 +33,11 @@ export function connectDatabase(url: string, options: { max?: number } = {}): Da
   const client = new SQL(withSessionDefaults(url), { max: options.max ?? 10 });
   const db = drizzle({ client });
   return { db, client, close: () => client.close() };
+}
+
+/** 就绪探针用：走同一连接池的最小查询；池被占满或连接失步时它会和业务请求一起卡住，正是探针要发现的。 */
+export async function databaseReady(db: Database): Promise<void> {
+  await db.execute(sql`select 1`);
 }
 
 /** 把数据库地址里的库名替换掉，供测试库与恢复流程使用。 */
