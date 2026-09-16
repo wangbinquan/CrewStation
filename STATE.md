@@ -21,7 +21,7 @@
 - 修复真实缺陷：开发页首次打开从 seq 0 起按 2000 条逐页重连回放 77,105 条历史，长时间停在“连接中”；新增 `replay=tail`，工作区首次只回放最近一页并注明起点，历史对话页仍从头回放；session 与 console 各加回归。
 - 本机平台整体部署到当前树（API／session／controller／console／任务镜像；`agent_runtime` 迁移已应用）；期间节点磁盘用满致 PostgreSQL 崩溃，只清理可再生的构建缓存、悬空镜像与旧 `cs-*` 标签后恢复；四个 QA CLI Pod 临时调至 150m 以让滚动更新调度，完成后恢复 400m，UID 与重启数不变。console 部署改为 Recreate 并写回清单。
 
-门禁：`bun run check` 2026-09-16T05:44:28Z **1329 pass／4 skip／0 fail**（1333 tests／228 files／7478 assertions），arch 六项通过；console build 505ms。未做：暗色主题实看、全程键盘、其余 23 项 UX-AT 的角色与失败旅程；RFC-004 实机验收另见其 plan.md。本批提交与 CI 见本节末尾。
+门禁：`bun run check` 2026-09-16T05:44:28Z **1329 pass／4 skip／0 fail**（1333 tests／228 files／7478 assertions），arch 六项通过；console build 505ms。未做：暗色主题实看、全程键盘、其余 23 项 UX-AT 的角色与失败旅程；RFC-004 实机验收另见其 plan.md。本批提交 **b85930dfb922d3e8e07dbdaf55c226d930ef7bac**（59 files，+661／−215），[CI 35061013350](https://github.com/wangbinquan/CrewStation/actions/runs/35061013350) 于 2026-09-16T05:54:40Z 成功（job `check`）。下一步：暗色主题与全程键盘实看（UX-AT-26），再按角色（测试者、管理员、开发者）与失败旅程逐项补其余 23 项 UX-AT 的实机证据。
 
 ## 最新接力：RFC-004 代码落地（2026-09-16）
 

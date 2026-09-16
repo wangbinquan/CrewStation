@@ -2029,4 +2029,4 @@ delivery QA 项目 prj_01a09f2abfbc7000be464c171bcb8f3c／服务 svc_01a09f2abfb
 
 `bun run check` 于 2026-09-16T05:44:28Z 通过：**1329 pass／4 skip／0 fail**（1333 tests／228 files／7478 assertions，122.22s），`tools/arch` 六项规则通过；console `bun run build` 505ms。新增回归：`overviewNextStep.test.tsx`（横幅推导、版本卡、测试者不显示）、`browserReplay.test.ts` tail 用例、`taskStreamReplay.test.ts` tail 用例；`failedDevSession.test.tsx` 选择器随标题元素改为 h1。证据 `/private/tmp/crewstation-rfc003-batch83-ux-alignment.json`。
 
-结论：UX-AT-35 的 1280×720 首窗、四标题与行数条件已在真实四窗页面量得，**记为通过，累计 29／52**；UX-AT-26 的浅色系统主题与键盘页签行为保持，暗色实看与全程键盘仍待补。提交与精确 SHA CI 见 STATE.md。
+结论：UX-AT-35 的 1280×720 首窗、四标题与行数条件已在真实四窗页面量得，**记为通过，累计 29／52**；UX-AT-26 的浅色系统主题与键盘页签行为保持，暗色实看与全程键盘仍待补。本批提交 **b85930dfb922d3e8e07dbdaf55c226d930ef7bac**（59 files，+661／−215），[CI 35061013350](https://github.com/wangbinquan/CrewStation/actions/runs/35061013350) 于 2026-09-16T05:54:40Z 成功；文档收尾提交见 STATE.md 下一节开工记录。
