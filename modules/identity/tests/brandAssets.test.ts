@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
-import { brandMarkDataUrl } from '../adapters/provider/brandMark';
+import { brandMarkDataUrl } from '../domain/brandMark';
 import { renderDemoLoginPage } from '../adapters/provider/demoLoginPage';
 
 test('登录前图标不需要二次鉴权，favicon 与登录字标逐字节使用 console 的同一原稿', () => {

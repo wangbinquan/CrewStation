@@ -126,6 +126,8 @@ export interface IdentityModuleApi {
   login(input: LoginInput, context?: LoginContext): Promise<LoginResult>;
   /** 登出后的跳转地址：登录页并保留校验过的 returnTo。 */
   logoutRedirect(returnTo: string | undefined, context?: LoginContext): string;
+  /** 用户域上被拒绝的浏览器导航要显示的页面：原因原话＋返回工作台。 */
+  forbiddenPage(message: string, context?: LoginContext): string;
   /** 会话令牌 → 用户；无效、过期或用户不存在返回 undefined。 */
   resolveSession(token: string): Promise<UserDto | undefined>;
   authorizeUserRequest(request: UserAuthRequest): Promise<UserAuthDecision>;

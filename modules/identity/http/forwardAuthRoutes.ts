@@ -24,7 +24,7 @@ export function forwardAuthRoutes(api: IdentityModuleApi): Hono<AppEnv> {
     if (sessionToken && (decision.kind === 'login-redirect' || decision.kind === 'unauthenticated')) {
       deleteCookie(c, api.sessionCookie.name, { domain: api.sessionCookie.domain, path: api.sessionCookie.path });
     }
-    return userResponse(c, decision, api.sessionCookie.name);
+    return userResponse(c, decision, api);
   });
   r.all('/forward-auth/service', async (c) => {
     const decision = await api.authorizeServiceRequest({
@@ -47,7 +47,8 @@ function requestId(c: Context<AppEnv>): string {
   return c.get('requestId') ?? Bun.randomUUIDv7();
 }
 
-function userResponse(c: Context<AppEnv>, decision: UserAuthDecision, sessionCookieName: string): Response {
+function userResponse(c: Context<AppEnv>, decision: UserAuthDecision, api: IdentityModuleApi): Response {
+  const sessionCookieName = api.sessionCookie.name;
   switch (decision.kind) {
     case 'allow': {
       c.header(IDENTITY_HEADERS.userId, decision.injected.userId);
@@ -64,6 +65,8 @@ function userResponse(c: Context<AppEnv>, decision: UserAuthDecision, sessionCoo
     case 'unauthenticated':
       return c.json({ error: 'unauthenticated', message: decision.message, details: {} }, 401);
     case 'forbidden':
+      // 浏览器导航给人看的页面（原因＋返回工作台）；程序调用仍是 JSON。
+      if ((c.req.header('accept') ?? '').includes('text/html')) return c.html(api.forbiddenPage(decision.message, { scheme: c.req.header('x-forwarded-proto') }), 403);
       return c.json({ error: 'forbidden', message: decision.message, details: {} }, 403);
   }
 }

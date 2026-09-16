@@ -2133,4 +2133,29 @@ UX-AT-38 记为通过，累计 **38／52**。旅程之外：申请理由字段�
 
 ### 门禁
 
-`bun run check` 于 2026-09-16T07:51:49Z 通过，**1342 pass／4 skip／0 fail**（1346 tests／232 files，135.77s）。提交与精确 SHA CI 见 STATE.md 本批一节。
+`bun run check` 于 2026-09-16T07:51:49Z 通过，**1342 pass／4 skip／0 fail**（1346 tests／232 files，135.77s）。本批提交 **a9cc419825a923ebc2e8944991a226ec0e89bbb5**，[CI 35070751617](https://github.com/wangbinquan/CrewStation/actions/runs/35070751617) 于 2026-09-16T07:55:06Z 成功。
+
+## 第八十八批：成员角色撤销的入口与链接规则、用户域 403 页面
+
+### 成员角色撤销（UX-AT-47 余项）
+
+owner 与 tester 两个真实上下文（副本在 `/private/tmp/crewstation-rfc003-batch84/`）：
+
+- 撤销前：tester 的项目列表有《RFC-003 新工作台验收》与“打开试用”；`preview.rfc003-verify-workbench.cs.localhost` 200，样例页显示当前用户 rfc003-tester；正式主机 200。
+- owner 在“项目设置 · 成员”对 rfc003-tester 点“移除”，行内确认“确认移除”后提示“已移除rfc003-tester的项目成员角色。”，成员表剩三行。
+- 撤销后：tester 项目列表“尚无项目”、市场“暂无可见应用”（项目为“项目成员”范围）；preview 主机 403，原因“没有项目 rfc003-verify-workbench 的 preview 访问权限：需要项目成员或 preview 测试者”；正式主机仍 200——既有正式链接的访问规则不因成员变化改变，与 design.md §2.7“不改变现有正式链接的访问规则”一致。
+- owner 用“完整邮箱或用户 ID”精确查找、“选择此成员”、角色选“preview 测试者”、“添加或改角色”加回；tester 刷新后列表与“打开试用”恢复，preview 主机 200。两侧 0 console error。
+
+结合第八十五批的两种可见范围撤销，UX-AT-47 记为通过，累计 **39／52**。
+
+### 用户域 403 从 JSON 变成给人看的页面
+
+撤销后 tester 在浏览器里打开 preview 主机看到的是网关原样返回的 `{"error":"forbidden","message":…}`。design.md §3“无权限”要求对象与原因并保留可用的返回路径，于是 ForwardAuth 对 `Accept: text/html` 的被拒绝导航改回一页 HTML：标题“无权访问这个地址”、服务端原话作为原因、说明“这不是页面不存在：你已登录，但当前账号没有访问它所需的项目角色…”、“返回工作台”指向 console 首页；配色与演示登录页同源并跟随系统明暗。程序调用（非 HTML accept）仍是原 JSON 与 403。实现：`application/forbiddenPage.ts` 渲染，`IdentityModuleApi.forbiddenPage(message, context)` 由 wiring 用 `consoleOrigin(session, scheme)` 组装，`http/forwardAuthRoutes.ts` 在 `forbidden` 分支按 accept 分流；品牌原稿 `brandMark.ts` 与 SVG 从 `adapters/provider/` 移到 `domain/`，因为 http 层只能经 application／api 取用而 application 不能碰 adapters。回归：`forwardAuth.test.ts`（HTML 与 JSON 两种 accept）、`forbiddenPage.test.ts`（转义、返回链接、双主题令牌）、`brandAssets.test.ts` 改路径后仍逐字节比对原稿。
+
+### 部署与实看
+
+`cs-control-plane:dev` 重建后只重启 cs-auth（ForwardAuth 在它里面，08:01:54Z）。以非成员 visitor 在浏览器打开 preview 主机：1280 浅色与 390 暗色都得到 403、`text/html`、标题“无权访问 · CrewStation”、原因原话与“返回工作台”链接，点返回到达 `console.cs.localhost`，暗色底 `rgb(17,21,28)`，两宽度无横向溢出。
+
+### 门禁
+
+`bun run check` 于 2026-09-16T08:04:20Z 通过，**1344 pass／4 skip／0 fail**（1348 tests／233 files，132.86s），arch、lint、两处 typecheck 无告警。提交与精确 SHA CI 见 STATE.md 本批一节。

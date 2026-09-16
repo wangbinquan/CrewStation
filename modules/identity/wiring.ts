@@ -13,6 +13,7 @@ import type { IdentityModuleApi } from './api/moduleApi';
 import { authStatusUseCase } from './application/authStatus';
 import { currentUserUseCase } from './application/currentUser';
 import { demoLoginUseCases } from './application/demoLogin';
+import { renderForbiddenPage } from './application/forbiddenPage';
 import type { IdentityUseCaseDeps } from './application/dependencies';
 import { devSessionTokenUseCases } from './application/devSessionTokens';
 import { ensureUserUseCase } from './application/ensureUser';
@@ -23,7 +24,7 @@ import { queryUsersUseCases } from './application/queryUsers';
 import { sessionTokenUseCases } from './application/sessionTokens';
 import { resolveHostByPattern } from './domain/hosts';
 import type { SessionSettings } from './domain/session';
-import { sessionCookie, withSessionDefaults } from './domain/session';
+import { consoleOrigin, sessionCookie, withSessionDefaults } from './domain/session';
 import { authRoutes } from './http/authRoutes';
 import { devSessionGate } from './http/devSessionGate';
 import { forwardAuthRoutes } from './http/forwardAuthRoutes';
@@ -114,6 +115,7 @@ export function createIdentityModule(deps: IdentityModuleDeps): IdentityModule {
     authStatus: authStatusUseCase(useCaseDeps),
     ...demoLoginUseCases(useCaseDeps),
     logoutRedirect: logoutUseCase(useCaseDeps),
+    forbiddenPage: (message, context = {}) => renderForbiddenPage({ message, consoleUrl: `${consoleOrigin(session, context.scheme)}/` }),
     resolveSession: sessionTokenUseCases(useCaseDeps).resolveSession,
     authorizeUserRequest: forwardAuthUserUseCase(useCaseDeps),
     authorizeServiceRequest: forwardAuthServiceUseCase(useCaseDeps),

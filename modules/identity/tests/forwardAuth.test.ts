@@ -103,6 +103,14 @@ describe.skipIf(!available)('forward-auth user domain', () => {
     expect((await forwardUser('evil.example.com', { cookie: `cs_session=${aliceCookie}` })).status).toBe(403);
   });
 
+  test('无权访问 preview：浏览器导航得到带原因与返回工作台的 HTML，程序调用仍是 JSON', async () => {
+    const html = await forwardUser('preview.demo.cs.localhost', { cookie: `cs_session=${aliceCookie}`, accept: 'text/html,application/xhtml+xml' });
+    expect(html.status).toBe(403); expect(html.headers.get('content-type') ?? '').toContain('text/html');
+    const body = await html.text();
+    expect(body).toContain('没有项目 demo 的 preview 访问权限'); expect(body).toContain('href="http://console.cs.localhost/"'); expect(body).toContain('返回工作台');
+    const json = await forwardUser('preview.demo.cs.localhost', { cookie: `cs_session=${aliceCookie}`, accept: 'application/json' });
+    expect(json.status).toBe(403); expect(await json.json()).toMatchObject({ error: 'forbidden' });
+  });
   test('preview 与 dev 主机要求成员或测试者：无权 403，有权 200 且 cs_slot 正确', async () => {
     expect((await forwardUser('preview.demo.cs.localhost', { cookie: `cs_session=${aliceCookie}` })).status).toBe(403);
     expect((await forwardUser('dev.demo.cs.localhost', { cookie: `cs_session=${aliceCookie}` })).status).toBe(403);

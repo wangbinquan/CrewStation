@@ -1,5 +1,5 @@
 import { LOGIN_PATH } from '../../domain/session';
-import { brandMarkDataUrl } from './brandMark';
+import { brandMarkDataUrl } from '../../domain/brandMark';
 
 export interface DemoLoginPageInput {
   /** 已由用例层校验过的跳转地址。 */
