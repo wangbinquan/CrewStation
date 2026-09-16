@@ -5,11 +5,21 @@
 
 ## 一句话
 
-基线三件套（v0.3.3）的第一轮实现已在本机 kind 集群上跑通并推上 main；**RFC-001（算力归平台）与 RFC-002（管理空间与租户空间分离）已实现、实跑确认并推上 main；RFC-004（管理员定义 Agent 启动前 Hook）的生产代码与测试已于 2026-09-16 提交 main，实机验收未做；RFC-003 工作台已按设计附件完成视觉对齐并整体部署到本机，实机通过 51／52（仅余 UX-AT-42 乱序补发）**。
+基线三件套（v0.3.3）的第一轮实现已在本机 kind 集群上跑通并推上 main；**RFC-001（算力归平台）与 RFC-002（管理空间与租户空间分离）已实现、实跑确认并推上 main；RFC-004（管理员定义 Agent 启动前 Hook）的生产代码与测试已于 2026-09-16 提交 main，实机验收未做；RFC-003 工作台已按设计附件完成并整体部署到本机，52／52 项 UX-AT 全部实机通过、本地 gate 与精确 SHA CI 通过,RFC-003 已 Done**。
 
 ## 进行中的 RFC
 
-**RFC-003 工作台 UX 重设计处于 In Progress，作者已要求完整实现并提交上库。RFC-004 于 2026-09-16 按作者会话目标“完整落地RFC-004并提交上库”提前启动并完成代码落地，状态 In Progress（实机验收待续）。** RFC-001 与 RFC-002 都已 Done，见 `proposal/rfc/README.md` 的索引表。
+**RFC-003 工作台 UX 重设计已 Done（2026-09-16）：52／52 项 UX-AT 全部实机通过,本地 gate 与精确 SHA CI 通过。RFC-004（管理员定义 Agent 启动前 Hook）于 2026-09-16 按作者会话目标提前完成代码落地，状态 In Progress（实机验收待续）——现可按其 plan.md 启动 Hook 实机。** RFC-001 与 RFC-002 都已 Done，见 `proposal/rfc/README.md` 的索引表。
+
+## 最新接力：UX-AT-42 乱序补发实机，52／52 收官（2026-09-16）
+
+本批开工时 main 为 **f58132b19d9e92c1f869c65b52874a17feb5cc9d**（第九十四批记录已上库，CI 成功）。最后一项 UX-AT-42“乱序补发”以**可回滚的真实故障注入**走通,无生产代码改动:
+
+- 把开发会话所有 `native_activity_*` 投影行与游标快照成可回滚 SQL;向一个**已连接、未结束的真实 CLI**（`agt_01a0a54b81ff…`,事件来自执行子任务）的事件日志插入一条源序号跳号（5 跳过 4,真实乱序）的原生动态事件。
+- 经真实 cs-session→dev-session 同步管线:注入前接口与 DB 均 `connected/ready/sourceSeq=3`;注入后均变为 `source=unavailable, sourceReason=channel-gap`（子游标 232→233）,控制台 `activityStatus` 据此渲染“轮次状态未确认”、不显示成功;套用快照+复位游标+删除注入事件后**逐字节还原**（残留注入事件 0、无控制台错误）。
+- 这与 E57“状态源不可用”同一可观察结果:未知不展示成功、工具完成不等同整轮完成。领域规则另有精确单测 `nativeActivityProjection.test.ts`。
+
+**至此 RFC-003 全部 52／52 项 UX-AT 实机通过,RFC-003 置为 Done。** 证据 `/private/tmp/crewstation-rfc003-batch95/`。门禁:`bun run check` 2026-09-16T15:12:30Z **1344 pass／4 skip／0 fail（1348 tests／233 files）**。本批提交 **<COMMIT_SHA>**,[CI <CI_RUN>](https://github.com/wangbinquan/CrewStation/actions/runs/<CI_RUN>) <CI_TIME> 成功。
 
 ## 最新接力：失败分支的完整浏览器实机（2026-09-16）
 

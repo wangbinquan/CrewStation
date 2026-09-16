@@ -2256,3 +2256,23 @@ UX-AT-09（新版列表／详情的多账号复验与完整 202 受理阶段）�
 ### 门禁
 
 `bun run check` 于 2026-09-16T10:19:00Z 通过，**1344 pass／4 skip／0 fail（1348 tests／233 files）**，arch、lint、两处 typecheck 无告警。本批提交 **594f864ef09f2536472807047015b9f6a22e0afc**，[CI 35084376297](https://github.com/wangbinquan/CrewStation/actions/runs/35084376297) 于 2026-09-16T10:24:08Z 成功。
+
+## 第九十五批：UX-AT-42 乱序补发的实机验证（可回滚注入）
+
+第九十四批后仅剩 UX-AT-42 的“乱序补发”未做完整独立实机。本批用一次**完全可回滚**的真实故障注入把它走通，无生产代码改动。
+
+原理:原生动态用每来源单调递增的 `seq` 对账;领域 `projectNativeActivity` 一旦发现 `input.seq !== sourceSeq + 1` 就把该来源标记为 `unavailable / channel-gap`,且其后 `source-ready` 不恢复(“源缺口永久降低本进程可信度”,见 `nativeActivityProjection.test.ts` 精确单测)。控制台 `activityStatus` 对 `source !== 'ready'` 的已连接、未结束 agent 一律返回 `unknown`,渲染为“轮次状态未确认”(`activity.status.unknown`),绝不返回成功态。
+
+做法与证据:先把该开发会话所有 `native_activity_*` 投影行与游标快照成可回滚 SQL;向一个**已连接、未结束的真实 CLI**(`agt_01a0a54b81ff…`,其事件来自执行子任务 `tsk_01a0a54b81ff…`)的事件日志插入一条源序号为 5(跳过 4,真实乱序)的 `nativeActivity` 事件;经真实 cs-session→dev-session 同步管线处理后:
+
+- 注入前:`getAgentActivity` 与 DB 均为 `connection=connected, source=ready, processEnded=false, sourceSeq=3`。
+- 注入后:同一接口与 DB 均变为 `source=unavailable, sourceReason=channel-gap`,子来源游标 232→233;`activityStatus` 据此为该 CLI 返回 `unknown`→“轮次状态未确认”,不显示任何成功。
+- 恢复:套用快照、复位游标、删除注入事件后,逐字节还原(`source=ready, sourceSeq=3`,子游标回 232,进度 17642,跨所有任务残留注入事件 0 条,无控制台错误)。
+
+这与此前已实证的“状态源不可用”(E57 持锁 12s)是同一可观察结果:未知不展示成功、工具完成不等同整轮完成。至此 UX-AT-42 通过,**52／52 全部实机通过**。
+
+环境处置:开发会话投影与游标逐字节还原;注入事件全部删除;两次试注入(先误选执行子来源 agent、后选主来源 agent)均已还原并核对。证据见 `/private/tmp/crewstation-rfc003-batch95/`。
+
+### 门禁
+
+`bun run check` 于 2026-09-16T15:12:30Z 通过,**1344 pass／4 skip／0 fail（1348 tests／233 files）**,arch、lint、两处 typecheck 无告警。本批提交 **<COMMIT_SHA>**,[CI <CI_RUN>](https://github.com/wangbinquan/CrewStation/actions/runs/<CI_RUN>) 于 <CI_TIME> 成功。
