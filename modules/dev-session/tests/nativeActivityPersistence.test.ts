@@ -119,3 +119,32 @@ describe.skipIf(!available)('原生动态投影和个人已读的真实数据库
     expect((await f.repo.read(f.taskId, f.other, { limit: 10 })).states[0]?.pending[0]?.unread).toBe(true);
   }, 15000);
 });
+
+describe.skipIf(!available)('原生动态的锁等待有界、读取不排队（2026-09-16 cs-api 连接池被一条空闲事务拖死的回归）', () => {
+  test('另一事务持有任务锁时：读取立即返回快照，写入在上限后以 precondition 失败并释放，锁释放后写入恢复', async () => {
+    const f = await fixture();
+    await f.repo.apply(f.taskId, 0, [f.event('source-ready')]);
+    const second = f.event('turn-started', 1);
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => { release = resolve; });
+    const holder = database.db.transaction(async (tx) => {
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext('dev_session.native_activity'), hashtext(${f.taskId}))`);
+      await held;
+    });
+    await Bun.sleep(200);
+    try {
+    const readStarted = Date.now();
+    const page = await f.repo.read(f.taskId, f.user, { limit: 50 });
+    expect(page.items).toHaveLength(1);
+    expect(Date.now() - readStarted).toBeLessThan(1000);
+    const applyStarted = Date.now();
+    await expect(f.repo.apply(f.taskId, 10, [second])).rejects.toMatchObject({ kind: 'precondition' });
+    const waited = Date.now() - applyStarted;
+    expect(waited).toBeGreaterThanOrEqual(1400);
+    expect(waited).toBeLessThan(4000);
+    await expect(f.repo.markRead(f.taskId, f.user, { agentId: f.agentId, turnId: 'turn-1', throughSeq: 10 })).rejects.toMatchObject({ kind: 'precondition' });
+    } finally { release(); await holder; }
+    expect(await f.repo.apply(f.taskId, 10, [second])).toBe(20);
+    expect((await f.repo.read(f.taskId, f.user, { limit: 50 })).items).toHaveLength(2);
+  });
+});

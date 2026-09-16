@@ -50,6 +50,8 @@ export function AdminNav(): ReactElement {
   const t = useT();
   const { projectId } = useParams({ strict: false }), path = useLocation().pathname;
   const me = useApiQuery(queryKeys.me(), () => api.me.get());
+  // 身份确定不是管理员时不再列出管理页：每一页都只会是同一个拒绝说明，左栏只留回工作台。
+  const nonAdmin = !me.isPending && !me.error && me.data !== undefined && me.data.isAdmin !== true;
   const inProject = path.startsWith('/admin/integrations/') && projectId && !me.error && me.data?.isAdmin === true;
   if (inProject) {
     return (
@@ -61,7 +63,7 @@ export function AdminNav(): ReactElement {
   }
   return (
     <NavFrame subtitleKey="app.adminSpace" hintKey="nav.adminHint">
-      <AdminGlobalLinks />
+      {nonAdmin ? <Link to="/" className={styles.back}>← {t('admin.denied.back')}</Link> : <AdminGlobalLinks />}
     </NavFrame>
   );
 }

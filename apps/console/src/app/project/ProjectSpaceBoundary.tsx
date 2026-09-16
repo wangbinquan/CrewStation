@@ -26,12 +26,17 @@ export function ProjectSpaceBoundary({ children }: { readonly children: ReactNod
   useEffect(() => { if (redirectTo) void navigate({ to: redirectTo, params: { projectId }, search, replace: true }); }, [redirectTo, projectId, search, navigate]);
   const pending = !!redirectTo || project.isPending || (integration && me.isPending);
   const failed = (((!project.data || [401, 403, 404].includes(project.error?.status ?? 0)) && project.error) || (integration && me.error));
+  // 404 与 403 同样表示“不存在或不是成员”（服务端不区分），给明确的对象说明与返回路径，而不是可重试的读取失败。
+  const missing = !!failed && !me.error && [403, 404].includes(project.error?.status ?? 0);
   const visible = !pending && !denied && !failed && !project.previewOnly;
   const [visited, setVisited] = useState(false);
   if (visible && !visited) setVisited(true);
   let notice: ReactNode;
   if (pending) notice = <QueryStatus isPending error={null} />;
   else if (denied) notice = <EmptyState title={t('admin.denied.title')} description={t('admin.denied.description')} action={<Link to="/">{t('admin.denied.back')}</Link>} />;
+  else if (missing) notice = <EmptyState title={t('projectContext.missingTitle')} description={t('projectContext.missingDescription', { projectId })} action={<>
+    {space === 'admin' ? <Link to="/admin/capabilities" search={{ tab: 'integrations' }}>{t('nav.admin.backToIntegrations')}</Link> : <Link to="/projects">{t('projectContext.backToProjects')}</Link>}
+    <Button variant="ghost" onClick={() => void project.refetch()}>{t('projectContext.retry')}</Button></>} />;
   else if (failed) notice = <><QueryStatus isPending={false} error={project.error ?? me.error} /><Button onClick={() => { void project.refetch(); if (me.error) void me.refetch(); }}>{t('projectContext.retry')}</Button></>;
   else notice = <><QueryStatus isPending={false} error={project.error} />{project.previewOnly ? <TesterProjectPage /> : null}</>;
   // 只保留曾经打开的页面，避免身份刷新清掉草稿；首次以测试者进入不挂载内部页面。

@@ -69,6 +69,15 @@ describe('管理空间与租户空间分离（RFC-002）', () => {
     expect(app.path()).toBe('/');
   });
 
+  test('普通成员：管理左栏不列管理页，只留回工作台', async () => {
+    asMember();
+    app = await renderApp('/admin/compute');
+    expect(app.text()).toContain('仅平台管理员可见');
+    for (const href of ['href="/admin/users"', 'href="/admin/compute"', 'href="/admin/gateway"', 'href="/admin/requests"']) expect(app.html()).not.toContain(href);
+    expect(app.html()).toContain('href="/"');
+    expect(app.text()).toContain('平台管理');
+  });
+
   test('/v1/me 还在路上：既不显示管理内容也不显示拒绝页', async () => {
     handlers = [{ match: '/v1/me', hang: true }];
     app = await renderApp('/admin/users');

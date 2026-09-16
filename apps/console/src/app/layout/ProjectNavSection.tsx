@@ -25,14 +25,16 @@ export function ProjectNavSection({ projectId, space = 'workbench', backTo }: { 
   const t = useT();
   const identity = useProjectIdentity(projectId);
   const pages = identity.previewOnly ? [{ page: 'overview' as const, labelKey: 'nav.preview', exact: false }] : PROJECT_PAGES;
+  // 项目不存在或当前身份不是成员：五个入口都会落到同一个说明页，只保留返回与对象 ID。
+  const missing = !identity.data && [403, 404].includes(identity.error?.status ?? 0);
   return (
     <div className={styles.section}>
       {backTo}
       <div className={styles.sectionTitle}>
         <span className={styles.projectName} title={identity.data?.name}>{identity.data?.name ?? t('nav.currentProject')}</span>
-        {identity.data?.slug ? <code className={styles.projectId} title={identity.data.slug}>{identity.data.slug}{identity.data.kind ? ` · ${t(`projects.kind.${identity.data.kind}`)}` : ''}</code> : null}
+        {identity.data?.slug ? <code className={styles.projectId} title={identity.data.slug}>{identity.data.slug}{identity.data.kind ? ` · ${t(`projects.kind.${identity.data.kind}`)}` : ''}</code> : missing ? <code className={styles.projectId} title={projectId}>{projectId}</code> : null}
       </div>
-      <ul className={styles.list} aria-label={t('nav.projectPages')}>
+      {missing ? null : <ul className={styles.list} aria-label={t('nav.projectPages')}>
         {pages.map((item) => (
           <li key={item.page}>
             <Link
@@ -46,7 +48,7 @@ export function ProjectNavSection({ projectId, space = 'workbench', backTo }: { 
             </Link>
           </li>
         ))}
-      </ul>
+      </ul>}
     </div>
   );
 }

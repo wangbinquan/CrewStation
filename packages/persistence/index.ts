@@ -1,5 +1,5 @@
 export type { Database, DatabaseHandle, Executor, Transaction } from './connection';
-export { connectDatabase, withDatabaseName } from './connection';
+export { SESSION_OPTIONS, connectDatabase, withDatabaseName, withSessionDefaults } from './connection';
 export type { MigrationFile, MigrationSet } from './migrations';
 export { readMigrationDir, runMigrations } from './migrations';
 export { platformInfraSchema } from './infraSchema';

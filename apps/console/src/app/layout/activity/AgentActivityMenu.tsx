@@ -36,10 +36,11 @@ export function AgentActivityMenu(): ReactElement {
   useEffect(() => { if (store && projectId && session.data?.taskId && !session.error) store.register(session.data.taskId, projectId, project.data?.name ?? projectId, space); }, [store, projectId, project.data?.name, space, session.data, session.error]);
   useEffect(() => { if (!snapshot.notice || !store) return; const id = snapshot.notice.id, timer = setTimeout(() => store.dismissNotice(id), 7000); return () => clearTimeout(timer); }, [snapshot.notice, store]);
   const counts = snapshot.tasks.reduce((total, task) => { const counts = activityCounts(task); return { pending: total.pending + counts.pending, completions: total.completions + counts.completions }; }, { pending: 0, completions: 0 });
-  return <div className={styles.root} ref={root}>
+  // Escape 在整个入口区域生效：焦点停在按钮上（打开后未进入面板）时也能关闭并留在按钮。
+  return <div className={styles.root} ref={root} onKeyDown={(event) => { if (open && event.key === 'Escape') { event.preventDefault(); close(); } }}>
     <Button aria-expanded={open} onClick={() => open ? close() : setOpen(true)}>{t('activity.title')}{counts.pending ? <b className={styles.warning}>{t('activity.pendingCount', { count: counts.pending })}</b> : null}{counts.completions ? <b className={styles.success}>{t('activity.completedCount', { count: counts.completions })}</b> : null}</Button>
     {snapshot.notice ? <div className={styles.toast} role="status" aria-live="polite"><span>{t('activity.new', { count: snapshot.notice.count })}</span><Button onClick={() => { setOpen(true); store?.dismissNotice(snapshot.notice!.id); }}>{t('activity.show')}</Button></div> : null}
-    {open ? <section className={styles.panel} aria-label={t('activity.title')} onKeyDown={(event) => { if (event.key === 'Escape') { event.preventDefault(); close(); } }}>
+    {open ? <section className={styles.panel} aria-label={t('activity.title')}>
       <header><strong>{t('activity.title')}</strong><Button onClick={() => close()}>{t('activity.close')}</Button></header>
       <p className={styles.hint}>{t('activity.readHint')}</p>
       {snapshot.limited ? <p role="status">{t('activity.limit')}</p> : null}

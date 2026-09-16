@@ -66,6 +66,23 @@ sql`kind = ANY(ARRAY[${sql.join(kinds.map((k) => sql`${k}`), sql`, `)}]::text[])
 必须先**在目标库里**跑 `REASSIGN OWNED` / `DROP OWNED` 再删——注意是「在目标库里」，
 连着别的库跑不算数（`modules/data` 的 `dropRole` 就是为此带上 `databaseName` 的）。
 
+### 咨询锁排队会把整个连接池拖死：写锁只 try 不等，读取不取锁，服务端限制事务内空闲
+
+2026-09-16 实撞：cs-api 一条事务取得 `pg_advisory_xact_lock('dev_session.native_activity', task)` 后停在 idle in transaction 八分钟
+（最后一条语句竟是 `identity.users` 的读取——说明这条连接带着未结束的事务回到了池子里，原因未复现）；其余九条连接全部排在这把锁后面，
+池子 `max: 10` 耗尽，`/v1/me` 也 502，工作台每页都停在“载入中”。Pod 仍 Running、健康检查仍 200，只有 `pg_stat_activity`
+（`state`、`wait_event`、`pg_blocking_pids`）能看出来。
+
+三层处理，缺一不可：写事务用 `pg_try_advisory_xact_lock` 每 100ms 轮询、最多 1.5s，拿不到就正常提交并在事务外抛 `precondition`
+（第一版用 `set local lock_timeout` 让锁语句报错，集群里随即出现无关查询撞上 “current transaction is aborted”——事务里不要制造
+服务端错误）；读取改用 `repeatable read` 只读事务，不再取锁；`connectDatabase` 给连接串补
+`options=-c idle_in_transaction_session_timeout=60000`（Bun SQL 会把 libpq 的 `options` 交给服务端，`show` 返回 `1min`），
+持锁空闲的事务 60s 内被服务端终止。回归见 `modules/dev-session/tests/nativeActivityPersistence.test.ts` 与
+`packages/persistence/connection.test.ts`；本机 10 连接／60 并发混合失败事务的压测，四种模式结束后池子全部 idle、无残留咨询锁。
+
+**任何 `pg_advisory_xact_lock` 都要问：等待有没有上限、读路径是不是也在排队。** 顺带：Bun SQL 里 `= any(${array}::int[])`
+传数组参数会报 `insufficient data left in message`（08P01），和上面“malformed array literal”是同一个坑。
+
 ## Kubernetes 与本机集群
 
 ### 反复导入镜像会把 docker-desktop 的 118G 磁盘填满，先崩的是 PostgreSQL
@@ -79,7 +96,7 @@ sql`kind = ANY(ARRAY[${sql.join(kinds.map((k) => sql`${k}`), sql`, `)}]::text[])
 ### 节点 CPU 预约 10／10 时滚动更新排不进新 Pod
 
 控制面每个部署请求 100m，RollingUpdate 默认先起新再停旧，节点满额时新 Pod 一直 Pending，`rollout status` 超时。
-两种做法都用过：单副本静态服务改 `strategy: Recreate`（console 已写回清单）；或临时把闲置 CLI Pod 原地缩到 150m 再恢复——
+两种做法都用过：单副本服务改 `strategy: Recreate`（console 先改，2026-09-16 cs-api 卡死后 `rollout restart` 的新 Pod Pending 了六分钟，七个平台部署的清单全部写回 Recreate）；或临时把闲置 CLI Pod 原地缩到 150m 再恢复——
 `kubectl patch pod … --subresource resize`，requests 与 limits 要一起改，否则 Guaranteed QoS 变化会被拒绝；容器名等于 Pod 名。
 
 
@@ -212,6 +229,17 @@ zod 默认剥掉未知键：不加 `.strict()`，旧写法的 `driver` / `model`
 不在仓库里的家目录。
 
 ## 前端与测试
+
+### 多身份、明暗主题与全程键盘的实机核对：无头 Chrome＋CDP 浏览器上下文
+
+Chrome 扩展只有一份登录态、一个系统主题，测不了“同一时刻四个真实角色各看到什么”“暗色下每页长什么样”。
+2026-09-16 起用本机 `Google Chrome --headless=new --remote-debugging-port=9333 --user-data-dir=<scratch>` 配一段 ~150 行的
+CDP 脚本（会话草稿目录，不入库）：每个身份一个 `Target.createBrowserContext`（独立 cookie 罐），`Page.navigate` 到工作台被
+ForwardAuth 带到演示登录页后用 `form.requestSubmit()` 提交用户名；`Emulation.setEmulatedMedia` 切 `prefers-color-scheme`，
+`Emulation.setDeviceMetricsOverride` 定 1280×720／390；`Input.dispatchKeyEvent` 走 Tab／方向键／Escape 并读 `document.activeElement`
+的 `outline-style`；`Page.captureScreenshot` 留证。踩过的坑：`Target.createTarget` 的 `width/height` 只对上下文里第一个窗口有效，
+第二个页面再传会报 “Target position can only be set for new windows”；页面就绪要等 `main h1` 且正文里没有“载入中／读取中”，
+只等 `loadEventFired` 拿到的是骨架。
 
 ### Chrome 扩展量窄屏：窗口压不到 500px 以下，用同源 iframe 模拟视口
 

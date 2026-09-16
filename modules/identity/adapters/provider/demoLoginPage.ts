@@ -16,14 +16,27 @@ export function renderDemoLoginPage({ returnTo }: DemoLoginPageInput): string {
 <title>CrewStation 演示登录</title>
 <link rel="icon" type="image/svg+xml" href="${brandMarkDataUrl}">
 <style>
-  body { font-family: system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; background: #f5f6f8; color: #1f2328; margin: 0; padding: 24px; }
-  main { max-width: 420px; margin: 8vh auto; background: #fff; border: 1px solid #d8dee4; border-radius: 12px; padding: 28px; }
+  /* 配色与 apps/console 的 tokens.css 同源：浅色 bg #f5f7fa ／ text #182438 ／ line #dce3ed ／ action #235bd8，暗色 bg #11151c ／ surface #191f29 ／ text #e7edf6，随系统明暗切换。 */
+  :root { color-scheme: light dark; }
+  body { font-family: system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; background: #f5f7fa; color: #182438; margin: 0; padding: 24px; }
+  main { max-width: 420px; margin: 8vh auto; background: #fff; border: 1px solid #dce3ed; border-radius: 12px; padding: 28px; }
   h1 { display: flex; align-items: center; gap: 10px; font-size: 20px; margin: 0 0 12px; }
-  .notice { background: #fff4d6; border: 1px solid #f0c36d; border-radius: 8px; padding: 10px 12px; font-size: 14px; line-height: 1.5; }
+  .notice { background: #fff5df; border: 1px solid #f0c36d; color: #86520a; border-radius: 8px; padding: 10px 12px; font-size: 14px; line-height: 1.5; }
   label { display: block; margin: 14px 0 4px; font-size: 14px; }
-  input { width: 100%; box-sizing: border-box; padding: 8px 10px; border: 1px solid #b8c0c8; border-radius: 6px; font-size: 15px; }
-  button { margin-top: 18px; width: 100%; padding: 10px; border: 0; border-radius: 6px; background: #1f6feb; color: #fff; font-size: 15px; cursor: pointer; }
-  .hint { color: #59636e; font-size: 12px; line-height: 1.6; word-break: break-all; }
+  input { width: 100%; box-sizing: border-box; padding: 8px 10px; border: 1px solid #dce3ed; border-radius: 6px; font-size: 15px; background: #fff; color: inherit; }
+  button { margin-top: 18px; width: 100%; padding: 10px; border: 0; border-radius: 6px; background: #235bd8; color: #fff; font-size: 15px; cursor: pointer; }
+  button:hover { background: #1c4db8; }
+  :focus-visible { outline: 2px solid #8db3ff; outline-offset: 2px; }
+  .hint { color: #59677c; font-size: 12px; line-height: 1.6; word-break: break-all; }
+  @media (prefers-color-scheme: dark) {
+    body { background: #11151c; color: #e7edf6; }
+    main { background: #191f29; border-color: #344154; }
+    .notice { background: #392f1c; border-color: #6b5628; color: #f4c976; }
+    input { background: #222b39; border-color: #344154; }
+    button { background: #3970df; }
+    button:hover { background: #4d84ee; }
+    .hint { color: #adbacd; }
+  }
 </style>
 </head>
 <body>

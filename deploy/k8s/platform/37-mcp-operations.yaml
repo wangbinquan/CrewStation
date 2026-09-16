@@ -7,6 +7,8 @@ metadata:
 spec:
   # 无状态：每个请求新建 MCP 会话，副本之间不需要粘性，可以随意扩缩。
   replicas: 1
+  # 本机单节点的 CPU 请求已被占满，滚动更新的新 Pod 会一直 Pending（2026-09-16 cs-api 卡死时重启等了 6 分钟）；单副本直接重建。
+  strategy: { type: Recreate }
   selector:
     matchLabels: { app.kubernetes.io/name: mcp-operations }
   template:

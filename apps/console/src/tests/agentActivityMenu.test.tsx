@@ -93,3 +93,16 @@ test('翻页在途关闭菜单，迟到的历史响应不改变再次打开的�
   expect(Array.from(rendered!.host.querySelectorAll('button')).find((button) => button.textContent === '更早未读')?.disabled).toBe(false);
   expect(rendered!.text()).toContain('等待回答');
 });
+
+test('键盘：焦点还在入口按钮上时按 Escape 同样关闭面板，焦点留在按钮', async () => {
+  await fixture();
+  await rendered!.click('Agent 动态待处理 1');
+  expect(rendered!.host.querySelector('section[aria-label="Agent 动态"]')).not.toBeNull();
+  const button = rendered!.host.querySelector<HTMLButtonElement>('button[aria-expanded="true"]')!;
+  button.focus();
+  await act(async () => { button.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })); });
+  await rendered!.settle();
+  expect(rendered!.host.querySelector('section[aria-label="Agent 动态"]')).toBeNull();
+  expect(button.getAttribute('aria-expanded')).toBe('false');
+  expect(document.activeElement).toBe(button);
+});

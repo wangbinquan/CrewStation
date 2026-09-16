@@ -2030,3 +2030,43 @@ delivery QA 项目 prj_01a09f2abfbc7000be464c171bcb8f3c／服务 svc_01a09f2abfb
 `bun run check` 于 2026-09-16T05:44:28Z 通过：**1329 pass／4 skip／0 fail**（1333 tests／228 files／7478 assertions，122.22s），`tools/arch` 六项规则通过；console `bun run build` 505ms。新增回归：`overviewNextStep.test.tsx`（横幅推导、版本卡、测试者不显示）、`browserReplay.test.ts` tail 用例、`taskStreamReplay.test.ts` tail 用例；`failedDevSession.test.tsx` 选择器随标题元素改为 h1。证据 `/private/tmp/crewstation-rfc003-batch83-ux-alignment.json`。
 
 结论：UX-AT-35 的 1280×720 首窗、四标题与行数条件已在真实四窗页面量得，**记为通过，累计 29／52**；UX-AT-26 的浅色系统主题与键盘页签行为保持，暗色实看与全程键盘仍待补。本批提交 **b85930dfb922d3e8e07dbdaf55c226d930ef7bac**（59 files，+661／−215），[CI 35061013350](https://github.com/wangbinquan/CrewStation/actions/runs/35061013350) 于 2026-09-16T05:54:40Z 成功；文档收尾提交见 STATE.md 下一节开工记录。
+
+## 第八十四批：五个真实身份逐页核对、暗色与全程键盘、连接池卡死修复
+
+第八十三批之后剩余 23 项 UX-AT 大多需要“同一时刻多个真实身份”“系统暗色主题”“全程键盘”这三种 Chrome 扩展给不了的条件（扩展只有一份登录态、一个系统主题）。本批用本机 Chrome 152 的 `--headless=new --remote-debugging-port` 配一段约 150 行的 CDP 脚本（会话草稿目录，不入库；副本连同全部 JSON 与 81 张截图放在 `/private/tmp/crewstation-rfc003-batch84/`）：每个身份一个 `Target.createBrowserContext`（独立 cookie 罐），`Page.navigate` 到工作台被 ForwardAuth 带到演示登录页后以 `form.requestSubmit()` 提交用户名；`Emulation.setEmulatedMedia` 切 `prefers-color-scheme`；`Input.dispatchKeyEvent` 走 Tab／方向键／Enter／Escape 并读取 `document.activeElement` 的 `outline-style`。数据库里已有的五个演示身份：`admin`（平台管理员，也是验收项目开发者）、`rfc003-owner`（负责人）、`rfc003-developer`、`rfc003-tester`（preview 测试者）、`rfc003-visitor`（非成员），对象是 `rfc003-verify-workbench`（四个真实 OpenCode CLI 的会话仍在运行）。
+
+### 逐页核对结果与修复
+
+五个身份各打开 `/projects`、`/market`、项目概览／开发／历史对话／发布／运行与诊断／设置、`/admin`、`/admin/projects` 共 10 页（浅色），admin 与 owner 再各跑一遍暗色；50＋20 次页面加载没有一条 console error。角色差异与设计一致：测试者在项目内只有“版本试用”一栏，列表里开发／正式／健康三列写“当前角色不可查看”；开发者发布页没有“检查上线／回退”按钮并解释由负责人操作，设置页成员表只读；负责人与管理员拥有全部动作；非成员市场与项目列表为空态并说明由负责人开放／管理员开通。两处不符合 design.md §3“无权限”一行，本批修复：
+
+- 非成员打开项目地址原来显示“读取失败：项目 … 不存在”＋“重新读取项目”，左栏仍列着五个入口（点进去都是同一个错误）。服务端对非成员与不存在同样返回 404（`authorization.ts` 不区分，避免泄露存在性），所以 `ProjectSpaceBoundary` 对 403／404 改为独立空态“找不到该项目”，说明两种可能原因与对象 ID，动作为“返回数字人项目”（管理空间为“返回接入容器”）与“重新读取项目”；`ProjectNavSection` 在此状态只保留返回链接与 ID，不再列页面入口。503 等其他错误保持原可重试形态。回归 `projectAccessBoundary.test.tsx`（2 项）。
+- 非管理员进入 `/admin/*` 原来看到完整的 10 项管理左栏＋拒绝说明。`AdminNav` 在身份确定不是管理员时只保留“← 回到工作台”；`/v1/me` 未返回时仍显示骨架（既有测试要求）。回归 `adminSpace.test.tsx` 新增 1 项。
+- 顶栏 Agent 动态：焦点停在入口按钮上按 Escape 不关闭面板（`onKeyDown` 挂在面板 `<section>` 上，按钮不在其中）。改挂到入口根元素并回焦按钮。回归 `agentActivityMenu.test.tsx` 新增 1 项。
+- 演示登录页不跟随系统主题（暗色下仍是浅色底，`color-scheme: normal`），且配色与工作台令牌不同源。`demoLoginPage.ts` 改为 `color-scheme: light dark`，浅色 `#f5f7fa／#182438／#dce3ed／#235bd8`、暗色 `#11151c／#191f29／#e7edf6` 与 `tokens.css` 同值，补 `:focus-visible` 轮廓。回归 `modules/identity/tests/demoLoginPage.test.ts`。
+- 确认面板（`ConfirmationPanel`，17 处调用）打开时不移动焦点：键盘用户按下“检查上线／回退”后焦点落到 body，取消后也落到 body。改为打开时焦点进入面板本身（读屏先读问题，Tab 才到按钮，不会误按确认），关闭时回到打开它的控件；打开按钮在异步预检期间被禁用而失焦的情形用最近一次 `focusin` 记录兜底。回归 `confirmationPanelFocus.test.tsx`（2 项）。
+
+### 暗色主题与键盘实看
+
+暗色：admin／owner 各 10 页截图；令牌切换正确（`--cs-color-bg #11151c`、正文 `#e7edf6`），左栏、页签、卡片、横幅、表格、Agent 动态与“演示身份”徽标在暗色下可辨；登录页修复后 1280 与 390 两宽度暗色 `bodyBg rgb(17,21,28)`、`scrollWidth` 等于视口。浅色下登录页底色与工作台一致为 `rgb(245,247,250)`。工作台 favicon 为 `/brand/crewstation-mark.svg`，登录页图标是同一原稿的 data URL（既有字节相等测试）。
+
+键盘（owner，1280×720，最终镜像 `cs-console:rfc003-b84-final`）：概览页从左栏起连按 26 次 Tab，每一站都有 `outline: solid 2px`（`--cs-color-focus`），顺序为左栏 → 顶栏 → 主区动作 → 版本卡 → 活动链接；设置页页签 ArrowRight／End／Home／ArrowLeft 环绕移动并即时选中，Enter／Space 同步 `?tab=` 参数；全程键盘旅程：项目列表 Tab 到项目链接 → Enter 进概览 → Tab 到“发布与上线” → Enter → Tab 到“检查上线／回退至 v0.1.1” → Enter 打开 `role="alertdialog"`（`aria-label` 为“正式版本 v0.1.0 → v0.1.1”，焦点在面板内）→ 3 次 Tab 到“取消切换” → Enter 关闭，焦点回到“检查上线／回退”按钮；Agent 动态 Enter 打开、Escape 关闭且焦点留在按钮。没有按过“确认上线”。状态徽标（就绪／部署就绪／已开通／演示身份）都带文字，不只靠颜色。
+
+### 实机故障：cs-api 被一条空闲持锁事务拖死
+
+核对进行到 06:19Z 时 owner 的概览页停在“载入中”，`/v1/me` 经网关 502（上游 12s 超时），`project-summaries` 24s 502；Pod 1／1 Running、`/healthz` 4ms 正常。`pg_stat_activity` 给出原因：cs-api（10.244.0.148）的 10 条连接里，pid 232 处于 `idle in transaction` 8 分 15 秒、持有 `pg_advisory_xact_lock(hashtext('dev_session.native_activity'), hashtext(task))`，最后一条语句却是 `identity.users` 的按 ID 读取（说明这条连接带着未结束的事务回到了池子里，被其他模块的查询复用）；其余 9 条全部 `wait_event: advisory`、`pg_blocking_pids` 链到 232，池子（`max: 10`）耗尽，所有请求排队。同一时刻日志里两次 `TypeError: release.createdAt.toISOString`（列表接口拿到 `createdAt` 为 null 的行；库里 33 条 release 的 `created_at` 均非空）也指向连接被错用。`rollout restart` 的新 Pod 因节点 CPU 请求占满 Pending 了 6 分 40 秒，删除旧 Pod 后 06:31Z 恢复，`/v1/me` 6ms。
+
+处理分三层并分别验证：
+
+1. `drizzleNativeActivity`：写事务（`apply`／`markRead`）改用 `pg_try_advisory_xact_lock` 每 100ms 轮询、最多 1.5s，拿不到就正常提交并在事务外以 `precondition` 失败，`synchronizeSource` 据此报 `unavailable`；读取（`read`）不再取锁，改为 `repeatable read` 只读事务。第一版曾用 `set local lock_timeout` 让锁语句报错，部署后压测立刻出现两次无关的 `environments` 读取撞上 “current transaction is aborted”（事务里的服务端错误再次暴露了连接复用问题），因此换成 try 锁。回归 `nativeActivityPersistence.test.ts` 新增“另一事务持锁时读取立即返回、写入 1.4–4s 内以 precondition 失败、锁释放后恢复”。
+2. `packages/persistence/connectDatabase` 给连接串补 `options=-c idle_in_transaction_session_timeout=60000`（Bun SQL 会把 libpq 的 `options` 交给服务端启动参数，真实库 `show` 返回 `1min`）：同类空闲持锁事务 60s 内由服务端终止并释放锁。回归 `connection.test.ts`（纯函数 2 项＋真实库 1 项）。
+3. 七个平台部署（cs-api／cs-auth／cs-controller／cs-session／cs-events／两个 MCP）的清单改 `strategy: Recreate`，与 console 一致；节点 CPU 请求占满时单副本才能被替换。
+
+验证：本机 `cs-dev-pg` 上 10 连接／60 并发的混合压测（持锁等待超时、事务内 JS 抛错、事务内 SQL 错误、纯读四种模式）结束后 10 条连接全部 idle、无残留咨询锁，说明 Bun 1.3.13 的 `begin` 在这些路径上回滚正常，集群里“连接带事务回池”的触发条件仍未复现，记入 dev-gotchas。集群上以 psql 持锁 12s 模拟状态源不可用：26 个并发请求（20 次 `agent-activity`、5 次 `/v1/me`、1 次 `project-summaries`）全部在 2.5s 内返回 200，动态页 `sync=unavailable`，锁释放后下一次读取 19ms 且 `sync=ready`；`/v1/me` 始终 24–56ms。紧接 try 锁版 Pod 启动 6 秒后的第一轮曾有 5 个请求 11.2s 后 502，之后重复三轮再未出现，暂记为冷启动影响、未完全解释。
+
+### 部署与门禁
+
+镜像：`cs-control-plane:dev` 于 06:38Z 与 06:49Z 两次重建导入，只重启了 cs-api 与 cs-auth（其余五个进程仍运行 05:27Z 的镜像，下次 `install-platform.sh` 统一更新）；console 依次 `rfc003-b84-access`、`-ux`、`-focus`、`-final`（06:55Z）、`-final2`（确认面板尊重调用方已放入面板的焦点，与提交内容一致）。cs-api 卡死期间与恢复后四个 QA CLI Pod 未受影响，UID 与重启数不变。
+
+门禁：`bun run check` 于 2026-09-16T07:04:16Z 通过，**1340 pass／4 skip／0 fail**（1344 tests／232 files，169.80s），`tools/arch` 六项通过，lint 与两处 typecheck 无告警。第一轮门禁曾有 1 项失败：确认面板的默认聚焦覆盖了编辑器放弃提示对“继续编辑”的显式聚焦，改为调用方已把焦点放进面板时不再抢焦后通过。新增或扩展的自动化：`projectAccessBoundary.test.tsx`（2）、`adminSpace.test.tsx`（＋1）、`agentActivityMenu.test.tsx`（＋1）、`confirmationPanelFocus.test.tsx`（2）、`modules/identity/tests/demoLoginPage.test.ts`（1）、`nativeActivityPersistence.test.ts`（＋1，真实库）、`packages/persistence/connection.test.ts`（3，其一真实库）。
+
+结论：UX-AT-22、26、44、51 记为通过，累计 **33／52**；UX-AT-42 的“状态源不可用”分支已实证，乱序补发仍待做。提交与精确 SHA CI 见 STATE.md 本批一节。

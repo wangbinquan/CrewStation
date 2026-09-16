@@ -12,7 +12,27 @@ const RETAINED_ITEMS = 2000;
 const MAX_PENDING = 256 * 128;
 const RESULTS = ['turn-completed', 'turn-failed', 'turn-cancelled', 'turn-unconfirmed'];
 const scope = (taskId: TaskId) => eq(progress.taskId, taskId);
-const lock = (db: Executor, taskId: TaskId) => db.execute(sql`select pg_advisory_xact_lock(hashtext('dev_session.native_activity'), hashtext(${taskId}))`);
+/**
+ * 写事务按任务串行，但等待有界：持锁事务异常（2026-09-16 实机：一条事务持锁后空闲 8 分钟）时，其余请求在上限后以 precondition 失败并释放连接，
+ * 而不是让整个连接池排在这把锁后面把 API 拖死。用 try 锁轮询而不是 lock_timeout：事务里不产生服务端错误，不留下 aborted 事务。
+ * 读取不取锁，只用可重复读快照。
+ */
+const LOCK_WAIT_MS = 1500, LOCK_POLL_MS = 100;
+const BUSY = Symbol('native-activity-busy');
+async function lock(db: Executor, taskId: TaskId): Promise<boolean> {
+  const deadline = Date.now() + LOCK_WAIT_MS;
+  for (;;) {
+    const rows = await db.execute(sql`select pg_try_advisory_xact_lock(hashtext('dev_session.native_activity'), hashtext(${taskId})) as locked`);
+    if ((rows as unknown as Array<{ locked: boolean }>)[0]?.locked === true) return true;
+    if (Date.now() >= deadline) return false;
+    await Bun.sleep(LOCK_POLL_MS);
+  }
+}
+/** 事务内拿不到锁时正常提交（什么都没写）并在事务外报错，避免依赖驱动对事务内异常的回滚路径。 */
+function busyOr<T>(value: T | typeof BUSY): T {
+  if (value === BUSY) throw precondition('该任务的动态正在由其他请求写入，请稍后重试');
+  return value;
+}
 const cursor = async (db: Executor, taskId: TaskId) => (await db.select().from(progress).where(scope(taskId)))[0]?.throughSeq ?? 0;
 const sourceKey = (taskId: TaskId, sourceTaskId: TaskId) => and(eq(sources.taskId, taskId), eq(sources.sourceTaskId, sourceTaskId));
 const sourceCursor = async (db: Executor, taskId: TaskId, sourceTaskId: TaskId) => (await db.select().from(sources).where(sourceKey(taskId, sourceTaskId)))[0]?.throughSeq ?? 0;
@@ -22,8 +42,8 @@ export function drizzleNativeActivity(db: Database): NativeActivityRepository {
     cursor: (taskId, sourceTaskId = taskId) => sourceCursor(db, taskId, sourceTaskId),
     completedSources: async (taskId) => (await db.select({ id: sources.sourceTaskId }).from(sources).where(and(eq(sources.taskId, taskId), eq(sources.complete, true)))).map((r) => r.id as TaskId),
     async completeSource(taskId, sourceTaskId) { await db.insert(sources).values({ taskId, sourceTaskId, complete: true }).onConflictDoUpdate({ target: [sources.taskId, sources.sourceTaskId], set: { complete: true } }); },
-    apply: (taskId, sinceSeq, events, sourceTaskId = taskId) => db.transaction(async (tx) => {
-      await lock(tx, taskId);
+    apply: async (taskId, sinceSeq, events, sourceTaskId = taskId) => busyOr(await db.transaction(async (tx) => {
+      if (!(await lock(tx, taskId))) return BUSY;
       const throughSeq = await sourceCursor(tx, taskId, sourceTaskId);
       if (sinceSeq > throughSeq) throw precondition('状态投影不能越过未读取的源区间');
       if (events.length > 500 || events.some((event, i) => !Number.isSafeInteger(event.seq) || event.seq <= sinceSeq || (i > 0 && event.seq <= events[i - 1]!.seq))) throw validation('状态来源批次必须有界且按序号递增');
@@ -37,9 +57,9 @@ export function drizzleNativeActivity(db: Database): NativeActivityRepository {
       await tx.insert(progress).values({ taskId, throughSeq: projectionSeq }).onConflictDoUpdate({ target: progress.taskId, set: { throughSeq: projectionSeq } });
       await trim(tx, taskId);
       return next;
-    }),
-    read: (taskId, userId, query) => db.transaction(async (tx) => { await lock(tx, taskId); return readPage(tx, taskId, userId, query); }),
-    markRead: (taskId, userId, input) => db.transaction(async (tx) => { await lock(tx, taskId); return markRead(tx, taskId, userId, input); }),
+    })),
+    read: (taskId, userId, query) => db.transaction(async (tx) => readPage(tx, taskId, userId, query), { isolationLevel: 'repeatable read', accessMode: 'read only' }),
+    markRead: async (taskId, userId, input) => busyOr(await db.transaction(async (tx) => (await lock(tx, taskId)) ? markRead(tx, taskId, userId, input) : BUSY)),
   };
 }
 

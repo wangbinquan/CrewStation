@@ -6,6 +6,8 @@ metadata:
   labels: { app.kubernetes.io/name: cs-events, app.kubernetes.io/part-of: crewstation, app.kubernetes.io/managed-by: crewstation, crewstation.io/project: platform, crewstation.io/service: cs-events, crewstation.io/workload: platform }
 spec:
   replicas: 1
+  # 本机单节点的 CPU 请求已被占满，滚动更新的新 Pod 会一直 Pending（2026-09-16 cs-api 卡死时重启等了 6 分钟）；单副本直接重建。
+  strategy: { type: Recreate }
   selector:
     matchLabels: { app.kubernetes.io/name: cs-events }
   template:

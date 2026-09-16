@@ -5,11 +5,22 @@
 
 ## 一句话
 
-基线三件套（v0.3.3）的第一轮实现已在本机 kind 集群上跑通并推上 main；**RFC-001（算力归平台）与 RFC-002（管理空间与租户空间分离）已实现、实跑确认并推上 main；RFC-004（管理员定义 Agent 启动前 Hook）的生产代码与测试已于 2026-09-16 提交 main，实机验收未做；RFC-003 工作台已按设计附件完成视觉对齐并整体部署到本机，实机通过 29／52**。
+基线三件套（v0.3.3）的第一轮实现已在本机 kind 集群上跑通并推上 main；**RFC-001（算力归平台）与 RFC-002（管理空间与租户空间分离）已实现、实跑确认并推上 main；RFC-004（管理员定义 Agent 启动前 Hook）的生产代码与测试已于 2026-09-16 提交 main，实机验收未做；RFC-003 工作台已按设计附件完成视觉对齐并整体部署到本机，实机通过 33／52**。
 
 ## 进行中的 RFC
 
 **RFC-003 工作台 UX 重设计处于 In Progress，作者已要求完整实现并提交上库。RFC-004 于 2026-09-16 按作者会话目标“完整落地RFC-004并提交上库”提前启动并完成代码落地，状态 In Progress（实机验收待续）。** RFC-001 与 RFC-002 都已 Done，见 `proposal/rfc/README.md` 的索引表。
+
+## 最新接力：五身份逐页核对、暗色与键盘、cs-api 连接池卡死修复（2026-09-16）
+
+本批开工时 main 为 **afc454bbc22d61bf5da40edc1990e532c6e937d6**（第八十三批及其记录已上库）。剩余 UX-AT 多数要求多身份并行、系统暗色与全程键盘，Chrome 扩展给不了，改用本机无头 Chrome＋CDP 浏览器上下文（脚本与 81 张截图副本在 `/private/tmp/crewstation-rfc003-batch84/`）：
+
+- admin／owner／developer／tester／visitor 五个真实身份各 10 页（admin／owner 另有暗色）0 console error，角色边界同设计；修复非成员打开项目地址的“读取失败＋五个空入口”（改为“找不到该项目”空态、只留返回与 ID）与非管理员在 `/admin/*` 看到完整管理左栏（只留回工作台）。
+- 键盘与主题：Agent 动态在按钮上按 Escape 不关闭、确认面板打开不移焦点／取消后失焦、演示登录页不跟随暗色且配色与令牌不同源，均已修复并有回归；概览 26 站 Tab 全部有轮廓，项目列表→概览→发布→检查上线→取消切换全程键盘可达且回焦。UX-AT-22／26／44／51 通过，累计 **33／52**。
+- 实机故障：cs-api 一条事务持有 `dev_session.native_activity` 咨询锁后 idle in transaction 8 分钟，其余 9 条连接排队，`/v1/me` 502、工作台整体“载入中”。三层处理：写事务 try 锁轮询 1.5s 后以 precondition 失败、读取改只读快照；`connectDatabase` 补 `idle_in_transaction_session_timeout=60s`；七个平台部署清单改 Recreate（新 Pod 曾因 CPU 占满 Pending 6 分钟）。本机四模式连接池压测无残留；集群持锁 12s 下 26 并发全部 2.5s 内返回。连接带事务回池的触发条件未复现，记入 dev-gotchas。
+- 镜像：`cs-control-plane:dev` 两次重建，只重启 cs-api／cs-auth；console 最终 `cs-console:rfc003-b84-final`。四个 QA CLI Pod 未受影响。
+
+未做：其余 19 项 UX-AT（09／11／12／14／15／16／27／30／31／37／38／42 乱序补发／43／45–50）的角色与失败旅程；`release.createdAt` 为 null 的两次 TypeError 与冷启动一轮 502 未完全解释。门禁：`bun run check` 2026-09-16T07:04:16Z **1340 pass／4 skip／0 fail**（1344 tests／232 files），arch 六项通过。本批提交与 CI 见本节末尾。
 
 ## 最新接力：RFC-003 视觉对齐、有界首次回放与整体部署（2026-09-16）
 
