@@ -2275,4 +2275,4 @@ UX-AT-09（新版列表／详情的多账号复验与完整 202 受理阶段）�
 
 ### 门禁
 
-`bun run check` 于 2026-09-16T15:12:30Z 通过,**1344 pass／4 skip／0 fail（1348 tests／233 files）**,arch、lint、两处 typecheck 无告警。本批提交 **<COMMIT_SHA>**,[CI <CI_RUN>](https://github.com/wangbinquan/CrewStation/actions/runs/<CI_RUN>) 于 <CI_TIME> 成功。
+`bun run check` 于 2026-09-16T15:12:30Z 通过,**1344 pass／4 skip／0 fail（1348 tests／233 files）**,arch、lint、两处 typecheck 无告警。本批提交 **b2f147885a022baf343a66e486e1d991bc5ee56e**,[CI 35113904469](https://github.com/wangbinquan/CrewStation/actions/runs/35113904469) 于 2026-09-16T15:16:51Z 成功。

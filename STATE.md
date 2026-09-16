@@ -19,7 +19,7 @@
 - 经真实 cs-session→dev-session 同步管线:注入前接口与 DB 均 `connected/ready/sourceSeq=3`;注入后均变为 `source=unavailable, sourceReason=channel-gap`（子游标 232→233）,控制台 `activityStatus` 据此渲染“轮次状态未确认”、不显示成功;套用快照+复位游标+删除注入事件后**逐字节还原**（残留注入事件 0、无控制台错误）。
 - 这与 E57“状态源不可用”同一可观察结果:未知不展示成功、工具完成不等同整轮完成。领域规则另有精确单测 `nativeActivityProjection.test.ts`。
 
-**至此 RFC-003 全部 52／52 项 UX-AT 实机通过,RFC-003 置为 Done。** 证据 `/private/tmp/crewstation-rfc003-batch95/`。门禁:`bun run check` 2026-09-16T15:12:30Z **1344 pass／4 skip／0 fail（1348 tests／233 files）**。本批提交 **<COMMIT_SHA>**,[CI <CI_RUN>](https://github.com/wangbinquan/CrewStation/actions/runs/<CI_RUN>) <CI_TIME> 成功。
+**至此 RFC-003 全部 52／52 项 UX-AT 实机通过,RFC-003 置为 Done。** 证据 `/private/tmp/crewstation-rfc003-batch95/`。门禁:`bun run check` 2026-09-16T15:12:30Z **1344 pass／4 skip／0 fail（1348 tests／233 files）**。本批提交 **b2f147885a022baf343a66e486e1d991bc5ee56e**,[CI 35113904469](https://github.com/wangbinquan/CrewStation/actions/runs/35113904469) 2026-09-16T15:16:51Z 成功。
 
 ## 最新接力：失败分支的完整浏览器实机（2026-09-16）
 
