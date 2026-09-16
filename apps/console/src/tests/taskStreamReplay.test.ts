@@ -67,3 +67,23 @@ test('历史补齐前已超时的命令不再发往 Runner', async () => {
   socket.receive({ type: 'streamReady', connected: true, replayed: 0, replayComplete: true });
   expect(socket.sent).toHaveLength(0);
 });
+
+test('首次打开可以只要最近一页：地址带 replay=tail，状态记住回放起点；续接地址不再带 tail', async () => {
+  globalThis.WebSocket = Socket as unknown as typeof WebSocket;
+  const stream = new TaskStreamSocket((seq) => `ws://test/stream?sinceSeq=${seq}${seq === 0 ? '&replay=tail' : ''}`);
+  active = stream; stream.start();
+  const socket = Socket.instances[0]!;
+  expect(socket.url).toBe('ws://test/stream?sinceSeq=0&replay=tail');
+  socket.onopen?.();
+  socket.receive(event(401)); socket.receive(event(402));
+  socket.receive({ type: 'streamReady', connected: true, replayed: 2, replayComplete: true, replayFromSeq: 400 });
+  expect(stream.getState()).toMatchObject({ status: 'open', lastSeq: 402, replayed: 2, replayFromSeq: 400 });
+  socket.close();
+  // 第一次重连退避 1000ms ± 20%。
+  await Bun.sleep(1300);
+  const next = Socket.instances[1]!;
+  expect(next.url).toBe('ws://test/stream?sinceSeq=402');
+  next.onopen?.(); next.receive({ type: 'streamReady', connected: true, replayed: 0, replayComplete: true });
+  // 续接帧没有 replayFromSeq：起点保持首次的值，说明更早历史仍未回放。
+  expect(stream.getState()).toMatchObject({ status: 'open', replayFromSeq: 400, replayed: 0 });
+});

@@ -15,19 +15,25 @@
 .context {
   display: flex;
   align-items: center;
-  gap: var(--cs-space-2);
+  gap: var(--cs-space-3);
   min-width: 0;
   flex: 1 1 300px;
-  font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .brand, .space { flex: 0 0 auto; }
 .brand { color: var(--cs-color-text); }
 .brand:hover { text-decoration: none; }
-.project { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.space { color: var(--cs-color-text-muted); font-weight: 500; }
+
+/* 全局入口做成两枚圆角小块：当前空间淡蓝底＋蓝字。 */
+.globalNav { display: flex; align-items: center; gap: var(--cs-space-1); flex: 0 0 auto; }
+.pill { padding: 4px var(--cs-space-2); border-radius: var(--cs-radius-sm); color: var(--cs-color-text-muted); font-weight: 500; }
+.pill:hover { text-decoration: none; color: var(--cs-color-text); background: var(--cs-color-surface-muted); }
+.pillActive, .pillActive:hover { color: var(--cs-color-primary); background: var(--cs-color-tint); }
+
+.project { min-width: 0; overflow: hidden; text-overflow: ellipsis; font-weight: 600; }
 
 .separator {
   color: var(--cs-color-text-muted);
@@ -36,13 +42,15 @@
 .right {
   display: flex;
   align-items: center;
-  gap: var(--cs-space-2);
+  gap: var(--cs-space-3);
   flex: 0 1 auto;
   flex-wrap: wrap;
   min-width: 0;
 }
 
-.spaceSwitch { white-space: nowrap; }
+/* 空间切换是一条链接式动作，不做成第二个主按钮。 */
+.spaceSwitch { white-space: nowrap; border: 0; background: transparent; padding: 4px 0; color: var(--cs-color-primary); font-weight: 500; cursor: pointer; }
+.spaceSwitch:hover { text-decoration: underline; }
 
 .locale {
   display: flex;
@@ -60,6 +68,7 @@
   border: 1px solid var(--cs-color-border);
   border-radius: var(--cs-radius-sm);
   background: var(--cs-color-surface);
+  font-size: var(--cs-font-size-sm);
 }
 
 .user {
@@ -76,8 +85,8 @@
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  background: var(--cs-color-surface-muted);
-  color: var(--cs-color-text-muted);
+  background: var(--cs-color-tint);
+  color: var(--cs-color-primary);
   font-weight: 600;
 }
 
@@ -100,6 +109,8 @@
   }
 
   .context { flex-basis: 100%; }
+  /* 窄屏时项目名已在左栏显示，顶栏不再挤一份被截断的面包屑。 */
+  .separator, .project { display: none; }
   .right { width: 100%; }
   .user { flex-wrap: wrap; }
   .avatar { display: none; }
@@ -107,14 +118,14 @@
 
 .demo {
   padding: 1px 6px;
-  border: 1px solid var(--cs-color-warning-border, #d4a72c);
+  border: 1px solid var(--cs-tone-warning-fg);
   border-radius: 999px;
-  color: var(--cs-color-warning-text, #9a6700);
+  color: var(--cs-tone-warning-fg);
   font-size: 11px;
 }
 
 .logout {
-  color: var(--cs-color-text-muted, #57606a);
+  color: var(--cs-color-text-muted);
   font-size: 12px;
   text-decoration: none;
 }

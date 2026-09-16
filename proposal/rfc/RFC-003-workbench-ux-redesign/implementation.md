@@ -1985,3 +1985,48 @@ delivery QA 项目 prj_01a09f2abfbc7000be464c171bcb8f3c／服务 svc_01a09f2abfb
 16:48:14Z 原五任务、四个 CLI UID／Running／restart 0 和七份文件摘要保持，节点 CPU requests 仍为 10 核。delivery 当前工作树仍为 ea10bd3／main、十项未跟踪缓存、未推送 0。生产目标刚变更时容器缺 cb58ea9 对象，比较如实不可用；16:49:02Z 经正常 refresh-history 接口补齐，返回 behind／ahead=0／behind=1，文件差异 12 项（含原十项缓存），本地 HEAD、原未提交路径和未推送数保持。没有把 fetch 目标对象等同于更新本地文件或 origin/main 引用。
 
 证据位于 /private/tmp/crewstation-rfc003-batch82- 的 delivery-source-before／delivery-commit／migration-journey／destructive-rollback-initial／destructive-rollback-final／runtime-final／comparison-refresh／final-preserved 等文件。CUA 再次 getState 超时并重置内核，手动解锁及恢复连接的询问仍待答复；未向 tab 16／17 原 CLI 草稿发送输入。**完整界面累计仍 28／52，RFC-003 保持 In Progress；RFC-004 按约定等待。** 本批只提交三份证据文档，复用不变生产候选的本地门禁，托管 CI 按最终提交另核对。
+
+## 第八十三批：按设计附件对齐工作台视觉与开发页密度
+
+作者以会话目标“接手 RFC-003 并完整实现，首要考虑 UX 体验，遵循目标设计风格和体验”接续。本批先在 Chrome 里并排打开已部署工作台（console 第七十八批镜像）与设计附件 prototype.html，逐页比对后发现实现与附件在外壳层面明显分叉：附件是浅色左栏、淡蓝当前项、顶栏承载“能力市场／数字人项目”两枚全局入口、项目内左栏只留返回链接＋项目名＋五个入口、页签为下划线式、卡片以版本标签为标题；实现则是深色左栏、按钮式页签、概览三张等宽小卡片。功能已齐，风格未齐。
+
+### 视觉系统与外壳
+
+- `app/theme/tokens.css` 整体改用附件的明暗两套取值（底 #f5f7fa／面 #fff／线 #dce3ed／字 #182438／主动作 #235bd8／淡蓝 #eaf1ff 及对应暗色），圆角 6／8，左栏 208px；新增 `--cs-color-tint`、浅色 `--cs-nav-*`、`--cs-color-danger`（原 FormField 引用了未定义的变量）。组件仍只引用令牌。
+- 左栏改为浅色面＋右侧细线：工作台全局页显示“工作台／发现应用，构建能力”与两项入口；进入项目后只剩“← 数字人项目”、项目名、`slug · 类型` 与五个入口，当前项淡蓝底蓝字。管理左栏按 RFC-003 §4 分组：总览／申请审批 → 供给与接入（项目管理、能力接入）→ 平台设置（用户、算力、两类套餐、出站、网关），接入项目内仍是返回接入容器＋五入口＋折叠的平台菜单。
+- 顶栏承载全局入口两枚圆角块（当前空间淡蓝底），管理空间不出现租户入口；`Agent 动态` 改为带圆点的描边按钮，空间切换改为链接式；≤800px 隐藏顶栏面包屑（项目名已在左栏）。
+- 共享 Tabs 改为下划线式页签（当前项蓝字＋2px 蓝线，角色与键盘行为不变）；Badge 圆角 6；PageHeader 标题 22px／700；按钮 padding／字重与附件一致。
+
+### 概览、发布、诊断
+
+- 概览：主动作进入标题右侧；新增“下一步”横幅 `ProjectNextStepBanner`，只从仍有效的发布与部署槽事实推导：最新发布进行中／失败优先，其次待验证版本与正式版本不同则“{tag} 已发布，等待验证”，正式为空则“{tag} 可试用，尚无正式版本”；无明确下一步不显示，测试者不显示。两张 `DeploymentCard` 以标签为 28px 标题，下一行提交／`{ready}／{total} 副本就绪`，底部地址与访问入口，只有实际就绪才给入口（保留原“打开正式应用／打开试用”文字与主机校验）。“当前开发”卡右上直达开发。`ProjectSummaryAttention` 只保留运行健康项，避免与横幅重复。
+- 发布与上线：`DeployedVersionCard` 同样以标签为标题（点击选中该发布），SHA 保持完整可核对，副本与地址各一行，访问入口做成描边按钮。
+- 运行与诊断：健康卡以“正式版本（prod）／待验证版本（preview）”命名槽，日志筛选同名；不再直接露出物理槽名。
+
+### 开发工作区
+
+- 顶部改为一行：`开发会话` 标题＋连接状态徽记＋回放条数，右侧“▸ 数据访问 · 摘要”“▸ 会话”与主按钮“准备发布”；版本对比条紧接其后。
+- 工具栏：`＋ CLI` 主按钮，算力选择带可见标签“算力档位”，横排／纵排／网格／均分／并排预览合成一组分段控件靠右，当前项淡蓝底；页签与工具栏内边距收紧。
+- 终端卡：标题一行，轮次状态做成小色块（执行中蓝、需处理黄、完成绿、其余灰），连接／输入控制行改为浅灰底；卡片圆角 8。
+
+### 首次打开只回放最近一页（真实缺陷）
+
+实机打开 rfc003-verify-workbench 的开发页时，顶部长时间停在“连接中 · 已回放 2000 条 · 正在补齐历史事件”，`＋ CLI` 被禁用；查库确认该任务在 `session.runner_events` 中有 **77,105** 条事件（最大 seq 88,482），浏览器从 seq 0 起按 2000 条一页逐页重连回放，需要约 40 次连接才补齐。原生 CLI 工作区并不需要这些历史：终端画面按快照恢复，名册与动态各有持久查询。
+
+修法：流地址新增 `replay=tail`，服务端 `openBrowserReplay` 在 `sinceSeq=0` 且 tail 时从 `maxSeq-limit` 起只回放最近一页，`streamReady` 带 `replayFromSeq`；续接（`sinceSeq>0`）仍按游标补齐，不留缺口。客户端 `useTaskStream(taskId, enabled, { replay: 'tail' })` 由开发工作区与独立 CLI 卡使用，历史对话页仍从头回放以重建转录；状态文案改为“已回放最近 N 条”并附说明。session 与 console 各加回归（`browserReplay.test.ts` 新增 tail 用例；`taskStreamReplay.test.ts` 新增地址参数与起点用例）。部署后同一页面约 6 秒内显示“已连接 · 已回放最近 2000 条”，四个终端“终端已连接”，`＋ CLI` 可用。
+
+### 本机部署、磁盘事故与恢复
+
+工作台先以 `cs-console:rfc003-b83-ux1` 单独更新；节点 CPU 预约 10／10 核导致滚动更新的新 Pod 无法调度，console 部署改为 `Recreate`（已写回 `deploy/k8s/platform/35-console.yaml`）。随后为让 API／session 同步到当前树（新工作台需要 RFC-004 契约里的档位 `available` 字段），临时把四个闲置 QA CLI Pod 原地从 400m 调到 150m（QoS 保持 Guaranteed），运行 `install-platform.sh`。
+
+第一次运行时任务镜像的 apt 步骤失败（网络瞬时错误，重跑通过）。第二次运行导入四个镜像后节点磁盘 118G 用满，PostgreSQL 于 05:31:20Z 因 `could not write lock file "postmaster.pid": No space left on device` 崩溃（restartCount 13→15），迁移 Job 三次 `Connection closed` 失败。清理只针对可再生内容：`docker builder prune` 8.7GB、悬空镜像 6.4GB、节点 containerd 里 45 个旧 `cs-*` 标签与 85 个悬空引用；未动任何卷、任务卷或其他项目的镜像。05:35:34Z PostgreSQL 就绪，磁盘 97G／15G 可用。`SKIP_BUILD=1` 重跑：迁移 Job `crewstation-migrate-nvz6d` Completed（`agent_runtime` schema 已存在），八个服务全部滚动到 `:dev`，套餐与档位种子幂等重放；四个 CLI Pod 于 05:38:08Z 恢复 400m，UID 与重启次数（0）不变。最终 console 为 `cs-console:rfc003-b83-ux2`。
+
+### 实机测量
+
+同源 iframe 模拟 1280×720 视口打开真实开发页（四个真实 OpenCode CLI）：首窗卡片顶部距页面顶端 **205px**（要求 ≤210），卡片标题 36px，四个标题与“终端已连接”行全部可见，上排每窗 PTY 12 行×14px，下排卡片底部 697px 仍在视口内，页面 scrollWidth=1280 无横向溢出。390／320 同源 iframe：scrollWidth 分别 386／316，等于视口，无整页横向溢出；320 下顶栏面包屑被裁切的问题已按上述改为隐藏。Chrome 扩展无法把 macOS 窗口压到 500px 以下，因此窄屏量测用同源 iframe；主题只检查了浅色系统外观，暗色令牌已按附件给值但未实看。
+
+### 门禁
+
+`bun run check` 于 2026-09-16T05:44:28Z 通过：**1329 pass／4 skip／0 fail**（1333 tests／228 files／7478 assertions，122.22s），`tools/arch` 六项规则通过；console `bun run build` 505ms。新增回归：`overviewNextStep.test.tsx`（横幅推导、版本卡、测试者不显示）、`browserReplay.test.ts` tail 用例、`taskStreamReplay.test.ts` tail 用例；`failedDevSession.test.tsx` 选择器随标题元素改为 h1。证据 `/private/tmp/crewstation-rfc003-batch83-ux-alignment.json`。
+
+结论：UX-AT-35 的 1280×720 首窗、四标题与行数条件已在真实四窗页面量得，**记为通过，累计 29／52**；UX-AT-26 的浅色系统主题与键盘页签行为保持，暗色实看与全程键盘仍待补。提交与精确 SHA CI 见 STATE.md。

@@ -1,4 +1,5 @@
 /* 设计令牌：颜色、字体、间距、圆角、布局尺寸。组件只引用变量，不写裸色值。 */
+/* 取值对齐 RFC-003 设计附件（prototype.html）的明暗两套配色：浅底、白面、细线、蓝色主动作、淡蓝选中。 */
 :root {
   color-scheme: light dark;
 
@@ -6,35 +7,43 @@
   --cs-font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --cs-font-size: 14px;
   --cs-font-size-sm: 12px;
+  --cs-font-size-lg: 15px;
+  --cs-font-size-title: 22px;
   --cs-line-height: 1.6;
 
-  --cs-color-bg: #f4f5f7;
+  --cs-color-bg: #f5f7fa;
   --cs-color-surface: #ffffff;
-  --cs-color-surface-muted: #f0f2f5;
-  --cs-color-border: #dfe3e8;
-  --cs-color-text: #1c2128;
-  --cs-color-text-muted: #5f6b7a;
-  --cs-color-primary: #2563eb;
-  --cs-color-primary-hover: #1d4ed8;
+  --cs-color-surface-muted: #edf1f7;
+  --cs-color-border: #dce3ed;
+  --cs-color-text: #182438;
+  --cs-color-text-muted: #59677c;
+  --cs-color-primary: #235bd8;
+  --cs-color-primary-hover: #1c4db8;
   --cs-color-on-primary: #ffffff;
-  --cs-color-focus: #93c5fd;
+  /* 选中／当前对象的淡蓝底：左栏当前页、页签、主动作提示条。 */
+  --cs-color-tint: #eaf1ff;
+  --cs-color-focus: #8db3ff;
+  --cs-color-danger: #b02f39;
 
-  --cs-tone-neutral-fg: #4b5563;
-  --cs-tone-neutral-bg: #e5e7eb;
-  --cs-tone-info-fg: #1d4ed8;
-  --cs-tone-info-bg: #dbeafe;
-  --cs-tone-success-fg: #15803d;
-  --cs-tone-success-bg: #dcfce7;
-  --cs-tone-warning-fg: #b45309;
-  --cs-tone-warning-bg: #fef3c7;
-  --cs-tone-danger-fg: #b91c1c;
-  --cs-tone-danger-bg: #fee2e2;
+  --cs-tone-neutral-fg: #59677c;
+  --cs-tone-neutral-bg: #edf1f7;
+  --cs-tone-info-fg: #235bd8;
+  --cs-tone-info-bg: #eaf1ff;
+  --cs-tone-success-fg: #176746;
+  --cs-tone-success-bg: #eaf6ef;
+  --cs-tone-warning-fg: #86520a;
+  --cs-tone-warning-bg: #fff5df;
+  --cs-tone-danger-fg: #b02f39;
+  --cs-tone-danger-bg: #fff0f1;
 
-  --cs-nav-bg: #111827;
-  --cs-nav-text: #cbd5e1;
-  --cs-nav-text-muted: #6b7280;
-  --cs-nav-active-bg: #1f2937;
-  --cs-nav-active-text: #ffffff;
+  /* 左栏与内容同为浅色面，靠一条细线分隔；当前页用淡蓝底＋蓝字。 */
+  --cs-nav-bg: var(--cs-color-surface);
+  --cs-nav-border: var(--cs-color-border);
+  --cs-nav-text: var(--cs-color-text);
+  --cs-nav-text-muted: var(--cs-color-text-muted);
+  --cs-nav-hover-bg: var(--cs-color-surface-muted);
+  --cs-nav-active-bg: var(--cs-color-tint);
+  --cs-nav-active-text: var(--cs-color-primary);
 
   --cs-space-1: 4px;
   --cs-space-2: 8px;
@@ -43,40 +52,41 @@
   --cs-space-5: 24px;
   --cs-space-6: 32px;
 
-  --cs-radius-sm: 4px;
+  --cs-radius-sm: 6px;
   --cs-radius-md: 8px;
-  --cs-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
+  --cs-shadow-sm: 0 1px 2px rgba(24, 36, 56, 0.04);
 
-  --cs-nav-width: 224px;
+  --cs-nav-width: 208px;
   --cs-topbar-height: 52px;
   --cs-content-max-width: 1200px;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --cs-color-bg: #0f1419;
-    --cs-color-surface: #161b22;
-    --cs-color-surface-muted: #1f2630;
-    --cs-color-border: #2d3640;
-    --cs-color-text: #e6edf3;
-    --cs-color-text-muted: #9aa4b2;
-    --cs-color-primary: #3b82f6;
-    --cs-color-primary-hover: #60a5fa;
-    --cs-color-focus: #1d4ed8;
+    --cs-color-bg: #11151c;
+    --cs-color-surface: #191f29;
+    --cs-color-surface-muted: #222b39;
+    --cs-color-border: #344154;
+    --cs-color-text: #e7edf6;
+    --cs-color-text-muted: #adbacd;
+    --cs-color-primary: #3970df;
+    --cs-color-primary-hover: #4d84ee;
+    --cs-color-tint: #20365b;
+    --cs-color-focus: #8db3ff;
+    --cs-color-danger: #ffa4ad;
 
-    --cs-tone-neutral-fg: #d1d5db;
-    --cs-tone-neutral-bg: #374151;
-    --cs-tone-info-fg: #bfdbfe;
-    --cs-tone-info-bg: #1e3a8a;
-    --cs-tone-success-fg: #bbf7d0;
-    --cs-tone-success-bg: #14532d;
-    --cs-tone-warning-fg: #fde68a;
-    --cs-tone-warning-bg: #78350f;
-    --cs-tone-danger-fg: #fecaca;
-    --cs-tone-danger-bg: #7f1d1d;
+    --cs-tone-neutral-fg: #adbacd;
+    --cs-tone-neutral-bg: #222b39;
+    --cs-tone-info-fg: #8db3ff;
+    --cs-tone-info-bg: #20365b;
+    --cs-tone-success-fg: #87d9b1;
+    --cs-tone-success-bg: #18372b;
+    --cs-tone-warning-fg: #f4c976;
+    --cs-tone-warning-bg: #392f1c;
+    --cs-tone-danger-fg: #ffa4ad;
+    --cs-tone-danger-bg: #40242a;
 
-    --cs-nav-bg: #0b0f14;
-    --cs-nav-active-bg: #1f2937;
+    --cs-nav-active-text: #8db3ff;
     --cs-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
   }
 }

@@ -26,6 +26,7 @@ export const messages = {
   'release.versions.state.unknown': '状态未确认',
   'release.versions.checked': '部署记录读取于 {time}，每 5 秒刷新',
   'release.versions.refresh': '刷新部署版本',
+  'release.versions.select': '查看这个版本的发布记录',
   'release.versions.loading': '读取实际部署…',
   'release.versions.sharedData': '两个版本共用生产数据，试用也可能写入生产数据。就绪反映部署记录，实际访问和网关切换可能稍后生效。',
   'release.traffic.check': '检查上线／回退至 {tag}',

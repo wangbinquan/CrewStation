@@ -31,7 +31,7 @@ export function NativeTerminalCard(props: NativeTerminalCardProps): ReactElement
 function ExecutionTerminalCard(props: NativeTerminalCardProps): ReactElement {
   const terminal = props.terminal!, activity = useAgentActivity();
   const ended = terminal.lifecycle === 'ended' || terminal.lifecycle === 'failed';
-  const handle = useTaskStream(terminal.execution!.taskId, !ended && !['cleaning', 'finished'].includes(terminal.execution!.state));
+  const handle = useTaskStream(terminal.execution!.taskId, !ended && !['cleaning', 'finished'].includes(terminal.execution!.state), { replay: 'tail' });
   const { onTerminalChange } = props;
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | undefined;

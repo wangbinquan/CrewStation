@@ -1,20 +1,35 @@
 .workspace { min-width: 0; font-size: 14px; }
+/* 开发页的页签与工具栏比普通页面更紧：1280×720 下首窗距产品顶端要在 210px 以内（development-workspace.md §2）。 */
+.workspace [role="tab"] { padding: 5px 10px; }
+.workspace [role="tabpanel"] { padding-top: 4px; }
 .toolbar, .controlLine, .terminalHeader, .footer { display: flex; align-items: center; gap: 6px; min-width: 0; }
-.toolbar { flex-wrap: wrap; padding: 0 0 6px; }
+.toolbar { flex-wrap: wrap; padding: 0 0 4px; }
 .toolbar, .terminalHeader { position: relative; }
-.workspace button, .toolbar select { min-height: 28px; padding: 3px 7px; font-size: 12px; }
+.workspace button, .toolbar select { min-height: 28px; padding: 3px 8px; font-size: 12px; }
+/* 算力选择带可见标签；布局按钮合成一组分段控件靠右，当前项淡蓝底。 */
+.inlineField { display: inline-flex; align-items: center; gap: 6px; color: var(--cs-color-text-muted); font-size: 12px; }
+.segment { display: inline-flex; margin-left: auto; border: 1px solid var(--cs-color-border); border-radius: var(--cs-radius-md); overflow: hidden; }
+.segment > button { border: 0; border-radius: 0; border-left: 1px solid var(--cs-color-border); min-height: 26px; }
+.segment > button:first-child { border-left: 0; }
+.segment > button[aria-pressed="true"] { background: var(--cs-color-tint); color: var(--cs-color-primary); font-weight: 600; }
 .toolbar select, .menuBody select, .rename input { max-width: 180px; min-width: 0; background: var(--cs-color-surface); color: var(--cs-color-text); border: 1px solid var(--cs-color-border); border-radius: var(--cs-radius-sm); padding: 4px; }
 .separator { width: 1px; height: 18px; background: var(--cs-color-border); }
 .stage { height: calc(100dvh - 228px); min-height: 370px; min-width: 0; overflow: auto; }
-.terminalCard { display: flex; flex-direction: column; height: 100%; min-width: 0; min-height: 0; border: 1px solid var(--cs-color-border); border-radius: var(--cs-radius-sm); background: var(--cs-color-surface); }
+.terminalCard { display: flex; flex-direction: column; height: 100%; min-width: 0; min-height: 0; border: 1px solid var(--cs-color-border); border-radius: var(--cs-radius-md); background: var(--cs-color-surface); overflow: hidden; }
 .terminalCard:focus-within { border-color: var(--cs-color-primary); }
-.terminalHeader { flex-wrap: wrap; border-bottom: 1px solid var(--cs-color-border); padding: 2px 6px; font-size: 12px; flex-shrink: 0; }
+.terminalHeader { flex-wrap: wrap; border-bottom: 1px solid var(--cs-color-border); padding: 3px 8px; font-size: 12px; flex-shrink: 0; background: var(--cs-color-surface); }
+.terminalHeader > strong { font-weight: 600; }
+/* 轮次状态做成小色块：执行中蓝、需处理黄、完成绿、结束灰，不只靠文字。 */
 .lifecycle { color: var(--cs-color-text-muted); font-size: 12px; }
+.terminalHeader > .lifecycle[data-activity] { padding: 0 6px; border-radius: var(--cs-radius-sm); background: var(--cs-tone-neutral-bg); color: var(--cs-tone-neutral-fg); }
+.terminalHeader > .lifecycle[data-activity="running"] { background: var(--cs-tone-info-bg); color: var(--cs-tone-info-fg); }
+.terminalHeader > .lifecycle[data-activity="waiting"], .terminalHeader > .lifecycle[data-activity="failed"], .terminalHeader > .lifecycle[data-activity="runtime-failed"] { background: var(--cs-tone-warning-bg); color: var(--cs-tone-warning-fg); }
+.terminalHeader > .lifecycle[data-activity="completed"] { background: var(--cs-tone-success-bg); color: var(--cs-tone-success-fg); }
 .waiting, .lifecycle[data-activity="waiting"], .lifecycle[data-activity="failed"], .lifecycle[data-activity="runtime-failed"] { color: var(--cs-tone-warning-fg); }
 .completed, .lifecycle[data-activity="completed"] { color: var(--cs-tone-success-fg); }
 .lifecycle[data-activity="running"] { color: var(--cs-color-primary); }
 .compute { color: var(--cs-color-text-muted); margin-left: auto; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.controlLine { flex-shrink: 0; flex-wrap: wrap; padding: 0 6px; color: var(--cs-color-text-muted); font-size: 11px; }
+.controlLine { flex-shrink: 0; flex-wrap: wrap; padding: 0 8px; color: var(--cs-color-text-muted); font-size: 11px; background: var(--cs-color-surface-muted); }
 .controlLine button { padding: 0 4px; min-height: 22px; margin-left: auto; }
 .terminalSurface { flex: 1; min-height: 0; min-width: 0; overflow: auto; padding: 2px 4px; }
 .terminalSurface:focus-visible { outline: 2px solid var(--cs-color-primary); outline-offset: -2px; }

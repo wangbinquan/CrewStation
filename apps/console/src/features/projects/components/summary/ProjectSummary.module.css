@@ -5,6 +5,9 @@
 .filters input, .filters select { box-sizing: border-box; min-width: 0; min-height: 32px; padding: var(--cs-space-1) var(--cs-space-2); border: 1px solid var(--cs-color-border); border-radius: var(--cs-radius-sm); background: var(--cs-color-surface); color: var(--cs-color-text); }
 .filters input:focus-visible, .filters select:focus-visible { outline: 2px solid var(--cs-color-focus); outline-offset: 1px; }
 .toolbar { align-items: center; justify-content: space-between; margin-block: var(--cs-space-2); }
+/* 概览标题下的一行元数据：标识、类型、开通状态、角色与负责人紧挨着，不撑满整行。 */
+.meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--cs-space-2) var(--cs-space-3); margin: calc(-1 * var(--cs-space-2)) 0 var(--cs-space-4); color: var(--cs-color-text-muted); font-size: var(--cs-font-size-sm); }
+.meta code { font-size: var(--cs-font-size-sm); }
 .fact { display: flex; flex-direction: column; align-items: flex-start; gap: var(--cs-space-1); overflow-wrap: anywhere; }
 .fact code { font-size: var(--cs-font-size-sm); }
 .muted { color: var(--cs-color-text-muted); font-size: var(--cs-font-size-sm); }
@@ -22,3 +25,20 @@
 .activity { display: grid; gap: var(--cs-space-2); padding: 0; margin: 0; list-style: none; }
 .activity li { display: flex; justify-content: space-between; flex-wrap: wrap; gap: var(--cs-space-2); padding-block: var(--cs-space-1); border-bottom: 1px solid var(--cs-color-border); }
 @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+
+/* 概览：下一步横幅＋两张版本卡（标签作标题）＋当前开发；对齐设计附件的概览页。 */
+.banner { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--cs-space-2) var(--cs-space-4); padding: var(--cs-space-3) var(--cs-space-4); border-radius: var(--cs-radius-md); background: var(--cs-color-tint); }
+.banner[data-tone="warning"] { background: var(--cs-tone-warning-bg); }
+.banner strong { display: block; }
+.banner p { margin-top: 2px; }
+.banner a { font-weight: 600; white-space: nowrap; }
+.versionGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--cs-space-3); }
+.versionCard { display: flex; flex-direction: column; gap: var(--cs-space-2); min-width: 0; padding: var(--cs-space-4); border: 1px solid var(--cs-color-border); border-radius: var(--cs-radius-md); background: var(--cs-color-surface); }
+.versionHead { display: flex; align-items: center; justify-content: space-between; gap: var(--cs-space-2); }
+.versionTitle { font-size: var(--cs-font-size-lg); font-weight: 600; }
+.versionTag { font-size: 28px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.2; overflow-wrap: anywhere; }
+.versionEmpty { color: var(--cs-color-text-muted); }
+.versionFooter { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--cs-space-2); margin-top: var(--cs-space-2); padding-top: var(--cs-space-3); border-top: 1px solid var(--cs-color-border); overflow-wrap: anywhere; }
+.linkButton { display: inline-flex; align-items: center; padding: 5px var(--cs-space-3); border: 1px solid var(--cs-color-border); border-radius: var(--cs-radius-md); background: var(--cs-color-surface); color: var(--cs-color-text); font-weight: 500; white-space: nowrap; }
+.linkButton:hover { background: var(--cs-color-surface-muted); text-decoration: none; }
+@media (max-width: 900px) { .versionGrid { grid-template-columns: 1fr; } }

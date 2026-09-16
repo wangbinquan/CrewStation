@@ -1,5 +1,7 @@
 .root { position: relative; min-width: 0; }
-.root > button { font-size: 12px; min-height: 30px; padding: 4px 7px; gap: 6px; flex-wrap: wrap; }
+.root > button { font-size: 12px; min-height: 30px; padding: 4px 10px; gap: 6px; flex-wrap: wrap; }
+.root > button::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--cs-color-text-muted); }
+.root > button[aria-expanded="true"] { background: var(--cs-color-tint); border-color: var(--cs-color-primary); }
 .warning { color: var(--cs-tone-warning-fg); }
 .success { color: var(--cs-tone-success-fg); }
 .panel { position: absolute; right: 0; top: calc(100% + 8px); z-index: 30; width: 440px; max-width: calc(100vw - 20px); max-height: min(70dvh, 620px); overflow: auto; background: var(--cs-color-surface); border: 1px solid var(--cs-color-border); border-radius: 10px; box-shadow: 0 12px 36px #0003; padding: 10px; font-size: 12px; }

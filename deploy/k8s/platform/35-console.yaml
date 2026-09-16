@@ -6,6 +6,8 @@ metadata:
   labels: { app.kubernetes.io/name: console, app.kubernetes.io/part-of: crewstation }
 spec:
   replicas: 1
+  # 本机节点 CPU 预约常年接近满额，滚动更新时新 Pod 排不进去；工作台是静态资源服务，先停旧再起新即可。
+  strategy: { type: Recreate }
   selector:
     matchLabels: { app.kubernetes.io/name: console }
   template:

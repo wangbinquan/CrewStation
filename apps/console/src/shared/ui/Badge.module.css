@@ -1,7 +1,7 @@
 .badge {
   display: inline-block;
   padding: 1px var(--cs-space-2);
-  border-radius: 999px;
+  border-radius: var(--cs-radius-sm);
   font-size: 12px;
   font-weight: 500;
   line-height: 1.6;

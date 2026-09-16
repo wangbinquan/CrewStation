@@ -36,7 +36,7 @@ export type ApiClientOptions = TransportOptions;
 
 export interface TaskStreamResource {
   /** `/v1/tasks/:taskId/stream` 的 WebSocket 地址；baseUrl 为空时是同源相对路径。 */
-  taskStreamUrl(taskId: string, sinceSeq?: number): string;
+  taskStreamUrl(taskId: string, sinceSeq?: number, replay?: 'tail'): string;
 }
 
 /** 按资源分组的平台 API 客户端；每个方法对应一条用户面路由。 */
@@ -81,6 +81,6 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
     observability: observabilityResource(transport),
     capabilities: capabilitiesResource(transport),
     agentRuntime: agentRuntimeResource(transport),
-    stream: { taskStreamUrl: (taskId, sinceSeq = 0) => taskStreamUrl(transport.baseUrl, taskId, sinceSeq) },
+    stream: { taskStreamUrl: (taskId, sinceSeq = 0, replay) => taskStreamUrl(transport.baseUrl, taskId, sinceSeq, replay) },
   };
 }

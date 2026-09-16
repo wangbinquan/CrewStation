@@ -10,13 +10,10 @@ import styles from './ProjectSummary.module.css';
 export function ProjectSummaryAttention({ item, space }: { readonly item: ProjectSummaryDetail; readonly space: ProjectSpace }) {
   const t = useT(), params = { projectId: item.project.id };
   if (item.role === 'tester') return null;
-  const latest = item.releases.status === 'ready' && summaryIsFresh(item.releases) ? item.releases.value[0] : undefined;
-  const ongoing = latest && !['ready', 'superseded'].includes(latest.status);
   const healthUnknown = item.health.status !== 'ready' || !summaryIsFresh(item.health) || item.health.value.some((h) => h.state === 'unknown');
   const unhealthy = item.health.status === 'ready' && summaryIsFresh(item.health) && item.health.value.some((h) => !['healthy', 'unknown'].includes(h.state));
-  if (!ongoing && !healthUnknown && !unhealthy) return null;
+  if (!healthUnknown && !unhealthy) return null;
   return <Card compact title={t('projects.summary.attention')}><ul className={styles.activity}>
-    {ongoing ? <li><Link to={PROJECT_PATHS[space].release} params={params} search={{ release: latest.id }}>{latest.tag} · {t(`release.status.${latest.status}`)}</Link><span>{latest.message}</span></li> : null}
     {healthUnknown || unhealthy ? <li><Link to={PROJECT_PATHS[space].operations} params={params} search={{ tab: 'health' }}>{t(healthUnknown ? 'projects.summary.checkHealth' : 'projects.summary.fixHealth')}</Link></li> : null}
   </ul></Card>;
 }

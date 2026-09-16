@@ -21,6 +21,8 @@ export interface StreamState {
   readonly replayed: number;
   /** 每次 Runner 可用时自增，面板据此重查快照；不是进程启动次数。 */
   readonly generation: number;
+  /** 首次打开按 tail 回放时的起点；有值表示更早历史没有回放，只有最近一页。 */
+  readonly replayFromSeq?: number;
   readonly error?: string;
 }
 
@@ -161,7 +163,7 @@ export class TaskStreamSocket {
         return;
       case 'streamReady':
         if (frame.replayComplete === false) { this.continueReplay(frame.resumeFromSeq!, frame.replayed); return; }
-        this.patch({ runnerConnected: frame.connected, replayed: frame.replayed, generation: this.state.generation + (frame.connected ? 1 : 0) });
+        this.patch({ runnerConnected: frame.connected, replayed: frame.replayed, generation: this.state.generation + (frame.connected ? 1 : 0), ...(frame.replayFromSeq !== undefined ? { replayFromSeq: frame.replayFromSeq } : {}) });
         if (this.socket) this.drain(this.socket);
         return;
       case 'runnerReconnected':

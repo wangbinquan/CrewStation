@@ -6,8 +6,8 @@
 
 .slot {
   border: 1px solid var(--cs-color-border);
-  border-radius: var(--cs-radius-sm);
-  padding: var(--cs-space-3);
+  border-radius: var(--cs-radius-md);
+  padding: var(--cs-space-3) var(--cs-space-4);
 }
 
 .head {
@@ -19,7 +19,6 @@
 }
 
 .name {
-  font-family: var(--cs-font-mono);
   font-weight: 600;
 }
 

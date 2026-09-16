@@ -112,8 +112,8 @@ export const messages = {
   'logs.source.business-task': '业务任务',
   'logs.source.build': '构建',
   'logs.source.migration': '迁移',
-  'logs.slot.preview': 'preview',
-  'logs.slot.prod': 'prod',
+  'logs.slot.preview': '待验证版本（preview）',
+  'logs.slot.prod': '正式版本（prod）',
 
   'logs.follow.on': '跟随中',
   'logs.follow.off': '跟随',

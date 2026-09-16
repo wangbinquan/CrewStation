@@ -41,7 +41,7 @@ export function HealthCards({ projectId, onLogs }: { readonly projectId: string;
           {items.map((slot) => (
             <div key={slot.slot} className={styles.slot}>
               <div className={styles.head}>
-                <span className={styles.name}>{slot.slot}</span>
+                <span className={styles.name}>{t(`logs.slot.${slot.slot}`)}</span>
                 <Badge tone={TONE[slot.state]}>{t(`logs.healthState.${slot.state}`)}</Badge>
               </div>
               <dl className={styles.facts}>

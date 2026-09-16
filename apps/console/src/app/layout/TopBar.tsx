@@ -12,7 +12,10 @@ import { SpaceSwitch } from './SpaceSwitch';
 import { AgentActivityMenu } from './activity/AgentActivityMenu';
 import styles from './TopBar.module.css';
 
-/** 顶栏：当前空间与位置、空间切换（仅管理员）、界面语言、当前用户。 */
+/**
+ * 顶栏：品牌、工作台全局入口（能力市场／数字人项目）、当前项目名；右侧 Agent 动态、空间切换（仅管理员）、界面语言、当前用户。
+ * 全局入口放在顶栏，左栏进入项目后只留项目自己的五个入口（RFC-003 设计附件）。管理空间没有租户全局入口。
+ */
 export function TopBar(): ReactElement {
   const t = useT();
   const { projectId } = useParams({ strict: false });
@@ -24,7 +27,12 @@ export function TopBar(): ReactElement {
     <header className={styles.bar}>
       <div className={styles.context}>
         <Link to="/" className={styles.brand}><Brand name={t('app.brand')} /></Link>
-        <span className={styles.space}>{t(inAdmin ? 'app.adminSpace' : 'app.workbench')}</span>
+        {inAdmin ? <span className={styles.space}>{t('app.adminSpace')}</span> : (
+          <nav className={styles.globalNav} aria-label={t('nav.global')}>
+            <Link to="/market" className={[styles.pill, (path === '/' || path.startsWith('/market')) && styles.pillActive].filter(Boolean).join(' ')}>{t('nav.market')}</Link>
+            <Link to="/projects" className={[styles.pill, path.startsWith('/projects') && styles.pillActive].filter(Boolean).join(' ')}>{t('nav.projects')}</Link>
+          </nav>
+        )}
         {inProject && projectId !== undefined ? (
           <>
             <span className={styles.separator}>/</span>

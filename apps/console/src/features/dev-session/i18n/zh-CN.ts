@@ -63,6 +63,8 @@ export const messages = {
   'devSession.stream.closed': '已断开',
   'devSession.stream.attempt': '第 {count} 次重连',
   'devSession.stream.replayed': '已回放 {count} 条',
+  'devSession.stream.replayedTail': '已回放最近 {count} 条',
+  'devSession.stream.replayedTailHint': '首次打开只回放最近的事件；终端画面按快照恢复，CLI 名册与动态另有查询，更早历史未回放。',
 
   'devSession.runnerState.draining': 'TaskRunner 正在收尾（draining）：不再接受新工作，容器随后会停止。',
   'devSession.runnerState.shutting-down': 'TaskRunner 正在关闭：容器即将销毁，请确认改动已提交并推送。',
@@ -345,6 +347,7 @@ export const messages = {
   'devSession.native.layout.columns': '横排',
   'devSession.native.layout.rows': '纵排',
   'devSession.native.equal': '均分',
+  'devSession.native.layoutGroup': '窗口排布',
   'devSession.native.previewAlongside': '并排预览',
   'devSession.native.tabOptions': '页签设置',
   'devSession.native.rename': '重命名',

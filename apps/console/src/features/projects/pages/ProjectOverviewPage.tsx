@@ -13,7 +13,9 @@ import { ProjectStateBadge } from '../components/ProjectStateBadge';
 import { useProjectSummary } from '../model/useProjectSummaries';
 import { summaryIsFresh } from '../model/projectSummaryState';
 import { ProjectSummaryActions } from '../components/summary/ProjectSummaryActions';
-import { DeploymentFact, DevelopmentFact, HealthFact, SummaryChecked } from '../components/summary/SummaryFacts';
+import { DevelopmentFact, HealthFact, SummaryChecked } from '../components/summary/SummaryFacts';
+import { DeploymentCard } from '../components/summary/DeploymentCard';
+import { ProjectNextStepBanner } from '../components/summary/ProjectNextStepBanner';
 import { ProjectRecentActivity } from '../components/summary/ProjectRecentActivity';
 import { ProjectSummaryAttention } from '../components/summary/ProjectSummaryAttention';
 import styles from '../components/summary/ProjectSummary.module.css';
@@ -29,12 +31,13 @@ export function ProjectOverviewPage(): ReactElement {
     <>
       <PageHeader
         title={project?.name ?? t('projects.overview.title')}
-        actions={
+        actions={<>
+          {item ? <ProjectSummaryActions item={item} space={space} available={available} /> : null}
           <Button disabled={me.isFetching || query.isFetching} onClick={() => void refresh()}>{t('projects.summary.refreshOverview')}</Button>
-        }
+        </>}
       />
       {project !== undefined ? (
-        <div className={styles.toolbar}>
+        <div className={styles.meta}>
           <code>{project.slug}</code>
           <span>{t(`projects.kind.${project.kind}`)}</span>
           <ProjectStateBadge state={project.state} />
@@ -50,11 +53,14 @@ export function ProjectOverviewPage(): ReactElement {
       <QueryStatus isPending={!error && (me.isPending || query.isPending)} error={error} loadingKey="projects.overview.loading" errorKey="projects.overview.error" />
       {error && item ? <ActionNote tone="neutral">{t('projects.summary.lastRead')}</ActionNote> : null}
       {item ? <div className={styles.stack}>
-        <ProjectSummaryActions item={item} space={space} available={available} />
         {!summaryIsFresh(item) ? <ActionNote tone="neutral">{t('projects.summary.stale')}</ActionNote> : null}
-        <div className={styles.grid}><Card compact title={t('projects.summary.development')}><DevelopmentFact item={item} /><SummaryChecked checkedAt={item.development.checkedAt} /></Card>
-          <Card compact title={t('projects.summary.preview')}><DeploymentFact item={item} name="preview" canOpen={available && summaryIsFresh(item)} /><SummaryChecked checkedAt={item.slots.checkedAt} /></Card>
-          <Card compact title={t('projects.summary.prod')}><DeploymentFact item={item} name="prod" canOpen={available && summaryIsFresh(item)} /><SummaryChecked checkedAt={item.slots.checkedAt} /></Card></div>
+        {available ? <ProjectNextStepBanner item={item} space={space} /> : null}
+        <div className={styles.versionGrid}>
+          <DeploymentCard item={item} name="prod" canOpen={available && summaryIsFresh(item)} />
+          <DeploymentCard item={item} name="preview" canOpen={available && summaryIsFresh(item)} />
+        </div>
+        <Card compact title={t('projects.summary.development')} extra={available && item.role !== 'tester' && item.project.state === 'active' ? <Link to={PROJECT_PATHS[space].development} params={{ projectId }}>{t(item.development.status === 'ready' && item.development.value ? 'projects.summary.continue' : 'projects.summary.openDevelopment')}</Link> : undefined}>
+          <DevelopmentFact item={item} /><SummaryChecked checkedAt={item.development.checkedAt} /></Card>
         <Card compact title={t('projects.summary.health')} extra={<Link to={PROJECT_PATHS[space].operations} params={{ projectId }} search={{ tab: 'health' }}>{t('projects.summary.diagnostics')}</Link>}>
           <HealthFact item={item} /><SummaryChecked checkedAt={item.health.checkedAt} /><p className={styles.muted}>{t('projects.summary.dataHint')}</p></Card>
         {available ? <ProjectSummaryAttention item={item} space={space} /> : null}

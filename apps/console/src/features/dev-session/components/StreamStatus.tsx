@@ -18,7 +18,7 @@ export function StreamStatus({ state, sessionState }: { readonly state: StreamSt
     <span className={styles.status}>
       <Badge tone={tone}>{label}</Badge>
       {state.attempt > 0 ? <span className={styles.meta}>{t('devSession.stream.attempt', { count: state.attempt })}</span> : null}
-      {state.replayed > 0 ? <span className={styles.meta}>{t('devSession.stream.replayed', { count: state.replayed })}</span> : null}
+      {state.replayed > 0 ? <span className={styles.meta} title={state.replayFromSeq !== undefined ? t('devSession.stream.replayedTailHint') : undefined}>{t(state.replayFromSeq !== undefined ? 'devSession.stream.replayedTail' : 'devSession.stream.replayed', { count: state.replayed })}</span> : null}
       {state.error !== undefined ? <span className={styles.error}>{state.error}</span> : null}
     </span>
   );

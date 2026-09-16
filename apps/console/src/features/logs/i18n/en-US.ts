@@ -113,8 +113,8 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   'logs.source.business-task': 'Business task',
   'logs.source.build': 'Build',
   'logs.source.migration': 'Migration',
-  'logs.slot.preview': 'preview',
-  'logs.slot.prod': 'prod',
+  'logs.slot.preview': 'Preview (preview)',
+  'logs.slot.prod': 'Production (prod)',
 
   'logs.follow.on': 'Following',
   'logs.follow.off': 'Follow',

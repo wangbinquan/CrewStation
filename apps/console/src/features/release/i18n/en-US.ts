@@ -27,6 +27,7 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   'release.versions.state.unknown': 'State unconfirmed',
   'release.versions.checked': 'Deployment records read at {time}; refresh every 5s',
   'release.versions.refresh': 'Refresh deployments',
+  'release.versions.select': 'Show this version’s release record',
   'release.versions.loading': 'Reading actual deployments…',
   'release.versions.sharedData': 'Both versions share production data; testing may write to it. Ready describes deployment records. App access and gateway changes may take longer.',
   'release.traffic.check': 'Check go-live / rollback to {tag}',

@@ -65,6 +65,8 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   'devSession.stream.closed': 'Disconnected',
   'devSession.stream.attempt': 'retry {count}',
   'devSession.stream.replayed': '{count} events replayed',
+  'devSession.stream.replayedTail': 'Replayed the latest {count}',
+  'devSession.stream.replayedTailHint': 'Opening the workspace replays only recent events; terminal screens restore from snapshots and the CLI roster and activity have their own queries. Older history is not replayed.',
 
   'devSession.runnerState.draining': 'The TaskRunner is draining: it takes no new work and the container stops afterwards.',
   'devSession.runnerState.shutting-down': 'The TaskRunner is shutting down: the container is about to go away, so commit and push what you need.',
@@ -349,6 +351,7 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   "devSession.native.layout.columns": "Rows of windows",
   "devSession.native.layout.rows": "Stacked",
   "devSession.native.equal": "Equalize",
+  'devSession.native.layoutGroup': 'Window layout',
   "devSession.native.previewAlongside": "Preview alongside",
   "devSession.native.tabOptions": "Tab settings",
   "devSession.native.rename": "Rename",

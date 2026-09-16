@@ -6,8 +6,9 @@ import { buildUrl, segment } from './requestUrl';
  * baseUrl 为空时返回同源相对路径，由调用方按页面地址补全 ws(s) 协议；为 http(s) 绝对地址时改写为 ws(s)。
  * 断线重连时 sinceSeq 传最后看到的 seq：服务端回放 seq 严格大于它的事件。
  */
-export function taskStreamUrl(baseUrl: string, taskId: string, sinceSeq = 0): string {
-  return buildUrl(baseUrl, `/v1/tasks/${segment(taskId)}/stream`, { sinceSeq }).replace(/^http(s?):/i, 'ws$1:');
+/** `replay: 'tail'` 只对首次打开（sinceSeq=0）有意义：服务端只回放最近一页并在 streamReady 里给出 replayFromSeq。 */
+export function taskStreamUrl(baseUrl: string, taskId: string, sinceSeq = 0, replay?: 'tail'): string {
+  return buildUrl(baseUrl, `/v1/tasks/${segment(taskId)}/stream`, { sinceSeq, ...(replay ? { replay } : {}) }).replace(/^http(s?):/i, 'ws$1:');
 }
 
 /** 浏览器发出的命令帧：与 TaskRunner 命令同形，`id` 由客户端生成并用于匹配 result／error。 */
@@ -32,6 +33,8 @@ export interface TaskStreamReadyFrame {
   /** false 时本次只回放一页，客户端必须续接且不得发送命令；旧服务未提供时按完整处理。 */
   readonly replayComplete?: boolean;
   readonly resumeFromSeq?: number;
+  /** 首次打开按 tail 回放时的起点：只回放 seq 大于它的事件，更早历史未回放。 */
+  readonly replayFromSeq?: number;
 }
 
 export interface TaskStreamResultFrame {

@@ -47,7 +47,8 @@ export function DevSessionWorkbench({ projectId, session, access, canDevelop, se
   const t = useT();
   const { space } = useProjectScope();
   const taskId = session.taskId;
-  const { state: connection, channel } = useTaskStream(taskId);
+  // 原生 CLI 工作区只要最近一页历史：终端按快照恢复，名册／动态各有持久查询；几万条旧事件逐页回放只会让页面长时间“连接中”。
+  const { state: connection, channel } = useTaskStream(taskId, true, { replay: 'tail' });
   const state = session.state === 'failed' ? { ...connection, runnerConnected: false } : connection;
   const touch = useActivityTouch(taskId);
   const tree = useWorkspaceTree(channel, state.generation, state.runnerConnected);
@@ -66,11 +67,14 @@ export function DevSessionWorkbench({ projectId, session, access, canDevelop, se
         isNavigationBusy={(next) => !!location.fileChange(next) && editor.busy}
         allowNavigate={(current, next) => current.pathname === next.pathname && !('view' in next.search && next.search.view === 'conversation') && (!editor.dirty || !location.fileChange(next))}
         confirmationForNavigation={(next) => { const file = location.fileChange(next); return file ? { question: t('devSession.editor.openQuestion', { from: editor.file?.path ?? '', to: file }), confirmLabel: t('devSession.editor.discardOpen', { path: file }) } : undefined; }} onDiscard={location.approveFile} />
-      <header className={styles.context}><strong>{t('devSession.title')}</strong><StreamStatus state={state} sessionState={session.state} />
-        {session.state === 'running' && session.rebuild?.state === 'ready' ? <span title={session.rebuild.message}>{t('devSession.rebuild.ready')}</span> : null}
-        <details className={styles.disclosure}><summary>{t('devSession.data.title')}{accessSummary ? ` · ${accessSummary}` : ''}{dataDirty ? ` · ${t('devSession.editor.dirty')}` : ''}</summary><div><DataBindingPane data={data} onDirtyChange={setDataDirty} /></div></details>
-        <details className={styles.disclosure}><summary>{t('devSession.native.sessionMenu')}</summary><div><SessionCard session={session} stream={state} access={access} release={release} unsavedFile={editor.dirty ? editor.file?.path : undefined} editorBusy={editor.busy} dataAccessDirty={dataDirty} dataAccessBusy={data.busy} onOpenFile={location.openFile} /><Link to={PROJECT_PATHS[space].conversations} params={{ projectId }}>{t('devSession.native.history')}</Link></div></details>
-        <Link to={PROJECT_PATHS[space].release} params={{ projectId }} search={{ source: 'session' }}>{t('devSession.native.prepareRelease')}</Link>
+      <header className={styles.context}>
+        <div className={styles.titleRow}><h1 className={styles.title}>{t('devSession.title')}</h1><StreamStatus state={state} sessionState={session.state} />
+          {session.state === 'running' && session.rebuild?.state === 'ready' ? <span className={styles.note} title={session.rebuild.message}>{t('devSession.rebuild.ready')}</span> : null}</div>
+        <div className={styles.actions}>
+          <details className={styles.disclosure}><summary>{t('devSession.data.title')}{accessSummary ? ` · ${accessSummary}` : ''}{dataDirty ? ` · ${t('devSession.editor.dirty')}` : ''}</summary><div><DataBindingPane data={data} onDirtyChange={setDataDirty} /></div></details>
+          <details className={styles.disclosure}><summary>{t('devSession.native.sessionMenu')}</summary><div><SessionCard session={session} stream={state} access={access} release={release} unsavedFile={editor.dirty ? editor.file?.path : undefined} editorBusy={editor.busy} dataAccessDirty={dataDirty} dataAccessBusy={data.busy} onOpenFile={location.openFile} /><Link to={PROJECT_PATHS[space].conversations} params={{ projectId }}>{t('devSession.native.history')}</Link></div></details>
+          <Link className={styles.primary} to={PROJECT_PATHS[space].release} params={{ projectId }} search={{ source: 'session' }}>{t('devSession.native.prepareRelease')}</Link>
+        </div>
       </header>
       <VersionComparisonPanel projectId={projectId} taskId={taskId} channel={channel} canDevelop={canDevelop} compact />
       <NativeWorkspace taskId={taskId} userId={userId} channel={channel} stream={state} canDevelop={canDevelop && session.state !== 'failed'} onActivity={touch} activityTarget={activityTarget} editorDirty={editor.dirty} location={location}

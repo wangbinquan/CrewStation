@@ -68,6 +68,21 @@ sql`kind = ANY(ARRAY[${sql.join(kinds.map((k) => sql`${k}`), sql`, `)}]::text[])
 
 ## Kubernetes 与本机集群
 
+### 反复导入镜像会把 docker-desktop 的 118G 磁盘填满，先崩的是 PostgreSQL
+
+`install-platform.sh` 每次把四个镜像 `docker save | ctr import` 到节点，旧标签（`cs-console:rfc003-*` 等几十个）一直留在 containerd，
+加上宿主侧的构建缓存与悬空镜像，2026-09-16 一次导入后节点 `/` 100%，`postgres-0` 报 `could not write lock file "postmaster.pid": No space left on device`，
+迁移 Job 连续 `Connection closed`。判据：`docker exec desktop-control-plane df -h /`、`crictl images` 里成片的 `<none>` 与 `import-*`。
+清理只碰可再生内容：`docker builder prune -af`、`docker image prune -f`、`ctr -n k8s.io images rm` 未被任何 Pod 引用的旧 `cs-*` 标签、`crictl rmi` 悬空引用；
+不要 prune 卷（GitLab、测试库都在卷里），也不要删别的项目的镜像。部署前先看磁盘。
+
+### 节点 CPU 预约 10／10 时滚动更新排不进新 Pod
+
+控制面每个部署请求 100m，RollingUpdate 默认先起新再停旧，节点满额时新 Pod 一直 Pending，`rollout status` 超时。
+两种做法都用过：单副本静态服务改 `strategy: Recreate`（console 已写回清单）；或临时把闲置 CLI Pod 原地缩到 150m 再恢复——
+`kubectl patch pod … --subresource resize`，requests 与 limits 要一起改，否则 Guaranteed QoS 变化会被拒绝；容器名等于 Pod 名。
+
+
 ### `.dockerignore` 会静默吃掉构建需要的目录
 
 控制面镜像的 `.dockerignore` 排除了 `templates`，于是开通链停在「模板 minimal-sample 不存在」，
@@ -197,6 +212,13 @@ zod 默认剥掉未知键：不加 `.strict()`，旧写法的 `driver` / `model`
 不在仓库里的家目录。
 
 ## 前端与测试
+
+### Chrome 扩展量窄屏：窗口压不到 500px 以下，用同源 iframe 模拟视口
+
+Claude in Chrome 的 `resize_window` 到 390／320 会被 macOS Chrome 的最小窗口宽度吞掉（`innerWidth` 不变），全屏窗口更是完全不响应。
+在页面里注入同源 `<iframe src=location.pathname style="width:390px">` 即可得到真实的 390px 布局视口（cookie 同站、媒体查询按 iframe 宽度生效），
+用 `contentDocument.documentElement.scrollWidth` 比 `contentWindow.innerWidth` 判断整页横向溢出；1280×720 的高度量测同理。
+
 
 ### happy-dom 里 React 的 onChange 走 IE 时代的 input 事件 polyfill：先 focus，再 keyup
 

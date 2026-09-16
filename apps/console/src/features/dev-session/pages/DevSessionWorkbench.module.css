@@ -1,7 +1,17 @@
-.context { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; min-height: 28px; font-size: 12px; margin-bottom: 4px; }
-.context > strong { font-size: 14px; }
+/* 开发页顶部：一行标题＋连接状态，右侧数据访问／会话／准备发布；终端区域才是主体（RFC-003 §2.3）。 */
+.context { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px 12px; min-height: 30px; margin-bottom: 4px; }
+.titleRow { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; min-width: 0; font-size: 12px; }
+.title { font-size: 18px; font-weight: 700; letter-spacing: -0.01em; }
+.note { color: var(--cs-color-text-muted); }
+.actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-left: auto; font-size: 12px; }
 .disclosure { font-size: 12px; }
-.disclosure > summary { cursor: pointer; padding: 3px 6px; border: 1px solid var(--cs-color-border); border-radius: var(--cs-radius-sm); }
+.disclosure > summary { cursor: pointer; list-style: none; padding: 5px 10px; border: 1px solid var(--cs-color-border); border-radius: var(--cs-radius-md); background: var(--cs-color-surface); font-size: 13px; font-weight: 500; white-space: nowrap; }
+.disclosure > summary::-webkit-details-marker { display: none; }
+.disclosure > summary::before { content: '▸ '; color: var(--cs-color-text-muted); }
+.disclosure[open] > summary::before { content: '▾ '; }
+.disclosure > summary:hover { background: var(--cs-color-surface-muted); }
 .disclosure > summary:focus-visible { outline: 2px solid var(--cs-color-primary); }
 .disclosure[open] { flex-basis: 100%; }
 .disclosure > div { margin-top: 8px; }
+.primary { display: inline-flex; align-items: center; padding: 5px 12px; border-radius: var(--cs-radius-md); background: var(--cs-color-primary); color: var(--cs-color-on-primary); font-size: 13px; font-weight: 600; white-space: nowrap; }
+.primary:hover { background: var(--cs-color-primary-hover); text-decoration: none; }

@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router';
-import type { ReactElement } from 'react';
+import type { ReactElement, ReactNode } from 'react';
 import { useT } from '../../shared/lib/useT';
 import { useProjectIdentity } from '../../shared/project/useProjectIdentity';
 import { PROJECT_PATHS } from '../../shared/project/projectPaths';
@@ -21,15 +21,16 @@ const PROJECT_PAGES: readonly ProjectPageItem[] = [
   { page: 'settings', labelKey: 'nav.settings' },
 ];
 
-export function ProjectNavSection({ projectId, space = 'workbench' }: { readonly projectId: string; readonly space?: ProjectSpace }): ReactElement {
+export function ProjectNavSection({ projectId, space = 'workbench', backTo }: { readonly projectId: string; readonly space?: ProjectSpace; readonly backTo?: ReactNode }): ReactElement {
   const t = useT();
   const identity = useProjectIdentity(projectId);
   const pages = identity.previewOnly ? [{ page: 'overview' as const, labelKey: 'nav.preview', exact: false }] : PROJECT_PAGES;
   return (
     <div className={styles.section}>
+      {backTo}
       <div className={styles.sectionTitle}>
         <span className={styles.projectName} title={identity.data?.name}>{identity.data?.name ?? t('nav.currentProject')}</span>
-        {identity.data?.slug ? <code className={styles.projectId} title={identity.data.slug}>{identity.data.slug}</code> : null}
+        {identity.data?.slug ? <code className={styles.projectId} title={identity.data.slug}>{identity.data.slug}{identity.data.kind ? ` · ${t(`projects.kind.${identity.data.kind}`)}` : ''}</code> : null}
       </div>
       <ul className={styles.list} aria-label={t('nav.projectPages')}>
         {pages.map((item) => (

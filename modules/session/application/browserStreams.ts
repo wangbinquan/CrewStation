@@ -3,6 +3,7 @@ import { RunnerCommandSchema } from '@crewstation/contracts';
 import { forbidden, isPlatformError } from '@crewstation/kernel';
 import type { EventSink } from '../domain/runnerConnection';
 import { openBrowserReplay } from './browserReplay';
+import type { BrowserReplayOptions } from './browserReplay';
 import type { commandDispatch } from './commandDispatch';
 import type { SessionUseCaseDeps } from './dependencies';
 import type { RunnerHub } from './runnerHub';
@@ -17,9 +18,9 @@ export interface BrowserStream {
 /** 浏览器（工作台）到某任务的流：先回放持久事件到 sinceSeq 之后，再接实时广播；命令经同一派发口。 */
 export function browserStreams(deps: SessionUseCaseDeps, hub: RunnerHub, dispatch: ReturnType<typeof commandDispatch>) {
   return {
-    open: async (actor: Actor, taskId: TaskId, sink: EventSink, sinceSeq: number): Promise<BrowserStream> => {
+    open: async (actor: Actor, taskId: TaskId, sink: EventSink, sinceSeq: number, options: BrowserReplayOptions = {}): Promise<BrowserStream> => {
       if (!(await deps.taskAccess.canOpenStream(actor, taskId))) throw forbidden('无权访问该任务的会话流');
-      const { complete, unsubscribe } = await openBrowserReplay(deps, hub, taskId, sink, sinceSeq);
+      const { complete, unsubscribe } = await openBrowserReplay(deps, hub, taskId, sink, sinceSeq, options);
       const viewId = crypto.randomUUID();
       const controlled = new Set<string>();
       return {
