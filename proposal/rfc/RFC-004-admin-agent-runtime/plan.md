@@ -14,7 +14,7 @@
 | T6 | 管理员完整 Hook 预演与实际模型检查 | T4、T5 | 代码完成：task-runtime `runtime-check` 任务（平台命名空间、哨兵项目准入上限 4、oneshot Agent、固定回文标记、镜像 digest／CLI 版本／解释器上下文、unknown 语义）；`modules/task-runtime/tests/runtimeCheck.test.ts` 以假集群／假 Runner 验证。真实模型检查未在集群执行 |
 | T7 | 管理空间双页签、步骤列表／文件／脚本编辑／排序、检查与启用、租户准备进度 | T3、T6 | 代码完成：`apps/console/src/features/admin/components/runtime/*`、`AdminComputePage` 双页签（查询串直达）、档位绑定运行环境与就绪列、租户面不可用档位禁选与“环境准备中／失败”状态；`apps/console/src/tests/runtimeConfigEditor.test.tsx`。多分辨率／明暗主题／键盘实机验收未做 |
 | T8 | 旧配置接续、文档和完整实机验收 | T5、T7 | 部分：旧模式（`CS_AGENT_ENV_SECRET`）保留为未绑定档位的兼容路径并有回归测试；文档已更新。实机验收（下表 AR 的“实机”列）未执行 |
-| T9 | 精确提交 main、本地完整门禁、推送与精确 SHA CI | T8 | 2026-09-16 本地 `bun run check` 通过后按精确路径提交并推送；CI 结果见 `STATE.md` 本批小节 |
+| T9 | 精确提交 main、本地完整门禁、推送与精确 SHA CI | T8 | 已完成（代码部分）：2026-09-16 本地 `bun run check` 1325 pass／4 skip／0 fail 后按精确路径提交 `1562ccc16af579feffd12ed5fa0c07d67c2d6eef` 并推送，[CI 35053685096](https://github.com/wangbinquan/CrewStation/actions/runs/35053685096) 成功；T8 实机验收完成后需再次经此步 |
 
 T2–T8 按可验证小批推进；新增生产代码必须带测试，bug 先复现。没有独立的长期配置迁移双轨：旧模式只保留兼容入口，托管路径的领域状态与版本归 agent-runtime。
 

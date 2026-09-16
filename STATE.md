@@ -28,6 +28,8 @@
 
 未完成（不据自动化结果宣称已可用）：任务镜像重建与平台重新部署（含 `agent_runtime` 迁移）、真实运行环境检查、两类 CLI 经 Hook 的真实模型轮次、管理 UX 多分辨率／主题／键盘验收，以及 RFC-004 plan.md 中全部 AR 的实机证据。RFC-003 的剩余验收不受本批影响，继续按其 implementation 记录推进。
 
+本批提交 **1562ccc16af579feffd12ed5fa0c07d67c2d6eef**（191 files，+5660／−239），[CI 35053685096](https://github.com/wangbinquan/CrewStation/actions/runs/35053685096)／job 104659252779 于 2026-09-16T03:59:05Z 成功。下一步：重建任务镜像并重新部署本机平台（跑 `agent_runtime` 迁移），在管理空间建一份 OpenCode 运行环境并执行真实检查，再按 plan.md 实施说明逐项补 AR 实机证据。
+
 
 ## 最新接力：破坏性迁移与生产版本差距（2026-09-16）
 
