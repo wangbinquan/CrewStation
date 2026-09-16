@@ -2190,7 +2190,7 @@ UX-AT-12、31 记为通过，累计 **43／52**；UX-AT-11 的正常回退在浏
 
 ### 门禁
 
-`bun run check` 于 2026-09-16T08:23:11Z 通过，**1344 pass／4 skip／0 fail**（1348 tests／233 files，142.36s）。提交与精确 SHA CI 见 STATE.md 本批一节。
+`bun run check` 于 2026-09-16T08:23:11Z 通过，**1344 pass／4 skip／0 fail**（1348 tests／233 files，142.36s）。本批提交 **4e1a69ae8001c1ef4af213e30b25c46ba497606b**，[CI 35073544523](https://github.com/wangbinquan/CrewStation/actions/runs/35073544523) 于 2026-09-16T08:29:33Z 成功。
 
 ## 第九十一批：浏览器里的 API 试调
 
@@ -2200,4 +2200,19 @@ UX-AT-15 记为通过，累计 **44／52**。本批无生产代码改动。
 
 ### 门禁
 
-`bun run check` 于 2026-09-16T08:27:52Z 通过，**1344 pass／4 skip／0 fail**（1348 tests／233 files，139.09s）。提交与精确 SHA CI 见 STATE.md 本批一节。
+`bun run check` 于 2026-09-16T08:27:52Z 通过，**1344 pass／4 skip／0 fail**（1348 tests／233 files，139.09s）。本批提交 **85534646535fe5330d90fdee40a23d0dd1cce227**，[CI 35073978962](https://github.com/wangbinquan/CrewStation/actions/runs/35073978962) 于 2026-09-16T08:32:48Z 成功。
+
+## 第九十二批：从已推送分支发布补丁版本的完整浏览器旅程
+
+owner 与 tester 两个真实上下文（副本在 `/private/tmp/crewstation-rfc003-batch84/`），对象 `rfc003-verify-workbench`（正式 v0.1.0、待验证 v0.1.1，远端 main 仍是 6af30245c4）：
+
+- owner 在发布页“准备发布”：来源默认“已推送分支”（`aria-pressed`），分支下拉只有“main · 默认分支 · 6af30245c4”；“检查发布来源”后第二步显示确认提交 SHA、检查时间与“已确认远端分支的完整提交。尚未检查容器文件；构建、配置与迁移由服务端发布流程实际验证。”；“确认版本”后第三步版本字段默认 `patch`、页面提示“候选标签：v0.1.2。实际标签以服务端受理结果为准。”并带“待验证版本与正式版本共用生产数据…不会自动切换正式流量”的警告；填发布说明后“确认发布到待验证版本”。
+- 08:30:18Z 页面立即显示“已受理，等待发布流程推进；受理不代表构建或部署完成。”，发布历史多出 v0.1.2（building）；5 秒后转“正在构建固定提交，尚未确认部署就绪。”。
+- 构建停在这里 11 分钟：`cs-rfc003-verify-workbench/build-0b05fc5c1258` 的 Pod 请求 1 CPU，节点 CPU 请求 10／10 满额，`FailedScheduling: Insufficient cpu`。把四个 QA CLI Pod 原地缩到 150m 后 20 秒内构建 Completed（BuildKit 缓存命中），页面依次转“正在部署并等待就绪副本”→“该发布曾到达就绪状态”（提交后 701 秒）。随后四个 CLI Pod 恢复 400m，UID 与重启数不变。
+- 结果：v0.1.2 `ready` 占 preview 槽，v0.1.1 变 `superseded`，正式仍是 v0.1.0；blue 部署换成新 Pod。tester 刷新项目列表看到“v0.1.2 6af3024 就绪 打开试用”，详情页“待验证版本 v0.1.2 … 就绪 打开试用”，打开 preview 主机 200 且显示当前用户 rfc003-tester。两侧 0 console error。
+
+UX-AT-09（新版列表／详情的多账号复验与完整 202 受理阶段）记为通过，累计 **45／52**。本机环境的教训写入 dev-gotchas：构建 Job 在 CPU 满额节点上会一直 Pending，页面会诚实地停在“正在构建”而不是伪造进度。本批无生产代码改动。
+
+### 门禁
+
+`bun run check` 于 2026-09-16T08:46:34Z 通过，**1344 pass／4 skip／0 fail**（1348 tests／233 files，179.12s）。提交与精确 SHA CI 见 STATE.md 本批一节。

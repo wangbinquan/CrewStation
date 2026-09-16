@@ -108,7 +108,7 @@ sql`kind = ANY(ARRAY[${sql.join(kinds.map((k) => sql`${k}`), sql`, `)}]::text[])
 ### 节点 CPU 预约 10／10 时滚动更新排不进新 Pod
 
 控制面每个部署请求 100m，RollingUpdate 默认先起新再停旧，节点满额时新 Pod 一直 Pending，`rollout status` 超时。
-两种做法都用过：单副本服务改 `strategy: Recreate`（console 先改，2026-09-16 cs-api 卡死后 `rollout restart` 的新 Pod Pending 了六分钟，七个平台部署的清单全部写回 Recreate）；或临时把闲置 CLI Pod 原地缩到 150m 再恢复——
+两种做法都用过：单副本服务改 `strategy: Recreate`（console 先改，2026-09-16 cs-api 卡死后 `rollout restart` 的新 Pod Pending 了六分钟，七个平台部署的清单全部写回 Recreate）；发布构建 Job 的 Pod 请求 1 CPU，节点占满时它会一直 Pending、发布停在“正在构建”（2026-09-16 v0.1.2 等了 11 分钟，缩四个 CLI Pod 到 150m 后 20 秒内完成）；或临时把闲置 CLI Pod 原地缩到 150m 再恢复——
 `kubectl patch pod … --subresource resize`，requests 与 limits 要一起改，否则 Guaranteed QoS 变化会被拒绝；容器名等于 Pod 名。
 
 
