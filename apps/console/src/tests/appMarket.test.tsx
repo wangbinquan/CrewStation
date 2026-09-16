@@ -18,7 +18,7 @@ let saved: AppVisibilityDto;
 function fixture(owner = false, application = app()) {
   saved = { mode: 'members', userIds: [], users: [], revision: 0, updatedAt: null, canConfigure: owner };
   const calls: Array<{ url: string; method: string; body?: Record<string, unknown> }> = [];
-  let conflict = false, queryFailure = false, marketFailure = false;
+  let conflict = false, queryFailure = false, marketFailure = false, slowReload = false;
   globalThis.fetch = (async (raw: RequestInfo | URL, init?: RequestInit) => {
     const url = String(raw), method = init?.method ?? 'GET', body = init?.body ? JSON.parse(String(init.body)) : undefined;
     calls.push({ url, method, body });
@@ -30,12 +30,13 @@ function fixture(owner = false, application = app()) {
     } else if (url.endsWith('/app-visibility')) {
       if (method === 'PUT' && conflict) { saved = { ...saved, mode: 'selected', userIds: [userId], users: [user], revision: 2 }; result = { error: 'conflict', message: '其他负责人已更新' }; status = 409; }
       else if (method === 'GET' && queryFailure) { result = { error: 'unavailable', message: '暂时无法读取设置' }; status = 503; }
+      else if (method === 'GET' && slowReload) { await new Promise((resolve) => setTimeout(resolve, 300)); result = saved; }
       else { if (body) saved = { ...saved, ...body, revision: Number(body.expectedRevision) + 1 }; result = saved; }
     } else if (url.endsWith('/app-presentation')) result = { description: '整理团队知识', icon: 'book', revision: saved.revision, updatedAt: null };
     else if (url.includes('/member-candidates')) result = { items: [user] };
     return new Response(JSON.stringify(result), { status, headers: { 'content-type': 'application/json' } });
   }) as typeof fetch;
-  return { calls, conflict: (value: boolean) => { conflict = value; }, queryFailure: () => { queryFailure = true; }, revoke: () => { marketFailure = true; } };
+  return { calls, conflict: (value: boolean) => { conflict = value; }, queryFailure: () => { queryFailure = true; }, revoke: () => { marketFailure = true; }, slowReload: () => { slowReload = true; } };
 }
 async function input(node: HTMLInputElement | HTMLSelectElement, value: string) {
   await act(async () => {
@@ -63,6 +64,8 @@ describe('能力市场与负责人设置真实路由', () => {
     const f = fixture(); page = await renderApp(`/market/${projectId}`);
     expect(page.text()).toContain('知识助理'); f.revoke(); await page.click('重新检查');
     expect(page.text()).not.toContain('知识助理'); expect(page.text()).toContain('应用不存在或不可见'); expect(page.text()).not.toContain('暂无可见应用');
+    // 404 是明确状态而不是“读取失败”，说明可能原因并保留返回路径。
+    expect(page.text()).toContain('该应用当前对你不可见'); expect(page.text()).not.toContain('读取失败'); expect(page.html()).toContain('href="/market"');
   });
   test('已上线的正式地址独立打开，只有建设者与负责人有相应快捷入口', async () => {
     fixture(true, app({ canDevelop: true, canConfigure: true, production: { status: 'deployed', state: 'ready', host: 'knowledge.example.test', tag: 'v1.2.3', commitSha: 'abc123', freshness: 'current', checkedAt: '2026-09-13T00:00:00.000Z' } }));
@@ -103,5 +106,16 @@ describe('能力市场与负责人设置真实路由', () => {
     const f = fixture(true); page = await renderApp(`/projects/${projectId}/settings?tab=visibility`);
     await input(scopeSelect(), 'authenticated'); f.queryFailure(); await page.click('读取最新设置');
     expect(page.text()).toContain('暂时无法读取设置'); expect(scopeSelect().value).toBe('authenticated');
+  });
+});
+
+describe('保存后的后台重读', () => {
+  test('保存成功后重读设置期间不显示“暂不能保存”，成功提示与最新修订保留', async () => {
+    const f = fixture(true); page = await renderApp(`/projects/${projectId}/settings?tab=visibility`);
+    await input(scopeSelect(), 'authenticated'); f.slowReload(); await page.click('保存可见范围');
+    expect(f.calls.filter((call) => call.method === 'PUT')).toHaveLength(1);
+    expect(page.text()).toContain('已保存'); expect(page.text()).not.toContain('暂不能保存');
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 400)); }); await page.settle();
+    expect(page.text()).toContain('已保存第 1 版'); expect(page.text()).not.toContain('暂不能保存'); expect(scopeSelect().value).toBe('authenticated');
   });
 });

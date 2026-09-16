@@ -2069,4 +2069,35 @@ delivery QA 项目 prj_01a09f2abfbc7000be464c171bcb8f3c／服务 svc_01a09f2abfb
 
 门禁：`bun run check` 于 2026-09-16T07:04:16Z 通过，**1340 pass／4 skip／0 fail**（1344 tests／232 files，169.80s），`tools/arch` 六项通过，lint 与两处 typecheck 无告警。第一轮门禁曾有 1 项失败：确认面板的默认聚焦覆盖了编辑器放弃提示对“继续编辑”的显式聚焦，改为调用方已把焦点放进面板时不再抢焦后通过。新增或扩展的自动化：`projectAccessBoundary.test.tsx`（2）、`adminSpace.test.tsx`（＋1）、`agentActivityMenu.test.tsx`（＋1）、`confirmationPanelFocus.test.tsx`（2）、`modules/identity/tests/demoLoginPage.test.ts`（1）、`nativeActivityPersistence.test.ts`（＋1，真实库）、`packages/persistence/connection.test.ts`（3，其一真实库）。
 
-结论：UX-AT-22、26、44、51 记为通过，累计 **33／52**；UX-AT-42 的“状态源不可用”分支已实证，乱序补发仍待做。提交与精确 SHA CI 见 STATE.md 本批一节。
+结论：UX-AT-22、26、44、51 记为通过，累计 **33／52**；UX-AT-42 的“状态源不可用”分支已实证，乱序补发仍待做。本批提交 **c621675a0acaf48e33f1225f0ff571bee35ba7d5**（32 files，+442／−33），[CI 35066748980](https://github.com/wangbinquan/CrewStation/actions/runs/35066748980) 于 2026-09-16T07:07:49Z 成功。
+
+## 第八十五批：市场可见范围三身份旅程、两位成员未读隔离与两处状态修复
+
+沿用第八十四批的无头 Chrome 多身份上下文，对能力市场与个人未读做真实集群旅程（脚本与 JSON／截图副本仍在 `/private/tmp/crewstation-rfc003-batch84/`）。
+
+### 市场可见范围（UX-AT-45／46／47）
+
+owner（`rfc003-owner`，项目 `rfc003-verify-workbench`）、admin（`rfc003-verify-files` 的负责人）与非成员 visitor 三个上下文同时在线，全部通过页面控件操作、以接口读回核对：
+
+- 基线：visitor 市场“暂无可见应用”，`/v1/market/apps` 为空。
+- owner 把范围改为“全部登录用户”（第 6 版）→ visitor 市场出现且只出现《RFC-003 新工作台验收》；搜索“工作台”命中，搜索不存在的词显示“没有匹配的应用”，“清除筛选”恢复；详情页有“返回能力市场／重新检查／打开正式应用”。
+- owner 改为“项目成员与指定用户”，按邮箱精确查找 visitor 并加入名单，再次点击“加入指定名单”不产生第二条（第 7 版）→ visitor 仍可见。
+- admin 把《RFC-003 文件与预览验收》指定给 visitor（同样去重，第 3 版）→ visitor 市场两项；搜索“文件”只剩一项；其余三个成员范围的数字人项目始终不出现。
+- 撤销：admin 恢复项目成员（第 4 版），owner 恢复项目成员（第 8 版）→ visitor 在旧详情页点“重新检查”，页面变为“该应用当前对你不可见 · 服务器答复：应用 … 不存在。可能是负责人已收回市场可见范围，或应用已不存在；正式链接的访问规则不受影响。”并保留返回入口；回到列表为“暂无可见应用”，接口为空。三个上下文全程 0 console error。两个项目的可见范围已恢复到旅程前的“项目成员”。
+
+旅程暴露两处状态问题，均已修复并有回归：
+
+- 被撤销后的市场详情原来显示“读取失败：应用 … 不存在”——把明确状态写成了可重试的读取失败。`MarketDetailPage` 对 404 改为独立空态，保留服务器原话与返回路径（design.md §3），其他错误仍走 `QueryStatus`。`appMarket.test.tsx` 的撤销用例增加断言。
+- 保存可见范围成功的同一刻，页面短暂出现“最新身份或设置尚未确认，暂不能保存”：`AppVisibilityPage` 把保存后的后台重读也算进 `unavailable`。现在只有首次读取或读取失败才是“暂不能保存”，后台重读只暂停提交（`refreshing`），效果检查卡片也不再随重读卸载重挂。第二轮旅程六次保存的状态区只剩“已保存…”。新增回归“保存成功后重读设置期间不显示暂不能保存”。
+
+### 两位成员同时查看（UX-AT-43）
+
+owner 与 developer 各在自己的上下文打开同一开发会话页，徽标都是“待处理 4 未读完成 12”，接口各有 14 条未读项。owner 打开 Agent 动态，点击一条未读“本轮完成”的“查看结果”（CLI `…73df52`），页面定位并展开该窗口后标记本人已读：owner 徽标变为“未读完成 11”、接口 `unread` 中该 CLI 消失；developer 刷新后仍是 12、该 CLI 仍在其 `unread` 里。互不清除对方未读成立。
+
+### 观察但未解释
+
+07:14:15Z（console 刚 Recreate、两个真实标签页重连、三身份旅程进行中）网关记录 4 个 502：两次 `version-comparison?target=prod` 与两次 `workspace-layout` 都在 10.3s 后被上游断开，开发页出现“HTTP 502 · 重新应用当前布局”提示条（恢复路径有效）。随后单测同一比较接口 1.2s、并发两路期间 `/v1/me` 始终 5ms；cs-api `memory.current` 152MB／1GiB、CPU 节流 4 个周期，无 OOM。与第八十四批 try 锁版 Pod 启动 6 秒后的一轮 502 同类，仍归为未解释的偶发停顿，记在 STATE 未做项。
+
+### 部署与门禁
+
+console `cs-console:rfc003-b85`（07:13:16Z）。门禁：`bun run check` 于 2026-09-16T07:22:46Z 通过，**1341 pass／4 skip／0 fail**（1345 tests／232 files，131.21s），arch、lint、两处 typecheck 无告警。提交与精确 SHA CI 见 STATE.md 本批一节。

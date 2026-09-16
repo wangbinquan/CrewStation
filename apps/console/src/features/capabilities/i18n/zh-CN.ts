@@ -100,6 +100,8 @@ export const messages = {
   "market.noMatchesHint": "试试其他名称或用途关键词。",
   "market.noApps": "暂无可见应用",
   "market.noAppsHint": "应用负责人可以将应用开放给你；也可以稍后重新检查。",
+  "market.gone": "该应用当前对你不可见",
+  "market.goneHint": "服务器答复：{message}。可能是负责人已收回市场可见范围，或应用已不存在；正式链接的访问规则不受影响。",
   "market.owner": "负责人：{name}",
   "market.noDescription": "负责人尚未填写应用用途。",
   "market.open": "打开正式应用",

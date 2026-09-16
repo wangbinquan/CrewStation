@@ -101,6 +101,8 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   "market.noMatchesHint": "Try another app name or description.",
   "market.noApps": "No apps available",
   "market.noAppsHint": "An app owner can make an app visible to you. You can also check again later.",
+  "market.gone": "This app is no longer visible to you",
+  "market.goneHint": "The server answered: {message}. The owner may have withdrawn the market visibility, or the app no longer exists; the production link keeps its own access rules.",
   "market.owner": "Owner: {name}",
   "market.noDescription": "The owner has not added a description yet.",
   "market.open": "Open production app",

@@ -18,14 +18,16 @@ interface SettingsProps {
   readonly presentation: AppPresentationDto;
   readonly canConfigure: boolean;
   readonly unavailable: boolean;
+  /** 后台重读中：暂停提交但不显示“暂不能保存”。 */
+  readonly refreshing?: boolean;
   readonly reload: () => Promise<unknown>;
 }
 
 /** 两个独立修订共用一次导航确认，成功保存只清除所属草稿。读取失败保留已挂载编辑器。 */
-export function AppVisibilitySettings({ projectId, visibility, presentation, canConfigure, unavailable, reload }: SettingsProps) {
+export function AppVisibilitySettings({ projectId, visibility, presentation, canConfigure, unavailable, refreshing = false, reload }: SettingsProps) {
   const t = useT(), [discard, setDiscard] = useState<'scope' | 'presentation'>();
   const panel = useRef<HTMLDivElement>(null), trigger = useRef<HTMLButtonElement | null>(null);
-  const canSave = canConfigure && !unavailable && !discard;
+  const canSave = canConfigure && !unavailable && !refreshing && !discard;
   const scopeEditor = useVisibilityEditor(projectId, visibility, reload, canSave);
   const presentationEditor = usePresentationEditor(projectId, presentation, reload, canSave);
   const pending = scopeEditor.save.isPending || presentationEditor.save.isPending;
