@@ -17,7 +17,7 @@
 
 环境：重建后 cs-api／console 的 Recreate 新 Pod 因 v0.1.2 的 preview Deployment 请求 500m 而 Pending 约 10 分钟，四个 QA CLI Pod 再缩到 150m 后就绪并保持 150m（节点请求 9450m／10）；演示登录会用 `displayName ?? username` 覆盖名字，管理员显示名已改回“CrewStation Admin”。
 
-未做：其余 7 项 UX-AT 需故障注入或专门历史构造（见上一节）。门禁：`bun run check` 2026-09-16T09:08:32Z **1344 pass／4 skip／0 fail**（1348 tests／233 files），arch 六项通过。本批提交与 CI 见本节末尾。
+未做：其余 7 项 UX-AT 需故障注入或专门历史构造（见上一节）。门禁：`bun run check` 2026-09-16T09:08:32Z **1344 pass／4 skip／0 fail**（1348 tests／233 files），arch 六项通过。本批提交 **57870d8d80dbd73f7a0fd4ab7153bc74d3ae5726**（25 files，+129／−21），[CI 35077764589](https://github.com/wangbinquan/CrewStation/actions/runs/35077764589) 于 2026-09-16T09:12:03Z 成功。
 
 ## 最新接力：浏览器发布补丁版本到就绪（2026-09-16）
 
