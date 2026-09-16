@@ -23,7 +23,7 @@
 
 累计 **51／52**。唯一未做完整独立实机的是 **UX-AT-42 乱序补发**：去重、断线补发、状态源不可用已实证，乱序缺口对账为纯领域规则且有精确单测（`nativeActivityProjection.test.ts`），可观察结果与已实证的“状态源不可用”一致；在当前活跃验收会话（13 agent、4 CLI）注入并回滚整段动态投影风险不成比例，故不做。
 
-环境处置：workbench 生产恢复 1／1、两槽 ready；工作树回 `main`／`1aa2db9`／非浅、无孤儿分支；files 服务槽逐字节还原；producer 正式首次上线 v0.1.3 保留。门禁：`bun run check` 2026-09-16T10:19:00Z **1344 pass／4 skip／0 fail（1348 tests／233 files）**。本批提交 **<COMMIT_SHA>**，[CI <CI_RUN>](https://github.com/wangbinquan/CrewStation/actions/runs/<CI_RUN>) <CI_TIME> 成功。
+环境处置：workbench 生产恢复 1／1、两槽 ready；工作树回 `main`／`1aa2db9`／非浅、无孤儿分支；files 服务槽逐字节还原；producer 正式首次上线 v0.1.3 保留。门禁：`bun run check` 2026-09-16T10:19:00Z **1344 pass／4 skip／0 fail（1348 tests／233 files）**。本批提交 **594f864ef09f2536472807047015b9f6a22e0afc**，[CI 35084376297](https://github.com/wangbinquan/CrewStation/actions/runs/35084376297) 2026-09-16T10:24:08Z 成功。
 
 ## 最新接力：申请人与审批人显示名字（2026-09-16）
 
