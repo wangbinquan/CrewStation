@@ -299,6 +299,15 @@ Claude in Chrome 的 `resize_window` 到 390／320 会被 macOS Chrome 的最小
 「代码里不许出现 localStorage」这类断言，会被解释「为什么不用 localStorage」的注释绊倒。
 `apps/console/src/tests/sourceScan.ts` 同时给出原文与去注释后的正文，断言用后者。
 
+### 设了 HTTP_PROXY 时，「fetch 没抛异常」不等于目标活着
+
+实机验收要先探测网关与调试浏览器在不在，不在就整套跳过。本机若设了 `HTTP_PROXY`（这台机器上是
+`http://127.0.0.1:1087`），Bun 的 `fetch` 会走代理；目标关着时**代理替它回一个 503**，于是
+`try { await fetch(url) } catch` 永远不进 catch，探测把「连不上」读成「可用」，用例随后在连接处崩掉而不是跳过。
+
+探测要校验回来的东西对不对，别只看抛没抛：网关要求状态码 < 500，调试浏览器要求 `/json/version`
+真的给出 `webSocketDebuggerUrl`。见 `tests/e2e/consoleSession.ts`。
+
 ## 并发开发与 Agent 协作
 
 ### 不要 reset 已经推送的提交
