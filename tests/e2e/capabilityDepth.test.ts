@@ -1,0 +1,96 @@
+import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
+import type { Browser, Page } from './cdp';
+import { apiGet, connectBrowser, e2eAvailable, open, signIn } from './consoleSession';
+
+/**
+ * 能力深度锁。
+ *
+ * `platformCapabilities.test.ts` 回答「这页在不在」，这里回答「这页上的能力全不全」：
+ * 页签、分区标题、主控件逐条点名。少一个页签、少一个入口，都是能力退化，光看页面标题抓不到。
+ *
+ * 只断言与部署状态无关的结构性能力（页签、卡片标题、主按钮），这样换一套数据也成立；
+ * 具体版本号、副本数这类会变的东西不进断言。
+ */
+
+const available = await e2eAvailable();
+
+/** 每条 = 一块能力面，`parts` 里的每一项 = 这块能力必须暴露出来的一个入口或分区。 */
+const PROJECT_DEPTH = [
+  {
+    capability: '发布与上线：两个槽、试用入口、发布历史',
+    suffix: '/release',
+    parts: ['准备发布', '正式版本', '待验证版本', '发布历史', '两个版本共用生产数据'],
+  },
+  {
+    capability: '运行与诊断：健康、告警、日志、事件投递、调用链',
+    suffix: '/operations',
+    parts: ['健康状态', '告警与通知', '日志', '事件投递', '调用链回放'],
+  },
+  {
+    capability: '项目设置：成员、可见性、配置、资源、仓库、生命周期',
+    suffix: '/settings',
+    parts: ['成员', '应用可见性', '配置与密钥', '开发资源', '仓库', '生命周期'],
+  },
+  {
+    capability: '成员管理：三种角色与负责人转移规则',
+    suffix: '/settings?tab=members',
+    parts: ['项目负责人', '开发者', 'preview 测试者', '负责人只能由管理员转移'],
+  },
+] as const;
+
+const ADMIN_DEPTH = [
+  {
+    capability: '管理总览：三类待办与供给入口',
+    path: '/admin',
+    parts: ['待处理事项', '待审批 API 申请', '待审批出站申请', '开通失败', '新建数字人'],
+  },
+  {
+    capability: '能力接入：接入容器、开放策略、事件来源',
+    path: '/admin/capabilities',
+    parts: ['接入容器', 'API 开放策略', '事件来源'],
+  },
+] as const;
+
+let browser: Browser | undefined;
+let admin: Page | undefined;
+let projectId: string | undefined;
+
+beforeAll(async () => {
+  if (!available) return;
+  browser = await connectBrowser();
+  admin = await signIn(browser, 'admin', 'CrewStation Admin');
+  const page = await apiGet<{ items?: Array<{ id: string; serviceId?: string }> }>(admin, '/v1/projects?limit=20');
+  // 深度断言要落在一个真有服务的数字人项目上，接入容器项目的页面构成不同。
+  const withService = (page.items ?? []).find((item) => typeof item.serviceId === 'string');
+  projectId = withService?.id ?? (page.items ?? [])[0]?.id;
+});
+
+afterAll(async () => {
+  await admin?.close().catch(() => undefined);
+  browser?.close();
+});
+
+describe.skipIf(!available)('平台能力的构成没有退化', () => {
+  test.each(PROJECT_DEPTH.map((entry) => [entry.capability, entry.suffix, entry.parts] as const))(
+    '%s',
+    async (_capability, suffix, parts) => {
+      expect(projectId, '环境里至少要有一个数字人项目').toBeDefined();
+      await open(admin!, `/projects/${projectId}${suffix}`);
+      const text = await admin!.text();
+      for (const part of parts) expect(text).toContain(part);
+      expect(admin!.takeErrors()).toEqual([]);
+    },
+    30_000,
+  );
+
+  test.each(ADMIN_DEPTH.map((entry) => [entry.capability, entry.path, entry.parts] as const))(
+    '%s',
+    async (_capability, path, parts) => {
+      await open(admin!, path);
+      const text = await admin!.text();
+      for (const part of parts) expect(text).toContain(part);
+      expect(admin!.takeErrors()).toEqual([]);
+    },
+    30_000,
+  );
+});
