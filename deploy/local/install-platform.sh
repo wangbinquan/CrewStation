@@ -3,7 +3,7 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 NS=crewstation-system
-NODE=desktop-control-plane
+NODE="${CREWSTATION_NODE_CONTAINER:-desktop-control-plane}"
 # shellcheck source=lib.sh
 source "$ROOT/deploy/local/lib.sh" 2>/dev/null || true
 
@@ -20,12 +20,20 @@ if [[ "${SKIP_BUILD:-}" != "1" ]]; then
   docker build -q -f "$ROOT/deploy/docker/console.Dockerfile" -t cs-console:dev "$ROOT"
   # 任务容器镜像默认也重建。以前是「有就不建」，结果改了 runtimes/task 之后集群里跑的还是旧镜像，
   # 现象是事件里少字段而代码看着没问题——查一轮才发现。慢就慢在这一个镜像，要跳过用 SKIP_TASK_RUNTIME_BUILD=1。
-  if [[ "${SKIP_TASK_RUNTIME_BUILD:-}" == "1" && -n "$(docker images -q cs-task-runtime:dev)" ]]; then
+  # 任务容器镜像要联网装两个 Agent CLI，是最慢也最容易被网络拖住的一个。起不了开发会话也无所谓的
+  # 环境（CI 的前台验收就是）用 CS_SKIP_TASK_RUNTIME=1 整个跳过；要用开发会话时必须去掉这个开关。
+  if [[ "${CS_SKIP_TASK_RUNTIME:-}" == "1" ]]; then
+    log "跳过任务容器镜像（CS_SKIP_TASK_RUNTIME=1）：这个环境起不了开发会话"
+  elif [[ "${SKIP_TASK_RUNTIME_BUILD:-}" == "1" && -n "$(docker images -q cs-task-runtime:dev)" ]]; then
     log "跳过任务容器镜像构建（SKIP_TASK_RUNTIME_BUILD=1）"
   else
     docker build -q -f "$ROOT/runtimes/task/Dockerfile" -t cs-task-runtime:dev "$ROOT"
   fi
-  for img in cs-control-plane:dev cs-builder:dev cs-console:dev cs-task-runtime:dev; do import_image "$img"; done
+  # 没建出来的镜像不导入，否则 docker save 会在这里失败。
+  for img in cs-control-plane:dev cs-builder:dev cs-console:dev cs-task-runtime:dev; do
+    [[ -n "$(docker images -q "$img")" ]] || { log "跳过导入 $img（本地没有这个镜像）"; continue; }
+    import_image "$img"
+  done
 fi
 
 log "机密：crewstation-secrets"

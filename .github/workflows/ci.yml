@@ -33,3 +33,71 @@ jobs:
           done
       - run: bun run check
       - run: cd apps/console && bun run build
+
+  # 前台实机验收：在 CI 里真装一套平台，再用无头浏览器打它。
+  # `check` 作业里这套用例是跳过的（没有集群也没有浏览器），能力回归只能靠这个作业兜住。
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      CREWSTATION_KUBE_CONTEXT: kind-crewstation
+      CREWSTATION_NODE_CONTAINER: crewstation-control-plane
+      # 网关经 port-forward 暴露在高位端口：CI 里不占 80，脚本与用例都按这个地址走。
+      CS_CONSOLE_URL: http://console.cs.localhost:8080
+      CS_E2E_CONSOLE: http://console.cs.localhost:8080
+      # 前台验收不起开发会话，跳过要联网装两个 Agent CLI 的任务容器镜像。
+      CS_SKIP_TASK_RUNTIME: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.13
+      - run: bun install --frozen-lockfile
+
+      - name: create kind cluster
+        uses: helm/kind-action@v1
+        with:
+          cluster_name: crewstation
+
+      - name: resolve the console host to loopback
+        run: echo '127.0.0.1 console.cs.localhost' | sudo tee -a /etc/hosts
+
+      - name: bootstrap infrastructure
+        run: deploy/local/bootstrap.sh --skip-verify
+
+      - name: expose the gateway
+        run: |
+          nohup kubectl -n crewstation-system port-forward svc/traefik 8080:80 >/tmp/port-forward.log 2>&1 &
+          for _ in $(seq 1 60); do
+            curl -sS -o /dev/null --max-time 2 http://127.0.0.1:8080/ && exit 0
+            sleep 1
+          done
+          echo '网关在 60s 内没有经 port-forward 应答' >&2; cat /tmp/port-forward.log >&2; exit 1
+
+      - name: install platform
+        run: deploy/local/install-platform.sh
+
+      - name: start the debug browser
+        run: |
+          google-chrome --headless=new --remote-debugging-port=9333 \
+            --no-sandbox --disable-dev-shm-usage --disable-gpu \
+            --user-data-dir=/tmp/cs-e2e-chrome about:blank >/tmp/chrome.log 2>&1 &
+          for _ in $(seq 1 30); do
+            curl -sSf --max-time 2 http://127.0.0.1:9333/json/version >/dev/null && exit 0
+            sleep 1
+          done
+          echo '调试浏览器没起来' >&2; cat /tmp/chrome.log >&2; exit 1
+
+      - name: front-end acceptance against the deployed platform
+        run: bun test tests/e2e/
+
+      - name: diagnostics
+        if: failure()
+        run: |
+          kubectl -n crewstation-system get pods -o wide || true
+          kubectl -n crewstation-system get svc,ingressroute || true
+          for d in cs-api cs-auth console traefik; do
+            echo "=== $d ==="
+            kubectl -n crewstation-system logs "deploy/$d" --tail=60 || true
+          done
+          curl -sS -o /dev/null -w 'console %{http_code}\n' "$CS_CONSOLE_URL/" || true
