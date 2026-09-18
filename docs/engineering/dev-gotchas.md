@@ -252,12 +252,16 @@ zod 默认剥掉未知键：不加 `.strict()`，旧写法的 `driver` / `model`
 Chrome 扩展只有一份登录态、一个系统主题，测不了“同一时刻四个真实角色各看到什么”“暗色下每页长什么样”。
 2026-09-16 起用本机 `Google Chrome --headless=new --remote-debugging-port=9333 --user-data-dir=<scratch>` 配一段 ~150 行的
 CDP 脚本（会话草稿目录，不入库）：每个身份一个 `Target.createBrowserContext`（独立 cookie 罐），`Page.navigate` 到工作台被
-ForwardAuth 带到演示登录页后用 `form.requestSubmit()` 提交用户名；`Emulation.setEmulatedMedia` 切 `prefers-color-scheme`，
+ForwardAuth 带到登录页后填用户名密码并 `form.requestSubmit()`（口令来自 `.local/admin.env`；配了 OIDC 时登录页上是
+`a.provider` 入口，点进去在 IdP 页面上再点一次就回来了）；`Emulation.setEmulatedMedia` 切 `prefers-color-scheme`，
 `Emulation.setDeviceMetricsOverride` 定 1280×720／390；`Input.dispatchKeyEvent` 走 Tab／方向键／Escape 并读 `document.activeElement`
 的 `outline-style`；`Page.captureScreenshot` 留证。踩过的坑：`Target.createTarget` 的 `width/height` 只对上下文里第一个窗口有效，
 第二个页面再传会报 “Target position can only be set for new windows”；页面就绪要等 `main h1` 且正文里没有“载入中／读取中”，
 只等 `loadEventFired` 拿到的是骨架。
-演示登录用 `displayName ?? username` 覆盖用户名字：脚本反复以 `admin` 登录后管理员显示名变成了“admin”，登录请求要带 `displayName`。
+**真点击要分两步量坐标**：`scrollIntoView()` 之后在**同一次** `Runtime.evaluate` 里读 `getBoundingClientRect()`，
+拿到的还是滚动前的位置，`Input.dispatchMouseEvent` 于是点在别的元素上——页面照常、断言照绿、什么也没发生。
+先滚动、`sleep` 一下、再量一次坐标，并用 `document.elementFromPoint()` 确认那个点确实落在目标上，落不上就报错而不是空点。
+另外，浏览器里换过前端代码要 `Network.setCacheDisabled`：镜像换了而 index.html 还在缓存里时，核对的是上一版界面。
 
 ### Chrome 扩展量窄屏：窗口压不到 500px 以下，用同源 iframe 模拟视口
 

@@ -46,7 +46,7 @@ export function connectBrowser(): Promise<Browser> {
   return Browser.connect(CDP_PORT);
 }
 
-/** 以 `username` 演示登录到一个全新上下文；返回的页面此后就是这个身份。 */
+/** 以 `username` 登录到一个全新上下文；返回的页面此后就是这个身份。 */
 /**
  * 实机登录走产品路径：用户名＋密码（RFC-005 删除了演示登录）。
  * 口令按顺序取 `CS_E2E_PASSWORD`、`.local/admin.env`；两处都没有就让调用方看到明确的失败，

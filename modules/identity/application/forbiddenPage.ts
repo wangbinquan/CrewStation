@@ -9,7 +9,7 @@ export interface ForbiddenPageInput {
 
 /**
  * 用户域上被拒绝的浏览器导航（preview／dev 主机无成员或测试者角色等）：给人看的页面，而不是一段 JSON。
- * 对象与原因用服务端原话，返回路径固定指向工作台（design.md §3“无权限”）。配色与演示登录页同源，跟随系统明暗。
+ * 对象与原因用服务端原话，返回路径固定指向工作台（design.md §3“无权限”）。配色与登录页同源，跟随系统明暗。
  */
 export function renderForbiddenPage({ message, consoleUrl }: ForbiddenPageInput): string {
   return `<!doctype html>
