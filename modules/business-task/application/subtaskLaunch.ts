@@ -1,25 +1,20 @@
 import type { ProfileRevisionRef, SubmitSubtaskRequest, SubtaskId } from '@crewstation/contracts';
-import { isPlatformError, newId, validation } from '@crewstation/kernel';
+import { newId, validation } from '@crewstation/kernel';
 import type { BusinessTask } from '../domain/businessTask';
 import { resolveContract, resolveProfile } from '../domain/contractRegistry';
 import type { SubtaskRun } from '../domain/subtaskRun';
 import { isTerminal, transition } from '../domain/subtaskRun';
 import type { BusinessTaskUseCaseDeps } from './dependencies';
+import { subtaskAgentLaunch } from './subtaskAgentLaunch';
 import { subtaskRefresh } from './subtaskRefresh';
 
 interface ExecResult { execId: string; exitCode: number | null; stdout: string; stderr: string; truncated: boolean }
-
-/** 业务侧只拿得到子任务的 error 字符串（details 不进 SubtaskRun），档位不存在时可选档位必须写进正文（RFC-001）。 */
-function launchFailure(error: unknown): string {
-  const message = error instanceof Error ? error.message : String(error);
-  const available = isPlatformError(error) && Array.isArray(error.details?.available) ? (error.details.available as string[]) : undefined;
-  return `启动 Agent 失败：${message}${available ? `，当前可用：${available.join('、') || '（无）'}` : ''}`;
-}
 
 /** 构造与启动子任务：Agent 走 startAgent，命令走 exec(wait) 并在后台收尾。 */
 export function subtaskLaunch(deps: BusinessTaskUseCaseDeps) {
   const { uow, environments, runner, settings, clock, logger } = deps;
   const { finish } = subtaskRefresh(deps);
+  const launchAgent = subtaskAgentLaunch(deps, finish);
 
   const settleCommand = async (run: SubtaskRun, r: ExecResult): Promise<void> => {
     const current = await uow.read.subtasks.getById(run.id);
@@ -40,36 +35,14 @@ export function subtaskLaunch(deps: BusinessTaskUseCaseDeps) {
    * 子任务留在 pending，等 onRunnerConnected 再派发；调用方本来就要轮询子任务状态。
    */
   const launch = async (run: SubtaskRun): Promise<SubtaskRun> => {
+    if (run.kind === 'agent' && run.agentProfile) return launchAgent(run);
     const env = await environments.getEnvironment(run.taskId);
     if (!env?.connected) {
       logger.info('subtask waits for runner', { subtaskId: run.id, taskId: run.taskId, state: env?.state });
       return run;
     }
-    let started = transition(run, 'running', clock.now(), { startedAt: clock.now() });
+    const started = transition(run, 'running', clock.now(), { startedAt: clock.now() });
     await uow.run((scope) => scope.subtasks.update(started));
-    if (run.kind === 'agent' && run.agentProfile) {
-      try {
-        // 构造时没解析成（档位被删、不可用、没有默认档位）：此刻再解析一次，失败原因原样写进子任务（RFC-006 §4.3）。
-        if (!started.computeProfile) {
-          const resolved = await deps.compute.resolve(run.agentProfile.compute, 'subtask');
-          const pinned: ProfileRevisionRef = { profile: resolved.name, revision: resolved.revision };
-          started = { ...started, computeProfile: pinned };
-          await uow.run((scope) => scope.subtasks.update(started));
-        }
-        // 材料按本 attempt 固定的修订取，重发同一 attempt 不重跑启动前步骤（RFC-004 §5 沿用）。
-        const material = await deps.compute.launchMaterial(started.computeProfile!);
-        await runner.sendCommand(run.taskId, {
-          id: `start-${run.runnerRef}`, type: 'startAgent', agentId: run.runnerRef ?? '', compute: material.name, profileRevision: material.revision,
-          launch: material.launch, beforeStart: material.beforeStart, processAttemptId: `${run.runnerRef}:${run.attempt}`, permission: run.agentProfile.permission,
-          mode: run.mode ?? 'oneshot', ...(run.cwd ? { cwd: run.cwd } : {}), initialPrompt: run.prompt ?? '', mcp: settings.mcp.map((m) => ({ name: m.name, url: m.url, headers: {} })), env: {},
-        });
-      } catch (error) {
-        const failed = transition(started, 'failed', clock.now(), { error: launchFailure(error) });
-        await finish(started, failed);
-        return failed;
-      }
-      return started;
-    }
     const execId = run.runnerRef ?? '';
     void runner.sendCommand(run.taskId, { id: `exec-${execId}`, type: 'exec', execId, command: run.command ?? [], ...(run.cwd ? { cwd: run.cwd } : {}), env: {}, timeoutSeconds: run.timeoutSeconds ?? 3600, wait: true })
       .then((result) => settleCommand(run, result as ExecResult))
@@ -79,8 +52,13 @@ export function subtaskLaunch(deps: BusinessTaskUseCaseDeps) {
 
   return {
     launch,
-    /** TaskRunner 连上时由组合根调用：把等容器的 pending 子任务按提交顺序派发出去。 */
+    /**
+     * TaskRunner 连上时由组合根调用：业务任务容器连上 → 按提交顺序为等容器的子任务登记执行环境（命令子任务直接执行）；
+     * 某个子任务的子 Runner 连上 → 派发它的 startAgent（RFC-006）。返回本次真正开始执行的子任务数。
+     */
     dispatchPending: async (taskId: SubtaskRun['taskId']): Promise<number> => {
+      const owner = await uow.read.subtasks.findByExecution(taskId);
+      if (owner) return owner.state === 'pending' && (await launch(owner)).state !== 'pending' ? 1 : 0;
       let dispatched = 0;
       for (const run of await uow.read.subtasks.listByTask(taskId)) {
         if (run.state !== 'pending') continue;

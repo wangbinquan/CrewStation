@@ -2,6 +2,7 @@ import type { BeforeStartExecution, ProbeTerminalResult, ProfileTestContext, Pro
 import { ProbeTerminalResultSchema, TASKRUNNER_PROTOCOL_VERSION, isKnownProtocol } from '@crewstation/contracts';
 import { isPlatformError } from '@crewstation/kernel';
 import type { ProfileTestRunInput, ProfileTestRunProgress, ProfileTestRunResult } from '../api/moduleApi';
+import { CONTAINER_START_FAILURES, IMAGE_PULL_FAILURES, RUNNER_UNAVAILABLE_HINT } from '../domain/podFailures';
 import { profileTestAgentId } from '../domain/profileTestEnvironment';
 import type { ProtocolProbe } from '../domain/profileTestStages';
 import { TEST_STAGE, absorbAgentEvent, commandVerdict, imageStage, launchStage, modelVerdict, runnerStage, stagesFromBeforeStart } from '../domain/profileTestStages';
@@ -20,10 +21,6 @@ export interface ProfileTestDeps {
   runner?: TestRunner;
   timing?: Partial<ProfileTestTiming>;
 }
-
-/** 主容器的等待原因：镜像拉不下来与容器起不来分开归类（RFC-006 §6.2）。 */
-const IMAGE_PULL_FAILURES = new Set(['ErrImagePull', 'ImagePullBackOff', 'InvalidImageName', 'ErrImageNeverPull', 'RegistryUnavailable', 'SignatureValidationFailed']);
-const CONTAINER_START_FAILURES = new Set(['CreateContainerError', 'CreateContainerConfigError', 'RunContainerError', 'StartError', 'ContainerCannotRun', 'CrashLoopBackOff']);
 
 interface Session {
   readonly deps: TaskRuntimeUseCaseDeps; readonly timing: ProfileTestTiming; readonly runner: TestRunner; readonly env: TaskEnvironment;
@@ -82,7 +79,7 @@ async function waitForRunner(s: Session): Promise<ProfileTestRunResult | undefin
       return result(s, 'failed', 'image-pull-failed', message, [imageStage('failed', { error: { code: 'image-pull-failed', message } }), runnerStage('skipped')]);
     }
     if (live.state === 'failed' || pod.phase === 'Failed' || pod.phase === 'Succeeded' || pod.phase === 'Missing' || (pod.waitingReason && CONTAINER_START_FAILURES.has(pod.waitingReason))) {
-      const message = `测试容器没有起来：镜像里可能没有平台 Runner 启动路径 /opt/crewstation/bin/task-runner，请基于平台底座镜像构建${note || (live.message ? `：${live.message}` : '')}`;
+      const message = `测试容器没有起来：${RUNNER_UNAVAILABLE_HINT}${note || (live.message ? `：${live.message}` : '')}`;
       return result(s, 'failed', 'runner-unavailable', message, [imageStage(pulled || pod.imageId ? 'succeeded' : 'skipped'), runnerStage('failed', { error: { code: 'runner-unavailable', message } })]);
     }
     if (!pulled && (pod.phase === 'Running' || pod.imageId)) {

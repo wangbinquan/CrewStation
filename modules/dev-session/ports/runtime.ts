@@ -8,7 +8,7 @@ export interface EnvironmentView {
   state: 'creating' | 'running' | 'paused' | 'releasing' | 'released' | 'failed';
   podName: string;
   connected: boolean;
-  native?: { parentTaskId: TaskId; agentId: string; terminalId: string; runnerId: string; state: 'queued' | 'starting' | 'running' | 'cleaning' | 'finished'; profile: { name: string; cpu: string; memory: string; storage: string }; failureReason?: string };
+  native?: { purpose: 'cli' | 'agent' | 'subtask'; parentTaskId: TaskId; agentId: string; terminalId?: string; runnerId: string; state: 'queued' | 'starting' | 'running' | 'cleaning' | 'finished'; profile: { name: string; cpu: string; memory: string; storage: string }; failureReason?: string };
   branch?: string;
   traceId: string;
   message?: string;
@@ -16,9 +16,15 @@ export interface EnvironmentView {
   lastActivityAt: string;
 }
 
+/** 一个 Agent 的独立执行环境（RFC-006 §5）：「＋ CLI」带 terminalId，headless Agent 没有；image 是档位修订按摘要固定的镜像。 */
+export interface CreateExecutionInput {
+  id: TaskId; parentTaskId: TaskId; purpose: 'cli' | 'agent'; createdBy: UserId; agentId: string; terminalId?: string; runnerId: string; fingerprint: string;
+  profile?: string; image?: string; computeProfile?: { name: string; revision: number };
+}
+
 /** 由 task-runtime 提供。 */
 export interface Environments {
-  createNativeExecution(input: { id: TaskId; parentTaskId: TaskId; createdBy: UserId; agentId: string; terminalId: string; runnerId: string; fingerprint: string; profile?: string }): Promise<EnvironmentView>;
+  createNativeExecution(input: CreateExecutionInput): Promise<EnvironmentView>;
   inspectRebuild(projectId: ProjectId): Promise<DevSessionRebuildInspection>;
   requestRebuild(projectId: ProjectId, input: RebuildDevSessionRequest): Promise<DevSessionRebuildDto>;
   getRebuild(taskId: TaskId): Promise<DevSessionRebuildDto | undefined>;

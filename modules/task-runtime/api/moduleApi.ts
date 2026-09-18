@@ -26,7 +26,7 @@ export interface EnvironmentDto {
   profile: string;
   podName: string;
   connected: boolean;
-  native?: { parentTaskId: TaskId; agentId: string; terminalId: string; runnerId: string; state: 'queued' | 'starting' | 'running' | 'cleaning' | 'finished'; profile: { name: string; cpu: string; memory: string; storage: string }; failureReason?: string };
+  native?: { purpose: 'cli' | 'agent' | 'subtask'; parentTaskId: TaskId; agentId: string; terminalId?: string; runnerId: string; state: 'queued' | 'starting' | 'running' | 'cleaning' | 'finished'; profile: { name: string; cpu: string; memory: string; storage: string }; failureReason?: string };
   branch?: string;
   preview?: { command: string[]; port: number; healthPath: string };
   traceId: string;
@@ -48,15 +48,23 @@ export interface CreateEnvironmentInput {
   labels?: Record<string, string>;
 }
 
+/**
+ * 为一个 Agent 登记独立执行环境（RFC-006 §5）：cli／agent 的父任务是开发会话，subtask 的父任务是业务任务。
+ * image 是档位修订按摘要固定的镜像；省略时用平台任务镜像（RFC-006 之前受理的 CLI）。
+ */
 export interface CreateNativeExecutionInput {
   id: TaskId;
   parentTaskId: TaskId;
-  createdBy: UserId;
+  purpose?: 'cli' | 'agent' | 'subtask';
+  /** 业务子任务没有发起用户。 */
+  createdBy?: UserId;
   agentId: string;
-  terminalId: string;
+  terminalId?: string;
   runnerId: string;
   fingerprint: string;
   profile?: string;
+  image?: string;
+  computeProfile?: { name: string; revision: number };
 }
 
 /** task-runtime 对外能力：环境生命周期与配额；授权由 dev-session／business-task 在调用前完成，这里只做准入与集群操作。 */

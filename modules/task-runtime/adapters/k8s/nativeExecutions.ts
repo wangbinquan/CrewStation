@@ -37,7 +37,9 @@ function resourcesMatch(actual: unknown, expected: Record<string, string>): bool
 }
 const intent = (env: TaskEnvironment) => {
   const n = env.native!;
-  return createHash('sha256').update(JSON.stringify([env.id, n.parentTaskId, n.pvcUid, n.nodeName, n.runnerId, n.agentId, n.terminalId, n.fingerprint, n.profile, n.image])).digest('hex');
+  // RFC-006 新增的用途只在非 cli 执行上参与：既有 CLI Pod 的归属注解不变，回收时仍能核对。
+  const extra = n.purpose && n.purpose !== 'cli' ? [n.purpose] : [];
+  return createHash('sha256').update(JSON.stringify([env.id, n.parentTaskId, n.pvcUid, n.nodeName, n.runnerId, n.agentId, n.terminalId, n.fingerprint, n.profile, n.image, ...extra])).digest('hex');
 };
 
 function owned(object: K8sObject, env: TaskEnvironment, expectedUid?: string): string {

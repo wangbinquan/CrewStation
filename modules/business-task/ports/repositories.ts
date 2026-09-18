@@ -16,6 +16,12 @@ export interface SubtaskRepository {
   getById(id: SubtaskId): Promise<SubtaskRun | undefined>;
   listByTask(taskId: TaskId): Promise<SubtaskRun[]>;
   listActive(limit: number): Promise<SubtaskRun[]>;
+  /** RFC-006：按子任务执行环境的 taskId 找子任务（子 Runner 连上时派发）。 */
+  findByExecution(executionTaskId: TaskId): Promise<SubtaskRun | undefined>;
+  /** 已登记执行环境、还在等子 Runner 的 Agent 子任务。 */
+  listPendingExecutions(limit: number): Promise<SubtaskRun[]>;
+  /** 已结束但执行环境尚未交给 task-runtime 回收的子任务。 */
+  listUnreleasedExecutions(limit: number): Promise<SubtaskRun[]>;
 }
 
 export interface ContractRepository {

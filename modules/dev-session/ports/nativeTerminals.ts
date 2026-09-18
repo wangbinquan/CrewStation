@@ -9,7 +9,8 @@ export interface NativeTerminalStart {
   /** RFC-006：受理时固定的档位修订；重试与后台派发只用它，不再看当前最新。RFC-006 之前受理的记录没有它，不能再派发。 */
   profile?: ProfileRevisionRef;
   record: NativeTerminalRecord;
-  execution?: { taskId: TaskId; taskProfile?: string; stopRequested?: boolean; finalized?: boolean; screen?: 'available' | 'unavailable' };
+  /** image：受理时档位修订按摘要固定的镜像（RFC-006）；之前受理的 CLI 没有，按平台任务镜像起。 */
+  execution?: { taskId: TaskId; taskProfile?: string; image?: string; stopRequested?: boolean; finalized?: boolean; screen?: 'available' | 'unavailable' };
 }
 
 /** 只保存启动身份与配置，不存 MCP／模型凭据；同一次请求的配置与 Runner 身份不可变。 */

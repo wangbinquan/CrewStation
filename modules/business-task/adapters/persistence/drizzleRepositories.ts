@@ -1,6 +1,6 @@
 import type { AgentProfile, BusinessTaskState, OutputContract, ProjectId, ReleaseId, ProfileRevisionRef, ServiceId, SubtaskId, SubtaskMode, SubtaskState, TaskId, TraceId, VolumeMode } from '@crewstation/contracts';
 import type { Executor } from '@crewstation/persistence';
-import { desc, eq, inArray } from 'drizzle-orm';
+import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import type { BusinessTask } from '../../domain/businessTask';
 
 import type { SubtaskRun } from '../../domain/subtaskRun';
@@ -23,7 +23,7 @@ export function drizzleTaskRepository(db: Executor): TaskRepository {
   };
 }
 
-interface SubtaskSpec { prompt?: string; cwd?: string; command?: string[]; timeoutSeconds?: number; agentProfile?: AgentProfile; outputContract?: OutputContract; computeProfile?: ProfileRevisionRef }
+interface SubtaskSpec { prompt?: string; cwd?: string; command?: string[]; timeoutSeconds?: number; agentProfile?: AgentProfile; outputContract?: OutputContract; computeProfile?: ProfileRevisionRef; execution?: SubtaskRun['execution'] }
 
 export function drizzleSubtaskRepository(db: Executor): SubtaskRepository {
   const toRun = (r: typeof subtasks.$inferSelect): SubtaskRun => {
@@ -37,7 +37,7 @@ export function drizzleSubtaskRepository(db: Executor): SubtaskRepository {
   };
   const toRow = (s: SubtaskRun): typeof subtasks.$inferInsert => ({
     id: s.id, taskId: s.taskId, name: s.name, kind: s.kind, mode: s.mode ?? null, state: s.state, attempt: s.attempt,
-    spec: ({ prompt: s.prompt, cwd: s.cwd, command: s.command, timeoutSeconds: s.timeoutSeconds, agentProfile: s.agentProfile, outputContract: s.outputContract, computeProfile: s.computeProfile }) as unknown,
+    spec: ({ prompt: s.prompt, cwd: s.cwd, command: s.command, timeoutSeconds: s.timeoutSeconds, agentProfile: s.agentProfile, outputContract: s.outputContract, computeProfile: s.computeProfile, execution: s.execution }) as unknown,
     runnerRef: s.runnerRef ?? null, sessionId: s.sessionId ?? null, exitCode: s.exitCode ?? null, output: s.output ?? null, businessOutcome: s.businessOutcome ?? null,
     contractResult: s.contractResult ?? null, error: s.error ?? null, createdAt: s.createdAt, startedAt: s.startedAt ?? null, endedAt: s.endedAt ?? null,
   });
@@ -47,6 +47,9 @@ export function drizzleSubtaskRepository(db: Executor): SubtaskRepository {
     getById: async (id) => { const row = (await db.select().from(subtasks).where(eq(subtasks.id, id)))[0]; return row ? toRun(row) : undefined; },
     listByTask: async (taskId) => (await db.select().from(subtasks).where(eq(subtasks.taskId, taskId)).orderBy(subtasks.createdAt)).map(toRun),
     listActive: async (limit) => (await db.select().from(subtasks).where(inArray(subtasks.state, ['running', 'awaiting-input'])).orderBy(subtasks.createdAt).limit(limit)).map(toRun),
+    findByExecution: async (executionTaskId) => { const row = (await db.select().from(subtasks).where(sql`${subtasks.spec}->'execution'->>'taskId' = ${executionTaskId}`))[0]; return row ? toRun(row) : undefined; },
+    listPendingExecutions: async (limit) => (await db.select().from(subtasks).where(and(eq(subtasks.state, 'pending'), sql`${subtasks.spec}->'execution' IS NOT NULL`)).orderBy(subtasks.createdAt).limit(limit)).map(toRun),
+    listUnreleasedExecutions: async (limit) => (await db.select().from(subtasks).where(and(inArray(subtasks.state, ['succeeded', 'failed', 'cancelled']), sql`${subtasks.spec}->'execution' IS NOT NULL`, sql`coalesce(${subtasks.spec}->'execution'->>'released', 'false') <> 'true'`)).orderBy(subtasks.createdAt).limit(limit)).map(toRun),
   };
 }
 

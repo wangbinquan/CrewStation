@@ -2,10 +2,10 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import type { ProfileRevisionRef, ProjectId, ReleaseId, RunnerCommand, RunnerEvent, ServiceActor, ServiceId, TaskId } from '@crewstation/contracts';
 import { LaunchSpecSchema } from '@crewstation/contracts';
 import { eventbusMigrations } from '@crewstation/eventbus';
-import { precondition, validation } from '@crewstation/kernel';
+import { precondition, quotaExceeded, validation } from '@crewstation/kernel';
 import type { TestDatabase } from '@crewstation/testkit';
 import { createTestDatabase, testDatabaseAvailable } from '@crewstation/testkit';
-import type { ComputeCatalog } from '../ports/runtime';
+import type { ComputeCatalog, EnvironmentView } from '../ports/runtime';
 import type { BusinessTaskModule } from '../wiring';
 import { businessTaskMigrations, createBusinessTaskModule } from '../wiring';
 
@@ -17,8 +17,15 @@ const projectId = 'prj_0123456789abcdef0123456789abcdef' as ProjectId;
 const caller: ServiceActor = { identity: 'demo/demo', project: 'demo', service: 'demo', slot: 'prod' };
 const stranger: ServiceActor = { identity: 'other/other', project: 'other', service: 'other' };
 const commands: RunnerCommand[] = [];
+/** 命令发往哪个 Runner：RFC-006 起 Agent 子任务的命令发往它自己的执行环境。 */
+const routed: Array<{ taskId: string; command: RunnerCommand }> = [];
+/** Agent 子任务的执行环境（每个 Agent 一个 Pod）；connected 模拟子 Runner 是否已连上。 */
+const executions = new Map<string, EnvironmentView>();
+const executionControls = { connected: true, reject: undefined as unknown };
 const events = new Map<string, Array<{ seq: number; at: string; event: RunnerEvent }>>();
 const released: string[] = [];
+/** 某条命令发往的 Runner 任务 ID（Agent 子任务的是它的执行环境）。 */
+const runnerOf = (command: RunnerCommand): string => routed.find((r) => r.command === command)!.taskId;
 const emit = (taskId: string, event: RunnerEvent) => { const list = events.get(taskId) ?? []; list.push({ seq: list.length + 1, at: new Date().toISOString(), event }); events.set(taskId, list); };
 const agentEvent = (agentId: string, type: string, extra: Record<string, unknown> = {}): RunnerEvent => ({ kind: 'agent', event: { agentId, seq: 0, at: new Date().toISOString(), type, ...extra } as never });
 
@@ -48,14 +55,27 @@ beforeAll(async () => {
     db: tdb.db,
     environments: {
       createEnvironment: async (input) => ({ id: `tsk_${Bun.randomUUIDv7().replace(/-/g, '')}` as TaskId, projectId, state: 'running', connected: true, traceId: input.traceId ?? '0123456789abcdef0123456789abcdef', podName: 'task-1' }),
-      releaseEnvironment: async (taskId) => { released.push(taskId); return { id: taskId, projectId, state: 'released', connected: false, traceId: 't', podName: 'task-1' }; },
+      createNativeExecution: async (input) => {
+        const existing = executions.get(input.id); if (existing) return existing;
+        if (executionControls.reject) throw executionControls.reject;
+        const env: EnvironmentView = { id: input.id, projectId, state: executionControls.connected ? 'running' : 'creating', connected: executionControls.connected, traceId: 't', podName: `sub-${input.id.slice(4)}`, native: { state: executionControls.connected ? 'running' : 'queued' } };
+        executions.set(input.id, env);
+        return env;
+      },
+      releaseEnvironment: async (taskId) => {
+        released.push(taskId);
+        const execution = executions.get(taskId);
+        if (execution) { execution.connected = false; execution.state = 'releasing'; execution.native = { ...execution.native!, state: 'cleaning' }; return execution; }
+        return { id: taskId, projectId, state: 'released', connected: false, traceId: 't', podName: 'task-1' };
+      },
       pauseEnvironment: async (taskId) => ({ id: taskId, projectId, state: 'paused', connected: false, traceId: 't', podName: 'task-1' }),
       resumeEnvironment: async (taskId) => ({ id: taskId, projectId, state: 'creating', connected: false, traceId: 't', podName: 'task-1' }),
-      getEnvironment: async (taskId) => ({ id: taskId, projectId, state: runnerConnected ? 'running' : 'creating', connected: runnerConnected, traceId: 't', podName: 'task-1' }),
+      getEnvironment: async (taskId) => executions.get(taskId) ?? ({ id: taskId, projectId, state: runnerConnected ? 'running' : 'creating', connected: runnerConnected, traceId: 't', podName: 'task-1' }),
     },
     runner: {
       sendCommand: async (taskId, command) => {
         commands.push(command);
+        routed.push({ taskId, command });
         if (command.type === 'exec') { emit(taskId, { kind: 'execExited', execId: command.execId, exitCode: command.command.includes('fail') ? 2 : 0, durationMs: 5 }); return { execId: command.execId, exitCode: command.command.includes('fail') ? 2 : 0, stdout: 'done\n', stderr: '', durationMs: 5, truncated: false }; }
         if (command.type === 'verifyContract') return { ok: !command.contract.required.includes('missing.md'), missing: command.contract.required.filter((f) => f === 'missing.md'), schemaErrors: [] };
         return {};
@@ -91,24 +111,24 @@ describe.skipIf(!available)('business-task module', () => {
     expect(await bt.api.subtaskOutput(caller, task.id, command.id)).toBe('done\n');
 
     expect((await bt.api.getSubtask(caller, task.id, agent.id)).state).toBe('running');
-    emit(task.id, agentEvent(start.agentId, 'session', { sessionId: 'sess-1' }));
-    emit(task.id, agentEvent(start.agentId, 'text', { text: '第一段' }));
-    emit(task.id, agentEvent(start.agentId, 'text', { text: '第二段' }));
-    emit(task.id, agentEvent(start.agentId, 'completed', { result: { exitCode: 0 } }));
+    emit(runnerOf(start), agentEvent(start.agentId, 'session', { sessionId: 'sess-1' }));
+    emit(runnerOf(start), agentEvent(start.agentId, 'text', { text: '第一段' }));
+    emit(runnerOf(start), agentEvent(start.agentId, 'text', { text: '第二段' }));
+    emit(runnerOf(start), agentEvent(start.agentId, 'completed', { result: { exitCode: 0 } }));
     const done = await bt.api.getSubtask(caller, task.id, agent.id);
     expect(done).toMatchObject({ state: 'succeeded', sessionId: 'sess-1', contractResult: { ok: true } });
     expect(await bt.api.subtaskOutput(caller, task.id, agent.id)).toBe('第一段第二段');
 
     const strict = await bt.api.submitSubtask(caller, task.id, { kind: 'agent', name: 'strict', agentProfile: 'chat-v1', outputContract: 'strict-v1', mode: 'oneshot', prompt: 'x' });
     const strictStart = commands.filter((c) => c.type === 'startAgent').at(-1) as Extract<RunnerCommand, { type: 'startAgent' }>;
-    emit(task.id, agentEvent(strictStart.agentId, 'completed'));
+    emit(runnerOf(strictStart), agentEvent(strictStart.agentId, 'completed'));
     expect(await bt.api.getSubtask(caller, task.id, strict.id)).toMatchObject({ state: 'failed', contractResult: { ok: false, missing: ['missing.md'] } });
     const retried = await bt.api.retrySubtask(caller, task.id, strict.id);
     expect(retried).toMatchObject({ attempt: 2, state: 'running', name: 'strict' });
 
     const chat = await bt.api.submitSubtask(caller, task.id, { kind: 'agent', name: 'chat', agentProfile: 'chat-v1', mode: 'interactive', prompt: '你好' });
     const chatStart = commands.filter((c) => c.type === 'startAgent').at(-1) as Extract<RunnerCommand, { type: 'startAgent' }>;
-    emit(task.id, agentEvent(chatStart.agentId, 'permission'));
+    emit(runnerOf(chatStart), agentEvent(chatStart.agentId, 'permission'));
     expect((await bt.api.getSubtask(caller, task.id, chat.id)).state).toBe('awaiting-input');
     expect((await bt.api.sendSubtaskMessage(caller, task.id, chat.id, { content: '继续' })).state).toBe('running');
     expect(commands.at(-1)).toMatchObject({ type: 'sendMessage', content: '继续' });
@@ -123,7 +143,12 @@ describe.skipIf(!available)('business-task module', () => {
 
     const closed = await bt.api.closeTask(caller, task.id);
     expect(closed.state).toBe('closed');
-    expect(released).toEqual([task.id]);
+    // 业务任务容器释放；每个已结束的 Agent 子任务的执行环境在结束时已交给 task-runtime 回收（RFC-006）。
+    expect(released).toContain(task.id);
+    const agentRunners = routed.filter((r) => r.command.type === 'startAgent').map((r) => r.taskId);
+    expect(agentRunners.every((id) => id !== task.id)).toBe(true);
+    // 重试的 strict 在关闭任务时仍在运行：它的执行环境由 task-runtime 随业务任务容器一并回收（父释放先回收子执行环境）。
+    expect(agentRunners.filter((id) => released.includes(id))).toHaveLength(agentRunners.length - 1);
     await expect(bt.api.submitSubtask(caller, task.id, { kind: 'command', name: 'late', command: ['ls'], timeoutSeconds: 10 })).rejects.toMatchObject({ kind: 'precondition' });
     expect((await bt.api.listProjectTasks({ userId: 'usr_0123456789abcdef0123456789abcdef' as never, isAdmin: false }, projectId)).length).toBe(1);
   });
@@ -172,7 +197,7 @@ describe.skipIf(!available)('business-task module', () => {
       expect(JSON.stringify(sub)).not.toContain('sk-business');
       // 管理员随后保存了新修订：已受理的 attempt 不换修订；重试是新 attempt，按当时的当前修订固定。
       computeProfiles = [{ name: 'sample-opencode', revision: 8, isDefault: true }];
-      emit(task.id, agentEvent(start.agentId, 'error', { error: { message: 'boom' } }));
+      emit(runnerOf(start), agentEvent(start.agentId, 'error', { error: { message: 'boom' } }));
       expect((await bt.api.getSubtask(caller, task.id, sub.id)).state).toBe('failed');
       const retried = await bt.api.retrySubtask(caller, task.id, sub.id);
       expect(retried).toMatchObject({ attempt: 2, profileRevision: 8 });
@@ -198,6 +223,55 @@ describe.skipIf(!available)('business-task module', () => {
       expect(commands.filter((c) => c.type === 'startAgent' && c.initialPrompt === '默认三')).toHaveLength(0);
     } finally {
       computeProfiles = [{ name: 'sample-opencode', revision: 1, isDefault: true }];
+      await bt.api.closeTask(caller, task.id);
+    }
+  });
+
+  test('Agent 子任务各自一个执行环境（RFC-006 §5.4）：额度满直接失败并写明原因；子 Runner 未连上时等待，连上后派发', async () => {
+    const task = await bt.api.createTask(caller, { labels: {} });
+    try {
+      executionControls.reject = quotaExceeded('项目并发额度已满，子任务未启动；请稍后重试');
+      const full = await bt.api.submitSubtask(caller, task.id, { kind: 'agent', name: 'full', agentProfile: 'chat-v1', mode: 'oneshot', prompt: '额度满' });
+      expect(full).toMatchObject({ state: 'failed', error: '启动 Agent 失败：项目并发额度已满，子任务未启动；请稍后重试' });
+      executionControls.reject = undefined;
+      executionControls.connected = false;
+      const waiting = await bt.api.submitSubtask(caller, task.id, { kind: 'agent', name: 'wait-child', agentProfile: 'chat-v1', mode: 'interactive', prompt: '等子 Runner' });
+      expect(waiting.state).toBe('pending');
+      expect(routed.filter((r) => r.command.type === 'startAgent' && r.command.initialPrompt === '等子 Runner')).toHaveLength(0);
+      await expect(bt.api.sendSubtaskMessage(caller, task.id, waiting.id, { content: 'x' })).rejects.toMatchObject({ kind: 'precondition' });
+      const [executionId, execution] = [...executions.entries()].at(-1)!;
+      expect(execution.native?.state).toBe('queued');
+      execution.connected = true; execution.state = 'running'; execution.native = { state: 'running' };
+      expect(await bt.api.dispatchPendingSubtasks(executionId as never)).toBe(1);
+      const start = routed.find((r) => r.command.type === 'startAgent' && r.command.initialPrompt === '等子 Runner')!;
+      expect(start.taskId).toBe(executionId);
+      expect((await bt.api.getSubtask(caller, task.id, waiting.id)).state).toBe('running');
+      await bt.api.sendSubtaskMessage(caller, task.id, waiting.id, { content: '继续' });
+      expect(routed.at(-1)).toMatchObject({ taskId: executionId, command: { type: 'sendMessage', content: '继续' } });
+    } finally {
+      executionControls.connected = true; executionControls.reject = undefined;
+      await bt.api.closeTask(caller, task.id);
+    }
+  });
+
+  test('执行环境在 Agent 结束前没了（业务任务暂停、Pod 丢失）：子任务失败并带原因；未开始的子任务取消即回收执行环境', async () => {
+    const task = await bt.api.createTask(caller, { labels: {} });
+    try {
+      const running = await bt.api.submitSubtask(caller, task.id, { kind: 'agent', name: 'lost', agentProfile: 'chat-v1', mode: 'oneshot', prompt: '会丢' });
+      const executionId = routed.find((r) => r.command.type === 'startAgent' && r.command.initialPrompt === '会丢')!.taskId;
+      const env = executions.get(executionId)!;
+      env.connected = false; env.state = 'releasing'; env.native = { state: 'cleaning', failureReason: '业务任务已暂停，此子任务的执行环境随之结束' };
+      expect(await bt.api.getSubtask(caller, task.id, running.id)).toMatchObject({ state: 'failed', error: '业务任务已暂停，此子任务的执行环境随之结束' });
+
+      executionControls.connected = false;
+      const pending = await bt.api.submitSubtask(caller, task.id, { kind: 'agent', name: 'never', agentProfile: 'chat-v1', mode: 'oneshot', prompt: '不会起' });
+      const pendingExecution = [...executions.keys()].at(-1)!;
+      const before = routed.length;
+      expect((await bt.api.cancelSubtask(caller, task.id, pending.id)).state).toBe('cancelled');
+      expect(routed.slice(before).filter((r) => r.command.type === 'cancelAgent')).toHaveLength(0);
+      expect(released).toContain(pendingExecution);
+    } finally {
+      executionControls.connected = true;
       await bt.api.closeTask(caller, task.id);
     }
   });

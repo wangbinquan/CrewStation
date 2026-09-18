@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import type { AgentInstanceDto } from '@crewstation/contracts';
 import type { ReactElement } from 'react';
 import { errorMessage } from '../../../../shared/api/useApi';
 import { useT } from '../../../../shared/lib/useT';
 import { Button } from '../../../../shared/ui/Button';
 import { UnsavedChangesGuard } from '../../../../shared/navigation/UnsavedChangesGuard';
-import type { DevAgentsHandle } from '../../hooks/useDevAgents';
+import type { AgentSelection, DevAgentsHandle } from '../../hooks/useDevAgents';
 import { useHistoricalMessages } from '../../hooks/useHistoricalMessages';
 import { useHistoricalStart } from '../../hooks/useHistoricalStart';
 import type { TranscriptsByAgent } from '../../model/agentTranscript';
@@ -21,22 +21,29 @@ export interface AgentsPaneProps {
   readonly agents: DevAgentsHandle;
   readonly transcripts: TranscriptsByAgent;
   readonly onActivity: () => void;
-  readonly initialAgentId?: string;
+  /** 选择在页面层：页面还要据此订阅选中 Agent 的执行环境流（RFC-006）。 */
+  readonly selection: AgentSelection;
+}
+
+/** 选中 Agent 的执行环境（RFC-006：每个 Agent 一个 Pod）：准备中写明排队或调度原因，失败写明原因。 */
+function ExecutionNotice({ agent }: { readonly agent: AgentInstanceDto | undefined }): ReactElement | null {
+  const t = useT();
+  const execution = agent?.execution;
+  if (agent === undefined || execution === undefined) return null;
+  if (agent.state === 'failed' && execution.message) return <PaneNotice tone="warning">{t('devSession.agents.executionFailedReason', { reason: execution.message })}</PaneNotice>;
+  if (execution.state !== 'queued' && execution.state !== 'starting') return null;
+  return <PaneNotice tone="info">{execution.message ? t('devSession.agents.executionPreparingReason', { reason: execution.message }) : t('devSession.agents.executionPreparingHint')}</PaneNotice>;
 }
 
 /** Agent 面板：并行 Agent 的名册、当前 Agent 的转录与输入框，以及新建入口。 */
-export function AgentsPane({ agents, transcripts, onActivity, initialAgentId }: AgentsPaneProps): ReactElement {
+export function AgentsPane({ agents, transcripts, onActivity, selection }: AgentsPaneProps): ReactElement {
   const t = useT();
-  const [choice, setChoice] = useState<{ source?: string; agentId?: string }>({});
   const messages = useHistoricalMessages(agents.sendMessage);
-  const picked = choice.source === initialAgentId ? choice.agentId : initialAgentId;
-  const setPicked = (agentId: string) => setChoice({ source: initialAgentId, agentId });
+  const { picked, selected, select: setPicked } = selection;
   const creation = useHistoricalStart(agents.start, (agentId, showResult) => {
     if (showResult) setPicked(agentId);
     onActivity();
   });
-  // 没选过就看第一个：名册异步到达时不需要在 effect 里补 setState。
-  const selected = picked === undefined ? agents.agents[0] : agents.agents.find((agent) => agent.agentId === picked);
   const draft = selected === undefined ? undefined : messages.drafts[selected.agentId];
   const lines = selected === undefined ? [] : (transcripts[selected.agentId] ?? []);
   return (
@@ -62,6 +69,7 @@ export function AgentsPane({ agents, transcripts, onActivity, initialAgentId }: 
             {agents.agents.length === 0 ? <PaneNotice tone="muted">{t('devSession.agents.empty')}</PaneNotice> : null}
             {agents.loadError !== null ? <PaneNotice tone="warning">{errorMessage(agents.loadError)}</PaneNotice> : null}
             {!agents.isPending && picked !== undefined && selected === undefined ? <PaneNotice tone="warning">{t('devSession.agents.missingTarget')}</PaneNotice> : null}
+            <ExecutionNotice agent={selected} />
             <AgentTranscriptView lines={lines} />
             <AgentComposer
               disabled={selected === undefined || !agentAcceptsInput(selected.state)}

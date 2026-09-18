@@ -24,7 +24,7 @@ class NativeTerminals {
     const profile = await nativeCompute(this.deps, input.compute);
     return this.repository.reserve({
       taskId, createdBy: actor.userId, clientRequestId: input.clientRequestId, fingerprint: fingerprintOf(input), input,
-      profile: { profile: profile.name, revision: profile.revision }, execution: { taskId: newId('tsk') as TaskId, ...(profile.taskProfile ? { taskProfile: profile.taskProfile } : {}) },
+      profile: { profile: profile.name, revision: profile.revision }, execution: { taskId: newId('tsk') as TaskId, image: profile.image, ...(profile.taskProfile ? { taskProfile: profile.taskProfile } : {}) },
       record: { agentId: newId('agt'), terminalId: newId('pty'), runnerId: crypto.randomUUID(), compute: profile.name, permission: input.permission, revision: 0, lifecycle: 'starting', startedAt: this.deps.clock.now().toISOString(), cols: input.cols, rows: input.rows, profileRevision: profile.revision, protocol: profile.protocol },
     });
   }

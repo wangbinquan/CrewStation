@@ -21,7 +21,7 @@ export function isolatedNativeFixture() {
     const existing = environments.get(input.id); if (existing) return existing;
     if (controls.reject) throw controls.reject;
     const env: EnvironmentView = { ...(await parent(workspaceTask))!, id: input.id, connected: controls.ready, state: controls.ready ? 'running' : 'creating',
-      native: { parentTaskId: input.parentTaskId, agentId: input.agentId, terminalId: input.terminalId, runnerId: input.runnerId, state: controls.ready ? 'running' : 'queued', profile: { name: input.profile ?? 'default', cpu: '1', memory: '2Gi', storage: '2Gi' } } };
+      native: { purpose: input.purpose, parentTaskId: input.parentTaskId, agentId: input.agentId, terminalId: input.terminalId, runnerId: input.runnerId, state: controls.ready ? 'running' : 'queued', profile: { name: input.profile ?? 'default', cpu: '1', memory: '2Gi', storage: '2Gi' } } };
     environments.set(input.id, env); allocations.push(input.id); steps.push(`allocate:${input.id}`);
     rosters.set(input.id, { runnerId: input.runnerId, terminals: [] });
     if (controls.loseCreate) { controls.loseCreate = false; throw new Error('lost create receipt'); }

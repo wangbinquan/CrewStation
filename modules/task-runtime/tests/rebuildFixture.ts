@@ -8,7 +8,7 @@ import { sql } from 'drizzle-orm';
 import { createTaskRuntimeModule, taskRuntimeMigrations } from '../wiring';
 import { drizzleUnitOfWork } from '../adapters/persistence/drizzleUnitOfWork';
 
-export async function rebuildFixture(options: { running?: boolean } = {}) {
+export async function rebuildFixture(options: { running?: boolean; kind?: 'dev-session' | 'business' } = {}) {
   const tdb = await createTestDatabase([eventbusMigrations, queueMigrations, taskRuntimeMigrations]);
   const k8s = createFakeK8sClient();
   const projectId = `prj_${'a'.repeat(32)}` as ProjectId, serviceId = `svc_${'a'.repeat(32)}` as ServiceId;
@@ -21,7 +21,10 @@ export async function rebuildFixture(options: { running?: boolean } = {}) {
     sources: { configEnv: async () => ({ GREETING: 'keep' }), dataEnv: async () => ({ CS_DATABASE_URL: 'test-database' }), taskDataEnv: async () => ({}) },
     checkout: { checkoutFor: async () => { state.checkoutCalls++; return { repoUrl: 'https://git.invalid/qa.git', credentialSecretName: 'original-checkout' }; } },
     clock: { now: () => new Date(++time) }, settings: { taskImage: 'task:current', sessionUrl: 'ws://session/runner', systemNamespace: 'cs-system', userDomain: 'localhost', serviceDomain: 'svc.localhost', workerUid: 10001, defaultProfile: 'coding-medium', userAuthMiddleware: 'auth', dropIdentityHeadersMiddleware: 'drop' } });
-  const initial = await runtime.api.createEnvironment({ serviceId, kind: 'dev-session', branch: 'work', preview: { command: ['bun', 'run', 'dev'], port: 3000, healthPath: '/' } });
+  // 业务任务父环境（RFC-006 子任务执行环境）用持久卷模式，才能验证暂停。
+  const initial = options.kind === 'business'
+    ? await runtime.api.createEnvironment({ serviceId, kind: 'business', volumeMode: 'persistent' })
+    : await runtime.api.createEnvironment({ serviceId, kind: 'dev-session', branch: 'work', preview: { command: ['bun', 'run', 'dev'], port: 3000, healthPath: '/' } });
   const uow = drizzleUnitOfWork(tdb.db), env = (await uow.read.environments.getById(initial.id))!;
   const pod = (await k8s.get(Resources.Pod!, env.podName, env.namespace))!;
   const token = (pod.spec as { containers: Array<{ env: Array<{ name: string; value: string }> }> }).containers[0]!.env.find((v) => v.name === 'CS_RUNNER_TOKEN')!.value;

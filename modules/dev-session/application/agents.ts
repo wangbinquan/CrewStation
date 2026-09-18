@@ -1,14 +1,18 @@
 import type {
-  Actor, AgentEvent, AgentInstanceDto, AgentInstanceState, BeforeStartExecution, RunnerEvent, SendAgentMessageRequest, ServiceId, StartDevAgentRequest, TaskId,
+  Actor, AgentEvent, AgentInstanceDto, AgentInstanceState, BeforeStartExecution, RunnerEvent, SendAgentMessageRequest, StartDevAgentRequest, TaskId,
 } from '@crewstation/contracts';
-import { IDENTITY_HEADERS } from '@crewstation/contracts';
 import { forbidden, newId, notFound, precondition } from '@crewstation/kernel';
+import type { AgentStart, AgentStartRepository } from '../ports/agentStarts';
+import type { AgentExecutionLifecycle } from './agentExecution';
 import type { DevSessionUseCaseDeps } from './dependencies';
-import { profileLaunchFields } from './profileLaunch';
 
-/** 开发会话内的 Agent 都是流式交互（G5）；平台只负责启动、传话与取消，不编排（R04）。 */
-export function agentUseCases(deps: DevSessionUseCaseDeps) {
-  const { environments, runner, authorizer, settings } = deps;
+/**
+ * 开发会话内的 Agent 都是流式交互（G5）；平台只负责启动、传话与取消，不编排（R04）。
+ * RFC-006：每个 Agent 一个执行环境（Pod）。受理时固定档位修订并登记执行环境（占额度），子 Runner 连上后派发；
+ * 消息与取消路由到子 Runner。RFC-006 之前在开发容器里起的 Agent 没有受理记录，仍按父任务路由与还原。
+ */
+export function agentUseCases(deps: DevSessionUseCaseDeps, starts: AgentStartRepository, executions: AgentExecutionLifecycle) {
+  const { environments, runner, authorizer } = deps;
   const guard = async (actor: Actor, taskId: TaskId) => {
     const env = await environments.getEnvironment(taskId);
     if (!env) throw notFound('开发会话', taskId);
@@ -17,56 +21,82 @@ export function agentUseCases(deps: DevSessionUseCaseDeps) {
     if (!env.connected) throw precondition('开发容器尚未连接');
     return env;
   };
+  /** 消息与取消的目标 Runner：有受理记录的走它自己的执行环境，老 Agent 走父开发容器。 */
+  const target = async (taskId: TaskId, agentId: string): Promise<{ start?: AgentStart; runnerTask: TaskId }> => {
+    const start = await starts.get(agentId);
+    return start && start.taskId === taskId ? { start, runnerTask: start.execution.taskId } : { runnerTask: taskId };
+  };
   return {
     startAgent: async (actor: Actor, taskId: TaskId, input: StartDevAgentRequest): Promise<AgentInstanceDto> => {
       const env = await guard(actor, taskId);
-      const agentId = newId('agt');
-      // 连接头在 spawn 时写死、事后改不了，所以每次启动 Agent 现签一枚，而不是续期旧的（Design §5.9）。
-      const credential = await deps.credentials.issueDevSessionToken({
-        taskId, projectId: env.projectId, serviceId: env.serviceId as ServiceId, userId: actor.userId,
-      });
-      const headers = { [IDENTITY_HEADERS.devSessionToken]: credential.token };
-      // RFC-006：受理时解析档位（省略即 default），headless 只能用两种已知协议；按固定修订取派发材料。
+      // RFC-006：受理时解析档位（省略即 default），headless 只能用两种已知协议；此后派发只按固定修订取材料。
       const resolved = await deps.compute.resolve(input.compute, 'agent');
-      const profile = await profileLaunchFields(deps, { profile: resolved.name, revision: resolved.revision }, agentId);
-      await runner.sendCommand(taskId, {
-        id: `start-${agentId}`, type: 'startAgent', agentId, ...profile,
-        permission: input.permission, mode: 'interactive',
-        ...(input.cwd ? { cwd: input.cwd } : {}), initialPrompt: input.prompt, ...(input.resumeSessionId ? { resumeSessionId: input.resumeSessionId } : {}),
-        mcp: settings.mcp.map((m) => ({ name: m.name, url: m.url, headers })), env: {},
-      });
+      const start: AgentStart = {
+        agentId: newId('agt'), taskId: env.id, createdBy: actor.userId, compute: resolved.name, profile: { profile: resolved.name, revision: resolved.revision }, permission: input.permission,
+        request: { prompt: input.prompt, ...(input.cwd ? { cwd: input.cwd } : {}), ...(input.resumeSessionId ? { resumeSessionId: input.resumeSessionId } : {}) },
+        execution: { taskId: newId('tsk') as TaskId, runnerId: crypto.randomUUID(), image: resolved.image, ...(resolved.taskProfile ? { taskProfile: resolved.taskProfile } : {}) },
+        state: 'pending', cursor: 0, finalized: false, createdAt: deps.clock.now().toISOString(),
+      };
+      await starts.insert(start);
+      const execution = await executions.admit(start);
+      void executions.dispatch(start.agentId);
       await environments.touch(taskId);
-      return { agentId, taskId: env.id, compute: resolved.name, permission: input.permission, state: 'preparing', profileRevision: resolved.revision, startedAt: deps.clock.now().toISOString() };
+      return { agentId: start.agentId, taskId: env.id, compute: start.compute, permission: start.permission, state: 'preparing', profileRevision: start.profile.revision,
+        execution: { taskId: execution.id, state: execution.native?.state ?? 'queued', ...(execution.message ? { message: execution.message } : {}) }, startedAt: start.createdAt };
     },
     sendMessage: async (actor: Actor, taskId: TaskId, agentId: string, input: SendAgentMessageRequest): Promise<void> => {
       await guard(actor, taskId);
-      await runner.sendCommand(taskId, { id: `msg-${newId('m')}`, type: 'sendMessage', agentId, content: input.content });
+      const { start, runnerTask } = await target(taskId, agentId);
+      if (start && start.state !== 'dispatched') throw precondition(start.state === 'pending' ? '此 Agent 还在准备执行环境，请稍后再发' : '此 Agent 已结束');
+      await runner.sendCommand(runnerTask, { id: `msg-${newId('m')}`, type: 'sendMessage', agentId, content: input.content });
       await environments.touch(taskId);
     },
     cancelAgent: async (actor: Actor, taskId: TaskId, agentId: string): Promise<void> => {
       await guard(actor, taskId);
-      await runner.sendCommand(taskId, { id: `cancel-${agentId}`, type: 'cancelAgent', agentId });
+      const { start, runnerTask } = await target(taskId, agentId);
+      // 还没派发：直接结束并回收执行环境，不再起进程。
+      if (start?.state === 'pending') { await executions.end(start, { cancelled: true }); await executions.dispatch(agentId); return; }
+      if (start?.state === 'ended') return;
+      await runner.sendCommand(runnerTask, { id: `cancel-${agentId}`, type: 'cancelAgent', agentId });
     },
-    /** 从持久事件还原每个 Agent 的最新状态。 */
+    /** 从各来源（父开发容器与每个 Agent 的执行环境）的持久事件还原每个 Agent 的最新状态。 */
     listAgents: async (actor: Actor, taskId: TaskId): Promise<AgentInstanceDto[]> => {
       const env = await environments.getEnvironment(taskId);
       if (!env) throw notFound('开发会话', taskId);
       await authorizer.authorize(actor, env.projectId, 'view');
+      const recorded = await starts.listByTask(taskId);
       const agents = new Map<string, AgentInstanceDto>();
-      for (const stored of await runner.listEvents(taskId, { kinds: ['agent', 'beforeStart'], limit: 5000 })) {
-        if (stored.event.kind === 'beforeStart') { applyBeforeStart(agents, taskId, stored.event.execution, stored.at); continue; }
-        const e = stored.event as Extract<RunnerEvent, { kind: 'agent' }>;
-        // 档位与权限只在 started 事件的 spec 里；缺了就如实留空，不编造（权限编错尤其误导人）。
-        const current = agents.get(e.event.agentId) ?? { agentId: e.event.agentId, taskId, compute: '', permission: 'read-only' as const, state: 'starting' as AgentInstanceState, startedAt: stored.at };
-        const spec = e.event.spec ? { compute: e.event.spec.compute, permission: e.event.spec.permission, profileRevision: e.event.spec.profileRevision } : {};
-        agents.set(e.event.agentId, {
-          ...current, ...spec, ...(e.event.sessionId ? { sessionId: e.event.sessionId } : {}),
-          state: stateOf(e.event, current.state), ...(isTerminal(e.event.type) ? { endedAt: stored.at } : {}),
-        });
+      for (const source of [taskId, ...recorded.map((s) => s.execution.taskId)]) {
+        for (const stored of await runner.listEvents(source, { kinds: ['agent', 'beforeStart'], limit: 5000 })) applyStored(agents, taskId, stored);
       }
+      for (const start of recorded) agents.set(start.agentId, await withExecution(deps, start, agents.get(start.agentId)));
       return [...agents.values()];
     },
   };
+}
+
+function applyStored(agents: Map<string, AgentInstanceDto>, taskId: TaskId, stored: { at: string; event: RunnerEvent }): void {
+  if (stored.event.kind === 'beforeStart') { applyBeforeStart(agents, taskId, stored.event.execution, stored.at); return; }
+  if (stored.event.kind !== 'agent') return;
+  const e = stored.event;
+  // 档位与权限只在 started 事件的 spec 里；缺了就如实留空，不编造（权限编错尤其误导人）。
+  const current = agents.get(e.event.agentId) ?? { agentId: e.event.agentId, taskId, compute: '', permission: 'read-only' as const, state: 'starting' as AgentInstanceState, startedAt: stored.at };
+  const spec = e.event.spec ? { compute: e.event.spec.compute, permission: e.event.spec.permission, profileRevision: e.event.spec.profileRevision } : {};
+  agents.set(e.event.agentId, {
+    ...current, ...spec, ...(e.event.sessionId ? { sessionId: e.event.sessionId } : {}),
+    state: stateOf(e.event, current.state), ...(isTerminal(e.event.type) ? { endedAt: stored.at } : {}),
+  });
+}
+
+/** 受理记录补齐名册：还没有事件的 Agent 显示为准备中；执行环境的状态与原因（排队、调度、失败）原样带上。 */
+async function withExecution(deps: DevSessionUseCaseDeps, start: AgentStart, observed: AgentInstanceDto | undefined): Promise<AgentInstanceDto> {
+  const env = start.finalized ? undefined : await deps.environments.getEnvironment(start.execution.taskId);
+  const base: AgentInstanceDto = observed ?? { agentId: start.agentId, taskId: start.taskId, compute: start.compute, permission: start.permission, state: 'preparing', profileRevision: start.profile.revision, startedAt: start.createdAt };
+  const state: AgentInstanceState = start.state === 'ended' && !['completed', 'failed', 'cancelled'].includes(base.state) ? (start.cancelled ? 'cancelled' : start.failure ? 'failed' : 'completed') : base.state;
+  const executionState = env?.native?.state ?? (start.finalized || start.state === 'ended' ? 'finished' : 'queued');
+  const message = start.failure ?? (['queued', 'starting'].includes(executionState) ? env?.message : undefined);
+  return { ...base, compute: base.compute || start.compute, profileRevision: base.profileRevision ?? start.profile.revision, state,
+    ...(state !== base.state && start.endedAt ? { endedAt: start.endedAt } : {}), execution: { taskId: start.execution.taskId, state: executionState, ...(message ? { message } : {}) } };
 }
 
 /** 启动前步骤的进度只影响“环境准备中／准备失败”，不会被显示成 Agent 正在执行任务（RFC-004、RFC-006）。 */

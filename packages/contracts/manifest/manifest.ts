@@ -82,7 +82,7 @@ export function describeManifestFailure(error: z.ZodError): string {
   const issues = error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`);
   const legacyCompute = error.issues.some((issue) => issue.path.includes('agentProfiles') && /driver|model|compute/.test(issue.message));
   const hint = legacyCompute
-    ? '；算力已由平台统一提供（RFC-001）：把 agentProfiles 里的 driver 与 model 换成一行 `compute: <档位名>`，可用档位见工作台的平台管理 → 算力档位'
+    ? '；算力已由平台统一提供（RFC-001、RFC-006）：把 agentProfiles 里的 driver 与 model 换成一行 `compute: <档位名>`，或写 `compute: default` 使用管理员设定的默认档位；可用的算力档位见工作台的能力页'
     : '';
   return `${issues.join('；')}${hint}`;
 }

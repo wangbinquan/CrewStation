@@ -11,6 +11,8 @@ import { drizzleReminderRepository } from './adapters/persistence/drizzleReminde
 import { drizzleNativeTerminals } from './adapters/persistence/drizzleNativeTerminals';
 import { drizzleWorkspaceLayouts } from './adapters/persistence/drizzleWorkspaceLayouts';
 import { drizzleNativeActivity } from './adapters/persistence/drizzleNativeActivity';
+import { drizzleAgentStarts } from './adapters/persistence/drizzleAgentStarts';
+import { AgentExecutionLifecycle } from './application/agentExecution';
 import { boundedNativeRead, nativeActivityUseCases } from './application/nativeActivity';
 import { workspaceLayoutUseCases } from './application/workspaceLayout';
 import { workspaceLayoutRoutes } from './http/workspaceLayoutRoutes';
@@ -69,7 +71,9 @@ export function createDevSessionModule(deps: DevSessionModuleDeps): DevSessionMo
     settings: deps.settings, clock: deps.clock ?? systemClock, logger: deps.logger ?? noopLogger,
   };
   const lifecycle = sessionLifecycleUseCases(useCaseDeps);
-  const agents = agentUseCases(useCaseDeps);
+  const agentStarts = drizzleAgentStarts(deps.db);
+  const agentExecutions = new AgentExecutionLifecycle(useCaseDeps, agentStarts);
+  const agents = agentUseCases(useCaseDeps, agentStarts, agentExecutions);
   const remind = idleReminderUseCase(useCaseDeps);
   const terminals = drizzleNativeTerminals(deps.db);
   const activity = nativeActivityUseCases(useCaseDeps, drizzleNativeActivity(deps.db), terminals);
@@ -77,6 +81,9 @@ export function createDevSessionModule(deps: DevSessionModuleDeps): DevSessionMo
   const api: DevSessionModuleApi = {
     invokeApi: apiInvocationUseCase(useCaseDeps),
     name: 'dev-session', ...lifecycle, ...agents, ...native, ...activity, ...workspaceLayoutUseCases(useCaseDeps, drizzleWorkspaceLayouts(deps.db), terminals),
+    // 子 Runner 连上时由组合根调用：headless Agent 的执行环境先认领，其余按「＋ CLI」处理（RFC-006）。
+    dispatchPendingNativeExecution: async (executionTaskId) => { if (!(await agentExecutions.dispatchExecution(executionTaskId))) await native.dispatchPendingNativeExecution(executionTaskId); },
+    reconcileNativeExecutions: async () => { await Promise.all([native.reconcileNativeExecutions(), agentExecutions.sweep()]); },
     ...rebuildSessionUseCases(useCaseDeps),
     ...versionComparisonUseCases(useCaseDeps), workspaceStatus: workspaceStatusUseCase(useCaseDeps), publish: publishFromSessionUseCase(useCaseDeps), sendIdleReminders: remind,
     async listNativeTerminals(actor, taskId) {
@@ -95,7 +102,7 @@ export function createDevSessionModule(deps: DevSessionModuleDeps): DevSessionMo
     api,
     http: [devSessionRoutes(api, deps.isAdmin), nativeTerminalRoutes(api, deps.isAdmin), workspaceLayoutRoutes(api, deps.isAdmin)],
     workers: [{ start: () => { timer ??= setInterval(() => void remind().catch((e: unknown) => useCaseDeps.logger.error('idle reminder failed', { error: String(e) })), 60_000); }, stop: async () => { if (timer) clearInterval(timer); timer = undefined; } },
-      { start: () => { executionTimer ??= setInterval(() => void native.reconcileNativeExecutions().catch(() => useCaseDeps.logger.error('native execution reconciliation failed')), 2000); }, stop: async () => { if (executionTimer) clearInterval(executionTimer); executionTimer = undefined; } }],
+      { start: () => { executionTimer ??= setInterval(() => void api.reconcileNativeExecutions().catch(() => useCaseDeps.logger.error('execution reconciliation failed')), 2000); }, stop: async () => { if (executionTimer) clearInterval(executionTimer); executionTimer = undefined; } }],
     migrations: devSessionMigrations,
   };
 }

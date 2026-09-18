@@ -57,6 +57,11 @@ export const AgentInstanceDtoSchema = z.object({
   /** RFC-006：此 Agent 受理时固定的档位修订。 */
   profileRevision: z.number().int().min(1).optional(),
   beforeStart: z.object({ executionId: z.string().min(1), state: BeforeStartStateSchema, currentStep: z.string().optional(), failedStep: z.string().optional(), error: z.string().optional() }).optional(),
+  /**
+   * RFC-006：此 Agent 独立的执行环境（每个 Agent 一个 Pod）。taskId 用来订阅它的流；message 写明排队、调度、失败的原因。
+   * RFC-006 之前在开发容器里起的 Agent 没有这一项。
+   */
+  execution: z.object({ taskId: TaskIdSchema, state: z.enum(['queued', 'starting', 'running', 'cleaning', 'finished']), message: z.string().optional() }).optional(),
   startedAt: z.iso.datetime(),
   endedAt: z.iso.datetime().optional(),
 });

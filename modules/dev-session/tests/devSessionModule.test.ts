@@ -18,6 +18,8 @@ const serviceId = 'svc_0123456789abcdef0123456789abcdef' as ServiceId;
 const owner: Actor = { userId: 'usr_0123456789abcdef0123456789abcdef' as UserId, isAdmin: false };
 const developer: Actor = { userId: 'usr_1123456789abcdef0123456789abcdef' as UserId, isAdmin: false };
 const envs = new Map<string, EnvironmentView & { createdBy: UserId; preview?: { command: string[]; port: number; healthPath: string } }>();
+/** RFC-006：每个 headless Agent 一个执行环境；这里假定子 Runner 立即连上。 */
+const executions = new Map<string, EnvironmentView>();
 const computeProfiles: FakeProfile[] = [{ name: 'balanced', protocol: 'claude-code', model: 'anthropic/claude-sonnet-5', isDefault: true }, { name: 'term-cli', protocol: 'terminal' }];
 const commands: RunnerCommand[] = [];
 let agentEvents: Array<{ seq: number; at: string; event: RunnerEvent }> | undefined;
@@ -37,13 +39,18 @@ beforeAll(async () => {
     apiCatalog: { listOperations: async () => [] },
     db: tdb.db,
     environments: {
-      createNativeExecution: async () => { throw new Error('独立执行未设置'); },
+      createNativeExecution: async (input) => {
+        const env: EnvironmentView = { id: input.id, projectId, serviceId, state: 'running', podName: `agt-${input.id.slice(4)}`, connected: true, traceId: 'trace', createdAt: new Date().toISOString(), lastActivityAt: new Date().toISOString(),
+          native: { purpose: input.purpose, parentTaskId: input.parentTaskId, agentId: input.agentId, runnerId: input.runnerId, state: 'running', profile: { name: input.profile ?? 'coding-medium', cpu: '1', memory: '2Gi', storage: '2Gi' } } };
+        executions.set(input.id, env);
+        return env;
+      },
       getRebuild: async () => undefined,
       inspectRebuild: async () => { throw new Error("恢复预检未设置"); },
       requestRebuild: async () => { throw new Error("恢复请求未设置"); },
       createEnvironment: async (input) => { const env = { id: `tsk_${Bun.randomUUIDv7().replace(/-/g, '')}` as TaskId, projectId, serviceId: input.serviceId, state: 'running' as const, podName: 'task-x', connected: true, branch: input.branch, traceId: 'trace', createdAt: new Date().toISOString(), lastActivityAt: new Date('2026-09-11T00:00:00Z').toISOString(), createdBy: input.createdBy, preview: input.preview }; envs.set(env.id, env); return env; },
       releaseEnvironment: async (taskId) => { const env = envs.get(taskId)!; envs.delete(taskId); return { ...env, state: 'released' }; },
-      getEnvironment: async (taskId) => envs.get(taskId),
+      getEnvironment: async (taskId) => envs.get(taskId) ?? executions.get(taskId),
       findDevSession: async (_projectId, options) => [...envs.values()].find((env) => ['creating', 'running', 'releasing'].includes(env.state)) ?? (options?.includeLatestFailure ? [...envs.values()].at(-1) : undefined),
       listRunningDevSessions: async () => [...envs.values()],
       touch: async (taskId) => { const env = envs.get(taskId); if (env) env.lastActivityAt = new Date().toISOString(); },
@@ -89,6 +96,8 @@ describe.skipIf(!available)('dev-session module', () => {
     expect((await dev.api.listBranches(developer, projectId))[0]).toMatchObject({ name: 'main', behindPreview: 2 });
 
     const agent = await dev.api.startAgent(developer, created.id, { compute: 'balanced', permission: 'edit', prompt: '你好' });
+    expect(agent.execution).toMatchObject({ state: 'running' });
+    await dev.api.dispatchPendingNativeExecution(agent.execution!.taskId);
     const start = commands.find((c) => c.type === 'startAgent');
     expect(start).toMatchObject({ mode: 'interactive', initialPrompt: '你好', mcp: [{ name: 'capabilities' }] });
     // 会话级短期令牌进了 MCP 连接头，并且绑定的是本会话、本项目、本服务与启动者（Design §5.9）。
@@ -130,11 +139,16 @@ describe.skipIf(!available)('dev-session module', () => {
     const created = [...envs.values()][0]!;
     commands.length = 0;
 
+    const startAndDispatch = async (input: Parameters<typeof dev.api.startAgent>[2]) => {
+      const dto = await dev.api.startAgent(developer, created.id, input);
+      await dev.api.dispatchPendingNativeExecution(dto.execution!.taskId);
+      return dto;
+    };
     // 省略 compute → 解析到管理员设为默认的档位，命令带上固定修订与 launch（显式二进制）。
-    await dev.api.startAgent(developer, created.id, { permission: 'edit', prompt: '用默认档' });
+    await startAndDispatch({ permission: 'edit', prompt: '用默认档' });
     expect(commands.find((c) => c.type === 'startAgent')).toMatchObject({ compute: 'balanced', profileRevision: 1, launch: { protocol: 'claude-code', binaryPath: '/usr/local/bin/claude', model: 'anthropic/claude-sonnet-5' }, beforeStart: { profile: 'balanced', revision: 1 } });
     commands.length = 0;
-    await dev.api.startAgent(developer, created.id, { compute: 'default', permission: 'edit', prompt: '显式 default' });
+    await startAndDispatch({ compute: 'default', permission: 'edit', prompt: '显式 default' });
     expect(commands.find((c) => c.type === 'startAgent')).toMatchObject({ compute: 'balanced' });
 
     // 不存在的档位：报错里要列出可选项，否则调用方只能去猜。
@@ -161,6 +175,7 @@ describe.skipIf(!available)('dev-session module', () => {
       // 错误要能照着改：指出换成 compute，并说去哪儿看可用档位。
       expect(session.message).toContain('compute: <档位名>');
       expect(session.message).toContain('算力档位');
+      expect(session.message).toContain('compute: default');
       // 没有预览配置：开发容器不会拿着半截 Manifest 去起预览。
       expect([...envs.values()].at(-1)?.preview).toBeUndefined();
     } finally {

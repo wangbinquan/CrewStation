@@ -5,33 +5,40 @@
 
 ## 一句话
 
-基线三件套（v0.3.3）的第一轮实现已在本机 kind 集群上跑通并推上 main；**RFC-001（算力归平台）与 RFC-002（管理空间与租户空间分离）已实现、实跑确认并推上 main；RFC-004（管理员定义 Agent 启动前 Hook）的生产代码与测试已于 2026-09-16 提交 main，实机验收未做；RFC-003 工作台已按设计附件完成并整体部署到本机，52／52 项 UX-AT 全部实机通过、本地 gate 与精确 SHA CI 通过,RFC-003 已 Done**。
+基线三件套（v0.3.3）的第一轮实现已在本机 kind 集群上跑通并推上 main；**RFC-001（算力归平台）与 RFC-002（管理空间与租户空间分离）已实现、实跑确认并推上 main；RFC-004 已被 RFC-006 取代（Superseded）；RFC-006（算力档位合并运行环境、每个 Agent 一个 Pod）的代码与测试已提交 main，实机验收未做；RFC-003 工作台已按设计附件完成并整体部署到本机，52／52 项 UX-AT 全部实机通过、本地 gate 与精确 SHA CI 通过,RFC-003 已 Done**。
 
 ## 进行中的 RFC
 
-**RFC-003 工作台 UX 重设计已 Done（2026-09-16）：52／52 项 UX-AT 全部实机通过,本地 gate 与精确 SHA CI 通过。RFC-004（管理员定义 Agent 启动前 Hook）于 2026-09-16 按作者会话目标提前完成代码落地，状态 In Progress（实机验收待续）——现可按其 plan.md 启动 Hook 实机。** RFC-001 与 RFC-002 都已 Done，见 `proposal/rfc/README.md` 的索引表。**RFC-005（OIDC／OAuth 2.0 公司登录）于 2026-09-18 落档为 Draft，待作者批准后才可进入实现（开发规则 §5.3）。** **RFC-006（算力档位合并运行环境）2026-09-18 落档，同日作者设定会话目标「完整实现RFC并提交上库」，进入实施（In Progress）；RFC-004 同日置为 Superseded，其 AR 实机验收不再执行。**
+**RFC-003 工作台 UX 重设计已 Done（2026-09-16）：52／52 项 UX-AT 全部实机通过,本地 gate 与精确 SHA CI 通过。RFC-004（管理员定义 Agent 启动前 Hook）已按 RFC-006 的裁定 C8 置为 Superseded，其 AR 实机验收不再执行。** RFC-001 与 RFC-002 都已 Done，见 `proposal/rfc/README.md` 的索引表。**RFC-005（OIDC／OAuth 2.0 公司登录）于 2026-09-18 落档为 Draft，待作者批准后才可进入实现（开发规则 §5.3）。** **RFC-006（算力档位合并运行环境）2026-09-18 落档，同日作者设定会话目标「完整实现RFC并提交上库」，进入实施（In Progress）：代码与自动化证据已提交 main，实机验收（T12）待做，见下方接力。**
 
-## 最新接力：RFC-006（算力档位合并运行环境）三件套落档，待作者批准（2026-09-18）
+## 最新接力：RFC-006（算力档位合并运行环境）代码落地，实机验收待做（2026-09-18）
 
-本批只写文档（RFC-006 三件套、ADR-0005 提议稿、RFC 索引一行），**无任何生产代码改动**。起因是作者指出三个问题：档位与运行环境没有匹配关系、不支持自定义二进制且没有真实测试、运行时无法指定镜像。逐条对照源码都成立：启动哪个二进制只由档位的 `driver` 决定，运行环境只是可选的启动前步骤包；本机 4 个档位全部未绑定运行环境，唯一的运行环境 `kkk` 从未检查过（只读查库）。证据与 `文件:行号` 在 RFC-006 proposal.md §1。
+作者会话目标「完整实现RFC并提交上库」，RFC-006 据此 In Progress。作者五轮裁定 C1–C20 在 proposal.md §2；§13 的 P1–P8 与 ADR-0005 **未经作者逐条确认**，先按提议做法实施，ADR-0005 状态仍是「实施中」。RFC-004 已按 C8 置为 Superseded。
 
-作者当日经五轮问答裁定 C1–C20，写在 `proposal/rfc/RFC-006-unified-compute-profile/proposal.md` §2，要点：
+已提交 main：
 
-1. 档位与运行环境**合并成一个对象**，只有管理员注册；二进制路径必填，另加一个只用于「＋ CLI」的通用终端协议。
-2. 档位指定镜像：管理员基于平台底座自建，只能放平台仓库，由平台签发推送凭据。
-3. **每个 Agent 独立 Pod**，每个 Pod 占一个项目额度。
-4. **保存即生效、自动测试、通过前不可选**。
-5. 断代删除部署配置模式、`CS_AGENT_ENV_SECRET`、stub、`CS_DEFAULT_COMPUTE_PROFILE`；Manifest 可写 `compute: default`，每次启动时解析。
-6. 停用与删除照 agent-workflow；平台升级后的旧底座镜像不做处理。
+- **2635e27**：统一算力档位与 TaskRunner 协议 2，本地门禁与 CI（run 35308530121）通过。
+  - agent-runtime 成为档位唯一宿主：修订与内容哈希、凭据、保存即测、可用性、默认／停用／删除与引用确认、复制、租户投影。
+  - 平台仓库推送凭据与 `/forward-auth/registry`。
+  - 协议 2：必填二进制、四组 agent-workflow 字段、通用终端协议、`probeTerminal`；旧 Runner 握手被拒只记原因。
+  - task-runtime 档位测试执行器：阶段与移植的失败分类正则。
+  - 断代删除 stub、`agentEnvFile`、`CS_AGENT_ENV_SECRET`、`CS_DEFAULT_COMPUTE_PROFILE`、运行环境接口；安装不预置档位，模板写 `compute: default`。
+  - 控制台一张档位表加编辑器。
+- **每个 Agent 一个 Pod（本批）**：
+  - headless Agent 与业务 Agent 子任务各自一个执行环境：用档位镜像、占额度、消息与取消路由到子 Runner、终态后回收。
+  - 执行环境的握手被拒、镜像拉取失败、容器起不来会立即失败并写明原因。
+  - 业务任务暂停时结束全部子任务执行环境（P7）。
+  - 控制台按执行环境订阅 headless Agent 的流。
+  - 提交号见 `git log`，逐项证据见 RFC-006 plan.md「实施说明」。
 
-**待作者确认**：
+**实机验收（T12，CP-01..CP-22）尚未执行**，design.md §13 的四项技术实测也要在部署后先做。部署注意：
 
-- proposal.md §13 的八项设计提议 P1–P8（协议不可改、模型可空、只有执行字段触发重测、测试只跑 oneshot、复制档位、Pod 私有 HOME 与跨 Agent 续接、暂停结束 Agent Pod、删除时的引用口径）。
-- design.md §11 的结构变化，也就是 ADR-0005：档位从 project 移到 agent-runtime。
+1. agent-runtime 迁移会删掉本机原有的 4 个档位和运行环境 `kkk`（C8）。部署后没有任何档位，要先由管理员建档、测试通过并设为默认，才能起 Agent 或发布写了 `compute: default` 的项目。
+2. Runner 协议升到 2 以后，本机现有开发会话与业务任务里的旧 Runner 握手会被拒：只在环境上记原因，不改状态、不删 Pod、不动工作卷。**不要释放 RFC-003 的 QA 会话**，其中可能有未推送的工作；验收用新建项目。
+3. `install-platform.sh` 会 apply `41-registry-gateway.yaml`，并调 `publish-base-image.sh` 把任务镜像推成底座 `crewstation/task-runtime:dev`。任务镜像必须重建。
+4. 登录已改为 RFC-005 的用户名＋密码（`.local/admin.env`）。
 
-实施前要实测的四个技术点在 design.md §13，其中最重要的是 Docker 经网关加 ForwardAuth 推送。
-
-实施排期里最要紧的一条（plan.md）：Runner 协议升到 2 后，本机现有开发会话与业务任务里的旧 Runner 会全部握手失败。释放 RFC-003 QA 会话之前，要先核对未推送内容并向作者确认。
+实机之后按 design.md §12 回填基线三件套（T11）。
 
 ## 最新接力：RFC-005 全量实现（OIDC 公司登录、引导交接、身份转发）（2026-09-18）
 

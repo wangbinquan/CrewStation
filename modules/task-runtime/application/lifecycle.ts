@@ -10,7 +10,7 @@ import type { TaskRuntimeUseCaseDeps } from './dependencies';
 import { runnerLifecycle } from './runnerLifecycle';
 import { failEnvironment } from './failEnvironment';
 import { rebuildIsActive } from '../domain/environmentRebuild';
-import { deferWorkspaceRelease } from './nativeExecution';
+import { deferWorkspaceRelease, scheduleExecutionCleanup } from './nativeExecution';
 
 export type ReleaseReason = 'user' | 'owner-force' | 'business' | 'failed' | 'pod-lost' | 'profile-test';
 
@@ -65,14 +65,7 @@ export function lifecycleUseCases(deps: TaskRuntimeUseCaseDeps) {
         if (env.state === 'running') await scope.environments.update({ ...env, lastActivityAt: clock.now(), updatedAt: clock.now() });
       });
     },
-    pauseEnvironment: async (taskId: TaskId): Promise<TaskEnvironment> => {
-      const env = await load(taskId);
-      if (!canPause(env)) throw precondition('只有持久卷模式的运行中业务任务可以暂停');
-      await cluster.deletePod(env);
-      const paused = transition(env, 'paused', clock.now(), { connected: false });
-      await uow.run(async (scope) => { await scope.environments.update(paused); await scope.admissions.release(env.projectId); });
-      return paused;
-    },
+    pauseEnvironment: pauseEnvironmentUseCase(deps, load),
     resumeEnvironment: async (taskId: TaskId): Promise<TaskEnvironment> => {
       const env = await load(taskId);
       if (env.state !== 'paused') throw precondition('只有暂停中的任务可以恢复');
@@ -93,5 +86,25 @@ export function lifecycleUseCases(deps: TaskRuntimeUseCaseDeps) {
       });
       return resumed;
     },
+  };
+}
+
+/** 暂停业务任务：先结束任务内全部 Agent 执行环境（恢复时不重起，RFC-006 P7），再删容器、释放额度。 */
+function pauseEnvironmentUseCase(deps: TaskRuntimeUseCaseDeps, load: (taskId: TaskId) => Promise<TaskEnvironment>) {
+  const { uow, cluster, clock } = deps;
+  return async (taskId: TaskId): Promise<TaskEnvironment> => {
+    const env = await load(taskId);
+    if (!canPause(env)) throw precondition('只有持久卷模式的运行中业务任务可以暂停');
+    // 暂停时结束任务内全部 Agent 执行环境，恢复时不重起（RFC-006 P7）；子任务按「执行环境已结束」收尾。
+    await uow.run(async (scope) => {
+      await scope.admissions.lock(env.projectId);
+      for (const child of await scope.environments.listChildren(env.id)) {
+        if (child.native && child.native.state !== 'finished') await scheduleExecutionCleanup(scope, child, clock.now(), '业务任务已暂停，此子任务的执行环境随之结束');
+      }
+    });
+    await cluster.deletePod(env);
+    const paused = transition(env, 'paused', clock.now(), { connected: false });
+    await uow.run(async (scope) => { await scope.environments.update(paused); await scope.admissions.release(env.projectId); });
+    return paused;
   };
 }

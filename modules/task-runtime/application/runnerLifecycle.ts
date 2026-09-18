@@ -3,6 +3,7 @@ import { tokenMatches } from '../domain/runnerToken';
 import type { RunnerRejection } from '../domain/taskEnvironment';
 import { transition } from '../domain/taskEnvironment';
 import type { TaskRuntimeUseCaseDeps } from './dependencies';
+import { scheduleExecutionCleanup } from './nativeExecution';
 
 /** 回调携带本连接的令牌，在项目事务锁内再次核对，防止旧握手迟到。 */
 export function runnerLifecycle(deps: TaskRuntimeUseCaseDeps) {
@@ -25,8 +26,9 @@ export function runnerLifecycle(deps: TaskRuntimeUseCaseDeps) {
       });
     },
     /**
-     * 握手被拒（RFC-006 §5.3，协议不一致）：只把原因记在环境上供页面与档位测试读取，不改状态、不删 Pod、不动工作卷——
-     * 旧底座镜像里的开发会话可能还有未推送的工作。同一原因重复握手不重复写。
+     * 握手被拒（RFC-006 §5.3，协议不一致）：会话与业务任务只把原因记在环境上供页面与档位测试读取，不改状态、不删 Pod、
+     * 不动工作卷——旧底座镜像里的开发会话可能还有未推送的工作。Agent 的执行环境起不来就是失败：回收本次 Pod 并释放额度，
+     * 只影响这一个 Agent。同一原因重复握手不重复写。
      */
     onRunnerRejected: async (taskId: TaskId, token: string, rejection: Omit<RunnerRejection, 'at'>): Promise<void> => {
       const original = await deps.uow.read.environments.getById(taskId);
@@ -36,7 +38,9 @@ export function runnerLifecycle(deps: TaskRuntimeUseCaseDeps) {
         const env = await scope.environments.getById(taskId);
         if (!env || !tokenMatches(token, env.runnerTokenHash) || env.runnerRejection?.message === rejection.message) return;
         const now = deps.clock.now();
-        await scope.environments.update({ ...env, runnerRejection: { ...rejection, at: now.toISOString() }, message: rejection.message, updatedAt: now });
+        const recorded = { ...env, runnerRejection: { ...rejection, at: now.toISOString() }, message: rejection.message, updatedAt: now };
+        if (env.native && ['queued', 'starting'].includes(env.native.state)) await scheduleExecutionCleanup(scope, recorded, now, rejection.message);
+        else await scope.environments.update(recorded);
       });
     },
     onRunnerDisconnected: async (taskId: TaskId, token: string): Promise<void> => {

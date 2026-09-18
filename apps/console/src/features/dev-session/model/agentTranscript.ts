@@ -1,4 +1,4 @@
-import type { AgentEvent, AgentEventType } from '@crewstation/contracts';
+import type { AgentEvent, AgentEventType, AgentInstanceDto } from '@crewstation/contracts';
 
 /** 一条记录；标签文案由组件按 type 查 i18n，模型层不放界面文案。 */
 export interface TranscriptLine {
@@ -73,4 +73,17 @@ export function isLifecycleEvent(event: AgentEvent): boolean {
 /** 旧驱动下一轮可能直接输出文本或工具事件；只在开始输出时刷新，不能每个片段都查询。 */
 export function isExecutionEvent(event: AgentEvent): boolean {
   return EXECUTION_TYPES.has(event.type) || event.type === 'status' && event.status === 'running';
+}
+
+/**
+ * 需要订阅的 Agent 执行环境任务流（RFC-006：每个 Agent 一个执行环境，它的事件存在执行环境自己的任务下）。
+ * 未结束的都订阅，生命周期信号才能及时刷新名册；已结束的只为选中的 Agent 订阅，按 seq 回放重建转录。
+ * 没有执行环境的老 Agent 仍从开发会话的任务流读取，这里不列。
+ */
+export function executionStreamTaskIds(agents: readonly AgentInstanceDto[], selectedAgentId: string | undefined): readonly string[] {
+  const ids = new Set<string>();
+  for (const agent of agents) {
+    if (agent.execution && (agent.execution.state !== 'finished' || agent.agentId === selectedAgentId)) ids.add(agent.execution.taskId);
+  }
+  return [...ids];
 }

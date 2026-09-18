@@ -23,8 +23,9 @@ export class NativeExecutionLifecycle {
   }
   private async admit(start: NativeTerminalStart): Promise<EnvironmentView | undefined> {
     try {
-      return await this.deps.environments.createNativeExecution({ id: start.execution!.taskId, parentTaskId: start.taskId, createdBy: start.createdBy, agentId: start.record.agentId,
-        terminalId: start.record.terminalId, runnerId: start.record.runnerId, fingerprint: start.fingerprint, profile: start.execution!.taskProfile });
+      return await this.deps.environments.createNativeExecution({ id: start.execution!.taskId, parentTaskId: start.taskId, purpose: 'cli', createdBy: start.createdBy, agentId: start.record.agentId,
+        terminalId: start.record.terminalId, runnerId: start.record.runnerId, fingerprint: start.fingerprint, ...(start.execution!.taskProfile ? { profile: start.execution!.taskProfile } : {}),
+        ...(start.execution!.image ? { image: start.execution!.image } : {}), ...(start.profile ? { computeProfile: { name: start.profile.profile, revision: start.profile.revision } } : {}) });
     } catch (error) {
       if (!isPlatformError(error) || !rejected(error)) throw error;
       await this.finishRecord(start, 'start-failed', error.message);

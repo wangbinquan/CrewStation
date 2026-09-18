@@ -15,7 +15,7 @@ export interface AgentRosterProps {
 export function AgentRoster({ agents, selected, onSelect }: AgentRosterProps): ReactElement {
   const t = useT();
   // 启动前 Hook（RFC-004）只展示步骤名与结果；脚本内容、文件正文与输出不会到达租户面。
-  const preparationLine = (agent: AgentInstanceDto): string | undefined => {
+  const hookLine = (agent: AgentInstanceDto): string | undefined => {
     const hook = agent.beforeStart;
     if (!hook) return undefined;
     if (hook.state === 'queued') return t('devSession.agents.preparingQueued');
@@ -23,6 +23,16 @@ export function AgentRoster({ agents, selected, onSelect }: AgentRosterProps): R
     if (hook.state === 'failed') return t('devSession.agents.preparationFailed', { step: hook.failedStep ?? '', id: hook.executionId.slice(-6) });
     return undefined;
   };
+  // RFC-006：每个 Agent 一个执行环境；名册只给简短状态，原因在面板里对选中的 Agent 展开，悬停也能看到。
+  const executionLine = (agent: AgentInstanceDto): string | undefined => {
+    const execution = agent.execution;
+    if (execution === undefined) return undefined;
+    if (agent.state === 'failed' && execution.message) return t('devSession.agents.executionFailed');
+    if (execution.state === 'queued') return t('devSession.agents.executionQueued');
+    if (execution.state === 'starting') return t('devSession.agents.executionStarting');
+    return undefined;
+  };
+  const preparationLine = (agent: AgentInstanceDto): string | undefined => hookLine(agent) ?? executionLine(agent);
   return (
     <div className={styles.roster} role="tablist" aria-label={t('devSession.agents.rosterLabel')}>
       {agents.map((agent) => (
@@ -37,7 +47,7 @@ export function AgentRoster({ agents, selected, onSelect }: AgentRosterProps): R
           <span className={styles.compute}>L-{agent.agentId.slice(-6)} · {agent.compute}</span>
           {agent.profileRevision ? <small className={styles.compute}>{t('devSession.agents.profileRevision', { revision: agent.profileRevision })}</small> : null}
           <Badge tone={agentStateTone(agent.state)}>{t(`devSession.agentState.${agent.state}`)}</Badge>
-          {preparationLine(agent) !== undefined ? <small className={styles.compute}>{preparationLine(agent)}</small> : null}
+          {preparationLine(agent) !== undefined ? <small className={styles.compute} title={agent.execution?.message}>{preparationLine(agent)}</small> : null}
         </button>
       ))}
     </div>

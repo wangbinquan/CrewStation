@@ -2,10 +2,11 @@ import type { Actor, ProjectId, ServiceActor, SubmitSubtaskRequest, SubtaskDto, 
 import { newId, notFound, precondition } from '@crewstation/kernel';
 import { acceptsSubtasks } from '../domain/businessTask';
 import type { SubtaskRun } from '../domain/subtaskRun';
-import { isTerminal, transition } from '../domain/subtaskRun';
+import { isTerminal, runnerTaskOf, transition } from '../domain/subtaskRun';
 import type { BusinessTaskUseCaseDeps } from './dependencies';
 import { subtaskLaunch } from './subtaskLaunch';
 import { subtaskRefresh } from './subtaskRefresh';
+import { subtaskSweep } from './subtaskSweep';
 import { taskLifecycleUseCases } from './taskLifecycle';
 import { subtaskToDto } from './toDto';
 
@@ -13,7 +14,7 @@ import { subtaskToDto } from './toDto';
 export function subtaskUseCases(deps: BusinessTaskUseCaseDeps) {
   const { uow, runner, settings, clock } = deps;
   const { ownedTask } = taskLifecycleUseCases(deps);
-  const { refresh, finish } = subtaskRefresh(deps);
+  const { refresh, finish, releaseExecution } = subtaskRefresh(deps);
 
   const load = async (taskId: TaskId, subtaskId: SubtaskId): Promise<SubtaskRun> => {
     const run = await uow.read.subtasks.getById(subtaskId);
@@ -56,7 +57,7 @@ export function subtaskUseCases(deps: BusinessTaskUseCaseDeps) {
       const run = await refresh(await load(taskId, subtaskId));
       if (run.output !== undefined) return run.output;
       if (run.kind !== 'agent') return '';
-      const events = await runner.listEvents(taskId, { kinds: ['agent'], agentId: run.runnerRef ?? '', limit: 5000 });
+      const events = await runner.listEvents(runnerTaskOf(run), { kinds: ['agent'], agentId: run.runnerRef ?? '', limit: 5000 });
       return events.map((e) => (e.event.kind === 'agent' ? e.event.event.text ?? '' : '')).join('').slice(0, settings.outputLimitBytes);
     },
     sendSubtaskMessage: async (caller: ServiceActor, taskId: TaskId, subtaskId: SubtaskId, input: SubtaskMessageRequest): Promise<SubtaskDto> => {
@@ -64,7 +65,8 @@ export function subtaskUseCases(deps: BusinessTaskUseCaseDeps) {
       const run = await refresh(await load(taskId, subtaskId));
       if (run.kind !== 'agent' || run.mode !== 'interactive') throw precondition('只有交互模式的 Agent 子任务接受消息');
       if (isTerminal(run)) throw precondition(`子任务已 ${run.state}`);
-      await runner.sendCommand(taskId, { id: `msg-${newId('m')}`, type: 'sendMessage', agentId: run.runnerRef ?? '', content: input.content });
+      if (run.state === 'pending') throw precondition('子任务尚未开始执行（执行环境准备中），请稍后再发消息');
+      await runner.sendCommand(runnerTaskOf(run), { id: `msg-${newId('m')}`, type: 'sendMessage', agentId: run.runnerRef ?? '', content: input.content });
       const running = run.state === 'awaiting-input' ? transition(run, 'running', clock.now()) : run;
       if (running !== run) await uow.run((scope) => scope.subtasks.update(running));
       return subtaskToDto(running);
@@ -73,7 +75,10 @@ export function subtaskUseCases(deps: BusinessTaskUseCaseDeps) {
       await ownedTask(caller, taskId);
       const run = await load(taskId, subtaskId);
       if (isTerminal(run)) return subtaskToDto(run);
-      await runner.sendCommand(taskId, run.kind === 'agent' ? { id: `cancel-${run.id}`, type: 'cancelAgent', agentId: run.runnerRef ?? '' } : { id: `cancel-${run.id}`, type: 'cancelExec', execId: run.runnerRef ?? '' });
+      // 还没派发的子任务没有进程可取消：直接结束，执行环境随 finish 回收。
+      if (run.state !== 'pending') {
+        await runner.sendCommand(runnerTaskOf(run), run.kind === 'agent' ? { id: `cancel-${run.id}`, type: 'cancelAgent', agentId: run.runnerRef ?? '' } : { id: `cancel-${run.id}`, type: 'cancelExec', execId: run.runnerRef ?? '' });
+      }
       return subtaskToDto(await finish(run, transition(run, 'cancelled', clock.now())));
     },
     listProjectSubtasks: async (actor: Actor, projectId: ProjectId, taskId: TaskId): Promise<SubtaskDto[]> => {
@@ -83,11 +88,6 @@ export function subtaskUseCases(deps: BusinessTaskUseCaseDeps) {
       return (await uow.read.subtasks.listByTask(taskId)).map(subtaskToDto);
     },
     listProjectSubtasksInternal: async (taskId: TaskId): Promise<SubtaskDto[]> => (await uow.read.subtasks.listByTask(taskId)).map(subtaskToDto),
-    /** 工作器：推进仍在运行的子任务，避免只靠业务轮询。 */
-    sweepActive: async (): Promise<number> => {
-      let n = 0;
-      for (const run of await uow.read.subtasks.listActive(200)) { const next = await refresh(run); if (next !== run) n += 1; }
-      return n;
-    },
+    sweepActive: subtaskSweep(deps, { refresh, launch, releaseExecution }),
   };
 }

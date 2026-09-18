@@ -33,5 +33,9 @@ export function historicalConversationFixture() {
     const seq = eventSequence++;
     f.receive({ type: 'event', seq, at: activityTime, event: { kind: 'agent', event: { ...event, seq, at: activityTime } } });
   };
-  return { ...f, agents, rosterRequests, receiveAgent, sends, finish, starts, finishStart, restore: () => { for (const [index] of sends.entries()) finish(index, true); for (const [index] of starts.entries()) finishStart(index, true); f.restore(); } };
+  /** 只发给某条流（开发会话或某个 Agent 的执行环境）；seq 可指定，用来模拟重新挂载后的回放。 */
+  const receiveAgentOn = (taskId: string, event: Omit<AgentEvent, 'seq' | 'at'>, seq = eventSequence++) => {
+    f.receiveFor(taskId, { type: 'event', seq, at: activityTime, event: { kind: 'agent', event: { ...event, seq, at: activityTime } } });
+  };
+  return { ...f, agents, rosterRequests, receiveAgent, receiveAgentOn, sends, finish, starts, finishStart, restore: () => { for (const [index] of sends.entries()) finish(index, true); for (const [index] of starts.entries()) finishStart(index, true); f.restore(); } };
 }

@@ -3,19 +3,30 @@ import { precondition } from '@crewstation/kernel';
 
 export type EnvironmentState = 'creating' | 'running' | 'paused' | 'releasing' | 'released' | 'failed';
 
-/** 一个原生 CLI 的独立执行实例；工作卷与数据绑定仍由父开发会话拥有。 */
+/** 执行环境的用途（RFC-006 §5.1）：「＋ CLI」、开发会话里的 headless Agent、业务 Agent 子任务。 */
+export type ExecutionPurpose = 'cli' | 'agent' | 'subtask';
+
+/**
+ * 一个 Agent 的独立执行实例（每个 Agent 一个 Pod，C3）；工作卷与数据绑定仍由父任务拥有。
+ * 持久列沿用 native；RFC-006 之前受理的记录没有 purpose，按 cli 处理。
+ */
 export interface NativeExecution {
+  readonly purpose?: ExecutionPurpose;
   readonly parentTaskId: TaskId;
   readonly parentPodUid: string;
   readonly pvcUid: string;
   readonly nodeName: string;
   readonly agentId: string;
-  readonly terminalId: string;
+  /** 只有「＋ CLI」有终端。 */
+  readonly terminalId?: string;
   readonly runnerId: string;
   readonly fingerprint: string;
   readonly requestedProfile: string | null;
   readonly profile: { name: string; cpu: string; memory: string; storage: string };
+  /** 档位修订按摘要固定的镜像；RFC-006 之前受理的 CLI 是平台任务镜像。 */
   readonly image: string;
+  /** 受理时固定的算力档位修订（RFC-006）。 */
+  readonly computeProfile?: { readonly name: string; readonly revision: number };
   readonly state: 'queued' | 'starting' | 'running' | 'cleaning' | 'finished';
   readonly podUid?: string;
   readonly secretUid?: string;
@@ -91,3 +102,8 @@ export function podNameFor(taskId: TaskId): string {
 export function pvcNameFor(taskId: TaskId): string {
   return `task-${taskId.slice(4, 16)}-work`;
 }
+
+export const purposeOf = (execution: NativeExecution): ExecutionPurpose => execution.purpose ?? 'cli';
+
+/** 各用途给用户看的称呼：消息里说「此 CLI」「此 Agent」「此子任务」，不混用。 */
+export const EXECUTION_NOUN: Record<ExecutionPurpose, string> = { cli: 'CLI', agent: 'Agent', subtask: '子任务' };

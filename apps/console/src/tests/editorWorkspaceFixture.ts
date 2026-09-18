@@ -17,7 +17,9 @@ export function editorWorkspaceFixture() {
     readyState = 1;
     onmessage?: (message: { data: string }) => void;
     onclose?: () => void;
-    constructor() { sockets.push(this); queueMicrotask(() => this.receive({ type: 'streamReady', connected: true, replayed: 0 })); }
+    /** 连接地址：按任务区分流（RFC-006 每个 Agent 执行环境一条流）。 */
+    url: string;
+    constructor(url = '') { this.url = url; sockets.push(this); queueMicrotask(() => this.receive({ type: 'streamReady', connected: true, replayed: 0 })); }
     receive(frame: object) { if (this.readyState === 1) this.onmessage?.({ data: JSON.stringify(frame) }); }
     close() { this.readyState = 3; this.onclose?.(); }
     send(data: string) {
@@ -56,5 +58,10 @@ export function editorWorkspaceFixture() {
   }) as typeof fetch;
   const finishWrite = (failure?: { code: string; message: string }) => { const finish = pendingWrite; pendingWrite = undefined; finish?.(failure); };
   const receive = (frame: object) => { for (const socket of sockets) socket.receive(frame); };
-  return { commands, writes, files, preview, sessionState, finishWrite, receive, restore: () => { globalThis.fetch = originalFetch; globalThis.WebSocket = originalSocket; window.location.href = originalHref; } };
+  const streamOf = (socket: Socket) => /\/v1\/tasks\/([^/]+)\/stream/.exec(socket.url)?.[1];
+  /** 只发给某个任务的流；receive 仍然广播给所有打开的流。 */
+  const receiveFor = (taskId: string, frame: object) => { for (const socket of sockets) if (streamOf(socket) === taskId) socket.receive(frame); };
+  const openStreams = (taskId: string) => sockets.filter((socket) => socket.readyState === 1 && streamOf(socket) === taskId).length;
+  const streamsOpened = (taskId: string) => sockets.filter((socket) => streamOf(socket) === taskId).length;
+  return { commands, writes, files, preview, sessionState, finishWrite, receive, receiveFor, openStreams, streamsOpened, restore: () => { globalThis.fetch = originalFetch; globalThis.WebSocket = originalSocket; window.location.href = originalHref; } };
 }

@@ -5,20 +5,32 @@ import { useProjectScope } from '../../../shared/project/ProjectScope';
 import { useT } from '../../../shared/lib/useT';
 import { PageHeader } from '../../../shared/ui/PageHeader';
 import { QueryStatus } from '../../../shared/ui/QueryStatus';
+import { AgentExecutionStream } from '../components/agents/AgentExecutionStream';
 import { AgentsPane } from '../components/agents/AgentsPane';
 import { TerminalPane } from '../components/terminal/TerminalPane';
 import { useActivityTouch } from '../hooks/useActivityTouch';
 import { useAgentTranscripts } from '../hooks/useAgentTranscripts';
-import { useDevAgents } from '../hooks/useDevAgents';
+import { useAgentSelection, useDevAgents } from '../hooks/useDevAgents';
 import { useDevSession } from '../hooks/useDevSession';
 import { useTaskStream } from '../hooks/useTaskStream';
+import { executionStreamTaskIds } from '../model/agentTranscript';
 
+/**
+ * 开发会话的流仍服务老 Agent 与终端面板；RFC-006 起每个 Agent 有自己的执行环境，页面按名册为它们各开一条流，
+ * 事件汇入同一份转录（已结束的只为选中的 Agent 开，用于回放）。
+ */
 function ConversationSession({ taskId, agentId }: { readonly taskId: string; readonly agentId?: string }): ReactElement {
   const { channel } = useTaskStream(taskId);
   const agents = useDevAgents(taskId);
-  const transcripts = useAgentTranscripts(channel, agents.refresh);
+  const { transcripts, ingest } = useAgentTranscripts(channel, taskId, agents.refresh);
+  const selection = useAgentSelection(agents.agents, agentId);
   const touch = useActivityTouch(taskId);
-  return <><AgentsPane agents={agents} transcripts={transcripts} onActivity={touch} initialAgentId={agentId} /><TerminalPane channel={channel} onActivity={touch} /></>;
+  const streams = executionStreamTaskIds(agents.agents, selection.selected?.agentId);
+  return <>
+    {streams.map((id) => <AgentExecutionStream key={id} taskId={id} ingest={ingest} />)}
+    <AgentsPane agents={agents} transcripts={transcripts} onActivity={touch} selection={selection} />
+    <TerminalPane channel={channel} onActivity={touch} />
+  </>;
 }
 export function HistoricalConversationsPage(): ReactElement {
   const t = useT();

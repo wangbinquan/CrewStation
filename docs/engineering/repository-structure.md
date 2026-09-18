@@ -190,16 +190,16 @@ modules/<name>/
 | 层 | 模块 | 拥有的对象与职责 | 依赖的模块 |
 |---|---|---|---|
 | L1 | `identity` | User、登录适配器、用户令牌与 JWKS、服务身份解析（源 Pod IP → 身份）、来源令牌、上游凭据下发 | — |
-| L2 | `project` | Project、Service、成员三级角色、preview 测试者、命名空间登记、TaskQuota、ServicePlan、TaskProfile | identity |
+| L2 | `project` | Project、Service、成员三级角色、preview 测试者、命名空间登记、TaskQuota、ServicePlan、TaskProfile（算力档位已按 ADR-0005 移出） | identity |
 | L3 | `scm` | SourceRepositoryBinding、建仓、代推、标签与保护标签、会话级短期 Git 凭据 | project |
 | L3 | `config` | ConfigItem、SecretValue、开发与生产两组值、版本快照、注入渲染 | project |
 | L3 | `data` | DataResource、DataBinding、TaskDataBinding 三模式与审批、Provider 端口（postgres、s3、pvc） | project |
 | L3 | `egress` | 全局与项目级出站白名单、追加申请、被阻请求记录 | project |
 | L3 | `api-catalog` | APIProxy 登记、操作键（proxy＋method＋path）、开放策略、APIGrant、APIRequest、Swagger 裁剪 | project |
 | L3 | `events` | EventProducer 登记、事件类型、inbox 去重、订阅、投递状态机、死信、推送 | project |
-| L3 | `agent-runtime` | 管理员运行环境（RFC-004）：启动前 Hook 步骤、不可变版本、凭据引用、检查记录、解析服务；检查执行器与档位引用经 ports 由 platform 回填（ADR-0004） | —（不 import 其他模块） |
+| L3 | `agent-runtime` | 算力档位（RFC-006）：协议、镜像、二进制、启动前步骤、凭据、修订、测试记录、默认与引用确认、平台仓库推送凭据；TaskProfile 目录、发布引用与测试执行经 ports 由 platform 回填（ADR-0004、ADR-0005） | —（不 import 其他模块） |
 | L4 | `release` | Manifest 校验、Release、构建、迁移、DeploymentSlot、TrafficSwitch、发布并发控制；发布 `release.registered` | project、scm、config、data |
-| L4 | `task-runtime` | TaskEnvironment 生命周期、Pod 与两种持久卷模式、配额原子准入、TaskRunner 归属与协议服务端语义 | project、config、data、egress |
+| L4 | `task-runtime` | TaskEnvironment 生命周期、Pod 与两种持久卷模式、配额原子准入、每个 Agent 一个执行环境（「＋ CLI」／headless／业务子任务）、档位测试执行、TaskRunner 归属与协议服务端语义 | project、config、data、egress |
 | L5 | `dev-session` | 一项目一会话、分支与落后提交数、空闲提醒、强制释放、发布入口 | task-runtime、release、scm |
 | L5 | `business-task` | 业务任务、SubtaskRun 契约层、oneshot／interactive、attempt、契约校验、文件与结果读取 | task-runtime、release |
 | L5 | `session` | TaskRunner 出向连接与浏览器流的中枢：租约、游标、重连、帧路由 | task-runtime |
@@ -226,7 +226,7 @@ flowchart BT
   observability & capabilities & provisioning --> platform
 ```
 
-拆分依据：Design 里每一个有自己状态机的对象簇一个模块。围绕任务的能力刻意拆成四个模块（`task-runtime`、`dev-session`、`business-task`、`session`），因为 agent-workflow 的 `task.ts` 正是把这四件事写进了一个 7780 行的文件。管理员运行环境有自己的版本／检查／启用状态机，因此按 ADR-0004 单独成 `agent-runtime`，而不塞进已有 39／40 个源码文件的 `project` 或 `dev-session`。
+拆分依据：Design 里每一个有自己状态机的对象簇一个模块。围绕任务的能力刻意拆成四个模块（`task-runtime`、`dev-session`、`business-task`、`session`），因为 agent-workflow 的 `task.ts` 正是把这四件事写进了一个 7780 行的文件。管理员运行环境有自己的版本／检查／启用状态机，因此按 ADR-0004 单独成 `agent-runtime`，而不塞进已有 39／40 个源码文件的 `project` 或 `dev-session`；RFC-006 把运行环境并入算力档位后，档位整体移入 `agent-runtime`（ADR-0005）。
 
 ## 6. 进程组合：哪个模块跑在哪个应用里
 

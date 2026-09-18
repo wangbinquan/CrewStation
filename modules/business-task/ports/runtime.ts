@@ -7,11 +7,21 @@ export interface EnvironmentView {
   connected: boolean;
   traceId: string;
   podName: string;
+  message?: string;
+  /** 子任务的独立执行环境（RFC-006 §5.4）；业务任务容器本身没有。 */
+  native?: { state: 'queued' | 'starting' | 'running' | 'cleaning' | 'finished'; failureReason?: string };
+}
+
+/** Agent 子任务的独立执行环境（每个 Agent 一个 Pod，占一个项目并发额度）；image 是档位修订按摘要固定的镜像。 */
+export interface CreateSubtaskExecutionInput {
+  id: TaskId; parentTaskId: TaskId; purpose: 'subtask'; agentId: string; runnerId: string; fingerprint: string;
+  profile?: string; image?: string; computeProfile?: { name: string; revision: number };
 }
 
 /** 由 task-runtime 提供。 */
 export interface Environments {
   createEnvironment(input: { serviceId: ServiceId; kind: 'business'; volumeMode?: VolumeMode; profile?: string; traceId?: TraceId; labels?: Record<string, string> }): Promise<EnvironmentView>;
+  createNativeExecution(input: CreateSubtaskExecutionInput): Promise<EnvironmentView>;
   releaseEnvironment(taskId: TaskId, reason: 'business' | 'failed'): Promise<EnvironmentView>;
   pauseEnvironment(taskId: TaskId): Promise<EnvironmentView>;
   resumeEnvironment(taskId: TaskId): Promise<EnvironmentView>;
