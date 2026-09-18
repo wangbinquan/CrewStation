@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
+import { readFileSync } from 'node:fs';
 import type { OidcProviderDto, ProjectId, UserId } from '@crewstation/contracts';
 import { IDENTITY_HEADERS, TOKEN_CLAIMS } from '@crewstation/contracts';
 import type { AppEnv } from '@crewstation/http';
@@ -245,6 +246,40 @@ describe.skipIf(!available)('身份转发', () => {
 });
 
 describe.skipIf(!available)('管理面路由的边界', () => {
+  /**
+   * 每条带请求体的管理面路由都要有**成功**分支的 HTTP 用例。
+   * 实机撞过：一次 replace-all 把读体帮手改成了调用自己（`return await body(c)`），
+   * 于是所有带体的路由都栈溢出并被 catch 成「请求体必须是 JSON」——而当时只有「体不是 JSON」
+   * 这一条失败分支有用例，两种情况的响应一模一样，测试全绿，线上全坏。
+   */
+  test('带请求体的管理面路由：合法 JSON 真的被读到并落库', async () => {
+    const admin = { 'x-cs-user-id': adminId, 'x-cs-auth-method': 'oidc', 'content-type': 'application/json' };
+    const created = await app.request('/v1/admin/auth/providers', {
+      method: 'POST', headers: admin,
+      body: JSON.stringify({ slug: 'http-created', displayName: 'HTTP 建的', issuerUrl: ISSUER, clientId: 'cs', clientSecret: 's', scopes: 'openid', provisioning: 'auto' }),
+    });
+    expect(created.status).toBe(201);
+    const dto = await created.json() as { id: string; slug: string };
+    expect(dto.slug).toBe('http-created');
+
+    const patched = await app.request(`/v1/admin/auth/providers/${dto.id}`, { method: 'PATCH', headers: admin, body: JSON.stringify({ displayName: 'HTTP 改的' }) });
+    expect(patched.status).toBe(200);
+    expect((await patched.json() as { displayName: string }).displayName).toBe('HTTP 改的');
+
+    const forwarding = await app.request('/v1/admin/auth/forwarding', { method: 'PUT', headers: admin, body: JSON.stringify({ fields: ['name'] }) });
+    expect(forwarding.status).toBe(200);
+    expect((await forwarding.json() as { global: { fields: string[] } }).global.fields).toEqual(['name']);
+
+    const override = await app.request(`/v1/admin/auth/forwarding/projects/${projectId}`, { method: 'PUT', headers: admin, body: JSON.stringify({ fields: ['name', 'email'] }) });
+    expect(override.status).toBe(200);
+    expect((await override.json() as { fields: string[] }).fields).toEqual(['email', 'name']);
+    expect((await app.request(`/v1/admin/auth/forwarding/projects/${projectId}`, { method: 'DELETE', headers: admin })).status).toBe(200);
+
+    const policy = await app.request('/v1/admin/auth/login-policy', { method: 'PUT', headers: admin, body: JSON.stringify({ passwordLoginEnabled: true }) });
+    expect(policy.status).toBe(200);
+    await identity.api.setGlobalForwarding(passwordAdmin, { fields: ['name', 'email'] });
+  });
+
   test('非 JSON 请求体是 400 而不是 500；非管理员读写一律 403', async () => {
     const admin = { 'x-cs-user-id': adminId, 'x-cs-auth-method': 'oidc' };
     const bad = await app.request('/v1/admin/auth/providers', { method: 'POST', headers: { ...admin, 'content-type': 'application/json' }, body: 'not json' });
@@ -265,4 +300,24 @@ describe.skipIf(!available)('管理面路由的边界', () => {
     const response = await app.request('/v1/admin/auth/login-policy', { headers: { 'x-cs-user-id': adminId, 'x-cs-auth-method': 'oidc' } });
     expect(response.headers.get('cache-control')).toBe('no-store');
   });
+});
+
+/**
+ * 源码层用例：管理面每个带请求体的处理器都必须**先读体、再 await 别的东西**。
+ * 理由是这条错误路径的行为不该依赖数据库：体不是 JSON 就该立刻 400，
+ * 而不是先等一次「调用者是不是管理员」的往返，也不该随数据库延迟变化。
+ */
+test('管理面处理器先读请求体再做任何 await', () => {
+  const source = readFileSync(new URL('../http/adminAuthRoutes.ts', import.meta.url), 'utf8')
+    .split('\n').filter((line) => !line.trim().startsWith('*') && !line.trim().startsWith('//') && !line.trim().startsWith('/**')).join('\n');
+  const handlers = source.split(/\n  r\.(?=get|post|put|patch|delete)/).slice(1);
+  for (const handler of handlers) {
+    const bodyAt = handler.search(/await (readJsonBody\(c\)|parseBody\()/);
+    if (bodyAt < 0) continue;
+    const actorAt = handler.search(/await actor\(c\)/);
+    const apiAt = handler.search(/await api\./);
+    for (const [name, at] of [['actor(c)', actorAt], ['api.*', apiAt]] as const) {
+      if (at >= 0) expect(bodyAt, `请求体必须在 ${name} 之前读：${handler.split('\n')[0]}`).toBeLessThan(at);
+    }
+  }
 });

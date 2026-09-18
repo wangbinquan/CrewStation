@@ -21,6 +21,11 @@ const has = (name: string): boolean => args.includes(`--${name}`);
 
 const PORT = Number(flag('port', '9001'));
 const ISSUER = flag('issuer', `http://localhost:${PORT}`) as string;
+/**
+ * 浏览器要走的授权地址可以与服务端到服务端的地址不同——真实 IdP 也常是这样（公网入口 vs 内网入口）。
+ * 本机验收就靠它：cs-auth 用 host.docker.internal 取 discovery／换码／取 JWKS，浏览器用 127.0.0.1 打授权页。
+ */
+const BROWSER_ORIGIN = flag('browser-origin', ISSUER) as string;
 const CLIENT_ID = flag('client-id', 'mock-client') as string;
 const CLIENT_SECRET = flag('client-secret', 'mock-secret') as string;
 const WITH_DISCOVERY = !has('no-discovery');
@@ -69,7 +74,7 @@ const server = Bun.serve({
       if (!WITH_DISCOVERY) return json({ error: 'not_found' }, 404);
       return json({
         issuer: ISSUER,
-        authorization_endpoint: `${ISSUER}/authorize`,
+        authorization_endpoint: `${BROWSER_ORIGIN}/authorize`,
         token_endpoint: `${ISSUER}/token`,
         userinfo_endpoint: `${ISSUER}/userinfo`,
         jwks_uri: `${ISSUER}/jwks.json`,

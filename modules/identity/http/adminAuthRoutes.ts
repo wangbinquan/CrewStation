@@ -24,12 +24,17 @@ export function adminAuthRoutes(api: IdentityModuleApi): Hono<AppEnv> {
   };
   // 登录策略与提供方配置都不该被任何中间层缓存：管理员改完必须立刻看到新状态。
   r.use('/v1/admin/auth/*', async (c, next) => { c.header('Cache-Control', 'no-store'); await next(); });
-  // 请求体由用例按契约 Schema 逐字段校验，这里只负责「不是 JSON 就是 400 而不是 500」。
-  const body = async (c: Context<AppEnv>): Promise<unknown> => {
+  /**
+   * 请求体由用例按契约 Schema 逐字段校验，这里只负责「不是 JSON 就是 400 而不是 500」。
+   * 每个带体的处理器都先读体、再查调用者：格式错就该立刻 400，不该先等一次数据库往返，
+   * 也不该让这条错误路径的行为随数据库延迟变化。顺序由 tests/authAdmin.test.ts 的源码层用例锁住。
+   */
+  const readJsonBody = async (c: Context<AppEnv>): Promise<unknown> => {
     try {
-      return await body(c);
-    } catch {
-      throw validation('请求体必须是 JSON');
+      return await c.req.json();
+    } catch (error) {
+      // 带上解析失败的原话：客户端 400，不含机密，少了它排查只能靠猜。
+      throw validation('请求体必须是 JSON', { reason: error instanceof Error ? error.message : String(error) });
     }
   };
 
@@ -40,9 +45,9 @@ export function adminAuthRoutes(api: IdentityModuleApi): Hono<AppEnv> {
   });
 
   r.get('/v1/admin/auth/providers', async (c) => c.json({ items: await api.listProviders(await actor(c)) }));
-  r.post('/v1/admin/auth/providers', async (c) => c.json(await api.createProvider(await actor(c), await body(c)), 201));
+  r.post('/v1/admin/auth/providers', async (c) => { const input = await readJsonBody(c); return c.json(await api.createProvider(await actor(c), input), 201); });
   r.get('/v1/admin/auth/providers/:id', async (c) => c.json(await api.getProvider(await actor(c), parseParams(c, providerParams).id as OidcProviderId)));
-  r.patch('/v1/admin/auth/providers/:id', async (c) => c.json(await api.patchProvider(await actor(c), parseParams(c, providerParams).id as OidcProviderId, await body(c))));
+  r.patch('/v1/admin/auth/providers/:id', async (c) => { const input = await readJsonBody(c); return c.json(await api.patchProvider(await actor(c), parseParams(c, providerParams).id as OidcProviderId, input)); });
   r.delete('/v1/admin/auth/providers/:id', async (c) => {
     await api.removeProvider(await actor(c), parseParams(c, providerParams).id as OidcProviderId);
     return c.body(null, 204);
@@ -51,12 +56,15 @@ export function adminAuthRoutes(api: IdentityModuleApi): Hono<AppEnv> {
 
   r.get('/v1/admin/auth/forwarding', async (c) => c.json(await api.readForwarding(await actor(c))));
   r.put('/v1/admin/auth/forwarding', async (c) => {
-    await api.setGlobalForwarding(await actor(c), await body(c));
-    return c.json(await api.readForwarding(await actor(c)));
+    const input = await readJsonBody(c);
+    const caller = await actor(c);
+    await api.setGlobalForwarding(caller, input);
+    return c.json(await api.readForwarding(caller));
   });
   r.put('/v1/admin/auth/forwarding/projects/:projectId', async (c) => {
+    const input = await readJsonBody(c);
     const { projectId } = parseParams(c, projectParams);
-    await api.setProjectForwarding(await actor(c), projectId as ProjectId, await body(c));
+    await api.setProjectForwarding(await actor(c), projectId as ProjectId, input);
     return c.json(await api.effectiveForwarding(projectId as ProjectId));
   });
   r.delete('/v1/admin/auth/forwarding/projects/:projectId', async (c) => {

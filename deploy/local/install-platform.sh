@@ -86,7 +86,7 @@ if kubectl -n $NS exec "$AUTH_POD" -- bun apps/cs-auth/src/main.ts bootstrap-adm
     --username "$ADMIN_USER" --display-name "平台管理员" --email "$ADMIN_EMAIL" --password "$ADMIN_PASSWORD" >/dev/null 2>&1; then
   mkdir -p "$ROOT/.local"
   printf 'CS_BOOTSTRAP_ADMIN_USERNAME=%s\nCS_BOOTSTRAP_ADMIN_PASSWORD=%s\n' "$ADMIN_USER" "$ADMIN_PASSWORD" > "$ROOT/.local/admin.env"
-  log "已创建首位管理员 $ADMIN_USER（口令写入 .local/admin.env），引导令牌已退役"
+  log "已创建首位管理员 ${ADMIN_USER}（口令写入 .local/admin.env），引导令牌已退役"
 else
   log "首位管理员已存在，跳过引导（引导令牌在 Secret crewstation-secrets 的 CS_BOOTSTRAP_TOKEN）"
 fi
@@ -97,5 +97,5 @@ if [[ "${CS_SKIP_TASK_RUNTIME:-}" == "1" ]]; then log "跳过推送平台底座�
 # 套餐是建项目的前置；装完就种上。算力档位不预置（RFC-006），由管理员在平台管理里创建并测试。
 "$ROOT/deploy/local/seed-catalog.sh"
 
-log "完成。控制台：http://console.cs.localhost/  登录：http://console.cs.localhost/auth/login（用户名 $ADMIN_USER）"
+log "完成。控制台：http://console.cs.localhost/  登录：http://console.cs.localhost/auth/login（用户名 ${ADMIN_USER}）"
 kubectl -n $NS get pods -o wide
