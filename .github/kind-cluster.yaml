@@ -1,0 +1,13 @@
+# CI 用的 kind 集群：把宿主机 80 端口接到节点的 30080（Traefik 的 web NodePort，由工作流固定住）。
+#
+# 为什么一定要是 80：登录跳转地址由平台配置的用户域（cs.localhost）生成，不带端口。
+# 把网关放在 8080 上时，浏览器被 302 到 http://console.cs.localhost/auth/login，
+# 落到无人监听的 80 端口，页内请求随即报 Failed to fetch——查过一轮才定位到。
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+  - role: control-plane
+    extraPortMappings:
+      - containerPort: 30080
+        hostPort: 80
+        protocol: TCP

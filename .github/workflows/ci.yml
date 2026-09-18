@@ -42,9 +42,10 @@ jobs:
     env:
       CREWSTATION_KUBE_CONTEXT: kind-crewstation
       CREWSTATION_NODE_CONTAINER: crewstation-control-plane
-      # 网关经 port-forward 暴露在高位端口：CI 里不占 80，脚本与用例都按这个地址走。
-      CS_CONSOLE_URL: http://console.cs.localhost:8080
-      CS_E2E_CONSOLE: http://console.cs.localhost:8080
+      # 必须落在 80：登录跳转地址由平台配置的用户域生成，不带端口。放在高位端口时浏览器会被
+      # 302 到 http://console.cs.localhost/auth/login，撞上没人监听的 80，页内请求随即 Failed to fetch。
+      CS_CONSOLE_URL: http://console.cs.localhost
+      CS_E2E_CONSOLE: http://console.cs.localhost
       # 前台验收不起开发会话，跳过要联网装两个 Agent CLI 的任务容器镜像。
       CS_SKIP_TASK_RUNTIME: '1'
     steps:
@@ -58,6 +59,7 @@ jobs:
         uses: helm/kind-action@v1
         with:
           cluster_name: crewstation
+          config: .github/kind-cluster.yaml
 
       - name: resolve the console host to loopback
         run: echo '127.0.0.1 console.cs.localhost' | sudo tee -a /etc/hosts
@@ -65,14 +67,19 @@ jobs:
       - name: bootstrap infrastructure
         run: deploy/local/bootstrap.sh --skip-verify
 
-      - name: expose the gateway
+      # kind 把宿主机 80 接到节点 30080，这里把 Traefik 的 web NodePort 钉在 30080 上对齐。
+      # 合并补丁对列表是整体替换，所以两个端口都要写全。
+      - name: expose the gateway on port 80
         run: |
-          nohup kubectl -n crewstation-system port-forward svc/traefik 8080:80 >/tmp/port-forward.log 2>&1 &
+          kubectl -n crewstation-system patch svc traefik -p '{"spec":{"ports":[
+            {"name":"web","port":80,"targetPort":"web","nodePort":30080},
+            {"name":"websecure","port":443,"targetPort":"websecure"}]}}'
           for _ in $(seq 1 60); do
-            curl -sS -o /dev/null --max-time 2 http://127.0.0.1:8080/ && exit 0
+            curl -sS -o /dev/null --max-time 2 "$CS_CONSOLE_URL/" && exit 0
             sleep 1
           done
-          echo '网关在 60s 内没有经 port-forward 应答' >&2; cat /tmp/port-forward.log >&2; exit 1
+          echo '网关在 60s 内没有从 80 端口应答' >&2
+          kubectl -n crewstation-system get svc traefik -o wide >&2; exit 1
 
       - name: install platform
         run: deploy/local/install-platform.sh
