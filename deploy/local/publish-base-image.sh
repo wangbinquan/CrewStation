@@ -14,6 +14,9 @@ node_exec ctr -n k8s.io images inspect "${SOURCE}" >/dev/null 2>&1 \
   || die "节点 containerd 里没有 ${SOURCE}：先跑 install-platform.sh（不要带 CS_SKIP_TASK_RUNTIME=1）"
 node_exec ctr -n k8s.io images tag --force "${SOURCE}" "${TARGET}" >/dev/null
 node_exec ctr -n k8s.io images push --plain-http "${TARGET}" >/dev/null
+# 开发会话与业务任务的父容器按 CS_TASK_IMAGE 用集群内仓库名拉底座（10-config.yaml）：节点上同名标签随每次推送指向最新内容，
+# IfNotPresent 直接命中；kubelet 要求重新拉取时（1.36 的拉取校验记录，见 dev-gotchas）也能从仓库拉到同一份。
+node_exec ctr -n k8s.io images tag --force "${SOURCE}" "${REGISTRY_HOST}/crewstation/task-runtime:${TAG}" >/dev/null
 # 摘要经节点回环地址向仓库查清单取得（仓库的 NodePort 只在节点上可达）。
 DIGEST="$(node_exec curl -fsS -I \
   -H 'Accept: application/vnd.oci.image.index.v1+json' -H 'Accept: application/vnd.oci.image.manifest.v1+json' -H 'Accept: application/vnd.docker.distribution.manifest.v2+json' \

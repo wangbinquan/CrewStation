@@ -16,7 +16,7 @@ data:
   CS_PASSWORD_LOGIN: ""
   CS_REGISTRY_BASE: registry.crewstation-system.svc.cluster.local:5000
   CS_BUILDER_IMAGE: cs-builder:dev
-  CS_TASK_IMAGE: cs-task-runtime:dev
+  CS_TASK_IMAGE: registry.crewstation-system.svc.cluster.local:5000/crewstation/task-runtime:dev
   CS_BUILDKIT_ADDRESS: tcp://buildkitd.crewstation-system.svc.cluster.local:1234
   CS_GITLAB_URL: http://host.docker.internal:8929
   CS_GITLAB_GROUP: crewstation

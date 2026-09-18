@@ -33,6 +33,13 @@
 `Executable not found in $PATH: "git"`。凡是以子进程调用外部命令的，都要回头确认镜像里真的有它
 （本仓已踩过 git；`setsid` / `setpriv` 来自 util-linux，任务镜像里显式装了）。
 
+### OpenCode Zen 免费档拒绝没有 bash 工具的请求（403 FreeTierError）
+
+2026-09-18 实测：`opencode run` 用 `opencode/big-pickle` 时，只要 agent 的权限表把 `bash` 设成 `deny`（平台的 read-only 与 edit 两档都是），
+服务端就答 `403 … OpenCode's free tier can only be used from within OpenCode`（`FreeTierError`），其余 deny（edit、webfetch）不影响。
+错误只出现在 stdout 的 `{"type":"error",…}` 那一行里，归一后的事件文案只剩「运行时报告错误」。所以：档位测试按 agent-workflow 冒烟取全放行；
+本机只有这个免费模型时，read-only／edit 的 Agent（包括最小示例的 `chat-v1`）真实轮次会被拒，这是模型服务的限制，不是平台故障。
+
 ### 两个 Agent CLI 的安装器只写 root 家目录
 
 `claude` 与 `opencode` 的官方安装器把二进制放进 root 的家目录，uid 10001 的 worker 进不去。
@@ -104,13 +111,27 @@ sql`kind = ANY(ARRAY[${sql.join(kinds.map((k) => sql`${k}`), sql`, `)}]::text[])
 迁移 Job 连续 `Connection closed`。判据：`docker exec desktop-control-plane df -h /`、`crictl images` 里成片的 `<none>` 与 `import-*`。
 清理只碰可再生内容：`docker builder prune -af`、`docker image prune -f`、`ctr -n k8s.io images rm` 未被任何 Pod 引用的旧 `cs-*` 标签、`crictl rmi` 悬空引用；
 不要 prune 卷（GitLab、测试库都在卷里），也不要删别的项目的镜像。部署前先看磁盘。
+2026-09-18 RFC-006 实机验收时复发：一小时内连跑六次 `install-platform.sh`（每次都重导四个镜像，任务镜像约 1 GB），`/` 从 95% 到 100%，
+`postgres-0` 同样起不来（崩溃恢复本身没问题，腾出空间后自动恢复）。只改了控制面代码时不要跑整套安装：`docker build` 控制面镜像 →
+`docker save | ctr import` 只导这一个 → `rollout restart` 七个平台部署 → `docker image prune -f` → `crictl rmi` 被取代的旧镜像；磁盘持平。
 
 ### 节点 CPU 预约 10／10 时滚动更新排不进新 Pod
 
 控制面每个部署请求 100m，RollingUpdate 默认先起新再停旧，节点满额时新 Pod 一直 Pending，`rollout status` 超时。
 两种做法都用过：单副本服务改 `strategy: Recreate`（console 先改，2026-09-16 cs-api 卡死后 `rollout restart` 的新 Pod Pending 了六分钟，七个平台部署的清单全部写回 Recreate）；发布构建 Job 的 Pod 请求 1 CPU，节点占满时它会一直 Pending、发布停在“正在构建”（2026-09-16 v0.1.2 等了 11 分钟，缩四个 CLI Pod 到 150m 后 20 秒内完成）；新版本的 Deployment 按部署时的套餐请求 CPU（v0.1.2 的 preview Pod 500m，正式槽 50m），随后 cs-api／console 的 Recreate 又因此 Pending 10 分钟——重建平台镜像前先看 `kubectl describe node` 的 cpu 请求余量；或临时把闲置 CLI Pod 原地缩到 150m 再恢复——
 `kubectl patch pod … --subresource resize`，requests 与 limits 要一起改，否则 Guaranteed QoS 变化会被拒绝；容器名等于 Pod 名。
+构建 Job 有截止时间：一直排不进去时约 30 分钟后发布记为「构建失败：Job was active longer than specified deadline」（2026-09-18 首次发布即如此），
+要重新发布而不是等它自己恢复。缩别的会话或项目的 Pod 之前先征得它的所有者同意。
 
+
+### kubelet 1.36 可能坚持重拉本机导入的镜像：任务父容器改用平台仓库里的底座
+
+本机的平台镜像都是 `docker save | ctr import` 进节点的，Pod 用 `IfNotPresent` 引用本地标签。kubelet 1.36 会在
+`/var/lib/kubelet/image_manager/pulling` 记下拉取意图：某次拉取失败过（2026-09-18 磁盘写满、导入被打断时新建的开发会话就撞上了），
+之后即使镜像已经在 containerd 里、`ctr images check` 显示完整，kubelet 仍要求重新拉取来校验，而 `docker.io/library/cs-task-runtime:dev`
+根本不在任何仓库里，于是 `ImagePullBackOff`（`pull access denied … insufficient_scope`）一直不消失。不要去改 kubelet 的状态文件：
+`CS_TASK_IMAGE` 改指 `publish-base-image.sh` 推进集群内仓库的同一底座（摘要相同），脚本同时在节点上给这个名字打标签，
+平时 `IfNotPresent` 直接命中，kubelet 要重拉时也拉得到。
 
 ### `.dockerignore` 会静默吃掉构建需要的目录
 
