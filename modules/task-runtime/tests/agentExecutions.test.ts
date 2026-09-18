@@ -75,6 +75,9 @@ describe.skipIf(!available)('Agent 执行环境（RFC-006 §5：每个 Agent 一
     expect(child).toMatchObject({ kind: 'business', podName: `sub-${child.id.slice(4)}`, native: { purpose: 'subtask' } });
     await expect(f.runtime.api.createNativeExecution(agentInput({ purpose: 'agent' }))).rejects.toMatchObject({ kind: 'precondition' });
     await f.runNative();
+    // 业务任务与子任务执行环境的 Pod 用网关身份索引与项目出站策略认的工作负载名，Agent 才能访问模型端点。
+    const parentPod = (await f.k8s.get(Resources.Pod!, f.env.podName, f.env.namespace))!, childPod = (await f.k8s.get(Resources.Pod!, child.podName, f.env.namespace))!;
+    expect([parentPod.metadata.labels?.['crewstation.io/workload'], childPod.metadata.labels?.['crewstation.io/workload']]).toEqual(['business-task', 'business-task']);
     await f.runtime.api.pauseEnvironment(f.env.id);
     expect(await f.runtime.api.getEnvironment(child.id)).toMatchObject({ native: { state: 'cleaning', failureReason: '业务任务已暂停，此子任务的执行环境随之结束' } });
     await f.runNative();

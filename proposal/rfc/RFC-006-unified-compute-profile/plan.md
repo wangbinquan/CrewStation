@@ -71,13 +71,13 @@
 | T1 | 完成（2635e27） | `packages/contracts/taskrunner/launch.ts` 与 `launch.test.ts`（字段适用矩阵、保留参数与变量前缀、`default` 保留名）；`protocol.test.ts`（协议 2 必填字段、`startAgent` 拒绝 terminal、hello 拒绝协议 1）；`api/compute/computeProfile.ts` | 未执行 |
 | T2 | 完成（2635e27） | `modules/agent-runtime/**`：`domainRules.test.ts`、`computeProfileModule.test.ts`（修订与内容哈希、凭据 keep／replace／clear、可用性四种原因、默认／停用／删除与引用确认、复制、保存即排测试、新修订作废旧测试、HTTP 权限与租户投影）；迁移 `0003_compute_profiles.sql`（断代）；project 删除档位代码与迁移 `0008_drop_compute_profiles.sql` | 未执行 |
 | T3 | 完成（2635e27） | `packages/agent-drivers` 与 `runtimes/task`：argv／env 精确断言、终端协议与 `CS_MCP_*`、`probeTerminal`（超时、截断、正则、重复尝试）、删除项的源码层断言（`removedSurfaces.test.ts`）；Dockerfile 的 `/opt/crewstation/bin/task-runner` | 两个原生动态验收用例需在 Linux 任务镜像内跑（`CS_NATIVE_ACTIVITY_ACCEPTANCE=1`），未执行；镜像未在集群构建 |
-| T4 | 完成（本批） | `modules/task-runtime/tests/agentExecutions.test.ts`（三种用途的准入与额度、档位镜像按摘要、显式 Runner 命令与 `runAsUser: 0`、握手被拒回收并释放额度、镜像拉取／容器起不来立即失败、暂停结束子执行环境且恢复不重起）；`taskRuntimeModule.test.ts`（无 agent-env） | 未执行 |
-| T5 | 完成（本批） | `modules/dev-session/tests/profileLaunch.test.ts`（headless Agent 受理即登记执行环境、子 Runner 就绪后派发且不重复、额度满、消息与取消路由到子 Runner、终态后回收不重启、执行环境失败原因、未派发即取消）；`devSessionModule.test.ts`（`default` 每次启动解析、终端档位只进「＋ CLI」） | 未执行 |
-| T6 | 完成（本批） | `modules/business-task/tests/businessTaskModule.test.ts`（子任务各自执行环境、额度满失败文案、子 Runner 未连上时等待、消息路由、执行环境丢失时失败带原因、未开始即取消回收、修订固定与 `default` 解析） | 未执行 |
+| T4 | 完成（7cbe22f） | `modules/task-runtime/tests/agentExecutions.test.ts`（三种用途的准入与额度、档位镜像按摘要、显式 Runner 命令与 `runAsUser: 0`、握手被拒回收并释放额度、镜像拉取／容器起不来立即失败、暂停结束子执行环境且恢复不重起）；`taskRuntimeModule.test.ts`（无 agent-env） | 未执行 |
+| T5 | 完成（7cbe22f） | `modules/dev-session/tests/profileLaunch.test.ts`（headless Agent 受理即登记执行环境、子 Runner 就绪后派发且不重复、额度满、消息与取消路由到子 Runner、终态后回收不重启、执行环境失败原因、未派发即取消）；`devSessionModule.test.ts`（`default` 每次启动解析、终端档位只进「＋ CLI」） | 未执行 |
+| T6 | 完成（7cbe22f） | `modules/business-task/tests/businessTaskModule.test.ts`（子任务各自执行环境、额度满失败文案、子 Runner 未连上时等待、消息路由、执行环境丢失时失败带原因、未开始即取消回收、修订固定与 `default` 解析） | 未执行 |
 | T7 | 完成（2635e27） | `modules/task-runtime/tests/profileTest.test.ts`（假集群／假 Runner 逐阶段：通过、启动前步骤失败、超时取消、镜像拉取失败、容器起不来、协议不一致、终端命令通过与不匹配、租约丢失与环境中途失败记 unknown）；`profileTestClassifier.test.ts`（移植 agent-workflow 的正则回归，含 `503`／`529` 误命中与十万次 nonce） | 未执行 |
 | T8 | 代码完成（2635e27） | 保存时解析摘要与前缀校验（agent-runtime 用例）；推送凭据签发与仓库 ForwardAuth（`pushGrant.test.ts`、`computeProfileModule.test.ts`：过期、越权路径、签名错、删除与目录列举被拒）；`deploy/k8s/platform/41-registry-gateway.yaml`、`deploy/local/publish-base-image.sh` | design.md §13 四项实测未执行 |
 | T9 | 完成（2635e27） | release 三种拒绝；capabilities 改源；CLI 安装不播种（`installInitialize.test.ts`、`installConfig.test.ts`）；模板 `compute: default`；settings 删除 `CS_AGENT_ENV_SECRET`／`CS_DEFAULT_COMPUTE_PROFILE` | 未执行 |
-| T10 | 完成（2635e27 管理页；本批 headless Agent 的执行环境流） | `apps/console/src/tests/compute*.test.ts*`（档位表、按协议显隐、测试时间线、默认／停用／删除确认、推送信息卡、租户下拉过滤与禁选原因、无运行环境页签的源码层断言）；`agentExecutionStreams.test.tsx`（每个未结束的执行环境一条流、选中已结束的 Agent 时回放且不重复、老 Agent 仍读父会话流、准备中与失败原因的呈现） | 多分辨率与明暗主题未核对 |
+| T10 | 完成（2635e27 管理页；7cbe22f headless Agent 的执行环境流） | `apps/console/src/tests/compute*.test.ts*`（档位表、按协议显隐、测试时间线、默认／停用／删除确认、推送信息卡、租户下拉过滤与禁选原因、无运行环境页签的源码层断言）；`agentExecutionStreams.test.tsx`（每个未结束的执行环境一条流、选中已结束的 Agent 时回放且不重复、老 Agent 仍读父会话流、准备中与失败原因的呈现） | 多分辨率与明暗主题未核对 |
 | T11 | 部分 | ADR-0005 与结构文档 §5 已同步；RFC-004 已置 Superseded；ADR-0005 待作者复核后再标「已接受」 | 基线回填待 T12 之后 |
 | T12 | 未开始 | — | 待本机部署 |
-| T13 | 每批执行 | 2635e27：本地门禁全绿，并在隔离目录单独跑过提交树的门禁；CI run 35308530121 成功 | — |
+| T13 | 每批执行 | 2635e27：本地门禁全绿，并在隔离目录单独跑过提交树的门禁；CI run 35308530121 成功。7cbe22f（每个 Agent 一个 Pod）：本地门禁全绿（1546 pass）；CI run 35310598962 成功 | — |

@@ -37,10 +37,16 @@ function checkoutContainer(image: string, source: TaskSourceCheckout, uid: numbe
  */
 export const RUNNER_COMMAND: readonly string[] = Object.freeze(['/usr/bin/tini', '--', '/opt/crewstation/bin/task-runner']);
 
+/**
+ * Pod 的工作负载标签用网关的 Pod 身份索引与项目网络策略认的名字：业务任务是 `business-task`（TaskKind 是 `business`）。
+ * 此前直接写 TaskKind，业务任务 Pod 既不在身份索引里、也拿不到任务出站策略（RFC-006 起业务 Agent 子任务的 Pod 要访问模型端点）。
+ */
+export const WORKLOAD_LABEL: Record<TaskPodSpec['env']['kind'], string> = { 'dev-session': 'dev-session', business: 'business-task', 'profile-test': 'profile-test' };
+
 export function taskPodObject({ env, image, envVars, resources, source, envSecretName, nodeName, workVolume }: TaskPodSpec, workerUid: number): K8sObject {
   const pod = podObject({
     name: env.podName, namespace: env.namespace, image, imagePullPolicy: 'IfNotPresent', command: [...RUNNER_COMMAND], runAsUser: 0,
-    labels: { [LABELS.project]: env.labels[LABELS.project] ?? '', [LABELS.service]: env.labels[LABELS.service] ?? '', [LABELS.workload]: env.kind, [LABELS.task]: env.id },
+    labels: { [LABELS.project]: env.labels[LABELS.project] ?? '', [LABELS.service]: env.labels[LABELS.service] ?? '', [LABELS.workload]: WORKLOAD_LABEL[env.kind], [LABELS.task]: env.id },
     env: Object.entries(envVars).map(([name, value]) => ({ name, value })),
     resources: { cpu: resources.cpu, memory: resources.memory, ephemeralStorage: resources.storage },
     volumes: [workVolume === 'emptyDir' ? { name: 'work', mountPath: '/work', emptyDir: true } : { name: 'work', mountPath: '/work', pvc: env.pvcName }],

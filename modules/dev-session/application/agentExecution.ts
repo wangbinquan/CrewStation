@@ -96,7 +96,8 @@ export class AgentExecutionLifecycle {
   dispatch(agentId: string): Promise<void> {
     const current = this.active.get(agentId);
     if (current) { this.rerun.add(agentId); return current; }
-    if (this.active.size >= 4) return Promise.resolve();
+    // 每个处理占一条带咨询锁的事务连接：与「＋ CLI」的派发一样每进程最多两项，避免占满连接池。
+    if (this.active.size >= 2) return Promise.resolve();
     const operation = (async () => {
       do {
         this.rerun.delete(agentId);
@@ -119,7 +120,7 @@ export class AgentExecutionLifecycle {
     try {
       const starts = await this.repo.listUnfinalized(this.after, 32);
       this.after = starts.length === 32 ? starts.at(-1)!.agentId : undefined;
-      for (let i = 0; i < starts.length; i += 4) await Promise.all(starts.slice(i, i + 4).map((start) => this.dispatch(start.agentId)));
+      for (let i = 0; i < starts.length; i += 2) await Promise.all(starts.slice(i, i + 2).map((start) => this.dispatch(start.agentId)));
     } finally { this.sweeping = false; }
   }
 }
