@@ -1,6 +1,6 @@
 # RFC-006｜设计
 
-> In Progress · 2026-09-18 作者设定会话目标「完整实现RFC并提交上库」，据此进入实施。与 [proposal.md](proposal.md)、[plan.md](plan.md)、[ADR-0005](../../../docs/adr/0005-compute-profile-in-agent-runtime.md) 一起看。§11 是对结构文档的变化，§13 是实施前必须实测的技术点。
+> Done · 2026-09-18 作者设定会话目标「完整实现RFC并提交上库」，据此实施完成。与 [proposal.md](proposal.md)、[plan.md](plan.md)、[ADR-0005](../../../docs/adr/0005-compute-profile-in-agent-runtime.md) 一起看。§11 是对结构文档的变化，§13 是实施前必须实测的技术点。
 
 ## 1. 现状与断点
 

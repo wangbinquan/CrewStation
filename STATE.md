@@ -5,42 +5,21 @@
 
 ## 一句话
 
-基线三件套（v0.3.3）的第一轮实现已在本机 kind 集群上跑通并推上 main；**RFC-001（算力归平台）与 RFC-002（管理空间与租户空间分离）已实现、实跑确认并推上 main；RFC-004 已被 RFC-006 取代（Superseded）；RFC-006（算力档位合并运行环境、每个 Agent 一个 Pod）的代码与测试已提交 main，实机验收大部分通过，需要发布构建的几项因本机 CPU 不足未执行；RFC-003 工作台已按设计附件完成并整体部署到本机，52／52 项 UX-AT 全部实机通过、本地 gate 与精确 SHA CI 通过,RFC-003 已 Done；RFC-005（OIDC／OAuth 2.0 公司登录）代码、测试与 OA-01…OA-31 实机验收全部完成，已 Done**。
+基线三件套（v0.3.3）的第一轮实现已在本机 kind 集群上跑通并推上 main；**RFC-001（算力归平台）与 RFC-002（管理空间与租户空间分离）已实现、实跑确认并推上 main；RFC-004 已被 RFC-006 取代（Superseded）；RFC-006（算力档位合并运行环境、每个 Agent 一个 Pod）已实现、实机验收完毕并推上 main，已 Done（P1–P8、ADR-0005 与 I17–I19 待作者复核）；RFC-003 工作台已按设计附件完成并整体部署到本机，52／52 项 UX-AT 全部实机通过、本地 gate 与精确 SHA CI 通过,RFC-003 已 Done；RFC-005（OIDC／OAuth 2.0 公司登录）代码、测试与 OA-01…OA-31 实机验收全部完成，已 Done**。
 
 ## 进行中的 RFC
 
-**RFC-003 工作台 UX 重设计已 Done（2026-09-16）：52／52 项 UX-AT 全部实机通过,本地 gate 与精确 SHA CI 通过。RFC-004（管理员定义 Agent 启动前 Hook）已按 RFC-006 的裁定 C8 置为 Superseded，其 AR 实机验收不再执行。** RFC-001 与 RFC-002 都已 Done，见 `proposal/rfc/README.md` 的索引表。**RFC-005（OIDC／OAuth 2.0 公司登录）于 2026-09-18 落档、同日按作者会话目标「完整实现整个RFC并提交上库」实施完毕并实机验收，已 Done。** **RFC-006（算力档位合并运行环境）2026-09-18 落档，同日作者设定会话目标「完整实现RFC并提交上库」，进入实施（In Progress）：代码与自动化证据已提交 main，实机验收（T12）大部分通过，CP-10／17／19 等需要发布构建的项未执行，见下方接力。**
+**RFC-003 工作台 UX 重设计已 Done（2026-09-16）：52／52 项 UX-AT 全部实机通过,本地 gate 与精确 SHA CI 通过。RFC-004（管理员定义 Agent 启动前 Hook）已按 RFC-006 的裁定 C8 置为 Superseded，其 AR 实机验收不再执行。** RFC-001 与 RFC-002 都已 Done，见 `proposal/rfc/README.md` 的索引表。**RFC-005（OIDC／OAuth 2.0 公司登录）于 2026-09-18 落档、同日按作者会话目标「完整实现整个RFC并提交上库」实施完毕并实机验收，已 Done。** **RFC-006（算力档位合并运行环境）2026-09-18 落档，同日作者设定会话目标「完整实现RFC并提交上库」，同日实施完成并 **Done**：CP-01…CP-22 实机核对完毕，基线三件套回填到 v0.3.4，见下方接力。**
 
-## 最新接力：RFC-006 实机验收大部分通过，发布相关几项受本机 CPU 所限（2026-09-18）
+## 最新接力：RFC-006 Done——实机验收全部核对，基线回填 v0.3.4（2026-09-18）
 
-作者会话目标「完整实现RFC并提交上库」，RFC-006 In Progress。作者五轮裁定 C1–C20 在 proposal.md §2；§13 的 P1–P8 与 ADR-0005 **未经作者逐条确认**，先按提议做法实施，ADR-0005 状态仍是「实施中」。RFC-004 已按 C8 置为 Superseded。
+作者会话目标「完整实现RFC并提交上库」。作者五轮裁定 C1–C20 在 proposal.md §2；**待作者复核**：§13 的 P1–P8、ADR-0005（仍为「实施中」）、`docs/engineering/implementation-open-questions.md` 的 I17（档位测试轮次的权限档位）、I18（构建资源是否可配置）、I19（read-only／edit 去掉 bash 与免费模型相冲）。RFC-004 已按 C8 置为 Superseded。
 
-已提交 main 并过 CI：2635e27（统一档位与 Runner 协议 2）、7cbe22f（每个 Agent 一个 Pod）、b2cf79a、4a1b274（仓库 TLS 路由），以及本批实机修复 **2e743a6**、**8083552**。
+提交（都已推上 main，CI 按 SHA 见各提交）：2635e27（统一档位与 Runner 协议 2）、7cbe22f（每个 Agent 一个 Pod）、b2cf79a、4a1b274；实机修复 2e743a6（档位测试的权限、原文分类与打码摘录、`driver_not_installed`、`{{mcp.*}}` 上下文、终端测试收尾、跳过阶段、保存不清空说明、编辑器错误焦点）、8083552（任务父容器改从集群内仓库拉底座）、b0a526c（构建 Pod 按 `git clone`＋`buildctl` 客户端的负载改为 250m／512Mi）、67c343d（opencode 的 error 行带厂商原文）；文档 5c3fbf5、ef5050d（基线 v0.3.4）与本批收尾。
 
-实机（本机 kind，部署到 8083552；逐项证据 `/private/tmp/crewstation-rfc006-20260918/`，README 有逐项表，plan.md「实施说明」T12 有摘要）：
+实机（逐项证据 `/private/tmp/crewstation-rfc006-20260918/README.md`）：design.md §13 四项与 CP-01…CP-22 全部核对。验收项目 `rfc006-verify`（`prj_01a0b3546ef570009ee4c590852cca21`）：首次发布在构建 Pod 右尺寸后成功；`/chat` 经默认档位得到真实模型输出；额度满时子任务立即 failed；暂停结束 Agent Pod、恢复不重起；被引用档位删除先列项目；引用通用终端档位的发布在部署阶段被拒。本机做不到、以自动化用例为准的两处：CP-03 的 Claude Code 真实轮次（无登录态）、CP-11 的「没有默认档位」（默认设过就不能停用或删除）。模板原样的 read-only `chat-v1` 被 OpenCode Zen 免费档以 403 拒绝（I19），验收项目的 `chat-v1` 改用 full（分支 `rfc006-accept`；受保护的 main 不接受会话推送，发布走分支）。
 
-- **通过**：design.md §13 四项；CP-01～09、13～16、18、20～22；CP-11 的「default 每次启动解析、改默认后下次即换」；CP-12 的「默认不能停用／删除、删除后起 Agent 报不存在」。UI 三项用本机无头 Chrome（端口 9555）＋`tests/e2e` 的 CDP 助手。
-- **未执行**：CP-10、CP-17、CP-19，以及 CP-07／CP-11 的「发布被拒」、CP-12 的「删除被引用档位先列项目」——都要先有一次成功的发布构建。构建 Pod 固定请求 1 CPU，节点 CPU 预约 98%（大头是 RFC-003 QA 会话与各项目服务槽），验收项目 `rfc006-verify`（`prj_01a0b3546ef570009ee4c590852cca21`）的首次发布 Pending 到截止时间后失败。腾 CPU 需要缩别的会话的 Pod，**没有得到所有者同意，没动**。腾出 ≥1 CPU 后：对该项目重新发布（`POST /v1/services/svc_01a0b3546ef57001ae988e24182fa9a5/releases`），再做这几项。
-- **本机做不到**：CP-03 的 Claude Code 真实轮次（无登录态，只验证了「鉴权失败」分类）；CP-11 的「没有默认档位」（默认一旦设过就不能停用或删除）。
-
-实机发现并已修复（2e743a6、8083552，均带会红的用例）：
-
-1. 档位测试以 read-only 起轮次，OpenCode Zen 免费档对没有 bash 工具的请求答 403，好档位被判坏——改为 full，与 agent-workflow 冒烟一致（取舍记为 open-questions I17）。
-2. 厂商报错只在事件原始行里，分类拿不到——测试保留原始行尾部参与分类，并在原因后附打码摘录（移植 maskDiagnosticsText）。
-3. 二进制路径错（`driver_not_installed`）被归成「不符合协议」——改归启动失败。
-4. 步骤里的 `{{mcp.*}}` 在测试里没有上下文，这种档位永远测不过——引用时给 MCP 地址与不授权的占位令牌。
-5. 通用终端测试通过后步骤仍显示「等待中」；失败收尾没走到的阶段改记「跳过」。
-6. 不带说明保存或复制会把说明清空（zod 4 的 default 在 optional 里照样生效）。
-7. 编辑器保存校验失败时焦点不落到出错字段。
-8. kubelet 1.36 对本机导入的 `cs-task-runtime:dev` 留下拉取意图后坚持重拉，新开发会话一直 ImagePullBackOff——`CS_TASK_IMAGE` 改指集群内仓库的同一底座。
-
-新增给作者的待决项：`docs/engineering/implementation-open-questions.md` I17（测试轮次的权限档位）、I18（构建资源写死 1 CPU）、I19（read-only／edit 去掉 bash 与免费模型相冲），I2 补了 `{{mcp.token}}` 在业务子任务里的表现。
-
-环境现状：06:45Z Docker Desktop 磁盘写满过一次（postgres 自愈，见 dev-gotchas），之后只重建控制面、清理被取代的镜像，磁盘约 6 GB 余量；**不要在本机连续跑整套 `install-platform.sh`**。档位：oc-base（默认）、fork-oc、demo-term、oc-fields、oc-steps 可用，其余是失败分类的样例（测试失败、租户不可选）。验收期间临时降配的 coding-medium／standard-small 已恢复原值；新增任务套餐 rfc006-agent（150m／1Gi／2Gi）供档位用。RFC-003 QA 会话没有动。
-
-基线三件套已按 RFC-006 design.md §12 回填到 **v0.3.4**（T11；在 T12 未全部完成时先做，plan.md 注明了顺序偏离），CLAUDE.md 的版本与 RFC 状态同步。
-
-下一步：腾出 CPU 后补 CP-10／17／19 与三处发布相关项（若结果要求改设计，再补一次回填）；ADR-0005 与 open-questions I17–I19 等作者裁定；RFC-006 在 T12 完成前保持 In Progress。
+环境现状：06:45Z Docker Desktop 磁盘写满过一次（postgres 自愈，见 dev-gotchas），之后只重建控制面并清理被取代的镜像；**不要在本机连续跑整套 `install-platform.sh`**。任务镜像没有为 67c343d 重建（实机子任务的错误文案仍是旧的「运行时报告错误」，原文在事件 raw 里）。档位：oc-base（默认）、fork-oc、demo-term、oc-fields 可用，oc-steps 已按 CP-12 删除，其余是失败分类样例。临时降配的 coding-medium／standard-small 已恢复；rfc006-agent（150m／1Gi／2Gi）留给档位用；验收项目预览槽 v0.1.2 在跑（25m）。RFC-003 QA 会话没有动。
 
 ## 最新接力：RFC-005 实机验收跑完，RFC-005 Done（2026-09-18）
 
