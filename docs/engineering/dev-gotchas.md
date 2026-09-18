@@ -135,6 +135,11 @@ sql`kind = ANY(ARRAY[${sql.join(kinds.map((k) => sql`${k}`), sql`, `)}]::text[])
 放行表的判定逻辑在 `modules/gateway`，但**执行判定的是 cs-auth**（ForwardAuth）。
 只重启 cs-api 与 cs-controller，403 照旧。**先想清楚这段代码跑在哪个进程里**，再决定重启谁。
 
+同一个 ConfigMap 开关往往被**多个进程**读，只重启一个会让界面与实际各说各话。
+2026-09-18 实撞：`CS_PASSWORD_LOGIN=force-on`（RFC-005 的破窗口）只重启 cs-auth 后，登录页照收密码，
+而管理面的认证页由 cs-api 应答、它的 `forcedOn` 还是 `false`，于是卡片写着「已关闭」、还给出一个按下去必然 409 的开关。
+改这类开关前先 `grep` 一遍谁读它（`packages/settings` 的字段名最好找），把读它的进程一起重启，运维文档也要写全。
+
 ### 按任务建的资源，路由也要按任务建
 
 开发预览的目标 Service 是随任务 Pod 建的，放进 gateway 的「按服务重算路由」里对不上生命周期。
@@ -309,6 +314,20 @@ Claude in Chrome 的 `resize_window` 到 390／320 会被 macOS Chrome 的最小
 真的给出 `webSocketDebuggerUrl`。见 `tests/e2e/consoleSession.ts`。
 
 ## 并发开发与 Agent 协作
+
+### 整文件批量替换会把「定义处」也换掉：抽助手函数后它开始调用自己
+
+2026-09-18 实撞：把一批路由里的 `await c.req.json()` 换成新助手 `await body(c)`，用的是整文件
+`s.replace("await c.req.json()", "await body(c)")`——助手**自己的函数体**也在这个文件里，于是
+`const body = async (c) => await body(c)`，每条读 body 的管理路由都稳定回「请求体必须是 JSON」。
+抽助手时先写定义、再改调用点，替换后**读一遍定义**；助手名别跟局部变量重名（`body` → `readJsonBody`）。
+错误里带上原始原因（`{ reason: error.message }`），这类自伤才不会伪装成「客户端发的不是 JSON」。
+
+### 每条路由的**成功路径**都要有用例，只测失败分支等于没测
+
+上面那个 bug 能进集群，是因为管理面路由的 HTTP 测试只断言了「缺字段 400」「越权 403」这类失败分支——
+它们在 body 读坏时照样绿。判据很简单：**关掉的功能能不能让测试变红**。加完成功路径用例后，
+把 bug 再种回去确认它确实红，再删掉——红过一次的测试才算数（开发规则 §3）。
 
 ### `git commit -- <pathspec>` 会漏掉 `git mv` 的删除侧
 

@@ -1,6 +1,6 @@
 # RFC-005｜实施计划
 
-> In Progress · 2026-09-18 作者以会话目标「完整实现整个RFC并提交上库」要求实施。T1–T8 与 T11 的生产代码与测试已落地，T9（实机验收）待执行。
+> Done · 2026-09-18 T1–T11 全部完成：生产代码与测试已上 main，T9 实机验收在本机 kind 集群＋两个 mock IdP＋无头 Chrome 上逐项跑完，结果见 acceptance-audit.md。
 > 每批自带测试（开发规则 §4），门禁绿了再按精确路径提交（§2、§3）。
 
 ## 任务
@@ -13,9 +13,9 @@
 | T4 | OIDC 登录链：`packages/jwt` 增 `createRemoteJwks`／`verifyIdToken`、`adapters/idp/httpIdpClient.ts`、`oidcLogin.ts`、`oidc_flows` 一次性消费、登录页／引导页／错误页渲染 | T1、T3 | 已完成：`packages/jwt/idToken.ts`、`adapters/idp/{httpIdpClient,cachedEndpointResolver}.ts`、`application/oidc/{acquireClaims,login}.ts`、`application/loginPages.ts`；`tests/oidcLogin.test.ts`（假 IdP）与 `tests/mockIdpChain.test.ts`（真 HTTP＋真 RS256 验签） |
 | T5 | 会话认证方式传递：会话声明 `cs_auth`、ForwardAuth 仅工作台注入 `x-cs-auth-method`、`40-gateway.yaml` 两处、`packages/http/identity.ts`、`/v1/me.authMethod` | T4 | 已完成：会话声明 `cs_auth`、ForwardAuth 仅工作台注入 `x-cs-auth-method`、`40-gateway.yaml` 两处、`packages/http/identity.ts`、`/v1/me.authMethod`；`tests/authAdmin.test.ts` 覆盖「业务目标没有这个头」 |
 | T6 | 演示登录整条删除：契约、`modules/identity` 内引用、CLI 告警、`tests/e2e/consoleSession.ts` 改用密码登录、`10-config.yaml` 去 `CS_IDENTITY_PROVIDER` | T3 | 已完成：演示适配器、`DemoLoginRequestSchema`、`AuthStatusDto`、`demoIdentity`、`CS_IDENTITY_PROVIDER` 全部删除；CLI `whoami` 改显示登录方式，e2e `signIn` 改口令登录 |
-| T7 | 工作台 `/admin/authentication`：登录方式卡、Provider 列表与表单（§6.3 逐项）、探针渲染、`InlineConfirm`、i18n 双语、`AdminNav` 分组 | T2、T5 | 已完成：`/admin/authentication` 三张卡（`features/admin/components/auth/*`）、中英文案、`AdminNav` 与路由；`apps/console/src/tests/adminAuthentication.test.tsx` 8 条。多分辨率与明暗主题留在 T9 实机核对 |
+| T7 | 工作台 `/admin/authentication`：登录方式卡、Provider 列表与表单（§6.3 逐项）、探针渲染、`InlineConfirm`、i18n 双语、`AdminNav` 分组 | T2、T5 | 已完成：`/admin/authentication` 三张卡（`features/admin/components/auth/*`）、中英文案、`AdminNav` 与路由；`apps/console/src/tests/adminAuthentication.test.tsx` 9 条。多分辨率、明暗与键盘已在 T9 实机核对（OA-24） |
 | T8 | `tools/mock-idp/` 与本机部署清单、`install-platform.sh` 播种引导管理员 | T4 | 已完成：`tools/mock-idp/`（标准／纯 OAuth2／非标 userinfo 三形态）、`install-platform.sh` 生成引导令牌并调 `bootstrap-admin` 播种管理员并写 `.local/admin.env` |
-| T9 | 实机验收：下表 OA 逐项，浏览器实跑 | T6、T7、T8 | 每项一条证据（截图／接口回放／数据库快照），证据目录写进 `STATE.md` |
+| T9 | 实机验收：下表 OA 逐项，浏览器实跑 | T6、T7、T8 | 已完成：OA-01…OA-31 逐项有证据（实机项为无头 Chrome＋真网关＋两个 mock IdP 的往返，其余为自动化），逐条记在 [acceptance-audit.md](./acceptance-audit.md) |
 | T10 | 本地完整门禁、按精确路径提交、推送后按自己的 SHA 盯 CI 到绿 | T9 | `bun run check` 全绿＋CI run 链接 |
 | T11 | 身份转发（A8–A11）：`identity_forwarding` 表与自定义映射、生效集求解、ForwardAuth 注入与令牌同步裁剪、`drop-identity-headers` 交给 cs-controller 生成、`authResponseHeadersRegex`、能力说明改为实际生效集、管理面转发卡与项目只读页 | T1、T5 | 已完成：`identity_forwarding` 表、候选与生效集求解、ForwardAuth 注入与令牌同步裁剪、能力说明改为实际生效集、管理面转发卡与项目只读接口 |
 
@@ -30,7 +30,18 @@
 3. 引导的非交互入口是 cs-auth 的 `bootstrap-admin` 子命令，与浏览器向导共用同一事务用例。
 
 自动化覆盖到的 OA 项：OA-01…OA-04（引导与常规登录，`authFlow.test.ts`）、OA-05…OA-08 的接口层（`oidcLogin.test.ts` 与真 HTTP 的 `mockIdpChain.test.ts`）、OA-09…OA-11、OA-13…OA-16、OA-18…OA-22（`authAdmin.test.ts`、`oidcLogin.test.ts`、域层单测）、OA-25（源码层断言）、OA-26…OA-29（`authAdmin.test.ts` 的转发用例）、OA-31（`capabilitiesModule.test.ts`）。
-仍需实机的：OA-05…OA-08 的**浏览器**往返、OA-12、OA-17（改 ConfigMap 并重启）、OA-23（两个 Provider 的登录页形态）、OA-24（多分辨率／明暗／键盘）、OA-30（伪造头被网关抹掉）。
+实机验收（2026-09-18，本机 kind 集群＋两个 mock IdP＋无头 Chrome）已全部执行完：服务端往返、破窗口、
+最后一个 Provider 保护、两 Provider 并存与 A12 账户隔离、转发裁剪与伪造头被网关抹掉，浏览器往返与
+OA-24 的多分辨率／明暗／键盘见下表各行的「实机」标注，证据（截图与接口回放）按 §证据 存放。
+
+实机跑出来、自动化没能发现的两处问题，已在本批一并修掉：
+
+1. **破窗口期间管理面报的是库内策略而不是正在生效的状态**：`CS_PASSWORD_LOGIN=force-on` 压着库内的「已关闭」时，
+   认证页照库内值写「已关闭」，还给出一个按下去必然 409 的开关——恰好在唯一需要这块牌子的场合骗人。
+   现在卡片写正在生效的「已开启」，另起一行列出被压着的库内策略，两个方向都不给按（`LoginMethodsCard`，
+   `adminAuthentication.test.tsx` 加了对应用例）。
+2. **这个开关被两个进程读**：登录页归 cs-auth，管理面归 cs-api；只重启 cs-auth 会让界面与实际各说各话。
+   文案、design.md §8、OA-17 与 `10-config.yaml` 一律改成「重启 cs-auth 与 cs-api」。
 
 ## 验收案例
 
@@ -52,7 +63,7 @@
 | OA-14 | OIDC 管理员关闭常规登录 | 关闭后登录页不再渲染密码表单；直接 POST `/auth/login` 固定 403；已存在的密码会话不被吊销（本次不做强制下线） |
 | OA-15 | 重新打开 | 同一位置由 OIDC 管理员重开后，密码登录立即可用，无需重启 |
 | OA-16 | 最后一个启用 Provider | 密码登录关闭期间，停用或删除最后一个启用 Provider 被拒绝（`last-enabled-oidc-required`），界面按钮同时禁用 |
-| OA-17 | 破窗口 | 改 ConfigMap 为 `CS_PASSWORD_LOGIN=force-on` 并重启 cs-auth 后，密码登录可用、管理面显示「由安装配置强制开启」且开关禁改；去掉后恢复库内策略 |
+| OA-17 | 破窗口 | 改 ConfigMap 为 `CS_PASSWORD_LOGIN=force-on` 并重启 cs-auth 与 cs-api 后，密码登录可用、管理面把它显示为已开启并单列被压着的库内策略、两个方向都禁改；去掉后恢复库内策略 |
 | OA-18 | state 一次性 | 同一 `state` 回放第二次被拒；过期 state 被拒；两个 cs-auth 副本轮询时仍然只成功一次 |
 | OA-19 | 令牌／userinfo 故障 | 令牌端点 5xx、userinfo 超时、userinfo 200 带错误对象、体超限，四种都得到对应错误页且不落半截用户 |
 | OA-20 | 验签与绑定 | 篡改 `id_token`、nonce 不符、空 `sub`、`userinfo.sub` 与已验证主体不符，四种都拒绝登录 |
@@ -64,8 +75,8 @@
 | OA-26 | 默认转发集 | 未做任何转发配置时，业务收到的头与令牌声明与本 RFC 之前一致（用户 ID、显示名、邮箱、身份令牌），最小样例页面正常显示当前用户 |
 | OA-27 | 关掉一个字段 | 全局关掉邮箱后，业务请求里**没有** `x-cs-user-email` 这个头（不是空串），令牌声明里也没有 `email`；平台侧档案仍保留邮箱；最长 5 分钟内全部生效 |
 | OA-28 | 按项目覆盖 | 给一个项目放宽、给另一个收紧，两个项目的业务同时观察到各自的集合；未设置覆盖的项目跟随全局默认；删除覆盖即回到默认 |
-| OA-29 | 自定义映射字段 | 管理员映射 `employee-no ← empNo` 并允许转发后，业务收到 `x-cs-user-attr-employee-no` 且令牌 `cs_attrs.employee-no` 一致；非法 key 与撞名 key 被拒 |
-| OA-30 | 伪造与撤销 | 外部伪造 `x-cs-user-attr-*` 一律被 `drop-identity-headers` 清掉；删除一个映射后重下发完成前后都不存在可伪造窗口 |
+| OA-29 | 自定义映射字段 | 管理员映射 `employee-no ← empNo` 并允许转发后，业务收到的 `x-cs-user-attrs` JSON 里有 `employee-no`（落地改为单个 JSON 头，见 §实施说明 1）且令牌 `cs_attrs.employee-no` 一致；非法 key 与撞名 key 被拒 |
+| OA-30 | 伪造与撤销 | 外部伪造 `x-cs-user-attrs` 一律被 `drop-identity-headers` 清掉；名单是静态的，删除一个映射前后都不存在可伪造窗口 |
 | OA-31 | 能力说明一致 | 能力说明 MCP 与工作台能力页展示的身份头集合＝该项目实际收到的集合；改配置后页面随之变化，不再是静态常量表 |
 
 A12 已裁定不同 Provider 之间只做账户不合并，因此 OA-23 的预期就是「两个账户」，本 RFC 不提供手工绑定入口。

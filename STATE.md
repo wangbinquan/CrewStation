@@ -5,11 +5,36 @@
 
 ## 一句话
 
-基线三件套（v0.3.3）的第一轮实现已在本机 kind 集群上跑通并推上 main；**RFC-001（算力归平台）与 RFC-002（管理空间与租户空间分离）已实现、实跑确认并推上 main；RFC-004 已被 RFC-006 取代（Superseded）；RFC-006（算力档位合并运行环境、每个 Agent 一个 Pod）的代码与测试已提交 main，实机验收未做；RFC-003 工作台已按设计附件完成并整体部署到本机，52／52 项 UX-AT 全部实机通过、本地 gate 与精确 SHA CI 通过,RFC-003 已 Done**。
+基线三件套（v0.3.3）的第一轮实现已在本机 kind 集群上跑通并推上 main；**RFC-001（算力归平台）与 RFC-002（管理空间与租户空间分离）已实现、实跑确认并推上 main；RFC-004 已被 RFC-006 取代（Superseded）；RFC-006（算力档位合并运行环境、每个 Agent 一个 Pod）的代码与测试已提交 main，实机验收未做；RFC-003 工作台已按设计附件完成并整体部署到本机，52／52 项 UX-AT 全部实机通过、本地 gate 与精确 SHA CI 通过,RFC-003 已 Done；RFC-005（OIDC／OAuth 2.0 公司登录）代码、测试与 OA-01…OA-31 实机验收全部完成，已 Done**。
 
 ## 进行中的 RFC
 
-**RFC-003 工作台 UX 重设计已 Done（2026-09-16）：52／52 项 UX-AT 全部实机通过,本地 gate 与精确 SHA CI 通过。RFC-004（管理员定义 Agent 启动前 Hook）已按 RFC-006 的裁定 C8 置为 Superseded，其 AR 实机验收不再执行。** RFC-001 与 RFC-002 都已 Done，见 `proposal/rfc/README.md` 的索引表。**RFC-005（OIDC／OAuth 2.0 公司登录）于 2026-09-18 落档为 Draft，待作者批准后才可进入实现（开发规则 §5.3）。** **RFC-006（算力档位合并运行环境）2026-09-18 落档，同日作者设定会话目标「完整实现RFC并提交上库」，进入实施（In Progress）：代码与自动化证据已提交 main，实机验收（T12）待做，见下方接力。**
+**RFC-003 工作台 UX 重设计已 Done（2026-09-16）：52／52 项 UX-AT 全部实机通过,本地 gate 与精确 SHA CI 通过。RFC-004（管理员定义 Agent 启动前 Hook）已按 RFC-006 的裁定 C8 置为 Superseded，其 AR 实机验收不再执行。** RFC-001 与 RFC-002 都已 Done，见 `proposal/rfc/README.md` 的索引表。**RFC-005（OIDC／OAuth 2.0 公司登录）于 2026-09-18 落档、同日按作者会话目标「完整实现整个RFC并提交上库」实施完毕并实机验收，已 Done。** **RFC-006（算力档位合并运行环境）2026-09-18 落档，同日作者设定会话目标「完整实现RFC并提交上库」，进入实施（In Progress）：代码与自动化证据已提交 main，实机验收（T12）待做，见下方接力。**
+
+## 最新接力：RFC-005 实机验收跑完，RFC-005 Done（2026-09-18）
+
+OA-01…OA-31 逐项核对完毕，能实机的都在当前部署上实机跑了一遍：真网关、真 Traefik、两个 `tools/mock-idp/` 起的真 IdP
+（9001 标准 OIDC＋RS256 真签名；9002 无 discovery／无 id_token／`post_json` userinfo／`subjectClaim=id`）、无头 Chrome＋CDP。
+逐条证据在 `proposal/rfc/RFC-005-oidc-company-login/acceptance-audit.md`，RFC-005 三件套状态改 **Done**。
+
+实机走通的整链路：登录页两个公司身份入口 → 点按钮 → IdP → 回跳 → `/v1/me` 拿到 `authMethod: "oidc"`；`allowlist` 放行与
+`email-domain-not-allowed` 的中文错误页（不留半截用户）；`auto` 开通；管理员在用户目录标记 OIDC 用户后对方重载即进管理空间；
+同一邮箱从两个 Provider 进来得到两个账户（A12）；关闭常规登录后登录页无密码表单、直 POST 403，OIDC 管理员原位重开立即生效；
+破窗口开关；最后一个 Provider 与「仍有用户关联」的删除保护；默认转发集下业务页面照常显示当前用户，伪造身份头被网关抹掉；
+1440／1280／1024／768／390 五档、明暗主题、全程键盘。
+
+实机跑出来、自动化没能发现并已修掉的两处：
+
+1. **破窗口期间管理面报的是库内策略而不是正在生效的状态**：`CS_PASSWORD_LOGIN=force-on` 压着库内的「关」时，认证页照库内值写「已关闭」，
+   还给出一个按下去必然 409 的开关。改为写正在生效的状态、单列被压着的库内策略、两个方向都不给按（`LoginMethodsCard`＋一条会红的用例）。
+2. **这个开关被两个进程读**：登录页归 cs-auth、认证页归 cs-api，只重启一个界面与实际就各说各话。文案、design.md §8、OA-17 与
+   `10-config.yaml` 一律改成「重启 cs-auth 与 cs-api」，并记进 `docs/engineering/dev-gotchas.md`。
+
+另外补上的两条 gotcha：整文件批量替换会把助手函数的**定义处**也换掉（`body` 助手调用自己，所有读 body 的管理路由稳定 400），
+以及「只测失败分支等于没测」——补了每条 body 路由的成功路径用例，并把 bug 种回去确认它们会红。
+
+集群已还原到验收前：Provider 0 个、OIDC 用户 0 个、`CS_PASSWORD_LOGIN` 已从 ConfigMap 去掉并重启 cs-auth 与 cs-api、
+全局转发集回到 `["name","email"]`、用户名密码登录开启（`.local/admin.env` 那套仍可用）。
 
 ## 最新接力：RFC-006（算力档位合并运行环境）代码落地，实机验收待做（2026-09-18）
 
@@ -55,7 +80,7 @@
 
 三处实施期调整（已写进 RFC design §11 与 proposal §8，请作者过目）：自定义字段合并成**一个 JSON 头** `x-cs-user-attrs`（原设计每字段一个头，会迫使网关删头名单动态下发并留出可伪造窗口）；`users.external_id` 保留为自然键（权威索引仍是 `user_identities`）；引导的非交互入口是 cs-auth 的 `bootstrap-admin` 子命令。
 
-**接着要做的是 T9 实机**：改 ConfigMap 的破窗口、两个 Provider 的登录页、浏览器往返、伪造头被网关抹掉、多分辨率／明暗／键盘。清单与已被自动化覆盖的部分见该 RFC 的 plan.md「实施说明」。
+T9 实机已在下一批（本文件最上方那条接力）跑完，逐项证据见该 RFC 的 `acceptance-audit.md`。
 
 ## 最新接力：RFC-005（OIDC 公司登录）三件套落档，待作者批准（2026-09-18）
 
@@ -69,7 +94,7 @@
 4. 没有存量系统，断代开发（不写迁移兼容、不做按邮箱认领）；
 5. 演示登录整条删除（`demoIdentityProvider`、`demoIdentity`、`CS_IDENTITY_PROVIDER` 全下线，e2e 与 CLI 改用密码登录）；
 6. 多 Provider 并存，与 agent-workflow 同形；
-7. IdP 全不可达时的破窗口是安装配置强制开关（`CS_PASSWORD_LOGIN=force-on`）＋重启 cs-auth。
+7. IdP 全不可达时的破窗口是安装配置强制开关（`CS_PASSWORD_LOGIN=force-on`）＋重启 cs-auth 与 cs-api（登录页读前者，管理面读后者）。
 
 开工前要知道的三条落地约束（都写进了 design.md）：PKCE／state **必须落库**（agent-workflow 是进程内 Map，本仓控制面 HA 是 v1 要求）；关闭密码登录的前置条件需要 cs-api 知道「当前会话是密码还是 OIDC 建立的」，因此新增平台内部头 `x-cs-auth-method`（只在工作台目标注入，不进业务接入约定表）；删掉演示登录会同时切断 e2e 的 `signIn()` 与 CLI 取 `CS_TOKEN` 的路，所以 T6 必须与 T8（`install-platform.sh` 播种引导管理员）同批。
 
