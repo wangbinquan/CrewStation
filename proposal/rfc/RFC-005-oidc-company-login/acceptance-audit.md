@@ -14,6 +14,9 @@
 Provider 0 个、`user_identities` 0 行、OIDC 用户 0 个、`CS_PASSWORD_LOGIN` 从 ConfigMap 去掉并重启 cs-auth 与 cs-api、
 全局转发集回到安装默认 `["name","email"]`、用户名密码登录开启。
 
+本批六笔提交（`a696610`、`eeb7312`、`a0a5f6a`、`906f678`、`97c9e99`、`3c8cf6a`）逐笔按精确路径提交并推上 main，
+末批 SHA 的 CI（[run 35314046341](https://github.com/wangbinquan/CrewStation/actions/runs/35314046341)）`check` 与 `e2e` 两个作业均成功。
+
 ## 2. 逐项
 
 | 编号 | 方式 | 证据 |

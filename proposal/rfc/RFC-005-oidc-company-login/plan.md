@@ -16,7 +16,7 @@
 | T7 | 工作台 `/admin/authentication`：登录方式卡、Provider 列表与表单（§6.3 逐项）、探针渲染、`InlineConfirm`、i18n 双语、`AdminNav` 分组 | T2、T5 | 已完成：`/admin/authentication` 三张卡（`features/admin/components/auth/*`）、中英文案、`AdminNav` 与路由；`apps/console/src/tests/adminAuthentication.test.tsx` 9 条。多分辨率、明暗与键盘已在 T9 实机核对（OA-24） |
 | T8 | `tools/mock-idp/` 与本机部署清单、`install-platform.sh` 播种引导管理员 | T4 | 已完成：`tools/mock-idp/`（标准／纯 OAuth2／非标 userinfo 三形态）、`install-platform.sh` 生成引导令牌并调 `bootstrap-admin` 播种管理员并写 `.local/admin.env` |
 | T9 | 实机验收：下表 OA 逐项，浏览器实跑 | T6、T7、T8 | 已完成：OA-01…OA-31 逐项有证据（实机项为无头 Chrome＋真网关＋两个 mock IdP 的往返，其余为自动化），逐条记在 [acceptance-audit.md](./acceptance-audit.md) |
-| T10 | 本地完整门禁、按精确路径提交、推送后按自己的 SHA 盯 CI 到绿 | T9 | `bun run check` 全绿＋CI run 链接 |
+| T10 | 本地完整门禁、按精确路径提交、推送后按自己的 SHA 盯 CI 到绿 | T9 | 已完成：本地 `bun run check` 全绿（唯一偶发红是 `modules/scm/tests/gitlabIntegration.test.ts`，单跑绿，见 dev-gotchas「刚签发的项目访问令牌…」）；末批 [`3c8cf6a` CI run 35314046341](https://github.com/wangbinquan/CrewStation/actions/runs/35314046341) 的 `check` 与 `e2e` 两个作业均成功，此前 `a0a5f6a`／`906f678`／`97c9e99` 亦全绿 |
 | T11 | 身份转发（A8–A11）：`identity_forwarding` 表与自定义映射、生效集求解、ForwardAuth 注入与令牌同步裁剪、网关复制与删头名单、能力说明改为实际生效集、管理面转发卡与项目只读页 | T1、T5 | 已完成：`identity_forwarding` 表、候选与生效集求解、ForwardAuth 注入与令牌同步裁剪、能力说明改为实际生效集、管理面转发卡与项目只读接口。**名单没有交给 cs-controller 动态生成**：自定义字段合并成单个 `x-cs-user-attrs` 后，`40-gateway.yaml` 的复制与删头名单保持静态即可（见 §实施说明 1），`authResponseHeadersRegex` 因此也不需要 |
 
 排期约束：T5 改的是网关与业务接入面，必须与 T4 同批部署，否则关闭密码登录的前置条件读不到认证方式。T6 一旦落地，本机任何未播种管理员的环境都登录不进去，因此 T6 与 T8 同批提交。**T11 与 T5 同批部署**：两者都改 `forward-auth-user` 与 `drop-identity-headers`，分两次上会让网关出现一次「注入了但没被复制」或「能被伪造」的窗口；T11 的前端部分跟 T7 一起做，避免认证页两次返工。实机验收（T9）在 T11 之后跑，OA 表含转发项。
