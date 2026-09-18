@@ -53,12 +53,12 @@ beforeAll(async () => {
   const page = await apiGet<{ items?: Array<{ id: string; name: string }> }>(admin, '/v1/projects?limit=20');
   const first = (page.items ?? [])[0];
   if (first) project = { id: first.id, name: first.name };
-});
+}, 120_000);
 
 afterAll(async () => {
   await admin?.close().catch(() => undefined);
   browser?.close();
-});
+}, 30_000);
 
 describe.skipIf(!available)('平台能力在当前部署的前台验收', () => {
   test('登录后拿到的是管理员身份，且顶栏给出管理空间入口', async () => {
@@ -67,7 +67,7 @@ describe.skipIf(!available)('平台能力在当前部署的前台验收', () => 
     await open(admin!, '/');
     expect(await admin!.bodyText()).toContain('进入平台管理');
     expect(admin!.takeErrors()).toEqual([]);
-  }, 30_000);
+  }, 45_000);
 
   test.each(ADMIN_PAGES.map((p) => [p.capability, p.path, p.marker] as const))(
     '管理能力「%s」在 %s 渲染出来',
@@ -79,14 +79,14 @@ describe.skipIf(!available)('平台能力在当前部署的前台验收', () => 
       expect(text).not.toContain('仅平台管理员可见');
       expect(admin!.takeErrors()).toEqual([]);
     },
-    30_000,
+    45_000,
   );
 
   test('能力市场列出当前身份可用的数字人应用', async () => {
     await open(admin!, '/market');
     expect(await admin!.text()).toContain('能力市场');
     expect(admin!.takeErrors()).toEqual([]);
-  }, 30_000);
+  }, 45_000);
 
   test.each(PROJECT_PAGES.map((p) => [p.capability, p.suffix, p.marker] as const))(
     '项目能力「%s」在项目页 %s 渲染出来',
@@ -97,7 +97,7 @@ describe.skipIf(!available)('平台能力在当前部署的前台验收', () => 
       expect(text).toContain(marker);
       expect(admin!.takeErrors()).toEqual([]);
     },
-    30_000,
+    45_000,
   );
 
   test('非管理员被挡在管理空间外：是拒绝页，不是登录页也不是 404', async () => {

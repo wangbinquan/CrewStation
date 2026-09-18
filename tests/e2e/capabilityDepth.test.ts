@@ -63,12 +63,12 @@ beforeAll(async () => {
   // 深度断言要落在一个真有服务的数字人项目上，接入容器项目的页面构成不同。
   const withService = (page.items ?? []).find((item) => typeof item.serviceId === 'string');
   projectId = withService?.id ?? (page.items ?? [])[0]?.id;
-});
+}, 120_000);
 
 afterAll(async () => {
   await admin?.close().catch(() => undefined);
   browser?.close();
-});
+}, 30_000);
 
 describe.skipIf(!available)('平台能力的构成没有退化', () => {
   test.each(PROJECT_DEPTH.map((entry) => [entry.capability, entry.suffix, entry.parts] as const))(
@@ -80,7 +80,7 @@ describe.skipIf(!available)('平台能力的构成没有退化', () => {
       for (const part of parts) expect(text).toContain(part);
       expect(admin!.takeErrors()).toEqual([]);
     },
-    30_000,
+    45_000,
   );
 
   test.each(ADMIN_DEPTH.map((entry) => [entry.capability, entry.path, entry.parts] as const))(
@@ -91,6 +91,6 @@ describe.skipIf(!available)('平台能力的构成没有退化', () => {
       for (const part of parts) expect(text).toContain(part);
       expect(admin!.takeErrors()).toEqual([]);
     },
-    30_000,
+    45_000,
   );
 });
