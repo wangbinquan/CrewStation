@@ -1,6 +1,6 @@
-import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
-import type { Browser, Page } from './cdp';
-import { apiGet, connectBrowser, e2eAvailable, open, signIn } from './consoleSession';
+import { afterAll, describe, expect, test } from 'bun:test';
+import { e2eAvailable, open } from './consoleSession';
+import { openAdminSession } from './session';
 
 /**
  * 能力深度锁。
@@ -13,6 +13,8 @@ import { apiGet, connectBrowser, e2eAvailable, open, signIn } from './consoleSes
  */
 
 const available = await e2eAvailable();
+const session = available ? await openAdminSession() : undefined;
+const project = session?.project;
 
 /** 每条 = 一块能力面，`parts` 里的每一项 = 这块能力必须暴露出来的一个入口或分区。 */
 const PROJECT_DEPTH = [
@@ -51,45 +53,32 @@ const ADMIN_DEPTH = [
   },
 ] as const;
 
-let browser: Browser | undefined;
-let admin: Page | undefined;
-let projectId: string | undefined;
-
-beforeAll(async () => {
-  if (!available) return;
-  browser = await connectBrowser();
-  admin = await signIn(browser, 'admin', 'CrewStation Admin');
-  const page = await apiGet<{ items?: Array<{ id: string; serviceId?: string }> }>(admin, '/v1/projects?limit=20');
-  // 深度断言要落在一个真有服务的数字人项目上，接入容器项目的页面构成不同。
-  const withService = (page.items ?? []).find((item) => typeof item.serviceId === 'string');
-  projectId = withService?.id ?? (page.items ?? [])[0]?.id;
-}, 120_000);
-
 afterAll(async () => {
-  await admin?.close().catch(() => undefined);
-  browser?.close();
+  await session?.close();
 }, 30_000);
 
-describe.skipIf(!available)('平台能力的构成没有退化', () => {
-  test.each(PROJECT_DEPTH.map((entry) => [entry.capability, entry.suffix, entry.parts] as const))(
-    '%s',
-    async (_capability, suffix, parts) => {
-      expect(projectId, '环境里至少要有一个数字人项目').toBeDefined();
-      await open(admin!, `/projects/${projectId}${suffix}`);
-      const text = await admin!.text();
-      for (const part of parts) expect(text).toContain(part);
-      expect(admin!.takeErrors()).toEqual([]);
-    },
-    45_000,
-  );
-
+describe.skipIf(!session)('管理能力的构成没有退化', () => {
   test.each(ADMIN_DEPTH.map((entry) => [entry.capability, entry.path, entry.parts] as const))(
     '%s',
     async (_capability, path, parts) => {
-      await open(admin!, path);
-      const text = await admin!.text();
+      await open(session!.admin, path);
+      const text = await session!.admin.text();
       for (const part of parts) expect(text).toContain(part);
-      expect(admin!.takeErrors()).toEqual([]);
+      expect(session!.admin.takeErrors()).toEqual([]);
+    },
+    45_000,
+  );
+});
+
+// 同 platformCapabilities：没有可用的数字人项目就整组跳过，不在「没有对象」上得出假结论。
+describe.skipIf(!project)('数字人项目的能力构成没有退化', () => {
+  test.each(PROJECT_DEPTH.map((entry) => [entry.capability, entry.suffix, entry.parts] as const))(
+    '%s',
+    async (_capability, suffix, parts) => {
+      await open(session!.admin, `/projects/${project!.id}${suffix}`);
+      const text = await session!.admin.text();
+      for (const part of parts) expect(text).toContain(part);
+      expect(session!.admin.takeErrors()).toEqual([]);
     },
     45_000,
   );
