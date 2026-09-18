@@ -44,6 +44,8 @@ export interface TaskRuntimeModuleDeps {
   /** 档位测试用的 Runner 通道（RFC-006）；不给则测试报“未配置测试执行通道”。 */
   testRunner?: TestRunner;
   testTiming?: Partial<ProfileTestTiming>;
+  /** 平台两个 MCP 的服务域地址，供档位测试展开步骤里的 `{{mcp.*}}`（RFC-006 C16）。 */
+  testMcp?: ReadonlyArray<{ name: string; url: string }>;
   isAdmin: (userId: UserId) => Promise<boolean>;
   settings: TaskRuntimeSettings;
   cluster?: TaskCluster;
@@ -90,7 +92,7 @@ export function createTaskRuntimeModule(deps: TaskRuntimeModuleDeps): TaskRuntim
   const runProfileTest = runProfileTestUseCase(useCaseDeps, {
     createTestEnvironment: (input) => createTestEnvironment({ ...input, labels: { [LABELS.project]: PROFILE_TEST_LABELS.project, [LABELS.service]: PROFILE_TEST_LABELS.service, ...input.labels } }),
     release: (taskId) => lifecycle.releaseEnvironment(taskId, 'profile-test'),
-    ...(deps.testRunner ? { runner: deps.testRunner } : {}), ...(deps.testTiming ? { timing: deps.testTiming } : {}),
+    ...(deps.testRunner ? { runner: deps.testRunner } : {}), ...(deps.testTiming ? { timing: deps.testTiming } : {}), ...(deps.testMcp ? { mcp: deps.testMcp } : {}),
   });
   const api: TaskRuntimeModuleApi = {
     name: 'task-runtime',

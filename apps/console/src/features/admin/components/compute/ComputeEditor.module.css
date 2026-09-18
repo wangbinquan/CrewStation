@@ -18,6 +18,9 @@
 
 .wide { grid-column: 1 / -1; }
 
+/* 编辑器内容的外层：只为找「第一个标红字段」挂 ref，不参与布局。 */
+.contents { display: contents; }
+
 .toolbar {
   display: flex;
   flex-wrap: wrap;

@@ -6,7 +6,7 @@ import { planCredentialWrites } from '../domain/credentialWrites';
 import type { RegistryLayout } from '../domain/imageReference';
 import { parseProfileImage, pinnedReference, pullReference, repositoryOf } from '../domain/imageReference';
 import type { ProfileTest } from '../domain/profileTest';
-import { initialStages, mergeStages, outcomeSentence, testPrompt } from '../domain/profileTest';
+import { initialStages, mergeStages, outcomeSentence, skipUnreachedStages, testPrompt } from '../domain/profileTest';
 import { validateProfileContent } from '../domain/profileValidation';
 import { assertJsonTemplate, placeholdersInsideStrings, stripJsonComments, validateRevisionContent } from '../domain/revisionValidation';
 
@@ -133,6 +133,8 @@ describe('修订哈希、可用性与测试阶段', () => {
     expect(initialStages('terminal', []).map((s) => s.id)).toEqual(['image', 'runner', 'command']);
     const merged = mergeStages(initialStages('terminal', []), [{ id: 'command', kind: 'command', name: '测试命令', state: 'failed' }, { id: 'extra', kind: 'launch', name: 'x', state: 'succeeded' }]);
     expect(merged.map((s) => [s.id, s.state])).toEqual([['image', 'pending'], ['runner', 'pending'], ['command', 'failed'], ['extra', 'succeeded']]);
+    // 失败收尾时没走到的阶段记为跳过；已有终态的阶段不动。
+    expect(skipUnreachedStages(merged).map((s) => [s.id, s.state])).toEqual([['image', 'skipped'], ['runner', 'skipped'], ['command', 'failed'], ['extra', 'succeeded']]);
     const [one, two] = [testPrompt(), testPrompt()];
     expect(one.prompt).toContain(one.expectedReply);
     expect(one.expectedReply).not.toBe(two.expectedReply);

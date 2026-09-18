@@ -1,9 +1,9 @@
-import type { BeforeStartExecution, ProbeTerminalResult, ProfileTestContext, ProfileTestOutcome, ProfileTestStage, RunnerEvent, TaskId } from '@crewstation/contracts';
+import type { BeforeStartExecution, McpConnection, ProbeTerminalResult, ProfileTestContext, ProfileTestOutcome, ProfileTestStage, RunnerEvent, TaskId } from '@crewstation/contracts';
 import { ProbeTerminalResultSchema, TASKRUNNER_PROTOCOL_VERSION, isKnownProtocol } from '@crewstation/contracts';
 import { isPlatformError } from '@crewstation/kernel';
 import type { ProfileTestRunInput, ProfileTestRunProgress, ProfileTestRunResult } from '../api/moduleApi';
 import { CONTAINER_START_FAILURES, IMAGE_PULL_FAILURES, RUNNER_UNAVAILABLE_HINT } from '../domain/podFailures';
-import { profileTestAgentId } from '../domain/profileTestEnvironment';
+import { profileTestAgentId, profileTestMcp } from '../domain/profileTestEnvironment';
 import type { ProtocolProbe } from '../domain/profileTestStages';
 import { TEST_STAGE, absorbAgentEvent, commandVerdict, imageStage, launchStage, modelVerdict, runnerStage, stagesFromBeforeStart } from '../domain/profileTestStages';
 import type { TaskEnvironment } from '../domain/taskEnvironment';
@@ -20,11 +20,14 @@ export interface ProfileTestDeps {
   release(taskId: TaskId): Promise<unknown>;
   runner?: TestRunner;
   timing?: Partial<ProfileTestTiming>;
+  /** 平台两个 MCP 的服务域地址；步骤模板引用 `{{mcp.*}}` 时测试才用得上（profileTestMcp）。 */
+  mcp?: ReadonlyArray<{ name: string; url: string }>;
 }
 
 interface Session {
   readonly deps: TaskRuntimeUseCaseDeps; readonly timing: ProfileTestTiming; readonly runner: TestRunner; readonly env: TaskEnvironment;
   readonly input: ProfileTestRunInput; readonly report: ProfileTestReport; readonly heartbeat: () => Promise<boolean>; readonly context: Partial<ProfileTestContext>;
+  readonly mcp: McpConnection[];
 }
 
 const messageOf = (error: unknown): string => (error instanceof Error ? error.message : String(error));
@@ -45,7 +48,7 @@ export function runProfileTestUseCase(deps: TaskRuntimeUseCaseDeps, test: Profil
     let env: TaskEnvironment;
     try { env = await test.createTestEnvironment({ image: input.image, ...(input.taskProfile ? { taskProfile: input.taskProfile } : {}), labels: { 'crewstation.io/profile-test': input.testId } }); }
     catch (error) { return { state: 'failed', error: `无法创建测试任务：${messageOf(error)}`, stages: [] }; }
-    const session: Session = { deps, timing, runner, env, input, report, heartbeat, context: { kind: 'platform-namespace', taskId: env.id, image: input.image, workdir: '/work' } };
+    const session: Session = { deps, timing, runner, env, input, report, heartbeat, context: { kind: 'platform-namespace', taskId: env.id, image: input.image, workdir: '/work' }, mcp: profileTestMcp(input.beforeStart.steps, test.mcp ?? []) };
     try {
       await report({ context: session.context, stages: [imageStage('running')] });
       const waited = await waitForRunner(session);
@@ -114,14 +117,19 @@ async function cliVersion(s: Session): Promise<string | null> {
   } catch { return null; }
 }
 
-/** 已知协议：发一次 oneshot 的 nonce 轮次，按事件推进阶段；截止时间 = 脚本预算＋模型预算，到点主动取消。 */
+/**
+ * 已知协议：发一次 oneshot 的 nonce 轮次，按事件推进阶段；截止时间 = 脚本预算＋模型预算，到点主动取消。
+ * 权限取 full，与 agent-workflow 冒烟的系统 persona（`permission: {}`，工具全在）一致：按最小权限去掉 bash 之后，
+ * 有的模型服务会拒绝这种请求（本机实测 OpenCode Zen 免费档对没有 bash 工具的请求答 403 FreeTierError），
+ * 测试就会把一个可用的档位判成不可用。测试容器是临时的空工作目录，不带项目源码、数据与租户配置，提示词固定。
+ */
 async function observeProtocolTurn(s: Session): Promise<ProfileTestRunResult> {
   const { input, runner, env, timing } = s;
   const agentId = profileTestAgentId(input.testId);
   try {
     await runner.sendCommand(env.id, {
-      id: `pft-start-${input.testId}`, type: 'startAgent', agentId, compute: input.profile, profileRevision: input.revision, launch: input.launch, permission: 'read-only',
-      mode: 'oneshot', initialPrompt: input.prompt, mcp: [], env: {}, beforeStart: input.beforeStart, processAttemptId: `${input.testId}:1`,
+      id: `pft-start-${input.testId}`, type: 'startAgent', agentId, compute: input.profile, profileRevision: input.revision, launch: input.launch, permission: 'full',
+      mode: 'oneshot', initialPrompt: input.prompt, mcp: s.mcp, env: {}, beforeStart: input.beforeStart, processAttemptId: `${input.testId}:1`,
     });
   } catch (error) {
     const message = messageOf(error);
@@ -129,17 +137,18 @@ async function observeProtocolTurn(s: Session): Promise<ProfileTestRunResult> {
     return result(s, 'failed', beforeStart ? 'before-start-failed' : 'spawn-failed', message, [{ id: TEST_STAGE.launch, kind: 'launch', name: '启动 CLI', state: 'failed', error: { code: String((isPlatformError(error) && error.details?.code) || 'rejected'), message } }]);
   }
   const deadline = Date.now() + scriptBudgetOf(input) + timing.modelBudgetMs;
-  let sinceSeq = 0, probe: ProtocolProbe = { started: false, text: '' }, execution: BeforeStartExecution | undefined;
+  const secrets = Object.values(input.beforeStart.secrets);
+  let sinceSeq = 0, probe: ProtocolProbe = { started: false, text: '', diagnostics: '' }, execution: BeforeStartExecution | undefined;
   const absorb = (event: RunnerEvent): void => {
     if (event.kind === 'beforeStart' && event.execution.agentId === agentId) execution = event.execution;
     if (event.kind === 'agent' && event.event.agentId === agentId) probe = absorbAgentEvent(probe, event.event);
   };
   const stages = (timedOut: boolean): ProfileTestStage[] => [
-    ...(execution ? stagesFromBeforeStart(execution) : []), launchStage(probe, execution?.state === 'succeeded' || probe.started), modelVerdict(probe, input.expectedReply, timedOut, !!input.launch.model).stage,
+    ...(execution ? stagesFromBeforeStart(execution) : []), launchStage(probe, execution?.state === 'succeeded' || probe.started), modelVerdict(probe, input.expectedReply, timedOut, !!input.launch.model, secrets).stage,
   ];
   const finish = (timedOut: boolean): ProfileTestRunResult => {
     if (execution?.state === 'failed' || execution?.state === 'cancelled') return result(s, 'failed', 'before-start-failed', execution.error?.message ?? '启动前步骤失败', stages(false));
-    const verdict = modelVerdict(probe, input.expectedReply, timedOut, !!input.launch.model);
+    const verdict = modelVerdict(probe, input.expectedReply, timedOut, !!input.launch.model, secrets);
     return verdict.stage.state === 'succeeded' ? result(s, 'passed', 'passed', undefined, stages(false)) : result(s, 'failed', verdict.outcome, verdict.error, stages(timedOut));
   };
   const watch = watchEnvironment(s);
@@ -168,22 +177,27 @@ async function runTerminalProbe(s: Session): Promise<ProfileTestRunResult> {
   let settled: { ok: true; value: ProbeTerminalResult } | { ok: false; error: unknown } | undefined;
   void runner.sendCommand(env.id, {
     id: `pft-probe-${input.testId}`, type: 'probeTerminal', probeId, compute: input.profile, profileRevision: input.revision, launch: input.launch,
-    command: test.command, expect: test.expect, timeoutMs: test.timeoutMs, mcp: [], env: {}, beforeStart: input.beforeStart, processAttemptId: `${input.testId}:1`,
+    command: test.command, expect: test.expect, timeoutMs: test.timeoutMs, mcp: s.mcp, env: {}, beforeStart: input.beforeStart, processAttemptId: `${input.testId}:1`,
   }).then((payload) => { settled = { ok: true, value: ProbeTerminalResultSchema.parse(payload) }; }, (error: unknown) => { settled = { ok: false, error }; });
   const deadline = Date.now() + scriptBudgetOf(input) + test.timeoutMs + 60_000;
   let sinceSeq = 0, execution: BeforeStartExecution | undefined;
   const steps = (): ProfileTestStage[] => (execution ? stagesFromBeforeStart(execution) : []);
+  const drain = async (): Promise<number> => {
+    const events = await runner.listEvents(env.id, { sinceSeq, kinds: ['beforeStart'], agentId: probeId, limit: 500 }).catch(() => []);
+    for (const stored of events) { sinceSeq = stored.seq; if (stored.event.kind === 'beforeStart' && stored.event.execution.agentId === probeId) execution = stored.event.execution; }
+    return events.length;
+  };
   const watch = watchEnvironment(s);
   while (!settled) {
     if (!await s.heartbeat()) return result(s, 'unknown', 'environment-lost', '测试作业租约丢失，无法确认启动前脚本是否已执行', steps());
-    const events = await runner.listEvents(env.id, { sinceSeq, kinds: ['beforeStart'], agentId: probeId, limit: 500 }).catch(() => []);
-    for (const stored of events) { sinceSeq = stored.seq; if (stored.event.kind === 'beforeStart' && stored.event.execution.agentId === probeId) execution = stored.event.execution; }
-    if (events.length) await s.report({ stages: [...steps(), { id: TEST_STAGE.command, kind: 'command', name: '测试命令', state: execution?.state === 'succeeded' ? 'running' : 'pending' }] });
+    if (await drain()) await s.report({ stages: [...steps(), { id: TEST_STAGE.command, kind: 'command', name: '测试命令', state: execution?.state === 'succeeded' ? 'running' : 'pending' }] });
     const lost = await watch();
     if (lost) return result(s, 'unknown', 'environment-lost', lost, steps());
     if (Date.now() > deadline) return result(s, 'unknown', 'environment-lost', 'Runner 在时限内没有返回测试命令的结果，无法确认启动前脚本是否已执行', steps());
     if (!settled) await Bun.sleep(timing.pollMs);
   }
+  // 回执可能先于最后几条步骤事件被读到（Runner 先发步骤事件再回复，轮询间隔里只看到了「执行中」）：收尾前再读一遍，阶段才是终态。
+  await drain();
   const outcome = settled as { ok: true; value: ProbeTerminalResult } | { ok: false; error: unknown };
   if (!outcome.ok) return result(s, 'failed', 'spawn-failed', `Runner 拒绝了测试命令：${messageOf(outcome.error)}`, steps());
   const probe = outcome.value;

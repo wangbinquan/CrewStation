@@ -199,8 +199,9 @@ function composeRuntime(deps: PlatformModuleDeps, core: ReturnType<typeof compos
   const { project, config, data, scm, isAdmin, resolveById } = core;
   const { release } = delivery;
   const testRunner = createSessionClient(settings.sessionInternalUrl);
+  const mcp = [{ name: 'capabilities', url: settings.mcp.capabilitiesUrl }, { name: 'operations', url: settings.mcp.operationsUrl }];
   const taskRuntime = createTaskRuntimeModule({
-    db, k8s, logger, isAdmin: (id) => isAdmin(id), authorizer: project.api, quotas: { quotaLimit: project.api.quotaLimit }, testRunner,
+    db, k8s, logger, isAdmin: (id) => isAdmin(id), authorizer: project.api, quotas: { quotaLimit: project.api.quotaLimit }, testRunner, testMcp: mcp,
     profiles: { listTaskProfiles: project.api.listTaskProfiles, getTaskProfile: async (name) => (await project.api.listTaskProfiles()).find((p) => p.name === name) },
     services: { resolveServiceById: resolveById },
     checkout: {
@@ -220,7 +221,6 @@ function composeRuntime(deps: PlatformModuleDeps, core: ReturnType<typeof compos
   late.taskRuntime = taskRuntime.api;
   const runner = createSessionClient(settings.sessionInternalUrl);
   const computeCatalog = computeCatalogFor(core.agentRuntime.api);
-  const mcp = [{ name: 'capabilities', url: settings.mcp.capabilitiesUrl }, { name: 'operations', url: settings.mcp.operationsUrl }];
   const devSession = createDevSessionModule({
     apiCatalog: core.apiCatalog.api,
     db, logger, isAdmin: (id) => isAdmin(id), environments: taskRuntime.api, runner, releases: release.api,

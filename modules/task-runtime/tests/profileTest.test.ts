@@ -85,6 +85,7 @@ beforeAll(async () => {
       connectionStatus: async () => ({ connected: true, capabilities: capabilities as never }),
     },
     testTiming: { pollMs: 20, connectTimeoutMs: 1500, modelBudgetMs: 1500, disconnectGraceMs: 200 },
+    testMcp: [{ name: 'capabilities', url: 'http://mcp-capabilities.svc.cs.internal/mcp' }, { name: 'operations', url: 'http://mcp-operations.svc.cs.internal/mcp' }],
     settings: { taskImage: 'cs-task-runtime:test', systemNamespace: 'crewstation-system', sessionUrl: 'ws://cs-session:8083/runner', userDomain: 'cs.localhost', serviceDomain: 'svc.cs.internal', workerUid: 10001, defaultProfile: 'coding-medium', userAuthMiddleware: 'forward-auth-user', dropIdentityHeadersMiddleware: 'drop-identity-headers' },
   });
 });
@@ -114,7 +115,7 @@ describe.skipIf(!available)('档位测试执行器（RFC-006 §6）', () => {
     expect(outcome.stages.map((s) => [s.id, s.state])).toEqual([['step:warm', 'succeeded'], ['launch', 'succeeded'], ['model', 'succeeded']]);
     expect(progress.flatMap((p) => p.stages ?? []).filter((s) => s.id === 'runner').at(-1)).toMatchObject({ state: 'succeeded' });
     const start = commands.find((c) => c.type === 'startAgent') as Extract<RunnerCommand, { type: 'startAgent' }>;
-    expect(start).toMatchObject({ compute: 'gw', profileRevision: 2, launch: { protocol: 'opencode', binaryPath: '/usr/local/bin/opencode' }, beforeStart: { captureOutput: true, secrets: { KEY: 'sk-test' } }, mode: 'oneshot', permission: 'read-only', processAttemptId: 'pft_1:1' });
+    expect(start).toMatchObject({ compute: 'gw', profileRevision: 2, launch: { protocol: 'opencode', binaryPath: '/usr/local/bin/opencode' }, beforeStart: { captureOutput: true, secrets: { KEY: 'sk-test' } }, mode: 'oneshot', permission: 'full', processAttemptId: 'pft_1:1' });
     expect((commands.find((c) => c.type === 'exec') as Extract<RunnerCommand, { type: 'exec' }>).command).toEqual(['/usr/local/bin/opencode', '--version']);
     expect(await runtime.api.getEnvironment(taskId)).toMatchObject({ kind: 'profile-test', state: 'released', projectId: PROFILE_TEST_PROJECT_ID, message: 'released: profile-test' });
     // 测试任务的流只对管理员开放。
@@ -179,8 +180,31 @@ describe.skipIf(!available)('档位测试执行器（RFC-006 §6）', () => {
     let outcome = await run;
     expect(outcome).toMatchObject({ state: 'passed', outcome: 'passed', context: { cliVersion: null } });
     expect(outcome.stages.map((s) => [s.id, s.state])).toEqual([['step:warm', 'succeeded'], ['command', 'succeeded']]);
-    expect(commands.filter((c) => c.type === 'probeTerminal').at(-1)).toMatchObject({ command: terminalTest.command, expect: 'tool \\d', timeoutMs: 5000, processAttemptId: 'pft_7:1' });
+    expect(commands.filter((c) => c.type === 'probeTerminal').at(-1)).toMatchObject({ command: terminalTest.command, expect: 'tool \\d', timeoutMs: 5000, processAttemptId: 'pft_7:1', mcp: [] });
     await settled();
+
+    // 步骤内容引用了 {{mcp.*}}：测试给平台 MCP 的真实地址与不授权的占位令牌，模板才展开得了（2026-09-18 实机：没给时步骤报「未定义」）。
+    const mcpStep = { kind: 'file' as const, stepId: 'mcp-hint', name: '写 MCP 地址', pathTemplate: '{{agent.home}}/mcp.txt', contentTemplate: 'caps={{mcp.capabilitiesUrl}}', format: 'text' as const, mode: 0o600, existing: 'require-same' as const };
+    // 同时复现实机的顺序：执行器轮询时只看到「执行中」，步骤成功事件紧挨着回执到达——阶段仍要以终态收尾。
+    const matchingProbe = onProbe;
+    onProbe = async (id, command) => {
+      const running = execution(command.probeId, 'running', 'succeeded');
+      emit(id, { kind: 'beforeStart', execution: { ...running, steps: running.steps.map((step) => ({ ...step, state: 'running' as const })) } });
+      await Bun.sleep(80);
+      emit(id, { kind: 'beforeStart', execution: execution(command.probeId, 'succeeded', 'succeeded') });
+      return { probeId: command.probeId, beforeStart: { state: 'succeeded' }, command: { exitCode: 0, timedOut: false, matched: true, outputTail: 'tool 1.2.3', durationMs: 3 } };
+    };
+    run = runtime.api.runProfileTest(inputFor('pft_11', { launch: terminal, terminalTest, beforeStart: { ...material, steps: [mcpStep] } }), async () => undefined, async () => true);
+    await connectRunner();
+    const passedWithMcp = await run;
+    expect(passedWithMcp.state).toBe('passed');
+    expect(passedWithMcp.stages.map((st) => [st.id, st.state])).toEqual([['step:warm', 'succeeded'], ['command', 'succeeded']]);
+    expect(commands.filter((c) => c.type === 'probeTerminal').at(-1)).toMatchObject({ processAttemptId: 'pft_11:1', mcp: [
+      { name: 'capabilities', url: 'http://mcp-capabilities.svc.cs.internal/mcp', headers: { 'x-cs-dev-session-token': 'crewstation-profile-test-no-mcp-access' } },
+      { name: 'operations', url: 'http://mcp-operations.svc.cs.internal/mcp', headers: { 'x-cs-dev-session-token': 'crewstation-profile-test-no-mcp-access' } },
+    ] });
+    await settled();
+    onProbe = matchingProbe;
 
     run = runtime.api.runProfileTest(inputFor('pft_8', { launch: terminal, terminalTest: { ...terminalTest, command: ['/opt/tool/bin/tool'] } }), async () => undefined, async () => true);
     await connectRunner();

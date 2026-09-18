@@ -66,6 +66,8 @@ describe('新建算力档位', () => {
     await setField('档位名', 'default'); await setField('镜像', 'registry.cs.local/runtimes/aider:1'); await setField('二进制路径', '/opt/aider/bin/aider');
     await press('创建档位');
     expect(page.text()).toContain('default 是保留名，指代平台默认档位。'); expect(page.text()).toContain('请填写测试命令。'); expect(page.text()).toContain('3 处待修正');
+    // 错误焦点：落到第一个标红的字段（2026-09-18 实机核对 CP-22 时发现编辑器缺这一步）。
+    expect((document.activeElement as HTMLElement | null)?.closest('label')?.querySelector('span')?.textContent).toBe('档位名');
     expect(backend.writes).toEqual([]);
 
     await setField('档位名', 'aider-cli'); await setField(TERMINAL_ONLY[0]!, '/opt/aider/bin/aider\n--version'); await setField(TERMINAL_ONLY[1]!, '^aider'); await setField(TERMINAL_ONLY[2]!, '30');

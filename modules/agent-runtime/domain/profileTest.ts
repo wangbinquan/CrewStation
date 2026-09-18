@@ -52,6 +52,11 @@ export function mergeStages(current: readonly ProfileTestStage[], updates: reado
   return merged;
 }
 
+/** 测试以失败或无法确认收尾时，没走到的阶段记为「跳过」，不留一排「等待中」让人以为还在跑（2026-09-18 实机所见）。 */
+export function skipUnreachedStages(stages: readonly ProfileTestStage[]): ProfileTestStage[] {
+  return stages.map((s) => (s.state === 'pending' ? { ...s, state: 'skipped' as const } : s));
+}
+
 /**
  * 固定测试内容：不带租户源码或业务数据；每次一个新的随机 nonce，回文里必须原样出现才算真实模型轮次（agent-workflow 的判定）。
  */

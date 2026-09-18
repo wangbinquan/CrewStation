@@ -15,7 +15,12 @@ export const ComputeProfileNameSchema = SlugSchema.refine((name) => name !== DEF
 /** 档位用途：通用终端协议只能用于「＋ CLI」。 */
 export const ComputeUsageSchema = z.enum(['cli', 'agent', 'subtask']);
 
-export const ComputeProfileDescriptionSchema = z.string().max(500).default('');
+/**
+ * 说明文字：建档时缺省为空串；保存与复制时缺省表示「不改／沿用原档位」，这两处用不带 default 的版本——
+ * zod 4 的 default 包在 optional 里照样生效，会把缺省变成空串，把原说明清掉（2026-09-18 实机发现）。
+ */
+const DescriptionTextSchema = z.string().max(500);
+export const ComputeProfileDescriptionSchema = DescriptionTextSchema.default('');
 
 /** 通用终端协议的测试命令（C11）：argv 数组，不拼成 shell 字符串；期望输出是对 stdout＋stderr 的正则。 */
 export const TerminalTestSchema = z.object({
@@ -59,13 +64,13 @@ export const CreateComputeProfileRequestSchema = z.object({
 /** 保存：expectedRevision 比较；执行相关内容变化才生成新修订并自动测试，只改说明不生成（P3）。 */
 export const SaveComputeProfileRequestSchema = z.object({
   expectedRevision: z.number().int().min(1),
-  description: ComputeProfileDescriptionSchema.optional(),
+  description: DescriptionTextSchema.optional(),
   content: ComputeProfileContentSchema,
   credentials: z.record(EnvNameSchema, ProfileCredentialWriteSchema).default({}),
 }).strict();
 
 export const SetComputeProfileEnabledRequestSchema = z.object({ enabled: z.boolean() }).strict();
-export const CopyComputeProfileRequestSchema = z.object({ name: ComputeProfileNameSchema, description: ComputeProfileDescriptionSchema.optional() }).strict();
+export const CopyComputeProfileRequestSchema = z.object({ name: ComputeProfileNameSchema, description: DescriptionTextSchema.optional() }).strict();
 export const StartProfileTestRequestSchema = z.object({ clientRequestId: z.uuid() }).strict();
 /** 删除被已上线版本引用的档位须显式确认（C19）。 */
 export const DeleteComputeProfileQuerySchema = z.object({ confirmReferences: z.enum(['true', 'false']).optional() });

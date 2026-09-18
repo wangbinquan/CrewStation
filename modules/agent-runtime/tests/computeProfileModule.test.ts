@@ -187,6 +187,20 @@ describe.skipIf(!available)('算力档位模块（RFC-006）', () => {
     expect(refused.status).toBe(409);
   });
 
+  test('HTTP：保存与复制不带说明时保留原说明（缺省不能被解析成空串；2026-09-18 实机发现）', async () => {
+    const app = createApp({ name: 'agent-runtime-test' });
+    for (const router of mod.http) app.route('/', router);
+    const headers = { [IDENTITY_HEADERS.userId]: admin.userId, [IDENTITY_HEADERS.userName]: 'n', [IDENTITY_HEADERS.userEmail]: 'e@x', 'content-type': 'application/json' };
+    const before = await mod.api.getProfile(admin, 'glm-claude-2');
+    await mod.api.saveProfile(admin, 'glm-claude-2', { expectedRevision: before.revision, description: '保留这段说明', content: before.content, credentials: {} });
+    const saved = await app.request('/v1/admin/compute-profiles/glm-claude-2', { method: 'PUT', headers, body: JSON.stringify({ expectedRevision: before.revision, content: before.content }) });
+    expect(saved.status).toBe(200);
+    expect((await mod.api.getProfile(admin, 'glm-claude-2')).description).toBe('保留这段说明');
+    const copied = await app.request('/v1/admin/compute-profiles/glm-claude-2/copy', { method: 'POST', headers, body: JSON.stringify({ name: 'glm-claude-3' }) });
+    expect(copied.status).toBe(201);
+    expect((await mod.api.getProfile(admin, 'glm-claude-3')).description).toBe('保留这段说明');
+  });
+
   test('镜像页与推送凭据：底座按摘要给出示例 Dockerfile；凭据只给管理员、只在签发响应里出现；仓库 ForwardAuth 只放行前缀内推拉（C18）', async () => {
     const app = createApp({ name: 'agent-runtime-test' });
     for (const router of [...mod.http, ...mod.forwardAuth]) app.route('/', router);

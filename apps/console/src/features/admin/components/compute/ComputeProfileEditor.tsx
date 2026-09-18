@@ -1,6 +1,7 @@
 import type { ComputeProfileDetailDto } from '@crewstation/contracts';
 import { BEFORE_START_LIMITS } from '@crewstation/contracts';
 import type { ReactElement } from 'react';
+import { useEffect, useRef } from 'react';
 import { api } from '../../../../shared/api/client';
 import { queryKeys } from '../../../../shared/api/queryKeys';
 import { errorMessage, useApiQuery } from '../../../../shared/api/useApi';
@@ -81,8 +82,12 @@ function ProfileEditorForm({ detail, onClose, onCreated }: { readonly detail?: C
   const tasks = useApiQuery(queryKeys.taskProfiles(), () => api.catalog.listTaskProfiles());
   const saving = useProfileSave(detail, editor, onCreated);
   const busy = saving.busy, errorCount = Object.keys(editor.errors).length;
+  // 保存校验失败时焦点落到第一个标红的字段（与控制台其他表单一致）；错误只在提交时产生、一改就清空，不会在输入中抢焦点。
+  const root = useRef<HTMLDivElement>(null);
+  useEffect(() => { if (Object.keys(editor.errors).length) root.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus(); }, [editor.errors]);
   return (
     <Card compact title={<EditorTitle detail={detail} />} extra={<Button onClick={onClose}>{t('admin.profile.close')}</Button>} footer={t('admin.profile.editorHint')}>
+      <div ref={root} className={styles.contents}>
       <UnsavedChangesGuard dirty={editor.dirty || busy} scope={t('admin.profile.title')} />
       {detail ? <p className={styles.hint} title={detail.imageDigest}>{t('admin.profile.revisionNote', { revision: detail.revision, hash: detail.contentHash.slice(0, 12), digest: detail.imageDigest ? shortDigest(detail.imageDigest) : '—' })}</p> : null}
       <ProfileBasicsSection draft={editor.draft} errors={editor.errors} disabled={busy} creating={creating} onChange={editor.update} />
@@ -106,6 +111,7 @@ function ProfileEditorForm({ detail, onClose, onCreated }: { readonly detail?: C
         </ActionNote>
       ) : saving.save.error ? <ActionNote tone="error">{t('admin.profile.saveError', { message: errorMessage(saving.save.error) })}</ActionNote> : null}
       {detail ? <ProfileTestPanel name={detail.name} latest={detail.latestTest} dirty={editor.dirty} onLocate={(stepId) => { const index = editor.draft.steps.findIndex((step) => step.stepId === stepId); if (index >= 0) editor.setSelected(index); }} /> : null}
+      </div>
     </Card>
   );
 }
