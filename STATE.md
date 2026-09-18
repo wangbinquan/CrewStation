@@ -9,7 +9,25 @@
 
 ## 进行中的 RFC
 
-**RFC-003 工作台 UX 重设计已 Done（2026-09-16）：52／52 项 UX-AT 全部实机通过,本地 gate 与精确 SHA CI 通过。RFC-004（管理员定义 Agent 启动前 Hook）于 2026-09-16 按作者会话目标提前完成代码落地，状态 In Progress（实机验收待续）——现可按其 plan.md 启动 Hook 实机。** RFC-001 与 RFC-002 都已 Done，见 `proposal/rfc/README.md` 的索引表。
+**RFC-003 工作台 UX 重设计已 Done（2026-09-16）：52／52 项 UX-AT 全部实机通过,本地 gate 与精确 SHA CI 通过。RFC-004（管理员定义 Agent 启动前 Hook）于 2026-09-16 按作者会话目标提前完成代码落地，状态 In Progress（实机验收待续）——现可按其 plan.md 启动 Hook 实机。** RFC-001 与 RFC-002 都已 Done，见 `proposal/rfc/README.md` 的索引表。**RFC-005（OIDC／OAuth 2.0 公司登录）于 2026-09-18 落档为 Draft，待作者批准后才可进入实现（开发规则 §5.3）。**
+
+## 最新接力：RFC-005（OIDC 公司登录）三件套落档，待作者批准（2026-09-18）
+
+本批只写文档，**无任何生产代码改动**。作者指示：把 agent-workflow 的 OIDC／OAuth 2.0 认证能力搬进来，配置界面的配置项与它完全一致，接入后原登录方式失效，系统初始化逻辑与它一致；并明确「没有存量系统，直接断代开发」。
+
+已把 agent-workflow 的实现面逐处读过并对照本仓现状，落成 `proposal/rfc/RFC-005-oidc-company-login/` 三件套并登记进 RFC 索引。作者当日七项裁定写在该 RFC 的 proposal.md §2：
+
+1. 初始化完全照搬 agent-workflow，**含本地用户名＋密码账户**与引导令牌交接；
+2. 常规（密码）登录**由经 OIDC 登录的管理员手动关闭**（取代本轮早先一次「自动失效、无开关」的答复，后者会把首位管理员锁在门外）；
+3. 开通策略只做 `auto`／`allowlist`，不做 `invite`；
+4. 没有存量系统，断代开发（不写迁移兼容、不做按邮箱认领）；
+5. 演示登录整条删除（`demoIdentityProvider`、`demoIdentity`、`CS_IDENTITY_PROVIDER` 全下线，e2e 与 CLI 改用密码登录）；
+6. 多 Provider 并存，与 agent-workflow 同形；
+7. IdP 全不可达时的破窗口是安装配置强制开关（`CS_PASSWORD_LOGIN=force-on`）＋重启 cs-auth。
+
+开工前要知道的三条落地约束（都写进了 design.md）：PKCE／state **必须落库**（agent-workflow 是进程内 Map，本仓控制面 HA 是 v1 要求）；关闭密码登录的前置条件需要 cs-api 知道「当前会话是密码还是 OIDC 建立的」，因此新增平台内部头 `x-cs-auth-method`（只在工作台目标注入，不进业务接入约定表）；删掉演示登录会同时切断 e2e 的 `signIn()` 与 CLI 取 `CS_TOKEN` 的路，所以 T6 必须与 T8（`install-platform.sh` 播种引导管理员）同批。
+
+**RFC-005 尚未批准，未进入实现阶段（开发规则 §5.3）。** 两项待作者确认写在 proposal.md §11：`gitNameClaim`／`emailClaim` 是否顺带驱动开发容器的 git 身份；`x-cs-auth-method` 的登记位置。
 
 ## 最新接力：UX-AT-42 乱序补发实机，52／52 收官（2026-09-16）
 
