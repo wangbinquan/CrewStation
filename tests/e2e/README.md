@@ -23,6 +23,23 @@ bun run check                 # 完整门禁，实机验收包含在内
 
 换环境用 `CS_E2E_CONSOLE`（网关地址）和 `CS_E2E_CDP_PORT`（调试端口）覆盖。
 
+## 在 GitHub CI 上
+
+`.github/workflows/ci.yml` 的 `e2e` 作业会真装一套平台再跑这些用例：kind 建集群 → `bootstrap.sh`
+→ 把 Traefik 的 web NodePort 钉到 30080（kind 把宿主机 80 接到它）→ `install-platform.sh` →
+起无头 Chrome → `bun test tests/e2e`。快门禁 `check` 作业不受影响，仍然几分钟出结果。
+
+两个 CI 专用开关：`CS_SKIP_TASK_RUNTIME=1` 跳过要联网装两个 Agent CLI 的任务容器镜像（前台验收
+用不到，它也是最容易被网络拖住的一步）；`CREWSTATION_NODE_CONTAINER` 让节点名不再钉死在
+`desktop-control-plane`。
+
+**网关必须落在 80 端口**：登录跳转地址由平台配置的用户域生成，不带端口。放在 8080 上时浏览器会被
+302 到 `http://console.cs.localhost/auth/login`，撞上没人监听的 80，页内请求随即 `Failed to fetch`。
+
+**项目空间的用例在 CI 里是跳过的**：开通链第二步 `ensureRepository` 需要 GitLab，CI 里没有，
+所以全新集群里没有「已开通且有服务的数字人项目」可测。这些用例只在有真实项目的环境（比如本机）
+才跑。要让 CI 也覆盖它们，得先让 CI 有一个可用的 GitLab。
+
 ## 用例怎么写
 
 - **不写死环境里的 ID。** 用例以当前身份问平台要一个真实项目（`/v1/projects`），因此换台机器、换套数据依然成立。
