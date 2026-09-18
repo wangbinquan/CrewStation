@@ -1,5 +1,6 @@
 // ← agent-workflow `runtime/opencode/events.ts`，`--format json` 行 → NormalizedEvent。
-// 与源的差异：新增 `tool` 的尽力提取（源只判定 kind）；其余（文本提取、kind 推断、token 累计）原样。
+// 与源的差异：新增 `tool` 的尽力提取（源只判定 kind）；`error` 行取厂商的错误文案作 text（源留空，下游只能拿到「运行时报告错误」，
+// 2026-09-18 实机：业务子任务把 OpenCode Zen 的 403 报成这一句）；其余（文本提取、kind 推断、token 累计）原样。
 
 import type {
   NormalizedEvent,
@@ -25,7 +26,7 @@ export function parseEvent(line: string): NormalizedEvent | null {
   const tool = extractToolCall(evt);
   return {
     kind: inferEventKind(evt),
-    text: extractTextFromEvent(evt),
+    text: evt.type === 'error' ? extractErrorText(evt) : extractTextFromEvent(evt),
     // 与 Claude 不同：opencode 每个事件的顶层 `sessionID` 就是会话 id，没有根／侧链之分。
     ...(typeof evt.sessionID === 'string' ? { sessionId: evt.sessionID } : {}),
     ...(tool === undefined ? {} : { tool }),
@@ -41,6 +42,21 @@ export function extractTextFromEvent(evt: Record<string, unknown>): string | nul
   if (part && typeof part === 'object' && part.type === 'text' && typeof part.text === 'string') return part.text;
   if (evt.type === 'text' && typeof evt.text === 'string') return evt.text;
   return null;
+}
+
+/**
+ * `{"type":"error",…}` 行的可读原因：依次取 `error.data.message`、`error.message`、`error.name`，带 HTTP 状态时附在后面。
+ * 例：`Error from provider (Console): OpenCode's free tier can only be used from within OpenCode（HTTP 403）`。
+ */
+export function extractErrorText(evt: Record<string, unknown>): string | null {
+  const error = evt.error as Record<string, unknown> | undefined;
+  if (!error || typeof error !== 'object') return null;
+  const data = error.data as Record<string, unknown> | undefined;
+  const pick = (value: unknown) => (typeof value === 'string' && value.trim().length > 0 ? value.trim() : undefined);
+  const message = pick(data?.message) ?? pick(error.message) ?? pick(error.name);
+  if (!message) return null;
+  const status = typeof data?.statusCode === 'number' ? `（HTTP ${data.statusCode}）` : '';
+  return `${message}${status}`.slice(0, 1000);
 }
 
 export function inferEventKind(evt: Record<string, unknown>): NormalizedEventKind {

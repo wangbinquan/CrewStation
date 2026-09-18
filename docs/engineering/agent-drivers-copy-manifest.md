@@ -198,6 +198,7 @@
 - **输出格式**：`run --format json`（每行一个 JSON），`--thinking` 让 `reasoning` 事件进入 stdout。
 - **识别的 `type`**：`tool_use`、`text`、`reasoning`、`permission.asked`／`permission_asked`（→ `permission_asked`）、`error`、`step_start`、`step_finish`；其他 truthy JSON 一律 `text`。`JSON.parse` 失败或结果为 falsy（`null`／`0`／`""`／`false`）→ `null`。
 - **文本**：`part.type === 'text'` 时取 `part.text`；否则 `type === 'text'` 时取顶层 `text`。
+- **错误文案（CrewStation 新增，源没有）**：`type: 'error'` 行依次取 `error.data.message`、`error.message`、`error.name`，带 `statusCode` 时附「（HTTP n）」，作为归一事件的 text；源把它留空，下游只能拿到「运行时报告错误」（2026-09-18 实机：业务子任务把 OpenCode Zen 的 403 报成这一句）。
 - **会话 id**：每个事件的顶层 `sessionID`（与 Claude 不同，无根／侧链区分）。
 - **完成**：`observeSystemEvent` 把 `step_finish` 判为 `terminalResult: 'success'`；驱动**没有** `parseTerminalResultError`。
 - **token**：`computeTokenDelta` 依次在 `evt`、`evt.part`、`evt.usage`、`evt.step`、`evt.message` 上找 `tokens` 对象或内联 `input_tokens`／`output_tokens`／`prompt_tokens`／`completion_tokens`；缓存计数兼容 `cache.read`／`cache.write`（1.15.5+）与旧的 `cache_read`／`cache_creation`。

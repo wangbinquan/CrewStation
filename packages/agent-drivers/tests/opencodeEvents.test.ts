@@ -1,7 +1,7 @@
 // 样本行取自 agent-workflow `runtime/opencode/events.ts` 的形状注释与其 token 探测顺序
 // （缓存计数的 `cache: {read, write}` 形态实测于 opencode 1.15.5+）。
 import { describe, expect, test } from 'bun:test';
-import { computeTokenDelta, inferEventKind, observeSystemEvent, parseEvent } from '../drivers/opencode/events';
+import { computeTokenDelta, extractErrorText, inferEventKind, observeSystemEvent, parseEvent } from '../drivers/opencode/events';
 import { detectOpencodeSessionNotFound } from '../drivers/opencode/probe';
 import { createAgentEventFactory, toAgentEvent } from '../drivers/agentEventMapping';
 
@@ -68,6 +68,17 @@ describe('OpenCode 归一事件 → AgentEvent', () => {
 });
 
 describe('OpenCode 会话不存在判定', () => {
+  test('error 行取厂商错误文案与 HTTP 状态作原因（2026-09-18 实机的两行原样）', () => {
+    const freeTier = '{"type":"error","timestamp":1789722695771,"sessionID":"ses_1","error":{"name":"APIError","data":{"message":"Error from provider (Console): OpenCode\'s free tier can only be used from within OpenCode","statusCode":403,"isRetryable":false}}}';
+    const unknownModel = '{"type":"error","sessionID":"ses_2","error":{"name":"UnknownError","data":{"message":"Unexpected server error. Check server logs for details.","ref":"err_1"}}}';
+    expect(parseEvent(freeTier)).toMatchObject({ kind: 'error', sessionId: 'ses_1', text: "Error from provider (Console): OpenCode's free tier can only be used from within OpenCode（HTTP 403）" });
+    expect(parseEvent(unknownModel)?.text).toBe('Unexpected server error. Check server logs for details.');
+    expect(extractErrorText({ type: 'error', error: { name: 'ProviderAuthError' } })).toBe('ProviderAuthError');
+    expect(extractErrorText({ type: 'error' })).toBeNull();
+    // 归一成 AgentEvent 后，错误文案就是这句原因，而不是「运行时报告错误」。
+    expect(toAgentEvent(parseEvent(freeTier)!, createAgentEventFactory('agt-1'))?.error).toEqual({ code: 'runtime_error', message: "Error from provider (Console): OpenCode's free tier can only be used from within OpenCode（HTTP 403）" });
+  });
+
   test('四条措辞都能识别；空尾部不误报', () => {
     expect(detectOpencodeSessionNotFound('error: session not found')).toBe(true);
     expect(detectOpencodeSessionNotFound('Session ses_1 does not exist')).toBe(true);

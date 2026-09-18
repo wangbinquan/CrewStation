@@ -31,7 +31,7 @@ export interface ProtocolProbe {
   text: string;
   /**
    * 事件携带的 CLI 原始行（stdout 的逐行 JSON）拼成的有界尾部。agent-workflow 的冒烟对 stdout／stderr 原文做分类并随原因给出摘录；
-   * 这里的等价物是事件的 raw——厂商的报错（例如 opencode 的 `{"type":"error",…}`）只在 raw 里，归一后的错误文案只剩「运行时报告错误」。
+   * 这里的等价物是事件的 raw——归一后的错误文案只是一句概括（opencode 的 error 行由驱动提取厂商文案，别的 CLI 或字段形状变化时仍可能只剩「运行时报告错误」），原文以 raw 为准。
    */
   diagnostics: string;
   outcome?: { kind: 'completed' | 'error' | 'cancelled'; message?: string; code?: string; exitCode?: number | null; at: string };
