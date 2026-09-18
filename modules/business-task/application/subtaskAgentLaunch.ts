@@ -8,7 +8,7 @@ import type { BusinessTaskUseCaseDeps } from './dependencies';
 function launchFailure(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
   const available = isPlatformError(error) && Array.isArray(error.details?.available) ? (error.details.available as string[]) : undefined;
-  return `启动 Agent 失败：${message}${available ? `，当前可用：${available.join('、') || '（无）'}` : ''}`;
+  return `启动 Agent 失败：${message}${available ? `，现有档位：${available.join('、') || '（无）'}` : ''}`;
 }
 
 type Finish = (run: SubtaskRun, next: SubtaskRun) => Promise<SubtaskRun>;

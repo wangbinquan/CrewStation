@@ -177,7 +177,8 @@ describe.skipIf(!available)('business-task module', () => {
       const orphan = await bt.api.submitSubtask(caller, task.id, { kind: 'agent', name: 'orphan', agentProfile: 'chat-v1', mode: 'oneshot', prompt: '孤儿档位' });
       expect(orphan.state).toBe('failed');
       expect(orphan.error).toContain('算力档位 sample-opencode 不存在');
-      expect(orphan.error).toContain('当前可用：balanced');
+      // 列出的是现有档位（不论测试状态），不能叫「当前可用」（2026-09-18 实机：测试失败的档位也被列成可用）。
+      expect(orphan.error).toContain('现有档位：balanced');
       expect(commands.filter((c) => c.type === 'startAgent' && c.initialPrompt === '孤儿档位')).toHaveLength(0);
     } finally {
       computeProfiles = [{ name: 'sample-opencode', revision: 1, isDefault: true }];

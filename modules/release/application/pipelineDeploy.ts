@@ -24,7 +24,7 @@ async function computeProblem(deps: ReleaseUseCaseDeps, manifest: Manifest): Pro
   const found = await Promise.all(wanted.map(async (name) => ({ name, profile: await deps.plans.lookupComputeProfile(name) })));
   if (found.some((f) => f.name === 'default' && !f.profile)) return '算力档位 default 指向平台默认档位，但平台尚未设置默认档位；请管理员在平台管理里设置';
   const missing = found.filter((f) => !f.profile).map((f) => f.name);
-  if (missing.length > 0) return `算力档位 ${missing.join('、')} 不存在；当前可用：${(await deps.plans.listComputeProfiles()).join('、') || '（空）'}`;
+  if (missing.length > 0) return `算力档位 ${missing.join('、')} 不存在；现有档位：${(await deps.plans.listComputeProfiles()).join('、') || '（空）'}`;
   const terminal = found.filter((f) => f.profile?.terminalOnly).map((f) => f.name);
   if (terminal.length > 0) return `算力档位 ${terminal.join('、')} 是通用终端协议，只能用于「＋ CLI」，不能用于业务子任务`;
   return undefined;
