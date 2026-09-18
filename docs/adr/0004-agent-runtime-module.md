@@ -1,6 +1,6 @@
 # 0004. Agent 运行配置拥有独立领域模块
 
-- 状态：已接受，2026-09-16 已实施（`modules/agent-runtime` 已创建，随 RFC-004 落地）
+- 状态：已接受，2026-09-16 已实施（`modules/agent-runtime` 已创建，随 RFC-004 落地）；其中「现有算力档位继续归 project」一条随 RFC-006 的实施改由 [ADR-0005](0005-compute-profile-in-agent-runtime.md) 规定（2026-09-18 起实施，待作者复核）
 - 日期：2026-09-14
 - 关联：[RFC-004](../../proposal/rfc/RFC-004-admin-agent-runtime/proposal.md)
 

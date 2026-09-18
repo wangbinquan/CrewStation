@@ -1,6 +1,8 @@
 # RFC-004｜设计
 
-> In Progress · 2026-09-14 与 [proposal.md](proposal.md)、[plan.md](plan.md)、[ADR-0004](../../../docs/adr/0004-agent-runtime-module.md) 一并批准为实施依据；2026-09-16 已按本设计实现（新增 L3 模块 `modules/agent-runtime`，contracts／Runner／agent-drivers／project／dev-session／business-task／task-runtime／session／platform／console 相应扩展）。§1 的“现状与断点”保留为实施前的证据；实现与设计的对应关系见 plan.md 实施说明。
+> **Superseded · 2026-09-18 被 [RFC-006](../RFC-006-unified-compute-profile/design.md) 取代**；以下为历史记录。
+>
+> 2026-09-14 与 [proposal.md](proposal.md)、[plan.md](plan.md)、[ADR-0004](../../../docs/adr/0004-agent-runtime-module.md) 一并批准为实施依据；2026-09-16 已按本设计实现（新增 L3 模块 `modules/agent-runtime`，contracts／Runner／agent-drivers／project／dev-session／business-task／task-runtime／session／platform／console 相应扩展）。§1 的“现状与断点”保留为实施前的证据；实现与设计的对应关系见 plan.md 实施说明。
 
 ## 1. 现状与断点
 

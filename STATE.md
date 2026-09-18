@@ -9,7 +9,7 @@
 
 ## 进行中的 RFC
 
-**RFC-003 工作台 UX 重设计已 Done（2026-09-16）：52／52 项 UX-AT 全部实机通过,本地 gate 与精确 SHA CI 通过。RFC-004（管理员定义 Agent 启动前 Hook）于 2026-09-16 按作者会话目标提前完成代码落地，状态 In Progress（实机验收待续）——现可按其 plan.md 启动 Hook 实机。** RFC-001 与 RFC-002 都已 Done，见 `proposal/rfc/README.md` 的索引表。**RFC-005（OIDC／OAuth 2.0 公司登录）于 2026-09-18 落档为 Draft，待作者批准后才可进入实现（开发规则 §5.3）。** **RFC-006（算力档位合并运行环境）于 2026-09-18 落档为 Draft；它批准后 RFC-004 置为 Superseded，因此在作者裁定 RFC-006 之前不要再推进 RFC-004 的 AR 实机验收。**
+**RFC-003 工作台 UX 重设计已 Done（2026-09-16）：52／52 项 UX-AT 全部实机通过,本地 gate 与精确 SHA CI 通过。RFC-004（管理员定义 Agent 启动前 Hook）于 2026-09-16 按作者会话目标提前完成代码落地，状态 In Progress（实机验收待续）——现可按其 plan.md 启动 Hook 实机。** RFC-001 与 RFC-002 都已 Done，见 `proposal/rfc/README.md` 的索引表。**RFC-005（OIDC／OAuth 2.0 公司登录）于 2026-09-18 落档为 Draft，待作者批准后才可进入实现（开发规则 §5.3）。** **RFC-006（算力档位合并运行环境）2026-09-18 落档，同日作者设定会话目标「完整实现RFC并提交上库」，进入实施（In Progress）；RFC-004 同日置为 Superseded，其 AR 实机验收不再执行。**
 
 ## 最新接力：RFC-006（算力档位合并运行环境）三件套落档，待作者批准（2026-09-18）
 
