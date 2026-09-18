@@ -24,3 +24,20 @@ spec:
       priority: 100
       middlewares: [{ name: forward-auth-registry }]
       services: [{ name: registry, port: 5000 }]
+---
+# Docker 客户端对 registry.cs.localhost 先走 HTTPS（主机名解析到回环地址，按 insecure 跳过证书校验）。Traefik 的 websecure 入口
+# 用默认证书完成握手后，没有匹配的路由就答 404，客户端不会再回退到 HTTP——所以同一条路由也挂在 websecure 上（实测，design.md §13 第 1 项）。
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: registry-push-tls
+  namespace: crewstation-system
+spec:
+  entryPoints: [websecure]
+  routes:
+    - match: Host(`registry.cs.localhost`)
+      kind: Rule
+      priority: 100
+      middlewares: [{ name: forward-auth-registry }]
+      services: [{ name: registry, port: 5000 }]
+  tls: {}
