@@ -53,6 +53,23 @@ test('没有启用的提供方时同样不给关；安装配置强制开启时�
   expect(page.text()).toContain('CS_PASSWORD_LOGIN=force-on');
 });
 
+test('强制开启压着库内的「关」时：牌子写正在生效的状态，库内策略另起一行，两个方向都不给按', async () => {
+  adminAuthenticationFixture({ forcedOn: true, passwordLoginEnabled: false });
+  page = await renderApp('/admin/authentication');
+  // 破窗开关正是唯一需要这块牌子的场合：照库内值写「已关闭」，而登录页明明还收密码，就是在骗人。
+  expect(rowValue('用户名密码登录')).toBe('已开启');
+  expect(rowValue('库内策略')).toBe('已关闭');
+  const buttons = [...document.querySelectorAll('button')].map((node) => node.textContent ?? '');
+  expect(buttons).not.toContain('开启用户名密码登录');
+  expect(buttons).not.toContain('关闭用户名密码登录');
+});
+
+/** 取名值对列表里某一行的值；断「牌子上写的是什么」用。 */
+function rowValue(label: string): string | undefined {
+  const row = [...document.querySelectorAll('dt')].find((node) => node.textContent === label);
+  return row?.nextElementSibling?.textContent ?? undefined;
+}
+
 test('OIDC 会话的管理员两段式确认后关闭常规登录，请求真的发出', async () => {
   const f = adminAuthenticationFixture();
   page = await renderApp('/admin/authentication');

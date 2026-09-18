@@ -155,7 +155,7 @@ ForwardAuth 的 allow 分支今天固定注入四个头。改成：
 
 - **引导令牌**：安装期生成随机值写进 Secret，注入 cs-auth 为 `CS_BOOTSTRAP_TOKEN`，安装输出打印一次。只有 `/auth/bootstrap*` 认它，且只在 `bootstrap_completed_at IS NULL` 时有效——**事实源是数据库，不是文件**：删掉 Secret 不等于退役，重建 Secret 也不能复活权限。令牌永不换成会话。
 - **非交互播种**：cs-auth 的入口已有 `migrate` 子命令（`apps/cs-auth/src/main.ts`），再加 `bootstrap-admin`，与 HTTP 路由共用同一事务用例。`deploy/local/install-platform.sh` 调它建出本机验收用的管理员（值来自 `CS_BOOTSTRAP_ADMIN_USERNAME/EMAIL/PASSWORD`），保持脚本幂等、不需要人开浏览器。
-- **破窗口（A7）**：`CS_PASSWORD_LOGIN=force-on` 时，登录发现与 `POST /auth/login` 都无条件视密码登录为开启，库内策略暂不生效；管理面把开关显示为「由安装配置强制开启」并禁改。改完要重启 cs-auth 才生效，这是它作为「持有集群权限才能做的事」的边界。
+- **破窗口（A7）**：`CS_PASSWORD_LOGIN=force-on` 时，登录发现与 `POST /auth/login` 都无条件视密码登录为开启，库内策略暂不生效；管理面把「用户名密码登录」显示为正在生效的**已开启**、另起一行写出被压着的库内策略，并两个方向都禁改。改完要**重启 cs-auth 与 cs-api** 才生效：前者决定登录页收不收密码，后者决定管理面看到的 `forcedOn`；只重启一个，界面与实际会各说各话。这道「要持有集群权限才能做」正是它作为破窗口的边界。
 
 ## 9. 失败模式
 

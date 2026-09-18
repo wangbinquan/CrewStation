@@ -15,6 +15,7 @@ export const authMessages = {
   'admin.auth.sessionOidc': 'Company identity (OIDC)',
   'admin.auth.sessionPassword': 'Local username and password',
   'admin.auth.enabledProviders': 'Enabled providers',
+  'admin.auth.storedPolicy': 'Stored policy',
   'admin.auth.on': 'on',
   'admin.auth.off': 'off',
   'admin.auth.yes': 'yes',
@@ -25,7 +26,7 @@ export const authMessages = {
   'admin.auth.disableConfirm': 'Close it',
   'admin.auth.saving': 'Saving…',
   'admin.auth.policySaveError': 'Could not save the login policy',
-  'admin.auth.blocked.forcedOn': 'The install config forces username/password login on (CS_PASSWORD_LOGIN=force-on); remove it and restart cs-auth before closing it here.',
+  'admin.auth.blocked.forcedOn': 'The install config is forcing username/password login on (CS_PASSWORD_LOGIN=force-on), so the stored policy is suspended. Remove it and restart cs-auth and cs-api before changing this here.',
   'admin.auth.blocked.session': 'This session came from a local password. Sign in through the company identity once, then close regular login — that is what guarantees someone can still get in afterwards.',
   'admin.auth.blocked.providers': 'No provider is enabled, so closing it would lock everyone out.',
 

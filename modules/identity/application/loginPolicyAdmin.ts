@@ -62,6 +62,6 @@ function refusal(reason: 'not-admin' | 'requires-oidc-session' | 'requires-enabl
     case 'requires-enabled-oidc':
       return conflict('至少要有一个启用的身份提供方，才能关闭用户名密码登录', { code: 'password-login-requires-enabled-oidc' });
     case 'forced-on':
-      return conflict('安装配置已强制开启用户名密码登录，请先去掉 CS_PASSWORD_LOGIN=force-on 并重启 cs-auth', { code: 'password-login-forced-on' });
+      return conflict('安装配置已强制开启用户名密码登录，请先去掉 CS_PASSWORD_LOGIN=force-on 并重启 cs-auth 与 cs-api', { code: 'password-login-forced-on' });
   }
 }

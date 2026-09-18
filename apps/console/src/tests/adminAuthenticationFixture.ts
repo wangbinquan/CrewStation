@@ -16,11 +16,11 @@ export function provider(overrides: Partial<OidcProviderDto> = {}): OidcProvider
 }
 
 /** 认证页的桩：登录策略、提供方、转发三条读，加上它们的写；不打桩真实后端。 */
-export function adminAuthenticationFixture(options: { authMethod?: 'password' | 'oidc'; providers?: OidcProviderDto[]; forcedOn?: boolean } = {}) {
+export function adminAuthenticationFixture(options: { authMethod?: 'password' | 'oidc'; providers?: OidcProviderDto[]; forcedOn?: boolean; passwordLoginEnabled?: boolean } = {}) {
   const calls: Array<{ url: URL; method: string; body?: unknown }> = [];
   const state = {
     authMethod: options.authMethod ?? 'oidc',
-    passwordLoginEnabled: true,
+    passwordLoginEnabled: options.passwordLoginEnabled ?? true,
     forcedOn: options.forcedOn ?? false,
     providers: options.providers ?? [provider()],
     globalFields: ['name', 'email'] as string[],

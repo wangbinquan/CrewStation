@@ -12,9 +12,8 @@ import { QueryStatus } from '../../../../shared/ui/QueryStatus';
 import { Button } from '../../../../shared/ui/Button';
 import { MutationError } from '../MutationError';
 
-/** 关不掉时的原因：三条前置缺哪一条就说哪一条，不给一个只是灰着的开关（RFC-005 §6.1）。 */
-function blockedReason(policy: LoginPolicyDto): 'forcedOn' | 'session' | 'providers' | undefined {
-  if (policy.forcedOn) return 'forcedOn';
+/** 关不掉时的原因：两条前置缺哪一条就说哪一条，不给一个只是灰着的开关（RFC-005 §6.1）。强制开关另说，见下。 */
+function blockedReason(policy: LoginPolicyDto): 'session' | 'providers' | undefined {
   if (policy.callerAuthMethod !== 'oidc') return 'session';
   if (policy.enabledProviderCount < 1) return 'providers';
   return undefined;
@@ -27,6 +26,8 @@ export function LoginMethodsCard(): ReactElement {
   const update = useApiMutation((passwordLoginEnabled: boolean) => api.auth.setLoginPolicy({ passwordLoginEnabled }), { invalidate: [queryKeys.loginPolicy()] });
   const data = policy.data;
   const reason = data === undefined ? undefined : blockedReason(data);
+  // 破窗开关生效时，真正在跑的是「开着」，库内策略暂时不算数——牌子照库内值写就会在唯一需要它的场合骗人。
+  const effectiveOn = data !== undefined && (data.forcedOn || data.passwordLoginEnabled);
   return (
     <Card title={t('admin.auth.methodsTitle')} footer={t('admin.auth.methodsHint')}>
       <MutationError error={update.error} messageKey="admin.auth.policySaveError" />
@@ -35,13 +36,18 @@ export function LoginMethodsCard(): ReactElement {
         <>
           <DefinitionList
             items={[
-              { label: t('admin.auth.passwordLogin'), value: <Badge tone={data.passwordLoginEnabled ? 'info' : 'neutral'}>{data.passwordLoginEnabled ? t('admin.auth.on') : t('admin.auth.off')}</Badge> },
+              { label: t('admin.auth.passwordLogin'), value: <Badge tone={effectiveOn ? 'info' : 'neutral'}>{effectiveOn ? t('admin.auth.on') : t('admin.auth.off')}</Badge> },
+              ...(data.forcedOn
+                ? [{ label: t('admin.auth.storedPolicy'), value: <Badge tone="neutral">{data.passwordLoginEnabled ? t('admin.auth.on') : t('admin.auth.off')}</Badge> }]
+                : []),
               { label: t('admin.auth.bootstrapToken'), value: <Badge tone={data.bootstrapCompletedAt === null ? 'warning' : 'neutral'}>{data.bootstrapCompletedAt === null ? t('admin.auth.bootstrapPending') : t('admin.auth.bootstrapRetired')}</Badge> },
               { label: t('admin.auth.currentSession'), value: data.callerAuthMethod === 'oidc' ? t('admin.auth.sessionOidc') : t('admin.auth.sessionPassword') },
               { label: t('admin.auth.enabledProviders'), value: String(data.enabledProviderCount) },
             ]}
           />
-          {data.passwordLoginEnabled ? (
+          {data.forcedOn ? (
+            <p>{t('admin.auth.blocked.forcedOn')}</p>
+          ) : data.passwordLoginEnabled ? (
             reason === undefined ? (
               <InlineConfirm
                 label={t('admin.auth.disable')}

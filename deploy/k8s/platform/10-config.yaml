@@ -11,7 +11,8 @@ data:
   CS_PUBLIC_SCHEME: http
   # 命中这些邮箱的账户一建档即平台管理员；OIDC 登录也按它判定（RFC-005 §7）。
   CS_ADMIN_EMAILS: admin@demo.invalid
-  # 置成 force-on 并重启 cs-auth，可在 IdP 全不可达时强制恢复用户名密码登录（RFC-005 A7 的破窗口）。
+  # 置成 force-on 并重启 cs-auth 与 cs-api，可在 IdP 全不可达时强制恢复用户名密码登录（RFC-005 A7 的破窗口）。
+  # 两个都要重启：cs-auth 决定登录页收不收密码，cs-api 决定管理面显示的状态。
   CS_PASSWORD_LOGIN: ""
   CS_REGISTRY_BASE: registry.crewstation-system.svc.cluster.local:5000
   CS_BUILDER_IMAGE: cs-builder:dev

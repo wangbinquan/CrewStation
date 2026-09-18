@@ -89,7 +89,7 @@ export function renderLoginPage({ discovery, returnTo, error, justBootstrapped }
   <h2>公司身份</h2>${discovery.providers.map((p) => `
   <a class="provider" href="/auth/oidc/${encodeURIComponent(p.slug)}/start?returnTo=${encodeURIComponent(returnTo)}">使用${escapeHtml(p.displayName)}登录</a>`).join('')}`;
   const empty = password === '' && providers === '' ? `
-  <p class="error">当前没有可用的登录方式：用户名密码登录已关闭，且没有启用的身份提供方。持有集群权限的运维可在安装配置里设置 <code>CS_PASSWORD_LOGIN=force-on</code> 并重启 cs-auth 恢复。</p>` : '';
+  <p class="error">当前没有可用的登录方式：用户名密码登录已关闭，且没有启用的身份提供方。持有集群权限的运维可在安装配置里设置 <code>CS_PASSWORD_LOGIN=force-on</code> 并重启 cs-auth 与 cs-api 恢复。</p>` : '';
   const done = justBootstrapped === true ? '<p class="notice">首位管理员已创建，引导令牌已永久失效。请用刚创建的用户名与密码登录。</p>' : '';
   return shell('登录 · CrewStation', `${done}${error ? `<p class="error">${escapeHtml(error)}</p>` : ''}${providers}${password}${empty}
   <p class="hint">登录后跳回 <code>${escapeHtml(returnTo)}</code>。</p>`);

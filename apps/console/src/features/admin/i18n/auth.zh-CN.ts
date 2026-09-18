@@ -15,6 +15,7 @@ export const authMessages = {
   'admin.auth.sessionOidc': '公司身份（OIDC）',
   'admin.auth.sessionPassword': '本地用户名密码',
   'admin.auth.enabledProviders': '启用的身份提供方',
+  'admin.auth.storedPolicy': '库内策略',
   'admin.auth.on': '已开启',
   'admin.auth.off': '已关闭',
   'admin.auth.yes': '是',
@@ -25,7 +26,7 @@ export const authMessages = {
   'admin.auth.disableConfirm': '确认关闭',
   'admin.auth.saving': '保存中…',
   'admin.auth.policySaveError': '保存登录策略失败',
-  'admin.auth.blocked.forcedOn': '安装配置已强制开启用户名密码登录（CS_PASSWORD_LOGIN=force-on），先去掉它并重启 cs-auth 才能在这里关闭。',
+  'admin.auth.blocked.forcedOn': '安装配置正强制开启用户名密码登录（CS_PASSWORD_LOGIN=force-on），库内策略暂不生效。去掉它并重启 cs-auth 与 cs-api 后，这里才能再改。',
   'admin.auth.blocked.session': '当前会话来自本地用户名密码。请先用公司身份登录一次，再来关闭常规登录——这样才能保证关完仍有人进得来。',
   'admin.auth.blocked.providers': '还没有启用的身份提供方，关闭后谁都登不进来。',
 
