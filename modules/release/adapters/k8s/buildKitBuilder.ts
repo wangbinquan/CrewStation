@@ -35,7 +35,9 @@ export function buildKitBuilder(k8s: K8sClient, settings: BuildKitSettings): Ima
           { name: 'IMAGE', value: spec.image },
           { name: 'GIT_TOKEN', valueFrom: { secretKeyRef: { name: spec.credentialSecretName, key: 'token' } } },
         ],
-        resources: { cpu: '1', memory: '2Gi' },
+        // 这个 Pod 只做 git clone 和 buildctl 客户端，镜像在 buildkitd 里构建（它有自己的资源）；按客户端的负载请求，
+        // 否则忙碌节点上 1 CPU 的预约会让发布一直排不进去、到截止时间才失败（2026-09-18 本机实测）。
+        resources: { cpu: '250m', memory: '512Mi' },
         activeDeadlineSeconds: settings.timeoutSeconds,
         ttlSecondsAfterFinished: 3600,
       }));

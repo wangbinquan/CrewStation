@@ -78,6 +78,9 @@ describe.skipIf(!available)('release module', () => {
     expect((await release.api.getRelease(owner, dto.id)).status).toBe('building');
     const buildJob = k8s.applied.find((o) => o.kind === 'Job')!;
     expect(buildJob.metadata.namespace).toBe('cs-demo');
+    // 构建 Pod 只跑 git clone 与 buildctl 客户端，按这个负载请求资源（实际构建在 buildkitd）。
+    expect((buildJob.spec as { template: { spec: { containers: Array<{ resources: unknown }> } } }).template.spec.containers[0]!.resources)
+      .toEqual({ requests: { cpu: '250m', memory: '512Mi' }, limits: { cpu: '250m', memory: '512Mi' } });
     await release.api.runPipelineStep(dto.id);
     expect((await release.api.getRelease(owner, dto.id)).status).toBe('building');
     await markJob(buildJob.metadata.name, true);
