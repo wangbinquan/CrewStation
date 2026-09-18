@@ -22,7 +22,7 @@ const PROFILES = '- { name: coding-medium, cpu: "1", memory: 2Gi, storage: 10Gi 
 /** 旧发行包里的档位文件（RFC-001 形状）：RFC-006 起安装器不再读取它。 */
 const LEGACY_COMPUTE = '- { name: balanced, driver: claude-code, model: anthropic/claude-sonnet-5 }\n';
 
-const ADMIN = { id: `usr_${'a'.padEnd(32, '0')}`, name: '管理员', email: 'a@example.com', isAdmin: true, memberships: [], demoIdentity: true };
+const ADMIN = { id: `usr_${'a'.padEnd(32, '0')}`, name: '管理员', email: 'a@example.com', isAdmin: true, memberships: [], authMethod: 'password' as const };
 const CLUSTER = fakeCluster({ version: clusterOk('{}') });
 
 function filesFor(allowlist: string, integrations = '{ gitlabEventProducer: { enabled: false }, referenceApiProxy: { enabled: false } }'): ReturnType<typeof memoryFiles> {

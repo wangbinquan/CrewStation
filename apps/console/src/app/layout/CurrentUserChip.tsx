@@ -17,7 +17,7 @@ export function CurrentUserChip(): ReactElement {
         {name.slice(0, 1).toUpperCase()}
       </span>
       <span className={styles.userName}>{name}</span>
-      {me.data?.demoIdentity === true ? <span className={styles.demo}>{t('topBar.demoIdentity')}</span> : null}
+      {me.data?.authMethod === 'password' ? <span className={styles.demo}>{t('topBar.localSession')}</span> : null}
       <a className={styles.logout} href="/auth/logout">
         {t('topBar.logout')}
       </a>

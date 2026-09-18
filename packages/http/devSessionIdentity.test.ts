@@ -50,7 +50,8 @@ describe('开发会话令牌中间件', () => {
   test('令牌有效时改判为用户身份，盖掉网关注入的服务身份', async () => {
     const res = await get('/v1/projects/prj_a/branches', 'good');
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ kind: 'user', userId: 'usr_1', name: 'Ada', email: 'ada@example.com', devSession: { taskId: 'tsk_1', projectId: 'prj_a', serviceId: 'svc_a' } });
+    // 开发会话令牌不是一次浏览器登录，认证方式按常规登录记（只会更严，不会放宽）。
+    expect(await res.json()).toEqual({ kind: 'user', userId: 'usr_1', name: 'Ada', email: 'ada@example.com', authMethod: 'password', devSession: { taskId: 'tsk_1', projectId: 'prj_a', serviceId: 'svc_a' } });
     expect((await get('/v1/projects/prj_a/publish', 'good', 'POST')).status).toBe(200);
   });
 

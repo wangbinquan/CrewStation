@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, test } from 'bun:test';
-import { apiGet, e2eAvailable, open, signIn } from './consoleSession';
+import { apiGet, e2eAvailable, e2eVisitor, open, signIn } from './consoleSession';
 import { openAdminSession } from './session';
 
 /**
@@ -13,6 +13,7 @@ import { openAdminSession } from './session';
  */
 
 const available = await e2eAvailable();
+const visitor = e2eVisitor();
 const session = available ? await openAdminSession() : undefined;
 const project = session?.project;
 
@@ -70,22 +71,23 @@ describe.skipIf(!session)('平台能力在当前部署的前台验收', () => {
     expect(session!.admin.takeErrors()).toEqual([]);
   }, 45_000);
 
-  test('非管理员被挡在管理空间外：是拒绝页，不是登录页也不是 404', async () => {
-    const visitor = await signIn(session!.browser, 'e2e-visitor', 'E2E 访客');
+  // 第二个非管理员身份在本机只能由 OIDC 或另一套口令提供（演示登录已随 RFC-005 删除）；没配就跳过，不伪造结论。
+  test.skipIf(visitor === undefined)('非管理员被挡在管理空间外：是拒绝页，不是登录页也不是 404', async () => {
+    const visitor_ = await signIn(session!.browser, visitor!.username, visitor!.password);
     try {
-      const me = await apiGet<{ isAdmin?: boolean }>(visitor, '/v1/me');
+      const me = await apiGet<{ isAdmin?: boolean }>(visitor_, '/v1/me');
       expect(me.isAdmin).toBe(false);
       // 顶栏不给他一个必然撞墙的入口。
-      await open(visitor, '/');
-      expect(await visitor.bodyText()).not.toContain('进入平台管理');
+      await open(visitor_, '/');
+      expect(await visitor_.bodyText()).not.toContain('进入平台管理');
       // 直接输地址也进不去，但要说清楚这是哪、为什么、怎么回去。
-      await open(visitor, '/admin');
-      const denied = await visitor.text();
+      await open(visitor_, '/admin');
+      const denied = await visitor_.text();
       expect(denied).toContain('仅平台管理员可见');
       expect(denied).toContain('回到工作台');
-      expect(await visitor.eval<boolean>(`!!document.querySelector('form input[name="username"]')`)).toBe(false);
+      expect(await visitor_.eval<boolean>(`!!document.querySelector('form input[name="username"]')`)).toBe(false);
     } finally {
-      await visitor.close().catch(() => undefined);
+      await visitor_.close().catch(() => undefined);
     }
   }, 60_000);
 });

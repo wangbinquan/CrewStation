@@ -85,6 +85,11 @@ export interface OidcFlowRepository {
 export interface LoginPolicyRepository {
   read(): Promise<LoginPolicy>;
   setPasswordLoginEnabled(enabled: boolean, now: Date): Promise<LoginPolicy>;
+  /**
+   * 置完成态并强制打开密码登录；仅在当前仍未完成时成功。
+   * 它与首位管理员的插入必须在同一事务里，并发提交才能「至多一个成功、失败方零插入」。
+   */
+  completeBootstrap(now: Date): Promise<boolean>;
 }
 
 export interface ForwardingRecord {

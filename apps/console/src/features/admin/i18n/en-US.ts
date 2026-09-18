@@ -1,5 +1,6 @@
 import type { MessagesShapedLike } from '../../../shared/lib/i18n';
 import type { messages as zhCN } from './zh-CN';
+import { authMessages } from './auth.en-US';
 import { computeMessages } from './compute.en-US';
 
 export const messages: MessagesShapedLike<typeof zhCN> = {
@@ -137,7 +138,8 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   'admin.plans.emptyTitle': 'No service plans yet',
   'admin.plans.emptyDescription': 'At least one plan must exist before a project Manifest has a spec to reference.',
 
-  // 算力档位（RFC-006）的文案单独成文件，守住文件行数上限。
+  // 登录方式（RFC-005）与算力档位（RFC-006）的文案各自成文件，守住文件行数上限。
+  ...authMessages,
   ...computeMessages,
 
   'admin.profiles.title': 'Task container profiles',

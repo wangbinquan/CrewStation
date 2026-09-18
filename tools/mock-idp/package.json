@@ -1,0 +1,10 @@
+{
+  "name": "@crewstation/tools-mock-idp",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "本机验收用的最小 IdP：标准 OIDC、纯 OAuth 2.0 与非标 userinfo 三种形态（RFC-005 §10）",
+  "dependencies": {
+    "jose": "6.2.12"
+  }
+}

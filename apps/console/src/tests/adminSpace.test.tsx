@@ -16,7 +16,7 @@ const requests: string[] = [];
 let handlers: Handler[] = [];
 let app: RenderedApp | undefined;
 
-const ADMIN = { id: 'usr_a', name: '管理员', email: 'a@example.com', isAdmin: true, memberships: [], demoIdentity: true };
+const ADMIN = { id: 'usr_a', name: '管理员', email: 'a@example.com', isAdmin: true, memberships: [], authMethod: 'password' as const };
 const MEMBER = { ...ADMIN, id: 'usr_m', name: '普通成员', isAdmin: false };
 
 globalThis.fetch = (async (input: string | URL | Request) => {

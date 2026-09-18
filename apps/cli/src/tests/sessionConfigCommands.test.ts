@@ -121,10 +121,18 @@ describe('config list', () => {
 });
 
 describe('whoami', () => {
-  test('演示身份要被明确标注', async () => {
-    const me = { id: id('usr', 'a'), name: '张三', email: 'z@example.com', isAdmin: true, memberships: [{ projectId: PROJECT_ID, role: 'owner' }], demoIdentity: true };
+  test('本地会话要被明确标注：关闭常规登录需要先用公司身份登录一次', async () => {
+    const me = { id: id('usr', 'a'), name: '张三', email: 'z@example.com', isAdmin: true, memberships: [{ projectId: PROJECT_ID, role: 'owner' }], authMethod: 'password' as const };
     const result = await runForTest(['whoami'], { respond: routes({ 'GET /v1/me': jsonResponse(200, me) }) });
     expect(result.code).toBe(0);
-    expect(result.out.join('\n')).toContain('演示身份');
+    expect(result.out.join('\n')).toContain('用户名密码');
+    expect(result.out.join('\n')).toContain('关闭常规登录需要先用公司身份登录');
+  });
+
+  test('公司身份会话不再提示那句话', async () => {
+    const me = { id: id('usr', 'a'), name: '张三', email: 'z@example.com', isAdmin: true, memberships: [], authMethod: 'oidc' as const };
+    const result = await runForTest(['whoami'], { respond: routes({ 'GET /v1/me': jsonResponse(200, me) }) });
+    expect(result.out.join('\n')).toContain('公司身份（OIDC）');
+    expect(result.out.join('\n')).not.toContain('关闭常规登录需要先用公司身份登录');
   });
 });

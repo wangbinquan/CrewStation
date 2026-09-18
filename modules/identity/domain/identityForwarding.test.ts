@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { attrHeaderName, effectiveForwardingFields, forwardedHeaders, forwardedTokenClaims, forwardingCandidates, forwardingProjection } from './identityForwarding';
+import { effectiveForwardingFields, forwardedHeaders, forwardedTokenClaims, forwardingCandidates, forwardingProjection } from './identityForwarding';
 
 const profile = { name: '张三', email: 'zhang@corp.com', gitName: 'zhangsan', attrs: { 'employee-no': 'E-9', department: '平台组' } };
 const candidates = forwardingCandidates([
@@ -36,18 +36,17 @@ describe('注入投影', () => {
     expect(claims).toEqual({ name: '张三' });
   });
 
-  test('自定义字段走 x-cs-user-attr- 前缀与 cs_attrs 声明，两侧同源', () => {
+  test('自定义字段合并成一个 JSON 头，与 cs_attrs 声明逐字段一致', () => {
     const fields = ['name', 'email', 'git-name', 'employee-no'];
-    expect(forwardedHeaders(fields, profile)).toEqual({
-      'x-cs-user-name': '张三',
-      'x-cs-user-email': 'zhang@corp.com',
-      [attrHeaderName('git-name')]: 'zhangsan',
-      [attrHeaderName('employee-no')]: 'E-9',
-    });
+    const headers = forwardedHeaders(fields, profile);
+    expect(headers['x-cs-user-name']).toBe('张三');
+    expect(headers['x-cs-user-email']).toBe('zhang@corp.com');
+    expect(JSON.parse(headers['x-cs-user-attrs'] ?? '{}')).toEqual({ 'git-name': 'zhangsan', 'employee-no': 'E-9' });
+    // 单个 JSON 头而不是每字段一个头：网关的删头名单因此保持静态，不给伪造留窗口。
     expect(forwardedTokenClaims(fields, profile)).toEqual({ name: '张三', email: 'zhang@corp.com', cs_attrs: { 'git-name': 'zhangsan', 'employee-no': 'E-9' } });
   });
 
-  test('档案里没有的自定义字段不出现；没有 attrs 时不带空的 cs_attrs', () => {
+  test('档案里没有的自定义字段不出现；一个都没有时连 JSON 头都不给', () => {
     expect(forwardedHeaders(['department', 'unknown'], { ...profile, attrs: {} })).toEqual({});
     expect(forwardedTokenClaims(['name'], { ...profile, attrs: {} })).not.toHaveProperty('cs_attrs');
   });
@@ -56,7 +55,7 @@ describe('注入投影', () => {
     const projection = forwardingProjection(['name', 'employee-no']);
     expect(projection.headers).toContain('x-cs-user-id');
     expect(projection.headers).toContain('x-cs-identity-token');
-    expect(projection.headers).toContain(attrHeaderName('employee-no'));
+    expect(projection.headers).toContain('x-cs-user-attrs');
     expect(projection.tokenClaims).toEqual(['cs_attrs.employee-no', 'name']);
     expect(forwardingProjection([]).headers).toEqual(['x-cs-identity-token', 'x-cs-user-id']);
   });

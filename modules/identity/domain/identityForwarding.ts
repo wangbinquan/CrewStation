@@ -1,5 +1,5 @@
 import type { ClaimMapping, ForwardingCandidate } from '@crewstation/contracts';
-import { FIXED_FORWARDING_FIELDS, FORWARDING_FIELD_KEY_REGEX, IDENTITY_ATTR_HEADER_PREFIX, IDENTITY_HEADERS, TOKEN_CLAIMS } from '@crewstation/contracts';
+import { FIXED_FORWARDING_FIELDS, FORWARDING_FIELD_KEY_REGEX, IDENTITY_HEADERS, TOKEN_CLAIMS } from '@crewstation/contracts';
 
 /** 平台侧保留的身份档案（user_identities.profile 与本地账户的同形投影）。 */
 export interface IdentityProfile {
@@ -41,29 +41,21 @@ export function effectiveForwardingFields(sets: ForwardingSets, candidates: read
   return { fields: [...new Set(fields)].sort(), source: sets.project === undefined ? 'global' : 'project' };
 }
 
-export function attrHeaderName(key: string): string {
-  return `${IDENTITY_ATTR_HEADER_PREFIX}${key}`;
-}
-
-/** 按生效集把档案投影成要注入的明文头；用户 ID 与身份令牌恒定注入，不由集合决定。 */
+/**
+ * 按生效集把档案投影成要注入的明文头；用户 ID 与身份令牌恒定注入，不由集合决定。
+ * 自定义字段合并进一个 JSON 头，与令牌里的 `cs_attrs` 逐字段一致。
+ */
 export function forwardedHeaders(fields: readonly string[], profile: IdentityProfile): Record<string, string> {
   const out: Record<string, string> = {};
   if (fields.includes('name')) out[IDENTITY_HEADERS.userName] = profile.name;
   if (fields.includes('email')) out[IDENTITY_HEADERS.userEmail] = profile.email;
-  if (fields.includes('git-name') && profile.gitName !== null) out[attrHeaderName('git-name')] = profile.gitName;
-  for (const key of fields) {
-    if (key === 'name' || key === 'email' || key === 'git-name') continue;
-    const value = profile.attrs[key];
-    if (value !== undefined) out[attrHeaderName(key)] = value;
-  }
+  const attrs = forwardedAttrs(fields, profile);
+  if (Object.keys(attrs).length > 0) out[IDENTITY_HEADERS.userAttrs] = JSON.stringify(attrs);
   return out;
 }
 
-/** 令牌声明与明文头同步裁剪（A11）：关掉的字段在声明里也不出现，否则业务验签后照样读到。 */
-export function forwardedTokenClaims(fields: readonly string[], profile: IdentityProfile): Record<string, unknown> {
-  const claims: Record<string, unknown> = {};
-  if (fields.includes('name')) claims.name = profile.name;
-  if (fields.includes('email')) claims.email = profile.email;
+/** 明文头与令牌声明共用这一份取值，两侧因此不可能不一致。 */
+export function forwardedAttrs(fields: readonly string[], profile: IdentityProfile): Record<string, string> {
   const attrs: Record<string, string> = {};
   if (fields.includes('git-name') && profile.gitName !== null) attrs['git-name'] = profile.gitName;
   for (const key of fields) {
@@ -71,6 +63,15 @@ export function forwardedTokenClaims(fields: readonly string[], profile: Identit
     const value = profile.attrs[key];
     if (value !== undefined) attrs[key] = value;
   }
+  return attrs;
+}
+
+/** 令牌声明与明文头同步裁剪（A11）：关掉的字段在声明里也不出现，否则业务验签后照样读到。 */
+export function forwardedTokenClaims(fields: readonly string[], profile: IdentityProfile): Record<string, unknown> {
+  const claims: Record<string, unknown> = {};
+  if (fields.includes('name')) claims.name = profile.name;
+  if (fields.includes('email')) claims.email = profile.email;
+  const attrs = forwardedAttrs(fields, profile);
   if (Object.keys(attrs).length > 0) claims[TOKEN_CLAIMS.attrs] = attrs;
   return claims;
 }

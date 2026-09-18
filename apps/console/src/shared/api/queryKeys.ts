@@ -5,6 +5,9 @@
 export const queryKeys = {
   me: () => ['me'] as const,
   users: () => ['users'] as const,
+  loginPolicy: () => ['auth', 'login-policy'] as const,
+  authProviders: () => ['auth', 'providers'] as const,
+  identityForwarding: () => ['auth', 'forwarding'] as const,
   projects: () => ['projects'] as const,
   projectSummaries: (userId: string, search: unknown) => ['projects', 'summaries', userId, search] as const,
   projectSummary: (projectId: string, userId: string) => ['projects', projectId, 'summary', userId] as const,

@@ -20,7 +20,7 @@ export function alertsFixture() {
       else { status = 204; if (method === 'PUT') state.subscriptions = [...state.subscriptions.filter((row) => row.userId !== input.userId), { ...input, projectId } as AlertSubscriptionDto]; else if (method === 'DELETE') state.subscriptions = state.subscriptions.filter((row) => !path.endsWith(row.userId)); }
     } else {
       reads.push(path);
-      if (path === '/v1/me') body = { id: ownerId, name: '王负责人', email: 'owner@test.invalid', isAdmin: state.admin, demoIdentity: true, memberships: [{ projectId, role: state.role }] };
+      if (path === '/v1/me') body = { id: ownerId, name: '王负责人', email: 'owner@test.invalid', isAdmin: state.admin, authMethod: 'password' as const, memberships: [{ projectId, role: state.role }] };
       else if (path === `/v1/projects/${projectId}`) body = { id: projectId, serviceId, name: '演示应用', slug: 'demo', kind: state.admin ? 'APIProxy' : 'DigitalWorker', state: 'active', ownerUserId: ownerId };
       else if (path.endsWith('/alerts')) { if (state.failAlerts) { status = 503; body = { error: 'unavailable', message: '读取告警失败' }; } else body = { items: alerts.map((row) => ({ ...row, projectId: state.wrongProject ? `prj_${'f'.repeat(32)}` : projectId })) }; }
       else if (path.endsWith('/alert-subscriptions')) { if (state.failSubscriptions) { status = 503; body = { error: 'unavailable', message: '读取订阅失败' }; } else body = { items: state.subscriptions }; }

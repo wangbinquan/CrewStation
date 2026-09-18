@@ -176,7 +176,7 @@ describe('status', () => {
 
 describe('verify', () => {
   const READY = 'cs-api=2/2\ncs-auth=1/1\ncs-controller=1/1\ncs-session=1/1\ncs-events=1/1\n';
-  const ME = { id: `usr_${'a'.padEnd(32, '0')}`, name: '张三', email: 'z@example.com', isAdmin: false, memberships: [], demoIdentity: true };
+  const ME = { id: `usr_${'a'.padEnd(32, '0')}`, name: '张三', email: 'z@example.com', isAdmin: false, memberships: [], authMethod: 'password' as const };
 
   test('smoke：有令牌时用 /v1/me 一次验路由、身份与 cs-api', async () => {
     const cluster = fakeCluster({ '-n crewstation-system get deployments -o jsonpath': clusterOk(READY) });

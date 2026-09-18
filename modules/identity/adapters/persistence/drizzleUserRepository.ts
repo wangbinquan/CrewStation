@@ -13,6 +13,7 @@ export function drizzleUserRepository(db: Executor): UserRepository {
   return {
     getById: (id) => db.select().from(users).where(eq(users.id, id)).then(one),
     getByExternalId: (externalId) => db.select().from(users).where(eq(users.externalId, externalId)).then(one),
+    getByUsername: (username) => db.select().from(users).where(eq(users.username, username)).then(one),
     getByEmail: (email) => db.select().from(users).where(sql`lower(${users.email}) = lower(${email})`).limit(2).then((rows) => rows.length === 1 ? one(rows) : undefined),
     count: async () => Number((await db.select({ n: count() }).from(users))[0]?.n ?? 0),
     list: async () => (await db.select().from(users).orderBy(users.createdAt)).map(toUser),

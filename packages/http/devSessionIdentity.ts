@@ -36,6 +36,8 @@ export function devSessionIdentity(resolve: DevSessionTokenResolver): Middleware
       userId: principal.userId,
       name: principal.name,
       email: principal.email,
+      // 开发会话令牌不是一次浏览器登录：它无从谈认证方式，按常规登录处理即可（只会更严）。
+      authMethod: 'password',
       devSession: { taskId: principal.taskId, projectId: principal.projectId, serviceId: principal.serviceId },
     });
     await next();

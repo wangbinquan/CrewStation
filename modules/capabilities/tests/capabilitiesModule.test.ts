@@ -26,11 +26,15 @@ describe('capabilities module', () => {
         dataResources: async () => [],
         operations: async () => [{ key: 'issues:GET:/v1/issues/{id}', proxy: 'issues', method: 'GET', path: '/v1/issues/{id}', openPolicy: 'default', granted: true }],
         subscriptions: async () => [],
+        identityForwarding: async () => ({ projectId, source: 'global' as const, fields: ['name'], headers: ['x-cs-identity-token', 'x-cs-user-id', 'x-cs-user-name'], tokenClaims: ['name'] }),
       },
     });
     const dto = await api.describe(actor, projectId);
     expect(dto.hosts.dev).toBe('dev.demo.cs.localhost');
     expect(dto.conventions.identityHeaders['userId']).toBe('x-cs-user-id');
+    // 能力说明给的是**当前生效**的转发集，而不是静态常量表（RFC-005 B10）。
+    expect(dto.identityForwarding).toMatchObject({ source: 'global', fields: ['name'] });
+    expect(dto.identityForwarding.headers).not.toContain('x-cs-user-email');
     expect(dto.config).toEqual({ development: ['GREETING', 'DEBUG'], production: ['GREETING'] });
     expect(dto.operations[0]?.granted).toBe(true);
     expect(dto.plan?.name).toBe('standard-small');

@@ -3,17 +3,6 @@ import { TOKEN_CLAIMS } from '../../convention';
 import { WorkloadKindSchema } from '../../gateway/identity';
 import { TraceIdSchema } from '../../ids';
 
-/** 演示身份适配器的登录请求；正式环境由 OIDC 适配器替代，工作台必须标注“演示身份”。 */
-export const DemoLoginRequestSchema = z.object({
-  username: z.string().regex(/^[a-z][a-z0-9-]{1,30}$/),
-  displayName: z.string().min(1).max(80).optional(),
-  email: z.string().email().optional(),
-  /** 登录后跳回的用户域地址；只允许平台用户域下的地址。 */
-  returnTo: z.string().optional(),
-});
-
-export const IdentityProviderKindSchema = z.enum(['demo', 'oidc']);
-
 /** 一次会话是怎么建立的（RFC-005 §7.1）：本地用户名密码，或某个 OIDC Provider。 */
 export const AuthMethodSchema = z.enum(['password', 'oidc']);
 
@@ -51,16 +40,6 @@ export const LoginDiscoveryDtoSchema = z.object({
   jwksPath: z.string(),
 }).strict();
 
-export const AuthStatusDtoSchema = z.object({
-  provider: IdentityProviderKindSchema,
-  loginPath: z.string(),
-  logoutPath: z.string(),
-  jwksPath: z.string(),
-});
-
-export type DemoLoginRequest = z.infer<typeof DemoLoginRequestSchema>;
-export type IdentityProviderKind = z.infer<typeof IdentityProviderKindSchema>;
-export type AuthStatusDto = z.infer<typeof AuthStatusDtoSchema>;
 export type AuthMethod = z.infer<typeof AuthMethodSchema>;
 export type PasswordLoginRequest = z.infer<typeof PasswordLoginRequestSchema>;
 export type BootstrapAdminRequest = z.infer<typeof BootstrapAdminRequestSchema>;

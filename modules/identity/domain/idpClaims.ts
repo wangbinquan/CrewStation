@@ -1,12 +1,7 @@
-import type { ClaimMapping } from '@crewstation/contracts';
+import type { ClaimMapping, OidcLoginFailureCode } from '@crewstation/contracts';
 
-/** 回调途中每一种可呈现的失败；http 层按它渲染确定的原因页，不落到 JSON 500。 */
-export type OidcFailureCode =
-  | 'invalid-callback' | 'state-expired' | 'provider-disabled' | 'client-secret-missing' | 'endpoints-unresolved'
-  | 'token-exchange-failed' | 'id-token-verify-failed' | 'userinfo-fetch-failed' | 'userinfo-shape-invalid'
-  | 'userinfo-unavailable' | 'jwks-unavailable' | 'userinfo-subject-mismatch'
-  | 'email-claim-invalid' | 'display-name-claim-invalid' | 'git-name-claim-invalid'
-  | 'email-not-verified' | 'email-domain-not-allowed' | 'bootstrap-admin-required' | 'provider-config-changed';
+/** 回调途中每一种可呈现的失败；http 层按它渲染确定的原因页，不落到 JSON 500。取值由契约定义。 */
+export type OidcFailureCode = OidcLoginFailureCode;
 
 export class OidcLoginError extends Error {
   constructor(readonly code: OidcFailureCode, message: string) {

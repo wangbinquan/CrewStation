@@ -12,6 +12,7 @@ type AdminPagePath =
   | '/admin'
   | '/admin/projects'
   | '/admin/users'
+  | '/admin/authentication'
   | '/admin/compute'
   | '/admin/service-plans'
   | '/admin/task-profiles'
@@ -38,6 +39,7 @@ const ADMIN_GROUPS: readonly { readonly titleKey?: string; readonly pages: reado
   ] },
   { titleKey: 'nav.admin.groupSettings', pages: [
     { to: '/admin/users', labelKey: 'nav.admin.users' },
+    { to: '/admin/authentication', labelKey: 'nav.admin.authentication' },
     { to: '/admin/compute', labelKey: 'nav.admin.compute' },
     { to: '/admin/service-plans', labelKey: 'nav.admin.servicePlans' },
     { to: '/admin/task-profiles', labelKey: 'nav.admin.taskProfiles' },

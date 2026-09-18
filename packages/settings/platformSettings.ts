@@ -27,7 +27,10 @@ export interface PlatformSettings {
   maintenanceWindow: boolean;
   idleMinutes: number;
   selfAddress: string;
-  identityProvider: 'demo' | 'oidc';
+  /** 安装期下发的引导令牌；只能用来创建首位管理员，完成态以数据库为准（RFC-005 §8）。 */
+  bootstrapToken: string | undefined;
+  /** `CS_PASSWORD_LOGIN=force-on`：IdP 全不可达时的破窗口，压过库内登录策略。 */
+  passwordLoginForcedOn: boolean;
   sessionTtlSeconds: number;
 }
 
@@ -66,7 +69,8 @@ export function loadPlatformSettings(env: Record<string, string | undefined> = p
     maintenanceWindow: env.CS_MAINTENANCE_WINDOW === 'true',
     idleMinutes: num(env.CS_IDLE_MINUTES, 120),
     selfAddress: env.CS_SELF_ADDRESS ?? `http://${env.POD_IP ?? '127.0.0.1'}:${portFrom(env, 'cs-session', 8083)}`,
-    identityProvider: env.CS_IDENTITY_PROVIDER === 'oidc' ? 'oidc' : 'demo',
+    bootstrapToken: env.CS_BOOTSTRAP_TOKEN || undefined,
+    passwordLoginForcedOn: env.CS_PASSWORD_LOGIN === 'force-on',
     sessionTtlSeconds: num(env.CS_SESSION_TTL_SECONDS, 28800),
   };
 }

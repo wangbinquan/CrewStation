@@ -1,4 +1,5 @@
 import type { Messages } from '../../../shared/lib/i18n';
+import { authMessages } from './auth.zh-CN';
 import { computeMessages } from './compute.zh-CN';
 
 export const messages = {
@@ -136,7 +137,8 @@ export const messages = {
   'admin.plans.emptyTitle': '还没有服务套餐',
   'admin.plans.emptyDescription': '至少要有一个套餐，项目的 Manifest 才有可引用的规格。',
 
-  // 算力档位（RFC-006）的文案单独成文件，守住文件行数上限。
+  // 登录方式（RFC-005）与算力档位（RFC-006）的文案各自成文件，守住文件行数上限。
+  ...authMessages,
   ...computeMessages,
 
   'admin.profiles.title': '任务容器套餐',

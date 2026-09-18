@@ -152,7 +152,7 @@ describe('createApiClient：请求形状', () => {
     expect(calls[1]).toMatchObject({ url: '/v1/projects/prj_1/dev-session?expectedTaskId=tsk_1', method: 'DELETE' });
   });
   test('GET /v1/me 同源、带 Cookie、accept json', async () => {
-    const me = { id: `usr_${'0'.repeat(32)}`, name: 'a', email: 'a@x', isAdmin: false, memberships: [], demoIdentity: true };
+    const me = { id: `usr_${'0'.repeat(32)}`, name: 'a', email: 'a@x', isAdmin: false, memberships: [], authMethod: 'password' as const };
     const { calls, fetchImpl } = fakeFetch(() => json(200, me));
     const client = createApiClient({ fetch: fetchImpl });
     const received: unknown = await client.me.get();

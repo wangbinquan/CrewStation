@@ -28,6 +28,13 @@ export const messages = {
 
   'capabilities.conventions.title': '集成约定',
   'capabilities.conventions.note': '用户域由网关注入身份请求头，业务服务不写登录代码；环境变量名、约定路径与事件头同样由平台固定。',
+  'capabilities.forwarding.title': '本服务实际收到的用户身份',
+  'capabilities.forwarding.source': '配置来源',
+  'capabilities.forwarding.sourceGlobal': '全局默认',
+  'capabilities.forwarding.sourceProject': '本项目覆盖',
+  'capabilities.forwarding.headers': '会注入的请求头',
+  'capabilities.forwarding.claims': '身份令牌声明',
+  'capabilities.forwarding.none': '（无）',
   'capabilities.conventions.identityHeaders': '身份请求头',
   'capabilities.conventions.env': '环境变量',
   'capabilities.conventions.paths': '约定路径',

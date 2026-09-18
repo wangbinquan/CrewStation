@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { ProjectIdSchema, UserIdSchema } from '../ids';
+import { AuthMethodSchema } from './auth/session';
 
 export const MemberRoleSchema = z.enum(['owner', 'developer', 'tester']);
 
@@ -9,8 +10,8 @@ export const CurrentUserDtoSchema = z.object({
   email: z.string(),
   isAdmin: z.boolean(),
   memberships: z.array(z.object({ projectId: ProjectIdSchema, role: MemberRoleSchema })),
-  /** 演示身份适配器登录时为 true，工作台必须显式标注。 */
-  demoIdentity: z.boolean(),
+  /** 本次会话是怎么建立的：本地用户名密码，或某个 OIDC Provider（RFC-005 §7.1）。 */
+  authMethod: AuthMethodSchema,
 });
 
 export const UserDtoSchema = z.object({ id: UserIdSchema, name: z.string(), email: z.string(), isAdmin: z.boolean() });

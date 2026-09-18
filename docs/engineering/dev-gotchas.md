@@ -310,6 +310,24 @@ Claude in Chrome 的 `resize_window` 到 390／320 会被 macOS Chrome 的最小
 
 ## 并发开发与 Agent 协作
 
+### `git commit -- <pathspec>` 会漏掉 `git mv` 的删除侧
+
+2026-09-18 实撞：把 `packages/contracts/api/auth.ts` 用 `git mv` 移成 `api/auth/session.ts` 后，
+按路径提交时写的是 `git commit -- packages/contracts/api/auth ...`——这个 pathspec 匹配**新目录**，
+但匹配不到被删除的 `api/auth.ts`（它不在 `api/auth/` 下）。结果：新文件进了提交，删除留在暂存区，
+远端同时存在两份同名内容，`api/` 的文件数也差一。CI 恰好还是绿的，所以没人会注意到。
+
+移动文件后提交前看一眼 `git diff --cached --stat` 里有没有 `D` 行落在 pathspec 之外；
+更稳的做法是把旧路径也写进 pathspec（`git commit -- packages/contracts/api/auth.ts packages/contracts/api/auth`）。
+
+### 并发会话改同一个共享文件时，门禁可能是别人的红
+
+同一棵工作树上另一个会话正在重构契约时，`bun run typecheck` 会有几十条不属于你的错误，
+此时**本地全量门禁跑不绿不等于你的改动有问题**。做法：按自己的路径过滤输出
+（`bun run typecheck 2>&1 | grep -E "^(modules/你的模块|packages/你的包)"`）确认自己这侧干净，
+自己的测试文件逐个跑绿，然后等对方提交后再提交自己的——**不要**把对方未完成的 hunk 一起提上去，
+那会让主干变红且难以归因（开发规则 §2「绝不删除、绝不回退别人的改动」的另一面）。
+
 ### 不要 reset 已经推送的提交
 
 2026-09-12 实撞：一个子 Agent 看到工作树里出现了它没创建的提交，判断成「harness 自动提交」，

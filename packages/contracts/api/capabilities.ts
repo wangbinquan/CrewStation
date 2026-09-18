@@ -10,10 +10,21 @@ export const CapabilityDescriptionDtoSchema = z.object({
   service: z.object({ identity: z.string(), slug: z.string(), namespace: z.string() }),
   hosts: z.object({ prod: z.string(), preview: z.string(), dev: z.string(), service: z.string(), platformApi: z.string() }),
   conventions: z.object({
+    /** 头名约定表：名字本身的契约。用户身份头里哪些真的会到达本服务，看下面的 identityForwarding。 */
     identityHeaders: z.record(z.string(), z.string()),
     env: z.record(z.string(), z.string()),
     paths: z.record(z.string(), z.string()),
     eventHeaders: z.record(z.string(), z.string()),
+  }),
+  /**
+   * 本项目实际生效的身份转发（RFC-005 §7.2）：平台按管理员配置裁剪外发字段，
+   * 这里给出的是**当前真的会注入**的头与令牌声明，而不是静态常量表。
+   */
+  identityForwarding: z.object({
+    source: z.enum(['global', 'project']),
+    fields: z.array(z.string()),
+    headers: z.array(z.string()),
+    tokenClaims: z.array(z.string()),
   }),
   quota: QuotaDtoSchema.optional(),
   plan: ServicePlanDtoSchema.optional(),

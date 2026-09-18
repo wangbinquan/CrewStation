@@ -326,6 +326,7 @@
         "@crewstation/jwt": "workspace:*",
         "@crewstation/kernel": "workspace:*",
         "@crewstation/persistence": "workspace:*",
+        "@crewstation/secretbox": "workspace:*",
         "drizzle-orm": "0.45.2",
         "hono": "4.13.7",
         "zod": "4.6.2",
@@ -664,6 +665,13 @@
       "name": "@crewstation/tools-arch",
       "version": "0.0.0",
     },
+    "tools/mock-idp": {
+      "name": "@crewstation/tools-mock-idp",
+      "version": "0.0.0",
+      "dependencies": {
+        "jose": "6.2.12",
+      },
+    },
     "tools/scaffold": {
       "name": "@crewstation/tools-scaffold",
       "version": "0.0.0",
@@ -811,6 +819,8 @@
     "@crewstation/testkit": ["@crewstation/testkit@workspace:packages/testkit"],
 
     "@crewstation/tools-arch": ["@crewstation/tools-arch@workspace:tools/arch"],
+
+    "@crewstation/tools-mock-idp": ["@crewstation/tools-mock-idp@workspace:tools/mock-idp"],
 
     "@crewstation/tools-scaffold": ["@crewstation/tools-scaffold@workspace:tools/scaffold"],
 

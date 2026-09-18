@@ -2,7 +2,7 @@ import { errorFromResponse, networkError } from './apiClientError';
 import type { Query } from './requestUrl';
 import { buildUrl } from './requestUrl';
 
-export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE';
+export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
 /** fetch 的入参；Bun 的类型里没有全局 `RequestInfo`，这里显式写出三种形态。 */
 export type FetchInput = string | URL | Request;

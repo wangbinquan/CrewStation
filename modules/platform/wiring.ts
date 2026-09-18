@@ -1,4 +1,4 @@
-import type { Actor, ProjectId, ServiceId, UserId } from '@crewstation/contracts';
+import type { Actor, ProjectId, ServiceId, UserDto, UserId } from '@crewstation/contracts';
 import type { EventConsumer } from '@crewstation/eventbus';
 import type { K8sClient } from '@crewstation/k8s';
 import { buildEgressNetworkPolicy, namespaceObject, projectNetworkPolicy, resourceQuotaObject, secretObject, taskEgressNetworkPolicy } from '@crewstation/k8s';
@@ -15,7 +15,7 @@ import { createEgressModule } from '@crewstation/module-egress';
 import { createEventsModule } from '@crewstation/module-events';
 import { createGatewayModule } from '@crewstation/module-gateway';
 import type { GatewayModuleApi } from '@crewstation/module-gateway';
-import { createIdentityModule, demoIdentityProvider } from '@crewstation/module-identity';
+import { createIdentityModule } from '@crewstation/module-identity';
 import { createObservabilityModule } from '@crewstation/module-observability';
 import { createProjectModule } from '@crewstation/module-project';
 import { createProvisioningModule } from '@crewstation/module-provisioning';
@@ -39,6 +39,8 @@ import type { Lifecycle } from './api/moduleApi';
 /** 组合根的对外形状：各进程只挑选自己角色的入口；模块实例也暴露出来供 CLI 与测试直接使用。 */
 export interface PlatformModuleApi {
   readonly name: 'platform';
+  /** 引导首位管理员这一条运维路径需要它：安装脚本在容器内以子命令调用（RFC-005 §8）。 */
+  readonly bootstrapAdmin: (raw: unknown) => Promise<UserDto>;
   readonly routers: { api: Hono<AppEnv>[]; auth: Hono<AppEnv>[]; session: Hono<AppEnv>[]; events: Hono<AppEnv>[] };
   readonly background: { controller: Lifecycle[]; session: Lifecycle[]; events: Lifecycle[] };
   readonly websocket: unknown;
@@ -82,8 +84,14 @@ function composeCore(deps: PlatformModuleDeps, late: Late) {
 
   const identity = createIdentityModule({
     db, logger,
-    settings: { adminEmails: settings.adminEmails, userDomain: settings.userDomain, cookieDomain: `.${settings.userDomain}`, secure: settings.publicScheme === 'https', sessionTtlSeconds: settings.sessionTtlSeconds },
-    provider: demoIdentityProvider(),
+    settings: {
+      adminEmails: settings.adminEmails, userDomain: settings.userDomain, cookieDomain: `.${settings.userDomain}`,
+      secure: settings.publicScheme === 'https', sessionTtlSeconds: settings.sessionTtlSeconds,
+      secretKey: settings.secretKeyBase64, passwordLoginForcedOn: settings.passwordLoginForcedOn,
+      ...(settings.bootstrapToken === undefined ? {} : { bootstrapToken: settings.bootstrapToken }),
+    },
+    // 身份转发按项目覆盖时要把主机里的 slug 换成项目 ID；project 装配在 identity 之后，故经端口惰性取。
+    projectDirectory: { idBySlug: async (slug) => (await projectApi().resolveServiceIdentity(`${slug}/${slug}`))?.projectId },
     previewAccess: { canView: async (userId, slug) => { const r = await projectApi().resolveServiceIdentity(`${slug}/${slug}`); return r ? (await projectApi().roleOf({ userId, isAdmin: await projectApi().isAdmin(userId) }, r.projectId)) !== undefined : false; } },
     membershipLookup: { membershipsOf: (userId) => projectApi().listUserMemberships(userId) },
     workloadLookup: { byIp: (ip) => gatewayApi().lookupByIp(ip) },
@@ -291,6 +299,7 @@ function composeAggregates(deps: PlatformModuleDeps, core: ReturnType<typeof com
       configKeys: async (actor, projectId, env) => (await config.api.listItems(actor, projectId, env)).map((i) => i.name),
       dataResources: data.api.listResources, operations: (actor, serviceId) => apiCatalog.api.listOperations(actor, serviceId),
       subscriptions: (actor, projectId) => runtime.events.api.listSubscriptions(actor, projectId),
+      identityForwarding: (projectId) => core.identity.api.effectiveForwarding(projectId),
     },
   });
   const provisioning = createProvisioningModule({
@@ -327,6 +336,7 @@ export function createPlatformModule(deps: PlatformModuleDeps): PlatformModule {
   const m = composeModules(deps);
   const api: PlatformModuleApi = {
     name: 'platform',
+    bootstrapAdmin: (raw) => m.identity.api.bootstrapAdmin(raw),
     routers: {
       // devSessionGate 只挂中间件不占路径，必须排在最前：Hono 按注册顺序执行，晚于业务路由就来不及改判身份。
       api: [...m.identity.http.devSessionGate, ...m.project.http, ...m.identity.http.users, ...m.config.http, ...m.agentRuntime.http, ...m.egress.http, ...m.data.http, ...m.scm.http, ...m.apiCatalog.http, ...m.release.http, ...m.gateway.http, ...m.taskRuntime.http, ...m.devSession.http, m.businessTask.http.service, m.businessTask.http.user, ...m.events.http.query, ...m.observability.http, ...m.capabilities.http, ...m.provisioning.http],

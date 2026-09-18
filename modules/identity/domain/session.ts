@@ -5,6 +5,8 @@ import { HOST_PATTERNS, TOKEN_CLAIMS, UserIdSchema } from '@crewstation/contract
 export const SESSION_COOKIE_NAME = 'cs_session';
 /** 会话 JWT 的 aud：只被 cs-auth 自己验证，不会注入任何业务请求。 */
 export const SESSION_AUDIENCE = 'session';
+/** 会话 JWT 里记录本次会话是怎么建立的；关闭常规登录要靠它判定（RFC-005 A2）。 */
+export const SESSION_AUTH_CLAIM = 'cs_auth';
 /** 目标是工作台（cs-api）时身份令牌的 aud。 */
 export const CONSOLE_AUDIENCE = 'console';
 /** 服务域上目标为平台 API 时来源令牌的 aud。 */

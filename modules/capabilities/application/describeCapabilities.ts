@@ -19,7 +19,7 @@ export function describeCapabilitiesUseCase(sources: CapabilitySources, settings
     await sources.authorize(actor, projectId, 'view');
     const svc = await sources.resolveServiceOfProject(projectId);
     if (!svc) throw notFound('项目服务', projectId);
-    const [quota, plans, computeProfiles, devKeys, prodKeys, data, operations, subscriptions] = await Promise.all([
+    const [quota, plans, computeProfiles, devKeys, prodKeys, data, operations, subscriptions, forwarding] = await Promise.all([
       sources.quota(actor, projectId).catch(() => undefined),
       sources.servicePlans(),
       sources.computeProfiles(),
@@ -28,11 +28,13 @@ export function describeCapabilitiesUseCase(sources: CapabilitySources, settings
       sources.dataResources(actor, projectId),
       sources.operations(actor, svc.serviceId),
       sources.subscriptions(actor, projectId),
+      sources.identityForwarding(projectId),
     ]);
     return {
       service: { identity: svc.identity, slug: svc.slug, namespace: svc.namespace },
       hosts: { prod: `${svc.slug}.${settings.userDomain}`, preview: `preview.${svc.slug}.${settings.userDomain}`, dev: `dev.${svc.slug}.${settings.userDomain}`, service: `${svc.name}.${settings.serviceDomain}`, platformApi: `api.${settings.serviceDomain}` },
       conventions: { identityHeaders: { ...IDENTITY_HEADERS }, env: { ...PLATFORM_ENV }, paths: { ...PLATFORM_PATHS }, eventHeaders: { ...EVENT_HEADERS } },
+      identityForwarding: { source: forwarding.source, fields: forwarding.fields, headers: forwarding.headers, tokenClaims: forwarding.tokenClaims },
       ...(quota ? { quota } : {}),
       ...(plans.find((p) => p.name === settings.defaultServicePlan) ? { plan: plans.find((p) => p.name === settings.defaultServicePlan) } : {}),
       computeProfiles,

@@ -1,130 +1,147 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
-import { IDENTITY_HEADERS, TOKEN_CLAIMS } from '@crewstation/contracts';
+import { TOKEN_CLAIMS } from '@crewstation/contracts';
 import type { AppEnv } from '@crewstation/http';
-import { createApp } from '@crewstation/http';
 import { verifyWithJwks } from '@crewstation/jwt';
 import type { TestDatabase } from '@crewstation/testkit';
 import { createTestDatabase, testDatabaseAvailable } from '@crewstation/testkit';
 import type { Hono } from 'hono';
-import { demoIdentityProvider } from '../adapters/provider/demoIdentityProvider';
+import { drizzleLoginPolicyRepository } from '../adapters/persistence/drizzleOidcRepositories';
 import type { IdentityModule } from '../wiring';
-import { createIdentityModule, identityMigrations } from '../wiring';
+import { identityMigrations } from '../wiring';
+import { BASE_SETTINGS, TEST_PASSWORD, identityModuleFor, loginWithPassword, mountRouters, seedLocalUser } from './identityFixture';
 
 const available = await testDatabaseAvailable();
-const settings = { adminEmails: ['boss@demo.invalid'], userDomain: 'cs.localhost', cookieDomain: '.cs.localhost', secure: false, sessionTtlSeconds: 3600 };
 let tdb: TestDatabase;
 let identity: IdentityModule;
 let app: Hono<AppEnv>;
 
-function mount(module: IdentityModule): Hono<AppEnv> {
-  const hono = createApp({ name: 'test' });
-  for (const router of [...module.http.auth, ...module.http.forwardAuth, ...module.http.users]) hono.route('/', router);
-  return hono;
-}
-
-async function loginForm(fields: Record<string, string>): Promise<Response> {
-  return app.request('/auth/login', { method: 'POST', body: new URLSearchParams(fields), headers: { accept: 'text/html' } });
-}
-
 function cookieValue(res: Response): string {
-  const header = res.headers.get('set-cookie') ?? '';
-  return /cs_session=([^;]*)/.exec(header)?.[1] ?? '';
+  return /cs_session=([^;]*)/.exec(res.headers.get('set-cookie') ?? '')?.[1] ?? '';
 }
+
+async function bootstrap(fields: Record<string, string>): Promise<Response> {
+  return app.request('/auth/bootstrap', { method: 'POST', body: new URLSearchParams(fields), headers: { accept: 'text/html' } });
+}
+
+const ADMIN_FORM = { token: BASE_SETTINGS.bootstrapToken, username: 'platform-admin', displayName: '平台管理员', email: 'Admin@Corp.example', password: 'correct-horse-battery', confirmPassword: 'correct-horse-battery' };
 
 beforeAll(async () => {
   if (!available) return;
   tdb = await createTestDatabase([identityMigrations]);
-  identity = createIdentityModule({ db: tdb.db, settings, provider: demoIdentityProvider() });
-  app = mount(identity);
+  identity = identityModuleFor(tdb.db, { settings: { ...BASE_SETTINGS, adminEmails: ['owner@corp.example'] } });
+  app = mountRouters(identity, ['auth', 'users']);
 });
 afterAll(async () => { await tdb?.drop(); });
 
-describe.skipIf(!available)('auth flow (demo provider)', () => {
-  test('GET /auth/login 渲染带“演示身份”提示的表单，returnTo 已校验并回填', async () => {
-    const res = await app.request('/auth/login?returnTo=http%3A%2F%2Fdemo.cs.localhost%2Fapp%3Fx%3D1');
-    expect(res.status).toBe(200);
-    expect(res.headers.get('content-type')).toContain('text/html');
-    const html = await res.text();
-    expect(html).toContain('演示身份');
-    expect(html).toContain('name="returnTo" value="http://demo.cs.localhost/app?x=1"');
-    const evil = await (await app.request('/auth/login?returnTo=http%3A%2F%2Fevil.com%2F')).text();
-    expect(evil).toContain('name="returnTo" value="http://console.cs.localhost/"');
+describe.skipIf(!available)('引导交接与常规登录', () => {
+  test('全新安装：登录页只给引导入口，密码登录与 OIDC 一律 403', async () => {
+    const page = await (await app.request('/auth/login')).text();
+    expect(page).toContain('创建首位管理员');
+    expect(page).not.toContain('name="password"');
+    expect(await (await app.request('/auth/status')).json()).toMatchObject({ mode: 'bootstrap', passwordLoginEnabled: false, bootstrapTokenEnabled: true, providers: [] });
+    const denied = await app.request('/auth/login', { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json' }, body: JSON.stringify({ username: 'x', password: 'y' }) });
+    expect(denied.status).toBe(403);
+    expect(await denied.json()).toMatchObject({ details: { code: 'bootstrap-admin-required' } });
+    // 库里预置了 Provider 也不能提前用：引导阶段只有一条路。
+    expect((await app.request('/auth/oidc/corp/start')).status).toBe(403);
   });
 
-  test('POST /auth/login：建档、下发 cs_session Cookie 并 302 到校验过的 returnTo', async () => {
-    const res = await loginForm({ username: 'alice', displayName: 'Alice', email: 'alice@example.com', returnTo: 'http://demo.cs.localhost/app' });
+  test('引导令牌不对不放行；两次密码不一致与弱口令都被挡在创建之前', async () => {
+    expect((await bootstrap({ ...ADMIN_FORM, token: 'wrong-token' })).status).toBe(403);
+    expect((await bootstrap({ ...ADMIN_FORM, confirmPassword: 'another-horse-battery' })).status).toBe(400);
+    expect((await bootstrap({ ...ADMIN_FORM, password: 'short', confirmPassword: 'short' })).status).toBe(400);
+    expect(await identity.api.findByEmail('admin@corp.example')).toBeUndefined();
+  });
+
+  test('引导成功：管理员建档、完成态落库、强制开启密码登录，且不返回会话', async () => {
+    const res = await bootstrap(ADMIN_FORM);
+    expect(res.status).toBe(302);
+    expect(res.headers.get('location')).toBe('/auth/login?setup=complete');
+    expect(res.headers.get('set-cookie')).toBeNull();
+    const admin = await identity.api.findByEmail('admin@corp.example');
+    expect(admin).toMatchObject({ name: '平台管理员', isAdmin: true });
+    const policy = await drizzleLoginPolicyRepository(tdb.db).read();
+    expect(policy.bootstrapCompletedAt).not.toBeNull();
+    expect(policy.passwordLoginEnabled).toBe(true);
+  });
+
+  test('交接后的登录页说清下一步：引导令牌已失效，用新账户登录一次', async () => {
+    const page = await (await app.request('/auth/login?setup=complete')).text();
+    expect(page).toContain('首位管理员已创建');
+    expect(page).toContain('name="password"');
+  });
+
+  test('引导令牌当场退役：完成后再提交一次是 409，引导页跳回登录页', async () => {
+    const again = await bootstrap({ ...ADMIN_FORM, username: 'second-admin', email: 'second@corp.example' });
+    expect(again.status).toBe(409);
+    const page = await app.request('/auth/bootstrap');
+    expect(page.status).toBe(302);
+    expect(page.headers.get('location')).toBe('/auth/login');
+  });
+
+  test('常规登录：下发 cs_session Cookie 并跳回校验过的 returnTo；会话记录认证方式为密码', async () => {
+    const res = await app.request('/auth/login', {
+      method: 'POST',
+      body: new URLSearchParams({ username: 'platform-admin', password: ADMIN_FORM.password, returnTo: 'http://demo.cs.localhost/app' }),
+    });
     expect(res.status).toBe(302);
     expect(res.headers.get('location')).toBe('http://demo.cs.localhost/app');
     const cookie = res.headers.get('set-cookie') ?? '';
     expect(cookie).toMatch(/^cs_session=[A-Za-z0-9._-]+;/);
-    expect(cookie).toContain('Max-Age=3600');
     expect(cookie).toContain('Domain=.cs.localhost');
-    expect(cookie).toContain('Path=/');
     expect(cookie).toContain('HttpOnly');
     expect(cookie).toContain('SameSite=Lax');
     expect(cookie).not.toContain('Secure');
-    const user = await identity.api.resolveSession(cookieValue(res));
-    expect(user).toMatchObject({ name: 'Alice', email: 'alice@example.com', isAdmin: true });
-    expect((await identity.api.currentUser(user!.id)).demoIdentity).toBe(true);
+    const verified = await verifyWithJwks(cookieValue(res), await identity.api.jwks(), { audience: 'session', issuer: TOKEN_CLAIMS.issuer });
+    expect(verified.claims).toMatchObject({ cs_kind: 'session', cs_auth: 'password' });
   });
 
-  test('returnTo 不在用户域内 → 回工作台；缺省邮箱落在 demo.invalid；JSON 提交得到 JSON', async () => {
-    const res = await loginForm({ username: 'bob', returnTo: 'https://evil.com/steal' });
-    expect(res.headers.get('location')).toBe('http://console.cs.localhost/');
-    const json = await app.request('/auth/login', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', accept: 'application/json' },
-      body: JSON.stringify({ username: 'carol', returnTo: '/projects' }),
-    });
-    expect(json.status).toBe(200);
-    expect(await json.json()).toMatchObject({ user: { name: 'carol', email: 'carol@demo.invalid', isAdmin: false }, returnTo: 'http://console.cs.localhost/projects' });
+  test('口令错、账号不存在、账号没有本地口令：都是同一句 401，不泄露账号是否存在', async () => {
+    await seedLocalUser(tdb.db, { username: 'dev-one' });
+    const oidcOnly = await identity.api.ensureUser({ externalId: 'oidc:idp:sub-1', name: 'OIDC 用户', email: 'oidc@corp.example' });
+    expect(oidcOnly.name).toBe('OIDC 用户');
+    const attempts = await Promise.all([
+      app.request('/auth/login', { method: 'POST', headers: { accept: 'application/json' }, body: new URLSearchParams({ username: 'dev-one', password: 'wrong-password' }) }),
+      app.request('/auth/login', { method: 'POST', headers: { accept: 'application/json' }, body: new URLSearchParams({ username: 'nobody-here', password: TEST_PASSWORD }) }),
+      app.request('/auth/login', { method: 'POST', headers: { accept: 'application/json' }, body: new URLSearchParams({ username: 'oidc-user', password: TEST_PASSWORD }) }),
+    ]);
+    for (const attempt of attempts) {
+      expect(attempt.status).toBe(401);
+      expect((await attempt.json() as { message: string }).message).toBe('用户名或密码不正确');
+    }
   });
 
-  test('非法用户名 400；空的可选字段按缺省处理', async () => {
-    expect((await loginForm({ username: 'Bad Name' })).status).toBe(400);
-    const res = await loginForm({ username: 'dave', displayName: '', email: '', returnTo: '' });
-    expect(res.status).toBe(302);
-    expect(res.headers.get('location')).toBe('http://console.cs.localhost/');
+  test('表单提交失败时原因显示在登录页上，JSON 调用方拿到结构化错误', async () => {
+    const html = await app.request('/auth/login', { method: 'POST', headers: { accept: 'text/html' }, body: new URLSearchParams({ username: 'dev-one', password: 'wrong-password' }) });
+    expect(html.status).toBe(401);
+    expect(await html.text()).toContain('用户名或密码不正确');
   });
 
-  test('/auth/status 与 JWKS：演示提供者、路径、只含公钥', async () => {
-    expect(await (await app.request('/auth/status')).json()).toEqual({ provider: 'demo', loginPath: '/auth/login', logoutPath: '/auth/logout', jwksPath: '/.well-known/jwks.json' });
+  test('/v1/me 带出本次会话的认证方式；JWKS 只含公钥', async () => {
+    const { userId } = await loginWithPassword(app, identity, 'dev-one');
+    const me = await app.request('/v1/me', { headers: { 'x-cs-user-id': userId } });
+    expect(await me.json()).toMatchObject({ authMethod: 'password', isAdmin: false });
+    const oidcSession = await app.request('/v1/me', { headers: { 'x-cs-user-id': userId, 'x-cs-auth-method': 'oidc' } });
+    expect(await oidcSession.json()).toMatchObject({ authMethod: 'oidc' });
     const jwks = await (await app.request('/.well-known/jwks.json')).json() as { keys: Array<Record<string, unknown>> };
-    expect(jwks.keys.length).toBe(1);
     expect(jwks.keys[0]).toMatchObject({ kty: 'EC', crv: 'P-256', alg: 'ES256', use: 'sig' });
     expect(jwks.keys[0]).not.toHaveProperty('d');
   });
 
-  test('会话令牌本身可用 JWKS 验签：sub=user:<id>、aud=session、iss=crewstation', async () => {
-    const res = await loginForm({ username: 'erin' });
-    const jwks = await identity.api.jwks();
-    const verified = await verifyWithJwks(cookieValue(res), jwks, { audience: 'session', issuer: TOKEN_CLAIMS.issuer });
-    expect(verified.subject).toMatch(/^user:usr_[0-9a-f]{32}$/);
-    expect(verified.claims).toMatchObject({ cs_kind: 'session' });
-  });
-
-  test('登出清 Cookie 并回登录页保留 returnTo', async () => {
+  test('登出清 Cookie 并回登录页保留 returnTo；returnTo 出了用户域一律回工作台', async () => {
     const res = await app.request('/auth/logout?returnTo=http%3A%2F%2Fdemo.cs.localhost%2Fx', { method: 'POST' });
-    expect(res.status).toBe(302);
     expect(res.headers.get('location')).toBe('http://console.cs.localhost/auth/login?returnTo=http%3A%2F%2Fdemo.cs.localhost%2Fx');
     expect(res.headers.get('set-cookie')).toMatch(/^cs_session=;.*Max-Age=0/);
+    const evil = await app.request('/auth/login', { method: 'POST', body: new URLSearchParams({ username: 'dev-one', password: TEST_PASSWORD, returnTo: 'https://evil.com/steal' }) });
+    expect(evil.headers.get('location')).toBe('http://console.cs.localhost/');
   });
 
-  test('X-Forwarded-Proto 为 https 时跳转与登录页都用 https', async () => {
-    const res = await loginForm({ username: 'frank', returnTo: '/home' });
-    expect(res.headers.get('location')).toBe('http://console.cs.localhost/home');
-    const https = await app.request('/auth/login', { method: 'POST', body: new URLSearchParams({ username: 'frank', returnTo: '/home' }), headers: { 'x-forwarded-proto': 'https' } });
-    expect(https.headers.get('location')).toBe('https://console.cs.localhost/home');
-  });
-
-  test('未配置身份提供者：/auth/* 回 503，JWKS 仍可用，管理面不受影响', async () => {
-    const bare = mount(createIdentityModule({ db: tdb.db, settings }));
-    const login = await bare.request('/auth/login');
-    expect(login.status).toBe(503);
-    expect(await login.json()).toMatchObject({ error: 'unavailable', message: '未配置身份提供者' });
-    expect((await bare.request('/auth/status')).status).toBe(503);
-    expect((await bare.request('/.well-known/jwks.json')).status).toBe(200);
-    const me = await bare.request('/v1/me', { headers: { [IDENTITY_HEADERS.userId]: (await identity.api.findByEmail('alice@example.com'))!.id } });
-    expect(me.status).toBe(200);
+  test('X-Forwarded-Proto 为 https 时跳转用 https', async () => {
+    const res = await app.request('/auth/login', {
+      method: 'POST',
+      headers: { 'x-forwarded-proto': 'https' },
+      body: new URLSearchParams({ username: 'dev-one', password: TEST_PASSWORD, returnTo: '/home' }),
+    });
+    expect(res.headers.get('location')).toBe('https://console.cs.localhost/home');
   });
 });

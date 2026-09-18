@@ -154,14 +154,14 @@ A2 取代本轮早先一次「自动失效、无开关」的答复：作者随�
 | # | 被关闭的能力 | 影响面 | 替代 |
 |---|---|---|---|
 | B1 | 演示登录整条删除：`demoIdentityProvider`、`DemoLoginRequestSchema`、`demo:` 外部标识、`/v1/me.demoIdentity`、CLI 的「演示身份」告警 | 契约、identity 模块、api-client、CLI、`CS_IDENTITY_PROVIDER=demo` 安装项 | 本地开发与 e2e 改用引导管理员的用户名＋密码登录 |
-| B2 | `identity.users.external_id` 取消，外部身份移到 `user_identities`（一个用户可有多条） | identity 模块内部（引用面只在该模块，已核） | 断代重建表，不写迁移（A4） |
+| B2 | 外部身份的权威索引移到 `user_identities`（一个用户可有多条，`(provider, subject)` 唯一） | identity 模块内部（引用面只在该模块，已核） | **实现时的调整**：`users.external_id` 保留为人可读的自然键（`local:<username>`／`oidc:<providerId>:<subject>`），不再是权威索引。去掉它只会迫使六个无关模块的测试改写，换不来任何东西 |
 | B3 | 「库里没有用户时首个登录者即管理员」取消 | `shouldBootstrapAdmin` | 引导向导产生首位管理员；`CS_ADMIN_EMAILS` 继续有效 |
 | B4 | 未完成引导时，密码登录与 OIDC 登录一律 403 | 全新安装的所有登录入口 | 先过引导向导 |
 | B5 | 常规登录关闭后 `POST /auth/login` 固定 403，登录页不渲染密码表单 | 旧页面、脚本、CLI 取会话的方式 | OIDC 登录；或 A7 的安装配置强制开关 |
 | B6 | 已关联外部身份的账户不能改密／不能被重置密码 | 本地密码面（当前只有引导管理员） | 凭据归 IdP |
 | B7 | `invite` 开通档不提供 | Provider 表单少一档，与 agent-workflow 不完全一致 | 作者已裁定（A3） |
 | B8 | 不提供 `oidcDefaultRole` | 登录方式卡少一项 | 本仓无 guest／user 维度 |
-| B9 | 业务不再保证收到 `x-cs-user-name` 与 `x-cs-user-email`：未被允许转发的字段**不注入该头**，令牌声明里也不出现 | 所有业务服务、两个槽与开发预览；最小样例页面读当前用户的那段 | 默认转发集包含显示名与邮箱，行为与今天一致；关掉是管理员的显式动作，界面写明影响 |
+| B9 | 业务不再保证收到 `x-cs-user-name` 与 `x-cs-user-email`：未被允许转发的字段**不注入该头**，令牌声明里也不出现。自定义字段走一个 JSON 头 `x-cs-user-attrs` | 所有业务服务、两个槽与开发预览；最小样例页面读当前用户的那段 | 默认转发集包含显示名与邮箱，行为与今天一致；关掉是管理员的显式动作，界面写明影响 |
 | B10 | 能力说明里的身份头不再是静态常量表 | 能力说明 MCP 与工作台能力页（`describeCapabilities`） | 改为展示当前生效的转发集；按项目查看时给该项目的有效集 |
 
 ## 9. 用户故事

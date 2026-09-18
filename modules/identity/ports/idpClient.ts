@@ -1,5 +1,5 @@
 import type { UserinfoRequestStyle } from '@crewstation/contracts';
-import type { DiscoveryDocument } from '../domain/endpointResolution';
+import type { DiscoveryDocument, EffectiveEndpoints, EndpointConfig } from '../domain/endpointResolution';
 
 export interface TokenResponse {
   readonly accessToken: string;
@@ -41,4 +41,13 @@ export interface IdpClient {
   verifyIdToken(input: VerifyIdTokenInput): Promise<Record<string, unknown>>;
   /** 探针用：JWKS 是否真的给出一份 `{ keys: [...] }`。 */
   jwksReachable(jwksUri: string): Promise<boolean>;
+}
+
+/**
+ * 端点解析：discovery 逐字段合并手工端点，并带正／负缓存。
+ * 缓存是进程内的（多副本各自缓存不影响正确性），因此它是适配器而不是领域规则；
+ * 用例只依赖这个端口，测试可以给一个不缓存的实现。
+ */
+export interface EndpointResolver {
+  resolve(provider: EndpointConfig, options?: { readonly forceFresh?: boolean }): Promise<EffectiveEndpoints>;
 }

@@ -52,9 +52,9 @@ function userResponse(c: Context<AppEnv>, decision: UserAuthDecision, api: Ident
   switch (decision.kind) {
     case 'allow': {
       c.header(IDENTITY_HEADERS.userId, decision.injected.userId);
-      c.header(IDENTITY_HEADERS.userName, decision.injected.userName);
-      c.header(IDENTITY_HEADERS.userEmail, decision.injected.userEmail);
       c.header(IDENTITY_HEADERS.identityToken, decision.injected.identityToken);
+      // 其余身份头按「身份转发」配置逐项注入：不在生效集里的字段这里就没有对应的头（RFC-005 §7.2）。
+      for (const [name, value] of Object.entries(decision.injected.attributes)) c.header(name, value);
       c.header(IDENTITY_HEADERS.requestId, requestId(c));
       // 网关把本响应头复制进原请求：去掉平台会话 Cookie，业务服务拿不到会话令牌（Design §7.1）。
       c.header('cookie', withoutSessionCookie(c.req.header('cookie'), sessionCookieName));

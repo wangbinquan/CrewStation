@@ -1,24 +1,36 @@
 # RFC-005｜实施计划
 
-> Draft · 2026-09-18 待作者批准。批准后按下表小批推进；每批自带测试（开发规则 §4），门禁绿了再按精确路径提交（§2、§3）。
+> In Progress · 2026-09-18 作者以会话目标「完整实现整个RFC并提交上库」要求实施。T1–T8 与 T11 的生产代码与测试已落地，T9（实机验收）待执行。
+> 每批自带测试（开发规则 §4），门禁绿了再按精确路径提交（§2、§3）。
 
 ## 任务
 
 | 编号 | 工作 | 依赖 | 完成证据（预期） |
 |---|---|---|---|
-| T1 | 契约与数据模型：`packages/contracts/api/oidc.ts`、`api/auth.ts` 改写、迁移 0004–0008、`ports/*`、`domain/*` 六个纯函数文件 | 作者批准 | 域层单测：端点合并与 `loginViable` 矩阵、字段读取与拼接、开通决策、四态发现、关闭前置；契约 `.strict()` 用例 |
-| T2 | Provider 管理面：drizzle 仓储、`secretbox` 封存、`application/providerAdmin.ts`、`http/adminAuthRoutes.ts`、探针、`api-client/resources/auth.ts` | T1 | 模块集成测试：CRUD、slug 冲突、`subjectClaim` 锁、密文不出响应、探针三形态；api-client 路径用例 |
-| T3 | 登录策略与引导：`loginPolicy` 仓储、`bootstrapAdmin.ts`、`passwordLogin.ts`、`bunPasswordHasher`、`force-on`、cs-auth 的 `bootstrap-admin` 子命令 | T1 | 并发引导只成一个且零半状态；密码登录四条拒绝分支；恒定时间比较；`force-on` 覆盖库内策略 |
-| T4 | OIDC 登录链：`packages/jwt` 增 `createRemoteJwks`／`verifyIdToken`、`adapters/idp/httpIdpClient.ts`、`oidcLogin.ts`、`oidc_flows` 一次性消费、登录页／引导页／错误页渲染 | T1、T3 | start→callback 全链（假 IdP fetch）；同一 state 第二次必败；§9 失败模式逐条一个用例 |
-| T5 | 会话认证方式传递：会话声明 `cs_auth`、ForwardAuth 仅工作台注入 `x-cs-auth-method`、`40-gateway.yaml` 两处、`packages/http/identity.ts`、`/v1/me.authMethod` | T4 | ForwardAuth 决策用例（工作台注入／业务目标不注入）；伪造头被 drop 的用例；`/v1/me` 用例 |
-| T6 | 演示登录整条删除：契约、`modules/identity` 内引用、CLI 告警、`tests/e2e/consoleSession.ts` 改用密码登录、`10-config.yaml` 去 `CS_IDENTITY_PROVIDER` | T3 | 全仓再无 `demo:`／`demoIdentity` 引用的源码层断言；e2e 可用新口登录 |
-| T7 | 工作台 `/admin/authentication`：登录方式卡、Provider 列表与表单（§6.3 逐项）、探针渲染、`InlineConfirm`、i18n 双语、`AdminNav` 分组 | T2、T5 | 前端用例：表单逐项、三条禁用理由、探针渲染、删除确认；多分辨率与明暗主题在 T9 实机核对 |
-| T8 | `tools/mock-idp/` 与本机部署清单、`install-platform.sh` 播种引导管理员 | T4 | 本机部署后三形态各能完成一次登录；脚本可重复执行 |
+| T1 | 契约与数据模型：`packages/contracts/api/auth/*`、迁移 0004–0009、`ports/*`、`domain/*` 七个纯函数文件 | 作者批准 | 已完成：`packages/contracts/api/auth/{session,oidc}.ts`、`ids.ts`、`convention.ts`（`x-cs-user-attrs`／`cs_attrs`）、`gateway/identity.ts`（平台内部头）、迁移 0004–0009、`modules/identity/{domain,ports}/*`；域层单测 5 个文件，契约单测 `packages/contracts/tests/oidc.test.ts` |
+| T2 | Provider 管理面：drizzle 仓储、`secretbox` 封存、`application/providerAdmin.ts`、`http/adminAuthRoutes.ts`、探针、`api-client/resources/auth.ts` | T1 | 已完成：`adapters/persistence/drizzleOidcRepositories.ts`、`adapters/crypto/secretBoxCipher.ts`、`application/oidc/providerAdmin.ts`、`http/adminAuthRoutes.ts`、`packages/api-client/resources/auth.ts`；`tests/authAdmin.test.ts` 覆盖 CRUD、slug 冲突、主体字段锁、密文不出响应、探针三形态 |
+| T3 | 登录策略与引导：`loginPolicy` 仓储、`bootstrapAdmin.ts`、`passwordLogin.ts`、`bunPasswordHasher`、`force-on`、cs-auth 的 `bootstrap-admin` 子命令 | T1 | 已完成：`application/{loginDiscovery,passwordLogin,bootstrapAdmin,loginPolicyAdmin}.ts`、`adapters/password/bunPasswordHasher.ts`、`loginPolicyRepository.completeBootstrap`；`tests/authFlow.test.ts` 覆盖引导四态、令牌退役、三条 401 同话术 |
+| T4 | OIDC 登录链：`packages/jwt` 增 `createRemoteJwks`／`verifyIdToken`、`adapters/idp/httpIdpClient.ts`、`oidcLogin.ts`、`oidc_flows` 一次性消费、登录页／引导页／错误页渲染 | T1、T3 | 已完成：`packages/jwt/idToken.ts`、`adapters/idp/{httpIdpClient,cachedEndpointResolver}.ts`、`application/oidc/{acquireClaims,login}.ts`、`application/loginPages.ts`；`tests/oidcLogin.test.ts`（假 IdP）与 `tests/mockIdpChain.test.ts`（真 HTTP＋真 RS256 验签） |
+| T5 | 会话认证方式传递：会话声明 `cs_auth`、ForwardAuth 仅工作台注入 `x-cs-auth-method`、`40-gateway.yaml` 两处、`packages/http/identity.ts`、`/v1/me.authMethod` | T4 | 已完成：会话声明 `cs_auth`、ForwardAuth 仅工作台注入 `x-cs-auth-method`、`40-gateway.yaml` 两处、`packages/http/identity.ts`、`/v1/me.authMethod`；`tests/authAdmin.test.ts` 覆盖「业务目标没有这个头」 |
+| T6 | 演示登录整条删除：契约、`modules/identity` 内引用、CLI 告警、`tests/e2e/consoleSession.ts` 改用密码登录、`10-config.yaml` 去 `CS_IDENTITY_PROVIDER` | T3 | 已完成：演示适配器、`DemoLoginRequestSchema`、`AuthStatusDto`、`demoIdentity`、`CS_IDENTITY_PROVIDER` 全部删除；CLI `whoami` 改显示登录方式，e2e `signIn` 改口令登录 |
+| T7 | 工作台 `/admin/authentication`：登录方式卡、Provider 列表与表单（§6.3 逐项）、探针渲染、`InlineConfirm`、i18n 双语、`AdminNav` 分组 | T2、T5 | 已完成：`/admin/authentication` 三张卡（`features/admin/components/auth/*`）、中英文案、`AdminNav` 与路由；`apps/console/src/tests/adminAuthentication.test.tsx` 8 条。多分辨率与明暗主题留在 T9 实机核对 |
+| T8 | `tools/mock-idp/` 与本机部署清单、`install-platform.sh` 播种引导管理员 | T4 | 已完成：`tools/mock-idp/`（标准／纯 OAuth2／非标 userinfo 三形态）、`install-platform.sh` 生成引导令牌并调 `bootstrap-admin` 播种管理员并写 `.local/admin.env` |
 | T9 | 实机验收：下表 OA 逐项，浏览器实跑 | T6、T7、T8 | 每项一条证据（截图／接口回放／数据库快照），证据目录写进 `STATE.md` |
 | T10 | 本地完整门禁、按精确路径提交、推送后按自己的 SHA 盯 CI 到绿 | T9 | `bun run check` 全绿＋CI run 链接 |
-| T11 | 身份转发（A8–A11）：`identity_forwarding` 表与自定义映射、生效集求解、ForwardAuth 注入与令牌同步裁剪、`drop-identity-headers` 交给 cs-controller 生成、`authResponseHeadersRegex`、能力说明改为实际生效集、管理面转发卡与项目只读页 | T1、T5 | 求解纯函数单测；注入用例（关掉邮箱后头与声明同时消失、自定义字段注入、工作台目标不受约束）；能力说明与实际注入同源的一致性用例；前端转发卡用例 |
+| T11 | 身份转发（A8–A11）：`identity_forwarding` 表与自定义映射、生效集求解、ForwardAuth 注入与令牌同步裁剪、`drop-identity-headers` 交给 cs-controller 生成、`authResponseHeadersRegex`、能力说明改为实际生效集、管理面转发卡与项目只读页 | T1、T5 | 已完成：`identity_forwarding` 表、候选与生效集求解、ForwardAuth 注入与令牌同步裁剪、能力说明改为实际生效集、管理面转发卡与项目只读接口 |
 
 排期约束：T5 改的是网关与业务接入面，必须与 T4 同批部署，否则关闭密码登录的前置条件读不到认证方式。T6 一旦落地，本机任何未播种管理员的环境都登录不进去，因此 T6 与 T8 同批提交。**T11 与 T5 同批部署**：两者都改 `forward-auth-user` 与 `drop-identity-headers`，分两次上会让网关出现一次「注入了但没被复制」或「能被伪造」的窗口；T11 的前端部分跟 T7 一起做，避免认证页两次返工。实机验收（T9）在 T11 之后跑，OA 表含转发项。
+
+## 实施说明（2026-09-18）
+
+作者以会话目标「完整实现整个RFC并提交上库」要求实施，覆盖原「批准后启动」的排期。落地时对设计做了三处调整，均记在 design.md §11 与 proposal.md §8：
+
+1. 自定义身份字段合并成一个 JSON 头 `x-cs-user-attrs`（原设计每字段一个头），网关的复制与删头名单因此保持静态，不再需要动态下发，也没有可伪造窗口；
+2. `users.external_id` 保留为人可读的自然键，权威索引仍是 `user_identities`；
+3. 引导的非交互入口是 cs-auth 的 `bootstrap-admin` 子命令，与浏览器向导共用同一事务用例。
+
+自动化覆盖到的 OA 项：OA-01…OA-04（引导与常规登录，`authFlow.test.ts`）、OA-05…OA-08 的接口层（`oidcLogin.test.ts` 与真 HTTP 的 `mockIdpChain.test.ts`）、OA-09…OA-11、OA-13…OA-16、OA-18…OA-22（`authAdmin.test.ts`、`oidcLogin.test.ts`、域层单测）、OA-25（源码层断言）、OA-26…OA-29（`authAdmin.test.ts` 的转发用例）、OA-31（`capabilitiesModule.test.ts`）。
+仍需实机的：OA-05…OA-08 的**浏览器**往返、OA-12、OA-17（改 ConfigMap 并重启）、OA-23（两个 Provider 的登录页形态）、OA-24（多分辨率／明暗／键盘）、OA-30（伪造头被网关抹掉）。
 
 ## 验收案例
 

@@ -2,17 +2,15 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import type { UserId, WorkloadIdentity } from '@crewstation/contracts';
 import { IDENTITY_HEADERS, TOKEN_CLAIMS } from '@crewstation/contracts';
 import type { AppEnv } from '@crewstation/http';
-import { createApp } from '@crewstation/http';
 import { verifyWithJwks } from '@crewstation/jwt';
 import type { TestDatabase } from '@crewstation/testkit';
 import { createTestDatabase, testDatabaseAvailable } from '@crewstation/testkit';
 import type { Hono } from 'hono';
-import { demoIdentityProvider } from '../adapters/provider/demoIdentityProvider';
 import type { IdentityModule } from '../wiring';
-import { createIdentityModule, identityMigrations } from '../wiring';
+import { identityMigrations } from '../wiring';
+import { BASE_SETTINGS, completeBootstrap, identityModuleFor, loginWithPassword, mountRouters, seedLocalUser } from './identityFixture';
 
 const available = await testDatabaseAvailable();
-const settings = { adminEmails: [] as string[], userDomain: 'cs.localhost', cookieDomain: '.cs.localhost', secure: false, sessionTtlSeconds: 3600 };
 const workloads: Record<string, WorkloadIdentity> = {
   '10.244.0.23': { identity: 'demo/demo', project: 'demo', service: 'demo', kind: 'service', slot: 'prod' },
   '10.244.0.40': { identity: 'demo/demo', project: 'demo', service: 'demo', kind: 'dev-session' },
@@ -25,10 +23,8 @@ let aliceCookie: string;
 let aliceId: UserId;
 
 function moduleOn(db: TestDatabase['db']): IdentityModule {
-  return createIdentityModule({
-    db,
-    settings,
-    provider: demoIdentityProvider(),
+  return identityModuleFor(db, {
+    settings: BASE_SETTINGS,
     previewAccess: { canView: async (userId, slug) => testers.has(`${userId}@${slug}`) },
     workloadLookup: { byIp: async (ip) => workloads[ip] },
     allowlistEvaluator: {
@@ -42,16 +38,13 @@ function moduleOn(db: TestDatabase['db']): IdentityModule {
 }
 
 function mount(module: IdentityModule): Hono<AppEnv> {
-  const hono = createApp({ name: 'test' });
-  for (const router of [...module.http.auth, ...module.http.forwardAuth]) hono.route('/', router);
-  return hono;
+  return mountRouters(module, ['auth', 'forwardAuth']);
 }
 
-async function login(username: string, extra: Record<string, string> = {}): Promise<{ cookie: string; userId: UserId }> {
-  const res = await app.request('/auth/login', { method: 'POST', body: new URLSearchParams({ username, ...extra }) });
-  const cookie = /cs_session=([^;]*)/.exec(res.headers.get('set-cookie') ?? '')?.[1] ?? '';
-  const user = await identity.api.resolveSession(cookie);
-  return { cookie, userId: user!.id };
+/** 播种一个本地账户再走真实的密码登录；本地账户是本 RFC 里唯一不依赖外部 IdP 的会话来源。 */
+async function login(username: string, name?: string): Promise<{ cookie: string; userId: UserId }> {
+  await seedLocalUser(tdb.db, { username, ...(name === undefined ? {} : { name }), email: `${username}@demo.invalid` });
+  return loginWithPassword(app, identity, username);
 }
 
 async function forwardUser(host: string, extra: Record<string, string> = {}): Promise<Response> {
@@ -67,6 +60,7 @@ beforeAll(async () => {
   tdb = await createTestDatabase([identityMigrations]);
   identity = moduleOn(tdb.db);
   app = mount(identity);
+  await completeBootstrap(tdb.db);
   ({ cookie: aliceCookie, userId: aliceId } = await login('alice'));
 });
 afterAll(async () => { await tdb?.drop(); });
@@ -123,7 +117,7 @@ describe.skipIf(!available)('forward-auth user domain', () => {
   });
 
   test('非 ASCII 显示名：头按 RFC 8187 编码，令牌保留原文', async () => {
-    const { cookie } = await login('zhang', { displayName: '张三' });
+    const { cookie } = await login('zhang', '张三');
     const res = await forwardUser('demo.cs.localhost', { cookie: `cs_session=${cookie}` });
     expect(res.status).toBe(200);
     expect(res.headers.get(IDENTITY_HEADERS.userName)).toBe("UTF-8''%E5%BC%A0%E4%B8%89");
@@ -189,7 +183,7 @@ describe.skipIf(!available)('signing keys', () => {
     expect(kid).not.toBe(before);
     expect((await identity.api.jwks()).keys.map((k) => k.kid)).toEqual([kid, before]);
     expect((await identity.api.resolveSession(aliceCookie))?.id).toBe(aliceId);
-    const { cookie } = await login('alice');
+    const { cookie } = await loginWithPassword(app, identity, 'alice');
     const verified = await verifyWithJwks(cookie, await identity.api.jwks(), { audience: 'session' });
     expect(verified.kid).toBe(kid);
     // 另一副本尚未感知轮换：遇到未知 kid 时重读密钥环后验签成功。

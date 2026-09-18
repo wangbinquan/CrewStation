@@ -1,5 +1,7 @@
 import type { TransportOptions } from './httpTransport';
 import { createTransport } from './httpTransport';
+import type { AuthResource } from './resources/auth';
+import { authResource } from './resources/auth';
 import type { ApiCatalogResource } from './resources/apiCatalog';
 import { apiCatalogResource } from './resources/apiCatalog';
 import type { CapabilitiesResource } from './resources/capabilities';
@@ -44,6 +46,8 @@ export interface ApiClient {
   readonly baseUrl: string;
   readonly me: MeResource;
   readonly users: UsersResource;
+  /** RFC-005：认证管理面（登录策略、身份提供方、身份转发；仅管理员）。 */
+  readonly auth: AuthResource;
   readonly projects: ProjectsResource;
   readonly catalog: CatalogResource;
   readonly services: ServicesResource;
@@ -68,6 +72,7 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
     baseUrl: transport.baseUrl,
     me: meResource(transport),
     users: usersResource(transport),
+    auth: authResource(transport),
     projects: projectsResource(transport),
     catalog: catalogResource(transport),
     services: servicesResource(transport),

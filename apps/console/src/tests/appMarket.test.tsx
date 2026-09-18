@@ -23,7 +23,7 @@ function fixture(owner = false, application = app()) {
     const url = String(raw), method = init?.method ?? 'GET', body = init?.body ? JSON.parse(String(init.body)) : undefined;
     calls.push({ url, method, body });
     let result: unknown = { items: [] }, status = 200;
-    if (url.endsWith('/v1/me')) result = { id: userId, name: '使用者', email: 'user@example.com', isAdmin: false, memberships: owner ? [{ projectId, role: 'owner' }] : [], demoIdentity: true };
+    if (url.endsWith('/v1/me')) result = { id: userId, name: '使用者', email: 'user@example.com', isAdmin: false, memberships: owner ? [{ projectId, role: 'owner' }] : [], authMethod: 'password' as const };
     else if (url.includes('/market/apps')) {
       if (marketFailure) { result = { error: 'not_found', message: '应用不存在或不可见' }; status = 404; }
       else result = url.includes(`/apps/${projectId}`) ? application : { items: [application] };

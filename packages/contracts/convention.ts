@@ -9,6 +9,14 @@ export const IDENTITY_HEADERS = {
   userEmail: 'x-cs-user-email',
   /** 用户域：平台签名 JWT，aud 绑定目标服务，业务需要时可验签。 */
   identityToken: 'x-cs-identity-token',
+  /**
+   * 用户域：平台按「身份转发」配置注入的自定义身份字段，值是一个 JSON 对象
+   * （如 `{"employee-no":"E-9"}`），与身份令牌的 `cs_attrs` 声明逐字段一致（RFC-005 §7.2）。
+   * 一个字段都不转发时**整个头不出现**，业务据此区分「没给」与「给了空值」。
+   * 用单个 JSON 头而不是每字段一个头，是为了让网关的删头名单保持静态——
+   * Traefik 的 headers 中间件不支持前缀通配，动态头名会给伪造留下窗口。
+   */
+  userAttrs: 'x-cs-user-attrs',
   /** 服务域：网关按源 Pod IP 解析出的调用方服务身份（`<project>/<service>`）。 */
   sourceService: 'x-cs-source-service',
   sourceSlot: 'x-cs-source-slot',
@@ -24,11 +32,6 @@ export const IDENTITY_HEADERS = {
   requestId: 'x-cs-request-id',
 } as const;
 
-/**
- * 用户域：平台按「身份转发」配置注入的自定义身份字段，头名为本前缀加字段名（RFC-005 §7.2），
- * 例如 `x-cs-user-attr-employee-no`。未被允许转发的字段**不注入该头**，业务据此区分「没给」与「给了空值」。
- */
-export const IDENTITY_ATTR_HEADER_PREFIX = 'x-cs-user-attr-';
 
 /** 业务容器内可读的环境变量；值由平台在部署与开发会话启动时注入。 */
 export const PLATFORM_ENV = {

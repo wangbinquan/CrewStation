@@ -1,4 +1,4 @@
-import type { ComputeProfileSummaryDto, Actor, ApiOperationDto, DataResourceDto, ProjectId, QuotaDto, ServiceId, ServicePlanDto, SubscriptionDto } from '@crewstation/contracts';
+import type { ComputeProfileSummaryDto, Actor, ApiOperationDto, DataResourceDto, EffectiveForwardingDto, ProjectId, QuotaDto, ServiceId, ServicePlanDto, SubscriptionDto } from '@crewstation/contracts';
 
 /** 能力说明只读聚合的各来源；全部由已有模块的公开查询提供。 */
 export interface CapabilitySources {
@@ -12,6 +12,8 @@ export interface CapabilitySources {
   dataResources(actor: Actor, projectId: ProjectId): Promise<DataResourceDto[]>;
   operations(actor: Actor, serviceId: ServiceId): Promise<ApiOperationDto[]>;
   subscriptions(actor: Actor, projectId: ProjectId): Promise<SubscriptionDto[]>;
+  /** 本项目实际生效的身份转发集；与 ForwardAuth 的注入同源，能力说明因此不会说谎（RFC-005 B10）。 */
+  identityForwarding(projectId: ProjectId): Promise<EffectiveForwardingDto>;
 }
 
 export interface CapabilitySettings {

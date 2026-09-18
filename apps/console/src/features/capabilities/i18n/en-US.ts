@@ -29,6 +29,13 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
 
   'capabilities.conventions.title': 'Integration conventions',
   'capabilities.conventions.note': 'On the user domain the gateway injects identity headers, so business services write no login code; environment variable names, conventional paths and event headers are fixed by the platform too.',
+  'capabilities.forwarding.title': 'User identity this service actually receives',
+  'capabilities.forwarding.source': 'Configuration source',
+  'capabilities.forwarding.sourceGlobal': 'global default',
+  'capabilities.forwarding.sourceProject': 'project override',
+  'capabilities.forwarding.headers': 'Injected headers',
+  'capabilities.forwarding.claims': 'Identity token claims',
+  'capabilities.forwarding.none': '(none)',
   'capabilities.conventions.identityHeaders': 'Identity headers',
   'capabilities.conventions.env': 'Environment variables',
   'capabilities.conventions.paths': 'Conventional paths',

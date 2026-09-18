@@ -62,7 +62,8 @@ CREATE TABLE identity.oidc_providers (
 -- 0005_user_identities.sql：一人多条外部身份；(provider_id, subject) 唯一
 -- 0006_auth_login_policy.sql：单行（id='global' CHECK），password_login_enabled、bootstrap_completed_at
 -- 0007_oidc_flows.sql：state PK、provider_id、redirect_uri、code_verifier、nonce、return_to、expires_at、consumed_at
--- 0008_users_local_account.sql：users 加 username UNIQUE、password_hash、git_name；去掉 external_id（A4 断代）
+-- 0008_users_local_account.sql：users 加 username UNIQUE、password_hash、git_name
+--   （external_id 保留为自然键 local:／oidc:，权威索引是 user_identities；见 proposal §8 B2 的实现调整）
 -- 0009_identity_forwarding.sql：转发集。scope('global'|'project') + project_id（global 行为 NULL，
 --   部分唯一索引保证 global 只有一行、每个 project 至多一行）、fields jsonb、updated_by、updated_at
 ```
@@ -143,9 +144,9 @@ TTL 5 分钟；`start` 时顺手删除已过期行（有上限），不新增后
 ForwardAuth 的 allow 分支今天固定注入四个头。改成：
 
 1. **求解生效集**（`domain/identityForwarding.ts`，纯函数）：目标主机解析出项目后，取该项目的覆盖，没有则取全局默认；工作台目标不受它约束（工作台是平台自己的面，读 `/v1/me`）。
-2. **注入**：`x-cs-user-id` 与 `x-cs-identity-token` 恒定注入；`name`／`email` 在集合里才注入 `x-cs-user-name`／`x-cs-user-email`；自定义字段注入 `x-cs-user-attr-<key>`（值取当前登录身份 `profile` 里的对应值，经现有 `headerSafe` 编码）。**不在集合里的字段不注入该头**，而不是注入空串——空串在业务侧与「有值但为空」无法区分。
+2. **注入**：`x-cs-user-id` 与 `x-cs-identity-token` 恒定注入；`name`／`email` 在集合里才注入 `x-cs-user-name`／`x-cs-user-email`；自定义字段合并成**一个 JSON 头** `x-cs-user-attrs`（如 `{"employee-no":"E-9"}`，值取当前登录身份 `profile` 里的对应值，经现有 `headerSafe` 编码）。**不在集合里的字段不出现**，而不是给空串——空串在业务侧与「有值但为空」无法区分。合并成一个头是实现期的调整，理由见 §11 偏离项 5。
 3. **令牌同步裁剪**（A11）：`name`／`email` 声明按同一集合出现或消失；自定义字段进 `cs_attrs` 对象（`{ <key>: <string> }`），不平铺到顶层，避免与标准声明撞名。`IdentityTokenClaimsSchema` 相应把 `name`／`email` 改为可选并新增 `cs_attrs`。
-4. **网关侧两处**。复制进原请求：`forward-auth-user` 除固定四项外加 `authResponseHeadersRegex: ^[Xx]-[Cc][Ss]-[Uu]ser-[Aa]ttr-`（本机 Traefik 是 v3.7.13，[bootstrap.sh:73](../../../deploy/local/bootstrap.sh#L73)，该字段自 v2.4 起支持），这样新增一个自定义字段不必改 YAML。防伪造：`drop-identity-headers` 必须逐项清空，Traefik 的 `headers` 中间件不支持前缀通配，因此这个 Middleware 从静态 YAML **移交给 cs-controller 按当前映射生成**（`modules/gateway` 的 `traefikApplier` 已经在 apply `stripPrefix` Middleware，多一类同理），映射变更即重下发，最大延迟与放行表一致。映射被删除时先重下发再停止注入，顺序反了会留下一个可伪造的头名窗口。
+4. **网关侧两处，都保持静态**。`forward-auth-user` 的 `authResponseHeaders` 加 `x-cs-user-attrs` 与 `x-cs-auth-method`；`drop-identity-headers` 同样加这两项。因为自定义字段合并成了一个固定头名，两张名单都不随管理员配置变化：不需要 `authResponseHeadersRegex`，也不需要把 `drop-identity-headers` 交给 cs-controller 动态生成，更不存在「映射刚加、删头名单还没下发」的可伪造窗口。
 5. **能力说明一致**：`describeCapabilities` 从输出常量表改为输出「该项目当前实际会收到的头与声明」，能力页与 MCP 因此不会说谎（B10）。
 
 两条硬规则：转发集只影响**外发**，平台侧 `profile` 始终存全量；转发集变更不回溯已签发的身份令牌（寿命 300 秒，见 `IDENTITY_TOKEN_TTL_SECONDS`），界面注明「最长 5 分钟内全部生效」。
@@ -200,4 +201,7 @@ ForwardAuth 的 allow 分支今天固定注入四个头。改成：
 2. **`packages/jwt` 长出第三方 `id_token` 验签能力**。它的职责本就是「jose 封装」，但此前只服务平台自签令牌；不这样做就得让 `modules/identity` 直接依赖 jose，jose 版本会出现两处。
 3. **`users` 表去列（`external_id`）而不是加兼容列**，依据 A4「没有存量系统，断代开发」。
 4. **业务接入约定表的语义从「固定四个头」变为「平台配置的转发集」**（`IDENTITY_HEADERS` 仍在，但 `x-cs-user-name`／`x-cs-user-email` 变成可能缺席，另加 `x-cs-user-attr-<key>` 一族）。这是本 RFC 对业务侧唯一的破坏性契约变更，已列为 B9／B10；替代方案是只裁剪令牌不裁剪明文头，但那等于没关。
-5. **删除 `settings.identityProvider` 与 `CS_IDENTITY_PROVIDER`**（[10-config.yaml:13](../../../deploy/k8s/platform/10-config.yaml#L13)）：登录方法从启动参数变成库内数据，这个开关不再有意义。
+5. **删除 `settings.identityProvider` 与 `CS_IDENTITY_PROVIDER`**：登录方法从启动参数变成库内数据，这个开关不再有意义。
+6. **自定义身份字段合并成一个 JSON 头 `x-cs-user-attrs`**（实现期调整，原设计是每字段一个 `x-cs-user-attr-<key>`）。原设计要求网关的删头名单随管理员映射动态生成，而 Traefik 的 `headers` 中间件不支持前缀通配；那条路要么新增一条 cs-controller 下发链，要么留下「映射已加、删头名单未到」的可伪造窗口。合并成一个固定头名后两张名单都保持静态，且与令牌里的 `cs_attrs` 结构一一对应，业务只需读一处。
+7. **`users.external_id` 保留为自然键**（见 proposal §8 B2）：权威索引仍是 `user_identities`。
+8. **引导的非交互入口是 cs-auth 的 `bootstrap-admin` 子命令**（与浏览器向导同一事务用例），安装脚本调它播种首位管理员；`tools/mock-idp/` 提供本机 IdP，并有一条真 HTTP 的回归用例 `modules/identity/tests/mockIdpChain.test.ts` 覆盖它自己。

@@ -46,7 +46,7 @@ function CapabilitySections({ description }: { readonly description: CapabilityD
   return (
     <div className={styles.stack}>
       <CapabilityIdentity service={description.service} hosts={description.hosts} />
-      <CapabilityConventions conventions={description.conventions} />
+      <CapabilityConventions conventions={description.conventions} forwarding={description.identityForwarding} />
       <CapabilityConfigKeys config={description.config} />
       <CapabilityData data={description.data} />
       <CapabilityOperations operations={description.operations} />

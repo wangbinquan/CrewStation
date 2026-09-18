@@ -22,24 +22,24 @@ beforeAll(async () => {
   tdb = await createTestDatabase([identityMigrations]);
   identity = createIdentityModule({
     db: tdb.db,
-    settings: { adminEmails: [] },
+    settings: { adminEmails: ['admin@example.com'] },
     membershipLookup: { membershipsOf: async (userId) => (userId === memberId ? [{ projectId, role: 'developer' }] : []) },
   });
   app = createApp({ name: 'test' });
   for (const router of identity.http.users) app.route('/', router);
   adminId = (await identity.api.ensureUser({ externalId: 'oidc:admin', name: 'Admin', email: 'admin@example.com' })).id;
-  memberId = (await identity.api.ensureUser({ externalId: 'demo:member', name: 'Member', email: 'member@demo.invalid' })).id;
+  memberId = (await identity.api.ensureUser({ externalId: 'oidc:idp:member', name: 'Member', email: 'member@example.com' })).id;
 });
 afterAll(async () => { await tdb?.drop(); });
 
 describe.skipIf(!available)('user routes (cs-api)', () => {
   const asUser = (id: string) => ({ [IDENTITY_HEADERS.userId]: id });
 
-  test('/v1/me：成员关系来自 MembershipLookup，demoIdentity 看外部标识前缀', async () => {
+  test('/v1/me：成员关系来自 MembershipLookup，认证方式来自平台内部头（缺省按密码）', async () => {
     const me = await app.request('/v1/me', { headers: asUser(memberId) });
     expect(me.status).toBe(200);
-    expect(await me.json()).toEqual({ id: memberId, name: 'Member', email: 'member@demo.invalid', isAdmin: false, memberships: [{ projectId, role: 'developer' }], demoIdentity: true });
-    expect(await (await app.request('/v1/me', { headers: asUser(adminId) })).json()).toMatchObject({ isAdmin: true, memberships: [], demoIdentity: false });
+    expect(await me.json()).toEqual({ id: memberId, name: 'Member', email: 'member@example.com', isAdmin: false, memberships: [{ projectId, role: 'developer' }], authMethod: 'password' });
+    expect(await (await app.request('/v1/me', { headers: { ...asUser(adminId), 'x-cs-auth-method': 'oidc' } })).json()).toMatchObject({ isAdmin: true, memberships: [], authMethod: 'oidc' });
     expect((await app.request('/v1/me')).status).toBe(401);
     expect((await app.request('/v1/me', { headers: asUser('usr_ffffffffffffffffffffffffffffffff') })).status).toBe(401);
   });

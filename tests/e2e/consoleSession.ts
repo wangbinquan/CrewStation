@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import type { Page } from './cdp';
 import { Browser, DEFAULT_CDP_PORT } from './cdp';
 
@@ -46,23 +47,55 @@ export function connectBrowser(): Promise<Browser> {
 }
 
 /** 以 `username` 演示登录到一个全新上下文；返回的页面此后就是这个身份。 */
-export async function signIn(browser: Browser, username: string, displayName?: string): Promise<Page> {
+/**
+ * 实机登录走产品路径：用户名＋密码（RFC-005 删除了演示登录）。
+ * 口令按顺序取 `CS_E2E_PASSWORD`、`.local/admin.env`；两处都没有就让调用方看到明确的失败，
+ * 而不是悄悄停在登录页上让后面的断言给出假结论。
+ */
+export async function signIn(browser: Browser, username: string, password?: string): Promise<Page> {
+  const secret = password ?? e2ePassword();
   const page = await browser.newPage(await browser.newContext());
   await page.goto(`${CONSOLE_URL}/`);
-  const onLogin = await page.eval<boolean>(`!!document.querySelector('form input[name="username"]')`);
+  const onLogin = await page.eval<boolean>(`!!document.querySelector('form input[name="password"]')`);
   if (onLogin) {
     const loaded = page.waitForLoad();
     await page.eval(`(() => {
       const form = document.querySelector('form');
       form.querySelector('input[name="username"]').value = ${JSON.stringify(username)};
-      const display = form.querySelector('input[name="displayName"]');
-      if (display) display.value = ${JSON.stringify(displayName ?? username)};
+      form.querySelector('input[name="password"]').value = ${JSON.stringify(secret)};
       form.requestSubmit();
     })()`);
     await loaded;
   }
   await settle(page);
   return page;
+}
+
+/** 实机用的管理员用户名：安装脚本写在 .local/admin.env 里，可用 CS_E2E_USERNAME 覆盖。 */
+export function e2eAdminUsername(): string {
+  return process.env.CS_E2E_USERNAME ?? localAdminEnv('CS_BOOTSTRAP_ADMIN_USERNAME') ?? 'platform-admin';
+}
+
+/** 第二个非管理员身份：本机只能由 OIDC 或另一套口令提供，没配就让相关用例整组跳过。 */
+export function e2eVisitor(): { username: string; password: string } | undefined {
+  const username = process.env.CS_E2E_VISITOR_USERNAME;
+  const password = process.env.CS_E2E_VISITOR_PASSWORD;
+  return username && password ? { username, password } : undefined;
+}
+
+function localAdminEnv(key: string): string | undefined {
+  try {
+    const file = readFileSync(new URL('../../.local/admin.env', import.meta.url), 'utf8');
+    return new RegExp(`^${key}=(.*)$`, 'm').exec(file)?.[1]?.trim();
+  } catch {
+    return undefined;
+  }
+}
+
+function e2ePassword(): string {
+  const password = process.env.CS_E2E_PASSWORD ?? localAdminEnv('CS_BOOTSTRAP_ADMIN_PASSWORD');
+  if (password) return password;
+  throw new Error('缺少实机登录口令：设置 CS_E2E_PASSWORD，或让 install-platform.sh 写出 .local/admin.env');
 }
 
 /** 等到页面不再处于载入态；工作台各页统一用这几个词表示还在读。 */

@@ -13,7 +13,7 @@ const userParams = z.object({ userId: UserIdSchema });
 /** 管理面（cs-api）：当前用户与用户目录；身份来自网关注入的头。 */
 export function userRoutes(api: IdentityModuleApi): Hono<AppEnv> {
   const r = new Hono<AppEnv>();
-  r.get('/v1/me', async (c) => c.json(await api.currentUser(requireUser(c).userId as UserId)));
+  r.get('/v1/me', async (c) => { const user = requireUser(c); return c.json(await api.currentUser(user.userId as UserId, user.authMethod)); });
   r.get('/v1/users', async (c) => {
     await requireAdmin(c, api);
     return c.json({ items: await api.listUsers() });

@@ -33,6 +33,23 @@
 
 实施排期里最要紧的一条（plan.md）：Runner 协议升到 2 后，本机现有开发会话与业务任务里的旧 Runner 会全部握手失败。释放 RFC-003 QA 会话之前，要先核对未推送内容并向作者确认。
 
+## 最新接力：RFC-005 全量实现（OIDC 公司登录、引导交接、身份转发）（2026-09-18）
+
+作者会话目标「完整实现整个RFC并提交上库」，据此实施 RFC-005，状态改 In Progress；T1–T8 与 T11 的生产代码与测试已落地，**实机验收（T9）未做**。
+
+落地面（都在 `modules/identity`，未新增模块、不需要 ADR）：
+
+- **契约**：`packages/contracts/api/auth/{session,oidc}.ts`（`api/` 撞 20 文件上限，auth 两件挪进子目录）；`x-cs-user-attrs` 与 `cs_attrs` 进业务约定表；`x-cs-auth-method` 登记为平台内部头（只在工作台目标注入）。
+- **数据**：identity 迁移 0004–0009 —— `oidc_providers`、`user_identities`（`(provider,subject)` 唯一＝账户不合并）、`auth_login_policy` 单行、`oidc_flows`（PKCE／state **落库**，多副本一次性消费）、users 加 `username`／`password_hash`／`git_name`、`identity_forwarding`（全局一行＋每项目一行，默认集 `["name","email"]` 与本 RFC 之前行为一致）。
+- **登录链**：`/auth/status`、`/auth/login`（服务端渲染，方法由登录发现决定）、`/auth/bootstrap`(+POST)、`/auth/oidc/:slug/{start,callback}`、`/auth/logout`；端点解析逐字段合并＋正负缓存＋`loginViable` 门；身份取值三条不变量（未验证 id_token 不解析、验签只看配置状态、`subjectClaim` 是模式开关）。
+- **管理面**（cs-api）：`/v1/admin/auth/{login-policy,providers,forwarding}` 与 `/v1/projects/:id/identity-forwarding`；工作台 `/admin/authentication` 三张卡（登录方式、身份提供方、身份转发），配置项与 agent-workflow 逐项一致（少 invite 一档，多自定义映射一块）。
+- **演示登录整条删除**：适配器、契约、`demoIdentity`、`CS_IDENTITY_PROVIDER` 全下线；CLI `whoami` 改显示登录方式；e2e `signIn` 改口令登录，口令由 `install-platform.sh` 写进 `.local/admin.env`（也可用 `CS_E2E_PASSWORD`）。
+- **本机 IdP**：`tools/mock-idp/` 支持标准 OIDC、纯 OAuth 2.0（无 discovery／无 id_token）、非标 userinfo（`post_json`＋`subjectClaim`）三形态；`modules/identity/tests/mockIdpChain.test.ts` 用真 HTTP＋真 RS256 验签覆盖它自己。
+
+三处实施期调整（已写进 RFC design §11 与 proposal §8，请作者过目）：自定义字段合并成**一个 JSON 头** `x-cs-user-attrs`（原设计每字段一个头，会迫使网关删头名单动态下发并留出可伪造窗口）；`users.external_id` 保留为自然键（权威索引仍是 `user_identities`）；引导的非交互入口是 cs-auth 的 `bootstrap-admin` 子命令。
+
+**接着要做的是 T9 实机**：改 ConfigMap 的破窗口、两个 Provider 的登录页、浏览器往返、伪造头被网关抹掉、多分辨率／明暗／键盘。清单与已被自动化覆盖的部分见该 RFC 的 plan.md「实施说明」。
+
 ## 最新接力：RFC-005（OIDC 公司登录）三件套落档，待作者批准（2026-09-18）
 
 本批只写文档，**无任何生产代码改动**。作者指示：把 agent-workflow 的 OIDC／OAuth 2.0 认证能力搬进来，配置界面的配置项与它完全一致，接入后原登录方式失效，系统初始化逻辑与它一致；并明确「没有存量系统，直接断代开发」。

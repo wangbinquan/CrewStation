@@ -56,6 +56,7 @@ export const capabilityDescription = (): CapabilityDescriptionDto => ({
   service: { identity: CALLER_IDENTITY, slug: 'demo', namespace: 'cs-demo' },
   hosts: { prod: 'demo.cs.localhost', preview: 'preview.demo.cs.localhost', dev: 'dev.demo.cs.localhost', service: 'worker.svc.cs.internal', platformApi: 'api.svc.cs.internal' },
   conventions: { identityHeaders: { ...IDENTITY_HEADERS }, env: { CS_PROJECT: 'CS_PROJECT' }, paths: { health: '/healthz' }, eventHeaders: {} },
+  identityForwarding: { source: 'global', fields: ['name', 'email'], headers: ['x-cs-identity-token', 'x-cs-user-email', 'x-cs-user-id', 'x-cs-user-name'], tokenClaims: ['email', 'name'] },
   quota: { maxConcurrentTasks: 3, running: 1 },
   plan: { name: 'standard-small', cpu: '500m', memory: '512Mi', maxReplicas: 2, description: '' },
   config: { development: ['GREETING'], production: ['GREETING'] },

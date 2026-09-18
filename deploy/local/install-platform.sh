@@ -41,9 +41,12 @@ DB_URL="$(kubectl -n $NS get secret postgres-credentials -o jsonpath='{.data.url
 [[ -n "$DB_URL" ]] || { echo "postgres-credentials 缺少 url" >&2; exit 1; }
 if kubectl -n $NS get secret crewstation-secrets >/dev/null 2>&1; then
   SECRET_KEY="$(kubectl -n $NS get secret crewstation-secrets -o jsonpath='{.data.CS_SECRET_KEY}' | base64 -d)"
+  BOOTSTRAP_TOKEN="$(kubectl -n $NS get secret crewstation-secrets -o jsonpath='{.data.CS_BOOTSTRAP_TOKEN}' | base64 -d)"
 else
   SECRET_KEY="$(openssl rand -base64 32)"
 fi
+# 引导令牌只能用来创建首位管理员，用完即永久失效；失效与否以数据库为准，重建这个 Secret 不会复活权限（RFC-005 §8）。
+[[ -n "${BOOTSTRAP_TOKEN:-}" ]] || BOOTSTRAP_TOKEN="$(openssl rand -hex 24)"
 GITLAB_TOKEN=""
 if [[ -f "$ROOT/.local/gitlab.env" ]]; then GITLAB_TOKEN="$(grep '^CS_TEST_GITLAB_TOKEN=' "$ROOT/.local/gitlab.env" | cut -d= -f2-)"; fi
 [[ -n "$GITLAB_TOKEN" ]] || log "警告：未找到 .local/gitlab.env，GitLab 令牌为空，建仓与发布不可用"
@@ -52,6 +55,7 @@ kubectl -n $NS create secret generic crewstation-secrets \
   --from-literal=CS_DATA_POSTGRES_ADMIN_URL="$DB_URL" \
   --from-literal=CS_SECRET_KEY="$SECRET_KEY" \
   --from-literal=CS_GITLAB_TOKEN="$GITLAB_TOKEN" \
+  --from-literal=CS_BOOTSTRAP_TOKEN="$BOOTSTRAP_TOKEN" \
   --dry-run=client -o yaml | kubectl apply -f - >/dev/null
 
 log "应用平台清单"
@@ -68,11 +72,30 @@ for d in cs-api cs-auth cs-controller cs-session cs-events console mcp-capabilit
   kubectl -n $NS rollout restart deployment/$d >/dev/null 2>&1 || true
   kubectl -n $NS rollout status deployment/$d --timeout=180s
 done
+# 首位管理员：产品路径是浏览器里的引导向导，这里用 cs-auth 的同名子命令做非交互播种，
+# 让本机验收与 CLI 不必先去点浏览器。已经引导过的库上它会失败，脚本据此保持幂等。
+ADMIN_USER="${CS_BOOTSTRAP_ADMIN_USERNAME:-platform-admin}"
+ADMIN_EMAIL="${CS_BOOTSTRAP_ADMIN_EMAIL:-admin@demo.invalid}"
+ADMIN_PASSWORD="${CS_BOOTSTRAP_ADMIN_PASSWORD:-}"
+if [[ -z "$ADMIN_PASSWORD" ]]; then
+  if [[ -f "$ROOT/.local/admin.env" ]]; then ADMIN_PASSWORD="$(grep '^CS_BOOTSTRAP_ADMIN_PASSWORD=' "$ROOT/.local/admin.env" | cut -d= -f2-)"; fi
+  [[ -n "$ADMIN_PASSWORD" ]] || ADMIN_PASSWORD="$(openssl rand -hex 12)"
+fi
+AUTH_POD="$(kubectl -n $NS get pod -l app.kubernetes.io/name=cs-auth -o jsonpath='{.items[0].metadata.name}')"
+if kubectl -n $NS exec "$AUTH_POD" -- bun apps/cs-auth/src/main.ts bootstrap-admin \
+    --username "$ADMIN_USER" --display-name "平台管理员" --email "$ADMIN_EMAIL" --password "$ADMIN_PASSWORD" >/dev/null 2>&1; then
+  mkdir -p "$ROOT/.local"
+  printf 'CS_BOOTSTRAP_ADMIN_USERNAME=%s\nCS_BOOTSTRAP_ADMIN_PASSWORD=%s\n' "$ADMIN_USER" "$ADMIN_PASSWORD" > "$ROOT/.local/admin.env"
+  log "已创建首位管理员 $ADMIN_USER（口令写入 .local/admin.env），引导令牌已退役"
+else
+  log "首位管理员已存在，跳过引导（引导令牌在 Secret crewstation-secrets 的 CS_BOOTSTRAP_TOKEN）"
+fi
+
 # 平台底座镜像推进集群内仓库（RFC-006 §7.1）：档位镜像 FROM 它构建，档位保存时按摘要固定。
 if [[ "${CS_SKIP_TASK_RUNTIME:-}" == "1" ]]; then log "跳过推送平台底座（CS_SKIP_TASK_RUNTIME=1）"; else "$ROOT/deploy/local/publish-base-image.sh"; fi
 
 # 套餐是建项目的前置；装完就种上。算力档位不预置（RFC-006），由管理员在平台管理里创建并测试。
 "$ROOT/deploy/local/seed-catalog.sh"
 
-log "完成。控制台：http://console.cs.localhost/  登录：http://console.cs.localhost/auth/login"
+log "完成。控制台：http://console.cs.localhost/  登录：http://console.cs.localhost/auth/login（用户名 $ADMIN_USER）"
 kubectl -n $NS get pods -o wide

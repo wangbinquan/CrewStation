@@ -1,4 +1,5 @@
-import { IDENTITY_HEADERS } from '@crewstation/contracts';
+import type { AuthMethod } from '@crewstation/contracts';
+import { AuthMethodSchema, IDENTITY_HEADERS, PLATFORM_INTERNAL_HEADERS } from '@crewstation/contracts';
 import { forbidden, unauthenticated } from '@crewstation/kernel';
 import type { Context, MiddlewareHandler } from 'hono';
 
@@ -8,7 +9,7 @@ import type { Context, MiddlewareHandler } from 'hono';
  * 表示“这个用户是以某个开发会话的名义在调用”，其可用接口被 devSessionScope 限死在本项目内。
  */
 export type RequestIdentity =
-  | { kind: 'user'; userId: string; name: string; email: string; token?: string; devSession?: { taskId: string; projectId: string; serviceId: string } }
+  | { kind: 'user'; userId: string; name: string; email: string; authMethod: AuthMethod; token?: string; devSession?: { taskId: string; projectId: string; serviceId: string } }
   | { kind: 'service'; identity: string; project: string; service: string; slot?: string; token?: string };
 
 export interface AppVariables {
@@ -28,11 +29,15 @@ export function identityFromHeaders(): MiddlewareHandler<AppEnv> {
     const userId = c.req.header(IDENTITY_HEADERS.userId);
     const source = c.req.header(IDENTITY_HEADERS.sourceService);
     if (userId) {
+      // 认证方式是平台内部头，只在工作台目标上由 ForwardAuth 注入；缺失时按常规登录处理——
+      // 它只会让人「关不掉密码登录」，不会放宽任何东西。
+      const authMethod = AuthMethodSchema.safeParse(c.req.header(PLATFORM_INTERNAL_HEADERS.authMethod));
       c.set('identity', {
         kind: 'user',
         userId,
         name: c.req.header(IDENTITY_HEADERS.userName) ?? '',
         email: c.req.header(IDENTITY_HEADERS.userEmail) ?? '',
+        authMethod: authMethod.success ? authMethod.data : 'password',
         ...tokenOf(c, IDENTITY_HEADERS.identityToken),
       });
     } else if (source) {

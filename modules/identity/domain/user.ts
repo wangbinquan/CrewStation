@@ -16,16 +16,13 @@ export interface User {
   readonly lastLoginAt: Date;
 }
 
-/** 管理员判定：安装配置列出的邮箱，或数据库里还没有任何用户时的第一个登录者。 */
+/**
+ * 管理员判定：安装配置列出的邮箱，或数据库里还没有任何用户时的第一个建档者。
+ * 引导向导落地后，OIDC 路径只用前一条（`existingUsers` 传 1）：
+ * 引导阶段本来就不允许 OIDC 登录，留着「第一个即管理员」只会让任何人抢到管理员（RFC-005 B3）。
+ */
 export function shouldBootstrapAdmin(email: string, adminEmails: readonly string[], existingUsers: number): boolean {
   return adminEmails.map((e) => e.toLowerCase()).includes(email.toLowerCase()) || existingUsers === 0;
-}
-
-/** 演示身份适配器登记的外部标识前缀；工作台据此把用户标注为“演示身份”。 */
-export const DEMO_EXTERNAL_ID_PREFIX = 'demo:';
-
-export function isDemoIdentity(externalId: string): boolean {
-  return externalId.startsWith(DEMO_EXTERNAL_ID_PREFIX);
 }
 
 /** 外部标识的 OIDC 形态：`oidc:<providerId>:<subject>`，与 user_identities 的唯一键一一对应。 */

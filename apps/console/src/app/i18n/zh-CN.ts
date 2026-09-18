@@ -143,7 +143,7 @@ export const messages = {
   'topBar.userTitle': '{email}｜{role}',
   'topBar.roleAdmin': '平台管理员',
   'topBar.roleMember': '普通用户',
-  'topBar.demoIdentity': '演示身份',
+  'topBar.localSession': '本地账户',
   'topBar.logout': '登出',
   'topBar.userHint': '登录与身份注入由网关（cs-auth）在用户域完成，工作台不写登录代码；接入后此处显示真实用户。',
   'locale.label': '界面语言',

@@ -1,5 +1,5 @@
 import type { Browser, Page } from './cdp';
-import { apiGet, connectBrowser, signIn } from './consoleSession';
+import { apiGet, connectBrowser, e2eAdminUsername, signIn } from './consoleSession';
 
 export interface DiscoveredProject {
   readonly id: string;
@@ -33,7 +33,7 @@ export async function openAdminSession(): Promise<AdminSession | undefined> {
   let browser: Browser | undefined;
   try {
     browser = await connectBrowser();
-    const admin = await signIn(browser, 'admin', 'CrewStation Admin');
+    const admin = await signIn(browser, e2eAdminUsername());
     const page = await apiGet<{ items?: ProjectRow[] }>(admin, '/v1/projects?limit=50');
     // 必须是已开通且有服务的数字人项目：开通失败或半截的项目页面构成不同，拿它断言只会得出假结论。
     const usable = (page.items ?? []).find(

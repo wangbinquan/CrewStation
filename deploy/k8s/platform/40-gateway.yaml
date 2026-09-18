@@ -8,7 +8,8 @@ spec:
   forwardAuth:
     address: http://cs-auth.crewstation-system.svc.cluster.local:8081/forward-auth/user
     trustForwardHeader: false
-    authResponseHeaders: [x-cs-user-id, x-cs-user-name, x-cs-user-email, x-cs-identity-token, x-cs-request-id, Cookie]
+    # x-cs-user-attrs 是自定义身份字段的 JSON（RFC-005 §7.2）；x-cs-auth-method 是平台内部头，只在工作台目标上注入。
+    authResponseHeaders: [x-cs-user-id, x-cs-user-name, x-cs-user-email, x-cs-user-attrs, x-cs-identity-token, x-cs-auth-method, x-cs-request-id, Cookie]
 ---
 apiVersion: traefik.io/v1alpha1
 kind: Middleware
@@ -32,7 +33,9 @@ spec:
       x-cs-user-id: ""
       x-cs-user-name: ""
       x-cs-user-email: ""
+      x-cs-user-attrs: ""
       x-cs-identity-token: ""
+      x-cs-auth-method: ""
       x-cs-source-service: ""
       x-cs-source-slot: ""
       x-cs-source-token: ""

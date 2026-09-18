@@ -81,6 +81,18 @@ export const PatchOidcProviderRequestSchema = CreateOidcProviderRequestSchema.pa
 
 export const OidcEndpointSourceSchema = z.enum(['discovery', 'manual']);
 
+/**
+ * 一次 OIDC 登录可能失败在哪一步。平台按它渲染确定的原因页并在页面上显示错误码，
+ * 管理员据此直接定位到认证页上的某个配置项。
+ */
+export const OidcLoginFailureCodeSchema = z.enum([
+  'invalid-callback', 'state-expired', 'provider-disabled', 'client-secret-missing', 'endpoints-unresolved',
+  'token-exchange-failed', 'id-token-verify-failed', 'userinfo-fetch-failed', 'userinfo-shape-invalid',
+  'userinfo-unavailable', 'jwks-unavailable', 'userinfo-subject-mismatch',
+  'email-claim-invalid', 'display-name-claim-invalid', 'git-name-claim-invalid',
+  'email-not-verified', 'email-domain-not-allowed', 'bootstrap-admin-required', 'provider-config-changed',
+]);
+
 /** 探针（测试连接）结果：始终随 200 返回，配置坏掉时逐项诊断最有价值。 */
 export const OidcProbeResultSchema = z.object({
   ok: z.boolean(),
@@ -154,6 +166,7 @@ export type OidcProviderDto = z.infer<typeof OidcProviderDtoSchema>;
 export type CreateOidcProviderRequest = z.infer<typeof CreateOidcProviderRequestSchema>;
 export type PatchOidcProviderRequest = z.infer<typeof PatchOidcProviderRequestSchema>;
 export type OidcEndpointSource = z.infer<typeof OidcEndpointSourceSchema>;
+export type OidcLoginFailureCode = z.infer<typeof OidcLoginFailureCodeSchema>;
 export type OidcProbeResult = z.infer<typeof OidcProbeResultSchema>;
 export type LoginPolicyDto = z.infer<typeof LoginPolicyDtoSchema>;
 export type UpdateLoginPolicyRequest = z.infer<typeof UpdateLoginPolicyRequestSchema>;

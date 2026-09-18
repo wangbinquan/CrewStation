@@ -1,6 +1,7 @@
 import { createRoute } from '@tanstack/react-router';
 import { rootRoute } from '../../app/router/rootRoute';
 import { AdminLayout } from '../../app/layout/AdminLayout';
+import { AdminAuthenticationPage } from './pages/AdminAuthenticationPage';
 import { AdminComputePage } from './pages/AdminComputePage';
 import { AdminEgressPage } from './pages/AdminEgressPage';
 import { AdminGatewayPage } from './pages/AdminGatewayPage';
@@ -18,6 +19,7 @@ export const adminRoute = createRoute({ getParentRoute: () => rootRoute, path: '
 export const adminOverviewRoute = createRoute({ getParentRoute: () => adminRoute, path: '/', component: AdminOverviewPage });
 export const adminProjectsRoute = createRoute({ getParentRoute: () => adminRoute, path: 'projects', component: AdminProjectsPage, validateSearch: (search: Record<string, unknown>) => parseProjectDirectorySearch(search) });
 export const adminUsersRoute = createRoute({ getParentRoute: () => adminRoute, path: 'users', component: AdminUsersPage });
+export const adminAuthenticationRoute = createRoute({ getParentRoute: () => adminRoute, path: 'authentication', component: AdminAuthenticationPage });
 export const adminComputeRoute = createRoute({ getParentRoute: () => adminRoute, path: 'compute', component: AdminComputePage, validateSearch: (search: Record<string, unknown>) => parseComputeSearch(search) });
 export const adminServicePlansRoute = createRoute({ getParentRoute: () => adminRoute, path: 'service-plans', component: AdminServicePlansPage });
 export const adminTaskProfilesRoute = createRoute({ getParentRoute: () => adminRoute, path: 'task-profiles', component: AdminTaskProfilesPage });

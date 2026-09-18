@@ -9,10 +9,10 @@ import type { TestDatabase } from '@crewstation/testkit';
 import { createTestDatabase, testDatabaseAvailable } from '@crewstation/testkit';
 import type { Context } from 'hono';
 import { Hono } from 'hono';
-import { demoIdentityProvider } from '../adapters/provider/demoIdentityProvider';
 import { DEV_SESSION_TOKEN_TTL_SECONDS } from '../domain/devSessionToken';
 import type { IdentityModule } from '../wiring';
 import { createIdentityModule, identityMigrations } from '../wiring';
+import { BASE_SETTINGS, completeBootstrap, loginWithPassword, seedLocalUser } from './identityFixture';
 
 const available = await testDatabaseAvailable();
 const taskId = 'tsk_0123456789abcdef0123456789abcdef' as TaskId;
@@ -32,6 +32,12 @@ let alice: UserDto;
 let app: Hono<AppEnv>;
 
 /** 与 cs-api 同序装配：createApp 的身份头中间件在前，devSessionGate 紧随其后，业务路由最后。 */
+function mountAuth(module: IdentityModule): Hono<AppEnv> {
+  const hono = createApp({ name: 'test-auth' });
+  for (const router of module.http.auth) hono.route('/', router);
+  return hono;
+}
+
 function mount(module: IdentityModule): Hono<AppEnv> {
   const hono = createApp({ name: 'test-api' });
   for (const router of module.http.devSessionGate) hono.route('/', router);
@@ -60,11 +66,12 @@ beforeAll(async () => {
   identity = createIdentityModule({
     db: tdb.db,
     clock,
-    provider: demoIdentityProvider(),
-    settings: { adminEmails: [], userDomain: 'cs.localhost', cookieDomain: '.cs.localhost', secure: false, sessionTtlSeconds: 3600 },
+    settings: BASE_SETTINGS,
     devSessionState: { activeSession: async (id) => (id === taskId ? session : undefined) },
   });
-  alice = await identity.api.ensureUser({ externalId: 'demo:alice', name: 'Alice', email: 'alice@example.com' });
+  await completeBootstrap(tdb.db);
+  await seedLocalUser(tdb.db, { username: 'alice', name: 'Alice', email: 'alice@example.com' });
+  alice = (await identity.api.findByEmail('alice@example.com'))!;
   app = mount(identity);
 });
 afterAll(async () => { await tdb?.drop(); });
@@ -88,7 +95,8 @@ describe.skipIf(!available)('开发会话令牌', () => {
     expect(resolved?.user.email).toBe('alice@example.com');
     expect(await identity.api.resolveDevSessionToken('not-a-token')).toBeUndefined();
     // 浏览器会话 Cookie 的 aud 是 session，不能拿来当开发会话令牌用。
-    const cookie = (await identity.api.login({ username: 'alice' })).session.token;
+    const loginApp = mountAuth(identity);
+    const { cookie } = await loginWithPassword(loginApp, identity, 'alice');
     expect(await identity.api.resolveDevSessionToken(cookie)).toBeUndefined();
   });
 
@@ -133,7 +141,7 @@ describe.skipIf(!available)('开发会话令牌', () => {
   });
 
   test('未装配会话现状查询时一律拒绝（失败即关门）', async () => {
-    const bare = createIdentityModule({ db: tdb.db, clock, settings: { adminEmails: [] } });
+    const bare = createIdentityModule({ db: tdb.db, clock, settings: BASE_SETTINGS });
     const token = (await bare.api.issueDevSessionToken({ taskId, projectId, serviceId, userId: alice.id })).token;
     expect(await bare.api.resolveDevSessionToken(token)).toBeUndefined();
   });

@@ -143,7 +143,7 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   'topBar.userTitle': '{email} · {role}',
   'topBar.roleAdmin': 'Platform administrator',
   'topBar.roleMember': 'Member',
-  'topBar.demoIdentity': 'Demo identity',
+  'topBar.localSession': 'Local account',
   'topBar.logout': 'Sign out',
   'topBar.userHint': 'Login and identity injection happen at the gateway (cs-auth) on the user domain; the workbench has no login code.',
   'locale.label': 'Language',
