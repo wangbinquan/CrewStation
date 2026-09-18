@@ -27,7 +27,11 @@
 
 开工前要知道的三条落地约束（都写进了 design.md）：PKCE／state **必须落库**（agent-workflow 是进程内 Map，本仓控制面 HA 是 v1 要求）；关闭密码登录的前置条件需要 cs-api 知道「当前会话是密码还是 OIDC 建立的」，因此新增平台内部头 `x-cs-auth-method`（只在工作台目标注入，不进业务接入约定表）；删掉演示登录会同时切断 e2e 的 `signIn()` 与 CLI 取 `CS_TOKEN` 的路，所以 T6 必须与 T8（`install-platform.sh` 播种引导管理员）同批。
 
-**RFC-005 尚未批准，未进入实现阶段（开发规则 §5.3）。** 两项待作者确认写在 proposal.md §11：`gitNameClaim`／`emailClaim` 是否顺带驱动开发容器的 git 身份；`x-cs-auth-method` 的登记位置。
+同日第二轮裁定已并入（A8–A12）：IdP 带回的身份信息**先全部留在平台**，不注入容器 git 身份；改为由平台配置**哪些字段转发给业务**，粒度是全局默认＋按项目覆盖；可转发字段集可扩展（管理员把 userinfo 任意字段映射成转发项）；身份令牌声明与明文头**同步裁剪**；不同 Provider 之间只做账户不合并（用户唯一键＝Provider＋subject，不做手工绑定），不做 realm 级隔离。`x-cs-auth-method` 确认登记为平台内部头。
+
+由此新增任务 T11（身份转发）与 OA-26…OA-31，并带来本 RFC 对业务侧唯一的破坏性契约变更：`x-cs-user-name`／`x-cs-user-email` 变成**可能缺席**，另加 `x-cs-user-attr-<key>` 一族；`drop-identity-headers` 从静态 YAML 移交 cs-controller 按当前映射生成，复制侧用 Traefik v3 的 `authResponseHeadersRegex`。能力说明从静态常量表改为「实际生效的转发集」。
+
+**RFC-005 尚未批准，未进入实现阶段（开发规则 §5.3）。** 推迟到后续 RFC 的两件事写在 proposal.md §11：开发容器的 git 身份注入、realm 级隔离。
 
 ## 最新接力：UX-AT-42 乱序补发实机，52／52 收官（2026-09-16）
 
