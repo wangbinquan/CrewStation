@@ -1,12 +1,13 @@
 # Design｜CrewStation 数字人能力平台
 
 > 状态：设计草案，待原型与评审验证  
-> 版本：0.3.3 · 整理日期：2026-09-10  
+> 版本：0.3.4 · 整理日期：2026-09-10  
 > 修订日期：2026-09-11（v0.2.0：任务级执行环境、代码托管与持续意图修改）  
 > 修订日期：2026-09-11（v0.3.0：与 Proposal v0.3.0 同步，平台职责收窄、标签发布、网关鉴权、接入容器与事件中心、规模目标；删除 ZIP 与知识飞轮）  
 > 修订日期：2026-09-11（v0.3.1：选型按 tech-evaluation.md 确认并回填 §3）  
 > 修订日期：2026-09-11（v0.3.2：设计门检视 25 项裁定落文：蓝绿部署槽、源 Pod IP 服务身份、用户域与服务域、网关本地放行表、契约随 Manifest 登记、子任务两种模式、配置与 Secret、日志与告警、每项目命名空间、TaskRunner 独立 UID）  
 > 修订日期：2026-09-11（v0.3.3：§15.1 仓库组织改为指向 `docs/engineering/repository-structure.md`；新增 D52）  
+> 修订日期：2026-09-18（v0.3.4：RFC-006 回填——算力档位即完整执行配置、每个 Agent 一个执行环境、平台底座与档位镜像、Runner 协议升级不向下兼容）  
 > 配套文档：[Proposal](./proposal.md) · [Plan](./plan.md) · [Tech Evaluation](./tech-evaluation.md) · [设计门检视](./reviews/design-gate-2026-09-11.md)
 
 ## 目录
@@ -90,7 +91,7 @@ v0.3.2 依据设计门检视（`reviews/design-gate-2026-09-11.md`）的 25 项�
 | `DevSession`（面向用户称“开发会话”） | 意图任务：一个项目同时至多一个；引用其 `TaskEnvironment`，另有工作分支、预览进程、Agent 会话、数据绑定、空闲提醒状态 | 运行／释放 |
 | `TaskEnvironment` | 任务容器的逻辑对象：用途 intent 或 business、持久卷模式、配额占用、traceId、容器与卷引用 | 任务级 |
 | `TaskRunner` | 任务容器内以独立 UID 常驻的平台进程，向控制面暴露启动 Agent、执行命令、读写文件、终端与预览守护接口 | 随容器 |
-| `AgentSession` | 一次 Agent 会话：驱动、模型、原生会话 ID、模式（流式交互或一次性）、状态；属于开发会话或某个业务子任务 | 可恢复 |
+| `AgentSession` | 一次 Agent 会话：算力档位与固定修订、协议、原生会话 ID、模式（流式交互或一次性）、状态；属于开发会话或某个业务子任务；每个 Agent 在自己的执行环境（Pod）里运行 | 可恢复 |
 | `AgentProfile` / `OutputContract` | Manifest `tasks` 段声明、随发布登记的 Agent 配置与产物契约；子任务按名称引用 | 随 Release 版本化 |
 | `SubtaskRun` / `Attempt` | 业务任务内一次 `agent` 或 `command` 子任务及其尝试：agentProfile、outputContract、模式 oneshot 或 interactive、状态、退出信息 | 子任务级 |
 | `CommandRun` | 命令子任务或开发会话内显式命令的 argv、cwd、退出状态与输出 | 执行级 |
@@ -102,6 +103,7 @@ v0.3.2 依据设计门检视（`reviews/design-gate-2026-09-11.md`）的 25 项�
 | `TrafficSwitch` | 负责人把 prod 流量切到某槽的动作：方向、预期在线 Release、执行人、结果；回退也是一次切换 | 不可变记录 |
 | `ServiceDeployment` | 某槽上某 Release 的运行副本 | 可替换 |
 | `ServicePlan` / `TaskProfile` | 管理员定义的服务资源套餐与任务容器规格；Manifest 引用 | 管理级 |
+| `ComputeProfile`（算力档位） | 管理员定义的完整 Agent 执行配置：协议（Claude Code、OpenCode 或只用于「＋ CLI」的通用终端）、平台仓库里的镜像（按摘要固定）、二进制与参数、启动前步骤、变量与凭据、模型、资源套餐；执行内容只追加为不可变修订，保存即测试，测试通过前不可选；Manifest `agentProfiles[].compute` 按名称或 `default` 引用，每次启动时解析（RFC-006） | 管理级、按修订版本化 |
 | `APIOperation` / `OpenPolicy` / `APIGrant` / `APIRequest` | 目录中的操作（键为 proxy 名加方法加路径）、默认或定向开放策略、服务获得的授权、待审批申请 | 目录／策略级 |
 | `UpstreamConnection` | API proxy 使用的公司上游连接与凭据引用，由 cs-auth 按需下发 | 管理级 |
 | `EventType` / `EventSubscription` / `EventDelivery` | EventProducer 声明的事件类型、服务的订阅与处理路径、投递记录 | 服务级 |
@@ -788,7 +790,7 @@ TaskDataBinding 记录任务、资源、主体、模式、范围、到期时间�
 
 ### 10.1 TaskEnvironment 与 TaskRunner
 
-TaskEnvironment 是一项工作的逻辑对象，对应项目命名空间内一个由平台调度的长驻容器和一个持久卷；容器内以独立系统用户常驻 TaskRunner，tini 作 PID 1。开发会话与业务任务共用容器镜像、TaskRunner 与 RuntimeDriver，差别在用途、发起方与接口面：开发会话只有 §5.6 的启动原语与流式交互；业务任务在此之上有子任务契约层。
+TaskEnvironment 是一项工作的逻辑对象，对应项目命名空间内一个由平台调度的长驻容器和一个持久卷；容器内以独立系统用户常驻 TaskRunner，tini 作 PID 1。开发会话与业务任务的父容器用平台底座镜像与同一 TaskRunner；每个 Agent（「＋ CLI」、headless Agent、业务 Agent 子任务）另起一个执行环境（Pod），挂父任务的工作卷，镜像、二进制与资源由所选算力档位决定（RFC-006）。两类任务的差别在用途、发起方与接口面：开发会话只有 §5.6 的启动原语与流式交互；业务任务在此之上有子任务契约层。
 
 TaskRunner 是普通程序：启动 Agent 子进程、执行命令、读写文件、守护预览、回传事件，并在业务任务中校验 Manifest 登记的契约与记录 attempt。它不决定下一步，不编排。
 
@@ -832,7 +834,7 @@ interactive： Queued → Starting → Running ⇄ AwaitingInput → Verifying �
 
 任务容器内可同时有多个 Agent 进程、命令进程、终端与预览进程；同一目录的并发写入由使用者或业务程序负责，平台不加锁。Agent 与命令进程以普通用户运行，TaskRunner 以独立用户运行，凭据文件、契约定义与 TaskRunner 状态只对后者可读。子任务或 Agent 结束时 TaskRunner 核对退出、清理其进程树与临时凭据；清理不确定时标记该子任务为 Failed 并保留容器供检查，不阻止其他子任务。
 
-配额在 `Requested → Admitted` 以同一事务的行锁判定：每数字人并发任务数上限包含开发会话与业务任务；超额请求一律拒绝并返回明确状态，由业务自行重试。首版没有时长、模型用量等其他预算；任务只在使用者或业务程序关闭时结束，空闲只提醒。
+配额在 `Requested → Admitted` 以同一事务的行锁判定：每数字人并发任务数上限包含开发会话、业务任务与每个 Agent 执行环境（RFC-006：每个 Agent 一个 Pod，各占一个）；超额请求一律拒绝并返回明确状态，由业务自行重试。首版没有时长、模型用量等其他预算；任务只在使用者或业务程序关闭时结束，空闲只提醒。
 
 ### 10.5 文件与结果读取
 
@@ -863,7 +865,7 @@ TaskRunner 出向连接 cs-session：携带绑定 cs-session audience 的投影�
 
 ### 10.8 容器镜像、驱动配置与凭据
 
-任务容器镜像内含 tini、TaskRunner、OpenCode 与 Claude Code CLI 及模板语言工具链，版本一起锁定并记录；新镜像默认只用于新任务，运行中任务不替换。两个 CLI 的凭据与会话存储按 agent-workflow 的方式靠环境变量与目录约定：模型凭据以平台 Secret 经环境变量注入，容器内 Agent 可读取，这是接受并记录的残余风险；`HOME`、`XDG_DATA_HOME` 与 `CLAUDE_CONFIG_DIR` 指向任务持久卷，使持久模式恢复后会话目录仍在。远程 MCP 连接按 agent-workflow 的注入形状写入：OpenCode 的 remote 类型 MCP 配置，Claude Code 的 `--mcp-config` 文件；连接凭据为会话级短期令牌。agentProfile 的 `permission` 映射到两个 CLI 的权限参数，未映射的键拒绝。Claude Code 自带沙箱在容器内关闭。配额按数字人配置；预热池是条件性选项，复用前必须清理跨任务数据。禁止任务容器访问宿主 Docker socket；任务 Pod 不自动挂载默认 ServiceAccount 令牌，只投影所需 audience 的令牌。
+平台底座镜像内含 tini、TaskRunner、OpenCode 与 Claude Code CLI 及模板语言工具链，版本一起锁定并记录；新镜像默认只用于新任务，运行中任务不替换。管理员可基于底座构建档位镜像（只放平台仓库，保存档位时按摘要固定），Pod 以 root 显式启动 Runner，Agent 进程仍降权运行（RFC-006）。两个 CLI 的凭据与会话存储按 agent-workflow 的方式靠环境变量与目录约定：模型凭据是算力档位的凭据（SecretBox 密文落库，派发时解密），经启动前材料进入 Agent 进程环境，容器内 Agent 可读取，这是接受并记录的残余风险；`HOME`、`XDG_DATA_HOME` 与 `CLAUDE_CONFIG_DIR` 指向任务持久卷，使持久模式恢复后会话目录仍在。远程 MCP 连接按 agent-workflow 的注入形状写入：OpenCode 的 remote 类型 MCP 配置，Claude Code 的 `--mcp-config` 文件；连接凭据为会话级短期令牌。agentProfile 的 `permission` 映射到两个 CLI 的权限参数，未映射的键拒绝。Claude Code 自带沙箱在容器内关闭。配额按数字人配置；预热池是条件性选项，复用前必须清理跨任务数据。禁止任务容器访问宿主 Docker socket；任务 Pod 不自动挂载默认 ServiceAccount 令牌，只投影所需 audience 的令牌。
 
 ## 11. 空 Kubernetes 集群的一键安装
 
@@ -968,7 +970,7 @@ backup: { configurationSecretRef: off-cluster-backup }
 | 网关、数据库 Operator、CRD | 独立依赖发布流程 | 需验证兼容和在途资源 |
 | 数字人业务服务与接入容器 | 标签发布与切流 | 使用稳定 DataBinding，迁移单独记录 |
 | 应用代码与托管 Project | SCM 模块＋项目规则 | 平台升级不替换仓库绑定或覆盖代码 |
-| 任务容器镜像（TaskRunner、双驱动） | 运行环境版本发布 | 新任务用新镜像，运行中任务不替换 |
+| 平台底座镜像（TaskRunner、双驱动）与管理员的档位镜像 | 底座随平台安装与升级推入平台仓库；档位镜像由管理员基于底座构建，保存档位时按摘要固定（RFC-006） | 新启动的 Agent 用档位修订固定的镜像，运行中不替换 |
 | 开放策略、目录、上游连接、出站白名单、套餐 | 管理员流程 | 独立生效，不随代码回退 |
 
 ### 12.2 平台升级
@@ -981,7 +983,7 @@ backup: { configurationSecretRef: off-cluster-backup }
 
 ### 12.4 任务容器镜像升级
 
-新镜像验证后用于新建的开发会话与业务任务；运行中的容器不换镜像。持久模式的业务任务在暂停后恢复时使用新镜像，需验证卷内容与新工具链兼容；TaskRunner 协议版本按 N-1 兼容。
+新镜像验证后用于新建的开发会话与业务任务；运行中的容器不换镜像。持久模式的业务任务在暂停后恢复时使用新镜像，需验证卷内容与新工具链兼容；TaskRunner 协议升级不向下兼容：平台升级后，旧底座镜像里的 Runner 握手被拒，环境只记录原因、不改状态也不删容器；管理员基于新底座重建档位镜像（RFC-006 C20）。
 
 ### 12.5 配置与策略更新
 

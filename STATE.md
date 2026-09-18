@@ -38,7 +38,9 @@
 
 环境现状：06:45Z Docker Desktop 磁盘写满过一次（postgres 自愈，见 dev-gotchas），之后只重建控制面、清理被取代的镜像，磁盘约 6 GB 余量；**不要在本机连续跑整套 `install-platform.sh`**。档位：oc-base（默认）、fork-oc、demo-term、oc-fields、oc-steps 可用，其余是失败分类的样例（测试失败、租户不可选）。验收期间临时降配的 coding-medium／standard-small 已恢复原值；新增任务套餐 rfc006-agent（150m／1Gi／2Gi）供档位用。RFC-003 QA 会话没有动。
 
-下一步：腾出 CPU 后补 CP-10／17／19 与三处发布相关项；T12 完成后按 design.md §12 回填基线三件套（T11，脚本已备好：先 dry-run 核对锚点）；ADR-0005 等作者复核。
+基线三件套已按 RFC-006 design.md §12 回填到 **v0.3.4**（T11；在 T12 未全部完成时先做，plan.md 注明了顺序偏离），CLAUDE.md 的版本与 RFC 状态同步。
+
+下一步：腾出 CPU 后补 CP-10／17／19 与三处发布相关项（若结果要求改设计，再补一次回填）；ADR-0005 与 open-questions I17–I19 等作者裁定；RFC-006 在 T12 完成前保持 In Progress。
 
 ## 最新接力：RFC-005 实机验收跑完，RFC-005 Done（2026-09-18）
 
