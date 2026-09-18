@@ -6,6 +6,12 @@ export const ServiceIdentitySchema = z.string().regex(/^[a-z][a-z0-9-]*\/[a-z][a
 
 export const WorkloadKindSchema = z.enum(['service', 'dev-session', 'business-task', 'platform']);
 
+/**
+ * 平台内部头：**不属于**业务接入约定表 `IDENTITY_HEADERS`，业务服务永远收不到。
+ * 用户域 ForwardAuth 只在目标是工作台时注入，让 cs-api 知道当前会话是怎么建立的（RFC-005 §7.1）。
+ */
+export const PLATFORM_INTERNAL_HEADERS = { authMethod: 'x-cs-auth-method' } as const;
+
 export const WorkloadIdentitySchema = z.object({
   identity: ServiceIdentitySchema,
   project: z.string().min(1),

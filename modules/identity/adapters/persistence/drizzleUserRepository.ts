@@ -22,9 +22,9 @@ export function drizzleUserRepository(db: Executor): UserRepository {
 }
 
 function toUser(row: typeof users.$inferSelect): User {
-  return { id: row.id as UserId, externalId: row.externalId, name: row.name, email: row.email, isAdmin: row.isAdmin, createdAt: row.createdAt, lastLoginAt: row.lastLoginAt };
+  return { id: row.id as UserId, externalId: row.externalId, username: row.username, name: row.name, email: row.email, gitName: row.gitName, passwordHash: row.passwordHash, isAdmin: row.isAdmin, createdAt: row.createdAt, lastLoginAt: row.lastLoginAt };
 }
 
 function toRow(user: User): typeof users.$inferInsert {
-  return { id: user.id, externalId: user.externalId, name: user.name, email: user.email, isAdmin: user.isAdmin, createdAt: user.createdAt, lastLoginAt: user.lastLoginAt };
+  return { id: user.id, externalId: user.externalId, username: user.username, name: user.name, email: user.email, gitName: user.gitName, passwordHash: user.passwordHash, isAdmin: user.isAdmin, createdAt: user.createdAt, lastLoginAt: user.lastLoginAt };
 }

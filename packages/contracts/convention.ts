@@ -24,6 +24,12 @@ export const IDENTITY_HEADERS = {
   requestId: 'x-cs-request-id',
 } as const;
 
+/**
+ * 用户域：平台按「身份转发」配置注入的自定义身份字段，头名为本前缀加字段名（RFC-005 §7.2），
+ * 例如 `x-cs-user-attr-employee-no`。未被允许转发的字段**不注入该头**，业务据此区分「没给」与「给了空值」。
+ */
+export const IDENTITY_ATTR_HEADER_PREFIX = 'x-cs-user-attr-';
+
 /** 业务容器内可读的环境变量；值由平台在部署与开发会话启动时注入。 */
 export const PLATFORM_ENV = {
   project: 'CS_PROJECT',
@@ -58,6 +64,8 @@ export const TOKEN_CLAIMS = {
   subjectPrefixService: 'service:',
   audiencePrefixService: 'service:',
   kind: 'cs_kind',
+  /** 身份令牌里自定义身份字段的容器：`{ <字段名>: <字符串值> }`，与明文头同步裁剪。 */
+  attrs: 'cs_attrs',
   project: 'cs_project',
   service: 'cs_service',
   slot: 'cs_slot',

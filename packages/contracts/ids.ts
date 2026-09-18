@@ -13,6 +13,9 @@ export const OperationIdSchema = prefixed('op').brand<'OperationId'>();
 /** RFC-004：管理员运行环境配置与其检查记录。 */
 export const RuntimeConfigIdSchema = prefixed('arc').brand<'RuntimeConfigId'>();
 export const RuntimeCheckIdSchema = prefixed('chk').brand<'RuntimeCheckId'>();
+/** RFC-005：OIDC 身份提供方与一条外部身份关联。 */
+export const OidcProviderIdSchema = prefixed('idp').brand<'OidcProviderId'>();
+export const UserIdentityIdSchema = prefixed('uid').brand<'UserIdentityId'>();
 export const TraceIdSchema = z.string().regex(/^[0-9a-f]{32}$/, 'traceId 必须是 32 位十六进制').brand<'TraceId'>();
 
 /** 对外可见的短名：项目 slug、服务名、代理名、事件类型片段都用它。 */
@@ -28,5 +31,7 @@ export type EventId = z.infer<typeof EventIdSchema>;
 export type OperationId = z.infer<typeof OperationIdSchema>;
 export type RuntimeConfigId = z.infer<typeof RuntimeConfigIdSchema>;
 export type RuntimeCheckId = z.infer<typeof RuntimeCheckIdSchema>;
+export type OidcProviderId = z.infer<typeof OidcProviderIdSchema>;
+export type UserIdentityId = z.infer<typeof UserIdentityIdSchema>;
 export type TraceId = z.infer<typeof TraceIdSchema>;
 export type Slug = z.infer<typeof SlugSchema>;

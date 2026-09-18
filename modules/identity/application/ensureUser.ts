@@ -21,8 +21,11 @@ export function ensureUserUseCase({ users, settings, clock }: EnsureUserDeps) {
     const created: User = {
       id: newId('usr') as UserId,
       externalId: external.externalId,
+      username: null,
       name: external.name,
       email: external.email,
+      gitName: null,
+      passwordHash: null,
       isAdmin: shouldBootstrapAdmin(external.email, settings.adminEmails, await users.count()),
       createdAt: now,
       lastLoginAt: now,
