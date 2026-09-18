@@ -25,6 +25,9 @@
 - [I14. 失败开发容器的工作卷恢复](#i14-失败开发容器的工作卷恢复)
 - [I15. 同一工作树中多个 CLI 的资源隔离](#i15-同一工作树中多个-cli-的资源隔离)
 - [I16. Bun SQL 连接池偶发挂死：运行时与驱动的选择](#i16-bun-sql-连接池偶发挂死运行时与驱动的选择)
+- [I17. 档位测试轮次的权限档位与 `{{mcp.*}}` 取值](#i17-档位测试轮次的权限档位与-mcp-取值)
+- [I18. 发布构建 Job 的资源写死 1 CPU／2Gi](#i18-发布构建-job-的资源写死-1-cpu2gi)
+- [I19. read-only／edit 两档去掉 bash，与只认「OpenCode 内」请求的模型服务相冲](#i19-read-onlyedit-两档去掉-bash与只认opencode-内请求的模型服务相冲)
 
 ## I1. 操作 MCP 的「以本服务身份调用内部 API」用的是谁的身份
 
@@ -41,6 +44,8 @@
 **为什么是问题**：Design §5.9 的「会话级短期令牌」一句写在开发会话语境里，但 §10 的业务任务容器用的是同一套 MCP 注入形状。业务 Agent 该不该、以什么身份访问平台 MCP，没有条款。
 
 **可选做法**：(a) 业务子任务签发绑定到 businessTask 的等价令牌，授权范围按该服务而不是按用户；(b) 业务容器不连平台 MCP，能力说明经环境变量与 Manifest 给出；(c) 只连能力说明 MCP，不连操作 MCP。
+
+**RFC-006 之后的新表现（2026-09-18）**：档位的启动前步骤可以写 `{{mcp.token}}`（C16）。业务子任务只拿到两个 MCP 地址、没有令牌，引用了 `{{mcp.token}}` 的档位用于业务子任务时会在启动前步骤报「模板变量未定义」；`{{mcp.capabilitiesUrl}}`／`{{mcp.operationsUrl}}` 照常展开。本条裁定后这一表现随之确定。
 
 ## I3. 长命 Agent 进程的 MCP 令牌续期
 
@@ -201,3 +206,28 @@
 | (c) 保持现状，只靠自愈探针 | 无 | 每次卡死仍有约 45s 全平台不可用，且触发原因继续未知 |
 
 **需要作者裁定**：是否允许改变 Bun 版本策略或驱动选择；在裁定前继续按 (c) 运行并记录每次发生的时间与当时的浏览器上下文数量。
+
+## I17. 档位测试轮次的权限档位与 `{{mcp.*}}` 取值
+
+**现状（RFC-006 实施中，2026-09-18）**：档位测试的真实模型轮次原先以 `read-only` 启动。本机实测 OpenCode Zen 免费档（big-pickle）对权限表里 `bash: deny` 的请求答 `403 FreeTierError`，一个真实可用的档位因此被判为不可用。现改为 `full`，与 RFC-006 design §6.2「与 agent-workflow 的判定一致」对齐（agent-workflow 冒烟的系统 persona 发空权限表，工具全在）。另外，档位步骤引用 `{{mcp.*}}` 时测试原先没有 MCP 上下文、模板必然展开失败；现在只在步骤内容引用了 `mcp.*` 时，给平台两个 MCP 的真实地址与一个不授予任何权限的占位令牌。
+
+**为什么需要作者确认**：测试 Pod 跑在平台命名空间，那里没有网络策略；`full` 让模型在测试容器里可以执行 shell。提示词固定、容器是临时的空工作目录、不带项目源码与租户配置，但这仍是比最小权限更宽的默认。占位令牌让「模板能展开」可测，不代表「MCP 可连」可测。
+
+**可选做法**：(a) 维持 `full`＋占位令牌（现状）；(b) 回到 `read-only`，接受部分模型服务下的假阴性，失败原因里附原文（已实现）让管理员自己判断；(c) `full`＋给 `profile-test` 工作负载加网络策略，只放行 cs-session、平台仓库与出站代理；(d) 新增专供测试的权限档（保留 bash、拒绝写工作区以外的路径）。
+
+## I18. 发布构建 Job 的资源写死 1 CPU／2Gi
+
+**现状**：`modules/release/adapters/k8s/buildKitBuilder.ts` 的构建 Pod 固定请求 1 CPU、2Gi。本机节点 CPU 预约满额时它一直 Pending，约 30 分钟后发布记为「构建失败：Job was active longer than specified deadline」（2026-09-18 RFC-006 验收项目的首次发布即如此，节点余量 550m）。
+
+**为什么是问题**：构建资源不属于任何管理员可调的套餐，环境紧张时只能去缩别人的 Pod（需要所有者同意）。生产集群一般有余量，但同一问题会以「发布排队」的形式出现且原因只在 Pod 事件里。
+
+**可选做法**：(a) 安装配置增加构建资源（`CS_BUILD_CPU`／`CS_BUILD_MEMORY`），默认不变；(b) 构建资源跟随项目的服务套餐或一个管理员定义的「构建套餐」；(c) 维持现状，发布记录在 Pending 时写明调度原因（Insufficient cpu）而不是只显示「正在构建」。
+
+## I19. read-only／edit 两档去掉 bash，与只认「OpenCode 内」请求的模型服务相冲
+
+**现状**：三档权限到 opencode 权限表的映射是 CrewStation 的裁定（`packages/agent-drivers/permission/opencodePermission.ts`）：read-only 与 edit 都 `bash: deny`，只有 full 放行。OpenCode Zen 免费档据此拒绝请求（见 I17）。本机没有付费模型，因此开发会话默认 edit 的 headless Agent、最小示例 `chat-v1`（read-only）等真实轮次都会被拒；平台把厂商原文写进失败原因。
+
+**为什么是问题**：这是模型服务的策略，不是平台故障；但它让「本机用免费模型跑通最小示例 `/chat`」这条验收路径（RFC-006 CP-17）只能改用 full 档的 agentProfile。
+
+**可选做法**：(a) 维持映射，本机验收用 full 档或付费模型；(b) edit 档把 bash 改为 `ask`（工具仍在请求里；headless 下 `ask` 的实际行为未验证，需先实测），read-only 不变；(c) edit 档放行 bash，与 agent-workflow 默认更接近。
+
