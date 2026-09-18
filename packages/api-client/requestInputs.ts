@@ -1,5 +1,5 @@
 import type {
-  ComputeProfileWriteRequest, CreateProjectRequest, CreateRuntimeConfigRequest, SaveRuntimeDraftRequest, ListDeliveriesQuery, LogQuery, PublishRequest, RequestTaskDataBinding, ServicePlanDto, SetConfigItemRequest,
+  CreateProjectRequest, ListDeliveriesQuery, LogQuery, PublishRequest, RequestTaskDataBinding, ServicePlanDto, SetConfigItemRequest,
   PublishDevSessionRequest, StartDevAgentRequest, TaskProfileDto,
 } from '@crewstation/contracts';
 
@@ -20,7 +20,3 @@ export type ListDeliveriesInput = Partial<ListDeliveriesQuery>;
 export type LogQueryInput = WithDefaults<LogQuery, 'limit'>;
 export type ServicePlanInput = WithDefaults<ServicePlanDto, 'description'>;
 export type TaskProfileInput = WithDefaults<TaskProfileDto, 'description'>;
-export type ComputeProfileInput = WithDefaults<ComputeProfileWriteRequest, 'description'>;
-/** RFC-004：运行环境建档与草稿保存。 */
-export type CreateRuntimeConfigInput = WithDefaults<CreateRuntimeConfigRequest, 'description' | 'preset'>;
-export type SaveRuntimeDraftInput = WithDefaults<SaveRuntimeDraftRequest, 'vars' | 'secretNames' | 'credentials' | 'models'>;

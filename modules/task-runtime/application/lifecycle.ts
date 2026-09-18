@@ -12,7 +12,7 @@ import { failEnvironment } from './failEnvironment';
 import { rebuildIsActive } from '../domain/environmentRebuild';
 import { deferWorkspaceRelease } from './nativeExecution';
 
-export type ReleaseReason = 'user' | 'owner-force' | 'business' | 'failed' | 'pod-lost' | 'runtime-check';
+export type ReleaseReason = 'user' | 'owner-force' | 'business' | 'failed' | 'pod-lost' | 'profile-test';
 
 /** 运行、释放、暂停、恢复与连接回调；释放即回收 Pod、跟随卷与配额（R14、R29）。 */
 export function lifecycleUseCases(deps: TaskRuntimeUseCaseDeps) {
@@ -89,7 +89,7 @@ export function lifecycleUseCases(deps: TaskRuntimeUseCaseDeps) {
       });
       await cluster.createPod({
         env: resumed, image: settings.taskImage, envVars: await containerEnv(deps, resumed, svc, token), resources: { cpu: profile.cpu, memory: profile.memory, storage: profile.storage },
-        ...(settings.agentEnvSecretName ? { agentEnvSecretName: settings.agentEnvSecretName } : {}), ...(await sourceOf(deps, resumed.serviceId, resumed.branch)), ...previewRouteOf(settings, resumed, svc.slug),
+        ...(await sourceOf(deps, resumed.serviceId, resumed.branch)), ...previewRouteOf(settings, resumed, svc.slug),
       });
       return resumed;
     },

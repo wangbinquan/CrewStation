@@ -15,7 +15,7 @@ export async function setupClaudeNativeActivity(ctx: AgentSpawnContext, context:
   const channel = context.nativeActivity;
   if (!channel) return undefined;
   try {
-    const probe = await probeClaudeCode(context.host, ctx.head ?? ['claude'], { cwd: ctx.cwd, env, timeoutMs: 5000 });
+    const probe = await probeClaudeCode(context.host, [...ctx.head], { cwd: ctx.cwd, env, timeoutMs: 5000 });
     if (!probe.compatible || probe.version !== '2.1.268') return { unavailable: 'unsupported-version' };
     // 已由操作者指定的遥测目的地／策略必须继续有效；冲突时仅放弃平台状态观察。
     if (Object.keys(env).some((key) => key.startsWith('OTEL_') || key === 'CLAUDE_CODE_ENABLE_TELEMETRY' || key === 'CLAUDE_CODE_ENHANCED_TELEMETRY_BETA')) return { unavailable: 'source-error' };

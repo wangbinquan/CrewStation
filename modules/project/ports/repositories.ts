@@ -1,5 +1,5 @@
 import type { MemberRole, ProjectId, ServiceId, UserId } from '@crewstation/contracts';
-import type { ComputeProfile, ServicePlan, TaskProfile } from '../domain/plans';
+import type { ServicePlan, TaskProfile } from '../domain/plans';
 import type { Project } from '../domain/project';
 import type { TaskQuota } from '../domain/quota';
 import type { Service } from '../domain/service';
@@ -47,12 +47,5 @@ export interface CatalogRepository {
   listTaskProfiles(): Promise<TaskProfile[]>;
   getTaskProfile(name: string): Promise<TaskProfile | undefined>;
   upsertTaskProfile(profile: TaskProfile): Promise<void>;
-  listComputeProfiles(): Promise<ComputeProfile[]>;
-  getComputeProfile(name: string): Promise<ComputeProfile | undefined>;
-  /** 新增或覆盖；给了 expectedRevision 且与当前不符时不写入，返回 undefined。写入后 revision 加一。 */
-  upsertComputeProfile(profile: Omit<ComputeProfile, 'revision'>, expectedRevision?: number): Promise<ComputeProfile | undefined>;
-  deleteComputeProfile(name: string): Promise<void>;
-  listComputeProfilesByRuntimeConfig(runtimeConfigId: string): Promise<ComputeProfile[]>;
 }
 
-export type { ComputeProfile };

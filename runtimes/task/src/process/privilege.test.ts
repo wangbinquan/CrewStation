@@ -33,7 +33,7 @@ describe('controllingTerminalPrefix', () => {
 
 describe('buildChildEnv', () => {
   test('剔除 runner 私有变量，降权时改写 HOME', () => {
-    const base = { PATH: '/bin', CS_RUNNER_TOKEN: 'secret', CS_AGENT_ENV_FILE: '/run/x', CS_SESSION_URL: 'ws://x', CS_RUNNER_EXTRA: '1', CS_TASK_ID: 'tsk_1', HOME: '/root', EMPTY: undefined };
+    const base = { PATH: '/bin', CS_RUNNER_TOKEN: 'secret', CS_SESSION_URL: 'ws://x', CS_RUNNER_EXTRA: '1', CS_TASK_ID: 'tsk_1', HOME: '/root', EMPTY: undefined };
     const plain = buildChildEnv(base);
     expect(plain).toEqual({ PATH: '/bin', CS_TASK_ID: 'tsk_1', HOME: '/root' });
     const dropped = buildChildEnv(base, { home: '/work', extra: { TERM: 'xterm' } });

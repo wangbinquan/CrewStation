@@ -1,5 +1,4 @@
 import { describe, expect, test } from 'bun:test';
-import { parseEnvLines } from '../agentEnvFile';
 import { loadConfigFromEnv, RunnerConfigError } from '../config';
 import { compileJsonSchema } from './jsonSchemaValidator';
 
@@ -29,15 +28,6 @@ describe('compileJsonSchema', () => {
   });
 });
 
-describe('parseEnvLines', () => {
-  test('KEY=VALUE、export、注释、引号；非法行回调而不抛', () => {
-    const invalid: Array<[number, string]> = [];
-    const parsed = parseEnvLines(['# comment', '', 'ANTHROPIC_API_KEY=sk-test', 'export OPENAI_API_KEY="quoted=value"', "SINGLE='a b'", 'BAD LINE', '=nokey', '1ABC=x'].join('\n'), (line, reason) => invalid.push([line, reason]));
-    expect(parsed).toEqual({ ANTHROPIC_API_KEY: 'sk-test', OPENAI_API_KEY: 'quoted=value', SINGLE: 'a b' });
-    expect(invalid).toEqual([[6, 'missing ='], [7, 'missing ='], [8, 'invalid key']]);
-  });
-});
-
 describe('loadConfigFromEnv', () => {
   const base = { CS_TASK_ID: 'tsk_0123456789abcdef0123456789abcdef', CS_RUNNER_TOKEN: 't', CS_SESSION_URL: 'ws://cs-session.crewstation-system:8083/runner' };
   test('独立 CLI 连接使用执行身份，父工作区身份和原容器缺省行为保持', () => {
@@ -57,6 +47,11 @@ describe('loadConfigFromEnv', () => {
     const withPreview = loadConfigFromEnv({ ...base, CS_WORKDIR: '/srv', CS_WORKER_UID: '2000', CS_PREVIEW_COMMAND: '["bun","run","dev"]', CS_PREVIEW_PORT: '3000', CS_PREVIEW_HEALTH_PATH: '/healthz', CS_TERMINAL_BACKEND: 'script' });
     expect(withPreview.preview).toEqual({ command: ['bun', 'run', 'dev'], port: 3000, healthPath: '/healthz' });
     expect(withPreview).toMatchObject({ workdir: '/srv', workerUid: 2000, workerGid: 10001, terminalBackend: 'script' });
+  });
+  test('RFC-006 删除了部署配置的凭据文件：旧 Pod 规格残留的 CS_AGENT_ENV_FILE 不再被读取', () => {
+    const config = loadConfigFromEnv({ ...base, CS_AGENT_ENV_FILE: '/var/run/crewstation/agent.env' });
+    expect(Object.keys(config)).not.toContain('agentEnvFile');
+    expect(JSON.stringify(config)).not.toContain('agent.env');
   });
   test('缺少必填、非法任务 ID、预览配置不完整都报 RunnerConfigError', () => {
     expect(() => loadConfigFromEnv({ ...base, CS_TASK_ID: undefined })).toThrow(RunnerConfigError);

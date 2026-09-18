@@ -1,14 +1,15 @@
 import { z } from 'zod';
+import { SlugSchema } from '../ids';
 
 /**
- * RFC-004：Agent 进程启动前 Hook（CrewStation 自身的生命周期，不是 CLI 的同名能力）。
- * 保存、下发与容器内执行三处共用同一组上限；改数字要同时想到已启用版本仍按旧值执行。
+ * Agent 进程启动前 Hook（RFC-004 引入，RFC-006 并入算力档位；CrewStation 自身的生命周期，不是 CLI 的同名能力）。
+ * 保存、下发与容器内执行三处共用同一组上限；改数字要同时想到已保存的档位修订仍按旧值执行。
  */
 export const BEFORE_START_LIMITS = {
   maxSteps: 20,
   /** 单个文件模板或脚本正文。 */
   maxTextBytes: 256 * 1024,
-  /** 一份运行环境版本的全部内容。 */
+  /** 一份档位修订的全部启动前内容。 */
   maxConfigBytes: 1024 * 1024,
   /** 脚本经 CS_HOOK_ENV_OUT 输出的 JSON 字符串映射。 */
   maxEnvOutputBytes: 64 * 1024,
@@ -69,8 +70,6 @@ export const BeforeStartStepsSchema = z.array(BeforeStartStepSchema).max(BEFORE_
   if (total > BEFORE_START_LIMITS.maxTotalTimeoutMs) ctx.addIssue({ code: 'custom', message: `脚本超时之和 ${total}ms 超过 ${BEFORE_START_LIMITS.maxTotalTimeoutMs}ms` });
 });
 
-export const RuntimeDriverSchema = z.enum(['claude-code', 'opencode']);
-
 /** 哪个文件供 CLI 加载：Claude 的 settings.json 或 OpenCode 的配置文件；none 表示只用平台合成。 */
 export const ConfigFileBindingSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('none') }).strict(),
@@ -78,23 +77,22 @@ export const ConfigFileBindingSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('opencode-config'), pathTemplate: PathTemplateSchema }).strict(),
 ]);
 
-export const RuntimeRevisionRefSchema = z.object({ configId: z.string().min(1), revision: z.number().int().min(1) });
+/** 档位修订的引用（RFC-006）：受理时固定，重试与迟到派发都按它取材料，不再解析「当前最新」。 */
+export const ProfileRevisionRefSchema = z.object({ profile: SlugSchema, revision: z.number().int().min(1) });
 
 /**
- * 下发给 TaskRunner 的一次启动材料。密钥值只在这里出现一次：不进事件、不进名册、不进日志。
- * 材料对应一个固定版本，同一 agentId／attempt 的重试必须重用同一份材料而不是重新解析“最新”。
+ * 下发给 TaskRunner 的一次启动前材料（RFC-006：由档位修订给出）。密钥值只在这里出现一次：不进事件、不进名册、不进日志。
+ * 材料对应一个固定修订，同一 agentId／attempt 的重试必须重用同一份材料而不是重新解析「最新」。
  */
-export const AgentRuntimeMaterialSchema = z.object({
-  configId: z.string().min(1),
-  configName: z.string().min(1),
+export const BeforeStartMaterialSchema = z.object({
+  profile: SlugSchema,
   revision: z.number().int().min(1),
-  driver: RuntimeDriverSchema,
   contentHash: z.string().min(1),
   steps: BeforeStartStepsSchema,
   vars: z.record(EnvNameSchema, z.string()).default({}),
   secrets: z.record(EnvNameSchema, z.string()).default({}),
   configFile: ConfigFileBindingSchema,
-  /** 管理员检查任务保留脚本输出尾部；租户启动不收集。 */
+  /** 管理员测试作业保留脚本输出尾部；租户启动不收集。 */
   captureOutput: z.boolean().default(false),
 }).strict();
 
@@ -121,7 +119,7 @@ export const BeforeStartStepRecordSchema = z.object({
   /** 脚本经输出协议提供的变量名；值不出现。 */
   outputVariables: z.array(EnvNameSchema).optional(),
   error: BeforeStartErrorSchema.optional(),
-  /** 只有 captureOutput 的检查任务携带。 */
+  /** 只有 captureOutput 的测试作业携带。 */
   log: z.object({ stdoutTail: z.string().max(BEFORE_START_LIMITS.maxLogTailChars), stderrTail: z.string().max(BEFORE_START_LIMITS.maxLogTailChars) }).optional(),
 });
 
@@ -130,7 +128,7 @@ export const BeforeStartExecutionSchema = z.object({
   executionId: z.string().min(1),
   agentId: z.string().min(1),
   processAttemptId: z.string().min(1),
-  runtime: RuntimeRevisionRefSchema,
+  profile: ProfileRevisionRefSchema,
   state: BeforeStartStateSchema,
   queuedAt: z.iso.datetime(),
   startedAt: z.iso.datetime().optional(),
@@ -156,10 +154,9 @@ export type BeforeStartStep = z.infer<typeof BeforeStartStepSchema>;
 export type FileStep = z.infer<typeof FileStepSchema>;
 export type ScriptStep = z.infer<typeof ScriptStepSchema>;
 export type ScriptLanguage = z.infer<typeof ScriptLanguageSchema>;
-export type RuntimeDriver = z.infer<typeof RuntimeDriverSchema>;
 export type ConfigFileBinding = z.infer<typeof ConfigFileBindingSchema>;
-export type RuntimeRevisionRef = z.infer<typeof RuntimeRevisionRefSchema>;
-export type AgentRuntimeMaterial = z.infer<typeof AgentRuntimeMaterialSchema>;
+export type ProfileRevisionRef = z.infer<typeof ProfileRevisionRefSchema>;
+export type BeforeStartMaterial = z.infer<typeof BeforeStartMaterialSchema>;
 export type BeforeStartState = z.infer<typeof BeforeStartStateSchema>;
 export type BeforeStartStepState = z.infer<typeof BeforeStartStepStateSchema>;
 export type BeforeStartErrorCode = z.infer<typeof BeforeStartErrorCodeSchema>;

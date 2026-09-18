@@ -18,7 +18,8 @@ will grow out of these manifests. All figures below are observed outputs from th
 | `local/verify.sh` | Re-runnable verifications A–D |
 | `local/lib.sh` | Shared helpers, including the guard that ties the context to the node container |
 | `local/install-platform.sh` | Platform layer on top of the infrastructure: builds and imports the four images, writes the platform Secret, applies `k8s/platform/*`, runs migrations, waits for rollout, then seeds the catalog. Set `SKIP_BUILD=1` to skip all image builds, `SKIP_TASK_RUNTIME_BUILD=1` to keep an existing `cs-task-runtime:dev` |
-| `local/seed-catalog.sh` | Seeds the platform catalog as `admin`: one service plan, one task-container profile, and the three compute profiles `sample-stub` / `balanced` / `deep` (RFC-001). Idempotent; called at the end of `install-platform.sh` |
+| `local/seed-catalog.sh` | Seeds the platform catalog as `admin`: one service plan and one task-container profile. Compute profiles are not seeded (RFC-006): an administrator creates them in the console, and a profile becomes selectable only after its test passes. Idempotent; called at the end of `install-platform.sh` |
+| `local/publish-base-image.sh` | Tags the imported task image as the platform base `crewstation/task-runtime:<tag>` and pushes it into the in-cluster registry through the node, so administrators can build profile images `FROM` it (RFC-006 §7.1). Called by `install-platform.sh` unless `CS_SKIP_TASK_RUNTIME=1` |
 | `local/bootstrap-integrations.sh` | Creates the two built-in integration-container projects, pushes `integrations/*` into their repositories and releases them to the preview slot |
 
 ## Prerequisites (verified 2026-09-11)
@@ -48,7 +49,8 @@ deploy/local/coredns-rewrite.sh          # individual steps, each idempotent
 deploy/local/node-registry-hosts.sh
 
 deploy/local/install-platform.sh         # then the platform itself; seeds the catalog on the way out
-deploy/local/seed-catalog.sh             # re-seed plans and compute profiles on their own
+deploy/local/seed-catalog.sh             # re-seed service plans and task-container profiles on their own
+deploy/local/publish-base-image.sh       # re-push the platform base image (crewstation/task-runtime) into the registry
 deploy/local/bootstrap-integrations.sh   # the two built-in integration containers
 ```
 

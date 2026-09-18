@@ -57,13 +57,13 @@ describe.skipIf(!available)('session module', () => {
 
   test('hello 令牌错误被拒；正确则 welcome 并回调 task-runtime', async () => {
     const bad = await openSocket(`ws://${base}/runner`);
-    bad.ws.send(JSON.stringify({ type: 'hello', protocolVersion: TASKRUNNER_PROTOCOL_VERSION, taskId, runnerToken: 'bad', workdir: '/work', capabilities: { drivers: ['stub'], pty: false, preview: false } }));
+    bad.ws.send(JSON.stringify({ type: 'hello', protocolVersion: TASKRUNNER_PROTOCOL_VERSION, taskId, runnerToken: 'bad', workdir: '/work', capabilities: { protocols: ['claude-code', 'opencode', 'terminal'], pty: false, preview: false } }));
     expect(await bad.next((f) => (f as { type: string }).type === 'error')).toMatchObject({ code: 'unauthorized' });
     const good = await openSocket(`ws://${base}/runner`);
-    good.ws.send(JSON.stringify({ type: 'hello', protocolVersion: TASKRUNNER_PROTOCOL_VERSION, taskId, runnerToken: 'good', workdir: '/work', capabilities: { drivers: ['stub'], pty: false, preview: true } }));
+    good.ws.send(JSON.stringify({ type: 'hello', protocolVersion: TASKRUNNER_PROTOCOL_VERSION, taskId, runnerToken: 'good', workdir: '/work', capabilities: { protocols: ['claude-code', 'opencode', 'terminal'], pty: false, preview: true } }));
     expect(await good.next((f) => (f as { type: string }).type === 'welcome')).toMatchObject({ resumeFromSeq: 0 });
     expect(connectedEvents).toEqual(['up']);
-    expect(await session.api.connectionStatus(taskId)).toMatchObject({ connected: true, drivers: ['stub'] });
+    expect(await session.api.connectionStatus(taskId)).toMatchObject({ connected: true, protocols: ['claude-code', 'opencode', 'terminal'] });
 
     good.ws.send(JSON.stringify({ type: 'event', seq: 1, at: new Date().toISOString(), event: { kind: 'agent', event: { agentId: 'a1', seq: 0, at: new Date().toISOString(), type: 'text', text: 'hello' } } }));
     good.ws.send(JSON.stringify({ type: 'event', seq: 2, at: new Date().toISOString(), event: { kind: 'terminalOutput', terminalId: 't1', data: 'ephemeral' } }));
@@ -107,7 +107,7 @@ describe.skipIf(!available)('session module', () => {
     // hello 与随后的事件帧在同一个 tick 里发出：hello 的校验与建连是异步的，
     // 早期实现会在它落地前把第 2 帧再次当成 hello，以 1008「首帧必须是 hello」断开。
     const at = new Date().toISOString();
-    runner.ws.send(JSON.stringify({ type: 'hello', protocolVersion: TASKRUNNER_PROTOCOL_VERSION, taskId: burstTask, runnerToken: 'good', workdir: '/work', capabilities: { drivers: ['stub'], pty: false, preview: false } }));
+    runner.ws.send(JSON.stringify({ type: 'hello', protocolVersion: TASKRUNNER_PROTOCOL_VERSION, taskId: burstTask, runnerToken: 'good', workdir: '/work', capabilities: { protocols: ['claude-code', 'opencode', 'terminal'], pty: false, preview: false } }));
     for (let seq = 1; seq <= 5; seq += 1) {
       runner.ws.send(JSON.stringify({ type: 'event', seq, at, event: { kind: 'agent', event: { agentId: 'a1', seq, at, type: 'text', text: `burst ${seq}` } } }));
     }

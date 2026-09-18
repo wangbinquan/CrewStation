@@ -23,13 +23,13 @@ import { rebuildUseCases } from './application/requestRebuild';
 import { rebuildWorker } from './workers/rebuildWorker';
 import { nativeExecutionWorker } from './workers/nativeExecutionWorker';
 import { createNativeExecutionUseCase } from './application/nativeExecution';
-import { createCheckEnvironmentUseCase } from './application/checkEnvironment';
-import { RUNTIME_CHECK_LABELS } from './domain/runtimeCheckEnvironment';
-import { runRuntimeCheckUseCase } from './application/runtimeCheck';
-import type { RuntimeCheckTiming } from './application/runtimeCheck';
+import { createTestEnvironmentUseCase } from './application/testEnvironment';
+import { PROFILE_TEST_LABELS } from './domain/profileTestEnvironment';
+import { runProfileTestUseCase } from './application/profileTest';
+import type { ProfileTestTiming } from './application/profileTest';
 import { environmentRoutes } from './http/environmentRoutes';
 import type { TaskCluster } from './ports/cluster';
-import type { CheckRunner, EnvironmentSources, ProfileCatalog, ProjectAuthorizer, QuotaSource, ServiceResolver, SourceCheckoutSource, TaskRuntimeSettings } from './ports/platform';
+import type { EnvironmentSources, ProfileCatalog, ProjectAuthorizer, QuotaSource, ServiceResolver, SourceCheckoutSource, TaskRuntimeSettings, TestRunner } from './ports/platform';
 
 export interface TaskRuntimeModuleDeps {
   db: Database;
@@ -41,9 +41,9 @@ export interface TaskRuntimeModuleDeps {
   sources: EnvironmentSources;
   /** 开发会话的源码检出；不给则容器里是空工作卷。 */
   checkout?: SourceCheckoutSource;
-  /** 运行环境检查用的 Runner 通道（RFC-004）；不给则检查报“未配置执行通道”。 */
-  checkRunner?: CheckRunner;
-  checkTiming?: Partial<RuntimeCheckTiming>;
+  /** 档位测试用的 Runner 通道（RFC-006）；不给则测试报“未配置测试执行通道”。 */
+  testRunner?: TestRunner;
+  testTiming?: Partial<ProfileTestTiming>;
   isAdmin: (userId: UserId) => Promise<boolean>;
   settings: TaskRuntimeSettings;
   cluster?: TaskCluster;
@@ -83,11 +83,15 @@ export function createTaskRuntimeModule(deps: TaskRuntimeModuleDeps): TaskRuntim
   const queries = environmentQueries(useCaseDeps);
   const reconcile = reconcileUseCase(useCaseDeps, lifecycle);
   const recoveryDeps = { ...useCaseDeps, recoveryCluster: kubernetesTaskRecoveryCluster(deps.k8s), provisioner: kubernetesRebuildProvisioner(deps.k8s, deps.settings.workerUid) };
-  const executionDeps = { ...useCaseDeps, nativeCluster: kubernetesNativeExecutions(deps.k8s, deps.settings.workerUid, deps.settings.agentEnvSecretName) };
+  const executionDeps = { ...useCaseDeps, nativeCluster: kubernetesNativeExecutions(deps.k8s, deps.settings.workerUid) };
   const createNative = createNativeExecutionUseCase(executionDeps);
   const rebuild = rebuildUseCases(recoveryDeps);
-  const createCheckEnvironment = createCheckEnvironmentUseCase(useCaseDeps);
-  const runRuntimeCheck = runRuntimeCheckUseCase(useCaseDeps, { createCheck: (input) => createCheckEnvironment({ ...input, labels: { [LABELS.project]: RUNTIME_CHECK_LABELS.project, [LABELS.service]: RUNTIME_CHECK_LABELS.service, ...input.labels } }), release: (taskId) => lifecycle.releaseEnvironment(taskId, 'runtime-check'), ...(deps.checkRunner ? { checkRunner: deps.checkRunner } : {}), ...(deps.checkTiming ? { timing: deps.checkTiming } : {}) });
+  const createTestEnvironment = createTestEnvironmentUseCase(useCaseDeps);
+  const runProfileTest = runProfileTestUseCase(useCaseDeps, {
+    createTestEnvironment: (input) => createTestEnvironment({ ...input, labels: { [LABELS.project]: PROFILE_TEST_LABELS.project, [LABELS.service]: PROFILE_TEST_LABELS.service, ...input.labels } }),
+    release: (taskId) => lifecycle.releaseEnvironment(taskId, 'profile-test'),
+    ...(deps.testRunner ? { runner: deps.testRunner } : {}), ...(deps.testTiming ? { timing: deps.testTiming } : {}),
+  });
   const api: TaskRuntimeModuleApi = {
     name: 'task-runtime',
     ...rebuild,
@@ -100,6 +104,7 @@ export function createTaskRuntimeModule(deps: TaskRuntimeModuleDeps): TaskRuntim
     touch: lifecycle.touch,
     onRunnerConnected: lifecycle.onRunnerConnected,
     onRunnerDisconnected: lifecycle.onRunnerDisconnected,
+    onRunnerRejected: lifecycle.onRunnerRejected,
     getEnvironment: async (taskId) => { const env = await queries.getEnvironment(taskId); return env ? environmentToDto(env) : undefined; },
     describeEnvironment: queries.describeEnvironment,
     listEnvironments: queries.listEnvironments,
@@ -110,7 +115,7 @@ export function createTaskRuntimeModule(deps: TaskRuntimeModuleDeps): TaskRuntim
     verifyRunnerToken: queries.verifyRunnerToken,
     canOpenStream: queries.canOpenStream,
     reconcile,
-    runRuntimeCheck,
+    runProfileTest,
   };
   let timer: ReturnType<typeof setInterval> | undefined;
   return {

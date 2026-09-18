@@ -22,6 +22,8 @@ export interface ReleaseModuleApi {
   listTrafficSwitches(actor: Actor, serviceId: ServiceId): Promise<TrafficSwitchDto[]>;
   activeEndpoint(serviceId: ServiceId): Promise<ActiveEndpoint | undefined>;
   slotRoles(serviceId: ServiceId): Promise<{ prod: PhysicalSlot; preview: PhysicalSlot } | undefined>;
+  /** 两个槽当前版本的 Manifest 按名称引用的算力档位（RFC-006 P8）。 */
+  deployedComputeReferences(serviceId: ServiceId): Promise<string[]>;
   /** 推进一步流水线；返回是否结束与建议的重试间隔。 */
   runPipelineStep(releaseId: ReleaseId): Promise<{ done: boolean; retryAfterSeconds: number }>;
 }

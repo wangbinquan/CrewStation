@@ -3,7 +3,7 @@
 // 只有 Claude Code 支持：`-p --input-format stream-json --output-format stream-json --verbose` 下
 // 进程在每个 `result` 之后继续读 stdin 的下一行，stdin EOF 才退出（见 claudeCode/streamInput.ts 的依据与残余风险）。
 
-import type { AgentDriver, AgentEvent } from '@crewstation/contracts';
+import type { AgentEvent, KnownAgentProtocol } from '@crewstation/contracts';
 import { DriverStateError } from '../contract/agentDriver';
 import type { DriverAgentSpec, DriverLaunchContext } from '../contract/agentDriver';
 import type { DriverChildProcessWithStdin } from '../contract/processHost';
@@ -16,8 +16,8 @@ export class ResidentAgentRun extends AgentRunBase {
   private lifetime: Promise<void>;
   private turnError: string | null = null;
 
-  constructor(spec: DriverAgentSpec, context: DriverLaunchContext, prepared: PreparedRuntime, driverName: AgentDriver) {
-    super(spec, context, prepared, driverName);
+  constructor(spec: DriverAgentSpec, context: DriverLaunchContext, prepared: PreparedRuntime, protocol: KnownAgentProtocol) {
+    super(spec, context, prepared, protocol);
     if (prepared.encodeStreamFrame === undefined) throw new DriverStateError('driver_misconfigured', '常驻运行需要适配器提供输入帧编码');
     this.lifetime = this.begin();
   }
@@ -78,7 +78,7 @@ export class ResidentAgentRun extends AgentRunBase {
     if (this.cancelled) return;
     if (result.exitCode !== 0) {
       const code = this.prepared.detectSessionNotFound(result.stderrTail) ? 'session_not_found' : 'agent_failed';
-      this.finishFailed(code, failureMessage(this.driverName, result.exitCode, result.signalCode, result.stderrTail), result.exitCode);
+      this.finishFailed(code, failureMessage(this.protocol, result.exitCode, result.signalCode, result.stderrTail), result.exitCode);
       return;
     }
     if (this.turnError !== null) {

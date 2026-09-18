@@ -15,11 +15,19 @@ export interface DeploySteps {
 }
 
 /** 部署阶段：待命槽换上新发布并标记旧发布 superseded；就绪后登记 Manifest 与 OpenAPI。 */
-/** Manifest 的 tasks.agentProfiles 引用的档位里，哪些在平台目录中不存在。 */
-async function missingComputeProfiles(deps: ReleaseUseCaseDeps, manifest: Manifest): Promise<string[]> {
+/**
+ * Manifest 的 tasks.agentProfiles 引用的档位问题（RFC-006 §4.4）：不存在、是通用终端协议、写了 default 而平台没有默认档位。
+ * 只看存在性与协议，不看测试状态。返回给发布记录的原因文案；没有问题返回 undefined。
+ */
+async function computeProblem(deps: ReleaseUseCaseDeps, manifest: Manifest): Promise<string | undefined> {
   const wanted = manifest.kind === 'DigitalWorker' ? [...new Set((manifest.spec.tasks?.agentProfiles ?? []).map((p) => p.compute))] : [];
-  const found = await Promise.all(wanted.map(async (name) => ({ name, ok: (await deps.plans.getComputeProfile(name)) !== undefined })));
-  return found.filter((f) => !f.ok).map((f) => f.name);
+  const found = await Promise.all(wanted.map(async (name) => ({ name, profile: await deps.plans.lookupComputeProfile(name) })));
+  if (found.some((f) => f.name === 'default' && !f.profile)) return '算力档位 default 指向平台默认档位，但平台尚未设置默认档位；请管理员在平台管理里设置';
+  const missing = found.filter((f) => !f.profile).map((f) => f.name);
+  if (missing.length > 0) return `算力档位 ${missing.join('、')} 不存在；当前可用：${(await deps.plans.listComputeProfiles()).join('、') || '（空）'}`;
+  const terminal = found.filter((f) => f.profile?.terminalOnly).map((f) => f.name);
+  if (terminal.length > 0) return `算力档位 ${terminal.join('、')} 是通用终端协议，只能用于「＋ CLI」，不能用于业务子任务`;
+  return undefined;
 }
 
 export function deploySteps(deps: ReleaseUseCaseDeps, ctx: PipelineContext): DeploySteps {
@@ -29,12 +37,9 @@ export function deploySteps(deps: ReleaseUseCaseDeps, ctx: PipelineContext): Dep
     const plan = await deps.plans.getServicePlan(manifest.spec.service.plan);
     if (!plan) return ctx.fail(release, `服务套餐 ${manifest.spec.service.plan} 不存在`);
     if (manifest.spec.service.replicas > plan.maxReplicas) return ctx.fail(release, `副本数 ${manifest.spec.service.replicas} 超过套餐上限 ${plan.maxReplicas}`);
-    // 引用不存在的算力档位就不进部署（RFC-001），与引用不存在的服务套餐同等对待。
-    const missingCompute = await missingComputeProfiles(deps, manifest);
-    if (missingCompute.length > 0) {
-      const available = (await deps.plans.listComputeProfiles()).map((p) => p.name);
-      return ctx.fail(release, `算力档位 ${missingCompute.join('、')} 不存在；当前可用：${available.join('、') || '（空）'}`);
-    }
+    // 算力档位有问题就不进部署（RFC-001、RFC-006），与引用不存在的服务套餐同等对待。
+    const problem = await computeProblem(deps, manifest);
+    if (problem) return ctx.fail(release, problem);
     const env = await renderSlotEnv(deps, { projectId: release.projectId, serviceId: release.serviceId, projectSlug: svc.slug, serviceName: svc.name, physical: release.targetSlot, manifest });
     await deps.deployer.deploy({ namespace: svc.namespace, projectSlug: svc.slug, serviceName: svc.name, physical: release.targetSlot, releaseId: release.id, image: release.image ?? '', manifest, env: env.values, plan });
     const now = clock.now();

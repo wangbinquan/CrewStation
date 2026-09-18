@@ -14,7 +14,7 @@ export function subtaskToDto(run: SubtaskRun): SubtaskDto {
     id: run.id, taskId: run.taskId, name: run.name, kind: run.kind, ...(run.mode ? { mode: run.mode } : {}), state: run.state, attempt: run.attempt,
     ...(run.agentProfile ? { agentProfile: run.agentProfile.name } : {}), ...(run.outputContract ? { outputContract: run.outputContract.name } : {}),
     ...(run.businessOutcome ? { businessOutcome: run.businessOutcome } : {}), ...(run.sessionId ? { sessionId: run.sessionId } : {}),
-    ...(run.exitCode !== undefined ? { exitCode: run.exitCode } : {}), ...(run.contractResult ? { contractResult: run.contractResult } : {}), ...(run.runtime ? { runtime: run.runtime } : {}),
+    ...(run.exitCode !== undefined ? { exitCode: run.exitCode } : {}), ...(run.contractResult ? { contractResult: run.contractResult } : {}), ...(run.computeProfile ? { compute: run.computeProfile.profile, profileRevision: run.computeProfile.revision } : {}),
     ...(run.startedAt ? { startedAt: run.startedAt.toISOString() } : {}), ...(run.endedAt ? { endedAt: run.endedAt.toISOString() } : {}), ...(run.error ? { error: run.error } : {}),
   };
 }

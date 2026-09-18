@@ -14,9 +14,9 @@ export function drizzleEnvironmentRepository(db: Executor): EnvironmentRepositor
     runnerTokenHash: r.runnerTokenHash, connected: r.connected, ...(r.branch ? { branch: r.branch } : {}), ...(r.preview ? { preview: json<TaskEnvironment['preview']>(r.preview) } : {}),
     labels: json<Record<string, string>>(r.labels), ...(r.createdBy ? { createdBy: r.createdBy as UserId } : {}), ...(r.message ? { message: r.message } : {}),
     createdAt: r.createdAt, updatedAt: r.updatedAt, lastActivityAt: r.lastActivityAt, ...(r.rebuildId ? { rebuildId: r.rebuildId } : {}),
-    ...(r.native ? { native: json<TaskEnvironment['native']>(r.native) } : {}), ...(r.release ? { release: json<TaskEnvironment['release']>(r.release) } : {}),
+    ...(r.native ? { native: json<TaskEnvironment['native']>(r.native) } : {}), ...(r.release ? { release: json<TaskEnvironment['release']>(r.release) } : {}), ...(r.runnerRejection ? { runnerRejection: json<TaskEnvironment['runnerRejection']>(r.runnerRejection) } : {}),
   });
-  const toRow = (e: TaskEnvironment): typeof environments.$inferInsert => ({ ...e, branch: e.branch ?? null, preview: e.preview ?? null, createdBy: e.createdBy ?? null, message: e.message ?? null, rebuildId: e.rebuildId ?? null, native: e.native ?? null, release: e.release ?? null });
+  const toRow = (e: TaskEnvironment): typeof environments.$inferInsert => ({ ...e, branch: e.branch ?? null, preview: e.preview ?? null, createdBy: e.createdBy ?? null, message: e.message ?? null, rebuildId: e.rebuildId ?? null, native: e.native ?? null, release: e.release ?? null, runnerRejection: e.runnerRejection ?? null });
   return {
     insert: async (e) => { await db.insert(environments).values(toRow(e)); },
     update: async (e) => { await db.update(environments).set(toRow(e)).where(eq(environments.id, e.id)); },

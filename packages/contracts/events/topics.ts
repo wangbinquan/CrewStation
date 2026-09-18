@@ -45,10 +45,10 @@ export const ReleaseStatusChangedSchema = z.object({ ...base, serviceId: Service
 /** 切流后订阅推送目标、路由与告警基线都随 active 槽变化。 */
 export const TrafficSwitchedSchema = z.object({ ...base, projectId: ProjectIdSchema, serviceId: ServiceIdSchema, fromSlot: SlotNameSchema, toSlot: SlotNameSchema, releaseId: ReleaseIdSchema, actorUserId: z.string() });
 
-/** runtime-check：管理员运行环境检查的平台专属短期任务（RFC-004），跑在系统命名空间。 */
-export const TaskKindSchema = z.enum(['dev-session', 'business', 'runtime-check']);
+/** profile-test：管理员档位测试的平台专属短期任务（RFC-006），跑在系统命名空间。 */
+export const TaskKindSchema = z.enum(['dev-session', 'business', 'profile-test']);
 export const TaskCreatedSchema = z.object({ ...base, projectId: ProjectIdSchema, serviceId: ServiceIdSchema, taskId: TaskIdSchema, kind: TaskKindSchema });
-export const TaskReleasedSchema = z.object({ ...base, projectId: ProjectIdSchema, taskId: TaskIdSchema, kind: TaskKindSchema, reason: z.enum(['user', 'owner-force', 'business', 'failed', 'pod-lost', 'runtime-check']) });
+export const TaskReleasedSchema = z.object({ ...base, projectId: ProjectIdSchema, taskId: TaskIdSchema, kind: TaskKindSchema, reason: z.enum(['user', 'owner-force', 'business', 'failed', 'pod-lost', 'profile-test']) });
 
 export const SubtaskFinishedSchema = z.object({ ...base, taskId: TaskIdSchema, subtaskId: SubtaskIdSchema, state: z.enum(['succeeded', 'failed', 'cancelled']), attempt: z.number().int().min(1) });
 

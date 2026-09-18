@@ -417,7 +417,7 @@ packages/agent-drivers/
 │  ├─ claudeSubagentEntries.ts       # ClaudeAgentEntry, ClaudeAgentsOpts, renderClaudeSubagentEntries
 │  ├─ stageSkills.ts                 # ← runtime/stageSkills.ts
 │  ├─ injectionIdentity.ts           # ← runtime/injectionIdentity.ts
-│  ├─ spawnHead.ts                   # ← runtime/head.ts
+│  ├─ spawnHead.ts                   # ← runtime/head.ts（RFC-006 已删除，由 launchArgs.ts 取代）
 │  └─ spawnContextTranslation.ts     # ← runtime/spawnCtx.ts
 └─ drivers/
    ├─ registry.ts                    # ← runtime/index.ts（getRuntimeDriver, tryGetRuntimeDriver, RUNTIME_KINDS, isKnownRuntimeKind；不再做再导出）
@@ -465,7 +465,7 @@ packages/agent-drivers/
 |---|---|---|
 | `runtime/types.ts` | `contract/driver.ts`、`contract/events.ts`、`contract/spawn.ts`、`contract/spawnLegacy.ts`、`contract/probe.ts`、`contract/capture.ts` | 拆分（971 → 6 个文件） |
 | `runtime/index.ts` | `drivers/registry.ts` ＋ 包根 `index.ts` 的具名导出 | 改名（非根 `index.ts` 禁用） |
-| `runtime/head.ts` | `injection/spawnHead.ts` | 改名 |
+| `runtime/head.ts` | `injection/spawnHead.ts` | 改名；RFC-006 已删除：二进制与附加参数由档位修订的 `launch` 给出，装配在 `injection/launchArgs.ts`，不再有按协议的默认命令头 |
 | `runtime/spawnCtx.ts` | `injection/spawnContextTranslation.ts` | 改名 |
 | `runtime/stageSkills.ts` | `injection/stageSkills.ts` | 原样 |
 | `runtime/injectionIdentity.ts` | `injection/injectionIdentity.ts` | 原样 |

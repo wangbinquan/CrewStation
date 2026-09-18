@@ -29,6 +29,12 @@ export function renderOpencodeAgentEntry(ctx: AgentSpawnContext): Record<string,
     options: { outputs: [] },
   };
   if (ctx.model !== undefined && ctx.model.length > 0) entry.model = ctx.model;
+  // RFC-006：档位的 opencode 生成参数，与 agent-workflow agentInjection.ts 的 inlineAgent 写法一致；未设置的键不出现。
+  const params = ctx.opencode;
+  if (params?.variant !== undefined) entry.variant = params.variant;
+  if (params?.temperature !== undefined) entry.temperature = params.temperature;
+  if (params?.steps !== undefined) entry.steps = params.steps;
+  if (params?.maxSteps !== undefined) entry.maxSteps = params.maxSteps;
   return entry;
 }
 

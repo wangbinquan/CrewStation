@@ -11,8 +11,8 @@ export const SubtaskIdSchema = prefixed('sub').brand<'SubtaskId'>();
 export const EventIdSchema = prefixed('evt').brand<'EventId'>();
 export const OperationIdSchema = prefixed('op').brand<'OperationId'>();
 /** RFC-004：管理员运行环境配置与其检查记录。 */
-export const RuntimeConfigIdSchema = prefixed('arc').brand<'RuntimeConfigId'>();
-export const RuntimeCheckIdSchema = prefixed('chk').brand<'RuntimeCheckId'>();
+/** RFC-006：一次算力档位测试。 */
+export const ProfileTestIdSchema = prefixed('pft').brand<'ProfileTestId'>();
 /** RFC-005：OIDC 身份提供方与一条外部身份关联。 */
 export const OidcProviderIdSchema = prefixed('idp').brand<'OidcProviderId'>();
 export const UserIdentityIdSchema = prefixed('uid').brand<'UserIdentityId'>();
@@ -29,8 +29,7 @@ export type TaskId = z.infer<typeof TaskIdSchema>;
 export type SubtaskId = z.infer<typeof SubtaskIdSchema>;
 export type EventId = z.infer<typeof EventIdSchema>;
 export type OperationId = z.infer<typeof OperationIdSchema>;
-export type RuntimeConfigId = z.infer<typeof RuntimeConfigIdSchema>;
-export type RuntimeCheckId = z.infer<typeof RuntimeCheckIdSchema>;
+export type ProfileTestId = z.infer<typeof ProfileTestIdSchema>;
 export type OidcProviderId = z.infer<typeof OidcProviderIdSchema>;
 export type UserIdentityId = z.infer<typeof UserIdentityIdSchema>;
 export type TraceId = z.infer<typeof TraceIdSchema>;

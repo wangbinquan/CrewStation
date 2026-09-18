@@ -1,5 +1,5 @@
-/** 绝不能进入任何子进程的环境变量：runner 令牌与凭据文件位置。 */
-const STRIPPED_EXACT = new Set(['CS_RUNNER_TOKEN', 'CS_AGENT_ENV_FILE', 'CS_SESSION_URL']);
+/** 绝不能进入任何子进程的环境变量：runner 令牌与 cs-session 地址。 */
+const STRIPPED_EXACT = new Set(['CS_RUNNER_TOKEN', 'CS_SESSION_URL']);
 const STRIPPED_PREFIX = 'CS_RUNNER_';
 
 export interface ChildEnvOptions {

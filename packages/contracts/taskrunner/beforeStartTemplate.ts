@@ -2,7 +2,9 @@
  * 启动前 Hook 的模板变量语法（RFC-004 §5.1）。平台保存时校验、容器内执行时展开，两侧共用这一份解析，
  * 否则“保存能过、启动才报未定义变量”。只展开已声明的有限变量，不执行任何表达式。
  */
-export const TEMPLATE_CONTEXT_NAMES = ['agent.home', 'agent.runDir', 'agent.id', 'workspace'] as const;
+export const TEMPLATE_CONTEXT_NAMES = ['agent.home', 'agent.runDir', 'agent.id', 'workspace', 'mcp.capabilitiesUrl', 'mcp.operationsUrl', 'mcp.token'] as const;
+/** 以这些上下文变量开头的模板可作为路径（RFC-004 的三个目录变量）；mcp.* 只能出现在内容里（RFC-006 C16）。 */
+export const TEMPLATE_PATH_CONTEXT_NAMES = ['agent.home', 'agent.runDir', 'workspace'] as const;
 export type TemplateContextName = (typeof TEMPLATE_CONTEXT_NAMES)[number];
 
 export type TemplateReference =

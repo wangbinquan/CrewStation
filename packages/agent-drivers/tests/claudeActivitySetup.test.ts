@@ -15,7 +15,7 @@ async function fixture(version = '2.1.268', customEnv: Record<string, string> = 
   await mkdir(join(root, '.claude'));
   const existing = join(root, '.claude', 'settings.json');
   await writeFile(existing, JSON.stringify({ hooks: { Stop: [{ hooks: [{ type: 'command', command: 'user-hook' }] }] } }));
-  const prepared = await prepareNativeTerminal({ driver: 'claude-code', permission: 'edit', agentId: 'native', compute: 'balanced', model: 'anthropic/fixed-model', mcp: [] }, { cwd: root, runDir: join(root, 'run'), env: { HOME: root, ...customEnv }, host: createFakeProcessHost([{ stdout: [`${version} (Claude Code)`] }]), logger: noopLogger, nativeActivity: { endpoint: 'http://127.0.0.1:1234/activity/private', token: 'private' } });
+  const prepared = await prepareNativeTerminal({ launch: { protocol: 'claude-code', binaryPath: '/usr/local/bin/claude', extraArgs: [], isSandbox: false, model: 'anthropic/fixed-model' }, profileRevision: 1, permission: 'edit', agentId: 'native', compute: 'balanced', mcp: [] }, { cwd: root, runDir: join(root, 'run'), env: { HOME: root, ...customEnv }, host: createFakeProcessHost([{ stdout: [`${version} (Claude Code)`] }]), logger: noopLogger, nativeActivity: { endpoint: 'http://127.0.0.1:1234/activity/private', token: 'private' } });
   return { prepared, existing };
 }
 
@@ -41,5 +41,5 @@ test('不支持的 CLI 和操作者已配置的 telemetry 只降级观察，保�
   const { prepared: custom } = await fixture('2.1.268', { OTEL_EXPORTER_OTLP_ENDPOINT: 'https://company.example/telemetry' });
   expect(custom.activityUnavailable).toBe('source-error');
   expect(custom.plan.env.OTEL_EXPORTER_OTLP_ENDPOINT).toBe('https://company.example/telemetry');
-  expect(custom.plan.cmd[0]).toBe('claude');
+  expect(custom.plan.cmd[0]).toBe('/usr/local/bin/claude');
 });

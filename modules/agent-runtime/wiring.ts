@@ -8,27 +8,36 @@ import { readMigrationDir } from '@crewstation/persistence';
 import type { Hono } from 'hono';
 import { secretboxCipher } from './adapters/crypto/secretboxCipher';
 import { drizzleUnitOfWork } from './adapters/persistence/drizzleUnitOfWork';
+import { httpImageRegistry } from './adapters/registry/httpImageRegistry';
 import type { AgentRuntimeModuleApi } from './api/moduleApi';
-import { activationUseCases } from './application/activation';
-import { checkUseCases } from './application/checks';
 import type { AgentRuntimeUseCaseDeps } from './application/dependencies';
-import { manageConfigUseCases } from './application/manageConfigs';
-import { resolveRuntimeUseCases } from './application/resolveRuntime';
-import { saveDraftUseCase } from './application/saveDraft';
-import { agentRuntimeAdminRoutes } from './http/adminRoutes';
-import type { CheckExecutor } from './ports/checkExecutor';
+import { profileQueries } from './application/profileQueries';
+import { profileSettingUseCases } from './application/profileSettings';
+import { profileTestUseCases } from './application/profileTests';
+import { profileWriteUseCases } from './application/profileWrites';
+import { resolveProfileUseCases } from './application/resolveProfile';
+import { runtimeImageUseCases } from './application/runtimeImages';
+import type { RegistryLayout } from './domain/imageReference';
+import { computeProfileAdminRoutes, computeProfileCatalogRoutes, registryForwardAuthRoutes } from './http/adminRoutes';
+import type { ImageRegistry } from './ports/imageRegistry';
 import type { ProfileReferences } from './ports/profileReferences';
 import type { SecretCipher } from './ports/secretCipher';
-import { checkWorker } from './workers/checkWorker';
+import type { TaskProfileDirectory } from './ports/taskProfiles';
+import type { ProfileTestExecutor } from './ports/testExecutor';
+import { testWorker } from './workers/testWorker';
 
 export interface AgentRuntimeModuleDeps {
   db: Database;
   isAdmin: (userId: UserId) => Promise<boolean>;
-  /** 平台专属检查任务的执行器（task-runtime 实现，由组合根注入）。 */
-  executor: CheckExecutor;
-  /** 引用某运行环境的算力档位（project 实现）。 */
+  /** 平台命名空间里的档位测试执行器（task-runtime 实现，由组合根注入，ADR-0005）。 */
+  executor: ProfileTestExecutor;
+  /** 已上线版本对档位的按名引用（release 实现，由组合根注入）。 */
   references: ProfileReferences;
-  settings: { secretKeyBase64: string };
+  /** 资源套餐目录（project 实现，由组合根注入）。 */
+  taskProfiles: TaskProfileDirectory;
+  /** registry.baseTag：平台底座镜像的标签；pushCredentialTtlSeconds：推送凭据有效期，默认 8 小时。 */
+  settings: { secretKeyBase64: string; registry: RegistryLayout & { scheme: 'http' | 'https'; baseTag: string }; pushCredentialTtlSeconds?: number };
+  registry?: ImageRegistry;
   cipher?: SecretCipher;
   clock?: Clock;
   logger?: Logger;
@@ -37,6 +46,8 @@ export interface AgentRuntimeModuleDeps {
 export interface AgentRuntimeModule {
   readonly api: AgentRuntimeModuleApi;
   readonly http: Hono<AppEnv>[];
+  /** 挂在 cs-auth 的网关鉴权端点（平台镜像仓库主机）。 */
+  readonly forwardAuth: Hono<AppEnv>[];
   readonly workers: Array<{ start(): void; stop(): Promise<void> }>;
   readonly migrations: MigrationSet;
 }
@@ -49,19 +60,25 @@ export const agentRuntimeMigrations: MigrationSet = {
 
 export function createAgentRuntimeModule(deps: AgentRuntimeModuleDeps): AgentRuntimeModule {
   const logger = deps.logger ?? noopLogger;
+  const { scheme, baseTag, ...layout } = deps.settings.registry;
   const useCaseDeps: AgentRuntimeUseCaseDeps = {
     uow: drizzleUnitOfWork(deps.db), cipher: deps.cipher ?? secretboxCipher(deps.settings.secretKeyBase64), executor: deps.executor, references: deps.references,
-    clock: deps.clock ?? systemClock, logger,
+    taskProfiles: deps.taskProfiles, registry: deps.registry ?? httpImageRegistry({ layout, scheme }), clock: deps.clock ?? systemClock, logger,
   };
-  const checks = checkUseCases(useCaseDeps);
-  const resolve = resolveRuntimeUseCases(useCaseDeps);
+  const queries = profileQueries(useCaseDeps);
+  const tests = profileTestUseCases(useCaseDeps);
+  const resolver = resolveProfileUseCases(useCaseDeps);
+  // 推送凭据的签名密钥与 secretbox 密钥同源但分用途派生，二者互不可替代。
+  const signingKey = new Bun.CryptoHasher('sha256').update('crewstation:registry-push-key:v1').update(Buffer.from(deps.settings.secretKeyBase64, 'base64')).digest();
+  const images = runtimeImageUseCases(useCaseDeps, { signingKey, baseTag, ttlSeconds: deps.settings.pushCredentialTtlSeconds ?? 8 * 3600 });
   const api: AgentRuntimeModuleApi = {
     name: 'agent-runtime',
-    ...manageConfigUseCases(useCaseDeps),
-    saveDraft: saveDraftUseCase(useCaseDeps),
-    startCheck: checks.startCheck, getCheck: checks.getCheck, runQueuedCheck: checks.runQueuedCheck,
-    ...activationUseCases(useCaseDeps),
-    resolveActive: resolve.resolveActive, resolveRevision: resolve.resolveRevision,
+    listProfiles: queries.listProfiles, getProfile: queries.getProfile, listSummaries: queries.listSummaries,
+    ...profileWriteUseCases(useCaseDeps),
+    ...profileSettingUseCases(useCaseDeps),
+    startTest: tests.startTest, getTest: tests.getTest, runQueuedTest: tests.runQueuedTest,
+    resolve: resolver.resolve, launchMaterial: resolver.launchMaterial, lookupForRelease: resolver.lookupForRelease, listNames: resolver.listNames,
+    runtimeImages: images.runtimeImages, issuePushCredential: images.issuePushCredential, authorizeRegistryRequest: images.authorizeRegistryRequest,
   };
-  return { api, http: [agentRuntimeAdminRoutes(api, deps.isAdmin)], workers: [checkWorker(deps.db, api, logger)], migrations: agentRuntimeMigrations };
+  return { api, http: [computeProfileAdminRoutes(api, deps.isAdmin), computeProfileCatalogRoutes(api)], forwardAuth: [registryForwardAuthRoutes(api)], workers: [testWorker(deps.db, api, logger)], migrations: agentRuntimeMigrations };
 }

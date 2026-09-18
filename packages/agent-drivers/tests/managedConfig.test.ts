@@ -1,7 +1,7 @@
 import { afterEach, expect, test } from 'bun:test';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { noopLogger } from '@crewstation/kernel';
 import { mergeClaudeSettings } from '../drivers/claudeCode/managedSettings';
 import { prepareNativeTerminal } from '../drivers/nativeTerminal';
@@ -31,15 +31,16 @@ test('OpenCode 配置合成：保留管理员 provider options／baseURL，只�
   expect(merged).toMatchObject({ theme: 'dark', model: 'anthropic/claude-x', enabled_providers: ['anthropic'], agent: { crewstation: { model: 'anthropic/claude-x' } } });
 });
 
-async function managedFixture(driver: 'claude-code' | 'opencode', file: string, content: string) {
+async function managedFixture(driver: 'claude-code' | 'opencode', file: string, content: string, configDir: { configDirEnv?: string; configDirName?: string } = {}) {
   const root = await mkdtemp(join(tmpdir(), 'cs-managed-plan-'));
   cleanups.push(() => rm(root, { recursive: true, force: true }));
   const home = join(root, 'home');
-  await mkdir(join(home, driver === 'claude-code' ? '.claude' : '.opencode'), { recursive: true });
   const path = join(home, file);
+  await mkdir(dirname(path), { recursive: true });
   await writeFile(path, content);
   const host = createFakeProcessHost([{ stdout: [driver === 'claude-code' ? '2.1.268 (Claude Code)' : '1.18.29'] }]);
-  const prepared = await prepareNativeTerminal({ driver, permission: 'edit', agentId: 'managed', compute: 'managed', model: 'anthropic/model-name', mcp: [{ name: 'platform', url: 'http://mcp.example/mcp', headers: { authorization: 'mcp-token' } }], runtime: { configId: 'arc_' + 'c'.repeat(32), revision: 4 } },
+  const launch = { protocol: driver, binaryPath: driver === 'claude-code' ? '/usr/local/bin/claude' : '/usr/local/bin/opencode', extraArgs: [], isSandbox: false, model: 'anthropic/model-name', ...configDir };
+  const prepared = await prepareNativeTerminal({ launch, profileRevision: 4, permission: 'edit', agentId: 'managed', compute: 'managed', mcp: [{ name: 'platform', url: 'http://mcp.example/mcp', headers: { authorization: 'mcp-token' } }] },
     { cwd: root, runDir: join(root, 'run'), env: { HOME: home, API_KEY: 'k' }, host, logger: noopLogger, managed: { home, runDir: join(root, 'run'), configFile: { kind: driver === 'claude-code' ? 'claude-settings' : 'opencode-config', path } },
       nativeActivity: driver === 'claude-code' ? { endpoint: 'http://127.0.0.1:1234/activity/private', token: 'private' } : undefined });
   return { root, home, prepared };
@@ -73,6 +74,18 @@ test('管理员配置文件坏了：驱动报 cli_config_invalid 而不是静默
   cleanups.push(() => rm(root, { recursive: true, force: true }));
   const path = join(root, 'settings.json');
   await writeFile(path, '{ not json');
-  const error = await prepareNativeTerminal({ driver: 'claude-code', permission: 'edit', agentId: 'bad', compute: 'managed', model: 'anthropic/m', mcp: [] }, { cwd: root, runDir: join(root, 'run'), env: {}, host: createFakeProcessHost([]), logger: noopLogger, managed: { home: root, runDir: join(root, 'run'), configFile: { kind: 'claude-settings', path } } }).catch((e: unknown) => e);
+  const error = await prepareNativeTerminal({ launch: { protocol: 'claude-code', binaryPath: '/usr/local/bin/claude', extraArgs: [], isSandbox: false, model: 'anthropic/m' }, profileRevision: 1, permission: 'edit', agentId: 'bad', compute: 'managed', mcp: [] }, { cwd: root, runDir: join(root, 'run'), env: {}, host: createFakeProcessHost([]), logger: noopLogger, managed: { home: root, runDir: join(root, 'run'), configFile: { kind: 'claude-settings', path } } }).catch((e: unknown) => e);
   expect(error).toMatchObject({ kind: 'validation', details: { code: 'cli_config_invalid' } });
+});
+
+test('fork 改名的配置目录（RFC-006）：托管 Claude 的配置根改由档位给的变量名指向私有家目录下的档位目录名', async () => {
+  const { home, prepared } = await managedFixture('claude-code', '.codeagent/settings.json', '{}', { configDirEnv: 'CODEAGENT_CONFIG_DIR', configDirName: '.codeagent' });
+  expect(prepared.plan.env.CODEAGENT_CONFIG_DIR).toBe(join(home, '.codeagent'));
+  expect(prepared.plan.env.CLAUDE_CONFIG_DIR).toBeUndefined();
+});
+
+test('fork 改名的配置目录（RFC-006）：OpenCode 的每次运行配置目录用档位的变量名与目录叶名', async () => {
+  const { prepared } = await managedFixture('opencode', '.opencode/opencode.json', '{}', { configDirEnv: 'FORK_CONFIG_DIR', configDirName: '.fork' });
+  expect(prepared.plan.env.FORK_CONFIG_DIR?.endsWith('/run/.fork')).toBe(true);
+  expect(prepared.plan.env.OPENCODE_CONFIG_DIR).toBeUndefined();
 });

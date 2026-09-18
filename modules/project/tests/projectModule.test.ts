@@ -95,39 +95,12 @@ describe.skipIf(!available)('project module', () => {
     expect((await app.request('/v1/projects')).status).toBe(401);
   });
 
-  test('算力档位：按名覆盖、非管理员不能写、租户投影不含驱动与模型（RFC-001）', async () => {
-    await project.api.upsertComputeProfile(admin, { name: 'balanced', driver: 'claude-code', model: 'anthropic/claude-sonnet-5', description: '均衡' });
-    await project.api.upsertComputeProfile(admin, { name: 'balanced', driver: 'claude-code', model: 'anthropic/claude-opus-5', description: '均衡（改）' });
-    expect((await project.api.listComputeProfilesFull(admin)).filter((p) => p.name === 'balanced')).toEqual([
-      { name: 'balanced', driver: 'claude-code', model: 'anthropic/claude-opus-5', description: '均衡（改）', revision: 2 },
-    ]);
-
-    // 租户面只给名字、说明与可用性：厂商与模型是平台的采购信息；未绑定运行环境即部署配置模式。
-    const summary = (await project.api.listComputeProfiles()).find((p) => p.name === 'balanced')!;
-    expect(summary).toEqual({ name: 'balanced', description: '均衡（改）', mode: 'legacy', available: true });
-
-    await expect(project.api.listComputeProfilesFull(dev)).rejects.toMatchObject({ kind: 'forbidden' });
-    await expect(project.api.upsertComputeProfile(dev, { name: 'x', driver: 'stub', model: 'stub/echo', description: '' })).rejects.toMatchObject({ kind: 'forbidden' });
-    await expect(project.api.deleteComputeProfile(dev, 'balanced')).rejects.toMatchObject({ kind: 'forbidden' });
-
-    expect(await project.api.resolveComputeProfile('balanced')).toMatchObject({ driver: 'claude-code', model: 'anthropic/claude-opus-5' });
-    expect(await project.api.resolveComputeProfile('nope')).toBeUndefined();
-    await project.api.deleteComputeProfile(admin, 'balanced');
-    expect(await project.api.resolveComputeProfile('balanced')).toBeUndefined();
-  });
-
-  test('管理员绑定 CLI 资源套餐并可恢复默认；不存在的套餐不覆盖原配置', async () => {
+  test('任务套餐：管理员按名覆盖，非管理员不能写；算力档位已移到 agent-runtime（RFC-006、ADR-0005）', async () => {
     await project.api.upsertTaskProfile(admin, { name: 'cli-large', cpu: '2', memory: '4Gi', storage: '2Gi', description: 'CLI' });
-    const input = { name: 'cli-bound', driver: 'opencode' as const, model: 'opencode/big-pickle', taskProfile: 'cli-large', description: '并行开发' };
-    await project.api.upsertComputeProfile(admin, input);
-    expect(await project.api.resolveComputeProfile(input.name)).toEqual({ ...input, revision: 1 });
-    expect((await project.api.listComputeProfiles()).find((p) => p.name === input.name)).toEqual({ name: input.name, description: input.description, mode: 'legacy', available: true });
-    await expect(project.api.upsertComputeProfile(dev, input)).rejects.toMatchObject({ kind: 'forbidden' });
-    await expect(project.api.upsertComputeProfile(admin, { ...input, taskProfile: 'missing' })).rejects.toMatchObject({ kind: 'not_found' });
-    expect((await project.api.resolveComputeProfile(input.name))?.taskProfile).toBe('cli-large');
-    await project.api.upsertComputeProfile(admin, { ...input, taskProfile: undefined });
-    expect(await project.api.resolveComputeProfile(input.name)).not.toHaveProperty('taskProfile');
-    await project.api.deleteComputeProfile(admin, input.name);
+    await project.api.upsertTaskProfile(admin, { name: 'cli-large', cpu: '1', memory: '4Gi', storage: '2Gi', description: 'CLI（改）' });
+    expect((await project.api.listTaskProfiles()).filter((p) => p.name === 'cli-large')).toEqual([{ name: 'cli-large', cpu: '1', memory: '4Gi', storage: '2Gi', description: 'CLI（改）' }]);
+    await expect(project.api.upsertTaskProfile(dev, { name: 'x-y', cpu: '1', memory: '1Gi', storage: '1Gi', description: '' })).rejects.toMatchObject({ kind: 'forbidden' });
+    expect(Object.keys(project.api).filter((key) => /compute/i.test(key))).toEqual([]);
   });
 
   test('项目列表按 kind 过滤：先作用域后过滤，成员筛不出别人的接入容器（RFC-002）', async () => {

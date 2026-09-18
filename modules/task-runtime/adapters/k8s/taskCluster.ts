@@ -51,7 +51,8 @@ export function kubernetesTaskCluster(k8s: K8sClient, workerUid: number): TaskCl
       const phase = (pod.status?.phase ?? 'Unknown') as Exclude<Awaited<ReturnType<TaskCluster['podPhase']>>['phase'], 'Missing'>;
       const message = podMessage(pod);
       const imageId = pod.status?.containerStatuses?.[0]?.imageID;
-      return { phase, ...(pod.status?.podIP ? { ip: pod.status.podIP } : {}), ...(message ? { message } : {}), ...(imageId ? { imageId } : {}) };
+      const waitingReason = pod.status?.containerStatuses?.[0]?.state?.waiting?.reason ?? pod.status?.containerStatuses?.[0]?.state?.terminated?.reason;
+      return { phase, ...(pod.status?.podIP ? { ip: pod.status.podIP } : {}), ...(message ? { message } : {}), ...(imageId ? { imageId } : {}), ...(waitingReason ? { waitingReason } : {}) };
     },
     deletePod: async (env) => {
       await removeTaskPod(k8s, env);

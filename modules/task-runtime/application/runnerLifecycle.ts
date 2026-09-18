@@ -1,5 +1,6 @@
 import type { TaskId } from '@crewstation/contracts';
 import { tokenMatches } from '../domain/runnerToken';
+import type { RunnerRejection } from '../domain/taskEnvironment';
 import { transition } from '../domain/taskEnvironment';
 import type { TaskRuntimeUseCaseDeps } from './dependencies';
 
@@ -21,6 +22,21 @@ export function runnerLifecycle(deps: TaskRuntimeUseCaseDeps) {
         await scope.environments.update(env.state === 'creating' ? transition(env, 'running', now, { ...patch, message: '环境已连接' }) : { ...env, ...patch });
         if (record?.state === 'starting') await scope.rebuilds.update({ ...record, state: 'ready', updatedAt: now, message: '原工作树已恢复；需要的 CLI 请逐个手动启动' });
         return true;
+      });
+    },
+    /**
+     * 握手被拒（RFC-006 §5.3，协议不一致）：只把原因记在环境上供页面与档位测试读取，不改状态、不删 Pod、不动工作卷——
+     * 旧底座镜像里的开发会话可能还有未推送的工作。同一原因重复握手不重复写。
+     */
+    onRunnerRejected: async (taskId: TaskId, token: string, rejection: Omit<RunnerRejection, 'at'>): Promise<void> => {
+      const original = await deps.uow.read.environments.getById(taskId);
+      if (!original) return;
+      await deps.uow.run(async (scope) => {
+        await scope.admissions.lock(original.projectId);
+        const env = await scope.environments.getById(taskId);
+        if (!env || !tokenMatches(token, env.runnerTokenHash) || env.runnerRejection?.message === rejection.message) return;
+        const now = deps.clock.now();
+        await scope.environments.update({ ...env, runnerRejection: { ...rejection, at: now.toISOString() }, message: rejection.message, updatedAt: now });
       });
     },
     onRunnerDisconnected: async (taskId: TaskId, token: string): Promise<void> => {

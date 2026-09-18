@@ -26,3 +26,26 @@ describe('工作台不向租户暴露模型与驱动（RFC-001）', () => {
     expect(form.code).toContain("t('devSession.agents.compute')");
   });
 });
+
+/**
+ * RFC-006：运行环境并入算力档位。类型检查只能证明删掉的 api 不再被调用，挡不住有人照旧写一个
+ * 「运行环境」页签或把镜像、二进制搬到租户下拉里——这里在源码层把两件事钉住。
+ */
+describe('算力档位是唯一的执行配置（RFC-006）', () => {
+  test('控制台不再调用运行环境接口，也没有运行环境页签或组件目录', () => {
+    expect(files.filter((file) => /\bagentRuntime\b|agent-runtime-configs|RuntimeConfig|admin\.runtime\./.test(file.code)).map((file) => file.path)).toEqual([]);
+    expect(files.filter((file) => file.path.startsWith('features/admin/components/runtime/')).map((file) => file.path)).toEqual([]);
+    const page = sourceAt(files, 'admin/pages/AdminComputePage.tsx');
+    expect(page.code).not.toContain('role="tab"');
+    expect(page.code).not.toContain('admin.compute.tab');
+    expect(page.code).toContain('ComputeProfilesSection');
+  });
+
+  test('租户面的档位下拉只读名称、说明、仅终端与可用性，不读镜像、二进制与模型', () => {
+    for (const suffix of ['agents/ComputeOptions.tsx', 'dev-session/model/computeChoices.ts', 'agents/StartAgentForm.tsx', 'native/NativeToolbar.tsx']) {
+      expect(sourceAt(files, suffix).code).not.toMatch(/binaryPath|imageDigest|\.image\b|\.model\b|protocol/);
+    }
+    expect(sourceAt(files, 'native/NativeToolbar.tsx').code).toContain("choicesFor(profiles.data?.items ?? [], 'cli')");
+    expect(sourceAt(files, 'agents/StartAgentForm.tsx').code).toContain("choicesFor(profiles.data?.items ?? [], 'agent')");
+  });
+});

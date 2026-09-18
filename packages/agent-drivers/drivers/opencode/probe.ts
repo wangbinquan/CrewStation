@@ -8,8 +8,8 @@ import { extractVersion } from '../../process/semver';
 import type { CliProbeResult, ProbeOptions } from '../claudeCode/probe';
 import { getOpencodeBinaryVersion, recordOpencodeBinaryVersion } from './versionRegistry';
 
-export async function probeOpencode(host: ProcessHost, head: readonly string[] = ['opencode'], options: ProbeOptions): Promise<CliProbeResult> {
-  const binary = head[0] ?? 'opencode';
+export async function probeOpencode(host: ProcessHost, head: readonly string[], options: ProbeOptions): Promise<CliProbeResult> {
+  const binary = head[0] ?? '';
   const log = options.logger;
   const result = await spawnVersionProbe(host, head, {
     cwd: options.cwd,
@@ -39,7 +39,7 @@ const probed = new Map<string, Promise<string | null>>();
  * 于是在第一次装配时就地探一次（结果进注册表，之后所有 Agent 直接查表）。
  */
 export async function ensureOpencodeBinaryVersion(host: ProcessHost, head: readonly string[], options: ProbeOptions): Promise<string | null> {
-  const binary = head[0] ?? 'opencode';
+  const binary = head[0] ?? '';
   const known = getOpencodeBinaryVersion(binary);
   if (known !== null) return known;
   let pending = probed.get(binary);

@@ -30,14 +30,15 @@ spec:
   subscriptions:
     - eventType: gitlab.push
       handlerPath: /events/gitlab
-  # 业务任务：Agent 子任务只能引用这里登记的 agentProfile；样例用 stub 驱动回显。
+  # 业务任务：Agent 子任务只能引用这里登记的 agentProfile。
   tasks:
     profile: coding-medium        # 管理员定义的任务容器套餐
     defaultVolumeMode: follow-container
     agentProfiles:
       - name: chat-v1
-        # 算力由平台统一提供：这里只引用管理员定义的档位名，不写厂商与模型（RFC-001）。
-        compute: sample-stub
+        # 算力由平台统一提供：这里只引用管理员定义的档位名，不写镜像、二进制与模型。
+        # default 指管理员当前设为默认的档位，每次起 Agent 时解析（RFC-006）；也可以写具体档位名。
+        compute: default
         permission: read-only
     outputContracts: []
   release:

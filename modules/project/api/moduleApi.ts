@@ -1,6 +1,6 @@
 import type {
   ProjectPage, ProjectPageEntry, ProjectPageQuery,
-  ComputeProfileAdminDto, ComputeProfileDto, ComputeProfileSummaryDto, ComputeProfileWriteRequest, Actor, CreateProjectRequest, ListProjectsQuery, ManifestKind, MemberDto, ProjectDto, ProjectId, ProjectState, QuotaDto, ServiceDto,
+  Actor, CreateProjectRequest, ListProjectsQuery, ManifestKind, MemberDto, ProjectDto, ProjectId, ProjectState, QuotaDto, ServiceDto,
   ServiceId, ServicePlanDto, SetMemberRequest, SetQuotaRequest, TaskProfileDto, UserId,
   AppVisibilityDto, AppVisibilityCheckDto, SetAppVisibilityRequest, AppPresentationDto, SetAppPresentationRequest, MemberCandidateDto, MarketAppsQuery, MarketAppDto,
 } from '@crewstation/contracts';
@@ -85,16 +85,5 @@ export interface ProjectModuleApi {
   listServicePlans(): Promise<ServicePlanDto[]>;
   upsertServicePlan(actor: Actor, plan: ServicePlanDto): Promise<ServicePlanDto>;
   listTaskProfiles(): Promise<TaskProfileDto[]>;
-  /** 租户面：名字、说明与能否起 Agent（RFC-001、RFC-004）。 */
-  listComputeProfiles(): Promise<ComputeProfileSummaryDto[]>;
-  /** 管理面：含驱动、模型与运行环境就绪信息；非管理员抛 forbidden。 */
-  listComputeProfilesFull(actor: Actor): Promise<ComputeProfileAdminDto[]>;
-  /** 按 expectedRevision 比较后写入；已托管档位缺少期望版本时 precondition，版本不符 conflict。 */
-  upsertComputeProfile(actor: Actor, input: ComputeProfileWriteRequest): Promise<ComputeProfileDto>;
-  deleteComputeProfile(actor: Actor, name: string): Promise<void>;
-  /** 档位名 → 具体驱动、模型与运行环境绑定；不存在返回 undefined，由调用方决定报错文案。 */
-  resolveComputeProfile(name: string): Promise<ComputeProfileDto | undefined>;
-  /** 引用某运行环境的档位名（RFC-004）。 */
-  listComputeProfilesReferencing(runtimeConfigId: string): Promise<string[]>;
   upsertTaskProfile(actor: Actor, profile: TaskProfileDto): Promise<TaskProfileDto>;
 }

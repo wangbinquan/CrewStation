@@ -2,7 +2,7 @@
 // ← agent-workflow `execution/agentProcess.ts` 的 outcome 映射思路，但那里的产物是一条汇总记录，
 // 这里的产物是一条 AgentEvent 流。
 
-import type { AgentDriver, AgentEvent, AgentEventType } from '@crewstation/contracts';
+import type { AgentEvent, AgentEventType, KnownAgentProtocol } from '@crewstation/contracts';
 import type { DriverAgentProcess, DriverAgentSpec, DriverLaunchContext } from '../contract/agentDriver';
 import { DriverStateError } from '../contract/agentDriver';
 import type { DriverChildProcess } from '../contract/processHost';
@@ -28,7 +28,7 @@ export abstract class AgentRunBase implements DriverAgentProcess {
     protected readonly spec: DriverAgentSpec,
     protected readonly context: DriverLaunchContext,
     protected readonly prepared: PreparedRuntime,
-    protected readonly driverName: AgentDriver,
+    protected readonly protocol: KnownAgentProtocol,
   ) {
     this.event = createAgentEventFactory(spec.agentId);
   }
@@ -56,15 +56,16 @@ export abstract class AgentRunBase implements DriverAgentProcess {
     return this.event(type, fields, at);
   }
 
-  /** 首个事件：只记录不含凭据的规格摘要（MCP 只记名字，env 一概不记）。 */
+  /** 首个事件：只记录不含凭据的规格摘要（MCP 只记名字，env 一概不记，二进制路径属于管理面也不记）。 */
   protected emitStarted(): void {
+    const model = this.spec.launch.model;
     this.push(this.emit('started', {
-      // spec 是契约字段：工作台的 Agent 列表按持久事件还原，没有它只能编造驱动名、模型与权限。
-      spec: { compute: this.spec.compute, driver: this.driverName, model: this.spec.model, permission: this.spec.permission, ...(this.spec.runtime ? { runtime: this.spec.runtime } : {}) },
+      // spec 是契约字段：工作台的 Agent 列表按持久事件还原，没有它只能编造档位、协议与权限（RFC-006：档位名＋修订＋协议）。
+      spec: { compute: this.spec.compute, profileRevision: this.spec.profileRevision, protocol: this.protocol, ...(model === undefined ? {} : { model }), permission: this.spec.permission },
       raw: {
-        driver: this.driverName,
+        protocol: this.protocol,
         mode: this.spec.mode,
-        model: this.spec.model,
+        ...(model === undefined ? {} : { model }),
         permission: this.spec.permission,
         mcp: this.spec.mcp.map((m) => m.name),
         systemPrompt: this.spec.systemPrompt !== undefined,

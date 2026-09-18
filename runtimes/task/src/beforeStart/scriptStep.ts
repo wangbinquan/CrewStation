@@ -1,5 +1,6 @@
 import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { platformMcpEnv } from '@crewstation/agent-drivers';
 import type { ScriptStep } from '@crewstation/contracts';
 import { BEFORE_START_LIMITS, HOOK_CONTEXT_ENV } from '@crewstation/contracts';
 import type { ProcessLauncher } from '../process/launcher';
@@ -10,7 +11,7 @@ import { BeforeStartFailure } from './failure';
 import { resolveHookPath } from './hookPaths';
 import type { InterpreterCatalog } from './interpreters';
 import type { HookContext } from './templateContext';
-import { redactSecrets } from './templateContext';
+import { redactSecrets, sensitiveValues } from './templateContext';
 
 export interface ScriptStepDeps { launcher: ProcessLauncher; interpreters: InterpreterCatalog; signal: AbortSignal }
 export interface ScriptStepResult { exitCode: number | null; cwd: string; output: Record<string, string>; log: { stdoutTail: string; stderrTail: string } }
@@ -25,10 +26,11 @@ export async function executeScriptStep(step: ScriptStep, ctx: HookContext, deps
   const envOut = join(ctx.runDir, `hook-${step.stepId}.env.json`);
   await writeFile(scriptFile, step.source, { mode: 0o600 });
   await deps.launcher.chownToWorker(scriptFile);
-  // 脚本源码不做凭据文本替换：凭据经输入环境读取（RFC-004 §5.1）。
+  // 脚本源码不做凭据文本替换：凭据经输入环境读取（RFC-004 §5.1）；`{{mcp.*}}` 同理经 CS_MCP_* 读取（RFC-006 C16）。
   const env = deps.launcher.baseEnv({
     ...ctx.vars, ...ctx.secrets, ...ctx.env, HOME: ctx.home,
     [HOOK_CONTEXT_ENV.agentId]: ctx.agentId, [HOOK_CONTEXT_ENV.agentHome]: ctx.home, [HOOK_CONTEXT_ENV.agentRunDir]: ctx.runDir, [HOOK_CONTEXT_ENV.workdir]: ctx.workspace, [HOOK_CONTEXT_ENV.envOut]: envOut,
+    ...platformMcpEnv(ctx.mcp),
   });
   const cmd = deps.interpreters.argvFor(step, scriptFile, cwd, env);
   if (deps.signal.aborted) throw new BeforeStartFailure('cancelled', '启动前脚本在开始前被取消', step.stepId);
@@ -48,7 +50,8 @@ export async function executeScriptStep(step: ScriptStep, ctx: HookContext, deps
     clearTimeout(timer);
     deps.signal.removeEventListener('abort', onAbort);
   }
-  const log = { stdoutTail: redactSecrets(tails.stdout, ctx.secrets), stderrTail: redactSecrets(tails.stderr, ctx.secrets) };
+  const sensitive = sensitiveValues(ctx);
+  const log = { stdoutTail: redactSecrets(tails.stdout, sensitive), stderrTail: redactSecrets(tails.stderr, sensitive) };
   if (cancelled) throw new BeforeStartFailure('cancelled', '启动前脚本被取消', step.stepId);
   if (timedOut) throw new BeforeStartFailure('script_timeout', `脚本超过 ${Math.round(step.timeoutMs / 1000)} 秒未结束，已终止整个进程组`, step.stepId);
   const exitCode = proc.exitCode;

@@ -26,8 +26,8 @@ export interface ProbeOptions {
   logger?: Logger;
 }
 
-export async function probeClaudeCode(host: ProcessHost, head: readonly string[] = ['claude'], options: ProbeOptions): Promise<CliProbeResult> {
-  const binary = head[0] ?? 'claude';
+export async function probeClaudeCode(host: ProcessHost, head: readonly string[], options: ProbeOptions): Promise<CliProbeResult> {
+  const binary = head[0] ?? '';
   const log = options.logger;
   const result = await spawnVersionProbe(host, head, {
     cwd: options.cwd,

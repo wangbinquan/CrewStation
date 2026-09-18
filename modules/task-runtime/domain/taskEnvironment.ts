@@ -23,6 +23,13 @@ export interface NativeExecution {
   readonly preparedAt?: string;
 }
 
+export interface RunnerRejection {
+  readonly code: 'protocol_mismatch';
+  readonly runnerProtocol: number | null;
+  readonly message: string;
+  readonly at: string;
+}
+
 /** 一项任务一个长驻容器（R05、R29）；开发会话与业务任务共用这个对象，只是 kind 与卷模式不同。 */
 export interface TaskEnvironment {
   readonly id: TaskId;
@@ -46,7 +53,9 @@ export interface TaskEnvironment {
   readonly message?: string;
   readonly rebuildId?: string;
   readonly native?: NativeExecution;
-  readonly release?: { reason: 'user' | 'owner-force' | 'business' | 'failed' | 'pod-lost' | 'runtime-check'; occupied: boolean };
+  readonly release?: { reason: 'user' | 'owner-force' | 'business' | 'failed' | 'pod-lost' | 'profile-test'; occupied: boolean };
+  /** Runner 握手被拒的原因（RFC-006）：旧底座镜像里的 Runner 协议不一致。只记录，不改状态、不删 Pod，也不动工作卷。 */
+  readonly runnerRejection?: RunnerRejection;
   readonly createdAt: Date;
   readonly updatedAt: Date;
   readonly lastActivityAt: Date;

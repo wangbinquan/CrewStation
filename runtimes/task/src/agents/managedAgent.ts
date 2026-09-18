@@ -1,4 +1,4 @@
-import type { AgentEvent, AgentRuntimeMaterial } from '@crewstation/contracts';
+import type { AgentEvent, BeforeStartMaterial } from '@crewstation/contracts';
 import type { Logger } from '@crewstation/kernel';
 import type { BeforeStartRunner } from '../beforeStart/beforeStartRunner';
 import { BeforeStartFailure } from '../beforeStart/failure';
@@ -13,15 +13,15 @@ export interface ManagedAgentDeps {
   beforeStart: BeforeStartRunner;
   launcher: ProcessLauncher;
   cwd: string;
-  /** 平台经命令追加的变量（不含旧 agentEnv 文件：托管与部署配置模式不混合）。 */
+  /** 平台经命令追加的变量；模型凭据由档位修订的启动前材料给出。 */
   commandEnv: Record<string, string>;
-  material: AgentRuntimeMaterial;
+  material: BeforeStartMaterial;
   processAttemptId: string;
   logger: Logger;
 }
 
 /**
- * 托管 Agent：先跑完启动前 Hook，再创建 CLI 进程（RFC-004 §5）。
+ * 托管 Agent：先跑完启动前 Hook，再创建 CLI 进程（RFC-004 §5；RFC-006 起每次启动都走这里）。
  * 准备期间“环境准备中”不冒充“Agent 正在执行”；失败只发一条 before_start_failed 的 error 事件，不创建 CLI。
  */
 export class ManagedAgentProcess implements AgentProcess {
@@ -56,7 +56,7 @@ export class ManagedAgentProcess implements AgentProcess {
   private async begin(): Promise<void> {
     let outcome;
     try {
-      outcome = await this.deps.beforeStart.run({ agentId: this.spec.agentId, processAttemptId: this.deps.processAttemptId, material: this.deps.material, workspace: this.deps.cwd });
+      outcome = await this.deps.beforeStart.run({ agentId: this.spec.agentId, processAttemptId: this.deps.processAttemptId, material: this.deps.material, workspace: this.deps.cwd, mcp: this.spec.mcp });
     } catch (error) {
       const failure = error instanceof BeforeStartFailure ? error : undefined;
       if (this.cancelled || failure?.code === 'cancelled') { if (!this.events.closed) { this.events.push(this.event('cancelled', { result: { durationMs: 0 } })); this.events.close(); } return; }

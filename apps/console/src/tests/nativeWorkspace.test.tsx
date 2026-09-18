@@ -21,7 +21,7 @@ function setup(errorStatus = 412) {
     } else if (url.endsWith('/agent-terminals')) {
       if (method === 'POST') { starts.push(JSON.parse(String(init?.body))); status = errorStatus; body = { error: errorStatus === 412 ? 'precondition' : 'unavailable', message: errorStatus === 412 ? '演示档位不支持原生 CLI' : '结果暂未收到', details: {} }; }
       else body = { items: [], connection: 'connected', runnerId: null, checkedAt: '2026-09-13T00:00:00.000Z' };
-    } else body = { items: [{ name: 'balanced', description: '标准' }] };
+    } else body = { items: [{ name: 'balanced', description: '标准', terminalOnly: false, isDefault: true, available: true }] };
     return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
   }) as typeof fetch;
   return { starts, saves };

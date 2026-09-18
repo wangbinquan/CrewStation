@@ -1,5 +1,5 @@
-import type { SubmitSubtaskRequest, SubtaskId } from '@crewstation/contracts';
-import { newId, validation } from '@crewstation/kernel';
+import type { ProfileRevisionRef, SubmitSubtaskRequest, SubtaskId } from '@crewstation/contracts';
+import { isPlatformError, newId, validation } from '@crewstation/kernel';
 import type { BusinessTask } from '../domain/businessTask';
 import { resolveContract, resolveProfile } from '../domain/contractRegistry';
 import type { SubtaskRun } from '../domain/subtaskRun';
@@ -8,6 +8,13 @@ import type { BusinessTaskUseCaseDeps } from './dependencies';
 import { subtaskRefresh } from './subtaskRefresh';
 
 interface ExecResult { execId: string; exitCode: number | null; stdout: string; stderr: string; truncated: boolean }
+
+/** 业务侧只拿得到子任务的 error 字符串（details 不进 SubtaskRun），档位不存在时可选档位必须写进正文（RFC-001）。 */
+function launchFailure(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  const available = isPlatformError(error) && Array.isArray(error.details?.available) ? (error.details.available as string[]) : undefined;
+  return `启动 Agent 失败：${message}${available ? `，当前可用：${available.join('、') || '（无）'}` : ''}`;
+}
 
 /** 构造与启动子任务：Agent 走 startAgent，命令走 exec(wait) 并在后台收尾。 */
 export function subtaskLaunch(deps: BusinessTaskUseCaseDeps) {
@@ -38,27 +45,26 @@ export function subtaskLaunch(deps: BusinessTaskUseCaseDeps) {
       logger.info('subtask waits for runner', { subtaskId: run.id, taskId: run.taskId, state: env?.state });
       return run;
     }
-    const started = transition(run, 'running', clock.now(), { startedAt: clock.now() });
+    let started = transition(run, 'running', clock.now(), { startedAt: clock.now() });
     await uow.run((scope) => scope.subtasks.update(started));
     if (run.kind === 'agent' && run.agentProfile) {
       try {
-        // 档位名在发布时已校验存在；这里再解析一次是因为管理员可能在此期间删掉它（RFC-001 §5）。
-        const compute = await deps.compute.resolve(run.agentProfile.compute);
-        if (!compute) {
-          // 业务侧只拿得到子任务的 error 字符串（details 不进 SubtaskRun），可选档位必须写进正文。
-          const available = (await deps.compute.list()).map((p) => p.name);
-          throw validation(`算力档位 ${run.agentProfile.compute} 不存在，当前可用：${available.join('、') || '（无）'}`, { available });
+        // 构造时没解析成（档位被删、不可用、没有默认档位）：此刻再解析一次，失败原因原样写进子任务（RFC-006 §4.3）。
+        if (!started.computeProfile) {
+          const resolved = await deps.compute.resolve(run.agentProfile.compute, 'subtask');
+          const pinned: ProfileRevisionRef = { profile: resolved.name, revision: resolved.revision };
+          started = { ...started, computeProfile: pinned };
+          await uow.run((scope) => scope.subtasks.update(started));
         }
-        // 托管档位：材料按本 attempt 在构造时固定的版本取，重发同一 attempt 不重跑脚本（RFC-004 §5）。
-        const runtime = run.runtime ? await deps.compute.runtimeMaterial(run.runtime) : undefined;
+        // 材料按本 attempt 固定的修订取，重发同一 attempt 不重跑启动前步骤（RFC-004 §5 沿用）。
+        const material = await deps.compute.launchMaterial(started.computeProfile!);
         await runner.sendCommand(run.taskId, {
-          id: `start-${run.runnerRef}`, type: 'startAgent', agentId: run.runnerRef ?? '', compute: compute.name, driver: compute.driver, model: compute.model,
-          permission: run.agentProfile.permission,
+          id: `start-${run.runnerRef}`, type: 'startAgent', agentId: run.runnerRef ?? '', compute: material.name, profileRevision: material.revision,
+          launch: material.launch, beforeStart: material.beforeStart, processAttemptId: `${run.runnerRef}:${run.attempt}`, permission: run.agentProfile.permission,
           mode: run.mode ?? 'oneshot', ...(run.cwd ? { cwd: run.cwd } : {}), initialPrompt: run.prompt ?? '', mcp: settings.mcp.map((m) => ({ name: m.name, url: m.url, headers: {} })), env: {},
-          ...(runtime ? { runtime, processAttemptId: `${run.runnerRef}:${run.attempt}` } : {}),
         });
       } catch (error) {
-        const failed = transition(started, 'failed', clock.now(), { error: `启动 Agent 失败：${error instanceof Error ? error.message : String(error)}` });
+        const failed = transition(started, 'failed', clock.now(), { error: launchFailure(error) });
         await finish(started, failed);
         return failed;
       }
@@ -91,9 +97,9 @@ export function subtaskLaunch(deps: BusinessTaskUseCaseDeps) {
       if (!profile) throw validation(`agentProfile ${input.agentProfile} 未在该服务的发布中登记`, { registered: registration?.agentProfiles.map((p) => p.name) ?? [] });
       const contract = input.outputContract ? resolveContract(registration, input.outputContract) : undefined;
       if (input.outputContract && !contract) throw validation(`outputContract ${input.outputContract} 未在该服务的发布中登记`);
-      // 每个 attempt 在构造时固定运行环境版本（RFC-004）；档位此时不存在则留给启动时按原有路径报错。
-      const compute = await deps.compute.resolve(profile.compute);
-      return { ...base, kind: 'agent', mode: input.mode, prompt: input.prompt, agentProfile: profile, ...(contract ? { outputContract: contract } : {}), ...(compute?.runtime ? { runtime: compute.runtime } : {}), runnerRef: newId('agt') };
+      // 每个 attempt 在构造时固定档位修订，`default` 在此刻解析（C17）；解析失败留给启动时按同一原因把子任务置为失败。
+      const pinned = await deps.compute.resolve(profile.compute, 'subtask').then((r): ProfileRevisionRef => ({ profile: r.name, revision: r.revision }), () => undefined);
+      return { ...base, kind: 'agent', mode: input.mode, prompt: input.prompt, agentProfile: profile, ...(contract ? { outputContract: contract } : {}), ...(pinned ? { computeProfile: pinned } : {}), runnerRef: newId('agt') };
     },
   };
 }

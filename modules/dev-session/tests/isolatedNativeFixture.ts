@@ -2,6 +2,7 @@ import type { NativeTerminalDto, NativeTerminalRecord, NativeTerminalRoster, Run
 import { notFound, precondition } from '@crewstation/kernel';
 import type { EnvironmentView } from '../ports/runtime';
 import { nativeTerminalUseCases } from '../application/nativeTerminals';
+import { fakeComputeCatalog } from './computeFixture';
 import { memoryNativeRepository } from './nativeTerminalFixture';
 import { workspaceActor, workspaceFixture, workspaceTask } from './workspaceFixture';
 
@@ -13,7 +14,7 @@ export function isolatedNativeFixture() {
     offline: new Set<TaskId>(), taskProfile: 'cli-small', model: 'opencode/one', ready: true };
   const parent = f.deps.environments.getEnvironment;
   f.deps.environments.getEnvironment = async (id) => id === workspaceTask ? parent(id) : environments.get(id);
-  f.deps.compute.resolve = async (name) => ({ name, driver: 'opencode', model: controls.model, taskProfile: controls.taskProfile });
+  f.deps.compute = fakeComputeCatalog(() => [{ name: 'qa-cli', protocol: 'opencode', model: controls.model, taskProfile: controls.taskProfile, isDefault: true }]);
   f.deps.credentials.issueDevSessionToken = async (binding) => { issued.push(binding); return { token: 'fixture-token', expiresAt: '2026-09-16T00:00:00Z' }; };
   f.deps.environments.createNativeExecution = async (input) => {
     await controls.beforeCreate?.();
@@ -42,7 +43,7 @@ export function isolatedNativeFixture() {
       if (command.runnerId !== roster.runnerId) throw precondition('wrong runner');
       const record: NativeTerminalRecord = { agentId: command.agentId, terminalId: command.terminalId, runnerId: command.runnerId, compute: command.compute, permission: command.permission,
         lifecycle: 'running', revision: 2, cols: command.cols, rows: command.rows, startedAt: f.deps.clock.now().toISOString(),
-        ...(command.runtime ? { runtime: { configId: command.runtime.configId, revision: command.runtime.revision } } : {}) };
+        profileRevision: command.profileRevision, protocol: command.launch.protocol };
       roster.terminals.push(record); steps.push(`start:${taskId}`);
       if (controls.loseStart) { controls.loseStart = false; throw new Error('lost start receipt'); }
       return structuredClone(record);

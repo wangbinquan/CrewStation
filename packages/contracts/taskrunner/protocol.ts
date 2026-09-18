@@ -1,16 +1,20 @@
 import { z } from 'zod';
 import { SubtaskIdSchema, TaskIdSchema } from '../ids';
-import { AgentDriverSchema, AgentPermissionSchema, OutputContractSchema } from '../manifest/tasks';
+import { AgentPermissionSchema, OutputContractSchema } from '../manifest/tasks';
 import { AgentEventSchema } from './agentEvents';
 import { NativeActivityEventSchema } from './nativeActivity';
 import { RunnerApiInvocationSchema, ApiInvocationResultSchema } from './apiInvocation';
 import { RunnerWorkspaceStatusSchema } from './workspace';
 import { ComparisonDetailQuerySchema, ComparisonDetailsSchema, GitObjectIdSchema, RunnerComparisonSchema } from './workspaceComparison';
 import { NativeTerminalRecordSchema, NativeTerminalRosterSchema, TerminalControlSchema, TerminalSizeSchema, TerminalSnapshotSchema } from './nativeTerminal';
-import { AgentRuntimeMaterialSchema, BeforeStartExecutionSchema, RunnerInterpreterSchema } from './beforeStart';
+import { BeforeStartErrorSchema, BeforeStartExecutionSchema, BeforeStartMaterialSchema, RunnerInterpreterSchema } from './beforeStart';
+import { AgentProtocolSchema, LaunchSpecSchema } from './launch';
 
-/** TaskRunner ↔ cs-session 协议版本；不兼容变更递增，双方在 hello 时校验。 */
-export const TASKRUNNER_PROTOCOL_VERSION = 1;
+/**
+ * TaskRunner ↔ cs-session 协议版本；不兼容变更递增，双方在 hello 时校验。
+ * 2（RFC-006）：启动命令携带档位修订的 launch 与必有的启动前材料，hello 报 Runner 理解的协议；旧底座镜像里的 Runner 握手即被拒。
+ */
+export const TASKRUNNER_PROTOCOL_VERSION = 2;
 
 export const McpConnectionSchema = z.object({
   name: z.string().min(1),
@@ -27,12 +31,11 @@ export const RunnerHelloSchema = z.object({
   runnerToken: z.string().min(1),
   workdir: z.string().min(1),
   capabilities: z.object({
-    drivers: z.array(AgentDriverSchema),
+    /** Runner 代码理解的协议；二进制在不在、能不能起由档位测试证明，不由 hello 声称（RFC-006）。 */
+    protocols: z.array(AgentProtocolSchema),
     pty: z.boolean(),
     preview: z.boolean(),
     apiInvocations: z.literal(1).optional(),
-    /** RFC-004：能执行管理员启动前 Hook 并按 runtime 材料合成 CLI 配置；旧 Runner 没有它，平台在写 socket 前拒绝。 */
-    agentRuntimeConfig: z.literal(1).optional(),
     /** 容器内实际可用的脚本解释器清单；缺少所需语言的启动在执行前被拒。 */
     interpreters: z.array(RunnerInterpreterSchema).optional(),
   }),
@@ -40,40 +43,80 @@ export const RunnerHelloSchema = z.object({
 
 const cmd = <T extends string>(type: T) => ({ id: z.string().min(1), type: z.literal(type) });
 
+/** 两类启动命令共用的档位部分：名称回显、固定修订、二进制与参数、启动前材料与尝试标识（RFC-006）。 */
+const ProfileLaunchShape = {
+  /** 算力档位名：平台原样透传，TaskRunner 不解释，只在 started 事件与名册里回显。 */
+  compute: z.string().min(1),
+  profileRevision: z.number().int().min(1),
+  launch: LaunchSpecSchema,
+  permission: AgentPermissionSchema,
+  cwd: z.string().optional(),
+  systemPrompt: z.string().optional(),
+  mcp: z.array(McpConnectionSchema).default([]),
+  /** 追加到 Agent 进程的环境变量名值对。 */
+  env: z.record(z.string(), z.string()).default({}),
+  /** 档位修订的启动前材料：每次启动都有（可以没有步骤），Hook 成功后才创建 CLI 进程。 */
+  beforeStart: BeforeStartMaterialSchema,
+  /** 同一 Agent 每次真实创建 CLI 进程的尝试标识；重发同一 attempt 只恢复原执行结果，不重跑脚本。 */
+  processAttemptId: z.string().min(1),
+};
+
 export const StartAgentCommandSchema = z.object({
   ...cmd('startAgent'),
   agentId: z.string().min(1),
-  /**
-   * 算力档位名（RFC-001）。平台原样透传，TaskRunner 不解释，只在 started 事件里回显。
-   * 两个档位可以指向同一个模型，从 (driver, model) 反查不出唯一档位名，因此必须透传。
-   */
-  compute: z.string().min(1),
-  driver: AgentDriverSchema,
-  model: z.string().min(1),
-  permission: AgentPermissionSchema,
+  ...ProfileLaunchShape,
   mode: z.enum(['oneshot', 'interactive']),
-  cwd: z.string().optional(),
   initialPrompt: z.string().optional(),
   resumeSessionId: z.string().optional(),
-  systemPrompt: z.string().optional(),
-  mcp: z.array(McpConnectionSchema).default([]),
-  /** 追加到 Agent 进程的环境变量名值对；模型凭据也经此进入（接受的残余风险）。 */
-  env: z.record(z.string(), z.string()).default({}),
-  /** RFC-004：管理员运行环境的固定版本材料；缺省走旧的 agentEnvFile 路径，二者不混合。 */
-  runtime: AgentRuntimeMaterialSchema.optional(),
-  /** 同一 Agent 每次真实创建 CLI 进程的尝试标识；重发同一 attempt 只恢复原执行结果，不重跑脚本。 */
-  processAttemptId: z.string().min(1).optional(),
+}).superRefine((command, ctx) => {
+  // headless 与业务子任务要解析事件与会话：通用终端协议只能进「＋ CLI」（RFC-006 C6）。
+  if (command.launch.protocol === 'terminal') ctx.addIssue({ code: 'custom', message: '通用终端协议的档位只能用于「＋ CLI」', path: ['launch', 'protocol'] });
 });
 
-export const StartAgentTerminalCommandSchema = StartAgentCommandSchema.omit({ mode: true, initialPrompt: true, resumeSessionId: true }).extend({
-  type: z.literal('startAgentTerminal'), driver: z.enum(['claude-code', 'opencode']),
+export const StartAgentTerminalCommandSchema = z.object({
+  ...cmd('startAgentTerminal'),
+  agentId: z.string().min(1),
+  ...ProfileLaunchShape,
   terminalId: z.string().min(1), runnerId: z.uuid(), requestFingerprint: z.string().min(1),
   ...TerminalSizeSchema.shape,
+});
+
+/** 通用终端协议的档位测试（RFC-006 C11）：先跑启动前步骤，再执行管理员的测试命令并按正则判定输出。 */
+export const ProbeTerminalCommandSchema = z.object({
+  ...cmd('probeTerminal'),
+  probeId: z.string().min(1),
+  compute: z.string().min(1),
+  profileRevision: z.number().int().min(1),
+  launch: LaunchSpecSchema,
+  command: z.array(z.string().min(1)).min(1).max(32),
+  /** 期望输出的正则源码；对 stdout＋stderr 判定。 */
+  expect: z.string().min(1).max(1024),
+  timeoutMs: z.number().int().min(1000).max(600_000),
+  cwd: z.string().optional(),
+  mcp: z.array(McpConnectionSchema).default([]),
+  env: z.record(z.string(), z.string()).default({}),
+  beforeStart: BeforeStartMaterialSchema,
+  processAttemptId: z.string().min(1),
+});
+
+/** probeTerminal 的结果：启动前步骤失败时没有 command 段；输出只保留有界尾部。 */
+export const ProbeTerminalResultSchema = z.object({
+  probeId: z.string(),
+  beforeStart: z.object({ state: z.enum(['succeeded', 'failed', 'cancelled']), error: BeforeStartErrorSchema.optional() }),
+  command: z.object({
+    exitCode: z.number().int().nullable(),
+    timedOut: z.boolean(),
+    matched: z.boolean(),
+    outputTail: z.string().max(8192),
+    durationMs: z.number().int().min(0),
+    spawnError: z.string().optional(),
+  }).optional(),
 });
 
 export const RunnerCommandSchema = z.discriminatedUnion('type', [
   StartAgentCommandSchema,
   StartAgentTerminalCommandSchema,
+  ProbeTerminalCommandSchema,
   RunnerApiInvocationSchema.safeExtend({ ...cmd('invokeApi') }),
   z.object({ ...cmd('listAgentTerminals') }),
   z.object({ ...cmd('stopAgentTerminal'), agentId: z.string().min(1), runnerId: z.uuid() }),
@@ -108,6 +151,7 @@ export const PreviewStateSchema = z.enum(['disabled', 'stopped', 'starting', 're
 export const RunnerResultPayloads = {
   invokeApi: ApiInvocationResultSchema,
   startAgentTerminal: NativeTerminalRecordSchema,
+  probeTerminal: ProbeTerminalResultSchema,
   listAgentTerminals: NativeTerminalRosterSchema,
   attachTerminal: TerminalSnapshotSchema,
   claimTerminalControl: TerminalControlSchema,
@@ -160,6 +204,8 @@ export type RunnerHello = z.infer<typeof RunnerHelloSchema>;
 export type RunnerCommand = z.infer<typeof RunnerCommandSchema>;
 export type StartAgentCommand = z.infer<typeof StartAgentCommandSchema>;
 export type StartAgentTerminalCommand = z.infer<typeof StartAgentTerminalCommandSchema>;
+export type ProbeTerminalCommand = z.infer<typeof ProbeTerminalCommandSchema>;
+export type ProbeTerminalResult = z.infer<typeof ProbeTerminalResultSchema>;
 export type RunnerEvent = z.infer<typeof RunnerEventSchema>;
 export type RunnerMessage = z.infer<typeof RunnerMessageSchema>;
 export type SessionMessage = z.infer<typeof SessionMessageSchema>;

@@ -1,4 +1,5 @@
 import type { AgentSupervisor } from './agents/agentSupervisor';
+import type { TerminalProbes } from './agents/terminalProbe';
 import type { CommandHandlers } from './commandDispatcher';
 import type { ContractVerifier } from './contract/verifyContract';
 import type { ExecSupervisor } from './exec/execSupervisor';
@@ -12,6 +13,7 @@ import type { WorkspaceComparisons } from './workspace/workspaceComparison';
 export interface CommandTargets {
   invokeApi: (input: RunnerApiInvocation) => Promise<ApiInvocationResult>;
   agents: AgentSupervisor;
+  probes: TerminalProbes;
   execs: ExecSupervisor;
   terminals: TerminalSupervisor;
   nativeTerminals: NativeTerminalSupervisor;
@@ -38,6 +40,7 @@ export function buildCommandHandlers(targets: CommandTargets): CommandHandlers {
     claimTerminalControl: async (c) => targets.nativeTerminals.claim(c.terminalId, c.viewId, c.runnerId),
     detachTerminal: async (c) => { targets.nativeTerminals.detach(c.terminalId, c.viewId); return ack(); },
     startAgent: (c) => targets.agents.start(c).then(ack),
+    probeTerminal: (c) => targets.probes.run(c),
     sendMessage: (c) => targets.agents.send(c.agentId, c.content).then(ack),
     cancelAgent: (c) => targets.agents.cancel(c.agentId).then(ack),
     exec: (c) => targets.execs.run(c),

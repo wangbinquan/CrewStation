@@ -21,7 +21,7 @@ describe('capabilities module', () => {
         quota: async () => ({ maxConcurrentTasks: 3, running: 1 }),
         servicePlans: async () => [{ name: 'standard-small', cpu: '500m', memory: '512Mi', maxReplicas: 3, description: '' }],
 
-        computeProfiles: async () => [{ name: 'sample-stub', description: '样例', mode: 'legacy' as const, available: true }],
+        computeProfiles: async () => [{ name: 'balanced', description: '样例', terminalOnly: false, isDefault: true, available: true }, { name: 'tool-cli', description: '终端', terminalOnly: true, isDefault: false, available: false, reason: '档位 tool-cli 正在测试' }],
         configKeys: async (_a, _p, env) => (env === 'production' ? ['GREETING'] : ['GREETING', 'DEBUG']),
         dataResources: async () => [],
         operations: async () => [{ key: 'issues:GET:/v1/issues/{id}', proxy: 'issues', method: 'GET', path: '/v1/issues/{id}', openPolicy: 'default', granted: true }],
@@ -34,6 +34,9 @@ describe('capabilities module', () => {
     expect(dto.config).toEqual({ development: ['GREETING', 'DEBUG'], production: ['GREETING'] });
     expect(dto.operations[0]?.granted).toBe(true);
     expect(dto.plan?.name).toBe('standard-small');
+    // 租户只看到档位名、说明、是否仅终端、是否默认与可用性，看不到镜像、二进制或模型（RFC-006 C2）。
+    expect(dto.computeProfiles.map((p) => [p.name, p.isDefault, p.terminalOnly, p.available])).toEqual([['balanced', true, false, true], ['tool-cli', false, true, false]]);
+    expect(JSON.stringify(dto.computeProfiles)).not.toMatch(/image|binaryPath|model/);
     expect(dto.businessTaskApi.length).toBeGreaterThan(3);
   });
 });

@@ -2,8 +2,10 @@ import { afterEach, describe, expect, test } from 'bun:test';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { RunnerResultPayloads } from '@crewstation/contracts';
+import { echoDriverFactory } from './echoAgentDriver';
 import type { FakeSession } from './fakeSession';
 import { CommandFailure, startFakeSession } from './fakeSession';
+import { profileFields } from './profileFixtures';
 import type { TestRunner } from './testRunner';
 import { freePort, startTestRunner, TEST_SUBTASK_ID } from './testRunner';
 
@@ -15,7 +17,7 @@ afterEach(async () => {
 async function boot(overrides: Parameters<typeof startTestRunner>[1] = {}): Promise<{ session: FakeSession; tr: TestRunner }> {
   const session = startFakeSession();
   cleanups.push(() => session.stop());
-  const tr = await startTestRunner(session.url, overrides);
+  const tr = await startTestRunner(session.url, overrides, { drivers: echoDriverFactory() });
   cleanups.push(() => tr.dispose());
   await tr.runner.whenConnected();
   return { session, tr };
@@ -125,7 +127,7 @@ describe('终端', () => {
 describe('shutdown', () => {
   test('回 ack，runnerState draining，取消 Agent、关终端，然后 exit(0)', async () => {
     const { session, tr } = await boot();
-    await session.call({ id: 's1', type: 'startAgent', agentId: 'agent-s', compute: 'sample-stub', driver: 'stub', model: 'stub/echo', permission: 'edit', mode: 'interactive', initialPrompt: 'stay' });
+    await session.call({ id: 's1', type: 'startAgent', agentId: 'agent-s', ...profileFields('agent-s'), mode: 'interactive', initialPrompt: 'stay' });
     await session.waitForEvent('agent', (e) => e.event.agentId === 'agent-s' && e.event.type === 'status');
     if (session.hellos[0]?.capabilities.pty) await session.call({ id: 's2', type: 'openTerminal', terminalId: 'term-s', cols: 80, rows: 24 });
     expect(await session.call({ id: 's3', type: 'shutdown', graceSeconds: 10 })).toEqual({});

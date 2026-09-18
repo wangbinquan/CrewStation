@@ -1,16 +1,15 @@
-import type { AgentPermission, McpConnection, RuntimeRevisionRef } from '@crewstation/contracts';
+import type { AgentPermission, LaunchSpec, McpConnection } from '@crewstation/contracts';
 import type { DriverLaunchSpec } from './processHost';
 
-/** 平台解析后的原生终端规格；不是租户可传入的 CLI flags。 */
+/** 平台解析后的原生终端规格；不是租户可传入的 CLI flags。三种协议都可以（RFC-006：terminal 只在这里可用）。 */
 export interface NativeTerminalSpec {
   agentId: string;
-  driver: 'claude-code' | 'opencode';
   compute: string;
-  model: string;
+  profileRevision: number;
+  launch: LaunchSpec;
   permission: AgentPermission;
   systemPrompt?: string;
   mcp: McpConnection[];
-  runtime?: RuntimeRevisionRef;
 }
 
 export interface PreparedNativeTerminal {

@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
 import type { RunnerCommand, RunnerHello, TaskId } from '@crewstation/contracts';
-import { API_INVOCATION_TIMEOUT_MS } from '@crewstation/contracts';
+import { API_INVOCATION_TIMEOUT_MS, TASKRUNNER_PROTOCOL_VERSION } from '@crewstation/contracts';
 import { fixedClock } from '@crewstation/kernel';
 import { commandDispatch } from '../application/commandDispatch';
 import { RunnerConnection } from '../domain/runnerConnection';
@@ -9,7 +9,7 @@ import { fetchForwarder } from '../adapters/http/fetchForwarder';
 
 const taskId = 'tsk_0123456789abcdef0123456789abcdef' as TaskId;
 const command: RunnerCommand = { id: 'invoke', type: 'invokeApi', proxy: 'crm', method: 'GET', path: '/items', query: {}, headers: {} };
-const hello: RunnerHello = { type: 'hello', taskId, protocolVersion: 1, runnerToken: 'token', workdir: '/work', capabilities: { drivers: ['stub'], pty: true, preview: false } };
+const hello: RunnerHello = { type: 'hello', taskId, protocolVersion: TASKRUNNER_PROTOCOL_VERSION, runnerToken: 'token', workdir: '/work', capabilities: { protocols: ['claude-code', 'opencode', 'terminal'], pty: true, preview: false } };
 
 function fixture(capable: boolean) {
   const sent: RunnerCommand[] = [];
@@ -29,7 +29,7 @@ test('旧 Runner 拒绝新命令时 socket 和 pending 均未写入；CLI 普通
   await expect(f.dispatch.sendCommand(taskId, command)).rejects.toMatchObject({ details: { code: 'api_invocations_unavailable' } });
   await expect(f.dispatch.sendLocalOnly(taskId, command)).rejects.toMatchObject({ kind: 'precondition' });
   expect(f.sent).toEqual([]); expect(f.connection.pending.size).toBe(0);
-  expect(await f.dispatch.connectionStatus(taskId)).toMatchObject({ connected: true, drivers: ['stub'] });
+  expect(await f.dispatch.connectionStatus(taskId)).toMatchObject({ connected: true, protocols: ['claude-code', 'opencode', 'terminal'] });
   const ordinary = f.dispatch.sendCommand(taskId, { id: 'list', type: 'listAgentTerminals' });
   expect(f.sent.map((item) => item.type)).toEqual(['listAgentTerminals']);
   f.connection.pending.settle('list', { ok: true, payload: { terminals: [] } });

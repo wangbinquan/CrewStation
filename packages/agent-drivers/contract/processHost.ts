@@ -38,6 +38,6 @@ export interface ProcessHost {
   pumpLines(stream: ReadableStream<Uint8Array>, onLine: (line: string) => void): Promise<void>;
   /** 把运行目录与其中的文件交给 worker，否则降权后的 CLI 读不到 0600 的 mcp-config.json。 */
   chownToWorker(path: string): Promise<void>;
-  /** PATH 上解析可执行文件；决定驱动的 available()。 */
+  /** 解析可执行文件（绝对路径或 PATH 上的名字）；供版本探测等辅助调用。 */
   which(binary: string): string | null;
 }

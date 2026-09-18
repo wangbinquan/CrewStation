@@ -1,14 +1,20 @@
 import type { Actor, ProjectId, ServiceId, TaskId, TaskKind, TraceId, UserId, VolumeMode } from '@crewstation/contracts';
 import type { DevSessionRebuildDto, DevSessionRebuildInspection, RebuildDevSessionRequest } from '@crewstation/contracts';
-import type { AgentRuntimeMaterial, RuntimeCheckContext, RuntimeCheckStage, RuntimeDriver } from '@crewstation/contracts';
+import type { BeforeStartMaterial, LaunchSpec, ProfileTestContext, ProfileTestOutcome, ProfileTestStage, TerminalTest } from '@crewstation/contracts';
 
-/** 运行环境检查（RFC-004）：输入为固定版本的启动材料与探针提示，进度按阶段上报，结局四态；unknown 表示环境中途丢失。 */
-export interface RuntimeCheckInput { checkId: string; driver: RuntimeDriver; model: string; material: AgentRuntimeMaterial; prompt: string; expectedReply: string }
-export interface RuntimeCheckProgress { context?: Partial<RuntimeCheckContext>; stages?: RuntimeCheckStage[] }
-export interface RuntimeCheckOutcome { state: 'succeeded' | 'failed' | 'cancelled' | 'unknown'; error?: string; context?: Partial<RuntimeCheckContext>; stages: RuntimeCheckStage[] }
+/**
+ * 档位测试（RFC-006 §6）：输入为一个档位修订的镜像、launch 与启动前材料，加上已知协议的 nonce 提示或通用终端的测试命令；
+ * 进度按阶段上报，结局三态，unknown 表示环境中途丢失、无法确认启动前脚本是否已执行。
+ */
+export interface ProfileTestRunInput {
+  testId: string; profile: string; revision: number; launch: LaunchSpec; image: string; taskProfile?: string;
+  beforeStart: BeforeStartMaterial; prompt: string; expectedReply: string; terminalTest?: TerminalTest;
+}
+export interface ProfileTestRunProgress { context?: Partial<ProfileTestContext>; stages?: ProfileTestStage[] }
+export interface ProfileTestRunResult { state: 'passed' | 'failed' | 'unknown'; outcome?: ProfileTestOutcome; error?: string; context?: Partial<ProfileTestContext>; stages: ProfileTestStage[] }
 
 export type EnvironmentState = 'creating' | 'running' | 'paused' | 'releasing' | 'released' | 'failed';
-export type ReleaseReason = 'user' | 'owner-force' | 'business' | 'failed' | 'pod-lost' | 'runtime-check';
+export type ReleaseReason = 'user' | 'owner-force' | 'business' | 'failed' | 'pod-lost' | 'profile-test';
 
 export interface EnvironmentDto {
   id: TaskId;
@@ -65,6 +71,8 @@ export interface TaskRuntimeModuleApi {
   touch(taskId: TaskId): Promise<void>;
   onRunnerConnected(taskId: TaskId, token: string): Promise<boolean>;
   onRunnerDisconnected(taskId: TaskId, token: string): Promise<void>;
+  /** 握手被拒（协议不一致）：只记录原因，不改状态、不删 Pod（RFC-006 §5.3）。 */
+  onRunnerRejected(taskId: TaskId, token: string, rejection: { code: 'protocol_mismatch'; runnerProtocol: number | null; message: string }): Promise<void>;
   inspectRebuild(projectId: ProjectId): Promise<DevSessionRebuildInspection>;
   requestRebuild(projectId: ProjectId, input: RebuildDevSessionRequest): Promise<DevSessionRebuildDto>;
   getRebuild(taskId: TaskId): Promise<DevSessionRebuildDto | undefined>;
@@ -81,5 +89,5 @@ export interface TaskRuntimeModuleApi {
   canOpenStream(actor: Actor, taskId: TaskId): Promise<boolean>;
   reconcile(): Promise<number>;
   /** RFC-004：在平台专属检查任务里执行完整 Hook 与一次最小模型调用，结束后清理任务；供 agent-runtime 的执行器端口。 */
-  runRuntimeCheck(input: RuntimeCheckInput, report: (progress: RuntimeCheckProgress) => Promise<void>, heartbeat: () => Promise<boolean>): Promise<RuntimeCheckOutcome>;
+  runProfileTest(input: ProfileTestRunInput, report: (progress: ProfileTestRunProgress) => Promise<void>, heartbeat: () => Promise<boolean>): Promise<ProfileTestRunResult>;
 }

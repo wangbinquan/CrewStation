@@ -35,6 +35,7 @@ export function AgentRoster({ agents, selected, onSelect }: AgentRosterProps): R
           onClick={() => onSelect(agent.agentId)}
         >
           <span className={styles.compute}>L-{agent.agentId.slice(-6)} · {agent.compute}</span>
+          {agent.profileRevision ? <small className={styles.compute}>{t('devSession.agents.profileRevision', { revision: agent.profileRevision })}</small> : null}
           <Badge tone={agentStateTone(agent.state)}>{t(`devSession.agentState.${agent.state}`)}</Badge>
           {preparationLine(agent) !== undefined ? <small className={styles.compute}>{preparationLine(agent)}</small> : null}
         </button>

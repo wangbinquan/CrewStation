@@ -39,7 +39,6 @@ export interface TaskRuntimeSettings {
   readonly userDomain: string;
   readonly serviceDomain: string;
   readonly workerUid: number;
-  readonly agentEnvSecretName?: string;
   readonly defaultProfile: string;
   /** 开发预览是用户域主机，路由要挂网关的这两个系统中间件。 */
   readonly userAuthMiddleware: string;
@@ -47,10 +46,10 @@ export interface TaskRuntimeSettings {
 }
 
 /**
- * 由 session-client 提供（RFC-004 检查执行）：向检查任务的 TaskRunner 下发命令、读持久事件、读握手能力。
- * task-runtime 平时不需要它；只有运行环境检查在这里等待 Hook 与模型结果。
+ * 由 session-client 提供（RFC-006 档位测试）：向测试任务的 TaskRunner 下发命令、读持久事件、读握手能力。
+ * task-runtime 平时不需要它；只有档位测试在这里等待启动前步骤与协议轮次的结果。
  */
-export interface CheckRunner {
+export interface TestRunner {
   sendCommand(taskId: TaskId, command: RunnerCommand): Promise<unknown>;
   listEvents(taskId: TaskId, options?: { sinceSeq?: number; kinds?: RunnerEvent['kind'][]; agentId?: string; limit?: number }): Promise<Array<{ seq: number; at: string; event: RunnerEvent }>>;
   connectionStatus(taskId: TaskId): Promise<{ connected: boolean; capabilities?: RunnerHello['capabilities'] }>;

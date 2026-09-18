@@ -3,13 +3,13 @@ import { mkdir, readFile, stat, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { RunnerResultPayloads, TASKRUNNER_PROTOCOL_VERSION } from '@crewstation/contracts';
-import { createClaudeCodeCliDriver, createOpencodeCliDriver } from '../src/agents/cliDriver';
-import type { DriverRegistry } from '../src/agents/registry';
-import { createDriverRegistry } from '../src/agents/registry';
-import { createStubDriver } from '../src/agents/stubDriver';
+import { createCliDriverFactory } from '../src/agents/cliDriver';
+import type { AgentDriverFactory } from '../src/agents/driver';
 import { contentVersion } from '../src/files/fileCommands';
+import { echoDriverFactory } from './echoAgentDriver';
 import type { FakeSession } from './fakeSession';
 import { CommandFailure, startFakeSession } from './fakeSession';
+import { launchSpec, profileFields } from './profileFixtures';
 import type { TestRunner } from './testRunner';
 import { runningAsRoot, startTestRunner, TEST_TASK_ID, TEST_TOKEN, WORKER_ID } from './testRunner';
 
@@ -18,16 +18,11 @@ afterEach(async () => {
   for (const cleanup of cleanups.splice(0).reverse()) await cleanup();
 });
 
-/** 驱动注册表在测试里固定住：两个 CLI 一律按「二进制不在位」接入，hello 与错误码才不随开发机上装了什么而变。 */
-function testDrivers(): DriverRegistry {
-  const absent = { which: () => null };
-  return createDriverRegistry([createStubDriver(), createClaudeCodeCliDriver(absent), createOpencodeCliDriver(absent)]);
-}
-
-async function boot(): Promise<{ session: FakeSession; tr: TestRunner }> {
+/** 缺省注入回显替身（测试专用，经与真实驱动同一个工厂接缝）；CLI 驱动的用例单独注入“二进制不在位”的真实工厂。 */
+async function boot(drivers: AgentDriverFactory = echoDriverFactory()): Promise<{ session: FakeSession; tr: TestRunner }> {
   const session = startFakeSession();
   cleanups.push(() => session.stop());
-  const tr = await startTestRunner(session.url, {}, { registry: testDrivers() });
+  const tr = await startTestRunner(session.url, {}, { drivers });
   cleanups.push(() => tr.dispose());
   await tr.runner.whenConnected();
   return { session, tr };
@@ -49,8 +44,8 @@ describe('握手与心跳', () => {
     const { session } = await boot();
     const roster = RunnerResultPayloads.listAgentTerminals.parse(await session.call({ id: 'native-list', type: 'listAgentTerminals' }));
     expect(roster.terminals).toEqual([]);
-    const result = await session.call({ id: 'native-start', type: 'startAgentTerminal', agentId: 'native-bad', terminalId: 'native-terminal', runnerId: roster.runnerId, requestFingerprint: 'start-one', driver: 'claude-code', compute: 'balanced', model: 'model', permission: 'edit', cwd: 'directory-that-does-not-exist', cols: 80, rows: 24 });
-    expect(RunnerResultPayloads.startAgentTerminal.parse(result)).toMatchObject({ lifecycle: 'failed', reason: 'start-failed' });
+    const result = await session.call({ id: 'native-start', type: 'startAgentTerminal', agentId: 'native-bad', terminalId: 'native-terminal', runnerId: roster.runnerId, requestFingerprint: 'start-one', ...profileFields('native-bad'), cwd: 'directory-that-does-not-exist', cols: 80, rows: 24 });
+    expect(RunnerResultPayloads.startAgentTerminal.parse(result)).toMatchObject({ lifecycle: 'failed', reason: 'start-failed', profileRevision: 3, protocol: 'claude-code' });
     await session.call({ id: 'native-close-view', type: 'closeTerminal', terminalId: 'native-terminal' });
     expect(RunnerResultPayloads.listAgentTerminals.parse(await session.call({ id: 'native-list-again', type: 'listAgentTerminals' })).terminals).toHaveLength(1);
     expect(RunnerResultPayloads.attachTerminal.parse(await session.call({ id: 'native-attach', type: 'attachTerminal', terminalId: 'native-terminal', runnerId: roster.runnerId }))).toMatchObject({ data: '', throughSeq: 0 });
@@ -59,7 +54,11 @@ describe('握手与心跳', () => {
     const { session, tr } = await boot();
     const hello = await session.waitFor(() => session.hellos[0]);
     expect(hello).toMatchObject({ type: 'hello', protocolVersion: TASKRUNNER_PROTOCOL_VERSION, taskId: TEST_TASK_ID, runnerToken: TEST_TOKEN, workdir: tr.runner.workdir });
-    expect(hello.capabilities.drivers).toEqual(['stub']);
+    // RFC-006：宣告的是 Runner 代码理解的协议，与开发机或镜像里装了哪些二进制无关；旧的两个字段不再发送。
+    expect(hello.capabilities.protocols).toEqual(['claude-code', 'opencode', 'terminal']);
+    const rawCapabilities = (session.rawHellos[0] as { capabilities: Record<string, unknown> }).capabilities;
+    expect(Object.keys(rawCapabilities)).not.toContain('drivers');
+    expect(Object.keys(rawCapabilities)).not.toContain('agentRuntimeConfig');
     expect(hello.capabilities.preview).toBe(false);
     expect(typeof hello.capabilities.pty).toBe('boolean');
     const ready = await session.waitForEvent('runnerState');
@@ -189,11 +188,13 @@ describe('文件', () => {
   });
 });
 
-describe('stub Agent', () => {
-  test('oneshot：started → session → 回显 text → completed，mcp 名与 env 键被记录', async () => {
-    const { session } = await boot();
-    const prompt = 'hello stub world';
-    const command = { id: 'a1', type: 'startAgent', agentId: 'agent-1', compute: 'sample-stub', driver: 'stub', model: 'stub/echo', permission: 'edit', mode: 'oneshot', initialPrompt: prompt, mcp: [{ name: 'ops', url: 'http://ops.svc.cs.internal/mcp' }], env: { STUB_TEST_KEY: 'value-must-not-be-logged' } };
+describe('headless Agent（回显替身经驱动工厂注入）', () => {
+  test('oneshot：先过启动前 Hook，started 回显档位名、修订与协议，launch 原样到达驱动，mcp 名与 env 键被记录', async () => {
+    const drivers = echoDriverFactory();
+    const { session } = await boot(drivers);
+    const prompt = 'hello echo world';
+    const launch = launchSpec('opencode', { binaryPath: '/opt/fork/bin/opencode', model: 'anthropic/echo' });
+    const command = { id: 'a1', type: 'startAgent', agentId: 'agent-1', ...profileFields('agent-1', { compute: 'sample', launch, mcp: [{ name: 'ops', url: 'http://ops.svc.cs.internal/mcp' }], env: { ECHO_TEST_KEY: 'value-must-not-be-logged' } }), mode: 'oneshot', initialPrompt: prompt };
     expect(await session.call(command)).toEqual({});
     await session.waitForEvent('agent', (e) => e.event.agentId === 'agent-1' && e.event.type === 'completed');
     const events = session.eventsOf('agent').map((e) => e.event.event).filter((e) => e.agentId === 'agent-1');
@@ -201,21 +202,37 @@ describe('stub Agent', () => {
     expect(events.at(-1)?.type).toBe('completed');
     expect(events.filter((e) => e.type === 'text').map((e) => e.text).join('')).toBe(prompt);
     expect(events.every((e, i) => e.seq === i + 1)).toBe(true);
-    expect(events[0]?.raw).toMatchObject({ mode: 'oneshot', model: 'stub/echo', mcp: ['ops'] });
-    expect((events[0]?.raw as { envKeys: string[] }).envKeys).toContain('STUB_TEST_KEY');
+    expect(events[0]?.spec).toEqual({ compute: 'sample', profileRevision: 3, protocol: 'opencode', model: 'anthropic/echo', permission: 'edit' });
+    expect(events[0]?.raw).toMatchObject({ mode: 'oneshot', binaryPath: '/opt/fork/bin/opencode', mcp: ['ops'], homeIsPrivate: true });
+    expect((events[0]?.raw as { envKeys: string[] }).envKeys).toContain('ECHO_TEST_KEY');
     expect((events[0]?.raw as { envKeys: string[] }).envKeys).not.toContain('CS_RUNNER_TOKEN');
-    expect(events[1]?.sessionId).toBe('stub-agent-1');
+    expect(drivers.starts[0]?.spec.launch).toEqual(launch);
+    expect(events[1]?.sessionId).toBe('echo-agent-1');
     expect(events.at(-1)?.result).toMatchObject({ summary: `echoed ${prompt.length} chars`, exitCode: 0 });
-    await expectFailure(session.call({ id: 'a2', type: 'startAgent', agentId: 'agent-x', compute: 'sample-stub', driver: 'stub', model: 'm', permission: 'edit', mode: 'oneshot', cwd: '../outside' }), 'path_denied');
+    // 空步骤的材料同样留下一条执行记录：每次启动都经启动前 Hook（RFC-006）。
+    const hook = session.eventsOf('beforeStart').map((e) => e.event.execution).filter((e) => e.agentId === 'agent-1').at(-1);
+    expect(hook).toMatchObject({ state: 'succeeded', processAttemptId: 'agent-1:1', profile: { profile: 'balanced', revision: 3 }, steps: [] });
+    expect(JSON.stringify(session.frames)).not.toContain('value-must-not-be-logged');
+    await expectFailure(session.call({ id: 'a2', type: 'startAgent', agentId: 'agent-x', ...profileFields('agent-x'), mode: 'oneshot', cwd: '../outside' }), 'path_denied');
+  });
+
+  test('协议 2 的形状：通用终端协议不能用于 headless，旧形状（driver／model、无 launch）的命令被拒', async () => {
+    const { session } = await boot();
+    await expectFailure(session.call({ id: 't1', type: 'startAgent', agentId: 'agent-t', ...profileFields('agent-t', { launch: launchSpec('terminal') }), mode: 'oneshot' }), 'invalid_command');
+    await expectFailure(session.call({ id: 't2', type: 'startAgent', agentId: 'agent-v1', compute: 'balanced', driver: 'claude-code', model: 'm', permission: 'edit', mode: 'oneshot' }), 'invalid_command');
+    await expectFailure(session.call({ id: 't3', type: 'startAgent', agentId: 'agent-nb', ...profileFields('agent-nb', { beforeStart: undefined }), mode: 'oneshot' }), 'invalid_command');
+    await expectFailure(session.call({ id: 't4', type: 'startAgent', agentId: 'agent-rel', ...profileFields('agent-rel', { launch: launchSpec('claude-code', { binaryPath: 'claude' }) }), mode: 'oneshot' }), 'invalid_command');
+    expect(session.eventsOf('agent')).toEqual([]);
+    expect(session.eventsOf('beforeStart')).toEqual([]);
   });
 
   test('interactive：WRITE 指令以 worker 身份落盘，sendMessage 回显，cancelAgent 结束', async () => {
     const { session, tr } = await boot();
-    const start = { id: 'b1', type: 'startAgent', agentId: 'agent-2', compute: 'sample-stub', driver: 'stub', model: 'stub/echo', permission: 'full', mode: 'interactive', initialPrompt: 'WRITE out/hello.txt: written by stub' };
+    const start = { id: 'b1', type: 'startAgent', agentId: 'agent-2', ...profileFields('agent-2', { permission: 'full' }), mode: 'interactive', initialPrompt: 'WRITE out/hello.txt: written by echo' };
     await session.call(start);
     await session.waitForEvent('agent', (e) => e.event.agentId === 'agent-2' && e.event.type === 'status' && e.event.status === 'waiting');
     const file = join(tr.workdir, 'out', 'hello.txt');
-    expect(await readFile(file, 'utf8')).toBe('written by stub');
+    expect(await readFile(file, 'utf8')).toBe('written by echo');
     if (runningAsRoot) expect((await stat(file)).uid).toBe(WORKER_ID);
     const tools = session.eventsOf('agent').map((e) => e.event.event).filter((e) => e.agentId === 'agent-2' && e.type.startsWith('tool-'));
     expect(tools.map((t) => t.type)).toEqual(['tool-start', 'tool-end']);
@@ -224,22 +241,23 @@ describe('stub Agent', () => {
     await expectFailure(session.call({ ...start, id: 'b2-dup' }), 'agent_exists');
     await session.call({ id: 'b3', type: 'sendMessage', agentId: 'agent-2', content: 'second turn' });
     const texts = session.eventsOf('agent').map((e) => e.event.event).filter((e) => e.agentId === 'agent-2' && e.type === 'text');
-    expect(texts.map((t) => t.text).join('')).toBe('WRITE out/hello.txt: written by stubsecond turn');
+    expect(texts.map((t) => t.text).join('')).toBe('WRITE out/hello.txt: written by echosecond turn');
     await expectFailure(session.call({ id: 'b4', type: 'sendMessage', agentId: 'ghost', content: 'x' }), 'not_found');
 
     await session.call({ id: 'b5', type: 'cancelAgent', agentId: 'agent-2' });
     await session.waitForEvent('agent', (e) => e.event.agentId === 'agent-2' && e.event.type === 'cancelled');
     await expectFailure(session.call({ id: 'b6', type: 'sendMessage', agentId: 'agent-2', content: 'too late' }), 'not_found');
-    expect(tr.logLines.some((line) => line.includes('written by stub'))).toBe(false);
+    expect(tr.logLines.some((line) => line.includes('written by echo'))).toBe(false);
   });
 
-  test('CLI 驱动：二进制不在位时报 driver_not_installed，不白建运行目录', async () => {
-    const { session } = await boot();
-    await session.call({ id: 'd1', type: 'startAgent', agentId: 'agent-3', compute: 'sample-stub', driver: 'claude-code', model: 'anthropic/claude-sonnet-4', permission: 'edit', mode: 'oneshot', initialPrompt: 'hi' });
+  test('CLI 驱动：档位二进制不在位时报 driver_not_installed（消息带档位给的绝对路径），Agent 结束后私有目录随之清理', async () => {
+    const { session, tr } = await boot(createCliDriverFactory({ which: () => null }));
+    await session.call({ id: 'd1', type: 'startAgent', agentId: 'agent-3', ...profileFields('agent-3', { launch: launchSpec('claude-code', { binaryPath: '/opt/absent/bin/claude', model: 'anthropic/claude-sonnet-4' }) }), mode: 'oneshot', initialPrompt: 'hi' });
     const failure = await session.waitForEvent('agent', (e) => e.event.agentId === 'agent-3' && e.event.type === 'error');
     expect(failure.event.event.error?.code).toBe('driver_not_installed');
-    expect(failure.event.event.error?.message).toBe('driver binary not installed: claude');
+    expect(failure.event.event.error?.message).toBe('driver binary not installed: /opt/absent/bin/claude');
     await Bun.sleep(20);
     await expectFailure(session.call({ id: 'd2', type: 'cancelAgent', agentId: 'agent-3' }), 'not_found');
+    expect(await stat(join(tr.config.agentRunDir!, 'agent-3')).then(() => true, () => false)).toBe(false);
   });
 });

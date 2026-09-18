@@ -1,8 +1,11 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
-import type { ProjectId, ReleaseId, RunnerCommand, RunnerEvent, RuntimeRevisionRef, ServiceActor, ServiceId, TaskId } from '@crewstation/contracts';
+import type { ProfileRevisionRef, ProjectId, ReleaseId, RunnerCommand, RunnerEvent, ServiceActor, ServiceId, TaskId } from '@crewstation/contracts';
+import { LaunchSpecSchema } from '@crewstation/contracts';
 import { eventbusMigrations } from '@crewstation/eventbus';
+import { precondition, validation } from '@crewstation/kernel';
 import type { TestDatabase } from '@crewstation/testkit';
 import { createTestDatabase, testDatabaseAvailable } from '@crewstation/testkit';
+import type { ComputeCatalog } from '../ports/runtime';
 import type { BusinessTaskModule } from '../wiring';
 import { businessTaskMigrations, createBusinessTaskModule } from '../wiring';
 
@@ -20,11 +23,23 @@ const emit = (taskId: string, event: RunnerEvent) => { const list = events.get(t
 const agentEvent = (agentId: string, type: string, extra: Record<string, unknown> = {}): RunnerEvent => ({ kind: 'agent', event: { agentId, seq: 0, at: new Date().toISOString(), type, ...extra } as never });
 
 let runnerConnected = true;
-/** 可变：用来验证「登记时存在、起子任务时被管理员删掉」的档位（RFC-001）。 */
-let computeProfiles = ['sample-stub'];
-/** RFC-004：设置后档位视为托管，子任务在构造时固定该版本。 */
-let managedRuntime: RuntimeRevisionRef | undefined;
-const materialRequests: RuntimeRevisionRef[] = [];
+/** 可变：验证「登记时存在、起子任务时被管理员删掉」的档位（RFC-001），以及修订与默认档位随时间变化（RFC-006）。 */
+let computeProfiles: Array<{ name: string; revision: number; isDefault?: boolean }> = [{ name: 'sample-opencode', revision: 1, isDefault: true }];
+const materialRequests: ProfileRevisionRef[] = [];
+const image = `registry.test/runtime/sample@sha256:${'0'.repeat(64)}`;
+const fakeCompute: ComputeCatalog = {
+  resolve: async (name) => {
+    const found = !name || name === 'default' ? computeProfiles.find((p) => p.isDefault) : computeProfiles.find((p) => p.name === name);
+    if (!found && (!name || name === 'default')) throw precondition('平台尚未设置默认算力档位，请管理员在平台管理里设置', { code: 'no_default_profile' });
+    if (!found) throw validation(`算力档位 ${name} 不存在`, { code: 'profile_not_found', available: computeProfiles.map((p) => p.name) });
+    return { name: found.name, revision: found.revision, protocol: 'opencode', image };
+  },
+  launchMaterial: async (ref) => {
+    materialRequests.push(ref);
+    return { name: ref.profile, revision: ref.revision, protocol: 'opencode', image, launch: LaunchSpecSchema.parse({ protocol: 'opencode', binaryPath: '/usr/local/bin/opencode', model: 'opencode/one' }),
+      beforeStart: { profile: ref.profile, revision: ref.revision, contentHash: 'h', steps: [], vars: {}, secrets: { KEY: 'sk-business' }, configFile: { kind: 'none' }, captureOutput: false } };
+  },
+};
 
 beforeAll(async () => {
   if (!available) return;
@@ -49,11 +64,11 @@ beforeAll(async () => {
     },
     directory: { resolveServiceIdentity: async (identity) => (identity === 'demo/demo' ? { serviceId, projectId } : undefined) },
     authorizer: { authorize: async () => undefined },
-    compute: { resolve: async (name: string) => (computeProfiles.includes(name) ? { name, driver: 'stub' as const, model: 'stub/echo', ...(managedRuntime ? { runtime: managedRuntime } : {}) } : undefined), runtimeMaterial: async (ref) => { materialRequests.push(ref); return { configId: ref.configId, configName: 'gw', revision: ref.revision, driver: 'opencode', contentHash: 'h', steps: [], vars: {}, secrets: { KEY: 'sk-business' }, configFile: { kind: 'none' }, captureOutput: false }; }, list: async () => computeProfiles.map((name) => ({ name })) },
+    compute: fakeCompute,
     isAdmin: async () => false,
     settings: { mcp: [{ name: 'operations', url: 'http://mcp-operations.svc.cs.internal/mcp' }], outputLimitBytes: 65536, consumerName: 'test.business-task' },
   });
-  await bt.api.registerContracts({ occurredAt: new Date().toISOString(), projectId, serviceId, releaseId: 'rel_0123456789abcdef0123456789abcdef' as ReleaseId, tag: 'v0.1.0', commitSha: 'abc', manifest: { apiVersion: 'crewstation/v1', kind: 'DigitalWorker', spec: { service: { command: ['bun'], port: 3000, healthPath: '/healthz', plan: 'p', replicas: 1, releaseMode: 'rolling-compatible' }, env: [], apis: { requested: [] }, subscriptions: [], release: { migration: { compatibility: 'none', destructive: false, rollback: 'switch-back' } }, tasks: { profile: 'coding-medium', defaultVolumeMode: 'follow-container', agentProfiles: [{ name: 'chat-v1', compute: 'sample-stub', permission: 'read-only' }], outputContracts: [{ name: 'report-v1', required: ['reports/analysis.md'] }, { name: 'strict-v1', required: ['missing.md'] }] } } } });
+  await bt.api.registerContracts({ occurredAt: new Date().toISOString(), projectId, serviceId, releaseId: 'rel_0123456789abcdef0123456789abcdef' as ReleaseId, tag: 'v0.1.0', commitSha: 'abc', manifest: { apiVersion: 'crewstation/v1', kind: 'DigitalWorker', spec: { service: { command: ['bun'], port: 3000, healthPath: '/healthz', plan: 'p', replicas: 1, releaseMode: 'rolling-compatible' }, env: [], apis: { requested: [] }, subscriptions: [], release: { migration: { compatibility: 'none', destructive: false, rollback: 'switch-back' } }, tasks: { profile: 'coding-medium', defaultVolumeMode: 'follow-container', agentProfiles: [{ name: 'chat-v1', compute: 'sample-opencode', permission: 'read-only' }, { name: 'chat-default', compute: 'default', permission: 'read-only' }], outputContracts: [{ name: 'report-v1', required: ['reports/analysis.md'] }, { name: 'strict-v1', required: ['missing.md'] }] } } } });
 });
 afterAll(async () => { await tdb?.drop(); });
 
@@ -69,8 +84,8 @@ describe.skipIf(!available)('business-task module', () => {
     const agent = await bt.api.submitSubtask(caller, task.id, { kind: 'agent', name: 'analysis', agentProfile: 'chat-v1', outputContract: 'report-v1', mode: 'oneshot', prompt: '分析' });
     const command = await bt.api.submitSubtask(caller, task.id, { kind: 'command', name: 'tests', command: ['bun', 'test'], timeoutSeconds: 60 });
     const start = commands.find((c) => c.type === 'startAgent') as Extract<RunnerCommand, { type: 'startAgent' }>;
-    // 档位由平台解析后再下发，业务只登记了档位名（RFC-001）。
-    expect(start).toMatchObject({ compute: 'sample-stub', driver: 'stub', model: 'stub/echo', permission: 'read-only', mode: 'oneshot', initialPrompt: '分析', mcp: [{ name: 'operations' }] });
+    // 档位由平台解析后再下发，业务只登记了档位名；命令带固定修订与显式二进制（RFC-006）。
+    expect(start).toMatchObject({ compute: 'sample-opencode', profileRevision: 1, launch: { protocol: 'opencode', binaryPath: '/usr/local/bin/opencode', model: 'opencode/one' }, permission: 'read-only', mode: 'oneshot', initialPrompt: '分析', mcp: [{ name: 'operations' }] });
     await Bun.sleep(50);
     expect((await bt.api.getSubtask(caller, task.id, command.id))).toMatchObject({ state: 'succeeded', exitCode: 0 });
     expect(await bt.api.subtaskOutput(caller, task.id, command.id)).toBe('done\n');
@@ -131,40 +146,59 @@ describe.skipIf(!available)('business-task module', () => {
 
   test('登记的档位已被管理员下线：子任务直接失败并列出现有档位，不下发 startAgent（RFC-001）', async () => {
     const task = await bt.api.createTask(caller, { labels: {} });
-    computeProfiles = ['balanced'];
+    computeProfiles = [{ name: 'balanced', revision: 1, isDefault: true }];
     try {
       // 发布时档位存在才登记得下，这里模拟发布之后被管理员删掉：失败要说清还有哪些档位可用。
       const orphan = await bt.api.submitSubtask(caller, task.id, { kind: 'agent', name: 'orphan', agentProfile: 'chat-v1', mode: 'oneshot', prompt: '孤儿档位' });
       expect(orphan.state).toBe('failed');
-      expect(orphan.error).toContain('算力档位 sample-stub 不存在');
-      expect(orphan.error).toContain('balanced');
+      expect(orphan.error).toContain('算力档位 sample-opencode 不存在');
+      expect(orphan.error).toContain('当前可用：balanced');
       expect(commands.filter((c) => c.type === 'startAgent' && c.initialPrompt === '孤儿档位')).toHaveLength(0);
     } finally {
-      computeProfiles = ['sample-stub'];
+      computeProfiles = [{ name: 'sample-opencode', revision: 1, isDefault: true }];
       await bt.api.closeTask(caller, task.id);
     }
   });
-  test('托管档位：子任务在构造时固定运行版本，启动按该版本取材料并带 attempt，DTO 只暴露版本引用（RFC-004）', async () => {
-    managedRuntime = { configId: 'arc_' + 'a'.repeat(32), revision: 7 };
+  test('固定修订：子任务在构造时固定档位修订，启动按该修订取材料并带 attempt，DTO 只暴露档位名与修订号（RFC-006）', async () => {
+    computeProfiles = [{ name: 'sample-opencode', revision: 7, isDefault: true }];
     try {
       const task = await bt.api.createTask(caller, { labels: {} });
-      const sub = await bt.api.submitSubtask(caller, task.id, { kind: 'agent', name: 'managed', agentProfile: 'chat-v1', mode: 'oneshot', prompt: '分析' });
-      expect(sub.runtime).toEqual(managedRuntime);
+      const sub = await bt.api.submitSubtask(caller, task.id, { kind: 'agent', name: 'pinned', agentProfile: 'chat-v1', mode: 'oneshot', prompt: '分析' });
+      expect(sub).toMatchObject({ compute: 'sample-opencode', profileRevision: 7 });
       const start = commands.filter((c) => c.type === 'startAgent').at(-1) as Extract<RunnerCommand, { type: 'startAgent' }>;
-      expect(start.runtime).toMatchObject({ revision: 7, secrets: { KEY: 'sk-business' } });
+      expect(start).toMatchObject({ profileRevision: 7, beforeStart: { revision: 7, secrets: { KEY: 'sk-business' } } });
       expect(start.processAttemptId).toBe(`${start.agentId}:1`);
-      expect(materialRequests.at(-1)).toEqual(managedRuntime);
+      expect(materialRequests.at(-1)).toEqual({ profile: 'sample-opencode', revision: 7 });
       expect(JSON.stringify(sub)).not.toContain('sk-business');
-      // 已启用版本随后变化：已受理的 attempt 不换版本；重试是新 attempt，按当时的已启用版本固定。
-      managedRuntime = { configId: managedRuntime.configId, revision: 8 };
+      // 管理员随后保存了新修订：已受理的 attempt 不换修订；重试是新 attempt，按当时的当前修订固定。
+      computeProfiles = [{ name: 'sample-opencode', revision: 8, isDefault: true }];
       emit(task.id, agentEvent(start.agentId, 'error', { error: { message: 'boom' } }));
       expect((await bt.api.getSubtask(caller, task.id, sub.id)).state).toBe('failed');
       const retried = await bt.api.retrySubtask(caller, task.id, sub.id);
-      expect(retried).toMatchObject({ attempt: 2, runtime: { revision: 8 } });
+      expect(retried).toMatchObject({ attempt: 2, profileRevision: 8 });
       const retryStart = commands.filter((c) => c.type === 'startAgent').at(-1) as Extract<RunnerCommand, { type: 'startAgent' }>;
-      expect(retryStart.processAttemptId).toBe(`${retryStart.agentId}:2`);
-      expect(retryStart.runtime?.revision).toBe(8);
+      expect(retryStart).toMatchObject({ profileRevision: 8, processAttemptId: `${retryStart.agentId}:2` });
       await bt.api.closeTask(caller, task.id);
-    } finally { managedRuntime = undefined; }
+    } finally { computeProfiles = [{ name: 'sample-opencode', revision: 1, isDefault: true }]; }
+  });
+
+  test('Manifest 写 default：每次受理时解析到当时的默认档位；没有默认档位时子任务失败并写明原因（C17）', async () => {
+    const task = await bt.api.createTask(caller, { labels: {} });
+    try {
+      const first = await bt.api.submitSubtask(caller, task.id, { kind: 'agent', name: 'd1', agentProfile: 'chat-default', mode: 'oneshot', prompt: '默认一' });
+      expect(first).toMatchObject({ compute: 'sample-opencode', profileRevision: 1 });
+      computeProfiles = [{ name: 'sample-opencode', revision: 1 }, { name: 'bigger', revision: 3, isDefault: true }];
+      const second = await bt.api.submitSubtask(caller, task.id, { kind: 'agent', name: 'd2', agentProfile: 'chat-default', mode: 'oneshot', prompt: '默认二' });
+      expect(second).toMatchObject({ compute: 'bigger', profileRevision: 3 });
+      expect(commands.filter((c) => c.type === 'startAgent').at(-1)).toMatchObject({ compute: 'bigger', initialPrompt: '默认二' });
+      computeProfiles = [{ name: 'sample-opencode', revision: 1 }];
+      const orphan = await bt.api.submitSubtask(caller, task.id, { kind: 'agent', name: 'd3', agentProfile: 'chat-default', mode: 'oneshot', prompt: '默认三' });
+      expect(orphan).toMatchObject({ state: 'failed' });
+      expect(orphan.error).toContain('平台尚未设置默认算力档位');
+      expect(commands.filter((c) => c.type === 'startAgent' && c.initialPrompt === '默认三')).toHaveLength(0);
+    } finally {
+      computeProfiles = [{ name: 'sample-opencode', revision: 1, isDefault: true }];
+      await bt.api.closeTask(caller, task.id);
+    }
   });
 });

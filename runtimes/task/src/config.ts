@@ -20,9 +20,7 @@ export interface RunnerConfig {
   workerUid: number;
   workerGid: number;
   preview?: PreviewConfig;
-  /** root 专属 0600 文件，`KEY=VALUE` 行；只注入部署配置模式的 Agent 进程（模型凭据）。 */
-  agentEnvFile?: string;
-  /** 托管 Agent 私有目录的根（RFC-004）；缺省 <tmpdir>/crewstation-agents，测试注入临时目录。 */
+  /** 每个 Agent 私有目录的根（RFC-004）；缺省 <tmpdir>/crewstation-agents，测试注入临时目录。 */
   agentRunDir?: string;
   terminalBackend: TerminalBackendChoice;
   replayCapacity: number;
@@ -57,7 +55,6 @@ export function loadConfigFromEnv(env: Env = process.env): RunnerConfig {
     workerUid: integer(env, 'CS_WORKER_UID', DEFAULT_WORKER_ID),
     workerGid: integer(env, 'CS_WORKER_GID', DEFAULT_WORKER_ID),
     preview: parsePreview(env),
-    agentEnvFile: env.CS_AGENT_ENV_FILE || undefined,
     terminalBackend: parseTerminalBackend(env.CS_TERMINAL_BACKEND),
     replayCapacity: 5000,
     idleTimeoutMs: 90_000,

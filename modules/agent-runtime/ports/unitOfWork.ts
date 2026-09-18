@@ -1,12 +1,12 @@
-import type { RuntimeCheckId } from '@crewstation/contracts';
-import type { RuntimeCheckRepository, RuntimeConfigRepository, RuntimeCredentialRepository, RuntimeRevisionRepository } from './repositories';
+import type { ProfileTestId } from '@crewstation/contracts';
+import type { CredentialRepository, ProfileRepository, RevisionRepository, TestRepository } from './repositories';
 
 export interface RepositoryScope {
-  readonly configs: RuntimeConfigRepository;
-  readonly revisions: RuntimeRevisionRepository;
-  readonly credentials: RuntimeCredentialRepository;
-  readonly checks: RuntimeCheckRepository;
-  readonly checkQueue: { enqueue(checkId: RuntimeCheckId): Promise<void> };
+  readonly profiles: ProfileRepository;
+  readonly revisions: RevisionRepository;
+  readonly credentials: CredentialRepository;
+  readonly tests: TestRepository;
+  readonly testQueue: { enqueue(testId: ProfileTestId): Promise<void> };
 }
 
 export interface UnitOfWork {

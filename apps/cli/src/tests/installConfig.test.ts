@@ -77,7 +77,8 @@ describe('发行包', () => {
     '/bundle/release.lock.yaml': 'version: 1.4.0\nimages:\n  cs-api: sha256:abc\n  cs-session: sha256:def\n',
     '/bundle/profiles/service-plans.yaml': '- { name: standard-small, cpu: "500m", memory: 512Mi, maxReplicas: 3 }\n- { name: broken }\n',
     '/bundle/profiles/task-profiles.yaml': '- { name: coding-medium, cpu: "1", memory: 2Gi, storage: 10Gi }\n',
-    '/bundle/profiles/compute-profiles.yaml': '- { name: sample-stub, driver: stub, model: stub/echo }\n- { name: nomodel, driver: stub }\n',
+    // 旧发行包的档位文件：RFC-006 起不再读取（安装不预置档位）。
+    '/bundle/profiles/compute-profiles.yaml': '- { name: balanced, driver: claude-code, model: anthropic/claude-sonnet-5 }\n',
   };
 
   test('逐项报告 Design §11.2 的目录在不在', () => {
@@ -97,15 +98,14 @@ describe('发行包', () => {
     const profiles = readBundleProfiles(memoryFiles(files, dirs), '/bundle');
     expect(profiles.servicePlans.map((plan) => plan.name)).toEqual(['standard-small']);
     expect(profiles.taskProfiles.map((plan) => plan.name)).toEqual(['coding-medium']);
-    // 算力档位缺 model 同样被忽略：没有 model 的档位起不了 Agent，宁可缺档也不种一个坏档（RFC-001）。
-    expect(profiles.computeProfiles.map((item) => item.name)).toEqual(['sample-stub']);
+    expect(profiles).not.toHaveProperty('computeProfiles');
     expect(profiles.notes.join('\n')).toContain('1 条字段不全');
+    expect(profiles.notes.join('\n')).not.toContain('compute-profiles');
   });
 
   test('缺 profiles 文件不是错误，只是记一笔', () => {
     const profiles = readBundleProfiles(memoryFiles({}, ['/bundle']), '/bundle');
     expect(profiles.servicePlans).toEqual([]);
-    expect(profiles.computeProfiles).toEqual([]);
-    expect(profiles.notes).toHaveLength(3);
+    expect(profiles.notes).toHaveLength(2);
   });
 });

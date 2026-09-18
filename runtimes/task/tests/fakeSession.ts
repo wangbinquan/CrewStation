@@ -30,6 +30,8 @@ export interface FakeSession {
   readonly port: number;
   readonly frames: RunnerMessage[];
   readonly hellos: RunnerHello[];
+  /** 解析前的 hello 原文：zod 会剥掉未知键，断言“旧字段已不再发送”要看原文。 */
+  readonly rawHellos: unknown[];
   readonly connections: number;
   events(): EventFrame[];
   eventsOf<K extends RunnerEvent['kind']>(kind: K): EventFrame<EventOfKind<K>>[];
@@ -45,6 +47,7 @@ export interface FakeSession {
 export function startFakeSession(options: FakeSessionOptions = {}): FakeSession {
   const frames: RunnerMessage[] = [];
   const hellos: RunnerHello[] = [];
+  const rawHellos: unknown[] = [];
   let current: { send(data: string): void } | undefined;
   let connections = 0;
   const server = Bun.serve({
@@ -58,10 +61,12 @@ export function startFakeSession(options: FakeSessionOptions = {}): FakeSession 
         current = ws;
       },
       message(ws, raw) {
-        const frame = RunnerMessageSchema.parse(JSON.parse(typeof raw === 'string' ? raw : new TextDecoder().decode(raw)));
+        const json: unknown = JSON.parse(typeof raw === 'string' ? raw : new TextDecoder().decode(raw));
+        const frame = RunnerMessageSchema.parse(json);
         frames.push(frame);
         if (frame.type === 'hello') {
           hellos.push(frame);
+          rawHellos.push(json);
           ws.send(JSON.stringify({ type: 'welcome', protocolVersion: TASKRUNNER_PROTOCOL_VERSION, resumeFromSeq: options.resumeFromSeq?.() ?? 0, ...(options.nativeActivity === false ? {} : { nativeActivityVersion: 1 }) }));
         }
       },
@@ -86,6 +91,7 @@ export function startFakeSession(options: FakeSessionOptions = {}): FakeSession 
     port,
     frames,
     hellos,
+    rawHellos,
     get connections() {
       return connections;
     },

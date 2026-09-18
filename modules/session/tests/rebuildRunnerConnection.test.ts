@@ -18,7 +18,7 @@ test('旧握手通过初检但已失效时，不接管连接、不清空当前�
     forwarder: { forward: async () => ({}) },
   };
   const hub = runnerHub(deps);
-  const connect = (token: string) => hub.onHello({ type: 'hello', protocolVersion: TASKRUNNER_PROTOCOL_VERSION, taskId, runnerToken: token, workdir: '/work', capabilities: { drivers: [], pty: true, preview: true } }, { send: (frame) => frames.push(frame) });
+  const connect = (token: string) => hub.onHello({ type: 'hello', protocolVersion: TASKRUNNER_PROTOCOL_VERSION, taskId, runnerToken: token, workdir: '/work', capabilities: { protocols: ['claude-code', 'opencode', 'terminal'], pty: true, preview: true } }, { send: (frame) => frames.push(frame) });
   const first = await connect('original'); if (!first.ok) throw new Error(first.message);
   first.connection.pending.add({ id: 'pending', type: 'listFiles', sentAt: 0, resolve: () => {}, reject: () => callbacks.push('rejected') });
   accepted = 'new-generation';

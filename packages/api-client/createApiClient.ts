@@ -1,13 +1,13 @@
 import type { TransportOptions } from './httpTransport';
 import { createTransport } from './httpTransport';
-import type { AgentRuntimeResource } from './resources/agentRuntime';
-import { agentRuntimeResource } from './resources/agentRuntime';
 import type { ApiCatalogResource } from './resources/apiCatalog';
 import { apiCatalogResource } from './resources/apiCatalog';
 import type { CapabilitiesResource } from './resources/capabilities';
 import { capabilitiesResource } from './resources/capabilities';
 import type { CatalogResource } from './resources/catalog';
 import { catalogResource } from './resources/catalog';
+import type { ComputeProfilesResource } from './resources/computeProfiles';
+import { computeProfilesResource } from './resources/computeProfiles';
 import type { ConfigResource } from './resources/config';
 import { configResource } from './resources/config';
 import type { DevSessionResource } from './resources/devSession';
@@ -56,8 +56,8 @@ export interface ApiClient {
   readonly gateway: GatewayResource;
   readonly observability: ObservabilityResource;
   readonly capabilities: CapabilitiesResource;
-  /** RFC-004：管理员运行环境。 */
-  readonly agentRuntime: AgentRuntimeResource;
+  /** RFC-006：算力档位管理（仅管理员）。 */
+  readonly computeProfiles: ComputeProfilesResource;
   readonly stream: TaskStreamResource;
 }
 
@@ -80,7 +80,7 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
     gateway: gatewayResource(transport),
     observability: observabilityResource(transport),
     capabilities: capabilitiesResource(transport),
-    agentRuntime: agentRuntimeResource(transport),
+    computeProfiles: computeProfilesResource(transport),
     stream: { taskStreamUrl: (taskId, sinceSeq = 0, replay) => taskStreamUrl(transport.baseUrl, taskId, sinceSeq, replay) },
   };
 }

@@ -1,4 +1,4 @@
-import type { RuntimeCredentialWrite } from '@crewstation/contracts';
+import type { ProfileCredentialWrite } from '@crewstation/contracts';
 import { validation } from '@crewstation/kernel';
 
 export interface CredentialPlan {
@@ -11,7 +11,7 @@ export interface CredentialPlan {
  * keep／replace／clear 三选一：keep 只能用于已有值的名字，clear 对未设置的名字无副作用，也可清掉已取消声明的旧值。
  * 写请求没有提到的已设置凭据一律保留（不会因为界面没列出来就被删）。
  */
-export function planCredentialWrites(existing: ReadonlySet<string>, declared: readonly string[], writes: Record<string, RuntimeCredentialWrite>): CredentialPlan {
+export function planCredentialWrites(existing: ReadonlySet<string>, declared: readonly string[], writes: Record<string, ProfileCredentialWrite>): CredentialPlan {
   const plan: CredentialPlan = { replace: [], clear: [] };
   for (const [name, write] of Object.entries(writes)) {
     // clear 允许作用于已不再声明的旧名字：取消声明与删值应能在同一次保存里完成。

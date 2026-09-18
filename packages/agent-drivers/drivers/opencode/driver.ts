@@ -7,46 +7,46 @@
 
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import type { AgentDriver as AgentDriverName } from '@crewstation/contracts';
+import type { KnownAgentProtocol } from '@crewstation/contracts';
 import type { CliAgentDriver, DriverAgentSpec, DriverLaunchContext } from '../../contract/agentDriver';
 import type { AgentSpawnContext } from '../../contract/spawnPlan';
-import { toMcpServerSpec } from '../../contract/spawnPlan';
-import { pickRuntimeHead } from '../../injection/spawnHead';
+import { launchSpawnFields, toMcpServerSpec } from '../../contract/spawnPlan';
+import { assertLaunchForKnownProtocol } from '../../injection/launchArgs';
 import { createRunDirectory, defaultRunDir } from '../../process/runDirectory';
-import type { CliAdapterOptions, CliRuntimeAdapter, PreparedRuntime } from '../cliRuntimeAdapter';
+import type { CliRuntimeAdapter, PreparedRuntime } from '../cliRuntimeAdapter';
 import { createCliAgentDriver } from '../cliAgentDriver';
 import { OPENCODE_AGENT_NAME, buildOpencodeArgv } from './argv';
-import { OPENCODE_CONFIG_DIR_NAME, OPENCODE_INLINE_CONFIG_WARN_BYTES, buildOpencodeEnv } from './env';
+import { OPENCODE_INLINE_CONFIG_WARN_BYTES, buildOpencodeEnv, opencodeConfigDirName } from './env';
 import { materializeOpencodeConfig } from './managedConfig';
 import { parseEvent } from './events';
 import { detectOpencodeSessionNotFound, ensureOpencodeBinaryVersion } from './probe';
 
-export const OPENCODE_DRIVER_NAME: AgentDriverName = 'opencode';
-export const OPENCODE_BINARY = 'opencode';
+export const OPENCODE_PROTOCOL: KnownAgentProtocol = 'opencode';
 
-export function opencodeAdapter(options: CliAdapterOptions = {}): CliRuntimeAdapter {
-  const head = pickRuntimeHead(options.binaryPath, [OPENCODE_BINARY]);
+/** 二进制与参数来自每次启动的 launch（RFC-006）；适配器只认协议。 */
+export function opencodeAdapter(): CliRuntimeAdapter {
   return {
-    name: OPENCODE_DRIVER_NAME,
-    binary: head[0] ?? OPENCODE_BINARY,
+    protocol: OPENCODE_PROTOCOL,
     // `opencode run --help`（1.18.29 实测）的 message 是位置参数，没有任何 stdin 流入口：
     // 交互式只能退化为「一轮一进程 ＋ `--session <id>` 续接」。
     supportsResidentStream: false,
-    prepare: (spec, context) => prepareOpencode(spec, context, head),
+    prepare: prepareOpencode,
   };
 }
 
-export function createOpencodeDriver(which: (binary: string) => string | null, options: CliAdapterOptions = {}): CliAgentDriver {
-  return createCliAgentDriver(opencodeAdapter(options), which);
+export function createOpencodeDriver(which: (binary: string) => string | null): CliAgentDriver {
+  return createCliAgentDriver(opencodeAdapter(), which);
 }
 
-async function prepareOpencode(spec: DriverAgentSpec, context: DriverLaunchContext, head: string[]): Promise<PreparedRuntime> {
+async function prepareOpencode(spec: DriverAgentSpec, context: DriverLaunchContext): Promise<PreparedRuntime> {
+  assertLaunchForKnownProtocol(spec.launch);
   const runDir = await createRunDirectory(context.runDir ?? defaultRunDir(spec.agentId), context.host);
-  const configDir = join(runDir.path, OPENCODE_CONFIG_DIR_NAME);
+  const base = baseContext(spec, context, runDir.path);
+  const head = [...base.head];
+  const configDir = join(runDir.path, opencodeConfigDirName(base));
   mkdirSync(join(configDir, 'skills'), { recursive: true, mode: 0o700 });
   await context.host.chownToWorker(configDir);
   await context.host.chownToWorker(join(configDir, 'skills'));
-  const base = { ...baseContext(spec, context, runDir.path), head };
   const { env, inlineConfigBytes } = buildOpencodeEnv(base, configDir);
   if (inlineConfigBytes > OPENCODE_INLINE_CONFIG_WARN_BYTES) {
     context.logger.warn('opencode 内联配置偏大', { bytes: inlineConfigBytes, limit: OPENCODE_INLINE_CONFIG_WARN_BYTES });
@@ -81,7 +81,7 @@ function baseContext(spec: DriverAgentSpec, context: DriverLaunchContext, runDir
     agentId: spec.agentId,
     prompt: '',
     ...(spec.systemPrompt === undefined ? {} : { systemPrompt: spec.systemPrompt }),
-    model: spec.model,
+    ...launchSpawnFields(spec.launch),
     permission: spec.permission,
     mcps: spec.mcp.map(toMcpServerSpec),
     cwd: context.cwd,

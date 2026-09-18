@@ -2,6 +2,7 @@ import type { Actor, ProjectId, ReleaseId, RunnerCommand, ServiceId, TaskId, Use
 import { fixedClock, noopLogger } from '@crewstation/kernel';
 import type { DevSessionUseCaseDeps } from '../application/dependencies';
 import type { EnvironmentView } from '../ports/runtime';
+import { fakeComputeCatalog } from './computeFixture';
 
 export const workspaceProject = 'prj_0123456789abcdef0123456789abcdef' as ProjectId;
 export const workspaceService = 'svc_0123456789abcdef0123456789abcdef' as ServiceId;
@@ -54,10 +55,10 @@ export function workspaceFixture() {
       },
     },
     scm: { readFile: async () => undefined, listBranches: async () => [], pushUrl: async () => ({ url: 'https://git.example/demo.git', expiresAt: checkedAt }) },
-    compute: { resolve: async () => undefined, runtimeMaterial: async () => { throw new Error('运行材料未设置'); }, list: async () => [] }, manifests: { parse: () => { throw new Error('unused'); } },
+    compute: fakeComputeCatalog(() => []), manifests: { parse: () => { throw new Error('unused'); } },
     credentials: { issueDevSessionToken: async () => ({ token: 'test', expiresAt: checkedAt }) }, notifier: { notify: async () => {} },
     reminders: { lastReminder: async () => undefined, recordReminder: async () => {} },
-    settings: { idleMinutes: 30, userDomain: 'cs.localhost', mcp: [], defaultPreviewPort: 3000, defaultComputeProfile: 'balanced' },
+    settings: { idleMinutes: 30, userDomain: 'cs.localhost', mcp: [], defaultPreviewPort: 3000 },
     clock: fixedClock(checkedAt), logger: noopLogger,
   };
   return { deps, state, commands };

@@ -31,20 +31,21 @@ function checkoutContainer(image: string, source: TaskSourceCheckout, uid: numbe
 }
 
 
-export function taskPodObject({ env, image, envVars, resources, agentEnvSecretName, source, envSecretName, nodeName }: TaskPodSpec, workerUid: number): K8sObject {
+/**
+ * 显式的 Runner 启动路径与 root 身份（RFC-006 §7.3）：管理员以底座构建的镜像里改过的 USER、ENTRYPOINT、CMD
+ * 都影响不到 Runner；Runner 再经 setpriv 把每个 Agent／终端／exec 降到 worker。
+ */
+export const RUNNER_COMMAND: readonly string[] = Object.freeze(['/usr/bin/tini', '--', '/opt/crewstation/bin/task-runner']);
+
+export function taskPodObject({ env, image, envVars, resources, source, envSecretName, nodeName, workVolume }: TaskPodSpec, workerUid: number): K8sObject {
   const pod = podObject({
-    name: env.podName, namespace: env.namespace, image, imagePullPolicy: 'IfNotPresent',
+    name: env.podName, namespace: env.namespace, image, imagePullPolicy: 'IfNotPresent', command: [...RUNNER_COMMAND], runAsUser: 0,
     labels: { [LABELS.project]: env.labels[LABELS.project] ?? '', [LABELS.service]: env.labels[LABELS.service] ?? '', [LABELS.workload]: env.kind, [LABELS.task]: env.id },
     env: Object.entries(envVars).map(([name, value]) => ({ name, value })),
     resources: { cpu: resources.cpu, memory: resources.memory, ephemeralStorage: resources.storage },
-    volumes: [{ name: 'work', mountPath: '/work', pvc: env.pvcName }],
+    volumes: [workVolume === 'emptyDir' ? { name: 'work', mountPath: '/work', emptyDir: true } : { name: 'work', mountPath: '/work', pvc: env.pvcName }],
     ...(source ? { initContainers: [checkoutContainer(image, source, workerUid)] } : {}),
   });
-  if (agentEnvSecretName) {
-    const spec = pod.spec as { volumes: unknown[]; containers: Array<{ volumeMounts: unknown[] }> };
-    spec.volumes.push({ name: 'agent-env', secret: { secretName: agentEnvSecretName, defaultMode: 0o400, optional: true } });
-    spec.containers[0]!.volumeMounts.push({ name: 'agent-env', mountPath: '/etc/crewstation', readOnly: true });
-  }
   if (env.rebuildId) pod.metadata.labels!['crewstation.io/rebuild'] = env.rebuildId;
   if (env.native) pod.metadata.labels!['crewstation.io/workspace-task'] = env.native.parentTaskId;
   if (nodeName) (pod.spec as Record<string, unknown>).affinity = { nodeAffinity: { requiredDuringSchedulingIgnoredDuringExecution: { nodeSelectorTerms: [{ matchFields: [{ key: 'metadata.name', operator: 'In', values: [nodeName] }] }] } } };

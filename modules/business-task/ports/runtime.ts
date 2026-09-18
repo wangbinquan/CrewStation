@@ -1,4 +1,4 @@
-import type { Actor, AgentDriver, AgentRuntimeMaterial, ProjectId, RunnerCommand, RunnerEvent, RuntimeRevisionRef, ServiceId, TaskId, TraceId, VolumeMode } from '@crewstation/contracts';
+import type { Actor, AgentProtocol, BeforeStartMaterial, ComputeUsage, LaunchSpec, ProfileRevisionRef, ProjectId, RunnerCommand, RunnerEvent, ServiceId, TaskId, TraceId, VolumeMode } from '@crewstation/contracts';
 
 export interface EnvironmentView {
   id: TaskId;
@@ -29,16 +29,30 @@ export interface ServiceDirectory {
   resolveServiceIdentity(identity: string): Promise<{ serviceId: ServiceId; projectId: ProjectId } | undefined>;
 }
 
+/** 受理时解析出的档位（RFC-006）：`default` 已换成真实名称，修订固定。 */
+export interface ResolvedCompute {
+  name: string;
+  revision: number;
+  protocol: AgentProtocol;
+  taskProfile?: string;
+  /** 按摘要固定的镜像引用。 */
+  image: string;
+}
+
+/** 派发一次启动的材料（含解密凭据）：只在下发命令时取，不落库、不进日志、不进事件。 */
+export interface ComputeLaunch extends ResolvedCompute {
+  launch: LaunchSpec;
+  beforeStart: BeforeStartMaterial;
+}
+
 /**
- * 由 project 模块提供（RFC-001）：算力档位名 → 具体驱动与模型。
- * 业务子任务引用的是 Manifest 里登记的档位名，解析同样发生在平台侧。
+ * 由 agent-runtime 提供（RFC-006）：业务子任务引用 Manifest 登记的档位名或 `default`，解析发生在平台侧。
+ * 不存在报 validation（details.available 列出可选）；没有默认档位、档位不可用报 precondition；终端档位报 validation。
  */
 export interface ComputeCatalog {
-  /** 托管档位（RFC-004）带回受理时固定的运行环境版本；配置未就绪时抛 precondition。 */
-  resolve(name: string): Promise<{ name: string; driver: AgentDriver; model: string; runtime?: RuntimeRevisionRef } | undefined>;
-  /** 固定版本的启动材料，只在下发 startAgent 时取。 */
-  runtimeMaterial(ref: RuntimeRevisionRef): Promise<AgentRuntimeMaterial>;
-  list(): Promise<Array<{ name: string }>>;
+  resolve(nameOrDefault: string | undefined, usage: ComputeUsage): Promise<ResolvedCompute>;
+  /** 按受理时固定的修订取材料：停用或改了当前修订都不影响它。 */
+  launchMaterial(ref: ProfileRevisionRef): Promise<ComputeLaunch>;
 }
 
 export interface ProjectAuthorizer {

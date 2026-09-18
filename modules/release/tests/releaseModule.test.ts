@@ -18,8 +18,9 @@ const serviceId = 'svc_0123456789abcdef0123456789abcdef' as ServiceId;
 const projectId = 'prj_0123456789abcdef0123456789abcdef' as ProjectId;
 let manifestYaml = '';
 let tagCounter = 0;
+let defaultProfile: string | undefined = 'balanced';
 
-const baseManifest = (migration: string, compute = 'sample-stub') => `
+const baseManifest = (migration: string, compute = 'default') => `
 apiVersion: crewstation/v1
 kind: DigitalWorker
 spec:
@@ -51,8 +52,8 @@ beforeAll(async () => {
     services: { resolveServiceById: async () => ({ projectId, slug: 'demo', name: 'demo', namespace: 'cs-demo' }) },
     plans: {
       getServicePlan: async (name) => (name === 'standard-small' ? { name, cpu: '500m', memory: '512Mi', maxReplicas: 3, description: '' } : undefined),
-      getComputeProfile: async (name) => (name === 'sample-stub' ? { name } : undefined),
-      listComputeProfiles: async () => [{ name: 'sample-stub' }],
+      lookupComputeProfile: async (name: string) => (name === 'default' ? (defaultProfile ? { name: defaultProfile, terminalOnly: false } : undefined) : name === 'balanced' ? { name, terminalOnly: false } : name === 'term-cli' ? { name, terminalOnly: true } : undefined),
+      listComputeProfiles: async () => ['balanced', 'term-cli'],
     },
     config: { render: async () => ({ values: { GREETING: 'hi' }, version: 7 }), validate: async (_p, _e, keys) => ({ missing: keys.filter((k) => k !== 'GREETING') }) },
     data: { envFor: async () => ({ CS_DATABASE_URL: 'postgres://prod' }) },
@@ -151,20 +152,37 @@ describe.skipIf(!available)('release module', () => {
     expect((await release.api.getRelease(owner, destructive.id))).toMatchObject({ status: 'failed', message: expect.stringContaining('维护窗口') });
   });
 
-  test('引用不存在的算力档位：发布被拒，不进构建，错误列出可用档位（RFC-001）', async () => {
-    manifestYaml = baseManifest('migration: { compatibility: none, destructive: false, rollback: switch-back }', 'nope');
-    const before = k8s.applied.filter((o) => o.kind === 'Job').length;
+  /** 发布只看档位存在性与协议（RFC-006 §4.4）：三种拒绝都在部署前发生，不会部署半截。 */
+  test.each([
+    ['nope', '算力档位 nope 不存在', 'balanced'],
+    ['term-cli', '通用终端协议', '「＋ CLI」'],
+    ['default', '尚未设置默认档位', '平台管理'],
+  ])('算力档位 %s：发布被拒，不进部署（RFC-001、RFC-006）', async (compute, first, second) => {
+    if (compute === 'default') defaultProfile = undefined;
+    manifestYaml = baseManifest('migration: { compatibility: none, destructive: false, rollback: switch-back }', compute);
     const dto = await release.api.publish(owner, serviceId, { branch: 'main', version: 'patch' });
     await release.api.runPipelineStep(dto.id);
     await markJob(`build-${dto.id.slice(-12)}`, true);
     await release.api.runPipelineStep(dto.id);
     const failed = await release.api.getRelease(owner, dto.id);
     expect(failed.status).toBe('failed');
-    expect(failed.message).toContain('算力档位 nope 不存在');
-    expect(failed.message).toContain('sample-stub');
+    expect(failed.message).toContain(first);
+    expect(failed.message).toContain(second);
     // 部署一步都没走：没有新的 Deployment。
     expect(k8s.applied.filter((o) => o.kind === 'Deployment' && (o.metadata.name as string).includes(dto.id.slice(-6))).length).toBe(0);
-    expect(before).toBeGreaterThanOrEqual(0);
+    defaultProfile = 'balanced';
+    manifestYaml = baseManifest('migration: { compatibility: none, destructive: false, rollback: switch-back }');
+  });
+
+  test('两个槽当前版本引用的档位按名称列出，经 default 的不计（RFC-006 P8）', async () => {
+    manifestYaml = baseManifest('migration: { compatibility: none, destructive: false, rollback: switch-back }', 'balanced');
+    const dto = await release.api.publish(owner, serviceId, { branch: 'main', version: 'patch' });
+    for (let i = 0; i < 6; i += 1) {
+      await release.api.runPipelineStep(dto.id);
+      await markJob(`build-${dto.id.slice(-12)}`, true);
+    }
+    expect(await release.api.deployedComputeReferences(serviceId)).toContain('balanced');
+    expect(await release.api.deployedComputeReferences(serviceId)).not.toContain('default');
     manifestYaml = baseManifest('migration: { compatibility: none, destructive: false, rollback: switch-back }');
   });
 });

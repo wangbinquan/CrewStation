@@ -3,7 +3,7 @@ import { API_INVOCATION_TIMEOUT_MS, COMPARISON_COMMAND_TIMEOUT_MS, COMPARISON_HI
 import { PlatformError } from '@crewstation/kernel';
 
 export interface StoredEvent { seq: number; at: string; event: RunnerEvent }
-export interface ConnectionStatus { connected: boolean; replica?: string; lastSeq?: number; drivers?: string[]; capabilities?: RunnerHello['capabilities'] }
+export interface ConnectionStatus { connected: boolean; replica?: string; lastSeq?: number; protocols?: string[]; capabilities?: RunnerHello['capabilities'] }
 
 /** 与 cs-session 的 internal 路由一一对应；只在系统命名空间内调用。 */
 export interface SessionClient {

@@ -7,7 +7,9 @@ import { useT } from '../../../../shared/lib/useT';
 import { Button } from '../../../../shared/ui/Button';
 import type { HistoricalStartHandle } from '../../hooks/useHistoricalStart';
 import { AGENT_PERMISSIONS } from '../../model/agentOptions';
+import { choiceBlocked, choicesFor, resolveChoice } from '../../model/computeChoices';
 import { PaneNotice } from '../PaneNotice';
+import { ComputeOptions, computeBlockText } from './ComputeOptions';
 import styles from './StartAgentForm.module.css';
 
 export interface StartAgentFormProps {
@@ -17,26 +19,23 @@ export interface StartAgentFormProps {
 /**
  * 启动一个流式交互 Agent。算力由平台统一提供（RFC-001）：这里只选管理员定义的档位名，
  * 厂商、模型与驱动都不出现在租户面——它们是平台的采购信息，业务也无从判断该填什么。
+ * RFC-006：通用终端协议的档位只能用于「＋ CLI」，这里不列。
  */
 export function StartAgentForm({ creation }: StartAgentFormProps): ReactElement {
   const t = useT();
   const profiles = useApiQuery(queryKeys.computeProfiles(), () => api.catalog.listComputeProfiles());
-  const options = profiles.data?.items ?? [];
+  const options = choicesFor(profiles.data?.items ?? [], 'agent');
   const { compute, permission, prompt, busy, edit, start } = creation;
-  // 省略档位就走平台默认档，所以空选项是合法的；只有一个可用档位都没有时才拦住。
-  const usable = options.filter((option) => option.available);
-  const ready = usable.length > 0 && prompt.trim() !== '' && (compute === '' || usable.some((option) => option.name === compute));
+  // 空选项是「默认档位」，启动时由服务端解析（C17）；默认档位不存在或所选档位不可用时拦住并说明原因。
+  const block = profiles.data === undefined ? undefined : choiceBlocked(options, compute);
+  const blockText = computeBlockText(t, block, resolveChoice(options, compute));
+  const ready = profiles.data !== undefined && block === undefined && prompt.trim() !== '';
   return (
     <div className={styles.form}>
       <div className={styles.row}>
         <label htmlFor="agent-compute">{t('devSession.agents.compute')}</label>
         <select id="agent-compute" className={styles.select} value={compute} disabled={busy} onChange={(event) => edit({ compute: event.target.value })}>
-          <option value="">{t('devSession.agents.computeDefault')}</option>
-          {options.map((option) => (
-            <option key={option.name} value={option.name} disabled={!option.available}>
-              {!option.available ? t('devSession.agents.computeUnavailable', { name: option.name, reason: option.reason ?? '' }) : option.description === '' ? option.name : `${option.name} · ${option.description}`}
-            </option>
-          ))}
+          <ComputeOptions items={options} withDescription />
         </select>
         <label htmlFor="agent-permission">{t('devSession.agents.permission')}</label>
         <select id="agent-permission" className={styles.select} value={permission} disabled={busy} onChange={(event) => edit({ permission: event.target.value as AgentPermission })}>
@@ -49,7 +48,7 @@ export function StartAgentForm({ creation }: StartAgentFormProps): ReactElement 
       </div>
       {profiles.isPending ? <PaneNotice tone="info">{t('devSession.agents.computeLoading')}</PaneNotice> : null}
       {!profiles.isPending && options.length === 0 ? <PaneNotice tone="warning">{t('devSession.agents.computeEmpty')}</PaneNotice> : null}
-      {options.length > 0 && usable.length < options.length ? <PaneNotice tone="warning">{t('devSession.agents.computeUnavailableHint')}</PaneNotice> : null}
+      {options.length > 0 && blockText ? <PaneNotice tone="warning">{blockText}</PaneNotice> : null}
       <textarea
         className={styles.prompt}
         rows={3}

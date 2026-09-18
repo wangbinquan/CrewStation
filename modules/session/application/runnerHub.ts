@@ -1,6 +1,8 @@
 import type { RunnerMessage, TaskId } from '@crewstation/contracts';
 import { RunnerMessageSchema, TASKRUNNER_PROTOCOL_VERSION } from '@crewstation/contracts';
 import { isDurable } from '../domain/eventDurability';
+import type { ProtocolMismatch } from '../domain/runtimeNegotiation';
+import { protocolMismatchOf } from '../domain/runtimeNegotiation';
 import type { EventSink } from '../domain/runnerConnection';
 import { RunnerConnection } from '../domain/runnerConnection';
 import type { SessionUseCaseDeps } from './dependencies';
@@ -14,6 +16,8 @@ export function runnerHub(deps: SessionUseCaseDeps) {
   const { logger } = deps;
 
   const onHello = async (raw: unknown, socket: EventSink): Promise<RunnerOpenResult> => {
+    const mismatch = protocolMismatchOf(raw);
+    if (mismatch) return rejectMismatch(deps, mismatch);
     const parsed = RunnerMessageSchema.safeParse(raw);
     if (!parsed.success || parsed.data.type !== 'hello') return { ok: false, code: 'bad_hello', message: '首帧必须是 hello' };
     const hello = parsed.data;
@@ -31,7 +35,7 @@ export function runnerHub(deps: SessionUseCaseDeps) {
     socket.send(JSON.stringify({ type: 'welcome', protocolVersion: TASKRUNNER_PROTOCOL_VERSION, resumeFromSeq, nativeActivityVersion: 1 }));
     deps.taskAccess.onRunnerReady?.(hello.taskId);
     connection.broadcast(JSON.stringify({ type: 'runnerReconnected' }));
-    logger.info('runner connected', { taskId: hello.taskId, resumeFromSeq, drivers: hello.capabilities.drivers });
+    logger.info('runner connected', { taskId: hello.taskId, resumeFromSeq, protocols: hello.capabilities.protocols });
     return { ok: true, connection };
   };
 
@@ -93,3 +97,12 @@ export function runnerHub(deps: SessionUseCaseDeps) {
 export type RunnerHub = ReturnType<typeof runnerHub>;
 /** http 层只经 application 认识连接对象。 */
 export type ActiveRunnerConnection = RunnerConnection;
+
+/** 协议不一致的握手（RFC-006 §5.3）：令牌有效才把原因回写给 task-runtime，然后拒绝；不接管连接、不发 welcome。 */
+async function rejectMismatch(deps: SessionUseCaseDeps, mismatch: ProtocolMismatch): Promise<RunnerOpenResult> {
+  const verified = await deps.runnerAuth.verifyRunnerToken(mismatch.taskId, mismatch.runnerToken);
+  if (!verified.ok) return { ok: false, code: 'unauthorized', message: verified.reason };
+  await deps.taskAccess.onRunnerRejected?.(mismatch.taskId, mismatch.runnerToken, { code: 'protocol_mismatch', runnerProtocol: mismatch.runnerProtocol, message: mismatch.message });
+  deps.logger.warn('runner protocol mismatch', { taskId: mismatch.taskId, runnerProtocol: mismatch.runnerProtocol });
+  return { ok: false, code: 'protocol_mismatch', message: mismatch.message };
+}

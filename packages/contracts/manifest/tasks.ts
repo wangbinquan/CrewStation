@@ -1,19 +1,19 @@
 import { z } from 'zod';
 import { SlugSchema } from '../ids';
 
-export const AgentDriverSchema = z.enum(['claude-code', 'opencode', 'stub']);
 /** 业务侧的抽象权限，驱动层映射为各 CLI 的标志。 */
 export const AgentPermissionSchema = z.enum(['read-only', 'edit', 'full']);
 export const VolumeModeSchema = z.enum(['follow-container', 'persistent']);
 
 /**
- * Agent 档案（RFC-001）：算力由平台统一提供，业务不声明厂商、模型与驱动，只引用管理员定义的档位名。
+ * Agent 档案（RFC-001）：算力由平台统一提供，业务不声明厂商、模型与驱动，只引用管理员定义的档位名；
+ * RFC-006：也可以写 `default`，每次启动时解析到管理员设为默认的档位。
  * `.strict()` 是必需的：zod 默认剥掉未知键，旧写法的 `driver` / `model` 会被静默丢弃，
  * 业务会以为自己指定了驱动，实际没有；strict 之后会明确报出「无法识别的键 driver」。
  */
 export const AgentProfileSchema = z.object({
   name: SlugSchema,
-  /** 引用管理员定义的算力档位；档位封装「用哪个驱动、哪个模型」。 */
+  /** 管理员定义的算力档位名，或 `default`；档位封装协议、镜像、二进制、启动前步骤与模型（RFC-006）。 */
   compute: SlugSchema,
   permission: AgentPermissionSchema.default('edit'),
   /** 相对仓库根的系统提示文件，可选。 */
@@ -37,7 +37,6 @@ export const TasksSpecSchema = z.object({
 }).refine((t) => new Set(t.agentProfiles.map((p) => p.name)).size === t.agentProfiles.length, 'agentProfiles 名称重复')
   .refine((t) => new Set(t.outputContracts.map((c) => c.name)).size === t.outputContracts.length, 'outputContracts 名称重复');
 
-export type AgentDriver = z.infer<typeof AgentDriverSchema>;
 export type AgentPermission = z.infer<typeof AgentPermissionSchema>;
 export type VolumeMode = z.infer<typeof VolumeModeSchema>;
 export type AgentProfile = z.infer<typeof AgentProfileSchema>;

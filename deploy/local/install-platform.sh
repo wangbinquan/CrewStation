@@ -63,12 +63,15 @@ if ! kubectl -n $NS wait --for=condition=complete job/crewstation-migrate --time
   kubectl -n $NS logs job/crewstation-migrate --tail=50 || true
   echo "迁移失败" >&2; exit 1
 fi
-for f in 30-cs-api 31-cs-auth 32-cs-controller 33-cs-session 34-cs-events 35-console 36-mcp-capabilities 37-mcp-operations 40-gateway; do kubectl apply -f "$ROOT/deploy/k8s/platform/$f.yaml" >/dev/null; done
+for f in 30-cs-api 31-cs-auth 32-cs-controller 33-cs-session 34-cs-events 35-console 36-mcp-capabilities 37-mcp-operations 40-gateway 41-registry-gateway; do kubectl apply -f "$ROOT/deploy/k8s/platform/$f.yaml" >/dev/null; done
 for d in cs-api cs-auth cs-controller cs-session cs-events console mcp-capabilities mcp-operations; do
   kubectl -n $NS rollout restart deployment/$d >/dev/null 2>&1 || true
   kubectl -n $NS rollout status deployment/$d --timeout=180s
 done
-# 套餐与算力档位是建项目、起 Agent 的前置；装完就种上，省得第一次用的时候才发现目录是空的。
+# 平台底座镜像推进集群内仓库（RFC-006 §7.1）：档位镜像 FROM 它构建，档位保存时按摘要固定。
+if [[ "${CS_SKIP_TASK_RUNTIME:-}" == "1" ]]; then log "跳过推送平台底座（CS_SKIP_TASK_RUNTIME=1）"; else "$ROOT/deploy/local/publish-base-image.sh"; fi
+
+# 套餐是建项目的前置；装完就种上。算力档位不预置（RFC-006），由管理员在平台管理里创建并测试。
 "$ROOT/deploy/local/seed-catalog.sh"
 
 log "完成。控制台：http://console.cs.localhost/  登录：http://console.cs.localhost/auth/login"

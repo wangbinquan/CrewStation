@@ -1,7 +1,8 @@
 import { mkdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import type { AgentRuntimeMaterial, BeforeStartExecution, BeforeStartStepRecord, RunnerEvent } from '@crewstation/contracts';
+import { platformMcpEndpoints } from '@crewstation/agent-drivers';
+import type { BeforeStartExecution, BeforeStartMaterial, BeforeStartStepRecord, McpConnection, RunnerEvent } from '@crewstation/contracts';
 import type { Logger } from '@crewstation/kernel';
 import type { ProcessLauncher } from '../process/launcher';
 import { asBeforeStartFailure, BeforeStartFailure } from './failure';
@@ -17,9 +18,11 @@ export const RUN_DIR_PREFIX = 'crewstation-agents';
 export interface BeforeStartRequest {
   agentId: string;
   processAttemptId: string;
-  material: AgentRuntimeMaterial;
+  material: BeforeStartMaterial;
   /** Agent 的工作目录（已解析）；脚本缺省在这里运行。 */
   workspace: string;
+  /** 启动命令携带的 MCP 连接：平台两个 MCP 的地址与会话令牌由此进入 `{{mcp.*}}` 与脚本环境（RFC-006 C16）。 */
+  mcp?: readonly McpConnection[];
   onProgress?: (execution: BeforeStartExecution) => void;
 }
 
@@ -59,7 +62,7 @@ export class BeforeStartRunner {
     const now = new Date().toISOString();
     const execution: BeforeStartExecution = {
       executionId: `bse_${crypto.randomUUID().replace(/-/g, '')}`, agentId: request.agentId, processAttemptId: request.processAttemptId,
-      runtime: { configId: request.material.configId, revision: request.material.revision }, state: 'queued', queuedAt: now,
+      profile: { profile: request.material.profile, revision: request.material.revision }, state: 'queued', queuedAt: now,
       steps: request.material.steps.map((step): BeforeStartStepRecord => ({ stepId: step.stepId, name: step.name, kind: step.kind, state: 'pending' })),
     };
     const abort = new AbortController();
@@ -90,7 +93,7 @@ export class BeforeStartRunner {
   private async execute(entry: Entry, request: BeforeStartRequest): Promise<BeforeStartOutcome> {
     const { material } = request;
     const runDir = this.runDirFor(request.agentId), home = this.homeFor(request.agentId);
-    const ctx: HookContext = { agentId: request.agentId, home, runDir, workspace: request.workspace, vars: { ...material.vars }, secrets: { ...material.secrets }, env: {} };
+    const ctx: HookContext = { agentId: request.agentId, home, runDir, workspace: request.workspace, vars: { ...material.vars }, secrets: { ...material.secrets }, mcp: platformMcpEndpoints(request.mcp ?? []), env: {} };
     this.update(entry, { state: 'running', startedAt: new Date().toISOString() }, request.onProgress);
     try {
       if (entry.abort.signal.aborted) throw new BeforeStartFailure('cancelled', '启动在准备开始前被取消');
@@ -109,7 +112,7 @@ export class BeforeStartRunner {
     }
   }
 
-  private async runStep(entry: Entry, step: AgentRuntimeMaterial['steps'][number], ctx: HookContext, captureOutput: boolean, onProgress?: BeforeStartRequest['onProgress']): Promise<void> {
+  private async runStep(entry: Entry, step: BeforeStartMaterial['steps'][number], ctx: HookContext, captureOutput: boolean, onProgress?: BeforeStartRequest['onProgress']): Promise<void> {
     if (entry.abort.signal.aborted) throw new BeforeStartFailure('cancelled', '启动被取消', step.stepId);
     const startedAt = Date.now();
     this.patchStep(entry, step.stepId, { state: 'running', startedAt: new Date(startedAt).toISOString() }, onProgress);

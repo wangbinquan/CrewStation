@@ -1,26 +1,27 @@
 // 驱动对外契约。与 `runtimes/task/src/agents/driver.ts` 的 AgentDriver／AgentProcess 结构一致，
 // 但不能直接 import 它（技术包不依赖运行时），于是在这里重新声明；宿主的 cliDriver.ts 做适配。
 
-import type { AgentDriver as AgentDriverName, AgentEvent, AgentPermission, McpConnection, RuntimeRevisionRef } from '@crewstation/contracts';
+import type { AgentEvent, AgentPermission, KnownAgentProtocol, LaunchSpec, McpConnection } from '@crewstation/contracts';
 import type { Logger } from '@crewstation/kernel';
 import type { ProcessHost } from './processHost';
 import type { NativeActivityChannel } from './nativeTerminal';
 import type { ManagedRuntimeContext } from './managedRuntime';
 
-/** 一次 startAgent 剥掉协议外壳后的启动规格（与宿主 AgentSpec 同形，去掉 driver 字段）。 */
+/** 一次 startAgent 剥掉协议外壳后的启动规格（与宿主 AgentSpec 同形）。 */
 export interface DriverAgentSpec {
   agentId: string;
   /** 算力档位名（RFC-001）：平台透传，驱动不解释，只在 started 事件里回显。 */
   compute: string;
-  model: string;
+  /** RFC-006：受理时固定的档位修订，只在 started 事件里回显。 */
+  profileRevision: number;
+  /** RFC-006：档位修订固定的二进制、参数与模型；headless 只接受两种已知协议。 */
+  launch: LaunchSpec;
   permission: AgentPermission;
   mode: 'oneshot' | 'interactive';
   initialPrompt?: string;
   resumeSessionId?: string;
   systemPrompt?: string;
   mcp: McpConnection[];
-  /** RFC-004：固定的运行环境版本，只在 started 事件里回显。 */
-  runtime?: RuntimeRevisionRef;
 }
 
 export interface DriverLaunchContext {
@@ -34,7 +35,7 @@ export interface DriverLaunchContext {
   gitUserName?: string | null;
   gitUserEmail?: string | null;
   nativeActivity?: NativeActivityChannel;
-  /** RFC-004：启动前 Hook 已成功时的托管上下文；缺省为部署配置模式。 */
+  /** 启动前 Hook 成功后的托管上下文（RFC-004；RFC-006 起宿主每次启动都提供）。 */
   managed?: ManagedRuntimeContext;
 }
 
@@ -45,10 +46,9 @@ export interface DriverAgentProcess {
   readonly events: AsyncIterable<AgentEvent>;
 }
 
+/** 一种已知协议的驱动：二进制来自每次启动的 `spec.launch.binaryPath`，驱动本身不绑定任何二进制（RFC-006 C5）。 */
 export interface CliAgentDriver {
-  readonly name: AgentDriverName;
-  /** 只有二进制真的在 PATH 上才为 true —— 它进 hello 的 capabilities.drivers。 */
-  available(): boolean;
+  readonly protocol: KnownAgentProtocol;
   start(spec: DriverAgentSpec, context: DriverLaunchContext): DriverAgentProcess;
 }
 

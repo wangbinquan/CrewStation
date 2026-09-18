@@ -6,7 +6,7 @@
 // 都以「stderr 只有一整块 run usage ＋ exit 1」收场，极难归因。
 // argv 组装是同步纯函数、不能现场探测，这张进程内表就是桥：每次 `--version` 探测成功即记录。
 
-/** binary 记号（PATH 上就是 'opencode'，覆写时是绝对路径）→ 最近一次成功探测到的版本。 */
+/** binary 记号（档位修订的二进制绝对路径，RFC-006）→ 最近一次成功探测到的版本。 */
 const versions = new Map<string, string | null>();
 
 export function recordOpencodeBinaryVersion(binary: string, version: string | null): void {

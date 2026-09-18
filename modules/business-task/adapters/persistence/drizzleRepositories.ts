@@ -1,4 +1,4 @@
-import type { AgentProfile, BusinessTaskState, OutputContract, ProjectId, ReleaseId, RuntimeRevisionRef, ServiceId, SubtaskId, SubtaskMode, SubtaskState, TaskId, TraceId, VolumeMode } from '@crewstation/contracts';
+import type { AgentProfile, BusinessTaskState, OutputContract, ProjectId, ReleaseId, ProfileRevisionRef, ServiceId, SubtaskId, SubtaskMode, SubtaskState, TaskId, TraceId, VolumeMode } from '@crewstation/contracts';
 import type { Executor } from '@crewstation/persistence';
 import { desc, eq, inArray } from 'drizzle-orm';
 import type { BusinessTask } from '../../domain/businessTask';
@@ -23,7 +23,7 @@ export function drizzleTaskRepository(db: Executor): TaskRepository {
   };
 }
 
-interface SubtaskSpec { prompt?: string; cwd?: string; command?: string[]; timeoutSeconds?: number; agentProfile?: AgentProfile; outputContract?: OutputContract; runtime?: RuntimeRevisionRef }
+interface SubtaskSpec { prompt?: string; cwd?: string; command?: string[]; timeoutSeconds?: number; agentProfile?: AgentProfile; outputContract?: OutputContract; computeProfile?: ProfileRevisionRef }
 
 export function drizzleSubtaskRepository(db: Executor): SubtaskRepository {
   const toRun = (r: typeof subtasks.$inferSelect): SubtaskRun => {
@@ -37,7 +37,7 @@ export function drizzleSubtaskRepository(db: Executor): SubtaskRepository {
   };
   const toRow = (s: SubtaskRun): typeof subtasks.$inferInsert => ({
     id: s.id, taskId: s.taskId, name: s.name, kind: s.kind, mode: s.mode ?? null, state: s.state, attempt: s.attempt,
-    spec: ({ prompt: s.prompt, cwd: s.cwd, command: s.command, timeoutSeconds: s.timeoutSeconds, agentProfile: s.agentProfile, outputContract: s.outputContract, runtime: s.runtime }) as unknown,
+    spec: ({ prompt: s.prompt, cwd: s.cwd, command: s.command, timeoutSeconds: s.timeoutSeconds, agentProfile: s.agentProfile, outputContract: s.outputContract, computeProfile: s.computeProfile }) as unknown,
     runnerRef: s.runnerRef ?? null, sessionId: s.sessionId ?? null, exitCode: s.exitCode ?? null, output: s.output ?? null, businessOutcome: s.businessOutcome ?? null,
     contractResult: s.contractResult ?? null, error: s.error ?? null, createdAt: s.createdAt, startedAt: s.startedAt ?? null, endedAt: s.endedAt ?? null,
   });

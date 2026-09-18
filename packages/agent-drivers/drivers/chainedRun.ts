@@ -2,7 +2,7 @@
 // oneshot 模式下两个 CLI 都走这里（与 agent-workflow 完全一致）；交互模式下 OpenCode 走这里，
 // 因为 `opencode run` 的 message 是位置参数、没有任何 stdin 流入口（`opencode run --help`，1.18.29 实测）。
 
-import type { AgentDriver, AgentEvent } from '@crewstation/contracts';
+import type { AgentEvent, KnownAgentProtocol } from '@crewstation/contracts';
 import { DriverStateError } from '../contract/agentDriver';
 import type { DriverAgentSpec, DriverLaunchContext } from '../contract/agentDriver';
 import type { DriverChildProcess } from '../contract/processHost';
@@ -13,8 +13,8 @@ import { pumpTurn } from './turnPump';
 export class ChainedAgentRun extends AgentRunBase {
   private turn: Promise<void>;
 
-  constructor(spec: DriverAgentSpec, context: DriverLaunchContext, prepared: PreparedRuntime, driverName: AgentDriver) {
-    super(spec, context, prepared, driverName);
+  constructor(spec: DriverAgentSpec, context: DriverLaunchContext, prepared: PreparedRuntime, protocol: KnownAgentProtocol) {
+    super(spec, context, prepared, protocol);
     this.turn = this.begin();
   }
 
@@ -74,7 +74,7 @@ export class ChainedAgentRun extends AgentRunBase {
     if (result.exitCode !== 0) {
       const sessionGone = this.prepared.detectSessionNotFound(result.stderrTail);
       const code = sessionGone ? 'session_not_found' : 'agent_failed';
-      this.finishFailed(code, failureMessage(this.driverName, result.exitCode, result.signalCode, result.stderrTail), result.exitCode);
+      this.finishFailed(code, failureMessage(this.protocol, result.exitCode, result.signalCode, result.stderrTail), result.exitCode);
       return;
     }
     // 干净退出但运行时自报终止错误（Claude 的 `result.is_error`：鉴权失败／API 报错）。

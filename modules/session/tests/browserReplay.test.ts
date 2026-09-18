@@ -25,7 +25,7 @@ function fixture(listSince: SessionUseCaseDeps['events']['listSince'], replayLim
   const commands: unknown[] = [];
   const hub = runnerHub(deps);
   const streams = browserStreams(deps, hub, { sendCommand: async (_task, command) => { commands.push(command); return {}; }, sendLocalOnly: async () => ({}), connectionStatus: async () => ({ connected: true }) });
-  const connect = () => hub.onHello({ type: 'hello', taskId, protocolVersion: TASKRUNNER_PROTOCOL_VERSION, runnerToken: 'token', workdir: '/work', capabilities: { drivers: [], pty: true, preview: true } }, { send: () => {} });
+  const connect = () => hub.onHello({ type: 'hello', taskId, protocolVersion: TASKRUNNER_PROTOCOL_VERSION, runnerToken: 'token', workdir: '/work', capabilities: { protocols: ['claude-code', 'opencode', 'terminal'], pty: true, preview: true } }, { send: () => {} });
   return { hub, streams, connect, commands };
 }
 

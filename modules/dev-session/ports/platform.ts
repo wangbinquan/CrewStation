@@ -1,4 +1,4 @@
-import type { Actor, AgentDriver, AgentRuntimeMaterial, ApiOperationDto, BranchDto, Manifest, ProjectId, PublishRequest, ReleaseDto, RuntimeRevisionRef, ServiceId, SlotDto, TaskId, UserId } from '@crewstation/contracts';
+import type { Actor, AgentProtocol, ApiOperationDto, BeforeStartMaterial, ComputeUsage, LaunchSpec, ProfileRevisionRef, BranchDto, Manifest, ProjectId, PublishRequest, ReleaseDto, ServiceId, SlotDto, TaskId, UserId } from '@crewstation/contracts';
 
 /** api-catalog L3 的公开操作查询，由平台装配。 */
 export interface ApiInvocationCatalog {
@@ -22,25 +22,29 @@ export interface SourceControl {
   readFile(serviceId: ServiceId, ref: string, path: string): Promise<string | undefined>;
 }
 
-/**
- * 由 project 模块提供（RFC-001）：算力档位名 → 具体驱动与模型。
- * 解析发生在平台侧，容器拿到的是已经定好的具体值。
- */
+/** 受理时解析出的档位（RFC-006）：`default` 已换成真实名称，修订固定。 */
 export interface ResolvedCompute {
   name: string;
-  driver: AgentDriver;
-  model: string;
+  revision: number;
+  protocol: AgentProtocol;
   taskProfile?: string;
-  /** RFC-004：受理时固定的运行环境版本；未绑定即部署配置模式。解析本身在托管配置未就绪时抛 precondition。 */
-  runtime?: RuntimeRevisionRef;
+  /** 按摘要固定的镜像引用。 */
+  image: string;
 }
 
+/** 派发一次启动的材料（含解密凭据）：只在下发命令时取，不落库、不进日志、不进事件。 */
+export interface ComputeLaunch extends ResolvedCompute {
+  launch: LaunchSpec;
+  beforeStart: BeforeStartMaterial;
+}
+
+/**
+ * 由 agent-runtime 提供（RFC-006）：档位名或 `default` → 固定修订；按修订取派发材料。
+ * 不存在、不可用、终端档位用错用途都由它抛出可读错误，本模块原样透传。
+ */
 export interface ComputeCatalog {
-  resolve(name: string): Promise<ResolvedCompute | undefined>;
-  /** 固定版本的启动材料（含解密凭据）：只在下发命令时取，不落库、不进日志、不进事件。 */
-  runtimeMaterial(ref: RuntimeRevisionRef): Promise<AgentRuntimeMaterial>;
-  /** 只用于报错时列出可选项。 */
-  list(): Promise<Array<{ name: string }>>;
+  resolve(nameOrDefault: string | undefined, usage: ComputeUsage): Promise<ResolvedCompute>;
+  launchMaterial(ref: ProfileRevisionRef): Promise<ComputeLaunch>;
 }
 
 /** 由 release 模块提供。 */
@@ -72,6 +76,4 @@ export interface DevSessionSettings {
   /** 注入 Agent 的平台 MCP 连接（能力说明、操作）。 */
   readonly mcp: Array<{ name: string; url: string }>;
   readonly defaultPreviewPort: number;
-  /** 起 Agent 时省略 compute 用的默认档位名（RFC-001）。 */
-  readonly defaultComputeProfile: string;
 }

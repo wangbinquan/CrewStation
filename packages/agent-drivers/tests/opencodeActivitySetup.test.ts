@@ -20,7 +20,7 @@ async function fixture(version = '1.18.29') {
   const deps = join(root, 'deps'); await mkdir(join(deps, 'node_modules'), { recursive: true });
   await writeFile(join(deps, 'package.json'), JSON.stringify({ dependencies: { '@opencode-ai/plugin': '1.18.29' } }));
   await writeFile(join(deps, 'package-lock.json'), JSON.stringify({ lockfileVersion: 3, packages: { '': { dependencies: { '@opencode-ai/plugin': '1.18.29' } } } }));
-  const prepare = () => prepareNativeTerminal({ driver: 'opencode', permission: 'edit', agentId: 'native', compute: 'balanced', model: 'anthropic/fixed-model', mcp: [] }, { cwd: root, runDir: join(root, 'run'), env: { HOME: root }, host, logger: noopLogger, nativeActivity: { endpoint: 'http://127.0.0.1:1234/activity', token: 'private-observer-token', opencodeDependencies: deps } });
+  const prepare = () => prepareNativeTerminal({ launch: { protocol: 'opencode', binaryPath: '/usr/local/bin/opencode', extraArgs: [], isSandbox: false, model: 'anthropic/fixed-model' }, profileRevision: 1, permission: 'edit', agentId: 'native', compute: 'balanced', mcp: [] }, { cwd: root, runDir: join(root, 'run'), env: { HOME: root }, host, logger: noopLogger, nativeActivity: { endpoint: 'http://127.0.0.1:1234/activity', token: 'private-observer-token', opencodeDependencies: deps } });
   return { root, host, deps, prepare };
 }
 
@@ -47,7 +47,7 @@ test('其他版本或 SDK 缺失仅降级状态源，原生 CLI 的运行计划�
   const f = await fixture(); await rm(f.deps, { recursive: true });
   const unavailable = await f.prepare();
   expect(unavailable.activityUnavailable).toBe('source-error');
-  expect(unavailable.plan.cmd[0]).toBe('opencode');
+  expect(unavailable.plan.cmd[0]).toBe('/usr/local/bin/opencode');
 });
 
 test('已有用户依赖完整保留，多 CLI 同时准备不会互相覆盖全局目录', async () => {

@@ -57,13 +57,16 @@ export const queryKeys = {
   servicePlans: () => ['service-plans'] as const,
   projectTemplates: () => ['project-templates', 'admin'] as const,
   taskProfiles: () => ['task-profiles'] as const,
-  /** 算力档位（RFC-001）：租户投影与管理面全量分开缓存，两者字段不同。 */
+  /**
+   * 算力档位（RFC-006）：租户投影与管理面分开缓存，两者字段不同；都挂在 compute-profiles 前缀下，
+   * 管理员一次写入按前缀失效，租户下拉与管理列表一起刷新。测试在运行中按短间隔轮询。
+   */
   computeProfiles: () => ['compute-profiles'] as const,
-  computeProfilesFull: () => ['compute-profiles', 'full'] as const,
-  /** 管理员运行环境（RFC-004）：列表、详情与检查分别缓存；检查在运行中按短间隔轮询。 */
-  runtimeConfigs: () => ['runtime-configs'] as const,
-  runtimeConfig: (id: string) => ['runtime-configs', id] as const,
-  runtimeCheck: (id: string, checkId: string) => ['runtime-configs', id, 'checks', checkId] as const,
+  adminComputeProfiles: () => ['compute-profiles', 'admin'] as const,
+  adminComputeProfile: (name: string) => ['compute-profiles', 'admin', name] as const,
+  profileTest: (name: string, testId: string) => ['compute-profiles', 'admin', name, 'tests', testId] as const,
+  /** 平台仓库的推送地址与底座镜像；签发的推送凭据不缓存。 */
+  runtimeImages: () => ['runtime-images'] as const,
   /** 网关的只读派生状态；重算后按 gateway 前缀一次失效。 */
   gateway: () => ['gateway'] as const,
   gatewayRoutes: () => ['gateway', 'routes'] as const,

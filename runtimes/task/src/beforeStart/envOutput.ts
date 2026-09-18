@@ -8,7 +8,7 @@ export const RESERVED_ENV_NAMES: ReadonlySet<string> = new Set([
   'HOME', 'USER', 'LOGNAME', 'PATH', 'PWD', 'CS_AGENT_ID', 'CS_AGENT_HOME', 'CS_AGENT_RUN_DIR', 'CS_WORKDIR', 'CS_HOOK_ENV_OUT',
   'CS_RUNNER_TOKEN', 'CS_SESSION_URL', 'CS_TASK_ID', 'CS_TRACE_ID', 'CLAUDE_CONFIG_DIR', 'OPENCODE_CONFIG', 'OPENCODE_CONFIG_DIR', 'OPENCODE_CONFIG_CONTENT',
 ]);
-export const RESERVED_ENV_PREFIXES: readonly string[] = ['CS_RUNNER_', 'OTEL_'];
+export const RESERVED_ENV_PREFIXES: readonly string[] = ['CS_RUNNER_', 'CS_MCP_', 'OTEL_'];
 
 export function isReservedEnvName(name: string): boolean {
   return RESERVED_ENV_NAMES.has(name) || RESERVED_ENV_PREFIXES.some((prefix) => name.startsWith(prefix));

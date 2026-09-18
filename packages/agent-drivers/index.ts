@@ -53,12 +53,12 @@ export type {
   SystemEventObservation,
 } from './contract/normalizedEvent';
 export type { AgentSpawnContext, McpServerSpec, SpawnPlan } from './contract/spawnPlan';
-export { toMcpServerSpec } from './contract/spawnPlan';
+export { launchSpawnFields, toMcpServerSpec } from './contract/spawnPlan';
 
-export type { CliAdapterOptions, CliRuntimeAdapter, PreparedRuntime, TurnInput } from './drivers/cliRuntimeAdapter';
+export type { CliRuntimeAdapter, PreparedRuntime, TurnInput } from './drivers/cliRuntimeAdapter';
 export { createCliAgentDriver } from './drivers/cliAgentDriver';
-export { CLAUDE_BINARY, CLAUDE_DRIVER_NAME, claudeCodeAdapter, createClaudeCodeDriver } from './drivers/claudeCode/driver';
-export { OPENCODE_BINARY, OPENCODE_DRIVER_NAME, createOpencodeDriver, opencodeAdapter } from './drivers/opencode/driver';
+export { CLAUDE_PROTOCOL, claudeCodeAdapter, createClaudeCodeDriver } from './drivers/claudeCode/driver';
+export { OPENCODE_PROTOCOL, createOpencodeDriver, opencodeAdapter } from './drivers/opencode/driver';
 
 export {
   CLAUDE_HEADLESS_BASE_ARGV,
@@ -70,7 +70,7 @@ export {
   claudeModelName,
   renderClaudeMcpConfig,
 } from './drivers/claudeCode/argv';
-export { assembleClaudeEnv } from './drivers/claudeCode/env';
+export { CLAUDE_CONFIG_DIR_ENV, CLAUDE_CONFIG_DIR_NAME, assembleClaudeEnv, claudeConfigDirEnv } from './drivers/claudeCode/env';
 export { detectClaudeSessionNotFound, observeSystemEvent as observeClaudeSystemEvent, parseEvent as parseClaudeEvent } from './drivers/claudeCode/events';
 export { claudeUserMessageFrame } from './drivers/claudeCode/streamInput';
 export type { CliProbeResult, ProbeOptions } from './drivers/claudeCode/probe';
@@ -83,7 +83,7 @@ export {
   buildOpencodeArgv,
   resolveAutoApproveFlag,
 } from './drivers/opencode/argv';
-export { OPENCODE_CONFIG_DIR_ENV, OPENCODE_CONFIG_DIR_NAME, buildOpencodeEnv } from './drivers/opencode/env';
+export { OPENCODE_CONFIG_DIR_ENV, OPENCODE_CONFIG_DIR_NAME, buildOpencodeEnv, opencodeConfigDirEnv, opencodeConfigDirName } from './drivers/opencode/env';
 export { buildOpencodeInlineConfig, renderOpencodeAgentEntry } from './drivers/opencode/inlineConfig';
 export { computeTokenDelta, extractTextFromEvent, inferEventKind, observeSystemEvent as observeOpencodeSystemEvent, parseEvent as parseOpencodeEvent } from './drivers/opencode/events';
 export { detectOpencodeSessionNotFound, ensureOpencodeBinaryVersion, probeOpencode, resetOpencodeProbes } from './drivers/opencode/probe';
@@ -102,7 +102,9 @@ export {
   renderOpencodeMcpInjection,
 } from './injection/mcpInjection';
 
-export { pickRuntimeHead } from './injection/spawnHead';
+export type { PlatformMcpEndpoints } from './injection/platformMcp';
+export { PLATFORM_MCP_NAMES, platformMcpEndpoints, platformMcpEnv, terminalMcpEnv } from './injection/platformMcp';
+export { assertClaudeExtraArgs, assertConfigDirEnv, assertTerminalArgs } from './injection/launchArgs';
 export { compareSemver, extractVersion } from './process/semver';
 export { DEFAULT_VERSION_PROBE_TIMEOUT_MS, spawnVersionProbe } from './process/versionProbe';
 export { MAX_STDERR_TAIL_CHARS, createBoundedTail } from './process/boundedTail';

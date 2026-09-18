@@ -1,4 +1,4 @@
-import { chown, mkdtemp, rm } from 'node:fs/promises';
+import { chmod, chown, mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { TaskId } from '@crewstation/contracts';
@@ -28,6 +28,10 @@ export const runningAsRoot = typeof process.getuid === 'function' && process.get
 export async function startTestRunner(sessionUrl: string, overrides: Partial<RunnerConfig> = {}, hooks: RunnerHooks = {}): Promise<TestRunner> {
   const workdir = await mkdtemp(join(tmpdir(), 'cs-runner-'));
   if (runningAsRoot) await chown(workdir, WORKER_ID, WORKER_ID);
+  // 每次启动的私有目录（启动前 Hook）放进本次测试自己的临时根，不落到共享的 <tmpdir>/crewstation-agents。
+  const agentRunRoot = await mkdtemp(join(tmpdir(), 'cs-runner-agents-'));
+  // mkdtemp 是 root 独占的 0700：降权后的 CLI 与脚本要能穿过它走到自己的私有目录。
+  if (runningAsRoot) await chmod(agentRunRoot, 0o755);
   const logLines: string[] = [];
   const exitCodes: number[] = [];
   const config: RunnerConfig = {
@@ -43,6 +47,7 @@ export async function startTestRunner(sessionUrl: string, overrides: Partial<Run
     reconnect: { baseMs: 20, maxMs: 60 },
     previewPolicy: { maxRestarts: 5, baseDelayMs: 20, pollIntervalMs: 50, probeTimeoutMs: 1000 },
     logger: createJsonLogger({ service: 'taskrunner-test' }, (line) => logLines.push(line)),
+    agentRunDir: join(agentRunRoot, 'agents'),
     ...overrides,
   };
   const runner = await startRunner(config, { exit: (code) => exitCodes.push(code), ...hooks });
@@ -56,6 +61,7 @@ export async function startTestRunner(sessionUrl: string, overrides: Partial<Run
       await runner.stop();
       runner.link.close();
       await rm(workdir, { recursive: true, force: true });
+      await rm(agentRunRoot, { recursive: true, force: true });
     },
   };
 }

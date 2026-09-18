@@ -25,6 +25,7 @@ export const environments = taskRuntimeSchema.table('environments', {
   rebuildId: text('rebuild_id'),
   native: jsonDocument('native').$type<TaskEnvironment['native']>(),
   release: jsonDocument('release').$type<TaskEnvironment['release']>(),
+  runnerRejection: jsonDocument('runner_rejection').$type<TaskEnvironment['runnerRejection']>(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
   lastActivityAt: timestamp('last_activity_at', { withTimezone: true }).notNull(),

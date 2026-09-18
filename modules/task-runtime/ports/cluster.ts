@@ -15,8 +15,8 @@ export interface TaskPodSpec {
   /** 重建时持久化于专用 Secret，允许创建响应丢失后复用同一份环境。 */
   envSecretName?: string;
   resources: { cpu: string; memory: string; storage: string };
-  /** 模型凭据等只给 Agent 进程的变量文件所在 Secret；不存在则不挂。 */
-  agentEnvSecretName?: string;
+  /** 工作目录的卷：任务用自己的 PVC（默认）；档位测试用 Pod 内的临时目录，Pod 结束即清理（RFC-006 §5.2）。 */
+  workVolume?: 'pvc' | 'emptyDir';
   source?: TaskSourceCheckout;
   /** 共享 RWO 工作卷的执行容器与恢复容器由调度器安排在原节点。 */
   nodeName?: string;
@@ -36,7 +36,8 @@ export type PodPhase = 'Pending' | 'Running' | 'Succeeded' | 'Failed' | 'Unknown
 export interface TaskCluster {
   ensureVolume(env: TaskEnvironment, size: string): Promise<void>;
   createPod(spec: TaskPodSpec): Promise<void>;
-  podPhase(env: TaskEnvironment): Promise<{ phase: PodPhase; message?: string; ip?: string; imageId?: string }>;
+  /** waitingReason：主容器的等待原因（ErrImagePull、CreateContainerError 等），档位测试据此区分镜像与 Runner 的失败。 */
+  podPhase(env: TaskEnvironment): Promise<{ phase: PodPhase; message?: string; ip?: string; imageId?: string; waitingReason?: string }>;
   deletePod(env: TaskEnvironment): Promise<void>;
   deleteVolume(env: TaskEnvironment): Promise<void>;
 }

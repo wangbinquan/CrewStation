@@ -7,40 +7,39 @@
 //   <runDir>/mcp-config.json    —— 目录 0o700、文件 0o600
 // 用文件而不是内联 JSON 传 MCP 配置，是源里记录过的教训：内联到 argv 会把凭据漏进 /proc/<pid>/cmdline。
 
-import type { AgentDriver as AgentDriverName } from '@crewstation/contracts';
+import type { KnownAgentProtocol } from '@crewstation/contracts';
 import type { CliAgentDriver, DriverAgentSpec, DriverLaunchContext } from '../../contract/agentDriver';
 import type { AgentSpawnContext } from '../../contract/spawnPlan';
-import { toMcpServerSpec } from '../../contract/spawnPlan';
-import { pickRuntimeHead } from '../../injection/spawnHead';
+import { launchSpawnFields, toMcpServerSpec } from '../../contract/spawnPlan';
+import { assertLaunchForKnownProtocol } from '../../injection/launchArgs';
 import { createRunDirectory, defaultRunDir } from '../../process/runDirectory';
-import type { CliAdapterOptions, CliRuntimeAdapter, PreparedRuntime } from '../cliRuntimeAdapter';
+import type { CliRuntimeAdapter, PreparedRuntime } from '../cliRuntimeAdapter';
 import { createCliAgentDriver } from '../cliAgentDriver';
 import { buildClaudeSpawn, renderClaudeMcpConfig } from './argv';
 import { readManagedClaudeSettings, writeMergedClaudeSettings } from './managedSettings';
 import { detectClaudeSessionNotFound, parseEvent } from './events';
 import { claudeUserMessageFrame } from './streamInput';
 
-export const CLAUDE_DRIVER_NAME: AgentDriverName = 'claude-code';
-export const CLAUDE_BINARY = 'claude';
+export const CLAUDE_PROTOCOL: KnownAgentProtocol = 'claude-code';
 
-export function claudeCodeAdapter(options: CliAdapterOptions = {}): CliRuntimeAdapter {
-  const head = pickRuntimeHead(options.binaryPath, [CLAUDE_BINARY]);
+/** 二进制与参数来自每次启动的 launch（RFC-006）；适配器只认协议。 */
+export function claudeCodeAdapter(): CliRuntimeAdapter {
   return {
-    name: CLAUDE_DRIVER_NAME,
-    binary: head[0] ?? CLAUDE_BINARY,
+    protocol: CLAUDE_PROTOCOL,
     // `claude --help`（2.1.268）：`--input-format <text|stream-json>` 明确支持实时流式输入。
     supportsResidentStream: true,
-    prepare: (spec, context) => prepareClaude(spec, context, head),
+    prepare: prepareClaude,
   };
 }
 
-export function createClaudeCodeDriver(which: (binary: string) => string | null, options: CliAdapterOptions = {}): CliAgentDriver {
-  return createCliAgentDriver(claudeCodeAdapter(options), which);
+export function createClaudeCodeDriver(which: (binary: string) => string | null): CliAgentDriver {
+  return createCliAgentDriver(claudeCodeAdapter(), which);
 }
 
-async function prepareClaude(spec: DriverAgentSpec, context: DriverLaunchContext, head: string[]): Promise<PreparedRuntime> {
+async function prepareClaude(spec: DriverAgentSpec, context: DriverLaunchContext): Promise<PreparedRuntime> {
+  assertLaunchForKnownProtocol(spec.launch);
   const runDir = await createRunDirectory(context.runDir ?? defaultRunDir(spec.agentId), context.host);
-  const base = { ...baseContext(spec, context, runDir.path), head };
+  const base = baseContext(spec, context, runDir.path);
   const systemPromptFile = await runDir.write('system.md', spec.systemPrompt ?? '');
   const mcp = renderClaudeMcpConfig(base);
   const mcpConfigFile = mcp === null ? undefined : await runDir.write('mcp-config.json', mcp.json);
@@ -75,7 +74,7 @@ function baseContext(spec: DriverAgentSpec, context: DriverLaunchContext, runDir
     agentId: spec.agentId,
     prompt: '',
     ...(spec.systemPrompt === undefined ? {} : { systemPrompt: spec.systemPrompt }),
-    model: spec.model,
+    ...launchSpawnFields(spec.launch),
     permission: spec.permission,
     mcps: spec.mcp.map(toMcpServerSpec),
     cwd: context.cwd,

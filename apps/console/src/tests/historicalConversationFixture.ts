@@ -17,7 +17,7 @@ export function historicalConversationFixture() {
   globalThis.fetch = (async (raw, init) => {
     const path = new URL(String(raw), 'http://localhost').pathname;
     if (path.endsWith('/agents') && (init?.method ?? 'GET') === 'GET') { rosterRequests.push(path); return Response.json({ items: agents }); }
-    if (path === '/v1/catalog/compute-profiles') return Response.json({ items: [{ name: 'standard', description: '通用档位', mode: 'legacy', available: true }, { name: 'fast', description: '快速档位', mode: 'legacy', available: true }] });
+    if (path === '/v1/catalog/compute-profiles') return Response.json({ items: [{ name: 'standard', description: '通用档位', terminalOnly: false, isDefault: true, available: true }, { name: 'fast', description: '快速档位', terminalOnly: false, isDefault: false, available: true }] });
     if (path.endsWith('/agents') && init?.method === 'POST') return new Promise<Response>((resolve) => starts.push({ input: JSON.parse(String(init.body)), resolve }));
     const target = path.match(/\/agents\/([^/]+)\/messages$/);
     if (target && init?.method === 'POST') return new Promise<Response>((resolve) => sends.push({ agentId: target[1]!, content: JSON.parse(String(init.body)).content, resolve }));

@@ -5,7 +5,7 @@ import { PreviewStateSchema } from '../taskrunner/protocol';
 import { PublishRequestSchema } from './release';
 import { ApiInvocationInputSchema, ApiInvocationResultSchema } from '../taskrunner/apiInvocation';
 import { DevSessionRebuildDtoSchema } from './devSessionRecovery';
-import { BeforeStartStateSchema, RuntimeRevisionRefSchema } from '../taskrunner/beforeStart';
+import { BeforeStartStateSchema } from '../taskrunner/beforeStart';
 
 export const ApiInvocationRequestSchema = ApiInvocationInputSchema.extend({ expectedTaskId: TaskIdSchema, operationKey: z.string().min(1).max(8192) }).strict();
 export const ApiInvocationResponseSchema = z.object({ taskId: TaskIdSchema, operationKey: z.string().min(1).max(8192), result: ApiInvocationResultSchema }).strict();
@@ -54,8 +54,8 @@ export const AgentInstanceDtoSchema = z.object({
   permission: AgentPermissionSchema,
   state: AgentInstanceStateSchema,
   sessionId: z.string().optional(),
-  /** RFC-004：此 Agent 固定使用的运行环境版本。 */
-  runtime: RuntimeRevisionRefSchema.optional(),
+  /** RFC-006：此 Agent 受理时固定的档位修订。 */
+  profileRevision: z.number().int().min(1).optional(),
   beforeStart: z.object({ executionId: z.string().min(1), state: BeforeStartStateSchema, currentStep: z.string().optional(), failedStep: z.string().optional(), error: z.string().optional() }).optional(),
   startedAt: z.iso.datetime(),
   endedAt: z.iso.datetime().optional(),
@@ -63,7 +63,7 @@ export const AgentInstanceDtoSchema = z.object({
 
 /** 开发会话内启动流式交互 Agent；算力由平台按档位分配，使用者不指定驱动与模型。 */
 export const StartDevAgentRequestSchema = z.object({
-  /** 管理员定义的算力档位名；省略时用平台默认档（RFC-001）。 */
+  /** 管理员定义的算力档位名或 `default`；省略即 `default`，每次启动时解析到管理员设为默认的档位（RFC-006）。 */
   compute: SlugSchema.optional(),
   permission: AgentPermissionSchema.default('edit'),
   prompt: z.string().min(1),

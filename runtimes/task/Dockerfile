@@ -11,7 +11,8 @@ RUN apt-get update \
 RUN groupadd --gid 10001 worker \
   && useradd --uid 10001 --gid 10001 --home-dir /work --create-home --shell /bin/bash worker
 
-# 两个 Agent CLI：@crewstation/agent-drivers 的驱动拉起的就是它们，缺了 hello 的 capabilities.drivers 就只剩 stub。
+# 两个 Agent CLI：底座预装（RFC-006 C5），已知协议的档位把 binaryPath 指向 /usr/local/bin 下的它们；
+# 管理员以本镜像为底座另装的二进制，由档位的 binaryPath 指过去，Runner 不再按协议默认名启动任何 CLI。
 # 用官方安装脚本装原生可执行文件（本镜像没有 node，npm 包那条路走不通）；两个脚本都只装进 root 的家目录，
 # 而 Agent 进程经 setpriv 降到 worker(10001)、/root 不可遍历，所以装完把真正的二进制搬进 /usr/local/bin。
 # 版本显式钉住：这两个号也是 packages/agent-drivers 里 argv／事件形状实测所依据的版本，升级时一并复核。
@@ -48,9 +49,17 @@ RUN printf '%s\n' \
   && bun install --production \
   && rm -rf /root/.bun/install/cache
 
+# 稳定的 Runner 启动路径（RFC-006 §7）：Pod 显式以 root 执行 ["/usr/bin/tini", "--", "/opt/crewstation/bin/task-runner"]，
+# 管理员镜像里改过的 USER／ENTRYPOINT／CMD／WORKDIR 都影响不到 Runner 的启动。bun 的绝对路径在构建时写死，
+# PATH 被改也找得到；先回到 /app 是因为 bun run 从当前目录读 bunfig.toml。
+RUN mkdir -p /opt/crewstation/bin \
+  && printf '#!/bin/sh\ncd /app || exit 1\nexec %s run /app/runtimes/task/src/main.ts "$@"\n' "$(command -v bun)" > /opt/crewstation/bin/task-runner \
+  && chmod 0755 /opt/crewstation/bin/task-runner \
+  && sh -n /opt/crewstation/bin/task-runner
+
 ENV CS_WORKDIR=/work \
     NODE_ENV=production
 VOLUME ["/work"]
 
 ENTRYPOINT ["/usr/bin/tini", "--"]
-CMD ["bun", "run", "runtimes/task/src/main.ts"]
+CMD ["/opt/crewstation/bin/task-runner"]

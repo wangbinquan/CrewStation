@@ -1,4 +1,4 @@
-// 把一个 CliRuntimeAdapter 包成 CliAgentDriver：决定 available()，并按模式挑运行策略。
+// 把一个 CliRuntimeAdapter 包成 CliAgentDriver：启动前核对协议与二进制，并按模式挑运行策略。
 
 import type { AgentEvent } from '@crewstation/contracts';
 import type { CliAgentDriver, DriverAgentProcess, DriverAgentSpec, DriverLaunchContext } from '../contract/agentDriver';
@@ -11,31 +11,30 @@ import { createEventStream } from './eventStream';
 import { ResidentAgentRun } from './residentRun';
 
 /**
- * `available()` 要解析 PATH 才能回答，而 CliAgentDriver 的签名里没有 ProcessHost，
- * 所以 `which` 在构造时注入（宿主传自己的 Bun.which，测试传替身）。
- * 它决定 hello 的 capabilities.drivers：二进制不在就不宣告，`start` 也直接报 driver_not_installed，
- * 不白建运行目录。
+ * 二进制来自每次启动的 `spec.launch.binaryPath`（RFC-006 C5），驱动本身不绑定任何二进制；
+ * `which` 在构造时注入（宿主传自己的 Bun.which，测试传替身），启动时用它判断那个绝对路径是否可执行。
+ * 不在位就只发 driver_not_installed，不白建运行目录；协议与适配器不符（平台下发错了）同样只报错不启动。
  */
 export function createCliAgentDriver(adapter: CliRuntimeAdapter, which: (binary: string) => string | null): CliAgentDriver {
   return {
-    name: adapter.name,
-    available: () => which(adapter.binary) !== null,
+    protocol: adapter.protocol,
     start: (spec, context) => {
-      if (which(adapter.binary) === null) return notInstalled(adapter.binary, spec);
+      if (spec.launch.protocol !== adapter.protocol) return failedBeforeStart(spec, 'protocol_mismatch', `档位协议 ${spec.launch.protocol} 不能由 ${adapter.protocol} 驱动启动`);
+      if (which(spec.launch.binaryPath) === null) return failedBeforeStart(spec, 'driver_not_installed', `driver binary not installed: ${spec.launch.binaryPath}`);
       return start(adapter, spec, context);
     },
   };
 }
 
-/** 二进制不在位：一条 error 事件后即结束，send／cancel 都是空操作。 */
-function notInstalled(binary: string, spec: DriverAgentSpec): DriverAgentProcess {
+/** 启动前就能判定的失败：一条 error 事件后即结束，send／cancel 都是空操作。 */
+function failedBeforeStart(spec: DriverAgentSpec, code: string, message: string): DriverAgentProcess {
   const events = createEventStream<AgentEvent>();
   const event = createAgentEventFactory(spec.agentId);
-  events.push(event('error', { error: { code: 'driver_not_installed', message: `driver binary not installed: ${binary}` } }));
+  events.push(event('error', { error: { code, message } }));
   events.close();
   return {
     events,
-    send: () => Promise.reject(new DriverStateError('agent_not_running', `driver ${binary} 未启动`)),
+    send: () => Promise.reject(new DriverStateError('agent_not_running', `Agent ${spec.agentId} 未启动`)),
     cancel: () => Promise.resolve(),
   };
 }
@@ -49,8 +48,8 @@ function start(adapter: CliRuntimeAdapter, spec: DriverAgentSpec, context: Drive
     .then((prepared) => {
       const resident = spec.mode === 'interactive' && adapter.supportsResidentStream;
       const run = resident
-        ? new ResidentAgentRun(spec, context, prepared, adapter.name)
-        : new ChainedAgentRun(spec, context, prepared, adapter.name);
+        ? new ResidentAgentRun(spec, context, prepared, adapter.protocol)
+        : new ChainedAgentRun(spec, context, prepared, adapter.protocol);
       pending.attach(run);
     })
     .catch((error: unknown) => {

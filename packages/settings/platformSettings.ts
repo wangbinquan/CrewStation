@@ -9,10 +9,14 @@ export interface PlatformSettings {
   defaultMaxConcurrentTasks: number;
   defaultServicePlan: string;
   defaultTaskProfile: string;
-  /** 开发会话与业务子任务省略 compute 时用的算力档位名（RFC-001）。 */
-  defaultComputeProfile: string;
   dataPostgres: { adminUrl: string; visibleHost: string; visiblePort: number };
   registryBase: string;
+  /** 管理员从工作机推送档位镜像的主机名（经网关，RFC-006 C18）。 */
+  registryPushHost: string;
+  /** 集群内访问平台仓库 HTTP API 的协议（解析镜像摘要）。 */
+  registryScheme: 'http' | 'https';
+  /** 平台底座镜像在仓库里的路径与标签：管理员据此 FROM（RFC-006 C3）。 */
+  baseImage: { repository: string; tag: string };
   builderImage: string;
   buildkitAddress: string;
   taskImage: string;
@@ -22,7 +26,6 @@ export interface PlatformSettings {
   mcp: { capabilitiesUrl: string; operationsUrl: string };
   maintenanceWindow: boolean;
   idleMinutes: number;
-  agentEnvSecretName: string | undefined;
   selfAddress: string;
   identityProvider: 'demo' | 'oidc';
   sessionTtlSeconds: number;
@@ -48,9 +51,11 @@ export function loadPlatformSettings(env: Record<string, string | undefined> = p
     defaultMaxConcurrentTasks: num(env.CS_DEFAULT_MAX_CONCURRENT_TASKS, 3),
     defaultServicePlan: env.CS_DEFAULT_SERVICE_PLAN ?? 'standard-small',
     defaultTaskProfile: env.CS_DEFAULT_TASK_PROFILE ?? 'coding-medium',
-    defaultComputeProfile: env.CS_DEFAULT_COMPUTE_PROFILE ?? 'balanced',
     dataPostgres: { adminUrl: dataAdminUrl, visibleHost: visible.hostname, visiblePort: num(visible.port, 5432) },
     registryBase: env.CS_REGISTRY_BASE ?? `registry.${systemNamespace}.svc.cluster.local:5000`,
+    registryPushHost: env.CS_REGISTRY_PUSH_HOST ?? `registry.${env.CS_USER_DOMAIN ?? 'cs.localhost'}`,
+    registryScheme: env.CS_REGISTRY_SCHEME === 'https' ? 'https' : 'http',
+    baseImage: { repository: env.CS_BASE_IMAGE_REPOSITORY ?? 'crewstation/task-runtime', tag: env.CS_BASE_IMAGE_TAG ?? 'dev' },
     builderImage: env.CS_BUILDER_IMAGE ?? 'cs-builder:dev',
     buildkitAddress: env.CS_BUILDKIT_ADDRESS ?? `tcp://buildkitd.${systemNamespace}.svc.cluster.local:1234`,
     taskImage: env.CS_TASK_IMAGE ?? 'cs-task-runtime:dev',
@@ -60,7 +65,6 @@ export function loadPlatformSettings(env: Record<string, string | undefined> = p
     mcp: { capabilitiesUrl: env.CS_MCP_CAPABILITIES_URL ?? `http://mcp-capabilities.${serviceDomain}/mcp`, operationsUrl: env.CS_MCP_OPERATIONS_URL ?? `http://mcp-operations.${serviceDomain}/mcp` },
     maintenanceWindow: env.CS_MAINTENANCE_WINDOW === 'true',
     idleMinutes: num(env.CS_IDLE_MINUTES, 120),
-    agentEnvSecretName: env.CS_AGENT_ENV_SECRET || undefined,
     selfAddress: env.CS_SELF_ADDRESS ?? `http://${env.POD_IP ?? '127.0.0.1'}:${portFrom(env, 'cs-session', 8083)}`,
     identityProvider: env.CS_IDENTITY_PROVIDER === 'oidc' ? 'oidc' : 'demo',
     sessionTtlSeconds: num(env.CS_SESSION_TTL_SECONDS, 28800),

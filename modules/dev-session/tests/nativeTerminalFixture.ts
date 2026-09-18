@@ -4,6 +4,7 @@ import { newId } from '@crewstation/kernel';
 import type { NativeTerminalRepository, NativeTerminalStart } from '../ports/nativeTerminals';
 import { nativeTerminalUseCases } from '../application/nativeTerminals';
 import { workspaceFixture } from './workspaceFixture';
+import { fakeComputeCatalog } from './computeFixture';
 
 export function memoryNativeRepository(): NativeTerminalRepository {
   const records: NativeTerminalStart[] = [];
@@ -39,9 +40,9 @@ export function memoryNativeRepository(): NativeTerminalRepository {
 export function nativeFixture() {
   const base = workspaceFixture();
   const repository = memoryNativeRepository();
-  const current = { runnerId: crypto.randomUUID(), terminals: [] as NativeTerminalRecord[], loseStartResult: false, offline: false, driver: 'claude-code' as 'claude-code' | 'stub', model: 'anthropic/model' };
+  const current = { runnerId: crypto.randomUUID(), terminals: [] as NativeTerminalRecord[], loseStartResult: false, offline: false, available: true, model: 'anthropic/model' };
   const calls: RunnerCommand[] = [];
-  base.deps.compute.resolve = async (name) => ({ name, driver: current.driver, model: current.model });
+  base.deps.compute = fakeComputeCatalog(() => [{ name: 'balanced', protocol: 'claude-code', model: current.model, isDefault: true, available: current.available }]);
   base.deps.runner.sendCommand = async (_task, c) => {
     calls.push(c);
     if (current.offline) throw new Error('offline');
@@ -61,9 +62,9 @@ export function nativeFixture() {
   const api = nativeTerminalUseCases(base.deps, repository);
   // 此夹具代表升级前已受理的旧父 Runner 名册；新执行路径使用 isolatedNativeFixture。
   const startNativeTerminal: typeof api.startNativeTerminal = async (actor, taskId, input) => {
-    if (current.driver !== 'stub' && !await repository.findRequest(taskId, actor.userId, input.clientRequestId)) await repository.reserve({
+    if (current.available && !await repository.findRequest(taskId, actor.userId, input.clientRequestId)) await repository.reserve({
       taskId, createdBy: actor.userId, clientRequestId: input.clientRequestId, fingerprint: createHash('sha256').update(JSON.stringify([input.compute ?? null, input.permission, input.cwd ?? null, input.cols, input.rows])).digest('hex'),
-      input, driver: current.driver, model: current.model,
+      input, profile: { profile: 'balanced', revision: 1 },
       record: { agentId: newId('agt'), terminalId: newId('pty'), runnerId: current.runnerId, compute: input.compute ?? 'balanced', permission: input.permission, revision: 0, lifecycle: 'starting', startedAt: base.deps.clock.now().toISOString(), cols: input.cols, rows: input.rows },
     });
     return api.startNativeTerminal(actor, taskId, input);

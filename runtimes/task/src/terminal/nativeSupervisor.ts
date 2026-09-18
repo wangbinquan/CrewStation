@@ -1,5 +1,5 @@
-import type { NativeTerminalRecord, RunnerEvent, StartAgentTerminalCommand, TerminalControl, TerminalSnapshot } from '@crewstation/contracts';
-import { TerminalSizeSchema } from '@crewstation/contracts';
+import type { KnownAgentProtocol, NativeTerminalRecord, RunnerEvent, StartAgentTerminalCommand, TerminalControl, TerminalSnapshot } from '@crewstation/contracts';
+import { TerminalSizeSchema, isKnownProtocol } from '@crewstation/contracts';
 import type { Logger } from '@crewstation/kernel';
 import type { ManagedRuntimeContext, PreparedNativeTerminal } from '@crewstation/agent-drivers';
 import { prepareNativeTerminal } from '@crewstation/agent-drivers';
@@ -21,9 +21,8 @@ export interface NativeSupervisorDeps {
   backend: PtyBackend | undefined;
   launcher: ProcessLauncher;
   paths: WorkdirPaths;
-  agentEnv: Record<string, string>;
-  /** RFC-004：启动前 Hook 执行器；缺省表示本容器不支持托管启动。 */
-  beforeStart?: BeforeStartRunner;
+  /** 启动前 Hook 执行器：RFC-006 起每次启动都先经它（步骤可以为空），模型凭据也只从档位材料来。 */
+  beforeStart: BeforeStartRunner;
   emit: (event: RunnerEvent) => void;
   logger: Logger;
   prepare?: typeof prepareNativeTerminal;
@@ -34,6 +33,8 @@ interface NativeEntry {
   record: NativeTerminalRecord;
   fingerprint: string;
   start: Promise<NativeTerminalRecord>;
+  /** 工作目录确认后兑现（目录不合法时等失败记录写好）；启动命令只等到这里就回名册。 */
+  accepted: Promise<void>;
   control: ReturnType<typeof createTerminalControl>;
   screen: ReturnType<typeof createTerminalScreen>;
   outputSeq: number;
@@ -62,30 +63,31 @@ export class NativeTerminalSupervisor {
     const existing = this.entries.get(command.agentId);
     if (existing) {
       if (existing.fingerprint !== command.requestFingerprint || existing.record.terminalId !== command.terminalId) throw new RunnerCommandError('native_request_conflict', '启动标识已用于其他 CLI 配置');
-      return existing.start.then(() => ({ ...existing.record }));
+      return existing.accepted.then(() => ({ ...existing.record }));
     }
     if (!this.deps.backend || this.deps.backend.kind !== 'native') throw new RunnerCommandError('pty_unavailable', '原生 CLI 需要支持窗口尺寸调整的原生 PTY');
     if (this.byTerminal.has(command.terminalId)) throw new RunnerCommandError('terminal_exists', '终端标识已使用');
     if (this.entries.size >= MAX_NATIVE_TERMINALS || this.size >= MAX_RUNNING_TERMINALS) throw new RunnerCommandError('terminal_limit', '本开发会话的 CLI 名册已满或并行进程达到上限（256 条名册／32 个运行中）');
-    if (command.runtime && !this.deps.beforeStart) throw new RunnerCommandError('agent_runtime_unavailable', '本容器不支持管理员运行环境');
     const record: NativeTerminalRecord = {
       agentId: command.agentId, terminalId: command.terminalId, runnerId: this.runnerId,
-      compute: command.compute, permission: command.permission, revision: 0, lifecycle: 'starting', startedAt: new Date().toISOString(), cols: command.cols, rows: command.rows,
-      ...(command.runtime ? { runtime: { configId: command.runtime.configId, revision: command.runtime.revision } } : {}),
+      compute: command.compute, profileRevision: command.profileRevision, protocol: command.launch.protocol, permission: command.permission,
+      revision: 0, lifecycle: 'starting', startedAt: new Date().toISOString(), cols: command.cols, rows: command.rows,
     };
-    const entry: NativeEntry = { record, fingerprint: command.requestFingerprint, start: Promise.resolve(record), control: createTerminalControl(), screen: createTerminalScreen(command.cols, command.rows), outputSeq: 0, stopped: false };
+    const entry: NativeEntry = { record, fingerprint: command.requestFingerprint, start: Promise.resolve(record), accepted: Promise.resolve(), control: createTerminalControl(), screen: createTerminalScreen(command.cols, command.rows), outputSeq: 0, stopped: false };
     this.entries.set(command.agentId, entry);
     this.byTerminal.set(command.terminalId, entry);
     this.emit(entry);
-    entry.start = this.launch(command, entry);
-    // 托管启动要先跑完 Hook（可能数分钟）：立即回 starting 名册，进度经 nativeTerminal／beforeStart 事件流出。
-    return command.runtime ? Promise.resolve({ ...entry.record }) : entry.start;
+    const cwd = this.deps.paths.resolveCwd(command.cwd);
+    entry.start = this.launch(command, entry, cwd);
+    // 启动前步骤可能要数分钟：工作目录一确认就回 starting 名册，进度经 nativeTerminal／beforeStart 事件流出。
+    entry.accepted = cwd.then(() => undefined, () => entry.start.then(() => undefined));
+    return entry.accepted.then(() => ({ ...entry.record }));
   }
 
-  /** 托管启动的前半段：Hook 成功返回合并后的环境与托管上下文；失败或取消返回 undefined 并已写好失败记录。 */
-  private async prepareManaged(command: StartAgentTerminalCommand, entry: NativeEntry, cwd: string): Promise<{ env: Record<string, string>; managed: ManagedRuntimeContext } | undefined> {
+  /** 启动的前半段：Hook 成功返回合并后的环境与托管上下文；失败或取消返回 undefined 并已写好失败记录。 */
+  private async prepareEnvironment(command: StartAgentTerminalCommand, entry: NativeEntry, cwd: string): Promise<{ env: Record<string, string>; managed: ManagedRuntimeContext } | undefined> {
     try {
-      const outcome = await this.deps.beforeStart!.run({ agentId: command.agentId, processAttemptId: command.processAttemptId ?? `${command.agentId}:1`, material: command.runtime!, workspace: cwd, onProgress: (execution) => {
+      const outcome = await this.deps.beforeStart.run({ agentId: command.agentId, processAttemptId: command.processAttemptId, material: command.beforeStart, workspace: cwd, mcp: command.mcp, onProgress: (execution) => {
         const running = execution.steps.find((s) => s.stepId === execution.currentStepId), failed = execution.steps.find((s) => s.state === 'failed');
         entry.record = { ...entry.record, beforeStart: { executionId: execution.executionId, state: execution.state, ...(running ? { currentStep: running.name } : {}), ...(failed ? { failedStep: failed.name } : {}) } };
         this.emit(entry);
@@ -94,6 +96,7 @@ export class NativeTerminalSupervisor {
     } catch (error) {
       const failure = error instanceof BeforeStartFailure ? error : undefined;
       const cancelled = entry.stopped || failure?.code === 'cancelled';
+      this.deps.beforeStart.release(command.agentId);
       entry.record = { ...entry.record, lifecycle: cancelled ? 'ended' : 'failed', endedAt: new Date().toISOString(), reason: cancelled ? 'stopped' : 'before-start-failed',
         ...(cancelled ? {} : { error: `环境准备失败：${failure?.stepId ? `步骤 ${failure.stepId}，` : ''}${error instanceof Error ? error.message : String(error)}` }) };
       this.emit(entry);
@@ -101,20 +104,18 @@ export class NativeTerminalSupervisor {
     }
   }
 
-  private async launch(command: StartAgentTerminalCommand, entry: NativeEntry): Promise<NativeTerminalRecord> {
+  private async launch(command: StartAgentTerminalCommand, entry: NativeEntry, cwdResolution: Promise<string>): Promise<NativeTerminalRecord> {
     try {
-      const cwd = await this.deps.paths.resolveCwd(command.cwd);
-      // 托管与部署配置模式不混合：有 runtime 材料就不读旧 agentEnv 文件。
-      let env = this.deps.launcher.baseEnv({ ...this.deps.agentEnv, ...command.env, TERM: 'xterm-256color', COLUMNS: String(command.cols), LINES: String(command.rows) });
-      let managed: ManagedRuntimeContext | undefined;
-      if (command.runtime) {
-        const prepared = await this.prepareManaged(command, entry, cwd);
-        if (!prepared) return { ...entry.record };
-        env = prepared.env; managed = prepared.managed;
-        if (entry.stopped) { entry.record = { ...entry.record, lifecycle: 'ended', endedAt: new Date().toISOString(), reason: 'stopped' }; this.emit(entry); return { ...entry.record }; }
-      }
-      entry.activity = this.observe(entry, command.driver);
-      const prepared = await (this.deps.prepare ?? prepareNativeTerminal)(command, { cwd, env, host: createProcessHost(this.deps.launcher), logger: this.deps.logger, ...(entry.activity ? { nativeActivity: entry.activity.options } : {}), ...(managed ? { managed, runDir: managed.runDir } : {}) });
+      const cwd = await cwdResolution;
+      // 目录解析期间 stop 到达时 Hook 尚未登记，取消不到它：在这里截住，不再跑启动前步骤。
+      if (entry.stopped) return this.endStopped(entry);
+      const environment = await this.prepareEnvironment(command, entry, cwd);
+      if (!environment) return { ...entry.record };
+      if (entry.stopped) return this.endStopped(entry);
+      // 通用终端协议没有 Agent 动态（RFC-006 C6）：不开观测通道，也不发 source-unavailable。
+      const { protocol } = command.launch;
+      entry.activity = isKnownProtocol(protocol) ? this.observe(entry, protocol) : undefined;
+      const prepared = await (this.deps.prepare ?? prepareNativeTerminal)(command, { cwd, env: environment.env, host: createProcessHost(this.deps.launcher), logger: this.deps.logger, ...(entry.activity ? { nativeActivity: entry.activity.options } : {}), managed: environment.managed, runDir: environment.managed.runDir });
       entry.prepared = prepared;
       if (prepared.activityUnavailable) entry.activity?.unavailable(prepared.activityUnavailable);
       const session = this.deps.backend!.open({ ...prepared.plan, cols: command.cols, rows: command.rows, onData: (data) => this.output(entry, data) });
@@ -125,9 +126,17 @@ export class NativeTerminalSupervisor {
     } catch (error) {
       entry.activity?.close();
       entry.prepared?.dispose();
+      this.deps.beforeStart.release(command.agentId);
       entry.record = { ...entry.record, lifecycle: 'failed', endedAt: new Date().toISOString(), reason: 'start-failed', error: error instanceof Error ? error.message : 'CLI 启动失败' };
       this.emit(entry);
     }
+    return { ...entry.record };
+  }
+
+  private endStopped(entry: NativeEntry): NativeTerminalRecord {
+    this.deps.beforeStart.release(entry.record.agentId);
+    entry.record = { ...entry.record, lifecycle: 'ended', endedAt: new Date().toISOString(), reason: 'stopped' };
+    this.emit(entry);
     return { ...entry.record };
   }
 
@@ -138,13 +147,13 @@ export class NativeTerminalSupervisor {
     }).catch((error: unknown) => this.deps.logger.error('native terminal screen write failed', { agentId: entry.record.agentId, error: String(error) }));
   }
 
-  private observe(entry: NativeEntry, driver: 'claude-code' | 'opencode'): NativeActivityObserver | undefined {
-    try { return (this.deps.activityFactory ?? (driver === 'claude-code' ? createClaudeActivityChannel : createOpencodeActivityChannel))({ ...entry.record, emit: (activity) => this.deps.emit({ kind: 'nativeActivity', activity }) }); }
+  private observe(entry: NativeEntry, protocol: KnownAgentProtocol): NativeActivityObserver | undefined {
+    try { return (this.deps.activityFactory ?? (protocol === 'claude-code' ? createClaudeActivityChannel : createOpencodeActivityChannel))({ ...entry.record, emit: (activity) => this.deps.emit({ kind: 'nativeActivity', activity }) }); }
     catch {
       this.deps.logger.warn('native activity channel unavailable; CLI remains usable', { agentId: entry.record.agentId });
       this.deps.emit({ kind: 'nativeActivity', activity: {
         agentId: entry.record.agentId, terminalId: entry.record.terminalId, runnerId: this.runnerId, eventId: crypto.randomUUID(), seq: 1, turnOrdinal: 0,
-        signal: { source: driver === 'claude-code' ? 'claude-code/2.1.268' : 'opencode/1.18.29', sourceEventId: 'channel-unavailable', kind: 'source-unavailable', occurredAt: new Date().toISOString(), nativeSessionId: null, turnId: null, reason: 'source-error' },
+        signal: { source: protocol === 'claude-code' ? 'claude-code/2.1.268' : 'opencode/1.18.29', sourceEventId: 'channel-unavailable', kind: 'source-unavailable', occurredAt: new Date().toISOString(), nativeSessionId: null, turnId: null, reason: 'source-error' },
       } });
       return undefined;
     }
@@ -153,7 +162,7 @@ export class NativeTerminalSupervisor {
   private exited(entry: NativeEntry, exitCode: number | null): void {
     entry.record = { ...entry.record, lifecycle: 'ended', exitCode, endedAt: new Date().toISOString(), reason: entry.stopped ? 'stopped' : 'exited' };
     entry.prepared?.dispose();
-    if (entry.record.runtime) this.deps.beforeStart?.release(entry.record.agentId);
+    this.deps.beforeStart.release(entry.record.agentId);
     entry.activity?.close();
     this.emit(entry);
     this.deps.emit({ kind: 'terminalClosed', terminalId: entry.record.terminalId, exitCode });
@@ -196,8 +205,8 @@ export class NativeTerminalSupervisor {
     const entry = this.entries.get(agentId);
     if (!entry) throw notFound(`agent ${agentId}`);
     entry.stopped = true;
-    // 准备中的托管启动：取消 Hook，跳过后续步骤，不创建 CLI。
-    if (entry.record.runtime && entry.record.lifecycle === 'starting') this.deps.beforeStart?.cancel(agentId);
+    // 准备中的启动：取消 Hook，跳过后续步骤，不创建 CLI。
+    if (entry.record.lifecycle === 'starting') this.deps.beforeStart.cancel(agentId);
     await entry.start;
     if (entry.record.lifecycle === 'running') await entry.session!.close();
   }

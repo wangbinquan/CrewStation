@@ -1,36 +1,43 @@
-import type { RuntimeCheckId, RuntimeConfigId, RuntimeConfigListQuery, UserId } from '@crewstation/contracts';
-import type { RuntimeCheck } from '../domain/runtimeCheck';
-import type { RuntimeConfig, RuntimeCredential, RuntimeRevision } from '../domain/runtimeConfig';
+import type { ProfileTestId, UserId } from '@crewstation/contracts';
+import type { ComputeProfile, ProfileCredential, ProfileRevision } from '../domain/computeProfile';
+import type { ProfileTest } from '../domain/profileTest';
 
-export interface RuntimeConfigRepository {
-  insert(config: RuntimeConfig): Promise<void>;
-  update(config: RuntimeConfig): Promise<void>;
-  getById(id: RuntimeConfigId): Promise<RuntimeConfig | undefined>;
-  /** 事务内锁住配置行，串行化草稿保存、启用与停用。 */
-  lockById(id: RuntimeConfigId): Promise<RuntimeConfig | undefined>;
-  getByName(name: string): Promise<RuntimeConfig | undefined>;
-  /** 按名字排序的有界分页；after 为上一页最后一个名字。 */
-  listPage(filter: Pick<RuntimeConfigListQuery, 'name' | 'driver'> & { enabled?: boolean }, limit: number, after?: string): Promise<RuntimeConfig[]>;
+export interface ProfileRepository {
+  insert(profile: ComputeProfile): Promise<void>;
+  update(profile: ComputeProfile): Promise<void>;
+  get(name: string): Promise<ComputeProfile | undefined>;
+  /** 事务内锁住档位行，串行化保存、启用、设默认与删除。 */
+  lock(name: string): Promise<ComputeProfile | undefined>;
+  getDefault(): Promise<ComputeProfile | undefined>;
+  list(): Promise<ComputeProfile[]>;
+  remove(name: string): Promise<void>;
+  /** 设默认前清掉旧默认（部分唯一索引保证全平台至多一个）。 */
+  clearDefault(): Promise<void>;
 }
 
-export interface RuntimeRevisionRepository {
-  insert(revision: RuntimeRevision): Promise<void>;
-  get(configId: RuntimeConfigId, revision: number): Promise<RuntimeRevision | undefined>;
+export interface RevisionRepository {
+  insert(revision: ProfileRevision): Promise<void>;
+  get(profile: string, revision: number): Promise<ProfileRevision | undefined>;
+  removeAll(profile: string): Promise<void>;
 }
 
-export interface RuntimeCredentialRepository {
-  list(configId: RuntimeConfigId): Promise<RuntimeCredential[]>;
-  upsert(credential: RuntimeCredential): Promise<void>;
-  remove(configId: RuntimeConfigId, name: string): Promise<void>;
+export interface CredentialRepository {
+  list(profile: string): Promise<ProfileCredential[]>;
+  upsert(credential: ProfileCredential): Promise<void>;
+  remove(profile: string, name: string): Promise<void>;
+  removeAll(profile: string): Promise<void>;
 }
 
-export interface RuntimeCheckRepository {
-  insert(check: RuntimeCheck): Promise<void>;
-  update(check: RuntimeCheck): Promise<void>;
-  get(checkId: RuntimeCheckId): Promise<RuntimeCheck | undefined>;
-  findByRequest(configId: RuntimeConfigId, createdBy: UserId, clientRequestId: string): Promise<RuntimeCheck | undefined>;
-  /** 某版本内容的最近一次检查（任何状态）。 */
-  latestFor(configId: RuntimeConfigId, revision: number, contentHash: string): Promise<RuntimeCheck | undefined>;
+export interface TestRepository {
+  insert(test: ProfileTest): Promise<void>;
+  update(test: ProfileTest): Promise<void>;
+  get(testId: ProfileTestId): Promise<ProfileTest | undefined>;
+  findByRequest(profile: string, createdBy: UserId, clientRequestId: string): Promise<ProfileTest | undefined>;
+  /** 某修订的最近一次测试（任何状态）。 */
+  latestFor(profile: string, revision: number): Promise<ProfileTest | undefined>;
+  /** 新修订产生时，旧修订上还没结束的测试作废。 */
+  supersedeBefore(profile: string, revision: number, at: Date): Promise<void>;
+  removeAll(profile: string): Promise<void>;
 }
 
-export const RUNTIME_CHECK_JOB_KIND = 'agent-runtime.check';
+export const PROFILE_TEST_JOB_KIND = 'agent-runtime.profile-test';

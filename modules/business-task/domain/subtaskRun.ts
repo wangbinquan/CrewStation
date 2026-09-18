@@ -1,4 +1,4 @@
-import type { AgentProfile, OutputContract, RuntimeRevisionRef, SubtaskId, SubtaskMode, SubtaskState, TaskId } from '@crewstation/contracts';
+import type { AgentProfile, OutputContract, ProfileRevisionRef, SubtaskId, SubtaskMode, SubtaskState, TaskId } from '@crewstation/contracts';
 import { precondition } from '@crewstation/kernel';
 
 export interface ContractCheck { ok: boolean; missing: string[]; schemaErrors: string[] }
@@ -18,8 +18,8 @@ export interface SubtaskRun {
   readonly timeoutSeconds?: number;
   readonly agentProfile?: AgentProfile;
   readonly outputContract?: OutputContract;
-  /** RFC-004：本次 attempt 固定的运行环境版本；部署配置模式没有它。 */
-  readonly runtime?: RuntimeRevisionRef;
+  /** RFC-006：本次 attempt 固定的算力档位修订（`default` 已解析成真实名称）；构造时解析失败则在首次派发时再解析。 */
+  readonly computeProfile?: ProfileRevisionRef;
   /** TaskRunner 侧的关联 ID（agentId 或 execId）。 */
   readonly runnerRef?: string;
   readonly sessionId?: string;

@@ -1,4 +1,4 @@
-import type { AgentDriver as AgentDriverName, AgentEvent, AgentEventType, AgentPermission, McpConnection, RuntimeRevisionRef } from '@crewstation/contracts';
+import type { AgentEvent, AgentEventType, AgentPermission, KnownAgentProtocol, LaunchSpec, McpConnection } from '@crewstation/contracts';
 import type { ManagedRuntimeContext } from '@crewstation/agent-drivers';
 import type { Logger } from '@crewstation/kernel';
 import type { ProcessLauncher } from '../process/launcher';
@@ -8,26 +8,26 @@ export interface AgentSpec {
   agentId: string;
   /** 算力档位名（RFC-001）：平台透传，运行时不解释，只在 started 事件里回显。 */
   compute: string;
-  driver: AgentDriverName;
-  model: string;
+  /** RFC-006：受理时固定的档位修订，只在 started 事件里回显。 */
+  profileRevision: number;
+  /** RFC-006：档位修订固定的二进制、参数与模型；headless 只接受两种已知协议。 */
+  launch: LaunchSpec;
   permission: AgentPermission;
   mode: 'oneshot' | 'interactive';
   initialPrompt?: string;
   resumeSessionId?: string;
   systemPrompt?: string;
   mcp: McpConnection[];
-  /** RFC-004：固定的运行环境版本，只在 started 事件里回显。 */
-  runtime?: RuntimeRevisionRef;
 }
 
-/** 由 TaskRunner 提供给驱动的宿主能力：已解析的 cwd、含凭据的完整环境（绝不记录）、降权拉起器。 */
+/** 由 TaskRunner 提供给驱动的宿主能力：已解析的 cwd、含凭据的完整环境（绝不记录）、降权拉起器与托管上下文。 */
 export interface AgentLaunchContext {
   cwd: string;
   env: Record<string, string>;
   launcher: ProcessLauncher;
   logger: Logger;
-  /** RFC-004：启动前 Hook 成功后的托管上下文（私有 HOME、绑定的 CLI 配置文件）。 */
-  managed?: ManagedRuntimeContext;
+  /** 启动前 Hook 成功后的托管上下文（私有 HOME、绑定的 CLI 配置文件）；RFC-006 起每次启动都有。 */
+  managed: ManagedRuntimeContext;
 }
 
 export interface AgentProcess {
@@ -39,15 +39,15 @@ export interface AgentProcess {
   readonly events: AsyncIterable<AgentEvent>;
 }
 
-/**
- * 驱动接口：把一种 CLI（或 stub）包装为 AgentProcess。真实的 claude-code／opencode 实现将来自
- * `@crewstation/agent-drivers`（自 agent-workflow 复制），通过 registry 接入；本运行时只定义扩展点。
- */
+/** 驱动接口：把一种已知协议的 CLI 包装为 AgentProcess；二进制来自每次启动的 `launch.binaryPath`（RFC-006 C5）。 */
 export interface AgentDriver {
-  readonly name: AgentDriverName;
-  /** 是否可在本容器内真正运行；决定 hello 的 capabilities.drivers。 */
-  available(): boolean;
+  readonly protocol: KnownAgentProtocol;
   start(spec: AgentSpec, context: AgentLaunchContext): AgentProcess;
+}
+
+/** 按档位协议取驱动（RFC-006：取代按驱动名注册的表）；测试经同一接缝注入替身。 */
+export interface AgentDriverFactory {
+  forProtocol(protocol: KnownAgentProtocol): AgentDriver;
 }
 
 export type AgentEventFields = Partial<Omit<AgentEvent, 'agentId' | 'seq' | 'at' | 'type'>>;

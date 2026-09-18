@@ -14,7 +14,8 @@ test('逐个启动无需任务文字，重复请求查回原 CLI；另一用户�
   expect(f.calls.filter((c) => c.type === 'startAgentTerminal')).toHaveLength(1);
   expect(first).not.toHaveProperty('model');
   expect(first).not.toHaveProperty('driver');
-  expect(f.calls.find((c) => c.type === 'startAgentTerminal')).toMatchObject({ compute: 'balanced', permission: 'edit', driver: 'claude-code', model: 'anthropic/model' });
+  // RFC-006：命令带固定档位修订与 launch（二进制显式），不再带 driver／model 两个裸字段。
+  expect(f.calls.find((c) => c.type === 'startAgentTerminal')).toMatchObject({ compute: 'balanced', profileRevision: 1, permission: 'edit', launch: { protocol: 'claude-code', binaryPath: '/usr/local/bin/claude', model: 'anthropic/model' }, processAttemptId: expect.stringMatching(/:1$/) });
   await expect(f.api.startNativeTerminal(actor, taskId, { ...input, permission: 'full' })).rejects.toMatchObject({ kind: 'conflict' });
   const another = { ...actor, userId: 'usr_1123456789abcdef0123456789abcdef' as UserId };
   expect((await f.api.startNativeTerminal(another, taskId, input)).agentId).not.toBe(first.agentId);
@@ -79,8 +80,9 @@ test('明确的启动拒绝落失败记录，其他窗口继续存在；演示�
   expect(await f.api.startNativeTerminal(actor, taskId, input)).toMatchObject({ lifecycle: 'failed', reason: 'start-failed' });
   expect((await f.api.listNativeTerminals(actor, taskId)).items.find((r) => r.agentId === first.agentId)?.lifecycle).toBe('running');
   expect((await f.api.startNativeTerminal(actor, taskId, input)).lifecycle).toBe('failed');
-  f.current.driver = 'stub';
-  await expect(f.api.startNativeTerminal(actor, taskId, f.input())).rejects.toMatchObject({ kind: 'precondition' });
+  // 档位不可用（测试中、失败或停用）时新 CLI 被拒，原因由目录给出，已有窗口不受影响（RFC-006 C7）。
+  f.current.available = false;
+  await expect(f.api.startNativeTerminal(actor, taskId, f.input())).rejects.toMatchObject({ kind: 'precondition', details: { code: 'profile_unavailable' } });
 });
 
 test('租户输入只接受档位与会话选项，任意驱动参数和不合理窗口尺寸都拒绝', () => {

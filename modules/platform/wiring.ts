@@ -1,5 +1,4 @@
-import type { Actor, ProjectId, RuntimeRevisionRef, ServiceId, UserId } from '@crewstation/contracts';
-import { precondition } from '@crewstation/kernel';
+import type { Actor, ProjectId, ServiceId, UserId } from '@crewstation/contracts';
 import type { EventConsumer } from '@crewstation/eventbus';
 import type { K8sClient } from '@crewstation/k8s';
 import { buildEgressNetworkPolicy, namespaceObject, projectNetworkPolicy, resourceQuotaObject, secretObject, taskEgressNetworkPolicy } from '@crewstation/k8s';
@@ -22,6 +21,7 @@ import { createProjectModule } from '@crewstation/module-project';
 import { createProvisioningModule } from '@crewstation/module-provisioning';
 import type { ProjectModuleApi } from '@crewstation/module-project';
 import { createReleaseModule } from '@crewstation/module-release';
+import type { ReleaseModuleApi } from '@crewstation/module-release';
 import { createScmModule } from '@crewstation/module-scm';
 import { createSessionModule } from '@crewstation/module-session';
 import { createTaskRuntimeModule } from '@crewstation/module-task-runtime';
@@ -64,7 +64,7 @@ export const SYSTEM_ACTOR: Actor = { userId: 'usr_000000000000000000000000000000
 
 const consumerLifecycle = (consumer: EventConsumer): Lifecycle => ({ start: () => consumer.start(), stop: () => consumer.stop() });
 
-interface Late { project?: ProjectModuleApi; gateway?: GatewayModuleApi; taskRuntime?: TaskRuntimeModuleApi; agentRuntime?: AgentRuntimeModuleApi }
+interface Late { project?: ProjectModuleApi; gateway?: GatewayModuleApi; taskRuntime?: TaskRuntimeModuleApi; release?: ReleaseModuleApi }
 
 function composeCore(deps: PlatformModuleDeps, late: Late) {
   const { db, settings, logger } = deps;
@@ -95,9 +95,7 @@ function composeCore(deps: PlatformModuleDeps, late: Late) {
       return env && env.kind === 'dev-session' && (env.state === 'creating' || env.state === 'running') ? { projectId: env.projectId } : undefined;
     } },
   });
-  // 运行环境目录在 agent-runtime（L3，晚于 project 装配）：装配前一律回答“不存在”，即只允许部署配置模式（RFC-004）。
-  const project = createProjectModule({ db, identity: identity.api, hosts, taskUsage: { runningTasks }, settings: { defaultMaxConcurrentTasks: settings.defaultMaxConcurrentTasks, defaultServicePlan: settings.defaultServicePlan },
-    runtimeConfigs: { describe: async (configId) => late.agentRuntime?.describeConfig(configId) } });
+  const project = createProjectModule({ db, identity: identity.api, hosts, taskUsage: { runningTasks }, settings: { defaultMaxConcurrentTasks: settings.defaultMaxConcurrentTasks, defaultServicePlan: settings.defaultServicePlan } });
   late.project = project.api;
   const isAdmin = (userId: string) => identity.api.isAdmin(userId as UserId);
   // 申请人／审批人在申请、绑定列表里显示可辨识名字；查不到就让界面回退到 ID。
@@ -106,14 +104,19 @@ function composeCore(deps: PlatformModuleDeps, late: Late) {
 
   const config = createConfigModule({ db, project: project.api, settings: { secretKeyBase64: settings.secretKeyBase64 } });
   const egress = createEgressModule({ db, project: project.api });
-  // 检查执行器在 task-runtime（L4）：由这里回填，agent-runtime 只依赖端口（ADR-0004）。
+  // 算力档位（RFC-006、ADR-0005）：测试执行在 task-runtime（L4）、已上线引用在 release（L4）、资源套餐在 project（L2），都由这里回填。
   const agentRuntime = createAgentRuntimeModule({
     db, logger, isAdmin: (id) => identity.api.isAdmin(id),
-    executor: { run: (input, report, heartbeat) => { if (!late.taskRuntime) throw new Error('task-runtime 尚未装配'); return late.taskRuntime.runRuntimeCheck(input, report, heartbeat); } },
-    references: { listReferencing: (configId) => project.api.listComputeProfilesReferencing(configId) },
-    settings: { secretKeyBase64: settings.secretKeyBase64 },
+    executor: { run: (input, report, heartbeat) => { if (!late.taskRuntime) throw new Error('task-runtime 尚未装配'); return late.taskRuntime.runProfileTest(input, report, heartbeat); } },
+    references: { listReferencingProjects: async (profile) => {
+      const releaseApi = late.release;
+      if (!releaseApi) return [];
+      const hits = await Promise.all((await project.api.listServices()).map(async (s) => ((await releaseApi.deployedComputeReferences(s.serviceId)).includes(profile) ? s.slug : undefined)));
+      return [...new Set(hits.filter((slug): slug is string => slug !== undefined))].sort();
+    } },
+    taskProfiles: { exists: async (name) => (await project.api.listTaskProfiles()).some((p) => p.name === name) },
+    settings: { secretKeyBase64: settings.secretKeyBase64, registry: { pullBase: settings.registryBase, pushHost: settings.registryPushHost, baseRepository: settings.baseImage.repository, runtimePrefix: 'runtime/', scheme: settings.registryScheme, baseTag: settings.baseImage.tag } },
   });
-  late.agentRuntime = agentRuntime.api;
   const data = createDataModule({
     db, isAdmin: (id) => isAdmin(id), authorizer: project.api, users: userDirectory,
     services: { resolveServiceById: async (id) => { const r = await resolveById(id); return r ? { projectId: r.projectId, slug: r.slug } : undefined; } },
@@ -152,8 +155,8 @@ function composeDelivery(deps: PlatformModuleDeps, core: ReturnType<typeof compo
     },
     plans: {
       getServicePlan: async (name) => (await project.api.listServicePlans()).find((p) => p.name === name),
-      getComputeProfile: (name) => project.api.resolveComputeProfile(name),
-      listComputeProfiles: () => project.api.listComputeProfiles(),
+      lookupComputeProfile: (name) => core.agentRuntime.api.lookupForRelease(name),
+      listComputeProfiles: () => core.agentRuntime.api.listNames(),
     },
     config: {
       render: async (projectId, env) => ({ values: await config.api.renderEnv(projectId, env), version: await config.api.currentVersion(projectId, env) }),
@@ -171,36 +174,25 @@ function composeDelivery(deps: PlatformModuleDeps, core: ReturnType<typeof compo
     settings: { systemNamespace: settings.systemNamespace, serviceDomain: settings.serviceDomain, userAuthMiddleware: 'forward-auth-user', serviceAuthMiddleware: 'forward-auth-service', dropIdentityHeadersMiddleware: 'drop-identity-headers', allowlistMaxStaleSeconds: 300, consumerName: 'gateway' },
   });
   late.gateway = gateway.api;
+  late.release = release.api;
   return { release, gateway };
 }
 
 /**
- * 算力档位解析（RFC-001）：一处实现，dev-session 与 business-task 共用。
- * RFC-004：托管档位在受理时固定已启用版本；材料只在下发命令时按固定版本解密取出。
+ * 算力档位解析（RFC-006 §4.3）：一处实现，dev-session 与 business-task 共用。受理时固定档位修订；
+ * 派发时按固定修订取材料（含解密凭据），只经受控 Runner 命令通道发出。
  */
-function computeCatalogFor(project: ProjectModuleApi, agentRuntime: AgentRuntimeModuleApi) {
-  return {
-    resolve: async (name: string) => {
-      const profile = await project.resolveComputeProfile(name);
-      if (!profile) return undefined;
-      const base = { name: profile.name, driver: profile.driver, model: profile.model, ...(profile.taskProfile ? { taskProfile: profile.taskProfile } : {}) };
-      if (!profile.runtimeConfigId) return base;
-      const material = await agentRuntime.resolveActive(profile.runtimeConfigId);
-      if (material.driver !== profile.driver) throw precondition(`档位 ${profile.name} 的驱动与运行环境 ${material.configName} 不一致，请管理员改绑`, { code: 'runtime_driver_mismatch' });
-      return { ...base, runtime: { configId: material.configId, revision: material.revision } satisfies RuntimeRevisionRef };
-    },
-    runtimeMaterial: (ref: RuntimeRevisionRef) => agentRuntime.resolveRevision(ref.configId, ref.revision),
-    list: () => project.listComputeProfiles(),
-  };
+function computeCatalogFor(agentRuntime: AgentRuntimeModuleApi) {
+  return { resolve: agentRuntime.resolve, launchMaterial: agentRuntime.launchMaterial };
 }
 
 function composeRuntime(deps: PlatformModuleDeps, core: ReturnType<typeof composeCore>, delivery: ReturnType<typeof composeDelivery>, late: Late) {
   const { db, k8s, settings, logger } = deps;
   const { project, config, data, scm, isAdmin, resolveById } = core;
   const { release } = delivery;
-  const checkRunner = createSessionClient(settings.sessionInternalUrl);
+  const testRunner = createSessionClient(settings.sessionInternalUrl);
   const taskRuntime = createTaskRuntimeModule({
-    db, k8s, logger, isAdmin: (id) => isAdmin(id), authorizer: project.api, quotas: { quotaLimit: project.api.quotaLimit }, checkRunner,
+    db, k8s, logger, isAdmin: (id) => isAdmin(id), authorizer: project.api, quotas: { quotaLimit: project.api.quotaLimit }, testRunner,
     profiles: { listTaskProfiles: project.api.listTaskProfiles, getTaskProfile: async (name) => (await project.api.listTaskProfiles()).find((p) => p.name === name) },
     services: { resolveServiceById: resolveById },
     checkout: {
@@ -215,11 +207,11 @@ function composeRuntime(deps: PlatformModuleDeps, core: ReturnType<typeof compos
       },
     },
     sources: { configEnv: (projectId, env) => config.api.renderEnv(projectId, env), dataEnv: data.api.envFor, taskDataEnv: data.api.envForTask },
-    settings: { taskImage: settings.taskImage, systemNamespace: settings.systemNamespace, sessionUrl: settings.sessionRunnerUrl, userDomain: settings.userDomain, serviceDomain: settings.serviceDomain, workerUid: 10001, defaultProfile: settings.defaultTaskProfile, userAuthMiddleware: 'forward-auth-user', dropIdentityHeadersMiddleware: 'drop-identity-headers', ...(settings.agentEnvSecretName ? { agentEnvSecretName: settings.agentEnvSecretName } : {}) },
+    settings: { taskImage: settings.taskImage, systemNamespace: settings.systemNamespace, sessionUrl: settings.sessionRunnerUrl, userDomain: settings.userDomain, serviceDomain: settings.serviceDomain, workerUid: 10001, defaultProfile: settings.defaultTaskProfile, userAuthMiddleware: 'forward-auth-user', dropIdentityHeadersMiddleware: 'drop-identity-headers' },
   });
   late.taskRuntime = taskRuntime.api;
   const runner = createSessionClient(settings.sessionInternalUrl);
-  const computeCatalog = computeCatalogFor(project.api, core.agentRuntime.api);
+  const computeCatalog = computeCatalogFor(core.agentRuntime.api);
   const mcp = [{ name: 'capabilities', url: settings.mcp.capabilitiesUrl }, { name: 'operations', url: settings.mcp.operationsUrl }];
   const devSession = createDevSessionModule({
     apiCatalog: core.apiCatalog.api,
@@ -235,7 +227,7 @@ function composeRuntime(deps: PlatformModuleDeps, core: ReturnType<typeof compos
     // 注入 Agent 的远程 MCP 连接凭据由 identity 签发：一个签发者、一个密钥环、一份 JWKS。
     credentials: { issueDevSessionToken: (binding) => core.identity.api.issueDevSessionToken(binding) },
     compute: computeCatalog,
-    settings: { idleMinutes: settings.idleMinutes, userDomain: settings.userDomain, mcp, defaultPreviewPort: 3000, defaultComputeProfile: settings.defaultComputeProfile },
+    settings: { idleMinutes: settings.idleMinutes, userDomain: settings.userDomain, mcp, defaultPreviewPort: 3000 },
   });
   const businessTask = createBusinessTaskModule({
     db, logger, isAdmin: (id) => isAdmin(id), environments: taskRuntime.api, runner, authorizer: project.api,
@@ -265,6 +257,7 @@ function composeRuntime(deps: PlatformModuleDeps, core: ReturnType<typeof compos
           .catch((error: unknown) => logger.error('dispatch pending subtasks failed', { taskId, error: error instanceof Error ? error.message : String(error) }));
       },
       onRunnerDisconnected: taskRuntime.api.onRunnerDisconnected,
+      onRunnerRejected: taskRuntime.api.onRunnerRejected,
     },
     settings: { selfAddress: settings.selfAddress, commandTimeoutMs: 30_000, runnerStaleMs: 30_000, replayLimit: 2000 },
   });
@@ -294,7 +287,7 @@ function composeAggregates(deps: PlatformModuleDeps, core: ReturnType<typeof com
     settings: { userDomain: settings.userDomain, serviceDomain: settings.serviceDomain, mcp: [{ name: 'capabilities', url: settings.mcp.capabilitiesUrl }, { name: 'operations', url: settings.mcp.operationsUrl }], defaultServicePlan: settings.defaultServicePlan },
     sources: {
       resolveServiceOfProject: serviceOfProject, authorize: project.api.authorize, quota: project.api.getQuota, servicePlans: project.api.listServicePlans,
-      computeProfiles: project.api.listComputeProfiles,
+      computeProfiles: core.agentRuntime.api.listSummaries,
       configKeys: async (actor, projectId, env) => (await config.api.listItems(actor, projectId, env)).map((i) => i.name),
       dataResources: data.api.listResources, operations: (actor, serviceId) => apiCatalog.api.listOperations(actor, serviceId),
       subscriptions: (actor, projectId) => runtime.events.api.listSubscriptions(actor, projectId),
@@ -337,7 +330,7 @@ export function createPlatformModule(deps: PlatformModuleDeps): PlatformModule {
     routers: {
       // devSessionGate 只挂中间件不占路径，必须排在最前：Hono 按注册顺序执行，晚于业务路由就来不及改判身份。
       api: [...m.identity.http.devSessionGate, ...m.project.http, ...m.identity.http.users, ...m.config.http, ...m.agentRuntime.http, ...m.egress.http, ...m.data.http, ...m.scm.http, ...m.apiCatalog.http, ...m.release.http, ...m.gateway.http, ...m.taskRuntime.http, ...m.devSession.http, m.businessTask.http.service, m.businessTask.http.user, ...m.events.http.query, ...m.observability.http, ...m.capabilities.http, ...m.provisioning.http],
-      auth: [...m.identity.http.auth, ...m.identity.http.forwardAuth],
+      auth: [...m.identity.http.auth, ...m.identity.http.forwardAuth, ...m.agentRuntime.forwardAuth],
       session: [m.session.http.runner, m.session.http.stream, m.session.http.internal],
       events: [...m.events.http.ingress],
     },

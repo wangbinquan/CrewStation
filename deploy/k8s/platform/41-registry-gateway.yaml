@@ -1,0 +1,26 @@
+# 平台镜像仓库的推送入口（RFC-006 §7.2，本机适配）：管理员在工作机上 docker login／push 到 registry.cs.localhost，
+# 经网关与 cs-auth 的 ForwardAuth 校验平台签发的推送凭据（带到期时间与仓库前缀的签名口令），只放行 /v2/ 探测、
+# runtime/ 前缀下的推拉与平台底座镜像的拉取。集群内拉取不经过这里：kubelet 仍经节点 containerd 的 hosts.toml 走 NodePort。
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: forward-auth-registry
+  namespace: crewstation-system
+spec:
+  forwardAuth:
+    address: http://cs-auth.crewstation-system.svc.cluster.local:8081/forward-auth/registry
+    trustForwardHeader: false
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: registry-push
+  namespace: crewstation-system
+spec:
+  entryPoints: [web]
+  routes:
+    - match: Host(`registry.cs.localhost`)
+      kind: Rule
+      priority: 100
+      middlewares: [{ name: forward-auth-registry }]
+      services: [{ name: registry, port: 5000 }]

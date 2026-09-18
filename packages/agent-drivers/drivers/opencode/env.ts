@@ -3,17 +3,28 @@
 // 与源的差异：
 //  - 不读 `AGENT_WORKFLOW_OPENCODE_BIN`、`OPENCODE_PURE`；
 //  - 不设 `OPENCODE_AW_INVENTORY_OUT`（清单插件不复制）；
-//  - `configDirEnv` 不再可配置（源为自定义 fork 留的 RFC-154 改名口），固定 `OPENCODE_CONFIG_DIR`，
-//    因此源里 `envNameMatches` 那套大小写折叠比较也不需要（POSIX 精确 delete 即可）。
+//  - 配置目录变量名与目录叶名按档位覆盖（RFC-006，对应源 RFC-154 给自定义 fork 留的改名口），缺省
+//    `OPENCODE_CONFIG_DIR`／`.opencode`；源里 `envNameMatches` 那套大小写折叠比较不需要（POSIX 精确 delete 即可）。
 
 import { validation } from '@crewstation/kernel';
 import type { AgentSpawnContext } from '../../contract/spawnPlan';
+import { assertConfigDirEnv } from '../../injection/launchArgs';
 import { applyGitIdentity } from '../claudeCode/env';
 import { buildOpencodeInlineConfig } from './inlineConfig';
 
-/** opencode 的配置目录环境变量名与目录叶名。 */
+/** opencode 的配置目录环境变量名与目录叶名（协议默认值；档位可覆盖）。 */
 export const OPENCODE_CONFIG_DIR_ENV = 'OPENCODE_CONFIG_DIR';
 export const OPENCODE_CONFIG_DIR_NAME = '.opencode';
+
+/** 本次启动的配置目录变量名：档位覆盖优先，且不能与平台注入的环境变量同名。 */
+export function opencodeConfigDirEnv(ctx: Pick<AgentSpawnContext, 'configDir'>): string {
+  return ctx.configDir?.env === undefined ? OPENCODE_CONFIG_DIR_ENV : assertConfigDirEnv(ctx.configDir.env);
+}
+
+/** 本次启动的配置目录叶名（运行目录下）。 */
+export function opencodeConfigDirName(ctx: Pick<AgentSpawnContext, 'configDir'>): string {
+  return ctx.configDir?.name ?? OPENCODE_CONFIG_DIR_NAME;
+}
 /** opencode 在内联配置**之后**合并这个变量；绝不让宿主环境里的值悄悄改写托管子进程。 */
 const SCRUBBED = 'OPENCODE_PERMISSION';
 /** 内联配置序列化后的告警阈值（源：超过只告警不失败）。 */
@@ -34,7 +45,7 @@ export function buildOpencodeEnv(ctx: AgentSpawnContext, configDir: string): Ope
     // spawn 的 `cwd:` 只改工作目录、PWD 仍是父进程继承下来的，不钉死就会加载两个 Instance，
     // `--format json` 的事件也就不再进我们的 stdout 泵。
     PWD: ctx.cwd,
-    [OPENCODE_CONFIG_DIR_ENV]: configDir,
+    [opencodeConfigDirEnv(ctx)]: configDir,
     OPENCODE_CONFIG_CONTENT: inlineConfigSerialized,
   };
   delete env[SCRUBBED];

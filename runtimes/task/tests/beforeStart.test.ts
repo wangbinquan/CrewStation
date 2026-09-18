@@ -2,7 +2,8 @@ import { afterEach, describe, expect, test } from 'bun:test';
 import { chmod, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { AgentRuntimeMaterial, BeforeStartExecution, RunnerEvent } from '@crewstation/contracts';
+import type { BeforeStartExecution, BeforeStartMaterial, McpConnection, RunnerEvent } from '@crewstation/contracts';
+import { IDENTITY_HEADERS, TERMINAL_MCP_ENV } from '@crewstation/contracts';
 import { noopLogger } from '@crewstation/kernel';
 import { BeforeStartRunner } from '../src/beforeStart/beforeStartRunner';
 import { BeforeStartFailure } from '../src/beforeStart/failure';
@@ -26,9 +27,16 @@ async function fixture() {
   return { root, launcher, interpreters, events, runner, workspace };
 }
 
-function material(steps: AgentRuntimeMaterial['steps'], extra: Partial<AgentRuntimeMaterial> = {}): AgentRuntimeMaterial {
-  return { configId: 'arc_' + 'a'.repeat(32), configName: 'qa-runtime', revision: 3, driver: 'opencode', contentHash: 'hash', steps, vars: { GATEWAY: 'https://gateway.example' }, secrets: { API_KEY: 'sk-secret-value-9x' }, configFile: { kind: 'none' }, captureOutput: true, ...extra };
+function material(steps: BeforeStartMaterial['steps'], extra: Partial<BeforeStartMaterial> = {}): BeforeStartMaterial {
+  return { profile: 'qa-profile', revision: 3, contentHash: 'hash', steps, vars: { GATEWAY: 'https://gateway.example' }, secrets: { API_KEY: 'sk-secret-value-9x' }, configFile: { kind: 'none' }, captureOutput: true, ...extra };
 }
+
+/** 平台两个 MCP 的连接（组合根下发的名字）；令牌在会话令牌头里。 */
+const MCP_TOKEN = 'dev-session-token-7q';
+const platformMcp = [
+  { name: 'capabilities', url: 'http://mcp-capabilities.svc/mcp', headers: { [IDENTITY_HEADERS.devSessionToken]: MCP_TOKEN } },
+  { name: 'operations', url: 'http://mcp-operations.svc/mcp', headers: { [IDENTITY_HEADERS.devSessionToken]: MCP_TOKEN } },
+];
 
 const executions = (events: RunnerEvent[]): BeforeStartExecution[] => events.flatMap((e) => (e.kind === 'beforeStart' ? [e.execution] : []));
 
@@ -46,6 +54,7 @@ describe('启动前 Hook 执行器（RFC-004）', () => {
       { kind: 'file', stepId: 'summary', name: '写汇总', pathTemplate: '{{agent.runDir}}/summary.txt', format: 'text', mode: 0o600, existing: 'replace', contentTemplate: 'js={{env.FROM_JS}} sh={{env.FROM_SHELL}}' },
     ]) });
     expect(outcome.execution.state).toBe('succeeded');
+    expect(outcome.execution.profile).toEqual({ profile: 'qa-profile', revision: 3 });
     expect(outcome.execution.steps.map((s) => s.state)).toEqual(outcome.execution.steps.map(() => 'succeeded'));
     const settings = JSON.parse(await readFile(join(outcome.home, '.claude', 'settings.json'), 'utf8'));
     expect(settings).toEqual({ env: { BASE: 'https://gateway.example', TOKEN: 'sk-secret-value-9x' }, quote: 'a"b' });
@@ -108,7 +117,7 @@ describe('启动前 Hook 执行器（RFC-004）', () => {
 
   test('模板未定义变量、非法 JSON、保留变量、非法输出与缺失解释器各有独立错误码', async () => {
     const f = await fixture();
-    const run = (stepsInput: AgentRuntimeMaterial['steps'], id: string) => f.runner.run({ agentId: id, processAttemptId: `${id}:1`, workspace: f.workspace, material: material(stepsInput) }).then(() => 'ok', (e: BeforeStartFailure) => e.code);
+    const run = (stepsInput: BeforeStartMaterial['steps'], id: string) => f.runner.run({ agentId: id, processAttemptId: `${id}:1`, workspace: f.workspace, material: material(stepsInput) }).then(() => 'ok', (e: BeforeStartFailure) => e.code);
     expect(await run([{ kind: 'file', stepId: 'a', name: 'a', pathTemplate: '{{agent.home}}/a.json', format: 'json', mode: 0o600, existing: 'replace', contentTemplate: '{"x":"{{vars.MISSING}}"}' }], 'undef')).toBe('template_variable_undefined');
     expect(await run([{ kind: 'file', stepId: 'b', name: 'b', pathTemplate: '{{agent.home}}/b.json', format: 'json', mode: 0o600, existing: 'replace', contentTemplate: '{"x": {{vars.GATEWAY}} }' }], 'json')).toBe('invalid_json');
     expect(await run([{ kind: 'script', stepId: 'c', name: 'c', language: 'shell', argv: [], timeoutMs: 5000, source: 'printf \'{"HOME":"/tmp"}\' > "$CS_HOOK_ENV_OUT"' }], 'reserved')).toBe('reserved_variable');
@@ -153,5 +162,36 @@ describe('启动前 Hook 执行器（RFC-004）', () => {
     expect(code).toBe('path_denied');
     expect(await readFile(join(dir, 'existing.txt'), 'utf8')).toBe('original');
     await writeFile(join(f.root, 'probe'), '');
+  });
+});
+
+describe('平台 MCP 与路径规则（RFC-006 C16）', () => {
+  test('{{mcp.*}} 在文件内容里展开，脚本环境有 CS_MCP_*，会话令牌在日志尾部被遮盖', async () => {
+    const f = await fixture();
+    const outcome = await f.runner.run({ agentId: 'mcp', processAttemptId: 'mcp:1', workspace: f.workspace, mcp: platformMcp, material: material([
+      { kind: 'file', stepId: 'cfg', name: '写 CLI 配置', pathTemplate: '{{agent.home}}/.tool/config.json', format: 'json', mode: 0o600, existing: 'replace', contentTemplate: '{"capabilities":"{{mcp.capabilitiesUrl}}","operations":"{{mcp.operationsUrl}}","token":"{{mcp.token}}"}' },
+      { kind: 'script', stepId: 'env', name: '脚本读 MCP', language: 'shell', argv: [], timeoutMs: 10000, source: `test "$${TERMINAL_MCP_ENV.token}" = "${MCP_TOKEN}"\necho "token=$${TERMINAL_MCP_ENV.token}"\nprintf '{"OPS":"%s"}' "$${TERMINAL_MCP_ENV.operationsUrl}" > "$CS_HOOK_ENV_OUT"\n` },
+    ]) });
+    expect(JSON.parse(await readFile(join(outcome.home, '.tool', 'config.json'), 'utf8'))).toEqual({ capabilities: 'http://mcp-capabilities.svc/mcp', operations: 'http://mcp-operations.svc/mcp', token: MCP_TOKEN });
+    expect(outcome.env.OPS).toBe('http://mcp-operations.svc/mcp');
+    // CLI 进程环境不自动带 CS_MCP_*：已知协议由平台注入 MCP 配置，通用终端由驱动在拉起时加。
+    expect(outcome.env[TERMINAL_MCP_ENV.token]).toBeUndefined();
+    const script = outcome.execution.steps.find((step) => step.stepId === 'env')!;
+    expect(script.log?.stdoutTail).toContain('token=***');
+    expect(JSON.stringify(executions(f.events))).not.toContain(MCP_TOKEN);
+  });
+
+  test('没有对应 MCP 连接时 {{mcp.*}} 按未定义变量失败；MCP 变量不能出现在路径里；路径只能以 /、~/ 或目录变量开头；脚本不能输出 CS_MCP_*', async () => {
+    const f = await fixture();
+    const run = (steps: BeforeStartMaterial['steps'], id: string, mcp: McpConnection[] = platformMcp) => f.runner.run({ agentId: id, processAttemptId: `${id}:1`, workspace: f.workspace, mcp, material: material(steps) }).then(() => 'ok', (e: BeforeStartFailure) => `${e.code}:${e.stepId ?? ''}`);
+    const file = (stepId: string, pathTemplate: string, contentTemplate = 'x') => ({ kind: 'file' as const, stepId, name: stepId, pathTemplate, format: 'text' as const, mode: 0o600, existing: 'replace' as const, contentTemplate });
+    expect(await run([file('tok', '{{agent.home}}/token.txt', '{{mcp.token}}')], 'no-mcp', [])).toBe('template_variable_undefined:tok');
+    expect(await run([file('tok', '{{agent.home}}/token.txt', '{{mcp.token}}')], 'no-token', [{ name: 'operations', url: 'http://mcp-operations.svc/mcp', headers: {} }])).toBe('template_variable_undefined:tok');
+    expect(await run([file('p1', '{{agent.home}}/{{mcp.token}}.txt')], 'mcp-path')).toBe('path_denied:p1');
+    expect(await run([file('p2', '{{vars.GATEWAY}}/x.txt')], 'var-prefix')).toBe('path_denied:p2');
+    expect(await run([file('p3', '{{agent.id}}/x.txt')], 'id-prefix')).toBe('path_denied:p3');
+    expect(await run([{ kind: 'script', stepId: 's1', name: 's1', language: 'shell', argv: [], timeoutMs: 5000, cwdTemplate: 'relative/dir', source: 'true' }], 'cwd-relative')).toBe('path_denied:s1');
+    expect(await run([{ kind: 'script', stepId: 's2', name: 's2', language: 'shell', argv: [], timeoutMs: 5000, source: 'printf \'{"CS_MCP_TOKEN":"forged"}\' > "$CS_HOOK_ENV_OUT"' }], 'forge')).toBe('reserved_variable:s2');
+    expect(await run([file('ok', '~/fine.txt', '{{mcp.operationsUrl}}'), file('ok2', `${f.root}/shared-{{agent.id}}.txt`)], 'allowed')).toBe('ok');
   });
 });

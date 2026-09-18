@@ -7,6 +7,8 @@ import type { EnvironmentView } from '../ports/runtime';
 import type { DevSessionModule } from '../wiring';
 import { createDevSessionModule, devSessionMigrations } from '../wiring';
 import { readyWorkspace } from './workspaceFixture';
+import type { FakeProfile } from './computeFixture';
+import { fakeComputeCatalog } from './computeFixture';
 
 const available = await testDatabaseAvailable();
 let tdb: TestDatabase;
@@ -16,7 +18,7 @@ const serviceId = 'svc_0123456789abcdef0123456789abcdef' as ServiceId;
 const owner: Actor = { userId: 'usr_0123456789abcdef0123456789abcdef' as UserId, isAdmin: false };
 const developer: Actor = { userId: 'usr_1123456789abcdef0123456789abcdef' as UserId, isAdmin: false };
 const envs = new Map<string, EnvironmentView & { createdBy: UserId; preview?: { command: string[]; port: number; healthPath: string } }>();
-const computeProfiles: Array<{ name: string; driver: 'claude-code' | 'opencode' | 'stub'; model: string }> = [{ name: 'balanced', driver: 'claude-code', model: 'anthropic/claude-sonnet-5' }];
+const computeProfiles: FakeProfile[] = [{ name: 'balanced', protocol: 'claude-code', model: 'anthropic/claude-sonnet-5', isDefault: true }, { name: 'term-cli', protocol: 'terminal' }];
 const commands: RunnerCommand[] = [];
 let agentEvents: Array<{ seq: number; at: string; event: RunnerEvent }> | undefined;
 const notices: string[] = [];
@@ -57,7 +59,7 @@ beforeAll(async () => {
         return {};
       },
       listEvents: async () => agentEvents ?? [
-        { seq: 1, at: new Date().toISOString(), event: { kind: 'agent', event: { agentId: 'agt_1', seq: 0, at: new Date().toISOString(), type: 'started', spec: { compute: 'balanced', driver: 'claude-code', model: 'anthropic/claude-sonnet-5', permission: 'read-only' } } } },
+        { seq: 1, at: new Date().toISOString(), event: { kind: 'agent', event: { agentId: 'agt_1', seq: 0, at: new Date().toISOString(), type: 'started', spec: { compute: 'balanced', profileRevision: 1, protocol: 'claude-code', model: 'anthropic/claude-sonnet-5', permission: 'read-only' } } } },
         { seq: 2, at: new Date().toISOString(), event: { kind: 'agent', event: { agentId: 'agt_1', seq: 1, at: new Date().toISOString(), type: 'completed', sessionId: 's1' } } },
         { seq: 3, at: new Date().toISOString(), event: { kind: 'agent', event: { agentId: 'agt_2', seq: 0, at: new Date().toISOString(), type: 'text', text: '没有 started 事件' } } },
       ],
@@ -67,10 +69,10 @@ beforeAll(async () => {
     authorizer: { authorize: async (actor, _p, action) => { if (action === 'force-release-session' && actor.userId !== owner.userId) throw new Error('forbidden'); }, ownerOf: async () => owner.userId },
     services: { resolveServiceOfProject: async () => ({ serviceId, slug: 'demo', name: 'demo' }) },
     notifier: { notify: async (_p, users, message) => { notices.push(`${users.length}:${message}`); } },
-    compute: { resolve: async (name: string) => computeProfiles.find((p) => p.name === name), runtimeMaterial: async () => { throw new Error('运行材料未设置'); }, list: async () => computeProfiles.map((p) => ({ name: p.name })) },
+    compute: fakeComputeCatalog(() => computeProfiles),
     credentials: { issueDevSessionToken: async (binding) => { issued.push(binding); return { token: `tok-${binding.taskId}`, expiresAt: new Date().toISOString() }; } },
     isAdmin: async () => false,
-    settings: { idleMinutes: 30, userDomain: 'cs.localhost', mcp: [{ name: 'capabilities', url: 'http://mcp-capabilities.svc.cs.internal/mcp' }], defaultPreviewPort: 3000, defaultComputeProfile: 'balanced' },
+    settings: { idleMinutes: 30, userDomain: 'cs.localhost', mcp: [{ name: 'capabilities', url: 'http://mcp-capabilities.svc.cs.internal/mcp' }], defaultPreviewPort: 3000 },
     clock: fixedClock('2026-09-11T01:00:00Z'),
   });
 });
@@ -95,7 +97,7 @@ describe.skipIf(!available)('dev-session module', () => {
     await dev.api.sendMessage(developer, created.id, agent.agentId, { content: '继续' });
     const listed = await dev.api.listAgents(developer, created.id);
     // 档位与权限来自 started 事件的 spec，不是编出来的；租户面不返回厂商与模型（RFC-001）。
-    expect(listed[0]).toMatchObject({ agentId: 'agt_1', state: 'completed', sessionId: 's1', compute: 'balanced', permission: 'read-only' });
+    expect(listed[0]).toMatchObject({ agentId: 'agt_1', state: 'completed', sessionId: 's1', compute: 'balanced', permission: 'read-only', profileRevision: 1 });
     expect(listed[0]).not.toHaveProperty('model');
     expect(listed[0]).not.toHaveProperty('driver');
     // 没有 started 事件时留最小权限的占位，绝不谎称 edit。
@@ -122,25 +124,30 @@ describe.skipIf(!available)('dev-session module', () => {
     expect(released.unpushed).toEqual(['abc123 wip']);
   });
 
-  test('算力档位：省略用默认档、不存在的档位报错并列出可选、默认档缺失报 precondition（RFC-001）', async () => {
+  test('算力档位：省略即 default、不存在的档位报错并列出可选、未设默认报 precondition、终端档位不能用于 headless（RFC-006）', async () => {
     envs.clear();
     await dev.api.openSession(developer, projectId, { branch: 'main' });
     const created = [...envs.values()][0]!;
     commands.length = 0;
 
-    // 省略 compute → 用平台默认档，命令带上解析后的具体驱动与模型。
+    // 省略 compute → 解析到管理员设为默认的档位，命令带上固定修订与 launch（显式二进制）。
     await dev.api.startAgent(developer, created.id, { permission: 'edit', prompt: '用默认档' });
-    expect(commands.find((c) => c.type === 'startAgent')).toMatchObject({ compute: 'balanced', driver: 'claude-code', model: 'anthropic/claude-sonnet-5' });
+    expect(commands.find((c) => c.type === 'startAgent')).toMatchObject({ compute: 'balanced', profileRevision: 1, launch: { protocol: 'claude-code', binaryPath: '/usr/local/bin/claude', model: 'anthropic/claude-sonnet-5' }, beforeStart: { profile: 'balanced', revision: 1 } });
+    commands.length = 0;
+    await dev.api.startAgent(developer, created.id, { compute: 'default', permission: 'edit', prompt: '显式 default' });
+    expect(commands.find((c) => c.type === 'startAgent')).toMatchObject({ compute: 'balanced' });
 
     // 不存在的档位：报错里要列出可选项，否则调用方只能去猜。
     const bad = await dev.api.startAgent(developer, created.id, { compute: 'nope', permission: 'edit', prompt: 'x' }).catch((e: unknown) => e);
-    expect(bad).toMatchObject({ kind: 'validation', details: { available: ['balanced'] } });
+    expect(bad).toMatchObject({ kind: 'validation', details: { available: ['balanced', 'term-cli'] } });
+    // 通用终端档位只能用于「＋ CLI」（C6）。
+    await expect(dev.api.startAgent(developer, created.id, { compute: 'term-cli', permission: 'edit', prompt: 'x' })).rejects.toMatchObject({ kind: 'validation', details: { code: 'terminal_profile_not_allowed' } });
 
     // 默认档没配置时报 precondition，不静默挑一档——静默挑会让业务以为自己拿到了预期算力。
-    computeProfiles.length = 0;
+    computeProfiles[0]!.isDefault = false;
     const noDefault = await dev.api.startAgent(developer, created.id, { permission: 'edit', prompt: 'y' }).catch((e: unknown) => e);
-    expect(noDefault).toMatchObject({ kind: 'precondition' });
-    computeProfiles.push({ name: 'balanced', driver: 'claude-code', model: 'anthropic/claude-sonnet-5' });
+    expect(noDefault).toMatchObject({ kind: 'precondition', details: { code: 'no_default_profile' } });
+    computeProfiles[0]!.isDefault = true;
 
     await dev.api.releaseSession(owner, projectId, { force: true });
   });
@@ -192,12 +199,12 @@ describe.skipIf(!available)('dev-session module', () => {
       return at;
     };
     try {
-      const startedAt = append({ type: 'started', spec: { compute: 'qa-opencode', driver: 'opencode', model: 'opencode/big-pickle', permission: 'read-only' } });
+      const startedAt = append({ type: 'started', spec: { compute: 'qa-opencode', profileRevision: 3, protocol: 'opencode', model: 'opencode/big-pickle', permission: 'read-only' } });
       append({ type: 'session', sessionId: 'ses_history' });
       append({ type: 'text', text: 'RFC003_HISTORY_ONE' });
       append({ type: 'status', status: 'waiting' });
       // 实机两轮均发出 waiting，但原投影把所有 status 当 running，页面一直显示执行中。
-      const identity = { agentId: 'agt_history', taskId: session.taskId, sessionId: 'ses_history', compute: 'qa-opencode', permission: 'read-only', startedAt } as const;
+      const identity = { agentId: 'agt_history', taskId: session.taskId, sessionId: 'ses_history', compute: 'qa-opencode', permission: 'read-only', profileRevision: 3, startedAt } as const;
       expect(await dev.api.listAgents(developer, session.taskId)).toEqual([{ ...identity, state: 'awaiting-input' }]);
 
       for (const status of ['diagnostic information', undefined]) {

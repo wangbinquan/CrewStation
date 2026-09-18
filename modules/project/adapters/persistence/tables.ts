@@ -46,18 +46,6 @@ export const servicePlans = projectSchema.table('service_plans', {
   description: text('description').notNull().default(''),
 });
 
-/** 算力档位（RFC-001）：driver 与 model 是平台的采购信息，租户面不返回。 */
-export const computeProfiles = projectSchema.table('compute_profiles', {
-  name: text('name').primaryKey(),
-  driver: text('driver').notNull(),
-  model: text('model').notNull(),
-  taskProfile: text('task_profile'),
-  description: text('description').notNull().default(''),
-  /** RFC-004：绑定的运行环境；null 即部署配置模式。 */
-  runtimeConfigId: text('runtime_config_id'),
-  revision: integer('revision').notNull().default(0),
-});
-
 export const taskProfiles = projectSchema.table('task_profiles', {
   name: text('name').primaryKey(),
   cpu: text('cpu').notNull(),

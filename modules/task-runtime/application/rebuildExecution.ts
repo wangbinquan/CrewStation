@@ -34,7 +34,7 @@ export async function executeRebuild(deps: RebuildExecutionDeps, scope: Reposito
   const prepared = { ...env, runnerTokenHash: hashRunnerToken(secret.token) };
   const spec = { env: prepared, image: record.image, envVars: {}, envSecretName: record.secretName, resources: record.input.profile,
     ...(record.nodeName ? { nodeName: record.nodeName } : {}),
-    ...(deps.settings.agentEnvSecretName ? { agentEnvSecretName: deps.settings.agentEnvSecretName } : {}), ...previewRouteOf(deps.settings, env, svc.slug) };
+    ...previewRouteOf(deps.settings, env, svc.slug) };
   await requireRebuildLease(heartbeat);
   if (retainedVolume(await deps.recoveryCluster.inspect(original)).uid !== record.input.expectedVolumeUid) throw precondition('原工作卷在准备期间已变化，恢复停止');
   const podUid = await deps.provisioner.ensurePod(record, spec);

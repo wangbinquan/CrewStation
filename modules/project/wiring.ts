@@ -14,7 +14,6 @@ import { createProjectUseCase } from './application/createProject';
 import type { ProjectUseCaseDeps } from './application/dependencies';
 import { memberUseCases } from './application/manageMembers';
 import { quotaAndPlanUseCases } from './application/manageQuotaAndPlans';
-import { computeProfileUseCases } from './application/manageComputeProfiles';
 import { queryProjectUseCases } from './application/queryProjects';
 import { catalogRoutes } from './http/catalogRoutes';
 import { projectRoutes } from './http/projectRoutes';
@@ -24,7 +23,6 @@ import { marketListingUseCases } from './application/marketListings';
 import { projectPageUseCases } from './application/projectPages';
 import type { HostNaming } from './ports/hostNaming';
 import type { ProjectSettings } from './ports/projectSettings';
-import type { RuntimeConfigDirectory } from './ports/runtimeConfigs';
 import type { TaskUsage } from './ports/taskUsage';
 
 export interface ProjectModuleDeps {
@@ -34,8 +32,6 @@ export interface ProjectModuleDeps {
   settings: ProjectSettings;
   /** 并发任务占用数；缺省恒为 0（无任务运行时的单元测试与 CLI）。 */
   taskUsage?: TaskUsage;
-  /** 运行环境目录（RFC-004）；缺省一律回答不存在，即只允许部署配置模式。 */
-  runtimeConfigs?: RuntimeConfigDirectory;
   clock?: Clock;
 }
 
@@ -58,7 +54,6 @@ export function createProjectModule(deps: ProjectModuleDeps): ProjectModule {
     hosts: deps.hosts,
     settings: deps.settings,
     taskUsage: deps.taskUsage ?? { runningTasks: async () => 0 },
-    runtimeConfigs: deps.runtimeConfigs ?? { describe: async () => undefined },
     clock: deps.clock ?? systemClock,
   };
   const api: ProjectModuleApi = {
@@ -70,7 +65,6 @@ export function createProjectModule(deps: ProjectModuleDeps): ProjectModule {
     ...queryProjectUseCases(useCaseDeps),
     ...memberUseCases(useCaseDeps),
     ...quotaAndPlanUseCases(useCaseDeps),
-    ...computeProfileUseCases(useCaseDeps),
     ...appVisibilityUseCases(useCaseDeps),
     ...marketListingUseCases(useCaseDeps),
     ...projectPageUseCases(useCaseDeps),

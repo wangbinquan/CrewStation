@@ -92,7 +92,7 @@ function verifyPod(pod: K8sObject, env: TaskEnvironment): string {
 }
 
 /** 所有写入只针对本次执行 Pod／Secret；接口没有创建、修改或删除 PVC 的能力。 */
-export function kubernetesNativeExecutions(k8s: K8sClient, workerUid: number, agentEnvSecretName?: string): NativeExecutionCluster {
+export function kubernetesNativeExecutions(k8s: K8sClient, workerUid: number): NativeExecutionCluster {
   return {
     inspectWorkspace: (parent) => inspectWorkspace(k8s, parent),
     prepare: async (env, values) => {
@@ -105,7 +105,7 @@ export function kubernetesNativeExecutions(k8s: K8sClient, workerUid: number, ag
       const token = secret.stringData?.CS_RUNNER_TOKEN ?? (secret.data?.CS_RUNNER_TOKEN ? Buffer.from(secret.data.CS_RUNNER_TOKEN, 'base64').toString('utf8') : undefined);
       if (!secret.immutable || secret.metadata.deletionTimestamp || !token) throw precondition('CLI 环境配置不完整，停止启动');
       const pod = await createOrRead(k8s, Resources.Pod!, env, env.podName, async () => {
-        const object = taskPodObject({ env, image: n.image, envVars: {}, envSecretName: secretName(env), resources: n.profile, nodeName: n.nodeName, ...(agentEnvSecretName ? { agentEnvSecretName } : {}) }, workerUid);
+        const object = taskPodObject({ env, image: n.image, envVars: {}, envSecretName: secretName(env), resources: n.profile, nodeName: n.nodeName }, workerUid);
         object.metadata.annotations = { [intentKey]: intent(env) };
         return object;
       });

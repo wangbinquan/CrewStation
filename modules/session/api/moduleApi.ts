@@ -7,5 +7,5 @@ export interface SessionModuleApi {
   readonly name: 'session';
   sendCommand(taskId: TaskId, command: RunnerCommand): Promise<unknown>;
   listEvents(taskId: TaskId, options: { sinceSeq?: number; kinds?: RunnerEvent['kind'][]; agentId?: string; limit?: number }): Promise<StoredEventDto[]>;
-  connectionStatus(taskId: TaskId): Promise<{ connected: boolean; replica?: string; lastSeq?: number; drivers?: string[]; capabilities?: RunnerHello['capabilities'] }>;
+  connectionStatus(taskId: TaskId): Promise<{ connected: boolean; replica?: string; lastSeq?: number; protocols?: string[]; capabilities?: RunnerHello['capabilities'] }>;
 }

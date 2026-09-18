@@ -56,7 +56,8 @@ function NativeTerminalFrame({ terminalId, terminal, layout, store, channel, str
       <strong title={terminal?.agentId}>{label}</strong><span className={styles.lifecycle} data-activity={state}>{t(`activity.status.${state}`)}</span>
       {terminal?.lifecycle === 'running' && terminal.connection === 'connected' && stream.runnerConnected && state !== 'ended' ? <small className={styles.lifecycle}>{t('activity.processOnline')}</small> : null}
       <span className={styles.compute}>{terminal?.compute}</span>
-      {terminal?.runtime ? <small title={terminal.runtime.configId}>{t('devSession.agents.runtimeRevision', { revision: terminal.runtime.revision })}</small> : null}
+      {terminal?.protocol === 'terminal' ? <small title={t('devSession.agents.terminalOnlyHint')}>{t('devSession.agents.terminalOnly')}</small> : null}
+      {terminal?.profileRevision ? <small>{t('devSession.agents.profileRevision', { revision: terminal.profileRevision })}</small> : null}
       {terminal?.execution?.profile ? <small title={t('devSession.native.resourcesHint')}>CPU {terminal.execution.profile.cpu} · {terminal.execution.profile.memory}</small> : null}
       <Button variant="ghost" aria-label={t('devSession.native.zoom', { id: label })} onClick={() => store.update((value) => ({ ...value, maximizedTerminalId: value.maximizedTerminalId === terminalId ? null : terminalId }))}>{layout.maximizedTerminalId === terminalId ? '↙' : '↗'}</Button>
       <details className={styles.menu}><summary aria-label={t('devSession.native.options', { id: label })}>···</summary><div className={styles.menuBody}>

@@ -28,7 +28,7 @@ function fixture() {
   };
   const hub = runnerHub(deps);
   const streams = browserStreams(deps, hub, { sendCommand: async (_task, c) => { commands.push(c); return {}; }, sendLocalOnly: async () => ({}), connectionStatus: async () => ({ connected: true }) });
-  const hello = { type: 'hello', taskId, protocolVersion: TASKRUNNER_PROTOCOL_VERSION, runnerToken: 'token', workdir: '/work', capabilities: { drivers: ['claude-code'], pty: true, preview: true } };
+  const hello = { type: 'hello', taskId, protocolVersion: TASKRUNNER_PROTOCOL_VERSION, runnerToken: 'token', workdir: '/work', capabilities: { protocols: ['claude-code', 'opencode', 'terminal'], pty: true, preview: true } };
   return { hub, streams, hello, durable, commands };
 }
 
@@ -87,7 +87,8 @@ test('控制租约绑定服务端视图，断开只 detach；不同连接不能�
 });
 
 test('原生 CLI 创建和结束必须经过持久名册接口，浏览器流不能绕过；普通终端旧命令保留', () => {
-  const native = StartAgentTerminalCommandSchema.parse({ id: 'start', type: 'startAgentTerminal', agentId: 'a', terminalId: 't', runnerId: crypto.randomUUID(), requestFingerprint: 'fingerprint', driver: 'claude-code', compute: 'balanced', model: 'model', permission: 'edit', cols: 80, rows: 24 });
+  const native = StartAgentTerminalCommandSchema.parse({ id: 'start', type: 'startAgentTerminal', agentId: 'a', terminalId: 't', runnerId: crypto.randomUUID(), requestFingerprint: 'fingerprint', compute: 'balanced', profileRevision: 1, launch: { protocol: 'claude-code', binaryPath: '/usr/local/bin/claude', model: 'model' }, permission: 'edit', cols: 80, rows: 24,
+    beforeStart: { profile: 'balanced', revision: 1, contentHash: 'h', steps: [], vars: {}, secrets: {}, configFile: { kind: 'none' }, captureOutput: false }, processAttemptId: 'a:1' });
   expect(() => terminalViewCommand(native, 'view')).toThrow('名册');
   expect(() => terminalViewCommand({ id: 'stop', type: 'stopAgentTerminal', agentId: 'a', runnerId: native.runnerId }, 'view')).toThrow('名册');
   expect(terminalViewCommand({ id: 'shell', type: 'openTerminal', terminalId: 'shell', cols: 80, rows: 24 }, 'view')).toMatchObject({ type: 'openTerminal' });

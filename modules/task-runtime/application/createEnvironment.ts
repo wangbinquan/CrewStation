@@ -72,7 +72,7 @@ export function createEnvironmentUseCase(deps: TaskRuntimeUseCaseDeps) {
       await cluster.ensureVolume(env, profile.storage);
       await cluster.createPod({
         env, image: settings.taskImage, envVars: await containerEnv(deps, env, svc, token), resources: { cpu: profile.cpu, memory: profile.memory, storage: profile.storage },
-        ...(settings.agentEnvSecretName ? { agentEnvSecretName: settings.agentEnvSecretName } : {}), ...(await sourceOf(deps, env.serviceId, env.branch)), ...previewRouteOf(settings, env, svc.slug),
+        ...(await sourceOf(deps, env.serviceId, env.branch)), ...previewRouteOf(settings, env, svc.slug),
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);

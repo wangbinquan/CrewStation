@@ -7,12 +7,14 @@
 //  - 不写 `settings.json`、不传 `--settings`：CrewStation 在任务容器内关闭 Claude 内置沙箱（已登记的偏离），
 //    而源的 settings 文件正是 `sandbox.enabled: true` 的载体；
 //  - 不传 `--agents`：子代理闭包属于 agent-workflow 的 DAG 编排面，不复制；
-//  - 不传 `--add-dir`、不做 `extraArgs`：CrewStation 没有「自定义 fork 私有 flag」这个产品概念，
-//    平台独占 flag 表仍然保留（见 CLAUDE_PLATFORM_OWNED_FLAGS），供将来开放 extraArgs 时复用；
+//  - 不传 `--add-dir`；RFC-006 起档位可带 `extraArgs`（fork 私有 flag），追加在全部平台 argv 之后，
+//    平台独占 flag 表与保存时的校验同源（contracts 的 CLAUDE_RESERVED_ARGS）；
 //  - 新增 `--input-format stream-json`：交互式常驻流（见 streamInput.ts）。
 
+import { CLAUDE_RESERVED_ARGS } from '@crewstation/contracts';
 import { validation } from '@crewstation/kernel';
 import type { AgentSpawnContext, SpawnPlan } from '../../contract/spawnPlan';
+import { assertClaudeExtraArgs } from '../../injection/launchArgs';
 import { renderClaudeMcpInjection } from '../../injection/mcpInjection';
 import { claudeToolGateFor, claudeToolsValue } from '../../permission/claudeToolGate';
 import { opencodePermissionFor } from '../../permission/opencodePermission';
@@ -25,16 +27,10 @@ export const CLAUDE_HEADLESS_BASE_ARGV: readonly string[] = Object.freeze(['-p',
 export const CLAUDE_STREAM_INPUT_ARGV: readonly string[] = Object.freeze(['--input-format', 'stream-json']);
 
 /**
- * 平台装配的 flag。将来若开放「运行时私有 flag」，它们不得被替换掉：
- * 这是 argv 正确性校验，不是执行边界。源里额外含 `--settings`、`--add-dir`，此处一并保留。
+ * 平台装配的 flag：档位的附加参数不得替换它们。这是 argv 正确性校验，不是执行边界。
+ * 表本身在 contracts（CLAUDE_RESERVED_ARGS），agent-runtime 保存时与这里启动时用同一份。
  */
-export const CLAUDE_PLATFORM_OWNED_FLAGS: ReadonlySet<string> = new Set([
-  '-p', '--print', '--output-format', '--input-format', '--verbose', '--model',
-  '--append-system-prompt-file', '--append-system-prompt', '--system-prompt', '--system-prompt-file',
-  '--mcp-config', '--agents', '--resume', '--continue', '--session-id', '--fork-session',
-  '--permission-mode', '--dangerously-skip-permissions', '--tools', '--allowedTools', '--allowed-tools',
-  '--disallowedTools', '--disallowed-tools', '--settings', '--add-dir',
-]);
+export const CLAUDE_PLATFORM_OWNED_FLAGS: ReadonlySet<string> = new Set(CLAUDE_RESERVED_ARGS);
 
 export interface ClaudeExplicitPermissionArgv {
   /** 由权限映射得出的内置工具载入集。 */
@@ -75,13 +71,14 @@ export interface ClaudeArgvInput {
   settingsFile?: string;
 }
 
-/** 组装 argv。顺序与源一致：命令头 → 传输基线 → 权限段 → 模型 → system prompt → MCP → resume。 */
+/** 组装 argv。顺序与源一致：命令头 → 传输基线 → 权限段 → 模型 → system prompt → MCP → resume → 档位附加参数。 */
 export function buildClaudeArgv(input: ClaudeArgvInput): string[] {
   const { ctx } = input;
+  const extraArgs = assertClaudeExtraArgs(ctx.extraArgs);
   const gate = claudeToolGateFor(opencodePermissionFor(ctx.permission));
   const mcpAllowedTools = input.mcpServerNames.map((name) => `mcp__${name}__*`).join(',');
   const cmd = [
-    ...(ctx.head ?? ['claude']),
+    ...ctx.head,
     ...CLAUDE_HEADLESS_BASE_ARGV,
     ...(ctx.interactiveStream === true ? CLAUDE_STREAM_INPUT_ARGV : []),
     // gate 恒非 null：CrewStation 的三档权限一定产出非空 map，于是永远走 dontAsk ＋ 显式载入集，
@@ -99,6 +96,7 @@ export function buildClaudeArgv(input: ClaudeArgvInput): string[] {
   if (input.mcpConfigFile !== undefined) cmd.push('--mcp-config', input.mcpConfigFile);
   if (input.settingsFile !== undefined) cmd.push('--settings', input.settingsFile);
   if (ctx.resumeSessionId !== undefined && ctx.resumeSessionId.length > 0) cmd.push('--resume', ctx.resumeSessionId);
+  cmd.push(...extraArgs);
   return cmd;
 }
 

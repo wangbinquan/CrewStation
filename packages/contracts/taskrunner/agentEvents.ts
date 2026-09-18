@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { AgentDriverSchema, AgentPermissionSchema } from '../manifest/tasks';
-import { RuntimeRevisionRefSchema } from './beforeStart';
+import { AgentPermissionSchema } from '../manifest/tasks';
+import { KnownAgentProtocolSchema } from './launch';
 
 /** 驱动层把两个 CLI 的输出归一为这一种事件；工作台流式面板与 execution_events 都消费它。 */
 export const AgentEventTypeSchema = z.enum([
@@ -16,9 +16,9 @@ export const AgentEventSchema = z.object({
   sessionId: z.string().optional(),
   /**
    * `started` 事件带上这次运行的规格。工作台的 Agent 列表是按持久事件还原的，
-   * 没有它就只能编造驱动名、模型与权限——权限编错尤其误导人。
+   * 没有它就只能编造档位、协议与权限——权限编错尤其误导人。RFC-006：档位名＋固定修订＋协议；模型可能为空（交给二进制默认）。
    */
-  spec: z.object({ compute: z.string(), driver: AgentDriverSchema, model: z.string(), permission: AgentPermissionSchema, runtime: RuntimeRevisionRefSchema.optional() }).optional(),
+  spec: z.object({ compute: z.string(), profileRevision: z.number().int().min(1), protocol: KnownAgentProtocolSchema, model: z.string().optional(), permission: AgentPermissionSchema }).optional(),
   text: z.string().optional(),
   tool: z.object({ callId: z.string().optional(), name: z.string(), input: z.unknown().optional(), output: z.unknown().optional(), isError: z.boolean().optional() }).optional(),
   status: z.string().optional(),

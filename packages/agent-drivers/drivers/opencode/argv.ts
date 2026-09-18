@@ -38,7 +38,8 @@ export function resolveAutoApproveFlag(binaryVersion: string | null | undefined)
 export const MAX_OPENCODE_PROMPT_BYTES = 120 * 1024;
 
 export interface OpencodeArgvInput {
-  head?: string[];
+  /** 档位修订的二进制路径（RFC-006 C5：必有，不回落 `opencode`）。 */
+  head: readonly string[];
   agentName?: string;
   resumeSessionId?: string;
   /** 已探测到的二进制版本，决定 auto-approve flag 的拼写。 */
@@ -55,7 +56,7 @@ export function buildOpencodeArgv(input: OpencodeArgvInput, prompt: string): str
     );
   }
   const cmd = [
-    ...(input.head ?? ['opencode']),
+    ...input.head,
     'run',
     '--agent', input.agentName ?? OPENCODE_AGENT_NAME,
     '--format', 'json',

@@ -2,7 +2,7 @@
 // 因此对具体 CLI 一无所知。源里没有这层抽象（agent-workflow 的 RuntimeDriver 把装配、解析、
 // 会话捕获、清单读取全挂在一个对象上）；这里只留 CrewStation 实际要的四件事。
 
-import type { AgentDriver as AgentDriverName } from '@crewstation/contracts';
+import type { KnownAgentProtocol } from '@crewstation/contracts';
 import type { NormalizedEvent } from '../contract/normalizedEvent';
 import type { DriverAgentSpec, DriverLaunchContext } from '../contract/agentDriver';
 import type { SpawnPlan } from '../contract/spawnPlan';
@@ -28,15 +28,8 @@ export interface PreparedRuntime {
 }
 
 export interface CliRuntimeAdapter {
-  readonly name: AgentDriverName;
-  /** 用于 available() 与诊断文案的可执行文件记号：默认是 PATH 上的名字，被 binaryPath 覆盖时是该路径。 */
-  readonly binary: string;
+  readonly protocol: KnownAgentProtocol;
   /** CLI 是否真的支持「进程常驻、持续读 stdin」；false 时交互式退化为链式 one-shot。 */
   readonly supportsResidentStream: boolean;
   prepare(spec: DriverAgentSpec, context: DriverLaunchContext): Promise<PreparedRuntime>;
-}
-
-/** 自定义二进制路径（不在 PATH 上、或 fork 版本）；缺省用 CLI 的协议默认名。 */
-export interface CliAdapterOptions {
-  binaryPath?: string;
 }

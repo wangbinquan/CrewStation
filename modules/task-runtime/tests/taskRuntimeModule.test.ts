@@ -29,7 +29,7 @@ beforeAll(async () => {
     sources: { configEnv: async () => ({ GREETING: 'dev-hi' }), dataEnv: async () => ({ CS_DATABASE_URL: 'postgres://dev' }), taskDataEnv: async () => ({}) },
     checkout: { checkoutFor: async () => ({ repoUrl: 'http://git.local/crewstation/demo.git', credentialSecretName: 'git-checkout-demo' }) },
     isAdmin: async () => false,
-    settings: { taskImage: 'cs-task-runtime:dev', systemNamespace: 'crewstation-system', sessionUrl: 'ws://cs-session:8083/runner', userDomain: 'cs.localhost', serviceDomain: 'svc.cs.internal', workerUid: 10001, defaultProfile: 'coding-medium', agentEnvSecretName: 'agent-env', userAuthMiddleware: 'forward-auth-user', dropIdentityHeadersMiddleware: 'drop-identity-headers' },
+    settings: { taskImage: 'cs-task-runtime:dev', systemNamespace: 'crewstation-system', sessionUrl: 'ws://cs-session:8083/runner', userDomain: 'cs.localhost', serviceDomain: 'svc.cs.internal', workerUid: 10001, defaultProfile: 'coding-medium', userAuthMiddleware: 'forward-auth-user', dropIdentityHeadersMiddleware: 'drop-identity-headers' },
   });
 });
 afterAll(async () => { await tdb?.drop(); });
@@ -69,7 +69,11 @@ describe.skipIf(!available)('task-runtime module', () => {
     expect(rule.middlewares.map((m) => `${m.namespace}/${m.name}`)).toEqual(['crewstation-system/drop-identity-headers', 'crewstation-system/forward-auth-user']);
     // 长驻容器的环境里没有 Git 令牌。
     expect(Object.keys(env).some((k) => k.includes('GIT_TOKEN'))).toBe(false);
-    expect(env.CS_AGENT_ENV_FILE).toBe('/etc/crewstation/agent.env');
+    // RFC-006 §7.3：显式的 Runner 启动路径与 root 身份；不再挂旧的 agent-env 凭据文件，也没有它的环境变量。
+    const main = devPod.spec as { containers: Array<{ command?: string[]; securityContext?: { runAsUser?: number } }>; volumes: Array<{ name: string }> };
+    expect(main.containers[0]).toMatchObject({ command: ['/usr/bin/tini', '--', '/opt/crewstation/bin/task-runner'], securityContext: { runAsUser: 0 } });
+    expect(main.volumes.map((v) => v.name)).toEqual(['work']);
+    expect(env.CS_AGENT_ENV_FILE).toBeUndefined();
     expect(env.CS_RUNNER_TOKEN!.length).toBeGreaterThan(20);
     await expect(runtime.api.createEnvironment({ serviceId, kind: 'dev-session' })).rejects.toMatchObject({ kind: 'conflict' });
 

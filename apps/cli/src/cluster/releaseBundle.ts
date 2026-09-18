@@ -1,4 +1,4 @@
-import type { ComputeProfileInput, ServicePlanInput, TaskProfileInput } from '@crewstation/api-client';
+import type { ServicePlanInput, TaskProfileInput } from '@crewstation/api-client';
 import { CliFailure } from '../runtime/cliError';
 import type { FileAccess } from '../runtime/commandContext';
 
@@ -44,12 +44,13 @@ export function inspectBundle(files: FileAccess, root: string): ReleaseBundle {
   };
 }
 
-/** 发行包的套餐定义；安装第 5 阶段据此写入平台目录。缺文件不是错误，报告里说明即可。 */
+/**
+ * 发行包的套餐定义；安装第 5 阶段据此写入平台目录。缺文件不是错误，报告里说明即可。
+ * 发行包不再带算力档位（RFC-006）：旧包里的 profiles/compute-profiles.yaml 不读取。
+ */
 export interface BundleProfiles {
   readonly servicePlans: readonly ServicePlanInput[];
   readonly taskProfiles: readonly TaskProfileInput[];
-  /** 算力档位（RFC-001）：档位名 → 驱动与模型，只有平台知道这层映射。 */
-  readonly computeProfiles: readonly ComputeProfileInput[];
   readonly notes: readonly string[];
 }
 
@@ -57,8 +58,7 @@ export function readBundleProfiles(files: FileAccess, root: string): BundleProfi
   const notes: string[] = [];
   const servicePlans = readList<ServicePlanInput>(files, join(root, 'profiles/service-plans.yaml'), notes, isServicePlan);
   const taskProfiles = readList<TaskProfileInput>(files, join(root, 'profiles/task-profiles.yaml'), notes, isTaskProfile);
-  const computeProfiles = readList<ComputeProfileInput>(files, join(root, 'profiles/compute-profiles.yaml'), notes, isComputeProfile);
-  return { servicePlans, taskProfiles, computeProfiles, notes };
+  return { servicePlans, taskProfiles, notes };
 }
 
 function readLock(files: FileAccess, root: string): { version: string | undefined; images: readonly string[] } {
@@ -100,10 +100,6 @@ function isServicePlan(value: Record<string, unknown>): boolean {
 
 function isTaskProfile(value: Record<string, unknown>): boolean {
   return typeof value.name === 'string' && typeof value.cpu === 'string' && typeof value.memory === 'string' && typeof value.storage === 'string';
-}
-
-function isComputeProfile(value: Record<string, unknown>): boolean {
-  return typeof value.name === 'string' && typeof value.driver === 'string' && typeof value.model === 'string';
 }
 
 export function join(root: string, rel: string): string {

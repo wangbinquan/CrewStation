@@ -1,70 +1,79 @@
-import type { RuntimeCheckId, RuntimeCheckState, RuntimeConfigId, RuntimeDriver, UserId } from '@crewstation/contracts';
+import type { AgentProtocol, ProfileTestId, ProfileTestOutcome, ProfileTestState, UserId } from '@crewstation/contracts';
 import type { Executor } from '@crewstation/persistence';
-import { and, asc, desc, eq, gt, ilike } from 'drizzle-orm';
-import type { RuntimeCheck } from '../../domain/runtimeCheck';
-import type { RuntimeConfig, RuntimeCredential, RuntimeRevision, RuntimeRevisionContent } from '../../domain/runtimeConfig';
-import type { RuntimeCheckRepository, RuntimeConfigRepository, RuntimeCredentialRepository, RuntimeRevisionRepository } from '../../ports/repositories';
-import { checks, configs, credentials, revisions } from './tables';
+import { and, asc, desc, eq, inArray, lt } from 'drizzle-orm';
+import type { ComputeProfile, ProfileCredential, ProfileRevision } from '../../domain/computeProfile';
+import type { ProfileTest } from '../../domain/profileTest';
+import type { CredentialRepository, ProfileRepository, RevisionRepository, TestRepository } from '../../ports/repositories';
+import { profileCredentials, profileRevisions, profileTests, profiles } from './tables';
 
 const json = <T>(v: unknown): T => (typeof v === 'string' ? JSON.parse(v) : v) as T;
 
-const toConfig = (r: typeof configs.$inferSelect): RuntimeConfig => ({
-  id: r.id as RuntimeConfigId, name: r.name, description: r.description, driver: r.driver as RuntimeDriver, draftRevision: r.draftRevision, activeRevision: r.activeRevision,
-  enabled: r.enabled, createdBy: r.createdBy as UserId, createdAt: r.createdAt, updatedBy: r.updatedBy as UserId, updatedAt: r.updatedAt,
+const toProfile = (r: typeof profiles.$inferSelect): ComputeProfile => ({
+  name: r.name, protocol: r.protocol as AgentProtocol, description: r.description, enabled: r.enabled, isDefault: r.isDefault, currentRevision: r.currentRevision,
+  createdBy: r.createdBy as UserId, createdAt: r.createdAt, updatedBy: r.updatedBy as UserId, updatedAt: r.updatedAt,
 });
-const configRow = (c: RuntimeConfig): typeof configs.$inferInsert => ({ ...c });
 
-export function drizzleRuntimeConfigRepository(db: Executor): RuntimeConfigRepository {
+export function drizzleProfileRepository(db: Executor): ProfileRepository {
   return {
-    insert: async (c) => { await db.insert(configs).values(configRow(c)); },
-    update: async (c) => { await db.update(configs).set(configRow(c)).where(eq(configs.id, c.id)); },
-    getById: async (id) => { const row = (await db.select().from(configs).where(eq(configs.id, id)))[0]; return row ? toConfig(row) : undefined; },
-    lockById: async (id) => { const row = (await db.select().from(configs).where(eq(configs.id, id)).for('update'))[0]; return row ? toConfig(row) : undefined; },
-    getByName: async (name) => { const row = (await db.select().from(configs).where(eq(configs.name, name)))[0]; return row ? toConfig(row) : undefined; },
-    listPage: async (filter, limit, after) => {
-      const where = and(
-        filter.name ? ilike(configs.name, `%${filter.name.replace(/[%_]/g, '')}%`) : undefined,
-        filter.driver ? eq(configs.driver, filter.driver) : undefined,
-        filter.enabled === undefined ? undefined : eq(configs.enabled, filter.enabled),
-        after ? gt(configs.name, after) : undefined,
-      );
-      return (await db.select().from(configs).where(where).orderBy(asc(configs.name)).limit(limit)).map(toConfig);
-    },
+    insert: async (p) => { await db.insert(profiles).values({ ...p }); },
+    update: async (p) => { await db.update(profiles).set({ ...p }).where(eq(profiles.name, p.name)); },
+    get: async (name) => { const row = (await db.select().from(profiles).where(eq(profiles.name, name)))[0]; return row ? toProfile(row) : undefined; },
+    lock: async (name) => { const row = (await db.select().from(profiles).where(eq(profiles.name, name)).for('update'))[0]; return row ? toProfile(row) : undefined; },
+    getDefault: async () => { const row = (await db.select().from(profiles).where(eq(profiles.isDefault, true)))[0]; return row ? toProfile(row) : undefined; },
+    list: async () => (await db.select().from(profiles).orderBy(asc(profiles.name))).map(toProfile),
+    remove: async (name) => { await db.delete(profiles).where(eq(profiles.name, name)); },
+    clearDefault: async () => { await db.update(profiles).set({ isDefault: false }).where(eq(profiles.isDefault, true)); },
   };
 }
 
-export function drizzleRuntimeRevisionRepository(db: Executor): RuntimeRevisionRepository {
-  const toRevision = (r: typeof revisions.$inferSelect): RuntimeRevision => ({ configId: r.configId as RuntimeConfigId, revision: r.revision, ...json<RuntimeRevisionContent>(r.content), contentHash: r.contentHash, createdBy: r.createdBy as UserId, createdAt: r.createdAt });
+export function drizzleRevisionRepository(db: Executor): RevisionRepository {
+  const toRevision = (r: typeof profileRevisions.$inferSelect): ProfileRevision => ({
+    profile: r.profile, revision: r.revision, content: json<ProfileRevision['content']>(r.content), imageDigest: r.imageDigest, contentHash: r.contentHash,
+    createdBy: r.createdBy as UserId, createdAt: r.createdAt,
+  });
   return {
-    insert: async (rev) => {
-      const { configId, revision, contentHash, createdBy, createdAt, ...content } = rev;
-      await db.insert(revisions).values({ configId, revision, contentHash, createdBy, createdAt, content });
-    },
-    get: async (configId, revision) => { const row = (await db.select().from(revisions).where(and(eq(revisions.configId, configId), eq(revisions.revision, revision))))[0]; return row ? toRevision(row) : undefined; },
+    insert: async (rev) => { await db.insert(profileRevisions).values({ ...rev }); },
+    get: async (profile, revision) => { const row = (await db.select().from(profileRevisions).where(and(eq(profileRevisions.profile, profile), eq(profileRevisions.revision, revision))))[0]; return row ? toRevision(row) : undefined; },
+    removeAll: async (profile) => { await db.delete(profileRevisions).where(eq(profileRevisions.profile, profile)); },
   };
 }
 
-export function drizzleRuntimeCredentialRepository(db: Executor): RuntimeCredentialRepository {
-  const toCredential = (r: typeof credentials.$inferSelect): RuntimeCredential => ({ configId: r.configId as RuntimeConfigId, name: r.name, cipherText: r.cipherText, updatedBy: r.updatedBy as UserId, updatedAt: r.updatedAt });
+export function drizzleCredentialRepository(db: Executor): CredentialRepository {
+  const toCredential = (r: typeof profileCredentials.$inferSelect): ProfileCredential => ({ profile: r.profile, name: r.name, cipherText: r.cipherText, updatedBy: r.updatedBy as UserId, updatedAt: r.updatedAt });
   return {
-    list: async (configId) => (await db.select().from(credentials).where(eq(credentials.configId, configId)).orderBy(asc(credentials.name))).map(toCredential),
-    upsert: async (c) => { await db.insert(credentials).values({ ...c }).onConflictDoUpdate({ target: [credentials.configId, credentials.name], set: { cipherText: c.cipherText, updatedBy: c.updatedBy, updatedAt: c.updatedAt } }); },
-    remove: async (configId, name) => { await db.delete(credentials).where(and(eq(credentials.configId, configId), eq(credentials.name, name))); },
+    list: async (profile) => (await db.select().from(profileCredentials).where(eq(profileCredentials.profile, profile)).orderBy(asc(profileCredentials.name))).map(toCredential),
+    upsert: async (c) => { await db.insert(profileCredentials).values({ ...c }).onConflictDoUpdate({ target: [profileCredentials.profile, profileCredentials.name], set: { cipherText: c.cipherText, updatedBy: c.updatedBy, updatedAt: c.updatedAt } }); },
+    remove: async (profile, name) => { await db.delete(profileCredentials).where(and(eq(profileCredentials.profile, profile), eq(profileCredentials.name, name))); },
+    removeAll: async (profile) => { await db.delete(profileCredentials).where(eq(profileCredentials.profile, profile)); },
   };
 }
 
-export function drizzleRuntimeCheckRepository(db: Executor): RuntimeCheckRepository {
-  const toCheck = (r: typeof checks.$inferSelect): RuntimeCheck => ({
-    checkId: r.checkId as RuntimeCheckId, configId: r.configId as RuntimeConfigId, revision: r.revision, contentHash: r.contentHash, clientRequestId: r.clientRequestId, createdBy: r.createdBy as UserId,
-    ...(r.model ? { model: r.model } : {}), state: r.state as RuntimeCheckState, context: json<RuntimeCheck['context']>(r.context), stages: json<RuntimeCheck['stages']>(r.stages),
+export function drizzleTestRepository(db: Executor): TestRepository {
+  const toTest = (r: typeof profileTests.$inferSelect): ProfileTest => ({
+    testId: r.testId as ProfileTestId, profile: r.profile, revision: r.revision, contentHash: r.contentHash, trigger: r.trigger as ProfileTest['trigger'],
+    ...(r.clientRequestId ? { clientRequestId: r.clientRequestId } : {}), createdBy: r.createdBy as UserId, state: r.state as ProfileTestState,
+    ...(r.outcome ? { outcome: r.outcome as ProfileTestOutcome } : {}), context: json<ProfileTest['context']>(r.context), stages: json<ProfileTest['stages']>(r.stages),
     ...(r.error ? { error: r.error } : {}), createdAt: r.createdAt, ...(r.startedAt ? { startedAt: r.startedAt } : {}), ...(r.endedAt ? { endedAt: r.endedAt } : {}),
   });
-  const row = (c: RuntimeCheck): typeof checks.$inferInsert => ({ ...c, model: c.model ?? null, error: c.error ?? null, startedAt: c.startedAt ?? null, endedAt: c.endedAt ?? null });
+  const row = (t: ProfileTest): typeof profileTests.$inferInsert => ({
+    ...t, clientRequestId: t.clientRequestId ?? null, outcome: t.outcome ?? null, error: t.error ?? null, startedAt: t.startedAt ?? null, endedAt: t.endedAt ?? null,
+  });
   return {
-    insert: async (c) => { await db.insert(checks).values(row(c)); },
-    update: async (c) => { await db.update(checks).set(row(c)).where(eq(checks.checkId, c.checkId)); },
-    get: async (checkId) => { const r = (await db.select().from(checks).where(eq(checks.checkId, checkId)))[0]; return r ? toCheck(r) : undefined; },
-    findByRequest: async (configId, createdBy, clientRequestId) => { const r = (await db.select().from(checks).where(and(eq(checks.configId, configId), eq(checks.createdBy, createdBy), eq(checks.clientRequestId, clientRequestId))))[0]; return r ? toCheck(r) : undefined; },
-    latestFor: async (configId, revision, contentHash) => { const r = (await db.select().from(checks).where(and(eq(checks.configId, configId), eq(checks.revision, revision), eq(checks.contentHash, contentHash))).orderBy(desc(checks.createdAt)).limit(1))[0]; return r ? toCheck(r) : undefined; },
+    insert: async (t) => { await db.insert(profileTests).values(row(t)); },
+    update: async (t) => { await db.update(profileTests).set(row(t)).where(eq(profileTests.testId, t.testId)); },
+    get: async (testId) => { const r = (await db.select().from(profileTests).where(eq(profileTests.testId, testId)))[0]; return r ? toTest(r) : undefined; },
+    findByRequest: async (profile, createdBy, clientRequestId) => {
+      const r = (await db.select().from(profileTests).where(and(eq(profileTests.profile, profile), eq(profileTests.createdBy, createdBy), eq(profileTests.clientRequestId, clientRequestId))))[0];
+      return r ? toTest(r) : undefined;
+    },
+    latestFor: async (profile, revision) => {
+      const r = (await db.select().from(profileTests).where(and(eq(profileTests.profile, profile), eq(profileTests.revision, revision))).orderBy(desc(profileTests.createdAt)).limit(1))[0];
+      return r ? toTest(r) : undefined;
+    },
+    supersedeBefore: async (profile, revision, at) => {
+      await db.update(profileTests).set({ state: 'superseded', endedAt: at })
+        .where(and(eq(profileTests.profile, profile), lt(profileTests.revision, revision), inArray(profileTests.state, ['queued', 'running'])));
+    },
+    removeAll: async (profile) => { await db.delete(profileTests).where(eq(profileTests.profile, profile)); },
   };
 }

@@ -1,30 +1,45 @@
 import { describe, expect, test } from 'bun:test';
-import { createClaudeCodeCliDriver, createOpencodeCliDriver } from './cliDriver';
-import { createDriverRegistry } from './registry';
-import { createStubDriver } from './stubDriver';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import type { AgentEvent } from '@crewstation/contracts';
+import { noopLogger } from '@crewstation/kernel';
+import { RunnerCommandError } from '../commandError';
+import { createProcessLauncher } from '../process/launcher';
+import { probeCurrentUid, resolveIsolation } from '../process/privilege';
+import { createCliDriverFactory } from './cliDriver';
+import type { AgentSpec } from './driver';
 
-describe('CLI 驱动接线', () => {
-  test('二进制缺失时不宣告可用；存在时宣告可用', () => {
-    expect(createClaudeCodeCliDriver({ which: () => null }).available()).toBe(false);
-    expect(createClaudeCodeCliDriver({ which: () => '/usr/local/bin/claude' }).available()).toBe(true);
-    expect(createOpencodeCliDriver({ which: () => null }).available()).toBe(false);
-    expect(createOpencodeCliDriver({ which: () => '/usr/local/bin/opencode' }).available()).toBe(true);
+async function collect(events: AsyncIterable<AgentEvent>): Promise<AgentEvent[]> {
+  const out: AgentEvent[] = [];
+  for await (const event of events) out.push(event);
+  return out;
+}
+
+describe('CLI 驱动工厂（RFC-006：按协议取驱动，二进制随每次启动下发）', () => {
+  test('两种已知协议各一个驱动，协议与契约一致', () => {
+    const drivers = createCliDriverFactory({ which: () => null });
+    expect(drivers.forProtocol('claude-code').protocol).toBe('claude-code');
+    expect(drivers.forProtocol('opencode').protocol).toBe('opencode');
   });
 
-  test('驱动名与契约一致', () => {
-    expect(createClaudeCodeCliDriver({ which: () => null }).name).toBe('claude-code');
-    expect(createOpencodeCliDriver({ which: () => null }).name).toBe('opencode');
-  });
-});
-
-describe('驱动注册表', () => {
-  test('内建三种驱动；available 只含二进制在位的驱动；重复注册报错', () => {
-    const drivers = [createStubDriver(), createClaudeCodeCliDriver({ which: () => null }), createOpencodeCliDriver({ which: () => '/bin/opencode' })];
-    const registry = createDriverRegistry(drivers);
-    expect(registry.names().sort()).toEqual(['claude-code', 'opencode', 'stub']);
-    expect(registry.available().sort()).toEqual(['opencode', 'stub']);
-    expect(registry.get('stub')?.name).toBe('stub');
-    const stub = registry.get('stub');
-    expect(() => createDriverRegistry([stub!, stub!])).toThrow(/重复注册/);
+  test('按档位给的绝对路径判断二进制；不在位只发 driver_not_installed，状态错误转成协议错误码', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'cs-cli-driver-'));
+    try {
+      const seen: string[] = [];
+      const drivers = createCliDriverFactory({ which: (binary) => { seen.push(binary); return null; } });
+      const launcher = createProcessLauncher({ isolation: resolveIsolation({ uid: 10001, gid: 10001, currentUid: probeCurrentUid(), which: (b) => Bun.which(b) }), processEnv: process.env, workerHome: root, logger: noopLogger });
+      const spec: AgentSpec = { agentId: 'fork', compute: 'balanced', profileRevision: 2, launch: { protocol: 'claude-code', binaryPath: '/opt/fork/bin/claude', extraArgs: [], isSandbox: false }, permission: 'edit', mode: 'interactive', mcp: [] };
+      const agent = drivers.forProtocol('claude-code').start(spec, { cwd: root, env: {}, launcher, logger: noopLogger, managed: { home: join(root, 'home'), runDir: root } });
+      const events = await collect(agent.events);
+      expect(seen).toEqual(['/opt/fork/bin/claude']);
+      expect(events.map((e) => [e.type, e.error?.code])).toEqual([['error', 'driver_not_installed']]);
+      expect(events[0]?.error?.message).toBe('driver binary not installed: /opt/fork/bin/claude');
+      const failure = await agent.send('hi').catch((error: unknown) => error);
+      expect(failure).toBeInstanceOf(RunnerCommandError);
+      expect((failure as RunnerCommandError).code).toBe('agent_not_running');
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
   });
 });

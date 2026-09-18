@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# 往本机平台目录里种初始套餐与算力档位（RFC-001）。幂等：PUT 是 upsert，重复执行无副作用。
-# 发行版里这一步由 `crewstation install` 的初始化阶段从发行包 profiles/ 读文件完成；
-# 本机没有发行包，值直接写在这里，与 RFC-001 design §7 的表一致。
+# 往本机平台目录里种初始服务套餐与任务容器规格。幂等：PUT 是 upsert，重复执行无副作用。
+# 发行版里这一步由 `crewstation install` 的初始化阶段从发行包 profiles/ 读文件完成；本机没有发行包，值直接写在这里。
+# 算力档位不预置（RFC-006）：档位要指定镜像与二进制并真实测试通过才可选，由管理员在平台管理 → 算力档位里创建。
 # 前置：install-platform.sh 已跑完，控制台可登录。令牌与 Cookie 只进临时文件，从不打印。
 set -euo pipefail
 CONSOLE_URL="${CS_CONSOLE_URL:-http://console.cs.localhost}"
@@ -43,13 +43,4 @@ jq -nc --arg n "${SERVICE_PLAN}" '{name:$n,cpu:"500m",memory:"512Mi",maxReplicas
 jq -nc --arg n "${TASK_PROFILE}" '{name:$n,cpu:"1",memory:"2Gi",storage:"10Gi",description:"本机默认任务容器规格"}' \
   | put /v1/catalog/task-profiles "任务容器规格 ${TASK_PROFILE}"
 
-# 算力档位：业务只引用名字，驱动与模型只有平台知道（RFC-001）。
-# 本机唯一真能跑的是 stub；balanced 与 deep 先种上，等真实凭据配好即可用，起 Agent 时会报驱动不可用而不是「档位不存在」。
-jq -nc '{name:"sample-stub",driver:"stub",model:"stub/echo",description:"样例与自测，不消耗真实算力"}' \
-  | put /v1/catalog/compute-profiles "算力档位 sample-stub"
-jq -nc '{name:"balanced",driver:"claude-code",model:"anthropic/claude-sonnet-5",description:"默认档，日常开发与业务子任务"}' \
-  | put /v1/catalog/compute-profiles "算力档位 balanced"
-jq -nc '{name:"deep",driver:"claude-code",model:"anthropic/claude-opus-5",description:"复杂分析与重构"}' \
-  | put /v1/catalog/compute-profiles "算力档位 deep"
-
-log "完成。平台管理 → 算力档位 可以改。"
+log "完成。算力档位请在平台管理 → 算力档位里创建、测试通过并设为默认。"

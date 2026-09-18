@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { AgentEvent } from '@crewstation/contracts';
+import type { AgentEvent, KnownAgentProtocol, LaunchSpec } from '@crewstation/contracts';
 import { noopLogger } from '@crewstation/kernel';
 import type { DriverAgentProcess, DriverAgentSpec, DriverLaunchContext } from '../contract/agentDriver';
 import { createClaudeCodeDriver } from '../drivers/claudeCode/driver';
@@ -28,11 +28,17 @@ function runDir(): string {
   return path;
 }
 
+/** 档位修订固定的启动规格：二进制是绝对路径（RFC-006 C5）。 */
+function launch(protocol: KnownAgentProtocol, overrides: Partial<LaunchSpec> = {}): LaunchSpec {
+  return { protocol, binaryPath: protocol === 'claude-code' ? '/bin/claude' : '/bin/opencode', extraArgs: [], isSandbox: false, model: 'anthropic/claude-sonnet-4', ...overrides };
+}
+
 function spec(overrides: Partial<DriverAgentSpec> = {}): DriverAgentSpec {
   return {
     agentId: 'agt-1',
-  compute: 'balanced',
-    model: 'anthropic/claude-sonnet-4',
+    compute: 'balanced',
+    profileRevision: 3,
+    launch: launch('claude-code'),
     permission: 'edit',
     mode: 'oneshot',
     initialPrompt: '写个 hello',
@@ -40,6 +46,10 @@ function spec(overrides: Partial<DriverAgentSpec> = {}): DriverAgentSpec {
     mcp: [],
     ...overrides,
   };
+}
+
+function openSpec(overrides: Partial<DriverAgentSpec> = {}): DriverAgentSpec {
+  return spec({ launch: launch('opencode'), ...overrides });
 }
 
 function context(host: DriverLaunchContext['host']): DriverLaunchContext {
@@ -75,9 +85,12 @@ describe('oneshot 运行', () => {
     const host = createFakeProcessHost([CLAUDE_TURN('好的')]);
     const events = await collect(createClaudeCodeDriver(() => '/bin/claude').start(spec(), context(host)));
     expect(events[0]?.raw).toEqual({
-      driver: 'claude-code', mode: 'oneshot', model: 'anthropic/claude-sonnet-4', permission: 'edit',
+      protocol: 'claude-code', mode: 'oneshot', model: 'anthropic/claude-sonnet-4', permission: 'edit',
       mcp: [], systemPrompt: true, resume: false,
     });
+    // spec 是契约字段（RFC-006）：档位名＋受理时固定的修订＋协议；二进制路径属于管理面，不进事件。
+    expect(events[0]?.spec).toEqual({ compute: 'balanced', profileRevision: 3, protocol: 'claude-code', model: 'anthropic/claude-sonnet-4', permission: 'edit' });
+    expect(JSON.stringify(events[0])).not.toContain('/bin/claude');
   });
 
   test('prompt 经 stdin 写一次后立即关闭', async () => {
@@ -129,23 +142,23 @@ describe('OpenCode 交互式：链式 one-shot ＋ --session 续接', () => {
       { stdout: ['1.17.0'] },
       { stdout: ['{"type":"step_finish","sessionID":"ses_1"}'] },
     ]);
-    await collect(createOpencodeDriver(() => '/bin/opencode').start(spec(), context(host)));
-    expect(host.spawns[0]?.cmd).toEqual(['opencode', '--version']);
+    await collect(createOpencodeDriver(() => '/bin/opencode').start(openSpec(), context(host)));
+    expect(host.spawns[0]?.cmd).toEqual(['/bin/opencode', '--version']);
     expect(host.spawns[1]?.cmd).toContain('--dangerously-skip-permissions');
     // 只探一次：第二个 Agent 直接查表。
     const second = createFakeProcessHost([{ stdout: ['{"type":"step_finish","sessionID":"ses_2"}'] }]);
-    await collect(createOpencodeDriver(() => '/bin/opencode').start(spec({ agentId: 'agt-2' }), context(second)));
+    await collect(createOpencodeDriver(() => '/bin/opencode').start(openSpec({ agentId: 'agt-2' }), context(second)));
     expect(second.spawns).toHaveLength(1);
     expect(second.spawns[0]?.cmd).toContain('--dangerously-skip-permissions');
   });
 
   test('第二轮用第一轮捕获到的 sessionID 续接，每轮一个进程', async () => {
-    recordOpencodeBinaryVersion('opencode', '1.18.29');
+    recordOpencodeBinaryVersion('/bin/opencode', '1.18.29');
     const host = createFakeProcessHost([
       { stdout: ['{"type":"text","part":{"type":"text","text":"一"},"sessionID":"ses_1"}', '{"type":"step_finish","sessionID":"ses_1"}'] },
       { stdout: ['{"type":"text","part":{"type":"text","text":"二"},"sessionID":"ses_1"}', '{"type":"step_finish","sessionID":"ses_1"}'] },
     ]);
-    const agent = createOpencodeDriver(() => '/bin/opencode').start(spec({ mode: 'interactive' }), context(host));
+    const agent = createOpencodeDriver(() => '/bin/opencode').start(openSpec({ mode: 'interactive' }), context(host));
     const events: AgentEvent[] = [];
     const pump = (async () => {
       for await (const event of agent.events) events.push(event);
@@ -162,9 +175,9 @@ describe('OpenCode 交互式：链式 one-shot ＋ --session 续接', () => {
   });
 
   test('opencode 的 prompt 走 argv，stdin 不开管道', async () => {
-    recordOpencodeBinaryVersion('opencode', '1.18.29');
+    recordOpencodeBinaryVersion('/bin/opencode', '1.18.29');
     const host = createFakeProcessHost([{ stdout: ['{"type":"step_finish","sessionID":"ses_1"}'] }]);
-    await collect(createOpencodeDriver(() => '/bin/opencode').start(spec(), context(host)));
+    await collect(createOpencodeDriver(() => '/bin/opencode').start(openSpec(), context(host)));
     expect(host.spawns[0]?.stdinWrites).toEqual([]);
     expect(host.spawns[0]?.cmd.at(-1)).toBe('写个 hello');
   });
@@ -197,6 +210,58 @@ describe('Claude 交互式：常驻进程 ＋ stream-json 输入帧', () => {
     await agent.cancel();
     await pump;
     expect(events.at(-1)?.type).toBe('cancelled');
+  });
+});
+
+describe('档位的二进制与参数（RFC-006）', () => {
+  test('二进制取自 launch.binaryPath：不在位时报 driver_not_installed 并点名该路径，不回落 claude', async () => {
+    const host = createFakeProcessHost([]);
+    const events = await collect(createClaudeCodeDriver((binary) => (binary === '/opt/fork/bin/claude' ? null : binary)).start(spec({ launch: launch('claude-code', { binaryPath: '/opt/fork/bin/claude' }) }), context(host)));
+    expect(events.map((e) => e.type)).toEqual(['error']);
+    expect(events[0]?.error).toEqual({ code: 'driver_not_installed', message: 'driver binary not installed: /opt/fork/bin/claude' });
+    expect(host.spawns).toHaveLength(0);
+  });
+
+  test('协议与驱动不符（平台下发错了）只报 protocol_mismatch，不拉起进程', async () => {
+    const host = createFakeProcessHost([]);
+    const events = await collect(createClaudeCodeDriver(() => '/bin/opencode').start(spec({ launch: launch('opencode') }), context(host)));
+    expect(events.map((e) => e.error?.code)).toEqual(['protocol_mismatch']);
+    expect(host.spawns).toHaveLength(0);
+  });
+
+  test('命令头就是档位的二进制；附加参数排在全部平台 argv 之后', async () => {
+    const host = createFakeProcessHost([CLAUDE_TURN('好的')]);
+    await collect(createClaudeCodeDriver((b) => b).start(spec({ launch: launch('claude-code', { binaryPath: '/opt/fork/bin/claude', extraArgs: ['--skip-safe-check', '--region', 'cn'] }) }), context(host)));
+    const cmd = host.spawns[0]?.cmd ?? [];
+    expect(cmd[0]).toBe('/opt/fork/bin/claude');
+    expect(cmd.slice(-3)).toEqual(['--skip-safe-check', '--region', 'cn']);
+  });
+
+  test('附加参数不能覆盖平台参数（含 --flag=value）：装配失败，一个进程都不起', async () => {
+    for (const extraArgs of [['--model', 'x'], ['--settings=/tmp/x.json'], ['bare-positional']]) {
+      const host = createFakeProcessHost([CLAUDE_TURN('好的')]);
+      const events = await collect(createClaudeCodeDriver((b) => b).start(spec({ launch: launch('claude-code', { extraArgs }) }), context(host)));
+      expect(events.map((e) => e.error?.code)).toEqual(['driver_setup_failed']);
+      expect(host.spawns).toHaveLength(0);
+    }
+  });
+
+  test('opencode 不接受附加参数；配置目录变量名不能与平台注入的变量同名', async () => {
+    const host = createFakeProcessHost([]);
+    const withArgs = await collect(createOpencodeDriver((b) => b).start(openSpec({ launch: launch('opencode', { extraArgs: ['--x'] }) }), context(host)));
+    expect(withArgs.map((e) => e.error?.code)).toEqual(['driver_setup_failed']);
+    const reserved = await collect(createOpencodeDriver((b) => b).start(openSpec({ launch: launch('opencode', { configDirEnv: 'OPENCODE_CONFIG_CONTENT' }) }), context(host)));
+    expect(reserved.map((e) => e.error?.code)).toEqual(['driver_setup_failed']);
+    expect(reserved[0]?.error?.message).toContain('OPENCODE_CONFIG_CONTENT');
+    expect(host.spawns).toHaveLength(0);
+  });
+
+  test('没有模型时（P2）started 不带 model，argv 也不带 --model', async () => {
+    const { model: _omit, ...rest } = launch('claude-code');
+    const host = createFakeProcessHost([CLAUDE_TURN('好的')]);
+    const events = await collect(createClaudeCodeDriver((b) => b).start(spec({ launch: rest as LaunchSpec }), context(host)));
+    expect(events[0]?.spec).toEqual({ compute: 'balanced', profileRevision: 3, protocol: 'claude-code', permission: 'edit' });
+    expect(host.spawns[0]?.cmd).not.toContain('--model');
   });
 });
 
