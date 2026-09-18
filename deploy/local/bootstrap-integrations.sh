@@ -8,7 +8,6 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 CONSOLE_URL="${CS_CONSOLE_URL:-http://console.cs.localhost}"
-ADMIN_USERNAME="${CS_ADMIN_USERNAME:-admin}"
 SERVICE_PLAN="${CS_SERVICE_PLAN:-standard-small}"
 BRANCH="${CS_BRANCH:-main}"
 # 集群内访问 GitLab 的地址；与 deploy/k8s/platform/10-config.yaml 的 CS_GITLAB_URL 一致。
@@ -40,11 +39,13 @@ api() {
 
 detail() { head -c 300 "${BODY}" 2>/dev/null || true; }
 
+# shellcheck source=deploy/local/admin-credentials.sh
+. "${ROOT}/deploy/local/admin-credentials.sh"
+resolve_admin_credentials "${ROOT}" || exit 1
+
 login() {
   local code
-  code="$(curl -sS --max-time 30 -c "${COOKIE_JAR}" -o "${BODY}" -w '%{http_code}' \
-    -H 'accept: application/json' -X POST "${CONSOLE_URL}/auth/login" \
-    --data-urlencode "username=${ADMIN_USERNAME}" --data-urlencode 'displayName=CrewStation Admin' || printf '000')"
+  code="$(admin_login_request "${CONSOLE_URL}" "${COOKIE_JAR}" "${BODY}")"
   [ "${code}" = "200" ] || die "以 ${ADMIN_USERNAME} 登录 ${CONSOLE_URL} 失败：HTTP ${code} $(detail)"
   chmod 600 "${COOKIE_JAR}"
   ADMIN_USER_ID="$(jq -r '.user.id' "${BODY}")"

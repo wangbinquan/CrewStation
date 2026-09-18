@@ -4,13 +4,17 @@
 # 算力档位不预置（RFC-006）：档位要指定镜像与二进制并真实测试通过才可选，由管理员在平台管理 → 算力档位里创建。
 # 前置：install-platform.sh 已跑完，控制台可登录。令牌与 Cookie 只进临时文件，从不打印。
 set -euo pipefail
+ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 CONSOLE_URL="${CS_CONSOLE_URL:-http://console.cs.localhost}"
-ADMIN_USERNAME="${CS_ADMIN_USERNAME:-admin}"
 SERVICE_PLAN="${CS_SERVICE_PLAN:-standard-small}"
 TASK_PROFILE="${CS_TASK_PROFILE:-coding-medium}"
 
 log() { printf '\033[1;34m[seed]\033[0m %s\n' "$*"; }
 die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
+
+# shellcheck source=deploy/local/admin-credentials.sh
+. "${ROOT}/deploy/local/admin-credentials.sh"
+resolve_admin_credentials "${ROOT}" || exit 1
 
 TMP="$(mktemp -d)"; chmod 700 "${TMP}"; trap 'rm -rf "${TMP}"' EXIT
 COOKIE_JAR="${TMP}/cookies"; BODY="${TMP}/response.json"; REQ="${TMP}/request.json"
@@ -23,9 +27,7 @@ api() { # METHOD PATH [with-body] -> 打印 HTTP 状态码，响应体落在 ${B
 }
 detail() { head -c 300 "${BODY}" 2>/dev/null || true; }
 
-code="$(curl -sS --max-time 30 -c "${COOKIE_JAR}" -o "${BODY}" -w '%{http_code}' \
-  -H 'accept: application/json' -X POST "${CONSOLE_URL}/auth/login" \
-  --data-urlencode "username=${ADMIN_USERNAME}" --data-urlencode 'displayName=CrewStation Admin' || printf '000')"
+code="$(admin_login_request "${CONSOLE_URL}" "${COOKIE_JAR}" "${BODY}")"
 [ "${code}" = "200" ] || die "以 ${ADMIN_USERNAME} 登录 ${CONSOLE_URL} 失败：HTTP ${code} $(detail)"
 chmod 600 "${COOKIE_JAR}"
 [ "$(jq -r '.user.isAdmin' "${BODY}")" = "true" ] || die "${ADMIN_USERNAME} 不是管理员，写不了平台目录"
