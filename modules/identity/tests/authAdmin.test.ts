@@ -155,7 +155,10 @@ describe.skipIf(!available)('登录策略', () => {
   test('关闭期间：登录页不渲染密码表单，POST 固定 403，最后一个启用 Provider 不许停用或删除', async () => {
     const page = await (await app.request('/auth/login')).text();
     expect(page).not.toContain('name="password"');
-    expect(page).toContain('使用公司统一身份登录');
+    // 入口按钮上就是显示名本身（读屏用 aria-label 补成整句），而不是把它拼进一句中文里——
+    // 显示名常是中英混排，拼出来会缺字间空格。
+    expect(page).toContain('<strong>公司统一身份</strong>');
+    expect(page).toContain('aria-label="使用 公司统一身份 登录"');
     const denied = await app.request('/auth/login', { method: 'POST', headers: { accept: 'application/json' }, body: new URLSearchParams({ username: 'admin-one', password: 'test-password-1234' }) });
     expect(denied.status).toBe(403);
     expect(await denied.json()).toMatchObject({ details: { code: 'password-login-disabled' } });

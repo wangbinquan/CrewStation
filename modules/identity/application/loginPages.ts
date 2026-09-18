@@ -25,6 +25,9 @@ function shell(title: string, body: string): string {
   button { margin-top: 18px; width: 100%; padding: 10px; border: 0; border-radius: 6px; background: #235bd8; color: #fff; font-size: 15px; cursor: pointer; }
   button:hover { background: #1c4db8; }
   a.provider { display: block; margin-top: 10px; padding: 10px; border: 1px solid #235bd8; border-radius: 6px; color: #235bd8; text-decoration: none; font-size: 15px; text-align: center; }
+  a.provider strong { display: block; font-weight: 600; }
+  /* 名字与说明分两行：显示名常是中英混排（「Mock 公司身份」「Corp SSO」），拼进一句话里就会缺字间空格。 */
+  a.provider span { display: block; margin-top: 2px; font-size: 12px; color: #59677c; }
   a.provider:hover { background: #eef3fd; }
   a.back { display: inline-block; margin-top: 16px; font-size: 14px; color: #235bd8; }
   :focus-visible { outline: 2px solid #8db3ff; outline-offset: 2px; }
@@ -39,6 +42,7 @@ function shell(title: string, body: string): string {
     button { background: #3970df; }
     button:hover { background: #4d84ee; }
     a.provider { border-color: #3970df; color: #9dbcff; }
+    a.provider span { color: #adbacd; }
     a.provider:hover { background: #222b39; }
     .hint { color: #adbacd; }
   }
@@ -87,7 +91,7 @@ export function renderLoginPage({ discovery, returnTo, error, justBootstrapped }
   </form>` : '';
   const providers = discovery.providers.length === 0 ? '' : `
   <h2>公司身份</h2>${discovery.providers.map((p) => `
-  <a class="provider" href="/auth/oidc/${encodeURIComponent(p.slug)}/start?returnTo=${encodeURIComponent(returnTo)}">使用${escapeHtml(p.displayName)}登录</a>`).join('')}`;
+  <a class="provider" href="/auth/oidc/${encodeURIComponent(p.slug)}/start?returnTo=${encodeURIComponent(returnTo)}" aria-label="使用 ${escapeHtml(p.displayName)} 登录"><strong>${escapeHtml(p.displayName)}</strong><span>跳转到该身份提供方完成登录</span></a>`).join('')}`;
   const empty = password === '' && providers === '' ? `
   <p class="error">当前没有可用的登录方式：用户名密码登录已关闭，且没有启用的身份提供方。持有集群权限的运维可在安装配置里设置 <code>CS_PASSWORD_LOGIN=force-on</code> 并重启 cs-auth 与 cs-api 恢复。</p>` : '';
   const done = justBootstrapped === true ? '<p class="notice">首位管理员已创建，引导令牌已永久失效。请用刚创建的用户名与密码登录。</p>' : '';

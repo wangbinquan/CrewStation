@@ -200,7 +200,7 @@ ForwardAuth 的 allow 分支今天固定注入四个头。改成：
 1. **新增平台内部头 `x-cs-auth-method`**。不进 `IDENTITY_HEADERS`（那是业务接入约定表），只在工作台目标注入。替代方案是把策略写接口挪到 cs-auth，代价是同一个对象的读写分处两个进程、工作台要调两套 API。
 2. **`packages/jwt` 长出第三方 `id_token` 验签能力**。它的职责本就是「jose 封装」，但此前只服务平台自签令牌；不这样做就得让 `modules/identity` 直接依赖 jose，jose 版本会出现两处。
 3. **`users` 表去列（`external_id`）而不是加兼容列**，依据 A4「没有存量系统，断代开发」。
-4. **业务接入约定表的语义从「固定四个头」变为「平台配置的转发集」**（`IDENTITY_HEADERS` 仍在，但 `x-cs-user-name`／`x-cs-user-email` 变成可能缺席，另加 `x-cs-user-attr-<key>` 一族）。这是本 RFC 对业务侧唯一的破坏性契约变更，已列为 B9／B10；替代方案是只裁剪令牌不裁剪明文头，但那等于没关。
+4. **业务接入约定表的语义从「固定四个头」变为「平台配置的转发集」**（`IDENTITY_HEADERS` 仍在，但 `x-cs-user-name`／`x-cs-user-email` 变成可能缺席，另加一个 `x-cs-user-attrs` JSON 头装自定义字段，见下 6）。这是本 RFC 对业务侧唯一的破坏性契约变更，已列为 B9／B10；替代方案是只裁剪令牌不裁剪明文头，但那等于没关。
 5. **删除 `settings.identityProvider` 与 `CS_IDENTITY_PROVIDER`**：登录方法从启动参数变成库内数据，这个开关不再有意义。
 6. **自定义身份字段合并成一个 JSON 头 `x-cs-user-attrs`**（实现期调整，原设计是每字段一个 `x-cs-user-attr-<key>`）。原设计要求网关的删头名单随管理员映射动态生成，而 Traefik 的 `headers` 中间件不支持前缀通配；那条路要么新增一条 cs-controller 下发链，要么留下「映射已加、删头名单未到」的可伪造窗口。合并成一个固定头名后两张名单都保持静态，且与令牌里的 `cs_attrs` 结构一一对应，业务只需读一处。
 7. **`users.external_id` 保留为自然键**（见 proposal §8 B2）：权威索引仍是 `user_identities`。
