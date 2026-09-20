@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { SignJWT, exportJWK, generateKeyPair } from 'jose';
-import { DEV_ROLES, findDevRole } from './roles';
+import { renderOidcRoleChoicePage } from './page';
+import { findDevRole } from './roles';
 import type { DevRole } from './roles';
 
 export const DEV_OIDC_CLIENT_ID = 'crewstation-dev-auth';
@@ -26,9 +27,8 @@ export interface DevOidc {
 
 const noStore = { 'cache-control': 'no-store' };
 const json = (body: unknown, status = 200): Response => new Response(JSON.stringify(body), { status, headers: { ...noStore, 'content-type': 'application/json' } });
-const html = (body: string, status = 200): Response => new Response(`<!doctype html><meta charset="utf-8"><title>CrewStation dev IdP</title><body style="font-family:system-ui;background:#0b0d12;color:#f4f7fb;padding:28px">${body}</body>`, { status, headers: { ...noStore, 'content-type': 'text/html; charset=utf-8' } });
+const html = (body: string, status = 200): Response => new Response(body, { status, headers: { ...noStore, 'content-type': 'text/html; charset=utf-8' } });
 const base64url = (value: Buffer): string => value.toString('base64url');
-const escapeHtml = (value: string): string => value.replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character] as string);
 
 function userinfo(role: DevRole): Record<string, unknown> {
   return { sub: role.sub, email: role.email, email_verified: true, name: role.name, preferred_username: role.username };
@@ -46,12 +46,7 @@ function validAuthorize(url: URL, options: DevOidcOptions): string | undefined {
 }
 
 function chooseRole(url: URL): Response {
-  const links = DEV_ROLES.map((role) => {
-    const target = new URL(url);
-    target.searchParams.set('as', role.sub);
-    return `<li><a style="color:#55e6a5" href="${escapeHtml(`${target.pathname}${target.search}`)}">${escapeHtml(role.title)} · ${escapeHtml(role.email)}</a></li>`;
-  }).join('');
-  return html(`<h1>选择开发角色</h1><p>正常的一键入口不会停在这里；此页用于协议调试。</p><ul>${links}</ul>`);
+  return html(renderOidcRoleChoicePage(url));
 }
 
 export async function createDevOidc(options: DevOidcOptions): Promise<DevOidc> {

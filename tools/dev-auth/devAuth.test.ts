@@ -85,6 +85,33 @@ test('开发 IdP 完整校验 PKCE，并签发可由 JWKS 验证的 ID token', a
   expect((await call('/oidc/test/token', request)).status).toBe(400);
 });
 
+test('开发 IdP 未指定角色时使用整卡按钮，并保留原 OAuth 参数', async () => {
+  const origin = 'http://dev-idp.test';
+  const oidc = await createDevOidc({
+    issuer: () => `${origin}/oidc/test`,
+    authorizationOrigin: () => origin,
+    clientSecret: 'test-client-secret',
+  });
+  const authorize = new URL(`${origin}/oidc/test/authorize`);
+  authorize.search = new URLSearchParams({
+    client_id: 'crewstation-dev-auth', response_type: 'code', redirect_uri: 'http://console.test/callback',
+    state: 'state-value', nonce: 'nonce-value', code_challenge: 'challenge-value', code_challenge_method: 'S256',
+  }).toString();
+
+  const response = await oidc.fetch(new Request(authorize), '/oidc/test');
+  const page = await response.text();
+
+  expect(response.status).toBe(200);
+  expect(page).toContain('<h1>选择开发角色</h1>');
+  expect(page).toContain('class="oidc-role-option role-admin"');
+  expect(page).toContain('data-testid="choose-admin"');
+  expect(page).toContain('name="state" value="state-value"');
+  expect(page).toContain('name="code_challenge" value="challenge-value"');
+  expect(page).toContain('name="as" value="dev-role-admin"');
+  expect(page.match(/class="oidc-role-option/g)).toHaveLength(4);
+  expect(page).not.toContain('<li><a');
+});
+
 test('生产源码不包含开发 Provider 或固定账号', async () => {
   const source = new Bun.Glob('**/*.{ts,tsx,js,jsx,json,yaml,yml,sh}');
   const violations: string[] = [];
