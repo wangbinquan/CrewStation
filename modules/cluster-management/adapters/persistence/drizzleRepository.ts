@@ -44,7 +44,7 @@ export function drizzleClusterRepository(db: Database): ClusterRepository {
       return body;
     }),
     operation: async (id) => (await db.select().from(operations).where(eq(operations.id, id)))[0]?.body,
-    operations: async (query, actorId) => (await db.select().from(operations).where(and(query.uid ? sql`${operations.body}->'target'->>'uid' = ${query.uid}` : undefined, query.projectId ? sql`${operations.body}->'target'->'ownership'->>'projectId' = ${query.projectId}` : undefined, query.idempotencyKey ? and(eq(operations.actorId, actorId), eq(operations.key, query.idempotencyKey)) : undefined)).orderBy(desc(operations.createdAt)).limit(query.limit)).map((r) => r.body),
+    operations: async (query, actorId) => (await db.select().from(operations).where(and(query.phase ? sql`${operations.body}->>'phase' = ${query.phase}` : undefined, query.uid ? sql`${operations.body}->'target'->>'uid' = ${query.uid}` : undefined, query.projectId ? sql`${operations.body}->'target'->'ownership'->>'projectId' = ${query.projectId}` : undefined, query.idempotencyKey ? and(eq(operations.actorId, actorId), eq(operations.key, query.idempotencyKey)) : undefined)).orderBy(desc(operations.createdAt)).limit(query.limit)).map((r) => r.body),
     update: async (operation, fence) => (await db.update(operations).set({ body: operation, fence }).where(and(eq(operations.id, operation.operationId), lte(operations.fence, fence))).returning({ id: operations.id })).length === 1,
   };
 }

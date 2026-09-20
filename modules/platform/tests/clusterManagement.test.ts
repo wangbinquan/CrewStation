@@ -37,10 +37,13 @@ async function connect(id: TaskId) {
 describe.skipIf(!available)('cluster HTTP through actual platform composition', () => {
   test('registered platform components are visible without managed labels; unregistered namespace siblings are absent', async () => {
     await k8s.create({ apiVersion: 'apps/v1', kind: 'Deployment', metadata: { name: 'cs-api', namespace: 'crewstation-system', generation: 1 }, spec: { replicas: 1, template: { metadata: {}, spec: { containers: [{ name: 'api', image: 'api' }] } } } });
+    await k8s.create({ apiVersion: 'apps/v1', kind: 'Deployment', metadata: { name: 'crewstation-dev-auth', namespace: 'crewstation-system', uid: 'dev-auth-deployment', labels: { 'app.kubernetes.io/managed-by': 'crewstation-local' } }, spec: { template: { spec: { containers: [{ name: 'dev-auth', envFrom: [{ secretRef: { name: 'crewstation-dev-auth' } }] }] } } } });
+    await k8s.create({ apiVersion: 'v1', kind: 'Secret', metadata: { name: 'crewstation-dev-auth', namespace: 'crewstation-system', uid: 'dev-auth-secret' } });
     await k8s.create({ apiVersion: 'v1', kind: 'Pod', metadata: { name: 'external', namespace: 'crewstation-system' } }); await platform.modules.cluster.collect();
-    const page = ClusterPageSchema.parse(await (await request('/resources?scope=system')).json()); expect(page.items.map((r) => r.name)).toEqual(['cs-api']);
-    const checked = await inspect(page.items[0]!.resourceId, 'restart'); expect(checked.capability.executionRoute).toBe('kubernetes'); expect(checked.capability.enabled).toBe(true);
-    expect((await inspect(page.items[0]!.resourceId, 'delete')).capability.enabled).toBe(false);
+    const page = ClusterPageSchema.parse(await (await request('/resources?scope=system')).json()); expect(page.items.map((r) => r.name)).toEqual(['crewstation-dev-auth', 'crewstation-dev-auth', 'cs-api']);
+    const api = page.items.find((r) => r.name === 'cs-api')!;
+    const checked = await inspect(api.resourceId, 'restart'); expect(checked.capability.executionRoute).toBe('kubernetes'); expect(checked.capability.enabled).toBe(true);
+    expect((await inspect(api.resourceId, 'delete')).capability.enabled).toBe(false);
   });
   test('persistent business workspace restart and close flow through owning modules, retaining task and volume', async () => {
     const { project, businessTask: business, taskRuntime: tasks, cluster, data } = platform.modules;

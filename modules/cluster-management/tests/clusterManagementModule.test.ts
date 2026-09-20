@@ -50,6 +50,8 @@ describe.skipIf(!available)('cluster-management durable module', () => {
     expect((await module.api.operation(admin, one.operationId)).phase).toBe('succeeded');
     expect(await k8s.get(Resources.ConfigMap!, row.name, row.namespace)).toBeUndefined();
     expect((await module.api.operations(admin, { idempotencyKey: request.idempotencyKey, limit: 5 })).items).toHaveLength(1);
+    expect((await module.api.operations(admin, { phase: 'succeeded', uid: row.uid, limit: 5 })).items).toHaveLength(1);
+    expect((await module.api.operations(admin, { phase: 'failed', uid: row.uid, limit: 5 })).items).toHaveLength(0);
     const refresh = await module.api.refresh(admin), repeated = await module.api.refresh(admin);
     expect(refresh.refreshId).toBe(repeated.refreshId);
     await module.runOnce();

@@ -38,6 +38,9 @@ test('lost acceptance response recovers by the same key after reopening and need
   page.unmount(); page = await renderApp('/admin/cluster?resourceId=resource-uid'); await page.settle(); expect(page.text()).toContain('operation-stable'); expect(writes()).toHaveLength(1);
   f.attention(); await page.navigate('/admin/cluster?tab=operations&operationId=operation-stable'); expect(page.text()).toContain('继续核对'); await page.click('继续核对');
   expect(f.calls.some((c) => c.path.endsWith('/reconcile') && c.method === 'POST')).toBe(true); expect(writes()).toHaveLength(1);
+  await page.navigate('/admin/cluster?tab=operations&operationPhase=needs-attention&operationUid=uid-original');
+  expect(page.text()).toContain('操作阶段'); expect(page.search()).toMatchObject({ operationPhase: 'needs-attention', operationUid: 'uid-original' });
+  expect(f.calls.some((c) => c.path.endsWith('/operations') && c.query.get('phase') === 'needs-attention' && c.query.get('uid') === 'uid-original')).toBe(true);
 });
 test('namespace filter is URL state; events/containers/logs use selected UID, previous logs are explicit', async () => {
   const f = clusterFixture(); f.row.kind = 'Pod'; f.row.view = 'pods'; f.row.purpose = 'development-cli';

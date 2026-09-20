@@ -122,5 +122,10 @@ export const messages = {
   "cluster.purpose.migration": "Migration",
   "cluster.purpose.platform-service": "Platform service",
   "cluster.purpose.platform-infrastructure": "Platform infrastructure",
-  "cluster.purpose.unknown": "Unknown purpose"
+  "cluster.purpose.unknown": "Unknown purpose",
+  "cluster.targetUid": "Target resource UID",
+  "cluster.operationPhase": "Operation phase",
+  "cluster.allPhases": "All phases",
+  "cluster.actor": "Operator",
+  "cluster.created": "Accepted at"
 } as const;

@@ -122,5 +122,10 @@ export const messages = {
   "cluster.purpose.migration": "数据迁移",
   "cluster.purpose.platform-service": "平台服务",
   "cluster.purpose.platform-infrastructure": "平台基础组件",
-  "cluster.purpose.unknown": "用途待核对"
+  "cluster.purpose.unknown": "用途待核对",
+  "cluster.targetUid": "目标资源 UID",
+  "cluster.operationPhase": "操作阶段",
+  "cluster.allPhases": "全部阶段",
+  "cluster.actor": "操作者",
+  "cluster.created": "受理时间"
 } as const;

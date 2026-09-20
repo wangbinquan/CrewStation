@@ -58,7 +58,7 @@ crewstation/
 ├─ modules/                      # 领域模块：按限界上下文划分；不知道自己跑在哪个进程里
 │  ├─ identity/  project/  scm/  config/  data/  egress/  api-catalog/  events/  agent-runtime/
 │  ├─ release/  task-runtime/  dev-session/  business-task/  session/  gateway/
-│  └─ observability/  capabilities/  provisioning/  platform/
+│  └─ observability/  cluster-management/  capabilities/  provisioning/  platform/
 ├─ packages/                     # 技术库：与领域无关，删掉所有业务概念后仍然成立
 │  ├─ contracts/                 # Manifest、平台 API、事件、放行表、TaskRunner 协议的 zod Schema：唯一跨进程真相
 │  ├─ kernel/                    # Result／错误类型、ID、时钟、日志接口、类型工具；零 IO
@@ -204,6 +204,7 @@ modules/<name>/
 | L5 | `business-task` | 业务任务、SubtaskRun 契约层、oneshot／interactive、attempt、契约校验、文件与结果读取 | task-runtime、release |
 | L5 | `session` | TaskRunner 出向连接与浏览器流的中枢：租约、游标、重连、帧路由 | task-runtime |
 | L5 | `gateway` | 用户域与服务域路由表、放行表、Pod 身份索引的生成、版本与下发 | identity、project、release、api-catalog |
+| L6 | `cluster-management` | 受管 K8s 快照、归属/用途、管理员检查与持久运维操作（ADR-0006）；副本/任务期望值仍归原模块 | project、task-runtime、release、dev-session、business-task、agent-runtime（仅注入端口） |
 | L6 | `observability` | 日志采集入口与查询、部署健康态、告警订阅、execution_events、traceId 索引 | project、task-runtime、release（只读端口） |
 | L6 | `capabilities` | 能力说明聚合：本服务授权、绑定、订阅、配额、套餐、约定表 | 多个模块的公开查询 |
 | L6 | `provisioning` | 项目开通编排：命名空间→仓库→数据→路由→首个标签发布→active；失败留原因可重跑（ADR-0003） | project、scm、data、gateway、release |
@@ -223,7 +224,8 @@ flowchart BT
   api-catalog & events & data & config --> capabilities
   scm & data & gateway & release --> provisioning
   agent-runtime --> platform
-  observability & capabilities & provisioning --> platform
+  release & task-runtime & dev-session & business-task --> cluster-management
+  observability & cluster-management & capabilities & provisioning --> platform
 ```
 
 拆分依据：Design 里每一个有自己状态机的对象簇一个模块。围绕任务的能力刻意拆成四个模块（`task-runtime`、`dev-session`、`business-task`、`session`），因为 agent-workflow 的 `task.ts` 正是把这四件事写进了一个 7780 行的文件。管理员运行环境有自己的版本／检查／启用状态机，因此按 ADR-0004 单独成 `agent-runtime`，而不塞进已有 39／40 个源码文件的 `project` 或 `dev-session`；RFC-006 把运行环境并入算力档位后，档位整体移入 `agent-runtime`（ADR-0005）。
