@@ -1,8 +1,14 @@
 # RFC-012｜设计
 
-## 已核实的现状
+状态：Done · 2026-09-20。以下为已实现设计，完成证据见 [实施与验证](./plan.md)。
 
-`modules/agent-runtime/application/profileQueries.ts:41` 返回全局档位；`application/resolveProfile.ts:33` 无项目上下文。开发启动在 `modules/dev-session/application/agents.ts:33` 和 `nativeTerminals.ts:24` 解析；业务在 `modules/business-task/application/subtaskLaunch.ts:79` 固定修订；发布在 `modules/release/application/pipelineDeploy.ts:22` 检查引用。开发容器在 `modules/task-runtime/application/createEnvironment.ts:50` 使用平台默认套餐。
+## 实现定位
+
+- `modules/agent-runtime/application/projectComputePolicy.ts:8` 负责项目策略读写、角色校验、档位与套餐校验及修订冲突；`projectProfiles.ts:9` 统一处理项目目录、默认解析与启动／发布授权，再调用原档位解析器。
+- `modules/agent-runtime/application/profileQueries.ts` 保留管理员完整目录，租户全局投影只包含默认可见档位；项目投影按继承范围或显式清单过滤。项目授权同时进入档位删除引用检查。
+- `modules/dev-session/application/agents.ts:33`、`nativeTerminals.ts:24` 使用工作区项目；`modules/business-task/application/subtaskLaunch.ts:79` 使用业务任务项目固定修订，新 attempt 重新解析；`modules/release/application/pipelineDeploy.ts:49` 使用发布所属项目检查引用。
+- `modules/task-runtime/application/createEnvironment.ts:50` 为新开发工作区选择项目分配的套餐；`rebuildInspection.ts:47` 过滤恢复候选，`:60` 在恢复受理时重查项目分配。
+- `modules/agent-runtime/adapters/persistence/migrations/0004_project_compute_policies.sql` 新增策略表与默认可见字段，并以 CHECK 约束平台默认档位必须可见。
 
 ## 归属与持久化
 
