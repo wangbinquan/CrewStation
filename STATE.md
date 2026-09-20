@@ -43,7 +43,7 @@ CM-01–24 已完成：248 个来源无错误，完整快照 450 项资源、32 
 
 实机补正三项：档位测试 ID 读取持久化关联；采集独立 worker 避免长操作挡住刷新；业务恢复确认旧 Pod UID 消失后才占配额并重建。106 条生命周期回归和静态检查、生产构建通过。API／controller 已滚动至 `cs-control-plane:rfc010-20260920-4`。真实确认／结果的 1280／390／320px、中英文、主题、焦点与无整页溢出通过。
 
-最终完整门禁第二轮 1871 pass／5 skip／4 fail：本次和真实 OIDC E2E 均通过；四项失败是另一任务在运行中加入的语言按钮／去重复导航回归，等待该候选稳定。保留完整输出、不取消运行或移除其他测试。最终精确发布与 SHA CI 继续收口，RFC 暂为 In Progress；逐项 ID、UID、HTTP／耗时／trace 与历史失败见 `proposal/rfc/RFC-010-cluster-management/acceptance.md`。
+最终完整检查 **1875 pass／5 skip／0 fail，10393 assertions，303 文件，265.13s**，本次发布新增可执行行覆盖 **47／48（97.9%）**。期间修复了集群装配测试在 Pod 真正创建前模拟握手的竞态，完整等候队列操作后再关闭夹具；磁盘耗尽的无效轮次和仅清理未被使用构建缓存的恢复过程均如实留档。实现 `119bf59` 与测试修正 `7237ecc` 已随共享 main 推送，发布后 `HEAD == origin/main == 7237ecce628e4693d69127bea766e13fca0ff13e`、index 为空；[精确 SHA CI](https://github.com/wangbinquan/CrewStation/actions/runs/35516088549) 六个作业全部成功，RFC-010 已 Done（T1–T11、CM-01–25）。逐项 ID、UID、HTTP／耗时／trace 与历史失败见 `proposal/rfc/RFC-010-cluster-management/acceptance.md`。
 
 ## 并行接力：用例防护体系与 CI 用例执行体系（2026-09-20）
 

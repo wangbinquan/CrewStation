@@ -1,6 +1,6 @@
 # RFC-010｜CrewStation 集群资源管理
 
-> 状态：In Progress；作者已批准完整实现与提交上库
+> 状态：Done；2026-09-20 完成 T1–T11 与 CM-01–25，代码、实机验收及精确 SHA CI 通过
 > 日期：2026-09-20
 > 配套：[技术设计](./design.md) · [实施计划](./plan.md) · [现状核对](./audit.md) · [ADR-0006](../../../docs/adr/0006-cluster-management-module.md)
 

@@ -1,6 +1,6 @@
 # RFC-010 验收记录
 
-> 2026-09-20，In Progress：CM-01–24 已完成，最终发布与精确 SHA CI 正在收口。作者已批准完整实现、提交上库，并明确批准本机 RBAC 应用。
+> 2026-09-20，Done：T1–T11 与 CM-01–25 全部完成，生产代码、实机验收、本地完整检查与精确 SHA CI 通过。作者已批准完整实现、提交上库及本机 RBAC 应用。
 
 ## 范围、环境与部署
 
@@ -10,7 +10,7 @@
 
 专用项目 `prj_01a0bece32717000b24fb87ed5a19323`，服务 `svc_01a0bece32717001a18d98f9f4aeeb8d`，namespace `cs-rfc010-cluster-qa`。所有任务、发布槽、Job、finalizer 均在本次专用资源上验收；未修改其他 RFC 的业务资源。内置 `mcp-operations` 重启前已说明目标并与正在操作本机平台的任务协调窗口。
 
-最终 API／controller 镜像 `cs-control-plane:rfc010-20260920-4`：Docker image ID `sha256:8bfc807d59dc90c02247164e7f2303eb183f060e1b87bef1c6912e98459f0731`，节点导入 manifest `sha256:55eb2f9a2cfba1a42903ffe81e51848c82863e3fd55e1e2c989d7dd9c9faebae`，两份 Deployment rollout 成功。console 的集群功能与既有 `rfc010-20260920-2` 相同，当前共享镜像另包含语言控件等并行改动；本次在实际部署上重新检查确认与结果。`mcp-operations` 只滚动原镜像，没有更换版本。
+最终 API／controller 镜像 `cs-control-plane:rfc010-20260920-4`：Docker image ID `sha256:8bfc807d59dc90c02247164e7f2303eb183f060e1b87bef1c6912e98459f0731`，节点导入 manifest `sha256:55eb2f9a2cfba1a42903ffe81e51848c82863e3fd55e1e2c989d7dd9c9faebae`，两份 Deployment rollout 成功，实际 Pod imageID 与上述 Docker image ID 一致，部署后核对时均 Ready／0 次重启。后续磁盘故障恢复后的最终核对仍全部 Ready：API 1 次、controller 2 次、console 0 次重启；PostgreSQL 累计 27 次（本轮前已有 24 次），未隐藏环境故障导致的重启。console 当前共享镜像为 `cs-console:rfc011-buttons-20260920`、实际 imageID `sha256:319b4c7df3e5e41c133ab462b4e4b8c2315071e69b9df9d082f0194fd50e0a90`，集群功能与已验收版本一致；本次重新检查确认和中英文结果。`mcp-operations` 只滚动原镜像，没有更换版本。
 
 ## 清单与只读行为
 
@@ -77,7 +77,7 @@
 | 21 | 协调窗口后的实际系统重启与单实例扩缩／核心删除限制通过 |
 | 22–23 | 幂等重放、finalizer 超时和继续核对同名替换实跑；过期、租约、响应丢失和崩溃恢复回归通过 |
 | 24 | 三种宽度、主题、语言、确认／结果及键盘焦点通过 |
-| 25 | 生产构建、最终候选门禁与发布 CI 结果见下节；不把其他并发候选的失败算作全绿 |
+| 25 | 生产构建、完整本地检查与发布 7237ecc 的六项 CI 全部通过；跳过范围及历史失败分别记录于下节 |
 
 ## 自动化、构建与发布
 
@@ -85,7 +85,11 @@
 
 新生命周期定向验证 **106 pass／0 fail／753 assertions**，24 文件；真实 PostgreSQL。业务恢复的延迟删除与替换实例用例先红后绿；超时有界回归通过。静态检查和 console 生产构建通过。E2E 帮助函数显式支持 `CS_E2E_AUTH=dev-oidc`，经真实 Provider 选择已有身份并校验 `/v1/me`；默认 CI 的密码路径保持可用，没有通过不可达浏览器端口屏蔽验收。
 
-最终完整门禁和精确 SHA 发布结果将在本节追加。此前已发布主体 `b7fb3e5`／`73ad1a0`、共享接线 `b3d8d0e`、文档基线 `da4f437` 的 [CI 35509904421](https://github.com/wangbinquan/CrewStation/actions/runs/35509904421) 六个作业通过；此历史结果不代替本次修复的最终 CI。
+最终完整本地检查 **1875 pass／5 skip／0 fail，10393 assertions，303 文件，265.13s**；架构、lint、两套类型检查通过。五个跳过是未提供该自动化环境的非管理员浏览器、真实集群客户端和三条原生 CLI 场景，前者与集群管理的实际边界另有上述实机证据。本次发布相对 `a694465` 的新增可执行行覆盖 **47／48（97.9%）**，无防护违规。
+
+完整门禁候选已发布至 `7237ecce628e4693d69127bea766e13fca0ff13e`，包含实现 `119bf59` 与测试同步修正 `7237ecc`，并保留三个并行任务各自提交的输出；推送后 `HEAD == origin/main`，共享索引为空。精确 SHA 的 [CI 35516088549](https://github.com/wangbinquan/CrewStation/actions/runs/35516088549) 六个作业全部成功：static、unit、module、console、gate、e2e。
+
+此前已发布主体 `b7fb3e5`／`73ad1a0`、共享接线 `b3d8d0e`、文档基线 `da4f437` 的 [CI 35509904421](https://github.com/wangbinquan/CrewStation/actions/runs/35509904421) 六个作业通过；此历史结果不代替本次修复的最终 CI。
 
 本机临时证据位于 `/tmp/cs-rfc010-*.log`、`*-evidence.json` 和截图 `confirm-visible-{1280,390,320}.png`／`result-visible-{1280,390,320}.png`；它们不是跨机器发布附件，本文件保留可追踪的实际 ID 与结果。专用验收任务全部结束、配额 0；三个临时隐藏算力档位已停用，验收项目／发布历史与按语义保留的两份业务 PVC 留存。
 
@@ -94,5 +98,10 @@
 - 批准 RBAC 前是部分清单（84 个 403 来源），不作为完整清单通过证据；批准后已经替换为上述全来源实测。
 - 初次业务工作区重启 `61555223-6284-4790-ba27-a606b8ea8160` 碰到旧 Pod 仍在删除的 HTTP 409；已由等待原实例消失的修复与新操作复验闭环。
 - 档位停止 `e5b63194-0038-412d-b621-71bed4702597` 缺少测试 ID 映射返回 404，已修；另一排队操作 `8c632889-2cc1-43a1-a586-fee2afbeed79` 执行时旧测试 Pod 已自行结束，按旧 UID 拒绝 404。最终停止证据为仍在运行的新测试，不把失败重命名为成功。
-- 13:03Z 本机 API 曾报 Bun SQL `08P01: bind message has 2 result formats but query has 7 columns`，同池健康检查失败后由 liveness 自动重启。保存旧日志后观察恢复；属于已登记的数据库客户端池问题（dev-gotchas／I16），本次未扩展修改持久化层。滚动窗口的临时 502 也没有计为通过。
+- 13:03Z 本机 API 曾报 Bun SQL `08P01: bind message has 2 result formats but query has 7 columns`，同池健康检查失败后由 liveness 自动重启。保存旧日志后观察恢复；表现与已登记的数据库客户端池问题（dev-gotchas／I16）一致，具体触发原因未独立复现；本次未扩展修改持久化层。滚动窗口的临时 502 也没有计为通过。
 - 第一轮本次 full check：1830 pass／4 skip／6 fail／4 errors，认证读取遇到上述 API 重启，另有并发首页修复中间状态。第二轮：1871 pass／5 skip／4 fail，10345 assertions，303 文件，259.22s；真实 OIDC E2E 与本次所有用例通过，四个失败是运行中新增的语言双按钮／去重复导航回归，等待其对应候选收口。不取消运行，也不丢弃他人测试来制造绿色。
+- 随后共享候选的 1874 pass／5 skip／1 fail 为原生状态 HTTP 用例预期 403、收到 503；该处理器没有 503 分支，单文件复核通过。代理与直连的临时环回对照各 100 次均返回 403，未复现，因此不将代理猜测写成已确认原因。
+- 下一轮 1819 pass／5 skip／46 fail（235.01s）在 PostgreSQL `checkpoint request failed` 后连续进入 recovery mode；节点磁盘 100%，数据库实际日志为 `No space left on device`。按仓库恢复规则核对全量 Pod、工作负载及 ReplicaSet 引用，仅回收无引用的 21 个 CrewStation 节点旧镜像缓存及仍存在的 16 个宿主旧标签；未删卷、数据库或其他项目镜像，释放约 1.2GB。数据库自动恢复后，重建失效的本地测试转发，临时测试库创建／删除通过，再运行完整检查。
+- 环境恢复后的 1873 pass／5 skip／2 fail（265.88s）定位到集群装配测试的握手竞态：它把数据库 `creating` 当作 Pod 已创建，提前读到空对象，未等候的操作随后在夹具关闭后污染相邻网关用例。改为由实际 Fake Kubernetes 创建完成触发 Runner 握手，并完整等候队列操作；明确断言 `creating` 时新 Pod 仍不存在、握手返回 true。相邻两个文件定向 **8 pass／0 fail／54 assertions**，生产逻辑不变，再对修正后的测试候选执行完整检查。
+
+实机修复精确提交为 `119bf592b2413dd02c9c3e1ccaa9894b4fb4293d`（21 个路径）；共享 STATE 中并行任务的已有记录完整保留。该提交对 `a694465` 的新增可执行行覆盖 **22／23（95.7%）**，无防护违规。随后仅测试夹具修正为 `7237ecc`；最终 14 个代码／测试文件已按该候选冻结，完整检查至推送的内容哈希一致，后续收口只修改文档。
