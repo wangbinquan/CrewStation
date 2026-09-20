@@ -32,7 +32,7 @@ async function connect(id: TaskId) {
   const pod = (await k8s.get(Resources.Pod!, fact.podName, fact.namespace))!;
   const token = (pod.spec as { containers: Array<{ env: Array<{ name: string; value: string }> }> }).containers[0]!.env.find((e) => e.name === 'CS_RUNNER_TOKEN')!.value;
   await k8s.mergePatch(Resources.Pod!, fact.podName, fact.namespace, { status: { phase: 'Running', conditions: [{ type: 'Ready', status: 'True' }] } });
-  await platform.modules.taskRuntime.api.onRunnerConnected(id, token);
+  expect(await platform.modules.taskRuntime.api.onRunnerConnected(id, token)).toBe(true);
 }
 describe.skipIf(!available)('cluster HTTP through actual platform composition', () => {
   test('registered platform components are visible without managed labels; unregistered namespace siblings are absent', async () => {
@@ -56,9 +56,19 @@ describe.skipIf(!available)('cluster HTTP through actual platform composition', 
     await cluster.collect(); const resources = await cluster.api.resources(admin, { scope: 'project', projectId: p.id, limit: 50 });
     const pod = resources.items.find((r) => r.taskId === task.id)!; expect(pod.purpose).toBe('business-workspace'); expect(pod.profile).toBe('coding-medium');
     const volume = structuredClone(resources.items.find((r) => r.kind === 'PersistentVolumeClaim'));
-    const op = await accept(pod.resourceId, 'restart'), execution = cluster.runOnce();
-    for (let i = 0; i < 200; i++) { const current = await tasks.api.getEnvironment(task.id); if (current?.state === 'creating') { await connect(task.id); break; } await Bun.sleep(5); }
-    await execution; expect((await cluster.api.operation(admin, op.operationId)).phase).toBe('succeeded');
+    const op = await accept(pod.resourceId, 'restart'), create = k8s.create;
+    k8s.create = async (object) => {
+      if (object.kind !== 'Pod' || object.metadata.name !== pod.name) return create(object);
+      // Creating is committed before the Kubernetes call; it does not mean the new Pod can connect yet.
+      expect((await tasks.api.getEnvironment(task.id))?.state).toBe('creating');
+      expect(await k8s.get(Resources.Pod!, pod.name, pod.namespace)).toBeUndefined();
+      const created = await create(object);
+      await connect(task.id);
+      return created;
+    };
+    // Join the complete operation before fixture teardown, including failures in the simulated Runner.
+    try { await cluster.runOnce(); } finally { k8s.create = create; }
+    expect((await cluster.api.operation(admin, op.operationId)).phase).toBe('succeeded');
     expect(await tasks.api.runningTaskCount(p.id)).toBe(1); expect(await k8s.get(Resources.PersistentVolumeClaim!, volume!.name, volume!.namespace)).toMatchObject({ metadata: { uid: volume!.uid } });
     await cluster.collect(); const after = (await cluster.api.resources(admin, { scope: 'project', projectId: p.id, limit: 50 })).items.find((r) => r.taskId === task.id)!;
     await business.api.getTask(caller, task.id); const del = await accept(after.resourceId, 'delete'); await cluster.runOnce();
