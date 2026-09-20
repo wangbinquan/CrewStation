@@ -62,6 +62,43 @@ test('普通用户开发 URL 被拒绝，旧试用项目链接迁移到市场，
   expect(f.calls.some((c) => c.path.includes('/dev-session') || c.path.startsWith('/v1/projects'))).toBe(false);
 });
 
+test.each(['developer', 'admin'] as const)('%s 项目列表和新建页不重复全局导航，进入项目后才出现项目菜单', async (role) => {
+  const f = fixture(role); f.state.trial = false; f.state.created = true;
+  page = await renderApp('/projects');
+  // 实机项目列表的左栏重复了顶栏的“应用／项目开发”，白占一列。
+  expect(Boolean(document.querySelector('nav[aria-label="主导航"]'))).toBe(false);
+  expect(document.querySelectorAll('a[href="/market"]')).toHaveLength(1);
+  expect(document.querySelectorAll('a[href="/projects"]')).toHaveLength(1);
+  await page.click('新建项目'); expect(page.path()).toBe('/projects/new');
+  expect(Boolean(document.querySelector('nav[aria-label="主导航"]'))).toBe(false);
+  await page.navigate(`/projects/${projectId}/settings`);
+  const nav = document.querySelector('nav[aria-label="主导航"]')!;
+  expect(nav.querySelectorAll('[aria-label="项目页面"] a')).toHaveLength(6);
+  expect(Boolean(nav.querySelector('a[href="/market"]'))).toBe(false);
+  const back = nav.querySelector<HTMLAnchorElement>('a[href="/projects"]')!;
+  await act(async () => back.click()); await page.settle();
+  expect(page.path()).toBe('/projects');
+  expect(Boolean(document.querySelector('nav[aria-label="主导航"]'))).toBe(false);
+  await page.navigate('/missing-page');
+  expect(Boolean(document.querySelector('nav[aria-label="主导航"]'))).toBe(false);
+});
+
+test('首页自动更新收到异常响应时保留搜索输入，提示重试并能恢复应用列表', async () => {
+  fixture(); const base = globalThis.fetch; let invalid = false;
+  globalThis.fetch = (async (raw, init) => invalid && new URL(String(raw), 'http://localhost').pathname === '/v1/market/apps'
+    ? new Response('<html>暂不可用</html>', { headers: { 'content-type': 'text/html' } }) : base(raw, init)) as typeof fetch;
+  page = await renderApp('/'); await change('main input', '会议草稿');
+  // 实机自动刷新后取到没有 items 的响应，旧页面在 items.length 处崩溃。
+  invalid = true;
+  await act(async () => { focusManager.setFocused(false); focusManager.setFocused(true); }); await page.settle();
+  expect(page.text()).toContain('应用列表暂时无法更新，请稍后重试。');
+  expect(page.text()).not.toContain('Something went wrong');
+  expect(document.querySelector<HTMLInputElement>('main input')?.value).toBe('会议草稿');
+  invalid = false; await page.click('重新查询');
+  expect(page.text()).toContain('团队助理'); expect(page.text()).not.toContain('应用列表暂时无法更新');
+  expect(document.querySelector<HTMLInputElement>('main input')?.value).toBe('会议草稿');
+});
+
 test('身份失败显示重试，不使用旧开发身份放行或挂载目录', async () => {
   const f = fixture('developer'); f.state.denied = true; page = await renderApp('/projects');
   expect(page.text()).toContain('身份暂不可用'); expect(page.text()).not.toContain('需要开发者角色');

@@ -11,9 +11,13 @@ describe('两个空间的结构约定（RFC-002）', () => {
   test('租户左栏没有任何管理入口', () => {
     const nav = sourceAt(files, 'layout/WorkbenchNav.tsx');
     expect(nav.code).not.toContain('/admin');
-    // RFC-003 全局入口改为市场与数字人项目；管理空间边界继续保持。
-    expect(nav.code).toContain("t('nav.market')");
+    // 全局入口只由顶栏承接；左栏保留当前项目与返回列表，管理空间边界继续保持。
+    expect(nav.code).not.toContain("t('nav.market')");
+    expect(nav.code).toContain('<ProjectNavSection');
     expect(nav.code).toContain("t('nav.projects')");
+    const top = sourceAt(files, 'layout/TopBar.tsx');
+    expect(top.code).toContain("t('nav.market')");
+    expect(top.code).toContain("t('nav.projects')");
   });
 
   test('管理左栏的供给与审批入口及守卫都在管理布局这一侧', () => {

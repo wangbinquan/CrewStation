@@ -13,7 +13,11 @@ import styles from '../components/market/Market.module.css';
 export function MarketPage() {
   const t = useT(), [input, setInput] = useState(''), [q, setQ] = useState(''), [cursors, setCursors] = useState<string[]>([]);
   const cursor = cursors.at(-1);
-  const query = useMarketQuery(['apps', q, cursor], () => api.capabilities.marketApps({ q, limit: 20, ...(cursor ? { cursor } : {}) }));
+  const query = useMarketQuery(['apps', q, cursor], async () => {
+    const page = await api.capabilities.marketApps({ q, limit: 20, ...(cursor ? { cursor } : {}) });
+    if (!page || !Array.isArray(page.items)) throw new Error(t('market.invalidResponse'));
+    return page;
+  });
   const restart = () => { setInput(''); setQ(''); setCursors([]); };
   return <>
     <PageHeader title={t('market.title')} description={[t('market.intro')]} />

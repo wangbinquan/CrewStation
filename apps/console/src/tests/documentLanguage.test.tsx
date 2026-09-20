@@ -30,9 +30,10 @@ async function mountLocale(initialLocale?: Locale) {
       <LocaleSwitch /><input aria-label="未提交草稿" defaultValue="保留这份输入" />
     </I18nProvider>,
   ));
-  const select = host.querySelector('select')!;
-  return { host, select, change: async (locale: Locale) => {
-    await act(async () => { select.value = locale; select.dispatchEvent(new Event('change', { bubbles: true })); });
+  const group = host.querySelector('[role="group"]');
+  const button = (locale: Locale) => host.querySelector<HTMLButtonElement>(`button[lang="${locale}"]`)!;
+  return { host, group, button, change: async (locale: Locale) => {
+    await act(async () => { button(locale).focus(); button(locale).click(); });
   } };
 }
 
@@ -40,25 +41,36 @@ test('真实语言控件同步文案与文档语言，往返切换保留输入�
   const page = await mountLocale();
   const input = page.host.querySelector('input')!;
   input.focus();
-  expect(page.select.getAttribute('aria-label')).toBe('界面语言');
+  expect(Boolean(page.host.querySelector('select'))).toBe(false);
+  expect(page.group?.getAttribute('aria-label')).toBe('界面语言');
+  expect(page.group?.querySelectorAll('button')).toHaveLength(2);
+  expect(page.button('zh-CN').getAttribute('aria-pressed')).toBe('true');
+  expect(page.button('en-US').getAttribute('aria-pressed')).toBe('false');
   expect(document.documentElement.lang).toBe('zh-CN');
   await page.change('en-US');
-  expect(page.select.getAttribute('aria-label')).toBe('Language');
+  expect(page.group?.getAttribute('aria-label')).toBe('Language');
+  expect(page.button('en-US').getAttribute('aria-pressed')).toBe('true');
+  expect(page.button('zh-CN').getAttribute('aria-pressed')).toBe('false');
   // 实机英文已加载，html 却仍是 zh-CN，辅助阅读不能据此选择正确语言。
   expect(document.documentElement.lang).toBe('en-US');
   expect(page.host.querySelector('input') === input).toBe(true);
   expect(input.value).toBe('保留这份输入');
-  expect(document.activeElement === input).toBe(true);
+  expect(document.activeElement === page.button('en-US')).toBe(true);
   await page.change('zh-CN');
-  expect(page.select.getAttribute('aria-label')).toBe('界面语言');
+  expect(page.group?.getAttribute('aria-label')).toBe('界面语言');
+  expect(page.button('zh-CN').getAttribute('aria-pressed')).toBe('true');
   expect(document.documentElement.lang).toBe('zh-CN');
   expect(input.value).toBe('保留这份输入');
-  expect(document.activeElement === input).toBe(true);
+  expect(document.activeElement === page.button('zh-CN')).toBe(true);
+  await page.change('zh-CN');
+  expect(input.value).toBe('保留这份输入');
+  expect(document.documentElement.lang).toBe('zh-CN');
 });
 
 test('初始英文文案使用英文声明，卸载后恢复宿主声明', async () => {
   const page = await mountLocale('en-US');
-  expect(page.select.getAttribute('aria-label')).toBe('Language');
+  expect(page.group?.getAttribute('aria-label')).toBe('Language');
+  expect(page.button('en-US').getAttribute('aria-pressed')).toBe('true');
   expect(document.documentElement.lang).toBe('en-US');
   dispose?.(); dispose = undefined;
   expect(document.documentElement.lang).toBe('zh-CN');

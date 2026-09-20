@@ -35,6 +35,8 @@
       'main';
   }
 
+  .noNav { grid-template-rows: auto minmax(0, 1fr); grid-template-areas: 'topbar' 'main'; }
+
   .main {
     padding: var(--cs-space-4);
   }

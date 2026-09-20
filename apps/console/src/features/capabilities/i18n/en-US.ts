@@ -115,6 +115,7 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   "market.searchAction": "Search",
   "market.refresh": "Check again",
   "market.retry": "Retry query",
+  "market.invalidResponse": "The app list could not be updated. Please try again shortly.",
   "market.reset": "Clear filters",
   "market.noMatches": "No matching apps",
   "market.noMatchesHint": "Try another app name or description.",

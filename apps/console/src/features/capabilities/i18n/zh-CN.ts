@@ -114,6 +114,7 @@ export const messages = {
   "market.searchAction": "搜索",
   "market.refresh": "重新检查",
   "market.retry": "重新查询",
+  "market.invalidResponse": "应用列表暂时无法更新，请稍后重试。",
   "market.reset": "清除筛选",
   "market.noMatches": "没有匹配的应用",
   "market.noMatchesHint": "试试其他名称或用途关键词。",

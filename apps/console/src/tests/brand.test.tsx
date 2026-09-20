@@ -16,7 +16,9 @@ test('品牌字标的图形为装饰，单独图标带名称；单色版本继�
   expect(ui.host.querySelector('[role="img"]')?.getAttribute('aria-label')).toBe('CrewStation');
 });
 
-test('窄屏隐藏语言说明时，下拉框仍有可访问名称', async () => {
+test('紧凑语言按钮保留分组与每种语言的可访问名称', async () => {
   ui = await renderElement(<LocaleSwitch />, {});
-  expect(ui.host.querySelector('select')?.getAttribute('aria-label')).toBe('界面语言');
+  const group = ui.host.querySelector('[role="group"]');
+  expect(group?.getAttribute('aria-label')).toBe('界面语言');
+  expect([...group!.querySelectorAll('button')].map((button) => button.getAttribute('aria-label'))).toEqual(['中文', 'English']);
 });

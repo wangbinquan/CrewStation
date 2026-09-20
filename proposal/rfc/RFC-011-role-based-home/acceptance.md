@@ -63,6 +63,34 @@
 - 新候选完整检查：1864 pass／5 skip／0 fail，10304 assertions，254.66s；日志 `/private/tmp/rfc011-auto-refresh-full-gate.log`。三个本任务生产文件的变更行覆盖率为 3／3（100%），其余并行改动不计入本次补丁报告。
 - console 生产构建成功，最终镜像 `cs-console:rfc011-auto-refresh-20260920`，摘要 `42bc74fe5246b5d410b7745bf7226c310143c5297d0cc4d034fbca7d23eb3b05`，本机 rollout 成功。
 - 真实首页重载确认：右上角无“重新检查”，搜索、应用列表和 Beta 试用入口正常。自动更新继续由 `useMarketQuery` 承担。
+- 提交 `b9e99180ab131009ea56c4e752ae522b45b8a355` 已推上 main；[CI 35511170152](https://github.com/wangbinquan/CrewStation/actions/runs/35511170152) 的六个作业全部成功。
+
+## 语言切换外观追加
+
+作者认为右上角语言切换外观不协调。入口改为地球图标、当前语言与下拉箭头，取消常驻文字标签与外框；统一为 32px 高度，悬停或键盘聚焦显示淡底。扩展既有 `GlyphIcon` 的可选行内样式，应用卡片继续使用默认图标样式。保留原生选择器和中英文辅助名称，语言切换逻辑与草稿保留行为不变。
+
+- 既有语言与品牌回归：4 pass／0 fail，19 assertions，覆盖文档语言、辅助名称、切换时未提交输入和焦点保留。
+- console 生产构建成功；镜像 `cs-console:rfc011-locale-20260920`，摘要 `8ebed0804ed9e292ac8df3c791b9c8dd1799e25156d6324c7e3db9e899bd6bb0`，本机 rollout 成功。
+- 实际部署的 1100px 桌面、390px 中文浅色、320px 中文浅色与英文深色均无页面横向溢出；控件实际尺寸 100×32px。真实顶层页面用方向键与 Enter 往返中英文，焦点保持在控件，2px 焦点边框可见，`html.lang` 随之切换。
+- 首轮完整检查的静态检查、模块和组件通过；本机已关闭密码登录，旧 E2E 前置登录仍寻找密码表单，19 项随之停在登录页失败（1831 pass／22 skip／19 fail，日志 `/private/tmp/rfc011-locale-full-gate.log`）。未修改平台登录策略；并行 RFC-010 的测试助手随后增加显式 OIDC 登录，本批使用该模式继续门禁，不将旧轮次记为通过。
+- 长时间停留实机于 13:02 UTC 再次出现 `Cannot read properties of undefined (reading 'length')`，落在首页读取列表处；触发时的原始响应未保存，未将上游原因归于登录服务或并行集群操作。新增无 `items` 响应的回归用例，旧页面稳定报同类错误；首页查询现在先核对列表结构，异常时使用中英文提示与既有重试，保留搜索输入。修正后角色首页、语言、品牌与文案键回归 27 pass／0 fail，110 assertions，日志 `/private/tmp/rfc011-market-invalid-red.log` 与 `/private/tmp/rfc011-locale-regression.log`。
+- 显式 OIDC 的中间轮实机用例通过，完整结果为 1866 pass／5 skip／2 fail／1 error（351.52s）。失败在并行变更的集群业务工作区重启与长操作刷新测试，分别为 Pod 尚不存在、测试数据库连接关闭；日志 `/private/tmp/rfc011-locale-oidc-full-gate.log`。同两文件单独复核为 9 pass／0 fail，62 assertions，但不以该局部结果替代完整门禁。
+- 首页异常恢复修正后，最终 console 镜像为 `cs-console:rfc011-locale-20260920-2`，摘要 `79598baceac2f85952fd68cec3d56873d937c8c3e4ff1cb471fad216fb782d9e`；构建与 rollout 成功，真实首页重载后语言控件、应用和 Beta 列表正常。
+- 最终八个 console 代码／测试文件内容已冻结，五个变更生产 TS 文件的可执行变更行覆盖为 13／13（100%），无违规。本轮完整检查静态部分通过，1833 pass／4 skip／6 fail／4 errors（259.89s）：四个 E2E 模块因并行更新的 OIDC 页面不再匹配身份链接而无法登录，两条任务运行时恢复用例失败。本批首页与语言回归均通过；日志 `/private/tmp/rfc011-locale-final-full-gate.log`，补丁报告 `/private/tmp/rfc011-locale-patch-audit.json`。未将这些失败或未执行的 E2E 计为成功，发布需满足仓库门禁或得到作者对本次精确提交的例外授权。
+
+
+## 直接语言按钮与项目导航去重追加
+
+作者在上一候选的精确发布例外问题上回复「批准」，随后明确要求语言切换使用按钮、不使用下拉，并指出项目开发页左侧重复出现“应用／项目开发”。本次实现遵从追加裁定：
+
+- 语言控件为「中文／EN」两个原生按钮，使用 `aria-pressed` 表达当前选择；保留中英文辅助名称、键盘焦点和文档语言同步，去掉下拉框与箭头。
+- 项目列表、新建项目及全局 404 使用无侧栏布局；只在具体项目中显示六项项目菜单和返回列表，空间切换统一由顶部导航承担。窄屏无侧栏页面同步取消空导航行。
+- `documentLanguage` 与 `roleHome` 的四个新行为断言先在旧实现上失败，再随修正通过；连同项目导航与文案键共 49 pass／0 fail，258 assertions，日志 `/private/tmp/rfc011-buttons-nav-red.log`、`/private/tmp/rfc011-buttons-nav-targeted.log`。既有项目设置实机用例同步改为点击语言按钮。
+- 生产构建完成；复用同版本 Bun 运行层封装主机 Vite 产物，以免在剩余约 200MB 的 Docker VM 上重复安装构建依赖。未清理其他镜像、容器、卷或数据。镜像 `cs-console:rfc011-buttons-20260920`，摘要 `319b4c7df3e5e41c133ab462b4e4b8c2315071e69b9df9d082f0194fd50e0a90`，rollout 成功。
+- 真实 1100px 页面确认顶部只有语言按钮、没有语言选择框；点击及 Enter／空格可往返切换，焦点边框 2px，未提交的项目名称保留。项目列表与新建页无重复侧栏，进入“首页角色验收”后六项菜单正常，返回列表时侧栏消失。390px 浅色与 320px 深色中文页面 `scrollWidth == clientWidth`，两个按钮各 40px 宽。
+- 全量检查发现两个历史断言仍强制旧下拉框与左侧市场入口（1873 pass／5 skip／2 fail）；按新界面语义更新后，相关六文件 57 pass／0 fail，287 assertions。最终 14 个代码／测试文件哈希已冻结；本次七个生产 TS 文件的变更可执行行覆盖 25／25（100%），无违规。未将上一候选的例外授权或历史绿色当作新候选的测试结果。
+- 最终完整门禁静态通过，1874 pass／5 skip／1 fail，10386 assertions，250.85s；唯一失败为 `runtimes/task/tests/nativeActivityChannel.test.ts:40` 的未授权 HTTP 状态预期 403、实际 503。本文件未被本次修改，单独复核 6 pass／0 fail，19 assertions，但不足以将全量结果记绿或证明 503 的来源。日志 `/private/tmp/rfc011-buttons-full-check-final.log` 与 `/private/tmp/rfc011-native-channel-recheck.log`。所有工作台与本机实机用例通过，包括 390px 英文深色的项目设置九个主题。
+- 遵从作者已批准的精确发布及按提交 CI 核验流程，本次提交范围为 14 个代码／测试文件及 2 份记录；新增文件范围均对应作者随后要求的按钮交互、导航去重及其回归。GitHub 最终提交的门禁另行核验，不把本机全量失败隐去。
 
 ## 待授权操作
 

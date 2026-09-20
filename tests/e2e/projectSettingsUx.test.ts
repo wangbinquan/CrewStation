@@ -9,7 +9,7 @@ const routes = ['settings', 'settings?tab=visibility', 'settings?tab=members', '
 
 async function openLocalized(page: Page, path: string, locale: string) {
   await open(page, path);
-  await page.eval(`(() => { const select = document.querySelector('header select'); select.value = ${JSON.stringify(locale)}; select.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+  await page.eval(`document.querySelector('header button[lang="${locale}"]').click()`);
   await settle(page);
 }
 
