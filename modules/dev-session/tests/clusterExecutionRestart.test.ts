@@ -1,0 +1,30 @@
+import { expect, test } from 'bun:test';
+import { clusterNativeUseCases } from '../application/nativeTerminals';
+import { clusterAgentUseCases } from '../application/agents';
+import { isolatedNativeFixture } from './isolatedNativeFixture';
+import { fakeComputeCatalog } from './computeFixture';
+import { agentExecutionFixture } from './agentExecutionFixture';
+import { workspaceActor, workspaceTask } from './workspaceFixture';
+const admin = { ...workspaceActor, isAdmin: true };
+test('single CLI reopens once from the frozen profile, links predecessor and leaves sibling/parent alone', async () => {
+  const f = isolatedNativeFixture(), old = await f.start(), sibling = await f.start(), commands = clusterNativeUseCases(f.deps, f.repository);
+  await expect(commands.inspectClusterNative(workspaceActor, old.execution!.taskId)).rejects.toThrow('管理员');
+  const inspection = await commands.inspectClusterNative(admin, old.execution!.taskId), op = crypto.randomUUID();
+  const one = await commands.manageClusterNative(admin, old.execution!.taskId, true, op), two = await commands.manageClusterNative(admin, old.execution!.taskId, true, op);
+  expect(one).toEqual(two); expect(one.operationId).not.toBe(old.execution!.taskId);
+  const next = (await f.repository.list(workspaceTask)).find((r) => r.execution?.taskId === one.operationId)!;
+  expect(next.profile).toEqual(inspection.profile); expect(next.execution?.previousTaskId).toBe(old.execution!.taskId);
+  await f.api.dispatchPendingNativeExecution(next.execution!.taskId);
+  expect(f.allocations.filter((id) => id === next.execution!.taskId)).toHaveLength(1); expect(f.releases).toEqual([old.execution!.taskId]);
+  expect(f.environments.get(sibling.execution!.taskId)?.connected).toBe(true); expect(f.state.released).toBe(false);
+});
+test('headless restart waits for predecessor cleanup and does not launch duplicate Agents', async () => {
+  const f = agentExecutionFixture(); f.deps.compute = fakeComputeCatalog(() => [{ name: 'sample-opencode', protocol: 'opencode', model: 'm' }]); const old = await f.api.startAgent(workspaceActor, workspaceTask, { compute: 'sample-opencode', permission: 'edit', prompt: 'keep this prompt' });
+  const commands = clusterAgentUseCases(f.deps, f.starts, f.lifecycle), op = crypto.randomUUID();
+  await expect(commands.inspectClusterAgent(workspaceActor, old.execution!.taskId)).rejects.toThrow();
+  const one = await commands.manageClusterAgent(admin, old.execution!.taskId, true, op), two = await commands.manageClusterAgent(admin, old.execution!.taskId, true, op);
+  expect(one).toEqual(two); const next = await f.starts.findByExecution(one.operationId as typeof workspaceTask); expect(next?.request.prompt).toBe('keep this prompt');
+  await f.lifecycle.dispatch(next!.agentId); expect(f.inputs).toHaveLength(1);
+  const previous = f.environments.get(old.execution!.taskId)!; previous.native!.state = 'finished'; previous.state = 'released';
+  await f.lifecycle.dispatch(next!.agentId); await f.lifecycle.dispatch(next!.agentId); expect(f.inputs).toHaveLength(2); expect(String(f.inputs[1]?.id)).toBe(one.operationId); expect(f.state.released).toBe(false);
+});

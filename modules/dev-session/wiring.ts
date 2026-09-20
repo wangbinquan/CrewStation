@@ -17,8 +17,8 @@ import { boundedNativeRead, nativeActivityUseCases } from './application/nativeA
 import { workspaceLayoutUseCases } from './application/workspaceLayout';
 import { workspaceLayoutRoutes } from './http/workspaceLayoutRoutes';
 import type { DevSessionModuleApi } from './api/moduleApi';
-import { agentUseCases } from './application/agents';
-import { nativeTerminalUseCases } from './application/nativeTerminals';
+import { agentUseCases, clusterAgentUseCases } from './application/agents';
+import { nativeTerminalUseCases, clusterNativeUseCases } from './application/nativeTerminals';
 import type { DevSessionUseCaseDeps } from './application/dependencies';
 import { idleReminderUseCase } from './application/idleReminder';
 import { publishFromSessionUseCase } from './application/publishFromSession';
@@ -80,6 +80,7 @@ export function createDevSessionModule(deps: DevSessionModuleDeps): DevSessionMo
   const native = nativeTerminalUseCases(useCaseDeps, terminals);
   const api: DevSessionModuleApi = {
     invokeApi: apiInvocationUseCase(useCaseDeps),
+    ...clusterAgentUseCases(useCaseDeps, agentStarts, agentExecutions), ...clusterNativeUseCases(useCaseDeps, terminals),
     name: 'dev-session', ...lifecycle, ...agents, ...native, ...activity, ...workspaceLayoutUseCases(useCaseDeps, drizzleWorkspaceLayouts(deps.db), terminals),
     // 子 Runner 连上时由组合根调用：headless Agent 的执行环境先认领，其余按「＋ CLI」处理（RFC-006）。
     dispatchPendingNativeExecution: async (executionTaskId) => { if (!(await agentExecutions.dispatchExecution(executionTaskId))) await native.dispatchPendingNativeExecution(executionTaskId); },

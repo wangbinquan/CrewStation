@@ -4,6 +4,7 @@ import { hashRunnerToken, newRunnerToken } from '../domain/runnerToken';
 import { PROFILE_TEST_LABELS, PROFILE_TEST_MAX_CONCURRENT, PROFILE_TEST_PROJECT_ID, PROFILE_TEST_SERVICE_ID } from '../domain/profileTestEnvironment';
 import type { TaskEnvironment } from '../domain/taskEnvironment';
 import { podNameFor, pvcNameFor, transition } from '../domain/taskEnvironment';
+import { recordPodInstance } from './createEnvironment';
 import { containerEnv } from './containerEnv';
 import type { TaskRuntimeUseCaseDeps } from './dependencies';
 
@@ -41,7 +42,8 @@ export function createTestEnvironmentUseCase(deps: TaskRuntimeUseCaseDeps) {
     });
     try {
       const envVars = await containerEnv(deps, env, { slug: PROFILE_TEST_LABELS.project, name: PROFILE_TEST_LABELS.service }, token);
-      await cluster.createPod({ env, image: input.image, envVars, resources: { cpu: profile.cpu, memory: profile.memory, storage: profile.storage }, workVolume: 'emptyDir' });
+      const podUid = await cluster.createPod({ env, image: input.image, envVars, resources: { cpu: profile.cpu, memory: profile.memory, storage: profile.storage }, workVolume: 'emptyDir' });
+      await recordPodInstance(deps, env, podUid);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       logger.error('profile test pod creation failed', { taskId: id, error: message });

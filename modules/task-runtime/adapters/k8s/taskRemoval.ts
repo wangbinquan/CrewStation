@@ -16,5 +16,5 @@ export async function removeTaskPod(k8s: K8sClient, env: TaskEnvironment): Promi
   if (env.rebuildId) {
     await removeRebuilt(k8s, env, Resources.Pod!, env.podName);
     await removeRebuilt(k8s, env, Resources.Secret!, `${env.podName}-runner`);
-  } else await k8s.delete(Resources.Pod!, env.podName, env.namespace, { gracePeriodSeconds: 30 });
+  } else await k8s.delete(Resources.Pod!, env.podName, env.namespace, { gracePeriodSeconds: 30, ...(env.podUid ? { preconditions: { uid: env.podUid } } : {}) });
 }

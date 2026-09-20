@@ -1,0 +1,12 @@
+import { z } from 'zod';
+import { ClusterActionCapabilitySchema, ClusterActionSchema, ClusterResourceSchema } from './resources';
+export const ClusterInspectRequestSchema = z.object({ action: ClusterActionSchema, replicas: z.number().int().min(1).max(1000).optional() }).strict();
+export const ClusterInspectionSchema = z.object({ inspectionId: z.string(), expiresAt: z.string(), target: ClusterResourceSchema, request: ClusterInspectRequestSchema, capability: ClusterActionCapabilitySchema, related: z.array(z.object({ uid: z.string(), kind: z.string(), name: z.string() })), domain: z.record(z.string(), z.unknown()).optional() });
+export const ClusterOperationRequestSchema = z.object({ inspectionId: z.string().min(1), idempotencyKey: z.string().min(8).max(128), params: ClusterInspectRequestSchema }).strict();
+export const ClusterOperationSchema = z.object({ operationId: z.string(), inspectionId: z.string(), idempotencyKey: z.string(), actorId: z.string(), action: ClusterActionSchema, target: ClusterResourceSchema, params: ClusterInspectRequestSchema, phase: z.enum(['queued', 'executing', 'observing', 'succeeded', 'failed', 'needs-attention']), resumeCount: z.number().int().nonnegative().optional(), resumePhase: z.enum(['executing', 'observing']).optional(), observationStartedAt: z.string().optional(), createdAt: z.string(), updatedAt: z.string(), finishedAt: z.string().optional(), durationMs: z.number(), traceId: z.string(), httpStatus: z.number(), reason: z.string(), domainOperationId: z.string().optional(), after: ClusterResourceSchema.optional() });
+export const ClusterOperationQuerySchema = z.object({ uid: z.string().optional(), projectId: z.string().optional(), idempotencyKey: z.string().optional(), limit: z.coerce.number().int().min(1).max(100).default(50) });
+export type ClusterInspectRequest = z.infer<typeof ClusterInspectRequestSchema>;
+export type ClusterInspection = z.infer<typeof ClusterInspectionSchema>;
+export type ClusterOperationRequest = z.infer<typeof ClusterOperationRequestSchema>;
+export type ClusterOperation = z.infer<typeof ClusterOperationSchema>;
+export type ClusterOperationQuery = z.infer<typeof ClusterOperationQuerySchema>;

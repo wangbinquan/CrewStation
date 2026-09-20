@@ -20,6 +20,7 @@ export function publishUseCase(deps: Pick<ReleaseUseCaseDeps, 'uow' | 'tagger' |
     const dto = await uow.run(async (scope) => {
       await scope.slots.initialize(initialSlots(serviceId, now));
       const slots = (await scope.slots.get(serviceId))!;
+      if (await scope.maintenance.active(serviceId)) throw conflict('集群运维操作尚未结束，请等待后再发布');
       // 首次发布也先确保槽行存在并取得锁，再复查；打标期间另一发布可能已被受理。
       const concurrent = await scope.releases.findInProgress(serviceId);
       if (concurrent) throw conflict(`已创建标签 ${tag}，但发布 ${concurrent.tag} 仍在进行中；本次未启动流水线，请等待后重新选择版本`, { releaseId: concurrent.id, createdTag: tag });

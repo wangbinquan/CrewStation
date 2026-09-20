@@ -5,7 +5,7 @@ import { hashRunnerToken, newRunnerToken } from '../domain/runnerToken';
 import type { TaskEnvironment } from '../domain/taskEnvironment';
 import { canPause, occupiesQuota, transition } from '../domain/taskEnvironment';
 import { containerEnv } from './containerEnv';
-import { previewRouteOf, sourceOf } from './createEnvironment';
+import { previewRouteOf, recordPodInstance, sourceOf } from './createEnvironment';
 import type { TaskRuntimeUseCaseDeps } from './dependencies';
 import { runnerLifecycle } from './runnerLifecycle';
 import { failEnvironment } from './failEnvironment';
@@ -76,15 +76,16 @@ export function lifecycleUseCases(deps: TaskRuntimeUseCaseDeps) {
       if (!profile) throw precondition(`任务套餐 ${env.profile} 已不存在`);
       const limit = (await deps.quotas.quotaLimit(env.projectId)) ?? 0;
       const token = newRunnerToken();
-      const resumed = transition(env, 'creating', clock.now(), { runnerTokenHash: hashRunnerToken(token), connected: false });
+      const resumed = transition(env, 'creating', clock.now(), { runnerTokenHash: hashRunnerToken(token), connected: false, podUid: undefined });
       await uow.run(async (scope) => {
         if (!(await scope.admissions.tryAcquire(env.projectId, limit))) throw precondition(`并发任务已达配额上限 ${limit}`);
         await scope.environments.update(resumed);
       });
-      await cluster.createPod({
+      const podUid = await cluster.createPod({
         env: resumed, image: settings.taskImage, envVars: await containerEnv(deps, resumed, svc, token), resources: { cpu: profile.cpu, memory: profile.memory, storage: profile.storage },
         ...(await sourceOf(deps, resumed.serviceId, resumed.branch)), ...previewRouteOf(settings, resumed, svc.slug),
       });
+      await recordPodInstance(deps, resumed, podUid);
       return resumed;
     },
   };

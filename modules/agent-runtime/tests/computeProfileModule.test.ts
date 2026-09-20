@@ -18,7 +18,7 @@ const dev: Actor = { userId: 'usr_1123456789abcdef0123456789abcdef' as UserId, i
 const layout = { pullBase: 'registry.cs.svc:5000', pushHost: 'registry.cs.localhost', baseRepository: 'crewstation/task-runtime', runtimePrefix: 'runtime/' };
 const digests = new Map<string, string>([['runtime/glm:1.2', `sha256:${'1'.repeat(64)}`], ['crewstation/task-runtime:dev', `sha256:${'2'.repeat(64)}`], ['runtime/tool:1', `sha256:${'3'.repeat(64)}`]]);
 const executions: ProfileTestInput[] = [];
-let result: (input: ProfileTestInput) => ProfileTestResult = () => ({ state: 'passed', outcome: 'passed', stages: [{ id: 'model', kind: 'model', name: '真实模型轮次', state: 'succeeded', detail: '回显了测试标记' }] });
+let result: (input: ProfileTestInput) => ProfileTestResult | Promise<ProfileTestResult> = () => ({ state: 'passed', outcome: 'passed', stages: [{ id: 'model', kind: 'model', name: '真实模型轮次', state: 'succeeded', detail: '回显了测试标记' }] });
 let references: string[] = [];
 const noHeartbeat = async () => true;
 
@@ -58,7 +58,7 @@ afterAll(async () => { await tdb?.drop(); });
 describe.skipIf(!available)('算力档位模块（RFC-006）', () => {
   test('建档：镜像规范化并按摘要固定、凭据只回「已设置」、自动排测试；测试通过前租户不可选', async () => {
     const created = await mod.api.createProfile(admin, claude());
-    expect(created).toMatchObject({ name: 'glm-claude', protocol: 'claude-code', revision: 1, image: 'registry.cs.svc:5000/runtime/glm:1.2', imageDigest: digests.get('runtime/glm:1.2'), binaryPath: '/opt/glm/bin/claude', model: 'glm-4.6', enabled: true, isDefault: false });
+    expect(created).toMatchObject({ name: 'glm-claude', protocol: 'claude-code', revision: 1, image: 'registry.cs.svc:5000/runtime/glm:1.2', imageDigest: digests.get('runtime/glm:1.2'), binaryPath: '/opt/glm/bin/claude', model: 'glm-4.6', enabled: true, isDefault: false, defaultVisible: true });
     expect(created.credentials).toEqual([expect.objectContaining({ name: 'TOKEN', set: true, updatedBy: admin.userId })]);
     expect(JSON.stringify(created)).not.toContain('sk-live-1');
     expect(created.latestTest).toMatchObject({ state: 'queued', trigger: 'save', revision: 1 });
@@ -231,4 +231,18 @@ describe.skipIf(!available)('算力档位模块（RFC-006）', () => {
     expect((await auth('GET', '/v2/', basic('usr_someone-else', credential.password))).status).toBe(401);
     expect((await auth('GET', '/v2/', basic(credential.username, `${credential.password.slice(0, -2)}xx`))).status).toBe(401);
   });
+  test('集群停止测试后，迟到的 passed 回执不能覆盖已停止终态', async () => {
+    const created = await mod.api.createProfile(admin, claude({ name: 'cluster-stop' }));
+    const id = created.latestTest!.testId as ProfileTestId;
+    let release!: (value: ProfileTestResult) => void, entered!: () => void;
+    const started = new Promise<void>((resolve) => { entered = resolve; });
+    result = async () => { entered(); return new Promise<ProfileTestResult>((resolve) => { release = resolve; }); };
+    const running = mod.api.runQueuedTest(id, noHeartbeat); await started;
+    await expect(mod.api.stopClusterTest(dev, id)).rejects.toMatchObject({ kind: 'forbidden' });
+    await mod.api.stopClusterTest(admin, id); release({ state: 'passed', outcome: 'passed', stages: [] }); await running;
+    expect(await mod.api.getTest(admin, 'cluster-stop', id)).toMatchObject({ state: 'unknown', outcome: 'environment-lost', error: expect.stringContaining('管理员停止') });
+    await mod.api.stopClusterTest(admin, id); expect((await mod.api.getTest(admin, 'cluster-stop', id)).state).toBe('unknown');
+    result = () => ({ state: 'passed', outcome: 'passed', stages: [] });
+  });
+
 });

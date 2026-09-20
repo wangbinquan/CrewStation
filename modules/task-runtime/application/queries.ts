@@ -1,7 +1,7 @@
 import type { Actor, ProjectId, TaskId } from '@crewstation/contracts';
 import { TASKRUNNER_PROTOCOL_VERSION } from '@crewstation/contracts';
 import type { DevSessionDto } from '@crewstation/contracts';
-import { notFound } from '@crewstation/kernel';
+import { notFound, precondition } from '@crewstation/kernel';
 import { tokenMatches } from '../domain/runnerToken';
 import type { EnvironmentState, TaskEnvironment } from '../domain/taskEnvironment';
 import type { TaskRuntimeUseCaseDeps } from './dependencies';
@@ -40,6 +40,16 @@ export function environmentToDto(env: TaskEnvironment): EnvironmentDto {
 export function environmentQueries(deps: TaskRuntimeUseCaseDeps) {
   const { uow, authorizer } = deps;
   return {
+    listClusterTasks: async () => {
+      const result: ReturnType<typeof clusterTask>[] = []; let after: string | undefined;
+      for (let page = 0; page < 1000; page++) {
+        const environments = await uow.read.environments.listByStates(['creating', 'running', 'paused', 'releasing', 'released', 'failed'], { after, limit: 500 });
+        result.push(...environments.map(clusterTask));
+        if (environments.length < 500) return result;
+        after = environments.at(-1)!.id;
+      }
+      throw precondition('任务目录超过单轮采集上限，保留上次快照');
+    },
     getEnvironment: async (taskId: TaskId): Promise<TaskEnvironment | undefined> => uow.read.environments.getById(taskId),
     listEnvironments: async (actor: Actor, projectId: ProjectId, states?: EnvironmentState[]): Promise<EnvironmentDto[]> => {
       await authorizer.authorize(actor, projectId, 'view');
@@ -68,3 +78,5 @@ export function environmentQueries(deps: TaskRuntimeUseCaseDeps) {
     },
   };
 }
+
+function clusterTask(e: TaskEnvironment) { return ({ taskId: e.id, projectId: e.projectId, namespace: e.namespace, podName: e.podName, pvcName: e.pvcName, ...(e.podUid ? { podUid: e.podUid } : {}), kind: e.kind, state: e.state, profile: e.native?.computeProfile?.name ?? e.labels['crewstation.io/compute-profile'] ?? e.profile, ...(e.kind === 'profile-test' && e.labels['crewstation.io/profile-revision'] ? { profileRevision: Number(e.labels['crewstation.io/profile-revision']) } : {}), revision: e.updatedAt.toISOString(), volumeMode: e.volumeMode, ...(e.native ? { purpose: e.native.purpose ?? 'cli', parentTaskId: e.native.parentTaskId, agentId: e.native.agentId, ...(e.native.terminalId ? { terminalId: e.native.terminalId } : {}), ...(e.native.podUid ? { podUid: e.native.podUid } : {}), pvcUid: e.native.pvcUid, ...(e.native.computeProfile ? { profileRevision: e.native.computeProfile.revision } : {}) } : {}) }); }

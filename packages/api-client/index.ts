@@ -29,3 +29,4 @@ export type { GatewayAllowlistDto, GatewayReconcileResult, GatewayResource, Gate
 export type { ObservabilityResource } from './resources/observability';
 export type { CapabilitiesResource } from './resources/capabilities';
 export type { ComputeProfilesResource } from './resources/computeProfiles';
+export type { ClusterResourceClient } from './resources/cluster';

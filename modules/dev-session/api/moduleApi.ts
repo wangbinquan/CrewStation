@@ -16,6 +16,10 @@ export interface NativeTerminalApi {
 
 export interface DevSessionModuleApi extends NativeTerminalApi {
   readonly name: 'dev-session';
+  inspectClusterNative(actor: Actor, id: TaskId): Promise<Record<string, unknown>>;
+  inspectClusterAgent(actor: Actor, id: TaskId): Promise<Record<string, unknown>>;
+  manageClusterNative(actor: Actor, id: TaskId, restart: boolean, operationId: string): Promise<{ operationId: string }>;
+  manageClusterAgent(actor: Actor, id: TaskId, restart: boolean, operationId: string): Promise<{ operationId: string }>;
   dispatchPendingNativeExecution(executionTaskId: TaskId): Promise<void>;
   reconcileNativeExecutions(): Promise<void>;
   inspectSessionRebuild(actor: Actor, projectId: ProjectId): Promise<DevSessionRebuildInspection>;

@@ -78,6 +78,7 @@ export class AgentExecutionLifecycle {
   private async tick(agentId: string): Promise<void> {
     let start = await this.repo.get(agentId);
     if (!start || start.finalized) return;
+    if (start.state === 'pending' && start.execution.previousTaskId) { const old = await this.deps.environments.getEnvironment(start.execution.previousTaskId); if (old && old.native?.state !== 'finished') return; }
     let env = await this.deps.environments.getEnvironment(start.execution.taskId);
     if (start.state === 'pending' && !env) env = await this.admit(start).catch((error: unknown) => { if (definitive(error)) return undefined; throw error; });
     start = (await this.repo.get(agentId))!;

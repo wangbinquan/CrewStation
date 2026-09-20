@@ -1,3 +1,4 @@
+import type { JsonPatch } from './client';
 import { conflict } from '@crewstation/kernel';
 import type { K8sClient } from './client';
 import type { K8sObject, ResourceRef } from './resources';
@@ -19,15 +20,29 @@ export function createFakeK8sClient(): FakeK8sClient {
   let version = 1;
   const stamp = <T extends K8sObject>(obj: T): T => ({ ...obj, metadata: { ...obj.metadata, resourceVersion: String(version++), uid: obj.metadata.uid ?? `uid-${obj.metadata.name}` } });
   const keyFor = (ref: ResourceRef, name: string, namespace?: string): string => keyOf(ref.apiVersion, ref.kind, ref.namespaced ? namespace : undefined, name);
+  const select = (ref: ResourceRef, namespace?: string, labelSelector = '') => {
+    const selector = Object.fromEntries(labelSelector.split(',').filter(Boolean).map((pair) => pair.split('=') as [string, string]));
+    return [...objects.values()].filter((o) => o.apiVersion === ref.apiVersion && o.kind === ref.kind && (!namespace || o.metadata.namespace === namespace)
+      && Object.entries(selector).every(([k, v]) => o.metadata.labels?.[k] === v));
+  };
   return {
     objects,
     applied,
     deleted,
     get: async (ref, name, namespace) => objects.get(keyFor(ref, name, namespace)) as never,
-    list: async (ref, namespace, options = {}) => {
-      const selector = Object.fromEntries((options.labelSelector ?? '').split(',').filter(Boolean).map((pair) => pair.split('=') as [string, string]));
-      return [...objects.values()].filter((o) => o.apiVersion === ref.apiVersion && o.kind === ref.kind && (!namespace || o.metadata.namespace === namespace)
-        && Object.entries(selector).every(([k, v]) => o.metadata.labels?.[k] === v)) as never;
+    list: async (ref, namespace, options = {}) => select(ref, namespace, options.labelSelector) as never,
+    listPage: async (ref, namespace, options = {}) => {
+      options.signal?.throwIfAborted();
+      const all = select(ref, namespace, options.labelSelector);
+      const start = Number(options.continue ?? 0), end = start + (options.limit ?? all.length);
+      return { items: all.slice(start, end), resourceVersion: String(version), continue: end < all.length ? String(end) : '' } as never;
+    },
+    jsonPatch: async (ref, name, namespace, patches) => {
+      const key = keyFor(ref, name, namespace), current = objects.get(key);
+      if (!current) throw conflict(`${ref.kind} ${name} 不存在`);
+      const copy = structuredClone(current);
+      for (const patch of patches) applyJsonPatch(copy, patch);
+      const stored = stamp(copy); objects.set(key, stored); applied.push(stored); return stored as never;
     },
     create: async (obj) => {
       const key = keyFor(refOf(obj), obj.metadata.name, obj.metadata.namespace);
@@ -72,4 +87,18 @@ function deepMerge(base: Record<string, unknown>, patch: Record<string, unknown>
     else out[k] = v;
   }
   return out;
+}
+
+function applyJsonPatch(object: K8sObject, patch: JsonPatch): void {
+  const parts = patch.path.slice(1).split('/').map((s) => s.replaceAll('~1', '/').replaceAll('~0', '~'));
+  const key = parts.pop()!;
+  let parent: Record<string, unknown> = object;
+  for (const part of parts) {
+    if (!parent[part] || typeof parent[part] !== 'object') throw conflict(`JSON Patch 路径不存在：${patch.path}`);
+    parent = parent[part] as Record<string, unknown>;
+  }
+  if (patch.op === 'test') {
+    if (JSON.stringify(parent[key]) !== JSON.stringify(patch.value)) throw conflict(`JSON Patch 前置条件不匹配：${patch.path}`);
+  } else if (patch.op === 'remove') delete parent[key];
+  else parent[key] = structuredClone(patch.value);
 }

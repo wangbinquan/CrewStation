@@ -96,6 +96,7 @@ export function createTaskRuntimeModule(deps: TaskRuntimeModuleDeps): TaskRuntim
   });
   const api: TaskRuntimeModuleApi = {
     name: 'task-runtime',
+    listClusterTasks: queries.listClusterTasks,
     ...rebuild,
     createEnvironment: async (input) => environmentToDto(await create(input)),
     createNativeExecution: async (input) => environmentToDto(await createNative(input)),

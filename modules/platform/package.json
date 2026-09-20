@@ -38,7 +38,8 @@
     "@crewstation/queue": "workspace:*",
     "@crewstation/session-client": "workspace:*",
     "@crewstation/settings": "workspace:*",
-    "hono": "4.13.7"
+    "hono": "4.13.7",
+    "@crewstation/module-cluster-management": "workspace:*"
   },
   "devDependencies": {
     "@crewstation/testkit": "workspace:*"

@@ -47,3 +47,7 @@ export * from './api/market/appListing';
 export * from './api/workbench/projectPage';
 export * from './api/workbench/projectSummary';
 export * from './api/requests/page';
+export * from './api/cluster/resources';
+export * from './api/cluster/operations';
+
+export * from './api/compute/projectCompute';

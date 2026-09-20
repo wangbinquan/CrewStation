@@ -71,6 +71,7 @@ export interface CreateNativeExecutionInput {
 /** task-runtime 对外能力：环境生命周期与配额；授权由 dev-session／business-task 在调用前完成，这里只做准入与集群操作。 */
 export interface TaskRuntimeModuleApi {
   readonly name: 'task-runtime';
+  listClusterTasks(): Promise<Array<{ taskId: string; projectId: string; namespace: string; podName: string; podUid?: string; pvcName: string; pvcUid?: string; kind: string; state: string; purpose?: string; parentTaskId?: string; agentId?: string; terminalId?: string; profile: string; profileRevision?: number; revision: string; volumeMode: string }>>;
   createEnvironment(input: CreateEnvironmentInput): Promise<EnvironmentDto>;
   createNativeExecution(input: CreateNativeExecutionInput): Promise<EnvironmentDto>;
   releaseEnvironment(taskId: TaskId, reason: ReleaseReason): Promise<EnvironmentDto>;
@@ -82,7 +83,7 @@ export interface TaskRuntimeModuleApi {
   onRunnerDisconnected(taskId: TaskId, token: string): Promise<void>;
   /** 握手被拒（协议不一致）：只记录原因，不改状态、不删 Pod（RFC-006 §5.3）。 */
   onRunnerRejected(taskId: TaskId, token: string, rejection: { code: 'protocol_mismatch'; runnerProtocol: number | null; message: string }): Promise<void>;
-  inspectRebuild(projectId: ProjectId): Promise<DevSessionRebuildInspection>;
+  inspectRebuild(projectId: ProjectId, administrator?: boolean): Promise<DevSessionRebuildInspection>;
   requestRebuild(projectId: ProjectId, input: RebuildDevSessionRequest): Promise<DevSessionRebuildDto>;
   getRebuild(taskId: TaskId): Promise<DevSessionRebuildDto | undefined>;
   getEnvironment(taskId: TaskId): Promise<EnvironmentDto | undefined>;

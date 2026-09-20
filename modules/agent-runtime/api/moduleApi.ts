@@ -1,5 +1,5 @@
 import type {
-  Actor, AgentProtocol, BeforeStartMaterial, ComputeProfileDetailDto, ComputeProfileList, ComputeProfileSummaryDto, ComputeUsage, CopyComputeProfileRequest, CreateComputeProfileRequest,
+  Actor, ProjectId, ProjectComputePolicyDto, SaveProjectComputePolicy, AgentProtocol, BeforeStartMaterial, ComputeProfileDetailDto, ComputeProfileList, ComputeProfileSummaryDto, ComputeUsage, CopyComputeProfileRequest, CreateComputeProfileRequest,
   LaunchSpec, ProfileRevisionRef, ProfileTestDto, ProfileTestId, RegistryPushCredential, RuntimeImagesInfo, SaveComputeProfileRequest, StartProfileTestRequest,
 } from '@crewstation/contracts';
 
@@ -28,6 +28,14 @@ export interface ProfileLaunchMaterial extends ResolvedProfile {
  */
 export interface AgentRuntimeModuleApi {
   readonly name: 'agent-runtime';
+  getProjectComputePolicy(actor: Actor, projectId: ProjectId): Promise<ProjectComputePolicyDto>;
+  saveProjectComputePolicy(actor: Actor, projectId: ProjectId, input: SaveProjectComputePolicy): Promise<ProjectComputePolicyDto>;
+  projectDevTaskProfile(projectId: ProjectId): Promise<string | undefined>;
+  listProjectSummaries(actor: Actor, projectId: ProjectId): Promise<ComputeProfileSummaryDto[]>;
+  resolveForProject(projectId: ProjectId, name: string | undefined, usage: ComputeUsage): Promise<ResolvedProfile>;
+  lookupForProjectRelease(projectId: ProjectId, name: string): Promise<{ name: string; terminalOnly: boolean } | undefined>;
+  setDefaultVisible(actor: Actor, name: string, visible: boolean): Promise<ComputeProfileDetailDto>;
+  stopClusterTest(actor: Actor, testId: ProfileTestId): Promise<void>;
   listProfiles(actor: Actor): Promise<ComputeProfileList>;
   createProfile(actor: Actor, input: CreateComputeProfileRequest): Promise<ComputeProfileDetailDto>;
   getProfile(actor: Actor, name: string): Promise<ComputeProfileDetailDto>;

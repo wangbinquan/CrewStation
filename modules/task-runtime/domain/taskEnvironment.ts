@@ -52,6 +52,8 @@ export interface TaskEnvironment {
   readonly profile: string;
   readonly namespace: string;
   readonly podName: string;
+  /** Exact current instance; names alone cannot authorize cluster operations. */
+  readonly podUid?: string;
   readonly pvcName: string;
   readonly traceId: TraceId;
   /** 一次性令牌的 sha256；明文只进容器环境变量。 */

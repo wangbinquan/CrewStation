@@ -1,3 +1,8 @@
+import { precondition } from '@crewstation/kernel';
+import { projectComputePolicyUseCases } from './application/projectComputePolicy';
+import { projectProfileUseCases } from './application/projectProfiles';
+import { projectComputeRoutes } from './http/projectComputeRoutes';
+import type { ComputeProjects } from './ports/projects';
 import { join } from 'node:path';
 import type { UserId } from '@crewstation/contracts';
 import type { AppEnv } from '@crewstation/http';
@@ -28,6 +33,7 @@ import { testWorker } from './workers/testWorker';
 
 export interface AgentRuntimeModuleDeps {
   db: Database;
+  projects?: ComputeProjects;
   isAdmin: (userId: UserId) => Promise<boolean>;
   /** 平台命名空间里的档位测试执行器（task-runtime 实现，由组合根注入，ADR-0005）。 */
   executor: ProfileTestExecutor;
@@ -36,7 +42,7 @@ export interface AgentRuntimeModuleDeps {
   /** 资源套餐目录（project 实现，由组合根注入）。 */
   taskProfiles: TaskProfileDirectory;
   /** registry.baseTag：平台底座镜像的标签；pushCredentialTtlSeconds：推送凭据有效期，默认 8 小时。 */
-  settings: { secretKeyBase64: string; registry: RegistryLayout & { scheme: 'http' | 'https'; baseTag: string }; pushCredentialTtlSeconds?: number };
+  settings: { defaultTaskProfile?: string; secretKeyBase64: string; registry: RegistryLayout & { scheme: 'http' | 'https'; baseTag: string }; pushCredentialTtlSeconds?: number };
   registry?: ImageRegistry;
   cipher?: SecretCipher;
   clock?: Clock;
@@ -62,6 +68,8 @@ export function createAgentRuntimeModule(deps: AgentRuntimeModuleDeps): AgentRun
   const logger = deps.logger ?? noopLogger;
   const { scheme, baseTag, ...layout } = deps.settings.registry;
   const useCaseDeps: AgentRuntimeUseCaseDeps = {
+    projects: deps.projects ?? { authorize: async () => { throw precondition('项目目录尚未装配'); }, name: async () => { throw precondition('项目目录尚未装配'); } },
+    defaultTaskProfile: deps.settings.defaultTaskProfile ?? 'coding-medium',
     uow: drizzleUnitOfWork(deps.db), cipher: deps.cipher ?? secretboxCipher(deps.settings.secretKeyBase64), executor: deps.executor, references: deps.references,
     taskProfiles: deps.taskProfiles, registry: deps.registry ?? httpImageRegistry({ layout, scheme }), clock: deps.clock ?? systemClock, logger,
   };
@@ -73,12 +81,14 @@ export function createAgentRuntimeModule(deps: AgentRuntimeModuleDeps): AgentRun
   const images = runtimeImageUseCases(useCaseDeps, { signingKey, baseTag, ttlSeconds: deps.settings.pushCredentialTtlSeconds ?? 8 * 3600 });
   const api: AgentRuntimeModuleApi = {
     name: 'agent-runtime',
+    ...projectComputePolicyUseCases(useCaseDeps), ...projectProfileUseCases(useCaseDeps),
     listProfiles: queries.listProfiles, getProfile: queries.getProfile, listSummaries: queries.listSummaries,
     ...profileWriteUseCases(useCaseDeps),
     ...profileSettingUseCases(useCaseDeps),
+    stopClusterTest: tests.stopClusterTest,
     startTest: tests.startTest, getTest: tests.getTest, runQueuedTest: tests.runQueuedTest,
     resolve: resolver.resolve, launchMaterial: resolver.launchMaterial, lookupForRelease: resolver.lookupForRelease, listNames: resolver.listNames,
     runtimeImages: images.runtimeImages, issuePushCredential: images.issuePushCredential, authorizeRegistryRequest: images.authorizeRegistryRequest,
   };
-  return { api, http: [computeProfileAdminRoutes(api, deps.isAdmin), computeProfileCatalogRoutes(api)], forwardAuth: [registryForwardAuthRoutes(api)], workers: [testWorker(deps.db, api, logger)], migrations: agentRuntimeMigrations };
+  return { api, http: [computeProfileAdminRoutes(api, deps.isAdmin), computeProfileCatalogRoutes(api), projectComputeRoutes(api, deps.isAdmin)], forwardAuth: [registryForwardAuthRoutes(api)], workers: [testWorker(deps.db, api, logger)], migrations: agentRuntimeMigrations };
 }

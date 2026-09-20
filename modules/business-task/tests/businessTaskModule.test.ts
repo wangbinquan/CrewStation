@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import type { ProfileRevisionRef, ProjectId, ReleaseId, RunnerCommand, RunnerEvent, ServiceActor, ServiceId, TaskId } from '@crewstation/contracts';
-import { LaunchSpecSchema } from '@crewstation/contracts';
+import { ClusterOperationSchema, ClusterResourceSchema, LaunchSpecSchema } from '@crewstation/contracts';
 import { eventbusMigrations } from '@crewstation/eventbus';
 import { forbidden, precondition, quotaExceeded, validation } from '@crewstation/kernel';
 import type { TestDatabase } from '@crewstation/testkit';
@@ -294,4 +294,30 @@ test.skipIf(!available)('业务子任务按所属项目校验档位；拒绝后�
     const retried = await bt.api.retrySubtask(caller, task.id, sub.id);
     expect(retried.state).toBe('running'); expect(computeProjects.at(-1)).toBe(projectId);
   } finally { denyCompute = false; await bt.api.closeTask(caller, task.id); }
+});
+
+
+test.skipIf(!available)('集群入口不重放成功业务；失败子任务的重复操作只受理一次，并沿原取消流程结束', async () => {
+  const actor = { userId: 'usr_0123456789abcdef0123456789abcdef' as never, isAdmin: true };
+  const task = await bt.api.createTask(caller, { labels: {} });
+  const target = (taskId: string) => ClusterResourceSchema.parse({ resourceId: taskId, apiVersion: 'v1', kind: 'Pod', namespace: 'cs-demo', name: taskId, uid: taskId, resourceVersion: '1', revision: '1', observedAt: new Date().toISOString(), view: 'pods', ownership: { scope: 'project', projectId, projectName: 'Demo', slug: 'demo', projectKind: 'DigitalWorker', archived: false }, purpose: 'business-subtask', phase: 'Running', ready: true, abnormal: false, reason: '', topLevel: true, standalone: true, restarts: 0, labels: {}, owners: [], references: [], containers: [], facts: {}, availableActions: [], taskId });
+  try {
+    const done = await bt.api.submitSubtask(caller, task.id, { kind: 'agent', name: 'completed-cluster', agentProfile: 'chat-v1', mode: 'oneshot', prompt: 'already done' });
+    const start = commands.at(-1) as Extract<RunnerCommand, { type: 'startAgent' }>;
+    const execution = runnerOf(start); emit(execution, agentEvent(start.agentId, 'completed', { result: { exitCode: 0 } }));
+    expect((await bt.api.getSubtask(caller, task.id, done.id)).state).toBe('succeeded');
+    await expect(bt.api.inspectClusterTask(actor, target(execution), { action: 'restart' })).rejects.toThrow('成功业务不会重复执行');
+    const failed = await bt.api.submitSubtask(caller, task.id, { kind: 'agent', name: 'retry-cluster', agentProfile: 'chat-v1', mode: 'oneshot', prompt: 'retry me' });
+    const failedStart = commands.at(-1) as Extract<RunnerCommand, { type: 'startAgent' }>;
+    const oldExecution = runnerOf(failedStart); await bt.api.cancelSubtask(caller, task.id, failed.id);
+    const resource = target(oldExecution), before = commands.filter((c) => c.type === 'startAgent').length;
+    expect(await bt.api.inspectClusterTask(actor, resource, { action: 'restart' })).toMatchObject({ subtaskState: 'cancelled' });
+    const operation = ClusterOperationSchema.parse({ operationId: crypto.randomUUID(), inspectionId: 'inspection', idempotencyKey: 'cluster-retry', actorId: actor.userId, action: 'restart', params: { action: 'restart' }, target: resource, phase: 'executing', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), durationMs: 0, traceId: 'trace', httpStatus: 202, reason: '' });
+    const first = await bt.api.executeClusterTask(actor, operation), repeated = await bt.api.executeClusterTask(actor, operation);
+    expect(repeated.operationId).toBe(first.operationId); expect(commands.filter((c) => c.type === 'startAgent')).toHaveLength(before + 1);
+    expect(await bt.api.observeClusterTask(operation)).toMatchObject({ done: true, failed: false });
+    const restarted = runnerOf(commands.at(-1)!); expect(restarted).not.toBe(oldExecution); expect(released).not.toContain(task.id);
+    const close = ClusterOperationSchema.parse({ ...operation, operationId: crypto.randomUUID(), action: 'delete', params: { action: 'delete' }, target: target(restarted) });
+    await bt.api.executeClusterTask(actor, close); expect(released).toContain(restarted); expect(released).not.toContain(task.id);
+  } finally { await bt.api.closeTask(caller, task.id); }
 });

@@ -86,6 +86,7 @@ export class NativeExecutionLifecycle {
   private async tick(executionId: TaskId) {
     let start = await this.repo.findExecution(executionId);
     if (!start?.execution || start.execution.finalized) return;
+    if (start.execution.previousTaskId && !start.execution.stopRequested) { const old = await this.deps.environments.getEnvironment(start.execution.previousTaskId); if (old && old.native?.state !== 'finished') return; }
     let env = await this.deps.environments.getEnvironment(executionId);
     if (!env && !nativeEnded(start.record)) {
       if (start.execution.stopRequested) await this.finishRecord(start, 'stopped');

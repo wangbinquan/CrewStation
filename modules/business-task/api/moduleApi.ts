@@ -1,8 +1,11 @@
-import type { Actor, BusinessTaskDto, CreateBusinessTaskRequest, DomainPayload, ProjectId, ServiceActor, SubmitSubtaskRequest, SubtaskDto, SubtaskId, SubtaskMessageRequest, TaskId } from '@crewstation/contracts';
+import type { ClusterOperation, ClusterResource, ClusterInspectRequest, Actor, BusinessTaskDto, CreateBusinessTaskRequest, DomainPayload, ProjectId, ServiceActor, SubmitSubtaskRequest, SubtaskDto, SubtaskId, SubtaskMessageRequest, TaskId } from '@crewstation/contracts';
 
 /** business-task 对外能力：业务服务以自身身份创建任务并提交契约化子任务；用户只读查看。 */
 export interface BusinessTaskModuleApi {
   readonly name: 'business-task';
+  inspectClusterTask(actor: Actor, target: ClusterResource, request: ClusterInspectRequest): Promise<Record<string, unknown>>;
+  executeClusterTask(actor: Actor, operation: ClusterOperation): Promise<{ operationId: string }>;
+  observeClusterTask(operation: ClusterOperation): Promise<{ done: boolean; failed?: boolean; reason: string }>;
   createTask(caller: ServiceActor, input: CreateBusinessTaskRequest): Promise<BusinessTaskDto>;
   getTask(caller: ServiceActor, taskId: TaskId): Promise<BusinessTaskDto>;
   closeTask(caller: ServiceActor, taskId: TaskId): Promise<BusinessTaskDto>;

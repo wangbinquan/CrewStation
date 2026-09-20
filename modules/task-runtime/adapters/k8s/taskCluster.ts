@@ -42,8 +42,9 @@ export function kubernetesTaskCluster(k8s: K8sClient, workerUid: number): TaskCl
       await k8s.create(pvcObject({ name: env.pvcName, namespace: env.namespace, size, labels: { [LABELS.task]: env.id, [LABELS.project]: env.labels[LABELS.project] ?? '' } }));
     },
     createPod: async (spec) => {
-      await k8s.create(taskPodObject(spec, workerUid));
+      const pod = await k8s.create(taskPodObject(spec, workerUid));
       await ensureTaskPreview(k8s, spec);
+      return pod.metadata.uid;
     },
     podPhase: async (env) => {
       const pod = await k8s.get<PodObject>(Resources.Pod!, env.podName, env.namespace);
@@ -52,7 +53,7 @@ export function kubernetesTaskCluster(k8s: K8sClient, workerUid: number): TaskCl
       const message = podMessage(pod);
       const imageId = pod.status?.containerStatuses?.[0]?.imageID;
       const waitingReason = pod.status?.containerStatuses?.[0]?.state?.waiting?.reason ?? pod.status?.containerStatuses?.[0]?.state?.terminated?.reason;
-      return { phase, ...(pod.status?.podIP ? { ip: pod.status.podIP } : {}), ...(message ? { message } : {}), ...(imageId ? { imageId } : {}), ...(waitingReason ? { waitingReason } : {}) };
+      return { phase, ...(pod.metadata.uid ? { uid: pod.metadata.uid } : {}), ...(pod.status?.podIP ? { ip: pod.status.podIP } : {}), ...(message ? { message } : {}), ...(imageId ? { imageId } : {}), ...(waitingReason ? { waitingReason } : {}) };
     },
     deletePod: async (env) => {
       await removeTaskPod(k8s, env);

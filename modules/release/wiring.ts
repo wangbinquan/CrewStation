@@ -1,3 +1,5 @@
+import { kubernetesSlotControl } from './adapters/k8s/slotControl';
+import { slotMaintenanceUseCases } from './application/slotMaintenance';
 import { join } from 'node:path';
 import type { UserId } from '@crewstation/contracts';
 import type { AppEnv } from '@crewstation/http';
@@ -81,6 +83,7 @@ export function createReleaseModule(deps: ReleaseModuleDeps): ReleaseModule {
   };
   const api: ReleaseModuleApi = {
     name: 'release',
+    ...slotMaintenanceUseCases({ ...useCaseDeps, slotControl: kubernetesSlotControl(deps.k8s), isAdmin: deps.isAdmin }),
     publish: publishUseCase(useCaseDeps),
     switchTraffic: switchTrafficUseCase(useCaseDeps),
     ...releaseQueries(useCaseDeps),

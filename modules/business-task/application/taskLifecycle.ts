@@ -37,7 +37,7 @@ export function taskLifecycleUseCases(deps: BusinessTaskUseCaseDeps) {
     closeTask: async (caller: ServiceActor, taskId: TaskId): Promise<BusinessTaskDto> => {
       const task = await ownedTask(caller, taskId);
       if (task.state === 'closed') return taskToDto(task);
-      const closing = transition(task, 'closing', clock.now());
+      const closing = task.state === 'closing' ? task : transition(task, 'closing', clock.now());
       await uow.run((scope) => scope.tasks.update(closing));
       await environments.releaseEnvironment(taskId, 'business');
       const closed = transition(closing, 'closed', clock.now(), { closedAt: clock.now() });

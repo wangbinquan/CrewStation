@@ -13,6 +13,7 @@ export const environments = taskRuntimeSchema.table('environments', {
   profile: text('profile').notNull(),
   namespace: text('namespace').notNull(),
   podName: text('pod_name').notNull(),
+  podUid: text('pod_uid'),
   pvcName: text('pvc_name').notNull(),
   traceId: text('trace_id').notNull(),
   runnerTokenHash: text('runner_token_hash').notNull(),

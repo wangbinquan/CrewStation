@@ -6,7 +6,7 @@ export interface EnvironmentRepository {
   update(env: TaskEnvironment): Promise<void>;
   getById(id: TaskId): Promise<TaskEnvironment | undefined>;
   listByProject(projectId: ProjectId, states?: EnvironmentState[]): Promise<TaskEnvironment[]>;
-  listByStates(states: EnvironmentState[]): Promise<TaskEnvironment[]>;
+  listByStates(states: EnvironmentState[], page?: { after?: string; limit: number }): Promise<TaskEnvironment[]>;
   listByTrace(traceId: string): Promise<TaskEnvironment[]>;
   listChildren(parentTaskId: TaskId): Promise<TaskEnvironment[]>;
   pendingExecutions(): Promise<TaskEnvironment[]>;

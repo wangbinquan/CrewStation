@@ -1,3 +1,5 @@
+import { clusterResource } from './resources/cluster';
+import type { ClusterResourceClient } from './resources/cluster';
 import type { TransportOptions } from './httpTransport';
 import { createTransport } from './httpTransport';
 import type { AuthResource } from './resources/auth';
@@ -58,6 +60,7 @@ export interface ApiClient {
   readonly apiCatalog: ApiCatalogResource;
   readonly events: EventsResource;
   readonly gateway: GatewayResource;
+  readonly cluster: ClusterResourceClient;
   readonly observability: ObservabilityResource;
   readonly capabilities: CapabilitiesResource;
   /** RFC-006：算力档位管理（仅管理员）。 */
@@ -84,6 +87,7 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
     events: eventsResource(transport),
     gateway: gatewayResource(transport),
     observability: observabilityResource(transport),
+    cluster: clusterResource(transport),
     capabilities: capabilitiesResource(transport),
     computeProfiles: computeProfilesResource(transport),
     stream: { taskStreamUrl: (taskId, sinceSeq = 0, replay) => taskStreamUrl(transport.baseUrl, taskId, sinceSeq, replay) },

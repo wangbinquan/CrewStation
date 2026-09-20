@@ -1,3 +1,4 @@
+import type { SlotMaintenance, ClusterSlotProjection } from '../domain/slotMaintenance';
 import type { ReleaseId, ServiceId, SlotName, UserId } from '@crewstation/contracts';
 import type { Release } from '../domain/release';
 import type { ServiceSlots } from '../domain/slots';
@@ -33,4 +34,13 @@ export interface TrafficSwitchRecord {
 export interface TrafficSwitchRepository {
   insert(record: TrafficSwitchRecord): Promise<void>;
   listByService(serviceId: ServiceId, limit: number): Promise<TrafficSwitchRecord[]>;
+}
+
+export interface MaintenanceRepository {
+  get(id: string): Promise<SlotMaintenance | undefined>;
+  save(record: SlotMaintenance): Promise<void>;
+  active(serviceId: string): Promise<SlotMaintenance | undefined>;
+  override(serviceId: string, physical: string): Promise<number | undefined>;
+  setOverride(serviceId: string, physical: string, replicas?: number): Promise<void>;
+  projection(serviceId?: string): Promise<ClusterSlotProjection[]>;
 }

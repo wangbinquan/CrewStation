@@ -32,6 +32,10 @@ export function profileTestUseCases(deps: AgentRuntimeUseCaseDeps) {
       if (!test || test.profile !== name) throw notFound('档位测试', testId);
       return testToDto(test);
     },
+    stopClusterTest: async (actor: Actor, testId: ProfileTestId) => {
+      adminOnly(actor); const test = await uow.read.tests.get(testId); if (!test) throw notFound('档位测试', testId);
+      if (!isTestTerminal(test.state)) await uow.run((scope) => scope.tests.update({ ...test, state: 'unknown', outcome: 'environment-lost', error: '管理员停止了本次档位测试，不能判定为通过', endedAt: clock.now(), stages: skipUnreachedStages(test.stages) }));
+    },
     runQueuedTest: (testId: ProfileTestId, heartbeat: () => Promise<boolean>) => runQueuedTest(deps, testId, heartbeat),
     assertTerminal: (test: ProfileTest): void => { if (!isTestTerminal(test.state)) throw conflict('测试尚未结束'); },
   };
@@ -48,7 +52,7 @@ async function runQueuedTest(deps: AgentRuntimeUseCaseDeps, testId: ProfileTestI
   let test: ProfileTest = { ...queued, state: 'running', startedAt: clock.now() };
   const save = async (): Promise<void> => {
     const latest = await uow.read.tests.get(testId);
-    if (latest?.state === 'superseded') return;
+    if (latest && isTestTerminal(latest.state)) return;
     await uow.run((scope) => scope.tests.update(test));
   };
   const fail = async (outcome: ProfileTest['outcome'], message: string): Promise<void> => {

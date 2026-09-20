@@ -3,6 +3,7 @@
  * 失效时按前缀匹配（`queryClient.invalidateQueries({ queryKey: queryKeys.releases(serviceId) })`）。
  */
 export const queryKeys = {
+  cluster: (part: string, query?: unknown) => ['cluster', part, query] as const,
   me: () => ['me'] as const,
   users: () => ['users'] as const,
   loginPolicy: () => ['auth', 'login-policy'] as const,
@@ -64,7 +65,7 @@ export const queryKeys = {
    * 算力档位（RFC-006）：租户投影与管理面分开缓存，两者字段不同；都挂在 compute-profiles 前缀下，
    * 管理员一次写入按前缀失效，租户下拉与管理列表一起刷新。测试在运行中按短间隔轮询。
    */
-  computeProfiles: () => ['compute-profiles'] as const,
+  computeProfiles: (projectId?: string) => projectId ? ['compute-profiles', projectId] as const : ['compute-profiles'] as const,
   adminComputeProfiles: () => ['compute-profiles', 'admin'] as const,
   adminComputeProfile: (name: string) => ['compute-profiles', 'admin', name] as const,
   profileTest: (name: string, testId: string) => ['compute-profiles', 'admin', name, 'tests', testId] as const,

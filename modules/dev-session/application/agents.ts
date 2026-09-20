@@ -30,7 +30,7 @@ export function agentUseCases(deps: DevSessionUseCaseDeps, starts: AgentStartRep
     startAgent: async (actor: Actor, taskId: TaskId, input: StartDevAgentRequest): Promise<AgentInstanceDto> => {
       const env = await guard(actor, taskId);
       // RFC-006：受理时解析档位（省略即 default），headless 只能用两种已知协议；此后派发只按固定修订取材料。
-      const resolved = await deps.compute.resolve(input.compute, 'agent');
+      const resolved = await deps.compute.resolve(input.compute, 'agent', env.projectId);
       const start: AgentStart = {
         agentId: newId('agt'), taskId: env.id, createdBy: actor.userId, compute: resolved.name, profile: { profile: resolved.name, revision: resolved.revision }, permission: input.permission,
         request: { prompt: input.prompt, ...(input.cwd ? { cwd: input.cwd } : {}), ...(input.resumeSessionId ? { resumeSessionId: input.resumeSessionId } : {}) },
@@ -127,4 +127,31 @@ function stateOf(event: AgentEvent, current: AgentInstanceState): AgentInstanceS
 
 function isTerminal(type: string): boolean {
   return type === 'completed' || type === 'error' || type === 'cancelled';
+}
+
+/** 集群重启生成一个可追踪的新执行；每个 operationId 只登记一次，不复用已结束 Agent。 */
+export function clusterAgentUseCases(deps: DevSessionUseCaseDeps, starts: AgentStartRepository, executions: AgentExecutionLifecycle) {
+  const load = async (actor: Actor, id: TaskId) => {
+    if (!actor.isAdmin) throw forbidden();
+    const old = await starts.findByExecution(id); if (!old) throw notFound('开发 Agent', id);
+    const env = await deps.environments.getEnvironment(old.taskId); if (!env) throw notFound('父工作区', old.taskId);
+    await deps.authorizer.authorize(actor, env.projectId, 'develop'); return { old, env };
+  };
+  return {
+    inspectClusterAgent: async (actor: Actor, id: TaskId) => { const { old } = await load(actor, id); return { parentTaskId: old.taskId, agentId: old.agentId, profile: old.profile, permission: old.permission }; },
+    manageClusterAgent: async (actor: Actor, id: TaskId, restart: boolean, operationId: string): Promise<{ operationId: string }> => {
+      const { old, env } = await load(actor, id); const suffix = operationId.replaceAll('-', '');
+      const nextId = `agt_${suffix}`, taskId = `tsk_${suffix}` as TaskId;
+      await starts.withLock(old.agentId, async () => {
+        if (restart && !await starts.get(nextId)) {
+          if (!env.connected || env.state !== 'running') throw precondition('父工作区未就绪，无法重开 Agent');
+          await starts.insert({ agentId: nextId, taskId: old.taskId, createdBy: actor.userId, compute: old.compute, profile: old.profile, permission: old.permission, request: old.request,
+            execution: { ...old.execution, taskId, runnerId: operationId, previousTaskId: id }, state: 'pending', cursor: 0, finalized: false, createdAt: deps.clock.now().toISOString() });
+        }
+        await executions.end((await starts.get(old.agentId))!, { cancelled: true });
+      });
+      await executions.dispatch(old.agentId);
+      return { operationId: restart ? taskId : id };
+    },
+  };
 }

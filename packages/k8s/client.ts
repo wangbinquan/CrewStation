@@ -4,7 +4,9 @@ import type { K8sObject, ResourceRef, WatchEventType } from './resources';
 import { refOf, resourcePath } from './resources';
 import { readWatchStream } from './watch';
 
-export interface ListOptions { labelSelector?: string; fieldSelector?: string; limit?: number }
+export interface ListOptions { labelSelector?: string; fieldSelector?: string; limit?: number; continue?: string; signal?: AbortSignal }
+export interface ListPage<T> { items: T[]; resourceVersion: string; continue: string }
+export interface JsonPatch { op: 'test' | 'add' | 'replace' | 'remove'; path: string; value?: unknown }
 export interface DeleteOptions {
   propagationPolicy?: 'Background' | 'Foreground' | 'Orphan';
   gracePeriodSeconds?: number;
@@ -12,12 +14,14 @@ export interface DeleteOptions {
   preconditions?: { uid?: string; resourceVersion?: string };
 }
 export interface WatchOptions { labelSelector?: string; resourceVersion?: string; timeoutSeconds?: number; signal?: AbortSignal }
-export interface LogOptions { container?: string; follow?: boolean; timestamps?: boolean; sinceSeconds?: number; tailLines?: number; signal?: AbortSignal }
+export interface LogOptions { container?: string; follow?: boolean; previous?: boolean; timestamps?: boolean; sinceSeconds?: number; tailLines?: number; signal?: AbortSignal }
 
 /** 平台只需要的 API Server 操作；模块通过它而不是 kubectl 管理对象。 */
 export interface K8sClient {
-  get<T extends K8sObject>(ref: ResourceRef, name: string, namespace?: string): Promise<T | undefined>;
+  get<T extends K8sObject>(ref: ResourceRef, name: string, namespace?: string, signal?: AbortSignal): Promise<T | undefined>;
   list<T extends K8sObject>(ref: ResourceRef, namespace?: string, options?: ListOptions): Promise<T[]>;
+  listPage<T extends K8sObject>(ref: ResourceRef, namespace?: string, options?: ListOptions): Promise<ListPage<T>>;
+  jsonPatch<T extends K8sObject>(ref: ResourceRef, name: string, namespace: string | undefined, patch: JsonPatch[]): Promise<T>;
   create<T extends K8sObject>(obj: T): Promise<T>;
   /** 服务端 apply：幂等写入，由 fieldManager 拥有字段。 */
   apply<T extends K8sObject>(obj: T, options?: { fieldManager?: string; force?: boolean }): Promise<T>;
@@ -47,21 +51,19 @@ export function createK8sClient(config: ClusterConfig, fetchImpl: typeof fetch =
     throw await toError(res);
   };
 
+  const listPage = async <T extends K8sObject>(ref: ResourceRef, namespace?: string, options: ListOptions = {}): Promise<ListPage<T>> => {
+    const body = await json<{ items: T[]; metadata?: { resourceVersion?: string; continue?: string } }>(await request('GET', `${resourcePath(ref, namespace)}?${listQuery(options)}`, options.signal ? { signal: options.signal } : {}));
+    return { items: body.items.map((item) => ({ ...item, apiVersion: item.apiVersion ?? ref.apiVersion, kind: item.kind ?? ref.kind })), resourceVersion: body.metadata?.resourceVersion ?? '', continue: body.metadata?.continue ?? '' };
+  };
   return {
-    get: async (ref, name, namespace) => {
-      const res = await request('GET', resourcePath(ref, namespace, name));
+    get: async (ref, name, namespace, signal) => {
+      const res = await request('GET', resourcePath(ref, namespace, name), signal ? { signal } : {});
       if (res.status === 404) return undefined;
       return json(res);
     },
-    list: async (ref, namespace, options = {}) => {
-      const params = new URLSearchParams();
-      if (options.labelSelector) params.set('labelSelector', options.labelSelector);
-      if (options.fieldSelector) params.set('fieldSelector', options.fieldSelector);
-      if (options.limit) params.set('limit', String(options.limit));
-      const query = params.toString();
-      const body = await json<{ items: K8sObject[] }>(await request('GET', `${resourcePath(ref, namespace)}${query ? `?${query}` : ''}`));
-      return body.items.map((item) => ({ ...item, apiVersion: item.apiVersion ?? ref.apiVersion, kind: item.kind ?? ref.kind })) as never;
-    },
+    list: async (ref, namespace, options) => (await listPage(ref, namespace, options)).items as never,
+    listPage,
+    jsonPatch: async (ref, name, namespace, patch) => json(await request('PATCH', resourcePath(ref, namespace, name), { body: JSON.stringify(patch), contentType: 'application/json-patch+json', signal: AbortSignal.timeout(15_000) })),
     create: async (obj) => json(await request('POST', resourcePath(refOf(obj), obj.metadata.namespace), { body: JSON.stringify(obj), contentType: 'application/json' })),
     apply: async (obj, options = {}) => {
       const params = new URLSearchParams({ fieldManager: options.fieldManager ?? 'crewstation', force: String(options.force ?? true) });
@@ -69,7 +71,7 @@ export function createK8sClient(config: ClusterConfig, fetchImpl: typeof fetch =
     },
     mergePatch: async (ref, name, namespace, patch) => json(await request('PATCH', resourcePath(ref, namespace, name), { body: JSON.stringify(patch), contentType: 'application/merge-patch+json' })),
     delete: async (ref, name, namespace, options = {}) => {
-      const res = await request('DELETE', resourcePath(ref, namespace, name), { body: JSON.stringify({ apiVersion: 'v1', kind: 'DeleteOptions', ...options }), contentType: 'application/json' });
+      const res = await request('DELETE', resourcePath(ref, namespace, name), { body: JSON.stringify({ apiVersion: 'v1', kind: 'DeleteOptions', ...options }), contentType: 'application/json', signal: AbortSignal.timeout(15_000) });
       if (res.status === 404) return false;
       if (!res.ok) throw await toError(res);
       return true;
@@ -86,6 +88,7 @@ export function createK8sClient(config: ClusterConfig, fetchImpl: typeof fetch =
       const params = new URLSearchParams();
       if (options.container) params.set('container', options.container);
       if (options.follow) params.set('follow', 'true');
+      if (options.previous) params.set('previous', 'true');
       if (options.timestamps !== undefined) params.set('timestamps', String(options.timestamps));
       if (options.sinceSeconds) params.set('sinceSeconds', String(options.sinceSeconds));
       if (options.tailLines !== undefined) params.set('tailLines', String(options.tailLines));
@@ -94,6 +97,12 @@ export function createK8sClient(config: ClusterConfig, fetchImpl: typeof fetch =
       return res.body ?? new ReadableStream<Uint8Array>({ start: (c) => c.close() });
     },
   };
+}
+
+function listQuery(options: ListOptions): URLSearchParams {
+  const params = new URLSearchParams();
+  for (const key of ['labelSelector', 'fieldSelector', 'limit', 'continue'] as const) if (options[key] !== undefined) params.set(key, String(options[key]));
+  return params;
 }
 
 async function toError(res: Response): Promise<PlatformError> {

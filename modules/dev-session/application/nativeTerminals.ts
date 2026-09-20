@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import type { Actor, NativeTerminalDto, NativeTerminalList, NativeTerminalRoster, ServiceId, StartNativeTerminalRequest, TaskId } from '@crewstation/contracts';
+import type { Actor, NativeTerminalDto, NativeTerminalList, NativeTerminalRoster, ProjectId, ServiceId, StartNativeTerminalRequest, TaskId } from '@crewstation/contracts';
 import { IDENTITY_HEADERS, NativeTerminalRecordSchema, RunnerResultPayloads } from '@crewstation/contracts';
 import { conflict, isPlatformError, newId, notFound, precondition } from '@crewstation/kernel';
 import type { NativeTerminalRepository, NativeTerminalStart } from '../ports/nativeTerminals';
@@ -20,8 +20,8 @@ class NativeTerminals {
     if (dto.lifecycle !== 'unknown') await this.repository.saveRecord(start.taskId, NativeTerminalRecordSchema.parse(dto));
     return dto;
   }
-  private async reserve(actor: Actor, taskId: TaskId, input: StartNativeTerminalRequest) {
-    const profile = await nativeCompute(this.deps, input.compute);
+  private async reserve(actor: Actor, taskId: TaskId, input: StartNativeTerminalRequest, projectId: ProjectId) {
+    const profile = await nativeCompute(this.deps, projectId, input.compute);
     return this.repository.reserve({
       taskId, createdBy: actor.userId, clientRequestId: input.clientRequestId, fingerprint: fingerprintOf(input), input,
       profile: { profile: profile.name, revision: profile.revision }, execution: { taskId: newId('tsk') as TaskId, image: profile.image, ...(profile.taskProfile ? { taskProfile: profile.taskProfile } : {}) },
@@ -33,7 +33,7 @@ class NativeTerminals {
     let start = await this.repository.findRequest(taskId, actor.userId, input.clientRequestId);
     if (!start) {
       if (!env.connected || env.state !== 'running' || env.native) throw precondition('工作区未连接或正在释放，不能新增 CLI');
-      start = await this.reserve(actor, taskId, input);
+      start = await this.reserve(actor, taskId, input, env.projectId);
     }
     if (start.fingerprint !== fingerprintOf(input)) throw conflict('此启动请求标识已用于不同配置，请保留原请求查询结果', { clientRequestId: input.clientRequestId });
     if (!start.execution) return this.legacyStart(actor, start, env);
@@ -94,4 +94,32 @@ export function nativeTerminalUseCases(deps: DevSessionUseCaseDeps, repository: 
   const cases = new NativeTerminals(deps, repository);
   return { startNativeTerminal: cases.start.bind(cases), listNativeTerminals: cases.list.bind(cases), stopNativeTerminal: cases.stop.bind(cases), getNativeTerminalSnapshot: cases.snapshot.bind(cases),
     dispatchPendingNativeExecution: cases.execution.dispatch.bind(cases.execution), reconcileNativeExecutions: cases.execution.sweep.bind(cases.execution) };
+}
+
+/** 管理员重开沿用受理时的档位修订，新的 clientRequestId 即集群 operationId。 */
+export function clusterNativeUseCases(deps: DevSessionUseCaseDeps, repository: NativeTerminalRepository) {
+  const execution = new NativeExecutionLifecycle(deps, repository);
+  const load = async (actor: Actor, executionId: TaskId) => {
+    if (!actor.isAdmin) throw precondition('仅管理员可以操作集群执行环境');
+    const old = await repository.findExecution(executionId);
+    if (!old?.execution || !old.profile) throw precondition('没有可重开的独立 CLI 受理记录');
+    await nativeEnvironment(deps, actor, old.taskId, 'develop'); return old;
+  };
+  return {
+    inspectClusterNative: async (actor: Actor, id: TaskId) => { const old = await load(actor, id); return { parentTaskId: old.taskId, agentId: old.record.agentId, profile: old.profile!, inputHash: fingerprintOf(old.input) }; },
+    manageClusterNative: async (actor: Actor, id: TaskId, restart: boolean, operationId: string): Promise<{ operationId: string }> => {
+      const old = await load(actor, id);
+      let next: NativeTerminalStart | undefined;
+      if (restart) {
+        const parent = await deps.environments.getEnvironment(old.taskId);
+        if (!parent?.connected || parent.state !== 'running') throw precondition('父工作区未就绪，无法重开 CLI');
+        const suffix = createHash('sha256').update(operationId).digest('hex').slice(0, 32);
+        next = await repository.reserve({ taskId: old.taskId, createdBy: actor.userId, clientRequestId: operationId, input: { ...old.input, clientRequestId: operationId }, fingerprint: old.fingerprint, profile: old.profile!,
+          execution: { taskId: `tsk_${suffix}` as TaskId, image: old.execution!.image, taskProfile: old.execution!.taskProfile, previousTaskId: id },
+          record: { agentId: `agt_${suffix}`, terminalId: `pty_${suffix}`, runnerId: operationId, compute: old.record.compute, permission: old.record.permission, protocol: old.record.protocol, profileRevision: old.profile!.revision, cols: old.input.cols, rows: old.input.rows, revision: 0, lifecycle: 'starting', startedAt: deps.clock.now().toISOString() } });
+      }
+      await repository.requestStop(old.taskId, old.record.agentId); await execution.dispatch(id);
+      return { operationId: next?.execution?.taskId ?? id };
+    },
+  };
 }

@@ -1,3 +1,5 @@
+import { drizzleClusterCommands } from './adapters/persistence/clusterCommands';
+import { businessClusterUseCases } from './application/clusterManagement';
 import { join } from 'node:path';
 import type { UserId } from '@crewstation/contracts';
 import { DomainTopic } from '@crewstation/contracts';
@@ -58,6 +60,7 @@ export function createBusinessTaskModule(deps: BusinessTaskModuleDeps): Business
   const registerContracts = registerContractsUseCase(useCaseDeps);
   const api: BusinessTaskModuleApi = {
     name: 'business-task',
+    ...businessClusterUseCases(useCaseDeps, drizzleClusterCommands(deps.db)),
     createTask: lifecycle.createTask, getTask: lifecycle.getTask, closeTask: lifecycle.closeTask, pauseTask: lifecycle.pauseTask, resumeTask: lifecycle.resumeTask, listProjectTasks: lifecycle.listProjectTasks,
     ...subtasks,
     registerContracts,

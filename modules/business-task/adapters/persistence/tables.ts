@@ -1,3 +1,4 @@
+import type { ClusterCommand } from '../../ports/clusterCommands';
 import { integer, text, timestamp } from 'drizzle-orm/pg-core';
 import { jsonDocument } from '@crewstation/persistence';
 import { businessTaskSchema } from './schema';
@@ -47,3 +48,5 @@ export const contracts = businessTaskSchema.table('contracts', {
   outputContracts: jsonDocument('output_contracts').notNull(),
   registeredAt: timestamp('registered_at', { withTimezone: true }).notNull(),
 });
+
+export const clusterCommands = businessTaskSchema.table('cluster_commands', { id: text('id').primaryKey(), body: jsonDocument('body').$type<ClusterCommand>().notNull() });

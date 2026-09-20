@@ -17,6 +17,7 @@ export function switchTrafficUseCase(deps: Pick<ReleaseUseCaseDeps, 'uow' | 'aut
     return uow.run(async (scope) => {
       const slots = await scope.slots.get(serviceId);
       if (!slots) throw precondition('服务尚无任何部署');
+      if (await scope.maintenance.active(serviceId)) throw precondition('集群运维操作尚未结束，请等待后再切流');
       const next = switchTraffic(slots, input.toSlot, input.expectedActiveRelease, now, input.expectedTargetRelease);
       // publish 在同一槽锁内登记目标；流水线结束前不能把它将覆盖的待命槽变成线上。
       const inProgress = await scope.releases.findInProgress(serviceId);

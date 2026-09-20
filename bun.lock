@@ -201,6 +201,24 @@
         "@crewstation/testkit": "workspace:*",
       },
     },
+    "modules/cluster-management": {
+      "name": "@crewstation/module-cluster-management",
+      "version": "0.0.0",
+      "dependencies": {
+        "@crewstation/contracts": "workspace:*",
+        "@crewstation/http": "workspace:*",
+        "@crewstation/k8s": "workspace:*",
+        "@crewstation/kernel": "workspace:*",
+        "@crewstation/persistence": "workspace:*",
+        "@crewstation/queue": "workspace:*",
+        "drizzle-orm": "0.45.2",
+        "hono": "4.13.7",
+        "zod": "4.6.2",
+      },
+      "devDependencies": {
+        "@crewstation/testkit": "workspace:*",
+      },
+    },
     "modules/config": {
       "name": "@crewstation/module-config",
       "version": "0.0.0",
@@ -369,6 +387,7 @@
         "@crewstation/module-api-catalog": "workspace:*",
         "@crewstation/module-business-task": "workspace:*",
         "@crewstation/module-capabilities": "workspace:*",
+        "@crewstation/module-cluster-management": "workspace:*",
         "@crewstation/module-config": "workspace:*",
         "@crewstation/module-data": "workspace:*",
         "@crewstation/module-dev-session": "workspace:*",
@@ -785,6 +804,8 @@
     "@crewstation/module-business-task": ["@crewstation/module-business-task@workspace:modules/business-task"],
 
     "@crewstation/module-capabilities": ["@crewstation/module-capabilities@workspace:modules/capabilities"],
+
+    "@crewstation/module-cluster-management": ["@crewstation/module-cluster-management@workspace:modules/cluster-management"],
 
     "@crewstation/module-config": ["@crewstation/module-config@workspace:modules/config"],
 

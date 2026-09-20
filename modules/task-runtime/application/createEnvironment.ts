@@ -47,8 +47,9 @@ export function createEnvironmentUseCase(deps: TaskRuntimeUseCaseDeps) {
   return async (input: CreateEnvironmentInput): Promise<TaskEnvironment> => {
     const svc = await services.resolveServiceById(input.serviceId);
     if (!svc) throw notFound('服务', input.serviceId);
-    const profile = await profiles.getTaskProfile(input.profile ?? settings.defaultProfile);
-    if (!profile) throw validation(`任务套餐 ${input.profile ?? settings.defaultProfile} 不存在`);
+    const selected = input.kind === 'dev-session' ? await profiles.devSessionProfile?.(svc.projectId) ?? settings.defaultProfile : input.profile ?? settings.defaultProfile;
+    const profile = await profiles.getTaskProfile(selected);
+    if (!profile) throw validation(`任务套餐 ${selected} 不存在`);
     const limit = await quotas.quotaLimit(svc.projectId);
     if (limit === undefined) throw validation('项目尚未配置并发任务配额');
     const volumeMode: VolumeMode = input.kind === 'dev-session' ? 'follow-container' : (input.volumeMode ?? 'follow-container');
@@ -70,10 +71,11 @@ export function createEnvironmentUseCase(deps: TaskRuntimeUseCaseDeps) {
     });
     try {
       await cluster.ensureVolume(env, profile.storage);
-      await cluster.createPod({
+      const podUid = await cluster.createPod({
         env, image: settings.taskImage, envVars: await containerEnv(deps, env, svc, token), resources: { cpu: profile.cpu, memory: profile.memory, storage: profile.storage },
         ...(await sourceOf(deps, env.serviceId, env.branch)), ...previewRouteOf(settings, env, svc.slug),
       });
+      await recordPodInstance(deps, env, podUid);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       logger.error('task pod creation failed', { taskId: id, error: message });
@@ -85,4 +87,14 @@ export function createEnvironmentUseCase(deps: TaskRuntimeUseCaseDeps) {
     }
     return env;
   };
+}
+
+/** Preserve concurrent Runner updates while binding the exact instance returned by Kubernetes. */
+export async function recordPodInstance(deps: TaskRuntimeUseCaseDeps, env: TaskEnvironment, uid: string | void): Promise<void> {
+  if (!uid) return;
+  await deps.uow.run(async (scope) => {
+    await scope.admissions.lock(env.projectId);
+    const current = await scope.environments.getById(env.id);
+    if (current?.podName === env.podName && current.runnerTokenHash === env.runnerTokenHash) await scope.environments.update({ ...current, podUid: uid });
+  });
 }

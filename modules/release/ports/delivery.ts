@@ -23,6 +23,7 @@ export interface SlotDeploySpec {
   releaseId: string;
   image: string;
   manifest: Manifest;
+  replicas?: number;
   env: Record<string, string>;
   plan: ServicePlanDto;
 }

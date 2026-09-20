@@ -1,5 +1,5 @@
 import type { Actor, BranchDto, DevSessionDto, Manifest, OpenDevSessionRequest, PreviewState, ProjectId, RebuildDevSessionRequest, TaskId, WorkspaceStatusDto } from '@crewstation/contracts';
-import { conflict, isPlatformError, notFound, precondition } from '@crewstation/kernel';
+import { forbidden, conflict, isPlatformError, notFound, precondition } from '@crewstation/kernel';
 import { inspectWorkspace } from './workspaceStatus';
 import type { DevSessionUseCaseDeps } from './dependencies';
 import type { EnvironmentView } from '../ports/runtime';
@@ -100,6 +100,7 @@ export function rebuildSessionUseCases({ authorizer, environments }: DevSessionU
       return environments.inspectRebuild(projectId);
     },
     rebuildSession: async (actor: Actor, projectId: ProjectId, input: RebuildDevSessionRequest) => {
+      if (input.reason === 'administrator-restart' && !actor.isAdmin) throw forbidden('只有管理员可以主动重启正常开发会话');
       await authorizer.authorize(actor, projectId, 'develop');
       return environments.requestRebuild(projectId, input);
     },

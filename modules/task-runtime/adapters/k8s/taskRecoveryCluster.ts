@@ -35,7 +35,8 @@ export function kubernetesTaskRecoveryCluster(k8s: K8sClient): TaskRecoveryClust
       if (!pod) return;
       if (uid(pod) !== expectedUid) throw precondition('原容器实例已变化，请重新检查恢复对象');
       const confirmedUpgrade = reason === 'protocol_mismatch' && env.kind === 'dev-session' && !env.native && env.state === 'creating' && Boolean(env.rebuildId) && !env.connected && env.runnerRejection?.code === 'protocol_mismatch';
-      if (!['Failed', 'Succeeded'].includes(phase(pod)) && !confirmedUpgrade) throw precondition('原容器尚未结束，不能重建');
+      const confirmedRestart = reason === 'administrator-restart' && env.kind === 'dev-session' && !env.native && env.state === 'creating' && Boolean(env.rebuildId) && !env.connected;
+      if (!['Failed', 'Succeeded'].includes(phase(pod)) && !confirmedUpgrade && !confirmedRestart) throw precondition('原容器尚未结束，不能重建');
       if (pod.metadata.deletionTimestamp) return;
       await k8s.delete(Resources.Pod!, env.podName, env.namespace, { gracePeriodSeconds: 30,
         preconditions: { uid: expectedUid, ...(pod.metadata.resourceVersion ? { resourceVersion: pod.metadata.resourceVersion } : {}) } });

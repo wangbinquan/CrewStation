@@ -14,7 +14,7 @@ export function kubernetesSlotDeployer(k8s: K8sClient): SlotDeployer {
       const selector = { [LABELS.service]: spec.serviceName, [LABELS.slot]: spec.physical };
       const labels = { [LABELS.project]: spec.projectSlug, [LABELS.service]: spec.serviceName, [LABELS.slot]: spec.physical, [LABELS.workload]: 'service', [LABELS.release]: spec.releaseId };
       await k8s.apply(deploymentObject({
-        name, namespace: spec.namespace, labels, selector, replicas: spec.manifest.spec.service.replicas,
+        name, namespace: spec.namespace, labels, selector, replicas: spec.replicas ?? spec.manifest.spec.service.replicas,
         image: spec.image, command: spec.manifest.spec.service.command, port: spec.manifest.spec.service.port, healthPath: spec.manifest.spec.service.healthPath,
         env: Object.entries(spec.env).map(([k, v]) => ({ name: k, value: v })),
         resources: { cpu: spec.plan.cpu, memory: spec.plan.memory },

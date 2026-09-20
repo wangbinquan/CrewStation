@@ -1,3 +1,4 @@
+import type { MaintenanceRepository } from './repositories';
 import type { DomainPayload, DomainTopicName } from '@crewstation/contracts';
 import type { ReleaseRepository, SlotRepository, TrafficSwitchRepository } from './repositories';
 
@@ -6,6 +7,7 @@ export interface DomainEventPublisher {
 }
 
 export interface RepositoryScope {
+  readonly maintenance: MaintenanceRepository;
   readonly releases: ReleaseRepository;
   readonly slots: SlotRepository;
   readonly switches: TrafficSwitchRepository;

@@ -1,6 +1,6 @@
 export type { ClusterConfig } from './config';
 export { fromKubeconfig, loadClusterConfig } from './config';
-export type { DeleteOptions, K8sClient, ListOptions, LogOptions, WatchOptions } from './client';
+export type { DeleteOptions, JsonPatch, K8sClient, ListOptions, ListPage, LogOptions, WatchOptions } from './client';
 export { createK8sClient } from './client';
 export type { K8sObject, ObjectMeta, ResourceRef, WatchEventType } from './resources';
 export { Resources, refOf, resourcePath } from './resources';

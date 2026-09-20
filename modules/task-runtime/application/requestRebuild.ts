@@ -1,5 +1,6 @@
 import type { DevSessionRebuildDto, ProjectId, RebuildDevSessionRequest, TaskId } from '@crewstation/contracts';
 import { RebuildDevSessionRequestSchema } from '@crewstation/contracts';
+import { scheduleExecutionCleanup } from './nativeExecution';
 import { conflict, precondition, quotaExceeded } from '@crewstation/kernel';
 import type { EnvironmentRebuild } from '../domain/environmentRebuild';
 import { rebuildToDto } from '../domain/environmentRebuild';
@@ -18,9 +19,10 @@ export function rebuildUseCases(deps: RebuildDependencies) {
         if (previous.projectId !== projectId || JSON.stringify(previous.input) !== JSON.stringify(input)) throw conflict('该恢复请求编号已用于另一份确认内容');
         return rebuildToDto(previous);
       }
-      const env = await recoverableDevSession(scope, projectId);
+      const env = await recoverableDevSession(scope, projectId, input.reason === 'administrator-restart');
       await validateRebuild(deps, env, input);
       const children = (await scope.environments.listChildren(env.id)).filter((child) => child.native?.state !== 'finished');
+      if (input.reason === 'administrator-restart') for (const child of children) await scheduleExecutionCleanup(scope, child, deps.clock.now(), '管理员重启工作区，结束本次执行');
       const nodes = new Set(children.map((child) => child.native!.nodeName));
       if (nodes.size > 1 || children.some((child) => child.native!.pvcUid !== input.expectedVolumeUid)) throw precondition('现有 CLI 的工作卷或节点不一致，请先由管理员检查');
       const nodeName = [...nodes][0];
@@ -42,7 +44,7 @@ export function rebuildUseCases(deps: RebuildDependencies) {
     });
   };
   return {
-    inspectRebuild: (projectId: ProjectId) => inspectRebuild(deps, projectId), requestRebuild,
+    inspectRebuild: (projectId: ProjectId, administrator = false) => inspectRebuild(deps, projectId, administrator), requestRebuild,
     getRebuild: async (taskId: TaskId): Promise<DevSessionRebuildDto | undefined> => {
       const env = await deps.uow.read.environments.getById(taskId);
       const record = env?.rebuildId ? await deps.uow.read.rebuilds.get(env.rebuildId) : undefined;

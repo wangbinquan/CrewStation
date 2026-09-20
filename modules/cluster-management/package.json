@@ -1,0 +1,27 @@
+{
+  "name": "@crewstation/module-cluster-management",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "受管 Kubernetes 资源快照、归属用途与持久化运维操作",
+  "exports": {
+    ".": "./index.ts"
+  },
+  "crewstation": {
+    "layer": 6
+  },
+  "dependencies": {
+    "@crewstation/contracts": "workspace:*",
+    "@crewstation/kernel": "workspace:*",
+    "drizzle-orm": "0.45.2",
+    "@crewstation/http": "workspace:*",
+    "@crewstation/k8s": "workspace:*",
+    "@crewstation/persistence": "workspace:*",
+    "@crewstation/queue": "workspace:*",
+    "hono": "4.13.7",
+    "zod": "4.6.2"
+  },
+  "devDependencies": {
+    "@crewstation/testkit": "workspace:*"
+  }
+}

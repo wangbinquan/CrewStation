@@ -33,14 +33,18 @@ export function subtaskUseCases(deps: BusinessTaskUseCaseDeps) {
       await uow.run((scope) => scope.subtasks.insert(run));
       return subtaskToDto(await launch(run));
     },
-    retrySubtask: async (caller: ServiceActor, taskId: TaskId, subtaskId: SubtaskId): Promise<SubtaskDto> => {
+    retrySubtask: async (caller: ServiceActor, taskId: TaskId, subtaskId: SubtaskId, operationId?: string): Promise<SubtaskDto> => {
       const task = await ownedTask(caller, taskId);
+      const retryId = operationId ? `sub_${operationId.replaceAll('-', '')}` as SubtaskId : undefined;
+      const accepted = retryId ? await uow.read.subtasks.getById(retryId) : undefined;
+      if (accepted) return subtaskToDto(accepted);
       const previous = await load(taskId, subtaskId);
       if (!isTerminal(previous)) throw precondition('只能重试已结束的子任务');
       const spec: SubmitSubtaskRequest = previous.kind === 'command'
         ? { kind: 'command', name: previous.name, command: previous.command ?? [], timeoutSeconds: previous.timeoutSeconds ?? 3600, ...(previous.cwd ? { cwd: previous.cwd } : {}) }
         : { kind: 'agent', name: previous.name, agentProfile: previous.agentProfile?.name ?? '', ...(previous.outputContract ? { outputContract: previous.outputContract.name } : {}), mode: previous.mode ?? 'oneshot', prompt: previous.prompt ?? '', ...(previous.cwd ? { cwd: previous.cwd } : {}) };
-      const run = await build(task, spec, previous.attempt + 1);
+      const built = await build(task, spec, previous.attempt + 1);
+      const run = retryId ? { ...built, id: retryId } : built;
       await uow.run((scope) => scope.subtasks.insert(run));
       return subtaskToDto(await launch(run));
     },

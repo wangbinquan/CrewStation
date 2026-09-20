@@ -35,9 +35,9 @@ export type PodPhase = 'Pending' | 'Running' | 'Succeeded' | 'Failed' | 'Unknown
 /** 任务容器与卷的集群操作；实现在 adapters/k8s。 */
 export interface TaskCluster {
   ensureVolume(env: TaskEnvironment, size: string): Promise<void>;
-  createPod(spec: TaskPodSpec): Promise<void>;
+  createPod(spec: TaskPodSpec): Promise<string | void>;
   /** waitingReason：主容器的等待原因（ErrImagePull、CreateContainerError 等），档位测试据此区分镜像与 Runner 的失败。 */
-  podPhase(env: TaskEnvironment): Promise<{ phase: PodPhase; message?: string; ip?: string; imageId?: string; waitingReason?: string }>;
+  podPhase(env: TaskEnvironment): Promise<{ phase: PodPhase; uid?: string; message?: string; ip?: string; imageId?: string; waitingReason?: string }>;
   deletePod(env: TaskEnvironment): Promise<void>;
   deleteVolume(env: TaskEnvironment): Promise<void>;
 }

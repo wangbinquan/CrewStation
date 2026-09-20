@@ -1,3 +1,4 @@
+import { drizzleMaintenance } from './drizzleMaintenance';
 import { publishDomainEvent } from '@crewstation/eventbus';
 import type { Database, Executor } from '@crewstation/persistence';
 import type { RepositoryScope, UnitOfWork } from '../../ports/unitOfWork';
@@ -5,6 +6,7 @@ import { drizzleReleaseRepository, drizzleSlotRepository, drizzleTrafficSwitchRe
 
 export function scopeOver(executor: Executor, lockSlots = false): RepositoryScope {
   return {
+    maintenance: drizzleMaintenance(executor),
     releases: drizzleReleaseRepository(executor),
     slots: drizzleSlotRepository(executor, lockSlots),
     switches: drizzleTrafficSwitchRepository(executor),

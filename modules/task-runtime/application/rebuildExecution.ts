@@ -19,6 +19,7 @@ export async function requireRebuildLease(heartbeat: RebuildHeartbeat): Promise<
 /** 每次执行持有项目行锁；崩溃后通过不可变请求标签和 UID 接续已创建资源。 */
 export async function executeRebuild(deps: RebuildExecutionDeps, scope: RepositoryScope, record: EnvironmentRebuild, env: TaskEnvironment, heartbeat: RebuildHeartbeat): Promise<void> {
   await requireRebuildLease(heartbeat);
+  if (record.input.reason === 'administrator-restart' && (await scope.environments.listChildren(env.id)).some((child) => child.native && child.native.state !== 'finished')) throw new Error('等待工作区子执行回收完成');
   const original = { ...env, podName: record.originalPodName };
   const resources = await deps.recoveryCluster.inspect(original);
   if (retainedVolume(resources).uid !== record.input.expectedVolumeUid) throw precondition('原工作卷实例已变化，恢复停止');
@@ -42,7 +43,7 @@ export async function executeRebuild(deps: RebuildExecutionDeps, scope: Reposito
   await deps.provisioner.ensurePreview(record, spec);
   await requireRebuildLease(heartbeat);
   const now = deps.clock.now();
-  await scope.environments.update({ ...prepared, updatedAt: now, message: '恢复容器已创建，等待调度和新环境连接' });
+  await scope.environments.update({ ...prepared, podUid, updatedAt: now, message: '恢复容器已创建，等待调度和新环境连接' });
   await scope.rebuilds.update({ ...record, state: 'starting', secretUid: secret.uid, podUid, message: '等待新环境连接，原 CLI 不会自动启动', updatedAt: now });
 }
 

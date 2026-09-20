@@ -1,0 +1,71 @@
+import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
+import { ClusterFilterSchema, ClusterResourceSchema, ClusterSummarySchema } from '@crewstation/contracts';
+import { createFakeK8sClient, Resources } from '@crewstation/k8s';
+import { createTestDatabase, testDatabaseAvailable } from '@crewstation/testkit';
+import type { TestDatabase } from '@crewstation/testkit';
+import { queueMigrations } from '@crewstation/queue';
+import { createApp } from '@crewstation/http';
+import { clusterManagementMigrations, createClusterManagementModule } from '../index';
+import type { ClusterManagementModule } from '../index';
+import { admin, facts, catalog, object, query } from './inventoryFixture';
+const available = await testDatabaseAvailable();
+let tdb: TestDatabase, module: ClusterManagementModule;
+const k8s = createFakeK8sClient();
+beforeAll(async () => {
+  if (!available) return;
+  tdb = await createTestDatabase([queueMigrations, clusterManagementMigrations]);
+  module = createClusterManagementModule({ db: tdb.db, k8s, metadata: { read: async () => structuredClone(facts) }, domains: { inspect: async () => { throw new Error('unexpected domain'); }, execute: async () => { throw new Error('unexpected domain'); }, observe: async () => { throw new Error('unexpected domain'); } }, isAdmin: async (id) => id === admin.userId, systemNamespace: 'crewstation-system', catalog, instance: 'test', observationMs: 100, wait: async () => undefined });
+});
+afterAll(async () => { await tdb?.drop(); });
+describe.skipIf(!available)('cluster-management durable module', () => {
+  test('reads shared persisted inventory, rejects non-admin and keeps secret values out of snapshots', async () => {
+    await k8s.create(object('ConfigMap', 'orphan'));
+    await k8s.create({ ...object('Secret', 'credentials'), data: { password: 'DO-NOT-EXPOSE' } });
+    const pod = object('Pod', 'worker', 'cs-demo', { containers: [{ name: 'main', image: 'worker:v1', env: [{ name: 'TOKEN', value: 'PRIVATE-TOKEN' }] }] });
+    await k8s.create({ ...pod, status: { phase: 'Running', conditions: [{ type: 'Ready', status: 'False' }], containerStatuses: [{ name: 'main', ready: false, restartCount: 3, state: { waiting: { reason: 'CrashLoopBackOff' } } }] } });
+    await k8s.create(object('Pod', 'external', 'kube-system'));
+    const snapshot = await module.collect();
+    expect(JSON.stringify(snapshot)).not.toContain('DO-NOT-EXPOSE'); expect(JSON.stringify(snapshot)).not.toContain('PRIVATE-TOKEN');
+    const summary = ClusterSummarySchema.parse(await module.api.summary(admin, query));
+    expect(summary).toMatchObject({ pods: 1, runningPods: 1, readyPods: 0, abnormal: 1, complete: true });
+    const first = await module.api.resources(admin, { ...query, snapshotId: summary.snapshotId, limit: 1 });
+    expect(first.total).toBe(3); expect(first.nextCursor).toBeDefined();
+    const second = await module.api.resources(admin, { ...query, snapshotId: summary.snapshotId, limit: 1, cursor: first.nextCursor });
+    expect(second.items[0]?.uid).not.toBe(first.items[0]?.uid);
+    await expect(module.api.resources(admin, { ...query, snapshotId: summary.snapshotId, limit: 1, cursor: first.nextCursor, scope: 'system' })).rejects.toMatchObject({ kind: 'conflict' });
+    await expect(module.api.summary({ ...admin, isAdmin: false }, query)).rejects.toMatchObject({ kind: 'forbidden' });
+    const row = ClusterResourceSchema.parse(first.items[0]); expect((await module.api.detail(admin, row.resourceId)).resource.uid).toBe(row.uid);
+    await expect(module.api.logs(admin, row.resourceId, { container: 'main', tailLines: 200, previous: 'false' })).rejects.toMatchObject({ kind: 'precondition' });
+  });
+  test('UID-safe inspection, durable idempotent acceptance, queue execution and journal', async () => {
+    const row = (await module.api.resources(admin, { ...query, kind: 'ConfigMap' })).items[0]!;
+    const inspected = await module.api.inspect(admin, row.resourceId, { action: 'delete' });
+    expect(inspected.capability.enabled).toBe(true);
+    expect(await k8s.get(Resources.ConfigMap!, row.name, row.namespace)).toBeDefined();
+    const request = { inspectionId: inspected.inspectionId, idempotencyKey: crypto.randomUUID(), params: { action: 'delete' as const } };
+    const [one, two] = await Promise.all([module.api.accept(admin, request), module.api.accept(admin, request)]);
+    expect(one.operationId).toBe(two.operationId);
+    await expect(module.api.accept(admin, { ...request, params: { action: 'restart' } })).rejects.toMatchObject({ kind: 'conflict' });
+    await module.runOnce();
+    expect((await module.api.operation(admin, one.operationId)).phase).toBe('succeeded');
+    expect(await k8s.get(Resources.ConfigMap!, row.name, row.namespace)).toBeUndefined();
+    expect((await module.api.operations(admin, { idempotencyKey: request.idempotencyKey, limit: 5 })).items).toHaveLength(1);
+    const refresh = await module.api.refresh(admin), repeated = await module.api.refresh(admin);
+    expect(refresh.refreshId).toBe(repeated.refreshId);
+    await module.runOnce();
+    expect((await module.api.resources(admin, { ...query, kind: 'ConfigMap' })).total).toBe(0);
+  });
+  test('inspection does not let a new UID inherit prior confirmation', async () => {
+    const item = await k8s.create(object('ConfigMap', 'replacement')); await module.collect();
+    const row = (await module.api.resources(admin, { ...query, kind: 'ConfigMap' })).items[0]!;
+    const checked = await module.api.inspect(admin, row.resourceId, { action: 'delete' });
+    await k8s.apply({ ...item, metadata: { ...item.metadata, uid: 'another-uid' } });
+    await expect(module.api.accept(admin, { inspectionId: checked.inspectionId, idempotencyKey: crypto.randomUUID(), params: { action: 'delete' } })).rejects.toMatchObject({ kind: 'conflict' });
+    expect((await k8s.get(Resources.ConfigMap!, 'replacement', 'cs-demo'))?.metadata.uid).toBe('another-uid');
+  });
+  test('admin HTTP read path, missing identity and malformed query fail visibly', async () => {
+    const app = createApp({ name: 'cluster-test' }); for (const r of module.http) app.route('/', r);
+    const denied = await app.request('/v1/admin/cluster/summary'); expect(denied.status).toBe(401);
+    expect(ClusterFilterSchema.safeParse({ limit: 101 }).success).toBe(false);
+  });
+});

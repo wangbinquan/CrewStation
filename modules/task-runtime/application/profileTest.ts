@@ -46,7 +46,7 @@ export function runProfileTestUseCase(deps: TaskRuntimeUseCaseDeps, test: Profil
     const runner = test.runner;
     if (!runner) return { state: 'failed', error: '本进程未配置测试执行通道', stages: [] };
     let env: TaskEnvironment;
-    try { env = await test.createTestEnvironment({ image: input.image, ...(input.taskProfile ? { taskProfile: input.taskProfile } : {}), labels: { 'crewstation.io/profile-test': input.testId } }); }
+    try { env = await test.createTestEnvironment({ image: input.image, ...(input.taskProfile ? { taskProfile: input.taskProfile } : {}), labels: { 'crewstation.io/profile-test': input.testId, 'crewstation.io/compute-profile': input.profile, 'crewstation.io/profile-revision': String(input.revision) } }); }
     catch (error) { return { state: 'failed', error: `无法创建测试任务：${messageOf(error)}`, stages: [] }; }
     const session: Session = { deps, timing, runner, env, input, report, heartbeat, context: { kind: 'platform-namespace', taskId: env.id, image: input.image, workdir: '/work' }, mcp: profileTestMcp(input.beforeStart.steps, test.mcp ?? []) };
     try {

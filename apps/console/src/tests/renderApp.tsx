@@ -13,6 +13,7 @@ import { messages as capabilitiesZh } from '../features/capabilities/i18n/zh-CN'
 import { messages as catalogZh } from '../features/catalog/i18n/zh-CN';
 import { messages as configZh } from '../features/config/i18n/zh-CN';
 import { messages as logsZh } from '../features/logs/i18n/zh-CN';
+import { messages as clusterZh } from '../features/cluster/i18n/zh-CN';
 import { messages as eventsZh } from '../features/events/i18n/zh-CN';
 import { I18nProvider } from '../shared/lib/I18nProvider';
 import { mergeMessages } from '../shared/lib/i18n';
@@ -33,6 +34,7 @@ const zh = mergeMessages([
   { source: 'logs', messages: logsZh },
   { source: 'config', messages: configZh },
   { source: 'catalog', messages: catalogZh },
+  { source: 'cluster', messages: clusterZh },
 ]);
 const catalog: MessageCatalog = { 'zh-CN': zh, 'en-US': zh };
 

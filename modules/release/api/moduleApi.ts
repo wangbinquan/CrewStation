@@ -1,3 +1,4 @@
+import type { ClusterResource, ClusterInspectRequest, ClusterInspection, ClusterOperation } from '@crewstation/contracts';
 import type { Actor, PublishRequest, ReleaseDto, ReleaseId, ServiceId, SlotDto, TrafficSwitchDto, TrafficSwitchRequest } from '@crewstation/contracts';
 
 export type PhysicalSlot = 'blue' | 'green';
@@ -12,6 +13,10 @@ export interface ActiveEndpoint {
 /** release 模块对外能力：发布、切流、查询；流水线推进由工作器调用。 */
 export interface ReleaseModuleApi {
   readonly name: 'release';
+  listClusterSlots(): Promise<Array<{ serviceId: string; physical: PhysicalSlot; role: 'prod' | 'preview'; releaseId?: string; state: string; manifestReplicas?: number; overrideReplicas?: number; plan?: string; revision: string }>>;
+  inspectSlotOperation(actor: Actor, target: ClusterResource, request: ClusterInspectRequest): Promise<Pick<ClusterInspection, 'capability' | 'domain'>>;
+  executeSlotOperation(actor: Actor, operation: ClusterOperation, inspection: ClusterInspection): Promise<{ operationId: string }>;
+  observeSlotOperation(operation: ClusterOperation): Promise<{ done: boolean; failed?: boolean; reason: string }>;
   publish(actor: Actor, serviceId: ServiceId, input: PublishRequest): Promise<ReleaseDto>;
   switchTraffic(actor: Actor, serviceId: ServiceId, input: TrafficSwitchRequest): Promise<TrafficSwitchDto>;
   listReleases(actor: Actor, serviceId: ServiceId): Promise<ReleaseDto[]>;

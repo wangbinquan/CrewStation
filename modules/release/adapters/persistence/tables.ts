@@ -1,3 +1,4 @@
+import type { SlotMaintenance } from '../../domain/slotMaintenance';
 import { integer, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core';
 import { jsonDocument } from '@crewstation/persistence';
 import { releaseSchema } from './schema';
@@ -40,3 +41,6 @@ export const trafficSwitches = releaseSchema.table('traffic_switches', {
   reason: text('reason'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
 });
+
+export const replicaOverrides = releaseSchema.table('replica_overrides', { serviceId: text('service_id').notNull(), physical: text('physical').notNull(), replicas: integer('replicas').notNull() }, (t) => [uniqueIndex('replica_overrides_slot').on(t.serviceId, t.physical)]);
+export const slotMaintenance = releaseSchema.table('slot_maintenance', { id: text('id').primaryKey(), serviceId: text('service_id').notNull(), state: text('state').notNull(), body: jsonDocument('body').$type<SlotMaintenance>().notNull() });
