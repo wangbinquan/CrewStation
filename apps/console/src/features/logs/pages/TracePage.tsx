@@ -9,16 +9,17 @@ import { Card } from '../../../shared/ui/Card';
 import { DataTable } from '../../../shared/ui/DataTable';
 import { FormField } from '../../../shared/ui/FormField';
 import { QueryStatus } from '../../../shared/ui/QueryStatus';
+import { Stack } from '../../../shared/ui/Stack';
 
 export function TracePage({ projectId, traceId, onTrace }: { readonly projectId: string; readonly traceId?: string; readonly onTrace: (id: string) => void }) {
   const t = useT(), dateText = useDateText(), [draft, setDraft] = useState(traceId ?? ''), [invalid, setInvalid] = useState(false);
   const fieldId = useId(), field = useRef<HTMLInputElement>(null);
   const trace = useApiQuery(['trace', projectId, traceId], () => api.observability.trace(projectId, traceId!), { enabled: Boolean(traceId) });
-  return <Card compact title={t('operations.tab.trace')}>
-    <form onSubmit={(event) => { event.preventDefault(); const result = TraceIdSchema.safeParse(draft.trim()); setInvalid(!result.success); if (result.success) onTrace(result.data); else field.current?.focus(); }}>
+  return <Card stacked compact title={t('operations.tab.trace')}>
+    <form onSubmit={(event) => { event.preventDefault(); const result = TraceIdSchema.safeParse(draft.trim()); setInvalid(!result.success); if (result.success) onTrace(result.data); else field.current?.focus(); }}><Stack>
       <FormField label="Trace ID" hint={t('logs.trace.hint')} hintId={`${fieldId}-hint`} errorId={`${fieldId}-error`} error={invalid ? t('logs.trace.invalid') : undefined}><input ref={field} aria-describedby={`${fieldId}-hint`} aria-errormessage={invalid ? `${fieldId}-error` : undefined} aria-invalid={invalid} value={draft} onChange={(event) => setDraft(event.target.value)} /></FormField>
       <Button type="submit">{t('logs.trace.load')}</Button>
-    </form>
+    </Stack></form>
     {traceId ? <QueryStatus isPending={trace.isPending} error={trace.error} isEmpty={trace.data?.events.length === 0 && trace.data.tasks.length === 0 && trace.data.subtasks.length === 0 && trace.data.sessionIds.length === 0} emptyTitle={t('logs.trace.empty')} /> : null}
     {trace.data ? <>
       <p><code>{trace.data.traceId}</code></p>

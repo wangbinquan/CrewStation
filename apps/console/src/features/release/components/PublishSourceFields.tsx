@@ -3,6 +3,7 @@ import { useProjectScope } from '../../../shared/project/ProjectScope';
 import { PROJECT_PATHS } from '../../../shared/project/projectPaths';
 import { useT } from '../../../shared/lib/useT';
 import { Button } from '../../../shared/ui/Button';
+import { ActionRow } from '../../../shared/ui/ActionRow';
 import { FormField } from '../../../shared/ui/FormField';
 import { QueryStatus } from '../../../shared/ui/QueryStatus';
 import { DefinitionList } from '../../../shared/ui/DefinitionList';
@@ -13,7 +14,7 @@ export function PublishSourceFields({ preparation: p, onSource }: { readonly pre
   const t = useT(), { projectId, space } = useProjectScope(), query = p.source === 'session' ? p.workspace : p.branches;
   const workspace = p.workspace.data;
   return <>
-    <div>{(['repository', 'session'] as const).map((source) => <Button key={source} aria-pressed={p.source === source} disabled={p.busy} onClick={() => { if (p.resetCheck()) onSource(source); }}>{t(`release.prepare.source.${source}`)}</Button>)}</div>
+    <ActionRow>{(['repository', 'session'] as const).map((source) => <Button key={source} aria-pressed={p.source === source} disabled={p.busy} onClick={() => { if (p.resetCheck()) onSource(source); }}>{t(`release.prepare.source.${source}`)}</Button>)}</ActionRow>
     <p>{t(`release.prepare.hint.${p.source}`)}</p>
     <QueryStatus isPending={query.isPending} error={p.sessionMissing ? null : query.error} isEmpty={p.sessionMissing} emptyTitle={t('release.prepare.noSession')} emptyDescription={t('release.prepare.noSessionHint')} />
     {p.source === 'repository' ? <FormField label={t('release.publish.branch')} hint={t('release.prepare.branchHint')}>

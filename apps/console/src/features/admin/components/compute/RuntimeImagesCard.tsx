@@ -53,7 +53,7 @@ export function RuntimeImagesCard(): ReactElement {
   const issue = useApiMutation(() => api.computeProfiles.issuePushCredential(), { onSuccess: (issued) => setCredential(issued) });
   const data = info.data;
   return (
-    <Card title={t('admin.images.title')} footer={t('admin.images.hint')}>
+    <Card stacked title={t('admin.images.title')} footer={t('admin.images.hint')}>
       <QueryStatus isPending={info.isPending} error={info.error} />
       {data ? (
         <>

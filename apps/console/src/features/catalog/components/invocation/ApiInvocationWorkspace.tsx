@@ -26,7 +26,7 @@ export function ApiInvocationWorkspace({ context, children }: { readonly context
   };
   return <>
     <UnsavedChangesGuard dirty={controller.dirty || controller.pending} scope={t('catalog.invoke.draftScope')} />
-    {context.canDevelop || selected ? <Card compact title={t('catalog.invoke.title')} extra={<Button disabled={controller.pending || controller.checking || controller.session.isFetching || !context.canDevelop} onClick={() => { void controller.rebind(); }}>{t('catalog.invoke.rebind')}</Button>}>
+    {context.canDevelop || selected ? <Card stacked compact title={t('catalog.invoke.title')} extra={<Button disabled={controller.pending || controller.checking || controller.session.isFetching || !context.canDevelop} onClick={() => { void controller.rebind(); }}>{t('catalog.invoke.rebind')}</Button>}>
       <p className={styles.note}>{t('catalog.invoke.scope')}</p>
       {selected || controller.taskId ? <p className={styles.note}>{t('catalog.invoke.limits')}</p> : <details><summary>{t('catalog.invoke.limitsTitle')}</summary><p className={styles.note}>{t('catalog.invoke.limits')}</p></details>}
       <p className={styles.note}>{controller.taskId ? <>{t('catalog.invoke.boundTask')} <code>{controller.taskId}</code></> : t('catalog.invoke.notBound')}</p>

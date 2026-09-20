@@ -28,7 +28,7 @@ export function ProjectProvisioningPage({ projectId }: { projectId: string }) {
     try { await retry.mutateAsync(); } catch { /* 保留失败内容与原状态供重试。 */ } finally { busy.current = false; }
   };
   const item = project.data, paths = PROJECT_PATHS[item?.kind === 'DigitalWorker' ? 'workbench' : 'admin'];
-  return <Card compact title={t('projects.provision.title')} extra={<Button disabled={project.isFetching || retry.isPending} onClick={() => void project.refetch()}>{t('projects.provision.refresh')}</Button>}>
+  return <Card stacked compact title={t('projects.provision.title')} extra={<Button disabled={project.isFetching || retry.isPending} onClick={() => void project.refetch()}>{t('projects.provision.refresh')}</Button>}>
     <QueryStatus isPending={project.isPending} error={project.error} loadingKey="projects.overview.loading" errorKey="projects.overview.error" />
     {item && !project.error ? <>
       <DefinitionList layout="grid" items={[{ label: t('projects.create.name'), value: item.name }, { label: t('projects.create.slug'), value: item.slug },

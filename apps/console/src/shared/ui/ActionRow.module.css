@@ -1,0 +1,7 @@
+.actions:not([hidden]) {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--cs-space-2);
+  min-width: 0;
+}

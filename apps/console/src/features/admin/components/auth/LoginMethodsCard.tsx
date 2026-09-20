@@ -29,7 +29,7 @@ export function LoginMethodsCard(): ReactElement {
   // 破窗开关生效时，真正在跑的是「开着」，库内策略暂时不算数——牌子照库内值写就会在唯一需要它的场合骗人。
   const effectiveOn = data !== undefined && (data.forcedOn || data.passwordLoginEnabled);
   return (
-    <Card title={t('admin.auth.methodsTitle')} footer={t('admin.auth.methodsHint')}>
+    <Card stacked title={t('admin.auth.methodsTitle')} footer={t('admin.auth.methodsHint')}>
       <MutationError error={update.error} messageKey="admin.auth.policySaveError" />
       <QueryStatus isPending={policy.isPending} error={policy.error} />
       {data === undefined ? null : (

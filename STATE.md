@@ -11,7 +11,24 @@
 
 **RFC-003 工作台 UX 重设计已 Done（2026-09-16）：52／52 项 UX-AT 全部实机通过，本地 gate 与精确 SHA CI 通过。RFC-004（管理员定义 Agent 启动前 Hook）已按 RFC-006 的裁定 C8 置为 Superseded，其 AR 实机验收不再执行。** RFC-001 与 RFC-002 都已 Done，见 `proposal/rfc/README.md` 的索引表。**RFC-005（OIDC／OAuth 2.0 公司登录）于 2026-09-18 落档、同日按作者会话目标「完整实现整个RFC并提交上库」实施完毕并实机验收，已 Done。** **RFC-006（算力档位合并运行环境）2026-09-18 落档，同日作者设定会话目标「完整实现RFC并提交上库」，同日实施完成并 Done：CP-01…CP-22 实机核对完毕，基线三件套回填到 v0.3.4，见下方接力。** **RFC-007 于 2026-09-20 完成 T1–T8，本机 Chrome 四角色、旧页签恢复、本地 gate 与精确 SHA CI 全部通过，已 Done。**
 
-## 最新接力：RFC-007 开发环境 OAuth 2.0 一键换角色（2026-09-20）
+## 最新接力：按钮与内容框贴边修复（2026-09-20）
+
+作者反馈多处按钮紧贴上下内容框。实机定位：卡片只有外框内边距，内部块没有统一间隔；工具栏的 gap 只分隔组内元素。
+新增公共 `Stack`／`ActionRow`，`Card stacked` 按需启用；认证、镜像说明、发布准备、告警订阅、调用链、项目生命周期／开通、
+开发恢复和 API 试调共 11 处卡片接入。纵向内容统一 12px，同组操作 8px 并可换行；独立按钮保持自然宽度。
+发布最后一步与恢复检查表单也使用同一布局；移除已由父布局承担的重复 margin，既有独立布局的卡片保持默认行为。
+
+新增 `tests/e2e/layoutSpacing.test.ts` 的 7 项真实浏览器回归，旧部署全部因 0px 间距失败；新版全部通过。
+覆盖 1280px／390px 的镜像示例、身份提供方、发布准备，以及告警订阅和调用链查询；验证间距、按钮自然尺寸、横向溢出与浏览器异常。
+另以浏览器核对发布最后一步：提示框到操作区 12px，按钮之间 8px，按钮高约 33.6px，390px 页面无横向溢出；未提交发布或业务配置。
+定向交互 **68 pass／0 fail／575 assertions**；完整 `bun run check` **1621 pass／5 skip／0 fail，9033 assertions，182.16s**，
+含本机 PostgreSQL、GitLab 和浏览器集成；console build、架构、全仓 lint、根类型与 console 类型通过。GitHub CI 由本批提交触发，按该精确 SHA 核对。
+
+本机工作台已更新为 `cs-console:button-spacing-20260920`，Deployment 1／1 Available；镜像清单摘要
+`sha256:6410fc6ff96bb019e887784f8fe0e6fb340c27c9400424847862270a3026e856`。
+本批精确路径、候选校验和与完整门禁日志保存在 `/private/tmp/crewstation-button-spacing-20260920/`。
+
+## 上一轮接力：RFC-007 开发环境 OAuth 2.0 一键换角色（2026-09-20）
 
 作者要求把 `agent-workflow` 的 dev OAuth 2.0 能力迁入并适配 CrewStation。现已新增本机专用 `crewstation-dev-auth`
 Deployment／Service／Traefik IngressRoute；它复用 `cs-control-plane:dev`，只执行 `tools/dev-auth/main.ts`，生产清单与生产源码不引用。

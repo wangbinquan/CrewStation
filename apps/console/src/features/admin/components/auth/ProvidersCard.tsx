@@ -6,6 +6,7 @@ import { queryKeys } from '../../../../shared/api/queryKeys';
 import { useApiMutation, useApiQuery } from '../../../../shared/api/useApi';
 import { useT } from '../../../../shared/lib/useT';
 import { ActionNote } from '../../../../shared/ui/ActionNote';
+import { ActionRow } from '../../../../shared/ui/ActionRow';
 import { Badge } from '../../../../shared/ui/Badge';
 import { Button } from '../../../../shared/ui/Button';
 import { Card } from '../../../../shared/ui/Card';
@@ -41,7 +42,7 @@ export function ProvidersCard(): ReactElement {
   const items = providers.data?.items ?? [];
 
   return (
-    <Card title={t('admin.auth.providersTitle')} footer={t('admin.auth.providersHint')}>
+    <Card stacked title={t('admin.auth.providersTitle')} footer={t('admin.auth.providersHint')}>
       <MutationError error={create.error ?? patch.error ?? remove.error ?? test.error} messageKey="admin.auth.providerSaveError" />
       <QueryStatus
         isPending={providers.isPending}
@@ -59,7 +60,7 @@ export function ProvidersCard(): ReactElement {
               <td>{provider.issuerUrl}</td>
               <td>{provider.provisioning === 'auto' ? t('admin.auth.provisioningAuto') : t('admin.auth.provisioningAllowlist')}</td>
               <td><Badge tone={provider.enabled ? 'info' : 'neutral'}>{provider.enabled ? t('admin.auth.on') : t('admin.auth.off')}</Badge></td>
-              <td>
+              <td><ActionRow>
                 <Button variant="ghost" onClick={() => { setEditing(provider); setAdding(false); }}>{t('admin.auth.edit')}</Button>
                 <Button
                   variant="ghost"
@@ -79,7 +80,7 @@ export function ProvidersCard(): ReactElement {
                   busyLabel={t('admin.auth.saving')}
                   onConfirm={() => remove.mutate(provider.id)}
                 />
-              </td>
+              </ActionRow></td>
             </tr>
           ))}
         </DataTable>

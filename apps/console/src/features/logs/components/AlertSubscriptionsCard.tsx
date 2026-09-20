@@ -1,6 +1,7 @@
 import { useT } from '../../../shared/lib/useT';
 import { Card } from '../../../shared/ui/Card';
 import { Button } from '../../../shared/ui/Button';
+import { ActionRow } from '../../../shared/ui/ActionRow';
 import { DataTable } from '../../../shared/ui/DataTable';
 import { QueryStatus } from '../../../shared/ui/QueryStatus';
 import { ActionNote } from '../../../shared/ui/ActionNote';
@@ -13,15 +14,15 @@ import { AlertSubscriptionForm } from './AlertSubscriptionForm';
 export function AlertSubscriptionsCard({ projectId, canManage }: { readonly projectId: string; readonly canManage: boolean }) {
   const t = useT(), p = useAlertSubscriptions(projectId, canManage), review = p.review;
   const target = review?.kind === 'save' ? review.input : review?.before;
-  return <Card compact title={t('logs.alerts.subscription.title')} extra={<Button disabled={p.busy || p.query.isFetching} onClick={() => void p.query.refetch()}>{t('logs.alerts.subscription.refresh')}</Button>}>
+  return <Card stacked compact title={t('logs.alerts.subscription.title')} extra={<Button disabled={p.busy || p.query.isFetching} onClick={() => void p.query.refetch()}>{t('logs.alerts.subscription.refresh')}</Button>}>
     <UnsavedChangesGuard dirty={p.dirty || p.busy} scope={t('logs.alerts.subscription.form')} allowNavigate={(current, next) => current.pathname === next.pathname && 'tab' in next.search && next.search.tab === 'alerts'} />
     <ActionNote tone="neutral">{t('logs.alerts.subscription.deliveryUnavailable')}</ActionNote>
     <QueryStatus isPending={p.query.isPending} error={p.query.error} />
     {!p.unavailable && p.query.data?.items.length === 0 ? <p>{t('logs.alerts.subscription.empty')}</p> : null}
     {!p.unavailable && p.query.data?.items.length ? <DataTable columns={[t('logs.alerts.subscription.member'), t('logs.alerts.subscription.channel'), t('logs.alerts.subscription.target'), t('logs.alerts.actions')]}>
-      {p.query.data.items.map((row) => <tr key={row.userId}><td>{p.name(row.userId)}</td><td>{t(`logs.alerts.channel.${row.channel}`)}</td><td>{row.target ?? '—'}</td><td>{canManage ? <>
+      {p.query.data.items.map((row) => <tr key={row.userId}><td>{p.name(row.userId)}</td><td>{t(`logs.alerts.channel.${row.channel}`)}</td><td>{row.target ?? '—'}</td><td>{canManage ? <ActionRow>
         <Button disabled={p.busy || !!review} onClick={() => p.start(row)}>{t('logs.alerts.subscription.edit', { name: p.name(row.userId) })}</Button><Button disabled={p.busy || !!review} onClick={() => void p.prepare(row)}>{t('logs.alerts.subscription.remove', { name: p.name(row.userId) })}</Button>
-      </> : '—'}</td></tr>)}
+      </ActionRow> : '—'}</td></tr>)}
     </DataTable> : null}
     {canManage ? <Button disabled={p.busy || !!review} onClick={() => p.start()}>{t('logs.alerts.subscription.add')}</Button> : <p>{t('logs.alerts.subscription.noPermission')}</p>}
     {p.open ? <AlertSubscriptionForm p={p} /> : null}

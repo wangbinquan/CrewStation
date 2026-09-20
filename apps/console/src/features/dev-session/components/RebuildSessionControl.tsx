@@ -4,6 +4,8 @@ import type { ReactNode } from 'react';
 import { errorMessage } from '../../../shared/api/useApi';
 import { useT } from '../../../shared/lib/useT';
 import { Button } from '../../../shared/ui/Button';
+import { ActionRow } from '../../../shared/ui/ActionRow';
+import { Stack } from '../../../shared/ui/Stack';
 import { Card } from '../../../shared/ui/Card';
 import { ConfirmationPanel } from '../../../shared/ui/ConfirmationPanel';
 import { DefinitionList } from '../../../shared/ui/DefinitionList';
@@ -33,13 +35,15 @@ export function RebuildSessionControl({ projectId, session, newSession }: { proj
   const inspection = recovery.inspection;
   const confirmedFailure = receipt?.requestId === recovery.submitted?.requestId && receipt?.state === 'failed';
   const needsCheck = confirmedFailure || (recovery.submit.error && ['conflict', 'precondition', 'not_found'].includes(recovery.submit.error.kind));
-  return <Card compact title={t('devSession.rebuild.title')}>
+  return <Card stacked compact title={t('devSession.rebuild.title')}>
     {receipt?.state === 'failed' ? <PaneNotice tone="warning">{receipt.message}</PaneNotice> : null}
     {!inspection ? <>
-      <Button id={startId} variant="primary" disabled={recovery.check.isPending} onClick={() => { setShowNew(false); recovery.inspect(); }}>{t(recovery.check.isPending ? 'devSession.rebuild.checking' : 'devSession.rebuild.check')}</Button>
-      <Button variant="ghost" disabled={recovery.check.isPending} onClick={() => setShowNew(!showNew)} aria-expanded={showNew}>{t('devSession.rebuild.newRemote')}</Button>
+      <ActionRow>
+        <Button id={startId} variant="primary" disabled={recovery.check.isPending} onClick={() => { setShowNew(false); recovery.inspect(); }}>{t(recovery.check.isPending ? 'devSession.rebuild.checking' : 'devSession.rebuild.check')}</Button>
+        <Button variant="ghost" disabled={recovery.check.isPending} onClick={() => setShowNew(!showNew)} aria-expanded={showNew}>{t('devSession.rebuild.newRemote')}</Button>
+      </ActionRow>
       {showNew ? newSession : null}
-    </> : <div ref={panel}>
+    </> : <Stack ref={panel}>
       <DefinitionList layout="grid" items={[{ label: t('devSession.session.taskId'), value: inspection.taskId },
         { label: t('devSession.rebuild.volume'), value: `${inspection.volume.capacity} · ${inspection.volume.uid}` }]} />
       <FormField label={t('devSession.rebuild.profile')} hint={t('devSession.rebuild.profileHint', { capacity: inspection.volume.capacity })}>
@@ -56,7 +60,7 @@ export function RebuildSessionControl({ projectId, session, newSession }: { proj
           {!confirmedFailure ? <PaneNotice tone={recovery.submit.error ? 'warning' : 'info'}>{t(recovery.submit.isPending ? 'devSession.rebuild.sending' : 'devSession.rebuild.receiptUnknown')}</PaneNotice> : null}
           <Button disabled={recovery.submit.isPending} onClick={needsCheck ? recovery.inspect : () => void recovery.confirm()}>{t(needsCheck ? 'devSession.rebuild.recheck' : 'devSession.rebuild.retry')}</Button>
         </>}
-    </div>}
+    </Stack>}
     {recovery.check.error ? <PaneNotice tone="warning">{errorMessage(recovery.check.error)}</PaneNotice> : null}
     {recovery.submit.error ? <PaneNotice tone="warning">{errorMessage(recovery.submit.error)}</PaneNotice> : null}
   </Card>;

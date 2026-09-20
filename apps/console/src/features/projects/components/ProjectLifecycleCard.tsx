@@ -21,7 +21,7 @@ export function ProjectLifecycleCard({ project, isAdmin, unavailable }: { readon
     try { await archive.mutateAsync(undefined); } catch { /* 真实错误由下面呈现。 */ }
     finally { lock.current = false; }
   };
-  return <Card compact title={t('settings.tab.lifecycle')}>
+  return <Card stacked compact title={t('settings.tab.lifecycle')}>
     <p><ProjectStateBadge state={project.state} /> {project.message}</p>
     <p>{t('projects.lifecycle.effect')}</p>
     <p>{t('projects.lifecycle.retained')}</p>

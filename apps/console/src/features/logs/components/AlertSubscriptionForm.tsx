@@ -2,6 +2,7 @@ import { useEffect, useId, useRef } from 'react';
 import { useT } from '../../../shared/lib/useT';
 import { FormField } from '../../../shared/ui/FormField';
 import { Button } from '../../../shared/ui/Button';
+import { ActionRow } from '../../../shared/ui/ActionRow';
 import { QueryStatus } from '../../../shared/ui/QueryStatus';
 import type { AlertSubscriptions } from '../hooks/useAlertSubscriptions';
 import styles from './Alerts.module.css';
@@ -30,7 +31,9 @@ export function AlertSubscriptionForm({ p }: { readonly p: AlertSubscriptions })
     {p.draft.channel === 'webhook' ? <FormField label={t('logs.alerts.subscription.target')} hint={t('logs.alerts.subscription.targetHint')} hintId={`${id}-target-hint`} error={p.errors.target ? t(p.errors.target) : undefined} errorId={`${id}-target-error`}>
       <input name="alertTarget" value={p.draft.target} disabled={disabled} aria-invalid={!!p.errors.target} aria-describedby={`${id}-target-hint${p.errors.target ? ` ${id}-target-error` : ''}`} aria-errormessage={p.errors.target ? `${id}-target-error` : undefined} onChange={(event) => change('target', event.target.value)} />
     </FormField> : null}
-    <Button type="submit" variant="primary" disabled={disabled || p.unavailable}>{t(p.busy ? 'logs.alerts.subscription.busy' : 'logs.alerts.subscription.review')}</Button>
-    <Button disabled={disabled} onClick={p.close}>{t('logs.alerts.subscription.close')}</Button>
+    <ActionRow>
+      <Button type="submit" variant="primary" disabled={disabled || p.unavailable}>{t(p.busy ? 'logs.alerts.subscription.busy' : 'logs.alerts.subscription.review')}</Button>
+      <Button disabled={disabled} onClick={p.close}>{t('logs.alerts.subscription.close')}</Button>
+    </ActionRow>
   </form>;
 }

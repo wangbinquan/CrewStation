@@ -152,6 +152,7 @@ RFC 写完必须得到用户批准才能进入实现阶段。**不要边写 RFC 
 
 - 动手前先扫一遍 `apps/console/src/shared/ui/` 与 `shared/lib/`：`Card`、`Button`、`Badge`、`DataTable`、`FormField`、`QueryStatus`、`InlineConfirm`、`ActionNote`、`EmptyState`、`PageHeader`、`DefinitionList`、`PageHeader`，以及 `usePollingRefetch`、`useDateText`。**清单以源码为准**，不在本文重复以免过时。
 - 现有组件差一两个 prop 时**最小扩展它**（加可选 prop、向后兼容），让所有调用方一起受益；**不要** fork 一份或绕开。
+- 卡片直接组合表单、表格、提示与操作时用 `Card stacked`；卡片之外的纵向内容用 `Stack`，同组按钮用 `ActionRow`。卡片的 `padding` 只管外框留白，按钮组的 `gap` 只管组内间隔，内容块之间的间距由父布局承担。
 - 真的需要全新一类组件时，按「新增公共组件」对待：放进 `shared/ui/<Name>.tsx`、配同名 CSS module、文案走 `useT()`。初版就要考虑被别人复用的形态。
 - 颜色一律走 `app/theme/tokens.css` 的变量，**不写裸色值**。
 - **禁止 `alert` / `confirm` / `prompt`**：浏览器模态框会冻住本仓用来调试的浏览器自动化。确认一律用行内 UI（`InlineConfirm`）。

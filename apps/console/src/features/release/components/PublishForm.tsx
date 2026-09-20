@@ -4,6 +4,8 @@ import { useT } from '../../../shared/lib/useT';
 import { useDateText } from '../../../shared/lib/useDateText';
 import { ActionNote } from '../../../shared/ui/ActionNote';
 import { Button } from '../../../shared/ui/Button';
+import { ActionRow } from '../../../shared/ui/ActionRow';
+import { Stack } from '../../../shared/ui/Stack';
 import { Card } from '../../../shared/ui/Card';
 import { FormField } from '../../../shared/ui/FormField';
 import { DefinitionList } from '../../../shared/ui/DefinitionList';
@@ -20,7 +22,7 @@ export function PublishForm({ serviceId, projectId, source, canPublish, actions,
   const t = useT(), date = useDateText(), id = useId(), form = useRef<HTMLFormElement>(null);
   const p = usePublishPreparation(projectId, serviceId, source, canPublish && actions.busy !== 'traffic', actions, onAccepted);
   useEffect(() => { if (Object.keys(p.errors).length) form.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus(); }, [p.errors]);
-  return <Card compact title={t('release.prepare.title')} extra={<Button disabled={p.busy} onClick={onClose}>{t('release.prepare.close')}</Button>}>
+  return <Card stacked compact title={t('release.prepare.title')} extra={<Button disabled={p.busy} onClick={onClose}>{t('release.prepare.close')}</Button>}>
     <ol className={styles.steps}>{['source', 'check', 'version'].map((step, index) => <li key={step} aria-current={p.step === index ? 'step' : undefined}>{index + 1}. {t(`release.prepare.step.${step}`)}</li>)}</ol>
     {!canPublish ? <ActionNote tone="neutral">{t('release.prepare.noPermission')}</ActionNote> : null}
     {p.step === 0 ? <PublishSourceFields preparation={p} onSource={onSource} /> : <>
@@ -32,7 +34,7 @@ export function PublishForm({ serviceId, projectId, source, canPublish, actions,
       ]} />
       <ActionNote tone="neutral">{t(`release.prepare.checked.${source}`)}</ActionNote>
       {p.stale ? <ActionNote tone="neutral">{t('release.prepare.sourceChanged')} <Button disabled={p.busy} onClick={p.resetCheck}>{t('release.prepare.check')}</Button></ActionNote> : null}
-      {p.step === 1 ? <><Button disabled={p.busy} onClick={() => p.setStep(0)}>{t('release.prepare.back')}</Button><Button variant="primary" disabled={p.busy || !canPublish || p.stale} onClick={() => p.setStep(2)}>{t('release.prepare.reviewVersion')}</Button></> : <form ref={form} noValidate aria-label={t('release.prepare.title')} onSubmit={(event) => { event.preventDefault(); void p.submit(); }}>
+      {p.step === 1 ? <ActionRow><Button disabled={p.busy} onClick={() => p.setStep(0)}>{t('release.prepare.back')}</Button><Button variant="primary" disabled={p.busy || !canPublish || p.stale} onClick={() => p.setStep(2)}>{t('release.prepare.reviewVersion')}</Button></ActionRow> : <form ref={form} noValidate aria-label={t('release.prepare.title')} onSubmit={(event) => { event.preventDefault(); void p.submit(); }}><Stack>
         <div className={styles.form}>
           <FormField label={t('release.publish.version')} hint={t('release.publish.versionHint')} hintId={`${id}-version-hint`} error={p.errors.version} errorId={`${id}-version-error`}>
             <input name="version" value={p.version} disabled={p.busy} aria-invalid={!!p.errors.version} aria-describedby={`${id}-version-hint${p.errors.version ? ` ${id}-version-error` : ''}`} aria-errormessage={p.errors.version ? `${id}-version-error` : undefined} onChange={(event) => { p.setVersion(event.target.value); p.setErrors({ ...p.errors, version: undefined }); }} />
@@ -45,9 +47,11 @@ export function PublishForm({ serviceId, projectId, source, canPublish, actions,
         <p>{t('release.prepare.candidate', { tag: p.candidate ?? '—' })}</p>
         {p.tags.error ? <Button disabled={p.busy || p.tags.isFetching} onClick={() => void p.tags.refetch()}>{t('release.prepare.refreshTags')}</Button> : null}
         <ActionNote tone="neutral">{t('release.prepare.productionWarning')}</ActionNote>
-        <Button disabled={p.busy} onClick={() => p.setStep(1)}>{t('release.prepare.back')}</Button>
-        <Button type="submit" variant="primary" disabled={p.busy || !!actions.busy || !canPublish || p.tags.isPending || !!p.tags.error || p.stale}>{t(p.busy ? 'release.publish.submitting' : 'release.prepare.submit')}</Button>
-      </form>}
+        <ActionRow>
+          <Button disabled={p.busy} onClick={() => p.setStep(1)}>{t('release.prepare.back')}</Button>
+          <Button type="submit" variant="primary" disabled={p.busy || !!actions.busy || !canPublish || p.tags.isPending || !!p.tags.error || p.stale}>{t(p.busy ? 'release.publish.submitting' : 'release.prepare.submit')}</Button>
+        </ActionRow>
+      </Stack></form>}
     </>}
     {p.error ? <ActionNote tone="error">{p.error} {p.showHistoryReminder ? t('release.prepare.recheck') : null}</ActionNote> : null}
     {p.failedPaths.length ? <ul>{p.failedPaths.map((path) => <li key={path}><code>{path}</code></li>)}</ul> : null}

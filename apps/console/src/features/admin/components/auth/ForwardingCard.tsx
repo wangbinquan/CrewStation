@@ -36,7 +36,7 @@ export function ForwardingCard(): ReactElement {
   const globalFields = new Set(data?.global.fields ?? []);
 
   return (
-    <Card title={t('admin.auth.forwardingTitle')} footer={t('admin.auth.forwardingHint')}>
+    <Card stacked title={t('admin.auth.forwardingTitle')} footer={t('admin.auth.forwardingHint')}>
       <MutationError error={setGlobal.error ?? setProject.error ?? clearProject.error} messageKey="admin.auth.forwardingSaveError" />
       <QueryStatus isPending={forwarding.isPending} error={forwarding.error} />
       {data === undefined ? null : (
