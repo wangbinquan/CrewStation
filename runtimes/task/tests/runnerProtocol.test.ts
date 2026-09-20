@@ -48,7 +48,8 @@ describe('握手与心跳', () => {
     expect(RunnerResultPayloads.startAgentTerminal.parse(result)).toMatchObject({ lifecycle: 'failed', reason: 'start-failed', profileRevision: 3, protocol: 'claude-code' });
     await session.call({ id: 'native-close-view', type: 'closeTerminal', terminalId: 'native-terminal' });
     expect(RunnerResultPayloads.listAgentTerminals.parse(await session.call({ id: 'native-list-again', type: 'listAgentTerminals' })).terminals).toHaveLength(1);
-    expect(RunnerResultPayloads.attachTerminal.parse(await session.call({ id: 'native-attach', type: 'attachTerminal', terminalId: 'native-terminal', runnerId: roster.runnerId }))).toMatchObject({ data: '', throughSeq: 0 });
+    // 没有输出的失败会话仍声明默认鼠标编码，避免浏览器把完整快照误判为旧快照。
+    expect(RunnerResultPayloads.attachTerminal.parse(await session.call({ id: 'native-attach', type: 'attachTerminal', terminalId: 'native-terminal', runnerId: roster.runnerId }))).toMatchObject({ data: '\u001b[?1006l', throughSeq: 0 });
   });
   test('首帧 hello 合协议，welcome 后收到 seq=1 的 runnerState ready，ping 得到 pong，无效命令帧按 id 回 invalid_command', async () => {
     const { session, tr } = await boot();
