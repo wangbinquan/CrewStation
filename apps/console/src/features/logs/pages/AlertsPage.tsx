@@ -25,7 +25,7 @@ export function AlertsPage({ projectId, search, change, onLogs }: { readonly pro
   });
   usePollingRefetch(alerts.refetch, 5_000);
   const me = useApiQuery(queryKeys.me(), () => api.me.get());
-  const canManage = !me.error && !!me.data && (me.data.isAdmin || me.data.memberships.some((member) => member.projectId === projectId && member.role === 'owner'));
+  const canManage = !me.error && !!me.data && (me.data.isAdmin || me.data.memberships?.some((member) => member.projectId === projectId && member.role === 'owner') === true);
   const rows = !alerts.error ? alerts.data?.items ?? [] : [], filter = search.alertState ?? 'all';
   const shown = rows.filter((row) => filter === 'all' || row.state === filter), selected = rows.find((row) => row.id === search.alertId);
   return <div className={styles.stack}>

@@ -33,8 +33,8 @@ function ReleaseWorkspace(): ReactElement {
   const { projectId, space } = useProjectScope(), navigate = useNavigate();
   const search = parseReleaseSearch(useSearch({ strict: false }));
   const me = useApiQuery(queryKeys.me(), () => api.me.get());
-  const canPublish = !me.error && !!me.data && (me.data.isAdmin || me.data.memberships.some((member) => member.projectId === projectId && ['owner', 'developer'].includes(member.role)));
-  const canSwitch = !me.error && !!me.data && (me.data.isAdmin || me.data.memberships.some((member) => member.projectId === projectId && member.role === 'owner'));
+  const canPublish = !me.error && !!me.data && (me.data.isAdmin || me.data.memberships?.some((member) => member.projectId === projectId && ['owner', 'developer'].includes(member.role)) === true);
+  const canSwitch = !me.error && !!me.data && (me.data.isAdmin || me.data.memberships?.some((member) => member.projectId === projectId && member.role === 'owner') === true);
   const updateSearch = (next: typeof search) => void navigate({ to: PROJECT_PATHS[space].release, params: { projectId }, search: next });
   const { serviceId, isPending, error } = useServiceOfProject(projectId);
   return (

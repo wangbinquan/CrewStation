@@ -20,7 +20,7 @@ export function AgentActivityMenu(): ReactElement {
   const { projectId: routeProjectId } = useParams({ strict: false });
   const me = useApiQuery(queryKeys.me(), () => api.me.get()), pathname = useLocation().pathname;
   const isAdmin = !me.error && me.data?.isAdmin === true;
-  const canView = !me.error && (isAdmin || me.data?.memberships.some((member) => member.projectId === routeProjectId && ['owner', 'developer'].includes(member.role)));
+  const canView = !me.error && (isAdmin || me.data?.memberships?.some((member) => member.projectId === routeProjectId && ['owner', 'developer'].includes(member.role)));
   const projectId = canView && (pathname.startsWith('/projects/') || pathname.startsWith('/admin/integrations/') && isAdmin) ? routeProjectId : undefined;
   const session = useApiQuery(queryKeys.devSession(projectId ?? ''), () => api.devSession.get(projectId!), { enabled: Boolean(projectId && store), refetchIntervalMs: 10000 });
   const project = useApiQuery(queryKeys.project(projectId ?? ''), () => api.projects.get(projectId!), { enabled: Boolean(projectId && store) });

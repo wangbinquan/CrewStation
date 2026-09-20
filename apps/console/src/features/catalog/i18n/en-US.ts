@@ -2,6 +2,8 @@ import type { MessagesShapedLike } from '../../../shared/lib/i18n';
 import type { messages as zhCN } from './zh-CN';
 
 export const messages: MessagesShapedLike<typeof zhCN> = {
+  'catalog.identityUnavailable': 'Current user details are unavailable, so development access cannot be confirmed. API documentation remains available.',
+  'catalog.reloadIdentity': 'Reload user details',
   "catalog.caller.search": "Search callers",
   "catalog.caller.find": "Find callers",
   "catalog.caller.select": "Caller project",

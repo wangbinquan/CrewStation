@@ -54,6 +54,17 @@ test('管理员在项目消费页也不出现平台写操作，只给保留项�
   expect(page.text()).toContain('管理接口开放策略');
 });
 
+test('当前用户缺少成员列表时 API 页面不崩溃，重新读取恢复后清除提示', async () => {
+  const f = fixture(), fallback = globalThis.fetch; let incomplete = true;
+  globalThis.fetch = (async (raw, init) => incomplete && String(raw).endsWith('/v1/me')
+    ? Response.json({ id: 'user', name: '开发者', isAdmin: false }) : fallback(raw, init)) as typeof fetch;
+  page = await renderApp(`/projects/${projectId}/settings?tab=resources&resource=api`);
+  expect(page.text()).toContain('当前用户资料不完整'); expect(page.text()).toContain('可调用的操作');
+  expect(page.text()).not.toContain('Something went wrong'); expect(f.writes).toEqual([]);
+  incomplete = false; await page.click('重新读取用户资料');
+  expect(page.text()).not.toContain('当前用户资料不完整'); expect(f.writes).toEqual([]);
+});
+
 test('理由格式首屏提示，超过上限明确报错且不发送申请', async () => {
   const f = fixture(); page = await renderApp(`/projects/${projectId}/settings?tab=resources&resource=api`);
   await page.click('申请定向开放'); expect(page.text()).toContain('最多 500 字');

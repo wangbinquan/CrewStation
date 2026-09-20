@@ -1,6 +1,8 @@
 import type { Messages } from '../../../shared/lib/i18n';
 
 export const messages = {
+  'catalog.identityUnavailable': '当前用户资料不完整，暂不能确认开发权限；你仍可浏览 API 文档。',
+  'catalog.reloadIdentity': '重新读取用户资料',
   "catalog.caller.search": "搜索调用方",
   "catalog.caller.find": "查询调用方",
   "catalog.caller.select": "调用方项目",
