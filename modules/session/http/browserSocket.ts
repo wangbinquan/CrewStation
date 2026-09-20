@@ -27,7 +27,7 @@ export function browserSocketRoutes(streams: ReturnType<typeof browserStreams>, 
         const socket = ws as unknown as ServerWebSocket;
         chain = chain.then(async () => {
           const actor = { userId: user.userId as UserId, isAdmin: await isAdmin(user.userId as UserId) };
-          stream = await streams.open(actor, taskId, { send: (frame) => socket.send(frame) }, Number.isSafeInteger(sinceSeq) && sinceSeq >= 0 ? sinceSeq : 0, { tail });
+          stream = await streams.open(actor, taskId, { send: (frame) => socket.send(frame), close: (code, reason) => socket.close(code, reason) }, Number.isSafeInteger(sinceSeq) && sinceSeq >= 0 ? sinceSeq : 0, { tail });
         }).catch((error: unknown) => {
           const denied = isPlatformError(error) && error.kind === 'forbidden';
           socket.send(JSON.stringify({ type: 'error', id: 'open', code: denied ? 'forbidden' : 'unavailable', message: denied ? error.message : '会话历史暂时无法读取，正在重新连接' }));

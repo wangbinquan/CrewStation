@@ -1,11 +1,22 @@
 import type { MessagesShapedLike } from '../../../shared/lib/i18n';
 import type { messages as zhCN } from './zh-CN';
 import { authMessages } from './auth.en-US';
+import { projectComputeMessages } from './projectCompute.en-US';
 import { computeMessages } from './compute.en-US';
 
 export const messages: MessagesShapedLike<typeof zhCN> = {
+  ...projectComputeMessages,
+  "admin.users.role": "Platform role",
+  "admin.users.roleFor": "Role for {name}",
+  "admin.users.saveRole": "Save role",
+  "admin.users.cancelRole": "Cancel",
+  "admin.users.refreshRole": "Reload current role",
+  "admin.users.roleQuestion": "Set {name} to {role}?",
+  "admin.users.roleHint": "Administrators include developer access. Downgrades stop further development actions; project owners must transfer ownership first.",
+  "admin.users.hint": "Users use applications, developers create and develop projects, and administrators also manage the platform. Project membership determines access to individual projects and trials.",
+
   "admin.overview.hint": "Review pending work and manage projects, capabilities and runtime resources.",
-  "admin.retryIdentity": "Reload administrator identity",
+  "admin.retryIdentity": "Check permissions again",
   "admin.directory.title": "Project directory",
   "admin.directory.description": "Browse all project types and manage provisioning, members and lifecycle.",
   "admin.directory.search": "Name or slug",
@@ -85,7 +96,7 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   'admin.denied.back': 'Back to the workbench',
 
   'admin.overview.open': 'Open {page}',
-  'admin.overview.users': 'Who is a platform administrator: only they create projects, integrate company systems and decide open-policy and egress requests.',
+  'admin.overview.users': 'Assign user, developer and administrator roles for application access, project development and platform management.',
   'admin.overview.compute': 'Configure the CLI, model, startup files and scripts for agents. Profiles are tested on save and referenced by name in projects.',
   'admin.overview.servicePlans': 'Service plans: CPU, memory and replica ceiling for digital-worker services, referenced by name from the manifest.',
   'admin.overview.taskProfiles': 'Task container profiles: CPU, memory and storage for dev-session and business task containers.',
@@ -105,7 +116,6 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   'admin.integrations.emptyDescription': 'The installer can create the built-in GitLab event producer and the reference API proxy; you can also create one as APIProxy/EventProducer from the workbench project list.',
 
   'admin.users.title': 'Users',
-  'admin.users.hint': 'The admin flag decides who may create projects, integrate company systems and decide open requests; users themselves arrive through company login — the workbench creates no accounts.',
   'admin.users.name': 'Name',
   'admin.users.email': 'Email',
   'admin.users.admin': 'Admin',

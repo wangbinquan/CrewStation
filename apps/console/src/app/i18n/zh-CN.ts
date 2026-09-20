@@ -2,6 +2,18 @@ import type { Messages } from '../../shared/lib/i18n';
 
 /** app 级文案：导航、顶栏、语言、404，以及 shared/ui 里通用组件的缺省文案。页面文案在各 feature 的 i18n/ 中。 */
 export const messages = {
+  'development.suspended': '开发权限已变化。当前输入仍保留，权限恢复后可继续；你也可以返回应用首页。',
+  "nav.market": "应用",
+  "nav.projects": "项目开发",
+  "app.adminSpace": "平台管理",
+  "topBar.role.user": "用户",
+  "topBar.role.developer": "开发者",
+  "topBar.role.admin": "管理员",
+  "development.denied": "需要开发者角色",
+  "development.deniedHint": "你可以在应用首页使用或试用应用。如需创建和开发项目，请联系管理员开通开发者角色。",
+  "topBar.userHint": "正在读取当前账户",
+
+
   'ui.requestPage.label': '{scope}分页',
   'ui.requestPage.count': '本页 {count} 项',
   'ui.requestPage.unknown': '本页数量未确认',
@@ -97,7 +109,6 @@ export const messages = {
   'activity.invalidTarget': "该动态属于已结束的开发会话，或目标 CLI 已不可用。当前窗口没有被替换。",
   'activity.readFailed': "已定位 CLI，但未能核对该条动态或保存个人已读。可从 Agent 动态再次打开重试。",
   'app.workbench': '工作台',
-  'app.adminSpace': '平台管理',
   'nav.aria': '主导航',
   'nav.global': '工作台入口',
   'nav.workbenchHint': '发现应用，构建能力',
@@ -105,8 +116,6 @@ export const messages = {
   'nav.admin.groupSupply': '供给与接入',
   'nav.admin.groupSettings': '平台设置',
   'nav.myProjects': '我的项目',
-  'nav.projects': '数字人项目',
-  'nav.market': '能力市场',
   'nav.projectPages': '项目页面',
   'nav.preview': '版本试用',
   'nav.settings': '项目设置',
@@ -145,7 +154,6 @@ export const messages = {
   'topBar.roleMember': '普通用户',
   'topBar.localSession': '本地账户',
   'topBar.logout': '登出',
-  'topBar.userHint': '登录与身份注入由网关（cs-auth）在用户域完成，工作台不写登录代码；接入后此处显示真实用户。',
   'locale.label': '界面语言',
   'locale.zh-CN': '中文',
   'locale.en-US': 'English',

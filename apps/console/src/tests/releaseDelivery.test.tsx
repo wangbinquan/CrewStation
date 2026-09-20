@@ -88,7 +88,7 @@ test('错误发布身份、未知槽与无副本都不可试用或切换；错�
 
 test('开发者可准备发布但无切换按钮，测试者无发布权；管理员保持管理空间，概览不再重复切流', async () => {
   const f = releaseDeliveryFixture(); f.state.role = 'developer'; page = await renderApp(`/projects/${projectId}/release`); expect(button('准备发布')?.disabled).toBe(false); expect(button('检查上线／回退至 v1.1.0')).toBeUndefined();
-  page.unmount(); f.state.role = 'tester'; f.reads.length = 0; page = await renderApp(`/projects/${projectId}/release`); expect(page.text()).toContain('你是此项目的测试者'); expect(button('准备发布')).toBeUndefined(); expect(button('检查上线／回退至 v1.1.0')).toBeUndefined();
+  page.unmount(); f.state.role = 'tester'; f.reads.length = 0; page = await renderApp(`/projects/${projectId}/release`); expect(page.text()).toContain('Beta'); expect(button('准备发布')).toBeUndefined(); expect(button('检查上线／回退至 v1.1.0')).toBeUndefined();
   expect(f.reads.some((path) => /\/slots|\/releases|\/branches/.test(path))).toBe(false);
   page.unmount(); f.state.admin = true; page = await renderApp(`/admin/integrations/${projectId}/release`); await check(); await click('取消切换'); await click('v1.1.0'); expect(page.path()).toBe(`/admin/integrations/${projectId}/release`); expect(page.search().release).toBe(targetId);
   await page.navigate(`/admin/integrations/${projectId}`); expect(page.text()).not.toContain('将用户流量切'); expect(button('检查上线／回退至 v1.1.0')).toBeUndefined();

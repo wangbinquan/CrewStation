@@ -1,3 +1,4 @@
+import type { PlatformRole } from '@crewstation/contracts';
 import { boolean, index, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core';
 import { jsonDocument } from '@crewstation/persistence';
 import { identitySchema } from './schema';
@@ -14,6 +15,8 @@ export const users = identitySchema.table('users', {
   /** argon2id（Bun.password）；为空即没有本地口令。 */
   passwordHash: text('password_hash'),
   isAdmin: boolean('is_admin').notNull().default(false),
+  platformRole: text('platform_role').$type<PlatformRole>().notNull().default('user'),
+  roleInitialized: boolean('role_initialized').notNull().default(true),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
   lastLoginAt: timestamp('last_login_at', { withTimezone: true }).notNull(),
 });

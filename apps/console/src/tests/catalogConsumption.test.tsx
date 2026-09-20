@@ -13,7 +13,7 @@ function fixture(admin = false) {
   const state = { failure: true, requested: false };
   globalThis.fetch = (async (raw, init) => {
     const url = String(raw); let status = 200, body: unknown = { items: [] };
-    if (url.endsWith('/v1/me')) body = { id: 'user', name: '开发者', isAdmin: admin, memberships: [{ projectId, role: 'owner' }] };
+    if (url.endsWith('/v1/me')) body = { id: 'user', name: '开发者', platformRole: (admin) ? 'admin' : 'developer', isAdmin: admin, memberships: [{ projectId, role: 'owner' }] };
     else if (url.endsWith(`/v1/projects/${projectId}`)) body = { id: projectId, serviceId, name: '知识助理', slug: 'knowledge', kind: 'DigitalWorker', state: 'active' };
     else if (url.includes('/catalog/operations')) body = { items: [{ key: 'billing:GET:/invoices', proxy: 'billing', method: 'GET', path: '/invoices', openPolicy: 'targeted', granted: false }] };
     else if (init?.method === 'POST') {
@@ -57,7 +57,7 @@ test('管理员在项目消费页也不出现平台写操作，只给保留项�
 test('当前用户缺少成员列表时 API 页面不崩溃，重新读取恢复后清除提示', async () => {
   const f = fixture(), fallback = globalThis.fetch; let incomplete = true;
   globalThis.fetch = (async (raw, init) => incomplete && String(raw).endsWith('/v1/me')
-    ? Response.json({ id: 'user', name: '开发者', isAdmin: false }) : fallback(raw, init)) as typeof fetch;
+    ? Response.json({ id: 'user', name: '开发者', platformRole: 'developer', isAdmin: false }) : fallback(raw, init)) as typeof fetch;
   page = await renderApp(`/projects/${projectId}/settings?tab=resources&resource=api`);
   expect(page.text()).toContain('当前用户资料不完整'); expect(page.text()).toContain('可调用的操作');
   expect(page.text()).not.toContain('Something went wrong'); expect(f.writes).toEqual([]);

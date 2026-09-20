@@ -107,7 +107,7 @@ test('Swagger 在途修改保留新输入，另一个 Execute 不会并发发送
 
 test('测试者不挂载开发工具；开发者无会话时不能执行实际 Swagger', async () => {
   const f = apiInvocationFixture(); f.state.role = 'tester'; page = await renderApp(`${invocationRoute}&proxy=crm`);
-  expect(page.text()).toContain('你是此项目的测试者');
+  expect(page.text()).toContain('Beta');
   expect(document.querySelector('.swagger-ui') === null).toBe(true); expect(f.calls).toHaveLength(0);
   expect(f.reads.some((url) => /\/catalog\/|\/openapi|\/dev-session/.test(url))).toBe(false);
   page.unmount(); page = undefined; f.state.role = 'developer'; f.state.sessionFailure = true;
@@ -117,10 +117,10 @@ test('测试者不挂载开发工具；开发者无会话时不能执行实际 S
 
 test('当前身份刷新后调整 Swagger 写入口，恢复开发权限时保留此前输入', async () => {
   const f = apiInvocationFixture(); f.state.role = 'tester'; page = await renderApp(`${invocationRoute}&proxy=crm`);
-  expect(page.text()).toContain('你是此项目的测试者'); expect(document.querySelector('.try-out__btn') === null).toBe(true);
-  f.state.role = 'developer'; await refreshInvocationQueries(page); await expand();
+  expect(page.text()).toContain('Beta'); expect(document.querySelector('.try-out__btn') === null).toBe(true);
+  f.state.role = 'developer'; await refreshInvocationQueries(page); await page.navigate(`${invocationRoute}&proxy=crm`); await expand();
   await invocationInput(page, document.querySelector<HTMLInputElement>('.opblock-post input[placeholder="id"]')!, 'role-draft');
-  f.state.role = 'tester'; await refreshInvocationQueries(page); expect(page.text()).toContain('你是此项目的测试者');
+  f.state.role = 'tester'; await refreshInvocationQueries(page); expect(page.text()).toContain('需要开发者角色');
   expect(document.querySelector('.opblock-post')?.closest('[hidden]') !== null).toBe(true);
   expect(document.querySelector('.opblock-post .execute') === null).toBe(true);
   f.state.role = 'developer'; await refreshInvocationQueries(page); await until('.opblock-post .execute'); expect(document.querySelector<HTMLInputElement>('.opblock-post input[placeholder="id"]')!.value).toBe('role-draft'); expect(f.calls).toHaveLength(0);

@@ -10,13 +10,14 @@ export function CurrentUserChip(): ReactElement {
   const t = useT();
   const me = useApiQuery(queryKeys.me(), () => api.me.get());
   const name = me.data?.name ?? (me.isPending ? t('topBar.userLoading') : t('topBar.userUnknown'));
-  const title = me.data === undefined ? t('topBar.userHint') : t('topBar.userTitle', { email: me.data.email, role: me.data.isAdmin ? t('topBar.roleAdmin') : t('topBar.roleMember') });
+  const title = me.data === undefined ? t('topBar.userHint') : t('topBar.userTitle', { email: me.data.email, role: t(`topBar.role.${me.data.platformRole}`) });
   return (
     <div className={styles.user} title={title}>
       <span className={styles.avatar} aria-hidden="true">
         {name.slice(0, 1).toUpperCase()}
       </span>
       <span className={styles.userName}>{name}</span>
+      {me.data && !me.error ? <span className={styles.demo}>{t(`topBar.role.${me.data.platformRole}`)}</span> : null}
       {me.data?.authMethod === 'password' ? <span className={styles.demo}>{t('topBar.localSession')}</span> : null}
       <a className={styles.logout} href="/auth/logout">
         {t('topBar.logout')}

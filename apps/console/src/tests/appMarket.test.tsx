@@ -11,7 +11,7 @@ const userId = `usr_${'a'.repeat(32)}` as UserId, projectId = `prj_${'b'.repeat(
 const user = { userId, name: '小林', email: 'lin@example.com' };
 const app = (overrides: Partial<MarketAppDto> = {}): MarketAppDto => ({
   projectId: projectId as MarketAppDto['projectId'], name: '知识助理', icon: 'book', description: '整理团队知识',
-  owner: { userId, name: '应用负责人' }, projectState: 'active', canDevelop: false, canConfigure: false, visibilityRevision: 1,
+  owner: { userId, name: '应用负责人' }, projectState: 'active', canPreview: false, entry: { kind: 'production', status: 'unavailable' }, canDevelop: false, canConfigure: false, visibilityRevision: 1,
   production: { status: 'not-deployed', freshness: 'current', checkedAt: '2026-09-13T00:00:00.000Z' }, checkedAt: '2026-09-13T00:00:00.000Z', ...overrides,
 });
 let saved: AppVisibilityDto;
@@ -23,7 +23,7 @@ function fixture(owner = false, application = app()) {
     const url = String(raw), method = init?.method ?? 'GET', body = init?.body ? JSON.parse(String(init.body)) : undefined;
     calls.push({ url, method, body });
     let result: unknown = { items: [] }, status = 200;
-    if (url.endsWith('/v1/me')) result = { id: userId, name: '使用者', email: 'user@example.com', isAdmin: false, memberships: owner ? [{ projectId, role: 'owner' }] : [], authMethod: 'password' as const };
+    if (url.endsWith('/v1/me')) result = { id: userId, name: '使用者', email: 'user@example.com', platformRole: owner ? 'developer' : 'user', isAdmin: false, memberships: owner ? [{ projectId, role: 'owner' }] : [], authMethod: 'password' as const };
     else if (url.includes('/market/apps')) {
       if (marketFailure) { result = { error: 'not_found', message: '应用不存在或不可见' }; status = 404; }
       else result = url.includes(`/apps/${projectId}`) ? application : { items: [application] };
@@ -53,7 +53,7 @@ const scopeSelect = () => document.querySelector<HTMLSelectElement>('form select
 describe('能力市场与负责人设置真实路由', () => {
   test('首页是市场，应用使用者不请求项目内部数据；详情不会展示项目导航', async () => {
     const f = fixture(); page = await renderApp('/');
-    expect(page.text()).toContain('知识助理'); expect(page.text()).toContain('尚未上线');
+    expect(page.text()).toContain('知识助理'); expect(page.text()).toContain('暂不可用');
     expect(page.text()).not.toContain('进入项目'); expect(page.text()).not.toContain('打开正式应用');
     await page.click('知识助理');
     expect(page.path()).toBe(`/market/${projectId}`);
@@ -67,18 +67,18 @@ describe('能力市场与负责人设置真实路由', () => {
     // 404 是明确状态而不是“读取失败”，说明可能原因并保留返回路径。
     expect(page.text()).toContain('该应用当前对你不可见'); expect(page.text()).not.toContain('读取失败'); expect(page.html()).toContain('href="/market"');
   });
-  test('已上线的正式地址独立打开，只有建设者与负责人有相应快捷入口', async () => {
-    fixture(true, app({ canDevelop: true, canConfigure: true, production: { status: 'deployed', state: 'ready', host: 'knowledge.example.test', tag: 'v1.2.3', commitSha: 'abc123', freshness: 'current', checkedAt: '2026-09-13T00:00:00.000Z' } }));
+  test('已上线应用独立打开，负责人也没有项目编辑入口或提交信息', async () => {
+    fixture(true, app({ canDevelop: true, canConfigure: true, entry: { kind: 'production', status: 'ready', host: 'knowledge.example.test' }, production: { status: 'deployed', state: 'ready', host: 'knowledge.example.test', tag: 'v1.2.3', commitSha: 'abc123', freshness: 'current', checkedAt: '2026-09-13T00:00:00.000Z' } }));
     page = await renderApp(`/market/${projectId}`);
     const link = document.querySelector<HTMLAnchorElement>('a[href="http://knowledge.example.test"]');
-    expect(link?.target).toBe('_blank'); expect(page.text()).toContain('v1.2.3'); expect(page.text()).toContain('abc123');
-    expect(page.text()).toContain('进入项目'); await page.click('配置可见性');
-    expect(page.path()).toBe(`/projects/${projectId}/settings`);
+    expect(link?.target).toBe('_blank'); expect(page.text()).not.toContain('abc123');
+    expect(page.text()).not.toContain('进入项目'); expect(page.text()).not.toContain('配置可见性');
+    expect(page.html()).not.toContain(`/projects/${projectId}/settings`);
   });
   test('暂停应用保留正式版本记录，不能同时显示在线与正式打开入口', async () => {
     fixture(false, app({ projectState: 'paused', production: { status: 'deployed', state: 'ready', host: 'knowledge.example.test', tag: 'v1.2.3', commitSha: 'abc123', freshness: 'current', checkedAt: '2026-09-13T00:00:00.000Z' } }));
     page = await renderApp(`/market/${projectId}`);
-    expect(page.text()).toContain('已暂停'); expect(page.text()).toContain('正式版本');
+    expect(page.text()).toContain('暂不可用');
     expect(page.text()).not.toContain('已上线'); expect(page.text()).not.toContain('打开正式应用');
   });
   test('指定名单约束首屏展示；空名单字段错误；精确查找去重与取消不保存', async () => {

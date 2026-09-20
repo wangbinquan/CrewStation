@@ -3,7 +3,7 @@ import type { EventConsumer } from '@crewstation/eventbus';
 import { createEventConsumer } from '@crewstation/eventbus';
 import type { Logger } from '@crewstation/kernel';
 import { noopLogger } from '@crewstation/kernel';
-import type { UserId } from '@crewstation/contracts';
+import type { Actor, ProjectId, UserId } from '@crewstation/contracts';
 import type { AppEnv } from '@crewstation/http';
 import type { Database } from '@crewstation/persistence';
 import type { Hono } from 'hono';
@@ -22,6 +22,7 @@ export interface ProvisioningModuleDeps {
   consumerName: string;
   isAdmin: (userId: UserId) => Promise<boolean>;
   logger?: Logger;
+  authorizeRetry?: (actor: Actor, projectId: ProjectId) => Promise<void>;
 }
 
 export interface ProvisioningModule {
@@ -38,7 +39,7 @@ export function createProvisioningModule(deps: ProvisioningModuleDeps): Provisio
   const api: ProvisioningModuleApi = { name: 'provisioning', provisionProject: provision, retry: enqueue };
   return {
     api,
-    http: [provisioningRoutes(api, deps.isAdmin)],
+    http: [provisioningRoutes(api, deps.isAdmin, deps.authorizeRetry)],
     workers: [createWorker({ db: deps.db, kinds: [PROVISION_JOB_KIND], owner: deps.workerOwner, concurrency: 2, leaseSeconds: 600, logger, handler: provisionJobHandler(api) })],
     subscriptions: createEventConsumer({ db: deps.db, consumer: deps.consumerName, logger }).on(DomainTopic.projectCreated, async (e) => { await enqueue(e.payload.projectId); }),
   };

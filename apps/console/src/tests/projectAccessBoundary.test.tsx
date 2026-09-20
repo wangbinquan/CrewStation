@@ -13,7 +13,7 @@ interface Handler {
 let handlers: Handler[] = [];
 let app: RenderedApp | undefined;
 const projectId = `prj_${'c'.repeat(32)}`;
-const MEMBER = { id: 'usr_m', name: '普通成员', email: 'm@example.com', isAdmin: false, memberships: [], authMethod: 'password' as const };
+const MEMBER = { id: 'usr_m', name: '普通成员', email: 'm@example.com', platformRole: 'developer', isAdmin: false, memberships: [], authMethod: 'password' as const };
 
 globalThis.fetch = (async (input: string | URL | Request) => {
   const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;

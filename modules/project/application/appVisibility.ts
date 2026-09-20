@@ -57,7 +57,7 @@ export function appVisibilityUseCases(deps: ProjectUseCaseDeps) {
       await authorize(actor, projectId, 'manage-members');
       const parsed = UserIdSchema.safeParse(identity.trim());
       const user = parsed.success ? await users.getUser(parsed.data) : await users.findByEmail(identity.trim());
-      return user ? [{ userId: user.id, name: user.name, email: user.email }] : [];
+      return user ? [{ userId: user.id, name: user.name, email: user.email, platformRole: user.platformRole }] : [];
     },
   };
 }

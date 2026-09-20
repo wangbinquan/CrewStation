@@ -174,7 +174,7 @@ async function createWithIdentity(deps: Deps, provider: OidcProviderRecord, clai
       email: profile.email ?? `${username}@${provider.slug}.oidc.invalid`,
       gitName: profile.gitName,
       passwordHash: null,
-      isAdmin: shouldBootstrapAdminForOidc(profile.email, deps.settings.adminEmails),
+      platformRole: shouldBootstrapAdminForOidc(profile.email, deps.settings.adminEmails) ? 'admin' : 'user',
       createdAt: now,
       lastLoginAt: now,
     };

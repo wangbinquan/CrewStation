@@ -9,11 +9,12 @@ export interface ProjectRepository {
   update(project: Project): Promise<void>;
   getById(id: ProjectId): Promise<Project | undefined>;
   getBySlug(slug: string): Promise<Project | undefined>;
-  list(): Promise<Project[]>;
+  list(page?: { after?: string; limit: number }): Promise<Project[]>;
   listByIds(ids: readonly ProjectId[]): Promise<Project[]>;
 }
 
 export interface ServiceRepository {
+  list(projectIds?: readonly ProjectId[]): Promise<Service[]>;
   insert(service: Service): Promise<void>;
   getById(id: ServiceId): Promise<Service | undefined>;
   getByProject(projectId: ProjectId): Promise<Service | undefined>;
@@ -48,4 +49,3 @@ export interface CatalogRepository {
   getTaskProfile(name: string): Promise<TaskProfile | undefined>;
   upsertTaskProfile(profile: TaskProfile): Promise<void>;
 }
-

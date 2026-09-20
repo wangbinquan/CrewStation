@@ -1,4 +1,11 @@
-import type { ProjectSummaryDetail, UserId } from '@crewstation/contracts';
+import type { MarketAppDto, ProjectSummaryDetail, UserId } from '@crewstation/contracts';
+
+export function trialMarketFixture(projectId: string): MarketAppDto {
+  const checkedAt = new Date().toISOString();
+  return { projectId: projectId as MarketAppDto['projectId'], name: '数字助手 1', description: '整理团队日常工作', icon: 'assistant', owner: { userId: summaryUserId, name: '王负责人' }, projectState: 'active',
+    canPreview: true, canDevelop: false, canConfigure: false, entry: { kind: 'trial', status: 'ready', host: 'preview.demo.test' },
+    production: { status: 'not-deployed', checkedAt, freshness: 'current' }, visibilityRevision: 1, checkedAt };
+}
 
 export const summaryUserId = `usr_${'a'.repeat(32)}` as UserId;
 export function summaryFixtureItem(n = 1): ProjectSummaryDetail {
@@ -25,7 +32,7 @@ export function summaryFixture() {
     let body: unknown = { items: [] }, status = 200;
     if (url.pathname === '/v1/me') {
       if (state.meError) { status = 503; body = { error: 'unavailable', message: '身份读取失败' }; }
-      else body = { id: summaryUserId, name: '王负责人', email: 'owner@test.invalid', isAdmin: state.admin, memberships: [{ projectId: state.item.project.id, role: state.item.role }] };
+      else body = { id: summaryUserId, name: '王负责人', email: 'owner@test.invalid', platformRole: (state.admin) ? 'admin' : 'developer', isAdmin: state.admin, memberships: [{ projectId: state.item.project.id, role: state.item.role }] };
     }
     else if (url.pathname.startsWith('/v1/workbench/project-summaries')) {
       if (state.hang) return new Promise<Response>(() => {});

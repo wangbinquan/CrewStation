@@ -38,13 +38,14 @@ export function useMemberEditor({ isAdmin, canManage, members, pending, disabled
   };
   const select = (value: MemberCandidateDto | undefined) => {
     setUser(value); setRawId(''); setError(undefined);
-    setRole(members.find((member) => member.userId === value?.userId)?.role ?? 'developer');
+    setRole(value?.platformRole === 'user' ? 'tester' : members.find((member) => member.userId === value?.userId)?.role ?? 'developer');
   };
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); if (locked) return;
     const parsed = UserIdSchema.safeParse(targetId);
     if (!parsed.success) { setError(t('projects.members.targetRequired')); event.currentTarget.querySelector<HTMLElement>('input:not(:disabled), select:not(:disabled)')?.focus(); return; }
     if ((role === 'owner' && !isAdmin) || (current?.role === 'owner' && role !== 'owner')) return;
+    if (role !== 'tester' && user?.platformRole === 'user') { setError(t('projects.members.developerRequired')); return; }
     setError(undefined); const input = { userId: parsed.data, role };
     if (role === 'owner' && current?.role !== 'owner') setConfirmedInput(input);
     else void save(input);

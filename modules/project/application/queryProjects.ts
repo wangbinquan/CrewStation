@@ -1,6 +1,7 @@
 import type { Actor, ListProjectsQuery, ProjectDto, ProjectId, ProjectState, ServiceDto, ServiceId, UserId } from '@crewstation/contracts';
-import { notFound } from '@crewstation/kernel';
+import { notFound, precondition } from '@crewstation/kernel';
 import { transition } from '../domain/project';
+import { developerActor } from './creation/eligibility';
 import { authorizationUseCases } from './authorization';
 import type { ProjectUseCaseDeps } from './dependencies';
 import { projectToDto, serviceToDto } from './toDto';
@@ -33,7 +34,9 @@ export function queryProjectUseCases(deps: ProjectUseCaseDeps) {
      * 也只会在他自己的项目里筛，拿不到别人的接入容器。
      */
     listProjects: async (actor: Actor, query?: ListProjectsQuery): Promise<ProjectDto[]> => {
-      const projects = actor.isAdmin ? await uow.read.projects.list() : await uow.read.projects.listByIds(await uow.read.memberships.listProjectIdsByUser(actor.userId));
+      actor = await developerActor(deps, actor);
+      const memberships = await uow.read.memberships.listByUser(actor.userId);
+      const projects = actor.isAdmin ? await uow.read.projects.list() : (await uow.read.projects.listByIds(memberships.filter((m) => m.role !== 'tester').map((m) => m.projectId))).filter((p) => p.kind === 'DigitalWorker');
       const kinds = query?.kind;
       const dtos = await Promise.all(projects.map(async (p) => projectToDto(p, await uow.read.services.getByProject(p.id))));
       return kinds === undefined ? dtos : dtos.filter((dto) => kinds.includes(dto.kind));
@@ -58,6 +61,7 @@ export function queryProjectUseCases(deps: ProjectUseCaseDeps) {
       const [service, project] = await Promise.all([uow.read.services.getByProject(projectId), uow.read.projects.getById(projectId)]);
       return service ? resolved(service, project) : undefined;
     },
+    listClusterProjects: () => clusterProjectDirectory(deps),
     listServices: async () => {
       const out = [];
       for (const project of await uow.read.projects.list()) {
@@ -86,4 +90,16 @@ export function queryProjectUseCases(deps: ProjectUseCaseDeps) {
       return projectToDto(next, await scope.services.getByProject(projectId));
     }),
   };
+}
+
+async function clusterProjectDirectory({ uow }: ProjectUseCaseDeps) {
+      const result = []; let after: string | undefined;
+      for (let page = 0; page < 1000; page++) {
+        const projects = await uow.read.projects.list({ after, limit: 500 });
+        const byProject = new Map((await uow.read.services.list(projects.map((p) => p.id))).map((s) => [s.projectId, s]));
+        result.push(...projects.map((p) => { const s = byProject.get(p.id); return { projectId: p.id, name: p.name, slug: p.slug, namespace: p.namespace, kind: p.kind, state: p.state, ...(s ? { serviceId: s.id, serviceName: s.name } : {}) }; }));
+        if (projects.length < 500) return result;
+        after = projects.at(-1)!.id;
+      }
+      throw precondition('项目目录超过单轮采集上限，保留上次快照');
 }

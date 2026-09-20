@@ -19,7 +19,8 @@ type AdminPagePath =
   | '/admin/capabilities'
   | '/admin/requests'
   | '/admin/egress'
-  | '/admin/gateway';
+  | '/admin/gateway'
+  | '/admin/cluster';
 
 interface AdminPageItem {
   readonly to: AdminPagePath;
@@ -44,6 +45,7 @@ const ADMIN_GROUPS: readonly { readonly titleKey?: string; readonly pages: reado
     { to: '/admin/service-plans', labelKey: 'nav.admin.servicePlans' },
     { to: '/admin/task-profiles', labelKey: 'nav.admin.taskProfiles' },
     { to: '/admin/egress', labelKey: 'nav.admin.egress' },
+    { to: '/admin/cluster', labelKey: 'cluster.title' },
     { to: '/admin/gateway', labelKey: 'nav.admin.gateway' },
   ] },
 ];
@@ -53,8 +55,8 @@ export function AdminNav(): ReactElement {
   const { projectId } = useParams({ strict: false }), path = useLocation().pathname;
   const me = useApiQuery(queryKeys.me(), () => api.me.get());
   // 身份确定不是管理员时不再列出管理页：每一页都只会是同一个拒绝说明，左栏只留回工作台。
-  const nonAdmin = !me.isPending && !me.error && me.data !== undefined && me.data.isAdmin !== true;
-  const inProject = path.startsWith('/admin/integrations/') && projectId && !me.error && me.data?.isAdmin === true;
+  const nonAdmin = !me.isPending && !me.error && me.data !== undefined && me.data.platformRole !== 'admin';
+  const inProject = path.startsWith('/admin/integrations/') && projectId && !me.error && me.data?.platformRole === 'admin';
   if (inProject) {
     return (
       <nav className={styles.nav} aria-label={t('nav.aria')}>

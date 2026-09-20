@@ -43,7 +43,7 @@ export function bootstrapAdminUseCases(deps: Deps) {
           email,
           gitName: request.displayName,
           passwordHash,
-          isAdmin: true,
+          platformRole: 'admin',
           createdAt: now,
           lastLoginAt: now,
         };

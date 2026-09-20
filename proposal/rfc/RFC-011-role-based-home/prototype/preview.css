@@ -1,0 +1,82 @@
+.homeHeader { min-height: 72px; padding: 10px max(24px, calc((100vw - 1180px) / 2)); display: flex; align-items: center; gap: 28px; background: var(--cs-color-surface); border-bottom: 1px solid var(--cs-color-border); }
+.brandAction { padding: 4px 0; }
+.spaceNavigation { display: flex; align-items: center; gap: 8px; flex: 1; }
+.spaceNavigation button { padding: 9px 15px; font-size: 14px; }
+.spaceNavigation [aria-current="page"] { background: var(--cs-color-tint); color: var(--cs-color-primary); }
+.account { display: flex; align-items: center; gap: 9px; flex-shrink: 0; font-size: 13px; }
+.account small { display: block; color: var(--cs-color-text-muted); font-size: 11px; }
+.avatar { display: grid; place-items: center; height: 33px; width: 33px; border-radius: 50%; color: var(--cs-color-primary); background: var(--cs-color-tint); font-weight: 650; }
+.homeMain { max-width: 1180px; margin: auto; padding: 42px 0 36px; min-height: calc(100vh - 144px); }
+.workingMain { padding-top: 32px; }
+.marketHeading { margin-bottom: 24px; }
+.marketHeading h1 { font-size: 29px; letter-spacing: -.03em; margin-top: 6px; }
+.eyebrow { color: var(--cs-color-primary); font-size: 12px; font-weight: 650; letter-spacing: .06em; }
+.applicationSearch { display: flex; align-items: end; gap: 10px; margin-bottom: 28px; max-width: 680px; }
+.applicationSearch label { flex: 1; }
+.applicationSearch input { min-height: 40px; }
+.applicationSearch button { min-height: 40px; }
+.listHeading, .projectToolbar { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 14px; }
+.listHeading h2, .projectToolbar h2 { font-size: 15px; margin: 0; }
+.applicationGrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.applicationCard { display: flex; flex-direction: column; margin-bottom: 0; }
+.applicationCard > header { border-bottom: 0; padding-top: 20px; padding-bottom: 0; align-items: center; gap: 8px; }
+.applicationCard > header h2 { min-width: 0; }
+.applicationCard > div { flex: 1; padding-top: 14px; }
+.applicationCard > footer { border-top: 0; padding-top: 0; padding-bottom: 20px; }
+.applicationName { display: flex; align-items: center; gap: 10px; font-size: 16px; }
+.applicationName > span { flex-shrink: 0; }
+.applicationDescription { color: var(--cs-color-text-muted); min-height: 44px; margin: 0 0 18px; }
+.applicationCard p.muted { margin: 0; font-size: 12px; }
+.muted { color: var(--cs-color-text-muted); }
+.available { color: var(--cs-tone-success-fg); font-size: 12px; white-space: nowrap; }
+.available span { font-size: 8px; padding-right: 4px; }
+.betaHint { display: flex; align-items: center; gap: 8px; margin: 24px 0 0; color: var(--cs-color-text-muted); font-size: 12px; }
+.detailCard { max-width: 760px; }
+.detailCard textarea { width: 100%; }
+.prototypeFooter { max-width: 1180px; margin: 0 auto; padding: 12px 0 24px; color: var(--cs-color-text-muted); font-size: 11px; border-top: 1px solid var(--cs-color-border); }
+.reviewTools { display: flex; flex-wrap: wrap; gap: 24px; align-items: end; margin-top: 14px; }
+.reviewTools select { min-width: 140px; font-size: 12px; }
+.projectToolbar { margin-top: 20px; }
+.projectToolbar label { width: 280px; }
+.projectList { display: flex; flex-direction: column; gap: 12px; }
+.projectRow { margin: 0; }
+.projectRowContent { display: grid; grid-template-columns: 1fr 130px 110px; align-items: center; gap: 20px; }
+.projectRowContent h3 { margin: 0 0 4px; font-size: 15px; }
+.projectRowContent > span { justify-self: start; }
+.creationCard { max-width: 720px; }
+.formStack { display: flex; flex-direction: column; gap: 20px; }
+.creationSummary { padding: 16px; background: var(--cs-color-surface-muted); border-radius: var(--cs-radius-sm); }
+.creationSummary p { margin: 5px 0 0; color: var(--cs-color-text-muted); }
+.formActions { margin-top: 24px; }
+.reviewList { display: grid; grid-template-columns: 100px 1fr; gap: 12px; margin: 0; }
+.reviewList dt { color: var(--cs-color-text-muted); }
+.reviewList dd { margin: 0; overflow-wrap: anywhere; }
+.developmentStatus { display: flex; align-items: center; gap: 12px; }
+.adminGrid, .roleList { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.roleEditor { margin-top: 20px; max-width: 720px; }
+@media (max-width: 1240px) { .homeMain, .prototypeFooter { margin-left: 24px; margin-right: 24px; } }
+@media (max-width: 900px) { .applicationGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .homeHeader { gap: 16px; padding: 12px 24px; } .adminGrid, .roleList { grid-template-columns: 1fr; } }
+@media (max-width: 600px) {
+  .homeHeader { flex-wrap: wrap; gap: 8px 12px; padding: 12px 16px 8px; }
+  .brandAction { max-width: 190px; }
+  .account { margin-left: auto; font-size: 12px; }
+  .account .avatar { display: none; }
+  .spaceNavigation { flex-basis: 100%; order: 3; gap: 5px; }
+  .spaceNavigation button { padding: 7px 12px; }
+  .homeMain, .prototypeFooter { margin-left: 16px; margin-right: 16px; }
+  .homeMain { padding-top: 24px; }
+  .marketHeading h1 { font-size: 25px; }
+  .marketHeading { margin-bottom: 20px; }
+  .applicationSearch { gap: 8px; flex-wrap: wrap; }
+  .applicationSearch label { flex-basis: 100%; }
+  .applicationGrid { grid-template-columns: 1fr; gap: 12px; }
+  .applicationDescription { min-height: auto; }
+  .betaHint { align-items: start; }
+  .reviewTools { gap: 12px; }
+  .reviewTools label { flex: 1 1 160px; }
+  .projectToolbar { align-items: stretch; flex-direction: column; gap: 12px; }
+  .projectToolbar label { width: 100%; }
+  .projectRowContent { grid-template-columns: 1fr auto; gap: 12px; }
+  .projectRowContent > div { grid-column: 1 / -1; }
+  .reviewList { grid-template-columns: 86px 1fr; }
+}

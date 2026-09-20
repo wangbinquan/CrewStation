@@ -1,47 +1,47 @@
 import './domSetup';
 import { afterEach, expect, test } from 'bun:test';
 import { renderApp } from './renderApp';
-import { summaryFixture } from './projectSummaryFixture';
-import type { ReleaseId } from '@crewstation/contracts';
+import { trialMarketFixture } from './projectSummaryFixture';
 
 const originalFetch = globalThis.fetch;
 let page: Awaited<ReturnType<typeof renderApp>> | undefined;
 afterEach(() => { page?.unmount(); page = undefined; globalThis.fetch = originalFetch; });
+const projectId = `prj_${'b'.repeat(32)}`;
 function fixture() {
-  const f = summaryFixture(), checkedAt = new Date().toISOString(); f.admin = false; f.projectDenied = true; f.item.role = 'tester';
-  f.item.development = f.item.slots = f.item.health = f.item.releases = f.item.switches = { status: 'restricted', checkedAt };
-  f.item.preview = { status: 'ready', checkedAt, value: { name: 'preview', active: false, state: 'ready', replicas: 1, readyReplicas: 1,
-    host: 'preview.demo.test', releaseId: `rel_${'b'.repeat(32)}` as ReleaseId, tag: 'v1.0.1', commitSha: 'b'.repeat(40) } };
-  return f;
+  const state = { app: trialMarketFixture(projectId), failed: false }, calls: string[] = [];
+  globalThis.fetch = (async (raw) => {
+    const path = new URL(String(raw), 'http://localhost').pathname; calls.push(path);
+    if (path === '/v1/me') return Response.json({ id: 'usr_trial', name: '试用成员', platformRole: 'user', isAdmin: false, memberships: [{ projectId, role: 'tester' }] });
+    if (state.failed) return Response.json({ error: 'unavailable', message: '应用读取失败' }, { status: 503 });
+    if (path === '/v1/market/apps') return Response.json({ items: [state.app] });
+    if (path === `/v1/market/apps/${projectId}`) return Response.json(state.app);
+    throw new Error(`试用界面不能查询内部数据：${path}`);
+  }) as typeof fetch;
+  return { state, calls };
 }
 
-test('测试者由列表进入试用详情，无权项目接口和开发／配置页面不挂载', async () => {
-  const f = fixture(); page = await renderApp('/projects');
-  // 真实测试者列表无试用入口，点击项目名又只得到角色 view 拒绝。
-  expect(document.querySelector('a[href="//preview.demo.test"]')?.textContent).toBe('打开试用');
-  await page.click('数字助手 1'); expect(page.text()).toContain('v1.0.1'); expect(page.text()).toContain('共享生产数据');
-  expect(page.text()).toContain('你是此项目的测试者');
-  expect(document.querySelector('[aria-label="项目页面"]')?.textContent).toBe('版本试用');
-  expect(f.calls.some((url) => url === `/v1/projects/${f.item.project.id}` || /\/dev-session|\/config\/|\/health/.test(url))).toBe(false);
-  await page.navigate(`/projects/${f.item.project.id}/settings?tab=config`);
-  expect(page.text()).toContain('你是此项目的测试者'); expect(f.calls.some((url) => /\/config\//.test(url))).toBe(false);
-  expect(f.writes).toEqual([]);
+test('普通试用成员由首页 Beta 直接试用，旧项目链接回到应用详情且不读取技术接口', async () => {
+  const f = fixture(); page = await renderApp('/');
+  expect(document.querySelector('a[href="http://preview.demo.test"]')?.textContent).toContain('试用应用');
+  expect(page.text()).toContain('Beta'); expect(page.text()).toContain('共用业务数据');
+  await page.click('数字助手 1'); expect(page.path()).toBe(`/market/${projectId}`);
+  expect(page.text()).not.toContain('开发'); expect(document.querySelector('[aria-label="项目页面"]')).toBeNull();
+  await page.navigate(`/projects/${projectId}/settings?tab=config`);
+  expect(page.path()).toBe(`/market/${projectId}`); expect(page.text()).toContain('Beta');
+  expect(f.calls.every((path) => path === '/v1/me' || path.startsWith('/v1/market/apps'))).toBe(true);
 });
 
-test('试用读取失败、未部署与未就绪不提供旧链接；刷新恢复可用', async () => {
-  const f = fixture(); page = await renderApp(`/projects/${f.item.project.id}`);
-  const ready = f.item.preview!;
-  expect(document.querySelector('a[href="//preview.demo.test"]') !== null).toBe(true);
-  f.error = true; await page.click('重新检查'); expect(page.text()).toContain('摘要读取失败');
-  expect(document.querySelector('a[href="//preview.demo.test"]') === null).toBe(true);
-  f.error = false;
-  if (ready.status !== 'ready' || !ready.value) throw new Error('missing fixture preview');
-  f.item.preview = { ...ready, value: { ...ready.value, state: 'deploying', readyReplicas: 0 } };
-  await page.click('重新检查'); expect(page.text()).toContain('部署中');
-  expect(document.querySelector('a[href="//preview.demo.test"]') === null).toBe(true);
-  f.item.preview = { status: 'ready', value: null, checkedAt: new Date().toISOString() };
-  await page.click('重新检查'); expect(page.text()).toContain('尚未部署');
-  expect(document.querySelector('a[href="//preview.demo.test"]') === null).toBe(true);
-  f.item.preview = ready; await page.click('重新检查');
-  expect(document.querySelector('a[href="//preview.demo.test"]') !== null).toBe(true);
+test('试用读取失败与未就绪不保留旧链接，刷新恢复可用，未知状态不冒充未上线 Beta', async () => {
+  const f = fixture(); page = await renderApp(`/market/${projectId}`);
+  expect(document.querySelector('a[href="http://preview.demo.test"]')).not.toBeNull();
+  f.state.failed = true; await page.click('重新检查'); expect(page.text()).toContain('应用读取失败');
+  expect(document.querySelector('a[href="http://preview.demo.test"]')).toBeNull();
+  f.state.failed = false; f.state.app.entry = { kind: 'trial', status: 'unavailable' };
+  await page.click('重新检查'); expect(document.querySelector('a[href="http://preview.demo.test"]')).toBeNull();
+  f.state.app = trialMarketFixture(projectId); await page.click('重新检查');
+  expect(document.querySelector('a[href="http://preview.demo.test"]')).not.toBeNull();
+  f.state.app.entry = { kind: 'production', status: 'unknown' };
+  f.state.app.production = { status: 'unknown', freshness: 'unknown', checkedAt: new Date().toISOString() };
+  await page.click('重新检查'); expect(page.text()).not.toContain('Beta');
+  expect(document.querySelector('a[href="http://preview.demo.test"]')).toBeNull();
 });

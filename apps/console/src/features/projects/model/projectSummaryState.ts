@@ -6,7 +6,7 @@ export function summaryIsFresh(part: { checkedAt: string }, now = Date.now()): b
 /** 主动作只依据尚有效的当前来源；点击进入实际操作页，概览不直接写入。 */
 export function projectNextAction(item: ProjectSummaryDetail) {
   if (!summaryIsFresh(item)) return undefined;
-  if (item.project.state === 'failed' || item.project.state === 'provisioning') return item.role === 'admin'
+  if (item.project.state === 'failed' || item.project.state === 'provisioning') return item.role === 'admin' || item.role === 'owner'
     ? { type: 'provision' as const, label: item.project.state === 'failed' ? 'projects.summary.fixProvision' : 'projects.summary.checkProvision' } : undefined;
   if (item.project.state !== 'active' || item.role === 'tester') return undefined;
   const latest = item.releases.status === 'ready' && summaryIsFresh(item.releases) ? item.releases.value[0] : undefined;

@@ -23,8 +23,11 @@ beforeAll(async () => {
   tdb = await createTestDatabase([eventbusMigrations, identityMigrations, projectMigrations]);
   const identity = createIdentityModule({ db: tdb.db, settings: { adminEmails: [] } });
   const a = await identity.api.ensureUser({ externalId: 'demo:admin', name: 'Admin', email: 'admin@example.com' });
+    if (a.platformRole === 'user') await identity.api.setPlatformRole(a.id, { platformRole: 'developer', expectedRole: 'user' });
   const o = await identity.api.ensureUser({ externalId: 'demo:owner', name: 'Owner', email: 'owner@example.com' });
+    if (o.platformRole === 'user') await identity.api.setPlatformRole(o.id, { platformRole: 'developer', expectedRole: 'user' });
   const d = await identity.api.ensureUser({ externalId: 'demo:dev', name: 'Dev', email: 'dev@example.com' });
+    if (d.platformRole === 'user') await identity.api.setPlatformRole(d.id, { platformRole: 'developer', expectedRole: 'user' });
   admin = { userId: a.id, isAdmin: true };
   owner = { userId: o.id, isAdmin: false };
   dev = { userId: d.id, isAdmin: false };
@@ -55,9 +58,9 @@ describe.skipIf(!available)('project module', () => {
     expect(await project.api.resolveServiceIdentity('demo/demo')).toMatchObject({ projectId, namespace: 'cs-demo' });
   });
 
-  test('非管理员不能建项目；重复 slug 冲突；不存在的套餐被拒', async () => {
+  test('开发者不能覆盖资源；重复 slug 冲突；不存在的套餐被拒', async () => {
     const input = { slug: 'other', name: 'x', kind: 'DigitalWorker' as const, ownerUserId: owner.userId, template: 'minimal-sample' };
-    await expect(project.api.createProject(owner, input)).rejects.toMatchObject({ kind: 'forbidden' });
+    await expect(project.api.createProject(owner, { ...input, plan: 'standard-small' })).rejects.toMatchObject({ kind: 'validation' });
     await expect(project.api.createProject(admin, { ...input, slug: 'demo' })).rejects.toMatchObject({ kind: 'conflict' });
     await expect(project.api.createProject(admin, { ...input, plan: 'nope' })).rejects.toMatchObject({ kind: 'validation' });
   });
@@ -117,7 +120,7 @@ describe.skipIf(!available)('project module', () => {
 
     // dev 是 demo 的成员、不是两个接入容器的成员：带 kind 也只在自己的作用域里筛。
     expect((await project.api.listProjects(dev, { kind: ['APIProxy', 'EventProducer'] })).map((p) => p.slug)).toEqual([]);
-    expect((await project.api.listProjects(dev, { kind: ['DigitalWorker'] })).map((p) => p.slug)).toEqual(['demo']);
+    expect((await project.api.listProjects(dev, { kind: ['DigitalWorker'] })).map((p) => p.slug)).toEqual([]);
   });
 
   test('HTTP 的 kind 是逗号分隔串，非法值 400（RFC-002）', async () => {

@@ -27,8 +27,11 @@ beforeAll(async () => {
   tdb = await createTestDatabase([eventbusMigrations, identityMigrations, projectMigrations, egressMigrations]);
   const identity = createIdentityModule({ db: tdb.db, settings: { adminEmails: [] } });
   const a = await identity.api.ensureUser({ externalId: 'demo:admin', name: 'Admin', email: 'admin@example.com' });
+    if (a.platformRole === 'user') await identity.api.setPlatformRole(a.id, { platformRole: 'developer', expectedRole: 'user' });
   const o = await identity.api.ensureUser({ externalId: 'demo:owner', name: 'Owner', email: 'owner@example.com' });
+    if (o.platformRole === 'user') await identity.api.setPlatformRole(o.id, { platformRole: 'developer', expectedRole: 'user' });
   const d = await identity.api.ensureUser({ externalId: 'demo:dev', name: 'Dev', email: 'dev@example.com' });
+    if (d.platformRole === 'user') await identity.api.setPlatformRole(d.id, { platformRole: 'developer', expectedRole: 'user' });
   admin = { userId: a.id, isAdmin: true };
   owner = { userId: o.id, isAdmin: false };
   dev = { userId: d.id, isAdmin: false };
@@ -57,13 +60,13 @@ describe.skipIf(!available)('egress module', () => {
     const invoke = (identity = 'egress-proxy/egress-proxy', body = payload) => app.request('/internal/egress/http', { method: 'POST', headers: { [IDENTITY_HEADERS.sourceService]: identity, 'content-type': 'application/json' }, body: JSON.stringify(body) });
     // 白名单不能只有管理页面；真实调用必须先被阻、批准后放行、撤销后再次被阻。
     expect((await invoke()).status).toBe(403); expect(calls).toHaveLength(0);
-    expect(await runtime.api.listBlocked(owner, proxy.id)).toEqual([expect.objectContaining({ fqdn: 'company.example.org', source: 'slot', count: 1 })]);
+    expect(await runtime.api.listBlocked(admin, proxy.id)).toEqual([expect.objectContaining({ fqdn: 'company.example.org', source: 'slot', count: 1 })]);
     await runtime.api.addEntry(admin, { fqdn: 'company.example.org', scope: 'project', projectId: otherProjectId });
     expect((await invoke()).status).toBe(403);
-    const requested = await runtime.api.requestEntry(owner, proxy.id, { fqdn: 'company.example.org' });
+    const requested = await runtime.api.requestEntry(admin, proxy.id, { fqdn: 'company.example.org' });
     await runtime.api.decideRequest(admin, requested.id, { approve: true, decision: '允许此代理访问公司系统' });
     const response = await invoke(); expect(response.status).toBe(201); expect(response.headers.get('x-total')).toBe('7'); expect(await response.text()).toBe('公司系统响应'); expect(calls).toEqual([payload.url]);
-    const entry = (await runtime.api.listEntries(owner, proxy.id)).find((e) => e.fqdn === 'company.example.org')!;
+    const entry = (await runtime.api.listEntries(admin, proxy.id)).find((e) => e.fqdn === 'company.example.org')!;
     await runtime.api.removeEntry(admin, entry.id); expect((await invoke()).status).toBe(403); expect(calls).toHaveLength(1);
     const global = await runtime.api.addEntry(admin, { fqdn: '*.example.org', scope: 'global' });
     expect((await invoke()).status).toBe(201); expect(calls).toHaveLength(2);

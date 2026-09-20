@@ -38,7 +38,7 @@ describe.skipIf(!available)('user routes (cs-api)', () => {
   test('/v1/me：成员关系来自 MembershipLookup，认证方式来自平台内部头（缺省按密码）', async () => {
     const me = await app.request('/v1/me', { headers: asUser(memberId) });
     expect(me.status).toBe(200);
-    expect(await me.json()).toEqual({ id: memberId, name: 'Member', email: 'member@example.com', isAdmin: false, memberships: [{ projectId, role: 'developer' }], authMethod: 'password' });
+    expect(await me.json()).toEqual({ id: memberId, name: 'Member', email: 'member@example.com', platformRole: 'user', isAdmin: false, memberships: [{ projectId, role: 'developer' }], authMethod: 'password' });
     expect(await (await app.request('/v1/me', { headers: { ...asUser(adminId), 'x-cs-auth-method': 'oidc' } })).json()).toMatchObject({ isAdmin: true, memberships: [], authMethod: 'oidc' });
     expect((await app.request('/v1/me')).status).toBe(401);
     expect((await app.request('/v1/me', { headers: asUser('usr_ffffffffffffffffffffffffffffffff') })).status).toBe(401);

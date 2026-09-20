@@ -23,7 +23,7 @@ function fixture(options: { admin?: boolean; meFailure?: boolean; pendingMe?: bo
     if (url.pathname === '/v1/me') {
       if (options.pendingMe) return new Promise<Response>(() => {});
       if (options.meFailure) { status = 503; body = { error: 'unavailable', message: '身份读取失败' }; }
-      else body = { id: 'user', name: '管理员', isAdmin: options.admin !== false, memberships: [] };
+      else body = { id: 'user', name: '管理员', platformRole: (options.admin !== false) ? 'admin' : 'developer', isAdmin: options.admin !== false, memberships: [] };
     } else if (url.pathname === '/v1/projects/page') {
       if (state.projectsFailure) { status = 503; body = { error: 'unavailable', message: '项目目录失败' }; }
       else body = { items: [project, integration].filter((p) => url.searchParams.get('kind')?.split(',').includes(p.kind)).map((p) => ({ project: p, role: 'admin', ownerName: '管理员' })) };
@@ -165,7 +165,7 @@ test('从指定 API 文档进入管理再返回，恢复原分类与接口而不
   await page.click('管理接口开放策略');
   expect(page.path()).toBe('/admin/capabilities');
   expect(page.search()).toMatchObject({ tab: 'api', projectId, proxy: 'billing', operation: key });
-  await page.click('回到工作台');
+  await page.click('项目开发');
   // 实机只记 pathname，回程把 settings 的分类和操作丢掉，误落到默认成员页。
   expect(page.path()).toBe(`/projects/${projectId}/resources`);
   expect(page.search()).toEqual({ section: 'api', proxy: 'billing', operation: key });

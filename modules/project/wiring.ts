@@ -4,7 +4,7 @@ import type { Clock } from '@crewstation/kernel';
 import { systemClock } from '@crewstation/kernel';
 import type { IdentityModuleApi } from '@crewstation/module-identity';
 import type { Database, MigrationSet } from '@crewstation/persistence';
-import { readMigrationDir } from '@crewstation/persistence';
+import { keyedLock, readMigrationDir } from '@crewstation/persistence';
 import type { Hono } from 'hono';
 import { drizzleUnitOfWork } from './adapters/persistence/drizzleUnitOfWork';
 import type { ProjectModuleApi } from './api/moduleApi';
@@ -21,6 +21,8 @@ import { appListingRoutes } from './http/appListingRoutes';
 import { appVisibilityUseCases } from './application/appVisibility';
 import { marketListingUseCases } from './application/marketListings';
 import { projectPageUseCases } from './application/projectPages';
+import { creationCatalogUseCase } from './application/creation/eligibility';
+import type { CreationTemplates } from './ports/creation';
 import type { HostNaming } from './ports/hostNaming';
 import type { ProjectSettings } from './ports/projectSettings';
 import type { TaskUsage } from './ports/taskUsage';
@@ -33,6 +35,7 @@ export interface ProjectModuleDeps {
   /** 并发任务占用数；缺省恒为 0（无任务运行时的单元测试与 CLI）。 */
   taskUsage?: TaskUsage;
   clock?: Clock;
+  creationTemplates?: CreationTemplates;
 }
 
 export interface ProjectModule {
@@ -50,6 +53,9 @@ export const projectMigrations: MigrationSet = {
 export function createProjectModule(deps: ProjectModuleDeps): ProjectModule {
   const useCaseDeps: ProjectUseCaseDeps = {
     uow: drizzleUnitOfWork(deps.db),
+    // 与角色变更共用短协调锁，避免不同用户同时占满连接池而饿死各自的业务事务。
+    roleLock: { run: (id, work) => keyedLock(deps.db)(['platform-roles', `user-role:${id}`], work) },
+    creationTemplates: deps.creationTemplates ?? { list: async () => [] },
     users: { isAdmin: (id) => deps.identity.isAdmin(id), getUser: (id) => deps.identity.getUser(id), findByEmail: (email) => deps.identity.findByEmail(email) },
     hosts: deps.hosts,
     settings: deps.settings,
@@ -58,6 +64,7 @@ export function createProjectModule(deps: ProjectModuleDeps): ProjectModule {
   };
   const api: ProjectModuleApi = {
     name: 'project',
+    creationCatalog: creationCatalogUseCase(useCaseDeps),
     isAdmin: (userId) => deps.identity.isAdmin(userId),
     ...authorizationUseCases(useCaseDeps),
     createProject: createProjectUseCase(useCaseDeps),

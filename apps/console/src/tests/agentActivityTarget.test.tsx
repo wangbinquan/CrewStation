@@ -19,7 +19,7 @@ async function fixture() {
   globalThis.fetch = (async (input, init) => {
     const url = String(input);
     let result: unknown = {};
-    if (url.endsWith('/v1/me')) result = { id: activityUserId, name: '测试者', memberships: [], isAdmin: false };
+    if (url.endsWith('/v1/me')) result = { id: activityUserId, name: '测试者', memberships: [], platformRole: 'developer', isAdmin: false };
     else if (url.endsWith('/agent-terminals')) result = f.roster;
     else if (url.endsWith('/agent-activity/read')) { const body = JSON.parse(String(init?.body)); writes.push(body); result = await f.source.read(activityTaskId, body); }
     else if (url.includes('/agent-activity')) result = f.page;

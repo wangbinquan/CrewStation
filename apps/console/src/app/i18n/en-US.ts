@@ -2,6 +2,17 @@ import type { MessagesShapedLike } from '../../shared/lib/i18n';
 import type { messages as zhCN } from './zh-CN';
 
 export const messages: MessagesShapedLike<typeof zhCN> = {
+  'development.suspended': 'Development access has changed. Your current input is retained until access is restored, or you can return to applications.',
+  "nav.market": "Applications",
+  "nav.projects": "Development",
+  "app.adminSpace": "Administration",
+  "topBar.role.user": "User",
+  "topBar.role.developer": "Developer",
+  "topBar.role.admin": "Administrator",
+  "development.denied": "Developer access required",
+  "development.deniedHint": "Use and try applications from the home page. Ask an administrator for the developer role to create and develop projects.",
+  "topBar.userHint": "Reading your account",
+
   'ui.requestPage.label': '{scope} pages',
   'ui.requestPage.count': '{count} requests on this page',
   'ui.requestPage.unknown': 'Page count unconfirmed',
@@ -97,7 +108,6 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   'activity.invalidTarget': "This update belongs to an ended session, or its CLI is unavailable. The current window was preserved.",
   'activity.readFailed': "The CLI is open, but the event or personal read update could not be verified. Open it again from Agent activity to retry.",
   'app.workbench': 'Workbench',
-  'app.adminSpace': 'Platform admin',
   'nav.aria': 'Main navigation',
   'nav.global': 'Workbench entries',
   'nav.workbenchHint': 'Discover apps, build capabilities',
@@ -105,8 +115,6 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   'nav.admin.groupSupply': 'Supply and integrations',
   'nav.admin.groupSettings': 'Platform settings',
   'nav.myProjects': 'My projects',
-  'nav.projects': 'Digital worker projects',
-  'nav.market': 'App market',
   'nav.projectPages': 'Project pages',
   'nav.preview': 'Try a version',
   'nav.settings': 'Project settings',
@@ -145,7 +153,6 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   'topBar.roleMember': 'Member',
   'topBar.localSession': 'Local account',
   'topBar.logout': 'Sign out',
-  'topBar.userHint': 'Login and identity injection happen at the gateway (cs-auth) on the user domain; the workbench has no login code.',
   'locale.label': 'Language',
   'locale.zh-CN': '中文',
   'locale.en-US': 'English',

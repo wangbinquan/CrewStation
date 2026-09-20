@@ -72,6 +72,7 @@ beforeAll(async () => {
   await completeBootstrap(tdb.db);
   await seedLocalUser(tdb.db, { username: 'alice', name: 'Alice', email: 'alice@example.com' });
   alice = (await identity.api.findByEmail('alice@example.com'))!;
+  alice = await identity.api.setPlatformRole(alice.id, { expectedRole: 'user', platformRole: 'developer' });
   app = mount(identity);
 });
 afterAll(async () => { await tdb?.drop(); });

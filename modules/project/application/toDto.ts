@@ -32,6 +32,6 @@ export function serviceToDto(service: Service, project: Project, hosts: HostNami
   };
 }
 
-export function memberToDto(membership: Membership, user: { name: string; email: string } | undefined): MemberDto {
-  return { userId: membership.userId, role: membership.role, name: user?.name ?? '', email: user?.email ?? '' };
+export function memberToDto(membership: Membership, user: { name: string; email: string; platformRole?: MemberDto['platformRole'] } | undefined): MemberDto {
+  return { userId: membership.userId, role: membership.role, ...(user?.platformRole ? { platformRole: user.platformRole } : {}), name: user?.name ?? '', email: user?.email ?? '' };
 }

@@ -18,8 +18,9 @@ function fixture(admin = true) {
     const body = init?.body ? JSON.parse(String(init.body)) as Record<string, unknown> : undefined;
     requests.push({ path, method, body });
     let result: unknown = { items: [] }, status = 200;
-    if (path === '/v1/me') result = { id: userId, name: '管理者', email: 'admin@test.invalid', isAdmin: admin, memberships: [] };
+    if (path === '/v1/me') result = { id: userId, name: '管理者', email: 'admin@test.invalid', platformRole: (admin) ? 'admin' : 'developer', isAdmin: admin, memberships: [] };
     else if (path === '/v1/users') result = { items: [{ id: userId, name: '负责人甲', email: 'owner@test.invalid' }] };
+    else if (path === '/v1/catalog/project-creation') result = { templates: [{ name: 'minimal-sample', kind: 'DigitalWorker', servicePlan: 'standard-small', requiredConfig: [] }], defaultServicePlan: 'standard-small', maxConcurrentTasks: 3 };
     else if (path === '/v1/catalog/project-templates') {
       if (state.catalogFailure) { status = 503; result = { error: 'unavailable', message: '模板目录离线' }; }
       else result = { items: state.noTemplates ? [] : [
@@ -55,14 +56,14 @@ async function field(name: string, value: string) {
   }); await page!.settle();
 }
 
-test('新建入口归管理空间，工作台不再内嵌平台创建表单', async () => {
+test('开发列表进入简洁自建表单，代建资源表单仍属于管理空间', async () => {
   const f = fixture(); page = await renderApp('/projects');
   // 原版把所有 kind 和原始模板输入放在工作台日常列表上方。
   expect(document.querySelectorAll('[name="name"], [name="slug"], [name="template"], [name="kind"]').length).toBe(0);
   expect(document.querySelectorAll('form').length).toBe(1);
   expect(f.writes()).toHaveLength(0);
-  await page.click('新建数字人'); expect(page.path()).toBe('/admin/projects/new');
-  expect(page.text()).toContain('基本信息'); expect(document.querySelector('[name="kind"]')).toBeNull();
+  await page.click('新建项目'); expect(page.path()).toBe('/projects/new');
+  expect(page.text()).toContain('项目信息'); expect(document.querySelector('[name="kind"]')).toBeNull();
 });
 
 test('逐步校验所有字段，返回保留草稿；按真实 kind 过滤模板并提交套餐与配额', async () => {

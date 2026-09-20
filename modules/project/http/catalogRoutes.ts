@@ -13,5 +13,6 @@ export function catalogRoutes(api: ProjectModuleApi): Hono<AppEnv> {
   r.get('/v1/catalog/task-profiles', async (c) => c.json({ items: await api.listTaskProfiles() }));
   r.put('/v1/catalog/task-profiles', async (c) => c.json(await api.upsertTaskProfile(await actorFrom(c, api), await parseBody(c, TaskProfileDtoSchema))));
 
+  r.get('/v1/catalog/project-creation', async (c) => c.json(await api.creationCatalog(await actorFrom(c, api))));
   return r;
 }

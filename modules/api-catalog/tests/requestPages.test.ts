@@ -24,10 +24,11 @@ beforeAll(async () => {
   const identity = createIdentityModule({ db: db.db, settings: { adminEmails: ['admin@test.invalid'] } });
   admin = { userId: (await identity.api.ensureUser({ externalId: 'admin', name: 'Admin', email: 'admin@test.invalid' })).id, isAdmin: true };
   member = { userId: (await identity.api.ensureUser({ externalId: 'member', name: 'Member', email: 'member@test.invalid' })).id, isAdmin: false };
+  await identity.api.setPlatformRole(member.userId, { platformRole: 'developer', expectedRole: 'user' });
   projects = createProjectModule({ db: db.db, identity: identity.api, hosts, settings: { defaultMaxConcurrentTasks: 3, defaultServicePlan: 'small' } });
   await projects.api.upsertServicePlan(admin, { name: 'small', cpu: '1', memory: '1Gi', maxReplicas: 1, description: '' });
   alpha = await projects.api.createProject(admin, { name: 'Alpha', slug: 'alpha', kind: 'DigitalWorker', ownerUserId: member.userId, template: 'sample' });
-  beta = await projects.api.createProject(admin, { name: 'Beta', slug: 'beta', kind: 'APIProxy', ownerUserId: admin.userId, template: 'sample' });
+  beta = await projects.api.createProject(admin, { name: 'Beta', slug: 'beta', kind: 'DigitalWorker', ownerUserId: admin.userId, template: 'sample' });
   catalog = createApiCatalogModule({ db: db.db, projects: projects.api, services, hosts });
   const repo = drizzleRequestRepository(db.db);
   for (let i = 0; i < 72; i++) {

@@ -1,5 +1,6 @@
 import { Link } from '@tanstack/react-router';
 import type { ReactElement, ReactNode } from 'react';
+import { useState } from 'react';
 import { api } from '../../shared/api/client';
 import { queryKeys } from '../../shared/api/queryKeys';
 import { useApiQuery } from '../../shared/api/useApi';
@@ -19,17 +20,19 @@ import { Button } from '../../shared/ui/Button';
  */
 export function AdminGuard({ children }: { readonly children: ReactNode }): ReactElement {
   const t = useT();
-  const me = useApiQuery(queryKeys.me(), () => api.me.get());
-  if (me.isPending || me.error !== null) return <><QueryStatus isPending={me.isPending} error={me.error} />
-    {me.error ? <Button disabled={me.isFetching} onClick={() => void me.refetch({ cancelRefetch: false })}>{t('admin.retryIdentity')}</Button> : null}</>;
-  if (me.data?.isAdmin !== true) {
-    return (
+  const me = useApiQuery(queryKeys.me(), () => api.me.get(), { staleTimeMs: 0, refetchOnWindowFocus: true, refetchIntervalMs: 15000 });
+  const [visitedUser, setVisitedUser] = useState<string>();
+  const allowed = !me.isPending && !me.error && me.data?.platformRole === 'admin';
+  const visited = !!me.data?.id && visitedUser === me.data.id;
+  if (allowed && !visited) setVisitedUser(me.data!.id);
+  const notice = me.isPending || me.error ? <><QueryStatus isPending={me.isPending} error={me.error} />
+    {me.error ? <Button disabled={me.isFetching} onClick={() => void me.refetch({ cancelRefetch: false })}>{t('admin.retryIdentity')}</Button> : null}</>
+    : !allowed ? (
       <EmptyState
         title={t('admin.denied.title')}
         description={t('admin.denied.description')}
         action={<Link to="/">{t('admin.denied.back')}</Link>}
       />
-    );
-  }
-  return <>{children}</>;
+    ) : null;
+  return <>{notice}<div key={me.data?.id} hidden={!allowed} inert={!allowed} style={allowed ? { display: 'contents' } : undefined}>{allowed || visited && !!me.error ? children : null}</div></>;
 }

@@ -1,7 +1,8 @@
 import { z } from 'zod';
 import { ProjectIdSchema, ServiceIdSchema, SlugSchema, UserIdSchema } from '../ids';
 import { ManifestKindSchema } from '../manifest/serviceSpec';
-import { MemberRoleSchema } from './identity';
+import { MemberRoleSchema, PlatformRoleSchema } from './identity';
+import { ProjectTemplateDtoSchema } from './scm';
 
 export const ProjectStateSchema = z.enum(['provisioning', 'active', 'paused', 'archived', 'failed']);
 
@@ -34,18 +35,21 @@ export const ListProjectsQuerySchema = z.object({
     .optional(),
 });
 
-/** 管理员代建项目并指定负责人（G16）。 */
+/** 开发者自建默认本人；管理员可代建并指定资源。 */
 export const CreateProjectRequestSchema = z.object({
   slug: SlugSchema,
   name: z.string().min(1).max(80),
   kind: ManifestKindSchema.default('DigitalWorker'),
-  ownerUserId: UserIdSchema,
+  ownerUserId: UserIdSchema.optional(),
   template: SlugSchema.default('minimal-sample'),
   plan: SlugSchema.optional(),
   maxConcurrentTasks: z.number().int().min(1).max(100).optional(),
-});
+}).strict();
 
-export const MemberDtoSchema = z.object({ userId: UserIdSchema, role: MemberRoleSchema, name: z.string(), email: z.string() });
+export const ProjectCreationCatalogSchema = z.object({ templates: z.array(ProjectTemplateDtoSchema), defaultServicePlan: SlugSchema, maxConcurrentTasks: z.number().int().min(1) });
+export type ProjectCreationCatalog = z.infer<typeof ProjectCreationCatalogSchema>;
+
+export const MemberDtoSchema = z.object({ userId: UserIdSchema, role: MemberRoleSchema, platformRole: PlatformRoleSchema.optional(), name: z.string(), email: z.string() });
 export const SetMemberRequestSchema = z.object({ userId: UserIdSchema, role: MemberRoleSchema });
 
 export const QuotaDtoSchema = z.object({ maxConcurrentTasks: z.number().int().min(1), running: z.number().int().min(0) });

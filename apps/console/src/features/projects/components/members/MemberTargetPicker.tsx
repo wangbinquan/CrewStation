@@ -52,7 +52,7 @@ function AdminMemberDirectory({ disabled, onSelect, error }: Pick<PickerProps, '
     <FormField label={t('projects.members.user')} hint={t('projects.members.directoryHint')} error={error} hintId={`${id}-hint`} errorId={`${id}-error`}>
       <select value="" aria-invalid={Boolean(error)} aria-describedby={`${id}-hint${error ? ` ${id}-error` : ''}`} disabled={disabled || users.isPending || users.isError} onChange={(event) => {
         const user = users.data?.items.find((item) => item.id === event.target.value);
-        if (user) onSelect({ userId: user.id, name: user.name, email: user.email });
+        if (user) onSelect({ userId: user.id, name: user.name, email: user.email, platformRole: user.platformRole });
       }}><option value="">{t('projects.members.userPlaceholder')}</option>{users.data?.items.map((user) => <option value={user.id} key={user.id}>{user.name} · {user.email}</option>)}</select>
     </FormField>
     {users.isError ? <Button disabled={users.isFetching} onClick={() => { void users.refetch(); }}>{t('projects.members.refreshDirectory')}</Button> : null}

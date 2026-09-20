@@ -15,7 +15,7 @@ function fixture() {
   const writes: Array<{ path: string; input: Record<string, unknown> }> = [];
   globalThis.fetch = (async (raw, init) => {
     const path = new URL(String(raw), 'http://localhost').pathname;
-    if (path === '/v1/me') return Response.json({ id: `usr_${'a'.repeat(32)}`, name: '管理员', email: 'admin@test.invalid', isAdmin: true, memberships: [] });
+    if (path === '/v1/me') return Response.json({ id: `usr_${'a'.repeat(32)}`, name: '管理员', email: 'admin@test.invalid', platformRole: 'admin', isAdmin: true, memberships: [] });
     if (!/\/catalog\/(service-plans|task-profiles)$/.test(path)) return Response.json({ items: [] });
     const kind = path.endsWith('service-plans') ? 'service' : 'task';
     if (init?.method === 'PUT') {

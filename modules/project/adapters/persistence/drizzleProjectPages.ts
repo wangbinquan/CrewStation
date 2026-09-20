@@ -10,7 +10,7 @@ export function drizzleProjectPages(db: Executor): ProjectPageRepository {
     const rows = await db.select({ project: projects, serviceId: services.id, role: memberships.role })
       .from(projects).leftJoin(services, eq(services.projectId, projects.id))
       .leftJoin(memberships, and(eq(memberships.projectId, projects.id), eq(memberships.userId, actor.userId)))
-      .where(and(actor.isAdmin ? undefined : sql`${memberships.userId} IS NOT NULL`,
+      .where(and(actor.isAdmin ? undefined : and(inArray(memberships.role, ['owner', 'developer']), eq(projects.kind, 'DigitalWorker')),
         inArray(projects.kind, query.kind), query.state ? eq(projects.state, query.state) : undefined,
         query.ownerUserId ? eq(projects.ownerUserId, query.ownerUserId) : undefined,
         query.after ? gt(projects.id, query.after) : undefined, query.ids ? inArray(projects.id, [...query.ids]) : undefined,

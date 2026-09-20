@@ -46,7 +46,7 @@ export function editorWorkspaceFixture() {
     const path = new URL(String(raw), 'http://localhost').pathname, method = init?.method ?? 'GET';
     if (method !== 'GET') writes.push({ path, method });
     let body: unknown = { items: [] }, status = 200;
-    if (path === '/v1/me') body = { id: activityUserId, name: '负责人', memberships: [{ projectId: activityProjectId, role: 'owner' }], isAdmin: false };
+    if (path === '/v1/me') body = { id: activityUserId, name: '负责人', memberships: [{ projectId: activityProjectId, role: 'owner' }], platformRole: 'developer', isAdmin: false };
     else if (path === `/v1/projects/${activityProjectId}`) body = { id: activityProjectId, ownerUserId: activityUserId, serviceId: `svc_${'4'.repeat(32)}`, name: '编辑器验收', slug: 'editor', kind: 'DigitalWorker', state: 'active' };
     else if (path.endsWith('/workspace-layout')) body = method === 'PUT' ? { revision: 2, layout: JSON.parse(String(init?.body)).layout, updatedAt: activityTime } : { revision: 0, layout: null, updatedAt: null };
     else if (path.endsWith('/agent-terminals')) body = { ...f.roster, items: [] };

@@ -40,7 +40,7 @@ describe('项目列表的真实分页与独立状态', () => {
     const f = summaryFixture(); f.meError = true; page = await renderApp('/projects');
     expect(page.text()).toContain('身份读取失败'); expect(page.text()).not.toContain('加载项目…'); expect(page.text()).not.toContain('本页 0 项');
     expect(f.calls.some((url) => url.startsWith('/v1/workbench/project-summaries'))).toBe(false);
-    f.meError = false; await page.click('刷新项目'); expect(page.text()).toContain('数字助手 1');
+    f.meError = false; await page.click('重新检查权限'); expect(page.text()).toContain('数字助手 1');
   });
   test('紧凑列表只请求当前摘要页，基本信息可展开，未知健康不显示正常', async () => {
     const f = summaryFixture(); page = await renderApp('/projects');
@@ -64,7 +64,7 @@ describe('项目列表的真实分页与独立状态', () => {
   test('初始加载、失败与无项目／无筛选结果分别显示，非法回执不变为空列表', async () => {
     const f = summaryFixture(); f.hang = true; page = await renderApp('/projects');
     expect(page.text()).toContain('加载项目'); expect(page.text()).not.toContain('尚无项目'); page.unmount(); page = undefined;
-    f.hang = false; f.empty = true; page = await renderApp('/projects'); expect(page.text()).toContain('尚无项目'); expect(page.text()).toContain('复制开通需求');
+    f.hang = false; f.empty = true; page = await renderApp('/projects'); expect(page.text()).toContain('尚无项目'); expect(page.text()).toContain('新建项目');
     await page.navigate('/projects?q=不存在'); expect(page.text()).toContain('没有符合条件的项目'); expect(page.text()).not.toContain('尚无项目');
     f.error = true; await page.click('刷新项目'); expect(page.text()).toContain('摘要读取失败'); expect(page.text()).not.toContain('没有符合条件');
     f.error = false; f.invalid = true; await page.click('刷新项目'); expect(page.text()).toContain('项目摘要格式无法确认'); expect(page.text()).not.toContain('尚无项目');
@@ -110,12 +110,14 @@ describe('概览按实际状态选择下一步', () => {
     f.error = true; await page.click('刷新概览'); expect(document.querySelector('a[href="//trial.test"]')).toBeNull(); expect(page.text()).toContain('上次读取的记录');
     expect(document.querySelector('[data-primary-project-action]')).toBeNull();
   });
-  test('开通失败优先给管理员具名恢复入口，普通负责人可见原因并联系管理员', async () => {
+  test('开通失败给管理员或负责人具名恢复入口，普通开发成员只能联系管理员', async () => {
     const f = summaryFixture(); f.item.role = 'admin'; f.item.project.state = 'failed'; f.item.project.message = '模板缺少配置';
     page = await renderApp(`/projects/${f.item.project.id}`); expect(page.text()).toContain('模板缺少配置');
     const action = document.querySelector('[data-primary-project-action]') as HTMLAnchorElement;
     expect(action.textContent).toContain('查看开通问题'); expect(action.getAttribute('href')).toContain(`/admin/projects/${f.item.project.id}/provisioning`);
-    f.admin = false; f.item.role = 'owner'; await page.click('刷新概览'); expect(document.querySelector('[data-primary-project-action]')).toBeNull(); expect(page.text()).toContain('联系管理员处理开通问题');
+    f.admin = false; f.item.role = 'owner'; await page.click('刷新概览');
+    expect(document.querySelector('[data-primary-project-action]')?.getAttribute('href')).toBe(`/projects/${f.item.project.id}/provisioning`);
+    f.item.role = 'developer'; await page.click('刷新概览'); expect(document.querySelector('[data-primary-project-action]')).toBeNull(); expect(page.text()).toContain('联系管理员处理开通问题');
   });
   test('最新发布失败直达该发布，次动作继续开发；没有会话时开始开发只导航', async () => {
     const f = summaryFixture(), time = new Date().toISOString();

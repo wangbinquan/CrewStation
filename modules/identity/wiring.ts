@@ -4,7 +4,7 @@ import type { AppEnv } from '@crewstation/http';
 import type { Clock, Logger } from '@crewstation/kernel';
 import { systemClock } from '@crewstation/kernel';
 import type { Database, MigrationSet } from '@crewstation/persistence';
-import { readMigrationDir } from '@crewstation/persistence';
+import { keyedLock, readMigrationDir } from '@crewstation/persistence';
 import type { Hono } from 'hono';
 import { keyRingTokenService } from './adapters/jwt/keyRingTokenService';
 import { secretBoxCipher } from './adapters/crypto/secretBoxCipher';
@@ -33,6 +33,7 @@ import { oidcLoginUseCases } from './application/oidc/login';
 import { providerAdminUseCases } from './application/oidc/providerAdmin';
 import { passwordLoginUseCases } from './application/passwordLogin';
 import { queryUsersUseCases } from './application/queryUsers';
+import { platformRoleUseCases } from './application/roles/platformRoles';
 import { sessionTokenUseCases } from './application/sessionTokens';
 import { resolveHostByPattern } from './domain/hosts';
 import { resolveReturnTo } from './domain/session';
@@ -148,6 +149,7 @@ export function createIdentityModule(deps: IdentityModuleDeps): IdentityModule {
     name: 'identity',
     ensureUser: ensureUserUseCase(useCaseDeps),
     ...queryUsersUseCases(useCaseDeps.users),
+    ...platformRoleUseCases({ ...useCaseDeps, roleLock: { run: (id, work) => keyedLock(deps.db)(['platform-roles', `user-role:${id}`], work) } }),
     sessionCookie: sessionCookie(session),
     ...discovery,
     loginPageHtml: async (returnTo, context = {}, error, justBootstrapped) =>

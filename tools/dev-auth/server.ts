@@ -37,7 +37,7 @@ const html = (body: string, status = 200): Response => new Response(body, { stat
 const redirect = (location: string): Response => new Response(null, { status: 303, headers: { 'cache-control': 'no-store', location } });
 
 export function safeReturnTo(value: unknown): string {
-  return typeof value === 'string' && /^\/(?![\\/])[^\u0000-\u001f]*$/.test(value) ? value : '/projects';
+  return typeof value === 'string' && /^\/(?![\\/])[^\u0000-\u001f]*$/.test(value) ? value : '/';
 }
 
 export function selectableProjects(projects: readonly PlatformProject[]): readonly DevAuthProject[] {
@@ -54,8 +54,9 @@ async function authorizeRole(platform: PlatformClient, oidc: DevOidc, routePrefi
 }
 
 async function reconcileMemberships(platform: PlatformClient, seeded: SeededState, role: DevRole, userId: string, targetProjectId?: string): Promise<void> {
-  if (role.memberRole && !seeded.projects.some((project) => project.id === targetProjectId && project.state !== 'archived' && project.kind === 'DigitalWorker')) throw new Error('请选择一个可用的数字人项目');
+  if (role.memberRole && (targetProjectId || role.key === 'tester') && !seeded.projects.some((project) => project.id === targetProjectId && project.state !== 'archived' && project.kind === 'DigitalWorker')) throw new Error('请选择一个可用的数字人项目');
   for (const project of seeded.projects) {
+    if (project.ownerUserId === userId && role.platformRole !== 'user') continue;
     if (project.ownerUserId === userId) throw new Error(`固定角色已是项目「${project.name}」的负责人，开发入口不会自动转移所有权`);
     const current = (await platform.members(seeded.adminCookie, project.id)).find((member) => member.userId === userId);
     const wanted = role.memberRole && project.id === targetProjectId ? role.memberRole : null;
@@ -73,7 +74,7 @@ async function seed(platform: PlatformClient, oidc: DevOidc, issuer: string, rou
     const roleCookie = await authorizeRole(platform, oidc, routePrefix, role, '/');
     const current = await platform.me(roleCookie);
     users.set(role.key, current.id);
-    if (current.isAdmin !== role.isAdmin) await platform.setAdmin(adminCookie, current.id, role.isAdmin);
+    if (current.platformRole !== role.platformRole) await platform.setPlatformRole(adminCookie, current.id, role.platformRole);
   }
   return { adminCookie, users, projects: await platform.projects(adminCookie) };
 }
@@ -127,7 +128,7 @@ export async function startDevAuthServer(input: ServerOptions = {}): Promise<Sta
     const action = async (): Promise<void> => {
       const userId = seeded?.users.get(role.key);
       if (!seeded || !userId) throw new Error('开发角色尚未准备完成');
-      await platform.setAdmin(seeded.adminCookie, userId, role.isAdmin);
+      await platform.setPlatformRole(seeded.adminCookie, userId, role.platformRole);
       await reconcileMemberships(platform, seeded, role, userId, projectId);
       const authorization = new URL(await platform.startAuthorization(returnTo));
       authorization.searchParams.set('as', role.sub);

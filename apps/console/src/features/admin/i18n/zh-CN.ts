@@ -1,10 +1,21 @@
 import type { Messages } from '../../../shared/lib/i18n';
 import { authMessages } from './auth.zh-CN';
+import { projectComputeMessages } from './projectCompute.zh-CN';
 import { computeMessages } from './compute.zh-CN';
 
 export const messages = {
+  ...projectComputeMessages,
+  "admin.users.role": "平台角色",
+  "admin.users.roleFor": "{name} 的角色",
+  "admin.users.saveRole": "保存角色",
+  "admin.users.cancelRole": "取消",
+  "admin.users.refreshRole": "重新读取当前角色",
+  "admin.users.roleQuestion": "将 {name} 的平台角色设为“{role}”？",
+  "admin.users.roleHint": "管理员包含开发者能力。降级会停止后续开发操作；负责人需先转交项目。",
+  "admin.users.hint": "用户使用应用；开发者创建和开发项目；管理员同时管理平台。项目成员决定具体的开发或试用范围。",
+
   "admin.overview.hint": "处理当前待办，管理项目、能力供给和运行资源。",
-  "admin.retryIdentity": "重新读取管理身份",
+  "admin.retryIdentity": "重新检查权限",
   "admin.directory.title": "项目目录",
   "admin.directory.description": "查看所有类型的项目，直接处理开通、成员和生命周期。",
   "admin.directory.search": "名称或标识",
@@ -84,7 +95,7 @@ export const messages = {
   'admin.denied.back': '回到工作台',
 
   'admin.overview.open': '打开{page}',
-  'admin.overview.users': '谁是平台管理员：管理员才能创建项目、接入公司系统、裁定开放与出站申请。',
+  'admin.overview.users': '分配用户、开发者和管理员角色，决定谁可以使用应用、开发项目及管理平台。',
   'admin.overview.compute': '为 Agent 配置 CLI、模型、启动文件与脚本。保存后自动测试，项目按档位名称使用。',
   'admin.overview.servicePlans': '服务套餐：数字人服务的 CPU、内存与副本上限，由 Manifest 按名引用。',
   'admin.overview.taskProfiles': '任务容器套餐：开发会话与业务任务容器的 CPU、内存与存储。',
@@ -104,7 +115,6 @@ export const messages = {
   'admin.integrations.emptyDescription': '安装器可以代建内置的 GitLab 事件生产者与参考 API 代理；也可以在工作台的项目列表里按 APIProxy／EventProducer 新建。',
 
   'admin.users.title': '用户',
-  'admin.users.hint': '管理员标记决定谁能创建项目、接入公司系统与裁定开放申请；用户本身由公司登录带入，工作台不建账号。',
   'admin.users.name': '姓名',
   'admin.users.email': '邮箱',
   'admin.users.admin': '管理员',

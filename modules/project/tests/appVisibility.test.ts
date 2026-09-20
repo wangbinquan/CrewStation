@@ -20,6 +20,7 @@ beforeAll(async () => {
   const actors: Actor[] = [];
   for (const name of ['admin', 'owner', 'developer', 'tester', 'visitor', 'other']) {
     const user = await identity.api.ensureUser({ externalId: `demo:${name}`, name, email: `${name}@example.com` });
+    if (user.platformRole === 'user') await identity.api.setPlatformRole(user.id, { platformRole: 'developer', expectedRole: 'user' });
     actors.push({ userId: user.id, isAdmin: name === 'admin' });
   }
   [admin, owner, dev, tester, visitor, other] = actors as [Actor, Actor, Actor, Actor, Actor, Actor];
@@ -60,7 +61,7 @@ describe.skipIf(!available)('市场范围与展示资料（真实 PostgreSQL）'
   });
   test('指定名单去重、真实账号匹配、无效／空名单字段错误与保存效果检查', async () => {
     const p = await app();
-    expect(await module.api.memberCandidates(owner, p.id, 'VISITOR@example.com')).toEqual([{ userId: visitor.userId, name: 'visitor', email: 'visitor@example.com' }]);
+    expect(await module.api.memberCandidates(owner, p.id, 'VISITOR@example.com')).toEqual([{ userId: visitor.userId, name: 'visitor', email: 'visitor@example.com', platformRole: 'developer' }]);
     expect(await module.api.memberCandidates(owner, p.id, visitor.userId)).toHaveLength(1);
     expect(await module.api.memberCandidates(owner, p.id, 'vis')).toEqual([]);
     const setting = { mode: 'selected' as const, expectedRevision: 0, userIds: [visitor.userId, visitor.userId] };

@@ -18,7 +18,7 @@ function fixture(options: { admin?: boolean; pendingMe?: boolean; meFailure?: bo
     if (url.endsWith('/v1/me')) {
       if (state.pendingMe) return new Promise<Response>(() => {});
       if (state.meFailure) { status = 503; body = { error: 'unavailable', message: '身份读取失败' }; }
-      else body = { id: 'user', name: '管理员', email: 'admin@example.invalid', isAdmin: state.admin !== false, memberships: [] };
+      else body = { id: 'user', name: '管理员', email: 'admin@example.invalid', platformRole: (state.admin !== false) ? 'admin' : 'developer', isAdmin: state.admin !== false, memberships: [] };
     } else if (url.endsWith(`/v1/projects/${projectId}`)) {
       if (state.projectFailure) { status = 503; body = { error: 'unavailable', message: '项目目录读取失败' }; }
       else body = { ...project, kind: state.digitalWorker ? 'DigitalWorker' : 'APIProxy' };
@@ -66,7 +66,7 @@ describe('管理接入容器复用业务页面', () => {
   test('数字人误入接入容器路径时回到自己的工作台页面，保留分类', async () => {
     fixture({ digitalWorker: true }); page = await renderApp(`/admin/integrations/${projectId}/settings?tab=repository`);
     expect(page.path()).toBe(`/projects/${projectId}/resources`); expect(page.search().section).toBe('project');
-    expect(page.text()).toContain('能力市场');
+    expect(page.text()).toContain('项目开发');
   });
 
   test('接入项目的可见性链接归位环境变量，不请求市场设置', async () => {
@@ -80,7 +80,7 @@ test('旧租户接入链接不能覆盖原工作台返回位置', async () => {
   fixture(); page = await renderApp('/projects?q=return-project');
   await page.navigate(`/projects/${projectId}/logs?source=slot&slot=prod&limit=300`);
   expect(page.path()).toBe(`/admin/integrations/${projectId}/operations`);
-  await page.click('回到工作台');
+  await page.click('项目开发');
   // 实机把旧租户地址记进返回位置，按钮回程又被项目类型边界重定向到管理页。
   expect(page.path()).toBe('/projects'); expect(page.search().q).toBe('return-project');
 });
@@ -89,8 +89,8 @@ test('直接打开旧接入链接时，返回工作台使用初始位置，不�
   rememberWorkbenchPath('/'); // 模拟整页载入时空间记忆的初始值。
   fixture(); page = await renderApp(`/projects/${projectId}/settings?tab=repository`);
   expect(page.path()).toBe(`/admin/integrations/${projectId}/resources`);
-  await page.click('回到工作台');
-  expect(page.path()).toBe('/'); expect(page.text()).toContain('能力市场');
+  await page.click('项目开发');
+  expect(page.path()).toBe('/projects'); expect(page.text()).toContain('项目开发');
 });
 
 test('旧接入项目读取失败再恢复，不会把待识别地址保存成工作台返回位置', async () => {
@@ -99,7 +99,7 @@ test('旧接入项目读取失败再恢复，不会把待识别地址保存成�
   expect(page.text()).toContain('项目目录读取失败');
   f.state.projectFailure = false; await page.click('重新读取项目');
   expect(page.path()).toBe(`/admin/integrations/${projectId}/resources`);
-  await page.click('回到工作台');
+  await page.click('项目开发');
   expect(page.path()).toBe('/projects'); expect(page.search().q).toBe('keep-on-error');
 });
 

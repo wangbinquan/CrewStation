@@ -1,5 +1,5 @@
 import type {
-  AuthMethod, CurrentUserDto, EffectiveForwardingDto, IdentityForwardingDto, JwksDocument, LoginDiscoveryDto, LoginPolicyDto,
+  SetPlatformRoleRequest, AuthMethod, CurrentUserDto, EffectiveForwardingDto, IdentityForwardingDto, JwksDocument, LoginDiscoveryDto, LoginPolicyDto,
   OidcLoginFailureCode, OidcProbeResult, OidcProviderDto, OidcProviderId, ProjectId, ServiceId, TaskId, UserDto, UserId, WorkloadIdentity,
 } from '@crewstation/contracts';
 
@@ -135,6 +135,8 @@ export interface IdentityModuleApi {
   findByEmail(email: string): Promise<UserDto | undefined>;
   isAdmin(userId: UserId): Promise<boolean>;
   listUsers(): Promise<UserDto[]>;
+  initializePlatformRoles(): Promise<{ initialized: number }>;
+  setPlatformRole(userId: UserId, input: SetPlatformRoleRequest): Promise<UserDto>;
   setAdmin(userId: UserId, isAdmin: boolean): Promise<UserDto>;
   readonly sessionCookie: SessionCookieSpec;
 

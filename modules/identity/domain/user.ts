@@ -1,4 +1,4 @@
-import type { UserId } from '@crewstation/contracts';
+import type { PlatformRole, UserId } from '@crewstation/contracts';
 
 export interface User {
   readonly id: UserId;
@@ -11,7 +11,7 @@ export interface User {
   readonly gitName: string | null;
   /** argon2id 哈希；为空即没有本地口令，不能用常规登录进来。 */
   readonly passwordHash: string | null;
-  readonly isAdmin: boolean;
+  readonly platformRole: PlatformRole;
   readonly createdAt: Date;
   readonly lastLoginAt: Date;
 }

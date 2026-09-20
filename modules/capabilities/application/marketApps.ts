@@ -1,39 +1,28 @@
-import type { Actor, MarketAppDto, MarketAppsQuery, MarketAppsPage, ProjectId } from '@crewstation/contracts';
+import type { Actor, MarketAppDto, MarketAppsQuery, MarketAppsPage, MarketTrialDto, ProjectId } from '@crewstation/contracts';
+import { forbidden } from '@crewstation/kernel';
+import { entryOf, marketSlots, productionOf, trialOf } from './marketDeployment';
 import type { Clock } from '@crewstation/kernel';
-import type { MarketListingSource, MarketSources } from '../ports/market';
-
-async function withDeadline<T>(work: Promise<T>): Promise<T> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  try { return await Promise.race([work, new Promise<never>((_resolve, reject) => { timer = setTimeout(() => reject(new Error('source timeout')), 2500); })]); }
-  finally { clearTimeout(timer); }
-}
-
-async function productionOf(sources: MarketSources, listing: MarketListingSource, clock: Clock): Promise<MarketAppDto['production']> {
-  const checkedAt = clock.now().toISOString();
-  const unknown = { status: 'unknown', freshness: 'unknown', checkedAt } as const;
-  if (!listing.serviceId) return listing.projectState === 'provisioning' ? { status: 'not-deployed', freshness: 'current', checkedAt } : unknown;
-  try {
-    const slots = await withDeadline(sources.slots(listing.serviceId));
-    if (slots.length === 0) return { status: 'not-deployed', freshness: 'current', checkedAt: clock.now().toISOString() };
-    const active = slots.filter((slot) => slot.name === 'prod' && slot.active);
-    if (active.length !== 1) return unknown;
-    const slot = active[0]!;
-    if (slot.state === 'empty' && !slot.releaseId) return { status: 'not-deployed', freshness: 'current', checkedAt: clock.now().toISOString() };
-    if (slot.state === 'empty' || !slot.releaseId || !slot.tag || !slot.commitSha || !slot.host) return unknown;
-    return { status: 'deployed', tag: slot.tag, commitSha: slot.commitSha, host: slot.host, state: slot.state, freshness: 'current', checkedAt: clock.now().toISOString() };
-  } catch { return unknown; }
-}
+import type { MarketSources } from '../ports/market';
 
 export function marketAppUseCases(sources: MarketSources, clock: Clock) {
   const detail = async (actor: Actor, projectId: ProjectId): Promise<MarketAppDto> => {
     const listing = await sources.get(actor, projectId);
-    const production = await productionOf(sources, listing, clock);
+    const slots = await marketSlots(sources, listing);
+    const production = productionOf(slots, clock);
     // 聚合期间可能撤销可见性；返回前再次裁定。内部 serviceId 不进入 HTTP 投影。
     const { serviceId: _serviceId, ...current } = await sources.get(actor, projectId);
-    return { ...current, production };
+    return { ...current, production, entry: entryOf(production, current, slots) };
   };
   return {
     getMarketApp: detail,
+    getMarketTrial: async (actor: Actor, projectId: ProjectId): Promise<MarketTrialDto> => {
+      const listing = await sources.get(actor, projectId);
+      if (!listing.canPreview) throw forbidden('你不是此应用的试用成员');
+      const slots = await marketSlots(sources, listing);
+      const current = await sources.get(actor, projectId);
+      if (!current.canPreview) throw forbidden('试用资格已变化');
+      return { projectId, name: current.name, ...trialOf(slots, current), checkedAt: clock.now().toISOString(), sharedData: true };
+    },
     listMarketApps: async (actor: Actor, query: MarketAppsQuery): Promise<MarketAppsPage> => {
       const page = await sources.list(actor, query);
       const items: MarketAppDto[] = [];
@@ -41,7 +30,9 @@ export function marketAppUseCases(sources: MarketSources, clock: Clock) {
       for (let offset = 0; offset < page.items.length; offset += 4) {
         const results = await Promise.allSettled(page.items.slice(offset, offset + 4).map((item) => detail(actor, item.projectId)));
         for (const result of results) {
-          if (result.status === 'fulfilled') items.push(result.value);
+          if (result.status === 'fulfilled') {
+            if (result.value.production.status !== 'not-deployed' || result.value.canPreview) items.push(result.value);
+          }
           else if (!(result.reason instanceof Object && 'kind' in result.reason && result.reason.kind === 'not_found')) throw result.reason;
         }
       }

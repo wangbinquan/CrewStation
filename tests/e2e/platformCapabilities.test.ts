@@ -28,6 +28,7 @@ const ADMIN_PAGES = [
   { path: '/admin/capabilities', marker: '能力接入', capability: '接入容器与开放策略' },
   { path: '/admin/requests', marker: '申请审批', capability: '定向开放与出站申请审批' },
   { path: '/admin/egress', marker: '出站白名单', capability: '出站域名白名单' },
+  { path: '/admin/cluster', marker: '集群管理', capability: '受管 Kubernetes 资源与运维操作（RFC-010）' },
   { path: '/admin/gateway', marker: '网关', capability: '网关路由与放行表' },
 ] as const;
 
@@ -45,10 +46,12 @@ afterAll(async () => {
 
 describe.skipIf(!session)('平台能力在当前部署的前台验收', () => {
   test('登录后拿到的是管理员身份，且顶栏给出管理空间入口', async () => {
-    const me = await apiGet<{ isAdmin?: boolean }>(session!.admin, '/v1/me');
-    expect(me.isAdmin).toBe(true);
+    const me = await apiGet<{ isAdmin?: boolean; platformRole: string }>(session!.admin, '/v1/me');
+    expect(me.isAdmin).toBe(true); expect(me.platformRole).toBe('admin');
     await open(session!.admin, '/');
-    expect(await session!.admin.bodyText()).toContain('进入平台管理');
+    expect(await session!.admin.eval<boolean>(`!!document.querySelector('header a[href="/admin"]')`)).toBe(true);
+    expect(await session!.admin.bodyText()).toContain('能力市场');
+    expect(await session!.admin.bodyText()).not.toContain('Agent 动态');
     expect(session!.admin.takeErrors()).toEqual([]);
   }, 45_000);
 
@@ -95,6 +98,16 @@ describe.skipIf(!session)('平台能力在当前部署的前台验收', () => {
 // 项目空间要有一个已开通、有服务的数字人项目才谈得上验收。全新集群（CI 就是）里一个都没有，
 // 这时整组显式跳过——比让断言在「没有对象」上失败或假装通过都更诚实。
 describe.skipIf(!project)('数字人项目的能力面', () => {
+  test('管理员能打开指定项目的算力授权页，读取真实授权与项目可选档位', async () => {
+    await open(session!.admin, `/admin/projects/${project!.id}/compute`);
+    expect(await session!.admin.text()).toContain('Agent 档位范围');
+    expect(await session!.admin.text()).toContain('开发容器资源套餐');
+    const policy = await apiGet<{ projectId: string; revision: number }>(session!.admin, `/v1/projects/${project!.id}/compute-policy`);
+    const profiles = await apiGet<{ items: unknown[] }>(session!.admin, `/v1/projects/${project!.id}/compute-profiles`);
+    expect(policy.projectId).toBe(project!.id); expect(policy.revision).toBeGreaterThanOrEqual(0);
+    expect(Array.isArray(profiles.items)).toBe(true); expect(session!.admin.takeErrors()).toEqual([]);
+  }, 45_000);
+
   test.each(PROJECT_PAGES.map((p) => [p.capability, p.suffix, p.marker] as const))(
     '项目能力「%s」在项目页 %s 渲染出来',
     async (_capability, suffix, marker) => {

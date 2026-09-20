@@ -24,7 +24,7 @@ export function MarketPage() {
     </form>
     <QueryStatus isPending={query.isPending || query.isFetching} error={query.error} />
     {query.error ? <Button onClick={() => { setCursors([]); void query.refetch(); }}>{t('market.retry')}</Button> : null}
-    {query.current?.items.length === 0 ? <EmptyState title={t(q ? 'market.noMatches' : 'market.noApps')} description={t(q ? 'market.noMatchesHint' : 'market.noAppsHint')} action={q ? <Button onClick={restart}>{t('market.reset')}</Button> : undefined} /> : null}
+    {query.current?.items.length === 0 ? <EmptyState title={t(query.current.nextCursor ? 'market.pageEmpty' : q ? 'market.noMatches' : 'market.noApps')} description={t(query.current.nextCursor ? 'market.pageEmptyHint' : q ? 'market.noMatchesHint' : 'market.noAppsHint')} action={q ? <Button onClick={restart}>{t('market.reset')}</Button> : undefined} /> : null}
     <div className={styles.grid}>{query.current?.items.map((app) => <MarketAppCard key={app.projectId} app={app} />)}</div>
     <div className={styles.pagination}>
       {cursor ? <Button disabled={query.isFetching} onClick={() => setCursors(cursors.slice(0, -1))}>{t('market.previous')}</Button> : null}

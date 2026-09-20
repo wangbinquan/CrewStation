@@ -27,7 +27,7 @@ test('接入容器的预览日志始终保留管理空间和开发任务，不�
   const base = globalThis.fetch, calls: URL[] = [];
   globalThis.fetch = (async (raw, init) => {
     const url = new URL(String(raw), 'http://localhost'); calls.push(url); const response = await base(raw, init);
-    if (url.pathname === '/v1/me') return Response.json({ ...await response.json(), isAdmin: true });
+    if (url.pathname === '/v1/me') return Response.json({ ...await response.json(), platformRole: 'admin', isAdmin: true });
     if (url.pathname === `/v1/projects/${activityProjectId}`) return Response.json({ ...await response.json(), kind: 'APIProxy' });
     return response;
   }) as typeof fetch;

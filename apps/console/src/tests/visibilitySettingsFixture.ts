@@ -27,7 +27,7 @@ export function visibilitySettingsFixture() {
       else if (key === 'visibility') { state.visibility = { ...state.visibility, ...input, revision: state.visibility.revision + 1 }; body = state.visibility; }
       else { state.presentation = { ...state.presentation, ...input, revision: state.presentation.revision + 1 }; body = state.presentation; }
     } else if (state.failure && path.endsWith(`/${state.failure}`)) { status = 503; body = { error: 'unavailable', message: '最新设置暂不可读取' }; }
-    else if (path === '/v1/me') body = { id: settingsUserId, name: '负责人', email: 'owner@test.invalid', isAdmin: false, memberships: [{ projectId: settingsProjectId, role: state.role }] };
+    else if (path === '/v1/me') body = { id: settingsUserId, name: '负责人', email: 'owner@test.invalid', platformRole: 'developer', isAdmin: false, memberships: [{ projectId: settingsProjectId, role: state.role }] };
     else if (path === `/v1/projects/${settingsProjectId}`) body = { id: settingsProjectId, serviceId: `svc_${'c'.repeat(32)}`, slug: 'knowledge', name: '知识助理', kind: 'DigitalWorker', ownerUserId: settingsUserId, state: 'active' };
     else if (path.endsWith('/app-visibility')) body = state.visibility;
     else if (path.endsWith('/app-presentation')) body = state.presentation;

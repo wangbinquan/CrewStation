@@ -18,7 +18,7 @@ export function adminDirectoryFixture() {
     const url = new URL(String(input), 'http://localhost'), method = init?.method ?? 'GET'; calls.push({ url, method });
     let body: unknown = { items: [] }, status = 200;
     if (url.pathname === '/v1/me') { if (state.identityError) { status = 503; body = { error: 'unavailable', message: '管理身份离线' }; }
-      else body = { id: userId, name: '管理员', email: 'admin@test.invalid', isAdmin: state.admin, memberships: [] }; }
+      else body = { id: userId, name: '管理员', email: 'admin@test.invalid', platformRole: (state.admin) ? 'admin' : 'developer', isAdmin: state.admin, memberships: [] }; }
     else if (url.pathname === '/v1/projects/page') {
       if (state.projectError) { status = 503; body = { error: 'unavailable', message: '管理项目目录离线' }; }
       else if (state.invalidProject) body = { items: [{}] };

@@ -1,12 +1,13 @@
 import type { Actor, MemberDto, ProjectId, SetMemberRequest, UserId } from '@crewstation/contracts';
 import { forbidden, precondition, validation } from '@crewstation/kernel';
+import { currentActor } from './creation/eligibility';
 import { authorizationUseCases } from './authorization';
 import type { ProjectUseCaseDeps } from './dependencies';
 import { memberToDto } from './toDto';
 
 /** 负责人管理成员与 preview 测试者；负责人本人的角色只能由管理员转移。 */
 export function memberUseCases(deps: ProjectUseCaseDeps) {
-  const { uow, users } = deps;
+  const { uow, users, roleLock } = deps;
   const { authorize } = authorizationUseCases(deps);
   return {
     listMembers: async (actor: Actor, projectId: ProjectId): Promise<MemberDto[]> => {
@@ -16,9 +17,11 @@ export function memberUseCases(deps: ProjectUseCaseDeps) {
     },
     setMember: async (actor: Actor, projectId: ProjectId, input: SetMemberRequest): Promise<MemberDto> => {
       await authorize(actor, projectId, input.role === 'tester' ? 'manage-testers' : 'manage-members');
-      if (input.role === 'owner' && !actor.isAdmin) throw forbidden('负责人只能由管理员转移');
+      return roleLock.run(input.userId, async () => {
+      if (input.role === 'owner' && !(await currentActor(deps, actor)).isAdmin) throw forbidden('负责人只能由管理员转移');
       const user = await users.getUser(input.userId);
       if (!user) throw validation(`用户 ${input.userId} 不存在`);
+      if (input.role !== 'tester' && user.platformRole === 'user') throw validation('开发成员和负责人必须是开发者或管理员', { field: 'userId' });
       return uow.run(async (scope) => {
         const project = await scope.projects.getById(projectId);
         if (project && project.ownerUserId === input.userId && input.role !== 'owner') throw precondition('不能降级当前负责人，请先转移负责人');
@@ -28,6 +31,7 @@ export function memberUseCases(deps: ProjectUseCaseDeps) {
         }
         await scope.memberships.upsert({ projectId, userId: input.userId, role: input.role });
         return memberToDto({ projectId, userId: input.userId, role: input.role }, user);
+      });
       });
     },
     removeMember: async (actor: Actor, projectId: ProjectId, userId: UserId): Promise<void> => {

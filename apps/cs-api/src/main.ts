@@ -16,7 +16,8 @@ const platform = createPlatformModule({ db, k8s, settings, logger, instance: `${
 
 if (process.argv[2] === 'migrate') {
   const applied = await runMigrations(db, platform.api.migrations, logger);
-  logger.info('migrations done', { applied: applied.length });
+  const roles = await platform.api.initializePlatformRoles();
+  logger.info('migrations done', { applied: applied.length, roles });
   await close();
   process.exit(0);
 }

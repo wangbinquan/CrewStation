@@ -16,8 +16,8 @@ const requests: string[] = [];
 let handlers: Handler[] = [];
 let app: RenderedApp | undefined;
 
-const ADMIN = { id: 'usr_a', name: '管理员', email: 'a@example.com', isAdmin: true, memberships: [], authMethod: 'password' as const };
-const MEMBER = { ...ADMIN, id: 'usr_m', name: '普通成员', isAdmin: false };
+const ADMIN = { id: 'usr_a', name: '管理员', email: 'a@example.com', platformRole: 'admin', isAdmin: true, memberships: [], authMethod: 'password' as const };
+const MEMBER = { ...ADMIN, id: 'usr_m', name: '普通成员', platformRole: 'user', isAdmin: false };
 
 globalThis.fetch = (async (input: string | URL | Request) => {
   const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
@@ -98,7 +98,7 @@ describe('管理空间与租户空间分离（RFC-002）', () => {
     asAdmin();
     app = await renderApp('/admin');
     // 已经在管理空间，切换控件指回工作台。
-    expect(app.text()).toContain('回到工作台');
+    expect(app.html()).toContain('href="/projects"');
     for (const label of ['用户与权限', '算力档位', '服务套餐', '任务容器套餐', '能力接入', '申请审批', '出站白名单', '网关']) {
       expect(app.text()).toContain(label);
     }
@@ -113,9 +113,9 @@ describe('管理空间与租户空间分离（RFC-002）', () => {
       body: { id: projectId, serviceId: `svc_${'b'.repeat(32)}`, name: '数字人', slug: 'worker', kind: 'DigitalWorker', state: 'active' } });
     app = await renderApp(`/projects/${projectId}/release`);
     expect(app.path()).toBe(`/projects/${projectId}/release`);
-    await app.click('进入平台管理');
+    await app.click('平台管理');
     expect(app.path()).toBe('/admin');
-    await app.click('回到工作台');
+    await app.click('项目开发');
     expect(app.path()).toBe(`/projects/${projectId}/release`);
   });
 

@@ -23,7 +23,7 @@ function fixture() {
       else body = { ...item, ...input, version: 4 };
     } else if (path === '/v1/me') {
       if (state.failIdentity) { status = 503; body = { error: 'unavailable', message: '身份读取失败' }; }
-      else body = { id: userId, name: '当前成员', email: 'member@test.invalid', isAdmin: state.admin, memberships: [{ projectId, role: state.role }] };
+      else body = { id: userId, name: '当前成员', email: 'member@test.invalid', platformRole: (state.admin) ? 'admin' : 'developer', isAdmin: state.admin, memberships: [{ projectId, role: state.role }] };
     }
     else if (path === `/v1/projects/${projectId}`) body = { id: projectId, serviceId, slug: 'demo', name: '演示应用', kind: 'DigitalWorker', ownerUserId: userId, state: 'active' };
     else if (/\/config\/(development|production)$/.test(path)) {
@@ -64,9 +64,11 @@ test('管理员仍可维护生产组；身份刷新失败保护草稿并禁写�
   await input(visible('input[placeholder="DATABASE_URL"]'), 'ADMIN_VALUE');
   await input(visible('input[placeholder="写入后生效于下一次注入"]'), '保留的生产草稿'); f.state.failIdentity = true; await click('刷新配置');
   expect(page.text()).toContain('身份读取失败');
-  expect(visible<HTMLInputElement>('input[placeholder="写入后生效于下一次注入"]').value).toBe('保留的生产草稿');
-  await click('保存'); expect(f.writes).toHaveLength(0);
-  f.state.failIdentity = false; await click('刷新配置'); await click('保存');
+  const draft = document.querySelector<HTMLInputElement>('input[placeholder="写入后生效于下一次注入"]')!;
+  expect(draft.value).toBe('保留的生产草稿'); expect(draft.closest('[hidden]')).not.toBeNull();
+  await act(async () => { draft.closest('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); });
+  await page.settle(); expect(f.writes).toHaveLength(0);
+  f.state.failIdentity = false; await click('重新检查权限'); await click('保存');
   expect(f.writes).toHaveLength(1); expect(f.writes[0]?.path).toBe(`/v1/projects/${projectId}/config/production`);
 });
 

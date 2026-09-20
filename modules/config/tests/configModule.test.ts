@@ -26,8 +26,11 @@ beforeAll(async () => {
   tdb = await createTestDatabase([eventbusMigrations, identityMigrations, projectMigrations, configMigrations]);
   const identity = createIdentityModule({ db: tdb.db, settings: { adminEmails: [] } });
   const a = await identity.api.ensureUser({ externalId: 'demo:admin', name: 'Admin', email: 'admin@example.com' });
+    if (a.platformRole === 'user') await identity.api.setPlatformRole(a.id, { platformRole: 'developer', expectedRole: 'user' });
   const o = await identity.api.ensureUser({ externalId: 'demo:owner', name: 'Owner', email: 'owner@example.com' });
+    if (o.platformRole === 'user') await identity.api.setPlatformRole(o.id, { platformRole: 'developer', expectedRole: 'user' });
   const d = await identity.api.ensureUser({ externalId: 'demo:dev', name: 'Dev', email: 'dev@example.com' });
+    if (d.platformRole === 'user') await identity.api.setPlatformRole(d.id, { platformRole: 'developer', expectedRole: 'user' });
   admin = { userId: a.id, isAdmin: true };
   owner = { userId: o.id, isAdmin: false };
   dev = { userId: d.id, isAdmin: false };

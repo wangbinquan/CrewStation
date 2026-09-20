@@ -6,7 +6,7 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import type { CapabilitiesModuleApi } from '../api/moduleApi';
 
-export function marketRoutes(api: Pick<CapabilitiesModuleApi, 'listMarketApps' | 'getMarketApp'>, isAdmin: (userId: UserId) => Promise<boolean>): Hono<AppEnv> {
+export function marketRoutes(api: Pick<CapabilitiesModuleApi, 'listMarketApps' | 'getMarketApp' | 'getMarketTrial'>, isAdmin: (userId: UserId) => Promise<boolean>): Hono<AppEnv> {
   const r = new Hono<AppEnv>();
   r.use('/v1/market/*', async (c, next) => { c.header('Cache-Control', 'private, no-store'); await next(); });
   r.get('/v1/market/apps', async (c) => {
@@ -16,6 +16,10 @@ export function marketRoutes(api: Pick<CapabilitiesModuleApi, 'listMarketApps' |
   r.get('/v1/market/apps/:projectId', async (c) => {
     const actor = await actorFrom(c, (id) => isAdmin(id as UserId));
     return c.json(await api.getMarketApp({ ...actor, userId: actor.userId as UserId }, parseParams(c, z.object({ projectId: ProjectIdSchema })).projectId));
+  });
+  r.get('/v1/market/apps/:projectId/trial', async (c) => {
+    const actor = await actorFrom(c, (id) => isAdmin(id as UserId));
+    return c.json(await api.getMarketTrial({ ...actor, userId: actor.userId as UserId }, parseParams(c, z.object({ projectId: ProjectIdSchema })).projectId));
   });
   return r;
 }

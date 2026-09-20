@@ -1,6 +1,17 @@
 import type { Messages } from '../../../shared/lib/i18n';
 
 export const messages = {
+  "market.intro": "找到适合你的应用，打开即可使用。带 Beta 标签的应用可供成员提前试用。",
+  "market.open": "打开应用",
+  "market.try": "试用应用",
+  "market.sharedData": "Beta 试用与正式版共用业务数据，修改会影响实际数据。",
+  "market.trialTitle": "试用新版本 · Beta",
+  "market.entry.ready": "可使用",
+  "market.entry.unavailable": "暂不可用",
+  "market.entry.unknown": "状态待确认",
+  "market.pageEmpty": "本页暂无可用应用",
+  "market.pageEmptyHint": "可以继续查看下一页，或重新搜索。",
+
   'capabilities.title': '能力说明',
   'capabilities.line1': '聚合本数字人当前可用的一切：身份约定与域名、平台 API 地址、配置键、数据资源、可调用操作、事件订阅、并发配额与服务套餐、两个平台 MCP 服务器。',
   'capabilities.line2': '这一页是能力说明 MCP 的人类可读版本：同一份数据，值都可直接复制到代码或开发容器里使用。',
@@ -98,7 +109,6 @@ export const messages = {
   'capabilities.businessTaskApi.summary': '说明',
   'capabilities.businessTaskApi.empty': '还没有登记业务子任务接口。',
   "market.title": "能力市场",
-  "market.intro": "发现你有权使用的数字人应用。",
   "market.search": "搜索应用",
   "market.searchHint": "按应用名称或用途搜索，最多 120 字。",
   "market.searchAction": "搜索",
@@ -113,10 +123,9 @@ export const messages = {
   "market.goneHint": "服务器答复：{message}。可能是负责人已收回市场可见范围，或应用已不存在；正式链接的访问规则不受影响。",
   "market.owner": "负责人：{name}",
   "market.noDescription": "负责人尚未填写应用用途。",
-  "market.open": "打开正式应用",
   "market.develop": "进入项目",
   "market.configure": "配置可见性",
-  "market.notAvailable": "正式入口暂不可用",
+  "market.notAvailable": "应用暂不可用",
   "market.production.deployed": "已上线",
   "market.production.not-deployed": "尚未上线",
   "market.production.unknown": "正式状态未知",

@@ -4,3 +4,4 @@ export type { MigrationFile, MigrationSet } from './migrations';
 export { readMigrationDir, runMigrations } from './migrations';
 export { platformInfraSchema } from './infraSchema';
 export { jsonDocument } from './jsonDocument';
+export { keyedLock } from './keyedLock';

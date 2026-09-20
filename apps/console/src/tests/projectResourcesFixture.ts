@@ -17,7 +17,7 @@ export function projectResourcesFixture(admin = false) {
   globalThis.fetch = (async (raw) => {
     const path = new URL(String(raw), 'http://localhost').pathname; calls.push(path);
     if (state.fail && path.endsWith(`/${state.fail}`)) return Response.json({ error: 'unavailable', message: '本主题暂不可用' }, { status: 503 });
-    if (path === '/v1/me') return Response.json({ id: 'user', name: '开发者', isAdmin: admin, memberships: [{ projectId: resourcesProjectId, role: 'developer' }] });
+    if (path === '/v1/me') return Response.json({ id: 'user', name: '开发者', platformRole: (admin) ? 'admin' : 'developer', isAdmin: admin, memberships: [{ projectId: resourcesProjectId, role: 'developer' }] });
     if (path === `/v1/projects/${resourcesProjectId}`) return Response.json({ id: resourcesProjectId, serviceId: resourcesServiceId, name: '示例项目', slug: 'demo', namespace: 'cs-demo', kind: state.kind, state: 'active' });
     if (path.endsWith('/capabilities')) return Response.json(state.invalid ? {} : capability);
     if (path.endsWith('/repository')) return Response.json({ serviceId: resourcesServiceId, pathWithNamespace: 'crew/demo', defaultBranch: 'main', state: 'ready', httpUrl: 'https://repo.test/crew/demo' });

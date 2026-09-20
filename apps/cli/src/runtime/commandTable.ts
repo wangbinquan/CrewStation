@@ -80,7 +80,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     name: 'verify', group: OPERATE, summary: '运行检查套件', args: [], emitsDto: true, run: verify,
     flags: [...OPERATOR_FLAGS, { name: 'suite', type: 'string', placeholder: 'name', summary: `套件：${SUITE_IDS.join('、')}（默认 smoke）` }],
   },
-  { name: 'whoami', group: DEVELOP, summary: '当前身份、是否管理员、项目成员关系', args: [], flags: [], emitsDto: true, run: whoami },
+  { name: 'whoami', group: DEVELOP, summary: '当前身份、平台角色、项目成员关系', args: [], flags: [], emitsDto: true, run: whoami },
   { name: 'projects list', group: DEVELOP, summary: '列出我可见的项目', args: [], flags: [], emitsDto: true, run: listProjects },
   { name: 'projects show', group: DEVELOP, summary: '项目详情', args: [PROJECT_ARG], flags: [], emitsDto: true, run: showProject },
   { name: 'projects branches', group: DEVELOP, summary: '分支列表与落后两槽的提交数', args: [PROJECT_ARG], flags: [], emitsDto: true, run: listBranches },

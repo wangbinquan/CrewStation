@@ -13,7 +13,7 @@ function fixture() {
   globalThis.fetch = (async (raw, init) => {
     const path = new URL(String(raw), 'http://localhost').pathname, method = init?.method ?? 'GET'; calls.push({ path, method });
     let body: unknown = { items: [] }, status = 200;
-    if (path === '/v1/me') body = { id: userId, name: '负责人', isAdmin: false, memberships: [{ projectId, role: 'owner' }] };
+    if (path === '/v1/me') body = { id: userId, name: '负责人', platformRole: 'developer', isAdmin: false, memberships: [{ projectId, role: 'owner' }] };
     else if (path === `/v1/projects/${projectId}`) body = { id: projectId, serviceId: state.noService ? undefined : serviceId, name: '示例', slug: 'demo', kind: 'DigitalWorker', state: 'active' };
     else if (path.endsWith('/slots')) {
       if (state.slotsFailure) { status = 503; body = { error: 'unavailable', message: '部署槽读取失败' }; }

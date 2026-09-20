@@ -1,5 +1,5 @@
 import type { UserId } from '@crewstation/contracts';
-import { SetAdminRequestSchema, UserIdSchema } from '@crewstation/contracts';
+import { SetPlatformRoleRequestSchema, SetAdminRequestSchema, UserIdSchema } from '@crewstation/contracts';
 import type { AppEnv } from '@crewstation/http';
 import { parseBody, parseParams, requireUser } from '@crewstation/http';
 import { forbidden } from '@crewstation/kernel';
@@ -23,6 +23,11 @@ export function userRoutes(api: IdentityModuleApi): Hono<AppEnv> {
     const { userId } = parseParams(c, userParams);
     const { isAdmin } = await parseBody(c, SetAdminRequestSchema);
     return c.json(await api.setAdmin(userId as UserId, isAdmin));
+  });
+  r.put('/v1/users/:userId/platform-role', async (c) => {
+    await requireAdmin(c, api);
+    const { userId } = parseParams(c, userParams);
+    return c.json(await api.setPlatformRole(userId as UserId, await parseBody(c, SetPlatformRoleRequestSchema)));
   });
   return r;
 }

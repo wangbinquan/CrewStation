@@ -32,7 +32,7 @@ export function devSessionTokenUseCases({ tokens, users, devSessions, clock }: D
       const active = await devSessions.activeSession(binding.taskId);
       if (!active || active.projectId !== binding.projectId) return undefined;
       const user = await users.getById(binding.userId);
-      return user ? { ...binding, user: toDto(user) } : undefined;
+      return user && user.platformRole !== 'user' ? { ...binding, user: toDto(user) } : undefined;
     },
   };
 }

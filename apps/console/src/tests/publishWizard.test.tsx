@@ -3,7 +3,7 @@ import { afterEach, expect, test } from 'bun:test';
 import { act } from 'react';
 import { focusManager, onlineManager } from '@tanstack/react-query';
 import { renderApp } from './renderApp';
-import { testerSummaryFixture } from './projectSummaryFixture';
+import { testerSummaryFixture, trialMarketFixture } from './projectSummaryFixture';
 
 const projectId = `prj_${'a'.repeat(32)}`, serviceId = `svc_${'b'.repeat(32)}`, userId = `usr_${'c'.repeat(32)}`, taskId = `tsk_${'d'.repeat(32)}`, releaseId = `rel_${'e'.repeat(32)}`;
 const sha = 'a'.repeat(40), time = '2026-09-13T01:00:00.000Z', originalFetch = globalThis.fetch;
@@ -21,7 +21,8 @@ function fixture() {
       else { status = 202; release.commitSha = String(input.expectedCommitSha); body = { ...release, serviceId: state.responseMismatch ? `svc_${'f'.repeat(32)}` : serviceId }; }
     } else {
       reads.push(path);
-      if (path === '/v1/me') body = { id: userId, name: '负责人', email: 'owner@test.invalid', isAdmin: state.admin, memberships: [{ projectId, role: state.role }] };
+      if (path === '/v1/me') body = { id: userId, name: '负责人', email: 'owner@test.invalid', platformRole: (state.admin) ? 'admin' : 'developer', isAdmin: state.admin, memberships: [{ projectId, role: state.role }] };
+      else if (path === `/v1/market/apps/${projectId}`) body = trialMarketFixture(projectId);
       else if (path === `/v1/workbench/project-summaries/${projectId}`) body = testerSummaryFixture(projectId, serviceId);
       else if (path === `/v1/projects/${projectId}`) body = { id: projectId, serviceId, name: '演示应用', slug: 'demo', kind: state.kind, state: 'active', ownerUserId: userId };
       else if (path.endsWith('/branches')) { if (state.failBranches) { status = 503; body = { error: 'unavailable', message: '分支读取失败' }; } else body = { items: [{ name: 'main', headSha: state.sha, isDefault: true, behindPreview: null, behindProd: null }] }; }
@@ -155,7 +156,7 @@ test('关闭准备与切项目先确认，取消保留草稿；测试者不能�
   const f = fixture(); page = await renderApp(`/projects/${projectId}/release?source=repository`); await review(); await input('message', '未保存的发布说明');
   await click('收起准备'); expect(page.text()).toContain('未保存'); await click('继续编辑'); expect(document.querySelector<HTMLTextAreaElement>('[name="message"]')?.value).toBe('未保存的发布说明');
   await page.requestNavigate(`/projects/${projectId}`); await click('放弃输入并离开'); expect(f.writes).toHaveLength(0);
-  f.state.role = 'tester'; page.unmount(); f.reads.length = 0; page = await renderApp(`/projects/${projectId}/release?source=repository`); expect(page.text()).toContain('你是此项目的测试者');
+  f.state.role = 'tester'; page.unmount(); f.reads.length = 0; page = await renderApp(`/projects/${projectId}/release?source=repository`); expect(page.text()).toContain('Beta');
   expect(document.querySelector('form[aria-label="发布准备"]') === null).toBe(true);
   expect(f.reads.some((path) => /\/branches|\/tags|\/workspace-status/.test(path))).toBe(false);
 });

@@ -16,7 +16,8 @@ export function currentUserUseCase(deps: Deps) {
       id: user.id,
       name: user.name,
       email: user.email,
-      isAdmin: user.isAdmin,
+      platformRole: user.platformRole,
+      isAdmin: user.platformRole === 'admin',
       memberships: await deps.memberships.membershipsOf(userId),
       authMethod,
     };

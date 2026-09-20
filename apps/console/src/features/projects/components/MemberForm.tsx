@@ -25,7 +25,7 @@ export function MemberForm(props: MemberEditorOptions & { readonly onDirtyChange
     <MemberTargetPicker key={editor.pickerKey} projectId={projectId} isAdmin={isAdmin} user={user} rawId={rawId} mode={mode} identity={identity} error={error} disabled={locked} onSelect={editor.select} onRawId={editor.changeRawId} onMode={editor.changeMode} onIdentity={editor.changeIdentity} />
     <FormField label={t('projects.members.columnRole')} hint={t(`projects.members.roleHint.${role}`)} hintId={`${id}-role-hint`}>
       <select aria-label={t('projects.members.roleLabel')} aria-describedby={`${id}-role-hint`} value={role} disabled={locked || (current?.role === 'owner' && !isAdmin)} onChange={(event) => editor.setRole(event.target.value as MemberRole)}>
-        {(['owner', 'developer', 'tester'] as const).map((value) => <option value={value} key={value} disabled={value === 'owner' && !isAdmin}>{t(`projects.role.${value}`)}</option>)}
+        {(['owner', 'developer', 'tester'] as const).map((value) => <option value={value} key={value} disabled={value === 'owner' && !isAdmin || value !== 'tester' && user?.platformRole === 'user'}>{t(`projects.role.${value}`)}</option>)}
       </select>
     </FormField>
     <p>{t('projects.members.ownerRule')}</p>

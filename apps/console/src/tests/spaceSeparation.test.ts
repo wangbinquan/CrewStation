@@ -21,7 +21,7 @@ describe('两个空间的结构约定（RFC-002）', () => {
     for (const path of ['/admin/users', '/admin/compute', '/admin/service-plans', '/admin/task-profiles', '/admin/capabilities', '/admin/requests', '/admin/egress', '/admin/gateway']) {
       expect(nav.code).toContain(`'${path}'`);
     }
-    expect(sourceAt(files, 'layout/AdminLayout.tsx').code).toContain('<AdminGuard>');
+    expect(sourceAt(files, 'layout/AdminLayout.tsx').code).toMatch(/<AdminGuard(?:\s[^>]*)?>/);
   });
 
   test('管理页自己不再判 isAdmin：权限只在守卫一处', () => {

@@ -3,6 +3,7 @@ import { PendingCommands } from './pendingCommands';
 
 export interface EventSink {
   send(frame: string): void;
+  close?(code: number, reason: string): void;
 }
 
 /** 一个 TaskRunner 的在线连接：hello 信息、待回复命令、最后收到的 seq、订阅它的浏览器流。 */

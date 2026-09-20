@@ -54,7 +54,7 @@ export async function seedLocalUser(db: Database, input: { username: string; nam
     email: input.email ?? `${input.username}@corp.example`,
     gitName: input.gitName ?? null,
     passwordHash: await bunPasswordHasher().hash(TEST_PASSWORD),
-    isAdmin: input.isAdmin ?? false,
+    platformRole: input.isAdmin ? 'admin' : 'user',
     createdAt: now,
     lastLoginAt: now,
   });

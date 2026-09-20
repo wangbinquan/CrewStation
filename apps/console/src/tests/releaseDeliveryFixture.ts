@@ -1,5 +1,5 @@
 import type { ReleaseDto, SlotDto } from '@crewstation/contracts';
-import { testerSummaryFixture } from './projectSummaryFixture';
+import { testerSummaryFixture, trialMarketFixture } from './projectSummaryFixture';
 
 export const projectId = `prj_${'a'.repeat(32)}`, serviceId = `svc_${'b'.repeat(32)}`, userId = `usr_${'c'.repeat(32)}`;
 export const prodId = `rel_${'d'.repeat(32)}`, targetId = `rel_${'e'.repeat(32)}`, historyId = `rel_${'f'.repeat(32)}`;
@@ -25,7 +25,8 @@ export function releaseDeliveryFixture() {
       } else { status = 202; body = { ...candidate, commitSha: input.expectedCommitSha, status: 'pending' }; }
     } else {
       reads.push(path);
-      if (path === '/v1/me') body = { id: userId, name: '负责人', email: 'owner@test.invalid', isAdmin: state.admin, memberships: [{ projectId, role: state.role }] };
+      if (path === '/v1/me') body = { id: userId, name: '负责人', email: 'owner@test.invalid', platformRole: (state.admin) ? 'admin' : 'developer', isAdmin: state.admin, memberships: [{ projectId, role: state.role }] };
+      else if (path === `/v1/market/apps/${projectId}`) body = trialMarketFixture(projectId);
       else if (path === `/v1/workbench/project-summaries/${projectId}`) body = testerSummaryFixture(projectId, serviceId);
       else if (path === `/v1/projects/${projectId}`) body = { id: projectId, serviceId, name: '演示应用', slug: 'demo', kind: state.admin ? 'APIProxy' : 'DigitalWorker', state: 'active', ownerUserId: userId };
       else if (path.endsWith('/slots')) { if (state.failSlots) { status = 503; body = { error: 'unavailable', message: '部署读取失败' }; } else body = { items: state.slots }; }

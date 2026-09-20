@@ -3,7 +3,7 @@ import { focusManager } from '@tanstack/react-query';
 import type { ApiInvocationRequest, ApiOperationDto } from '@crewstation/contracts';
 import { ApiInvocationRequestSchema, TaskIdSchema } from '@crewstation/contracts';
 import type { RenderedApp } from './renderApp';
-import { testerSummaryFixture } from './projectSummaryFixture';
+import { testerSummaryFixture, trialMarketFixture } from './projectSummaryFixture';
 
 export const invocationProjectId = `prj_${'a'.repeat(32)}`, invocationTaskId = TaskIdSchema.parse(`tsk_${'c'.repeat(32)}`);
 const serviceId = `svc_${'b'.repeat(32)}`, userId = `usr_${'d'.repeat(32)}`;
@@ -27,7 +27,8 @@ export function apiInvocationFixture() {
       return pending.handle ? pending.handle(input) : Response.json(invocationResponse(input));
     }
     reads.push(url);
-    if (url.endsWith('/v1/me')) return Response.json({ id: userId, name: '开发者', isAdmin: false, memberships: [{ projectId: invocationProjectId, role: state.role }] });
+    if (url.endsWith('/v1/me')) return Response.json({ id: userId, name: '开发者', platformRole: 'developer', isAdmin: false, memberships: [{ projectId: invocationProjectId, role: state.role }] });
+    if (url.endsWith(`/v1/market/apps/${invocationProjectId}`)) return Response.json(trialMarketFixture(invocationProjectId));
     if (url.endsWith(`/v1/workbench/project-summaries/${invocationProjectId}`)) return Response.json(testerSummaryFixture(invocationProjectId, serviceId));
     if (url.endsWith(`/v1/projects/${invocationProjectId}`)) return Response.json({ id: invocationProjectId, serviceId, name: '知识助理', slug: 'knowledge', kind: 'DigitalWorker', state: 'active' });
     if (url.endsWith('/dev-session')) {

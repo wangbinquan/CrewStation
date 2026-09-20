@@ -18,7 +18,7 @@ export function adminRequestPagesFixture() {
     const url = new URL(String(raw), 'http://localhost'), method = init?.method ?? 'GET';
     const input = init?.body ? JSON.parse(String(init.body)) as Record<string, unknown> : undefined;
     calls.push({ url, method, body: input }); let body: unknown = { items: [] }, status = 200;
-    if (url.pathname === '/v1/me') body = { id: userId, name: '审批管理员', isAdmin: state.admin, memberships: [] };
+    if (url.pathname === '/v1/me') body = { id: userId, name: '审批管理员', platformRole: (state.admin) ? 'admin' : 'developer', isAdmin: state.admin, memberships: [] };
     else if (url.pathname === '/v1/api-requests/page' || url.pathname === '/v1/egress/requests/page') {
       const api = url.pathname === '/v1/api-requests/page', source = api ? apiRequests : egressRequests, name = api ? 'api' : 'egress';
       if (api) await state.holdApi;

@@ -1,8 +1,12 @@
-import type { Actor, ProjectId, ServiceId, UserDto, UserId } from '@crewstation/contracts';
+import { createClusterManagementModule } from '@crewstation/module-cluster-management';
+import { installedSystemComponents } from './domain/systemComponents';
+import type { ClusterResource, ClusterInspectRequest, ClusterOperation, ClusterInspection, TaskId, ProfileTestId, RebuildDevSessionRequest } from '@crewstation/contracts';
+import type { Actor, ComputeUsage, ProjectId, ServiceId, UserDto, UserId } from '@crewstation/contracts';
 import type { EventConsumer } from '@crewstation/eventbus';
 import type { K8sClient } from '@crewstation/k8s';
 import { buildEgressNetworkPolicy, namespaceObject, projectNetworkPolicy, resourceQuotaObject, secretObject, taskEgressNetworkPolicy } from '@crewstation/k8s';
 import type { Logger } from '@crewstation/kernel';
+import { forbidden, precondition } from '@crewstation/kernel';
 import { createAgentRuntimeModule } from '@crewstation/module-agent-runtime';
 import type { AgentRuntimeModuleApi } from '@crewstation/module-agent-runtime';
 import { createApiCatalogModule } from '@crewstation/module-api-catalog';
@@ -40,6 +44,7 @@ import type { Lifecycle } from './api/moduleApi';
 export interface PlatformModuleApi {
   readonly name: 'platform';
   /** 引导首位管理员这一条运维路径需要它：安装脚本在容器内以子命令调用（RFC-005 §8）。 */
+  readonly initializePlatformRoles: () => Promise<{ initialized: number }>;
   readonly bootstrapAdmin: (raw: unknown) => Promise<UserDto>;
   readonly routers: { api: Hono<AppEnv>[]; auth: Hono<AppEnv>[]; session: Hono<AppEnv>[]; events: Hono<AppEnv>[] };
   readonly background: { controller: Lifecycle[]; session: Lifecycle[]; events: Lifecycle[] };
@@ -103,7 +108,7 @@ function composeCore(deps: PlatformModuleDeps, late: Late) {
       return env && env.kind === 'dev-session' && (env.state === 'creating' || env.state === 'running') ? { projectId: env.projectId } : undefined;
     } },
   });
-  const project = createProjectModule({ db, identity: identity.api, hosts, taskUsage: { runningTasks }, settings: { defaultMaxConcurrentTasks: settings.defaultMaxConcurrentTasks, defaultServicePlan: settings.defaultServicePlan } });
+  const project = createProjectModule({ db, identity: identity.api, creationTemplates: { list: () => scm.api.listTemplates(SYSTEM_ACTOR) }, hosts, taskUsage: { runningTasks }, settings: { defaultMaxConcurrentTasks: settings.defaultMaxConcurrentTasks, defaultServicePlan: settings.defaultServicePlan } });
   late.project = project.api;
   const isAdmin = (userId: string) => identity.api.isAdmin(userId as UserId);
   // 申请人／审批人在申请、绑定列表里显示可辨识名字；查不到就让界面回退到 ID。
@@ -115,6 +120,7 @@ function composeCore(deps: PlatformModuleDeps, late: Late) {
   // 算力档位（RFC-006、ADR-0005）：测试执行在 task-runtime（L4）、已上线引用在 release（L4）、资源套餐在 project（L2），都由这里回填。
   const agentRuntime = createAgentRuntimeModule({
     db, logger, isAdmin: (id) => identity.api.isAdmin(id),
+    projects: { authorize: project.api.authorize, name: async (projectId) => (await project.api.resolveServiceOfProject(projectId))?.slug },
     executor: { run: (input, report, heartbeat) => { if (!late.taskRuntime) throw new Error('task-runtime 尚未装配'); return late.taskRuntime.runProfileTest(input, report, heartbeat); } },
     references: { listReferencingProjects: async (profile) => {
       const releaseApi = late.release;
@@ -123,7 +129,7 @@ function composeCore(deps: PlatformModuleDeps, late: Late) {
       return [...new Set(hits.filter((slug): slug is string => slug !== undefined))].sort();
     } },
     taskProfiles: { exists: async (name) => (await project.api.listTaskProfiles()).some((p) => p.name === name) },
-    settings: { secretKeyBase64: settings.secretKeyBase64, registry: { pullBase: settings.registryBase, pushHost: settings.registryPushHost, baseRepository: settings.baseImage.repository, runtimePrefix: 'runtime/', scheme: settings.registryScheme, baseTag: settings.baseImage.tag } },
+    settings: { defaultTaskProfile: settings.defaultTaskProfile, secretKeyBase64: settings.secretKeyBase64, registry: { pullBase: settings.registryBase, pushHost: settings.registryPushHost, baseRepository: settings.baseImage.repository, runtimePrefix: 'runtime/', scheme: settings.registryScheme, baseTag: settings.baseImage.tag } },
   });
   const data = createDataModule({
     db, isAdmin: (id) => isAdmin(id), authorizer: project.api, users: userDirectory,
@@ -163,7 +169,7 @@ function composeDelivery(deps: PlatformModuleDeps, core: ReturnType<typeof compo
     },
     plans: {
       getServicePlan: async (name) => (await project.api.listServicePlans()).find((p) => p.name === name),
-      lookupComputeProfile: (name) => core.agentRuntime.api.lookupForRelease(name),
+      lookupComputeProfile: (name, projectId) => core.agentRuntime.api.lookupForProjectRelease(projectId, name),
       listComputeProfiles: () => core.agentRuntime.api.listNames(),
     },
     config: {
@@ -191,7 +197,7 @@ function composeDelivery(deps: PlatformModuleDeps, core: ReturnType<typeof compo
  * 派发时按固定修订取材料（含解密凭据），只经受控 Runner 命令通道发出。
  */
 function computeCatalogFor(agentRuntime: AgentRuntimeModuleApi) {
-  return { resolve: agentRuntime.resolve, launchMaterial: agentRuntime.launchMaterial };
+  return { resolve: (name: string | undefined, usage: ComputeUsage, projectId: ProjectId) => agentRuntime.resolveForProject(projectId, name, usage), launchMaterial: agentRuntime.launchMaterial };
 }
 
 function composeRuntime(deps: PlatformModuleDeps, core: ReturnType<typeof composeCore>, delivery: ReturnType<typeof composeDelivery>, late: Late) {
@@ -202,7 +208,7 @@ function composeRuntime(deps: PlatformModuleDeps, core: ReturnType<typeof compos
   const mcp = [{ name: 'capabilities', url: settings.mcp.capabilitiesUrl }, { name: 'operations', url: settings.mcp.operationsUrl }];
   const taskRuntime = createTaskRuntimeModule({
     db, k8s, logger, isAdmin: (id) => isAdmin(id), authorizer: project.api, quotas: { quotaLimit: project.api.quotaLimit }, testRunner, testMcp: mcp,
-    profiles: { listTaskProfiles: project.api.listTaskProfiles, getTaskProfile: async (name) => (await project.api.listTaskProfiles()).find((p) => p.name === name) },
+    profiles: { devSessionProfile: core.agentRuntime.api.projectDevTaskProfile, listTaskProfiles: project.api.listTaskProfiles, getTaskProfile: async (name) => (await project.api.listTaskProfiles()).find((p) => p.name === name) },
     services: { resolveServiceById: resolveById },
     checkout: {
       // 开发容器的工作卷要先有源码：签一个只读的会话级 Git 令牌，写进项目命名空间的 Secret，
@@ -253,7 +259,7 @@ function composeRuntime(deps: PlatformModuleDeps, core: ReturnType<typeof compos
     db, logger, isAdmin: (id) => isAdmin(id),
     runnerAuth: { verifyRunnerToken: taskRuntime.api.verifyRunnerToken },
     taskAccess: {
-      canOpenStream: taskRuntime.api.canOpenStream,
+      canOpenStream: async (actor, id) => taskRuntime.api.canOpenStream({ ...actor, isAdmin: await core.isAdmin(actor.userId) }, id),
       // 先把环境标成已连接，再派发等容器就绪的业务子任务：提交子任务时容器往往还没连上。
       // 派发不能 await：这个回调跑在 cs-session 处理 hello 的串行链上，而派发要等 TaskRunner
       // 的回执——回执要经同一条链回来，等下去必然自锁到命令超时。
@@ -295,7 +301,7 @@ function composeAggregates(deps: PlatformModuleDeps, core: ReturnType<typeof com
     settings: { userDomain: settings.userDomain, serviceDomain: settings.serviceDomain, mcp: [{ name: 'capabilities', url: settings.mcp.capabilitiesUrl }, { name: 'operations', url: settings.mcp.operationsUrl }], defaultServicePlan: settings.defaultServicePlan },
     sources: {
       resolveServiceOfProject: serviceOfProject, authorize: project.api.authorize, quota: project.api.getQuota, servicePlans: project.api.listServicePlans,
-      computeProfiles: core.agentRuntime.api.listSummaries,
+      computeProfiles: core.agentRuntime.api.listProjectSummaries,
       configKeys: async (actor, projectId, env) => (await config.api.listItems(actor, projectId, env)).map((i) => i.name),
       dataResources: data.api.listResources, operations: (actor, serviceId) => apiCatalog.api.listOperations(actor, serviceId),
       subscriptions: (actor, projectId) => runtime.events.api.listSubscriptions(actor, projectId),
@@ -304,6 +310,11 @@ function composeAggregates(deps: PlatformModuleDeps, core: ReturnType<typeof com
   });
   const provisioning = createProvisioningModule({
     db, logger, workerOwner: `${deps.instance}.provisioning`, consumerName: 'provisioning', isAdmin: (id) => isAdmin(id),
+    authorizeRetry: async (actor, id) => {
+      const role = await project.api.authorize(actor, id, 'view');
+      if (role !== 'owner' && role !== 'admin') throw forbidden('只有负责人或管理员可以重新开通项目');
+      if ((await project.api.getProject(actor, id)).state !== 'failed') throw precondition('只有开通失败的项目可以重试');
+    },
     steps: {
       loadProject: project.api.getProvisioningProject,
       ensureNamespace: async (f) => {
@@ -329,28 +340,76 @@ function composeModules(deps: PlatformModuleDeps) {
   const delivery = composeDelivery(deps, core, late);
   const runtime = composeRuntime(deps, core, delivery, late);
   const aggregates = composeAggregates(deps, core, delivery, runtime);
-  return { identity: core.identity, project: core.project, config: core.config, egress: core.egress, data: core.data, scm: core.scm, apiCatalog: core.apiCatalog, agentRuntime: core.agentRuntime, ...delivery, ...runtime, ...aggregates };
+  const cluster = composeCluster(deps, core, delivery, runtime);
+  return { cluster, identity: core.identity, project: core.project, config: core.config, egress: core.egress, data: core.data, scm: core.scm, apiCatalog: core.apiCatalog, agentRuntime: core.agentRuntime, ...delivery, ...runtime, ...aggregates };
 }
 
 export function createPlatformModule(deps: PlatformModuleDeps): PlatformModule {
   const m = composeModules(deps);
   const api: PlatformModuleApi = {
     name: 'platform',
+    initializePlatformRoles: () => m.identity.api.initializePlatformRoles(),
     bootstrapAdmin: (raw) => m.identity.api.bootstrapAdmin(raw),
     routers: {
       // devSessionGate 只挂中间件不占路径，必须排在最前：Hono 按注册顺序执行，晚于业务路由就来不及改判身份。
-      api: [...m.identity.http.devSessionGate, ...m.project.http, ...m.identity.http.users, ...m.config.http, ...m.agentRuntime.http, ...m.egress.http, ...m.data.http, ...m.scm.http, ...m.apiCatalog.http, ...m.release.http, ...m.gateway.http, ...m.taskRuntime.http, ...m.devSession.http, m.businessTask.http.service, m.businessTask.http.user, ...m.events.http.query, ...m.observability.http, ...m.capabilities.http, ...m.provisioning.http],
+      api: [...m.identity.http.devSessionGate, ...m.project.http, ...m.identity.http.users, ...m.config.http, ...m.agentRuntime.http, ...m.egress.http, ...m.data.http, ...m.scm.http, ...m.apiCatalog.http, ...m.release.http, ...m.gateway.http, ...m.taskRuntime.http, ...m.devSession.http, m.businessTask.http.service, m.businessTask.http.user, ...m.events.http.query, ...m.observability.http, ...m.cluster.http, ...m.capabilities.http, ...m.provisioning.http],
       auth: [...m.identity.http.auth, ...m.identity.http.forwardAuth, ...m.agentRuntime.forwardAuth],
       session: [m.session.http.runner, m.session.http.stream, m.session.http.internal],
       events: [...m.events.http.ingress],
     },
     background: {
-      controller: [...m.release.workers, ...m.gateway.workers, consumerLifecycle(m.gateway.subscriptions), ...m.taskRuntime.workers, ...m.agentRuntime.workers, ...m.devSession.workers, ...m.businessTask.workers, consumerLifecycle(m.businessTask.subscriptions), ...m.apiCatalog.subscriptions.map(consumerLifecycle), ...m.observability.workers, ...m.provisioning.workers, consumerLifecycle(m.provisioning.subscriptions)],
+      controller: [...m.cluster.workers, ...m.release.workers, ...m.gateway.workers, consumerLifecycle(m.gateway.subscriptions), ...m.taskRuntime.workers, ...m.agentRuntime.workers, ...m.devSession.workers, ...m.businessTask.workers, consumerLifecycle(m.businessTask.subscriptions), ...m.apiCatalog.subscriptions.map(consumerLifecycle), ...m.observability.workers, ...m.provisioning.workers, consumerLifecycle(m.provisioning.subscriptions)],
       session: [...m.session.workers],
       events: [...m.events.workers, ...m.events.subscriptions.map(consumerLifecycle)],
     },
     websocket: m.session.websocket,
-    migrations: [queueMigrations, eventbusMigrations, m.identity.migrations, m.project.migrations, m.config.migrations, m.agentRuntime.migrations, m.egress.migrations, m.data.migrations, m.scm.migrations, m.apiCatalog.migrations, m.events.migrations, m.release.migrations, m.taskRuntime.migrations, m.devSession.migrations, m.businessTask.migrations, m.session.migrations, m.gateway.migrations, m.observability.migrations],
+    migrations: [queueMigrations, eventbusMigrations, m.identity.migrations, m.project.migrations, m.config.migrations, m.agentRuntime.migrations, m.egress.migrations, m.data.migrations, m.scm.migrations, m.apiCatalog.migrations, m.events.migrations, m.release.migrations, m.taskRuntime.migrations, m.devSession.migrations, m.businessTask.migrations, m.session.migrations, m.gateway.migrations, m.observability.migrations, m.cluster.migrations],
   };
   return { api, modules: m };
+}
+
+function composeCluster(deps: PlatformModuleDeps, core: ReturnType<typeof composeCore>, delivery: ReturnType<typeof composeDelivery>, runtime: ReturnType<typeof composeRuntime>) {
+  const tasks = runtime.taskRuntime.api, dev = runtime.devSession.api, business = runtime.businessTask.api, release = delivery.release.api;
+  const inspectTask = async (actor: Actor, target: ClusterResource, request: ClusterInspectRequest): Promise<Record<string, unknown>> => {
+    if (target.purpose === 'development-cli') return dev.inspectClusterNative(actor, target.taskId as TaskId);
+    if (target.purpose === 'development-agent') return dev.inspectClusterAgent(actor, target.taskId as TaskId);
+    if (target.purpose === 'business-subtask' || target.purpose === 'business-workspace') return business.inspectClusterTask(actor, target, request);
+    if (target.purpose === 'profile-test') { if (request.action !== 'delete') throw precondition('档位测试只能停止，请从算力档位页面重新测试'); return { testId: target.labels['crewstation.io/profile-test'] }; }
+    const env = await tasks.getEnvironment(target.taskId as TaskId); if (!env) throw precondition('开发环境不存在');
+    const { checkedAt: _checkedAt, ...workspace } = await dev.workspaceStatus(actor, env.projectId);
+    if (request.action === 'delete') return { taskId: env.id, volumeMode: env.volumeMode, workspace };
+    const inspection = await tasks.inspectRebuild(env.projectId, true), profile = inspection.profiles.find((p) => p.name === inspection.currentProfile);
+    if (!profile) throw precondition('原任务套餐已不存在');
+    return { taskId: env.id, workspace, rebuild: { expectedTaskId: env.id, expectedUpdatedAt: inspection.updatedAt, expectedPodUid: inspection.podUid, expectedVolumeUid: inspection.volume.uid, profile: { name: profile.name, cpu: profile.cpu, memory: profile.memory, storage: profile.storage }, reason: inspection.reason } };
+  };
+  const executeTask = async (actor: Actor, op: ClusterOperation, inspection: ClusterInspection) => {
+    if (op.target.purpose === 'development-cli') return dev.manageClusterNative(actor, op.target.taskId as TaskId, op.action === 'restart', op.operationId);
+    if (op.target.purpose === 'development-agent') return dev.manageClusterAgent(actor, op.target.taskId as TaskId, op.action === 'restart', op.operationId);
+    if (op.target.purpose === 'business-subtask' || op.target.purpose === 'business-workspace') return business.executeClusterTask(actor, op);
+    if (op.target.purpose === 'profile-test') { await core.agentRuntime.api.stopClusterTest(actor, op.target.labels['crewstation.io/profile-test'] as ProfileTestId); await tasks.releaseEnvironment(op.target.taskId as TaskId, 'profile-test'); return { operationId: op.target.taskId! }; }
+    const env = await tasks.getEnvironment(op.target.taskId as TaskId); if (!env) throw precondition('开发环境不存在');
+    if (op.action === 'delete') await dev.releaseSession(actor, env.projectId, { force: true, expectedTaskId: env.id });
+    else await dev.rebuildSession(actor, env.projectId, { ...inspection.domain?.rebuild as Omit<RebuildDevSessionRequest, 'requestId'>, requestId: op.operationId });
+    return { operationId: op.action === 'restart' ? op.operationId : env.id };
+  };
+  const observeTask = async (op: ClusterOperation) => {
+    if (op.target.purpose === 'business-subtask' || op.target.purpose === 'business-workspace') return business.observeClusterTask(op);
+    if (op.action === 'restart' && op.target.purpose === 'development-workspace') { const rebuild = await tasks.getRebuild(op.target.taskId as TaskId); return { done: rebuild?.state === 'ready' || rebuild?.state === 'failed', failed: rebuild?.state === 'failed', reason: rebuild?.message ?? '等待新工作区 Runner 连接' }; }
+    const env = await tasks.getEnvironment((op.action === 'restart' ? op.domainOperationId : op.target.taskId) as TaskId);
+    return { done: op.action === 'delete' ? !env || env.state === 'released' : env?.state === 'running' && env.connected || env?.state === 'failed', failed: op.action === 'restart' && env?.state === 'failed', reason: env?.message ?? (op.action === 'delete' ? '等待执行环境回收' : '等待新执行连接') };
+  };
+  return createClusterManagementModule({ db: deps.db, k8s: deps.k8s, instance: deps.instance, logger: deps.logger, systemNamespace: deps.settings.systemNamespace, catalog: installedSystemComponents().map((c) => c.kind === 'Namespace' ? { ...c, name: deps.settings.systemNamespace } : c), isAdmin: core.identity.api.isAdmin,
+    metadata: { read: async () => {
+      const [projects, taskFacts, slots, plans] = await Promise.all([core.project.api.listClusterProjects(), tasks.listClusterTasks(), release.listClusterSlots(), core.project.api.listServicePlans()]);
+      const releases = slots.flatMap((slot) => { const project = projects.find((p) => p.serviceId === slot.serviceId); return project ? [{ ...slot, namespace: project.namespace, serviceName: project.serviceName!, ...(slot.plan ? { maxReplicas: plans.find((p) => p.name === slot.plan)?.maxReplicas ?? 0 } : {}) }] : []; });
+      const retained = projects.filter((p) => p.serviceName).flatMap((p) => ['blue', 'green'].map((slot) => ({ namespace: p.namespace, kind: 'Service', name: `${p.serviceName}-${slot}`, reason: '发布槽 Service 跨发布保留' })));
+      for (const p of projects) { retained.push({ namespace: p.namespace, kind: 'ResourceQuota', name: 'crewstation-project', reason: '项目配额' }); for (const name of ['crewstation-default', 'crewstation-task-egress', 'crewstation-build-egress']) retained.push({ namespace: p.namespace, kind: 'NetworkPolicy', name, reason: '项目网络配置' }); }
+      return { projects, tasks: taskFacts, releases, retained, complete: true };
+    } },
+    domains: { inspect: async (actor, target, request) => {
+      if (target.serviceId && target.kind === 'Deployment') return release.inspectSlotOperation(actor, target, request);
+      const capability = target.availableActions.find((a) => a.action === request.action)!;
+      try { const domain = await inspectTask(actor, target, request); return { capability: { ...capability, impactSummary: [...capability.impactSummary, ...(domain.volumeMode === 'follow-container' && request.action === 'delete' ? ['此工作区的工作卷也会释放，请先确认所有未提交及未推送内容'] : []), ...(target.purpose === 'development-workspace' && request.action === 'restart' ? ['保留原任务与工作卷；结束该工作区内所有 CLI 和 Agent，新工作区连接后需手动启动'] : [])] }, domain }; } catch (e) { return { capability: { ...capability, enabled: false, reason: e instanceof Error ? e.message : String(e) } }; }
+    }, execute: (actor, op, inspection) => op.target.kind === 'Deployment' ? release.executeSlotOperation(actor, op, inspection) : executeTask(actor, op, inspection), observe: (op) => op.target.kind === 'Deployment' ? release.observeSlotOperation(op) : observeTask(op) },
+  });
 }

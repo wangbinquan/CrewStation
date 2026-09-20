@@ -10,13 +10,15 @@ describe('开发角色', () => {
   test('映射 CrewStation 的四个安全视角，不包含会转移所有权的 owner', () => {
     expect(DEV_ROLES.map((role) => role.key)).toEqual(['admin', 'developer', 'tester', 'member']);
     expect(DEV_ROLES.map((role) => role.memberRole)).toEqual([null, 'developer', 'tester', null]);
+    expect(DEV_ROLES.map((role) => role.platformRole)).toEqual(['admin', 'developer', 'user', 'user']);
     expect(findDevRole('owner')).toBeUndefined();
   });
 
-  test('没有项目时禁用项目角色，播种失败时禁用全部登录', () => {
+  test('没有项目仍可登录开发者自建，试用需要项目；播种失败时禁用全部登录', () => {
     const ready = renderDevAuthPage({ status: 'ready', startedAt: 1, projects: [] });
     expect(ready).toContain('data-testid="login-admin"');
-    expect(ready).toContain('data-testid="login-developer" disabled');
+    expect(ready).not.toContain('data-testid="login-developer" disabled');
+    expect(ready).toContain('data-testid="login-tester" disabled');
     const failed = renderDevAuthPage({ status: 'error', startedAt: 1, projects: [], error: '登录失败 401' });
     expect(failed).toContain('登录失败 401');
     expect((failed.match(/disabled/g) ?? []).length).toBeGreaterThanOrEqual(4);
@@ -31,7 +33,7 @@ describe('开发角色', () => {
     expect(projects.map((project) => project.id)).toEqual(['p1']);
     const page = renderDevAuthPage({ status: 'ready', startedAt: 1, projects }, 'one-time-form-token');
     expect(page).toContain('name="csrf" value="one-time-form-token"');
-    expect(page).toContain('/projects/p1/dev-session');
+    expect((page.match(/name="returnTo" value="\/"/g) ?? [])).toHaveLength(4);
     expect(page).toContain('action="/reseed"');
     expect(page).not.toContain('接入容器');
   });
@@ -50,7 +52,7 @@ describe('开发角色', () => {
 
   test('回跳只接受站内绝对路径', () => {
     expect(safeReturnTo('/projects/p1')).toBe('/projects/p1');
-    for (const value of ['https://evil.test', '//evil.test', '/\\evil', 'projects']) expect(safeReturnTo(value)).toBe('/projects');
+    for (const value of ['https://evil.test', '//evil.test', '/\\evil', 'projects']) expect(safeReturnTo(value)).toBe('/');
   });
 });
 
@@ -86,11 +88,16 @@ test('开发 IdP 完整校验 PKCE，并签发可由 JWKS 验证的 ID token', a
 test('生产源码不包含开发 Provider 或固定账号', async () => {
   const source = new Bun.Glob('**/*.{ts,tsx,js,jsx,json,yaml,yml,sh}');
   const violations: string[] = [];
+  // RFC-010 的已安装对象目录仅登记部署名；这不等于把本机 Provider、账号或登录流程放入生产。
+  const componentMetadata = new Set(['modules/platform/domain/systemComponents.ts', 'modules/platform/tests/clusterManagement.test.ts']);
   let scanned = 0;
   for (const root of ['apps', 'modules', 'packages', 'runtimes']) {
     for await (const path of source.scan({ cwd: root, onlyFiles: true })) {
       scanned += 1;
-      if (/dev-roles|dev-role-admin|crewstation-dev-auth/.test(await Bun.file(`${root}/${path}`).text())) violations.push(`${root}/${path}`);
+      const fullPath = `${root}/${path}`, text = await Bun.file(fullPath).text();
+      const hasIdentity = /dev-roles|dev-role-(?:admin|developer|tester|member)/.test(text);
+      const hasRuntimeReference = /crewstation-dev-auth/.test(text) && !componentMetadata.has(fullPath);
+      if (hasIdentity || hasRuntimeReference) violations.push(fullPath);
     }
   }
   expect(scanned).toBeGreaterThan(0);

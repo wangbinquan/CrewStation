@@ -1,6 +1,6 @@
 import type { ManifestKind, MemberRole, ProjectId, ProjectState, ServiceId, UserId } from '@crewstation/contracts';
 import type { Executor } from '@crewstation/persistence';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, gt, inArray } from 'drizzle-orm';
 import type { Project } from '../../domain/project';
 import type { Service } from '../../domain/service';
 import type { MembershipRepository, ProjectRepository, ServiceRepository } from '../../ports/repositories';
@@ -13,7 +13,7 @@ export function drizzleProjectRepository(db: Executor): ProjectRepository {
     update: async (project) => { await db.update(projects).set(toProjectRow(project)).where(eq(projects.id, project.id)); },
     getById: (id) => db.select().from(projects).where(eq(projects.id, id)).then(first),
     getBySlug: (slug) => db.select().from(projects).where(eq(projects.slug, slug)).then(first),
-    list: async () => (await db.select().from(projects).orderBy(projects.createdAt)).map(toProject),
+    list: async (page) => (await db.select().from(projects).where(page?.after ? gt(projects.id, page.after) : undefined).orderBy(page ? projects.id : projects.createdAt).limit(page ? Math.min(500, Math.max(1, page.limit)) : 2_147_483_647)).map(toProject),
     listByIds: async (ids) => (ids.length === 0 ? [] : (await db.select().from(projects).where(inArray(projects.id, [...ids])).orderBy(projects.createdAt)).map(toProject)),
   };
 }
@@ -21,6 +21,7 @@ export function drizzleProjectRepository(db: Executor): ProjectRepository {
 export function drizzleServiceRepository(db: Executor): ServiceRepository {
   const first = (rows: Array<typeof services.$inferSelect>): Service | undefined => (rows[0] ? toService(rows[0]) : undefined);
   return {
+    list: async (ids) => ids?.length === 0 ? [] : (await db.select().from(services).where(ids ? inArray(services.projectId, [...ids]) : undefined)).map(toService),
     insert: async (service) => { await db.insert(services).values({ ...service }); },
     getById: (id) => db.select().from(services).where(eq(services.id, id)).then(first),
     getByProject: (projectId) => db.select().from(services).where(eq(services.projectId, projectId)).then(first),

@@ -1,52 +1,45 @@
-import { Link, useLocation, useParams } from '@tanstack/react-router';
-import type { ReactElement } from 'react';
+import { useEffect } from 'react';
+import { Link, useLocation, useNavigate } from '@tanstack/react-router';
 import { useT } from '../../shared/lib/useT';
-import { useProjectIdentity } from '../../shared/project/useProjectIdentity';
 import { api } from '../../shared/api/client';
 import { queryKeys } from '../../shared/api/queryKeys';
 import { useApiQuery } from '../../shared/api/useApi';
+import { useProjectIdentity } from '../../shared/project/useProjectIdentity';
 import { Brand } from '../../shared/ui/Brand';
 import { CurrentUserChip } from './CurrentUserChip';
 import { LocaleSwitch } from './LocaleSwitch';
-import { SpaceSwitch } from './SpaceSwitch';
-import { AgentActivityMenu } from './activity/AgentActivityMenu';
+import { recallWorkbenchPath, rememberWorkbenchPath } from './spaceMemory';
 import styles from './TopBar.module.css';
 
-/**
- * 顶栏：品牌、工作台全局入口（能力市场／数字人项目）、当前项目名；右侧 Agent 动态、空间切换（仅管理员）、界面语言、当前用户。
- * 全局入口放在顶栏，左栏进入项目后只留项目自己的五个入口（RFC-003 设计附件）。管理空间没有租户全局入口。
- */
-export function TopBar(): ReactElement {
-  const t = useT();
-  const { projectId } = useParams({ strict: false });
+/** Space navigation follows the current platform role; the brand always opens applications. */
+export function TopBar() {
+  const t = useT(), { pathname: path, href } = useLocation(), navigate = useNavigate();
   const me = useApiQuery(queryKeys.me(), () => api.me.get());
-  const path = useLocation().pathname, inAdmin = path.startsWith('/admin');
-  const inProject = path.startsWith('/projects/') || path.startsWith('/admin/integrations/') && !me.error && me.data?.isAdmin === true;
-  const project = useProjectIdentity(inProject ? projectId : undefined);
-  return (
-    <header className={styles.bar}>
-      <div className={styles.context}>
-        <Link to="/" className={styles.brand}><Brand name={t('app.brand')} /></Link>
-        {inAdmin ? <span className={styles.space}>{t('app.adminSpace')}</span> : (
-          <nav className={styles.globalNav} aria-label={t('nav.global')}>
-            <Link to="/market" className={[styles.pill, (path === '/' || path.startsWith('/market')) && styles.pillActive].filter(Boolean).join(' ')}>{t('nav.market')}</Link>
-            <Link to="/projects" className={[styles.pill, path.startsWith('/projects') && styles.pillActive].filter(Boolean).join(' ')}>{t('nav.projects')}</Link>
-          </nav>
-        )}
-        {inProject && projectId !== undefined ? (
-          <>
-            <span className={styles.separator}>/</span>
-            <span className={styles.project}>{project.data?.name ?? t('nav.currentProject')}</span>
-          </>
-        ) : null}
-      </div>
-      <div className={styles.right}>
-        <AgentActivityMenu />
-        {/* 接入项目的旧租户地址会跳到管理空间，不能记录成工作台返回位置。 */}
-        <SpaceSwitch rememberLocation={!inProject || project.data?.kind === 'DigitalWorker'} />
-        <LocaleSwitch />
-        <CurrentUserChip />
-      </div>
-    </header>
-  );
+  const role = !me.error && !me.isPending ? me.data?.platformRole : undefined;
+  const projectId = /^\/projects\/(prj_[a-z0-9]+)(?:\/|$)/.exec(path)?.[1];
+  const canRemember = role === 'admin' || role === 'developer';
+  const previewOnly = role !== 'admin' && me.data?.memberships?.some((member) => member.projectId === projectId && member.role === 'tester');
+  const project = useProjectIdentity(canRemember && !previewOnly ? projectId : undefined);
+  useEffect(() => {
+    if (canRemember && path.startsWith('/projects') && (!projectId || !project.error && project.data?.kind === 'DigitalWorker')) rememberWorkbenchPath(href);
+  }, [canRemember, path, href, projectId, project.error, project.data?.kind]);
+  const development = async () => {
+    const identity = await me.refetch();
+    const saved = recallWorkbenchPath(), id = /^\/projects\/(prj_[a-z0-9]+)(?:[/?]|$)/.exec(saved)?.[1];
+    const eligible = identity.data?.platformRole === 'admin' || identity.data?.platformRole === 'developer';
+    const allowed = identity.data?.platformRole === 'admin' || !id || identity.data?.memberships?.some((m) => m.projectId === id && m.role !== 'tester');
+    if (!identity.error && eligible) void navigate({ href: allowed && saved.startsWith('/projects') ? saved : '/projects' });
+  };
+  const pill = (active: boolean) => [styles.pill, active && styles.pillActive].filter(Boolean).join(' ');
+  return <header className={styles.bar}>
+    <div className={styles.context}>
+      <Link to="/" className={styles.brand}><Brand name={t('app.brand')} /></Link>
+      <nav className={styles.globalNav} aria-label={t('nav.global')}>
+        <Link to="/market" className={pill(path === '/' || path.startsWith('/market'))}>{t('nav.market')}</Link>
+        {role === 'developer' || role === 'admin' ? <Link to="/projects" onClick={(event) => { event.preventDefault(); void development(); }} className={pill(path.startsWith('/projects'))}>{t('nav.projects')}</Link> : null}
+        {role === 'admin' ? <Link to="/admin" className={pill(path.startsWith('/admin'))}>{t('app.adminSpace')}</Link> : null}
+      </nav>
+    </div>
+    <div className={styles.right}><LocaleSwitch /><CurrentUserChip /></div>
+  </header>;
 }

@@ -1,11 +1,12 @@
 import { z } from 'zod';
 import { ProjectIdSchema, UserIdSchema } from '../../ids';
 import { pageOf } from '../envelope';
+import { PlatformRoleSchema } from '../identity';
 import { ProjectStateSchema } from '../project';
 
 export const AppVisibilityModeSchema = z.enum(['members', 'authenticated', 'selected']);
 export const AppIconSchema = z.enum(['station', 'assistant', 'workflow', 'book', 'chart', 'spark']);
-export const MemberCandidateDtoSchema = z.object({ userId: UserIdSchema, name: z.string(), email: z.string() });
+export const MemberCandidateDtoSchema = z.object({ userId: UserIdSchema, name: z.string(), email: z.string(), platformRole: PlatformRoleSchema.optional() });
 export const MemberCandidatesQuerySchema = z.object({ identity: z.string().trim().min(1).max(254) });
 export const SetAppVisibilityRequestSchema = z.object({
   mode: AppVisibilityModeSchema,
@@ -36,7 +37,8 @@ export const MarketAppsQuerySchema = z.object({
 export const MarketAppDtoSchema = z.object({
   projectId: ProjectIdSchema, name: z.string(), description: z.string(), icon: AppIconSchema,
   owner: z.object({ userId: UserIdSchema, name: z.string() }), projectState: ProjectStateSchema,
-  canDevelop: z.boolean(), canConfigure: z.boolean(), visibilityRevision: z.number().int().min(0),
+  canDevelop: z.boolean(), canConfigure: z.boolean(), canPreview: z.boolean(), visibilityRevision: z.number().int().min(0),
+  entry: z.object({ kind: z.enum(['production', 'trial']), status: z.enum(['ready', 'unavailable', 'unknown']), host: z.string().optional() }),
   production: z.discriminatedUnion('status', [
     z.object({ status: z.literal('deployed'), tag: z.string(), commitSha: z.string(), host: z.string(), state: z.enum(['deploying', 'ready', 'degraded', 'failed']), freshness: z.literal('current'), checkedAt: z.iso.datetime() }),
     z.object({ status: z.literal('not-deployed'), freshness: z.literal('current'), checkedAt: z.iso.datetime() }),
@@ -45,6 +47,11 @@ export const MarketAppDtoSchema = z.object({
   checkedAt: z.iso.datetime(),
 });
 export const MarketAppsPageSchema = pageOf(MarketAppDtoSchema);
+export const MarketTrialDtoSchema = z.object({
+  projectId: ProjectIdSchema, name: z.string(), status: z.enum(['ready', 'unavailable', 'unknown']),
+  host: z.string().optional(), version: z.string().optional(), checkedAt: z.iso.datetime(), sharedData: z.literal(true),
+});
+export type MarketTrialDto = z.infer<typeof MarketTrialDtoSchema>;
 export type AppVisibilityMode = z.infer<typeof AppVisibilityModeSchema>;
 export type AppIcon = z.infer<typeof AppIconSchema>;
 export type MemberCandidateDto = z.infer<typeof MemberCandidateDtoSchema>;

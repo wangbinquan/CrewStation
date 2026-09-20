@@ -20,7 +20,7 @@ export function useProjectCreation(scope: CreationScope, onCreated: (project: Pr
   const users = useApiQuery(queryKeys.users(), () => api.users.list());
   const templates = useApiQuery(queryKeys.projectTemplates(), () => api.catalog.listProjectTemplates());
   const plans = useApiQuery(queryKeys.servicePlans(), () => api.catalog.listServicePlans());
-  const catalog: CreationCatalog = { users: users.data?.items ?? [], templates: templates.data?.items ?? [], plans: plans.data?.items ?? [] };
+  const catalog: CreationCatalog = { users: (users.data?.items ?? []).filter((user) => user.platformRole !== 'user'), templates: templates.data?.items ?? [], plans: plans.data?.items ?? [] };
   const create = useApiMutation((input: CreateProjectInput) => api.projects.create(input), { invalidate: [queryKeys.projects()] });
   const available = !accepted && !users.isPending && !users.isFetching && !users.error && !templates.isPending && !templates.isFetching && !templates.error && !plans.isPending && !plans.isFetching && !plans.error;
   const dirty = !accepted && (create.isPending || JSON.stringify(draft) !== JSON.stringify(initialCreationDraft(scope)));

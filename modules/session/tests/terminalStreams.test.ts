@@ -38,28 +38,36 @@ test('浏览器先开而 Runner 尚未连接，之后连接／断线／重连均
   const stream = await f.streams.open(actor, taskId, { send: (raw) => frames.push(JSON.parse(raw)) }, 0);
   expect(frames[0]).toMatchObject({ type: 'streamReady', connected: false });
   const first = await f.hub.onHello(f.hello, { send: () => {} });
+  await new Promise((resolve) => setTimeout(resolve, 0));
   if (!first.ok) throw new Error(first.message);
   await f.hub.onMessage(first.connection, { type: 'event', seq: 1, at, event: { kind: 'nativeTerminal', terminal: { agentId: 'a', terminalId: 't', runnerId: crypto.randomUUID(), revision: 2, compute: 'balanced', permission: 'edit', lifecycle: 'running', startedAt: at, cols: 80, rows: 24 } } });
+  await new Promise((resolve) => setTimeout(resolve, 0));
   expect(frames).toContainEqual(expect.objectContaining({ type: 'event', seq: 1 }));
   expect(f.durable).toHaveLength(1);
   await f.hub.onClose(first.connection);
   const second = await f.hub.onHello(f.hello, { send: () => {} });
+  await new Promise((resolve) => setTimeout(resolve, 0));
   if (!second.ok) throw new Error(second.message);
   await f.hub.onMessage(second.connection, { type: 'event', seq: 2, at, event: { kind: 'terminalOutput', terminalId: 't', terminalSeq: 1, data: 'after reconnect' } });
+  await new Promise((resolve) => setTimeout(resolve, 0));
   expect(frames).toContainEqual(expect.objectContaining({ type: 'event', seq: 2 }));
   expect(f.durable).toHaveLength(1);
   stream.close();
   const before = frames.length;
   await f.hub.onMessage(second.connection, { type: 'event', seq: 3, at, event: { kind: 'terminalOutput', terminalId: 't', data: 'detached' } });
+  await new Promise((resolve) => setTimeout(resolve, 0));
   expect(frames).toHaveLength(before);
 });
 
 test('后台原生状态在没有浏览器订阅时仍持久化，稍后按游标回放身份与请求状态', async () => {
   const f = fixture(); const connected = await f.hub.onHello(f.hello, { send: () => {} });
+  await new Promise((resolve) => setTimeout(resolve, 0));
   if (!connected.ok) throw new Error(connected.message);
   const activity = { agentId: 'a', terminalId: 't', runnerId: crypto.randomUUID(), eventId: crypto.randomUUID(), seq: 2, turnOrdinal: 1, signal: { source: 'opencode/1.18.29', sourceEventId: 'request', kind: 'request-opened', occurredAt: at, nativeSessionId: 'session', turnId: 'turn', request: { id: 'question-1', kind: 'question' } } };
   await f.hub.onMessage(connected.connection, { type: 'event', seq: 1, at, event: { kind: 'nativeActivity', activity } });
+  await new Promise((resolve) => setTimeout(resolve, 0));
   await f.hub.onMessage(connected.connection, { type: 'event', seq: 2, at, event: { kind: 'terminalOutput', terminalId: 't', data: 'transient' } });
+  await new Promise((resolve) => setTimeout(resolve, 0));
   expect(f.durable).toHaveLength(1);
   const frames: unknown[] = [];
   const stream = await f.streams.open(actor, taskId, { send: (raw) => frames.push(JSON.parse(raw)) }, 0);

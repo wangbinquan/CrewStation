@@ -22,7 +22,7 @@ function fixture() {
       else { member.role = String(input?.role); body = { ...member, userId: input?.userId }; }
     } else if (url.pathname === '/v1/me') {
       if (state.failIdentity) { status = 503; body = { error: 'unavailable', message: '当前身份读取失败' }; }
-      else body = { id: ownerId, name: '负责人甲', email: 'owner@test.invalid', isAdmin: state.admin, memberships: [{ projectId, role: state.role }] };
+      else body = { id: ownerId, name: '负责人甲', email: 'owner@test.invalid', platformRole: (state.admin) ? 'admin' : 'developer', isAdmin: state.admin, memberships: [{ projectId, role: state.role }] };
     }
     else if (url.pathname.startsWith('/v1/projects/') && !url.pathname.slice(13).includes('/')) body = { id: url.pathname.split('/').at(-1), serviceId, slug: 'demo', name: '演示应用', kind: 'DigitalWorker', ownerUserId: ownerId, state: state.projectState };
     else if (url.pathname === '/v1/users') body = { items: [{ id: memberId, name: member.name, email: member.email }] };
@@ -168,7 +168,7 @@ test('成员草稿：身份读取失败或角色撤销后保留目标和角色�
   f.state.failIdentity = true; await page.click('刷新成员');
   expect(page.text()).toContain('当前身份读取失败'); expect(role().disabled).toBe(true); expect(role().value).toBe('tester'); expect(page.text()).toContain('已选择 小林');
   await act(async () => { role().closest('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); }); await page.settle(); expect(f.writes()).toHaveLength(0);
-  f.state.failIdentity = false; f.state.role = 'developer'; await page.click('刷新成员');
+  f.state.failIdentity = false; f.state.role = 'developer'; await page.click('重新检查权限');
   expect(role().value).toBe('tester'); expect(role().disabled).toBe(true); await page.click('高级'); expect(page.search().tab).toBe('members'); await page.click('继续编辑');
   f.state.role = 'owner'; await page.click('刷新成员'); expect(role().disabled).toBe(false); expect(f.writes()).toHaveLength(0);
   await page.click('添加或改角色'); expect(f.writes()[0]?.body).toEqual({ userId: memberId, role: 'tester' });

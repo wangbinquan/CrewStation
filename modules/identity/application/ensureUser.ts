@@ -26,7 +26,7 @@ export function ensureUserUseCase({ users, settings, clock }: EnsureUserDeps) {
       email: external.email,
       gitName: null,
       passwordHash: null,
-      isAdmin: shouldBootstrapAdmin(external.email, settings.adminEmails, await users.count()),
+      platformRole: shouldBootstrapAdmin(external.email, settings.adminEmails, await users.count()) ? 'admin' : 'user',
       createdAt: now,
       lastLoginAt: now,
     };
@@ -36,5 +36,5 @@ export function ensureUserUseCase({ users, settings, clock }: EnsureUserDeps) {
 }
 
 export function toDto(user: User): UserDto {
-  return { id: user.id, name: user.name, email: user.email, isAdmin: user.isAdmin };
+  return { id: user.id, name: user.name, email: user.email, platformRole: user.platformRole, isAdmin: user.platformRole === 'admin' };
 }

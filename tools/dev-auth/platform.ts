@@ -1,7 +1,7 @@
 import { DEV_OIDC_CLIENT_ID } from './oidc';
 
 interface Items<T> { readonly items: readonly T[] }
-export interface PlatformUser { readonly id: string; readonly name: string; readonly email: string; readonly isAdmin: boolean }
+export interface PlatformUser { readonly id: string; readonly name: string; readonly email: string; readonly isAdmin: boolean; readonly platformRole: 'user' | 'developer' | 'admin' }
 export interface CurrentPlatformUser extends PlatformUser { readonly memberships: readonly { projectId: string; role: 'owner' | 'developer' | 'tester' }[] }
 export interface PlatformProject { readonly id: string; readonly slug: string; readonly name: string; readonly kind: string; readonly state: string; readonly ownerUserId: string }
 export interface PlatformMember { readonly userId: string; readonly role: 'owner' | 'developer' | 'tester'; readonly name: string; readonly email: string }
@@ -102,8 +102,12 @@ export class PlatformClient {
     return this.json(await this.request('/v1/me', { cookie }));
   }
 
-  async setAdmin(cookie: string, userId: string, isAdmin: boolean): Promise<void> {
-    await this.request(`/v1/users/${encodeURIComponent(userId)}/admin`, { method: 'PUT', cookie, body: { isAdmin } });
+  async setPlatformRole(cookie: string, userId: string, platformRole: PlatformUser['platformRole']): Promise<void> {
+    const users = (await this.json<Items<PlatformUser>>(await this.request('/v1/users', { cookie }))).items;
+    const current = users.find((user) => user.id === userId);
+    if (!current) throw new Error('开发角色用户不存在');
+    if (current.platformRole === platformRole) return;
+    await this.request(`/v1/users/${encodeURIComponent(userId)}/platform-role`, { method: 'PUT', cookie, body: { platformRole, expectedRole: current.platformRole } });
   }
 
   async projects(cookie: string): Promise<readonly PlatformProject[]> {

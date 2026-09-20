@@ -3,6 +3,7 @@ import { MarketAppsQuerySchema, ProjectIdSchema } from '@crewstation/contracts';
 import { notFound, validation } from '@crewstation/kernel';
 import type { MarketListing } from '../api/moduleApi';
 import type { VisibleApplication } from '../ports/appListings';
+import { currentActor } from './creation/eligibility';
 import type { ProjectUseCaseDeps } from './dependencies';
 
 function readCursor(actor: Actor, query: MarketAppsQuery): ProjectId | undefined {
@@ -14,16 +15,19 @@ function readCursor(actor: Actor, query: MarketAppsQuery): ProjectId | undefined
   } catch { throw validation('市场分页已失效，请从第一页重新查询'); }
 }
 
-export function marketListingUseCases({ uow, users, clock }: ProjectUseCaseDeps) {
+export function marketListingUseCases(deps: ProjectUseCaseDeps) {
+  const { uow, users, clock } = deps;
   const toListing = async ({ project, service, listing, role }: VisibleApplication, actor: Actor): Promise<MarketListing> => ({
     projectId: project.id, name: project.name, description: listing.description, icon: listing.icon,
     owner: { userId: project.ownerUserId, name: (await users.getUser(project.ownerUserId))?.name ?? project.ownerUserId },
-    projectState: project.state, canDevelop: actor.isAdmin || project.ownerUserId === actor.userId || role === 'owner' || role === 'developer',
-    canConfigure: actor.isAdmin || project.ownerUserId === actor.userId || role === 'owner',
+    projectState: project.state, canPreview: actor.isAdmin || role !== undefined || project.ownerUserId === actor.userId,
+    canDevelop: actor.isAdmin || actor.platformRole === 'developer' && (project.ownerUserId === actor.userId || role === 'owner' || role === 'developer'),
+    canConfigure: actor.isAdmin || actor.platformRole === 'developer' && (project.ownerUserId === actor.userId || role === 'owner'),
     visibilityRevision: listing.revision, checkedAt: clock.now().toISOString(), ...(service ? { serviceId: service.id } : {}),
   });
   return {
     listMarketListings: async (actor: Actor, raw: MarketAppsQuery) => {
+      actor = await currentActor(deps, actor);
       const parsed = MarketAppsQuerySchema.safeParse(raw);
       if (!parsed.success) throw validation('市场查询参数无效');
       const query = parsed.data, after = readCursor(actor, query);
@@ -35,6 +39,7 @@ export function marketListingUseCases({ uow, users, clock }: ProjectUseCaseDeps)
       };
     },
     getMarketListing: async (actor: Actor, projectId: ProjectId) => {
+      actor = await currentActor(deps, actor);
       const row = (await uow.read.appListings.visible(actor, { projectId, q: '', limit: 1 }))[0];
       if (!row) throw notFound('应用', projectId);
       return toListing(row, actor);

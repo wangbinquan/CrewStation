@@ -22,7 +22,7 @@ export function ProjectSummaryTable({ items, available }: { readonly items: read
       <td><DevelopmentFact item={item} /></td><td><DeploymentFact item={item} name="preview" canOpen={available && summaryIsFresh(item)} /></td>
       <td><DeploymentFact item={item} name="prod" canOpen={available && summaryIsFresh(item)} /></td><td><HealthFact item={item} /></td>
       <td><div className={styles.fact}>{canDevelop ? <Link to="/projects/$projectId/dev-session" params={{ projectId: p.id }}>{t(item.development.status === 'ready' && item.development.value ? 'projects.summary.continue' : 'projects.summary.openDevelopment')}</Link> : null}
-        {available && item.role === 'admin' && (p.state === 'failed' || p.state === 'provisioning') ? <Link to="/admin/projects/$projectId/provisioning" params={{ projectId: p.id }}>{t('projects.provision.title')}</Link> : null}</div></td>
+        {available && (item.role === 'admin' || item.role === 'owner') && (p.state === 'failed' || p.state === 'provisioning') ? <Link to={item.role === 'admin' ? '/admin/projects/$projectId/provisioning' : '/projects/$projectId/provisioning'} params={{ projectId: p.id }}>{t('projects.provision.title')}</Link> : null}</div></td>
     </tr>;
   })}</DataTable>;
 }

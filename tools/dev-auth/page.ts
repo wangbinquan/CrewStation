@@ -26,11 +26,10 @@ function projectOptions(projects: readonly DevAuthProject[]): string {
 
 function roleCards(state: DevAuthPageState, actionToken: string): string {
   return DEV_ROLES.map((role) => {
-    const needsProject = role.memberRole !== null;
+    const needsProject = role.key === 'tester';
     const disabled = state.status !== 'ready' || (needsProject && state.projects.length === 0);
     const tag = role.isAdmin ? '全局管理权限' : role.memberRole === null ? '无项目权限' : role.memberRole === 'developer' ? '项目开发权限' : '版本试用权限';
-    const projectPath = state.projects[0] ? `/projects/${escapeHtml(state.projects[0].id)}` : '/projects';
-    const returnTo = role.memberRole === 'developer' ? `${projectPath}/dev-session` : role.memberRole === 'tester' ? projectPath : role.isAdmin ? '/admin' : '/';
+    const returnTo = '/';
     return `<form class="role-card role-${role.key}" method="post" action="/login/${role.key}">
       <input type="hidden" name="csrf" value="${escapeHtml(actionToken)}">
       <input class="project-id" type="hidden" name="projectId" value="${escapeHtml(state.projects[0]?.id ?? '')}">
@@ -59,7 +58,7 @@ export function renderDevAuthPage(state: DevAuthPageState, actionToken = ''): st
   <section class="project"><label for="project">目标项目</label><select id="project"${state.projects.length === 0 ? ' disabled' : ''}>${projectOptions(state.projects)}</select><span>开发者和测试者只加入这个项目；切换普通成员会清除其项目关系。</span></section>
   <section class="roles">${roleCards(state, actionToken)}</section>
   <footer><span>Provider <code>dev-roles</code></span><span>启动于 ${new Date(state.startedAt).toLocaleString('zh-CN')}</span></footer></main>
-  <script>if(location.pathname!=='/')history.replaceState(null,'','/');const select=document.querySelector('#project');const sync=()=>{if(!select)return;const project='/projects/'+encodeURIComponent(select.value);document.querySelectorAll('.project-id').forEach((node)=>node.value=select.value);document.querySelectorAll('form').forEach((form)=>{const back=form.querySelector('[name=returnTo]');if(back&&form.action.includes('/login/developer'))back.value=project+'/dev-session';if(back&&form.action.includes('/login/tester'))back.value=project})};if(select){const saved=localStorage.getItem('crewstation.devAuth.project');if(saved&&[...select.options].some((option)=>option.value===saved))select.value=saved;sync();select.addEventListener('change',()=>{localStorage.setItem('crewstation.devAuth.project',select.value);sync()})}</script>
+  <script>if(location.pathname!=='/')history.replaceState(null,'','/');const select=document.querySelector('#project');const sync=()=>{if(!select)return;document.querySelectorAll('.project-id').forEach((node)=>node.value=select.value)};if(select){const saved=localStorage.getItem('crewstation.devAuth.project');if(saved&&[...select.options].some((option)=>option.value===saved))select.value=saved;sync();select.addEventListener('change',()=>{localStorage.setItem('crewstation.devAuth.project',select.value);sync()})}</script>
   </body></html>`;
 }
 

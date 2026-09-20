@@ -2,6 +2,17 @@ import type { MessagesShapedLike } from '../../../shared/lib/i18n';
 import type { messages as zhCN } from './zh-CN';
 
 export const messages: MessagesShapedLike<typeof zhCN> = {
+  "market.intro": "Find an application and open it to get started. Beta applications are available to their trial members.",
+  "market.open": "Open application",
+  "market.try": "Try application",
+  "market.sharedData": "Beta shares business data with production. Changes affect real data.",
+  "market.trialTitle": "Try the next version · Beta",
+  "market.entry.ready": "Available",
+  "market.entry.unavailable": "Unavailable",
+  "market.entry.unknown": "Status unconfirmed",
+  "market.pageEmpty": "No applications on this page",
+  "market.pageEmptyHint": "Continue to the next page or search again.",
+
   'capabilities.title': 'Capabilities',
   'capabilities.line1': 'Everything this digital worker can use right now: identity conventions and domains, the platform API base, config keys, data resources, callable operations, event subscriptions, the concurrency quota and service plan, and the two platform MCP servers.',
   'capabilities.line2': 'This page is the human-readable twin of the capability-description MCP server: the same data, with every value ready to copy into code or into the dev container.',
@@ -99,7 +110,6 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   'capabilities.businessTaskApi.summary': 'Summary',
   'capabilities.businessTaskApi.empty': 'No business subtask API registered yet.',
   "market.title": "App market",
-  "market.intro": "Discover digital worker apps available to you.",
   "market.search": "Search apps",
   "market.searchHint": "Search names or descriptions, up to 120 characters.",
   "market.searchAction": "Search",
@@ -114,10 +124,9 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   "market.goneHint": "The server answered: {message}. The owner may have withdrawn the market visibility, or the app no longer exists; the production link keeps its own access rules.",
   "market.owner": "Owner: {name}",
   "market.noDescription": "The owner has not added a description yet.",
-  "market.open": "Open production app",
   "market.develop": "Go to project",
   "market.configure": "Configure visibility",
-  "market.notAvailable": "Production entry unavailable",
+  "market.notAvailable": "Application unavailable",
   "market.production.deployed": "Deployed to production",
   "market.production.not-deployed": "Not deployed to production",
   "market.production.unknown": "Production status unknown",

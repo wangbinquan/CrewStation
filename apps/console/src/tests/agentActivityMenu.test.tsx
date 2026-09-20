@@ -17,7 +17,7 @@ async function fixture(admin = false) {
   const f = activityFixture(), calls: string[] = [];
   globalThis.fetch = (async (input) => {
     const url = String(input); calls.push(url); let body: unknown = {};
-    if (url.endsWith('/v1/me')) body = { id: activityUserId, name: '开发者', memberships: [{ projectId: activityProjectId, role: 'developer' }], isAdmin: admin };
+    if (url.endsWith('/v1/me')) body = { id: activityUserId, name: '开发者', memberships: [{ projectId: activityProjectId, role: 'developer' }], platformRole: (admin) ? 'admin' : 'developer', isAdmin: admin };
     else if (url.endsWith('/dev-session')) body = { taskId: activityTaskId, state: 'running' };
     else if (url.includes('/agent-activity')) body = f.page;
     else if (url.endsWith('/agent-terminals')) body = f.roster;
@@ -46,13 +46,14 @@ test('全局入口显示后台等待，关闭返回按钮；前往处理传递�
   expect(rendered!.text()).not.toContain('查看只标记本人已读');
 });
 
-test('管理接入容器的动态离开项目后仍保留，前往处理回到管理 CLI', async () => {
+test('离开开发空间后清除动态订阅，聚焦页面不再请求任务动态', async () => {
   const f = await fixture(true);
   await act(async () => { rendered!.host.querySelector<HTMLAnchorElement>('a[href="/admin"]')!.click(); }); await rendered!.settle();
   expect(f.router.state.location.pathname).toBe('/admin');
-  await rendered!.click('Agent 动态待处理 1'); await rendered!.click('前往处理');
-  expect(f.router.state.location.pathname).toBe(`/admin/integrations/${activityProjectId}/dev-session`);
-  expect(f.router.state.location.search).toMatchObject({ task: activityTaskId, agent: f.terminal.agentId, event: 'event-question', seq: 3 });
+  expect(rendered!.text()).not.toContain('待处理 1');
+  const reads = f.calls.filter((url) => url.includes('/agent-activity')).length;
+  await act(async () => window.dispatchEvent(new Event('focus'))); await rendered!.settle();
+  expect(f.calls.filter((url) => url.includes('/agent-activity'))).toHaveLength(reads);
   expect(f.calls.some((url) => url.endsWith('/read'))).toBe(false);
 });
 

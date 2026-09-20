@@ -30,10 +30,11 @@ test('身份或任一设置读取失败都会暂停写入，保留两份输入�
     expect(page.text()).toContain('最新设置暂不可读取');
     expect(settingsField('市场可见范围').value).toBe('authenticated'); expect(settingsField('应用用途').value).toBe('不能丢失的用途');
     // 旧表单只禁用保存中按钮，仍可按失败前的旧查询结果发出保存。
-    expect(settingsButton('保存可见范围').disabled).toBe(true); expect(settingsButton('保存展示资料').disabled).toBe(true);
+    if (failure === 'me') expect(settingsField('应用用途').closest('[hidden]')).not.toBeNull();
+    else { expect(settingsButton('保存可见范围').disabled).toBe(true); expect(settingsButton('保存展示资料').disabled).toBe(true); }
     await act(async () => { for (const label of ['市场可见范围', '应用用途']) settingsForm(label).dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); });
     await page.settle(); expect(f.writes).toHaveLength(0);
-    f.state.failure = ''; await clickSetting(page, '读取最新设置');
+    f.state.failure = ''; await clickSetting(page, failure === 'me' ? '重新检查权限' : '读取最新设置');
     expect(settingsButton('保存可见范围').disabled).toBe(false); expect(settingsButton('保存展示资料').disabled).toBe(false);
   }
   expect(f.writes).toHaveLength(0); await clickSetting(page, '保存展示资料'); expect(f.writes).toHaveLength(1);

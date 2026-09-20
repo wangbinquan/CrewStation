@@ -87,7 +87,7 @@ export function computeBackend(initial: readonly ComputeProfileDetailDto[] = [pr
   const replace = (next: ComputeProfileDetailDto) => { state.profiles = state.profiles.map((p) => (p.name === next.name ? next : p)); return next; };
   const create = (body: Record<string, unknown>) => {
     const content = ComputeProfileContentSchema.parse(body.content), name = String(body.name);
-    const created = profileDetail({ name, description: body.description, protocol: content.launch.protocol, image: content.image, binaryPath: content.launch.binaryPath, model: content.launch.model,
+    const created = profileDetail({ name, description: body.description, defaultVisible: body.defaultVisible ?? true, protocol: content.launch.protocol, image: content.image, binaryPath: content.launch.binaryPath, model: content.launch.model,
       availability: { state: 'testing', available: false, reason: '测试中' }, latestTest: queuedTest(name, 1), content, credentials: content.secretNames.map((secret) => ({ name: secret, set: true })) });
     state.profiles.push(created);
     return json(created, 201);
@@ -105,16 +105,17 @@ export function computeBackend(initial: readonly ComputeProfileDetailDto[] = [pr
   };
   const profileRoute = (method: string, sub: string, query: string, body: Record<string, unknown>, profile: ComputeProfileDetailDto): Response => {
     if (sub === '') return method === 'GET' ? json(profile) : method === 'PUT' ? save(profile, body) : remove(profile, query);
+    if (sub === 'default-visible') return json(replace({ ...profile, defaultVisible: body.defaultVisible === true }));
     if (sub === 'enabled') return profile.isDefault && body.enabled === false ? conflict('默认档位不能停用', { code: 'default_profile' }) : json(replace({ ...profile, enabled: body.enabled === true }));
-    if (sub === 'default') { state.profiles = state.profiles.map((p) => ({ ...p, isDefault: p.name === profile.name })); return json(state.profiles.find((p) => p.name === profile.name)); }
+    if (sub === 'default') { state.profiles = state.profiles.map((p) => ({ ...p, isDefault: p.name === profile.name, defaultVisible: p.name === profile.name ? true : p.defaultVisible })); return json(state.profiles.find((p) => p.name === profile.name)); }
     if (sub === 'copy') { const copy = { ...profile, name: String(body.name), isDefault: false, revision: 1 }; state.profiles.push(copy); return json(copy, 201); }
     if (sub === 'tests' && method === 'POST') { state.testCursor = 0; return json(state.manualTests[0], 202); }
     if (sub.startsWith('tests/')) { state.testCursor = Math.min(state.testCursor + 1, state.manualTests.length - 1); return json(state.manualTests[state.testCursor]); }
     return json({ error: 'not_found', message: `未知路径 ${sub}`, details: {} }, 404);
   };
   const route = (method: string, path: string, query: string, body: Record<string, unknown>): Response => {
-    if (path === '/v1/me') return json({ id: ADMIN_ID, name: '王管理', email: 'admin@test.invalid', isAdmin: true, memberships: [], authMethod: 'password' });
-    if (path === '/v1/users') return json({ items: [{ id: ADMIN_ID, name: '王管理', email: 'admin@test.invalid', isAdmin: true }] });
+    if (path === '/v1/me') return json({ id: ADMIN_ID, name: '王管理', email: 'admin@test.invalid', platformRole: 'admin', isAdmin: true, memberships: [], authMethod: 'password' });
+    if (path === '/v1/users') return json({ items: [{ id: ADMIN_ID, name: '王管理', email: 'admin@test.invalid', platformRole: 'admin', isAdmin: true }] });
     if (path === '/v1/catalog/task-profiles') return json({ items: [{ name: 'cli-large', cpu: '2', memory: '4Gi', storage: '2Gi', description: '' }] });
     if (path === '/v1/admin/runtime-images') return json(RUNTIME_IMAGES);
     if (path === '/v1/admin/runtime-images/credentials') return json(PUSH_CREDENTIAL, 201);

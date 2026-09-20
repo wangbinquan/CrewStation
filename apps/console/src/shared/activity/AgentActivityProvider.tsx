@@ -11,9 +11,9 @@ const EMPTY: ActivitySnapshot = { tasks: [], notice: null, limited: false };
 const subscribeEmpty = () => () => {};
 const snapshotEmpty = () => EMPTY;
 
-export function AgentActivityProvider({ children }: { readonly children: ReactNode }): ReactElement {
+export function AgentActivityProvider({ children, enabled = true }: { readonly children: ReactNode; readonly enabled?: boolean }): ReactElement {
   const me = useApiQuery(queryKeys.me(), () => api.me.get());
-  const userId = me.error ? undefined : me.data?.id;
+  const userId = enabled && !me.error && (me.data?.platformRole === 'developer' || me.data?.platformRole === 'admin') ? me.data.id : undefined;
   const store = useMemo(() => userId ? new AgentActivityStore({
     page: (taskId, before) => api.devSession.getAgentActivity(taskId, { limit: 50, unread: true, ...(before === undefined ? {} : { before }) }),
     terminals: (taskId) => api.devSession.listNativeTerminals(taskId),

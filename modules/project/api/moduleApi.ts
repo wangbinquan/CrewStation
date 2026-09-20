@@ -1,5 +1,5 @@
 import type {
-  ProjectPage, ProjectPageEntry, ProjectPageQuery,
+  ProjectCreationCatalog, ProjectPage, ProjectPageEntry, ProjectPageQuery,
   Actor, CreateProjectRequest, ListProjectsQuery, ManifestKind, MemberDto, ProjectDto, ProjectId, ProjectState, QuotaDto, ServiceDto,
   ServiceId, ServicePlanDto, SetMemberRequest, SetQuotaRequest, TaskProfileDto, UserId,
   AppVisibilityDto, AppVisibilityCheckDto, SetAppVisibilityRequest, AppPresentationDto, SetAppPresentationRequest, MemberCandidateDto, MarketAppsQuery, MarketAppDto,
@@ -38,7 +38,7 @@ export interface ProvisioningProject {
 }
 
 /** 供 L6 聚合正式状态；serviceId 仅供模块间定位，HTTP 市场响应显式投影。 */
-export type MarketListing = Omit<MarketAppDto, 'production'> & { serviceId?: ServiceId };
+export type MarketListing = Omit<MarketAppDto, 'production' | 'entry'> & { serviceId?: ServiceId };
 
 /** project 模块对外能力；其他模块经 ports 注入其中的子集。 */
 export interface ProjectModuleApi {
@@ -47,6 +47,7 @@ export interface ProjectModuleApi {
   roleOf(actor: Actor, projectId: ProjectId): Promise<EffectiveRole | undefined>;
   /** 无权限时抛 forbidden；非成员抛 not_found。 */
   authorize(actor: Actor, projectId: ProjectId, action: ProjectAction): Promise<EffectiveRole>;
+  creationCatalog(actor: Actor): Promise<ProjectCreationCatalog>;
   createProject(actor: Actor, input: CreateProjectRequest): Promise<ProjectDto>;
   getProject(actor: Actor, projectId: ProjectId): Promise<ProjectDto>;
   listProjects(actor: Actor, query?: ListProjectsQuery): Promise<ProjectDto[]>;
@@ -72,6 +73,7 @@ export interface ProjectModuleApi {
   /** 无 actor 的内部解析，供网关、发布、任务等模块经端口使用。 */
   resolveServiceById(serviceId: ServiceId): Promise<ResolvedService | undefined>;
   resolveServiceOfProject(projectId: ProjectId): Promise<ResolvedService | undefined>;
+  listClusterProjects(): Promise<Array<{ projectId: string; name: string; slug: string; namespace: string; kind: string; state: string; serviceId?: string; serviceName?: string }>>;
   listServices(): Promise<ResolvedService[]>;
   /** 单项目内部查询，不遍历所有项目；缺失或已归档时不再开通。 */
   getProvisioningProject(projectId: ProjectId): Promise<ProvisioningProject | undefined>;

@@ -34,7 +34,7 @@ export function adminAuthenticationFixture(options: { authMethod?: 'password' | 
     calls.push({ url, method, body });
     let payload: unknown = { items: [] };
     let status = 200;
-    if (url.pathname === '/v1/me') payload = { id: userId, name: '管理员', email: 'admin@corp.example', isAdmin: true, memberships: [], authMethod: state.authMethod };
+    if (url.pathname === '/v1/me') payload = { id: userId, name: '管理员', email: 'admin@corp.example', platformRole: 'admin', isAdmin: true, memberships: [], authMethod: state.authMethod };
     else if (url.pathname === '/v1/admin/auth/login-policy') {
       if (method === 'PUT') state.passwordLoginEnabled = Boolean((body as { passwordLoginEnabled?: boolean }).passwordLoginEnabled);
       payload = {

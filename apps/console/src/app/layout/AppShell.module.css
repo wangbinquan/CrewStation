@@ -8,6 +8,8 @@
   min-height: 100vh;
 }
 
+.noNav { grid-template-columns: minmax(0, 1fr); grid-template-areas: 'topbar' 'main'; }
+
 .main {
   grid-area: main;
   padding: var(--cs-space-5);
