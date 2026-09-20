@@ -7,6 +7,8 @@ export interface NativeActivityOptions {
   emit(activity: NativeActivityEvent): void;
   dependencyDir?: string;
   leaseMs?: number;
+  /** OpenCode 首次插件握手的等待上限；冷启动不能占用已连接后的心跳租约。 */
+  startupTimeoutMs?: number;
 }
 
 export function createActivityStamp(options: NativeActivityOptions): (signal: NativeActivitySignal) => void {

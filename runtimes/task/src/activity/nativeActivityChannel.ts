@@ -15,10 +15,12 @@ export function createOpencodeActivityChannel(options: NativeActivityOptions): N
   const token = crypto.randomUUID();
   const stamp = createActivityStamp(options);
   const normalizer = new OpencodeNativeActivity(stamp);
-  const state = { closed: false, sequence: 0, ready: false, degraded: false, lastContact: Date.now() };
+  const startedAt = Date.now();
+  const state = { closed: false, sequence: 0, ready: false, degraded: false, lastContact: startedAt };
   const now = () => new Date().toISOString();
   const gap = (reason: NativeActivitySignal['reason']) => { state.degraded = true; normalizer.gap(now(), crypto.randomUUID(), reason); };
   const leaseMs = options.leaseMs ?? 20000;
+  const startupTimeoutMs = options.startupTimeoutMs ?? 120000;
   const server = Bun.serve({
     hostname: '127.0.0.1', port: 0, maxRequestBodySize: 32768,
     async fetch(request) {
@@ -46,8 +48,10 @@ export function createOpencodeActivityChannel(options: NativeActivityOptions): N
     },
   });
   const timer = setInterval(() => {
-    if (Date.now() - state.lastContact >= leaseMs) gap('source-error');
-  }, Math.min(5000, leaseMs));
+    // 低 CPU 配额下 CLI 冷启动会超过一个心跳周期；收到首次 ready 后才开始心跳计时。
+    const elapsed = Date.now() - (state.ready ? state.lastContact : startedAt);
+    if (elapsed >= (state.ready ? leaseMs : startupTimeoutMs)) gap('source-error');
+  }, Math.min(5000, leaseMs, startupTimeoutMs));
   timer.unref();
   return {
     options: { endpoint: `http://127.0.0.1:${server.port}/activity`, token, opencodeDependencies: options.dependencyDir ?? '/opt/crewstation-opencode-plugin' },

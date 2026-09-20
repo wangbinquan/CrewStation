@@ -6,9 +6,9 @@ import { createOpencodeActivityChannel } from '../src/activity/nativeActivityCha
 const cleanups: Array<() => void> = [];
 afterEach(() => { for (const close of cleanups.splice(0)) close(); });
 const at = '2026-09-13T08:00:00.000Z';
-function fixture(leaseMs = 20000, notify?: (event: NativeActivityEvent) => void) {
+function fixture(leaseMs = 20000, notify?: (event: NativeActivityEvent) => void, startupTimeoutMs?: number) {
   const events: NativeActivityEvent[] = [];
-  const observer = createOpencodeActivityChannel({ agentId: 'cli-a', terminalId: 'term-a', runnerId: '4b6ae7d3-c955-41a9-8b1e-cb6360ed0b36', leaseMs, emit: (event) => { events.push(NativeActivityEventSchema.parse(event)); notify?.(event); } });
+  const observer = createOpencodeActivityChannel({ agentId: 'cli-a', terminalId: 'term-a', runnerId: '4b6ae7d3-c955-41a9-8b1e-cb6360ed0b36', leaseMs, ...(startupTimeoutMs === undefined ? {} : { startupTimeoutMs }), emit: (event) => { events.push(NativeActivityEventSchema.parse(event)); notify?.(event); } });
   cleanups.push(observer.close);
   const post = (sequence: number, event: unknown, token = observer.options.token) => fetch(observer.options.endpoint, { method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' }, body: JSON.stringify({ protocol: 1, sequence, event }) });
   let sequence = 0;
@@ -54,14 +54,38 @@ test('正文／未知字段被严格拒绝，畸形事件不作为正常输入',
   expect(f.kinds()).toEqual(['source-ready', 'source-unavailable']);
 });
 
-test('心跳到期是状态通道故障，迟到的 ready 不把它恢复成成功；其他 CLI 不受影响', async () => {
+test('低 CPU 下 CLI 初始化可以超过心跳间隔，首次握手后才开始检测心跳丢失', async () => {
+  let resolve!: () => void;
+  const expired = new Promise<void>((done) => { resolve = done; });
+  const f = fixture(50, (event) => { if (event.signal.kind === 'source-unavailable') resolve(); });
+  // 实机 150m 配额下 OpenCode 尚在初始化，20 秒心跳计时却已把整条观测链永久降级。
+  await Bun.sleep(150);
+  expect(f.kinds()).toEqual([]);
+  await f.post(1, { type: 'ready' });
+  expect(f.kinds()).toEqual(['source-ready']);
+  await expired;
+  expect(f.kinds()).toEqual(['source-ready', 'source-unavailable']);
+});
+
+test('已握手后的心跳到期仍永久降级，重复 ready 不恢复成功；其他 CLI 不受影响', async () => {
   let resolve!: () => void;
   const expired = new Promise<void>((done) => { resolve = done; });
   const f = fixture(30, (event) => { if (event.signal.kind === 'source-unavailable') resolve(); });
+  await f.post(1, { type: 'ready' });
   const other = fixture(); await other.post(1, { type: 'ready' });
+  await expired;
+  await f.post(2, { type: 'ready' });
+  expect(f.kinds()).toEqual(['source-ready', 'source-unavailable']);
+  expect(other.kinds()).toEqual(['source-ready']);
+  expect(f.events[0]?.eventId).not.toBe(other.events[0]?.eventId);
+});
+
+test('首次握手仍有独立上限，超时后的迟到 ready 不掩盖未知状态', async () => {
+  let resolve!: () => void;
+  const expired = new Promise<void>((done) => { resolve = done; });
+  const f = fixture(20000, (event) => { if (event.signal.kind === 'source-unavailable') resolve(); }, 30);
   await expired;
   await f.post(1, { type: 'ready' });
   expect(f.kinds()).toEqual(['source-unavailable']);
-  expect(other.kinds()).toEqual(['source-ready']);
-  expect(f.events[0]?.eventId).not.toBe(other.events[0]?.eventId);
+  expect(f.events[0]?.signal.reason).toBe('source-error');
 });
