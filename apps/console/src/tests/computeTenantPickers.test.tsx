@@ -87,7 +87,7 @@ describe('新建 Agent（历史对话）', () => {
   });
 });
 
-describe('「＋ 创建 CLI」', () => {
+describe('「＋ 创建开发Agent会话」', () => {
   const workspace = () => <NativeWorkspace taskId="task-1" userId="user-1" channel={{ send: async () => ({}), subscribe: () => () => {} }} stream={{ ...INITIAL_STREAM_STATE, status: 'open', runnerConnected: true, generation: 1 }} canDevelop onActivity={() => {}} preview={null} editor={null} changes={null} />;
   const cliSelect = () => page!.host.querySelector<HTMLSelectElement>('select[aria-label="算力档位"]')!;
 
@@ -101,10 +101,10 @@ describe('「＋ 创建 CLI」', () => {
     });
     page = await renderElement(workspace(), messages);
     expect([...cliSelect().options].map((option) => option.textContent)).toEqual(['默认档位（claude-daily）', 'claude-daily', 'aider-shell · 仅终端', 'opencode-lite（不可用：测试失败：缺少鉴权）']);
-    expect(page.button('＋ 创建 CLI').disabled).toBe(false);
+    expect(page.button('＋ 创建开发Agent会话').disabled).toBe(false);
     await act(async () => { Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')!.set!.call(cliSelect(), 'aider-shell'); cliSelect().dispatchEvent(new Event('change', { bubbles: true })); });
     await page.settle();
-    await page.click('＋ 创建 CLI');
+    await page.click('＋ 创建开发Agent会话');
     expect(starts).toHaveLength(1); expect(starts[0]).toMatchObject({ compute: 'aider-shell' }); expect(page.text()).toContain('演示拒绝');
   });
 
@@ -117,7 +117,7 @@ describe('「＋ 创建 CLI」', () => {
       return undefined;
     });
     page = await renderElement(workspace(), messages);
-    expect(page.text()).toContain('档位 claude-daily 当前不可用：测试中。'); expect(page.button('＋ 创建 CLI').disabled).toBe(true);
+    expect(page.text()).toContain('档位 claude-daily 当前不可用：测试中。'); expect(page.button('＋ 创建开发Agent会话').disabled).toBe(true);
     const card = page.host.querySelector(`[data-native-terminal="${terminal.terminalId}"]`)!;
     expect(card.textContent).toContain('仅终端'); expect(card.textContent).toContain('档位修订 4');
     expect(card.querySelector('small[title]')?.getAttribute('title')).toContain('平台不解析它的输出');

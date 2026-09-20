@@ -72,7 +72,7 @@ test('差异别名与待验证目标接到实际查询，空 CLI 工作区也能
   expect(document.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toContain('变更');
   expect(calls.some((url) => url.pathname.endsWith('/version-comparison') && url.searchParams.get('target') === 'preview')).toBe(true);
   expect(page.text()).toContain('工作树与待验证版本'); await page.navigate(`${path}?view=split`);
-  expect(page.text()).toContain('开发预览'); expect(page.text()).toContain('创建第一个 CLI');
+  expect(page.text()).toContain('开发预览'); expect(page.text()).toContain('创建第一个开发Agent会话');
   await page.click('代码'); await page.click('CLI 工作区'); await page.click('＋ 工作区'); expect(page.search().view).toBe('split'); expect(page.text()).toContain('工作区 2');
   expect(fixture.commands.some((c) => c.type === 'startAgentTerminal' || c.type === 'stopAgentTerminal')).toBe(false);
 });

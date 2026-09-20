@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from 'bun:test';
-import { mkdtemp, rm, stat } from 'node:fs/promises';
+import { mkdtemp, rm, stat, mkdir, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { AgentProtocol } from '@crewstation/contracts';
@@ -7,6 +7,7 @@ import { IDENTITY_HEADERS, TERMINAL_MCP_ENV } from '@crewstation/contracts';
 import { noopLogger } from '@crewstation/kernel';
 import type { NativeTerminalSpec } from '../contract/nativeTerminal';
 import { prepareNativeTerminal } from '../drivers/nativeTerminal';
+import { seedOpencodeNativePreferences } from '../drivers/opencode/nativePreferences';
 import { createFakeProcessHost } from './fakeProcessHost';
 
 const cleanup: Array<() => Promise<unknown>> = [];
@@ -14,14 +15,16 @@ afterEach(async () => { for (const clean of cleanup.splice(0)) await clean(); })
 
 const BINARY: Record<AgentProtocol, string> = { 'claude-code': '/usr/local/bin/claude', opencode: '/usr/local/bin/opencode', terminal: '/opt/tools/bin/codex' };
 
-async function fixture(protocol: AgentProtocol, permission: NativeTerminalSpec['permission'] = 'edit', mcp: NativeTerminalSpec['mcp'] = [{ name: 'platform', url: 'http://mcp.example/mcp', headers: { authorization: 'private-mcp-token' } }], extraArgs: string[] = []) {
+async function fixture(protocol: AgentProtocol, permission: NativeTerminalSpec['permission'] = 'edit', mcp: NativeTerminalSpec['mcp'] = [{ name: 'platform', url: 'http://mcp.example/mcp', headers: { authorization: 'private-mcp-token' } }], extraArgs: string[] = [], preferences?: object) {
   const root = await mkdtemp(join(tmpdir(), 'cs-native-plan-'));
   cleanup.push(() => rm(root, { recursive: true, force: true }));
+  const home = join(root, 'home'), state = join(home, '.local', 'state', 'opencode');
+  if (preferences) { await mkdir(state, { recursive: true }); await writeFile(join(state, 'kv.json'), JSON.stringify(preferences)); }
   const host = createFakeProcessHost([]);
   const launch = { protocol, binaryPath: BINARY[protocol], extraArgs, isSandbox: false, ...(protocol === 'terminal' ? {} : { model: 'anthropic/model-name' }) };
   const spec: NativeTerminalSpec = { launch, profileRevision: 4, permission, agentId: 'agent-native', compute: 'balanced', systemPrompt: 'Shared worktree instructions', mcp };
-  const prepared = await prepareNativeTerminal(spec, { cwd: root, runDir: join(root, 'run'), env: { MODEL_KEY: 'private-model-key' }, host, logger: noopLogger, gitUserName: 'Developer', gitUserEmail: 'dev@example.invalid' });
-  return { root, host, prepared };
+  const prepared = await prepareNativeTerminal(spec, { cwd: root, runDir: join(root, 'run'), env: { HOME: home, MODEL_KEY: 'private-model-key' }, managed: { home, runDir: join(root, 'run') }, host, logger: noopLogger, gitUserName: 'Developer', gitUserEmail: 'dev@example.invalid' });
+  return { root, state, host, prepared };
 }
 
 test('Claude 原生计划无需初始 prompt，独立 session id，权限／MCP／Git 身份保留且不是 JSON 模式', async () => {
@@ -83,4 +86,36 @@ test('通用终端协议：没有平台 MCP 连接时不写空的 CS_MCP_* 变�
   const { prepared } = await fixture('terminal', 'edit', []);
   for (const name of Object.values(TERMINAL_MCP_ENV)) expect(prepared.plan.env[name]).toBeUndefined();
   await expect(fixture('terminal', 'edit', [], [`--x${String.fromCharCode(10)}`])).rejects.toThrow('控制字符');
+});
+
+
+test('新建 OpenCode 会话默认有历史滚动条，偏好文件可由降权后的 Agent 读取', async () => {
+  const { state, host, prepared } = await fixture('opencode');
+  const file = join(state, 'kv.json');
+  // 实机 OpenCode 的原生会话滚动条默认隐藏，用户看不到任何历史入口。
+  expect(await Bun.file(file).json()).toMatchObject({ scrollbar_visible: true });
+  expect((await stat(file)).mode & 0o777).toBe(0o600);
+  for (const path of [state, join(state, '..'), join(state, '..', '..'), file]) expect(host.chownedPaths).toContain(path);
+  expect(prepared.plan.env.XDG_STATE_HOME).toBeUndefined();
+});
+
+test.each([{ scrollbar_visible: false, theme: 'system' }, { theme: 'custom' }])('新建会话保留已有 OpenCode 界面偏好 %j', async (preferences) => {
+  const { state } = await fixture('opencode', 'edit', [], [], preferences);
+  expect(await Bun.file(join(state, 'kv.json')).json()).toEqual(preferences);
+});
+
+
+test('OpenCode 历史偏好遵守 XDG 状态目录，只初始化新文件，不借用宿主 HOME', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'cs-native-prefs-'));
+  cleanup.push(() => rm(root, { recursive: true, force: true }));
+  const host = createFakeProcessHost([]), home = join(root, 'home'), xdg = join(root, 'xdg');
+  const context = { cwd: root, env: { XDG_STATE_HOME: xdg }, managed: { home, runDir: root }, host, logger: noopLogger };
+  await seedOpencodeNativePreferences(context);
+  expect(await Bun.file(join(xdg, 'opencode', 'kv.json')).json()).toEqual({ scrollbar_visible: true });
+  expect(await Bun.file(join(home, '.local', 'state', 'opencode', 'kv.json')).exists()).toBe(false);
+  const chowned = [...host.chownedPaths];
+  await seedOpencodeNativePreferences({ ...context, managed: undefined });
+  expect(host.chownedPaths).toEqual(chowned);
+  await seedOpencodeNativePreferences({ ...context, env: { XDG_STATE_HOME: 'relative-not-valid' } });
+  expect(await Bun.file(join(home, '.local', 'state', 'opencode', 'kv.json')).json()).toEqual({ scrollbar_visible: true });
 });

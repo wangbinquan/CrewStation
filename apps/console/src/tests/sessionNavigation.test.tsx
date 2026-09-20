@@ -71,7 +71,7 @@ test.each([false, true])('档位读取失败有刷新及匹配身份的配置指
   expect(page.text()).toContain('算力目录暂不可读');
   expect(Boolean(document.querySelector('a[href="/admin/compute"]'))).toBe(isAdmin);
   if (!isAdmin) expect(page.text()).toContain('请联系管理员提供可用档位');
-  const create = () => [...document.querySelectorAll<HTMLButtonElement>('button')].find((node) => node.textContent === '＋ 创建 CLI')!;
+  const create = () => [...document.querySelectorAll<HTMLButtonElement>('button')].find((node) => node.textContent === '＋ 创建开发Agent会话')!;
   expect(create().disabled).toBe(true);
   available = true; await page.click('刷新档位');
   expect(create().disabled).toBe(false);

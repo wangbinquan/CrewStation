@@ -6,6 +6,51 @@ import { createTerminalControl, TERMINAL_CONTROL_LEASE_MS } from '../src/termina
 
 const { Terminal } = createRequire(import.meta.url)('@xterm/headless') as typeof XtermHeadless;
 
+test.each([1006, 1016])('重新连接时保留鼠标编码 %s，原生 Agent 仍能识别滚轮与拖动', async (mode) => {
+  const screen = createTerminalScreen(80, 24);
+  try {
+    // OpenCode 在备用屏幕内自行滚动历史；只有鼠标 tracking 而没有 SGR 编码会让它读错事件。
+    await screen.write(`\x1b[?1049h\x1b[?1003h\x1b[?${mode}`, 1);
+    await screen.write('hAgent history', 2);
+    const snapshot = await screen.snapshot();
+    expect(snapshot.data).toContain('\x1b[?1003h');
+    expect(snapshot.data).toContain(`\x1b[?${mode}h`);
+    expect(snapshot.throughSeq).toBe(2);
+  } finally { await screen.dispose(); }
+});
+
+const mouseCases = [
+  { name: 'SGR 与 tracking 合并设置', data: '\x1b[?1003;1006h', sgr: 1, pixels: 2 },
+  { name: '后设置的像素模式优先', data: '\x1b[?1006;1016h', sgr: 2, pixels: 1 },
+  { name: '后设置的 SGR 模式优先', data: '\x1b[?1016;1006h', sgr: 1, pixels: 2 },
+  { name: '关闭任一编码恢复默认', data: '\x1b[?1016h\x1b[?1006l', sgr: 2, pixels: 2 },
+  { name: '关闭像素编码', data: '\x1b[?1016h\x1b[?1016l', sgr: 2, pixels: 2 },
+  { name: '硬复位清除鼠标模式', data: '\x1b[?1006h\x1bc', sgr: 2, pixels: 2 },
+  { name: '软复位保持鼠标编码', data: '\x1b[?1006h\x1b[!p', sgr: 1, pixels: 2 },
+];
+for (const item of mouseCases) test(`快照恢复实际鼠标状态：${item.name}`, async () => {
+  const screen = createTerminalScreen(80, 24), restored = new Terminal({ cols: 80, rows: 24, allowProposedApi: true });
+  try {
+    await screen.write(item.data, 1);
+    const snapshot = await screen.snapshot();
+    await new Promise<void>((resolve) => restored.write(snapshot.data, resolve));
+    const replies: string[] = [];
+    restored.onData((data) => replies.push(data));
+    await new Promise<void>((resolve) => restored.write('\x1b[?1006$p\x1b[?1016$p', resolve));
+    expect(replies).toEqual([`\x1b[?1006;${item.sgr}$y`, `\x1b[?1016;${item.pixels}$y`]);
+  } finally { await screen.dispose(); restored.dispose(); }
+});
+
+test('采集快照不打断尚未写完的鼠标转义序列', async () => {
+  const screen = createTerminalScreen(80, 24);
+  try {
+    await screen.write('\x1b[?1006', 1);
+    expect((await screen.snapshot()).data).toEndWith('\x1b[?1006l');
+    await screen.write('h', 2);
+    expect((await screen.snapshot()).data).toEndWith('\x1b[?1006h');
+  } finally { await screen.dispose(); }
+});
+
 test('快照恢复颜色、光标、备用屏幕及跨片段 ANSI；序号与已解析屏幕一致', async () => {
   const screen = createTerminalScreen(40, 8);
   const restored = new Terminal({ cols: 40, rows: 8, allowProposedApi: true });

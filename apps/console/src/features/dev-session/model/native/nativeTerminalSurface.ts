@@ -1,4 +1,4 @@
-import type { TerminalSnapshot } from '@crewstation/contracts';
+import type { AgentProtocol, TerminalSnapshot } from '@crewstation/contracts';
 import { FitAddon } from '@xterm/addon-fit';
 import { Terminal } from '@xterm/xterm';
 import type { NativeTerminalSink } from './nativeTerminalAttachment';
@@ -14,6 +14,7 @@ export class NativeTerminalSurface implements NativeTerminalSink {
   private timer?: ReturnType<typeof setTimeout>;
   private tail: Promise<void> = Promise.resolve();
   private controlled = false;
+  constructor(private readonly protocol?: AgentProtocol) {}
   mount(container: HTMLElement, input: (data: string) => void, resize: (cols: number, rows: number) => void): void {
     const look = terminalLook(container);
     const terminal = new Terminal({ ...look, fontSize: 12, cursorBlink: true, scrollback: 500, disableStdin: true });
@@ -50,7 +51,10 @@ export class NativeTerminalSurface implements NativeTerminalSink {
     this.tail = this.tail.then(() => {
       if (this.terminal !== terminal) return;
       terminal.reset(); terminal.resize(snapshot.cols, snapshot.rows);
-      return new Promise<void>((resolve) => terminal.write(snapshot.data, resolve));
+      // 旧 Runner 的 addon-serialize 遗漏编码：只兼容已知使用 SGR 的 OpenCode，保留新快照的明确模式。
+      const legacyOpencode = this.protocol === 'opencode' && /\x1b\[\?(?:\d+;)*100[023](?:;\d+)*h/.test(snapshot.data)
+        && !/\x1b\[\?(?:\d+;)*(?:1006|1016)(?:;\d+)*[hl]/.test(snapshot.data);
+      return new Promise<void>((resolve) => terminal.write(snapshot.data + (legacyOpencode ? '\x1b[?1006h' : ''), resolve));
     });
     return this.tail;
   }

@@ -50,3 +50,15 @@
 本轮只提交 RFC-008 的 60 个明确路径；共享 STATE 与 RFC 索引完整保留 RFC-009 输出。门禁执行期间 RFC-008 的 53 个代码／测试／设计附件文件指纹未变化；并行设置与其他门禁 WIP 不随本次代码提交。功能提交 `5252c4c43804bdfbd2a8beb92bc3c2f9289bb12d` 已推送到 `main`，推后 fetch 确认精确同步。
 
 [GitHub CI 35502873316](https://github.com/wangbinquan/CrewStation/actions/runs/35502873316) 针对上述精确 SHA 已完成且 **success**：`check` 3 分 8 秒（含完整门禁和工作台构建），`e2e` 5 分 29 秒（新集群安装平台后真实浏览器验收）。T1–T7 与 DS-01…DS-16 完成，RFC-008 标记 **Done**。后续收口提交仅更新这份证据与 RFC／接力状态，不修改已验证的生产代码。
+
+## 追加：会话历史滚动与创建入口命名（2026-09-20）
+
+作者指出 OpenCode 历史无法滚动，并要求把创建入口改为「创建开发Agent会话」。
+
+- 根因回归先红：`@xterm/addon-serialize@0.14.0` 保存 tracking 模式却丢失 SGR / SGR_PIXELS 鼠标编码，重连后滚轮与拖动事件格式改变。Runner 现在通过公开 parser 观察模式，快照完整保留编码；覆盖跨片段 ANSI、复位、组合模式和实际恢复后的模式查询。浏览器端只为缺失编码的旧 OpenCode 快照补 SGR，不覆盖明确保存的编码或其他协议。
+- [OpenCode 1.18.29 原生界面](https://github.com/anomalyco/opencode/blob/v1.18.29/packages/tui/src/routes/session/index.tsx) 默认隐藏 session scrollbar；新建托管原生会话现在在 XDG 状态目录首次写入 `scrollbar_visible: true`，保留已有偏好，目录和文件可由 worker 读取。旧会话可在 Ctrl+P 中选择 `Toggle session scrollbar`。界面提示获取输入控制后回看历史。
+- 真实创建按钮、中英文引导、空状态及设计附件统一命名。单击启动、双击去重与按原请求重试的行为保持原测试约束。设计稿显示独立滚动条：正文 141px / 内容 224px，真实拖动后 `scrollTop=82.5`，输入框保持窗底；这是设计附件证据，不是 Agent 端到端证据。
+- 真实浏览器加载生产 `NativeTerminalSurface` 的无后端夹具：旧快照恢复后向上滚动得到 `ESC[<64;65;10M`，拖动包括按下 `ESC[<0;65;10M`、移动 `ESC[<32;65;17M` 和释放 `ESC[<0;65;17m`；新快照向下滚动得到 `ESC[<65;65;10M`；只读时滚轮与拖动输出均为空。该夹具未创建 Agent 或 PTY。
+- 本机 console 镜像 `cs-console:rfc008-scroll-20260920` 已就绪。任务镜像摘要 `sha256:1afe7bbad507de9aa23f36e7a2be07049e2da4de4d98a335ef4173a3357147b9` 已进入默认档位 `volc-glm-5-2` 修订 3，模型、凭据与资源套餐保持。自动测试 `pft_01a0be574e3d70009c6b4957885d7ffa` 通过：镜像、Runner 协议 2、启动前步骤、CLI 1.18.29 与真实模型回文均成功，执行任务 `tsk_01a0be574f5270008f210fdaf009e5b8`。
+- 新建真实 Agent 长历史验收被自动审批拦截：理由为尚需明确授权创建验证资源。已向作者询问创建 1 个验证会话、完成后停止，待答复；未绕过此限制，不能将自动模型回文或浏览器夹具说成原生长历史已实测。
+- 运行时、驱动与终端组件定向回归 **47 pass / 0 fail / 190 assertions（6 文件）**，日志 `/tmp/cs-rfc008-scroll-core-final.log`；整页回归曾受并行 RFC-011 新角色守卫的在制夹具影响，所属任务补齐后复验 **14 pass / 0 fail / 103 assertions（2 文件）**，日志 `/tmp/cs-rfc008-scroll-navigation-final.log`。完整门禁第一次在并行 identity/release/k8s 的 lint 阶段停止，尚不能认定整个共享候选或本次 GitHub CI 通过。候选和剩余验证将在发布前继续核对。

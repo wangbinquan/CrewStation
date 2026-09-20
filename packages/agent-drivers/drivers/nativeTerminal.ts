@@ -17,6 +17,7 @@ import { materializeOpencodeConfig } from './opencode/managedConfig';
 import { buildOpencodeNativeEnv } from './opencode/nativeEnv';
 import { buildOpencodeNativeArgv } from './opencode/nativeArgv';
 import { setupOpencodeNativeActivity } from './opencode/nativeActivitySetup';
+import { seedOpencodeNativePreferences } from './opencode/nativePreferences';
 
 /** 只准备原生 argv 与配置；所有进程仍由 Runtime 的降权 PTY 后端拉起。 */
 export async function prepareNativeTerminal(spec: NativeTerminalSpec, context: DriverLaunchContext): Promise<PreparedNativeTerminal> {
@@ -50,6 +51,7 @@ export async function prepareNativeTerminal(spec: NativeTerminalSpec, context: D
     await context.host.chownToWorker(configDir);
     await context.host.chownToWorker(join(configDir, 'skills'));
     const env = buildOpencodeNativeEnv(ctx, configDir);
+    await seedOpencodeNativePreferences(context);
     const activityUnavailable = await setupOpencodeNativeActivity(ctx, context, runDir, env, configDir);
     await materializeOpencodeConfig(env, context.managed, runDir);
     return { plan: { cmd: buildOpencodeNativeArgv(ctx), cwd: ctx.cwd, env }, ...(activityUnavailable ? { activityUnavailable } : {}), dispose: runDir.dispose };

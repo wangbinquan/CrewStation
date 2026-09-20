@@ -20,7 +20,7 @@ export function NativeTerminalView(props: NativeTerminalViewProps): ReactElement
 }
 
 function SavedNativeTerminalView({ terminal }: Pick<NativeTerminalViewProps, 'terminal'>): ReactElement {
-  const t = useT(), host = useRef<HTMLDivElement>(null), surface = useMemo(() => new NativeTerminalSurface(), []);
+  const t = useT(), host = useRef<HTMLDivElement>(null), surface = useMemo(() => new NativeTerminalSurface(terminal.protocol), [terminal.protocol]);
   const screen = useApiQuery(['tasks', terminal.taskId, 'native-screen', terminal.agentId], async () => {
     const result = NativeTerminalSnapshotDtoSchema.parse(await api.devSession.getNativeTerminalSnapshot(terminal.taskId, terminal.agentId));
     if (result.snapshot && (result.snapshot.terminalId !== terminal.terminalId || result.snapshot.runnerId !== terminal.runnerId)) throw new Error(t('devSession.native.screenMismatch'));
@@ -41,9 +41,9 @@ function LiveNativeTerminalView({ terminal, channel, stream, onActivity, canDeve
   const activity = useRef(onActivity);
   useEffect(() => { activity.current = onActivity; }, [onActivity]);
   const { surface, attachment } = useMemo(() => {
-    const surface = new NativeTerminalSurface();
+    const surface = new NativeTerminalSurface(terminal.protocol);
     return { surface, attachment: new NativeTerminalAttachment(channel, terminal.terminalId, terminal.runnerId, surface) };
-  }, [channel, terminal.terminalId, terminal.runnerId]);
+  }, [channel, terminal.terminalId, terminal.runnerId, terminal.protocol]);
   const state = useSyncExternalStore(attachment.subscribe, attachment.getState);
   useEffect(() => {
     if (!host.current) return;
@@ -59,6 +59,7 @@ function LiveNativeTerminalView({ terminal, channel, stream, onActivity, canDeve
   return <>
     <div className={styles.controlLine}>
       <span>{t(`devSession.native.attach.${state.phase}`)}</span>
+      {terminal.protocol === 'opencode' && state.phase === 'ready' ? <span title={t('devSession.native.historyHelp')}>{t(state.controlled ? 'devSession.native.historyControlled' : 'devSession.native.historyReadOnly')}</span> : null}
       {state.truncated ? <span title={t('devSession.native.scrollback')}>{t('devSession.native.bounded')}</span> : null}
       <Button variant="ghost" disabled={!canDevelop || state.phase !== 'ready' || terminal.lifecycle !== 'running' || state.controlled} onClick={() => void attachment.claim().then((ok) => { if (ok) { surface.setControlled(true); surface.focus(); } })}>{t(state.controlled ? 'devSession.native.controlling' : 'devSession.native.claim')}</Button>
       {state.phase === 'error' ? <Button variant="ghost" onClick={() => void attachment.refresh()}>{t('devSession.native.reattach')}</Button> : null}

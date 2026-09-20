@@ -24,19 +24,19 @@ function updateScenario() {
   byId('health').className = `badge ${ready ? 'success' : 'warning'}`;
   byId('connection-notice').hidden = ready; byId('environment-dot').hidden = ready;
   byId('changes-count').hidden = !ready;
-  byId('notice-title').textContent = outdated ? '开发环境版本过旧，暂时无法创建 CLI' : preparing ? '正在准备开发环境' : '开发环境暂时未连接';
-  byId('notice-body').textContent = outdated ? '旧环境协议为 1，平台要求 2。更新环境后可继续开发，工作文件和未推送提交可保留。' : preparing ? '平台正在准备工作树和运行容器。连接成功后即可创建 CLI，无需手动配置连接地址。' : '页面连接正常，但尚未收到开发环境的连接。检查状态或查看该任务日志，已有草稿会保留。';
+  byId('notice-title').textContent = outdated ? '开发环境版本过旧，暂时无法创建开发Agent会话' : preparing ? '正在准备开发环境' : '开发环境暂时未连接';
+  byId('notice-body').textContent = outdated ? '旧环境协议为 1，平台要求 2。更新环境后可继续开发，工作文件和未推送提交可保留。' : preparing ? '平台正在准备工作树和运行容器。连接成功后即可创建开发Agent会话，无需手动配置连接地址。' : '页面连接正常，但尚未收到开发环境的连接。检查状态或查看该任务日志，已有草稿会保留。';
   byId('notice-action').textContent = outdated ? '检查并恢复环境' : '查看连接情况';
-  byId('empty-title').textContent = ready ? '创建一个 CLI，开始开发' : outdated ? '先恢复开发环境，再开始编写' : preparing ? '环境正在准备，马上开始' : '等待开发环境恢复连接';
+  byId('empty-title').textContent = ready ? '创建一个开发Agent会话，开始开发' : outdated ? '先恢复开发环境，再开始编写' : preparing ? '环境正在准备，马上开始' : '等待开发环境恢复连接';
   byId('empty-body').textContent = ready ? '选择上方算力档位，启动一个终端后直接输入需求。需要并行开发时，再逐个添加 CLI。' : outdated ? 'CLI 会在已连接的环境中启动。当前环境需要更新，无需手动填写连接地址。' : '连接问题与处理入口始终可见，恢复后可以继续使用这个工作区。';
-  byId('empty-action').textContent = ready ? '＋ 创建第一个 CLI' : outdated ? '检查并恢复环境' : '查看连接情况';
+  byId('empty-action').textContent = ready ? '＋ 创建开发Agent会话' : outdated ? '检查并恢复环境' : '查看连接情况';
   byId('create-cli').disabled = !ready;
   byId('recovery').hidden = !outdated;
   byId('check-badge').textContent = ready ? '环境已连接' : '需要处理 1 项';
   byId('check-badge').className = `badge ${ready ? 'success' : 'warning'}`;
   byId('runner-icon').textContent = ready ? '✓' : '!';
   byId('runner-icon').className = ready ? 'ok' : 'warn';
-  byId('runner-detail').textContent = ready ? '已连接，可创建 CLI、读取文件与预览' : outdated ? '连接被拒绝：协议版本 1，平台要求 2' : preparing ? '等待容器启动与自动连接' : '未收到容器连接，原因尚待检查';
+  byId('runner-detail').textContent = ready ? '已连接，可创建开发Agent会话、读取文件与预览' : outdated ? '连接被拒绝：协议版本 1，平台要求 2' : preparing ? '等待容器启动与自动连接' : '未收到容器连接，原因尚待检查';
   byId('cli-detail').textContent = ready ? '可启动，使用管理员提供的算力档位' : '环境恢复后，可选择算力档位并创建';
   byId('version-summary').textContent = ready ? 'main · 未提交 2 文件 · 未推送 1 提交（演示）' : '工作树状态待环境连接后读取';
   ['preview','comparison'].forEach((name) => { byId(`${name}-offline`).hidden = ready; byId(`${name}-ready`).hidden = !ready; });
@@ -69,7 +69,7 @@ function terminalCard(item) {
   const spacer = document.createElement('span'); spacer.className = 'grow';
   const profile = document.createElement('span'); profile.className = 'subtle'; profile.textContent = 'GLM-5.2';
   header.append(title, badge, spacer, profile, makeButton('收起', () => { item.workspace = null; renderWorkspace(); }));
-  const output = document.createElement('pre'); output.textContent = item.output;
+  const output = document.createElement('pre'); output.textContent = item.output; output.tabIndex = 0; output.setAttribute('role', 'region'); output.setAttribute('aria-label', `CLI ${item.id} 会话历史，可滚动回看`);
   const form = document.createElement('form'); form.className = 'terminal-input';
   const prompt = document.createElement('span'); prompt.textContent = '›';
   const input = document.createElement('input'); input.setAttribute('aria-label', `CLI ${item.id} 输入`); input.placeholder = '输入开发需求…（演示）'; input.value = item.draft ?? '';
@@ -96,7 +96,7 @@ byId('alongside').addEventListener('click', () => { byId('alongside-preview').hi
 byId('inspect-recovery').addEventListener('click', () => { byId('recovery-confirm').hidden = false; byId('recovery-profile').focus(); });
 byId('recovery-profile').addEventListener('change', (event) => { byId('confirm-recovery').disabled = !event.target.value; });
 byId('cancel-recovery').addEventListener('click', () => { byId('recovery-confirm').hidden = true; byId('inspect-recovery').focus(); });
-byId('confirm-recovery').addEventListener('click', () => { scenario = 'empty'; byId('recovery-confirm').hidden = true; updateScenario(); show('cli'); feedback('演示恢复完成：工作树保留。现在可以逐个创建 CLI。真实实现需要等待新环境握手。'); });
+byId('confirm-recovery').addEventListener('click', () => { scenario = 'empty'; byId('recovery-confirm').hidden = true; updateScenario(); show('cli'); feedback('演示恢复完成：工作树保留。现在可以逐个创建开发Agent会话。真实实现需要等待新环境握手。'); });
 byId('scenario').addEventListener('change', (event) => {
   scenario = event.target.value; terminals.length = 0;
   if (scenario === 'ready') {
