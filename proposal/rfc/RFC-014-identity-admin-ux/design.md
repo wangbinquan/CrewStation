@@ -1,6 +1,6 @@
 # RFC-014 技术与交互设计
 
-状态：In Progress · 2026-09-20 作者已授权完整实现、验证与提交上库。
+状态：Done · 2026-09-21。T1–T8 完成；实现与验证记录见 [acceptance.md](./acceptance.md)，发布 `a1b87a1` 的六项 CI 全部成功。
 
 ## 1. 依据与边界
 
@@ -50,7 +50,7 @@
 | 账号规则 | `provisioning`、`allowedEmailDomains`、`trustEmailVerified` |
 | 字段映射 | `usernameClaim`、`gitNameClaim`、`emailClaim`、`subjectClaim`、`claimMappings` |
 
-`iconUrl` 当前 UI 不支持配置且一直提交 null，本次不新增图标上传。`slug` 编辑时不可变。`clientSecretSet` 呈现「已设置」；空输入仍表示保留，不填入伪装的星号值。用户名和 Git 名允许按序多个字段；所有空值、范围与保留键限制沿用当前 Schema。
+`iconUrl` 当前 UI 不支持配置，本次不新增图标上传；新建保持 null，编辑保留已有原值。`slug` 编辑时不可变。`clientSecretSet` 呈现「已设置」；空输入仍表示保留，不填入伪装的星号值。用户名和 Git 名允许按序多个字段；所有空值、范围与保留键限制沿用当前 Schema。
 
 自定义映射由每行「平台字段名 ← 身份来源字段」组成；新增／删除映射行属于表单草稿，仍转成原 `claimMappings` 数组。保留最多 20 项与字段约束，非法字段逐行报错。
 
