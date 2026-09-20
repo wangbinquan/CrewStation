@@ -1113,7 +1113,9 @@ T11 列表／概览本地提交为 `a1a16107bed76891e089198e2bfc9cf1378944b7`，
 
 **本轮两笔提交已由并行发布者推送上库**。最终 fetch 确认本地 main 与 origin/main 同为 `dc788b7c63b32d5963ddc1602fa7a0e3eae40af6`；[精确 SHA CI 35506895560](https://github.com/wangbinquan/CrewStation/actions/runs/35506895560) 已于 2026-09-20 11:15:59Z 全部成功：static、unit、module、console、gate、e2e 均为 success（e2e 5分47秒）。这证明已发布候选，不代表 RFC-010/011/012 未提交工作树已通过完整验收。
 
-真实新建 Agent 长历史验收仍被自动审批拦截，理由为需要明确授权创建验证资源；已询问作者是否允许创建一个验证会话并在结束后停止，尚待答复，未绕过限制。细节见 `proposal/rfc/RFC-008-development-session-ux/acceptance.md`。本小节保留在共享 STATE，交由后续相关任务完整提交；并行源代码未纳入本次滚动修复提交。
+作者随后明确回复「授权」，真实长历史验收已完成：仅创建 `CLI 45afe1`，执行任务 `tsk_01a0bf16644d7000bbeddca54490b791`，沿用 150m／1Gi／2Gi。OpenCode 1.18.29 生成带首尾标记的 80 行，实测滚轮、拖动、刷新与平台重连后回看历史均生效，输入区保持固定。已通过「结束进程」停止验证 Agent，页面显示已结束，独立 Pod 已回收；主开发会话保持连接、工作树未修改。细节见 `proposal/rfc/RFC-008-development-session-ux/acceptance.md`。
+
+验收期间共享 Docker 虚拟磁盘满导致 PostgreSQL 与会话服务中断。已先完整备份六份无标签、无容器引用的旧构建镜像，再仅回收这些缓存，恢复 1.2G 可用空间；未删除业务卷或运行容器。数据库自动恢复，API／controller／session／console 均 1/1。备份为 `/private/tmp/cs-rfc008-unused-images-20260920.tar`，摘要与恢复办法见验收记录；磁盘仍接近满额，后续构建前需另行处理容量。
 
 
 ## 2026-09-20 RFC-012：项目算力授权与默认可见性（Done）
