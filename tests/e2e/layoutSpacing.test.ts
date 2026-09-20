@@ -38,6 +38,21 @@ async function spacing(page: Page, label: string, row = false) {
   })()`);
 }
 
+async function providerHeaderSpacing(page: Page) {
+  return page.eval<{ titleGap: number; bodyGap: number; height: number; width: number; containerWidth: number; overflow: number }>(`(() => {
+    const button = [...document.querySelectorAll('button')].find((node) => node.textContent.trim() === '新增身份提供方');
+    const header = button?.closest('header'), title = header?.querySelector('h2'), content = header?.nextElementSibling?.firstElementChild;
+    if (!button || !header || !title || !content) throw new Error('Missing identity provider header or content');
+    const action = button.getBoundingClientRect(), heading = title.getBoundingClientRect(), container = header.getBoundingClientRect();
+    return {
+      titleGap: Math.max(action.left - heading.right, action.top - heading.bottom),
+      bodyGap: content.getBoundingClientRect().top - container.bottom,
+      height: action.height, width: action.width, containerWidth: container.width,
+      overflow: document.documentElement.scrollWidth - innerWidth,
+    };
+  })()`);
+}
+
 describe.skipIf(!session)('卡片操作区的真实布局间距', () => {
   test.each([1280, 390])('%dpx：镜像示例与凭据操作之间留白，按钮保持自然尺寸', async (width) => {
     const page = session!.admin;
@@ -53,14 +68,15 @@ describe.skipIf(!session)('卡片操作区的真实布局间距', () => {
     expect(page.takeErrors()).toEqual([]);
   }, 45_000);
 
-  test.each([1280, 390])('%dpx：身份提供方列表或空态与新增按钮之间留白', async (width) => {
+  test.each([1280, 390, 320])('%dpx：身份提供方标题、新增操作和内容之间留白', async (width) => {
     const page = session!.admin;
     await viewport(page, width);
     await open(page, '/admin/authentication');
-    const actual = await spacing(page, '新增身份提供方');
-    // 有数据和没有数据时都应由容器留出间隔，不依赖表格最后一行的 padding。
-    expect(actual.before).not.toBeNull();
-    expect(actual.before!).toBeGreaterThanOrEqual(8);
+    const actual = await providerHeaderSpacing(page);
+    // RFC-014 将新增操作移到标题栏；仍锁住标题与按钮、标题栏与列表／空态的真实间距。
+    expect(actual.titleGap).toBeGreaterThanOrEqual(8);
+    expect(actual.bodyGap).toBeGreaterThanOrEqual(8);
+    expect(actual.height).toBeLessThan(60);
     expect(actual.width).toBeLessThan(actual.containerWidth);
     expect(actual.overflow).toBeLessThanOrEqual(1);
     expect(page.takeErrors()).toEqual([]);
