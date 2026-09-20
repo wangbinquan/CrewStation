@@ -45,6 +45,8 @@ CM-01–24 已完成：248 个来源无错误，完整快照 450 项资源、32 
 
 最终完整检查 **1875 pass／5 skip／0 fail，10393 assertions，303 文件，265.13s**，本次发布新增可执行行覆盖 **47／48（97.9%）**。期间修复了集群装配测试在 Pod 真正创建前模拟握手的竞态，完整等候队列操作后再关闭夹具；磁盘耗尽的无效轮次和仅清理未被使用构建缓存的恢复过程均如实留档。实现 `119bf59` 与测试修正 `7237ecc` 已随共享 main 推送，发布后 `HEAD == origin/main == 7237ecce628e4693d69127bea766e13fca0ff13e`、index 为空；[精确 SHA CI](https://github.com/wangbinquan/CrewStation/actions/runs/35516088549) 六个作业全部成功，RFC-010 已 Done（T1–T11、CM-01–25）。逐项 ID、UID、HTTP／耗时／trace 与历史失败见 `proposal/rfc/RFC-010-cluster-management/acceptance.md`。
 
+收口文档 `207cc4a` 的后续 CI 发现既有历史 Agent 测试在名册回执前向禁用输入框合成输入，导致快捷键断言失败；已用受控回执稳定复现并修正测试为等待实际可编辑，生产代码未变。两个相关文件 14 pass／0 fail／133 assertions；追加完整门禁与发布结果见同一验收记录。
+
 ## 并行接力：用例防护体系与 CI 用例执行体系（2026-09-20）
 
 作者要求把用例防护体系与 GitHub 上的 CI 用例执行体系建立起来：新功能有防护用例的位置与编写要求，新增与重构不弄坏已有业务。

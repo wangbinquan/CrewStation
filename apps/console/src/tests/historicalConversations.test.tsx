@@ -12,6 +12,9 @@ const cliPath = `/projects/${activityProjectId}/dev-session`, path = `${cliPath}
 const input = () => document.querySelector<HTMLTextAreaElement>('textarea[aria-label="发给 Agent 的消息"]')!;
 const button = (label: string) => [...document.querySelectorAll('button')].find((node) => node.textContent === label)!;
 async function edit(text: string) {
+  const readyBy = Date.now() + 1000;
+  while (input()?.disabled !== false && Date.now() < readyBy) await page!.settle();
+  expect(input()?.disabled).toBe(false);
   await act(async () => { const node = input(); node.focus(); Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!.call(node, text); node.dispatchEvent(new Event('input', { bubbles: true })); node.dispatchEvent(new KeyboardEvent('keyup', { key: 'a', bubbles: true })); });
   await page!.settle();
 }
@@ -35,7 +38,12 @@ test('历史 Agent 草稿按对象保留，切换、新建取消与发送失败�
 });
 
 test('发送在途时重复快捷键只发送一次；成功回执不清除随后编辑的新内容', async () => {
-  fixture = historicalConversationFixture(); page = await renderApp(path); await edit('第一条消息');
+  const rosterReady = Promise.withResolvers<void>();
+  fixture = historicalConversationFixture(rosterReady.promise); page = await renderApp(path);
+  // CI 曾在名册回执前向禁用输入框注入消息；固定回执顺序，不能靠三个事件循环假设已经可编辑。
+  expect(input().disabled).toBe(true);
+  queueMicrotask(() => rosterReady.resolve());
+  await edit('第一条消息');
   // 按钮 disabled 曾被 Ctrl+Enter 绕过；同步连续事件也必须只派发一次。
   await act(async () => { input().dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true })); input().dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', metaKey: true, bubbles: true })); }); await page.settle();
   expect(fixture.sends).toHaveLength(1); expect(input().value).toBe('第一条消息');
