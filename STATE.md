@@ -54,6 +54,10 @@
 CI 变成六个作业：`static`／`unit`／`module`／`console` 并行，`gate` 合并三层产物做按层汇总、**分层审计**（每个用例文件都必须真的跑过；方法级与工作台两层不允许任何跳过）与新增代码防护，`e2e` 独立并自带 PostgreSQL（`CS_TEST_REQUIRE=e2e,database`）。**看一次推送绿不绿，看 `gate` 与 `e2e`。**
 本机 `bun run check` 不变；新增 `bun run test:unit`／`test:module`／`test:console`／`test:e2e` 可单跑一层。`check:ci` 已删除。用例文件只许用 `.test.ts(x)` 命名（`test-discipline` 新增的一条）。
 
+**按层拆分的验证**：`9cedae486dd8d99dfe66b80e2718750e9307ff33` 经作者确认与 RFC-008 暂存的本地提交 `b69fef7` 一起推送。它的 [CI 35506624499](https://github.com/wangbinquan/CrewStation/actions/runs/35506624499) `static`／`unit`／`e2e` 绿，`module`／`console` 各红一条——都是 `b69fef7` 改了按钮文案与终端快照却漏改的旧断言（`rebuildSession.test.tsx`、`runnerProtocol.test.ts`），与分层无关；`gate` 如实汇总后按设计变红。
+RFC-008 会话随即提交修正 `dc788b7c63b32d5963ddc1602fa7a0e3eae40af6`，其 [CI 35506895560](https://github.com/wangbinquan/CrewStation/actions/runs/35506895560) 六个作业全绿：方法级 UT 55 个文件 292 条、**0 跳过**；模块级 UT 152 个文件 978 条（970 pass／8 skip）；工作台 69 个文件 474 条全过；`gate` 合并 1744 条、行覆盖率 96.3%、分层审计通过；`e2e` 22 pass／17 skip（自带 PostgreSQL 后 `apiInvocation` 的 2 条不再跳过）。
+**事故记录**：准备 `9cedae4` 时我用「先以写模式打开、再读取」的写法就地改写，把工作树里的 `STATE.md` 截成了 0 字节，其中有三个并行会话未提交的接力内容（RFC-011 新段、RFC-009 的 PS-11 结论、RFC-008 追加段）。已按各会话操作记录里的补丁原文在已提交版本上逐个重放恢复，并与对方一分钟前自己量到的 `git diff --numstat`（+20／−3）对上；期间 `STATE.md` 为空约 25 分钟（18:46–19:11），在此期间读过它的会话请重新读取。写法教训见 `dev-gotchas.md`「就地改写共享文件」。
+
 ## 最新接力：项目设置与开发资源分工（2026-09-20）
 
 作者要求项目设置直观、简化，并明确批准「批准实施并批准代码提交上库」。生产实现已完成：
