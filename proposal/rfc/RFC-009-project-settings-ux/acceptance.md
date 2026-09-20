@@ -45,7 +45,10 @@
 - 本批路径清单 `/private/tmp/rfc009-paths.json`；生产与测试内容指纹 `/private/tmp/rfc009-candidate-sha256.json`，用于复用同一候选门禁。
 - 共同完整 gate 第一次停在新增 E2E 的两处 `Page.eval` 返回类型，未进入测试；仅补类型参数，根类型检查通过。
 - 最终共同 `bun run check` **1684 pass／5 skip／0 fail，9534 assertions，272 文件，228.33 秒**。架构、全仓 lint、根与 console 类型均通过，日志 `/private/tmp/rfc008009-check-final-2.log`。59 个本批生产／测试文件内容指纹未变。
-- 该本地门禁运行于共享工作树，包含 RFC-008 及其他任务未提交的门禁硬化；它们未混入本批范围。最终干净 checkout 结果单独以精确 SHA GitHub CI 核对，发布证据待回填。
+- 该本地门禁运行于共享工作树，包含 RFC-008 及其他任务未提交的门禁硬化；它们的代码未混入本批范围。最终干净 checkout 结果单独以精确 SHA GitHub CI 核对。
+- 实现提交 `c5e5f0ec7a6563183d64f5fedf8a166536d9a31c` 按 74 个精确路径上库，提交后核对署名、路径与远端一致；RFC-008 的两份共享文档输出保持完整。
+- 精确 SHA [CI 35503015065](https://github.com/wangbinquan/CrewStation/actions/runs/35503015065) 于 `2026-09-20T09:47:55Z` 完成，`check` **success（2分56秒）**、`e2e` **success（6分16秒）**。
+- 已读取 hosted e2e 原始日志：**18 pass／19 skip／0 fail／67 assertions**。该工作流没有 GitLab 与可验收项目，新增四个项目布局场景及五个项目能力场景在 CI 跳过；它们的实际执行证据是本机 11 项／274 assertions，不能把 CI 成功解读成托管环境覆盖了项目实机路径。
 
 测试夹具、真实浏览器 E2E 与 CUA 手工交互分别记录，以上计数有重叠，不相加为不同用例总数。
 本次没有新增后端 DTO、迁移或持久化配置。保留 RFC-008 和其他任务的共享树输出；提交只包含明确范围。

@@ -11,6 +11,22 @@
 
 **RFC-003 工作台 UX 重设计已 Done（2026-09-16）：52／52 项 UX-AT 全部实机通过，本地 gate 与精确 SHA CI 通过。RFC-004（管理员定义 Agent 启动前 Hook）已按 RFC-006 的裁定 C8 置为 Superseded，其 AR 实机验收不再执行。** RFC-001 与 RFC-002 都已 Done，见 `proposal/rfc/README.md` 的索引表。**RFC-005（OIDC／OAuth 2.0 公司登录）于 2026-09-18 落档、同日按作者会话目标「完整实现整个RFC并提交上库」实施完毕并实机验收，已 Done。** **RFC-006（算力档位合并运行环境）2026-09-18 落档，同日作者设定会话目标「完整实现RFC并提交上库」，同日实施完成并 Done：CP-01…CP-22 实机核对完毕，基线三件套回填到 v0.3.4，见下方接力。** **RFC-007 于 2026-09-20 完成 T1–T8，本机 Chrome 四角色、旧页签恢复、本地 gate 与精确 SHA CI 全部通过，已 Done。**
 
+## 并行接力：用例防护体系与 CI 用例执行体系（2026-09-20）
+
+作者要求把用例防护体系与 GitHub 上的 CI 用例执行体系建立起来：新功能有防护用例的位置与编写要求，新增与重构不弄坏已有业务。
+先核对现状（本机 266 个用例文件、1642 条用例、行覆盖率 95.9%）：用例不缺，缺的是让它们不会悄悄失效的机制，逐条证据在 `docs/engineering/testing.md` §0。
+本批没有改任何产品行为；结构性规则记在 **ADR-0007**（状态「实施中」，P1–P6 六个取值待作者复核）。
+
+- **规范**：新增 `docs/engineering/testing.md`——用例分层（沿用 Plan §10.1）、每种单元的用例放哪、每类改动必带哪些用例、编写要求、CI 执行体系、已知防护缺口。开发规则 §3／§4、结构文档 §1／§10（v0.4）、CLAUDE.md、AGENTS.md、README、`tests/e2e/README.md`、脚手架模板都已指向它。
+- **绿必须等于跑过**：`@crewstation/testkit` 新增能力闸门与 `CS_TEST_REQUIRE`（`database`、`gitlab`、`e2e`）。CI 的 `check` 点名 `database`、`e2e` 点名 `e2e`；此前数据库连不上时约 60 组集成用例整层跳过、e2e 登录失败时整套跳过，两个作业都照绿。
+- **`tools/arch` 由六条规则变八条**：`test-discipline`（禁 `.only`、无条件 `.skip`、`.todo`、`.failing`、恒真 `skipIf`、用例重试；仓库根 `tests/` 只允许约定的用例层目录）与 `migration-lock`（`tools/arch/migrations.lock.json` 锁住 62 个迁移；`bun run migrations:lock` 只追加）。规则清单收进 `ruleSet.ts`。
+- **业务契约面金样**：`packages/contracts/tests/golden/contractSurface.json` 锁住约定表常量、事件推送头、TaskRunner 协议号与 Manifest、事件、业务任务的 Schema 形状；纯新增 `bun run contracts:lock`，破坏性变更必须 `--breaking "<作者批准的依据>"` 并永久留痕。另有三条对账用例：模板与接入容器手抄的约定名、业务任务服务域路由清单（让最小样例自己的客户端代码打真实路由）、能力说明里的 API 表。
+- **`tools/testguard`（新工具单元）**：CI 作业摘要（用例汇总、逐条列出的跳过、覆盖率、本次推送删除或改名的用例），以及**阻断性的新增代码防护**——只看本次推送改动的行，改到的生产文件必须有用例加载、改动的可执行行 ≥80% 被执行到；无存量基线。`bunfig.toml` 让 `bun test` 始终产出 `coverage/junit.xml` 与 `lcov.info`，本机与 CI 仍是同一条 `bun run check`。
+- **顺带补的用例**：平台迁移清单完整性（漏挂一个模块的迁移会红，已做变异验证）、工作台中英文文案键对齐、脚手架产物。
+
+两个实测结论写进了 `dev-gotchas.md`「用例与 CI」：全仓 `--randomize` 会有约 100 条因有意的文件内顺序依赖而失败，所以没有引入随机序巡检；`.only` 在本机静默吃掉同文件其余用例，只有 CI 才报错。
+**最大的遗留缺口**：CI 里没有 GitLab，项目空间的实机用例与 scm 的真实 GitLab 用例在 CI 永远跳过，开通、发布、切流、开发会话在 CI 没有实机证明；三种做法登记为 `implementation-open-questions.md` **I20**，待作者裁定。
+
 ## 最新接力：项目设置与开发资源分工（2026-09-20）
 
 作者要求项目设置直观、简化，并明确批准「批准实施并批准代码提交上库」。生产实现已完成：
@@ -21,7 +37,9 @@
 已部署 `cs-console:rfc009-20260920-3` 并实机操作默认入口、变量草稿往返、错误聚焦、离开确认和五资源主题。
 最终真实 E2E **11 pass／0 fail／274 assertions**；1280／390／320px 中文浅色、390px 英文深色九主题均无整页横向溢出。
 配置／成员／应用／资源候选 46 项、API／边界 14 项回归通过，console 构建通过；与 RFC-008 共用最终完整 gate，
-**1684 pass／5 skip／0 fail，9534 assertions，228.33 秒**，架构、lint、两套类型全部通过。本批精确上库与 CI 继续核验。
+**1684 pass／5 skip／0 fail，9534 assertions，228.33 秒**，架构、lint、两套类型全部通过。实现提交
+`c5e5f0ec7a6563183d64f5fedf8a166536d9a31c` 已上库，精确 SHA [CI 35503015065](https://github.com/wangbinquan/CrewStation/actions/runs/35503015065)
+的 `check`／`e2e` 均成功。CI 的项目实机组因未提供 GitLab／项目而跳过，本批九主题布局证据来自本机 11 项实跑，未将 CI 绿色当作它们已执行。
 没有实际修改演示项目配置、成员权限或归档。真实只读 API 试调在原有容器网关通道超时，页面原因与输入保留；
 未得到 HTTP／trace，PS-11 的真实成功响应欠证，因此 RFC-009 仍 **In Progress**。实现、自动化与实机证据分别见
 `proposal/rfc/RFC-009-project-settings-ux/acceptance.md`。保留并行 RFC-008 的全部输出，Git 发布串行协调。
