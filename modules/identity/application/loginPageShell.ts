@@ -1,5 +1,27 @@
 import { brandMarkDataUrl } from '../domain/brandMark';
 
+const PROVIDER_CARD_STYLES = `
+  .provider-list { display: grid; gap: 10px; }
+  a.provider-card { display: grid; grid-template-columns: 42px minmax(0, 1fr) 30px; align-items: center; gap: 12px; min-height: 68px; padding: 11px 12px; border: 1px solid #c8d5ea; border-radius: 10px; background: #f7f9fd; color: #182438; text-decoration: none; text-align: left; box-shadow: 0 1px 2px #1824380a; }
+  a.provider-card:hover { border-color: #235bd8; background: #eef3fd; box-shadow: 0 4px 12px #235bd81f; }
+  a.provider-card:active { transform: translateY(1px); }
+  .provider-card-mark { display: grid; place-items: center; width: 42px; height: 42px; border-radius: 10px; background: #dfe9fb; color: #235bd8; font: 750 12px/1 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .04em; }
+  .provider-card-copy { min-width: 0; }
+  .provider-card-copy strong { display: block; overflow: hidden; color: #182438; font-size: 15px; font-weight: 650; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
+  /* 名字与说明分两行：显示名常是中英混排（「Mock 公司身份」「Corp SSO」），拼进一句话里就会缺字间空格。 */
+  .provider-card-copy > span { display: block; margin-top: 3px; color: #59677c; font-size: 12px; line-height: 1.35; }
+  .provider-card-action { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 8px; background: #235bd8; color: #fff; font-size: 17px; line-height: 1; }
+`;
+
+const DARK_PROVIDER_CARD_STYLES = `
+    a.provider-card { border-color: #344154; background: #202734; color: #e7edf6; box-shadow: 0 1px 2px #0003; }
+    a.provider-card:hover { border-color: #5d8df0; background: #252e3d; box-shadow: 0 4px 14px #0005; }
+    .provider-card-mark { background: #263b61; color: #b8ceff; }
+    .provider-card-copy strong { color: #f5f8fc; }
+    .provider-card-copy > span { color: #adbacd; }
+    .provider-card-action { background: #3970df; color: #fff; }
+`;
+
 /** 页面外壳：配色与 apps/console 的 tokens.css 同源，跟随系统明暗；三张登录相关页面共用它。 */
 export function loginPageShell(title: string, body: string): string {
   return `<!doctype html>
@@ -21,11 +43,7 @@ export function loginPageShell(title: string, body: string): string {
   input { width: 100%; box-sizing: border-box; padding: 8px 10px; border: 1px solid #dce3ed; border-radius: 6px; font-size: 15px; background: #fff; color: inherit; }
   button { margin-top: 18px; width: 100%; padding: 10px; border: 0; border-radius: 6px; background: #235bd8; color: #fff; font-size: 15px; cursor: pointer; }
   button:hover { background: #1c4db8; }
-  a.provider { display: block; margin-top: 10px; padding: 10px; border: 1px solid #235bd8; border-radius: 6px; color: #235bd8; text-decoration: none; font-size: 15px; text-align: center; }
-  a.provider strong { display: block; font-weight: 600; }
-  /* 名字与说明分两行：显示名常是中英混排（「Mock 公司身份」「Corp SSO」），拼进一句话里就会缺字间空格。 */
-  a.provider span { display: block; margin-top: 2px; font-size: 12px; color: #59677c; }
-  a.provider:hover { background: #eef3fd; }
+${PROVIDER_CARD_STYLES}
   a.back { display: inline-block; margin-top: 16px; font-size: 14px; color: #235bd8; }
   :focus-visible { outline: 2px solid #8db3ff; outline-offset: 2px; }
   .hint { color: #59677c; font-size: 12px; line-height: 1.6; word-break: break-all; }
@@ -44,9 +62,7 @@ export function loginPageShell(title: string, body: string): string {
     input { background: #222b39; border-color: #344154; }
     button { background: #3970df; }
     button:hover { background: #4d84ee; }
-    a.provider { border-color: #3970df; color: #9dbcff; }
-    a.provider span { color: #adbacd; }
-    a.provider:hover { background: #222b39; }
+${DARK_PROVIDER_CARD_STYLES}
     .hint { color: #adbacd; }
     .field-error { color: #f3b0b0; }
   }

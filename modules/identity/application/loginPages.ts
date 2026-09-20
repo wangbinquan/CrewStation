@@ -33,8 +33,14 @@ export function renderLoginPage({ discovery, returnTo, error, justBootstrapped }
     <button type="submit">登录</button>
   </form>` : '';
   const providers = discovery.providers.length === 0 ? '' : `
-  <h2>公司身份</h2>${discovery.providers.map((p) => `
-  <a class="provider" href="/auth/oidc/${encodeURIComponent(p.slug)}/start?returnTo=${encodeURIComponent(returnTo)}" aria-label="使用 ${escapeHtml(p.displayName)} 登录"><strong>${escapeHtml(p.displayName)}</strong><span>跳转到该身份提供方完成登录</span></a>`).join('')}`;
+  <h2>公司身份</h2>
+  <nav class="provider-list" aria-label="公司身份登录方式">${discovery.providers.map((p) => `
+    <a class="provider-card" href="/auth/oidc/${encodeURIComponent(p.slug)}/start?returnTo=${encodeURIComponent(returnTo)}" aria-label="使用 ${escapeHtml(p.displayName)} 登录">
+      <span class="provider-card-mark" aria-hidden="true">ID</span>
+      <span class="provider-card-copy"><strong>${escapeHtml(p.displayName)}</strong><span>使用公司身份继续</span></span>
+      <span class="provider-card-action" aria-hidden="true">→</span>
+    </a>`).join('')}
+  </nav>`;
   const empty = password === '' && providers === '' ? `
   <p class="error">当前没有可用的登录方式：用户名密码登录已关闭，且没有启用的身份提供方。持有集群权限的运维可在安装配置里设置 <code>CS_PASSWORD_LOGIN=force-on</code> 并重启 cs-auth 与 cs-api 恢复。</p>` : '';
   const done = justBootstrapped === true ? '<p class="notice">首位管理员已创建，引导令牌已永久失效。请用刚创建的用户名与密码登录。</p>' : '';
