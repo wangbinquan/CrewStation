@@ -23,6 +23,15 @@ bun run check                 # 完整门禁，实机验收包含在内
 
 换环境用 `CS_E2E_CONSOLE`（网关地址）和 `CS_E2E_CDP_PORT`（调试端口）覆盖。
 
+本机关闭密码登录、已安装开发 OIDC 时，使用已有开发管理员身份运行同一套用例：
+
+```bash
+CS_E2E_AUTH=dev-oidc CS_E2E_USERNAME=dev-admin bun run check
+```
+
+该模式只完成 OAuth/OIDC 登录并核对返回身份，不同步或修改测试账号的角色；不会把未知用户名映射为管理员。
+CI 继续使用默认的密码模式。不要通过指定一个未监听的 CDP 端口来把登录失败变成实机跳过。
+
 ## 在 GitHub CI 上
 
 `.github/workflows/ci.yml` 的 `e2e` 作业会真装一套平台再跑这些用例：kind 建集群 → `bootstrap.sh`

@@ -11,6 +11,7 @@ import { runnerLifecycle } from './runnerLifecycle';
 import { failEnvironment } from './failEnvironment';
 import { rebuildIsActive } from '../domain/environmentRebuild';
 import { deferWorkspaceRelease, scheduleExecutionCleanup } from './nativeExecution';
+import { waitForPausedPodRemoval } from './pausedPod';
 
 export type ReleaseReason = 'user' | 'owner-force' | 'business' | 'failed' | 'pod-lost' | 'profile-test';
 
@@ -74,6 +75,7 @@ export function lifecycleUseCases(deps: TaskRuntimeUseCaseDeps) {
       if (!svc) throw notFound('服务', env.serviceId);
       const profile = await deps.profiles.getTaskProfile(env.profile);
       if (!profile) throw precondition(`任务套餐 ${env.profile} 已不存在`);
+      await waitForPausedPodRemoval(cluster, env);
       const limit = (await deps.quotas.quotaLimit(env.projectId)) ?? 0;
       const token = newRunnerToken();
       const resumed = transition(env, 'creating', clock.now(), { runnerTokenHash: hashRunnerToken(token), connected: false, podUid: undefined });

@@ -48,6 +48,7 @@ export function projectResources(objects: ResourceObject[], facts: InventoryFact
       ...(slot ? { serviceId: slot.serviceId, physicalSlot: slot.physical, slotRole: slot.role, domainRevision: slot.revision, ...(slot.releaseId ? { releaseId: slot.releaseId } : {}) } : labels['crewstation.io/release'] ? { releaseId: labels['crewstation.io/release'] } : {}),
     };
     if (obj.kind === 'Pod' && labels['crewstation.io/task'] && !task) row.facts.identityReason = '没有匹配此 Pod UID 的任务实例记录；旧工作区需要 Runner 重新连接后绑定实例';
+    if (task?.kind === 'profile-test' && task.profileTestId) row.facts.profileTestId = task.profileTestId;
     if (slot) for (const [key, v] of Object.entries({ manifestReplicas: slot.manifestReplicas, overrideReplicas: slot.overrideReplicas, maxReplicas: slot.maxReplicas })) if (v !== undefined) row.facts[key] = String(v);
     if (obj.kind === 'HorizontalPodAutoscaler') row.facts.target = JSON.stringify(objectRecord(obj.spec).scaleTargetRef);
     row.availableActions = resourceCapabilities(row, facts, system, objects);

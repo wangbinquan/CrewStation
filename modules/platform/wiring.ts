@@ -374,7 +374,7 @@ function composeCluster(deps: PlatformModuleDeps, core: ReturnType<typeof compos
     if (target.purpose === 'development-cli') return dev.inspectClusterNative(actor, target.taskId as TaskId);
     if (target.purpose === 'development-agent') return dev.inspectClusterAgent(actor, target.taskId as TaskId);
     if (target.purpose === 'business-subtask' || target.purpose === 'business-workspace') return business.inspectClusterTask(actor, target, request);
-    if (target.purpose === 'profile-test') { if (request.action !== 'delete') throw precondition('档位测试只能停止，请从算力档位页面重新测试'); return { testId: target.labels['crewstation.io/profile-test'] }; }
+    if (target.purpose === 'profile-test') { if (request.action !== 'delete') throw precondition('档位测试只能停止，请从算力档位页面重新测试'); if (!target.facts.profileTestId) throw precondition('任务记录缺少档位测试关联，请从算力档位页面核对'); return { testId: target.facts.profileTestId }; }
     const env = await tasks.getEnvironment(target.taskId as TaskId); if (!env) throw precondition('开发环境不存在');
     const { checkedAt: _checkedAt, ...workspace } = await dev.workspaceStatus(actor, env.projectId);
     if (request.action === 'delete') return { taskId: env.id, volumeMode: env.volumeMode, workspace };
@@ -386,7 +386,7 @@ function composeCluster(deps: PlatformModuleDeps, core: ReturnType<typeof compos
     if (op.target.purpose === 'development-cli') return dev.manageClusterNative(actor, op.target.taskId as TaskId, op.action === 'restart', op.operationId);
     if (op.target.purpose === 'development-agent') return dev.manageClusterAgent(actor, op.target.taskId as TaskId, op.action === 'restart', op.operationId);
     if (op.target.purpose === 'business-subtask' || op.target.purpose === 'business-workspace') return business.executeClusterTask(actor, op);
-    if (op.target.purpose === 'profile-test') { await core.agentRuntime.api.stopClusterTest(actor, op.target.labels['crewstation.io/profile-test'] as ProfileTestId); await tasks.releaseEnvironment(op.target.taskId as TaskId, 'profile-test'); return { operationId: op.target.taskId! }; }
+    if (op.target.purpose === 'profile-test') { await core.agentRuntime.api.stopClusterTest(actor, inspection.domain?.testId as ProfileTestId); await tasks.releaseEnvironment(op.target.taskId as TaskId, 'profile-test'); return { operationId: op.target.taskId! }; }
     const env = await tasks.getEnvironment(op.target.taskId as TaskId); if (!env) throw precondition('开发环境不存在');
     if (op.action === 'delete') await dev.releaseSession(actor, env.projectId, { force: true, expectedTaskId: env.id });
     else await dev.rebuildSession(actor, env.projectId, { ...inspection.domain?.rebuild as Omit<RebuildDevSessionRequest, 'requestId'>, requestId: op.operationId });

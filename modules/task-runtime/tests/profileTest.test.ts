@@ -109,6 +109,7 @@ describe.skipIf(!available)('档位测试执行器（RFC-006 §6）', () => {
     expect(spec.volumes).toEqual([{ name: 'work', emptyDir: {} }]);
     expect(pod.metadata.labels).toMatchObject({ 'crewstation.io/project': 'platform', 'crewstation.io/service': 'profile-test', 'crewstation.io/workload': 'profile-test' });
     const taskId = await connectRunner();
+    expect((await runtime.api.listClusterTasks()).find((task) => task.taskId === taskId)).toMatchObject({ profileTestId: 'pft_1' });
     const outcome = await run;
     expect(outcome).toMatchObject({ state: 'passed', outcome: 'passed' });
     expect(outcome.context).toMatchObject({ kind: 'platform-namespace', taskId, image, imageDigest: image, runnerProtocol: 2, cliVersion: 'opencode 1.18.29', interpreters: [{ language: 'shell' }], workdir: '/work' });

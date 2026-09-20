@@ -72,4 +72,24 @@ describe.skipIf(!available)('cluster HTTP through actual platform composition', 
     expect(directory).toHaveLength(506); expect(directory.filter((p) => p.state === 'archived')).toHaveLength(505); expect(executions).toHaveLength(506);
     expect(new Set(executions.map((t) => t.taskId)).size).toBe(506); expect(executions.every((t) => !('runnerTokenHash' in t))).toBe(true);
   });
+  test('profile-test stop resolves its durable test identity without a Pod label', async () => {
+    const taskId = 'tsk_77777777777777777777777777777777' as TaskId, testId = 'pft_77777777777777777777777777777777', namespace = 'crewstation-system', podName = 'profile-stop';
+    const pod = await k8s.create({ apiVersion: 'v1', kind: 'Pod', metadata: { name: podName, namespace, uid: crypto.randomUUID(), labels: { 'crewstation.io/task': taskId, 'app.kubernetes.io/managed-by': 'crewstation' } }, status: { phase: 'Pending' } });
+    await database.handle.client`INSERT INTO task_runtime.environments (id, project_id, service_id, kind, state, volume_mode, profile, namespace, pod_name, pvc_name, trace_id, runner_token_hash, labels, created_at, updated_at, last_activity_at, pod_uid)
+      VALUES (${taskId}, 'prj_00000000000000000000000000000001', 'svc_00000000000000000000000000000001', 'profile-test', 'creating', 'follow-container', 'coding-medium', ${namespace}, ${podName}, 'no-volume', '77777777777777777777777777777777', 'hash', ${JSON.stringify({ 'crewstation.io/profile-test': testId, 'crewstation.io/compute-profile': 'cluster-test' })}, NOW(), NOW(), NOW(), ${pod.metadata.uid!})`;
+    await database.handle.client`INSERT INTO agent_runtime.profile_tests (test_id, profile, revision, content_hash, trigger, created_by, state, context, stages, created_at)
+      VALUES (${testId}, 'cluster-test', 1, 'hash', 'manual', ${admin.userId}, 'running', ${JSON.stringify({ kind: 'platform-namespace', taskId })}, '[]', NOW())`;
+    const { cluster, agentRuntime, taskRuntime } = platform.modules;
+    await cluster.collect();
+    const row = (await cluster.api.resources(admin, { scope: 'system', limit: 50 })).items.find((r) => r.taskId === taskId)!;
+    // Live profile-test Pods intentionally carry no test-id label; only the UID-bound task record owns that link.
+    expect(row.labels['crewstation.io/profile-test']).toBeUndefined();
+    const checked = await inspect(row.resourceId, 'delete'); expect(checked.domain).toEqual({ testId });
+    const op = await accept(row.resourceId, 'delete'); await cluster.runOnce();
+    const result = await cluster.api.operation(admin, op.operationId); expect(result.phase, result.reason).toBe('succeeded');
+    expect(await agentRuntime.api.getTest(admin, 'cluster-test', testId as never)).toMatchObject({ state: 'unknown', outcome: 'environment-lost' });
+    expect(await taskRuntime.api.getEnvironment(taskId)).toMatchObject({ state: 'released' });
+    expect(await k8s.get(Resources.Pod!, podName, namespace)).toBeUndefined();
+  });
+
 });

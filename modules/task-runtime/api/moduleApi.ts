@@ -71,7 +71,7 @@ export interface CreateNativeExecutionInput {
 /** task-runtime 对外能力：环境生命周期与配额；授权由 dev-session／business-task 在调用前完成，这里只做准入与集群操作。 */
 export interface TaskRuntimeModuleApi {
   readonly name: 'task-runtime';
-  listClusterTasks(): Promise<Array<{ taskId: string; projectId: string; namespace: string; podName: string; podUid?: string; pvcName: string; pvcUid?: string; kind: string; state: string; purpose?: string; parentTaskId?: string; agentId?: string; terminalId?: string; profile: string; profileRevision?: number; revision: string; volumeMode: string }>>;
+  listClusterTasks(): Promise<Array<{ taskId: string; projectId: string; namespace: string; podName: string; podUid?: string; pvcName: string; pvcUid?: string; kind: string; state: string; purpose?: string; parentTaskId?: string; agentId?: string; terminalId?: string; profile: string; profileRevision?: number; profileTestId?: string; revision: string; volumeMode: string }>>;
   createEnvironment(input: CreateEnvironmentInput): Promise<EnvironmentDto>;
   createNativeExecution(input: CreateNativeExecutionInput): Promise<EnvironmentDto>;
   releaseEnvironment(taskId: TaskId, reason: ReleaseReason): Promise<EnvironmentDto>;

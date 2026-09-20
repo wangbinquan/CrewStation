@@ -63,9 +63,14 @@ export function connectBrowser(): Promise<Browser> {
  * 而不是悄悄停在登录页上让后面的断言给出假结论。
  */
 export async function signIn(browser: Browser, username: string, password?: string): Promise<Page> {
-  const secret = password ?? e2ePassword();
   const page = await browser.newPage(await browser.newContext());
   await page.goto(`${CONSOLE_URL}/`);
+  if (process.env.CS_E2E_AUTH === 'dev-oidc') {
+    await signInDevOidc(page, username);
+    await settle(page);
+    return page;
+  }
+  const secret = password ?? e2ePassword();
   const onLogin = await page.eval<boolean>(`!!document.querySelector('form input[name="password"]')`);
   if (onLogin) {
     const loaded = page.waitForLoad();
@@ -79,6 +84,22 @@ export async function signIn(browser: Browser, username: string, password?: stri
   }
   await settle(page);
   return page;
+}
+
+/** 显式选择本机已有开发身份；只走 OIDC 登录，不调用登录器的角色同步／授予接口。 */
+async function signInDevOidc(page: Page, username: string): Promise<void> {
+  const subjects: Record<string, string> = { 'dev-admin': 'dev-role-admin', 'dev-developer': 'dev-role-developer', 'dev-tester': 'dev-role-tester', 'dev-member': 'dev-role-member' };
+  const subject = subjects[username];
+  if (!subject) throw new Error(`dev-oidc 验收须指定已有开发身份，不能将 ${username} 自动映射为管理员`);
+  const provider = 'a[href^="/auth/oidc/dev-roles/start"]';
+  await page.waitUntil(`!!document.querySelector(${JSON.stringify(provider)})`);
+  await page.eval(`document.querySelector(${JSON.stringify(provider)}).click()`);
+  const role = `a[href*="as=${subject}"], form:has(input[name="as"][value="${subject}"]) button[type="submit"]`;
+  await page.waitUntil(`!!document.querySelector(${JSON.stringify(role)})`);
+  await page.eval(`document.querySelector(${JSON.stringify(role)}).click()`);
+  await page.waitUntil(`location.origin === ${JSON.stringify(CONSOLE_URL)} && !location.pathname.startsWith('/auth/')`, 20000);
+  const response = await page.eval<{ status: number; name?: string }>(`fetch('/v1/me').then(async r => ({status:r.status, name:(await r.json()).name}))`);
+  if (response.status !== 200 || response.name !== username) throw new Error(`OIDC 验收登录未得到指定身份 ${username}（HTTP ${response.status}）`);
 }
 
 /** 实机用的管理员用户名：安装脚本写在 .local/admin.env 里，可用 CS_E2E_USERNAME 覆盖。 */

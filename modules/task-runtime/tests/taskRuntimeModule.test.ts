@@ -112,6 +112,56 @@ describe.skipIf(!available)('task-runtime module', () => {
     expect(rows[0]!.running).toBeLessThanOrEqual(2);
   });
 
+  test('业务恢复等待旧 Pod 真正删除再占用配额，保留工作卷且仅创建一次新实例', async () => {
+    quota = 20;
+    const env = await runtime.api.createEnvironment({ serviceId, kind: 'business', volumeMode: 'persistent' });
+    const key = `v1/Pod/cs-demo/${env.podName}`, oldPod = k8s.objects.get(key)!;
+    const volume = k8s.objects.get(`v1/PersistentVolumeClaim/cs-demo/${env.podName}-work`)!;
+    await runtime.api.onRunnerConnected(env.id, podEnv(env.podName).CS_RUNNER_TOKEN!);
+    await runtime.api.pauseEnvironment(env.id);
+    const before = await runtime.api.runningTaskCount(projectId);
+    k8s.objects.set(key, { ...oldPod, metadata: { ...oldPod.metadata, deletionTimestamp: new Date().toISOString() } });
+    const originalGet = k8s.get, originalCreate = k8s.create; let reads = 0, created = 0;
+    k8s.create = async (object) => {
+      if (object.kind === 'Pod' && object.metadata.name === env.podName) {
+        created += 1;
+        return originalCreate({ ...object, metadata: { ...object.metadata, uid: crypto.randomUUID() } });
+      }
+      return originalCreate(object);
+    };
+    k8s.get = async (ref, name, namespace) => {
+      if (ref.kind === 'Pod' && name === env.podName && namespace === 'cs-demo') {
+        expect((await runtime.api.getEnvironment(env.id))?.state).toBe('paused');
+        expect(await runtime.api.runningTaskCount(projectId)).toEqual(before);
+        if (++reads === 3) k8s.objects.delete(key);
+      }
+      return originalGet(ref, name, namespace);
+    };
+    try {
+      const resumed = await runtime.api.resumeEnvironment(env.id);
+      expect(reads).toBe(3); expect(created).toBe(1); expect(resumed.state).toBe('creating');
+      expect(k8s.objects.get(key)?.metadata.uid).not.toBe(oldPod.metadata.uid);
+      expect(k8s.objects.get(`v1/PersistentVolumeClaim/cs-demo/${env.podName}-work`)?.metadata.uid).toBe(volume.metadata.uid);
+    } finally { k8s.get = originalGet; k8s.create = originalCreate; await runtime.api.releaseEnvironment(env.id, 'business'); }
+  });
+
+  test('业务恢复遇到同名不同 UID 时保留暂停状态与配额，拒绝覆盖新实例', async () => {
+    quota = 20;
+    const env = await runtime.api.createEnvironment({ serviceId, kind: 'business', volumeMode: 'persistent' });
+    const key = `v1/Pod/cs-demo/${env.podName}`, oldPod = k8s.objects.get(key)!;
+    await runtime.api.onRunnerConnected(env.id, podEnv(env.podName).CS_RUNNER_TOKEN!);
+    await runtime.api.pauseEnvironment(env.id);
+    const before = await runtime.api.runningTaskCount(projectId);
+    k8s.objects.set(key, { ...oldPod, metadata: { ...oldPod.metadata, uid: 'replacement-instance' } });
+    try {
+      await expect(runtime.api.resumeEnvironment(env.id)).rejects.toThrow('实例已变化');
+      expect(await runtime.api.getEnvironment(env.id)).toMatchObject({ state: 'paused' });
+      expect((await runtime.api.listClusterTasks()).find((task) => task.taskId === env.id)?.podUid).toBe(oldPod.metadata.uid);
+      expect(await runtime.api.runningTaskCount(projectId)).toEqual(before);
+      expect(k8s.objects.get(key)?.metadata.uid).toBe('replacement-instance');
+    } finally { k8s.objects.delete(key); await runtime.api.releaseEnvironment(env.id, 'business'); }
+  });
+
   test('只读会话查询保留最新失败，显式新建与释放后不复活旧失败记录', async () => {
     quota = 5;
     const failed = await runtime.api.createEnvironment({ serviceId, kind: 'dev-session', branch: 'main' });

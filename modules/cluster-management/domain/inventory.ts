@@ -6,7 +6,7 @@ export interface ResourceObject {
   [key: string]: unknown;
 }
 export interface ProjectFact { projectId: string; name: string; slug: string; namespace: string; kind: string; state: string; serviceId?: string; serviceName?: string }
-export interface TaskFact { taskId: string; projectId: string; namespace: string; podName: string; podUid?: string; pvcName: string; pvcUid?: string; kind: string; state: string; purpose?: string; parentTaskId?: string; agentId?: string; terminalId?: string; profile: string; profileRevision?: number; revision: string; volumeMode: string }
+export interface TaskFact { taskId: string; projectId: string; namespace: string; podName: string; podUid?: string; pvcName: string; pvcUid?: string; kind: string; state: string; purpose?: string; parentTaskId?: string; agentId?: string; terminalId?: string; profile: string; profileRevision?: number; profileTestId?: string; revision: string; volumeMode: string }
 export interface ReleaseFact { serviceId: string; namespace: string; serviceName: string; physical: 'blue' | 'green'; role: 'prod' | 'preview'; releaseId?: string; state: string; manifestReplicas?: number; overrideReplicas?: number; maxReplicas?: number; revision: string }
 export interface ProtectedReference { namespace: string; kind: string; name: string; reason: string }
 export interface InventoryFacts { projects: ProjectFact[]; tasks: TaskFact[]; releases: ReleaseFact[]; retained: ProtectedReference[]; complete: boolean; reason?: string }

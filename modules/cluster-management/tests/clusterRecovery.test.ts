@@ -21,6 +21,27 @@ async function setup() {
   return { k8s, state, data, module, inspect, accept, repository: drizzleClusterRepository(database.db) };
 }
 describe.skipIf(!available)('durable inventory and operation recovery', () => {
+  test('inventory refresh proceeds while a resource operation waits for convergence', async () => {
+    const f = await setup();
+    await f.k8s.create(object('Deployment', 'cs-api', 'crewstation-system', { replicas: 1, template: { metadata: {}, spec: { containers: [{ name: 'api', image: 'api' }] } } }));
+    const first = await f.module.collect(), waiting = Promise.withResolvers<void>(), resume = Promise.withResolvers<void>();
+    f.state.wait = async () => { waiting.resolve(); await resume.promise; };
+    const lifecycle = f.module.workers[0]!;
+    lifecycle.start();
+    try {
+      const deadline = Date.now() + 3000;
+      while ((await f.repository.latest())?.id === first.id && Date.now() < deadline) await Bun.sleep(10);
+      expect((await f.repository.latest())?.id).not.toBe(first.id);
+      await f.accept('cs-api', 'restart'); await waiting.promise;
+      await f.k8s.create(object('ConfigMap', 'created-during-rollout'));
+      await f.module.api.refresh(admin);
+      const refreshedBy = Date.now() + 3000;
+      let seen = false;
+      do { seen = (await f.repository.latest())?.resources.some((r) => r.name === 'created-during-rollout') ?? false; if (!seen) await Bun.sleep(20); } while (!seen && Date.now() < refreshedBy);
+      // A pending rollout previously held the shared queue batch and prevented every later manual refresh.
+      expect(seen).toBe(true);
+    } finally { resume.resolve(); await lifecycle.stop(); }
+  }, 10000);
   test('cancelled collection preserves the last complete snapshot and the next attempt remains usable', async () => {
     const f = await setup(); await f.k8s.create(object('ConfigMap', 'retained')); const previous = await f.module.collect();
     const cancel = new AbortController(), list = f.k8s.listPage;
