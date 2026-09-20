@@ -1,6 +1,6 @@
 # RFC-009｜实现与验收记录
 
-> 2026-09-20。作者已批准实施及提交上库。生产实现完成；以下严格区分 HTTP 边界回归、真实工作台操作与尚未取得的外部 API 响应。
+> Done · 2026-09-20。作者已批准实施及提交上库。生产实现、原有验收与 PS-11 真实 API 成功响应均完成；HTTP 边界回归、真实工作台操作和旧部署问题分别记录。
 
 ## 1. 已落地行为
 
@@ -28,7 +28,7 @@
 | PS-08 | 实际成员列表及新增入口可用；`projectMembers` 覆盖精确查找、直接修改该行、ID、目录、移除、转移及失败草稿，未实际改成员权限 |
 | PS-09 | 高级保留归档后果；`projectMembers` 覆盖管理员限定、状态约束、取消、失败与重试，未实际归档项目 |
 | PS-10 | `projectResources` 核对五主题内容和空／错／未知配额；实际 demo 仓库为 `crewstation/demo`、分支 `main`，状态 ready，运行任务与配额可见 |
-| PS-11 | 目录显示真实 22 个操作并打开详情试调；`catalogConsumption`、`apiInvocationForm`／`Draft` 覆盖授权、Swagger、请求、HTTP／耗时／trace及草稿；实际 GET 在原有容器网关通道超时，成功响应验收仍欠证，详见 §4 |
+| PS-11 | 目录显示真实 22 个操作；`catalogConsumption`、`apiInvocationForm`／`Draft` 覆盖授权、Swagger、请求、HTTP／耗时／trace及草稿；专用验收项目的详情和 Swagger 分别实际返回 HTTP 200、112／91 ms，任务、操作键和 trace 完整，见 §5。旧演示代理超时仍保留在 §4 |
 | PS-12 | `projectResources` 验证 Manifest 文件、订阅与投递 ID 往返，来源为代码声明；真实事件主题提供代码和投递入口 |
 | PS-13 | `projectResources` 验证开发／生产数据、连接变量名、资源 ID 和同项目 data 深链接；真实数据主题保留对应入口 |
 | PS-14 | `projectResources`、`projectNavigation`、`adminProjectSpace` 覆盖两空间旧地址、优先级、参数清理与后退，含 overview 携带过期 operation 的兼容情形 |
@@ -53,7 +53,7 @@
 测试夹具、真实浏览器 E2E 与 CUA 手工交互分别记录，以上计数有重叠，不相加为不同用例总数。
 本次没有新增后端 DTO、迁移或持久化配置。保留 RFC-008 和其他任务的共享树输出；提交只包含明确范围。
 
-## 4. 真实 API 试调限制
+## 4. 旧演示代理的独立部署问题
 
 实际任务 `tsk_01a0954107447000b7936485fb80d15d`，操作
 `test-gitlab:GET:/v4/projects/{id}/repository/commits/{sha}`，参数为 `crewstation/demo`、`main`。
@@ -61,5 +61,37 @@
 `api_invocation_timeout`。页面完整显示“API 试调超过 15 秒；请求可能已执行，请核对业务结果后再决定是否重试”，保留输入，离开前确认。
 错误来自未修改的 TaskRunner `createApiInvoker`，调用的原有内部地址为 `http://api.svc.cs.internal/api/`；它未取得上游完整响应。
 在同一容器直接执行一次相同目标的只读 GET（5 秒上限）也在 5001ms 返回 `TimeoutError`，可复现不经过本次 UI 的通道超时；尚未判定 DNS、网关或上游中的具体根因。
-没有得到 HTTP 状态、成功耗时或 trace，不能以目录渲染或受控回归宣称本轮真实 API 成功。
-RFC-009 保持 In Progress，后续补该真实响应验收；此限制不改变本次设置 UX 已完成实现与可独立发布的范围。
+这一次调用没有得到 HTTP 状态、成功耗时或 trace，不能以目录渲染或受控回归宣称成功。
+
+后续定位：DNS 在 63ms 内解析到 Traefik `10.96.199.52`；同容器读取 JWKS 返回 200，未授权健康路径返回明确 403。
+实际 GET 已经通过网关并到达 `reference-api-proxy-green`，代理在转发上游阶段超时。
+运行镜像与 GitLab main 均停在 `v0.1.2`／`7dee80be75906e6265094bf852866a2ceb96bd0e`，没有
+2026-09-15 已上库的 `fc10d203eef13bd532f03276021262d522f55b4c` 出站适配；直接读取部署源码确认
+`src/platform/egressTransport.ts` 不存在，入口也没有调用 `platformEgressFetch`。
+该项目没有 `host.docker.internal` 出站条目，原 Pod 直连上游健康路径也在 5000ms 超时。
+上述证据把故障定位到旧代理的上游转发段；本轮没有替它增加权限、更新业务仓库或改动部署。
+后续如要恢复演示项目的 `test-gitlab`，需按既有接入流程更新代理并配置其上游出站规则，不能把本 RFC 关闭解读为旧代理已修好。
+
+## 5. PS-11 真实成功响应补验与收口
+
+复用已配置的专用验收项目 `prj_01a09eb302d67000a680835da140f993`（`rfc003-verify-workbench`），
+其既有 APIGrant 允许 `rfc003-integration-qa:GET:/v4/projects`；目标代理已部署出站适配，且该代理项目已有对应域名规则。
+没有新增 APIGrant、白名单或凭据。调用匿名只读项目列表，响应 `[]` 是上游 GitLab 的真实 200 结果。
+
+旧验收会话因 Runner 协议 1 与平台要求 2 不兼容而断开。作者在本轮明确回复「授权」后，使用真实工作台的
+「检查并恢复原工作树 → 确认保留工作树重建」，沿用原资源套餐恢复任务 `tsk_01a09eb4f03f7000ba011a517772cc09`。
+新 Pod 为 `task-01a09eb4f03f-r-54f96eb4bb45`，页面显示「原工作树已恢复」「已连接 cs-session」。
+工作卷 `task-01a09eb4f03f-work` 的 UID 仍是 `31042273-699a-4888-912b-06d9babadc72`，容量 10Gi、状态 Bound。
+
+| 真实操作 | UTC 时间 | HTTP／容器内耗时 | trace |
+|---|---|---|---|
+| 开发资源 → API → 操作详情 → 发送请求 | `2026-09-20T10:31:33.203Z` | **200／112 ms** | `01a0be5f041070009dc7f7fc5d404cd4` |
+| 同页 Swagger → Try it out → Execute | `2026-09-20T10:32:16.700Z` | **200／91 ms** | `01a0be5fadfb70008bbb106035f140e5` |
+
+两次页面均显示任务 `tsk_01a09eb4f03f7000ba011a517772cc09`、操作键 `rfc003-integration-qa:GET:/v4/projects`、
+响应正文、HTTP、实测耗时和完整请求；响应头包含对应 trace，且与目标代理的 `forwarded` 日志逐条吻合。
+详情查询为 `search=rfc003-verify-workbench&per_page=1`，Swagger 同此并带 `page=1`。
+Swagger 仅显示该代理获授权的 GET 操作；历史批准／拒绝申请仍可查看。两次试调期间浏览器无 error／warn。
+
+本轮无需改生产代码。补跑参考代理回归 **33 pass／0 fail／108 assertions**，其余实现沿用 §3 的已通过候选及精确 SHA CI。
+PS-11 的真实成功响应缺口已关闭，T1–T8 完成，RFC-009 标记 Done。§4 的旧代理部署问题仍单独记录，不冒充已修复。

@@ -1,6 +1,6 @@
 # RFC-009｜技术与交互设计
 
-> 已批准并实现 · 2026-09-20；与 [proposal.md](./proposal.md) 配套。只改变前端组织，不新增持久化或后端接口。
+> Done · 2026-09-20；与 [proposal.md](./proposal.md) 配套。只改变前端组织，不新增持久化或后端接口；实际验收见 [acceptance.md](./acceptance.md)。
 
 ## 目录
 
