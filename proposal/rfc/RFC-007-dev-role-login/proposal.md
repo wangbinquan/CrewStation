@@ -1,6 +1,6 @@
 # RFC-007｜开发环境 OAuth 2.0 一键换角色
 
-> **In Progress · 2026-09-20**。作者直接要求“把 agent-workflow 的 dev 启动 OAuth 2.0 认证能力搬过来并适配到环境上，实现一键换角色登录”，该指令同时批准本 RFC 进入实施。
+> **Done · 2026-09-20**。作者直接要求“把 agent-workflow 的 dev 启动 OAuth 2.0 认证能力搬过来并适配到环境上，实现一键换角色登录”，该指令同时批准本 RFC 进入实施；T1–T8 已完成，功能提交 `fd1418fd78a1601fbae81860ecaf12dc3213a1f2` 与 CI 可移植性修复 `35452d504eb827cbb858e78a42b59369adad6b5b` 已上库，后者的精确 SHA `check`／`e2e` 均通过。
 
 ## 1. 背景
 

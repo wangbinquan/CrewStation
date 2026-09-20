@@ -5,11 +5,11 @@
 
 ## 一句话
 
-基线三件套（v0.3.3）的第一轮实现已在本机 kind 集群上跑通并推上 main；**RFC-001（算力归平台）与 RFC-002（管理空间与租户空间分离）已实现、实跑确认并推上 main；RFC-004 已被 RFC-006 取代（Superseded）；RFC-006（算力档位合并运行环境、每个 Agent 一个 Pod）已实现、实机验收完毕并推上 main，已 Done（P1–P8、ADR-0005 与 I17–I19 待作者复核）；RFC-003 工作台已按设计附件完成并整体部署到本机，52／52 项 UX-AT 全部实机通过、本地 gate 与精确 SHA CI 通过,RFC-003 已 Done；RFC-005（OIDC／OAuth 2.0 公司登录）代码、测试与 OA-01…OA-31 实机验收全部完成，已 Done**。
+基线三件套（v0.3.3）的第一轮实现已在本机 kind 集群上跑通并推上 main；**RFC-001（算力归平台）与 RFC-002（管理空间与租户空间分离）已实现、实跑确认并推上 main；RFC-004 已被 RFC-006 取代（Superseded）；RFC-006（算力档位合并运行环境、每个 Agent 一个 Pod）已实现、实机验收完毕并推上 main，已 Done（P1–P8、ADR-0005 与 I17–I19 待作者复核）；RFC-003 工作台已按设计附件完成并整体部署到本机，52／52 项 UX-AT 全部实机通过、本地 gate 与精确 SHA CI 通过，已 Done；RFC-005（OIDC／OAuth 2.0 公司登录）代码、测试与 OA-01…OA-31 实机验收全部完成，已 Done；RFC-007（开发环境 OAuth 2.0 一键换角色）代码、四角色 Chrome 实机验收、本地 gate 与精确 SHA CI 全部完成，已 Done**。
 
-## 进行中的 RFC
+## RFC 状态
 
-**RFC-003 工作台 UX 重设计已 Done（2026-09-16）：52／52 项 UX-AT 全部实机通过,本地 gate 与精确 SHA CI 通过。RFC-004（管理员定义 Agent 启动前 Hook）已按 RFC-006 的裁定 C8 置为 Superseded，其 AR 实机验收不再执行。** RFC-001 与 RFC-002 都已 Done，见 `proposal/rfc/README.md` 的索引表。**RFC-005（OIDC／OAuth 2.0 公司登录）于 2026-09-18 落档、同日按作者会话目标「完整实现整个RFC并提交上库」实施完毕并实机验收，已 Done。** **RFC-006（算力档位合并运行环境）2026-09-18 落档，同日作者设定会话目标「完整实现RFC并提交上库」，同日实施完成并 **Done**：CP-01…CP-22 实机核对完毕，基线三件套回填到 v0.3.4，见下方接力。**
+**RFC-003 工作台 UX 重设计已 Done（2026-09-16）：52／52 项 UX-AT 全部实机通过，本地 gate 与精确 SHA CI 通过。RFC-004（管理员定义 Agent 启动前 Hook）已按 RFC-006 的裁定 C8 置为 Superseded，其 AR 实机验收不再执行。** RFC-001 与 RFC-002 都已 Done，见 `proposal/rfc/README.md` 的索引表。**RFC-005（OIDC／OAuth 2.0 公司登录）于 2026-09-18 落档、同日按作者会话目标「完整实现整个RFC并提交上库」实施完毕并实机验收，已 Done。** **RFC-006（算力档位合并运行环境）2026-09-18 落档，同日作者设定会话目标「完整实现RFC并提交上库」，同日实施完成并 Done：CP-01…CP-22 实机核对完毕，基线三件套回填到 v0.3.4，见下方接力。** **RFC-007 于 2026-09-20 完成 T1–T8，本机 Chrome 四角色、旧页签恢复、本地 gate 与精确 SHA CI 全部通过，已 Done。**
 
 ## 最新接力：RFC-007 开发环境 OAuth 2.0 一键换角色（2026-09-20）
 
@@ -24,8 +24,10 @@ Deployment／Service／Traefik IngressRoute；它复用 `cs-control-plane:dev`�
 真实 Chrome 连续验证四角色并核对 `/v1/me`。最终滚动重启前保留旧页签，第一次点击得到 HTTP 403 及“页面已更新”完整可重试页面，
 第二次以新令牌登录并直接落到 RFC-006 实机验收项目开发页；随后恢复管理员，Chrome 留在角色入口。
 定向验证 **8 pass／0 fail／32 assertions**，部署 1／1 Ready；统一冻结候选的最终 `bun run check`
-**1614 pass／5 skip／0 fail，8995 assertions**，架构、全仓 lint、根类型与 console 类型全部通过。完整证据见
-`proposal/rfc/RFC-007-dev-role-login/acceptance-audit.md`。提交、推送与 exact-SHA CI 仍属 T8，完成后回填并将 RFC-007 置为 Done。
+**1614 pass／5 skip／0 fail，8995 assertions**，架构、全仓 lint、根类型与 console 类型全部通过。功能提交
+`fd1418fd78a1601fbae81860ecaf12dc3213a1f2` 与 CI 可移植性修复 `35452d504eb827cbb858e78a42b59369adad6b5b` 已推上 `main`；
+精确 SHA [CI 35496732781](https://github.com/wangbinquan/CrewStation/actions/runs/35496732781) 的 `check`（3 分 7 秒）与 `e2e`（5 分 39 秒）均成功，RFC-007 已 Done。完整证据见
+`proposal/rfc/RFC-007-dev-role-login/acceptance-audit.md`。
 
 ## 并行接力：首次访问直接创建管理员（2026-09-20）
 
@@ -40,8 +42,8 @@ CI／无人值守安装须显式 `CS_BOOTSTRAP_ADMIN=1`；需要管理员权限�
 真实 Chrome＋独立 PostgreSQL 临时数据库的创建／登录／原路径返回／令牌退役链已通过，1280×900 与 390×844 浅／深色无横向溢出，
 浏览器无异常；console 构建通过。初版 DOM 测试的全局注册干扰已改为独立窗口并通过跨文件定向复验；最终 `bun run check`
 **1610 pass／5 skip／0 fail，8967 assertions，184.39s**（含本机 PostgreSQL、GitLab 和当时可用的网关浏览器集成）。
-正在协调身份相关共享文件提交，尚未发布。本批设计与详细证据见 `proposal/rfc/RFC-005-oidc-company-login/initial-admin-correction.md`，
-本机浏览器证据 `/tmp/crewstation-first-admin-20260920/`；临时服务、数据库和浏览器已清理。
+本批已随 `fd1418fd78a1601fbae81860ecaf12dc3213a1f2` 发布，精确后继 `35452d504eb827cbb858e78a42b59369adad6b5b` 的 GitHub `check`／`e2e` 均成功。本批设计与详细证据见
+`proposal/rfc/RFC-005-oidc-company-login/initial-admin-correction.md`，本机浏览器证据 `/tmp/crewstation-first-admin-20260920/`；临时服务、数据库和浏览器已清理。
 
 ## 并行接力：算力档位列表与编辑页交互整理（2026-09-20）
 

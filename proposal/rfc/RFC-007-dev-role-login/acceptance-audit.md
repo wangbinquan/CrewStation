@@ -31,6 +31,9 @@
 
 最终先保留重启前页面，再滚动 dev-auth：第一次点击得到“页面已更新／此前页面的安全令牌已失效”提示和完整角色页，第二次点击以新令牌完成真实 OIDC 并落到开发会话页。随后恢复平台管理员。项目下拉只剩数字人项目，选择 RFC-006 后刷新仍保持该选项。Chrome 最终停在 `http://dev-auth.cs.localhost/`，浏览器中的 CrewStation 会话恢复为开发环境平台管理员。
 
-## 尚待发布证据
+## 发布证据
 
-提交 SHA、远端祖先关系和该 SHA 的 GitHub `check`／`e2e` 终态在 T8 完成后回填。
+- 功能与首次管理员链随提交 `fd1418fd78a1601fbae81860ecaf12dc3213a1f2` 推上 `main`；该提交包含 dev-auth、安装编排、OIDC 配置、首次访问创建管理员及对应测试与文档。
+- 首轮托管 `check` 唯一失败是测试调用了 CI 镜像没有安装的外部 `rg`。提交 `35452d504eb827cbb858e78a42b59369adad6b5b` 改用 `Bun.Glob` 读取相同生产目录，仍断言扫描文件数大于 0 且开发标记零命中，不降低隔离标准。
+- 推送后重新 fetch，`HEAD` 与 `origin/main` 同为 `35452d504eb827cbb858e78a42b59369adad6b5b`，左右提交数 `0／0`；`fd1418fd78a1601fbae81860ecaf12dc3213a1f2` 是该远端提交祖先。
+- 精确 SHA [GitHub Actions 35496732781](https://github.com/wangbinquan/CrewStation/actions/runs/35496732781) 成功：`check`（job `106040960057`）3 分 7 秒，`e2e`（job `106040960190`）5 分 39 秒；真实 Kind 集群安装、调试浏览器启动与前端验收全部通过。

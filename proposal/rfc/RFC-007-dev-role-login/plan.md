@@ -13,4 +13,4 @@
 
 ## 实施状态
 
-作者于 2026-09-20 直接要求完整实现并适配当前环境。T1–T7 已完成：协议与边界定向测试 8／8、部署 1／1 Ready，Chrome 四角色、旧页签令牌恢复与 `/v1/me` 实机通过；统一候选最终 `bun run check` 1614 pass／5 skip／0 fail。详见 [acceptance-audit.md](./acceptance-audit.md)。T8 等待提交、推送和精确 SHA CI。
+作者于 2026-09-20 直接要求完整实现并适配当前环境。T1–T8 已完成：协议与边界定向测试 8／8、部署 1／1 Ready，Chrome 四角色、旧页签令牌恢复与 `/v1/me` 实机通过；统一候选最终 `bun run check` 1614 pass／5 skip／0 fail。功能提交 `fd1418fd78a1601fbae81860ecaf12dc3213a1f2` 和 CI 可移植性修复 `35452d504eb827cbb858e78a42b59369adad6b5b` 已推上 `main`；精确 SHA [GitHub Actions 35496732781](https://github.com/wangbinquan/CrewStation/actions/runs/35496732781) 的 `check` 与 `e2e` 均成功。详见 [acceptance-audit.md](./acceptance-audit.md)。
