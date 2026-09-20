@@ -8,15 +8,15 @@ import { sql } from 'drizzle-orm';
 import { createTaskRuntimeModule, taskRuntimeMigrations } from '../wiring';
 import { drizzleUnitOfWork } from '../adapters/persistence/drizzleUnitOfWork';
 
-export async function rebuildFixture(options: { running?: boolean; kind?: 'dev-session' | 'business' } = {}) {
+export async function rebuildFixture(options: { running?: boolean; kind?: 'dev-session' | 'business'; assignedProfile?: string } = {}) {
   const tdb = await createTestDatabase([eventbusMigrations, queueMigrations, taskRuntimeMigrations]);
   const k8s = createFakeK8sClient();
   const projectId = `prj_${'a'.repeat(32)}` as ProjectId, serviceId = `svc_${'a'.repeat(32)}` as ServiceId;
   let time = Date.parse('2026-09-15T10:00:00Z');
-  const state = { quota: 2, checkoutCalls: 0, profiles: [{ name: 'coding-medium', cpu: '1', memory: '2Gi', storage: '10Gi', description: '' },
+  const state = { assignedProfile: options.assignedProfile, quota: 2, checkoutCalls: 0, profiles: [{ name: 'coding-medium', cpu: '1', memory: '2Gi', storage: '10Gi', description: '' },
     { name: 'coding-large', cpu: '2', memory: '4Gi', storage: '20Gi', description: '' }] as TaskProfileDto[] };
   const runtime = createTaskRuntimeModule({ db: tdb.db, k8s, authorizer: { authorize: async () => {} }, isAdmin: async () => true,
-    quotas: { quotaLimit: async () => state.quota }, profiles: { listTaskProfiles: async () => state.profiles, getTaskProfile: async (name) => state.profiles.find((p) => p.name === name) },
+    quotas: { quotaLimit: async () => state.quota }, profiles: { devSessionProfile: async () => state.assignedProfile, listTaskProfiles: async () => state.profiles, getTaskProfile: async (name) => state.profiles.find((p) => p.name === name) },
     services: { resolveServiceById: async () => ({ projectId, namespace: 'cs-qa', slug: 'qa', name: 'qa' }) },
     sources: { configEnv: async () => ({ GREETING: 'keep' }), dataEnv: async () => ({ CS_DATABASE_URL: 'test-database' }), taskDataEnv: async () => ({}) },
     checkout: { checkoutFor: async () => { state.checkoutCalls++; return { repoUrl: 'https://git.invalid/qa.git', credentialSecretName: 'original-checkout' }; } },
@@ -33,7 +33,7 @@ export async function rebuildFixture(options: { running?: boolean; kind?: 'dev-s
   if (options.running) await runtime.api.onRunnerConnected(env.id, token);
   else await runtime.api.markFailed(env.id, 'OOMKilled');
   const request = async (): Promise<RebuildDevSessionRequest> => {
-    const check = await runtime.api.inspectRebuild(projectId), profile = check.profiles[1]!;
+    const check = await runtime.api.inspectRebuild(projectId), profile = check.profiles.at(-1)!;
     return { requestId: crypto.randomUUID(), expectedTaskId: env.id, expectedUpdatedAt: check.updatedAt, expectedPodUid: check.podUid, expectedVolumeUid: check.volume.uid,
       profile: { name: profile.name, cpu: profile.cpu, memory: profile.memory, storage: profile.storage } };
   };

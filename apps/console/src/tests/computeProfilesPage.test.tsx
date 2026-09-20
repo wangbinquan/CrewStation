@@ -78,7 +78,7 @@ describe('算力档位列表（RFC-006）', () => {
     expect((await actions('opencode-lite')).textContent).toContain('删除档位 opencode-lite？');
     await clickIn(await actions('opencode-lite'), '确认');
     expect(backend!.writes).toEqual([{ method: 'DELETE', path: '/v1/admin/compute-profiles/opencode-lite', query: '', body: {} }]);
-    expect((await actions('opencode-lite')).textContent).toContain('这些项目当前上线的版本引用了这个档位：crm-bot、hr-helper');
+    expect((await actions('opencode-lite')).textContent).toContain('这些项目的授权或当前上线版本引用了这个档位：crm-bot、hr-helper');
     await clickIn(await actions('opencode-lite'), '仍然删除');
     expect((await actions('opencode-lite')).textContent).toContain('确认删除 opencode-lite？2 个项目会受影响。');
     await clickIn(await actions('opencode-lite'), '确认');

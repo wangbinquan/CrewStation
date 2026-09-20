@@ -43,7 +43,7 @@ export interface ComputeLaunch extends ResolvedCompute {
  * 不存在、不可用、终端档位用错用途都由它抛出可读错误，本模块原样透传。
  */
 export interface ComputeCatalog {
-  resolve(nameOrDefault: string | undefined, usage: ComputeUsage): Promise<ResolvedCompute>;
+  resolve(nameOrDefault: string | undefined, usage: ComputeUsage, projectId: ProjectId): Promise<ResolvedCompute>;
   launchMaterial(ref: ProfileRevisionRef): Promise<ComputeLaunch>;
 }
 

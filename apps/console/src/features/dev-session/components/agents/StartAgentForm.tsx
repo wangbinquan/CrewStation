@@ -13,6 +13,7 @@ import { ComputeOptions, computeBlockText } from './ComputeOptions';
 import styles from './StartAgentForm.module.css';
 
 export interface StartAgentFormProps {
+  readonly projectId: string;
   readonly creation: HistoricalStartHandle;
 }
 
@@ -21,9 +22,9 @@ export interface StartAgentFormProps {
  * 厂商、模型与驱动都不出现在租户面——它们是平台的采购信息，业务也无从判断该填什么。
  * RFC-006：通用终端协议的档位只能用于「＋ CLI」，这里不列。
  */
-export function StartAgentForm({ creation }: StartAgentFormProps): ReactElement {
+export function StartAgentForm({ projectId, creation }: StartAgentFormProps): ReactElement {
   const t = useT();
-  const profiles = useApiQuery(queryKeys.computeProfiles(), () => api.catalog.listComputeProfiles());
+  const profiles = useApiQuery(queryKeys.computeProfiles(projectId), () => api.catalog.listComputeProfiles(projectId));
   const options = choicesFor(profiles.data?.items ?? [], 'agent');
   const { compute, permission, prompt, busy, edit, start } = creation;
   // 空选项是「默认档位」，启动时由服务端解析（C17）；默认档位不存在或所选档位不可用时拦住并说明原因。

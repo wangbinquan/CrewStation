@@ -20,9 +20,9 @@ describe('工作台不向租户暴露模型与驱动（RFC-001）', () => {
     expect(offenders).toEqual([]);
   });
 
-  test('新建 Agent 表单读的是算力档位目录', () => {
+  test('新建 Agent 表单读取当前项目的算力档位目录', () => {
     const form = sourceAt(files, 'agents/StartAgentForm.tsx');
-    expect(form.code).toContain('listComputeProfiles()');
+    expect(form.code).toContain('listComputeProfiles(projectId)');
     expect(form.code).toContain("t('devSession.agents.compute')");
   });
 });

@@ -19,7 +19,7 @@ export function testToDto(test: ProfileTest): ProfileTestDto {
 export function listItemOf(profile: ComputeProfile, revision: ProfileRevision, latest: ProfileTest | undefined): ComputeProfileListItem {
   const { launch } = revision.content;
   return {
-    name: profile.name, protocol: profile.protocol, description: profile.description, enabled: profile.enabled, isDefault: profile.isDefault, revision: revision.revision,
+    name: profile.name, protocol: profile.protocol, description: profile.description, enabled: profile.enabled, isDefault: profile.isDefault, defaultVisible: profile.defaultVisible ?? true, revision: revision.revision,
     image: revision.content.image, imageDigest: revision.imageDigest, binaryPath: launch.binaryPath, ...(launch.model ? { model: launch.model } : {}),
     ...(revision.content.taskProfile ? { taskProfile: revision.content.taskProfile } : {}), availability: availabilityOf(profile, revision, latest),
     ...(latest ? { latestTest: testToDto(latest) } : {}), updatedBy: profile.updatedBy, updatedAt: profile.updatedAt.toISOString(),

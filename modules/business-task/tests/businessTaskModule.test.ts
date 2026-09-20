@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import type { ProfileRevisionRef, ProjectId, ReleaseId, RunnerCommand, RunnerEvent, ServiceActor, ServiceId, TaskId } from '@crewstation/contracts';
 import { LaunchSpecSchema } from '@crewstation/contracts';
 import { eventbusMigrations } from '@crewstation/eventbus';
-import { precondition, quotaExceeded, validation } from '@crewstation/kernel';
+import { forbidden, precondition, quotaExceeded, validation } from '@crewstation/kernel';
 import type { TestDatabase } from '@crewstation/testkit';
 import { createTestDatabase, testDatabaseAvailable } from '@crewstation/testkit';
 import type { ComputeCatalog, EnvironmentView } from '../ports/runtime';
@@ -34,8 +34,12 @@ let runnerConnected = true;
 let computeProfiles: Array<{ name: string; revision: number; isDefault?: boolean }> = [{ name: 'sample-opencode', revision: 1, isDefault: true }];
 const materialRequests: ProfileRevisionRef[] = [];
 const image = `registry.test/runtime/sample@sha256:${'0'.repeat(64)}`;
+let denyCompute = false;
+const computeProjects: ProjectId[] = [];
 const fakeCompute: ComputeCatalog = {
-  resolve: async (name) => {
+  resolve: async (name, _usage, id) => {
+    computeProjects.push(id);
+    if (denyCompute) throw forbidden('项目未获授权使用此档位');
     const found = !name || name === 'default' ? computeProfiles.find((p) => p.isDefault) : computeProfiles.find((p) => p.name === name);
     if (!found && (!name || name === 'default')) throw precondition('平台尚未设置默认算力档位，请管理员在平台管理里设置', { code: 'no_default_profile' });
     if (!found) throw validation(`算力档位 ${name} 不存在`, { code: 'profile_not_found', available: computeProfiles.map((p) => p.name) });
@@ -276,4 +280,18 @@ describe.skipIf(!available)('business-task module', () => {
       await bt.api.closeTask(caller, task.id);
     }
   });
+});
+
+test.skipIf(!available)('业务子任务按所属项目校验档位；拒绝后不派发，恢复授权的重试重新校验', async () => {
+  const task = await bt.api.createTask(caller, { labels: {} });
+  try {
+    denyCompute = true;
+    const count = commands.length;
+    const sub = await bt.api.submitSubtask(caller, task.id, { kind: 'agent', name: 'denied', agentProfile: 'chat-v1', mode: 'oneshot', prompt: '项目授权' });
+    expect(sub).toMatchObject({ state: 'failed', error: expect.stringContaining('未获授权') });
+    expect(computeProjects.at(-1)).toBe(projectId); expect(commands.length).toBe(count);
+    denyCompute = false;
+    const retried = await bt.api.retrySubtask(caller, task.id, sub.id);
+    expect(retried.state).toBe('running'); expect(computeProjects.at(-1)).toBe(projectId);
+  } finally { denyCompute = false; await bt.api.closeTask(caller, task.id); }
 });

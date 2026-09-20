@@ -1,5 +1,5 @@
 import type { TaskId } from '@crewstation/contracts';
-import { isPlatformError, newId } from '@crewstation/kernel';
+import { isPlatformError, newId, notFound } from '@crewstation/kernel';
 import type { SubtaskRun } from '../domain/subtaskRun';
 import { isTerminal, transition } from '../domain/subtaskRun';
 import type { BusinessTaskUseCaseDeps } from './dependencies';
@@ -25,7 +25,9 @@ export function subtaskAgentLaunch(deps: BusinessTaskUseCaseDeps, finish: Finish
   /** 档位修订在构造时没解析成（被删、不可用、没有默认档位）：此刻再解析一次，失败原因原样写进子任务（RFC-006 §4.3）。 */
   const pinProfile = async (run: SubtaskRun): Promise<SubtaskRun> => {
     if (run.computeProfile) return run;
-    const resolved = await deps.compute.resolve(run.agentProfile!.compute, 'subtask');
+    const task = await uow.read.tasks.getById(run.taskId);
+    if (!task) throw notFound('业务任务', run.taskId);
+    const resolved = await deps.compute.resolve(run.agentProfile!.compute, 'subtask', task.projectId);
     const pinned: SubtaskRun = { ...run, computeProfile: { profile: resolved.name, revision: resolved.revision } };
     await uow.run((scope) => scope.subtasks.update(pinned));
     return pinned;

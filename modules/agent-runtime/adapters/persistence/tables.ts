@@ -1,7 +1,7 @@
 import { boolean, index, integer, primaryKey, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 import { jsonDocument } from '@crewstation/persistence';
-import type { ComputeProfileContent, ProfileTestContext, ProfileTestStage } from '@crewstation/contracts';
+import type { ComputeProfileContent, ProjectComputePolicy, ProfileTestContext, ProfileTestStage } from '@crewstation/contracts';
 import { agentRuntimeSchema } from './schema';
 
 /** RFC-006：算力档位。说明、启用与默认在这里，执行内容在只追加的修订里；跨模块只存名称，不建外键。 */
@@ -11,6 +11,7 @@ export const profiles = agentRuntimeSchema.table('profiles', {
   description: text('description').notNull().default(''),
   enabled: boolean('enabled').notNull().default(true),
   isDefault: boolean('is_default').notNull().default(false),
+  defaultVisible: boolean('default_visible').notNull().default(true),
   currentRevision: integer('current_revision').notNull(),
   createdBy: text('created_by').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
@@ -53,3 +54,9 @@ export const profileTests = agentRuntimeSchema.table('profile_tests', {
   startedAt: timestamp('started_at', { withTimezone: true }),
   endedAt: timestamp('ended_at', { withTimezone: true }),
 }, (t) => [uniqueIndex('profile_tests_request').on(t.profile, t.createdBy, t.clientRequestId), index('profile_tests_revision').on(t.profile, t.revision, t.createdAt)]);
+
+export const projectComputePolicies = agentRuntimeSchema.table('project_compute_policies', {
+  projectId: text('project_id').primaryKey(), revision: integer('revision').notNull(),
+  policy: jsonDocument('policy').$type<ProjectComputePolicy>().notNull(),
+  updatedBy: text('updated_by').notNull(), updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
+});

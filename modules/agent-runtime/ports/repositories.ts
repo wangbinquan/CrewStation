@@ -1,4 +1,5 @@
-import type { ProfileTestId, UserId } from '@crewstation/contracts';
+import type { ProjectComputePolicyRecord } from '../domain/projectComputePolicy';
+import type { ProfileTestId, ProjectId, UserId } from '@crewstation/contracts';
 import type { ComputeProfile, ProfileCredential, ProfileRevision } from '../domain/computeProfile';
 import type { ProfileTest } from '../domain/profileTest';
 
@@ -41,3 +42,9 @@ export interface TestRepository {
 }
 
 export const PROFILE_TEST_JOB_KIND = 'agent-runtime.profile-test';
+
+export interface ProjectPolicyRepository {
+  get(projectId: ProjectId): Promise<ProjectComputePolicyRecord | undefined>;
+  save(record: ProjectComputePolicyRecord, expectedRevision: number): Promise<boolean>;
+  referencing(name: string): Promise<ProjectId[]>;
+}

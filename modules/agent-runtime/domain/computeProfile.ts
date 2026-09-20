@@ -13,6 +13,7 @@ export interface ComputeProfile {
   readonly description: string;
   readonly enabled: boolean;
   readonly isDefault: boolean;
+  readonly defaultVisible?: boolean;
   readonly currentRevision: number;
   readonly createdBy: UserId;
   readonly createdAt: Date;

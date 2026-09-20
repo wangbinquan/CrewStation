@@ -18,6 +18,7 @@ import { StartAgentForm } from './StartAgentForm';
 import styles from './AgentsPane.module.css';
 
 export interface AgentsPaneProps {
+  readonly projectId: string;
   readonly agents: DevAgentsHandle;
   readonly transcripts: TranscriptsByAgent;
   readonly onActivity: () => void;
@@ -36,7 +37,7 @@ function ExecutionNotice({ agent }: { readonly agent: AgentInstanceDto | undefin
 }
 
 /** Agent 面板：并行 Agent 的名册、当前 Agent 的转录与输入框，以及新建入口。 */
-export function AgentsPane({ agents, transcripts, onActivity, selection }: AgentsPaneProps): ReactElement {
+export function AgentsPane({ projectId, agents, transcripts, onActivity, selection }: AgentsPaneProps): ReactElement {
   const t = useT();
   const messages = useHistoricalMessages(agents.sendMessage);
   const { picked, selected, select: setPicked } = selection;
@@ -62,7 +63,7 @@ export function AgentsPane({ agents, transcripts, onActivity, selection }: Agent
         {creation.busy ? <PaneNotice tone="info">{t('devSession.agents.startingHint')}</PaneNotice> : null}
         {creation.error ? <PaneNotice tone="warning">{creation.error}</PaneNotice> : null}
         {creation.open ? (
-          <StartAgentForm creation={creation} />
+          <StartAgentForm projectId={projectId} creation={creation} />
         ) : (
           <>
             <AgentRoster agents={agents.agents} selected={selected?.agentId} onSelect={setPicked} />

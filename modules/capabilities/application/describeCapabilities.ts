@@ -22,7 +22,7 @@ export function describeCapabilitiesUseCase(sources: CapabilitySources, settings
     const [quota, plans, computeProfiles, devKeys, prodKeys, data, operations, subscriptions, forwarding] = await Promise.all([
       sources.quota(actor, projectId).catch(() => undefined),
       sources.servicePlans(),
-      sources.computeProfiles(),
+      sources.computeProfiles(actor, projectId),
       sources.configKeys(actor, projectId, 'development'),
       sources.configKeys(actor, projectId, 'production'),
       sources.dataResources(actor, projectId),

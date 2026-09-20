@@ -1,3 +1,4 @@
+import type { ComputeProjects } from '../ports/projects';
 import type { Clock, Logger } from '@crewstation/kernel';
 import type { ImageRegistry } from '../ports/imageRegistry';
 import type { ProfileReferences } from '../ports/profileReferences';
@@ -8,6 +9,8 @@ import type { UnitOfWork } from '../ports/unitOfWork';
 
 export interface AgentRuntimeUseCaseDeps {
   uow: UnitOfWork;
+  projects: ComputeProjects;
+  defaultTaskProfile: string;
   cipher: SecretCipher;
   executor: ProfileTestExecutor;
   references: ProfileReferences;

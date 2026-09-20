@@ -18,6 +18,7 @@ export interface ComputeProfilesResource {
   /** PUT /v1/admin/compute-profiles/:name/enabled：默认档位不能停用（409）。 */
   setEnabled(name: string, enabled: boolean): Promise<ComputeProfileDetailDto>;
   /** PUT /v1/admin/compute-profiles/:name/default */
+  setDefaultVisible(name: string, defaultVisible: boolean): Promise<ComputeProfileDetailDto>;
   setDefault(name: string): Promise<ComputeProfileDetailDto>;
   /** DELETE /v1/admin/compute-profiles/:name：被引用且未确认时 409，details 带项目清单。 */
   remove(name: string, options?: { confirmReferences?: boolean }): Promise<void>;
@@ -41,6 +42,7 @@ export function computeProfilesResource(transport: Transport): ComputeProfilesRe
     get: (name) => transport.request<ComputeProfileDetailDto>('GET', `${base}/${segment(name)}`),
     save: (name, input) => transport.request<ComputeProfileDetailDto>('PUT', `${base}/${segment(name)}`, { body: input }),
     setEnabled: (name, enabled) => transport.request<ComputeProfileDetailDto>('PUT', `${base}/${segment(name)}/enabled`, { body: { enabled } }),
+    setDefaultVisible: (name, defaultVisible) => transport.request('PUT', `${base}/${segment(name)}/default-visible`, { body: { defaultVisible } }),
     setDefault: (name) => transport.request<ComputeProfileDetailDto>('PUT', `${base}/${segment(name)}/default`, { body: {} }),
     remove: (name, options = {}) => transport.request<void>('DELETE', `${base}/${segment(name)}`, options.confirmReferences ? { query: { confirmReferences: 'true' } } : {}),
     copy: (name, input) => transport.request<ComputeProfileDetailDto>('POST', `${base}/${segment(name)}/copy`, { body: input }),

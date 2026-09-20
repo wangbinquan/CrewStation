@@ -44,7 +44,7 @@ test('两窗接入不同 Runner，父连接断开仍能附着；切页签只关�
     return new Response(JSON.stringify(body), { headers: { 'content-type': 'application/json' } });
   }) as typeof fetch;
   const parentCommands: unknown[] = [];
-  page = await renderElement(<NativeWorkspace taskId={one.taskId} userId={one.createdBy} channel={{ send: async (command) => { parentCommands.push(command); return {}; }, subscribe: () => () => {} }} stream={INITIAL_STREAM_STATE} canDevelop onActivity={() => {}} preview={null} editor={null} changes={null} />, messages);
+  page = await renderElement(<NativeWorkspace projectId="project-1" taskId={one.taskId} userId={one.createdBy} channel={{ send: async (command) => { parentCommands.push(command); return {}; }, subscribe: () => () => {} }} stream={INITIAL_STREAM_STATE} canDevelop onActivity={() => {}} preview={null} editor={null} changes={null} />, messages);
   expect(Socket.instances).toHaveLength(2);
   for (const item of [one, two]) expect(Socket.instances.some((socket) => socket.url.includes(item.execution!.taskId))).toBe(true);
   await act(async () => { for (const socket of Socket.instances) { socket.onopen?.(); socket.receive({ type: 'streamReady', connected: true, replayed: 0, replayComplete: true }); } }); await page.settle();

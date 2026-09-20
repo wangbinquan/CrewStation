@@ -7,7 +7,7 @@ export interface CapabilitySources {
   quota(actor: Actor, projectId: ProjectId): Promise<QuotaDto>;
   servicePlans(): Promise<ServicePlanDto[]>;
   /** 本平台可用的算力档位（RFC-001）：只有名字与说明。 */
-  computeProfiles(): Promise<ComputeProfileSummaryDto[]>;
+  computeProfiles(actor: Actor, projectId: ProjectId): Promise<ComputeProfileSummaryDto[]>;
   configKeys(actor: Actor, projectId: ProjectId, env: 'development' | 'production'): Promise<string[]>;
   dataResources(actor: Actor, projectId: ProjectId): Promise<DataResourceDto[]>;
   operations(actor: Actor, serviceId: ServiceId): Promise<ApiOperationDto[]>;

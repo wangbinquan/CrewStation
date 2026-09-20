@@ -12,6 +12,7 @@ export function ProfileListRow({ profile, updatedBy, onOpen }: { readonly profil
   const t = useT(), date = useDateText();
   return <ProfileRowActions profile={profile} onOpen={onOpen}>{(controls, expanded) => <tr className={expanded ? styles.expandedRow : styles.profileRow}>
     <td><div className={styles.nameLine}><code>{profile.name}</code>{profile.isDefault ? <Badge tone="info">{t('admin.profile.defaultBadge')}</Badge> : null}</div>
+      <span className={styles.hint}>{t(profile.defaultVisible === false ? 'admin.profile.defaultHidden' : 'admin.profile.defaultVisible')}</span>
       {profile.description ? <p className={styles.hint}>{profile.description}</p> : null}
       <details className={styles.configuration}><summary>{t('admin.profile.configurationDetails')}</summary><dl className={styles.configurationDetails}>
         <dt>{t('admin.profile.column.image')}</dt><dd><code>{profile.image}</code><div title={profile.imageDigest}>{profile.imageDigest ? `@${shortDigest(profile.imageDigest)}` : '—'}</div></dd>

@@ -76,7 +76,7 @@ export function subtaskLaunch(deps: BusinessTaskUseCaseDeps) {
       const contract = input.outputContract ? resolveContract(registration, input.outputContract) : undefined;
       if (input.outputContract && !contract) throw validation(`outputContract ${input.outputContract} 未在该服务的发布中登记`);
       // 每个 attempt 在构造时固定档位修订，`default` 在此刻解析（C17）；解析失败留给启动时按同一原因把子任务置为失败。
-      const pinned = await deps.compute.resolve(profile.compute, 'subtask').then((r): ProfileRevisionRef => ({ profile: r.name, revision: r.revision }), () => undefined);
+      const pinned = await deps.compute.resolve(profile.compute, 'subtask', task.projectId).then((r): ProfileRevisionRef => ({ profile: r.name, revision: r.revision }), () => undefined);
       return { ...base, kind: 'agent', mode: input.mode, prompt: input.prompt, agentProfile: profile, ...(contract ? { outputContract: contract } : {}), ...(pinned ? { computeProfile: pinned } : {}), runnerRef: newId('agt') };
     },
   };

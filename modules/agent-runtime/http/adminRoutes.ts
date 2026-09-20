@@ -27,6 +27,7 @@ export function computeProfileAdminRoutes(api: AgentRuntimeModuleApi, isAdmin: (
   r.get('/v1/admin/compute-profiles/:name', async (c) => c.json(await api.getProfile(await actor(c), name(c))));
   r.put('/v1/admin/compute-profiles/:name', async (c) => c.json(await api.saveProfile(await actor(c), name(c), await parseBody(c, SaveComputeProfileRequestSchema))));
   r.put('/v1/admin/compute-profiles/:name/enabled', async (c) => c.json(await api.setEnabled(await actor(c), name(c), (await parseBody(c, SetComputeProfileEnabledRequestSchema)).enabled)));
+  r.put('/v1/admin/compute-profiles/:name/default-visible', async (c) => c.json(await api.setDefaultVisible(await actor(c), name(c), (await parseBody(c, z.object({ defaultVisible: z.boolean() }).strict())).defaultVisible)));
   r.put('/v1/admin/compute-profiles/:name/default', async (c) => c.json(await api.setDefault(await actor(c), name(c))));
   r.delete('/v1/admin/compute-profiles/:name', async (c) => {
     await api.removeProfile(await actor(c), name(c), parseQuery(c, DeleteComputeProfileQuerySchema).confirmReferences === 'true');

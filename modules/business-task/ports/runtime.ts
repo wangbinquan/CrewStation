@@ -60,7 +60,7 @@ export interface ComputeLaunch extends ResolvedCompute {
  * 不存在报 validation（details.available 列出可选）；没有默认档位、档位不可用报 precondition；终端档位报 validation。
  */
 export interface ComputeCatalog {
-  resolve(nameOrDefault: string | undefined, usage: ComputeUsage): Promise<ResolvedCompute>;
+  resolve(nameOrDefault: string | undefined, usage: ComputeUsage, projectId: ProjectId): Promise<ResolvedCompute>;
   /** 按受理时固定的修订取材料：停用或改了当前修订都不影响它。 */
   launchMaterial(ref: ProfileRevisionRef): Promise<ComputeLaunch>;
 }

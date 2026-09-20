@@ -54,10 +54,10 @@ async function applyCredentials(scope: RepositoryScope, profile: string, prepare
 }
 
 /** 建档与复制共用：档位、修订 1、凭据与一次保存触发的测试在同一事务里落库。 */
-async function insertProfile(deps: AgentRuntimeUseCaseDeps, actor: Actor, input: { name: string; description: string; protocol: AgentProtocol }, prepared: PreparedContent): Promise<void> {
+async function insertProfile(deps: AgentRuntimeUseCaseDeps, actor: Actor, input: { name: string; description: string; protocol: AgentProtocol; defaultVisible?: boolean }, prepared: PreparedContent): Promise<void> {
   const now = deps.clock.now();
   const hash = contentHashOf(prepared.content, prepared.imageDigest, credentialStampOf(prepared.content.secretNames, prepared.credentials));
-  const profile: ComputeProfile = { name: input.name, protocol: input.protocol, description: input.description, enabled: true, isDefault: false, currentRevision: 1, createdBy: actor.userId, createdAt: now, updatedBy: actor.userId, updatedAt: now };
+  const profile: ComputeProfile = { name: input.name, protocol: input.protocol, description: input.description, enabled: true, isDefault: false, defaultVisible: input.defaultVisible ?? true, currentRevision: 1, createdBy: actor.userId, createdAt: now, updatedBy: actor.userId, updatedAt: now };
   const revision: ProfileRevision = { profile: input.name, revision: 1, content: prepared.content, imageDigest: prepared.imageDigest, contentHash: hash, createdBy: actor.userId, createdAt: now };
   const test = queuedTest(revision, input.protocol, 'save', actor.userId, now);
   await deps.uow.run(async (scope) => {
@@ -111,7 +111,7 @@ export function profileWriteUseCases(deps: AgentRuntimeUseCaseDeps) {
     createProfile: async (actor: Actor, input: CreateComputeProfileRequest): Promise<ComputeProfileDetailDto> => {
       adminOnly(actor);
       const protocol = input.content.launch.protocol;
-      await insertProfile(deps, actor, { name: input.name, description: input.description, protocol }, await prepare(deps, protocol, input.content, input.credentials, []));
+      await insertProfile(deps, actor, { name: input.name, description: input.description, protocol, defaultVisible: input.defaultVisible }, await prepare(deps, protocol, input.content, input.credentials, []));
       return getProfile(actor, input.name);
     },
     saveProfile: save,
@@ -123,7 +123,7 @@ export function profileWriteUseCases(deps: AgentRuntimeUseCaseDeps) {
       const revision = await uow.read.revisions.get(source, from.currentRevision);
       if (!revision) throw notFound('档位修订', `${source}@${from.currentRevision}`);
       const credentials = await uow.read.credentials.list(source);
-      await insertProfile(deps, actor, { name: input.name, description: input.description ?? from.description, protocol: from.protocol }, await prepare(deps, from.protocol, revision.content, {}, credentials));
+      await insertProfile(deps, actor, { name: input.name, description: input.description ?? from.description, protocol: from.protocol, defaultVisible: from.defaultVisible }, await prepare(deps, from.protocol, revision.content, {}, credentials));
       return getProfile(actor, input.name);
     },
   };

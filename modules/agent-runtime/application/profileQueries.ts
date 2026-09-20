@@ -21,8 +21,15 @@ export function profileQueries(deps: AgentRuntimeUseCaseDeps) {
     if (!profile) throw notFound('算力档位', name);
     return current(profile);
   };
+  const referencingProjects = async (name: string): Promise<string[]> => {
+    const [released, granted] = await Promise.all([
+      references.listReferencingProjects(name), uow.read.projectPolicies.referencing(name),
+    ]);
+    const names = await Promise.all(granted.map(async (id) => await deps.projects.name(id) ?? id));
+    return [...new Set([...released, ...names])];
+  };
   return {
-    current, load,
+    current, load, referencingProjects,
     listProfiles: async (actor: Actor): Promise<ComputeProfileList> => {
       adminOnly(actor);
       const rows = await Promise.all((await uow.read.profiles.list()).map(current));
@@ -31,15 +38,15 @@ export function profileQueries(deps: AgentRuntimeUseCaseDeps) {
     getProfile: async (actor: Actor, name: string): Promise<ComputeProfileDetailDto> => {
       adminOnly(actor);
       const { profile, revision, latest } = await load(name);
-      const [stored, referencedBy] = await Promise.all([uow.read.credentials.list(name), references.listReferencingProjects(name)]);
+      const [stored, referencedBy] = await Promise.all([uow.read.credentials.list(name), referencingProjects(name)]);
       return {
         ...listItemOf(profile, revision, latest), content: revision.content, contentHash: revision.contentHash,
         credentials: credentialStates(revision.content.secretNames, stored), referencedBy, createdBy: profile.createdBy, createdAt: profile.createdAt.toISOString(),
       };
     },
     /** 租户面投影：名字、说明、是否仅终端、是否默认与能否选用；不泄露镜像、二进制、模型与步骤（RFC-001、RFC-006）。 */
-    listSummaries: async (): Promise<ComputeProfileSummaryDto[]> => {
-      const rows = await Promise.all((await uow.read.profiles.list()).map(current));
+    listSummaries: async (includeHidden = false): Promise<ComputeProfileSummaryDto[]> => {
+      const rows = await Promise.all((await uow.read.profiles.list()).filter((p) => includeHidden || p.defaultVisible !== false).map(current));
       return rows.map(({ profile, revision, latest }) => {
         const { available, reason } = availabilityOf(profile, revision, latest);
         return { name: profile.name, description: profile.description, terminalOnly: profile.protocol === 'terminal', isDefault: profile.isDefault, available, ...(reason ? { reason } : {}) };

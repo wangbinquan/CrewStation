@@ -79,7 +79,7 @@ export function DevSessionWorkbench({ projectId, session, access, canDevelop, se
         </div>
       </header>
       <div className={styles.guide}><ConnectionGuide {...diagnostics} onEnvironment={location.search.view === 'session' ? undefined : () => location.selectView('session')} /></div>
-      <NativeWorkspace taskId={taskId} userId={userId} channel={channel} stream={state} canDevelop={canDevelop} onActivity={touch} activityTarget={activityTarget} editorDirty={editor.dirty} location={location}
+      <NativeWorkspace projectId={projectId} taskId={taskId} userId={userId} channel={channel} stream={state} canDevelop={canDevelop} onActivity={touch} activityTarget={activityTarget} editorDirty={editor.dirty} location={location}
         isAdmin={isAdmin} dataDirty={dataDirty} blockedReason={health !== 'ready' ? t(`devSession.connection.${health}`) : undefined}
         version={health === 'ready' ? <VersionComparisonPanel projectId={projectId} taskId={taskId} channel={channel} canDevelop={canDevelop} compact /> : null}
         data={<DataBindingPane data={data} onDirtyChange={setDataDirty} />}

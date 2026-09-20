@@ -1,11 +1,11 @@
 import { expect, test } from 'bun:test';
 import type { ProfileRevisionRef, RunnerCommand } from '@crewstation/contracts';
-import { quotaExceeded } from '@crewstation/kernel';
+import { forbidden, quotaExceeded } from '@crewstation/kernel';
 import { agentExecutionFixture } from './agentExecutionFixture';
 import type { FakeProfile } from './computeFixture';
 import { fakeComputeCatalog } from './computeFixture';
 import { isolatedNativeFixture } from './isolatedNativeFixture';
-import { workspaceActor as actor, workspaceTask as taskId } from './workspaceFixture';
+import { workspaceActor as actor, workspaceProject as projectId, workspaceTask as taskId } from './workspaceFixture';
 
 const ref: ProfileRevisionRef = { profile: 'gw', revision: 5 };
 
@@ -116,4 +116,17 @@ test('通用终端档位：「＋ CLI」可以起，launch 为 terminal 协议�
   expect(terminal).toMatchObject({ compute: 'tool', protocol: 'terminal' });
   const start = f.commands.find((c) => c.command.type === 'startAgentTerminal')!.command as Extract<RunnerCommand, { type: 'startAgentTerminal' }>;
   expect(start.launch).toEqual({ protocol: 'terminal', binaryPath: '/opt/tool/bin/tool', extraArgs: [], isSandbox: false });
+});
+
+
+test('Agent 与 CLI 的档位授权使用工作区项目，拒绝时不创建执行环境', async () => {
+  const headless = agentExecutionFixture(), cli = isolatedNativeFixture();
+  const requests: unknown[] = [];
+  for (const f of [headless, cli]) f.deps.compute.resolve = async (name, usage, id) => {
+    requests.push({ name, usage, id }); throw forbidden('项目未获授权使用此档位');
+  };
+  await expect(headless.api.startAgent(actor, taskId, { compute: 'private', permission: 'edit', prompt: 'x' })).rejects.toMatchObject({ kind: 'forbidden' });
+  await expect(cli.api.startNativeTerminal(actor, taskId, { ...cli.input(), compute: 'private' })).rejects.toMatchObject({ kind: 'forbidden' });
+  expect(requests).toEqual([{ name: 'private', usage: 'agent', id: projectId }, { name: 'private', usage: 'cli', id: projectId }]);
+  expect(headless.inputs).toEqual([]); expect(cli.allocations).toEqual([]);
 });

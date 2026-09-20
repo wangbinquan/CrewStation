@@ -9,6 +9,7 @@ import { AdminOverviewPage } from './pages/AdminOverviewPage';
 import { AdminServicePlansPage } from './pages/AdminServicePlansPage';
 import { AdminTaskProfilesPage } from './pages/AdminTaskProfilesPage';
 import { AdminUsersPage } from './pages/AdminUsersPage';
+import { AdminProjectComputePage } from './pages/AdminProjectComputePage';
 import { AdminProjectsPage } from './pages/AdminProjectsPage';
 import { parseProjectDirectorySearch } from '../../shared/admin/projectDirectorySearch';
 import { parseComputeSearch } from './model/computeSearch';
@@ -25,3 +26,5 @@ export const adminServicePlansRoute = createRoute({ getParentRoute: () => adminR
 export const adminTaskProfilesRoute = createRoute({ getParentRoute: () => adminRoute, path: 'task-profiles', component: AdminTaskProfilesPage });
 export const adminEgressRoute = createRoute({ getParentRoute: () => adminRoute, path: 'egress', component: AdminEgressPage });
 export const adminGatewayRoute = createRoute({ getParentRoute: () => adminRoute, path: 'gateway', component: AdminGatewayPage });
+
+export const adminProjectComputeRoute = createRoute({ getParentRoute: () => adminRoute, path: 'projects/$projectId/compute', component: AdminProjectComputePage });

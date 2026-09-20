@@ -81,10 +81,12 @@ describe('新建算力档位', () => {
     expect((document.activeElement as HTMLElement | null)?.closest('label')?.querySelector('span')?.textContent).toBe('档位名');
     expect(backend.writes).toEqual([]);
 
+    expect(control('默认可见性').value).toBe('true');
+    await setField('默认可见性', 'false');
     await setField('档位名', 'aider-cli'); await setField(TERMINAL_ONLY[0]!, '/opt/aider/bin/aider\n--version'); await setField(TERMINAL_ONLY[1]!, '^aider'); await setField(TERMINAL_ONLY[2]!, '30');
     await press('创建档位');
     expect(backend.writes).toEqual([{ method: 'POST', path: '/v1/admin/compute-profiles', query: '', body: {
-      name: 'aider-cli', description: '', credentials: {},
+      name: 'aider-cli', description: '', defaultVisible: false, credentials: {},
       content: { image: 'registry.cs.local/runtimes/aider:1', launch: { protocol: 'terminal', binaryPath: '/opt/aider/bin/aider', extraArgs: [] }, steps: [], vars: {}, secretNames: [], configFile: { kind: 'none' }, terminalTest: { command: ['/opt/aider/bin/aider', '--version'], expect: '^aider', timeoutMs: 30_000 } },
     } }]);
     expect(page.search()).toEqual({ profile: 'aider-cli' });

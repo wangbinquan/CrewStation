@@ -1,4 +1,4 @@
-import type { AppPresentationDto, AppVisibilityCheckDto, AppVisibilityDto, ManifestKind, MemberCandidateDto, MemberDto, ProjectDto, QuotaDto, SetAppPresentationRequest, SetAppVisibilityRequest, SetMemberRequest, SetQuotaRequest } from '@crewstation/contracts';
+import type { ProjectComputePolicyDto, SaveProjectComputePolicy, AppPresentationDto, AppVisibilityCheckDto, AppVisibilityDto, ManifestKind, MemberCandidateDto, MemberDto, ProjectDto, QuotaDto, SetAppPresentationRequest, SetAppVisibilityRequest, SetMemberRequest, SetQuotaRequest } from '@crewstation/contracts';
 import type { ProjectPage, ProjectPageQuery } from '@crewstation/contracts';
 import type { Transport } from '../httpTransport';
 import type { ItemsPage } from '../itemsPage';
@@ -6,6 +6,8 @@ import type { CreateProjectInput } from '../requestInputs';
 import { segment } from '../requestUrl';
 
 export interface ProjectsResource {
+  getComputePolicy(projectId: string): Promise<ProjectComputePolicyDto>;
+  saveComputePolicy(projectId: string, input: SaveProjectComputePolicy): Promise<ProjectComputePolicyDto>;
   /**
    * GET /v1/projects：管理员看全部，成员看自己所在的项目。
    * `kinds` 在作用域之后再筛一层（RFC-002）：租户空间传 `['DigitalWorker']`，
@@ -40,6 +42,8 @@ export interface ProjectsResource {
 export function projectsResource(transport: Transport): ProjectsResource {
   const base = (projectId: string) => `/v1/projects/${segment(projectId)}`;
   return {
+    getComputePolicy: (id) => transport.request('GET', `${base(id)}/compute-policy`),
+    saveComputePolicy: (id, input) => transport.request('PUT', `${base(id)}/compute-policy`, { body: input }),
     list: (kinds) => transport.request<ItemsPage<ProjectDto>>('GET', '/v1/projects', kinds === undefined ? {} : { query: { kind: kinds.join(',') } }),
     page: (query = {}) => transport.request('GET', '/v1/projects/page', { query: { ...query, kind: query.kind?.join(',') } }),
     create: (input) => transport.request<ProjectDto>('POST', '/v1/projects', { body: input }),

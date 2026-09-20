@@ -13,6 +13,7 @@ import { lines, stepFromDto, stepToDto, validateSteps } from './stepDraft';
 export interface ProfileDraft {
   name: string;
   description: string;
+  defaultVisible: boolean;
   protocol: AgentProtocol;
   image: string;
   binaryPath: string;
@@ -40,7 +41,7 @@ const EMPTY_OPENCODE = { variant: '', temperature: '', steps: '', maxSteps: '' }
 
 export function blankDraft(protocol: AgentProtocol, preset: ProfilePreset = 'blank'): ProfileDraft {
   return applyPreset({
-    name: '', description: '', protocol, image: '', binaryPath: suggestedBinaryPath(protocol), extraArgs: '', configDirEnv: '', configDirName: '', isSandbox: false, model: '',
+    name: '', description: '', defaultVisible: true, protocol, image: '', binaryPath: suggestedBinaryPath(protocol), extraArgs: '', configDirEnv: '', configDirName: '', isSandbox: false, model: '',
     opencode: { ...EMPTY_OPENCODE }, taskProfile: '', steps: [], vars: [], secretNames: [], credentials: {}, configFileKind: 'none', configFilePath: '',
     testCommand: '', testExpect: '', testTimeoutSeconds: '60',
   }, preset);
@@ -83,7 +84,7 @@ function credentialOps(secretNames: readonly string[], states: readonly ProfileC
 export function draftFromDetail(detail: ComputeProfileDetailDto): ProfileDraft {
   const { content } = detail, launch = content.launch, test = content.terminalTest;
   return {
-    name: detail.name, description: detail.description, protocol: detail.protocol, image: content.image, binaryPath: launch.binaryPath,
+    name: detail.name, description: detail.description, defaultVisible: detail.defaultVisible ?? true, protocol: detail.protocol, image: content.image, binaryPath: launch.binaryPath,
     extraArgs: launch.extraArgs.join('\n'), configDirEnv: launch.configDirEnv ?? '', configDirName: launch.configDirName ?? '', isSandbox: launch.isSandbox, model: launch.model ?? '',
     opencode: { variant: launch.opencode?.variant ?? '', temperature: numberText(launch.opencode?.temperature), steps: numberText(launch.opencode?.steps), maxSteps: numberText(launch.opencode?.maxSteps) },
     taskProfile: content.taskProfile ?? '', steps: content.steps.map(stepFromDto), vars: Object.entries(content.vars).map(([name, value]) => ({ name, value })),
@@ -188,7 +189,7 @@ function credentialWrites(draft: ProfileDraft): Record<string, CredentialOp> {
 }
 
 export function toCreateRequest(draft: ProfileDraft): CreateComputeProfileInput {
-  return { name: draft.name.trim(), description: draft.description, content: toContent(draft), credentials: credentialWrites(draft) };
+  return { name: draft.name.trim(), description: draft.description, defaultVisible: draft.defaultVisible, content: toContent(draft), credentials: credentialWrites(draft) };
 }
 
 export function toSaveRequest(draft: ProfileDraft, expectedRevision: number): SaveComputeProfileInput {

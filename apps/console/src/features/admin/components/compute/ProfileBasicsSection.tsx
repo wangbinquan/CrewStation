@@ -34,6 +34,9 @@ export function ProfileBasicsSection({ draft, errors, disabled, creating, onChan
           onChange={(protocol) => onChange((d) => withProtocol(d, protocol as AgentProtocol))}
           hint={creating ? t(`admin.profile.protocolHint.${draft.protocol}`) : t('admin.profile.field.protocolFixed')}
           options={PROTOCOLS.map((protocol) => ({ value: protocol, label: t(`admin.profile.protocol.${protocol}`) }))} />
+        <AdminField label={t('admin.profile.visibility')} value={String(draft.defaultVisible)} disabled={disabled}
+          hint={t('admin.profile.visibilityHint')} onChange={(value) => onChange((d) => ({ ...d, defaultVisible: value === 'true' }))}
+          options={[{ value: 'true', label: t('admin.profile.defaultVisible') }, { value: 'false', label: t('admin.profile.defaultHidden') }]} />
         </> : null}
         {creating ? (
           <AdminField label={t('admin.profile.field.preset')} value="" disabled={disabled} hint={t('admin.profile.field.presetHint')}

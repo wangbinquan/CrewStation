@@ -39,7 +39,7 @@ describe('租户面档位选择（RFC-006 C6、C17）', () => {
 function serveCatalog(items: readonly ComputeProfileSummaryDto[], extra: (url: string, init?: RequestInit) => unknown = () => undefined) {
   globalThis.fetch = (async (raw: RequestInfo | URL, init?: RequestInit) => {
     const url = String(raw);
-    const body = url.endsWith('/v1/catalog/compute-profiles') ? { items } : extra(url, init) ?? { items: [] };
+    const body = url.endsWith('/v1/projects/project-1/compute-profiles') ? { items } : extra(url, init) ?? { items: [] };
     return body instanceof Response ? body : new Response(JSON.stringify(body), { headers: { 'content-type': 'application/json' } });
   }) as typeof fetch;
 }
@@ -49,7 +49,7 @@ function Form({ initial, started }: { readonly initial: string; readonly started
   const [compute, setCompute] = useState(initial);
   const creation = { compute, permission: 'edit', prompt: '整理需求', busy: false, open: true, dirty: false, setOpen: () => {}, start: () => started.push(compute),
     edit: (change: { compute?: string }) => { if (change.compute !== undefined) setCompute(change.compute); } } as unknown as HistoricalStartHandle;
-  return <StartAgentForm creation={creation} />;
+  return <StartAgentForm projectId="project-1" creation={creation} />;
 }
 const select = () => page!.host.querySelector<HTMLSelectElement>('#agent-compute')!;
 const options = () => [...select().options].map((option) => [option.value, option.textContent, option.disabled]);
@@ -70,12 +70,17 @@ describe('新建 Agent（历史对话）', () => {
     expect(page.text()).toContain('档位 opencode-lite 当前不可用：测试失败：缺少鉴权。'); expect(page.button('启动').disabled).toBe(true);
     page.unmount();
     page = await renderElement(<Form initial="gone-profile" started={[]} />, messages);
-    expect(page.text()).toContain('所选档位已不存在（可能已被管理员删除），请重新选择。'); expect(page.button('启动').disabled).toBe(true);
+    expect(page.text()).toContain('所选档位已不存在或不再授予此项目，请重新选择。'); expect(page.button('启动').disabled).toBe(true);
     page.unmount();
     serveCatalog(withoutDefault);
     page = await renderElement(<Form initial="" started={[]} />, messages);
-    expect(options()[0]).toEqual(['', '默认档位（平台尚未设置）', false]);
-    expect(page.text()).toContain('平台还没有设置默认档位'); expect(page.button('启动').disabled).toBe(true);
+    expect(options()[0]).toEqual(['', '默认档位（项目尚未设置）', false]);
+    expect(page.text()).toContain('此项目尚未设置默认档位'); expect(page.button('启动').disabled).toBe(true);
+  });
+
+  test('项目允许清单为空时说明需要分配，不能误报平台没有档位', async () => {
+    serveCatalog([]); page = await renderElement(<Form initial="" started={[]} />, messages);
+    expect(page.text()).toContain('此项目尚未分配算力档位'); expect(page.button('启动').disabled).toBe(true);
   });
 
   test('名册标出每个 Agent 受理时固定的档位修订，只有档位名与修订，没有模型', async () => {
@@ -88,7 +93,7 @@ describe('新建 Agent（历史对话）', () => {
 });
 
 describe('「＋ 创建开发Agent会话」', () => {
-  const workspace = () => <NativeWorkspace taskId="task-1" userId="user-1" channel={{ send: async () => ({}), subscribe: () => () => {} }} stream={{ ...INITIAL_STREAM_STATE, status: 'open', runnerConnected: true, generation: 1 }} canDevelop onActivity={() => {}} preview={null} editor={null} changes={null} />;
+  const workspace = () => <NativeWorkspace projectId="project-1" taskId="task-1" userId="user-1" channel={{ send: async () => ({}), subscribe: () => () => {} }} stream={{ ...INITIAL_STREAM_STATE, status: 'open', runnerConnected: true, generation: 1 }} canDevelop onActivity={() => {}} preview={null} editor={null} changes={null} />;
   const cliSelect = () => page!.host.querySelector<HTMLSelectElement>('select[aria-label="算力档位"]')!;
 
   test('列出全部档位（通用终端标「仅终端」），选中的档位随启动请求发出', async () => {

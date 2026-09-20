@@ -9,6 +9,8 @@ export interface QuotaSource {
 }
 
 export interface ProfileCatalog {
+  /** 分配过开发套餐的项目只能用该套餐；未分配保持原默认／恢复行为。 */
+  devSessionProfile?(projectId: ProjectId): Promise<string | undefined>;
   listTaskProfiles(): Promise<TaskProfileDto[]>;
   getTaskProfile(name: string): Promise<{ name: string; cpu: string; memory: string; storage: string } | undefined>;
 }

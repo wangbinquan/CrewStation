@@ -23,8 +23,8 @@ import { useWorkspaceLocation } from '../../hooks/layout/useWorkspaceLocation';
 import type { WorkspaceLocation } from '../../model/layout/developmentLocation';
 import { locationView } from '../../model/layout/developmentLocation';
 
-export function NativeWorkspace({ taskId, userId, channel, stream, canDevelop, onActivity, preview, editor, changes, activityTarget, editorDirty = false, location, data, environment, dataDirty = false, version, blockedReason, isAdmin = false }: {
-  readonly taskId: string; readonly userId: string; readonly channel: TaskStreamChannel; readonly stream: StreamState; readonly canDevelop: boolean;
+export function NativeWorkspace({ projectId, taskId, userId, channel, stream, canDevelop, onActivity, preview, editor, changes, activityTarget, editorDirty = false, location, data, environment, dataDirty = false, version, blockedReason, isAdmin = false }: {
+  readonly projectId: string; readonly taskId: string; readonly userId: string; readonly channel: TaskStreamChannel; readonly stream: StreamState; readonly canDevelop: boolean;
   readonly onActivity: () => void; readonly preview: ReactNode; readonly editor: ReactNode; readonly changes: ReactNode;
   readonly data?: ReactNode; readonly environment?: ReactNode; readonly dataDirty?: boolean; readonly version?: ReactNode;
   readonly blockedReason?: string; readonly isAdmin?: boolean;
@@ -75,7 +75,7 @@ export function NativeWorkspace({ taskId, userId, channel, stream, canDevelop, o
       <div hidden={view !== 'cli'}>
         {native.query.error || native.start.error || native.stop.error ? <p className={styles.error} role="status">{errorMessage(native.query.error ?? native.start.error ?? native.stop.error)}{native.query.error ? <Button onClick={() => void native.query.refetch()}>{t('devSession.connection.check')}</Button> : null}</p> : null}
         <NativeWorkspaceTabs taskId={taskId} layout={layout} store={store} loaded={state.loaded} roster={roster}>
-          <NativeToolbar layout={layout} store={store} native={native} canStart={state.loaded && canDevelop && stream.runnerConnected && !blockedReason} blockedReason={blockedReason ?? (!state.loaded ? t('devSession.native.layoutLoading') : !canDevelop ? t('devSession.connection.noPermission') : undefined)} isAdmin={isAdmin} onPreviewAlongside={location ? (show) => location.selectView(show ? 'split' : 'cli') : undefined} />
+          <NativeToolbar projectId={projectId} layout={layout} store={store} native={native} canStart={state.loaded && canDevelop && stream.runnerConnected && !blockedReason} blockedReason={blockedReason ?? (!state.loaded ? t('devSession.native.layoutLoading') : !canDevelop ? t('devSession.connection.noPermission') : undefined)} isAdmin={isAdmin} onPreviewAlongside={location ? (show) => location.selectView(show ? 'split' : 'cli') : undefined} />
           <div className={styles.stage}>{view === 'cli' ? layout.previewAlongside ? <SplitGrid items={[{ id: 'terminals', content: terminalContent }, { id: 'preview', content: preview }]} mode="columns" ratios={{ columns: [layout.previewRatio, 1 - layout.previewRatio], rows: [1] }} separatorLabel={(axis, index) => t(`devSession.native.resize.${axis}`, { index })} onResize={(ratios) => store.update((value) => ({ ...value, previewRatio: Math.max(0.25, Math.min(0.75, ratios.columns[0] ?? 0.5)) }))} /> : terminalContent : null}</div>
         </NativeWorkspaceTabs>
         {version}

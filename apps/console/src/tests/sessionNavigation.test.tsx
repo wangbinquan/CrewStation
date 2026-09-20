@@ -61,7 +61,7 @@ test('连接引导区分页面、容器、准备、协议和恢复状态，回�
 test.each([false, true])('档位读取失败有刷新及匹配身份的配置指引（管理员=%s）', async (isAdmin) => {
   f = editorWorkspaceFixture(); const base = globalThis.fetch; let available = false;
   globalThis.fetch = (async (raw, init) => {
-    if (String(raw).endsWith('/catalog/compute-profiles')) return available
+    if (String(raw).endsWith('/compute-profiles')) return available
       ? Response.json({ items: [{ name: 'ready', available: true, isDefault: true, terminalOnly: false, description: '' }] })
       : Response.json({ error: 'unavailable', message: '算力目录暂不可读' }, { status: 503 });
     const response = await base(raw, init);

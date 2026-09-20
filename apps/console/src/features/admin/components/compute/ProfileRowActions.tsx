@@ -40,10 +40,11 @@ export function ProfileRowActions({ profile, onOpen, children }: ProfileRowActio
   const [copyName, setCopyName] = useState('');
   const copy = useApiMutation((name: string) => api.computeProfiles.copy(profile.name, { name }), { invalidate: INVALIDATE, onSuccess: (detail) => { setCopying(false); onOpen(detail.name); } });
   const setDefault = useApiMutation(() => api.computeProfiles.setDefault(profile.name), { invalidate: INVALIDATE });
+  const visibility = useApiMutation((value: boolean) => api.computeProfiles.setDefaultVisible(profile.name, value), { invalidate: INVALIDATE });
   const toggle = useApiMutation((enabled: boolean) => api.computeProfiles.setEnabled(profile.name, enabled), { invalidate: INVALIDATE });
   const remove = useApiMutation((confirmReferences: boolean) => api.computeProfiles.remove(profile.name, { confirmReferences }), { invalidate: INVALIDATE });
   const references = referencedProjects(remove.error);
-  const busy = copy.isPending || setDefault.isPending || toggle.isPending || remove.isPending;
+  const busy = visibility.isPending || copy.isPending || setDefault.isPending || toggle.isPending || remove.isPending;
   const defaultBlocked = profile.protocol === 'terminal' ? t('admin.profile.defaultTerminal') : !profile.enabled ? t('admin.profile.defaultDisabled') : undefined;
   const copyValid = ComputeProfileNameSchema.safeParse(copyName).success;
   return (
@@ -62,6 +63,7 @@ export function ProfileRowActions({ profile, onOpen, children }: ProfileRowActio
         {profile.isDefault && profile.enabled ? <Button disabled title={t('admin.profile.defaultLocked')}>{t('admin.profile.disable')}</Button>
           : <InlineConfirm label={profile.enabled ? t('admin.profile.disable') : t('admin.profile.enable')} question={profile.enabled ? t('admin.profile.disableQuestion', { name: profile.name }) : t('admin.profile.enableQuestion', { name: profile.name })}
               busy={toggle.isPending} busyLabel={t('admin.profile.working')} onConfirm={() => toggle.mutate(!profile.enabled)} />}
+        {profile.isDefault ? <Button disabled title={t('admin.profile.visibilityLocked')}>{t('admin.profile.defaultVisible')}</Button> : <InlineConfirm label={t(profile.defaultVisible === false ? 'admin.profile.defaultVisible' : 'admin.profile.defaultHidden')} question={t('admin.profile.visibilityQuestion', { name: profile.name })} busy={visibility.isPending} onConfirm={() => visibility.mutate(profile.defaultVisible === false)} />}
         <span className={styles.destructive}>{profile.isDefault ? <Button disabled title={t('admin.profile.defaultLocked')}>{t('admin.profile.remove')}</Button>
           : <InlineConfirm label={t('admin.profile.remove')} question={t('admin.profile.removeQuestion', { name: profile.name })} busy={remove.isPending} busyLabel={t('admin.profile.removing')} onConfirm={() => remove.mutate(false)} />}</span>
         </div>
@@ -77,6 +79,7 @@ export function ProfileRowActions({ profile, onOpen, children }: ProfileRowActio
       ) : null}
       {copy.error ? <ActionNote tone="error">{t('admin.profile.copyError', { message: errorMessage(copy.error) })}</ActionNote> : null}
       {setDefault.error ? <ActionNote tone="error">{t('admin.profile.setDefaultError', { message: errorMessage(setDefault.error) })}</ActionNote> : null}
+      {visibility.error ? <ActionNote tone="error">{errorMessage(visibility.error)}</ActionNote> : null}
       {toggle.error ? <ActionNote tone="error">{t('admin.profile.toggleError', { message: errorMessage(toggle.error) })}</ActionNote> : null}
       {references ? (
         <ActionNote tone="error">

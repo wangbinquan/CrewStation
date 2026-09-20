@@ -15,9 +15,9 @@ import { ComputeOptions, computeBlockText } from '../agents/ComputeOptions';
 import type { useNativeTerminals } from '../../hooks/native/useNativeTerminals';
 import styles from './NativeWorkspace.module.css';
 
-export function NativeToolbar({ layout, store, native, canStart, onPreviewAlongside, blockedReason, isAdmin = false }: { readonly layout: WorkspaceLayout; readonly store: WorkspaceLayoutStore; readonly native: ReturnType<typeof useNativeTerminals>; readonly canStart: boolean; readonly blockedReason?: string; readonly isAdmin?: boolean; readonly onPreviewAlongside?: (show: boolean) => void }): ReactElement {
+export function NativeToolbar({ projectId, layout, store, native, canStart, onPreviewAlongside, blockedReason, isAdmin = false }: { readonly projectId: string; readonly layout: WorkspaceLayout; readonly store: WorkspaceLayoutStore; readonly native: ReturnType<typeof useNativeTerminals>; readonly canStart: boolean; readonly blockedReason?: string; readonly isAdmin?: boolean; readonly onPreviewAlongside?: (show: boolean) => void }): ReactElement {
   const t = useT();
-  const profiles = useApiQuery(queryKeys.computeProfiles(), () => api.catalog.listComputeProfiles());
+  const profiles = useApiQuery(queryKeys.computeProfiles(projectId), () => api.catalog.listComputeProfiles(projectId));
   const compute = layout.preferredCompute ?? '';
   // 「＋ CLI」列出全部档位（含仅终端的通用终端协议，RFC-006 C6）；选中的档位不可用、平台没设默认档位时不许启动：
   // 服务端会拒绝，前端先把原因摆出来。

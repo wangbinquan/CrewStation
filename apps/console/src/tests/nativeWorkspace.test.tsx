@@ -28,7 +28,7 @@ function setup(errorStatus = 412) {
   }) as typeof fetch;
   return { starts, saves };
 }
-const element = (location?: WorkspaceLocation) => <NativeWorkspace taskId="task-1" userId="user-1" location={location} channel={{ send: async () => ({}), subscribe: () => () => {} }} stream={{ ...INITIAL_STREAM_STATE, status: 'open', runnerConnected: true, generation: 1 }} canDevelop onActivity={() => {}} preview={<div>真实预览位置</div>} editor={<div>代码位置</div>} changes={<div>差异位置</div>} />;
+const element = (location?: WorkspaceLocation) => <NativeWorkspace projectId="project-1" taskId="task-1" userId="user-1" location={location} channel={{ send: async () => ({}), subscribe: () => () => {} }} stream={{ ...INITIAL_STREAM_STATE, status: 'open', runnerConnected: true, generation: 1 }} canDevelop onActivity={() => {}} preview={<div>真实预览位置</div>} editor={<div>代码位置</div>} changes={<div>差异位置</div>} />;
 
 describe('紧凑原生工作台', () => {
   test('重获焦点读到其他页签的代码视图时，当前 CLI 地址仍控制功能页且可以继续选择', async () => {

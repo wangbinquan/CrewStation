@@ -9,7 +9,7 @@ import { profileCredentials, profileRevisions, profileTests, profiles } from './
 const json = <T>(v: unknown): T => (typeof v === 'string' ? JSON.parse(v) : v) as T;
 
 const toProfile = (r: typeof profiles.$inferSelect): ComputeProfile => ({
-  name: r.name, protocol: r.protocol as AgentProtocol, description: r.description, enabled: r.enabled, isDefault: r.isDefault, currentRevision: r.currentRevision,
+  name: r.name, protocol: r.protocol as AgentProtocol, description: r.description, enabled: r.enabled, isDefault: r.isDefault, defaultVisible: r.defaultVisible, currentRevision: r.currentRevision,
   createdBy: r.createdBy as UserId, createdAt: r.createdAt, updatedBy: r.updatedBy as UserId, updatedAt: r.updatedAt,
 });
 
@@ -60,7 +60,7 @@ export function drizzleTestRepository(db: Executor): TestRepository {
   });
   return {
     insert: async (t) => { await db.insert(profileTests).values(row(t)); },
-    update: async (t) => { await db.update(profileTests).set(row(t)).where(eq(profileTests.testId, t.testId)); },
+    update: async (t) => { await db.update(profileTests).set(row(t)).where(and(eq(profileTests.testId, t.testId), inArray(profileTests.state, ['queued', 'running']))); },
     get: async (testId) => { const r = (await db.select().from(profileTests).where(eq(profileTests.testId, testId)))[0]; return r ? toTest(r) : undefined; },
     findByRequest: async (profile, createdBy, clientRequestId) => {
       const r = (await db.select().from(profileTests).where(and(eq(profileTests.profile, profile), eq(profileTests.createdBy, createdBy), eq(profileTests.clientRequestId, clientRequestId))))[0];

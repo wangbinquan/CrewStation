@@ -57,6 +57,7 @@ export const ProfileCredentialStateSchema = z.object({ name: EnvNameSchema, set:
 export const CreateComputeProfileRequestSchema = z.object({
   name: ComputeProfileNameSchema,
   description: ComputeProfileDescriptionSchema,
+  defaultVisible: z.boolean().optional(),
   content: ComputeProfileContentSchema,
   credentials: z.record(EnvNameSchema, ProfileCredentialWriteSchema).default({}),
 }).strict();
@@ -142,6 +143,7 @@ export const ComputeProfileListItemSchema = z.object({
   description: z.string(),
   enabled: z.boolean(),
   isDefault: z.boolean(),
+  defaultVisible: z.boolean().optional(),
   revision: z.number().int().min(1),
   image: z.string(),
   imageDigest: z.string(),

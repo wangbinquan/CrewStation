@@ -1,3 +1,4 @@
+import { forbidden } from '@crewstation/kernel';
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import type { Actor, ProjectId, ReleaseId, ServiceId, UserId } from '@crewstation/contracts';
 import { eventbusMigrations } from '@crewstation/eventbus';
@@ -52,7 +53,7 @@ beforeAll(async () => {
     services: { resolveServiceById: async () => ({ projectId, slug: 'demo', name: 'demo', namespace: 'cs-demo' }) },
     plans: {
       getServicePlan: async (name) => (name === 'standard-small' ? { name, cpu: '500m', memory: '512Mi', maxReplicas: 3, description: '' } : undefined),
-      lookupComputeProfile: async (name: string) => (name === 'default' ? (defaultProfile ? { name: defaultProfile, terminalOnly: false } : undefined) : name === 'balanced' ? { name, terminalOnly: false } : name === 'term-cli' ? { name, terminalOnly: true } : undefined),
+      lookupComputeProfile: async (name: string, id) => { expect(id).toBe(projectId); if (name === 'private') throw forbidden('项目未获授权使用 private 档位'); return (name === 'default' ? (defaultProfile ? { name: defaultProfile, terminalOnly: false } : undefined) : name === 'balanced' ? { name, terminalOnly: false } : name === 'term-cli' ? { name, terminalOnly: true } : undefined); },
       listComputeProfiles: async () => ['balanced', 'term-cli'],
     },
     config: { render: async () => ({ values: { GREETING: 'hi' }, version: 7 }), validate: async (_p, _e, keys) => ({ missing: keys.filter((k) => k !== 'GREETING') }) },
@@ -157,6 +158,7 @@ describe.skipIf(!available)('release module', () => {
 
   /** 发布只看档位存在性与协议（RFC-006 §4.4）：三种拒绝都在部署前发生，不会部署半截。 */
   test.each([
+    ['private', '未获授权', 'private'],
     ['nope', '算力档位 nope 不存在', 'balanced'],
     ['term-cli', '通用终端协议', '「＋ CLI」'],
     ['default', '尚未设置默认档位', '平台管理'],

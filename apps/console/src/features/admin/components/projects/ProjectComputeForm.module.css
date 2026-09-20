@@ -1,0 +1,5 @@
+.profiles { min-width: 0; border: 1px solid var(--cs-color-border); border-radius: 8px; padding: 12px; }
+.profiles p { color: var(--cs-color-text-muted); margin: 0 0 12px; }
+.choice { display: flex; align-items: flex-start; gap: 8px; padding: 8px 0; overflow-wrap: anywhere; }
+.choice input { flex: 0 0 auto; margin-top: 3px; }
+.choice small { display: block; color: var(--cs-color-text-muted); }
