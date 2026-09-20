@@ -73,15 +73,13 @@ describe('哪些文件需要用例防护', () => {
 });
 
 describe('本机门禁与 CI 门禁是同一批检查', () => {
-  // CI 跑 check:ci、本机跑 check。两条脚本一旦各改各的，「本机绿、CI 红」就会回来；
-  // 这里要求它们共用同一段静态检查，用例那一步只允许多出报告参数，不允许多出路径或筛选。
-  test('check 与 check:ci 只差报告参数', async () => {
+  // CI 把门禁拆成 static 与按层的用例作业。静态那一段必须就是本机 check 的前半段，
+  // 每一层都必须经同一个分层运行器——各写各的筛选参数，就会有文件掉在所有作业之外。
+  test('check 复用 check:static；每一层的脚本都走分层运行器', async () => {
     const scripts = ((await Bun.file(new URL('../../../package.json', import.meta.url)).json()) as { scripts: Record<string, string> }).scripts;
     expect(scripts.check).toBe('bun run check:static && bun test');
-    expect(scripts['check:ci']).toBe('bun run check:static && bun run test:cover');
-    const cover = scripts['test:cover']!.replace(/^mkdir -p coverage && /, '');
-    expect(cover.startsWith('bun test ')).toBe(true);
-    expect(cover.split(' ').slice(2).every((argument) => /^--(coverage|coverage-reporter|coverage-dir|reporter|reporter-outfile)(=|$)/.test(argument))).toBe(true);
+    expect(scripts['check:static']).toBe('bun run arch:check && bun run lint && bun run typecheck && bun run typecheck:console');
+    for (const tier of ['unit', 'module', 'console', 'e2e']) expect(scripts[`test:${tier}`]).toBe(`bun run tools/testguard/main.ts tier ${tier}`);
   });
 });
 

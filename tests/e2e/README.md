@@ -27,9 +27,10 @@ bun run check                 # 完整门禁，实机验收包含在内
 
 `.github/workflows/ci.yml` 的 `e2e` 作业会真装一套平台再跑这些用例：kind 建集群 → `bootstrap.sh`
 → 把 Traefik 的 web NodePort 钉到 30080（kind 把宿主机 80 接到它）→ `install-platform.sh` →
-起无头 Chrome → `bun test tests/e2e`。快门禁 `check` 作业不受影响，仍然几分钟出结果。
+起无头 Chrome → `bun run test:e2e --cover`。其余几层（`static`、`unit`、`module`、`console`、`gate`）是并行的独立作业，不受影响，仍然几分钟出结果。
 
-`e2e` 作业设了 `CS_TEST_REQUIRE=e2e`：网关、浏览器与管理员都是作业自己装的，探测不到或登录不上在那里是**故障**，
+`e2e` 作业设了 `CS_TEST_REQUIRE=e2e,database`（作业里另起了一个 PostgreSQL，给 `apiInvocation.test.ts` 这类要真实数据库加进程内服务的用例用——
+这一层只在这个作业里跑）：网关、浏览器、管理员与数据库都是作业自己装的，探测不到或登录不上在那里是**故障**，
 `e2eAvailable()` 与 `openAdminSession()` 会抛错让作业变红，而不是像本机那样整套跳过（`requiredMode.test.ts` 锁的就是这一点，规则见
 `docs/engineering/testing.md` §5）。项目空间用例在 CI 里仍然因为没有 GitLab 而跳过，这是登记在案的防护缺口（同文 §10）。
 

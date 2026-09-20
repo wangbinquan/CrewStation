@@ -59,6 +59,21 @@
 同一个行为优先写在**能断言它的最低一层**：能抽成纯函数就写单元用例，不要拿实机用例去测一个判定分支。
 反过来，渲染用例把 `fetch` 打了桩，后端换了字段它照绿——跨进程的真实性只有实机层能证明，两者互补，不能互相替代。
 
+### 2.1 执行分层：每个用例文件恰好属于一层
+
+上表是「证明什么」的分层；**执行**时按位置把每个用例文件归到四层之一，CI 一层一个作业（§8），本机也可以单跑一层：
+
+| 执行层 | 归属判定（`tools/testguard/testTiers.ts`，唯一事实源） | 约束 | 本机命令 |
+|---|---|---|---|
+| `unit` 方法级 UT | 就近放在源码旁的 `*.test.ts(x)`，且不带 `skipIf` | 不依赖任何环境；CI 上不起任何服务，**一条跳过都不允许** | `bun run test:unit` |
+| `module` 模块级 UT | 位于任意单元的 `tests/` 目录下；以及就近放、却带 `skipIf`（依赖数据库或集群）的文件 | CI 上真实 PostgreSQL，`database` 被点名要求 | `bun run test:module` |
+| `console` 工作台 | `apps/console/` 下的全部用例 | happy-dom；一条跳过都不允许 | `bun run test:console` |
+| `e2e` 实机端到端 | `tests/e2e/` | 真实部署＋浏览器＋数据库，`e2e`、`database` 被点名要求 | `bun run test:e2e` |
+
+结构、契约两层的用例没有单独的作业：按位置，它们落在 `unit` 或 `module` 里（`packages/contracts/manifest/manifest.test.ts` 是方法级，`tools/arch/tests/` 是模块级）。
+四层合起来就是本机 `bun test` 跑的全部文件——不会有文件掉在所有作业之外；`gate` 作业还会拿分层清单对实际执行结果再核一遍（§8.2）。
+用例文件只用 `.test.ts`／`.test.tsx` 命名：`.spec.ts`、`_test.ts` 这类 Bun 也认、分层却认不出的命名由 `test-discipline` 规则阻断。
+
 ## 3. 用例放在哪
 
 | 单元 | 位置 | 说明 |
@@ -113,7 +128,8 @@
 3. **`CS_TEST_REQUIRE` 点名的能力不允许缺席**：逗号分隔，现有 `database`、`gitlab`、`e2e`。被点名而探测失败时闸门抛错，用例文件在加载期就红。写错能力名同样报错。
 4. **禁止** `.only`、无条件 `.skip`、`.todo`、`.failing`、恒真的 `skipIf`、用例重试（`retry:`）。由 `tools/arch` 的 `test-discipline` 规则阻断，覆盖工作区、`tests/`、`integrations/`、`templates/` 与 `deploy/`。
 
-CI 的 `check` 作业设 `CS_TEST_REQUIRE=database`，`e2e` 作业设 `CS_TEST_REQUIRE=e2e`：那两样东西是作业自己装的，缺了就是故障。
+CI 的 `module` 作业设 `CS_TEST_REQUIRE=database`，`e2e` 作业设 `CS_TEST_REQUIRE=e2e,database`：那些东西是作业自己装的，缺了就是故障。
+`unit` 与 `console` 两个作业不提供任何环境，那两层里出现跳过本身就是失败。
 仓库根 `tests/` 不是工作区单元，按相对路径引用 `packages/testkit/capability.ts`（该文件零依赖，为此而设）。
 
 新增一种环境能力：在 `packages/testkit/capability.ts` 的 `TEST_CAPABILITIES` 里加名字，在用例里用 `resolveCapability` 接上探测，并在本节与 §8 写明哪个作业提供它。
@@ -164,21 +180,32 @@ CI 的 `check` 作业设 `CS_TEST_REQUIRE=database`，`e2e` 作业设 `CS_TEST_R
 
 `.github/workflows/ci.yml`，`push` 到 `main`、任何 PR 与手动触发时运行。主干开发下每个推送的 SHA 各自跑完，互不取消。
 
-### 8.1 两个作业
+### 8.1 六个作业：一层一个，GitHub 上一眼看得见哪一层红了
 
-| 作业 | 内容 | 典型耗时 | 阻断条件 |
+| 作业 | 内容 | 环境 | 阻断条件 |
 |---|---|---|---|
-| `check` | `bun run check:ci`（`arch:check` → lint → 两次类型检查 → 全部用例，真实 PostgreSQL 17）→ 工作台构建 → 用例报告 → **新增代码防护** → 上传 `junit.xml`／`lcov.info` | 约 3 分钟 | 任一步失败；数据库不可达；新增代码防护未通过 |
-| `e2e` | kind 建集群 → `bootstrap.sh` → `install-platform.sh` → 无头 Chrome → `bun test tests/e2e/` → 用例报告 → 上传 `junit.xml`；失败时打印集群诊断 | 约 6 分钟 | 任一步失败；网关、浏览器或管理员登录不可用 |
+| `static`（结构规则 · lint · 类型） | `bun run check:static`：`arch:check` → lint → 两次类型检查 | 无 | 任一步失败 |
+| `unit`（方法级 UT） | `bun run test:unit --cover` | **不起任何服务** | 用例失败；出现任何跳过；有用例文件没被执行 |
+| `module`（模块级 UT） | `bun run test:module --cover` | 真实 PostgreSQL 17，`CS_TEST_REQUIRE=database` | 用例失败；数据库不可达；有用例文件没被执行 |
+| `console`（工作台） | `bun run test:console --cover` → 工作台构建 | 无 | 用例失败；出现任何跳过；构建失败 |
+| `gate`（汇总 · 新增代码防护） | 下载三层产物 → 合并报告与分层审计 → **新增代码防护** → 核对四个作业都绿 | 无 | 任何一层红；审计不过；新增代码防护未通过 |
+| `e2e`（实机端到端） | kind 建集群 → `bootstrap.sh` → `install-platform.sh` → 无头 Chrome → `bun run test:e2e --cover` → 报告；失败时打印集群诊断 | 真实部署、浏览器、PostgreSQL，`CS_TEST_REQUIRE=e2e,database` | 任一步失败；网关、浏览器、管理员登录或数据库不可用 |
 
-本机跑 `bun run check`，CI 跑 `bun run check:ci`：两者共用同一段 `check:static` 与同一批用例，`check:ci` 只多出 lcov 与 JUnit 两个报告参数，
-把 `lcov.info` 与 `junit.xml` 写到 `coverage/`（已 gitignore），报告与闸门读的就是这两个文件。`tools/testguard` 里有一条用例锁住「两条脚本只差报告参数」。
+前五个作业并行起跑，`gate` 等前四个结束（不论成败）后汇总；`e2e` 独立。**看一次推送是不是绿的，看 `gate` 与 `e2e` 两个作业。**
+本机跑 `bun run check`（`check:static` 加全部用例，一个进程）；CI 的 `static` 跑同一条 `check:static`，四层用例由同一个分层运行器点名文件执行。
+各层把 `lcov.info` 与 `junit.xml` 写到 `coverage/<层>/`（已 gitignore）并作为产物上传，`gate` 合并后判定。
 覆盖率没有在 `bunfig.toml` 里常开，是因为实测 Bun 每次覆盖 `lcov.info` 都会留下一个 `.lcov.info.*.tmp`（全量一次约 500 KB），
 而且任何一次单文件运行都会冲掉全量结果。
 
-### 8.2 作业摘要怎么看
+### 8.2 作业摘要与分层审计
 
-每次运行的 Summary 页有四节：用例执行（总数、按区域、失败、**逐条列出的跳过**、最慢的 10 条）、行覆盖率汇总、新增代码防护、本次改动删除或改名的用例。
+`gate` 的 Summary 页依次是：**按层汇总**（方法级、模块级、工作台各有多少文件、多少用例、通过／失败／跳过）、用例执行（失败、**逐条列出的跳过**、最慢的 10 条）、行覆盖率汇总、新增代码防护、本次改动删除或改名的用例。`e2e` 的 Summary 是它那一层的同款报告。
+
+分层审计有两条，任何一条不过 `gate` 就红：
+
+1. **每个用例文件都必须真的跑过。** 拿分层清单对报告里实际出现的文件：属于这三层、报告里却一条用例都没有的文件，要么没被执行，要么在加载期就崩了（后者在单进程运行里只表现为一行 `Unhandled error`，很容易被漏看）。
+2. **方法级与工作台两层不允许跳过。** 那两层不依赖环境；用例要依赖环境，就放进所属单元的 `tests/`。
+
 跳过清单里的每一条都是这次运行没有提供的防护，原因应当都能在 §10 找到；出现解释不了的跳过就是问题。
 覆盖率汇总只是信息，不设存量门槛。
 
@@ -194,7 +221,7 @@ CI 的 `check` 作业设 `CS_TEST_REQUIRE=database`，`e2e` 作业设 `CS_TEST_R
 只有用真实外部系统才能执行到的代码，先考虑用替身补一条用例；确实不行时在 ADR 里写带期限的例外：`- exception: patch-coverage <路径或 glob> until <YYYY-MM-DD>`（格式见 `docs/adr/README.md`）。
 
 闸门在推送之后才跑，所以红了按开发规则 §3 处理：立刻补用例，或 revert 自己那笔。
-本机有数据库时可以提前看：先 `bun run test:cover` 跑一遍全量，再 `bun run test:patch --base origin/main`。
+`gate` 用三层合并后的覆盖率判定（`--tiers unit,module,console`）。本机有数据库时可以提前看：先 `bun run test:cover` 跑一遍全量，再 `bun run test:patch --base origin/main`。
 加 `--worktree` 把未提交的改动算进去——共享工作树上会连别人的在制改动一起算，而且 git 的 diff 看不见未追踪的新文件，要先 `git add` 自己的文件。
 
 ### 8.4 分支保护
@@ -233,8 +260,8 @@ CI 的 `check` 作业设 `CS_TEST_REQUIRE=database`，`e2e` 作业设 `CS_TEST_R
 ## 11. 命令速查
 
 ```
-bun run check                       # 门禁：arch:check → lint → typecheck ×2 → 全部用例
-bun run check:ci                    # CI 跑的那一条：同上，另把 lcov.info 与 junit.xml 写到 coverage/
+bun run check                       # 门禁：check:static（arch:check → lint → typecheck ×2）→ 全部用例
+bun run test:unit                   # 只跑方法级 UT；同理 test:module、test:console、test:e2e（加 --cover 产出 coverage/<层>/ 并审计）
 bun test path/to/file.test.ts       # 单个文件；必须在仓库根运行
 bun run test:cover                  # 全部用例并产出 coverage/（后面可以跟路径，但那样的覆盖率不完整）
 bun run test:report                 # 把上一次 test:cover 的结果渲染成 CI 摘要同款的报告

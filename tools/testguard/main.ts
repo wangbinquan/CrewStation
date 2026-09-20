@@ -1,15 +1,23 @@
-// 用法（都要在跑完全量 `bun run test:cover` 之后执行，读的是 coverage/ 下的产物）：
-//   bun run test:report [--title <作业名>] [--base <sha>] [--skip-coverage]   用例执行、跳过、覆盖率与删除用例的汇总；只报告，不阻断
-//   bun run test:patch --base <sha> [--worktree]            新增代码防护闸门；未通过 exit 1
-import { appendFileSync, existsSync, readFileSync, readdirSync } from 'node:fs';
+// 用法（在仓库根运行）：
+//   bun run test:tier <unit|module|console|e2e> [--cover]   跑某一层；--cover 时把 lcov.info 与 junit.xml 写到 coverage/<层>/ 并做该层的审计
+//   bun run test:report [--tiers unit,module,console] [--title <名字>] [--base <sha>] [--skip-coverage]
+//                                                          汇总报告；带 --tiers 时合并各层产物并审计「每个用例文件都跑过」，审计不过 exit 1
+//   bun run test:patch --base <sha> [--tiers …] [--worktree] 新增代码防护闸门；未通过 exit 1
+// 不带 --tiers 时读 coverage/ 下的单份产物（`bun run test:cover` 写出的）。
+import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { parseAddedLines, parseRemovedTests } from './changedLines';
+import type { TestCase } from './junitReport';
 import { areaOf, parseJunit } from './junitReport';
-import { parseLcov, summarizeCoverage } from './lcovReport';
+import type { Coverage } from './lcovReport';
+import { mergeCoverage, parseLcov, summarizeCoverage } from './lcovReport';
 import { evaluatePatch } from './patchCoverage';
 import { DEFAULT_JUNIT_PATH, DEFAULT_LCOV_PATH, PATCH_LINE_COVERAGE_MIN, PRODUCTION_ROOTS } from './policy';
 import { activeExceptions, hasRuntimeLogic, isExcepted, isProtectedSource, scriptEntrypoints } from './protectionScope';
-import { renderCoverage, renderPatch, renderRemovedTests, renderTestReport } from './stepSummary';
+import { renderCoverage, renderPatch, renderRemovedTests, renderTestReport, renderTiers } from './stepSummary';
+import type { TestTier } from './testTiers';
+import { TIER_POLICY, isTestTier, testFilesByTier, tierTestArgs } from './testTiers';
+import { auditPassed, auditTiers } from './tierAudit';
 
 const root = resolve(import.meta.dir, '..', '..');
 const [command, ...rest] = process.argv.slice(2);
@@ -43,20 +51,63 @@ function readArtifact(path: string, what: string): string | undefined {
   return undefined;
 }
 
+function requestedTiers(): TestTier[] {
+  const names = (option('tiers') ?? '').split(',').map((name) => name.trim()).filter((name) => name.length > 0);
+  const unknown = names.filter((name) => !isTestTier(name));
+  if (unknown.length > 0) { console.error(`未知的用例分层：${unknown.join('、')}`); process.exit(2); }
+  return names as TestTier[];
+}
+
+/** 带 --tiers 时读各层目录并合并，否则读 coverage/ 下的单份产物。 */
+function loadCases(tiers: readonly TestTier[]): TestCase[] {
+  const paths = tiers.length > 0 ? tiers.map((tier) => `coverage/${tier}/junit.xml`) : [option('junit') ?? DEFAULT_JUNIT_PATH];
+  return paths.flatMap((path) => parseJunit(readArtifact(path, '用例报告') ?? ''));
+}
+
+function loadCoverage(tiers: readonly TestTier[]): Coverage | undefined {
+  const paths = tiers.length > 0 ? tiers.map((tier) => `coverage/${tier}/lcov.info`) : [option('lcov') ?? DEFAULT_LCOV_PATH];
+  const parts = paths.map((path) => readArtifact(path, '覆盖率'));
+  return parts.some((part) => part === undefined) ? undefined : mergeCoverage(parts.map((part) => parseLcov(part ?? '')));
+}
+
+function runTier(): number {
+  const tier = rest[0];
+  if (!isTestTier(tier)) { console.error('用法：main.ts tier <unit|module|console|e2e> [--cover]'); return 2; }
+  const expected = testFilesByTier(root);
+  const outDir = rest.includes('--cover') ? `coverage/${tier}` : undefined;
+  if (outDir) mkdirSync(join(root, outDir), { recursive: true });
+  console.log(`${TIER_POLICY[tier].label}（${tier}）：${expected[tier].length} 个用例文件`);
+  const run = Bun.spawnSync(['bun', ...tierTestArgs(expected[tier], outDir)], { cwd: root, stdout: 'inherit', stderr: 'inherit' });
+  if (!outDir) return run.exitCode;
+  const audit = auditTiers(expected, [tier], loadCases([tier]));
+  for (const file of audit.notExecuted) console.error(`✗ 没有被执行的用例文件：${file}`);
+  for (const skipped of audit.forbiddenSkips) console.error(`✗ ${TIER_POLICY[tier].label}不允许跳过：${skipped.file} › ${skipped.name}`);
+  return run.exitCode !== 0 ? run.exitCode : auditPassed(audit) ? 0 : 1;
+}
+
 function report(): number {
-  const junit = readArtifact(option('junit') ?? DEFAULT_JUNIT_PATH, '用例报告');
-  if (junit) publish(renderTestReport(option('title') ?? 'bun test', parseJunit(junit)));
+  const tiers = requestedTiers();
+  const cases = loadCases(tiers);
+  let passed = true;
+  if (tiers.length > 0) {
+    const expected = testFilesByTier(root);
+    const tierByFile = new Map(tiers.flatMap((tier) => expected[tier].map((file) => [file, tier] as const)));
+    const audit = auditTiers(expected, tiers, cases);
+    publish(renderTiers(tiers, (file) => tierByFile.get(file), cases, audit));
+    passed = auditPassed(audit);
+  }
+  if (cases.length > 0) publish(renderTestReport(option('title') ?? 'bun test', cases));
   // 实机验收作业只跑 tests/e2e，那里的覆盖率只有几份辅助文件，列出来只会误导。
-  const lcov = rest.includes('--skip-coverage') ? undefined : readArtifact(option('lcov') ?? DEFAULT_LCOV_PATH, '覆盖率');
-  if (lcov) publish(renderCoverage(summarizeCoverage(parseLcov(lcov), areaOf, (file) => isProtectedSource(file, entrypoints))));
+  const coverage = rest.includes('--skip-coverage') ? undefined : loadCoverage(tiers);
+  if (coverage) publish(renderCoverage(summarizeCoverage(coverage, areaOf, (file) => isProtectedSource(file, entrypoints))));
   const base = resolveBase(option('base'));
   if (base) publish(renderRemovedTests(parseRemovedTests(git(['diff', '--unified=0', '--no-color', '--no-ext-diff', base, 'HEAD', '--', '*.test.ts', '*.test.tsx']).out)));
-  return 0;
+  return passed ? 0 : 1;
 }
 
 function patch(): number {
-  const lcov = readArtifact(option('lcov') ?? DEFAULT_LCOV_PATH, '覆盖率');
-  if (!lcov) return 1;
+  const coverage = loadCoverage(requestedTiers());
+  if (!coverage) return 1;
   const base = resolveBase(option('base'));
   if (!base) { publish('## 新增代码防护\n\n没有可对比的基线提交（仓库只有一个提交），本次不判定。'); return 0; }
   const target = rest.includes('--worktree') ? [] : ['HEAD'];
@@ -67,7 +118,7 @@ function patch(): number {
   const exceptions = activeExceptions(adrs, new Date().toISOString().slice(0, 10));
   const verdict = evaluatePatch({
     changes: parseAddedLines(diff.out),
-    coverage: parseLcov(lcov),
+    coverage,
     inScope: (file) => isProtectedSource(file, entrypoints) && !isExcepted(file, exceptions) && existsSync(join(root, file)),
     hasLogic: (file) => hasRuntimeLogic(file, readFileSync(join(root, file), 'utf8')),
     minPercent: PATCH_LINE_COVERAGE_MIN,
@@ -76,6 +127,7 @@ function patch(): number {
   return verdict.violations.length === 0 ? 0 : 1;
 }
 
-if (command === 'report') process.exit(report());
+if (command === 'tier') process.exit(runTier());
+else if (command === 'report') process.exit(report());
 else if (command === 'patch') process.exit(patch());
-else { console.error('用法：main.ts report|patch（见文件头注释）'); process.exit(2); }
+else { console.error('用法：main.ts tier|report|patch（见文件头注释）'); process.exit(2); }

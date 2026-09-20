@@ -19,7 +19,8 @@ bun run check          # arch:check + lint + typecheck + test，与 CI 一致
 bun run arch:check     # 依赖方向、模块模板、持久化归属、尺寸与命名、用例纪律、迁移锁
 bun run migrations:lock  # 新迁移入锁（只追加）
 bun run contracts:lock   # 业务契约面金样入锁；破坏性变更要 --breaking "<依据>"
-bun run test:cover       # 全部用例并产出 coverage/lcov.info 与 junit.xml（CI 的 check:ci 用的就是它）
+bun run test:unit        # 只跑一层：test:unit（方法级 UT）、test:module（模块级 UT）、test:console、test:e2e；CI 一层一个作业
+bun run test:cover       # 全部用例并产出 coverage/lcov.info 与 junit.xml
 bun run test:report      # 把上一次 test:cover 渲染成 CI 摘要同款的报告
 bun run scaffold:module <name> <layer> --deps a,b --desc "..."   # 按模板新建模块
 ```

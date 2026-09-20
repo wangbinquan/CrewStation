@@ -39,7 +39,7 @@ bun run arch:check          # the eight structural rules (six architecture rules
 bun test path/to/file.test.ts   # a single test file; run from the repo root
 bun run migrations:lock <file>…   # after adding a migration: append it to tools/arch/migrations.lock.json (append-only; name your own files on the shared tree)
 bun run contracts:lock      # after changing the business-facing contract surface; breaking changes need --breaking "<approved basis>"
-bun run check:ci            # what CI runs: the same static checks and tests as check, plus lcov and JUnit output under coverage/
+bun run test:unit           # one execution tier: test:unit (method-level UT), test:module (module-level UT), test:console, test:e2e; add --cover for coverage/<tier>/ plus the tier audit
 bun run test:cover          # all tests with coverage/lcov.info and coverage/junit.xml
 bun run test:report         # render the last test:cover run the way the CI job summary does
 bun run test:patch --base origin/main   # preview the new-code protection gate locally (after a full test:cover)
@@ -50,7 +50,7 @@ bun run scaffold:module <name>  # the only sanctioned way to create a module
 ./deploy/local/verify.sh            # post-install checks (registry pull, routing, source IP, ForwardAuth)
 ```
 
-`bun run check` must pass before any commit. Integration tests that need PostgreSQL or the local GitLab skip themselves when those are unreachable, so a green run on a bare machine does not mean the integration paths ran. CI names the environments it provides in `CS_TEST_REQUIRE` (`database` in `check`, `e2e` in `e2e`); there an unreachable environment fails the job instead of skipping. CI also blocks on new-code protection: production files touched by a push must be loaded by some test, and at least 80% of the changed executable lines must be executed (`tools/testguard`, ADR-0007). CI runs `bun run check:ci`, which differs from `check` only by the two report flags; a test keeps the two scripts from drifting.
+`bun run check` must pass before any commit. Integration tests that need PostgreSQL or the local GitLab skip themselves when those are unreachable, so a green run on a bare machine does not mean the integration paths ran. CI runs one job per execution tier: `static` (the same `check:static` as the local gate), `unit` (method-level UT: colocated tests, no services, no skips allowed), `module` (module-level UT under each unit's `tests/`, real PostgreSQL), `console`, `gate` (merged report, the audit that every test file really ran, and new-code protection) and `e2e`; a push is green when `gate` and `e2e` are. The tiers are decided in one place, `tools/testguard/testTiers.ts`, and together equal everything `bun test` runs locally. CI names the environments it provides in `CS_TEST_REQUIRE` (`database` in `module`, `e2e,database` in `e2e`); there an unreachable environment fails the job instead of skipping. New-code protection: production files touched by a push must be loaded by some test, and at least 80% of the changed executable lines must be executed (`tools/testguard`, ADR-0007).
 
 The `crewstation …` commands in Design §11–12 are the product CLI under `apps/cli`, not developer tooling.
 

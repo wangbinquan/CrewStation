@@ -1,6 +1,11 @@
-# 用例执行体系的说明见 docs/engineering/testing.md §8。两个作业各自承担一层：
-#   check —— 门禁：结构规则、lint、类型、全部不依赖集群的用例（含真实 PostgreSQL 的模块集成用例），再加新增代码防护；
-#   e2e   —— 实机验收：真装一套平台，用无头浏览器从网关打进去。
+# 用例执行体系的说明见 docs/engineering/testing.md §8。每一层用例一个作业，GitHub 上一眼看得见哪一层红了：
+#   static  —— 结构规则、lint、两次类型检查（本机 `bun run check` 的前半段，同一条 check:static）
+#   unit    —— 方法级 UT：就近放在源码旁、不依赖任何环境的用例；不起任何服务，一条跳过都不允许
+#   module  —— 模块级 UT：各单元 tests/ 下的用例，真实 PostgreSQL，数据库被点名要求
+#   console —— 工作台渲染与模型用例，再加工作台构建
+#   gate    —— 合并三层的报告：每个用例文件都必须在某一层真的跑过；新增代码防护；任何一层红它就红
+#   e2e     —— 实机验收：真装一套平台，用无头浏览器从网关打进去
+# 分层由 tools/testguard/testTiers.ts 一处决定，四层合起来就是本机 `bun test` 跑的全部文件。
 name: ci
 on:
   push:
@@ -22,7 +27,37 @@ env:
   BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
 
 jobs:
-  check:
+  static:
+    name: static（结构规则 · lint · 类型）
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-workspace
+      - run: bun run check:static
+
+  unit:
+    name: unit（方法级 UT）
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-workspace
+        with:
+          standalone: 'true'
+      # 这一层不起任何服务：用例一旦依赖环境就会在这里跳过，而跳过在这一层是失败。
+      - run: bun run test:unit --cover
+      - name: upload tier results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tier-unit
+          path: coverage/unit/
+          if-no-files-found: warn
+          retention-days: 14
+
+  module:
+    name: module（模块级 UT）
     runs-on: ubuntu-latest
     timeout-minutes: 20
     services:
@@ -41,48 +76,88 @@ jobs:
       CS_TEST_REQUIRE: database
     steps:
       - uses: actions/checkout@v4
-        with:
-          # 新增代码防护要对本次推送的 before..after 做 diff，浅克隆里没有 before。
-          fetch-depth: 0
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: 1.3.13
-      - run: bun install --frozen-lockfile
-      # 模板与两个接入容器有意不在根 workspaces 里（生成出来的项目要能独立安装），
-      # 但它们的测试会被根 `bun test` 收进来。不在这儿装依赖，CI 就会报 Cannot find package 'hono'。
-      - name: install standalone packages
-        run: |
-          for dir in templates/minimal-sample integrations/gitlab-event-producer integrations/reference-api-proxy; do
-            (cd "$dir" && bun install --frozen-lockfile)
-          done
-      # check:ci 与本机的 check 是同一段静态检查加同一批用例，只多了 lcov 与 JUnit 两个报告参数（package.json）。
-      - run: bun run check:ci
-      - run: cd apps/console && bun run build
-
-      # 以下三步读的是 check:ci 留在 coverage/ 下的 junit.xml 与 lcov.info。
-      - name: test report
-        if: always()
-        run: bun run test:report --title check --base "$BASE_SHA"
-      # 只看本次推送改动的行：改到的生产文件必须有用例加载它，改动的可执行行被执行到的比例不低于下限。
-      - name: new-code protection
-        run: bun run test:patch --base "$BASE_SHA"
-      - name: upload test results
+      - uses: ./.github/actions/setup-workspace
+      - run: bun run test:module --cover
+      - name: upload tier results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: check-test-results
-          path: |
-            coverage/junit.xml
-            coverage/lcov.info
+          name: tier-module
+          path: coverage/module/
           if-no-files-found: warn
           retention-days: 14
 
+  console:
+    name: console（工作台）
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-workspace
+      - run: bun run test:console --cover
+      - run: cd apps/console && bun run build
+      - name: upload tier results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tier-console
+          path: coverage/console/
+          if-no-files-found: warn
+          retention-days: 14
+
+  gate:
+    name: gate（汇总 · 新增代码防护）
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [static, unit, module, console]
+    if: always()
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # 新增代码防护要对本次推送的 before..after 做 diff，浅克隆里没有 before。
+          fetch-depth: 0
+      - uses: ./.github/actions/setup-workspace
+      - uses: actions/download-artifact@v4
+        with: { name: tier-unit, path: coverage/unit }
+      - uses: actions/download-artifact@v4
+        if: always()
+        with: { name: tier-module, path: coverage/module }
+      - uses: actions/download-artifact@v4
+        if: always()
+        with: { name: tier-console, path: coverage/console }
+      # 合并三层：按层汇总、逐条列出的跳过、覆盖率、删除的用例；并审计每个用例文件都在某一层真的跑过。
+      - name: test report and tier audit
+        if: always()
+        run: bun run test:report --tiers unit,module,console --title "unit + module + console" --base "$BASE_SHA"
+      # 只看本次推送改动的行：改到的生产文件必须有用例加载它，改动的可执行行被执行到的比例不低于下限。
+      - name: new-code protection
+        if: always()
+        run: bun run test:patch --tiers unit,module,console --base "$BASE_SHA"
+      - name: every tier must be green
+        if: always()
+        run: |
+          echo "static=${{ needs.static.result }} unit=${{ needs.unit.result }} module=${{ needs.module.result }} console=${{ needs.console.result }}"
+          [ "${{ needs.static.result }}" = success ] && [ "${{ needs.unit.result }}" = success ] && [ "${{ needs.module.result }}" = success ] && [ "${{ needs.console.result }}" = success ]
+
   # 前台实机验收：在 CI 里真装一套平台，再用无头浏览器打它。
-  # `check` 作业里这套用例是跳过的（没有集群也没有浏览器），能力回归只能靠这个作业兜住。
+  # 这一层只在这个作业里跑（别的作业没有集群也没有浏览器），能力回归只能靠它兜住。
   e2e:
+    name: e2e（实机端到端）
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    # tests/e2e 里有一组用例要真实数据库加进程内服务（apiInvocation）；这一层只在这个作业里跑，所以数据库也在这里起。
+    services:
+      postgres:
+        image: postgres:17.11
+        env:
+          POSTGRES_USER: crewstation
+          POSTGRES_PASSWORD: crewstation-dev
+          POSTGRES_DB: crewstation
+        ports: ['55432:5432']
+        options: >-
+          --health-cmd "pg_isready -U crewstation" --health-interval 5s --health-timeout 5s --health-retries 20
     env:
+      CS_TEST_DATABASE_URL: postgres://crewstation:crewstation-dev@127.0.0.1:55432/crewstation
       CREWSTATION_KUBE_CONTEXT: kind-crewstation
       CREWSTATION_NODE_CONTAINER: crewstation-control-plane
       # 必须落在 80：登录跳转地址由平台配置的用户域生成，不带端口。放在高位端口时浏览器会被
@@ -97,13 +172,10 @@ jobs:
       CS_SKIP_DEV_AUTH: '1'
       # 网关、浏览器与管理员都是这个作业自己装的：探测不到或登录不上是故障。
       # 不点名的话整套用例会 skipIf 跳过、作业照绿，实机验收等于被悄悄关掉。
-      CS_TEST_REQUIRE: e2e
+      CS_TEST_REQUIRE: e2e,database
     steps:
       - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: 1.3.13
-      - run: bun install --frozen-lockfile
+      - uses: ./.github/actions/setup-workspace
 
       - name: create kind cluster
         uses: helm/kind-action@v1
@@ -146,18 +218,17 @@ jobs:
           echo '调试浏览器没起来' >&2; cat /tmp/chrome.log >&2; exit 1
 
       - name: front-end acceptance against the deployed platform
-        # JUnit 报告器不会自己建目录。
-        run: mkdir -p coverage && bun test tests/e2e/ --reporter=junit --reporter-outfile=coverage/junit.xml
+        run: bun run test:e2e --cover
 
       - name: test report
         if: always()
-        run: bun run test:report --title e2e --skip-coverage
-      - name: upload test results
+        run: bun run test:report --tiers e2e --title e2e --skip-coverage
+      - name: upload tier results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: e2e-test-results
-          path: coverage/junit.xml
+          name: tier-e2e
+          path: coverage/e2e/junit.xml
           if-no-files-found: warn
           retention-days: 14
 

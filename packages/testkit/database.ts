@@ -17,7 +17,7 @@ let availability: Promise<boolean> | undefined;
 
 /**
  * 数据库不可达时返回 false，调用方应 skip 并在日志里说明，而不是静默通过。
- * CS_TEST_REQUIRE 点名 database 时（CI 的 check 作业）不可达直接抛错：那里跳过就是漏跑整层集成用例。
+ * CS_TEST_REQUIRE 点名 database 时（CI 的 module 与 e2e 作业）不可达直接抛错：那里跳过就是漏跑整层集成用例。
  */
 export function testDatabaseAvailable(): Promise<boolean> {
   availability ??= probeDatabase().then((failure) => resolveCapability('database', failure === undefined, `测试数据库不可达 ${baseUrl()}（${failure}）`));

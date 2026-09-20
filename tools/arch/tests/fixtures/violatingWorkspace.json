@@ -33,5 +33,7 @@
  "modules/high/adapters/persistence/migrations/0003_locked.sql": "CREATE TABLE high.kept (id text);\n",
  "modules/high/adapters/persistence/migrations/0003_late.sql": "CREATE TABLE high.late (id text);\n",
  "modules/high/adapters/persistence/migrations/0004_fresh.sql": "CREATE TABLE high.fresh (id text);\n",
- "tools/arch/migrations.lock.json": "{\"files\": {\"modules/high/adapters/persistence/migrations/0001_create_schema.sql\": \"0000000000000000000000000000000000000000000000000000000000000000\", \"modules/high/adapters/persistence/migrations/0002_gone.sql\": \"1111111111111111111111111111111111111111111111111111111111111111\", \"modules/high/adapters/persistence/migrations/0003_locked.sql\": \"d3a956c9675fa4eea47bb65ea8ca5f8b552ce032c99898d8f523fb5ab6e7d18d\"}}"
+ "tools/arch/migrations.lock.json": "{\"files\": {\"modules/high/adapters/persistence/migrations/0001_create_schema.sql\": \"0000000000000000000000000000000000000000000000000000000000000000\", \"modules/high/adapters/persistence/migrations/0002_gone.sql\": \"1111111111111111111111111111111111111111111111111111111111111111\", \"modules/high/adapters/persistence/migrations/0003_locked.sql\": \"d3a956c9675fa4eea47bb65ea8ca5f8b552ce032c99898d8f523fb5ab6e7d18d\"}}",
+ "modules/low/tests/legacy.spec.ts": "import { test } from 'bun:test';\ntest('别的命名', () => {});\n",
+ "integrations/sample/src/old_test.ts": "import { test } from 'bun:test';\ntest('别的命名', () => {});\n"
 }

@@ -65,17 +65,17 @@ git push origin main
 
 ## 3. 门禁
 
-**唯一权威门禁是 GitHub Actions**（`.github/workflows/ci.yml`）：`check` 作业在干净 checkout 上跑 `bun run check`、工作台构建与新增代码防护，`e2e` 作业真装一套平台再做实机验收。两个作业各自承担什么、摘要怎么看，见 `testing.md` §8。
+**唯一权威门禁是 GitHub Actions**（`.github/workflows/ci.yml`），在干净 checkout 上一层一个作业：`static`（结构规则、lint、类型）、`unit`（方法级 UT）、`module`（模块级 UT，真实 PostgreSQL）、`console`（工作台用例与构建）、`gate`（合并报告、分层审计、新增代码防护），以及真装一套平台做实机验收的 `e2e`。**看一次推送绿不绿，看 `gate` 与 `e2e`。** 各作业承担什么、摘要怎么看，见 `testing.md` §8。
 
 ```
 bun run check   # arch:check → lint → typecheck → typecheck:console → test
 ```
 
-CI 跑的是 `bun run check:ci`：同一段静态检查、同一批用例，只多出覆盖率与 JUnit 两个报告参数（由用例锁住两者只差这一点）。本地跑的是**同一批检查**，因此本仓与 agent-workflow 不同：**推之前请在本地把它跑绿**。本仓单次全量约一分钟，不存在那边「本地门禁 8–10 分钟、多 session 互相挤占」的问题，没有理由把红推给别人。
+CI 的 `static` 跑的就是 `check` 前半段的 `check:static`，四层用例合起来就是 `bun test` 的全部文件（分层只在 `tools/testguard/testTiers.ts` 一处决定，`gate` 会核对每个用例文件都真的跑过）。本地跑的是**同一批检查**，因此本仓与 agent-workflow 不同：**推之前请在本地把它跑绿**。本仓单次全量约一分钟，不存在那边「本地门禁 8–10 分钟、多 session 互相挤占」的问题，没有理由把红推给别人。
 
 - `arch:check` 无基线、无例外清单。加例外要走 ADR，并写成 `docs/adr/` 里的过期行（格式见 `docs/adr/README.md`），到期自动失效。
-- 依赖 PostgreSQL 与本机测试 GitLab 的集成用例**在连不上时自行跳过**。因此本机全绿**不等于**集成路径跑过——要确认，看 CI。CI 用 `CS_TEST_REQUIRE` 点名它自己提供的环境（`check` 点名 `database`，`e2e` 点名 `e2e`），在那里缺席就是失败而不是跳过；规则见 `testing.md` §5。
-- **新增代码防护**在 `check` 作业里阻断：本次推送改到的生产文件必须有用例加载它，改动的可执行行被用例执行到的比例不低于下限（`testing.md` §8.3）。它在推送之后才判定，本机有数据库时可以先 `bun run test:cover` 再 `bun run test:patch --base origin/main` 提前看。
+- 依赖 PostgreSQL 与本机测试 GitLab 的集成用例**在连不上时自行跳过**。因此本机全绿**不等于**集成路径跑过——要确认，看 CI。CI 用 `CS_TEST_REQUIRE` 点名它自己提供的环境（`module` 点名 `database`，`e2e` 点名 `e2e,database`），在那里缺席就是失败而不是跳过；`unit` 与 `console` 两层不允许出现任何跳过。规则见 `testing.md` §5。
+- **新增代码防护**在 `gate` 作业里阻断：本次推送改到的生产文件必须有用例加载它，改动的可执行行被用例执行到的比例不低于下限（`testing.md` §8.3）。它在推送之后才判定，本机有数据库时可以先 `bun run test:cover` 再 `bun run test:patch --base origin/main` 提前看。
 - 新增迁移要 `bun run migrations:lock`，改动业务契约面要 `bun run contracts:lock`；两把锁都在门禁里，规则见 `testing.md` §6、§7。
 - **推完立刻按自己的 sha 查 CI**，盯到绿为止。红了立刻修；一时修不完就 revert 自己那笔，别把红的主干留给下一个人。
 

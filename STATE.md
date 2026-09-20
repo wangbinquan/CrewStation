@@ -49,6 +49,11 @@
 随后一笔补了 `bun run migrations:lock <迁移文件>`：共享工作树上不带路径会把别的会话未提交的新迁移一起锁进去，对方的文件不在自己的提交里，CI 上就是「已入锁的迁移被删除」。
 **并行会话注意**：新迁移在入锁前 `arch:check` 会红，这是规则本意；只锁自己的那一个，别人的留给对方。
 
+**CI 按层拆作业（同日追加）**：作者指出「GitHub 上不只要挂 e2e 用例，模块级 UT、方法 UT 也需要」。它们此前其实一直在跑（单个 `check` 作业里的 1708 条），但从 GitHub 上看不出来，也分不清哪一层红了。
+现在每个用例文件按位置恰好属于四层之一（唯一事实源 `tools/testguard/testTiers.ts`）：`unit` 方法级 UT（就近放、不依赖环境）、`module` 模块级 UT（各单元 `tests/` 下，以及就近放却带 `skipIf` 的）、`console` 工作台、`e2e`。
+CI 变成六个作业：`static`／`unit`／`module`／`console` 并行，`gate` 合并三层产物做按层汇总、**分层审计**（每个用例文件都必须真的跑过；方法级与工作台两层不允许任何跳过）与新增代码防护，`e2e` 独立并自带 PostgreSQL（`CS_TEST_REQUIRE=e2e,database`）。**看一次推送绿不绿，看 `gate` 与 `e2e`。**
+本机 `bun run check` 不变；新增 `bun run test:unit`／`test:module`／`test:console`／`test:e2e` 可单跑一层。`check:ci` 已删除。用例文件只许用 `.test.ts(x)` 命名（`test-discipline` 新增的一条）。
+
 ## 最新接力：项目设置与开发资源分工（2026-09-20）
 
 作者要求项目设置直观、简化，并明确批准「批准实施并批准代码提交上库」。生产实现已完成：

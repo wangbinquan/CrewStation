@@ -20,6 +20,19 @@ export function parseLcov(text: string): Coverage {
   return coverage;
 }
 
+/** 各层作业各出一份 lcov；同一行在多层都被执行到时命中次数相加。 */
+export function mergeCoverage(parts: readonly Coverage[]): Coverage {
+  const merged = new Map<string, Map<number, number>>();
+  for (const part of parts) {
+    for (const [file, hits] of part) {
+      const lines = merged.get(file) ?? new Map<number, number>();
+      for (const [line, count] of hits) lines.set(line, (lines.get(line) ?? 0) + count);
+      merged.set(file, lines);
+    }
+  }
+  return merged;
+}
+
 export interface AreaCoverage {
   readonly area: string;
   readonly files: number;

@@ -378,7 +378,7 @@ Bun 在 `CI=true` 时拒绝 `.only`（`.only is disabled in CI environments`）�
 2026-09-20 实撞：为了让本机与 CI 共用一条命令，曾在 `bunfig.toml` 写了 `coverage = true`。Bun 1.3.13 每次覆盖 `coverage/lcov.info`
 都会在旁边留下一个 `.lcov.info.<hash>.tmp`（全量一次约 500 KB，跑一次多一个）；更糟的是，共享工作树上任何人跑一次
 `bun test 某个文件`，全量的 `lcov.info` 就被那一个文件的结果冲掉，随后的新增代码防护预演全是误报。
-现在覆盖率只在 `bun run test:cover`（CI 的 `check:ci` 用它）里打开。另一个相关的坑：`--reporter=junit` **不会自己建输出目录**，
+现在覆盖率只在 `bun run test:cover` 与各层的 `--cover`（CI 用的是后者）里打开。另一个相关的坑：`--reporter=junit` **不会自己建输出目录**，
 目录不存在时用例全过、最后报 `JUnitReportFailed … ENOENT` 并以非零退出，所以脚本里先 `mkdir -p coverage`。
 
 ### 新增工作区单元后要 `bun install` 并提交 `bun.lock`
@@ -387,6 +387,16 @@ Bun 在 `CI=true` 时拒绝 `.only`（`.only is disabled in CI environments`）�
 本机不装照样能跑，CI 的 `bun install --frozen-lockfile` 会当场失败。加完单元跑一次 `bun install`，确认 lock 的 diff 只有自己那一条，再一起提交。
 
 ## 并发开发与 Agent 协作
+
+### 就地改写共享文件：`open(p,'w').write(f(open(p).read()))` 会先清空再读
+
+2026-09-20 实撞：给 `STATE.md` 追加一段时写了 `open(p,'w').write(apply(open(p).read()))`。Python 先求值 `open(p,'w')`——文件当场被清空——
+再去读，读到的是空串，`apply` 里的断言随即失败，留下一个 0 字节的 `STATE.md`。那一刻工作树里还有三个并行会话**尚未提交**的接力段落，git 里没有它们。
+最后是靠其他会话的操作记录里保存的补丁原文逐个重放，并用对方一分钟前自己量到的 `git diff --numstat`（+20／−3）对上数，才原样恢复。
+
+改写任何共享文件都按这个顺序：**先读进变量、算出新内容、断言通过，再写临时文件并 `os.replace`**（`Path.write_text(new)` 也必须在 `new` 已经算好之后）。
+`STATE.md` 是全仓最热的共享文件，别的会话的未提交内容随时都在里面；只想提交自己那一段时，用 `git hash-object -w` 加
+`git update-index --cacheinfo` 把「HEAD 版本＋自己的段落」放进暂存区，工作树里的别人内容原样留着。
 
 ### ADR、RFC 与待决问题的编号会被并行会话抢占：提交前再看一眼
 

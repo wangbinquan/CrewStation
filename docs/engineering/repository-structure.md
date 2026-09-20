@@ -303,7 +303,7 @@ apps/console/src/
 | 无环 | ESLint `import/no-cycle` |
 | 用例纪律：禁 `.only`、无条件 `.skip`、`.todo`、`.failing`、恒真 `skipIf`、用例重试；仓库根 `tests/` 只允许约定的用例层目录 | `tools/arch`（`test-discipline`，ADR-0007）：除工作区外还扫 `tests/`、`integrations/`、`templates/`、`deploy/` |
 | 迁移只增不改：已入锁的不可修改、删除，新迁移不得插队且必须入锁 | `tools/arch`（`migration-lock`，ADR-0007）：比对 `tools/arch/migrations.lock.json` |
-| 新增代码防护：本次推送改到的生产文件必须有用例加载，改动行的执行比例不低于下限 | `tools/testguard`，在 CI 的 `check` 作业里阻断（ADR-0007） |
+| 新增代码防护：本次推送改到的生产文件必须有用例加载，改动行的执行比例不低于下限 | `tools/testguard`，在 CI 的 `gate` 作业里阻断（ADR-0007） |
 
 检查器自带负向夹具测试（`tools/arch/tests/`，夹具以 JSON 存放，避免源码中的 import 字样被当成真实依赖），每条规则至少一个故意违规样例；`bun test` 同时断言真实仓库零违规。规则清单只在 `tools/arch/ruleSet.ts` 一处登记。用例放在哪、必须写哪些、CI 怎么执行，见 `testing.md`。模块只能由 `bun run scaffold:module` 生成，模板文件在 `tools/scaffold/templates/*.tmpl`。
 

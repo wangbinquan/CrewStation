@@ -42,7 +42,7 @@ describe('resolveCapability', () => {
 
 /**
  * 锁的是真实故障形态：CI 的 PostgreSQL 服务没起来时，约 60 个 `describe.skipIf(!available)` 整组跳过、
- * check 作业照绿。这里在子进程里用一个必然连不上的地址走真实探测，确认被点名时进程非零退出。
+ * 作业照绿。这里在子进程里用一个必然连不上的地址走真实探测，确认被点名时进程非零退出。
  */
 describe('testDatabaseAvailable 在子进程里的真实行为', () => {
   const script = `import { testDatabaseAvailable } from ${JSON.stringify(join(import.meta.dir, 'database.ts'))}; console.log('available=' + await testDatabaseAvailable());`;

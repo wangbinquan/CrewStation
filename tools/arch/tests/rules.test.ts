@@ -107,6 +107,10 @@ describe('test-discipline', () => {
   test('工作区之外由根 bun test 收进来的用例同样受约束', () => {
     expect(messages('integrations/sample/src/main.test.ts')).toContain('禁止提交 .only');
   });
+  test('bun 认、分层却不认的用例命名', () => {
+    expect(messages('modules/low/tests/legacy.spec.ts')).toContain('只用 .test.ts');
+    expect(messages('integrations/sample/src/old_test.ts')).toContain('只用 .test.ts');
+  });
   test('仓库根 tests/ 只允许约定的用例层目录，不散放文件', () => {
     expect(messages('tests/misc')).toContain('只允许用例层目录');
     expect(messages('tests/loose.test.ts')).toContain('不散放文件');
