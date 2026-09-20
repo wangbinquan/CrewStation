@@ -14,7 +14,7 @@ const BANNED: ReadonlyArray<{ pattern: RegExp; message: string }> = [
   { pattern: new RegExp(String.raw`${SUBJECT}\.todo\b`), message: '禁止 .todo：没写出来的用例不是防护' },
   { pattern: new RegExp(String.raw`${SUBJECT}\.failing\b`), message: '禁止 .failing：已知失败要么修要么删' },
   { pattern: /\bskipIf\s*\(\s*(?:true|1|!0|!!1)\s*\)/, message: '禁止恒真的 skipIf：条件必须来自一次真实的环境探测' },
-  { pattern: /\bretry\s*:\s*[1-9]/, message: '禁止用例重试：重跑才过不算通过，先查清是不是真 bug' },
+  { pattern: /\bretry\s*:\s*[1-9]/, message: '禁止用例重试（retry: N）：重跑才过不算通过，先查清是不是真 bug；若这是被测对象自己的 retry 字段，把取值提成具名常量' },
 ];
 
 /** 用例纪律：禁用会让防护静默失效的写法；仓库根 tests/ 只允许约定的用例层目录。 */

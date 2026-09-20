@@ -37,7 +37,7 @@ bun install                 # Bun 1.3.13 workspaces
 bun run check               # the gate: arch:check → lint → typecheck → typecheck:console → test
 bun run arch:check          # the eight structural rules (six architecture rules, test-discipline, migration-lock); no baseline, no exceptions list
 bun test path/to/file.test.ts   # a single test file; run from the repo root
-bun run migrations:lock     # after adding a migration: append it to tools/arch/migrations.lock.json (append-only)
+bun run migrations:lock <file>…   # after adding a migration: append it to tools/arch/migrations.lock.json (append-only; name your own files on the shared tree)
 bun run contracts:lock      # after changing the business-facing contract surface; breaking changes need --breaking "<approved basis>"
 bun run check:ci            # what CI runs: the same static checks and tests as check, plus lcov and JUnit output under coverage/
 bun run test:cover          # all tests with coverage/lcov.info and coverage/junit.xml

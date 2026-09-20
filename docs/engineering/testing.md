@@ -133,6 +133,7 @@ CI 的 `check` 作业设 `CS_TEST_REQUIRE=database`，`e2e` 作业设 `CS_TEST_R
 | 破坏性 | 删、改名、改值；新增必填；收紧长度与格式；由宽松改成 `strict`；让业务收到新的状态值、新的联合分支或 `null` | 先有作者批准的依据（RFC 的能力影响清单或裁定编号，开发规则 §5.5），再 `bun run contracts:lock --breaking "<依据>"`；依据、日期与逐条变化永久留在金样的 `breakingChanges` 里 |
 
 没有依据的破坏性变更，命令拒绝执行且不写文件。不要手改金样。
+共享工作树上金样不一致、而契约改动不是你的：那是对方的红，**不要替别人入锁**——入锁会把对方尚未提交的契约形状写进你的提交。
 分类器宁严勿松：放宽约束、调换联合分支顺序这类改动也会被归为破坏性，给出依据即可。
 金样只记录 JSON Schema 表达得出的形状；`refine`／`superRefine` 里的规则它看不见，仍由各 Schema 自己的行为用例负责。
 
@@ -152,9 +153,11 @@ CI 的 `check` 作业设 `CS_TEST_REQUIRE=database`，`e2e` 作业设 `CS_TEST_R
 | 已入锁的迁移内容变了 | 阻断。要改就新增一个迁移 |
 | 已入锁的迁移被删除或改名 | 阻断 |
 | 新迁移的序号不大于同目录已入锁的最大序号 | 阻断。插队会让新装与升级的执行顺序不一致 |
-| 新迁移尚未入锁 | 阻断，运行 `bun run migrations:lock` 并把锁文件一起提交 |
+| 新迁移尚未入锁 | 阻断，运行 `bun run migrations:lock <该文件>` 并把锁文件一起提交 |
 
-`bun run migrations:lock` **只追加**：存在前三种情形时它拒绝执行、一个字节都不写。确需改写已入锁的迁移（例如发行前合并迁移）时手工编辑锁文件，并在提交说明里写清原因。
+`bun run migrations:lock` **只追加**：存在前三种情形时它拒绝执行、一个字节都不写。
+**共享工作树上要带路径运行，只锁自己的迁移**：不带路径会把别的会话尚未提交的新迁移一起锁进去，而你的提交里没有那个文件，CI 上就是「已入锁的迁移被删除」。
+反过来，本机 `arch:check` 报的「尚未入锁」如果是别的会话的在制迁移，那是对方的红，留给对方（`dev-gotchas.md`「门禁可能是别人的红」）。确需改写已入锁的迁移（例如发行前合并迁移）时手工编辑锁文件，并在提交说明里写清原因。
 `modules/platform/tests/migrationCoverage.test.ts` 另外保证：磁盘上的每个迁移都在平台的迁移清单里，并能按层序在空库上一次应用成功——新模块建了迁移却忘了加进 `modules/platform/wiring.ts` 时，它会红。
 
 ## 8. CI 执行体系
@@ -236,7 +239,7 @@ bun test path/to/file.test.ts       # 单个文件；必须在仓库根运行
 bun run test:cover                  # 全部用例并产出 coverage/（后面可以跟路径，但那样的覆盖率不完整）
 bun run test:report                 # 把上一次 test:cover 的结果渲染成 CI 摘要同款的报告
 bun run test:patch --base origin/main [--worktree]   # 新增代码防护，本机预演（要先跑过全量 test:cover）
-bun run migrations:lock             # 新迁移入锁（只追加）
+bun run migrations:lock <迁移文件>… # 新迁移入锁（只追加）；共享工作树上带路径，只锁自己的
 bun run contracts:lock [--breaking "<依据>"]          # 业务契约面金样入锁
 CS_TEST_REQUIRE=database bun test   # 数据库缺席时报错而不是跳过
 ```

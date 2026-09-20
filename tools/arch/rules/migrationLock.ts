@@ -29,5 +29,5 @@ function checkNewMigration(root: string, rel: string, locked: Readonly<Record<st
   if (migrationNumber(rel) <= highest) {
     return [{ rule: RULE, file: join(root, rel), message: `新迁移的序号必须大于同目录已入锁的最大序号 ${String(highest).padStart(4, '0')}：插队会让新装与升级的执行顺序不一致` }];
   }
-  return [{ rule: RULE, file: join(root, rel), message: '新迁移尚未入锁：运行 bun run migrations:lock 并把锁文件一起提交' }];
+  return [{ rule: RULE, file: join(root, rel), message: `新迁移尚未入锁：是你的迁移就运行 bun run migrations:lock ${rel} 并把锁文件一起提交；是别的会话的在制文件就留给对方` }];
 }
