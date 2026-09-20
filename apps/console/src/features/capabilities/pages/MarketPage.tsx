@@ -16,7 +16,7 @@ export function MarketPage() {
   const query = useMarketQuery(['apps', q, cursor], () => api.capabilities.marketApps({ q, limit: 20, ...(cursor ? { cursor } : {}) }));
   const restart = () => { setInput(''); setQ(''); setCursors([]); };
   return <>
-    <PageHeader title={t('market.title')} description={[t('market.intro')]} actions={<Button disabled={query.isFetching} onClick={() => { void query.refetch(); }}>{t('market.refresh')}</Button>} />
+    <PageHeader title={t('market.title')} description={[t('market.intro')]} />
     <form className={styles.search} onSubmit={(event) => { event.preventDefault(); setQ(input.trim()); setCursors([]); }}>
       <FormField label={t('market.search')} hint={t('market.searchHint')}><input value={input} maxLength={120} onChange={(event) => setInput(event.target.value)} /></FormField>
       <Button type="submit" variant="primary">{t('market.searchAction')}</Button>
