@@ -47,4 +47,6 @@
 
 最终共享候选的 `bun run check` 已完成：**1684 pass / 5 skip / 0 fail，9534 assertions，1689 tests / 272 files / 228.33s**；架构、全仓 lint、根类型与工作台类型全部通过。日志 `/private/tmp/rfc008009-check-final-2.log`。此前未完成检查被并行页面引用／E2E 类型声明中断，修复由所属任务完成。
 
-本轮只提交 RFC-008 的 60 个明确路径；共享 STATE 与 RFC 索引完整保留 RFC-009 输出。门禁执行期间 RFC-008 的 53 个代码／测试／设计附件文件指纹未变化；并行设置与其他门禁 WIP 不随本次代码提交。GitHub 干净 checkout 的精确 SHA CI 待发布后记录。
+本轮只提交 RFC-008 的 60 个明确路径；共享 STATE 与 RFC 索引完整保留 RFC-009 输出。门禁执行期间 RFC-008 的 53 个代码／测试／设计附件文件指纹未变化；并行设置与其他门禁 WIP 不随本次代码提交。功能提交 `5252c4c43804bdfbd2a8beb92bc3c2f9289bb12d` 已推送到 `main`，推后 fetch 确认精确同步。
+
+[GitHub CI 35502873316](https://github.com/wangbinquan/CrewStation/actions/runs/35502873316) 针对上述精确 SHA 已完成且 **success**：`check` 3 分 8 秒（含完整门禁和工作台构建），`e2e` 5 分 29 秒（新集群安装平台后真实浏览器验收）。T1–T7 与 DS-01…DS-16 完成，RFC-008 标记 **Done**。后续收口提交仅更新这份证据与 RFC／接力状态，不修改已验证的生产代码。
