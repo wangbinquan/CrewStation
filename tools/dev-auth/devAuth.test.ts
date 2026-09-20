@@ -84,10 +84,17 @@ test('开发 IdP 完整校验 PKCE，并签发可由 JWKS 验证的 ID token', a
 });
 
 test('生产源码不包含开发 Provider 或固定账号', async () => {
-  const command = Bun.spawn(['rg', '-n', 'dev-roles|dev-role-admin|crewstation-dev-auth', 'apps', 'modules', 'packages', 'runtimes'], { stdout: 'pipe', stderr: 'pipe' });
-  const output = await new Response(command.stdout).text();
-  expect(await command.exited).toBe(1);
-  expect(output).toBe('');
+  const source = new Bun.Glob('**/*.{ts,tsx,js,jsx,json,yaml,yml,sh}');
+  const violations: string[] = [];
+  let scanned = 0;
+  for (const root of ['apps', 'modules', 'packages', 'runtimes']) {
+    for await (const path of source.scan({ cwd: root, onlyFiles: true })) {
+      scanned += 1;
+      if (/dev-roles|dev-role-admin|crewstation-dev-auth/.test(await Bun.file(`${root}/${path}`).text())) violations.push(`${root}/${path}`);
+    }
+  }
+  expect(scanned).toBeGreaterThan(0);
+  expect(violations).toEqual([]);
 });
 
 test('本机 Service 在 readiness 前发布 dev-auth，避免 discovery 播种自锁', async () => {
