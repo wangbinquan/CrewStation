@@ -20,5 +20,18 @@
  "modules/high/application/useCase.ts": "import type { LowApi } from '@crewstation/module-low';\nexport type UseCase = LowApi;\n",
  "apps/console/package.json": "{\"name\": \"@crewstation/console\", \"version\": \"0.0.0\", \"private\": true, \"type\": \"module\"}",
  "apps/console/src/main.ts": "import { k } from '@crewstation/kernel';\nexport const main = k;\n",
- "docs/adr/0009-test.md": "- exception: size-limit packages/kernel/big.ts until 2000-01-01\n- exception: no-default-export packages/kernel/def.ts until 2999-12-31\n"
+ "docs/adr/0009-test.md": "- exception: size-limit packages/kernel/big.ts until 2000-01-01\n- exception: no-default-export packages/kernel/def.ts until 2999-12-31\n",
+ "modules/low/tests/focused.test.ts": "import { describe, test } from 'bun:test';\ntest.only('聚焦一条', () => {});\ntest('被静默跳过的另一条', () => {});\n",
+ "modules/low/tests/parked.test.ts": "import { describe, test } from 'bun:test';\ntest.skip('先放着', () => {});\ntest.todo('以后再写');\ntest.failing('已知失败', () => {});\n",
+ "packages/kernel/flaky.test.ts": "import { describe, test } from 'bun:test';\ntest.skipIf(true)('永远跳过', () => {});\ntest('重跑才过', () => {}, { retry: 3 });\n",
+ "modules/low/tests/gated.test.ts": "import { describe, test } from 'bun:test';\n// 注释里写 test.only( 或 test.skip( 不算违规\n/* describe.only( 与 retry: 2 也一样 */\nconst available = false;\ndescribe.skipIf(!available)('由环境探测驱动', () => { test('x', () => {}); });\n",
+ "integrations/sample/src/main.test.ts": "import { describe, test } from 'bun:test';\ndescribe.only('工作区外的用例', () => { test('x', () => {}); });\n",
+ "tests/e2e/ok.test.ts": "import { describe, test } from 'bun:test';\ntest('约定的用例层', () => {});\n",
+ "tests/misc/stray.test.ts": "import { describe, test } from 'bun:test';\ntest('清单外的目录', () => {});\n",
+ "tests/loose.test.ts": "import { describe, test } from 'bun:test';\ntest('散放的文件', () => {});\n",
+ "modules/high/adapters/persistence/migrations/0001_create_schema.sql": "CREATE SCHEMA high;\nCREATE TABLE high.edited_after_lock (id text);\n",
+ "modules/high/adapters/persistence/migrations/0003_locked.sql": "CREATE TABLE high.kept (id text);\n",
+ "modules/high/adapters/persistence/migrations/0003_late.sql": "CREATE TABLE high.late (id text);\n",
+ "modules/high/adapters/persistence/migrations/0004_fresh.sql": "CREATE TABLE high.fresh (id text);\n",
+ "tools/arch/migrations.lock.json": "{\"files\": {\"modules/high/adapters/persistence/migrations/0001_create_schema.sql\": \"0000000000000000000000000000000000000000000000000000000000000000\", \"modules/high/adapters/persistence/migrations/0002_gone.sql\": \"1111111111111111111111111111111111111111111111111111111111111111\", \"modules/high/adapters/persistence/migrations/0003_locked.sql\": \"d3a956c9675fa4eea47bb65ea8ca5f8b552ce032c99898d8f523fb5ab6e7d18d\"}}"
 }

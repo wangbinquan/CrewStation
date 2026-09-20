@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { requiredTestCapabilities, resolveCapability } from '../../packages/testkit/capability';
 import type { Page } from './cdp';
 import { Browser, DEFAULT_CDP_PORT } from './cdp';
 
@@ -33,13 +34,22 @@ const browserUp = (url: string) =>
  * 两个条件都满足才跑实机用例：网关能应答，且本机有一个开着调试端口的 Chrome。
  * 起浏览器这一步就是显式的「我要跑实机」，所以不再额外设开关；没起浏览器的机器上整套自动跳过。
  * 起法见 tests/e2e/README.md。
+ *
+ * CI 的 e2e 作业设 `CS_TEST_REQUIRE=e2e`：那里两样东西都是作业自己装的，缺任何一样都是故障而不是「没环境」，
+ * 此时抛错让作业变红，而不是整套跳过后照绿。
  */
 export async function e2eAvailable(): Promise<boolean> {
   const [gateway, browser] = await Promise.all([
     gatewayUp(CONSOLE_URL),
     browserUp(`http://127.0.0.1:${CDP_PORT}/json/version`),
   ]);
-  return gateway && browser;
+  const missing = [gateway ? undefined : `网关 ${CONSOLE_URL} 没有应答`, browser ? undefined : `调试浏览器 127.0.0.1:${CDP_PORT} 没有应答`].filter((reason) => reason !== undefined);
+  return resolveCapability('e2e', missing.length === 0, missing.join('；'));
+}
+
+/** 本次运行是否点名要求实机验收；被点名时登录与会话建立的失败不允许再退化成跳过。 */
+export function e2eRequired(): boolean {
+  return requiredTestCapabilities().has('e2e');
 }
 
 export function connectBrowser(): Promise<Browser> {

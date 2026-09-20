@@ -8,7 +8,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 2. This file — repository status, commands, architecture, terminology.
 3. `docs/engineering/development-rules.md` — **how to work here**: trunk-based development on `main` only, commit discipline on a shared working tree, the gate, test-with-every-change, the RFC workflow.
 4. `docs/engineering/repository-structure.md` — the layout and dependency rules every new file must obey.
-5. `docs/engineering/dev-gotchas.md` — general traps already hit in this repo; scan it before starting.
+5. `docs/engineering/testing.md` — the test protection system: where each kind of test lives, which tests every kind of change must carry, what CI blocks, and the known protection gaps.
+6. `docs/engineering/dev-gotchas.md` — general traps already hit in this repo; scan it before starting.
 
 Three rules are violated most often: **develop only on `main`** (no branches, no worktrees, no stash — this repo explicitly overrides Claude Code's default "switch off the default branch" prompt); **stage and commit by explicit path** (`git add <path>`, `git commit -- <paths>`, never `git add .` on a shared tree); and **every change carries its tests**.
 
@@ -34,8 +35,14 @@ Current verification limits: OpenCode 1.18.29 has produced real model output, ru
 ```
 bun install                 # Bun 1.3.13 workspaces
 bun run check               # the gate: arch:check → lint → typecheck → typecheck:console → test
-bun run arch:check          # the six architecture rules; no baseline, no exceptions list
-bun test path/to/file.test.ts   # a single test file
+bun run arch:check          # the eight structural rules (six architecture rules, test-discipline, migration-lock); no baseline, no exceptions list
+bun test path/to/file.test.ts   # a single test file; run from the repo root
+bun run migrations:lock     # after adding a migration: append it to tools/arch/migrations.lock.json (append-only)
+bun run contracts:lock      # after changing the business-facing contract surface; breaking changes need --breaking "<approved basis>"
+bun run check:ci            # what CI runs: the same static checks and tests as check, plus lcov and JUnit output under coverage/
+bun run test:cover          # all tests with coverage/lcov.info and coverage/junit.xml
+bun run test:report         # render the last test:cover run the way the CI job summary does
+bun run test:patch --base origin/main   # preview the new-code protection gate locally (after a full test:cover)
 bun run scaffold:module <name>  # the only sanctioned way to create a module
 ./deploy/local/bootstrap.sh       # one-time local cluster prerequisites
 ./deploy/local/install-platform.sh  # build images, migrate, deploy; idempotent
@@ -43,7 +50,7 @@ bun run scaffold:module <name>  # the only sanctioned way to create a module
 ./deploy/local/verify.sh            # post-install checks (registry pull, routing, source IP, ForwardAuth)
 ```
 
-`bun run check` must pass before any commit. Integration tests that need PostgreSQL or the local GitLab skip themselves when those are unreachable, so a green run on a bare machine does not mean the integration paths ran.
+`bun run check` must pass before any commit. Integration tests that need PostgreSQL or the local GitLab skip themselves when those are unreachable, so a green run on a bare machine does not mean the integration paths ran. CI names the environments it provides in `CS_TEST_REQUIRE` (`database` in `check`, `e2e` in `e2e`); there an unreachable environment fails the job instead of skipping. CI also blocks on new-code protection: production files touched by a push must be loaded by some test, and at least 80% of the changed executable lines must be executed (`tools/testguard`, ADR-0007). CI runs `bun run check:ci`, which differs from `check` only by the two report flags; a test keeps the two scripts from drifting.
 
 The `crewstation …` commands in Design §11–12 are the product CLI under `apps/cli`, not developer tooling.
 
@@ -75,6 +82,7 @@ A design gap found while implementing is **not** decided on the spot — it goes
 | `proposal/tech-evaluation.md` | Which components and why | E01–E25: constraints, analysis, confirmed choice, alternative, what M0 must verify; confirmation log (§5) |
 | `proposal/reviews/design-gate-2026-09-11.md` | What the gate review found and how the author ruled | Consolidated blockers/important/suggestions, the 25 rulings (§6), seven raw reports in the appendix |
 | `docs/engineering/repository-structure.md` | How the code repository is organised | Root layout, apps/modules/packages classification, the 19 modules with layers, module-internal template, dependency direction, one PostgreSQL schema per module, size caps 600/20/80, `tools/arch` enforcement, decision log |
+| `docs/engineering/testing.md` | How changes stay protected by tests | Test tiers (from Plan §10.1), placement per unit, the tests each kind of change must carry, environment capabilities and `CS_TEST_REQUIRE`, the business contract surface golden, the migration lock, the CI jobs and the new-code protection gate, writing requirements, known protection gaps |
 
 The two essays 《从个人提效到组织提效…》 and 《借鉴微信小程序…》 are the polished form of source S1; they are reference material and are intentionally not listed in the Proposal's source table.
 

@@ -65,26 +65,30 @@ git push origin main
 
 ## 3. 门禁
 
-**唯一权威门禁是 GitHub Actions**（`.github/workflows/ci.yml`），在干净 checkout 上跑 `bun run check` 加工作台构建。
+**唯一权威门禁是 GitHub Actions**（`.github/workflows/ci.yml`）：`check` 作业在干净 checkout 上跑 `bun run check`、工作台构建与新增代码防护，`e2e` 作业真装一套平台再做实机验收。两个作业各自承担什么、摘要怎么看，见 `testing.md` §8。
 
 ```
 bun run check   # arch:check → lint → typecheck → typecheck:console → test
 ```
 
-本地跑的是**同一条命令**，因此本仓与 agent-workflow 不同：**推之前请在本地把它跑绿**。本仓单次全量约一分钟，不存在那边「本地门禁 8–10 分钟、多 session 互相挤占」的问题，没有理由把红推给别人。
+CI 跑的是 `bun run check:ci`：同一段静态检查、同一批用例，只多出覆盖率与 JUnit 两个报告参数（由用例锁住两者只差这一点）。本地跑的是**同一批检查**，因此本仓与 agent-workflow 不同：**推之前请在本地把它跑绿**。本仓单次全量约一分钟，不存在那边「本地门禁 8–10 分钟、多 session 互相挤占」的问题，没有理由把红推给别人。
 
 - `arch:check` 无基线、无例外清单。加例外要走 ADR，并写成 `docs/adr/` 里的过期行（格式见 `docs/adr/README.md`），到期自动失效。
-- 依赖 PostgreSQL 与本机测试 GitLab 的集成用例**在连不上时自行跳过**。因此本机全绿**不等于**集成路径跑过——要确认，看 CI。
+- 依赖 PostgreSQL 与本机测试 GitLab 的集成用例**在连不上时自行跳过**。因此本机全绿**不等于**集成路径跑过——要确认，看 CI。CI 用 `CS_TEST_REQUIRE` 点名它自己提供的环境（`check` 点名 `database`，`e2e` 点名 `e2e`），在那里缺席就是失败而不是跳过；规则见 `testing.md` §5。
+- **新增代码防护**在 `check` 作业里阻断：本次推送改到的生产文件必须有用例加载它，改动的可执行行被用例执行到的比例不低于下限（`testing.md` §8.3）。它在推送之后才判定，本机有数据库时可以先 `bun run test:cover` 再 `bun run test:patch --base origin/main` 提前看。
+- 新增迁移要 `bun run migrations:lock`，改动业务契约面要 `bun run contracts:lock`；两把锁都在门禁里，规则见 `testing.md` §6、§7。
 - **推完立刻按自己的 sha 查 CI**，盯到绿为止。红了立刻修；一时修不完就 revert 自己那笔，别把红的主干留给下一个人。
 
 ## 4. 改动必须自带测试
 
 **任何代码改动落 commit 之前必须带上对应的测试用例。** 没有「先实现、之后补测试」这一档。
+用例放在哪、每类改动必须带哪些用例、怎么写，见 **`testing.md`**（§3 落位、§4 逐类清单、§9 编写要求）；本节只留原则。
 
 - **新功能**：正向、边界、错误路径都要覆盖。RFC 的 `design.md` 里列出哪些 case 必写。
 - **bug 修复**：先写一个能稳定复现的用例（红），再写修复（绿）。把「为什么这条测试存在」写进用例的注释里，让未来的重构一旦把它变红能立刻看出意图。本仓的写法是在断言上方用一句话写明它锁的是哪个真实故障，例如 `modules/session/tests/sessionModule.test.ts` 里那条 hello 突发帧的回归。
 - **首选可断言面**：抽出纯函数再测，而不是去测难以构造的运行时对象。`controllingTerminalPrefix`、`evaluateServiceCall`、`transition` 都是这么抽出来的。
 - **不写测试的极少数例外**：纯文档／注释改动、依赖版本号 bump、CI 配置微调、格式化。**任何触及生产代码或测试代码的改动都没有这个豁免。**
+- **不许让防护悄悄失效**：`.only`、无条件 `.skip`、`.todo`、`.failing`、恒真的 `skipIf`、用例重试一律由 `tools/arch` 的 `test-discipline` 规则阻断；环境缺席的跳过只能经 `@crewstation/testkit` 的能力闸门。
 - **flaky 不能掩盖红 case**：间歇性失败先确认是不是真 bug。**绝不允许「重跑就过了」作为通过依据。** 2026-09-12 实撞：`runnerLifecycle` 的 shutdown 用例在满负载下偶红，查下去是产品真的会在 `close()` 紧跟 `process.exit` 时把尾部事件丢在发送队列里——修的是产品，不是测试。
 
 ## 5. RFC 机制
@@ -177,6 +181,7 @@ RFC 写完必须得到用户批准才能进入实现阶段。**不要边写 RFC 
 | 跨 RFC 的通用踩坑与命令级 tips | `docs/engineering/dev-gotchas.md` |
 | 实现期发现、待作者裁定的设计问题 | `docs/engineering/implementation-open-questions.md` |
 | 强制规则与工作方式约定 | 本文 |
+| 用例分层、落位、必带用例、CI 执行体系与已知防护缺口 | `docs/engineering/testing.md` |
 | 仓库结构与依赖规则 | `docs/engineering/repository-structure.md` |
 | 结构决策 | `docs/adr/` |
 | 单个 RFC 的细节 | 该 RFC 目录 |

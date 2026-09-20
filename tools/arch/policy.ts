@@ -71,6 +71,19 @@ export const INFRA_SCHEMA_OWNERS: Record<string, string> = {
   'packages/queue': 'platform_infra',
 };
 
+/**
+ * 仓库根 `tests/` 只放跨单元的用例层，一层一个目录（ADR-0007、docs/engineering/testing.md §2）。
+ * 单元自己的用例留在单元里；这里不允许出现清单之外的目录，也不允许散放文件。
+ */
+export const ROOT_TEST_TIERS: readonly string[] = ['contracts', 'e2e', 'security', 'scale', 'upgrade', 'architecture'];
+export const ROOT_TEST_LOOSE_FILES: readonly string[] = ['README.md'];
+
+/** 不在工作区里、但同样由根 `bun test` 收进来的用例所在目录；用例纪律对它们一视同仁。 */
+export const EXTRA_TEST_ROOTS: readonly string[] = ['tests', 'integrations', 'templates', 'deploy'];
+
+/** 迁移锁文件：已入锁的迁移不可修改、删除或插队（ADR-0007）。 */
+export const MIGRATION_LOCK_FILE = 'tools/arch/migrations.lock.json';
+
 export function moduleSchemaName(shortName: string): string {
   return shortName.replace(/-/g, '_');
 }

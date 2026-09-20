@@ -28,6 +28,7 @@
 - [I17. 档位测试轮次的权限档位与 `{{mcp.*}}` 取值](#i17-档位测试轮次的权限档位与-mcp-取值)
 - [I18. 发布构建 Job 的资源写死 1 CPU／2Gi](#i18-发布构建-job-的资源写死-1-cpu2gi)
 - [I19. read-only／edit 两档去掉 bash，与只认「OpenCode 内」请求的模型服务相冲](#i19-read-onlyedit-两档去掉-bash与只认opencode-内请求的模型服务相冲)
+- [I20. CI 里没有 GitLab：核心业务链路在 CI 没有实机证明](#i20-ci-里没有-gitlab核心业务链路在-ci-没有实机证明)
 
 ## I1. 操作 MCP 的「以本服务身份调用内部 API」用的是谁的身份
 
@@ -233,3 +234,11 @@
 
 **可选做法**：(a) 维持映射，本机验收用 full 档或付费模型；(b) edit 档把 bash 改为 `ask`（工具仍在请求里；headless 下 `ask` 的实际行为未验证，需先实测），read-only 不变；(c) edit 档放行 bash，与 agent-workflow 默认更接近。
 
+
+## I20. CI 里没有 GitLab：核心业务链路在 CI 没有实机证明
+
+**现状**：开通链第二步 `ensureRepository` 需要 GitLab，而 GitHub CI 的 `e2e` 作业里没有（`tests/e2e/README.md`「项目空间的用例在 CI 里是跳过的」）。2026-09-20 的 CI 运行 35497825404 里，`e2e` 作业 32 条用例跑了 18 条、跳过 14 条，其中 11 条是项目空间用例（项目概览与两个部署槽、发布与上线、运行与诊断、项目设置、成员管理及其布局）；`check` 作业里 `modules/scm/tests/gitlabIntegration.test.ts` 的 5 条真实 GitLab 用例同样跳过。`e2e` 作业还设了 `CS_SKIP_TASK_RUNTIME=1`，开发会话与业务子任务也不在 CI 的实机范围内。这些用例只在有 `aw-local-gitlab` 与本机集群的机器上跑；而那台 GitLab 的 compose 定义已丢失、组与令牌是手工引导的（CLAUDE.md「known, deferred gap」），仓库里没有可复现的搭建方式。
+
+**为什么是问题**：管理员代建项目 → 建仓 → 首标签构建 → preview 槽 → 切流／回退、开发会话、业务子任务，是平台最核心的几条链路（AT-01、03、33、38、47）。它们的回归目前取决于「改动的人恰好在一台环境齐全的机器上跑了全量用例」；CI 是绿的并不说明这些链路没坏。`docs/engineering/testing.md` §10 已把它登记为头号防护缺口，`CS_TEST_REQUIRE` 里也预留了 `gitlab` 能力，但提供这项能力需要先决定下面的做法。
+
+**可选做法**：(a) 仓库里补一套可复现的 GitLab 引导（compose＋`gitlab-rails runner` 建根令牌、`crewstation-test` 组与受保护标签权限），CI 新增一个定时或手动触发的 `full-e2e` 作业：起 gitlab-ce、装任务容器镜像、`CS_TEST_REQUIRE=e2e,gitlab,database` 跑全部实机用例；代价是作业耗时（gitlab-ce 冷启动数分钟、镜像约 1.5 GB）与 runner 内存余量需要先实测，且要先还上「GitLab 定义丢失」这笔债；(b) 写一个只实现平台用到的那部分 GitLab 兼容接口（项目、分支、标签、保护规则、Git HTTP）的轻量替身供 CI 使用；代价是替身与真实 GitLab 行为漂移的风险（令牌生效延迟、分支列表 30 秒缓存这类坑正是替身测不出来的）；(c) 维持现状，把「推送前在环境齐全的机器上跑全量」写成发布类改动的硬性要求，CI 只兜不依赖 GitLab 的部分。

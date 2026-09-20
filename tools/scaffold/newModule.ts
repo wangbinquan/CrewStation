@@ -30,6 +30,8 @@ for (const [rel, content] of Object.entries(renderModuleFiles({ name, layer, dep
   writeFileSync(path, content);
 }
 console.log(`已生成 modules/${name}（L${layer}${deps.length ? `，依赖 ${deps.join('、')}` : ''}）`);
+console.log('下一步：bun install；新模块按 ADR 登记；用例写法见 docs/engineering/testing.md。');
+if (persistence) console.log('带迁移的模块还要：bun run migrations:lock（新迁移入锁），并把迁移集加进 modules/platform/wiring.ts 的清单。');
 
 function valueOf(args: string[], flag: string): string | undefined {
   const i = args.indexOf(flag);

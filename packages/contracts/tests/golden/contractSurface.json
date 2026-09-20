@@ -1,0 +1,1328 @@
+{
+  "note": "业务契约面金样：已部署的数字人与业务仓库依赖的那部分契约。不要手改；规则见 docs/engineering/testing.md §6。",
+  "surface": {
+    "constants": {
+      "IDENTITY_HEADERS": {
+        "userId": "x-cs-user-id",
+        "userName": "x-cs-user-name",
+        "userEmail": "x-cs-user-email",
+        "identityToken": "x-cs-identity-token",
+        "userAttrs": "x-cs-user-attrs",
+        "sourceService": "x-cs-source-service",
+        "sourceSlot": "x-cs-source-slot",
+        "sourceToken": "x-cs-source-token",
+        "devSessionToken": "x-cs-dev-session-token",
+        "traceId": "x-cs-trace-id",
+        "requestId": "x-cs-request-id"
+      },
+      "PLATFORM_ENV": {
+        "project": "CS_PROJECT",
+        "service": "CS_SERVICE",
+        "slot": "CS_SLOT",
+        "environment": "CS_ENVIRONMENT",
+        "userDomain": "CS_USER_DOMAIN",
+        "serviceDomain": "CS_SERVICE_DOMAIN",
+        "platformApiUrl": "CS_PLATFORM_API_URL",
+        "internalApiBase": "CS_INTERNAL_API_BASE",
+        "jwksUrl": "CS_JWKS_URL",
+        "databaseUrl": "CS_DATABASE_URL",
+        "port": "PORT",
+        "taskId": "CS_TASK_ID",
+        "traceId": "CS_TRACE_ID"
+      },
+      "PLATFORM_PATHS": {
+        "health": "/healthz",
+        "internalApiPrefix": "/api/",
+        "jwks": "/.well-known/jwks.json"
+      },
+      "TOKEN_CLAIMS": {
+        "issuer": "crewstation",
+        "subjectPrefixUser": "user:",
+        "subjectPrefixService": "service:",
+        "audiencePrefixService": "service:",
+        "kind": "cs_kind",
+        "attrs": "cs_attrs",
+        "project": "cs_project",
+        "service": "cs_service",
+        "slot": "cs_slot",
+        "taskId": "cs_task_id",
+        "traceId": "cs_trace_id",
+        "audienceDevSession": "dev-session",
+        "kindDevSession": "dev-session"
+      },
+      "HOST_PATTERNS": {
+        "console": "console.{userDomain}",
+        "prod": "{project}.{userDomain}",
+        "preview": "preview.{project}.{userDomain}",
+        "devPreview": "dev.{project}.{userDomain}",
+        "service": "{service}.{serviceDomain}",
+        "platformApi": "api.{serviceDomain}",
+        "events": "events.{serviceDomain}",
+        "mcpCapabilities": "mcp-capabilities.{serviceDomain}",
+        "mcpOperations": "mcp-operations.{serviceDomain}"
+      },
+      "PLATFORM_SERVICE_HOSTS": {
+        "platformApi": "api",
+        "events": "events",
+        "mcpCapabilities": "mcp-capabilities",
+        "mcpOperations": "mcp-operations"
+      },
+      "EVENT_HEADERS": {
+        "eventType": "x-cs-event-type",
+        "deliveryId": "x-cs-delivery-id",
+        "deliveryAttempt": "x-cs-delivery-attempt"
+      },
+      "TASKRUNNER": {
+        "protocolVersion": "2"
+      }
+    },
+    "schemas": {
+      "Manifest": {
+        "direction": "business-to-platform",
+        "schema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "oneOf": [
+            {
+              "properties": {
+                "apiVersion": {
+                  "const": "crewstation/v1",
+                  "type": "string"
+                },
+                "kind": {
+                  "const": "DigitalWorker",
+                  "type": "string"
+                },
+                "spec": {
+                  "properties": {
+                    "apis": {
+                      "default": {
+                        "requested": []
+                      },
+                      "properties": {
+                        "exposes": {
+                          "properties": {
+                            "openapi": {
+                              "minLength": 1,
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "openapi"
+                          ],
+                          "type": "object"
+                        },
+                        "requested": {
+                          "default": [],
+                          "items": {
+                            "properties": {
+                              "method": {
+                                "enum": [
+                                  "DELETE",
+                                  "GET",
+                                  "HEAD",
+                                  "OPTIONS",
+                                  "PATCH",
+                                  "POST",
+                                  "PUT"
+                                ],
+                                "type": "string"
+                              },
+                              "path": {
+                                "format": "starts_with",
+                                "pattern": "^\\/.*",
+                                "type": "string"
+                              },
+                              "proxy": {
+                                "pattern": "^[a-z][a-z0-9-]{1,38}[a-z0-9]$",
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "method",
+                              "path",
+                              "proxy"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "development": {
+                      "properties": {
+                        "command": {
+                          "items": {
+                            "minLength": 1,
+                            "type": "string"
+                          },
+                          "minItems": 1,
+                          "type": "array"
+                        },
+                        "healthPath": {
+                          "format": "starts_with",
+                          "pattern": "^\\/.*",
+                          "type": "string"
+                        },
+                        "port": {
+                          "maximum": 65535,
+                          "minimum": 1,
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "command"
+                      ],
+                      "type": "object"
+                    },
+                    "env": {
+                      "default": [],
+                      "items": {
+                        "properties": {
+                          "default": {
+                            "type": "string"
+                          },
+                          "from": {
+                            "enum": [
+                              "config",
+                              "secret"
+                            ],
+                            "type": "string"
+                          },
+                          "key": {
+                            "minLength": 1,
+                            "type": "string"
+                          },
+                          "name": {
+                            "pattern": "^[A-Z][A-Z0-9_]*$",
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "from",
+                          "name"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "release": {
+                      "default": {
+                        "migration": {
+                          "compatibility": "none",
+                          "destructive": false,
+                          "rollback": "switch-back"
+                        }
+                      },
+                      "properties": {
+                        "migration": {
+                          "default": {
+                            "compatibility": "none",
+                            "destructive": false,
+                            "rollback": "switch-back"
+                          },
+                          "properties": {
+                            "compatibility": {
+                              "default": "none",
+                              "enum": [
+                                "destructive",
+                                "expand-only",
+                                "none"
+                              ],
+                              "type": "string"
+                            },
+                            "destructive": {
+                              "default": false,
+                              "type": "boolean"
+                            },
+                            "rollback": {
+                              "default": "switch-back",
+                              "enum": [
+                                "blocked",
+                                "switch-back"
+                              ],
+                              "type": "string"
+                            }
+                          },
+                          "type": "object"
+                        },
+                        "migrationCommand": {
+                          "items": {
+                            "minLength": 1,
+                            "type": "string"
+                          },
+                          "minItems": 1,
+                          "type": "array"
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "service": {
+                      "properties": {
+                        "command": {
+                          "items": {
+                            "minLength": 1,
+                            "type": "string"
+                          },
+                          "minItems": 1,
+                          "type": "array"
+                        },
+                        "healthPath": {
+                          "default": "/healthz",
+                          "format": "starts_with",
+                          "pattern": "^\\/.*",
+                          "type": "string"
+                        },
+                        "plan": {
+                          "pattern": "^[a-z][a-z0-9-]{1,38}[a-z0-9]$",
+                          "type": "string"
+                        },
+                        "port": {
+                          "maximum": 65535,
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "releaseMode": {
+                          "default": "rolling-compatible",
+                          "enum": [
+                            "rolling-compatible"
+                          ],
+                          "type": "string"
+                        },
+                        "replicas": {
+                          "default": 1,
+                          "maximum": 20,
+                          "minimum": 1,
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "command",
+                        "plan",
+                        "port"
+                      ],
+                      "type": "object"
+                    },
+                    "subscriptions": {
+                      "default": [],
+                      "items": {
+                        "properties": {
+                          "eventType": {
+                            "pattern": "^[a-z][a-z0-9-]*(\\.[a-z][a-z0-9-]*)+$",
+                            "type": "string"
+                          },
+                          "handlerPath": {
+                            "format": "starts_with",
+                            "pattern": "^\\/.*",
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "eventType",
+                          "handlerPath"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "tasks": {
+                      "properties": {
+                        "agentProfiles": {
+                          "default": [],
+                          "items": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "compute": {
+                                "pattern": "^[a-z][a-z0-9-]{1,38}[a-z0-9]$",
+                                "type": "string"
+                              },
+                              "name": {
+                                "pattern": "^[a-z][a-z0-9-]{1,38}[a-z0-9]$",
+                                "type": "string"
+                              },
+                              "permission": {
+                                "default": "edit",
+                                "enum": [
+                                  "edit",
+                                  "full",
+                                  "read-only"
+                                ],
+                                "type": "string"
+                              },
+                              "systemPromptFile": {
+                                "minLength": 1,
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "compute",
+                              "name"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        "defaultVolumeMode": {
+                          "default": "follow-container",
+                          "enum": [
+                            "follow-container",
+                            "persistent"
+                          ],
+                          "type": "string"
+                        },
+                        "outputContracts": {
+                          "default": [],
+                          "items": {
+                            "properties": {
+                              "name": {
+                                "pattern": "^[a-z][a-z0-9-]{1,38}[a-z0-9]$",
+                                "type": "string"
+                              },
+                              "required": {
+                                "default": [],
+                                "items": {
+                                  "minLength": 1,
+                                  "type": "string"
+                                },
+                                "type": "array"
+                              },
+                              "schema": {
+                                "minLength": 1,
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "name"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        "profile": {
+                          "pattern": "^[a-z][a-z0-9-]{1,38}[a-z0-9]$",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "profile"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "service"
+                  ],
+                  "type": "object"
+                }
+              },
+              "required": [
+                "apiVersion",
+                "kind",
+                "spec"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "apiVersion": {
+                  "const": "crewstation/v1",
+                  "type": "string"
+                },
+                "kind": {
+                  "const": "APIProxy",
+                  "type": "string"
+                },
+                "spec": {
+                  "properties": {
+                    "apis": {
+                      "properties": {
+                        "exposes": {
+                          "properties": {
+                            "openapi": {
+                              "minLength": 1,
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "openapi"
+                          ],
+                          "type": "object"
+                        }
+                      },
+                      "required": [
+                        "exposes"
+                      ],
+                      "type": "object"
+                    },
+                    "development": {
+                      "properties": {
+                        "command": {
+                          "items": {
+                            "minLength": 1,
+                            "type": "string"
+                          },
+                          "minItems": 1,
+                          "type": "array"
+                        },
+                        "healthPath": {
+                          "format": "starts_with",
+                          "pattern": "^\\/.*",
+                          "type": "string"
+                        },
+                        "port": {
+                          "maximum": 65535,
+                          "minimum": 1,
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "command"
+                      ],
+                      "type": "object"
+                    },
+                    "env": {
+                      "default": [],
+                      "items": {
+                        "properties": {
+                          "default": {
+                            "type": "string"
+                          },
+                          "from": {
+                            "enum": [
+                              "config",
+                              "secret"
+                            ],
+                            "type": "string"
+                          },
+                          "key": {
+                            "minLength": 1,
+                            "type": "string"
+                          },
+                          "name": {
+                            "pattern": "^[A-Z][A-Z0-9_]*$",
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "from",
+                          "name"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "proxy": {
+                      "pattern": "^[a-z][a-z0-9-]{1,38}[a-z0-9]$",
+                      "type": "string"
+                    },
+                    "release": {
+                      "default": {
+                        "migration": {
+                          "compatibility": "none",
+                          "destructive": false,
+                          "rollback": "switch-back"
+                        }
+                      },
+                      "properties": {
+                        "migration": {
+                          "default": {
+                            "compatibility": "none",
+                            "destructive": false,
+                            "rollback": "switch-back"
+                          },
+                          "properties": {
+                            "compatibility": {
+                              "default": "none",
+                              "enum": [
+                                "destructive",
+                                "expand-only",
+                                "none"
+                              ],
+                              "type": "string"
+                            },
+                            "destructive": {
+                              "default": false,
+                              "type": "boolean"
+                            },
+                            "rollback": {
+                              "default": "switch-back",
+                              "enum": [
+                                "blocked",
+                                "switch-back"
+                              ],
+                              "type": "string"
+                            }
+                          },
+                          "type": "object"
+                        },
+                        "migrationCommand": {
+                          "items": {
+                            "minLength": 1,
+                            "type": "string"
+                          },
+                          "minItems": 1,
+                          "type": "array"
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "service": {
+                      "properties": {
+                        "command": {
+                          "items": {
+                            "minLength": 1,
+                            "type": "string"
+                          },
+                          "minItems": 1,
+                          "type": "array"
+                        },
+                        "healthPath": {
+                          "default": "/healthz",
+                          "format": "starts_with",
+                          "pattern": "^\\/.*",
+                          "type": "string"
+                        },
+                        "plan": {
+                          "pattern": "^[a-z][a-z0-9-]{1,38}[a-z0-9]$",
+                          "type": "string"
+                        },
+                        "port": {
+                          "maximum": 65535,
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "releaseMode": {
+                          "default": "rolling-compatible",
+                          "enum": [
+                            "rolling-compatible"
+                          ],
+                          "type": "string"
+                        },
+                        "replicas": {
+                          "default": 1,
+                          "maximum": 20,
+                          "minimum": 1,
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "command",
+                        "plan",
+                        "port"
+                      ],
+                      "type": "object"
+                    },
+                    "upstream": {
+                      "properties": {
+                        "connection": {
+                          "pattern": "^[a-z][a-z0-9-]{1,38}[a-z0-9]$",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "connection"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "apis",
+                    "proxy",
+                    "service",
+                    "upstream"
+                  ],
+                  "type": "object"
+                }
+              },
+              "required": [
+                "apiVersion",
+                "kind",
+                "spec"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "apiVersion": {
+                  "const": "crewstation/v1",
+                  "type": "string"
+                },
+                "kind": {
+                  "const": "EventProducer",
+                  "type": "string"
+                },
+                "spec": {
+                  "properties": {
+                    "development": {
+                      "properties": {
+                        "command": {
+                          "items": {
+                            "minLength": 1,
+                            "type": "string"
+                          },
+                          "minItems": 1,
+                          "type": "array"
+                        },
+                        "healthPath": {
+                          "format": "starts_with",
+                          "pattern": "^\\/.*",
+                          "type": "string"
+                        },
+                        "port": {
+                          "maximum": 65535,
+                          "minimum": 1,
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "command"
+                      ],
+                      "type": "object"
+                    },
+                    "env": {
+                      "default": [],
+                      "items": {
+                        "properties": {
+                          "default": {
+                            "type": "string"
+                          },
+                          "from": {
+                            "enum": [
+                              "config",
+                              "secret"
+                            ],
+                            "type": "string"
+                          },
+                          "key": {
+                            "minLength": 1,
+                            "type": "string"
+                          },
+                          "name": {
+                            "pattern": "^[A-Z][A-Z0-9_]*$",
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "from",
+                          "name"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "ingress": {
+                      "properties": {
+                        "path": {
+                          "format": "starts_with",
+                          "pattern": "^\\/.*",
+                          "type": "string"
+                        },
+                        "verification": {
+                          "default": "none",
+                          "enum": [
+                            "gitlab-token",
+                            "hmac-sha256",
+                            "none"
+                          ],
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "path"
+                      ],
+                      "type": "object"
+                    },
+                    "producer": {
+                      "pattern": "^[a-z][a-z0-9-]{1,38}[a-z0-9]$",
+                      "type": "string"
+                    },
+                    "produces": {
+                      "items": {
+                        "properties": {
+                          "eventType": {
+                            "pattern": "^[a-z][a-z0-9-]*(\\.[a-z][a-z0-9-]*)+$",
+                            "type": "string"
+                          },
+                          "schema": {
+                            "minLength": 1,
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "eventType"
+                        ],
+                        "type": "object"
+                      },
+                      "minItems": 1,
+                      "type": "array"
+                    },
+                    "release": {
+                      "default": {
+                        "migration": {
+                          "compatibility": "none",
+                          "destructive": false,
+                          "rollback": "switch-back"
+                        }
+                      },
+                      "properties": {
+                        "migration": {
+                          "default": {
+                            "compatibility": "none",
+                            "destructive": false,
+                            "rollback": "switch-back"
+                          },
+                          "properties": {
+                            "compatibility": {
+                              "default": "none",
+                              "enum": [
+                                "destructive",
+                                "expand-only",
+                                "none"
+                              ],
+                              "type": "string"
+                            },
+                            "destructive": {
+                              "default": false,
+                              "type": "boolean"
+                            },
+                            "rollback": {
+                              "default": "switch-back",
+                              "enum": [
+                                "blocked",
+                                "switch-back"
+                              ],
+                              "type": "string"
+                            }
+                          },
+                          "type": "object"
+                        },
+                        "migrationCommand": {
+                          "items": {
+                            "minLength": 1,
+                            "type": "string"
+                          },
+                          "minItems": 1,
+                          "type": "array"
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "service": {
+                      "properties": {
+                        "command": {
+                          "items": {
+                            "minLength": 1,
+                            "type": "string"
+                          },
+                          "minItems": 1,
+                          "type": "array"
+                        },
+                        "healthPath": {
+                          "default": "/healthz",
+                          "format": "starts_with",
+                          "pattern": "^\\/.*",
+                          "type": "string"
+                        },
+                        "plan": {
+                          "pattern": "^[a-z][a-z0-9-]{1,38}[a-z0-9]$",
+                          "type": "string"
+                        },
+                        "port": {
+                          "maximum": 65535,
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "releaseMode": {
+                          "default": "rolling-compatible",
+                          "enum": [
+                            "rolling-compatible"
+                          ],
+                          "type": "string"
+                        },
+                        "replicas": {
+                          "default": 1,
+                          "maximum": 20,
+                          "minimum": 1,
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "command",
+                        "plan",
+                        "port"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "ingress",
+                    "producer",
+                    "produces",
+                    "service"
+                  ],
+                  "type": "object"
+                }
+              },
+              "required": [
+                "apiVersion",
+                "kind",
+                "spec"
+              ],
+              "type": "object"
+            }
+          ]
+        }
+      },
+      "ProducedEvent": {
+        "direction": "business-to-platform",
+        "schema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "properties": {
+            "dedupKey": {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            },
+            "eventType": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "occurredAt": {
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$",
+              "type": "string"
+            },
+            "payload": {},
+            "traceId": {
+              "pattern": "^[0-9a-f]{32}$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "dedupKey",
+            "eventType",
+            "occurredAt",
+            "payload"
+          ],
+          "type": "object"
+        }
+      },
+      "EventDelivery": {
+        "direction": "platform-to-business",
+        "schema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "additionalProperties": false,
+          "properties": {
+            "attempt": {
+              "maximum": 9007199254740991,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "deliveryId": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "eventId": {
+              "pattern": "^evt_[0-9a-f]{32}$",
+              "type": "string"
+            },
+            "eventType": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "occurredAt": {
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$",
+              "type": "string"
+            },
+            "payload": {},
+            "receivedAt": {
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$",
+              "type": "string"
+            },
+            "source": {
+              "additionalProperties": false,
+              "properties": {
+                "producer": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "project": {
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "producer",
+                "project"
+              ],
+              "type": "object"
+            },
+            "traceId": {
+              "pattern": "^[0-9a-f]{32}$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "attempt",
+            "deliveryId",
+            "eventId",
+            "eventType",
+            "occurredAt",
+            "payload",
+            "receivedAt",
+            "source",
+            "traceId"
+          ],
+          "type": "object"
+        }
+      },
+      "CreateBusinessTaskRequest": {
+        "direction": "business-to-platform",
+        "schema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "properties": {
+            "labels": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "default": {},
+              "propertyNames": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "profile": {
+              "pattern": "^[a-z][a-z0-9-]{1,38}[a-z0-9]$",
+              "type": "string"
+            },
+            "traceId": {
+              "pattern": "^[0-9a-f]{32}$",
+              "type": "string"
+            },
+            "volumeMode": {
+              "enum": [
+                "follow-container",
+                "persistent"
+              ],
+              "type": "string"
+            }
+          },
+          "type": "object"
+        }
+      },
+      "SubmitSubtaskRequest": {
+        "direction": "business-to-platform",
+        "schema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "oneOf": [
+            {
+              "properties": {
+                "agentProfile": {
+                  "pattern": "^[a-z][a-z0-9-]{1,38}[a-z0-9]$",
+                  "type": "string"
+                },
+                "cwd": {
+                  "type": "string"
+                },
+                "kind": {
+                  "const": "agent",
+                  "type": "string"
+                },
+                "mode": {
+                  "default": "oneshot",
+                  "enum": [
+                    "interactive",
+                    "oneshot"
+                  ],
+                  "type": "string"
+                },
+                "name": {
+                  "pattern": "^[a-z][a-z0-9-]{1,38}[a-z0-9]$",
+                  "type": "string"
+                },
+                "outputContract": {
+                  "pattern": "^[a-z][a-z0-9-]{1,38}[a-z0-9]$",
+                  "type": "string"
+                },
+                "prompt": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "resumeSessionId": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "agentProfile",
+                "kind",
+                "name",
+                "prompt"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "command": {
+                  "items": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "minItems": 1,
+                  "type": "array"
+                },
+                "cwd": {
+                  "type": "string"
+                },
+                "kind": {
+                  "const": "command",
+                  "type": "string"
+                },
+                "name": {
+                  "pattern": "^[a-z][a-z0-9-]{1,38}[a-z0-9]$",
+                  "type": "string"
+                },
+                "timeoutSeconds": {
+                  "default": 3600,
+                  "maximum": 86400,
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "command",
+                "kind",
+                "name"
+              ],
+              "type": "object"
+            }
+          ]
+        }
+      },
+      "SubtaskMessageRequest": {
+        "direction": "business-to-platform",
+        "schema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "properties": {
+            "content": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "content"
+          ],
+          "type": "object"
+        }
+      },
+      "BusinessTaskDto": {
+        "direction": "platform-to-business",
+        "schema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "additionalProperties": false,
+          "properties": {
+            "closedAt": {
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$",
+              "type": "string"
+            },
+            "createdAt": {
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$",
+              "type": "string"
+            },
+            "id": {
+              "pattern": "^tsk_[0-9a-f]{32}$",
+              "type": "string"
+            },
+            "labels": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "propertyNames": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "message": {
+              "type": "string"
+            },
+            "podName": {
+              "type": "string"
+            },
+            "profile": {
+              "pattern": "^[a-z][a-z0-9-]{1,38}[a-z0-9]$",
+              "type": "string"
+            },
+            "serviceId": {
+              "pattern": "^svc_[0-9a-f]{32}$",
+              "type": "string"
+            },
+            "state": {
+              "enum": [
+                "closed",
+                "closing",
+                "creating",
+                "failed",
+                "paused",
+                "running"
+              ],
+              "type": "string"
+            },
+            "traceId": {
+              "pattern": "^[0-9a-f]{32}$",
+              "type": "string"
+            },
+            "volumeMode": {
+              "enum": [
+                "follow-container",
+                "persistent"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "createdAt",
+            "id",
+            "labels",
+            "profile",
+            "serviceId",
+            "state",
+            "traceId",
+            "volumeMode"
+          ],
+          "type": "object"
+        }
+      },
+      "SubtaskDto": {
+        "direction": "platform-to-business",
+        "schema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "additionalProperties": false,
+          "properties": {
+            "agentProfile": {
+              "pattern": "^[a-z][a-z0-9-]{1,38}[a-z0-9]$",
+              "type": "string"
+            },
+            "attempt": {
+              "maximum": 9007199254740991,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "businessOutcome": {
+              "type": "string"
+            },
+            "compute": {
+              "type": "string"
+            },
+            "contractResult": {
+              "additionalProperties": false,
+              "properties": {
+                "missing": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "ok": {
+                  "type": "boolean"
+                },
+                "schemaErrors": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              },
+              "required": [
+                "missing",
+                "ok",
+                "schemaErrors"
+              ],
+              "type": "object"
+            },
+            "endedAt": {
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$",
+              "type": "string"
+            },
+            "error": {
+              "type": "string"
+            },
+            "exitCode": {
+              "maximum": 9007199254740991,
+              "minimum": -9007199254740991,
+              "type": "integer"
+            },
+            "id": {
+              "pattern": "^sub_[0-9a-f]{32}$",
+              "type": "string"
+            },
+            "kind": {
+              "enum": [
+                "agent",
+                "command"
+              ],
+              "type": "string"
+            },
+            "mode": {
+              "enum": [
+                "interactive",
+                "oneshot"
+              ],
+              "type": "string"
+            },
+            "name": {
+              "pattern": "^[a-z][a-z0-9-]{1,38}[a-z0-9]$",
+              "type": "string"
+            },
+            "outputContract": {
+              "pattern": "^[a-z][a-z0-9-]{1,38}[a-z0-9]$",
+              "type": "string"
+            },
+            "profileRevision": {
+              "maximum": 9007199254740991,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "sessionId": {
+              "type": "string"
+            },
+            "startedAt": {
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$",
+              "type": "string"
+            },
+            "state": {
+              "enum": [
+                "awaiting-input",
+                "cancelled",
+                "failed",
+                "pending",
+                "running",
+                "succeeded",
+                "verifying"
+              ],
+              "type": "string"
+            },
+            "taskId": {
+              "pattern": "^tsk_[0-9a-f]{32}$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "attempt",
+            "id",
+            "kind",
+            "name",
+            "state",
+            "taskId"
+          ],
+          "type": "object"
+        }
+      }
+    }
+  },
+  "breakingChanges": []
+}

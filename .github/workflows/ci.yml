@@ -1,11 +1,30 @@
+# 用例执行体系的说明见 docs/engineering/testing.md §8。两个作业各自承担一层：
+#   check —— 门禁：结构规则、lint、类型、全部不依赖集群的用例（含真实 PostgreSQL 的模块集成用例），再加新增代码防护；
+#   e2e   —— 实机验收：真装一套平台，用无头浏览器从网关打进去。
 name: ci
 on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
+
+# 主干开发下每个推送的 SHA 都要各自跑完（开发规则 §3「按自己的 sha 查 CI」），所以 push 不互相取消；
+# 只有同一个 PR 的旧运行会被新提交取消。
+concurrency:
+  group: ci-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+env:
+  # 新增代码防护的对比基线：PR 取目标分支，push 取这次推送之前的提交；手动触发时为空，退回到上一个提交。
+  BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+
 jobs:
   check:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     services:
       postgres:
         image: postgres:17.11
@@ -18,8 +37,13 @@ jobs:
           --health-cmd "pg_isready -U crewstation" --health-interval 5s --health-timeout 5s --health-retries 20
     env:
       CS_TEST_DATABASE_URL: postgres://crewstation:crewstation-dev@127.0.0.1:55432/crewstation
+      # 数据库是这个作业自己起的：连不上是故障。不点名的话，依赖它的六十来组用例会整层跳过、作业照绿。
+      CS_TEST_REQUIRE: database
     steps:
       - uses: actions/checkout@v4
+        with:
+          # 新增代码防护要对本次推送的 before..after 做 diff，浅克隆里没有 before。
+          fetch-depth: 0
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.3.13
@@ -31,8 +55,27 @@ jobs:
           for dir in templates/minimal-sample integrations/gitlab-event-producer integrations/reference-api-proxy; do
             (cd "$dir" && bun install --frozen-lockfile)
           done
-      - run: bun run check
+      # check:ci 与本机的 check 是同一段静态检查加同一批用例，只多了 lcov 与 JUnit 两个报告参数（package.json）。
+      - run: bun run check:ci
       - run: cd apps/console && bun run build
+
+      # 以下三步读的是 check:ci 留在 coverage/ 下的 junit.xml 与 lcov.info。
+      - name: test report
+        if: always()
+        run: bun run test:report --title check --base "$BASE_SHA"
+      # 只看本次推送改动的行：改到的生产文件必须有用例加载它，改动的可执行行被执行到的比例不低于下限。
+      - name: new-code protection
+        run: bun run test:patch --base "$BASE_SHA"
+      - name: upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: check-test-results
+          path: |
+            coverage/junit.xml
+            coverage/lcov.info
+          if-no-files-found: warn
+          retention-days: 14
 
   # 前台实机验收：在 CI 里真装一套平台，再用无头浏览器打它。
   # `check` 作业里这套用例是跳过的（没有集群也没有浏览器），能力回归只能靠这个作业兜住。
@@ -52,6 +95,9 @@ jobs:
       CS_BOOTSTRAP_ADMIN: '1'
       # RFC-007 的固定角色入口是本机人工验收工具；产品 E2E 保持独立的身份夹具。
       CS_SKIP_DEV_AUTH: '1'
+      # 网关、浏览器与管理员都是这个作业自己装的：探测不到或登录不上是故障。
+      # 不点名的话整套用例会 skipIf 跳过、作业照绿，实机验收等于被悄悄关掉。
+      CS_TEST_REQUIRE: e2e
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
@@ -100,7 +146,20 @@ jobs:
           echo '调试浏览器没起来' >&2; cat /tmp/chrome.log >&2; exit 1
 
       - name: front-end acceptance against the deployed platform
-        run: bun test tests/e2e/
+        # JUnit 报告器不会自己建目录。
+        run: mkdir -p coverage && bun test tests/e2e/ --reporter=junit --reporter-outfile=coverage/junit.xml
+
+      - name: test report
+        if: always()
+        run: bun run test:report --title e2e --skip-coverage
+      - name: upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-test-results
+          path: coverage/junit.xml
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: diagnostics
         if: failure()

@@ -2,12 +2,15 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import { rmSync } from 'node:fs';
 import { relative, resolve } from 'node:path';
 import { isExcepted, loadExceptions } from '../exceptions';
+import { RULES } from '../ruleSet';
 import { cycles } from '../rules/cycles';
 import { declaredDependencies } from '../rules/declaredDependencies';
 import { dependencyDirection } from '../rules/dependencyDirection';
+import { migrationLock } from '../rules/migrationLock';
 import { moduleTemplate } from '../rules/moduleTemplate';
 import { persistenceOwnership } from '../rules/persistenceOwnership';
 import { sizeAndNaming } from '../rules/sizeAndNaming';
+import { testDiscipline } from '../rules/testDiscipline';
 import type { Violation, Workspace } from '../archModel';
 import { loadWorkspace } from '../workspace';
 import { createViolatingWorkspace } from './fixtureWorkspace';
@@ -82,6 +85,55 @@ describe('declared-dependencies 与 no-cycles', () => {
   });
 });
 
+describe('test-discipline', () => {
+  const messages = (file: string): string => messagesOf(testDiscipline(ws), file).join();
+  test('让同文件其余用例静默失效的 only', () => {
+    expect(messages('modules/low/tests/focused.test.ts')).toContain('禁止提交 .only');
+  });
+  test('无条件跳过、占位用例与已知失败', () => {
+    const found = messages('modules/low/tests/parked.test.ts');
+    expect(found).toContain('禁止无条件 .skip');
+    expect(found).toContain('禁止 .todo');
+    expect(found).toContain('禁止 .failing');
+  });
+  test('恒真的 skipIf 与用例重试', () => {
+    const found = messages('packages/kernel/flaky.test.ts');
+    expect(found).toContain('恒真的 skipIf');
+    expect(found).toContain('禁止用例重试');
+  });
+  test('注释里提到这些写法不算违规；由环境探测驱动的 skipIf 是允许的', () => {
+    expect(messages('modules/low/tests/gated.test.ts')).toBe('');
+  });
+  test('工作区之外由根 bun test 收进来的用例同样受约束', () => {
+    expect(messages('integrations/sample/src/main.test.ts')).toContain('禁止提交 .only');
+  });
+  test('仓库根 tests/ 只允许约定的用例层目录，不散放文件', () => {
+    expect(messages('tests/misc')).toContain('只允许用例层目录');
+    expect(messages('tests/loose.test.ts')).toContain('不散放文件');
+    expect(messages('tests/e2e')).toBe('');
+  });
+});
+
+describe('migration-lock', () => {
+  const messages = (file: string): string => messagesOf(migrationLock(ws), file).join();
+  const dir = 'modules/high/adapters/persistence/migrations';
+  test('已入锁的迁移被修改', () => {
+    expect(messages(`${dir}/0001_create_schema.sql`)).toContain('不可修改');
+  });
+  test('已入锁的迁移被删除', () => {
+    expect(messages(`${dir}/0002_gone.sql`)).toContain('被删除或改名');
+  });
+  test('新迁移尚未入锁', () => {
+    expect(messages(`${dir}/0004_fresh.sql`)).toContain('尚未入锁');
+  });
+  test('新迁移的序号不大于已入锁的最大序号就是插队', () => {
+    expect(messages(`${dir}/0003_late.sql`)).toContain('必须大于同目录已入锁的最大序号 0003');
+  });
+  test('内容与锁一致的迁移不报', () => {
+    expect(messages(`${dir}/0003_locked.sql`)).toBe('');
+  });
+});
+
 describe('ADR 例外', () => {
   test('过期例外失效，有效例外放行', () => {
     const { active, expired } = loadExceptions(root, new Date('2026-09-11'));
@@ -94,7 +146,6 @@ describe('ADR 例外', () => {
 describe('真实仓库', () => {
   test('当前仓库无违规', () => {
     const real = loadWorkspace(resolve(import.meta.dir, '..', '..', '..'));
-    const all = [dependencyDirection, moduleTemplate, persistenceOwnership, sizeAndNaming, declaredDependencies, cycles].flatMap((rule) => rule(real));
-    expect(all).toEqual([]);
+    expect(RULES.flatMap((rule) => rule(real))).toEqual([]);
   });
 });

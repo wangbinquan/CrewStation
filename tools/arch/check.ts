@@ -2,16 +2,8 @@
 import { relative, resolve } from 'node:path';
 import { isExcepted, loadExceptions } from './exceptions';
 import { printReport } from './report';
-import { cycles } from './rules/cycles';
-import { declaredDependencies } from './rules/declaredDependencies';
-import { dependencyDirection } from './rules/dependencyDirection';
-import { moduleTemplate } from './rules/moduleTemplate';
-import { persistenceOwnership } from './rules/persistenceOwnership';
-import { sizeAndNaming } from './rules/sizeAndNaming';
-import type { Rule } from './archModel';
+import { RULES } from './ruleSet';
 import { loadWorkspace } from './workspace';
-
-const RULES: Rule[] = [dependencyDirection, moduleTemplate, persistenceOwnership, sizeAndNaming, declaredDependencies, cycles];
 
 const root = resolve(import.meta.dir, '..', '..');
 const ws = loadWorkspace(root);

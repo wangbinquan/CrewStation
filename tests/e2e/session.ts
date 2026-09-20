@@ -1,5 +1,5 @@
 import type { Browser, Page } from './cdp';
-import { apiGet, connectBrowser, e2eAdminUsername, signIn } from './consoleSession';
+import { apiGet, connectBrowser, e2eAdminUsername, e2eRequired, signIn } from './consoleSession';
 
 export interface DiscoveredProject {
   readonly id: string;
@@ -28,6 +28,9 @@ interface ProjectRow {
  * 在模块加载期做这件事，是为了让「环境里没有项目」表现成一组显式跳过，而不是让断言在
  * 「没有对象」上失败——`describe.skipIf` 只能在注册时判断，beforeAll 里发现就来不及了。
  * 任何一步出错都返回 undefined，让整套用例跳过而不是崩在加载期。
+ *
+ * 例外：`CS_TEST_REQUIRE=e2e`（CI 的 e2e 作业）时出错原样抛出。登录页改坏、管理员没建出来，
+ * 在那里表现成「整套跳过、作业照绿」，等于实机验收被悄悄关掉。
  */
 export async function openAdminSession(): Promise<AdminSession | undefined> {
   let browser: Browser | undefined;
@@ -49,8 +52,9 @@ export async function openAdminSession(): Promise<AdminSession | undefined> {
         owned.close();
       },
     };
-  } catch {
+  } catch (error) {
     browser?.close();
+    if (e2eRequired()) throw new Error(`CS_TEST_REQUIRE 要求实机验收，但管理员会话没有建立：${String(error)}`, { cause: error });
     return undefined;
   }
 }

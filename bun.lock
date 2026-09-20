@@ -684,6 +684,10 @@
       "name": "@crewstation/tools-scaffold",
       "version": "0.0.0",
     },
+    "tools/testguard": {
+      "name": "@crewstation/tools-testguard",
+      "version": "0.0.0",
+    },
   },
   "packages": {
     "@babel/code-frame": ["@babel/code-frame@7.29.7", "", { "dependencies": { "@babel/helper-validator-identifier": "^7.29.7", "js-tokens": "^4.0.0", "picocolors": "^1.1.1" } }, "sha512-Aup7aUOfpbAUg2ROOJN6Iw5f9DMBlzu0mIkm/malLQFN/YQgO48wCj0Kxa3sEHJvPVFg7siR+qRInwXd2qhQKw=="],
@@ -833,6 +837,8 @@
     "@crewstation/tools-mock-idp": ["@crewstation/tools-mock-idp@workspace:tools/mock-idp"],
 
     "@crewstation/tools-scaffold": ["@crewstation/tools-scaffold@workspace:tools/scaffold"],
+
+    "@crewstation/tools-testguard": ["@crewstation/tools-testguard@workspace:tools/testguard"],
 
     "@crewstation/ws": ["@crewstation/ws@workspace:packages/ws"],
 

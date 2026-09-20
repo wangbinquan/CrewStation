@@ -1,3 +1,6 @@
+// 本模块的集成用例放在这个目录，纯函数的单元用例就近放在源码旁（domain/x.test.ts）。
+// 每个用例、每条路由都要有成功路径与拒绝分支；写法与必带的用例见 docs/engineering/testing.md §3、§4。
+// 需要真实数据库时：`const available = await testDatabaseAvailable()` 加 `describe.skipIf(!available)`，不要自己造跳过条件。
 import { describe, expect, test } from 'bun:test';
 import { create{{pascal}}Module } from '../wiring';
 

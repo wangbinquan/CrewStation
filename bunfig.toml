@@ -5,3 +5,6 @@ exact = true
 root = "."
 # CSS Module 在 bun test 里会退化成路径字符串，见该文件的注释。
 preload = ["./apps/console/src/tests/cssModules.ts"]
+# 覆盖率不在这里常开：Bun 每次覆盖 lcov.info 都会留下一个 .lcov.info.*.tmp，单文件运行还会冲掉全量结果。
+# 需要时用 `bun run test:cover`（CI 的 check:ci 用的就是它），见 docs/engineering/testing.md §8。
+coverageSkipTestFiles = true

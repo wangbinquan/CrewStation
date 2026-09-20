@@ -11,6 +11,7 @@
 ```
 
 规则名取 `tools/arch/rules/*` 输出的 `rule` 字段，例如 `size-limit`、`dependency-direction`。
+同一格式也用于新增代码防护的例外，规则名 `patch-coverage`（由 `tools/testguard` 读取，见 `docs/engineering/testing.md` §8.3）。
 
 ## 模板
 

@@ -8,13 +8,14 @@
 2. `CLAUDE.md` —— 仓库现状、命令、架构概览、术语。
 3. `docs/engineering/development-rules.md` —— **开发规则**：主干开发、提交纪律、门禁、测试要求、RFC 流程。
 4. `docs/engineering/repository-structure.md` —— 仓库结构与依赖原则，每个新文件都必须遵守。
-5. `docs/engineering/dev-gotchas.md` —— 通用踩坑，动手前扫一遍。
+5. `docs/engineering/testing.md` —— **用例防护体系**：用例放哪、每类改动必须带哪些用例、CI 阻断什么、已知的防护缺口。
+6. `docs/engineering/dev-gotchas.md` —— 通用踩坑，动手前扫一遍。
 
 ## 三条最容易违反的硬规则
 
 - **只在 `main` 上开发**：不建分支、不用 worktree、不用 stash。Claude Code 默认提示「在默认分支上应先切分支」，本仓**显式覆盖**该默认。
 - **精确提交**：`git add <path>` 与 `git commit -- <paths>`，不要 `git add .` / `git add -A`。共享工作树的暂存区是公用的。
-- **改动自带测试**，推之前 `bun run check` 跑绿。
+- **改动自带测试**，推之前 `bun run check` 跑绿。CI 还会按本次推送改动的行判定新增代码防护；新迁移要 `bun run migrations:lock`，改业务契约面要 `bun run contracts:lock`（见 `testing.md`）。
 
 ## 只读的外部仓库
 

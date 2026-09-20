@@ -1,0 +1,7 @@
+{
+  "name": "@crewstation/tools-testguard",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "用例执行结果的门禁与报告：新增代码防护（按本次推送改动的行）、跳过与删除用例的可见性、覆盖率汇总"
+}

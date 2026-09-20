@@ -1,7 +1,7 @@
 # 仓库结构、模块划分与依赖原则
 
 > 状态：已确认（2026-09-11 作者裁定第 13 节四项），作为 Design §15.1 的展开并进入 Plan T0.2  
-> 版本：0.3 · 日期：2026-09-12（0.3：根目录补 RFC／根级说明文件，模块清单补 ADR-0003 的两个模块，§11 指向开发规则）  
+> 版本：0.4 · 日期：2026-09-20（0.4：按 ADR-0007 补用例落位与两条新规则、`tools/testguard`，§10 指向用例防护体系；0.3：根目录补 RFC／根级说明文件，模块清单补 ADR-0003 的两个模块，§11 指向开发规则）  
 > 适用范围：CrewStation 代码仓（Bun workspaces monorepo）的全部代码，包括控制面、任务容器、工作台、CLI、部署与测试
 
 ## 目录
@@ -81,10 +81,10 @@ crewstation/
 ├─ templates/
 │  └─ minimal-sample/            # 业务项目模板
 ├─ deploy/                       # Kubernetes 清单、安装器、profiles、镜像清单
-├─ tests/                        # 跨模块测试：contracts、e2e、security、scale、upgrade、architecture
-├─ tools/                        # 仓内工程脚本：arch 规则检查、代码生成、统计；不被任何应用 import
+├─ tests/                        # 跨单元的用例层，一层一个目录：contracts、e2e、security、scale、upgrade、architecture（清单外的目录被规则阻断）
+├─ tools/                        # 仓内工程脚本：arch 规则检查、testguard 用例门禁与报告、代码生成；不被任何应用 import
 ├─ docs/                         # 工程文档
-│  ├─ engineering/               # 本文件、开发规则、踩坑记录、实现期待决问题
+│  ├─ engineering/               # 本文件、开发规则、用例防护体系、踩坑记录、实现期待决问题
 │  └─ adr/                       # 架构决策记录：只记「结构规则本身」的决策
 ├─ proposal/                     # 产品与设计提案
 │  ├─ proposal.md design.md plan.md tech-evaluation.md   # 基线三件套＋技术评估
@@ -130,7 +130,7 @@ modules/<name>/
 ├─ http/                         # Hono 路由：把 HTTP 翻译成 application 调用；一组资源一个文件
 ├─ workers/                      # 队列消费者与协调循环（reconciler）；一个职责一个文件
 ├─ wiring.ts                     # 装配：实例化 adapters → application → 返回 { api, http?, workers?, subscriptions? }
-└─ tests/                        # 模块级集成测试（真实数据库）；单元测试就近放 *.test.ts
+└─ tests/                        # 模块级集成测试（真实数据库）；单元测试就近放 *.test.ts；各类改动必带的用例见 testing.md §4
 ```
 
 每层的职责与允许 import 的范围：
@@ -301,8 +301,11 @@ apps/console/src/
 | 文件行数、目录文件数、函数行数、禁用文件名、默认导出 | ESLint `max-lines`、`max-lines-per-function` + `tools/arch` |
 | 桶文件 | `tools/arch`：非根 `index.ts` 直接失败 |
 | 无环 | ESLint `import/no-cycle` |
+| 用例纪律：禁 `.only`、无条件 `.skip`、`.todo`、`.failing`、恒真 `skipIf`、用例重试；仓库根 `tests/` 只允许约定的用例层目录 | `tools/arch`（`test-discipline`，ADR-0007）：除工作区外还扫 `tests/`、`integrations/`、`templates/`、`deploy/` |
+| 迁移只增不改：已入锁的不可修改、删除，新迁移不得插队且必须入锁 | `tools/arch`（`migration-lock`，ADR-0007）：比对 `tools/arch/migrations.lock.json` |
+| 新增代码防护：本次推送改到的生产文件必须有用例加载，改动行的执行比例不低于下限 | `tools/testguard`，在 CI 的 `check` 作业里阻断（ADR-0007） |
 
-检查器自带负向夹具测试（`tools/arch/tests/`，夹具以 JSON 存放，避免源码中的 import 字样被当成真实依赖），每条规则至少一个故意违规样例；`bun test` 同时断言真实仓库零违规。模块只能由 `bun run scaffold:module` 生成，模板文件在 `tools/scaffold/templates/*.tmpl`。
+检查器自带负向夹具测试（`tools/arch/tests/`，夹具以 JSON 存放，避免源码中的 import 字样被当成真实依赖），每条规则至少一个故意违规样例；`bun test` 同时断言真实仓库零违规。规则清单只在 `tools/arch/ruleSet.ts` 一处登记。用例放在哪、必须写哪些、CI 怎么执行，见 `testing.md`。模块只能由 `bun run scaffold:module` 生成，模板文件在 `tools/scaffold/templates/*.tmpl`。
 
 不设“基线清单”。规则从第一个提交生效，因此不存在存量违规；后续任何违规都是新引入的，直接修。
 

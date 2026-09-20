@@ -14,6 +14,7 @@
 - [WebSocket](#websocket)
 - [契约变更](#契约变更)
 - [前端与测试](#前端与测试)
+- [用例与 CI](#用例与-ci)
 - [并发开发与 Agent 协作](#并发开发与-agent-协作)
 
 ## 工具链与依赖
@@ -348,7 +349,50 @@ Claude in Chrome 的 `resize_window` 到 390／320 会被 macOS Chrome 的最小
 探测要校验回来的东西对不对，别只看抛没抛：网关要求状态码 < 500，调试浏览器要求 `/json/version`
 真的给出 `webSocketDebuggerUrl`。见 `tests/e2e/consoleSession.ts`。
 
+## 用例与 CI
+
+规范正文在 `testing.md`；这里只记撞过的坑。
+
+### 不要对全仓开 `bun test --randomize`：模块集成用例是同一个库上的有序场景
+
+2026-09-20 想加一条「随机序巡检」来抓用例间的隐性依赖，实测 `bun test --randomize --seed=20260920`：1649 条里 100 条失败，
+逐条看全是模块集成用例——它们在 `beforeAll` 建一个库，后面的用例接着前面写下的状态推进（先建项目、再发布、再切流），
+`--randomize` 连文件内的顺序也打乱，于是「还没建就去查」。这是有意的写法，不是缺陷。文件之间的独立性另有保证：每个文件自己建库、自己删。
+要抓偶发失败用 `--rerun-each`（按文件重跑），不要用随机序。
+
+### `.only` 在本机静默吃掉同文件的其余用例，只有 CI 才报错
+
+Bun 在 `CI=true` 时拒绝 `.only`（`.only is disabled in CI environments`），本机不设这个变量：实测同文件里一条 `test.only` 加一条必然失败的用例，
+本机输出 `2 pass, 0 fail`，失败的那条根本没跑。调试时留下的 `.only` 因此会让你「本机全绿」地把红推上去。
+现在由 `tools/arch` 的 `test-discipline` 规则在门禁第一步拦下；无条件 `.skip`、`.todo`、`.failing`、恒真 `skipIf` 与 `retry:` 同理。
+
+### 子进程里跑的代码不进覆盖率：命令行脚本的逻辑要放在可 import 的模块里
+
+`bun test` 的 lcov 只记录用例进程自己加载的文件。用 `Bun.spawn` 起子进程去测一个脚本，被测脚本那几行在覆盖率里是 0，
+新增代码防护（`testing.md` §8.3）会把它判成「没有用例执行到」。做法是入口只留参数解析与输出，逻辑放进旁边可 import 的模块直接测
+（`tools/arch/lockMigrations.ts` 只有十来行，逻辑在 `migrationLockUpdate.ts`）；入口文件本身不在防护范围内。
+需要验证「进程真的非零退出」这类只有子进程才能看到的行为时，再补一条子进程用例（`packages/testkit/capability.test.ts`）。
+
+### 不要在 `bunfig.toml` 里常开覆盖率：每次运行留一个 `.tmp`，单文件运行还会冲掉全量结果
+
+2026-09-20 实撞：为了让本机与 CI 共用一条命令，曾在 `bunfig.toml` 写了 `coverage = true`。Bun 1.3.13 每次覆盖 `coverage/lcov.info`
+都会在旁边留下一个 `.lcov.info.<hash>.tmp`（全量一次约 500 KB，跑一次多一个）；更糟的是，共享工作树上任何人跑一次
+`bun test 某个文件`，全量的 `lcov.info` 就被那一个文件的结果冲掉，随后的新增代码防护预演全是误报。
+现在覆盖率只在 `bun run test:cover`（CI 的 `check:ci` 用它）里打开。另一个相关的坑：`--reporter=junit` **不会自己建输出目录**，
+目录不存在时用例全过、最后报 `JUnitReportFailed … ENOENT` 并以非零退出，所以脚本里先 `mkdir -p coverage`。
+
+### 新增工作区单元后要 `bun install` 并提交 `bun.lock`
+
+`tools/testguard` 只是多了一个没有任何依赖的 `package.json`，`bun.lock` 的 workspaces 段也会多一条。
+本机不装照样能跑，CI 的 `bun install --frozen-lockfile` 会当场失败。加完单元跑一次 `bun install`，确认 lock 的 diff 只有自己那一条，再一起提交。
+
 ## 并发开发与 Agent 协作
+
+### ADR、RFC 与待决问题的编号会被并行会话抢占：提交前再看一眼
+
+2026-09-20 实撞：写 ADR-0006 的五分钟前，另一个会话已经建了未提交的 `docs/adr/0006-cluster-management-module.md` 并在它的 RFC 里引用了四处。
+两边都只看了已提交的历史，于是都取了下一个号。编号类文件（`docs/adr/NNNN-*`、`proposal/rfc/RFC-NNN-*`、待决问题的 `I` 号）落盘前先 `ls` 目录并看 `git status` 里的未追踪文件；
+撞号时后来者让号（对方先建、引用更多），并把自己文件里的全部引用一起改掉。
 
 ### 整文件批量替换会把「定义处」也换掉：抽助手函数后它开始调用自己
 

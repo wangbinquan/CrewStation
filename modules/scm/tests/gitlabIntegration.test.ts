@@ -10,7 +10,7 @@ import { RepositoryBindingDtoSchema } from '@crewstation/contracts';
 import type { GitLabClient } from '@crewstation/gitlab-client';
 import { createGitLabClient } from '@crewstation/gitlab-client';
 import type { TestDatabase } from '@crewstation/testkit';
-import { createTestDatabase, testDatabaseAvailable } from '@crewstation/testkit';
+import { createTestDatabase, resolveCapability, testDatabaseAvailable } from '@crewstation/testkit';
 import { bunGitRunner } from '../adapters/git/bunGitRunner';
 import { DEFAULT_CREDENTIAL_USERNAME, PLATFORM_PUSH_USERNAME, credentialTemplate, splitCredential, withCredential } from '../domain/remoteUrl';
 import { hashToken } from '../domain/sessionCredential';
@@ -37,9 +37,10 @@ function loadGitLabEnv(): { url: string; token: string } | undefined {
 
 const gitlabEnv = loadGitLabEnv();
 const dbAvailable = await testDatabaseAvailable();
-const available = gitlabEnv !== undefined && dbAvailable;
-if (!gitlabEnv) console.warn('[scm] 未找到 .local/gitlab.env，GitLab 集成测试跳过');
-else if (!dbAvailable) console.warn('[scm] .local/gitlab.env 存在但测试数据库不可达，GitLab 集成测试跳过');
+// 能力闸门：CS_TEST_REQUIRE 点名 gitlab 的运行里缺 .local/gitlab.env 是故障，不是「没环境」。
+const gitlabAvailable = resolveCapability('gitlab', gitlabEnv !== undefined, '未找到 .local/gitlab.env（CS_TEST_GITLAB_URL／CS_TEST_GITLAB_TOKEN）');
+const available = gitlabAvailable && dbAvailable;
+if (gitlabAvailable && !dbAvailable) console.warn('[scm] .local/gitlab.env 存在但测试数据库不可达，GitLab 集成测试跳过');
 
 const hex = () => Bun.randomUUIDv7().replace(/-/g, '');
 const slug = `it-${hex().slice(-8)}`;
