@@ -8,6 +8,7 @@
 - 控制服务镜像：`cs-control-plane:rfc011-20260920-1`，摘要 `d96f8ea4caf7b368dd45a191af0468d41c96c31640d39cf653d0cc21e575fb25`；API、认证、控制器、会话、事件与两个 MCP 均 rollout 成功。
 - 最终控制服务镜像：`cs-control-plane:rfc011-20260920-2`，摘要 `c099f349e6a115f0d5448ea3ac18cd18309f255ed98f53c13684d83027f95f74`，已导入 `desktop-control-plane` 并完成上述七个服务 rollout，全部 1／1 ready。该轮没有重启无代码变化的 dev-auth。
 - 首次实机 console 镜像：`cs-console:rfc011-20260920-1`，摘要 `8fa99b7f753165811d91e1d1ff2005f196c59f0d950f95481378e579c8fa98de`。随后仅有重试按钮文案与并行集群操作面板修正，最终构建另记录。
+- 最终 console：`cs-console:rfc010-20260920-2`，摘要 `b6e0e989886038c87cc8727eef84a35ded4d4ba568de8aabec548dc0ba6d0a31`；沿用共享构建标签，包含本 RFC 已通过门禁的页面。实际 deployment 1／1 ready，浏览器重载后首页应用、Beta 入口和三角色目录正常，console error 为空，`dev-member` 仍为用户。
 - 测试登录器首次初始化遇到 OIDC discovery 的 503；经其既有 `/reseed` 恢复为 ready，没有修改集群 RBAC。
 - CUA 浏览器分别以 `dev-member`、`dev-developer`、`dev-tester`、`dev-admin` 的真实 OIDC 会话验收。四个测试视角对应三类平台角色，均无目标登录落在 `/` 能力市场。
 - 专用项目：`prj_01a0be892ee2700090acb2428fab3c16`，名称“首页角色验收”，slug `rfc011-role-home`。创建约 19:17（Asia/Shanghai），19:19 前确认项目 `active`，owner 为 `dev-developer`，首版 `v0.1.0` 已部署就绪，SHA `a077638d104040875351808ea6fc5b14c20af386`。没有把创建响应当成开通成功。
@@ -48,6 +49,12 @@
 - `bun run build`（console）成功，日志 `/private/tmp/rfc011-console-final-build.log`。
 - 5 个环境条件跳过：未提供 E2E 非管理员口令、未启用 `CS_TEST_K8S`、OpenCode 原生 TUI、Claude 原生状态、Linux 镜像控制终端。角色拒绝边界有本轮真实普通用户浏览器及真实数据库／HTTP证据；其他跳过不作为本 RFC 通过证据。
 - `contracts:lock` 核对业务契约金样无变化；新增 identity 迁移已纳入共享迁移锁。
+
+## 代码发布
+
+- 实现提交：`b3d8d0ed5e964aa7f7f71fc47bdabf1ced62f1e5`，185 个明确路径；共享文件完整保留 RFC-010／012 装配和 RFC-008 历史流回归交接，未提交未交接的 RFC-010 独立文档。
+- 首次统一推送：`da4f4373f70ccf5305614b0cf4ddb6bb900b4718`，包含本实现和并行任务的 v0.3.6 文档回填；推送后 `HEAD == origin/main`，工作树与暂存区干净。
+- 精确提交 [CI 35509904421](https://github.com/wangbinquan/CrewStation/actions/runs/35509904421) 的 `static`、`unit`、`module`、`console`、`gate`、`e2e` 六个作业全部成功。分层审计通过，生产代码行覆盖率 96.6%（40954／42401），新增代码防护 2495／2526（98.77%）。端到端 23 pass／18 skip／0 fail；其中 17 个项目场景因 CI 未提供 GitLab／项目而跳过，另 1 项缺少非管理员账号，不以 CI 绿色替代前述本机四视角、真实创建和 Beta 试用证据。
 
 ## 待授权操作
 
