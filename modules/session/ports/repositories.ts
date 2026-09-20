@@ -5,6 +5,7 @@ export interface StoredRunnerEvent {
   seq: number;
   at: Date;
   event: RunnerEvent;
+  legacyEvent?: unknown;
 }
 
 export interface RunnerEventStore {

@@ -2,16 +2,16 @@ import { expect, test } from 'bun:test';
 import { CreateComputeProfileRequestSchema } from './computeProfile';
 import { ProjectComputePolicySchema, SaveProjectComputePolicySchema } from './projectCompute';
 
-const policy = { mode: 'restricted' as const, allowedProfiles: ['fast'], defaultProfile: 'fast', devTaskProfile: 'coding-large' };
+const policy = { mode: 'restricted' as const, allowedProfiles: ['01a0bf5d-8f4b-7115-8dc3-606fbf8691fb'], defaultProfile: '01a0bf5d-8f4b-7115-8dc3-606fbf8691fb', devTaskProfile: '01a0bf5d-8f4b-7f2b-8caf-3349046050a1' };
 test('项目算力策略明确表达继承、空授权及默认套餐，不接受重复或越界默认档位', () => {
   expect(ProjectComputePolicySchema.parse(policy)).toEqual(policy);
   expect(ProjectComputePolicySchema.parse({ mode: 'inherit', allowedProfiles: [], defaultProfile: null, devTaskProfile: null }).mode).toBe('inherit');
   expect(ProjectComputePolicySchema.parse({ ...policy, allowedProfiles: [], defaultProfile: null }).allowedProfiles).toEqual([]);
-  for (const patch of [{ defaultProfile: 'other' }, { allowedProfiles: ['fast', 'fast'] }, { allowedProfiles: Array.from({ length: 201 }, (_, i) => `p-${i}`), defaultProfile: null }, { mode: 'inherit' }, { extra: true }, { defaultProfile: 'default' }]) {
+  for (const patch of [{ defaultProfile: '01a0bf5d-8f4b-7d92-898a-10d1b0735837' }, { allowedProfiles: ['01a0bf5d-8f4b-7115-8dc3-606fbf8691fb', '01a0bf5d-8f4b-7115-8dc3-606fbf8691fb'] }, { allowedProfiles: Array.from({ length: 201 }, () => Bun.randomUUIDv7()), defaultProfile: null }, { mode: 'inherit' }, { extra: true }, { defaultProfile: 'default' }]) {
     expect(ProjectComputePolicySchema.safeParse({ ...policy, ...patch }).success).toBe(false);
   }
   expect(SaveProjectComputePolicySchema.safeParse({ policy, expectedRevision: 0 }).success).toBe(true);
-  for (const input of [{ policy }, { policy, expectedRevision: -1 }, { policy, expectedRevision: 0, projectId: 'other' }]) expect(SaveProjectComputePolicySchema.safeParse(input).success).toBe(false);
+  for (const input of [{ policy }, { policy, expectedRevision: -1 }, { policy, expectedRevision: 0, projectId: '01a0bf5d-8f4b-7d92-898a-10d1b0735837' }]) expect(SaveProjectComputePolicySchema.safeParse(input).success).toBe(false);
 });
 
 

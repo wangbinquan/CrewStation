@@ -1,4 +1,5 @@
-import { randomUUID } from 'node:crypto';
+import { resourceReferences } from './resourceReferences';
+import { newResourceId } from '@crewstation/kernel';
 import type { ClusterSource } from '@crewstation/contracts';
 import type { InventorySnapshot, ResourceObject } from '../domain/inventory';
 import { collectedKinds } from '../domain/inventory';
@@ -17,7 +18,7 @@ export async function collectSnapshot(deps: ClusterDeps, signal: AbortSignal): P
     try {
       const result = await deps.cluster.collect(source.kind, source.namespace || undefined, source.selector, AbortSignal.any([signal, AbortSignal.timeout(30_000)]));
       objects.push(...result.objects.filter((o) => !source.selector || !namespaces.includes(o.metadata.namespace ?? '')));
-      sources.push({ key, kind: source.kind, namespace: source.namespace, batchId: randomUUID(), observedAt: deps.clock.now().toISOString(), resourceVersion: result.resourceVersion, state: 'complete', count: result.objects.length });
+      sources.push({ key, kind: source.kind, namespace: source.namespace, batchId: newResourceId(), observedAt: deps.clock.now().toISOString(), resourceVersion: result.resourceVersion, state: 'complete', count: result.objects.length });
     } catch (error) {
       signal.throwIfAborted();
       const unsupported = typeof error === 'object' && error !== null && 'kind' in error && error.kind === 'not_found';
@@ -28,11 +29,11 @@ export async function collectSnapshot(deps: ClusterDeps, signal: AbortSignal): P
   const lanes = Array.from({ length: 4 }, async () => { for (;;) { signal.throwIfAborted(); const job = jobs.shift(); if (!job) break; await one(job); } });
   await Promise.all(lanes); signal.throwIfAborted();
   const unique = [...new Map(objects.map((o) => [o.metadata.uid, o])).values()];
-  const resources = projectResources(unique, facts, deps.systemNamespace, deps.catalog, deps.clock.now().toISOString());
+  const resources = await resourceReferences(deps, projectResources(unique, facts, deps.systemNamespace, deps.catalog, deps.clock.now().toISOString(), await deps.repository.resourceIds(unique.map((object) => object.metadata.uid!))));
   const seen = new Set(resources.map((r) => r.uid));
   for (const row of previous?.resources ?? []) if (!seen.has(row.uid) && (stale.has(`${row.namespace || '*'}/${row.kind}`) || !namespaces.includes(row.namespace) && stale.has(`*/${row.kind}`))) resources.push({ ...row, availableActions: row.availableActions.map((a) => ({ ...a, enabled: false, reason: '来源过期，请等待完整采集' })) });
   if (!facts.complete) sources.push({ key: 'platform-metadata', kind: 'Platform', namespace: '', batchId: '', resourceVersion: '', state: 'error', count: 0, reason: facts.reason ?? '平台资料读取失败' });
-  const snapshot = { id: randomUUID(), startedAt, finishedAt: deps.clock.now().toISOString(), facts, sources: sources.sort((a, b) => a.key.localeCompare(b.key)), resources };
+  const snapshot = { id: newResourceId(), startedAt, finishedAt: deps.clock.now().toISOString(), facts, sources: sources.sort((a, b) => a.key.localeCompare(b.key)), resources };
   await deps.repository.saveSnapshot(snapshot);
   return snapshot;
 }

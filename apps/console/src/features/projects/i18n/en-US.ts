@@ -340,7 +340,7 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   'projects.provision.development': 'Open development',
   'projects.provision.backProjects': 'Back to digital workers',
   'projects.provision.invalidProject': 'Invalid project identifier. Open the project from administration.',
-  "projects.members.userIdHint": "Enter a registered user ID: usr_ followed by 32 lowercase hexadecimal characters. The server verifies this account on save.",
+  "projects.members.userIdHint": "Enter a registered user ID: 36-character lowercase UUIDv7 with hyphens. The server verifies this account on save.",
   "projects.members.refresh": "Refresh members",
   "projects.members.mode.lookup": "By account",
   "projects.members.mode.id": "Advanced: user ID",

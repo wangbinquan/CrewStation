@@ -4,7 +4,7 @@ import { rememberWorkbenchPath } from '../app/layout/spaceMemory';
 import { renderApp } from './renderApp';
 
 const originalFetch = globalThis.fetch;
-const projectId = `prj_${'1'.repeat(32)}`, serviceId = `svc_${'2'.repeat(32)}`, taskId = `tsk_${'3'.repeat(32)}`;
+const projectId = '01a0bf5d-8f4b-7148-804c-6bd655d243f6', serviceId = '01a0bf5d-8f4b-76be-8473-58312e41bdd7', taskId = '01a0bf5d-8f4b-7954-8f77-0beb0852f027';
 const project = { id: projectId, serviceId, name: '公司接口接入', slug: 'company-api', kind: 'APIProxy', state: 'active', namespace: 'cs-company-api', createdAt: '2026-09-13T01:00:00.000Z' };
 let page: Awaited<ReturnType<typeof renderApp>> | undefined;
 afterEach(() => { page?.unmount(); page = undefined; globalThis.fetch = originalFetch; });
@@ -22,7 +22,7 @@ function fixture(options: { admin?: boolean; pendingMe?: boolean; meFailure?: bo
     } else if (url.endsWith(`/v1/projects/${projectId}`)) {
       if (state.projectFailure) { status = 503; body = { error: 'unavailable', message: '项目目录读取失败' }; }
       else body = { ...project, kind: state.digitalWorker ? 'DigitalWorker' : 'APIProxy' };
-    } else if (url.includes('/v1/projects/page?')) body = { items: [{ project: { ...project, ownerUserId: `usr_${'a'.repeat(32)}` }, role: 'admin', ownerName: '管理员' }] };
+    } else if (url.includes('/v1/projects/page?')) body = { items: [{ project: { ...project, ownerUserId: '01a0bf5d-8f4b-7f8b-8136-e631380738b0' }, role: 'admin', ownerName: '管理员' }] };
     else if (url.includes('/v1/projects?')) body = { items: [project] };
     else if (url.endsWith(`/v1/services/${serviceId}`)) body = { id: serviceId, projectId };
     else if (url.endsWith('/dev-session')) { status = 404; body = { error: 'not_found', message: '当前没有开发会话' }; }

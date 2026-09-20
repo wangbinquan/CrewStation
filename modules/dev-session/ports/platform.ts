@@ -1,4 +1,4 @@
-import type { Actor, AgentProtocol, ApiOperationDto, BeforeStartMaterial, ComputeUsage, LaunchSpec, ProfileRevisionRef, BranchDto, Manifest, ProjectId, PublishRequest, ReleaseDto, ServiceId, SlotDto, TaskId, UserId } from '@crewstation/contracts';
+import type { Actor, AgentProtocol, ApiOperationDto, BeforeStartMaterial, ComputeProfileSelector, ComputeUsage, LaunchSpec, ProfileRevisionRef, BranchDto, Manifest, ProjectId, PublishRequest, ReleaseDto, ServiceId, SlotDto, TaskId, UserId } from '@crewstation/contracts';
 
 /** api-catalog L3 的公开操作查询，由平台装配。 */
 export interface ApiInvocationCatalog {
@@ -24,6 +24,7 @@ export interface SourceControl {
 
 /** 受理时解析出的档位（RFC-006）：`default` 已换成真实名称，修订固定。 */
 export interface ResolvedCompute {
+  id: string;
   name: string;
   revision: number;
   protocol: AgentProtocol;
@@ -43,7 +44,7 @@ export interface ComputeLaunch extends ResolvedCompute {
  * 不存在、不可用、终端档位用错用途都由它抛出可读错误，本模块原样透传。
  */
 export interface ComputeCatalog {
-  resolve(nameOrDefault: string | undefined, usage: ComputeUsage, projectId: ProjectId): Promise<ResolvedCompute>;
+  resolve(selector: ComputeProfileSelector | undefined, usage: ComputeUsage, projectId: ProjectId): Promise<ResolvedCompute>;
   launchMaterial(ref: ProfileRevisionRef): Promise<ComputeLaunch>;
 }
 

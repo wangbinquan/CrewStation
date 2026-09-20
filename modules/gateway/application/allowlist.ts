@@ -22,16 +22,17 @@ export function allowlistUseCases(deps: GatewayUseCaseDeps) {
     const services = await deps.services.listServices();
     const callers = new Set<string>([...services.map((s) => s.identity), ...(await deps.grants.listCallers())]);
     let defaultOpen: string[] = [];
+    let operationRoutes: AllowlistDocument['operationRoutes'] = [];
     const entries: AllowlistDocument['entries'] = [];
     for (const caller of callers) {
       const granted = await deps.grants.grantedOperations(caller);
-      defaultOpen = granted.defaultOpen;
+      defaultOpen = granted.defaultOpen; operationRoutes = granted.operationRoutes;
       const service = services.find((s) => s.identity === caller);
       entries.push({ caller, operations: granted.operations, platformApi: service !== undefined, platformHosts: platformHostsFor(service?.kind) });
     }
-    if (callers.size === 0) defaultOpen = (await deps.grants.grantedOperations('none/none')).defaultOpen;
+    if (callers.size === 0) { const granted = await deps.grants.grantedOperations('none/none'); defaultOpen = granted.defaultOpen; operationRoutes = granted.operationRoutes; }
     const latest = await deps.allowlists.latest();
-    const doc: AllowlistDocument = { version: (latest?.version ?? 0) + 1, generatedAt: deps.clock.now().toISOString(), defaultOpen, entries, maxStaleSeconds: deps.settings.allowlistMaxStaleSeconds };
+    const doc: AllowlistDocument = { identityVersion: 2, operationRoutes, version: (latest?.version ?? 0) + 1, generatedAt: deps.clock.now().toISOString(), defaultOpen, entries, maxStaleSeconds: deps.settings.allowlistMaxStaleSeconds };
     await deps.allowlists.save(doc);
     cached = { doc, at: Date.now() };
     deps.logger.info('allowlist rebuilt', { version: doc.version, callers: entries.length, defaultOpen: defaultOpen.length });
@@ -40,7 +41,8 @@ export function allowlistUseCases(deps: GatewayUseCaseDeps) {
   const current = async (): Promise<AllowlistDocument | undefined> => {
     if (cached && Date.now() - cached.at < 2000) return cached.doc;
     const doc = await deps.allowlists.latest();
-    if (doc) cached = { doc, at: Date.now() };
+    if (doc?.identityVersion !== 2) return undefined;
+    cached = { doc, at: Date.now() };
     return doc;
   };
   return {

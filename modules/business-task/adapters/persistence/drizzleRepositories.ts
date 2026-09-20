@@ -1,3 +1,4 @@
+import { conflict } from '@crewstation/kernel';
 import type { AgentProfile, BusinessTaskState, OutputContract, ProjectId, ReleaseId, ProfileRevisionRef, ServiceId, SubtaskId, SubtaskMode, SubtaskState, TaskId, TraceId, VolumeMode } from '@crewstation/contracts';
 import type { Executor } from '@crewstation/persistence';
 import { and, desc, eq, inArray, sql } from 'drizzle-orm';
@@ -30,18 +31,32 @@ export function drizzleSubtaskRepository(db: Executor): SubtaskRepository {
     const spec = json<SubtaskSpec>(r.spec);
     return {
       id: r.id as SubtaskId, taskId: r.taskId as TaskId, name: r.name, kind: r.kind as 'agent' | 'command', ...(r.mode ? { mode: r.mode as SubtaskMode } : {}), state: r.state as SubtaskState, attempt: r.attempt,
-      ...spec, ...(r.runnerRef ? { runnerRef: r.runnerRef } : {}), ...(r.sessionId ? { sessionId: r.sessionId } : {}), ...(r.exitCode !== null ? { exitCode: r.exitCode } : {}), ...(r.output !== null ? { output: r.output } : {}),
+      ...spec, ...(r.retryOperationId && r.retryOf ? { retry: { operationId: r.retryOperationId, previousId: r.retryOf as SubtaskId } } : {}), ...(r.runnerRef ? { runnerRef: r.runnerRef } : {}), ...(r.sessionId ? { sessionId: r.sessionId } : {}), ...(r.exitCode !== null ? { exitCode: r.exitCode } : {}), ...(r.output !== null ? { output: r.output } : {}),
       ...(r.businessOutcome ? { businessOutcome: r.businessOutcome } : {}), ...(r.contractResult ? { contractResult: json<SubtaskRun['contractResult']>(r.contractResult) } : {}), ...(r.error ? { error: r.error } : {}),
       createdAt: r.createdAt, ...(r.startedAt ? { startedAt: r.startedAt } : {}), ...(r.endedAt ? { endedAt: r.endedAt } : {}),
     };
   };
   const toRow = (s: SubtaskRun): typeof subtasks.$inferInsert => ({
     id: s.id, taskId: s.taskId, name: s.name, kind: s.kind, mode: s.mode ?? null, state: s.state, attempt: s.attempt,
+    retryOperationId: s.retry?.operationId ?? null, retryOf: s.retry?.previousId ?? null,
     spec: ({ prompt: s.prompt, cwd: s.cwd, command: s.command, timeoutSeconds: s.timeoutSeconds, agentProfile: s.agentProfile, outputContract: s.outputContract, computeProfile: s.computeProfile, execution: s.execution }) as unknown,
     runnerRef: s.runnerRef ?? null, sessionId: s.sessionId ?? null, exitCode: s.exitCode ?? null, output: s.output ?? null, businessOutcome: s.businessOutcome ?? null,
     contractResult: s.contractResult ?? null, error: s.error ?? null, createdAt: s.createdAt, startedAt: s.startedAt ?? null, endedAt: s.endedAt ?? null,
   });
   return {
+    findRetry: async (taskId, operationId) => {
+      const row = (await db.select().from(subtasks).where(and(eq(subtasks.taskId, taskId), eq(subtasks.retryOperationId, operationId))))[0];
+      return row ? toRun(row) : undefined;
+    },
+    reserveRetry: async (run) => {
+      if (!run.retry) throw new Error('Retry reservation requires an operation identity');
+      const created = await db.insert(subtasks).values(toRow(run)).onConflictDoNothing().returning();
+      if (created[0]) return { run: toRun(created[0]), created: true };
+      const old = (await db.select().from(subtasks).where(and(eq(subtasks.taskId, run.taskId), eq(subtasks.retryOperationId, run.retry.operationId))))[0];
+      const existing = old ? toRun(old) : undefined;
+      if (!existing || existing.retry?.previousId !== run.retry.previousId) throw conflict('重试操作已用于不同的子任务');
+      return { run: existing, created: false };
+    },
     insert: async (s) => { await db.insert(subtasks).values(toRow(s)); },
     update: async (s) => { await db.update(subtasks).set(toRow(s)).where(eq(subtasks.id, s.id)); },
     getById: async (id) => { const row = (await db.select().from(subtasks).where(eq(subtasks.id, id)))[0]; return row ? toRun(row) : undefined; },

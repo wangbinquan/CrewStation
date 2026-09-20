@@ -1,13 +1,13 @@
 import { join } from 'node:path';
 import type { ProjectId, ServiceId, UserId } from '@crewstation/contracts';
-import { DomainTopic } from '@crewstation/contracts';
+import { DomainTopic, TaskIdSchema } from '@crewstation/contracts';
 import type { EventConsumer } from '@crewstation/eventbus';
 import { createEventConsumer } from '@crewstation/eventbus';
 import type { AppEnv } from '@crewstation/http';
 import type { K8sClient } from '@crewstation/k8s';
 import type { Clock, Logger } from '@crewstation/kernel';
 import { noopLogger, systemClock } from '@crewstation/kernel';
-import type { Database, MigrationSet } from '@crewstation/persistence';
+import type { Database, MigrationSet, ResourceIdentityDirectory } from '@crewstation/persistence';
 import { readMigrationDir } from '@crewstation/persistence';
 import type { Hono } from 'hono';
 import { traefikApplier } from './adapters/k8s/traefikApplier';
@@ -24,6 +24,7 @@ import type { PodWatcher } from './workers/podWatcher';
 import { podWatcher } from './workers/podWatcher';
 
 export interface GatewayModuleDeps {
+  identities?: ResourceIdentityDirectory;
   db: Database;
   k8s: K8sClient;
   services: ServiceDirectory & { serviceIdOfProject(projectId: ProjectId): Promise<ServiceId | undefined> };
@@ -54,6 +55,7 @@ export const gatewayMigrations: MigrationSet = {
 export function createGatewayModule(deps: GatewayModuleDeps): GatewayModule {
   const logger = deps.logger ?? noopLogger;
   const useCaseDeps: GatewayUseCaseDeps = {
+    normalizeTaskId: async (value) => TaskIdSchema.safeParse(value).success ? value : deps.identities?.resolve('task', [value]),
     allowlists: drizzleAllowlistRepository(deps.db),
     pods: drizzlePodIdentityRepository(deps.db),
     routes: drizzleRouteRepository(deps.db),

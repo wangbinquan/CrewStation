@@ -1,4 +1,4 @@
-import type { ConfigEnv } from '@crewstation/contracts';
+import type { ConfigEnv, ConfigItemDto } from '@crewstation/contracts';
 import { useRef } from 'react';
 import type { ReactElement } from 'react';
 import { errorMessage, isApiClientError, useApiQuery } from '../../../shared/api/useApi';
@@ -31,7 +31,7 @@ export function ConfigEnvPanel({ projectId, env, onDirtyChange }: ConfigEnvPanel
   const me = useApiQuery(queryKeys.me(), () => api.me.get());
   const role = me.data?.memberships?.find((member) => member.projectId === projectId)?.role;
   const editable = me.data?.isAdmin === true || role === 'owner' || env === 'development' && role === 'developer';
-  const { items, versions, save, remove } = useConfigEnv(projectId, env);
+  const { definitions, items, versions, save, remove } = useConfigEnv(projectId, env);
   const { confirmation, ...editor } = useConfigDraft(env, onDirtyChange);
   const writeLock = useRef(false);
   const list = items.data?.items ?? [];
@@ -41,10 +41,10 @@ export function ConfigEnvPanel({ projectId, env, onDirtyChange }: ConfigEnvPanel
     writeLock.current = true;
     try { const result = await save.mutateAsync(input); editor.complete(); return result; } finally { writeLock.current = false; }
   };
-  const deleteItem = async (name: string) => {
+  const deleteItem = async (item: ConfigItemDto) => {
     if (writeLock.current || disabled) return;
     writeLock.current = true;
-    try { await remove.mutateAsync(name); } catch { /* 错误由面板显示。 */ } finally { writeLock.current = false; }
+    try { await remove.mutateAsync({ id: item.id, version: item.version }); } catch { /* 错误由面板显示。 */ } finally { writeLock.current = false; }
   };
   return (
     <Card stacked compact
@@ -75,22 +75,22 @@ export function ConfigEnvPanel({ projectId, env, onDirtyChange }: ConfigEnvPanel
           items={list}
           readOnly={!editable}
           disabled={disabled || busy}
-          deletingName={remove.isPending ? remove.variables : undefined}
+          deletingName={remove.isPending ? remove.variables.id : undefined}
           onDelete={(name) => void deleteItem(name)}
           onEdit={(item, button) => {
-            editor.select({ name: item.name, isSecret: item.isSecret, ...(item.isSecret ? {} : { value: item.value ?? '' }) }, button);
+            editor.select({ id: item.id, definitionId: item.definitionId, bindingName: item.bindingName, expectedVersion: item.version, name: item.name, isSecret: item.isSecret, ...(item.isSecret ? {} : { value: item.value ?? '' }) }, button);
           }}
         />
       ) : null}
       <WriteError action="config.error.save" error={save.error} />
       <WriteError action="config.error.delete" error={remove.error} />
       {save.isSuccess ? <ActionNote tone="success">{t('config.saved', { name: save.data.name, version: save.data.version, env: t(`config.env.${env}`) })} {t(`config.effect.${env}`)}</ActionNote> : null}
-      {remove.isSuccess ? <ActionNote tone="success">{t('config.deleted', { name: remove.variables ?? '', env: t(`config.env.${env}`) })} {t(`config.effect.${env}`)}</ActionNote> : null}
+      {remove.isSuccess ? <ActionNote tone="success">{t('config.deleted', { name: list.find((item) => item.id === remove.variables?.id)?.name ?? remove.variables?.id ?? '', env: t(`config.env.${env}`) })} {t(`config.effect.${env}`)}</ActionNote> : null}
       {editor.next ? <div ref={confirmation}><ConfirmationPanel question={t(editor.next.draft ? 'config.draft.replace' : 'config.draft.cancel', { env: t(`config.env.${env}`), name: editor.next.draft?.name || t('config.draft.blank') })} confirmLabel={t(editor.next.draft ? 'config.draft.discard' : 'config.draft.confirmCancel')} cancelLabel={t('ui.draft.stay')} busy={busy} onConfirm={editor.confirm} onCancel={editor.keep} /></div> : null}
       {editor.draft ? <Stack>
         <h3 className={styles.formTitle}>{t(editor.draft.name ? 'config.edit' : 'config.add', { name: editor.draft.name })}</h3>
         <p className={styles.note}>{t('config.draft.lifetime')}</p>
-        <ConfigItemForm key={editor.sequence} draft={editor.draft} envLabel={t(`config.env.${env}`)} existingNames={list.map((item) => item.name)} pending={save.isPending} disabled={disabled || remove.isPending || Boolean(editor.next)} onSubmit={changeItem} onReset={() => editor.select()} onDirtyChange={editor.dirtyChanged} />
+        <ConfigItemForm key={editor.sequence} draft={editor.draft} envLabel={t(`config.env.${env}`)} definitions={definitions.data?.items ?? []} existingNames={list.map((item) => item.bindingName)} pending={save.isPending} disabled={disabled || remove.isPending || Boolean(editor.next)} onSubmit={changeItem} onReset={() => editor.select()} onDirtyChange={editor.dirtyChanged} />
       </Stack> : null}
     </Card>
   );

@@ -8,7 +8,7 @@ import { objectArray, objectRecord } from '../../domain/inventory';
 import type { ResourceObject } from '../../domain/inventory';
 const restartKey = 'crewstation.io/cluster-operation';
 const refFor = (r: ClusterResource): ResourceRef => Resources[r.kind]!;
-export function kubernetesClusterReader(k8s: K8sClient): ClusterReader {
+export function kubernetesClusterReader(k8s: K8sClient, physicalOperationId: (id: string) => Promise<string> = async (id) => id): ClusterReader {
   const get = (r: ClusterResource) => k8s.get(refFor(r), r.name, r.namespace || undefined, AbortSignal.timeout(15_000));
   const exact = async (r: ClusterResource) => { const live = await get(r); if (!live) throw notFound('资源', r.name); if (live.metadata.uid !== r.uid) throw conflict('资源已被同名新实例替换'); return live; };
   return {
@@ -28,12 +28,14 @@ export function kubernetesClusterReader(k8s: K8sClient): ClusterReader {
       return { uid: r.uid, container: query.container, previous: query.previous === 'true', text, truncated };
     },
     hasApplied: async (r, request, operationId) => {
+      operationId = await physicalOperationId(operationId);
       const live = await get(r);
       if (request.action === 'delete') return !live || live.metadata.uid !== r.uid;
       if (live?.metadata.uid !== r.uid) return false;
       return objectRecord(objectRecord(objectRecord(objectRecord(live.spec).template).metadata).annotations)[restartKey] === operationId || live.metadata.annotations?.[restartKey] === operationId;
     },
     apply: async (r, request, operationId) => {
+      operationId = await physicalOperationId(operationId);
       for (let attempt = 0; attempt < 3; attempt++) {
         const live = await exact(r);
         if (configRevision(live) !== r.revision) throw conflict('资源期望配置已变化，请重新检查');

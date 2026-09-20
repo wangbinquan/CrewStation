@@ -77,7 +77,7 @@ describe('verifyContract', () => {
       properties: { score: { type: 'number' }, summary: { type: 'string' } },
     }));
     const base = { type: 'verifyContract', subtaskId: TEST_SUBTASK_ID } as const;
-    const first = RunnerResultPayloads.verifyContract.parse(await session.call({ id: 'k1', ...base, contract: { name: 'report', required: ['out/result.json', 'out/missing.txt', 'out/broken.json'], schema: 'contracts/result.schema.json' } }));
+    const first = RunnerResultPayloads.verifyContract.parse(await session.call({ id: 'k1', ...base, contract: { id: '01a0bf5d-8f4b-712a-8823-9941565633fd', name: 'report', required: ['out/result.json', 'out/missing.txt', 'out/broken.json'], schema: 'contracts/result.schema.json' } }));
     expect(first.ok).toBe(false);
     expect(first.missing).toEqual(['out/missing.txt']);
     expect(first.schemaErrors.some((e) => e.startsWith('out/result.json:') && e.includes('summary'))).toBe(true);
@@ -86,17 +86,17 @@ describe('verifyContract', () => {
 
     await writeFile(join(tr.workdir, 'out', 'result.json'), JSON.stringify({ score: 0.9, summary: 'fine' }));
     await writeFile(join(tr.workdir, 'out', 'missing.txt'), 'present now');
-    const second = RunnerResultPayloads.verifyContract.parse(await session.call({ id: 'k2', ...base, contract: { name: 'report', required: ['out/result.json', 'out/missing.txt'], schema: 'contracts/result.schema.json' } }));
+    const second = RunnerResultPayloads.verifyContract.parse(await session.call({ id: 'k2', ...base, contract: { id: '01a0bf5d-8f4b-712a-8823-9941565633fd', name: 'report', required: ['out/result.json', 'out/missing.txt'], schema: 'contracts/result.schema.json' } }));
     expect(second).toEqual({ ok: true, missing: [], schemaErrors: [] });
 
-    const noSchema = RunnerResultPayloads.verifyContract.parse(await session.call({ id: 'k3', ...base, contract: { name: 'plain', required: ['out/result.json'] } }));
+    const noSchema = RunnerResultPayloads.verifyContract.parse(await session.call({ id: 'k3', ...base, contract: { id: '01a0bf5d-8f4b-70ad-8df4-736af231dd34', name: 'plain', required: ['out/result.json'] } }));
     expect(noSchema.ok).toBe(true);
-    const badSchema = RunnerResultPayloads.verifyContract.parse(await session.call({ id: 'k4', ...base, contract: { name: 'plain', required: ['out/result.json'], schema: 'contracts/nope.json' } }));
+    const badSchema = RunnerResultPayloads.verifyContract.parse(await session.call({ id: 'k4', ...base, contract: { id: '01a0bf5d-8f4b-70ad-8df4-736af231dd34', name: 'plain', required: ['out/result.json'], schema: 'contracts/nope.json' } }));
     expect(badSchema.ok).toBe(false);
     expect(badSchema.schemaErrors).toEqual(['schema contracts/nope.json: file not found']);
-    const scoped = RunnerResultPayloads.verifyContract.parse(await session.call({ id: 'k5', ...base, cwd: 'out', contract: { name: 'scoped', required: ['result.json', 'absent.json'] } }));
+    const scoped = RunnerResultPayloads.verifyContract.parse(await session.call({ id: 'k5', ...base, cwd: 'out', contract: { id: '01a0bf5d-8f4b-7237-83e5-8d73a7beb30b', name: 'scoped', required: ['result.json', 'absent.json'] } }));
     expect(scoped.missing).toEqual(['absent.json']);
-    expect(await failureCode(session.call({ id: 'k6', ...base, contract: { name: 'escape', required: ['../../etc/passwd'] } }))).toBe('path_denied');
+    expect(await failureCode(session.call({ id: 'k6', ...base, contract: { id: '01a0bf5d-8f4b-71f1-8356-b6520236d74c', name: 'escape', required: ['../../etc/passwd'] } }))).toBe('path_denied');
   });
 });
 
@@ -104,7 +104,7 @@ describe('终端', () => {
   test('真实 shell：输入回显、resize 生效（原生 PTY）、关闭后 terminalClosed', async () => {
     const { session, tr } = await boot();
     if (!session.hellos[0]?.capabilities.pty) {
-      expect(await failureCode(session.call({ id: 't0', type: 'openTerminal', terminalId: 't1', cols: 80, rows: 24 }))).toBe('pty_unavailable');
+      expect(await failureCode(session.call({ id: 't0', type: 'openTerminal', terminalId: 't1', cols: 80, rows: 24 }))).toBe('01a0bf5d-8f4b-7610-8404-0734dc2d7612');
       return;
     }
     expect(await session.call({ id: 't1', type: 'openTerminal', terminalId: 'term-1', cols: 80, rows: 24 })).toEqual({});

@@ -2,6 +2,7 @@ import { expect, test } from 'bun:test';
 import type { UserId } from '@crewstation/contracts';
 import { NativeTerminalDtoSchema, StartNativeTerminalRequestSchema } from '@crewstation/contracts';
 import { forbidden, PlatformError } from '@crewstation/kernel';
+import { computeId } from './computeFixture';
 import { nativeFixture } from './nativeTerminalFixture';
 import { workspaceActor as actor, workspaceTask as taskId } from './workspaceFixture';
 
@@ -15,9 +16,9 @@ test('逐个启动无需任务文字，重复请求查回原 CLI；另一用户�
   expect(first).not.toHaveProperty('model');
   expect(first).not.toHaveProperty('driver');
   // RFC-006：命令带固定档位修订与 launch（二进制显式），不再带 driver／model 两个裸字段。
-  expect(f.calls.find((c) => c.type === 'startAgentTerminal')).toMatchObject({ compute: 'balanced', profileRevision: 1, permission: 'edit', launch: { protocol: 'claude-code', binaryPath: '/usr/local/bin/claude', model: 'anthropic/model' }, processAttemptId: expect.stringMatching(/:1$/) });
+  expect(f.calls.find((c) => c.type === 'startAgentTerminal')).toMatchObject({ compute: computeId('balanced'), profileRevision: 1, permission: 'edit', launch: { protocol: 'claude-code', binaryPath: '/usr/local/bin/claude', model: 'anthropic/model' }, processAttemptId: expect.stringMatching(/:1$/) });
   await expect(f.api.startNativeTerminal(actor, taskId, { ...input, permission: 'full' })).rejects.toMatchObject({ kind: 'conflict' });
-  const another = { ...actor, userId: 'usr_1123456789abcdef0123456789abcdef' as UserId };
+  const another = { ...actor, userId: '01a0bf5d-8f4b-7a4e-8eb2-04fca5c047bf' as UserId };
   expect((await f.api.startNativeTerminal(another, taskId, input)).agentId).not.toBe(first.agentId);
   expect((await f.api.listNativeTerminals(actor, taskId)).items).toHaveLength(2);
 });

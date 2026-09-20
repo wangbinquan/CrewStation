@@ -20,7 +20,7 @@ const toolNamed = (name: string): McpToolDefinition<OperationsContext> => {
 function route(request: CapturedRequest): Response {
   const path = request.url.startsWith(PLATFORM) ? request.url.slice(PLATFORM.length) : request.url;
   if (path === '/v1/projects') return jsonResponse(200, projectPage());
-  if (path === `/v1/projects/${PROJECT_ID}/publish`) return jsonResponse(202, { id: `rel_${'4'.repeat(32)}`, tag: 'v0.1.1', status: 'building' });
+  if (path === `/v1/projects/${PROJECT_ID}/publish`) return jsonResponse(202, { id: '01a0bf5d-8f4b-7033-8d68-9e5bbb2ec163', tag: 'v0.1.1', status: 'building' });
   if (path === `/v1/projects/${PROJECT_ID}/branches`) return jsonResponse(200, { items: [{ name: 'main', headSha: 'abc1234', isDefault: true, behindPreview: 0, behindProd: 2 }] });
   if (path === `/v1/projects/${PROJECT_ID}/dev-session`) return jsonResponse(200, { state: 'running', branch: 'main', previewHost: 'dev.demo.cs.localhost', preview: { state: 'ready' } });
   if (path === `/v1/services/${SERVICE_ID}/slots`) return jsonResponse(200, { items: [{ name: 'preview', active: false, state: 'ready' }, { name: 'prod', active: true, state: 'ready' }] });
@@ -108,7 +108,7 @@ describe('操作 MCP：入参校验', () => {
     expect(tool.checkInput({ source: '别的' }).ok).toBe(false);
     expect(tool.checkInput({ source: 'slot', slot: 'staging' }).ok).toBe(false);
     expect(tool.checkInput({ source: 'dev-session', taskId: 'tsk_1' }).ok).toBe(false);
-    expect(tool.checkInput({ source: 'dev-session', taskId: `tsk_${'5'.repeat(32)}` }).ok).toBe(true);
+    expect(tool.checkInput({ source: 'dev-session', taskId: '01a0bf5d-8f4b-75cd-8578-3f54c85da51e' }).ok).toBe(true);
     expect(tool.checkInput({ source: 'slot', limit: 5000 }).ok).toBe(false);
     expect(tool.checkInput({ source: 'slot', since: '昨天' }).ok).toBe(false);
   });

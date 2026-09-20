@@ -13,14 +13,17 @@ export function commandDispatch(deps: Pick<SessionUseCaseDeps, 'registry' | 'for
     // 在写入旧 Runner 的 socket 前协商，未知命令不得干扰正在运行的 CLI。
     if (command.type === 'invokeApi' && connection.hello.capabilities.apiInvocations !== 1) throw new PlatformError('precondition', '当前开发容器不支持 API 试调；请保存工作并在容器更新后重新开启会话', { code: 'api_invocations_unavailable' });
     assertLaunchSupported(command, connection.hello.capabilities);
-    return new Promise<unknown>((resolve, reject) => {
+    return (async () => {
+      const wire = connection.legacy ? await connection.legacy.outgoing(command) : command;
+      return new Promise<unknown>((resolve, reject) => {
       connection.pending.add({
         id: command.id, type: command.type, sentAt: deps.clock.now().getTime(), resolve,
         ...commandTimeout(command),
         reject: (error) => reject(new PlatformError(error.code === 'timeout' ? 'unavailable' : 'precondition', error.message, { code: error.code })),
       });
-      try { connection.socket.send(JSON.stringify(command)); } catch (error) { connection.pending.settle(command.id, { ok: false, code: 'send_failed', message: String(error) }); }
-    });
+      try { connection.socket.send(JSON.stringify(wire)); } catch (error) { connection.pending.settle(command.id, { ok: false, code: 'send_failed', message: String(error) }); }
+      });
+    })();
   };
 
   return {

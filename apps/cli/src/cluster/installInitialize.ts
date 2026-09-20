@@ -1,6 +1,6 @@
 import type { ApiClient, CreateProjectInput } from '@crewstation/api-client';
 import { isApiClientError } from '@crewstation/api-client';
-import { EgressFqdnPatternSchema } from '@crewstation/contracts';
+import { BUILTIN_RESOURCES, EgressFqdnPatternSchema } from '@crewstation/contracts';
 import type { CheckLine, OperatorContext } from './installReport';
 import { checkLine as line } from './installReport';
 import type { BundleProfiles } from './releaseBundle';
@@ -43,8 +43,8 @@ async function seedPlans(api: ApiClient, profiles: BundleProfiles, suffix: strin
     return line(label, 'pending-config', profiles.notes.join('；') || '发行包 profiles/ 没有可用套餐');
   }
   const results = [
-    ...(await Promise.all(profiles.servicePlans.map(async (plan) => [`服务套餐 ${plan.name}`, await attempt(() => api.catalog.upsertServicePlan(plan))] as const))),
-    ...(await Promise.all(profiles.taskProfiles.map(async (item) => [`任务规格 ${item.name}`, await attempt(() => api.catalog.upsertTaskProfile(item))] as const))),
+    ...(await Promise.all(profiles.servicePlans.map(async (plan) => [`服务套餐 ${plan.name}`, await attempt(() => api.catalog.createServicePlan(plan))] as const))),
+    ...(await Promise.all(profiles.taskProfiles.map(async (item) => [`任务规格 ${item.name}`, await attempt(() => api.catalog.createTaskProfile(item))] as const))),
   ];
   const failures = results.filter(([, result]) => result.kind === 'failed').map(([name, result]) => `${name}：${result.kind === 'failed' ? result.problem : ''}`);
   if (failures.length > 0) return line(label, 'failed', failures.join('；'));
@@ -90,10 +90,10 @@ function describeAttempt(result: Attempt): string {
 function integrationProjects(ctx: OperatorContext): readonly Omit<CreateProjectInput, 'ownerUserId'>[] {
   const wanted: Omit<CreateProjectInput, 'ownerUserId'>[] = [];
   if (ctx.config.gitlabEventProducer) {
-    wanted.push({ slug: 'gitlab-event-producer', name: '内置 GitLab 事件生产者', kind: 'EventProducer', template: 'gitlab-event-producer' });
+    wanted.push({ slug: 'gitlab-event-producer', name: '内置 GitLab 事件生产者', kind: 'EventProducer', template: BUILTIN_RESOURCES.eventTemplate });
   }
   if (ctx.config.referenceApiProxy) {
-    wanted.push({ slug: 'reference-api-proxy', name: '参考 API 代理', kind: 'APIProxy', template: 'reference-api-proxy' });
+    wanted.push({ slug: 'reference-api-proxy', name: '参考 API 代理', kind: 'APIProxy', template: BUILTIN_RESOURCES.proxyTemplate });
   }
   return wanted;
 }

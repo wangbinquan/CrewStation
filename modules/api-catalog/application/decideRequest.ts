@@ -18,20 +18,20 @@ export function grantUseCases({ uow, clock }: ApiCatalogUseCaseDeps) {
         const decided = decideRequest(request, input.approve, actor.userId, input.decision, now);
         await scope.requests.update(decided);
         if (input.approve) {
-          await scope.grants.upsert(grantOperation(request.serviceId, request.operationKey, actor.userId, now));
-          await scope.events.publish(DomainTopic.grantChanged, { occurredAt: now.toISOString(), serviceId: request.serviceId, operationKey: request.operationKey, state: 'granted' });
+          await scope.grants.upsert(grantOperation(request.serviceId, request.operationId, actor.userId, now));
+          await scope.events.publish(DomainTopic.grantChanged, { occurredAt: now.toISOString(), serviceId: request.serviceId, operationId: request.operationId, state: 'granted' });
         }
         return requestToDto(decided);
       });
     },
-    revokeGrant: async (actor: Actor, serviceId: ServiceId, operationKey: string): Promise<void> => {
+    revokeGrant: async (actor: Actor, serviceId: ServiceId, operationId: string): Promise<void> => {
       if (!actor.isAdmin) throw forbidden('只有管理员可以撤销授权');
       const now = clock.now();
       await uow.run(async (scope) => {
-        const existing = await scope.grants.get(serviceId, operationKey);
-        if (!existing || existing.state !== 'granted') throw notFound('授权', operationKey);
+        const existing = await scope.grants.get(serviceId, operationId);
+        if (!existing || existing.state !== 'granted') throw notFound('授权', operationId);
         await scope.grants.upsert(revokeGrant(existing, now));
-        await scope.events.publish(DomainTopic.grantChanged, { occurredAt: now.toISOString(), serviceId, operationKey, state: 'revoked' });
+        await scope.events.publish(DomainTopic.grantChanged, { occurredAt: now.toISOString(), serviceId, operationId, state: 'revoked' });
       });
     },
   };

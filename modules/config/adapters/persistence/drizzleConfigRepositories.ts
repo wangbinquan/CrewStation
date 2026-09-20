@@ -3,24 +3,24 @@ import type { Executor } from '@crewstation/persistence';
 import { and, eq, sql } from 'drizzle-orm';
 import type { ConfigItem } from '../../domain/configItem';
 import type { ConfigVersion, ConfigVersionEntry } from '../../domain/configVersion';
-import type { ConfigItemRepository, ConfigVersionRepository } from '../../ports/repositories';
-import { items, valueSets, versionEntries, versions } from './tables';
+import type { ConfigDefinitionRepository, ConfigItemRepository, ConfigVersionRepository } from '../../ports/repositories';
+import { definitions, items, valueSets, versionEntries, versions } from './tables';
 
 export function drizzleConfigItemRepository(db: Executor): ConfigItemRepository {
   const inSet = (projectId: ProjectId, env: ConfigEnv) => and(eq(items.projectId, projectId), eq(items.env, env));
   return {
     list: async (projectId, env) => (await db.select().from(items).where(inSet(projectId, env)).orderBy(items.name)).map(toItem),
-    get: async (projectId, env, name) => {
-      const row = (await db.select().from(items).where(and(inSet(projectId, env), eq(items.name, name))))[0];
+    get: async (projectId, env, id) => {
+      const row = (await db.select().from(items).where(and(inSet(projectId, env), eq(items.id, id))))[0];
       return row ? toItem(row) : undefined;
     },
     upsert: async (item) => {
-      const { projectId, env, name, ...rest } = item;
-      await db.insert(items).values({ projectId, env, name, ...rest })
-        .onConflictDoUpdate({ target: [items.projectId, items.env, items.name], set: { ...rest } });
+      const { id, ...rest } = item;
+      await db.insert(items).values({ id, ...rest })
+        .onConflictDoUpdate({ target: items.id, set: { ...rest } });
     },
-    remove: async (projectId, env, name) => {
-      await db.delete(items).where(and(inSet(projectId, env), eq(items.name, name)));
+    remove: async (projectId, env, id) => {
+      await db.delete(items).where(and(inSet(projectId, env), eq(items.id, id)));
     },
   };
 }
@@ -44,7 +44,7 @@ export function drizzleConfigVersionRepository(db: Executor): ConfigVersionRepos
       const { projectId, env, version, createdBy, createdAt } = snapshot;
       await db.insert(versions).values({ projectId, env, version, createdBy, createdAt });
       if (snapshot.entries.length > 0) {
-        await db.insert(versionEntries).values(snapshot.entries.map((e) => ({ projectId, env, version, name: e.name, isSecret: e.isSecret, value: e.value })));
+        await db.insert(versionEntries).values(snapshot.entries.map((e) => ({ projectId, env, version, itemId: e.itemId, definitionId: e.definitionId, bindingName: e.bindingName, name: e.name, isSecret: e.isSecret, value: e.value })));
       }
     },
     get: async (projectId, env, version) => {
@@ -62,13 +62,26 @@ export function drizzleConfigVersionRepository(db: Executor): ConfigVersionRepos
 }
 
 function toItem(row: typeof items.$inferSelect): ConfigItem {
-  return { projectId: row.projectId as ProjectId, env: row.env as ConfigEnv, name: row.name, isSecret: row.isSecret, value: row.value, version: row.version, updatedBy: row.updatedBy as UserId, updatedAt: row.updatedAt };
+  return { id: row.id, definitionId: row.definitionId, bindingName: row.bindingName, projectId: row.projectId as ProjectId, env: row.env as ConfigEnv, name: row.name, isSecret: row.isSecret, value: row.value, version: row.version, updatedBy: row.updatedBy as UserId, updatedAt: row.updatedAt };
 }
 
 function toEntry(row: typeof versionEntries.$inferSelect): ConfigVersionEntry {
-  return { name: row.name, isSecret: row.isSecret, value: row.value };
+  return { itemId: row.itemId, definitionId: row.definitionId, bindingName: row.bindingName, name: row.name, isSecret: row.isSecret, value: row.value };
 }
 
 function toVersion(row: typeof versions.$inferSelect, entries: ConfigVersionEntry[]): ConfigVersion {
   return { projectId: row.projectId as ProjectId, env: row.env as ConfigEnv, version: row.version, entries, createdBy: row.createdBy as UserId, createdAt: row.createdAt };
+}
+
+export function drizzleConfigDefinitionRepository(db: Executor): ConfigDefinitionRepository {
+  return {
+    list: async (projectId) => db.select().from(definitions).where(eq(definitions.projectId, projectId)).orderBy(definitions.name, definitions.id),
+    get: async (projectId, id) => (await db.select().from(definitions).where(and(eq(definitions.projectId, projectId), eq(definitions.id, id))))[0],
+    insert: async (definition) => { await db.insert(definitions).values(definition); },
+    insertIfAbsent: async (definition) => { await db.insert(definitions).values(definition).onConflictDoNothing(); },
+    rename: async (projectId, id, name) => {
+      await db.update(definitions).set({ name }).where(and(eq(definitions.projectId, projectId), eq(definitions.id, id)));
+      await db.update(items).set({ name }).where(and(eq(items.projectId, projectId), eq(items.definitionId, id)));
+    },
+  };
 }

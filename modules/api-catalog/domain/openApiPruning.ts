@@ -1,11 +1,11 @@
-import { HttpMethodSchema, operationKey } from '@crewstation/contracts';
+import { HttpMethodSchema, operationSignature } from '@crewstation/contracts';
 import type { JsonObject } from './openApiOperations';
 import { isJsonObject, openApiPaths } from './openApiOperations';
 
 export interface PruneOptions {
   readonly proxy: string;
   /** 调用方可调的操作键（默认开放 ＋ 已授权）。 */
-  readonly allowedKeys: ReadonlySet<string>;
+  readonly allowedOperations: readonly { id: string; method: string; path: string }[];
   /** 服务域内部 API 地址：`http://api.<serviceDomain>/api/<proxy>`。 */
   readonly serversUrl: string;
 }
@@ -35,7 +35,8 @@ export function pruneOpenApi(doc: unknown, options: PruneOptions): JsonObject {
   return result;
 }
 
-function prunePaths(paths: JsonObject, { proxy, allowedKeys }: PruneOptions): JsonObject {
+function prunePaths(paths: JsonObject, { proxy, allowedOperations }: PruneOptions): JsonObject {
+  const allowed = new Map(allowedOperations.map((operation) => [operationSignature(proxy, operation.method, operation.path), operation.id]));
   const out: JsonObject = {};
   for (const [path, item] of Object.entries(paths)) {
     if (!isJsonObject(item)) continue;
@@ -44,8 +45,8 @@ function prunePaths(paths: JsonObject, { proxy, allowedKeys }: PruneOptions): Js
     for (const [field, value] of Object.entries(item)) {
       if (!METHOD_KEYS.has(field)) {
         kept[field] = value;
-      } else if (allowedKeys.has(operationKey(proxy, field, path))) {
-        kept[field] = value;
+      } else if (allowed.has(operationSignature(proxy, field, path))) {
+        kept[field] = isJsonObject(value) ? { ...value, 'x-crewstation-operation-id': allowed.get(operationSignature(proxy, field, path)) } : value;
         operations += 1;
       }
     }

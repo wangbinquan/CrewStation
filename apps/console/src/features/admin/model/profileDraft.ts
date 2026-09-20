@@ -1,5 +1,5 @@
 import type { AgentProtocol, ComputeProfileContentInput, ComputeProfileDetailDto, CreateComputeProfileInput, ProfileCredentialState, SaveComputeProfileInput } from '@crewstation/contracts';
-import { ConfigDirNameSchema, DEFAULT_COMPUTE_PROFILE, EnvNameSchema, SlugSchema, isPlatformSpawnEnv, reservedLaunchArg } from '@crewstation/contracts';
+import { ConfigDirNameSchema, ComputeProfileNameSchema, EnvNameSchema, isPlatformSpawnEnv, reservedLaunchArg } from '@crewstation/contracts';
 import type { ProfilePreset } from './profilePresets';
 import { presetContent, presetsFor } from './profilePresets';
 import { configFileKindFor, showsField, suggestedBinaryPath } from './protocolFields';
@@ -27,7 +27,7 @@ export interface ProfileDraft {
   taskProfile: string;
   steps: StepDraft[];
   vars: Array<{ name: string; value: string }>;
-  secretNames: string[];
+  secrets: Array<{ id: string; name: string }>;
   credentials: Record<string, CredentialOp>;
   configFileKind: 'none' | 'claude-settings' | 'opencode-config';
   configFilePath: string;
@@ -42,7 +42,7 @@ const EMPTY_OPENCODE = { variant: '', temperature: '', steps: '', maxSteps: '' }
 export function blankDraft(protocol: AgentProtocol, preset: ProfilePreset = 'blank'): ProfileDraft {
   return applyPreset({
     name: '', description: '', defaultVisible: true, protocol, image: '', binaryPath: suggestedBinaryPath(protocol), extraArgs: '', configDirEnv: '', configDirName: '', isSandbox: false, model: '',
-    opencode: { ...EMPTY_OPENCODE }, taskProfile: '', steps: [], vars: [], secretNames: [], credentials: {}, configFileKind: 'none', configFilePath: '',
+    opencode: { ...EMPTY_OPENCODE }, taskProfile: '', steps: [], vars: [], secrets: [], credentials: {}, configFileKind: 'none', configFilePath: '',
     testCommand: '', testExpect: '', testTimeoutSeconds: '60',
   }, preset);
 }
@@ -50,12 +50,12 @@ export function blankDraft(protocol: AgentProtocol, preset: ProfilePreset = 'bla
 /** 预设只替换启动前步骤、变量、凭据与配置绑定；启动参数与名称保持。 */
 export function applyPreset(draft: ProfileDraft, preset: ProfilePreset): ProfileDraft {
   const content = presetContent(preset);
-  return { ...draft, steps: content.steps, vars: content.vars, secretNames: content.secretNames, credentials: content.credentials, configFileKind: content.configFileKind, configFilePath: content.configFilePath };
+  return { ...draft, steps: content.steps, vars: content.vars, secrets: content.secrets, credentials: content.credentials, configFileKind: content.configFileKind, configFilePath: content.configFilePath };
 }
 
 /** 草稿的启动前内容是否仍是某个预设的原样（管理员还没动过）。 */
 function untouchedPreset(draft: ProfileDraft): ProfilePreset | undefined {
-  const beforeStart = (c: Pick<ProfileDraft, 'steps' | 'vars' | 'secretNames' | 'credentials' | 'configFileKind' | 'configFilePath'>) => JSON.stringify([c.steps, c.vars, c.secretNames, c.credentials, c.configFileKind, c.configFilePath]);
+  const beforeStart = (c: Pick<ProfileDraft, 'steps' | 'vars' | 'secrets' | 'credentials' | 'configFileKind' | 'configFilePath'>) => JSON.stringify([c.steps.map(({ stepId: _id, ...step }) => step), c.vars, c.secrets.map((secret) => [secret.name, c.credentials[secret.id]]), c.configFileKind, c.configFilePath]);
   const current = beforeStart(draft);
   return presetsFor(draft.protocol).find((preset) => beforeStart(presetContent(preset)) === current);
 }
@@ -77,8 +77,8 @@ export function withProtocol(draft: ProfileDraft, protocol: AgentProtocol): Prof
 const numberText = (value: number | undefined) => (value === undefined ? '' : String(value));
 
 /** 已设置的凭据默认保留；声明了但还没有值的凭据默认待填写。 */
-function credentialOps(secretNames: readonly string[], states: readonly ProfileCredentialState[]): Record<string, CredentialOp> {
-  return Object.fromEntries(secretNames.map((name) => [name, states.find((s) => s.name === name)?.set ? { op: 'keep' as const } : { op: 'replace' as const, value: '' }]));
+function credentialOps(secrets: readonly { id: string; name: string }[], states: readonly ProfileCredentialState[]): Record<string, CredentialOp> {
+  return Object.fromEntries(secrets.map(({ id }) => [id, states.find((s) => s.id === id)?.set ? { op: 'keep' as const } : { op: 'replace' as const, value: '' }]));
 }
 
 export function draftFromDetail(detail: ComputeProfileDetailDto): ProfileDraft {
@@ -88,7 +88,7 @@ export function draftFromDetail(detail: ComputeProfileDetailDto): ProfileDraft {
     extraArgs: launch.extraArgs.join('\n'), configDirEnv: launch.configDirEnv ?? '', configDirName: launch.configDirName ?? '', isSandbox: launch.isSandbox, model: launch.model ?? '',
     opencode: { variant: launch.opencode?.variant ?? '', temperature: numberText(launch.opencode?.temperature), steps: numberText(launch.opencode?.steps), maxSteps: numberText(launch.opencode?.maxSteps) },
     taskProfile: content.taskProfile ?? '', steps: content.steps.map(stepFromDto), vars: Object.entries(content.vars).map(([name, value]) => ({ name, value })),
-    secretNames: [...content.secretNames], credentials: credentialOps(content.secretNames, detail.credentials),
+    secrets: content.secrets.map((secret) => ({ ...secret })), credentials: credentialOps(content.secrets, detail.credentials),
     configFileKind: content.configFile.kind, configFilePath: content.configFile.kind === 'none' ? '' : content.configFile.pathTemplate,
     testCommand: test?.command.join('\n') ?? '', testExpect: test?.expect ?? '', testTimeoutSeconds: String(Math.round((test?.timeoutMs ?? 60_000) / 1000)),
   };
@@ -134,10 +134,10 @@ function validateTerminalTest(draft: ProfileDraft, errors: DraftErrors): void {
 }
 
 /** 客户端只拦能即时定位的错误；模板变量、镜像能否解析与凭据是否齐全由服务端与测试作业回报。 */
-export function validateProfileDraft(draft: ProfileDraft, creating: boolean): DraftErrors {
+export function validateProfileDraft(draft: ProfileDraft, _creating: boolean): DraftErrors {
   const errors: DraftErrors = {};
-  if (creating && draft.name === DEFAULT_COMPUTE_PROFILE) errors.name = 'reservedName';
-  else if (creating && !SlugSchema.safeParse(draft.name).success) errors.name = 'profileName';
+  if (!draft.name.trim()) errors.name = 'nameRequired';
+  else if (!ComputeProfileNameSchema.safeParse(draft.name).success) errors.name = 'profileName';
   if (draft.description.length > 500) errors.description = 'descriptionTooLong';
   validateLaunch(draft, errors);
   validateTerminalTest(draft, errors);
@@ -145,10 +145,10 @@ export function validateProfileDraft(draft: ProfileDraft, creating: boolean): Dr
   const varNames = new Set<string>();
   draft.vars.forEach((v, i) => {
     if (!EnvNameSchema.safeParse(v.name).success) errors[`vars.${i}.name`] = 'envName';
-    else if (varNames.has(v.name) || draft.secretNames.includes(v.name)) errors[`vars.${i}.name`] = 'envNameDuplicate';
+    else if (varNames.has(v.name) || draft.secrets.some((secret) => secret.name === v.name)) errors[`vars.${i}.name`] = 'envNameDuplicate';
     varNames.add(v.name);
   });
-  draft.secretNames.forEach((name, i) => { if (!EnvNameSchema.safeParse(name).success) errors[`secrets.${i}`] = 'envName'; });
+  draft.secrets.forEach(({ name }, i) => { if (!EnvNameSchema.safeParse(name).success || draft.secrets.filter((secret) => secret.name === name).length > 1) errors[`secrets.${i}`] = 'envName'; });
   if (draft.configFileKind !== 'none' && !draft.configFilePath.trim()) errors.configFilePath = 'pathRequired';
   return errors;
 }
@@ -177,7 +177,7 @@ export function toContent(draft: ProfileDraft): ComputeProfileContentInput {
     ...(trimmed(draft.taskProfile) ? { taskProfile: trimmed(draft.taskProfile) } : {}),
     steps: draft.steps.map(stepToDto),
     vars: Object.fromEntries(draft.vars.map((v) => [v.name, v.value])),
-    secretNames: draft.secretNames,
+    secrets: draft.secrets,
     configFile: kind && draft.configFileKind !== 'none' ? { kind, pathTemplate: trimmed(draft.configFilePath) } : { kind: 'none' },
     ...(showsField(p, 'terminalTest') ? { terminalTest: { command: lines(draft.testCommand), expect: draft.testExpect, timeoutMs: Number(draft.testTimeoutSeconds) * 1000 } } : {}),
   };
@@ -185,7 +185,7 @@ export function toContent(draft: ProfileDraft): ComputeProfileContentInput {
 
 /** keep／replace 只对本修订声明的名字有意义；空的 replace 等于没写，不发送；clear 也允许针对已取消声明的名字。 */
 function credentialWrites(draft: ProfileDraft): Record<string, CredentialOp> {
-  return Object.fromEntries(Object.entries(draft.credentials).filter(([name, op]) => op.op === 'clear' || (draft.secretNames.includes(name) && (op.op === 'keep' || op.value !== ''))));
+  return Object.fromEntries(Object.entries(draft.credentials).filter(([name, op]) => op.op === 'clear' || (draft.secrets.some((secret) => secret.id === name) && (op.op === 'keep' || op.value !== ''))));
 }
 
 export function toCreateRequest(draft: ProfileDraft): CreateComputeProfileInput {
@@ -193,7 +193,7 @@ export function toCreateRequest(draft: ProfileDraft): CreateComputeProfileInput 
 }
 
 export function toSaveRequest(draft: ProfileDraft, expectedRevision: number): SaveComputeProfileInput {
-  return { expectedRevision, description: draft.description, content: toContent(draft), credentials: credentialWrites(draft) };
+  return { expectedRevision, name: draft.name.trim(), description: draft.description, content: toContent(draft), credentials: credentialWrites(draft) };
 }
 
 export function draftDirty(a: ProfileDraft, b: ProfileDraft): boolean {

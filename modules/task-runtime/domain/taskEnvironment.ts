@@ -1,5 +1,10 @@
 import type { ProjectId, ServiceId, TaskId, TaskKind, TraceId, UserId, VolumeMode } from '@crewstation/contracts';
 import { precondition } from '@crewstation/kernel';
+export interface LegacyTaskClusterIdentity {
+  readonly taskId: string;
+  readonly rebuildId?: string;
+  readonly native?: NativeExecution;
+}
 
 export type EnvironmentState = 'creating' | 'running' | 'paused' | 'releasing' | 'released' | 'failed';
 
@@ -22,11 +27,11 @@ export interface NativeExecution {
   readonly runnerId: string;
   readonly fingerprint: string;
   readonly requestedProfile: string | null;
-  readonly profile: { name: string; cpu: string; memory: string; storage: string };
+  readonly profile: { id: string; name: string; cpu: string; memory: string; storage: string };
   /** 档位修订按摘要固定的镜像；RFC-006 之前受理的 CLI 是平台任务镜像。 */
   readonly image: string;
   /** 受理时固定的算力档位修订（RFC-006）。 */
-  readonly computeProfile?: { readonly name: string; readonly revision: number };
+  readonly computeProfile?: { readonly profileId: string; readonly revision: number };
   readonly state: 'queued' | 'starting' | 'running' | 'cleaning' | 'finished';
   readonly podUid?: string;
   readonly secretUid?: string;
@@ -43,6 +48,7 @@ export interface RunnerRejection {
 
 /** 一项任务一个长驻容器（R05、R29）；开发会话与业务任务共用这个对象，只是 kind 与卷模式不同。 */
 export interface TaskEnvironment {
+  readonly legacyCluster?: LegacyTaskClusterIdentity;
   readonly id: TaskId;
   readonly projectId: ProjectId;
   readonly serviceId: ServiceId;
@@ -98,11 +104,11 @@ export function canPause(env: TaskEnvironment): boolean {
 }
 
 export function podNameFor(taskId: TaskId): string {
-  return `task-${taskId.slice(4, 16)}`;
+  return `task-${taskId.replaceAll('-', '')}`;
 }
 
 export function pvcNameFor(taskId: TaskId): string {
-  return `task-${taskId.slice(4, 16)}-work`;
+  return `task-${taskId.replaceAll('-', '')}-work`;
 }
 
 export const purposeOf = (execution: NativeExecution): ExecutionPurpose => execution.purpose ?? 'cli';

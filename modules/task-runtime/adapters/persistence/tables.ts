@@ -4,6 +4,7 @@ import type { TaskEnvironment } from '../../domain/taskEnvironment';
 import { taskRuntimeSchema } from './schema';
 
 export const environments = taskRuntimeSchema.table('environments', {
+  legacyCluster: jsonDocument('legacy_cluster').$type<TaskEnvironment['legacyCluster']>(),
   id: text('id').primaryKey(),
   projectId: text('project_id').notNull(),
   serviceId: text('service_id').notNull(),

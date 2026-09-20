@@ -20,7 +20,7 @@ import { mutableClock } from './fakeAdapters';
 
 const ENV_FILE = resolve(import.meta.dir, '..', '..', '..', '.local', 'gitlab.env');
 const GROUP = 'crewstation-test';
-const TEMPLATE = 'integration-sample';
+const TEMPLATE = '01a0bf5d-8f4b-73be-8cf4-3872f3c4a309';
 const TIMEOUT = 120_000;
 
 function loadGitLabEnv(): { url: string; token: string } | undefined {
@@ -45,10 +45,10 @@ if (gitlabAvailable && !dbAvailable) console.warn('[scm] .local/gitlab.env 存�
 const hex = () => Bun.randomUUIDv7().replace(/-/g, '');
 const slug = `it-${hex().slice(-8)}`;
 const path = `${GROUP}/${slug}`;
-const serviceId = `svc_${hex()}` as ServiceId;
-const otherServiceId = `svc_${hex()}` as ServiceId;
-const projectId = `prj_${hex()}` as ProjectId;
-const actor: Actor = { userId: `usr_${'a'.repeat(32)}` as UserId, isAdmin: false };
+const serviceId = Bun.randomUUIDv7() as ServiceId;
+const otherServiceId = Bun.randomUUIDv7() as ServiceId;
+const projectId = Bun.randomUUIDv7() as ProjectId;
+const actor: Actor = { userId: '01a0bf5d-8f4b-7f8b-8136-e631380738b0' as UserId, isAdmin: false };
 const clock = mutableClock(new Date().toISOString());
 
 let tdb: TestDatabase;
@@ -93,6 +93,8 @@ beforeAll(async () => {
   client = createGitLabClient({ baseUrl: gitlabEnv.url, token: gitlabEnv.token });
   templatesRoot = await mkdtemp(join(tmpdir(), 'cs-scm-templates-'));
   await mkdir(join(templatesRoot, TEMPLATE, 'src'), { recursive: true });
+  await writeFile(join(templatesRoot, TEMPLATE, 'template.json'), JSON.stringify({ id: TEMPLATE, name: 'integration-sample', servicePlan: '01a0bf5d-8f4b-7000-9e4b-b54e91ee9d10' }));
+  await writeFile(join(templatesRoot, TEMPLATE, 'crewstation.yaml'), Bun.YAML.stringify({ apiVersion: 'crewstation/v2', kind: 'DigitalWorker', spec: { service: { command: ['bun', 'src/index.ts'], port: 3000, servicePlanId: '01a0bf5d-8f4b-7000-9e4b-b54e91ee9d10' } } }));
   await writeFile(join(templatesRoot, TEMPLATE, 'README.md'), `# ${TEMPLATE}\n`);
   await writeFile(join(templatesRoot, TEMPLATE, 'src', 'index.ts'), 'export const hello = "crewstation";\n');
   workRoot = await mkdtemp(join(tmpdir(), 'cs-scm-it-'));
@@ -123,7 +125,7 @@ afterAll(async () => {
 describe.skipIf(!available)('scm × 本机 GitLab', () => {
   test('建仓：在 crewstation-test 组建项目、推模板首个提交、默认分支 main', async () => {
     expect((await client.getGroup(GROUP)).fullPath).toBe(GROUP);
-    const dto = await scm.api.ensureRepository(serviceId, projectId, { slug, templateName: TEMPLATE });
+    const dto = await scm.api.ensureRepository(serviceId, projectId, { slug, templateId: TEMPLATE });
     remoteProjectId = dto.remoteProjectId;
     httpUrl = dto.httpUrl;
     firstCreatedAt = dto.createdAt;
@@ -133,7 +135,7 @@ describe.skipIf(!available)('scm × 本机 GitLab', () => {
     expect(remote.defaultBranch).toBe('main');
     expect(remote.visibility).toBe('private');
     const tree = await client.getRepositoryTree(remote.id, '', { recursive: true });
-    expect(tree.filter((e) => e.type === 'blob').map((e) => e.path).sort()).toEqual(['README.md', 'src/index.ts']);
+    expect(tree.filter((e) => e.type === 'blob').map((e) => e.path).sort()).toEqual(['README.md', 'crewstation.yaml', 'src/index.ts']);
     const main = await client.getBranch(remote.id, 'main');
     expect(main.default).toBe(true);
     expect(main.commit.authorName).toBe('CrewStation Bot');
@@ -142,10 +144,10 @@ describe.skipIf(!available)('scm × 本机 GitLab', () => {
   }, TIMEOUT);
 
   test('幂等重跑返回同一绑定；同路径的另一服务 → conflict，不接管', async () => {
-    const again = await scm.api.ensureRepository(serviceId, projectId, { slug, templateName: TEMPLATE });
+    const again = await scm.api.ensureRepository(serviceId, projectId, { slug, templateId: TEMPLATE });
     expect(again.remoteProjectId).toBe(remoteProjectId ?? '');
     expect(again.createdAt).toBe(firstCreatedAt);
-    await expect(scm.api.ensureRepository(otherServiceId, projectId, { slug, templateName: TEMPLATE })).rejects.toMatchObject({ kind: 'conflict' });
+    await expect(scm.api.ensureRepository(otherServiceId, projectId, { slug, templateId: TEMPLATE })).rejects.toMatchObject({ kind: 'conflict' });
     await expect(scm.api.getBinding(actor, otherServiceId)).rejects.toMatchObject({ kind: 'not_found' });
     expect(String((await client.getProject(path)).id)).toBe(remoteProjectId ?? '');
   }, TIMEOUT);

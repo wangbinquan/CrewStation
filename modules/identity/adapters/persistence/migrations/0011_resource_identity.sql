@@ -1,0 +1,3 @@
+ALTER TABLE identity.user_identities ALTER CONSTRAINT user_identities_user_id_fkey DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE identity.user_identities ALTER CONSTRAINT user_identities_provider_id_fkey DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE identity.oidc_flows ALTER CONSTRAINT oidc_flows_provider_id_fkey DEFERRABLE INITIALLY DEFERRED;

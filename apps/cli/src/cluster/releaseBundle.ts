@@ -1,4 +1,5 @@
 import type { ServicePlanInput, TaskProfileInput } from '@crewstation/api-client';
+import { ResourceIdSchema } from '@crewstation/contracts';
 import { CliFailure } from '../runtime/cliError';
 import type { FileAccess } from '../runtime/commandContext';
 
@@ -49,15 +50,15 @@ export function inspectBundle(files: FileAccess, root: string): ReleaseBundle {
  * 发行包不再带算力档位（RFC-006）：旧包里的 profiles/compute-profiles.yaml 不读取。
  */
 export interface BundleProfiles {
-  readonly servicePlans: readonly ServicePlanInput[];
-  readonly taskProfiles: readonly TaskProfileInput[];
+  readonly servicePlans: readonly (ServicePlanInput & { id: string })[];
+  readonly taskProfiles: readonly (TaskProfileInput & { id: string })[];
   readonly notes: readonly string[];
 }
 
 export function readBundleProfiles(files: FileAccess, root: string): BundleProfiles {
   const notes: string[] = [];
-  const servicePlans = readList<ServicePlanInput>(files, join(root, 'profiles/service-plans.yaml'), notes, isServicePlan);
-  const taskProfiles = readList<TaskProfileInput>(files, join(root, 'profiles/task-profiles.yaml'), notes, isTaskProfile);
+  const servicePlans = readList<ServicePlanInput & { id: string }>(files, join(root, 'profiles/service-plans.yaml'), notes, isServicePlan);
+  const taskProfiles = readList<TaskProfileInput & { id: string }>(files, join(root, 'profiles/task-profiles.yaml'), notes, isTaskProfile);
   return { servicePlans, taskProfiles, notes };
 }
 
@@ -95,11 +96,11 @@ function readList<T>(files: FileAccess, path: string, notes: string[], guard: (v
 }
 
 function isServicePlan(value: Record<string, unknown>): boolean {
-  return typeof value.name === 'string' && typeof value.cpu === 'string' && typeof value.memory === 'string' && typeof value.maxReplicas === 'number';
+  return ResourceIdSchema.safeParse(value.id).success && typeof value.name === 'string' && typeof value.cpu === 'string' && typeof value.memory === 'string' && typeof value.maxReplicas === 'number';
 }
 
 function isTaskProfile(value: Record<string, unknown>): boolean {
-  return typeof value.name === 'string' && typeof value.cpu === 'string' && typeof value.memory === 'string' && typeof value.storage === 'string';
+  return ResourceIdSchema.safeParse(value.id).success && typeof value.name === 'string' && typeof value.cpu === 'string' && typeof value.memory === 'string' && typeof value.storage === 'string';
 }
 
 export function join(root: string, rel: string): string {

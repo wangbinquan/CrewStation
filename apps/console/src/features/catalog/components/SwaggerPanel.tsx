@@ -40,15 +40,15 @@ export function SwaggerPanel({ serviceId, proxies, initialProxy, invocation }: S
           <select className={styles.select} value={proxy} disabled={invocation.controller.pending || invocation.controller.checking} onChange={(e) => requestChange(e.target.value)}>
             <option value="">{t('catalog.swagger.selectHint')}</option>
             {proxies.map((entry) => (
-              <option key={entry.proxy} value={entry.proxy}>
-                {entry.proxy}
+              <option key={entry.id} value={entry.id}>
+                {entry.name}
               </option>
             ))}
           </select>
         </label>
       )}
       {proxy ? <div className={styles.controls}><Button disabled={spec.isFetching} onClick={() => { void spec.refetch(); }}>{t('catalog.swagger.checkDocument')}</Button><Button disabled={!spec.data || !!spec.error || spec.isFetching || invocation.controller.pending || invocation.controller.checking} onClick={() => requestChange(proxy)}>{t('catalog.swagger.reloadDocument')}</Button></div> : null}
-      {replacement !== undefined ? <ConfirmationPanel question={t('catalog.swagger.replaceQuestion', { proxy })} hint={t('catalog.swagger.replaceHint')} confirmLabel={t('catalog.invoke.replace')} cancelLabel={t('catalog.invoke.keep')} busy={invocation.controller.pending || invocation.controller.checking} onConfirm={() => choose(replacement)} onCancel={() => setReplacement(undefined)} /> : null}
+      {replacement !== undefined ? <ConfirmationPanel question={t('catalog.swagger.replaceQuestion', { proxy: proxies.find((entry) => entry.id === proxy)?.name ?? proxy })} hint={t('catalog.swagger.replaceHint')} confirmLabel={t('catalog.invoke.replace')} cancelLabel={t('catalog.invoke.keep')} busy={invocation.controller.pending || invocation.controller.checking} onConfirm={() => choose(replacement)} onCancel={() => setReplacement(undefined)} /> : null}
       {/* 没选代理时查询是禁用的，isPending 会一直为真，所以先看有没有选中。 */}
       <QueryStatus isPending={proxy.length > 0 && spec.isPending} error={spec.error} loadingKey="catalog.swagger.loading" errorKey="catalog.error.load" />
       {spec.data !== undefined ? <SwaggerDocument key={`${proxy}:${revision}`} spec={spec.data} proxy={proxy} invocation={invocation} readFailed={!!spec.error} /> : null}

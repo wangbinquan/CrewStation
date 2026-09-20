@@ -61,8 +61,8 @@ export class BeforeStartRunner {
     if (existing) return existing.promise;
     const now = new Date().toISOString();
     const execution: BeforeStartExecution = {
-      executionId: `bse_${crypto.randomUUID().replace(/-/g, '')}`, agentId: request.agentId, processAttemptId: request.processAttemptId,
-      profile: { profile: request.material.profile, revision: request.material.revision }, state: 'queued', queuedAt: now,
+      executionId: Bun.randomUUIDv7(), agentId: request.agentId, processAttemptId: request.processAttemptId,
+      profile: { profileId: request.material.profile, revision: request.material.revision }, state: 'queued', queuedAt: now,
       steps: request.material.steps.map((step): BeforeStartStepRecord => ({ stepId: step.stepId, name: step.name, kind: step.kind, state: 'pending' })),
     };
     const abort = new AbortController();

@@ -4,11 +4,11 @@ import { parseTemplateReference, renderTemplate, scanTemplate } from './beforeSt
 
 describe('启动前 Hook 契约', () => {
   test('步骤表：stepId 唯一、脚本超时之和受上限、custom 必须给解释器、默认值补齐', () => {
-    const step = ScriptStepSchema.parse({ kind: 'script', stepId: 'a', name: 'a', language: 'shell', source: 'true' });
+    const step = ScriptStepSchema.parse({ kind: 'script', stepId: '01a0bf5d-8f4b-7e50-851c-0a59d1d1f1f3', name: 'a', language: 'shell', source: 'true' });
     expect(step).toMatchObject({ timeoutMs: BEFORE_START_LIMITS.defaultScriptTimeoutMs, argv: [] });
-    expect(ScriptStepSchema.safeParse({ kind: 'script', stepId: 'a', name: 'a', language: 'custom', source: 'x' }).success).toBe(false);
+    expect(ScriptStepSchema.safeParse({ kind: 'script', stepId: '01a0bf5d-8f4b-7e50-851c-0a59d1d1f1f3', name: 'a', language: 'custom', source: 'x' }).success).toBe(false);
     expect(BeforeStartStepsSchema.safeParse([step, { ...step }]).success).toBe(false);
-    const heavy = Array.from({ length: 4 }, (_, i) => ({ ...step, stepId: `s${i}`, timeoutMs: BEFORE_START_LIMITS.maxScriptTimeoutMs }));
+    const heavy = Array.from({ length: 4 }, () => ({ ...step, stepId: Bun.randomUUIDv7(), timeoutMs: BEFORE_START_LIMITS.maxScriptTimeoutMs }));
     expect(BeforeStartStepsSchema.safeParse(heavy).success).toBe(false);
     expect(BeforeStartStepsSchema.safeParse(heavy.slice(0, 3)).success).toBe(true);
   });

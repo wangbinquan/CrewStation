@@ -11,6 +11,8 @@ export interface TaskRepository {
 }
 
 export interface SubtaskRepository {
+  findRetry(taskId: TaskId, operationId: string): Promise<SubtaskRun | undefined>;
+  reserveRetry(run: SubtaskRun): Promise<{ run: SubtaskRun; created: boolean }>;
   insert(run: SubtaskRun): Promise<void>;
   update(run: SubtaskRun): Promise<void>;
   getById(id: SubtaskId): Promise<SubtaskRun | undefined>;

@@ -61,7 +61,7 @@ function RequestSummary({ request }: { readonly request: ApiRequestDto }): React
   return (
     <div className={styles.summary}>
       <div className={styles.head}>
-        <code className={styles.key}>{request.operationKey}</code>
+        <code className={styles.key}>{request.operationId}</code>
         <Badge tone={STATE_TONE[request.state]}>{t(STATE_KEY[request.state])}</Badge>
       </div>
       <dl className={styles.facts}>

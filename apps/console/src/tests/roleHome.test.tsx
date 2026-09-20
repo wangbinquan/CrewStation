@@ -8,7 +8,7 @@ import { renderApp } from './renderApp';
 const originalFetch = globalThis.fetch;
 let page: Awaited<ReturnType<typeof renderApp>> | undefined;
 afterEach(() => { page?.unmount(); page = undefined; globalThis.fetch = originalFetch; sessionStorage.clear(); });
-const userId = `usr_${'a'.repeat(32)}`, projectId = `prj_${'b'.repeat(32)}`, otherId = `usr_${'c'.repeat(32)}`;
+const userId = `01a0bf5d-8f4b-799e-8662-91273789253a`, projectId = `01a0bf5d-8f4b-791e-89de-7760fac24856`, otherId = `01a0bf5d-8f4b-7e44-886a-b79b12465703`;
 
 function fixture(role: PlatformRole = 'user') {
   const state = { role, targetRole: 'user' as PlatformRole, trial: true, created: false, failCreate: false, conflict: false, denied: false };
@@ -22,7 +22,7 @@ function fixture(role: PlatformRole = 'user') {
     if (path === '/v1/me') { data = { id: userId, name: '小林', email: 'lin@test.invalid', platformRole: state.role, isAdmin: state.role === 'admin', memberships: state.created ? [{ projectId, role: 'owner' }] : state.trial ? [{ projectId, role: 'tester' }] : [], authMethod: 'oidc' }; if (state.denied) { data = { error: 'unavailable', message: '身份暂不可用' }; status = 503; } }
     else if (path === '/v1/users') data = { items: [{ id: otherId, name: '小周', email: 'zhou@test.invalid', platformRole: state.targetRole, isAdmin: state.targetRole === 'admin' }] };
     else if (path.endsWith('/platform-role')) { if (state.conflict) { status = 409; data = { error: 'conflict', message: '角色已被另一管理员修改' }; } else { state.targetRole = body!.platformRole as PlatformRole; data = { id: otherId, platformRole: state.targetRole }; } }
-    else if (path === '/v1/catalog/project-creation') data = { templates: [{ name: 'minimal-sample', kind: 'DigitalWorker', servicePlan: 'standard', requiredConfig: [] }], defaultServicePlan: 'standard', maxConcurrentTasks: 3 };
+    else if (path === '/v1/catalog/project-creation') data = { templates: [{ id: '01a0bf5d-8f4b-7002-9560-94caf593fb19', name: 'minimal-sample', kind: 'DigitalWorker', servicePlan: '01a0bf5d-8f4b-7000-9e4b-b54e91ee9d10', requiredConfig: [] }], defaultServicePlan: '01a0bf5d-8f4b-7000-9e4b-b54e91ee9d10', maxConcurrentTasks: 3 };
     else if (path === '/v1/projects' && method === 'POST') {
       if (state.failCreate) { status = 409; data = { error: 'conflict', message: '该标识已存在', details: { field: 'slug' } }; }
       else { state.created = true; data = project; status = 201; }
@@ -110,21 +110,23 @@ test('开发者表单初始约束可见，逐字段错误与焦点正确，冲�
   expect(page.text()).toContain('平台默认资源'); expect(page.text()).toContain('3–40');
   await page.click('创建项目'); expect(document.querySelectorAll('[aria-invalid="true"]')).toHaveLength(3);
   expect(document.activeElement?.getAttribute('name')).toBe('name');
-  await change('[name="name"]', '团队助理'); await change('[name="slug"]', 'team-helper'); await change('[name="template"]', 'minimal-sample');
+  await change('[name="name"]', '团队助理'); await change('[name="slug"]', 'team-helper'); await change('[name="template"]', '01a0bf5d-8f4b-7002-9560-94caf593fb19');
   f.state.failCreate = true; await page.click('创建项目'); expect(page.text()).toContain('该标识已存在'); expect(document.querySelector<HTMLInputElement>('[name="name"]')?.value).toBe('团队助理');
   f.state.failCreate = false; await page.click('创建项目'); await page!.settle(); expect(page.path()).toBe(`/projects/${projectId}/provisioning`);
   const request = f.calls.find((c) => c.method === 'POST')!;
-  expect(request.body).toEqual({ name: '团队助理', slug: 'team-helper', template: 'minimal-sample', kind: 'DigitalWorker' });
+  expect(request.body).toEqual({ name: '团队助理', slug: 'team-helper', template: '01a0bf5d-8f4b-7002-9560-94caf593fb19', kind: 'DigitalWorker' });
   expect(f.calls.some((c) => c.path === '/v1/users')).toBe(false);
 });
 
 test('管理员修改角色有确认，409 保留选择并重新读取后再保存', async () => {
   const f = fixture('admin'); page = await renderApp('/admin/users');
-  await change('select:has(option[value="developer"])', 'developer'); await page.click('保存角色');
+  await page.click('管理权限');
+  await act(async () => document.querySelector<HTMLInputElement>('input[value="developer"]')!.click());
+  await page.click('检查变更');
   expect(document.querySelector('[role="alertdialog"]')).not.toBeNull(); f.state.conflict = true;
   await page.click('保存角色'); expect(page.text()).toContain('角色已被另一管理员修改');
-  expect(document.querySelector<HTMLSelectElement>('select:has(option[value="developer"])')?.value).toBe('developer');
-  await page.click('重新读取当前角色'); f.state.conflict = false; await page.click('保存角色');
+  expect(document.querySelector<HTMLInputElement>('input[value="developer"]')?.checked).toBe(true);
+  await page.click('重新读取当前角色'); f.state.conflict = false; await page.click('检查变更'); await page.click('保存角色');
   expect(f.state.targetRole).toBe('developer'); expect(f.calls.find((c) => c.method === 'PUT')?.body).toEqual({ platformRole: 'developer', expectedRole: 'user' });
 });
 
@@ -172,7 +174,7 @@ test('自建回执丢失先核对本人同标识项目，不重复提交已创�
     return response;
   }) as typeof fetch;
   page = await renderApp('/projects/new');
-  await change('[name="name"]', '团队助理'); await change('[name="slug"]', 'team-helper'); await change('[name="template"]', 'minimal-sample');
+  await change('[name="name"]', '团队助理'); await change('[name="slug"]', 'team-helper'); await change('[name="template"]', '01a0bf5d-8f4b-7002-9560-94caf593fb19');
   await page.click('创建项目'); expect(page.text()).toContain('回执'); expect(document.querySelector<HTMLInputElement>('[name="slug"]')?.disabled).toBe(true);
   await page.click('核对创建结果'); expect(page.path()).toBe(`/projects/${projectId}/provisioning`);
   expect(f.calls.filter((call) => call.method === 'POST')).toHaveLength(1); expect(sessionStorage.getItem(`cs-project-draft:${userId}`)).toBeNull();

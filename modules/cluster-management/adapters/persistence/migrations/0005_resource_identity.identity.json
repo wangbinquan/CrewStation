@@ -1,0 +1,1143 @@
+{
+  "version": "resource-identity/v1",
+  "schema": "cluster_management",
+  "entities": [
+    {
+      "table": "snapshots",
+      "kind": "cluster-snapshot",
+      "keys": [
+        "id"
+      ],
+      "idColumn": "id"
+    },
+    {
+      "table": "inspections",
+      "kind": "cluster-inspection",
+      "keys": [
+        "id"
+      ],
+      "idColumn": "id"
+    },
+    {
+      "table": "operations",
+      "kind": "cluster-operation",
+      "keys": [
+        "id"
+      ],
+      "idColumn": "id"
+    },
+    {
+      "table": "refreshes",
+      "kind": "cluster-refresh",
+      "keys": [
+        "request_id"
+      ],
+      "idColumn": "request_id"
+    },
+    {
+      "table": "resource_identities",
+      "kind": "cluster-resource",
+      "keys": [
+        "uid"
+      ],
+      "idColumn": "id",
+      "aliases": [
+        [
+          "legacy_id"
+        ]
+      ]
+    },
+    {
+      "table": "refresh_history",
+      "kind": "cluster-refresh",
+      "keys": [
+        "id"
+      ],
+      "idColumn": "id"
+    }
+  ],
+  "references": [
+    {
+      "table": "inspections",
+      "column": "actor_id",
+      "kind": "user",
+      "keys": [
+        "actor_id"
+      ]
+    },
+    {
+      "table": "operations",
+      "column": "actor_id",
+      "kind": "user",
+      "keys": [
+        "actor_id"
+      ]
+    }
+  ],
+  "documents": [
+    {
+      "table": "snapshots",
+      "column": "legacy_body",
+      "references": [
+        {
+          "path": "target.projectId",
+          "kind": "project",
+          "nullable": true
+        },
+        {
+          "path": "target.serviceId",
+          "kind": "service",
+          "nullable": true
+        },
+        {
+          "path": "target.taskId",
+          "kind": "task",
+          "nullable": true
+        },
+        {
+          "path": "target.agentId",
+          "kind": "agent",
+          "nullable": true
+        },
+        {
+          "path": "target.terminalId",
+          "kind": "terminal",
+          "nullable": true
+        },
+        {
+          "path": "target.profileTestId",
+          "kind": "profile-test",
+          "nullable": true
+        },
+        {
+          "path": "target.releaseId",
+          "kind": "release",
+          "nullable": true
+        },
+        {
+          "path": "after.projectId",
+          "kind": "project",
+          "nullable": true
+        },
+        {
+          "path": "after.serviceId",
+          "kind": "service",
+          "nullable": true
+        },
+        {
+          "path": "after.taskId",
+          "kind": "task",
+          "nullable": true
+        },
+        {
+          "path": "after.agentId",
+          "kind": "agent",
+          "nullable": true
+        },
+        {
+          "path": "after.terminalId",
+          "kind": "terminal",
+          "nullable": true
+        },
+        {
+          "path": "after.profileTestId",
+          "kind": "profile-test",
+          "nullable": true
+        },
+        {
+          "path": "after.releaseId",
+          "kind": "release",
+          "nullable": true
+        },
+        {
+          "path": "resources.*.projectId",
+          "kind": "project",
+          "nullable": true
+        },
+        {
+          "path": "resources.*.serviceId",
+          "kind": "service",
+          "nullable": true
+        },
+        {
+          "path": "resources.*.taskId",
+          "kind": "task",
+          "nullable": true
+        },
+        {
+          "path": "resources.*.agentId",
+          "kind": "agent",
+          "nullable": true
+        },
+        {
+          "path": "resources.*.terminalId",
+          "kind": "terminal",
+          "nullable": true
+        },
+        {
+          "path": "resources.*.profileTestId",
+          "kind": "profile-test",
+          "nullable": true
+        },
+        {
+          "path": "resources.*.releaseId",
+          "kind": "release",
+          "nullable": true
+        },
+        {
+          "path": "id",
+          "kind": "cluster-snapshot"
+        },
+        {
+          "path": "facts.projects.*.projectId",
+          "kind": "project",
+          "nullable": true
+        },
+        {
+          "path": "facts.projects.*.serviceId",
+          "kind": "service",
+          "nullable": true
+        },
+        {
+          "path": "facts.projects.*.taskId",
+          "kind": "task",
+          "nullable": true
+        },
+        {
+          "path": "facts.projects.*.parentTaskId",
+          "kind": "task",
+          "nullable": true
+        },
+        {
+          "path": "facts.projects.*.agentId",
+          "kind": "agent",
+          "nullable": true
+        },
+        {
+          "path": "facts.projects.*.terminalId",
+          "kind": "terminal",
+          "nullable": true
+        },
+        {
+          "path": "facts.projects.*.profileTestId",
+          "kind": "profile-test",
+          "nullable": true
+        },
+        {
+          "path": "facts.projects.*.releaseId",
+          "kind": "release",
+          "nullable": true
+        },
+        {
+          "path": "facts.tasks.*.projectId",
+          "kind": "project",
+          "nullable": true
+        },
+        {
+          "path": "facts.tasks.*.serviceId",
+          "kind": "service",
+          "nullable": true
+        },
+        {
+          "path": "facts.tasks.*.taskId",
+          "kind": "task",
+          "nullable": true
+        },
+        {
+          "path": "facts.tasks.*.parentTaskId",
+          "kind": "task",
+          "nullable": true
+        },
+        {
+          "path": "facts.tasks.*.agentId",
+          "kind": "agent",
+          "nullable": true
+        },
+        {
+          "path": "facts.tasks.*.terminalId",
+          "kind": "terminal",
+          "nullable": true
+        },
+        {
+          "path": "facts.tasks.*.profileTestId",
+          "kind": "profile-test",
+          "nullable": true
+        },
+        {
+          "path": "facts.tasks.*.releaseId",
+          "kind": "release",
+          "nullable": true
+        },
+        {
+          "path": "facts.releases.*.projectId",
+          "kind": "project",
+          "nullable": true
+        },
+        {
+          "path": "facts.releases.*.serviceId",
+          "kind": "service",
+          "nullable": true
+        },
+        {
+          "path": "facts.releases.*.taskId",
+          "kind": "task",
+          "nullable": true
+        },
+        {
+          "path": "facts.releases.*.parentTaskId",
+          "kind": "task",
+          "nullable": true
+        },
+        {
+          "path": "facts.releases.*.agentId",
+          "kind": "agent",
+          "nullable": true
+        },
+        {
+          "path": "facts.releases.*.terminalId",
+          "kind": "terminal",
+          "nullable": true
+        },
+        {
+          "path": "facts.releases.*.profileTestId",
+          "kind": "profile-test",
+          "nullable": true
+        },
+        {
+          "path": "facts.releases.*.releaseId",
+          "kind": "release",
+          "nullable": true
+        },
+        {
+          "path": "target.ownership.projectId",
+          "kind": "project"
+        },
+        {
+          "path": "target.parentTaskId",
+          "kind": "task"
+        },
+        {
+          "path": "after.ownership.projectId",
+          "kind": "project"
+        },
+        {
+          "path": "after.parentTaskId",
+          "kind": "task"
+        },
+        {
+          "path": "resources.*.ownership.projectId",
+          "kind": "project"
+        },
+        {
+          "path": "resources.*.parentTaskId",
+          "kind": "task"
+        },
+        {
+          "path": "resources.*.resourceId",
+          "kind": "cluster-resource",
+          "keys": [
+            "uid"
+          ]
+        },
+        {
+          "path": "resources.*.owners.*.resourceId",
+          "kind": "cluster-resource",
+          "keys": [
+            "uid"
+          ]
+        },
+        {
+          "path": "resources.*.facts.profileTestId",
+          "kind": "profile-test"
+        },
+        {
+          "path": "resources.*.profile",
+          "kind": "compute-profile",
+          "when": {
+            "purpose": [
+              "development-cli",
+              "development-agent",
+              "business-subtask",
+              "profile-test"
+            ]
+          }
+        },
+        {
+          "path": "resources.*.profile",
+          "kind": "task-profile",
+          "when": {
+            "purpose": [
+              "development-workspace",
+              "business-workspace"
+            ]
+          }
+        },
+        {
+          "path": "resources.*.domainRevision",
+          "kind": "release",
+          "serializedPath": "1",
+          "nullable": true,
+          "when": {
+            "kind": "Deployment"
+          }
+        },
+        {
+          "path": "facts.releases.*.revision",
+          "kind": "release",
+          "serializedPath": "1",
+          "nullable": true
+        },
+        {
+          "path": "facts.tasks.*.profile",
+          "kind": "compute-profile",
+          "when": {
+            "purpose": [
+              "cli",
+              "agent",
+              "subtask"
+            ]
+          }
+        },
+        {
+          "path": "facts.tasks.*.profile",
+          "kind": "compute-profile",
+          "when": {
+            "kind": "profile-test",
+            "parentTaskId": null
+          }
+        },
+        {
+          "path": "facts.tasks.*.profile",
+          "kind": "task-profile",
+          "when": {
+            "kind": [
+              "dev-session",
+              "business"
+            ],
+            "parentTaskId": null
+          }
+        }
+      ],
+      "targetColumn": "body",
+      "provenanceColumn": "identity_provenance"
+    },
+    {
+      "table": "inspections",
+      "column": "legacy_body",
+      "references": [
+        {
+          "path": "target.projectId",
+          "kind": "project",
+          "nullable": true
+        },
+        {
+          "path": "target.serviceId",
+          "kind": "service",
+          "nullable": true
+        },
+        {
+          "path": "target.taskId",
+          "kind": "task",
+          "nullable": true
+        },
+        {
+          "path": "target.agentId",
+          "kind": "agent",
+          "nullable": true
+        },
+        {
+          "path": "target.terminalId",
+          "kind": "terminal",
+          "nullable": true
+        },
+        {
+          "path": "target.profileTestId",
+          "kind": "profile-test",
+          "nullable": true
+        },
+        {
+          "path": "target.releaseId",
+          "kind": "release",
+          "nullable": true
+        },
+        {
+          "path": "after.projectId",
+          "kind": "project",
+          "nullable": true
+        },
+        {
+          "path": "after.serviceId",
+          "kind": "service",
+          "nullable": true
+        },
+        {
+          "path": "after.taskId",
+          "kind": "task",
+          "nullable": true
+        },
+        {
+          "path": "after.agentId",
+          "kind": "agent",
+          "nullable": true
+        },
+        {
+          "path": "after.terminalId",
+          "kind": "terminal",
+          "nullable": true
+        },
+        {
+          "path": "after.profileTestId",
+          "kind": "profile-test",
+          "nullable": true
+        },
+        {
+          "path": "after.releaseId",
+          "kind": "release",
+          "nullable": true
+        },
+        {
+          "path": "resources.*.projectId",
+          "kind": "project",
+          "nullable": true
+        },
+        {
+          "path": "resources.*.serviceId",
+          "kind": "service",
+          "nullable": true
+        },
+        {
+          "path": "resources.*.taskId",
+          "kind": "task",
+          "nullable": true
+        },
+        {
+          "path": "resources.*.agentId",
+          "kind": "agent",
+          "nullable": true
+        },
+        {
+          "path": "resources.*.terminalId",
+          "kind": "terminal",
+          "nullable": true
+        },
+        {
+          "path": "resources.*.profileTestId",
+          "kind": "profile-test",
+          "nullable": true
+        },
+        {
+          "path": "resources.*.releaseId",
+          "kind": "release",
+          "nullable": true
+        },
+        {
+          "path": "inspectionId",
+          "kind": "cluster-inspection"
+        },
+        {
+          "path": "target.ownership.projectId",
+          "kind": "project"
+        },
+        {
+          "path": "target.parentTaskId",
+          "kind": "task"
+        },
+        {
+          "path": "after.ownership.projectId",
+          "kind": "project"
+        },
+        {
+          "path": "after.parentTaskId",
+          "kind": "task"
+        },
+        {
+          "path": "resources.*.ownership.projectId",
+          "kind": "project"
+        },
+        {
+          "path": "resources.*.parentTaskId",
+          "kind": "task"
+        },
+        {
+          "path": "target.resourceId",
+          "kind": "cluster-resource",
+          "keys": [
+            "uid"
+          ]
+        },
+        {
+          "path": "target.owners.*.resourceId",
+          "kind": "cluster-resource",
+          "keys": [
+            "uid"
+          ]
+        },
+        {
+          "path": "after.resourceId",
+          "kind": "cluster-resource",
+          "keys": [
+            "uid"
+          ]
+        },
+        {
+          "path": "after.owners.*.resourceId",
+          "kind": "cluster-resource",
+          "keys": [
+            "uid"
+          ]
+        },
+        {
+          "path": "target.facts.profileTestId",
+          "kind": "profile-test"
+        },
+        {
+          "path": "target.profile",
+          "kind": "compute-profile",
+          "when": {
+            "purpose": [
+              "development-cli",
+              "development-agent",
+              "business-subtask",
+              "profile-test"
+            ]
+          }
+        },
+        {
+          "path": "target.profile",
+          "kind": "task-profile",
+          "when": {
+            "purpose": [
+              "development-workspace",
+              "business-workspace"
+            ]
+          }
+        },
+        {
+          "path": "target.domainRevision",
+          "kind": "release",
+          "serializedPath": "1",
+          "nullable": true,
+          "when": {
+            "kind": "Deployment"
+          }
+        },
+        {
+          "path": "after.facts.profileTestId",
+          "kind": "profile-test"
+        },
+        {
+          "path": "after.profile",
+          "kind": "compute-profile",
+          "when": {
+            "purpose": [
+              "development-cli",
+              "development-agent",
+              "business-subtask",
+              "profile-test"
+            ]
+          }
+        },
+        {
+          "path": "after.profile",
+          "kind": "task-profile",
+          "when": {
+            "purpose": [
+              "development-workspace",
+              "business-workspace"
+            ]
+          }
+        },
+        {
+          "path": "after.domainRevision",
+          "kind": "release",
+          "serializedPath": "1",
+          "nullable": true,
+          "when": {
+            "kind": "Deployment"
+          }
+        },
+        {
+          "path": "domain.taskId",
+          "kind": "task"
+        },
+        {
+          "path": "domain.parentTaskId",
+          "kind": "task"
+        },
+        {
+          "path": "domain.agentId",
+          "kind": "agent"
+        },
+        {
+          "path": "domain.subtaskId",
+          "kind": "subtask"
+        },
+        {
+          "path": "domain.testId",
+          "kind": "profile-test"
+        },
+        {
+          "path": "domain.rebuild.expectedTaskId",
+          "kind": "task"
+        },
+        {
+          "path": "domain.profile.profile",
+          "kind": "compute-profile",
+          "rename": "profileId"
+        },
+        {
+          "path": "domain.rebuild.profile.name",
+          "kind": "task-profile",
+          "copyTo": "id"
+        },
+        {
+          "path": "domain.revision",
+          "kind": "release",
+          "serializedPath": "1",
+          "nullable": true
+        }
+      ],
+      "targetColumn": "body",
+      "provenanceColumn": "identity_provenance"
+    },
+    {
+      "table": "operations",
+      "column": "legacy_body",
+      "references": [
+        {
+          "path": "target.projectId",
+          "kind": "project",
+          "nullable": true
+        },
+        {
+          "path": "target.serviceId",
+          "kind": "service",
+          "nullable": true
+        },
+        {
+          "path": "target.taskId",
+          "kind": "task",
+          "nullable": true
+        },
+        {
+          "path": "target.agentId",
+          "kind": "agent",
+          "nullable": true
+        },
+        {
+          "path": "target.terminalId",
+          "kind": "terminal",
+          "nullable": true
+        },
+        {
+          "path": "target.profileTestId",
+          "kind": "profile-test",
+          "nullable": true
+        },
+        {
+          "path": "target.releaseId",
+          "kind": "release",
+          "nullable": true
+        },
+        {
+          "path": "after.projectId",
+          "kind": "project",
+          "nullable": true
+        },
+        {
+          "path": "after.serviceId",
+          "kind": "service",
+          "nullable": true
+        },
+        {
+          "path": "after.taskId",
+          "kind": "task",
+          "nullable": true
+        },
+        {
+          "path": "after.agentId",
+          "kind": "agent",
+          "nullable": true
+        },
+        {
+          "path": "after.terminalId",
+          "kind": "terminal",
+          "nullable": true
+        },
+        {
+          "path": "after.profileTestId",
+          "kind": "profile-test",
+          "nullable": true
+        },
+        {
+          "path": "after.releaseId",
+          "kind": "release",
+          "nullable": true
+        },
+        {
+          "path": "resources.*.projectId",
+          "kind": "project",
+          "nullable": true
+        },
+        {
+          "path": "resources.*.serviceId",
+          "kind": "service",
+          "nullable": true
+        },
+        {
+          "path": "resources.*.taskId",
+          "kind": "task",
+          "nullable": true
+        },
+        {
+          "path": "resources.*.agentId",
+          "kind": "agent",
+          "nullable": true
+        },
+        {
+          "path": "resources.*.terminalId",
+          "kind": "terminal",
+          "nullable": true
+        },
+        {
+          "path": "resources.*.profileTestId",
+          "kind": "profile-test",
+          "nullable": true
+        },
+        {
+          "path": "resources.*.releaseId",
+          "kind": "release",
+          "nullable": true
+        },
+        {
+          "path": "inspectionId",
+          "kind": "cluster-inspection"
+        },
+        {
+          "path": "operationId",
+          "kind": "cluster-operation"
+        },
+        {
+          "path": "actorId",
+          "kind": "user"
+        },
+        {
+          "path": "target.ownership.projectId",
+          "kind": "project"
+        },
+        {
+          "path": "target.parentTaskId",
+          "kind": "task"
+        },
+        {
+          "path": "after.ownership.projectId",
+          "kind": "project"
+        },
+        {
+          "path": "after.parentTaskId",
+          "kind": "task"
+        },
+        {
+          "path": "resources.*.ownership.projectId",
+          "kind": "project"
+        },
+        {
+          "path": "resources.*.parentTaskId",
+          "kind": "task"
+        },
+        {
+          "path": "target.resourceId",
+          "kind": "cluster-resource",
+          "keys": [
+            "uid"
+          ]
+        },
+        {
+          "path": "target.owners.*.resourceId",
+          "kind": "cluster-resource",
+          "keys": [
+            "uid"
+          ]
+        },
+        {
+          "path": "after.resourceId",
+          "kind": "cluster-resource",
+          "keys": [
+            "uid"
+          ]
+        },
+        {
+          "path": "after.owners.*.resourceId",
+          "kind": "cluster-resource",
+          "keys": [
+            "uid"
+          ]
+        },
+        {
+          "path": "domainOperationId",
+          "kind": "cluster-operation",
+          "nullable": true,
+          "where": {
+            "identity_domain_kind": "cluster-operation"
+          }
+        },
+        {
+          "path": "domainOperationId",
+          "kind": "subtask",
+          "nullable": true,
+          "where": {
+            "identity_domain_kind": "subtask"
+          }
+        },
+        {
+          "path": "domainOperationId",
+          "kind": "task",
+          "nullable": true,
+          "where": {
+            "identity_domain_kind": "task"
+          }
+        },
+        {
+          "path": "target.facts.profileTestId",
+          "kind": "profile-test"
+        },
+        {
+          "path": "target.profile",
+          "kind": "compute-profile",
+          "when": {
+            "purpose": [
+              "development-cli",
+              "development-agent",
+              "business-subtask",
+              "profile-test"
+            ]
+          }
+        },
+        {
+          "path": "target.profile",
+          "kind": "task-profile",
+          "when": {
+            "purpose": [
+              "development-workspace",
+              "business-workspace"
+            ]
+          }
+        },
+        {
+          "path": "target.domainRevision",
+          "kind": "release",
+          "serializedPath": "1",
+          "nullable": true,
+          "when": {
+            "kind": "Deployment"
+          }
+        },
+        {
+          "path": "after.facts.profileTestId",
+          "kind": "profile-test"
+        },
+        {
+          "path": "after.profile",
+          "kind": "compute-profile",
+          "when": {
+            "purpose": [
+              "development-cli",
+              "development-agent",
+              "business-subtask",
+              "profile-test"
+            ]
+          }
+        },
+        {
+          "path": "after.profile",
+          "kind": "task-profile",
+          "when": {
+            "purpose": [
+              "development-workspace",
+              "business-workspace"
+            ]
+          }
+        },
+        {
+          "path": "after.domainRevision",
+          "kind": "release",
+          "serializedPath": "1",
+          "nullable": true,
+          "when": {
+            "kind": "Deployment"
+          }
+        }
+      ],
+      "targetColumn": "body",
+      "provenanceColumn": "identity_provenance"
+    }
+  ],
+  "inlineEntities": [
+    {
+      "table": "operations",
+      "column": "body",
+      "path": "inspectionId",
+      "kind": "cluster-inspection"
+    }
+  ],
+  "finalize": [
+    "ALTER TABLE cluster_management.resource_identities DROP COLUMN legacy_id"
+  ],
+  "imports": [
+    {
+      "table": "refresh_history",
+      "kind": "cluster-refresh",
+      "keys": [
+        "id"
+      ],
+      "idColumn": "id"
+    }
+  ],
+  "declarations": [
+    {
+      "table": "operations",
+      "column": "identity_agent_restart",
+      "path": "agentId",
+      "kind": "cluster-operation",
+      "keys": [
+        "$row.id"
+      ],
+      "fields": {
+        "operation_id": "$row.id",
+        "agent_id": "$value",
+        "task_id": "taskId"
+      }
+    },
+    {
+      "path": "resources.*.profile",
+      "kind": "compute-profile",
+      "when": {
+        "purpose": [
+          "development-cli",
+          "development-agent",
+          "business-subtask",
+          "profile-test"
+        ]
+      },
+      "table": "snapshots",
+      "column": "legacy_body",
+      "fields": {
+        "id": "$value",
+        "name": "$value"
+      }
+    },
+    {
+      "path": "facts.tasks.*.profile",
+      "kind": "compute-profile",
+      "when": {
+        "purpose": [
+          "cli",
+          "agent",
+          "subtask"
+        ]
+      },
+      "table": "snapshots",
+      "column": "legacy_body",
+      "fields": {
+        "id": "$value",
+        "name": "$value"
+      }
+    },
+    {
+      "path": "facts.tasks.*.profile",
+      "kind": "compute-profile",
+      "when": {
+        "kind": "profile-test",
+        "parentTaskId": null
+      },
+      "table": "snapshots",
+      "column": "legacy_body",
+      "fields": {
+        "id": "$value",
+        "name": "$value"
+      }
+    },
+    {
+      "path": "target.profile",
+      "kind": "compute-profile",
+      "when": {
+        "purpose": [
+          "development-cli",
+          "development-agent",
+          "business-subtask",
+          "profile-test"
+        ]
+      },
+      "table": "inspections",
+      "column": "legacy_body",
+      "fields": {
+        "id": "$value",
+        "name": "$value"
+      }
+    },
+    {
+      "path": "after.profile",
+      "kind": "compute-profile",
+      "when": {
+        "purpose": [
+          "development-cli",
+          "development-agent",
+          "business-subtask",
+          "profile-test"
+        ]
+      },
+      "table": "inspections",
+      "column": "legacy_body",
+      "fields": {
+        "id": "$value",
+        "name": "$value"
+      }
+    },
+    {
+      "path": "domain.profile.profile",
+      "kind": "compute-profile",
+      "table": "inspections",
+      "column": "legacy_body",
+      "fields": {
+        "id": "$value",
+        "name": "$value"
+      }
+    },
+    {
+      "path": "target.profile",
+      "kind": "compute-profile",
+      "when": {
+        "purpose": [
+          "development-cli",
+          "development-agent",
+          "business-subtask",
+          "profile-test"
+        ]
+      },
+      "table": "operations",
+      "column": "legacy_body",
+      "fields": {
+        "id": "$value",
+        "name": "$value"
+      }
+    },
+    {
+      "path": "after.profile",
+      "kind": "compute-profile",
+      "when": {
+        "purpose": [
+          "development-cli",
+          "development-agent",
+          "business-subtask",
+          "profile-test"
+        ]
+      },
+      "table": "operations",
+      "column": "legacy_body",
+      "fields": {
+        "id": "$value",
+        "name": "$value"
+      }
+    }
+  ]
+}

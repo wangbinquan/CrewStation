@@ -7,8 +7,8 @@ import { runnerHub } from '../application/runnerHub';
 import type { SessionUseCaseDeps } from '../application/dependencies';
 import type { StoredRunnerEvent } from '../ports/repositories';
 
-const taskId = 'tsk_0123456789abcdef0123456789abcdef' as TaskId;
-const actor = { userId: 'usr_0123456789abcdef0123456789abcdef' as UserId, isAdmin: false };
+const taskId = '01a0bf5d-8f4b-7418-8a3f-7cbb4a1fd751' as TaskId;
+const actor = { userId: '01a0bf5d-8f4b-7793-867c-efd7527b386b' as UserId, isAdmin: false };
 const at = '2026-09-13T00:00:00.000Z';
 const stored = (seq: number): StoredRunnerEvent => ({ taskId, seq, at: new Date(at), event: { kind: 'runnerState', state: 'ready' } });
 
@@ -35,7 +35,7 @@ test('两个现存浏览器连接分别重查权限：撤销的一端停止读�
   const connected = await f.connect(); if (!connected.ok) throw new Error(connected.message);
   const first: unknown[] = [], second: unknown[] = [], closed: number[] = [];
   const one = await f.streams.open(actor, taskId, { send: (raw) => first.push(JSON.parse(raw)), close: (code) => closed.push(code) }, 0);
-  const two = await f.streams.open({ userId: `usr_${'b'.repeat(32)}` as UserId, isAdmin: false }, taskId, { send: (raw) => second.push(JSON.parse(raw)) }, 0);
+  const two = await f.streams.open({ userId: '01a0bf5d-8f4b-7d2c-8398-1524485c437e' as UserId, isAdmin: false }, taskId, { send: (raw) => second.push(JSON.parse(raw)) }, 0);
   revoked = true;
   await f.hub.onMessage(connected.connection, { type: 'event', seq: 1, at, event: stored(1).event });
   await new Promise((resolve) => setTimeout(resolve, 0));

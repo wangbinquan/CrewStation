@@ -17,5 +17,5 @@ export interface ProfileLaunchFields {
 export async function profileLaunchFields(deps: Pick<DevSessionUseCaseDeps, 'compute'>, profile: ProfileRevisionRef | undefined, agentId: string): Promise<ProfileLaunchFields> {
   if (!profile) throw precondition('这条 CLI 记录受理于档位合并之前，没有固定的档位修订，不能再启动；请新建一个 CLI', { code: 'profile_revision_missing' });
   const material = await deps.compute.launchMaterial(profile);
-  return { compute: material.name, profileRevision: material.revision, launch: material.launch, beforeStart: material.beforeStart, processAttemptId: `${agentId}:1` };
+  return { compute: material.id, profileRevision: material.revision, launch: material.launch, beforeStart: material.beforeStart, processAttemptId: `${agentId}:1` };
 }

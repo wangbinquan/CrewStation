@@ -1,0 +1,170 @@
+{
+  "version": "resource-identity/v1",
+  "schema": "platform_infra",
+  "entities": [],
+  "references": [],
+  "documents": [
+    {
+      "table": "jobs",
+      "column": "legacy_payload",
+      "targetColumn": "payload",
+      "where": {
+        "kind": "project.provision"
+      },
+      "references": [
+        {
+          "path": "projectId",
+          "kind": "project"
+        }
+      ],
+      "provenanceColumn": "identity_provenance"
+    },
+    {
+      "table": "jobs",
+      "column": "legacy_payload",
+      "targetColumn": "payload",
+      "where": {
+        "kind": "events.deliver"
+      },
+      "references": [
+        {
+          "path": "deliveryId",
+          "kind": "delivery"
+        }
+      ],
+      "provenanceColumn": "identity_provenance"
+    },
+    {
+      "table": "jobs",
+      "column": "legacy_payload",
+      "targetColumn": "payload",
+      "where": {
+        "kind": "release.pipeline"
+      },
+      "references": [
+        {
+          "path": "releaseId",
+          "kind": "release"
+        }
+      ],
+      "provenanceColumn": "identity_provenance"
+    },
+    {
+      "table": "jobs",
+      "column": "legacy_payload",
+      "targetColumn": "payload",
+      "where": {
+        "kind": "agent-runtime.profile-test"
+      },
+      "references": [
+        {
+          "path": "testId",
+          "kind": "profile-test"
+        }
+      ],
+      "provenanceColumn": "identity_provenance"
+    },
+    {
+      "table": "jobs",
+      "column": "legacy_payload",
+      "targetColumn": "payload",
+      "where": {
+        "kind": "task-runtime.rebuild"
+      },
+      "references": [
+        {
+          "path": "requestId",
+          "kind": "rebuild"
+        }
+      ],
+      "provenanceColumn": "identity_provenance"
+    },
+    {
+      "table": "jobs",
+      "column": "legacy_payload",
+      "targetColumn": "payload",
+      "where": {
+        "kind": "task-runtime.native-execution"
+      },
+      "references": [
+        {
+          "path": "taskId",
+          "kind": "task"
+        }
+      ],
+      "provenanceColumn": "identity_provenance"
+    },
+    {
+      "table": "jobs",
+      "column": "legacy_payload",
+      "targetColumn": "payload",
+      "where": {
+        "kind": "cluster-management.refresh"
+      },
+      "references": [
+        {
+          "path": "requestId",
+          "kind": "cluster-refresh"
+        }
+      ],
+      "provenanceColumn": "identity_provenance"
+    },
+    {
+      "table": "jobs",
+      "column": "legacy_payload",
+      "targetColumn": "payload",
+      "where": {
+        "kind": "cluster-management.operation"
+      },
+      "references": [
+        {
+          "path": "operationId",
+          "kind": "cluster-operation"
+        }
+      ],
+      "provenanceColumn": "identity_provenance"
+    }
+  ],
+  "finalize": [
+    "UPDATE platform_infra.jobs SET dedup_key = (payload->>'projectId') || substring(dedup_key FROM length(legacy_payload->>'projectId') + 1) WHERE kind = 'project.provision' AND dedup_key IS NOT NULL AND starts_with(dedup_key, legacy_payload->>'projectId')",
+    "UPDATE platform_infra.jobs SET dedup_key = (payload->>'deliveryId') || substring(dedup_key FROM length(legacy_payload->>'deliveryId') + 1) WHERE kind = 'events.deliver' AND dedup_key IS NOT NULL AND starts_with(dedup_key, legacy_payload->>'deliveryId')",
+    "UPDATE platform_infra.jobs SET dedup_key = (payload->>'releaseId') || substring(dedup_key FROM length(legacy_payload->>'releaseId') + 1) WHERE kind = 'release.pipeline' AND dedup_key IS NOT NULL AND starts_with(dedup_key, legacy_payload->>'releaseId')",
+    "UPDATE platform_infra.jobs SET dedup_key = (payload->>'testId') || substring(dedup_key FROM length(legacy_payload->>'testId') + 1) WHERE kind = 'agent-runtime.profile-test' AND dedup_key IS NOT NULL AND starts_with(dedup_key, legacy_payload->>'testId')",
+    "UPDATE platform_infra.jobs SET dedup_key = (payload->>'requestId') || substring(dedup_key FROM length(legacy_payload->>'requestId') + 1) WHERE kind = 'task-runtime.rebuild' AND dedup_key IS NOT NULL AND starts_with(dedup_key, legacy_payload->>'requestId')",
+    "UPDATE platform_infra.jobs SET dedup_key = (payload->>'taskId') || substring(dedup_key FROM length(legacy_payload->>'taskId') + 1) WHERE kind = 'task-runtime.native-execution' AND dedup_key IS NOT NULL AND starts_with(dedup_key, legacy_payload->>'taskId')",
+    "UPDATE platform_infra.jobs SET dedup_key = (payload->>'requestId') || substring(dedup_key FROM length(legacy_payload->>'requestId') + 1) WHERE kind = 'cluster-management.refresh' AND dedup_key IS NOT NULL AND starts_with(dedup_key, legacy_payload->>'requestId')",
+    "UPDATE platform_infra.jobs SET dedup_key = (payload->>'operationId') || substring(dedup_key FROM length(legacy_payload->>'operationId') + 1) WHERE kind = 'cluster-management.operation' AND dedup_key IS NOT NULL AND starts_with(dedup_key, legacy_payload->>'operationId')"
+  ],
+  "declarations": [
+    {
+      "table": "jobs",
+      "column": "legacy_payload",
+      "where": {
+        "kind": "cluster-management.refresh"
+      },
+      "path": "requestId",
+      "kind": "cluster-refresh",
+      "keys": [
+        "$value"
+      ],
+      "fields": {
+        "id": "$value"
+      }
+    },
+    {
+      "table": "jobs",
+      "column": "legacy_payload",
+      "where": {
+        "kind": "agent-runtime.profile-test"
+      },
+      "path": "testId",
+      "kind": "profile-test",
+      "keys": [
+        "$value"
+      ],
+      "fields": {
+        "id": "$value"
+      }
+    }
+  ]
+}

@@ -1,3 +1,4 @@
+import { newDraftResourceId } from '@crewstation/api-client';
 import type { BeforeStartStep, ScriptLanguage } from '@crewstation/contracts';
 import { BEFORE_START_LIMITS, StepIdSchema } from '@crewstation/contracts';
 
@@ -50,10 +51,8 @@ export const SCRIPT_EXAMPLES: Record<ScriptLanguage, string> = {
   custom: '# 由自定义解释器执行；解释器路径写在“解释器”里，一行一个参数。\n',
 };
 
-export function newStep(kind: StepDraft['kind'], existing: readonly StepDraft[]): StepDraft {
-  let n = existing.length + 1;
-  while (existing.some((s) => s.stepId === `${kind}-${n}`)) n += 1;
-  const stepId = `${kind}-${n}`;
+export function newStep(kind: StepDraft['kind'], _existing: readonly StepDraft[]): StepDraft {
+  const stepId = newDraftResourceId();
   return stepFromDto(kind === 'file'
     ? { kind: 'file', stepId, name: '', pathTemplate: '{{agent.home}}/', contentTemplate: '', format: 'text', mode: 0o600, existing: 'require-same' }
     : { kind: 'script', stepId, name: '', language: 'shell', source: SCRIPT_EXAMPLES.shell, argv: [], timeoutMs: BEFORE_START_LIMITS.defaultScriptTimeoutMs });
@@ -70,9 +69,7 @@ export function moveStep(steps: StepDraft[], index: number, delta: -1 | 1): Step
 export function duplicateStep(steps: StepDraft[], index: number): StepDraft[] {
   const source = steps[index];
   if (!source) return steps;
-  let n = 2;
-  while (steps.some((s) => s.stepId === `${source.stepId}-${n}`)) n += 1;
-  const copy = { ...source, stepId: `${source.stepId}-${n}`, name: `${source.name} (2)` };
+  const copy = { ...source, stepId: newDraftResourceId(), name: `${source.name} (2)` };
   return [...steps.slice(0, index + 1), copy, ...steps.slice(index + 1)];
 }
 

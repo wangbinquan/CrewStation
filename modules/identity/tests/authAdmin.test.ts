@@ -17,7 +17,7 @@ import { BASE_SETTINGS, completeBootstrap, identityModuleFor, loginWithPassword,
 
 const available = await testDatabaseAvailable();
 const ISSUER = 'https://idp.corp.example';
-const projectId = 'prj_0123456789abcdef0123456789abcdef' as ProjectId;
+const projectId = '01a0bf5d-8f4b-7178-82e1-9a99060b1192' as ProjectId;
 let tdb: TestDatabase;
 let identity: IdentityModule;
 let app: Hono<AppEnv>;

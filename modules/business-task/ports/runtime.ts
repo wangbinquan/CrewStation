@@ -1,4 +1,4 @@
-import type { Actor, AgentProtocol, BeforeStartMaterial, ComputeUsage, LaunchSpec, ProfileRevisionRef, ProjectId, RunnerCommand, RunnerEvent, ServiceId, TaskId, TraceId, VolumeMode } from '@crewstation/contracts';
+import type { Actor, AgentProtocol, BeforeStartMaterial, ComputeProfileSelector, ComputeUsage, LaunchSpec, ProfileRevisionRef, ProjectId, RunnerCommand, RunnerEvent, ServiceId, TaskId, TraceId, VolumeMode } from '@crewstation/contracts';
 
 export interface EnvironmentView {
   id: TaskId;
@@ -7,6 +7,7 @@ export interface EnvironmentView {
   connected: boolean;
   traceId: string;
   podName: string;
+  profile: string;
   message?: string;
   /** 子任务的独立执行环境（RFC-006 §5.4）；业务任务容器本身没有。 */
   native?: { state: 'queued' | 'starting' | 'running' | 'cleaning' | 'finished'; failureReason?: string };
@@ -15,7 +16,7 @@ export interface EnvironmentView {
 /** Agent 子任务的独立执行环境（每个 Agent 一个 Pod，占一个项目并发额度）；image 是档位修订按摘要固定的镜像。 */
 export interface CreateSubtaskExecutionInput {
   id: TaskId; parentTaskId: TaskId; purpose: 'subtask'; agentId: string; runnerId: string; fingerprint: string;
-  profile?: string; image?: string; computeProfile?: { name: string; revision: number };
+  profile?: string; image?: string; computeProfile?: { profileId: string; revision: number };
 }
 
 /** 由 task-runtime 提供。 */
@@ -41,6 +42,7 @@ export interface ServiceDirectory {
 
 /** 受理时解析出的档位（RFC-006）：`default` 已换成真实名称，修订固定。 */
 export interface ResolvedCompute {
+  id: string;
   name: string;
   revision: number;
   protocol: AgentProtocol;
@@ -60,7 +62,7 @@ export interface ComputeLaunch extends ResolvedCompute {
  * 不存在报 validation（details.available 列出可选）；没有默认档位、档位不可用报 precondition；终端档位报 validation。
  */
 export interface ComputeCatalog {
-  resolve(nameOrDefault: string | undefined, usage: ComputeUsage, projectId: ProjectId): Promise<ResolvedCompute>;
+  resolve(selector: ComputeProfileSelector | undefined, usage: ComputeUsage, projectId: ProjectId): Promise<ResolvedCompute>;
   /** 按受理时固定的修订取材料：停用或改了当前修订都不影响它。 */
   launchMaterial(ref: ProfileRevisionRef): Promise<ComputeLaunch>;
 }

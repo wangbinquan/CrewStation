@@ -3,6 +3,9 @@ import type { ConfigItem } from './configItem';
 import { byName } from './configItem';
 
 export interface ConfigVersionEntry {
+  readonly itemId: string;
+  readonly definitionId: string;
+  readonly bindingName: string;
   readonly name: string;
   readonly isSecret: boolean;
   /** 与 ConfigItem.value 同义：Secret 存密文，Release 可据此重建注入内容。 */
@@ -20,7 +23,7 @@ export interface ConfigVersion {
 }
 
 export function snapshotOf(projectId: ProjectId, env: ConfigEnv, version: number, items: readonly ConfigItem[], createdBy: UserId, createdAt: Date): ConfigVersion {
-  const entries = [...items].sort(byName).map(({ name, isSecret, value }) => ({ name, isSecret, value }));
+  const entries = [...items].sort(byName).map(({ id, definitionId, bindingName, name, isSecret, value }) => ({ itemId: id, definitionId, bindingName, name, isSecret, value }));
   return { projectId, env, version, entries, createdBy, createdAt };
 }
 
@@ -30,11 +33,11 @@ export function keysOf(entries: readonly { name: string }[]): string[] {
 
 /** Manifest env 段引用的配置项键：缺省取环境变量名本身。 */
 export function configKeyOf(entry: EnvEntry): string {
-  return entry.key ?? entry.name;
+  return entry.configDefinitionId;
 }
 
 /** 取值组里不存在的键；Release 与开发会话启动前据此拒绝或提示。 */
-export function missingKeys(entries: readonly EnvEntry[], present: readonly { name: string }[]): string[] {
-  const names = new Set(present.map((p) => p.name));
+export function missingKeys(entries: readonly EnvEntry[], present: readonly { definitionId: string }[]): string[] {
+  const names = new Set(present.map((p) => p.definitionId));
   return [...new Set(entries.map(configKeyOf).filter((key) => !names.has(key)))];
 }

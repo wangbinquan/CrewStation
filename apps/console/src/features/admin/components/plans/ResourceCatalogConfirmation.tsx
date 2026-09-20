@@ -10,7 +10,7 @@ export function ResourceCatalogConfirmation({ kind, writer }: { readonly kind: R
   const t = useT(), snapshot = writer.confirmation;
   if (!snapshot) return null;
   const before = resourceCatalogDraft(snapshot.before), after = resourceCatalogDraft(snapshot.input);
-  const fields: readonly ResourceCatalogField[] = ['cpu', 'memory', kind === 'service' ? 'maxReplicas' : 'storage', 'description'];
+  const fields: readonly ResourceCatalogField[] = ['name', 'cpu', 'memory', kind === 'service' ? 'maxReplicas' : 'storage', 'description'];
   return <ConfirmationPanel question={t(snapshot.before ? 'admin.resource.overwriteQuestion' : 'admin.resource.createQuestion', { kind: t(`admin.resource.${kind}`), name: snapshot.input.name })} hint={t('admin.resource.confirmHint')} confirmLabel={t(snapshot.before ? 'admin.resource.confirmOverwrite' : 'admin.resource.confirmCreate')} cancelLabel={t('ui.draft.stay')} busy={writer.busy} confirmDisabled={writer.unavailable} onConfirm={() => { void writer.confirm(); }} onCancel={writer.cancel}>
     {writer.changed ? <ActionNote tone="neutral">{t('admin.resource.changed')}</ActionNote> : null}
     <DataTable columns={[t('admin.resource.field'), t('admin.resource.current'), t('admin.resource.next')]}>{fields.map((field) => <tr key={field}>

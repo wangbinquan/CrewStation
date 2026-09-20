@@ -1,3 +1,7 @@
+import { BUILTIN_RESOURCES } from '@crewstation/contracts';
+const computeIds = new Map<string, string>();
+const computeId = (name: string): string => { if (!computeIds.has(name)) computeIds.set(name, Bun.randomUUIDv7()); return computeIds.get(name)!; };
+const computeSelector = (name: string) => name === 'default' ? { kind: 'default' as const } : { kind: 'profile' as const, profileId: computeId(name) };
 import { forbidden } from '@crewstation/kernel';
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import type { Actor, ProjectId, ReleaseId, ServiceId, UserId } from '@crewstation/contracts';
@@ -14,25 +18,25 @@ const available = await testDatabaseAvailable();
 let tdb: TestDatabase;
 let k8s: FakeK8sClient;
 let release: ReleaseModule;
-const owner: Actor = { userId: 'usr_0123456789abcdef0123456789abcdef' as UserId, isAdmin: false };
-const serviceId = 'svc_0123456789abcdef0123456789abcdef' as ServiceId;
-const projectId = 'prj_0123456789abcdef0123456789abcdef' as ProjectId;
+const owner: Actor = { userId: '01a0bf5d-8f4b-7793-867c-efd7527b386b' as UserId, isAdmin: false };
+const serviceId = '01a0bf5d-8f4b-76c5-866c-f1feda3d63bb' as ServiceId;
+const projectId = '01a0bf5d-8f4b-7178-82e1-9a99060b1192' as ProjectId;
 let manifestYaml = '';
 let tagCounter = 0;
 let defaultProfile: string | undefined = 'balanced';
 
 const baseManifest = (migration: string, compute = 'default') => `
-apiVersion: crewstation/v1
+apiVersion: crewstation/v2
 kind: DigitalWorker
 spec:
-  service: { command: [bun, run, src/main.ts], port: 3000, healthPath: /healthz, plan: standard-small, replicas: 1 }
-  env: [{ name: GREETING, from: config }]
+  service: { command: [bun, run, src/main.ts], port: 3000, healthPath: /healthz, servicePlanId: ${BUILTIN_RESOURCES.servicePlanSmall}, replicas: 1 }
+  env: [{ name: GREETING, from: config, configDefinitionId: 01a0bf5d-8f4b-7e10-85ed-74d540e5d6f8 }]
   apis: { requested: [], exposes: { openapi: ./openapi.yaml } }
   subscriptions: []
   tasks:
-    profile: coding-medium
+    taskProfileId: ${BUILTIN_RESOURCES.taskProfileMedium}
     defaultVolumeMode: follow-container
-    agentProfiles: [{ name: chat-v1, compute: ${compute}, permission: read-only }]
+    agentProfiles: [{ id: 01a0bf5d-8f4b-761b-8fff-2cf4dc4f242f, name: chat-v1, compute: ${JSON.stringify(computeSelector(compute))}, permission: read-only }]
   release:
     ${migration}
 `;
@@ -52,11 +56,11 @@ beforeAll(async () => {
     authorizer: { authorize: async (actor, _p, action) => { if (action === 'switch-traffic' && actor.userId !== owner.userId) throw new Error('forbidden'); } },
     services: { resolveServiceById: async () => ({ projectId, slug: 'demo', name: 'demo', namespace: 'cs-demo' }) },
     plans: {
-      getServicePlan: async (name) => (name === 'standard-small' ? { name, cpu: '500m', memory: '512Mi', maxReplicas: 3, description: '' } : undefined),
-      lookupComputeProfile: async (name: string, id) => { expect(id).toBe(projectId); if (name === 'private') throw forbidden('项目未获授权使用 private 档位'); return (name === 'default' ? (defaultProfile ? { name: defaultProfile, terminalOnly: false } : undefined) : name === 'balanced' ? { name, terminalOnly: false } : name === 'term-cli' ? { name, terminalOnly: true } : undefined); },
+      getServicePlan: async (id) => (id === BUILTIN_RESOURCES.servicePlanSmall ? { id, name: 'standard-small', cpu: '500m', memory: '512Mi', maxReplicas: 3, description: '' } : undefined),
+      lookupComputeProfile: async (selector, id) => { expect(id).toBe(projectId); const name = selector.kind === "default" ? "default" : [...computeIds].find(([, value]) => value === selector.profileId)?.[0]; if (name === 'private') throw forbidden('项目未获授权使用 private 档位'); return (name === 'default' ? (defaultProfile ? { name: defaultProfile, terminalOnly: false } : undefined) : name === 'balanced' ? { name, terminalOnly: false } : name === 'term-cli' ? { name, terminalOnly: true } : undefined); },
       listComputeProfiles: async () => ['balanced', 'term-cli'],
     },
-    config: { render: async () => ({ values: { GREETING: 'hi' }, version: 7 }), validate: async (_p, _e, keys) => ({ missing: keys.filter((k) => k !== 'GREETING') }) },
+    config: { render: async () => ({ values: { '01a0bf5d-8f4b-7e10-85ed-74d540e5d6f8': 'hi' }, version: 7 }), validate: async (_p, _e, keys) => ({ missing: keys.filter((k) => k !== '01a0bf5d-8f4b-7e10-85ed-74d540e5d6f8') }) },
     data: { envFor: async () => ({ CS_DATABASE_URL: 'postgres://prod' }) },
     hosts: { prodHost: (s) => `${s}.cs.localhost`, previewHost: (s) => `preview.${s}.cs.localhost` },
     isAdmin: async () => false,
@@ -109,9 +113,9 @@ describe.skipIf(!available)('release module', () => {
     const slots = await release.api.getSlots(owner, serviceId);
     expect(slots.map((s) => [s.name, s.state, s.host])).toEqual([['prod', 'empty', 'demo.cs.localhost'], ['preview', 'ready', 'preview.demo.cs.localhost']]);
 
-    await expect(release.api.switchTraffic({ userId: 'usr_ffffffffffffffffffffffffffffffff' as UserId, isAdmin: false }, serviceId, { toSlot: 'preview' })).rejects.toThrow('forbidden');
+    await expect(release.api.switchTraffic({ userId: '01a0bf5d-8f4b-72ed-8b3d-1ceb06a30ca3' as UserId, isAdmin: false }, serviceId, { toSlot: 'preview' })).rejects.toThrow('forbidden');
     await expect(release.api.switchTraffic(owner, serviceId, { toSlot: 'preview', expectedActiveRelease: dto.id })).rejects.toMatchObject({ kind: 'precondition' });
-    await expect(release.api.switchTraffic(owner, serviceId, { toSlot: 'preview', expectedActiveRelease: null, expectedTargetRelease: 'rel_ffffffffffffffffffffffffffffffff' as ReleaseId })).rejects.toMatchObject({ kind: 'precondition' });
+    await expect(release.api.switchTraffic(owner, serviceId, { toSlot: 'preview', expectedActiveRelease: null, expectedTargetRelease: '01a0bf5d-8f4b-7c03-891e-3d6d1b2b3fdb' as ReleaseId })).rejects.toMatchObject({ kind: 'precondition' });
     const switched = await release.api.switchTraffic(owner, serviceId, { toSlot: 'preview', expectedActiveRelease: null, expectedTargetRelease: dto.id });
     expect(switched.releaseId).toBe(dto.id);
     // 记的是发布从待命槽接管生产流量，不是物理槽名：首次晋级没有上一个发布。
@@ -124,7 +128,7 @@ describe.skipIf(!available)('release module', () => {
     // 回退：再发一个版本到待命槽后切回去，记录要带上切走前的线上发布。
     const second = await release.api.publish(owner, serviceId, { branch: 'main', version: 'patch' });
     await release.api.runPipelineStep(second.id);
-    await markJob(`build-${second.id.slice(-12)}`, true);
+    await markJob(`build-${second.id.replaceAll('-', '')}`, true);
     await release.api.runPipelineStep(second.id);
     await markDeployment('demo-blue', 1);
     await release.api.runPipelineStep(second.id);
@@ -138,10 +142,10 @@ describe.skipIf(!available)('release module', () => {
     manifestYaml = baseManifest('migrationCommand: [bun, run, db:migrate]\n    migration: { compatibility: expand-only, destructive: false, rollback: switch-back }');
     const dto = await release.api.publish(owner, serviceId, { branch: 'main', version: 'patch' });
     await release.api.runPipelineStep(dto.id);
-    await markJob(`build-${dto.id.slice(-12)}`, true);
+    await markJob(`build-${dto.id.replaceAll('-', '')}`, true);
     await release.api.runPipelineStep(dto.id);
     expect((await release.api.getRelease(owner, dto.id)).status).toBe('migrating');
-    await markJob(`migrate-${dto.id.slice(-12)}`, false);
+    await markJob(`migrate-${dto.id.replaceAll('-', '')}`, false);
     expect(await release.api.runPipelineStep(dto.id)).toEqual({ done: true, retryAfterSeconds: 0 });
     const failed = await release.api.getRelease(owner, dto.id);
     expect(failed.status).toBe('failed');
@@ -151,7 +155,7 @@ describe.skipIf(!available)('release module', () => {
     manifestYaml = baseManifest('migration: { compatibility: destructive, destructive: true, rollback: blocked }');
     const destructive = await release.api.publish(owner, serviceId, { branch: 'main', version: 'minor' });
     await release.api.runPipelineStep(destructive.id);
-    await markJob(`build-${destructive.id.slice(-12)}`, true);
+    await markJob(`build-${destructive.id.replaceAll('-', '')}`, true);
     await release.api.runPipelineStep(destructive.id);
     expect((await release.api.getRelease(owner, destructive.id))).toMatchObject({ status: 'failed', message: expect.stringContaining('维护窗口') });
   });
@@ -167,11 +171,11 @@ describe.skipIf(!available)('release module', () => {
     manifestYaml = baseManifest('migration: { compatibility: none, destructive: false, rollback: switch-back }', compute);
     const dto = await release.api.publish(owner, serviceId, { branch: 'main', version: 'patch' });
     await release.api.runPipelineStep(dto.id);
-    await markJob(`build-${dto.id.slice(-12)}`, true);
+    await markJob(`build-${dto.id.replaceAll('-', '')}`, true);
     await release.api.runPipelineStep(dto.id);
     const failed = await release.api.getRelease(owner, dto.id);
     expect(failed.status).toBe('failed');
-    expect(failed.message).toContain(first);
+    expect(failed.message).toContain(compute === 'nope' ? `算力档位 ${computeId(compute)} 不存在` : first);
     expect(failed.message).toContain(second);
     // 部署一步都没走：没有新的 Deployment。
     expect(k8s.applied.filter((o) => o.kind === 'Deployment' && (o.metadata.name as string).includes(dto.id.slice(-6))).length).toBe(0);
@@ -179,14 +183,14 @@ describe.skipIf(!available)('release module', () => {
     manifestYaml = baseManifest('migration: { compatibility: none, destructive: false, rollback: switch-back }');
   });
 
-  test('两个槽当前版本引用的档位按名称列出，经 default 的不计（RFC-006 P8）', async () => {
+  test('两个槽当前版本引用的档位按 UUID 列出，经 default 的不计（RFC-006 P8）', async () => {
     manifestYaml = baseManifest('migration: { compatibility: none, destructive: false, rollback: switch-back }', 'balanced');
     const dto = await release.api.publish(owner, serviceId, { branch: 'main', version: 'patch' });
     for (let i = 0; i < 6; i += 1) {
       await release.api.runPipelineStep(dto.id);
-      await markJob(`build-${dto.id.slice(-12)}`, true);
+      await markJob(`build-${dto.id.replaceAll('-', '')}`, true);
     }
-    expect(await release.api.deployedComputeReferences(serviceId)).toContain('balanced');
+    expect(await release.api.deployedComputeReferences(serviceId)).toContain(computeId('balanced'));
     expect(await release.api.deployedComputeReferences(serviceId)).not.toContain('default');
     manifestYaml = baseManifest('migration: { compatibility: none, destructive: false, rollback: switch-back }');
   });

@@ -1,0 +1,590 @@
+{
+  "version": "resource-identity/v1",
+  "schema": "release",
+  "entities": [
+    {
+      "table": "releases",
+      "kind": "release",
+      "keys": [
+        "id"
+      ],
+      "idColumn": "id"
+    },
+    {
+      "table": "traffic_switches",
+      "kind": "traffic-switch",
+      "keys": [
+        "id"
+      ],
+      "idColumn": "id"
+    }
+  ],
+  "references": [
+    {
+      "table": "releases",
+      "column": "service_id",
+      "kind": "service",
+      "keys": [
+        "service_id"
+      ]
+    },
+    {
+      "table": "releases",
+      "column": "project_id",
+      "kind": "project",
+      "keys": [
+        "project_id"
+      ]
+    },
+    {
+      "table": "releases",
+      "column": "created_by",
+      "kind": "user",
+      "keys": [
+        "created_by"
+      ]
+    },
+    {
+      "table": "service_slots",
+      "column": "service_id",
+      "kind": "service",
+      "keys": [
+        "service_id"
+      ]
+    },
+    {
+      "table": "replica_overrides",
+      "column": "service_id",
+      "kind": "service",
+      "keys": [
+        "service_id"
+      ]
+    },
+    {
+      "table": "slot_maintenance",
+      "column": "service_id",
+      "kind": "service",
+      "keys": [
+        "service_id"
+      ]
+    },
+    {
+      "table": "traffic_switches",
+      "column": "service_id",
+      "kind": "service",
+      "keys": [
+        "service_id"
+      ]
+    },
+    {
+      "table": "traffic_switches",
+      "column": "release_id",
+      "kind": "release",
+      "keys": [
+        "release_id"
+      ]
+    },
+    {
+      "table": "traffic_switches",
+      "column": "previous_release_id",
+      "kind": "release",
+      "keys": [
+        "previous_release_id"
+      ],
+      "nullable": true
+    },
+    {
+      "table": "traffic_switches",
+      "column": "actor_user_id",
+      "kind": "user",
+      "keys": [
+        "actor_user_id"
+      ]
+    },
+    {
+      "table": "slot_maintenance",
+      "column": "id",
+      "kind": "cluster-operation",
+      "keys": [
+        "id"
+      ]
+    }
+  ],
+  "documents": [
+    {
+      "table": "service_slots",
+      "column": "blue",
+      "references": [
+        {
+          "path": "releaseId",
+          "kind": "release",
+          "nullable": true
+        }
+      ]
+    },
+    {
+      "table": "service_slots",
+      "column": "green",
+      "references": [
+        {
+          "path": "releaseId",
+          "kind": "release",
+          "nullable": true
+        }
+      ]
+    },
+    {
+      "table": "releases",
+      "column": "legacy_manifest",
+      "targetColumn": "manifest",
+      "references": [
+        {
+          "path": "spec.service.plan",
+          "kind": "service-plan",
+          "rename": "servicePlanId"
+        },
+        {
+          "path": "spec.tasks.profile",
+          "kind": "task-profile",
+          "rename": "taskProfileId"
+        },
+        {
+          "path": "spec.env.*.name",
+          "kind": "configDefinition",
+          "keys": [
+            "$row.project_id",
+            "key|$value"
+          ],
+          "copyTo": "configDefinitionId"
+        },
+        {
+          "path": "spec.apis.requested.*",
+          "kind": "api-operation",
+          "keys": [
+            "$value.proxy",
+            "$value.method",
+            "$value.path"
+          ],
+          "objectKey": "operationId"
+        },
+        {
+          "path": "spec.subscriptions.*.eventType",
+          "kind": "eventType",
+          "rename": "eventTypeId"
+        },
+        {
+          "path": "spec.tasks.agentProfiles.*.name",
+          "kind": "agent-profile",
+          "keys": [
+            "$row.service_id",
+            "$value"
+          ],
+          "copyTo": "id"
+        },
+        {
+          "path": "spec.tasks.agentProfiles.*.compute",
+          "kind": "compute-profile",
+          "selector": {
+            "defaultValue": "default",
+            "valueKey": "profileId"
+          }
+        },
+        {
+          "path": "spec.tasks.outputContracts.*.name",
+          "kind": "output-contract",
+          "keys": [
+            "$row.service_id",
+            "$value"
+          ],
+          "copyTo": "id"
+        }
+      ],
+      "set": [
+        {
+          "path": "apiVersion",
+          "value": "crewstation/v2"
+        }
+      ],
+      "provenanceColumn": "identity_provenance"
+    },
+    {
+      "table": "slot_maintenance",
+      "column": "legacy_body",
+      "targetColumn": "body",
+      "references": [
+        {
+          "path": "operation.target.projectId",
+          "kind": "project",
+          "nullable": true
+        },
+        {
+          "path": "operation.target.serviceId",
+          "kind": "service",
+          "nullable": true
+        },
+        {
+          "path": "operation.target.taskId",
+          "kind": "task",
+          "nullable": true
+        },
+        {
+          "path": "operation.target.agentId",
+          "kind": "agent",
+          "nullable": true
+        },
+        {
+          "path": "operation.target.terminalId",
+          "kind": "terminal",
+          "nullable": true
+        },
+        {
+          "path": "operation.target.profileTestId",
+          "kind": "profile-test",
+          "nullable": true
+        },
+        {
+          "path": "operation.target.releaseId",
+          "kind": "release",
+          "nullable": true
+        },
+        {
+          "path": "operation.after.projectId",
+          "kind": "project",
+          "nullable": true
+        },
+        {
+          "path": "operation.after.serviceId",
+          "kind": "service",
+          "nullable": true
+        },
+        {
+          "path": "operation.after.taskId",
+          "kind": "task",
+          "nullable": true
+        },
+        {
+          "path": "operation.after.agentId",
+          "kind": "agent",
+          "nullable": true
+        },
+        {
+          "path": "operation.after.terminalId",
+          "kind": "terminal",
+          "nullable": true
+        },
+        {
+          "path": "operation.after.profileTestId",
+          "kind": "profile-test",
+          "nullable": true
+        },
+        {
+          "path": "operation.after.releaseId",
+          "kind": "release",
+          "nullable": true
+        },
+        {
+          "path": "operation.resources.*.projectId",
+          "kind": "project",
+          "nullable": true
+        },
+        {
+          "path": "operation.resources.*.serviceId",
+          "kind": "service",
+          "nullable": true
+        },
+        {
+          "path": "operation.resources.*.taskId",
+          "kind": "task",
+          "nullable": true
+        },
+        {
+          "path": "operation.resources.*.agentId",
+          "kind": "agent",
+          "nullable": true
+        },
+        {
+          "path": "operation.resources.*.terminalId",
+          "kind": "terminal",
+          "nullable": true
+        },
+        {
+          "path": "operation.resources.*.profileTestId",
+          "kind": "profile-test",
+          "nullable": true
+        },
+        {
+          "path": "operation.resources.*.releaseId",
+          "kind": "release",
+          "nullable": true
+        },
+        {
+          "path": "operation.inspectionId",
+          "kind": "cluster-inspection"
+        },
+        {
+          "path": "operation.operationId",
+          "kind": "cluster-operation"
+        },
+        {
+          "path": "operation.actorId",
+          "kind": "user"
+        },
+        {
+          "path": "operation.target.ownership.projectId",
+          "kind": "project"
+        },
+        {
+          "path": "operation.target.parentTaskId",
+          "kind": "task"
+        },
+        {
+          "path": "operation.after.ownership.projectId",
+          "kind": "project"
+        },
+        {
+          "path": "operation.after.parentTaskId",
+          "kind": "task"
+        },
+        {
+          "path": "operation.resources.*.ownership.projectId",
+          "kind": "project"
+        },
+        {
+          "path": "operation.resources.*.parentTaskId",
+          "kind": "task"
+        },
+        {
+          "path": "inspection.target.projectId",
+          "kind": "project",
+          "nullable": true
+        },
+        {
+          "path": "inspection.target.serviceId",
+          "kind": "service",
+          "nullable": true
+        },
+        {
+          "path": "inspection.target.taskId",
+          "kind": "task",
+          "nullable": true
+        },
+        {
+          "path": "inspection.target.agentId",
+          "kind": "agent",
+          "nullable": true
+        },
+        {
+          "path": "inspection.target.terminalId",
+          "kind": "terminal",
+          "nullable": true
+        },
+        {
+          "path": "inspection.target.profileTestId",
+          "kind": "profile-test",
+          "nullable": true
+        },
+        {
+          "path": "inspection.target.releaseId",
+          "kind": "release",
+          "nullable": true
+        },
+        {
+          "path": "inspection.after.projectId",
+          "kind": "project",
+          "nullable": true
+        },
+        {
+          "path": "inspection.after.serviceId",
+          "kind": "service",
+          "nullable": true
+        },
+        {
+          "path": "inspection.after.taskId",
+          "kind": "task",
+          "nullable": true
+        },
+        {
+          "path": "inspection.after.agentId",
+          "kind": "agent",
+          "nullable": true
+        },
+        {
+          "path": "inspection.after.terminalId",
+          "kind": "terminal",
+          "nullable": true
+        },
+        {
+          "path": "inspection.after.profileTestId",
+          "kind": "profile-test",
+          "nullable": true
+        },
+        {
+          "path": "inspection.after.releaseId",
+          "kind": "release",
+          "nullable": true
+        },
+        {
+          "path": "inspection.resources.*.projectId",
+          "kind": "project",
+          "nullable": true
+        },
+        {
+          "path": "inspection.resources.*.serviceId",
+          "kind": "service",
+          "nullable": true
+        },
+        {
+          "path": "inspection.resources.*.taskId",
+          "kind": "task",
+          "nullable": true
+        },
+        {
+          "path": "inspection.resources.*.agentId",
+          "kind": "agent",
+          "nullable": true
+        },
+        {
+          "path": "inspection.resources.*.terminalId",
+          "kind": "terminal",
+          "nullable": true
+        },
+        {
+          "path": "inspection.resources.*.profileTestId",
+          "kind": "profile-test",
+          "nullable": true
+        },
+        {
+          "path": "inspection.resources.*.releaseId",
+          "kind": "release",
+          "nullable": true
+        },
+        {
+          "path": "inspection.inspectionId",
+          "kind": "cluster-inspection"
+        },
+        {
+          "path": "inspection.target.ownership.projectId",
+          "kind": "project"
+        },
+        {
+          "path": "inspection.target.parentTaskId",
+          "kind": "task"
+        },
+        {
+          "path": "inspection.after.ownership.projectId",
+          "kind": "project"
+        },
+        {
+          "path": "inspection.after.parentTaskId",
+          "kind": "task"
+        },
+        {
+          "path": "inspection.resources.*.ownership.projectId",
+          "kind": "project"
+        },
+        {
+          "path": "inspection.resources.*.parentTaskId",
+          "kind": "task"
+        },
+        {
+          "path": "operation.target.resourceId",
+          "kind": "cluster-resource",
+          "keys": [
+            "uid"
+          ]
+        },
+        {
+          "path": "operation.target.domainRevision",
+          "kind": "release",
+          "serializedPath": "1",
+          "nullable": true
+        },
+        {
+          "path": "operation.after.resourceId",
+          "kind": "cluster-resource",
+          "keys": [
+            "uid"
+          ]
+        },
+        {
+          "path": "operation.after.domainRevision",
+          "kind": "release",
+          "serializedPath": "1",
+          "nullable": true
+        },
+        {
+          "path": "inspection.target.resourceId",
+          "kind": "cluster-resource",
+          "keys": [
+            "uid"
+          ]
+        },
+        {
+          "path": "inspection.target.domainRevision",
+          "kind": "release",
+          "serializedPath": "1",
+          "nullable": true
+        },
+        {
+          "path": "inspection.after.resourceId",
+          "kind": "cluster-resource",
+          "keys": [
+            "uid"
+          ]
+        },
+        {
+          "path": "inspection.after.domainRevision",
+          "kind": "release",
+          "serializedPath": "1",
+          "nullable": true
+        },
+        {
+          "path": "inspection.domain.revision",
+          "kind": "release",
+          "serializedPath": "1",
+          "nullable": true
+        }
+      ],
+      "provenanceColumn": "identity_provenance"
+    }
+  ],
+  "inlineEntities": [
+    {
+      "table": "releases",
+      "column": "legacy_manifest",
+      "path": "spec.tasks.agentProfiles.*.name",
+      "kind": "agent-profile",
+      "keys": [
+        "$row.service_id",
+        "$value"
+      ]
+    },
+    {
+      "table": "releases",
+      "column": "legacy_manifest",
+      "path": "spec.tasks.outputContracts.*.name",
+      "kind": "output-contract",
+      "keys": [
+        "$row.service_id",
+        "$value"
+      ]
+    }
+  ],
+  "declarations": [
+    {
+      "table": "releases",
+      "column": "legacy_manifest",
+      "path": "spec.env.*.name",
+      "kind": "configDefinition",
+      "keys": [
+        "$row.project_id",
+        "key|$value"
+      ],
+      "fields": {
+        "project_id": "$row.project_id",
+        "name": "key|$value",
+        "binding_name": "key|$value"
+      }
+    }
+  ]
+}

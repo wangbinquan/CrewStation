@@ -8,7 +8,7 @@ import { AvailabilityBadge, TestSummaryBadge } from './ProfileStatusBadges';
 import styles from './ComputeList.module.css';
 
 /** 长镜像与修订资料可展开，日常扫描保留状态与操作。 */
-export function ProfileListRow({ profile, updatedBy, onOpen }: { readonly profile: ComputeProfileListItem; readonly updatedBy: string; readonly onOpen: (name: string) => void }) {
+export function ProfileListRow({ profile, taskProfileName, updatedBy, onOpen }: { readonly profile: ComputeProfileListItem; readonly taskProfileName?: string; readonly updatedBy: string; readonly onOpen: (name: string) => void }) {
   const t = useT(), date = useDateText();
   return <ProfileRowActions profile={profile} onOpen={onOpen}>{(controls, expanded) => <tr className={expanded ? styles.expandedRow : styles.profileRow}>
     <td><div className={styles.nameLine}><code>{profile.name}</code>{profile.isDefault ? <Badge tone="info">{t('admin.profile.defaultBadge')}</Badge> : null}</div>
@@ -23,7 +23,7 @@ export function ProfileListRow({ profile, updatedBy, onOpen }: { readonly profil
     <td><div className={styles.rowStack}>
       <span>{t(`admin.profile.protocol.${profile.protocol}`)}</span>
       {profile.protocol !== 'terminal' ? <code className={styles.model}>{profile.model || t('admin.profile.modelBinaryDefault')}</code> : null}
-      <span className={styles.hint}>{t('admin.profile.column.taskProfile')}：{profile.taskProfile ?? t('admin.profile.defaultTaskProfile')}</span>
+      <span className={styles.hint}>{t('admin.profile.column.taskProfile')}：{taskProfileName ?? profile.taskProfile ?? t('admin.profile.defaultTaskProfile')}</span>
     </div></td>
     <td><div className={styles.status}><AvailabilityBadge availability={profile.availability} /><TestSummaryBadge test={profile.latestTest} compact /></div></td>
     <td>{controls}</td>

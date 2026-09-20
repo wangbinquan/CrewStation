@@ -1,4 +1,4 @@
-import type { Actor, ConfigEnv, ProjectId, ServiceId, ServicePlanDto } from '@crewstation/contracts';
+import type { Actor, ComputeProfileSelector, ConfigEnv, ProjectId, ServiceId, ServicePlanDto } from '@crewstation/contracts';
 
 export interface ProjectAuthorizer {
   authorize(actor: Actor, projectId: ProjectId, action: 'publish' | 'switch-traffic' | 'view' | 'view-preview'): Promise<unknown>;
@@ -14,7 +14,7 @@ export interface PlanCatalog {
    * 算力档位（RFC-001、RFC-006）：发布时校验 Manifest 引用的档位存在且不是通用终端协议；`default` 解析到当前默认档位。
    * 不看测试状态：能不能用在起 Agent 时判定。
    */
-  lookupComputeProfile(name: string, projectId: ProjectId): Promise<{ name: string; terminalOnly: boolean } | undefined>;
+  lookupComputeProfile(selector: ComputeProfileSelector, projectId: ProjectId): Promise<{ name: string; terminalOnly: boolean } | undefined>;
   listComputeProfiles(): Promise<string[]>;
 }
 

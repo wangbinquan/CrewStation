@@ -1,3 +1,4 @@
+import { computeId } from './computeFixture';
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import { sql } from 'drizzle-orm';
 import type { NativeActivitySignal, NativeTerminalRecord } from '@crewstation/contracts';
@@ -18,8 +19,8 @@ afterAll(async () => { await database?.drop(); });
 
 async function fixture() {
   const taskId = TaskIdSchema.parse(newId('tsk')), agentId = newId('agt');
-  const record: NativeTerminalRecord = { agentId, terminalId: newId('pty'), runnerId: crypto.randomUUID(), compute: 'balanced', permission: 'edit', revision: 1, lifecycle: 'running', startedAt: new Date().toISOString(), cols: 80, rows: 24 };
-  await drizzleNativeTerminals(database.db).reserve({ taskId, createdBy: workspaceActor.userId, clientRequestId: crypto.randomUUID(), fingerprint: 'activity', profile: { profile: 'balanced', revision: 1 }, input: { clientRequestId: crypto.randomUUID(), permission: 'edit', cols: 80, rows: 24 }, record });
+  const record: NativeTerminalRecord = { agentId, terminalId: newId('pty'), runnerId: crypto.randomUUID(), compute: computeId('balanced'), permission: 'edit', revision: 1, lifecycle: 'running', startedAt: new Date().toISOString(), cols: 80, rows: 24 };
+  await drizzleNativeTerminals(database.db).reserve({ taskId, createdBy: workspaceActor.userId, clientRequestId: crypto.randomUUID(), fingerprint: 'activity', profile: { profileId: computeId('balanced'), revision: 1 }, input: { clientRequestId: crypto.randomUUID(), permission: 'edit', cols: 80, rows: 24 }, record });
   let seq = 0;
   const event = (kind: NativeActivitySignal['kind'], ordinal = 0, fields: Partial<NativeActivitySignal> = {}): StoredNativeEvent => {
     const current = ++seq;

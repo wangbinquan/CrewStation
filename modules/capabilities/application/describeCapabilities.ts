@@ -6,12 +6,12 @@ import type { CapabilitySettings, CapabilitySources } from '../ports/sources';
 
 /** 业务任务 API 的约定摘要；与 business-task 模块的 serviceRoutes 一致（只读描述，不是第二份实现）。 */
 const BUSINESS_TASK_API = [
-  { method: 'POST', path: '/v1/business-tasks', summary: '以服务身份创建业务任务（长驻容器）' },
-  { method: 'POST', path: '/v1/business-tasks/{taskId}/subtasks', summary: '提交 Agent 或命令子任务（agentProfile 须在 Manifest 登记）' },
-  { method: 'GET', path: '/v1/business-tasks/{taskId}/subtasks/{subtaskId}', summary: '查询子任务状态与契约校验结果' },
-  { method: 'GET', path: '/v1/business-tasks/{taskId}/subtasks/{subtaskId}/output', summary: '读取子任务输出（text/plain）' },
-  { method: 'POST', path: '/v1/business-tasks/{taskId}/subtasks/{subtaskId}/messages', summary: '给交互模式的 Agent 子任务续消息' },
-  { method: 'POST', path: '/v1/business-tasks/{taskId}/close', summary: '关闭任务并释放容器' },
+  { method: 'POST', path: '/v2/business-tasks', summary: '以服务身份创建业务任务（长驻容器）' },
+  { method: 'POST', path: '/v2/business-tasks/{taskId}/subtasks', summary: '提交 Agent 或命令子任务（agentProfileId 须在 Manifest 登记）' },
+  { method: 'GET', path: '/v2/business-tasks/{taskId}/subtasks/{subtaskId}', summary: '查询子任务状态与契约校验结果' },
+  { method: 'GET', path: '/v2/business-tasks/{taskId}/subtasks/{subtaskId}/output', summary: '读取子任务输出（text/plain）' },
+  { method: 'POST', path: '/v2/business-tasks/{taskId}/subtasks/{subtaskId}/messages', summary: '给交互模式的 Agent 子任务续消息' },
+  { method: 'POST', path: '/v2/business-tasks/{taskId}/close', summary: '关闭任务并释放容器' },
 ];
 
 export function describeCapabilitiesUseCase(sources: CapabilitySources, settings: CapabilitySettings, clock: Clock) {
@@ -36,7 +36,7 @@ export function describeCapabilitiesUseCase(sources: CapabilitySources, settings
       conventions: { identityHeaders: { ...IDENTITY_HEADERS }, env: { ...PLATFORM_ENV }, paths: { ...PLATFORM_PATHS }, eventHeaders: { ...EVENT_HEADERS } },
       identityForwarding: { source: forwarding.source, fields: forwarding.fields, headers: forwarding.headers, tokenClaims: forwarding.tokenClaims },
       ...(quota ? { quota } : {}),
-      ...(plans.find((p) => p.name === settings.defaultServicePlan) ? { plan: plans.find((p) => p.name === settings.defaultServicePlan) } : {}),
+      ...(plans.find((p) => p.id === settings.defaultServicePlan) ? { plan: plans.find((p) => p.id === settings.defaultServicePlan) } : {}),
       computeProfiles,
       config: { development: devKeys, production: prodKeys },
       data,

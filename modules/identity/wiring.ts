@@ -1,3 +1,4 @@
+import type { LegacyIdentityLookup } from './ports/legacyIdentity';
 import { join } from 'node:path';
 import { TOKEN_CLAIMS } from '@crewstation/contracts';
 import type { AppEnv } from '@crewstation/http';
@@ -77,6 +78,7 @@ export type { ResolvedHost, UserSlot } from './domain/hosts';
 
 /** 运行面（cs-auth）的外部能力；缺省实现一律“拒绝／未知”，不配置也安全。 */
 export interface IdentityRuntimeDeps {
+  legacyIds?: LegacyIdentityLookup;
   /** 缺省存到本模块的 identity.signing_keys 表。 */
   keyStore?: KeyStore;
   /** 缺省按 contracts HOST_PATTERNS 与 settings.userDomain 推导。 */
@@ -131,6 +133,7 @@ export function createIdentityModule(deps: IdentityModuleDeps): IdentityModule {
   const idp = deps.idp ?? httpIdpClient({ ...(deps.logger ? { logger: deps.logger } : {}) });
   const useCaseDeps: IdentityUseCaseDeps = {
     users: drizzleUserRepository(deps.db),
+    legacyIds: deps.legacyIds,
     settings: deps.settings,
     session,
     clock,

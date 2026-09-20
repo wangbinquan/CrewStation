@@ -75,7 +75,7 @@ export function releaseQueries(deps: Pick<ReleaseUseCaseDeps, 'uow' | 'authorize
         const id = slots[physical].releaseId;
         const manifest = id ? (await uow.read.releases.getById(id))?.manifest : undefined;
         if (manifest?.kind !== 'DigitalWorker') continue;
-        for (const profile of manifest.spec.tasks?.agentProfiles ?? []) if (profile.compute !== 'default') names.add(profile.compute);
+        for (const profile of manifest.spec.tasks?.agentProfiles ?? []) if (profile.compute.kind === 'profile') names.add(profile.compute.profileId);
       }
       return [...names].sort();
     },

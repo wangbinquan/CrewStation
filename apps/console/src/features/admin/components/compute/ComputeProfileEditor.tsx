@@ -115,7 +115,7 @@ function ProfileEditorForm({ detail, onClose, onCreated }: { readonly detail?: C
         </div>
         <div data-editor-section="test" hidden={view.section !== 'test'} className={styles.panel}>
           <TerminalTestSection draft={editor.draft} errors={editor.errors} disabled={busy} onChange={editor.update} />
-          {detail ? <ProfileTestPanel name={detail.name} latest={detail.latestTest} dirty={editor.dirty} onLocate={view.locate} /> : <p className={styles.stepEmpty}>{t('admin.profile.editor.createTestHint')}</p>}
+          {detail ? <ProfileTestPanel name={detail.id} latest={detail.latestTest} dirty={editor.dirty} onLocate={view.locate} /> : <p className={styles.stepEmpty}>{t('admin.profile.editor.createTestHint')}</p>}
         </div>
       </Tabs>
       </div>

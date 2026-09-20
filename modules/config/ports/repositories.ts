@@ -1,12 +1,20 @@
-import type { ConfigEnv, ProjectId } from '@crewstation/contracts';
+import type { ConfigDefinitionDto, ConfigEnv, ProjectId } from '@crewstation/contracts';
 import type { ConfigItem } from '../domain/configItem';
 import type { ConfigVersion } from '../domain/configVersion';
 
+export interface ConfigDefinitionRepository {
+  list(projectId: ProjectId): Promise<ConfigDefinitionDto[]>;
+  get(projectId: ProjectId, id: string): Promise<ConfigDefinitionDto | undefined>;
+  insert(definition: ConfigDefinitionDto & { projectId: ProjectId }): Promise<void>;
+  insertIfAbsent(definition: ConfigDefinitionDto & { projectId: ProjectId }): Promise<void>;
+  rename(projectId: ProjectId, id: string, name: string): Promise<void>;
+}
+
 export interface ConfigItemRepository {
   list(projectId: ProjectId, env: ConfigEnv): Promise<ConfigItem[]>;
-  get(projectId: ProjectId, env: ConfigEnv, name: string): Promise<ConfigItem | undefined>;
+  get(projectId: ProjectId, env: ConfigEnv, id: string): Promise<ConfigItem | undefined>;
   upsert(item: ConfigItem): Promise<void>;
-  remove(projectId: ProjectId, env: ConfigEnv, name: string): Promise<void>;
+  remove(projectId: ProjectId, env: ConfigEnv, id: string): Promise<void>;
 }
 
 export interface ConfigVersionRepository {

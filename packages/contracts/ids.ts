@@ -1,21 +1,22 @@
 import { z } from 'zod';
 
-const prefixed = (prefix: string) => z.string().regex(new RegExp(`^${prefix}_[0-9a-f]{32}$`), `${prefix} ID 格式不正确`);
+/** RFC-013：完整、小写 UUIDv7；名称与协议符号不得作为资源身份传入。 */
+export const ResourceIdSchema = z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/, '资源 ID 必须是完整的小写 UUIDv7');
 
-export const ProjectIdSchema = prefixed('prj').brand<'ProjectId'>();
-export const ServiceIdSchema = prefixed('svc').brand<'ServiceId'>();
-export const UserIdSchema = prefixed('usr').brand<'UserId'>();
-export const ReleaseIdSchema = prefixed('rel').brand<'ReleaseId'>();
-export const TaskIdSchema = prefixed('tsk').brand<'TaskId'>();
-export const SubtaskIdSchema = prefixed('sub').brand<'SubtaskId'>();
-export const EventIdSchema = prefixed('evt').brand<'EventId'>();
-export const OperationIdSchema = prefixed('op').brand<'OperationId'>();
+export const ProjectIdSchema = ResourceIdSchema.brand<'ProjectId'>();
+export const ServiceIdSchema = ResourceIdSchema.brand<'ServiceId'>();
+export const UserIdSchema = ResourceIdSchema.brand<'UserId'>();
+export const ReleaseIdSchema = ResourceIdSchema.brand<'ReleaseId'>();
+export const TaskIdSchema = ResourceIdSchema.brand<'TaskId'>();
+export const SubtaskIdSchema = ResourceIdSchema.brand<'SubtaskId'>();
+export const EventIdSchema = ResourceIdSchema.brand<'EventId'>();
+export const OperationIdSchema = ResourceIdSchema.brand<'OperationId'>();
 /** RFC-004：管理员运行环境配置与其检查记录。 */
 /** RFC-006：一次算力档位测试。 */
-export const ProfileTestIdSchema = prefixed('pft').brand<'ProfileTestId'>();
+export const ProfileTestIdSchema = ResourceIdSchema.brand<'ProfileTestId'>();
 /** RFC-005：OIDC 身份提供方与一条外部身份关联。 */
-export const OidcProviderIdSchema = prefixed('idp').brand<'OidcProviderId'>();
-export const UserIdentityIdSchema = prefixed('uid').brand<'UserIdentityId'>();
+export const OidcProviderIdSchema = ResourceIdSchema.brand<'OidcProviderId'>();
+export const UserIdentityIdSchema = ResourceIdSchema.brand<'UserIdentityId'>();
 export const TraceIdSchema = z.string().regex(/^[0-9a-f]{32}$/, 'traceId 必须是 32 位十六进制').brand<'TraceId'>();
 
 /** 对外可见的短名：项目 slug、服务名、代理名、事件类型片段都用它。 */

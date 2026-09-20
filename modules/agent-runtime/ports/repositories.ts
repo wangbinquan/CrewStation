@@ -25,7 +25,7 @@ export interface RevisionRepository {
 export interface CredentialRepository {
   list(profile: string): Promise<ProfileCredential[]>;
   upsert(credential: ProfileCredential): Promise<void>;
-  remove(profile: string, name: string): Promise<void>;
+  remove(profile: string, id: string, updatedBy: UserId, updatedAt: Date): Promise<void>;
   removeAll(profile: string): Promise<void>;
 }
 

@@ -12,6 +12,7 @@ export interface Delivery {
   readonly subscriptionId: string;
   readonly serviceId: ServiceId;
   readonly projectId: ProjectId;
+  readonly eventTypeId: string;
   readonly eventType: string;
   readonly state: DeliveryState;
   /** 已开始的尝试次数；信封里的 attempt 就是它。 */
@@ -27,12 +28,12 @@ export interface Delivery {
 const RESUMABLE: readonly DeliveryState[] = ['pending', 'retrying', 'delivering'];
 
 export function newDelivery(
-  id: string, event: { id: EventId; eventType: string; traceId: TraceId },
+  id: string, event: { id: EventId; eventTypeId: string; eventType: string; traceId: TraceId },
   subscription: { id: string; serviceId: ServiceId; projectId: ProjectId }, now: Date,
 ): Delivery {
   return {
     id, eventId: event.id, subscriptionId: subscription.id, serviceId: subscription.serviceId, projectId: subscription.projectId,
-    eventType: event.eventType, state: 'pending', attempts: 0, nextAttemptAt: now, traceId: event.traceId, createdAt: now, updatedAt: now,
+    eventTypeId: event.eventTypeId, eventType: event.eventType, state: 'pending', attempts: 0, nextAttemptAt: now, traceId: event.traceId, createdAt: now, updatedAt: now,
   };
 }
 

@@ -1,98 +1,57 @@
-import type { CreateOidcProviderRequest, OidcProbeResult, OidcProviderDto } from '@crewstation/contracts';
-import { useState } from 'react';
-import type { ReactElement } from 'react';
+import type { CreateOidcProviderRequest, OidcProviderDto } from '@crewstation/contracts';
+import { useRef, useState } from 'react';
 import { api } from '../../../../shared/api/client';
 import { queryKeys } from '../../../../shared/api/queryKeys';
 import { useApiMutation, useApiQuery } from '../../../../shared/api/useApi';
 import { useT } from '../../../../shared/lib/useT';
-import { ActionNote } from '../../../../shared/ui/ActionNote';
 import { ActionRow } from '../../../../shared/ui/ActionRow';
 import { Badge } from '../../../../shared/ui/Badge';
 import { Button } from '../../../../shared/ui/Button';
 import { Card } from '../../../../shared/ui/Card';
-import { DataTable } from '../../../../shared/ui/DataTable';
 import { InlineConfirm } from '../../../../shared/ui/InlineConfirm';
 import { QueryStatus } from '../../../../shared/ui/QueryStatus';
 import { MutationError } from '../MutationError';
+import { useProviderProbe, providerVersion } from '../../hooks/useProviderProbe';
 import { ProviderForm } from './ProviderForm';
+import { ProviderProbePanel } from './provider/ProviderProbePanel';
+import styles from './IdentityAdmin.module.css';
 
-function probeSummary(result: OidcProbeResult, t: (key: string) => string): string {
-  const endpoints = Object.entries(result.endpoints)
-    .map(([key, value]) => `${key}: ${value === null ? t('admin.auth.probeMissing') : `${value.source} ${value.url}`}`)
-    .join('；');
-  const discovery = result.discovery.ok ? t('admin.auth.probeDiscoveryOk') : `${t('admin.auth.probeDiscoveryFailed')}${result.discovery.error ? `（${result.discovery.error}）` : ''}`;
-  const jwks = result.jwksReachable === undefined ? '' : `｜JWKS ${result.jwksReachable ? t('admin.auth.probeReachable') : t('admin.auth.probeUnreachable')}`;
-  return `${result.ok ? t('admin.auth.probeOk') : t('admin.auth.probeNotOk')}｜${discovery}${jwks}｜${endpoints}`;
-}
-
-/** 身份提供方列表与编辑：新增、改、停用、删除、测试连接（RFC-005 §6.2）。 */
-export function ProvidersCard(): ReactElement {
-  const t = useT();
-  const [editing, setEditing] = useState<OidcProviderDto | undefined>(undefined);
-  const [adding, setAdding] = useState(false);
-  const [probe, setProbe] = useState<{ slug: string; text: string } | undefined>(undefined);
+export function ProvidersCard() {
+  const t = useT(), [editing, setEditing] = useState<OidcProviderDto | 'new'>();
   const providers = useApiQuery(queryKeys.authProviders(), () => api.auth.listProviders());
+  const probe = useProviderProbe(), openerId = useRef('');
+  const close = () => { setEditing(undefined); requestAnimationFrame(() => document.getElementById(openerId.current)?.focus()); };
   const invalidate = [queryKeys.authProviders(), queryKeys.loginPolicy(), queryKeys.identityForwarding()];
-  const create = useApiMutation((body: CreateOidcProviderRequest) => api.auth.createProvider(body), { invalidate, onSuccess: () => setAdding(false) });
-  const patch = useApiMutation((input: { id: string; body: CreateOidcProviderRequest }) => api.auth.patchProvider(input.id, input.body), { invalidate, onSuccess: () => setEditing(undefined) });
-  const remove = useApiMutation((id: string) => api.auth.removeProvider(id), { invalidate });
-  const test = useApiMutation((provider: OidcProviderDto) => api.auth.testProvider(provider.id), {
-    onSuccess: () => undefined,
-  });
+  const create = useApiMutation((body: CreateOidcProviderRequest) => api.auth.createProvider(body), { invalidate, onSuccess: close });
+  const patch = useApiMutation((input: { id: string; body: CreateOidcProviderRequest }) => api.auth.patchProvider(input.id, input.body), { invalidate, onSuccess: (provider) => { probe.invalidate(provider.id); close(); } });
+  const remove = useApiMutation((id: string) => api.auth.removeProvider(id), { invalidate, onSuccess: close });
+  const begin = (provider: OidcProviderDto | 'new') => { create.reset(); patch.reset(); remove.reset(); openerId.current = provider === 'new' ? 'provider-new' : `provider-${provider.id}`; setEditing(provider); };
+  if (editing) return <Card className={styles.container} stacked title={editing === 'new' ? t('admin.auth.providerNew') : editing.displayName} extra={<Badge>{editing === 'new' ? t('admin.identity.newProvider') : editing.slug}</Badge>}>
+    <ProviderForm key={editing === 'new' ? 'new' : editing.id} initial={editing === 'new' ? undefined : editing} busy={create.isPending || patch.isPending || remove.isPending}
+      error={create.error?.message ?? patch.error?.message} onCancel={close} onSubmit={(body) => editing === 'new' ? create.mutate(body) : patch.mutate({ id: editing.id, body })} />
+    {editing !== 'new' ? <div className={styles.danger}><strong>{t('admin.identity.removeProvider')}</strong><p className={styles.muted}>{t('admin.auth.removeQuestion')}</p>
+      <InlineConfirm label={t('admin.identity.removeProvider')} question={t('admin.auth.removeQuestion')} busy={remove.isPending || patch.isPending} onConfirm={() => remove.mutate(editing.id)} />
+      <MutationError error={remove.error} messageKey="admin.auth.providerSaveError" />
+    </div> : null}
+  </Card>;
   const items = providers.data?.items ?? [];
-
-  return (
-    <Card stacked title={t('admin.auth.providersTitle')} footer={t('admin.auth.providersHint')}>
-      <MutationError error={create.error ?? patch.error ?? remove.error ?? test.error} messageKey="admin.auth.providerSaveError" />
-      <QueryStatus
-        isPending={providers.isPending}
-        error={providers.error}
-        isEmpty={items.length === 0 && !adding}
-        emptyTitle={t('admin.auth.providersEmptyTitle')}
-        emptyDescription={t('admin.auth.providersEmptyDescription')}
-      />
-      {items.length > 0 ? (
-        <DataTable columns={[t('admin.auth.slug'), t('admin.auth.displayName'), t('admin.auth.issuerUrl'), t('admin.auth.provisioning'), t('admin.auth.enabled'), t('admin.auth.actions')]}>
-          {items.map((provider) => (
-            <tr key={provider.id}>
-              <td><code>{provider.slug}</code></td>
-              <td>{provider.displayName}</td>
-              <td>{provider.issuerUrl}</td>
-              <td>{provider.provisioning === 'auto' ? t('admin.auth.provisioningAuto') : t('admin.auth.provisioningAllowlist')}</td>
-              <td><Badge tone={provider.enabled ? 'info' : 'neutral'}>{provider.enabled ? t('admin.auth.on') : t('admin.auth.off')}</Badge></td>
-              <td><ActionRow>
-                <Button variant="ghost" onClick={() => { setEditing(provider); setAdding(false); }}>{t('admin.auth.edit')}</Button>
-                <Button
-                  variant="ghost"
-                  disabled={test.isPending}
-                  onClick={async () => {
-                    const result = await test.mutateAsync(provider);
-                    setProbe({ slug: provider.slug, text: probeSummary(result, t) });
-                  }}
-                >
-                  {test.isPending && test.variables?.id === provider.id ? t('admin.auth.testing') : t('admin.auth.test')}
-                </Button>
-                <InlineConfirm
-                  label={t('admin.auth.remove')}
-                  question={t('admin.auth.removeQuestion')}
-                  variant="ghost"
-                  busy={remove.isPending && remove.variables === provider.id}
-                  busyLabel={t('admin.auth.saving')}
-                  onConfirm={() => remove.mutate(provider.id)}
-                />
-              </ActionRow></td>
-            </tr>
-          ))}
-        </DataTable>
-      ) : null}
-      {probe ? <ActionNote tone="neutral">{`${probe.slug}：${probe.text}`}</ActionNote> : null}
-      {editing === undefined && !adding ? <Button variant="primary" onClick={() => setAdding(true)}>{t('admin.auth.providerNew')}</Button> : null}
-      {adding ? <ProviderForm busy={create.isPending} onCancel={() => setAdding(false)} onSubmit={(body) => create.mutate(body)} /> : null}
-      {editing === undefined ? null : (
-        <>
-          <ProviderForm key={editing.id} initial={editing} busy={patch.isPending} onCancel={() => setEditing(undefined)} onSubmit={(body) => patch.mutate({ id: editing.id, body })} />
-        </>
-      )}
-    </Card>
-  );
+  return <Card className={styles.container} stacked title={t('admin.auth.providersTitle')} extra={<Button id="provider-new" variant="primary" onClick={() => begin('new')}>{t('admin.auth.providerNew')}</Button>} footer={t('admin.auth.providersHint')}>
+    <QueryStatus isPending={providers.isPending} error={providers.error} isEmpty={!items.length} emptyTitle={t('admin.auth.providersEmptyTitle')} emptyDescription={t('admin.auth.providersEmptyDescription')} />
+    {providers.error ? <Button onClick={() => void providers.refetch()}>{t('admin.identity.retry')}</Button> : null}
+    <div>{items.map((provider) => {
+      const current = probe.probes[provider.id], stale = current !== undefined && current.version !== providerVersion(provider);
+      return <div className={styles.providerRow} key={provider.id}>
+        <div className={styles.providerIdentity}><span className={styles.mark} aria-hidden="true">{Array.from(provider.displayName)[0]}</span>
+          <div className={styles.providerDetails}><div className={styles.providerTitle}><strong>{provider.displayName}</strong><Badge tone={provider.enabled ? 'success' : 'neutral'}>{t(provider.enabled ? 'admin.auth.on' : 'admin.auth.off')}</Badge></div>
+            <div className={styles.meta}><code>{provider.slug}</code><span title={provider.issuerUrl}>{new URL(provider.issuerUrl).host}</span></div>
+            <span className={styles.muted}>{t(provider.provisioning === 'allowlist' ? 'admin.auth.provisioningAllowlist' : 'admin.auth.provisioningAuto')}</span>
+          </div>
+        </div>
+        <ActionRow><Button id={`provider-${provider.id}`} onClick={() => begin(provider)}>{t('admin.auth.edit')}</Button>
+          <Button variant="ghost" disabled={current?.pending && !stale} onClick={() => void probe.run(provider)}>{t(current?.pending && !stale ? 'admin.auth.testing' : 'admin.auth.test')}</Button>
+        </ActionRow>
+        {current ? <ProviderProbePanel probe={current} stale={stale} /> : <span className={styles.muted}>{t('admin.identity.notTested')}</span>}
+      </div>;
+    })}</div>
+  </Card>;
 }

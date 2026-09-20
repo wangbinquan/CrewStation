@@ -1,9 +1,9 @@
-import { createHash } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 import type { K8sClient, K8sObject, ResourceRef } from '@crewstation/k8s';
 import { LABELS, Resources, secretObject } from '@crewstation/k8s';
 import { isPlatformError, precondition } from '@crewstation/kernel';
 import type { TaskEnvironment } from '../../domain/taskEnvironment';
+import { nativeIntent, nativeIntentMatches, taskLabelMatches } from '../../domain/physicalIdentity';
 import type { NativeExecutionCluster } from '../../ports/cluster';
 import { taskPodObject } from './taskObjects';
 
@@ -35,17 +35,12 @@ function resourcesMatch(actual: unknown, expected: Record<string, string>): bool
     });
   });
 }
-const intent = (env: TaskEnvironment) => {
-  const n = env.native!;
-  // RFC-006 新增的用途只在非 cli 执行上参与：既有 CLI Pod 的归属注解不变，回收时仍能核对。
-  const extra = n.purpose && n.purpose !== 'cli' ? [n.purpose] : [];
-  return createHash('sha256').update(JSON.stringify([env.id, n.parentTaskId, n.pvcUid, n.nodeName, n.runnerId, n.agentId, n.terminalId, n.fingerprint, n.profile, n.image, ...extra])).digest('hex');
-};
+const intent = (env: TaskEnvironment) => nativeIntent(env.id, env.native!);
 
 function owned(object: K8sObject, env: TaskEnvironment, expectedUid?: string): string {
   const uid = object.metadata.uid;
-  if (!uid || (expectedUid && expectedUid !== uid) || object.metadata.labels?.[LABELS.task] !== env.id
-    || object.metadata.labels?.[workspaceKey] !== env.native!.parentTaskId || object.metadata.annotations?.[intentKey] !== intent(env)) {
+  if (!uid || (expectedUid && expectedUid !== uid) || !taskLabelMatches(object.metadata.labels?.[LABELS.task], env)
+    || (object.metadata.labels?.[workspaceKey] !== env.native!.parentTaskId && !(env.legacyCluster?.native?.parentTaskId && object.metadata.labels?.[workspaceKey] === env.legacyCluster.native.parentTaskId)) || !nativeIntentMatches(object.metadata.annotations?.[intentKey], env)) {
     throw precondition('CLI 执行资源的归属或实例已变化，停止操作该资源');
   }
   return uid;
@@ -72,8 +67,8 @@ async function inspectWorkspace(k8s: K8sClient, parent: TaskEnvironment) {
   const nodeName = (pod?.spec as { nodeName?: string } | undefined)?.nodeName;
   const modes = (volume?.spec as { accessModes?: string[] } | undefined)?.accessModes;
   const volumes = (pod?.spec as { volumes?: Array<{ persistentVolumeClaim?: { claimName?: string } }> } | undefined)?.volumes;
-  if (!pod?.metadata.uid || pod.metadata.deletionTimestamp || pod.status?.phase !== 'Running' || pod.metadata.labels?.[LABELS.task] !== parent.id || typeof nodeName !== 'string') throw precondition('工作区容器尚未就绪，暂时不能新增 CLI');
-  if (!volume?.metadata.uid || volume.metadata.deletionTimestamp || volume.status?.phase !== 'Bound' || volume.metadata.labels?.[LABELS.task] !== parent.id
+  if (!pod?.metadata.uid || pod.metadata.deletionTimestamp || pod.status?.phase !== 'Running' || !taskLabelMatches(pod.metadata.labels?.[LABELS.task], parent) || typeof nodeName !== 'string') throw precondition('工作区容器尚未就绪，暂时不能新增 CLI');
+  if (!volume?.metadata.uid || volume.metadata.deletionTimestamp || volume.status?.phase !== 'Bound' || !taskLabelMatches(volume.metadata.labels?.[LABELS.task], parent)
     || !volumes?.some((v) => v.persistentVolumeClaim?.claimName === parent.pvcName)) throw precondition('原工作卷尚未就绪或归属已变化，不能新增 CLI');
   if (modes?.includes('ReadWriteOncePod') || !modes?.some((mode) => mode === 'ReadWriteOnce' || mode === 'ReadWriteMany')) throw precondition('当前工作卷不支持多个 CLI 共享写入，请由管理员配置共享工作卷');
   return { podUid: pod.metadata.uid, pvcUid: volume.metadata.uid, nodeName };

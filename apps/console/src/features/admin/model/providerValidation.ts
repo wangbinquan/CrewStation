@@ -16,7 +16,8 @@ export function providerErrors(body: unknown, editing: boolean): Record<string, 
   const errors: Record<string, string> = {};
   for (const issue of result.error.issues) {
     const field = String(issue.path[0]);
-    errors[fields[field] ?? field] = `admin.auth.invalid.${messages[field] ?? 'field'}`;
+    const key = field === 'claimMappings' ? issue.path.join('.') : fields[field] ?? field;
+    errors[key] = `admin.auth.invalid.${messages[field] ?? 'field'}`;
   }
   return errors;
 }

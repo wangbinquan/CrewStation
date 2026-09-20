@@ -5,8 +5,8 @@ import { provisionProjectUseCase } from '../application/provisionProject';
 import type { ProjectFacts, ProvisioningSteps } from '../api/steps';
 
 const facts: ProjectFacts = {
-  projectId: 'prj_0123456789abcdef0123456789abcdef' as ProjectId, state: 'provisioning', serviceId: 'svc_0123456789abcdef0123456789abcdef' as ServiceId,
-  slug: 'demo', name: 'demo', namespace: 'cs-demo', kind: 'DigitalWorker', template: 'minimal-sample',
+  projectId: '01a0bf5d-8f4b-7178-82e1-9a99060b1192' as ProjectId, state: 'provisioning', serviceId: '01a0bf5d-8f4b-76c5-866c-f1feda3d63bb' as ServiceId,
+  slug: 'demo', name: 'demo', namespace: 'cs-demo', kind: 'DigitalWorker', template: '01a0bf5d-8f4b-7002-9560-94caf593fb19',
 };
 
 describe('provisioning', () => {

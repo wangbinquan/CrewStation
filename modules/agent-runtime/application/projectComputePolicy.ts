@@ -9,7 +9,7 @@ export function projectComputePolicyUseCases(deps: AgentRuntimeUseCaseDeps) {
   const getProjectComputePolicy = async (actor: Actor, projectId: ProjectId): Promise<ProjectComputePolicyDto> => {
     await deps.projects.authorize(actor, projectId, 'view');
     const record = await deps.uow.read.projectPolicies.get(projectId), policy = record?.policy ?? INHERITED_COMPUTE_POLICY;
-    const effectiveDefaultProfile = policy.mode === 'inherit' ? (await deps.uow.read.profiles.getDefault())?.name ?? null : policy.defaultProfile;
+    const effectiveDefaultProfile = policy.mode === 'inherit' ? (await deps.uow.read.profiles.getDefault())?.id ?? null : policy.defaultProfile;
     return { projectId, revision: record?.revision ?? 0, policy, effectiveDefaultProfile,
       effectiveDevTaskProfile: policy.devTaskProfile ?? deps.defaultTaskProfile, updatedAt: record?.updatedAt.toISOString() ?? null };
   };

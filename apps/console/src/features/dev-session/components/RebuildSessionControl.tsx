@@ -50,7 +50,7 @@ export function RebuildSessionControl({ projectId, session, newSession }: { proj
       <FormField label={t('devSession.rebuild.profile')} hint={t('devSession.rebuild.profileHint', { capacity: inspection.volume.capacity })}>
         <select aria-label={t('devSession.rebuild.profile')} value={recovery.profileName} disabled={Boolean(recovery.submitted)} onChange={(event) => recovery.setProfileName(event.target.value)}>
           <option value="">{t('devSession.rebuild.pick')}</option>
-          {inspection.profiles.map((profile) => <option key={profile.name} value={profile.name}>{t('devSession.rebuild.profileOption', { name: profile.name, cpu: profile.cpu, memory: profile.memory, storage: profile.storage })}</option>)}
+          {inspection.profiles.map((profile) => <option key={profile.id} value={profile.id}>{t('devSession.rebuild.profileOption', { name: profile.name, cpu: profile.cpu, memory: profile.memory, storage: profile.storage })}</option>)}
         </select>
       </FormField>
       {inspection.profiles.length === 0 ? <PaneNotice tone="warning">{t('devSession.rebuild.noProfiles')}</PaneNotice> : null}

@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import type { Actor, EventId, Manifest, ProjectId, ReleaseId, ServiceActor, ServiceId, TraceId, UserId } from '@crewstation/contracts';
-import { DomainTopic, EVENT_HEADERS, EventDeliverySchema, IDENTITY_HEADERS, ManifestSchema } from '@crewstation/contracts';
+import { BUILTIN_RESOURCES, DomainTopic, EVENT_HEADERS, EventDeliverySchema, IDENTITY_HEADERS, ManifestSchema } from '@crewstation/contracts';
 import { eventbusMigrations, publishDomainEvent } from '@crewstation/eventbus';
 import { createApp } from '@crewstation/http';
 import { newId } from '@crewstation/kernel';
@@ -30,16 +30,18 @@ let subscriber: ReturnType<typeof Bun.serve>;
 let subscriberMode: 'ok' | 'fail' = 'fail';
 const received: Received[] = [];
 const endpoints = new Map<ServiceId, string>();
+const eventTypes = new Map<string, { id: string; producerId: string }>();
+const typeId = (code: string): string => eventTypes.get(code)!.id;
 const PIPELINE = 'gitlab.pipeline.finished';
 const gitlab: ServiceActor = { identity: 'gitlab-events/gitlab-events', project: 'gitlab-events', service: 'gitlab-events', slot: 'prod' };
 
 const hosts = { prodHost: (s: string) => `${s}.cs.localhost`, previewHost: (s: string) => `preview.${s}.cs.localhost`, serviceHost: (s: string) => `${s}.svc.cs.internal` };
-const service = { command: ['bun', 'run', 'src/main.ts'], port: 3000, plan: 'standard-small' };
+const service = { command: ['bun', 'run', 'src/main.ts'], port: 3000, servicePlanId: BUILTIN_RESOURCES.servicePlanSmall };
 const producerManifest = (producer: string, types: string[]): Manifest => ManifestSchema.parse({
-  apiVersion: 'crewstation/v1', kind: 'EventProducer',
+  apiVersion: 'crewstation/v2', kind: 'EventProducer',
   spec: { service, producer, ingress: { path: '/hooks/gitlab', verification: 'gitlab-token' }, produces: types.map((eventType) => ({ eventType, ...(eventType === PIPELINE ? { schema: './schemas/pipeline.json' } : {}) })) },
 });
-const subscriberManifest = (subscriptions: Array<{ eventType: string; handlerPath: string }>): Manifest => ManifestSchema.parse({ apiVersion: 'crewstation/v1', kind: 'DigitalWorker', spec: { service, subscriptions } });
+const subscriberManifest = (subscriptions: Array<{ eventType: string; handlerPath: string }>): Manifest => ManifestSchema.parse({ apiVersion: 'crewstation/v2', kind: 'DigitalWorker', spec: { service, subscriptions: subscriptions.map(({ eventType, handlerPath }) => ({ eventTypeId: typeId(eventType), handlerPath })) } });
 
 /** 发布登记事件并让消费者跑一轮；runOnce 会一并消费游标之后的所有事件，所以只断言效果。 */
 async function registerRelease(target: Target, manifest: Manifest): Promise<void> {
@@ -74,10 +76,10 @@ beforeAll(async () => {
   admin = { userId: a.id, isAdmin: true };
   owner = { userId: o.id, isAdmin: false };
   dev = { userId: d.id, isAdmin: false };
-  project = createProjectModule({ db: tdb.db, identity: identity.api, hosts, settings: { defaultMaxConcurrentTasks: 3, defaultServicePlan: 'standard-small' } });
-  await project.api.upsertServicePlan(admin, { name: 'standard-small', cpu: '500m', memory: '512Mi', maxReplicas: 3, description: '' });
+  project = createProjectModule({ db: tdb.db, identity: identity.api, hosts, settings: { defaultMaxConcurrentTasks: 3, defaultServicePlan: BUILTIN_RESOURCES.servicePlanSmall } });
+  await project.api.updateServicePlan(admin, BUILTIN_RESOURCES.servicePlanSmall, { name: 'standard-small', cpu: '500m', memory: '512Mi', maxReplicas: 3, description: '' });
   const create = async (slug: string, kind: 'DigitalWorker' | 'EventProducer'): Promise<Target> => {
-    const dto = await project.api.createProject(admin, { slug, name: slug, kind, ownerUserId: owner.userId, template: 'minimal-sample' });
+    const dto = await project.api.createProject(admin, { slug, name: slug, kind, ownerUserId: owner.userId, template: BUILTIN_RESOURCES.minimalTemplate });
     return { projectId: dto.id, serviceId: dto.serviceId! };
   };
   producerProject = await create('gitlab-events', 'EventProducer');
@@ -119,27 +121,28 @@ describe.skipIf(!available)('events module', () => {
 
   test('release.registered：生产方与事件类型登记，数字人订阅替换并保持 id 稳定', async () => {
     await registerRelease(producerProject, producerManifest('gitlab', [PIPELINE, 'gitlab.push']));
+    for (const type of await events.api.listEventTypes(dev)) eventTypes.set(type.eventType, type);
     await registerRelease(demo, subscriberManifest([{ eventType: PIPELINE, handlerPath: '/events/old' }, { eventType: 'gitlab.push', handlerPath: '/events/push' }]));
     await registerRelease(other, subscriberManifest([{ eventType: PIPELINE, handlerPath: '/hooks' }]));
     expect(await events.api.listEventTypes(dev)).toEqual([
-      { eventType: PIPELINE, producer: 'gitlab', producerProject: 'gitlab-events', schemaRef: './schemas/pipeline.json' },
-      { eventType: 'gitlab.push', producer: 'gitlab', producerProject: 'gitlab-events' },
+      { name: PIPELINE, state: 'active', id: typeId(PIPELINE), producerId: eventTypes.get(PIPELINE)!.producerId, eventType: PIPELINE, producer: 'gitlab', producerProject: 'gitlab-events', schemaRef: './schemas/pipeline.json' },
+      { name: 'gitlab.push', state: 'active', id: typeId('gitlab.push'), producerId: eventTypes.get('gitlab.push')!.producerId, eventType: 'gitlab.push', producer: 'gitlab', producerProject: 'gitlab-events' },
     ]);
     const before = await events.api.listSubscriptions(owner, demo.projectId);
     expect(before.map((s) => [s.eventType, s.handlerPath, s.state])).toEqual([[PIPELINE, '/events/old', 'active'], ['gitlab.push', '/events/push', 'active']]);
     await registerRelease(demo, subscriberManifest([{ eventType: PIPELINE, handlerPath: '/events/pipeline' }]));
     const after = await events.api.listSubscriptions(owner, demo.projectId);
     expect(after.map((s) => [s.id, s.handlerPath])).toEqual([[before[0]!.id, '/events/pipeline']]);
-    await expect(events.api.listSubscriptions({ userId: 'usr_00000000000000000000000000000000' as UserId, isAdmin: false }, demo.projectId)).rejects.toMatchObject({ kind: 'not_found' });
+    await expect(events.api.listSubscriptions({ userId: '01a0bf5d-8f4b-7622-8c1a-d607ceefa8df' as UserId, isAdmin: false }, demo.projectId)).rejects.toMatchObject({ kind: 'not_found' });
   });
 
   test('produce：生产方身份核对、未知事件类型、去重与每订阅一条投递入队', async () => {
-    const input = { eventType: PIPELINE, dedupKey: 'pipeline-1', occurredAt: '2026-09-11T08:00:00.000Z', traceId, payload: { pipeline: 42, status: 'success' } };
+    const input = { eventTypeId: typeId(PIPELINE), dedupKey: 'pipeline-1', occurredAt: '2026-09-11T08:00:00.000Z', traceId, payload: { pipeline: 42, status: 'success' } };
     await expect(events.api.produce({ identity: 'demo/demo', project: 'demo', service: 'demo' }, input)).rejects.toMatchObject({ kind: 'forbidden' });
-    await expect(events.api.produce(gitlab, { ...input, eventType: 'gitlab.unknown' })).rejects.toMatchObject({ kind: 'not_found' });
+    await expect(events.api.produce(gitlab, { ...input, eventTypeId: Bun.randomUUIDv7() })).rejects.toMatchObject({ kind: 'not_found' });
     const result = await events.api.produce(gitlab, input);
     expect(result).toMatchObject({ deduplicated: false, deliveries: 2 });
-    expect(result.eventId).toMatch(/^evt_[0-9a-f]{32}$/);
+    expect(result.eventId).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
     eventId = result.eventId;
     expect(await events.api.produce(gitlab, { ...input, payload: { different: true } })).toEqual({ eventId, deduplicated: true, deliveries: 0 });
     const demoDeliveries = await events.api.listDeliveries(owner, demo.projectId);
@@ -183,7 +186,7 @@ describe.skipIf(!available)('events module', () => {
   test('replay：只有负责人、只有 dead；重放后重新计数并再次入队', async () => {
     await expect(events.api.replayDelivery(dev, otherDelivery)).rejects.toMatchObject({ kind: 'forbidden' });
     await expect(events.api.replayDelivery(owner, demoDelivery)).rejects.toMatchObject({ kind: 'precondition' });
-    await expect(events.api.replayDelivery(owner, 'dlv_nope')).rejects.toMatchObject({ kind: 'not_found' });
+    await expect(events.api.replayDelivery(owner, '01a0bf5d-8f4b-7620-8dc5-e6b70c33a3e2')).rejects.toMatchObject({ kind: 'not_found' });
     const replayed = await events.api.replayDelivery(owner, otherDelivery);
     expect(replayed).toMatchObject({ state: 'pending', attempts: 0 });
     expect(replayed.lastError).toBeUndefined();
@@ -196,7 +199,7 @@ describe.skipIf(!available)('events module', () => {
   });
 
   test('订阅被移除后待投递的记录直接 dead；没给 traceId 时由 cs-events 生成', async () => {
-    const result = await events.api.produce(gitlab, { eventType: PIPELINE, dedupKey: 'pipeline-2', occurredAt: new Date().toISOString(), payload: null });
+    const result = await events.api.produce(gitlab, { eventTypeId: typeId(PIPELINE), dedupKey: 'pipeline-2', occurredAt: new Date().toISOString(), payload: null });
     expect(result.deliveries).toBe(2);
     const pending = (await events.api.listDeliveries(owner, other.projectId, { state: 'pending' }))[0]!;
     expect(pending.traceId).toMatch(/^[0-9a-f]{32}$/);
@@ -212,14 +215,14 @@ describe.skipIf(!available)('events module', () => {
     for (const router of [...events.http.ingress, ...events.http.query]) app.route('/', router);
     const json = { 'content-type': 'application/json' };
     const asUser = (actor: Actor) => ({ [IDENTITY_HEADERS.userId]: actor.userId });
-    const body = JSON.stringify({ eventType: PIPELINE, dedupKey: 'pipeline-3', occurredAt: new Date().toISOString(), payload: { n: 3 } });
-    expect((await app.request('/v1/events/produce', { method: 'POST', headers: json, body })).status).toBe(401);
-    expect((await app.request('/v1/events/produce', { method: 'POST', headers: { ...json, ...asUser(admin) }, body })).status).toBe(403);
-    const produced = await app.request('/v1/events/produce', { method: 'POST', headers: { ...json, [IDENTITY_HEADERS.sourceService]: gitlab.identity, [IDENTITY_HEADERS.sourceSlot]: 'prod' }, body });
+    const body = JSON.stringify({ eventTypeId: typeId(PIPELINE), dedupKey: 'pipeline-3', occurredAt: new Date().toISOString(), payload: { n: 3 } });
+    expect((await app.request('/v2/events/produce', { method: 'POST', headers: json, body })).status).toBe(401);
+    expect((await app.request('/v2/events/produce', { method: 'POST', headers: { ...json, ...asUser(admin) }, body })).status).toBe(403);
+    const produced = await app.request('/v2/events/produce', { method: 'POST', headers: { ...json, [IDENTITY_HEADERS.sourceService]: gitlab.identity, [IDENTITY_HEADERS.sourceSlot]: 'prod' }, body });
     expect(produced.status).toBe(202);
     expect(await produced.json()).toMatchObject({ deduplicated: false, deliveries: 1 });
-    expect((await app.request('/v1/events/produce', { method: 'POST', headers: { ...json, [IDENTITY_HEADERS.sourceService]: gitlab.identity }, body: JSON.stringify({ eventType: PIPELINE }) })).status).toBe(400);
-    expect((await app.request('/v1/events/produce', { method: 'POST', headers: { ...json, [IDENTITY_HEADERS.sourceService]: 'demo/demo' }, body })).status).toBe(403);
+    expect((await app.request('/v2/events/produce', { method: 'POST', headers: { ...json, [IDENTITY_HEADERS.sourceService]: gitlab.identity }, body: JSON.stringify({ eventType: PIPELINE }) })).status).toBe(400);
+    expect((await app.request('/v2/events/produce', { method: 'POST', headers: { ...json, [IDENTITY_HEADERS.sourceService]: 'demo/demo' }, body })).status).toBe(403);
     const types = await app.request('/v1/catalog/event-types', { headers: asUser(dev) });
     expect(((await types.json()) as { items: unknown[] }).items).toHaveLength(2);
     const subs = await app.request(`/v1/projects/${demo.projectId}/subscriptions`, { headers: asUser(dev) });
@@ -227,7 +230,7 @@ describe.skipIf(!available)('events module', () => {
     const deliveries = await app.request(`/v1/projects/${demo.projectId}/deliveries?state=delivered&limit=1`, { headers: asUser(owner) });
     expect(((await deliveries.json()) as { items: unknown[] }).items).toHaveLength(1);
     expect((await app.request(`/v1/projects/${demo.projectId}/deliveries?state=bogus`, { headers: asUser(owner) })).status).toBe(400);
-    expect((await app.request(`/v1/projects/${demo.projectId}/deliveries`, { headers: asUser({ userId: 'usr_00000000000000000000000000000000' as UserId, isAdmin: false }) })).status).toBe(404);
+    expect((await app.request(`/v1/projects/${demo.projectId}/deliveries`, { headers: asUser({ userId: '01a0bf5d-8f4b-7622-8c1a-d607ceefa8df' as UserId, isAdmin: false }) })).status).toBe(404);
     expect((await app.request(`/v1/deliveries/${demoDelivery}/replay`, { method: 'POST', headers: asUser(owner) })).status).toBe(412);
     expect((await app.request(`/v1/deliveries/${demoDelivery}/replay`, { method: 'POST', headers: asUser(dev) })).status).toBe(403);
   });

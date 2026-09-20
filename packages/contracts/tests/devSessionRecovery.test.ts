@@ -2,7 +2,7 @@ import { expect, test } from 'bun:test';
 import { DevSessionRebuildDtoSchema, RebuildDevSessionRequestSchema } from '../api/devSessionRecovery';
 import { TaskIdSchema } from '../ids';
 
-const request = { requestId: 'ef981d85-ce35-41fd-bbc8-2bace4d66068', expectedTaskId: TaskIdSchema.parse(`tsk_${'a'.repeat(32)}`), expectedUpdatedAt: '2026-09-15T10:00:00.000Z', expectedVolumeUid: 'original-volume', expectedPodUid: 'old-pod', profile: { name: 'coding-medium', cpu: '1', memory: '2Gi', storage: '10Gi' } };
+const request = { requestId: 'ef981d85-ce35-41fd-bbc8-2bace4d66068', expectedTaskId: TaskIdSchema.parse('01a0bf5d-8f4b-7e3b-8ee6-bf27a166622a'), expectedUpdatedAt: '2026-09-15T10:00:00.000Z', expectedVolumeUid: 'original-volume', expectedPodUid: 'old-pod', profile: { id: '01a0bf5d-8f4b-77d4-8382-20af68c628bc', name: 'coding-medium', cpu: '1', memory: '2Gi', storage: '10Gi' } };
 
 test('保卷重建固定请求、任务、卷和套餐资源；已缺失 Pod 必须显式确认为 null', () => {
   expect(RebuildDevSessionRequestSchema.parse(request)).toEqual(request);
@@ -17,7 +17,7 @@ test('保卷重建固定请求、任务、卷和套餐资源；已缺失 Pod 必
 });
 
 test('恢复回执明确排队与等待 Runner，不将受理状态等同完成，也不包含凭据', () => {
-  const receipt = { requestId: request.requestId, taskId: request.expectedTaskId, profile: request.profile, createdAt: request.expectedUpdatedAt, updatedAt: request.expectedUpdatedAt };
+  const receipt = { id: '01a0bf5d-8f4b-7c7a-86ff-e516273ebd4b', requestId: request.requestId, taskId: request.expectedTaskId, profile: request.profile, createdAt: request.expectedUpdatedAt, updatedAt: request.expectedUpdatedAt };
   for (const state of ['queued', 'replacing', 'starting', 'ready', 'failed'] as const) expect(DevSessionRebuildDtoSchema.parse({ ...receipt, state }).state).toBe(state);
   expect(DevSessionRebuildDtoSchema.safeParse({ ...receipt, state: 'accepted' }).success).toBe(false);
   expect(DevSessionRebuildDtoSchema.safeParse({ ...receipt, state: 'starting', runnerToken: 'never-return-credentials' }).success).toBe(false);

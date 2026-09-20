@@ -52,7 +52,7 @@ export class NativeTerminalSupervisor {
   readonly runnerId: string;
   private readonly entries = new Map<string, NativeEntry>();
   private readonly byTerminal = new Map<string, NativeEntry>();
-  constructor(private readonly deps: NativeSupervisorDeps) { this.runnerId = deps.runnerId ?? crypto.randomUUID(); }
+  constructor(private readonly deps: NativeSupervisorDeps) { this.runnerId = deps.runnerId ?? Bun.randomUUIDv7(); }
 
   has(terminalId: string): boolean { return this.byTerminal.has(terminalId); }
   list() { return { runnerId: this.runnerId, terminals: [...this.entries.values()].map((e) => ({ ...e.record })) }; }
@@ -152,7 +152,7 @@ export class NativeTerminalSupervisor {
     catch {
       this.deps.logger.warn('native activity channel unavailable; CLI remains usable', { agentId: entry.record.agentId });
       this.deps.emit({ kind: 'nativeActivity', activity: {
-        agentId: entry.record.agentId, terminalId: entry.record.terminalId, runnerId: this.runnerId, eventId: crypto.randomUUID(), seq: 1, turnOrdinal: 0,
+        agentId: entry.record.agentId, terminalId: entry.record.terminalId, runnerId: this.runnerId, eventId: Bun.randomUUIDv7(), seq: 1, turnOrdinal: 0,
         signal: { source: protocol === 'claude-code' ? 'claude-code/2.1.268' : 'opencode/1.18.29', sourceEventId: 'channel-unavailable', kind: 'source-unavailable', occurredAt: new Date().toISOString(), nativeSessionId: null, turnId: null, reason: 'source-error' },
       } });
       return undefined;

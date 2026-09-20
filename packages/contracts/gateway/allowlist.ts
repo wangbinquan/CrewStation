@@ -1,5 +1,10 @@
 import { z } from 'zod';
 import { ServiceIdentitySchema } from './identity';
+import { ResourceIdSchema, SlugSchema } from '../ids';
+import { HttpMethodSchema } from '../manifest/serviceSpec';
+
+export const OperationRouteSchema = z.object({ id: ResourceIdSchema, proxy: SlugSchema, method: HttpMethodSchema, path: z.string().startsWith('/') });
+export type OperationRoute = z.infer<typeof OperationRouteSchema>;
 
 /**
  * 网关放行表：按调用方服务身份列出允许的操作键（`<proxy>:<METHOD>:<path>`）。
@@ -7,7 +12,7 @@ import { ServiceIdentitySchema } from './identity';
  */
 export const AllowlistEntrySchema = z.object({
   caller: ServiceIdentitySchema,
-  operations: z.array(z.string().min(1)),
+  operations: z.array(ResourceIdSchema),
   /** 允许调用平台 API（创建业务任务等）；所有已发布服务默认 true。 */
   platformApi: z.boolean().default(true),
   /**
@@ -18,10 +23,12 @@ export const AllowlistEntrySchema = z.object({
 });
 
 export const AllowlistDocumentSchema = z.object({
+  identityVersion: z.literal(2),
+  operationRoutes: z.array(OperationRouteSchema),
   version: z.number().int().min(0),
   generatedAt: z.iso.datetime(),
   /** 默认开放的操作键，对所有调用方生效。 */
-  defaultOpen: z.array(z.string().min(1)),
+  defaultOpen: z.array(ResourceIdSchema),
   entries: z.array(AllowlistEntrySchema),
   /** 失联时按最后一版继续放行的最长时间；超过后拒绝。 */
   maxStaleSeconds: z.number().int().min(1),

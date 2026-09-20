@@ -7,16 +7,16 @@ import { marketAppUseCases } from '../application/marketApps';
 import type { MarketListingSource } from '../ports/market';
 import { marketRoutes } from '../http/marketRoutes';
 
-const actor: Actor = { userId: `usr_${'a'.repeat(32)}` as UserId, isAdmin: false };
-const projectId = `prj_${'b'.repeat(32)}` as ProjectId;
-const listing: MarketListingSource = { projectId, name: '市场应用', description: '整理知识', icon: 'book', owner: { userId: actor.userId, name: '负责人' }, projectState: 'active', canPreview: false, canDevelop: false, canConfigure: false, visibilityRevision: 1, checkedAt: '2026-09-13T00:00:00.000Z', serviceId: `svc_${'c'.repeat(32)}` as ServiceId };
+const actor: Actor = { userId: '01a0bf5d-8f4b-7f8b-8136-e631380738b0' as UserId, isAdmin: false };
+const projectId = '01a0bf5d-8f4b-7aef-84b8-c458233bab22' as ProjectId;
+const listing: MarketListingSource = { projectId, name: '市场应用', description: '整理知识', icon: 'book', owner: { userId: actor.userId, name: '负责人' }, projectState: 'active', canPreview: false, canDevelop: false, canConfigure: false, visibilityRevision: 1, checkedAt: '2026-09-13T00:00:00.000Z', serviceId: '01a0bf5d-8f4b-7d97-81d1-7163b23b1d2e' as ServiceId };
 const clock = fixedClock('2026-09-13T00:00:00Z');
 const slot = (overrides: Partial<SlotDto> = {}): SlotDto => ({ name: 'prod', active: true, replicas: 1, readyReplicas: 1, state: 'empty', host: 'app.example.test', ...overrides });
 const setup = (slots: () => Promise<SlotDto[]>, get = async () => listing) => marketAppUseCases({ slots, get, list: async () => ({ items: [listing] }) }, clock);
 
 describe('市场仅聚合正式部署且保留未知', () => {
   test('已发布应用的成员在同次聚合收到新版入口，正式卡片仍直达正式应用', async () => {
-    const releaseId = `rel_${'e'.repeat(32)}` as SlotDto['releaseId'];
+    const releaseId = '01a0bf5d-8f4b-7dda-8ca7-d5d5f8a92b44' as SlotDto['releaseId'];
     const prod = slot({ state: 'ready', tag: 'v1.0.0', commitSha: 'old', releaseId });
     const preview = slot({ name: 'preview', active: false, state: 'ready', tag: 'v2.0.0', releaseId, host: 'preview.app.example.test' });
     let probes = 0;
@@ -34,7 +34,7 @@ describe('市场仅聚合正式部署且保留未知', () => {
   });
   test('试用成员的未发布应用直接给 Beta 入口，未知正式状态不能冒充未发布', async () => {
     const trial = { ...listing, canPreview: true };
-    const preview = slot({ name: 'preview', active: false, state: 'ready', tag: 'v2.0.0', commitSha: 'new', releaseId: `rel_${'e'.repeat(32)}` as SlotDto['releaseId'], host: 'preview.app.example.test' });
+    const preview = slot({ name: 'preview', active: false, state: 'ready', tag: 'v2.0.0', commitSha: 'new', releaseId: '01a0bf5d-8f4b-7dda-8ca7-d5d5f8a92b44' as SlotDto['releaseId'], host: 'preview.app.example.test' });
     const api = setup(async () => [slot(), preview], async () => trial);
     expect((await api.listMarketApps(actor, { q: '', limit: 20 })).items[0]?.entry).toMatchObject({ kind: 'trial', status: 'ready', host: preview.host });
     expect(await api.getMarketTrial(actor, projectId)).toMatchObject({ name: listing.name, status: 'ready', host: preview.host, sharedData: true });
@@ -59,7 +59,7 @@ describe('市场仅聚合正式部署且保留未知', () => {
     expect((await setup(async () => [slot({ state: 'ready' })]).getMarketApp(actor, projectId)).production.status).toBe('unknown');
   });
   test('正式 tag／SHA／主机来自同一个 prod 记录，输出不含内部定位与项目数据', async () => {
-    const dto = await setup(async () => [slot({ state: 'ready', tag: 'v1.2.3', commitSha: 'abc', releaseId: `rel_${'d'.repeat(32)}` as SlotDto['releaseId'] })]).getMarketApp(actor, projectId);
+    const dto = await setup(async () => [slot({ state: 'ready', tag: 'v1.2.3', commitSha: 'abc', releaseId: '01a0bf5d-8f4b-762d-81e1-f95f4dd57c2d' as SlotDto['releaseId'] })]).getMarketApp(actor, projectId);
     expect(dto.production).toMatchObject({ status: 'deployed', tag: 'v1.2.3', commitSha: 'abc', host: 'app.example.test' });
     expect(dto).not.toHaveProperty('serviceId'); expect(dto).not.toHaveProperty('namespace'); expect(dto).not.toHaveProperty('userIds');
     expect(MarketAppDtoSchema.safeParse(dto).success).toBe(true);

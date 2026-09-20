@@ -1,6 +1,6 @@
 import type {
-  CreateProjectRequest, ListDeliveriesQuery, LogQuery, PublishRequest, RequestTaskDataBinding, ServicePlanDto, SetConfigItemRequest,
-  PublishDevSessionRequest, StartDevAgentRequest, TaskProfileDto,
+  CreateProjectRequest, ListDeliveriesQuery, LogQuery, PublishRequest, RequestTaskDataBinding, ServicePlanWrite, SetConfigItemRequest,
+  PublishDevSessionRequest, StartDevAgentRequest, TaskProfileWrite,
 } from '@crewstation/contracts';
 
 /**
@@ -18,5 +18,5 @@ export type SetConfigItemInput = WithDefaults<Omit<SetConfigItemRequest, 'env'>,
 export type RequestTaskDataBindingInput = WithDefaults<RequestTaskDataBinding, 'ttlMinutes'>;
 export type ListDeliveriesInput = Partial<ListDeliveriesQuery>;
 export type LogQueryInput = WithDefaults<LogQuery, 'limit'>;
-export type ServicePlanInput = WithDefaults<ServicePlanDto, 'description'>;
-export type TaskProfileInput = WithDefaults<TaskProfileDto, 'description'>;
+export type ServicePlanInput = WithDefaults<ServicePlanWrite, 'description'>;
+export type TaskProfileInput = WithDefaults<TaskProfileWrite, 'description'>;

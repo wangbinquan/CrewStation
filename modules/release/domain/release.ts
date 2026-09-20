@@ -4,6 +4,8 @@ import type { PhysicalSlot } from './slots';
 
 /** 一次发布：平台创建的标签指向固定 SHA，构建、迁移、部署到待命槽后就绪；切流不属于发布。 */
 export interface Release {
+  /** Original key only for reconnecting an accepted pre-upgrade Job. */
+  readonly legacyResourceId?: string;
   readonly id: ReleaseId;
   readonly serviceId: ServiceId;
   readonly projectId: ProjectId;

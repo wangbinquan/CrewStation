@@ -17,7 +17,7 @@ export function useCatalogRequestReview(scope: RequestPageScope, active: boolean
   }, active);
   const decide = useApiMutation(async ({ request: original, approve, decision }: { request: ApiRequestDto; approve: boolean; decision?: string }) => {
     const parsed = ApiRequestDtoSchema.safeParse(await api.apiCatalog.decideRequest(original.id, { approve, decision }));
-    if (!parsed.success || parsed.data.id !== original.id || parsed.data.serviceId !== original.serviceId || parsed.data.operationKey !== original.operationKey ||
+    if (!parsed.success || parsed.data.id !== original.id || parsed.data.serviceId !== original.serviceId || parsed.data.operationId !== original.operationId ||
       parsed.data.state !== (approve ? 'approved' : 'rejected') || parsed.data.decision !== decision) throw new Error(t('ui.requestPage.invalidDecision'));
     return parsed.data;
   }, { invalidate: [queryKeys.operations(), queryKeys.accessRequests()] });

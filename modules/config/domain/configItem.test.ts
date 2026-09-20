@@ -1,3 +1,4 @@
+import { newResourceId } from '@crewstation/kernel';
 import { describe, expect, test } from 'bun:test';
 import type { ProjectId, UserId } from '@crewstation/contracts';
 import type { ConfigItem } from './configItem';
@@ -6,7 +7,9 @@ import { keysOf, missingKeys, snapshotOf } from './configVersion';
 
 const projectId = 'prj_00000000000000000000000000000001' as ProjectId;
 const userId = 'usr_00000000000000000000000000000001' as UserId;
-const item = (name: string, isSecret = false): ConfigItem => ({ projectId, env: 'production', name, isSecret, value: `v-${name}`, version: 1, updatedBy: userId, updatedAt: new Date('2026-09-11T00:00:00Z') });
+const definitionIds = new Map<string, string>();
+const definition = (name: string) => { if (!definitionIds.has(name)) definitionIds.set(name, newResourceId()); return definitionIds.get(name)!; };
+const item = (name: string, isSecret = false): ConfigItem => ({ id: newResourceId(), definitionId: definition(name), bindingName: name, projectId, env: 'production', name, isSecret, value: `v-${name}`, version: 1, updatedBy: userId, updatedAt: new Date('2026-09-11T00:00:00Z') });
 
 describe('config domain', () => {
   test('配置项名必须是大写蛇形', () => {
@@ -28,11 +31,11 @@ describe('config domain', () => {
     expect(keysOf(snapshot.entries)).toEqual(['AAA', 'ZZZ']);
   });
 
-  test('Manifest env 段校验：key 缺省取 name，重复键只报一次', () => {
+  test('Manifest env 段按定义 ID 校验，重复引用只报一次', () => {
     const missing = missingKeys(
-      [{ name: 'DB_URL', from: 'config', key: 'DATABASE_URL' }, { name: 'TOKEN', from: 'secret' }, { name: 'TOKEN2', from: 'secret', key: 'TOKEN' }, { name: 'PRESENT', from: 'config' }],
+      [{ name: 'DB_URL', from: 'config', configDefinitionId: definition('DATABASE_URL') }, { name: 'TOKEN', from: 'secret', configDefinitionId: definition('TOKEN') }, { name: 'TOKEN2', from: 'secret', configDefinitionId: definition('TOKEN') }, { name: 'PRESENT', from: 'config', configDefinitionId: definition('PRESENT') }],
       [item('PRESENT')],
     );
-    expect(missing).toEqual(['DATABASE_URL', 'TOKEN']);
+    expect(missing).toEqual([definition('DATABASE_URL'), definition('TOKEN')]);
   });
 });

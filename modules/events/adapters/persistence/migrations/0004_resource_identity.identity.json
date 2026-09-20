@@ -1,0 +1,171 @@
+{
+  "version": "resource-identity/v1",
+  "schema": "events",
+  "entities": [
+    {
+      "table": "producers",
+      "kind": "eventProducer",
+      "keys": [
+        "producer"
+      ],
+      "idColumn": "id"
+    },
+    {
+      "table": "event_types",
+      "kind": "eventType",
+      "keys": [
+        "event_type"
+      ],
+      "idColumn": "id"
+    },
+    {
+      "table": "subscriptions",
+      "kind": "subscription",
+      "keys": [
+        "id"
+      ],
+      "idColumn": "id"
+    },
+    {
+      "table": "inbox",
+      "kind": "event",
+      "keys": [
+        "id"
+      ],
+      "idColumn": "id"
+    },
+    {
+      "table": "deliveries",
+      "kind": "delivery",
+      "keys": [
+        "id"
+      ],
+      "idColumn": "id"
+    },
+    {
+      "table": "deliveries",
+      "kind": "subscription",
+      "keys": [
+        "subscription_id"
+      ],
+      "idColumn": "subscription_id"
+    }
+  ],
+  "references": [
+    {
+      "table": "event_types",
+      "column": "producer_id",
+      "kind": "eventProducer",
+      "keys": [
+        "producer_id"
+      ]
+    },
+    {
+      "table": "subscriptions",
+      "column": "event_type_id",
+      "kind": "eventType",
+      "keys": [
+        "event_type_id"
+      ]
+    },
+    {
+      "table": "inbox",
+      "column": "producer_id",
+      "kind": "eventProducer",
+      "keys": [
+        "producer_id"
+      ]
+    },
+    {
+      "table": "inbox",
+      "column": "event_type_id",
+      "kind": "eventType",
+      "keys": [
+        "event_type_id"
+      ]
+    },
+    {
+      "table": "deliveries",
+      "column": "event_type_id",
+      "kind": "eventType",
+      "keys": [
+        "event_type_id"
+      ]
+    },
+    {
+      "table": "producers",
+      "column": "project_id",
+      "kind": "project",
+      "keys": [
+        "project_id"
+      ]
+    },
+    {
+      "table": "producers",
+      "column": "service_id",
+      "kind": "service",
+      "keys": [
+        "service_id"
+      ]
+    },
+    {
+      "table": "subscriptions",
+      "column": "project_id",
+      "kind": "project",
+      "keys": [
+        "project_id"
+      ]
+    },
+    {
+      "table": "subscriptions",
+      "column": "service_id",
+      "kind": "service",
+      "keys": [
+        "service_id"
+      ]
+    },
+    {
+      "table": "deliveries",
+      "column": "project_id",
+      "kind": "project",
+      "keys": [
+        "project_id"
+      ]
+    },
+    {
+      "table": "deliveries",
+      "column": "service_id",
+      "kind": "service",
+      "keys": [
+        "service_id"
+      ]
+    },
+    {
+      "table": "deliveries",
+      "column": "event_id",
+      "kind": "event",
+      "keys": [
+        "event_id"
+      ]
+    },
+    {
+      "table": "deliveries",
+      "column": "subscription_id",
+      "kind": "subscription",
+      "keys": [
+        "subscription_id"
+      ]
+    }
+  ],
+  "finalize": [
+    "ALTER TABLE events.producers DROP CONSTRAINT producers_pkey, ALTER COLUMN id SET NOT NULL, ALTER COLUMN name SET NOT NULL, ADD PRIMARY KEY (id), ADD UNIQUE (producer), ADD UNIQUE (service_id)",
+    "ALTER TABLE events.event_types DROP CONSTRAINT event_types_pkey, ALTER COLUMN id SET NOT NULL, ALTER COLUMN name SET NOT NULL, ALTER COLUMN producer_id SET NOT NULL, ADD PRIMARY KEY (id), ADD UNIQUE (event_type)",
+    "DROP INDEX events.subscriptions_service_event_idx",
+    "CREATE UNIQUE INDEX subscriptions_service_event_idx ON events.subscriptions(service_id, event_type_id)",
+    "DROP INDEX events.inbox_dedup_idx",
+    "CREATE UNIQUE INDEX inbox_dedup_idx ON events.inbox(producer_id, dedup_key)",
+    "ALTER TABLE events.subscriptions ALTER COLUMN event_type_id SET NOT NULL",
+    "ALTER TABLE events.inbox ALTER COLUMN producer_id SET NOT NULL, ALTER COLUMN event_type_id SET NOT NULL",
+    "ALTER TABLE events.deliveries ALTER COLUMN event_type_id SET NOT NULL"
+  ]
+}

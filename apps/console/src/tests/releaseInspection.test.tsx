@@ -11,7 +11,7 @@ import { api } from '../shared/api/client';
 import { useApiMutation } from '../shared/api/useApi';
 import { I18nProvider } from '../shared/lib/I18nProvider';
 
-const taskId = 'tsk_0123456789abcdef0123456789abcdef';
+const taskId = '01a0bf5d-8f4b-7418-8a3f-7cbb4a1fd751';
 const cleanups: Array<() => void> = [];
 const requests: string[] = [];
 let response: unknown;
@@ -20,8 +20,8 @@ const originalFetch = globalThis.fetch;
 afterEach(() => { for (const cleanup of cleanups.splice(0)) cleanup(); requests.length = 0; globalThis.fetch = originalFetch; waitForResponse = undefined; });
 
 function Control(): ReactElement {
-  const release = useApiMutation((force: boolean) => api.devSession.release('prj_test', { force }));
-  return <ReleaseControl projectId="prj_test" taskId={taskId} access={{ isOwner: true, isMine: true, canRelease: true, needsForce: false }} release={release} />;
+  const release = useApiMutation((force: boolean) => api.devSession.release('01a0bf5d-8f4b-708c-89b0-9c4412e78c07', { force }));
+  return <ReleaseControl projectId="01a0bf5d-8f4b-708c-89b0-9c4412e78c07" taskId={taskId} access={{ isOwner: true, isMine: true, canRelease: true, needsForce: false }} release={release} />;
 }
 
 async function renderControl() {
@@ -53,7 +53,7 @@ test('释放前展示具体 dirty 文件和未推送提交；取消不 DELETE，
   await ui.click('释放会话');
   expect(ui.text()).toContain('待保存.txt');
   expect(ui.text()).toContain('尚未推送的首页');
-  expect(requests).toEqual(['GET /v1/projects/prj_test/dev-session/workspace-status']);
+  expect(requests).toEqual(['GET /v1/projects/01a0bf5d-8f4b-708c-89b0-9c4412e78c07/dev-session/workspace-status']);
   await ui.click('取消');
   expect(requests.every((request) => request.startsWith('GET'))).toBe(true);
   await ui.click('释放会话');
@@ -77,7 +77,7 @@ test('检查 pending 时不能确认；检查未知后仍可显式释放且文�
 });
 
 test('预检返回另一个会话时不能沿用旧确认释放', async () => {
-  response = { status: 'unavailable', taskId: 'tsk_other', reason: '重新连接中', checkedAt: '2026-09-13T00:00:00.000Z' };
+  response = { status: 'unavailable', taskId: '01a0bf5d-8f4b-7063-8f17-997d0c19dced', reason: '重新连接中', checkedAt: '2026-09-13T00:00:00.000Z' };
   const ui = await renderControl();
   await ui.click('释放会话');
   expect(ui.text()).toContain('开发会话已变化');

@@ -46,6 +46,8 @@ export class PendingCommands {
     return n;
   }
 
+  typeOf(id: string): string | undefined { return this.pending.get(id)?.type; }
+
   get size(): number {
     return this.pending.size;
   }

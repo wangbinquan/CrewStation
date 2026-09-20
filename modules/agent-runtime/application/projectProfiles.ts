@@ -1,4 +1,4 @@
-import type { Actor, ComputeUsage, ProjectId } from '@crewstation/contracts';
+import type { Actor, ComputeProfileSelector, ComputeUsage, ProjectId } from '@crewstation/contracts';
 import { PlatformError, notFound, precondition } from '@crewstation/kernel';
 import { INHERITED_COMPUTE_POLICY } from '../domain/projectComputePolicy';
 import type { AgentRuntimeUseCaseDeps } from './dependencies';
@@ -12,9 +12,9 @@ export function projectProfileUseCases(deps: AgentRuntimeUseCaseDeps) {
     if (!await deps.projects.name(projectId)) throw notFound('项目', projectId);
     return (await deps.uow.read.projectPolicies.get(projectId))?.policy ?? INHERITED_COMPUTE_POLICY;
   };
-  const authorizedName = async (projectId: ProjectId, wanted?: string): Promise<string> => {
+  const authorizedName = async (projectId: ProjectId, wanted?: ComputeProfileSelector): Promise<string> => {
     const policy = await policyOf(projectId);
-    const name = wanted && wanted !== 'default' ? wanted : policy.mode === 'restricted' ? policy.defaultProfile : (await deps.uow.read.profiles.getDefault())?.name;
+    const name = wanted?.kind === 'profile' ? wanted.profileId : policy.mode === 'restricted' ? policy.defaultProfile : (await deps.uow.read.profiles.getDefault())?.id;
     if (!name) throw precondition('项目尚未配置可用的默认算力档位，请管理员分配', { code: 'no_project_default_profile' });
     const allowed = policy.mode === 'restricted' ? policy.allowedProfiles.includes(name) : (await deps.uow.read.profiles.get(name))?.defaultVisible !== false;
     if (!allowed) throw new PlatformError('forbidden', `项目未获授权使用算力档位 ${name}，请联系管理员分配`, { code: 'project_compute_forbidden', profile: name });
@@ -23,13 +23,13 @@ export function projectProfileUseCases(deps: AgentRuntimeUseCaseDeps) {
   const summaries = async (projectId: ProjectId) => {
     const policy = await policyOf(projectId);
     const profiles = await queries.listSummaries(true);
-    const visible = new Set((await deps.uow.read.profiles.list()).filter((p) => p.defaultVisible !== false).map((p) => p.name));
-    return profiles.filter((p) => policy.mode === 'restricted' ? policy.allowedProfiles.includes(p.name) : visible.has(p.name))
-      .map((p) => ({ ...p, isDefault: policy.mode === 'restricted' ? p.name === policy.defaultProfile : p.isDefault }));
+    const visible = new Set((await deps.uow.read.profiles.list()).filter((p) => p.defaultVisible !== false).map((p) => p.id));
+    return profiles.filter((p) => policy.mode === 'restricted' ? policy.allowedProfiles.includes(p.id) : visible.has(p.id))
+      .map((p) => ({ ...p, isDefault: policy.mode === 'restricted' ? p.id === policy.defaultProfile : p.isDefault }));
   };
   return {
     listProjectSummaries: async (actor: Actor, projectId: ProjectId) => { await deps.projects.authorize(actor, projectId, 'view'); return summaries(projectId); },
-    resolveForProject: async (projectId: ProjectId, wanted: string | undefined, usage: ComputeUsage) => resolver.resolve(await authorizedName(projectId, wanted), usage),
-    lookupForProjectRelease: async (projectId: ProjectId, wanted: string) => resolver.lookupForRelease(await authorizedName(projectId, wanted)),
+    resolveForProject: async (projectId: ProjectId, wanted: ComputeProfileSelector | undefined, usage: ComputeUsage) => resolver.resolve({ kind: 'profile', profileId: await authorizedName(projectId, wanted) }, usage),
+    lookupForProjectRelease: async (projectId: ProjectId, wanted: ComputeProfileSelector) => resolver.lookupForRelease({ kind: 'profile', profileId: await authorizedName(projectId, wanted) }),
   };
 }

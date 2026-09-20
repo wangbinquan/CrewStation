@@ -25,11 +25,11 @@ beforeAll(async () => {
   [admin, owner, member, tester, stranger] = actors as [Actor, Actor, Actor, Actor, Actor];
   module = createProjectModule({ db: db.db, identity: identity.api,
     hosts: { prodHost: (s) => s, previewHost: (s) => s, serviceHost: (s) => s },
-    settings: { defaultMaxConcurrentTasks: 3, defaultServicePlan: 'standard' } });
-  await module.api.upsertServicePlan(admin, { name: 'standard', cpu: '1', memory: '1Gi', maxReplicas: 1, description: '' });
+    settings: { defaultMaxConcurrentTasks: 3, defaultServicePlan: '01a0bf5d-8f4b-7fe6-8d34-68cf5c74d8ec' } });
+  await module.api.createServicePlan(admin, { id: '01a0bf5d-8f4b-7fe6-8d34-68cf5c74d8ec', name: 'standard', cpu: '1', memory: '1Gi', maxReplicas: 1, description: '' });
   for (let i = 0; i < 24; i++) {
     const kind: ManifestKind = i === 23 ? 'APIProxy' : 'DigitalWorker';
-    const p = await module.api.createProject(admin, { slug: `page-${i}`, name: `项目 ${i}`, kind, ownerUserId: owner.userId, template: 'minimal-sample' }); ids.push(p.id);
+    const p = await module.api.createProject(admin, { slug: `page-${i}`, name: `项目 ${i}`, kind, ownerUserId: owner.userId, template: '01a0bf5d-8f4b-7002-9560-94caf593fb19' }); ids.push(p.id);
     if (i < 4) await module.api.setMember(admin, p.id, { userId: member.userId, role: 'developer' });
     if (i === 0) await module.api.setMember(admin, p.id, { userId: tester.userId, role: 'tester' });
     if (i === 1) await module.api.setProjectState(p.id, 'failed', '开通失败');
@@ -92,7 +92,7 @@ describe.skipIf(!available)('项目有界基础分页', () => {
     expect(service?.serviceId).toBe((await module.api.getProject(admin, id)).serviceId);
     await module.api.setProjectState(id, 'active'); await module.api.archiveProject(admin, id);
     expect(await module.api.resolveServiceOfProject(id)).toMatchObject({ projectId: id, state: 'archived' });
-    expect(await module.api.resolveServiceOfProject(`prj_${'0'.repeat(32)}` as ProjectId)).toBeUndefined();
+    expect(await module.api.resolveServiceOfProject('01a0bf5d-8f4b-7516-8d17-d7ba6b6e2fe8' as ProjectId)).toBeUndefined();
   });
   test('身份成员投影保留完整角色与范围，撤销即时移除', async () => {
     expect(await module.api.listUserMemberships(stranger.userId)).toEqual([]);

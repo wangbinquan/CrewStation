@@ -18,8 +18,8 @@ export function AdminRequestTodos({ kind }: { readonly kind: 'api' | 'egress' })
   return <AdminTodoCard title={t(`admin.todo.${kind}`)} refreshLabel={t(`admin.todo.refresh.${kind}`)} pending={query.isPending} error={query.error} busy={busy}
     count={query.data ? items.length : undefined} more={!!query.data?.nextCursor} checkedAt={query.dataUpdatedAt} refresh={refresh}
     open={<Link to="/admin/requests" search={{ tab: kind, state: 'pending' }}>{t('admin.todo.openRequests')}</Link>}>
-    {items.length ? <ul className={styles.list}>{items.map((item) => <li key={item.id}><div className={styles.title}>{current ? <Link to="/admin/requests" search={{ tab: kind, state: 'pending', projectId: item.projectId }}>{'operationKey' in item ? item.operationKey : item.fqdn}</Link>
-      : <span>{'operationKey' in item ? item.operationKey : item.fqdn}</span>}</div><div className={styles.muted}>{item.project ? `${item.project.name} · ${item.project.slug}` : item.projectId}</div>
+    {items.length ? <ul className={styles.list}>{items.map((item) => <li key={item.id}><div className={styles.title}>{current ? <Link to="/admin/requests" search={{ tab: kind, state: 'pending', projectId: item.projectId }}>{'operationId' in item ? item.operationId : item.fqdn}</Link>
+      : <span>{'operationId' in item ? item.operationId : item.fqdn}</span>}</div><div className={styles.muted}>{item.project ? `${item.project.name} · ${item.project.slug}` : item.projectId}</div>
       {item.reason ? <p>{item.reason}</p> : null}</li>)}</ul> : null}
   </AdminTodoCard>;
 }

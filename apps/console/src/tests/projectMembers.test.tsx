@@ -3,7 +3,7 @@ import { afterEach, expect, test } from 'bun:test';
 import { act } from 'react';
 import { renderApp } from './renderApp';
 
-const originalFetch = globalThis.fetch, projectId = `prj_${'a'.repeat(32)}`, serviceId = `svc_${'b'.repeat(32)}`, ownerId = `usr_${'c'.repeat(32)}`, memberId = `usr_${'d'.repeat(32)}`;
+const originalFetch = globalThis.fetch, projectId = '01a0bf5d-8f4b-7e1e-8dde-c9c2ae13ed34', serviceId = '01a0bf5d-8f4b-760b-86b6-0bb9f08a9eaa', ownerId = '01a0bf5d-8f4b-7ed2-8386-a4b2e1a36efb', memberId = '01a0bf5d-8f4b-7baf-8eed-680262285455';
 let page: Awaited<ReturnType<typeof renderApp>> | undefined;
 afterEach(() => { page?.unmount(); page = undefined; globalThis.fetch = originalFetch; });
 
@@ -77,13 +77,13 @@ test('负责人精确查找，目录失败与无匹配分开；赋角色失败�
 
 test('高级 ID 保留有效直输能力，首屏格式约束、字段错误和焦点；失败草稿不进入另一项目', async () => {
   const f = fixture(); page = await renderApp(`/projects/${projectId}/settings?tab=members`); if (f.state.role !== 'developer' || f.state.admin) await page.click('添加成员');
-  await page.click('高级：用户 ID'); expect(page.text()).toContain('32 位小写十六进制');
-  const id = field('用户 ID'); await input(id, 'usr_bad'); await page.click('添加或改角色');
+  await page.click('高级：用户 ID'); expect(page.text()).toContain('36 字符 UUIDv7');
+  const id = field('用户 ID'); await input(id, 'usr_invalid'); await page.click('添加或改角色');
   expect(id.getAttribute('aria-invalid')).toBe('true'); expect(document.activeElement === id).toBe(true); expect(f.writes()).toHaveLength(0);
   f.state.failWrite = true; await input(id, memberId); await page.click('添加或改角色');
   expect(f.writes()[0]?.body).toEqual({ userId: memberId, role: 'developer' }); expect(id.value).toBe(memberId);
   expect(f.calls.some((call) => call.url.pathname.endsWith('/member-candidates'))).toBe(false);
-  await page.requestNavigate(`/projects/prj_${'e'.repeat(32)}/settings?tab=members`);
+  await page.requestNavigate(`/projects/01a0bf5d-8f4b-72fa-8e8f-b3b7a425ee7d/settings?tab=members`);
   expect(page.path()).toBe(`/projects/${projectId}/settings`); await page.click('放弃输入并离开');
   expect(document.querySelector<HTMLInputElement>('input')?.value).not.toBe(memberId); expect(page.text()).not.toContain('成员写入暂不可用');
 });

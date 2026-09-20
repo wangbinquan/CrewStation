@@ -1,4 +1,5 @@
 import type { AgentProtocol, ProfileTestId, ProfileTestOutcome, ProfileTestState, UserId } from '@crewstation/contracts';
+import { conflict } from '@crewstation/kernel';
 import type { Executor } from '@crewstation/persistence';
 import { and, asc, desc, eq, inArray, lt } from 'drizzle-orm';
 import type { ComputeProfile, ProfileCredential, ProfileRevision } from '../../domain/computeProfile';
@@ -9,26 +10,26 @@ import { profileCredentials, profileRevisions, profileTests, profiles } from './
 const json = <T>(v: unknown): T => (typeof v === 'string' ? JSON.parse(v) : v) as T;
 
 const toProfile = (r: typeof profiles.$inferSelect): ComputeProfile => ({
-  name: r.name, protocol: r.protocol as AgentProtocol, description: r.description, enabled: r.enabled, isDefault: r.isDefault, defaultVisible: r.defaultVisible, currentRevision: r.currentRevision,
+  id: r.id, name: r.name, protocol: r.protocol as AgentProtocol, description: r.description, enabled: r.enabled, isDefault: r.isDefault, defaultVisible: r.defaultVisible, currentRevision: r.currentRevision,
   createdBy: r.createdBy as UserId, createdAt: r.createdAt, updatedBy: r.updatedBy as UserId, updatedAt: r.updatedAt,
 });
 
 export function drizzleProfileRepository(db: Executor): ProfileRepository {
   return {
     insert: async (p) => { await db.insert(profiles).values({ ...p }); },
-    update: async (p) => { await db.update(profiles).set({ ...p }).where(eq(profiles.name, p.name)); },
-    get: async (name) => { const row = (await db.select().from(profiles).where(eq(profiles.name, name)))[0]; return row ? toProfile(row) : undefined; },
-    lock: async (name) => { const row = (await db.select().from(profiles).where(eq(profiles.name, name)).for('update'))[0]; return row ? toProfile(row) : undefined; },
+    update: async (p) => { await db.update(profiles).set({ ...p }).where(eq(profiles.id, p.id)); },
+    get: async (name) => { const row = (await db.select().from(profiles).where(eq(profiles.id, name)))[0]; return row ? toProfile(row) : undefined; },
+    lock: async (name) => { const row = (await db.select().from(profiles).where(eq(profiles.id, name)).for('update'))[0]; return row ? toProfile(row) : undefined; },
     getDefault: async () => { const row = (await db.select().from(profiles).where(eq(profiles.isDefault, true)))[0]; return row ? toProfile(row) : undefined; },
     list: async () => (await db.select().from(profiles).orderBy(asc(profiles.name))).map(toProfile),
-    remove: async (name) => { await db.delete(profiles).where(eq(profiles.name, name)); },
+    remove: async (name) => { await db.delete(profiles).where(eq(profiles.id, name)); },
     clearDefault: async () => { await db.update(profiles).set({ isDefault: false }).where(eq(profiles.isDefault, true)); },
   };
 }
 
 export function drizzleRevisionRepository(db: Executor): RevisionRepository {
   const toRevision = (r: typeof profileRevisions.$inferSelect): ProfileRevision => ({
-    profile: r.profile, revision: r.revision, content: json<ProfileRevision['content']>(r.content), imageDigest: r.imageDigest, contentHash: r.contentHash,
+    profile: r.profile, revision: r.revision, content: json<ProfileRevision['content']>(r.normalizedContent ?? r.content), imageDigest: r.imageDigest, contentHash: r.contentHash,
     createdBy: r.createdBy as UserId, createdAt: r.createdAt,
   });
   return {
@@ -39,11 +40,11 @@ export function drizzleRevisionRepository(db: Executor): RevisionRepository {
 }
 
 export function drizzleCredentialRepository(db: Executor): CredentialRepository {
-  const toCredential = (r: typeof profileCredentials.$inferSelect): ProfileCredential => ({ profile: r.profile, name: r.name, cipherText: r.cipherText, updatedBy: r.updatedBy as UserId, updatedAt: r.updatedAt });
+  const toCredential = (r: typeof profileCredentials.$inferSelect): ProfileCredential => ({ id: r.id, profile: r.profile, name: r.name, cipherText: r.cipherText, updatedBy: r.updatedBy as UserId, updatedAt: r.updatedAt });
   return {
     list: async (profile) => (await db.select().from(profileCredentials).where(eq(profileCredentials.profile, profile)).orderBy(asc(profileCredentials.name))).map(toCredential),
-    upsert: async (c) => { await db.insert(profileCredentials).values({ ...c }).onConflictDoUpdate({ target: [profileCredentials.profile, profileCredentials.name], set: { cipherText: c.cipherText, updatedBy: c.updatedBy, updatedAt: c.updatedAt } }); },
-    remove: async (profile, name) => { await db.delete(profileCredentials).where(and(eq(profileCredentials.profile, profile), eq(profileCredentials.name, name))); },
+    upsert: async (c) => { const written = await db.insert(profileCredentials).values({ ...c }).onConflictDoUpdate({ target: profileCredentials.id, set: { name: c.name, cipherText: c.cipherText, updatedBy: c.updatedBy, updatedAt: c.updatedAt }, setWhere: eq(profileCredentials.profile, c.profile) }).returning({ id: profileCredentials.id }); if (!written.length) throw conflict('凭据 ID 已属于其他算力档位'); },
+    remove: async (profile, name, updatedBy, updatedAt) => { await db.update(profileCredentials).set({ cipherText: null, updatedBy, updatedAt }).where(and(eq(profileCredentials.profile, profile), eq(profileCredentials.id, name))); },
     removeAll: async (profile) => { await db.delete(profileCredentials).where(eq(profileCredentials.profile, profile)); },
   };
 }

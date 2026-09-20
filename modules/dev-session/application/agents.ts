@@ -32,16 +32,16 @@ export function agentUseCases(deps: DevSessionUseCaseDeps, starts: AgentStartRep
       // RFC-006：受理时解析档位（省略即 default），headless 只能用两种已知协议；此后派发只按固定修订取材料。
       const resolved = await deps.compute.resolve(input.compute, 'agent', env.projectId);
       const start: AgentStart = {
-        agentId: newId('agt'), taskId: env.id, createdBy: actor.userId, compute: resolved.name, profile: { profile: resolved.name, revision: resolved.revision }, permission: input.permission,
+        agentId: newId('agt'), taskId: env.id, createdBy: actor.userId, compute: resolved.id, computeName: resolved.name, profile: { profileId: resolved.id, revision: resolved.revision }, permission: input.permission,
         request: { prompt: input.prompt, ...(input.cwd ? { cwd: input.cwd } : {}), ...(input.resumeSessionId ? { resumeSessionId: input.resumeSessionId } : {}) },
-        execution: { taskId: newId('tsk') as TaskId, runnerId: crypto.randomUUID(), image: resolved.image, ...(resolved.taskProfile ? { taskProfile: resolved.taskProfile } : {}) },
+        execution: { taskId: newId('tsk') as TaskId, runnerId: Bun.randomUUIDv7(), image: resolved.image, ...(resolved.taskProfile ? { taskProfile: resolved.taskProfile } : {}) },
         state: 'pending', cursor: 0, finalized: false, createdAt: deps.clock.now().toISOString(),
       };
       await starts.insert(start);
       const execution = await executions.admit(start);
       void executions.dispatch(start.agentId);
       await environments.touch(taskId);
-      return { agentId: start.agentId, taskId: env.id, compute: start.compute, permission: start.permission, state: 'preparing', profileRevision: start.profile.revision,
+      return { agentId: start.agentId, taskId: env.id, compute: start.compute, computeName: start.computeName, permission: start.permission, state: 'preparing', profileRevision: start.profile.revision,
         execution: { taskId: execution.id, state: execution.native?.state ?? 'queued', ...(execution.message ? { message: execution.message } : {}) }, startedAt: start.createdAt };
     },
     sendMessage: async (actor: Actor, taskId: TaskId, agentId: string, input: SendAgentMessageRequest): Promise<void> => {
@@ -91,11 +91,11 @@ function applyStored(agents: Map<string, AgentInstanceDto>, taskId: TaskId, stor
 /** 受理记录补齐名册：还没有事件的 Agent 显示为准备中；执行环境的状态与原因（排队、调度、失败）原样带上。 */
 async function withExecution(deps: DevSessionUseCaseDeps, start: AgentStart, observed: AgentInstanceDto | undefined): Promise<AgentInstanceDto> {
   const env = start.finalized ? undefined : await deps.environments.getEnvironment(start.execution.taskId);
-  const base: AgentInstanceDto = observed ?? { agentId: start.agentId, taskId: start.taskId, compute: start.compute, permission: start.permission, state: 'preparing', profileRevision: start.profile.revision, startedAt: start.createdAt };
+  const base: AgentInstanceDto = observed ?? { agentId: start.agentId, taskId: start.taskId, compute: start.compute, computeName: start.computeName, permission: start.permission, state: 'preparing', profileRevision: start.profile.revision, startedAt: start.createdAt };
   const state: AgentInstanceState = start.state === 'ended' && !['completed', 'failed', 'cancelled'].includes(base.state) ? (start.cancelled ? 'cancelled' : start.failure ? 'failed' : 'completed') : base.state;
   const executionState = env?.native?.state ?? (start.finalized || start.state === 'ended' ? 'finished' : 'queued');
   const message = start.failure ?? (['queued', 'starting'].includes(executionState) ? env?.message : undefined);
-  return { ...base, compute: base.compute || start.compute, profileRevision: base.profileRevision ?? start.profile.revision, state,
+  return { ...base, computeName: start.computeName, compute: base.compute || start.compute, profileRevision: base.profileRevision ?? start.profile.revision, state,
     ...(state !== base.state && start.endedAt ? { endedAt: start.endedAt } : {}), execution: { taskId: start.execution.taskId, state: executionState, ...(message ? { message } : {}) } };
 }
 
@@ -107,7 +107,7 @@ function applyBeforeStart(agents: Map<string, AgentInstanceDto>, taskId: TaskId,
   const beforeStart = { executionId: execution.executionId, state: execution.state, ...(running ? { currentStep: running.name } : {}), ...(failed ? { failedStep: failed.name } : {}), ...(execution.error ? { error: execution.error.message } : {}) };
   const preparing = execution.state === 'queued' || execution.state === 'running';
   const state: AgentInstanceState = preparing ? 'preparing' : execution.state === 'failed' ? 'failed' : execution.state === 'cancelled' ? 'cancelled' : current.state === 'preparing' ? 'starting' : current.state;
-  agents.set(execution.agentId, { ...current, compute: current.compute || execution.profile.profile, profileRevision: execution.profile.revision, beforeStart, state, ...(execution.state === 'failed' || execution.state === 'cancelled' ? { endedAt: execution.endedAt ?? at } : {}) });
+  agents.set(execution.agentId, { ...current, compute: current.compute || execution.profile.profileId, profileRevision: execution.profile.revision, beforeStart, state, ...(execution.state === 'failed' || execution.state === 'cancelled' ? { endedAt: execution.endedAt ?? at } : {}) });
 }
 
 function stateOf(event: AgentEvent, current: AgentInstanceState): AgentInstanceState {
@@ -140,18 +140,18 @@ export function clusterAgentUseCases(deps: DevSessionUseCaseDeps, starts: AgentS
   return {
     inspectClusterAgent: async (actor: Actor, id: TaskId) => { const { old } = await load(actor, id); return { parentTaskId: old.taskId, agentId: old.agentId, profile: old.profile, permission: old.permission }; },
     manageClusterAgent: async (actor: Actor, id: TaskId, restart: boolean, operationId: string): Promise<{ operationId: string }> => {
-      const { old, env } = await load(actor, id); const suffix = operationId.replaceAll('-', '');
-      const nextId = `agt_${suffix}`, taskId = `tsk_${suffix}` as TaskId;
+      const { old, env } = await load(actor, id);
+      const next = restart ? await starts.reserveRestart(operationId) : undefined;
       await starts.withLock(old.agentId, async () => {
-        if (restart && !await starts.get(nextId)) {
+        if (next && !await starts.get(next.agentId)) {
           if (!env.connected || env.state !== 'running') throw precondition('父工作区未就绪，无法重开 Agent');
-          await starts.insert({ agentId: nextId, taskId: old.taskId, createdBy: actor.userId, compute: old.compute, profile: old.profile, permission: old.permission, request: old.request,
-            execution: { ...old.execution, taskId, runnerId: operationId, previousTaskId: id }, state: 'pending', cursor: 0, finalized: false, createdAt: deps.clock.now().toISOString() });
+          await starts.insert({ agentId: next.agentId, taskId: old.taskId, createdBy: actor.userId, compute: old.compute, computeName: old.computeName, profile: old.profile, permission: old.permission, request: old.request,
+            execution: { ...old.execution, taskId: next.taskId, runnerId: Bun.randomUUIDv7(), previousTaskId: id }, state: 'pending', cursor: 0, finalized: false, createdAt: deps.clock.now().toISOString() });
         }
         await executions.end((await starts.get(old.agentId))!, { cancelled: true });
       });
       await executions.dispatch(old.agentId);
-      return { operationId: restart ? taskId : id };
+      return { operationId: next?.taskId ?? id };
     },
   };
 }

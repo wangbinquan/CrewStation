@@ -11,8 +11,8 @@ import type { UnitOfWork } from '../ports/unitOfWork';
 import { releaseMigrations } from '../wiring';
 
 const available = await testDatabaseAvailable(), now = new Date('2026-09-13T01:00:00Z');
-const serviceId = `svc_${'a'.repeat(32)}` as ServiceId, projectId = `prj_${'b'.repeat(32)}` as ProjectId, releaseId = `rel_${'c'.repeat(32)}` as ReleaseId;
-const actor: Actor = { userId: `usr_${'d'.repeat(32)}` as UserId, isAdmin: false };
+const serviceId = '01a0bf5d-8f4b-7455-8963-87369647717e' as ServiceId, projectId = '01a0bf5d-8f4b-7aef-84b8-c458233bab22' as ProjectId, releaseId = '01a0bf5d-8f4b-778f-8c4c-27f518d5c2e2' as ReleaseId;
+const actor: Actor = { userId: '01a0bf5d-8f4b-7baf-8eed-680262285455' as UserId, isAdmin: false };
 function signal() { let resolve!: () => void; const promise = new Promise<void>((done) => { resolve = done; }); return { promise, resolve }; }
 
 test.skipIf(!available)('两个首次上线请求读取同一服务时串行核对；只落一次切换和事件，普通查询仍可读', async () => {
@@ -54,7 +54,7 @@ test.skipIf(!available)('两个首次上线请求读取同一服务时串行核�
 
 test.skipIf(!available)('旧待命版本仍就绪时，进行中的发布阻止切流；发布失败后可重新确认原版本', async () => {
   const db = await createTestDatabase([eventbusMigrations, releaseMigrations]), uow = drizzleUnitOfWork(db.db);
-  const pendingId = `rel_${'e'.repeat(32)}` as ReleaseId;
+  const pendingId = '01a0bf5d-8f4b-7dda-8ca7-d5d5f8a92b44' as ReleaseId;
   try {
     await uow.run(async (scope) => {
       const initial = initialSlots(serviceId, now);
@@ -87,10 +87,10 @@ const rollbackCases: Array<{ name: string; migration: MigrationSpec; newer?: boo
 ];
 for (const scenario of rollbackCases) test.skipIf(!available)(scenario.name, async () => {
   const db = await createTestDatabase([eventbusMigrations, releaseMigrations]), uow = drizzleUnitOfWork(db.db);
-  const targetId = `rel_${'f'.repeat(32)}` as ReleaseId;
+  const targetId = '01a0bf5d-8f4b-7fd8-80e1-98a6fb83510b' as ReleaseId;
   try {
-    const manifest = ManifestSchema.parse({ apiVersion: 'crewstation/v1', kind: 'DigitalWorker', spec: {
-      service: { command: ['bun', 'run', 'src/main.ts'], port: 3000, plan: 'standard-small' }, release: { migration: scenario.migration },
+    const manifest = ManifestSchema.parse({ apiVersion: 'crewstation/v2', kind: 'DigitalWorker', spec: {
+      service: { command: ['bun', 'run', 'src/main.ts'], port: 3000, servicePlanId: '01a0bf5d-8f4b-7000-9e4b-b54e91ee9d10' }, release: { migration: scenario.migration },
     } });
     await uow.run(async (scope) => {
       const initial = initialSlots(serviceId, now);

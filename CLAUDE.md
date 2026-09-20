@@ -15,6 +15,8 @@ Three rules are violated most often: **develop only on `main`** (no branches, no
 
 ## Repository status
 
+RFC-013 defines platform resource IDs as canonical lowercase, hyphenated UUIDv7 (36 characters). Names are display/search fields; foreign keys, resource routes and selections use IDs. Manifest v2 and Runner v3 are current; legacy business v1 and authenticated Runner v2 remain explicit adapters. Protocol symbols and external identifiers remain distinct. See `proposal/rfc/RFC-013-resource-uuid/design.md` and its plan for upgrade/publication evidence.
+
 CrewStation (数字人能力平台: a platform on which teams build, publish and run "digital worker" business apps with coding agents) now holds **both** the design documents under `proposal/` and a working implementation. The three proposal documents are v0.3.6 (v0.3.5 backfills RFC-011 roles/home; v0.3.6 backfills RFC-010 managed cluster operations) and remain the authoritative contract; the code is the first implementation of that contract, verified on the local kind cluster, not a shipped product.
 
 What exists in the cluster today (local `docker-desktop` kind node, namespace `crewstation-system`): the five resident services, both platform MCP servers, the workbench, Traefik, PostgreSQL, a registry and BuildKit. Chains that have actually been run end to end and observed, not inferred:

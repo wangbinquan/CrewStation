@@ -3,7 +3,7 @@ import { BEFORE_START_LIMITS, TEMPLATE_PATH_CONTEXT_NAMES, scanTemplate } from '
 import { validation } from '@crewstation/kernel';
 
 /** 档位修订里属于启动前 Hook 的那部分内容（RFC-004 的步骤、变量、凭据与配置绑定，RFC-006 并入档位）。 */
-export type BeforeStartContent = Pick<ComputeProfileContent, 'steps' | 'vars' | 'secretNames' | 'configFile'>;
+export type BeforeStartContent = Pick<ComputeProfileContent, 'steps' | 'vars' | 'secrets' | 'configFile'>;
 
 /** 保留给平台的环境变量：脚本输出与普通变量都不能覆盖，冲突时显示变量名。 */
 export const RESERVED_ENV_NAMES: ReadonlySet<string> = new Set([
@@ -29,9 +29,9 @@ export function validateRevisionContent(content: BeforeStartContent): void {
     if (isReservedEnvName(name)) throw fail(`变量 ${name} 是平台保留名，不能作为普通变量`, undefined, `vars.${name}`);
     total += bytes(name) + bytes(value);
   }
-  for (const name of content.secretNames) {
-    if (isReservedEnvName(name)) throw fail(`凭据 ${name} 是平台保留名`, undefined, `secretNames`);
-    if (name in content.vars) throw fail(`${name} 同时出现在普通变量与凭据中，只能选一处`, undefined, `secretNames`);
+  for (const { name } of content.secrets) {
+    if (isReservedEnvName(name)) throw fail(`凭据 ${name} 是平台保留名`, undefined, `secrets`);
+    if (name in content.vars) throw fail(`${name} 同时出现在普通变量与凭据中，只能选一处`, undefined, `secrets`);
   }
   const outputs = new Set<string>();
   for (const step of content.steps) {
@@ -85,7 +85,7 @@ function assertReferences(template: string, content: BeforeStartContent, stepId:
 function isDeclared(ref: TemplateReference, content: BeforeStartContent, allowEnv: boolean): boolean {
   if (ref.kind === 'context') return true;
   if (ref.kind === 'vars') return ref.name in content.vars;
-  if (ref.kind === 'secrets') return content.secretNames.includes(ref.name);
+  if (ref.kind === 'secrets') return content.secrets.some((entry) => entry.name === ref.name);
   return allowEnv && !isReservedEnvName(ref.name);
 }
 

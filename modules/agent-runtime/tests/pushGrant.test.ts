@@ -3,7 +3,7 @@ import type { PushGrant } from '../domain/pushGrant';
 import { registryDecision, signGrant, verifyGrant } from '../domain/pushGrant';
 
 const key = new TextEncoder().encode('k'.repeat(32));
-const grant: PushGrant = { sub: 'usr_1', exp: 2_000, push: ['runtime/'], pull: ['runtime/', 'crewstation/task-runtime'] };
+const grant: PushGrant = { sub: '01a0bf5d-8f4b-7ac9-8852-aff2e92a734c', exp: 2_000, push: ['runtime/'], pull: ['runtime/', 'crewstation/task-runtime'] };
 
 describe('推送凭据（RFC-006 C18）', () => {
   test('签名、到期与篡改：只有同一密钥签发且未到期的口令有效', () => {

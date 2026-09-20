@@ -53,10 +53,10 @@ export function CapabilityOperations({ operations }: { readonly operations: Capa
     <CapabilitySection title={t('capabilities.operations.title')} note={t('capabilities.operations.note')}>
       <CapabilityTable
         rows={operations}
-        rowKey={(row) => row.key}
+        rowKey={(row) => row.id}
         empty={t('capabilities.operations.empty')}
         columns={[
-          { header: t('capabilities.operations.key'), cell: (row) => <CopyValue value={row.key} label={row.key} /> },
+          { header: t('capabilities.operations.key'), cell: (row) => <CopyValue value={row.id} label={row.id} /> },
           { header: t('capabilities.operations.method'), cell: (row) => <code>{row.method}</code> },
           { header: t('capabilities.operations.path'), cell: (row) => <CopyValue value={row.path} label={row.path} /> },
           {

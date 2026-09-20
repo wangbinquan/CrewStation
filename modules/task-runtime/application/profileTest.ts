@@ -1,9 +1,10 @@
+import { newResourceId } from '@crewstation/kernel';
 import type { BeforeStartExecution, McpConnection, ProbeTerminalResult, ProfileTestContext, ProfileTestOutcome, ProfileTestStage, RunnerEvent, TaskId } from '@crewstation/contracts';
 import { ProbeTerminalResultSchema, TASKRUNNER_PROTOCOL_VERSION, isKnownProtocol } from '@crewstation/contracts';
 import { isPlatformError } from '@crewstation/kernel';
 import type { ProfileTestRunInput, ProfileTestRunProgress, ProfileTestRunResult } from '../api/moduleApi';
 import { CONTAINER_START_FAILURES, IMAGE_PULL_FAILURES, RUNNER_UNAVAILABLE_HINT } from '../domain/podFailures';
-import { profileTestAgentId, profileTestMcp } from '../domain/profileTestEnvironment';
+import { profileTestMcp } from '../domain/profileTestEnvironment';
 import type { ProtocolProbe } from '../domain/profileTestStages';
 import { TEST_STAGE, absorbAgentEvent, commandVerdict, imageStage, launchStage, modelVerdict, runnerStage, stagesFromBeforeStart } from '../domain/profileTestStages';
 import type { TaskEnvironment } from '../domain/taskEnvironment';
@@ -48,7 +49,7 @@ export function runProfileTestUseCase(deps: TaskRuntimeUseCaseDeps, test: Profil
     let env: TaskEnvironment;
     try { env = await test.createTestEnvironment({ image: input.image, ...(input.taskProfile ? { taskProfile: input.taskProfile } : {}), labels: { 'crewstation.io/profile-test': input.testId, 'crewstation.io/compute-profile': input.profile, 'crewstation.io/profile-revision': String(input.revision) } }); }
     catch (error) { return { state: 'failed', error: `无法创建测试任务：${messageOf(error)}`, stages: [] }; }
-    const session: Session = { deps, timing, runner, env, input, report, heartbeat, context: { kind: 'platform-namespace', taskId: env.id, image: input.image, workdir: '/work' }, mcp: profileTestMcp(input.beforeStart.steps, test.mcp ?? []) };
+    const session: Session = { deps, timing, runner, env, input, report, heartbeat, context: { kind: 'platform-namespace', taskId: env.id, agentId: newResourceId(), image: input.image, workdir: '/work' }, mcp: profileTestMcp(input.beforeStart.steps, test.mcp ?? []) };
     try {
       await report({ context: session.context, stages: [imageStage('running')] });
       const waited = await waitForRunner(session);
@@ -111,7 +112,7 @@ async function describeRunner(s: Session): Promise<void> {
 
 async function cliVersion(s: Session): Promise<string | null> {
   try {
-    const execId = `pft-version-${crypto.randomUUID()}`;
+    const execId = newResourceId();
     const reply = await s.runner.sendCommand(s.env.id, { id: execId, type: 'exec', execId, command: [s.input.launch.binaryPath, '--version'], env: {}, timeoutSeconds: 30, wait: true }) as { exitCode: number | null; stdout: string };
     return reply.exitCode === 0 ? reply.stdout.trim().split('\n')[0]?.slice(0, 200) || null : null;
   } catch { return null; }
@@ -125,7 +126,7 @@ async function cliVersion(s: Session): Promise<string | null> {
  */
 async function observeProtocolTurn(s: Session): Promise<ProfileTestRunResult> {
   const { input, runner, env, timing } = s;
-  const agentId = profileTestAgentId(input.testId);
+  const agentId = s.context.agentId!;
   try {
     await runner.sendCommand(env.id, {
       id: `pft-start-${input.testId}`, type: 'startAgent', agentId, compute: input.profile, profileRevision: input.revision, launch: input.launch, permission: 'full',
@@ -173,7 +174,7 @@ async function runTerminalProbe(s: Session): Promise<ProfileTestRunResult> {
   const { input, runner, env, timing } = s;
   const test = input.terminalTest;
   if (!test) return result(s, 'failed', 'output-mismatch', '通用终端档位缺少测试命令，请编辑档位补上测试命令与期望输出', []);
-  const probeId = profileTestAgentId(input.testId);
+  const probeId = s.context.agentId!;
   let settled: { ok: true; value: ProbeTerminalResult } | { ok: false; error: unknown } | undefined;
   void runner.sendCommand(env.id, {
     id: `pft-probe-${input.testId}`, type: 'probeTerminal', probeId, compute: input.profile, profileRevision: input.revision, launch: input.launch,

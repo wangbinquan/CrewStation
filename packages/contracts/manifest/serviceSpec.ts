@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import { SlugSchema } from '../ids';
+import { ResourceIdSchema } from '../ids';
 
-export const ManifestApiVersionSchema = z.literal('crewstation/v1');
+export const ManifestApiVersionSchema = z.literal('crewstation/v2');
 export const ManifestKindSchema = z.enum(['DigitalWorker', 'APIProxy', 'EventProducer']);
 export const HttpMethodSchema = z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS']);
 
@@ -10,7 +10,7 @@ export const ServiceSpecSchema = z.object({
   port: z.number().int().min(1).max(65535),
   healthPath: z.string().startsWith('/').default('/healthz'),
   /** 管理员定义的服务套餐名。 */
-  plan: SlugSchema,
+  servicePlanId: ResourceIdSchema,
   replicas: z.number().int().min(1).max(20).default(1),
   releaseMode: z.enum(['rolling-compatible']).default('rolling-compatible'),
 });
@@ -27,7 +27,7 @@ export const EnvEntrySchema = z.object({
   name: z.string().regex(/^[A-Z][A-Z0-9_]*$/, '环境变量名必须是大写蛇形'),
   from: z.enum(['config', 'secret']),
   /** 缺省时取 name 作为配置项键。 */
-  key: z.string().min(1).optional(),
+  configDefinitionId: ResourceIdSchema,
   /**
    * 生产组尚未维护该键时使用的兜底值：让模板仓库首个标签就能发布，负责人随后在工作台覆盖。
    * 密钥不允许带默认值——密钥必须由负责人显式提供。
@@ -36,9 +36,7 @@ export const EnvEntrySchema = z.object({
 }).refine((e) => !(e.from === 'secret' && e.default !== undefined), { message: '密钥不能声明 default', path: ['default'] });
 
 export const RequestedApiSchema = z.object({
-  proxy: SlugSchema,
-  method: HttpMethodSchema,
-  path: z.string().startsWith('/'),
+  operationId: ResourceIdSchema,
 });
 
 export const ExposedApiSchema = z.object({
@@ -46,8 +44,10 @@ export const ExposedApiSchema = z.object({
   openapi: z.string().min(1),
 });
 
+export const EventCodeSchema = z.string().regex(/^[a-z][a-z0-9-]*(\.[a-z][a-z0-9-]*)+$/, '事件编码形如 gitlab.pipeline.finished');
+
 export const SubscriptionSchema = z.object({
-  eventType: z.string().regex(/^[a-z][a-z0-9-]*(\.[a-z][a-z0-9-]*)+$/, '事件类型形如 gitlab.pipeline.finished'),
+  eventTypeId: ResourceIdSchema,
   handlerPath: z.string().startsWith('/'),
 });
 

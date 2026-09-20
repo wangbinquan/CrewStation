@@ -1,3 +1,4 @@
+import { normalizeVerifiedIdentity } from './verifiedIdentity';
 import type { AuthMethod, UserDto } from '@crewstation/contracts';
 import { AuthMethodSchema } from '@crewstation/contracts';
 import type { IssuedSession } from '../api/moduleApi';
@@ -5,7 +6,7 @@ import { SESSION_AUDIENCE, SESSION_AUTH_CLAIM, userIdFromSubject, userSubject } 
 import type { IdentityUseCaseDeps } from './dependencies';
 import { toDto } from './ensureUser';
 
-type Deps = Pick<IdentityUseCaseDeps, 'tokens' | 'users' | 'session' | 'clock'>;
+type Deps = Pick<IdentityUseCaseDeps, 'tokens' | 'users' | 'session' | 'clock' | 'legacyIds'>;
 
 export interface ResolvedSession {
   readonly user: UserDto;
@@ -13,9 +14,9 @@ export interface ResolvedSession {
 }
 
 /** 浏览器会话是一枚 aud=session 的平台 JWT，放在 cs_session Cookie 里；只有 cs-auth 验它。 */
-export function sessionTokenUseCases({ tokens, users, session, clock }: Deps) {
+export function sessionTokenUseCases({ tokens, users, session, clock, legacyIds }: Deps) {
   const resolveDetail = async (token: string): Promise<ResolvedSession | undefined> => {
-    const verified = await tokens.verify(token, { audience: SESSION_AUDIENCE });
+    const verified = await normalizeVerifiedIdentity(await tokens.verify(token, { audience: SESSION_AUDIENCE }), legacyIds);
     const userId = verified ? userIdFromSubject(verified.subject) : undefined;
     if (!userId || !verified) return undefined;
     const user = await users.getById(userId);

@@ -10,19 +10,19 @@ afterEach(() => { page?.unmount(); page = undefined; globalThis.fetch = original
 function fixture() {
   const state = { readFailure: false, saveFailure: false, hold: undefined as Promise<void> | undefined, holdRead: undefined as Promise<void> | undefined,
     readOverride: undefined as unknown, writeOverride: undefined as Record<string, unknown> | undefined,
-    service: { name: 'standard-small', cpu: '500m', memory: '512Mi', maxReplicas: 3, description: '原服务套餐' },
-    task: { name: 'dev-standard', cpu: '1', memory: '2Gi', storage: '10Gi', description: '原任务套餐' } };
+    service: { id: '01a0bf5d-8f4b-7000-9e4b-b54e91ee9d10', name: 'standard-small', cpu: '500m', memory: '512Mi', maxReplicas: 3, description: '原服务套餐' },
+    task: { id: '01a0bf5d-8f4b-7816-8968-e71a4c0675bb', name: 'dev-standard', cpu: '1', memory: '2Gi', storage: '10Gi', description: '原任务套餐' } };
   const writes: Array<{ path: string; input: Record<string, unknown> }> = [];
   globalThis.fetch = (async (raw, init) => {
     const path = new URL(String(raw), 'http://localhost').pathname;
-    if (path === '/v1/me') return Response.json({ id: `usr_${'a'.repeat(32)}`, name: '管理员', email: 'admin@test.invalid', platformRole: 'admin', isAdmin: true, memberships: [] });
-    if (!/\/catalog\/(service-plans|task-profiles)$/.test(path)) return Response.json({ items: [] });
-    const kind = path.endsWith('service-plans') ? 'service' : 'task';
-    if (init?.method === 'PUT') {
+    if (path === '/v1/me') return Response.json({ id: '01a0bf5d-8f4b-7f8b-8136-e631380738b0', name: '管理员', email: 'admin@test.invalid', platformRole: 'admin', isAdmin: true, memberships: [] });
+    if (!/\/catalog\/(service-plans|task-profiles)(?:\/[0-9a-f-]{36})?$/.test(path)) return Response.json({ items: [] });
+    const kind = path.includes('/service-plans') ? 'service' : 'task';
+    if (init?.method === 'PUT' || init?.method === 'POST') {
       const input = JSON.parse(String(init.body)) as Record<string, unknown>; writes.push({ path, input });
       if (state.hold) await state.hold;
       if (state.saveFailure) return Response.json({ error: 'unavailable', message: '套餐保存失败' }, { status: 503 });
-      Object.assign(state[kind], input); return Response.json({ ...state[kind], ...state.writeOverride });
+      Object.assign(state[kind], input, init?.method === 'POST' ? { id: Bun.randomUUIDv7() } : {}); return Response.json({ ...state[kind], ...state.writeOverride });
     }
     if (state.holdRead) await state.holdRead;
     if (state.readOverride) return Response.json(state.readOverride);
@@ -46,8 +46,8 @@ test('套餐字段约束与全部错误首屏可定位；空表单 submit 不能
   await act(async () => { document.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); }); await page.settle();
   // 旧 AdminForm 只禁用按钮，没有字段校验；表单提交仍把空资源写进目录。
   expect(f.writes).toHaveLength(0); expect(document.querySelectorAll('[aria-invalid="true"]')).toHaveLength(3);
-  expect(page.text()).toContain('3–40 位'); expect(page.text()).toContain('500m'); expect(document.activeElement === field('名称')).toBe(true);
-  await input('名称', 'BAD NAME'); await input('CPU', ' '); await input('内存', ' '); await input('最大副本', '1.5'); await page.click('检查并保存');
+  expect(page.text()).toContain('1–80'); expect(page.text()).toContain('500m'); expect(document.activeElement === field('名称')).toBe(true);
+  await input('名称', ' '.repeat(3)); await input('CPU', ' '); await input('内存', ' '); await input('最大副本', '1.5'); await page.click('检查并保存');
   expect(document.querySelectorAll('[aria-invalid="true"]')).toHaveLength(4); expect(f.writes).toHaveLength(0);
 });
 

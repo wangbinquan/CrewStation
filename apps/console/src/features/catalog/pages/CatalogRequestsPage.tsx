@@ -28,7 +28,7 @@ export function CatalogRequestsPage({ projectId, state, cursor, active, onPage, 
     <RequestPageControls scope={t('admin.requests.api')} cursor={cursor} nextCursor={requests.data?.nextCursor} busy={review.busy || decide.isPending}
       count={requests.isPending || requests.error ? undefined : items.length} updatedAt={requests.dataUpdatedAt} onPage={onPage} />
     {decide.error ? <ActionNote tone="error">{t('ui.requestPage.decisionError', { message: errorMessage(decide.error) })}</ActionNote> : null}
-    {decide.isSuccess ? <ActionNote tone="success">{t('catalog.admin.decided', { key: decide.data.operationKey, state: t(decide.data.state === 'approved' ? 'catalog.requests.stateApproved' : 'catalog.requests.stateRejected') })}</ActionNote> : null}
+    {decide.isSuccess ? <ActionNote tone="success">{t('catalog.admin.decided', { key: decide.data.operationId, state: t(decide.data.state === 'approved' ? 'catalog.requests.stateApproved' : 'catalog.requests.stateRejected') })}</ActionNote> : null}
     <RequestsPanel requests={shown} loading={requests.isPending} loadError={requests.error} title={t('catalog.admin.requestsTitle')} empty={t('catalog.admin.requestsEmpty')}
       renderService={(serviceId) => {
         const item = shown.find((request) => request.serviceId === serviceId), project = item?.project;
@@ -36,7 +36,7 @@ export function CatalogRequestsPage({ projectId, state, cursor, active, onPage, 
           {item ? <> · <Link to="/admin/requests" search={{ tab: 'api', state, projectId: item.projectId }}>{t('admin.requests.filterProject')}</Link></> : null}</p>;
       }}
       management={{ busy: paused, onDecide: submit, decisionFor: drafts.read, onDecisionChange: (id, value) => {
-        const item = shown.find((request) => request.id === id); if (item) drafts.change(id, `${item.project?.name ?? item.projectId} · ${item.operationKey}`, value);
+        const item = shown.find((request) => request.id === id); if (item) drafts.change(id, `${item.project?.name ?? item.projectId} · ${item.operationId}`, value);
       } }} />
     <RequestDraftNotice drafts={drafts.entries} pendingIds={shown.filter((r) => r.state === 'pending').map((r) => r.id)} busy={decide.isPending} onDiscard={drafts.discard} />
     {requests.error && items.length > 0 && !forbidden ? <ActionNote tone="neutral">{t('catalog.admin.lastRequests')}</ActionNote> : null}

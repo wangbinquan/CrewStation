@@ -1,0 +1,2 @@
+.copy { display: inline-flex; align-items: center; flex-wrap: wrap; gap: var(--cs-space-2); max-width: 100%; }
+.error { color: var(--cs-color-danger); font-size: var(--cs-font-size-sm); overflow-wrap: anywhere; }

@@ -12,18 +12,18 @@ export interface SwaggerBuiltRequest { url?: string; method?: string; headers?: 
 
 /** Swagger 自己负责参数序列化；只读取生成结果，执行仍交给固定的目录操作与开发会话。 */
 export function swaggerApiInvocation(proxy: string, request: SwaggerInvocationRequest, built: SwaggerBuiltRequest, operations: readonly ApiOperationDto[], expectedTaskId: string | undefined): ApiInvocationRequest {
-  const operation = operations.find((item) => item.proxy === proxy && item.path === request.pathName && item.method.toLowerCase() === request.method?.toLowerCase());
+  const operation = operations.find((item) => item.proxyId === proxy && item.path === request.pathName && item.method.toLowerCase() === request.method?.toLowerCase());
   if (!operation || operation.granted !== true) throw new Error('catalog.invoke.operationUnavailable');
   if (!built.url || built.method?.toLowerCase() !== operation.method.toLowerCase()) throw new Error('catalog.invoke.requestInvalid');
   const url = new URL(built.url);
   const server = swaggerServer(request.spec);
-  if (url.username || url.password || url.hash || url.origin !== server.origin || server.pathname.replace(/\/$/, '') !== `/api/${proxy}`) throw new Error('catalog.invoke.swaggerDestination');
+  if (url.username || url.password || url.hash || url.origin !== server.origin || server.pathname.replace(/\/$/, '') !== `/api/${operation.proxy}`) throw new Error('catalog.invoke.swaggerDestination');
   const pathParameters = Object.fromEntries(apiPathParameterNames(operation.path).map((name) => {
     const value = request.parameters?.[`path.${name}`] ?? request.parameters?.[name];
     if (!['string', 'number', 'boolean'].includes(typeof value)) throw new Error('catalog.invoke.swaggerUnsupported');
     return [name, String(value)];
   }));
-  const expectedPath = `/api/${proxy}${operation.path.replace(/\{([^{}]+)\}/g, (_match, name: string) => encodeURIComponent(pathParameters[name]!))}`;
+  const expectedPath = `/api/${operation.proxy}${operation.path.replace(/\{([^{}]+)\}/g, (_match, name: string) => encodeURIComponent(pathParameters[name]!))}`;
   // matrix/label 等高级路径序列化不能默默改写为 simple；表单可明确输入其所需路径值。
   if (url.pathname !== expectedPath) throw new Error('catalog.invoke.swaggerUnsupported');
   const query = Object.fromEntries([...new Set(url.searchParams.keys())].map((name) => { const values = url.searchParams.getAll(name); return [name, values.length === 1 ? values[0]! : values]; }));
@@ -32,7 +32,7 @@ export function swaggerApiInvocation(proxy: string, request: SwaggerInvocationRe
     return [name, value];
   }));
   if (built.form !== undefined || (built.body !== undefined && typeof built.body !== 'string')) throw new Error('catalog.invoke.swaggerUnsupported');
-  const parsed = ApiInvocationRequestSchema.safeParse({ expectedTaskId, operationKey: operation.key, pathParameters, query, headers, body: built.body });
+  const parsed = ApiInvocationRequestSchema.safeParse({ expectedTaskId, operationId: operation.id, pathParameters, query, headers, body: built.body });
   if (!parsed.success) throw new Error(expectedTaskId ? 'catalog.invoke.requestInvalid' : 'catalog.invoke.noSession');
   return parsed.data;
 }

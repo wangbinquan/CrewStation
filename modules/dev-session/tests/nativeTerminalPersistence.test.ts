@@ -1,3 +1,4 @@
+import { computeId } from './computeFixture';
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import { sql } from 'drizzle-orm';
 import { TaskIdSchema } from '@crewstation/contracts';
@@ -17,11 +18,11 @@ afterAll(async () => { await database?.drop(); });
 describe.skipIf(!available)('原生 CLI 持久名册', () => {
   test('执行绑定、停止意图与末屏跨实例保持；名册不携带屏幕，迟到运行态不能覆盖结束', async () => {
     const repo = drizzleNativeTerminals(database.db), other = drizzleNativeTerminals(database.db), taskId = TaskIdSchema.parse(newId('tsk'));
-    const input: NativeTerminalStart = { taskId, createdBy: workspaceActor.userId, clientRequestId: crypto.randomUUID(), fingerprint: 'execution', profile: { profile: 'balanced', revision: 2 },
-      input: { clientRequestId: crypto.randomUUID(), permission: 'edit', cols: 80, rows: 24 }, execution: { taskId: TaskIdSchema.parse(newId('tsk')), taskProfile: 'cli-small' },
-      record: { agentId: newId('agt'), terminalId: newId('pty'), runnerId: crypto.randomUUID(), compute: 'balanced', permission: 'edit', revision: 2, lifecycle: 'running', startedAt: new Date().toISOString(), cols: 80, rows: 24 } };
+    const input: NativeTerminalStart = { taskId, createdBy: workspaceActor.userId, clientRequestId: crypto.randomUUID(), fingerprint: 'execution', profile: { profileId: computeId('balanced'), revision: 2 },
+      input: { clientRequestId: crypto.randomUUID(), permission: 'edit', cols: 80, rows: 24 }, execution: { taskId: TaskIdSchema.parse(newId('tsk')), taskProfile: '01a0bf5d-8f4b-7dd6-8102-2aa5cc3255b1' },
+      record: { agentId: newId('agt'), terminalId: newId('pty'), runnerId: crypto.randomUUID(), compute: computeId('balanced'), permission: 'edit', revision: 2, lifecycle: 'running', startedAt: new Date().toISOString(), cols: 80, rows: 24 } };
     await repo.reserve(input); await other.requestStop(taskId, input.record.agentId);
-    expect((await repo.findExecution(input.execution!.taskId))?.execution).toMatchObject({ taskProfile: 'cli-small', stopRequested: true });
+    expect((await repo.findExecution(input.execution!.taskId))?.execution).toMatchObject({ taskProfile: '01a0bf5d-8f4b-7dd6-8102-2aa5cc3255b1', stopRequested: true });
     const snapshot = { terminalId: input.record.terminalId, runnerId: input.record.runnerId, cols: 80, rows: 24, data: 'final screen', throughSeq: 2, scrollbackLimit: 500, truncated: true };
     await repo.saveSnapshot(taskId, input.record.agentId, { status: 'available', snapshot });
     expect(await other.getSnapshot(taskId, input.record.agentId)).toEqual({ status: 'pending' });
@@ -56,9 +57,9 @@ describe.skipIf(!available)('原生 CLI 持久名册', () => {
     const repo1 = drizzleNativeTerminals(database.db);
     const repo2 = drizzleNativeTerminals(database.db);
     const input: NativeTerminalStart = {
-      taskId: workspaceTask, createdBy: workspaceActor.userId, clientRequestId: crypto.randomUUID(), fingerprint: 'original', profile: { profile: 'balanced', revision: 7 },
+      taskId: workspaceTask, createdBy: workspaceActor.userId, clientRequestId: crypto.randomUUID(), fingerprint: 'original', profile: { profileId: computeId('balanced'), revision: 7 },
       input: { clientRequestId: crypto.randomUUID(), permission: 'edit', cols: 80, rows: 24 },
-      record: { agentId: 'agent-one', terminalId: 'terminal-one', runnerId: crypto.randomUUID(), compute: 'balanced', permission: 'edit', revision: 0, lifecycle: 'starting', startedAt: new Date().toISOString(), cols: 80, rows: 24 },
+      record: { agentId: 'agent-one', terminalId: 'terminal-one', runnerId: crypto.randomUUID(), compute: computeId('balanced'), permission: 'edit', revision: 0, lifecycle: 'starting', startedAt: new Date().toISOString(), cols: 80, rows: 24 },
     };
     const [one, duplicate] = await Promise.all([repo1.reserve(input), repo2.reserve({ ...input, record: { ...input.record, agentId: 'agent-two' } })]);
     expect(one.record.agentId).toBe(duplicate.record.agentId);
@@ -69,7 +70,7 @@ describe.skipIf(!available)('原生 CLI 持久名册', () => {
     await repo2.saveRecord(workspaceTask, started);
     const restored = await drizzleNativeTerminals(database.db).findRequest(workspaceTask, workspaceActor.userId, input.clientRequestId);
     expect(restored?.record).toMatchObject({ lifecycle: 'ended', revision: 3 });
-    expect(restored?.profile).toEqual({ profile: 'balanced', revision: 7 });
+    expect(restored?.profile).toEqual({ profileId: computeId('balanced'), revision: 7 });
     const rows = await database.db.execute(sql`select jsonb_typeof(record) as kind from dev_session.native_terminal_starts`);
     expect(rows[0]?.kind).toBe('object');
   });

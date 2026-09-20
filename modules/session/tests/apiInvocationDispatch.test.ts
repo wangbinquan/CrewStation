@@ -7,7 +7,7 @@ import { RunnerConnection } from '../domain/runnerConnection';
 import { commandTimeout } from '../domain/commandTimeout';
 import { fetchForwarder } from '../adapters/http/fetchForwarder';
 
-const taskId = 'tsk_0123456789abcdef0123456789abcdef' as TaskId;
+const taskId = '01a0bf5d-8f4b-7418-8a3f-7cbb4a1fd751' as TaskId;
 const command: RunnerCommand = { id: 'invoke', type: 'invokeApi', proxy: 'crm', method: 'GET', path: '/items', query: {}, headers: {} };
 const hello: RunnerHello = { type: 'hello', taskId, protocolVersion: TASKRUNNER_PROTOCOL_VERSION, runnerToken: 'token', workdir: '/work', capabilities: { protocols: ['claude-code', 'opencode', 'terminal'], pty: true, preview: false } };
 

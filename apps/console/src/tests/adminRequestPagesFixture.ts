@@ -1,17 +1,17 @@
 import type { ApiRequestPage, EgressRequestPage, ProjectId, ServiceId, UserId } from '@crewstation/contracts';
 
-const userId = `usr_${'a'.repeat(32)}` as UserId, now = '2026-09-14T01:00:00.000Z';
+const userId = '01a0bf5d-8f4b-7f8b-8136-e631380738b0' as UserId, now = '2026-09-14T01:00:00.000Z';
 export function adminRequestPagesFixture() {
   const calls: Array<{ url: URL; method: string; body?: Record<string, unknown> }> = [];
   const state = { admin: true, apiError: 0, egressError: 0, invalidApi: false, invalidEgress: false, decisionError: false, wrongDecision: false,
     holdDecision: undefined as Promise<void> | undefined, holdApi: undefined as Promise<void> | undefined };
-  const project = (i: number) => ({ id: `prj_${(i % 3).toString(16).padStart(32, '0')}` as ProjectId, name: `申请项目 ${i % 3}`, slug: `tenant-${i % 3}`, kind: 'DigitalWorker' as const });
+  const project = (i: number) => ({ id: `01a0bf5d-8f4b-7a01-8000-${(i % 3).toString(16).padStart(12, '0')}` as ProjectId, name: `申请项目 ${i % 3}`, slug: `tenant-${i % 3}`, kind: 'DigitalWorker' as const });
   const apiRequests: ApiRequestPage['items'] = Array.from({ length: 48 }, (_, i) => ({
-    id: `req_${i.toString(16).padStart(32, '0')}`, projectId: project(i).id, project: project(i), serviceId: `svc_${(i % 3).toString(16).padStart(32, '0')}` as ServiceId,
-    operationKey: `billing:GET:/invoices/${i}`, state: i < 45 ? 'pending' : 'approved', requestedBy: userId, createdAt: now, reason: `账单申请 ${i}`,
+    id: `01a0bf5d-8f4b-7a04-8000-${i.toString(16).padStart(12, '0')}`, projectId: project(i).id, project: project(i), serviceId: `01a0bf5d-8f4b-7a02-8000-${(i % 3).toString(16).padStart(12, '0')}` as ServiceId,
+    operationId: `01a0bf5d-8f4b-7a06-8000-${i.toString(16).padStart(12, '0')}`, state: i < 45 ? 'pending' : 'approved', requestedBy: userId, createdAt: now, reason: `账单申请 ${i}`,
   }));
   const egressRequests: EgressRequestPage['items'] = Array.from({ length: 45 }, (_, i) => ({
-    id: `egq_${i.toString(16).padStart(32, '0')}`, projectId: project(i).id, project: project(i), fqdn: `model-${i}.example.invalid`,
+    id: `01a0bf5d-8f4b-7a05-8000-${i.toString(16).padStart(12, '0')}`, projectId: project(i).id, project: project(i), fqdn: `model-${i}.example.invalid`,
     state: i < 43 ? 'pending' : 'rejected', requestedBy: userId, createdAt: now, reason: `出站用途 ${i}`,
   }));
   globalThis.fetch = (async (raw, init) => {

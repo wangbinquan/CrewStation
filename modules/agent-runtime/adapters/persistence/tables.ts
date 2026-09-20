@@ -6,7 +6,8 @@ import { agentRuntimeSchema } from './schema';
 
 /** RFC-006：算力档位。说明、启用与默认在这里，执行内容在只追加的修订里；跨模块只存名称，不建外键。 */
 export const profiles = agentRuntimeSchema.table('profiles', {
-  name: text('name').primaryKey(),
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
   protocol: text('protocol').notNull(),
   description: text('description').notNull().default(''),
   enabled: boolean('enabled').notNull().default(true),
@@ -23,6 +24,7 @@ export const profileRevisions = agentRuntimeSchema.table('profile_revisions', {
   profile: text('profile').notNull(),
   revision: integer('revision').notNull(),
   content: jsonDocument('content').$type<ComputeProfileContent>().notNull(),
+  normalizedContent: jsonDocument('normalized_content').$type<ComputeProfileContent>(),
   imageDigest: text('image_digest').notNull(),
   contentHash: text('content_hash').notNull(),
   createdBy: text('created_by').notNull(),
@@ -30,12 +32,13 @@ export const profileRevisions = agentRuntimeSchema.table('profile_revisions', {
 }, (t) => [primaryKey({ columns: [t.profile, t.revision] })]);
 
 export const profileCredentials = agentRuntimeSchema.table('profile_credentials', {
+  id: text('id').primaryKey(),
   profile: text('profile').notNull(),
   name: text('name').notNull(),
-  cipherText: text('cipher_text').notNull(),
+  cipherText: text('cipher_text'),
   updatedBy: text('updated_by').notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
-}, (t) => [primaryKey({ columns: [t.profile, t.name] })]);
+}, (t) => [uniqueIndex('profile_credentials_symbol').on(t.profile, t.name)]);
 
 export const profileTests = agentRuntimeSchema.table('profile_tests', {
   testId: text('test_id').primaryKey(),

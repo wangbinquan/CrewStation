@@ -1,10 +1,11 @@
 import { publishDomainEvent } from '@crewstation/eventbus';
 import type { Database, Executor } from '@crewstation/persistence';
 import type { RepositoryScope, UnitOfWork } from '../../ports/unitOfWork';
-import { drizzleConfigItemRepository, drizzleConfigVersionRepository } from './drizzleConfigRepositories';
+import { drizzleConfigDefinitionRepository, drizzleConfigItemRepository, drizzleConfigVersionRepository } from './drizzleConfigRepositories';
 
 export function scopeOver(executor: Executor): RepositoryScope {
   return {
+    definitions: drizzleConfigDefinitionRepository(executor),
     items: drizzleConfigItemRepository(executor),
     versions: drizzleConfigVersionRepository(executor),
     events: { publish: async (topic, payload) => { await publishDomainEvent(executor, topic, payload); } },

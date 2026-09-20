@@ -2,6 +2,11 @@ import type { Messages } from '../../shared/lib/i18n';
 
 /** app 级文案：导航、顶栏、语言、404，以及 shared/ui 里通用组件的缺省文案。页面文案在各 feature 的 i18n/ 中。 */
 export const messages = {
+  'ui.copy.label': '复制',
+  'ui.copy.done': '已复制',
+  'ui.copy.value': '复制 {value}',
+  'ui.copy.failed': '复制失败，请选择文本后手动复制。',
+
   'development.suspended': '开发权限已变化。当前输入仍保留，权限恢复后可继续；你也可以返回应用首页。',
   "nav.market": "应用",
   "nav.projects": "项目开发",

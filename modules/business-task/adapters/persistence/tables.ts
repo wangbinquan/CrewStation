@@ -27,6 +27,8 @@ export const subtasks = businessTaskSchema.table('subtasks', {
   mode: text('mode'),
   state: text('state').notNull(),
   attempt: integer('attempt').notNull(),
+  retryOperationId: text('retry_operation_id'),
+  retryOf: text('retry_of'),
   spec: jsonDocument('spec').notNull(),
   runnerRef: text('runner_ref'),
   sessionId: text('session_id'),

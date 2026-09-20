@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
-import { ClusterFilterSchema, ClusterResourceSchema, ClusterSummarySchema } from '@crewstation/contracts';
+import { ResourceIdSchema, ClusterFilterSchema, ClusterResourceSchema, ClusterSummarySchema } from '@crewstation/contracts';
 import { createFakeK8sClient, Resources } from '@crewstation/k8s';
 import { createTestDatabase, testDatabaseAvailable } from '@crewstation/testkit';
 import type { TestDatabase } from '@crewstation/testkit';
@@ -34,6 +34,9 @@ describe.skipIf(!available)('cluster-management durable module', () => {
     expect(second.items[0]?.uid).not.toBe(first.items[0]?.uid);
     await expect(module.api.resources(admin, { ...query, snapshotId: summary.snapshotId, limit: 1, cursor: first.nextCursor, scope: 'system' })).rejects.toMatchObject({ kind: 'conflict' });
     await expect(module.api.summary({ ...admin, isAdmin: false }, query)).rejects.toMatchObject({ kind: 'forbidden' });
+    const refreshed = await module.collect();
+    expect(refreshed.resources.map((resource) => resource.resourceId)).toEqual(snapshot.resources.map((resource) => resource.resourceId));
+    expect(refreshed.resources.every((resource) => ResourceIdSchema.safeParse(resource.resourceId).success)).toBe(true);
     const row = ClusterResourceSchema.parse(first.items[0]); expect((await module.api.detail(admin, row.resourceId)).resource.uid).toBe(row.uid);
     await expect(module.api.logs(admin, row.resourceId, { container: 'main', tailLines: 200, previous: 'false' })).rejects.toMatchObject({ kind: 'precondition' });
   });

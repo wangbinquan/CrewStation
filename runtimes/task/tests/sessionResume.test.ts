@@ -7,7 +7,7 @@ import { startFakeSession } from './fakeSession';
 
 const cleanups: Array<() => void> = [];
 afterEach(() => { for (const fn of cleanups.splice(0).reverse()) fn(); });
-const hello: RunnerHello = { type: 'hello', taskId: 'tsk_0123456789abcdef0123456789abcdef' as TaskId, protocolVersion: TASKRUNNER_PROTOCOL_VERSION, runnerToken: 'test', workdir: '/work', capabilities: { protocols: [], pty: false, preview: false } };
+const hello: RunnerHello = { type: 'hello', taskId: '01a0bf5d-8f4b-7418-8a3f-7cbb4a1fd751' as TaskId, protocolVersion: TASKRUNNER_PROTOCOL_VERSION, runnerToken: 'test', workdir: '/work', capabilities: { protocols: [], pty: false, preview: false } };
 
 test('新 Runner 在已有持久游标之后开始 seq，首次握手前生成的事件也不能被吞掉', async () => {
   const session = startFakeSession({ resumeFromSeq: () => 100 }); cleanups.push(() => session.stop());

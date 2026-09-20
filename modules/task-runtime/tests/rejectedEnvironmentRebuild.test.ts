@@ -13,7 +13,7 @@ describe.skipIf(!available)('RFC-008 旧协议开发环境保卷恢复', () => {
   test('仍运行的旧协议环境可检查和恢复，满额时沿用已占额度，保留原卷且不重新检出', async () => {
     f = await rebuildFixture({ running: true }); f.state.quota = 1;
     await f.runtime.api.onRunnerRejected(f.env.id, f.token, rejection);
-    expect(await f.runtime.api.getEnvironment(f.env.id)).toMatchObject({ connected: false, connectionIssue: { ...rejection, requiredProtocol: 2 } });
+    expect(await f.runtime.api.getEnvironment(f.env.id)).toMatchObject({ connected: false, connectionIssue: { ...rejection, requiredProtocol: 3 } });
     // 旧版本只写拒绝原因，可能把历史 connected=true 留下来；真实握手已被拒绝。
     const legacy = (await f.uow.read.environments.getById(f.env.id))!;
     await f.uow.run((scope) => scope.environments.update({ ...legacy, connected: true }));
@@ -29,7 +29,7 @@ describe.skipIf(!available)('RFC-008 旧协议开发环境保卷恢复', () => {
     expect(await f.runtime.api.runningTaskCount(f.projectId)).toBe(1);
     expect(await f.runtime.api.onRunnerConnected(f.env.id, f.token)).toBe(false);
     await f.run();
-    const record = (await f.uow.read.rebuilds.get(input.requestId))!;
+    const record = (await f.uow.read.rebuilds.findRequest(f.projectId, input.requestId))!;
     expect(record.state).toBe('starting');
     expect(await f.k8s.get(Resources.Pod!, f.env.podName, f.env.namespace)).toBeUndefined();
     expect(await f.k8s.get(Resources.PersistentVolumeClaim!, f.env.pvcName, f.env.namespace)).toEqual(volume);

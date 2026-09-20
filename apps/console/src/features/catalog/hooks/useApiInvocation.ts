@@ -40,13 +40,13 @@ export function useApiInvocation(context: ApiInvocationContext) {
   };
   const send = async (source: string, input: ApiInvocationRequest): Promise<ApiInvocationResponse> => {
     if (locked.current) throw new Error(t('catalog.invoke.busy'));
-    if (!context.canDevelop || !context.catalogReady || !context.operations.some((item) => item.key === input.operationKey && item.granted === true)) throw new Error(t('catalog.invoke.operationUnavailable'));
+    if (!context.canDevelop || !context.catalogReady || !context.operations.some((item) => item.id === input.operationId && item.granted === true)) throw new Error(t('catalog.invoke.operationUnavailable'));
     if (!binding.current || input.expectedTaskId !== binding.current || currentTaskId !== binding.current) throw new Error(t('catalog.invoke.sessionChanged'));
     locked.current = true; setPending(true); setError(undefined); setOutcome(undefined);
     const generation = life.current, submittedRevision = revisions.current.get(source);
     try {
       const parsed = ApiInvocationResponseSchema.safeParse(await api.devSession.invokeApi(context.projectId, input));
-      if (!parsed.success || parsed.data.taskId !== input.expectedTaskId || parsed.data.operationKey !== input.operationKey) throw new Error(t('catalog.invoke.unknownResult'));
+      if (!parsed.success || parsed.data.taskId !== input.expectedTaskId || parsed.data.operationId !== input.operationId) throw new Error(t('catalog.invoke.unknownResult'));
       if (generation === life.current) { setError(undefined); setOutcome({ request: input, response: parsed.data }); if (submittedRevision === revisions.current.get(source)) setDirtySources((sources) => sources.filter((item) => item !== source)); }
       return parsed.data;
     } catch (failure) { if (generation === life.current) setError(errorMessage(failure)); throw failure; }

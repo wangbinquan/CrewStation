@@ -30,13 +30,13 @@ describe.skipIf(!available)('平台角色首页装配（真实数据库与 HTTP�
     const users = await Promise.all(['owner', 'developer', 'tester'].map((name) => identity.api.ensureUser({ externalId: name, name, email: `${name}@role.test` })));
     for (const user of users.slice(0, 2)) await identity.api.setPlatformRole(user.id, { platformRole: 'developer', expectedRole: 'user' });
     const owner: Actor = { userId: users[0]!.id, isAdmin: false };
-    await project.api.upsertServicePlan(admin, { name: 'standard-small', cpu: '1', memory: '1Gi', maxReplicas: 1, description: '' });
+    await project.api.updateServicePlan(admin, '01a0bf5d-8f4b-7000-9e4b-b54e91ee9d10', { name: 'standard-small', cpu: '1', memory: '1Gi', maxReplicas: 1, description: '' });
     expect(await platform.api.initializePlatformRoles()).toEqual({ initialized: 0 });
     const catalog = await project.api.creationCatalog(owner);
     expect(catalog.templates.some((template) => template.name === 'minimal-sample')).toBe(true);
     const app = createApp({ name: 'role-home' }); for (const route of platform.api.routers.api) app.route('/', route);
     const call = (id: UserId, path: string, method = 'GET') => app.request(path, { method, headers: { [IDENTITY_HEADERS.userId]: id } });
-    const p = await project.api.createProject(owner, { name: '开发者的应用', slug: 'role-home', kind: 'DigitalWorker', template: 'minimal-sample' });
+    const p = await project.api.createProject(owner, { name: '开发者的应用', slug: 'role-home', kind: 'DigitalWorker', template: '01a0bf5d-8f4b-7002-9560-94caf593fb19' });
     expect(p.ownerUserId).toBe(owner.userId);
     await project.api.setMember(owner, p.id, { userId: users[1]!.id, role: 'developer' });
     await project.api.setMember(owner, p.id, { userId: users[2]!.id, role: 'tester' });

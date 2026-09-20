@@ -1,5 +1,5 @@
 import type { ProjectId } from '@crewstation/contracts';
-import { ListDeliveriesQuerySchema, ProjectIdSchema } from '@crewstation/contracts';
+import { ResourceIdSchema, ListDeliveriesQuerySchema, ProjectIdSchema } from '@crewstation/contracts';
 import type { AppEnv } from '@crewstation/http';
 import { parseParams, parseQuery } from '@crewstation/http';
 import { Hono } from 'hono';
@@ -23,7 +23,7 @@ export function queryRoutes(api: EventsModuleApi): Hono<AppEnv> {
     return c.json({ items: await api.listDeliveries(await actorFrom(c, api), projectId as ProjectId, query) });
   });
   r.post('/v1/deliveries/:id/replay', async (c) => {
-    const { id } = parseParams(c, z.object({ id: z.string().min(1) }));
+    const { id } = parseParams(c, z.object({ id: ResourceIdSchema }));
     return c.json(await api.replayDelivery(await actorFrom(c, api), id));
   });
   return r;

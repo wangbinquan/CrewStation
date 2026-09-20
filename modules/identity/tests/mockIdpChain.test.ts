@@ -16,7 +16,7 @@ import { BASE_SETTINGS, completeBootstrap, identityModuleFor, mountRouters } fro
 const dbAvailable = await testDatabaseAvailable();
 const PORT = 19_000 + Math.floor(Math.random() * 500);
 const ISSUER = `http://127.0.0.1:${PORT}`;
-const admin: AuthAdminActor = { userId: 'usr_00000000000000000000000000000001' as AuthAdminActor['userId'], isAdmin: true, authMethod: 'password' };
+const admin: AuthAdminActor = { userId: '01a0bf5d-8f4b-7a14-83c9-8e56fbdde549' as AuthAdminActor['userId'], isAdmin: true, authMethod: 'password' };
 
 let idp: Subprocess | undefined;
 let tdb: TestDatabase;

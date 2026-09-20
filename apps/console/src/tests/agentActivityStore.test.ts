@@ -80,7 +80,7 @@ test('更早未读页同样刷新本人已读；错误身份响应不覆盖现�
   const f = activityFixture(); await f.register();
   await f.store.older(activityTaskId, 10); await f.store.refresh(activityTaskId);
   expect(f.pageCalls.filter((before) => before === 10)).toHaveLength(2);
-  f.source.page = async () => ({ ...f.page, projectId: `prj_${'9'.repeat(32)}` as AgentActivityPage['projectId'] });
+  f.source.page = async () => ({ ...f.page, projectId: '01a0bf5d-8f4b-7778-8210-20fd38f61ee3' as AgentActivityPage['projectId'] });
   await f.store.refresh(activityTaskId);
   expect(f.store.getSnapshot().tasks[0]).toMatchObject({ stale: true, error: 'activity.identityMismatch', page: { projectId: activityProjectId } });
 });

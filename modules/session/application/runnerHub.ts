@@ -16,9 +16,11 @@ export function runnerHub(deps: SessionUseCaseDeps) {
   const { logger } = deps;
 
   const onHello = async (raw: unknown, socket: EventSink): Promise<RunnerOpenResult> => {
-    const mismatch = protocolMismatchOf(raw);
+    const legacy = await deps.legacyRunners?.hello(raw);
+    const candidate = legacy?.hello ?? await deps.legacyRunners?.normalizeTask?.(raw) ?? raw;
+    const mismatch = protocolMismatchOf(candidate);
     if (mismatch) return rejectMismatch(deps, mismatch);
-    const parsed = RunnerMessageSchema.safeParse(raw);
+    const parsed = RunnerMessageSchema.safeParse(candidate);
     if (!parsed.success || parsed.data.type !== 'hello') return { ok: false, code: 'bad_hello', message: '首帧必须是 hello' };
     const hello = parsed.data;
     const auth = await deps.runnerAuth.verifyRunnerToken(hello.taskId, hello.runnerToken);
@@ -29,19 +31,22 @@ export function runnerHub(deps: SessionUseCaseDeps) {
     if (previous) previous.pending.failAll('TaskRunner 重新连接');
     const now = deps.clock.now();
     const connection = new RunnerConnection(hello, socket, resumeFromSeq, deps.settings.commandTimeoutMs, now.getTime());
+    connection.legacy = legacy?.bridge;
     for (const sub of subscribers.get(hello.taskId) ?? []) connection.subscribers.add(sub);
     connections.set(hello.taskId, connection);
     await deps.registry.claim(hello.taskId, deps.settings.selfAddress, now);
-    socket.send(JSON.stringify({ type: 'welcome', protocolVersion: TASKRUNNER_PROTOCOL_VERSION, resumeFromSeq, nativeActivityVersion: 1 }));
+    socket.send(JSON.stringify({ type: 'welcome', protocolVersion: legacy ? 2 : TASKRUNNER_PROTOCOL_VERSION, resumeFromSeq, nativeActivityVersion: 1 }));
     deps.taskAccess.onRunnerReady?.(hello.taskId);
     connection.broadcast(JSON.stringify({ type: 'runnerReconnected' }));
     logger.info('runner connected', { taskId: hello.taskId, resumeFromSeq, protocols: hello.capabilities.protocols });
     return { ok: true, connection };
   };
 
-  const onMessage = async (connection: RunnerConnection, raw: unknown): Promise<void> => {
+  const onMessage = (connection: RunnerConnection, raw: unknown): Promise<void> => connection.process(async () => {
     if (connections.get(connection.hello.taskId) !== connection) return;
-    const parsed = RunnerMessageSchema.safeParse(raw);
+    const candidate = await normalizeIncoming(deps, connection, raw);
+    const parsed = RunnerMessageSchema.safeParse(candidate);
+    if (connections.get(connection.hello.taskId) !== connection) return;
     if (!parsed.success) { logger.warn('invalid runner frame', { taskId: connection.hello.taskId }); return; }
     const message: RunnerMessage = parsed.data;
     const now = deps.clock.now();
@@ -53,12 +58,12 @@ export function runnerHub(deps: SessionUseCaseDeps) {
       case 'hello': return;
       case 'event': {
         if (!connection.accept(message.seq, now.getTime())) return;
-        if (isDurable(message.event)) await deps.events.append({ taskId: connection.hello.taskId, seq: message.seq, at: new Date(message.at), event: message.event });
+        if (isDurable(message.event)) await deps.events.append({ taskId: connection.hello.taskId, seq: message.seq, at: new Date(message.at), event: message.event, ...(connection.legacy ? { legacyEvent: (raw as { event: unknown }).event } : {}) });
         connection.broadcast(RunnerConnection.frameOf(message.seq, message.at, message.event));
         return;
       }
     }
-  };
+  });
 
   const onClose = async (connection: RunnerConnection): Promise<void> => {
     if (connections.get(connection.hello.taskId) !== connection) return;
@@ -68,16 +73,6 @@ export function runnerHub(deps: SessionUseCaseDeps) {
     await deps.registry.release(connection.hello.taskId, deps.settings.selfAddress);
     await deps.taskAccess.onRunnerDisconnected(connection.hello.taskId, connection.hello.runnerToken);
     logger.info('runner disconnected', { taskId: connection.hello.taskId });
-  };
-
-  /** 定时：过期命令、失联连接、注册表心跳。 */
-  const tick = async (): Promise<void> => {
-    const now = deps.clock.now();
-    for (const [taskId, connection] of connections) {
-      connection.pending.expire(now.getTime());
-      if (now.getTime() - connection.lastSeenAt > deps.settings.runnerStaleMs) { connection.socket.send(JSON.stringify({ type: 'ping', at: now.toISOString() })); }
-      await deps.registry.heartbeat(taskId, deps.settings.selfAddress, now);
-    }
   };
 
   const subscribe = (taskId: TaskId, sink: EventSink) => {
@@ -91,7 +86,7 @@ export function runnerHub(deps: SessionUseCaseDeps) {
       connections.get(taskId)?.subscribers.delete(sink);
     };
   };
-  return { connections, subscribe, onHello, onMessage, onClose, tick };
+  return { connections, subscribe, onHello, onMessage, onClose, tick: () => tickRunners(deps, connections) };
 }
 
 export type RunnerHub = ReturnType<typeof runnerHub>;
@@ -105,4 +100,21 @@ async function rejectMismatch(deps: SessionUseCaseDeps, mismatch: ProtocolMismat
   await deps.taskAccess.onRunnerRejected?.(mismatch.taskId, mismatch.runnerToken, { code: 'protocol_mismatch', runnerProtocol: mismatch.runnerProtocol, message: mismatch.message });
   deps.logger.warn('runner protocol mismatch', { taskId: mismatch.taskId, runnerProtocol: mismatch.runnerProtocol });
   return { ok: false, code: 'protocol_mismatch', message: mismatch.message };
+}
+
+async function normalizeIncoming(deps: SessionUseCaseDeps, connection: RunnerConnection, raw: unknown): Promise<unknown> {
+  if (!connection.legacy) return raw;
+  const frame = typeof raw === "object" && raw !== null ? raw as Record<string, unknown> : undefined;
+  try { return await connection.legacy.incoming(raw, typeof frame?.id === "string" ? connection.pending.typeOf(frame.id) : undefined); }
+  catch { deps.logger.warn("unresolved legacy runner frame", { taskId: connection.hello.taskId }); return undefined; }
+}
+
+/** Expire commands and refresh live connections without changing their identity. */
+async function tickRunners(deps: SessionUseCaseDeps, connections: Map<TaskId, RunnerConnection>): Promise<void> {
+    const now = deps.clock.now();
+    for (const [taskId, connection] of connections) {
+      connection.pending.expire(now.getTime());
+      if (now.getTime() - connection.lastSeenAt > deps.settings.runnerStaleMs) { connection.socket.send(JSON.stringify({ type: 'ping', at: now.toISOString() })); }
+      await deps.registry.heartbeat(taskId, deps.settings.selfAddress, now);
+    }
 }

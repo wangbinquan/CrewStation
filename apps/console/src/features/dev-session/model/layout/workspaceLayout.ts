@@ -1,7 +1,8 @@
+import { newDraftResourceId } from '@crewstation/api-client';
 import type { WorkspaceLayout, WorkspaceTab } from '@crewstation/contracts';
 
 export function newWorkspaceTab(name: string): WorkspaceTab {
-  return { id: crypto.randomUUID(), name, layout: 'grid', paneOrder: [], ratios: { columns: [1, 1], rows: [1, 1] } };
+  return { id: newDraftResourceId(), name, layout: 'grid', paneOrder: [], ratios: { columns: [1, 1], rows: [1, 1] } };
 }
 export function initialWorkspaceLayout(name: string): WorkspaceLayout {
   const tab = newWorkspaceTab(name);

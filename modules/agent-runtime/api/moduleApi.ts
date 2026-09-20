@@ -1,5 +1,5 @@
 import type {
-  Actor, ProjectId, ProjectComputePolicyDto, SaveProjectComputePolicy, AgentProtocol, BeforeStartMaterial, ComputeProfileDetailDto, ComputeProfileList, ComputeProfileSummaryDto, ComputeUsage, CopyComputeProfileRequest, CreateComputeProfileRequest,
+  Actor, ProjectId, ProjectComputePolicyDto, SaveProjectComputePolicy, AgentProtocol, BeforeStartMaterial, ComputeProfileDetailDto, ComputeProfileList, ComputeProfileSummaryDto, ComputeProfileSelector, ComputeUsage, CopyComputeProfileRequest, CreateComputeProfileRequest,
   LaunchSpec, ProfileRevisionRef, ProfileTestDto, ProfileTestId, RegistryPushCredential, RuntimeImagesInfo, SaveComputeProfileRequest, StartProfileTestRequest,
 } from '@crewstation/contracts';
 
@@ -8,6 +8,7 @@ export type RegistryVerdict = { readonly status: 200 } | { readonly status: 401 
 
 /** 受理一次启动时解析出的档位：名称（default 已换成真实名称）、固定修订与协议。 */
 export interface ResolvedProfile {
+  readonly id: string;
   readonly name: string;
   readonly revision: number;
   readonly protocol: AgentProtocol;
@@ -32,8 +33,8 @@ export interface AgentRuntimeModuleApi {
   saveProjectComputePolicy(actor: Actor, projectId: ProjectId, input: SaveProjectComputePolicy): Promise<ProjectComputePolicyDto>;
   projectDevTaskProfile(projectId: ProjectId): Promise<string | undefined>;
   listProjectSummaries(actor: Actor, projectId: ProjectId): Promise<ComputeProfileSummaryDto[]>;
-  resolveForProject(projectId: ProjectId, name: string | undefined, usage: ComputeUsage): Promise<ResolvedProfile>;
-  lookupForProjectRelease(projectId: ProjectId, name: string): Promise<{ name: string; terminalOnly: boolean } | undefined>;
+  resolveForProject(projectId: ProjectId, selector: ComputeProfileSelector | undefined, usage: ComputeUsage): Promise<ResolvedProfile>;
+  lookupForProjectRelease(projectId: ProjectId, selector: ComputeProfileSelector): Promise<{ id: string; name: string; terminalOnly: boolean } | undefined>;
   setDefaultVisible(actor: Actor, name: string, visible: boolean): Promise<ComputeProfileDetailDto>;
   stopClusterTest(actor: Actor, testId: ProfileTestId): Promise<void>;
   listProfiles(actor: Actor): Promise<ComputeProfileList>;
@@ -57,10 +58,10 @@ export interface AgentRuntimeModuleApi {
   /** 租户面投影（无 actor：任何登录用户都能看下拉）。 */
   listSummaries(): Promise<ComputeProfileSummaryDto[]>;
   /** 受理新启动：default 在此解析；不可用、终端档位用错用途都抛可读错误。 */
-  resolve(nameOrDefault: string | undefined, usage: ComputeUsage): Promise<ResolvedProfile>;
+  resolve(selector: ComputeProfileSelector | undefined, usage: ComputeUsage): Promise<ResolvedProfile>;
   /** 按固定修订取派发材料（含解密凭据）。 */
   launchMaterial(ref: ProfileRevisionRef): Promise<ProfileLaunchMaterial>;
   /** 发布校验：只看存在性与协议。 */
-  lookupForRelease(nameOrDefault: string): Promise<{ name: string; terminalOnly: boolean } | undefined>;
+  lookupForRelease(selector: ComputeProfileSelector): Promise<{ id: string; name: string; terminalOnly: boolean } | undefined>;
   listNames(): Promise<string[]>;
 }

@@ -5,8 +5,8 @@
  */
 import { IDENTITY_HEADERS } from './identity';
 
-/** 必须与 crewstation.yaml `spec.tasks.agentProfiles[].name` 一致：Agent 子任务只能引用发布时登记的档案。 */
-export const CHAT_AGENT_PROFILE = 'chat-v1';
+/** 必须与 crewstation.yaml `spec.tasks.agentProfiles[].id` 一致：Agent 子任务只能引用发布时登记的档案。 */
+export const CHAT_AGENT_PROFILE = '01a0bf5d-8f4b-7101-8000-000000000001';
 export const CHAT_SUBTASK_NAME = 'chat';
 
 export const TERMINAL_STATES = ['succeeded', 'failed', 'cancelled'] as const;
@@ -51,13 +51,13 @@ export class PlatformApiError extends Error {
  */
 export async function runChat(prompt: string, options: AgentClientOptions): Promise<ChatRunResult> {
   const http = createTransport(options);
-  const taskId = requireId('创建业务任务', await http.post('创建业务任务', '/v1/business-tasks', {}));
-  const taskPath = `/v1/business-tasks/${encodeURIComponent(taskId)}`;
+  const taskId = requireId('创建业务任务', await http.post('创建业务任务', '/v2/business-tasks', {}));
+  const taskPath = `/v2/business-tasks/${encodeURIComponent(taskId)}`;
   try {
     const subtaskId = requireId('提交 Agent 子任务', await http.post('提交 Agent 子任务', `${taskPath}/subtasks`, {
       kind: 'agent',
       name: CHAT_SUBTASK_NAME,
-      agentProfile: CHAT_AGENT_PROFILE,
+      agentProfileId: CHAT_AGENT_PROFILE,
       mode: 'oneshot',
       prompt,
     }));

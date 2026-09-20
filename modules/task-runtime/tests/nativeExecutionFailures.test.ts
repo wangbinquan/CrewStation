@@ -11,7 +11,7 @@ import { rebuildFixture } from './rebuildFixture';
 const available = await testDatabaseAvailable();
 let f: Awaited<ReturnType<typeof rebuildFixture>> | undefined;
 afterEach(async () => { await f?.close(); f = undefined; });
-const input = () => ({ id: newId('tsk') as TaskId, parentTaskId: f!.env.id, createdBy: `usr_${'c'.repeat(32)}` as UserId,
+const input = () => ({ id: newId('tsk') as TaskId, parentTaskId: f!.env.id, createdBy: '01a0bf5d-8f4b-7ed2-8386-a4b2e1a36efb' as UserId,
   agentId: newId('agt'), terminalId: newId('pty'), runnerId: crypto.randomUUID(), fingerprint: 'f'.repeat(64) });
 
 describe.skipIf(!available)('独立 CLI 创建与清理的故障接续', () => {
@@ -132,7 +132,7 @@ describe.skipIf(!available)('独立 CLI 创建与清理的故障接续', () => {
 
   test('不支持多 Pod 的卷和缺失套餐在准入前拒绝，父子互嵌也被拒绝', async () => {
     f = await rebuildFixture({ running: true }); const { runtime, k8s, env } = f;
-    await expect(runtime.api.createNativeExecution({ ...input(), profile: 'removed-profile' })).rejects.toThrow('资源套餐 removed-profile 不存在');
+    await expect(runtime.api.createNativeExecution({ ...input(), profile: '01a0bf5d-8f4b-76a2-88fc-15aced4d7c86' })).rejects.toThrow('资源套餐 01a0bf5d-8f4b-76a2-88fc-15aced4d7c86 不存在');
     await k8s.mergePatch(Resources.PersistentVolumeClaim!, env.pvcName, env.namespace, { spec: { accessModes: ['ReadWriteOncePod'] } });
     await expect(runtime.api.createNativeExecution(input())).rejects.toThrow('共享写入');
     expect(await runtime.api.runningTaskCount(f.projectId)).toBe(1);

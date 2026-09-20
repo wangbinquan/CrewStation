@@ -107,13 +107,13 @@ export function fakeGit(gitlab?: ReturnType<typeof fakeGitLab>) {
   return { runner, pushes, failNextPushes: (count: number) => { pendingFailures = count; } };
 }
 
-export function fakeTemplates(known: string[] = ['minimal-sample']) {
-  const materialized: Array<{ templateName: string; targetDir: string }> = [];
+export function fakeTemplates(known: string[] = ['01a0bf5d-8f4b-7002-9560-94caf593fb19']) {
+  const materialized: Array<{ templateId: string; targetDir: string }> = [];
   const source: TemplateSource = {
-    list: async () => known.map((name) => ({ name, kind: 'DigitalWorker', servicePlan: 'standard-small', requiredConfig: [] })),
-    materialize: async (templateName, targetDir) => {
-      if (!known.includes(templateName)) throw notFound('模板', templateName);
-      materialized.push({ templateName, targetDir });
+    list: async () => known.map((name) => ({ id: name, name, kind: 'DigitalWorker', servicePlan: '01a0bf5d-8f4b-7000-9e4b-b54e91ee9d10', requiredConfig: [] })),
+    materialize: async (templateId, targetDir) => {
+      if (!known.includes(templateId)) throw notFound('模板', templateId);
+      materialized.push({ templateId, targetDir });
     },
   };
   return { source, materialized };

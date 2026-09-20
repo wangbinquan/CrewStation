@@ -1,4 +1,4 @@
-import type { AllowlistDocument, WorkloadIdentity } from '@crewstation/contracts';
+import type { AllowlistDocument, OperationRoute, WorkloadIdentity } from '@crewstation/contracts';
 import { PLATFORM_PATHS, PLATFORM_SERVICE_HOSTS, matchesOperationPath } from '@crewstation/contracts';
 
 export interface EvaluationTarget { host: string; method: string; path: string }
@@ -26,7 +26,7 @@ export function evaluateServiceCall(doc: AllowlistDocument, caller: WorkloadIden
     if (path.startsWith(PLATFORM_PATHS.internalApiPrefix)) {
       const [proxy = '', ...rest] = path.slice(PLATFORM_PATHS.internalApiPrefix.length).split('/');
       const upstreamPath = `/${rest.join('/')}`;
-      return decideOperation(granted, proxy, target.method, upstreamPath, `proxy:${proxy}`);
+      return decideOperation(granted, doc.operationRoutes, proxy, target.method, upstreamPath, `proxy:${proxy}`);
     }
     if (entry?.platformApi ?? false) return { allowed: true, targetIdentity: 'platform-api' };
     return { allowed: false, targetIdentity: 'platform-api', reason: `${caller.identity} 未登记为平台服务，不能调用平台 API` };
@@ -41,7 +41,7 @@ export function evaluateServiceCall(doc: AllowlistDocument, caller: WorkloadIden
         ? { allowed: true, targetIdentity: `platform:${serviceName}` }
         : { allowed: false, targetIdentity: `platform:${serviceName}`, reason: `${caller.identity} 不能调用平台端点 ${target.host}` };
     }
-    return decideOperation(granted, serviceName, target.method, path, `service:${serviceName}`);
+    return decideOperation(granted, doc.operationRoutes, serviceName, target.method, path, `service:${serviceName}`);
   }
   return { allowed: false, targetIdentity: target.host, reason: `未知的服务域主机 ${target.host}` };
 }
@@ -53,11 +53,10 @@ function platformHostOf(hostPrefix: string): keyof typeof PLATFORM_SERVICE_HOSTS
   return undefined;
 }
 
-function decideOperation(granted: Set<string>, proxy: string, method: string, path: string, targetIdentity: string): Evaluation {
-  for (const key of granted) {
-    const [keyProxy, keyMethod, ...templateParts] = key.split(':');
-    if (keyProxy !== proxy || keyMethod !== method.toUpperCase()) continue;
-    if (matchesOperationPath(templateParts.join(':'), path)) return { allowed: true, targetIdentity };
+function decideOperation(granted: Set<string>, routes: readonly OperationRoute[], proxy: string, method: string, path: string, targetIdentity: string): Evaluation {
+  for (const route of routes) {
+    if (!granted.has(route.id) || route.proxy !== proxy || route.method !== method.toUpperCase()) continue;
+    if (matchesOperationPath(route.path, path)) return { allowed: true, targetIdentity };
   }
   return { allowed: false, targetIdentity, reason: `操作 ${proxy}:${method.toUpperCase()}:${path} 未对调用方开放` };
 }

@@ -8,7 +8,7 @@ import { renderApp } from './renderApp';
 const originalFetch = globalThis.fetch;
 let page: Awaited<ReturnType<typeof renderApp>> | undefined;
 afterEach(() => { page?.unmount(); page = undefined; globalThis.fetch = originalFetch; });
-const userId = `usr_${'a'.repeat(32)}` as UserId, projectId = `prj_${'b'.repeat(32)}`;
+const userId = '01a0bf5d-8f4b-7f8b-8136-e631380738b0' as UserId, projectId = '01a0bf5d-8f4b-7aef-84b8-c458233bab22';
 const user = { userId, name: '小林', email: 'lin@example.com' };
 const app = (overrides: Partial<MarketAppDto> = {}): MarketAppDto => ({
   projectId: projectId as MarketAppDto['projectId'], name: '知识助理', icon: 'book', description: '整理团队知识',

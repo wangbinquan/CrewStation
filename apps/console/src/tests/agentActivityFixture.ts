@@ -3,9 +3,9 @@ import { AgentActivityPageSchema, NativeTerminalDtoSchema } from '@crewstation/c
 import { AgentActivityStore } from '../shared/activity/agentActivityStore';
 import type { ActivitySource } from '../shared/activity/agentActivityStore';
 
-export const activityProjectId = `prj_${'1'.repeat(32)}`;
-export const activityTaskId = `tsk_${'2'.repeat(32)}`;
-export const activityUserId = `usr_${'3'.repeat(32)}`;
+export const activityProjectId = '01a0bf5d-8f4b-7148-804c-6bd655d243f6';
+export const activityTaskId = '01a0bf5d-8f4b-71ae-81d1-f0c74fac0615';
+export const activityUserId = '01a0bf5d-8f4b-77de-8c37-bb59d6ad31fb';
 export const activityTime = '2026-09-13T02:00:00.000Z';
 
 export function activityFixture() {

@@ -1,5 +1,5 @@
 import type {
-  BranchDto, ListBranchesQuery, ReleaseDto, RepositoryBindingDto, ServiceDto, SlotDto, TagDto, TrafficSwitchDto, TrafficSwitchRequest,
+  BranchDto, ListBranchesQuery, ManifestUpgradePreview, ReleaseDto, RepositoryBindingDto, ServiceDto, SlotDto, TagDto, TrafficSwitchDto, TrafficSwitchRequest,
 } from '@crewstation/contracts';
 import type { Transport } from '../httpTransport';
 import type { ItemsPage } from '../itemsPage';
@@ -12,6 +12,7 @@ export interface ServicesResource {
   get(serviceId: string): Promise<ServiceDto>;
   /** GET /v1/services/:serviceId/repository */
   getRepository(serviceId: string): Promise<RepositoryBindingDto>;
+  previewManifestUpgrade(serviceId: string, content: string): Promise<ManifestUpgradePreview>;
   /** GET /v1/services/:serviceId/branches?previewSha&prodSha：给出两槽提交时服务端计算落后数。 */
   listBranches(serviceId: string, query?: ListBranchesQuery): Promise<ItemsPage<BranchDto>>;
   /** GET /v1/services/:serviceId/tags */
@@ -35,6 +36,7 @@ export function servicesResource(transport: Transport): ServicesResource {
   return {
     get: (serviceId) => transport.request<ServiceDto>('GET', base(serviceId)),
     getRepository: (serviceId) => transport.request<RepositoryBindingDto>('GET', `${base(serviceId)}/repository`),
+    previewManifestUpgrade: (serviceId, content) => transport.request<ManifestUpgradePreview>('POST', `${base(serviceId)}/manifest-upgrade`, { body: { content } }),
     listBranches: (serviceId, query) => transport.request<ItemsPage<BranchDto>>('GET', `${base(serviceId)}/branches`, { query }),
     listTags: (serviceId) => transport.request<ItemsPage<TagDto>>('GET', `${base(serviceId)}/tags`),
     listReleases: (serviceId) => transport.request<ItemsPage<ReleaseDto>>('GET', `${base(serviceId)}/releases`),

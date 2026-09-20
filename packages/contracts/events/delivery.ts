@@ -1,13 +1,15 @@
 import { z } from 'zod';
-import { EventIdSchema, TraceIdSchema } from '../ids';
+import { ResourceIdSchema, EventIdSchema, TraceIdSchema } from '../ids';
 
 /** cs-events 经服务域推送给业务服务 active 槽处理路径的信封；业务以 2xx 确认。 */
 export const EventDeliverySchema = z.object({
-  deliveryId: z.string().min(1),
+  deliveryId: ResourceIdSchema,
   eventId: EventIdSchema,
+  eventTypeId: ResourceIdSchema,
   eventType: z.string().min(1),
   source: z.object({
     /** 生产方 EventProducer 的 producer 名。 */
+    producerId: ResourceIdSchema,
     producer: z.string().min(1),
     project: z.string().min(1),
   }),
@@ -26,7 +28,7 @@ export const EVENT_HEADERS = {
 } as const;
 
 /** EventProducer 向 cs-events 投递原始事件的请求体。 */
-export const ProducedEventSchema = z.object({
+export const LegacyProducedEventSchema = z.object({
   eventType: z.string().min(1),
   /** 生产方给出的幂等键，inbox 以 (producer, dedupKey) 去重。 */
   dedupKey: z.string().min(1).max(200),
@@ -35,6 +37,9 @@ export const ProducedEventSchema = z.object({
   traceId: TraceIdSchema.optional(),
   payload: z.unknown(),
 });
+
+export const ProducedEventSchema = LegacyProducedEventSchema.omit({ eventType: true }).extend({ eventTypeId: ResourceIdSchema });
+export type LegacyProducedEvent = z.infer<typeof LegacyProducedEventSchema>;
 
 export const DeliveryStateSchema = z.enum(['pending', 'delivering', 'delivered', 'retrying', 'dead']);
 

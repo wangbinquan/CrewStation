@@ -7,7 +7,7 @@ import { readJobState } from './jobStatus';
 export function migrationJobRunner(k8s: K8sClient, settings: { timeoutSeconds: number }): MigrationRunner {
   return {
     start: async (spec) => {
-      const name = `migrate-${spec.releaseId.slice(-12)}`;
+      const name = `migrate-${spec.legacyResourceId ? spec.legacyResourceId.slice(-12) : spec.releaseId.replaceAll('-', '')}`;
       await k8s.apply(jobObject({
         name, namespace: spec.namespace, image: spec.image, command: spec.command,
         labels: { [LABELS.component]: 'migration', [LABELS.release]: spec.releaseId },

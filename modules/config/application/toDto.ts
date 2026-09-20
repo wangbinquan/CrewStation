@@ -6,6 +6,7 @@ import { keysOf } from '../domain/configVersion';
 /** Secret 只写不读：isSecret 时不带 value 字段。 */
 export function itemToDto(item: ConfigItem): ConfigItemDto {
   return {
+    id: item.id, definitionId: item.definitionId, bindingName: item.bindingName,
     name: item.name,
     env: item.env,
     isSecret: item.isSecret,
@@ -17,5 +18,5 @@ export function itemToDto(item: ConfigItem): ConfigItemDto {
 }
 
 export function versionToDto(version: ConfigVersion): ConfigVersionDto {
-  return { env: version.env, version: version.version, createdAt: version.createdAt.toISOString(), keys: keysOf(version.entries) };
+  return { env: version.env, version: version.version, createdAt: version.createdAt.toISOString(), keys: keysOf(version.entries), entries: version.entries.map(({ itemId, definitionId, bindingName, name }) => ({ itemId, definitionId, bindingName, name })) };
 }

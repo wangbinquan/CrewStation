@@ -18,6 +18,7 @@ export const resources = dataSchema.table('resources', {
 }, (t) => [uniqueIndex('resources_service_env_kind_idx').on(t.serviceId, t.env, t.kind)]);
 
 export const taskBindings = dataSchema.table('task_bindings', {
+  legacyResourceId: text('legacy_resource_id'),
   id: text('id').primaryKey(),
   taskId: text('task_id').notNull(),
   serviceId: text('service_id').notNull(),

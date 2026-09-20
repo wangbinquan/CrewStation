@@ -1,0 +1,27 @@
+{
+  "version": "resource-identity/v1",
+  "schema": "gateway",
+  "entities": [],
+  "references": [
+    {
+      "table": "pod_identities",
+      "column": "task_id",
+      "kind": "task",
+      "keys": [
+        "task_id"
+      ],
+      "nullable": true
+    },
+    {
+      "table": "routes",
+      "column": "service_id",
+      "kind": "service",
+      "keys": [
+        "service_id"
+      ]
+    }
+  ],
+  "finalize": [
+    "ALTER TABLE gateway.routes DROP CONSTRAINT routes_pkey, ALTER COLUMN service_id SET NOT NULL, ADD PRIMARY KEY (service_id)"
+  ]
+}

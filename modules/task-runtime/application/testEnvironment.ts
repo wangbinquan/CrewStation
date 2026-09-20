@@ -31,7 +31,7 @@ export function createTestEnvironmentUseCase(deps: TaskRuntimeUseCaseDeps) {
     const now = clock.now();
     const id = newId('tsk') as TaskId;
     const env: TaskEnvironment = {
-      id, projectId: PROFILE_TEST_PROJECT_ID, serviceId: PROFILE_TEST_SERVICE_ID, kind: 'profile-test', state: 'creating', volumeMode: 'follow-container', profile: profile.name,
+      id, projectId: PROFILE_TEST_PROJECT_ID, serviceId: PROFILE_TEST_SERVICE_ID, kind: 'profile-test', state: 'creating', volumeMode: 'follow-container', profile: profile.id,
       namespace: settings.systemNamespace, podName: podNameFor(id), pvcName: pvcNameFor(id), traceId: newTraceId() as TraceId, runnerTokenHash: hashRunnerToken(token), connected: false,
       labels: input.labels ?? {}, createdAt: now, updatedAt: now, lastActivityAt: now,
     };

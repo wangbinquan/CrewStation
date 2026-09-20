@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useT } from '../../../../shared/lib/useT';
 import type { useResourceCatalogDraft } from '../../hooks/useResourceCatalogDraft';
-import type { ResourceCatalogEntry, ResourceCatalogField, ResourceCatalogKind } from '../../model/resourceCatalogDraft';
+import type { ResourceCatalogInput, ResourceCatalogField, ResourceCatalogKind } from '../../model/resourceCatalogDraft';
 import { AdminField } from '../AdminField';
 import { AdminForm } from '../AdminForm';
 
@@ -11,7 +11,7 @@ interface ResourceFormProps {
   readonly busy: boolean;
   readonly frozen: boolean;
   readonly unavailable: boolean;
-  readonly onPrepare: (input: ResourceCatalogEntry) => void;
+  readonly onPrepare: (input: ResourceCatalogInput) => void;
   readonly onChange: () => void;
 }
 

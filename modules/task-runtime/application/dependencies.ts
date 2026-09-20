@@ -11,6 +11,8 @@ export interface TaskRuntimeUseCaseDeps {
   profiles: ProfileCatalog;
   services: ServiceResolver;
   sources: EnvironmentSources;
+  /** Explicit protocol-2 startup alias, persisted before an older image can connect. */
+  legacyRunnerTaskId?: (taskId: string) => Promise<string>;
   /** 缺省不检出：业务任务容器不需要源码，单元测试也不需要集群。 */
   checkout?: SourceCheckoutSource;
   settings: TaskRuntimeSettings;

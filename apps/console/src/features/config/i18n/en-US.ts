@@ -2,6 +2,11 @@ import type { MessagesShapedLike } from '../../../shared/lib/i18n';
 import type { messages as zhCN } from './zh-CN';
 
 export const messages: MessagesShapedLike<typeof zhCN> = {
+  'config.form.displayNameHint': '1–120 characters for display. Renaming preserves the resource ID and variable binding.',
+  'config.form.invalidDisplayName': 'Enter a display name of 1–120 characters.',
+  'config.form.definition': 'Configuration definition',
+  'config.form.newDefinition': 'Create a definition',
+  'config.form.bindingName': 'Environment binding',
   'config.readOnly.production': 'Read only. Only the project owner or an administrator can change production values.',
   'config.readOnly.development': 'Read only. Project developers, owners and administrators can change development values.',
   'config.title': 'Config',
@@ -34,9 +39,9 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   'config.items.deleting': 'Deleting…',
 
   'config.form.title': 'Add or overwrite an item',
-  'config.form.name': 'Key',
+  'config.form.name': 'Display name',
   'config.form.namePlaceholder': 'DATABASE_URL',
-  'config.form.nameHint': 'Upper snake case starting with a letter, matching the Manifest env section; writing an existing key overwrites it and creates a new version.',
+  'config.form.nameHint': 'Start with an uppercase letter; use uppercase letters, digits or underscores. This is the application environment variable. Edit an existing value from its row.',
   'config.form.value': 'Value',
   'config.form.valuePlaceholder': 'Takes effect at the next injection',
   'config.form.isSecret': 'Mark as secret',

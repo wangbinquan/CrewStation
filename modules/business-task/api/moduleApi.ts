@@ -27,3 +27,5 @@ export interface BusinessTaskModuleApi {
   registerContracts(payload: DomainPayload<'release.registered'>): Promise<void>;
   sweepActive(): Promise<number>;
 }
+
+export type { LegacyBusinessProjection } from './legacyBusiness';

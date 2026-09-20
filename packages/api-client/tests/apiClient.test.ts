@@ -45,7 +45,7 @@ async function caught(call: () => Promise<unknown>): Promise<ApiClientError> {
 describe('createApiClient：请求形状', () => {
   test('两类申请分页保留真实服务端游标、项目和状态，不改旧全量调用', async () => {
     const f = fakeFetch(() => json(200, { items: [], nextCursor: 'cursor-next' })), client = createApiClient({ baseUrl: 'https://console.test', fetch: f.fetchImpl });
-    const query = { projectId: `prj_${'a'.repeat(32)}` as ProjectId, state: 'pending' as const, limit: 5, cursor: 'opaque/value?x=1' };
+    const query = { projectId: '01a0bf5d-8f4b-7fc7-8b88-18362617594b' as ProjectId, state: 'pending' as const, limit: 5, cursor: 'opaque/value?x=1' };
     expect(await client.apiCatalog.listRequestPage(query)).toEqual({ items: [], nextCursor: 'cursor-next' });
     await client.egress.listRequestPage(query);
     expect(f.calls.map((c) => new URL(c.url).pathname)).toEqual(['/v1/api-requests/page', '/v1/egress/requests/page']);
@@ -55,7 +55,7 @@ describe('createApiClient：请求形状', () => {
   });
   test('有界项目页与摘要准确传递分页、筛选和详情对象', async () => {
     const f = fakeFetch(() => json(200, { items: [], nextCursor: 'next' })); const client = createApiClient({ fetch: f.fetchImpl });
-    const filters = { q: '项目 a/b', state: 'failed' as const, kind: ['APIProxy', 'EventProducer'] as const, limit: 20, cursor: 'a+b/=c', ownerUserId: `usr_${'a'.repeat(32)}` as UserId };
+    const filters = { q: '项目 a/b', state: 'failed' as const, kind: ['APIProxy', 'EventProducer'] as const, limit: 20, cursor: 'a+b/=c', ownerUserId: '01a0bf5d-8f4b-799e-8662-91273789253a' as UserId };
     expect(await client.projects.page({ ...filters, kind: [...filters.kind] })).toEqual({ items: [], nextCursor: 'next' });
     await client.capabilities.projectSummaries({ ...filters, kind: [...filters.kind] });
     await client.capabilities.projectSummary('project one');
@@ -69,7 +69,7 @@ describe('createApiClient：请求形状', () => {
   test('API 试调只调用项目的结构化入口，固定会话和参数原样保留，有界且不重复发送', async () => {
     const requests: Array<{ url: string; init?: RequestInit }> = [];
     const fetchImpl: FetchLike = async (url, init) => { requests.push({ url: String(url), init }); return json(200, { taskId: 'fixed-task' }); };
-    const input = { expectedTaskId: `tsk_${'a'.repeat(32)}` as TaskId, operationKey: 'crm:POST:/items/{id}', pathParameters: { id: '1' }, query: { label: ['one', 'two'] }, headers: { 'content-type': 'application/json' }, body: '{"name":"test"}' };
+    const input = { expectedTaskId: '01a0bf5d-8f4b-7e3b-8ee6-bf27a166622a' as TaskId, operationId: 'crm:POST:/items/{id}', pathParameters: { id: '1' }, query: { label: ['one', 'two'] }, headers: { 'content-type': 'application/json' }, body: '{"name":"test"}' };
     const client = createApiClient({ fetch: fetchImpl });
     const received: unknown = await client.devSession.invokeApi('project one', input);
     expect(received).toEqual({ taskId: 'fixed-task' });
@@ -80,7 +80,7 @@ describe('createApiClient：请求形状', () => {
   test('告警与订阅使用既有项目作用域端点，保存和移除不发送通知测试请求', async () => {
     const { calls, fetchImpl } = fakeFetch((call) => call.method === 'GET' ? json(200, { items: [] }) : new Response(null, { status: 204 }));
     const client = createApiClient({ fetch: fetchImpl });
-    const input = { userId: `usr_${'a'.repeat(32)}` as UserId, channel: 'webhook' as const, target: 'https://notice.example.test/hook' };
+    const input = { userId: '01a0bf5d-8f4b-799e-8662-91273789253a' as UserId, channel: 'webhook' as const, target: 'https://notice.example.test/hook' };
     await client.observability.alerts('project one'); await client.observability.alertSubscriptions('project one');
     await client.observability.setAlertSubscription('project one', input); await client.observability.removeAlertSubscription('project one', 'user/two');
     expect(calls.map((call) => [call.method, call.url])).toEqual([
@@ -92,7 +92,7 @@ describe('createApiClient：请求形状', () => {
   test('两个发布来源均保留确认 SHA，开发来源另保留会话 ID，仍调用各自真实端点', async () => {
     const { calls, fetchImpl } = fakeFetch(() => json(202, {}));
     const client = createApiClient({ fetch: fetchImpl });
-    const input = { branch: 'main', expectedCommitSha: 'a'.repeat(40), expectedTaskId: `tsk_${'b'.repeat(32)}` as TaskId };
+    const input = { branch: 'main', expectedCommitSha: 'a'.repeat(40), expectedTaskId: '01a0bf5d-8f4b-780e-826f-c732652342f0' as TaskId };
     await client.devSession.publish('project one', input);
     await client.services.publish('service two', { branch: input.branch, expectedCommitSha: input.expectedCommitSha });
     expect(calls.map((call) => [call.method, call.url])).toEqual([['POST', '/v1/projects/project%20one/publish'], ['POST', '/v1/services/service%20two/releases']]);
@@ -104,7 +104,7 @@ describe('createApiClient：请求形状', () => {
     const { calls, fetchImpl } = fakeFetch(() => json(200, { items: [] }));
     const client = createApiClient({ fetch: fetchImpl });
     await client.catalog.listProjectTemplates();
-    const input = { name: '财务助手', slug: 'finance', kind: 'DigitalWorker' as const, ownerUserId: `usr_${'a'.repeat(32)}` as UserId,
+    const input = { name: '财务助手', slug: 'finance', kind: 'DigitalWorker' as const, ownerUserId: '01a0bf5d-8f4b-799e-8662-91273789253a' as UserId,
       template: 'custom-template', plan: 'standard-large', maxConcurrentTasks: 7 };
     await client.projects.create(input);
     expect(calls.map((call) => [call.method, call.url])).toEqual([['GET', '/v1/catalog/project-templates'], ['POST', '/v1/projects']]);
@@ -152,7 +152,7 @@ describe('createApiClient：请求形状', () => {
     expect(calls[1]).toMatchObject({ url: '/v1/projects/prj_1/dev-session?expectedTaskId=tsk_1', method: 'DELETE' });
   });
   test('GET /v1/me 同源、带 Cookie、accept json', async () => {
-    const me = { id: `usr_${'0'.repeat(32)}`, name: 'a', email: 'a@x', isAdmin: false, memberships: [], authMethod: 'password' as const };
+    const me = { id: '01a0bf5d-8f4b-7622-8c1a-d607ceefa8df', name: 'a', email: 'a@x', isAdmin: false, memberships: [], authMethod: 'password' as const };
     const { calls, fetchImpl } = fakeFetch(() => json(200, me));
     const client = createApiClient({ fetch: fetchImpl });
     const received: unknown = await client.me.get();
@@ -179,14 +179,14 @@ describe('createApiClient：请求形状', () => {
     expect(calls[3]?.url).toBe('http://cs-api:8080/v1/projects/prj_1/dev-session');
   });
 
-  test('JSON 请求体与 content-type；config.set 按路径补 env', async () => {
+  test('JSON 请求体与 content-type；config.create 按路径补 env', async () => {
     const { calls, fetchImpl } = fakeFetch(() => json(200, { ok: true }));
     const client = createApiClient({ fetch: fetchImpl });
-    await client.config.set('prj_1', 'production', { name: 'DB_URL', value: 'x', isSecret: true });
+    await client.config.create('prj_1', 'production', { name: 'DB_URL', bindingName: 'DB_URL', value: 'x', isSecret: true });
     await client.services.switchTraffic('svc_1', { toSlot: 'preview' });
     expect(calls[0]?.url).toBe('/v1/projects/prj_1/config/production');
     expect(calls[0]?.headers.get('content-type')).toBe('application/json');
-    expect(JSON.parse(calls[0]?.body ?? '{}')).toEqual({ name: 'DB_URL', value: 'x', isSecret: true, env: 'production' });
+    expect(JSON.parse(calls[0]?.body ?? '{}')).toEqual({ name: 'DB_URL', bindingName: 'DB_URL', value: 'x', isSecret: true, env: 'production' });
     expect(calls[1]?.url).toBe('/v1/services/svc_1/traffic-switch');
     expect(JSON.parse(calls[1]?.body ?? '{}')).toEqual({ toSlot: 'preview' });
   });

@@ -67,7 +67,7 @@ describe('颜色', () => {
 describe('--json 原样输出', () => {
   test('json() 就是 DTO 的 JSON，没有额外包装', () => {
     const { lines, emit } = collect(false);
-    const dto = { items: [{ id: 'prj_1', nested: { a: [1, 2] } }], nextCursor: 'c' };
+    const dto = { items: [{ id: '01a0bf5d-8f4b-7a0d-8ab6-0c1b5602350c', nested: { a: [1, 2] } }], nextCursor: 'c' };
     emit.json(dto);
     expect(JSON.parse(lines.join('\n'))).toEqual(dto);
   });

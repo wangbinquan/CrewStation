@@ -4,6 +4,7 @@ import type { GatewayApplier, GatewaySettings } from '../ports/gatewayApply';
 import type { AllowlistRepository, PodIdentityRepository, RouteRepository } from '../ports/repositories';
 
 export interface GatewayUseCaseDeps {
+  normalizeTaskId?: (value: string) => Promise<string | undefined>;
   allowlists: AllowlistRepository;
   pods: PodIdentityRepository;
   routes: RouteRepository;

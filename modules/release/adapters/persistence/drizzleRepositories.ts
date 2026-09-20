@@ -54,6 +54,7 @@ export function drizzleTrafficSwitchRepository(db: Executor): TrafficSwitchRepos
 function toRelease(row: ReleaseRow): Release {
   const json = <T>(v: unknown): T => (typeof v === 'string' ? JSON.parse(v) : v) as T;
   return {
+    ...(row.legacyResourceId ? { legacyResourceId: row.legacyResourceId } : {}),
     id: row.id as ReleaseId, serviceId: row.serviceId as ServiceId, projectId: row.projectId as ProjectId, tag: row.tag, commitSha: row.commitSha, branch: row.branch,
     status: row.status as ReleaseStatus, targetSlot: row.targetSlot as PhysicalSlot,
     ...(row.image ? { image: row.image } : {}), ...(row.manifest ? { manifest: json<Manifest>(row.manifest) } : {}),
@@ -65,7 +66,7 @@ function toRelease(row: ReleaseRow): Release {
 
 function toRow(r: Release): typeof releases.$inferInsert {
   return {
-    id: r.id, serviceId: r.serviceId, projectId: r.projectId, tag: r.tag, commitSha: r.commitSha, branch: r.branch, status: r.status, targetSlot: r.targetSlot,
+    legacyResourceId: r.legacyResourceId ?? null, id: r.id, serviceId: r.serviceId, projectId: r.projectId, tag: r.tag, commitSha: r.commitSha, branch: r.branch, status: r.status, targetSlot: r.targetSlot,
     image: r.image ?? null, manifest: r.manifest ?? null, configVersion: r.configVersion ?? null, pipeline: r.pipeline, message: r.message ?? null,
     createdBy: r.createdBy, createdAt: r.createdAt, updatedAt: r.updatedAt,
   };

@@ -33,7 +33,7 @@ export function BeforeStartStepList({ steps, selected, errors, disabled, onSelec
           {steps.map((step, index) => {
             const invalid = Object.keys(errors).some((key) => key.startsWith(`steps.${index}.`));
             return (
-              <li key={index} className={index === selected ? styles.selected : undefined}>
+              <li key={step.stepId} className={index === selected ? styles.selected : undefined}>
                 <Button className={styles.stepChoice} variant="ghost" aria-pressed={index === selected} disabled={disabled} onClick={() => onSelect(index)}>
                   <span className={styles.stepNumber}>{index + 1}</span>
                   <span className={styles.stepSummary}>

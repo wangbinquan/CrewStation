@@ -21,9 +21,9 @@ export function OperationsTable({ operations, serviceContext = true, renderActio
   return (
     <DataTable columns={columns} className={styles.operationsTable}>
       {operations.map((operation) => (
-        <tr key={operation.key}>
+        <tr key={operation.id}>
           <td>
-            <code>{operation.key}</code>
+            <code>{operation.id}</code>
             {operation.summary !== undefined ? <p className={styles.summary}>{operation.summary}</p> : null}
           </td>
           <td className={styles.proxyCell}>{operation.proxy}</td>

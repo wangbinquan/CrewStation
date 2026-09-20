@@ -37,10 +37,10 @@ describe('LaunchSpec 按协议的字段适用矩阵（RFC-006 proposal §5.1）'
 });
 
 describe('档位名与 Manifest 的 default（C13、C17）', () => {
-  test('default 是保留名：管理员不能建叫 default 的档位；Manifest 可以写 default', () => {
-    expect(ComputeProfileNameSchema.safeParse(DEFAULT_COMPUTE_PROFILE).success).toBe(false);
+  test('名称可以为 default；默认选择使用独立对象', () => {
+    expect(ComputeProfileNameSchema.safeParse(DEFAULT_COMPUTE_PROFILE).success).toBe(true);
     expect(ComputeProfileNameSchema.safeParse('balanced').success).toBe(true);
-    expect(AgentProfileSchema.safeParse({ name: 'chat-v1', compute: 'default', permission: 'read-only' }).success).toBe(true);
+    expect(AgentProfileSchema.safeParse({ id: '01a0bf5d-8f4b-75bc-8c93-1d465b77cd64', name: 'chat-v1', compute: { kind: 'default' }, permission: 'read-only' }).success).toBe(true);
   });
   test('创建请求：镜像、launch 与通用终端的测试命令一起校验', () => {
     const content = { image: 'registry.local:5000/runtime/tool:1', launch: { protocol: 'terminal', binaryPath: '/opt/tool/bin/tool' }, terminalTest: { command: ['/opt/tool/bin/tool', '--version'], expect: 'tool \\d' } };

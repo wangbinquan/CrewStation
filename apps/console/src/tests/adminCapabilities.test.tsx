@@ -5,17 +5,17 @@ import { renderApp } from './renderApp';
 import { parseCapabilitySearch, parseRequestSearch } from '../shared/admin/managementSearch';
 
 const originalFetch = globalThis.fetch;
-const projectId = `prj_${'a'.repeat(32)}`, serviceId = `svc_${'b'.repeat(32)}`, integrationId = `prj_${'c'.repeat(32)}`;
-const project = { id: projectId, serviceId, name: '知识助理', slug: 'knowledge', kind: 'DigitalWorker', state: 'active', ownerUserId: `usr_${'a'.repeat(32)}`, namespace: 'cs-knowledge', createdAt: '2026-09-13T01:00:00.000Z' };
-const integration = { id: integrationId, serviceId: `svc_${'d'.repeat(32)}`, name: '账单接入', slug: 'billing', kind: 'APIProxy', state: 'active', ownerUserId: `usr_${'a'.repeat(32)}`, namespace: 'cs-billing', createdAt: '2026-09-13T01:00:00.000Z' };
-const key = 'billing:GET:/invoices', createdAt = '2026-09-13T01:00:00.000Z';
+const projectId = '01a0bf5d-8f4b-7e1e-8dde-c9c2ae13ed34', serviceId = '01a0bf5d-8f4b-760b-86b6-0bb9f08a9eaa', integrationId = '01a0bf5d-8f4b-7fcb-815b-e99537cac400';
+const project = { id: projectId, serviceId, name: '知识助理', slug: 'knowledge', kind: 'DigitalWorker', state: 'active', ownerUserId: '01a0bf5d-8f4b-7f8b-8136-e631380738b0', namespace: 'cs-knowledge', createdAt: '2026-09-13T01:00:00.000Z' };
+const integration = { id: integrationId, serviceId: '01a0bf5d-8f4b-7549-8049-52b214d44948', name: '账单接入', slug: 'billing', kind: 'APIProxy', state: 'active', ownerUserId: '01a0bf5d-8f4b-7f8b-8136-e631380738b0', namespace: 'cs-billing', createdAt: '2026-09-13T01:00:00.000Z' };
+const key = '01a0bf5d-8f4b-76a3-876b-499013b49883', createdAt = '2026-09-13T01:00:00.000Z';
 let page: Awaited<ReturnType<typeof renderApp>> | undefined;
 afterEach(() => { page?.unmount(); page = undefined; globalThis.fetch = originalFetch; });
 
 function fixture(options: { admin?: boolean; meFailure?: boolean; pendingMe?: boolean; producerSlug?: string } = {}) {
   const calls: Array<{ url: URL; method: string; body?: Record<string, unknown> }> = [];
   const state = { projectsFailure: false, operationsFailure: false, apiFailure: false, egressFailure: false, decisionFailure: false, grant: true, policy: 'targeted', requestState: 'pending', decision: undefined as string | undefined };
-  const request = () => ({ id: 'api-1', serviceId, operationKey: key, state: state.requestState, reason: '查询账单', requestedBy: project.ownerUserId, createdAt, decision: state.decision });
+  const request = () => ({ id: '01a0bf5d-8f4b-7835-8ec6-0f5b147720c4', serviceId, operationId: key, state: state.requestState, reason: '查询账单', requestedBy: project.ownerUserId, createdAt, decision: state.decision });
   globalThis.fetch = (async (raw, init) => {
     const url = new URL(String(raw), 'http://localhost'), method = init?.method ?? 'GET';
     const data = init?.body ? JSON.parse(String(init.body)) as Record<string, unknown> : undefined;
@@ -23,7 +23,7 @@ function fixture(options: { admin?: boolean; meFailure?: boolean; pendingMe?: bo
     if (url.pathname === '/v1/me') {
       if (options.pendingMe) return new Promise<Response>(() => {});
       if (options.meFailure) { status = 503; body = { error: 'unavailable', message: '身份读取失败' }; }
-      else body = { id: 'user', name: '管理员', platformRole: (options.admin !== false) ? 'admin' : 'developer', isAdmin: options.admin !== false, memberships: [] };
+      else body = { id: '01a0bf5d-8f4b-7fae-8c2f-e82b0fa04985', name: '管理员', platformRole: (options.admin !== false) ? 'admin' : 'developer', isAdmin: options.admin !== false, memberships: [] };
     } else if (url.pathname === '/v1/projects/page') {
       if (state.projectsFailure) { status = 503; body = { error: 'unavailable', message: '项目目录失败' }; }
       else body = { items: [project, integration].filter((p) => url.searchParams.get('kind')?.split(',').includes(p.kind)).map((p) => ({ project: p, role: 'admin', ownerName: '管理员' })) };
@@ -35,27 +35,27 @@ function fixture(options: { admin?: boolean; meFailure?: boolean; pendingMe?: bo
       else body = project;
     }
     else if (url.pathname === `/v1/projects/${integrationId}`) body = integration;
-    else if (/^\/v1\/projects\/prj_[a-f0-9]{32}$/.test(url.pathname)) { status = 404; body = { error: 'not_found', message: '未找到指定项目' }; }
+    else if (/^\/v1\/projects\/[0-9a-f-]{36}$/.test(url.pathname)) { status = 404; body = { error: 'not_found', message: '未找到指定项目' }; }
     else if (url.pathname.endsWith('/openapi')) { status = 503; body = { error: 'unavailable', message: '文档暂不可用' }; }
     else if (url.pathname === '/v1/catalog/operations') {
       if (state.operationsFailure) { status = 503; body = { error: 'unavailable', message: '接口目录失败' }; }
-      else body = { items: [{ key, proxy: 'billing', method: 'GET', path: '/invoices', openPolicy: state.policy, granted: url.searchParams.has('serviceId') ? state.grant : undefined }] };
+      else body = { items: [{ id: key, proxyId: '01a0bf5d-8f4b-7274-8cd7-e347cbc132cf', proxy: 'billing', method: 'GET', path: '/invoices', openPolicy: state.policy, granted: url.searchParams.has('serviceId') ? state.grant : undefined }] };
     } else if (url.pathname.endsWith('/policy')) {
-      state.policy = String(data!.openPolicy); body = { key, openPolicy: state.policy };
+      state.policy = String(data!.openPolicy); body = { id: key, openPolicy: state.policy };
     } else if (method === 'DELETE') { state.grant = false; return new Response(null, { status: 204 }); }
     else if (url.pathname === '/v1/api-requests/page') {
       if (state.apiFailure) { status = 503; body = { error: 'unavailable', message: 'API 申请读取失败' }; }
-      else body = { items: [request(), { ...request(), id: 'api-2', operationKey: 'history-operation', state: 'approved' }]
+      else body = { items: [request(), { ...request(), id: '01a0bf5d-8f4b-7bab-8ad6-bbcdfe38933e', operationId: '01a0bf5d-8f4b-7fa5-8125-ce76ae48be7c', state: 'approved' }]
         .filter((r) => url.searchParams.get('state') === 'all' || r.state === url.searchParams.get('state')).map((r) => ({ ...r, projectId, project })) };
     } else if (url.pathname === '/v1/api-requests') {
       if (state.apiFailure) { status = 503; body = { error: 'unavailable', message: 'API 申请读取失败' }; }
-      else body = { items: [request(), { ...request(), id: 'api-2', operationKey: 'history-operation', state: 'approved' }] };
-    } else if (url.pathname === '/v1/api-requests/api-1/decision') {
+      else body = { items: [request(), { ...request(), id: '01a0bf5d-8f4b-7bab-8ad6-bbcdfe38933e', operationId: '01a0bf5d-8f4b-7fa5-8125-ce76ae48be7c', state: 'approved' }] };
+    } else if (url.pathname === '/v1/api-requests/01a0bf5d-8f4b-7835-8ec6-0f5b147720c4/decision') {
       if (state.decisionFailure) { status = 503; body = { error: 'unavailable', message: '审批服务失败' }; }
       else { state.requestState = data!.approve ? 'approved' : 'rejected'; state.decision = data!.decision as string; body = request(); }
     } else if (url.pathname === '/v1/egress/requests' || url.pathname === '/v1/egress/requests/page') {
       if (state.egressFailure) { status = 503; body = { error: 'unavailable', message: '出站申请读取失败' }; }
-      else body = { items: [{ id: 'egress-1', projectId, project, fqdn: 'example.invalid', reason: '模型调用', state: 'pending', createdAt, requestedBy: project.ownerUserId }]
+      else body = { items: [{ id: '01a0bf5d-8f4b-7ac2-817e-9026d79e6c6d', projectId, project, fqdn: 'example.invalid', reason: '模型调用', state: 'pending', createdAt, requestedBy: project.ownerUserId }]
         .filter((r) => url.pathname !== '/v1/egress/requests/page' || url.searchParams.get('state') === 'all' || r.state === url.searchParams.get('state')) };
     } else if (url.pathname === '/v1/catalog/event-types') body = { items: [{ eventType: 'billing.changed', producer: 'billing-events', producerProject: options.producerSlug ?? integrationId }] };
     else if (url.pathname.endsWith('/dev-session')) { status = 404; body = { error: 'not_found', message: '没有开发会话' }; }
@@ -84,8 +84,8 @@ describe('管理员能力与审批入口', () => {
   });
 
   test('旧 API 管理链接保留服务与操作上下文，平台策略必须明确确认后才提交', async () => {
-    const f = fixture(); page = await renderApp(`/admin/api-catalog?projectId=${projectId}&proxy=billing&operation=${encodeURIComponent(key)}`, '/projects');
-    expect(page.path()).toBe('/admin/capabilities'); expect(page.search()).toMatchObject({ tab: 'api', projectId, proxy: 'billing', operation: key });
+    const f = fixture(); page = await renderApp(`/admin/api-catalog?projectId=${projectId}&proxy=01a0bf5d-8f4b-7274-8cd7-e347cbc132cf&operation=${encodeURIComponent(key)}`, '/projects');
+    expect(page.path()).toBe('/admin/capabilities'); expect(page.search()).toMatchObject({ tab: 'api', projectId, proxy: '01a0bf5d-8f4b-7274-8cd7-e347cbc132cf', operation: key });
     expect(f.calls.find((call) => call.url.pathname === '/v1/catalog/operations')!.url.searchParams.get('serviceId')).toBe(serviceId);
     await page.click('改为默认开放'); expect(f.writes()).toHaveLength(0); expect(page.text()).toContain('此策略对所有服务生效');
     await page.click('确认'); expect(f.writes()).toHaveLength(1);
@@ -109,13 +109,13 @@ describe('管理员能力与审批入口', () => {
     expect(page.text()).toContain('项目目录失败'); expect(page.text()).not.toContain('改为默认开放');
     expect(f.calls.some((call) => call.url.pathname === '/v1/catalog/operations')).toBe(false);
     f.state.projectsFailure = false; await page.click('重新读取项目目录'); expect(page.text()).toContain('改为默认开放');
-    await page.navigate(`/admin/capabilities?tab=api&projectId=prj_${'f'.repeat(32)}`);
+    await page.navigate(`/admin/capabilities?tab=api&projectId=01a0bf5d-8f4b-7927-8d04-a341edee681a`);
     expect(page.text()).toContain('未找到指定项目'); expect(page.text()).not.toContain('改为默认开放');
   });
 
   test('两类审批页签保留各自草稿；API 失败保留理由，成功后展示决定并刷新项目结果', async () => {
     const f = fixture(); page = await renderApp(`/admin/requests?projectId=${projectId}`);
-    expect(page.text()).not.toContain('history-operation'); await input(visible<HTMLTextAreaElement>('textarea'), '用途尚需补充');
+    expect(page.text()).not.toContain('01a0bf5d-8f4b-7fa5-8125-ce76ae48be7c'); await input(visible<HTMLTextAreaElement>('textarea'), '用途尚需补充');
     await page.click('出站申请'); await input(visible<HTMLInputElement>('input'), '允许模型出口');
     await page.click('API 申请'); expect(visible<HTMLTextAreaElement>('textarea').value).toBe('用途尚需补充');
     await page.click('出站申请'); expect(visible<HTMLInputElement>('input').value).toBe('允许模型出口'); await page.click('API 申请');
@@ -124,7 +124,7 @@ describe('管理员能力与审批入口', () => {
     f.state.decisionFailure = false; await page.click('拒绝'); expect(f.writes().at(-1)!.body).toEqual({ approve: false, decision: '用途尚需补充' });
     expect(page.text()).toContain('申请已拒绝'); await input(document.querySelector('select option[value="all"]')!.parentElement as HTMLSelectElement, 'all');
     expect(page.text()).toContain('审批意见有未保存的输入'); await page.click('放弃输入并离开');
-    expect(page.text()).toContain('history-operation'); expect(page.text()).toContain('用途尚需补充');
+    expect(page.text()).toContain('01a0bf5d-8f4b-7fa5-8125-ce76ae48be7c'); expect(page.text()).toContain('用途尚需补充');
     await page.navigate(`/projects/${projectId}/settings?tab=resources&resource=api`);
     expect(page.text()).toContain('已拒绝'); expect([...document.querySelectorAll('button')].some((node) => node.textContent === '批准')).toBe(false);
   });
@@ -161,14 +161,14 @@ describe('管理员能力与审批入口', () => {
 });
 
 test('从指定 API 文档进入管理再返回，恢复原分类与接口而不是成员页', async () => {
-  const f = fixture(); page = await renderApp(`/projects/${projectId}/catalog?proxy=billing&operation=${encodeURIComponent(key)}`);
+  const f = fixture(); page = await renderApp(`/projects/${projectId}/catalog?proxy=01a0bf5d-8f4b-7274-8cd7-e347cbc132cf&operation=${encodeURIComponent(key)}`);
   await page.click('管理接口开放策略');
   expect(page.path()).toBe('/admin/capabilities');
-  expect(page.search()).toMatchObject({ tab: 'api', projectId, proxy: 'billing', operation: key });
+  expect(page.search()).toMatchObject({ tab: 'api', projectId, proxy: '01a0bf5d-8f4b-7274-8cd7-e347cbc132cf', operation: key });
   await page.click('项目开发');
   // 实机只记 pathname，回程把 settings 的分类和操作丢掉，误落到默认成员页。
   expect(page.path()).toBe(`/projects/${projectId}/resources`);
-  expect(page.search()).toEqual({ section: 'api', proxy: 'billing', operation: key });
+  expect(page.search()).toEqual({ section: 'api', proxy: '01a0bf5d-8f4b-7274-8cd7-e347cbc132cf', operation: key });
   expect(document.querySelector('[aria-label="资源主题"] [aria-current="page"]')?.textContent).toContain('API 接口');
   expect(page.text()).toContain(key); expect(f.writes()).toHaveLength(0);
   await page.back(); expect(page.path()).toBe('/admin/capabilities');

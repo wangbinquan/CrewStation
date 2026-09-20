@@ -34,7 +34,7 @@ describe.skipIf(!available)('平台三角色与迁移（PostgreSQL）', () => {
   test('并发撤销管理员只能成功一位；负责人降级提示转交对象', async () => {
     const isolated = await createTestDatabase([identityMigrations]);
     try {
-      const owned = `prj_${'b'.repeat(32)}` as ProjectId;
+      const owned = '01a0bf5d-8f4b-7aef-84b8-c458233bab22' as ProjectId;
       const identity = createIdentityModule({ db: isolated.db, settings: { adminEmails: ['two@test.invalid'] }, membershipLookup: { membershipsOf: async () => [{ projectId: owned, role: 'owner' }] } });
       const one = await identity.api.ensureUser({ externalId: 'one', name: 'One', email: 'one@test.invalid' });
       const two = await identity.api.ensureUser({ externalId: 'two', name: 'Two', email: 'two@test.invalid' });
@@ -54,7 +54,7 @@ describe.skipIf(!available)('平台三角色与迁移（PostgreSQL）', () => {
       let fail = true;
       const identity = createIdentityModule({ db: legacy.db, settings: { adminEmails: [] }, membershipLookup: { membershipsOf: async (id) => {
         if (id === ids[2] && fail) throw new Error('interrupted');
-        return [{ projectId: `prj_${'c'.repeat(32)}` as ProjectId, role: id === ids[1] ? 'developer' : 'tester' }];
+        return [{ projectId: '01a0bf5d-8f4b-7fcb-815b-e99537cac400' as ProjectId, role: id === ids[1] ? 'developer' : 'tester' }];
       } } });
       await expect(identity.api.initializePlatformRoles()).rejects.toThrow('interrupted');
       expect(await identity.api.getUser(ids[1]!)).toMatchObject({ platformRole: 'developer' });

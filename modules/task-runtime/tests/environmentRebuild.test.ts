@@ -21,7 +21,7 @@ describe.skipIf(!available)('原任务原卷重建', () => {
     expect((await runtime.api.getEnvironment(env.id))?.state).toBe('creating');
     await expect(runtime.api.releaseEnvironment(env.id, 'user')).rejects.toThrow('正在重建');
     await f.run();
-    const record = (await f.uow.read.rebuilds.get(input.requestId))!, current = (await f.uow.read.environments.getById(env.id))!;
+    const record = (await f.uow.read.rebuilds.findRequest(f.projectId, input.requestId))!, current = (await f.uow.read.environments.getById(env.id))!;
     expect(record.state).toBe('starting'); expect(current.podName).not.toBe(env.podName);
     expect(current.id).toBe(env.id); expect(current.pvcName).toBe(env.pvcName); expect(current.branch).toBe(env.branch);
     expect(await k8s.get(Resources.PersistentVolumeClaim!, env.pvcName, env.namespace)).toEqual(volume);

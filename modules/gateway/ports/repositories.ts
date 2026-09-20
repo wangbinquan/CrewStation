@@ -14,6 +14,6 @@ export interface PodIdentityRepository {
 }
 
 export interface RouteRepository {
-  saveForService(serviceName: string, routes: RouteEntry[]): Promise<void>;
-  listAll(): Promise<Array<{ serviceName: string; routes: RouteEntry[] }>>;
+  saveForService(serviceId: string, serviceName: string, routes: RouteEntry[]): Promise<void>;
+  listAll(): Promise<Array<{ serviceId: string; serviceName: string; routes: RouteEntry[] }>>;
 }

@@ -1,3 +1,4 @@
+import { computeId } from './computeFixture';
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import type { NativeTerminalRecord } from '@crewstation/contracts';
 import { AgentActivityPageSchema, IDENTITY_HEADERS } from '@crewstation/contracts';
@@ -18,9 +19,9 @@ afterAll(async () => { await db?.drop(); });
 describe.skipIf(!available)('动态资源实际装配与 HTTP', () => {
   test('读写路径、默认分页与 no-store；动态存储失败仍能列出 CLI，权限错误继续拒绝', async () => {
     const f = workspaceFixture(); const taskId = workspaceTask;
-    const record: NativeTerminalRecord = { agentId: newId('agt'), terminalId: newId('pty'), runnerId: crypto.randomUUID(), lifecycle: 'running', revision: 1, compute: 'balanced', permission: 'edit', startedAt: checkedAt, cols: 80, rows: 24 };
+    const record: NativeTerminalRecord = { agentId: newId('agt'), terminalId: newId('pty'), runnerId: crypto.randomUUID(), lifecycle: 'running', revision: 1, compute: computeId('balanced'), permission: 'edit', startedAt: checkedAt, cols: 80, rows: 24 };
     f.state.result = { runnerId: record.runnerId, terminals: [record] };
-    await drizzleNativeTerminals(db.db).reserve({ taskId, record, createdBy: workspaceActor.userId, clientRequestId: crypto.randomUUID(), fingerprint: 'http', profile: { profile: 'balanced', revision: 1 }, input: { clientRequestId: crypto.randomUUID(), permission: 'edit', cols: 80, rows: 24 } });
+    await drizzleNativeTerminals(db.db).reserve({ taskId, record, createdBy: workspaceActor.userId, clientRequestId: crypto.randomUUID(), fingerprint: 'http', profile: { profileId: computeId('balanced'), revision: 1 }, input: { clientRequestId: crypto.randomUUID(), permission: 'edit', cols: 80, rows: 24 } });
     f.deps.runner.listEvents = async (_task, query) => query?.sinceSeq ? [] : [{ seq: 1, at: checkedAt, event: { kind: 'nativeActivity', activity: { agentId: record.agentId, terminalId: record.terminalId, runnerId: record.runnerId, seq: 1, turnOrdinal: 0, eventId: 'source-ready', signal: { kind: 'source-ready', nativeSessionId: null, turnId: null, occurredAt: checkedAt, source: 'claude-code/2.1.268', sourceEventId: 'ready' } } } }];
     const module = createDevSessionModule({ ...f.deps, db: db.db, isAdmin: async () => false });
     const app = createApp({ name: 'activity-test' }); for (const route of module.http) app.route('/', route);

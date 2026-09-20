@@ -31,7 +31,7 @@ export function createWorkspaceComparisons(source: FileComparisonDeps): Workspac
       if (existing) return { ...existing.result, workspace, checkedAt: base.checkedAt };
       const commits = await compareCommits(deps.git, workspace, targetSha);
       const net = await readNetFiles(deps, targetSha);
-      const result: RunnerComparison = { ...base, comparisonId: crypto.randomUUID(), commits, files: net.summary };
+      const result: RunnerComparison = { ...base, comparisonId: Bun.randomUUIDv7(), commits, files: net.summary };
       const snapshot: ComparisonSnapshot = { id: result.comparisonId!, targetSha, workspace, createdAt: Date.now(), result, files: net.files };
       try { await requireCurrent(deps, snapshot); } catch { return { ...result, comparisonId: null, freshness: 'stale' }; }
       snapshots.save(snapshot);

@@ -15,21 +15,21 @@ export interface ProfileBasicsSectionProps {
   readonly draft: ProfileDraft;
   readonly errors: DraftErrors;
   readonly disabled: boolean;
-  /** 新建：名称、协议可填，可套用预设；编辑：名称与协议固定（P1）。 */
+  /** 新建可选择协议和预设；名称始终可编辑，协议建档后固定。 */
   readonly creating: boolean;
   readonly onChange: (fn: (draft: ProfileDraft) => ProfileDraft) => void;
 }
 
-/** 名称、说明与协议。`default` 是保留名；协议建档后不可改，换协议就新建档位（P1）。 */
+/** 名称用于展示；协议建档后不可改，换协议就新建档位。 */
 export function ProfileBasicsSection({ draft, errors, disabled, creating, onChange }: ProfileBasicsSectionProps): ReactElement {
   const t = useT();
   return (
     <div className={styles.sub}>
       <h3>{t('admin.profile.section.basics')}</h3>
       <div className={styles.fields}>
+        <AdminField label={t('admin.profile.field.name')} value={draft.name} onChange={(name) => onChange((d) => ({ ...d, name }))} disabled={disabled}
+          placeholder="claude-daily" hint={t('admin.profile.field.nameHint')} error={profileErrorText(t, errors, 'name')} />
         {creating ? <>
-        <AdminField label={t('admin.profile.field.name')} value={draft.name} onChange={(name) => onChange((d) => ({ ...d, name }))} disabled={disabled || !creating}
-          placeholder="claude-daily" hint={creating ? t('admin.profile.field.nameHint') : t('admin.profile.field.nameFixed')} error={profileErrorText(t, errors, 'name')} />
         <AdminField label={t('admin.profile.field.protocol')} value={draft.protocol} disabled={disabled || !creating}
           onChange={(protocol) => onChange((d) => withProtocol(d, protocol as AgentProtocol))}
           hint={creating ? t(`admin.profile.protocolHint.${draft.protocol}`) : t('admin.profile.field.protocolFixed')}

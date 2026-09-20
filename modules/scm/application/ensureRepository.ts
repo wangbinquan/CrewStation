@@ -58,17 +58,17 @@ async function claimRemote(deps: ScmUseCaseDeps, path: string, existing: Reposit
 /** 默认分支已存在（重试场景）就不再推模板，只补标签保护。 */
 async function populate(deps: ScmUseCaseDeps, binding: RepositoryBinding, input: EnsureRepositoryInput, remoteExisted: boolean): Promise<void> {
   const { gitlab, git, templates, scratch, settings } = deps;
-  const { templateName, initialPlan } = input;
+  const { templateId, initialPlan } = input;
   const hasDefaultBranch = remoteExisted && (await gitlab.getBranch(binding.remoteProjectId, binding.defaultBranch)) !== undefined;
   if (!hasDefaultBranch) {
     const dir = await scratch.create('cs-scm-init');
     try {
-      await templates.materialize(templateName, dir.path, initialPlan);
+      await templates.materialize(templateId, dir.path, initialPlan, { projectId: binding.projectId, serviceId: binding.serviceId });
       await git.initAndPush({
         workdir: dir.path,
         remoteUrlWithCredential: withCredential(binding.httpUrl, PLATFORM_PUSH_USERNAME, settings.platformToken),
         branch: binding.defaultBranch,
-        message: `chore: initialize from template ${templateName}`,
+        message: `chore: initialize from template ${templateId}`,
       });
     } finally {
       await dir.remove();

@@ -10,14 +10,14 @@ import { checkedAt, workspaceActor, workspaceFixture, workspaceProject, workspac
 
 function fixture() {
   const f = workspaceFixture(), calls: string[] = [], state = { allowed: true };
-  const profile = { name: 'medium', cpu: '1', memory: '2Gi', storage: '10Gi' };
+  const profile = { id: '01a0bf5d-8f4b-7c08-8245-6a7766e23a18', name: 'medium', cpu: '1', memory: '2Gi', storage: '10Gi' };
   const check: DevSessionRebuildInspection = { taskId: workspaceTask, projectId: workspaceProject, updatedAt: checkedAt, podUid: 'pod-original', volume: { uid: 'pvc-original', capacity: '10Gi' },
     currentProfile: profile.name, profiles: [{ ...profile, description: '' }], checkedAt };
   const input = { requestId: crypto.randomUUID(), expectedTaskId: workspaceTask, expectedUpdatedAt: checkedAt, expectedVolumeUid: 'pvc-original', expectedPodUid: 'pod-original', profile };
   f.deps.authorizer.authorize = async (_actor, projectId, action) => { calls.push(`${projectId}:${action}`); if (!state.allowed) throw forbidden('没有开发权限'); };
   f.deps.environments.inspectRebuild = async () => { calls.push('inspect'); return check; };
   f.deps.environments.requestRebuild = async (projectId, request) => { calls.push('submit'); expect(projectId).toBe(workspaceProject); expect(request).toEqual(input);
-    return { requestId: request.requestId, taskId: workspaceTask, state: 'queued', profile, createdAt: checkedAt, updatedAt: checkedAt }; };
+    return { id: Bun.randomUUIDv7(), requestId: request.requestId, taskId: workspaceTask, state: 'queued', profile, createdAt: checkedAt, updatedAt: checkedAt }; };
   const api = rebuildSessionUseCases(f.deps), app = createApp({ name: 'rebuild-test' });
   app.route('/', devSessionRoutes(api as DevSessionModuleApi, async () => false));
   const send = (method: string, body?: object) => app.request(`/v1/projects/${workspaceProject}/dev-session/rebuild`, { method,

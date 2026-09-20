@@ -13,11 +13,11 @@ let tdb: TestDatabase;
 let data: DataModule;
 const suffix = Bun.randomUUIDv7().replace(/-/g, '').slice(0, 8);
 const slug = `t${suffix}`;
-const serviceId = 'svc_0123456789abcdef0123456789abcdef' as ServiceId;
-const projectId = 'prj_0123456789abcdef0123456789abcdef' as ProjectId;
-const taskId = 'tsk_0123456789abcdef0123456789abcdef' as TaskId;
-const owner: Actor = { userId: 'usr_0123456789abcdef0123456789abcdef' as UserId, isAdmin: false };
-const dev: Actor = { userId: 'usr_1123456789abcdef0123456789abcdef' as UserId, isAdmin: false };
+const serviceId = '01a0bf5d-8f4b-76c5-866c-f1feda3d63bb' as ServiceId;
+const projectId = '01a0bf5d-8f4b-7178-82e1-9a99060b1192' as ProjectId;
+const taskId = '01a0bf5d-8f4b-7418-8a3f-7cbb4a1fd751' as TaskId;
+const owner: Actor = { userId: '01a0bf5d-8f4b-7793-867c-efd7527b386b' as UserId, isAdmin: false };
+const dev: Actor = { userId: '01a0bf5d-8f4b-7a4e-8eb2-04fca5c047bf' as UserId, isAdmin: false };
 
 beforeAll(async () => {
   if (!available) return;

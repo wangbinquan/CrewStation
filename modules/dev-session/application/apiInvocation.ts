@@ -18,7 +18,7 @@ export function apiInvocationUseCase(deps: DevSessionUseCaseDeps) {
     const service = await deps.services.resolveServiceOfProject(projectId);
     if (!service || service.serviceId !== env.serviceId) throw new PlatformError('conflict', '开发会话的服务身份已变化，无法试调');
     const operations = await deps.apiCatalog.listOperations(actor, service.serviceId);
-    const operation = operations.find((item) => item.key === input.operationKey);
+    const operation = operations.find((item) => item.id === input.operationId);
     if (!operation) throw new PlatformError('precondition', '操作已不在当前目录，请刷新开发资源');
     if (operation.granted !== true) throw new PlatformError('forbidden', '当前服务尚未获准调用此操作，请先申请');
     const command = resolveApiInvocation(operation, input);
@@ -31,6 +31,6 @@ export function apiInvocationUseCase(deps: DevSessionUseCaseDeps) {
     });
     const result = ApiInvocationResultSchema.safeParse(raw);
     if (!result.success) throw new PlatformError('unavailable', '开发容器返回的试调结果无法识别；请求可能已执行，请先核对业务结果，勿直接重试');
-    return { taskId: env.id, operationKey: input.operationKey, result: result.data };
+    return { taskId: env.id, operationId: input.operationId, result: result.data };
   };
 }

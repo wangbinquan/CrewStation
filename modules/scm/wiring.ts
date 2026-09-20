@@ -4,7 +4,7 @@ import type { AppEnv } from '@crewstation/http';
 import type { Clock } from '@crewstation/kernel';
 import { systemClock } from '@crewstation/kernel';
 import type { ProjectModuleApi } from '@crewstation/module-project';
-import type { Database, MigrationSet } from '@crewstation/persistence';
+import type { Database, MigrationSet, ResourceIdentityDirectory } from '@crewstation/persistence';
 import { readMigrationDir } from '@crewstation/persistence';
 import type { Hono } from 'hono';
 import { directoryTemplateSource } from './adapters/fs/directoryTemplateSource';
@@ -12,6 +12,7 @@ import { osScratchDirs } from './adapters/fs/osScratchDirs';
 import { bunGitRunner } from './adapters/git/bunGitRunner';
 import { gitLabGatewayAdapter } from './adapters/gitlab/gitLabGatewayAdapter';
 import { drizzleUnitOfWork } from './adapters/persistence/drizzleUnitOfWork';
+import { legacyManifestUpgrade } from './adapters/persistence/legacyManifestUpgrade';
 import type { ActorResolver, ScmModuleApi } from './api/moduleApi';
 import { createReleaseTagUseCase } from './application/createReleaseTag';
 import type { ScmUseCaseDeps } from './application/dependencies';
@@ -19,13 +20,17 @@ import { ensureRepositoryUseCase } from './application/ensureRepository';
 import { pushBranchUseCase } from './application/pushBranch';
 import { queryRepositoryUseCases } from './application/queryRepository';
 import { listTemplatesUseCase } from './application/listTemplates';
+import { previewManifestUpgradeUseCase } from './application/previewManifestUpgrade';
 import { sessionCredentialUseCases } from './application/sessionCredentials';
 import { repositoryRoutes } from './http/repositoryRoutes';
+import type { TemplateResourceBindings } from './ports/templateSource';
 import type { ScmSettings } from './ports/scmSettings';
 
 const DEFAULT_BOT_EMAIL = 'bot@crewstation.local';
 
 export interface ScmModuleDeps {
+  identities?: ResourceIdentityDirectory;
+  templateResources?: TemplateResourceBindings;
   db: Database;
   project: Pick<ProjectModuleApi, 'authorize' | 'isAdmin'>;
   settings: ScmSettings;
@@ -55,10 +60,11 @@ export function createScmModule(deps: ScmModuleDeps): ScmModule {
   const { settings, overrides } = deps;
   const client = createGitLabClient({ baseUrl: settings.baseUrl, token: settings.platformToken, ...(deps.fetch ? { fetch: deps.fetch } : {}) });
   const useCaseDeps: ScmUseCaseDeps = {
+    ...(deps.identities ? { manifestUpgrade: legacyManifestUpgrade(deps.identities, deps.templateResources) } : {}),
     uow: drizzleUnitOfWork(deps.db),
     gitlab: overrides?.gitlab ?? gitLabGatewayAdapter(client),
     git: overrides?.git ?? bunGitRunner({ authorName: settings.platformBotName, authorEmail: settings.platformBotEmail ?? DEFAULT_BOT_EMAIL }),
-    templates: overrides?.templates ?? directoryTemplateSource({ templatesRoot: deps.templatesRoot ?? join(import.meta.dir, '..', '..', 'templates'),
+    templates: overrides?.templates ?? directoryTemplateSource({ resources: deps.templateResources, templatesRoot: deps.templatesRoot ?? join(import.meta.dir, '..', '..', 'templates'),
       ...(deps.integrationTemplatesRoot ? { integrationTemplatesRoot: deps.integrationTemplatesRoot } : deps.templatesRoot === undefined ? { integrationTemplatesRoot: join(import.meta.dir, '..', '..', 'integrations') } : {}) }),
     scratch: overrides?.scratch ?? osScratchDirs(),
     authorizer: { authorize: (actor, projectId, action) => deps.project.authorize(actor, projectId, action) },
@@ -68,6 +74,7 @@ export function createScmModule(deps: ScmModuleDeps): ScmModule {
   const api: ScmModuleApi = {
     name: 'scm',
     listTemplates: listTemplatesUseCase(useCaseDeps.templates),
+    previewManifestUpgrade: previewManifestUpgradeUseCase(useCaseDeps),
     ensureRepository: ensureRepositoryUseCase(useCaseDeps),
     ...queryRepositoryUseCases(useCaseDeps),
     createReleaseTag: createReleaseTagUseCase(useCaseDeps),

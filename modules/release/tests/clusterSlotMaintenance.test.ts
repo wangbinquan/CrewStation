@@ -10,8 +10,8 @@ import { createReleaseModule, releaseMigrations } from '../wiring';
 const available = await testDatabaseAvailable();
 let database: TestDatabase | undefined;
 afterEach(async () => { await database?.drop(); database = undefined; });
-const admin: Actor = { userId: `usr_${'1'.repeat(32)}` as UserId, isAdmin: true }, serviceId = `svc_${'2'.repeat(32)}` as ServiceId, projectId = `prj_${'3'.repeat(32)}` as ProjectId;
-const yaml = 'apiVersion: crewstation/v1\nkind: DigitalWorker\nspec:\n  service: { command: [bun], port: 3000, healthPath: /healthz, plan: small, replicas: 1 }\n  release:\n    migration: { compatibility: none, destructive: false, rollback: switch-back }\n';
+const admin: Actor = { userId: '01a0bf5d-8f4b-7210-80c1-302ae945a98e' as UserId, isAdmin: true }, serviceId = '01a0bf5d-8f4b-7aea-8983-7b41e8b30563' as ServiceId, projectId = '01a0bf5d-8f4b-7710-89f8-83b88c835ea6' as ProjectId;
+const yaml = 'apiVersion: crewstation/v2\nkind: DigitalWorker\nspec:\n  service: { command: [bun], port: 3000, healthPath: /healthz, servicePlanId: 01a0bf5d-8f4b-781d-8b8e-bbbbc69c6c6a, replicas: 1 }\n  release:\n    migration: { compatibility: none, destructive: false, rollback: switch-back }\n';
 function canonical(value: unknown): unknown { if (Array.isArray(value)) return value.map(canonical); return value && typeof value === 'object' ? Object.fromEntries(Object.entries(value).sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => [k, canonical(v)])) : value; }
 async function fixture() {
   database = await createTestDatabase([eventbusMigrations, queueMigrations, releaseMigrations]);
@@ -19,12 +19,12 @@ async function fixture() {
   const release = createReleaseModule({ db: database.db, k8s, isAdmin: async (id) => id === admin.userId, authorizer: { authorize: async () => {} },
     tagger: { createReleaseTag: async () => ({ tag: `v0.0.${++version}`, commitSha: `sha-${version}` }) }, repo: { readFile: async (_s, _r, path) => path === 'crewstation.yaml' ? yaml : undefined, repositoryUrl: async () => ({ httpUrl: 'https://repo.invalid/test', credentialSecretName: 'test-git' }) },
     services: { resolveServiceById: async () => ({ projectId, slug: 'maintenance', name: 'maintenance', namespace: 'cs-maintenance' }) },
-    plans: { getServicePlan: async () => ({ name: 'small', cpu: '1', memory: '1Gi', maxReplicas: 3, description: '' }), lookupComputeProfile: async () => undefined, listComputeProfiles: async () => [] },
+    plans: { getServicePlan: async () => ({ id: '01a0bf5d-8f4b-781d-8b8e-bbbbc69c6c6a', name: 'small', cpu: '1', memory: '1Gi', maxReplicas: 3, description: '' }), lookupComputeProfile: async () => undefined, listComputeProfiles: async () => [] },
     config: { render: async () => ({ values: {}, version: 1 }), validate: async () => ({ missing: [] }) }, data: { envFor: async () => ({}) }, hosts: { prodHost: () => 'prod.invalid', previewHost: () => 'preview.invalid' },
     settings: { registryBase: 'registry', maintenanceWindow: false, buildTimeoutSeconds: 10, deployTimeoutSeconds: 10, builderImage: 'builder', buildkitAddress: 'buildkit', workerOwner: 'slot-test', serviceDomain: 'svc.internal', userDomain: 'user.invalid' } });
   const publish = async (ready = true) => {
     const rel = await release.api.publish(admin, serviceId, { branch: 'main', version: 'patch' }); await release.api.runPipelineStep(rel.id);
-    await k8s.mergePatch(Resources.Job!, `build-${rel.id.slice(-12)}`, 'cs-maintenance', { status: { succeeded: 1 } }); await release.api.runPipelineStep(rel.id);
+    await k8s.mergePatch(Resources.Job!, `build-${rel.id.replaceAll('-', '')}`, 'cs-maintenance', { status: { succeeded: 1 } }); await release.api.runPipelineStep(rel.id);
     if (ready) { const d = (await k8s.get(Resources.Deployment!, 'maintenance-green', 'cs-maintenance'))!; const n = (d.spec as { replicas: number }).replicas; await mark(n); await release.api.runPipelineStep(rel.id); }
     return rel;
   };

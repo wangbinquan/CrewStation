@@ -13,7 +13,7 @@ let f: Awaited<ReturnType<typeof rebuildFixture>> | undefined;
 afterEach(async () => { await f?.close(); f = undefined; });
 const image = `registry.local:5000/runtime/glm@sha256:${'b'.repeat(64)}`;
 const agentInput = (patch: Partial<CreateNativeExecutionInput> = {}): CreateNativeExecutionInput => ({ id: newId('tsk') as TaskId, parentTaskId: f!.env.id, purpose: 'agent',
-  createdBy: `usr_${'c'.repeat(32)}` as UserId, agentId: newId('agt'), runnerId: crypto.randomUUID(), fingerprint: 'a'.repeat(64), image, computeProfile: { name: 'glm', revision: 3 }, ...patch });
+  createdBy: '01a0bf5d-8f4b-7e44-886a-b79b12465703' as UserId, agentId: newId('agt'), runnerId: crypto.randomUUID(), fingerprint: 'a'.repeat(64), image, computeProfile: { profileId: '01a0bf5d-8f4b-7d07-8915-fe618b9d832d', revision: 3 }, ...patch });
 type PodSpec = { containers: Array<{ image: string; command: string[]; securityContext: { runAsUser: number }; envFrom: unknown }>; volumes: Array<{ persistentVolumeClaim?: { claimName: string } }> };
 const runnerToken = async (child: { podName: string }): Promise<string> => {
   const secret = [...f!.k8s.objects.values()].find((o) => o.kind === 'Secret' && (o as K8sObject & { stringData?: Record<string, string> }).stringData?.CS_RUNNER_TASK_ID !== undefined && o.metadata.name.includes(child.podName.slice(4, 16)))
@@ -25,7 +25,7 @@ describe.skipIf(!available)('Agent 执行环境（RFC-006 §5：每个 Agent 一
   test('headless Agent：档位镜像按摘要、显式 Runner 命令、挂父工作卷、独立占额；没有终端；额度满与父任务不符各有原因', async () => {
     f = await rebuildFixture({ running: true });
     const child = await f.runtime.api.createNativeExecution(agentInput());
-    expect(child).toMatchObject({ kind: 'dev-session', podName: `agt-${child.id.slice(4)}`, native: { purpose: 'agent', parentTaskId: f.env.id, state: 'queued' } });
+    expect(child).toMatchObject({ kind: 'dev-session', podName: `agt-${child.id.replaceAll('-', '')}`, native: { purpose: 'agent', parentTaskId: f.env.id, state: 'queued' } });
     expect(child.native).not.toHaveProperty('terminalId');
     await f.runNative();
     const pod = (await f.k8s.get(Resources.Pod!, child.podName, f.env.namespace))!;
@@ -72,7 +72,7 @@ describe.skipIf(!available)('Agent 执行环境（RFC-006 §5：每个 Agent 一
     f = await rebuildFixture({ running: true, kind: 'business' });
     f.state.quota = 3;
     const child = await f.runtime.api.createNativeExecution(agentInput({ purpose: 'subtask', createdBy: undefined }));
-    expect(child).toMatchObject({ kind: 'business', podName: `sub-${child.id.slice(4)}`, native: { purpose: 'subtask' } });
+    expect(child).toMatchObject({ kind: 'business', podName: `sub-${child.id.replaceAll('-', '')}`, native: { purpose: 'subtask' } });
     await expect(f.runtime.api.createNativeExecution(agentInput({ purpose: 'agent' }))).rejects.toMatchObject({ kind: 'precondition' });
     await f.runNative();
     // 业务任务与子任务执行环境的 Pod 用网关身份索引与项目出站策略认的工作负载名，Agent 才能访问模型端点。

@@ -41,7 +41,7 @@ describe('OpenAPI 操作发现与裁剪', () => {
   });
 
   test('只保留可调操作，沿 $ref 保留可达组件，securitySchemes 整体保留，servers 改写', () => {
-    const pruned = pruneOpenApi(doc, { proxy: 'issues', allowedKeys: new Set(['issues:GET:/v1/issues/{id}']), serversUrl: 'http://api.svc.cs.internal/api/issues' });
+    const pruned = pruneOpenApi(doc, { proxy: 'issues', allowedOperations: [{ id: '01a0bf5d-8f4b-7000-8000-000000000001', method: 'GET', path: '/v1/issues/{id}' }], serversUrl: 'http://api.svc.cs.internal/api/issues' });
     expect(Object.keys(pruned.paths as object)).toEqual(['/v1/issues/{id}']);
     const components = pruned.components as { schemas: object; parameters?: object; responses?: object; securitySchemes: object };
     expect(Object.keys(components.schemas).sort()).toEqual(['Issue', 'User']);
@@ -54,14 +54,14 @@ describe('OpenAPI 操作发现与裁剪', () => {
   });
 
   test('路径级 parameters 随保留的操作一起保留；无可调操作时 paths 为空', () => {
-    const pruned = pruneOpenApi(doc, { proxy: 'issues', allowedKeys: new Set(['issues:GET:/v1/issues']), serversUrl: 'http://api.svc.cs.internal/api/issues' });
+    const pruned = pruneOpenApi(doc, { proxy: 'issues', allowedOperations: [{ id: '01a0bf5d-8f4b-7000-8000-000000000001', method: 'GET', path: '/v1/issues' }], serversUrl: 'http://api.svc.cs.internal/api/issues' });
     const path = (pruned.paths as Record<string, Record<string, unknown>>)['/v1/issues']!;
     expect(Object.keys(path).sort()).toEqual(['get', 'parameters']);
     const components = pruned.components as { schemas: object; parameters: object; responses: object };
     expect(Object.keys(components.parameters)).toEqual(['Page']);
     expect(Object.keys(components.responses)).toEqual(['IssueList']);
     expect(Object.keys(components.schemas).sort()).toEqual(['Issue', 'User']);
-    const empty = pruneOpenApi(doc, { proxy: 'issues', allowedKeys: new Set(), serversUrl: 'http://api.svc.cs.internal/api/issues' });
+    const empty = pruneOpenApi(doc, { proxy: 'issues', allowedOperations: [], serversUrl: 'http://api.svc.cs.internal/api/issues' });
     expect(empty.paths).toEqual({});
     expect((empty.components as { schemas?: object }).schemas).toBeUndefined();
   });
@@ -73,7 +73,7 @@ describe('OpenAPI 操作发现与裁剪', () => {
       definitions: { Thing: { type: 'object' }, Other: { type: 'object' } },
       securityDefinitions: { basic: { type: 'basic' } },
     };
-    const pruned = pruneOpenApi(swagger, { proxy: 'legacy', allowedKeys: new Set(['legacy:GET:/things']), serversUrl: 'http://api.svc.cs.internal/api/legacy' });
+    const pruned = pruneOpenApi(swagger, { proxy: 'legacy', allowedOperations: [{ id: '01a0bf5d-8f4b-7000-8000-000000000001', method: 'GET', path: '/things' }], serversUrl: 'http://api.svc.cs.internal/api/legacy' });
     expect(Object.keys((pruned.paths as Record<string, object>)['/things']!)).toEqual(['get']);
     expect(Object.keys(pruned.definitions as object)).toEqual(['Thing']);
     expect(pruned.securityDefinitions).toEqual(swagger.securityDefinitions);

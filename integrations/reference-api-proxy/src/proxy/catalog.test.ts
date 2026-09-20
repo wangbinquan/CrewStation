@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { OPERATIONS, PROXY_NAME, operationKey } from './catalog';
+import { OPERATIONS, PROXY_NAME, operationSignature } from './catalog';
 
 /** 目录只认发布时从 openapi.yaml 读出的操作，所以两份清单必须一致。 */
 async function openApiOperations(): Promise<{ method: string; path: string }[]> {
@@ -30,8 +30,8 @@ describe('目录操作清单', () => {
     expect(OPERATIONS.filter((op) => op.method !== 'GET')).toEqual([{ method: 'POST', path: '/v4/projects/{id}/repository/branches' }]);
   });
 
-  test('操作键就是平台的 `<proxy>:<METHOD>:<path>`', () => {
-    expect(operationKey('get', '/v4/projects')).toBe('test-gitlab:GET:/v4/projects');
+  test('外部 HTTP 操作签名为 `<proxy>:<METHOD>:<path>`', () => {
+    expect(operationSignature('get', '/v4/projects')).toBe('test-gitlab:GET:/v4/projects');
     expect(PROXY_NAME).toBe('test-gitlab');
     // 代理名必须合平台 slug（packages/contracts/ids.ts 的 SlugSchema）。
     expect(PROXY_NAME).toMatch(/^[a-z][a-z0-9-]{1,38}[a-z0-9]$/);

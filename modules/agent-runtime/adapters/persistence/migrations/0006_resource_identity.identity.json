@@ -1,0 +1,334 @@
+{
+  "version": "resource-identity/v1",
+  "schema": "agent_runtime",
+  "entities": [
+    {
+      "table": "profiles",
+      "kind": "compute-profile",
+      "keys": [
+        "name"
+      ],
+      "idColumn": "id"
+    },
+    {
+      "table": "profile_credentials",
+      "kind": "profile-credential",
+      "keys": [
+        "profile",
+        "name"
+      ],
+      "idColumn": "id"
+    },
+    {
+      "table": "profile_tests",
+      "kind": "profile-test",
+      "keys": [
+        "test_id"
+      ],
+      "idColumn": "test_id"
+    },
+    {
+      "table": "retired_profile_identities",
+      "kind": "compute-profile",
+      "keys": [
+        "name"
+      ],
+      "idColumn": "id"
+    },
+    {
+      "table": "retired_test_identities",
+      "kind": "profile-test",
+      "keys": [
+        "id"
+      ],
+      "idColumn": "id"
+    },
+    {
+      "table": "retired_step_identities",
+      "kind": "compute-step",
+      "keys": [
+        "profile",
+        "name"
+      ],
+      "idColumn": "id"
+    }
+  ],
+  "references": [
+    {
+      "table": "profile_revisions",
+      "column": "profile",
+      "kind": "compute-profile",
+      "keys": [
+        "profile"
+      ]
+    },
+    {
+      "table": "profile_credentials",
+      "column": "profile",
+      "kind": "compute-profile",
+      "keys": [
+        "profile"
+      ]
+    },
+    {
+      "table": "profile_tests",
+      "column": "profile",
+      "kind": "compute-profile",
+      "keys": [
+        "profile"
+      ]
+    },
+    {
+      "table": "profiles",
+      "column": "created_by",
+      "kind": "user",
+      "keys": [
+        "created_by"
+      ]
+    },
+    {
+      "table": "profile_revisions",
+      "column": "created_by",
+      "kind": "user",
+      "keys": [
+        "created_by"
+      ]
+    },
+    {
+      "table": "profile_tests",
+      "column": "created_by",
+      "kind": "user",
+      "keys": [
+        "created_by"
+      ]
+    },
+    {
+      "table": "profiles",
+      "column": "updated_by",
+      "kind": "user",
+      "keys": [
+        "updated_by"
+      ]
+    },
+    {
+      "table": "profile_credentials",
+      "column": "updated_by",
+      "kind": "user",
+      "keys": [
+        "updated_by"
+      ]
+    },
+    {
+      "table": "project_compute_policies",
+      "column": "updated_by",
+      "kind": "user",
+      "keys": [
+        "updated_by"
+      ]
+    },
+    {
+      "table": "project_compute_policies",
+      "column": "project_id",
+      "kind": "project",
+      "keys": [
+        "project_id"
+      ]
+    },
+    {
+      "table": "retired_step_identities",
+      "column": "profile",
+      "kind": "compute-profile",
+      "keys": [
+        "profile"
+      ]
+    }
+  ],
+  "inlineEntities": [
+    {
+      "table": "profile_revisions",
+      "column": "content",
+      "path": "steps.*.stepId",
+      "kind": "compute-step",
+      "keys": [
+        "$row.profile",
+        "$value"
+      ]
+    }
+  ],
+  "documents": [
+    {
+      "table": "profile_revisions",
+      "column": "content",
+      "targetColumn": "normalized_content",
+      "references": [
+        {
+          "path": "taskProfile",
+          "kind": "task-profile"
+        },
+        {
+          "path": "steps.*.stepId",
+          "kind": "compute-step",
+          "keys": [
+            "$row.profile",
+            "$value"
+          ]
+        },
+        {
+          "path": "secretNames.*",
+          "kind": "profile-credential",
+          "keys": [
+            "$row.profile",
+            "$value"
+          ],
+          "declaration": true
+        },
+        {
+          "path": "steps.*.pathTemplate",
+          "kind": "compute-step",
+          "keys": [
+            "$row.profile",
+            "$value"
+          ],
+          "stepTemplate": true
+        },
+        {
+          "path": "steps.*.contentTemplate",
+          "kind": "compute-step",
+          "keys": [
+            "$row.profile",
+            "$value"
+          ],
+          "stepTemplate": true
+        },
+        {
+          "path": "steps.*.source",
+          "kind": "compute-step",
+          "keys": [
+            "$row.profile",
+            "$value"
+          ],
+          "stepTemplate": true
+        },
+        {
+          "path": "steps.*.cwdTemplate",
+          "kind": "compute-step",
+          "keys": [
+            "$row.profile",
+            "$value"
+          ],
+          "stepTemplate": true
+        },
+        {
+          "path": "steps.*.argv.*",
+          "kind": "compute-step",
+          "keys": [
+            "$row.profile",
+            "$value"
+          ],
+          "stepTemplate": true
+        },
+        {
+          "path": "configFile.pathTemplate",
+          "kind": "compute-step",
+          "keys": [
+            "$row.profile",
+            "$value"
+          ],
+          "stepTemplate": true
+        }
+      ],
+      "renames": [
+        {
+          "path": "secretNames",
+          "rename": "secrets"
+        }
+      ]
+    },
+    {
+      "table": "project_compute_policies",
+      "column": "policy",
+      "references": [
+        {
+          "path": "allowedProfiles.*",
+          "kind": "compute-profile"
+        },
+        {
+          "path": "defaultProfile",
+          "kind": "compute-profile",
+          "nullable": true
+        },
+        {
+          "path": "devTaskProfile",
+          "kind": "task-profile",
+          "nullable": true
+        }
+      ]
+    },
+    {
+      "table": "profile_tests",
+      "column": "context",
+      "references": [
+        {
+          "path": "taskId",
+          "kind": "task"
+        },
+        {
+          "path": "agentId",
+          "kind": "agent"
+        }
+      ]
+    },
+    {
+      "table": "profile_tests",
+      "column": "stages",
+      "references": [
+        {
+          "path": "*.stepId",
+          "kind": "compute-step",
+          "keys": [
+            "$row.profile",
+            "$value"
+          ]
+        }
+      ]
+    }
+  ],
+  "finalize": [
+    "ALTER TABLE agent_runtime.profiles ALTER COLUMN id SET NOT NULL",
+    "ALTER TABLE agent_runtime.profiles DROP CONSTRAINT profiles_pkey",
+    "ALTER TABLE agent_runtime.profiles ADD PRIMARY KEY (id)",
+    "ALTER TABLE agent_runtime.profile_credentials ALTER COLUMN id SET NOT NULL",
+    "ALTER TABLE agent_runtime.profile_credentials DROP CONSTRAINT profile_credentials_pkey",
+    "ALTER TABLE agent_runtime.profile_credentials ADD PRIMARY KEY (id)",
+    "CREATE UNIQUE INDEX profile_credentials_symbol ON agent_runtime.profile_credentials (profile, name)",
+    "DELETE FROM agent_runtime.retired_profile_identities AS retired WHERE EXISTS (SELECT 1 FROM agent_runtime.profiles AS active WHERE active.id = retired.id)",
+    "DELETE FROM agent_runtime.retired_test_identities AS retired WHERE EXISTS (SELECT 1 FROM agent_runtime.profile_tests AS active WHERE active.test_id = retired.id)"
+  ],
+  "imports": [
+    {
+      "table": "retired_profile_identities",
+      "kind": "compute-profile",
+      "keys": [
+        "name"
+      ],
+      "idColumn": "id"
+    },
+    {
+      "table": "retired_test_identities",
+      "kind": "profile-test",
+      "keys": [
+        "id"
+      ],
+      "idColumn": "id"
+    },
+    {
+      "table": "retired_step_identities",
+      "kind": "compute-step",
+      "keys": [
+        "profile",
+        "name"
+      ],
+      "idColumn": "id"
+    }
+  ]
+}

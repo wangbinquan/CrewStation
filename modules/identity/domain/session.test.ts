@@ -35,7 +35,7 @@ describe('session domain', () => {
   });
 
   test('会话主体 user:<id> 往返，非法主体返回 undefined', () => {
-    const id = 'usr_0123456789abcdef0123456789abcdef' as UserId;
+    const id = '01a0bf5d-8f4b-7793-867c-efd7527b386b' as UserId;
     expect(userSubject(id)).toBe(`user:${id}`);
     expect(userIdFromSubject(userSubject(id))).toBe(id);
     expect(userIdFromSubject('service:demo/demo')).toBeUndefined();

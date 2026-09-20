@@ -1,0 +1,272 @@
+{
+  "version": "resource-identity/v1",
+  "schema": "platform_infra",
+  "entities": [],
+  "references": [],
+  "documents": [
+    {
+      "table": "domain_events",
+      "column": "legacy_payload",
+      "targetColumn": "payload",
+      "where": {
+        "topic": "project.created"
+      },
+      "references": [
+        {
+          "path": "projectId",
+          "kind": "project"
+        }
+      ],
+      "provenanceColumn": "identity_provenance"
+    },
+    {
+      "table": "domain_events",
+      "column": "legacy_payload",
+      "targetColumn": "payload",
+      "where": {
+        "topic": "project.archived"
+      },
+      "references": [
+        {
+          "path": "projectId",
+          "kind": "project"
+        }
+      ],
+      "provenanceColumn": "identity_provenance"
+    },
+    {
+      "table": "domain_events",
+      "column": "legacy_payload",
+      "targetColumn": "payload",
+      "where": {
+        "topic": "release.registered"
+      },
+      "references": [
+        {
+          "path": "projectId",
+          "kind": "project"
+        },
+        {
+          "path": "serviceId",
+          "kind": "service"
+        },
+        {
+          "path": "releaseId",
+          "kind": "release"
+        },
+        {
+          "path": "manifest.spec.service.plan",
+          "kind": "service-plan",
+          "rename": "servicePlanId"
+        },
+        {
+          "path": "manifest.spec.tasks.profile",
+          "kind": "task-profile",
+          "rename": "taskProfileId"
+        },
+        {
+          "path": "manifest.spec.env.*.name",
+          "kind": "configDefinition",
+          "keys": [
+            "$row.identity_project_id",
+            "key|$value"
+          ],
+          "copyTo": "configDefinitionId"
+        },
+        {
+          "path": "manifest.spec.apis.requested.*",
+          "kind": "api-operation",
+          "keys": [
+            "$value.proxy",
+            "$value.method",
+            "$value.path"
+          ],
+          "objectKey": "operationId"
+        },
+        {
+          "path": "manifest.spec.subscriptions.*.eventType",
+          "kind": "eventType",
+          "rename": "eventTypeId"
+        },
+        {
+          "path": "manifest.spec.tasks.agentProfiles.*.name",
+          "kind": "agent-profile",
+          "keys": [
+            "$row.identity_service_id",
+            "$value"
+          ],
+          "copyTo": "id"
+        },
+        {
+          "path": "manifest.spec.tasks.agentProfiles.*.compute",
+          "kind": "compute-profile",
+          "selector": {
+            "defaultValue": "default",
+            "valueKey": "profileId"
+          }
+        },
+        {
+          "path": "manifest.spec.tasks.outputContracts.*.name",
+          "kind": "output-contract",
+          "keys": [
+            "$row.identity_service_id",
+            "$value"
+          ],
+          "copyTo": "id"
+        }
+      ],
+      "provenanceColumn": "identity_provenance",
+      "set": [
+        {
+          "path": "manifest.apiVersion",
+          "value": "crewstation/v2"
+        }
+      ]
+    },
+    {
+      "table": "domain_events",
+      "column": "legacy_payload",
+      "targetColumn": "payload",
+      "where": {
+        "topic": "release.status-changed"
+      },
+      "references": [
+        {
+          "path": "serviceId",
+          "kind": "service"
+        },
+        {
+          "path": "releaseId",
+          "kind": "release"
+        }
+      ],
+      "provenanceColumn": "identity_provenance"
+    },
+    {
+      "table": "domain_events",
+      "column": "legacy_payload",
+      "targetColumn": "payload",
+      "where": {
+        "topic": "release.traffic-switched"
+      },
+      "references": [
+        {
+          "path": "projectId",
+          "kind": "project"
+        },
+        {
+          "path": "serviceId",
+          "kind": "service"
+        },
+        {
+          "path": "releaseId",
+          "kind": "release"
+        },
+        {
+          "path": "actorUserId",
+          "kind": "user"
+        }
+      ],
+      "provenanceColumn": "identity_provenance"
+    },
+    {
+      "table": "domain_events",
+      "column": "legacy_payload",
+      "targetColumn": "payload",
+      "where": {
+        "topic": "task-runtime.task-created"
+      },
+      "references": [
+        {
+          "path": "projectId",
+          "kind": "project"
+        },
+        {
+          "path": "serviceId",
+          "kind": "service"
+        },
+        {
+          "path": "taskId",
+          "kind": "task"
+        }
+      ],
+      "provenanceColumn": "identity_provenance"
+    },
+    {
+      "table": "domain_events",
+      "column": "legacy_payload",
+      "targetColumn": "payload",
+      "where": {
+        "topic": "task-runtime.task-released"
+      },
+      "references": [
+        {
+          "path": "projectId",
+          "kind": "project"
+        },
+        {
+          "path": "taskId",
+          "kind": "task"
+        }
+      ],
+      "provenanceColumn": "identity_provenance"
+    },
+    {
+      "table": "domain_events",
+      "column": "legacy_payload",
+      "targetColumn": "payload",
+      "where": {
+        "topic": "business-task.subtask-finished"
+      },
+      "references": [
+        {
+          "path": "taskId",
+          "kind": "task"
+        },
+        {
+          "path": "subtaskId",
+          "kind": "subtask"
+        }
+      ],
+      "provenanceColumn": "identity_provenance"
+    },
+    {
+      "table": "domain_events",
+      "column": "legacy_payload",
+      "targetColumn": "payload",
+      "where": {
+        "topic": "api-catalog.grant-changed"
+      },
+      "references": [
+        {
+          "path": "serviceId",
+          "kind": "service"
+        },
+        {
+          "path": "operationKey",
+          "kind": "api-operation",
+          "rename": "operationId"
+        }
+      ],
+      "provenanceColumn": "identity_provenance"
+    },
+    {
+      "table": "domain_events",
+      "column": "legacy_payload",
+      "targetColumn": "payload",
+      "where": {
+        "topic": "config.changed"
+      },
+      "references": [
+        {
+          "path": "projectId",
+          "kind": "project"
+        }
+      ],
+      "provenanceColumn": "identity_provenance"
+    }
+  ],
+  "finalize": [
+    "ALTER TABLE platform_infra.domain_events DROP COLUMN identity_project_id, DROP COLUMN identity_service_id"
+  ]
+}

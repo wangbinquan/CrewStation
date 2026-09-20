@@ -52,7 +52,7 @@ export const TaskReleasedSchema = z.object({ ...base, projectId: ProjectIdSchema
 
 export const SubtaskFinishedSchema = z.object({ ...base, taskId: TaskIdSchema, subtaskId: SubtaskIdSchema, state: z.enum(['succeeded', 'failed', 'cancelled']), attempt: z.number().int().min(1) });
 
-export const GrantChangedSchema = z.object({ ...base, serviceId: ServiceIdSchema, operationKey: z.string(), state: z.enum(['granted', 'revoked']) });
+export const GrantChangedSchema = z.object({ ...base, serviceId: ServiceIdSchema, operationId: z.string(), state: z.enum(['granted', 'revoked']) });
 export const ConfigChangedSchema = z.object({ ...base, projectId: ProjectIdSchema, env: z.enum(['production', 'development']), version: z.number().int().min(1) });
 
 export const DomainPayloadSchemas = {

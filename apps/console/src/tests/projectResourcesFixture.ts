@@ -1,16 +1,16 @@
-export const resourcesProjectId = `prj_${'a'.repeat(32)}`, resourcesServiceId = `svc_${'b'.repeat(32)}`;
+export const resourcesProjectId = '01a0bf5d-8f4b-7e1e-8dde-c9c2ae13ed34', resourcesServiceId = '01a0bf5d-8f4b-760b-86b6-0bb9f08a9eaa';
 const createdAt = '2026-09-20T01:00:00.000Z';
 export function projectResourcesFixture(admin = false) {
   const state = { kind: admin ? 'APIProxy' : 'DigitalWorker', fail: '', invalid: false };
   const calls: string[] = [];
-  const subscription = { id: 'sub-source', serviceId: resourcesServiceId, eventType: 'source.changed', handlerPath: '/on-source', state: 'active' };
+  const subscription = { id: '01a0bf5d-8f4b-7b9c-8c07-a2ef94c840cd', eventTypeId: '01a0bf5d-8f4b-780c-85dd-95f81e0fec71', serviceId: resourcesServiceId, eventType: 'source.changed', handlerPath: '/on-source', state: 'active' };
   const capability = {
     service: { identity: 'demo/demo', slug: 'demo', namespace: 'cs-demo' },
     hosts: { prod: 'https://demo.test', preview: 'https://preview.demo.test', dev: 'https://dev.demo.test', service: 'https://svc.demo.test', platformApi: 'https://platform.test' },
     conventions: { identityHeaders: { user: 'X-User-Id' }, env: { api: 'CS_API_BASE' }, paths: { health: '/healthz' }, eventHeaders: { trace: 'X-Trace-Id' } },
     identityForwarding: { source: 'project', fields: ['userId'], headers: ['X-User-Id'], tokenClaims: ['sub'] },
     config: { development: ['APP_GREETING'], production: ['APP_TOKEN'] },
-    data: [{ id: 'db-source', projectId: resourcesProjectId, kind: 'postgres', env: 'development', plan: 'db-small', state: 'ready', envVar: 'CS_DATABASE_URL', createdAt }],
+    data: [{ id: '01a0bf5d-8f4b-7ff9-8b6e-d534bae6d857', projectId: resourcesProjectId, kind: 'postgres', env: 'development', plan: 'db-small', state: 'ready', envVar: 'CS_DATABASE_URL', createdAt }],
     subscriptions: [subscription], operations: [],
     mcp: [{ name: 'platform-mcp', url: 'https://mcp.test' }], businessTaskApi: [{ method: 'POST', path: '/business-tasks', summary: 'Start a business task' }], generatedAt: createdAt,
   };

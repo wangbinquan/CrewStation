@@ -11,8 +11,8 @@ import { createObservabilityModule, observabilityMigrations } from '../wiring';
 const available = await testDatabaseAvailable();
 let tdb: TestDatabase;
 let obs: ObservabilityModule;
-const projectId = 'prj_0123456789abcdef0123456789abcdef' as ProjectId;
-const actor: Actor = { userId: 'usr_0123456789abcdef0123456789abcdef' as UserId, isAdmin: false };
+const projectId = '01a0bf5d-8f4b-7178-82e1-9a99060b1192' as ProjectId;
+const actor: Actor = { userId: '01a0bf5d-8f4b-7793-867c-efd7527b386b' as UserId, isAdmin: false };
 let ready = 0;
 const notices: string[] = [];
 const logSelectors: string[] = [];
@@ -23,7 +23,7 @@ beforeAll(async () => {
   obs = createObservabilityModule({
     db: tdb.db, k8s: createFakeK8sClient(), isAdmin: async () => false,
     authorizer: { authorize: async () => undefined },
-    services: { resolveServiceOfProject: async () => ({ serviceId: 'svc_0123456789abcdef0123456789abcdef' as ServiceId, slug: 'demo', name: 'demo', namespace: 'cs-demo' }) },
+    services: { resolveServiceOfProject: async () => ({ serviceId: '01a0bf5d-8f4b-76c5-866c-f1feda3d63bb' as ServiceId, slug: 'demo', name: 'demo', namespace: 'cs-demo' }) },
     slots: { slotRoles: async () => ({ prod: 'blue', preview: 'green' }) },
     cluster: {
       observeDeployment: async (_ns, name) => (name === 'demo-blue' ? { replicas: 1, readyReplicas: ready, restarts: 0, lastTransitionAt: '2026-09-11T00:00:00Z' } : undefined),
@@ -33,8 +33,8 @@ beforeAll(async () => {
       },
     },
     traces: {
-      tasksByTrace: async () => [{ taskId: 'tsk_0123456789abcdef0123456789abcdef' as TaskId, kind: 'business', createdAt: '2026-09-11T00:00:00Z' }],
-      subtasksOfTask: async () => [{ id: 'sub_0123456789abcdef0123456789abcdef', taskId: 'tsk_0123456789abcdef0123456789abcdef', name: 'analysis', kind: 'agent', state: 'succeeded', attempt: 1, sessionId: 'sess-1' } as never],
+      tasksByTrace: async () => [{ taskId: '01a0bf5d-8f4b-7418-8a3f-7cbb4a1fd751' as TaskId, kind: 'business', createdAt: '2026-09-11T00:00:00Z' }],
+      subtasksOfTask: async () => [{ id: 'sub_0123456789abcdef0123456789abcdef', taskId: '01a0bf5d-8f4b-7418-8a3f-7cbb4a1fd751', name: 'analysis', kind: 'agent', state: 'succeeded', attempt: 1, sessionId: 'sess-1' } as never],
       sessionEvents: async () => [{ seq: 1, at: '2026-09-11T00:00:01Z', event: { kind: 'agent', event: { agentId: 'a', sessionId: 'sess-1', type: 'text', text: 'hi' } } }],
     },
     notifier: { notify: async (_p, m) => { notices.push(m); } },

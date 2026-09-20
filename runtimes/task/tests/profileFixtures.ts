@@ -10,10 +10,10 @@ export function launchSpec(protocol: AgentProtocol = 'claude-code', overrides: P
 
 /** 档位修订的启动前材料：每次启动都有，步骤可以为空。 */
 export function material(steps: BeforeStartMaterial['steps'] = [], extra: Partial<BeforeStartMaterial> = {}): BeforeStartMaterial {
-  return { profile: 'balanced', revision: 3, contentHash: 'hash', steps, vars: {}, secrets: {}, configFile: { kind: 'none' }, captureOutput: false, ...extra };
+  return { profile: '01a0bf5d-8f4b-7ad6-85af-678b84e2f6f6', revision: 3, contentHash: 'hash', steps, vars: {}, secrets: {}, configFile: { kind: 'none' }, captureOutput: false, ...extra };
 }
 
 /** 启动命令里档位的那一段（protocol.ts 的 ProfileLaunchShape）；经假 cs-session 发送时按 JSON 下发。 */
 export function profileFields(agentId: string, overrides: Record<string, unknown> = {}): Record<string, unknown> {
-  return { compute: 'balanced', profileRevision: 3, launch: launchSpec(), permission: 'edit', mcp: [], env: {}, beforeStart: material(), processAttemptId: `${agentId}:1`, ...overrides };
+  return { compute: '01a0bf5d-8f4b-7ad6-85af-678b84e2f6f6', profileRevision: 3, launch: launchSpec(), permission: 'edit', mcp: [], env: {}, beforeStart: material(), processAttemptId: `${agentId}:1`, ...overrides };
 }

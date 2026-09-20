@@ -39,7 +39,8 @@ export const taskQuotas = projectSchema.table('task_quotas', {
 });
 
 export const servicePlans = projectSchema.table('service_plans', {
-  name: text('name').primaryKey(),
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
   cpu: text('cpu').notNull(),
   memory: text('memory').notNull(),
   maxReplicas: integer('max_replicas').notNull(),
@@ -47,7 +48,8 @@ export const servicePlans = projectSchema.table('service_plans', {
 });
 
 export const taskProfiles = projectSchema.table('task_profiles', {
-  name: text('name').primaryKey(),
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
   cpu: text('cpu').notNull(),
   memory: text('memory').notNull(),
   storage: text('storage').notNull(),

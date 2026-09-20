@@ -2,13 +2,14 @@ import type { K8sClient, ResourceRef } from '@crewstation/k8s';
 import { LABELS, Resources } from '@crewstation/k8s';
 import { precondition } from '@crewstation/kernel';
 import type { TaskEnvironment } from '../../domain/taskEnvironment';
+import { taskLabelMatches } from '../../domain/physicalIdentity';
 import { rebuildLabel } from './rebuildObjects';
 
 async function removeRebuilt(k8s: K8sClient, env: TaskEnvironment, ref: ResourceRef, name: string): Promise<void> {
   const object = await k8s.get(ref, name, env.namespace);
   if (!object) return;
   const uid = object.metadata.uid;
-  if (!uid || object.metadata.labels?.[LABELS.task] !== env.id || object.metadata.labels?.[rebuildLabel] !== env.rebuildId) throw precondition('恢复资源归属已变化，停止释放');
+  if (!uid || !taskLabelMatches(object.metadata.labels?.[LABELS.task], env) || (object.metadata.labels?.[rebuildLabel] !== env.rebuildId && !(env.legacyCluster?.rebuildId && object.metadata.labels?.[rebuildLabel] === env.legacyCluster.rebuildId))) throw precondition('恢复资源归属已变化，停止释放');
   await k8s.delete(ref, name, env.namespace, { gracePeriodSeconds: 30, preconditions: { uid } });
 }
 

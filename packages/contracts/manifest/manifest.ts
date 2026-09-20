@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { SlugSchema } from '../ids';
 import {
-  DevelopmentSpecSchema, EnvEntrySchema, ExposedApiSchema, ManifestApiVersionSchema, ReleaseSpecSchema,
+  DevelopmentSpecSchema, EnvEntrySchema, EventCodeSchema, ExposedApiSchema, ManifestApiVersionSchema, ReleaseSpecSchema,
   RequestedApiSchema, ServiceSpecSchema, SubscriptionSchema,
 } from './serviceSpec';
 import { TasksSpecSchema } from './tasks';
@@ -53,7 +53,7 @@ export const EventProducerManifestSchema = z.object({
       verification: z.enum(['gitlab-token', 'hmac-sha256', 'none']).default('none'),
     }),
     produces: z.array(z.object({
-      eventType: SubscriptionSchema.shape.eventType,
+      eventType: EventCodeSchema,
       schema: z.string().min(1).optional(),
     })).min(1),
   }),
@@ -69,7 +69,7 @@ export type EventProducerManifest = z.infer<typeof EventProducerManifestSchema>;
 export type Manifest = z.infer<typeof ManifestSchema>;
 
 /** 目录操作键：`<proxy>:<METHOD>:<path>`，网关放行表与 Grant 都用它。 */
-export function operationKey(proxy: string, method: string, path: string): string {
+export function operationSignature(proxy: string, method: string, path: string): string {
   return `${proxy}:${method.toUpperCase()}:${path}`;
 }
 
@@ -82,7 +82,7 @@ export function describeManifestFailure(error: z.ZodError): string {
   const issues = error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`);
   const legacyCompute = error.issues.some((issue) => issue.path.includes('agentProfiles') && /driver|model|compute/.test(issue.message));
   const hint = legacyCompute
-    ? '；算力已由平台统一提供（RFC-001、RFC-006）：把 agentProfiles 里的 driver 与 model 换成一行 `compute: <档位名>`，或写 `compute: default` 使用管理员设定的默认档位；可用的算力档位见工作台的能力页'
+    ? '；算力已由平台统一提供（RFC-001、RFC-006）：把 agentProfiles 里的 driver 与 model 换成一行 `compute: { kind: profile, profileId: <UUIDv7> }`，或写 `compute: { kind: default }` 使用管理员设定的默认档位；可用的算力档位见工作台的能力页'
     : '';
   return `${issues.join('；')}${hint}`;
 }

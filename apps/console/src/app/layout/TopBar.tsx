@@ -16,7 +16,7 @@ export function TopBar() {
   const t = useT(), { pathname: path, href } = useLocation(), navigate = useNavigate();
   const me = useApiQuery(queryKeys.me(), () => api.me.get());
   const role = !me.error && !me.isPending ? me.data?.platformRole : undefined;
-  const projectId = /^\/projects\/(prj_[a-z0-9]+)(?:\/|$)/.exec(path)?.[1];
+  const projectId = /^\/projects\/([0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:\/|$)/.exec(path)?.[1];
   const canRemember = role === 'admin' || role === 'developer';
   const previewOnly = role !== 'admin' && me.data?.memberships?.some((member) => member.projectId === projectId && member.role === 'tester');
   const project = useProjectIdentity(canRemember && !previewOnly ? projectId : undefined);
@@ -25,7 +25,7 @@ export function TopBar() {
   }, [canRemember, path, href, projectId, project.error, project.data?.kind]);
   const development = async () => {
     const identity = await me.refetch();
-    const saved = recallWorkbenchPath(), id = /^\/projects\/(prj_[a-z0-9]+)(?:[/?]|$)/.exec(saved)?.[1];
+    const saved = recallWorkbenchPath(), id = /^\/projects\/([0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:[/?]|$)/.exec(saved)?.[1];
     const eligible = identity.data?.platformRole === 'admin' || identity.data?.platformRole === 'developer';
     const allowed = identity.data?.platformRole === 'admin' || !id || identity.data?.memberships?.some((m) => m.projectId === id && m.role !== 'tester');
     if (!identity.error && eligible) void navigate({ href: allowed && saved.startsWith('/projects') ? saved : '/projects' });

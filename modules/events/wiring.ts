@@ -15,7 +15,7 @@ import { drizzleUnitOfWork } from './adapters/persistence/drizzleUnitOfWork';
 import type { EventsModuleApi } from './api/moduleApi';
 import { deliverEventUseCase } from './application/deliverEvent';
 import type { EventsUseCaseDeps } from './application/dependencies';
-import { produceEventUseCase } from './application/produceEvent';
+import { produceEventUseCase, produceLegacyEventUseCase } from './application/produceEvent';
 import { eventQueryUseCases } from './application/queryEvents';
 import { registerReleaseUseCase } from './application/registerRelease';
 import { replayDeliveryUseCase } from './application/replayDelivery';
@@ -82,6 +82,7 @@ export function createEventsModule(deps: EventsModuleDeps): EventsModule {
     name: 'events',
     isAdmin: (userId) => deps.projects.isAdmin(userId),
     produce: produceEventUseCase(useCaseDeps),
+    produceLegacy: produceLegacyEventUseCase(useCaseDeps),
     ...eventQueryUseCases(useCaseDeps),
     replayDelivery: replayDeliveryUseCase(useCaseDeps),
     deliver: deliverEventUseCase(useCaseDeps),

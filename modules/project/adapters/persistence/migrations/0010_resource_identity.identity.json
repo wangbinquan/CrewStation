@@ -1,0 +1,192 @@
+{
+  "version": "resource-identity/v1",
+  "schema": "project",
+  "entities": [
+    {
+      "table": "service_plans",
+      "kind": "service-plan",
+      "keys": [
+        "name"
+      ],
+      "idColumn": "id"
+    },
+    {
+      "table": "task_profiles",
+      "kind": "task-profile",
+      "keys": [
+        "name"
+      ],
+      "idColumn": "id"
+    },
+    {
+      "table": "projects",
+      "kind": "project",
+      "keys": [
+        "id"
+      ],
+      "idColumn": "id"
+    },
+    {
+      "table": "services",
+      "kind": "service",
+      "keys": [
+        "id"
+      ],
+      "idColumn": "id",
+      "aliases": [
+        [
+          "identity"
+        ],
+        [
+          "name"
+        ]
+      ]
+    }
+  ],
+  "references": [
+    {
+      "table": "projects",
+      "column": "owner_user_id",
+      "kind": "user",
+      "keys": [
+        "owner_user_id"
+      ]
+    },
+    {
+      "table": "projects",
+      "column": "created_by",
+      "kind": "user",
+      "keys": [
+        "created_by"
+      ]
+    },
+    {
+      "table": "projects",
+      "column": "template",
+      "kind": "template",
+      "keys": [
+        "template"
+      ]
+    },
+    {
+      "table": "projects",
+      "column": "initial_plan",
+      "kind": "service-plan",
+      "keys": [
+        "initial_plan"
+      ],
+      "nullable": true
+    },
+    {
+      "table": "services",
+      "column": "project_id",
+      "kind": "project",
+      "keys": [
+        "project_id"
+      ]
+    },
+    {
+      "table": "memberships",
+      "column": "project_id",
+      "kind": "project",
+      "keys": [
+        "project_id"
+      ]
+    },
+    {
+      "table": "memberships",
+      "column": "user_id",
+      "kind": "user",
+      "keys": [
+        "user_id"
+      ]
+    },
+    {
+      "table": "task_quotas",
+      "column": "project_id",
+      "kind": "project",
+      "keys": [
+        "project_id"
+      ]
+    },
+    {
+      "table": "app_listings",
+      "column": "project_id",
+      "kind": "project",
+      "keys": [
+        "project_id"
+      ]
+    }
+  ],
+  "seeds": [
+    {
+      "kind": "service-plan",
+      "keys": [
+        "standard-small"
+      ],
+      "id": "01a0bf5d-8f4b-7000-9e4b-b54e91ee9d10"
+    },
+    {
+      "kind": "task-profile",
+      "keys": [
+        "coding-medium"
+      ],
+      "id": "01a0bf5d-8f4b-7001-8458-107366e7de39"
+    },
+    {
+      "kind": "project",
+      "keys": [
+        "prj_00000000000000000000000000000001"
+      ],
+      "id": "01a0bf5d-8f4b-7006-9d13-970deb06320c"
+    },
+    {
+      "kind": "service",
+      "keys": [
+        "svc_00000000000000000000000000000001"
+      ],
+      "id": "01a0bf5d-8f4b-7007-89d8-9f98aff105cb"
+    },
+    {
+      "kind": "template",
+      "keys": [
+        "minimal-sample"
+      ],
+      "id": "01a0bf5d-8f4b-7002-9560-94caf593fb19"
+    },
+    {
+      "kind": "template",
+      "keys": [
+        "reference-api-proxy"
+      ],
+      "id": "01a0bf5d-8f4b-7003-9dbe-4adc78f388e9"
+    },
+    {
+      "kind": "template",
+      "keys": [
+        "gitlab-event-producer"
+      ],
+      "id": "01a0bf5d-8f4b-7004-9cf7-0eb8bf66ffbc"
+    }
+  ],
+  "finalize": [
+    "ALTER TABLE project.service_plans ALTER COLUMN id SET NOT NULL",
+    "ALTER TABLE project.service_plans DROP CONSTRAINT service_plans_pkey",
+    "ALTER TABLE project.service_plans ADD PRIMARY KEY (id)",
+    "ALTER TABLE project.task_profiles ALTER COLUMN id SET NOT NULL",
+    "ALTER TABLE project.task_profiles DROP CONSTRAINT task_profiles_pkey",
+    "ALTER TABLE project.task_profiles ADD PRIMARY KEY (id)"
+  ],
+  "documents": [
+    {
+      "table": "app_listings",
+      "column": "user_ids",
+      "references": [
+        {
+          "path": "*",
+          "kind": "user"
+        }
+      ]
+    }
+  ]
+}

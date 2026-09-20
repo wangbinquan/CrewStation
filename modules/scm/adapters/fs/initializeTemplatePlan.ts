@@ -1,11 +1,11 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { ManifestSchema, SlugSchema, describeManifestFailure } from '@crewstation/contracts';
+import { ManifestSchema, ResourceIdSchema, describeManifestFailure } from '@crewstation/contracts';
 import { validation } from '@crewstation/kernel';
 
 /** 只作用于尚未提交的模板副本；不修改模板源或已经存在的远端分支。 */
 export async function initializeTemplatePlan(workdir: string, plan: string): Promise<void> {
-  if (!SlugSchema.safeParse(plan).success) throw validation('初始套餐名称不合法', { field: 'plan' });
+  if (!ResourceIdSchema.safeParse(plan).success) throw validation('初始套餐 ID 不合法', { field: 'plan' });
   const path = join(workdir, 'crewstation.yaml');
   let document: unknown;
   try {
@@ -17,7 +17,7 @@ export async function initializeTemplatePlan(workdir: string, plan: string): Pro
   if (!parsed.success) throw validation(`选定模板的 Manifest 不合法：${describeManifestFailure(parsed.error)}`, { field: 'template' });
   // 校验后仍写原始文档，避免 Schema 投影剥掉与此次套餐选择无关的扩展字段。
   const source = document as { spec: { service: Record<string, unknown> } };
-  if (source.spec.service.plan === plan) return;
-  source.spec.service.plan = plan;
+  if (source.spec.service.servicePlanId === plan) return;
+  source.spec.service.servicePlanId = plan;
   await writeFile(path, Bun.YAML.stringify(source));
 }

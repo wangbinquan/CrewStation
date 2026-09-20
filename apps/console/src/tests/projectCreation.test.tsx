@@ -5,7 +5,7 @@ import { renderApp } from './renderApp';
 import { browserHistoryFixture } from './browserHistoryFixture';
 
 const originalFetch = globalThis.fetch;
-const userId = `usr_${'a'.repeat(32)}`, projectId = `prj_${'b'.repeat(32)}`;
+const userId = '01a0bf5d-8f4b-7f8b-8136-e631380738b0', projectId = '01a0bf5d-8f4b-7aef-84b8-c458233bab22';
 let page: Awaited<ReturnType<typeof renderApp>> | undefined;
 afterEach(() => { page?.unmount(); page = undefined; globalThis.fetch = originalFetch; });
 
@@ -20,15 +20,15 @@ function fixture(admin = true) {
     let result: unknown = { items: [] }, status = 200;
     if (path === '/v1/me') result = { id: userId, name: '管理者', email: 'admin@test.invalid', platformRole: (admin) ? 'admin' : 'developer', isAdmin: admin, memberships: [] };
     else if (path === '/v1/users') result = { items: [{ id: userId, name: '负责人甲', email: 'owner@test.invalid' }] };
-    else if (path === '/v1/catalog/project-creation') result = { templates: [{ name: 'minimal-sample', kind: 'DigitalWorker', servicePlan: 'standard-small', requiredConfig: [] }], defaultServicePlan: 'standard-small', maxConcurrentTasks: 3 };
+    else if (path === '/v1/catalog/project-creation') result = { templates: [{ id: '01a0bf5d-8f4b-7002-9560-94caf593fb19', name: 'minimal-sample', kind: 'DigitalWorker', servicePlan: '01a0bf5d-8f4b-7000-9e4b-b54e91ee9d10', requiredConfig: [] }], defaultServicePlan: '01a0bf5d-8f4b-7000-9e4b-b54e91ee9d10', maxConcurrentTasks: 3 };
     else if (path === '/v1/catalog/project-templates') {
       if (state.catalogFailure) { status = 503; result = { error: 'unavailable', message: '模板目录离线' }; }
       else result = { items: state.noTemplates ? [] : [
-        { name: 'minimal-sample', kind: 'DigitalWorker', servicePlan: 'standard-small', requiredConfig: [] },
-        { name: 'reference-api-proxy', kind: 'APIProxy', servicePlan: 'standard-small', requiredConfig: [{ name: 'GITLAB_TOKEN', from: 'secret' }] },
-        { name: 'gitlab-event-producer', kind: 'EventProducer', servicePlan: 'standard-small', requiredConfig: [] },
+        { id: '01a0bf5d-8f4b-7002-9560-94caf593fb19', name: 'minimal-sample', kind: 'DigitalWorker', servicePlan: '01a0bf5d-8f4b-7000-9e4b-b54e91ee9d10', requiredConfig: [] },
+        { id: '01a0bf5d-8f4b-7003-9dbe-4adc78f388e9', name: 'reference-api-proxy', kind: 'APIProxy', servicePlan: '01a0bf5d-8f4b-7000-9e4b-b54e91ee9d10', requiredConfig: [{ name: 'GITLAB_TOKEN', from: 'secret' }] },
+        { id: '01a0bf5d-8f4b-7004-9cf7-0eb8bf66ffbc', name: 'gitlab-event-producer', kind: 'EventProducer', servicePlan: '01a0bf5d-8f4b-7000-9e4b-b54e91ee9d10', requiredConfig: [] },
       ] };
-    } else if (path === '/v1/catalog/service-plans') result = { items: [{ name: 'standard-small', cpu: '500m', memory: '512Mi', maxReplicas: 3, description: '小套餐' }, { name: 'standard-large', cpu: '2', memory: '4Gi', maxReplicas: 4, description: '大套餐' }] };
+    } else if (path === '/v1/catalog/service-plans') result = { items: [{ id: '01a0bf5d-8f4b-7000-9e4b-b54e91ee9d10', name: 'standard-small', cpu: '500m', memory: '512Mi', maxReplicas: 3, description: '小套餐' }, { id: '01a0bf5d-8f4b-76b5-8a28-f084e91fddf4', name: 'standard-large', cpu: '2', memory: '4Gi', maxReplicas: 4, description: '大套餐' }] };
     else if (path === '/v1/projects' && method === 'POST') {
       if (state.holdCreate) await state.holdCreate;
       if (state.createFailure) { status = 409; result = { error: 'conflict', message: '项目标识已占用', details: { field: 'slug' } }; }
@@ -74,9 +74,9 @@ test('逐步校验所有字段，返回保留草稿；按真实 kind 过滤模�
   await page.click('下一步'); expect(document.querySelectorAll('[aria-invalid="true"]')).toHaveLength(3); expect(f.writes()).toHaveLength(0);
   await field('name', '  账单接入  '); await field('slug', 'billing'); await field('ownerUserId', userId);
   await page.click('下一步'); expect(page.text()).toContain('1–100');
-  expect(document.querySelector('[name="template"] option[value="minimal-sample"]')).toBeNull();
+  expect(document.querySelector('[name="template"] option[value="01a0bf5d-8f4b-7002-9560-94caf593fb19"]')).toBeNull();
   await page.click('下一步'); expect(document.querySelectorAll('[aria-invalid="true"]')).toHaveLength(2);
-  await field('template', 'reference-api-proxy'); await field('plan', 'standard-large'); await field('maxConcurrentTasks', '101');
+  await field('template', '01a0bf5d-8f4b-7003-9dbe-4adc78f388e9'); await field('plan', '01a0bf5d-8f4b-76b5-8a28-f084e91fddf4'); await field('maxConcurrentTasks', '101');
   await page.click('下一步'); expect(document.querySelector('[name="maxConcurrentTasks"]')!.getAttribute('aria-invalid')).toBe('true');
   await field('maxConcurrentTasks', '7'); await page.click('下一步');
   expect(page.text()).toContain('GITLAB_TOKEN'); expect(page.text()).toContain('不会自动提供这些值');
@@ -86,14 +86,14 @@ test('逐步校验所有字段，返回保留草稿；按真实 kind 过滤模�
   await page.click('上一步'); expect(document.querySelector<HTMLInputElement>('[name="maxConcurrentTasks"]')!.value).toBe('7');
   await page.click('上一步'); expect(document.querySelector<HTMLInputElement>('[name="name"]')!.value).toBe('  账单接入  ');
   await page.click('下一步'); await page.click('下一步'); await page.click('创建项目');
-  expect(f.writes()).toHaveLength(1); expect(f.writes()[0]?.body).toEqual({ name: '账单接入', slug: 'billing', ownerUserId: userId, kind: 'APIProxy', template: 'reference-api-proxy', plan: 'standard-large', maxConcurrentTasks: 7 });
+  expect(f.writes()).toHaveLength(1); expect(f.writes()[0]?.body).toEqual({ name: '账单接入', slug: 'billing', ownerUserId: userId, kind: 'APIProxy', template: '01a0bf5d-8f4b-7003-9dbe-4adc78f388e9', plan: '01a0bf5d-8f4b-76b5-8a28-f084e91fddf4', maxConcurrentTasks: 7 });
   expect(page.path()).toBe(`/admin/projects/${projectId}/provisioning`); expect(page.text()).toContain('不提供逐阶段进度');
   await page.click('进入开发'); expect(page.path()).toBe(`/admin/integrations/${projectId}/dev-session`);
 });
 
 async function readyToCreate() {
   await field('name', '新数字人'); await field('slug', 'billing'); await field('ownerUserId', userId);
-  await page!.click('下一步'); await field('template', 'minimal-sample'); await field('plan', 'standard-small'); await page!.click('下一步');
+  await page!.click('下一步'); await field('template', '01a0bf5d-8f4b-7002-9560-94caf593fb19'); await field('plan', '01a0bf5d-8f4b-7000-9e4b-b54e91ee9d10'); await page!.click('下一步');
 }
 
 test('服务器字段错误返回原步骤并保留全部选择，空任务配额保留默认语义', async () => {
@@ -101,7 +101,7 @@ test('服务器字段错误返回原步骤并保留全部选择，空任务配�
   expect(page.text()).toContain('项目标识已占用'); expect(document.querySelector('[name="slug"]')!.getAttribute('aria-invalid')).toBe('true');
   expect(document.querySelector<HTMLInputElement>('[name="name"]')!.value).toBe('新数字人');
   f.state.createFailure = false; await field('slug', 'new-billing'); await page.click('下一步');
-  expect(document.querySelector<HTMLSelectElement>('[name="template"]')!.value).toBe('minimal-sample');
+  expect(document.querySelector<HTMLSelectElement>('[name="template"]')!.value).toBe('01a0bf5d-8f4b-7002-9560-94caf593fb19');
   await page.click('下一步'); await page.click('创建项目');
   expect(f.writes().at(-1)!.body).not.toHaveProperty('maxConcurrentTasks');
   expect(page.path()).toBe(`/admin/projects/${projectId}/provisioning`);
@@ -111,13 +111,13 @@ test('服务器字段错误返回原步骤并保留全部选择，空任务配�
 test('目录暂时失败保留输入但不能创建；恢复后选择仍在，切类型不能沿用旧模板', async () => {
   const f = fixture(); page = await renderApp('/admin/projects/new?scope=integration');
   await field('name', '接入'); await field('slug', 'billing'); await field('ownerUserId', userId); await page.click('下一步');
-  await field('template', 'reference-api-proxy'); await field('plan', 'standard-large');
+  await field('template', '01a0bf5d-8f4b-7003-9dbe-4adc78f388e9'); await field('plan', '01a0bf5d-8f4b-76b5-8a28-f084e91fddf4');
   f.state.catalogFailure = true; await page.click('重新读取目录'); expect(page.text()).toContain('模板目录离线');
-  await page.click('下一步'); expect(f.writes()).toHaveLength(0); expect(document.querySelector<HTMLSelectElement>('[name="template"]')!.value).toBe('reference-api-proxy');
+  await page.click('下一步'); expect(f.writes()).toHaveLength(0); expect(document.querySelector<HTMLSelectElement>('[name="template"]')!.value).toBe('01a0bf5d-8f4b-7003-9dbe-4adc78f388e9');
   f.state.catalogFailure = false; await page.click('重新读取目录'); await page.click('上一步'); await field('kind', 'EventProducer'); await page.click('下一步');
   expect(document.querySelector<HTMLSelectElement>('[name="template"]')!.value).toBe('');
-  expect(document.querySelector('[name="template"] option[value="reference-api-proxy"]')).toBeNull();
-  expect(document.querySelector('[name="template"] option[value="gitlab-event-producer"]')).not.toBeNull();
+  expect(document.querySelector('[name="template"] option[value="01a0bf5d-8f4b-7003-9dbe-4adc78f388e9"]')).toBeNull();
+  expect(document.querySelector('[name="template"] option[value="01a0bf5d-8f4b-7004-9cf7-0eb8bf66ffbc"]')).not.toBeNull();
 });
 
 test('开通失败可补生产配置与排队重试；202 和 active 都不冒充已经部署上线', async () => {
@@ -186,7 +186,7 @@ test('创建草稿：在途离开需确认，重复 submit 只写一次，迟到
 test('创建草稿：不匹配或无效创建回执保留复核材料，不导航到错误项目也不自动重试', async () => {
   const f = fixture(); f.state.resultOverride = { kind: 'APIProxy' }; page = await renderApp('/admin/projects/new'); await readyToCreate(); await page.click('创建项目');
   expect(page.path()).toBe('/admin/projects/new'); expect(page.text()).toContain('创建结果无法与本次输入对应'); expect(page.text()).toContain('新数字人'); expect(f.writes()).toHaveLength(1);
-  await page.click('上一步'); expect(document.querySelector<HTMLSelectElement>('[name="template"]')?.value).toBe('minimal-sample'); await page.click('下一步');
+  await page.click('上一步'); expect(document.querySelector<HTMLSelectElement>('[name="template"]')?.value).toBe('01a0bf5d-8f4b-7002-9560-94caf593fb19'); await page.click('下一步');
   f.state.resultOverride = { id: 'invalid-project' }; await page.click('创建项目'); expect(page.path()).toBe('/admin/projects/new'); expect(f.writes()).toHaveLength(2);
   await page.click('返回管理总览'); expect(document.querySelector('[role="alertdialog"]')).not.toBeNull(); await page.click('继续编辑');
 });

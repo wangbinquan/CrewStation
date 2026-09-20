@@ -1,16 +1,14 @@
 import type { ApiClient } from '@crewstation/api-client';
 import { isApiClientError } from '@crewstation/api-client';
-import type { ProjectDto } from '@crewstation/contracts';
+import { ResourceIdSchema, type ProjectDto } from '@crewstation/contracts';
 import { CliFailure } from '../runtime/cliError';
-
-const PROJECT_ID = /^prj_[0-9a-f]{32}$/;
 
 /**
  * 命令行上人写的是 slug（`crewstation publish demo`），平台路由收的是 ID。
  * 形状像 ID 的直接取；否则在“我可见的项目”里按 slug 找，找不到就把可选项报出来。
  */
 export async function resolveProject(api: ApiClient, ref: string): Promise<ProjectDto> {
-  if (PROJECT_ID.test(ref)) return api.projects.get(ref);
+  if (ResourceIdSchema.safeParse(ref).success) return api.projects.get(ref);
   const page = await api.projects.list();
   const hit = page.items.find((project) => project.slug === ref);
   if (hit !== undefined) return hit;

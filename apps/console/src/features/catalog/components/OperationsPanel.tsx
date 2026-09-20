@@ -31,9 +31,9 @@ export interface OperationsPanelProps {
 export function OperationsPanel({ operations, requests, loading, loadError, actions, proxy, operation, onClearContext, onInvoke }: OperationsPanelProps): ReactElement {
   const t = useT();
   const [filter, setFilter] = useState<OperationFilterValue>(INITIAL_FILTER);
-  const proxies = useMemo(() => [...new Set(operations.map((operation) => operation.proxy))].sort(), [operations]);
+  const proxies = useMemo(() => [...new Map(operations.map((operation) => [operation.proxyId, { id: operation.proxyId, name: operation.proxy }])).values()].sort((a, b) => a.name.localeCompare(b.name)), [operations]);
   const pendingByKey = useMemo(() => indexPending(requests), [requests]);
-  const visible = useMemo(() => operations.filter((item) => (!operation || item.key === operation) && (!proxy || item.proxy === proxy) && matches(item, filter)), [operations, filter, operation, proxy]);
+  const visible = useMemo(() => operations.filter((item) => (!operation || item.id === operation) && (!proxy || item.proxyId === proxy) && matches(item, filter)), [operations, filter, operation, proxy]);
   const writeError = actions.requestAccess.error;
   return (
     <Card compact title={t('catalog.operations.title')}>
@@ -49,7 +49,7 @@ export function OperationsPanel({ operations, requests, loading, loadError, acti
         emptyDescription={t('catalog.operations.emptyDescription')}
       />
       {writeError ? <ActionNote tone="error">{t('catalog.error.write', { message: errorMessage(writeError) })}</ActionNote> : null}
-      {visible.length > 0 ? <OperationsTable operations={visible} renderActions={(item) => <><OperationActions operation={item} pendingRequest={pendingByKey.get(item.key)} actions={actions} />{onInvoke && item.granted ? <Button disabled={loading || !!loadError} onClick={() => onInvoke(item)}>{t('catalog.invoke.open')}</Button> : null}</>} /> : null}
+      {visible.length > 0 ? <OperationsTable operations={visible} renderActions={(item) => <><OperationActions operation={item} pendingRequest={pendingByKey.get(item.id)} actions={actions} />{onInvoke && item.granted ? <Button disabled={loading || !!loadError} onClick={() => onInvoke(item)}>{t('catalog.invoke.open')}</Button> : null}</>} /> : null}
     </Card>
   );
 }
@@ -57,12 +57,12 @@ export function OperationsPanel({ operations, requests, loading, loadError, acti
 /** 只有 pending 会挡住再次申请；已批准或已拒绝的申请不影响再次提交。 */
 function indexPending(requests: readonly ApiRequestDto[]): ReadonlyMap<string, ApiRequestDto> {
   const map = new Map<string, ApiRequestDto>();
-  for (const request of requests) if (request.state === 'pending') map.set(request.operationKey, request);
+  for (const request of requests) if (request.state === 'pending') map.set(request.operationId, request);
   return map;
 }
 
 function matches(operation: ApiOperationDto, filter: OperationFilterValue): boolean {
-  if (filter.proxy !== ALL_PROXIES && operation.proxy !== filter.proxy) return false;
+  if (filter.proxy !== ALL_PROXIES && operation.proxyId !== filter.proxy) return false;
   if (filter.grant === 'granted') return operation.granted === true;
   if (filter.grant === 'not-granted') return operation.granted !== true;
   return true;

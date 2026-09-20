@@ -1,5 +1,7 @@
 # Design｜CrewStation 数字人能力平台
 
+
+> RFC-013 基线补充（2026-09-21）：平台资源与引用统一为 36 字符、小写、带连字符的 UUIDv7；名称用于展示和搜索。Manifest v2、业务 API v2、Runner v3 及历史兼容边界见 [资源身份设计](./rfc/RFC-013-resource-uuid/design.md)。实施与发布证据见该 RFC 的 plan。
 > 状态：设计草案，待原型与评审验证  
 > 版本：0.3.6 · 整理日期：2026-09-10
 > 修订日期：2026-09-11（v0.2.0：任务级执行环境、代码托管与持续意图修改）  
@@ -94,7 +96,7 @@ v0.3.2 依据设计门检视（`reviews/design-gate-2026-09-11.md`）的 25 项�
 | `TaskEnvironment` | 任务容器的逻辑对象：用途 intent 或 business、持久卷模式、配额占用、traceId、容器与卷引用 | 任务级 |
 | `TaskRunner` | 任务容器内以独立 UID 常驻的平台进程，向控制面暴露启动 Agent、执行命令、读写文件、终端与预览守护接口 | 随容器 |
 | `AgentSession` | 一次 Agent 会话：算力档位与固定修订、协议、原生会话 ID、模式（流式交互或一次性）、状态；属于开发会话或某个业务子任务；每个 Agent 在自己的执行环境（Pod）里运行 | 可恢复 |
-| `AgentProfile` / `OutputContract` | Manifest `tasks` 段声明、随发布登记的 Agent 配置与产物契约；子任务按名称引用 | 随 Release 版本化 |
+| `AgentProfile` / `OutputContract` | Manifest `tasks` 段声明、随发布登记的 Agent 配置与产物契约；子任务按 UUID 引用 | 随 Release 版本化 |
 | `SubtaskRun` / `Attempt` | 业务任务内一次 `agent` 或 `command` 子任务及其尝试：agentProfile、outputContract、模式 oneshot 或 interactive、状态、退出信息 | 子任务级 |
 | `CommandRun` | 命令子任务或开发会话内显式命令的 argv、cwd、退出状态与输出 | 执行级 |
 | `TaskVolume` | 任务持久卷：模式 `follow-container` 或 `persistent`，内嵌于 TaskEnvironment 记录 | 随任务 |
@@ -285,90 +287,53 @@ Knative、OPA、Temporal、Buildpacks、Longhorn 保留为条件性选项；首�
 
 ### 4.1 Manifest
 
-模板生成与标签发布统一使用版本化 Manifest。以下示例是拟议协议，构建 profile 与命令随最小样例模板语言确定。
+模板生成与标签发布使用 `crewstation/v2`。资源身份为完整小写 UUIDv7；`name` 仅作展示和搜索，`slug`、环境变量绑定、API method/path 与事件 code 是独立的业务协议符号。创建、复制、重命名和升级规则见 [RFC-013](./rfc/RFC-013-resource-uuid/design.md)。
+
+下面是最小数字人的有效结构示例；UUID 必须由平台创建资源后取得。模板槽位会在创建项目时分配独立 UUID，不能跨项目复用配置和 Agent 声明的身份。
 
 ```yaml
-apiVersion: crewstation/v1
+apiVersion: crewstation/v2
 kind: DigitalWorker
-metadata:
-  name: issue-worker
 spec:
-  build:
-    profile: web-service-v1          # 首版构建 profile 随最小样例模板语言在评审时确定
-    install: [<pkg>, install]
-    command: [<pkg>, build]
-  development:
-    command: [<pkg>, dev]            # TaskRunner 在开发容器内自动启动并守护
-    port: 3000
   service:
-    command: [<runtime>, dist/server.js]
+    command: [bun, run, src/main.ts]
     port: 3000
     healthPath: /healthz
-    plan: standard-small             # 管理员定义的服务套餐
-    replicas: 2                      # 每槽副本数，须在套餐允许范围内
-    releaseMode: rolling-compatible  # 使用单写卷时改为 maintenance
-  env:                               # 只声明键名与来源；取值在平台对象中分开发与生产两组
-    - { name: ISSUE_API_BASE, from: config }
-    - { name: NOTIFY_TOKEN, from: secret }
-  apis:
-    requested:                       # 只需为定向开放的接口申请；默认开放接口无需声明
-      - { proxy: issues, method: GET, path: /v1/issues/{id} }
-      - { proxy: scm, method: POST, path: /v1/merge-requests }
-    exposes:                         # 可选：把本服务接口登记进目录供其他数字人调用
-      openapi: ./openapi.yaml
-  subscriptions:
-    - { eventType: gitlab.pipeline.finished, handlerPath: /events/pipeline }
+    servicePlanId: 01a0bf5d-8f4b-7000-9e4b-b54e91ee9d10
+    replicas: 1
+  development: { command: [bun, run, --watch, src/main.ts], port: 3000 }
+  env:
+    - name: GREETING
+      from: config
+      configDefinitionId: 01a0bf5d-8f4b-7100-8000-000000000001
+      default: 你好
+  apis: { requested: [] }
+  subscriptions: []
   tasks:
-    profile: coding-medium           # 管理员定义的任务容器规格
-    defaultVolumeMode: follow-container   # 业务任务可在创建时以高级参数覆盖为 persistent
-    agentProfiles:                   # 随发布登记；子任务按名称引用
-      - { name: analysis-v1, driver: claude-code, model: <provider>/<model>, permission: read-only }
-      - { name: coding-v1, driver: opencode, model: <provider>/<model>, permission: edit }
-    outputContracts:
-      - { name: analysis-report-v1, required: [reports/analysis.md], schema: ./contracts/analysis-report.schema.json }
-      - { name: test-result-v1, required: [reports/test-result.json] }
-  data:
-    database: { type: postgresql, plan: shared-small, retention: retain }
-    attachments: { type: object-storage, plan: standard, retention: retain }
+    taskProfileId: 01a0bf5d-8f4b-7001-8458-107366e7de39
+    defaultVolumeMode: follow-container
+    agentProfiles:
+      - id: 01a0bf5d-8f4b-7101-8000-000000000001
+        name: chat-v1
+        compute: { kind: default }
+        permission: read-only
+    outputContracts: []
   release:
-    migrationCommand: [<pkg>, db:migrate]
-    migration:
-      compatibility: expand-only     # 须与在线槽兼容；destructive 需维护窗口
-      destructive: false
-      rollback: switch-back
+    migration: { compatibility: none, destructive: false, rollback: switch-back }
 ```
 
-```yaml
-apiVersion: crewstation/v1
-kind: APIProxy
-metadata: { name: issues }
-spec:
-  service: { command: [<runtime>, dist/server.js], port: 8080, healthPath: /healthz, plan: standard-small, replicas: 2 }
-  exposes: { openapi: ./openapi.yaml }     # 发布后以 proxy 名加方法加路径登记进目录
-  upstream: { connection: company-issues } # 管理员登记的上游连接；凭据由 cs-auth 按需下发
-  openPolicy: { default: targeted }        # 建议值；正式策略由管理员在目录中设置
-```
-
-```yaml
-apiVersion: crewstation/v1
-kind: EventProducer
-metadata: { name: gitlab-events }
-spec:
-  service: { command: [<runtime>, dist/server.js], port: 8080, plan: standard-small, replicas: 2 }
-  ingress: { path: /webhooks/gitlab, verification: secret-token }   # 经网关服务域进入
-  produces: [gitlab.merge_request.updated, gitlab.pipeline.finished, gitlab.note.created]
-```
+APIProxy 与 EventProducer 的可运行样例分别见 [API 接入模板](../integrations/reference-api-proxy/crewstation.yaml) 和 [事件接入模板](../integrations/gitlab-event-producer/crewstation.yaml)。结构以 `packages/contracts/manifest/` 为准。
 
 约束：
 
-- 不接收宿主机目录、Docker socket、任意 ServiceAccount、任意 K8s YAML、特权容器设置或原始公司凭据作为可直接生效配置。
-- `env` 只声明键名与来源，取值在平台 ConfigItem 与 SecretValue 中，分开发与生产两组；生产组由负责人维护。
-- `apis.requested` 以 proxy 名加方法加路径申请定向开放接口，实际 `APIGrant` 由管理员审批产生；`exposes` 登记的操作默认为定向开放。`openPolicy` 只是接入容器作者的建议值。
-- `tasks.agentProfiles` 与 `outputContracts` 随发布登记并版本化；子任务只能引用已登记名称。`tasks.profile` 与 `service.plan` 必须是管理员定义的套餐，`replicas` 在套餐范围内。
-- `tasks.defaultVolumeMode` 只影响业务任务；开发会话固定为 `follow-container`。配额不在 Manifest 申请。
-- `release.migration` 声明兼容性；`destructive: true` 的发布只能在维护窗口切流。
-- 没有角色、执行槽、检查点、基线策略、自动发布策略字段。
-- `plan` 是管理员允许的套餐；超额度、缺 StorageClass 或不支持的访问模式应阻塞发布。
+- `env` 通过 `configDefinitionId` 引用定义，以 `name` 指定注入变量名；开发／生产取值具有独立 ID 和版本，Secret 值仍只写不读。
+- `apis.requested` 使用 `operationId`；`subscriptions` 使用 `eventTypeId`。API 的 method/path、代理 URL 符号及事件 code 在边界解析，发布关系和执行索引使用 UUID。
+- Agent 档案和输出契约声明携带 `id`；子任务通过 `agentProfileId`／`outputContractId` 引用当前发布登记的对象。算力选择为 `{ kind: default }` 或 `{ kind: profile, profileId: <UUIDv7> }`。
+- 服务套餐和任务套餐分别为 `servicePlanId`／`taskProfileId`，配额与副本范围仍由平台校验；`defaultVolumeMode` 仅影响业务任务。
+- 新业务任务 API 使用 `/v2/business-tasks`；已部署的 v1 调用由明确的旧协议适配器唯一解析并固定引用。新管理 API 不接受名称代替 ID。
+- Runner v3 发送规范 UUID；经过认证的 v2 旧 Runner 通过持久映射接续。已有 Pod/PVC 保留名称和 UID，新物理名称使用完整 UUID 的无连字符形态。
+- 原始历史 Manifest、payload、日志、内容哈希保持原文；执行读取带来源校验摘要的规范投影。编辑器可预览旧 Manifest 升级，应用只更改草稿，保存仍检查文件版本。
+- 上游 connection、构建 profile、数据 provider plan 等尚未形成平台资源目录的声明符号按既有协议保留；不将其当作已实现资源的主键。
 
 ### 4.2 主要持久化关系
 
@@ -380,21 +345,21 @@ spec:
 | dev_sessions | project 上至多一条 active；task_environment_id、branch、opened_by、idle_since、reminder_sent_at | 同项目双会话、释放后残留、空闲无人知 |
 | task_environments | purpose、service、volume_mode、status、quota_slot、container_ref、volume_ref、trace_id | 超配额准入、持久卷误删、traceId 缺失 |
 | agent_sessions | dev_session_id 或 subtask_id；mode、driver、model、native_session_id、status | 混用上下文、并发恢复同一原生会话 |
-| agent_profiles / output_contracts | service＋release_id＋name；definition、digest | 未登记契约、发布后漂移 |
-| subtasks / attempts | task_id＋request_key；kind、mode、agent_profile、contract、attempt、status、business_outcome | 重试混入旧结果、契约未校验 |
+| agent_profiles / output_contracts | service_id＋release_id＋id；name 为展示，definition、digest | 未登记契约、发布后漂移 |
+| subtasks / attempts | task_id＋request_key；kind、mode、agent_profile_id、output_contract_id、attempt、status、business_outcome | 重试混入旧结果、契约未校验 |
 | command_runs | task_id、可选 subtask_id；argv、cwd、exit_code、输出引用 | 命令无退出记录 |
-| config_items / secret_values | service＋key＋value_set ∈ {development, production}；version、updated_by；Secret 值加密存储 | 明文落库、开发值进生产、无版本 |
+| config_definitions / config_items | definition_id＋env ∈ {development, production} 唯一；独立 item id、binding_name、version、updated_by；Secret 值加密存储 | 明文落库、开发值进生产、无版本 |
 | releases / traffic_switches / deployments | releases：service、tag 唯一、sha、image_digest、config_version、migration_decl、status；switches：service、from_slot、to_slot、expected_active_release、actor、result；deployments：slot、release_id | 手工标签冒充发布、迟到切流覆盖新版、两槽 active |
 | task_data_bindings | task、resource_ref、mode、scope、expires_at、approved_by、credential_ref | 任务结束继续访问、未审批即绑定 |
 | data_resources / data_bindings | service、value_set ∈ {production, development}、provider_id、retention、credential_ref | 跟随 Release 或任务删除业务数据 |
-| api_operations / open_policies / api_grants / api_requests | operation：proxy＋method＋path 唯一；policy ∈ {open, targeted}；grant：service＋operation；request：status、reason | 目录键冲突；未审批即放行；拒绝无理由 |
+| api_operations / open_policies / api_grants / api_requests | operation：id；proxy_id＋method＋path 唯一；policy ∈ {open, targeted}；grant：service＋operation；request：status、reason | 目录键冲突；未审批即放行；拒绝无理由 |
 | pod_identity_index | pod_ip＋valid_from；namespace、service、slot 或 task、valid_until | 源 IP 复用导致身份错配 |
 | gateway_policy_versions | version、routes_digest、allowlist_digest、identity_index_digest | 网关与控制面版本不一致 |
 | upstream_connections | name、owner、credential_ref、allowed_proxies | 凭据落入 proxy 配置 |
 | event_types / subscriptions / event_inbox / deliveries | producer＋type；subscription：service＋type＋handler_path；inbox：origin＋event_id 唯一，trace_id；delivery：attempt、target_slot | 重复投递、投到非 active 槽 |
 | egress_allowlist / egress_project_grants / egress_blocked | entry：domain、scope；grant：project＋entry；blocked：project、domain、count、last_seen | 无人知晓被阻；随意放开 |
 | alert_subscriptions / alerts | project＋type＋receiver；alert：source、type、first_seen、resolved_at | 崩溃无人知 |
-| service_plans / task_profiles / task_quotas | plan：name、limits；quota：service → max_concurrent_tasks | 超套餐；一人耗尽集群 |
+| service_plans / task_profiles / task_quotas | plan：id、name、limits；quota：service → max_concurrent_tasks | 超套餐；一人耗尽集群 |
 | execution_events | trace_id、otel_trace_id、task_id、subtask_id、session_id、sequence | 失去链路来源 |
 | install_runs / migrations / audit | step、version、fencing_token、result | 并发安装、误删仓库与数据 |
 

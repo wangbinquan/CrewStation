@@ -44,10 +44,10 @@ export function drizzlePodIdentityRepository(db: Executor): PodIdentityRepositor
 
 export function drizzleRouteRepository(db: Executor): RouteRepository {
   return {
-    saveForService: async (serviceName, entries) => {
-      const values = { serviceName, routes: entries, updatedAt: new Date() };
-      await db.insert(routes).values(values).onConflictDoUpdate({ target: routes.serviceName, set: values });
+    saveForService: async (serviceId, serviceName, entries) => {
+      const values = { serviceId, serviceName, routes: entries, updatedAt: new Date() };
+      await db.insert(routes).values(values).onConflictDoUpdate({ target: routes.serviceId, set: values });
     },
-    listAll: async () => (await db.select().from(routes).orderBy(routes.serviceName)).map((r) => ({ serviceName: r.serviceName, routes: json<RouteEntry[]>(r.routes) })),
+    listAll: async () => (await db.select().from(routes).orderBy(routes.serviceName)).map((r) => ({ serviceId: r.serviceId, serviceName: r.serviceName, routes: json<RouteEntry[]>(r.routes) })),
   };
 }

@@ -24,7 +24,7 @@ describe('withSessionDefaults', () => {
 
 describe.skipIf(!available)('connectDatabase 的会话默认值在真实 PostgreSQL 上生效', () => {
   test('新连接的 idle_in_transaction_session_timeout 为 1min', async () => {
-    const handle = connectDatabase(DEFAULT_TEST_DATABASE_URL, { max: 1 });
+    const handle = connectDatabase(process.env.CS_TEST_DATABASE_URL ?? DEFAULT_TEST_DATABASE_URL, { max: 1 });
     try {
       const rows = await handle.client`show idle_in_transaction_session_timeout` as Array<{ idle_in_transaction_session_timeout: string }>;
       expect(rows[0]?.idle_in_transaction_session_timeout).toBe('1min');

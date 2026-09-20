@@ -12,8 +12,8 @@ export interface CurrentProfile { profile: ComputeProfile; revision: ProfileRevi
 export function profileQueries(deps: AgentRuntimeUseCaseDeps) {
   const { uow, references } = deps;
   const current = async (profile: ComputeProfile): Promise<CurrentProfile> => {
-    const [revision, latest] = await Promise.all([uow.read.revisions.get(profile.name, profile.currentRevision), uow.read.tests.latestFor(profile.name, profile.currentRevision)]);
-    if (!revision) throw notFound('档位修订', `${profile.name}@${profile.currentRevision}`);
+    const [revision, latest] = await Promise.all([uow.read.revisions.get(profile.id, profile.currentRevision), uow.read.tests.latestFor(profile.id, profile.currentRevision)]);
+    if (!revision) throw notFound('档位修订', `${profile.id}@${profile.currentRevision}`);
     return { profile, revision, latest };
   };
   const load = async (name: string): Promise<CurrentProfile> => {
@@ -41,7 +41,7 @@ export function profileQueries(deps: AgentRuntimeUseCaseDeps) {
       const [stored, referencedBy] = await Promise.all([uow.read.credentials.list(name), referencingProjects(name)]);
       return {
         ...listItemOf(profile, revision, latest), content: revision.content, contentHash: revision.contentHash,
-        credentials: credentialStates(revision.content.secretNames, stored), referencedBy, createdBy: profile.createdBy, createdAt: profile.createdAt.toISOString(),
+        credentials: credentialStates(revision.content.secrets, stored), referencedBy, createdBy: profile.createdBy, createdAt: profile.createdAt.toISOString(),
       };
     },
     /** 租户面投影：名字、说明、是否仅终端、是否默认与能否选用；不泄露镜像、二进制、模型与步骤（RFC-001、RFC-006）。 */
@@ -49,7 +49,7 @@ export function profileQueries(deps: AgentRuntimeUseCaseDeps) {
       const rows = await Promise.all((await uow.read.profiles.list()).filter((p) => includeHidden || p.defaultVisible !== false).map(current));
       return rows.map(({ profile, revision, latest }) => {
         const { available, reason } = availabilityOf(profile, revision, latest);
-        return { name: profile.name, description: profile.description, terminalOnly: profile.protocol === 'terminal', isDefault: profile.isDefault, available, ...(reason ? { reason } : {}) };
+        return { id: profile.id, name: profile.name, description: profile.description, terminalOnly: profile.protocol === 'terminal', isDefault: profile.isDefault, available, ...(reason ? { reason } : {}) };
       });
     },
   };

@@ -1,11 +1,12 @@
 import { z } from 'zod';
-import { ProjectIdSchema, ServiceIdSchema, SlugSchema, UserIdSchema } from '../ids';
+import { ProjectIdSchema, ResourceIdSchema, ServiceIdSchema, SlugSchema, UserIdSchema } from '../ids';
 import { HttpMethodSchema, ManifestKindSchema } from '../manifest/serviceSpec';
 
 export const OpenPolicySchema = z.enum(['default', 'targeted']);
 
 export const ApiOperationDtoSchema = z.object({
-  key: z.string(),
+  id: ResourceIdSchema,
+  proxyId: ResourceIdSchema,
   proxy: SlugSchema,
   method: HttpMethodSchema,
   path: z.string(),
@@ -21,6 +22,8 @@ export const ApiProxyStateSchema = z.enum(['active', 'removed']);
 
 /** 目录中的一个代理：接入容器（APIProxy）或数字人以 `apis.exposes` 登记的自有 API（proxy 名即服务 slug）。 */
 export const ApiProxyDtoSchema = z.object({
+  id: ResourceIdSchema,
+  name: z.string().min(1).max(80),
   proxy: SlugSchema,
   projectId: ProjectIdSchema,
   serviceId: ServiceIdSchema,
@@ -36,9 +39,9 @@ export const ApiProxyDtoSchema = z.object({
 export const ApiRequestStateSchema = z.enum(['pending', 'approved', 'rejected']);
 
 export const ApiRequestDtoSchema = z.object({
-  id: z.string(),
+  id: ResourceIdSchema,
   serviceId: ServiceIdSchema,
-  operationKey: z.string(),
+  operationId: ResourceIdSchema,
   state: ApiRequestStateSchema,
   reason: z.string().optional(),
   requestedBy: UserIdSchema,
@@ -51,7 +54,7 @@ export const ApiRequestDtoSchema = z.object({
   decidedAt: z.iso.datetime().optional(),
 });
 
-export const CreateApiRequestSchema = z.object({ operationKey: z.string().min(1), reason: z.string().max(500).optional() });
+export const CreateApiRequestSchema = z.object({ operationId: ResourceIdSchema, reason: z.string().max(500).optional() });
 export const DecideApiRequestSchema = z.object({ approve: z.boolean(), decision: z.string().max(500).optional() });
 export const SetOpenPolicyRequestSchema = z.object({ openPolicy: OpenPolicySchema });
 

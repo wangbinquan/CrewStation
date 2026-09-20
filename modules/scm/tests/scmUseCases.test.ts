@@ -10,11 +10,11 @@ import { sessionCredentialUseCases } from '../application/sessionCredentials';
 import { hashToken } from '../domain/sessionCredential';
 import { TEST_SETTINGS, fakeGit, fakeGitLab, fakeScratch, fakeTemplates, memoryUnitOfWork, mutableClock, recordingAuthorizer } from './fakeAdapters';
 
-const serviceId = `svc_${'1'.repeat(32)}` as ServiceId;
-const otherServiceId = `svc_${'2'.repeat(32)}` as ServiceId;
-const projectId = `prj_${'1'.repeat(32)}` as ProjectId;
-const actor: Actor = { userId: `usr_${'1'.repeat(32)}` as UserId, isAdmin: false };
-const input = { slug: 'demo', templateName: 'minimal-sample' };
+const serviceId = '01a0bf5d-8f4b-7f20-83c3-08a8d54951b2' as ServiceId;
+const otherServiceId = '01a0bf5d-8f4b-76be-8473-58312e41bdd7' as ServiceId;
+const projectId = '01a0bf5d-8f4b-7148-804c-6bd655d243f6' as ProjectId;
+const actor: Actor = { userId: '01a0bf5d-8f4b-759b-8091-838671643836' as UserId, isAdmin: false };
+const input = { slug: 'demo', templateId: '01a0bf5d-8f4b-7002-9560-94caf593fb19' };
 const PUSH_URL = 'http://crewstation:glpat-platform-secret@gitlab.test:8929/crewstation/demo.git';
 
 function harness() {
@@ -43,7 +43,7 @@ describe('ensureRepository', () => {
     expect(dto).toMatchObject({ serviceId, provider: 'gitlab', remoteProjectId: '100', pathWithNamespace: 'crewstation/demo', httpUrl: 'http://gitlab.test:8929/crewstation/demo.git', defaultBranch: 'main', state: 'ready', createdAt: '2026-09-11T10:00:00.000Z' });
     expect(dto.message).toBeUndefined();
     expect(h.gitlab.calls).toEqual(['findProject crewstation/demo', 'createProject crewstation/demo', 'protect v*']);
-    expect(h.templates.materialized).toEqual([{ templateName: 'minimal-sample', targetDir: '/scratch/cs-scm-init-1' }]);
+    expect(h.templates.materialized).toEqual([{ templateId: '01a0bf5d-8f4b-7002-9560-94caf593fb19', targetDir: '/scratch/cs-scm-init-1' }]);
     expect(h.scratch.removed).toEqual(['/scratch/cs-scm-init-1']);
     expect(h.git.pushes).toEqual([{ kind: 'init', workdir: '/scratch/cs-scm-init-1', url: PUSH_URL, branch: 'main' }]);
     expect(await h.ensure(serviceId, projectId, input)).toEqual(dto);
@@ -103,8 +103,8 @@ describe('ensureRepository', () => {
 
   test('模板不存在 → not_found 并落 failed，临时目录被清理', async () => {
     const h = harness();
-    await expect(h.ensure(serviceId, projectId, { slug: 'demo', templateName: 'missing' })).rejects.toMatchObject({ kind: 'not_found' });
-    expect(h.memory.bindings.get(serviceId)).toMatchObject({ state: 'failed', message: expect.stringContaining('模板 missing 不存在') });
+    await expect(h.ensure(serviceId, projectId, { slug: 'demo', templateId: '01a0bf5d-8f4b-7ffa-8635-83dfa6706b87' })).rejects.toMatchObject({ kind: 'not_found' });
+    expect(h.memory.bindings.get(serviceId)).toMatchObject({ state: 'failed', message: expect.stringContaining('模板 01a0bf5d-8f4b-7ffa-8635-83dfa6706b87 不存在') });
     expect(h.scratch.removed).toHaveLength(1);
     expect(h.git.pushes).toHaveLength(0);
   });

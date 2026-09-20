@@ -17,8 +17,8 @@ afterEach(async () => { await fixture?.close(); fixture = undefined; });
 /** 真实 HTTP 查询／重放、PostgreSQL 事务和队列；授权端口只控制两个请求到达的先后。 */
 async function setup({ blockBoth = false, holdSettlement = false } = {}) {
   const db = await createTestDatabase([eventbusMigrations, queueMigrations, eventsMigrations]);
-  const projectId = `prj_${'1'.repeat(32)}` as ProjectId, serviceId = `svc_${'2'.repeat(32)}` as ServiceId;
-  const eventId = `evt_${'3'.repeat(32)}` as EventId, traceId = '4'.repeat(32) as TraceId, deliveryId = `dlv_${'5'.repeat(32)}`;
+  const projectId = '01a0bf5d-8f4b-7c8b-8b95-1301eee8667f' as ProjectId, serviceId = '01a0bf5d-8f4b-7aea-8983-7b41e8b30563' as ServiceId;
+  const eventId = '01a0bf5d-8f4b-7edd-893d-ce407383fd32' as EventId, traceId = '4'.repeat(32) as TraceId, deliveryId = '01a0bf5d-8f4b-7de1-8cb7-e71a5a804c21';
   const received: EventDelivery[] = []; let fail = true, writes = 0;
   const blocked = Promise.withResolvers<void>(), entered = Promise.withResolvers<void>();
   const settling = Promise.withResolvers<void>(), settlement = Promise.withResolvers<void>();
@@ -36,8 +36,8 @@ async function setup({ blockBoth = false, holdSettlement = false } = {}) {
     endpoints: { resolve: async () => ({ baseUrl: `http://127.0.0.1:${subscriber.port}` }) },
   });
   const uow = drizzleUnitOfWork(db.db, { jobMaxAttempts: 3 }), now = new Date();
-  const event = { id: eventId, eventType: 'qa.replay', traceId, producer: 'qa', producerProject: 'qa', dedupKey: 'replay-concurrency', occurredAt: now, receivedAt: now, payload: { marker: 'replay-only-once' } };
-  const subscription = { id: 'sub-replay', projectId, serviceId, eventType: event.eventType, handlerPath: '/events/qa', state: 'active' as const, updatedAt: now };
+  const event = { id: eventId, eventTypeId: '01a0bf5d-8f4b-7101-8bdd-4156390b171c', eventType: 'qa.replay', traceId, producerId: '01a0bf5d-8f4b-7588-86ec-6acc76da4738', producer: 'qa', producerProject: 'qa', dedupKey: 'replay-concurrency', occurredAt: now, receivedAt: now, payload: { marker: 'replay-only-once' } };
+  const subscription = { id: 'sub-replay', projectId, serviceId, eventTypeId: event.eventTypeId, eventType: event.eventType, handlerPath: '/events/qa', state: 'active' as const, updatedAt: now };
   await uow.run(async (scope) => {
     await scope.inbox.insert(event); await scope.subscriptions.upsert(subscription);
     await scope.deliveries.insert(newDelivery(deliveryId, event, subscription, now)); await scope.scheduler.schedule(deliveryId);
@@ -52,7 +52,7 @@ async function setup({ blockBoth = false, holdSettlement = false } = {}) {
   fail = false;
   expect(await uow.read.deliveries.getById(deliveryId)).toMatchObject({ state: 'dead', attempts: 1, lastError: 'HTTP 500' });
   const app = createApp({ name: 'replay-test' }); for (const route of events.http.query) app.route('/', route);
-  const post = () => app.request(`/v1/deliveries/${deliveryId}/replay`, { method: 'POST', headers: { [IDENTITY_HEADERS.userId]: `usr_${'6'.repeat(32)}` } });
+  const post = () => app.request(`/v1/deliveries/${deliveryId}/replay`, { method: 'POST', headers: { [IDENTITY_HEADERS.userId]: '01a0bf5d-8f4b-7cc0-8285-7ca7be66355a' } });
   return { post, entered: entered.promise, release: () => blocked.resolve(), received, eventId, traceId, deliveryId, uow, worker: events.workers[0]!,
     settleInitial: async () => { settlement.resolve(); await initialRun; },
     close: async () => { blocked.resolve(); settlement.resolve(); await initialRun; subscriber.stop(true); await db.drop(); } };

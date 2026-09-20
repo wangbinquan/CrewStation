@@ -42,8 +42,9 @@ function envelope(event: InboxEvent, attempt: Delivery): EventDelivery {
   return {
     deliveryId: attempt.id,
     eventId: event.id,
+    eventTypeId: event.eventTypeId,
     eventType: event.eventType,
-    source: { producer: event.producer, project: event.producerProject },
+    source: { producerId: event.producerId, producer: event.producer, project: event.producerProject },
     occurredAt: event.occurredAt.toISOString(),
     receivedAt: event.receivedAt.toISOString(),
     traceId: event.traceId,

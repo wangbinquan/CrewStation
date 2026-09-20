@@ -8,14 +8,14 @@ import { grants, requests } from './tables';
 
 export function drizzleGrantRepository(db: Executor): ApiGrantRepository {
   return {
-    get: async (serviceId, operationKey) => {
-      const row = (await db.select().from(grants).where(and(eq(grants.serviceId, serviceId), eq(grants.operationKey, operationKey))))[0];
+    get: async (serviceId, operationId) => {
+      const row = (await db.select().from(grants).where(and(eq(grants.serviceId, serviceId), eq(grants.operationId, operationId))))[0];
       return row ? toGrant(row) : undefined;
     },
-    listGranted: async (serviceId) => (await db.select().from(grants).where(and(eq(grants.serviceId, serviceId), eq(grants.state, 'granted'))).orderBy(grants.operationKey)).map(toGrant),
+    listGranted: async (serviceId) => (await db.select().from(grants).where(and(eq(grants.serviceId, serviceId), eq(grants.state, 'granted'))).orderBy(grants.operationId)).map(toGrant),
     upsert: async (grant) => {
       const row = toGrantRow(grant);
-      await db.insert(grants).values(row).onConflictDoUpdate({ target: [grants.serviceId, grants.operationKey], set: row });
+      await db.insert(grants).values(row).onConflictDoUpdate({ target: [grants.serviceId, grants.operationId], set: row });
     },
   };
 }
@@ -28,8 +28,8 @@ export function drizzleRequestRepository(db: Executor): ApiRequestRepository {
       const row = (await db.select().from(requests).where(eq(requests.id, id)))[0];
       return row ? toRequest(row) : undefined;
     },
-    findPending: async (serviceId, operationKey) => {
-      const row = (await db.select().from(requests).where(and(eq(requests.serviceId, serviceId), eq(requests.operationKey, operationKey), eq(requests.state, 'pending'))))[0];
+    findPending: async (serviceId, operationId) => {
+      const row = (await db.select().from(requests).where(and(eq(requests.serviceId, serviceId), eq(requests.operationId, operationId), eq(requests.state, 'pending'))))[0];
       return row ? toRequest(row) : undefined;
     },
     list: async (projectId) => {
@@ -46,18 +46,18 @@ export function drizzleRequestRepository(db: Executor): ApiRequestRepository {
 
 function toGrant(row: typeof grants.$inferSelect): ApiGrant {
   return {
-    serviceId: row.serviceId as ServiceId, operationKey: row.operationKey, state: row.state as GrantState,
+    serviceId: row.serviceId as ServiceId, operationId: row.operationId, state: row.state as GrantState,
     grantedBy: row.grantedBy as UserId, grantedAt: row.grantedAt, ...(row.revokedAt ? { revokedAt: row.revokedAt } : {}),
   };
 }
 
 function toGrantRow(grant: ApiGrant): typeof grants.$inferInsert {
-  return { serviceId: grant.serviceId, operationKey: grant.operationKey, state: grant.state, grantedBy: grant.grantedBy, grantedAt: grant.grantedAt, revokedAt: grant.revokedAt ?? null };
+  return { serviceId: grant.serviceId, operationId: grant.operationId, state: grant.state, grantedBy: grant.grantedBy, grantedAt: grant.grantedAt, revokedAt: grant.revokedAt ?? null };
 }
 
 function toRequest(row: typeof requests.$inferSelect): ApiRequest {
   return {
-    id: row.id, serviceId: row.serviceId as ServiceId, projectId: row.projectId as ProjectId, operationKey: row.operationKey,
+    id: row.id, serviceId: row.serviceId as ServiceId, projectId: row.projectId as ProjectId, operationId: row.operationId,
     state: row.state as ApiRequestState, ...(row.reason === null ? {} : { reason: row.reason }), requestedBy: row.requestedBy as UserId,
     ...(row.decidedBy === null ? {} : { decidedBy: row.decidedBy as UserId }), ...(row.decision === null ? {} : { decision: row.decision }),
     createdAt: row.createdAt, ...(row.decidedAt ? { decidedAt: row.decidedAt } : {}),
@@ -66,7 +66,7 @@ function toRequest(row: typeof requests.$inferSelect): ApiRequest {
 
 function toRequestRow(request: ApiRequest): typeof requests.$inferInsert {
   return {
-    id: request.id, serviceId: request.serviceId, projectId: request.projectId, operationKey: request.operationKey, state: request.state,
+    id: request.id, serviceId: request.serviceId, projectId: request.projectId, operationId: request.operationId, state: request.state,
     reason: request.reason ?? null, requestedBy: request.requestedBy, decidedBy: request.decidedBy ?? null, decision: request.decision ?? null,
     createdAt: request.createdAt, decidedAt: request.decidedAt ?? null,
   };

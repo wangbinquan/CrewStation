@@ -1,6 +1,6 @@
 /**
  * 目录里的代理名与本代理刻意暴露的那一小片上游接口。
- * 目录操作键是 `<proxy>:<METHOD>:<path>`（packages/contracts/manifest/manifest.ts 的 operationKey），
+ * 外部 HTTP 操作签名是 `<proxy>:<METHOD>:<path>`（packages/contracts/manifest/manifest.ts 的 operationSignature），
  * 由平台在发布时从 `openapi.yaml` 的 `paths` 读出来登记，因此这里的清单必须与 openapi.yaml 一致——
  * src/proxy/catalog.test.ts 会逐条比对。
  */
@@ -29,7 +29,7 @@ export const OPERATIONS: readonly CatalogOperation[] = [
   { method: 'GET', path: '/v4/projects/{id}/repository/commits/{sha}' },
 ];
 
-/** 目录操作键，与 packages/contracts/manifest/manifest.ts 的 operationKey 算法一致。 */
-export function operationKey(method: string, path: string): string {
+/** 协议签名不作为平台资源 ID，与 packages/contracts/manifest/manifest.ts 的 operationSignature 算法一致。 */
+export function operationSignature(method: string, path: string): string {
   return `${PROXY_NAME}:${method.toUpperCase()}:${path}`;
 }

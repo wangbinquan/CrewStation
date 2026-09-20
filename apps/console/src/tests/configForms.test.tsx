@@ -4,14 +4,14 @@ import { act } from 'react';
 import { renderApp } from './renderApp';
 import { browserHistoryFixture } from './browserHistoryFixture';
 
-const originalFetch = globalThis.fetch, projectId = `prj_${'a'.repeat(32)}`, serviceId = `svc_${'b'.repeat(32)}`, userId = `usr_${'c'.repeat(32)}`;
+const originalFetch = globalThis.fetch, projectId = '01a0bf5d-8f4b-7e1e-8dde-c9c2ae13ed34', serviceId = '01a0bf5d-8f4b-760b-86b6-0bb9f08a9eaa', userId = '01a0bf5d-8f4b-7ed2-8386-a4b2e1a36efb';
 let page: Awaited<ReturnType<typeof renderApp>> | undefined;
 afterEach(() => { page?.unmount(); page = undefined; globalThis.fetch = originalFetch; });
 
 function fixture() {
   const state = { failSave: false, failRead: false, failVersions: false, failIdentity: false, role: 'owner' as 'owner' | 'developer', admin: false, hold: undefined as Promise<void> | undefined };
   const writes: Array<{ path: string; method: string; body?: Record<string, unknown> }> = [];
-  const item = { name: 'GREETING', value: '当前值', isSecret: false, version: 3, env: 'development', updatedBy: userId, updatedAt: '2026-09-13T01:00:00.000Z' };
+  const item = { id: '01a0bf5d-8f4b-741b-855a-427597babed5', definitionId: '01a0bf5d-8f4b-712d-84fa-c34dfa1810f3', bindingName: 'GREETING', name: 'GREETING', value: '当前值', isSecret: false, version: 3, env: 'development', updatedBy: userId, updatedAt: '2026-09-13T01:00:00.000Z' };
   globalThis.fetch = (async (raw, init) => {
     const path = new URL(String(raw), 'http://localhost').pathname, method = init?.method ?? 'GET';
     let body: unknown = { items: [] }, status = 200;
@@ -28,7 +28,7 @@ function fixture() {
     else if (path === `/v1/projects/${projectId}`) body = { id: projectId, serviceId, slug: 'demo', name: '演示应用', kind: 'DigitalWorker', ownerUserId: userId, state: 'active' };
     else if (/\/config\/(development|production)$/.test(path)) {
       if (state.failRead) { status = 503; body = { error: 'unavailable', message: '配置读取失败' }; }
-      else body = { items: [{ ...item, env: path.endsWith('production') ? 'production' : 'development' }, { ...item, name: 'API_TOKEN', isSecret: true, value: undefined }] };
+      else body = { items: [{ ...item, env: path.endsWith('production') ? 'production' : 'development' }, { ...item, id: '01a0bf5d-8f4b-795e-8427-5e5540ef37fa', definitionId: '01a0bf5d-8f4b-7cd5-8fa7-42c6e13d2afb', bindingName: 'API_TOKEN', name: 'API_TOKEN', isSecret: true, value: undefined }] };
     } else if (path.endsWith('/versions') && state.failVersions) { status = 503; body = { error: 'unavailable', message: '历史服务暂不可用' }; }
     else if (path.endsWith('/dev-session')) { status = 404; body = { error: 'not_found', message: '无会话' }; }
     return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
@@ -81,7 +81,7 @@ test('配置保存失败保留值；成功后才清空输入并反馈真实版�
   expect(page.text()).toContain('配置服务暂不可用'); f.state.failSave = false; await click('保存');
   expect(visible('input[placeholder="写入后生效于下一次注入"]')).toBeUndefined();
   expect(page.text()).toContain('第 4 版'); expect(page.text()).toContain('现有进程不会自动加载');
-  expect(f.writes.at(-1)?.body).toEqual({ name: 'NEW_VALUE', value: '需要保留的内容', isSecret: false, env: 'development' });
+  expect(f.writes.at(-1)?.body).toEqual({ bindingName: 'NEW_VALUE', name: 'NEW_VALUE', value: '需要保留的内容', isSecret: false, env: 'development' });
 });
 
 test('键名规则与空值语义首屏可见；非法键有字段反馈并聚焦，空字符串是有效写入', async () => {
@@ -89,14 +89,14 @@ test('键名规则与空值语义首屏可见；非法键有字段反馈并聚�
   expect(page.text()).toContain('大写字母开头'); expect(page.text()).toContain('留空保存会写入空值');
   const key = visible<HTMLInputElement>('input[placeholder="DATABASE_URL"]');
   await input(key, 'wrong-key'); await click('保存'); expect(f.writes).toHaveLength(0);
-  expect(key.getAttribute('aria-invalid')).toBe('true'); expect(document.activeElement).toBe(key);
+  expect(key.getAttribute('aria-invalid')).toBe('true'); expect(document.activeElement === key).toBe(true);
   await input(key, 'EMPTY_VALUE'); await click('保存'); expect(f.writes[0]?.body).toMatchObject({ name: 'EMPTY_VALUE', value: '' });
 });
 
 test('填入普通键保留可读值，密钥不预填；两组失败草稿各自保留', async () => {
   const f = fixture(); f.state.failSave = true; page = await renderApp(`/projects/${projectId}/settings?tab=config`); await click('新增变量');
   await click('修改'); expect(visible<HTMLInputElement>('input[placeholder="写入后生效于下一次注入"]').value).toBe('当前值');
-  expect(page.text()).toContain('正在覆盖已存在的键 GREETING');
+  expect(page.html()).toContain('01a0bf5d-8f4b-741b-855a-427597babed5');
   const secretRow = [...document.querySelectorAll<HTMLTableRowElement>('tr')].find((row) => !row.closest('[hidden]') && row.textContent?.includes('API_TOKEN'))!;
   await act(async () => { secretRow.querySelector('button')!.click(); }); await page.settle();
   expect(visible<HTMLInputElement>('input[placeholder="写入后生效于下一次注入"]').value).toBe(''); expect(page.text()).toContain('旧密钥无法读回');

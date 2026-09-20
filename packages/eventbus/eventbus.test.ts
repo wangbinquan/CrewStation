@@ -5,7 +5,7 @@ import { createEventConsumer } from './consumer';
 import { eventbusMigrations, publishDomainEvent } from './publish';
 
 const available = await testDatabaseAvailable();
-const projectId = 'prj_0123456789abcdef0123456789abcdef' as never;
+const projectId = '01a0bf5d-8f4b-7e62-8502-0a6dd371d0bc' as never;
 
 describe.skipIf(!available)('跨进程事件日志', () => {
   test('发布校验载荷；两个消费者各自有序消费；失败重试后死信', async () => {

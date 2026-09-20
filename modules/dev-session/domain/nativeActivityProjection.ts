@@ -1,3 +1,4 @@
+import { newResourceId } from '@crewstation/kernel';
 import type { AgentActivityItem, AgentActivityState, AgentPendingRequest, AgentTurnSummary, NativeActivityEvent, NativeTerminalRecord } from '@crewstation/contracts';
 
 export interface NativeActivityProjection {
@@ -110,7 +111,7 @@ export function projectNativeLifecycle(previous: NativeActivityProjection, recor
   if (!['ended', 'failed'].includes(record.lifecycle) || projection.state.processEnded) return { projection };
   projection.state.processEnded = true; projection.state.pending = [];
   return { projection, item: {
-    eventId: `terminal:${record.agentId}:${record.runnerId}:${record.revision}`, agentId: record.agentId, terminalId: record.terminalId, runnerId: record.runnerId,
+    eventId: newResourceId(), agentId: record.agentId, terminalId: record.terminalId, runnerId: record.runnerId,
     seq, turnId: null, kind: 'process-ended', occurredAt: at, unread: false,
   } };
 }

@@ -3,13 +3,26 @@ import { projectResources, configRevision } from '../domain/projection';
 import { referencesOf } from '../domain/resourceGraph';
 import { resourceStatus, containerDetails } from '../domain/resourceStatus';
 import { pageResources, snapshotSummary } from '../application/queries';
-import { catalog, facts, object, query } from './inventoryFixture';
+import { resourceReferences } from '../application/resourceReferences';
+import { catalog, facts, object, query, resourceIds } from './inventoryFixture';
 import type { ResourceObject, InventoryFacts } from '../domain/inventory';
 const at = '2026-09-20T00:00:00Z';
-const project = (objects: ResourceObject[], data = facts) => projectResources(objects, structuredClone(data), 'crewstation-system', catalog, at);
+const project = (objects: ResourceObject[], data = facts) => projectResources(objects, structuredClone(data), 'crewstation-system', catalog, at, resourceIds(objects));
 const owner = (child: ResourceObject, parent: ResourceObject): ResourceObject => ({ ...child, metadata: { ...child.metadata, ownerReferences: [{ apiVersion: parent.apiVersion, kind: parent.kind, name: parent.metadata.name, uid: parent.metadata.uid!, controller: true }] } });
 
 describe('inventory ownership, purpose and resource graph', () => {
+  test('legacy release labels resolve to UUID references without altering physical evidence', async () => {
+    const row = project([object('Pod', 'legacy-release')])[0]!;
+    const canonical = '01a0bf5d-8f4b-7001-8458-107366e7de39';
+    const calls: string[] = [];
+    const rows = await resourceReferences({ resolveReleaseId: async (key) => { calls.push(key); return key === 'rel_old' ? canonical : undefined; } }, [
+      { ...row, releaseId: 'rel_old', labels: { release: 'rel_old' } }, { ...row, releaseId: canonical }, { ...row, releaseId: 'rel_deleted' }, row,
+    ]);
+    expect(rows[0]).toMatchObject({ releaseId: canonical, uid: row.uid, name: row.name, labels: { release: 'rel_old' } });
+    expect(rows[1]!.releaseId).toBe(canonical);
+    expect(rows[2]!.releaseId).toBeUndefined(); expect(rows[2]!.facts.identityReason).toContain('不可用');
+    expect(rows[3]).toEqual(row); expect(calls).toEqual(['rel_old', 'rel_deleted']);
+  });
   test('explicit system catalog follows UID owners and retained claims, never an entire namespace', () => {
     const api = object('Deployment', 'cs-api', 'crewstation-system', { replicas: 1, template: { spec: { containers: [{ name: 'main', image: 'api', envFrom: [{ secretRef: { name: 'api-env' } }] }] } } });
     const rs = owner(object('ReplicaSet', 'api-rs', 'crewstation-system'), api), pod = owner(object('Pod', 'api-pod', 'crewstation-system'), rs);
@@ -45,7 +58,7 @@ describe('inventory ownership, purpose and resource graph', () => {
   test('service purpose comes from project kind and slot role, HPA disables manual scale, retained references disable cleanup', () => {
     for (const [kind, purpose] of [['DigitalWorker', 'digital-worker-service'], ['APIProxy', 'api-proxy'], ['EventProducer', 'event-producer']] as const) {
       const data: InventoryFacts = structuredClone(facts); data.projects[0]!.kind = kind!;
-      data.releases.push({ serviceId: 'svc_demo', serviceName: 'demo', namespace: 'cs-demo', physical: 'green', role: 'preview', state: 'ready', revision: 'slot1', maxReplicas: 3 });
+      data.releases.push({ serviceId: '01a0bf5d-8f4b-737e-8dee-257334592476', serviceName: 'demo', namespace: 'cs-demo', physical: 'green', role: 'preview', state: 'ready', revision: 'slot1', maxReplicas: 3 });
       const d = object('Deployment', 'demo-green', 'cs-demo', { replicas: 1 }); d.metadata.labels = { 'crewstation.io/workload': 'service', 'crewstation.io/service': 'demo', 'crewstation.io/slot': 'green' };
       const hpa = object('HorizontalPodAutoscaler', 'auto', 'cs-demo', { scaleTargetRef: { kind: 'Deployment', name: 'demo-green' } });
       const row = project([d, hpa], data).find((r) => r.kind === 'Deployment')!;

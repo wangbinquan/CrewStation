@@ -12,6 +12,7 @@ export interface SubtaskRun {
   readonly mode?: SubtaskMode;
   readonly state: SubtaskState;
   readonly attempt: number;
+  readonly retry?: { operationId: string; previousId: SubtaskId };
   readonly prompt?: string;
   readonly cwd?: string;
   readonly command?: string[];

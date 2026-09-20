@@ -11,7 +11,7 @@ export function isolatedNativeFixture() {
   const environments = new Map<TaskId, EnvironmentView>(), rosters = new Map<TaskId, NativeTerminalRoster>();
   const commands: Array<{ taskId: TaskId; command: RunnerCommand }> = [], allocations: TaskId[] = [], releases: TaskId[] = [], steps: string[] = [], issued: unknown[] = [];
   const controls = { reject: undefined as unknown, beforeCreate: undefined as (() => Promise<void>) | undefined, loseCreate: false, loseStart: false, noSnapshot: false, loseRelease: false,
-    offline: new Set<TaskId>(), taskProfile: 'cli-small', model: 'opencode/one', ready: true };
+    offline: new Set<TaskId>(), taskProfile: '01a0bf5d-8f4b-7dd6-8102-2aa5cc3255b1', model: 'opencode/one', ready: true };
   const parent = f.deps.environments.getEnvironment;
   f.deps.environments.getEnvironment = async (id) => id === workspaceTask ? parent(id) : environments.get(id);
   f.deps.compute = fakeComputeCatalog(() => [{ name: 'qa-cli', protocol: 'opencode', model: controls.model, taskProfile: controls.taskProfile, isDefault: true }]);
@@ -21,7 +21,7 @@ export function isolatedNativeFixture() {
     const existing = environments.get(input.id); if (existing) return existing;
     if (controls.reject) throw controls.reject;
     const env: EnvironmentView = { ...(await parent(workspaceTask))!, id: input.id, connected: controls.ready, state: controls.ready ? 'running' : 'creating',
-      native: { purpose: input.purpose, parentTaskId: input.parentTaskId, agentId: input.agentId, terminalId: input.terminalId, runnerId: input.runnerId, state: controls.ready ? 'running' : 'queued', profile: { name: input.profile ?? 'default', cpu: '1', memory: '2Gi', storage: '2Gi' } } };
+      native: { purpose: input.purpose, parentTaskId: input.parentTaskId, agentId: input.agentId, terminalId: input.terminalId, runnerId: input.runnerId, state: controls.ready ? 'running' : 'queued', profile: { name: input.profile === '01a0bf5d-8f4b-7dd6-8102-2aa5cc3255b1' ? 'cli-small' : 'default', cpu: '1', memory: '2Gi', storage: '2Gi' } } };
     environments.set(input.id, env); allocations.push(input.id); steps.push(`allocate:${input.id}`);
     rosters.set(input.id, { runnerId: input.runnerId, terminals: [] });
     if (controls.loseCreate) { controls.loseCreate = false; throw new Error('lost create receipt'); }

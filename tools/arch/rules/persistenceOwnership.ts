@@ -36,12 +36,23 @@ function checkMigrations(unit: Unit): Violation[] {
   if (!existsSync(dir)) return [];
   const schema = moduleSchemaName(unit.shortName);
   const out: Violation[] = [];
-  for (const name of readdirSync(dir).filter((f) => f.endsWith('.sql'))) {
+  for (const name of readdirSync(dir).filter((f) => f.endsWith('.sql') || f.endsWith('.identity.json'))) {
     const path = join(dir, name);
-    if (!/^\d{4}_[a-z0-9_]+\.sql$/.test(name)) out.push({ rule: RULE, file: path, message: '迁移文件名必须为 NNNN_snake_case.sql' });
-    out.push(...checkSql(path, stripComments(readFileSync(path, 'utf8')), schema));
+    if (!/^\d{4}_[a-z0-9_]+\.(?:sql|identity\.json)$/.test(name)) out.push({ rule: RULE, file: path, message: '迁移文件名必须为 NNNN_snake_case.sql 或 NNNN_snake_case.identity.json' });
+    if (name.endsWith('.sql')) out.push(...checkSql(path, stripComments(readFileSync(path, 'utf8')), schema));
+    else out.push(...checkIdentity(path, schema));
   }
   return out;
+}
+
+function checkIdentity(path: string, schema: string): Violation[] {
+  try {
+    const data = JSON.parse(readFileSync(path, 'utf8')) as { version?: string; schema?: string; finalize?: string[] };
+    if (data.version !== 'resource-identity/v1' || data.schema !== schema) return [{ rule: RULE, file: path, message: `身份迁移必须声明 resource-identity/v1 和本模块 schema ${schema}` }];
+    return (data.finalize ?? []).flatMap((statement) => checkSql(path, stripComments(statement), schema));
+  } catch {
+    return [{ rule: RULE, file: path, message: '身份迁移必须是有效的 JSON 描述文件' }];
+  }
 }
 
 function checkSql(path: string, sql: string, schema: string): Violation[] {
@@ -52,7 +63,11 @@ function checkSql(path: string, sql: string, schema: string): Violation[] {
   for (const m of sql.matchAll(CREATE_TABLE_RE)) {
     if (!m[2]) out.push({ rule: RULE, file: path, message: `CREATE TABLE ${m[1]} 必须带 schema 前缀 ${schema}.` });
   }
+  // A declared table/CTE alias qualifies columns, never a schema. Object positions still require ownership.
+  const aliases = new Set([...sql.matchAll(/\b(?:from|join|update)\s+[a-z_][a-z0-9_.]*\s+as\s+([a-z_][a-z0-9_]*)/g)].map((m) => m[1]));
+  const objects = new Set([...sql.matchAll(/\b(?:from|join|update|into|table|references|index|sequence)\s+(?:if\s+(?:not\s+)?exists\s+)?([a-z_][a-z0-9_]*\.[a-z_][a-z0-9_]*)/g)].map((m) => m.index + m[0].lastIndexOf(m[1]!)));
   for (const m of sql.matchAll(QUALIFIED_RE)) {
+    if (aliases.has(m[1]) && !objects.has(m.index) && sql[m.index + m[0].length] !== '(') continue;
     if (m[1] !== schema && m[1] !== 'pg_catalog') out.push({ rule: RULE, file: path, message: `引用了其他 schema 的对象 ${m[0]}` });
   }
   return out;

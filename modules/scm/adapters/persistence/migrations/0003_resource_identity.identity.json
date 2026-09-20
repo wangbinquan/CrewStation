@@ -1,0 +1,40 @@
+{
+  "version": "resource-identity/v1",
+  "schema": "scm",
+  "entities": [
+    {
+      "table": "session_credentials",
+      "kind": "scm-credential",
+      "keys": [
+        "id"
+      ],
+      "idColumn": "id"
+    }
+  ],
+  "references": [
+    {
+      "table": "repository_bindings",
+      "column": "service_id",
+      "kind": "service",
+      "keys": [
+        "service_id"
+      ]
+    },
+    {
+      "table": "repository_bindings",
+      "column": "project_id",
+      "kind": "project",
+      "keys": [
+        "project_id"
+      ]
+    },
+    {
+      "table": "session_credentials",
+      "column": "service_id",
+      "kind": "service",
+      "keys": [
+        "service_id"
+      ]
+    }
+  ]
+}

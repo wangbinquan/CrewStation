@@ -1,0 +1,41 @@
+{
+  "version": "resource-identity/v1",
+  "schema": "observability",
+  "entities": [
+    {
+      "table": "alerts",
+      "kind": "alert",
+      "keys": [
+        "id"
+      ],
+      "idColumn": "id"
+    }
+  ],
+  "references": [
+    {
+      "table": "alerts",
+      "column": "project_id",
+      "kind": "project",
+      "keys": [
+        "project_id"
+      ],
+      "nullable": true
+    },
+    {
+      "table": "alert_subscriptions",
+      "column": "project_id",
+      "kind": "project",
+      "keys": [
+        "project_id"
+      ]
+    },
+    {
+      "table": "alert_subscriptions",
+      "column": "user_id",
+      "kind": "user",
+      "keys": [
+        "user_id"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,143 @@
+{
+  "version": "resource-identity/v1",
+  "schema": "api_catalog",
+  "entities": [
+    {
+      "table": "proxies",
+      "kind": "api-proxy",
+      "keys": [
+        "proxy"
+      ],
+      "idColumn": "id"
+    },
+    {
+      "table": "operations",
+      "kind": "api-operation",
+      "keys": [
+        "key"
+      ],
+      "idColumn": "id",
+      "aliases": [
+        [
+          "proxy",
+          "method",
+          "path"
+        ]
+      ]
+    },
+    {
+      "table": "requests",
+      "kind": "api-request",
+      "keys": [
+        "id"
+      ],
+      "idColumn": "id"
+    }
+  ],
+  "references": [
+    {
+      "table": "operations",
+      "column": "proxy_id",
+      "kind": "api-proxy",
+      "keys": [
+        "proxy_id"
+      ]
+    },
+    {
+      "table": "grants",
+      "column": "operation_key",
+      "kind": "api-operation",
+      "keys": [
+        "operation_key"
+      ]
+    },
+    {
+      "table": "requests",
+      "column": "operation_key",
+      "kind": "api-operation",
+      "keys": [
+        "operation_key"
+      ]
+    },
+    {
+      "table": "proxies",
+      "column": "project_id",
+      "kind": "project",
+      "keys": [
+        "project_id"
+      ]
+    },
+    {
+      "table": "proxies",
+      "column": "service_id",
+      "kind": "service",
+      "keys": [
+        "service_id"
+      ]
+    },
+    {
+      "table": "requests",
+      "column": "project_id",
+      "kind": "project",
+      "keys": [
+        "project_id"
+      ]
+    },
+    {
+      "table": "requests",
+      "column": "service_id",
+      "kind": "service",
+      "keys": [
+        "service_id"
+      ]
+    },
+    {
+      "table": "requests",
+      "column": "requested_by",
+      "kind": "user",
+      "keys": [
+        "requested_by"
+      ]
+    },
+    {
+      "table": "requests",
+      "column": "decided_by",
+      "kind": "user",
+      "keys": [
+        "decided_by"
+      ],
+      "nullable": true
+    },
+    {
+      "table": "grants",
+      "column": "service_id",
+      "kind": "service",
+      "keys": [
+        "service_id"
+      ]
+    },
+    {
+      "table": "grants",
+      "column": "granted_by",
+      "kind": "user",
+      "keys": [
+        "granted_by"
+      ]
+    }
+  ],
+  "finalize": [
+    "ALTER TABLE api_catalog.proxies ALTER COLUMN id SET NOT NULL",
+    "ALTER TABLE api_catalog.proxies ALTER COLUMN name SET NOT NULL",
+    "ALTER TABLE api_catalog.proxies DROP CONSTRAINT proxies_pkey",
+    "ALTER TABLE api_catalog.proxies ADD PRIMARY KEY (id)",
+    "ALTER TABLE api_catalog.proxies ADD UNIQUE (proxy)",
+    "ALTER TABLE api_catalog.operations ALTER COLUMN id SET NOT NULL",
+    "ALTER TABLE api_catalog.operations ALTER COLUMN proxy_id SET NOT NULL",
+    "ALTER TABLE api_catalog.operations DROP CONSTRAINT operations_pkey",
+    "ALTER TABLE api_catalog.operations DROP COLUMN key",
+    "ALTER TABLE api_catalog.operations ADD PRIMARY KEY (id)",
+    "ALTER TABLE api_catalog.operations ADD UNIQUE (proxy_id, method, path)",
+    "ALTER TABLE api_catalog.grants RENAME COLUMN operation_key TO operation_id",
+    "ALTER TABLE api_catalog.requests RENAME COLUMN operation_key TO operation_id"
+  ]
+}

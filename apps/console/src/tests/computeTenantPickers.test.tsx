@@ -19,9 +19,9 @@ let page: Awaited<ReturnType<typeof renderElement>> | undefined;
 afterEach(async () => { page?.unmount(); page = undefined; await new Promise((resolve) => setTimeout(resolve, 0)); globalThis.fetch = originalFetch; });
 
 const CATALOG: ComputeProfileSummaryDto[] = [
-  { name: 'claude-daily', description: '日常开发', terminalOnly: false, isDefault: true, available: true },
-  { name: 'aider-shell', description: '终端 CLI', terminalOnly: true, isDefault: false, available: true },
-  { name: 'opencode-lite', description: '', terminalOnly: false, isDefault: false, available: false, reason: '测试失败：缺少鉴权' },
+  { id: '01a0bf5d-8f4b-7b93-8744-95d0bccdf6a2', name: 'claude-daily', description: '日常开发', terminalOnly: false, isDefault: true, available: true },
+  { id: '01a0bf5d-8f4b-76dc-87b8-87b3fd611c0f', name: 'aider-shell', description: '终端 CLI', terminalOnly: true, isDefault: false, available: true },
+  { id: '01a0bf5d-8f4b-7202-82a4-92fec671e7a3', name: 'opencode-lite', description: '', terminalOnly: false, isDefault: false, available: false, reason: '测试失败：缺少鉴权' },
 ];
 const withoutDefault = CATALOG.map((item) => ({ ...item, isDefault: false }));
 
@@ -30,7 +30,7 @@ describe('租户面档位选择（RFC-006 C6、C17）', () => {
     expect(choicesFor(CATALOG, 'agent').map((item) => item.name)).toEqual(['claude-daily', 'opencode-lite']);
     expect(choicesFor(CATALOG, 'cli').map((item) => item.name)).toEqual(['claude-daily', 'aider-shell', 'opencode-lite']);
     expect(resolveChoice(CATALOG, '')?.name).toBe('claude-daily');
-    expect([choiceBlocked(CATALOG, ''), choiceBlocked(CATALOG, 'aider-shell'), choiceBlocked(CATALOG, 'opencode-lite'), choiceBlocked(CATALOG, 'gone')]).toEqual([undefined, undefined, 'unavailable', 'missing']);
+    expect([choiceBlocked(CATALOG, ''), choiceBlocked(CATALOG, CATALOG[1]!.id), choiceBlocked(CATALOG, CATALOG[2]!.id), choiceBlocked(CATALOG, 'gone')]).toEqual([undefined, undefined, 'unavailable', 'missing']);
     expect(choiceBlocked(withoutDefault, '')).toBe('no-default');
     expect(choiceBlocked(CATALOG.map((item) => ({ ...item, available: false, reason: '已停用' })), '')).toBe('unavailable');
   });
@@ -58,7 +58,7 @@ describe('新建 Agent（历史对话）', () => {
   test('只列讲协议的档位：默认项写出默认档位名，不可用的档位禁选并写明原因', async () => {
     serveCatalog(CATALOG); const started: string[] = [];
     page = await renderElement(<Form initial="" started={started} />, messages);
-    expect(options()).toEqual([['', '默认档位（claude-daily）', false], ['claude-daily', 'claude-daily · 日常开发', false], ['opencode-lite', 'opencode-lite（不可用：测试失败：缺少鉴权）', true]]);
+    expect(options()).toEqual([['', '默认档位（claude-daily）', false], [CATALOG[0]!.id, 'claude-daily · 日常开发', false], [CATALOG[2]!.id, 'opencode-lite（不可用：测试失败：缺少鉴权）', true]]);
     expect(page.text()).not.toContain('aider-shell');
     await page.click('启动');
     expect(started).toEqual(['']);
@@ -66,7 +66,7 @@ describe('新建 Agent（历史对话）', () => {
 
   test('之前选中的档位变得不可用或被删除、平台没有默认档位时不许启动，并说明原因', async () => {
     serveCatalog(CATALOG);
-    page = await renderElement(<Form initial="opencode-lite" started={[]} />, messages);
+    page = await renderElement(<Form initial={CATALOG[2]!.id} started={[]} />, messages);
     expect(page.text()).toContain('档位 opencode-lite 当前不可用：测试失败：缺少鉴权。'); expect(page.button('启动').disabled).toBe(true);
     page.unmount();
     page = await renderElement(<Form initial="gone-profile" started={[]} />, messages);
@@ -84,7 +84,7 @@ describe('新建 Agent（历史对话）', () => {
   });
 
   test('名册标出每个 Agent 受理时固定的档位修订，只有档位名与修订，没有模型', async () => {
-    const agent = AgentInstanceDtoSchema.parse({ agentId: 'agent-abcdef', taskId: `tsk_${'1'.repeat(32)}`, compute: 'claude-daily', permission: 'edit', state: 'running', startedAt: '2026-09-17T00:00:00.000Z', profileRevision: 3 });
+    const agent = AgentInstanceDtoSchema.parse({ agentId: 'agent-abcdef', taskId: '01a0bf5d-8f4b-7cb2-839d-fa8c82dbc4ee', compute: CATALOG[0]!.id, computeName: 'claude-daily', permission: 'edit', state: 'running', startedAt: '2026-09-17T00:00:00.000Z', profileRevision: 3 });
     page = await renderElement(<AgentRoster agents={[agent, { ...agent, agentId: 'agent-legacy', profileRevision: undefined }]} selected={agent.agentId} onSelect={() => {}} />, messages);
     const tabs = [...page.host.querySelectorAll('[role="tab"]')].map((tab) => tab.textContent ?? '');
     expect(tabs[0]).toContain('L-abcdef · claude-daily'); expect(tabs[0]).toContain('档位修订 3');
@@ -107,10 +107,10 @@ describe('「＋ 创建开发Agent会话」', () => {
     page = await renderElement(workspace(), messages);
     expect([...cliSelect().options].map((option) => option.textContent)).toEqual(['默认档位（claude-daily）', 'claude-daily', 'aider-shell · 仅终端', 'opencode-lite（不可用：测试失败：缺少鉴权）']);
     expect(page.button('＋ 创建开发Agent会话').disabled).toBe(false);
-    await act(async () => { Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')!.set!.call(cliSelect(), 'aider-shell'); cliSelect().dispatchEvent(new Event('change', { bubbles: true })); });
+    await act(async () => { Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')!.set!.call(cliSelect(), CATALOG[1]!.id); cliSelect().dispatchEvent(new Event('change', { bubbles: true })); });
     await page.settle();
     await page.click('＋ 创建开发Agent会话');
-    expect(starts).toHaveLength(1); expect(starts[0]).toMatchObject({ compute: 'aider-shell' }); expect(page.text()).toContain('演示拒绝');
+    expect(starts).toHaveLength(1); expect(starts[0]).toMatchObject({ compute: { kind: 'profile', profileId: CATALOG[1]!.id } }); expect(page.text()).toContain('演示拒绝');
   });
 
   test('默认档位不可用时拦住启动；卡片标出通用终端协议与固定的档位修订', async () => {

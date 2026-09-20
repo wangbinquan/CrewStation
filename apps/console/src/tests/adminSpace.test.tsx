@@ -16,8 +16,8 @@ const requests: string[] = [];
 let handlers: Handler[] = [];
 let app: RenderedApp | undefined;
 
-const ADMIN = { id: 'usr_a', name: '管理员', email: 'a@example.com', platformRole: 'admin', isAdmin: true, memberships: [], authMethod: 'password' as const };
-const MEMBER = { ...ADMIN, id: 'usr_m', name: '普通成员', platformRole: 'user', isAdmin: false };
+const ADMIN = { id: '01a0bf5d-8f4b-79ce-8050-133bcc183586', name: '管理员', email: 'a@example.com', platformRole: 'admin', isAdmin: true, memberships: [], authMethod: 'password' as const };
+const MEMBER = { ...ADMIN, id: '01a0bf5d-8f4b-7c24-887c-cad9850d2759', name: '普通成员', platformRole: 'user', isAdmin: false };
 
 globalThis.fetch = (async (input: string | URL | Request) => {
   const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
@@ -108,9 +108,9 @@ describe('管理空间与租户空间分离（RFC-002）', () => {
 
   test('空间往返保持项目上下文', async () => {
     asAdmin();
-    const projectId = `prj_${'a'.repeat(32)}`;
+    const projectId = '01a0bf5d-8f4b-7e1e-8dde-c9c2ae13ed34';
     handlers.push({ match: `/v1/projects/${projectId}`, exactPath: true,
-      body: { id: projectId, serviceId: `svc_${'b'.repeat(32)}`, name: '数字人', slug: 'worker', kind: 'DigitalWorker', state: 'active' } });
+      body: { id: projectId, serviceId: '01a0bf5d-8f4b-760b-86b6-0bb9f08a9eaa', name: '数字人', slug: 'worker', kind: 'DigitalWorker', state: 'active' } });
     app = await renderApp(`/projects/${projectId}/release`);
     expect(app.path()).toBe(`/projects/${projectId}/release`);
     await app.click('平台管理');

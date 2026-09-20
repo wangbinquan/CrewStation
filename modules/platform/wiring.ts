@@ -1,7 +1,9 @@
+import { BUILTIN_RESOURCES } from '@crewstation/contracts';
+import { resourceIdentityDirectory, type ResourceIdentityDirectory } from '@crewstation/persistence';
 import { createClusterManagementModule } from '@crewstation/module-cluster-management';
 import { installedSystemComponents } from './domain/systemComponents';
 import type { ClusterResource, ClusterInspectRequest, ClusterOperation, ClusterInspection, TaskId, ProfileTestId, RebuildDevSessionRequest } from '@crewstation/contracts';
-import type { Actor, ComputeUsage, ProjectId, ServiceId, UserDto, UserId } from '@crewstation/contracts';
+import type { Actor, ComputeProfileSelector, ComputeUsage, ProjectId, ServiceId, UserDto, UserId } from '@crewstation/contracts';
 import type { EventConsumer } from '@crewstation/eventbus';
 import type { K8sClient } from '@crewstation/k8s';
 import { buildEgressNetworkPolicy, namespaceObject, projectNetworkPolicy, resourceQuotaObject, secretObject, taskEgressNetworkPolicy } from '@crewstation/k8s';
@@ -16,6 +18,7 @@ import { createConfigModule } from '@crewstation/module-config';
 import { createDataModule } from '@crewstation/module-data';
 import { createDevSessionModule } from '@crewstation/module-dev-session';
 import { createEgressModule } from '@crewstation/module-egress';
+import type { EventsModuleApi } from '@crewstation/module-events';
 import { createEventsModule } from '@crewstation/module-events';
 import { createGatewayModule } from '@crewstation/module-gateway';
 import type { GatewayModuleApi } from '@crewstation/module-gateway';
@@ -67,13 +70,15 @@ export interface PlatformModule {
 }
 
 /** 平台内部调用用的管理员身份：不经成员关系检查的用例入口。 */
-export const SYSTEM_ACTOR: Actor = { userId: 'usr_00000000000000000000000000000000' as UserId, isAdmin: true };
+export const SYSTEM_ACTOR: Actor = { userId: BUILTIN_RESOURCES.systemActor as UserId, isAdmin: true };
 
 const consumerLifecycle = (consumer: EventConsumer): Lifecycle => ({ start: () => consumer.start(), stop: () => consumer.stop() });
 
-interface Late { project?: ProjectModuleApi; gateway?: GatewayModuleApi; taskRuntime?: TaskRuntimeModuleApi; release?: ReleaseModuleApi }
+interface Late { events?: EventsModuleApi; project?: ProjectModuleApi; gateway?: GatewayModuleApi; taskRuntime?: TaskRuntimeModuleApi; release?: ReleaseModuleApi }
 
-function composeCore(deps: PlatformModuleDeps, late: Late) {
+type CompositionDeps = PlatformModuleDeps & { identities: ResourceIdentityDirectory };
+
+function composeCore(deps: CompositionDeps, late: Late) {
   const { db, settings, logger } = deps;
   const hosts = {
     prodHost: (slug: string) => `${slug}.${settings.userDomain}`,
@@ -88,7 +93,7 @@ function composeCore(deps: PlatformModuleDeps, late: Late) {
   const gatewayApi = (): GatewayModuleApi => { if (!late.gateway) throw new Error('gateway 尚未装配'); return late.gateway; };
 
   const identity = createIdentityModule({
-    db, logger,
+    db, logger, legacyIds: deps.identities,
     settings: {
       adminEmails: settings.adminEmails, userDomain: settings.userDomain, cookieDomain: `.${settings.userDomain}`,
       secure: settings.publicScheme === 'https', sessionTtlSeconds: settings.sessionTtlSeconds,
@@ -128,7 +133,7 @@ function composeCore(deps: PlatformModuleDeps, late: Late) {
       const hits = await Promise.all((await project.api.listServices()).map(async (s) => ((await releaseApi.deployedComputeReferences(s.serviceId)).includes(profile) ? s.slug : undefined)));
       return [...new Set(hits.filter((slug): slug is string => slug !== undefined))].sort();
     } },
-    taskProfiles: { exists: async (name) => (await project.api.listTaskProfiles()).some((p) => p.name === name) },
+    taskProfiles: { exists: async (name) => (await project.api.listTaskProfiles()).some((p) => p.id === name) },
     settings: { defaultTaskProfile: settings.defaultTaskProfile, secretKeyBase64: settings.secretKeyBase64, registry: { pullBase: settings.registryBase, pushHost: settings.registryPushHost, baseRepository: settings.baseImage.repository, runtimePrefix: 'runtime/', scheme: settings.registryScheme, baseTag: settings.baseImage.tag } },
   });
   const data = createDataModule({
@@ -136,7 +141,14 @@ function composeCore(deps: PlatformModuleDeps, late: Late) {
     services: { resolveServiceById: async (id) => { const r = await resolveById(id); return r ? { projectId: r.projectId, slug: r.slug } : undefined; } },
     settings: { defaultPlan: 'db-small', secretKeyBase64: settings.secretKeyBase64, postgres: settings.dataPostgres },
   });
-  const scm = createScmModule({ db, project: project.api, settings: { baseUrl: settings.gitlab.baseUrl, groupPath: settings.gitlab.groupPath, platformToken: settings.gitlab.platformToken, platformBotName: settings.gitlab.botName, defaultBranch: 'main' } });
+  const scm = createScmModule({ db, project: project.api, identities: deps.identities, templateResources: {
+    allocate: (kind, context, templateId, slotId) => deps.identities.bind('scm', kind, ['template', context.serviceId, templateId, slotId]),
+    ensureDefinition: config.api.ensureTemplateDefinition,
+    eventType: async (producerCode, eventCode) => {
+      if (!late.events) throw new Error('events 尚未装配');
+      return (await late.events.listEventTypes(SYSTEM_ACTOR)).find((entry) => entry.state === 'active' && entry.producer === producerCode && entry.eventType === eventCode)?.id;
+    },
+  }, settings: { baseUrl: settings.gitlab.baseUrl, groupPath: settings.gitlab.groupPath, platformToken: settings.gitlab.platformToken, platformBotName: settings.gitlab.botName, defaultBranch: 'main' } });
   const apiCatalog = createApiCatalogModule({
     db, projects: project.api, hosts, logger, users: userDirectory,
     onCatalogChanged: async (serviceId) => {
@@ -151,10 +163,11 @@ function composeCore(deps: PlatformModuleDeps, late: Late) {
   return { identity, project, config, egress, data, scm, apiCatalog, agentRuntime, hosts, isAdmin, resolveById };
 }
 
-function composeDelivery(deps: PlatformModuleDeps, core: ReturnType<typeof composeCore>, late: Late) {
+function composeDelivery(deps: CompositionDeps, core: ReturnType<typeof composeCore>, late: Late) {
   const { db, k8s, settings, logger } = deps;
   const { project, config, data, scm, apiCatalog, hosts, isAdmin, resolveById } = core;
   const release = createReleaseModule({
+    physicalOperationId: async (id) => (await deps.identities.aliases('cluster-operation', id)).find((keys) => keys.length === 1 && keys[0] !== id)?.[0] ?? id,
     db, k8s, hosts, logger, isAdmin: (id) => isAdmin(id), authorizer: project.api, services: { resolveServiceById: resolveById },
     tagger: { createReleaseTag: (serviceId, { branch, version, expectedCommitSha }) => scm.api.createReleaseTag(serviceId, { branch, ...(expectedCommitSha ? { expectedCommitSha } : {}), ...(version.startsWith('v') ? { tag: version } : { bump: version as 'major' | 'minor' | 'patch' }) }) },
     repo: {
@@ -162,25 +175,26 @@ function composeDelivery(deps: PlatformModuleDeps, core: ReturnType<typeof compo
       repositoryUrl: async (serviceId) => {
         const [binding, svc, credential] = await Promise.all([scm.api.getBinding(SYSTEM_ACTOR, serviceId), resolveById(serviceId), scm.api.issueSessionCredential(serviceId, 180)]);
         if (!svc) throw new Error(`服务 ${serviceId} 不存在`);
-        const name = `git-cred-${serviceId.slice(-12)}`;
+        const name = `git-cred-${serviceId.replaceAll('-', '')}`;
         await k8s.apply(secretObject({ name, namespace: svc.namespace, stringData: { token: credential.token }, labels: { 'crewstation.io/service': svc.name } }));
         return { httpUrl: binding.httpUrl, credentialSecretName: name };
       },
     },
     plans: {
-      getServicePlan: async (name) => (await project.api.listServicePlans()).find((p) => p.name === name),
+      getServicePlan: async (name) => (await project.api.listServicePlans()).find((p) => p.id === name),
       lookupComputeProfile: (name, projectId) => core.agentRuntime.api.lookupForProjectRelease(projectId, name),
       listComputeProfiles: () => core.agentRuntime.api.listNames(),
     },
     config: {
-      render: async (projectId, env) => ({ values: await config.api.renderEnv(projectId, env), version: await config.api.currentVersion(projectId, env) }),
-      validate: (projectId, env, keys) => config.api.validateManifestEnv(projectId, env, keys.map((name) => ({ name, from: 'config' as const }))),
+      render: async (projectId, env) => ({ values: await config.api.renderDefinitions(projectId, env), version: await config.api.currentVersion(projectId, env) }),
+      validate: (projectId, env, keys) => config.api.validateManifestEnv(projectId, env, keys.map((configDefinitionId) => ({ name: 'CONFIG', configDefinitionId, from: 'config' as const }))),
     },
     data: { envFor: data.api.envFor },
     settings: { userDomain: settings.userDomain, serviceDomain: settings.serviceDomain, registryBase: settings.registryBase, maintenanceWindow: settings.maintenanceWindow, buildTimeoutSeconds: 1800, deployTimeoutSeconds: 600, builderImage: settings.builderImage, buildkitAddress: settings.buildkitAddress, workerOwner: `${deps.instance}.release` },
   });
   const listServices = async () => (await project.api.listServices()).map((s) => ({ serviceId: s.serviceId, projectId: s.projectId, projectSlug: s.slug, serviceName: s.name, namespace: s.namespace, identity: s.identity, kind: s.kind }));
   const gateway = createGatewayModule({
+    identities: deps.identities,
     db, k8s, hosts, logger, isAdmin: (id) => isAdmin(id),
     services: { listServices, getService: async (id) => (await listServices()).find((s) => s.serviceId === id), serviceIdOfProject: async (projectId) => (await listServices()).find((s) => s.projectId === projectId)?.serviceId },
     slots: { slotRoles: release.api.slotRoles },
@@ -197,10 +211,10 @@ function composeDelivery(deps: PlatformModuleDeps, core: ReturnType<typeof compo
  * 派发时按固定修订取材料（含解密凭据），只经受控 Runner 命令通道发出。
  */
 function computeCatalogFor(agentRuntime: AgentRuntimeModuleApi) {
-  return { resolve: (name: string | undefined, usage: ComputeUsage, projectId: ProjectId) => agentRuntime.resolveForProject(projectId, name, usage), launchMaterial: agentRuntime.launchMaterial };
+  return { resolve: (name: ComputeProfileSelector | undefined, usage: ComputeUsage, projectId: ProjectId) => agentRuntime.resolveForProject(projectId, name, usage), launchMaterial: agentRuntime.launchMaterial };
 }
 
-function composeRuntime(deps: PlatformModuleDeps, core: ReturnType<typeof composeCore>, delivery: ReturnType<typeof composeDelivery>, late: Late) {
+function composeRuntime(deps: CompositionDeps, core: ReturnType<typeof composeCore>, delivery: ReturnType<typeof composeDelivery>, late: Late) {
   const { db, k8s, settings, logger } = deps;
   const { project, config, data, scm, isAdmin, resolveById } = core;
   const { release } = delivery;
@@ -208,7 +222,7 @@ function composeRuntime(deps: PlatformModuleDeps, core: ReturnType<typeof compos
   const mcp = [{ name: 'capabilities', url: settings.mcp.capabilitiesUrl }, { name: 'operations', url: settings.mcp.operationsUrl }];
   const taskRuntime = createTaskRuntimeModule({
     db, k8s, logger, isAdmin: (id) => isAdmin(id), authorizer: project.api, quotas: { quotaLimit: project.api.quotaLimit }, testRunner, testMcp: mcp,
-    profiles: { devSessionProfile: core.agentRuntime.api.projectDevTaskProfile, listTaskProfiles: project.api.listTaskProfiles, getTaskProfile: async (name) => (await project.api.listTaskProfiles()).find((p) => p.name === name) },
+    profiles: { devSessionProfile: core.agentRuntime.api.projectDevTaskProfile, listTaskProfiles: project.api.listTaskProfiles, getTaskProfile: async (name) => (await project.api.listTaskProfiles()).find((p) => p.id === name) },
     services: { resolveServiceById: resolveById },
     checkout: {
       // 开发容器的工作卷要先有源码：签一个只读的会话级 Git 令牌，写进项目命名空间的 Secret，
@@ -216,7 +230,7 @@ function composeRuntime(deps: PlatformModuleDeps, core: ReturnType<typeof compos
       checkoutFor: async (serviceId) => {
         const [binding, svc, credential] = await Promise.all([core.scm.api.getBinding(SYSTEM_ACTOR, serviceId), resolveById(serviceId), core.scm.api.issueSessionCredential(serviceId, 30)]);
         if (!svc) return undefined;
-        const name = `git-checkout-${serviceId.slice(-12)}`;
+        const name = `git-checkout-${serviceId.replaceAll('-', '')}`;
         await k8s.apply(secretObject({ name, namespace: svc.namespace, stringData: { token: credential.token }, labels: { 'crewstation.io/service': svc.name } }));
         return { repoUrl: binding.httpUrl, credentialSecretName: name };
       },
@@ -228,6 +242,7 @@ function composeRuntime(deps: PlatformModuleDeps, core: ReturnType<typeof compos
   const runner = createSessionClient(settings.sessionInternalUrl);
   const computeCatalog = computeCatalogFor(core.agentRuntime.api);
   const devSession = createDevSessionModule({
+    identities: deps.identities,
     apiCatalog: core.apiCatalog.api,
     db, logger, isAdmin: (id) => isAdmin(id), environments: taskRuntime.api, runner, releases: release.api,
     scm: {
@@ -244,6 +259,7 @@ function composeRuntime(deps: PlatformModuleDeps, core: ReturnType<typeof compos
     settings: { idleMinutes: settings.idleMinutes, userDomain: settings.userDomain, mcp, defaultPreviewPort: 3000 },
   });
   const businessTask = createBusinessTaskModule({
+    identities: deps.identities,
     db, logger, isAdmin: (id) => isAdmin(id), environments: taskRuntime.api, runner, authorizer: project.api,
     directory: { resolveServiceIdentity: async (identity) => { const r = await project.api.resolveServiceIdentity(identity); return r ? { serviceId: r.serviceId, projectId: r.projectId } : undefined; } },
     compute: computeCatalog,
@@ -256,6 +272,7 @@ function composeRuntime(deps: PlatformModuleDeps, core: ReturnType<typeof compos
     worker: { owner: `${deps.instance}.events`, concurrency: 4 },
   });
   const session = createSessionModule({
+    identities: deps.identities,
     db, logger, isAdmin: (id) => isAdmin(id),
     runnerAuth: { verifyRunnerToken: taskRuntime.api.verifyRunnerToken },
     taskAccess: {
@@ -275,6 +292,7 @@ function composeRuntime(deps: PlatformModuleDeps, core: ReturnType<typeof compos
     },
     settings: { selfAddress: settings.selfAddress, commandTimeoutMs: 30_000, runnerStaleMs: 30_000, replayLimit: 2000 },
   });
+  late.events = events.api;
   return { taskRuntime, devSession, businessTask, events, session, sessionClient: runner };
 }
 
@@ -324,7 +342,7 @@ function composeAggregates(deps: PlatformModuleDeps, core: ReturnType<typeof com
         await k8s.apply(taskEgressNetworkPolicy({ namespace: f.namespace }));
         await k8s.apply(buildEgressNetworkPolicy({ namespace: f.namespace }));
       },
-      ensureRepository: async (f) => { await core.scm.api.ensureRepository(f.serviceId, f.projectId, { slug: f.slug, templateName: f.template, ...(f.initialPlan === undefined ? {} : { initialPlan: f.initialPlan }) }); },
+      ensureRepository: async (f) => { await core.scm.api.ensureRepository(f.serviceId, f.projectId, { slug: f.slug, templateId: f.template, ...(f.initialPlan === undefined ? {} : { initialPlan: f.initialPlan }) }); },
       ensureData: async (f) => { await data.api.ensureServiceData(f.serviceId); },
       reconcileRoutes: async (f) => { await delivery.gateway.api.reconcileService(f.serviceId); },
       ensureFirstRelease: async (f) => { if ((await delivery.release.api.listReleases(SYSTEM_ACTOR, f.serviceId)).length === 0) await delivery.release.api.publish(SYSTEM_ACTOR, f.serviceId, { branch: 'main', version: 'v0.1.0' }); },
@@ -334,7 +352,7 @@ function composeAggregates(deps: PlatformModuleDeps, core: ReturnType<typeof com
   return { observability, capabilities, provisioning };
 }
 
-function composeModules(deps: PlatformModuleDeps) {
+function composeModules(deps: CompositionDeps) {
   const late: Late = {};
   const core = composeCore(deps, late);
   const delivery = composeDelivery(deps, core, late);
@@ -345,7 +363,9 @@ function composeModules(deps: PlatformModuleDeps) {
 }
 
 export function createPlatformModule(deps: PlatformModuleDeps): PlatformModule {
-  const m = composeModules(deps);
+  let migrations: MigrationSet[] = [];
+  const identities = resourceIdentityDirectory(deps.db, () => migrations);
+  const m = composeModules({ ...deps, identities });
   const api: PlatformModuleApi = {
     name: 'platform',
     initializePlatformRoles: () => m.identity.api.initializePlatformRoles(),
@@ -365,10 +385,11 @@ export function createPlatformModule(deps: PlatformModuleDeps): PlatformModule {
     websocket: m.session.websocket,
     migrations: [queueMigrations, eventbusMigrations, m.identity.migrations, m.project.migrations, m.config.migrations, m.agentRuntime.migrations, m.egress.migrations, m.data.migrations, m.scm.migrations, m.apiCatalog.migrations, m.events.migrations, m.release.migrations, m.taskRuntime.migrations, m.devSession.migrations, m.businessTask.migrations, m.session.migrations, m.gateway.migrations, m.observability.migrations, m.cluster.migrations],
   };
+  migrations = api.migrations;
   return { api, modules: m };
 }
 
-function composeCluster(deps: PlatformModuleDeps, core: ReturnType<typeof composeCore>, delivery: ReturnType<typeof composeDelivery>, runtime: ReturnType<typeof composeRuntime>) {
+function composeCluster(deps: CompositionDeps, core: ReturnType<typeof composeCore>, delivery: ReturnType<typeof composeDelivery>, runtime: ReturnType<typeof composeRuntime>) {
   const tasks = runtime.taskRuntime.api, dev = runtime.devSession.api, business = runtime.businessTask.api, release = delivery.release.api;
   const inspectTask = async (actor: Actor, target: ClusterResource, request: ClusterInspectRequest): Promise<Record<string, unknown>> => {
     if (target.purpose === 'development-cli') return dev.inspectClusterNative(actor, target.taskId as TaskId);
@@ -378,9 +399,9 @@ function composeCluster(deps: PlatformModuleDeps, core: ReturnType<typeof compos
     const env = await tasks.getEnvironment(target.taskId as TaskId); if (!env) throw precondition('开发环境不存在');
     const { checkedAt: _checkedAt, ...workspace } = await dev.workspaceStatus(actor, env.projectId);
     if (request.action === 'delete') return { taskId: env.id, volumeMode: env.volumeMode, workspace };
-    const inspection = await tasks.inspectRebuild(env.projectId, true), profile = inspection.profiles.find((p) => p.name === inspection.currentProfile);
+    const inspection = await tasks.inspectRebuild(env.projectId, true), profile = inspection.profiles.find((p) => p.id === inspection.currentProfile);
     if (!profile) throw precondition('原任务套餐已不存在');
-    return { taskId: env.id, workspace, rebuild: { expectedTaskId: env.id, expectedUpdatedAt: inspection.updatedAt, expectedPodUid: inspection.podUid, expectedVolumeUid: inspection.volume.uid, profile: { name: profile.name, cpu: profile.cpu, memory: profile.memory, storage: profile.storage }, reason: inspection.reason } };
+    return { taskId: env.id, workspace, rebuild: { expectedTaskId: env.id, expectedUpdatedAt: inspection.updatedAt, expectedPodUid: inspection.podUid, expectedVolumeUid: inspection.volume.uid, profile: { id: profile.id, name: profile.name, cpu: profile.cpu, memory: profile.memory, storage: profile.storage }, reason: inspection.reason } };
   };
   const executeTask = async (actor: Actor, op: ClusterOperation, inspection: ClusterInspection) => {
     if (op.target.purpose === 'development-cli') return dev.manageClusterNative(actor, op.target.taskId as TaskId, op.action === 'restart', op.operationId);
@@ -398,10 +419,10 @@ function composeCluster(deps: PlatformModuleDeps, core: ReturnType<typeof compos
     const env = await tasks.getEnvironment((op.action === 'restart' ? op.domainOperationId : op.target.taskId) as TaskId);
     return { done: op.action === 'delete' ? !env || env.state === 'released' : env?.state === 'running' && env.connected || env?.state === 'failed', failed: op.action === 'restart' && env?.state === 'failed', reason: env?.message ?? (op.action === 'delete' ? '等待执行环境回收' : '等待新执行连接') };
   };
-  return createClusterManagementModule({ db: deps.db, k8s: deps.k8s, instance: deps.instance, logger: deps.logger, systemNamespace: deps.settings.systemNamespace, catalog: installedSystemComponents().map((c) => c.kind === 'Namespace' ? { ...c, name: deps.settings.systemNamespace } : c), isAdmin: core.identity.api.isAdmin,
+  return createClusterManagementModule({ resolveReleaseId: (legacy) => deps.identities.resolve('release', [legacy]), physicalOperationId: async (id) => (await deps.identities.aliases('cluster-operation', id)).find((keys) => keys.length === 1 && keys[0] !== id)?.[0] ?? id, db: deps.db, k8s: deps.k8s, instance: deps.instance, logger: deps.logger, systemNamespace: deps.settings.systemNamespace, catalog: installedSystemComponents().map((c) => c.kind === 'Namespace' ? { ...c, name: deps.settings.systemNamespace } : c), isAdmin: core.identity.api.isAdmin,
     metadata: { read: async () => {
       const [projects, taskFacts, slots, plans] = await Promise.all([core.project.api.listClusterProjects(), tasks.listClusterTasks(), release.listClusterSlots(), core.project.api.listServicePlans()]);
-      const releases = slots.flatMap((slot) => { const project = projects.find((p) => p.serviceId === slot.serviceId); return project ? [{ ...slot, namespace: project.namespace, serviceName: project.serviceName!, ...(slot.plan ? { maxReplicas: plans.find((p) => p.name === slot.plan)?.maxReplicas ?? 0 } : {}) }] : []; });
+      const releases = slots.flatMap((slot) => { const project = projects.find((p) => p.serviceId === slot.serviceId); return project ? [{ ...slot, namespace: project.namespace, serviceName: project.serviceName!, ...(slot.plan ? { maxReplicas: plans.find((p) => p.id === slot.plan)?.maxReplicas ?? 0 } : {}) }] : []; });
       const retained = projects.filter((p) => p.serviceName).flatMap((p) => ['blue', 'green'].map((slot) => ({ namespace: p.namespace, kind: 'Service', name: `${p.serviceName}-${slot}`, reason: '发布槽 Service 跨发布保留' })));
       for (const p of projects) { retained.push({ namespace: p.namespace, kind: 'ResourceQuota', name: 'crewstation-project', reason: '项目配额' }); for (const name of ['crewstation-default', 'crewstation-task-egress', 'crewstation-build-egress']) retained.push({ namespace: p.namespace, kind: 'NetworkPolicy', name, reason: '项目网络配置' }); }
       return { projects, tasks: taskFacts, releases, retained, complete: true };

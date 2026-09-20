@@ -7,8 +7,8 @@ import type { RunnerConfig } from '../src/config';
 import type { RunnerHandle, RunnerHooks } from '../src/runner';
 import { startRunner } from '../src/runner';
 
-export const TEST_TASK_ID = 'tsk_0123456789abcdef0123456789abcdef' as TaskId;
-export const TEST_SUBTASK_ID = 'sub_0123456789abcdef0123456789abcdef';
+export const TEST_TASK_ID = '01a0bf5d-8f4b-7418-8a3f-7cbb4a1fd751' as TaskId;
+export const TEST_SUBTASK_ID = '01a0bf5d-8f4b-7144-8d23-43f7e15387c2';
 export const TEST_TOKEN = 'runner-token-SECRET-do-not-log';
 export const WORKER_ID = 10001;
 

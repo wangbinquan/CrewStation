@@ -1,6 +1,11 @@
 import type { Messages } from '../../../shared/lib/i18n';
 
 export const messages = {
+  'devSession.editor.upgradeHint': '此文件使用旧版资源名称。可预览 UUID 引用升级，再放入当前草稿；保存时仍会检查文件版本。',
+  'devSession.editor.upgradePreview': '预览资源引用升级',
+  'devSession.editor.upgradeChanges': '查看 {count} 处变化',
+  'devSession.editor.upgradeStale': '草稿已经变化，请重新生成预览。',
+  'devSession.editor.upgradeApply': '应用到草稿',
   "devSession.navigation": "开发会话功能",
   "devSession.native.view.cli": "CLI 工作区",
   "devSession.native.view.data": "数据访问",

@@ -65,7 +65,7 @@ export interface CreateNativeExecutionInput {
   fingerprint: string;
   profile?: string;
   image?: string;
-  computeProfile?: { name: string; revision: number };
+  computeProfile?: { profileId: string; revision: number };
 }
 
 /** task-runtime 对外能力：环境生命周期与配额；授权由 dev-session／business-task 在调用前完成，这里只做准入与集群操作。 */

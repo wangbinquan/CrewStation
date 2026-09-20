@@ -21,8 +21,8 @@ export function creationErrors(draft: CreationDraft, scope: CreationScope, catal
   if (!catalog.users.some((user) => user.id === draft.ownerUserId)) errors.ownerUserId = 'ownerError';
   if (!creationKinds(scope).includes(draft.kind)) errors.kind = 'kindError';
   if (step > 0) {
-    if (!catalog.templates.some((template) => template.name === draft.template && template.kind === draft.kind)) errors.template = 'templateError';
-    if (!catalog.plans.some((plan) => plan.name === draft.plan)) errors.plan = 'planError';
+    if (!catalog.templates.some((template) => template.id === draft.template && template.kind === draft.kind)) errors.template = 'templateError';
+    if (!catalog.plans.some((plan) => plan.id === draft.plan)) errors.plan = 'planError';
     if (draft.maxConcurrentTasks.trim() !== '' && (!/^\d+$/.test(draft.maxConcurrentTasks) || Number(draft.maxConcurrentTasks) < 1 || Number(draft.maxConcurrentTasks) > 100)) errors.maxConcurrentTasks = 'quotaError';
   }
   return errors;

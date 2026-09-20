@@ -13,7 +13,7 @@ export interface BuildKitSettings {
 export function buildKitBuilder(k8s: K8sClient, settings: BuildKitSettings): ImageBuilder {
   return {
     start: async (spec) => {
-      const name = `build-${spec.releaseId.slice(-12)}`;
+      const name = `build-${spec.legacyResourceId ? spec.legacyResourceId.slice(-12) : spec.releaseId.replaceAll('-', '')}`;
       // 刚签发的 GitLab 项目访问令牌偶尔还没在 Git HTTP 认证路径上生效，克隆会以 401 失败；退避重试三次。
       const script = [
         'set -eu',

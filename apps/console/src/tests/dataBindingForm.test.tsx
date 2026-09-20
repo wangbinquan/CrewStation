@@ -8,12 +8,12 @@ import { messages } from '../features/dev-session/i18n/zh-CN';
 import { renderElement } from './renderElement';
 import { bindingDisplayState, productionAccessModes } from '../features/dev-session/model/dataAccessForm';
 
-const projectId = `prj_${'a'.repeat(32)}`, taskId = `tsk_${'b'.repeat(32)}`, serviceId = `svc_${'c'.repeat(32)}`;
+const projectId = '01a0bf5d-8f4b-7e1e-8dde-c9c2ae13ed34', taskId = '01a0bf5d-8f4b-7b61-81de-655e8f149909', serviceId = '01a0bf5d-8f4b-7d97-81d1-7163b23b1d2e';
 const originalFetch = globalThis.fetch;
 let page: Awaited<ReturnType<typeof renderElement>> | undefined;
 afterEach(() => { page?.unmount(); page = undefined; globalThis.fetch = originalFetch; });
 function Harness({ canDevelop = true, canManage = true, service = serviceId }: { readonly canDevelop?: boolean; readonly canManage?: boolean; readonly service?: string | null }) { return <DataBindingPane data={useDataBindings(projectId, taskId, service ?? undefined, { canDevelop, canManage })} />; }
-const record = (id: string, patch: Partial<TaskDataBindingDto> = {}): TaskDataBindingDto => ({ id, taskId: taskId as TaskDataBindingDto['taskId'], mode: 'diagnostic-readonly', state: 'requested', ttlMinutes: 30, requestedBy: `usr_${'d'.repeat(32)}` as TaskDataBindingDto['requestedBy'], requestedByName: '开发者小李', createdAt: '2026-09-13T00:00:00.000Z', ...patch });
+const record = (id: string, patch: Partial<TaskDataBindingDto> = {}): TaskDataBindingDto => ({ id, taskId: taskId as TaskDataBindingDto['taskId'], mode: 'diagnostic-readonly', state: 'requested', ttlMinutes: 30, requestedBy: '01a0bf5d-8f4b-7baf-8eed-680262285455' as TaskDataBindingDto['requestedBy'], requestedByName: '开发者小李', createdAt: '2026-09-13T00:00:00.000Z', ...patch });
 function setup(items: TaskDataBindingDto[] = []) {
   const requests: Array<{ path: string; body?: Record<string, unknown> }> = [];
   const state = { items, failRead: false, failWrite: false, hold: undefined as Promise<void> | undefined };
@@ -115,7 +115,7 @@ test('开发者可以申请但不审批；只读角色和未开通服务有明�
 });
 
 test('同一项目更换开发任务时不沿用旧任务的绑定缓存或申请草稿', async () => {
-  setup([record('previous-task-binding')]); const firstFetch = globalThis.fetch, nextTask = `tsk_${'e'.repeat(32)}`;
+  setup([record('previous-task-binding')]); const firstFetch = globalThis.fetch, nextTask = '01a0bf5d-8f4b-77a6-8262-352fbda71894';
   let finish: () => void; const held = new Promise<void>((resolve) => { finish = resolve; });
   globalThis.fetch = (async (raw, init) => {
     if (String(raw).includes(`/tasks/${nextTask}/data-bindings`)) { await held; return new Response(JSON.stringify({ items: [record('new-task-binding', { taskId: nextTask as TaskDataBindingDto['taskId'] })] }), { headers: { 'content-type': 'application/json' } }); }

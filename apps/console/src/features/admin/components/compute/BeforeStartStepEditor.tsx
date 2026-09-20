@@ -32,7 +32,7 @@ export function BeforeStartStepEditor({ step, index, errors, disabled, onChange 
   const err = (field: string) => stepErrorText(t, errors, index, field);
   return (
     <div className={styles.fields}>
-      <AdminField label={t('admin.profile.step.stepId')} value={step.stepId} onChange={(stepId) => onChange({ stepId })} disabled={disabled} hint={t('admin.profile.step.stepIdHint')} error={err('stepId')} />
+      <AdminField label={t('admin.profile.step.stepId')} value={step.stepId} onChange={() => undefined} readOnly disabled={disabled} hint={t('admin.profile.step.stepIdHint')} error={err('stepId')} />
       <AdminField label={t('admin.profile.step.name')} value={step.name} onChange={(name) => onChange({ name })} disabled={disabled} error={err('name')} />
       {step.kind === 'file' ? <FileFields step={step} disabled={disabled} err={err} onChange={onChange} /> : <ScriptFields step={step} disabled={disabled} err={err} onChange={onChange} />}
     </div>

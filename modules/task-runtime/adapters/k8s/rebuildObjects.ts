@@ -1,12 +1,13 @@
 import type { K8sClient, K8sObject, ResourceRef } from '@crewstation/k8s';
 import { LABELS } from '@crewstation/k8s';
 import { precondition } from '@crewstation/kernel';
+import { rebuildLabelsMatch } from '../../domain/physicalIdentity';
 import type { EnvironmentRebuild } from '../../domain/environmentRebuild';
 
 export const rebuildLabel = 'crewstation.io/rebuild';
 export function assertRebuildObject(object: K8sObject, record: EnvironmentRebuild, expectedUid?: string): string {
   const uid = object.metadata.uid;
-  if (!uid || object.metadata.labels?.[rebuildLabel] !== record.id || object.metadata.labels?.[LABELS.task] !== record.taskId || (expectedUid && uid !== expectedUid)) {
+  if (!uid || !rebuildLabelsMatch(object.metadata.labels?.[LABELS.task], object.metadata.labels?.[rebuildLabel], record) || (expectedUid && uid !== expectedUid)) {
     throw precondition('恢复资源的实例或归属已变化，已停止操作');
   }
   return uid;

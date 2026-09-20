@@ -7,6 +7,9 @@ import type { CatalogEntryState } from './apiOperation';
  * 同名代理只能属于一个服务；请求经服务域前缀 `/api/<proxy>/` 路由。
  */
 export interface ApiProxy {
+  readonly id: string;
+  readonly name: string;
+  /** Protocol route code; it is not the resource's identity or display name. */
   readonly proxy: string;
   readonly projectId: ProjectId;
   readonly serviceId: ServiceId;

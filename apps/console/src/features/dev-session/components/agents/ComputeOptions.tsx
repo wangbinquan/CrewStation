@@ -19,7 +19,7 @@ export function ComputeOptions({ items, withDescription = false }: { readonly it
   return (
     <>
       <option value="">{fallback ? t('devSession.agents.computeDefaultNamed', { name: fallback.name }) : t('devSession.agents.computeNoDefault')}</option>
-      {items.map((item) => <option key={item.name} value={item.name} disabled={!item.available}>{label(item)}</option>)}
+      {items.map((item) => <option key={item.id} value={item.id} disabled={!item.available}>{label(item)}</option>)}
     </>
   );
 }

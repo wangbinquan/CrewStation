@@ -18,6 +18,11 @@ export function podIdentityUseCases(deps: GatewayUseCaseDeps) {
     syncPod: async (pod: ObservedPod): Promise<void> => {
       const identity = identityFromLabels(pod.labels);
       if (!identity) return;
+      if (identity.taskId && deps.normalizeTaskId) {
+        const taskId = await deps.normalizeTaskId(identity.taskId);
+        if (!taskId) return;
+        identity.taskId = taskId;
+      }
       const now = deps.clock.now();
       if (pod.deleted || !pod.ip || pod.phase === 'Succeeded' || pod.phase === 'Failed') {
         await deps.pods.markDeleted(pod.name, pod.namespace, now);

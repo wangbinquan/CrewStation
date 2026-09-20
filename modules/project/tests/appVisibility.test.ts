@@ -26,17 +26,17 @@ beforeAll(async () => {
   [admin, owner, dev, tester, visitor, other] = actors as [Actor, Actor, Actor, Actor, Actor, Actor];
   module = createProjectModule({ db: tdb.db, identity: identity.api,
     hosts: { prodHost: (s) => `${s}.test`, previewHost: (s) => `preview.${s}.test`, serviceHost: (s) => `${s}.svc.test` },
-    settings: { defaultMaxConcurrentTasks: 3, defaultServicePlan: 'standard' },
+    settings: { defaultMaxConcurrentTasks: 3, defaultServicePlan: '01a0bf5d-8f4b-7fe6-8d34-68cf5c74d8ec' },
   });
   secondModule = createProjectModule({ db: tdb.db, identity: identity.api,
     hosts: { prodHost: (s) => `${s}.test`, previewHost: (s) => `preview.${s}.test`, serviceHost: (s) => `${s}.svc.test` },
-    settings: { defaultMaxConcurrentTasks: 3, defaultServicePlan: 'standard' },
+    settings: { defaultMaxConcurrentTasks: 3, defaultServicePlan: '01a0bf5d-8f4b-7fe6-8d34-68cf5c74d8ec' },
   });
-  await module.api.upsertServicePlan(admin, { name: 'standard', cpu: '1', memory: '1Gi', maxReplicas: 3, description: '' });
+  await module.api.createServicePlan(admin, { id: '01a0bf5d-8f4b-7fe6-8d34-68cf5c74d8ec', name: 'standard', cpu: '1', memory: '1Gi', maxReplicas: 3, description: '' });
 });
 afterAll(async () => { await tdb?.drop(); });
 async function app(name = '协同应用', kind: ProjectDto['kind'] = 'DigitalWorker') {
-  return module.api.createProject(admin, { slug: `market-${++sequence}`, name, kind, ownerUserId: owner.userId, template: 'minimal-sample' });
+  return module.api.createProject(admin, { slug: `market-${++sequence}`, name, kind, ownerUserId: owner.userId, template: '01a0bf5d-8f4b-7002-9560-94caf593fb19' });
 }
 const query = (q = '') => ({ limit: 50, q });
 
@@ -71,7 +71,7 @@ describe.skipIf(!available)('市场范围与展示资料（真实 PostgreSQL）'
     expect(await module.api.checkAppVisibility(owner, p.id, other.userId)).toMatchObject({ visible: false, basis: 'hidden', revision: 1 });
     expect(await module.api.checkAppVisibility(owner, p.id, admin.userId)).toMatchObject({ visible: true, basis: 'admin' });
     await expect(module.api.setAppVisibility(owner, p.id, { ...setting, expectedRevision: 1, userIds: [] })).rejects.toMatchObject({ kind: 'validation', details: { issues: [{ path: ['userIds'] }] } });
-    await expect(module.api.setAppVisibility(owner, p.id, { ...setting, expectedRevision: 1, userIds: ['usr_00000000000000000000000000000000' as UserId] })).rejects.toMatchObject({ kind: 'validation', details: { field: 'userIds' } });
+    await expect(module.api.setAppVisibility(owner, p.id, { ...setting, expectedRevision: 1, userIds: ['01a0bf5d-8f4b-7622-8c1a-d607ceefa8df' as UserId] })).rejects.toMatchObject({ kind: 'validation', details: { field: 'userIds' } });
     expect((await module.api.getAppVisibility(owner, p.id)).revision).toBe(1);
   });
   test('两个实例同 revision 并发只有一次保存；展示资料与范围共用修订且不丢其他字段', async () => {
@@ -117,6 +117,6 @@ describe.skipIf(!available)('市场范围与展示资料（真实 PostgreSQL）'
     expect((await request('member-candidates?identity=visitor%40example.com', visitor)).status).toBe(404);
     expect((await request('app-visibility', admin)).status).toBe(200);
     expect((await request('app-visibility', owner, { mode: 'authenticated', userIds: [], expectedRevision: 0 })).status).toBe(200);
-    await expect(module.api.getAppVisibility(visitor, 'prj_00000000000000000000000000000000' as ProjectId)).rejects.toMatchObject({ kind: 'not_found' });
+    await expect(module.api.getAppVisibility(visitor, '01a0bf5d-8f4b-7206-87a4-93e975cdc6ee' as ProjectId)).rejects.toMatchObject({ kind: 'not_found' });
   });
 });

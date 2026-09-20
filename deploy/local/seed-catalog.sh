@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 往本机平台目录里种初始服务套餐与任务容器规格。幂等：PUT 是 upsert，重复执行无副作用。
+# 往本机平台目录里种初始服务套餐与任务容器规格。幂等：按发行包固定 UUID 创建；已存在时保留管理员当前配置。
 # 发行版里这一步由 `crewstation install` 的初始化阶段从发行包 profiles/ 读文件完成；本机没有发行包，值直接写在这里。
 # 算力档位不预置（RFC-006）：档位要指定镜像与二进制并真实测试通过才可选，由管理员在平台管理 → 算力档位里创建。
 # 前置：install-platform.sh 已跑完，控制台可登录。令牌与 Cookie 只进临时文件，从不打印。
@@ -8,6 +8,8 @@ ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 CONSOLE_URL="${CS_CONSOLE_URL:-http://console.cs.localhost}"
 SERVICE_PLAN="${CS_SERVICE_PLAN:-standard-small}"
 TASK_PROFILE="${CS_TASK_PROFILE:-coding-medium}"
+SERVICE_PLAN_ID="${CS_SERVICE_PLAN_ID:-01a0bf5d-8f4b-7000-9e4b-b54e91ee9d10}"
+TASK_PROFILE_ID="${CS_TASK_PROFILE_ID:-01a0bf5d-8f4b-7001-8458-107366e7de39}"
 
 log() { printf '\033[1;34m[seed]\033[0m %s\n' "$*"; }
 die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
@@ -32,17 +34,17 @@ code="$(admin_login_request "${CONSOLE_URL}" "${COOKIE_JAR}" "${BODY}")"
 chmod 600 "${COOKIE_JAR}"
 [ "$(jq -r '.user.isAdmin' "${BODY}")" = "true" ] || die "${ADMIN_USERNAME} 不是管理员，写不了平台目录"
 
-put() { # 路径 说明 <<< JSON
+register() { # 路径 说明 <<< JSON
   local path="$1" what="$2" code
   cat > "${REQ}"
-  code="$(api PUT "${path}" with-body)"
-  [ "${code}" = "200" ] || die "登记${what}失败：HTTP ${code} $(detail)"
+  code="$(api POST "${path}" with-body)"
+  [ "${code}" = "200" ] || [ "${code}" = "201" ] || [ "${code}" = "409" ] || die "登记${what}失败：HTTP ${code} $(detail)"
   log "已登记${what}"
 }
 
-jq -nc --arg n "${SERVICE_PLAN}" '{name:$n,cpu:"500m",memory:"512Mi",maxReplicas:3,description:"本机默认服务套餐"}' \
-  | put /v1/catalog/service-plans "服务套餐 ${SERVICE_PLAN}"
-jq -nc --arg n "${TASK_PROFILE}" '{name:$n,cpu:"1",memory:"2Gi",storage:"10Gi",description:"本机默认任务容器规格"}' \
-  | put /v1/catalog/task-profiles "任务容器规格 ${TASK_PROFILE}"
+jq -nc --arg n "${SERVICE_PLAN}" --arg id "${SERVICE_PLAN_ID}" '{id:$id,name:$n,cpu:"500m",memory:"512Mi",maxReplicas:3,description:"本机默认服务套餐"}' \
+  | register /v1/catalog/service-plans "服务套餐 ${SERVICE_PLAN}"
+jq -nc --arg n "${TASK_PROFILE}" --arg id "${TASK_PROFILE_ID}" '{id:$id,name:$n,cpu:"1",memory:"2Gi",storage:"10Gi",description:"本机默认任务容器规格"}' \
+  | register /v1/catalog/task-profiles "任务容器规格 ${TASK_PROFILE}"
 
 log "完成。算力档位请在平台管理 → 算力档位里创建、测试通过并设为默认。"

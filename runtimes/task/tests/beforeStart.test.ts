@@ -54,7 +54,7 @@ describe('启动前 Hook 执行器（RFC-004）', () => {
       { kind: 'file', stepId: 'summary', name: '写汇总', pathTemplate: '{{agent.runDir}}/summary.txt', format: 'text', mode: 0o600, existing: 'replace', contentTemplate: 'js={{env.FROM_JS}} sh={{env.FROM_SHELL}}' },
     ]) });
     expect(outcome.execution.state).toBe('succeeded');
-    expect(outcome.execution.profile).toEqual({ profile: 'qa-profile', revision: 3 });
+    expect(outcome.execution.profile).toEqual({ profileId: 'qa-profile', revision: 3 });
     expect(outcome.execution.steps.map((s) => s.state)).toEqual(outcome.execution.steps.map(() => 'succeeded'));
     const settings = JSON.parse(await readFile(join(outcome.home, '.claude', 'settings.json'), 'utf8'));
     expect(settings).toEqual({ env: { BASE: 'https://gateway.example', TOKEN: 'sk-secret-value-9x' }, quote: 'a"b' });

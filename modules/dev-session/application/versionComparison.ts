@@ -1,7 +1,7 @@
 import type { Actor, ComparisonDetailQuery, ComparisonDetails, ComparisonTarget, ProjectId, RunnerComparison, VersionComparisonDto } from '@crewstation/contracts';
 import { RunnerResultPayloads } from '@crewstation/contracts';
 import { notFound, precondition } from '@crewstation/kernel';
-import { decodeComparisonReference, deploymentReference, encodeComparisonReference } from '../domain/comparisonReference';
+import { deploymentReference } from '../domain/comparisonReference';
 import type { DevSessionUseCaseDeps } from './dependencies';
 import { readComparisonDeployment } from './comparisonDeployment';
 import { inspectWorkspace } from './workspaceStatus';
@@ -29,18 +29,19 @@ export function versionComparisonUseCases(deps: DevSessionUseCaseDeps) {
     }
     const latest = await readComparisonDeployment(deps, actor, service.serviceId, target);
     if (deploymentReference(deployment) !== deploymentReference(latest)) return { ...result, comparisonId: null, freshness: 'stale', taskId: env.id, deployment, latestDeployment: latest };
-    const comparisonId = result.comparisonId ? encodeComparisonReference({ taskId: env.id, runnerId: result.comparisonId, target, deployment: deploymentReference(deployment) }) : null;
+    const comparisonId = result.comparisonId ? await deps.comparisons.create({ taskId: env.id, runnerComparisonId: result.comparisonId, target, deployment: deploymentReference(deployment) }) : null;
     return { ...result, comparisonId, taskId: env.id, deployment };
   };
   const versionComparisonDetails = async (actor: Actor, projectId: ProjectId, comparisonId: string, query: ComparisonDetailQuery): Promise<ComparisonDetails> => {
     const { env, service } = await context(actor, projectId);
-    const reference = decodeComparisonReference(comparisonId);
+    const reference = await deps.comparisons.get(comparisonId);
+    if (!reference) throw precondition('比较引用已过期或无效，请重新计算', { code: 'comparison_stale' });
     if (env.id !== reference.taskId || !env.connected) throw precondition('比较所属的会话已变化或未连接，请重新计算', { code: 'comparison_stale' });
     const current = async () => readComparisonDeployment(deps, actor, service.serviceId, reference.target);
     if (deploymentReference(await current()) !== reference.deployment) throw precondition('目标部署已变化，旧比较失效，请重新计算', { code: 'comparison_stale' });
-    const result = RunnerResultPayloads.workspaceComparisonDetails.parse(await deps.runner.sendCommand(env.id, { ...query, id: `diff-${crypto.randomUUID()}`, type: 'workspaceComparisonDetails', comparisonId: reference.runnerId }));
+    const result = RunnerResultPayloads.workspaceComparisonDetails.parse(await deps.runner.sendCommand(env.id, { ...query, id: `diff-${crypto.randomUUID()}`, type: 'workspaceComparisonDetails', comparisonId: reference.runnerComparisonId }));
     if (deploymentReference(await current()) !== reference.deployment) throw precondition('读取期间目标部署已变化，请重新计算', { code: 'comparison_stale' });
-    return { ...result, comparisonId };
+    return { ...result, comparisonId: reference.id };
   };
   const refreshComparisonHistory = async (actor: Actor, projectId: ProjectId, target: ComparisonTarget = 'prod'): Promise<VersionComparisonDto> => {
     const { env, service } = await context(actor, projectId, 'develop');

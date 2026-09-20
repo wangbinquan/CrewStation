@@ -12,21 +12,21 @@ describe('个人布局与保存竞争', () => {
   test('移动、排序、关闭最后页签和恢复均保留真实 CLI 身份', () => {
     let layout = initialWorkspaceLayout('一');
     const one = layout.activeTabId;
-    layout = moveTerminal(moveTerminal(layout, 'cli-a', one), 'cli-b', one);
-    layout = reorderTerminal(layout, one, 'cli-b', -1);
-    expect(layout.tabs[0]?.paneOrder).toEqual(['cli-b', 'cli-a']);
+    layout = moveTerminal(moveTerminal(layout, '01a0bf5d-8f4b-7dac-8e19-e226732a75a4', one), '01a0bf5d-8f4b-7b34-8c40-a2ff43c1a8f6', one);
+    layout = reorderTerminal(layout, one, '01a0bf5d-8f4b-7b34-8c40-a2ff43c1a8f6', -1);
+    expect(layout.tabs[0]?.paneOrder).toEqual(['01a0bf5d-8f4b-7b34-8c40-a2ff43c1a8f6', '01a0bf5d-8f4b-7dac-8e19-e226732a75a4']);
     layout = addWorkspaceTab(layout, '二');
-    layout = moveTerminal(layout, 'cli-a', layout.activeTabId);
+    layout = moveTerminal(layout, '01a0bf5d-8f4b-7dac-8e19-e226732a75a4', layout.activeTabId);
     layout = closeWorkspaceTab(layout, one, '三');
-    expect(layout.hiddenTerminalIds).toEqual(['cli-b']);
+    expect(layout.hiddenTerminalIds).toEqual(['01a0bf5d-8f4b-7b34-8c40-a2ff43c1a8f6']);
     layout = closeWorkspaceTab(layout, layout.activeTabId, '三');
     expect(layout.tabs).toHaveLength(1);
     expect(layout.tabs[0]?.paneOrder).toEqual([]);
-    expect(layout.hiddenTerminalIds).toEqual(['cli-b', 'cli-a']);
-    layout = moveTerminal(layout, 'cli-b', layout.activeTabId);
-    layout = reconcileWorkspaceLayout(layout, ['cli-a', 'cli-b', 'cli-c']);
-    expect(layout.tabs[0]?.paneOrder).toEqual(['cli-b']);
-    expect(layout.hiddenTerminalIds).toEqual(['cli-a', 'cli-c']);
+    expect(layout.hiddenTerminalIds).toEqual(['01a0bf5d-8f4b-7b34-8c40-a2ff43c1a8f6', '01a0bf5d-8f4b-7dac-8e19-e226732a75a4']);
+    layout = moveTerminal(layout, '01a0bf5d-8f4b-7b34-8c40-a2ff43c1a8f6', layout.activeTabId);
+    layout = reconcileWorkspaceLayout(layout, ['01a0bf5d-8f4b-7dac-8e19-e226732a75a4', '01a0bf5d-8f4b-7b34-8c40-a2ff43c1a8f6', '01a0bf5d-8f4b-74b4-891b-9e2229ecaa32']);
+    expect(layout.tabs[0]?.paneOrder).toEqual(['01a0bf5d-8f4b-7b34-8c40-a2ff43c1a8f6']);
+    expect(layout.hiddenTerminalIds).toEqual(['01a0bf5d-8f4b-7dac-8e19-e226732a75a4', '01a0bf5d-8f4b-74b4-891b-9e2229ecaa32']);
     expect(WorkspaceLayoutSchema.safeParse(layout).success).toBe(true);
   });
   test('写请求串行；旧回执和晚到刷新不能覆盖后续编辑', async () => {

@@ -43,8 +43,8 @@ export class RunnerConfigError extends Error {
 type Env = Record<string, string | undefined>;
 
 export function loadConfigFromEnv(env: Env = process.env): RunnerConfig {
-  const taskId = TaskIdSchema.safeParse(env.CS_RUNNER_TASK_ID ?? required(env, 'CS_TASK_ID'));
-  if (!taskId.success) throw new RunnerConfigError('CS_TASK_ID 不是合法的任务 ID（tsk_<32 位十六进制>）');
+  const taskId = TaskIdSchema.safeParse(env.CS_CANONICAL_RUNNER_TASK_ID ?? env.CS_RUNNER_TASK_ID ?? required(env, 'CS_TASK_ID'));
+  if (!taskId.success) throw new RunnerConfigError('CS_TASK_ID 不是合法的任务 ID（36 字符 UUIDv7）');
   return {
     taskId: taskId.data,
     ...(env.CS_RUNNER_NATIVE_ID ? { nativeRunnerId: NativeTerminalRosterSchema.shape.runnerId.parse(env.CS_RUNNER_NATIVE_ID) } : {}),

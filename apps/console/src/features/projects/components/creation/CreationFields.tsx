@@ -34,13 +34,13 @@ export function CreationResources({ draft, errors, catalog, disabled, setField }
     <FormField label={t('projects.create.template')} hint={t(options.length ? 'projects.wizard.templateHint' : 'projects.wizard.noTemplates')} hintId="creation-template-hint" error={errors.template} errorId="creation-template-error">
       <select {...attributes('template', errors.template)} value={draft.template} disabled={disabled} onChange={(event) => setField('template', event.target.value)}>
         <option value="">{t('projects.wizard.chooseTemplate')}</option>
-        {options.map((template) => <option value={template.name} key={template.name}>{template.name}</option>)}
+        {options.map((template) => <option value={template.id} key={template.id}>{template.name}</option>)}
       </select>
     </FormField>
     <FormField label={t('projects.wizard.plan')} hint={t(catalog.plans.length ? 'projects.wizard.planHint' : 'projects.wizard.noPlans')} hintId="creation-plan-hint" error={errors.plan} errorId="creation-plan-error">
       <select {...attributes('plan', errors.plan)} value={draft.plan} disabled={disabled} onChange={(event) => setField('plan', event.target.value)}>
         <option value="">{t('projects.wizard.choosePlan')}</option>
-        {catalog.plans.map((plan) => <option value={plan.name} key={plan.name}>{plan.name} · {plan.cpu} CPU · {plan.memory}</option>)}
+        {catalog.plans.map((plan) => <option value={plan.id} key={plan.id}>{plan.name} · {plan.cpu} CPU · {plan.memory}</option>)}
       </select>
     </FormField>
     <FormField label={t('projects.wizard.quota')} hint={t('projects.wizard.quotaHint')} hintId="creation-maxConcurrentTasks-hint" error={errors.maxConcurrentTasks} errorId="creation-maxConcurrentTasks-error">

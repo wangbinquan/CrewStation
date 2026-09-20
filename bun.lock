@@ -146,6 +146,7 @@
         "zod": "4.6.2",
       },
       "devDependencies": {
+        "@crewstation/module-identity": "workspace:*",
         "@crewstation/testkit": "workspace:*",
       },
     },
@@ -410,6 +411,7 @@
       },
       "devDependencies": {
         "@crewstation/testkit": "workspace:*",
+        "drizzle-orm": "0.45.2",
       },
     },
     "modules/project": {

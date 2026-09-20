@@ -1,16 +1,21 @@
 import { z } from 'zod';
-import { ProfileTestIdSchema, SlugSchema, TaskIdSchema, UserIdSchema } from '../../ids';
+import { ProfileTestIdSchema, ResourceIdSchema, TaskIdSchema, UserIdSchema } from '../../ids';
 import { BeforeStartErrorSchema, BeforeStartStepsSchema, ConfigFileBindingSchema, EnvNameSchema, RunnerInterpreterSchema, StepIdSchema } from '../../taskrunner/beforeStart';
 import { AgentProtocolSchema, LaunchSpecSchema } from '../../taskrunner/launch';
 
 /**
  * 算力档位（RFC-006）：一个对象就是一份完整执行配置——协议、镜像、二进制与参数、启动前步骤、变量与凭据、模型、资源套餐。
- * 只有管理员维护；业务与租户只按名称（或 `default`）引用，看不到镜像、二进制、模型与步骤。
+ * 只有管理员维护；业务与租户通过 UUID（或显式默认选择器）引用，看不到镜像、二进制、模型与步骤。
  */
 
-/** Manifest 与 API 里指代「管理员设为默认的档位」的保留名；每次启动 Agent 时解析（C13、C17）。 */
+/** Manifest 与 API 里指代「管理员设为默认的档位」的旧协议符号；当前协议用显式默认选择器，每次启动 Agent 时解析（C13、C17）。 */
 export const DEFAULT_COMPUTE_PROFILE = 'default';
-export const ComputeProfileNameSchema = SlugSchema.refine((name) => name !== DEFAULT_COMPUTE_PROFILE, '`default` 是保留名，指代平台默认档位');
+export const ComputeProfileSelectorSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('default') }).strict(),
+  z.object({ kind: z.literal('profile'), profileId: ResourceIdSchema }).strict(),
+]);
+export type ComputeProfileSelector = z.infer<typeof ComputeProfileSelectorSchema>;
+export const ComputeProfileNameSchema = z.string().trim().min(1).max(80);
 
 /** 档位用途：通用终端协议只能用于「＋ CLI」。 */
 export const ComputeUsageSchema = z.enum(['cli', 'agent', 'subtask']);
@@ -37,11 +42,13 @@ export const ComputeProfileContentSchema = z.object({
   image: z.string().min(1).max(512),
   launch: LaunchSpecSchema,
   /** 该档位每个 Agent Pod 的资源套餐；省略时用平台默认任务套餐。 */
-  taskProfile: SlugSchema.optional(),
+  taskProfile: ResourceIdSchema.optional(),
   steps: BeforeStartStepsSchema.default([]),
   vars: z.record(EnvNameSchema, z.string().max(65536)).default({}),
   /** 修订声明的凭据名；模板只能引用这里列出的名字，值经 credentials 单独写入。 */
-  secretNames: z.array(EnvNameSchema).max(64).default([]),
+  secrets: z.array(z.object({ id: ResourceIdSchema, name: EnvNameSchema }).strict()).max(64).default([]).superRefine((entries, ctx) => {
+    if (new Set(entries.map((entry) => entry.id)).size !== entries.length || new Set(entries.map((entry) => entry.name)).size !== entries.length) ctx.addIssue({ code: 'custom', message: '凭据 ID 与注入变量名各自必须唯一' });
+  }),
   configFile: ConfigFileBindingSchema.default({ kind: 'none' }),
   terminalTest: TerminalTestSchema.optional(),
 }).strict();
@@ -52,22 +59,23 @@ export const ProfileCredentialWriteSchema = z.discriminatedUnion('op', [
   z.object({ op: z.literal('replace'), value: z.string().min(1).max(65536) }).strict(),
   z.object({ op: z.literal('clear') }).strict(),
 ]);
-export const ProfileCredentialStateSchema = z.object({ name: EnvNameSchema, set: z.boolean(), updatedBy: UserIdSchema.optional(), updatedAt: z.iso.datetime().optional() });
+export const ProfileCredentialStateSchema = z.object({ id: ResourceIdSchema, name: EnvNameSchema, set: z.boolean(), updatedBy: UserIdSchema.optional(), updatedAt: z.iso.datetime().optional() });
 
 export const CreateComputeProfileRequestSchema = z.object({
   name: ComputeProfileNameSchema,
   description: ComputeProfileDescriptionSchema,
   defaultVisible: z.boolean().optional(),
   content: ComputeProfileContentSchema,
-  credentials: z.record(EnvNameSchema, ProfileCredentialWriteSchema).default({}),
+  credentials: z.record(ResourceIdSchema, ProfileCredentialWriteSchema).default({}),
 }).strict();
 
 /** 保存：expectedRevision 比较；执行相关内容变化才生成新修订并自动测试，只改说明不生成（P3）。 */
 export const SaveComputeProfileRequestSchema = z.object({
   expectedRevision: z.number().int().min(1),
+  name: ComputeProfileNameSchema.optional(),
   description: DescriptionTextSchema.optional(),
   content: ComputeProfileContentSchema,
-  credentials: z.record(EnvNameSchema, ProfileCredentialWriteSchema).default({}),
+  credentials: z.record(ResourceIdSchema, ProfileCredentialWriteSchema).default({}),
 }).strict();
 
 export const SetComputeProfileEnabledRequestSchema = z.object({ enabled: z.boolean() }).strict();
@@ -105,6 +113,7 @@ export const ProfileTestStageSchema = z.object({
 export const ProfileTestContextSchema = z.object({
   kind: z.literal('platform-namespace'),
   taskId: TaskIdSchema.optional(),
+  agentId: ResourceIdSchema.optional(),
   image: z.string().optional(),
   imageDigest: z.string().optional(),
   runnerProtocol: z.number().int().optional(),
@@ -115,7 +124,7 @@ export const ProfileTestContextSchema = z.object({
 
 export const ProfileTestDtoSchema = z.object({
   testId: ProfileTestIdSchema,
-  profile: SlugSchema,
+  profile: ResourceIdSchema,
   revision: z.number().int().min(1),
   contentHash: z.string().min(1),
   trigger: z.enum(['save', 'manual']),
@@ -138,7 +147,8 @@ export const ComputeProfileAvailabilitySchema = z.object({
 });
 
 export const ComputeProfileListItemSchema = z.object({
-  name: SlugSchema,
+  id: ResourceIdSchema,
+  name: ComputeProfileNameSchema,
   protocol: AgentProtocolSchema,
   description: z.string(),
   enabled: z.boolean(),
@@ -149,7 +159,7 @@ export const ComputeProfileListItemSchema = z.object({
   imageDigest: z.string(),
   binaryPath: z.string(),
   model: z.string().optional(),
-  taskProfile: SlugSchema.optional(),
+  taskProfile: ResourceIdSchema.optional(),
   availability: ComputeProfileAvailabilitySchema,
   latestTest: ProfileTestDtoSchema.optional(),
   updatedBy: UserIdSchema,
@@ -173,7 +183,8 @@ export const ComputeProfileReferencesSchema = z.object({ code: z.literal('profil
 
 /** 租户面投影（沿用 RFC-001 的按角色裁剪）：够画下拉，不泄露镜像、二进制与模型。 */
 export const ComputeProfileSummaryDtoSchema = z.object({
-  name: SlugSchema,
+  id: ResourceIdSchema,
+  name: ComputeProfileNameSchema,
   description: z.string().default(''),
   /** 通用终端协议：只能用于「＋ CLI」，没有 Agent 动态。 */
   terminalOnly: z.boolean(),

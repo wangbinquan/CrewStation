@@ -4,7 +4,7 @@ import type { K8sClient } from '@crewstation/k8s';
 import { kubernetesTaskRecoveryCluster } from '../adapters/k8s/taskRecoveryCluster';
 import type { TaskEnvironment } from '../domain/taskEnvironment';
 
-const env = { id: 'tsk_qa', podName: 'task-qa', pvcName: 'task-qa-work', namespace: 'cs-qa' } as TaskEnvironment;
+const env = { id: '01a0bf5d-8f4b-7810-8868-5612de9eb893', podName: 'task-qa', pvcName: 'task-qa-work', namespace: 'cs-qa' } as TaskEnvironment;
 async function fixture() {
   const k8s = createFakeK8sClient();
   await k8s.create({ apiVersion: 'v1', kind: 'Pod', metadata: { name: env.podName, namespace: env.namespace, uid: 'old-pod' }, status: { phase: 'Failed' } });

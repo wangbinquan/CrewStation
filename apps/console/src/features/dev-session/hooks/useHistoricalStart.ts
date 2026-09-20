@@ -28,7 +28,7 @@ export function useHistoricalStart(mutation: DevAgentsHandle['start'], onStarted
     if (sent.busy || sent.prompt.trim() === '') return;
     // 必须在 React 更新 disabled 之前锁定，防止连续点击创建两个真正的 Agent。
     update({ ...sent, busy: true, error: undefined });
-    void mutation.mutateAsync({ ...(sent.compute === '' ? {} : { compute: sent.compute }), permission: sent.permission, prompt: sent.prompt.trim() }).then(
+    void mutation.mutateAsync({ compute: sent.compute === '' ? { kind: 'default' } : { kind: 'profile', profileId: sent.compute }, permission: sent.permission, prompt: sent.prompt.trim() }).then(
       (agent) => {
         if (!mounted.current) return;
         const showResult = current.current.open;

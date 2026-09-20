@@ -1,3 +1,5 @@
+import { computeSelector } from './computeFixture';
+import { computeId } from './computeFixture';
 import { expect, test } from 'bun:test';
 import type { ProfileRevisionRef, RunnerCommand } from '@crewstation/contracts';
 import { forbidden, quotaExceeded } from '@crewstation/kernel';
@@ -7,16 +9,16 @@ import { fakeComputeCatalog } from './computeFixture';
 import { isolatedNativeFixture } from './isolatedNativeFixture';
 import { workspaceActor as actor, workspaceProject as projectId, workspaceTask as taskId } from './workspaceFixture';
 
-const ref: ProfileRevisionRef = { profile: 'gw', revision: 5 };
+const ref: ProfileRevisionRef = { profileId: computeId('gw'), revision: 5 };
 
 test('headless Agent：受理即登记独立执行环境（档位镜像、固定修订、占额）；子 Runner 连上后派发，launch 与材料不落 DTO；档位不可用时给出原因（RFC-006）', async () => {
   const f = agentExecutionFixture();
-  const profiles: FakeProfile[] = [{ name: 'gw', protocol: 'opencode', model: 'anthropic/m', revision: 5, taskProfile: 'cli-small', secrets: { KEY: 'sk-r5' } }];
+  const profiles: FakeProfile[] = [{ name: 'gw', protocol: 'opencode', model: 'anthropic/m', revision: 5, taskProfile: '01a0bf5d-8f4b-7dd6-8102-2aa5cc3255b1', secrets: { KEY: 'sk-r5' } }];
   const catalog = fakeComputeCatalog(() => profiles);
   f.deps.compute = catalog;
-  const dto = await f.api.startAgent(actor, taskId, { compute: 'gw', permission: 'edit', prompt: 'hi' });
-  expect(dto).toMatchObject({ state: 'preparing', compute: 'gw', profileRevision: 5, execution: { state: 'queued' } });
-  expect(f.inputs[0]).toMatchObject({ purpose: 'agent', parentTaskId: taskId, agentId: dto.agentId, profile: 'cli-small', computeProfile: { name: 'gw', revision: 5 } });
+  const dto = await f.api.startAgent(actor, taskId, { compute: computeSelector('gw'), permission: 'edit', prompt: 'hi' });
+  expect(dto).toMatchObject({ state: 'preparing', compute: computeId('gw'), profileRevision: 5, execution: { state: 'queued' } });
+  expect(f.inputs[0]).toMatchObject({ purpose: 'agent', parentTaskId: taskId, agentId: dto.agentId, profile: '01a0bf5d-8f4b-7dd6-8102-2aa5cc3255b1', computeProfile: { profileId: computeId('gw'), revision: 5 } });
   expect(f.inputs[0]!.image).toContain('registry.test/runtime/gw@sha256:');
   expect(f.routed.filter((r) => r.command.type === 'startAgent')).toHaveLength(0);
   const executionId = dto.execution!.taskId;
@@ -24,7 +26,7 @@ test('headless Agent：受理即登记独立执行环境（档位镜像、固定
   await f.lifecycle.dispatchExecution(executionId);
   const start = f.routed.find((r) => r.command.type === 'startAgent')!;
   expect(start.taskId).toBe(executionId);
-  expect(start.command).toMatchObject({ compute: 'gw', profileRevision: 5, mode: 'interactive', initialPrompt: 'hi', launch: { protocol: 'opencode', binaryPath: '/usr/local/bin/opencode', model: 'anthropic/m' }, beforeStart: { profile: 'gw', revision: 5, secrets: { KEY: 'sk-r5' } } });
+  expect(start.command).toMatchObject({ compute: computeId('gw'), profileRevision: 5, mode: 'interactive', initialPrompt: 'hi', launch: { protocol: 'opencode', binaryPath: '/usr/local/bin/opencode', model: 'anthropic/m' }, beforeStart: { profile: computeId('gw'), revision: 5, secrets: { KEY: 'sk-r5' } } });
   expect((start.command as Extract<RunnerCommand, { type: 'startAgent' }>).processAttemptId).toBe(`${dto.agentId}:1`);
   expect(catalog.materials).toEqual([ref]);
   expect(JSON.stringify(dto)).not.toContain('sk-r5');
@@ -33,7 +35,7 @@ test('headless Agent：受理即登记独立执行环境（档位镜像、固定
   await f.lifecycle.dispatchExecution(executionId);
   expect(f.routed.filter((r) => r.command.type === 'startAgent')).toHaveLength(1);
   profiles[0]!.available = false;
-  await expect(f.api.startAgent(actor, taskId, { compute: 'gw', permission: 'edit', prompt: 'hi' })).rejects.toMatchObject({ kind: 'precondition', details: { code: 'profile_unavailable' } });
+  await expect(f.api.startAgent(actor, taskId, { compute: computeSelector('gw'), permission: 'edit', prompt: 'hi' })).rejects.toMatchObject({ kind: 'precondition', details: { code: 'profile_unavailable' } });
 });
 
 test('headless Agent：额度满直接回给用户并结束受理记录；消息与取消路由到子 Runner；终态事件后回收执行环境且不重启', async () => {
@@ -77,13 +79,13 @@ test('headless Agent：执行环境失败（镜像拉不下来、旧底座）时
 test('Agent 列表：beforeStart 事件显示“环境准备中／失败步骤”，不显示成正在执行；started 事件带档位修订；老 Agent 仍从父开发容器还原', async () => {
   const f = agentExecutionFixture();
   const at = '2026-09-16T00:00:00.000Z';
-  const execution = (state: 'running' | 'succeeded' | 'failed', stepState: 'running' | 'succeeded' | 'failed') => ({ executionId: 'bse_1', agentId: 'agt_m', processAttemptId: 'agt_m:1', profile: ref, state, queuedAt: at, currentStepId: stepState === 'running' ? 'warm' : undefined, steps: [{ stepId: 'warm', name: '预热脚本', kind: 'script' as const, state: stepState }], ...(state === 'failed' ? { error: { code: 'script_failed' as const, message: '退出码 3' } } : {}) });
+  const execution = (state: 'running' | 'succeeded' | 'failed', stepState: 'running' | 'succeeded' | 'failed') => ({ executionId: '01a0bf5d-8f4b-7e7f-81bb-b57bb9166e87', agentId: '01a0bf5d-8f4b-789e-8ab4-e73b7acef269', processAttemptId: 'agt_m:1', profile: ref, state, queuedAt: at, currentStepId: stepState === 'running' ? 'warm' : undefined, steps: [{ stepId: 'warm', name: '预热脚本', kind: 'script' as const, state: stepState }], ...(state === 'failed' ? { error: { code: 'script_failed' as const, message: '退出码 3' } } : {}) });
   f.emit(taskId, { kind: 'beforeStart', execution: execution('running', 'running') }, at);
-  expect((await f.api.listAgents(actor, taskId))[0]).toMatchObject({ agentId: 'agt_m', state: 'preparing', compute: 'gw', profileRevision: 5, beforeStart: { state: 'running', currentStep: '预热脚本' } });
+  expect((await f.api.listAgents(actor, taskId))[0]).toMatchObject({ agentId: '01a0bf5d-8f4b-789e-8ab4-e73b7acef269', state: 'preparing', compute: computeId('gw'), profileRevision: 5, beforeStart: { state: 'running', currentStep: '预热脚本' } });
   f.emit(taskId, { kind: 'beforeStart', execution: execution('succeeded', 'succeeded') }, at);
-  f.emit(taskId, { kind: 'agent', event: { agentId: 'agt_m', seq: 1, at, type: 'started', spec: { compute: 'gw', profileRevision: 5, protocol: 'opencode', model: 'anthropic/m', permission: 'edit' } } }, at);
+  f.emit(taskId, { kind: 'agent', event: { agentId: '01a0bf5d-8f4b-789e-8ab4-e73b7acef269', seq: 1, at, type: 'started', spec: { compute: computeId('gw'), profileRevision: 5, protocol: 'opencode', model: 'anthropic/m', permission: 'edit' } } }, at);
   const listed = (await f.api.listAgents(actor, taskId))[0]!;
-  expect(listed).toMatchObject({ state: 'running', compute: 'gw', profileRevision: 5 });
+  expect(listed).toMatchObject({ state: 'running', compute: computeId('gw'), profileRevision: 5 });
   expect(listed).not.toHaveProperty('execution');
   const g = agentExecutionFixture();
   g.emit(taskId, { kind: 'beforeStart', execution: execution('failed', 'failed') }, at);
@@ -92,11 +94,11 @@ test('Agent 列表：beforeStart 事件显示“环境准备中／失败步骤�
 
 test('独立 CLI：受理记录固定档位修订，后台派发按该修订取材料并带 attempt；当前修订变化不影响已受理的 CLI', async () => {
   const f = isolatedNativeFixture();
-  const profile: FakeProfile = { name: 'qa-cli', protocol: 'opencode', model: 'opencode/one', taskProfile: 'cli-small', isDefault: true, revision: 5, secrets: { KEY: 'sk-r5' } };
+  const profile: FakeProfile = { name: 'qa-cli', protocol: 'opencode', model: 'opencode/one', taskProfile: '01a0bf5d-8f4b-7dd6-8102-2aa5cc3255b1', isDefault: true, revision: 5, secrets: { KEY: 'sk-r5' } };
   const catalog = fakeComputeCatalog(() => [profile]);
   f.deps.compute = catalog;
   const terminal = await f.start();
-  expect(terminal).toMatchObject({ compute: 'qa-cli', profileRevision: 5, protocol: 'opencode' });
+  expect(terminal).toMatchObject({ compute: computeId('qa-cli'), profileRevision: 5, protocol: 'opencode' });
   const start = f.commands.find((c) => c.command.type === 'startAgentTerminal')!.command as Extract<RunnerCommand, { type: 'startAgentTerminal' }>;
   expect(start).toMatchObject({ profileRevision: 5, launch: { protocol: 'opencode', binaryPath: '/usr/local/bin/opencode' }, beforeStart: { revision: 5 } });
   expect(start.processAttemptId).toBe(`${terminal.agentId}:1`);
@@ -113,7 +115,7 @@ test('通用终端档位：「＋ CLI」可以起，launch 为 terminal 协议�
   const f = isolatedNativeFixture();
   f.deps.compute = fakeComputeCatalog(() => [{ name: 'tool', protocol: 'terminal', isDefault: true }]);
   const terminal = await f.start();
-  expect(terminal).toMatchObject({ compute: 'tool', protocol: 'terminal' });
+  expect(terminal).toMatchObject({ compute: computeId('tool'), protocol: 'terminal' });
   const start = f.commands.find((c) => c.command.type === 'startAgentTerminal')!.command as Extract<RunnerCommand, { type: 'startAgentTerminal' }>;
   expect(start.launch).toEqual({ protocol: 'terminal', binaryPath: '/opt/tool/bin/tool', extraArgs: [], isSandbox: false });
 });
@@ -125,8 +127,8 @@ test('Agent 与 CLI 的档位授权使用工作区项目，拒绝时不创建执
   for (const f of [headless, cli]) f.deps.compute.resolve = async (name, usage, id) => {
     requests.push({ name, usage, id }); throw forbidden('项目未获授权使用此档位');
   };
-  await expect(headless.api.startAgent(actor, taskId, { compute: 'private', permission: 'edit', prompt: 'x' })).rejects.toMatchObject({ kind: 'forbidden' });
-  await expect(cli.api.startNativeTerminal(actor, taskId, { ...cli.input(), compute: 'private' })).rejects.toMatchObject({ kind: 'forbidden' });
-  expect(requests).toEqual([{ name: 'private', usage: 'agent', id: projectId }, { name: 'private', usage: 'cli', id: projectId }]);
+  await expect(headless.api.startAgent(actor, taskId, { compute: computeSelector('private'), permission: 'edit', prompt: 'x' })).rejects.toMatchObject({ kind: 'forbidden' });
+  await expect(cli.api.startNativeTerminal(actor, taskId, { ...cli.input(), compute: computeSelector('private') })).rejects.toMatchObject({ kind: 'forbidden' });
+  expect(requests).toEqual([{ name: computeSelector('private'), usage: 'agent', id: projectId }, { name: computeSelector('private'), usage: 'cli', id: projectId }]);
   expect(headless.inputs).toEqual([]); expect(cli.allocations).toEqual([]);
 });

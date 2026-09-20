@@ -28,7 +28,7 @@ export function validateApiInvocationDraft(operation: ApiOperationDto, expectedT
     if (!value || value === '.' || value === '..' || value.length > 8192) { errors[`path:${name}`] = 'catalog.invoke.pathInvalid'; continue; }
     try { encodeURIComponent(value); } catch { errors[`path:${name}`] = 'catalog.invoke.pathInvalid'; }
   }
-  const parsed = ApiInvocationRequestSchema.safeParse({ expectedTaskId, operationKey: operation.key, pathParameters: draft.pathParameters, query, headers, body });
+  const parsed = ApiInvocationRequestSchema.safeParse({ expectedTaskId, operationId: operation.id, pathParameters: draft.pathParameters, query, headers, body });
   if (!expectedTaskId) errors.session = 'catalog.invoke.noSession';
   if (!parsed.success && Object.keys(errors).length === 0) errors.request = 'catalog.invoke.requestInvalid';
   return { errors, ...(parsed.success && Object.keys(errors).length === 0 ? { input: parsed.data } : {}) };

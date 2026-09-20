@@ -45,7 +45,7 @@ export function drizzleUserIdentityRepository(db: Executor): UserIdentityReposit
     listByUser: async (userId) => (await db.select().from(userIdentities).where(eq(userIdentities.userId, userId))).map(toIdentity),
     countByProvider: async (providerId) => Number((await db.select({ n: count() }).from(userIdentities).where(eq(userIdentities.providerId, providerId)))[0]?.n ?? 0),
     link: async (record, now) => {
-      await db.insert(userIdentities).values({ id: `uid_${crypto.randomUUID().replace(/-/g, '')}`, ...toIdentityRow(record), linkedAt: now, lastLoginAt: now });
+      await db.insert(userIdentities).values({ id: Bun.randomUUIDv7(), ...toIdentityRow(record), linkedAt: now, lastLoginAt: now });
     },
     refresh: async (record, now) => {
       await db.update(userIdentities)

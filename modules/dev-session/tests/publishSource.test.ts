@@ -12,7 +12,7 @@ test('确认后会话或 HEAD 已变化：不推送、不打标签，旧来源�
   // 原入口只看请求抵达时的会话与分支，会发布用户尚未确认的同分支新 HEAD。
   await expect(publish(workspaceActor, workspaceProject, { branch: 'main', version: 'patch', expectedCommitSha: 'a'.repeat(40) })).rejects.toMatchObject({ kind: 'precondition', details: { actual: workspaceSha } });
   commands.length = 0;
-  await expect(publish(workspaceActor, workspaceProject, { branch: 'main', version: 'patch', expectedTaskId: `tsk_${'f'.repeat(32)}` as TaskId })).rejects.toMatchObject({ kind: 'precondition' });
+  await expect(publish(workspaceActor, workspaceProject, { branch: 'main', version: 'patch', expectedTaskId: '01a0bf5d-8f4b-7390-879c-7f0eefe9fb44' as TaskId })).rejects.toMatchObject({ kind: 'precondition' });
   expect(commands).toHaveLength(0);
   expect(state.published).toBe(false);
 });

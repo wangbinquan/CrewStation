@@ -58,6 +58,6 @@ test('发布重新读取实际工作树，dirty 或分支变化时不推送', as
 
 test('确认对象已被替换时拒绝释放新会话', async () => {
   const { deps, state } = workspaceFixture();
-  await expect(sessionLifecycleUseCases(deps).releaseSession(workspaceActor, workspaceProject, { expectedTaskId: 'tsk_1123456789abcdef0123456789abcdef' as TaskId })).rejects.toMatchObject({ kind: 'precondition' });
+  await expect(sessionLifecycleUseCases(deps).releaseSession(workspaceActor, workspaceProject, { expectedTaskId: '01a0bf5d-8f4b-7ad2-8eeb-8f56308fb856' as TaskId })).rejects.toMatchObject({ kind: 'precondition' });
   expect(state.released).toBe(false);
 });

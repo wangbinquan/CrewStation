@@ -13,7 +13,7 @@ let tdb: TestDatabase;
 let session: SessionModule;
 let server: ReturnType<typeof Bun.serve>;
 let base = '';
-const taskId = 'tsk_0123456789abcdef0123456789abcdef' as TaskId;
+const taskId = '01a0bf5d-8f4b-7418-8a3f-7cbb4a1fd751' as TaskId;
 const connectedEvents: string[] = [];
 
 const openSocket = (url: string, headers: Record<string, string> = {}): Promise<{ ws: WebSocket; frames: unknown[]; next: (pred?: (f: unknown) => boolean) => Promise<unknown> }> => new Promise((resolve, reject) => {
@@ -31,7 +31,7 @@ beforeAll(async () => {
   session = createSessionModule({
     db: tdb.db,
     runnerAuth: { verifyRunnerToken: async (_t, token) => (token === 'good' ? { ok: true, projectId: 'prj' } : { ok: false, reason: '令牌无效' }) },
-    taskAccess: { canOpenStream: async (actor) => actor.userId !== ('usr_ffffffffffffffffffffffffffffffff' as UserId), onRunnerConnected: async () => { connectedEvents.push('up'); }, onRunnerDisconnected: async () => { connectedEvents.push('down'); } },
+    taskAccess: { canOpenStream: async (actor) => actor.userId !== ('01a0bf5d-8f4b-72ed-8b3d-1ceb06a30ca3' as UserId), onRunnerConnected: async () => { connectedEvents.push('up'); }, onRunnerDisconnected: async () => { connectedEvents.push('down'); } },
     isAdmin: async () => false,
     settings: { selfAddress: 'http://127.0.0.1:0', commandTimeoutMs: 2000, runnerStaleMs: 30000, replayLimit: 100 },
   });
@@ -45,7 +45,7 @@ afterAll(async () => { server?.stop(true); await tdb?.drop(); });
 describe.skipIf(!available)('session module', () => {
   test('原生状态写入 agent 索引，可按单 CLI 和游标分页读取，不混入其他会话', async () => {
     const store = drizzleRunnerEventStore(tdb.db);
-    const task = 'tsk_abcdefabcdefabcdefabcdefabcdefab' as TaskId;
+    const task = '01a0bf5d-8f4b-787c-8e65-e847123d1c3d' as TaskId;
     for (let seq = 1; seq <= 3; seq++) {
       const event = { kind: 'nativeActivity' as const, activity: { agentId: seq === 2 ? 'other' : 'native', terminalId: 'terminal', runnerId: crypto.randomUUID(), eventId: crypto.randomUUID(), seq, turnOrdinal: 0, signal: { source: 'opencode/1.18.29' as const, sourceEventId: `event-${seq}`, kind: 'source-ready' as const, occurredAt: new Date().toISOString(), nativeSessionId: null, turnId: null } } };
       await store.append({ taskId: task, seq, at: new Date(), event });
@@ -72,7 +72,7 @@ describe.skipIf(!available)('session module', () => {
     const stored = await session.api.listEvents(taskId, {});
     expect(stored.map((e) => [e.seq, e.event.kind])).toEqual([[1, 'agent']]);
 
-    const browser = await openSocket(`ws://${base}/v1/tasks/${taskId}/stream?sinceSeq=0`, { [IDENTITY_HEADERS.userId]: 'usr_0123456789abcdef0123456789abcdef' });
+    const browser = await openSocket(`ws://${base}/v1/tasks/${taskId}/stream?sinceSeq=0`, { [IDENTITY_HEADERS.userId]: '01a0bf5d-8f4b-7793-867c-efd7527b386b' });
     const ready = await browser.next((f) => (f as { type: string }).type === 'streamReady');
     expect(ready).toMatchObject({ connected: true, replayed: 1 });
     expect(browser.frames[0]).toMatchObject({ type: 'event', seq: 1 });
@@ -90,7 +90,7 @@ describe.skipIf(!available)('session module', () => {
     good.ws.send(JSON.stringify({ type: 'event', seq: 3, at: new Date().toISOString(), event: { kind: 'previewState', state: 'ready', port: 3000 } }));
     expect(await browser.next((f) => (f as { seq?: number }).seq === 3)).toMatchObject({ type: 'event' });
 
-    const stranger = await openSocket(`ws://${base}/v1/tasks/${taskId}/stream`, { [IDENTITY_HEADERS.userId]: 'usr_ffffffffffffffffffffffffffffffff' });
+    const stranger = await openSocket(`ws://${base}/v1/tasks/${taskId}/stream`, { [IDENTITY_HEADERS.userId]: '01a0bf5d-8f4b-72ed-8b3d-1ceb06a30ca3' });
     expect(await stranger.next((f) => (f as { type: string }).type === 'error')).toMatchObject({ code: 'forbidden' });
 
     good.ws.close();
@@ -102,7 +102,7 @@ describe.skipIf(!available)('session module', () => {
   });
 
   test('hello 之后紧跟的事件帧不会被当成第二个 hello', async () => {
-    const burstTask = 'tsk_00000000000000000000000000000002' as TaskId;
+    const burstTask = '01a0bf5d-8f4b-743d-8161-f5181efad4e3' as TaskId;
     const runner = await openSocket(`ws://${base}/runner`);
     // hello 与随后的事件帧在同一个 tick 里发出：hello 的校验与建连是异步的，
     // 早期实现会在它落地前把第 2 帧再次当成 hello，以 1008「首帧必须是 hello」断开。

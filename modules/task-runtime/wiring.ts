@@ -6,7 +6,8 @@ import { LABELS } from '@crewstation/k8s';
 import type { Clock, Logger } from '@crewstation/kernel';
 import { noopLogger, systemClock } from '@crewstation/kernel';
 import type { Database, MigrationSet } from '@crewstation/persistence';
-import { readMigrationDir } from '@crewstation/persistence';
+import { readMigrationDir, resourceIdentityDirectory } from '@crewstation/persistence';
+import { legacyRunnerTaskId } from './adapters/persistence/legacyRunnerTaskId';
 import type { Hono } from 'hono';
 import { kubernetesTaskCluster } from './adapters/k8s/taskCluster';
 import { kubernetesTaskRecoveryCluster } from './adapters/k8s/taskRecoveryCluster';
@@ -75,6 +76,7 @@ export function createTaskRuntimeModule(deps: TaskRuntimeModuleDeps): TaskRuntim
     profiles: deps.profiles,
     services: deps.services,
     sources: deps.sources,
+    legacyRunnerTaskId: legacyRunnerTaskId(resourceIdentityDirectory(deps.db, () => [taskRuntimeMigrations])),
     ...(deps.checkout ? { checkout: deps.checkout } : {}),
     settings: deps.settings,
     clock: deps.clock ?? systemClock,

@@ -1,7 +1,7 @@
-import { ServicePlanDtoSchema, TaskProfileDtoSchema } from '@crewstation/contracts';
+import { ServicePlanDtoSchema, ServicePlanInputSchema, TaskProfileDtoSchema, TaskProfileInputSchema } from '@crewstation/contracts';
 import { api } from '../../../shared/api/client';
 import { queryKeys } from '../../../shared/api/queryKeys';
-import type { ResourceCatalogEntry, ResourceCatalogKind } from './resourceCatalogDraft';
+import type { ResourceCatalogEntry, ResourceCatalogInput, ResourceCatalogKind } from './resourceCatalogDraft';
 import { sameResourceCatalogEntry } from './resourceCatalogDraft';
 
 export function resourceCatalogAccess(kind: ResourceCatalogKind, readError: string, writeError: string) {
@@ -11,11 +11,14 @@ export function resourceCatalogAccess(kind: ResourceCatalogKind, readError: stri
     read: async (): Promise<{ items: ResourceCatalogEntry[] }> => {
       const result = kind === 'service' ? await api.catalog.listServicePlans() : await api.catalog.listTaskProfiles();
       const parsed = schema.array().safeParse(result.items);
-      if (!parsed.success || new Set(parsed.data.map((entry) => entry.name)).size !== parsed.data.length) throw new Error(readError);
+      if (!parsed.success || new Set(parsed.data.map((entry) => entry.id)).size !== parsed.data.length) throw new Error(readError);
       return { items: parsed.data };
     },
-    write: async (input: ResourceCatalogEntry): Promise<ResourceCatalogEntry> => {
-      const result = kind === 'service' ? await api.catalog.upsertServicePlan(ServicePlanDtoSchema.parse(input)) : await api.catalog.upsertTaskProfile(TaskProfileDtoSchema.parse(input));
+    write: async (input: ResourceCatalogInput): Promise<ResourceCatalogEntry> => {
+      const { id, ...body } = input;
+      const result = kind === 'service'
+        ? await (id ? api.catalog.updateServicePlan(id, ServicePlanInputSchema.parse(body)) : api.catalog.createServicePlan(ServicePlanInputSchema.parse(body)))
+        : await (id ? api.catalog.updateTaskProfile(id, TaskProfileInputSchema.parse(body)) : api.catalog.createTaskProfile(TaskProfileInputSchema.parse(body)));
       const parsed = schema.safeParse(result);
       if (!parsed.success || !sameResourceCatalogEntry(parsed.data, input)) throw new Error(writeError);
       return parsed.data;

@@ -12,17 +12,17 @@ export function requestAccessUseCase({ uow, services, projects, clock }: ApiCata
     await projects.authorize(actor, resolved.projectId, 'develop');
     const now = clock.now();
     return uow.run(async (scope) => {
-      const operation = await scope.operations.getByKey(input.operationKey);
-      if (!operation || operation.state !== 'active') throw notFound('操作', input.operationKey);
-      if (operation.openPolicy === 'default') throw precondition(`操作 ${operation.key} 默认开放，无需申请`, { operationKey: operation.key });
-      if ((await scope.grants.get(serviceId, operation.key))?.state === 'granted') {
-        throw conflict(`服务已获得 ${operation.key} 的授权`, { operationKey: operation.key });
+      const operation = await scope.operations.getById(input.operationId);
+      if (!operation || operation.state !== 'active') throw notFound('操作', input.operationId);
+      if (operation.openPolicy === 'default') throw precondition(`操作 ${operation.id} 默认开放，无需申请`, { operationId: operation.id });
+      if ((await scope.grants.get(serviceId, operation.id))?.state === 'granted') {
+        throw conflict(`服务已获得 ${operation.id} 的授权`, { operationId: operation.id });
       }
-      if (await scope.requests.findPending(serviceId, operation.key)) {
-        throw conflict(`操作 ${operation.key} 已有待审批的申请`, { operationKey: operation.key });
+      if (await scope.requests.findPending(serviceId, operation.id)) {
+        throw conflict(`操作 ${operation.id} 已有待审批的申请`, { operationId: operation.id });
       }
       const request: ApiRequest = {
-        id: newId('req'), serviceId, projectId: resolved.projectId, operationKey: operation.key, state: 'pending',
+        id: newId('req'), serviceId, projectId: resolved.projectId, operationId: operation.id, state: 'pending',
         ...(input.reason === undefined ? {} : { reason: input.reason }), requestedBy: actor.userId, createdAt: now,
       };
       await scope.requests.insert(request);

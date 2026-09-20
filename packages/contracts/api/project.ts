@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import { ProjectIdSchema, ServiceIdSchema, SlugSchema, UserIdSchema } from '../ids';
+import { ProjectIdSchema, ResourceIdSchema, ServiceIdSchema, SlugSchema, UserIdSchema } from '../ids';
+import { BUILTIN_RESOURCES } from '../builtinResources';
 import { ManifestKindSchema } from '../manifest/serviceSpec';
 import { MemberRoleSchema, PlatformRoleSchema } from './identity';
 import { ProjectTemplateDtoSchema } from './scm';
@@ -41,12 +42,12 @@ export const CreateProjectRequestSchema = z.object({
   name: z.string().min(1).max(80),
   kind: ManifestKindSchema.default('DigitalWorker'),
   ownerUserId: UserIdSchema.optional(),
-  template: SlugSchema.default('minimal-sample'),
-  plan: SlugSchema.optional(),
+  template: ResourceIdSchema.default(BUILTIN_RESOURCES.minimalTemplate),
+  plan: ResourceIdSchema.optional(),
   maxConcurrentTasks: z.number().int().min(1).max(100).optional(),
 }).strict();
 
-export const ProjectCreationCatalogSchema = z.object({ templates: z.array(ProjectTemplateDtoSchema), defaultServicePlan: SlugSchema, maxConcurrentTasks: z.number().int().min(1) });
+export const ProjectCreationCatalogSchema = z.object({ templates: z.array(ProjectTemplateDtoSchema), defaultServicePlan: ResourceIdSchema, maxConcurrentTasks: z.number().int().min(1) });
 export type ProjectCreationCatalog = z.infer<typeof ProjectCreationCatalogSchema>;
 
 export const MemberDtoSchema = z.object({ userId: UserIdSchema, role: MemberRoleSchema, platformRole: PlatformRoleSchema.optional(), name: z.string(), email: z.string() });
@@ -55,8 +56,17 @@ export const SetMemberRequestSchema = z.object({ userId: UserIdSchema, role: Mem
 export const QuotaDtoSchema = z.object({ maxConcurrentTasks: z.number().int().min(1), running: z.number().int().min(0) });
 export const SetQuotaRequestSchema = z.object({ maxConcurrentTasks: z.number().int().min(1).max(100) });
 
-export const ServicePlanDtoSchema = z.object({ name: SlugSchema, cpu: z.string(), memory: z.string(), maxReplicas: z.number().int().min(1), description: z.string().default('') });
-export const TaskProfileDtoSchema = z.object({ name: SlugSchema, cpu: z.string(), memory: z.string(), storage: z.string(), description: z.string().default('') });
+export const ServicePlanInputSchema = z.object({ name: z.string().trim().min(1).max(80), cpu: z.string(), memory: z.string(), maxReplicas: z.number().int().min(1), description: z.string().default('') }).strict();
+export const TaskProfileInputSchema = z.object({ name: z.string().trim().min(1).max(80), cpu: z.string(), memory: z.string(), storage: z.string(), description: z.string().default('') }).strict();
+export const ServicePlanDtoSchema = ServicePlanInputSchema.extend({ id: ResourceIdSchema });
+export const TaskProfileDtoSchema = TaskProfileInputSchema.extend({ id: ResourceIdSchema });
+export type ServicePlanWrite = z.infer<typeof ServicePlanInputSchema>;
+export type TaskProfileWrite = z.infer<typeof TaskProfileInputSchema>;
+/** Installers may supply the immutable UUID from a release bundle; ordinary creation mints one. */
+export const CreateServicePlanSchema = ServicePlanInputSchema.extend({ id: ResourceIdSchema.optional() });
+export const CreateTaskProfileSchema = TaskProfileInputSchema.extend({ id: ResourceIdSchema.optional() });
+export type CreateServicePlan = z.infer<typeof CreateServicePlanSchema>;
+export type CreateTaskProfile = z.infer<typeof CreateTaskProfileSchema>;
 
 export const ServiceDtoSchema = z.object({
   id: ServiceIdSchema,

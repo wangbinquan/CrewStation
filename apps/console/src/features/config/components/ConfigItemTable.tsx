@@ -11,7 +11,7 @@ import styles from './ConfigItemTable.module.css';
 export interface ConfigItemTableProps {
   readonly items: readonly ConfigItemDto[];
   readonly onEdit: (item: ConfigItemDto, button: HTMLButtonElement) => void;
-  readonly onDelete: (name: string) => void;
+  readonly onDelete: (item: ConfigItemDto) => void;
   readonly deletingName: string | undefined;
   readonly disabled?: boolean;
   readonly readOnly?: boolean;
@@ -25,9 +25,9 @@ export function ConfigItemTable({ items, onEdit, onDelete, deletingName, disable
   return (
     <DataTable columns={columns} className={styles.table}>
       {items.map((item) => (
-        <tr key={item.name}>
+        <tr key={item.id}>
           <td>
-            <code>{item.name}</code>
+            <span>{item.name}</span> <code>{item.bindingName}</code><details><summary>ID</summary><code>{item.id}</code></details>
             <details><summary>{t('config.itemDetails')}</summary><div className={styles.metadata}>
               <span>{t('config.items.version')}: {item.version}</span>
               <span>{t('config.items.updatedBy')}: {item.updatedBy}</span>
@@ -45,9 +45,9 @@ export function ConfigItemTable({ items, onEdit, onDelete, deletingName, disable
               variant="ghost"
               label={t('config.items.delete')}
               question={t('config.items.confirmDelete', { name: item.name })}
-              busy={disabled || deletingName === item.name}
-              busyLabel={t(deletingName === item.name ? 'config.items.deleting' : 'config.items.delete')}
-              onConfirm={() => onDelete(item.name)}
+              busy={disabled || deletingName === item.id}
+              busyLabel={t(deletingName === item.id ? 'config.items.deleting' : 'config.items.delete')}
+              onConfirm={() => onDelete(item)}
             />
           </td> : null}
         </tr>

@@ -10,9 +10,17 @@ export function drizzleProducerRepository(db: Executor): ProducerRepository {
   return {
     upsert: async (producer) => {
       const row = { ...producer };
-      await db.insert(producers).values(row).onConflictDoUpdate({ target: producers.producer, set: row });
+      await db.insert(producers).values(row).onConflictDoUpdate({ target: producers.id, set: row });
     },
-    getByName: async (name) => {
+    getById: async (id) => {
+      const row = (await db.select().from(producers).where(eq(producers.id, id)))[0];
+      return row ? { ...row, serviceId: row.serviceId as ServiceId, projectId: row.projectId as ProjectId } : undefined;
+    },
+    getByService: async (serviceId) => {
+      const row = (await db.select().from(producers).where(eq(producers.serviceId, serviceId)))[0];
+      return row ? { ...row, serviceId: row.serviceId as ServiceId, projectId: row.projectId as ProjectId } : undefined;
+    },
+    getByCode: async (name) => {
       const row = (await db.select().from(producers).where(eq(producers.producer, name)))[0];
       return row ? { ...row, serviceId: row.serviceId as ServiceId, projectId: row.projectId as ProjectId } : undefined;
     },
@@ -21,15 +29,20 @@ export function drizzleProducerRepository(db: Executor): ProducerRepository {
 
 export function drizzleEventTypeRepository(db: Executor): EventTypeRepository {
   return {
-    getByEventType: async (eventType) => {
+    getById: async (id) => {
+      const row = (await db.select().from(eventTypes).where(eq(eventTypes.id, id)))[0];
+      return row ? toEventType(row) : undefined;
+    },
+    getByCode: async (eventType) => {
       const row = (await db.select().from(eventTypes).where(eq(eventTypes.eventType, eventType)))[0];
       return row ? toEventType(row) : undefined;
     },
     list: async () => (await db.select().from(eventTypes).orderBy(eventTypes.eventType)).map(toEventType),
-    replaceForProducer: async (producer, types) => {
-      await db.delete(eventTypes).where(eq(eventTypes.producer, producer));
+    replaceForProducer: async (producerId, types) => {
+      await db.update(eventTypes).set({ state: 'removed' }).where(eq(eventTypes.producerId, producerId));
       for (const type of types) {
-        await db.insert(eventTypes).values({ eventType: type.eventType, producer: type.producer, producerProject: type.producerProject, schemaRef: type.schemaRef ?? null });
+        const row = { ...type, schemaRef: type.schemaRef ?? null };
+        await db.insert(eventTypes).values(row).onConflictDoUpdate({ target: eventTypes.id, set: row });
       }
     },
   };
@@ -43,8 +56,8 @@ export function drizzleSubscriptionRepository(db: Executor): SubscriptionReposit
     },
     listByService: async (serviceId) => (await db.select().from(subscriptions).where(eq(subscriptions.serviceId, serviceId)).orderBy(subscriptions.eventType)).map(toSubscription),
     listByProject: async (projectId) => (await db.select().from(subscriptions).where(eq(subscriptions.projectId, projectId)).orderBy(subscriptions.eventType)).map(toSubscription),
-    listActiveByEventType: async (eventType) => (await db.select().from(subscriptions)
-      .where(and(eq(subscriptions.eventType, eventType), eq(subscriptions.state, 'active'))).orderBy(subscriptions.id)).map(toSubscription),
+    listActiveByEventType: async (eventTypeId) => (await db.select().from(subscriptions)
+      .where(and(eq(subscriptions.eventTypeId, eventTypeId), eq(subscriptions.state, 'active'))).orderBy(subscriptions.id)).map(toSubscription),
     upsert: async (subscription) => {
       const row = { ...subscription };
       await db.insert(subscriptions).values(row).onConflictDoUpdate({ target: subscriptions.id, set: row });
@@ -54,7 +67,7 @@ export function drizzleSubscriptionRepository(db: Executor): SubscriptionReposit
 }
 
 function toEventType(row: typeof eventTypes.$inferSelect): EventType {
-  return { eventType: row.eventType, producer: row.producer, producerProject: row.producerProject, ...(row.schemaRef === null ? {} : { schemaRef: row.schemaRef }) };
+  return { id: row.id, name: row.name, producerId: row.producerId, state: row.state as EventType['state'], eventType: row.eventType, producer: row.producer, producerProject: row.producerProject, ...(row.schemaRef === null ? {} : { schemaRef: row.schemaRef }) };
 }
 
 function toSubscription(row: typeof subscriptions.$inferSelect): Subscription {

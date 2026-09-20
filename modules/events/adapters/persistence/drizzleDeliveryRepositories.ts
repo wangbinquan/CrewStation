@@ -9,15 +9,15 @@ import { deliveries, inbox } from './tables';
 export function drizzleInboxRepository(db: Executor): InboxRepository {
   return {
     insert: async (event) => {
-      const rows = await db.insert(inbox).values({ ...event }).onConflictDoNothing({ target: [inbox.producer, inbox.dedupKey] }).returning({ id: inbox.id });
+      const rows = await db.insert(inbox).values({ ...event }).onConflictDoNothing({ target: [inbox.producerId, inbox.dedupKey] }).returning({ id: inbox.id });
       return rows.length === 1;
     },
     getById: async (id) => {
       const row = (await db.select().from(inbox).where(eq(inbox.id, id)))[0];
       return row ? toInboxEvent(row) : undefined;
     },
-    getByDedup: async (producer, dedupKey) => {
-      const row = (await db.select().from(inbox).where(and(eq(inbox.producer, producer), eq(inbox.dedupKey, dedupKey))))[0];
+    getByDedup: async (producerId, dedupKey) => {
+      const row = (await db.select().from(inbox).where(and(eq(inbox.producerId, producerId), eq(inbox.dedupKey, dedupKey))))[0];
       return row ? toInboxEvent(row) : undefined;
     },
   };
@@ -46,7 +46,7 @@ function toInboxEvent(row: typeof inbox.$inferSelect): InboxEvent {
 function toDelivery(row: typeof deliveries.$inferSelect): Delivery {
   return {
     id: row.id, eventId: row.eventId as EventId, subscriptionId: row.subscriptionId, serviceId: row.serviceId as ServiceId,
-    projectId: row.projectId as ProjectId, eventType: row.eventType, state: row.state as DeliveryState, attempts: row.attempts,
+    projectId: row.projectId as ProjectId, eventTypeId: row.eventTypeId, eventType: row.eventType, state: row.state as DeliveryState, attempts: row.attempts,
     ...(row.nextAttemptAt ? { nextAttemptAt: row.nextAttemptAt } : {}), ...(row.lastError === null ? {} : { lastError: row.lastError }),
     traceId: row.traceId as TraceId, ...(row.deliveredAt ? { deliveredAt: row.deliveredAt } : {}), createdAt: row.createdAt, updatedAt: row.updatedAt,
   };
@@ -55,7 +55,7 @@ function toDelivery(row: typeof deliveries.$inferSelect): Delivery {
 function toDeliveryRow(delivery: Delivery): typeof deliveries.$inferInsert {
   return {
     id: delivery.id, eventId: delivery.eventId, subscriptionId: delivery.subscriptionId, serviceId: delivery.serviceId, projectId: delivery.projectId,
-    eventType: delivery.eventType, state: delivery.state, attempts: delivery.attempts, nextAttemptAt: delivery.nextAttemptAt ?? null,
+    eventTypeId: delivery.eventTypeId, eventType: delivery.eventType, state: delivery.state, attempts: delivery.attempts, nextAttemptAt: delivery.nextAttemptAt ?? null,
     lastError: delivery.lastError ?? null, traceId: delivery.traceId, deliveredAt: delivery.deliveredAt ?? null, createdAt: delivery.createdAt, updatedAt: delivery.updatedAt,
   };
 }

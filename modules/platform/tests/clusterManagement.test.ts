@@ -47,14 +47,14 @@ describe.skipIf(!available)('cluster HTTP through actual platform composition', 
   });
   test('persistent business workspace restart and close flow through owning modules, retaining task and volume', async () => {
     const { project, businessTask: business, taskRuntime: tasks, cluster, data } = platform.modules;
-    await project.api.upsertServicePlan(admin, { name: 'standard-small', cpu: '1', memory: '1Gi', maxReplicas: 3, description: '' });
-    await project.api.upsertTaskProfile(admin, { name: 'coding-medium', cpu: '1', memory: '1Gi', storage: '2Gi', description: '' });
-    const p = await project.api.createProject(admin, { name: 'Cluster business', slug: 'cluster-business', kind: 'DigitalWorker', template: 'minimal-sample' });
+    await project.api.updateServicePlan(admin, '01a0bf5d-8f4b-7000-9e4b-b54e91ee9d10', { name: 'standard-small', cpu: '1', memory: '1Gi', maxReplicas: 3, description: '' });
+    await project.api.updateTaskProfile(admin, '01a0bf5d-8f4b-7001-8458-107366e7de39', { name: 'coding-medium', cpu: '1', memory: '1Gi', storage: '2Gi', description: '' });
+    const p = await project.api.createProject(admin, { name: 'Cluster business', slug: 'cluster-business', kind: 'DigitalWorker', template: '01a0bf5d-8f4b-7002-9560-94caf593fb19' });
     await data.api.ensureServiceData(p.serviceId!);
     const caller = { identity: 'cluster-business/cluster-business', project: 'cluster-business', service: 'cluster-business' };
-    const task = await business.api.createTask(caller, { volumeMode: 'persistent', profile: 'coding-medium', labels: {} }); await connect(task.id); await business.api.getTask(caller, task.id);
+    const task = await business.api.createTask(caller, { volumeMode: 'persistent', taskProfileId: '01a0bf5d-8f4b-7001-8458-107366e7de39', labels: {} }); await connect(task.id); await business.api.getTask(caller, task.id);
     await cluster.collect(); const resources = await cluster.api.resources(admin, { scope: 'project', projectId: p.id, limit: 50 });
-    const pod = resources.items.find((r) => r.taskId === task.id)!; expect(pod.purpose).toBe('business-workspace'); expect(pod.profile).toBe('coding-medium');
+    const pod = resources.items.find((r) => r.taskId === task.id)!; expect(pod.purpose).toBe('business-workspace'); expect(pod.profile).toBe('01a0bf5d-8f4b-7001-8458-107366e7de39');
     const volume = structuredClone(resources.items.find((r) => r.kind === 'PersistentVolumeClaim'));
     const op = await accept(pod.resourceId, 'restart'), create = k8s.create;
     k8s.create = async (object) => {
@@ -83,10 +83,10 @@ describe.skipIf(!available)('cluster HTTP through actual platform composition', 
     expect(new Set(executions.map((t) => t.taskId)).size).toBe(506); expect(executions.every((t) => !('runnerTokenHash' in t))).toBe(true);
   });
   test('profile-test stop resolves its durable test identity without a Pod label', async () => {
-    const taskId = 'tsk_77777777777777777777777777777777' as TaskId, testId = 'pft_77777777777777777777777777777777', namespace = 'crewstation-system', podName = 'profile-stop';
+    const taskId = '01a0bf5d-8f4b-7a3a-8fdf-c38cfdab1083' as TaskId, testId = '01a0bf5d-8f4b-7b04-8338-c0077a1270be', namespace = 'crewstation-system', podName = 'profile-stop';
     const pod = await k8s.create({ apiVersion: 'v1', kind: 'Pod', metadata: { name: podName, namespace, uid: crypto.randomUUID(), labels: { 'crewstation.io/task': taskId, 'app.kubernetes.io/managed-by': 'crewstation' } }, status: { phase: 'Pending' } });
     await database.handle.client`INSERT INTO task_runtime.environments (id, project_id, service_id, kind, state, volume_mode, profile, namespace, pod_name, pvc_name, trace_id, runner_token_hash, labels, created_at, updated_at, last_activity_at, pod_uid)
-      VALUES (${taskId}, 'prj_00000000000000000000000000000001', 'svc_00000000000000000000000000000001', 'profile-test', 'creating', 'follow-container', 'coding-medium', ${namespace}, ${podName}, 'no-volume', '77777777777777777777777777777777', 'hash', ${JSON.stringify({ 'crewstation.io/profile-test': testId, 'crewstation.io/compute-profile': 'cluster-test' })}, NOW(), NOW(), NOW(), ${pod.metadata.uid!})`;
+      VALUES (${taskId}, '01a0bf5d-8f4b-7186-8218-81d5855b4fee', '01a0bf5d-8f4b-7d66-8ea8-4f71f7ae04bf', 'profile-test', 'creating', 'follow-container', 'coding-medium', ${namespace}, ${podName}, 'no-volume', '77777777777777777777777777777777', 'hash', ${JSON.stringify({ 'crewstation.io/profile-test': testId, 'crewstation.io/compute-profile': 'cluster-test' })}, NOW(), NOW(), NOW(), ${pod.metadata.uid!})`;
     await database.handle.client`INSERT INTO agent_runtime.profile_tests (test_id, profile, revision, content_hash, trigger, created_by, state, context, stages, created_at)
       VALUES (${testId}, 'cluster-test', 1, 'hash', 'manual', ${admin.userId}, 'running', ${JSON.stringify({ kind: 'platform-namespace', taskId })}, '[]', NOW())`;
     const { cluster, agentRuntime, taskRuntime } = platform.modules;

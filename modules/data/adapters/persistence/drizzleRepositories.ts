@@ -27,6 +27,7 @@ export function drizzleDataResourceRepository(db: Executor): DataResourceReposit
 
 export function drizzleTaskBindingRepository(db: Executor): TaskDataBindingRepository {
   const toBinding = (r: typeof taskBindings.$inferSelect): TaskDataBinding => ({
+    ...(r.legacyResourceId ? { legacyResourceId: r.legacyResourceId } : {}),
     id: r.id, taskId: r.taskId as TaskId, serviceId: r.serviceId, projectId: r.projectId, mode: r.mode as TaskDataMode, state: r.state as TaskDataBindingState,
     ...(r.reason ? { reason: r.reason } : {}), ...(r.decision ? { decision: r.decision } : {}), requestedBy: r.requestedBy as UserId, ...(r.decidedBy ? { decidedBy: r.decidedBy as UserId } : {}),
     ttlMinutes: r.ttlMinutes, ...(r.expiresAt ? { expiresAt: r.expiresAt } : {}), ...(r.roleName ? { roleName: r.roleName } : {}), ...(r.secretBox ? { secretBox: r.secretBox } : {}),

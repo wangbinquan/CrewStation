@@ -70,7 +70,7 @@ async function runQueuedTest(deps: AgentRuntimeUseCaseDeps, testId: ProfileTestI
   const alive = async (): Promise<boolean> => (await heartbeat()) && (await uow.read.tests.get(testId))?.state === 'running';
   try {
     const result = await executor.run({
-      testId, profile: profile.name, revision: revision.revision, launch: revision.content.launch, image: resolver.pinned(revision), beforeStart: material,
+      testId, profile: profile.id, revision: revision.revision, launch: revision.content.launch, image: resolver.pinned(revision), beforeStart: material,
       ...(revision.content.taskProfile ? { taskProfile: revision.content.taskProfile } : {}), ...(revision.content.terminalTest ? { terminalTest: revision.content.terminalTest } : {}), ...testPrompt(),
     }, async (progress) => {
       test = { ...test, context: { ...test.context, ...progress.context }, stages: mergeStages(test.stages, progress.stages) };

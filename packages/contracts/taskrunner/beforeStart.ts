@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { SlugSchema } from '../ids';
+import { ResourceIdSchema } from '../ids';
 
 /**
  * Agent 进程启动前 Hook（RFC-004 引入，RFC-006 并入算力档位；CrewStation 自身的生命周期，不是 CLI 的同名能力）。
@@ -22,7 +22,7 @@ export const BEFORE_START_LIMITS = {
   maxLogTailChars: 8 * 1024,
 } as const;
 
-export const StepIdSchema = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/, 'stepId 只允许字母、数字、下划线与连字符，1–64 位');
+export const StepIdSchema = ResourceIdSchema;
 export const EnvNameSchema = z.string().regex(/^[A-Za-z_][A-Za-z0-9_]{0,127}$/, '变量名必须以字母或下划线开头，只含字母、数字与下划线');
 const StepNameSchema = z.string().trim().min(1).max(80);
 const PathTemplateSchema = z.string().min(1).max(1024);
@@ -78,14 +78,14 @@ export const ConfigFileBindingSchema = z.discriminatedUnion('kind', [
 ]);
 
 /** 档位修订的引用（RFC-006）：受理时固定，重试与迟到派发都按它取材料，不再解析「当前最新」。 */
-export const ProfileRevisionRefSchema = z.object({ profile: SlugSchema, revision: z.number().int().min(1) });
+export const ProfileRevisionRefSchema = z.object({ profileId: ResourceIdSchema, revision: z.number().int().min(1) });
 
 /**
  * 下发给 TaskRunner 的一次启动前材料（RFC-006：由档位修订给出）。密钥值只在这里出现一次：不进事件、不进名册、不进日志。
  * 材料对应一个固定修订，同一 agentId／attempt 的重试必须重用同一份材料而不是重新解析「最新」。
  */
 export const BeforeStartMaterialSchema = z.object({
-  profile: SlugSchema,
+  profile: ResourceIdSchema,
   revision: z.number().int().min(1),
   contentHash: z.string().min(1),
   steps: BeforeStartStepsSchema,

@@ -6,7 +6,7 @@ import { parseSettingsSearch } from '../shared/project/settingsSearch';
 import { renderApp } from './renderApp';
 
 const originalFetch = globalThis.fetch;
-const projectId = `prj_${'a'.repeat(32)}`, serviceId = `svc_${'b'.repeat(32)}`, taskId = `tsk_${'c'.repeat(32)}`, releaseId = `rel_${'d'.repeat(32)}`, traceId = 'e'.repeat(32);
+const projectId = '01a0bf5d-8f4b-7e1e-8dde-c9c2ae13ed34', serviceId = '01a0bf5d-8f4b-760b-86b6-0bb9f08a9eaa', taskId = '01a0bf5d-8f4b-7e52-8b45-4a547fd10e4f', releaseId = '01a0bf5d-8f4b-762d-81e1-f95f4dd57c2d', traceId = 'e'.repeat(32);
 const project = { id: projectId, serviceId, name: '团队知识助理', slug: 'team-knowledge', kind: 'DigitalWorker', state: 'active', namespace: 'cs-team-knowledge', createdAt: '2026-09-13T01:00:00.000Z' };
 let page: Awaited<ReturnType<typeof renderApp>> | undefined;
 afterEach(() => { page?.unmount(); page = undefined; globalThis.fetch = originalFetch; });
@@ -20,7 +20,7 @@ function fixture(logItems?: unknown[], admin = false) {
     let status = 200, body: unknown = { items: [] };
     if (url.pathname === '/v1/me') body = { id: 'user', name: '小林', platformRole: (admin) ? 'admin' : 'developer', isAdmin: admin, memberships: [{ projectId, role: 'owner' }] };
     else if (url.pathname === `/v1/projects/${projectId}`) body = project;
-    else if (url.pathname === `/v1/projects/prj_${'f'.repeat(32)}`) body = { ...project, id: `prj_${'f'.repeat(32)}`, name: '另一个应用', slug: 'another-app' };
+    else if (url.pathname === `/v1/projects/01a0bf5d-8f4b-7927-8d04-a341edee681a`) body = { ...project, id: '01a0bf5d-8f4b-70bd-8586-401e32bbc3b4', name: '另一个应用', slug: 'another-app' };
     else if (url.pathname === `/v1/services/${serviceId}`) body = { id: serviceId, projectId };
     else if (url.pathname.endsWith('/dev-session')) { status = 404; body = { error: 'not_found', message: '没有开发会话' }; }
     else if (url.pathname.endsWith('/health')) body = { items: [{ slot: 'prod', state: 'unknown', readyReplicas: 0, replicas: 1, restarts: 2, lastTransitionAt: '2026-09-13T01:00:00.000Z' }] };
@@ -28,8 +28,8 @@ function fixture(logItems?: unknown[], admin = false) {
     else if (url.pathname.endsWith('/logs')) body = { items: logItems ?? [{ ts: '2026-09-13T01:01:00.000Z', source: 'build', stream: 'stderr', message: 'build fixture line' }] };
     else if (url.pathname.includes('/openapi')) { status = 503; body = { error: 'unavailable', message: '文档暂不可用' }; }
     else if (url.pathname.endsWith('/operations')) body = { items: [
-      { key: 'billing.getInvoice', proxy: 'billing', method: 'GET', path: '/invoices/{id}', openPolicy: 'default', granted: true },
-      { key: 'docs.getArticle', proxy: 'docs', method: 'GET', path: '/articles/{id}', openPolicy: 'targeted', granted: false },
+      { id: '01a0bf5d-8f4b-7735-8981-22e6031d8202', proxyId: '01a0bf5d-8f4b-7e4c-802d-e2023d65b4fe', proxy: 'billing', method: 'GET', path: '/invoices/{id}', openPolicy: 'default', granted: true },
+      { id: '01a0bf5d-8f4b-775b-84c1-bbc06f634e58', proxyId: '01a0bf5d-8f4b-75c6-8ee5-a606417e1b8d', proxy: 'docs', method: 'GET', path: '/articles/{id}', openPolicy: 'targeted', granted: false },
     ] };
     else if (url.pathname.endsWith('/deliveries')) body = { items: [
       { id: 'delivery-a', eventId: 'event-a', subscriptionId: 'sub-a', eventType: 'git.push', state: 'delivered', attempts: 1, traceId },
@@ -130,18 +130,18 @@ describe('六个项目入口与旧链接兼容', () => {
   });
 
   test('旧接口链接保留代理与操作并实际定位，清除后恢复完整目录', async () => {
-    const f = fixture(); page = await renderApp(`/projects/${projectId}/catalog?proxy=billing&operation=billing.getInvoice`);
-    expect(page.path()).toBe(`/projects/${projectId}/resources`); expect(page.search()).toMatchObject({ section: 'api', proxy: 'billing', operation: 'billing.getInvoice' });
-    expect(page.text()).toContain('billing.getInvoice'); expect(page.text()).not.toContain('docs.getArticle');
+    const f = fixture(); page = await renderApp(`/projects/${projectId}/catalog?proxy=01a0bf5d-8f4b-7e4c-802d-e2023d65b4fe&operation=01a0bf5d-8f4b-7735-8981-22e6031d8202`);
+    expect(page.path()).toBe(`/projects/${projectId}/resources`); expect(page.search()).toMatchObject({ section: 'api', proxy: '01a0bf5d-8f4b-7e4c-802d-e2023d65b4fe', operation: '01a0bf5d-8f4b-7735-8981-22e6031d8202' });
+    expect(page.text()).toContain('/invoices/{id}'); expect(page.text()).not.toContain('/articles/{id}');
     expect(page.text()).not.toContain('管理员模式');
-    await page.click('查看全部接口'); expect(page.search().operation).toBeUndefined(); expect(page.text()).toContain('docs.getArticle');
+    await page.click('查看全部接口'); expect(page.search().operation).toBeUndefined(); expect(page.text()).toContain('/articles/{id}');
     expect(f.calls.some((call) => call.method !== 'GET')).toBe(false);
   });
 
   test('旧能力链接保留 API 操作，不存在的操作不偷偷展示其他操作', async () => {
     fixture(); page = await renderApp(`/projects/${projectId}/capabilities?operation=missing.operation`);
     expect(page.search()).toMatchObject({ section: 'api', operation: 'missing.operation' });
-    expect(page.text()).toContain('missing.operation'); expect(page.text()).not.toContain('billing.getInvoice');
+    expect(page.text()).toContain('missing.operation'); expect(page.text()).not.toContain('/invoices/{id}');
   });
 
 });
@@ -173,7 +173,7 @@ describe('诊断、订阅与配置的上下文', () => {
   test('同一设置路由切换项目会换上下文，上一项目草稿不进入新项目', async () => {
     fixture(); page = await renderApp(`/projects/${projectId}/settings?tab=config`); await page.click('新增变量');
     await input(document.querySelector<HTMLInputElement>('input[placeholder="DATABASE_URL"]')!, 'OLD_PROJECT_DRAFT');
-    await page.requestNavigate(`/projects/prj_${'f'.repeat(32)}/settings?tab=config`);
+    await page.requestNavigate(`/projects/01a0bf5d-8f4b-7927-8d04-a341edee681a/settings?tab=config`);
     expect(page.path()).toBe(`/projects/${projectId}/settings`); await page.click('放弃输入并离开');
     expect(page.text()).toContain('另一个应用'); expect(page.text()).not.toContain('团队知识助理');
     expect([...document.querySelectorAll<HTMLInputElement>('input')].some((node) => node.value === 'OLD_PROJECT_DRAFT')).toBe(false);

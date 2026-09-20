@@ -10,8 +10,8 @@ import { releaseMigrations } from '../wiring';
 const available = await testDatabaseAvailable();
 test.skipIf(!available)('两个发布在打标时并行，首次部署也只登记一条流水线；冲突如实返回已创建标签', async () => {
   const db = await createTestDatabase([eventbusMigrations, releaseMigrations]), uow = drizzleUnitOfWork(db.db);
-  const serviceId = `svc_${'a'.repeat(32)}` as ServiceId, projectId = `prj_${'b'.repeat(32)}` as ProjectId;
-  const actor: Actor = { userId: `usr_${'c'.repeat(32)}` as UserId, isAdmin: false }, tags: string[] = [], queued: string[] = [];
+  const serviceId = '01a0bf5d-8f4b-7455-8963-87369647717e' as ServiceId, projectId = '01a0bf5d-8f4b-7aef-84b8-c458233bab22' as ProjectId;
+  const actor: Actor = { userId: '01a0bf5d-8f4b-7ed2-8386-a4b2e1a36efb' as UserId, isAdmin: false }, tags: string[] = [], queued: string[] = [];
   let bothTagged!: () => void; const tagsReady = new Promise<void>((resolve) => { bothTagged = resolve; });
   try {
     const publish = publishUseCase({

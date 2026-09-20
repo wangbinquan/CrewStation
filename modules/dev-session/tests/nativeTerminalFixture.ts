@@ -1,3 +1,4 @@
+import { computeId } from './computeFixture';
 import { createHash } from 'node:crypto';
 import type { NativeTerminalRecord, NativeTerminalSnapshotDto, RunnerCommand, StartNativeTerminalRequest } from '@crewstation/contracts';
 import { newId } from '@crewstation/kernel';
@@ -64,8 +65,8 @@ export function nativeFixture() {
   const startNativeTerminal: typeof api.startNativeTerminal = async (actor, taskId, input) => {
     if (current.available && !await repository.findRequest(taskId, actor.userId, input.clientRequestId)) await repository.reserve({
       taskId, createdBy: actor.userId, clientRequestId: input.clientRequestId, fingerprint: createHash('sha256').update(JSON.stringify([input.compute ?? null, input.permission, input.cwd ?? null, input.cols, input.rows])).digest('hex'),
-      input, profile: { profile: 'balanced', revision: 1 },
-      record: { agentId: newId('agt'), terminalId: newId('pty'), runnerId: current.runnerId, compute: input.compute ?? 'balanced', permission: input.permission, revision: 0, lifecycle: 'starting', startedAt: base.deps.clock.now().toISOString(), cols: input.cols, rows: input.rows },
+      input, profile: { profileId: computeId('balanced'), revision: 1 },
+      record: { agentId: newId('agt'), terminalId: newId('pty'), runnerId: current.runnerId, compute: input.compute?.kind === 'profile' ? input.compute.profileId : computeId('balanced'), permission: input.permission, revision: 0, lifecycle: 'starting', startedAt: base.deps.clock.now().toISOString(), cols: input.cols, rows: input.rows },
     });
     return api.startNativeTerminal(actor, taskId, input);
   };

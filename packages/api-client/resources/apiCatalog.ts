@@ -11,10 +11,11 @@ export interface ApiCatalogResource {
   listOperations(query?: { readonly serviceId?: string }): Promise<ItemsPage<ApiOperationDto>>;
   /** GET /v1/catalog/proxies */
   listProxies(): Promise<ItemsPage<ApiProxyDto>>;
+  renameProxy(id: string, input: { name: string }): Promise<ApiProxyDto>;
   /** GET /v1/catalog/proxies/:proxy/openapi?serviceId=：按该服务可调范围裁剪，servers 指向服务域内部 API 地址。 */
   openapi(proxy: string, query: { readonly serviceId: string }): Promise<Record<string, unknown>>;
   /** PUT /v1/catalog/operations/:key/policy（管理员）；操作键含 `/`，客户端负责编码。 */
-  setOpenPolicy(operationKey: string, input: SetOpenPolicyRequest): Promise<ApiOperationDto>;
+  setOpenPolicy(operationId: string, input: SetOpenPolicyRequest): Promise<ApiOperationDto>;
   /** POST /v1/services/:serviceId/api-requests（201）：为本服务申请定向开放。 */
   requestAccess(serviceId: string, input: CreateApiRequest): Promise<ApiRequestDto>;
   /** GET /v1/api-requests?projectId=：不带 projectId 只有管理员能看全部。 */
@@ -23,20 +24,21 @@ export interface ApiCatalogResource {
   /** POST /v1/api-requests/:id/decision（管理员批准或拒绝并给出理由） */
   decideRequest(id: string, input: DecideApiRequest): Promise<ApiRequestDto>;
   /** DELETE /v1/services/:serviceId/grants/:key（204） */
-  revokeGrant(serviceId: string, operationKey: string): Promise<void>;
+  revokeGrant(serviceId: string, operationId: string): Promise<void>;
 }
 
 export function apiCatalogResource(transport: Transport): ApiCatalogResource {
   return {
     listOperations: (query) => transport.request<ItemsPage<ApiOperationDto>>('GET', '/v1/catalog/operations', { query }),
     listProxies: () => transport.request<ItemsPage<ApiProxyDto>>('GET', '/v1/catalog/proxies'),
+    renameProxy: (id, input) => transport.request('PUT', `/v1/catalog/proxies/${segment(id)}/name`, { body: input }),
     openapi: (proxy, query) => transport.request<Record<string, unknown>>('GET', `/v1/catalog/proxies/${segment(proxy)}/openapi`, { query }),
-    setOpenPolicy: (operationKey, input) =>
-      transport.request<ApiOperationDto>('PUT', `/v1/catalog/operations/${segment(operationKey)}/policy`, { body: input }),
+    setOpenPolicy: (operationId, input) =>
+      transport.request<ApiOperationDto>('PUT', `/v1/catalog/operations/${segment(operationId)}/policy`, { body: input }),
     requestAccess: (serviceId, input) => transport.request<ApiRequestDto>('POST', `/v1/services/${segment(serviceId)}/api-requests`, { body: input }),
     listRequests: (query) => transport.request<ItemsPage<ApiRequestDto>>('GET', '/v1/api-requests', { query }),
     listRequestPage: (query) => transport.request<ApiRequestPage>('GET', '/v1/api-requests/page', { query }),
     decideRequest: (id, input) => transport.request<ApiRequestDto>('POST', `/v1/api-requests/${segment(id)}/decision`, { body: input }),
-    revokeGrant: (serviceId, operationKey) => transport.request<void>('DELETE', `/v1/services/${segment(serviceId)}/grants/${segment(operationKey)}`),
+    revokeGrant: (serviceId, operationId) => transport.request<void>('DELETE', `/v1/services/${segment(serviceId)}/grants/${segment(operationId)}`),
   };
 }

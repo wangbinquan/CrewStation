@@ -2,7 +2,7 @@ import { expect, test } from 'bun:test';
 import { createFakeK8sClient, createK8sClient, Resources } from '@crewstation/k8s';
 import { kubernetesClusterReader } from '../adapters/k8s/clusterReader';
 import { projectResources } from '../domain/projection';
-import { catalog, facts, object } from './inventoryFixture';
+import { catalog, facts, object, resourceIds } from './inventoryFixture';
 test('continue pages are complete, a 410 resets the whole batch, cancellation does not produce an empty success', async () => {
   const cursors: string[] = []; let expired = false;
   const client = createK8sClient({ server: 'https://k8s.invalid', defaultNamespace: 'cs-demo' }, (async (raw) => {
@@ -16,7 +16,7 @@ test('continue pages are complete, a 410 resets the whole batch, cancellation do
 });
 test('events bind UID, init/previous logs are bounded and UID replacement during read is rejected', async () => {
   const k8s = createFakeK8sClient(); const pod = await k8s.create(object('Pod', 'task', 'cs-demo', { containers: [{ name: 'main' }], initContainers: [{ name: 'init' }] }));
-  const row = projectResources([pod], facts, 'crewstation-system', catalog, new Date().toISOString())[0]!;
+  const row = projectResources([pod], facts, 'crewstation-system', catalog, new Date().toISOString(), resourceIds([pod]))[0]!;
   await k8s.create({ ...object('Event', 'old'), involvedObject: { uid: 'old-pod' }, message: 'wrong event' }); await k8s.create({ ...object('Event', 'current'), involvedObject: { uid: pod.metadata.uid }, message: 'current event' });
   const reader = kubernetesClusterReader(k8s); expect((await reader.events(row)).items.map((i) => i.message)).toEqual(['current event']);
   let previous = false, cancelled = false;

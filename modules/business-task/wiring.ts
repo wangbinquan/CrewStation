@@ -1,3 +1,6 @@
+import { legacyBusinessIdentity } from './adapters/persistence/legacyBusinessIdentity';
+import { legacyServiceRoutes } from './http/legacyServiceRoutes';
+import type { ResourceIdentityDirectory } from '@crewstation/persistence';
 import { drizzleClusterCommands } from './adapters/persistence/clusterCommands';
 import { businessClusterUseCases } from './application/clusterManagement';
 import { join } from 'node:path';
@@ -22,6 +25,7 @@ import { userRoutes } from './http/userRoutes';
 import type { ComputeCatalog, BusinessTaskSettings, Environments, ProjectAuthorizer, Runner, ServiceDirectory } from './ports/runtime';
 
 export interface BusinessTaskModuleDeps {
+  identities?: ResourceIdentityDirectory;
   /** 算力档位解析（RFC-001），由组合根接到 project。 */
   compute: ComputeCatalog;
   db: Database;
@@ -67,10 +71,12 @@ export function createBusinessTaskModule(deps: BusinessTaskModuleDeps): Business
   };
   const subscriptions = createEventConsumer({ db: deps.db, consumer: deps.settings.consumerName, logger })
     .on(DomainTopic.releaseRegistered, async (e) => { await registerContracts(e.payload); });
+  const service = serviceRoutes(api);
+  if (deps.identities) service.route('/', legacyServiceRoutes(api, legacyBusinessIdentity(deps.identities)));
   let timer: ReturnType<typeof setInterval> | undefined;
   return {
     api,
-    http: { service: serviceRoutes(api), user: userRoutes(api, deps.isAdmin) },
+    http: { service, user: userRoutes(api, deps.isAdmin) },
     subscriptions,
     workers: [{ start: () => { timer ??= setInterval(() => void subtasks.sweepActive().catch((e: unknown) => logger.error('subtask sweep failed', { error: String(e) })), 5000); }, stop: async () => { if (timer) clearInterval(timer); timer = undefined; } }],
     migrations: businessTaskMigrations,

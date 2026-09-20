@@ -1,0 +1,86 @@
+{
+  "version": "resource-identity/v1",
+  "schema": "identity",
+  "entities": [
+    {
+      "table": "users",
+      "kind": "user",
+      "keys": [
+        "id"
+      ],
+      "idColumn": "id"
+    },
+    {
+      "table": "oidc_providers",
+      "kind": "oidc-provider",
+      "keys": [
+        "id"
+      ],
+      "idColumn": "id"
+    },
+    {
+      "table": "user_identities",
+      "kind": "user-identity",
+      "keys": [
+        "id"
+      ],
+      "idColumn": "id"
+    }
+  ],
+  "references": [
+    {
+      "table": "user_identities",
+      "column": "user_id",
+      "kind": "user",
+      "keys": [
+        "user_id"
+      ]
+    },
+    {
+      "table": "user_identities",
+      "column": "provider_id",
+      "kind": "oidc-provider",
+      "keys": [
+        "provider_id"
+      ]
+    },
+    {
+      "table": "oidc_flows",
+      "column": "provider_id",
+      "kind": "oidc-provider",
+      "keys": [
+        "provider_id"
+      ]
+    },
+    {
+      "table": "identity_forwarding",
+      "column": "project_id",
+      "kind": "project",
+      "keys": [
+        "project_id"
+      ],
+      "nullable": true
+    },
+    {
+      "table": "identity_forwarding",
+      "column": "updated_by",
+      "kind": "user",
+      "keys": [
+        "updated_by"
+      ],
+      "nullable": true
+    }
+  ],
+  "seeds": [
+    {
+      "kind": "user",
+      "keys": [
+        "usr_00000000000000000000000000000000"
+      ],
+      "id": "01a0bf5d-8f4b-7005-9439-4a3efadf6f8f"
+    }
+  ],
+  "finalize": [
+    "UPDATE identity.identity_forwarding SET id = 'project:' || project_id WHERE scope = 'project'"
+  ]
+}

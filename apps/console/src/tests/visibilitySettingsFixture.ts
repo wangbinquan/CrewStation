@@ -2,7 +2,7 @@ import type { AppPresentationDto, AppVisibilityDto, UserId } from '@crewstation/
 import { act } from 'react';
 import type { RenderedApp } from './renderApp';
 
-export const settingsProjectId = `prj_${'b'.repeat(32)}`, settingsUserId = `usr_${'a'.repeat(32)}` as UserId;
+export const settingsProjectId = '01a0bf5d-8f4b-7aef-84b8-c458233bab22', settingsUserId = '01a0bf5d-8f4b-7f8b-8136-e631380738b0' as UserId;
 export const visibilitySettingsRoute = `/projects/${settingsProjectId}/settings?tab=visibility`;
 interface SettingsWrite { readonly path: string; readonly input: Record<string, unknown> }
 
@@ -28,7 +28,7 @@ export function visibilitySettingsFixture() {
       else { state.presentation = { ...state.presentation, ...input, revision: state.presentation.revision + 1 }; body = state.presentation; }
     } else if (state.failure && path.endsWith(`/${state.failure}`)) { status = 503; body = { error: 'unavailable', message: '最新设置暂不可读取' }; }
     else if (path === '/v1/me') body = { id: settingsUserId, name: '负责人', email: 'owner@test.invalid', platformRole: 'developer', isAdmin: false, memberships: [{ projectId: settingsProjectId, role: state.role }] };
-    else if (path === `/v1/projects/${settingsProjectId}`) body = { id: settingsProjectId, serviceId: `svc_${'c'.repeat(32)}`, slug: 'knowledge', name: '知识助理', kind: 'DigitalWorker', ownerUserId: settingsUserId, state: 'active' };
+    else if (path === `/v1/projects/${settingsProjectId}`) body = { id: settingsProjectId, serviceId: '01a0bf5d-8f4b-7d97-81d1-7163b23b1d2e', slug: 'knowledge', name: '知识助理', kind: 'DigitalWorker', ownerUserId: settingsUserId, state: 'active' };
     else if (path.endsWith('/app-visibility')) body = state.visibility;
     else if (path.endsWith('/app-presentation')) body = state.presentation;
     else if (path.endsWith('/member-candidates')) body = { items: [{ userId: settingsUserId, name: '小林', email: 'lin@example.com' }] };

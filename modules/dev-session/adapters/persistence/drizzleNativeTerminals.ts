@@ -34,7 +34,7 @@ export function drizzleNativeTerminals(db: Database): NativeTerminalRepository {
     },
     list: async (taskId) => (await db.select(selection).from(table).where(eq(table.taskId, taskId)).orderBy(table.agentId).limit(256)).map(toStart),
     async saveRecord(taskId, record) {
-      await db.update(table).set({ record }).where(and(agentKey(taskId, record.agentId), sql`(${table.record}->>'revision')::integer < ${record.revision}`, sql`${table.record}->>'lifecycle' NOT IN ('ended', 'failed')`));
+      await db.update(table).set({ record: sql`${JSON.stringify(record)}::text::jsonb || jsonb_strip_nulls(jsonb_build_object('computeName', ${table.record}->'computeName'))` }).where(and(agentKey(taskId, record.agentId), sql`(${table.record}->>'revision')::integer < ${record.revision}`, sql`${table.record}->>'lifecycle' NOT IN ('ended', 'failed')`));
     },
     async requestStop(taskId, agentId) { await db.update(table).set({ execution: sql`jsonb_set(${table.execution}, '{stopRequested}', 'true')` }).where(agentKey(taskId, agentId)); },
     async saveSnapshot(taskId, agentId, result) {

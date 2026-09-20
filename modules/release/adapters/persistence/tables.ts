@@ -4,6 +4,7 @@ import { jsonDocument } from '@crewstation/persistence';
 import { releaseSchema } from './schema';
 
 export const releases = releaseSchema.table('releases', {
+  legacyResourceId: text('legacy_resource_id'),
   id: text('id').primaryKey(),
   serviceId: text('service_id').notNull(),
   projectId: text('project_id').notNull(),

@@ -5,7 +5,7 @@ import { runnerHub } from '../application/runnerHub';
 import type { SessionUseCaseDeps } from '../application/dependencies';
 
 test('旧握手通过初检但已失效时，不接管连接、不清空当前命令或发出 welcome', async () => {
-  const taskId = TaskIdSchema.parse(`tsk_${'a'.repeat(32)}`), callbacks: string[] = [], frames: string[] = [];
+  const taskId = TaskIdSchema.parse('01a0bf5d-8f4b-78ad-881c-f45c9e552ded'), callbacks: string[] = [], frames: string[] = [];
   let accepted = 'original';
   const deps: SessionUseCaseDeps = {
     clock: fixedClock('2026-09-15T10:00:00Z'), logger: noopLogger,

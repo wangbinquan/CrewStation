@@ -1,3 +1,4 @@
+import { profileIdOf } from './computeProfileFixture';
 import { describe, expect, test } from 'bun:test';
 import { ComputeProfileContentSchema, CreateComputeProfileRequestSchema, SaveComputeProfileRequestSchema, launchApplicabilityIssues } from '@crewstation/contracts';
 import type { AgentProtocol } from '@crewstation/contracts';
@@ -54,20 +55,20 @@ describe('协议字段矩阵（RFC-006 §5.1）', () => {
   test('新建时换协议：未改过的建议路径与预设跟着换，改过的保留；换到通用终端清掉配置文件绑定', () => {
     const claude = blankDraft('claude-code', 'claude-settings');
     expect(claude.configFileKind).toBe('claude-settings');
-    expect(withProtocol(claude, 'opencode')).toMatchObject({ protocol: 'opencode', binaryPath: '/usr/local/bin/opencode', configFileKind: 'opencode-config', configFilePath: '{{agent.home}}/.opencode/opencode.json', secretNames: ['ANTHROPIC_API_KEY'] });
-    expect(withProtocol(claude, 'terminal')).toMatchObject({ protocol: 'terminal', binaryPath: '', steps: [], secretNames: [], configFileKind: 'none', configFilePath: '' });
+    expect(withProtocol(claude, 'opencode')).toMatchObject({ protocol: 'opencode', binaryPath: '/usr/local/bin/opencode', configFileKind: 'opencode-config', configFilePath: '{{agent.home}}/.opencode/opencode.json', secrets: [{ id: expect.any(String), name: 'ANTHROPIC_API_KEY' }] });
+    expect(withProtocol(claude, 'terminal')).toMatchObject({ protocol: 'terminal', binaryPath: '', steps: [], secrets: [], configFileKind: 'none', configFilePath: '' });
     const edited = { ...claude, binaryPath: '/opt/fork/claude', vars: [] };
-    expect(withProtocol(edited, 'opencode')).toMatchObject({ binaryPath: '/opt/fork/claude', steps: claude.steps, secretNames: ['ANTHROPIC_AUTH_TOKEN'], configFileKind: 'opencode-config', configFilePath: claude.configFilePath });
+    expect(withProtocol(edited, 'opencode')).toMatchObject({ binaryPath: '/opt/fork/claude', steps: claude.steps, secrets: claude.secrets, configFileKind: 'opencode-config', configFilePath: claude.configFilePath });
     expect(withProtocol(blankDraft('opencode'), 'claude-code')).toMatchObject({ steps: [], configFileKind: 'none' });
-    expect(applyPreset(claude, 'blank')).toMatchObject({ steps: [], vars: [], secretNames: [], configFileKind: 'none' });
+    expect(applyPreset(claude, 'blank')).toMatchObject({ steps: [], vars: [], secrets: [], configFileKind: 'none' });
   });
 });
 
 describe('草稿校验', () => {
-  test('新建时 default 是保留名、名称须为 slug；编辑时名称不参与校验', () => {
+  test('名称只用于显示：支持 default、空格与中文，创建和编辑都校验长度', () => {
     const draft = { ...blankDraft('claude-code'), image: 'registry.cs.local/runtimes/x:1' };
-    expect(validateProfileDraft({ ...draft, name: 'default' }, true)).toEqual({ name: 'reservedName' });
-    expect(validateProfileDraft({ ...draft, name: 'Bad Name' }, true)).toEqual({ name: 'profileName' });
+    expect(validateProfileDraft({ ...draft, name: 'default' }, true)).toEqual({});
+    expect(validateProfileDraft({ ...draft, name: '中文显示名称 Bad Name' }, true)).toEqual({});
     expect(validateProfileDraft({ ...draft, name: 'ok-name' }, true)).toEqual({});
     expect(validateProfileDraft({ ...draft, name: 'default' }, false)).toEqual({});
   });
@@ -97,7 +98,7 @@ describe('草稿校验', () => {
 
 describe('与契约往返', () => {
   test('详情 → 草稿 → 内容：未改动时逐字段等于服务端内容，且草稿不算脏', () => {
-    for (const detail of [profileDetail(), terminalProfile(), profileDetail({ name: 'opencode-lite', protocol: 'opencode', content: { launch: { protocol: 'opencode', binaryPath: '/usr/local/bin/opencode', extraArgs: [], isSandbox: false, opencode: { temperature: 0.2 } }, configFile: { kind: 'none' }, steps: [], secretNames: [] } })]) {
+    for (const detail of [profileDetail(), terminalProfile(), profileDetail({ name: 'opencode-lite', protocol: 'opencode', content: { launch: { protocol: 'opencode', binaryPath: '/usr/local/bin/opencode', extraArgs: [], isSandbox: false, opencode: { temperature: 0.2 } }, configFile: { kind: 'none' }, steps: [], secrets: [] } })]) {
       const draft = draftFromDetail(detail);
       expect(ComputeProfileContentSchema.parse(toContent(draft))).toEqual(detail.content);
       expect(draftDirty(draft, draftFromDetail(detail))).toBe(false);
@@ -105,15 +106,15 @@ describe('与契约往返', () => {
   });
 
   test('保存体带 expectedRevision；凭据只发有意义的操作：保留已声明的、清除任意名、丢掉空替换与未声明的替换', () => {
-    const draft = { ...draftFromDetail(profileDetail()), credentials: { ANTHROPIC_AUTH_TOKEN: { op: 'keep' as const }, OLD_TOKEN: { op: 'clear' as const }, STRAY: { op: 'replace' as const, value: 'x' } } };
+    const draft = { ...draftFromDetail(profileDetail()), credentials: { ['01a0bf5d-8f4b-794b-85ed-6ff36d0b859a']: { op: 'keep' as const }, ['01a0bf5d-8f4b-781e-8982-2b3a494bac39']: { op: 'clear' as const }, ['01a0bf5d-8f4b-7be3-8f8a-7d152c0aa6c9']: { op: 'replace' as const, value: 'x' } } };
     const request = SaveComputeProfileRequestSchema.parse(toSaveRequest(draft, 7));
     expect(request.expectedRevision).toBe(7);
-    expect(request.credentials).toEqual({ ANTHROPIC_AUTH_TOKEN: { op: 'keep' }, OLD_TOKEN: { op: 'clear' } });
+    expect(request.credentials).toEqual({ ['01a0bf5d-8f4b-794b-85ed-6ff36d0b859a']: { op: 'keep' }, ['01a0bf5d-8f4b-781e-8982-2b3a494bac39']: { op: 'clear' } });
     const fresh = { ...blankDraft('claude-code', 'claude-settings'), name: 'new-one', image: 'registry.cs.local/runtimes/claude:2.1' };
-    expect(fresh.credentials).toEqual({ ANTHROPIC_AUTH_TOKEN: { op: 'replace', value: '' } });
+    expect(fresh.credentials).toEqual({ [fresh.secrets[0]!.id]: { op: 'replace', value: '' } });
     const create = CreateComputeProfileRequestSchema.parse(toCreateRequest(fresh));
     expect(create.credentials).toEqual({});
-    expect(CreateComputeProfileRequestSchema.parse(toCreateRequest({ ...fresh, credentials: { ANTHROPIC_AUTH_TOKEN: { op: 'replace', value: 'sk-1' } } })).credentials).toEqual({ ANTHROPIC_AUTH_TOKEN: { op: 'replace', value: 'sk-1' } });
+    expect(CreateComputeProfileRequestSchema.parse(toCreateRequest({ ...fresh, credentials: { [fresh.secrets[0]!.id]: { op: 'replace', value: 'sk-1' } } })).credentials).toEqual({ [fresh.secrets[0]!.id]: { op: 'replace', value: 'sk-1' } });
   });
 
   test('路径预览：工作卷上的路径与同会话其他 Agent 共享，其余路径属于该 Agent 自己的 Pod', () => {
@@ -133,7 +134,7 @@ describe('列表状态与查询串', () => {
   });
 
   test('/admin/compute 只认 profile 与 create；旧的 tab／config 参数被忽略', () => {
-    expect(parseComputeSearch({ profile: 'claude-daily' })).toEqual({ profile: 'claude-daily' });
+    expect(parseComputeSearch({ profile: profileIdOf('claude-daily') })).toEqual({ profile: profileIdOf('claude-daily') });
     expect(parseComputeSearch({ create: 'true' })).toEqual({ create: true });
     expect(parseComputeSearch({ tab: 'runtime', config: 'arc_1' })).toEqual({});
     expect(parseComputeSearch({ profile: 'Not A Slug', create: true })).toEqual({ create: true });

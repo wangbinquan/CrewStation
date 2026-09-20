@@ -33,14 +33,14 @@ export function ProjectComputeForm({ initial, profiles, tasks, viewerId, onReloa
     if (lock.current) return;
     const found: Record<string, string> = {}, parsed = ProjectComputePolicySchema.safeParse(policy);
     if (!parsed.success) for (const issue of parsed.error.issues) found[String(issue.path[0])] = t('admin.projectCompute.invalidDefault');
-    if (policy.allowedProfiles.some((name) => !profiles.some((p) => p.name === name))) found.allowedProfiles = t('admin.projectCompute.missingProfile');
-    if (policy.defaultProfile && profiles.find((p) => p.name === policy.defaultProfile)?.protocol === 'terminal') found.defaultProfile = t('admin.projectCompute.invalidDefault');
-    if (policy.devTaskProfile && !tasks.some((p) => p.name === policy.devTaskProfile)) found.devTaskProfile = t('admin.projectCompute.missingTask');
+    if (policy.allowedProfiles.some((name) => !profiles.some((p) => p.id === name))) found.allowedProfiles = t('admin.projectCompute.missingProfile');
+    if (policy.defaultProfile && profiles.find((p) => p.id === policy.defaultProfile)?.protocol === 'terminal') found.defaultProfile = t('admin.projectCompute.invalidDefault');
+    if (policy.devTaskProfile && !tasks.some((p) => p.id === policy.devTaskProfile)) found.devTaskProfile = t('admin.projectCompute.missingTask');
     setErrors(found);
     if (Object.keys(found).length) { queueMicrotask(() => root.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus()); return; }
     lock.current = true; setSaved(false); save.mutate(policy, { onSettled: () => { lock.current = false; } });
   };
-  const known = new Set(profiles.map((profile) => profile.name));
+  const known = new Set(profiles.map((profile) => profile.id));
   return <Card stacked title={t('admin.projectCompute.title')} footer={t('admin.projectCompute.effect')}>
     <UnsavedChangesGuard dirty={dirty || save.isPending} scope={t('admin.projectCompute.title')} isNavigationBusy={() => save.isPending} />
     <form ref={root} onSubmit={(event) => { event.preventDefault(); submit(); }}><Stack>
@@ -50,20 +50,20 @@ export function ProjectComputeForm({ initial, profiles, tasks, viewerId, onReloa
       {draft.mode === 'restricted' ? <>
         <fieldset className={styles.profiles} disabled={save.isPending} aria-invalid={!!errors.allowedProfiles} tabIndex={-1}><legend>{t('admin.projectCompute.allowed')}</legend>
           <p>{t('admin.projectCompute.allowedHint')}</p>
-          {profiles.map((profile) => <label key={profile.name} className={styles.choice}><input type="checkbox" checked={draft.allowedProfiles.includes(profile.name)} onChange={(event) => change({ allowedProfiles: event.target.checked ? [...draft.allowedProfiles, profile.name] : draft.allowedProfiles.filter((name) => name !== profile.name) })} />
+          {profiles.map((profile) => <label key={profile.id} className={styles.choice}><input type="checkbox" checked={draft.allowedProfiles.includes(profile.id)} onChange={(event) => change({ allowedProfiles: event.target.checked ? [...draft.allowedProfiles, profile.id] : draft.allowedProfiles.filter((name) => name !== profile.id) })} />
             <span><strong>{profile.name}</strong> · {t(profile.defaultVisible === false ? 'admin.profile.defaultHidden' : 'admin.profile.defaultVisible')}<small>{profile.description || t(`admin.profile.protocol.${profile.protocol}`)}{!profile.availability.available ? ` · ${profile.availability.reason ?? t('admin.projectCompute.unavailable')}` : ''}</small></span></label>)}
           {draft.allowedProfiles.filter((name) => !known.has(name)).map((name) => <label key={name} className={styles.choice}><input type="checkbox" checked onChange={() => change({ allowedProfiles: draft.allowedProfiles.filter((value) => value !== name) })} /><span>{name} · {t('admin.projectCompute.missingProfile')}</span></label>)}
           {errors.allowedProfiles ? <ActionNote tone="error">{errors.allowedProfiles}</ActionNote> : null}
         </fieldset>
         <FormField label={t('admin.projectCompute.default')} hint={t('admin.projectCompute.defaultHint')} error={errors.defaultProfile}><select value={draft.defaultProfile ?? ''} aria-invalid={!!errors.defaultProfile} disabled={save.isPending} onChange={(event) => change({ defaultProfile: event.target.value || null })}>
           <option value="">{t('admin.projectCompute.noDefault')}</option>
-          {profiles.filter((profile) => draft.allowedProfiles.includes(profile.name) && profile.protocol !== 'terminal').map((profile) => <option key={profile.name} value={profile.name}>{profile.name}</option>)}
-          {draft.defaultProfile && !profiles.some((p) => p.name === draft.defaultProfile && draft.allowedProfiles.includes(p.name) && p.protocol !== 'terminal') ? <option value={draft.defaultProfile}>{draft.defaultProfile} · {t('admin.projectCompute.invalidDefault')}</option> : null}
+          {profiles.filter((profile) => draft.allowedProfiles.includes(profile.id) && profile.protocol !== 'terminal').map((profile) => <option key={profile.id} value={profile.id}>{profile.name}</option>)}
+          {draft.defaultProfile && !profiles.some((p) => p.id === draft.defaultProfile && draft.allowedProfiles.includes(p.id) && p.protocol !== 'terminal') ? <option value={draft.defaultProfile}>{draft.defaultProfile} · {t('admin.projectCompute.invalidDefault')}</option> : null}
         </select></FormField>
       </> : <ActionNote tone="neutral">{t('admin.projectCompute.inheritedDefault', { name: profiles.find((profile) => profile.isDefault)?.name ?? t('admin.projectCompute.noDefault') })}</ActionNote>}
       <FormField label={t('admin.projectCompute.devTask')} hint={t('admin.projectCompute.devHint')} error={errors.devTaskProfile}><select value={draft.devTaskProfile ?? ''} aria-invalid={!!errors.devTaskProfile} disabled={save.isPending} onChange={(event) => change({ devTaskProfile: event.target.value || null })}>
-        <option value="">{t('admin.profile.defaultTaskProfile')}</option>{tasks.map((p) => <option key={p.name} value={p.name}>{p.name} · CPU {p.cpu} · {p.memory} · {p.storage}</option>)}
-        {draft.devTaskProfile && !tasks.some((p) => p.name === draft.devTaskProfile) ? <option value={draft.devTaskProfile}>{draft.devTaskProfile} · {t('admin.projectCompute.missingTask')}</option> : null}
+        <option value="">{t('admin.profile.defaultTaskProfile')}</option>{tasks.map((p) => <option key={p.id} value={p.id}>{p.name} · CPU {p.cpu} · {p.memory} · {p.storage}</option>)}
+        {draft.devTaskProfile && !tasks.some((p) => p.id === draft.devTaskProfile) ? <option value={draft.devTaskProfile}>{draft.devTaskProfile} · {t('admin.projectCompute.missingTask')}</option> : null}
       </select></FormField>
       {save.error ? <ActionNote tone="error">{errorMessage(save.error)}</ActionNote> : null}{saved ? <ActionNote tone="success">{t('admin.projectCompute.saved')}</ActionNote> : null}
       <ActionRow><Button type="submit" variant="primary" disabled={save.isPending || !dirty}>{t(save.isPending ? 'admin.profile.working' : 'admin.projectCompute.save')}</Button>

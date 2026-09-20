@@ -1,3 +1,5 @@
+import { legacyRunnerIdentity } from './adapters/persistence/legacyRunnerIdentity';
+import type { ResourceIdentityDirectory } from '@crewstation/persistence';
 import { join } from 'node:path';
 import type { ServerWebSocket } from 'bun';
 import type { UserId } from '@crewstation/contracts';
@@ -22,6 +24,7 @@ import type { CommandForwarder, SessionSettings } from './ports/forwarding';
 import type { RunnerAuth, TaskAccess } from './ports/taskRuntime';
 
 export interface SessionModuleDeps {
+  identities?: ResourceIdentityDirectory;
   db: Database;
   runnerAuth: RunnerAuth;
   taskAccess: TaskAccess;
@@ -50,6 +53,7 @@ export const sessionMigrations: MigrationSet = {
 export function createSessionModule(deps: SessionModuleDeps): SessionModule {
   const useCaseDeps: SessionUseCaseDeps = {
     events: drizzleRunnerEventStore(deps.db),
+    legacyRunners: deps.identities ? legacyRunnerIdentity(deps.identities) : undefined,
     registry: drizzleConnectionRegistry(deps.db),
     forwarder: deps.forwarder ?? fetchForwarder(),
     runnerAuth: deps.runnerAuth,

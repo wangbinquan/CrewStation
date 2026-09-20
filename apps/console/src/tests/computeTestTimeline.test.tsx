@@ -15,7 +15,7 @@ async function renderPanel(latest: ProfileTestDto, onLocate: (stepId: string) =>
 const failedStep = [
   { id: 'image', kind: 'image', name: '拉取镜像', state: 'succeeded', durationMs: 1200 },
   { id: 'runner', kind: 'runner', name: 'Runner 握手', state: 'succeeded', durationMs: 40 },
-  { id: 'step:claude-settings', kind: 'step', stepId: 'claude-settings', name: 'Claude settings.json', state: 'failed', durationMs: 7, exitCode: 1,
+  { id: 'step:claude-settings', kind: 'step', stepId: '01a0bf5d-8f4b-7e58-8d8a-6b38a70679a1', name: 'Claude settings.json', state: 'failed', durationMs: 7, exitCode: 1,
     error: { code: 'file_path_in_use', message: '目标文件已存在且内容不同' }, log: { stdoutTail: '', stderrTail: 'refusing to overwrite settings.json' } },
   { id: 'launch', kind: 'launch', name: '启动 CLI', state: 'skipped' },
   { id: 'model', kind: 'model', name: '模型轮次', state: 'skipped' },
@@ -43,7 +43,7 @@ describe('测试时间线（RFC-006 §8）', () => {
       expect(view.host.querySelector('details > summary')?.textContent).toBe('查看测试环境与版本');
       expect(text).toContain('针对修订 1（c0ffee00c0ff）· 保存后自动测试');
       await view.click('定位到步骤');
-      expect(located).toEqual(['claude-settings']);
+      expect(located).toEqual(['01a0bf5d-8f4b-7e58-8d8a-6b38a70679a1']);
     } finally { view.unmount(); }
   });
 

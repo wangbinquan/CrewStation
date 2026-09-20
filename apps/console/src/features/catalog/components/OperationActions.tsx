@@ -26,12 +26,12 @@ export function OperationActions({ operation, pendingRequest, actions }: Operati
     return (
       <AccessRequestForm
         pending={actions.requestAccess.isPending}
-        error={actions.requestAccess.variables?.operationKey === operation.key && actions.requestAccess.error ? errorMessage(actions.requestAccess.error) : undefined}
+        error={actions.requestAccess.variables?.operationId === operation.id && actions.requestAccess.error ? errorMessage(actions.requestAccess.error) : undefined}
         onCancel={() => setRequesting(false)}
         onSubmit={(reason) => {
           if (submitting.current) return;
           submitting.current = true;
-          actions.requestAccess.mutate({ operationKey: operation.key, reason: reason.length > 0 ? reason : undefined }, { onSuccess: () => setRequesting(false), onSettled: () => { submitting.current = false; } });
+          actions.requestAccess.mutate({ operationId: operation.id, reason: reason.length > 0 ? reason : undefined }, { onSuccess: () => setRequesting(false), onSettled: () => { submitting.current = false; } });
         }}
       />
     );

@@ -1,5 +1,6 @@
-/** 管理员定义的套餐；Manifest 只按名字引用（G24）。 */
+/** 管理员定义的资源规格；引用使用稳定 ID，名称可修改。 */
 export interface ServicePlan {
+  readonly id: string;
   readonly name: string;
   readonly cpu: string;
   readonly memory: string;
@@ -8,6 +9,7 @@ export interface ServicePlan {
 }
 
 export interface TaskProfile {
+  readonly id: string;
   readonly name: string;
   readonly cpu: string;
   readonly memory: string;

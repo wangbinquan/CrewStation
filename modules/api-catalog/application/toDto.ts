@@ -5,7 +5,7 @@ import type { ApiRequest } from '../domain/apiRequest';
 
 export function operationToDto(op: ApiOperation, granted?: boolean): ApiOperationDto {
   return {
-    key: op.key,
+    id: op.id, proxyId: op.proxyId,
     proxy: op.proxy,
     method: op.method,
     path: op.path,
@@ -18,7 +18,7 @@ export function operationToDto(op: ApiOperation, granted?: boolean): ApiOperatio
 
 export function proxyToDto(proxy: ApiProxy, operationCount: number): ApiProxyDto {
   return {
-    proxy: proxy.proxy,
+    id: proxy.id, name: proxy.name, proxy: proxy.proxy,
     projectId: proxy.projectId,
     serviceId: proxy.serviceId,
     kind: proxy.kind,
@@ -33,7 +33,7 @@ export function requestToDto(request: ApiRequest): ApiRequestDto {
   return {
     id: request.id,
     serviceId: request.serviceId,
-    operationKey: request.operationKey,
+    operationId: request.operationId,
     state: request.state,
     ...(request.reason === undefined ? {} : { reason: request.reason }),
     requestedBy: request.requestedBy,

@@ -1,0 +1,35 @@
+.muted { color: var(--cs-color-text-muted); font-size: var(--cs-font-size-sm); line-height: 1.6; overflow-wrap: anywhere; }
+.sectionHeading, .providerRow { display: flex; justify-content: space-between; align-items: center; gap: var(--cs-space-4); flex-wrap: wrap; min-width: 0; }
+.providerRow { padding: var(--cs-space-4) 0; border-bottom: 1px solid var(--cs-color-border); }
+.providerRow:last-child { border-bottom: 0; }
+.providerIdentity { display: flex; gap: var(--cs-space-3); min-width: 0; flex: 1 1 260px; align-items: flex-start; }
+.mark { flex: 0 0 40px; height: 40px; display: grid; place-items: center; border-radius: var(--cs-radius-md); background: var(--cs-color-tint); color: var(--cs-color-primary); font-size: 20px; font-weight: 500; }
+.providerDetails { display: grid; justify-items: start; gap: var(--cs-space-2); min-width: 0; overflow-wrap: anywhere; }
+.providerTitle { display: flex; align-items: center; flex-wrap: wrap; gap: var(--cs-space-2); }
+.meta { display: flex; gap: var(--cs-space-3); flex-wrap: wrap; color: var(--cs-color-text-muted); font-size: var(--cs-font-size-sm); }
+.formGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: var(--cs-space-4) var(--cs-space-5); padding-top: var(--cs-space-4); }
+.fieldStack { display: grid; gap: var(--cs-space-3); min-width: 0; }
+.mappingRow { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto; gap: var(--cs-space-3); align-items: start; }
+.mappingArrow { align-self: center; color: var(--cs-color-text-muted); }
+.probe { width: 100%; display: grid; gap: var(--cs-space-3); padding: var(--cs-space-4); background: var(--cs-color-surface-muted); border-radius: var(--cs-radius-md); min-width: 0; }
+.endpoint { display: grid; grid-template-columns: 160px minmax(0, 1fr); gap: var(--cs-space-2) var(--cs-space-4); }
+.endpoint dt { color: var(--cs-color-text-muted); }
+.endpoint dd { display: grid; justify-items: start; gap: var(--cs-space-1); margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.danger { border-top: 1px solid var(--cs-color-border); margin-top: var(--cs-space-5); padding-top: var(--cs-space-4); display: grid; justify-items: start; gap: var(--cs-space-3); }
+.summary { display: flex; flex-wrap: wrap; gap: var(--cs-space-3) var(--cs-space-5); }
+.summary > div { display: flex; flex-wrap: wrap; gap: var(--cs-space-2); font-size: var(--cs-font-size-sm); }
+.summary dt { color: var(--cs-color-text-muted); }
+.summary dd { margin: 0; }
+.statusDetails { color: var(--cs-color-text-muted); font-size: var(--cs-font-size-sm); }
+.statusDetails summary { cursor: pointer; }
+.statusDetails[open] > dl { margin-top: var(--cs-space-2); }
+@media (max-width: 640px) { .formGrid { grid-template-columns: minmax(0, 1fr); } .mappingRow { grid-template-columns: minmax(0, 1fr); border-bottom: 1px solid var(--cs-color-border); padding-bottom: var(--cs-space-3); } .mappingArrow { display: none; } .endpoint { grid-template-columns: minmax(0, 1fr); } }
+.choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr)); gap: var(--cs-space-3); border: 0; padding: 0; margin: 0; }
+.fieldRow { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; gap: var(--cs-space-4); align-items: center; padding: var(--cs-space-3) 0; border-bottom: 1px solid var(--cs-color-border); }
+.fieldRow:last-child { border-bottom: 0; }
+@media (max-width: 560px) { .fieldRow { grid-template-columns: minmax(0, 1fr); gap: var(--cs-space-2); } .fieldRow > button { justify-self: start; } }
+
+.container > header { flex-wrap: wrap; overflow-wrap: anywhere; }
+.container > header > * { min-width: 0; max-width: 100%; }
+.container > header span { white-space: normal; overflow-wrap: anywhere; }
+.fieldStack > span { justify-self: start; }

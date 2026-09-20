@@ -27,8 +27,8 @@ export function useProfileSave(detail: ComputeProfileDetailDto | undefined, edit
   const [conflict, setConflict] = useState<number | undefined>(undefined);
   const [note, setNote] = useState<SaveNote | undefined>(undefined);
   const [created, setCreated] = useState<string | undefined>(undefined);
-  const adopt = (next: ComputeProfileDetailDto) => { queryClient.setQueryData(queryKeys.adminComputeProfile(next.name), next); editor.reload(draftFromDetail(next), next.revision); setConflict(undefined); };
-  const save = useApiMutation((draft: ProfileDraft) => (detail === undefined ? api.computeProfiles.create(toCreateRequest(draft)) : api.computeProfiles.save(detail.name, toSaveRequest(draft, editor.baseRevision ?? detail.revision))), {
+  const adopt = (next: ComputeProfileDetailDto) => { queryClient.setQueryData(queryKeys.adminComputeProfile(next.id), next); editor.reload(draftFromDetail(next), next.revision); setConflict(undefined); };
+  const save = useApiMutation((draft: ProfileDraft) => (detail === undefined ? api.computeProfiles.create(toCreateRequest(draft)) : api.computeProfiles.save(detail.id, toSaveRequest(draft, editor.baseRevision ?? detail.revision))), {
     invalidate: [queryKeys.computeProfiles()],
     onSuccess: (next) => {
       // P3：只改说明时服务端不生成新修订，也不重测。
@@ -36,11 +36,11 @@ export function useProfileSave(detail: ComputeProfileDetailDto | undefined, edit
       setNote(result);
       adopt(next);
       feedback.onSaved(result);
-      if (detail === undefined) setCreated(next.name);
+      if (detail === undefined) setCreated(next.id);
     },
   });
   // 放弃修改或按当前修订重存时，上一次保存的 409 已经处理过，不再显示成「保存失败」。
-  const reload = useApiMutation(() => api.computeProfiles.get(detail!.name), { onSuccess: (next) => { save.reset(); adopt(next); } });
+  const reload = useApiMutation(() => api.computeProfiles.get(detail!.id), { onSuccess: (next) => { save.reset(); adopt(next); } });
   // 保存中也算未保存（离开保护会拦）：等 mutation 落定、草稿归零后再跳。
   useEffect(() => { if (created !== undefined && !editor.dirty && !save.isPending) onCreated(created); }, [created, editor.dirty, save.isPending, onCreated]);
   const submit = () => {

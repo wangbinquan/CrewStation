@@ -1,0 +1,208 @@
+{
+  "version": "resource-identity/v1",
+  "schema": "task_runtime",
+  "entities": [
+    {
+      "table": "environments",
+      "kind": "task",
+      "keys": [
+        "id"
+      ],
+      "idColumn": "id"
+    },
+    {
+      "table": "environment_rebuilds",
+      "kind": "rebuild",
+      "keys": [
+        "id"
+      ],
+      "idColumn": "id"
+    }
+  ],
+  "references": [
+    {
+      "table": "environments",
+      "column": "project_id",
+      "kind": "project",
+      "keys": [
+        "project_id"
+      ]
+    },
+    {
+      "table": "environments",
+      "column": "service_id",
+      "kind": "service",
+      "keys": [
+        "service_id"
+      ]
+    },
+    {
+      "table": "environments",
+      "column": "profile",
+      "kind": "task-profile",
+      "keys": [
+        "profile"
+      ]
+    },
+    {
+      "table": "environments",
+      "column": "created_by",
+      "kind": "user",
+      "keys": [
+        "created_by"
+      ],
+      "nullable": true
+    },
+    {
+      "table": "environments",
+      "column": "rebuild_id",
+      "kind": "rebuild",
+      "keys": [
+        "rebuild_id"
+      ],
+      "nullable": true
+    },
+    {
+      "table": "admissions",
+      "column": "project_id",
+      "kind": "project",
+      "keys": [
+        "project_id"
+      ]
+    },
+    {
+      "table": "environment_rebuilds",
+      "column": "task_id",
+      "kind": "task",
+      "keys": [
+        "task_id"
+      ]
+    },
+    {
+      "table": "environment_rebuilds",
+      "column": "project_id",
+      "kind": "project",
+      "keys": [
+        "project_id"
+      ]
+    }
+  ],
+  "inlineEntities": [
+    {
+      "table": "environments",
+      "column": "native",
+      "path": "agentId",
+      "kind": "agent"
+    },
+    {
+      "table": "environments",
+      "column": "native",
+      "path": "terminalId",
+      "kind": "terminal"
+    },
+    {
+      "table": "environments",
+      "column": "native",
+      "path": "runnerId",
+      "kind": "runner"
+    }
+  ],
+  "documents": [
+    {
+      "table": "environments",
+      "column": "native",
+      "references": [
+        {
+          "path": "parentTaskId",
+          "kind": "task"
+        },
+        {
+          "path": "agentId",
+          "kind": "agent"
+        },
+        {
+          "path": "terminalId",
+          "kind": "terminal",
+          "nullable": true
+        },
+        {
+          "path": "runnerId",
+          "kind": "runner"
+        },
+        {
+          "path": "requestedProfile",
+          "kind": "task-profile",
+          "nullable": true
+        },
+        {
+          "path": "profile.name",
+          "kind": "task-profile",
+          "copyTo": "id"
+        },
+        {
+          "path": "computeProfile.name",
+          "kind": "compute-profile",
+          "rename": "profileId"
+        }
+      ]
+    },
+    {
+      "table": "environment_rebuilds",
+      "column": "input",
+      "references": [
+        {
+          "path": "expectedTaskId",
+          "kind": "task"
+        },
+        {
+          "path": "profile.name",
+          "kind": "task-profile",
+          "copyTo": "id"
+        }
+      ]
+    },
+    {
+      "table": "environments",
+      "column": "labels",
+      "references": [
+        {
+          "path": "/crewstation.io~1profile-test",
+          "kind": "profile-test"
+        },
+        {
+          "path": "/crewstation.io~1compute-profile",
+          "kind": "compute-profile"
+        }
+      ]
+    }
+  ],
+  "declarations": [
+    {
+      "table": "environments",
+      "column": "labels",
+      "where": {
+        "kind": "profile-test"
+      },
+      "path": "/crewstation.io~1profile-test",
+      "kind": "profile-test",
+      "keys": [
+        "$value"
+      ],
+      "fields": {
+        "id": "$value"
+      }
+    }
+  ],
+  "bindings": [
+    {
+      "table": "environments",
+      "kind": "task-profile",
+      "keys": [
+        "id"
+      ],
+      "referenceKeys": [
+        "profile"
+      ]
+    }
+  ]
+}

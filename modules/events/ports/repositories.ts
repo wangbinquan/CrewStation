@@ -6,21 +6,24 @@ import type { Subscription } from '../domain/subscription';
 
 export interface ProducerRepository {
   upsert(producer: Producer): Promise<void>;
-  getByName(producer: string): Promise<Producer | undefined>;
+  getById(id: string): Promise<Producer | undefined>;
+  getByService(serviceId: ServiceId): Promise<Producer | undefined>;
+  getByCode(producer: string): Promise<Producer | undefined>;
 }
 
 export interface EventTypeRepository {
-  getByEventType(eventType: string): Promise<EventType | undefined>;
+  getById(id: string): Promise<EventType | undefined>;
+  getByCode(eventType: string): Promise<EventType | undefined>;
   list(): Promise<EventType[]>;
   /** 用新声明整体替换该生产方的事件类型。 */
-  replaceForProducer(producer: string, types: readonly EventType[]): Promise<void>;
+  replaceForProducer(producerId: string, types: readonly EventType[]): Promise<void>;
 }
 
 export interface SubscriptionRepository {
   getById(id: string): Promise<Subscription | undefined>;
   listByService(serviceId: ServiceId): Promise<Subscription[]>;
   listByProject(projectId: ProjectId): Promise<Subscription[]>;
-  listActiveByEventType(eventType: string): Promise<Subscription[]>;
+  listActiveByEventType(eventTypeId: string): Promise<Subscription[]>;
   upsert(subscription: Subscription): Promise<void>;
   remove(id: string): Promise<void>;
 }
@@ -29,7 +32,7 @@ export interface InboxRepository {
   /** (producer, dedupKey) 已存在时不写入并返回 false。 */
   insert(event: InboxEvent): Promise<boolean>;
   getById(id: EventId): Promise<InboxEvent | undefined>;
-  getByDedup(producer: string, dedupKey: string): Promise<InboxEvent | undefined>;
+  getByDedup(producerId: string, dedupKey: string): Promise<InboxEvent | undefined>;
 }
 
 export interface DeliveryRepository {

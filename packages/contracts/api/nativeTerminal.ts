@@ -1,11 +1,12 @@
+import { ComputeProfileSelectorSchema } from './compute/computeProfile';
 import { z } from 'zod';
-import { SlugSchema, TaskIdSchema, UserIdSchema } from '../ids';
+import { TaskIdSchema, UserIdSchema } from '../ids';
 import { AgentPermissionSchema } from '../manifest/tasks';
 import { NativeTerminalRecordSchema, TerminalSizeSchema, TerminalSnapshotSchema } from '../taskrunner/nativeTerminal';
 import { AgentActivityStateSchema } from './activity/nativeActivity';
 
 export const StartNativeTerminalRequestSchema = TerminalSizeSchema.extend({
-  clientRequestId: z.uuid(), compute: SlugSchema.optional(), permission: AgentPermissionSchema.default('edit'),
+  clientRequestId: z.uuid(), compute: ComputeProfileSelectorSchema.optional(), permission: AgentPermissionSchema.default('edit'),
   cwd: z.string().min(1).max(1024).optional(),
 }).strict();
 

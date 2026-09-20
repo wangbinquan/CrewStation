@@ -32,12 +32,12 @@ export function SelfCreateProject() {
     {catalog.error ? <Button onClick={() => void catalog.refetch()}>{t('projects.wizard.refreshCatalog')}</Button> : null}
     {catalog.data ? <p>{t('projects.self.resources', { plan: catalog.data.defaultServicePlan, count: catalog.data.maxConcurrentTasks })}</p> : null}
     {catalog.data?.templates.length === 0 ? <ActionNote tone="neutral">{t('projects.wizard.noTemplates')}</ActionNote> : null}
-    <SelfCreationFields key={key} storageKey={key} userId={me.data?.id} userName={me.data?.name} templates={catalog.data?.templates.map((item) => item.name) ?? []} available={!me.error && (me.data?.platformRole === 'developer' || me.data?.platformRole === 'admin') && !!catalog.data && !catalog.error && !catalog.isFetching}
+    <SelfCreationFields key={key} storageKey={key} userId={me.data?.id} userName={me.data?.name} templates={catalog.data?.templates ?? []} available={!me.error && (me.data?.platformRole === 'developer' || me.data?.platformRole === 'admin') && !!catalog.data && !catalog.error && !catalog.isFetching}
       onCreated={(id) => void navigate({ to: '/projects/$projectId/provisioning', params: { projectId: id }, replace: true })} />
   </>;
 }
 
-interface FieldsProps { storageKey: string; userId: string | undefined; userName: string | undefined; templates: string[]; available: boolean; onCreated(id: string): void }
+interface FieldsProps { storageKey: string; userId: string | undefined; userName: string | undefined; templates: Array<{ id: string; name: string }>; available: boolean; onCreated(id: string): void }
 
 function SelfCreationFields({ storageKey, userId, userName, templates, available, onCreated }: FieldsProps) {
   const t = useT(), form = useRef<HTMLFormElement>(null), busy = useRef(false);
@@ -59,7 +59,7 @@ function SelfCreationFields({ storageKey, userId, userName, templates, available
     if (busy.current || !available || unknown) return;
     const next: Errors = {}, parsed = CreateProjectRequestSchema.safeParse({ ...draft, name: draft.name.trim() });
     for (const issue of parsed.error?.issues ?? []) { const field = String(issue.path[0]) as keyof Draft; if (field in empty) next[field] = t(`projects.self.invalid.${field}`); }
-    if (!templates.includes(draft.template)) next.template = t('projects.self.invalid.template');
+    if (!templates.some((template) => template.id === draft.template)) next.template = t('projects.self.invalid.template');
     setErrors(next); if (Object.keys(next).length) return;
     busy.current = true;
     try { const result = await create.mutateAsync(); if (result.id && result.slug === draft.slug && result.ownerUserId === userId) accept(result.id); else setUnknown(true); }
@@ -74,7 +74,7 @@ function SelfCreationFields({ storageKey, userId, userName, templates, available
       <form ref={form} noValidate onSubmit={(event) => { event.preventDefault(); void submit(); }}>
         <div className={styles.form}>{(['name', 'slug', 'template'] as const).map((field) => <FormField key={field} label={t(`projects.create.${field}`)} hint={t(`projects.wizard.${field}Hint`)} error={errors[field]} hintId={`self-${field}-hint`} errorId={`self-${field}-error`}>
           {field === 'template' ? <select name={field} aria-invalid={!!errors[field]} aria-describedby={`self-${field}-hint self-${field}-error`} value={draft[field]} disabled={create.isPending || unknown} onChange={(e) => setDraft({ ...draft, [field]: e.target.value })}>
-            <option value="">{t('projects.wizard.chooseTemplate')}</option>{templates.map((name) => <option key={name}>{name}</option>)}
+            <option value="">{t('projects.wizard.chooseTemplate')}</option>{templates.map((template) => <option key={template.id} value={template.id}>{template.name}</option>)}
           </select> : <input name={field} value={draft[field]} aria-invalid={!!errors[field]} aria-describedby={`self-${field}-hint self-${field}-error`} disabled={create.isPending || unknown} onChange={(e) => setDraft({ ...draft, [field]: e.target.value })} />}
         </FormField>)}</div>
         {create.error ? <ActionNote tone="error">{create.error.message}</ActionNote> : null}

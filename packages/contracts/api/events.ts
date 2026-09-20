@@ -1,22 +1,24 @@
 import { z } from 'zod';
 import { DeliveryStateSchema } from '../events/delivery';
-import { EventIdSchema, ServiceIdSchema, TraceIdSchema } from '../ids';
+import { ResourceIdSchema, EventIdSchema, ServiceIdSchema, TraceIdSchema } from '../ids';
 
-export const EventTypeDtoSchema = z.object({ eventType: z.string(), producer: z.string(), producerProject: z.string(), schemaRef: z.string().optional() });
+export const EventTypeDtoSchema = z.object({ id: ResourceIdSchema, name: z.string(), producerId: ResourceIdSchema, state: z.enum(['active', 'removed']), eventType: z.string(), producer: z.string(), producerProject: z.string(), schemaRef: z.string().optional() });
 
 export const SubscriptionDtoSchema = z.object({
-  id: z.string(),
+  id: ResourceIdSchema,
   serviceId: ServiceIdSchema,
+  eventTypeId: ResourceIdSchema,
   eventType: z.string(),
   handlerPath: z.string(),
   state: z.enum(['active', 'paused']),
 });
 
 export const DeliveryDtoSchema = z.object({
-  id: z.string(),
+  id: ResourceIdSchema,
   eventId: EventIdSchema,
+  eventTypeId: ResourceIdSchema,
   eventType: z.string(),
-  subscriptionId: z.string(),
+  subscriptionId: ResourceIdSchema,
   state: DeliveryStateSchema,
   attempts: z.number().int().min(0),
   nextAttemptAt: z.iso.datetime().optional(),

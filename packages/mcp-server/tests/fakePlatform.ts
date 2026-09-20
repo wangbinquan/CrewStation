@@ -4,8 +4,8 @@ import { IDENTITY_HEADERS } from '@crewstation/contracts';
 import type { Hono } from 'hono';
 import type { AppEnv } from '@crewstation/http';
 
-export const PROJECT_ID = `prj_${'1'.repeat(32)}`;
-export const SERVICE_ID = `svc_${'2'.repeat(32)}`;
+export const PROJECT_ID = '01a0bf5d-8f4b-7c8b-8b95-1301eee8667f';
+export const SERVICE_ID = '01a0bf5d-8f4b-7aea-8983-7b41e8b30563';
 export const CALLER_IDENTITY = 'demo/worker';
 
 export interface CapturedRequest {
@@ -41,15 +41,17 @@ export const projectPage = (): { items: ProjectDto[] } => ({
     name: '样例数字人',
     kind: 'DigitalWorker',
     namespace: 'cs-demo',
-    ownerUserId: `usr_${'3'.repeat(32)}` as ProjectDto['ownerUserId'],
+    ownerUserId: '01a0bf5d-8f4b-724c-8db6-5ac36a878a7d' as ProjectDto['ownerUserId'],
     state: 'active',
     serviceId: SERVICE_ID as ProjectDto['serviceId'],
     createdAt: '2026-09-11T00:00:00.000Z',
   }],
 });
 
+const fixtureIds = new Map<string, string>();
+const fixtureId = (key: string) => { if (!fixtureIds.has(key)) fixtureIds.set(key, Bun.randomUUIDv7()); return fixtureIds.get(key)!; };
 export const operation = (proxy: string, path: string, granted: boolean): ApiOperationDto => ({
-  key: `${proxy}:GET:${path}`, proxy, method: 'GET', path, summary: `读取 ${path}`, openPolicy: granted ? 'default' : 'targeted', granted,
+  id: fixtureId(`operation:${proxy}:${path}`), proxyId: fixtureId(`proxy:${proxy}`), proxy, method: 'GET', path, summary: `读取 ${path}`, openPolicy: granted ? 'default' : 'targeted', granted,
 });
 
 export const capabilityDescription = (): CapabilityDescriptionDto => ({
@@ -58,7 +60,7 @@ export const capabilityDescription = (): CapabilityDescriptionDto => ({
   conventions: { identityHeaders: { ...IDENTITY_HEADERS }, env: { CS_PROJECT: 'CS_PROJECT' }, paths: { health: '/healthz' }, eventHeaders: {} },
   identityForwarding: { source: 'global', fields: ['name', 'email'], headers: ['x-cs-identity-token', 'x-cs-user-email', 'x-cs-user-id', 'x-cs-user-name'], tokenClaims: ['email', 'name'] },
   quota: { maxConcurrentTasks: 3, running: 1 },
-  plan: { name: 'standard-small', cpu: '500m', memory: '512Mi', maxReplicas: 2, description: '' },
+  plan: { id: '01a0bf5d-8f4b-7eac-826b-82ee81e33869', name: 'standard-small', cpu: '500m', memory: '512Mi', maxReplicas: 2, description: '' },
   config: { development: ['GREETING'], production: ['GREETING'] },
   data: [],
   operations: [],

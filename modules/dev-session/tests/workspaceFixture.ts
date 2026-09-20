@@ -1,13 +1,14 @@
 import type { Actor, ProjectId, ReleaseId, RunnerCommand, ServiceId, TaskId, UserId } from '@crewstation/contracts';
-import { fixedClock, noopLogger } from '@crewstation/kernel';
+import { fixedClock, newResourceId, noopLogger } from '@crewstation/kernel';
 import type { DevSessionUseCaseDeps } from '../application/dependencies';
 import type { EnvironmentView } from '../ports/runtime';
+import type { ComparisonReference } from '../domain/comparisonReference';
 import { fakeComputeCatalog } from './computeFixture';
 
-export const workspaceProject = 'prj_0123456789abcdef0123456789abcdef' as ProjectId;
-export const workspaceService = 'svc_0123456789abcdef0123456789abcdef' as ServiceId;
-export const workspaceActor: Actor = { userId: 'usr_0123456789abcdef0123456789abcdef' as UserId, isAdmin: false };
-export const workspaceTask = 'tsk_0123456789abcdef0123456789abcdef' as TaskId;
+export const workspaceProject = '01a0bf5d-8f4b-7178-82e1-9a99060b1192' as ProjectId;
+export const workspaceService = '01a0bf5d-8f4b-76c5-866c-f1feda3d63bb' as ServiceId;
+export const workspaceActor: Actor = { userId: '01a0bf5d-8f4b-7793-867c-efd7527b386b' as UserId, isAdmin: false };
+export const workspaceTask = '01a0bf5d-8f4b-7418-8a3f-7cbb4a1fd751' as TaskId;
 export const workspaceSha = '0123456789abcdef0123456789abcdef01234567';
 export const checkedAt = '2026-09-13T00:00:00.000Z';
 
@@ -27,7 +28,9 @@ export function workspaceFixture() {
     id: workspaceTask, projectId: workspaceProject, serviceId: workspaceService, connected: state.connected,
     state: 'running', branch: 'main', podName: 'task-test', createdAt: checkedAt, lastActivityAt: checkedAt, traceId: 'trace', createdBy: workspaceActor.userId,
   });
+  const comparisons = new Map<string, ComparisonReference>();
   const deps: DevSessionUseCaseDeps = {
+    comparisons: { create: async (input) => { const id = newResourceId(); comparisons.set(id, { id, ...input }); return id; }, get: async (id) => comparisons.get(id) },
     apiCatalog: { listOperations: async () => [] },
     environments: {
       createNativeExecution: async () => { throw new Error('独立执行未设置'); },
@@ -51,7 +54,7 @@ export function workspaceFixture() {
     releases: {
       getSlots: async () => [], publish: async (_actor, _service, input) => {
         state.published = true;
-        return { id: 'rel_0123456789abcdef0123456789abcdef' as ReleaseId, serviceId: workspaceService, branch: input.branch, commitSha: workspaceSha, tag: 'v0.1.1', status: 'pending', createdBy: workspaceActor.userId, createdAt: checkedAt, updatedAt: checkedAt };
+        return { id: '01a0bf5d-8f4b-7fe7-81b4-3ca489d1f621' as ReleaseId, serviceId: workspaceService, branch: input.branch, commitSha: workspaceSha, tag: 'v0.1.1', status: 'pending', createdBy: workspaceActor.userId, createdAt: checkedAt, updatedAt: checkedAt };
       },
     },
     scm: { readFile: async () => undefined, listBranches: async () => [], pushUrl: async () => ({ url: 'https://git.example/demo.git', expiresAt: checkedAt }) },

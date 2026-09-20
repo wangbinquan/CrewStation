@@ -23,7 +23,7 @@ export function NativeWorkspaceTabs({ taskId, layout, store, loaded, roster, chi
     onChange={(value) => store.update((current) => ({ ...current, activeTabId: value, view: 'cli' }))}
     extra={<><Button variant="ghost" disabled={!loaded || layout.tabs.length >= 16} onClick={() => store.update((value) => addWorkspaceTab(value, t('devSession.native.numberedTab', { count: value.tabs.length + 1 })))}>{t('devSession.native.addTab')}</Button>
       <details className={styles.menu}><summary>{t('devSession.native.roster', { count: roster?.length ?? 0 })}</summary><div className={styles.roster}>
-        {roster?.map((terminal) => <div key={terminal.terminalId}><code>CLI {terminal.agentId.slice(-6)}</code><span>{terminal.compute} · {t(`activity.status.${activityStatus(terminal, task?.page?.states.find((item) => item.terminalId === terminal.terminalId) ?? terminal.activity, task?.page, task?.stale)}`)}</span>
+        {roster?.map((terminal) => <div key={terminal.terminalId}><code>CLI {terminal.agentId.slice(-6)}</code><span>{terminal.computeName ?? terminal.compute} · {t(`activity.status.${activityStatus(terminal, task?.page?.states.find((item) => item.terminalId === terminal.terminalId) ?? terminal.activity, task?.page, task?.stale)}`)}</span>
           <Button onClick={() => store.update((value) => ({ ...moveTerminal(value, terminal.terminalId, value.activeTabId), view: 'cli' }))}>{t('devSession.native.restore')}</Button></div>)}
         <small>{t('devSession.native.sharedHint')}</small>
       </div></details></>}>

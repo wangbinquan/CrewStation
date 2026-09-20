@@ -55,16 +55,16 @@ export function createNativeExecutionUseCase(deps: NativeExecutionDeps) {
   };
 }
 
-type TaskProfileRecord = { name: string; cpu: string; memory: string; storage: string };
+type TaskProfileRecord = { id: string; name: string; cpu: string; memory: string; storage: string };
 
 function executionEnvironment(deps: NativeExecutionDeps, input: CreateNativeExecutionInput, parent: TaskEnvironment, workspace: { podUid: string; pvcUid: string; nodeName: string }, profile: TaskProfileRecord): TaskEnvironment {
   const purpose = input.purpose ?? 'cli', now = deps.clock.now();
   const native: NativeExecution = { ...(purpose === 'cli' ? {} : { purpose }), parentTaskId: parent.id, parentPodUid: workspace.podUid, pvcUid: workspace.pvcUid, nodeName: workspace.nodeName,
     agentId: input.agentId, ...(input.terminalId ? { terminalId: input.terminalId } : {}), runnerId: input.runnerId, fingerprint: input.fingerprint, requestedProfile: input.profile ?? null,
-    profile: { name: profile.name, cpu: profile.cpu, memory: profile.memory, storage: profile.storage }, image: input.image ?? deps.settings.taskImage,
+    profile: { id: profile.id, name: profile.name, cpu: profile.cpu, memory: profile.memory, storage: profile.storage }, image: input.image ?? deps.settings.taskImage,
     ...(input.computeProfile ? { computeProfile: input.computeProfile } : {}), state: 'queued' };
   return { id: input.id, projectId: parent.projectId, serviceId: parent.serviceId, kind: parent.kind, state: 'creating',
-    volumeMode: 'persistent', profile: profile.name, namespace: parent.namespace, podName: `${ADMISSION[purpose].podPrefix}-${input.id.slice(4)}`, pvcName: parent.pvcName,
+    volumeMode: 'persistent', profile: profile.id, namespace: parent.namespace, podName: `${ADMISSION[purpose].podPrefix}-${input.id.replaceAll('-', '')}`, pvcName: parent.pvcName,
     traceId: parent.traceId, runnerTokenHash: hashRunnerToken(newRunnerToken()), connected: false, labels: parent.labels, ...(input.createdBy ? { createdBy: input.createdBy } : {}),
     native, message: `已受理，正在准备此${EXECUTION_NOUN[purpose]}的独立执行环境`, createdAt: now, updatedAt: now, lastActivityAt: now };
 }

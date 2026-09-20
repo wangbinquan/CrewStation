@@ -83,9 +83,9 @@ test('登录发现区分引导态与就绪态；常规登录提交不接受多�
   expect(PasswordLoginRequestSchema.safeParse({ username: 'admin', password: 'x', totp: '000000' }).success).toBe(false);
 });
 
-test('转发集只收合法字段名，且 Provider ID 有自己的前缀', () => {
+test('转发集只收合法字段名，且 Provider ID 使用完整 UUIDv7', () => {
   expect(UpdateIdentityForwardingRequestSchema.parse({ fields: ['name', 'email', 'employee-no'] }).fields).toHaveLength(3);
   expect(UpdateIdentityForwardingRequestSchema.safeParse({ fields: ['Name'] }).success).toBe(false);
-  expect(OidcProviderIdSchema.safeParse(`idp_${'a'.repeat(32)}`).success).toBe(true);
+  expect(OidcProviderIdSchema.safeParse('01a0bf5d-8f4b-74dc-8def-d0d389cd1588').success).toBe(true);
   expect(OidcProviderIdSchema.safeParse(`prj_${'a'.repeat(32)}`).success).toBe(false);
 });

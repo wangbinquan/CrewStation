@@ -7,6 +7,7 @@ export interface Subscription {
   readonly id: string;
   readonly serviceId: ServiceId;
   readonly projectId: ProjectId;
+  readonly eventTypeId: string;
   readonly eventType: string;
   readonly handlerPath: string;
   readonly state: SubscriptionState;
@@ -14,6 +15,7 @@ export interface Subscription {
 }
 
 export interface DeclaredSubscription {
+  readonly eventTypeId: string;
   readonly eventType: string;
   readonly handlerPath: string;
 }
@@ -31,16 +33,16 @@ export function reconcileSubscriptions(
   existing: readonly Subscription[], declared: readonly DeclaredSubscription[],
   owner: { serviceId: ServiceId; projectId: ProjectId }, mintId: () => string, now: Date,
 ): SubscriptionChanges {
-  const byType = new Map(existing.map((s) => [s.eventType, s] as const));
+  const byType = new Map(existing.map((s) => [s.eventTypeId, s] as const));
   const seen = new Set<string>();
   const upserts: Subscription[] = [];
   for (const d of declared) {
-    if (seen.has(d.eventType)) continue;
-    seen.add(d.eventType);
-    const previous = byType.get(d.eventType);
+    if (seen.has(d.eventTypeId)) continue;
+    seen.add(d.eventTypeId);
+    const previous = byType.get(d.eventTypeId);
     upserts.push(previous
-      ? { ...previous, handlerPath: d.handlerPath, updatedAt: now }
-      : { id: mintId(), serviceId: owner.serviceId, projectId: owner.projectId, eventType: d.eventType, handlerPath: d.handlerPath, state: 'active', updatedAt: now });
+      ? { ...previous, eventType: d.eventType, handlerPath: d.handlerPath, updatedAt: now }
+      : { id: mintId(), serviceId: owner.serviceId, projectId: owner.projectId, eventTypeId: d.eventTypeId, eventType: d.eventType, handlerPath: d.handlerPath, state: 'active', updatedAt: now });
   }
-  return { upserts, removedIds: existing.filter((s) => !seen.has(s.eventType)).map((s) => s.id) };
+  return { upserts, removedIds: existing.filter((s) => !seen.has(s.eventTypeId)).map((s) => s.id) };
 }

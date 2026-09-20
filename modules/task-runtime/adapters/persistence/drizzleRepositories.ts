@@ -9,6 +9,7 @@ const json = <T>(v: unknown): T => (typeof v === 'string' ? JSON.parse(v) : v) a
 
 export function drizzleEnvironmentRepository(db: Executor): EnvironmentRepository {
   const toEnv = (r: typeof environments.$inferSelect): TaskEnvironment => ({
+    ...(r.legacyCluster ? { legacyCluster: json<TaskEnvironment['legacyCluster']>(r.legacyCluster) } : {}),
     id: r.id as TaskId, projectId: r.projectId as ProjectId, serviceId: r.serviceId as ServiceId, kind: r.kind as TaskKind, state: r.state as EnvironmentState,
     volumeMode: r.volumeMode as VolumeMode, profile: r.profile, namespace: r.namespace, podName: r.podName, ...(r.podUid ? { podUid: r.podUid } : {}), pvcName: r.pvcName, traceId: r.traceId as TraceId,
     runnerTokenHash: r.runnerTokenHash, connected: r.connected, ...(r.branch ? { branch: r.branch } : {}), ...(r.preview ? { preview: json<TaskEnvironment['preview']>(r.preview) } : {}),

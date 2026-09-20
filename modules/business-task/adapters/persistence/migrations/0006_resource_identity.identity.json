@@ -1,0 +1,536 @@
+{
+  "version": "resource-identity/v1",
+  "schema": "business_task",
+  "entities": [
+    {
+      "table": "tasks",
+      "kind": "task",
+      "keys": [
+        "id"
+      ],
+      "idColumn": "id"
+    },
+    {
+      "table": "subtasks",
+      "kind": "subtask",
+      "keys": [
+        "id"
+      ],
+      "idColumn": "id"
+    },
+    {
+      "table": "subtasks",
+      "kind": "agent",
+      "keys": [
+        "runner_ref"
+      ],
+      "idColumn": "runner_ref",
+      "where": {
+        "kind": "agent"
+      },
+      "nullable": true
+    },
+    {
+      "table": "subtasks",
+      "kind": "exec",
+      "keys": [
+        "runner_ref"
+      ],
+      "idColumn": "runner_ref",
+      "where": {
+        "kind": "command"
+      },
+      "nullable": true
+    }
+  ],
+  "references": [
+    {
+      "table": "tasks",
+      "column": "project_id",
+      "kind": "project",
+      "keys": [
+        "project_id"
+      ]
+    },
+    {
+      "table": "tasks",
+      "column": "service_id",
+      "kind": "service",
+      "keys": [
+        "service_id"
+      ]
+    },
+    {
+      "table": "tasks",
+      "column": "profile",
+      "kind": "task-profile",
+      "keys": [
+        "profile"
+      ],
+      "keyOverride": {
+        "when": "default",
+        "keys": [
+          "id"
+        ]
+      }
+    },
+    {
+      "table": "subtasks",
+      "column": "task_id",
+      "kind": "task",
+      "keys": [
+        "task_id"
+      ]
+    },
+    {
+      "table": "contracts",
+      "column": "release_id",
+      "kind": "release",
+      "keys": [
+        "release_id"
+      ]
+    },
+    {
+      "table": "contracts",
+      "column": "service_id",
+      "kind": "service",
+      "keys": [
+        "service_id"
+      ]
+    },
+    {
+      "table": "cluster_commands",
+      "column": "id",
+      "kind": "cluster-operation",
+      "keys": [
+        "id"
+      ]
+    },
+    {
+      "table": "subtasks",
+      "column": "retry_operation_id",
+      "kind": "cluster-operation",
+      "keys": [
+        "retry_operation_id"
+      ],
+      "nullable": true
+    },
+    {
+      "table": "subtasks",
+      "column": "retry_of",
+      "kind": "subtask",
+      "keys": [
+        "retry_of"
+      ],
+      "nullable": true
+    }
+  ],
+  "inlineEntities": [
+    {
+      "table": "contracts",
+      "column": "agent_profiles",
+      "path": "*.name",
+      "kind": "agent-profile",
+      "keys": [
+        "$row.service_id",
+        "$value"
+      ]
+    },
+    {
+      "table": "contracts",
+      "column": "output_contracts",
+      "path": "*.name",
+      "kind": "output-contract",
+      "keys": [
+        "$row.service_id",
+        "$value"
+      ]
+    },
+    {
+      "table": "subtasks",
+      "column": "spec",
+      "path": "execution.runnerId",
+      "kind": "runner"
+    },
+    {
+      "table": "subtasks",
+      "column": "legacy_spec",
+      "path": "execution.taskId",
+      "kind": "task"
+    }
+  ],
+  "documents": [
+    {
+      "table": "contracts",
+      "column": "legacy_agent_profiles",
+      "references": [
+        {
+          "path": "*.name",
+          "kind": "agent-profile",
+          "keys": [
+            "$row.service_id",
+            "$value"
+          ],
+          "copyTo": "id"
+        },
+        {
+          "path": "*.compute",
+          "kind": "compute-profile",
+          "selector": {
+            "defaultValue": "default",
+            "valueKey": "profileId"
+          }
+        }
+      ],
+      "targetColumn": "agent_profiles"
+    },
+    {
+      "table": "contracts",
+      "column": "legacy_output_contracts",
+      "references": [
+        {
+          "path": "*.name",
+          "kind": "output-contract",
+          "keys": [
+            "$row.service_id",
+            "$value"
+          ],
+          "copyTo": "id"
+        }
+      ],
+      "targetColumn": "output_contracts"
+    },
+    {
+      "table": "subtasks",
+      "column": "legacy_spec",
+      "references": [
+        {
+          "path": "agentProfile.name",
+          "kind": "agent-profile",
+          "keys": [
+            "$row.identity_service_id",
+            "$value"
+          ],
+          "copyTo": "id"
+        },
+        {
+          "path": "agentProfile.compute",
+          "kind": "compute-profile",
+          "selector": {
+            "defaultValue": "default",
+            "valueKey": "profileId"
+          }
+        },
+        {
+          "path": "outputContract.name",
+          "kind": "output-contract",
+          "keys": [
+            "$row.identity_service_id",
+            "$value"
+          ],
+          "copyTo": "id"
+        },
+        {
+          "path": "computeProfile.profile",
+          "kind": "compute-profile",
+          "rename": "profileId"
+        },
+        {
+          "path": "execution.taskId",
+          "kind": "task"
+        },
+        {
+          "path": "execution.runnerId",
+          "kind": "runner"
+        }
+      ],
+      "targetColumn": "spec",
+      "provenanceColumn": "identity_provenance"
+    },
+    {
+      "table": "cluster_commands",
+      "column": "legacy_body",
+      "targetColumn": "body",
+      "references": [
+        {
+          "path": "operation.target.projectId",
+          "kind": "project",
+          "nullable": true
+        },
+        {
+          "path": "operation.target.serviceId",
+          "kind": "service",
+          "nullable": true
+        },
+        {
+          "path": "operation.target.taskId",
+          "kind": "task",
+          "nullable": true
+        },
+        {
+          "path": "operation.target.agentId",
+          "kind": "agent",
+          "nullable": true
+        },
+        {
+          "path": "operation.target.terminalId",
+          "kind": "terminal",
+          "nullable": true
+        },
+        {
+          "path": "operation.target.profileTestId",
+          "kind": "profile-test",
+          "nullable": true
+        },
+        {
+          "path": "operation.target.releaseId",
+          "kind": "release",
+          "nullable": true
+        },
+        {
+          "path": "operation.after.projectId",
+          "kind": "project",
+          "nullable": true
+        },
+        {
+          "path": "operation.after.serviceId",
+          "kind": "service",
+          "nullable": true
+        },
+        {
+          "path": "operation.after.taskId",
+          "kind": "task",
+          "nullable": true
+        },
+        {
+          "path": "operation.after.agentId",
+          "kind": "agent",
+          "nullable": true
+        },
+        {
+          "path": "operation.after.terminalId",
+          "kind": "terminal",
+          "nullable": true
+        },
+        {
+          "path": "operation.after.profileTestId",
+          "kind": "profile-test",
+          "nullable": true
+        },
+        {
+          "path": "operation.after.releaseId",
+          "kind": "release",
+          "nullable": true
+        },
+        {
+          "path": "operation.resources.*.projectId",
+          "kind": "project",
+          "nullable": true
+        },
+        {
+          "path": "operation.resources.*.serviceId",
+          "kind": "service",
+          "nullable": true
+        },
+        {
+          "path": "operation.resources.*.taskId",
+          "kind": "task",
+          "nullable": true
+        },
+        {
+          "path": "operation.resources.*.agentId",
+          "kind": "agent",
+          "nullable": true
+        },
+        {
+          "path": "operation.resources.*.terminalId",
+          "kind": "terminal",
+          "nullable": true
+        },
+        {
+          "path": "operation.resources.*.profileTestId",
+          "kind": "profile-test",
+          "nullable": true
+        },
+        {
+          "path": "operation.resources.*.releaseId",
+          "kind": "release",
+          "nullable": true
+        },
+        {
+          "path": "operation.inspectionId",
+          "kind": "cluster-inspection"
+        },
+        {
+          "path": "operation.operationId",
+          "kind": "cluster-operation"
+        },
+        {
+          "path": "operation.actorId",
+          "kind": "user"
+        },
+        {
+          "path": "operation.target.ownership.projectId",
+          "kind": "project"
+        },
+        {
+          "path": "operation.target.parentTaskId",
+          "kind": "task"
+        },
+        {
+          "path": "operation.after.ownership.projectId",
+          "kind": "project"
+        },
+        {
+          "path": "operation.after.parentTaskId",
+          "kind": "task"
+        },
+        {
+          "path": "operation.resources.*.ownership.projectId",
+          "kind": "project"
+        },
+        {
+          "path": "operation.resources.*.parentTaskId",
+          "kind": "task"
+        },
+        {
+          "path": "inspection.target.projectId",
+          "kind": "project",
+          "nullable": true
+        },
+        {
+          "path": "inspection.target.serviceId",
+          "kind": "service",
+          "nullable": true
+        },
+        {
+          "path": "inspection.target.taskId",
+          "kind": "task",
+          "nullable": true
+        },
+        {
+          "path": "inspection.target.agentId",
+          "kind": "agent",
+          "nullable": true
+        },
+        {
+          "path": "inspection.target.terminalId",
+          "kind": "terminal",
+          "nullable": true
+        },
+        {
+          "path": "inspection.target.profileTestId",
+          "kind": "profile-test",
+          "nullable": true
+        },
+        {
+          "path": "inspection.target.releaseId",
+          "kind": "release",
+          "nullable": true
+        },
+        {
+          "path": "inspection.after.projectId",
+          "kind": "project",
+          "nullable": true
+        },
+        {
+          "path": "inspection.after.serviceId",
+          "kind": "service",
+          "nullable": true
+        },
+        {
+          "path": "inspection.after.taskId",
+          "kind": "task",
+          "nullable": true
+        },
+        {
+          "path": "inspection.after.agentId",
+          "kind": "agent",
+          "nullable": true
+        },
+        {
+          "path": "inspection.after.terminalId",
+          "kind": "terminal",
+          "nullable": true
+        },
+        {
+          "path": "inspection.after.profileTestId",
+          "kind": "profile-test",
+          "nullable": true
+        },
+        {
+          "path": "inspection.after.releaseId",
+          "kind": "release",
+          "nullable": true
+        },
+        {
+          "path": "inspection.resources.*.projectId",
+          "kind": "project",
+          "nullable": true
+        },
+        {
+          "path": "inspection.resources.*.serviceId",
+          "kind": "service",
+          "nullable": true
+        },
+        {
+          "path": "inspection.resources.*.taskId",
+          "kind": "task",
+          "nullable": true
+        },
+        {
+          "path": "inspection.resources.*.agentId",
+          "kind": "agent",
+          "nullable": true
+        },
+        {
+          "path": "inspection.resources.*.terminalId",
+          "kind": "terminal",
+          "nullable": true
+        },
+        {
+          "path": "inspection.resources.*.profileTestId",
+          "kind": "profile-test",
+          "nullable": true
+        },
+        {
+          "path": "inspection.resources.*.releaseId",
+          "kind": "release",
+          "nullable": true
+        },
+        {
+          "path": "inspection.inspectionId",
+          "kind": "cluster-inspection"
+        },
+        {
+          "path": "inspection.target.ownership.projectId",
+          "kind": "project"
+        },
+        {
+          "path": "inspection.target.parentTaskId",
+          "kind": "task"
+        },
+        {
+          "path": "inspection.after.ownership.projectId",
+          "kind": "project"
+        },
+        {
+          "path": "inspection.after.parentTaskId",
+          "kind": "task"
+        },
+        {
+          "path": "inspection.resources.*.ownership.projectId",
+          "kind": "project"
+        },
+        {
+          "path": "inspection.resources.*.parentTaskId",
+          "kind": "task"
+        }
+      ],
+      "provenanceColumn": "identity_provenance"
+    }
+  ],
+  "finalize": [
+    "ALTER TABLE business_task.subtasks DROP COLUMN identity_service_id"
+  ]
+}

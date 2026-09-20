@@ -19,9 +19,9 @@ afterEach(() => { ui?.unmount(); ui = undefined; requests.length = 0; historyTar
 
 function comparison(): VersionComparisonDto {
   return VersionComparisonDtoSchema.parse({
-    comparisonId: 'comparison-1', taskId: `tsk_${'0'.repeat(32)}`, checkedAt: '2026-09-13T00:00:00.000Z', freshness: 'current',
+    comparisonId: 'comparison-1', taskId: '01a0bf5d-8f4b-763b-835f-dfbd2678fdb2', checkedAt: '2026-09-13T00:00:00.000Z', freshness: 'current',
     workspace: { status: 'ready', branch: 'main', headSha: 'a'.repeat(40), shallow: false, fingerprint: 'fp', uncommitted: [{ path: 'file.txt', status: '.M', index: '.', worktree: 'M' }], uncommittedCount: 1, uncommittedTruncated: false, unpushed: { status: 'ready', count: 0, commits: [], truncated: false }, upstream: { status: 'missing' }, checkedAt: '2026-09-13T00:00:00.000Z' },
-    deployment: { status: 'ready', target: 'prod', releaseId: `rel_${'0'.repeat(32)}`, tag: 'v0.1.0', commitSha: 'a'.repeat(40), host: 'demo.cs.localhost', state: 'ready' },
+    deployment: { status: 'ready', target: 'prod', releaseId: '01a0bf5d-8f4b-79fd-80a1-add06e63a170', tag: 'v0.1.0', commitSha: 'a'.repeat(40), host: 'demo.cs.localhost', state: 'ready' },
     commits: { status: 'equal', ahead: 0, behind: 0 }, files: { status: 'ready', count: 1, untrackedCount: 0 },
   });
 }
@@ -39,7 +39,7 @@ async function render(data: VersionComparisonDto, canDevelop = true, target: Com
     } : data;
     return new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } });
   }) as typeof fetch;
-  ui = await renderElement(<VersionComparisonPanel projectId="prj_test" taskId={data.taskId} channel={channel} canDevelop={canDevelop} target={target} onOpenFile={onOpenFile} compact={compact} />, messages);
+  ui = await renderElement(<VersionComparisonPanel projectId="01a0bf5d-8f4b-708c-89b0-9c4412e78c07" taskId={data.taskId} channel={channel} canDevelop={canDevelop} target={target} onOpenFile={onOpenFile} compact={compact} />, messages);
   return ui;
 }
 
@@ -56,7 +56,7 @@ test('提交一致仍显示未提交文件；四种详情、patch 与截断通�
   expect(requests.some((request) => request.includes('path=file.txt'))).toBe(true);
   expect(requests.every((request) => request.startsWith('GET'))).toBe(true);
   await page.click('补齐历史并重算');
-  expect(requests.filter((request) => request.startsWith('POST'))).toEqual(['POST /v1/projects/prj_test/dev-session/version-comparison/refresh-history']);
+  expect(requests.filter((request) => request.startsWith('POST'))).toEqual(['POST /v1/projects/01a0bf5d-8f4b-708c-89b0-9c4412e78c07/dev-session/version-comparison/refresh-history']);
 });
 
 test('未提交列表解释暂存区与工作区，未跟踪和二进制不混入提交差距', async () => {

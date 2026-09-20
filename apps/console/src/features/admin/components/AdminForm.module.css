@@ -10,6 +10,7 @@
   gap: var(--cs-space-3);
   align-items: start;
 }
+.stacked { min-width: 0; }
 
 .actions {
   display: flex;

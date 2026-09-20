@@ -1,0 +1,131 @@
+{
+  "version": "resource-identity/v1",
+  "schema": "config",
+  "entities": [
+    {
+      "table": "definitions",
+      "kind": "configDefinition",
+      "keys": [
+        "project_id",
+        "binding_name"
+      ],
+      "idColumn": "id"
+    },
+    {
+      "table": "items",
+      "kind": "configItem",
+      "keys": [
+        "project_id",
+        "env",
+        "name",
+        "identity_start"
+      ],
+      "idColumn": "id"
+    },
+    {
+      "table": "version_entries",
+      "kind": "configItem",
+      "keys": [
+        "project_id",
+        "env",
+        "name",
+        "identity_start"
+      ],
+      "idColumn": "item_id"
+    }
+  ],
+  "references": [
+    {
+      "table": "items",
+      "column": "definition_id",
+      "kind": "configDefinition",
+      "keys": [
+        "project_id",
+        "binding_name"
+      ]
+    },
+    {
+      "table": "version_entries",
+      "column": "definition_id",
+      "kind": "configDefinition",
+      "keys": [
+        "project_id",
+        "binding_name"
+      ]
+    },
+    {
+      "table": "value_sets",
+      "column": "project_id",
+      "kind": "project",
+      "keys": [
+        "project_id"
+      ]
+    },
+    {
+      "table": "definitions",
+      "column": "project_id",
+      "kind": "project",
+      "keys": [
+        "project_id"
+      ]
+    },
+    {
+      "table": "items",
+      "column": "project_id",
+      "kind": "project",
+      "keys": [
+        "project_id"
+      ]
+    },
+    {
+      "table": "versions",
+      "column": "project_id",
+      "kind": "project",
+      "keys": [
+        "project_id"
+      ]
+    },
+    {
+      "table": "version_entries",
+      "column": "project_id",
+      "kind": "project",
+      "keys": [
+        "project_id"
+      ]
+    },
+    {
+      "table": "items",
+      "column": "updated_by",
+      "kind": "user",
+      "keys": [
+        "updated_by"
+      ]
+    },
+    {
+      "table": "versions",
+      "column": "created_by",
+      "kind": "user",
+      "keys": [
+        "created_by"
+      ]
+    }
+  ],
+  "finalize": [
+    "ALTER TABLE config.definitions DROP CONSTRAINT definitions_pkey, ALTER COLUMN id SET NOT NULL, ADD PRIMARY KEY (id)",
+    "CREATE UNIQUE INDEX definitions_project_binding_idx ON config.definitions(project_id, binding_name)",
+    "ALTER TABLE config.items DROP CONSTRAINT items_pkey, ALTER COLUMN id SET NOT NULL, ALTER COLUMN definition_id SET NOT NULL, ALTER COLUMN binding_name SET NOT NULL, ADD PRIMARY KEY (id), DROP COLUMN identity_start",
+    "CREATE UNIQUE INDEX items_definition_env_idx ON config.items(definition_id, env)",
+    "ALTER TABLE config.version_entries DROP CONSTRAINT version_entries_pkey, ALTER COLUMN item_id SET NOT NULL, ALTER COLUMN definition_id SET NOT NULL, ALTER COLUMN binding_name SET NOT NULL, ADD PRIMARY KEY(project_id, env, version, item_id), DROP COLUMN identity_start"
+  ],
+  "imports": [
+    {
+      "table": "definitions",
+      "kind": "configDefinition",
+      "keys": [
+        "project_id",
+        "binding_name"
+      ],
+      "idColumn": "id"
+    }
+  ]
+}

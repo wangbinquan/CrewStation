@@ -1,5 +1,5 @@
 import type {
-  Actor, DeliveryDto, DeliveryState, EventTypeDto, ProducedEvent, ProduceResultDto, ProjectId, ServiceActor, SubscriptionDto, UserId,
+  Actor, DeliveryDto, DeliveryState, EventTypeDto, LegacyProducedEvent, ProducedEvent, ProduceResultDto, ProjectId, ServiceActor, SubscriptionDto, UserId,
 } from '@crewstation/contracts';
 
 export interface DeliveryFilter {
@@ -19,6 +19,7 @@ export interface EventsModuleApi {
   readonly name: 'events';
   isAdmin(userId: UserId): Promise<boolean>;
   /** EventProducer 经服务域投递原始事件：校验调用方是该事件类型的登记生产方，inbox 按 (producer, dedupKey) 去重，为每个活动订阅建投递并入队。 */
+  produceLegacy(caller: ServiceActor, input: LegacyProducedEvent): Promise<ProduceResultDto>;
   produce(caller: ServiceActor, input: ProducedEvent): Promise<ProduceResultDto>;
   listEventTypes(actor: Actor): Promise<EventTypeDto[]>;
   listSubscriptions(actor: Actor, projectId: ProjectId): Promise<SubscriptionDto[]>;

@@ -4,7 +4,9 @@ import { apiCatalogSchema } from './schema';
 
 
 export const proxies = apiCatalogSchema.table('proxies', {
-  proxy: text('proxy').primaryKey(),
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  proxy: text('proxy').notNull().unique(),
   projectId: text('project_id').notNull(),
   serviceId: text('service_id').notNull(),
   kind: text('kind').notNull(),
@@ -15,7 +17,8 @@ export const proxies = apiCatalogSchema.table('proxies', {
 });
 
 export const operations = apiCatalogSchema.table('operations', {
-  key: text('key').primaryKey(),
+  id: text('id').primaryKey(),
+  proxyId: text('proxy_id').notNull(),
   proxy: text('proxy').notNull(),
   method: text('method').notNull(),
   path: text('path').notNull(),
@@ -28,18 +31,18 @@ export const operations = apiCatalogSchema.table('operations', {
 
 export const grants = apiCatalogSchema.table('grants', {
   serviceId: text('service_id').notNull(),
-  operationKey: text('operation_key').notNull(),
+  operationId: text('operation_id').notNull(),
   state: text('state').notNull(),
   grantedBy: text('granted_by').notNull(),
   grantedAt: timestamp('granted_at', { withTimezone: true }).notNull(),
   revokedAt: timestamp('revoked_at', { withTimezone: true }),
-}, (t) => [primaryKey({ columns: [t.serviceId, t.operationKey] })]);
+}, (t) => [primaryKey({ columns: [t.serviceId, t.operationId] })]);
 
 export const requests = apiCatalogSchema.table('requests', {
   id: text('id').primaryKey(),
   serviceId: text('service_id').notNull(),
   projectId: text('project_id').notNull(),
-  operationKey: text('operation_key').notNull(),
+  operationId: text('operation_id').notNull(),
   state: text('state').notNull(),
   reason: text('reason'),
   requestedBy: text('requested_by').notNull(),

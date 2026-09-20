@@ -1,5 +1,7 @@
 # Proposal｜CrewStation 数字人能力平台
 
+
+> RFC-013 基线补充（2026-09-21）：平台资源与引用统一为 36 字符、小写、带连字符的 UUIDv7；名称用于展示和搜索。Manifest v2、业务 API v2、Runner v3 及历史兼容边界见 [资源身份设计](./rfc/RFC-013-resource-uuid/design.md)。实施与发布证据见该 RFC 的 plan。
 > 状态：提案草案，待评审  
 > 文档版本：0.3.6
 > 整理日期：2026-09-10  

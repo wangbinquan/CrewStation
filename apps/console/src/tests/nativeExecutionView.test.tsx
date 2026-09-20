@@ -30,7 +30,7 @@ const originalFetch = globalThis.fetch, originalSocket = globalThis.WebSocket, o
 let page: Awaited<ReturnType<typeof renderElement>> | undefined;
 afterEach(async () => { page?.unmount(); page = undefined; await new Promise((done) => setTimeout(done, 0)); globalThis.fetch = originalFetch; globalThis.WebSocket = originalSocket; Socket.instances = []; window.location.href = originalLocation; });
 const terminal = (name: string, digit: string): NativeTerminalDto => ({ ...activityFixture().terminal, agentId: `agent-${name}`, terminalId: `terminal-${name}`, runnerId: crypto.randomUUID(),
-  execution: { taskId: TaskIdSchema.parse(`tsk_${digit.repeat(32)}`), state: 'running', profile: { name: 'cli', cpu: '1', memory: '2Gi', storage: '2Gi' } } });
+  execution: { taskId: TaskIdSchema.parse(`01a0bf5d-8f4b-7abc-8123-${digit.repeat(12)}`), state: 'running', profile: { name: 'cli', cpu: '1', memory: '2Gi', storage: '2Gi' } } });
 
 test('两窗接入不同 Runner，父连接断开仍能附着；切页签只关显示连接，不停止 CLI', async () => {
   const one = { ...terminal('one', '4'), protocol: 'opencode' as const }, two = { ...terminal('two', '5'), protocol: 'terminal' as const }, layout = initialWorkspaceLayout('工作区 1');

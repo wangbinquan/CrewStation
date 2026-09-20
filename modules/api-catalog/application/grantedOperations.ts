@@ -5,11 +5,12 @@ import type { ApiCatalogUseCaseDeps } from './dependencies';
 export function grantedOperationsUseCase({ uow, services }: ApiCatalogUseCaseDeps) {
   return async (callerIdentity: string): Promise<GrantedOperations> => {
     const operations = await uow.read.operations.listActive();
-    const defaultOpen = operations.filter((op) => op.openPolicy === 'default').map((op) => op.key);
+    const operationRoutes = operations.map(({ id, proxy, method, path }) => ({ id, proxy, method, path }));
+    const defaultOpen = operations.filter((op) => op.openPolicy === 'default').map((op) => op.id);
     const caller = await services.resolveServiceIdentity(callerIdentity);
-    if (!caller) return { operations: [], defaultOpen };
-    const active = new Set(operations.map((op) => op.key));
-    const granted = (await uow.read.grants.listGranted(caller.serviceId)).map((g) => g.operationKey).filter((key) => active.has(key));
-    return { operations: granted, defaultOpen };
+    if (!caller) return { operations: [], defaultOpen, operationRoutes };
+    const active = new Set(operations.map((op) => op.id));
+    const granted = (await uow.read.grants.listGranted(caller.serviceId)).map((g) => g.operationId).filter((key) => active.has(key));
+    return { operations: granted, defaultOpen, operationRoutes };
   };
 }

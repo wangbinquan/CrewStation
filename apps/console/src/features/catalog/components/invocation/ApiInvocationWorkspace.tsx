@@ -21,7 +21,7 @@ export function ApiInvocationWorkspace({ context, children }: { readonly context
   const choose = (operation: ApiOperationDto) => { setSelected(operation); setVisible(true); controller.clearDirty('detail'); setReplacement(undefined); };
   const open = (operation: ApiOperationDto) => {
     if (!controller.begin()) return;
-    if (selected?.key === operation.key) { setVisible(true); return; }
+    if (selected?.id === operation.id) { setVisible(true); return; }
     if (selected && controller.dirtySources.includes('detail')) setReplacement(operation); else choose(operation);
   };
   return <>
@@ -35,8 +35,8 @@ export function ApiInvocationWorkspace({ context, children }: { readonly context
       {controller.pending ? <p role="status">{t('catalog.invoke.pendingHint')}</p> : null}
       {selected && !visible ? <Button onClick={() => setVisible(true)}>{t('catalog.invoke.restoreDraft')}</Button> : null}
     </Card> : null}
-    {replacement ? <ConfirmationPanel question={t('catalog.invoke.replaceQuestion', { operation: replacement.key })} hint={t('catalog.invoke.replaceHint')} confirmLabel={t('catalog.invoke.replace')} cancelLabel={t('catalog.invoke.keep')} busy={controller.pending || controller.checking} onConfirm={() => choose(replacement)} onCancel={() => setReplacement(undefined)} /> : null}
-    {selected ? <div ref={formHost} hidden={!visible}><ApiInvocationForm key={selected.key} operation={selected} controller={controller} onClose={() => setVisible(false)} /></div> : null}
+    {replacement ? <ConfirmationPanel question={t('catalog.invoke.replaceQuestion', { operation: replacement.id })} hint={t('catalog.invoke.replaceHint')} confirmLabel={t('catalog.invoke.replace')} cancelLabel={t('catalog.invoke.keep')} busy={controller.pending || controller.checking} onConfirm={() => choose(replacement)} onCancel={() => setReplacement(undefined)} /> : null}
+    {selected ? <div ref={formHost} hidden={!visible}><ApiInvocationForm key={selected.id} operation={selected} controller={controller} onClose={() => setVisible(false)} /></div> : null}
     {controller.outcome ? <ApiInvocationResult outcome={controller.outcome} /> : null}
     {children(controller, open)}
   </>;

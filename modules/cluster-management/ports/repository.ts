@@ -2,6 +2,7 @@ import type { ClusterInspection, ClusterOperation, ClusterOperationQuery } from 
 import type { InventorySnapshot } from '../domain/inventory';
 export interface SavedInspection { actorId: string; inspection: ClusterInspection }
 export interface ClusterRepository {
+  resourceIds(uids: readonly string[]): Promise<ReadonlyMap<string, string>>;
   latest(): Promise<InventorySnapshot | undefined>;
   snapshot(id: string): Promise<InventorySnapshot | undefined>;
   saveSnapshot(snapshot: InventorySnapshot): Promise<void>;

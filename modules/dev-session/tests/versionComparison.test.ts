@@ -3,12 +3,11 @@ import type { ReleaseId, RunnerCommand, RunnerComparison, SlotDto, TaskId } from
 import { VersionComparisonDtoSchema } from '@crewstation/contracts';
 import { forbidden } from '@crewstation/kernel';
 import { versionComparisonUseCases } from '../application/versionComparison';
-import { decodeComparisonReference } from '../domain/comparisonReference';
 import { checkedAt, readyWorkspace, workspaceActor, workspaceFixture, workspaceProject, workspaceSha } from './workspaceFixture';
 
 const otherSha = 'f'.repeat(40);
 const runnerId = '00000000-0000-4000-8000-000000000001';
-const releaseId = 'rel_0123456789abcdef0123456789abcdef' as ReleaseId;
+const releaseId = '01a0bf5d-8f4b-7fe7-81b4-3ca489d1f621' as ReleaseId;
 function fixture() {
   const base = workspaceFixture();
   let slots: SlotDto[] = [{ name: 'prod', active: true, releaseId, tag: 'v0.1.0', commitSha: otherSha, host: 'demo.cs.localhost', replicas: 1, readyReplicas: 1, state: 'ready' }];
@@ -30,8 +29,8 @@ test('比较目标取实际生产 releaseId／SHA，工作树保持 Runner 的�
   expect(result.deployment).toMatchObject({ status: 'ready', releaseId, commitSha: otherSha });
   expect(result.workspace).toMatchObject({ headSha: workspaceSha });
   expect(f.commands).toMatchObject([{ type: 'compareWorkspace', targetSha: otherSha }]);
-  const reference = decodeComparisonReference(result.comparisonId!);
-  expect(reference).toMatchObject({ runnerId, target: 'prod', deployment: `${releaseId}:${otherSha}` });
+  const reference = await f.deps.comparisons.get(result.comparisonId!);
+  expect(reference).toMatchObject({ runnerComparisonId: runnerId, target: 'prod', deployment: `${releaseId}:${otherSha}` });
 });
 
 test('部署查询失败、无部署和 Runner 断线独立表达，不回退为零差距', async () => {
@@ -64,7 +63,7 @@ test('旧详情在生产变化或会话替换时拒绝，检查发生在发往 R
   await expect(f.api.versionComparisonDetails(workspaceActor, workspaceProject, result.comparisonId!, { tab: 'files', limit: 50 })).rejects.toMatchObject({ kind: 'precondition', details: { code: 'comparison_stale' } });
   expect(f.commands.some((command) => command.type === 'workspaceComparisonDetails')).toBe(false);
   const env = await f.deps.environments.findDevSession(workspaceProject);
-  f.deps.environments.findDevSession = async () => ({ ...env!, id: 'tsk_1123456789abcdef0123456789abcdef' as TaskId });
+  f.deps.environments.findDevSession = async () => ({ ...env!, id: '01a0bf5d-8f4b-7ad2-8eeb-8f56308fb856' as TaskId });
   await expect(f.api.versionComparisonDetails(workspaceActor, workspaceProject, result.comparisonId!, { tab: 'files', limit: 50 })).rejects.toMatchObject({ kind: 'precondition' });
 });
 

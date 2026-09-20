@@ -5,13 +5,13 @@ export type JobState = { state: 'running' } | { state: 'succeeded' } | { state: 
 
 /** 构建：从仓库标签构建镜像并推送到平台注册表；实现为 BuildKit Job。 */
 export interface ImageBuilder {
-  start(spec: { releaseId: string; namespace: string; repoHttpUrl: string; credentialSecretName: string; ref: string; image: string }): Promise<{ buildRef: string }>;
+  start(spec: { releaseId: string; legacyResourceId?: string; namespace: string; repoHttpUrl: string; credentialSecretName: string; ref: string; image: string }): Promise<{ buildRef: string }>;
   status(buildRef: string, namespace: string): Promise<JobState>;
 }
 
 /** 迁移：在生产库上执行 Manifest 声明的迁移命令；实现为一次性 Job。 */
 export interface MigrationRunner {
-  start(spec: { releaseId: string; namespace: string; image: string; command: string[]; env: Record<string, string> }): Promise<{ migrationRef: string }>;
+  start(spec: { releaseId: string; legacyResourceId?: string; namespace: string; image: string; command: string[]; env: Record<string, string> }): Promise<{ migrationRef: string }>;
   status(migrationRef: string, namespace: string): Promise<JobState>;
 }
 

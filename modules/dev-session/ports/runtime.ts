@@ -20,7 +20,7 @@ export interface EnvironmentView {
 /** 一个 Agent 的独立执行环境（RFC-006 §5）：「＋ CLI」带 terminalId，headless Agent 没有；image 是档位修订按摘要固定的镜像。 */
 export interface CreateExecutionInput {
   id: TaskId; parentTaskId: TaskId; purpose: 'cli' | 'agent'; createdBy: UserId; agentId: string; terminalId?: string; runnerId: string; fingerprint: string;
-  profile?: string; image?: string; computeProfile?: { name: string; revision: number };
+  profile?: string; image?: string; computeProfile?: { profileId: string; revision: number };
 }
 
 /** 由 task-runtime 提供。 */

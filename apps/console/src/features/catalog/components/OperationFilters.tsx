@@ -13,7 +13,7 @@ export const ALL_PROXIES = '';
 
 export interface OperationFiltersProps {
   readonly value: OperationFilterValue;
-  readonly proxies: readonly string[];
+  readonly proxies: readonly { id: string; name: string }[];
   readonly count: number;
   readonly onChange: (value: OperationFilterValue) => void;
   readonly showGrant?: boolean;
@@ -29,8 +29,8 @@ export function OperationFilters({ value, proxies, count, onChange, showGrant = 
         <select className={styles.select} value={value.proxy} onChange={(e) => onChange({ ...value, proxy: e.target.value })}>
           <option value={ALL_PROXIES}>{t('catalog.filters.allProxies')}</option>
           {proxies.map((proxy) => (
-            <option key={proxy} value={proxy}>
-              {proxy}
+            <option key={proxy.id} value={proxy.id}>
+              {proxy.name}
             </option>
           ))}
         </select>

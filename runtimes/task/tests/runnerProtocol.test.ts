@@ -195,7 +195,7 @@ describe('headless Agent（回显替身经驱动工厂注入）', () => {
     const { session } = await boot(drivers);
     const prompt = 'hello echo world';
     const launch = launchSpec('opencode', { binaryPath: '/opt/fork/bin/opencode', model: 'anthropic/echo' });
-    const command = { id: 'a1', type: 'startAgent', agentId: 'agent-1', ...profileFields('agent-1', { compute: 'sample', launch, mcp: [{ name: 'ops', url: 'http://ops.svc.cs.internal/mcp' }], env: { ECHO_TEST_KEY: 'value-must-not-be-logged' } }), mode: 'oneshot', initialPrompt: prompt };
+    const command = { id: 'a1', type: 'startAgent', agentId: 'agent-1', ...profileFields('agent-1', { compute: '01a0bf5d-8f4b-7420-874a-95f797d76b36', launch, mcp: [{ name: 'ops', url: 'http://ops.svc.cs.internal/mcp' }], env: { ECHO_TEST_KEY: 'value-must-not-be-logged' } }), mode: 'oneshot', initialPrompt: prompt };
     expect(await session.call(command)).toEqual({});
     await session.waitForEvent('agent', (e) => e.event.agentId === 'agent-1' && e.event.type === 'completed');
     const events = session.eventsOf('agent').map((e) => e.event.event).filter((e) => e.agentId === 'agent-1');
@@ -203,7 +203,7 @@ describe('headless Agent（回显替身经驱动工厂注入）', () => {
     expect(events.at(-1)?.type).toBe('completed');
     expect(events.filter((e) => e.type === 'text').map((e) => e.text).join('')).toBe(prompt);
     expect(events.every((e, i) => e.seq === i + 1)).toBe(true);
-    expect(events[0]?.spec).toEqual({ compute: 'sample', profileRevision: 3, protocol: 'opencode', model: 'anthropic/echo', permission: 'edit' });
+    expect(events[0]?.spec).toEqual({ compute: '01a0bf5d-8f4b-7420-874a-95f797d76b36', profileRevision: 3, protocol: 'opencode', model: 'anthropic/echo', permission: 'edit' });
     expect(events[0]?.raw).toMatchObject({ mode: 'oneshot', binaryPath: '/opt/fork/bin/opencode', mcp: ['ops'], homeIsPrivate: true });
     expect((events[0]?.raw as { envKeys: string[] }).envKeys).toContain('ECHO_TEST_KEY');
     expect((events[0]?.raw as { envKeys: string[] }).envKeys).not.toContain('CS_RUNNER_TOKEN');
@@ -212,7 +212,7 @@ describe('headless Agent（回显替身经驱动工厂注入）', () => {
     expect(events.at(-1)?.result).toMatchObject({ summary: `echoed ${prompt.length} chars`, exitCode: 0 });
     // 空步骤的材料同样留下一条执行记录：每次启动都经启动前 Hook（RFC-006）。
     const hook = session.eventsOf('beforeStart').map((e) => e.event.execution).filter((e) => e.agentId === 'agent-1').at(-1);
-    expect(hook).toMatchObject({ state: 'succeeded', processAttemptId: 'agent-1:1', profile: { profile: 'balanced', revision: 3 }, steps: [] });
+    expect(hook).toMatchObject({ state: 'succeeded', processAttemptId: 'agent-1:1', profile: { profileId: '01a0bf5d-8f4b-7ad6-85af-678b84e2f6f6', revision: 3 }, steps: [] });
     expect(JSON.stringify(session.frames)).not.toContain('value-must-not-be-logged');
     await expectFailure(session.call({ id: 'a2', type: 'startAgent', agentId: 'agent-x', ...profileFields('agent-x'), mode: 'oneshot', cwd: '../outside' }), 'path_denied');
   });
@@ -220,7 +220,7 @@ describe('headless Agent（回显替身经驱动工厂注入）', () => {
   test('协议 2 的形状：通用终端协议不能用于 headless，旧形状（driver／model、无 launch）的命令被拒', async () => {
     const { session } = await boot();
     await expectFailure(session.call({ id: 't1', type: 'startAgent', agentId: 'agent-t', ...profileFields('agent-t', { launch: launchSpec('terminal') }), mode: 'oneshot' }), 'invalid_command');
-    await expectFailure(session.call({ id: 't2', type: 'startAgent', agentId: 'agent-v1', compute: 'balanced', driver: 'claude-code', model: 'm', permission: 'edit', mode: 'oneshot' }), 'invalid_command');
+    await expectFailure(session.call({ id: 't2', type: 'startAgent', agentId: 'agent-v1', compute: '01a0bf5d-8f4b-7ad6-85af-678b84e2f6f6', driver: 'claude-code', model: 'm', permission: 'edit', mode: 'oneshot' }), 'invalid_command');
     await expectFailure(session.call({ id: 't3', type: 'startAgent', agentId: 'agent-nb', ...profileFields('agent-nb', { beforeStart: undefined }), mode: 'oneshot' }), 'invalid_command');
     await expectFailure(session.call({ id: 't4', type: 'startAgent', agentId: 'agent-rel', ...profileFields('agent-rel', { launch: launchSpec('claude-code', { binaryPath: 'claude' }) }), mode: 'oneshot' }), 'invalid_command');
     expect(session.eventsOf('agent')).toEqual([]);

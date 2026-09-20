@@ -15,11 +15,11 @@ import { createIdentityModule, identityMigrations } from '../wiring';
 import { BASE_SETTINGS, completeBootstrap, loginWithPassword, seedLocalUser } from './identityFixture';
 
 const available = await testDatabaseAvailable();
-const taskId = 'tsk_0123456789abcdef0123456789abcdef' as TaskId;
-const projectId = 'prj_0123456789abcdef0123456789abcdef' as ProjectId;
-const otherProjectId = 'prj_1123456789abcdef0123456789abcdef' as ProjectId;
-const serviceId = 'svc_0123456789abcdef0123456789abcdef' as ServiceId;
-const otherServiceId = 'svc_1123456789abcdef0123456789abcdef' as ServiceId;
+const taskId = '01a0bf5d-8f4b-7418-8a3f-7cbb4a1fd751' as TaskId;
+const projectId = '01a0bf5d-8f4b-7178-82e1-9a99060b1192' as ProjectId;
+const otherProjectId = '01a0bf5d-8f4b-75fd-8135-d1b1da6a8cb7' as ProjectId;
+const serviceId = '01a0bf5d-8f4b-76c5-866c-f1feda3d63bb' as ServiceId;
+const otherServiceId = '01a0bf5d-8f4b-7549-872a-18d62f6a1f6d' as ServiceId;
 
 let now = new Date('2026-09-12T09:00:00Z');
 const clock: Clock = { now: () => new Date(now) };

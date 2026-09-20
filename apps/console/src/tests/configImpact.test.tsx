@@ -2,8 +2,8 @@ import './domSetup';
 import { afterEach, expect, test } from 'bun:test';
 import { renderApp } from './renderApp';
 
-const originalFetch = globalThis.fetch, projectId = `prj_${'a'.repeat(32)}`, serviceId = `svc_${'b'.repeat(32)}`, userId = `usr_${'c'.repeat(32)}`;
-const prodId = `rel_${'d'.repeat(32)}`, previewId = `rel_${'e'.repeat(32)}`, sha = 'f'.repeat(40);
+const originalFetch = globalThis.fetch, projectId = '01a0bf5d-8f4b-7e1e-8dde-c9c2ae13ed34', serviceId = '01a0bf5d-8f4b-760b-86b6-0bb9f08a9eaa', userId = '01a0bf5d-8f4b-7ed2-8386-a4b2e1a36efb';
+const prodId = '01a0bf5d-8f4b-762d-81e1-f95f4dd57c2d', previewId = '01a0bf5d-8f4b-7dda-8ca7-d5d5f8a92b44', sha = 'f'.repeat(40);
 let page: Awaited<ReturnType<typeof renderApp>> | undefined;
 afterEach(() => { page?.unmount(); page = undefined; globalThis.fetch = originalFetch; });
 

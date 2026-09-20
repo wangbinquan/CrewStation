@@ -12,7 +12,7 @@ for (const admin of [false, true]) {
   const prefix = admin ? '/admin/integrations' : '/projects';
   test.each([
     ['resources&resource=api&proxy=billing&operation=billing.get', { section: 'api', proxy: 'billing', operation: 'billing.get' }],
-    ['resources&resource=events&subscription=sub-source', { section: 'events', subscription: 'sub-source' }],
+    ['resources&resource=events&subscription=01a0bf5d-8f4b-7b9c-8c07-a2ef94c840cd', { section: 'events', subscription: '01a0bf5d-8f4b-7b9c-8c07-a2ef94c840cd' }],
     ['resources&resource=overview&operation=stale.operation', { section: 'project' }], ['repository', { section: 'project' }],
   ])(`旧设置迁移保留空间与参数 ${prefix} / %s`, async (tab, expected) => {
     projectResourcesFixture(admin); page = await renderApp(`${prefix}/${id}/settings?tab=${tab}`, admin ? '/admin' : '/projects');
@@ -32,13 +32,13 @@ test('资源按目的分组：项目不混入接入参数；配额未知不冒�
 });
 
 test('订阅来自代码，保留订阅 ID 与投递路径，并指向当前项目 Manifest', async () => {
-  projectResourcesFixture(); page = await renderApp(`/projects/${id}/resources?section=events&subscription=sub-source`);
+  projectResourcesFixture(); page = await renderApp(`/projects/${id}/resources?section=events&subscription=01a0bf5d-8f4b-7b9c-8c07-a2ef94c840cd`);
   expect(document.querySelector('tr[aria-current="true"]')?.textContent).toContain('source.changed');
   const links = [...document.querySelectorAll('a')];
   expect(links.find((link) => link.textContent?.includes('打开订阅声明'))?.getAttribute('href')).toContain('file=crewstation.yaml');
-  expect(links.find((link) => link.textContent?.includes('查看事件投递'))?.getAttribute('href')).toContain('subscription=sub-source');
-  await page.click('查看事件投递'); expect(page.search()).toEqual({ tab: 'deliveries', subscription: 'sub-source' });
-  await page.click('查看订阅'); expect(page.search()).toMatchObject({ section: 'events', subscription: 'sub-source' });
+  expect(links.find((link) => link.textContent?.includes('查看事件投递'))?.getAttribute('href')).toContain('subscription=01a0bf5d-8f4b-7b9c-8c07-a2ef94c840cd');
+  await page.click('查看事件投递'); expect(page.search()).toEqual({ tab: 'deliveries', subscription: '01a0bf5d-8f4b-7b9c-8c07-a2ef94c840cd' });
+  await page.click('查看订阅'); expect(page.search()).toMatchObject({ section: 'events', subscription: '01a0bf5d-8f4b-7b9c-8c07-a2ef94c840cd' });
 });
 
 test('平台接入按主题展开，正确说明转发来源且保留环境名、路径、MCP、业务任务接口', async () => {

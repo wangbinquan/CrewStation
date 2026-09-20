@@ -71,12 +71,12 @@ export function subtaskLaunch(deps: BusinessTaskUseCaseDeps) {
       const base = { id: newId('sub') as SubtaskId, taskId: task.id, name: input.name, state: 'pending' as const, attempt, createdAt: now, ...(input.cwd ? { cwd: input.cwd } : {}) };
       if (input.kind === 'command') return { ...base, kind: 'command', command: input.command, timeoutSeconds: input.timeoutSeconds, runnerRef: newId('exe') };
       const registration = await uow.read.contracts.latest(task.serviceId);
-      const profile = resolveProfile(registration, input.agentProfile);
-      if (!profile) throw validation(`agentProfile ${input.agentProfile} 未在该服务的发布中登记`, { registered: registration?.agentProfiles.map((p) => p.name) ?? [] });
-      const contract = input.outputContract ? resolveContract(registration, input.outputContract) : undefined;
-      if (input.outputContract && !contract) throw validation(`outputContract ${input.outputContract} 未在该服务的发布中登记`);
+      const profile = resolveProfile(registration, input.agentProfileId);
+      if (!profile) throw validation(`agentProfile ${input.agentProfileId} 未在该服务的发布中登记`, { registered: registration?.agentProfiles.map((p) => p.id) ?? [] });
+      const contract = input.outputContractId ? resolveContract(registration, input.outputContractId) : undefined;
+      if (input.outputContractId && !contract) throw validation(`outputContract ${input.outputContractId} 未在该服务的发布中登记`);
       // 每个 attempt 在构造时固定档位修订，`default` 在此刻解析（C17）；解析失败留给启动时按同一原因把子任务置为失败。
-      const pinned = await deps.compute.resolve(profile.compute, 'subtask', task.projectId).then((r): ProfileRevisionRef => ({ profile: r.name, revision: r.revision }), () => undefined);
+      const pinned = await deps.compute.resolve(profile.compute, 'subtask', task.projectId).then((r): ProfileRevisionRef => ({ profileId: r.id, revision: r.revision }), () => undefined);
       return { ...base, kind: 'agent', mode: input.mode, prompt: input.prompt, agentProfile: profile, ...(contract ? { outputContract: contract } : {}), ...(pinned ? { computeProfile: pinned } : {}), runnerRef: newId('agt') };
     },
   };

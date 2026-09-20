@@ -9,8 +9,8 @@ import type { SessionUseCaseDeps } from '../application/dependencies';
 import { terminalViewCommand } from '../domain/terminalViews';
 import { StartAgentTerminalCommandSchema } from '@crewstation/contracts';
 
-const taskId = 'tsk_0123456789abcdef0123456789abcdef' as TaskId;
-const actor = { userId: 'usr_0123456789abcdef0123456789abcdef' as UserId, isAdmin: false };
+const taskId = '01a0bf5d-8f4b-7418-8a3f-7cbb4a1fd751' as TaskId;
+const actor = { userId: '01a0bf5d-8f4b-7793-867c-efd7527b386b' as UserId, isAdmin: false };
 const at = '2026-09-13T00:00:00.000Z';
 
 function fixture() {
@@ -40,7 +40,7 @@ test('浏览器先开而 Runner 尚未连接，之后连接／断线／重连均
   const first = await f.hub.onHello(f.hello, { send: () => {} });
   await new Promise((resolve) => setTimeout(resolve, 0));
   if (!first.ok) throw new Error(first.message);
-  await f.hub.onMessage(first.connection, { type: 'event', seq: 1, at, event: { kind: 'nativeTerminal', terminal: { agentId: 'a', terminalId: 't', runnerId: crypto.randomUUID(), revision: 2, compute: 'balanced', permission: 'edit', lifecycle: 'running', startedAt: at, cols: 80, rows: 24 } } });
+  await f.hub.onMessage(first.connection, { type: 'event', seq: 1, at, event: { kind: 'nativeTerminal', terminal: { agentId: 'a', terminalId: 't', runnerId: crypto.randomUUID(), revision: 2, compute: '01a0bf5d-8f4b-7ad6-85af-678b84e2f6f6', permission: 'edit', lifecycle: 'running', startedAt: at, cols: 80, rows: 24 } } });
   await new Promise((resolve) => setTimeout(resolve, 0));
   expect(frames).toContainEqual(expect.objectContaining({ type: 'event', seq: 1 }));
   expect(f.durable).toHaveLength(1);
@@ -95,8 +95,8 @@ test('控制租约绑定服务端视图，断开只 detach；不同连接不能�
 });
 
 test('原生 CLI 创建和结束必须经过持久名册接口，浏览器流不能绕过；普通终端旧命令保留', () => {
-  const native = StartAgentTerminalCommandSchema.parse({ id: 'start', type: 'startAgentTerminal', agentId: 'a', terminalId: 't', runnerId: crypto.randomUUID(), requestFingerprint: 'fingerprint', compute: 'balanced', profileRevision: 1, launch: { protocol: 'claude-code', binaryPath: '/usr/local/bin/claude', model: 'model' }, permission: 'edit', cols: 80, rows: 24,
-    beforeStart: { profile: 'balanced', revision: 1, contentHash: 'h', steps: [], vars: {}, secrets: {}, configFile: { kind: 'none' }, captureOutput: false }, processAttemptId: 'a:1' });
+  const native = StartAgentTerminalCommandSchema.parse({ id: 'start', type: 'startAgentTerminal', agentId: 'a', terminalId: 't', runnerId: crypto.randomUUID(), requestFingerprint: 'fingerprint', compute: '01a0bf5d-8f4b-7ad6-85af-678b84e2f6f6', profileRevision: 1, launch: { protocol: 'claude-code', binaryPath: '/usr/local/bin/claude', model: 'model' }, permission: 'edit', cols: 80, rows: 24,
+    beforeStart: { profile: '01a0bf5d-8f4b-7ad6-85af-678b84e2f6f6', revision: 1, contentHash: 'h', steps: [], vars: {}, secrets: {}, configFile: { kind: 'none' }, captureOutput: false }, processAttemptId: 'a:1' });
   expect(() => terminalViewCommand(native, 'view')).toThrow('名册');
   expect(() => terminalViewCommand({ id: 'stop', type: 'stopAgentTerminal', agentId: 'a', runnerId: native.runnerId }, 'view')).toThrow('名册');
   expect(terminalViewCommand({ id: 'shell', type: 'openTerminal', terminalId: 'shell', cols: 80, rows: 24 }, 'view')).toMatchObject({ type: 'openTerminal' });

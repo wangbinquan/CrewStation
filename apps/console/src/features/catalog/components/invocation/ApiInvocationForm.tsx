@@ -22,7 +22,7 @@ export function ApiInvocationForm({ operation, controller, onClose }: { readonly
   };
   return <Card compact title={<>{t('catalog.invoke.detail')} <code>{operation.method} {operation.path}</code></>} extra={<Button onClick={onClose}>{t('catalog.invoke.hide')}</Button>}>
     <form ref={form} className={styles.form} noValidate onSubmit={(event) => { event.preventDefault(); send(); }}>
-      <p className={styles.note}>{operation.summary ?? operation.key}</p>
+      <p className={styles.note}>{operation.summary ?? operation.id}</p>
       <div className={styles.parameters}>
         {apiPathParameterNames(operation.path).map((name, index) => <FormField key={name} label={t('catalog.invoke.pathLabel', { name })} hint={t('catalog.invoke.pathHint')} error={errors[`path:${name}`] ? t(errors[`path:${name}`]!) : undefined} hintId={`${id}-path-hint-${index}`} errorId={`${id}-path-error-${index}`}>
           <input className={formStyles.textarea} value={draft.pathParameters[name] ?? ''} disabled={controller.pending} aria-invalid={!!errors[`path:${name}`]} aria-describedby={`${id}-path-hint-${index}`} aria-errormessage={errors[`path:${name}`] ? `${id}-path-error-${index}` : undefined} onChange={(event) => change({ pathParameters: { ...draft.pathParameters, [name]: event.target.value } })} />

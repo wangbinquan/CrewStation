@@ -43,9 +43,11 @@ export interface QuotaRepository {
 
 export interface CatalogRepository {
   listServicePlans(): Promise<ServicePlan[]>;
-  getServicePlan(name: string): Promise<ServicePlan | undefined>;
-  upsertServicePlan(plan: ServicePlan): Promise<void>;
+  getServicePlan(id: string): Promise<ServicePlan | undefined>;
+  createServicePlan(plan: ServicePlan): Promise<void>;
+  updateServicePlan(plan: ServicePlan): Promise<boolean>;
   listTaskProfiles(): Promise<TaskProfile[]>;
-  getTaskProfile(name: string): Promise<TaskProfile | undefined>;
-  upsertTaskProfile(profile: TaskProfile): Promise<void>;
+  getTaskProfile(id: string): Promise<TaskProfile | undefined>;
+  createTaskProfile(profile: TaskProfile): Promise<void>;
+  updateTaskProfile(profile: TaskProfile): Promise<boolean>;
 }

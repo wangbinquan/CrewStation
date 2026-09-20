@@ -20,6 +20,6 @@ export function createActivityStamp(options: NativeActivityOptions): (signal: Na
       if (turns.size > 256) turns.delete(turns.keys().next().value!);
     }
     const seq = ++sequence;
-    options.emit({ agentId: options.agentId, terminalId: options.terminalId, runnerId: options.runnerId, eventId: crypto.randomUUID(), seq, turnOrdinal: signal.turnId ? turns.get(signal.turnId) ?? 0 : 0, signal });
+    options.emit({ agentId: options.agentId, terminalId: options.terminalId, runnerId: options.runnerId, eventId: Bun.randomUUIDv7(), seq, turnOrdinal: signal.turnId ? turns.get(signal.turnId) ?? 0 : 0, signal });
   };
 }

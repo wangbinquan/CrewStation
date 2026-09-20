@@ -17,13 +17,13 @@ let platform: PlatformModule;
 let actor: Actor;
 let target: { projectId: ProjectId; serviceId: ServiceId };
 const k8s = createFakeK8sClient();
-const service = { command: ['bun', 'src/main.ts'], port: 3000, plan: 'standard-small' };
+const service = { command: ['bun', 'src/main.ts'], port: 3000, servicePlanId: '01a0bf5d-8f4b-7000-9e4b-b54e91ee9d10' };
 const document = { openapi: '3.0.3', info: { title: 'Proxy', version: '1' }, paths: { '/items': { get: {} } } };
 const worker = (exposes: boolean): Manifest => ManifestSchema.parse({
-  apiVersion: 'crewstation/v1', kind: 'DigitalWorker', spec: { service, apis: exposes ? { exposes: { openapi: './openapi.yaml' } } : {} },
+  apiVersion: 'crewstation/v2', kind: 'DigitalWorker', spec: { service, apis: exposes ? { exposes: { openapi: './openapi.yaml' } } : {} },
 });
 const proxy: Manifest = ManifestSchema.parse({
-  apiVersion: 'crewstation/v1', kind: 'APIProxy', spec: { service, proxy: 'test-gitlab', upstream: { connection: 'test-gitlab' }, apis: { exposes: { openapi: './openapi.yaml' } } },
+  apiVersion: 'crewstation/v2', kind: 'APIProxy', spec: { service, proxy: 'test-gitlab', upstream: { connection: 'test-gitlab' }, apis: { exposes: { openapi: './openapi.yaml' } } },
 });
 
 beforeAll(async () => {
@@ -37,8 +37,8 @@ beforeAll(async () => {
   await runMigrations(tdb.db, platform.api.migrations);
   const user = await platform.modules.identity.api.ensureUser({ externalId: 'demo:routing', name: 'Routing', email: 'routing@example.com' });
   actor = { userId: user.id, isAdmin: true };
-  await platform.modules.project.api.upsertServicePlan(actor, { name: 'standard-small', cpu: '500m', memory: '512Mi', maxReplicas: 1, description: '' });
-  const project = await platform.modules.project.api.createProject(actor, { slug: 'reference-proxy', name: 'Reference proxy', kind: 'APIProxy', ownerUserId: user.id, template: 'minimal-sample' });
+  await platform.modules.project.api.updateServicePlan(actor, '01a0bf5d-8f4b-7000-9e4b-b54e91ee9d10', { name: 'standard-small', cpu: '500m', memory: '512Mi', maxReplicas: 1, description: '' });
+  const project = await platform.modules.project.api.createProject(actor, { slug: 'reference-proxy', name: 'Reference proxy', kind: 'APIProxy', ownerUserId: user.id, template: '01a0bf5d-8f4b-7002-9560-94caf593fb19' });
   target = { projectId: project.id, serviceId: project.serviceId! };
 });
 afterAll(async () => { await tdb?.drop(); });
@@ -60,17 +60,19 @@ describe.skipIf(!available)('平台装配的目录与网关路由', () => {
     const { gateway, apiCatalog } = platform.modules;
     await register(worker(true));
     expect((await gateway.api.reconcileService(target.serviceId)).find((route) => route.kind === 'internal-api')?.pathPrefix).toBe('/api/reference-proxy');
+    const before = (await apiCatalog.api.listProxies(actor))[0]!;
     await register(proxy);
     expect((await apiCatalog.api.listProxies(actor)).map((item) => [item.proxy, item.state])).toEqual([
-      ['reference-proxy', 'removed'], ['test-gitlab', 'active'],
+      ['test-gitlab', 'active'],
     ]);
+    expect((await apiCatalog.api.listProxies(actor))[0]!.id).toBe(before.id);
     const routes = await gateway.api.reconcileService(target.serviceId);
     // 真实试调的目录是 test-gitlab；旧组合根取排序在前的退役条目，实际网关只能匹配 reference-proxy。
     expect(routes.find((route) => route.kind === 'internal-api')).toMatchObject({
       host: 'api.svc.cs.internal', pathPrefix: '/api/test-gitlab',
       target: { service: 'reference-proxy-blue', namespace: 'cs-reference-proxy' },
     });
-    expect((await apiCatalog.api.prunedOpenApi(actor, target.serviceId, 'test-gitlab')).servers).toEqual([{ url: 'http://api.svc.cs.internal/api/test-gitlab' }]);
+    expect((await apiCatalog.api.prunedOpenApi(actor, target.serviceId, before.id)).servers).toEqual([{ url: 'http://api.svc.cs.internal/api/test-gitlab' }]);
     const ingress = k8s.applied.filter((item) => item.kind === 'IngressRoute' && item.metadata.name === 'reference-proxy-internal-api').at(-1)!;
     expect(ingress.spec).toMatchObject({ routes: [{ match: 'Host(`api.svc.cs.internal`) && PathPrefix(`/api/test-gitlab`)' }] });
   });
@@ -81,7 +83,7 @@ describe.skipIf(!available)('平台装配的目录与网关路由', () => {
     expect(routes.map((route) => route.kind)).toEqual(['prod', 'preview', 'service']);
     expect(await k8s.get(Resources.IngressRoute!, 'reference-proxy-internal-api', 'cs-reference-proxy')).toBeUndefined();
     expect((await platform.modules.apiCatalog.api.listProxies(actor)).every((item) => item.state === 'removed')).toBe(true);
-    expect(await platform.modules.gateway.api.reconcileService('svc_00000000000000000000000000000000' as ServiceId)).toEqual([]);
+    expect(await platform.modules.gateway.api.reconcileService('01a0bf5d-8f4b-7430-8195-be2419fb2d35' as ServiceId)).toEqual([]);
   });
 
   test('网关先消费发布事件时，目录提交后仍会把实际路由更新为当前代理', async () => {
@@ -153,7 +155,7 @@ describe.skipIf(!available)('平台装配的目录与网关路由', () => {
       expect(await apiCatalog.subscriptions[0]!.runOnce()).toBe(1);
       const recovered = await k8s.get(Resources.IngressRoute!, 'reference-proxy-internal-api', 'cs-reference-proxy');
       expect(recovered?.spec).toMatchObject({ routes: [{ match: 'Host(`api.svc.cs.internal`) && PathPrefix(`/api/test-gitlab`)' }] });
-      expect((await apiCatalog.api.listOperations(actor)).map((item) => item.key)).toEqual(['test-gitlab:GET:/items']);
+      expect((await apiCatalog.api.listOperations(actor)).map((item) => `${item.proxy}:${item.method}:${item.path}`)).toEqual(['test-gitlab:GET:/items']);
     } finally {
       k8s.apply = apply;
     }

@@ -14,11 +14,11 @@ import { clusterApi } from './application/moduleApi';
 import { collectSnapshot } from './application/collection';
 import { executeOperation } from './application/executeOperation';
 import { clusterRoutes } from './http/clusterRoutes';
-export interface ClusterManagementModuleDeps { db: Database; k8s: K8sClient; metadata: ClusterMetadata; domains: DomainOperations; isAdmin(id: UserId): Promise<boolean>; systemNamespace: string; catalog: SystemComponent[]; instance: string; logger?: Logger; clock?: Clock; wait?: (ms: number) => Promise<void>; observationMs?: number }
+export interface ClusterManagementModuleDeps { resolveReleaseId?: (legacy: string) => Promise<string | undefined>; physicalOperationId?: (id: string) => Promise<string>; db: Database; k8s: K8sClient; metadata: ClusterMetadata; domains: DomainOperations; isAdmin(id: UserId): Promise<boolean>; systemNamespace: string; catalog: SystemComponent[]; instance: string; logger?: Logger; clock?: Clock; wait?: (ms: number) => Promise<void>; observationMs?: number }
 export const clusterManagementMigrations: MigrationSet = { module: 'cluster-management', layer: 6, files: readMigrationDir(join(import.meta.dir, 'adapters/persistence/migrations')) };
 export function createClusterManagementModule(input: ClusterManagementModuleDeps) {
   const repository = drizzleClusterRepository(input.db), logger = input.logger ?? noopLogger;
-  const deps = { ...input, repository, cluster: kubernetesClusterReader(input.k8s), clock: input.clock ?? systemClock, wait: input.wait ?? ((ms: number) => Bun.sleep(ms)), observationMs: input.observationMs ?? 300_000 };
+  const deps = { ...input, repository, cluster: kubernetesClusterReader(input.k8s, input.physicalOperationId), clock: input.clock ?? systemClock, wait: input.wait ?? ((ms: number) => Bun.sleep(ms)), observationMs: input.observationMs ?? 300_000 };
   const api = clusterApi(deps); let abort = new AbortController();
   const operations = createWorker({ db: input.db, owner: `${input.instance}.cluster.operations`, kinds: [CLUSTER_OPERATION], concurrency: 2, leaseSeconds: 60, logger, handler: async (job, ctx) => {
     const payload = job.payload as { operationId?: string; requestId?: string; resumeCount?: number };

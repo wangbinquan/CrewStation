@@ -1,10 +1,10 @@
 import type {
-  Actor, BranchDto, CreateReleaseTagRequest, ProjectId, ProjectTemplateDto, ReleaseTagDto, RepositoryBindingDto, ServiceId, SessionCredentialDto, TagDto, UserId,
+  Actor, BranchDto, CreateReleaseTagRequest, ManifestUpgradePreview, ProjectId, ProjectTemplateDto, ReleaseTagDto, RepositoryBindingDto, ServiceId, SessionCredentialDto, TagDto, UserId,
 } from '@crewstation/contracts';
 
 export interface EnsureRepositoryInput {
   readonly slug: string;
-  readonly templateName: string;
+  readonly templateId: string;
   readonly initialPlan?: string;
 }
 
@@ -20,6 +20,7 @@ export type ActorResolver = (userId: UserId) => Promise<Actor>;
 export interface ScmModuleApi {
   readonly name: 'scm';
   listTemplates(actor: Actor): Promise<ProjectTemplateDto[]>;
+  previewManifestUpgrade(actor: Actor, serviceId: ServiceId, content: string): Promise<ManifestUpgradePreview>;
   /** 幂等建仓：已有绑定直接返回；远端路径被占且不属于本服务时抛 conflict，绝不接管（R32）。 */
   ensureRepository(serviceId: ServiceId, projectId: ProjectId, input: EnsureRepositoryInput): Promise<RepositoryBindingDto>;
   getBinding(actor: Actor, serviceId: ServiceId): Promise<RepositoryBindingDto>;

@@ -1,9 +1,9 @@
 import { z } from 'zod';
-import { ProjectIdSchema, SlugSchema, TaskIdSchema } from '../ids';
+import { ProjectIdSchema, ResourceIdSchema, TaskIdSchema } from '../ids';
 import { TaskProfileDtoSchema } from './project';
 
 /** 套餐资源快照只用于确认；执行时仍重新读取管理员当前定义并逐项匹配。 */
-export const RebuildProfileSchema = TaskProfileDtoSchema.pick({ name: true, cpu: true, memory: true, storage: true }).strict();
+export const RebuildProfileSchema = TaskProfileDtoSchema.pick({ id: true, name: true, cpu: true, memory: true, storage: true }).strict();
 export const RebuildDevSessionRequestSchema = z.object({
   requestId: z.uuid(),
   expectedTaskId: TaskIdSchema,
@@ -20,13 +20,14 @@ export const DevSessionRebuildInspectionSchema = z.object({
   updatedAt: z.iso.datetime(),
   podUid: z.string().min(1).nullable(),
   volume: z.object({ uid: z.string().min(1), capacity: z.string().min(1) }).strict(),
-  currentProfile: SlugSchema,
+  currentProfile: ResourceIdSchema,
   profiles: z.array(TaskProfileDtoSchema),
   checkedAt: z.iso.datetime(),
   reason: z.enum(['failed', 'protocol_mismatch', 'administrator-restart']).optional(),
 }).strict();
 export const DevSessionRebuildStateSchema = z.enum(['queued', 'replacing', 'starting', 'ready', 'failed']);
 export const DevSessionRebuildDtoSchema = z.object({
+  id: ResourceIdSchema,
   requestId: z.uuid(), taskId: TaskIdSchema, state: DevSessionRebuildStateSchema,
   profile: RebuildProfileSchema, createdAt: z.iso.datetime(), updatedAt: z.iso.datetime(),
   message: z.string().optional(),

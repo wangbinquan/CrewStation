@@ -3,14 +3,16 @@ import type { TaskId, UserId } from '@crewstation/contracts';
 import { Resources } from '@crewstation/k8s';
 import { newId } from '@crewstation/kernel';
 import { testDatabaseAvailable } from '@crewstation/testkit';
+import { resourceIdentityDirectory } from '@crewstation/persistence';
+import { taskRuntimeMigrations } from '../wiring';
 import type { CreateNativeExecutionInput } from '../api/moduleApi';
 import { rebuildFixture } from './rebuildFixture';
 
 const available = await testDatabaseAvailable();
 let f: Awaited<ReturnType<typeof rebuildFixture>> | undefined;
 afterEach(async () => { await f?.close(); f = undefined; });
-const input = (parentTaskId: TaskId): CreateNativeExecutionInput => ({ id: newId('tsk') as TaskId, parentTaskId, createdBy: `usr_${'c'.repeat(32)}` as UserId,
-  agentId: newId('agt'), terminalId: newId('pty'), runnerId: crypto.randomUUID(), fingerprint: 'f'.repeat(64), profile: 'coding-medium' });
+const input = (parentTaskId: TaskId): CreateNativeExecutionInput => ({ id: newId('tsk') as TaskId, parentTaskId, createdBy: '01a0bf5d-8f4b-7ed2-8386-a4b2e1a36efb' as UserId,
+  agentId: newId('agt'), terminalId: newId('pty'), runnerId: crypto.randomUUID(), fingerprint: 'f'.repeat(64), profile: '01a0bf5d-8f4b-7001-8458-107366e7de39' });
 async function childToken(id: TaskId): Promise<string> {
   const child = (await f!.uow.read.environments.getById(id))!;
   const secret = (await f!.k8s.get(Resources.Secret!, `${child.podName}-runner`, child.namespace))!;
@@ -37,7 +39,9 @@ describe.skipIf(!available)('逐 CLI 独立执行环境', () => {
       volumes: [{ name: 'work', persistentVolumeClaim: { claimName: env.pvcName } }], affinity: { nodeAffinity: { requiredDuringSchedulingIgnoredDuringExecution: { nodeSelectorTerms: [{ matchFields: [{ key: 'metadata.name', values: ['worker-one'] }] }] } } } });
     expect((pod.spec as Record<string, unknown>).initContainers).toBeUndefined();
     const secret = (await k8s.get(Resources.Secret!, `${current.podName}-runner`, env.namespace))!;
-    expect(secret.stringData).toMatchObject({ CS_TASK_ID: env.id, CS_RUNNER_TASK_ID: current.id, CS_RUNNER_NATIVE_ID: request.runnerId, CS_ENVIRONMENT: 'development' });
+    expect(secret.stringData).toMatchObject({ CS_TASK_ID: env.id, CS_CANONICAL_RUNNER_TASK_ID: current.id, CS_RUNNER_TASK_ID: `tsk_${current.id.replaceAll('-', '')}`, CS_RUNNER_NATIVE_ID: request.runnerId, CS_ENVIRONMENT: 'development' });
+    const directory = resourceIdentityDirectory(f.tdb.db, () => [taskRuntimeMigrations]);
+    expect(await directory.resolve('task', [(secret.stringData as Record<string, string>).CS_RUNNER_TASK_ID!])).toBe(current.id);
     expect((secret.stringData as Record<string, string>).CS_PREVIEW_COMMAND).toBeUndefined();
     expect(await runtime.api.onRunnerConnected(a.id, await childToken(a.id))).toBe(true);
     expect(await runtime.api.findDevSession(projectId)).toMatchObject({ id: env.id, state: 'running' });
@@ -54,7 +58,7 @@ describe.skipIf(!available)('逐 CLI 独立执行环境', () => {
     expect(outcomes.filter((item) => item.status === 'fulfilled')).toHaveLength(1);
     expect(outcomes.filter((item) => item.status === 'rejected')).toMatchObject([{ reason: { kind: 'quota_exceeded' } }]);
     const accepted = outcomes[0]!.status === 'fulfilled' ? a : b;
-    for (const patch of [{ fingerprint: 'b'.repeat(64) }, { runnerId: crypto.randomUUID() }, { profile: 'coding-large' }, { agentId: 'another' }]) {
+    for (const patch of [{ fingerprint: 'b'.repeat(64) }, { runnerId: crypto.randomUUID() }, { profile: '01a0bf5d-8f4b-7f2b-8caf-3349046050a1' }, { agentId: 'another' }]) {
       await expect(runtime.api.createNativeExecution({ ...accepted, ...patch })).rejects.toMatchObject({ kind: 'conflict' });
     }
     expect(await runtime.api.runningTaskCount(projectId)).toBe(2);
@@ -128,7 +132,7 @@ describe.skipIf(!available)('逐 CLI 独立执行环境', () => {
     const rebuild = await runtime.api.requestRebuild(f.projectId, await f.request()); await f.run();
     const recovered = (await runtime.api.getEnvironment(env.id))!;
     expect((await k8s.get(Resources.Pod!, recovered.podName, env.namespace))?.spec).toMatchObject({ affinity: { nodeAffinity: { requiredDuringSchedulingIgnoredDuringExecution: { nodeSelectorTerms: [{ matchFields: [{ values: ['worker-one'] }] }] } } } });
-    expect((await f.uow.read.rebuilds.get(rebuild.requestId))?.nodeName).toBe('worker-one');
+    expect((await f.uow.read.rebuilds.get(rebuild.id))?.nodeName).toBe('worker-one');
     expect(await k8s.get(Resources.Pod!, child.podName, env.namespace)).toEqual(before);
     expect(await runtime.api.onRunnerConnected(child.id, childCredential)).toBe(true);
   });

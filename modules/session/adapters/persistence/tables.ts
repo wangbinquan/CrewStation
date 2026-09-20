@@ -9,6 +9,8 @@ export const runnerEvents = sessionSchema.table('runner_events', {
   kind: text('kind').notNull(),
   agentId: text('agent_id'),
   event: jsonDocument('event').notNull(),
+  legacyEvent: jsonDocument('legacy_event'),
+  identityProvenance: jsonDocument('identity_provenance'),
 }, (t) => [primaryKey({ columns: [t.taskId, t.seq] })]);
 
 export const connections = sessionSchema.table('connections', {

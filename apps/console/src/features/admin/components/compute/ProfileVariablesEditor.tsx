@@ -1,3 +1,4 @@
+import { newDraftResourceId } from '@crewstation/api-client';
 import type { ProfileCredentialState } from '@crewstation/contracts';
 import type { ReactElement } from 'react';
 import { useT } from '../../../../shared/lib/useT';
@@ -20,18 +21,17 @@ export interface ProfileVariablesEditorProps {
 /** 普通变量明文可见；凭据只显示“已设置／未设置”，写入走 keep／replace／clear 三选一，保存后不回显。 */
 export function ProfileVariablesEditor({ draft, errors, credentials, disabled, onChange }: ProfileVariablesEditorProps): ReactElement {
   const t = useT();
-  const stored = new Map(credentials.map((credential) => [credential.name, credential]));
+  const stored = new Map(credentials.map((credential) => [credential.id, credential]));
   const setVar = (index: number, patch: Partial<{ name: string; value: string }>) => onChange((d) => ({ ...d, vars: d.vars.map((v, i) => (i === index ? { ...v, ...patch } : v)) }));
-  const renameSecret = (index: number, name: string) => onChange((d) => {
-    const previous = d.secretNames[index]!;
-    const { [previous]: op, ...rest } = d.credentials;
-    return { ...d, secretNames: d.secretNames.map((n, i) => (i === index ? name : n)), credentials: { ...rest, [name]: op ?? { op: 'replace', value: '' } } };
+  const renameSecret = (id: string, name: string) => onChange((draft) => ({ ...draft, secrets: draft.secrets.map((secret) => secret.id === id ? { ...secret, name } : secret) }));
+  const setOp = (id: string, op: CredentialOp) => onChange((draft) => ({ ...draft, credentials: { ...draft.credentials, [id]: op } }));
+  const undeclare = (id: string) => onChange((draft) => {
+    const { [id]: _dropped, ...rest } = draft.credentials;
+    return { ...draft, secrets: draft.secrets.filter((secret) => secret.id !== id), credentials: stored.get(id)?.set ? { ...rest, [id]: { op: 'clear' } } : rest };
   });
-  const setOp = (name: string, op: CredentialOp) => onChange((d) => ({ ...d, credentials: { ...d.credentials, [name]: op } }));
-  const undeclare = (name: string) => onChange((d) => {
-    const { [name]: _dropped, ...rest } = d.credentials;
-    // 取消声明时把已存的值一并清掉，避免留下无人引用却仍可解密的密文。
-    return { ...d, secretNames: d.secretNames.filter((n) => n !== name), credentials: stored.get(name)?.set ? { ...rest, [name]: { op: 'clear' } } : rest };
+  const addSecret = () => onChange((draft) => {
+    const id = newDraftResourceId();
+    return { ...draft, secrets: [...draft.secrets, { id, name: '' }], credentials: { ...draft.credentials, [id]: { op: 'replace', value: '' } } };
   });
   return (
     <>
@@ -50,32 +50,32 @@ export function ProfileVariablesEditor({ draft, errors, credentials, disabled, o
       <div className={styles.sub}>
         <h3>{t('admin.profile.secrets.title')}</h3>
         <p className={styles.hint}>{t('admin.profile.secrets.hint')}</p>
-        {draft.secretNames.map((name, index) => {
-          const existing = stored.get(name);
-          const op = draft.credentials[name] ?? { op: existing ? 'keep' : 'replace', value: '' } as CredentialOp;
+        {draft.secrets.map(({ id, name }, index) => {
+          const existing = stored.get(id);
+          const op = draft.credentials[id] ?? { op: existing ? 'keep' : 'replace', value: '' } as CredentialOp;
           return (
-            <div key={existing ? name : `new-${index}`} className={styles.credential}>
+            <div key={id} className={styles.credential}>
               <div className={styles.credentialFields}>
-              {existing ? <code>{name}</code> : <AdminField label={t('admin.profile.vars.name')} value={name} onChange={(next) => renameSecret(index, next)} disabled={disabled} error={errors[`secrets.${index}`] ? t(`admin.profile.error.${errors[`secrets.${index}`]}`) : undefined} />}
+              <AdminField label={t('admin.profile.vars.name')} value={name} onChange={(next) => renameSecret(id, next)} disabled={disabled} error={errors[`secrets.${index}`] ? t(`admin.profile.error.${errors[`secrets.${index}`]}`) : undefined} />
               <div className={styles.toolbar}><Badge tone={existing?.set ? 'success' : 'warning'}>{t(existing?.set ? 'admin.profile.secrets.set' : 'admin.profile.secrets.unset')}</Badge></div>
               </div>
               <div className={styles.credentialFields}>
                 {existing ? (
                   <AdminField label={`${name} ${t('admin.profile.secrets.title')}`} value={op.op} disabled={disabled}
-                    onChange={(value) => setOp(name, value === 'replace' ? { op: 'replace', value: '' } : value === 'clear' ? { op: 'clear' } : { op: 'keep' })}
+                    onChange={(value) => setOp(id, value === 'replace' ? { op: 'replace', value: '' } : value === 'clear' ? { op: 'clear' } : { op: 'keep' })}
                     options={(['keep', 'replace', 'clear'] as const).map((value) => ({ value, label: t(`admin.profile.secrets.${value}`) }))} />
                 ) : null}
                 {op.op === 'replace' ? (
                   <FormField label={t('admin.profile.secrets.replace')}>
-                    <input type="password" autoComplete="new-password" value={op.value} placeholder={t('admin.profile.secrets.valuePlaceholder')} disabled={disabled} onChange={(event) => setOp(name, { op: 'replace', value: event.target.value })} />
+                    <input type="password" autoComplete="new-password" value={op.value} placeholder={t('admin.profile.secrets.valuePlaceholder')} disabled={disabled} onChange={(event) => setOp(id, { op: 'replace', value: event.target.value })} />
                   </FormField>
                 ) : null}
               </div>
-              <Button variant="ghost" className={styles.dangerAction} disabled={disabled} onClick={() => undeclare(name)}>{t('admin.profile.secrets.remove')}</Button>
+              <Button variant="ghost" className={styles.dangerAction} disabled={disabled} onClick={() => undeclare(id)}>{t('admin.profile.secrets.remove')}</Button>
             </div>
           );
         })}
-        <div className={styles.toolbar}><Button disabled={disabled} onClick={() => onChange((d) => ({ ...d, secretNames: [...d.secretNames, ''], credentials: { ...d.credentials, '': { op: 'replace', value: '' } } }))}>{t('admin.profile.secrets.add')}</Button></div>
+        <div className={styles.toolbar}><Button disabled={disabled} onClick={addSecret}>{t('admin.profile.secrets.add')}</Button></div>
       </div>
     </>
   );

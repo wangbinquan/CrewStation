@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import type { Actor, NativeTerminalDto, NativeTerminalList, NativeTerminalRoster, ProjectId, ServiceId, StartNativeTerminalRequest, TaskId } from '@crewstation/contracts';
 import { IDENTITY_HEADERS, NativeTerminalRecordSchema, RunnerResultPayloads } from '@crewstation/contracts';
-import { conflict, isPlatformError, newId, notFound, precondition } from '@crewstation/kernel';
+import { conflict, isPlatformError, newId, newResourceId, notFound, precondition } from '@crewstation/kernel';
 import type { NativeTerminalRepository, NativeTerminalStart } from '../ports/nativeTerminals';
 import { projectNativeTerminal } from '../domain/nativeTerminalProjection';
 import type { DevSessionUseCaseDeps } from './dependencies';
@@ -24,8 +24,8 @@ class NativeTerminals {
     const profile = await nativeCompute(this.deps, projectId, input.compute);
     return this.repository.reserve({
       taskId, createdBy: actor.userId, clientRequestId: input.clientRequestId, fingerprint: fingerprintOf(input), input,
-      profile: { profile: profile.name, revision: profile.revision }, execution: { taskId: newId('tsk') as TaskId, image: profile.image, ...(profile.taskProfile ? { taskProfile: profile.taskProfile } : {}) },
-      record: { agentId: newId('agt'), terminalId: newId('pty'), runnerId: crypto.randomUUID(), compute: profile.name, permission: input.permission, revision: 0, lifecycle: 'starting', startedAt: this.deps.clock.now().toISOString(), cols: input.cols, rows: input.rows, profileRevision: profile.revision, protocol: profile.protocol },
+      profile: { profileId: profile.id, revision: profile.revision }, execution: { taskId: newId('tsk') as TaskId, image: profile.image, ...(profile.taskProfile ? { taskProfile: profile.taskProfile } : {}) },
+      record: { agentId: newId('agt'), terminalId: newId('pty'), runnerId: Bun.randomUUIDv7(), compute: profile.id, computeName: profile.name, permission: input.permission, revision: 0, lifecycle: 'starting', startedAt: this.deps.clock.now().toISOString(), cols: input.cols, rows: input.rows, profileRevision: profile.revision, protocol: profile.protocol },
     });
   }
   async start(actor: Actor, taskId: TaskId, input: StartNativeTerminalRequest): Promise<NativeTerminalDto> {
@@ -35,7 +35,7 @@ class NativeTerminals {
       if (!env.connected || env.state !== 'running' || env.native) throw precondition('工作区未连接或正在释放，不能新增 CLI');
       start = await this.reserve(actor, taskId, input, env.projectId);
     }
-    if (start.fingerprint !== fingerprintOf(input)) throw conflict('此启动请求标识已用于不同配置，请保留原请求查询结果', { clientRequestId: input.clientRequestId });
+    if (fingerprintOf(start.input) !== fingerprintOf(input)) throw conflict('此启动请求标识已用于不同配置，请保留原请求查询结果', { clientRequestId: input.clientRequestId });
     if (!start.execution) return this.legacyStart(actor, start, env);
     // HTTP 只登记；持久名册由后台串行准入，页面重试不与停止／清理竞争创建环境。
     return this.execution.read((await this.repository.findAgent(taskId, start.record.agentId))!);
@@ -106,17 +106,16 @@ export function clusterNativeUseCases(deps: DevSessionUseCaseDeps, repository: N
     await nativeEnvironment(deps, actor, old.taskId, 'develop'); return old;
   };
   return {
-    inspectClusterNative: async (actor: Actor, id: TaskId) => { const old = await load(actor, id); return { parentTaskId: old.taskId, agentId: old.record.agentId, profile: old.profile!, inputHash: fingerprintOf(old.input) }; },
+    inspectClusterNative: async (actor: Actor, id: TaskId) => { const old = await load(actor, id); return { parentTaskId: old.taskId, agentId: old.record.agentId, profile: old.profile!, inputHash: old.fingerprint }; },
     manageClusterNative: async (actor: Actor, id: TaskId, restart: boolean, operationId: string): Promise<{ operationId: string }> => {
       const old = await load(actor, id);
       let next: NativeTerminalStart | undefined;
       if (restart) {
         const parent = await deps.environments.getEnvironment(old.taskId);
         if (!parent?.connected || parent.state !== 'running') throw precondition('父工作区未就绪，无法重开 CLI');
-        const suffix = createHash('sha256').update(operationId).digest('hex').slice(0, 32);
-        next = await repository.reserve({ taskId: old.taskId, createdBy: actor.userId, clientRequestId: operationId, input: { ...old.input, clientRequestId: operationId }, fingerprint: old.fingerprint, profile: old.profile!,
-          execution: { taskId: `tsk_${suffix}` as TaskId, image: old.execution!.image, taskProfile: old.execution!.taskProfile, previousTaskId: id },
-          record: { agentId: `agt_${suffix}`, terminalId: `pty_${suffix}`, runnerId: operationId, compute: old.record.compute, permission: old.record.permission, protocol: old.record.protocol, profileRevision: old.profile!.revision, cols: old.input.cols, rows: old.input.rows, revision: 0, lifecycle: 'starting', startedAt: deps.clock.now().toISOString() } });
+        next = await repository.reserve({ taskId: old.taskId, createdBy: actor.userId, clientRequestId: operationId, input: { ...old.input, clientRequestId: operationId }, fingerprint: fingerprintOf(old.input), profile: old.profile!,
+          execution: { taskId: newResourceId() as TaskId, image: old.execution!.image, taskProfile: old.execution!.taskProfile, previousTaskId: id },
+          record: { agentId: newResourceId(), terminalId: newResourceId(), runnerId: Bun.randomUUIDv7(), compute: old.record.compute, computeName: old.record.computeName, permission: old.record.permission, protocol: old.record.protocol, profileRevision: old.profile!.revision, cols: old.input.cols, rows: old.input.rows, revision: 0, lifecycle: 'starting', startedAt: deps.clock.now().toISOString() } });
       }
       await repository.requestStop(old.taskId, old.record.agentId); await execution.dispatch(id);
       return { operationId: next?.execution?.taskId ?? id };

@@ -52,7 +52,7 @@ test('真实 Provider 经 StrictMode 挂载，收起的 CLI 恢复并只标记�
 
 test('旧会话或错误终端的定位不改布局、不标记已读', async () => {
   const f = await fixture();
-  rendered = await renderElement(<AgentActivityProvider><Harness f={f} target={{ ...f.target, taskId: `tsk_${'9'.repeat(32)}` }} /></AgentActivityProvider>, messages);
+  rendered = await renderElement(<AgentActivityProvider><Harness f={f} target={{ ...f.target, taskId: '01a0bf5d-8f4b-78e3-8b79-df75f85b2367' }} /></AgentActivityProvider>, messages);
   expect(f.layout.getState().layout.view).toBe('code'); expect(f.writes).toEqual([]); expect(rendered.text()).toContain('activity.invalidTarget');
 });
 

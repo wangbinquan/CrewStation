@@ -8,12 +8,12 @@ import { initialSlots } from '../domain/slots';
 import { releaseMigrations } from '../wiring';
 
 const available = await testDatabaseAvailable();
-const serviceId = `svc_${'a'.repeat(32)}` as ServiceId, projectId = `prj_${'b'.repeat(32)}` as ProjectId;
-const tester: Actor = { userId: `usr_${'c'.repeat(32)}` as UserId, isAdmin: false };
+const serviceId = '01a0bf5d-8f4b-7455-8963-87369647717e' as ServiceId, projectId = '01a0bf5d-8f4b-7aef-84b8-c458233bab22' as ProjectId;
+const tester: Actor = { userId: '01a0bf5d-8f4b-7ed2-8386-a4b2e1a36efb' as UserId, isAdmin: false };
 
 test.skipIf(!available)('预览查询使用测试者既有权限，仅返回当前待命槽；切流、未部署和撤权按实际记录变化', async () => {
   const db = await createTestDatabase([eventbusMigrations, releaseMigrations]), uow = drizzleUnitOfWork(db.db), now = new Date();
-  const prodId = `rel_${'d'.repeat(32)}` as ReleaseId, previewId = `rel_${'e'.repeat(32)}` as ReleaseId;
+  const prodId = '01a0bf5d-8f4b-762d-81e1-f95f4dd57c2d' as ReleaseId, previewId = '01a0bf5d-8f4b-7dda-8ca7-d5d5f8a92b44' as ReleaseId;
   let permitted = true;
   const api = releaseQueries({ uow, authorizer: { authorize: async (actor, project, action) => {
     expect(actor).toEqual(tester); expect(project).toBe(projectId);

@@ -11,8 +11,8 @@ export interface PaneNoticeProps {
 /** 面板内的一行提示；warning 用 role=alert，读屏能播报失败。 */
 export function PaneNotice({ tone = 'info', children }: PaneNoticeProps): ReactElement {
   return (
-    <p className={[styles.notice, styles[tone]].join(' ')} role={tone === 'warning' ? 'alert' : 'status'}>
+    <div className={[styles.notice, styles[tone]].join(' ')} role={tone === 'warning' ? 'alert' : 'status'}>
       {children}
-    </p>
+    </div>
   );
 }

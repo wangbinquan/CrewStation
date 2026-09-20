@@ -12,8 +12,8 @@ const available = await testDatabaseAvailable();
 let tdb: TestDatabase;
 let k8s: FakeK8sClient;
 let gateway: GatewayModule;
-const demoId = 'svc_0123456789abcdef0123456789abcdef' as ServiceId;
-const issuesId = 'svc_1123456789abcdef0123456789abcdef' as ServiceId;
+const demoId = '01a0bf5d-8f4b-76c5-866c-f1feda3d63bb' as ServiceId;
+const issuesId = '01a0bf5d-8f4b-7549-872a-18d62f6a1f6d' as ServiceId;
 const services = [
   { serviceId: demoId, projectSlug: 'demo', serviceName: 'demo', namespace: 'cs-demo', identity: 'demo/demo', kind: 'DigitalWorker' as const },
   { serviceId: issuesId, projectSlug: 'issues', serviceName: 'issues', namespace: 'cs-issues', identity: 'issues/issues', kind: 'APIProxy' as const },
@@ -29,7 +29,7 @@ beforeAll(async () => {
     services: { listServices: async () => services, getService: async (id) => services.find((s) => s.serviceId === id), serviceIdOfProject: async () => demoId },
     slots: { slotRoles: async () => ({ prod: prodPhysical, preview: prodPhysical === 'blue' ? 'green' : 'blue' }) },
     grants: {
-      grantedOperations: async (caller) => ({ operations: caller === 'demo/demo' ? ['issues:POST:/v1/issues'] : [], defaultOpen: ['issues:GET:/v1/issues/{id}'] }),
+      grantedOperations: async (caller) => ({ operations: caller === 'demo/demo' ? ['01a0bf5d-8f4b-7155-8e96-d9844e02dfa4'] : [], defaultOpen: ['01a0bf5d-8f4b-73dc-813d-bb1eeb744398'], operationRoutes: [{ id: '01a0bf5d-8f4b-7155-8e96-d9844e02dfa4', proxy: 'issues', method: 'POST', path: '/v1/issues' }, { id: '01a0bf5d-8f4b-73dc-813d-bb1eeb744398', proxy: 'issues', method: 'GET', path: '/v1/issues/{id}' }] }),
       listCallers: async () => ['demo/demo'],
       proxyNameOf: async (id) => (id === issuesId ? 'issues' : undefined),
     },
@@ -65,7 +65,7 @@ describe.skipIf(!available)('gateway module', () => {
   test('放行表：默认开放、定向授权、平台 API、未知调用方、未知主机', async () => {
     const doc = await gateway.api.rebuildAllowlist();
     expect(doc.version).toBe(1);
-    expect(doc.entries.find((e) => e.caller === 'demo/demo')?.operations).toEqual(['issues:POST:/v1/issues']);
+    expect(doc.entries.find((e) => e.caller === 'demo/demo')?.operations).toEqual(['01a0bf5d-8f4b-7155-8e96-d9844e02dfa4']);
     const at = (method: string, path: string, host = 'api.svc.cs.internal') => gateway.api.evaluate(caller, { host, method, path });
     expect((await at('GET', '/api/issues/v1/issues/42?x=1')).allowed).toBe(true);
     expect((await at('POST', '/api/issues/v1/issues')).allowed).toBe(true);

@@ -8,7 +8,7 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 CONSOLE_URL="${CS_CONSOLE_URL:-http://console.cs.localhost}"
-SERVICE_PLAN="${CS_SERVICE_PLAN:-standard-small}"
+SERVICE_PLAN_ID="${CS_SERVICE_PLAN_ID:-01a0bf5d-8f4b-7000-9e4b-b54e91ee9d10}"
 BRANCH="${CS_BRANCH:-main}"
 # 集群内访问 GitLab 的地址；与 deploy/k8s/platform/10-config.yaml 的 CS_GITLAB_URL 一致。
 IN_CLUSTER_GITLAB="${CS_IN_CLUSTER_GITLAB_URL:-http://host.docker.internal:8929}"
@@ -57,8 +57,8 @@ login() {
 ensure_service_plan() {
   local code
   code="$(api GET /v1/catalog/service-plans)"
-  if [ "${code}" = "200" ] && jq -e --arg n "${SERVICE_PLAN}" '.items[]? | select(.name==$n)' "${BODY}" >/dev/null; then
-    log "服务套餐 ${SERVICE_PLAN} 已存在"
+  if [ "${code}" = "200" ] && jq -e --arg n "${SERVICE_PLAN_ID}" '.items[]? | select(.id==$n)' "${BODY}" >/dev/null; then
+    log "服务套餐 ${SERVICE_PLAN_ID} 已存在"
     return 0
   fi
   log "平台目录是空的，先跑 seed-catalog.sh"
@@ -100,7 +100,7 @@ ensure_project() {
     return 0
   fi
   jq -nc --arg s "${slug}" --arg n "${name}" --arg k "${kind}" --arg o "${ADMIN_USER_ID}" \
-    '{slug:$s,name:$n,kind:$k,ownerUserId:$o,template:"minimal-sample"}' > "${REQ}"
+    '{slug:$s,name:$n,kind:$k,ownerUserId:$o,template:(if $k=="EventProducer" then "01a0bf5d-8f4b-7004-9cf7-0eb8bf66ffbc" else "01a0bf5d-8f4b-7003-9dbe-4adc78f388e9" end)}' > "${REQ}"
   code="$(api POST /v1/projects with-body)"
   [ "${code}" = "201" ] || die "建项目 ${slug} 失败：HTTP ${code} $(detail)"
   PROJECT_ID="$(jq -r '.id' "${BODY}")"
@@ -133,11 +133,18 @@ wait_active() {
 set_config() {
   local project="$1" name="$2" value_var="$3" is_secret="$4" code kind='配置项'
   [ "${is_secret}" = "true" ] && kind='密钥'
-  CS_CONFIG_VALUE="${!value_var}" jq -nc --arg n "${name}" --argjson s "${is_secret}" \
-    '{name:$n,env:"production",value:$ENV.CS_CONFIG_VALUE,isSecret:$s}' > "${REQ}"
+  local definition item version method='POST' endpoint="/v1/projects/${project}/config/production"
+  [ "$(api GET "/v1/projects/${project}/config-definitions")" = "200" ] || die "查询配置定义失败"
+  definition="$(jq -r --arg n "${name}" '[.items[]? | select(.bindingName==$n)] | first | .id // empty' "${BODY}")"
+  [ "$(api GET "${endpoint}")" = "200" ] || die "查询生产配置失败"
+  item="$(jq -r --arg d "${definition}" '[.items[]? | select(.definitionId==$d)] | first | .id // empty' "${BODY}")"
+  version="$(jq -r --arg i "${item}" '[.items[]? | select(.id==$i)] | first | .version // 0' "${BODY}")"
+  if [ -n "${item}" ]; then method='PUT'; endpoint="${endpoint}/${item}"; fi
+  CS_CONFIG_VALUE="${!value_var}" jq -nc --arg n "${name}" --arg d "${definition}" --argjson v "${version}" --argjson s "${is_secret}" \
+    '{name:$n,bindingName:$n,env:"production",value:$ENV.CS_CONFIG_VALUE,isSecret:$s} + (if $d!="" then {definitionId:$d} else {} end) + (if $v>0 then {expectedVersion:$v} else {} end)' > "${REQ}"
   chmod 600 "${REQ}"
-  code="$(api PUT "/v1/projects/${project}/config/production" with-body)"
-  [ "${code}" = "200" ] || die "写生产配置 ${name} 失败：HTTP ${code} $(detail)"
+  code="$(api "${method}" "${endpoint}" with-body)"
+  [ "${code}" = "200" ] || [ "${code}" = "201" ] || die "写生产配置 ${name} 失败：HTTP ${code} $(detail)"
   log "  生产 ${kind} ${name} 已写入，值未打印"
 }
 
@@ -162,9 +169,14 @@ push_source() {
   remote="${GITLAB_URL}/${path}.git"
   work="${TMP}/$(printf '%s' "${path}" | tr '/' '-')"
   git_cs clone --quiet --branch "${branch}" "${remote}" "${work}" || die "克隆 ${remote} 失败"
-  # 整目录替换而不是叠加：仓库里现有的模板文件要消失，才算真把源码同步过去。
+  # 项目 Manifest 已绑定独立资源 UUID；旧源码通过显式升级接口生成当前格式。
+  jq -n --rawfile content "${work}/crewstation.yaml" '{content:$content}' > "${REQ}"
+  [ "$(api POST "/v1/services/${service}/manifest-upgrade" with-body)" = "200" ] || die "项目 Manifest 升级失败：$(detail)"
+  jq -r '.content' "${BODY}" > "${TMP}/project-manifest.yaml"
+  # 同步实现代码，保留此项目的资源绑定。
   find "${work}" -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
   tar -C "${src}" --exclude=node_modules --exclude=.git -cf - . | tar -C "${work}" -xf -
+  cp "${TMP}/project-manifest.yaml" "${work}/crewstation.yaml"
   git_cs -C "${work}" add -A
   if git_cs -C "${work}" diff --cached --quiet; then
     log "  源码与仓库一致，不产生新提交"

@@ -1,3 +1,5 @@
+import { computeId } from './computeFixture';
+import { computeSelector } from './computeFixture';
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import type { Actor, AgentEvent, ProjectId, RunnerCommand, RunnerEvent, ServiceId, TaskId, UserId } from '@crewstation/contracts';
 import { fixedClock } from '@crewstation/kernel';
@@ -13,10 +15,10 @@ import { fakeComputeCatalog } from './computeFixture';
 const available = await testDatabaseAvailable();
 let tdb: TestDatabase;
 let dev: DevSessionModule;
-const projectId = 'prj_0123456789abcdef0123456789abcdef' as ProjectId;
-const serviceId = 'svc_0123456789abcdef0123456789abcdef' as ServiceId;
-const owner: Actor = { userId: 'usr_0123456789abcdef0123456789abcdef' as UserId, isAdmin: false };
-const developer: Actor = { userId: 'usr_1123456789abcdef0123456789abcdef' as UserId, isAdmin: false };
+const projectId = '01a0bf5d-8f4b-7178-82e1-9a99060b1192' as ProjectId;
+const serviceId = '01a0bf5d-8f4b-76c5-866c-f1feda3d63bb' as ServiceId;
+const owner: Actor = { userId: '01a0bf5d-8f4b-7793-867c-efd7527b386b' as UserId, isAdmin: false };
+const developer: Actor = { userId: '01a0bf5d-8f4b-7a4e-8eb2-04fca5c047bf' as UserId, isAdmin: false };
 const envs = new Map<string, EnvironmentView & { createdBy: UserId; preview?: { command: string[]; port: number; healthPath: string } }>();
 /** RFC-006：每个 headless Agent 一个执行环境；这里假定子 Runner 立即连上。 */
 const executions = new Map<string, EnvironmentView>();
@@ -27,7 +29,7 @@ const notices: string[] = [];
 const issued: Array<{ taskId: TaskId; projectId: ProjectId; serviceId: ServiceId; userId: UserId }> = [];
 let dirty = '';
 const published: unknown[] = [];
-const manifest = 'apiVersion: crewstation/v1\nkind: DigitalWorker\nspec:\n  service: { command: [bun, run, src/main.ts], port: 3000, healthPath: /healthz, plan: standard-small }\n  development: { command: [bun, run, --watch, src/main.ts], port: 3000 }\n';
+const manifest = 'apiVersion: crewstation/v2\nkind: DigitalWorker\nspec:\n  service: { command: [bun, run, src/main.ts], port: 3000, healthPath: /healthz, servicePlanId: 01a0bf5d-8f4b-7000-9e4b-b54e91ee9d10 }\n  development: { command: [bun, run, --watch, src/main.ts], port: 3000 }\n';
 /** RFC-001 之前的写法：老仓库里还有一大堆。 */
 const legacyManifest = `${manifest}  tasks:\n    profile: coding-medium\n    agentProfiles: [{ name: chat-v1, driver: stub, model: stub/echo, permission: read-only }]\n`;
 let manifestText = manifest;
@@ -48,7 +50,7 @@ beforeAll(async () => {
       getRebuild: async () => undefined,
       inspectRebuild: async () => { throw new Error("恢复预检未设置"); },
       requestRebuild: async () => { throw new Error("恢复请求未设置"); },
-      createEnvironment: async (input) => { const env = { id: `tsk_${Bun.randomUUIDv7().replace(/-/g, '')}` as TaskId, projectId, serviceId: input.serviceId, state: 'running' as const, podName: 'task-x', connected: true, branch: input.branch, traceId: 'trace', createdAt: new Date().toISOString(), lastActivityAt: new Date('2026-09-11T00:00:00Z').toISOString(), createdBy: input.createdBy, preview: input.preview }; envs.set(env.id, env); return env; },
+      createEnvironment: async (input) => { const env = { id: Bun.randomUUIDv7() as TaskId, projectId, serviceId: input.serviceId, state: 'running' as const, podName: 'task-x', connected: true, branch: input.branch, traceId: 'trace', createdAt: new Date().toISOString(), lastActivityAt: new Date('2026-09-11T00:00:00Z').toISOString(), createdBy: input.createdBy, preview: input.preview }; envs.set(env.id, env); return env; },
       releaseEnvironment: async (taskId) => { const env = envs.get(taskId)!; envs.delete(taskId); return { ...env, state: 'released' }; },
       getEnvironment: async (taskId) => envs.get(taskId) ?? executions.get(taskId),
       findDevSession: async (_projectId, options) => [...envs.values()].find((env) => ['creating', 'running', 'releasing'].includes(env.state)) ?? (options?.includeLatestFailure ? [...envs.values()].at(-1) : undefined),
@@ -66,13 +68,13 @@ beforeAll(async () => {
         return {};
       },
       listEvents: async () => agentEvents ?? [
-        { seq: 1, at: new Date().toISOString(), event: { kind: 'agent', event: { agentId: 'agt_1', seq: 0, at: new Date().toISOString(), type: 'started', spec: { compute: 'balanced', profileRevision: 1, protocol: 'claude-code', model: 'anthropic/claude-sonnet-5', permission: 'read-only' } } } },
-        { seq: 2, at: new Date().toISOString(), event: { kind: 'agent', event: { agentId: 'agt_1', seq: 1, at: new Date().toISOString(), type: 'completed', sessionId: 's1' } } },
-        { seq: 3, at: new Date().toISOString(), event: { kind: 'agent', event: { agentId: 'agt_2', seq: 0, at: new Date().toISOString(), type: 'text', text: '没有 started 事件' } } },
+        { seq: 1, at: new Date().toISOString(), event: { kind: 'agent', event: { agentId: '01a0bf5d-8f4b-7aaa-86ba-278f66412c7f', seq: 0, at: new Date().toISOString(), type: 'started', spec: { compute: computeId('balanced'), profileRevision: 1, protocol: 'claude-code', model: 'anthropic/claude-sonnet-5', permission: 'read-only' } } } },
+        { seq: 2, at: new Date().toISOString(), event: { kind: 'agent', event: { agentId: '01a0bf5d-8f4b-7aaa-86ba-278f66412c7f', seq: 1, at: new Date().toISOString(), type: 'completed', sessionId: 's1' } } },
+        { seq: 3, at: new Date().toISOString(), event: { kind: 'agent', event: { agentId: '01a0bf5d-8f4b-7519-855a-71aee3eae874', seq: 0, at: new Date().toISOString(), type: 'text', text: '没有 started 事件' } } },
       ],
     },
     scm: { listBranches: async (_s, compare) => [{ name: 'main', headSha: 'abc', isDefault: true, behindPreview: compare.previewSha ? 2 : null, behindProd: null }], pushUrl: async () => ({ url: 'http://oauth2:secret@gitlab/demo.git', expiresAt: new Date().toISOString() }), readFile: async () => manifestText },
-    releases: { publish: async (_a, _s, input) => { published.push(input); return { id: 'rel_0123456789abcdef0123456789abcdef', serviceId, tag: 'v0.1.1', commitSha: 'abc', branch: input.branch, status: 'pending', createdBy: owner.userId, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() } as never; }, getSlots: async () => [{ name: 'preview', active: false, commitSha: 'p1', replicas: 1, readyReplicas: 1, state: 'ready', host: 'preview.demo.cs.localhost' }, { name: 'prod', active: true, replicas: 0, readyReplicas: 0, state: 'empty', host: 'demo.cs.localhost' }] },
+    releases: { publish: async (_a, _s, input) => { published.push(input); return { id: '01a0bf5d-8f4b-7fe7-81b4-3ca489d1f621', serviceId, tag: 'v0.1.1', commitSha: 'abc', branch: input.branch, status: 'pending', createdBy: owner.userId, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() } as never; }, getSlots: async () => [{ name: 'preview', active: false, commitSha: 'p1', replicas: 1, readyReplicas: 1, state: 'ready', host: 'preview.demo.cs.localhost' }, { name: 'prod', active: true, replicas: 0, readyReplicas: 0, state: 'empty', host: 'demo.cs.localhost' }] },
     authorizer: { authorize: async (actor, _p, action) => { if (action === 'force-release-session' && actor.userId !== owner.userId) throw new Error('forbidden'); }, ownerOf: async () => owner.userId },
     services: { resolveServiceOfProject: async () => ({ serviceId, slug: 'demo', name: 'demo' }) },
     notifier: { notify: async (_p, users, message) => { notices.push(`${users.length}:${message}`); } },
@@ -95,7 +97,7 @@ describe.skipIf(!available)('dev-session module', () => {
     expect((await dev.api.getSession(developer, projectId))?.preview).toBe('ready');
     expect((await dev.api.listBranches(developer, projectId))[0]).toMatchObject({ name: 'main', behindPreview: 2 });
 
-    const agent = await dev.api.startAgent(developer, created.id, { compute: 'balanced', permission: 'edit', prompt: '你好' });
+    const agent = await dev.api.startAgent(developer, created.id, { compute: computeSelector('balanced'), permission: 'edit', prompt: '你好' });
     expect(agent.execution).toMatchObject({ state: 'running' });
     await dev.api.dispatchPendingNativeExecution(agent.execution!.taskId);
     const start = commands.find((c) => c.type === 'startAgent');
@@ -106,11 +108,11 @@ describe.skipIf(!available)('dev-session module', () => {
     await dev.api.sendMessage(developer, created.id, agent.agentId, { content: '继续' });
     const listed = await dev.api.listAgents(developer, created.id);
     // 档位与权限来自 started 事件的 spec，不是编出来的；租户面不返回厂商与模型（RFC-001）。
-    expect(listed[0]).toMatchObject({ agentId: 'agt_1', state: 'completed', sessionId: 's1', compute: 'balanced', permission: 'read-only', profileRevision: 1 });
+    expect(listed[0]).toMatchObject({ agentId: '01a0bf5d-8f4b-7aaa-86ba-278f66412c7f', state: 'completed', sessionId: 's1', compute: computeId('balanced'), permission: 'read-only', profileRevision: 1 });
     expect(listed[0]).not.toHaveProperty('model');
     expect(listed[0]).not.toHaveProperty('driver');
     // 没有 started 事件时留最小权限的占位，绝不谎称 edit。
-    expect(listed[1]).toMatchObject({ agentId: 'agt_2', permission: 'read-only', compute: '' });
+    expect(listed[1]).toMatchObject({ agentId: '01a0bf5d-8f4b-7519-855a-71aee3eae874', permission: 'read-only', compute: '' });
 
     dirty = ' M src/main.ts\n?? new.ts\n';
     await expect(dev.api.publish(developer, projectId, { branch: 'main', version: 'patch' })).rejects.toMatchObject({ kind: 'precondition', details: { uncommitted: ['src/main.ts', 'new.ts'] } });
@@ -146,16 +148,16 @@ describe.skipIf(!available)('dev-session module', () => {
     };
     // 省略 compute → 解析到管理员设为默认的档位，命令带上固定修订与 launch（显式二进制）。
     await startAndDispatch({ permission: 'edit', prompt: '用默认档' });
-    expect(commands.find((c) => c.type === 'startAgent')).toMatchObject({ compute: 'balanced', profileRevision: 1, launch: { protocol: 'claude-code', binaryPath: '/usr/local/bin/claude', model: 'anthropic/claude-sonnet-5' }, beforeStart: { profile: 'balanced', revision: 1 } });
+    expect(commands.find((c) => c.type === 'startAgent')).toMatchObject({ compute: computeId('balanced'), profileRevision: 1, launch: { protocol: 'claude-code', binaryPath: '/usr/local/bin/claude', model: 'anthropic/claude-sonnet-5' }, beforeStart: { profile: computeId('balanced'), revision: 1 } });
     commands.length = 0;
-    await startAndDispatch({ compute: 'default', permission: 'edit', prompt: '显式 default' });
-    expect(commands.find((c) => c.type === 'startAgent')).toMatchObject({ compute: 'balanced' });
+    await startAndDispatch({ compute: computeSelector('default'), permission: 'edit', prompt: '显式 default' });
+    expect(commands.find((c) => c.type === 'startAgent')).toMatchObject({ compute: computeId('balanced') });
 
     // 不存在的档位：报错里要列出可选项，否则调用方只能去猜。
-    const bad = await dev.api.startAgent(developer, created.id, { compute: 'nope', permission: 'edit', prompt: 'x' }).catch((e: unknown) => e);
-    expect(bad).toMatchObject({ kind: 'validation', details: { available: ['balanced', 'term-cli'] } });
+    const bad = await dev.api.startAgent(developer, created.id, { compute: computeSelector('nope'), permission: 'edit', prompt: 'x' }).catch((e: unknown) => e);
+    expect(bad).toMatchObject({ kind: 'validation', details: { available: [computeId('balanced'), computeId('term-cli')] } });
     // 通用终端档位只能用于「＋ CLI」（C6）。
-    await expect(dev.api.startAgent(developer, created.id, { compute: 'term-cli', permission: 'edit', prompt: 'x' })).rejects.toMatchObject({ kind: 'validation', details: { code: 'terminal_profile_not_allowed' } });
+    await expect(dev.api.startAgent(developer, created.id, { compute: computeSelector('term-cli'), permission: 'edit', prompt: 'x' })).rejects.toMatchObject({ kind: 'validation', details: { code: 'terminal_profile_not_allowed' } });
 
     // 默认档没配置时报 precondition，不静默挑一档——静默挑会让业务以为自己拿到了预期算力。
     computeProfiles[0]!.isDefault = false;
@@ -173,9 +175,9 @@ describe.skipIf(!available)('dev-session module', () => {
       expect(session.state).toBe('running');
       expect(session.message).toContain('Unrecognized keys');
       // 错误要能照着改：指出换成 compute，并说去哪儿看可用档位。
-      expect(session.message).toContain('compute: <档位名>');
+      expect(session.message).toContain('compute: { kind: profile, profileId: <UUIDv7> }');
       expect(session.message).toContain('算力档位');
-      expect(session.message).toContain('compute: default');
+      expect(session.message).toContain('compute: { kind: default }');
       // 没有预览配置：开发容器不会拿着半截 Manifest 去起预览。
       expect([...envs.values()].at(-1)?.preview).toBeUndefined();
     } finally {
@@ -210,16 +212,16 @@ describe.skipIf(!available)('dev-session module', () => {
     const append = (event: Omit<AgentEvent, 'agentId' | 'seq' | 'at'>) => {
       const seq = agentEvents!.length;
       const at = new Date(Date.UTC(2026, 8, 14, 17, 36, seq)).toISOString();
-      agentEvents!.push({ seq, at, event: { kind: 'agent', event: { agentId: 'agt_history', seq, at, ...event } } });
+      agentEvents!.push({ seq, at, event: { kind: 'agent', event: { agentId: '01a0bf5d-8f4b-7a44-812d-6739541a37c9', seq, at, ...event } } });
       return at;
     };
     try {
-      const startedAt = append({ type: 'started', spec: { compute: 'qa-opencode', profileRevision: 3, protocol: 'opencode', model: 'opencode/big-pickle', permission: 'read-only' } });
+      const startedAt = append({ type: 'started', spec: { compute: computeId('qa-opencode'), profileRevision: 3, protocol: 'opencode', model: 'opencode/big-pickle', permission: 'read-only' } });
       append({ type: 'session', sessionId: 'ses_history' });
       append({ type: 'text', text: 'RFC003_HISTORY_ONE' });
       append({ type: 'status', status: 'waiting' });
       // 实机两轮均发出 waiting，但原投影把所有 status 当 running，页面一直显示执行中。
-      const identity = { agentId: 'agt_history', taskId: session.taskId, sessionId: 'ses_history', compute: 'qa-opencode', permission: 'read-only', profileRevision: 3, startedAt } as const;
+      const identity = { agentId: '01a0bf5d-8f4b-7a44-812d-6739541a37c9', taskId: session.taskId, sessionId: 'ses_history', compute: computeId('qa-opencode'), permission: 'read-only', profileRevision: 3, startedAt } as const;
       expect(await dev.api.listAgents(developer, session.taskId)).toEqual([{ ...identity, state: 'awaiting-input' }]);
 
       for (const status of ['diagnostic information', undefined]) {

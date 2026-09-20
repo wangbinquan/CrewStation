@@ -1,12 +1,12 @@
 import type { Actor, EgressRequestPage, ProjectDto, RequestPageQuery } from '@crewstation/contracts';
-import { EgressRequestPageSchema, RequestPageQuerySchema, RequestProjectSchema } from '@crewstation/contracts';
+import { EgressRequestPageSchema, RequestPageQuerySchema, RequestProjectSchema, ResourceIdSchema } from '@crewstation/contracts';
 import { validation } from '@crewstation/kernel';
 import { z } from 'zod';
 import type { EgressUseCaseDeps } from './dependencies';
 import { requestToDto } from './toDto';
 
 const scopeOf = (actor: Actor, q: RequestPageQuery) => JSON.stringify(['egress-requests-v1', actor.userId, actor.isAdmin, q.projectId ?? null, q.state]);
-const cursorSchema = z.object({ scope: z.string(), before: z.object({ id: z.string().regex(/^egq_[0-9a-f]{32}$/), createdAt: z.iso.datetime() }) });
+const cursorSchema = z.object({ scope: z.string(), before: z.object({ id: ResourceIdSchema, createdAt: z.iso.datetime() }) });
 function beforeCursor(actor: Actor, query: RequestPageQuery) {
   if (!query.cursor) return undefined;
   try {

@@ -13,10 +13,10 @@ describe('Result', () => {
 });
 
 describe('ids', () => {
-  test('带前缀且时间有序', () => {
+  test('完整 UUIDv7 且时间有序', () => {
     const a = newId('prj');
     const b = newId('prj');
-    expect(a.startsWith('prj_')).toBe(true);
+    expect(a).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
     expect(a < b).toBe(true);
   });
   test('traceId 为 32 位十六进制', () => {

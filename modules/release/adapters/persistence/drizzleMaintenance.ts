@@ -26,7 +26,7 @@ export function drizzleMaintenance(db: Executor): MaintenanceRepository {
       result.push(...slots.flatMap((s) => (['blue', 'green'] as const).map((physical): ClusterSlotProjection => {
         const slot = json<SlotState>(s[physical]), release = versions.find((r) => r.id === slot.releaseId), manifest = release?.manifest ? json<Manifest>(release.manifest) : undefined;
         const override = overrides.find((o) => o.serviceId === s.serviceId && o.physical === physical)?.replicas;
-        return { serviceId: s.serviceId, physical, role: s.active === physical ? 'prod' : 'preview', state: slot.state, revision: JSON.stringify([s.active, slot.releaseId, slot.state, override, release?.configVersion]), ...(slot.releaseId ? { releaseId: slot.releaseId } : {}), ...(manifest ? { manifestReplicas: manifest.spec.service.replicas, plan: manifest.spec.service.plan } : {}), ...(override === undefined ? {} : { overrideReplicas: override }) };
+        return { serviceId: s.serviceId, physical, role: s.active === physical ? 'prod' : 'preview', state: slot.state, revision: JSON.stringify([s.active, slot.releaseId, slot.state, override, release?.configVersion]), ...(slot.releaseId ? { releaseId: slot.releaseId } : {}), ...(manifest ? { manifestReplicas: manifest.spec.service.replicas, plan: manifest.spec.service.servicePlanId } : {}), ...(override === undefined ? {} : { overrideReplicas: override }) };
       })));
       if (slots.length < 500) return result;
       after = slots.at(-1)!.serviceId;

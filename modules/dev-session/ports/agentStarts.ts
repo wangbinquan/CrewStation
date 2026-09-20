@@ -9,8 +9,9 @@ export interface AgentStart {
   /** 父开发会话。 */
   readonly taskId: TaskId;
   readonly createdBy: UserId;
-  /** 解析后的档位名（`default` 已换成真实名称）。 */
+  /** 解析后的算力档位 UUID。 */
   readonly compute: string;
+  readonly computeName?: string;
   readonly profile: ProfileRevisionRef;
   readonly permission: AgentPermission;
   readonly request: { readonly prompt: string; readonly cwd?: string; readonly resumeSessionId?: string };
@@ -29,6 +30,7 @@ export interface AgentStart {
 }
 
 export interface AgentStartRepository {
+  reserveRestart(operationId: string): Promise<{ agentId: string; taskId: TaskId }>;
   insert(start: AgentStart): Promise<void>;
   get(agentId: string): Promise<AgentStart | undefined>;
   findByExecution(executionTaskId: TaskId): Promise<AgentStart | undefined>;

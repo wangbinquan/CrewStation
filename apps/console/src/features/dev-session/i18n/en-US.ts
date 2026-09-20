@@ -2,6 +2,11 @@ import type { MessagesShapedLike } from '../../../shared/lib/i18n';
 import type { messages as zhCN } from './zh-CN';
 
 export const messages: MessagesShapedLike<typeof zhCN> = {
+  'devSession.editor.upgradeHint': 'This file uses legacy resource names. Preview the UUID upgrade and apply it to the current draft. Saving still checks the file version.',
+  'devSession.editor.upgradePreview': 'Preview resource upgrade',
+  'devSession.editor.upgradeChanges': 'Review {count} changes',
+  'devSession.editor.upgradeStale': 'The draft has changed. Generate a new preview.',
+  'devSession.editor.upgradeApply': 'Apply to draft',
   "devSession.navigation": "Development session features",
   "devSession.native.view.cli": "CLI workspace",
   "devSession.native.view.data": "Data access",

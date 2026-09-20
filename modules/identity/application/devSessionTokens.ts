@@ -1,3 +1,4 @@
+import { normalizeVerifiedIdentity } from './verifiedIdentity';
 import type { DevSessionBinding, IssuedDevSessionToken, ResolvedDevSession } from '../api/moduleApi';
 import {
   DEV_SESSION_AUDIENCE, DEV_SESSION_TOKEN_TTL_SECONDS, devSessionClaims, devSessionGrantFrom, devSessionSubject,
@@ -5,13 +6,13 @@ import {
 import type { IdentityUseCaseDeps } from './dependencies';
 import { toDto } from './ensureUser';
 
-type Deps = Pick<IdentityUseCaseDeps, 'tokens' | 'users' | 'devSessions' | 'clock'>;
+type Deps = Pick<IdentityUseCaseDeps, 'tokens' | 'users' | 'devSessions' | 'clock' | 'legacyIds'>;
 
 /**
  * 开发会话令牌：Agent 连远程 MCP 用的唯一凭据（Design §5.9）。它不是通用的用户令牌——
  * 代表的是“某人在某个项目的某个开发会话里”，会话一释放就作废。
  */
-export function devSessionTokenUseCases({ tokens, users, devSessions, clock }: Deps) {
+export function devSessionTokenUseCases({ tokens, users, devSessions, clock, legacyIds }: Deps) {
   return {
     issueDevSessionToken: async (binding: DevSessionBinding): Promise<IssuedDevSessionToken> => {
       const token = await tokens.sign({
@@ -24,7 +25,7 @@ export function devSessionTokenUseCases({ tokens, users, devSessions, clock }: D
       return { token, expiresAt: expiresAt.toISOString() };
     },
     resolveDevSessionToken: async (token: string): Promise<ResolvedDevSession | undefined> => {
-      const verified = await tokens.verify(token, { audience: DEV_SESSION_AUDIENCE });
+      const verified = await normalizeVerifiedIdentity(await tokens.verify(token, { audience: DEV_SESSION_AUDIENCE }), legacyIds);
       if (!verified) return undefined;
       const binding = devSessionGrantFrom(verified.subject, verified.claims);
       if (!binding) return undefined;

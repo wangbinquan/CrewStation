@@ -10,7 +10,7 @@ import type { IdentityModule } from '../wiring';
 import { createIdentityModule, identityMigrations } from '../wiring';
 
 const available = await testDatabaseAvailable();
-const projectId = 'prj_0123456789abcdef0123456789abcdef' as ProjectId;
+const projectId = '01a0bf5d-8f4b-7178-82e1-9a99060b1192' as ProjectId;
 let tdb: TestDatabase;
 let identity: IdentityModule;
 let app: Hono<AppEnv>;
@@ -41,7 +41,7 @@ describe.skipIf(!available)('user routes (cs-api)', () => {
     expect(await me.json()).toEqual({ id: memberId, name: 'Member', email: 'member@example.com', platformRole: 'user', isAdmin: false, memberships: [{ projectId, role: 'developer' }], authMethod: 'password' });
     expect(await (await app.request('/v1/me', { headers: { ...asUser(adminId), 'x-cs-auth-method': 'oidc' } })).json()).toMatchObject({ isAdmin: true, memberships: [], authMethod: 'oidc' });
     expect((await app.request('/v1/me')).status).toBe(401);
-    expect((await app.request('/v1/me', { headers: asUser('usr_ffffffffffffffffffffffffffffffff') })).status).toBe(401);
+    expect((await app.request('/v1/me', { headers: asUser('01a0bf5d-8f4b-72ed-8b3d-1ceb06a30ca3') })).status).toBe(401);
   });
 
   test('用户目录与管理员标记只有管理员可用', async () => {
@@ -55,7 +55,7 @@ describe.skipIf(!available)('user routes (cs-api)', () => {
     expect(await identity.api.isAdmin(memberId)).toBe(true);
     const bad = await app.request(`/v1/users/${memberId}/admin`, { method: 'PUT', headers: { ...asUser(adminId), 'content-type': 'application/json' }, body: JSON.stringify({ isAdmin: 'yes' }) });
     expect(bad.status).toBe(400);
-    const missing = await app.request('/v1/users/usr_ffffffffffffffffffffffffffffffff/admin', { method: 'PUT', headers: { ...asUser(adminId), 'content-type': 'application/json' }, body: JSON.stringify({ isAdmin: true }) });
+    const missing = await app.request('/v1/users/01a0bf5d-8f4b-72ed-8b3d-1ceb06a30ca3/admin', { method: 'PUT', headers: { ...asUser(adminId), 'content-type': 'application/json' }, body: JSON.stringify({ isAdmin: true }) });
     expect(missing.status).toBe(404);
   });
 });

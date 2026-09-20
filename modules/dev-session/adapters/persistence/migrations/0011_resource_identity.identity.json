@@ -1,0 +1,617 @@
+{
+  "version": "resource-identity/v1",
+  "schema": "dev_session",
+  "entities": [
+    {
+      "table": "agent_starts",
+      "kind": "agent",
+      "keys": [
+        "agent_id"
+      ],
+      "idColumn": "agent_id"
+    },
+    {
+      "table": "native_terminal_starts",
+      "kind": "agent",
+      "keys": [
+        "agent_id"
+      ],
+      "idColumn": "agent_id"
+    },
+    {
+      "table": "native_activity_items",
+      "kind": "native-activity-event",
+      "keys": [
+        "event_id"
+      ],
+      "idColumn": "event_id"
+    },
+    {
+      "table": "cluster_agent_restarts",
+      "kind": "cluster-operation",
+      "keys": [
+        "operation_id"
+      ],
+      "idColumn": "operation_id"
+    },
+    {
+      "table": "cluster_agent_restarts",
+      "kind": "agent",
+      "keys": [
+        "agent_id"
+      ],
+      "idColumn": "agent_id"
+    },
+    {
+      "table": "cluster_agent_restarts",
+      "kind": "task",
+      "keys": [
+        "task_id"
+      ],
+      "idColumn": "task_id"
+    }
+  ],
+  "references": [
+    {
+      "table": "agent_starts",
+      "column": "task_id",
+      "kind": "task",
+      "keys": [
+        "task_id"
+      ]
+    },
+    {
+      "table": "agent_starts",
+      "column": "created_by",
+      "kind": "user",
+      "keys": [
+        "created_by"
+      ]
+    },
+    {
+      "table": "agent_starts",
+      "column": "execution_task_id",
+      "kind": "task",
+      "keys": [
+        "execution_task_id"
+      ],
+      "nullable": true
+    },
+    {
+      "table": "native_terminal_starts",
+      "column": "task_id",
+      "kind": "task",
+      "keys": [
+        "task_id"
+      ]
+    },
+    {
+      "table": "native_terminal_starts",
+      "column": "created_by",
+      "kind": "user",
+      "keys": [
+        "created_by"
+      ]
+    },
+    {
+      "table": "native_terminal_starts",
+      "column": "execution_task_id",
+      "kind": "task",
+      "keys": [
+        "execution_task_id"
+      ],
+      "nullable": true
+    },
+    {
+      "table": "agent_starts",
+      "column": "compute",
+      "kind": "compute-profile",
+      "keys": [
+        "compute"
+      ]
+    },
+    {
+      "table": "idle_reminders",
+      "column": "task_id",
+      "kind": "task",
+      "keys": [
+        "task_id"
+      ]
+    },
+    {
+      "table": "workspace_layouts",
+      "column": "task_id",
+      "kind": "task",
+      "keys": [
+        "task_id"
+      ]
+    },
+    {
+      "table": "native_activity_progress",
+      "column": "task_id",
+      "kind": "task",
+      "keys": [
+        "task_id"
+      ]
+    },
+    {
+      "table": "native_activity_sources",
+      "column": "task_id",
+      "kind": "task",
+      "keys": [
+        "task_id"
+      ]
+    },
+    {
+      "table": "native_activity_states",
+      "column": "task_id",
+      "kind": "task",
+      "keys": [
+        "task_id"
+      ]
+    },
+    {
+      "table": "native_activity_items",
+      "column": "task_id",
+      "kind": "task",
+      "keys": [
+        "task_id"
+      ]
+    },
+    {
+      "table": "native_activity_reads",
+      "column": "task_id",
+      "kind": "task",
+      "keys": [
+        "task_id"
+      ]
+    },
+    {
+      "table": "workspace_layouts",
+      "column": "user_id",
+      "kind": "user",
+      "keys": [
+        "user_id"
+      ]
+    },
+    {
+      "table": "native_activity_sources",
+      "column": "source_task_id",
+      "kind": "task",
+      "keys": [
+        "source_task_id"
+      ]
+    },
+    {
+      "table": "native_activity_states",
+      "column": "agent_id",
+      "kind": "agent",
+      "keys": [
+        "agent_id"
+      ]
+    },
+    {
+      "table": "native_activity_items",
+      "column": "agent_id",
+      "kind": "agent",
+      "keys": [
+        "agent_id"
+      ]
+    },
+    {
+      "table": "native_activity_reads",
+      "column": "agent_id",
+      "kind": "agent",
+      "keys": [
+        "agent_id"
+      ]
+    },
+    {
+      "table": "native_activity_reads",
+      "column": "user_id",
+      "kind": "user",
+      "keys": [
+        "user_id"
+      ]
+    }
+  ],
+  "documents": [
+    {
+      "table": "agent_starts",
+      "column": "profile",
+      "references": [
+        {
+          "path": "profile",
+          "kind": "compute-profile",
+          "rename": "profileId"
+        }
+      ]
+    },
+    {
+      "table": "native_terminal_starts",
+      "column": "profile",
+      "references": [
+        {
+          "path": "profile",
+          "kind": "compute-profile",
+          "rename": "profileId"
+        }
+      ]
+    },
+    {
+      "table": "agent_starts",
+      "column": "execution",
+      "references": [
+        {
+          "path": "taskId",
+          "kind": "task"
+        },
+        {
+          "path": "previousTaskId",
+          "kind": "task"
+        },
+        {
+          "path": "taskProfile",
+          "kind": "task-profile"
+        },
+        {
+          "path": "runnerId",
+          "kind": "runner"
+        }
+      ]
+    },
+    {
+      "table": "native_terminal_starts",
+      "column": "execution",
+      "references": [
+        {
+          "path": "taskId",
+          "kind": "task"
+        },
+        {
+          "path": "previousTaskId",
+          "kind": "task"
+        },
+        {
+          "path": "taskProfile",
+          "kind": "task-profile"
+        },
+        {
+          "path": "runnerId",
+          "kind": "runner"
+        }
+      ]
+    },
+    {
+      "table": "native_terminal_starts",
+      "column": "record",
+      "references": [
+        {
+          "path": "agentId",
+          "kind": "agent"
+        },
+        {
+          "path": "terminalId",
+          "kind": "terminal"
+        },
+        {
+          "path": "runnerId",
+          "kind": "runner"
+        },
+        {
+          "path": "compute",
+          "kind": "compute-profile"
+        },
+        {
+          "path": "beforeStart.executionId",
+          "kind": "before-start-execution"
+        }
+      ]
+    },
+    {
+      "table": "native_terminal_starts",
+      "column": "snapshot",
+      "references": [
+        {
+          "path": "agentId",
+          "kind": "agent"
+        },
+        {
+          "path": "terminalId",
+          "kind": "terminal"
+        },
+        {
+          "path": "runnerId",
+          "kind": "runner"
+        },
+        {
+          "path": "compute",
+          "kind": "compute-profile"
+        }
+      ]
+    },
+    {
+      "table": "native_terminal_starts",
+      "column": "input",
+      "references": [
+        {
+          "path": "compute",
+          "kind": "compute-profile",
+          "selector": {
+            "defaultValue": "default",
+            "valueKey": "profileId"
+          }
+        }
+      ]
+    },
+    {
+      "table": "native_activity_states",
+      "column": "projection",
+      "references": [
+        {
+          "path": "state.agentId",
+          "kind": "agent"
+        },
+        {
+          "path": "state.terminalId",
+          "kind": "terminal"
+        },
+        {
+          "path": "state.runnerId",
+          "kind": "runner"
+        },
+        {
+          "path": "state.pending.*.eventId",
+          "kind": "native-activity-event"
+        }
+      ]
+    },
+    {
+      "table": "native_activity_items",
+      "column": "item",
+      "references": [
+        {
+          "path": "agentId",
+          "kind": "agent"
+        },
+        {
+          "path": "terminalId",
+          "kind": "terminal"
+        },
+        {
+          "path": "runnerId",
+          "kind": "runner"
+        },
+        {
+          "path": "eventId",
+          "kind": "native-activity-event"
+        },
+        {
+          "path": "request.resolvedByEventId",
+          "kind": "native-activity-event"
+        }
+      ]
+    },
+    {
+      "table": "workspace_layouts",
+      "column": "legacy_layout",
+      "references": [
+        {
+          "path": "tabs.*.id",
+          "kind": "workspace-tab",
+          "keys": [
+            "$row.user_id",
+            "$row.task_id",
+            "$value"
+          ]
+        },
+        {
+          "path": "activeTabId",
+          "kind": "workspace-tab",
+          "keys": [
+            "$row.user_id",
+            "$row.task_id",
+            "$value"
+          ]
+        },
+        {
+          "path": "tabs.*.paneOrder.*",
+          "kind": "terminal",
+          "nullable": true
+        },
+        {
+          "path": "hiddenTerminalIds.*",
+          "kind": "terminal",
+          "nullable": true
+        },
+        {
+          "path": "selectedTerminalId",
+          "kind": "terminal",
+          "nullable": true
+        },
+        {
+          "path": "maximizedTerminalId",
+          "kind": "terminal",
+          "nullable": true
+        },
+        {
+          "path": "preferredCompute",
+          "kind": "compute-profile"
+        }
+      ],
+      "targetColumn": "layout",
+      "provenanceColumn": "identity_provenance"
+    }
+  ],
+  "inlineEntities": [
+    {
+      "table": "agent_starts",
+      "column": "execution",
+      "path": "runnerId",
+      "kind": "runner"
+    },
+    {
+      "table": "native_terminal_starts",
+      "column": "execution",
+      "path": "runnerId",
+      "kind": "runner"
+    },
+    {
+      "table": "native_terminal_starts",
+      "column": "record",
+      "path": "agentId",
+      "kind": "agent"
+    },
+    {
+      "table": "native_terminal_starts",
+      "column": "record",
+      "path": "terminalId",
+      "kind": "terminal"
+    },
+    {
+      "table": "native_terminal_starts",
+      "column": "record",
+      "path": "runnerId",
+      "kind": "runner"
+    },
+    {
+      "table": "native_terminal_starts",
+      "column": "record",
+      "path": "beforeStart.executionId",
+      "kind": "before-start-execution"
+    },
+    {
+      "table": "agent_starts",
+      "column": "execution",
+      "path": "taskId",
+      "kind": "task"
+    },
+    {
+      "table": "native_terminal_starts",
+      "column": "execution",
+      "path": "taskId",
+      "kind": "task"
+    },
+    {
+      "table": "workspace_layouts",
+      "column": "legacy_layout",
+      "path": "tabs.*.id",
+      "kind": "workspace-tab",
+      "keys": [
+        "$row.user_id",
+        "$row.task_id",
+        "$value"
+      ]
+    },
+    {
+      "table": "workspace_layouts",
+      "column": "legacy_layout",
+      "path": "tabs.*.paneOrder.*",
+      "kind": "terminal",
+      "nullable": true
+    },
+    {
+      "table": "workspace_layouts",
+      "column": "legacy_layout",
+      "path": "hiddenTerminalIds.*",
+      "kind": "terminal",
+      "nullable": true
+    },
+    {
+      "table": "workspace_layouts",
+      "column": "legacy_layout",
+      "path": "selectedTerminalId",
+      "kind": "terminal",
+      "nullable": true
+    },
+    {
+      "table": "workspace_layouts",
+      "column": "legacy_layout",
+      "path": "maximizedTerminalId",
+      "kind": "terminal",
+      "nullable": true
+    },
+    {
+      "table": "native_activity_states",
+      "column": "projection",
+      "path": "state.pending.*.eventId",
+      "kind": "native-activity-event"
+    },
+    {
+      "table": "native_activity_items",
+      "column": "item",
+      "path": "eventId",
+      "kind": "native-activity-event"
+    },
+    {
+      "table": "native_activity_items",
+      "column": "item",
+      "path": "request.resolvedByEventId",
+      "kind": "native-activity-event"
+    },
+    {
+      "table": "native_activity_items",
+      "column": "item",
+      "path": "agentId",
+      "kind": "agent"
+    },
+    {
+      "table": "native_activity_items",
+      "column": "item",
+      "path": "terminalId",
+      "kind": "terminal"
+    },
+    {
+      "table": "native_activity_items",
+      "column": "item",
+      "path": "runnerId",
+      "kind": "runner"
+    },
+    {
+      "table": "native_activity_states",
+      "column": "projection",
+      "path": "state.agentId",
+      "kind": "agent"
+    },
+    {
+      "table": "native_activity_states",
+      "column": "projection",
+      "path": "state.terminalId",
+      "kind": "terminal"
+    },
+    {
+      "table": "native_activity_states",
+      "column": "projection",
+      "path": "state.runnerId",
+      "kind": "runner"
+    }
+  ],
+  "declarations": [
+    {
+      "table": "workspace_layouts",
+      "column": "legacy_layout",
+      "path": "preferredCompute",
+      "kind": "compute-profile",
+      "keys": [
+        "$value"
+      ],
+      "fields": {
+        "id": "$value",
+        "name": "$value"
+      }
+    }
+  ],
+  "imports": [
+    {
+      "table": "cluster_agent_restarts",
+      "kind": "cluster-operation",
+      "keys": [
+        "operation_id"
+      ],
+      "idColumn": "operation_id"
+    }
+  ],
+  "finalize": [
+    "UPDATE dev_session.native_terminal_starts SET record = jsonb_set(record, '{computeName}', legacy_record->'compute') WHERE jsonb_typeof(legacy_record->'compute') = 'string'"
+  ]
+}

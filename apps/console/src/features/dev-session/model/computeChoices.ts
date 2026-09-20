@@ -12,7 +12,7 @@ export function choicesFor(items: readonly ComputeProfileSummaryDto[], use: Comp
  * 默认档位不会是通用终端协议（服务端不允许），所以两个入口用同一条规则。
  */
 export function resolveChoice(items: readonly ComputeProfileSummaryDto[], value: string): ComputeProfileSummaryDto | undefined {
-  return value === '' ? items.find((item) => item.isDefault) : items.find((item) => item.name === value);
+  return value === '' ? items.find((item) => item.isDefault) : items.find((item) => item.id === value);
 }
 
 /** 不能启动的原因：平台没设默认档位、所选档位已不在列表里、或所选档位当前不可用（停用／测试中／测试失败／未测试）。 */

@@ -54,7 +54,7 @@ export function ProfileLaunchSection({ draft, errors, disabled, taskProfiles, ta
         {showsField(p, 'model') ? <AdminField label={t('admin.profile.field.model')} value={draft.model} onChange={(model) => set({ model })} disabled={disabled} placeholder={t('admin.profile.field.modelPlaceholder')} hint={t('admin.profile.field.modelHint')} /> : null}
         <AdminField label={t('admin.profile.field.taskProfile')} value={draft.taskProfile} onChange={(taskProfile) => set({ taskProfile })} disabled={disabled || taskProfilesUnavailable}
           hint={t('admin.profile.field.taskProfileHint')} error={taskProfilesUnavailable ? t('admin.profile.field.taskProfileUnavailable') : undefined}
-          options={[{ value: '', label: t('admin.profile.defaultTaskProfile') }, ...taskProfiles.map((profile) => ({ value: profile.name, label: `${profile.name} · CPU ${profile.cpu} · ${profile.memory}` }))]} />
+          options={[{ value: '', label: t('admin.profile.defaultTaskProfile') }, ...taskProfiles.map((profile) => ({ value: profile.id, label: `${profile.name} · CPU ${profile.cpu} · ${profile.memory}` }))]} />
       </div>
     </div>
     <div className={styles.sub}>

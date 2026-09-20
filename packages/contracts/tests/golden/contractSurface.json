@@ -73,7 +73,7 @@
         "deliveryAttempt": "x-cs-delivery-attempt"
       },
       "TASKRUNNER": {
-        "protocolVersion": "2"
+        "protocolVersion": "3"
       }
     },
     "schemas": {
@@ -85,7 +85,7 @@
             {
               "properties": {
                 "apiVersion": {
-                  "const": "crewstation/v1",
+                  "const": "crewstation/v2",
                   "type": "string"
                 },
                 "kind": {
@@ -115,32 +115,13 @@
                           "default": [],
                           "items": {
                             "properties": {
-                              "method": {
-                                "enum": [
-                                  "DELETE",
-                                  "GET",
-                                  "HEAD",
-                                  "OPTIONS",
-                                  "PATCH",
-                                  "POST",
-                                  "PUT"
-                                ],
-                                "type": "string"
-                              },
-                              "path": {
-                                "format": "starts_with",
-                                "pattern": "^\\/.*",
-                                "type": "string"
-                              },
-                              "proxy": {
-                                "pattern": "^[a-z][a-z0-9-]{1,38}[a-z0-9]$",
+                              "operationId": {
+                                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
                                 "type": "string"
                               }
                             },
                             "required": [
-                              "method",
-                              "path",
-                              "proxy"
+                              "operationId"
                             ],
                             "type": "object"
                           },
@@ -179,6 +160,10 @@
                       "default": [],
                       "items": {
                         "properties": {
+                          "configDefinitionId": {
+                            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                            "type": "string"
+                          },
                           "default": {
                             "type": "string"
                           },
@@ -189,16 +174,13 @@
                             ],
                             "type": "string"
                           },
-                          "key": {
-                            "minLength": 1,
-                            "type": "string"
-                          },
                           "name": {
                             "pattern": "^[A-Z][A-Z0-9_]*$",
                             "type": "string"
                           }
                         },
                         "required": [
+                          "configDefinitionId",
                           "from",
                           "name"
                         ],
@@ -273,10 +255,6 @@
                           "pattern": "^\\/.*",
                           "type": "string"
                         },
-                        "plan": {
-                          "pattern": "^[a-z][a-z0-9-]{1,38}[a-z0-9]$",
-                          "type": "string"
-                        },
                         "port": {
                           "maximum": 65535,
                           "minimum": 1,
@@ -294,12 +272,16 @@
                           "maximum": 20,
                           "minimum": 1,
                           "type": "integer"
+                        },
+                        "servicePlanId": {
+                          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                          "type": "string"
                         }
                       },
                       "required": [
                         "command",
-                        "plan",
-                        "port"
+                        "port",
+                        "servicePlanId"
                       ],
                       "type": "object"
                     },
@@ -307,8 +289,8 @@
                       "default": [],
                       "items": {
                         "properties": {
-                          "eventType": {
-                            "pattern": "^[a-z][a-z0-9-]*(\\.[a-z][a-z0-9-]*)+$",
+                          "eventTypeId": {
+                            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
                             "type": "string"
                           },
                           "handlerPath": {
@@ -318,7 +300,7 @@
                           }
                         },
                         "required": [
-                          "eventType",
+                          "eventTypeId",
                           "handlerPath"
                         ],
                         "type": "object"
@@ -333,11 +315,47 @@
                             "additionalProperties": false,
                             "properties": {
                               "compute": {
-                                "pattern": "^[a-z][a-z0-9-]{1,38}[a-z0-9]$",
+                                "oneOf": [
+                                  {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "kind": {
+                                        "const": "default",
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": [
+                                      "kind"
+                                    ],
+                                    "type": "object"
+                                  },
+                                  {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "kind": {
+                                        "const": "profile",
+                                        "type": "string"
+                                      },
+                                      "profileId": {
+                                        "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": [
+                                      "kind",
+                                      "profileId"
+                                    ],
+                                    "type": "object"
+                                  }
+                                ]
+                              },
+                              "id": {
+                                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
                                 "type": "string"
                               },
                               "name": {
-                                "pattern": "^[a-z][a-z0-9-]{1,38}[a-z0-9]$",
+                                "maxLength": 80,
+                                "minLength": 1,
                                 "type": "string"
                               },
                               "permission": {
@@ -356,6 +374,7 @@
                             },
                             "required": [
                               "compute",
+                              "id",
                               "name"
                             ],
                             "type": "object"
@@ -374,8 +393,13 @@
                           "default": [],
                           "items": {
                             "properties": {
+                              "id": {
+                                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                                "type": "string"
+                              },
                               "name": {
-                                "pattern": "^[a-z][a-z0-9-]{1,38}[a-z0-9]$",
+                                "maxLength": 80,
+                                "minLength": 1,
                                 "type": "string"
                               },
                               "required": {
@@ -392,19 +416,20 @@
                               }
                             },
                             "required": [
+                              "id",
                               "name"
                             ],
                             "type": "object"
                           },
                           "type": "array"
                         },
-                        "profile": {
-                          "pattern": "^[a-z][a-z0-9-]{1,38}[a-z0-9]$",
+                        "taskProfileId": {
+                          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
                           "type": "string"
                         }
                       },
                       "required": [
-                        "profile"
+                        "taskProfileId"
                       ],
                       "type": "object"
                     }
@@ -425,7 +450,7 @@
             {
               "properties": {
                 "apiVersion": {
-                  "const": "crewstation/v1",
+                  "const": "crewstation/v2",
                   "type": "string"
                 },
                 "kind": {
@@ -484,6 +509,10 @@
                       "default": [],
                       "items": {
                         "properties": {
+                          "configDefinitionId": {
+                            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                            "type": "string"
+                          },
                           "default": {
                             "type": "string"
                           },
@@ -494,16 +523,13 @@
                             ],
                             "type": "string"
                           },
-                          "key": {
-                            "minLength": 1,
-                            "type": "string"
-                          },
                           "name": {
                             "pattern": "^[A-Z][A-Z0-9_]*$",
                             "type": "string"
                           }
                         },
                         "required": [
+                          "configDefinitionId",
                           "from",
                           "name"
                         ],
@@ -582,10 +608,6 @@
                           "pattern": "^\\/.*",
                           "type": "string"
                         },
-                        "plan": {
-                          "pattern": "^[a-z][a-z0-9-]{1,38}[a-z0-9]$",
-                          "type": "string"
-                        },
                         "port": {
                           "maximum": 65535,
                           "minimum": 1,
@@ -603,12 +625,16 @@
                           "maximum": 20,
                           "minimum": 1,
                           "type": "integer"
+                        },
+                        "servicePlanId": {
+                          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                          "type": "string"
                         }
                       },
                       "required": [
                         "command",
-                        "plan",
-                        "port"
+                        "port",
+                        "servicePlanId"
                       ],
                       "type": "object"
                     },
@@ -644,7 +670,7 @@
             {
               "properties": {
                 "apiVersion": {
-                  "const": "crewstation/v1",
+                  "const": "crewstation/v2",
                   "type": "string"
                 },
                 "kind": {
@@ -683,6 +709,10 @@
                       "default": [],
                       "items": {
                         "properties": {
+                          "configDefinitionId": {
+                            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                            "type": "string"
+                          },
                           "default": {
                             "type": "string"
                           },
@@ -693,16 +723,13 @@
                             ],
                             "type": "string"
                           },
-                          "key": {
-                            "minLength": 1,
-                            "type": "string"
-                          },
                           "name": {
                             "pattern": "^[A-Z][A-Z0-9_]*$",
                             "type": "string"
                           }
                         },
                         "required": [
+                          "configDefinitionId",
                           "from",
                           "name"
                         ],
@@ -823,10 +850,6 @@
                           "pattern": "^\\/.*",
                           "type": "string"
                         },
-                        "plan": {
-                          "pattern": "^[a-z][a-z0-9-]{1,38}[a-z0-9]$",
-                          "type": "string"
-                        },
                         "port": {
                           "maximum": 65535,
                           "minimum": 1,
@@ -844,12 +867,16 @@
                           "maximum": 20,
                           "minimum": 1,
                           "type": "integer"
+                        },
+                        "servicePlanId": {
+                          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                          "type": "string"
                         }
                       },
                       "required": [
                         "command",
-                        "plan",
-                        "port"
+                        "port",
+                        "servicePlanId"
                       ],
                       "type": "object"
                     }
@@ -883,8 +910,8 @@
               "minLength": 1,
               "type": "string"
             },
-            "eventType": {
-              "minLength": 1,
+            "eventTypeId": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
               "type": "string"
             },
             "occurredAt": {
@@ -900,7 +927,7 @@
           },
           "required": [
             "dedupKey",
-            "eventType",
+            "eventTypeId",
             "occurredAt",
             "payload"
           ],
@@ -919,15 +946,19 @@
               "type": "integer"
             },
             "deliveryId": {
-              "minLength": 1,
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
               "type": "string"
             },
             "eventId": {
-              "pattern": "^evt_[0-9a-f]{32}$",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
               "type": "string"
             },
             "eventType": {
               "minLength": 1,
+              "type": "string"
+            },
+            "eventTypeId": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
               "type": "string"
             },
             "occurredAt": {
@@ -948,6 +979,10 @@
                   "minLength": 1,
                   "type": "string"
                 },
+                "producerId": {
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                  "type": "string"
+                },
                 "project": {
                   "minLength": 1,
                   "type": "string"
@@ -955,6 +990,7 @@
               },
               "required": [
                 "producer",
+                "producerId",
                 "project"
               ],
               "type": "object"
@@ -969,6 +1005,7 @@
             "deliveryId",
             "eventId",
             "eventType",
+            "eventTypeId",
             "occurredAt",
             "payload",
             "receivedAt",
@@ -993,8 +1030,8 @@
               },
               "type": "object"
             },
-            "profile": {
-              "pattern": "^[a-z][a-z0-9-]{1,38}[a-z0-9]$",
+            "taskProfileId": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
               "type": "string"
             },
             "traceId": {
@@ -1019,8 +1056,8 @@
           "oneOf": [
             {
               "properties": {
-                "agentProfile": {
-                  "pattern": "^[a-z][a-z0-9-]{1,38}[a-z0-9]$",
+                "agentProfileId": {
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
                   "type": "string"
                 },
                 "cwd": {
@@ -1039,11 +1076,12 @@
                   "type": "string"
                 },
                 "name": {
-                  "pattern": "^[a-z][a-z0-9-]{1,38}[a-z0-9]$",
+                  "maxLength": 80,
+                  "minLength": 1,
                   "type": "string"
                 },
-                "outputContract": {
-                  "pattern": "^[a-z][a-z0-9-]{1,38}[a-z0-9]$",
+                "outputContractId": {
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
                   "type": "string"
                 },
                 "prompt": {
@@ -1055,7 +1093,7 @@
                 }
               },
               "required": [
-                "agentProfile",
+                "agentProfileId",
                 "kind",
                 "name",
                 "prompt"
@@ -1080,7 +1118,8 @@
                   "type": "string"
                 },
                 "name": {
-                  "pattern": "^[a-z][a-z0-9-]{1,38}[a-z0-9]$",
+                  "maxLength": 80,
+                  "minLength": 1,
                   "type": "string"
                 },
                 "timeoutSeconds": {
@@ -1133,7 +1172,7 @@
               "type": "string"
             },
             "id": {
-              "pattern": "^tsk_[0-9a-f]{32}$",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
               "type": "string"
             },
             "labels": {
@@ -1151,12 +1190,8 @@
             "podName": {
               "type": "string"
             },
-            "profile": {
-              "pattern": "^[a-z][a-z0-9-]{1,38}[a-z0-9]$",
-              "type": "string"
-            },
             "serviceId": {
-              "pattern": "^svc_[0-9a-f]{32}$",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
               "type": "string"
             },
             "state": {
@@ -1168,6 +1203,10 @@
                 "paused",
                 "running"
               ],
+              "type": "string"
+            },
+            "taskProfileId": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
               "type": "string"
             },
             "traceId": {
@@ -1186,9 +1225,9 @@
             "createdAt",
             "id",
             "labels",
-            "profile",
             "serviceId",
             "state",
+            "taskProfileId",
             "traceId",
             "volumeMode"
           ],
@@ -1201,8 +1240,11 @@
           "$schema": "https://json-schema.org/draft/2020-12/schema",
           "additionalProperties": false,
           "properties": {
-            "agentProfile": {
-              "pattern": "^[a-z][a-z0-9-]{1,38}[a-z0-9]$",
+            "agentProfileId": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            },
+            "agentProfileName": {
               "type": "string"
             },
             "attempt": {
@@ -1213,7 +1255,8 @@
             "businessOutcome": {
               "type": "string"
             },
-            "compute": {
+            "computeProfileId": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
               "type": "string"
             },
             "contractResult": {
@@ -1256,7 +1299,7 @@
               "type": "integer"
             },
             "id": {
-              "pattern": "^sub_[0-9a-f]{32}$",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
               "type": "string"
             },
             "kind": {
@@ -1274,11 +1317,15 @@
               "type": "string"
             },
             "name": {
-              "pattern": "^[a-z][a-z0-9-]{1,38}[a-z0-9]$",
+              "maxLength": 80,
+              "minLength": 1,
               "type": "string"
             },
-            "outputContract": {
-              "pattern": "^[a-z][a-z0-9-]{1,38}[a-z0-9]$",
+            "outputContractId": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            },
+            "outputContractName": {
               "type": "string"
             },
             "profileRevision": {
@@ -1307,7 +1354,7 @@
               "type": "string"
             },
             "taskId": {
-              "pattern": "^tsk_[0-9a-f]{32}$",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
               "type": "string"
             }
           },
@@ -1324,5 +1371,80 @@
       }
     }
   },
-  "breakingChanges": []
+  "breakingChanges": [
+    {
+      "date": "2026-09-20",
+      "basis": "RFC-013 资源 UUIDv7 与 Manifest v2 能力影响清单，作者已批准实施部署上库",
+      "changes": [
+        "～ constants/TASKRUNNER/protocolVersion：\"2\" → \"3\"",
+        "～ schemas/Manifest/oneOf[0]/properties/apiVersion/const：\"crewstation/v1\" → \"crewstation/v2\"",
+        "－ schemas/Manifest/oneOf[0]/properties/spec/properties/apis/properties/requested/items/properties/method（原值 {\"enum\":[\"DELETE\",\"GET\",\"HEAD\",\"OPTIONS\",\"PATCH\",\"POST\",\"PUT\"],\"type\":\"string\"}）",
+        "－ schemas/Manifest/oneOf[0]/properties/spec/properties/apis/properties/requested/items/properties/path（原值 {\"format\":\"starts_with\",\"pattern\":\"^\\\\/.*\",\"type\":\"string\"}）",
+        "－ schemas/Manifest/oneOf[0]/properties/spec/properties/apis/properties/requested/items/properties/proxy（原值 {\"pattern\":\"^[a-z][a-z0-9-]{1,38}[a-z0-9]$\",\"type\":\"string\"}）",
+        "＋ schemas/Manifest/oneOf[0]/properties/spec/properties/apis/properties/requested/items/required{operationId}",
+        "－ schemas/Manifest/oneOf[0]/properties/spec/properties/apis/properties/requested/items/required{method}",
+        "－ schemas/Manifest/oneOf[0]/properties/spec/properties/apis/properties/requested/items/required{path}",
+        "－ schemas/Manifest/oneOf[0]/properties/spec/properties/apis/properties/requested/items/required{proxy}",
+        "－ schemas/Manifest/oneOf[0]/properties/spec/properties/env/items/properties/key（原值 {\"minLength\":1,\"type\":\"string\"}）",
+        "＋ schemas/Manifest/oneOf[0]/properties/spec/properties/env/items/required{configDefinitionId}",
+        "－ schemas/Manifest/oneOf[0]/properties/spec/properties/service/properties/plan（原值 {\"pattern\":\"^[a-z][a-z0-9-]{1,38}[a-z0-9]$\",\"type\":\"string\"}）",
+        "＋ schemas/Manifest/oneOf[0]/properties/spec/properties/service/required{servicePlanId}",
+        "－ schemas/Manifest/oneOf[0]/properties/spec/properties/service/required{plan}",
+        "－ schemas/Manifest/oneOf[0]/properties/spec/properties/subscriptions/items/properties/eventType（原值 {\"pattern\":\"^[a-z][a-z0-9-]*(\\\\.[a-z][a-z0-9-]*)+$\",\"type\":\"string\"}）",
+        "＋ schemas/Manifest/oneOf[0]/properties/spec/properties/subscriptions/items/required{eventTypeId}",
+        "－ schemas/Manifest/oneOf[0]/properties/spec/properties/subscriptions/items/required{eventType}",
+        "－ schemas/Manifest/oneOf[0]/properties/spec/properties/tasks/properties/agentProfiles/items/properties/compute/pattern（原值 \"^[a-z][a-z0-9-]{1,38}[a-z0-9]$\"）",
+        "－ schemas/Manifest/oneOf[0]/properties/spec/properties/tasks/properties/agentProfiles/items/properties/compute/type（原值 \"string\"）",
+        "－ schemas/Manifest/oneOf[0]/properties/spec/properties/tasks/properties/agentProfiles/items/properties/name/pattern（原值 \"^[a-z][a-z0-9-]{1,38}[a-z0-9]$\"）",
+        "＋ schemas/Manifest/oneOf[0]/properties/spec/properties/tasks/properties/agentProfiles/items/properties/name/maxLength = 80",
+        "＋ schemas/Manifest/oneOf[0]/properties/spec/properties/tasks/properties/agentProfiles/items/properties/name/minLength = 1",
+        "＋ schemas/Manifest/oneOf[0]/properties/spec/properties/tasks/properties/agentProfiles/items/required{id}",
+        "－ schemas/Manifest/oneOf[0]/properties/spec/properties/tasks/properties/outputContracts/items/properties/name/pattern（原值 \"^[a-z][a-z0-9-]{1,38}[a-z0-9]$\"）",
+        "＋ schemas/Manifest/oneOf[0]/properties/spec/properties/tasks/properties/outputContracts/items/properties/name/maxLength = 80",
+        "＋ schemas/Manifest/oneOf[0]/properties/spec/properties/tasks/properties/outputContracts/items/properties/name/minLength = 1",
+        "＋ schemas/Manifest/oneOf[0]/properties/spec/properties/tasks/properties/outputContracts/items/required{id}",
+        "－ schemas/Manifest/oneOf[0]/properties/spec/properties/tasks/properties/profile（原值 {\"pattern\":\"^[a-z][a-z0-9-]{1,38}[a-z0-9]$\",\"type\":\"string\"}）",
+        "＋ schemas/Manifest/oneOf[0]/properties/spec/properties/tasks/required{taskProfileId}",
+        "－ schemas/Manifest/oneOf[0]/properties/spec/properties/tasks/required{profile}",
+        "～ schemas/Manifest/oneOf[1]/properties/apiVersion/const：\"crewstation/v1\" → \"crewstation/v2\"",
+        "－ schemas/Manifest/oneOf[1]/properties/spec/properties/env/items/properties/key（原值 {\"minLength\":1,\"type\":\"string\"}）",
+        "＋ schemas/Manifest/oneOf[1]/properties/spec/properties/env/items/required{configDefinitionId}",
+        "－ schemas/Manifest/oneOf[1]/properties/spec/properties/service/properties/plan（原值 {\"pattern\":\"^[a-z][a-z0-9-]{1,38}[a-z0-9]$\",\"type\":\"string\"}）",
+        "＋ schemas/Manifest/oneOf[1]/properties/spec/properties/service/required{servicePlanId}",
+        "－ schemas/Manifest/oneOf[1]/properties/spec/properties/service/required{plan}",
+        "～ schemas/Manifest/oneOf[2]/properties/apiVersion/const：\"crewstation/v1\" → \"crewstation/v2\"",
+        "－ schemas/Manifest/oneOf[2]/properties/spec/properties/env/items/properties/key（原值 {\"minLength\":1,\"type\":\"string\"}）",
+        "＋ schemas/Manifest/oneOf[2]/properties/spec/properties/env/items/required{configDefinitionId}",
+        "－ schemas/Manifest/oneOf[2]/properties/spec/properties/service/properties/plan（原值 {\"pattern\":\"^[a-z][a-z0-9-]{1,38}[a-z0-9]$\",\"type\":\"string\"}）",
+        "＋ schemas/Manifest/oneOf[2]/properties/spec/properties/service/required{servicePlanId}",
+        "－ schemas/Manifest/oneOf[2]/properties/spec/properties/service/required{plan}",
+        "－ schemas/ProducedEvent/properties/eventType（原值 {\"minLength\":1,\"type\":\"string\"}）",
+        "＋ schemas/ProducedEvent/required{eventTypeId}",
+        "－ schemas/ProducedEvent/required{eventType}",
+        "－ schemas/EventDelivery/properties/deliveryId/minLength（原值 1）",
+        "～ schemas/EventDelivery/properties/eventId/pattern：\"^evt_[0-9a-f]{32}$\" → \"^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$\"",
+        "－ schemas/CreateBusinessTaskRequest/properties/profile（原值 {\"pattern\":\"^[a-z][a-z0-9-]{1,38}[a-z0-9]$\",\"type\":\"string\"}）",
+        "－ schemas/SubmitSubtaskRequest/oneOf[0]/properties/agentProfile（原值 {\"pattern\":\"^[a-z][a-z0-9-]{1,38}[a-z0-9]$\",\"type\":\"string\"}）",
+        "－ schemas/SubmitSubtaskRequest/oneOf[0]/properties/name/pattern（原值 \"^[a-z][a-z0-9-]{1,38}[a-z0-9]$\"）",
+        "＋ schemas/SubmitSubtaskRequest/oneOf[0]/properties/name/maxLength = 80",
+        "＋ schemas/SubmitSubtaskRequest/oneOf[0]/properties/name/minLength = 1",
+        "－ schemas/SubmitSubtaskRequest/oneOf[0]/properties/outputContract（原值 {\"pattern\":\"^[a-z][a-z0-9-]{1,38}[a-z0-9]$\",\"type\":\"string\"}）",
+        "＋ schemas/SubmitSubtaskRequest/oneOf[0]/required{agentProfileId}",
+        "－ schemas/SubmitSubtaskRequest/oneOf[0]/required{agentProfile}",
+        "－ schemas/SubmitSubtaskRequest/oneOf[1]/properties/name/pattern（原值 \"^[a-z][a-z0-9-]{1,38}[a-z0-9]$\"）",
+        "＋ schemas/SubmitSubtaskRequest/oneOf[1]/properties/name/maxLength = 80",
+        "＋ schemas/SubmitSubtaskRequest/oneOf[1]/properties/name/minLength = 1",
+        "～ schemas/BusinessTaskDto/properties/id/pattern：\"^tsk_[0-9a-f]{32}$\" → \"^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$\"",
+        "－ schemas/BusinessTaskDto/properties/profile（原值 {\"pattern\":\"^[a-z][a-z0-9-]{1,38}[a-z0-9]$\",\"type\":\"string\"}）",
+        "～ schemas/BusinessTaskDto/properties/serviceId/pattern：\"^svc_[0-9a-f]{32}$\" → \"^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$\"",
+        "－ schemas/BusinessTaskDto/required{profile}",
+        "－ schemas/SubtaskDto/properties/agentProfile（原值 {\"pattern\":\"^[a-z][a-z0-9-]{1,38}[a-z0-9]$\",\"type\":\"string\"}）",
+        "－ schemas/SubtaskDto/properties/compute（原值 {\"type\":\"string\"}）",
+        "～ schemas/SubtaskDto/properties/id/pattern：\"^sub_[0-9a-f]{32}$\" → \"^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$\"",
+        "－ schemas/SubtaskDto/properties/name/pattern（原值 \"^[a-z][a-z0-9-]{1,38}[a-z0-9]$\"）",
+        "－ schemas/SubtaskDto/properties/outputContract（原值 {\"pattern\":\"^[a-z][a-z0-9-]{1,38}[a-z0-9]$\",\"type\":\"string\"}）",
+        "～ schemas/SubtaskDto/properties/taskId/pattern：\"^tsk_[0-9a-f]{32}$\" → \"^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$\""
+      ]
+    }
+  ]
 }

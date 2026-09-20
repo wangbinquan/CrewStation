@@ -1,5 +1,6 @@
-import type { Actor, ProjectId, QuotaDto, ServicePlanDto, SetQuotaRequest, TaskProfileDto } from '@crewstation/contracts';
-import { forbidden, notFound } from '@crewstation/kernel';
+import type { CreateServicePlan, CreateTaskProfile, Actor, ProjectId, QuotaDto, ServicePlanDto, ServicePlanWrite, SetQuotaRequest, TaskProfileDto, TaskProfileWrite } from '@crewstation/contracts';
+import { ResourceIdSchema } from '@crewstation/contracts';
+import { forbidden, newResourceId, notFound } from '@crewstation/kernel';
 import { authorizationUseCases } from './authorization';
 import type { ProjectUseCaseDeps } from './dependencies';
 
@@ -26,15 +27,29 @@ export function quotaAndPlanUseCases(deps: ProjectUseCaseDeps) {
     /** 供 task-runtime 原子准入时读取上限。 */
     quotaLimit: async (projectId: ProjectId): Promise<number | undefined> => (await uow.read.quotas.get(projectId))?.maxConcurrentTasks,
     listServicePlans: (): Promise<ServicePlanDto[]> => uow.read.catalog.listServicePlans(),
-    upsertServicePlan: async (actor: Actor, plan: ServicePlanDto): Promise<ServicePlanDto> => {
+    createServicePlan: async (actor: Actor, input: CreateServicePlan): Promise<ServicePlanDto> => {
       adminOnly(actor);
-      await uow.run((scope) => scope.catalog.upsertServicePlan(plan));
+      const plan = { ...input, id: input.id ? ResourceIdSchema.parse(input.id) : newResourceId() };
+      await uow.run((scope) => scope.catalog.createServicePlan(plan));
       return plan;
     },
-    listTaskProfiles: (): Promise<TaskProfileDto[]> => uow.read.catalog.listTaskProfiles(),
-    upsertTaskProfile: async (actor: Actor, profile: TaskProfileDto): Promise<TaskProfileDto> => {
+    updateServicePlan: async (actor: Actor, id: string, input: ServicePlanWrite): Promise<ServicePlanDto> => {
       adminOnly(actor);
-      await uow.run((scope) => scope.catalog.upsertTaskProfile(profile));
+      const plan = { ...input, id };
+      if (!await uow.run((scope) => scope.catalog.updateServicePlan(plan))) throw notFound('服务套餐', id);
+      return plan;
+    },
+    updateTaskProfile: async (actor: Actor, id: string, input: TaskProfileWrite): Promise<TaskProfileDto> => {
+      adminOnly(actor);
+      const profile = { ...input, id };
+      if (!await uow.run((scope) => scope.catalog.updateTaskProfile(profile))) throw notFound('任务规格', id);
+      return profile;
+    },
+    listTaskProfiles: (): Promise<TaskProfileDto[]> => uow.read.catalog.listTaskProfiles(),
+    createTaskProfile: async (actor: Actor, input: CreateTaskProfile): Promise<TaskProfileDto> => {
+      adminOnly(actor);
+      const profile = { ...input, id: input.id ? ResourceIdSchema.parse(input.id) : newResourceId() };
+      await uow.run((scope) => scope.catalog.createTaskProfile(profile));
       return profile;
     },
   };

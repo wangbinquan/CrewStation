@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import type { ClusterPurpose, ClusterResource } from '@crewstation/contracts';
 import type { InventoryFacts, ResourceObject, SystemComponent } from './inventory';
-import { networkKinds, objectRecord, resourceKey, workloadKinds } from './inventory';
+import { networkKinds, objectRecord, workloadKinds } from './inventory';
 import { resourceGraph, referencesOf } from './resourceGraph';
 import { containerDetails, resourceStatus, visibleFacts } from './resourceStatus';
 import { resourceCapabilities } from './resourceCapabilities';
@@ -11,7 +11,6 @@ function canonical(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(canonical);
   return value && typeof value === 'object' ? Object.fromEntries(Object.entries(value).sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => [k, canonical(v)])) : value;
 }
-export const resourceId = (obj: ResourceObject): string => digest([obj.apiVersion, resourceKey(obj), obj.metadata.uid]);
 export const configRevision = (obj: ResourceObject): string => digest({ uid: obj.metadata.uid, spec: obj.spec, data: obj.data, type: obj.type, owners: obj.metadata.ownerReferences, labels: obj.metadata.labels });
 
 function purposeOf(obj: ResourceObject, fact: InventoryFacts['tasks'][number] | undefined, projectKind: string | undefined, system: SystemComponent | undefined): ClusterPurpose {
@@ -27,13 +26,18 @@ function purposeOf(obj: ResourceObject, fact: InventoryFacts['tasks'][number] | 
   return system?.purpose ?? 'unknown';
 }
 
-export function projectResources(objects: ResourceObject[], facts: InventoryFacts, systemNamespace: string, catalog: SystemComponent[], observedAt: string): ClusterResource[] {
+export function projectResources(objects: ResourceObject[], facts: InventoryFacts, systemNamespace: string, catalog: SystemComponent[], observedAt: string, identities: ReadonlyMap<string, string>): ClusterResource[] {
+  const resourceId = (obj: ResourceObject): string => {
+    const id = identities.get(obj.metadata.uid!);
+    if (!id) throw new Error(`Unregistered cluster resource UID: ${obj.metadata.uid}`);
+    return id;
+  };
   const graph = resourceGraph(objects, facts, systemNamespace, catalog), rows: ClusterResource[] = [];
   for (const obj of objects) {
     const ownership = graph.ownership(obj);
     if (!ownership || !obj.metadata.uid) continue;
     const ns = obj.metadata.namespace ?? '', labels = obj.metadata.labels ?? {}, parent = graph.owner(obj);
-    const task = obj.kind === 'Pod' ? facts.tasks.find((t) => t.namespace === ns && t.podName === obj.metadata.name && labels['crewstation.io/task'] === t.taskId && (!!t.podUid && t.podUid === obj.metadata.uid)) : undefined;
+    const task = obj.kind === 'Pod' ? facts.tasks.find((t) => t.namespace === ns && t.podName === obj.metadata.name && (!!t.podUid && t.podUid === obj.metadata.uid)) : undefined;
     const project = facts.projects.find((p) => p.namespace === ns);
     const slot = facts.releases.find((s) => s.namespace === ns && s.serviceName === labels['crewstation.io/service'] && s.physical === labels['crewstation.io/slot']);
     const containers = containerDetails(obj), system = graph.system.get(obj.metadata.uid);

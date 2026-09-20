@@ -3,10 +3,11 @@ import type { UserId } from '@crewstation/contracts';
 import type { AppEnv } from '@crewstation/http';
 import type { Clock, Logger } from '@crewstation/kernel';
 import { isPlatformError, noopLogger, systemClock } from '@crewstation/kernel';
-import type { Database, MigrationSet } from '@crewstation/persistence';
+import type { Database, MigrationSet, ResourceIdentityDirectory } from '@crewstation/persistence';
 import { readMigrationDir } from '@crewstation/persistence';
 import type { Hono } from 'hono';
 import { yamlManifestParser } from './adapters/manifest/yamlManifestParser';
+import { drizzleComparisonReferences } from './adapters/persistence/drizzleComparisonReferences';
 import { drizzleReminderRepository } from './adapters/persistence/drizzleReminderRepository';
 import { drizzleNativeTerminals } from './adapters/persistence/drizzleNativeTerminals';
 import { drizzleWorkspaceLayouts } from './adapters/persistence/drizzleWorkspaceLayouts';
@@ -32,6 +33,7 @@ import type { ApiInvocationCatalog, ComputeCatalog, DevSessionSettings, McpCrede
 import type { Environments, Runner } from './ports/runtime';
 
 export interface DevSessionModuleDeps {
+  identities?: ResourceIdentityDirectory;
   apiCatalog: ApiInvocationCatalog;
   /** 算力档位解析（RFC-001），由组合根接到 project。 */
   compute: ComputeCatalog;
@@ -65,6 +67,7 @@ export const devSessionMigrations: MigrationSet = {
 
 export function createDevSessionModule(deps: DevSessionModuleDeps): DevSessionModule {
   const useCaseDeps: DevSessionUseCaseDeps = {
+    comparisons: drizzleComparisonReferences(deps.db, deps.clock ?? systemClock, deps.identities),
     environments: deps.environments, runner: deps.runner, scm: deps.scm, releases: deps.releases, manifests: yamlManifestParser,
     authorizer: deps.authorizer, apiCatalog: deps.apiCatalog,
     compute: deps.compute, services: deps.services, notifier: deps.notifier, credentials: deps.credentials, reminders: drizzleReminderRepository(deps.db),

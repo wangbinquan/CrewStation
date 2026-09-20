@@ -23,7 +23,8 @@ export const podIdentities = gatewaySchema.table('pod_identities', {
 }, (t) => [primaryKey({ columns: [t.namespace, t.podName] })]);
 
 export const routes = gatewaySchema.table('routes', {
-  serviceName: text('service_name').primaryKey(),
+  serviceId: text('service_id').primaryKey(),
+  serviceName: text('service_name').notNull(),
   routes: jsonDocument('routes').notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
 });

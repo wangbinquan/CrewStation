@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { jsonResponse, routes, runForTest } from './cliHarness';
 
-const id = (prefix: string, tail: string) => `${prefix}_${tail.padEnd(32, '0')}`;
+const id = (prefix: string, tail: string) => `01a0bf5d-8f4b-7a01-800${['prj', 'usr', 'svc'].indexOf(prefix)}-${tail.padEnd(12, '0')}`;
 
 const DEMO = {
   id: id('prj', 'a'), slug: 'demo', name: '最小样例', kind: 'DigitalWorker', namespace: 'cs-demo',
@@ -32,7 +32,7 @@ describe('projects list', () => {
 });
 
 describe('项目定位：slug 还是 ID', () => {
-  test('ID 形状的直接取详情，不拉列表', async () => {
+  test('UUIDv7 直接取详情，不拉列表或按名称查找', async () => {
     const result = await runForTest(['projects', 'show', DEMO.id], {
       respond: routes({ [`GET /v1/projects/${DEMO.id}`]: jsonResponse(200, DEMO) }),
     });

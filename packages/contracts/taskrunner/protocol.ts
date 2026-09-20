@@ -12,9 +12,10 @@ import { AgentProtocolSchema, LaunchSpecSchema } from './launch';
 
 /**
  * TaskRunner ↔ cs-session 协议版本；不兼容变更递增，双方在 hello 时校验。
+ * 3（RFC-013）：平台资源引用使用 UUIDv7；协议 2 经服务端显式兼容入口投影。
  * 2（RFC-006）：启动命令携带档位修订的 launch 与必有的启动前材料，hello 报 Runner 理解的协议；旧底座镜像里的 Runner 握手即被拒。
  */
-export const TASKRUNNER_PROTOCOL_VERSION = 2;
+export const TASKRUNNER_PROTOCOL_VERSION = 3;
 
 export const McpConnectionSchema = z.object({
   name: z.string().min(1),

@@ -25,15 +25,15 @@ beforeAll(async () => {
   admin = { userId: (await identity.api.ensureUser({ externalId: 'admin', name: 'Admin', email: 'admin@test.invalid' })).id, isAdmin: true };
   member = { userId: (await identity.api.ensureUser({ externalId: 'member', name: 'Member', email: 'member@test.invalid' })).id, isAdmin: false };
   await identity.api.setPlatformRole(member.userId, { platformRole: 'developer', expectedRole: 'user' });
-  projects = createProjectModule({ db: db.db, identity: identity.api, hosts, settings: { defaultMaxConcurrentTasks: 3, defaultServicePlan: 'small' } });
-  await projects.api.upsertServicePlan(admin, { name: 'small', cpu: '1', memory: '1Gi', maxReplicas: 1, description: '' });
-  alpha = await projects.api.createProject(admin, { name: 'Alpha', slug: 'alpha', kind: 'DigitalWorker', ownerUserId: member.userId, template: 'sample' });
-  beta = await projects.api.createProject(admin, { name: 'Beta', slug: 'beta', kind: 'DigitalWorker', ownerUserId: admin.userId, template: 'sample' });
+  projects = createProjectModule({ db: db.db, identity: identity.api, hosts, settings: { defaultMaxConcurrentTasks: 3, defaultServicePlan: '01a0bf5d-8f4b-781d-8b8e-bbbbc69c6c6a' } });
+  await projects.api.createServicePlan(admin, { id: '01a0bf5d-8f4b-781d-8b8e-bbbbc69c6c6a', name: 'small', cpu: '1', memory: '1Gi', maxReplicas: 1, description: '' });
+  alpha = await projects.api.createProject(admin, { name: 'Alpha', slug: 'alpha', kind: 'DigitalWorker', ownerUserId: member.userId, template: '01a0bf5d-8f4b-7af2-8bdb-e1aa9b6ec1e2' });
+  beta = await projects.api.createProject(admin, { name: 'Beta', slug: 'beta', kind: 'DigitalWorker', ownerUserId: admin.userId, template: '01a0bf5d-8f4b-7af2-8bdb-e1aa9b6ec1e2' });
   catalog = createApiCatalogModule({ db: db.db, projects: projects.api, services, hosts });
   const repo = drizzleRequestRepository(db.db);
   for (let i = 0; i < 72; i++) {
     const p = i < 52 ? alpha : beta;
-    await repo.insert({ id: newId('req'), projectId: p.id, serviceId: p.serviceId!, operationKey: `sample:GET:/${i}`, state: i % 2 === 0 ? 'pending' : 'rejected', requestedBy: admin.userId,
+    await repo.insert({ id: newId('req'), projectId: p.id, serviceId: p.serviceId!, operationId: newId('operation'), state: i % 2 === 0 ? 'pending' : 'rejected', requestedBy: admin.userId,
       createdAt: new Date(Date.UTC(2026, 8, 1, 0, 0, Math.floor(i / 3))) });
   }
 });
@@ -74,7 +74,7 @@ describe.skipIf(!available)('API 申请有界分页', () => {
     const second = await catalog.api.listRequestPage(admin, { state: 'pending', limit: 5, cursor: first.nextCursor });
     expect(second.items).toHaveLength(5); expect(second.items.some((r) => first.items.some((before) => before.id === r.id))).toBe(false);
     const id = newId('req');
-    await drizzleRequestRepository(db.db).insert({ id, projectId: alpha.id, serviceId: alpha.serviceId!, operationKey: 'new:GET:/new', state: 'pending', requestedBy: admin.userId, createdAt: new Date('2026-09-02T00:00:00Z') });
+    await drizzleRequestRepository(db.db).insert({ id, projectId: alpha.id, serviceId: alpha.serviceId!, operationId: newId('operation'), state: 'pending', requestedBy: admin.userId, createdAt: new Date('2026-09-02T00:00:00Z') });
     expect((await catalog.api.listRequestPage(admin, { state: 'pending', limit: 5 })).items[0]?.id).toBe(id);
     const failedNames = createApiCatalogModule({ db: db.db, projects: { ...projects.api, readProjectBasics: async () => { throw new Error('names unavailable'); } }, services, hosts });
     const page = await failedNames.api.listRequestPage(admin, { state: 'pending', limit: 5 });

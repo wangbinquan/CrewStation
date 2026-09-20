@@ -80,7 +80,7 @@ describe('项目列表的真实分页与独立状态', () => {
 
 test.each(['列表', '概览'])('%s 的会话分支明确标为创建时记录，缺失保持未知且不额外查询工作树', async (view) => {
   const f = summaryFixture(), time = new Date().toISOString();
-  const session = { taskId: `tsk_${'c'.repeat(32)}` as TaskId, state: 'running' as const, connected: true, branch: 'main', createdAt: time, lastActivityAt: time };
+  const session = { taskId: '01a0bf5d-8f4b-7e52-8b45-4a547fd10e4f' as TaskId, state: 'running' as const, connected: true, branch: 'main', createdAt: time, lastActivityAt: time };
   f.item.development = { status: 'ready', checkedAt: time, value: session };
   page = await renderApp(view === '列表' ? '/projects' : `/projects/${f.item.project.id}`);
   const branch = [...document.querySelectorAll('code')].find((node) => node.textContent === 'main')!;
@@ -99,8 +99,8 @@ describe('概览按实际状态选择下一步', () => {
   test('两个访问入口只指向实际就绪主机，降级与读取失败不沿用旧链接，诊断保留项目上下文', async () => {
     const f = summaryFixture(), time = new Date().toISOString();
     f.item.slots = { status: 'ready', checkedAt: time, value: [
-      { name: 'prod', active: true, tag: 'v1.0.0', commitSha: 'a'.repeat(40), releaseId: `rel_${'a'.repeat(32)}` as ReleaseId, host: 'formal.test', state: 'ready', replicas: 1, readyReplicas: 1 },
-      { name: 'preview', active: false, tag: 'v1.0.1', commitSha: 'b'.repeat(40), releaseId: `rel_${'b'.repeat(32)}` as ReleaseId, host: 'trial.test', state: 'ready', replicas: 1, readyReplicas: 1 },
+      { name: 'prod', active: true, tag: 'v1.0.0', commitSha: 'a'.repeat(40), releaseId: '01a0bf5d-8f4b-7574-87e3-e3a9645702f6' as ReleaseId, host: 'formal.test', state: 'ready', replicas: 1, readyReplicas: 1 },
+      { name: 'preview', active: false, tag: 'v1.0.1', commitSha: 'b'.repeat(40), releaseId: '01a0bf5d-8f4b-7645-8cca-c128d59001d1' as ReleaseId, host: 'trial.test', state: 'ready', replicas: 1, readyReplicas: 1 },
     ] };
     page = await renderApp(`/projects/${f.item.project.id}`);
     expect(document.querySelector('a[href="//formal.test"]')?.textContent).toBe('打开正式应用');
@@ -121,18 +121,18 @@ describe('概览按实际状态选择下一步', () => {
   });
   test('最新发布失败直达该发布，次动作继续开发；没有会话时开始开发只导航', async () => {
     const f = summaryFixture(), time = new Date().toISOString();
-    f.item.releases = { status: 'ready', checkedAt: time, value: [{ id: `rel_${'b'.repeat(32)}` as ReleaseId, serviceId: f.item.project.serviceId!,
+    f.item.releases = { status: 'ready', checkedAt: time, value: [{ id: '01a0bf5d-8f4b-7645-8cca-c128d59001d1' as ReleaseId, serviceId: f.item.project.serviceId!,
       tag: 'v1.0.2', commitSha: 'b'.repeat(40), branch: 'main', status: 'failed', createdBy: summaryUserId, createdAt: time, updatedAt: time }] };
     page = await renderApp(`/projects/${f.item.project.id}`);
     expect(document.querySelector('[data-primary-project-action]')?.textContent).toContain('处理 v1.0.2 发布问题');
-    expect(document.querySelector('[data-primary-project-action]')?.getAttribute('href')).toContain('release=rel_');
+    expect(document.querySelector('[data-primary-project-action]')?.getAttribute('href')).toContain('release=01a0bf5d-8f4b-7645-8cca-c128d59001d1');
     f.item.releases = { status: 'ready', checkedAt: time, value: [] }; await page.click('刷新概览');
     expect(document.querySelector('[data-primary-project-action]')?.textContent).toContain('开始开发');
     await page.click('开始开发'); expect(page.path()).toBe(`/projects/${f.item.project.id}/dev-session`); expect(f.writes).toEqual([]);
   });
   test('会话生命周期、连接、预览／正式以及健康分别显示，旧数据不驱动新主动作', async () => {
     const f = summaryFixture(), time = new Date().toISOString(); f.item.development = { status: 'ready', checkedAt: time, value: {
-      taskId: `tsk_${'c'.repeat(32)}` as TaskId, state: 'running', connected: false, branch: 'main', createdAt: time, lastActivityAt: time } };
+      taskId: '01a0bf5d-8f4b-7e52-8b45-4a547fd10e4f' as TaskId, state: 'running', connected: false, branch: 'main', createdAt: time, lastActivityAt: time } };
     page = await renderApp(`/projects/${f.item.project.id}`); expect(document.querySelector('[data-primary-project-action]')?.textContent).toContain('继续开发');
     expect(page.text()).toContain('会话运行中'); expect(page.text()).toContain('连接已断开'); expect(page.text()).toContain('健康状态暂不可用');
     f.error = true; await page.click('刷新概览'); expect(page.text()).toContain('摘要读取失败'); expect(document.querySelector('[data-primary-project-action]')).toBeNull();

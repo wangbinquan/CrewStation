@@ -1,5 +1,5 @@
 import type {
-  Actor, ConfigEnv, ConfigItemDto, ConfigVersionDto, EnvEntry, ManifestEnvValidation, ProjectId, SetConfigItemRequest,
+  Actor, ConfigDefinitionDto, ConfigEnv, ConfigItemDto, ConfigVersionDto, EnvEntry, ManifestEnvValidation, ProjectId, SetConfigItemRequest,
 } from '@crewstation/contracts';
 
 /**
@@ -7,13 +7,18 @@ import type {
  * 生产组由负责人维护，开发组开发者可维护；Secret 只写不读；每次改动使 (project, env) 的版本号加一并发布 config.changed。
  */
 export interface ConfigModuleApi {
+  /** Internal template provisioning: declare identity/binding without writing environment values. */
+  ensureTemplateDefinition(projectId: ProjectId, definition: ConfigDefinitionDto): Promise<void>;
   readonly name: 'config';
-  setItem(actor: Actor, projectId: ProjectId, input: SetConfigItemRequest): Promise<ConfigItemDto>;
-  deleteItem(actor: Actor, projectId: ProjectId, env: ConfigEnv, name: string): Promise<void>;
+  createItem(actor: Actor, projectId: ProjectId, input: SetConfigItemRequest): Promise<ConfigItemDto>;
+  updateItem(actor: Actor, projectId: ProjectId, id: string, input: SetConfigItemRequest): Promise<ConfigItemDto>;
+  listDefinitions(actor: Actor, projectId: ProjectId): Promise<ConfigDefinitionDto[]>;
+  deleteItem(actor: Actor, projectId: ProjectId, env: ConfigEnv, id: string, expectedVersion: number): Promise<void>;
   /** 不含 Secret 的值。 */
   listItems(actor: Actor, projectId: ProjectId, env: ConfigEnv): Promise<ConfigItemDto[]>;
   listVersions(actor: Actor, projectId: ProjectId, env: ConfigEnv): Promise<ConfigVersionDto[]>;
   /** 解密后的环境变量键值；供 release／task-runtime 在受信路径注入，不经 actor，不经 HTTP。指定 version 时按快照回放。 */
+  renderDefinitions(projectId: ProjectId, env: ConfigEnv, version?: number): Promise<Record<string, string>>;
   renderEnv(projectId: ProjectId, env: ConfigEnv, version?: number): Promise<Record<string, string>>;
   /** 从未改动过为 0。 */
   currentVersion(projectId: ProjectId, env: ConfigEnv): Promise<number>;

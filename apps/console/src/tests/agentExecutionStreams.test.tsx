@@ -10,8 +10,8 @@ import { renderApp } from './renderApp';
 let page: Awaited<ReturnType<typeof renderApp>> | undefined, fixture: ReturnType<typeof historicalConversationFixture> | undefined;
 afterEach(async () => { page?.unmount(); page = undefined; fixture?.restore(); fixture = undefined; await new Promise((resolve) => setTimeout(resolve, 0)); });
 const path = `/projects/${activityProjectId}/dev-session/conversations`;
-const execB = `tsk_${'b'.repeat(32)}`, execC = `tsk_${'c'.repeat(32)}`;
-const agentB = 'agt_exec_bravo22', agentC = 'agt_exec_charli';
+const execB = '01a0bf5d-8f4b-7b61-81de-655e8f149909', execC = '01a0bf5d-8f4b-7e52-8b45-4a547fd10e4f';
+const agentB = '01a0bf5d-8f4b-708c-8b30-0549c6a74088', agentC = '01a0bf5d-8f4b-7385-878f-ffcbb5579699';
 const withExecution = (agentId: string, state: 'running' | 'finished' | 'queued' | 'starting', taskId: string, patch: Record<string, unknown> = {}) =>
   AgentInstanceDtoSchema.parse({ agentId, taskId: activityTaskId, compute: 'standard', permission: 'edit', state: 'running', startedAt: activityTime, profileRevision: 2, execution: { taskId, state }, ...patch });
 async function select(agentId: string) {
@@ -35,6 +35,9 @@ test('执行环境里的 Agent 从它自己的流进转录；老 Agent 仍从开
   fixture = historicalConversationFixture();
   fixture.agents.push(withExecution(agentB, 'running', execB));
   page = await renderApp(`${path}?agent=${agentB}`);
+  // 身份、会话、名册和订阅分层完成；初始三轮渲染并不表示执行流已经连接。
+  const readyBy = Date.now() + 2000;
+  while (fixture.openStreams(execB) === 0 && Date.now() < readyBy) await page.settle();
   expect(fixture.openStreams(execB)).toBe(1);
   await deliver(execB, { agentId: agentB, type: 'text', text: '来自执行环境' });
   expect(transcript()).toContain('来自执行环境');

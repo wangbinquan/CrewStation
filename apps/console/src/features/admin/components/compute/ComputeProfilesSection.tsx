@@ -24,6 +24,7 @@ export function ComputeProfilesSection({ onOpen, onCreate }: { readonly onOpen: 
   const [search, setSearch] = useState('');
   const profiles = useApiQuery(queryKeys.adminComputeProfiles(), () => api.computeProfiles.list());
   // 修改人只有用户 ID：管理页用用户目录换成名字，读不到就显示 ID。
+  const tasks = useApiQuery(queryKeys.taskProfiles(), () => api.catalog.listTaskProfiles());
   const users = useApiQuery(queryKeys.users(), () => api.users.list());
   const items = profiles.data?.items ?? [];
   const matching = items.filter((item) => [item.name, item.description, item.model, item.protocol].some((value) => value?.toLowerCase().includes(search.trim().toLowerCase())));
@@ -39,7 +40,7 @@ export function ComputeProfilesSection({ onOpen, onCreate }: { readonly onOpen: 
       <QueryStatus isPending={profiles.isPending} error={profiles.error} isEmpty={matching.length === 0} emptyTitle={t(search.trim() ? 'admin.profile.noMatches' : 'admin.profile.emptyTitle')} emptyDescription={t(search.trim() ? 'admin.profile.searchHint' : 'admin.profile.emptyDescription')} />
       {matching.length > 0 ? (
         <DataTable className={styles.profileTable} columns={COLUMNS.map((column) => t(`admin.profile.column.${column}`))}>
-          {matching.map((profile) => <ProfileListRow key={profile.name} profile={profile} updatedBy={who(profile.updatedBy)} onOpen={onOpen} />)}
+          {matching.map((profile) => <ProfileListRow key={profile.id} profile={profile} taskProfileName={tasks.data?.items.find((task) => task.id === profile.taskProfile)?.name} updatedBy={who(profile.updatedBy)} onOpen={onOpen} />)}
         </DataTable>
       ) : null}
     </Card>

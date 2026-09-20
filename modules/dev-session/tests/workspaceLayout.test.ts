@@ -14,7 +14,7 @@ let database: TestDatabase;
 beforeAll(async () => { if (available) database = await createTestDatabase([devSessionMigrations]); });
 afterAll(async () => { await database?.drop(); });
 const layout = (terminalId: string): WorkspaceLayout => {
-  const tabId = crypto.randomUUID();
+  const tabId = Bun.randomUUIDv7();
   return { activeTabId: tabId, tabs: [{ id: tabId, name: '开发', layout: 'grid', paneOrder: [terminalId], ratios: { columns: [1, 2], rows: [1] } }], hiddenTerminalIds: [], selectedTerminalId: terminalId, maximizedTerminalId: null, previewAlongside: false, previewRatio: 0.5, view: 'cli' };
 };
 
@@ -28,7 +28,7 @@ describe.skipIf(!available)('个人工作区布局', () => {
     const results = await Promise.allSettled([api.saveWorkspaceLayout(workspaceActor, workspaceTask, input), workspaceLayoutUseCases(f.deps, drizzleWorkspaceLayouts(database.db), f.repository).saveWorkspaceLayout(workspaceActor, workspaceTask, input)]);
     expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
     expect(results.filter((result) => result.status === 'rejected')).toHaveLength(1);
-    const other = { ...workspaceActor, userId: 'usr_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' as UserId };
+    const other = { ...workspaceActor, userId: '01a0bf5d-8f4b-799e-8662-91273789253a' as UserId };
     expect((await api.getWorkspaceLayout(other, workspaceTask)).revision).toBe(0);
     await api.saveWorkspaceLayout(other, workspaceTask, { ...input, layout: { ...input.layout, view: 'preview' } });
     await api.saveWorkspaceLayout(workspaceActor, workspaceTask, { expectedRevision: 1, layout: { ...input.layout, view: 'code' } });

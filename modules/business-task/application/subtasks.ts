@@ -16,13 +16,7 @@ export function subtaskUseCases(deps: BusinessTaskUseCaseDeps) {
   const { ownedTask } = taskLifecycleUseCases(deps);
   const { refresh, finish, releaseExecution } = subtaskRefresh(deps);
 
-  const load = async (taskId: TaskId, subtaskId: SubtaskId): Promise<SubtaskRun> => {
-    const run = await uow.read.subtasks.getById(subtaskId);
-    if (!run || run.taskId !== taskId) throw notFound('子任务', subtaskId);
-    return run;
-  };
-
-  const { launch, build, dispatchPending } = subtaskLaunch(deps);
+  const { launch, build, dispatchPending } = subtaskLaunch(deps), load = loadSubtask(deps);
 
   return {
     dispatchPendingSubtasks: dispatchPending,
@@ -35,18 +29,23 @@ export function subtaskUseCases(deps: BusinessTaskUseCaseDeps) {
     },
     retrySubtask: async (caller: ServiceActor, taskId: TaskId, subtaskId: SubtaskId, operationId?: string): Promise<SubtaskDto> => {
       const task = await ownedTask(caller, taskId);
-      const retryId = operationId ? `sub_${operationId.replaceAll('-', '')}` as SubtaskId : undefined;
-      const accepted = retryId ? await uow.read.subtasks.getById(retryId) : undefined;
-      if (accepted) return subtaskToDto(accepted);
+      const accepted = operationId ? await uow.read.subtasks.findRetry(taskId, operationId) : undefined;
+      if (accepted) {
+        if (accepted.retry?.previousId !== subtaskId) throw precondition('重试操作已用于不同的子任务');
+        return subtaskToDto(accepted);
+      }
       const previous = await load(taskId, subtaskId);
       if (!isTerminal(previous)) throw precondition('只能重试已结束的子任务');
       const spec: SubmitSubtaskRequest = previous.kind === 'command'
         ? { kind: 'command', name: previous.name, command: previous.command ?? [], timeoutSeconds: previous.timeoutSeconds ?? 3600, ...(previous.cwd ? { cwd: previous.cwd } : {}) }
-        : { kind: 'agent', name: previous.name, agentProfile: previous.agentProfile?.name ?? '', ...(previous.outputContract ? { outputContract: previous.outputContract.name } : {}), mode: previous.mode ?? 'oneshot', prompt: previous.prompt ?? '', ...(previous.cwd ? { cwd: previous.cwd } : {}) };
+        : { kind: 'agent', name: previous.name, agentProfileId: previous.agentProfile?.id ?? '', ...(previous.outputContract ? { outputContractId: previous.outputContract.id } : {}), mode: previous.mode ?? 'oneshot', prompt: previous.prompt ?? '', ...(previous.cwd ? { cwd: previous.cwd } : {}) };
       const built = await build(task, spec, previous.attempt + 1);
-      const run = retryId ? { ...built, id: retryId } : built;
-      await uow.run((scope) => scope.subtasks.insert(run));
-      return subtaskToDto(await launch(run));
+      if (operationId) {
+        const accepted = await uow.run((scope) => scope.subtasks.reserveRetry({ ...built, retry: { operationId, previousId: subtaskId } }));
+        return subtaskToDto(accepted.created ? await launch(accepted.run) : accepted.run);
+      }
+      await uow.run((scope) => scope.subtasks.insert(built));
+      return subtaskToDto(await launch(built));
     },
     getSubtask: async (caller: ServiceActor, taskId: TaskId, subtaskId: SubtaskId): Promise<SubtaskDto> => {
       await ownedTask(caller, taskId);
@@ -93,5 +92,13 @@ export function subtaskUseCases(deps: BusinessTaskUseCaseDeps) {
     },
     listProjectSubtasksInternal: async (taskId: TaskId): Promise<SubtaskDto[]> => (await uow.read.subtasks.listByTask(taskId)).map(subtaskToDto),
     sweepActive: subtaskSweep(deps, { refresh, launch, releaseExecution }),
+  };
+}
+
+function loadSubtask(deps: BusinessTaskUseCaseDeps) {
+  return async (taskId: TaskId, subtaskId: SubtaskId): Promise<SubtaskRun> => {
+    const run = await deps.uow.read.subtasks.getById(subtaskId);
+    if (!run || run.taskId !== taskId) throw notFound("子任务", subtaskId);
+    return run;
   };
 }

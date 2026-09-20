@@ -5,3 +5,5 @@ export { readMigrationDir, runMigrations } from './migrations';
 export { platformInfraSchema } from './infraSchema';
 export { jsonDocument } from './jsonDocument';
 export { keyedLock } from './keyedLock';
+export { resourceIdentityDirectory } from './identity/identityDirectory';
+export type { ResourceIdentityDirectory } from './identity/identityDirectory';

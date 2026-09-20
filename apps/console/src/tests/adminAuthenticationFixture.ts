@@ -1,12 +1,12 @@
 import type { OidcProviderDto, ProjectId, UserId } from '@crewstation/contracts';
 
-const userId = `usr_${'a'.repeat(32)}` as UserId;
-const projectId = `prj_${'b'.repeat(32)}` as ProjectId;
+const userId = `01a0bf5d-8f4b-799e-8662-91273789253a` as UserId;
+const projectId = `01a0bf5d-8f4b-791e-89de-7760fac24856` as ProjectId;
 const now = '2026-09-18T00:00:00.000Z';
 
 export function provider(overrides: Partial<OidcProviderDto> = {}): OidcProviderDto {
   return {
-    id: `idp_${'1'.repeat(32)}` as OidcProviderDto['id'],
+    id: `01a0bf5d-8f4b-7910-83db-c5372b035fba` as OidcProviderDto['id'],
     slug: 'corp-sso', displayName: '公司统一身份', issuerUrl: 'https://idp.corp.example', clientId: 'cs-platform', clientSecretSet: true,
     scopes: 'openid profile email', provisioning: 'allowlist', allowedEmailDomains: ['@corp.example'], iconUrl: null, enabled: true,
     authorizationEndpoint: null, tokenEndpoint: null, userinfoEndpoint: null, userinfoRequestStyle: 'get_bearer', jwksUri: null,
@@ -35,6 +35,7 @@ export function adminAuthenticationFixture(options: { authMethod?: 'password' | 
     let payload: unknown = { items: [] };
     let status = 200;
     if (url.pathname === '/v1/me') payload = { id: userId, name: '管理员', email: 'admin@corp.example', platformRole: 'admin', isAdmin: true, memberships: [], authMethod: state.authMethod };
+    else if (url.pathname === '/v1/projects') payload = { items: [{ id: projectId, name: '团队助理', slug: 'team-helper', kind: 'DigitalWorker', state: 'ready', ownerUserId: userId, namespace: 'cs-team-helper', createdAt: now }] };
     else if (url.pathname === '/v1/admin/auth/login-policy') {
       if (method === 'PUT') state.passwordLoginEnabled = Boolean((body as { passwordLoginEnabled?: boolean }).passwordLoginEnabled);
       payload = {
@@ -42,7 +43,7 @@ export function adminAuthenticationFixture(options: { authMethod?: 'password' | 
         enabledProviderCount: state.providers.filter((p) => p.enabled).length, callerAuthMethod: state.authMethod,
       };
     } else if (url.pathname === '/v1/admin/auth/providers' && method === 'POST') {
-      const created = provider({ ...(body as Partial<OidcProviderDto>), id: `idp_${'2'.repeat(32)}` as OidcProviderDto['id'] });
+      const created = provider({ ...(body as Partial<OidcProviderDto>), id: `01a0bf5d-8f4b-7375-83fb-4d780369584d` as OidcProviderDto['id'] });
       state.providers = [...state.providers, created];
       payload = created;
       status = 201;

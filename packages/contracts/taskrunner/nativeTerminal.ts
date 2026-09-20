@@ -6,7 +6,7 @@ import { AgentProtocolSchema } from './launch';
 export const TerminalSizeSchema = z.object({ cols: z.number().int().min(10).max(300), rows: z.number().int().min(2).max(120) });
 export const NativeTerminalRecordSchema = TerminalSizeSchema.extend({
   agentId: z.string().min(1), terminalId: z.string().min(1), runnerId: z.uuid(),
-  compute: z.string().min(1), permission: AgentPermissionSchema,
+  compute: z.string().min(1), computeName: z.string().optional(), permission: AgentPermissionSchema,
   revision: z.number().int().nonnegative(),
   lifecycle: z.enum(['starting', 'running', 'ended', 'failed']),
   startedAt: z.iso.datetime(), endedAt: z.iso.datetime().optional(),

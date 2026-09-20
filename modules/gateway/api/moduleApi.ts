@@ -9,7 +9,7 @@ export interface GatewayModuleApi {
   reconcileService(serviceId: ServiceId): Promise<RouteEntry[]>;
   reconcileAll(): Promise<number>;
   removeService(serviceId: ServiceId): Promise<void>;
-  listRoutes(): Promise<Array<{ serviceName: string; routes: RouteEntry[] }>>;
+  listRoutes(): Promise<Array<{ serviceId: string; serviceName: string; routes: RouteEntry[] }>>;
   rebuildAllowlist(): Promise<AllowlistDocument>;
   currentAllowlist(): Promise<AllowlistDocument | undefined>;
   evaluate(caller: WorkloadIdentity, target: EvaluationTarget): Promise<Evaluation>;

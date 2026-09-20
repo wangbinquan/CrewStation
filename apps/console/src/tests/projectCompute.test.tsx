@@ -3,7 +3,7 @@ import { afterEach, expect, test } from 'bun:test';
 import { act } from 'react';
 import { renderApp } from './renderApp';
 import { computePagePath, computePolicyPath, projectComputeFixture } from './projectComputeFixture';
-import { computeBackend, profileDetail } from './computeProfileFixture';
+import { computeBackend, profileIdOf, profileDetail } from './computeProfileFixture';
 import { blankDraft, toCreateRequest } from '../features/admin/model/profileDraft';
 
 const originalFetch = globalThis.fetch;
@@ -20,25 +20,25 @@ test('授权页载入后显示继承规则；单独授予隐藏档位、项目�
   await setSelect('Agent 档位范围', 'restricted');
   expect(page.text()).toContain('默认不可见的档位也可单独授予此项目');
   await check('private-large'); await check('aider-shell');
-  expect([...select('项目默认 Agent 档位').options].map((o) => o.value)).toEqual(['', 'private-large']);
-  await setSelect('项目默认 Agent 档位', 'private-large'); await setSelect('开发容器资源套餐', 'coding-large');
+  expect([...select('项目默认 Agent 档位').options].map((o) => o.value)).toEqual(['', profileIdOf('private-large')]);
+  await setSelect('项目默认 Agent 档位', profileIdOf('private-large')); await setSelect('开发容器资源套餐', profileIdOf('coding-large'));
   await page.click('保存项目授权');
-  expect(f.writes).toEqual([{ expectedRevision: 0, policy: { mode: 'restricted', allowedProfiles: ['private-large', 'aider-shell'], defaultProfile: 'private-large', devTaskProfile: 'coding-large' } }]);
+  expect(f.writes).toEqual([{ expectedRevision: 0, policy: { mode: 'restricted', allowedProfiles: [profileIdOf('private-large'), profileIdOf('aider-shell')], defaultProfile: profileIdOf('private-large'), devTaskProfile: profileIdOf('coding-large') } }]);
   expect(page.text()).toContain('项目算力授权已保存'); expect(button('保存项目授权').disabled).toBe(true);
   await setSelect('Agent 档位范围', 'inherit'); expect(page.text()).toContain('继承平台默认档位：standard');
   await page.click('保存项目授权');
-  expect(f.writes.at(-1)).toEqual({ expectedRevision: 1, policy: { mode: 'inherit', allowedProfiles: [], defaultProfile: null, devTaskProfile: 'coding-large' } });
+  expect(f.writes.at(-1)).toEqual({ expectedRevision: 1, policy: { mode: 'inherit', allowedProfiles: [], defaultProfile: null, devTaskProfile: profileIdOf('coding-large') } });
 });
 
 test('取消默认档位的授权时显示字段错误并保留草稿；并发冲突不覆盖服务端，重新读取需确认丢弃', async () => {
   const f = projectComputeFixture(); page = await renderApp(computePagePath);
-  await setSelect('Agent 档位范围', 'restricted'); await check('private-large'); await setSelect('项目默认 Agent 档位', 'private-large'); await check('private-large');
+  await setSelect('Agent 档位范围', 'restricted'); await check('private-large'); await setSelect('项目默认 Agent 档位', profileIdOf('private-large')); await check('private-large');
   await page.click('保存项目授权');
   expect(document.querySelector('[role="alert"]')?.textContent).toContain('请选择允许范围'); expect(f.writes).toEqual([]);
   await check('private-large'); f.state.conflict = true;
   await page.click('保存项目授权'); expect(page.text()).toContain('本次修改未保存');
-  expect(select('项目默认 Agent 档位').value).toBe('private-large');
-  await page.click('重新读取'); expect(page.text()).toContain('放弃当前修改'); expect(select('项目默认 Agent 档位').value).toBe('private-large');
+  expect(select('项目默认 Agent 档位').value).toBe(profileIdOf('private-large'));
+  await page.click('重新读取'); expect(page.text()).toContain('放弃当前修改'); expect(select('项目默认 Agent 档位').value).toBe(profileIdOf('private-large'));
   await page.click('确认'); expect(select('Agent 档位范围').value).toBe('inherit');
 });
 
@@ -69,6 +69,6 @@ test('档位行能切换默认可见性，平台默认的隐藏操作不可用�
   await expand('private');
   const action = [...document.querySelectorAll('button')].find((b) => b.textContent === '默认可见' && !b.disabled)!;
   await act(async () => action.click()); await page.settle(); await page.click('确认');
-  expect(f.writes.at(-1)).toMatchObject({ method: 'PUT', path: '/v1/admin/compute-profiles/private/default-visible', body: { defaultVisible: true } });
+  expect(f.writes.at(-1)).toMatchObject({ method: 'PUT', path: `/v1/admin/compute-profiles/${profileIdOf('private')}/default-visible`, body: { defaultVisible: true } });
   expect(toCreateRequest({ ...blankDraft('opencode'), defaultVisible: false }).defaultVisible).toBe(false);
 });

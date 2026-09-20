@@ -1,0 +1,406 @@
+<style>
+  #cs-identity-design {
+    --cs-bg: light-dark(#f5f7fa, #11151c); --cs-surface: light-dark(#fff, #191f29);
+    --cs-muted-surface: light-dark(#edf1f7, #222b39); --cs-text: light-dark(#182438, #e7edf6);
+    --cs-muted: light-dark(#59677c, #adbacd); --cs-line: light-dark(#dce3ed, #344154);
+    --cs-primary: light-dark(#235bd8, #8db3ff); --cs-fill: light-dark(#235bd8, #3970df);
+    --cs-on-fill: #fff; --cs-tint: light-dark(#eaf1ff, #20365b);
+    --cs-success: light-dark(#176746, #87d9b1); --cs-success-bg: light-dark(#eaf6ef, #18372b);
+    --cs-warning: light-dark(#86520a, #f4c976); --cs-warning-bg: light-dark(#fff5df, #392f1c);
+    --cs-danger: light-dark(#b02f39, #ffa4ad); --cs-radius: 10px; --cs-row-space: 15px;
+    color: var(--cs-text); background: var(--cs-bg); font: 14px/1.55 system-ui, -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    width: 100%; overflow-wrap: anywhere; position: relative; isolation: isolate;
+  }
+  #cs-identity-design * { box-sizing: border-box; }
+  #cs-identity-design [hidden] { display: none !important; }
+  #cs-identity-design button, #cs-identity-design input, #cs-identity-design select { font: inherit; }
+  #cs-identity-design button { cursor: pointer; }
+  #cs-identity-design button:disabled { cursor: default; opacity: .5; }
+  #cs-identity-design :is(button,input,select,summary):focus-visible { outline: 2px solid var(--cs-primary); outline-offset: 3px; }
+  #cs-identity-design svg { flex-shrink: 0; }
+  #cs-identity-design h1, #cs-identity-design h2, #cs-identity-design h3, #cs-identity-design p { margin: 0; }
+  #cs-identity-design h1 { font-size: 24px; font-weight: 600; letter-spacing: -.6px; line-height: 1.4; }
+  #cs-identity-design h2 { font-size: 15px; font-weight: 600; line-height: 1.5; }
+  #cs-identity-design h3 { font-size: 14px; font-weight: 600; }
+  #cs-identity-design code { font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--cs-muted); background: none; padding: 0; white-space: normal; }
+  #cs-identity-design .cs-top { min-height: 58px; display: flex; align-items: center; gap: 28px; padding: 12px 20px; background: var(--cs-surface); border-bottom: 1px solid var(--cs-line); }
+  #cs-identity-design .cs-brand { display: flex; align-items: center; gap: 9px; font-weight: 650; white-space: nowrap; }
+  #cs-identity-design .cs-brand-mark { display: grid; place-items: center; color: var(--cs-primary); }
+  #cs-identity-design .cs-global { display: flex; align-items: center; gap: 20px; color: var(--cs-muted); font-size: 13px; }
+  #cs-identity-design .cs-global strong { color: var(--cs-primary); font-weight: 500; }
+  #cs-identity-design .cs-preview-label { margin-left: auto; color: var(--cs-muted); font-size: 12px; white-space: nowrap; }
+  #cs-identity-design .cs-shell { display: grid; grid-template-columns: 172px minmax(0,1fr); }
+  #cs-identity-design .cs-side { padding: 24px 12px; background: var(--cs-surface); border-right: 1px solid var(--cs-line); }
+  #cs-identity-design .cs-side-title { padding: 0 12px 20px; font-size: 13px; font-weight: 600; }
+  #cs-identity-design .cs-side-caption { font-size: 11px; color: var(--cs-muted); padding: 24px 12px 8px; }
+  #cs-identity-design .cs-side-item { display: flex; gap: 10px; align-items: center; width: 100%; min-height: 38px; padding: 8px 12px; text-align: left; font-size: 13px; border: 0; border-radius: 7px; background: transparent; color: var(--cs-muted); }
+  #cs-identity-design button.cs-side-item { color: var(--cs-text); }
+  #cs-identity-design .cs-side-item[aria-current=page] { background: var(--cs-tint); color: var(--cs-primary); font-weight: 500; }
+  #cs-identity-design .cs-side-item:hover:not([aria-current=page]):is(button) { background: var(--cs-muted-surface); }
+  #cs-identity-design .cs-main { padding: 30px 30px 34px; min-width: 0; }
+  #cs-identity-design .cs-eyebrow { color: var(--cs-muted); font-size: 12px; margin-bottom: 10px; }
+  #cs-identity-design .cs-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 26px; }
+  #cs-identity-design .cs-subtitle { color: var(--cs-muted); font-size: 13px; margin-top: 7px; }
+  #cs-identity-design .cs-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  #cs-identity-design .cs-button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 34px; padding: 6px 12px; border: 1px solid var(--cs-line); border-radius: 7px; background: var(--cs-surface); color: var(--cs-text); white-space: nowrap; font-size: 13px; }
+  #cs-identity-design .cs-button:hover { background: var(--cs-muted-surface); }
+  #cs-identity-design .cs-button.cs-primary { background: var(--cs-fill); border-color: var(--cs-fill); color: var(--cs-on-fill); }
+  #cs-identity-design .cs-button.cs-quiet { border-color: transparent; background: transparent; color: var(--cs-muted); }
+  #cs-identity-design .cs-button.cs-link { border-color: transparent; background: transparent; color: var(--cs-primary); padding-inline: 6px; }
+  #cs-identity-design .cs-button.cs-danger { color: var(--cs-danger); }
+  #cs-identity-design .cs-card { background: var(--cs-surface); border: 1px solid var(--cs-line); border-radius: var(--cs-radius); min-width: 0; }
+  #cs-identity-design .cs-card-header { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 20px; }
+  #cs-identity-design .cs-tools { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 18px; border-bottom: 1px solid var(--cs-line); }
+  #cs-identity-design .cs-search { position: relative; flex: 1; max-width: 320px; min-width: 0; }
+  #cs-identity-design .cs-search > svg { position: absolute; left: 11px; top: 11px; color: var(--cs-muted); }
+  #cs-identity-design .cs-input, #cs-identity-design .cs-select { background: var(--cs-surface); border: 1px solid var(--cs-line); color: var(--cs-text); border-radius: 7px; min-height: 38px; width: 100%; padding: 8px 11px; min-width: 0; }
+  #cs-identity-design .cs-input::placeholder { color: var(--cs-muted); opacity: .8; }
+  #cs-identity-design .cs-search .cs-input { padding-left: 35px; }
+  #cs-identity-design .cs-select { width: auto; padding-right: 26px; }
+  #cs-identity-design .cs-directory { display: grid; grid-template-columns: minmax(0,1fr); align-items: start; gap: 18px; }
+  #cs-identity-design .cs-directory.cs-editing { grid-template-columns: minmax(0,1fr) 290px; }
+  #cs-identity-design .cs-table { border-collapse: collapse; width: 100%; table-layout: fixed; }
+  #cs-identity-design .cs-table th { font-size: 12px; color: var(--cs-muted); font-weight: 400; text-align: left; padding: 12px 20px; background: var(--cs-muted-surface); }
+  #cs-identity-design .cs-table th:first-child { width: 54%; }
+  #cs-identity-design .cs-table th:last-child { width: 110px; text-align: right; }
+  #cs-identity-design .cs-table td { padding: var(--cs-row-space) 20px; border-bottom: 1px solid var(--cs-line); vertical-align: middle; }
+  #cs-identity-design .cs-table tr:last-child td { border-bottom: none; }
+  #cs-identity-design .cs-table td:last-child { text-align: right; }
+  #cs-identity-design .cs-table tr.cs-selected td { background: var(--cs-tint); }
+  #cs-identity-design .cs-person { display: flex; gap: 12px; align-items: center; min-width: 0; }
+  #cs-identity-design .cs-avatar { width: 34px; height: 34px; display: grid; place-items: center; flex: 0 0 34px; border-radius: 50%; color: var(--cs-muted); background: var(--cs-muted-surface); font-size: 13px; font-weight: 500; }
+  #cs-identity-design .cs-name { font-weight: 500; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  #cs-identity-design .cs-meta { display: block; color: var(--cs-muted); font-size: 12px; margin-top: 3px; }
+  #cs-identity-design .cs-badge { display: inline-flex; align-items: center; gap: 5px; background: var(--cs-muted-surface); color: var(--cs-muted); border-radius: 5px; padding: 2px 7px; font-size: 12px; white-space: nowrap; }
+  #cs-identity-design .cs-badge.cs-admin { color: var(--cs-primary); background: var(--cs-tint); }
+  #cs-identity-design .cs-badge.cs-ok { color: var(--cs-success); background: var(--cs-success-bg); }
+  #cs-identity-design .cs-dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+  #cs-identity-design .cs-footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; font-size: 12px; padding: 12px 20px; border-top: 1px solid var(--cs-line); color: var(--cs-muted); }
+  #cs-identity-design .cs-editor { padding: 20px; }
+  #cs-identity-design .cs-panel-heading { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 20px; }
+  #cs-identity-design .cs-small-heading { font-size: 12px; color: var(--cs-muted); margin: 22px 0 10px; }
+  #cs-identity-design .cs-choices { display: grid; gap: 8px; border: 0; padding: 0; margin: 0; min-width: 0; }
+  #cs-identity-design .cs-choice { display: flex; align-items: flex-start; gap: 9px; border: 1px solid var(--cs-line); border-radius: 8px; padding: 12px; background: var(--cs-surface); }
+  #cs-identity-design .cs-choice:has(input:checked) { border-color: var(--cs-primary); background: var(--cs-tint); }
+  #cs-identity-design input:is([type=radio],[type=checkbox]) { accent-color: var(--cs-fill); margin: 4px 0 0; flex-shrink: 0; width: 15px; height: 15px; }
+  #cs-identity-design .cs-choice strong { font-size: 13px; font-weight: 500; }
+  #cs-identity-design .cs-checkrow { display: flex; align-items: flex-start; gap: 10px; padding-block: 12px; }
+  #cs-identity-design .cs-form-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; padding-top: 22px; margin-top: 22px; border-top: 1px solid var(--cs-line); }
+  #cs-identity-design .cs-notice { padding: 12px 14px; background: var(--cs-tint); color: var(--cs-text); border-radius: 7px; font-size: 13px; margin-block: 14px; }
+  #cs-identity-design .cs-notice.cs-warning { background: var(--cs-warning-bg); color: var(--cs-warning); }
+  #cs-identity-design .cs-guide { padding: 20px; margin-bottom: 20px; display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 20px; border-bottom: 1px solid var(--cs-line); }
+  #cs-identity-design .cs-tabs { display: flex; gap: 24px; border-bottom: 1px solid var(--cs-line); margin-bottom: 24px; }
+  #cs-identity-design .cs-tab { border: none; border-bottom: 2px solid transparent; border-radius: 0; padding: 0 0 12px; color: var(--cs-muted); background: transparent; font-size: 14px; }
+  #cs-identity-design .cs-tab[aria-selected=true] { color: var(--cs-primary); border-bottom-color: var(--cs-primary); font-weight: 500; }
+  #cs-identity-design .cs-provider { padding: 0 20px 20px; }
+  #cs-identity-design .cs-provider-line { display: flex; align-items: center; gap: 14px; }
+  #cs-identity-design .cs-provider-logo { display: grid; place-items: center; width: 40px; height: 40px; flex: 0 0 40px; border-radius: 10px; background: var(--cs-muted-surface); color: var(--cs-muted); }
+  #cs-identity-design .cs-provider-content { min-width: 0; flex: 1; }
+  #cs-identity-design .cs-provider-details { display: flex; flex-wrap: wrap; gap: 8px 22px; color: var(--cs-muted); font-size: 12px; padding: 16px 0 0 54px; }
+  #cs-identity-design .cs-setting { margin-top: 18px; padding: 20px; display: flex; align-items: center; gap: 14px; }
+  #cs-identity-design .cs-setting-content { flex: 1; }
+  #cs-identity-design .cs-context { display: flex; gap: 10px 24px; flex-wrap: wrap; margin-top: 20px; font-size: 12px; color: var(--cs-muted); }
+  #cs-identity-design .cs-section { margin-top: 24px; }
+  #cs-identity-design .cs-form-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 20px; }
+  #cs-identity-design .cs-field { display: flex; flex-direction: column; gap: 7px; min-width: 0; font-size: 13px; }
+  #cs-identity-design .cs-field small { font-size: 12px; color: var(--cs-muted); }
+  #cs-identity-design .cs-field.cs-full { grid-column: 1 / -1; }
+  #cs-identity-design .cs-field input:disabled { color: var(--cs-muted); background: var(--cs-muted-surface); }
+  #cs-identity-design .cs-field .cs-select { width: 100%; }
+  #cs-identity-design .cs-field input[aria-invalid=true] { border-color: var(--cs-danger); }
+  #cs-identity-design .cs-error { color: var(--cs-danger); font-size: 12px; }
+  #cs-identity-design .cs-steps { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 4px; margin-bottom: 24px; padding-bottom: 20px; border-bottom: 1px solid var(--cs-line); }
+  #cs-identity-design .cs-step { display: flex; gap: 7px; align-items: center; justify-content: center; border: 0; padding: 9px 5px; background: transparent; color: var(--cs-muted); font-size: 12px; border-radius: 7px; }
+  #cs-identity-design .cs-step[aria-selected=true] { background: var(--cs-tint); color: var(--cs-primary); }
+  #cs-identity-design .cs-step-number { width: 19px; height: 19px; display: grid; place-items: center; border: 1px solid currentColor; border-radius: 50%; font-size: 11px; }
+  #cs-identity-design .cs-form-intro { margin-bottom: 22px; }
+  #cs-identity-design .cs-diagnostic { margin-top: 18px; border-top: 1px solid var(--cs-line); padding-top: 18px; }
+  #cs-identity-design .cs-diag-row { display: grid; grid-template-columns: 100px 80px minmax(0,1fr); gap: 10px; padding: 9px 0; font-size: 12px; }
+  #cs-identity-design details { margin-top: 18px; color: var(--cs-muted); font-size: 12px; }
+  #cs-identity-design summary { cursor: pointer; }
+  #cs-identity-design .cs-empty { padding: 40px 20px; text-align: center; color: var(--cs-muted); }
+  #cs-identity-design .cs-field-row { display: flex; gap: 16px; align-items: center; padding: 16px 20px; border-top: 1px solid var(--cs-line); }
+  #cs-identity-design .cs-field-row > div:first-child { flex: 1; }
+  #cs-identity-design .cs-mapping { display: grid; grid-template-columns: minmax(0,1fr) 20px minmax(0,1fr) 34px; gap: 8px; align-items: end; margin-bottom: 12px; }
+  #cs-identity-design .cs-mapping > span { align-self: center; color: var(--cs-muted); }
+  #cs-identity-design .cs-toast { color: var(--cs-success); font-size: 13px; padding-top: 16px; min-height: 24px; }
+  #cs-identity-design .cs-sr { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  @media(max-width:960px) {
+    #cs-identity-design .cs-directory.cs-editing { grid-template-columns: minmax(0,1fr); }
+    #cs-identity-design .cs-directory.cs-editing .cs-choices { grid-template-columns: repeat(3,minmax(0,1fr)); }
+  }
+  @media(max-width:800px) {
+    #cs-identity-design .cs-shell { grid-template-columns: 144px minmax(0,1fr); }
+    #cs-identity-design .cs-main { padding: 24px 20px; }
+    #cs-identity-design .cs-top { gap: 18px; }
+    #cs-identity-design .cs-global { gap: 12px; }
+    #cs-identity-design .cs-table th:first-child { width: 50%; }
+    #cs-identity-design .cs-provider-line { flex-wrap: wrap; }
+    #cs-identity-design .cs-provider-line > .cs-actions { margin-left: 54px; }
+    #cs-identity-design .cs-directory.cs-editing .cs-choices { grid-template-columns: 1fr; }
+  }
+  @media(max-width:620px) {
+    #cs-identity-design .cs-top { padding: 14px 16px; gap: 10px; }
+    #cs-identity-design .cs-global { display: none; }
+    #cs-identity-design .cs-preview-label { font-size: 11px; }
+    #cs-identity-design .cs-shell { display: block; }
+    #cs-identity-design .cs-side { display: flex; gap: 6px; border-right: 0; border-bottom: 1px solid var(--cs-line); padding: 10px 12px; }
+    #cs-identity-design .cs-side > :not(button) { display: none; }
+    #cs-identity-design .cs-side button { width: auto; flex: 1; justify-content: center; }
+    #cs-identity-design .cs-main { padding: 22px 16px; }
+    #cs-identity-design .cs-heading { flex-wrap: wrap; gap: 12px; margin-bottom: 20px; }
+    #cs-identity-design h1 { font-size: 22px; }
+    #cs-identity-design .cs-eyebrow { display: none; }
+    #cs-identity-design .cs-tools { flex-wrap: wrap; padding: 14px; }
+    #cs-identity-design .cs-search { flex-basis: 100%; max-width: none; }
+    #cs-identity-design .cs-table, #cs-identity-design .cs-table tbody { display: block; }
+    #cs-identity-design .cs-table thead { display: none; }
+    #cs-identity-design .cs-table tr { display: grid; grid-template-columns: minmax(0,1fr) auto; padding: 14px; gap: 6px; border-bottom: 1px solid var(--cs-line); }
+    #cs-identity-design .cs-table tr:last-child { border-bottom: 0; }
+    #cs-identity-design .cs-table td { padding: 0; border: 0; }
+    #cs-identity-design .cs-table td:first-child { grid-column: 1 / -1; }
+    #cs-identity-design .cs-table td:nth-child(2) { padding-left: 46px; display: flex; align-items: center; }
+    #cs-identity-design .cs-table tr.cs-selected { background: var(--cs-tint); }
+    #cs-identity-design .cs-form-grid { grid-template-columns: 1fr; gap: 18px; }
+    #cs-identity-design .cs-guide { grid-template-columns: 1fr; padding: 4px 0 20px; }
+    #cs-identity-design .cs-card-header, #cs-identity-design .cs-editor { padding: 16px; }
+    #cs-identity-design .cs-provider { padding: 0 16px 16px; }
+    #cs-identity-design .cs-provider-details { padding-left: 0; }
+    #cs-identity-design .cs-provider-line > .cs-actions { margin-left: 0; width: 100%; padding-top: 4px; }
+    #cs-identity-design .cs-setting { padding: 16px; flex-wrap: wrap; }
+    #cs-identity-design .cs-setting-content { flex-basis: calc(100% - 60px); }
+    #cs-identity-design .cs-setting > .cs-actions { width: 100%; justify-content: flex-end; }
+    #cs-identity-design .cs-steps { grid-template-columns: repeat(2,minmax(0,1fr)); }
+    #cs-identity-design .cs-diag-row { grid-template-columns: 1fr auto; }
+    #cs-identity-design .cs-diag-row code { grid-column: 1 / -1; }
+    #cs-identity-design .cs-field-row { padding: 14px 16px; flex-wrap: wrap; }
+    #cs-identity-design .cs-mapping { grid-template-columns: minmax(0,1fr) 34px; }
+    #cs-identity-design .cs-mapping > span { display: none; }
+    #cs-identity-design .cs-mapping > label { grid-column: 1; }
+    #cs-identity-design .cs-mapping > button { grid-column: 2; grid-row: 1 / 3; }
+  }
+  @media(pointer:coarse) {
+    #cs-identity-design .cs-button, #cs-identity-design .cs-side-item, #cs-identity-design .cs-tab, #cs-identity-design .cs-step { min-height: 44px; }
+    #cs-identity-design input, #cs-identity-design select { font-size: 16px; }
+  }
+</style>
+<div id="cs-identity-design" aria-label="CrewStation 用户与认证管理设计">
+  <header class="cs-top">
+    <div class="cs-brand"><span class="cs-brand-mark"><i data-lucide="panels-top-left" aria-hidden="true"></i></span>CrewStation</div>
+    <div class="cs-global"><span>应用</span><span>项目开发</span><strong>平台管理</strong></div>
+    <span class="cs-preview-label">设计预览 · 示例数据</span>
+  </header>
+  <div class="cs-shell">
+    <nav class="cs-side" aria-label="平台管理">
+      <div class="cs-side-title">平台管理</div>
+      <span class="cs-side-item">总览</span><span class="cs-side-item">申请审批</span>
+      <div class="cs-side-caption">供给与接入</div><span class="cs-side-item">项目管理</span><span class="cs-side-item">能力接入</span>
+      <div class="cs-side-caption">平台设置</div>
+      <button class="cs-side-item" type="button" data-page="users" aria-current="page"><i data-lucide="users" aria-hidden="true"></i>用户与权限</button>
+      <button class="cs-side-item" type="button" data-page="auth"><i data-lucide="key-round" aria-hidden="true"></i>认证</button>
+      <span class="cs-side-item">算力档位</span><span class="cs-side-item">服务套餐</span><span class="cs-side-item">任务容器套餐</span><span class="cs-side-item">出站白名单</span><span class="cs-side-item">集群管理</span><span class="cs-side-item">网关</span>
+    </nav>
+    <main class="cs-main"><div id="cs-design-content"></div><p class="cs-toast" id="cs-design-feedback" role="status" aria-live="polite"></p></main>
+  </div>
+</div>
+<script>
+(() => {
+  const root = document.getElementById('cs-identity-design');
+  const content = root.querySelector('#cs-design-content');
+  const feedback = root.querySelector('#cs-design-feedback');
+  const roles = { user: ['用户', '使用应用与获邀试用。'], developer: ['开发者', '创建项目，开发获授权的项目。'], admin: ['管理员', '管理平台，并包含开发者能力。'] };
+  const initialUsers = [
+    { id:'lin', name:'林朔', email:'lin.shuo@example.com', role:'admin', me:true },
+    { id:'chen', name:'陈予安', email:'chen.yuan@example.com', role:'developer' },
+    { id:'xu', name:'许清和', email:'xu.qinghe@example.com', role:'developer' },
+    { id:'zhou', name:'周闻溪', email:'zhou.wenxi@example.com', role:'user' },
+    { id:'li', name:'李知夏', email:'li.zhixia@example.com', role:'user' },
+    { id:'song', name:'宋序', email:'song.xu@example.com', role:'user' },
+    { id:'gu', name:'顾南', email:'gu.nan@example.com', role:'user' },
+  ];
+  const state = { page:'users', tab:'methods', query:'', role:'all', selected:null, picked:'user', confirm:false, guide:false, users:initialUsers, providerEdit:false, providerNew:false, step:0, probe:false, password:false, globalFields:['name','email'], pendingField:null, overrideOpen:false, overrideProject:'', overrideFields:['name','email'], overrides:[], mappings:[{key:'department',claim:'department'}] };
+  const design = { density:'compact', corners:'soft' };
+  const blankProvider = {name:'',slug:'',issuer:'',clientId:'',scopes:'openid profile email',enabled:true,authorization:'',token:'',userinfo:'',jwks:'',style:'get_bearer',provisioning:'allowlist',domains:'@example.com',trust:false,username:'',gitname:'',email:'',subject:''};
+  state.providers=[{...blankProvider,id:'corp',name:'企业统一登录',slug:'corp-sso',issuer:'https://login.example.com',clientId:'crewstation',secretSet:true,linked:true,mappings:[{key:'department',claim:'department'}]}];
+  state.editProviderId=null;
+  state.removeOverride=null;
+  const fields = [['name','显示名','应用中显示的用户姓名'],['email','邮箱','用户的邮箱地址'],['git-name','Git 名','用于 Git 身份的姓名'],['department','部门','来自企业账号的自定义字段']];
+  const projects = {assistant:'知识助手',brief:'周报助手',service:'客户服务台'};
+  const projectIds = {assistant:'prj_01a0bf476f1172c08fa422d86c89fb64',brief:'prj_01a0bf476f1172c09e1038f46cd601bd',service:'prj_01a0bf476f1172c0b0d6e7851a0f792d'};
+  let providerDraft = {};
+  let formBaseline = '';
+  let fieldErrors = {};
+  let leaveAction = null;
+  const esc = (value) => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+  const icon = (name) => `<i data-lucide="${name}" aria-hidden="true"></i>`;
+  const button = (text, action, style='cs-button', attrs='') => `<button type="button" class="${style}" data-action="${action}" ${attrs}>${text}</button>`;
+  const badge = (text,tone='') => `<span class="cs-badge ${tone}">${tone==='cs-ok'?'<span class="cs-dot"></span>':''}${text}</span>`;
+  const person = (user) => `<div class="cs-person"><span class="cs-avatar" aria-hidden="true">${esc(user.name[0])}</span><div><div class="cs-name">${esc(user.name)}${user.me?badge('你'):''}</div><span class="cs-meta">${esc(user.email)}</span></div></div>`;
+  const persist = () => window.openai?.setWidgetState?.({modelContent:{page:state.page,authenticationTab:state.tab,design},privateContent:{query:state.query,role:state.role}})?.catch(() => {});
+  function restore(saved) {
+    if (!saved) return;
+    const m = saved.modelContent || {}, p = saved.privateContent || {};
+    if (['users','auth'].includes(m.page)) state.page=m.page;
+    if (['methods','fields'].includes(m.authenticationTab)) state.tab=m.authenticationTab;
+    if (m.design && ['compact','comfortable'].includes(m.design.density)) design.density=m.design.density;
+    if (m.design && ['soft','crisp'].includes(m.design.corners)) design.corners=m.design.corners;
+    if (typeof p.query==='string') state.query=p.query.slice(0,200);
+    if (p.role==='all'||roles[p.role]) state.role=p.role;
+  }
+  function notify(text) { feedback.textContent=text; }
+  function paintIcons() { if (typeof lucide!=='undefined') lucide.createIcons({attrs:{width:16,height:16,'stroke-width':1.7}}); }
+  function applyDesign() { root.style.setProperty('--cs-row-space',design.density==='compact'?'13px':'20px'); root.style.setProperty('--cs-radius',design.corners==='soft'?'10px':'5px'); }
+  function render() {
+    applyDesign();
+    root.querySelectorAll('[data-page]').forEach(el => { if(el.dataset.page===state.page) el.setAttribute('aria-current','page'); else el.removeAttribute('aria-current'); });
+    content.innerHTML=state.page==='users'?usersPage():authPage();
+    paintIcons();
+  }
+  function usersPage() {
+    return `<div class="cs-eyebrow">平台设置</div><div class="cs-heading"><div><h1>用户与权限</h1><p class="cs-subtitle">管理成员的平台访问权限。</p></div>${button(icon('circle-help')+'角色说明','guide','cs-button cs-quiet',`aria-expanded="${state.guide}"`)}</div>
+      ${state.guide?`<div class="cs-guide">${Object.values(roles).map(([name,hint])=>`<div><h3>${name}</h3><p class="cs-meta">${hint}</p></div>`).join('')}<p class="cs-meta" style="grid-column:1/-1">项目内的开发、试用与负责人权限，由项目成员关系单独决定。</p></div>`:''}
+      <div class="cs-directory ${state.selected?'cs-editing':''}"><section class="cs-card" aria-label="用户目录"><div class="cs-tools"><label class="cs-search"><span class="cs-sr">搜索用户</span>${icon('search')}<input class="cs-input" id="cs-user-search" type="search" placeholder="搜索姓名或邮箱" value="${esc(state.query)}"></label><label><span class="cs-sr">平台角色筛选</span><select class="cs-select" id="cs-role-filter"><option value="all">全部角色</option>${Object.entries(roles).map(([key,[label]])=>`<option value="${key}" ${state.role===key?'selected':''}>${label}</option>`).join('')}</select></label></div><div id="cs-user-rows">${userRows()}</div></section>${state.selected?roleEditor():''}</div>`;
+  }
+  function userRows() {
+    const query=state.query.trim().toLowerCase();
+    const users=state.users.filter(u=>(state.role==='all'||u.role===state.role)&&(!query||`${u.name} ${u.email}`.toLowerCase().includes(query)));
+    return users.length?`<table class="cs-table"><thead><tr><th scope="col">用户</th><th scope="col">平台角色</th><th scope="col">操作</th></tr></thead><tbody>${users.map(u=>`<tr class="${state.selected===u.id?'cs-selected':''}"><td>${person(u)}</td><td>${badge(roles[u.role][0],u.role==='admin'?'cs-admin':'')}</td><td>${button('管理角色','edit-role','cs-button cs-link',`data-id="${u.id}" aria-label="管理 ${esc(u.name)} 的角色"`)}</td></tr>`).join('')}</tbody></table><div class="cs-footer"><span>显示 ${users.length} / ${state.users.length} 位用户</span><span>首次登录后自动加入目录</span></div>`:`<div class="cs-empty"><h3>没有匹配的用户</h3><p class="cs-meta">试试其他姓名、邮箱或角色。</p>${button('清除筛选','clear-filters','cs-button cs-link')}</div>`;
+  }
+  function roleEditor() {
+    const user=state.users.find(u=>u.id===state.selected);
+    return `<section class="cs-card cs-editor" aria-label="编辑 ${esc(user.name)} 的平台角色"><div class="cs-panel-heading"><h2>管理角色</h2>${button(icon('x'),'close-role','cs-button cs-quiet','aria-label="关闭角色编辑"')}</div>${person(user)}<p class="cs-small-heading">平台角色</p><fieldset class="cs-choices"><legend class="cs-sr">选择平台角色</legend>${Object.entries(roles).map(([key,[name,hint]])=>`<label class="cs-choice"><input name="cs-user-role" type="radio" value="${key}" ${state.picked===key?'checked':''}><span><strong>${name}</strong>${user.role===key?' '+badge('当前'):''}<span class="cs-meta">${hint}</span></span></label>`).join('')}</fieldset>
+      ${state.confirm?`<div class="cs-notice cs-warning" role="alert"><strong>确认修改 ${esc(user.name)} 的角色？</strong><p style="margin-top:6px">${roles[user.role][0]} → ${roles[state.picked][0]}</p><span class="cs-meta">权限范围随角色更新，项目成员关系保留。</span></div>`:''}<div class="cs-form-actions">${button('取消',state.confirm?'cancel-confirm':'close-role')}${button(state.confirm?'确认保存':'检查变更',state.confirm?'save-role':'confirm-role','cs-button cs-primary',state.picked===user.role?'disabled':'')}</div></section>`;
+  }
+  function authPage() {
+    if(state.providerEdit) return providerEditor();
+    return `<div class="cs-eyebrow">平台设置</div><div class="cs-heading"><div><h1>认证</h1><p class="cs-subtitle">连接公司账号，管理登录方式与应用可获取的身份信息。</p></div></div><div class="cs-tabs" role="tablist" aria-label="认证设置"><button class="cs-tab" id="cs-methods-tab" role="tab" aria-controls="cs-auth-panel" aria-selected="${state.tab==='methods'}" data-auth-tab="methods">登录方式</button><button class="cs-tab" id="cs-fields-tab" role="tab" aria-controls="cs-auth-panel" aria-selected="${state.tab==='fields'}" data-auth-tab="fields">身份字段</button></div><div id="cs-auth-panel" role="tabpanel" aria-labelledby="cs-${state.tab}-tab">${state.tab==='methods'?loginMethods():forwarding()}</div>`;
+  }
+  function loginMethods() {
+    return `<section class="cs-card"><div class="cs-card-header"><div><h2>公司登录</h2><p class="cs-meta">通过身份提供方登录 CrewStation。</p></div>${button(icon('plus')+'添加接入方','add-provider')}</div>${state.providers.map(providerRow).join('')||'<p class="cs-empty">还没有接入方，添加后即可配置公司登录。</p>'}</section>
+      <section class="cs-card cs-setting"><span class="cs-provider-logo">${icon('key-round')}</span><div class="cs-setting-content"><h2>密码登录</h2><p class="cs-meta">使用 CrewStation 本地账号和密码登录。</p></div><div class="cs-actions">${badge(state.password?'已开启':'已关闭')}${button(state.password?'关闭':'开启','password','cs-button')}</div></section>
+      ${state.passwordConfirm?`<div class="cs-notice cs-warning"><p>关闭密码登录后，请使用已启用的公司账号登录。</p><div class="cs-actions" style="margin-top:10px">${button('取消','cancel-password')}${button('确认关闭','disable-password','cs-button')}</div></div>`:''}
+      <div class="cs-context"><span>当前会话 · 公司账号登录</span><span>${state.providers.filter(p=>p.enabled).length} 个已启用接入方</span><span>初始化已完成</span></div><details><summary>查看登录状态详情</summary><p style="margin-top:10px">引导令牌已退役。当前会话来自 OIDC；关闭密码登录需要至少一个启用的接入方。</p></details>`;
+  }
+  function providerRow(provider) {
+    return `<div class="cs-provider"><div class="cs-provider-line"><span class="cs-provider-logo">${icon('building-2')}</span><div class="cs-provider-content"><div class="cs-name">${esc(provider.name)} ${badge(provider.enabled?'已启用':'已停用',provider.enabled?'cs-ok':'')}</div><span class="cs-meta">${esc(provider.issuer.replace(/^https?:\/\//,''))} <code>· ${esc(provider.slug)}</code></span></div><div class="cs-actions">${button('配置','edit-provider','cs-button',`data-provider-id="${provider.id}"`)}${button(icon('plug-zap')+'测试连接','probe','cs-button cs-quiet',`data-provider-id="${provider.id}"`)}</div></div><div class="cs-provider-details"><span>账号创建 · ${provider.provisioning==='allowlist'?'仅指定邮箱域':'首次登录自动创建'}</span><span>密钥 · ${provider.secretSet?'已设置':'未设置'}</span></div>${state.probe===provider.id?probePanel(provider):''}</div>`;
+  }
+  function probePanel(provider) {
+    return `<div class="cs-diagnostic"><div class="cs-panel-heading" style="margin-bottom:10px"><h3>${badge('配置已就绪','cs-ok')}</h3>${button('收起','hide-probe','cs-button cs-quiet')}</div><p class="cs-meta">模拟检查结果 · 自动发现成功。真实登录仍需在登录页验证。</p>${[['授权端点','/oauth/authorize'],['令牌端点','/oauth/token'],['用户信息','/userinfo'],['JWKS','/.well-known/jwks.json']].map(([name,path])=>`<div class="cs-diag-row"><span>${name}</span><span class="cs-meta">自动发现</span><code>${esc(provider.issuer.replace(/\/$/,''))}${path}</code></div>`).join('')}<p class="cs-meta">JWKS 可访问 · 支持 openid、profile、email</p></div>`;
+  }
+  function startProvider(adding,id) {
+    state.providerNew=adding; state.providerEdit=true; state.step=0; fieldErrors={};
+    state.editProviderId=adding?null:id;state.deleteProviderConfirm=false;
+    const current=state.providers.find(p=>p.id===id);
+    providerDraft={...(current||blankProvider),secret:''};
+    state.mappings=(current?.mappings||[]).map(m=>({...m}));
+    formBaseline=JSON.stringify({providerDraft,mappings:state.mappings});
+  }
+  function field(key,label,hint,placeholder='',full=false,type='text',disabled=false) {
+    const error=fieldErrors[key];
+    return `<label class="cs-field ${full?'cs-full':''}">${label}<input class="cs-input" data-provider-field="${key}" type="${type}" value="${esc(providerDraft[key])}" placeholder="${esc(placeholder)}" ${disabled?'disabled':''} aria-describedby="cs-hint-${key}" ${error?'aria-invalid="true"':''}><small id="cs-hint-${key}">${hint}</small>${error?`<span class="cs-error" role="alert">${error}</span>`:''}</label>`;
+  }
+  function providerEditor() {
+    return `<div class="cs-eyebrow">认证 / 公司登录</div><div class="cs-heading"><div><h1>${state.providerNew?'添加接入方':'配置'+esc(state.providers.find(p=>p.id===state.editProviderId)?.name)}</h1><p class="cs-subtitle">${state.providerNew?'连接公司的 OIDC / OAuth 2.0 身份服务。':esc(providerDraft.slug)+' · 保存后更新登录配置。'}</p></div>${button(icon('arrow-left')+'返回','leave-provider','cs-button cs-quiet')}</div>
+      <section class="cs-card cs-editor"><div class="cs-steps" role="tablist" aria-label="接入方配置分组">${['基本信息','连接设置','账号规则','字段映射'].map((name,i)=>`<button class="cs-step" type="button" role="tab" id="cs-step-${i}" aria-controls="cs-provider-step" aria-selected="${state.step===i}" data-step="${i}"><span class="cs-step-number">${i+1}</span>${name}${i===0&&Object.keys(fieldErrors).length?' · '+Object.keys(fieldErrors).length:''}</button>`).join('')}</div><div id="cs-provider-step" role="tabpanel" aria-labelledby="cs-step-${state.step}">${providerStep()}</div>
+      ${leaveAction?`<div class="cs-notice cs-warning"><p>还有未保存的配置。放弃这些修改？</p><div class="cs-actions" style="margin-top:10px">${button('继续编辑','stay-provider')}${button('放弃修改','discard-provider')}</div></div>`:''}
+      <div class="cs-form-actions">${button('取消','leave-provider')}${state.step>0?button('上一步','previous-step'):''}${state.step<3?button('下一步 '+icon('arrow-right'),'next-step','cs-button cs-primary'):button('保存配置','save-provider','cs-button cs-primary')}</div></section>
+      ${!state.providerNew?`<details ${state.deleteProviderConfirm?'open':''}><summary>停用与删除</summary><p style="margin:12px 0">停用会移除登录入口，已有会话仍保留。删除时若仍有关联用户，平台会说明原因。</p>${button('删除接入方','delete-provider','cs-button cs-danger')}${state.deleteProviderConfirm?`<div class="cs-notice cs-warning"><p>删除 ${esc(providerDraft.name)}？该登录入口将从登录页移除。</p><div class="cs-actions">${button('取消','cancel-delete-provider')}${button('确认删除','confirm-delete-provider','cs-button cs-danger')}</div></div>`:''}</details>`:''}`;
+  }
+  function providerStep() {
+    if(state.step===0) return `<div class="cs-form-intro"><h2>登录入口与应用凭据</h2><p class="cs-meta">先准备身份服务地址，以及公司身份平台分配的 Client ID 和密钥。</p></div><div class="cs-form-grid">${field('name','显示名称 · 必填','最多 128 字，显示在登录按钮上。','如：企业统一登录')}${field('slug','接入方标识 · 必填','1–64 位小写字母、数字或连字符；保存后不可更改。','corp-sso',false,'text',!state.providerNew)}${field('issuer','身份服务地址（Issuer URL）· 必填','完整 http(s) 地址，最多 2048 字；用于自动发现登录端点。','https://login.example.com',true)}${field('clientId','Client ID · 必填','由身份平台分配，最多 256 字。')}${field('secret',state.providerNew?'Client Secret · 必填':'Client Secret · 已设置',state.providerNew?'最多 1024 字；保存后不能读取原值。':'留空保留当前密钥。填写新值才会替换。','',false,'password')}${field('scopes','授权范围（Scopes）· 必填','空格分隔，最多 512 字。标准 OIDC 包含 openid。','openid profile email',true)}</div><label class="cs-checkrow"><input type="checkbox" data-provider-check="enabled" ${providerDraft.enabled?'checked':''}><span>启用此登录入口<span class="cs-meta">启用后，用户可在登录页选择此接入方。</span></span></label>`;
+    if(state.step===1) return `<div class="cs-form-intro"><h2>连接设置</h2><p class="cs-meta">优先自动发现；未提供或无法发现的端点，使用下方手工地址。</p></div><div class="cs-form-grid">${field('authorization','授权端点 · 选填','完整 http(s) 地址，最多 2048 字。','https://login.example.com/oauth/authorize',true)}${field('token','令牌端点 · 选填','完整 http(s) 地址，最多 2048 字。','https://login.example.com/oauth/token',true)}${field('userinfo','用户信息端点 · 选填','OAuth 2.0 身份取值使用此地址。','https://login.example.com/userinfo',true)}${field('jwks','签名公钥地址（JWKS）· 选填','完整 http(s) 地址，最多 2048 字。','https://login.example.com/jwks',true)}<label class="cs-field cs-full">用户信息请求方式<select class="cs-select" data-provider-field="style"><option value="get_bearer" ${providerDraft.style==='get_bearer'?'selected':''}>GET + Bearer（标准）</option><option value="post_json" ${providerDraft.style==='post_json'?'selected':''}>POST JSON（公司平台兼容）</option></select><small>兼容方式发送 client_id、access_token 与 scope，不附带鉴权头。</small></label></div>`;
+    if(state.step===2) return `<div class="cs-form-intro"><h2>首次登录时如何创建账号</h2><p class="cs-meta">已关联账号继续使用既有身份。</p></div><fieldset class="cs-choices"><legend class="cs-sr">账号创建规则</legend><label class="cs-choice"><input type="radio" name="cs-provisioning" value="allowlist" ${providerDraft.provisioning==='allowlist'?'checked':''}><span><strong>仅允许指定邮箱域</strong><span class="cs-meta">邮箱须已验证，且符合下方允许范围。</span></span></label><label class="cs-choice"><input type="radio" name="cs-provisioning" value="auto" ${providerDraft.provisioning==='auto'?'checked':''}><span><strong>首次登录自动创建账号</strong><span class="cs-meta">公司身份验证成功后即可加入平台。</span></span></label></fieldset><div class="cs-section">${field('domains','允许的邮箱域','以 @ 开头、逗号分隔，最多 50 个。','@example.com',false,'text',providerDraft.provisioning!=='allowlist')}</div><label class="cs-checkrow"><input type="checkbox" data-provider-check="trust" ${providerDraft.trust?'checked':''}><span>信任身份提供方的邮箱<span class="cs-meta">将邮箱视为已验证，仅适用于可信的身份平台。</span></span></label>`;
+    return `<div class="cs-form-intro"><h2>将公司身份字段映射到平台</h2><p class="cs-meta">标准 OIDC 字段可留空。配置自定义字段后，每次登录会更新对应值。</p></div><div class="cs-form-grid">${field('username','显示名字段','留空使用 preferred_username；可按顺序填写 1–8 个字段。','preferred_username')}${field('gitname','Git 名字段','留空跟随显示名；可按顺序填写 1–8 个字段。','git_name')}${field('email','邮箱字段','留空使用 email；配置后取不到值会阻止登录。','email')}${field('subject','唯一身份字段','留空使用 sub；已有账号关联后不能变更。','sub')}</div><div class="cs-section"><h3>自定义字段</h3><p class="cs-meta" style="margin-bottom:14px">平台字段名与身份来源一一对应，最多 20 项。</p>${state.mappings.map((m,i)=>`<div class="cs-mapping"><label class="cs-field">平台字段名<input class="cs-input" data-mapping="key" data-index="${i}" value="${esc(m.key)}" placeholder="department"></label><span>←</span><label class="cs-field">身份来源字段<input class="cs-input" data-mapping="claim" data-index="${i}" value="${esc(m.claim)}" placeholder="department"></label>${button(icon('x'),'remove-mapping','cs-button cs-quiet',`data-index="${i}" aria-label="移除映射 ${i+1}"`)}</div>`).join('')}${button(icon('plus')+'添加字段','add-mapping','cs-button cs-quiet')}</div>`;
+  }
+  function forwarding() {
+    return `<section class="cs-card"><div class="cs-card-header"><div><h2>应用可获取的身份字段</h2><p class="cs-meta">全局默认。用户 ID 与身份令牌始终传递。</p></div></div>${fields.map(([key,name,desc])=>`<div class="cs-field-row"><div><div class="cs-name">${name} <code>${key}</code></div><span class="cs-meta">${desc}</span></div>${badge(state.globalFields.includes(key)?'传递给应用':'不传递',state.globalFields.includes(key)?'cs-ok':'')}${button(state.globalFields.includes(key)?'停止传递':'开启','toggle-field','cs-button cs-quiet',`data-key="${key}" aria-label="${state.globalFields.includes(key)?'停止传递':'开启'}${name}"`)}</div>${state.pendingField===key?`<div class="cs-notice cs-warning" style="margin:0 20px 14px"><p>停止向应用传递${name}？平台仍保留该信息，最长 5 分钟生效。</p><div class="cs-actions" style="margin-top:10px">${button('取消','cancel-field')}${button('确认停止','confirm-field','cs-button',`data-key="${key}"`)}</div></div>`:''}`).join('')}<div class="cs-footer">设置更新后，最长 5 分钟在所有副本生效。</div></section>
+      <section class="cs-card cs-section"><div class="cs-card-header"><div><h2>项目例外</h2><p class="cs-meta">为个别项目设置不同的字段范围。</p></div>${button(icon('plus')+'添加','add-override')}</div>${state.overrides.length?state.overrides.map(o=>`<div class="cs-field-row"><div><div class="cs-name">${projects[o.project]}</div><span class="cs-meta">${o.fields.length?o.fields.map(k=>fields.find(f=>f[0]===k)[1]).join('、'):'不传递可选身份字段'}</span></div>${button('恢复默认','remove-override','cs-button cs-quiet',`data-project="${o.project}"`)}</div>${state.removeOverride===o.project?`<div class="cs-notice cs-warning" style="margin:0 20px 16px"><p>${projects[o.project]} 将重新使用全局默认，确认恢复？</p><div class="cs-actions">${button('取消','cancel-remove-override')}${button('确认恢复','confirm-remove-override','cs-button',`data-project="${o.project}"`)}</div></div>`:''}`).join(''):'<p class="cs-meta" style="padding:0 20px 20px">所有项目当前都使用全局默认。</p>'}${state.overrideOpen?overrideEditor():''}</section>`;
+  }
+  function overrideEditor() {
+    return `<div class="cs-editor" style="border-top:1px solid var(--cs-line)"><label class="cs-field">选择项目<select class="cs-select" id="cs-project-select"><option value="">选择一个项目</option>${Object.entries(projects).map(([id,name])=>`<option value="${id}" ${state.overrideProject===id?'selected':''}>${name}</option>`).join('')}</select><small id="cs-project-identity">${state.overrideProject?projectIds[state.overrideProject]:'选择项目后可核对其完整 ID。'}</small></label><p class="cs-small-heading">这个项目可以获取</p><fieldset class="cs-choices"><legend class="cs-sr">项目身份字段</legend>${fields.map(([key,name])=>`<label class="cs-checkrow"><input type="checkbox" data-override-field="${key}" ${state.overrideFields.includes(key)?'checked':''}><span>${name} <code>${key}</code></span></label>`).join('')}</fieldset><p class="cs-meta" id="cs-override-summary">${state.overrideFields.length?`已选择 ${state.overrideFields.length} 个可选字段。`:'不传递任何可选字段；用户 ID 与身份令牌仍会传递。'}</p><div class="cs-form-actions">${button('取消','cancel-override')}${button('保存项目设置','save-override','cs-button cs-primary',state.overrideProject?'':'disabled')}</div></div>`;
+  }
+  function tryLeave(next) {
+    if(state.providerEdit && JSON.stringify({providerDraft,mappings:state.mappings})!==formBaseline) {leaveAction=next;render();return;}
+    next();
+  }
+  function leaveProvider() {state.providerEdit=false;providerDraft={};leaveAction=null;render();}
+  root.addEventListener('input', event => {
+    const el=event.target;
+    if(el.id==='cs-user-search') {state.query=el.value;root.querySelector('#cs-user-rows').innerHTML=userRows();paintIcons();persist();}
+    if(el.dataset.providerField) {providerDraft[el.dataset.providerField]=el.value;delete fieldErrors[el.dataset.providerField];}
+    if(el.dataset.mapping) state.mappings[Number(el.dataset.index)][el.dataset.mapping]=el.value;
+  });
+  root.addEventListener('change', event => {
+    const el=event.target;
+    if(el.id==='cs-role-filter') {state.role=el.value;root.querySelector('#cs-user-rows').innerHTML=userRows();paintIcons();persist();}
+    if(el.name==='cs-user-role') {state.picked=el.value;state.confirm=false;render();root.querySelector(`[name="cs-user-role"][value="${state.picked}"]`).focus();}
+    if(el.dataset.providerCheck) providerDraft[el.dataset.providerCheck]=el.checked;
+    if(el.name==='cs-provisioning') {providerDraft.provisioning=el.value;render();root.querySelector(`[name="cs-provisioning"][value="${el.value}"]`).focus();}
+    if(el.dataset.providerField) providerDraft[el.dataset.providerField]=el.value;
+    if(el.id==='cs-project-select') {state.overrideProject=el.value;root.querySelector('[data-action="save-override"]').disabled=!el.value;root.querySelector('#cs-project-identity').textContent=el.value?projectIds[el.value]:'选择项目后可核对其完整 ID。';}
+    if(el.dataset.overrideField) {const key=el.dataset.overrideField;state.overrideFields=el.checked?[...state.overrideFields,key]:state.overrideFields.filter(f=>f!==key);root.querySelector('#cs-override-summary').textContent=state.overrideFields.length?`已选择 ${state.overrideFields.length} 个可选字段。`:'不传递任何可选字段；用户 ID 与身份令牌仍会传递。';}
+  });
+  root.addEventListener('keydown', event => {
+    const button=event.target.closest('[role="tab"]'); if(!button) return;
+    const tabs=Array.from(button.parentElement.querySelectorAll('[role="tab"]'));let next;
+    if(event.key==='ArrowRight') next=(tabs.indexOf(button)+1)%tabs.length;
+    if(event.key==='ArrowLeft') next=(tabs.indexOf(button)+tabs.length-1)%tabs.length;
+    if(event.key==='Home') next=0;if(event.key==='End') next=tabs.length-1;
+    if(next===undefined) return;event.preventDefault();const id=tabs[next].id;tabs[next].click();root.querySelector('#'+id)?.focus();
+  });
+  root.addEventListener('click', event => {
+    const el=event.target.closest('button');if(!el||el.disabled) return;
+    notify('');
+    if(el.dataset.page) {tryLeave(()=>{state.page=el.dataset.page;state.providerEdit=false;state.selected=null;providerDraft={};render();persist();});return;}
+    if(el.dataset.authTab) {state.tab=el.dataset.authTab;render();root.querySelector(`#cs-${state.tab}-tab`).focus();persist();return;}
+    if(el.dataset.step!==undefined) {state.step=Number(el.dataset.step);render();root.querySelector(`#cs-step-${state.step}`).focus();return;}
+    const action=el.dataset.action;
+    if(action==='guide') {state.guide=!state.guide;render();}
+    if(action==='clear-filters') {state.query='';state.role='all';render();persist();}
+    if(action==='edit-role') {state.selected=el.dataset.id;state.picked=state.users.find(u=>u.id===state.selected).role;state.confirm=false;render();root.querySelector('[name="cs-user-role"]:checked').focus();}
+    if(action==='close-role') {const id=state.selected;state.selected=null;state.confirm=false;render();root.querySelector(`[data-id="${id}"]`)?.focus();}
+    if(action==='confirm-role') {state.confirm=true;render();root.querySelector('[data-action="save-role"]').focus();}
+    if(action==='cancel-confirm') {state.confirm=false;render();root.querySelector('[data-action="confirm-role"]').focus();}
+    if(action==='save-role') {const user=state.users.find(u=>u.id===state.selected);user.role=state.picked;state.selected=null;state.confirm=false;render();notify(`演示：${user.name} 的角色已更新为${roles[user.role][0]}。`);}
+    if(action==='add-provider'||action==='edit-provider') {startProvider(action==='add-provider',el.dataset.providerId);render();}
+    if(action==='probe'||action==='hide-probe') {state.probe=action==='probe'?el.dataset.providerId:false;render();if(state.probe)notify('已显示模拟诊断结果；没有发送真实连接请求。');}
+    if(action==='password') {if(state.password){if(!state.providers.some(p=>p.enabled)){notify('演示：请先启用一个公司登录接入方。');return;}state.passwordConfirm=true;render();}else{state.password=true;render();notify('演示：密码登录已开启。');}}
+    if(action==='cancel-password'||action==='disable-password') {state.passwordConfirm=false;if(action==='disable-password')state.password=false;render();}
+    if(action==='next-step'||action==='previous-step') {state.step+=action==='next-step'?1:-1;render();root.querySelector('#cs-provider-step input, #cs-provider-step select')?.focus();}
+    if(action==='leave-provider') tryLeave(leaveProvider);
+    if(action==='stay-provider') {leaveAction=null;render();}
+    if(action==='discard-provider') {const next=leaveAction;leaveAction=null;providerDraft={};formBaseline='';next?.();}
+    if(action==='add-mapping'&&state.mappings.length<20) {state.mappings.push({key:'',claim:''});render();root.querySelectorAll('[data-mapping="key"]').item(state.mappings.length-1)?.focus();}
+    if(action==='remove-mapping') {state.mappings.splice(Number(el.dataset.index),1);render();}
+    if(action==='save-provider') {
+      fieldErrors={};for(const key of ['name','slug','issuer','clientId','scopes',...(state.providerNew?['secret']:[])])if(!providerDraft[key]?.trim())fieldErrors[key]='请填写此项。';
+      if(providerDraft.issuer&&!/^https?:\/\/.+/.test(providerDraft.issuer))fieldErrors.issuer='请填写完整的 http(s) 地址。';
+      if(Object.keys(fieldErrors).length){state.step=0;render();root.querySelector('[aria-invalid="true"]')?.focus();return;}
+      if(!providerDraft.enabled&&!state.password&&!state.providers.some(p=>p.id!==state.editProviderId&&p.enabled)){notify('演示：密码登录关闭时，须保留至少一个启用的公司登录接入方。');return;}
+      const {secret,...configuration}=providerDraft;
+      const saved={...configuration,id:state.editProviderId||'demo-'+Date.now(),secretSet:!!secret||configuration.secretSet,linked:!!configuration.linked,mappings:state.mappings.map(m=>({...m}))};
+      state.providers=state.providers.filter(p=>p.id!==saved.id);state.providers.push(saved);
+      leaveProvider();state.probe=false;render();notify('演示：配置已保存；列表已更新。');
+    }
+    if(action==='delete-provider') {state.deleteProviderConfirm=true;render();}
+    if(action==='cancel-delete-provider') {state.deleteProviderConfirm=false;render();}
+    if(action==='confirm-delete-provider') {const p=state.providers.find(p=>p.id===state.editProviderId);if(p.linked){notify('演示：此接入方仍有关联用户，不能删除。');return;}if(!state.password&&!state.providers.some(p=>p.id!==state.editProviderId&&p.enabled)){notify('演示：不能删除最后一个启用的公司登录接入方。');return;}state.providers=state.providers.filter(p=>p.id!==state.editProviderId);leaveProvider();notify('演示：接入方已删除。');}
+    if(action==='toggle-field') {const key=el.dataset.key;if(state.globalFields.includes(key))state.pendingField=key;else state.globalFields.push(key);render();}
+    if(action==='cancel-field') {state.pendingField=null;render();}
+    if(action==='confirm-field') {state.globalFields=state.globalFields.filter(k=>k!==el.dataset.key);state.pendingField=null;render();notify('演示：全局字段范围已更新。');}
+    if(action==='add-override') {state.overrideOpen=true;state.overrideProject='';state.overrideFields=[...state.globalFields];render();root.querySelector('#cs-project-select').focus();}
+    if(action==='cancel-override') {state.overrideOpen=false;render();}
+    if(action==='save-override'&&state.overrideProject) {state.overrides=state.overrides.filter(o=>o.project!==state.overrideProject);state.overrides.push({project:state.overrideProject,fields:[...state.overrideFields]});state.overrideOpen=false;render();notify('演示：项目身份字段已保存。');}
+    if(action==='remove-override') {state.removeOverride=el.dataset.project;render();}
+    if(action==='cancel-remove-override') {state.removeOverride=null;render();}
+    if(action==='confirm-remove-override') {state.overrides=state.overrides.filter(o=>o.project!==el.dataset.project);state.removeOverride=null;render();notify('演示：此项目恢复全局默认。');}
+  });
+  restore(window.openai?.widgetState);render();
+  window.addEventListener('openai:set_globals',event=>{if(event.detail?.globals?.widgetState){restore(event.detail.globals.widgetState);render();}});
+  if(typeof Tweak!=='undefined') {
+    const tweak=new Tweak({container:root,onChange:()=>{applyDesign();persist();}});
+    tweak.addSelect(design,'density',{label:'列表密度',options:[{value:'compact',label:'紧凑'},{value:'comfortable',label:'舒展'}]});
+    tweak.addSelect(design,'corners',{label:'边角',options:[{value:'soft',label:'柔和'},{value:'crisp',label:'利落'}]});
+  }
+})();
+</script>

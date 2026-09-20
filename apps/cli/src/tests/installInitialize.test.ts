@@ -17,8 +17,8 @@ egress: { mode: proxy, allowlist: ${allowlist} }
 `;
 
 const BUNDLE_DIRS = ['/bundle', '/bundle/profiles'];
-const PLANS = '- { name: standard-small, cpu: "500m", memory: 512Mi, maxReplicas: 3 }\n';
-const PROFILES = '- { name: coding-medium, cpu: "1", memory: 2Gi, storage: 10Gi }\n';
+const PLANS = '- { id: 01a0bf5d-8f4b-7000-9e4b-b54e91ee9d10, name: standard-small, cpu: "500m", memory: 512Mi, maxReplicas: 3 }\n';
+const PROFILES = '- { id: 01a0bf5d-8f4b-7001-8458-107366e7de39, name: coding-medium, cpu: "1", memory: 2Gi, storage: 10Gi }\n';
 /** 旧发行包里的档位文件（RFC-001 形状）：RFC-006 起安装器不再读取它。 */
 const LEGACY_COMPUTE = '- { name: balanced, driver: claude-code, model: anthropic/claude-sonnet-5 }\n';
 
@@ -45,8 +45,8 @@ async function initialize(files: ReturnType<typeof memoryFiles>, respond: Return
 describe('安装第 5 步：能做的真做', () => {
   test('发行包里的套餐写进平台目录', async () => {
     const respond = routes({
-      'PUT /v1/catalog/service-plans': jsonResponse(200, {}),
-      'PUT /v1/catalog/task-profiles': jsonResponse(200, {}),
+      'POST /v1/catalog/service-plans': jsonResponse(200, {}),
+      'POST /v1/catalog/task-profiles': jsonResponse(200, {}),
       'GET /v1/egress/entries': jsonResponse(200, { items: [] }),
       'POST /v1/egress/entries': jsonResponse(201, {}),
     });
@@ -58,8 +58,8 @@ describe('安装第 5 步：能做的真做', () => {
 
   test('出站白名单里的占位符被筛掉并点名，结论是受限', async () => {
     const respond = routes({
-      'PUT /v1/catalog/service-plans': jsonResponse(200, {}),
-      'PUT /v1/catalog/task-profiles': jsonResponse(200, {}),
+      'POST /v1/catalog/service-plans': jsonResponse(200, {}),
+      'POST /v1/catalog/task-profiles': jsonResponse(200, {}),
       'GET /v1/egress/entries': jsonResponse(200, { items: [{ id: 'e1', fqdn: 'git.example.com', scope: 'global', createdBy: ADMIN.id, createdAt: '2026-09-11T08:00:00.000Z' }] }),
       'POST /v1/egress/entries': jsonResponse(201, {}),
     });
@@ -75,8 +75,8 @@ describe('安装第 5 步：能做的真做', () => {
 
   test('启用的接入容器按管理员身份代建平台项目', async () => {
     const respond = routes({
-      'PUT /v1/catalog/service-plans': jsonResponse(200, {}),
-      'PUT /v1/catalog/task-profiles': jsonResponse(200, {}),
+      'POST /v1/catalog/service-plans': jsonResponse(200, {}),
+      'POST /v1/catalog/task-profiles': jsonResponse(200, {}),
       'GET /v1/egress/entries': jsonResponse(200, { items: [] }),
       'POST /v1/egress/entries': jsonResponse(201, {}),
       'GET /v1/me': jsonResponse(200, ADMIN),
@@ -87,14 +87,14 @@ describe('安装第 5 步：能做的真做', () => {
     expect(checks.find((check) => check.label === '接入容器平台项目')?.outcome).toBe('ok');
     const created = calls.filter((call) => call.method === 'POST' && call.url.endsWith('/v1/projects'));
     expect(created.map((call) => (call.body as { slug: string }).slug)).toEqual(['gitlab-event-producer', 'reference-api-proxy']);
-    expect(created[0]?.body).toMatchObject({ kind: 'EventProducer', template: 'gitlab-event-producer', ownerUserId: ADMIN.id });
-    expect(created[1]?.body).toMatchObject({ kind: 'APIProxy', template: 'reference-api-proxy' });
+    expect(created[0]?.body).toMatchObject({ kind: 'EventProducer', template: '01a0bf5d-8f4b-7004-9cf7-0eb8bf66ffbc', ownerUserId: ADMIN.id });
+    expect(created[1]?.body).toMatchObject({ kind: 'APIProxy', template: '01a0bf5d-8f4b-7003-9dbe-4adc78f388e9' });
   });
 
   test('项目已存在（409）按幂等处理，安装可以重跑', async () => {
     const respond = routes({
-      'PUT /v1/catalog/service-plans': jsonResponse(200, {}),
-      'PUT /v1/catalog/task-profiles': jsonResponse(200, {}),
+      'POST /v1/catalog/service-plans': jsonResponse(200, {}),
+      'POST /v1/catalog/task-profiles': jsonResponse(200, {}),
       'GET /v1/egress/entries': jsonResponse(200, { items: [] }),
       'POST /v1/egress/entries': jsonResponse(201, {}),
       'GET /v1/me': jsonResponse(200, ADMIN),
@@ -109,8 +109,8 @@ describe('安装第 5 步：能做的真做', () => {
 
   test('令牌不是管理员时报待配置，而不是硬闯', async () => {
     const respond = routes({
-      'PUT /v1/catalog/service-plans': jsonResponse(200, {}),
-      'PUT /v1/catalog/task-profiles': jsonResponse(200, {}),
+      'POST /v1/catalog/service-plans': jsonResponse(200, {}),
+      'POST /v1/catalog/task-profiles': jsonResponse(200, {}),
       'GET /v1/egress/entries': jsonResponse(200, { items: [] }),
       'POST /v1/egress/entries': jsonResponse(201, {}),
       'GET /v1/me': jsonResponse(200, { ...ADMIN, platformRole: 'user', isAdmin: false }),
@@ -121,7 +121,7 @@ describe('安装第 5 步：能做的真做', () => {
   });
 
   test('平台 API 出错时这一步是失败，整体退出码 1', async () => {
-    const respond = routes({ 'PUT /v1/catalog/service-plans': jsonResponse(500, { error: 'internal', message: '目录写入失败', details: {} }) });
+    const respond = routes({ 'POST /v1/catalog/service-plans': jsonResponse(500, { error: 'internal', message: '目录写入失败', details: {} }) });
     const { code, checks } = await initialize(filesFor('[git.example.com]'), respond);
     expect(code).toBe(1);
     expect(checks.find((check) => check.label.includes('服务套餐'))?.outcome).toBe('failed');
@@ -129,8 +129,8 @@ describe('安装第 5 步：能做的真做', () => {
 
   test('平台没有路由的几件事如实报未实现', async () => {
     const respond = routes({
-      'PUT /v1/catalog/service-plans': jsonResponse(200, {}),
-      'PUT /v1/catalog/task-profiles': jsonResponse(200, {}),
+      'POST /v1/catalog/service-plans': jsonResponse(200, {}),
+      'POST /v1/catalog/task-profiles': jsonResponse(200, {}),
       'GET /v1/egress/entries': jsonResponse(200, { items: [] }),
       'POST /v1/egress/entries': jsonResponse(201, {}),
     });
@@ -142,8 +142,8 @@ describe('安装第 5 步：能做的真做', () => {
 
   test('安装不预置算力档位：单独报 pending-config 并说明要管理员创建、测试、设默认；旧包里的档位文件也不写入（RFC-006）', async () => {
     const respond = routes({
-      'PUT /v1/catalog/service-plans': jsonResponse(200, {}),
-      'PUT /v1/catalog/task-profiles': jsonResponse(200, {}),
+      'POST /v1/catalog/service-plans': jsonResponse(200, {}),
+      'POST /v1/catalog/task-profiles': jsonResponse(200, {}),
       'GET /v1/egress/entries': jsonResponse(200, { items: [] }),
       'POST /v1/egress/entries': jsonResponse(201, {}),
     });

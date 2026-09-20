@@ -42,6 +42,7 @@
     "@crewstation/module-cluster-management": "workspace:*"
   },
   "devDependencies": {
-    "@crewstation/testkit": "workspace:*"
+    "@crewstation/testkit": "workspace:*",
+    "drizzle-orm": "0.45.2"
   }
 }

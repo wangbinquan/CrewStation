@@ -13,8 +13,9 @@ import { deleteConfigItemUseCase } from './application/deleteConfigItem';
 import type { ConfigUseCaseDeps } from './application/dependencies';
 import { queryConfigUseCases } from './application/queryConfig';
 import { renderEnvUseCase } from './application/renderEnv';
-import { setConfigItemUseCase } from './application/setConfigItem';
+import { configItemWriteUseCases } from './application/setConfigItem';
 import { validateManifestEnvUseCase } from './application/validateManifestEnv';
+import { ensureTemplateDefinitionUseCase } from './application/ensureTemplateDefinition';
 import { configRoutes } from './http/configRoutes';
 import type { ConfigSettings } from './ports/configSettings';
 
@@ -46,10 +47,12 @@ export function createConfigModule(deps: ConfigModuleDeps): ConfigModule {
     clock: deps.clock ?? systemClock,
   };
   const api: ConfigModuleApi = {
+    ensureTemplateDefinition: ensureTemplateDefinitionUseCase(useCaseDeps),
     name: 'config',
-    setItem: setConfigItemUseCase(useCaseDeps),
+    ...configItemWriteUseCases(useCaseDeps),
     deleteItem: deleteConfigItemUseCase(useCaseDeps),
     ...queryConfigUseCases(useCaseDeps),
+    renderDefinitions: renderEnvUseCase(useCaseDeps, true),
     renderEnv: renderEnvUseCase(useCaseDeps),
     validateManifestEnv: validateManifestEnvUseCase(useCaseDeps),
   };

@@ -23,12 +23,12 @@ async function boot(): Promise<{ session: FakeSession; tr: TestRunner }> {
 const SECRET = 'sk-probe-secret-4z';
 const TOKEN = 'dev-session-token-probe';
 const mcp = [{ name: 'operations', url: 'http://mcp-operations.svc/mcp', headers: { [IDENTITY_HEADERS.devSessionToken]: TOKEN } }];
-const hookOutput = { kind: 'script' as const, stepId: 'hook', name: '输出变量', language: 'shell' as const, argv: [], timeoutMs: 10000, source: 'printf \'{"FROM_HOOK":"from-hook"}\' > "$CS_HOOK_ENV_OUT"' };
+const hookOutput = { kind: 'script' as const, stepId: '01a0bf5d-8f4b-7941-8dca-596cd66539eb', name: '输出变量', language: 'shell' as const, argv: [], timeoutMs: 10000, source: 'printf \'{"FROM_HOOK":"from-hook"}\' > "$CS_HOOK_ENV_OUT"' };
 
 /** 通用终端协议的档位测试命令（RFC-006 C11）；缺省：先跑一个输出变量的脚本步骤，再以 sh 执行测试命令。 */
 function probe(probeId: string, overrides: Record<string, unknown> = {}): { id: string; type: string } & Record<string, unknown> {
   return {
-    id: `${probeId}-${String(overrides.processAttemptId ?? 1)}`, type: 'probeTerminal', probeId, compute: 'codex-term', profileRevision: 4, launch: launchSpec('terminal'),
+    id: `${probeId}-${String(overrides.processAttemptId ?? 1)}`, type: 'probeTerminal', probeId, compute: '01a0bf5d-8f4b-7278-813f-777a8bc3d9dc', profileRevision: 4, launch: launchSpec('terminal'),
     command: ['sh', '-c', 'echo "tool v1.2.3"'], expect: '^tool v\\d+\\.\\d+', timeoutMs: 10000, mcp, env: {},
     beforeStart: material([hookOutput], { secrets: { API_KEY: SECRET } }), processAttemptId: `${probeId}:1`, ...overrides,
   };
@@ -49,7 +49,7 @@ describe('probeTerminal（RFC-006 C11、§6.2）', () => {
     expect(await readFile(join(tr.workdir, 'runs.txt'), 'utf8')).toBe('run\n');
     const executions = session.eventsOf('beforeStart').map((e) => e.event.execution).filter((e) => e.agentId === 'probe-ok');
     expect(new Set(executions.map((e) => e.executionId)).size).toBe(1);
-    expect(executions.at(-1)).toMatchObject({ state: 'succeeded', profile: { profile: 'balanced', revision: 3 } });
+    expect(executions.at(-1)).toMatchObject({ state: 'succeeded', profile: { profileId: '01a0bf5d-8f4b-7ad6-85af-678b84e2f6f6', revision: 3 } });
     expect(JSON.stringify(session.frames)).not.toContain(SECRET);
     expect(JSON.stringify(session.frames)).not.toContain(TOKEN);
     expect(tr.logLines.some((line) => line.includes(SECRET) || line.includes(TOKEN))).toBe(false);
@@ -77,9 +77,9 @@ describe('probeTerminal（RFC-006 C11、§6.2）', () => {
 
   test('启动前步骤失败时不执行测试命令，只回步骤错误；私有目录已释放', async () => {
     const { session, tr } = await boot();
-    const command = probe('probe-hook', { command: ['sh', '-c', 'echo run >> runs.txt'], beforeStart: material([{ ...hookOutput, stepId: 'bad', name: '坏脚本', source: 'exit 3' }]) });
+    const command = probe('probe-hook', { command: ['sh', '-c', 'echo run >> runs.txt'], beforeStart: material([{ ...hookOutput, stepId: '01a0bf5d-8f4b-74ee-8658-eb8e96d92b68', name: '坏脚本', source: 'exit 3' }]) });
     const result = RunnerResultPayloads.probeTerminal.parse(await session.call(command, 15_000));
-    expect(result.beforeStart).toMatchObject({ state: 'failed', error: { code: 'script_failed', stepId: 'bad' } });
+    expect(result.beforeStart).toMatchObject({ state: 'failed', error: { code: 'script_failed', stepId: '01a0bf5d-8f4b-74ee-8658-eb8e96d92b68' } });
     expect(result.command).toBeUndefined();
     expect(await exists(join(tr.workdir, 'runs.txt'))).toBe(false);
     expect(await exists(join(tr.config.agentRunDir!, 'probe-hook'))).toBe(false);

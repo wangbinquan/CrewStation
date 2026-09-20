@@ -40,7 +40,7 @@ export function buildSteps(deps: ReleaseUseCaseDeps, ctx: PipelineContext, start
     } catch (error) {
       return ctx.fail(release, isPlatformError(error) ? error.message : String(error));
     }
-    const { migrationRef } = await deps.migrator.start({ releaseId: release.id, namespace: svc.namespace, image: release.image ?? '', command, env: env.values });
+    const { migrationRef } = await deps.migrator.start({ legacyResourceId: release.legacyResourceId, releaseId: release.id, namespace: svc.namespace, image: release.image ?? '', command, env: env.values });
     await ctx.save(release, 'migrating', { manifest, configVersion: env.configVersion, pipeline: { ...release.pipeline, migrationRef } });
     return WAIT;
   };
@@ -49,7 +49,7 @@ export function buildSteps(deps: ReleaseUseCaseDeps, ctx: PipelineContext, start
     startBuild: async (release, svc) => {
       const image = `${deps.settings.registryBase}/${svc.slug}:${release.tag}`;
       const { httpUrl, credentialSecretName } = await deps.repo.repositoryUrl(release.serviceId);
-      const { buildRef } = await deps.builder.start({ releaseId: release.id, namespace: svc.namespace, repoHttpUrl: httpUrl, credentialSecretName, ref: release.tag, image });
+      const { buildRef } = await deps.builder.start({ legacyResourceId: release.legacyResourceId, releaseId: release.id, namespace: svc.namespace, repoHttpUrl: httpUrl, credentialSecretName, ref: release.tag, image });
       await ctx.save(release, 'building', { image, pipeline: { ...release.pipeline, buildRef } });
       return WAIT;
     },

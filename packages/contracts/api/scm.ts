@@ -1,15 +1,24 @@
 import { z } from 'zod';
 import { ManifestKindSchema } from '../manifest/serviceSpec';
-import { ServiceIdSchema, SlugSchema } from '../ids';
+import { ResourceIdSchema, ServiceIdSchema } from '../ids';
 
 /** 当前控制面实际可复制的模板，不把发布包设计或不存在的模板当成可选项。 */
 export const ProjectTemplateDtoSchema = z.object({
-  name: SlugSchema,
+  id: ResourceIdSchema,
+  name: z.string().min(1).max(80),
   kind: ManifestKindSchema,
-  servicePlan: SlugSchema,
+  servicePlan: ResourceIdSchema,
   requiredConfig: z.array(z.object({ name: z.string(), from: z.enum(['config', 'secret']) })),
 });
 export type ProjectTemplateDto = z.infer<typeof ProjectTemplateDtoSchema>;
+
+export const ManifestUpgradeRequestSchema = z.object({ content: z.string().min(1).max(1_048_576) }).strict();
+export const ManifestUpgradePreviewSchema = z.object({
+  sourceHash: z.string().regex(/^[0-9a-f]{64}$/),
+  content: z.string(),
+  changes: z.array(z.object({ path: z.string(), before: z.unknown(), after: z.unknown() })),
+});
+export type ManifestUpgradePreview = z.infer<typeof ManifestUpgradePreviewSchema>;
 
 /** 每逻辑服务唯一的源码仓库绑定（R32）。 */
 export const RepositoryBindingDtoSchema = z.object({

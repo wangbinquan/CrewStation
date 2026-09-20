@@ -8,12 +8,12 @@ import { trialMarketFixture } from './projectSummaryFixture';
 const originalFetch = globalThis.fetch;
 let page: Awaited<ReturnType<typeof renderApp>> | undefined;
 afterEach(() => { page?.unmount(); page = undefined; globalThis.fetch = originalFetch; });
-const projectId = `prj_${'b'.repeat(32)}`;
+const projectId = '01a0bf5d-8f4b-7aef-84b8-c458233bab22';
 function fixture() {
   const state = { app: trialMarketFixture(projectId), failed: false }, calls: string[] = [];
   globalThis.fetch = (async (raw) => {
     const path = new URL(String(raw), 'http://localhost').pathname; calls.push(path);
-    if (path === '/v1/me') return Response.json({ id: 'usr_trial', name: '试用成员', platformRole: 'user', isAdmin: false, memberships: [{ projectId, role: 'tester' }] });
+    if (path === '/v1/me') return Response.json({ id: '01a0bf5d-8f4b-7b56-84bb-ca4f37bb8fa1', name: '试用成员', platformRole: 'user', isAdmin: false, memberships: [{ projectId, role: 'tester' }] });
     if (state.failed) return Response.json({ error: 'unavailable', message: '应用读取失败' }, { status: 503 });
     if (path === '/v1/market/apps') return Response.json({ items: [state.app] });
     if (path === `/v1/market/apps/${projectId}`) return Response.json(state.app);

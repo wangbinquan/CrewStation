@@ -6,7 +6,7 @@ export interface ApiRequest {
   readonly id: string;
   readonly serviceId: ServiceId;
   readonly projectId: ProjectId;
-  readonly operationKey: string;
+  readonly operationId: string;
   readonly state: ApiRequestState;
   readonly reason?: string;
   readonly requestedBy: UserId;

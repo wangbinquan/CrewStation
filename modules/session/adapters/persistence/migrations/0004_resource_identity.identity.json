@@ -1,0 +1,395 @@
+{
+  "version": "resource-identity/v1",
+  "schema": "session",
+  "entities": [],
+  "references": [
+    {
+      "table": "runner_events",
+      "column": "task_id",
+      "kind": "task",
+      "keys": [
+        "task_id"
+      ]
+    },
+    {
+      "table": "connections",
+      "column": "task_id",
+      "kind": "task",
+      "keys": [
+        "task_id"
+      ]
+    },
+    {
+      "table": "runner_events",
+      "column": "agent_id",
+      "kind": "agent",
+      "keys": [
+        "agent_id"
+      ],
+      "nullable": true
+    }
+  ],
+  "inlineEntities": [
+    {
+      "table": "runner_events",
+      "column": "event",
+      "path": "agentId",
+      "kind": "agent"
+    },
+    {
+      "table": "runner_events",
+      "column": "event",
+      "path": "event.agentId",
+      "kind": "agent"
+    },
+    {
+      "table": "runner_events",
+      "column": "event",
+      "path": "record.agentId",
+      "kind": "agent"
+    },
+    {
+      "table": "runner_events",
+      "column": "event",
+      "path": "record.terminalId",
+      "kind": "terminal"
+    },
+    {
+      "table": "runner_events",
+      "column": "event",
+      "path": "record.runnerId",
+      "kind": "runner"
+    },
+    {
+      "table": "runner_events",
+      "column": "event",
+      "path": "event.terminalId",
+      "kind": "terminal"
+    },
+    {
+      "table": "runner_events",
+      "column": "event",
+      "path": "event.runnerId",
+      "kind": "runner"
+    },
+    {
+      "table": "runner_events",
+      "column": "event",
+      "path": "execution.agentId",
+      "kind": "agent"
+    },
+    {
+      "table": "runner_events",
+      "column": "event",
+      "path": "result.execId",
+      "kind": "exec"
+    },
+    {
+      "table": "runner_events",
+      "column": "event",
+      "path": "execId",
+      "kind": "exec"
+    },
+    {
+      "table": "runner_events",
+      "column": "event",
+      "path": "activity.agentId",
+      "kind": "agent"
+    },
+    {
+      "table": "runner_events",
+      "column": "event",
+      "path": "activity.terminalId",
+      "kind": "terminal"
+    },
+    {
+      "table": "runner_events",
+      "column": "event",
+      "path": "activity.runnerId",
+      "kind": "runner"
+    },
+    {
+      "table": "runner_events",
+      "column": "event",
+      "path": "terminal.agentId",
+      "kind": "agent"
+    },
+    {
+      "table": "runner_events",
+      "column": "event",
+      "path": "terminal.terminalId",
+      "kind": "terminal"
+    },
+    {
+      "table": "runner_events",
+      "column": "event",
+      "path": "terminal.runnerId",
+      "kind": "runner"
+    },
+    {
+      "table": "runner_events",
+      "column": "legacy_event",
+      "path": "execution.executionId",
+      "kind": "before-start-execution"
+    },
+    {
+      "table": "runner_events",
+      "column": "legacy_event",
+      "path": "terminal.beforeStart.executionId",
+      "kind": "before-start-execution"
+    },
+    {
+      "table": "runner_events",
+      "column": "legacy_event",
+      "path": "activity.eventId",
+      "kind": "native-activity-event"
+    }
+  ],
+  "documents": [
+    {
+      "table": "runner_events",
+      "column": "legacy_event",
+      "references": [
+        {
+          "path": "agentId",
+          "kind": "agent"
+        },
+        {
+          "path": "event.agentId",
+          "kind": "agent"
+        },
+        {
+          "path": "record.agentId",
+          "kind": "agent"
+        },
+        {
+          "path": "record.terminalId",
+          "kind": "terminal"
+        },
+        {
+          "path": "record.runnerId",
+          "kind": "runner"
+        },
+        {
+          "path": "event.terminalId",
+          "kind": "terminal"
+        },
+        {
+          "path": "event.runnerId",
+          "kind": "runner"
+        },
+        {
+          "path": "execution.agentId",
+          "kind": "agent"
+        },
+        {
+          "path": "result.subtaskId",
+          "kind": "subtask"
+        },
+        {
+          "path": "result.execId",
+          "kind": "exec"
+        },
+        {
+          "path": "execId",
+          "kind": "exec"
+        },
+        {
+          "path": "activity.agentId",
+          "kind": "agent"
+        },
+        {
+          "path": "activity.terminalId",
+          "kind": "terminal"
+        },
+        {
+          "path": "activity.runnerId",
+          "kind": "runner"
+        },
+        {
+          "path": "terminal.agentId",
+          "kind": "agent"
+        },
+        {
+          "path": "terminal.terminalId",
+          "kind": "terminal"
+        },
+        {
+          "path": "terminal.runnerId",
+          "kind": "runner"
+        },
+        {
+          "path": "record.compute",
+          "kind": "compute-profile"
+        },
+        {
+          "path": "event.compute",
+          "kind": "compute-profile"
+        },
+        {
+          "path": "execution.executionId",
+          "kind": "before-start-execution"
+        },
+        {
+          "path": "terminal.beforeStart.executionId",
+          "kind": "before-start-execution"
+        },
+        {
+          "path": "execution.profile.profile",
+          "kind": "compute-profile",
+          "rename": "profileId"
+        },
+        {
+          "path": "execution.currentStepId",
+          "kind": "compute-step",
+          "keys": [
+            "$row.identity_profile",
+            "$value"
+          ]
+        },
+        {
+          "path": "execution.error.stepId",
+          "kind": "compute-step",
+          "keys": [
+            "$row.identity_profile",
+            "$value"
+          ]
+        },
+        {
+          "path": "execution.steps.*.stepId",
+          "kind": "compute-step",
+          "keys": [
+            "$row.identity_profile",
+            "$value"
+          ]
+        },
+        {
+          "path": "execution.steps.*.error.stepId",
+          "kind": "compute-step",
+          "keys": [
+            "$row.identity_profile",
+            "$value"
+          ]
+        },
+        {
+          "path": "event.spec.compute",
+          "kind": "compute-profile"
+        },
+        {
+          "path": "terminal.compute",
+          "kind": "compute-profile"
+        },
+        {
+          "path": "activity.eventId",
+          "kind": "native-activity-event"
+        }
+      ],
+      "targetColumn": "event",
+      "provenanceColumn": "identity_provenance"
+    }
+  ],
+  "finalize": [
+    "ALTER TABLE session.runner_events DROP COLUMN identity_profile"
+  ],
+  "declarations": [
+    {
+      "table": "runner_events",
+      "column": "legacy_event",
+      "path": "event.spec.compute",
+      "kind": "compute-profile",
+      "keys": [
+        "$value"
+      ],
+      "fields": {
+        "id": "$value",
+        "name": "$value"
+      }
+    },
+    {
+      "table": "runner_events",
+      "column": "legacy_event",
+      "path": "terminal.compute",
+      "kind": "compute-profile",
+      "keys": [
+        "$value"
+      ],
+      "fields": {
+        "id": "$value",
+        "name": "$value"
+      }
+    },
+    {
+      "table": "runner_events",
+      "column": "legacy_event",
+      "path": "execution.profile.profile",
+      "kind": "compute-profile",
+      "keys": [
+        "$value"
+      ],
+      "fields": {
+        "id": "$value",
+        "name": "$value"
+      }
+    },
+    {
+      "table": "runner_events",
+      "column": "legacy_event",
+      "path": "execution.currentStepId",
+      "kind": "compute-step",
+      "keys": [
+        "$row.identity_profile",
+        "$value"
+      ],
+      "fields": {
+        "id": "$value",
+        "profile": "$row.identity_profile",
+        "name": "$value"
+      }
+    },
+    {
+      "table": "runner_events",
+      "column": "legacy_event",
+      "path": "execution.error.stepId",
+      "kind": "compute-step",
+      "keys": [
+        "$row.identity_profile",
+        "$value"
+      ],
+      "fields": {
+        "id": "$value",
+        "profile": "$row.identity_profile",
+        "name": "$value"
+      }
+    },
+    {
+      "table": "runner_events",
+      "column": "legacy_event",
+      "path": "execution.steps.*.stepId",
+      "kind": "compute-step",
+      "keys": [
+        "$row.identity_profile",
+        "$value"
+      ],
+      "fields": {
+        "id": "$value",
+        "profile": "$row.identity_profile",
+        "name": "$value"
+      }
+    },
+    {
+      "table": "runner_events",
+      "column": "legacy_event",
+      "path": "execution.steps.*.error.stepId",
+      "kind": "compute-step",
+      "keys": [
+        "$row.identity_profile",
+        "$value"
+      ],
+      "fields": {
+        "id": "$value",
+        "profile": "$row.identity_profile",
+        "name": "$value"
+      }
+    }
+  ]
+}

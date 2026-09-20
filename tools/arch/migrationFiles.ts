@@ -25,7 +25,7 @@ export function collectMigrationChecksums(root: string, units: readonly Unit[]):
   for (const unit of units) {
     const dir = migrationDirOf(unit);
     if (!dir || !existsSync(dir)) continue;
-    for (const name of readdirSync(dir).filter((entry) => entry.endsWith('.sql')).sort()) {
+    for (const name of readdirSync(dir).filter((entry) => entry.endsWith('.sql') || entry.endsWith('.identity.json')).sort()) {
       const path = join(dir, name);
       out.set(relative(root, path), createHash('sha256').update(readFileSync(path, 'utf8')).digest('hex'));
     }
@@ -47,7 +47,7 @@ export function writeMigrationLock(root: string, files: ReadonlyMap<string, stri
 
 /** 迁移序号：文件名开头的四位数字；不合命名规则的文件由 persistence-ownership 报，这里当作 0。 */
 export function migrationNumber(relPath: string): number {
-  return Number(/(?:^|\/)(\d{4})_[^/]*\.sql$/.exec(relPath)?.[1] ?? 0);
+  return Number(/(?:^|\/)(\d{4})_[^/]*\.(?:sql|identity\.json)$/.exec(relPath)?.[1] ?? 0);
 }
 
 export function migrationDirKey(relPath: string): string {

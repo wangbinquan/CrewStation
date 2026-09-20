@@ -1,6 +1,7 @@
 import type { K8sClient, K8sObject } from '@crewstation/k8s';
 import { LABELS, Resources } from '@crewstation/k8s';
 import { precondition } from '@crewstation/kernel';
+import { taskLabelMatches } from '../../domain/physicalIdentity';
 import type { PodPhase } from '../../ports/cluster';
 import type { TaskRecoveryCluster } from '../../ports/recoveryCluster';
 
@@ -26,7 +27,7 @@ export function kubernetesTaskRecoveryCluster(k8s: K8sClient): TaskRecoveryClust
       return {
         pod: pod ? { uid: uid(pod), phase: phase(pod), deleting: Boolean(pod.metadata.deletionTimestamp) } : null,
         volume: volume ? { uid: uid(volume), phase: volume.status?.phase ?? 'Unknown', deleting: Boolean(volume.metadata.deletionTimestamp),
-          belongsToTask: volume.metadata.labels?.[LABELS.task] === env.id,
+          belongsToTask: taskLabelMatches(volume.metadata.labels?.[LABELS.task], env),
           ...(volume.status?.capacity?.storage ? { capacity: volume.status.capacity.storage } : {}) } : null,
       };
     },

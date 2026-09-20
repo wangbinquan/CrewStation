@@ -38,11 +38,11 @@ export function ProfileRowActions({ profile, onOpen, children }: ProfileRowActio
   const [expanded, setExpanded] = useState(false);
   const [copying, setCopying] = useState(false);
   const [copyName, setCopyName] = useState('');
-  const copy = useApiMutation((name: string) => api.computeProfiles.copy(profile.name, { name }), { invalidate: INVALIDATE, onSuccess: (detail) => { setCopying(false); onOpen(detail.name); } });
-  const setDefault = useApiMutation(() => api.computeProfiles.setDefault(profile.name), { invalidate: INVALIDATE });
-  const visibility = useApiMutation((value: boolean) => api.computeProfiles.setDefaultVisible(profile.name, value), { invalidate: INVALIDATE });
-  const toggle = useApiMutation((enabled: boolean) => api.computeProfiles.setEnabled(profile.name, enabled), { invalidate: INVALIDATE });
-  const remove = useApiMutation((confirmReferences: boolean) => api.computeProfiles.remove(profile.name, { confirmReferences }), { invalidate: INVALIDATE });
+  const copy = useApiMutation((name: string) => api.computeProfiles.copy(profile.id, { name }), { invalidate: INVALIDATE, onSuccess: (detail) => { setCopying(false); onOpen(detail.id); } });
+  const setDefault = useApiMutation(() => api.computeProfiles.setDefault(profile.id), { invalidate: INVALIDATE });
+  const visibility = useApiMutation((value: boolean) => api.computeProfiles.setDefaultVisible(profile.id, value), { invalidate: INVALIDATE });
+  const toggle = useApiMutation((enabled: boolean) => api.computeProfiles.setEnabled(profile.id, enabled), { invalidate: INVALIDATE });
+  const remove = useApiMutation((confirmReferences: boolean) => api.computeProfiles.remove(profile.id, { confirmReferences }), { invalidate: INVALIDATE });
   const references = referencedProjects(remove.error);
   const busy = visibility.isPending || copy.isPending || setDefault.isPending || toggle.isPending || remove.isPending;
   const defaultBlocked = profile.protocol === 'terminal' ? t('admin.profile.defaultTerminal') : !profile.enabled ? t('admin.profile.defaultDisabled') : undefined;
@@ -50,7 +50,7 @@ export function ProfileRowActions({ profile, onOpen, children }: ProfileRowActio
   return (
     <>
       {children(<div className={styles.rowActions}>
-        <Button disabled={busy} onClick={() => onOpen(profile.name)}>{t('admin.profile.edit')}</Button>
+        <Button disabled={busy} onClick={() => onOpen(profile.id)}>{t('admin.profile.edit')}</Button>
         <Button ref={trigger} variant="ghost" className={styles.moreButton} aria-expanded={expanded} aria-controls={panelId} onClick={() => setExpanded(!expanded)}>{t('admin.profile.moreActions')}</Button>
       </div>, expanded)}
       {expanded ? <tr className={styles.actionRow}><td colSpan={4}>

@@ -14,8 +14,8 @@ afterEach(async () => { page?.unmount(); page = undefined; await new Promise((re
 function setup() {
   const f = editorWorkspaceFixture(); fixture = f; f.sessionState.state = 'failed'; f.sessionState.message = 'OOMKilled';
   const fetch = globalThis.fetch, sent: RebuildDevSessionRequest[] = [];
-  const check: DevSessionRebuildInspection = { taskId: TaskIdSchema.parse(activityTaskId), projectId: ProjectIdSchema.parse(activityProjectId), updatedAt: activityTime, podUid: 'old-pod', volume: { uid: 'kept-pvc', capacity: '10Gi' }, currentProfile: 'medium',
-    profiles: [{ name: 'medium', cpu: '1', memory: '2Gi', storage: '10Gi', description: '' }, { name: 'large', cpu: '2', memory: '4Gi', storage: '20Gi', description: '' }], checkedAt: activityTime };
+  const check: DevSessionRebuildInspection = { taskId: TaskIdSchema.parse(activityTaskId), projectId: ProjectIdSchema.parse(activityProjectId), updatedAt: activityTime, podUid: 'old-pod', volume: { uid: 'kept-pvc', capacity: '10Gi' }, currentProfile: '01a0bf5d-8f4b-7c08-8245-6a7766e23a18',
+    profiles: [{ id: '01a0bf5d-8f4b-7c08-8245-6a7766e23a18', name: 'medium', cpu: '1', memory: '2Gi', storage: '10Gi', description: '' }, { id: '01a0bf5d-8f4b-7d35-8c41-6a85b807e9b5', name: 'large', cpu: '2', memory: '4Gi', storage: '20Gi', description: '' }], checkedAt: activityTime };
   const state = { checkError: false, loseResponse: false, blocked: false, failedKind: '' };
   let finish: (() => void) | undefined;
   globalThis.fetch = (async (raw, init) => {
@@ -26,7 +26,7 @@ function setup() {
     if (state.failedKind) return Response.json({ error: state.failedKind, message: '管理员套餐已变化，请重新检查' }, { status: 409 });
     if (state.loseResponse) return Response.json({ error: 'unavailable', message: '暂未收到恢复回执' }, { status: 503 });
     f.sessionState.state = 'creating';
-    f.sessionState.rebuild = { requestId: input.requestId, taskId: TaskIdSchema.parse(activityTaskId), profile: input.profile, state: 'queued', createdAt: activityTime, updatedAt: activityTime };
+    f.sessionState.rebuild = { id: Bun.randomUUIDv7(), requestId: input.requestId, taskId: TaskIdSchema.parse(activityTaskId), profile: input.profile, state: 'queued', createdAt: activityTime, updatedAt: activityTime };
     return Response.json(f.sessionState.rebuild, { status: 202 });
   }) as typeof fetch;
   return { f, sent, state, check, finish: () => finish?.() };
@@ -38,7 +38,7 @@ test('恢复检查、取消和失败保留原工作区；任务套餐在确认�
   state.checkError = true; await page.click('会话与环境'); await page.click('检查并恢复原工作树'); expect(page.text()).toContain('原工作卷检查失败'); expect(sent).toHaveLength(0);
   state.checkError = false; await page.click('会话与环境'); await page.click('检查并恢复原工作树');
   expect(page.text()).toContain('kept-pvc'); expect(page.text()).toContain('10Gi'); expect(page.text()).toContain('原 CLI 已结束');
-  const select = document.querySelector<HTMLSelectElement>('select[aria-label="环境资源套餐"]')!; expect(document.activeElement).toBe(select); expect(select.value).toBe('medium');
+  const select = document.querySelector<HTMLSelectElement>('select[aria-label="环境资源套餐"]')!; expect(document.activeElement).toBe(select); expect(select.value).toBe('01a0bf5d-8f4b-7c08-8245-6a7766e23a18');
   await page.click('保留当前工作区'); expect(sent).toHaveLength(0); expect(document.activeElement?.textContent).toBe('检查并恢复原工作树');
 });
 
@@ -48,13 +48,13 @@ test('重复确认只发一次，超时重试保持原请求与套餐，202 后�
   await act(async () => view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: '恢复前的未保存草稿' } }));
   f.sessionState.state = 'failed'; await act(async () => { focusManager.setFocused(false); focusManager.setFocused(true); }); await page.settle();
   await page.click('会话与环境'); await page.click('检查并恢复原工作树'); const select = document.querySelector<HTMLSelectElement>('select[aria-label="环境资源套餐"]')!;
-  await act(async () => { select.value = 'large'; select.dispatchEvent(new Event('change', { bubbles: true })); });
+  await act(async () => { select.value = '01a0bf5d-8f4b-7d35-8c41-6a85b807e9b5'; select.dispatchEvent(new Event('change', { bubbles: true })); });
   state.blocked = true; state.loseResponse = true;
   const confirm = [...document.querySelectorAll('button')].find((node) => node.textContent === '确认保留工作树重建')!;
   await act(async () => { confirm.click(); confirm.click(); }); await page.settle(); expect(sent).toHaveLength(1);
   await act(async () => finish()); await page.settle(); expect(page.text()).toContain('暂未收到恢复回执'); expect(select.disabled).toBe(true);
   state.blocked = false; state.loseResponse = false; await page.click('重试同一恢复请求');
-  expect(sent).toHaveLength(2); expect(sent[1]).toEqual(sent[0]); expect(sent[0]?.profile).toEqual({ name: 'large', cpu: '2', memory: '4Gi', storage: '20Gi' });
+  expect(sent).toHaveLength(2); expect(sent[1]).toEqual(sent[0]); expect(sent[0]?.profile).toEqual({ id: '01a0bf5d-8f4b-7d35-8c41-6a85b807e9b5', name: 'large', cpu: '2', memory: '4Gi', storage: '20Gi' });
   expect(page.text()).toContain('恢复已排队'); expect(page.text()).not.toContain('原工作树已恢复');
   expect(document.querySelector('.cm-content')).toBe(editor); expect(editor.textContent).toBe('恢复前的未保存草稿');
   expect(f.commands.some((command) => ['startAgentTerminal', 'closeTerminal', 'stopAgent'].includes(command.type))).toBe(false);
@@ -83,7 +83,7 @@ test('已受理恢复随后失败时直接重新检查，不锁在未知回执�
 test('恢复完成仅在工作区工具栏显示成功，详情仍保留说明且不重复启动 CLI', async () => {
   const { f } = setup(); f.sessionState.state = 'running';
   f.sessionState.message = '原工作树已恢复；需要的 CLI 请逐个手动启动';
-  f.sessionState.rebuild = { requestId: crypto.randomUUID(), taskId: TaskIdSchema.parse(activityTaskId), profile: { name: 'medium', cpu: '1', memory: '2Gi', storage: '10Gi' }, state: 'ready', createdAt: activityTime, updatedAt: activityTime, message: f.sessionState.message };
+  f.sessionState.rebuild = { id: Bun.randomUUIDv7(), requestId: crypto.randomUUID(), taskId: TaskIdSchema.parse(activityTaskId), profile: { id: '01a0bf5d-8f4b-7c08-8245-6a7766e23a18', name: 'medium', cpu: '1', memory: '2Gi', storage: '10Gi' }, state: 'ready', createdAt: activityTime, updatedAt: activityTime, message: f.sessionState.message };
   page = await renderApp(`/projects/${activityProjectId}/dev-session`);
   const result = [...document.querySelectorAll('span')].find((node) => node.textContent === '原工作树已恢复');
   expect(result?.closest('header')).not.toBeNull(); expect(result?.title).toContain('需要的 CLI 请逐个手动启动');

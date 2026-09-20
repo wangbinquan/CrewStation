@@ -1,3 +1,4 @@
+import type { LegacyIdentityLookup } from '../ports/legacyIdentity';
 import type { Clock } from '@crewstation/kernel';
 import type { SessionSettings } from '../domain/session';
 import type { AllowlistEvaluator } from '../ports/allowlistEvaluator';
@@ -16,6 +17,7 @@ import type { UserRepository } from '../ports/userRepository';
 import type { WorkloadLookup } from '../ports/workloadLookup';
 
 export interface IdentityUseCaseDeps {
+  legacyIds?: LegacyIdentityLookup;
   users: UserRepository;
   settings: IdentitySettings;
   session: SessionSettings;

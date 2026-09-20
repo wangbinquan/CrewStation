@@ -36,7 +36,7 @@ test('目录故障不混淆已确认调用方，资料读取失败或未知项�
   f.state.detailError = true; const before = f.calls.filter((c) => c.url.pathname === '/v1/catalog/operations').length;
   await page.click('重新读取项目目录'); expect(page.text()).toContain('调用方资料离线'); expect(f.calls.filter((c) => c.url.pathname === '/v1/catalog/operations')).toHaveLength(before);
   f.state.detailError = false; f.state.projectError = false; await page.click('重新读取项目目录'); expect(page.text()).toContain(selected.serviceId!);
-  await page.navigate(`/admin/capabilities?tab=api&projectId=prj_${'f'.repeat(32)}`); expect(page.text()).toContain('未找到指定项目');
+  await page.navigate(`/admin/capabilities?tab=api&projectId=01a0bf5d-8f4b-7927-8d04-a341edee681a`); expect(page.text()).toContain('未找到指定项目');
   expect(f.calls.filter((c) => c.url.pathname === '/v1/catalog/operations').every((c) => c.url.searchParams.has('serviceId'))).toBe(true);
   await page.click('清除调用方'); expect(page.search().projectId).toBeUndefined();
   expect(f.calls.filter((c) => c.url.pathname === '/v1/catalog/operations').at(-1)!.url.searchParams.has('serviceId')).toBe(false); expect(f.writes()).toHaveLength(0);

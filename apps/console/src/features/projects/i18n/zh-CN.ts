@@ -339,7 +339,7 @@ export const messages = {
   "projects.provision.development": "进入开发",
   "projects.provision.backProjects": "返回数字人项目",
   "projects.provision.invalidProject": "项目标识无效，请从管理入口重新打开。",
-  "projects.members.userIdHint": "填写已注册用户的完整 ID：usr_ 后接 32 位小写十六进制字符。直接提交时由服务器核验账号。",
+  "projects.members.userIdHint": "填写已注册用户的完整 ID：36 字符 UUIDv7（含连字符、小写）。直接提交时由服务器核验账号。",
   "projects.members.refresh": "刷新成员",
   "projects.members.mode.lookup": "按账号查找",
   "projects.members.mode.id": "高级：用户 ID",

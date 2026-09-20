@@ -19,7 +19,7 @@ let owner: Actor;
 let dev: Actor;
 let projectId: ProjectId;
 let otherProjectId: ProjectId;
-const stranger: Actor = { userId: 'usr_00000000000000000000000000000000' as UserId, isAdmin: false };
+const stranger: Actor = { userId: '01a0bf5d-8f4b-7622-8c1a-d607ceefa8df' as UserId, isAdmin: false };
 const hosts = { prodHost: (s: string) => `${s}.cs.localhost`, previewHost: (s: string) => `preview.${s}.cs.localhost`, serviceHost: (s: string) => `${s}.svc.cs.internal` };
 
 beforeAll(async () => {
@@ -35,11 +35,11 @@ beforeAll(async () => {
   admin = { userId: a.id, isAdmin: true };
   owner = { userId: o.id, isAdmin: false };
   dev = { userId: d.id, isAdmin: false };
-  const project = createProjectModule({ db: tdb.db, identity: identity.api, hosts, settings: { defaultMaxConcurrentTasks: 3, defaultServicePlan: 'standard-small' } });
+  const project = createProjectModule({ db: tdb.db, identity: identity.api, hosts, settings: { defaultMaxConcurrentTasks: 3, defaultServicePlan: '01a0bf5d-8f4b-7000-9e4b-b54e91ee9d10' } });
   projects = project;
-  await project.api.upsertServicePlan(admin, { name: 'standard-small', cpu: '500m', memory: '512Mi', maxReplicas: 3, description: '' });
-  projectId = (await project.api.createProject(admin, { slug: 'demo', name: '演示', kind: 'DigitalWorker', ownerUserId: owner.userId, template: 'minimal-sample' })).id;
-  otherProjectId = (await project.api.createProject(admin, { slug: 'other', name: '其他', kind: 'DigitalWorker', ownerUserId: owner.userId, template: 'minimal-sample' })).id;
+  await project.api.updateServicePlan(admin, '01a0bf5d-8f4b-7000-9e4b-b54e91ee9d10', { name: 'standard-small', cpu: '500m', memory: '512Mi', maxReplicas: 3, description: '' });
+  projectId = (await project.api.createProject(admin, { slug: 'demo', name: '演示', kind: 'DigitalWorker', ownerUserId: owner.userId, template: '01a0bf5d-8f4b-7002-9560-94caf593fb19' })).id;
+  otherProjectId = (await project.api.createProject(admin, { slug: 'other', name: '其他', kind: 'DigitalWorker', ownerUserId: owner.userId, template: '01a0bf5d-8f4b-7002-9560-94caf593fb19' })).id;
   await project.api.setMember(owner, projectId, { userId: dev.userId, role: 'developer' });
   egress = createEgressModule({ db: tdb.db, project: project.api });
 });
@@ -51,7 +51,7 @@ describe.skipIf(!available)('egress module', () => {
   test('代理运行时采用本项目白名单：被阻、批准、实际发送与撤销；其他项目不串用', async () => {
     const isolated = await createTestDatabase([egressMigrations]);
     try {
-    const proxy = await projects.api.createProject(admin, { slug: 'egress-proxy', name: '出站代理验收', kind: 'APIProxy', ownerUserId: owner.userId, template: 'reference-api-proxy' });
+    const proxy = await projects.api.createProject(admin, { slug: 'egress-proxy', name: '出站代理验收', kind: 'APIProxy', ownerUserId: owner.userId, template: '01a0bf5d-8f4b-7003-9dbe-4adc78f388e9' });
     await projects.api.setProjectState(proxy.id, 'active');
     const calls: string[] = [];
     const runtime = createEgressModule({ db: isolated.db, project: projects.api, outbound: { send: async (input) => { calls.push(input.url); return new Response('公司系统响应', { status: 201, headers: { 'x-total': '7' } }); } } });

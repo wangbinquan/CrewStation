@@ -1,5 +1,5 @@
 import type { DomainPayload, ServiceId } from '@crewstation/contracts';
-import { conflict, notFound, validation } from '@crewstation/kernel';
+import { conflict, newResourceId, notFound, validation } from '@crewstation/kernel';
 import { reconcileOperations } from '../domain/apiOperation';
 import type { ApiProxy } from '../domain/apiProxy';
 import { operationsFromOpenApi } from '../domain/openApiOperations';
@@ -49,22 +49,24 @@ function requireDocument(event: ReleaseRegistered): unknown {
 }
 
 /** 同名代理只能属于一个服务；同一服务改名后旧代理标记 removed。 */
-async function register(scope: RepositoryScope, proxy: ApiProxy): Promise<void> {
-  const existing = await scope.proxies.getByName(proxy.proxy);
-  if (existing && existing.serviceId !== proxy.serviceId) {
-    throw conflict(`代理名 ${proxy.proxy} 已被服务 ${existing.serviceId} 使用`, { proxy: proxy.proxy });
+async function register(scope: RepositoryScope, input: Omit<ApiProxy, 'id' | 'name'>): Promise<void> {
+  const existing = await scope.proxies.getByCode(input.proxy);
+  if (existing && existing.serviceId !== input.serviceId) {
+    throw conflict(`代理路由 ${input.proxy} 已被服务 ${existing.serviceId} 使用`, { proxy: input.proxy });
   }
+  const previous = existing ?? (await scope.proxies.listByService(input.serviceId)).find((entry) => entry.state === 'active');
+  const proxy: ApiProxy = { ...input, id: previous?.id ?? newResourceId(), name: previous?.name ?? input.proxy };
   const discovered = operationsFromOpenApi(proxy.document);
-  const current = await scope.operations.listByProxy(proxy.proxy);
+  const current = await scope.operations.listByProxy(proxy.id);
   await scope.proxies.upsert(proxy);
-  await scope.operations.upsertMany(reconcileOperations(current, discovered, proxy.proxy, proxy.updatedAt));
-  await removeProxiesOf(scope, proxy.serviceId, proxy.proxy, proxy.updatedAt);
+  await scope.operations.upsertMany(reconcileOperations(current, discovered, proxy.id, proxy.proxy, proxy.updatedAt));
+  await removeProxiesOf(scope, proxy.serviceId, proxy.id, proxy.updatedAt);
 }
 
 async function removeProxiesOf(scope: RepositoryScope, serviceId: ServiceId, except: string | undefined, now: Date): Promise<void> {
   for (const proxy of await scope.proxies.listByService(serviceId)) {
-    if (proxy.proxy === except || proxy.state === 'removed') continue;
+    if (proxy.id === except || proxy.state === 'removed') continue;
     await scope.proxies.upsert({ ...proxy, state: 'removed', updatedAt: now });
-    await scope.operations.upsertMany(reconcileOperations(await scope.operations.listByProxy(proxy.proxy), [], proxy.proxy, now));
+    await scope.operations.upsertMany(reconcileOperations(await scope.operations.listByProxy(proxy.id), [], proxy.id, proxy.proxy, now));
   }
 }

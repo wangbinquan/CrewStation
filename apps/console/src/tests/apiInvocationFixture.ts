@@ -5,14 +5,14 @@ import { ApiInvocationRequestSchema, TaskIdSchema } from '@crewstation/contracts
 import type { RenderedApp } from './renderApp';
 import { testerSummaryFixture, trialMarketFixture } from './projectSummaryFixture';
 
-export const invocationProjectId = `prj_${'a'.repeat(32)}`, invocationTaskId = TaskIdSchema.parse(`tsk_${'c'.repeat(32)}`);
-const serviceId = `svc_${'b'.repeat(32)}`, userId = `usr_${'d'.repeat(32)}`;
-export const invocationOperation: ApiOperationDto = { key: 'crm:POST:/items/{id}', proxy: 'crm', method: 'POST', path: '/items/{id}', summary: '保存条目', openPolicy: 'default', granted: true };
-export const secondInvocationOperation: ApiOperationDto = { key: 'crm:GET:/ping', proxy: 'crm', method: 'GET', path: '/ping', openPolicy: 'default', granted: true };
+export const invocationProjectId = '01a0bf5d-8f4b-7fc7-8b88-18362617594b', invocationTaskId = TaskIdSchema.parse('01a0bf5d-8f4b-7bb9-888e-1d0ad27ab62e');
+const serviceId = '01a0bf5d-8f4b-7b39-8ccd-8bcf2c64bfaf', userId = '01a0bf5d-8f4b-7099-8bf6-9a62a04f7e40';
+export const invocationOperation: ApiOperationDto = { id: '01a0bf5d-8f4b-7b54-886c-7917f8da8165', proxyId: '01a0bf5d-8f4b-7048-89ae-74b8b9667da7', proxy: 'crm', method: 'POST', path: '/items/{id}', summary: '保存条目', openPolicy: 'default', granted: true };
+export const secondInvocationOperation: ApiOperationDto = { id: '01a0bf5d-8f4b-7c44-873e-9d1b5d48fc29', proxyId: '01a0bf5d-8f4b-7048-89ae-74b8b9667da7', proxy: 'crm', method: 'GET', path: '/ping', openPolicy: 'default', granted: true };
 export const invocationRoute = `/projects/${invocationProjectId}/settings?tab=resources&resource=api`;
 
 export function invocationResponse(input: ApiInvocationRequest, overrides: Record<string, unknown> = {}) {
-  return { taskId: input.expectedTaskId, operationKey: input.operationKey, result: { status: 422, headers: { 'content-type': 'application/json' }, body: '{"message":"业务校验失败"}', truncated: false, bodyTruncated: false, headersTruncated: false, durationMs: 17 }, ...overrides };
+  return { taskId: input.expectedTaskId, operationId: input.operationId, result: { status: 422, headers: { 'content-type': 'application/json' }, body: '{"message":"业务校验失败"}', truncated: false, bodyTruncated: false, headersTruncated: false, durationMs: 17 }, ...overrides };
 }
 
 export function apiInvocationFixture() {
@@ -38,7 +38,7 @@ export function apiInvocationFixture() {
     }
     if (url.includes('/catalog/operations')) return state.catalogFailure ? Response.json({ error: 'unavailable', message: '接口目录暂不可用' }, { status: 503 }) : Response.json({ items: [{ ...invocationOperation, granted: state.granted }, secondInvocationOperation] });
     if (url.includes('/openapi?')) return state.documentFailure ? Response.json({ error: 'unavailable', message: '文档暂不可用' }, { status: 503 }) : Response.json(invocationSpec(state.documentVersion));
-    if (url.endsWith('/catalog/proxies')) return Response.json({ items: [{ proxy: 'crm' }, { proxy: 'billing' }] });
+    if (url.endsWith('/catalog/proxies')) return Response.json({ items: [{ id: invocationOperation.proxyId, name: 'crm', proxy: 'crm' }, { id: '01a0bf5d-8f4b-744d-8cd0-5317e6c8590f', name: 'billing', proxy: 'billing' }] });
     return Response.json({ items: [] });
   }) as typeof fetch;
   return { state, pending, calls, reads };
@@ -46,8 +46,8 @@ export function apiInvocationFixture() {
 
 export function invocationSpec(version = '1.0.0') {
   return { openapi: '3.0.3', info: { title: 'CRM', version }, servers: [{ url: 'http://api.fixture.invalid/api/crm' }], paths: {
-    '/items/{id}': { post: { summary: '保存条目', operationId: 'saveItem', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }, { name: 'search', in: 'query', schema: { type: 'string' } }], requestBody: { content: { 'application/json': { schema: { type: 'object', properties: { title: { type: 'string' } } } } } }, responses: { '200': { description: 'saved' } } } },
-    '/ping': { get: { operationId: 'ping', parameters: [{ name: 'value', in: 'query', schema: { type: 'string' } }], responses: { '200': { description: 'ok' } } } },
+    '/items/{id}': { post: { summary: '保存条目', operationId: 'saveItem', 'x-crewstation-operation-id': invocationOperation.id, parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }, { name: 'search', in: 'query', schema: { type: 'string' } }], requestBody: { content: { 'application/json': { schema: { type: 'object', properties: { title: { type: 'string' } } } } } }, responses: { '200': { description: 'saved' } } } },
+    '/ping': { get: { operationId: 'ping', 'x-crewstation-operation-id': secondInvocationOperation.id, parameters: [{ name: 'value', in: 'query', schema: { type: 'string' } }], responses: { '200': { description: 'ok' } } } },
   } };
 }
 

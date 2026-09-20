@@ -78,7 +78,7 @@ test('差异别名与待验证目标接到实际查询，空 CLI 工作区也能
 });
 
 test('链接指定旧会话时不读新会话文件，不定位错误 CLI；选择当前视图后可继续', async () => {
-  fixture = editorWorkspaceFixture(); page = await renderApp(`${path}?view=code&file=b.ts&task=tsk_${'9'.repeat(32)}`);
+  fixture = editorWorkspaceFixture(); page = await renderApp(`${path}?view=code&file=b.ts&task=01a0bf5d-8f4b-70bf-8bc6-de281b863440`);
   expect(page.text()).toContain('链接指定的开发会话或 CLI 已变化'); expect(fixture.commands.filter((c) => c.type === 'readFile')).toHaveLength(0);
   await page.click('代码'); expect(content()?.textContent).toBe('第二个文件'); expect(page.search().task).toBeUndefined();
   await page.navigate(`${path}?agent=missing-agent`); expect(page.text()).toContain('未定位到其他会话'); expect(page.text()).not.toContain('CLI missing');

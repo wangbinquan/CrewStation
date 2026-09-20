@@ -16,11 +16,11 @@ let scm: ScmModule;
 const gitlab = fakeGitLab();
 const git = fakeGit(gitlab);
 const clock = mutableClock();
-const owner: Actor = { userId: `usr_${'a'.repeat(32)}` as UserId, isAdmin: false };
-const stranger = `usr_${'b'.repeat(32)}` as UserId;
-const projectId = `prj_${'1'.repeat(32)}` as ProjectId;
-const serviceId = `svc_${'1'.repeat(32)}` as ServiceId;
-const unknownService = `svc_${'9'.repeat(32)}` as ServiceId;
+const owner: Actor = { userId: '01a0bf5d-8f4b-7f8b-8136-e631380738b0' as UserId, isAdmin: false };
+const stranger = '01a0bf5d-8f4b-7d2c-8398-1524485c437e' as UserId;
+const projectId = '01a0bf5d-8f4b-7148-804c-6bd655d243f6' as ProjectId;
+const serviceId = '01a0bf5d-8f4b-7f20-83c3-08a8d54951b2' as ServiceId;
+const unknownService = '01a0bf5d-8f4b-741c-831e-a6b38d5da205' as ServiceId;
 /** 代替 project 模块：只有 owner 是成员；非成员按 project 模块的约定得到 not_found。 */
 const project = {
   isAdmin: async () => false,
@@ -41,16 +41,16 @@ beforeAll(async () => {
 afterAll(async () => { await tdb?.drop(); });
 
 describe.skipIf(!available)('scm module', () => {
-  test('迁移建出 scm schema 的两张表；建仓后绑定落库、可读回且幂等', async () => {
+  test('迁移建出 scm schema 的业务表与身份映射表；建仓后绑定落库、可读回且幂等', async () => {
     const tables = (await tdb.db.execute(`SELECT table_name FROM information_schema.tables WHERE table_schema = 'scm' ORDER BY table_name`)) as unknown as Array<{ table_name: string }>;
-    expect(tables.map((t) => t.table_name)).toEqual(['repository_bindings', 'session_credentials']);
-    const dto = await scm.api.ensureRepository(serviceId, projectId, { slug: 'demo', templateName: 'minimal-sample' });
+    expect(tables.map((t) => t.table_name)).toEqual(['repository_bindings', 'resource_identity_aliases', 'session_credentials']);
+    const dto = await scm.api.ensureRepository(serviceId, projectId, { slug: 'demo', templateId: '01a0bf5d-8f4b-7002-9560-94caf593fb19' });
     expect(RepositoryBindingDtoSchema.parse(dto)).toMatchObject({ state: 'ready', pathWithNamespace: 'crewstation/demo', remoteProjectId: '100' });
     expect(await scm.api.getBinding(owner, serviceId)).toEqual(dto);
-    expect(await scm.api.ensureRepository(serviceId, projectId, { slug: 'demo', templateName: 'minimal-sample' })).toEqual(dto);
+    expect(await scm.api.ensureRepository(serviceId, projectId, { slug: 'demo', templateId: '01a0bf5d-8f4b-7002-9560-94caf593fb19' })).toEqual(dto);
     const rows = (await tdb.db.execute(`SELECT service_id, project_id, state, path_with_namespace, message FROM scm.repository_bindings`)) as unknown as Array<Record<string, unknown>>;
     expect(rows).toEqual([{ service_id: serviceId, project_id: projectId, state: 'ready', path_with_namespace: 'crewstation/demo', message: null }]);
-    await expect(scm.api.ensureRepository(`svc_${'2'.repeat(32)}` as ServiceId, projectId, { slug: 'demo', templateName: 'minimal-sample' })).rejects.toMatchObject({ kind: 'conflict' });
+    await expect(scm.api.ensureRepository('01a0bf5d-8f4b-76be-8473-58312e41bdd7' as ServiceId, projectId, { slug: 'demo', templateId: '01a0bf5d-8f4b-7002-9560-94caf593fb19' })).rejects.toMatchObject({ kind: 'conflict' });
   });
 
   test('凭据：库里只有哈希；到期后撤销并写 revoked_at', async () => {

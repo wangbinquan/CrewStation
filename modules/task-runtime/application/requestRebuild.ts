@@ -1,7 +1,7 @@
 import type { DevSessionRebuildDto, ProjectId, RebuildDevSessionRequest, TaskId } from '@crewstation/contracts';
 import { RebuildDevSessionRequestSchema } from '@crewstation/contracts';
 import { scheduleExecutionCleanup } from './nativeExecution';
-import { conflict, precondition, quotaExceeded } from '@crewstation/kernel';
+import { conflict, newResourceId, precondition, quotaExceeded } from '@crewstation/kernel';
 import type { EnvironmentRebuild } from '../domain/environmentRebuild';
 import { rebuildToDto } from '../domain/environmentRebuild';
 import { hashRunnerToken, newRunnerToken } from '../domain/runnerToken';
@@ -14,7 +14,7 @@ export function rebuildUseCases(deps: RebuildDependencies) {
     const input = RebuildDevSessionRequestSchema.parse(raw);
     return deps.uow.run(async (scope) => {
       await scope.admissions.lock(projectId);
-      const previous = await scope.rebuilds.get(input.requestId);
+      const previous = await scope.rebuilds.findRequest(projectId, input.requestId);
       if (previous) {
         if (previous.projectId !== projectId || JSON.stringify(previous.input) !== JSON.stringify(input)) throw conflict('该恢复请求编号已用于另一份确认内容');
         return rebuildToDto(previous);
@@ -29,13 +29,13 @@ export function rebuildUseCases(deps: RebuildDependencies) {
       const limit = (await deps.quotas.quotaLimit(projectId)) ?? 0;
       if (env.state === 'failed' && !(await scope.admissions.tryAcquire(projectId, limit))) throw quotaExceeded('项目并发任务配额已满，工作卷保持不变');
       const now = deps.clock.now();
-      const podName = `task-${env.id.slice(4, 16)}-r-${input.requestId.replaceAll('-', '').slice(0, 12)}`;
-      const record: EnvironmentRebuild = { id: input.requestId, taskId: env.id, projectId, input, namespace: env.namespace,
+      const id = newResourceId(), podName = `task-r-${id.replaceAll('-', '')}`;
+      const record: EnvironmentRebuild = { id, taskId: env.id, projectId, input, namespace: env.namespace,
         originalPodName: env.podName, podName, pvcName: env.pvcName, secretName: `${podName}-runner`, image: deps.settings.taskImage,
         state: 'queued', createdAt: now, updatedAt: now, ...(nodeName ? { nodeName } : {}) };
       await scope.rebuilds.insert(record);
       // 即刻失效旧 Runner；替换 Pod 只复用原工作卷，不重新检出仓库。
-      const patch = { rebuildId: record.id, podName, profile: input.profile.name,
+      const patch = { rebuildId: record.id, podName, profile: input.profile.id,
         connected: false, message: '已受理保留工作树重建，等待后台准备', runnerTokenHash: hashRunnerToken(newRunnerToken()) };
       // 仅前面核验过的协议拒绝环境沿用原占额进入恢复，不开放通用 running → creating 转移。
       await scope.environments.update(env.state === 'failed' ? transition(env, 'creating', now, patch) : { ...env, ...patch, state: 'creating', updatedAt: now });

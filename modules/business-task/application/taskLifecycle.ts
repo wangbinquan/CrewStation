@@ -21,9 +21,9 @@ export function taskLifecycleUseCases(deps: BusinessTaskUseCaseDeps) {
     createTask: async (caller: ServiceActor, input: CreateBusinessTaskRequest): Promise<BusinessTaskDto> => {
       const svc = await directory.resolveServiceIdentity(caller.identity);
       if (!svc) throw forbidden(`未登记的服务身份 ${caller.identity}`);
-      const env = await environments.createEnvironment({ serviceId: svc.serviceId, kind: 'business', ...(input.volumeMode ? { volumeMode: input.volumeMode } : {}), ...(input.profile ? { profile: input.profile } : {}), ...(input.traceId ? { traceId: input.traceId } : {}), labels: { 'crewstation.io/project': caller.project, 'crewstation.io/service': caller.service, ...input.labels } });
+      const env = await environments.createEnvironment({ serviceId: svc.serviceId, kind: 'business', ...(input.volumeMode ? { volumeMode: input.volumeMode } : {}), ...(input.taskProfileId ? { profile: input.taskProfileId } : {}), ...(input.traceId ? { traceId: input.traceId } : {}), labels: { 'crewstation.io/project': caller.project, 'crewstation.io/service': caller.service, ...input.labels } });
       const now = clock.now();
-      const task: BusinessTask = { id: env.id, serviceId: svc.serviceId, projectId: svc.projectId, callerIdentity: caller.identity, state: 'creating', traceId: env.traceId as TraceId, volumeMode: input.volumeMode ?? 'follow-container', profile: input.profile ?? 'default', labels: input.labels, createdAt: now, updatedAt: now };
+      const task: BusinessTask = { id: env.id, serviceId: svc.serviceId, projectId: svc.projectId, callerIdentity: caller.identity, state: 'creating', traceId: env.traceId as TraceId, volumeMode: input.volumeMode ?? 'follow-container', profile: env.profile, labels: input.labels, createdAt: now, updatedAt: now };
       await uow.run((scope) => scope.tasks.insert(task));
       return taskToDto(task, env.podName);
     },

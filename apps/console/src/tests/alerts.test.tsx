@@ -30,7 +30,7 @@ test('告警或订阅失败显示未确认而不是空记录，另一块仍可�
 
 test('成员选择自动填入 ID，完整字段约束和同时错误；失败保留草稿，保存不宣称送达', async () => {
   const f = alertsFixture(); page = await renderApp(route); await click('添加订阅'); await input('alertChannel', 'webhook');
-  expect(page.text()).toContain('32 位小写十六进制'); expect(page.text()).toContain('最多 2048 字符'); await input('alertUserId', 'not-a-user'); await input('alertTarget', 'ftp://example.test'); await click('检查订阅配置');
+  expect(page.text()).toContain('36 字符 UUIDv7'); expect(page.text()).toContain('最多 2048 字符'); await input('alertUserId', 'not-a-user'); await input('alertTarget', 'ftp://example.test'); await click('检查订阅配置');
   expect(document.querySelectorAll('[aria-invalid="true"]')).toHaveLength(2); expect(document.activeElement?.getAttribute('name')).toBe('alertUserId'); expect(f.writes).toHaveLength(0);
   await input('alertMember', memberId); await input('alertTarget', 'https://notice.example.test/hook'); expect(document.querySelector<HTMLInputElement>('[name="alertUserId"]')?.value).toBe(memberId);
   await click('检查订阅配置'); expect(page.text()).toContain('陈开发 · dev@test.invalid'); f.state.failSave = true; await click('确认保存订阅'); expect(page.text()).toContain('保存订阅失败'); expect(document.querySelector<HTMLInputElement>('[name="alertTarget"]')?.value).toBe('https://notice.example.test/hook');

@@ -40,7 +40,7 @@ async function flowFixture(capable: boolean) {
     await runner.runner.whenConnected();
     const fixture = workspaceFixture();
     fixture.deps.runner = createSessionClient(accepting.base);
-    fixture.deps.apiCatalog.listOperations = async () => [{ key: 'crm:POST:/items/{id}', proxy: 'crm', method: 'POST', path: '/items/{id}', openPolicy: 'default', granted: true }];
+    fixture.deps.apiCatalog.listOperations = async () => [{ id: '01a0bf5d-8f4b-7b54-886c-7917f8da8165', proxyId: '01a0bf5d-8f4b-7048-89ae-74b8b9667da7', proxy: 'crm', method: 'POST', path: '/items/{id}', openPolicy: 'default', granted: true }];
     const dev = createDevSessionModule({ ...fixture.deps, db: db.db, isAdmin: async () => false });
     const app = createApp({ name: 'invocation-api' }); for (const route of dev.http) app.route('/', route);
     const server = Bun.serve({ port: 0, fetch: app.fetch, idleTimeout: 0 }); cleanups.push(() => { server.stop(true); });
@@ -50,13 +50,13 @@ async function flowFixture(capable: boolean) {
   } catch (error) { await dispose(); throw error; }
 }
 
-const input = { expectedTaskId: workspaceTask, operationKey: 'crm:POST:/items/{id}', pathParameters: { id: 'one two' }, query: {}, headers: { 'content-type': 'application/json' }, body: '{"name":"trial"}' };
+const input = { expectedTaskId: workspaceTask, operationId: '01a0bf5d-8f4b-7b54-886c-7917f8da8165', pathParameters: { id: 'one two' }, query: {}, headers: { 'content-type': 'application/json' }, body: '{"name":"trial"}' };
 
 test.skipIf(!available)('结构化客户端 → HTTP 授权 → 跨副本会话 → 真实 Runner → HTTP 回执；非法输入不触发调用', async () => {
   const f = await flowFixture(true);
   try {
     expect(await createSessionClient(f.accepting.base).connectionStatus(workspaceTask)).toMatchObject({ connected: true, replica: f.owning.base });
-    expect(ApiInvocationResponseSchema.parse(await f.client.devSession.invokeApi(workspaceProject, input))).toMatchObject({ taskId: workspaceTask, operationKey: input.operationKey, result: { status: 201, body: '{"accepted":true}', truncated: false } });
+    expect(ApiInvocationResponseSchema.parse(await f.client.devSession.invokeApi(workspaceProject, input))).toMatchObject({ taskId: workspaceTask, operationId: input.operationId, result: { status: 201, body: '{"accepted":true}', truncated: false } });
     expect(f.upstreamRequests).toEqual([{ path: '/api/crm/items/one%20two', body: input.body, method: 'POST' }]);
     const headers = { [IDENTITY_HEADERS.userId]: workspaceActor.userId, 'content-type': 'application/json' };
     const path = `${f.baseUrl}/v1/projects/${workspaceProject}/dev-session/api-invocations`;

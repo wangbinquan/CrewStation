@@ -15,15 +15,16 @@ import { TEST_SETTINGS, fakeGit, fakeGitLab, memoryUnitOfWork, mutableClock, rec
 
 const tempDirs: string[] = [];
 afterEach(async () => { await Promise.all(tempDirs.splice(0).map((path) => rm(path, { recursive: true, force: true }))); });
-const serviceId = `svc_${'1'.repeat(32)}` as ServiceId;
-const projectId = `prj_${'1'.repeat(32)}` as ProjectId;
-const original = { apiVersion: 'crewstation/v1', kind: 'DigitalWorker', spec: { service: { command: ['bun', 'run', 'app.ts'], port: 3000, plan: 'standard-small' }, extension: { retained: true } } };
+const serviceId = '01a0bf5d-8f4b-7f5f-8f31-2dd4710eb919' as ServiceId;
+const projectId = '01a0bf5d-8f4b-7c8b-8b95-1301eee8667f' as ProjectId;
+const original = { apiVersion: 'crewstation/v2', kind: 'DigitalWorker', spec: { service: { command: ['bun', 'run', 'app.ts'], port: 3000, servicePlanId: '01a0bf5d-8f4b-7000-9e4b-b54e91ee9d10' }, extension: { retained: true } } };
 
 async function fixture(manifest = Bun.YAML.stringify(original)) {
   const root = await mkdtemp(join(tmpdir(), 'cs-template-init-'));
   tempDirs.push(root);
   await mkdir(join(root, 'custom-template'));
   await writeFile(join(root, 'custom-template', 'crewstation.yaml'), manifest);
+  await writeFile(join(root, 'custom-template', 'template.json'), JSON.stringify({ id: '01a0bf5d-8f4b-7e50-8ce3-2ac9ef12f158', name: 'custom-template', servicePlan: '01a0bf5d-8f4b-7000-9e4b-b54e91ee9d10' }));
   await writeFile(join(root, 'custom-template', 'README.md'), 'Chosen custom template');
   const templates = directoryTemplateSource({ templatesRoot: root });
   const gitlab = fakeGitLab();
@@ -42,11 +43,11 @@ async function fixture(manifest = Bun.YAML.stringify(original)) {
 describe('creation template initialization', () => {
   test('用户选定的套餐写进首次提交；原模板与未涉及的 Manifest 字段保持原样', async () => {
     const h = await fixture();
-    await h.ensure(serviceId, projectId, { slug: 'demo', templateName: 'custom-template', initialPlan: 'standard-large' });
+    await h.ensure(serviceId, projectId, { slug: 'demo', templateId: '01a0bf5d-8f4b-7e50-8ce3-2ac9ef12f158', initialPlan: '01a0bf5d-8f4b-76b5-8a28-f084e91fddf4' });
     // 修复创建页选择成功而初始仓库仍使用模板原套餐的断链。
-    expect(h.pushed[0]).toEqual({ readme: 'Chosen custom template', manifest: { ...original, spec: { ...original.spec, service: { ...original.spec.service, plan: 'standard-large' } } } });
+    expect(h.pushed[0]).toEqual({ readme: 'Chosen custom template', manifest: { ...original, spec: { ...original.spec, service: { ...original.spec.service, servicePlanId: '01a0bf5d-8f4b-76b5-8a28-f084e91fddf4' } } } });
     expect(Bun.YAML.parse(await readFile(join(h.root, 'custom-template', 'crewstation.yaml'), 'utf8'))).toEqual(original);
-    await h.ensure(serviceId, projectId, { slug: 'demo', templateName: 'missing-template', initialPlan: 'another-plan' });
+    await h.ensure(serviceId, projectId, { slug: 'demo', templateId: '01a0bf5d-8f4b-7f83-8cc0-5478c97ad8ed', initialPlan: '01a0bf5d-8f4b-70ee-8805-5a0552ca3e8d' });
     expect(h.pushed).toHaveLength(1);
   });
 
@@ -54,31 +55,31 @@ describe('creation template initialization', () => {
     const h = await fixture();
     const protect = h.gitlab.gateway.ensureTagProtection;
     h.gitlab.gateway.ensureTagProtection = async () => { throw new Error('tag protection temporarily unavailable'); };
-    await expect(h.ensure(serviceId, projectId, { slug: 'demo', templateName: 'custom-template', initialPlan: 'standard-large' })).rejects.toThrow('tag protection');
+    await expect(h.ensure(serviceId, projectId, { slug: 'demo', templateId: '01a0bf5d-8f4b-7e50-8ce3-2ac9ef12f158', initialPlan: '01a0bf5d-8f4b-76b5-8a28-f084e91fddf4' })).rejects.toThrow('tag protection');
     expect(h.memory.bindings.get(serviceId)?.state).toBe('failed');
     h.gitlab.gateway.ensureTagProtection = protect;
-    await h.ensure(serviceId, projectId, { slug: 'demo', templateName: 'missing-template', initialPlan: 'another-plan' });
+    await h.ensure(serviceId, projectId, { slug: 'demo', templateId: '01a0bf5d-8f4b-7f83-8cc0-5478c97ad8ed', initialPlan: '01a0bf5d-8f4b-70ee-8805-5a0552ca3e8d' });
     expect(h.pushed).toHaveLength(1);
     expect(h.memory.bindings.get(serviceId)?.state).toBe('ready');
   });
 
   test('未指定初始套餐的旧调用保留模板；非法 Manifest 不进行首次推送', async () => {
     const legacy = await fixture();
-    await legacy.ensure(serviceId, projectId, { slug: 'demo', templateName: 'custom-template' });
+    await legacy.ensure(serviceId, projectId, { slug: 'demo', templateId: '01a0bf5d-8f4b-7e50-8ce3-2ac9ef12f158' });
     expect(legacy.pushed[0]?.manifest).toEqual(original);
     const invalid = await fixture('kind: Invalid');
-    await expect(invalid.ensure(serviceId, projectId, { slug: 'demo', templateName: 'custom-template', initialPlan: 'standard-large' })).rejects.toMatchObject({ kind: 'validation' });
+    await expect(invalid.ensure(serviceId, projectId, { slug: 'demo', templateId: '01a0bf5d-8f4b-7e50-8ce3-2ac9ef12f158', initialPlan: '01a0bf5d-8f4b-76b5-8a28-f084e91fddf4' })).rejects.toMatchObject({ kind: 'validation' });
     expect(invalid.pushed).toHaveLength(0);
     expect(invalid.memory.bindings.get(serviceId)?.state).toBe('failed');
     const invalidPlan = await fixture();
-    await expect(invalidPlan.ensure(serviceId, projectId, { slug: 'demo', templateName: 'custom-template', initialPlan: 'INVALID' })).rejects.toMatchObject({ kind: 'validation', details: { field: 'plan' } });
+    await expect(invalidPlan.ensure(serviceId, projectId, { slug: 'demo', templateId: '01a0bf5d-8f4b-7e50-8ce3-2ac9ef12f158', initialPlan: 'INVALID' })).rejects.toMatchObject({ kind: 'validation', details: { field: 'plan' } });
     expect(invalidPlan.pushed).toHaveLength(0);
   });
 
   test('模板目录从实际 Manifest 读取类型、套餐、必填键；双目录与自定义根按实际可用性处理', async () => {
     const templatesRoot = join(import.meta.dir, '../../../templates');
     const integrationTemplatesRoot = join(import.meta.dir, '../../../integrations');
-    const source = directoryTemplateSource({ templatesRoot, integrationTemplatesRoot });
+    const source = directoryTemplateSource({ templatesRoot, integrationTemplatesRoot, resources: { allocate: async () => Bun.randomUUIDv7(), ensureDefinition: async () => {}, eventType: async () => Bun.randomUUIDv7() } });
     const items = await source.list();
     expect(items.map((item) => [item.name, item.kind])).toEqual([
       ['gitlab-event-producer', 'EventProducer'], ['minimal-sample', 'DigitalWorker'], ['reference-api-proxy', 'APIProxy'],
@@ -87,8 +88,8 @@ describe('creation template initialization', () => {
     expect(items[1]?.requiredConfig).toEqual([]);
     const target = await fixture();
     expect((await target.templates.list()).map((item) => item.name)).toEqual(['custom-template']);
-    await source.materialize('gitlab-event-producer', join(target.root, 'copied-integration'), 'standard-large');
-    expect(Bun.YAML.parse(await readFile(join(target.root, 'copied-integration/crewstation.yaml'), 'utf8'))).toMatchObject({ kind: 'EventProducer', spec: { service: { plan: 'standard-large' } } });
+    await source.materialize('01a0bf5d-8f4b-7004-9cf7-0eb8bf66ffbc', join(target.root, 'copied-integration'), '01a0bf5d-8f4b-76b5-8a28-f084e91fddf4', { projectId, serviceId });
+    expect(Bun.YAML.parse(await readFile(join(target.root, 'copied-integration/crewstation.yaml'), 'utf8'))).toMatchObject({ kind: 'EventProducer', spec: { service: { servicePlanId: '01a0bf5d-8f4b-76b5-8a28-f084e91fddf4' } } });
     await expect(directoryTemplateSource({ templatesRoot: join(target.root, 'missing') }).list()).rejects.toThrow();
     await expect(directoryTemplateSource({ templatesRoot: target.root, integrationTemplatesRoot: target.root }).list()).rejects.toMatchObject({ kind: 'validation' });
     await expect((await fixture('invalid: true')).templates.list()).rejects.toMatchObject({ kind: 'validation' });
@@ -96,17 +97,17 @@ describe('creation template initialization', () => {
 
   test('模板目录 HTTP 只给管理员；空目录与读取失败不同，不读取模板密钥值', async () => {
     const h = await fixture();
-    const adminId = `usr_${'a'.repeat(32)}` as UserId;
+    const adminId = '01a0bf5d-8f4b-799e-8662-91273789253a' as UserId;
     const resolveActor = async (userId: UserId): Promise<Actor> => ({ userId, isAdmin: userId === adminId });
     const app = createApp({ name: 'template-catalog' });
     const listTemplates = listTemplatesUseCase(h.templates);
     const unused = async (): Promise<never> => { throw new Error('unexpected repository call'); };
-    app.route('/', repositoryRoutes({ listTemplates, getBinding: unused, listBranches: unused, listTags: unused }, resolveActor));
+    app.route('/', repositoryRoutes({ listTemplates, previewManifestUpgrade: unused, getBinding: unused, listBranches: unused, listTags: unused }, resolveActor));
     const path = '/v1/catalog/project-templates';
     expect((await app.request(path)).status).toBe(401);
-    expect((await app.request(path, { headers: { [IDENTITY_HEADERS.userId]: `usr_${'b'.repeat(32)}` } })).status).toBe(403);
+    expect((await app.request(path, { headers: { [IDENTITY_HEADERS.userId]: '01a0bf5d-8f4b-760a-80c3-7ae7af848914' } })).status).toBe(403);
     const response = await app.request(path, { headers: { [IDENTITY_HEADERS.userId]: adminId } });
-    expect(await response.json()).toEqual({ items: [{ name: 'custom-template', kind: 'DigitalWorker', servicePlan: 'standard-small', requiredConfig: [] }] });
+    expect(await response.json()).toEqual({ items: [{ id: '01a0bf5d-8f4b-7e50-8ce3-2ac9ef12f158', name: 'custom-template', kind: 'DigitalWorker', servicePlan: '01a0bf5d-8f4b-7000-9e4b-b54e91ee9d10', requiredConfig: [] }] });
     await rm(join(h.root, 'custom-template'), { recursive: true });
     expect(await (await app.request(path, { headers: { [IDENTITY_HEADERS.userId]: adminId } })).json()).toEqual({ items: [] });
     await rm(h.root, { recursive: true });

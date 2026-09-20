@@ -1,14 +1,19 @@
-import { randomUUID } from 'node:crypto';
 import type { Database } from '@crewstation/persistence';
 import { enqueueJob } from '@crewstation/queue';
-import { conflict, notFound } from '@crewstation/kernel';
-import { and, desc, eq, lt, lte, sql } from 'drizzle-orm';
+import { conflict, newResourceId, notFound } from '@crewstation/kernel';
+import { and, desc, eq, inArray, lt, lte, sql } from 'drizzle-orm';
 import type { ClusterRepository } from '../../ports/repository';
-import { snapshots, inspections, operations, refreshes } from './tables';
+import { snapshots, inspections, operations, refreshes, resourceIdentities, refreshHistory } from './tables';
 export const CLUSTER_REFRESH = 'cluster-management.refresh';
 export const CLUSTER_OPERATION = 'cluster-management.operation';
 export function drizzleClusterRepository(db: Database): ClusterRepository {
   return {
+    resourceIds: async (uids) => {
+      const unique = [...new Set(uids.filter(Boolean))];
+      if (!unique.length) return new Map();
+      await db.insert(resourceIdentities).values(unique.map((uid) => ({ uid, id: newResourceId() }))).onConflictDoNothing();
+      return new Map((await db.select().from(resourceIdentities).where(inArray(resourceIdentities.uid, unique))).map((row) => [row.uid, row.id]));
+    },
     latest: async () => (await db.select().from(snapshots).orderBy(desc(snapshots.sequence)).limit(1))[0]?.body,
     snapshot: async (id) => (await db.select().from(snapshots).where(eq(snapshots.id, id)))[0]?.body,
     saveSnapshot: async (snapshot) => { await db.transaction(async (tx) => { await tx.insert(snapshots).values({ id: snapshot.id, createdAt: new Date(snapshot.finishedAt), body: snapshot }); await tx.delete(snapshots).where(lt(snapshots.createdAt, new Date(Date.parse(snapshot.finishedAt) - 600_000))); await tx.delete(inspections).where(and(lt(inspections.createdAt, new Date(Date.parse(snapshot.finishedAt) - 86_400_000)), sql`NOT EXISTS (SELECT 1 FROM cluster_management.operations o WHERE o.body->>'inspectionId' = ${inspections.id})`)); }); },
@@ -16,7 +21,8 @@ export function drizzleClusterRepository(db: Database): ClusterRepository {
       await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext('cluster-management.refresh'))`);
       const old = (await tx.select().from(refreshes).where(eq(refreshes.id, 'current')).for('update'))[0];
       if (old?.state === 'pending' && Date.now() - old.requestedAt.getTime() < 600_000) return old.requestId;
-      const requestId = randomUUID(), value = { id: 'current', requestId, requestedAt: new Date(), state: 'pending' };
+      const requestId = newResourceId(), value = { id: 'current', requestId, requestedAt: new Date(), state: 'pending' };
+      await tx.insert(refreshHistory).values({ id: requestId });
       await tx.insert(refreshes).values(value).onConflictDoUpdate({ target: refreshes.id, set: value });
       await enqueueJob(tx, CLUSTER_REFRESH, { requestId }, { dedupKey: requestId, maxAttempts: 100 });
       return requestId;

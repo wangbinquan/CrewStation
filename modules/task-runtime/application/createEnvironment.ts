@@ -57,7 +57,7 @@ export function createEnvironmentUseCase(deps: TaskRuntimeUseCaseDeps) {
     const now = clock.now();
     const id = newId('tsk') as TaskId;
     const env: TaskEnvironment = {
-      id, projectId: svc.projectId as ProjectId, serviceId: input.serviceId, kind: input.kind, state: 'creating', volumeMode, profile: profile.name,
+      id, projectId: svc.projectId as ProjectId, serviceId: input.serviceId, kind: input.kind, state: 'creating', volumeMode, profile: profile.id,
       namespace: svc.namespace, podName: podNameFor(id), pvcName: pvcNameFor(id), traceId: input.traceId ?? (newTraceId() as TraceId), runnerTokenHash: hashRunnerToken(token),
       connected: false, ...(input.branch ? { branch: input.branch } : {}), ...(input.preview ? { preview: input.preview } : {}), labels: input.labels ?? {},
       ...(input.createdBy ? { createdBy: input.createdBy } : {}), createdAt: now, updatedAt: now, lastActivityAt: now,

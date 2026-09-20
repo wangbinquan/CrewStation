@@ -29,8 +29,8 @@ export class AgentExecutionLifecycle {
     try {
       return await this.deps.environments.createNativeExecution({
         id: start.execution.taskId, parentTaskId: start.taskId, purpose: 'agent', createdBy: start.createdBy, agentId: start.agentId, runnerId: start.execution.runnerId,
-        fingerprint: `${start.agentId}:${start.profile.profile}@${start.profile.revision}`, ...(start.execution.taskProfile ? { profile: start.execution.taskProfile } : {}),
-        image: start.execution.image, computeProfile: { name: start.profile.profile, revision: start.profile.revision },
+        fingerprint: `${start.agentId}:${start.profile.profileId}@${start.profile.revision}`, ...(start.execution.taskProfile ? { profile: start.execution.taskProfile } : {}),
+        image: start.execution.image, computeProfile: { profileId: start.profile.profileId, revision: start.profile.revision },
       });
     } catch (error) {
       if (definitive(error)) await this.end(start, { failure: error.message });

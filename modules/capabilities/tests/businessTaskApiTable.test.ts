@@ -5,8 +5,8 @@ import type { Actor, ProjectId, ServiceId, UserId } from '@crewstation/contracts
 import { fixedClock } from '@crewstation/kernel';
 import { createCapabilitiesModule } from '../wiring';
 
-const projectId = 'prj_0123456789abcdef0123456789abcdef' as ProjectId;
-const actor: Actor = { userId: 'usr_0123456789abcdef0123456789abcdef' as UserId, isAdmin: false };
+const projectId = '01a0bf5d-8f4b-7178-82e1-9a99060b1192' as ProjectId;
+const actor: Actor = { userId: '01a0bf5d-8f4b-7793-867c-efd7527b386b' as UserId, isAdmin: false };
 const unused = async (): Promise<never> => { throw new Error('unused'); };
 
 async function describedBusinessTaskApi(): Promise<string[]> {
@@ -15,9 +15,9 @@ async function describedBusinessTaskApi(): Promise<string[]> {
     market: { list: async () => ({ items: [] }), get: unused, slots: async () => [] },
     projects: { list: async () => ({ items: [] }), read: async () => [], get: unused, session: async () => undefined, slots: async () => [], preview: async () => null, health: async () => [], releases: async () => [], switches: async () => [] },
     clock: fixedClock('2026-09-20T00:00:00Z'),
-    settings: { userDomain: 'cs.localhost', serviceDomain: 'svc.cs.internal', mcp: [], defaultServicePlan: 'standard-small' },
+    settings: { userDomain: 'cs.localhost', serviceDomain: 'svc.cs.internal', mcp: [], defaultServicePlan: '01a0bf5d-8f4b-7000-9e4b-b54e91ee9d10' },
     sources: {
-      resolveServiceOfProject: async () => ({ serviceId: 'svc_0123456789abcdef0123456789abcdef' as ServiceId, slug: 'demo', name: 'demo', identity: 'demo/demo', namespace: 'cs-demo' }),
+      resolveServiceOfProject: async () => ({ serviceId: '01a0bf5d-8f4b-76c5-866c-f1feda3d63bb' as ServiceId, slug: 'demo', name: 'demo', identity: 'demo/demo', namespace: 'cs-demo' }),
       authorize: async () => undefined, quota: async () => ({ maxConcurrentTasks: 1, running: 0 }), servicePlans: async () => [], computeProfiles: async () => [],
       configKeys: async () => [], dataResources: async () => [], operations: async () => [], subscriptions: async () => [],
       identityForwarding: async () => ({ projectId, source: 'global' as const, fields: [], headers: [], tokenClaims: [] }),

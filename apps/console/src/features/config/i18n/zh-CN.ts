@@ -1,6 +1,12 @@
 import type { Messages } from '../../../shared/lib/i18n';
 
 export const messages = {
+  'config.form.displayNameHint': '1–120 字符，用于展示；修改显示名称不会改变资源 ID 或变量绑定。',
+  'config.form.invalidDisplayName': '请填写 1–120 字符的显示名称。',
+
+  'config.form.definition': '配置定义',
+  'config.form.newDefinition': '创建新定义',
+  'config.form.bindingName': '变量绑定符号',
   'config.title': '环境变量',
   'config.line1': '配置与密钥是平台对象，在 Manifest 的 env 段声明，分开发与生产两组值；生产值由项目负责人维护。',
   'config.line2': '以环境变量注入任务容器与服务，并随 Release 版本化：每次写入产生一个新版本号。',
@@ -33,9 +39,9 @@ export const messages = {
   'config.items.deleting': '删除中…',
 
   'config.form.title': '新增或覆盖一项',
-  'config.form.name': '键',
+  'config.form.name': '显示名称',
   'config.form.namePlaceholder': 'DATABASE_URL',
-  'config.form.nameHint': '大写字母开头的大写蛇形，与 Manifest env 段一致；同名键写入即覆盖并产生新版本。',
+  'config.form.nameHint': '大写字母开头，只含大写字母、数字或下划线。作为应用读取的环境变量名；编辑现有取值请使用列表中的修改按钮。',
   'config.form.value': '值',
   'config.form.valuePlaceholder': '写入后生效于下一次注入',
   'config.form.isSecret': '标记为 Secret',

@@ -45,7 +45,7 @@ export async function inspectRebuild(deps: RebuildDependencies, projectId: Proje
   const resources = await deps.recoveryCluster.inspect(env);
   const volume = retainedVolume(resources); endedPod(resources, reason);
   const assigned = await deps.profiles.devSessionProfile?.(projectId);
-  const profiles = (await deps.profiles.listTaskProfiles()).filter((profile) => !assigned || profile.name === assigned);
+  const profiles = (await deps.profiles.listTaskProfiles()).filter((profile) => !assigned || profile.id === assigned);
   return { taskId: env.id, projectId, updatedAt: env.updatedAt.toISOString(), podUid: resources.pod?.uid ?? null,
     volume: { uid: volume.uid, capacity: volume.capacity }, currentProfile: env.profile,
     profiles, checkedAt: deps.clock.now().toISOString(), reason };
@@ -58,7 +58,7 @@ export async function validateRebuild(deps: RebuildDependencies, env: TaskEnviro
   const volume = retainedVolume(resources); endedPod(resources, input.reason);
   if (volume.uid !== input.expectedVolumeUid || (resources.pod?.uid ?? null) !== input.expectedPodUid) throw conflict('原容器或工作卷实例已变化，请重新检查');
   const assigned = await deps.profiles.devSessionProfile?.(env.projectId);
-  if (assigned && input.profile.name !== assigned) throw precondition('项目开发套餐已调整，请重新检查并使用管理员分配的套餐');
-  const profile = await deps.profiles.getTaskProfile(input.profile.name);
-  if (!profile || (['name', 'cpu', 'memory', 'storage'] as const).some((key) => profile[key] !== input.profile[key])) throw conflict('管理员的任务套餐已变化，请重新选择');
+  if (assigned && input.profile.id !== assigned) throw precondition('项目开发套餐已调整，请重新检查并使用管理员分配的套餐');
+  const profile = await deps.profiles.getTaskProfile(input.profile.id);
+  if (!profile || (['id', 'name', 'cpu', 'memory', 'storage'] as const).some((key) => profile[key] !== input.profile[key])) throw conflict('管理员的任务套餐已变化，请重新选择');
 }

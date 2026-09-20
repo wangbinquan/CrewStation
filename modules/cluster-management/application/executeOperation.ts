@@ -1,3 +1,4 @@
+import { resourceReferences } from './resourceReferences';
 import type { Actor, ClusterOperation, ClusterResource, UserId } from '@crewstation/contracts';
 import { isPlatformError, precondition } from '@crewstation/kernel';
 import { objectRecord } from '../domain/inventory';
@@ -44,7 +45,7 @@ async function observeNative(deps: ClusterDeps, op: ClusterOperation) {
   const live = await deps.cluster.get(op.target);
   if (op.action === 'delete') return { done: !live || live.metadata.uid !== op.target.uid, reason: live?.metadata.uid === op.target.uid ? '等待原实例终止（可能仍有 finalizer）' : '原 UID 已删除；同名替代对象不受影响' };
   if (!live || live.metadata.uid !== op.target.uid) return { done: true, failed: true, reason: '目标实例已消失或被替换' };
-  const after = projectResources([live], await deps.metadata.read(), deps.systemNamespace, deps.catalog, deps.clock.now().toISOString())[0];
+  const after = (await resourceReferences(deps, projectResources([live], await deps.metadata.read(), deps.systemNamespace, deps.catalog, deps.clock.now().toISOString(), await deps.repository.resourceIds([live.metadata.uid!]))))[0];
   if (!after) return { done: true, failed: true, reason: '资源归属已改变' };
   const status = objectRecord(live.status);
   const updated = op.target.kind === 'DaemonSet' ? Number(status.updatedNumberScheduled ?? 0) === after.desired : Number(status.updatedReplicas ?? 0) === after.desired;

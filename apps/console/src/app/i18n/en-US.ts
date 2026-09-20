@@ -2,6 +2,10 @@ import type { MessagesShapedLike } from '../../shared/lib/i18n';
 import type { messages as zhCN } from './zh-CN';
 
 export const messages: MessagesShapedLike<typeof zhCN> = {
+  'ui.copy.label': 'Copy',
+  'ui.copy.done': 'Copied',
+  'ui.copy.value': 'Copy {value}',
+  'ui.copy.failed': 'Copy failed. Select the text to copy manually.',
   'development.suspended': 'Development access has changed. Your current input is retained until access is restored, or you can return to applications.',
   "nav.market": "Applications",
   "nav.projects": "Development",

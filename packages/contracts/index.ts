@@ -1,5 +1,6 @@
 export { CONTRACTS_VERSION } from './version';
 export * from './ids';
+export * from './builtinResources';
 export * from './convention';
 export * from './manifest/serviceSpec';
 export * from './manifest/tasks';
@@ -51,3 +52,8 @@ export * from './api/cluster/resources';
 export * from './api/cluster/operations';
 
 export * from './api/compute/projectCompute';
+
+export { LegacyManifestSchema } from './manifest/legacy/manifest';
+export type { Manifest as LegacyManifest } from './manifest/legacy/manifest';
+
+export * from './api/legacyBusinessTask';

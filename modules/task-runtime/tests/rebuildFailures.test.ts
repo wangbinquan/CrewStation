@@ -23,7 +23,7 @@ describe.skipIf(!available)('重建作业重试与补偿', () => {
     expect(await f.runtime.api.runningTaskCount(f.projectId)).toBe(0);
     expect(await f.k8s.get(Resources.PersistentVolumeClaim!, f.env.pvcName, f.env.namespace)).toBeDefined();
     const retry = await f.request(); await f.runtime.api.requestRebuild(f.projectId, retry); await f.run();
-    const record = (await f.uow.read.rebuilds.get(retry.requestId))!;
+    const record = (await f.uow.read.rebuilds.findRequest(f.projectId, retry.requestId))!;
     const secret = (await f.k8s.get(Resources.Secret!, record.secretName, record.namespace))!;
     expect(await f.runtime.api.onRunnerConnected(f.env.id, (secret.stringData as Record<string, string>).CS_RUNNER_TOKEN!)).toBe(true);
     f.advance(5 * 60_000); await f.runtime.api.reconcile(); expect((await f.runtime.api.getEnvironment(f.env.id))?.state).toBe('running');

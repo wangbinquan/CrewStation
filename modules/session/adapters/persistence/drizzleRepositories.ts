@@ -1,3 +1,4 @@
+import { jsonHash } from '@crewstation/kernel';
 import type { RunnerEvent, TaskId } from '@crewstation/contracts';
 import type { Executor } from '@crewstation/persistence';
 import { and, asc, eq, gt, inArray, max } from 'drizzle-orm';
@@ -9,7 +10,7 @@ export function drizzleRunnerEventStore(db: Executor): RunnerEventStore {
   return {
     append: async (e) => {
       const agentId = e.event.kind === 'agent' ? e.event.event.agentId : e.event.kind === 'nativeActivity' ? e.event.activity.agentId : e.event.kind === 'beforeStart' ? e.event.execution.agentId : null;
-      await db.insert(runnerEvents).values({ taskId: e.taskId, seq: e.seq, at: e.at, kind: e.event.kind, agentId, event: e.event }).onConflictDoNothing();
+      await db.insert(runnerEvents).values({ taskId: e.taskId, seq: e.seq, at: e.at, kind: e.event.kind, agentId, event: e.event, legacyEvent: e.legacyEvent, identityProvenance: e.legacyEvent === undefined ? null : { originalHash: jsonHash(e.legacyEvent), normalizedHash: jsonHash(e.event), protocol: 2 } }).onConflictDoNothing();
     },
     maxSeq: async (taskId) => Number((await db.select({ m: max(runnerEvents.seq) }).from(runnerEvents).where(eq(runnerEvents.taskId, taskId)))[0]?.m ?? 0),
     listSince: async (taskId, sinceSeq, options) => {

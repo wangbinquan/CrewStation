@@ -1,3 +1,4 @@
+import { profileIdOf } from './computeProfileFixture';
 import './domSetup';
 import { afterEach, describe, expect, test } from 'bun:test';
 import { act } from 'react';
@@ -9,10 +10,10 @@ let backend: ReturnType<typeof computeBackend> | undefined;
 afterEach(() => { page?.unmount(); page = undefined; backend?.restore(); backend = undefined; });
 
 const failing = () => profileDetail({
-  name: 'opencode-lite', protocol: 'opencode', description: '', model: undefined, taskProfile: 'cli-large', binaryPath: '/usr/local/bin/opencode', referencedBy: ['crm-bot', 'hr-helper'],
+  name: 'opencode-lite', protocol: 'opencode', description: '', model: undefined, taskProfile: '01a0bf5d-8f4b-74c3-80c6-46c408c84194', binaryPath: '/usr/local/bin/opencode', referencedBy: ['crm-bot', 'hr-helper'],
   availability: { state: 'test-failed', available: false, reason: '最近一次测试失败：缺少鉴权' },
   latestTest: profileTest({ profile: 'opencode-lite', revision: 3, state: 'failed', outcome: 'auth-missing' }),
-  content: { launch: { protocol: 'opencode', binaryPath: '/usr/local/bin/opencode', extraArgs: [], isSandbox: false }, taskProfile: 'cli-large', configFile: { kind: 'none' }, steps: [], secretNames: [] },
+  content: { launch: { protocol: 'opencode', binaryPath: '/usr/local/bin/opencode', extraArgs: [], isSandbox: false }, taskProfile: '01a0bf5d-8f4b-74c3-80c6-46c408c84194', configFile: { kind: 'none' }, steps: [], secrets: [] },
 });
 const paused = () => profileDetail({ name: 'claude-paused', enabled: false, availability: { state: 'disabled', available: false, reason: '已停用' } });
 
@@ -77,7 +78,7 @@ describe('算力档位列表（RFC-006）', () => {
     await clickIn(await actions('opencode-lite'), '删除');
     expect((await actions('opencode-lite')).textContent).toContain('删除档位 opencode-lite？');
     await clickIn(await actions('opencode-lite'), '确认');
-    expect(backend!.writes).toEqual([{ method: 'DELETE', path: '/v1/admin/compute-profiles/opencode-lite', query: '', body: {} }]);
+    expect(backend!.writes).toEqual([{ method: 'DELETE', path: `/v1/admin/compute-profiles/${profileIdOf('opencode-lite')}`, query: '', body: {} }]);
     expect((await actions('opencode-lite')).textContent).toContain('这些项目的授权或当前上线版本引用了这个档位：crm-bot、hr-helper');
     await clickIn(await actions('opencode-lite'), '仍然删除');
     expect((await actions('opencode-lite')).textContent).toContain('确认删除 opencode-lite？2 个项目会受影响。');
@@ -91,30 +92,30 @@ describe('算力档位列表（RFC-006）', () => {
     await clickIn(await actions('opencode-lite'), '设为默认');
     expect((await actions('opencode-lite')).textContent).toContain('把 opencode-lite 设为默认档位？');
     await clickIn(await actions('opencode-lite'), '确认');
-    expect(backend!.writes[0]).toMatchObject({ method: 'PUT', path: '/v1/admin/compute-profiles/opencode-lite/default' });
+    expect(backend!.writes[0]).toMatchObject({ method: 'PUT', path: `/v1/admin/compute-profiles/${profileIdOf('opencode-lite')}/default` });
     expect(row('opencode-lite').textContent).toContain('默认');
     expect(buttonIn(await actions('claude-daily'), '设为默认')!.disabled).toBe(false);
     await clickIn(await actions('claude-daily'), '停用'); await clickIn(await actions('claude-daily'), '确认');
-    expect(backend!.writes[1]).toEqual({ method: 'PUT', path: '/v1/admin/compute-profiles/claude-daily/enabled', query: '', body: { enabled: false } });
+    expect(backend!.writes[1]).toEqual({ method: 'PUT', path: `/v1/admin/compute-profiles/${profileIdOf('claude-daily')}/enabled`, query: '', body: { enabled: false } });
     expect(buttonIn(await actions('claude-daily'), '启用')).toBeDefined();
   });
 });
 
 describe('复制档位与推送凭据（RFC-006）', () => {
-  test('复制：新名称先过校验（default 是保留名），成功后直接打开副本的编辑页', async () => {
+  test('复制：新名称先过长度校验，成功后直接打开副本的编辑页', async () => {
     await open();
     await clickIn(await actions('claude-daily'), '复制');
     const name = (await actions('claude-daily')).querySelector<HTMLInputElement>('form input')!;
     expect(name.value).toBe('claude-daily-copy');
-    await type(name, 'default');
-    expect((await actions('claude-daily')).textContent).toContain('档位名只允许小写字母、数字与连字符');
+    await type(name, 'x'.repeat(81));
+    expect((await actions('claude-daily')).textContent).toContain('名称需为 1–80 个字符。');
     expect(buttonIn(await actions('claude-daily'), '复制为新档位')!.disabled).toBe(true);
     await type((await actions('claude-daily')).querySelector<HTMLInputElement>('form input')!, 'claude-weekly');
     await clickIn(await actions('claude-daily'), '复制为新档位');
-    expect(backend!.writes).toEqual([{ method: 'POST', path: '/v1/admin/compute-profiles/claude-daily/copy', query: '', body: { name: 'claude-weekly' } }]);
-    expect(page!.search()).toEqual({ profile: 'claude-weekly' });
+    expect(backend!.writes).toEqual([{ method: 'POST', path: `/v1/admin/compute-profiles/${profileIdOf('claude-daily')}/copy`, query: '', body: { name: 'claude-weekly' } }]);
+    expect(page!.search()).toEqual({ profile: backend!.state.profiles.find((p) => p.name === 'claude-weekly')!.id });
     expect(page!.text()).toContain('claude-weekly');
-    expect([...document.querySelectorAll('label')].some((label) => label.querySelector('span')?.textContent === '档位名')).toBe(false);
+    expect([...document.querySelectorAll('label')].some((label) => label.querySelector('span')?.textContent === '档位名')).toBe(true);
   });
 
   test('推送凭据只显示一次：用户名、口令、登录命令可复制；收起后不再可见', async () => {
@@ -131,7 +132,7 @@ describe('复制档位与推送凭据（RFC-006）', () => {
       expect(copied).toEqual([PUSH_CREDENTIAL.password]); expect(copyPassword.textContent).toBe('已复制');
       // 卡片在列表与编辑页的同一位置：打开编辑页不会让刚签发的一次性凭据消失。
       await clickIn(row('claude-daily'), '编辑');
-      expect(page!.search()).toEqual({ profile: 'claude-daily' }); expect(page!.text()).toContain(PUSH_CREDENTIAL.password);
+      expect(page!.search()).toEqual({ profile: profileIdOf('claude-daily') }); expect(page!.text()).toContain(PUSH_CREDENTIAL.password);
       await page!.click('收起凭据');
       expect(page!.text()).not.toContain(PUSH_CREDENTIAL.password);
     } finally {

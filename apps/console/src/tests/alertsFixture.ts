@@ -1,6 +1,6 @@
 import type { AlertDto, AlertSubscriptionDto } from '@crewstation/contracts';
 
-export const projectId = `prj_${'a'.repeat(32)}`, serviceId = `svc_${'b'.repeat(32)}`, ownerId = `usr_${'c'.repeat(32)}`, memberId = `usr_${'d'.repeat(32)}`;
+export const projectId = '01a0bf5d-8f4b-7e1e-8dde-c9c2ae13ed34', serviceId = '01a0bf5d-8f4b-760b-86b6-0bb9f08a9eaa', ownerId = '01a0bf5d-8f4b-7ed2-8386-a4b2e1a36efb', memberId = '01a0bf5d-8f4b-7baf-8eed-680262285455';
 export const alertId = `alr_${'e'.repeat(32)}`;
 export function alertsFixture() {
   const time = '2026-09-13T01:00:00.000Z';
@@ -22,7 +22,7 @@ export function alertsFixture() {
       reads.push(path);
       if (path === '/v1/me') body = { id: ownerId, name: '王负责人', email: 'owner@test.invalid', platformRole: (state.admin) ? 'admin' : 'developer', isAdmin: state.admin, authMethod: 'password' as const, memberships: [{ projectId, role: state.role }] };
       else if (path === `/v1/projects/${projectId}`) body = { id: projectId, serviceId, name: '演示应用', slug: 'demo', kind: state.admin ? 'APIProxy' : 'DigitalWorker', state: 'active', ownerUserId: ownerId };
-      else if (path.endsWith('/alerts')) { if (state.failAlerts) { status = 503; body = { error: 'unavailable', message: '读取告警失败' }; } else body = { items: alerts.map((row) => ({ ...row, projectId: state.wrongProject ? `prj_${'f'.repeat(32)}` : projectId })) }; }
+      else if (path.endsWith('/alerts')) { if (state.failAlerts) { status = 503; body = { error: 'unavailable', message: '读取告警失败' }; } else body = { items: alerts.map((row) => ({ ...row, projectId: state.wrongProject ? '01a0bf5d-8f4b-70bd-8586-401e32bbc3b4' : projectId })) }; }
       else if (path.endsWith('/alert-subscriptions')) { if (state.failSubscriptions) { status = 503; body = { error: 'unavailable', message: '读取订阅失败' }; } else body = { items: state.subscriptions }; }
       else if (path.endsWith('/members')) { if (state.failMembers) { status = 503; body = { error: 'unavailable', message: '读取成员失败' }; } else body = { items: members }; }
       else if (path.endsWith('/dev-session')) { status = 404; body = { error: 'not_found', message: '没有开发会话' }; }

@@ -29,6 +29,7 @@ import type { ReleaseTagger, RepoReader } from './ports/sourceControl';
 import { PIPELINE_JOB_KIND, pipelineJobHandler } from './workers/pipelineHandler';
 
 export interface ReleaseModuleDeps {
+  physicalOperationId?: (id: string) => Promise<string>;
   db: Database;
   k8s: K8sClient;
   tagger: ReleaseTagger;
@@ -83,7 +84,7 @@ export function createReleaseModule(deps: ReleaseModuleDeps): ReleaseModule {
   };
   const api: ReleaseModuleApi = {
     name: 'release',
-    ...slotMaintenanceUseCases({ ...useCaseDeps, slotControl: kubernetesSlotControl(deps.k8s), isAdmin: deps.isAdmin }),
+    ...slotMaintenanceUseCases({ ...useCaseDeps, slotControl: kubernetesSlotControl(deps.k8s, deps.physicalOperationId), isAdmin: deps.isAdmin }),
     publish: publishUseCase(useCaseDeps),
     switchTraffic: switchTrafficUseCase(useCaseDeps),
     ...releaseQueries(useCaseDeps),

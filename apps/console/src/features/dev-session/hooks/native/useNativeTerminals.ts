@@ -27,7 +27,7 @@ export function useNativeTerminals(taskId: string, channel: TaskStreamChannel, s
   const launch = useCallback((compute: string, permission: AgentPermission) => {
     if (locked.current) return;
     locked.current = true;
-    pending.current ??= { clientRequestId: crypto.randomUUID(), ...(compute ? { compute } : {}), permission, cols: 80, rows: 24 };
+    pending.current ??= { clientRequestId: crypto.randomUUID(), compute: compute ? { kind: 'profile', profileId: compute } : { kind: 'default' }, permission, cols: 80, rows: 24 };
     start.mutate(pending.current, {
       onSuccess: (terminal) => { pending.current = null; onStarted(terminal); },
       onError: (error) => { if (isApiClientError(error) && error.status > 0 && ['validation', 'precondition', 'quota_exceeded', 'forbidden', 'not_found'].includes(error.kind)) pending.current = null; },

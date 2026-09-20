@@ -10,11 +10,11 @@ describe.skipIf(!available)('administrator workspace restart', () => {
   test('running workspace keeps task/PVC identity, reaps children before its Pod, retains quota once and binds the new UID', async () => {
     f = await rebuildFixture({ running: true }); f.state.quota = 3;
     const { runtime, env, k8s, projectId } = f, volume = structuredClone(await k8s.get(Resources.PersistentVolumeClaim!, env.pvcName, env.namespace));
-    const child = await runtime.api.createNativeExecution({ id: `tsk_${'b'.repeat(32)}` as TaskId, parentTaskId: env.id, createdBy: `usr_${'c'.repeat(32)}` as UserId, agentId: 'agent', terminalId: 'pty', runnerId: crypto.randomUUID(), fingerprint: 'f'.repeat(64), profile: 'coding-medium' });
+    const child = await runtime.api.createNativeExecution({ id: '01a0bf5d-8f4b-780e-826f-c732652342f0' as TaskId, parentTaskId: env.id, createdBy: '01a0bf5d-8f4b-7e44-886a-b79b12465703' as UserId, agentId: 'agent', terminalId: 'pty', runnerId: crypto.randomUUID(), fingerprint: 'f'.repeat(64), profile: '01a0bf5d-8f4b-7001-8458-107366e7de39' });
     await f.runNative(); expect(await runtime.api.runningTaskCount(projectId)).toBe(2);
     await expect(runtime.api.inspectRebuild(projectId)).rejects.toThrow();
-    const inspected = await runtime.api.inspectRebuild(projectId, true), profile = inspected.profiles.find((p) => p.name === inspected.currentProfile)!;
-    const input = { requestId: crypto.randomUUID(), expectedTaskId: env.id, expectedUpdatedAt: inspected.updatedAt, expectedPodUid: inspected.podUid, expectedVolumeUid: inspected.volume.uid, reason: 'administrator-restart' as const, profile: { name: profile.name, cpu: profile.cpu, memory: profile.memory, storage: profile.storage } };
+    const inspected = await runtime.api.inspectRebuild(projectId, true), profile = inspected.profiles.find((p) => p.id === inspected.currentProfile)!;
+    const input = { requestId: crypto.randomUUID(), expectedTaskId: env.id, expectedUpdatedAt: inspected.updatedAt, expectedPodUid: inspected.podUid, expectedVolumeUid: inspected.volume.uid, reason: 'administrator-restart' as const, profile: { id: profile.id, name: profile.name, cpu: profile.cpu, memory: profile.memory, storage: profile.storage } };
     await runtime.api.requestRebuild(projectId, input); await f.run();
     expect(await k8s.get(Resources.Pod!, env.podName, env.namespace)).toBeDefined(); expect(await runtime.api.runningTaskCount(projectId)).toBe(2);
     await f.nextNativeAttempt(); await f.nextAttempt();

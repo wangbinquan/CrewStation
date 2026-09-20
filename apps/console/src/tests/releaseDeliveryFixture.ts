@@ -1,8 +1,8 @@
 import type { ReleaseDto, SlotDto } from '@crewstation/contracts';
 import { testerSummaryFixture, trialMarketFixture } from './projectSummaryFixture';
 
-export const projectId = `prj_${'a'.repeat(32)}`, serviceId = `svc_${'b'.repeat(32)}`, userId = `usr_${'c'.repeat(32)}`;
-export const prodId = `rel_${'d'.repeat(32)}`, targetId = `rel_${'e'.repeat(32)}`, historyId = `rel_${'f'.repeat(32)}`;
+export const projectId = '01a0bf5d-8f4b-7e1e-8dde-c9c2ae13ed34', serviceId = '01a0bf5d-8f4b-760b-86b6-0bb9f08a9eaa', userId = '01a0bf5d-8f4b-7ed2-8386-a4b2e1a36efb';
+export const prodId = '01a0bf5d-8f4b-762d-81e1-f95f4dd57c2d', targetId = '01a0bf5d-8f4b-7dda-8ca7-d5d5f8a92b44', historyId = '01a0bf5d-8f4b-7fd8-80e1-98a6fb83510b';
 const sha = 'a'.repeat(40), time = '2026-09-13T01:00:00.000Z';
 
 export function releaseDeliveryFixture() {
@@ -31,7 +31,7 @@ export function releaseDeliveryFixture() {
       else if (path === `/v1/workbench/project-summaries/${projectId}`) body = testerSummaryFixture(projectId, serviceId);
       else if (path === `/v1/projects/${projectId}`) body = { id: projectId, serviceId, name: '演示应用', slug: 'demo', kind: state.admin ? 'APIProxy' : 'DigitalWorker', state: 'active', ownerUserId: userId };
       else if (path.endsWith('/slots')) { if (state.failSlots) { status = 503; body = { error: 'unavailable', message: '部署读取失败' }; } else body = { items: state.slots }; }
-      else if (path.startsWith('/v1/releases/')) { const item = releases.find((release) => path.endsWith(release.id)); body = state.badRelease ? { ...item, serviceId: `svc_${'f'.repeat(32)}` } : item; }
+      else if (path.startsWith('/v1/releases/')) { const item = releases.find((release) => path.endsWith(release.id)); body = state.badRelease ? { ...item, serviceId: '01a0bf5d-8f4b-7f17-8623-f7330845107a' } : item; }
       else if (path.endsWith('/releases')) body = { items: releases };
       else if (path.endsWith('/branches')) body = { items: [{ name: 'main', headSha: sha, isDefault: true, behindPreview: null, behindProd: null }] };
       else if (path.endsWith('/tags')) body = { items: releases.map((release) => ({ name: release.tag, commitSha: release.commitSha, protected: true, createdAt: release.createdAt })) };

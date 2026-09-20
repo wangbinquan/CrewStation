@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import type { NativeTerminalDto, RunnerEvent, TaskId } from '@crewstation/contracts';
-import { AgentActivityPageSchema } from '@crewstation/contracts';
+import { AgentActivityPageSchema, ResourceIdSchema } from '@crewstation/contracts';
 import { createTestDatabase, testDatabaseAvailable } from '@crewstation/testkit';
 import { runMigrations } from '@crewstation/persistence';
 import { sql } from 'drizzle-orm';
@@ -36,6 +36,7 @@ describe.skipIf(!available)('多个独立 CLI 动态的真实数据库汇聚', (
       await Promise.all([api.getAgentActivity(actor, taskId, { limit: 20 }), second.getAgentActivity(actor, taskId, { limit: 20 })]);
       let page = AgentActivityPageSchema.parse(await api.getAgentActivity(actor, taskId, { limit: 20 }));
       expect(page.connection).toBe('disconnected'); expect(page.items).toHaveLength(6);
+      expect(page.items.every((item) => ResourceIdSchema.safeParse(item.eventId).success)).toBe(true);
       expect(new Set(page.items.map((item) => item.seq)).size).toBe(6); expect(new Set(page.items.map((item) => item.eventId)).size).toBe(6);
       expect(page.states.find((s) => s.agentId === one.agentId)).toMatchObject({ connection: 'connected', sync: 'ready', currentTurn: { status: 'completed' }, processEnded: false });
       expect(page.states.find((s) => s.agentId === two.agentId)).toMatchObject({ connection: 'connected', sync: 'ready', pending: [{ id: 'question', unread: true }] });
@@ -59,16 +60,17 @@ describe.skipIf(!available)('多个独立 CLI 动态的真实数据库汇聚', (
   });
 
   test('升级把既有父事件游标带到来源表，继续同步不重播或跳过旧历史', async () => {
-    const database = await createTestDatabase([{ ...devSessionMigrations, files: devSessionMigrations.files.filter((file) => !file.name.startsWith('0006_')) }]);
+    const target = { ...devSessionMigrations, files: devSessionMigrations.files.filter((file) => Number(file.name.slice(0, 4)) < 10) };
+    const database = await createTestDatabase([{ ...target, files: target.files.filter((file) => !file.name.startsWith('0006_')) }]);
     try {
       await database.db.execute(sql`insert into dev_session.native_activity_progress (task_id, through_seq, pruned_through_seq) values (${taskId}, 55, 20)`);
-      expect(await runMigrations(database.db, [devSessionMigrations])).toEqual(['dev_session/0006_native_executions.sql']);
+      expect(await runMigrations(database.db, [target])).toEqual(['dev_session/0006_native_executions.sql']);
       const repo = drizzleNativeActivity(database.db);
       expect(await repo.cursor(taskId)).toBe(55);
       await repo.apply(taskId, 55, [{ seq: 60, at: '2026-09-13T00:00:00.000Z', event: { kind: 'previewState', state: 'stopped' } }]);
       expect(await repo.cursor(taskId)).toBe(60);
       expect(await repo.read(taskId, actor.userId, { limit: 10 })).toMatchObject({ throughSeq: 60, historyTruncated: true, items: [] });
-      expect(await runMigrations(database.db, [devSessionMigrations])).toEqual([]);
+      expect(await runMigrations(database.db, [target])).toEqual([]);
     } finally { await database.drop(); }
   });
 });

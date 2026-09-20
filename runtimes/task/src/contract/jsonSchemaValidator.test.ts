@@ -29,9 +29,16 @@ describe('compileJsonSchema', () => {
 });
 
 describe('loadConfigFromEnv', () => {
-  const base = { CS_TASK_ID: 'tsk_0123456789abcdef0123456789abcdef', CS_RUNNER_TOKEN: 't', CS_SESSION_URL: 'ws://cs-session.crewstation-system:8083/runner' };
+  const base = { CS_TASK_ID: '01a0bf5d-8f4b-7418-8a3f-7cbb4a1fd751', CS_RUNNER_TOKEN: 't', CS_SESSION_URL: 'ws://cs-session.crewstation-system:8083/runner' };
+  test('v3 uses the canonical execution identity while the v2 startup alias remains isolated', () => {
+    const canonical = '01a0bf5d-8f4b-7e3b-8ee6-bf27a166622a';
+    const env = { ...base, CS_RUNNER_TASK_ID: `tsk_${canonical.replaceAll('-', '')}`, CS_CANONICAL_RUNNER_TASK_ID: canonical };
+    expect(loadConfigFromEnv(env)).toMatchObject({ taskId: canonical });
+    expect(() => loadConfigFromEnv({ ...env, CS_CANONICAL_RUNNER_TASK_ID: 'bad' })).toThrow(RunnerConfigError);
+    expect(env.CS_TASK_ID).toBe(base.CS_TASK_ID);
+  });
   test('独立 CLI 连接使用执行身份，父工作区身份和原容器缺省行为保持', () => {
-    const execution = 'tsk_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', runnerId = crypto.randomUUID();
+    const execution = '01a0bf5d-8f4b-7e3b-8ee6-bf27a166622a', runnerId = crypto.randomUUID();
     const env = { ...base, CS_RUNNER_TASK_ID: execution, CS_RUNNER_NATIVE_ID: runnerId };
     expect(loadConfigFromEnv(env)).toMatchObject({ taskId: execution, nativeRunnerId: runnerId });
     expect(env.CS_TASK_ID).toBe(base.CS_TASK_ID);

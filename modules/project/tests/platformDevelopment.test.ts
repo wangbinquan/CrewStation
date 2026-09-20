@@ -15,7 +15,7 @@ const available = await testDatabaseAvailable();
 let db: TestDatabase, identity: IdentityModule, project: ProjectModule;
 let admin: Actor, developer: Actor, member: Actor;
 const asActor = (user: UserDto): Actor => ({ userId: user.id, isAdmin: user.isAdmin });
-const input = (slug: string) => ({ name: '应用', slug, kind: 'DigitalWorker' as const, template: 'minimal-sample' });
+const input = (slug: string) => ({ name: '应用', slug, kind: 'DigitalWorker' as const, template: '01a0bf5d-8f4b-7002-9560-94caf593fb19' });
 beforeAll(async () => {
   if (!available) return;
   db = await createTestDatabase([eventbusMigrations, identityMigrations, projectMigrations]);
@@ -25,22 +25,22 @@ beforeAll(async () => {
   developer = asActor(await identity.api.setPlatformRole(user.id, { platformRole: 'developer', expectedRole: 'user' }));
   member = asActor(await identity.api.ensureUser({ externalId: 'user', name: 'User', email: 'user@test.invalid' }));
   project = createProjectModule({ db: db.db, identity: identity.api, hosts: { prodHost: (s) => s, previewHost: (s) => `preview.${s}`, serviceHost: (s) => s },
-    creationTemplates: { list: async () => [{ name: 'minimal-sample', kind: 'DigitalWorker', requiredConfig: [], servicePlan: 'standard' }] },
-    settings: { defaultMaxConcurrentTasks: 3, defaultServicePlan: 'standard' } });
-  await project.api.upsertServicePlan(admin, { name: 'standard', cpu: '1', memory: '1Gi', maxReplicas: 2, description: '' });
+    creationTemplates: { list: async () => [{ id: '01a0bf5d-8f4b-7002-9560-94caf593fb19', name: 'minimal-sample', kind: 'DigitalWorker', requiredConfig: [], servicePlan: '01a0bf5d-8f4b-7fe6-8d34-68cf5c74d8ec' }] },
+    settings: { defaultMaxConcurrentTasks: 3, defaultServicePlan: '01a0bf5d-8f4b-7fe6-8d34-68cf5c74d8ec' } });
+  await project.api.createServicePlan(admin, { id: '01a0bf5d-8f4b-7fe6-8d34-68cf5c74d8ec', name: 'standard', cpu: '1', memory: '1Gi', maxReplicas: 2, description: '' });
 });
 afterAll(async () => { await db?.drop(); });
 
 describe.skipIf(!available)('平台开发资格、自建与成员资格', () => {
   test('开发者无项目也可自建，本人 owner、默认资源、服务与事件原子落库', async () => {
     expect(await project.api.listProjects(developer)).toEqual([]);
-    expect(await project.api.creationCatalog(developer)).toMatchObject({ defaultServicePlan: 'standard', maxConcurrentTasks: 3 });
+    expect(await project.api.creationCatalog(developer)).toMatchObject({ defaultServicePlan: '01a0bf5d-8f4b-7fe6-8d34-68cf5c74d8ec', maxConcurrentTasks: 3 });
     const p = await project.api.createProject(developer, input('self-built'));
     expect(p).toMatchObject({ ownerUserId: developer.userId, state: 'provisioning', kind: 'DigitalWorker' });
     expect(await project.api.listMembers(developer, p.id)).toEqual([expect.objectContaining({ userId: developer.userId, role: 'owner' })]);
     expect(await project.api.getQuota(developer, p.id)).toMatchObject({ maxConcurrentTasks: 3 });
     expect(await project.api.authorize(developer, p.id, 'switch-traffic')).toBe('owner');
-    expect(await project.api.getProvisioningProject(p.id)).toMatchObject({ initialPlan: 'standard', template: 'minimal-sample' });
+    expect(await project.api.getProvisioningProject(p.id)).toMatchObject({ initialPlan: '01a0bf5d-8f4b-7fe6-8d34-68cf5c74d8ec', template: '01a0bf5d-8f4b-7002-9560-94caf593fb19' });
     const events = await db.db.execute<{ topic: string }>('select topic from platform_infra.domain_events');
     expect(events.map((e) => e.topic)).toEqual(['project.created']);
     await expect(identity.api.setPlatformRole(developer.userId, { expectedRole: 'developer', platformRole: 'user' })).rejects.toMatchObject({ kind: 'precondition' });
@@ -49,7 +49,7 @@ describe.skipIf(!available)('平台开发资格、自建与成员资格', () => 
   test('伪造负责人、接入类型、资源、模板、未知字段与普通用户创建拒绝且无写入', async () => {
     const http = createApp({ name: 'self-create' }); for (const route of project.http) http.route('/', route);
     for (const [actor, patch, status] of [[member, {}, 403], [developer, { ownerUserId: admin.userId }, 400], [developer, { kind: 'APIProxy' }, 400],
-      [developer, { plan: 'standard' }, 400], [developer, { maxConcurrentTasks: 9 }, 400], [developer, { template: 'not-found' }, 400], [developer, { arbitrary: true }, 400]] as const) {
+      [developer, { plan: '01a0bf5d-8f4b-7fe6-8d34-68cf5c74d8ec' }, 400], [developer, { maxConcurrentTasks: 9 }, 400], [developer, { template: '01a0bf5d-8f4b-7f50-87a5-088d932fb0b0' }, 400], [developer, { arbitrary: true }, 400]] as const) {
       const response = await http.request('/v1/projects', { method: 'POST', headers: { [IDENTITY_HEADERS.userId]: actor.userId, 'content-type': 'application/json' }, body: JSON.stringify({ ...input('denied'), ...patch }) });
       expect(response.status).toBe(status);
     }
@@ -107,8 +107,8 @@ describe.skipIf(!available)('平台开发资格、自建与成员资格', () => 
     const concurrent = createProjectModule({ db: limited.db, identity: identity.api,
       hosts: { prodHost: (s) => s, previewHost: (s) => `preview.${s}`, serviceHost: (s) => s },
       // 模拟慢模板目录：两个独立协调事务若同时持有全部连接，后续项目事务便无法开始。
-      creationTemplates: { list: async () => { await Bun.sleep(50); return [{ name: 'minimal-sample', kind: 'DigitalWorker', requiredConfig: [], servicePlan: 'standard' }]; } },
-      settings: { defaultMaxConcurrentTasks: 3, defaultServicePlan: 'standard' } });
+      creationTemplates: { list: async () => { await Bun.sleep(50); return [{ id: '01a0bf5d-8f4b-7002-9560-94caf593fb19', name: 'minimal-sample', kind: 'DigitalWorker', requiredConfig: [], servicePlan: '01a0bf5d-8f4b-7fe6-8d34-68cf5c74d8ec' }]; } },
+      settings: { defaultMaxConcurrentTasks: 3, defaultServicePlan: '01a0bf5d-8f4b-7fe6-8d34-68cf5c74d8ec' } });
     try {
       const results = await Promise.allSettled(actors.map((actor, i) => concurrent.api.createProject(actor, input(`pool-create-${i}`))));
       expect(results.map((result) => result.status)).toEqual(['fulfilled', 'fulfilled', 'fulfilled', 'fulfilled']);

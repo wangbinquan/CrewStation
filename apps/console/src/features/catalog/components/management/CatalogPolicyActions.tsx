@@ -11,10 +11,10 @@ export function CatalogPolicyActions({ operation, serviceId, projectName, action
   const busy = actions.setPolicy.isPending || actions.revoke.isPending;
   return <div className={styles.rowActions}>
     <InlineConfirm label={t(target === 'default' ? 'catalog.admin.toDefault' : 'catalog.admin.toTargeted')}
-      question={t('catalog.admin.policyConfirm', { key: operation.key, policy: t(`catalog.policy.${target}`) })} busy={busy}
-      onConfirm={() => actions.setPolicy.mutate({ operationKey: operation.key, openPolicy: target })} />
+      question={t('catalog.admin.policyConfirm', { key: operation.id, policy: t(`catalog.policy.${target}`) })} busy={busy}
+      onConfirm={() => actions.setPolicy.mutate({ operationId: operation.id, openPolicy: target })} />
     {serviceId && operation.granted === true ? <InlineConfirm label={t('catalog.admin.revoke')}
-      question={t('catalog.admin.revokeServiceConfirm', { name: projectName ?? serviceId, key: operation.key }) + (operation.openPolicy === 'default' ? t('catalog.admin.defaultStillOpen') : '')}
-      busy={busy} onConfirm={() => actions.revoke.mutate({ serviceId, operationKey: operation.key })} /> : null}
+      question={t('catalog.admin.revokeServiceConfirm', { name: projectName ?? serviceId, key: operation.id }) + (operation.openPolicy === 'default' ? t('catalog.admin.defaultStillOpen') : '')}
+      busy={busy} onConfirm={() => actions.revoke.mutate({ serviceId, operationId: operation.id })} /> : null}
   </div>;
 }

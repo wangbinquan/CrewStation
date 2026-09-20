@@ -17,15 +17,16 @@ export class NativeExecutionLifecycle {
   private sweeping = false;
   private async finishRecord(start: NativeTerminalStart, reason: NativeTerminalRecord['reason'], error?: string) {
     if (nativeEnded(start.record)) return start.record;
-    const record: NativeTerminalRecord = { ...start.record, revision: start.record.revision + 1, lifecycle: error ? 'failed' : 'ended', endedAt: this.deps.clock.now().toISOString(), reason, ...(error ? { error } : {}) };
-    await this.repo.saveRecord(start.taskId, record);
+    let record: NativeTerminalRecord = { ...start.record, revision: start.record.revision + 1, lifecycle: error ? 'failed' : 'ended', endedAt: this.deps.clock.now().toISOString(), reason, ...(error ? { error } : {}) };
+    record = { ...record, computeName: start.record.computeName };
+          await this.repo.saveRecord(start.taskId, record);
     return record;
   }
   private async admit(start: NativeTerminalStart): Promise<EnvironmentView | undefined> {
     try {
       return await this.deps.environments.createNativeExecution({ id: start.execution!.taskId, parentTaskId: start.taskId, purpose: 'cli', createdBy: start.createdBy, agentId: start.record.agentId,
         terminalId: start.record.terminalId, runnerId: start.record.runnerId, fingerprint: start.fingerprint, ...(start.execution!.taskProfile ? { profile: start.execution!.taskProfile } : {}),
-        ...(start.execution!.image ? { image: start.execution!.image } : {}), ...(start.profile ? { computeProfile: { name: start.profile.profile, revision: start.profile.revision } } : {}) });
+        ...(start.execution!.image ? { image: start.execution!.image } : {}), ...(start.profile ? { computeProfile: { profileId: start.profile.profileId, revision: start.profile.revision } } : {}) });
     } catch (error) {
       if (!isPlatformError(error) || !rejected(error)) throw error;
       await this.finishRecord(start, 'start-failed', error.message);
@@ -43,6 +44,7 @@ export class NativeExecutionLifecycle {
           connection = 'connected';
           if (current.runnerId !== record.runnerId) record = await this.finishRecord(start, 'runner-restarted');
           else record = current.terminals.find((r) => r.agentId === record.agentId && r.terminalId === record.terminalId && r.runnerId === record.runnerId) ?? record;
+          record = { ...record, computeName: start.record.computeName };
           await this.repo.saveRecord(start.taskId, record);
         } catch { /* 单个 Runner 不响应不推断进程结束。 */ }
       }
@@ -56,13 +58,14 @@ export class NativeExecutionLifecycle {
     const credential = await this.deps.credentials.issueDevSessionToken({ taskId: start.taskId, projectId: env.projectId, serviceId: env.serviceId as ServiceId, userId: start.createdBy });
     // 受理时固定的档位修订：后台重试与迟到派发都用它，不重新解析“当前最新”（RFC-006）。
     const profile = await profileLaunchFields(this.deps, start.profile, start.record.agentId);
-    const record = RunnerResultPayloads.startAgentTerminal.parse(await this.deps.runner.sendCommand(env.id, {
+    let record = RunnerResultPayloads.startAgentTerminal.parse(await this.deps.runner.sendCommand(env.id, {
       id: newId('cmd'), type: 'startAgentTerminal', agentId: start.record.agentId, terminalId: start.record.terminalId, runnerId: start.record.runnerId,
       requestFingerprint: start.fingerprint, ...profile, permission: start.record.permission,
       cols: start.input.cols, rows: start.input.rows, ...(start.input.cwd ? { cwd: start.input.cwd } : {}),
       mcp: this.deps.settings.mcp.map((m) => ({ ...m, headers: { [IDENTITY_HEADERS.devSessionToken]: credential.token } })), env: {},
     }));
-    await this.repo.saveRecord(start.taskId, record);
+    record = { ...record, computeName: start.record.computeName };
+          await this.repo.saveRecord(start.taskId, record);
     await this.deps.environments.touch(start.taskId);
   }
   private async cleanup(start: NativeTerminalStart, env?: EnvironmentView) {

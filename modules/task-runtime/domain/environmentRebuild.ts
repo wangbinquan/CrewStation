@@ -1,7 +1,13 @@
 import type { DevSessionRebuildDto, ProjectId, RebuildDevSessionRequest, TaskId } from '@crewstation/contracts';
+export interface LegacyRebuildClusterIdentity {
+  readonly taskId: string;
+  readonly rebuildId: string;
+  readonly profile: unknown;
+}
 
 /** 恢复意图不携带凭据；新 Runner Secret 由集群适配器幂等准备。 */
 export interface EnvironmentRebuild {
+  readonly legacyCluster?: LegacyRebuildClusterIdentity;
   readonly id: string;
   readonly taskId: TaskId;
   readonly projectId: ProjectId;
@@ -27,6 +33,6 @@ export function rebuildIsActive(record: EnvironmentRebuild): boolean {
 }
 
 export function rebuildToDto(record: EnvironmentRebuild): DevSessionRebuildDto {
-  return { requestId: record.id, taskId: record.taskId, state: record.state, profile: record.input.profile,
+  return { id: record.id, requestId: record.input.requestId, taskId: record.taskId, state: record.state, profile: record.input.profile,
     createdAt: record.createdAt.toISOString(), updatedAt: record.updatedAt.toISOString(), ...(record.message ? { message: record.message } : {}) };
 }

@@ -2,12 +2,12 @@ import { useEffect, useRef, useState } from 'react';
 import { errorMessage, useApiMutation, useApiQuery } from '../../../shared/api/useApi';
 import { useT } from '../../../shared/lib/useT';
 import { resourceCatalogAccess } from '../model/resourceCatalogAccess';
-import type { ResourceCatalogEntry, ResourceCatalogKind } from '../model/resourceCatalogDraft';
+import type { ResourceCatalogEntry, ResourceCatalogInput, ResourceCatalogKind } from '../model/resourceCatalogDraft';
 import { sameResourceCatalogEntry } from '../model/resourceCatalogDraft';
 
-interface ResourceConfirmation { readonly input: ResourceCatalogEntry; readonly before: ResourceCatalogEntry | undefined }
+interface ResourceConfirmation { readonly input: ResourceCatalogInput; readonly before: ResourceCatalogEntry | undefined }
 
-/** 既有目录是同名覆盖；重读与对照改善确认材料，不冒充服务端 CAS。 */
+/** 按 ID 更新目标；新增时分配新身份，名称修改不改变更新目标。 */
 export function useResourceCatalogWrite(kind: ResourceCatalogKind, onSaved: (entry: ResourceCatalogEntry) => void) {
   const t = useT(), access = resourceCatalogAccess(kind, t('admin.resource.invalidRead'), t('admin.resource.invalidWrite'));
   const query = useApiQuery(access.key, access.read), save = useApiMutation(access.write, { invalidate: [access.key] });
@@ -16,16 +16,16 @@ export function useResourceCatalogWrite(kind: ResourceCatalogKind, onSaved: (ent
   const [error, setError] = useState<string>(), [changed, setChanged] = useState(false);
   useEffect(() => { const generation = life.current + 1; life.current = generation; return () => { life.current = generation + 1; }; }, []);
   const unavailable = query.isPending || query.isError || query.isFetching, busy = checking || save.isPending;
-  const current = async (name: string) => {
+  const current = async (id: string | undefined) => {
     const latest = await query.refetch();
     if (latest.error || !latest.data) throw latest.error ?? new Error(t('admin.resource.invalidRead'));
-    return latest.data.items.find((entry) => entry.name === name);
+    return latest.data.items.find((entry) => entry.id === id);
   };
-  const prepare = async (input: ResourceCatalogEntry) => {
+  const prepare = async (input: ResourceCatalogInput) => {
     if (lock.current || unavailable) return;
     lock.current = true; setChecking(true); setError(undefined); setChanged(false); save.reset();
     const generation = life.current;
-    try { const before = await current(input.name); if (generation === life.current) setConfirmation({ input, before }); }
+    try { const before = await current(input.id); if (generation === life.current) setConfirmation({ input, before }); }
     catch (failure) { if (generation === life.current) setError(errorMessage(failure)); }
     finally { lock.current = false; if (generation === life.current) setChecking(false); }
   };
@@ -34,7 +34,8 @@ export function useResourceCatalogWrite(kind: ResourceCatalogKind, onSaved: (ent
     lock.current = true; setChecking(true); setError(undefined);
     const generation = life.current, snapshot = confirmation;
     try {
-      const before = await current(snapshot.input.name);
+      const before = await current(snapshot.input.id);
+      if (snapshot.input.id && !before) throw new Error(t('admin.resource.invalidRead'));
       if (generation !== life.current) return;
       if (!sameResourceCatalogEntry(before, snapshot.before)) { setConfirmation({ input: snapshot.input, before }); setChanged(true); return; }
       const result = await save.mutateAsync(snapshot.input);

@@ -24,10 +24,10 @@ beforeAll(async () => {
   admin = { userId: (await identity.api.ensureUser({ externalId: 'admin', name: 'Admin', email: 'admin@test.invalid' })).id, isAdmin: true };
   member = { userId: (await identity.api.ensureUser({ externalId: 'member', name: 'Member', email: 'member@test.invalid' })).id, isAdmin: false };
   await identity.api.setPlatformRole(member.userId, { platformRole: 'developer', expectedRole: 'user' });
-  projects = createProjectModule({ db: db.db, identity: identity.api, hosts, settings: { defaultMaxConcurrentTasks: 3, defaultServicePlan: 'small' } });
-  await projects.api.upsertServicePlan(admin, { name: 'small', cpu: '1', memory: '1Gi', maxReplicas: 1, description: '' });
-  alpha = await projects.api.createProject(admin, { name: 'Alpha', slug: 'alpha', kind: 'DigitalWorker', ownerUserId: member.userId, template: 'sample' });
-  beta = await projects.api.createProject(admin, { name: 'Beta', slug: 'beta', kind: 'DigitalWorker', ownerUserId: admin.userId, template: 'sample' });
+  projects = createProjectModule({ db: db.db, identity: identity.api, hosts, settings: { defaultMaxConcurrentTasks: 3, defaultServicePlan: '01a0bf5d-8f4b-781d-8b8e-bbbbc69c6c6a' } });
+  await projects.api.createServicePlan(admin, { id: '01a0bf5d-8f4b-781d-8b8e-bbbbc69c6c6a', name: 'small', cpu: '1', memory: '1Gi', maxReplicas: 1, description: '' });
+  alpha = await projects.api.createProject(admin, { name: 'Alpha', slug: 'alpha', kind: 'DigitalWorker', ownerUserId: member.userId, template: '01a0bf5d-8f4b-7af2-8bdb-e1aa9b6ec1e2' });
+  beta = await projects.api.createProject(admin, { name: 'Beta', slug: 'beta', kind: 'DigitalWorker', ownerUserId: admin.userId, template: '01a0bf5d-8f4b-7af2-8bdb-e1aa9b6ec1e2' });
   egress = createEgressModule({ db: db.db, project: projects.api });
   const repo = drizzleEgressRequestRepository(db.db);
   for (let i = 0; i < 72; i++) {

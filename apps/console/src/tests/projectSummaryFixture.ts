@@ -7,11 +7,11 @@ export function trialMarketFixture(projectId: string): MarketAppDto {
     production: { status: 'not-deployed', checkedAt, freshness: 'current' }, visibilityRevision: 1, checkedAt };
 }
 
-export const summaryUserId = `usr_${'a'.repeat(32)}` as UserId;
+export const summaryUserId = '01a0bf5d-8f4b-7f8b-8136-e631380738b0' as UserId;
 export function summaryFixtureItem(n = 1): ProjectSummaryDetail {
   const time = new Date().toISOString(), part = { status: 'ready' as const, checkedAt: time };
-  return { project: { id: `prj_${n.toString(16).padStart(32, '0')}` as ProjectSummaryDetail['project']['id'],
-    serviceId: `svc_${n.toString(16).padStart(32, '0')}` as ProjectSummaryDetail['project']['serviceId'], slug: `demo-${n}`, name: `数字助手 ${n}`, kind: 'DigitalWorker',
+  return { project: { id: `01a0bf5d-8f4b-7a01-8000-${n.toString(16).padStart(12, '0')}` as ProjectSummaryDetail['project']['id'],
+    serviceId: `01a0bf5d-8f4b-7a02-8000-${n.toString(16).padStart(12, '0')}` as ProjectSummaryDetail['project']['serviceId'], slug: `demo-${n}`, name: `数字助手 ${n}`, kind: 'DigitalWorker',
     namespace: `cs-demo-${n}`, ownerUserId: summaryUserId as ProjectSummaryDetail['project']['ownerUserId'], state: 'active', createdAt: time },
     role: 'owner', ownerName: '王负责人', development: { ...part, value: null }, slots: { ...part, value: [] },
     health: { status: 'unknown', reason: 'not-provided', checkedAt: time }, releases: { ...part, value: [] }, switches: { ...part, value: [] }, checkedAt: time };

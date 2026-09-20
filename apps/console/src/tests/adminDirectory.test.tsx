@@ -10,13 +10,13 @@ afterEach(() => { page?.unmount(); page = undefined; globalThis.fetch = original
 
 test('管理总览显示三类真实待办，各取五条；失败来源保持错误，入口只导航', async () => {
   const f = adminDirectoryFixture(); f.state.egressError = true; page = await renderApp('/admin');
-  expect(page.text()).toContain('待处理事项'); expect(page.text()).toContain('billing:GET:/reports/0');
+  expect(page.text()).toContain('待处理事项'); expect(page.text()).toContain(f.apiRequests[0]!.operationId);
   expect(page.text()).toContain('出站待办离线'); expect(page.text()).toContain('生产配置尚未补齐');
-  expect(page.text()).not.toContain('billing:GET:/reports/5');
+  expect(page.text()).not.toContain(f.apiRequests[5]!.operationId);
   const requests = f.calls.filter((c) => c.url.pathname.endsWith('/page'));
   expect(requests).toHaveLength(3); expect(requests.every((c) => c.url.searchParams.get('limit') === '5')).toBe(true);
   expect(f.calls.some((c) => c.url.pathname === '/v1/projects')).toBe(false);
-  await page.click('billing:GET:/reports/0'); expect(page.path()).toBe('/admin/requests');
+  await page.click(f.apiRequests[0]!.operationId); expect(page.path()).toBe('/admin/requests');
   expect(page.search()).toMatchObject({ tab: 'api', state: 'pending', projectId: f.projects[0]!.project.id }); expect(f.writes()).toHaveLength(0);
 });
 
@@ -56,7 +56,7 @@ test('待办独立加载、空态与错误不混淆，失败来源单独重读�
   expect(card().textContent).toContain('数量未确认'); expect(card().textContent).not.toContain('当前没有待处理事项'); expect(page.text()).toContain('api-0.example.test');
   f.state.apiError = true; await act(async () => release()); await page.settle(); expect(card().textContent).toContain('API 待办离线');
   expect(card().textContent).not.toContain('本次显示 0 项'); f.state.holdApi = undefined; f.state.apiError = false;
-  await page.click('刷新 API 待办'); expect(card().textContent).toContain('billing:GET:/reports/0'); expect(card().textContent).toContain('还有更多');
+  await page.click('刷新 API 待办'); expect(card().textContent).toContain(f.apiRequests[0]!.operationId); expect(card().textContent).toContain('还有更多');
   f.apiRequests.length = 0; await page.click('刷新 API 待办'); expect(card().textContent).toContain('当前没有待处理事项'); expect(card().textContent).toContain('本次显示 0 项');
 });
 

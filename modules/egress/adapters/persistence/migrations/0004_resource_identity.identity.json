@@ -1,0 +1,74 @@
+{
+  "version": "resource-identity/v1",
+  "schema": "egress",
+  "entities": [
+    {
+      "table": "entries",
+      "kind": "egress-entry",
+      "keys": [
+        "id"
+      ],
+      "idColumn": "id"
+    },
+    {
+      "table": "requests",
+      "kind": "egress-request",
+      "keys": [
+        "id"
+      ],
+      "idColumn": "id"
+    }
+  ],
+  "references": [
+    {
+      "table": "entries",
+      "column": "project_id",
+      "kind": "project",
+      "keys": [
+        "project_id"
+      ],
+      "nullable": true
+    },
+    {
+      "table": "entries",
+      "column": "created_by",
+      "kind": "user",
+      "keys": [
+        "created_by"
+      ]
+    },
+    {
+      "table": "requests",
+      "column": "project_id",
+      "kind": "project",
+      "keys": [
+        "project_id"
+      ]
+    },
+    {
+      "table": "requests",
+      "column": "requested_by",
+      "kind": "user",
+      "keys": [
+        "requested_by"
+      ]
+    },
+    {
+      "table": "requests",
+      "column": "decided_by",
+      "kind": "user",
+      "keys": [
+        "decided_by"
+      ],
+      "nullable": true
+    },
+    {
+      "table": "blocked",
+      "column": "project_id",
+      "kind": "project",
+      "keys": [
+        "project_id"
+      ]
+    }
+  ]
+}

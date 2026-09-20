@@ -1,0 +1,81 @@
+{
+  "version": "resource-identity/v1",
+  "schema": "data",
+  "entities": [
+    {
+      "table": "resources",
+      "kind": "data-resource",
+      "keys": [
+        "id"
+      ],
+      "idColumn": "id"
+    },
+    {
+      "table": "task_bindings",
+      "kind": "data-binding",
+      "keys": [
+        "id"
+      ],
+      "idColumn": "id"
+    }
+  ],
+  "references": [
+    {
+      "table": "resources",
+      "column": "project_id",
+      "kind": "project",
+      "keys": [
+        "project_id"
+      ]
+    },
+    {
+      "table": "resources",
+      "column": "service_id",
+      "kind": "service",
+      "keys": [
+        "service_id"
+      ]
+    },
+    {
+      "table": "task_bindings",
+      "column": "project_id",
+      "kind": "project",
+      "keys": [
+        "project_id"
+      ]
+    },
+    {
+      "table": "task_bindings",
+      "column": "service_id",
+      "kind": "service",
+      "keys": [
+        "service_id"
+      ]
+    },
+    {
+      "table": "task_bindings",
+      "column": "task_id",
+      "kind": "task",
+      "keys": [
+        "task_id"
+      ]
+    },
+    {
+      "table": "task_bindings",
+      "column": "requested_by",
+      "kind": "user",
+      "keys": [
+        "requested_by"
+      ]
+    },
+    {
+      "table": "task_bindings",
+      "column": "decided_by",
+      "kind": "user",
+      "keys": [
+        "decided_by"
+      ],
+      "nullable": true
+    }
+  ]
+}

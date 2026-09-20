@@ -128,19 +128,19 @@ describe('POST /chat', () => {
       expect(new Headers(init?.headers).get('x-cs-trace-id')).toBe(traceId);
       expect(new Headers(init?.headers).has('authorization')).toBe(false);
       switch (`${method} ${url.pathname}`) {
-        case 'POST /v1/business-tasks':
+        case 'POST /v2/business-tasks':
           expect(JSON.parse(String(init?.body))).toEqual({});
-          return Response.json({ id: 'tsk_1', state: 'creating' });
-        case 'POST /v1/business-tasks/tsk_1/subtasks':
-          expect(JSON.parse(String(init?.body))).toEqual({ kind: 'agent', name: 'chat', agentProfile: 'chat-v1', mode: 'oneshot', prompt: '你好' });
-          return Response.json({ id: 'sub_1', state: 'pending' });
-        case 'GET /v1/business-tasks/tsk_1/subtasks/sub_1':
+          return Response.json({ id: '01a0bf5d-8f4b-75a7-80d4-bd6f2b68d4bb', state: 'creating' });
+        case 'POST /v2/business-tasks/01a0bf5d-8f4b-75a7-80d4-bd6f2b68d4bb/subtasks':
+          expect(JSON.parse(String(init?.body))).toEqual({ kind: 'agent', name: 'chat', agentProfileId: '01a0bf5d-8f4b-7101-8000-000000000001', mode: 'oneshot', prompt: '你好' });
+          return Response.json({ id: '01a0bf5d-8f4b-713a-8076-fce7d175418c', state: 'pending' });
+        case 'GET /v2/business-tasks/01a0bf5d-8f4b-75a7-80d4-bd6f2b68d4bb/subtasks/01a0bf5d-8f4b-713a-8076-fce7d175418c':
           polls += 1;
-          return Response.json({ id: 'sub_1', state: polls < 3 ? 'running' : 'succeeded' });
-        case 'GET /v1/business-tasks/tsk_1/subtasks/sub_1/output':
+          return Response.json({ id: '01a0bf5d-8f4b-713a-8076-fce7d175418c', state: polls < 3 ? 'running' : 'succeeded' });
+        case 'GET /v2/business-tasks/01a0bf5d-8f4b-75a7-80d4-bd6f2b68d4bb/subtasks/01a0bf5d-8f4b-713a-8076-fce7d175418c/output':
           return new Response('echo: 你好', { headers: { 'content-type': 'text/plain; charset=utf-8' } });
-        case 'POST /v1/business-tasks/tsk_1/close':
-          return Response.json({ id: 'tsk_1', state: 'closing' });
+        case 'POST /v2/business-tasks/01a0bf5d-8f4b-75a7-80d4-bd6f2b68d4bb/close':
+          return Response.json({ id: '01a0bf5d-8f4b-75a7-80d4-bd6f2b68d4bb', state: 'closing' });
         default:
           return new Response('not found', { status: 404 });
       }
@@ -148,15 +148,15 @@ describe('POST /chat', () => {
     const app = createApp({ env: platformEnv, platformFetch, sleep: async () => {}, log: quiet });
     const res = await app.request('/chat', json({ prompt: '你好' }, { 'x-cs-trace-id': traceId }));
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ text: 'echo: 你好', taskId: 'tsk_1', subtaskId: 'sub_1' });
+    expect(await res.json()).toEqual({ text: 'echo: 你好', taskId: '01a0bf5d-8f4b-75a7-80d4-bd6f2b68d4bb', subtaskId: '01a0bf5d-8f4b-713a-8076-fce7d175418c' });
     expect(calls).toEqual([
-      'POST /v1/business-tasks',
-      'POST /v1/business-tasks/tsk_1/subtasks',
-      'GET /v1/business-tasks/tsk_1/subtasks/sub_1',
-      'GET /v1/business-tasks/tsk_1/subtasks/sub_1',
-      'GET /v1/business-tasks/tsk_1/subtasks/sub_1',
-      'GET /v1/business-tasks/tsk_1/subtasks/sub_1/output',
-      'POST /v1/business-tasks/tsk_1/close',
+      'POST /v2/business-tasks',
+      'POST /v2/business-tasks/01a0bf5d-8f4b-75a7-80d4-bd6f2b68d4bb/subtasks',
+      'GET /v2/business-tasks/01a0bf5d-8f4b-75a7-80d4-bd6f2b68d4bb/subtasks/01a0bf5d-8f4b-713a-8076-fce7d175418c',
+      'GET /v2/business-tasks/01a0bf5d-8f4b-75a7-80d4-bd6f2b68d4bb/subtasks/01a0bf5d-8f4b-713a-8076-fce7d175418c',
+      'GET /v2/business-tasks/01a0bf5d-8f4b-75a7-80d4-bd6f2b68d4bb/subtasks/01a0bf5d-8f4b-713a-8076-fce7d175418c',
+      'GET /v2/business-tasks/01a0bf5d-8f4b-75a7-80d4-bd6f2b68d4bb/subtasks/01a0bf5d-8f4b-713a-8076-fce7d175418c/output',
+      'POST /v2/business-tasks/01a0bf5d-8f4b-75a7-80d4-bd6f2b68d4bb/close',
     ]);
   });
 
@@ -165,27 +165,27 @@ describe('POST /chat', () => {
     const platformFetch: FetchLike = async (input, init) => {
       const path = new URL(input).pathname;
       calls.push(`${init?.method ?? 'GET'} ${path}`);
-      if (path === '/v1/business-tasks') return Response.json({ id: 'tsk_2' });
+      if (path === '/v2/business-tasks') return Response.json({ id: '01a0bf5d-8f4b-7d9f-84c5-6e87dfc71be2' });
       if (path.endsWith('/subtasks')) return Response.json({ error: 'quota_exceeded', message: '并发任务配额已满', details: {} }, { status: 429 });
-      return Response.json({ id: 'tsk_2', state: 'closing' });
+      return Response.json({ id: '01a0bf5d-8f4b-7d9f-84c5-6e87dfc71be2', state: 'closing' });
     };
     const res = await createApp({ env: platformEnv, platformFetch, sleep: async () => {}, log: quiet }).request('/chat', json({ prompt: '你好' }));
     expect(res.status).toBe(502);
     expect(((await res.json()) as { error: string }).error).toBe('提交 Agent 子任务失败：HTTP 429（quota_exceeded：并发任务配额已满）');
-    expect(calls.at(-1)).toBe('POST /v1/business-tasks/tsk_2/close');
+    expect(calls.at(-1)).toBe('POST /v2/business-tasks/01a0bf5d-8f4b-7d9f-84c5-6e87dfc71be2/close');
   });
 
   test('子任务失败时返回 502、失败说明与部分输出', async () => {
     const platformFetch: FetchLike = async (input) => {
       const path = new URL(input).pathname;
-      if (path === '/v1/business-tasks') return Response.json({ id: 'tsk_3' });
-      if (path.endsWith('/subtasks')) return Response.json({ id: 'sub_3' });
-      if (path.endsWith('/sub_3')) return Response.json({ id: 'sub_3', state: 'failed', error: '模型不可用' });
+      if (path === '/v2/business-tasks') return Response.json({ id: '01a0bf5d-8f4b-7521-866c-4ee471cc7c69' });
+      if (path.endsWith('/subtasks')) return Response.json({ id: '01a0bf5d-8f4b-7e46-80e1-43e31e1d43ca' });
+      if (path.endsWith('/01a0bf5d-8f4b-7e46-80e1-43e31e1d43ca')) return Response.json({ id: '01a0bf5d-8f4b-7e46-80e1-43e31e1d43ca', state: 'failed', error: '模型不可用' });
       if (path.endsWith('/output')) return new Response('partial');
       return Response.json({});
     };
     const res = await createApp({ env: platformEnv, platformFetch, sleep: async () => {}, log: quiet }).request('/chat', json({ prompt: '你好' }));
     expect(res.status).toBe(502);
-    expect(await res.json()).toEqual({ error: 'Agent 子任务失败：模型不可用', text: 'partial', taskId: 'tsk_3', subtaskId: 'sub_3' });
+    expect(await res.json()).toEqual({ error: 'Agent 子任务失败：模型不可用', text: 'partial', taskId: '01a0bf5d-8f4b-7521-866c-4ee471cc7c69', subtaskId: '01a0bf5d-8f4b-7e46-80e1-43e31e1d43ca' });
   });
 });

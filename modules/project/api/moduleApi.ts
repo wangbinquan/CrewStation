@@ -1,7 +1,7 @@
 import type {
-  ProjectCreationCatalog, ProjectPage, ProjectPageEntry, ProjectPageQuery,
+  CreateServicePlan, CreateTaskProfile,  ProjectCreationCatalog, ProjectPage, ProjectPageEntry, ProjectPageQuery,
   Actor, CreateProjectRequest, ListProjectsQuery, ManifestKind, MemberDto, ProjectDto, ProjectId, ProjectState, QuotaDto, ServiceDto,
-  ServiceId, ServicePlanDto, SetMemberRequest, SetQuotaRequest, TaskProfileDto, UserId,
+  ServiceId, ServicePlanDto, ServicePlanWrite, TaskProfileWrite, SetMemberRequest, SetQuotaRequest, TaskProfileDto, UserId,
   AppVisibilityDto, AppVisibilityCheckDto, SetAppVisibilityRequest, AppPresentationDto, SetAppPresentationRequest, MemberCandidateDto, MarketAppsQuery, MarketAppDto,
 } from '@crewstation/contracts';
 
@@ -85,7 +85,9 @@ export interface ProjectModuleApi {
   setQuota(actor: Actor, projectId: ProjectId, input: SetQuotaRequest): Promise<QuotaDto>;
   quotaLimit(projectId: ProjectId): Promise<number | undefined>;
   listServicePlans(): Promise<ServicePlanDto[]>;
-  upsertServicePlan(actor: Actor, plan: ServicePlanDto): Promise<ServicePlanDto>;
+  createServicePlan(actor: Actor, plan: CreateServicePlan): Promise<ServicePlanDto>;
+  updateServicePlan(actor: Actor, id: string, plan: ServicePlanWrite): Promise<ServicePlanDto>;
+  updateTaskProfile(actor: Actor, id: string, profile: TaskProfileWrite): Promise<TaskProfileDto>;
   listTaskProfiles(): Promise<TaskProfileDto[]>;
-  upsertTaskProfile(actor: Actor, profile: TaskProfileDto): Promise<TaskProfileDto>;
+  createTaskProfile(actor: Actor, profile: CreateTaskProfile): Promise<TaskProfileDto>;
 }

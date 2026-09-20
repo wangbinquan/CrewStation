@@ -12,18 +12,18 @@ import { serviceRoutes } from '../http/serviceRoutes';
  * 但路径写在路由里而不在 contracts 里，所以在这里锁：删路由、改路径，这张表必须跟着动，而且动得让人看见。
  */
 const SERVICE_API = [
-  'GET /v1/business-tasks/:taskId',
-  'GET /v1/business-tasks/:taskId/subtasks',
-  'GET /v1/business-tasks/:taskId/subtasks/:subtaskId',
-  'GET /v1/business-tasks/:taskId/subtasks/:subtaskId/output',
-  'POST /v1/business-tasks',
-  'POST /v1/business-tasks/:taskId/close',
-  'POST /v1/business-tasks/:taskId/pause',
-  'POST /v1/business-tasks/:taskId/resume',
-  'POST /v1/business-tasks/:taskId/subtasks',
-  'POST /v1/business-tasks/:taskId/subtasks/:subtaskId/cancel',
-  'POST /v1/business-tasks/:taskId/subtasks/:subtaskId/messages',
-  'POST /v1/business-tasks/:taskId/subtasks/:subtaskId/retry',
+  'GET /v2/business-tasks/:taskId',
+  'GET /v2/business-tasks/:taskId/subtasks',
+  'GET /v2/business-tasks/:taskId/subtasks/:subtaskId',
+  'GET /v2/business-tasks/:taskId/subtasks/:subtaskId/output',
+  'POST /v2/business-tasks',
+  'POST /v2/business-tasks/:taskId/close',
+  'POST /v2/business-tasks/:taskId/pause',
+  'POST /v2/business-tasks/:taskId/resume',
+  'POST /v2/business-tasks/:taskId/subtasks',
+  'POST /v2/business-tasks/:taskId/subtasks/:subtaskId/cancel',
+  'POST /v2/business-tasks/:taskId/subtasks/:subtaskId/messages',
+  'POST /v2/business-tasks/:taskId/subtasks/:subtaskId/retry',
 ];
 
 const taskId = newId('tsk') as TaskId;
@@ -31,10 +31,10 @@ const subtaskId = newId('sub') as SubtaskId;
 const now = '2026-09-20T00:00:00.000Z';
 // 夹具先过契约 Schema：夹具写错应当错在夹具上，而不是错在后面的断言上。
 const task = (state: BusinessTaskDto['state']): BusinessTaskDto => BusinessTaskDtoSchema.parse({
-  id: taskId, serviceId: newId('svc'), state, traceId: 'a'.repeat(32), volumeMode: 'follow-container', profile: 'standard', labels: {}, createdAt: now,
+  id: taskId, serviceId: newId('svc'), state, traceId: 'a'.repeat(32), volumeMode: 'follow-container', taskProfileId: '01a0bf5d-8f4b-7001-8458-107366e7de39', labels: {}, createdAt: now,
 });
 const subtask = (state: SubtaskDto['state']): SubtaskDto => SubtaskDtoSchema.parse({
-  id: subtaskId, taskId, name: 'chat', kind: 'agent', mode: 'oneshot', state, attempt: 1, agentProfile: 'chat-v1',
+  id: subtaskId, taskId, name: 'chat', kind: 'agent', mode: 'oneshot', state, attempt: 1, agentProfileId: '01a0bf5d-8f4b-7101-8000-000000000001',
 });
 
 interface Recorded { readonly call: string; readonly caller: ServiceActor; readonly input?: unknown }
@@ -85,14 +85,14 @@ describe('业务任务的服务域 API 面', () => {
     expect(calls.map((entry) => entry.call)).toEqual(['createTask', 'submitSubtask', 'getSubtask', 'getSubtask', 'subtaskOutput', 'closeTask']);
     expect(calls.every((entry) => entry.caller.identity === 'demo/demo' && entry.caller.project === 'demo')).toBe(true);
     // 请求体过的是真实的 SubmitSubtaskRequestSchema：模板引用的档案名与模式原样到达用例层。
-    expect(calls[1]?.input).toMatchObject({ kind: 'agent', name: 'chat', agentProfile: 'chat-v1', mode: 'oneshot', prompt: '你好' });
+    expect(calls[1]?.input).toMatchObject({ kind: 'agent', name: 'chat', agentProfileId: '01a0bf5d-8f4b-7101-8000-000000000001', mode: 'oneshot', prompt: '你好' });
   });
 
   test('不带来源服务身份的请求被拒绝，用例层不被触达', async () => {
     const calls: Recorded[] = [];
     const app = createApp({ name: 'business-task-surface' });
     app.route('/', serviceRoutes(recordingApi(calls)));
-    const response = await app.fetch(new Request('http://api.svc.cs.internal/v1/business-tasks', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' }));
+    const response = await app.fetch(new Request('http://api.svc.cs.internal/v2/business-tasks', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' }));
     expect(response.status).toBe(401);
     expect(calls).toEqual([]);
   });

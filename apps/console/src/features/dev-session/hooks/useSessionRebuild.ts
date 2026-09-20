@@ -16,14 +16,14 @@ export function useSessionRebuild(projectId: string, taskId: string) {
     const result = await api.devSession.inspectRebuild(projectId);
     if (result.taskId !== taskId || result.projectId !== projectId) throw new Error(t('devSession.rebuild.invalidInspection'));
     return result;
-  }, { onSuccess: (result) => { setInspection(result); setProfileName(result.profiles.some((p) => p.name === result.currentProfile) ? result.currentProfile : ''); } });
+  }, { onSuccess: (result) => { setInspection(result); setProfileName(result.profiles.some((p) => p.id === result.currentProfile) ? result.currentProfile : ''); } });
   const submit = useApiMutation((input: RebuildDevSessionRequest) => api.devSession.rebuild(projectId, input), { invalidate: [queryKeys.devSession(projectId)] });
-  const profile = inspection?.profiles.find((p) => p.name === profileName);
+  const profile = inspection?.profiles.find((p) => p.id === profileName);
   const inspect = () => { if (sending.current || check.isPending) return; setInspection(undefined); setSubmitted(undefined); submit.reset(); check.mutate(); };
   const confirm = async () => {
     if (sending.current || !inspection || !profile) return;
     const input = submitted ?? { requestId: crypto.randomUUID(), expectedTaskId: inspection.taskId, expectedUpdatedAt: inspection.updatedAt,
-      expectedVolumeUid: inspection.volume.uid, expectedPodUid: inspection.podUid, ...(inspection.reason ? { reason: inspection.reason } : {}), profile: { name: profile.name, cpu: profile.cpu, memory: profile.memory, storage: profile.storage } };
+      expectedVolumeUid: inspection.volume.uid, expectedPodUid: inspection.podUid, ...(inspection.reason ? { reason: inspection.reason } : {}), profile: { id: profile.id, name: profile.name, cpu: profile.cpu, memory: profile.memory, storage: profile.storage } };
     sending.current = true; setSubmitted(input);
     try { await submit.mutateAsync(input); } catch { /* 错误由回执区展示；保留原请求用于显式重试。 */ }
     finally { sending.current = false; }

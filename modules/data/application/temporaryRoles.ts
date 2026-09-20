@@ -12,7 +12,7 @@ export function temporaryRoleUseCases(deps: DataUseCaseDeps) {
     grant: async (binding: TaskDataBinding): Promise<TaskDataBinding> => {
       const prod = await data.productionDatabase(binding.serviceId as ServiceId);
       if (!prod) throw precondition('生产库尚未供给，不能授予访问');
-      const roleName = `${prod.roleName}_t_${binding.id.slice(-8)}`;
+      const roleName = binding.roleName ?? (binding.legacyResourceId ? `${prod.roleName}_t_${binding.legacyResourceId.slice(-8)}` : `cs_t_${binding.id.replaceAll('-', '')}`);
       const { dsn } = await deps.postgres.createTemporaryRole({ databaseName: prod.databaseName, roleName, ownerRole: prod.roleName, readOnly: binding.mode === 'diagnostic-readonly', validUntil: binding.expiresAt ?? deps.clock.now() });
       return activate(binding, roleName, await deps.cipher.encrypt(dsn), deps.clock.now());
     },

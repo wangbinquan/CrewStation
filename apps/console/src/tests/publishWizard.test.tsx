@@ -5,7 +5,7 @@ import { focusManager, onlineManager } from '@tanstack/react-query';
 import { renderApp } from './renderApp';
 import { testerSummaryFixture, trialMarketFixture } from './projectSummaryFixture';
 
-const projectId = `prj_${'a'.repeat(32)}`, serviceId = `svc_${'b'.repeat(32)}`, userId = `usr_${'c'.repeat(32)}`, taskId = `tsk_${'d'.repeat(32)}`, releaseId = `rel_${'e'.repeat(32)}`;
+const projectId = '01a0bf5d-8f4b-7e1e-8dde-c9c2ae13ed34', serviceId = '01a0bf5d-8f4b-760b-86b6-0bb9f08a9eaa', userId = '01a0bf5d-8f4b-7ed2-8386-a4b2e1a36efb', taskId = '01a0bf5d-8f4b-75f0-8869-c66846f3c461', releaseId = '01a0bf5d-8f4b-7dda-8ca7-d5d5f8a92b44';
 const sha = 'a'.repeat(40), time = '2026-09-13T01:00:00.000Z', originalFetch = globalThis.fetch;
 let page: Awaited<ReturnType<typeof renderApp>> | undefined;
 afterEach(() => { page?.unmount(); page = undefined; globalThis.fetch = originalFetch; focusManager.setFocused(undefined); onlineManager.setOnline(true); });
@@ -18,7 +18,7 @@ function fixture() {
     if (method !== 'GET') {
       const input = JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>; writes.push({ path, body: input }); await state.hold;
       if (state.failPublish) { status = 412; body = { error: 'precondition', message: '工作树 HEAD 已经变化，请重新确认发布来源', details: { uncommitted: ['刚刚修改.ts'] } }; }
-      else { status = 202; release.commitSha = String(input.expectedCommitSha); body = { ...release, serviceId: state.responseMismatch ? `svc_${'f'.repeat(32)}` : serviceId }; }
+      else { status = 202; release.commitSha = String(input.expectedCommitSha); body = { ...release, serviceId: state.responseMismatch ? '01a0bf5d-8f4b-7f17-8623-f7330845107a' : serviceId }; }
     } else {
       reads.push(path);
       if (path === '/v1/me') body = { id: userId, name: '负责人', email: 'owner@test.invalid', platformRole: (state.admin) ? 'admin' : 'developer', isAdmin: state.admin, memberships: [{ projectId, role: state.role }] };

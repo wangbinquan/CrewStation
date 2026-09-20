@@ -3,7 +3,7 @@ import type { TaskEnvironment } from '../domain/taskEnvironment';
 import type { TaskRuntimeUseCaseDeps } from './dependencies';
 
 /** 任务容器的环境：平台约定变量＋所属环境的配置与数据＋任务级数据绑定＋TaskRunner 自身参数。明文令牌只在这里出现一次。 */
-export async function containerEnv(deps: Pick<TaskRuntimeUseCaseDeps, 'sources' | 'settings'>, env: TaskEnvironment, svc: { slug: string; name: string }, runnerToken: string): Promise<Record<string, string>> {
+export async function containerEnv(deps: Pick<TaskRuntimeUseCaseDeps, 'sources' | 'settings' | 'legacyRunnerTaskId'>, env: TaskEnvironment, svc: { slug: string; name: string }, runnerToken: string): Promise<Record<string, string>> {
   const environment = env.kind === 'dev-session' || env.kind === 'profile-test' ? 'development' : 'production';
   // 档位测试是平台任务：不属于任何项目，不带租户配置、数据或任务级数据绑定（RFC-006 §6）。
   const [config, data, taskData] = env.kind === 'profile-test' ? [{}, {}, {}] : await Promise.all([
@@ -26,12 +26,13 @@ export async function containerEnv(deps: Pick<TaskRuntimeUseCaseDeps, 'sources' 
     [PLATFORM_ENV.taskId]: env.native?.parentTaskId ?? env.id,
     [PLATFORM_ENV.traceId]: env.traceId,
     CS_RUNNER_TOKEN: runnerToken,
+    CS_CANONICAL_RUNNER_TASK_ID: env.id,
+    CS_RUNNER_TASK_ID: await deps.legacyRunnerTaskId?.(env.id) ?? env.id,
     CS_SESSION_URL: deps.settings.sessionUrl,
     CS_WORKDIR: '/work',
     CS_WORKER_UID: String(deps.settings.workerUid),
   };
   if (env.native) {
-    values.CS_RUNNER_TASK_ID = env.id;
     values.CS_RUNNER_NATIVE_ID = env.native.runnerId;
   }
   if (env.preview) {

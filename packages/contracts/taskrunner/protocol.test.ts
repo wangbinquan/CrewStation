@@ -2,8 +2,8 @@ import { describe, expect, test } from 'bun:test';
 import { matchesOperationPath } from '../gateway/allowlist';
 import { RunnerCommandSchema, RunnerMessageSchema, TASKRUNNER_PROTOCOL_VERSION } from './protocol';
 
-const beforeStart = { profile: 'balanced', revision: 3, contentHash: 'h', steps: [], vars: {}, secrets: {}, configFile: { kind: 'none' }, captureOutput: false };
-const startAgent = { id: 'c1', type: 'startAgent', agentId: 'a1', compute: 'balanced', profileRevision: 3, launch: { protocol: 'claude-code', binaryPath: '/usr/local/bin/claude' }, permission: 'edit', mode: 'interactive', beforeStart, processAttemptId: 'a1:1' };
+const beforeStart = { profile: '01a0bf5d-8f4b-7c09-8050-88ba5b806778', revision: 3, contentHash: 'h', steps: [], vars: {}, secrets: {}, configFile: { kind: 'none' }, captureOutput: false };
+const startAgent = { id: 'c1', type: 'startAgent', agentId: 'a1', compute: '01a0bf5d-8f4b-7c09-8050-88ba5b806778', profileRevision: 3, launch: { protocol: 'claude-code', binaryPath: '/usr/local/bin/claude' }, permission: 'edit', mode: 'interactive', beforeStart, processAttemptId: 'a1:1' };
 
 describe('TaskRunner 协议', () => {
   test('startAgent 命令默认值：mcp、env、launch.extraArgs 与 isSandbox 有默认', () => {
@@ -25,9 +25,9 @@ describe('TaskRunner 协议', () => {
     const { mode: _mode, ...withoutMode } = native;
     expect(RunnerCommandSchema.safeParse(withoutMode).success).toBe(true);
   });
-  test('hello 只接受协议 2，并报 Runner 理解的协议而不是驱动名', () => {
-    const hello = { type: 'hello', protocolVersion: TASKRUNNER_PROTOCOL_VERSION, taskId: `tsk_${'a'.repeat(32)}`, runnerToken: 't', workdir: '/work', capabilities: { protocols: ['claude-code', 'opencode', 'terminal'], pty: true, preview: false } };
-    expect(TASKRUNNER_PROTOCOL_VERSION).toBe(2);
+  test('hello 只接受协议 3，并报 Runner 理解的协议而不是驱动名', () => {
+    const hello = { type: 'hello', protocolVersion: TASKRUNNER_PROTOCOL_VERSION, taskId: Bun.randomUUIDv7(), runnerToken: 't', workdir: '/work', capabilities: { protocols: ['claude-code', 'opencode', 'terminal'], pty: true, preview: false } };
+    expect(TASKRUNNER_PROTOCOL_VERSION).toBe(3);
     expect(RunnerMessageSchema.safeParse(hello).success).toBe(true);
     expect(RunnerMessageSchema.safeParse({ ...hello, protocolVersion: 1 }).success).toBe(false);
     expect(RunnerMessageSchema.safeParse({ ...hello, capabilities: { drivers: ['claude-code'], pty: true, preview: false, agentRuntimeConfig: 1 } }).success).toBe(false);

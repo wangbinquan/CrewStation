@@ -25,7 +25,7 @@ test('不支持该协议或缺解释器的 Runner 在写 socket 前被拒；具�
 });
 
 test('旧底座 Runner（协议 1）的 hello：令牌有效才回写原因，且不接管连接、不发 welcome；伪造令牌与坏帧不回写', async () => {
-  const taskId = TaskIdSchema.parse(`tsk_${'b'.repeat(32)}`), rejections: unknown[] = [], frames: string[] = [];
+  const taskId = TaskIdSchema.parse('01a0bf5d-8f4b-7b61-81de-655e8f149909'), rejections: unknown[] = [], frames: string[] = [];
   const deps: SessionUseCaseDeps = {
     clock: fixedClock('2026-09-18T10:00:00Z'), logger: noopLogger,
     settings: { commandTimeoutMs: 1000, runnerStaleMs: 30000, replayLimit: 100, selfAddress: 'http://session' },

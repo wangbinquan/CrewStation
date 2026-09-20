@@ -24,8 +24,8 @@ export function ResourceCatalogSection({ kind }: { readonly kind: ResourceCatalo
   </div>}>
     <UnsavedChangesGuard dirty={editor.dirty || busy} scope={t(`admin.resource.${kind}`)} />
     <QueryStatus isPending={query.isPending} error={query.error} isEmpty={items.length === 0} emptyTitle={t(`admin.${prefix}.emptyTitle`)} emptyDescription={t(`admin.${prefix}.emptyDescription`)} />
-    {items.length ? <DataTable columns={['name', 'cpu', 'memory', kind === 'service' ? 'maxReplicas' : 'storage', 'description'].map((field) => t(`admin.${prefix}.${field}`)).concat(t('admin.resource.actions'))}>{items.map((entry) => <tr key={entry.name}>
-      <td><code>{entry.name}</code></td><td>{entry.cpu}</td><td>{entry.memory}</td><td>{'maxReplicas' in entry ? entry.maxReplicas : entry.storage}</td><td>{entry.description || t('admin.none')}</td>
+    {items.length ? <DataTable columns={['name', 'cpu', 'memory', kind === 'service' ? 'maxReplicas' : 'storage', 'description'].map((field) => t(`admin.${prefix}.${field}`)).concat(t('admin.resource.actions'))}>{items.map((entry) => <tr key={entry.id}>
+      <td>{entry.name}<br /><code>{entry.id}</code></td><td>{entry.cpu}</td><td>{entry.memory}</td><td>{'maxReplicas' in entry ? entry.maxReplicas : entry.storage}</td><td>{entry.description || t('admin.none')}</td>
       <td><Button disabled={busy || frozen || unavailable} onClick={() => { writer.resetFeedback(); editor.requestLoad(entry); }}>{t('admin.resource.edit')}</Button></td>
     </tr>)}</DataTable> : null}
     {editor.replacement !== undefined ? <ConfirmationPanel question={t('admin.resource.replaceQuestion', { name: editor.replacement?.name ?? t('admin.resource.emptyDraft') })} confirmLabel={t('admin.resource.replace')} cancelLabel={t('ui.draft.stay')} onConfirm={editor.replace} onCancel={editor.cancelReplacement} busy={busy} /> : null}

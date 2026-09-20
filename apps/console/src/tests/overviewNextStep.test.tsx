@@ -8,7 +8,7 @@ const originalFetch = globalThis.fetch;
 let page: Awaited<ReturnType<typeof renderApp>> | undefined;
 afterEach(() => { page?.unmount(); page = undefined; globalThis.fetch = originalFetch; });
 
-const prodRelease = `rel_${'a'.repeat(32)}` as ReleaseId, previewRelease = `rel_${'b'.repeat(32)}` as ReleaseId;
+const prodRelease = '01a0bf5d-8f4b-7574-87e3-e3a9645702f6' as ReleaseId, previewRelease = '01a0bf5d-8f4b-7645-8cca-c128d59001d1' as ReleaseId;
 const slot = (name: 'prod' | 'preview', tag: string, releaseId: ReleaseId, host: string) => ({ name, active: name === 'prod', tag, commitSha: (name === 'prod' ? 'a' : 'b').repeat(40), releaseId, host, state: 'ready' as const, replicas: 1, readyReplicas: 1 });
 
 test('概览的下一步横幅只从有效的槽与发布事实推导：待验证版本不同于正式版本才提示等待验证并直达该发布', async () => {

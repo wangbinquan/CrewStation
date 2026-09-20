@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import type { AgentActivityItem, AgentActivityQuery, ReadAgentActivityRequest, TaskId, UserId } from '@crewstation/contracts';
 import { precondition, validation } from '@crewstation/kernel';
 import type { Database, Executor } from '@crewstation/persistence';
@@ -7,6 +6,7 @@ import { activityNotifies, initialNativeActivity, projectNativeActivity, project
 import type { NativeActivityRepository, NativeActivityRead, StoredNativeEvent } from '../../ports/nativeActivity';
 import { activityItems as items, activityProgress as progress, activityReads as reads, activityStates as states, activitySources as sources } from './nativeActivityTables';
 import { nativeTerminalStarts as starts } from './nativeTerminalTable';
+import { nativeActivityIdentity } from './legacyNativeActivityIdentity';
 
 const RETAINED_ITEMS = 2000;
 const MAX_PENDING = 256 * 128;
@@ -73,7 +73,7 @@ async function applyEvents(db: Executor, taskId: TaskId, events: StoredNativeEve
     const start = known.get(record.agentId);
     if (!start || (start.executionTaskId ?? taskId) !== sourceTaskId || start.record.runnerId !== record.runnerId || start.record.terminalId !== record.terminalId) continue;
     const previous = projections.get(record.agentId) ?? initialNativeActivity(start.record);
-    const activity = event.kind === 'nativeActivity' ? { ...event.activity, eventId: sourceTaskId === taskId ? event.activity.eventId : `execution:${createHash('sha256').update(JSON.stringify([sourceTaskId, event.activity.eventId])).digest('hex')}` } : undefined;
+    const activity = event.kind === 'nativeActivity' ? { ...event.activity, eventId: await nativeActivityIdentity(db, sourceTaskId, event.activity.eventId) } : undefined;
     const result = activity ? projectNativeActivity(previous, activity, seq) : projectNativeLifecycle(previous, record as typeof start.record, seq, at);
     projections.set(record.agentId, result.projection); changed.add(record.agentId);
     if (result.item) additions.push({ taskId, seq, eventId: result.item.eventId, agentId: record.agentId, turnId: result.item.turnId, kind: result.item.kind, item: result.item });

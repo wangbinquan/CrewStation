@@ -1,6 +1,6 @@
 import './domSetup';
 import { afterEach, expect, test } from 'bun:test';
-import { act } from 'react';
+import { clickIdentityField, setIdentityField as field } from './identityUiHelpers';
 import { adminAuthenticationFixture, provider } from './adminAuthenticationFixture';
 import { renderApp } from './renderApp';
 
@@ -8,28 +8,17 @@ const originalFetch = globalThis.fetch;
 let page: Awaited<ReturnType<typeof renderApp>> | undefined;
 afterEach(() => { page?.unmount(); page = undefined; globalThis.fetch = originalFetch; });
 
-async function field(label: string, value: string): Promise<void> {
-  const node = [...document.querySelectorAll<HTMLInputElement | HTMLSelectElement>('input, select, textarea')]
-    .find((element) => element.closest('label')?.textContent?.includes(label) || element.getAttribute('aria-label') === label);
-  if (!node) throw new Error(`没有找到字段 ${label}`);
-  await act(async () => {
-    node.focus();
-    const proto = node instanceof HTMLSelectElement ? HTMLSelectElement.prototype : HTMLInputElement.prototype;
-    Object.getOwnPropertyDescriptor(proto, 'value')!.set!.call(node, value);
-    node.dispatchEvent(new Event(node instanceof HTMLSelectElement ? 'change' : 'input', { bubbles: true }));
-    node.dispatchEvent(new KeyboardEvent('keyup', { key: 'a', bubbles: true }));
-  });
-  await page!.settle();
-}
-
-test('认证页三张卡都在：登录方式、身份提供方与身份转发', async () => {
+test('认证页按登录方式和身份字段分组，保留登录与初始化信息', async () => {
   adminAuthenticationFixture();
   page = await renderApp('/admin/authentication');
   const text = page.text();
   expect(text).toContain('登录方式');
   expect(text).toContain('身份提供方');
-  expect(text).toContain('身份转发');
+  expect(text).toContain('身份字段');
+  expect(text).not.toContain('身份转发');
   expect(text).toContain('corp-sso');
+  expect(rowValue('平台初始化')).toBe('初始化已完成');
+  expect(document.querySelector('details')?.open).toBe(false);
   expect(text).toContain('已退役');
   expect(text).toContain('公司身份（OIDC）');
 });
@@ -81,7 +70,7 @@ test('OIDC 会话的管理员两段式确认后关闭常规登录，请求真的
   expect(write?.body).toEqual({ passwordLoginEnabled: false });
 });
 
-test('新增提供方：必填齐了才能提交，空值按 null 上线，自定义映射按等号解析', async () => {
+test('新增提供方：跨组保留输入，空值按 null 上线，自定义映射按行填写', async () => {
   const f = adminAuthenticationFixture();
   page = await renderApp('/admin/authentication');
   await page.click('新增身份提供方');
@@ -90,7 +79,8 @@ test('新增提供方：必填齐了才能提交，空值按 null 上线，自�
   await field('Issuer 地址', 'https://lab.corp.example');
   await field('Client ID', 'cs-lab');
   await field('Client Secret', 'lab-secret');
-  await field('自定义字段映射', 'employee-no=empNo');
+  await page.click('字段映射'); await page.click('添加映射');
+  await field('平台字段名 1', 'employee-no'); await field('来源字段 1', 'empNo');
   await page.click('新增');
   const created = f.writes().find((c) => c.method === 'POST');
   expect(created?.url.pathname).toBe('/v1/admin/auth/providers');
@@ -108,14 +98,18 @@ test('测试连接把逐端点来源与 JWKS 可达性显示出来', async () =>
   const text = page.text();
   expect(text).toContain('可登录');
   expect(text).toContain('自动发现成功');
-  expect(text).toContain('discovery https://idp.corp.example/authorize');
+  expect(text).toContain('自动发现');
+  expect(text).toContain('https://idp.corp.example/authorize');
+  expect(text).toContain('https://idp.corp.example/jwks');
 });
 
 test('身份转发：默认转发显示名与邮箱，停止转发是两段式确认且只改那一个字段', async () => {
   const f = adminAuthenticationFixture();
-  page = await renderApp('/admin/authentication');
+  page = await renderApp('/admin/authentication?tab=fields');
   expect(page.text()).toContain('用户 ID 与身份令牌恒定转发');
   await page.click('停止转发');
+  expect([...document.querySelectorAll('[role="alertdialog"], [role="group"]')].some((node) => node.textContent?.includes('最长 5 分钟生效'))).toBe(true);
+  expect(document.querySelector('[role="group"]')?.textContent).not.toContain('立刻');
   await page.click('确认');
   const write = f.writes().find((c) => c.url.pathname === '/v1/admin/auth/forwarding');
   expect(write?.method).toBe('PUT');
@@ -124,15 +118,19 @@ test('身份转发：默认转发显示名与邮箱，停止转发是两段式�
 
 test('项目覆盖：填项目与字段后保存，删除覆盖回到全局默认', async () => {
   const f = adminAuthenticationFixture();
-  page = await renderApp('/admin/authentication');
+  page = await renderApp('/admin/authentication?tab=fields');
+  await page.click('添加项目规则');
   await field('项目', f.projectId);
-  await field('转发字段', 'name');
+  await clickIdentityField('邮箱');
   await page.click('保存项目覆盖');
   const saved = f.writes().find((c) => c.url.pathname.includes('/forwarding/projects/'));
   expect(saved?.method).toBe('PUT');
   expect(saved?.body).toEqual({ fields: ['name'] });
   await page.settle();
   expect(page.text()).toContain(f.projectId);
+  expect(page.text()).toContain('团队助理');
+  await page.click('恢复全局默认'); await page.click('确认');
+  expect(f.writes().at(-1)?.method).toBe('DELETE');
 });
 
 
@@ -148,6 +146,8 @@ test('新增身份提供方一次标出所有必填错误，并允许取消；�
   await page.click('新增');
   expect(page.text()).toContain('1–64'); expect(f.writes()).toEqual([]);
   await page.click('取消编辑');
+  expect(page.text()).toContain('有未保存的输入');
+  await page.click('放弃输入并离开');
   expect(document.querySelector('input[type="password"]')).toBeNull();
   await page.click('新增身份提供方');
   expect(document.querySelector<HTMLInputElement>('input[type="password"]')?.value).toBe('');

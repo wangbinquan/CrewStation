@@ -25,7 +25,7 @@ test('审批只读取活动来源的 20 项分页，两类游标独立且切页�
   expect(apiCalls()).toHaveLength(1); expect(apiCalls()[0]!.url.searchParams.get('limit')).toBe('20');
   expect(f.calls.some((c) => ['/v1/projects', '/v1/api-requests', '/v1/egress/requests', '/v1/egress/requests/page'].includes(c.url.pathname))).toBe(false);
   expect(page.text()).toContain('申请项目 0'); expect(page.text()).toContain('tenant-0'); expect(page.text()).toContain('本页 20 项');
-  await click('下一页'); expect(page.search().apiCursor).toBe('api:20'); expect(page.text()).toContain('/invoices/20'); expect(page.text()).not.toContain('账单申请 0');
+  await click('下一页'); expect(page.search().apiCursor).toBe('api:20'); expect(page.text()).toContain(f.apiRequests[20]!.operationId); expect(page.text()).not.toContain('账单申请 0');
   await page.click('出站申请'); expect(page.search().apiCursor).toBe('api:20');
   await click('下一页'); expect(page.search().egressCursor).toBe('egress:20'); expect(page.text()).toContain('model-20.example.invalid');
   await page.click('API 申请'); expect(page.search()).toMatchObject({ apiCursor: 'api:20', egressCursor: 'egress:20' });
@@ -52,7 +52,7 @@ test('刷新移走申请时保留具名意见供核对；失败保留原草稿�
   await page.click('刷新 API 申请'); expect(page.text()).toContain('本页数量未确认'); expect(visible<HTMLTextAreaElement>('textarea')[0]!.value).toBe('保留的核对意见');
   await click('批准'); expect(f.writes()).toHaveLength(0);
   first.state = 'approved'; f.state.apiError = 0; await page.click('刷新 API 申请');
-  expect(page.text()).toContain('保留的意见'); expect(page.text()).toContain(first.operationKey);
+  expect(page.text()).toContain('保留的意见'); expect(page.text()).toContain(first.operationId);
   const orphan = visible<HTMLTextAreaElement>('textarea[readonly]')[0]!; expect(orphan.value).toBe('保留的核对意见');
   await page.requestNavigate('/admin'); expect(page.text()).toContain('审批意见有未保存的输入'); await page.click('继续编辑');
   await click('清除这条意见'); await type(visible<HTMLTextAreaElement>('textarea')[0]!, '允许账单使用');

@@ -6,6 +6,9 @@ import { validation } from '@crewstation/kernel';
  * Secret 的 `value` 是 SecretCipher 的密文，任何读接口都不返回它。
  */
 export interface ConfigItem {
+  readonly id: string;
+  readonly definitionId: string;
+  readonly bindingName: string;
   readonly projectId: ProjectId;
   readonly env: ConfigEnv;
   readonly name: string;

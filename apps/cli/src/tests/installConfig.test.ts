@@ -75,8 +75,8 @@ describe('发行包', () => {
   const dirs = ['/bundle', '/bundle/charts', '/bundle/images', '/bundle/profiles'];
   const files = {
     '/bundle/release.lock.yaml': 'version: 1.4.0\nimages:\n  cs-api: sha256:abc\n  cs-session: sha256:def\n',
-    '/bundle/profiles/service-plans.yaml': '- { name: standard-small, cpu: "500m", memory: 512Mi, maxReplicas: 3 }\n- { name: broken }\n',
-    '/bundle/profiles/task-profiles.yaml': '- { name: coding-medium, cpu: "1", memory: 2Gi, storage: 10Gi }\n',
+    '/bundle/profiles/service-plans.yaml': '- { id: 01a0bf5d-8f4b-7000-9e4b-b54e91ee9d10, name: standard-small, cpu: "500m", memory: 512Mi, maxReplicas: 3 }\n- { name: broken }\n',
+    '/bundle/profiles/task-profiles.yaml': '- { id: 01a0bf5d-8f4b-7001-8458-107366e7de39, name: coding-medium, cpu: "1", memory: 2Gi, storage: 10Gi }\n',
     // 旧发行包的档位文件：RFC-006 起不再读取（安装不预置档位）。
     '/bundle/profiles/compute-profiles.yaml': '- { name: balanced, driver: claude-code, model: anthropic/claude-sonnet-5 }\n',
   };

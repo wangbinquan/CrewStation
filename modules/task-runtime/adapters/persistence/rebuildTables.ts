@@ -1,8 +1,10 @@
 import { text, timestamp } from 'drizzle-orm/pg-core';
 import { jsonDocument } from '@crewstation/persistence';
+import type { EnvironmentRebuild } from '../../domain/environmentRebuild';
 import { taskRuntimeSchema } from './schema';
 
 export const environmentRebuilds = taskRuntimeSchema.table('environment_rebuilds', {
+  legacyCluster: jsonDocument('legacy_cluster').$type<EnvironmentRebuild['legacyCluster']>(),
   id: text('id').primaryKey(), taskId: text('task_id').notNull(), projectId: text('project_id').notNull(),
   input: jsonDocument('input').notNull(), namespace: text('namespace').notNull(),
   originalPodName: text('original_pod_name').notNull(), podName: text('pod_name').notNull(), pvcName: text('pvc_name').notNull(),

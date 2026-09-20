@@ -28,7 +28,7 @@ export function subtaskAgentLaunch(deps: BusinessTaskUseCaseDeps, finish: Finish
     const task = await uow.read.tasks.getById(run.taskId);
     if (!task) throw notFound('业务任务', run.taskId);
     const resolved = await deps.compute.resolve(run.agentProfile!.compute, 'subtask', task.projectId);
-    const pinned: SubtaskRun = { ...run, computeProfile: { profile: resolved.name, revision: resolved.revision } };
+    const pinned: SubtaskRun = { ...run, computeProfile: { profileId: resolved.id, revision: resolved.revision } };
     await uow.run((scope) => scope.subtasks.update(pinned));
     return pinned;
   };
@@ -45,12 +45,12 @@ export function subtaskAgentLaunch(deps: BusinessTaskUseCaseDeps, finish: Finish
       if (!env) {
         if (!(await environments.getEnvironment(current.taskId))?.connected) { logger.info('subtask waits for runner', { subtaskId: run.id, taskId: run.taskId }); return current; }
         if (!current.execution) {
-          current = { ...current, execution: { taskId: newId('tsk') as TaskId, runnerId: crypto.randomUUID() } };
+          current = { ...current, execution: { taskId: newId('tsk') as TaskId, runnerId: Bun.randomUUIDv7() } };
           await uow.run((scope) => scope.subtasks.update(current));
         }
         const material = await deps.compute.launchMaterial(current.computeProfile!);
         env = await environments.createNativeExecution({ id: current.execution!.taskId, parentTaskId: current.taskId, purpose: 'subtask', agentId: current.runnerRef ?? '', runnerId: current.execution!.runnerId,
-          fingerprint: `${current.id}:${current.attempt}`, ...(material.taskProfile ? { profile: material.taskProfile } : {}), image: material.image, computeProfile: { name: material.name, revision: material.revision } });
+          fingerprint: `${current.id}:${current.attempt}`, ...(material.taskProfile ? { profile: material.taskProfile } : {}), image: material.image, computeProfile: { profileId: material.id, revision: material.revision } });
       }
       if (env.native && ['cleaning', 'finished'].includes(env.native.state)) return failLaunch(current, new Error(env.native.failureReason ?? env.message ?? '子任务的执行环境已结束'));
       if (!env.connected) return current;
@@ -59,7 +59,7 @@ export function subtaskAgentLaunch(deps: BusinessTaskUseCaseDeps, finish: Finish
       current = started;
       const material = await deps.compute.launchMaterial(started.computeProfile!);
       await runner.sendCommand(env.id, {
-        id: `start-${run.runnerRef}`, type: 'startAgent', agentId: run.runnerRef ?? '', compute: material.name, profileRevision: material.revision,
+        id: `start-${run.runnerRef}`, type: 'startAgent', agentId: run.runnerRef ?? '', compute: material.id, profileRevision: material.revision,
         launch: material.launch, beforeStart: material.beforeStart, processAttemptId: `${run.runnerRef}:${run.attempt}`, permission: run.agentProfile!.permission,
         mode: run.mode ?? 'oneshot', ...(run.cwd ? { cwd: run.cwd } : {}), initialPrompt: run.prompt ?? '', mcp: settings.mcp.map((m) => ({ name: m.name, url: m.url, headers: {} })), env: {},
       });

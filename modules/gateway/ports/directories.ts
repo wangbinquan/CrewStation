@@ -1,3 +1,4 @@
+import type { OperationRoute } from '@crewstation/contracts';
 import type { ServiceId } from '@crewstation/contracts';
 
 /** 由 project 模块提供。 */
@@ -13,7 +14,7 @@ export interface SlotRoles {
 
 /** 由 api-catalog 模块提供：调用方已获授权的操作键、默认开放集合、已登记的 proxy 名。 */
 export interface GrantSource {
-  grantedOperations(callerIdentity: string): Promise<{ operations: string[]; defaultOpen: string[] }>;
+  grantedOperations(callerIdentity: string): Promise<{ operations: string[]; defaultOpen: string[]; operationRoutes: OperationRoute[] }>;
   listCallers(): Promise<string[]>;
   proxyNameOf(serviceId: ServiceId): Promise<string | undefined>;
 }

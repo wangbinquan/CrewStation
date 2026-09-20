@@ -1,0 +1,17 @@
+{
+  "id": "01a0bf5d-8f4b-7002-9560-94caf593fb19",
+  "name": "minimal-sample",
+  "servicePlan": "01a0bf5d-8f4b-7000-9e4b-b54e91ee9d10",
+  "bindings": {
+    "events": [
+      {
+        "id": "01a0bf5d-8f4b-7102-8000-000000000001",
+        "producerCode": "gitlab",
+        "eventCode": "gitlab.push"
+      }
+    ],
+    "sourceFiles": [
+      "src/platform/agentClient.ts"
+    ]
+  }
+}

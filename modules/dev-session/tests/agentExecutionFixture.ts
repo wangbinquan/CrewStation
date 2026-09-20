@@ -1,5 +1,5 @@
 import type { RunnerCommand, RunnerEvent, TaskId } from '@crewstation/contracts';
-import { notFound } from '@crewstation/kernel';
+import { newResourceId, notFound } from '@crewstation/kernel';
 import { AgentExecutionLifecycle } from '../application/agentExecution';
 import { agentUseCases } from '../application/agents';
 import type { AgentStart, AgentStartRepository } from '../ports/agentStarts';
@@ -8,8 +8,10 @@ import { workspaceFixture, workspaceTask } from './workspaceFixture';
 
 export function memoryAgentStarts(): AgentStartRepository & { rows: Map<string, AgentStart> } {
   const rows = new Map<string, AgentStart>();
+  const restarts = new Map<string, { agentId: string; taskId: TaskId }>();
   return {
     rows,
+    reserveRestart: async (operationId) => { if (!restarts.has(operationId)) restarts.set(operationId, { agentId: newResourceId(), taskId: newResourceId() as TaskId }); return restarts.get(operationId)!; },
     insert: async (start) => { rows.set(start.agentId, structuredClone(start)); },
     get: async (agentId) => structuredClone(rows.get(agentId)),
     findByExecution: async (id) => structuredClone([...rows.values()].find((s) => s.execution.taskId === id)),

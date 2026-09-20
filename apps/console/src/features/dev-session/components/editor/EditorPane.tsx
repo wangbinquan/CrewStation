@@ -8,9 +8,11 @@ import { PaneNotice } from '../PaneNotice';
 import { CodeEditor } from './CodeEditor';
 import { FileTree } from './FileTree';
 import { EditorDiscardPrompt } from './EditorDiscardPrompt';
+import { ManifestUpgradeNotice } from './ManifestUpgradeNotice';
 import styles from './EditorPane.module.css';
 
 export interface EditorPaneProps {
+  readonly serviceId?: string;
   readonly tree: WorkspaceTree;
   readonly editor: FileEditorHandle;
   readonly connected?: boolean;
@@ -55,7 +57,7 @@ function EditorNotice({ editor }: { readonly editor: FileEditorHandle }): ReactE
 }
 
 /** 编辑器：左树右编辑区，保存带 expectedVersion；磁盘上变了就提示重载，不覆盖。 */
-export function EditorPane({ tree, editor, connected = true }: EditorPaneProps): ReactElement {
+export function EditorPane({ tree, editor, serviceId, connected = true }: EditorPaneProps): ReactElement {
   const t = useT();
   return (
     <Pane
@@ -64,6 +66,7 @@ export function EditorPane({ tree, editor, connected = true }: EditorPaneProps):
       flush
       extra={<Toolbar editor={editor} connected={connected} />}
       notice={<>
+        {serviceId && editor.file?.path === 'crewstation.yaml' && /crewstation\/v1/.test(editor.draft) ? <ManifestUpgradeNotice serviceId={serviceId} editor={editor} /> : null}
         {!connected ? <PaneNotice tone="warning">{t('devSession.editor.disconnected')}</PaneNotice> : null}
         {editor.pendingAction || editor.conflict || editor.error !== undefined ? <EditorNotice editor={editor} /> : null}
       </>}

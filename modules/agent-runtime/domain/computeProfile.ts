@@ -7,6 +7,7 @@ import { outcomeSentence } from './profileTest';
  * 改它们不会让测试作废，也不会产生新的执行快照。
  */
 export interface ComputeProfile {
+  readonly id: string;
   readonly name: string;
   /** 建档后不可改（P1）；换协议就新建档位。 */
   readonly protocol: AgentProtocol;
@@ -34,9 +35,10 @@ export interface ProfileRevision {
 }
 
 export interface ProfileCredential {
+  readonly id: string;
   readonly profile: string;
   readonly name: string;
-  readonly cipherText: string;
+  readonly cipherText: string | null;
   readonly updatedBy: UserId;
   readonly updatedAt: Date;
 }
@@ -44,8 +46,8 @@ export interface ProfileCredential {
 const sha256 = (text: string): string => new Bun.CryptoHasher('sha256').update(text).digest('hex');
 
 /** 凭据戳：声明的凭据名及其当前密文（每次加密都换随机 IV），任何一次替换或清除都会改变它。 */
-export function credentialStampOf(declared: readonly string[], credentials: readonly Pick<ProfileCredential, 'name' | 'cipherText'>[]): string {
-  const entries = [...declared].sort().map((name) => [name, credentials.find((c) => c.name === name)?.cipherText ?? null]);
+export function credentialStampOf(declared: readonly { id: string; name: string }[], credentials: readonly Pick<ProfileCredential, 'id' | 'cipherText'>[]): string {
+  const entries = [...declared].sort((left, right) => left.id.localeCompare(right.id)).map(({ id, name }) => [id, name, credentials.find((credential) => credential.id === id)?.cipherText ?? null]);
   return sha256(JSON.stringify(entries));
 }
 

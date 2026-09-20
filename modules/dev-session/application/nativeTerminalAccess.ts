@@ -1,4 +1,4 @@
-import type { Actor, ProjectId, TaskId } from '@crewstation/contracts';
+import type { ComputeProfileSelector, Actor, ProjectId, TaskId } from '@crewstation/contracts';
 import { forbidden, notFound } from '@crewstation/kernel';
 import type { DevSessionUseCaseDeps } from './dependencies';
 
@@ -11,6 +11,6 @@ export async function nativeEnvironment(deps: DevSessionUseCaseDeps, actor: Acto
 }
 
 /** 「＋ CLI」用的档位（RFC-006）：三种协议都可以；省略或写 default 即默认档位，不存在、不可用由目录抛出可读错误。 */
-export async function nativeCompute(deps: DevSessionUseCaseDeps, projectId: ProjectId, name?: string) {
+export async function nativeCompute(deps: DevSessionUseCaseDeps, projectId: ProjectId, name?: ComputeProfileSelector) {
   return deps.compute.resolve(name, 'cli', projectId);
 }

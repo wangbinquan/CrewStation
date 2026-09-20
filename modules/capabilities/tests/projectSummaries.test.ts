@@ -8,17 +8,17 @@ import type { ProjectSummarySources } from '../ports/projectSummaries';
 import { projectSummaryRoutes } from '../http/projectSummaryRoutes';
 
 const clock = fixedClock('2026-09-13T00:00:00Z'), time = clock.now().toISOString();
-const actor: Actor = { userId: `usr_${'a'.repeat(32)}` as UserId, isAdmin: false };
-const entry = (n = 1): ProjectPageEntry => ({ project: { id: `prj_${n.toString(16).padStart(32, '0')}` as ProjectId,
-  serviceId: `svc_${n.toString(16).padStart(32, '0')}` as ServiceId, slug: `app-${n}`, name: `App ${n}`, kind: 'DigitalWorker',
+const actor: Actor = { userId: '01a0bf5d-8f4b-7f8b-8136-e631380738b0' as UserId, isAdmin: false };
+const entry = (n = 1): ProjectPageEntry => ({ project: { id: `01a0bf5d-8f4b-7a01-8000-${n.toString(16).padStart(12, '0')}` as ProjectId,
+  serviceId: `01a0bf5d-8f4b-7a02-8000-${n.toString(16).padStart(12, '0')}` as ServiceId, slug: `app-${n}`, name: `App ${n}`, kind: 'DigitalWorker',
   namespace: `cs-app-${n}`, ownerUserId: actor.userId, state: 'active', createdAt: time }, role: 'owner', ownerName: 'Owner' });
 const first = entry();
 const slots: SlotDto[] = [{ name: 'prod', active: true, state: 'empty', host: 'app.test', replicas: 0, readyReplicas: 0 },
   { name: 'preview', active: false, state: 'ready', host: 'preview.app.test', replicas: 1, readyReplicas: 1,
-    releaseId: `rel_${'b'.repeat(32)}`, tag: 'v1.0.0', commitSha: 'b'.repeat(40) } as SlotDto];
+    releaseId: '01a0bf5d-8f4b-7645-8cca-c128d59001d1', tag: 'v1.0.0', commitSha: 'b'.repeat(40) } as SlotDto];
 const health: HealthDto[] = [{ slot: 'prod', state: 'unknown', readyReplicas: 0, replicas: 0, restarts: 0, lastTransitionAt: time },
   { slot: 'preview', state: 'healthy', readyReplicas: 1, replicas: 1, restarts: 0, lastTransitionAt: time }];
-const session = { id: `tsk_${'c'.repeat(32)}`, projectId: first.project.id, serviceId: first.project.serviceId!, kind: 'dev-session' as const,
+const session = { id: '01a0bf5d-8f4b-7e52-8b45-4a547fd10e4f', projectId: first.project.id, serviceId: first.project.serviceId!, kind: 'dev-session' as const,
   state: 'running' as const, connected: false, branch: 'main', createdBy: actor.userId, createdAt: time, lastActivityAt: time };
 function setup(override: Partial<ProjectSummarySources> = {}, budgetMs = 2500) {
   const sources: ProjectSummarySources = { list: async () => ({ items: [first] }), read: async () => [first], get: async () => first,
@@ -108,7 +108,7 @@ describe('当前页项目摘要聚合', () => {
     await expect(setup({ read: async () => { throw new Error('scope offline'); } }).listProjectSummaries(actor, query())).rejects.toThrow('scope offline');
   });
   test('详情活动只保留该服务最近五笔真实发布，坏回执不借用其他服务的记录', async () => {
-    const releases: ReleaseDto[] = Array.from({ length: 7 }, (_, i) => ({ id: `rel_${i.toString(16).padStart(32, '0')}` as ReleaseDto['id'], serviceId: first.project.serviceId!,
+    const releases: ReleaseDto[] = Array.from({ length: 7 }, (_, i) => ({ id: `01a0bf5d-8f4b-7a03-8000-${i.toString(16).padStart(12, '0')}` as ReleaseDto['id'], serviceId: first.project.serviceId!,
       tag: `v1.0.${i}`, commitSha: 'b'.repeat(40), branch: 'main', status: 'failed', createdBy: actor.userId, createdAt: `2026-09-13T00:00:0${i}.000Z`, updatedAt: time }));
     const item = await setup({ releases: async () => releases }).getProjectSummary(actor, first.project.id);
     expect(ProjectSummaryDetailSchema.safeParse(item).success).toBe(true);

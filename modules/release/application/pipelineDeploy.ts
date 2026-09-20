@@ -28,10 +28,10 @@ async function computeProblem(deps: ReleaseUseCaseDeps, manifest: Manifest, proj
   }));
   const denied = found.find((entry) => entry.error);
   if (denied) return denied.error;
-  if (found.some((f) => f.name === 'default' && !f.profile)) return '算力档位 default 指向平台默认档位，但平台尚未设置默认档位；请管理员在平台管理里设置';
-  const missing = found.filter((f) => !f.profile).map((f) => f.name);
+  if (found.some((f) => f.name.kind === 'default' && !f.profile)) return '算力档位 default 指向平台默认档位，但平台尚未设置默认档位；请管理员在平台管理里设置';
+  const missing = found.filter((f) => !f.profile).map((f) => f.name.kind === 'profile' ? f.name.profileId : 'default');
   if (missing.length > 0) return `算力档位 ${missing.join('、')} 不存在；现有档位：${(await deps.plans.listComputeProfiles()).join('、') || '（空）'}`;
-  const terminal = found.filter((f) => f.profile?.terminalOnly).map((f) => f.name);
+  const terminal = found.filter((f) => f.profile?.terminalOnly).map((f) => f.name.kind === 'profile' ? f.name.profileId : 'default');
   if (terminal.length > 0) return `算力档位 ${terminal.join('、')} 是通用终端协议，只能用于「＋ CLI」，不能用于业务子任务`;
   return undefined;
 }
@@ -40,8 +40,8 @@ export function deploySteps(deps: ReleaseUseCaseDeps, ctx: PipelineContext): Dep
   const { uow, clock } = deps;
 
   const startDeploy: DeploySteps['startDeploy'] = async (release, svc, manifest) => {
-    const plan = await deps.plans.getServicePlan(manifest.spec.service.plan);
-    if (!plan) return ctx.fail(release, `服务套餐 ${manifest.spec.service.plan} 不存在`);
+    const plan = await deps.plans.getServicePlan(manifest.spec.service.servicePlanId);
+    if (!plan) return ctx.fail(release, `服务套餐 ${manifest.spec.service.servicePlanId} 不存在`);
     if (manifest.spec.service.replicas > plan.maxReplicas) return ctx.fail(release, `副本数 ${manifest.spec.service.replicas} 超过套餐上限 ${plan.maxReplicas}`);
     const replicas = await uow.read.maintenance.override(release.serviceId, release.targetSlot) ?? manifest.spec.service.replicas;
     if (replicas > plan.maxReplicas) return ctx.fail(release, `运维副本覆盖 ${replicas} 超过套餐上限 ${plan.maxReplicas}，请管理员调整或恢复发布配置`);

@@ -5,8 +5,8 @@ import { beginAttempt, markDelivered, markFailed, newDelivery, replayDelivery } 
 import { reconcileSubscriptions } from './subscription';
 
 const now = new Date('2026-09-11T00:00:00Z');
-const owner = { serviceId: 'svc_0123456789abcdef0123456789abcdef' as ServiceId, projectId: 'prj_0123456789abcdef0123456789abcdef' as ProjectId };
-const event = { id: 'evt_0123456789abcdef0123456789abcdef' as EventId, eventType: 'gitlab.push', traceId: '0123456789abcdef0123456789abcdef' as TraceId };
+const owner = { serviceId: '01a0bf5d-8f4b-76c5-866c-f1feda3d63bb' as ServiceId, projectId: '01a0bf5d-8f4b-7178-82e1-9a99060b1192' as ProjectId };
+const event = { id: '01a0bf5d-8f4b-7c44-8477-cc6c3fe31bee' as EventId, eventTypeId: '01a0bf5d-8f4b-796f-88f0-79a62633b947', eventType: 'gitlab.push', traceId: '0123456789abcdef0123456789abcdef' as TraceId };
 
 describe('投递状态机与退避', () => {
   test('退避 min(300, 5·2^n) 带 0.75–1.25 抖动', () => {
@@ -38,10 +38,10 @@ describe('投递状态机与退避', () => {
 
   test('订阅对齐：同事件类型保留 id 并更新路径，新类型新建，未声明的移除，重复声明取第一条', () => {
     const existing = [
-      { id: 'sbs_a', ...owner, eventType: 'gitlab.push', handlerPath: '/old', state: 'active' as const, updatedAt: now },
-      { id: 'sbs_b', ...owner, eventType: 'gitlab.mr', handlerPath: '/mr', state: 'paused' as const, updatedAt: now },
+      { id: 'sbs_a', ...owner, eventTypeId: '01a0bf5d-8f4b-796f-88f0-79a62633b947', eventType: 'gitlab.push', handlerPath: '/old', state: 'active' as const, updatedAt: now },
+      { id: 'sbs_b', ...owner, eventTypeId: '01a0bf5d-8f4b-7b04-828c-4ba2d5beb150', eventType: 'gitlab.mr', handlerPath: '/mr', state: 'paused' as const, updatedAt: now },
     ];
-    const declared = [{ eventType: 'gitlab.push', handlerPath: '/new' }, { eventType: 'gitlab.push', handlerPath: '/dup' }, { eventType: 'gitlab.tag', handlerPath: '/tag' }];
+    const declared = [{ eventTypeId: '01a0bf5d-8f4b-796f-88f0-79a62633b947', eventType: 'gitlab.push', handlerPath: '/new' }, { eventTypeId: '01a0bf5d-8f4b-796f-88f0-79a62633b947', eventType: 'gitlab.push', handlerPath: '/dup' }, { eventTypeId: '01a0bf5d-8f4b-714b-8098-264a0d4d4155', eventType: 'gitlab.tag', handlerPath: '/tag' }];
     let n = 0;
     const changes = reconcileSubscriptions(existing, declared, owner, () => `sbs_new${(n += 1)}`, now);
     expect(changes.upserts.map((s) => [s.id, s.eventType, s.handlerPath, s.state])).toEqual([['sbs_a', 'gitlab.push', '/new', 'active'], ['sbs_new1', 'gitlab.tag', '/tag', 'active']]);

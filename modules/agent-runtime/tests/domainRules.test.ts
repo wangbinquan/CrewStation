@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import type { BeforeStartStep, ComputeProfileContent, LaunchSpec } from '@crewstation/contracts';
+import { newResourceId } from '@crewstation/kernel';
 import { LaunchSpecSchema } from '@crewstation/contracts';
 import { availabilityOf, contentHashOf, credentialStampOf } from '../domain/computeProfile';
 import { planCredentialWrites } from '../domain/credentialWrites';
@@ -10,10 +11,13 @@ import { initialStages, mergeStages, outcomeSentence, skipUnreachedStages, testP
 import { validateProfileContent } from '../domain/profileValidation';
 import { assertJsonTemplate, placeholdersInsideStrings, stripJsonComments, validateRevisionContent } from '../domain/revisionValidation';
 
+const credentialIds = new Map<string, string>();
+const credential = (name: string) => { if (!credentialIds.has(name)) credentialIds.set(name, newResourceId()); return { id: credentialIds.get(name)!, name }; };
+const credentialList = (...names: string[]) => names.map(credential);
 const file = (patch: Partial<Extract<BeforeStartStep, { kind: 'file' }>> = {}): BeforeStartStep => ({ kind: 'file', stepId: 'f', name: 'f', pathTemplate: '{{agent.home}}/.claude/settings.json', contentTemplate: '{"env":{"K":"{{vars.K}}"}}', format: 'json', mode: 0o600, existing: 'require-same', ...patch });
 const script = (patch: Partial<Extract<BeforeStartStep, { kind: 'script' }>> = {}): BeforeStartStep => ({ kind: 'script', stepId: 's', name: 's', language: 'shell', source: 'true', argv: [], timeoutMs: 1000, ...patch });
 const launch = (patch: Partial<LaunchSpec> = {}): LaunchSpec => LaunchSpecSchema.parse({ protocol: 'claude-code', binaryPath: '/usr/local/bin/claude', ...patch });
-const content = (patch: Partial<ComputeProfileContent> = {}): ComputeProfileContent => ({ image: 'runtime/cli:1', launch: launch(), steps: [file()], vars: { K: 'v' }, secretNames: ['TOKEN'], configFile: { kind: 'none' }, ...patch });
+const content = (patch: Partial<ComputeProfileContent> = {}): ComputeProfileContent => ({ image: 'runtime/cli:1', launch: launch(), steps: [file()], vars: { K: 'v' }, secrets: credentialList('TOKEN'), configFile: { kind: 'none' }, ...patch });
 const messageOf = (fn: () => void) => { try { fn(); return undefined; } catch (e) { return e as { message: string; details: Record<string, unknown> }; } };
 const layout: RegistryLayout = { pullBase: 'registry.cs.svc:5000', pushHost: 'registry.cs.localhost', baseRepository: 'crewstation/task-runtime', runtimePrefix: 'runtime/' };
 
@@ -24,7 +28,7 @@ describe('启动前内容的保存校验（沿用 RFC-004）', () => {
     expect(() => validateRevisionContent(content({ steps: [script({ stepId: 'a' }), file({ contentTemplate: '{"x":"{{env.FROM}}"}' })] }))).not.toThrow();
     expect(messageOf(() => validateRevisionContent(content({ vars: { HOME: '/x' } })))).toMatchObject({ details: { field: 'vars.HOME' } });
     expect(messageOf(() => validateRevisionContent(content({ vars: { CS_MCP_TOKEN: 'x' } })))).toMatchObject({ details: { field: 'vars.CS_MCP_TOKEN' } });
-    expect(messageOf(() => validateRevisionContent(content({ secretNames: ['K'] })))?.message).toContain('同时出现');
+    expect(messageOf(() => validateRevisionContent(content({ secrets: credentialList('K') })))?.message).toContain('同时出现');
     expect(messageOf(() => validateRevisionContent(content({ steps: [file({ pathTemplate: 'relative/path.json' })] })))).toMatchObject({ details: { stepId: 'f', field: 'pathTemplate' } });
     expect(messageOf(() => validateRevisionContent(content({ steps: [file({ pathTemplate: '/etc/../x' })] })))?.message).toContain('..');
     expect(() => validateRevisionContent(content({ steps: [file({ pathTemplate: '~/.claude/settings.json' })] }))).not.toThrow();
@@ -45,11 +49,11 @@ describe('启动前内容的保存校验（沿用 RFC-004）', () => {
     expect(() => assertJsonTemplate('{"a":"{{vars.X}}"}', 'json', 's')).not.toThrow();
   });
   test('凭据写操作：keep 只对已有值；clear 未设置无副作用；未声明的名字被拒', () => {
-    const plan = planCredentialWrites(new Set(['A']), ['A', 'B', 'C'], { A: { op: 'keep' }, B: { op: 'replace', value: 'x' }, C: { op: 'clear' } });
-    expect(plan).toEqual({ replace: [{ name: 'B', value: 'x' }], clear: [] });
-    expect(() => planCredentialWrites(new Set(), ['A'], { A: { op: 'keep' } })).toThrow('尚未设置');
-    expect(() => planCredentialWrites(new Set(), ['A'], { Z: { op: 'replace', value: 'x' } })).toThrow('未在 secretNames');
-    expect(planCredentialWrites(new Set(['OLD']), ['A'], { OLD: { op: 'clear' } })).toEqual({ replace: [], clear: ['OLD'] });
+    const plan = planCredentialWrites(new Set([credential('A').id]), credentialList('A', 'B', 'C'), { [credential('A').id]: { op: 'keep' }, [credential('B').id]: { op: 'replace', value: 'x' }, [credential('C').id]: { op: 'clear' } });
+    expect(plan).toEqual({ replace: [{ id: credential('B').id, value: 'x' }], clear: [] });
+    expect(() => planCredentialWrites(new Set(), credentialList('A'), { [credential('A').id]: { op: 'keep' } })).toThrow('尚未设置');
+    expect(() => planCredentialWrites(new Set(), credentialList('A'), { [credential('Z').id]: { op: 'replace', value: 'x' } })).toThrow('未在 secrets');
+    expect(planCredentialWrites(new Set([credential('OLD').id]), credentialList('A'), { [credential('OLD').id]: { op: 'clear' } })).toEqual({ replace: [], clear: [credential('OLD').id] });
   });
 });
 
@@ -110,15 +114,15 @@ describe('修订哈希、可用性与测试阶段', () => {
     const a = content({ steps: [script({ stepId: 'a' }), script({ stepId: 'b' })], vars: { A: '1', B: '2' } });
     const b = content({ steps: [script({ stepId: 'a' }), script({ stepId: 'b' })], vars: { B: '2', A: '1' } });
     const c = content({ steps: [script({ stepId: 'b' }), script({ stepId: 'a' })], vars: { A: '1', B: '2' } });
-    const stamp = credentialStampOf(['TOKEN'], [{ name: 'TOKEN', cipherText: 'c1' }]);
+    const stamp = credentialStampOf(credentialList('TOKEN'), [{ id: credential('TOKEN').id, cipherText: 'c1' }]);
     expect(contentHashOf(a, 'sha256:1', stamp)).toBe(contentHashOf(b, 'sha256:1', stamp));
     expect(contentHashOf(a, 'sha256:1', stamp)).not.toBe(contentHashOf(c, 'sha256:1', stamp));
     expect(contentHashOf(a, 'sha256:1', stamp)).not.toBe(contentHashOf(a, 'sha256:2', stamp));
-    expect(stamp).not.toBe(credentialStampOf(['TOKEN'], [{ name: 'TOKEN', cipherText: 'c2' }]));
-    expect(credentialStampOf(['TOKEN'], [{ name: 'OTHER', cipherText: 'x' }])).toBe(credentialStampOf(['TOKEN'], []));
+    expect(stamp).not.toBe(credentialStampOf(credentialList('TOKEN'), [{ id: credential('TOKEN').id, cipherText: 'c2' }]));
+    expect(credentialStampOf(credentialList('TOKEN'), [{ id: credential('OTHER').id, cipherText: 'x' }])).toBe(credentialStampOf(credentialList('TOKEN'), []));
   });
   test('可用性：停用优先；测试须对得上当前内容哈希；四种不可用都给出原因', () => {
-    const test = (patch: Partial<ProfileTest>): ProfileTest => ({ testId: 'pft_x' as never, profile: 'p', revision: 2, contentHash: 'h', trigger: 'save', createdBy: 'usr_x' as never, state: 'passed', context: { kind: 'platform-namespace' }, stages: [], createdAt: new Date(), ...patch });
+    const test = (patch: Partial<ProfileTest>): ProfileTest => ({ testId: '01a0bf5d-8f4b-729c-88d5-a70a648c5dcc' as never, profile: 'p', revision: 2, contentHash: 'h', trigger: 'save', createdBy: '01a0bf5d-8f4b-7187-83ae-25aa3b5714fc' as never, state: 'passed', context: { kind: 'platform-namespace' }, stages: [], createdAt: new Date(), ...patch });
     expect(availabilityOf({ name: 'p', enabled: true }, { contentHash: 'h' }, test({}))).toEqual({ state: 'ready', available: true });
     expect(availabilityOf({ name: 'p', enabled: false }, { contentHash: 'h' }, test({}))).toMatchObject({ state: 'disabled', available: false });
     expect(availabilityOf({ name: 'p', enabled: true }, { contentHash: 'h' }, undefined)).toMatchObject({ state: 'untested', available: false });

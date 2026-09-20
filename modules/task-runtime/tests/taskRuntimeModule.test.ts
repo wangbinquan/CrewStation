@@ -12,8 +12,8 @@ const available = await testDatabaseAvailable();
 let tdb: TestDatabase;
 let k8s: FakeK8sClient;
 let runtime: TaskRuntimeModule;
-const serviceId = 'svc_0123456789abcdef0123456789abcdef' as ServiceId;
-const projectId = 'prj_0123456789abcdef0123456789abcdef' as ProjectId;
+const serviceId = '01a0bf5d-8f4b-76c5-866c-f1feda3d63bb' as ServiceId;
+const projectId = '01a0bf5d-8f4b-7178-82e1-9a99060b1192' as ProjectId;
 let quota = 2;
 
 beforeAll(async () => {
@@ -24,12 +24,12 @@ beforeAll(async () => {
     db: tdb.db, k8s,
     authorizer: { authorize: async () => undefined },
     quotas: { quotaLimit: async () => quota },
-    profiles: { listTaskProfiles: async () => [{ name: 'coding-medium', cpu: '1', memory: '2Gi', storage: '10Gi', description: '' }], getTaskProfile: async (name) => (name === 'coding-medium' ? { name, cpu: '1', memory: '2Gi', storage: '10Gi' } : undefined) },
+    profiles: { listTaskProfiles: async () => [{ id: '01a0bf5d-8f4b-7001-8458-107366e7de39', name: 'coding-medium', cpu: '1', memory: '2Gi', storage: '10Gi', description: '' }], getTaskProfile: async (id) => (id === '01a0bf5d-8f4b-7001-8458-107366e7de39' ? { id, name: id === '01a0bf5d-8f4b-7001-8458-107366e7de39' ? 'coding-medium' : 'cli-small', cpu: '1', memory: '2Gi', storage: '10Gi' } : undefined) },
     services: { resolveServiceById: async () => ({ projectId, slug: 'demo', name: 'demo', namespace: 'cs-demo' }) },
     sources: { configEnv: async () => ({ GREETING: 'dev-hi' }), dataEnv: async () => ({ CS_DATABASE_URL: 'postgres://dev' }), taskDataEnv: async () => ({}) },
     checkout: { checkoutFor: async () => ({ repoUrl: 'http://git.local/crewstation/demo.git', credentialSecretName: 'git-checkout-demo' }) },
     isAdmin: async () => false,
-    settings: { taskImage: 'cs-task-runtime:dev', systemNamespace: 'crewstation-system', sessionUrl: 'ws://cs-session:8083/runner', userDomain: 'cs.localhost', serviceDomain: 'svc.cs.internal', workerUid: 10001, defaultProfile: 'coding-medium', userAuthMiddleware: 'forward-auth-user', dropIdentityHeadersMiddleware: 'drop-identity-headers' },
+    settings: { taskImage: 'cs-task-runtime:dev', systemNamespace: 'crewstation-system', sessionUrl: 'ws://cs-session:8083/runner', userDomain: 'cs.localhost', serviceDomain: 'svc.cs.internal', workerUid: 10001, defaultProfile: '01a0bf5d-8f4b-7001-8458-107366e7de39', userAuthMiddleware: 'forward-auth-user', dropIdentityHeadersMiddleware: 'drop-identity-headers' },
   });
 });
 afterAll(async () => { await tdb?.drop(); });
@@ -44,7 +44,7 @@ describe.skipIf(!available)('task-runtime module', () => {
   test('开发会话：建卷建 Pod、环境变量、一项目一会话、配额原子准入、令牌校验、释放回收', async () => {
     const dev = await runtime.api.createEnvironment({ serviceId, kind: 'dev-session', branch: 'main', preview: { command: ['bun', 'run', '--watch', 'src/main.ts'], port: 3000, healthPath: '/healthz' } });
     expect(dev.state).toBe('creating');
-    expect(k8s.objects.has(`v1/PersistentVolumeClaim/cs-demo/${dev.id.slice(4, 16) ? `task-${dev.id.slice(4, 16)}-work` : ''}`)).toBe(true);
+    expect(k8s.objects.has(`v1/PersistentVolumeClaim/cs-demo/task-${dev.id.replaceAll('-', '')}-work`)).toBe(true);
     const env = podEnv(dev.podName);
     expect(env.CS_ENVIRONMENT).toBe('development');
     expect(env.GREETING).toBe('dev-hi');
@@ -96,7 +96,7 @@ describe.skipIf(!available)('task-runtime module', () => {
     await runtime.api.onRunnerConnected(biz.id, podEnv(biz.podName).CS_RUNNER_TOKEN!);
     const paused = await runtime.api.pauseEnvironment(biz.id);
     expect(paused.state).toBe('paused');
-    expect(k8s.objects.has(`v1/PersistentVolumeClaim/cs-demo/${biz.id.slice(4, 16) ? `task-${biz.id.slice(4, 16)}-work` : ''}`)).toBe(true);
+    expect(k8s.objects.has(`v1/PersistentVolumeClaim/cs-demo/task-${biz.id.replaceAll('-', '')}-work`)).toBe(true);
     const resumed = await runtime.api.resumeEnvironment(biz.id);
     expect(resumed.state).toBe('creating');
     expect(podEnv(biz.podName).CS_RUNNER_TOKEN).not.toBe(podEnv(dev.podName === biz.podName ? '' : biz.podName).CS_RUNNER_TOKEN === undefined);
@@ -173,7 +173,7 @@ describe.skipIf(!available)('task-runtime module', () => {
     expect(visible).toMatchObject({ id: failed.id, state: 'failed', connected: false });
     expect(visible?.message).toContain('OOMKilled');
     expect(await runtime.api.findDevSession(projectId)).toBeUndefined();
-    const oldVolume = `v1/PersistentVolumeClaim/cs-demo/task-${failed.id.slice(4, 16)}-work`;
+    const oldVolume = `v1/PersistentVolumeClaim/cs-demo/task-${failed.id.replaceAll('-', '')}-work`;
     expect(k8s.objects.has(oldVolume)).toBe(true);
     const replacement = await runtime.api.createEnvironment({ serviceId, kind: 'dev-session', branch: 'main' });
     expect(replacement.id).not.toBe(failed.id);

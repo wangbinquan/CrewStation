@@ -22,7 +22,7 @@ export function routeUseCases(deps: GatewayUseCaseDeps) {
       ...(proxyName ? { proxyName } : {}), platformApiHost: deps.hosts.platformApiHost(),
     }, names);
     await deps.applier.applyRoutes(svc.serviceName, svc.namespace, routes);
-    await deps.routes.saveForService(svc.serviceName, routes);
+    await deps.routes.saveForService(svc.serviceId, svc.serviceName, routes);
     deps.logger.info('routes reconciled', { service: svc.identity, routes: routes.length });
     return routes;
   };
@@ -37,7 +37,7 @@ export function routeUseCases(deps: GatewayUseCaseDeps) {
       const svc = await deps.services.getService(serviceId);
       if (!svc) return;
       await deps.applier.removeRoutes(svc.serviceName, svc.namespace);
-      await deps.routes.saveForService(svc.serviceName, []);
+      await deps.routes.saveForService(svc.serviceId, svc.serviceName, []);
     },
     listRoutes: () => deps.routes.listAll(),
   };

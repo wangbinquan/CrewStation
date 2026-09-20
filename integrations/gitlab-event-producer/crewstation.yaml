@@ -1,6 +1,6 @@
-# CrewStation Manifest（拟议协议 crewstation/v1）：平台按它构建、发布、注入配置，并在发布时登记生产方与事件类型。
+# CrewStation Manifest（拟议协议 crewstation/v2）：平台按它构建、发布、注入配置，并在发布时登记生产方与事件类型。
 # 结构以 packages/contracts/manifest/*.ts 的 zod Schema 为准；发布时平台先校验再构建。
-apiVersion: crewstation/v1
+apiVersion: crewstation/v2
 kind: EventProducer
 spec:
   # 接入容器和数字人走同一条建仓、开发会话、标签发布与两槽切流的流程；两个槽用同一条命令启动。
@@ -8,7 +8,7 @@ spec:
     command: ["bun", "run", "src/main.ts"]
     port: 3000
     healthPath: /healthz
-    plan: standard-small          # 管理员定义的服务套餐名
+    servicePlanId: 01a0bf5d-8f4b-7000-9e4b-b54e91ee9d10  # 服务套餐 UUID
     replicas: 1
   development:
     command: ["bun", "run", "--watch", "src/main.ts"]
@@ -18,6 +18,7 @@ spec:
     # GitLab webhook 上配置的 Secret token。密钥不允许声明 default（EnvEntrySchema 会拒绝）：
     # 必须由项目负责人在工作台显式提供，没有它本服务拒绝一切 webhook。
     - name: GITLAB_WEBHOOK_SECRET_TOKEN
+      configDefinitionId: 01a0bf5d-8f4b-7100-8000-000000000004  # 模板槽位；创建项目时分配独立 UUID
       from: secret
   # 目录中的生产方名；cs-events 按它核对投递方身份，EventDelivery 信封的 source.producer 也是它。
   producer: gitlab

@@ -3,6 +3,7 @@ import { Button } from '../../../shared/ui/Button';
 import styles from './AdminForm.module.css';
 
 export interface AdminFormProps {
+  readonly stacked?: boolean;
   readonly submitLabel: string;
   readonly busyLabel: string;
   readonly busy: boolean;
@@ -16,16 +17,17 @@ export interface AdminFormProps {
 }
 
 /** 管理页各分区新增表单的外壳：字段自动换行排布，提交按钮与说明在下方。 */
-export function AdminForm({ submitLabel, busyLabel, busy, incomplete, note, error, onSubmit, children, extraActions }: AdminFormProps): ReactElement {
+export function AdminForm({ submitLabel, busyLabel, busy, incomplete, note, error, onSubmit, children, extraActions, stacked = false }: AdminFormProps): ReactElement {
   return (
     <form
       className={styles.form}
+      noValidate
       onSubmit={(event) => {
         event.preventDefault();
         onSubmit();
       }}
     >
-      <div className={styles.fields}>{children}</div>
+      <div className={stacked ? styles.stacked : styles.fields}>{children}</div>
       <div className={styles.actions}>
         <Button type="submit" variant="primary" disabled={busy || incomplete}>
           {busy ? busyLabel : submitLabel}

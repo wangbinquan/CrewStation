@@ -1,5 +1,6 @@
 import type { ProjectId } from '@crewstation/contracts';
 import type { Executor } from '@crewstation/persistence';
+import { conflict } from '@crewstation/kernel';
 import { eq } from 'drizzle-orm';
 import type { CatalogRepository, QuotaRepository } from '../../ports/repositories';
 import { servicePlans, taskProfiles, taskQuotas } from './tables';
@@ -20,15 +21,13 @@ export function drizzleQuotaRepository(db: Executor): QuotaRepository {
 export function drizzleCatalogRepository(db: Executor): CatalogRepository {
   return {
     listServicePlans: () => db.select().from(servicePlans).orderBy(servicePlans.name),
-    getServicePlan: async (name) => (await db.select().from(servicePlans).where(eq(servicePlans.name, name)))[0],
-    upsertServicePlan: async (plan) => {
-      await db.insert(servicePlans).values(plan).onConflictDoUpdate({ target: servicePlans.name, set: { cpu: plan.cpu, memory: plan.memory, maxReplicas: plan.maxReplicas, description: plan.description } });
-    },
+    getServicePlan: async (id) => (await db.select().from(servicePlans).where(eq(servicePlans.id, id)))[0],
+    createServicePlan: async (plan) => { if (!(await db.insert(servicePlans).values(plan).onConflictDoNothing({ target: servicePlans.id }).returning()).length) throw conflict("服务套餐 ID 已存在"); },
+    updateServicePlan: async (plan) => (await db.update(servicePlans).set(plan).where(eq(servicePlans.id, plan.id)).returning({ id: servicePlans.id })).length === 1,
     listTaskProfiles: () => db.select().from(taskProfiles).orderBy(taskProfiles.name),
-    getTaskProfile: async (name) => (await db.select().from(taskProfiles).where(eq(taskProfiles.name, name)))[0],
-    upsertTaskProfile: async (profile) => {
-      await db.insert(taskProfiles).values(profile).onConflictDoUpdate({ target: taskProfiles.name, set: { cpu: profile.cpu, memory: profile.memory, storage: profile.storage, description: profile.description } });
-    },
+    getTaskProfile: async (id) => (await db.select().from(taskProfiles).where(eq(taskProfiles.id, id)))[0],
+    createTaskProfile: async (profile) => { if (!(await db.insert(taskProfiles).values(profile).onConflictDoNothing({ target: taskProfiles.id }).returning()).length) throw conflict("任务规格 ID 已存在"); },
+    updateTaskProfile: async (profile) => (await db.update(taskProfiles).set(profile).where(eq(taskProfiles.id, profile.id)).returning({ id: taskProfiles.id })).length === 1,
   };
 }
 
