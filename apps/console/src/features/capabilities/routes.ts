@@ -3,7 +3,6 @@ import { projectRoute } from '../../app/router/projectRoute';
 import { legacyResourceSearch } from '../../shared/project/resourceSearch';
 import { workbenchRoute } from '../../app/router/workbenchRoute';
 import { MarketPage } from './pages/MarketPage';
-import { MarketDetailPage } from './pages/MarketDetailPage';
 
 /** /projects/$projectId/capabilities：能力说明 */
 export const capabilitiesRoute = createRoute({ getParentRoute: () => projectRoute, path: 'capabilities',
@@ -12,4 +11,6 @@ export const capabilitiesRoute = createRoute({ getParentRoute: () => projectRout
 });
 export const marketHomeRoute = createRoute({ getParentRoute: () => workbenchRoute, path: '/', component: MarketPage });
 export const marketRoute = createRoute({ getParentRoute: () => workbenchRoute, path: '/market', component: MarketPage });
-export const marketDetailRoute = createRoute({ getParentRoute: () => workbenchRoute, path: '/market/$projectId', component: MarketDetailPage });
+export const marketLegacyRoute = createRoute({ getParentRoute: () => workbenchRoute, path: '/market/$projectId',
+  beforeLoad: () => { throw redirect({ to: '/market', replace: true }); },
+});

@@ -92,6 +92,22 @@
 - 最终完整门禁静态通过，1874 pass／5 skip／1 fail，10386 assertions，250.85s；唯一失败为 `runtimes/task/tests/nativeActivityChannel.test.ts:40` 的未授权 HTTP 状态预期 403、实际 503。本文件未被本次修改，单独复核 6 pass／0 fail，19 assertions，但不足以将全量结果记绿或证明 503 的来源。日志 `/private/tmp/rfc011-buttons-full-check-final.log` 与 `/private/tmp/rfc011-native-channel-recheck.log`。所有工作台与本机实机用例通过，包括 390px 英文深色的项目设置九个主题。
 - 遵从作者已批准的精确发布及按提交 CI 核验流程，本次提交范围为 14 个代码／测试文件及 2 份记录；新增文件范围均对应作者随后要求的按钮交互、导航去重及其回归。GitHub 最终提交的门禁另行核验，不把本机全量失败隐去。
 
+## 业务卡片与详情页移除追加
+
+作者明确要求能力市场采用业务卡片，点击直接打开 app 主页，并下掉应用详情页面。本轮沿用此前实施与上库授权，先更新设计和 B10 能力影响清单，再实现和验证。
+
+- 卡片复用 Card、GlyphIcon 和 Badge：保留名称、用途与必要状态，名称原生链接覆盖整卡区域；删除负责人、无用途占位、详情入口以及独立详情页面。旧 `/market/:projectId` 与试用成员旧项目地址 replace 到 `/market`。
+- 未发布应用仍为 Beta 卡片。已发布应用的正式链接和成员 Beta 新版链接独立，保留共用数据提示；不可用／未知／无效地址没有打开动作。后端在已取得的同份部署结果上增加可选 `trial` 投影，不增加逐卡查询，返回前复核试用资格；原 HTTP 接口继续兼容其他客户端。
+- 回归先复现旧标题进入详情等五项失败。替换后发现市场跳回旧项目时，路由切换的一帧仍会触发项目摘要；身份名称查询现同时核对平台开发资格和 tester-only 关系，回归确认零项目技术请求。
+- 定向 66 pass／0 fail、345 assertions；覆盖核对为 44 pass／0 fail、222 assertions。本次 10 个受防护的生产 TS 文件被加载，可执行变更行 37／37（100%）。契约面金样检查无变化，新增可选响应字段不破坏旧调用方。生产构建成功。
+- 本地 console 镜像 `cs-console:rfc011-business-cards-20260920`，摘要 `8de94d40c7a8acb360617ceb0a974ec752514a11ffcddcdba2ffa5b52fe416de`；cs-api 镜像 `cs-control-plane:rfc011-business-cards-20260920`，摘要 `12b3f1d35cf77a448326c57ea3727b603506f35a467cd2dd180855040283c5c4`。后者在当时部署的 RFC-010 镜像上只覆入本轮两处源文件，两项 rollout 均成功。
+- 真实首页显示八张卡片，零 `/market/…` 详情链接；点击首卡空白区域命中正式应用链接，Tab 可从搜索按钮进入该链接（2px 焦点），再进入独立 Beta 链接。直接打开该链接目标确认真实应用首页和当前用户 `dev-admin`。旧详情书签实测返回 `/market`。
+- 真实页面 1280／390／320px 的 `scrollWidth == clientWidth`，中文浅色／深色和桌面英文检查通过。验收框架通过同站点端口加载真实页面，无模拟应用数据。内嵌浏览器未回传外链新标签，iframe 内英文点击接口报 `Click target is no longer available`；没有将外链弹窗或窄屏英文点击记为实机通过，原生 href／target 与两种入口由路由用例覆盖。
+- 首轮完整检查静态通过，1873 pass／5 skip／5 fail（262.45s）；五项失败均为发布／API 试调测试的旧夹具只提供详情响应，迁移后市场列表为空。补齐三处列表响应，原断言保持，相关 37 pass／0 fail、388 assertions；最终 20 个代码／测试候选冻结后重新完整检查。日志 `/private/tmp/rfc011-business-cards-full.log`、`/private/tmp/rfc011-business-cards-fixtures.log`。
+- 最终完整 `bun run check` 通过：1878 pass／5 skip／0 fail，10427 assertions、303 文件、323.66s，静态四项均通过。显式使用本机已有 `dev-admin` OIDC 和真实数据库，环境跳过仍为非管理员自动化、集群客户端标志与三类原生 CLI 场景；未把跳过算成通过。20 个候选文件哈希与门禁开始前完全一致，生产内容未因夹具修正改变。日志 `/private/tmp/rfc011-business-cards-full-final.log`；发布范围精确限定本轮代码、回归和记录，共享 STATE 的其他任务记录保持原样。
+
+上一轮语言按钮与导航去重提交 `71a45c7` 已随共享主干发布；包含该提交的 `7237ecc` [CI 35516088549](https://github.com/wangbinquan/CrewStation/actions/runs/35516088549) 六项成功，本轮已重新核对远端祖先关系与终态。
+
 ## 待授权操作
 
 自动审批拒绝临时授予 `dev-member` 开发者角色，理由为未明确授权该具体账号。已请求“临时设为开发者，验证保存后立即恢复用户”的许可；拒绝之后没有通过其他接口执行。此项不阻止已实现代码的门禁与授权发布准备，但真实改权验收仍待答复。并行 RFC-010 的 Kubernetes RBAC 扩权由其原任务处理，未在本 RFC 中绕过。

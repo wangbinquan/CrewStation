@@ -18,7 +18,7 @@ export function DeveloperGuard({ children }: { readonly children: ReactNode }) {
   const previewOnly = !!projectId && !!membership && me.data?.platformRole !== 'admin' && (me.data?.platformRole === 'user' || membership.role === 'tester');
   const allowed = !me.isPending && !me.error && !previewOnly && (me.data?.platformRole === 'developer' || me.data?.platformRole === 'admin');
   if (allowed && !visited) setVisitedUser(me.data!.id);
-  if (!visited && !me.isPending && !me.error && previewOnly) return <Navigate to="/market/$projectId" params={{ projectId: projectId! }} replace />;
+  if (!visited && !me.isPending && !me.error && previewOnly) return <Navigate to="/market" replace />;
   const notice = me.isPending || me.error ? <><QueryStatus isPending={me.isPending} error={me.error} />
     {me.error ? <Button onClick={() => void me.refetch()}>{t('admin.retryIdentity')}</Button> : null}</>
     : !allowed ? <EmptyState title={t('development.denied')} description={t(visited ? 'development.suspended' : 'development.deniedHint')}

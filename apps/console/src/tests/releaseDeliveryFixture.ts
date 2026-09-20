@@ -26,6 +26,7 @@ export function releaseDeliveryFixture() {
     } else {
       reads.push(path);
       if (path === '/v1/me') body = { id: userId, name: '负责人', email: 'owner@test.invalid', platformRole: (state.admin) ? 'admin' : 'developer', isAdmin: state.admin, memberships: [{ projectId, role: state.role }] };
+      else if (path === '/v1/market/apps') body = { items: [trialMarketFixture(projectId)] };
       else if (path === `/v1/market/apps/${projectId}`) body = trialMarketFixture(projectId);
       else if (path === `/v1/workbench/project-summaries/${projectId}`) body = testerSummaryFixture(projectId, serviceId);
       else if (path === `/v1/projects/${projectId}`) body = { id: projectId, serviceId, name: '演示应用', slug: 'demo', kind: state.admin ? 'APIProxy' : 'DigitalWorker', state: 'active', ownerUserId: userId };

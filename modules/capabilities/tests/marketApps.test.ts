@@ -15,6 +15,23 @@ const slot = (overrides: Partial<SlotDto> = {}): SlotDto => ({ name: 'prod', act
 const setup = (slots: () => Promise<SlotDto[]>, get = async () => listing) => marketAppUseCases({ slots, get, list: async () => ({ items: [listing] }) }, clock);
 
 describe('市场仅聚合正式部署且保留未知', () => {
+  test('已发布应用的成员在同次聚合收到新版入口，正式卡片仍直达正式应用', async () => {
+    const releaseId = `rel_${'e'.repeat(32)}` as SlotDto['releaseId'];
+    const prod = slot({ state: 'ready', tag: 'v1.0.0', commitSha: 'old', releaseId });
+    const preview = slot({ name: 'preview', active: false, state: 'ready', tag: 'v2.0.0', releaseId, host: 'preview.app.example.test' });
+    let probes = 0;
+    const api = setup(async () => { probes += 1; return [prod, preview]; }, async () => ({ ...listing, canPreview: true }));
+    const dto = (await api.listMarketApps(actor, { q: '', limit: 20 })).items[0]!;
+    expect(dto.entry).toEqual({ kind: 'production', status: 'ready', host: prod.host });
+    expect(dto).toHaveProperty('trial', { status: 'ready', host: preview.host });
+    expect(probes).toBe(1); expect(MarketAppDtoSchema.parse(dto)).toHaveProperty('trial', { status: 'ready', host: preview.host });
+    const unavailable = await setup(async () => [prod, { ...preview, state: 'failed' }], async () => ({ ...listing, canPreview: true })).getMarketApp(actor, projectId);
+    expect(unavailable).toHaveProperty('trial', { status: 'unavailable' });
+    let reads = 0;
+    const revoked = await setup(async () => [prod, preview], async () => ({ ...listing, canPreview: ++reads === 1 })).getMarketApp(actor, projectId);
+    expect(revoked).not.toHaveProperty('trial');
+    expect(await setup(async () => [prod, preview]).getMarketApp(actor, projectId)).not.toHaveProperty('trial');
+  });
   test('试用成员的未发布应用直接给 Beta 入口，未知正式状态不能冒充未发布', async () => {
     const trial = { ...listing, canPreview: true };
     const preview = slot({ name: 'preview', active: false, state: 'ready', tag: 'v2.0.0', commitSha: 'new', releaseId: `rel_${'e'.repeat(32)}` as SlotDto['releaseId'], host: 'preview.app.example.test' });

@@ -1,10 +1,21 @@
 .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(290px, 100%), 1fr)); gap: var(--cs-space-3); }
-.content { display: grid; gap: var(--cs-space-2); min-width: 0; }
-.summary { min-height: 2.8em; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
-.description { white-space: pre-wrap; overflow-wrap: anywhere; }
-.owner { font-size: 12px; color: var(--cs-color-text-muted); }
-.meta, .actions { display: flex; align-items: center; flex-wrap: wrap; gap: var(--cs-space-2) var(--cs-space-3); }
-.actions > span { color: var(--cs-color-text-muted); font-size: 12px; }
+.appCard { position: relative; }
+.appCard:has(.appLink:hover) { border-color: var(--cs-color-primary); }
+.appCard:has(.appLink:focus-visible) { outline: 2px solid var(--cs-color-focus); outline-offset: 3px; }
+.content { display: flex; flex-direction: column; gap: var(--cs-space-3); min-width: 0; height: 100%; }
+.heading { display: flex; align-items: center; gap: var(--cs-space-3); }
+.appIcon { flex: none; display: grid; place-items: center; width: 44px; height: 44px; border-radius: var(--cs-radius-md); background: var(--cs-color-tint); color: var(--cs-tone-info-fg); }
+.appIcon svg { width: 26px; height: 26px; }
+.name { flex: 1; min-width: 0; font-size: var(--cs-font-size-lg); overflow-wrap: anywhere; }
+.appLink { color: inherit; text-decoration: none; }
+.appLink:hover { text-decoration: none; }
+.appLink::after { content: ''; position: absolute; inset: 0; border-radius: var(--cs-radius-md); }
+.summary { color: var(--cs-color-text-muted); min-height: 3.2em; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+.entry { margin-top: auto; padding-top: var(--cs-space-1); }
+.open { font-weight: 500; color: var(--cs-tone-info-fg); }
+.note { font-size: var(--cs-font-size-sm); color: var(--cs-color-text-muted); overflow-wrap: anywhere; }
+.trial { position: relative; z-index: 1; display: grid; gap: var(--cs-space-1); font-size: var(--cs-font-size-sm); }
+.trial a { width: fit-content; }
 .search { display: flex; align-items: end; flex-wrap: wrap; gap: var(--cs-space-2); margin-bottom: var(--cs-space-3); }
 .search > label { flex: 1; min-width: min(220px, 100%); max-width: 520px; }
 .search > button { align-self: start; margin-top: 24px; }

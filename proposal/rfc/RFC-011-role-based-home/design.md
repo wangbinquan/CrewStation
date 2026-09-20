@@ -102,24 +102,31 @@ HTTP、CLI、MCP 的用户路径均复用服务端授权；服务身份业务任
 
 ## 5. 市场与试用投影
 
-现有 market API 可继续返回版本信息供其他客户端使用；console 的用户卡片和详情不渲染 commit、部署槽及 canDevelop/canConfigure 对应动作。
+现有 market API 可继续返回版本信息供其他客户端使用；console 的用户卡片不渲染 commit、部署槽及 canDevelop/canConfigure 对应动作。按作者后续明确要求，删除应用详情页面。
 正式应用打开动作由服务端已确认的正式 host 和当前状态决定；成员试用的 Beta 卡片使用获授权的试用 host。未知、暂停、未准备好、不可见分开处理。
 市场列表增加面向使用的最小 `entry` 投影：`kind=production|trial`、状态与经过校验的 host；只有实际无正式版本且具有试用资格时 `kind=trial`，渲染 Beta。
 不能把正式状态 unknown 推断成“未发布”并改开试用域。没有试用资格不返回试用 host；Beta 可见性与资格在响应前复核。
-有正式版本时卡片保持 production，详情可另查已获授权的 Beta 试用版本。成员关系包括 owner／developer／tester，不改变平台开发门槛。
+有正式版本时卡片保持 production，卡片另附已获授权的 Beta 新版入口。成员关系包括 owner／developer／tester，不改变平台开发门槛。
 若某页聚合后只有不该展示的未发布项，保留合法 nextCursor，展示继续查询而非宣称“平台没有应用”；不得先拿全平台项目再在浏览器过滤。
 
 新增专用 `GET /v1/market/apps/:projectId/trial`（与现有 marketRoutes 前缀一致）：
 先判应用可见，再判 `view-preview`，只返回应用名、试用 host、版本、可用状态、检查时间和“共用业务数据”提示。
 用户没有试用资格时不发该查询、不展示试用链接；绕过 UI 的请求仍拒绝。后端不借此返回项目设置／成员资料或开发任务。
-可用资格由市场详情的最小 `canPreview` 字段表示；首页 Beta 卡片直接“试用应用”，在必要的数据提醒后打开试用域，不强制再进详情。聚合结束前复核可见性和权限，保持现有最多四并发、有界等待及明确 unknown 行为。
-旧 tester 项目链接经身份／试用资格核对，replace 到 `/market/:projectId` 的试用区域；不挂载项目内部页面。
+可用资格由市场投影的最小 `canPreview` 字段表示；首页 Beta 卡片直接“试用应用”，在必要的数据提醒后打开试用域。聚合结束前复核可见性和权限，保持现有最多四并发、有界等待及明确 unknown 行为。
+旧 tester 项目链接经身份／试用资格核对，replace 到 `/market`；旧 `/market/:projectId` 同样 replace 到市场，不挂载详情或项目内部页面。
+
+### 5.1 业务卡片直达应用（作者后续批准的交互调整）
+
+- 整张卡片以应用名的原生链接覆盖可点击区域，直接在新页打开服务端确认的应用主页；支持 Tab／Enter，不嵌套链接。复用 shared Card、GlyphIcon、Badge 与主题令牌，展示图标、名称、用途和必要状态，不再展示负责人或缺描述的技术占位文案。
+- 未就绪／未知／非法 host 不生成打开链接；自动刷新失败或撤权后不保留旧链接，保留搜索草稿与错误重试。
+- `MarketAppDto` 兼容新增可选 `trial: { status, host? }`，仅实际有正式版本且复核后仍可试用时返回。`marketApps.ts` 复用同次 `marketSlots` 结果（见 `marketDeployment.ts`），不增加逐卡片查询或部署读取。正式应用卡片的次要 Beta 链接独立可聚焦，旁边保留共用业务数据提示；试用未就绪有明确状态。
+- console 删除 `MarketDetailPage`、详情组件及专属试用查询组件；保留现有单应用／trial HTTP API 兼容其他客户端。路由回归覆盖旧链接重定向、正式与 Beta 直达、不可用状态、撤权和自动刷新；后端覆盖投影权限复核及单次聚合；实浏览器核对卡片空白区、键盘、新页面、中文／英文、明暗与窄屏。
 
 ## 6. 前端与登录落点
 
 | 地址 | 空间 | 门槛 |
 |---|---|---|
-| `/`、`/market`、`/market/:projectId` | 应用 | 已登录，并按应用可见性 |
+| `/`、`/market` | 应用 | 已登录，并按应用可见性；旧 `/market/:projectId` 重定向市场 |
 | `/projects`、`/projects/new` | 项目开发 | developer/admin |
 | `/projects/:id/*` | 项目开发 | 平台开发资格 ＋ 项目关系；旧 tester 链接先迁移 |
 | `/admin/*` | 平台管理 | admin |

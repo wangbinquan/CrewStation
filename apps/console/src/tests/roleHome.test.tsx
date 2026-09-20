@@ -58,7 +58,7 @@ test.each(['user', 'developer', 'admin'] as const)('%s 默认首页只有应用�
 test('普通用户开发 URL 被拒绝，旧试用项目链接迁移到市场，不挂开发页面', async () => {
   const f = fixture(); page = await renderApp('/projects/new');
   expect(page.text()).toContain('需要开发者角色'); expect(f.calls.every((c) => c.path === '/v1/me')).toBe(true);
-  await page.navigate(`/projects/${projectId}/dev-session`); expect(page.path()).toBe(`/market/${projectId}`);
+  await page.navigate(`/projects/${projectId}/dev-session`); expect(page.path()).toBe('/market');
   expect(f.calls.some((c) => c.path.includes('/dev-session') || c.path.startsWith('/v1/projects'))).toBe(false);
 });
 
@@ -128,21 +128,26 @@ test('管理员修改角色有确认，409 保留选择并重新读取后再保�
   expect(f.state.targetRole).toBe('developer'); expect(f.calls.find((c) => c.method === 'PUT')?.body).toEqual({ platformRole: 'developer', expectedRole: 'user' });
 });
 
-test('已上线应用保留正式入口，获邀用户可在详情试用新版，失败不沿用旧试用链接', async () => {
-  const f = fixture(), base = globalThis.fetch; let fail = true;
+test('已上线应用卡片保留正式入口和独立 Beta 链接，自动更新移除过期试用入口', async () => {
+  const f = fixture(), base = globalThis.fetch; let ready = true;
   globalThis.fetch = (async (raw, init) => {
     const path = new URL(String(raw), 'http://localhost').pathname;
-    if (path.endsWith('/trial')) return fail ? Response.json({ error: 'unavailable', message: '试用读取失败' }, { status: 503 })
-      : Response.json({ projectId, name: '团队助理', status: 'ready', host: 'new.team.test', version: 'v2', checkedAt: new Date().toISOString(), sharedData: true });
     const response = await base(raw, init);
-    if (path === `/v1/market/apps/${projectId}`) return Response.json({ ...await response.json(),
-      entry: { kind: 'production', status: 'ready', host: 'team.test' }, production: { status: 'deployed', tag: 'v1', commitSha: 'a'.repeat(40), host: 'team.test', state: 'ready', freshness: 'current', checkedAt: new Date().toISOString() } });
+    if (path === '/v1/market/apps') return Response.json({ items: [{ ...(await response.json()).items[0],
+      trial: ready ? { status: 'ready', host: 'new.team.test' } : { status: 'unavailable' },
+      entry: { kind: 'production', status: 'ready', host: 'team.test' }, production: { status: 'deployed', tag: 'v1', commitSha: 'a'.repeat(40), host: 'team.test', state: 'ready', freshness: 'current', checkedAt: new Date().toISOString() } }] });
     return response;
   }) as typeof fetch;
-  page = await renderApp(`/market/${projectId}`); expect(page.text()).toContain('试用读取失败'); expect(page.text()).not.toContain('v1');
+  page = await renderApp('/market'); expect(page.text()).not.toContain('v1');
+  expect(document.querySelector('a[href="http://team.test"]')?.textContent).toBe('团队助理');
+  const beta = document.querySelector<HTMLAnchorElement>('a[href="http://new.team.test"]')!;
+  expect(beta.textContent).toContain('试用新版本'); expect(beta.target).toBe('_blank');
+  expect(beta.parentElement?.closest('a')).toBeNull(); expect(page.text()).toContain('共用业务数据');
+  expect(document.querySelector('h2')?.textContent).not.toContain('Beta');
+  ready = false; await act(async () => { focusManager.setFocused(false); focusManager.setFocused(true); }); await page.settle();
   expect(document.querySelector('a[href="http://team.test"]')).not.toBeNull(); expect(document.querySelector('a[href="http://new.team.test"]')).toBeNull();
-  fail = false; await page.click('重新查询'); expect(document.querySelector('a[href="http://new.team.test"]')).not.toBeNull();
-  expect(f.calls.some((call) => call.path.includes('/v1/projects/'))).toBe(false);
+  expect(page.text()).toContain('暂不可用');
+  expect(f.calls.every((call) => call.path === '/v1/me' || call.path === '/v1/market/apps')).toBe(true);
 });
 
 test('开发身份刷新失败不丢自建草稿且暂停创建，恢复后仍需显式提交', async () => {

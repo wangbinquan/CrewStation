@@ -2,6 +2,7 @@ import './domSetup';
 import { afterEach, describe, expect, test } from 'bun:test';
 import type { AppVisibilityDto, MarketAppDto, UserId } from '@crewstation/contracts';
 import { act } from 'react';
+import { focusManager } from '@tanstack/react-query';
 import { renderApp } from './renderApp';
 
 const originalFetch = globalThis.fetch;
@@ -51,35 +52,51 @@ async function input(node: HTMLInputElement | HTMLSelectElement, value: string) 
 const scopeSelect = () => document.querySelector<HTMLSelectElement>('form select option[value="members"]')!.parentElement as HTMLSelectElement;
 
 describe('能力市场与负责人设置真实路由', () => {
-  test('首页是市场，应用使用者不请求项目内部数据；详情不会展示项目导航', async () => {
+  test('首页是业务卡片，不可用应用没有详情或打开入口，不请求项目内部数据', async () => {
     const f = fixture(); page = await renderApp('/');
     expect(page.text()).toContain('知识助理'); expect(page.text()).toContain('暂不可用');
     expect(page.text()).not.toContain('进入项目'); expect(page.text()).not.toContain('打开正式应用');
-    await page.click('知识助理');
-    expect(page.path()).toBe(`/market/${projectId}`);
+    expect(document.querySelector(`a[href="/market/${projectId}"]`)).toBeNull();
+    expect([...document.querySelectorAll('main a')].some((a) => a.textContent?.includes('知识助理'))).toBe(false);
     expect(page.text()).not.toContain('当前项目'); expect(page.html()).not.toContain('preview.');
     expect(f.calls.some((call) => call.url.includes('/v1/projects'))).toBe(false);
   });
-  test('详情重新校验被撤销时移除旧应用，不以空态隐藏查询错误', async () => {
-    const f = fixture(); page = await renderApp(`/market/${projectId}`);
-    expect(page.text()).toContain('知识助理'); f.revoke(); await page.click('重新检查');
+  test('市场自动校验被撤销时移除旧应用，不以空态隐藏查询错误', async () => {
+    const f = fixture(); page = await renderApp('/market');
+    expect(page.text()).toContain('知识助理'); f.revoke();
+    await act(async () => { focusManager.setFocused(false); focusManager.setFocused(true); }); await page.settle();
     expect(page.text()).not.toContain('知识助理'); expect(page.text()).toContain('应用不存在或不可见'); expect(page.text()).not.toContain('暂无可见应用');
-    // 404 是明确状态而不是“读取失败”，说明可能原因并保留返回路径。
-    expect(page.text()).toContain('该应用当前对你不可见'); expect(page.text()).not.toContain('读取失败'); expect(page.html()).toContain('href="/market"');
+    expect(page.text()).toContain('重新查询');
   });
   test('已上线应用独立打开，负责人也没有项目编辑入口或提交信息', async () => {
     fixture(true, app({ canDevelop: true, canConfigure: true, entry: { kind: 'production', status: 'ready', host: 'knowledge.example.test' }, production: { status: 'deployed', state: 'ready', host: 'knowledge.example.test', tag: 'v1.2.3', commitSha: 'abc123', freshness: 'current', checkedAt: '2026-09-13T00:00:00.000Z' } }));
-    page = await renderApp(`/market/${projectId}`);
+    page = await renderApp('/market');
     const link = document.querySelector<HTMLAnchorElement>('a[href="http://knowledge.example.test"]');
     expect(link?.target).toBe('_blank'); expect(page.text()).not.toContain('abc123');
+    // 卡片标题曾跳到技术详情页；名称现在就是应用主页的原生链接。
+    expect(link?.textContent).toBe('知识助理'); expect(link?.closest('h2')).not.toBeNull();
+    expect(document.querySelector(`a[href="/market/${projectId}"]`)).toBeNull();
+    expect(page.text()).not.toContain('应用详情'); expect(page.text()).not.toContain('负责人：');
     expect(page.text()).not.toContain('进入项目'); expect(page.text()).not.toContain('配置可见性');
     expect(page.html()).not.toContain(`/projects/${projectId}/settings`);
   });
   test('暂停应用保留正式版本记录，不能同时显示在线与正式打开入口', async () => {
     fixture(false, app({ projectState: 'paused', production: { status: 'deployed', state: 'ready', host: 'knowledge.example.test', tag: 'v1.2.3', commitSha: 'abc123', freshness: 'current', checkedAt: '2026-09-13T00:00:00.000Z' } }));
-    page = await renderApp(`/market/${projectId}`);
+    page = await renderApp('/market');
     expect(page.text()).toContain('暂不可用');
     expect(page.text()).not.toContain('已上线'); expect(page.text()).not.toContain('打开正式应用');
+  });
+  test('旧详情书签替换到能力市场，不再加载单应用详情', async () => {
+    const f = fixture(); page = await renderApp(`/market/${projectId}`);
+    expect(page.path()).toBe('/market'); expect(page.text()).toContain('知识助理');
+    expect(page.text()).not.toContain('应用详情');
+    expect(f.calls.some((call) => call.url.includes(`/apps/${projectId}`))).toBe(false);
+  });
+  test('即使响应声称可用，缺失或无效应用地址也不能生成打开链接', async () => {
+    const application = app({ entry: { kind: 'production', status: 'ready', host: 'javascript:alert(1)' }, description: '' });
+    fixture(false, application); page = await renderApp('/market');
+    expect(document.querySelector('main a')).toBeNull(); expect(page.text()).toContain('暂不可用');
+    expect(page.text()).not.toContain('负责人尚未填写');
   });
   test('指定名单约束首屏展示；空名单字段错误；精确查找去重与取消不保存', async () => {
     const f = fixture(true); page = await renderApp(`/projects/${projectId}/settings?tab=visibility`); await page.click('修改可见范围');

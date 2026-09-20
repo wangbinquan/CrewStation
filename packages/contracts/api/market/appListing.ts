@@ -39,6 +39,7 @@ export const MarketAppDtoSchema = z.object({
   owner: z.object({ userId: UserIdSchema, name: z.string() }), projectState: ProjectStateSchema,
   canDevelop: z.boolean(), canConfigure: z.boolean(), canPreview: z.boolean(), visibilityRevision: z.number().int().min(0),
   entry: z.object({ kind: z.enum(['production', 'trial']), status: z.enum(['ready', 'unavailable', 'unknown']), host: z.string().optional() }),
+  trial: z.object({ status: z.enum(['ready', 'unavailable', 'unknown']), host: z.string().optional() }).optional(),
   production: z.discriminatedUnion('status', [
     z.object({ status: z.literal('deployed'), tag: z.string(), commitSha: z.string(), host: z.string(), state: z.enum(['deploying', 'ready', 'degraded', 'failed']), freshness: z.literal('current'), checkedAt: z.iso.datetime() }),
     z.object({ status: z.literal('not-deployed'), freshness: z.literal('current'), checkedAt: z.iso.datetime() }),

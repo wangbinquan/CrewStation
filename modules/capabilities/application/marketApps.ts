@@ -11,7 +11,9 @@ export function marketAppUseCases(sources: MarketSources, clock: Clock) {
     const production = productionOf(slots, clock);
     // 聚合期间可能撤销可见性；返回前再次裁定。内部 serviceId 不进入 HTTP 投影。
     const { serviceId: _serviceId, ...current } = await sources.get(actor, projectId);
-    return { ...current, production, entry: entryOf(production, current, slots) };
+    const trial = current.canPreview && production.status === 'deployed' ? trialOf(slots, current) : undefined;
+    return { ...current, production, entry: entryOf(production, current, slots),
+      ...(trial ? { trial: { status: trial.status, ...(trial.host ? { host: trial.host } : {}) } } : {}) };
   };
   return {
     getMarketApp: detail,

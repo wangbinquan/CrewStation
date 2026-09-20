@@ -28,6 +28,7 @@ export function apiInvocationFixture() {
     }
     reads.push(url);
     if (url.endsWith('/v1/me')) return Response.json({ id: userId, name: '开发者', platformRole: 'developer', isAdmin: false, memberships: [{ projectId: invocationProjectId, role: state.role }] });
+    if (new URL(url, 'http://localhost').pathname === '/v1/market/apps') return Response.json({ items: [trialMarketFixture(invocationProjectId)] });
     if (url.endsWith(`/v1/market/apps/${invocationProjectId}`)) return Response.json(trialMarketFixture(invocationProjectId));
     if (url.endsWith(`/v1/workbench/project-summaries/${invocationProjectId}`)) return Response.json(testerSummaryFixture(invocationProjectId, serviceId));
     if (url.endsWith(`/v1/projects/${invocationProjectId}`)) return Response.json({ id: invocationProjectId, serviceId, name: '知识助理', slug: 'knowledge', kind: 'DigitalWorker', state: 'active' });

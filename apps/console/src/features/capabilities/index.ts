@@ -1,2 +1,2 @@
-export { capabilitiesRoute, marketHomeRoute, marketRoute, marketDetailRoute } from './routes';
+export { capabilitiesRoute, marketHomeRoute, marketRoute, marketLegacyRoute } from './routes';
 export { CapabilitiesPage } from './pages/CapabilitiesPage';

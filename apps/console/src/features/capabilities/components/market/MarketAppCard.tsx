@@ -1,42 +1,35 @@
 import type { MarketAppDto } from '@crewstation/contracts';
-import { Link } from '@tanstack/react-router';
 import { useT } from '../../../../shared/lib/useT';
 import { Badge } from '../../../../shared/ui/Badge';
 import { Card } from '../../../../shared/ui/Card';
 import { GlyphIcon } from '../../../../shared/ui/icons/GlyphIcon';
-import { MarketTrial } from './MarketTrial';
 import { marketHref } from './marketHref';
 import styles from './Market.module.css';
 
-export function MarketAppStatus({ app }: { readonly app: MarketAppDto }) {
-  const t = useT();
-  return <div className={styles.meta}>
-    {app.entry.kind === 'trial' ? <Badge tone="info">Beta</Badge> : null}
-    <Badge tone={app.entry.status === 'ready' ? 'success' : app.entry.status === 'unknown' ? 'warning' : 'neutral'}>{t(`market.entry.${app.entry.status}`)}</Badge>
-  </div>;
-}
-
-export function MarketAppAccess({ app }: { readonly app: MarketAppDto }) {
-  const t = useT(), href = app.entry.status === 'ready' ? marketHref(app.entry.host) : undefined;
-  return <div>
-    {app.entry.kind === 'trial' ? <p className={styles.owner}>{t('market.sharedData')}</p> : null}
-    <div className={styles.actions}>{href ? <a href={href} target="_blank" rel="noopener noreferrer">{t(app.entry.kind === 'trial' ? 'market.try' : 'market.open')} ↗</a> : <span>{t('market.notAvailable')}</span>}</div>
-  </div>;
-}
-
 export function MarketAppCard({ app }: { readonly app: MarketAppDto }) {
   const t = useT();
-  return <Card compact title={<Link to="/market/$projectId" params={{ projectId: app.projectId }}>{app.name}</Link>} extra={<GlyphIcon name={app.icon} />} footer={<MarketAppAccess app={app} />}>
-    <div className={styles.content}><p className={styles.summary}>{app.description || t('market.noDescription')}</p><p className={styles.owner}>{t('market.owner', { name: app.owner.name })}</p><MarketAppStatus app={app} /></div>
+  const href = app.entry.status === 'ready' ? marketHref(app.entry.host) : undefined;
+  const beta = app.entry.kind === 'trial';
+  const trial = app.canPreview && app.production.status === 'deployed' ? app.trial : undefined;
+  const trialHref = trial?.status === 'ready' ? marketHref(trial.host) : undefined;
+  const status = app.entry.status === 'unknown' ? 'unknown' : 'unavailable';
+  return <Card className={styles.appCard} footer={trial ? <div className={styles.trial}>
+    {trialHref ? <a href={trialHref} target="_blank" rel="noopener noreferrer">{t('market.trialTitle')} <span aria-hidden="true">↗</span></a>
+      : <span>{t('market.trialTitle')} · {t(`market.entry.${trial.status === 'unknown' ? 'unknown' : 'unavailable'}`)}</span>}
+    <p className={styles.note}>{t('market.sharedData')}</p>
+  </div> : undefined}>
+    <div className={styles.content}>
+      <div className={styles.heading}>
+        <div className={styles.appIcon}><GlyphIcon name={app.icon} /></div>
+        <h2 className={styles.name}>{href ? <a className={styles.appLink} href={href} target="_blank" rel="noopener noreferrer">{app.name}</a> : app.name}</h2>
+        {beta ? <Badge tone="info">Beta</Badge> : null}
+      </div>
+      {app.description ? <p className={styles.summary}>{app.description}</p> : null}
+      {beta ? <p className={styles.note}>{t('market.sharedData')}</p> : null}
+      <div className={styles.entry}>{href
+        ? <span className={styles.open}>{t(beta ? 'market.try' : 'market.open')} <span aria-hidden="true">↗</span></span>
+        : <Badge tone={status === 'unknown' ? 'warning' : 'neutral'}>{t(`market.entry.${status}`)}</Badge>}
+      </div>
+    </div>
   </Card>;
-}
-
-export function MarketAppDetail({ app }: { readonly app: MarketAppDto }) {
-  const t = useT();
-  return <>
-    <Card compact title={app.name} extra={<GlyphIcon name={app.icon} />} footer={<MarketAppAccess app={app} />}>
-      <div className={styles.content}><p className={styles.description}>{app.description || t('market.noDescription')}</p><p>{t('market.owner', { name: app.owner.name })}</p><MarketAppStatus app={app} /></div>
-    </Card>
-    {app.canPreview && app.production.status === 'deployed' ? <MarketTrial projectId={app.projectId} /> : null}
-  </>;
 }
