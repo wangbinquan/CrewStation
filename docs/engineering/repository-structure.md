@@ -236,9 +236,9 @@ flowchart BT
 
 | 应用 | 挂载的模块入口 |
 |---|---|
-| `cs-api` | 全部模块的 `http`（identity 仅管理面）、`capabilities`、`observability` 查询 |
+| `cs-api` | 全部模块的 `http`（identity 仅管理面）、`capabilities`、`observability`、`cluster-management` 查询与运维受理 |
 | `cs-auth` | `identity` 运行面（登录、ForwardAuth 用户域与服务域、JWKS、凭据服务）、`gateway` 的查表评估 |
-| `cs-controller` | `release`、`task-runtime`、`data`、`scm`、`gateway`、`egress`、`project`（命名空间）的 `workers` |
+| `cs-controller` | `release`、`task-runtime`、`data`、`scm`、`gateway`、`egress`、`project`（命名空间）、`cluster-management` 的 `workers` |
 | `cs-session` | `session` 的 WS 入口与 `workers` |
 | `cs-events` | `events` 的 ingress `http` 与投递 `workers` |
 | `mcp-capabilities`、`mcp-operations` | 不挂模块，只经 `api-client` 调 `cs-api` |

@@ -24,7 +24,7 @@
 | console/clusterManagement | 5 pass | 管理员守卫、六页签、服务端总量、URL/返回/分页、界限校验、检查与写入分离、202/trace/耗时、丢回执恢复、继续核对、日志和焦点返回 |
 | console/platformSurface | 2 pass | 前端和后台管理路由对账 |
 
-结构检查、根类型、console 类型与本任务 ESLint 定向通过。共享全量 check/coverage、console build 和最终发布 SHA 的结果另行追加；不沿用旧候选结果冒充当前版本门禁。
+结构检查、根类型、console 类型与本任务 ESLint 定向通过。共享全量 check/coverage、console build 的结果见下文；最终发布 SHA 的 CI 另行记录，不沿用旧候选结果冒充当前版本门禁。
 
 ## 真实部署只读记录
 
@@ -48,14 +48,14 @@ Context：`docker-desktop`；入口：`http://console.cs.localhost/admin/cluster
 | CM-02–04 | 归属/目录/引用/冲突/归档纯函数与真实 DB；现有三种项目和内置 Deployment 可见 | 应用 RBAC 后核对完整系统 owner 链与 UID 集合 |
 | CM-05–09 | 六种任务用途、旧 CLI、替换 UID、构建/迁移、槽映射、状态/容器/引用的投影回归 | 完整权限下逐项现场比对；旧无 Pod UID 记录须 Runner 重新连接后绑定 |
 | CM-10–11 | 分页、410、来源局部失败、取消、刷新合并、506 项数据库分批测试 | 本机权限恢复后的全来源 complete 与数值核对 |
-| CM-12–13 | URL/返回/快照/详情/容器/事件/current+previous 日志交互与 K8s 边界测试 | 真 Pod 日志与已删除 UID 的现场检查 |
+| CM-12–13 | URL/返回/快照/详情/容器/事件/current+previous 日志交互与 K8s 边界测试；真 Pod 详情、事件、当前日志均 HTTP 200，UID 一致 | previous 日志与已删除 UID 的现场检查 |
 | CM-14–15 | 发布槽真实 DB＋K8s 替身重启/副本跨发布/恢复/冲突测试 | 专用项目真实 Deployment、旧新 UID、Ready、发布/切流证据 |
 | CM-16–18 | 任务/业务真实 DB 与所属模块成功/失败/回收/配额/保卷回归，禁止成功业务重复执行 | 专用真实工作区、CLI/Agent/业务/档位测试终态证据 |
 | CM-19–20 | 试用槽状态/Service/历史、引用保留、UID 删除、检查无写入回归 | 专用真实资源删除与后续可重建 |
 | CM-21 | 系统动作能力及限制测试；真实系统清单可见 | 协调具体中断窗口后记录真实重启；不触碰其他会话活跃资源 |
 | CM-22–23 | 响应丢失、幂等双击、检查替换/过期、fencing、崩溃恢复、finalizer/超时继续核对；UI 显示 HTTP/trace/耗时 | 实机动作 operationId/UID/HTTP/trace/耗时 |
 | CM-24 | 实际三种宽度/浅深色/中英文无整页溢出；DOM 焦点与确认交互 | 最新镜像上的操作确认/结果窄屏复核 |
-| CM-25 | 定向静态和行为测试已通过；第一笔本地提交已核对 | 共享全量门禁、构建、最终远端同步与精确 SHA CI |
+| CM-25 | 定向静态和行为测试、恢复环境后的共享完整检查及 console 镜像构建通过；本地提交已核对 | 最终远端同步与精确 SHA CI |
 
 ## 本机 RBAC 阻塞
 
@@ -74,3 +74,21 @@ Context：`docker-desktop`；入口：`http://console.cs.localhost/admin/cluster
 安装清单对账补正内置登录器的真实名 `crewstation-dev-auth`（Deployment/Service/IngressRoute，并沿引用纳入 Secret），增加 `crewstation-local` 标签的真实平台装配测试；操作记录补齐 UID/阶段的 URL 筛选、操作者与受理时间。末轮定向回归与共享最终门禁结果继续追加。
 
 末轮上述补正的定向验证：11 pass / 0 fail，93 assertions（platform + cluster-management + console），ESLint 与 console 类型通过。
+
+第二轮完整检查自然结束为 1573 pass / 5 skip / 109 fail：一项既有开发身份隔离扫描将合法内置组件名字误判为身份接入，其余模块测试受 PostgreSQL `CREATE DATABASE` 的 `53100 No space left on device` 影响。该轮不作通过证据。扫描只对两处确切的组件目录元数据路径放行已安装对象名，固定 Provider 与账号仍在全部生产根路径禁止；仅回收未使用的可再生成 BuildKit 缓存后恢复测试库，未删除镜像、容器、数据卷或数据库。
+
+恢复环境后的冻结候选完整检查通过：`bun run check --coverage --coverage-reporter=lcov --coverage-dir=coverage --reporter=junit --reporter-outfile=coverage/junit.xml`，**1864 pass / 5 skip / 0 fail**、302 文件、10304 assertions、228.56 秒。证据日志 `/private/tmp/rfc011-recovered-full-gate.log`；覆盖本 RFC `73ad1a0`、共享接线和历史 Agent 页签的受控延迟修复。五个能力缺席跳过不计作实机通过。
+
+最终 console 候选镜像构建通过（Dockerfile 内执行生产 Vite build）：`cs-console:rfc010-20260920-2`，digest `sha256:b6e0e989886038c87cc8727eef84a35ded4d4ba568de8aabec548dc0ba6d0a31`；日志 `/tmp/cs-rfc010-console-build.log`。控制面最终候选由 RFC-011 构建为 `cs-control-plane:rfc011-20260920-2`，digest `sha256:c099f349e6a115f0d5448ea3ac18cd18309f255ed98f53c13684d83027f95f74`。构建通过与实际滚动部署分开记录，更新实机后再追加现场证据。
+
+## 最终镜像的只读实机复核
+
+控制面由 RFC-011 成功滚动后，console 于 20:03 CST 更新至上述最终镜像，generation／observedGeneration 均为 89，ready 1。实际 Pod `console-667c468d46-n5hzp` 的 imageID 与上述 console digest 完全一致；没有应用 RBAC，没有重启开发登录器。
+
+- 浏览器入口仍为 `/admin/cluster`，实际 bundle `assets/index-BiKRq5O0.js`。快照 `c79eb016-63c8-47be-bec1-56b6f9d7ea27`（12:03:38Z）为 278 资源、27 工作负载、33 Pod、32 Running／32 Ready、34 Service、9 PVC，仍有 84 个来源403，`complete=false`。
+- 实际 `crewstation-dev-auth` 的 Deployment、Service、IngressRoute、Secret 元数据均归属平台内置组件；未输出 Secret 正文。系统 Pod 因 ReplicaSet 读取缺失仍明确显示归属／用途待核对。
+- 1280 深色中文、390 浅色中文、320 深色英文均 `scrollWidth == clientWidth`，浏览器错误为空。320px 操作记录 UID＋succeeded 筛选返回 HTTP 200／0 条；这是空记录筛选验收，不是操作成功证据。
+- 实际 Pod `cs-api-5b465f9575-hjhbw`，UID `b21ac772-8e03-4f78-9538-41c28f314d8f`：详情、精确 UID 事件、容器 `cs-api` 当前日志分别 HTTP 200，耗时13／21／29ms；关联3项、事件5项、日志3780字符且未截断。日志 UID 与目标一致；响应没有 trace header，不补造 trace。
+- 320px 列表点击及直接 URL 打开后，详情获得焦点且在可视区（顶部44.89px、底部884.08px）；关闭详情后焦点返回原资源行。布局和动作限制均可见，未提交资源变更。
+
+本机证据 `/tmp/cs-rfc010-final-browser.jsonl`、`/tmp/cs-rfc010-focus-live.jsonl`；截图 `/tmp/cs-rfc010-final-overview-{1280,390,320}.png`、`/tmp/cs-rfc010-final-detail-click-320.png`、`/tmp/cs-rfc010-final-operations-320.png`，均为本机临时文件。共享接线已包含在 `b3d8d0e`，基线三件套回填 v0.3.6（R54／D53）；最终远端与精确 SHA CI 继续核对。权限和 CM 动作验收边界维持上文，不据此将整个 RFC 标 Done。
