@@ -39,11 +39,10 @@ export function ProfileVariablesEditor({ draft, errors, credentials, disabled, o
         <h3>{t('admin.profile.vars.title')}</h3>
         <p className={styles.hint}>{t('admin.profile.vars.hint')}</p>
         {draft.vars.map((variable, index) => (
-          <div key={index} className={styles.credential}>
+          <div key={index} className={styles.variable}>
             <AdminField label={t('admin.profile.vars.name')} value={variable.name} onChange={(name) => setVar(index, { name })} disabled={disabled} error={errors[`vars.${index}.name`] ? t(`admin.profile.error.${errors[`vars.${index}.name`]}`) : undefined} />
-            <span />
             <AdminField label={t('admin.profile.vars.value')} value={variable.value} onChange={(value) => setVar(index, { value })} disabled={disabled} />
-            <Button variant="ghost" disabled={disabled} onClick={() => onChange((d) => ({ ...d, vars: d.vars.filter((_, i) => i !== index) }))}>{t('admin.profile.vars.remove')}</Button>
+            <Button variant="ghost" className={styles.dangerAction} disabled={disabled} onClick={() => onChange((d) => ({ ...d, vars: d.vars.filter((_, i) => i !== index) }))}>{t('admin.profile.vars.remove')}</Button>
           </div>
         ))}
         <div className={styles.toolbar}><Button disabled={disabled} onClick={() => onChange((d) => ({ ...d, vars: [...d.vars, { name: '', value: '' }] }))}>{t('admin.profile.vars.add')}</Button></div>
@@ -56,15 +55,15 @@ export function ProfileVariablesEditor({ draft, errors, credentials, disabled, o
           const op = draft.credentials[name] ?? { op: existing ? 'keep' : 'replace', value: '' } as CredentialOp;
           return (
             <div key={existing ? name : `new-${index}`} className={styles.credential}>
+              <div className={styles.credentialFields}>
               {existing ? <code>{name}</code> : <AdminField label={t('admin.profile.vars.name')} value={name} onChange={(next) => renameSecret(index, next)} disabled={disabled} error={errors[`secrets.${index}`] ? t(`admin.profile.error.${errors[`secrets.${index}`]}`) : undefined} />}
-              <Badge tone={existing?.set ? 'success' : 'warning'}>{t(existing?.set ? 'admin.profile.secrets.set' : 'admin.profile.secrets.unset')}</Badge>
-              <div className={styles.toolbar}>
+              <div className={styles.toolbar}><Badge tone={existing?.set ? 'success' : 'warning'}>{t(existing?.set ? 'admin.profile.secrets.set' : 'admin.profile.secrets.unset')}</Badge></div>
+              </div>
+              <div className={styles.credentialFields}>
                 {existing ? (
-                  <select aria-label={`${name} ${t('admin.profile.secrets.title')}`} value={op.op} disabled={disabled} onChange={(event) => setOp(name, event.target.value === 'replace' ? { op: 'replace', value: '' } : event.target.value === 'clear' ? { op: 'clear' } : { op: 'keep' })}>
-                    <option value="keep">{t('admin.profile.secrets.keep')}</option>
-                    <option value="replace">{t('admin.profile.secrets.replace')}</option>
-                    <option value="clear">{t('admin.profile.secrets.clear')}</option>
-                  </select>
+                  <AdminField label={`${name} ${t('admin.profile.secrets.title')}`} value={op.op} disabled={disabled}
+                    onChange={(value) => setOp(name, value === 'replace' ? { op: 'replace', value: '' } : value === 'clear' ? { op: 'clear' } : { op: 'keep' })}
+                    options={(['keep', 'replace', 'clear'] as const).map((value) => ({ value, label: t(`admin.profile.secrets.${value}`) }))} />
                 ) : null}
                 {op.op === 'replace' ? (
                   <FormField label={t('admin.profile.secrets.replace')}>
@@ -72,7 +71,7 @@ export function ProfileVariablesEditor({ draft, errors, credentials, disabled, o
                   </FormField>
                 ) : null}
               </div>
-              <Button variant="ghost" disabled={disabled} onClick={() => undeclare(name)}>{t('admin.profile.secrets.remove')}</Button>
+              <Button variant="ghost" className={styles.dangerAction} disabled={disabled} onClick={() => undeclare(name)}>{t('admin.profile.secrets.remove')}</Button>
             </div>
           );
         })}

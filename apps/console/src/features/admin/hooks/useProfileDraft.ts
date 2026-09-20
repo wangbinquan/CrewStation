@@ -20,7 +20,7 @@ export function useProfileDraft(initial: ProfileDraft, initialRevision: number |
     removeStep: (index: number) => { update((d) => ({ ...d, steps: d.steps.filter((_, i) => i !== index) })); setSelected((s) => (s === null ? null : s === index ? null : s > index ? s - 1 : s)); },
     moveStep: (index: number, delta: -1 | 1) => { update((d) => ({ ...d, steps: moveStep(d.steps, index, delta) })); setSelected(index + delta); },
     duplicateStep: (index: number) => { update((d) => ({ ...d, steps: duplicateStep(d.steps, index) })); setSelected(index + 1); },
-    validate: (creating: boolean): boolean => { const found = validateProfileDraft(draft, creating); setErrors(found); return Object.keys(found).length === 0; },
+    validate: (creating: boolean): DraftErrors => { const found = validateProfileDraft(draft, creating); setErrors(found); return found; },
     /** 保存成功或选择放弃后，以服务端最新详情重建基线。 */
     reload: (next: ProfileDraft, revision: number) => { setDraft(next); setBase(next); setBaseRevision(revision); setErrors({}); setSelected(next.steps.length ? 0 : null); },
     /** 冲突：保留当前草稿，只把期望修订换成服务端当前值，让管理员对照后再保存。 */

@@ -11,7 +11,62 @@
 
 **RFC-003 工作台 UX 重设计已 Done（2026-09-16）：52／52 项 UX-AT 全部实机通过,本地 gate 与精确 SHA CI 通过。RFC-004（管理员定义 Agent 启动前 Hook）已按 RFC-006 的裁定 C8 置为 Superseded，其 AR 实机验收不再执行。** RFC-001 与 RFC-002 都已 Done，见 `proposal/rfc/README.md` 的索引表。**RFC-005（OIDC／OAuth 2.0 公司登录）于 2026-09-18 落档、同日按作者会话目标「完整实现整个RFC并提交上库」实施完毕并实机验收，已 Done。** **RFC-006（算力档位合并运行环境）2026-09-18 落档，同日作者设定会话目标「完整实现RFC并提交上库」，同日实施完成并 **Done**：CP-01…CP-22 实机核对完毕，基线三件套回填到 v0.3.4，见下方接力。**
 
-## 最新接力：GLM-5.2 接通与 OpenCode 冷启动状态修复（2026-09-20）
+## 最新接力：RFC-007 开发环境 OAuth 2.0 一键换角色（2026-09-20）
+
+作者要求把 `agent-workflow` 的 dev OAuth 2.0 能力迁入并适配 CrewStation。现已新增本机专用 `crewstation-dev-auth`
+Deployment／Service／Traefik IngressRoute；它复用 `cs-control-plane:dev`，只执行 `tools/dev-auth/main.ts`，生产清单与生产源码不引用。
+入口 `http://dev-auth.cs.localhost/` 当前 1／1 Ready，提供平台管理员、项目开发者、项目测试者和普通成员四个固定视角，不提供会改变项目所有权的 owner。
+
+角色点击走真实 discovery、授权码、PKCE、token、JWKS、userinfo、CrewStation callback 与 `cs_session`；开发者默认进入所选项目 `/dev-session`，
+测试者只见版本试用，普通成员无项目关系，管理员进入管理空间。项目只列未归档 `DigitalWorker`，接入容器不暴露给开发者；启动和“同步项目”都幂等播种。
+每次进程启动轮换 issuer 路径、RSA 密钥、client secret 和表单令牌，Provider 与四个账户 ID 保持不变。
+
+真实 Chrome 连续验证四角色并核对 `/v1/me`。最终滚动重启前保留旧页签，第一次点击得到 HTTP 403 及“页面已更新”完整可重试页面，
+第二次以新令牌登录并直接落到 RFC-006 实机验收项目开发页；随后恢复管理员，Chrome 留在角色入口。
+定向验证 **8 pass／0 fail／32 assertions**，部署 1／1 Ready；统一冻结候选的最终 `bun run check`
+**1614 pass／5 skip／0 fail，8995 assertions**，架构、全仓 lint、根类型与 console 类型全部通过。完整证据见
+`proposal/rfc/RFC-007-dev-role-login/acceptance-audit.md`。提交、推送与 exact-SHA CI 仍属 T8，完成后回填并将 RFC-007 置为 Done。
+
+## 并行接力：首次访问直接创建管理员（2026-09-20）
+
+作者要求直接沿用 agent-workflow 的首位管理员交接，避免首次打开找不到初始用户名密码。已修复根因：
+`install-platform.sh` 默认不再自动生成随机管理员，安装输出初始化链接；登录发现处于 bootstrap 时直接显示创建表单。
+链接自动带入一次性引导令牌并清除 URL，创建后令牌永久退役，再用自选账号密码登录并回原访问目标。
+每个字段都有初始规则与逐字段反馈；服务端错误保留非口令资料。已有账号保持正常登录。
+
+CI／无人值守安装须显式 `CS_BOOTSTRAP_ADMIN=1`；需要管理员权限的套餐播种与 RFC-007 开发角色登录器等待建号与凭据就绪，
+不再通过暗中建号满足依赖。安装脚本、部署文档、CI 与 lockfile 包含并发 RFC-007 输出，保持完整；发布需与其所有者协调。
+
+真实 Chrome＋独立 PostgreSQL 临时数据库的创建／登录／原路径返回／令牌退役链已通过，1280×900 与 390×844 浅／深色无横向溢出，
+浏览器无异常；console 构建通过。初版 DOM 测试的全局注册干扰已改为独立窗口并通过跨文件定向复验；最终 `bun run check`
+**1610 pass／5 skip／0 fail，8967 assertions，184.39s**（含本机 PostgreSQL、GitLab 和当时可用的网关浏览器集成）。
+正在协调身份相关共享文件提交，尚未发布。本批设计与详细证据见 `proposal/rfc/RFC-005-oidc-company-login/initial-admin-correction.md`，
+本机浏览器证据 `/tmp/crewstation-first-admin-20260920/`；临时服务、数据库和浏览器已清理。
+
+## 并行接力：算力档位列表与编辑页交互整理（2026-09-20）
+
+作者反馈表格难看，展开「更多操作」后按钮样式错乱。实机复现：操作列的 flex 默认拉伸把「编辑」从 33.6px 拉到 200.8px。
+已将次要操作移到档位下方跨四列的独立区域，统一按钮尺寸，复制表单与确认说明按可用宽度排列；收起保留复制草稿，Esc 收起并返回触发按钮。
+列表统一名称／说明、执行配置与状态的层次，详细配置归入档位信息，最近测试合成一行，失败原因仍可见；窄屏按单个档位纵向排列。
+
+作者随后追加编辑页交互与视觉修复。编辑器按基础配置、启动流程、变量与凭据、测试结果分组；切换保留草稿与测试轮询，
+保存配置后直接显示测试结果，跨分组校验自动选中出错步骤并聚焦字段，测试阶段的定位按钮真正跳转并聚焦。
+固定名称与协议放进标题摘要；常用字段和高级启动参数分组，启动步骤改为可选择的导航列表与独立编辑区，凭据统一表单排版。
+保存栏保持可见；修复壳层未限高 overflow 容器阻止 sticky 生效的问题，仅作用于算力编辑页。测试 ID、任务 ID、阶段原因与日志保留，环境详情可展开。
+
+最终定向测试 **21 pass／0 fail／240 assertions**，覆盖复制与确认、分组保留草稿、保存后测试、错误定位与跨分组测试跟踪；
+`typecheck:console`、定向 eslint、`arch:check` 与 console build 均通过。此前完整门禁遇到的并行登录测试依赖／全局 DOM 污染已由所属任务修复。
+本批 23 个源码与测试文件已冻结；统一冻结候选的最终 `bun run check` **1614 pass／5 skip／0 fail，8995 assertions**，
+架构、全仓 lint、根类型与 console 类型全部通过。
+
+本机工作台已更新为 `cs-console:compute-editor-20260920`，镜像清单摘要
+`sha256:b0cdf0923491518abbc64e4aea9709f2b0e626d1fd33a1c29213b03a0eb4b0da`，Deployment 1／1 Available，并已从原工作台地址复验。
+1280px 中英文与 390px 窄屏实测：展开操作、复制表单与确认提示正常，编辑按钮始终约 33.6px；390px 页面宽度同为 390px，无横向溢出。
+新版编辑页在 1280px 与 390px 实机验证：页面宽度与视口一致，保存错误聚焦「步骤名称」，测试定位聚焦「步骤 ID」，长表单滚动时保存按钮仍在顶部。
+本批浏览器验证未提交任何档位配置或删除请求。本批提交完整保留并行 RFC-007 与首次管理员任务的接力记录；
+精确文件清单 `/private/tmp/crewstation-compute-ui/editor-paths.txt`，冻结校验和 `editor-candidate.sha256`，测试与构建日志在同目录。
+
+## 上一轮接力：GLM-5.2 接通与 OpenCode 冷启动状态修复（2026-09-20）
 
 作者要求用本机 `opencode.json` 接通「火山AI网关/glm-5.2」，并授权将发现的 bug 修复上库。已建立管理员算力档位
 `volc-glm-5-2`：启动前文件步骤写入 Agent 独立 HOME 的 `.config/opencode/opencode.json`，本机配置中的真实 API Key

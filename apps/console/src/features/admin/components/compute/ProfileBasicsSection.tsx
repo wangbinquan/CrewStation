@@ -27,12 +27,14 @@ export function ProfileBasicsSection({ draft, errors, disabled, creating, onChan
     <div className={styles.sub}>
       <h3>{t('admin.profile.section.basics')}</h3>
       <div className={styles.fields}>
+        {creating ? <>
         <AdminField label={t('admin.profile.field.name')} value={draft.name} onChange={(name) => onChange((d) => ({ ...d, name }))} disabled={disabled || !creating}
           placeholder="claude-daily" hint={creating ? t('admin.profile.field.nameHint') : t('admin.profile.field.nameFixed')} error={profileErrorText(t, errors, 'name')} />
         <AdminField label={t('admin.profile.field.protocol')} value={draft.protocol} disabled={disabled || !creating}
           onChange={(protocol) => onChange((d) => withProtocol(d, protocol as AgentProtocol))}
           hint={creating ? t(`admin.profile.protocolHint.${draft.protocol}`) : t('admin.profile.field.protocolFixed')}
           options={PROTOCOLS.map((protocol) => ({ value: protocol, label: t(`admin.profile.protocol.${protocol}`) }))} />
+        </> : null}
         {creating ? (
           <AdminField label={t('admin.profile.field.preset')} value="" disabled={disabled} hint={t('admin.profile.field.presetHint')}
             onChange={(preset) => { if (preset) onChange((d) => applyPreset(d, preset as ProfilePreset)); }}

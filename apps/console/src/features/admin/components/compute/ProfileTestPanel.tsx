@@ -5,8 +5,9 @@ import { useT } from '../../../../shared/lib/useT';
 import { ActionNote } from '../../../../shared/ui/ActionNote';
 import { Badge } from '../../../../shared/ui/Badge';
 import { Button } from '../../../../shared/ui/Button';
+import { DefinitionList } from '../../../../shared/ui/DefinitionList';
 import { useProfileTest } from '../../hooks/useProfileTest';
-import { shortDigest, stageTone, testRunning, testTone } from '../../model/profileStatus';
+import { stageTone, testRunning, testTone } from '../../model/profileStatus';
 import styles from './ComputeEditor.module.css';
 
 export interface ProfileTestPanelProps {
@@ -24,12 +25,12 @@ export function ProfileTestPanel({ name, latest, dirty, onLocate }: ProfileTestP
   const test = useProfileTest(name, latest);
   return (
     <div className={styles.sub}>
-      <h3>{t('admin.profile.section.test')}</h3>
-      <p className={styles.hint}>{t('admin.profile.test.hint')}</p>
-      <div className={styles.toolbar}>
-        <Button variant="primary" disabled={dirty || test.running} onClick={() => test.start.mutate(undefined)}>{test.start.isPending ? t('admin.profile.test.starting') : t('admin.profile.test.retest')}</Button>
-        {dirty ? <span className={styles.hint}>{t('admin.profile.test.needSave')}</span> : null}
+      <div className={styles.sectionHeading}>
+        <h3>{t('admin.profile.section.test')}</h3>
+        <Button disabled={dirty || test.running} onClick={() => test.start.mutate(undefined)}>{test.start.isPending ? t('admin.profile.test.starting') : t('admin.profile.test.retest')}</Button>
       </div>
+      <p className={styles.hint}>{t('admin.profile.test.hint')}</p>
+      {dirty ? <ActionNote tone="neutral">{t('admin.profile.test.needSave')}</ActionNote> : null}
       {test.error ? <ActionNote tone="error">{t('admin.profile.test.error', { message: errorMessage(test.error) })}</ActionNote> : null}
       {test.shown ? <TestResult result={test.shown} onLocate={onLocate} /> : <p className={styles.hint}>{t('admin.profile.test.none')}</p>}
     </div>
@@ -39,7 +40,6 @@ export function ProfileTestPanel({ name, latest, dirty, onLocate }: ProfileTestP
 function TestResult({ result, onLocate }: { readonly result: ProfileTestDto; readonly onLocate: (stepId: string) => void }): ReactElement {
   const t = useT();
   const context = result.context, running = testRunning(result);
-  const interpreters = (context.interpreters ?? []).map((i) => `${i.language}${i.version ? ` ${i.version}` : ''}`).join(', ') || '—';
   return (
     <div className={styles.stageBody} aria-live="polite">
       <div className={styles.toolbar}>
@@ -50,9 +50,21 @@ function TestResult({ result, onLocate }: { readonly result: ProfileTestDto; rea
       {result.state === 'unknown' ? <ActionNote tone="neutral">{t('admin.profile.test.unknownNote')}</ActionNote> : null}
       {result.state === 'superseded' ? <ActionNote tone="neutral">{t('admin.profile.test.supersededNote')}</ActionNote> : null}
       {result.error ? <p className={styles.detail}>{result.error}</p> : null}
-      {context.taskId || context.image ? (
-        <p className={styles.hint} title={context.imageDigest}>{t('admin.profile.test.context', { image: context.image ?? '—', digest: context.imageDigest ? `@${shortDigest(context.imageDigest)}` : '', runner: context.runnerProtocol ?? '—', cli: context.cliVersion ?? '—', interpreters, taskId: context.taskId ?? '—' })}</p>
-      ) : null}
+      <div className={styles.testContext}>
+        <DefinitionList layout="grid" items={[
+          { label: t('admin.profile.editor.testId'), value: <code>{result.testId}</code> },
+          { label: t('admin.profile.editor.taskId'), value: <code>{context.taskId ?? '—'}</code> },
+        ]} />
+        <details><summary>{t('admin.profile.editor.testEnvironment')}</summary>
+          <DefinitionList items={[
+            { label: t('admin.profile.field.image'), value: <code>{context.image ?? '—'}</code> },
+            { label: 'Digest', value: <code>{context.imageDigest ?? '—'}</code> },
+            { label: t('admin.profile.editor.runner'), value: context.runnerProtocol ?? '—' },
+            { label: 'CLI', value: context.cliVersion ?? '—' },
+            { label: t('admin.profile.editor.interpreters'), value: (context.interpreters ?? []).map((i) => `${i.language}${i.version ? ` ${i.version}` : ''}`).join(', ') || '—' },
+          ]} />
+        </details>
+      </div>
       <ol className={styles.timeline}>
         {result.stages.map((stage) => (
           <li key={stage.id} className={styles.stage}>

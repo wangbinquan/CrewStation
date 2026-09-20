@@ -19,7 +19,7 @@ export function AdminComputePage(): ReactElement {
   const openProfile = useCallback((name: string) => go({ profile: name }), [go]);
   const editing = search.profile !== undefined || search.create === true;
   return (
-    <AdminSection title={t('nav.admin.compute')} description={t('admin.profile.pageHint')}>
+    <AdminSection title={t('nav.admin.compute')} description={t(editing ? 'admin.profile.editor.pageHint' : 'admin.profile.pageHint')}>
       {editing ? <ComputeProfileEditor {...(search.profile === undefined ? {} : { name: search.profile })} onClose={() => go({})} onCreated={openProfile} />
         : <ComputeProfilesSection onOpen={openProfile} onCreate={() => go({ create: true })} />}
       {/* 列表与编辑页同一位置：切换时卡片不重挂，刚签发的一次性凭据不会因为打开编辑页而消失。 */}

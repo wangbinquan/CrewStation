@@ -6,6 +6,7 @@ import { queryKeys } from '../../../shared/api/queryKeys';
 import { isApiClientError, useApiMutation } from '../../../shared/api/useApi';
 import type { ProfileDraft } from '../model/profileDraft';
 import { draftFromDetail, toCreateRequest, toSaveRequest } from '../model/profileDraft';
+import type { DraftErrors } from '../model/stepDraft';
 import type { ProfileDraftHandle } from './useProfileDraft';
 
 /** 409 时服务端给出当前修订号；两种写法都接受（currentRevision 或 revision）。 */
@@ -21,7 +22,7 @@ export type SaveNote = { kind: 'revision'; revision: number } | { kind: 'descrip
  * 保存：新建走 create，编辑走 save 并带 expectedRevision；冲突保留草稿并给出当前修订。
  * 新建成功后等草稿归零（不再算未保存）才跳到编辑页，免得离开保护把自己拦下来。
  */
-export function useProfileSave(detail: ComputeProfileDetailDto | undefined, editor: ProfileDraftHandle, onCreated: (name: string) => void) {
+export function useProfileSave(detail: ComputeProfileDetailDto | undefined, editor: ProfileDraftHandle, onCreated: (name: string) => void, feedback: { readonly onInvalid: (errors: DraftErrors) => void; readonly onSaved: (note: SaveNote) => void }) {
   const queryClient = useQueryClient();
   const [conflict, setConflict] = useState<number | undefined>(undefined);
   const [note, setNote] = useState<SaveNote | undefined>(undefined);
@@ -31,8 +32,10 @@ export function useProfileSave(detail: ComputeProfileDetailDto | undefined, edit
     invalidate: [queryKeys.computeProfiles()],
     onSuccess: (next) => {
       // P3：只改说明时服务端不生成新修订，也不重测。
-      setNote(detail !== undefined && next.revision === (editor.baseRevision ?? detail.revision) ? { kind: 'description' } : { kind: 'revision', revision: next.revision });
+      const result: SaveNote = detail !== undefined && next.revision === (editor.baseRevision ?? detail.revision) ? { kind: 'description' } : { kind: 'revision', revision: next.revision };
+      setNote(result);
       adopt(next);
+      feedback.onSaved(result);
       if (detail === undefined) setCreated(next.name);
     },
   });
@@ -42,7 +45,8 @@ export function useProfileSave(detail: ComputeProfileDetailDto | undefined, edit
   useEffect(() => { if (created !== undefined && !editor.dirty && !save.isPending) onCreated(created); }, [created, editor.dirty, save.isPending, onCreated]);
   const submit = () => {
     setNote(undefined);
-    if (!editor.validate(detail === undefined)) return;
+    const errors = editor.validate(detail === undefined);
+    if (Object.keys(errors).length) { feedback.onInvalid(errors); return; }
     save.mutateAsync(editor.draft).catch((error: unknown) => { const current = conflictRevision(error); if (current !== undefined) setConflict(current); });
   };
   return { save, reload, submit, conflict, clearConflict: () => { setConflict(undefined); save.reset(); }, note, busy: save.isPending || reload.isPending };

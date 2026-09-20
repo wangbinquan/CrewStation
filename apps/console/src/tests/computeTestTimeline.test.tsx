@@ -5,7 +5,7 @@ import type { ProfileTestDto } from '@crewstation/contracts';
 import { ProfileTestPanel } from '../features/admin/components/compute/ProfileTestPanel';
 import { computeMessages } from '../features/admin/i18n/compute.zh-CN';
 import { messages } from '../features/admin/i18n/zh-CN';
-import { TASK_ID, profileTest } from './computeProfileFixture';
+import { DIGEST, TASK_ID, profileTest, testIdOf } from './computeProfileFixture';
 import { renderElement } from './renderElement';
 
 async function renderPanel(latest: ProfileTestDto, onLocate: (stepId: string) => void = () => {}) {
@@ -39,7 +39,8 @@ describe('测试时间线（RFC-006 §8）', () => {
     try {
       const text = view.text();
       for (const part of ['启动前步骤失败：定位到失败的步骤修改后再保存。', '镜像', 'Runner', '启动前步骤', 'CLI 启动', '模型轮次', 'file_path_in_use', '目标文件已存在且内容不同', '退出码 1', 'refusing to overwrite settings.json', '未执行', '1200 ms']) expect(text).toContain(part);
-      expect(text).toContain(`镜像 registry.cs.local/runtimes/claude:2.1@ab12cd34ef56 · Runner 协议 2 · CLI 2.1.4 · 解释器 shell 5.2 · 任务 ${TASK_ID}`);
+      for (const part of [testIdOf(1), TASK_ID, 'registry.cs.local/runtimes/claude:2.1', DIGEST, 'shell 5.2', '2.1.4']) expect(text).toContain(part);
+      expect(view.host.querySelector('details > summary')?.textContent).toBe('查看测试环境与版本');
       expect(text).toContain('针对修订 1（c0ffee00c0ff）· 保存后自动测试');
       await view.click('定位到步骤');
       expect(located).toEqual(['claude-settings']);

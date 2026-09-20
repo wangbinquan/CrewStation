@@ -9,7 +9,7 @@ import { Card } from '../../../../shared/ui/Card';
 import { DataTable } from '../../../../shared/ui/DataTable';
 import { QueryStatus } from '../../../../shared/ui/QueryStatus';
 import { testRunning } from '../../model/profileStatus';
-import styles from './ComputeEditor.module.css';
+import styles from './ComputeList.module.css';
 import { ProfileListRow } from './ProfileListRow';
 import { FormField } from '../../../../shared/ui/FormField';
 

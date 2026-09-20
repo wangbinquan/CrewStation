@@ -19,10 +19,21 @@ const control = (label: string) => {
   return found.querySelector<Control>('input, select, textarea')!;
 };
 const button = (label: string) => [...document.querySelectorAll('button')].find((node) => node.textContent === label)!;
+const activeTab = () => document.querySelector('[role="tab"][aria-selected="true"]')?.textContent;
+async function openTab(label: string) {
+  const tab = [...document.querySelectorAll<HTMLButtonElement>('[role="tab"]')].find((node) => node.textContent?.startsWith(label));
+  if (!tab) throw new Error(`没有分组「${label}」`);
+  await act(async () => tab.click()); await page!.settle();
+}
+async function revealControl(node: HTMLElement) {
+  const section = node.closest<HTMLElement>('[data-editor-section]');
+  if (section?.hidden) await openTab({ basics: '基础配置', startup: '启动流程', variables: '变量与凭据', test: '测试结果' }[section.dataset.editorSection!]!);
+}
 
 /** happy-dom 下 React 走 input 事件 polyfill：绕过值跟踪器写值，文本框以 input＋keyup、下拉以 change 触发 onChange。 */
 async function setField(label: string, value: string) {
   const node = control(label);
+  await revealControl(node);
   const proto = node instanceof HTMLSelectElement ? HTMLSelectElement.prototype : node instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
   await act(async () => {
     node.focus(); Object.getOwnPropertyDescriptor(proto, 'value')!.set!.call(node, value);
@@ -31,7 +42,7 @@ async function setField(label: string, value: string) {
   });
   await page!.settle();
 }
-async function press(label: string) { await act(async () => button(label).click()); await page!.settle(); }
+async function press(label: string) { await revealControl(button(label)); await act(async () => button(label).click()); await page!.settle(); }
 /** 等后台轮询（2 秒一次）把结果带回来；超时即失败并打印当前页面。 */
 async function waitFor(done: () => boolean, timeoutMs = 3500) {
   const deadline = Date.now() + timeoutMs;
@@ -77,7 +88,7 @@ describe('新建算力档位', () => {
       content: { image: 'registry.cs.local/runtimes/aider:1', launch: { protocol: 'terminal', binaryPath: '/opt/aider/bin/aider', extraArgs: [] }, steps: [], vars: {}, secretNames: [], configFile: { kind: 'none' }, terminalTest: { command: ['/opt/aider/bin/aider', '--version'], expect: '^aider', timeoutMs: 30_000 } },
     } }]);
     expect(page.search()).toEqual({ profile: 'aider-cli' });
-    expect(control('档位名').disabled).toBe(true); expect(control('协议').disabled).toBe(true);
+    expect(labels()).not.toContain('档位名'); expect(labels()).not.toContain('协议');
     expect(page.text()).toContain('排队中'); expect(page.text()).toContain('测试中');
   });
 
@@ -107,10 +118,51 @@ describe('新建算力档位', () => {
   });
 });
 
+describe('编辑页分组与定位', () => {
+  test('分组切换保留草稿；保存配置后直接展示当前修订的测试结果', async () => {
+    backend = computeBackend(); page = await renderApp('/admin/compute?profile=claude-daily');
+    expect(activeTab()).toBe('基础配置');
+    await setField('模型', 'anthropic/claude-opus-5');
+    await openTab('启动流程');
+    expect(control('模型').closest<HTMLElement>('[data-editor-section]')?.hidden).toBe(true);
+    await openTab('变量与凭据'); await openTab('基础配置');
+    expect(control('模型').value).toBe('anthropic/claude-opus-5');
+    expect(button('保存').closest('[data-editor-section]')).toBeNull();
+    await press('保存');
+    expect(activeTab()).toBe('测试结果');
+    expect(backend.writes[0]!.body.content).toMatchObject({ launch: { model: 'anthropic/claude-opus-5' } });
+  });
+
+  test('保存时自动打开有错误的分组和步骤，并聚焦第一个错误字段', async () => {
+    backend = computeBackend(); page = await renderApp('/admin/compute?profile=claude-daily');
+    await openTab('启动流程'); await press('＋ 预置文件');
+    await openTab('基础配置'); await press('保存');
+    expect(activeTab()).toContain('启动流程');
+    expect(control('步骤 ID').value).toBe('file-2');
+    expect(document.activeElement).toBe(control('步骤名称'));
+    expect(document.activeElement?.getAttribute('aria-invalid')).toBe('true');
+    expect(backend.writes).toEqual([]);
+  });
+
+  test('测试阶段定位真正切换到启动流程并聚焦目标步骤，跨分组重测仍跟踪同一次测试', async () => {
+    backend = computeBackend(); page = await renderApp('/admin/compute?profile=claude-daily');
+    await openTab('测试结果'); await press('定位到步骤');
+    expect(activeTab()).toBe('启动流程');
+    expect(control('步骤 ID').value).toBe('claude-settings');
+    expect(document.activeElement).toBe(control('步骤 ID'));
+    backend.state.manualTests = [profileTest({ testId: testIdOf(9), trigger: 'manual', createdAt: LATER })];
+    await openTab('测试结果'); await press('重新测试');
+    await openTab('基础配置'); await openTab('测试结果');
+    expect(page.text()).toContain('手动测试');
+    expect(backend.writes).toHaveLength(1);
+  });
+
+});
+
 describe('编辑算力档位', () => {
   test('名称与协议固定；保存带 expectedRevision；冲突保留表单并给出当前修订，按当前修订重存', async () => {
     backend = computeBackend(); page = await renderApp('/admin/compute?profile=claude-daily');
-    expect(control('档位名').disabled).toBe(true); expect(control('协议').disabled).toBe(true);
+    expect(labels()).not.toContain('档位名'); expect(labels()).not.toContain('协议');
     expect(page.text()).toContain('当前修订 1'); expect(button('保存').disabled).toBe(true);
     await setField('模型', 'anthropic/claude-opus-5');
     expect(page.text()).toContain('有未保存的修改');

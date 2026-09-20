@@ -28,6 +28,11 @@ async function clickIn(scope: ParentNode, label: string) {
   if (!target) throw new Error(`「${label}」不在：${(scope as HTMLElement).textContent}`);
   await act(async () => target.click()); await page!.settle();
 }
+async function actions(name: string) {
+  const trigger = buttonIn(row(name), '更多操作')!;
+  if (trigger.getAttribute('aria-expanded') !== 'true') await clickIn(row(name), '更多操作');
+  return document.getElementById(trigger.getAttribute('aria-controls')!)!;
+}
 /** happy-dom 下 React 走 input 事件 polyfill：绕过值跟踪器写值，再以 keyup 触发 onChange。 */
 async function type(input: HTMLInputElement, value: string) {
   await act(async () => { input.focus(); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, value); input.dispatchEvent(new Event('input', { bubbles: true })); input.dispatchEvent(new KeyboardEvent('keyup', { key: 'a', bubbles: true })); });
@@ -54,61 +59,62 @@ describe('算力档位列表（RFC-006）', () => {
   test('默认档位不能停用也不能删除；通用终端与已停用的档位不能设为默认——按钮禁用并写明原因', async () => {
     await open();
     const locked = '默认档位不能停用也不能删除，请先把默认改到别的档位。';
-    const claude = row('claude-daily');
+    const claude = await actions('claude-daily');
     expect(buttonIn(claude, '设为默认')).toBeUndefined();
     for (const label of ['停用', '删除']) { expect(buttonIn(claude, label)!.disabled).toBe(true); expect(buttonIn(claude, label)!.title).toBe(locked); }
     expect(claude.textContent).toContain(locked);
-    const terminal = buttonIn(row('aider-shell'), '设为默认')!;
+    const terminal = buttonIn(await actions('aider-shell'), '设为默认')!;
     expect(terminal.disabled).toBe(true); expect(terminal.title).toBe('通用终端档位不能设为默认：default 会被业务子任务引用。');
-    const disabled = buttonIn(row('claude-paused'), '设为默认')!;
+    const disabled = buttonIn(await actions('claude-paused'), '设为默认')!;
     expect(disabled.disabled).toBe(true); expect(disabled.title).toBe('已停用的档位不能设为默认，请先启用。');
-    expect(buttonIn(row('claude-paused'), '启用')!.disabled).toBe(false);
-    expect(buttonIn(row('opencode-lite'), '设为默认')!.disabled).toBe(false);
+    expect(buttonIn(await actions('claude-paused'), '启用')!.disabled).toBe(false);
+    expect(buttonIn(await actions('opencode-lite'), '设为默认')!.disabled).toBe(false);
     expect(backend!.writes).toEqual([]);
   });
 
   test('删除被上线版本引用的档位：第一次 409 列出项目，再确认一次才带 confirmReferences 删除', async () => {
     await open();
-    await clickIn(row('opencode-lite'), '删除');
-    expect(row('opencode-lite').textContent).toContain('删除档位 opencode-lite？');
-    await clickIn(row('opencode-lite'), '确认');
+    await clickIn(await actions('opencode-lite'), '删除');
+    expect((await actions('opencode-lite')).textContent).toContain('删除档位 opencode-lite？');
+    await clickIn(await actions('opencode-lite'), '确认');
     expect(backend!.writes).toEqual([{ method: 'DELETE', path: '/v1/admin/compute-profiles/opencode-lite', query: '', body: {} }]);
-    expect(row('opencode-lite').textContent).toContain('这些项目当前上线的版本引用了这个档位：crm-bot、hr-helper');
-    await clickIn(row('opencode-lite'), '仍然删除');
-    expect(row('opencode-lite').textContent).toContain('确认删除 opencode-lite？2 个项目会受影响。');
-    await clickIn(row('opencode-lite'), '确认');
+    expect((await actions('opencode-lite')).textContent).toContain('这些项目当前上线的版本引用了这个档位：crm-bot、hr-helper');
+    await clickIn(await actions('opencode-lite'), '仍然删除');
+    expect((await actions('opencode-lite')).textContent).toContain('确认删除 opencode-lite？2 个项目会受影响。');
+    await clickIn(await actions('opencode-lite'), '确认');
     expect(backend!.writes[1]).toMatchObject({ method: 'DELETE', query: '?confirmReferences=true' });
     expect(row('opencode-lite')).toBeUndefined();
   });
 
   test('设为默认、停用都先确认再请求，成功后整表刷新', async () => {
     await open();
-    await clickIn(row('opencode-lite'), '设为默认');
-    expect(row('opencode-lite').textContent).toContain('把 opencode-lite 设为默认档位？');
-    await clickIn(row('opencode-lite'), '确认');
+    await clickIn(await actions('opencode-lite'), '设为默认');
+    expect((await actions('opencode-lite')).textContent).toContain('把 opencode-lite 设为默认档位？');
+    await clickIn(await actions('opencode-lite'), '确认');
     expect(backend!.writes[0]).toMatchObject({ method: 'PUT', path: '/v1/admin/compute-profiles/opencode-lite/default' });
     expect(row('opencode-lite').textContent).toContain('默认');
-    expect(buttonIn(row('claude-daily'), '设为默认')!.disabled).toBe(false);
-    await clickIn(row('claude-daily'), '停用'); await clickIn(row('claude-daily'), '确认');
+    expect(buttonIn(await actions('claude-daily'), '设为默认')!.disabled).toBe(false);
+    await clickIn(await actions('claude-daily'), '停用'); await clickIn(await actions('claude-daily'), '确认');
     expect(backend!.writes[1]).toEqual({ method: 'PUT', path: '/v1/admin/compute-profiles/claude-daily/enabled', query: '', body: { enabled: false } });
-    expect(buttonIn(row('claude-daily'), '启用')).toBeDefined();
+    expect(buttonIn(await actions('claude-daily'), '启用')).toBeDefined();
   });
 });
 
 describe('复制档位与推送凭据（RFC-006）', () => {
   test('复制：新名称先过校验（default 是保留名），成功后直接打开副本的编辑页', async () => {
     await open();
-    await clickIn(row('claude-daily'), '复制');
-    const name = row('claude-daily').querySelector<HTMLInputElement>('form input')!;
+    await clickIn(await actions('claude-daily'), '复制');
+    const name = (await actions('claude-daily')).querySelector<HTMLInputElement>('form input')!;
     expect(name.value).toBe('claude-daily-copy');
     await type(name, 'default');
-    expect(row('claude-daily').textContent).toContain('档位名只允许小写字母、数字与连字符');
-    expect(buttonIn(row('claude-daily'), '复制为新档位')!.disabled).toBe(true);
-    await type(row('claude-daily').querySelector<HTMLInputElement>('form input')!, 'claude-weekly');
-    await clickIn(row('claude-daily'), '复制为新档位');
+    expect((await actions('claude-daily')).textContent).toContain('档位名只允许小写字母、数字与连字符');
+    expect(buttonIn(await actions('claude-daily'), '复制为新档位')!.disabled).toBe(true);
+    await type((await actions('claude-daily')).querySelector<HTMLInputElement>('form input')!, 'claude-weekly');
+    await clickIn(await actions('claude-daily'), '复制为新档位');
     expect(backend!.writes).toEqual([{ method: 'POST', path: '/v1/admin/compute-profiles/claude-daily/copy', query: '', body: { name: 'claude-weekly' } }]);
     expect(page!.search()).toEqual({ profile: 'claude-weekly' });
-    expect(page!.text()).toContain('claude-weekly'); expect(page!.text()).toContain('档位名建档后不可改。');
+    expect(page!.text()).toContain('claude-weekly');
+    expect([...document.querySelectorAll('label')].some((label) => label.querySelector('span')?.textContent === '档位名')).toBe(false);
   });
 
   test('推送凭据只显示一次：用户名、口令、登录命令可复制；收起后不再可见', async () => {
@@ -146,6 +152,31 @@ describe('复制档位与推送凭据（RFC-006）', () => {
       if (original) Object.defineProperty(navigator, 'clipboard', original); else Reflect.deleteProperty(navigator, 'clipboard');
     }
   });
+});
+
+test('更多操作独立占整行；收起保留复制草稿，Escape 返回触发按钮并撤销待确认操作', async () => {
+  await open();
+  const target = row('opencode-lite'), trigger = buttonIn(target, '更多操作')!;
+  expect(trigger.getAttribute('aria-expanded')).toBe('false');
+  expect(buttonIn(target, '复制')).toBeUndefined();
+  const panel = await actions('opencode-lite');
+  // 曾把展开内容与编辑按钮放在同一个 flex 行里，编辑被拉伸、确认和复制表单挤在窄操作列。
+  expect(panel.closest('tr')).not.toBe(target);
+  expect(panel.closest('td')?.colSpan).toBe(4);
+  expect(panel.getAttribute('aria-label')).toContain('opencode-lite');
+  expect(trigger.getAttribute('aria-expanded')).toBe('true');
+  await clickIn(panel, '复制');
+  await type(panel.querySelector<HTMLInputElement>('form input')!, 'my-profile-copy');
+  await clickIn(target, '更多操作');
+  expect(document.getElementById(trigger.getAttribute('aria-controls')!)).toBeNull();
+  const reopened = await actions('opencode-lite');
+  expect(reopened.querySelector<HTMLInputElement>('form input')!.value).toBe('my-profile-copy');
+  await clickIn(reopened, '删除');
+  await act(async () => reopened.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+  expect(trigger.getAttribute('aria-expanded')).toBe('false');
+  expect(document.activeElement).toBe(trigger);
+  expect((await actions('opencode-lite')).textContent).not.toContain('删除档位 opencode-lite？');
+  expect(backend!.writes).toEqual([]);
 });
 
 

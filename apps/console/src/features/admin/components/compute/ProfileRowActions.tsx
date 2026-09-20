@@ -1,6 +1,6 @@
 import type { ComputeProfileListItem } from '@crewstation/contracts';
 import { ComputeProfileNameSchema, ComputeProfileReferencesSchema } from '@crewstation/contracts';
-import { useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import type { ReactElement } from 'react';
 import { api } from '../../../../shared/api/client';
 import { queryKeys } from '../../../../shared/api/queryKeys';
@@ -10,7 +10,7 @@ import { ActionNote } from '../../../../shared/ui/ActionNote';
 import { Button } from '../../../../shared/ui/Button';
 import { InlineConfirm } from '../../../../shared/ui/InlineConfirm';
 import { AdminField } from '../AdminField';
-import styles from './ComputeEditor.module.css';
+import styles from './ComputeList.module.css';
 
 const INVALIDATE = [queryKeys.computeProfiles()];
 
@@ -24,14 +24,18 @@ function referencedProjects(error: unknown): string[] | undefined {
 export interface ProfileRowActionsProps {
   readonly profile: ComputeProfileListItem;
   readonly onOpen: (name: string) => void;
+  /** 主行与展开行共享操作状态，等待请求时主行仍能禁用编辑；展开内容不挤进主行的操作单元格。 */
+  readonly children: (controls: ReactElement, expanded: boolean) => ReactElement;
 }
 
 /**
  * 一行的操作：编辑、复制、设为默认、启用／停用、删除。照 agent-workflow（C19）：默认档位不能停用也不能删除，
  * 通用终端档位不能设为默认（default 会被 Manifest 的业务子任务引用）；删除被已上线版本引用的档位要二次确认。
  */
-export function ProfileRowActions({ profile, onOpen }: ProfileRowActionsProps): ReactElement {
+export function ProfileRowActions({ profile, onOpen, children }: ProfileRowActionsProps): ReactElement {
   const t = useT();
+  const panelId = useId(), trigger = useRef<HTMLButtonElement>(null);
+  const [expanded, setExpanded] = useState(false);
   const [copying, setCopying] = useState(false);
   const [copyName, setCopyName] = useState('');
   const copy = useApiMutation((name: string) => api.computeProfiles.copy(profile.name, { name }), { invalidate: INVALIDATE, onSuccess: (detail) => { setCopying(false); onOpen(detail.name); } });
@@ -43,26 +47,32 @@ export function ProfileRowActions({ profile, onOpen }: ProfileRowActionsProps): 
   const defaultBlocked = profile.protocol === 'terminal' ? t('admin.profile.defaultTerminal') : !profile.enabled ? t('admin.profile.defaultDisabled') : undefined;
   const copyValid = ComputeProfileNameSchema.safeParse(copyName).success;
   return (
-    <div className={styles.rowStack}>
-      <div className={styles.rowActions}>
+    <>
+      {children(<div className={styles.rowActions}>
         <Button disabled={busy} onClick={() => onOpen(profile.name)}>{t('admin.profile.edit')}</Button>
-        <details className={styles.moreActions}><summary>{t('admin.profile.moreActions')}</summary><div className={styles.rowStack}>
-        <Button variant="ghost" disabled={busy} onClick={() => { setCopying((open) => !open); setCopyName(`${profile.name}-copy`); }}>{t('admin.profile.copy')}</Button>
-        {profile.isDefault ? null : defaultBlocked ? <Button variant="ghost" disabled title={defaultBlocked}>{t('admin.profile.setDefault')}</Button>
-          : <InlineConfirm variant="ghost" label={t('admin.profile.setDefault')} question={t('admin.profile.setDefaultQuestion', { name: profile.name })} busy={setDefault.isPending} busyLabel={t('admin.profile.working')} onConfirm={() => setDefault.mutate(undefined)} />}
-        {profile.isDefault && profile.enabled ? <Button variant="ghost" disabled title={t('admin.profile.defaultLocked')}>{t('admin.profile.disable')}</Button>
-          : <InlineConfirm variant="ghost" label={profile.enabled ? t('admin.profile.disable') : t('admin.profile.enable')} question={profile.enabled ? t('admin.profile.disableQuestion', { name: profile.name }) : t('admin.profile.enableQuestion', { name: profile.name })}
+        <Button ref={trigger} variant="ghost" className={styles.moreButton} aria-expanded={expanded} aria-controls={panelId} onClick={() => setExpanded(!expanded)}>{t('admin.profile.moreActions')}</Button>
+      </div>, expanded)}
+      {expanded ? <tr className={styles.actionRow}><td colSpan={4}>
+      <div id={panelId} className={styles.actionPanel} role="region" aria-label={t('admin.profile.actionsFor', { name: profile.name })}
+        onKeyDown={(event) => { if (event.key === 'Escape') { event.stopPropagation(); setExpanded(false); trigger.current?.focus(); } }}>
+        <div className={styles.secondaryActions}>
+        <Button disabled={busy} onClick={() => { setCopying((open) => !open); setCopyName(`${profile.name}-copy`); }}>{t('admin.profile.copy')}</Button>
+        {profile.isDefault ? null : defaultBlocked ? <Button disabled title={defaultBlocked}>{t('admin.profile.setDefault')}</Button>
+          : <InlineConfirm label={t('admin.profile.setDefault')} question={t('admin.profile.setDefaultQuestion', { name: profile.name })} busy={setDefault.isPending} busyLabel={t('admin.profile.working')} onConfirm={() => setDefault.mutate(undefined)} />}
+        {profile.isDefault && profile.enabled ? <Button disabled title={t('admin.profile.defaultLocked')}>{t('admin.profile.disable')}</Button>
+          : <InlineConfirm label={profile.enabled ? t('admin.profile.disable') : t('admin.profile.enable')} question={profile.enabled ? t('admin.profile.disableQuestion', { name: profile.name }) : t('admin.profile.enableQuestion', { name: profile.name })}
               busy={toggle.isPending} busyLabel={t('admin.profile.working')} onConfirm={() => toggle.mutate(!profile.enabled)} />}
-        {profile.isDefault ? <Button variant="ghost" disabled title={t('admin.profile.defaultLocked')}>{t('admin.profile.remove')}</Button>
-          : <InlineConfirm variant="ghost" label={t('admin.profile.remove')} question={t('admin.profile.removeQuestion', { name: profile.name })} busy={remove.isPending} busyLabel={t('admin.profile.removing')} onConfirm={() => remove.mutate(false)} />}
-        {profile.isDefault ? <small className={styles.hint}>{t('admin.profile.defaultLocked')}</small> : null}
-        </div></details>
-      </div>
+        <span className={styles.destructive}>{profile.isDefault ? <Button disabled title={t('admin.profile.defaultLocked')}>{t('admin.profile.remove')}</Button>
+          : <InlineConfirm label={t('admin.profile.remove')} question={t('admin.profile.removeQuestion', { name: profile.name })} busy={remove.isPending} busyLabel={t('admin.profile.removing')} onConfirm={() => remove.mutate(false)} />}</span>
+        </div>
+      {profile.isDefault ? <p className={styles.hint}>{t('admin.profile.defaultLocked')}</p> : null}
       {copying ? (
-        <form className={styles.toolbar} onSubmit={(event) => { event.preventDefault(); if (copyValid) copy.mutate(copyName); }}>
+        <form className={styles.copyForm} onSubmit={(event) => { event.preventDefault(); if (copyValid && !busy) copy.mutate(copyName); }}>
           <AdminField label={t('admin.profile.copyName')} value={copyName} onChange={setCopyName} disabled={copy.isPending} error={copyName !== '' && !copyValid ? t('admin.profile.error.profileName') : undefined} />
+          <div className={styles.secondaryActions}>
           <Button type="submit" variant="primary" disabled={!copyValid || copy.isPending}>{copy.isPending ? t('admin.profile.working') : t('admin.profile.copyConfirm')}</Button>
           <Button variant="ghost" disabled={copy.isPending} onClick={() => setCopying(false)}>{t('admin.profile.cancel')}</Button>
+          </div>
         </form>
       ) : null}
       {copy.error ? <ActionNote tone="error">{t('admin.profile.copyError', { message: errorMessage(copy.error) })}</ActionNote> : null}
@@ -74,6 +84,7 @@ export function ProfileRowActions({ profile, onOpen }: ProfileRowActionsProps): 
           <InlineConfirm label={t('admin.profile.removeAnyway')} question={t('admin.profile.removeAnywayQuestion', { name: profile.name, count: references.length })} busy={remove.isPending} busyLabel={t('admin.profile.removing')} onConfirm={() => remove.mutate(true)} />
         </ActionNote>
       ) : remove.error ? <ActionNote tone="error">{t('admin.profile.removeError', { message: errorMessage(remove.error) })}</ActionNote> : null}
-    </div>
+      </div></td></tr> : null}
+    </>
   );
 }

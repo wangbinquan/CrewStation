@@ -1,21 +1,22 @@
 import type { ComputeProfileDetailDto } from '@crewstation/contracts';
 import { BEFORE_START_LIMITS } from '@crewstation/contracts';
 import type { ReactElement } from 'react';
-import { useEffect, useRef } from 'react';
+import { useRef } from 'react';
 import { api } from '../../../../shared/api/client';
 import { queryKeys } from '../../../../shared/api/queryKeys';
-import { errorMessage, useApiQuery } from '../../../../shared/api/useApi';
+import { useApiQuery } from '../../../../shared/api/useApi';
 import { usePollingRefetch } from '../../../../shared/lib/usePollingRefetch';
 import { useT } from '../../../../shared/lib/useT';
 import { UnsavedChangesGuard } from '../../../../shared/navigation/UnsavedChangesGuard';
-import { ActionNote } from '../../../../shared/ui/ActionNote';
 import { Badge } from '../../../../shared/ui/Badge';
 import { Button } from '../../../../shared/ui/Button';
 import { Card } from '../../../../shared/ui/Card';
 import { QueryStatus } from '../../../../shared/ui/QueryStatus';
+import { Tabs } from '../../../../shared/ui/Tabs';
 import { useProfileDraft } from '../../hooks/useProfileDraft';
 import type { ProfileDraftHandle } from '../../hooks/useProfileDraft';
 import { useProfileSave } from '../../hooks/useProfileSave';
+import { EDITOR_SECTIONS, sectionForError, useProfileEditorView } from '../../hooks/useProfileEditorView';
 import { blankDraft, draftFromDetail } from '../../model/profileDraft';
 import { shortDigest, testRunning } from '../../model/profileStatus';
 import { BeforeStartStepEditor } from './BeforeStartStepEditor';
@@ -23,6 +24,7 @@ import { BeforeStartStepList } from './BeforeStartStepList';
 import styles from './ComputeEditor.module.css';
 import { ProfileBasicsSection } from './ProfileBasicsSection';
 import { ProfileLaunchSection } from './ProfileLaunchSection';
+import { ProfileEditorFeedback } from './ProfileEditorFeedback';
 import { ConfigFileSection, TerminalTestSection } from './ProfileProtocolSections';
 import { AvailabilityBadge } from './ProfileStatusBadges';
 import { ProfileTestPanel } from './ProfileTestPanel';
@@ -58,10 +60,13 @@ function ExistingProfileEditor({ name, onClose, onCreated }: Required<ComputePro
 function EditorTitle({ detail }: { readonly detail: ComputeProfileDetailDto | undefined }): ReactElement {
   const t = useT();
   if (!detail) return <>{t('admin.profile.createTitle')}</>;
-  return <span className={styles.toolbar}><code>{detail.name}</code> <AvailabilityBadge availability={detail.availability} />{detail.isDefault ? <Badge tone="info">{t('admin.profile.defaultBadge')}</Badge> : null}</span>;
+  return <span className={styles.profileSummary}>
+    <span className={styles.toolbar}><span className={styles.profileName}>{detail.name}</span><span className={styles.hint}>{t(`admin.profile.protocol.${detail.protocol}`)}</span><AvailabilityBadge availability={detail.availability} />{detail.isDefault ? <Badge tone="info">{t('admin.profile.defaultBadge')}</Badge> : null}</span>
+    <span className={styles.hint} title={detail.imageDigest}>{t('admin.profile.revisionNote', { revision: detail.revision, hash: detail.contentHash.slice(0, 12), digest: detail.imageDigest ? shortDigest(detail.imageDigest) : '—' })}</span>
+  </span>;
 }
 
-function StepsSection({ editor, disabled }: { readonly editor: ProfileDraftHandle; readonly disabled: boolean }): ReactElement {
+function StepsSection({ editor, disabled, onSelect }: { readonly editor: ProfileDraftHandle; readonly disabled: boolean; readonly onSelect: (index: number) => void }): ReactElement {
   const t = useT();
   const selected = editor.selected !== null ? editor.draft.steps[editor.selected] : undefined;
   return (
@@ -69,8 +74,11 @@ function StepsSection({ editor, disabled }: { readonly editor: ProfileDraftHandl
       <h3>{t('admin.profile.section.steps')}</h3>
       <p className={styles.hint}>{t('admin.profile.stepsHint', { max: BEFORE_START_LIMITS.maxSteps })}</p>
       <div className={styles.layout}>
-        <BeforeStartStepList steps={editor.draft.steps} selected={editor.selected} errors={editor.errors} disabled={disabled} onSelect={editor.setSelected} onAdd={editor.addStep} onMove={editor.moveStep} onDuplicate={editor.duplicateStep} onRemove={editor.removeStep} />
-        {selected !== undefined && editor.selected !== null ? <BeforeStartStepEditor step={selected} index={editor.selected} errors={editor.errors} disabled={disabled} onChange={(patch) => editor.changeStep(editor.selected!, patch)} /> : null}
+        <BeforeStartStepList steps={editor.draft.steps} selected={editor.selected} errors={editor.errors} disabled={disabled} onSelect={onSelect} onAdd={editor.addStep} onMove={editor.moveStep} onDuplicate={editor.duplicateStep} onRemove={editor.removeStep} />
+        {selected !== undefined && editor.selected !== null ? <div className={styles.stepEditor} data-step-editor>
+          <div className={styles.sectionHeading}><h4>{t('admin.profile.editor.stepTitle', { number: editor.selected + 1 })}</h4><Badge>{t(`admin.profile.step.kind.${selected.kind}`)}</Badge></div>
+          <BeforeStartStepEditor step={selected} index={editor.selected} errors={editor.errors} disabled={disabled} onChange={(patch) => editor.changeStep(editor.selected!, patch)} />
+        </div> : <div className={styles.stepEmpty}>{t('admin.profile.editor.selectStep')}</div>}
       </div>
     </div>
   );
@@ -79,38 +87,37 @@ function StepsSection({ editor, disabled }: { readonly editor: ProfileDraftHandl
 function ProfileEditorForm({ detail, onClose, onCreated }: { readonly detail?: ComputeProfileDetailDto; readonly onClose: () => void; readonly onCreated: (name: string) => void }): ReactElement {
   const t = useT(), creating = detail === undefined;
   const editor = useProfileDraft(detail ? draftFromDetail(detail) : blankDraft('claude-code', 'claude-settings'), detail?.revision);
-  const tasks = useApiQuery(queryKeys.taskProfiles(), () => api.catalog.listTaskProfiles());
-  const saving = useProfileSave(detail, editor, onCreated);
-  const busy = saving.busy, errorCount = Object.keys(editor.errors).length;
-  // 保存校验失败时焦点落到第一个标红的字段（与控制台其他表单一致）；错误只在提交时产生、一改就清空，不会在输入中抢焦点。
   const root = useRef<HTMLDivElement>(null);
-  useEffect(() => { if (Object.keys(editor.errors).length) root.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus(); }, [editor.errors]);
+  const view = useProfileEditorView(editor, root);
+  const tasks = useApiQuery(queryKeys.taskProfiles(), () => api.catalog.listTaskProfiles());
+  const saving = useProfileSave(detail, editor, onCreated, view);
+  const busy = saving.busy;
+  const items = EDITOR_SECTIONS.map((value) => {
+    const count = Object.keys(editor.errors).filter((field) => sectionForError(field) === value).length;
+    return { value, label: <span className={styles.toolbar}>{t(`admin.profile.editor.tab.${value}`)}{count ? <Badge tone="danger">{count}</Badge> : null}</span> };
+  });
   return (
-    <Card compact title={<EditorTitle detail={detail} />} extra={<Button onClick={onClose}>{t('admin.profile.close')}</Button>} footer={t('admin.profile.editorHint')}>
+    <Card className={styles.editorCard} title={<EditorTitle detail={detail} />} extra={<Button onClick={onClose}>{t('admin.profile.close')}</Button>}>
       <div ref={root} className={styles.contents}>
       <UnsavedChangesGuard dirty={editor.dirty || busy} scope={t('admin.profile.title')} />
-      {detail ? <p className={styles.hint} title={detail.imageDigest}>{t('admin.profile.revisionNote', { revision: detail.revision, hash: detail.contentHash.slice(0, 12), digest: detail.imageDigest ? shortDigest(detail.imageDigest) : '—' })}</p> : null}
-      <ProfileBasicsSection draft={editor.draft} errors={editor.errors} disabled={busy} creating={creating} onChange={editor.update} />
-      <ProfileLaunchSection draft={editor.draft} errors={editor.errors} disabled={busy} taskProfiles={tasks.data?.items ?? []} taskProfilesUnavailable={!tasks.data || !!tasks.error} onChange={editor.update} />
-      <StepsSection editor={editor} disabled={busy} />
-      <ProfileVariablesEditor draft={editor.draft} errors={editor.errors} credentials={detail?.credentials ?? []} disabled={busy} onChange={editor.update} />
-      <ConfigFileSection draft={editor.draft} errors={editor.errors} disabled={busy} onChange={editor.update} />
-      <TerminalTestSection draft={editor.draft} errors={editor.errors} disabled={busy} onChange={editor.update} />
-      <div className={styles.toolbar}>
-        <Button variant="primary" disabled={busy || (!creating && !editor.dirty)} onClick={saving.submit}>{saving.save.isPending ? t('admin.profile.saving') : creating ? t('admin.profile.createSubmit') : t('admin.profile.save')}</Button>
-        {editor.dirty && !creating ? <Badge tone="warning">{t('admin.profile.dirty')}</Badge> : null}
-        {errorCount > 0 ? <Badge tone="danger">{t('admin.profile.errorCount', { count: errorCount })}</Badge> : null}
-      </div>
-      {saving.note?.kind === 'revision' ? <ActionNote tone="success">{t('admin.profile.saved', { revision: saving.note.revision })}</ActionNote> : null}
-      {saving.note?.kind === 'description' ? <ActionNote tone="success">{t('admin.profile.savedDescription')}</ActionNote> : null}
-      {saving.conflict !== undefined ? (
-        <ActionNote tone="error">
-          {t('admin.profile.conflict', { revision: saving.conflict })}{' '}
-          <Button onClick={() => { editor.adoptRevision(saving.conflict!); saving.clearConflict(); }}>{t('admin.profile.adoptConflict', { revision: saving.conflict })}</Button>{' '}
-          <Button onClick={() => saving.reload.mutate(undefined)}>{t('admin.profile.discard')}</Button>
-        </ActionNote>
-      ) : saving.save.error ? <ActionNote tone="error">{t('admin.profile.saveError', { message: errorMessage(saving.save.error) })}</ActionNote> : null}
-      {detail ? <ProfileTestPanel name={detail.name} latest={detail.latestTest} dirty={editor.dirty} onLocate={(stepId) => { const index = editor.draft.steps.findIndex((step) => step.stepId === stepId); if (index >= 0) editor.setSelected(index); }} /> : null}
+      <ProfileEditorFeedback editor={editor} saving={saving} creating={creating} />
+      <Tabs label={t('admin.profile.editor.navigation')} items={items} value={view.section} onChange={view.select}>
+        <div data-editor-section="basics" hidden={view.section !== 'basics'} className={styles.panel}>
+          <ProfileBasicsSection draft={editor.draft} errors={editor.errors} disabled={busy} creating={creating} onChange={editor.update} />
+          <ProfileLaunchSection draft={editor.draft} errors={editor.errors} disabled={busy} taskProfiles={tasks.data?.items ?? []} taskProfilesUnavailable={!tasks.data || !!tasks.error} onChange={editor.update} />
+        </div>
+        <div data-editor-section="startup" hidden={view.section !== 'startup'} className={styles.panel}>
+          <StepsSection editor={editor} disabled={busy} onSelect={view.selectStep} />
+          <ConfigFileSection draft={editor.draft} errors={editor.errors} disabled={busy} onChange={editor.update} />
+        </div>
+        <div data-editor-section="variables" hidden={view.section !== 'variables'} className={styles.panel}>
+          <ProfileVariablesEditor draft={editor.draft} errors={editor.errors} credentials={detail?.credentials ?? []} disabled={busy} onChange={editor.update} />
+        </div>
+        <div data-editor-section="test" hidden={view.section !== 'test'} className={styles.panel}>
+          <TerminalTestSection draft={editor.draft} errors={editor.errors} disabled={busy} onChange={editor.update} />
+          {detail ? <ProfileTestPanel name={detail.name} latest={detail.latestTest} dirty={editor.dirty} onLocate={view.locate} /> : <p className={styles.stepEmpty}>{t('admin.profile.editor.createTestHint')}</p>}
+        </div>
+      </Tabs>
       </div>
     </Card>
   );

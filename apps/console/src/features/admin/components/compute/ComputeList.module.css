@@ -1,0 +1,67 @@
+.listToolbar {
+  display: flex;
+  align-items: end;
+  flex-wrap: wrap;
+  gap: var(--cs-space-2);
+  margin-bottom: var(--cs-space-4);
+}
+.listToolbar > label { flex: 1; min-width: min(100%, 14rem); max-width: 30rem; }
+
+.profileTable { table-layout: fixed; min-width: 720px; }
+.profileTable th:nth-child(1) { width: 29%; }
+.profileTable th:nth-child(2) { width: 29%; }
+.profileTable th:nth-child(4) { width: 208px; }
+.profileTable th { background: var(--cs-color-surface-muted); font-size: var(--cs-font-size-sm); }
+.profileTable td { padding-top: var(--cs-space-4); padding-bottom: var(--cs-space-4); }
+.profileTable tr:hover > td { background: var(--cs-color-bg); }
+.profileTable .expandedRow > td { background: var(--cs-color-bg); border-bottom-color: transparent; }
+.profileTable code { background: transparent; padding: 0; }
+
+.nameLine { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--cs-space-2); margin-bottom: var(--cs-space-1); }
+.nameLine > code { font-weight: 600; font-size: var(--cs-font-size); }
+.hint { margin: 0; color: var(--cs-color-text-muted); font-size: var(--cs-font-size-sm); }
+.rowStack { display: grid; justify-items: start; gap: var(--cs-space-1); }
+.rowStack .model { color: var(--cs-color-text-muted); }
+.status { display: grid; gap: var(--cs-space-1); }
+.status small { color: var(--cs-color-text-muted); font-size: var(--cs-font-size-sm); }
+.status > span > small { display: block; margin-top: var(--cs-space-1); }
+
+.configuration { margin-top: var(--cs-space-2); font-size: var(--cs-font-size-sm); }
+.configuration > summary { width: fit-content; color: var(--cs-color-primary); cursor: pointer; }
+.configurationDetails { margin: var(--cs-space-2) 0 0; padding-top: var(--cs-space-2); border-top: 1px solid var(--cs-color-border); }
+.configurationDetails dt { color: var(--cs-color-text-muted); }
+.configurationDetails dd { margin: 0 0 var(--cs-space-2); }
+
+/* 主操作保持单行；展开区占完整表格宽度，不与编辑按钮共享拉伸高度。 */
+.rowActions, .secondaryActions { display: flex; align-items: center; flex-wrap: wrap; gap: var(--cs-space-2); }
+.rowActions { flex-wrap: nowrap; justify-content: flex-end; }
+.moreButton { color: var(--cs-color-primary); padding-inline: var(--cs-space-2); }
+.moreButton::after { content: ''; width: 5px; height: 5px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: translateY(-2px) rotate(45deg); }
+.moreButton[aria-expanded='true']::after { transform: translateY(1px) rotate(225deg); }
+.profileTable .actionRow > td { background: var(--cs-color-bg); padding-top: 0; }
+.actionPanel { display: grid; gap: var(--cs-space-3); padding: var(--cs-space-3); border: 1px solid var(--cs-color-border); border-radius: var(--cs-radius-md); }
+.destructive > button:not(:disabled) { color: var(--cs-color-danger); }
+.copyForm { display: grid; gap: var(--cs-space-2); max-width: 32rem; padding-top: var(--cs-space-3); border-top: 1px solid var(--cs-color-border); }
+
+@media (max-width: 1000px) {
+  .profileTable { min-width: 0; }
+  .profileTable thead { display: none; }
+  .profileTable tbody, .profileTable tr, .profileTable td { display: block; }
+  .profileTable .profileRow, .profileTable .expandedRow {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: var(--cs-space-3);
+    padding: var(--cs-space-4) var(--cs-space-3);
+    border-bottom: 1px solid var(--cs-color-border);
+  }
+  .profileTable .expandedRow { background: var(--cs-color-bg); border-bottom: 0; }
+  .profileTable td { min-width: 0; padding: 0; border: 0; }
+  .profileTable td:first-child, .profileTable td:last-child { grid-column: 1 / -1; }
+  .profileTable .actionRow > td { padding: 0 var(--cs-space-3) var(--cs-space-4); border-bottom: 1px solid var(--cs-color-border); }
+  .rowActions { justify-content: flex-start; }
+}
+
+@media (max-width: 480px) {
+  .profileTable .profileRow, .profileTable .expandedRow { grid-template-columns: minmax(0, 1fr); }
+  .listToolbar > label { flex-basis: 100%; max-width: none; }
+}

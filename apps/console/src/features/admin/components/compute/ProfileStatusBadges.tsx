@@ -16,8 +16,13 @@ export function AvailabilityBadge({ availability }: { readonly availability: Com
 }
 
 /** 最近一次测试的状态与归类；没有测试记录时显示「尚无测试」。 */
-export function TestSummaryBadge({ test }: { readonly test: ProfileTestDto | undefined }): ReactElement {
+export function TestSummaryBadge({ test, compact = false }: { readonly test: ProfileTestDto | undefined; readonly compact?: boolean }): ReactElement {
   const t = useT();
+  if (compact) return <small title={test?.error}>
+    {t(test ? `admin.profile.test.state.${test.state}` : 'admin.profile.test.none')}
+    {test?.outcome && test.outcome !== 'passed' ? ` · ${t(`admin.profile.test.outcomeShort.${test.outcome}`)}` : ''}
+    {test ? ` · ${t('admin.profile.test.revision', { revision: test.revision })}` : ''}
+  </small>;
   if (!test) return <Badge tone="neutral">{t('admin.profile.test.none')}</Badge>;
   return (
     <span title={test.error}>

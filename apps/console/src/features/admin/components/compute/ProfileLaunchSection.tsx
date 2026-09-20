@@ -41,6 +41,7 @@ export function ProfileLaunchSection({ draft, errors, disabled, taskProfiles, ta
   const base = images.data?.baseImage.reference;
   const set = (patch: Partial<ProfileDraft>) => onChange((d) => ({ ...d, ...patch }));
   return (
+    <>
     <div className={styles.sub}>
       <h3>{t('admin.profile.section.launch')}</h3>
       <div className={styles.fields}>
@@ -54,6 +55,12 @@ export function ProfileLaunchSection({ draft, errors, disabled, taskProfiles, ta
         <AdminField label={t('admin.profile.field.taskProfile')} value={draft.taskProfile} onChange={(taskProfile) => set({ taskProfile })} disabled={disabled || taskProfilesUnavailable}
           hint={t('admin.profile.field.taskProfileHint')} error={taskProfilesUnavailable ? t('admin.profile.field.taskProfileUnavailable') : undefined}
           options={[{ value: '', label: t('admin.profile.defaultTaskProfile') }, ...taskProfiles.map((profile) => ({ value: profile.name, label: `${profile.name} · CPU ${profile.cpu} · ${profile.memory}` }))]} />
+      </div>
+    </div>
+    <div className={styles.sub}>
+      <h3>{t('admin.profile.editor.advanced')}</h3>
+      <p className={styles.hint}>{t('admin.profile.editor.advancedHint')}</p>
+      <div className={styles.fields}>
         {showsField(p, 'extraArgs') ? (
           <div className={styles.wide}>
             <AdminField label={t('admin.profile.field.extraArgs')} value={draft.extraArgs} onChange={(extraArgs) => set({ extraArgs })} disabled={disabled} rows={3} monospace hint={t(`admin.profile.field.extraArgsHint.${p}`)} error={err('extraArgs')} />
@@ -74,5 +81,6 @@ export function ProfileLaunchSection({ draft, errors, disabled, taskProfiles, ta
         )) : null}
       </div>
     </div>
+    </>
   );
 }
