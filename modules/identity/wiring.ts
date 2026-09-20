@@ -16,6 +16,7 @@ import { drizzleOidcUnitOfWork } from './adapters/persistence/drizzleOidcUnitOfW
 import { drizzleUserRepository } from './adapters/persistence/drizzleUserRepository';
 import type { IdentityModuleApi } from './api/moduleApi';
 import { bootstrapAdminUseCases } from './application/bootstrapAdmin';
+import { renderBootstrapPage } from './application/bootstrapPage';
 import { currentUserUseCase } from './application/currentUser';
 import { renderForbiddenPage } from './application/forbiddenPage';
 import type { IdentityUseCaseDeps } from './application/dependencies';
@@ -24,7 +25,7 @@ import { ensureUserUseCase } from './application/ensureUser';
 import { forwardAuthServiceUseCase } from './application/forwardAuthService';
 import { forwardAuthUserUseCase } from './application/forwardAuthUser';
 import { loginDiscoveryUseCases } from './application/loginDiscovery';
-import { renderBootstrapPage, renderLoginErrorPage, renderLoginPage } from './application/loginPages';
+import { renderLoginErrorPage, renderLoginPage } from './application/loginPages';
 import { loginPolicyUseCases } from './application/loginPolicyAdmin';
 import { logoutUseCase } from './application/logout';
 import { forwardingUseCases } from './application/oidc/forwardingAdmin';
@@ -157,7 +158,7 @@ export function createIdentityModule(deps: IdentityModuleDeps): IdentityModule {
         ...(justBootstrapped === undefined ? {} : { justBootstrapped }),
       }),
     ...passwordLoginUseCases(useCaseDeps),
-    bootstrapPageHtml: (error) => renderBootstrapPage(error),
+    bootstrapPageHtml: renderBootstrapPage,
     ...bootstrapAdminUseCases(useCaseDeps),
     ...oidcLoginUseCases(useCaseDeps),
     loginErrorPageHtml: (code) => renderLoginErrorPage(code),

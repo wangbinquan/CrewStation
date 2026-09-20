@@ -333,6 +333,7 @@
       },
       "devDependencies": {
         "@crewstation/testkit": "workspace:*",
+        "happy-dom": "20.14.5",
       },
     },
     "modules/observability": {
@@ -665,6 +666,13 @@
       "name": "@crewstation/tools-arch",
       "version": "0.0.0",
     },
+    "tools/dev-auth": {
+      "name": "@crewstation/tools-dev-auth",
+      "version": "0.0.0",
+      "dependencies": {
+        "jose": "6.2.12",
+      },
+    },
     "tools/mock-idp": {
       "name": "@crewstation/tools-mock-idp",
       "version": "0.0.0",
@@ -819,6 +827,8 @@
     "@crewstation/testkit": ["@crewstation/testkit@workspace:packages/testkit"],
 
     "@crewstation/tools-arch": ["@crewstation/tools-arch@workspace:tools/arch"],
+
+    "@crewstation/tools-dev-auth": ["@crewstation/tools-dev-auth@workspace:tools/dev-auth"],
 
     "@crewstation/tools-mock-idp": ["@crewstation/tools-mock-idp@workspace:tools/mock-idp"],
 

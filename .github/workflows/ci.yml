@@ -48,6 +48,10 @@ jobs:
       CS_E2E_CONSOLE: http://console.cs.localhost
       # 前台验收不起开发会话，跳过要联网装两个 Agent CLI 的任务容器镜像。
       CS_SKIP_TASK_RUNTIME: '1'
+      # CI 明确使用无人值守建号；普通安装保持待初始化，由用户在浏览器创建管理员。
+      CS_BOOTSTRAP_ADMIN: '1'
+      # RFC-007 的固定角色入口是本机人工验收工具；产品 E2E 保持独立的身份夹具。
+      CS_SKIP_DEV_AUTH: '1'
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2

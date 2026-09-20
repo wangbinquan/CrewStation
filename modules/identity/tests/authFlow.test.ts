@@ -34,10 +34,15 @@ beforeAll(async () => {
 afterAll(async () => { await tdb?.drop(); });
 
 describe.skipIf(!available)('引导交接与常规登录', () => {
-  test('全新安装：登录页只给引导入口，密码登录与 OIDC 一律 403', async () => {
+  test('全新安装：首次访问直接创建管理员，不要求寻找初始用户名密码', async () => {
     const page = await (await app.request('/auth/login')).text();
     expect(page).toContain('创建首位管理员');
-    expect(page).not.toContain('name="password"');
+    // 安装不能提前随机建号，页面也不能再把人挡在一个二次入口前。
+    expect(page).toContain('action="/auth/bootstrap"');
+    expect(page).toContain('name="confirmPassword"');
+    expect(page).not.toContain('action="/auth/login"');
+    expect(page).toContain('crewstation-secrets');
+    expect(page).not.toContain('<code>cs-bootstrap</code>');
     expect(await (await app.request('/auth/status')).json()).toMatchObject({ mode: 'bootstrap', passwordLoginEnabled: false, bootstrapTokenEnabled: true, providers: [] });
     const denied = await app.request('/auth/login', { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json' }, body: JSON.stringify({ username: 'x', password: 'y' }) });
     expect(denied.status).toBe(403);
@@ -53,10 +58,34 @@ describe.skipIf(!available)('引导交接与常规登录', () => {
     expect(await identity.api.findByEmail('admin@corp.example')).toBeUndefined();
   });
 
+  test('创建失败保留非口令资料和原访问目标，逐字段说明错误', async () => {
+    const target = 'http://demo.cs.localhost/work?tab=one&view=two';
+    const res = await bootstrap({ ...ADMIN_FORM, username: 'Invalid', email: 'wrong', password: 'short', confirmPassword: 'different', returnTo: target });
+    const html = await res.text();
+    expect(res.status).toBe(400);
+    expect(html).toContain('value="Invalid"');
+    expect(html).toContain('value="平台管理员"');
+    expect(html).toContain('name="returnTo" value="http://demo.cs.localhost/work?tab=one&amp;view=two"');
+    expect(html).toContain('用户名须为 3–48 位');
+    expect(html).toContain('请输入有效邮箱地址');
+    expect(html).toContain('密码至少 12 个字符');
+    expect(html).toContain('两次输入的密码不一致');
+    expect(html).not.toContain(`value="${BASE_SETTINGS.bootstrapToken}"`);
+    expect(html).not.toContain('value="short"');
+    expect(html).not.toContain('value="different"');
+  });
+
+  test('创建页展示每个字段的规则，不依赖禁用按钮解释原因', async () => {
+    const html = await (await app.request('/auth/bootstrap?returnTo=%2Fadmin')).text();
+    for (const hint of ['3–48', '1–80', '254', '12–200', '再次输入同一密码']) expect(html).toContain(hint);
+    expect(html).toContain('name="returnTo" value="/admin"');
+    expect(html).toContain('<button type="submit">创建管理员</button>');
+  });
+
   test('引导成功：管理员建档、完成态落库、强制开启密码登录，且不返回会话', async () => {
-    const res = await bootstrap(ADMIN_FORM);
+    const res = await bootstrap({ ...ADMIN_FORM, returnTo: '/admin' });
     expect(res.status).toBe(302);
-    expect(res.headers.get('location')).toBe('/auth/login?setup=complete');
+    expect(res.headers.get('location')).toBe('/auth/login?setup=complete&returnTo=%2Fadmin');
     expect(res.headers.get('set-cookie')).toBeNull();
     const admin = await identity.api.findByEmail('admin@corp.example');
     expect(admin).toMatchObject({ name: '平台管理员', isAdmin: true });
@@ -74,6 +103,7 @@ describe.skipIf(!available)('引导交接与常规登录', () => {
   test('引导令牌当场退役：完成后再提交一次是 409，引导页跳回登录页', async () => {
     const again = await bootstrap({ ...ADMIN_FORM, username: 'second-admin', email: 'second@corp.example' });
     expect(again.status).toBe(409);
+    expect(await again.text()).not.toContain('action="/auth/bootstrap"');
     const page = await app.request('/auth/bootstrap');
     expect(page.status).toBe(302);
     expect(page.headers.get('location')).toBe('/auth/login');
@@ -143,5 +173,22 @@ describe.skipIf(!available)('引导交接与常规登录', () => {
       body: new URLSearchParams({ username: 'dev-one', password: TEST_PASSWORD, returnTo: '/home' }),
     });
     expect(res.headers.get('location')).toBe('https://console.cs.localhost/home');
+  });
+
+  test('两个创建页同时提交只产生一个管理员，重新装配服务后旧令牌仍退役', async () => {
+    const isolated = await createTestDatabase([identityMigrations]);
+    try {
+      const module = identityModuleFor(isolated.db);
+      const results = await Promise.allSettled([
+        module.api.bootstrapAdmin(ADMIN_FORM),
+        module.api.bootstrapAdmin({ ...ADMIN_FORM, username: 'another-admin', email: 'other@corp.example' }),
+      ]);
+      expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+      expect(results.filter((result) => result.status === 'rejected')).toHaveLength(1);
+      expect(await module.api.listUsers()).toHaveLength(1);
+      const restarted = identityModuleFor(isolated.db);
+      expect(await restarted.api.bootstrapStatus()).toEqual({ required: false });
+      await expect(restarted.api.bootstrapAdmin({ ...ADMIN_FORM, username: 'third-admin' })).rejects.toMatchObject({ details: { code: 'bootstrap-already-complete' } });
+    } finally { await isolated.drop(); }
   });
 });

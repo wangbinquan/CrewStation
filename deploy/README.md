@@ -17,8 +17,9 @@ will grow out of these manifests. All figures below are observed outputs from th
 | `local/node-registry-hosts.sh` | Writes containerd's `hosts.toml` on the node for the in-cluster registry |
 | `local/verify.sh` | Re-runnable verifications A–D |
 | `local/lib.sh` | Shared helpers, including the guard that ties the context to the node container |
-| `local/install-platform.sh` | Platform layer on top of the infrastructure: builds and imports the four images, writes the platform Secret, applies `k8s/platform/*`, runs migrations, waits for rollout, then seeds the catalog. Set `SKIP_BUILD=1` to skip all image builds, `SKIP_TASK_RUNTIME_BUILD=1` to keep an existing `cs-task-runtime:dev` |
-| `local/seed-catalog.sh` | Seeds the platform catalog as `admin`: one service plan and one task-container profile. Compute profiles are not seeded (RFC-006): an administrator creates them in the console, and a profile becomes selectable only after its test passes. Idempotent; called at the end of `install-platform.sh` |
+| `local/install-platform.sh` | Builds and imports images, writes the platform Secret, applies `k8s/platform/*`, migrates and waits for rollout. A fresh install prints the administrator setup link; it does not create an account or password. Set `SKIP_BUILD=1` to skip builds, `SKIP_TASK_RUNTIME_BUILD=1` to keep the task image, or explicitly use `CS_BOOTSTRAP_ADMIN=1` for unattended setup |
+| `local/install-dev-auth.sh` | Local-only OAuth 2.0/OIDC role switcher at `http://dev-auth.cs.localhost/`: seeds four fixed users through the real login flow and converges their admin/project roles. Called by `install-platform.sh`; set `CS_SKIP_DEV_AUTH=1` to omit it |
+| `local/seed-catalog.sh` | Seeds one service plan and one task-container profile using the administrator account. Called after installation only when setup is complete and credentials are available. Compute profiles are created and tested by an administrator in the console (RFC-006) |
 | `local/publish-base-image.sh` | Tags the imported task image as the platform base `crewstation/task-runtime:<tag>` and pushes it into the in-cluster registry through the node, so administrators can build profile images `FROM` it (RFC-006 §7.1). Called by `install-platform.sh` unless `CS_SKIP_TASK_RUNTIME=1` |
 | `local/bootstrap-integrations.sh` | Creates the two built-in integration-container projects, pushes `integrations/*` into their repositories and releases them to the preview slot |
 
@@ -48,11 +49,35 @@ deploy/local/verify.sh [--keep]          # re-run checks A–D any time; --keep 
 deploy/local/coredns-rewrite.sh          # individual steps, each idempotent
 deploy/local/node-registry-hosts.sh
 
-deploy/local/install-platform.sh         # then the platform itself; seeds the catalog on the way out
+deploy/local/install-platform.sh         # then the platform; open its setup link to create your administrator
+deploy/local/install-dev-auth.sh         # rebuild/reseed only the local one-click role login entry
 deploy/local/seed-catalog.sh             # re-seed service plans and task-container profiles on their own
 deploy/local/publish-base-image.sh       # re-push the platform base image (crewstation/task-runtime) into the registry
 deploy/local/bootstrap-integrations.sh   # the two built-in integration containers
 ```
+
+### First administrator
+
+Open the initialization link printed by `install-platform.sh`, or open the console to see the
+administrator creation form. **There is no default username or initial password.** Choose your
+username, display name, email and password, create the account, then log in with it. The link carries
+the one-time bootstrap token; the page consumes it and removes it from the URL. Creation permanently
+retires the token. Existing installations keep their accounts and normal login flow.
+
+If the installation output is unavailable, the installation operator can retrieve the token:
+
+```bash
+kubectl -n crewstation-system get secret crewstation-secrets -o jsonpath='{.data.CS_BOOTSTRAP_TOKEN}' | base64 -d
+```
+
+After creating your account, configure plans in the admin space, or supply `CS_ADMIN_USERNAME` and
+`CS_ADMIN_PASSWORD` when running `seed-catalog.sh` or `install-dev-auth.sh`. Those authenticated steps
+wait until an administrator exists and credentials are available.
+
+CI and explicitly unattended installs set `CS_BOOTSTRAP_ADMIN=1`. They may set
+`CS_BOOTSTRAP_ADMIN_USERNAME`, `CS_BOOTSTRAP_ADMIN_EMAIL` and `CS_BOOTSTRAP_ADMIN_PASSWORD`; if the password
+is omitted in this explicit mode, it is generated and saved to `.local/admin.env` (mode `0600`). Normal
+interactive installation never writes that file. A creation failure fails the install with its reason.
 
 Re-running is safe: manifests are `kubectl apply`ed, the Secret is created only when absent, and the
 CoreDNS and containerd steps report `unchanged`. The Traefik CRDs are applied with

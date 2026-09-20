@@ -95,7 +95,7 @@ function localAdminEnv(key: string): string | undefined {
 function e2ePassword(): string {
   const password = process.env.CS_E2E_PASSWORD ?? localAdminEnv('CS_BOOTSTRAP_ADMIN_PASSWORD');
   if (password) return password;
-  throw new Error('缺少实机登录口令：设置 CS_E2E_PASSWORD，或让 install-platform.sh 写出 .local/admin.env');
+  throw new Error('缺少实机登录口令：先在浏览器创建管理员并设置 CS_E2E_USERNAME／CS_E2E_PASSWORD；CI 可用 CS_BOOTSTRAP_ADMIN=1 显式初始化');
 }
 
 /** 等到页面不再处于载入态；工作台各页统一用这几个词表示还在读。 */

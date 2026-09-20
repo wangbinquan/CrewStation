@@ -145,7 +145,7 @@ export interface IdentityModuleApi {
   /** 常规登录（本地用户名＋密码）。 */
   passwordLogin(input: LoginInput, context?: LoginContext): Promise<LoginResult>;
   /** 引导页与创建首位管理员；成功后引导令牌永久退役，且不返回会话。 */
-  bootstrapPageHtml(error?: string): string;
+  bootstrapPageHtml(error?: string, input?: LoginInput): string;
   bootstrapStatus(): Promise<{ required: boolean }>;
   bootstrapAdmin(raw: unknown): Promise<UserDto>;
   /** 发起 OIDC 登录：落库 PKCE／state／nonce 并给出跳转地址。 */

@@ -72,30 +72,32 @@ for d in cs-api cs-auth cs-controller cs-session cs-events console mcp-capabilit
   kubectl -n $NS rollout restart deployment/$d >/dev/null 2>&1 || true
   kubectl -n $NS rollout status deployment/$d --timeout=180s
 done
-# 首位管理员：产品路径是浏览器里的引导向导，这里用 cs-auth 的同名子命令做非交互播种，
-# 让本机验收与 CLI 不必先去点浏览器。已经引导过的库上它会失败，脚本据此保持幂等。
-ADMIN_USER="${CS_BOOTSTRAP_ADMIN_USERNAME:-platform-admin}"
-ADMIN_EMAIL="${CS_BOOTSTRAP_ADMIN_EMAIL:-admin@demo.invalid}"
-ADMIN_PASSWORD="${CS_BOOTSTRAP_ADMIN_PASSWORD:-}"
-if [[ -z "$ADMIN_PASSWORD" ]]; then
-  if [[ -f "$ROOT/.local/admin.env" ]]; then ADMIN_PASSWORD="$(grep '^CS_BOOTSTRAP_ADMIN_PASSWORD=' "$ROOT/.local/admin.env" | cut -d= -f2-)"; fi
-  [[ -n "$ADMIN_PASSWORD" ]] || ADMIN_PASSWORD="$(openssl rand -hex 12)"
-fi
-AUTH_POD="$(kubectl -n $NS get pod -l app.kubernetes.io/name=cs-auth -o jsonpath='{.items[0].metadata.name}')"
-if kubectl -n $NS exec "$AUTH_POD" -- bun apps/cs-auth/src/main.ts bootstrap-admin \
-    --username "$ADMIN_USER" --display-name "平台管理员" --email "$ADMIN_EMAIL" --password "$ADMIN_PASSWORD" >/dev/null 2>&1; then
-  mkdir -p "$ROOT/.local"
-  printf 'CS_BOOTSTRAP_ADMIN_USERNAME=%s\nCS_BOOTSTRAP_ADMIN_PASSWORD=%s\n' "$ADMIN_USER" "$ADMIN_PASSWORD" > "$ROOT/.local/admin.env"
-  log "已创建首位管理员 ${ADMIN_USER}（口令写入 .local/admin.env），引导令牌已退役"
-else
-  log "首位管理员已存在，跳过引导（引导令牌在 Secret crewstation-secrets 的 CS_BOOTSTRAP_TOKEN）"
-fi
+# 首次安装只提供初始化入口；只有明确的无人值守选项才允许提前建号。
+source "$ROOT/deploy/local/initial-admin.sh"
+source "$ROOT/deploy/local/admin-credentials.sh"
+CONSOLE_URL="${CS_CONSOLE_URL:-http://console.cs.localhost}"
+prepare_initial_admin "$ROOT" "$NS" "$CONSOLE_URL"
 
 # 平台底座镜像推进集群内仓库（RFC-006 §7.1）：档位镜像 FROM 它构建，档位保存时按摘要固定。
 if [[ "${CS_SKIP_TASK_RUNTIME:-}" == "1" ]]; then log "跳过推送平台底座（CS_SKIP_TASK_RUNTIME=1）"; else "$ROOT/deploy/local/publish-base-image.sh"; fi
 
-# 套餐是建项目的前置；装完就种上。算力档位不预置（RFC-006），由管理员在平台管理里创建并测试。
-"$ROOT/deploy/local/seed-catalog.sh"
+# 需要管理员登录的步骤必须等用户完成初始化；显式提供凭据时保留自动播种。
+ADMIN_CREDENTIALS_AVAILABLE=0
+if [[ "$ADMIN_SETUP_PENDING" == "0" ]] && resolve_admin_credentials "$ROOT" 2>/dev/null; then
+  ADMIN_CREDENTIALS_AVAILABLE=1
+  "$ROOT/deploy/local/seed-catalog.sh"
+else
+  log "套餐目录待管理员配置：创建并登录后在管理空间配置，或设置 CS_ADMIN_USERNAME／CS_ADMIN_PASSWORD 运行 deploy/local/seed-catalog.sh。"
+fi
 
-log "完成。控制台：http://console.cs.localhost/  登录：http://console.cs.localhost/auth/login（用户名 ${ADMIN_USER}）"
+# RFC-007：本机默认带上真实 OIDC 的一键角色入口；CI 和不需要角色验收的环境可显式跳过。
+if [[ "${CS_SKIP_DEV_AUTH:-}" == "1" ]]; then
+  log "跳过开发角色登录器（CS_SKIP_DEV_AUTH=1）"
+elif [[ "$ADMIN_CREDENTIALS_AVAILABLE" != "1" ]]; then
+  log "开发角色登录器待管理员初始化：创建账号后设置 CS_ADMIN_USERNAME／CS_ADMIN_PASSWORD 运行 deploy/local/install-dev-auth.sh。"
+else
+  CS_ADMIN_USERNAME="$ADMIN_USERNAME" CS_ADMIN_PASSWORD="$ADMIN_PASSWORD" "$ROOT/deploy/local/install-dev-auth.sh"
+fi
+
+log "完成。控制台：${CONSOLE_URL}/  登录与首次初始化：${CONSOLE_URL}/auth/login"
 kubectl -n $NS get pods -o wide

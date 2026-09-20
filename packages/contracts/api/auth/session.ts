@@ -21,12 +21,13 @@ export const PASSWORD_MIN_LENGTH = 12;
  * 角色固定管理员、状态固定可用，不提供普通用户或 OIDC 模式。
  */
 export const BootstrapAdminRequestSchema = z.object({
-  token: z.string().min(1).max(512),
-  username: z.string().regex(USERNAME_REGEX),
-  displayName: z.string().min(1).max(80),
-  email: z.string().email().max(254),
-  password: z.string().min(PASSWORD_MIN_LENGTH).max(200),
-  confirmPassword: z.string().min(PASSWORD_MIN_LENGTH).max(200),
+  token: z.string().min(1, '请填写引导令牌').max(512, '引导令牌最多 512 个字符'),
+  username: z.string().regex(USERNAME_REGEX, '用户名须为 3–48 位，以小写字母开头，仅含小写字母、数字、短横线和下划线'),
+  displayName: z.string().min(1, '请填写显示名').max(80, '显示名最多 80 个字符'),
+  email: z.string().email('请输入有效邮箱地址').max(254, '邮箱最多 254 个字符'),
+  password: z.string().min(PASSWORD_MIN_LENGTH, '密码至少 12 个字符').max(200, '密码最多 200 个字符'),
+  confirmPassword: z.string().min(PASSWORD_MIN_LENGTH, '确认密码至少 12 个字符').max(200, '确认密码最多 200 个字符'),
+  returnTo: z.string().optional(),
 }).strict().refine((v) => v.password === v.confirmPassword, { message: '两次输入的密码不一致', path: ['confirmPassword'] });
 
 /** 登录方法发现：引导未完成时只有引导令牌一条路，与 agent-workflow 的 bootstrap／ready 判别式同形。 */

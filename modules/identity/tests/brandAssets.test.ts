@@ -1,7 +1,8 @@
 import { expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { brandMarkDataUrl } from '../domain/brandMark';
-import { renderBootstrapPage, renderLoginPage } from '../application/loginPages';
+import { renderBootstrapPage } from '../application/bootstrapPage';
+import { renderLoginPage } from '../application/loginPages';
 
 test('登录前图标不需要二次鉴权，favicon 与登录字标逐字节使用 console 的同一原稿', () => {
   const canonical = readFileSync(new URL('../../../apps/console/public/brand/crewstation-mark.svg', import.meta.url), 'utf8');

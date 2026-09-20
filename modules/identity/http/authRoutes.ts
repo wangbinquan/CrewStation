@@ -36,7 +36,7 @@ export function authRoutes(api: IdentityModuleApi): Hono<AppEnv> {
 
   r.get('/auth/bootstrap', async (c) => {
     if (!(await api.bootstrapStatus()).required) return c.redirect('/auth/login', 302);
-    return c.html(api.bootstrapPageHtml());
+    return c.html(api.bootstrapPageHtml(undefined, { returnTo: c.req.query('returnTo') }));
   });
   r.post('/auth/bootstrap', async (c) => {
     const input = await loginInput(c);
@@ -44,10 +44,13 @@ export function authRoutes(api: IdentityModuleApi): Hono<AppEnv> {
       const admin = await api.bootstrapAdmin(input);
       if (wantsJson(c)) return c.json({ user: admin });
       // 不返回管理员会话：引导令牌的失效点就是这次提交，接下来必须用刚创建的账户正常登录一次。
-      return c.redirect('/auth/login?setup=complete', 302);
+      const redirect = new URLSearchParams({ setup: 'complete' });
+      if (typeof input.returnTo === 'string' && input.returnTo) redirect.set('returnTo', input.returnTo);
+      return c.redirect(`/auth/login?${redirect}`, 302);
     } catch (error) {
       if (wantsJson(c) || !isPlatformError(error)) throw error;
-      return c.html(api.bootstrapPageHtml(error.message), statusOf(error));
+      if (error.details.code === 'bootstrap-already-complete') return c.html(await api.loginPageHtml(undefined, scheme(c), error.message), 409);
+      return c.html(api.bootstrapPageHtml(error.message, input), statusOf(error));
     }
   });
 

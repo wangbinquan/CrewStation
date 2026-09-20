@@ -1,0 +1,13 @@
+{
+  "name": "@crewstation/tools-dev-auth",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "本机开发环境的一键角色登录入口（RFC-007）",
+  "scripts": {
+    "start": "bun run main.ts"
+  },
+  "dependencies": {
+    "jose": "6.2.12"
+  }
+}

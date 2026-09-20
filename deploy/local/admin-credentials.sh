@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # 本机脚本取管理员凭据的唯一实现：演示登录随 RFC-005 删除后，登录一律是用户名＋密码。
-# 顺序：环境变量 → install-platform.sh 写出的 .local/admin.env。取不到就让调用方明确失败，
+# 顺序：环境变量 → 显式无人值守安装写出的 .local/admin.env。取不到就让调用方明确失败，
 # 不要拿空口令去试——那会把「没配凭据」表现成「口令不对」。
 # 用法：source 本文件后调用 resolve_admin_credentials，它设置 ADMIN_USERNAME 与 ADMIN_PASSWORD。
 resolve_admin_credentials() {
@@ -13,7 +13,7 @@ resolve_admin_credentials() {
   fi
   [ -n "${ADMIN_USERNAME}" ] || ADMIN_USERNAME='platform-admin'
   if [ -z "${ADMIN_PASSWORD}" ]; then
-    printf 'ERROR: 没有管理员口令：设置 CS_ADMIN_PASSWORD，或先跑 deploy/local/install-platform.sh 生成 %s\n' "${env_file}" >&2
+    printf 'ERROR: 请先在浏览器创建管理员，再设置 CS_ADMIN_USERNAME 与 CS_ADMIN_PASSWORD；显式无人值守安装也可从 %s 读取。\n' "${env_file}" >&2
     return 1
   fi
 }

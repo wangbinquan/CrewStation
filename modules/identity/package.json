@@ -22,6 +22,7 @@
     "zod": "4.6.2"
   },
   "devDependencies": {
-    "@crewstation/testkit": "workspace:*"
+    "@crewstation/testkit": "workspace:*",
+    "happy-dom": "20.14.5"
   }
 }
