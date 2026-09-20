@@ -46,6 +46,7 @@ export function ProfileRowActions({ profile, onOpen }: ProfileRowActionsProps): 
     <div className={styles.rowStack}>
       <div className={styles.rowActions}>
         <Button disabled={busy} onClick={() => onOpen(profile.name)}>{t('admin.profile.edit')}</Button>
+        <details className={styles.moreActions}><summary>{t('admin.profile.moreActions')}</summary><div className={styles.rowStack}>
         <Button variant="ghost" disabled={busy} onClick={() => { setCopying((open) => !open); setCopyName(`${profile.name}-copy`); }}>{t('admin.profile.copy')}</Button>
         {profile.isDefault ? null : defaultBlocked ? <Button variant="ghost" disabled title={defaultBlocked}>{t('admin.profile.setDefault')}</Button>
           : <InlineConfirm variant="ghost" label={t('admin.profile.setDefault')} question={t('admin.profile.setDefaultQuestion', { name: profile.name })} busy={setDefault.isPending} busyLabel={t('admin.profile.working')} onConfirm={() => setDefault.mutate(undefined)} />}
@@ -54,8 +55,9 @@ export function ProfileRowActions({ profile, onOpen }: ProfileRowActionsProps): 
               busy={toggle.isPending} busyLabel={t('admin.profile.working')} onConfirm={() => toggle.mutate(!profile.enabled)} />}
         {profile.isDefault ? <Button variant="ghost" disabled title={t('admin.profile.defaultLocked')}>{t('admin.profile.remove')}</Button>
           : <InlineConfirm variant="ghost" label={t('admin.profile.remove')} question={t('admin.profile.removeQuestion', { name: profile.name })} busy={remove.isPending} busyLabel={t('admin.profile.removing')} onConfirm={() => remove.mutate(false)} />}
+        {profile.isDefault ? <small className={styles.hint}>{t('admin.profile.defaultLocked')}</small> : null}
+        </div></details>
       </div>
-      {profile.isDefault ? <small className={styles.hint}>{t('admin.profile.defaultLocked')}</small> : null}
       {copying ? (
         <form className={styles.toolbar} onSubmit={(event) => { event.preventDefault(); if (copyValid) copy.mutate(copyName); }}>
           <AdminField label={t('admin.profile.copyName')} value={copyName} onChange={setCopyName} disabled={copy.isPending} error={copyName !== '' && !copyValid ? t('admin.profile.error.profileName') : undefined} />

@@ -35,12 +35,12 @@ async function type(input: HTMLInputElement, value: string) {
 }
 
 describe('算力档位列表（RFC-006）', () => {
-  test('一张表就是全部：没有运行环境页签，按列给出协议、镜像摘要短码、二进制、模型、资源套餐、状态与最近测试', async () => {
+  test('一张表就是全部：没有运行环境页签，四列保留关键状态，详细配置可以展开', async () => {
     await open();
     const text = page!.text();
     expect(document.querySelectorAll('[role="tab"]')).toHaveLength(0);
     expect(text).not.toContain('运行环境');
-    for (const header of ['档位', '协议', '镜像', '二进制', '模型', '资源套餐', '状态', '最近测试', '修改', '操作']) expect([...document.querySelectorAll('th')].map((th) => th.textContent)).toContain(header);
+    for (const header of ['档位', '执行配置', '状态', '操作']) expect([...document.querySelectorAll('th')].map((th) => th.textContent)).toContain(header);
     const claude = row('claude-daily').textContent!;
     for (const part of ['默认', 'Claude Code 协议', 'registry.cs.local/runtimes/claude:2.1', '@ab12cd34ef56', '/usr/local/bin/claude', 'anthropic/claude-sonnet-5', '平台默认任务套餐', '可用', '测试通过', '修订 1', '王管理']) expect(claude).toContain(part);
     const opencode = row('opencode-lite').textContent!;
@@ -146,4 +146,18 @@ describe('复制档位与推送凭据（RFC-006）', () => {
       if (original) Object.defineProperty(navigator, 'clipboard', original); else Reflect.deleteProperty(navigator, 'clipboard');
     }
   });
+});
+
+
+test('档位可按名称和模型搜索；无匹配可以清除，查询不修改档位', async () => {
+  await open();
+  await type(document.querySelector<HTMLInputElement>('input[type="search"]')!, 'OPENCODE');
+  expect(row('opencode-lite')).toBeDefined(); expect(row('claude-daily')).toBeUndefined();
+  await type(document.querySelector<HTMLInputElement>('input[type="search"]')!, 'no-profile');
+  expect(page!.text()).toContain('没有匹配的档位');
+  await page!.click('清除搜索'); expect(row('claude-daily')).toBeDefined();
+  const details = row('claude-daily').querySelector('details')!;
+  await act(async () => details.querySelector('summary')!.click());
+  expect(details.open).toBe(true); expect(details.textContent).toContain('/usr/local/bin/claude');
+  expect(backend!.writes).toEqual([]);
 });

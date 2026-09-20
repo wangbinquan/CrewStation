@@ -6,6 +6,8 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   'capabilities.line1': 'Everything this digital worker can use right now: identity conventions and domains, the platform API base, config keys, data resources, callable operations, event subscriptions, the concurrency quota and service plan, and the two platform MCP servers.',
   'capabilities.line2': 'This page is the human-readable twin of the capability-description MCP server: the same data, with every value ready to copy into code or into the dev container.',
   'capabilities.loading': 'Loading…',
+  'capabilities.retry': 'Reload resources',
+  'capabilities.invalidResponse': 'The resource response is incomplete. Reload, or ask an administrator to check the platform if it persists.',
   'capabilities.error': 'Could not load: {message}',
   'capabilities.generatedAt': 'Generated at {time}',
   'capabilities.copy': 'Copy',

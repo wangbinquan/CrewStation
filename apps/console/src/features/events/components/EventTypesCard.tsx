@@ -1,5 +1,6 @@
 import type { ReactElement } from 'react';
 import { Link } from '@tanstack/react-router';
+import { ProjectIdSchema } from '@crewstation/contracts';
 import { api } from '../../../shared/api/client';
 import { queryKeys } from '../../../shared/api/queryKeys';
 import { useApiQuery } from '../../../shared/api/useApi';
@@ -33,7 +34,10 @@ export function EventTypesCard({ management = false }: { readonly management?: b
               </td>
               <td>{eventType.producer}</td>
               <td>
-                {management ? <Link to="/admin/integrations/$projectId" params={{ projectId: eventType.producerProject }}>{eventType.producer}</Link> : <code>{eventType.producerProject}</code>}
+                {management ? ProjectIdSchema.safeParse(eventType.producerProject).success
+                  ? <Link to="/admin/integrations/$projectId" params={{ projectId: eventType.producerProject }}>{eventType.producerProject}</Link>
+                  : <Link to="/admin/capabilities" search={{ tab: 'integrations', q: eventType.producerProject }}>{eventType.producerProject}</Link>
+                  : <code>{eventType.producerProject}</code>}
               </td>
               <td>{eventType.schemaRef ?? t('events.none')}</td>
             </tr>

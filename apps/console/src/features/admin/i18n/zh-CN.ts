@@ -85,7 +85,7 @@ export const messages = {
 
   'admin.overview.open': '打开{page}',
   'admin.overview.users': '谁是平台管理员：管理员才能创建项目、接入公司系统、裁定开放与出站申请。',
-  'admin.overview.compute': '算力档位：镜像、二进制、启动前步骤与模型合成一份执行配置，保存即测试；业务只引用档位名（RFC-006）。',
+  'admin.overview.compute': '为 Agent 配置 CLI、模型、启动文件与脚本。保存后自动测试，项目按档位名称使用。',
   'admin.overview.servicePlans': '服务套餐：数字人服务的 CPU、内存与副本上限，由 Manifest 按名引用。',
   'admin.overview.taskProfiles': '任务容器套餐：开发会话与业务任务容器的 CPU、内存与存储。',
   'admin.overview.integrations': '接入容器：APIProxy 与 EventProducer 两类平台项目，不出现在租户的项目列表里。',

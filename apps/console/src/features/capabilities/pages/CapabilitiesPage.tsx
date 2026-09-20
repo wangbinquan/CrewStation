@@ -1,4 +1,5 @@
 import type { CapabilityDescriptionDto } from '@crewstation/contracts';
+import { CapabilityDescriptionDtoSchema } from '@crewstation/contracts';
 import type { ReactElement } from 'react';
 import { useProjectScope } from '../../../shared/project/ProjectScope';
 import { api } from '../../../shared/api/client';
@@ -8,6 +9,7 @@ import { formatDateTime } from '../../../shared/lib/dateFormat';
 import { useI18n } from '../../../shared/lib/useI18n';
 import { useT } from '../../../shared/lib/useT';
 import { Badge } from '../../../shared/ui/Badge';
+import { Button } from '../../../shared/ui/Button';
 import { EmptyState } from '../../../shared/ui/EmptyState';
 import { PageHeader } from '../../../shared/ui/PageHeader';
 import { CapabilityConfigKeys } from '../components/CapabilityConfigKeys';
@@ -22,7 +24,11 @@ export function CapabilitiesPage({ embedded = false }: { readonly embedded?: boo
   const t = useT();
   const { locale } = useI18n();
   const { projectId } = useProjectScope();
-  const description = useApiQuery(queryKeys.capabilities(projectId), () => api.capabilities.describe(projectId));
+  const description = useApiQuery(queryKeys.capabilities(projectId), async () => {
+    const parsed = CapabilityDescriptionDtoSchema.safeParse(await api.capabilities.describe(projectId));
+    if (!parsed.success) throw new Error(t('capabilities.invalidResponse'));
+    return parsed.data;
+  });
   return (
     <>
       {!embedded ? <PageHeader
@@ -35,7 +41,7 @@ export function CapabilitiesPage({ embedded = false }: { readonly embedded?: boo
         }
       /> : null}
       {description.isPending ? <p className={styles.muted}>{t('capabilities.loading')}</p> : null}
-      {description.error ? <EmptyState title={t('capabilities.error', { message: errorMessage(description.error) })} /> : null}
+      {description.error ? <><EmptyState title={t('capabilities.error', { message: errorMessage(description.error) })} /><Button onClick={() => { void description.refetch(); }}>{t('capabilities.retry')}</Button></> : null}
       {description.data !== undefined ? <CapabilitySections description={description.data} /> : null}
     </>
   );

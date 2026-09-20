@@ -298,7 +298,7 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   'projects.wizard.noPlans': 'No service plans exist. Configure a plan in administration first.',
   'projects.wizard.choosePlan': 'Choose a plan',
   'projects.wizard.quota': 'Concurrent task limit',
-  'projects.wizard.quotaHint': 'Optional integer, 1–100. Blank uses the platform default. This is a task quota, not the number of CLI panes.',
+  'projects.wizard.quotaHint': 'Optional integer, 1–100. Blank uses the platform default. The development session, each CLI/agent and business tasks share this concurrency quota.',
   'projects.wizard.nameError': 'Enter a name of 1–80 characters.',
   'projects.wizard.slugError': 'Use 3–40 lowercase letters, digits or hyphens; start with a letter and end with a letter or digit.',
   'projects.wizard.ownerError': 'Choose an owner from the current directory.',

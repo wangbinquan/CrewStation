@@ -86,7 +86,7 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
 
   'admin.overview.open': 'Open {page}',
   'admin.overview.users': 'Who is a platform administrator: only they create projects, integrate company systems and decide open-policy and egress requests.',
-  'admin.overview.compute': 'Compute profiles: image, binary, before-start steps and model in one execution configuration, tested on save; tenants reference only a name (RFC-006).',
+  'admin.overview.compute': 'Configure the CLI, model, startup files and scripts for agents. Profiles are tested on save and referenced by name in projects.',
   'admin.overview.servicePlans': 'Service plans: CPU, memory and replica ceiling for digital-worker services, referenced by name from the manifest.',
   'admin.overview.taskProfiles': 'Task container profiles: CPU, memory and storage for dev-session and business task containers.',
   'admin.overview.integrations': 'Integration containers: APIProxy and EventProducer platform projects, kept out of tenant project lists.',

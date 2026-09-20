@@ -297,7 +297,7 @@ export const messages = {
   "projects.wizard.noPlans": "暂无服务套餐，请先在平台管理中配置套餐。",
   "projects.wizard.choosePlan": "选择套餐",
   "projects.wizard.quota": "并发任务上限",
-  "projects.wizard.quotaHint": "可选，1–100 的整数；留空使用平台默认值。这是任务配额，不是 CLI 窗口数量。",
+  "projects.wizard.quotaHint": "可选，1–100 的整数；留空使用平台默认值。开发会话、每个 CLI／Agent 和业务任务共用这个并发额度。",
   "projects.wizard.nameError": "请输入 1–80 字的名称。",
   "projects.wizard.slugError": "标识须为 3–40 位小写字母、数字或连字符，以字母开头，以字母或数字结尾。",
   "projects.wizard.ownerError": "请选择目录中存在的负责人。",

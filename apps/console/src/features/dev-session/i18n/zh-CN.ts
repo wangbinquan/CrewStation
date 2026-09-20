@@ -1,6 +1,8 @@
 import type { Messages } from '../../../shared/lib/i18n';
 
 export const messages = {
+  "devSession.editor.disconnected": "开发容器未连接，文件列表暂不可读。已打开文件的草稿仍保留；展开顶部“会话”查看原因。",
+  "devSession.editor.waitConnection": "连接恢复后会自动重新读取文件列表。",
   'devSession.rebuild.title': '恢复原工作树',
   'devSession.rebuild.check': '检查并恢复原工作树',
   'devSession.rebuild.checking': '正在检查原工作卷…',
@@ -37,8 +39,8 @@ export const messages = {
   'devSession.compare.previewTab.files': '相对待验证的文件差异',
 
   'devSession.title': '开发会话',
-  'devSession.line1': '一个项目同时最多一个开发会话：一个长期运行的开发容器，内含常驻 TaskRunner（独立 UID），默认连接开发数据库。',
-  'devSession.line2': '并行的流式交互 Agent、Web 终端、编辑器与预览共用同一条任务流；会话空闲只触发提醒。',
+  'devSession.line1': '从远端分支创建开发环境，逐个启动 CLI／Agent 并行开发，在独立页签查看预览、代码与生产版本差异。',
+  'devSession.line2': '每个 Agent 独立运行，共用当前工作树。一个项目同时保留一个开发会话，空闲时提醒，不自动释放。',
   'devSession.loading': '正在读取会话…',
 
   'devSession.state.creating': '创建中',

@@ -6,9 +6,9 @@
 
 .fields {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
   gap: var(--cs-space-3);
-  align-items: end;
+  align-items: start;
 }
 
 .actions {

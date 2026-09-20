@@ -71,15 +71,15 @@ export function DevSessionWorkbench({ projectId, session, access, canDevelop, se
         <div className={styles.titleRow}><h1 className={styles.title}>{t('devSession.title')}</h1><StreamStatus state={state} sessionState={session.state} />
           {session.state === 'running' && session.rebuild?.state === 'ready' ? <span className={styles.note} title={session.rebuild.message}>{t('devSession.rebuild.ready')}</span> : null}</div>
         <div className={styles.actions}>
-          <details className={styles.disclosure}><summary>{t('devSession.data.title')}{accessSummary ? ` · ${accessSummary}` : ''}{dataDirty ? ` · ${t('devSession.editor.dirty')}` : ''}</summary><div><DataBindingPane data={data} onDirtyChange={setDataDirty} /></div></details>
-          <details className={styles.disclosure}><summary>{t('devSession.native.sessionMenu')}</summary><div><SessionCard session={session} stream={state} access={access} release={release} unsavedFile={editor.dirty ? editor.file?.path : undefined} editorBusy={editor.busy} dataAccessDirty={dataDirty} dataAccessBusy={data.busy} onOpenFile={location.openFile} /><Link to={PROJECT_PATHS[space].conversations} params={{ projectId }}>{t('devSession.native.history')}</Link></div></details>
+          <details name="development-session-panels" className={styles.disclosure}><summary>{t('devSession.data.title')}{accessSummary ? ` · ${accessSummary}` : ''}{dataDirty ? ` · ${t('devSession.editor.dirty')}` : ''}</summary><div><DataBindingPane data={data} onDirtyChange={setDataDirty} /></div></details>
+          <details name="development-session-panels" className={styles.disclosure}><summary>{t('devSession.native.sessionMenu')}</summary><div><SessionCard session={session} stream={state} access={access} release={release} unsavedFile={editor.dirty ? editor.file?.path : undefined} editorBusy={editor.busy} dataAccessDirty={dataDirty} dataAccessBusy={data.busy} onOpenFile={location.openFile} /><Link to={PROJECT_PATHS[space].conversations} params={{ projectId }}>{t('devSession.native.history')}</Link></div></details>
           <Link className={styles.primary} to={PROJECT_PATHS[space].release} params={{ projectId }} search={{ source: 'session' }}>{t('devSession.native.prepareRelease')}</Link>
         </div>
       </header>
       <VersionComparisonPanel projectId={projectId} taskId={taskId} channel={channel} canDevelop={canDevelop} compact />
       <NativeWorkspace taskId={taskId} userId={userId} channel={channel} stream={state} canDevelop={canDevelop && session.state !== 'failed'} onActivity={touch} activityTarget={activityTarget} editorDirty={editor.dirty} location={location}
         preview={<DevelopmentPreview preview={preview} previewHost={session.previewHost} connected={state.runnerConnected} logs={<Link to={PROJECT_PATHS[space].operations} params={{ projectId }} search={{ tab: 'logs', source: 'dev-session', taskId }}>{t('devSession.preview.logs')}</Link>} />}
-        editor={<EditorPane tree={tree} editor={{ ...editor, openFile: location.openFile }} />}
+        editor={<EditorPane tree={tree} editor={{ ...editor, openFile: location.openFile }} connected={state.runnerConnected} />}
         changes={<VersionComparisonPanel projectId={projectId} taskId={taskId} channel={channel} canDevelop={canDevelop} initiallyExpanded target={location.search.target ?? 'prod'} onTargetChange={location.selectTarget} onOpenFile={location.openFile} />} />
     </>
   );

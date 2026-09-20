@@ -12,10 +12,11 @@ export interface AdminFormProps {
   readonly error?: ReactNode;
   readonly onSubmit: () => void;
   readonly children: ReactNode;
+  readonly extraActions?: ReactNode;
 }
 
 /** 管理页各分区新增表单的外壳：字段自动换行排布，提交按钮与说明在下方。 */
-export function AdminForm({ submitLabel, busyLabel, busy, incomplete, note, error, onSubmit, children }: AdminFormProps): ReactElement {
+export function AdminForm({ submitLabel, busyLabel, busy, incomplete, note, error, onSubmit, children, extraActions }: AdminFormProps): ReactElement {
   return (
     <form
       className={styles.form}
@@ -29,6 +30,7 @@ export function AdminForm({ submitLabel, busyLabel, busy, incomplete, note, erro
         <Button type="submit" variant="primary" disabled={busy || incomplete}>
           {busy ? busyLabel : submitLabel}
         </Button>
+        {extraActions}
         {note === undefined ? null : <span className={styles.note}>{note}</span>}
       </div>
       {error === undefined || error === null ? null : (

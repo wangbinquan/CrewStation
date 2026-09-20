@@ -53,6 +53,27 @@ async function input(node: HTMLInputElement | HTMLSelectElement, value: string) 
   await page!.settle();
 }
 
+test('资源说明读取失败展示原因，可原地重试而不需要离开设置页', async () => {
+  fixture(); const fallback = globalThis.fetch; let attempts = 0;
+  globalThis.fetch = (async (raw, init) => String(raw).endsWith('/capabilities')
+    ? Response.json({ error: 'unavailable', message: ++attempts === 1 ? '资源查询失败' : '资源查询仍不可用' }, { status: 503 })
+    : fallback(raw, init)) as typeof fetch;
+  page = await renderApp(`/projects/${projectId}/settings?tab=resources&resource=overview`);
+  expect(page.text()).toContain('资源查询失败'); expect(attempts).toBe(1);
+  await page.click('重新读取资源');
+  expect(attempts).toBe(2); expect(page.text()).toContain('资源查询仍不可用');
+  expect(page.path()).toBe(`/projects/${projectId}/settings`);
+});
+
+test('资源说明结构不完整时给出可重试错误，不让整个设置页崩溃', async () => {
+  fixture();
+  page = await renderApp(`/projects/${projectId}/settings?tab=resources&resource=overview`);
+  expect(page.text()).toContain('资源说明返回不完整');
+  expect(page.text()).toContain('重新读取资源');
+  await page.click('成员');
+  expect(page.search().tab).toBe('members');
+});
+
 describe('五个项目入口与旧链接兼容', () => {
   test('项目名与 slug 取实际项目，五项导航；概览不再请求成员和仓库详情', async () => {
     const f = fixture(); page = await renderApp(`/projects/${projectId}`);

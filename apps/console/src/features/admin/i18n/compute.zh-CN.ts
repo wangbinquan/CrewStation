@@ -2,6 +2,14 @@ import type { Messages } from '../../../shared/lib/i18n';
 
 /** 算力档位与平台仓库（RFC-006）的文案；由 zh-CN.ts 合并进 admin 的目录，单独成文件只是为了守住文件行数上限。 */
 export const computeMessages = {
+  "admin.profile.column.execution": "执行配置",
+  "admin.profile.configurationDetails": "配置详情",
+  "admin.profile.moreActions": "更多操作",
+  "admin.profile.search": "搜索档位、说明或模型",
+  "admin.profile.clearSearch": "清除搜索",
+  "admin.profile.refresh": "刷新档位",
+  "admin.profile.noMatches": "没有匹配的档位",
+  "admin.profile.searchHint": "修改关键词或清除搜索后查看全部档位。",
   'admin.profile.title': '算力档位',
   'admin.profile.pageHint': '算力档位是完整的执行配置：协议、镜像、二进制与参数、启动前步骤、变量与凭据、模型和资源套餐。租户与业务只按档位名（或 default）引用，看不到这些内容。',
   'admin.profile.hint': '保存即生效：执行相关的内容一改就生成新修订，并在平台命名空间里自动跑一次真实测试；测试通过前租户不能选这个档位。已运行的 Agent 固定各自受理时的修订。',

@@ -13,19 +13,20 @@ import styles from './EditorPane.module.css';
 export interface EditorPaneProps {
   readonly tree: WorkspaceTree;
   readonly editor: FileEditorHandle;
+  readonly connected?: boolean;
 }
 
-function Toolbar({ editor }: { readonly editor: FileEditorHandle }): ReactElement | null {
+function Toolbar({ editor, connected }: { readonly editor: FileEditorHandle; readonly connected: boolean }): ReactElement | null {
   const t = useT();
   if (editor.file === undefined) return null;
   return (
     <>
       <code className={styles.path}>{editor.file.path}</code>
       {editor.dirty ? <span className={styles.dirty}>{t('devSession.editor.dirty')}</span> : null}
-      <Button variant="primary" disabled={!editor.dirty || editor.busy || Boolean(editor.pendingAction)} onClick={editor.save}>
+      <Button variant="primary" disabled={!connected || !editor.dirty || editor.busy || Boolean(editor.pendingAction)} onClick={editor.save}>
         {editor.busy ? t('devSession.editor.saving') : t('devSession.editor.save')}
       </Button>
-      <Button disabled={editor.busy || Boolean(editor.pendingAction)} onClick={editor.reload}>
+      <Button disabled={!connected || editor.busy || Boolean(editor.pendingAction)} onClick={editor.reload}>
         {t('devSession.editor.reload')}
       </Button>
       <Button disabled={editor.busy || Boolean(editor.pendingAction)} onClick={editor.close}>{t('devSession.editor.close')}</Button>
@@ -54,22 +55,25 @@ function EditorNotice({ editor }: { readonly editor: FileEditorHandle }): ReactE
 }
 
 /** 编辑器：左树右编辑区，保存带 expectedVersion；磁盘上变了就提示重载，不覆盖。 */
-export function EditorPane({ tree, editor }: EditorPaneProps): ReactElement {
+export function EditorPane({ tree, editor, connected = true }: EditorPaneProps): ReactElement {
   const t = useT();
   return (
     <Pane
       title={t('devSession.editor.title')}
       className={styles.pane}
       flush
-      extra={<Toolbar editor={editor} />}
-      notice={editor.pendingAction || editor.conflict || editor.error !== undefined ? <EditorNotice editor={editor} /> : undefined}
+      extra={<Toolbar editor={editor} connected={connected} />}
+      notice={<>
+        {!connected ? <PaneNotice tone="warning">{t('devSession.editor.disconnected')}</PaneNotice> : null}
+        {editor.pendingAction || editor.conflict || editor.error !== undefined ? <EditorNotice editor={editor} /> : null}
+      </>}
     >
       <div className={styles.content}>
-        <FileTree tree={tree} openPath={editor.file?.path} onOpen={editor.openFile} disabled={editor.busy || Boolean(editor.pendingAction)} />
+        <FileTree tree={tree} openPath={editor.file?.path} onOpen={editor.openFile} disabled={!connected || editor.busy || Boolean(editor.pendingAction)} />
         {editor.file === undefined ? (
-          <p className={styles.placeholder}>{tree.error ?? t('devSession.editor.placeholder')}</p>
+          <p className={styles.placeholder}>{!connected ? t('devSession.editor.waitConnection') : tree.error ?? t('devSession.editor.placeholder')}</p>
         ) : (
-          <CodeEditor file={editor.file} draft={editor.draft} onChange={editor.change} onSave={editor.save} />
+          <CodeEditor file={editor.file} draft={editor.draft} onChange={editor.change} onSave={() => { if (connected) editor.save(); }} />
         )}
       </div>
     </Pane>

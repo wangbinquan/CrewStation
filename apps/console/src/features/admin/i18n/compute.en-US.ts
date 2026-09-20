@@ -3,6 +3,14 @@ import type { computeMessages as zhCN } from './compute.zh-CN';
 
 /** Messages for compute profiles and the platform registry (RFC-006), merged into the admin catalog by en-US.ts. */
 export const computeMessages: MessagesShapedLike<typeof zhCN> = {
+  "admin.profile.column.execution": "Execution",
+  "admin.profile.configurationDetails": "Configuration details",
+  "admin.profile.moreActions": "More actions",
+  "admin.profile.search": "Search profile, description or model",
+  "admin.profile.clearSearch": "Clear search",
+  "admin.profile.refresh": "Refresh profiles",
+  "admin.profile.noMatches": "No matching profiles",
+  "admin.profile.searchHint": "Change the keyword or clear the search to see every profile.",
   'admin.profile.title': 'Compute profiles',
   'admin.profile.pageHint': 'A compute profile is a complete execution configuration: protocol, image, binary and arguments, before-start steps, variables and credentials, model and resource plan. Tenants and business code refer to a profile only by name (or default) and never see its contents.',
   'admin.profile.hint': 'Saving takes effect: any change to the execution content creates a new revision and runs a real test in the platform namespace automatically; tenants cannot choose the profile until that test passes. Running agents keep the revision they were accepted with.',

@@ -33,7 +33,7 @@ const terminal = (name: string, digit: string): NativeTerminalDto => ({ ...activ
   execution: { taskId: TaskIdSchema.parse(`tsk_${digit.repeat(32)}`), state: 'running', profile: { name: 'cli', cpu: '1', memory: '2Gi', storage: '2Gi' } } });
 
 test('两窗接入不同 Runner，父连接断开仍能附着；切页签只关显示连接，不停止 CLI', async () => {
-  const one = terminal('one', '4'), two = terminal('two', '5'), layout = initialWorkspaceLayout('工作区 1');
+  const one = terminal('one', '4'), two = { ...terminal('two', '5'), protocol: 'terminal' as const }, layout = initialWorkspaceLayout('工作区 1');
   window.location.href = 'http://localhost/';
   layout.tabs[0]!.paneOrder = [one.terminalId, two.terminalId];
   globalThis.WebSocket = Socket as unknown as typeof WebSocket;
@@ -50,6 +50,8 @@ test('两窗接入不同 Runner，父连接断开仍能附着；切页签只关�
   await act(async () => { for (const socket of Socket.instances) { socket.onopen?.(); socket.receive({ type: 'streamReady', connected: true, replayed: 0, replayComplete: true }); } }); await page.settle();
   for (const item of [one, two]) expect(Socket.instances.find((socket) => socket.url.includes(item.execution!.taskId))?.sent).toContainEqual(expect.objectContaining({ type: 'attachTerminal', terminalId: item.terminalId, runnerId: item.runnerId }));
   expect(parentCommands).toEqual([]); expect(page.text()).toContain('CPU 1');
+  expect(document.querySelector('[data-native-terminal="terminal-two"] [data-activity]')).toBeNull();
+  expect(document.querySelector('[data-native-terminal="terminal-one"] [data-activity]')).not.toBeNull();
   await page.click('＋ 页签');
   expect(Socket.instances.every((socket) => socket.readyState === 3)).toBe(true);
   expect(Socket.instances.flatMap((socket) => socket.sent).some((command) => command.type === 'stopAgentTerminal' || command.type === 'startAgentTerminal')).toBe(false);

@@ -134,3 +134,19 @@
   font-family: var(--cs-font-mono);
   font-size: var(--cs-font-size-sm);
 }
+
+.listToolbar { display: flex; align-items: end; flex-wrap: wrap; gap: var(--cs-space-2); margin-bottom: var(--cs-space-3); }
+.listToolbar > label { flex: 1; max-width: 30rem; }
+.profileTable { table-layout: fixed; min-width: 640px; }
+.profileTable th:nth-child(1) { width: 24%; }
+.profileTable th:nth-child(2) { width: 29%; }
+.profileTable th:nth-child(3) { width: 29%; }
+.profileTable th:nth-child(4) { width: 18%; }
+.profileTable summary { cursor: pointer; color: var(--cs-color-primary); }
+.profileTable small { display: block; margin-top: var(--cs-space-1); }
+.configurationDetails { margin: var(--cs-space-2) 0 0; font-size: var(--cs-font-size-sm); }
+.configurationDetails dt { color: var(--cs-color-text-muted); }
+.configurationDetails dd { margin: 0 0 var(--cs-space-2); }
+.moreActions { min-width: 0; }
+.moreActions > summary { padding: 6px 0; }
+.moreActions > div { margin-top: var(--cs-space-2); }

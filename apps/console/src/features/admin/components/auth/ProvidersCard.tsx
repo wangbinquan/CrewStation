@@ -46,7 +46,7 @@ export function ProvidersCard(): ReactElement {
       <QueryStatus
         isPending={providers.isPending}
         error={providers.error}
-        isEmpty={items.length === 0}
+        isEmpty={items.length === 0 && !adding}
         emptyTitle={t('admin.auth.providersEmptyTitle')}
         emptyDescription={t('admin.auth.providersEmptyDescription')}
       />
@@ -86,11 +86,10 @@ export function ProvidersCard(): ReactElement {
       ) : null}
       {probe ? <ActionNote tone="neutral">{`${probe.slug}：${probe.text}`}</ActionNote> : null}
       {editing === undefined && !adding ? <Button variant="primary" onClick={() => setAdding(true)}>{t('admin.auth.providerNew')}</Button> : null}
-      {adding ? <ProviderForm busy={create.isPending} onSubmit={(body) => create.mutate(body)} /> : null}
+      {adding ? <ProviderForm busy={create.isPending} onCancel={() => setAdding(false)} onSubmit={(body) => create.mutate(body)} /> : null}
       {editing === undefined ? null : (
         <>
-          <ProviderForm initial={editing} busy={patch.isPending} onSubmit={(body) => patch.mutate({ id: editing.id, body })} />
-          <Button variant="ghost" onClick={() => setEditing(undefined)}>{t('admin.auth.cancelEdit')}</Button>
+          <ProviderForm key={editing.id} initial={editing} busy={patch.isPending} onCancel={() => setEditing(undefined)} onSubmit={(body) => patch.mutate({ id: editing.id, body })} />
         </>
       )}
     </Card>

@@ -134,3 +134,21 @@ test('项目覆盖：填项目与字段后保存，删除覆盖回到全局默�
   await page.settle();
   expect(page.text()).toContain(f.projectId);
 });
+
+
+test('新增身份提供方一次标出所有必填错误，并允许取消；非法输入不发送请求', async () => {
+  const f = adminAuthenticationFixture();
+  page = await renderApp('/admin/authentication');
+  await page.click('新增身份提供方'); await page.click('新增');
+  expect(document.querySelectorAll('[aria-invalid="true"]')).toHaveLength(5);
+  expect(document.activeElement?.getAttribute('aria-invalid')).toBe('true');
+  expect(document.querySelector('input[type="password"]')).not.toBeNull();
+  await field('标识', 'Wrong Slug');
+  expect(document.activeElement?.closest('label')?.textContent).toContain('标识');
+  await page.click('新增');
+  expect(page.text()).toContain('1–64'); expect(f.writes()).toEqual([]);
+  await page.click('取消编辑');
+  expect(document.querySelector('input[type="password"]')).toBeNull();
+  await page.click('新增身份提供方');
+  expect(document.querySelector<HTMLInputElement>('input[type="password"]')?.value).toBe('');
+});

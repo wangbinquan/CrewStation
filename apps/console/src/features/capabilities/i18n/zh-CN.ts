@@ -5,6 +5,8 @@ export const messages = {
   'capabilities.line1': '聚合本数字人当前可用的一切：身份约定与域名、平台 API 地址、配置键、数据资源、可调用操作、事件订阅、并发配额与服务套餐、两个平台 MCP 服务器。',
   'capabilities.line2': '这一页是能力说明 MCP 的人类可读版本：同一份数据，值都可直接复制到代码或开发容器里使用。',
   'capabilities.loading': '读取中…',
+  'capabilities.retry': '重新读取资源',
+  'capabilities.invalidResponse': '资源说明返回不完整，请重新读取；若持续失败，请联系管理员检查平台服务。',
   'capabilities.error': '读取失败：{message}',
   'capabilities.generatedAt': '生成于 {time}',
   'capabilities.copy': '复制',

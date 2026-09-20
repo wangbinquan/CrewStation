@@ -2,6 +2,8 @@ import type { MessagesShapedLike } from '../../../shared/lib/i18n';
 import type { messages as zhCN } from './zh-CN';
 
 export const messages: MessagesShapedLike<typeof zhCN> = {
+  "devSession.editor.disconnected": "The development container is disconnected, so files cannot be loaded. Open file drafts are preserved. Expand Session above to see the reason.",
+  "devSession.editor.waitConnection": "The file list will reload automatically when the connection returns.",
   'devSession.rebuild.title': 'Recover original worktree',
   'devSession.rebuild.check': 'Check and recover original worktree',
   'devSession.rebuild.checking': 'Checking original volume…',
@@ -39,8 +41,8 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
 
   'devSession.title': 'Dev session',
   'devSession.line1':
-    'A project has at most one dev session at a time: one long-lived dev container with a resident TaskRunner (own UID), bound to the development database by default.',
-  'devSession.line2': 'Parallel streaming agents, the web terminal, editor and preview all share one task stream; an idle session only triggers reminders.',
+    'Start CLI windows one at a time, arrange them in tabs, and inspect the preview, files and differences from production.',
+  'devSession.line2': 'Each agent runs independently and shares the working tree. A project keeps one development session; idle sessions trigger reminders without being released.',
   'devSession.loading': 'Loading the session…',
 
   'devSession.state.creating': 'Creating',

@@ -135,3 +135,17 @@ test('冲突后重新载入失败仍显示读取错误和原草稿，放弃确�
   expect(content().textContent).toBe('需要保留的草稿');
   expect(document.activeElement?.textContent).toContain('文件不存在：a.ts');
 });
+
+
+test('断连明确说明文件不可读取，保留编辑草稿并禁用保存，重连后恢复', async () => {
+  fixture = editorWorkspaceFixture(); page = await renderApp(path);
+  await page.click('代码'); await page.click('a.ts'); await edit('离线草稿');
+  await act(async () => fixture!.receive({ type: 'streamReady', connected: false, replayed: 0 })); await page.settle();
+  expect(page.text()).toContain('开发容器未连接，文件列表暂不可读');
+  expect(content().textContent).toBe('离线草稿');
+  const save = [...document.querySelectorAll('button')].find((button) => button.textContent === '保存')!;
+  expect(save.disabled).toBe(true);
+  await act(async () => fixture!.receive({ type: 'streamReady', connected: true, replayed: 0 })); await page.settle();
+  expect(page.text()).not.toContain('文件列表暂不可读'); expect(save.disabled).toBe(false);
+  expect(content().textContent).toBe('离线草稿');
+});

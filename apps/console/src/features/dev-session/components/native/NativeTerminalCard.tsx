@@ -53,7 +53,7 @@ function NativeTerminalFrame({ terminalId, terminal, layout, store, channel, str
   const state = activityStatus(terminal, activity?.page?.states.find((state) => state.terminalId === terminalId) ?? terminal?.activity, activity?.page ?? { sync: activitySync ?? 'unavailable', connection: terminal?.connection ?? 'unknown' }, activity?.stale || !stream.runnerConnected);
   return <section className={styles.terminalCard} data-native-terminal={terminalId} tabIndex={-1} onFocusCapture={() => store.update((value) => value.selectedTerminalId === terminalId ? value : { ...value, selectedTerminalId: terminalId })}>
     <header className={styles.terminalHeader}>
-      <strong title={terminal?.agentId}>{label}</strong><span className={styles.lifecycle} data-activity={state}>{t(`activity.status.${state}`)}</span>
+      <strong title={terminal?.agentId}>{label}</strong>{terminal?.protocol !== 'terminal' || state !== 'unknown' ? <span className={styles.lifecycle} data-activity={state}>{t(`activity.status.${state}`)}</span> : null}
       {terminal?.lifecycle === 'running' && terminal.connection === 'connected' && stream.runnerConnected && state !== 'ended' ? <small className={styles.lifecycle}>{t('activity.processOnline')}</small> : null}
       <span className={styles.compute}>{terminal?.compute}</span>
       {terminal?.protocol === 'terminal' ? <small title={t('devSession.agents.terminalOnlyHint')}>{t('devSession.agents.terminalOnly')}</small> : null}

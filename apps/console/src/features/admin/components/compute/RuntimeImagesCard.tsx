@@ -29,7 +29,7 @@ function CredentialNote({ credential, onDismiss }: { readonly credential: Regist
   return (
     <div className={styles.stageBody} role="status">
       <ActionNote tone="success">{t('admin.images.credentialIssued', { expiresAt: date(credential.expiresAt) })}</ActionNote>
-      <DefinitionList layout="grid" items={[
+      <DefinitionList items={[
         { label: t('admin.images.username'), value: <span className={styles.toolbar}><code>{credential.username}</code><CopyButton text={credential.username} label={t('admin.images.copyUsername')} /></span> },
         { label: t('admin.images.password'), value: <span className={styles.toolbar}><code className={styles.breakable}>{credential.password}</code><CopyButton text={credential.password} label={t('admin.images.copyPassword')} /></span> },
         { label: t('admin.images.pushPrefixes'), value: <code>{credential.pushPrefixes.join(', ')}</code> },
@@ -57,7 +57,7 @@ export function RuntimeImagesCard(): ReactElement {
       <QueryStatus isPending={info.isPending} error={info.error} />
       {data ? (
         <>
-          <DefinitionList layout="grid" items={[
+          <DefinitionList items={[
             { label: t('admin.images.pushHost'), value: <code>{data.pushHost}</code> },
             { label: t('admin.images.repositoryPrefix'), value: <code>{data.repositoryPrefix}</code> },
             { label: t('admin.images.pullReference'), value: <code className={styles.breakable}>{data.pullReference}</code> },

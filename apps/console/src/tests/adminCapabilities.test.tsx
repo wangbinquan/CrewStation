@@ -12,7 +12,7 @@ const key = 'billing:GET:/invoices', createdAt = '2026-09-13T01:00:00.000Z';
 let page: Awaited<ReturnType<typeof renderApp>> | undefined;
 afterEach(() => { page?.unmount(); page = undefined; globalThis.fetch = originalFetch; });
 
-function fixture(options: { admin?: boolean; meFailure?: boolean; pendingMe?: boolean } = {}) {
+function fixture(options: { admin?: boolean; meFailure?: boolean; pendingMe?: boolean; producerSlug?: string } = {}) {
   const calls: Array<{ url: URL; method: string; body?: Record<string, unknown> }> = [];
   const state = { projectsFailure: false, operationsFailure: false, apiFailure: false, egressFailure: false, decisionFailure: false, grant: true, policy: 'targeted', requestState: 'pending', decision: undefined as string | undefined };
   const request = () => ({ id: 'api-1', serviceId, operationKey: key, state: state.requestState, reason: '查询账单', requestedBy: project.ownerUserId, createdAt, decision: state.decision });
@@ -57,7 +57,7 @@ function fixture(options: { admin?: boolean; meFailure?: boolean; pendingMe?: bo
       if (state.egressFailure) { status = 503; body = { error: 'unavailable', message: '出站申请读取失败' }; }
       else body = { items: [{ id: 'egress-1', projectId, project, fqdn: 'example.invalid', reason: '模型调用', state: 'pending', createdAt, requestedBy: project.ownerUserId }]
         .filter((r) => url.pathname !== '/v1/egress/requests/page' || url.searchParams.get('state') === 'all' || r.state === url.searchParams.get('state')) };
-    } else if (url.pathname === '/v1/catalog/event-types') body = { items: [{ eventType: 'billing.changed', producer: 'billing-events', producerProject: integrationId }] };
+    } else if (url.pathname === '/v1/catalog/event-types') body = { items: [{ eventType: 'billing.changed', producer: 'billing-events', producerProject: options.producerSlug ?? integrationId }] };
     else if (url.pathname.endsWith('/dev-session')) { status = 404; body = { error: 'not_found', message: '没有开发会话' }; }
     return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
   }) as typeof fetch;
@@ -79,7 +79,7 @@ describe('管理员能力与审批入口', () => {
     expect(page.path()).toBe('/admin/capabilities'); expect(page.search().tab).toBe('integrations');
     expect(page.text()).toContain('账单接入'); expect(f.calls.some((call) => call.url.pathname === '/v1/catalog/operations')).toBe(false);
     await page.back(); expect(page.path()).toBe('/projects');
-    await page.navigate('/admin/capabilities?tab=events'); await page.click('billing-events');
+    await page.navigate('/admin/capabilities?tab=events'); await page.click(integrationId);
     expect(page.path()).toBe(`/admin/integrations/${integrationId}`);
   });
 
@@ -207,4 +207,15 @@ test('管理分类只保留适用的有界参数', () => {
   expect(parseCapabilitySearch({ tab: 'events', projectId, operation: key })).toEqual({ tab: 'events' });
   expect(parseCapabilitySearch({ tab: 'api', projectId: 'bad', proxy: '\nfoo', operation: 'x'.repeat(2049) })).toEqual({ tab: 'api', projectId: undefined, proxy: undefined, operation: undefined });
   expect(parseRequestSearch({ tab: 'unknown', projectId, state: 'unknown' })).toEqual({ tab: 'api', projectId, state: 'pending' });
+});
+
+
+test('事件目录的生产项目是 slug 时跳到已筛选的接入目录，不发出无效的项目 ID 请求', async () => {
+  const f = fixture({ producerSlug: 'billing' });
+  page = await renderApp('/admin/capabilities?tab=events');
+  await page.click('billing');
+  expect(page.path()).toBe('/admin/capabilities');
+  expect(page.search()).toMatchObject({ tab: 'integrations', q: 'billing' });
+  expect(f.calls.some((call) => call.url.pathname === '/v1/projects/billing')).toBe(false);
+  expect(page.text()).toContain('账单接入');
 });
