@@ -13,6 +13,7 @@ export function sessionLifecycleUseCases(deps: DevSessionUseCaseDeps) {
     previewHost: `dev.${slug}.${settings.userDomain}`, preview, createdBy: (env as { createdBy?: DevSessionDto['createdBy'] }).createdBy ?? ('usr_00000000000000000000000000000000' as DevSessionDto['createdBy']),
     createdAt: env.createdAt, lastActivityAt: env.lastActivityAt, ...(reminderAt ? { idleReminderSentAt: reminderAt.toISOString() } : {}), ...(env.message ? { message: env.message } : {}),
     rebuild: await environments.getRebuild(env.id),
+    ...(env.connectionIssue ? { connectionIssue: env.connectionIssue } : {}),
   });
 
   const previewOf = async (env: EnvironmentView): Promise<PreviewState> => {

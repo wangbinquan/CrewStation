@@ -1,5 +1,5 @@
 import type { Actor, ProjectId, RunnerCommand, RunnerEvent, ServiceId, TaskId, TraceId, UserId } from '@crewstation/contracts';
-import type { DevSessionRebuildDto, DevSessionRebuildInspection, RebuildDevSessionRequest } from '@crewstation/contracts';
+import type { DevSessionDto, DevSessionRebuildDto, DevSessionRebuildInspection, RebuildDevSessionRequest } from '@crewstation/contracts';
 
 export interface EnvironmentView {
   id: TaskId;
@@ -12,6 +12,7 @@ export interface EnvironmentView {
   branch?: string;
   traceId: string;
   message?: string;
+  connectionIssue?: DevSessionDto['connectionIssue'];
   createdAt: string;
   lastActivityAt: string;
 }

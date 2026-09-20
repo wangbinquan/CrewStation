@@ -11,11 +11,11 @@ export function useWorkspaceLocation(taskId: string, location: WorkspaceLocation
   const selected = !!search?.agent || !!search?.terminal, wrongTask = !!search?.task && search.task !== taskId;
   const invalid = wrongTask || wantsTerminal && selected && roster !== undefined && !terminal;
   useEffect(() => {
-    if (!location || !loaded || hasActivityTarget || invalid || !view || view === 'conversation' || selected && wantsTerminal && !roster || handled.current === location.key) return;
+    if (!location || !loaded || hasActivityTarget || invalid || !view || ['conversation', 'data', 'session'].includes(view) || selected && wantsTerminal && !roster || handled.current === location.key) return;
     handled.current = location.key;
     store.update((current) => {
       const next = wantsTerminal && selected && terminal ? revealActivityTerminal(current, terminal.terminalId, tabName) : current;
-      const display = view === 'split' ? 'cli' : view === 'diff' ? 'changes' : view;
+      const display = view === 'split' ? 'cli' : view === 'diff' ? 'changes' : view as 'cli' | 'preview' | 'code' | 'changes';
       const previewAlongside = wantsTerminal ? view === 'split' : next.previewAlongside;
       return next.view === display && next.previewAlongside === previewAlongside ? next : { ...next, view: display, previewAlongside };
     });

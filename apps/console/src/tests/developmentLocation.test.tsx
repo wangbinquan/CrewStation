@@ -19,7 +19,7 @@ async function edit(text: string) { const view = EditorView.findFromDOM(content(
 test('文件链接进入真实代码视图，切换视图更新地址，返回不会重复读取或启动 CLI', async () => {
   fixture = editorWorkspaceFixture(); const url = `${path}?view=code&file=b.ts`, history = browserHistoryFixture([url]);
   page = await renderApp(url, undefined, history.history); expect(content()?.textContent).toBe('第二个文件');
-  expect(page.search().file).toBe('b.ts'); await page.click('预览'); expect(page.search().view).toBe('preview'); expect(Boolean(content())).toBe(false);
+  expect(page.search().file).toBe('b.ts'); await page.click('预览'); expect(page.search().view).toBe('preview'); expect(content()?.closest('[hidden]')).not.toBeNull();
   await page.back(); expect(page.search().view).toBe('code'); expect(content()?.textContent).toBe('第二个文件');
   expect(fixture.commands.filter((c) => c.type === 'readFile')).toHaveLength(1);
   expect(fixture.writes.every((w) => w.path.endsWith('/workspace-layout'))).toBe(true);
@@ -62,18 +62,18 @@ test('中文路径完整传入读取，非法视图／控制字符参数不会�
   fixture = editorWorkspaceFixture(); const file = 'src/中文 参数.ts'; fixture.files.set(file, '含空格的路径');
   page = await renderApp(`${path}?file=${encodeURIComponent(file)}`); expect(content()?.textContent).toBe('含空格的路径'); expect(fixture.commands.some((c) => c.type === 'readFile' && c.path === file)).toBe(true);
   expect(parseDevelopmentSearch({ view: ['cli'], file: 'a\n.ts', target: 'invalid' })).toEqual({});
-  await page.navigate(`${path}?target=preview`); expect(document.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toContain('差异');
+  await page.navigate(`${path}?target=preview`); expect(document.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toContain('变更');
 });
 
 test('差异别名与待验证目标接到实际查询，空 CLI 工作区也能打开并排预览', async () => {
   fixture = editorWorkspaceFixture(); const base = globalThis.fetch, calls: URL[] = [];
   globalThis.fetch = (async (raw, init) => { calls.push(new URL(String(raw), 'http://localhost')); return base(raw, init); }) as typeof fetch;
   page = await renderApp(`${path}?view=changes&target=preview`);
-  expect(document.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toContain('差异');
+  expect(document.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toContain('变更');
   expect(calls.some((url) => url.pathname.endsWith('/version-comparison') && url.searchParams.get('target') === 'preview')).toBe(true);
   expect(page.text()).toContain('工作树与待验证版本'); await page.navigate(`${path}?view=split`);
-  expect(page.text()).toContain('开发预览'); expect(page.text()).toContain('开始一个 CLI');
-  await page.click('代码'); await page.click('＋ 页签'); expect(page.search().view).toBe('split'); expect(page.text()).toContain('工作区 2');
+  expect(page.text()).toContain('开发预览'); expect(page.text()).toContain('创建第一个 CLI');
+  await page.click('代码'); await page.click('CLI 工作区'); await page.click('＋ 工作区'); expect(page.search().view).toBe('split'); expect(page.text()).toContain('工作区 2');
   expect(fixture.commands.some((c) => c.type === 'startAgentTerminal' || c.type === 'stopAgentTerminal')).toBe(false);
 });
 
@@ -96,8 +96,8 @@ test('普通 Agent 链接恢复已存在窗口并覆盖个人视图，不标记�
   }) as typeof fetch;
   page = await renderApp(`${path}?agent=${f.terminal.agentId}&terminal=${f.terminal.terminalId}&task=${activityTaskId}`);
   expect(document.querySelectorAll(`[data-native-terminal="${f.terminal.terminalId}"]`)).toHaveLength(1);
-  expect(document.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toContain('已有页签');
-  await page.click('代码'); await page.click('放入当前页签'); expect(page.search().view).toBe('cli');
+  expect([...document.querySelectorAll('[role="tab"][aria-selected="true"]')].map((node) => node.textContent)).toContain('已有页签 · 1');
+  await page.click('代码'); await page.click('CLI 工作区'); await page.click('放入当前页签'); expect(page.search().view).toBe('cli');
   expect(fixture.writes.every((w) => w.path.endsWith('/workspace-layout'))).toBe(true);
   expect(fixture.commands.some((c) => ['startAgentTerminal', 'stopAgentTerminal', 'claimTerminalControl', 'terminalInput'].includes(c.type))).toBe(false);
 });
@@ -113,7 +113,7 @@ test('发布预检的未提交文件链接携带原会话，进入代码只读�
   expect(page.path()).toBe(path); expect(page.search()).toMatchObject({ view: 'code', file: 'b.ts', task: activityTaskId }); expect(content()?.textContent).toBe('第二个文件');
   expect(fixture.commands.filter((c) => c.type === 'readFile')).toHaveLength(1);
   expect(fixture.writes.every((w) => w.path.endsWith('/workspace-layout'))).toBe(true);
-  await page.click('释放会话');
+  await page.click('会话与环境'); await page.click('释放会话');
   const listed = document.querySelector<HTMLButtonElement>('[role="alertdialog"] button'); expect(listed?.textContent).toBe('b.ts');
   await act(async () => listed!.click()); await page.settle(); expect(document.querySelectorAll('[role="alertdialog"]')).toHaveLength(0);
   expect(content()?.textContent).toBe('第二个文件'); expect(fixture.writes.some((w) => w.method === 'DELETE')).toBe(false);

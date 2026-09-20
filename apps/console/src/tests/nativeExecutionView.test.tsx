@@ -52,7 +52,7 @@ test('两窗接入不同 Runner，父连接断开仍能附着；切页签只关�
   expect(parentCommands).toEqual([]); expect(page.text()).toContain('CPU 1');
   expect(document.querySelector('[data-native-terminal="terminal-two"] [data-activity]')).toBeNull();
   expect(document.querySelector('[data-native-terminal="terminal-one"] [data-activity]')).not.toBeNull();
-  await page.click('＋ 页签');
+  await page.click('＋ 工作区');
   expect(Socket.instances.every((socket) => socket.readyState === 3)).toBe(true);
   expect(Socket.instances.flatMap((socket) => socket.sent).some((command) => command.type === 'stopAgentTerminal' || command.type === 'startAgentTerminal')).toBe(false);
 });

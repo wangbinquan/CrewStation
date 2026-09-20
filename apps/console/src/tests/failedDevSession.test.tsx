@@ -33,7 +33,7 @@ test('失败会话在首屏显示真实对象和原因，新建需明确确认�
   // 实机 OOM 后 WebSocket 仍可回放历史；顶栏不能因此把失败会话标成绿色已连接。
   const status = [...document.querySelectorAll('header')].find((node) => node.querySelector('h1')?.textContent === '开发会话')!.querySelector('span')!;
   expect(status.textContent).toBe('失败');
-  await page.click('从远端另建工作树');
+  await page.click('会话与环境'); await page.click('从远端另建工作树');
   await page.click('从远端分支新建');
   expect(document.querySelector('[role="alertdialog"]')?.textContent).toContain('main');
   expect(page.text()).toContain('页面中的未保存输入'); expect(starts).toHaveLength(0);
@@ -54,7 +54,7 @@ test('运行中收到失败状态不卸载编辑器草稿，明确新建失败�
   expect(status.textContent).toBe('失败');
   expect(document.querySelector('.cm-content')).toBe(editor); expect(editor.textContent).toBe('OOM 前尚未保存的内容');
   expect(document.activeElement).toBe(editor);
-  await page.click('从远端另建工作树');
+  await page.click('会话与环境'); await page.click('从远端另建工作树');
   await page.click('从远端分支新建'); await page.click('确认新建工作树');
   expect(starts).toHaveLength(1); expect(JSON.parse(starts[0]!)).toEqual({ branch: 'main' });
   expect(page.text()).toContain('创建尚未成功，请保留当前输入');

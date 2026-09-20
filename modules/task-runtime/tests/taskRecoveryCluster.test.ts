@@ -49,3 +49,19 @@ test('工作卷删除中、归属变化或状态未知均原样反馈，不推�
   expect((await cluster.inspect(env)).volume).toEqual({ uid: 'kept-volume', phase: 'Unknown', deleting: true, belongsToTask: false });
   expect(k8s.deleted).toEqual([]);
 });
+
+
+test('运行中的原 Pod 仅允许已登记恢复的协议拒绝开发环境替换，拒绝仅客户端声明原因', async () => {
+  const { k8s, cluster } = await fixture();
+  await k8s.mergePatch(Resources.Pod!, env.podName, env.namespace, { status: { phase: 'Running' } });
+  const recovering: TaskEnvironment = { ...env, kind: 'dev-session', state: 'creating', connected: false, rebuildId: 'confirmed', runnerRejection: { code: 'protocol_mismatch', runnerProtocol: 1, message: 'old protocol', at: '2026-09-20T00:00:00Z' } };
+  await expect(cluster.removeFailedPod(env, 'old-pod', 'protocol_mismatch')).rejects.toThrow('尚未结束');
+  await expect(cluster.removeFailedPod({ ...recovering, connected: true }, 'old-pod', 'protocol_mismatch')).rejects.toThrow('尚未结束');
+  await expect(cluster.removeFailedPod({ ...recovering, rebuildId: undefined }, 'old-pod', 'protocol_mismatch')).rejects.toThrow('尚未结束');
+  await expect(cluster.removeFailedPod(recovering, 'old-pod')).rejects.toThrow('尚未结束');
+  expect(k8s.deleted).toEqual([]);
+  const volume = await k8s.get(Resources.PersistentVolumeClaim!, env.pvcName, env.namespace);
+  await cluster.removeFailedPod(recovering, 'old-pod', 'protocol_mismatch');
+  expect(k8s.deleted).toEqual(['v1/Pod/cs-qa/task-qa']);
+  expect(await k8s.get(Resources.PersistentVolumeClaim!, env.pvcName, env.namespace)).toEqual(volume);
+});

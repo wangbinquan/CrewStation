@@ -14,8 +14,8 @@ import type { SessionAccess } from '../model/sessionAccess';
 import type { StreamState } from '../model/taskStreamSocket';
 import { PaneNotice } from './PaneNotice';
 import { ReleaseControl } from './ReleaseControl';
-import { StreamStatus } from './StreamStatus';
-import styles from './SessionCard.module.css';
+import { Card } from '../../../shared/ui/Card';
+import { Stack } from '../../../shared/ui/Stack';
 
 export interface SessionCardProps {
   readonly session: DevSessionDto;
@@ -33,6 +33,8 @@ function details(session: DevSessionDto, stream: StreamState, access: SessionAcc
   return [
     { label: t('devSession.session.taskId'), value: <code>{session.taskId}</code> },
     { label: t('devSession.session.branch'), value: <code>{session.branch}</code> },
+    { label: t('devSession.session.pod'), value: <code>{session.podName ?? '—'}</code> },
+    { label: t('devSession.session.created'), value: formatDateTime(session.createdAt, locale) },
     {
       label: t('devSession.session.runner'),
       value: (
@@ -52,13 +54,8 @@ export function SessionCard({ session, stream, access, release, unsavedFile, edi
   const t = useT();
   const { locale } = useI18n();
   return (
-    <section className={styles.card}>
-      <header className={styles.header}>
-        <div className={styles.identity}>
-          <StreamStatus state={stream} sessionState={session.state} />
-        </div>
-        {session.state !== 'failed' ? <ReleaseControl projectId={session.projectId} taskId={session.taskId} access={access} release={release} unsavedFile={unsavedFile} editorBusy={editorBusy} dataAccessDirty={dataAccessDirty} dataAccessBusy={dataAccessBusy} onOpenFile={onOpenFile} /> : null}
-      </header>
+    <Card stacked title={t('devSession.session.details')} footer={session.state !== 'failed' ? <Stack><strong>{t('devSession.session.releaseTitle')}</strong><p>{t('devSession.release.hint')}</p>
+      <ReleaseControl projectId={session.projectId} taskId={session.taskId} access={access} release={release} unsavedFile={unsavedFile} editorBusy={editorBusy} dataAccessDirty={dataAccessDirty} dataAccessBusy={dataAccessBusy} onOpenFile={onOpenFile} /></Stack> : undefined}>
       <DefinitionList layout="grid" items={details(session, stream, access, t, locale)} />
       {stream.runnerState !== undefined && stream.runnerState !== 'ready' ? (
         <PaneNotice tone="warning">{t(`devSession.runnerState.${stream.runnerState}`)}</PaneNotice>
@@ -67,6 +64,6 @@ export function SessionCard({ session, stream, access, release, unsavedFile, edi
       {session.idleReminderSentAt !== undefined ? (
         <PaneNotice tone="info">{t('devSession.session.idleReminder', { at: formatDateTime(session.idleReminderSentAt, locale) })}</PaneNotice>
       ) : null}
-    </section>
+    </Card>
   );
 }

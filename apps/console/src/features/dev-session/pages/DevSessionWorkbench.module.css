@@ -1,16 +1,11 @@
-/* 开发页顶部：一行标题＋连接状态，右侧数据访问／会话／准备发布；终端区域才是主体（RFC-003 §2.3）。 */
+/* 固定身份区；信息和管理进入功能页签，异常仍在首屏可见（RFC-008）。 */
 .context { position: relative; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px 12px; min-height: 30px; margin-bottom: 4px; }
 .titleRow { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; min-width: 0; font-size: 12px; }
 .title { font-size: 18px; font-weight: 700; letter-spacing: -0.01em; }
 .note { color: var(--cs-color-text-muted); }
 .actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-left: auto; font-size: 12px; }
-.disclosure { font-size: 12px; }
-.disclosure > summary { cursor: pointer; list-style: none; padding: 5px 10px; border: 1px solid var(--cs-color-border); border-radius: var(--cs-radius-md); background: var(--cs-color-surface); font-size: 13px; font-weight: 500; white-space: nowrap; }
-.disclosure > summary::-webkit-details-marker { display: none; }
-.disclosure > summary::before { content: '▸ '; color: var(--cs-color-text-muted); }
-.disclosure[open] > summary::before { content: '▾ '; }
-.disclosure > summary:hover { background: var(--cs-color-surface-muted); }
-.disclosure > summary:focus-visible { outline: 2px solid var(--cs-color-primary); }
-.disclosure[open] > div { position: absolute; z-index: 30; right: 0; top: calc(100% + 6px); width: min(640px, 100%); max-height: min(65vh, 580px); overflow: auto; padding: var(--cs-space-3); border: 1px solid var(--cs-color-border); border-radius: var(--cs-radius-md); background: var(--cs-color-surface); box-shadow: 0 8px 24px #0002; }
 .primary { display: inline-flex; align-items: center; padding: 5px 12px; border-radius: var(--cs-radius-md); background: var(--cs-color-primary); color: var(--cs-color-on-primary); font-size: 13px; font-weight: 600; white-space: nowrap; }
 .primary:hover { background: var(--cs-color-primary-hover); text-decoration: none; }
+
+.branch { max-width: min(36vw, 260px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--cs-color-text-muted); }
+.guide:has(> div) { margin: var(--cs-space-2) 0 var(--cs-space-3); }

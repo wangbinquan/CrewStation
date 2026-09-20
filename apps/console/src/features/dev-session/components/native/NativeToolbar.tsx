@@ -1,5 +1,6 @@
 import type { AgentPermission, WorkspaceLayout } from '@crewstation/contracts';
 import { useState } from 'react';
+import { Link } from '@tanstack/react-router';
 import type { ReactElement } from 'react';
 import { api } from '../../../../shared/api/client';
 import { queryKeys } from '../../../../shared/api/queryKeys';
@@ -14,7 +15,7 @@ import { ComputeOptions, computeBlockText } from '../agents/ComputeOptions';
 import type { useNativeTerminals } from '../../hooks/native/useNativeTerminals';
 import styles from './NativeWorkspace.module.css';
 
-export function NativeToolbar({ layout, store, native, canStart, onPreviewAlongside }: { readonly layout: WorkspaceLayout; readonly store: WorkspaceLayoutStore; readonly native: ReturnType<typeof useNativeTerminals>; readonly canStart: boolean; readonly onPreviewAlongside?: (show: boolean) => void }): ReactElement {
+export function NativeToolbar({ layout, store, native, canStart, onPreviewAlongside, blockedReason, isAdmin = false }: { readonly layout: WorkspaceLayout; readonly store: WorkspaceLayoutStore; readonly native: ReturnType<typeof useNativeTerminals>; readonly canStart: boolean; readonly blockedReason?: string; readonly isAdmin?: boolean; readonly onPreviewAlongside?: (show: boolean) => void }): ReactElement {
   const t = useT();
   const profiles = useApiQuery(queryKeys.computeProfiles(), () => api.catalog.listComputeProfiles());
   const compute = layout.preferredCompute ?? '';
@@ -28,14 +29,14 @@ export function NativeToolbar({ layout, store, native, canStart, onPreviewAlongs
   const tab = layout.tabs.find((tab) => tab.id === layout.activeTabId)!;
   const nameInvalid = rename !== null && (!rename.trim() || rename.trim().length > 40);
   return <div className={styles.toolbar}>
-    <Button variant="primary" disabled={!canStart || native.start.isPending || profiles.isPending || profiles.isError || block !== undefined || tab.paneOrder.length >= 32} onClick={() => native.launch(compute, permission)}>{t(native.start.isPending ? 'devSession.agents.starting' : native.retryingOriginal ? 'devSession.native.retryStart' : 'devSession.native.add')}</Button>
     <label className={styles.inlineField}><span>{t('devSession.agents.compute')}</span><select aria-label={t('devSession.agents.compute')} value={compute} disabled={native.start.isPending || native.retryingOriginal} onChange={(event) => store.update((value) => ({ ...value, preferredCompute: event.target.value || undefined }))}><ComputeOptions items={items} /></select></label>
-    <details className={styles.menu}><summary>{t('devSession.native.advanced')}</summary><div className={styles.menuBody}><label>{t('devSession.agents.permission')}<select value={permission} disabled={native.start.isPending || native.retryingOriginal} onChange={(event) => setPermission(event.target.value as AgentPermission)}>{AGENT_PERMISSIONS.map((p) => <option key={p} value={p}>{t(`devSession.agentPermission.${p}`)}</option>)}</select></label></div></details>
-    <div className={styles.segment} role="group" aria-label={t('devSession.native.layoutGroup')}>
+    <Button variant="primary" disabled={!canStart || native.start.isPending || profiles.isPending || profiles.isError || block !== undefined || tab.paneOrder.length >= 32} onClick={() => native.launch(compute, permission)}>{t(native.start.isPending ? 'devSession.agents.starting' : native.retryingOriginal ? 'devSession.native.retryStart' : 'devSession.native.add')}</Button>
+    <details className={styles.menu}><summary>{t('devSession.native.advanced')}</summary><div className={styles.menuBody}><label>{t('devSession.agents.permission')}<select value={permission} disabled={native.start.isPending || native.retryingOriginal} onChange={(event) => setPermission(event.target.value as AgentPermission)}>{AGENT_PERMISSIONS.map((p) => <option key={p} value={p}>{t(`devSession.agentPermission.${p}`)}</option>)}</select></label><small>{t('devSession.native.permissionHint')}</small></div></details>
+    {tab.paneOrder.length > 0 ? <div className={styles.segment} role="group" aria-label={t('devSession.native.layoutGroup')}>
       {(['columns', 'rows', 'grid'] as const).map((mode) => <Button key={mode} variant="ghost" aria-pressed={tab.layout === mode} onClick={() => store.update((value) => updateWorkspaceTab(value, tab.id, (current) => ({ ...current, layout: mode })))}>{t(`devSession.native.layout.${mode}`)}</Button>)}
       <Button variant="ghost" onClick={() => store.update((value) => updateWorkspaceTab(value, tab.id, (current) => ({ ...current, ratios: { columns: [1, 1], rows: [1, 1] } })))}>{t('devSession.native.equal')}</Button>
       <Button variant="ghost" aria-pressed={layout.previewAlongside} onClick={() => onPreviewAlongside ? onPreviewAlongside(!layout.previewAlongside) : store.update((value) => ({ ...value, previewAlongside: !value.previewAlongside }))}>{t('devSession.native.previewAlongside')}</Button>
-    </div>
+    </div> : null}
     <details className={styles.menu}><summary>{t('devSession.native.tabOptions')}</summary><div className={styles.menuBody}>
       <Button variant="ghost" onClick={() => setRename(tab.name)}>{t('devSession.native.rename')}</Button>
       <Button variant="ghost" onClick={() => store.update((value) => closeWorkspaceTab(value, tab.id, t('devSession.native.defaultTab')))}>{t('devSession.native.closeTab')}</Button>
@@ -45,7 +46,11 @@ export function NativeToolbar({ layout, store, native, canStart, onPreviewAlongs
       <input aria-label={t('devSession.native.tabName')} value={rename} aria-invalid={nameInvalid} aria-describedby="tab-name-hint" onChange={(event) => setRename(event.target.value)} />
       <small id="tab-name-hint">{t('devSession.native.nameHint')}</small><Button type="submit">{t('devSession.native.saveName')}</Button><Button onClick={() => setRename(null)}>{t('devSession.release.cancel')}</Button>
     </form> : null}
+    {blockedReason && tab.paneOrder.length > 0 ? <p className={styles.blockReason}>{blockedReason}</p> : null}
+    {profiles.isPending ? <p className={styles.blockReason}>{t('devSession.native.loadingProfiles')}</p> : null}
+    {tab.paneOrder.length >= 32 ? <p className={styles.blockReason}>{t('devSession.native.fullWorkspace')}</p> : null}
     {profiles.error ? <p className={styles.error}>{errorMessage(profiles.error)}</p> : null}
     {blockText ? <p className={styles.error}>{blockText}</p> : null}
+    {profiles.error || blockText ? <div className={styles.helpActions}><Button disabled={profiles.isFetching} onClick={() => void profiles.refetch()}>{t('devSession.native.refreshProfiles')}</Button>{isAdmin ? <Link to="/admin/compute">{t('devSession.native.configureProfiles')}</Link> : <span>{t('devSession.native.askAdmin')}</span>}</div> : null}
   </div>;
 }

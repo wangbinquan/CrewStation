@@ -12,6 +12,8 @@ export interface DevSessionHandle {
   /** 没有会话不是错误：GET 返回 404 就是“还没开”。 */
   readonly missing: boolean;
   readonly loadError: ApiClientError | null;
+  readonly refresh: () => Promise<unknown>;
+  readonly refreshing: boolean;
   readonly open: UseMutationResult<DevSessionDto, ApiClientError, string>;
   readonly release: UseMutationResult<ReleaseDevSessionResult, ApiClientError, boolean>;
 }
@@ -28,6 +30,7 @@ export function useDevSession(projectId: string): DevSessionHandle {
     isPending: query.isPending,
     missing: absent,
     loadError: absent ? null : query.error,
+    refresh: query.refetch, refreshing: query.isFetching,
     open: useApiMutation((branch: string) => api.devSession.open(projectId, { branch }), { invalidate: [key] }),
     release: useApiMutation((force: boolean) => api.devSession.release(projectId, { force, ...(query.data ? { expectedTaskId: query.data.taskId } : {}) }), { invalidate: [key] }),
   };

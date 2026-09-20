@@ -7,7 +7,7 @@ import type { StreamState } from '../model/taskStreamSocket';
 import styles from './StreamStatus.module.css';
 
 /** 会话与容器状态优先于浏览器通道；能读回历史不代表开发容器仍可连接。 */
-export function StreamStatus({ state, sessionState }: { readonly state: StreamState; readonly sessionState: DevSessionState }): ReactElement {
+export function StreamStatus({ state, sessionState, compact = false }: { readonly state: StreamState; readonly sessionState: DevSessionState; readonly compact?: boolean }): ReactElement {
   const t = useT();
   const lifecycle = sessionState !== 'running';
   const runnerMissing = state.status === 'open' && !state.runnerConnected;
@@ -17,9 +17,9 @@ export function StreamStatus({ state, sessionState }: { readonly state: StreamSt
   return (
     <span className={styles.status}>
       <Badge tone={tone}>{label}</Badge>
-      {state.attempt > 0 ? <span className={styles.meta}>{t('devSession.stream.attempt', { count: state.attempt })}</span> : null}
-      {state.replayed > 0 ? <span className={styles.meta} title={state.replayFromSeq !== undefined ? t('devSession.stream.replayedTailHint') : undefined}>{t(state.replayFromSeq !== undefined ? 'devSession.stream.replayedTail' : 'devSession.stream.replayed', { count: state.replayed })}</span> : null}
-      {state.error !== undefined ? <span className={styles.error}>{state.error}</span> : null}
+      {!compact && state.attempt > 0 ? <span className={styles.meta}>{t('devSession.stream.attempt', { count: state.attempt })}</span> : null}
+      {!compact && state.replayed > 0 ? <span className={styles.meta} title={state.replayFromSeq !== undefined ? t('devSession.stream.replayedTailHint') : undefined}>{t(state.replayFromSeq !== undefined ? 'devSession.stream.replayedTail' : 'devSession.stream.replayed', { count: state.replayed })}</span> : null}
+      {!compact && state.error !== undefined ? <span className={styles.error}>{state.error}</span> : null}
     </span>
   );
 }

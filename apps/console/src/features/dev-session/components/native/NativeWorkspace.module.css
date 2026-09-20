@@ -14,7 +14,7 @@
 .segment > button[aria-pressed="true"] { background: var(--cs-color-tint); color: var(--cs-color-primary); font-weight: 600; }
 .toolbar select, .menuBody select, .rename input { max-width: 180px; min-width: 0; background: var(--cs-color-surface); color: var(--cs-color-text); border: 1px solid var(--cs-color-border); border-radius: var(--cs-radius-sm); padding: 4px; }
 .separator { width: 1px; height: 18px; background: var(--cs-color-border); }
-.stage { height: calc(100dvh - 228px); min-height: 370px; min-width: 0; overflow: auto; }
+.stage { height: calc(100dvh - 270px); min-height: 320px; min-width: 0; overflow: auto; }
 .terminalCard { display: flex; flex-direction: column; height: 100%; min-width: 0; min-height: 0; border: 1px solid var(--cs-color-border); border-radius: var(--cs-radius-md); background: var(--cs-color-surface); overflow: hidden; }
 .terminalCard:focus-within { border-color: var(--cs-color-primary); }
 .terminalHeader { flex-wrap: wrap; border-bottom: 1px solid var(--cs-color-border); padding: 3px 8px; font-size: 12px; flex-shrink: 0; background: var(--cs-color-surface); }
@@ -49,4 +49,19 @@
 .error { color: var(--cs-tone-warning-fg); background: var(--cs-tone-warning-bg); padding: 4px 8px; margin: 0; overflow-wrap: anywhere; font-size: 12px; }
 .footer { justify-content: space-between; padding-top: 4px; font-size: 11px; color: var(--cs-color-text-muted); }
 .rename { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; width: 100%; }
-@media (max-width: 600px) { .stage { height: 65dvh; min-height: 370px; } .footer { flex-wrap: wrap; } }
+@media (max-width: 600px) { .stage { height: 65dvh; min-height: 320px; } .footer { flex-wrap: wrap; } }
+
+/* 功能页与个人工作区各占一层；hidden 保留草稿但不参与布局。 */
+.workspace [hidden] { display: none; }
+.workspace [role="tab"] { white-space: nowrap; }
+.contentStage { height: calc(100dvh - 180px); min-height: 400px; min-width: 0; overflow: auto; }
+.information { padding: var(--cs-space-3) 0; max-width: 1040px; overflow-wrap: anywhere; }
+.blockReason { flex-basis: 100%; font-size: 12px; color: var(--cs-color-text-muted); }
+.helpActions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 12px; width: 100%; }
+.empty p { max-width: 540px; }
+@media (max-width: 600px) {
+  .segment { margin-left: 0; flex-wrap: wrap; }
+  .toolbar select { max-width: min(180px, 52vw); }
+  .workspace [role="tab"] { padding: 7px 8px; }
+  .contentStage { min-height: 440px; height: 70dvh; }
+}

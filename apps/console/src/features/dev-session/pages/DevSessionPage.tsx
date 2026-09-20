@@ -4,6 +4,7 @@ import { activityTargetFromSearch } from '../../../shared/activity/agentActivity
 import { useProjectScope } from '../../../shared/project/ProjectScope';
 import { errorMessage } from '../../../shared/api/useApi';
 import { useT } from '../../../shared/lib/useT';
+import { Button } from '../../../shared/ui/Button';
 import { PageHeader } from '../../../shared/ui/PageHeader';
 import { OpenSessionForm } from '../components/OpenSessionForm';
 import { PaneNotice } from '../components/PaneNotice';
@@ -30,16 +31,11 @@ export function DevSessionPage(): ReactElement {
     <>
       {!session.session ? <PageHeader title={t('devSession.title')} description={[t('devSession.line1'), t('devSession.line2')]} /> : null}
       {session.isPending ? <PaneNotice tone="muted">{t('devSession.loading')}</PaneNotice> : null}
-      {session.loadError !== null ? <PaneNotice tone="warning">{errorMessage(session.loadError)}</PaneNotice> : null}
+      {session.loadError !== null ? <PaneNotice tone="warning">{errorMessage(session.loadError)} <Button disabled={session.refreshing} onClick={() => void session.refresh()}>{t('devSession.connection.check')}</Button></PaneNotice> : null}
       {activityTarget && session.missing ? <PaneNotice tone="warning">{t('activity.invalidTarget')}</PaneNotice> : null}
       {session.release.data !== undefined ? <ReleaseOutcome result={session.release.data} /> : null}
       {/* 开会话时 Manifest 有问题：会话照样开，但要把原因摆在这儿。轮询回来的会话对象不带它，所以取开会话那次的返回值。 */}
       {session.open.data?.message !== undefined ? <PaneNotice tone="warning">{session.open.data.message}</PaneNotice> : null}
-      {session.session?.state === 'failed' ? <>
-        <PaneNotice tone="warning">{t('devSession.failed.notice', { taskId: session.session.taskId })} {session.session.message} {t('devSession.failed.worktree')}</PaneNotice>
-      </> : null}
-      {session.session && context.canDevelop && (session.session.state === 'failed' || session.session.rebuild) ? <RebuildSessionControl key={`rebuild-${session.session.taskId}`} projectId={projectId} session={session.session}
-        newSession={<OpenSessionForm branches={branches} open={session.open} previousTaskId={session.session.taskId} />} /> : null}
       {session.session === undefined || !context.userId ? null : (
         <DevSessionWorkbench
           key={session.session.taskId}
@@ -51,9 +47,13 @@ export function DevSessionPage(): ReactElement {
           userId={context.userId}
           release={session.release}
           activityTarget={activityTarget}
+          isAdmin={context.isAdmin} refresh={session.refresh} refreshing={session.refreshing}
+          recovery={context.canDevelop && (session.session.state === 'failed' || session.session.connectionIssue || session.session.rebuild) ? <RebuildSessionControl projectId={projectId} session={session.session}
+            newSession={<OpenSessionForm branches={branches} open={session.open} previousTaskId={session.session.taskId} />} /> : null}
         />
       )}
-      {session.missing ? <OpenSessionForm branches={branches} open={session.open} /> : null}
+      {session.missing && context.canDevelop ? <OpenSessionForm branches={branches} open={session.open} /> : null}
+      {session.missing && context.userId && !context.canDevelop ? <PaneNotice tone="info">{t('devSession.connection.noPermission')}</PaneNotice> : null}
     </>
   );
 }

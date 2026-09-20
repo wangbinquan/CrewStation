@@ -46,6 +46,8 @@ export function OpenSessionForm({ branches, open, previousTaskId }: OpenSessionF
         busy={open.isPending} confirmDisabled={branches.loadError !== null || branches.isPending}
         onConfirm={() => { open.mutate(confirmedBranch); setConfirmedBranch(undefined); }} onCancel={() => setConfirmedBranch(undefined)} /></div> : null}
       {branches.loadError !== null ? <PaneNotice tone="warning">{errorMessage(branches.loadError)}</PaneNotice> : null}
+      {branches.loadError && branches.refresh ? <Button onClick={() => void branches.refresh?.()}>{t('devSession.open.retryBranches')}</Button> : null}
+      {!branches.isPending && !branches.loadError && branches.branches.length === 0 ? <PaneNotice tone="info">{t('devSession.open.noBranches')}</PaneNotice> : null}
       {open.error !== null ? <PaneNotice tone="warning">{errorMessage(open.error)}</PaneNotice> : null}
     </Pane>
   );

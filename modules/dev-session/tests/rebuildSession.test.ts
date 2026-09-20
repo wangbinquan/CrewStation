@@ -4,7 +4,7 @@ import { IDENTITY_HEADERS } from '@crewstation/contracts';
 import type { DevSessionRebuildInspection } from '@crewstation/contracts';
 import { createApp } from '@crewstation/http';
 import { forbidden } from '@crewstation/kernel';
-import { rebuildSessionUseCases } from '../application/sessionLifecycle';
+import { sessionLifecycleUseCases, rebuildSessionUseCases } from '../application/sessionLifecycle';
 import { devSessionRoutes } from '../http/devSessionRoutes';
 import { checkedAt, workspaceActor, workspaceFixture, workspaceProject, workspaceTask } from './workspaceFixture';
 
@@ -40,4 +40,14 @@ test('恢复 HTTP 返回实际检查、202 排队回执；拒绝缺少任务／�
   }
   expect((await f.send('POST', { ...f.input, deleteVolume: true })).status).toBe(400);
   expect(f.calls.filter((call) => call === 'submit')).toHaveLength(1);
+});
+
+
+test('会话读取投影结构化协议故障，不向未连接的容器发送预览命令', async () => {
+  const f = workspaceFixture(); f.state.connected = false;
+  const original = f.deps.environments.findDevSession;
+  const issue = { code: 'protocol_mismatch' as const, runnerProtocol: 1, requiredProtocol: 2, message: '旧协议不兼容', at: checkedAt };
+  f.deps.environments.findDevSession = async (...args) => ({ ...(await original(...args))!, connectionIssue: issue });
+  expect(await sessionLifecycleUseCases(f.deps).getSession(workspaceActor, workspaceProject)).toMatchObject({ taskId: workspaceTask, preview: 'stopped', connectionIssue: issue });
+  expect(f.commands).toEqual([]);
 });

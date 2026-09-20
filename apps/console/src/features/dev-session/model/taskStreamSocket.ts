@@ -101,6 +101,18 @@ export class TaskStreamSocket {
     this.patch({ status: 'closed', runnerConnected: false });
   }
 
+  /** 只重连页面通道；保留游标和订阅，任何在途写入都不自动重发。 */
+  readonly reconnect = (): void => {
+    if (this.stopped) return;
+    if (this.retryTimer !== undefined) clearTimeout(this.retryTimer);
+    this.retryTimer = undefined;
+    const previous = this.socket; this.socket = undefined;
+    this.outbox = []; this.queue.failAll('disconnected', '页面连接已重新建立，请核对未完成操作');
+    previous?.close();
+    this.patch({ status: 'connecting', runnerConnected: false, runnerState: undefined, error: undefined, attempt: 0 });
+    this.open();
+  };
+
   private open(): void {
     const socket = new WebSocket(this.endpoint(this.state.lastSeq));
     this.socket = socket;

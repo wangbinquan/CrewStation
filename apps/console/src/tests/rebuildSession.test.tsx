@@ -35,8 +35,8 @@ function setup() {
 test('恢复检查、取消和失败保留原工作区；任务套餐在确认前完整可见', async () => {
   const { state, sent } = setup(); page = await renderApp(`/projects/${activityProjectId}/dev-session`);
   expect(page.text()).toContain('检查并恢复原工作树'); expect(page.text()).not.toContain('选一个远端分支');
-  state.checkError = true; await page.click('检查并恢复原工作树'); expect(page.text()).toContain('原工作卷检查失败'); expect(sent).toHaveLength(0);
-  state.checkError = false; await page.click('检查并恢复原工作树');
+  state.checkError = true; await page.click('会话与环境'); await page.click('检查并恢复原工作树'); expect(page.text()).toContain('原工作卷检查失败'); expect(sent).toHaveLength(0);
+  state.checkError = false; await page.click('会话与环境'); await page.click('检查并恢复原工作树');
   expect(page.text()).toContain('kept-pvc'); expect(page.text()).toContain('10Gi'); expect(page.text()).toContain('原 CLI 已结束');
   const select = document.querySelector<HTMLSelectElement>('select[aria-label="环境资源套餐"]')!; expect(document.activeElement).toBe(select); expect(select.value).toBe('medium');
   await page.click('保留当前工作区'); expect(sent).toHaveLength(0); expect(document.activeElement?.textContent).toBe('检查并恢复原工作树');
@@ -47,7 +47,7 @@ test('重复确认只发一次，超时重试保持原请求与套餐，202 后�
   await page.click('代码'); await page.click('a.ts'); const editor = document.querySelector<HTMLElement>('.cm-content')!, view = EditorView.findFromDOM(editor)!;
   await act(async () => view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: '恢复前的未保存草稿' } }));
   f.sessionState.state = 'failed'; await act(async () => { focusManager.setFocused(false); focusManager.setFocused(true); }); await page.settle();
-  await page.click('检查并恢复原工作树'); const select = document.querySelector<HTMLSelectElement>('select[aria-label="环境资源套餐"]')!;
+  await page.click('会话与环境'); await page.click('检查并恢复原工作树'); const select = document.querySelector<HTMLSelectElement>('select[aria-label="环境资源套餐"]')!;
   await act(async () => { select.value = 'large'; select.dispatchEvent(new Event('change', { bubbles: true })); });
   state.blocked = true; state.loseResponse = true;
   const confirm = [...document.querySelectorAll('button')].find((node) => node.textContent === '确认保留工作树重建')!;
@@ -63,14 +63,14 @@ test('重复确认只发一次，超时重试保持原请求与套餐，202 后�
 
 test('套餐变化或任务修订冲突必须重新检查，不能重发旧确认', async () => {
   const { state, check, sent } = setup(); page = await renderApp(`/projects/${activityProjectId}/dev-session`);
-  await page.click('检查并恢复原工作树'); state.failedKind = 'conflict'; await page.click('确认保留工作树重建'); expect(sent).toHaveLength(1);
+  await page.click('会话与环境'); await page.click('检查并恢复原工作树'); state.failedKind = 'conflict'; await page.click('确认保留工作树重建'); expect(sent).toHaveLength(1);
   check.profiles[0]!.memory = '3Gi'; state.failedKind = ''; await page.click('重新检查恢复对象'); expect(page.text()).toContain('3Gi');
   await page.click('确认保留工作树重建'); expect(sent[1]?.requestId).not.toBe(sent[0]?.requestId); expect(sent[1]?.profile.memory).toBe('3Gi');
 });
 
 test('已受理恢复随后失败时直接重新检查，不锁在未知回执或重试旧请求', async () => {
   const { f, sent } = setup(); page = await renderApp(`/projects/${activityProjectId}/dev-session`);
-  await page.click('检查并恢复原工作树'); await page.click('确认保留工作树重建');
+  await page.click('会话与环境'); await page.click('检查并恢复原工作树'); await page.click('确认保留工作树重建');
   f.sessionState.state = 'failed'; f.sessionState.rebuild!.state = 'failed'; f.sessionState.rebuild!.message = 'CPU 不足，原卷保留';
   await act(async () => { focusManager.setFocused(false); focusManager.setFocused(true); }); await page.settle();
   // 实机 Pending 超时后已得到失败结果，不能继续告诉用户回执未知并重放永久失败的请求。
@@ -88,4 +88,20 @@ test('恢复完成仅在工作区工具栏显示成功，详情仍保留说明�
   const result = [...document.querySelectorAll('span')].find((node) => node.textContent === '原工作树已恢复');
   expect(result?.closest('header')).not.toBeNull(); expect(result?.title).toContain('需要的 CLI 请逐个手动启动');
   expect(f.commands.some((command) => ['startAgentTerminal', 'closeTerminal', 'stopAgent'].includes(command.type))).toBe(false);
+});
+
+
+test('已确认协议不兼容的运行中环境展示保卷恢复，确认完整影响后发送原因', async () => {
+  const { f, check, sent } = setup(); f.sessionState.state = 'running';
+  f.sessionState.connectionIssue = { code: 'protocol_mismatch', runnerProtocol: 1, requiredProtocol: 2, message: 'Runner 协议版本 1，平台要求 2', at: activityTime };
+  check.reason = 'protocol_mismatch'; page = await renderApp(`/projects/${activityProjectId}/dev-session`);
+  const banner = [...document.querySelectorAll('[role="alert"]')].find((node) => !node.closest('[hidden]') && node.textContent?.includes('开发环境需要更新'));
+  expect(banner?.textContent).toContain('Runner 协议版本 1，平台要求 2');
+  expect([...document.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent === '＋ 创建 CLI')?.disabled).toBe(true);
+  await page.click('恢复开发环境'); expect(page.search().view).toBe('session');
+  expect(page.text()).not.toContain('从远端另建工作树'); await page.click('检查并恢复原工作树');
+  expect(document.querySelector('[role="alertdialog"]')?.textContent).toContain('终止该容器内仍运行的进程');
+  await page.click('确认保留工作树重建'); expect(sent).toHaveLength(1);
+  expect(sent[0]).toMatchObject({ reason: 'protocol_mismatch', expectedVolumeUid: 'kept-pvc', expectedPodUid: 'old-pod' });
+  expect(page.text()).toContain('恢复已排队');
 });

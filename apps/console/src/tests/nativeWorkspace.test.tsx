@@ -4,6 +4,8 @@ import { act } from 'react';
 import { NativeWorkspace } from '../features/dev-session/components/native/NativeWorkspace';
 import { messages } from '../features/dev-session/i18n/zh-CN';
 import { INITIAL_STREAM_STATE } from '../features/dev-session/model/taskStreamSocket';
+import { initialWorkspaceLayout } from '../features/dev-session/model/layout/workspaceLayout';
+import type { WorkspaceLocation } from '../features/dev-session/model/layout/developmentLocation';
 import { renderElement } from './renderElement';
 
 const originalFetch = globalThis.fetch;
@@ -26,32 +28,44 @@ function setup(errorStatus = 412) {
   }) as typeof fetch;
   return { starts, saves };
 }
-const element = () => <NativeWorkspace taskId="task-1" userId="user-1" channel={{ send: async () => ({}), subscribe: () => () => {} }} stream={{ ...INITIAL_STREAM_STATE, status: 'open', runnerConnected: true, generation: 1 }} canDevelop onActivity={() => {}} preview={<div>真实预览位置</div>} editor={<div>代码位置</div>} changes={<div>差异位置</div>} />;
+const element = (location?: WorkspaceLocation) => <NativeWorkspace taskId="task-1" userId="user-1" location={location} channel={{ send: async () => ({}), subscribe: () => () => {} }} stream={{ ...INITIAL_STREAM_STATE, status: 'open', runnerConnected: true, generation: 1 }} canDevelop onActivity={() => {}} preview={<div>真实预览位置</div>} editor={<div>代码位置</div>} changes={<div>差异位置</div>} />;
 
 describe('紧凑原生工作台', () => {
-  test('新页签不启动 CLI，保存空布局；关闭页签后仍有工作区', async () => {
+  test('重获焦点读到其他页签的代码视图时，当前 CLI 地址仍控制功能页且可以继续选择', async () => {
+    const f = setup(), base = globalThis.fetch;
+    page = await renderElement(element({ key: 'cli', search: { view: 'cli' }, selectView: () => {} }), messages);
+    globalThis.fetch = (async (raw, init) => String(raw).endsWith('/workspace-layout') && (init?.method ?? 'GET') === 'GET'
+      ? Response.json({ revision: 3, layout: { ...initialWorkspaceLayout('远端工作区'), view: 'code' }, updatedAt: '2026-09-20T00:00:00Z' }) : base(raw, init)) as typeof fetch;
+    await act(async () => { window.dispatchEvent(new Event('focus')); }); await page.settle();
+    // 实机两个浏览器页共用个人布局，旧实现会留在代码页且点击同一个 CLI 地址也无法返回。
+    expect(page.host.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe('CLI 工作区');
+    await page.click('CLI 工作区'); page.unmount(); page = undefined;
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(f.saves.at(-1)).toMatchObject({ layout: { view: 'cli' } });
+  });
+  test('新页签不启动 CLI，保存空布局；关闭工作区后仍有工作区', async () => {
     const f = setup(); page = await renderElement(element(), messages);
-    await page.click('＋ 页签');
+    await page.click('＋ 工作区');
     expect(page.text()).toContain('工作区 2'); expect(f.starts).toHaveLength(0);
-    const settings = [...page.host.querySelectorAll('summary')].find((node) => node.textContent === '页签设置')!;
+    const settings = [...page.host.querySelectorAll('summary')].find((node) => node.textContent === '工作区设置')!;
     await act(async () => settings.click());
-    await page.click('关闭页签');
+    await page.click('关闭工作区');
     expect(page.text()).toContain('工作区 1'); expect(page.text()).not.toContain('工作区 2');
     page.unmount(); page = undefined; await new Promise((resolve) => setTimeout(resolve, 0));
     expect(f.saves).toHaveLength(1); expect(f.saves[0]).toMatchObject({ expectedRevision: 0 });
   });
   test('双击只提交一次；明确拒绝后可以改算力档位恢复', async () => {
     const f = setup(); page = await renderElement(element(), messages);
-    const add = page.button('＋ CLI');
+    const add = page.button('＋ 创建 CLI');
     await act(async () => { add.click(); add.click(); }); await page.settle();
     expect(f.starts).toHaveLength(1); expect(f.starts[0]?.clientRequestId).toBeString();
     expect(page.text()).toContain('演示档位不支持原生 CLI');
     expect(page.host.querySelector<HTMLSelectElement>('select[aria-label="算力档位"]')?.disabled).toBe(false);
-    expect(page.button('＋ CLI').disabled).toBe(false);
+    expect(page.button('＋ 创建 CLI').disabled).toBe(false);
   });
   test('未确认的请求保留原 UUID 和配置，重试不变成第二次启动', async () => {
     const f = setup(503); page = await renderElement(element(), messages);
-    await page.click('＋ CLI');
+    await page.click('＋ 创建 CLI');
     expect(page.text()).toContain('核对并重试原请求');
     await page.click('核对并重试原请求');
     expect(f.starts).toHaveLength(2); expect(f.starts[1]).toEqual(f.starts[0]);

@@ -26,6 +26,20 @@ function start(commandTimeoutMs?: number) {
 }
 const event = (seq: number) => ({ type: 'event', seq, at: '2026-09-13T00:00:00.000Z', event: { kind: 'runnerState', state: 'ready' } });
 
+test('手动重连保留游标与订阅，拒绝未完成写入，不重放命令或接受旧连接事件', async () => {
+  const { stream, socket } = start(); const seqs: number[] = [];
+  stream.subscribeEvents((_event, seq) => seqs.push(seq));
+  socket.receive(event(8)); socket.receive({ type: 'streamReady', connected: true, replayed: 1 });
+  const write = stream.send({ type: 'writeFile', path: 'draft.ts', content: 'only once' });
+  const rejected = write.catch((error: unknown) => error);
+  stream.reconnect(); expect(await rejected).toMatchObject({ code: 'disconnected' });
+  const next = Socket.instances[1]!;
+  expect(next.url).toBe('ws://test/stream?sinceSeq=8');
+  socket.receive(event(50)); next.receive(event(9)); next.receive({ type: 'streamReady', connected: true, replayed: 1 });
+  expect(next.sent).toEqual([]); expect(socket.sent).toHaveLength(1);
+  expect(seqs).toEqual([8, 9]); expect(stream.getState().runnerConnected).toBe(true);
+});
+
 test('命令等待完整回放就绪，分页续接保持未发送命令且不用跳过的实时 seq', async () => {
   const { stream, socket } = start();
   const command = stream.send({ type: 'listFiles', path: '.' });

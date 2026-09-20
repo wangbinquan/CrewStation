@@ -28,8 +28,9 @@ export function RebuildSessionControl({ projectId, session, newSession }: { proj
   }, [recovery.inspection, startId]);
   const receipt = session.rebuild?.requestId === recovery.submitted?.requestId ? session.rebuild : recovery.submit.data ?? session.rebuild;
   // 恢复成功后的状态留在工作区工具栏，避免长期占据一整行通知。
-  if (session.state === 'running' && receipt?.state === 'ready') return null;
-  if (session.state !== 'failed' || (receipt && receipt.requestId === recovery.submitted?.requestId && receipt.state !== 'failed')) {
+  const upgrade = session.connectionIssue?.code === 'protocol_mismatch';
+  if (session.state === 'running' && receipt?.state === 'ready' && !upgrade) return null;
+  if ((session.state !== 'failed' && !upgrade) || receipt && ['queued', 'replacing', 'starting'].includes(receipt.state)) {
     return receipt ? <PaneNotice tone={receipt.state === 'failed' ? 'warning' : 'info'}>{t(`devSession.rebuild.${receipt.state}`)} · {receipt.message}</PaneNotice> : null;
   }
   const inspection = recovery.inspection;
@@ -40,7 +41,7 @@ export function RebuildSessionControl({ projectId, session, newSession }: { proj
     {!inspection ? <>
       <ActionRow>
         <Button id={startId} variant="primary" disabled={recovery.check.isPending} onClick={() => { setShowNew(false); recovery.inspect(); }}>{t(recovery.check.isPending ? 'devSession.rebuild.checking' : 'devSession.rebuild.check')}</Button>
-        <Button variant="ghost" disabled={recovery.check.isPending} onClick={() => setShowNew(!showNew)} aria-expanded={showNew}>{t('devSession.rebuild.newRemote')}</Button>
+        {session.state === 'failed' ? <Button variant="ghost" disabled={recovery.check.isPending} onClick={() => setShowNew(!showNew)} aria-expanded={showNew}>{t('devSession.rebuild.newRemote')}</Button> : null}
       </ActionRow>
       {showNew ? newSession : null}
     </> : <Stack ref={panel}>
@@ -53,7 +54,7 @@ export function RebuildSessionControl({ projectId, session, newSession }: { proj
         </select>
       </FormField>
       {inspection.profiles.length === 0 ? <PaneNotice tone="warning">{t('devSession.rebuild.noProfiles')}</PaneNotice> : null}
-      {!recovery.submitted ? <ConfirmationPanel question={t('devSession.rebuild.question')} hint={t('devSession.rebuild.hint')}
+      {!recovery.submitted ? <ConfirmationPanel question={t('devSession.rebuild.question')} hint={t(inspection.reason === 'protocol_mismatch' ? 'devSession.rebuild.upgradeHint' : 'devSession.rebuild.hint')}
         confirmLabel={t('devSession.rebuild.confirm')} cancelLabel={t('devSession.failed.cancel')} confirmDisabled={!recovery.profile}
         onConfirm={() => void recovery.confirm()} onCancel={recovery.cancel} />
         : <>

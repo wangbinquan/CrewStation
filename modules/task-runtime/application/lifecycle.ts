@@ -62,7 +62,8 @@ export function lifecycleUseCases(deps: TaskRuntimeUseCaseDeps) {
       await uow.run(async (scope) => {
         await scope.admissions.lock(original.projectId);
         const env = (await scope.environments.getById(taskId))!;
-        if (env.state === 'running') await scope.environments.update({ ...env, lastActivityAt: clock.now(), updatedAt: clock.now() });
+        // 活动心跳不改变环境修订；否则用户确认恢复时的点击会使刚检查过的快照过期。
+        if (env.state === 'running') await scope.environments.update({ ...env, lastActivityAt: clock.now() });
       });
     },
     pauseEnvironment: pauseEnvironmentUseCase(deps, load),

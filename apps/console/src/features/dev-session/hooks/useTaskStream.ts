@@ -14,6 +14,7 @@ export interface TaskStreamChannel {
 export interface TaskStreamHandle {
   readonly state: StreamState;
   readonly channel: TaskStreamChannel;
+  readonly reconnect: () => void;
 }
 
 /**
@@ -40,5 +41,5 @@ export function useTaskStream(taskId: string, enabled = true, options: TaskStrea
   }, [socket, enabled]);
   const state = useSyncExternalStore(socket.subscribeState, socket.getState);
   const channel = useMemo<TaskStreamChannel>(() => ({ send: socket.send, subscribe: socket.subscribeEvents }), [socket]);
-  return { state, channel };
+  return { state, channel, reconnect: socket.reconnect };
 }

@@ -1,5 +1,5 @@
 import type { Actor, ProjectId, ServiceId, TaskId, TaskKind, TraceId, UserId, VolumeMode } from '@crewstation/contracts';
-import type { DevSessionRebuildDto, DevSessionRebuildInspection, RebuildDevSessionRequest } from '@crewstation/contracts';
+import type { DevSessionDto, DevSessionRebuildDto, DevSessionRebuildInspection, RebuildDevSessionRequest } from '@crewstation/contracts';
 import type { BeforeStartMaterial, LaunchSpec, ProfileTestContext, ProfileTestOutcome, ProfileTestStage, TerminalTest } from '@crewstation/contracts';
 
 /**
@@ -32,6 +32,7 @@ export interface EnvironmentDto {
   traceId: string;
   createdBy?: string;
   message?: string;
+  connectionIssue?: DevSessionDto['connectionIssue'];
   createdAt: string;
   lastActivityAt: string;
 }

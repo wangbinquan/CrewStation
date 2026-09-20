@@ -27,6 +27,7 @@ export const DevSessionDtoSchema = z.object({
   lastActivityAt: z.iso.datetime(),
   idleReminderSentAt: z.iso.datetime().optional(),
   message: z.string().optional(),
+  connectionIssue: z.object({ code: z.literal('protocol_mismatch'), runnerProtocol: z.number().int().nullable(), requiredProtocol: z.number().int(), message: z.string(), at: z.iso.datetime() }).optional(),
   rebuild: DevSessionRebuildDtoSchema.optional(),
 });
 

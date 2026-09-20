@@ -82,7 +82,7 @@ export async function renderApp(initialPath: string, previousPath?: string, hist
     requestNavigate: async (href) => { await act(async () => { void router.navigate({ href }); }); await settle(); },
     click: async (label) => {
       const nodes = [...host.querySelectorAll('button, a')];
-      const target = nodes.find((node) => (node.textContent ?? '').includes(label));
+      const target = nodes.find((node) => !node.closest('[hidden]') && (node.textContent ?? '').includes(label));
       if (target === undefined) throw new Error(`点不到「${label}」，当前页面文本：${host.textContent ?? ''}`);
       await act(async () => { (target as HTMLElement).click(); });
       await settle();

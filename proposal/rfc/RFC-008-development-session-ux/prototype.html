@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>开发会话 · RFC-008 交互设计稿</title>
+  <link rel="stylesheet" href="prototype.css">
+  <script src="prototype.js" defer></script>
+</head>
+<body>
+  <header class="global"><strong class="brand"><span>CS</span> CrewStation</strong><nav aria-label="全局入口"><span>能力市场</span><span class="current">数字人项目</span></nav><span class="grow"></span><span class="subtle">Agent 动态 <b class="dot"></b></span><span class="avatar">王</span></header>
+  <aside class="sidebar"><span class="back">← 数字人项目</span><div class="project"><strong>演示数字人</strong><small>demo · 数字人</small></div><nav aria-label="项目页面"><span>概览</span><span class="current">开发</span><span>发布与上线</span><span>运行与诊断</span><span>项目设置</span></nav><div class="sidehint">同一个项目<br>持续开发，随时验证</div></aside>
+  <main>
+    <div class="pagehead"><div><h1>开发会话</h1><span id="health" class="badge warning">环境需要更新</span><span class="branch">⑂ main</span></div><button class="primary" id="publish">准备发布 <span aria-hidden="true">↗</span></button></div>
+    <div class="notice" id="connection-notice" role="status"><div class="notice-icon">!</div><div class="grow"><strong id="notice-title">开发环境版本过旧，暂时无法创建 CLI</strong><p id="notice-body">旧环境协议为 1，平台要求 2。更新环境后可继续开发，工作文件和未推送提交可保留。</p></div><button id="notice-action">检查并恢复环境</button></div>
+    <div class="viewtabs" role="tablist" aria-label="开发功能">
+      <button role="tab" aria-selected="true" data-view="cli">CLI 工作区</button>
+      <button role="tab" aria-selected="false" data-view="preview">预览</button>
+      <button role="tab" aria-selected="false" data-view="code">代码 <span id="code-dirty" hidden>· 未保存</span></button>
+      <button role="tab" aria-selected="false" data-view="changes">变更 <span class="count" id="changes-count" hidden>2</span></button>
+      <button role="tab" aria-selected="false" data-view="data">数据访问 <span id="data-dirty" hidden>· 草稿</span></button>
+      <button role="tab" aria-selected="false" data-view="session">会话与环境 <span id="environment-dot" class="dot warning-dot"></span></button>
+    </div>
+
+    <section id="view-cli" class="view" aria-label="CLI 工作区">
+      <div class="workspacebar"><div class="worktabs" id="worktabs" role="tablist" aria-label="个人工作区"><button role="tab" aria-selected="true" data-workspace="1">工作区 1 <span class="subtle">· 0</span></button></div><button id="add-workspace" class="quiet">＋ 工作区</button><span class="grow"></span><button id="roster-toggle" class="quiet" aria-expanded="false">全部 CLI <span id="roster-count">0</span></button></div>
+      <div id="roster" class="card roster" hidden></div>
+      <div class="toolbar"><label>算力档位 <select id="profile"><option>默认 · volc-glm-5-2</option><option>通用终端</option></select></label><button id="create-cli" class="primary" disabled>＋ 创建 CLI</button><details><summary>启动选项</summary><div class="options"><label>Agent 操作权限 <select><option>只读</option><option selected>可改文件</option><option>完全权限</option></select></label><p class="subtle">数据库访问在“数据访问”页签中管理。</p></div></details><span class="grow"></span><div id="layout-controls" hidden><label>排布 <select id="layout"><option value="grid">网格</option><option value="columns">横排</option><option value="rows">纵排</option></select></label><button id="alongside" aria-pressed="false">并排预览</button></div></div>
+      <div id="workspace-stage" class="stage">
+        <div class="empty" id="empty"><div class="terminal-symbol">&gt;_</div><h2 id="empty-title">先恢复开发环境，再开始编写</h2><p id="empty-body">CLI 会在已连接的环境中启动。当前环境需要更新，无需手动填写连接地址。</p><button id="empty-action" class="primary">检查并恢复环境</button><div class="steps"><span><b>1</b> 准备环境</span><span>→</span><span><b>2</b> 创建 CLI</span><span>→</span><span><b>3</b> 输入需求，看效果</span></div></div>
+        <div id="terminal-grid" class="terminal-grid" hidden></div>
+        <div id="alongside-preview" class="inline-preview" hidden><div class="cardhead"><strong>开发预览</strong><span class="badge success">可访问 · 演示</span></div><div class="sample"><h2>你好，欢迎使用演示数字人</h2><p>这里展示当前工作树的效果。</p></div></div>
+      </div>
+      <footer class="workspacefoot"><span>所有 CLI 共用当前工作树 · 工作区和排布仅属于你</span><span id="version-summary">工作树状态待环境连接后读取</span></footer>
+    </section>
+
+    <section id="view-session" class="view settings-view" aria-label="会话与环境" hidden>
+      <div class="sectionhead"><div><h2>会话与环境</h2><p>查看连接情况、恢复开发环境，或管理当前会话。</p></div><button id="check-status">重新检查状态</button></div>
+      <section class="card" aria-labelledby="connection-title"><div class="cardhead"><h3 id="connection-title">连接检查</h3><span class="badge warning" id="check-badge">需要处理 1 项</span></div><div class="checkrow"><span class="ok">✓</span><strong>页面连接</strong><span>已连接，可接收状态和历史记录</span></div><div class="checkrow"><span id="runner-icon" class="warn">!</span><strong>开发环境</strong><span id="runner-detail">连接被拒绝：协议版本 1，平台要求 2</span></div><div class="checkrow"><span class="subtle">—</span><strong>CLI</strong><span id="cli-detail">环境恢复后，可选择算力档位并创建</span></div></section>
+      <section class="card recovery" id="recovery"><h3>更新环境，保留当前工作树</h3><p>使用当前平台环境重新启动。文件、未提交修改、未推送提交和个人布局保留。</p><p class="subtle">原开发容器内的进程会结束，CLI 不会自动重启。检查不会修改当前环境。</p><div class="actions"><button id="inspect-recovery" class="primary">检查恢复条件</button><button class="quiet" data-log>查看环境日志 ↗</button></div><div id="recovery-confirm" class="confirmation" hidden><strong>原工作卷已就绪，可以保留工作树重建</strong><dl><dt>当前任务</dt><dd><code>tsk_01a095410744…</code></dd><dt>原工作卷</dt><dd>10 GiB · 已就绪，继续使用同一工作卷</dd></dl><label>环境资源套餐<select id="recovery-profile"><option value="">请选择资源套餐</option><option value="standard">标准开发环境 · 1 CPU / 2 GiB</option></select></label><p>确认后替换原开发容器，终止其中的旧进程。原工作文件保留。</p><div class="actions"><button id="confirm-recovery" class="primary" disabled>确认保留工作树重建</button><button id="cancel-recovery">取消</button></div></div></section>
+      <section class="card"><h3>环境信息</h3><dl class="facts"><dt>创建时分支</dt><dd><code>main</code></dd><dt>任务 ID</dt><dd><code>tsk_01a0954107447000b7936485fb80d15d</code></dd><dt>开发预览</dt><dd><code>dev.demo.cs.localhost</code></dd><dt>开启人</dt><dd>项目开发者</dd></dl><div class="actions"><button data-log>查看环境日志 ↗</button><button id="history">历史对话 ↗</button></div></section>
+      <section class="card release"><div><h3>释放开发会话</h3><p>结束所有相关进程并回收开发环境。操作前先检查未保存和未推送的改动。</p></div><button id="release">检查并释放…</button></section>
+    </section>
+
+    <section id="view-data" class="view settings-view" aria-label="数据访问" hidden>
+      <div class="sectionhead"><div><h2>数据访问</h2><p>查看开发数据，或向项目负责人申请生产数据访问。</p></div><button id="data-refresh">刷新状态</button></div>
+      <div class="data-overview"><section class="card"><div class="cardhead"><h3>开发数据</h3><span class="badge neutral">默认配置</span></div><p>开发环境默认注入开发库连接。开发库跨会话保留。</p><small>应用是否使用该连接，以实际项目配置为准。</small></section><section class="card"><div class="cardhead"><h3>生产数据</h3><span class="badge neutral" id="data-state">未申请</span></div><p>只读和读写分别申请，获批范围覆盖整个开发会话。</p><small>获批不会自动切换应用数据库，也不会让现有 CLI 自动载入连接。</small></section></div>
+      <form id="data-form" class="card form"><h3>申请额外数据访问</h3><label>访问方式<select name="mode"><option>生产数据只读</option><option>生产数据读写</option><option>额外开发数据绑定</option></select></label><label>有效时长（分钟）<input name="ttl" type="number" min="5" max="1440" value="60"><small>5–1440 分钟，到期后授权失效。</small></label><label>用途说明 <span class="subtle">可选</span><textarea name="reason" maxlength="500" placeholder="例如：排查订单汇总结果，仅读取相关记录"></textarea><small>最多 500 字，项目负责人将看到这段说明。</small></label><div class="actions"><button type="submit" class="primary">提交申请</button><span class="subtle" id="draft-status">切换页签会保留尚未提交的内容。</span></div></form><section class="card" id="data-record"><h3>申请与授权记录</h3><p class="subtle">当前没有额外绑定记录。</p></section>
+    </section>
+
+    <section id="view-preview" class="view" aria-label="预览" hidden><div class="sectionhead"><div><h2>开发预览</h2><p>查看当前工作树中已保存的内容。</p></div><button data-log>预览日志 ↗</button></div><div id="preview-offline" class="card"><h3>开发环境尚未连接</h3><p>先恢复环境，再查看开发预览。当前终端与代码草稿仍保留。</p><button data-environment class="primary">前往会话与环境</button></div><div id="preview-ready" class="card" hidden><div class="cardhead"><code>dev.demo.cs.localhost</code><span class="badge success">可访问 · 演示</span></div><div class="sample"><h2>你好，欢迎使用演示数字人</h2><p>当前分支 main · 当前工作树预览</p><input placeholder="向数字人提问（演示）"><button id="sample-send">发送</button></div></div></section>
+    <section id="view-code" class="view" aria-label="代码" hidden><div class="sectionhead"><div><h2>代码</h2><p>编辑当前工作树，切换页签保留未保存的输入。</p></div><button id="save-code">保存文件（演示）</button></div><div class="editor"><aside><strong>文件</strong><span class="current">src / app.ts</span><span>crewstation.yaml</span><span>package.json</span></aside><div><div class="filehead">src/app.ts <span class="subtle">· 设计稿示例</span></div><textarea id="source-code" aria-label="代码内容" spellcheck="false">export function welcome(name: string) {
+  return `你好，${name}。`;
+}
+
+// 在这里继续修改你的数字人应用。
+</textarea></div></div></section>
+    <section id="view-changes" class="view settings-view" aria-label="变更" hidden><div class="sectionhead"><div><h2>工作树与部署版本</h2><p>核对将要发布的改动、未提交文件和仓库同步情况。</p></div><button id="changes-refresh">重新检查</button></div><section class="card"><div class="cardhead"><h3>比较目标</h3><label><select><option>生产版本</option><option>待验证版本</option></select></label></div><div id="comparison-offline"><p>当前工作树暂不可读取，无法确认变更数量。</p><button data-environment>查看连接问题</button></div><div id="comparison-ready" hidden><div class="metrics"><div><strong>2</strong><span>未提交文件</span></div><div><strong>1</strong><span>待上线提交</span></div><div><strong>0</strong><span>缺少生产提交</span></div><div><strong>1</strong><span>未推送提交</span></div></div><div class="file-row"><code>src/app.ts</code><span class="badge neutral">已修改</span><button data-code>打开文件</button></div><div class="file-row"><code>README.md</code><span class="badge neutral">已修改</span><button data-code>打开文件</button></div></div></section></section>
+    <div id="feedback" role="status" class="feedback" hidden></div>
+  </main>
+  <footer class="demo-controls"><span><b>交互设计稿</b> · 模拟数据，不操作真实环境</span><label>演示状态 <select id="scenario"><option value="outdated">旧环境协议不兼容</option><option value="disconnected">容器暂时未连接</option><option value="starting">正在准备环境</option><option value="empty">环境就绪，尚无 CLI</option><option value="ready">开发中，四个 CLI</option></select></label></footer>
+</body>
+</html>

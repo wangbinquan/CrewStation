@@ -23,7 +23,7 @@ export function useSessionRebuild(projectId: string, taskId: string) {
   const confirm = async () => {
     if (sending.current || !inspection || !profile) return;
     const input = submitted ?? { requestId: crypto.randomUUID(), expectedTaskId: inspection.taskId, expectedUpdatedAt: inspection.updatedAt,
-      expectedVolumeUid: inspection.volume.uid, expectedPodUid: inspection.podUid, profile: { name: profile.name, cpu: profile.cpu, memory: profile.memory, storage: profile.storage } };
+      expectedVolumeUid: inspection.volume.uid, expectedPodUid: inspection.podUid, ...(inspection.reason ? { reason: inspection.reason } : {}), profile: { name: profile.name, cpu: profile.cpu, memory: profile.memory, storage: profile.storage } };
     sending.current = true; setSubmitted(input);
     try { await submit.mutateAsync(input); } catch { /* 错误由回执区展示；保留原请求用于显式重试。 */ }
     finally { sending.current = false; }

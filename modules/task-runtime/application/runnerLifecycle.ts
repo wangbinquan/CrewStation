@@ -19,7 +19,7 @@ export function runnerLifecycle(deps: TaskRuntimeUseCaseDeps) {
         const record = env.rebuildId ? await scope.rebuilds.get(env.rebuildId) : undefined;
         if (record && !['starting', 'ready'].includes(record.state)) return false;
         const now = deps.clock.now();
-        const patch = { connected: true, lastActivityAt: now, updatedAt: now, ...(env.native ? { native: { ...env.native, state: 'running' as const } } : {}) };
+        const patch = { connected: true, lastActivityAt: now, updatedAt: now, ...(env.runnerRejection ? { runnerRejection: undefined, message: undefined } : {}), ...(env.native ? { native: { ...env.native, state: 'running' as const } } : {}) };
         await scope.environments.update(env.state === 'creating' ? transition(env, 'running', now, { ...patch, message: '环境已连接' }) : { ...env, ...patch });
         if (record?.state === 'starting') await scope.rebuilds.update({ ...record, state: 'ready', updatedAt: now, message: '原工作树已恢复；需要的 CLI 请逐个手动启动' });
         return true;
@@ -36,9 +36,9 @@ export function runnerLifecycle(deps: TaskRuntimeUseCaseDeps) {
       await deps.uow.run(async (scope) => {
         await scope.admissions.lock(original.projectId);
         const env = await scope.environments.getById(taskId);
-        if (!env || !tokenMatches(token, env.runnerTokenHash) || env.runnerRejection?.message === rejection.message) return;
+        if (!env || !tokenMatches(token, env.runnerTokenHash) || env.runnerRejection?.message === rejection.message && !env.connected) return;
         const now = deps.clock.now();
-        const recorded = { ...env, runnerRejection: { ...rejection, at: now.toISOString() }, message: rejection.message, updatedAt: now };
+        const recorded = { ...env, connected: false, runnerRejection: { ...rejection, at: now.toISOString() }, message: rejection.message, updatedAt: now };
         if (env.native && ['queued', 'starting'].includes(env.native.state)) await scheduleExecutionCleanup(scope, recorded, now, rejection.message);
         else await scope.environments.update(recorded);
       });

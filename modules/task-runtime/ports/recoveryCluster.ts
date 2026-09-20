@@ -10,7 +10,7 @@ export interface RecoveryResources {
 /** 保卷重建的实例检查；不提供创建或删除工作卷的方法。 */
 export interface TaskRecoveryCluster {
   inspect(env: TaskEnvironment): Promise<RecoveryResources>;
-  removeFailedPod(env: TaskEnvironment, expectedUid: string): Promise<void>;
+  removeFailedPod(env: TaskEnvironment, expectedUid: string, reason?: 'failed' | 'protocol_mismatch'): Promise<void>;
 }
 
 /** 控制器幂等准备恢复实例；不提供工作卷删除／初始化能力。 */

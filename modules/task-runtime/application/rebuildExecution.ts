@@ -24,7 +24,7 @@ export async function executeRebuild(deps: RebuildExecutionDeps, scope: Reposito
   if (retainedVolume(resources).uid !== record.input.expectedVolumeUid) throw precondition('原工作卷实例已变化，恢复停止');
   if (resources.pod) {
     if (resources.pod.uid !== record.input.expectedPodUid) throw precondition('原容器实例已变化，恢复停止');
-    await deps.recoveryCluster.removeFailedPod(original, resources.pod.uid);
+    await deps.recoveryCluster.removeFailedPod(original, resources.pod.uid, record.input.reason);
     if ((await deps.recoveryCluster.inspect(original)).pod) throw new Error('等待原容器退出');
   }
   await requireRebuildLease(heartbeat);
