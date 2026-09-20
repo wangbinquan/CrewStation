@@ -15,7 +15,7 @@ import { releaseRoute } from '../../features/release';
 import { projectRoute } from './projectRoute';
 import { adminProjectRoutes } from './adminProjectRoutes';
 import { adminCapabilitiesRoute, adminRequestsRoute, adminIntegrationsLegacyRoute, adminCatalogLegacyRoute, adminProjectCreateRoute, adminProjectProvisioningRoute } from './adminGlobalRoutes';
-import { projectSettingsRoute, projectOperationsRoute } from './projectSections';
+import { projectSettingsRoute, projectOperationsRoute, projectResourcesRoute } from './projectSections';
 import { rootRoute } from './rootRoute';
 import { workbenchRoute } from './workbenchRoute';
 
@@ -28,6 +28,7 @@ export const routeTree = rootRoute.addChildren([
     projectRoute.addChildren([
       projectOverviewRoute,
       projectSettingsRoute,
+      projectResourcesRoute,
       projectOperationsRoute,
       devSessionRoute,
       historicalConversationsRoute,

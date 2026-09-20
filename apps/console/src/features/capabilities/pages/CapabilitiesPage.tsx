@@ -1,5 +1,6 @@
 import type { CapabilityDescriptionDto } from '@crewstation/contracts';
 import { CapabilityDescriptionDtoSchema } from '@crewstation/contracts';
+import type { ResourceSection, GuideTopic } from '../../../shared/project/resourceSearch';
 import type { ReactElement } from 'react';
 import { useProjectScope } from '../../../shared/project/ProjectScope';
 import { api } from '../../../shared/api/client';
@@ -20,7 +21,7 @@ import { CapabilityBusinessTaskApi, CapabilityMcp, CapabilityQuota } from '../co
 import styles from './CapabilitiesPage.module.css';
 
 /** 能力说明：一次取回聚合描述，按它实际包含的段落逐段呈现，值都可复制。 */
-export function CapabilitiesPage({ embedded = false }: { readonly embedded?: boolean }): ReactElement {
+export function CapabilitiesPage({ embedded = false, section, topic }: { readonly embedded?: boolean; readonly section?: ResourceSection; readonly topic?: GuideTopic }): ReactElement {
   const t = useT();
   const { locale } = useI18n();
   const { projectId } = useProjectScope();
@@ -42,24 +43,25 @@ export function CapabilitiesPage({ embedded = false }: { readonly embedded?: boo
       /> : null}
       {description.isPending ? <p className={styles.muted}>{t('capabilities.loading')}</p> : null}
       {description.error ? <><EmptyState title={t('capabilities.error', { message: errorMessage(description.error) })} /><Button onClick={() => { void description.refetch(); }}>{t('capabilities.retry')}</Button></> : null}
-      {description.data !== undefined ? <CapabilitySections description={description.data} /> : null}
+      {description.data !== undefined ? <CapabilitySections description={description.data} section={section} topic={topic} /> : null}
     </>
   );
 }
 
-/** 段落顺序：先身份与地址，再约定与配置，最后资源、操作、事件、配额与 MCP。 */
-function CapabilitySections({ description }: { readonly description: CapabilityDescriptionDto }): ReactElement {
-  return (
-    <div className={styles.stack}>
-      <CapabilityIdentity service={description.service} hosts={description.hosts} />
-      <CapabilityConventions conventions={description.conventions} forwarding={description.identityForwarding} />
-      <CapabilityConfigKeys config={description.config} />
-      <CapabilityData data={description.data} />
-      <CapabilityOperations operations={description.operations} />
-      <CapabilitySubscriptions subscriptions={description.subscriptions} />
-      <CapabilityQuota quota={description.quota} plan={description.plan} />
-      <CapabilityMcp mcp={description.mcp} />
-      <CapabilityBusinessTaskApi endpoints={description.businessTaskApi} />
-    </div>
-  );
+/** 旧聚合契约按使用目的拆开，全部字段仍保留在对应主题。 */
+function CapabilitySections({ description: d, section, topic }: { readonly description: CapabilityDescriptionDto; readonly section?: ResourceSection; readonly topic?: GuideTopic }): ReactElement {
+  const t = useT();
+  if (section === 'guide') return <div className={styles.stack}>
+    <details open={topic === 'identity'} key={`identity:${topic}`}><summary>{t('resources.guide.identity')}</summary><CapabilityConventions conventions={d.conventions} forwarding={d.identityForwarding} groups={['identityHeaders']} /></details>
+    <details open={topic === 'environment'} key={`environment:${topic}`}><summary>{t('resources.guide.environment')}</summary><CapabilityConventions conventions={d.conventions} forwarding={d.identityForwarding} groups={['env', 'paths', 'eventHeaders']} showForwarding={false} /><CapabilityConfigKeys config={d.config} /></details>
+    <details open={topic === 'mcp'} key={`mcp:${topic}`}><summary>{t('capabilities.mcp.title')}</summary><CapabilityMcp mcp={d.mcp} /></details>
+    <details open={topic === 'tasks'} key={`tasks:${topic}`}><summary>{t('capabilities.businessTaskApi.title')}</summary><CapabilityBusinessTaskApi endpoints={d.businessTaskApi} /></details>
+  </div>;
+  return <div className={styles.stack}>
+    {!section || section === 'project' ? <><CapabilityQuota quota={d.quota} plan={d.plan} /><details><summary>{t('resources.projectDetails')}</summary><CapabilityIdentity service={d.service} hosts={d.hosts} /></details></> : null}
+    {!section ? <><CapabilityConventions conventions={d.conventions} forwarding={d.identityForwarding} /><CapabilityConfigKeys config={d.config} /><CapabilityMcp mcp={d.mcp} /><CapabilityBusinessTaskApi endpoints={d.businessTaskApi} /></> : null}
+    {!section || section === 'data' ? <CapabilityData data={d.data} /> : null}
+    {!section || section === 'api' ? <CapabilityOperations operations={d.operations} /> : null}
+    {!section || section === 'events' ? <CapabilitySubscriptions subscriptions={d.subscriptions} /> : null}
+  </div>;
 }

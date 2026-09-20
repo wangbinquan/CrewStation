@@ -42,6 +42,8 @@ export const settingsField = (label: string) => [...document.querySelectorAll('l
 export const settingsButton = (label: string, root: ParentNode = document) => [...root.querySelectorAll<HTMLButtonElement>('button')].find((node) => !node.closest('[hidden]') && node.textContent === label)!;
 export const settingsForm = (label: string) => settingsField(label).closest('form')!;
 export async function editSetting(page: RenderedApp, label: string, value: string) {
+  if (label === '市场可见范围' && !document.querySelector('form select option[value="members"]')) await clickSetting(page, '修改可见范围');
+  if ((label === '应用用途' || label === '应用图标') && !document.querySelector('textarea')) await clickSetting(page, '修改展示资料');
   const field = settingsField(label);
   await act(async () => {
     field.focus();

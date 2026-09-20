@@ -368,4 +368,12 @@ export const messages = {
   "projects.lifecycle.archiving": "归档中…",
   "projects.lifecycle.error": "归档失败：{message}",
   "projects.lifecycle.saved": "服务器已返回项目状态：{state}。",
+  "projects.visibility.editScope": "修改可见范围",
+  "projects.visibility.editPresentation": "修改展示资料",
+  "projects.members.add": "添加成员",
+  "projects.members.editRole": "修改角色",
+  "projects.members.cancel": "取消成员编辑",
+  "projects.members.discardQuestion": "放弃未保存的成员设置？",
+  "projects.members.discard": "放弃成员设置",
+
 } satisfies Messages;

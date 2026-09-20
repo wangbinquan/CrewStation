@@ -369,4 +369,12 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   "projects.lifecycle.archiving": "Archiving…",
   "projects.lifecycle.error": "Could not archive: {message}",
   "projects.lifecycle.saved": "The server returned project state: {state}.",
+  "projects.visibility.editScope": "Edit audience",
+  "projects.visibility.editPresentation": "Edit presentation",
+  "projects.members.add": "Add member",
+  "projects.members.editRole": "Edit role",
+  "projects.members.cancel": "Cancel member editing",
+  "projects.members.discardQuestion": "Discard unsaved member changes?",
+  "projects.members.discard": "Discard member changes",
+
 };

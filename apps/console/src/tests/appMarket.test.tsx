@@ -48,7 +48,7 @@ async function input(node: HTMLInputElement | HTMLSelectElement, value: string) 
   });
   await page!.settle();
 }
-const scopeSelect = () => document.querySelector<HTMLSelectElement>('select option[value="members"]')!.parentElement as HTMLSelectElement;
+const scopeSelect = () => document.querySelector<HTMLSelectElement>('form select option[value="members"]')!.parentElement as HTMLSelectElement;
 
 describe('能力市场与负责人设置真实路由', () => {
   test('首页是市场，应用使用者不请求项目内部数据；详情不会展示项目导航', async () => {
@@ -82,7 +82,7 @@ describe('能力市场与负责人设置真实路由', () => {
     expect(page.text()).not.toContain('已上线'); expect(page.text()).not.toContain('打开正式应用');
   });
   test('指定名单约束首屏展示；空名单字段错误；精确查找去重与取消不保存', async () => {
-    const f = fixture(true); page = await renderApp(`/projects/${projectId}/settings?tab=visibility`);
+    const f = fixture(true); page = await renderApp(`/projects/${projectId}/settings?tab=visibility`); await page.click('修改可见范围');
     await input(scopeSelect(), 'selected');
     expect(page.text()).toContain('至少选择一位，最多 200 位'); await page.click('保存可见范围');
     expect(page.text()).toContain('请至少选择一位已注册用户'); expect(f.calls.filter((call) => call.method === 'PUT')).toHaveLength(0);
@@ -90,20 +90,20 @@ describe('能力市场与负责人设置真实路由', () => {
     await page.click('加入指定名单'); await page.click('加入指定名单');
     expect(document.querySelectorAll('ul.people li')).toHaveLength(1);
     await page.click('取消修改'); expect(scopeSelect().value).toBe('selected'); await page.click('放弃这份修改');
-    expect(scopeSelect().value).toBe('members'); expect(f.calls.filter((call) => call.method === 'PUT')).toHaveLength(0);
+    expect(document.querySelector('form select option[value="members"]')).toBeNull(); expect(page.text()).toContain('项目成员'); expect(f.calls.filter((call) => call.method === 'PUT')).toHaveLength(0);
   });
   test('并发保存保留草稿和最新范围，显式采用最新修订后再次保存', async () => {
-    const f = fixture(true); page = await renderApp(`/projects/${projectId}/settings?tab=visibility`);
+    const f = fixture(true); page = await renderApp(`/projects/${projectId}/settings?tab=visibility`); await page.click('修改可见范围');
     await input(scopeSelect(), 'authenticated'); f.conflict(true); await page.click('保存可见范围');
     expect(scopeSelect().value).toBe('authenticated'); expect(page.text()).toContain('本地草稿已保留'); expect(page.text()).toContain('第 2 版');
     f.conflict(false); await page.click('使用最新修订，保留本地草稿');
     expect(f.calls.filter((call) => call.method === 'PUT')).toHaveLength(1);
     await page.click('保存可见范围');
     expect(f.calls.filter((call) => call.method === 'PUT').at(-1)?.body).toEqual({ mode: 'authenticated', userIds: [], expectedRevision: 2 });
-    expect(scopeSelect().value).toBe('authenticated');
+    expect(document.querySelector('form select option[value="members"]')).toBeNull(); expect(page.text()).toContain('全部登录用户');
   });
   test('最新设置读取失败时保留已经输入的草稿，不能把表单卸载清空', async () => {
-    const f = fixture(true); page = await renderApp(`/projects/${projectId}/settings?tab=visibility`);
+    const f = fixture(true); page = await renderApp(`/projects/${projectId}/settings?tab=visibility`); await page.click('修改可见范围');
     await input(scopeSelect(), 'authenticated'); f.queryFailure(); await page.click('读取最新设置');
     expect(page.text()).toContain('暂时无法读取设置'); expect(scopeSelect().value).toBe('authenticated');
   });
@@ -111,11 +111,11 @@ describe('能力市场与负责人设置真实路由', () => {
 
 describe('保存后的后台重读', () => {
   test('保存成功后重读设置期间不显示“暂不能保存”，成功提示与最新修订保留', async () => {
-    const f = fixture(true); page = await renderApp(`/projects/${projectId}/settings?tab=visibility`);
+    const f = fixture(true); page = await renderApp(`/projects/${projectId}/settings?tab=visibility`); await page.click('修改可见范围');
     await input(scopeSelect(), 'authenticated'); f.slowReload(); await page.click('保存可见范围');
     expect(f.calls.filter((call) => call.method === 'PUT')).toHaveLength(1);
     expect(page.text()).toContain('已保存'); expect(page.text()).not.toContain('暂不能保存');
     await act(async () => { await new Promise((resolve) => setTimeout(resolve, 400)); }); await page.settle();
-    expect(page.text()).toContain('已保存第 1 版'); expect(page.text()).not.toContain('暂不能保存'); expect(scopeSelect().value).toBe('authenticated');
+    expect(page.text()).toContain('已保存第 1 版'); expect(page.text()).not.toContain('暂不能保存'); expect(page.text()).toContain('全部登录用户');
   });
 });

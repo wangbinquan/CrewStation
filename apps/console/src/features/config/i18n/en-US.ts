@@ -96,4 +96,18 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   "config.impact.state.ready": "Ready",
   "config.impact.state.degraded": "Degraded",
   "config.impact.state.failed": "Failed",
+  "config.add": "Add variable",
+  "config.edit": "Edit {name}",
+  "config.cancel": "Cancel editing",
+  "config.saveTo": "Save to {env}",
+  "config.itemDetails": "Change details",
+  "config.updateSecret": "Update secret",
+  "config.variables.development": "Development variables",
+  "config.variables.production": "Production variables",
+  "config.description": "Configure runtime values for your app; mark confidential values as secrets.",
+  "config.platformGuide": "Platform variables and integration guide →",
+  "config.draft.cancel": "Discard unsaved input for {env}?",
+  "config.draft.confirmCancel": "Discard input and close",
+  "config.impact.snapshots": "Compare deployed snapshots",
+
 };

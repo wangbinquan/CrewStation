@@ -1,5 +1,5 @@
 import type { AppVisibilityDto } from '@crewstation/contracts';
-import { useId } from 'react';
+import { useEffect, useId, useRef } from 'react';
 import { errorMessage } from '../../../../shared/api/useApi';
 import { useT } from '../../../../shared/lib/useT';
 import { ActionNote } from '../../../../shared/ui/ActionNote';
@@ -15,15 +15,18 @@ interface VisibilityFormProps {
   readonly saved: AppVisibilityDto;
   readonly editor: ReturnType<typeof useVisibilityEditor>;
   readonly canConfigure: boolean;
+  readonly editing: boolean;
   readonly frozen: boolean;
   readonly cancelDisabled: boolean;
   readonly onCancel: (button: HTMLButtonElement) => void;
 }
 
-export function AppVisibilityForm({ projectId, saved, editor, canConfigure, frozen, cancelDisabled, onCancel }: VisibilityFormProps) {
+export function AppVisibilityForm({ projectId, saved, editor, canConfigure, editing, frozen, cancelDisabled, onCancel }: VisibilityFormProps) {
   const t = useT(), id = useId(), locked = editor.save.isPending || frozen || !canConfigure;
-  if (!canConfigure && !editor.dirty && !editor.save.isPending) return <div className={styles.stack}><strong>{t(`projects.visibility.mode.${saved.mode}`)}</strong><p>{t(`projects.visibility.hint.${saved.mode}`)}</p><p>{saved.users.map((user) => `${user.name} · ${user.email}`).join('；')}</p><ActionNote tone="neutral">{t('projects.visibility.readOnly')}</ActionNote></div>;
-  return <form className={styles.stack} onSubmit={(event) => { event.preventDefault(); editor.submit(event.currentTarget); }} noValidate>
+  const form = useRef<HTMLFormElement>(null);
+  useEffect(() => { if (editing) form.current?.querySelector<HTMLElement>('textarea, select')?.focus(); }, [editing]);
+  if ((!canConfigure || !editing) && !editor.dirty && !editor.save.isPending) return <div className={styles.stack}><strong>{t(`projects.visibility.mode.${editor.draft.mode}`)}</strong><span>{t('projects.visibility.savedRevision', { revision: editor.draft.revision })}</span><p>{t(`projects.visibility.hint.${saved.mode}`)}</p><p>{saved.users.map((user) => `${user.name} · ${user.email}`).join('；')}</p>{!canConfigure ? <ActionNote tone="neutral">{t('projects.visibility.readOnly')}</ActionNote> : null}</div>;
+  return <form ref={form} className={styles.stack} onSubmit={(event) => { event.preventDefault(); editor.submit(event.currentTarget); }} noValidate>
     <FormField label={t('projects.visibility.scope')} hint={t(`projects.visibility.hint.${editor.draft.mode}`)} hintId={`${id}-hint`}>
       <select value={editor.draft.mode} aria-describedby={`${id}-hint`} disabled={locked} onChange={(event) => editor.select(event.target.value as AppVisibilityDto['mode'])}>
         {MODES.map((mode) => <option key={mode} value={mode}>{t(`projects.visibility.mode.${mode}`)}</option>)}

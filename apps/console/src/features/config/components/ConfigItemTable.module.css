@@ -3,7 +3,7 @@
  * 给最小宽度让它溢出并由 DataTable 的容器横向滚动，而不是把列压没。
  */
 .table {
-  min-width: 560px;
+  min-width: 340px;
 }
 
 .muted {
@@ -37,3 +37,5 @@
   white-space: nowrap;
   color: var(--cs-color-text-muted);
 }
+
+.metadata { display: flex; flex-direction: column; gap: 4px; color: var(--cs-color-text-muted); overflow-wrap: anywhere; max-width: 30ch; }

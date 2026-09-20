@@ -69,8 +69,8 @@ export function ProjectOverviewPage(): ReactElement {
       <div className={styles.toolbar}>
         <Link to={PROJECT_PATHS[space].release} params={{ projectId }}>{t('projects.overview.goRelease')}</Link>
         <Link to={PROJECT_PATHS[space].settings} params={{ projectId }} search={{ tab: 'members' }}>{t('settings.tab.members')}</Link>
-        <Link to={PROJECT_PATHS[space].settings} params={{ projectId }} search={{ tab: 'repository' }}>{t('settings.tab.repository')}</Link>
-        <Link to={PROJECT_PATHS[space].settings} params={{ projectId }} search={{ tab: 'resources' }}>{t('settings.tab.resources')}</Link>
+        <Link to={PROJECT_PATHS[space].resources} params={{ projectId }} search={{ section: 'project' }}>{t('settings.tab.repository')}</Link>
+        <Link to={PROJECT_PATHS[space].resources} params={{ projectId }} search={{ section: 'api' }}>{t('settings.tab.resources')}</Link>
       </div>
     </>
   );

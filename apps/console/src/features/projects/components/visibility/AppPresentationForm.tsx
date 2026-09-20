@@ -1,5 +1,5 @@
 import type { AppIcon, AppPresentationDto } from '@crewstation/contracts';
-import { useId } from 'react';
+import { useEffect, useId, useRef } from 'react';
 import { errorMessage } from '../../../../shared/api/useApi';
 import { useT } from '../../../../shared/lib/useT';
 import { ActionNote } from '../../../../shared/ui/ActionNote';
@@ -13,16 +13,19 @@ interface PresentationFormProps {
   readonly saved: AppPresentationDto;
   readonly editor: ReturnType<typeof usePresentationEditor>;
   readonly canConfigure: boolean;
+  readonly editing: boolean;
   readonly frozen: boolean;
   readonly cancelDisabled: boolean;
   readonly onCancel: (button: HTMLButtonElement) => void;
 }
 
-export function AppPresentationForm({ saved, editor, canConfigure, frozen, cancelDisabled, onCancel }: PresentationFormProps) {
+export function AppPresentationForm({ saved, editor, canConfigure, editing, frozen, cancelDisabled, onCancel }: PresentationFormProps) {
   const t = useT(), id = useId(), { draft, invalid, dirty, save, conflict } = editor;
   const locked = save.isPending || frozen || !canConfigure;
-  if (!canConfigure && !dirty && !save.isPending) return <div className={styles.person}><GlyphIcon name={saved.icon} /><p>{saved.description || t('projects.visibility.noDescription')}</p></div>;
-  return <form className={styles.stack} noValidate onSubmit={(event) => { event.preventDefault(); editor.submit(event.currentTarget); }}>
+  const form = useRef<HTMLFormElement>(null);
+  useEffect(() => { if (editing) form.current?.querySelector<HTMLElement>('textarea, select')?.focus(); }, [editing]);
+  if ((!canConfigure || !editing) && !dirty && !save.isPending) return <div className={styles.person}><GlyphIcon name={saved.icon} /><p>{editor.draft.description || t('projects.visibility.noDescription')}</p><span>{t('projects.visibility.savedRevision', { revision: editor.draft.revision })}</span></div>;
+  return <form ref={form} className={styles.stack} noValidate onSubmit={(event) => { event.preventDefault(); editor.submit(event.currentTarget); }}>
     <FormField label={t('projects.visibility.description')} hint={t('projects.visibility.descriptionHint')} hintId={`${id}-hint`} error={invalid ? t('projects.visibility.descriptionTooLong') : undefined} errorId={`${id}-error`}>
       <textarea rows={3} value={draft.description} disabled={locked} aria-invalid={invalid} aria-describedby={`${id}-hint${invalid ? ` ${id}-error` : ''}`} onChange={(event) => editor.describe(event.target.value)} />
     </FormField>

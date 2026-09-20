@@ -15,6 +15,7 @@ export interface ConfigItemDraft {
 }
 export interface ConfigItemFormProps {
   readonly draft: ConfigItemDraft;
+  readonly envLabel: string;
   readonly pending: boolean;
   readonly disabled?: boolean;
   readonly existingNames: readonly string[];
@@ -24,13 +25,14 @@ export interface ConfigItemFormProps {
 }
 
 /** 请求成功后才清空值；失败、目录暂不可用和环境切换保留当前输入。 */
-export function ConfigItemForm({ draft, pending, disabled = false, existingNames, onSubmit, onReset, onDirtyChange }: ConfigItemFormProps): ReactElement {
+export function ConfigItemForm({ draft, envLabel, pending, disabled = false, existingNames, onSubmit, onReset, onDirtyChange }: ConfigItemFormProps): ReactElement {
   const t = useT(), id = useId(), busy = useRef(false), nameInput = useRef<HTMLInputElement>(null);
   const [name, setName] = useState(draft.name), [value, setValue] = useState(draft.isSecret ? '' : draft.value ?? '');
   const [isSecret, setIsSecret] = useState(draft.isSecret), [nameError, setNameError] = useState<string>();
   const [baseline, setBaseline] = useState({ name: draft.name, value: draft.isSecret ? '' : draft.value ?? '', isSecret: draft.isSecret });
   const dirty = name !== baseline.name || value !== baseline.value || isSecret !== baseline.isSecret;
-  useEffect(() => { onDirtyChange(dirty); return () => onDirtyChange(false); }, [dirty, onDirtyChange]);
+  useEffect(() => { onDirtyChange(dirty || pending); return () => onDirtyChange(false); }, [dirty, pending, onDirtyChange]);
+  useEffect(() => { nameInput.current?.focus(); }, []);
   const submit = async (event: FormEvent): Promise<void> => {
     event.preventDefault();
     if (busy.current || pending || disabled) return;
@@ -53,8 +55,8 @@ export function ConfigItemForm({ draft, pending, disabled = false, existingNames
     </FormField>
     {existingNames.includes(name.trim()) ? <p>{t('config.form.overwriteHint', { name: name.trim() })}</p> : null}
     <div className={styles.buttons}>
-      <Button variant="primary" type="submit" disabled={locked}>{t(pending ? 'config.form.submitting' : 'config.form.submit')}</Button>
-      <Button variant="ghost" disabled={locked} onClick={onReset}>{t('config.form.reset')}</Button>
+      <Button variant="primary" type="submit" disabled={locked}>{pending ? t('config.form.submitting') : t('config.saveTo', { env: envLabel })}</Button>
+      <Button variant="ghost" disabled={pending} onClick={onReset}>{t('config.cancel')}</Button>
     </div>
   </form>;
 }

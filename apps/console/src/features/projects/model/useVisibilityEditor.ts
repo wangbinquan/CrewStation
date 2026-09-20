@@ -3,12 +3,12 @@ import { useRef, useState } from 'react';
 import { api } from '../../../shared/api/client';
 import { useApiMutation } from '../../../shared/api/useApi';
 
-export function useVisibilityEditor(projectId: string, saved: AppVisibilityDto, reload: () => Promise<unknown>, canSave: boolean) {
+export function useVisibilityEditor(projectId: string, saved: AppVisibilityDto, reload: () => Promise<unknown>, canSave: boolean, onSaved?: () => void) {
   const [draft, setDraft] = useState(saved), [base, setBase] = useState(saved), [invalid, setInvalid] = useState(false);
   const lock = useRef(false);
   const dirty = draft.mode !== base.mode || JSON.stringify(draft.userIds) !== JSON.stringify(base.userIds);
   const save = useApiMutation((input: SetAppVisibilityRequest) => api.projects.setAppVisibility(projectId, input), {
-    invalidate: [['market']], onSuccess: (value) => { setDraft(value); setBase(value); void reload(); },
+    invalidate: [['market']], onSuccess: (value) => { setDraft(value); setBase(value); void reload(); onSaved?.(); },
   });
   if (!dirty && !save.isPending && saved.revision > base.revision) { setDraft(saved); setBase(saved); }
   const conflict = saved.revision > base.revision;

@@ -3,12 +3,12 @@ import { useRef, useState } from 'react';
 import { api } from '../../../shared/api/client';
 import { useApiMutation } from '../../../shared/api/useApi';
 
-export function usePresentationEditor(projectId: string, saved: AppPresentationDto, reload: () => Promise<unknown>, canSave: boolean) {
+export function usePresentationEditor(projectId: string, saved: AppPresentationDto, reload: () => Promise<unknown>, canSave: boolean, onSaved?: () => void) {
   const [draft, setDraft] = useState(saved), [base, setBase] = useState(saved), [invalid, setInvalid] = useState(false);
   const lock = useRef(false);
   const dirty = draft.description !== base.description || draft.icon !== base.icon;
   const save = useApiMutation((input: SetAppPresentationRequest) => api.projects.setAppPresentation(projectId, input), {
-    invalidate: [['market']], onSuccess: (value) => { setDraft(value); setBase(value); void reload(); },
+    invalidate: [['market']], onSuccess: (value) => { setDraft(value); setBase(value); void reload(); onSaved?.(); },
   });
   if (!dirty && !save.isPending && saved.revision > base.revision) { setDraft(saved); setBase(saved); }
   const conflict = saved.revision > base.revision;

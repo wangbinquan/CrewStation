@@ -38,7 +38,7 @@ const row = (label: string) => [...document.querySelectorAll('tr')].find((elemen
 test('生产配置对照读取两槽精确 Release，使用全组历史版本并区分实际部署状态', async () => {
   const f = fixture(); page = await renderApp(`/projects/${projectId}/settings?tab=config`);
   expect(f.calls.some((call) => call.path.endsWith('/slots'))).toBe(false);
-  await page.click('生产取值组'); expect(page.text()).toContain('当前已保存的生产配置：第 7 版');
+  await page.click('生产'); expect(page.text()).toContain('当前已保存的生产配置：第 7 版');
   expect(row('正式版本').textContent).toContain('v1.0.0'); expect(row('正式版本').textContent).toContain('记录为第 3 版'); expect(row('正式版本').textContent).toContain('已有更新的配置');
   expect(row('待验证版本').textContent).toContain('部署中'); expect(row('待验证版本').textContent).toContain('与当前保存版本一致');
   expect(page.text()).toContain('实际注入键由各版本的 Manifest 决定');

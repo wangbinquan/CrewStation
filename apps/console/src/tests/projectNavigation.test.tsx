@@ -62,7 +62,7 @@ test('资源说明读取失败展示原因，可原地重试而不需要离开�
   expect(page.text()).toContain('资源查询失败'); expect(attempts).toBe(1);
   await page.click('重新读取资源');
   expect(attempts).toBe(2); expect(page.text()).toContain('资源查询仍不可用');
-  expect(page.path()).toBe(`/projects/${projectId}/settings`);
+  expect(page.path()).toBe(`/projects/${projectId}/resources`);
 });
 
 test('资源说明结构不完整时给出可重试错误，不让整个设置页崩溃', async () => {
@@ -70,20 +70,20 @@ test('资源说明结构不完整时给出可重试错误，不让整个设置�
   page = await renderApp(`/projects/${projectId}/settings?tab=resources&resource=overview`);
   expect(page.text()).toContain('资源说明返回不完整');
   expect(page.text()).toContain('重新读取资源');
-  await page.click('成员');
+  await page.click('项目设置'); await page.click('成员与角色');
   expect(page.search().tab).toBe('members');
 });
 
-describe('五个项目入口与旧链接兼容', () => {
-  test('项目名与 slug 取实际项目，五项导航；概览不再请求成员和仓库详情', async () => {
+describe('六个项目入口与旧链接兼容', () => {
+  test('项目名与 slug 取实际项目，六项导航；概览不再请求成员和仓库详情', async () => {
     const f = fixture(); page = await renderApp(`/projects/${projectId}`);
     const links = [...document.querySelectorAll('[aria-label="项目页面"] a')];
-    expect(links.map((link) => link.textContent)).toEqual(['概览', '开发', '发布与上线', '运行与诊断', '项目设置']);
+    expect(links.map((link) => link.textContent)).toEqual(['概览', '开发', '开发资源', '发布与上线', '运行与诊断', '项目设置']);
     expect(page.text()).toContain('团队知识助理'); expect(page.text()).toContain('team-knowledge');
     expect(document.querySelector('header.bar')?.textContent).not.toContain(projectId);
     expect(f.calls.some((call) => call.url.pathname.endsWith('/members') || call.url.pathname.endsWith('/repository'))).toBe(false);
-    await page.click('项目设置'); expect(page.search().tab).toBe('members');
-    expect(f.calls.some((call) => call.url.pathname.endsWith('/members'))).toBe(true);
+    await page.click('项目设置'); expect(page.search()).toMatchObject({ tab: 'config', env: 'development' });
+    expect(f.calls.some((call) => call.url.pathname.endsWith('/members'))).toBe(false);
   });
 
   test('旧日志深链接 replace，完整发布与时间条件实际进入接口；返回回到旧链接之前', async () => {
@@ -131,7 +131,7 @@ describe('五个项目入口与旧链接兼容', () => {
 
   test('旧接口链接保留代理与操作并实际定位，清除后恢复完整目录', async () => {
     const f = fixture(); page = await renderApp(`/projects/${projectId}/catalog?proxy=billing&operation=billing.getInvoice`);
-    expect(page.path()).toBe(`/projects/${projectId}/settings`); expect(page.search()).toMatchObject({ tab: 'resources', resource: 'api', proxy: 'billing', operation: 'billing.getInvoice' });
+    expect(page.path()).toBe(`/projects/${projectId}/resources`); expect(page.search()).toMatchObject({ section: 'api', proxy: 'billing', operation: 'billing.getInvoice' });
     expect(page.text()).toContain('billing.getInvoice'); expect(page.text()).not.toContain('docs.getArticle');
     expect(page.text()).not.toContain('管理员模式');
     await page.click('查看全部接口'); expect(page.search().operation).toBeUndefined(); expect(page.text()).toContain('docs.getArticle');
@@ -140,7 +140,7 @@ describe('五个项目入口与旧链接兼容', () => {
 
   test('旧能力链接保留 API 操作，不存在的操作不偷偷展示其他操作', async () => {
     fixture(); page = await renderApp(`/projects/${projectId}/capabilities?operation=missing.operation`);
-    expect(page.search()).toMatchObject({ tab: 'resources', resource: 'api', operation: 'missing.operation' });
+    expect(page.search()).toMatchObject({ section: 'api', operation: 'missing.operation' });
     expect(page.text()).toContain('missing.operation'); expect(page.text()).not.toContain('billing.getInvoice');
   });
 
@@ -149,12 +149,12 @@ describe('五个项目入口与旧链接兼容', () => {
 describe('诊断、订阅与配置的上下文', () => {
   test('同路径切到生产配置后，空间往返恢复最新分组', async () => {
     const f = fixture(undefined, true); page = await renderApp(`/projects/${projectId}/config`);
-    await page.click('生产取值组'); expect(page.search().env).toBe('production');
+    await page.click('生产'); expect(page.search().env).toBe('production');
     await page.click('进入平台管理'); await page.click('回到工作台');
     // 同一 pathname 的 query 也必须更新返回位置，不能沿用开发组或默认成员分类。
     expect(page.path()).toBe(`/projects/${projectId}/settings`);
     expect(page.search()).toEqual({ tab: 'config', env: 'production' });
-    expect([...document.querySelectorAll('[role="tab"][aria-selected="true"]')].map((node) => node.textContent)).toContain('生产取值组');
+    expect([...document.querySelectorAll('[role="tab"][aria-selected="true"]')].map((node) => node.textContent)).toContain('生产');
     expect(f.calls.some((call) => call.method !== 'GET')).toBe(false);
   });
 
@@ -171,7 +171,7 @@ describe('诊断、订阅与配置的上下文', () => {
   });
 
   test('同一设置路由切换项目会换上下文，上一项目草稿不进入新项目', async () => {
-    fixture(); page = await renderApp(`/projects/${projectId}/settings?tab=config`);
+    fixture(); page = await renderApp(`/projects/${projectId}/settings?tab=config`); await page.click('新增变量');
     await input(document.querySelector<HTMLInputElement>('input[placeholder="DATABASE_URL"]')!, 'OLD_PROJECT_DRAFT');
     await page.requestNavigate(`/projects/prj_${'f'.repeat(32)}/settings?tab=config`);
     expect(page.path()).toBe(`/projects/${projectId}/settings`); await page.click('放弃输入并离开');
@@ -182,7 +182,7 @@ describe('诊断、订阅与配置的上下文', () => {
     const f = fixture(); page = await renderApp(`/projects/${projectId}/events?subscription=sub-a`);
     expect(page.search()).toMatchObject({ tab: 'deliveries', subscription: 'sub-a' });
     expect(page.text()).toContain('最近 50 条'); expect(page.text()).toContain('git.push'); expect(page.text()).not.toContain('git.issue');
-    await page.click('查看订阅'); expect(page.search()).toMatchObject({ tab: 'resources', resource: 'events', subscription: 'sub-a' });
+    await page.click('查看订阅'); expect(page.search()).toMatchObject({ section: 'events', subscription: 'sub-a' });
     expect(document.querySelector('tr[aria-current="true"]')?.textContent).toContain('git.push');
     await page.back(); await page.click(traceId);
     expect(page.search()).toEqual({ tab: 'trace', traceId }); expect(page.text()).toContain('runner.connected');
@@ -194,9 +194,11 @@ describe('诊断、订阅与配置的上下文', () => {
     const f = fixture(); page = await renderApp(`/projects/${projectId}/config`);
     expect(page.search()).toMatchObject({ tab: 'config', env: 'development' });
     expect(document.querySelector('[aria-label="项目页面"] a[aria-current="page"]')?.textContent).toBe('项目设置');
+    await page.click('新增变量');
     const nameInput = document.querySelector<HTMLInputElement>('input[placeholder="DATABASE_URL"]')!;
-    await input(nameInput, 'DEV_DRAFT'); await page.click('生产取值组');
+    await input(nameInput, 'DEV_DRAFT'); await page.click('生产');
     expect(page.search().env).toBe('production'); expect(nameInput.closest('[hidden]')).not.toBeNull();
+    await page.click('新增变量');
     const prodName = [...document.querySelectorAll<HTMLInputElement>('input[placeholder="DATABASE_URL"]')].find((node) => !node.closest('[hidden]'))!;
     await input(prodName, 'PROD_DRAFT'); await page.back();
     expect(page.search().env).toBe('development'); expect(nameInput.value).toBe('DEV_DRAFT'); expect(prodName.value).toBe('PROD_DRAFT');
@@ -276,7 +278,7 @@ test('缩窄后选中页签完整可见，不抢正文焦点，卸载停止观�
 });
 
 test('分类参数只接受有效且相关的值，未知对象不降级为另一个对象', () => {
-  expect(parseSettingsSearch({ tab: 'bad', env: 'production', operation: 'foo' })).toEqual({ tab: 'members' });
+  expect(parseSettingsSearch({ tab: 'bad', env: 'production', operation: 'foo' })).toEqual({ tab: 'config', env: 'production' });
   expect(parseSettingsSearch({ tab: 'config', env: 'bad', proxy: 'foo' })).toEqual({ tab: 'config', env: 'development' });
   expect(parseOperationsSearch({ tab: 'logs', source: 'build', taskId, releaseId, limit: 5000, since: 'bad' })).toEqual({ tab: 'logs', source: 'build', releaseId, since: undefined, limit: 200 });
   expect(parseOperationsSearch({ tab: 'trace', traceId: 'not-a-trace', releaseId })).toEqual({ tab: 'trace', traceId: undefined });

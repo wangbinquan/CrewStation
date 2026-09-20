@@ -16,8 +16,8 @@ export function CapabilityData({ data }: { readonly data: readonly DataResourceD
         rowKey={(row) => row.id}
         empty={t('capabilities.data.empty')}
         columns={[
-          { header: t('capabilities.data.kind'), cell: (row) => <code>{row.kind}</code> },
-          { header: t('capabilities.data.env'), cell: (row) => row.env },
+          { header: t('capabilities.data.kind'), cell: (row) => <><code>{row.kind}</code><details><summary>{t('settings.technicalDetails')}</summary><code>{row.id}</code>{row.message ? <p>{row.message}</p> : null}</details></> },
+          { header: t('capabilities.data.env'), cell: (row) => t(`config.env.${row.env}`) },
           { header: t('capabilities.data.plan'), cell: (row) => row.plan },
           { header: t('capabilities.data.state'), cell: (row) => <Badge tone={row.state === 'ready' ? 'success' : 'neutral'}>{row.state}</Badge> },
           { header: t('capabilities.data.envVar'), cell: (row) => <CopyValue value={row.envVar} label={row.envVar} /> },

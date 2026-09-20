@@ -16,6 +16,7 @@ interface ProjectPageItem {
 const PROJECT_PAGES: readonly ProjectPageItem[] = [
   { page: 'overview', labelKey: 'nav.overview', exact: true },
   { page: 'development', labelKey: 'nav.devSession' },
+  { page: 'resources', labelKey: 'nav.resources' },
   { page: 'release', labelKey: 'nav.release' },
   { page: 'operations', labelKey: 'nav.operations' },
   { page: 'settings', labelKey: 'nav.settings' },
@@ -25,7 +26,7 @@ export function ProjectNavSection({ projectId, space = 'workbench', backTo }: { 
   const t = useT();
   const identity = useProjectIdentity(projectId);
   const pages = identity.previewOnly ? [{ page: 'overview' as const, labelKey: 'nav.preview', exact: false }] : PROJECT_PAGES;
-  // 项目不存在或当前身份不是成员：五个入口都会落到同一个说明页，只保留返回与对象 ID。
+  // 项目不存在或当前身份不是成员：项目入口都会落到同一个说明页，只保留返回与对象 ID。
   const missing = !identity.data && [403, 404].includes(identity.error?.status ?? 0);
   return (
     <div className={styles.section}>

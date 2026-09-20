@@ -7,6 +7,7 @@ import { useT } from '../../../shared/lib/useT';
 export type MemberTargetMode = 'lookup' | 'id' | 'directory';
 export interface MemberEditorOptions {
   readonly projectId: string;
+  readonly initialMember?: MemberDto;
   readonly isAdmin: boolean;
   readonly canManage: boolean;
   readonly members: readonly MemberDto[];
@@ -16,16 +17,16 @@ export interface MemberEditorOptions {
 }
 
 /** 查找文字与 ID 都保留；未选中查找结果时不能偷偷提交另一模式的旧 ID。 */
-export function useMemberEditor({ isAdmin, canManage, members, pending, disabled, onSave }: MemberEditorOptions) {
+export function useMemberEditor({ isAdmin, canManage, members, pending, disabled, onSave, initialMember }: MemberEditorOptions) {
   const t = useT();
-  const [user, setUser] = useState<MemberCandidateDto>(), [rawId, setRawId] = useState(''), [identity, setIdentity] = useState('');
-  const [mode, setMode] = useState<MemberTargetMode>('lookup'), [role, setRole] = useState<MemberRole>('developer');
+  const [user, setUser] = useState<MemberCandidateDto | undefined>(initialMember), [rawId, setRawId] = useState(''), [identity, setIdentity] = useState('');
+  const [mode, setMode] = useState<MemberTargetMode>('lookup'), [role, setRole] = useState<MemberRole>(initialMember?.role ?? 'developer');
   const [error, setError] = useState<string>(), [confirmedInput, setConfirmedInput] = useState<SetMemberRequest>();
   const [pickerKey, setPickerKey] = useState(0);
   const targetId = user?.userId ?? (mode === 'id' ? rawId.trim() : ''), current = members.find((member) => member.userId === targetId);
   const currentOwner = members.find((member) => member.role === 'owner');
   const locked = disabled || !canManage || pending || Boolean(confirmedInput);
-  const dirty = Boolean(user || rawId || identity || role !== 'developer' || confirmedInput);
+  const dirty = user?.userId !== initialMember?.userId || Boolean(rawId || identity || role !== (initialMember?.role ?? 'developer') || confirmedInput);
   const save = async (input: SetMemberRequest) => {
     if (disabled || !canManage || pending || (input.role === 'owner' && !isAdmin)) return;
     try {

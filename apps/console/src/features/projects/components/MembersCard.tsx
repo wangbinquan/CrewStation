@@ -6,6 +6,9 @@ import { Button } from '../../../shared/ui/Button';
 import { Card } from '../../../shared/ui/Card';
 import { DataTable } from '../../../shared/ui/DataTable';
 import { InlineConfirm } from '../../../shared/ui/InlineConfirm';
+import { ConfirmationPanel } from '../../../shared/ui/ConfirmationPanel';
+import { ActionRow } from '../../../shared/ui/ActionRow';
+import { useMemberPanel } from '../model/useMemberPanel';
 import { QueryStatus } from '../../../shared/ui/QueryStatus';
 import { useMemberManagement } from '../model/useMemberManagement';
 import type { ProjectOwnership } from '../model/useProjectOwnership';
@@ -20,8 +23,10 @@ export function MembersCard({ projectId, ownership }: MembersCardProps) {
   const { isOwner: canManage, isAdmin } = ownership;
   const t = useT(), management = useMemberManagement(projectId, canManage && !ownership.unavailable);
   const { members, save, remove, pending, unavailable } = management, items = members.data?.items ?? [];
+  const { confirmation, ...editor } = useMemberPanel();
+  const blocked = pending || unavailable || ownership.unavailable;
   const columns = [t('projects.members.columnName'), t('projects.members.columnEmail'), t('projects.members.columnRole'), t('projects.members.columnActions')];
-  return <Card compact title={t('projects.members.title')} extra={<Button disabled={pending || members.isFetching} onClick={() => { void Promise.all([members.refetch(), ownership.reload()]); }}>{t('projects.members.refresh')}</Button>}>
+  return <Card stacked compact title={t('projects.members.title')} extra={<>{canManage ? <Button variant="primary" disabled={blocked} onClick={(event) => editor.select(null, event.currentTarget)}>{t('projects.members.add')}</Button> : null}<Button disabled={pending || members.isFetching} onClick={() => { void Promise.all([members.refetch(), ownership.reload()]); }}>{t('projects.members.refresh')}</Button></>}>
     <QueryStatus isPending={members.isPending} error={ownership.error ?? members.error} loadingKey="projects.members.loading" errorKey="projects.members.error" />
     {ownership.error ? <ActionNote tone="neutral">{t('projects.members.identityUnconfirmed')}</ActionNote> : !canManage ? <p>{t('projects.members.readOnly')}</p> : null}
     {pending ? <ActionNote tone="neutral">{t('projects.members.pendingNote')}</ActionNote> : null}
@@ -29,12 +34,13 @@ export function MembersCard({ projectId, ownership }: MembersCardProps) {
     {items.length > 0 ? <DataTable columns={columns}>{items.map((member) => <tr key={member.userId}>
       <td>{member.name}</td><td>{member.email}</td>
       <td><Badge tone={member.role === 'owner' ? 'info' : 'neutral'}>{t(`projects.role.${member.role}`)}</Badge></td>
-      <td>{canManage && member.role !== 'owner' ? <InlineConfirm variant="ghost" label={t('projects.members.remove')} question={t('projects.members.removeQuestion', { name: member.name, email: member.email })} confirmLabel={t('projects.members.confirmRemove')} busy={pending || unavailable || ownership.unavailable} onConfirm={() => { void management.removeMember(member); }} /> : member.role === 'owner' ? t('projects.members.currentOwner') : null}</td>
+      <td><ActionRow>{canManage && (member.role !== 'owner' || isAdmin) ? <Button variant="ghost" disabled={blocked} onClick={(event) => editor.select(member, event.currentTarget)}>{t('projects.members.editRole')}</Button> : null}{canManage && member.role !== 'owner' ? <InlineConfirm variant="ghost" label={t('projects.members.remove')} question={t('projects.members.removeQuestion', { name: member.name, email: member.email })} confirmLabel={t('projects.members.confirmRemove')} busy={pending || unavailable || ownership.unavailable} onConfirm={() => { void management.removeMember(member); }} /> : member.role === 'owner' ? t('projects.members.currentOwner') : null}</ActionRow></td>
     </tr>)}</DataTable> : null}
     {save.isError ? <ActionNote tone="error">{t('projects.members.saveError', { message: errorMessage(save.error) })}</ActionNote> : null}
     {remove.isError ? <ActionNote tone="error">{t('projects.members.removeError', { message: errorMessage(remove.error) })}</ActionNote> : null}
     {save.isSuccess ? <ActionNote tone="success">{t('projects.members.saved', { name: save.data.name, role: t(`projects.role.${save.data.role}`) })}</ActionNote> : null}
     {remove.isSuccess ? <ActionNote tone="success">{t('projects.members.removed', { name: remove.data.name })}</ActionNote> : null}
-    <MemberForm projectId={projectId} isAdmin={isAdmin} canManage={canManage} members={items} pending={pending} disabled={unavailable || ownership.unavailable} onSave={management.saveMember} />
+    {editor.next ? <div ref={confirmation}><ConfirmationPanel question={t('projects.members.discardQuestion')} confirmLabel={t('projects.members.discard')} cancelLabel={t('ui.draft.stay')} busy={pending} onConfirm={editor.confirm} onCancel={editor.keep} /></div> : null}
+    {editor.member !== undefined ? <MemberForm key={editor.sequence} initialMember={editor.member ?? undefined} projectId={projectId} isAdmin={isAdmin} canManage={canManage} members={items} pending={pending} disabled={unavailable || ownership.unavailable || Boolean(editor.next)} onSave={async (input) => { const result = await management.saveMember(input); if (result) editor.close(); return result; }} onDirtyChange={editor.dirtyChanged} onCancel={() => editor.select()} /> : null}
   </Card>;
 }

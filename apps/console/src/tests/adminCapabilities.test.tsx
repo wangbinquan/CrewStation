@@ -167,12 +167,12 @@ test('从指定 API 文档进入管理再返回，恢复原分类与接口而不
   expect(page.search()).toMatchObject({ tab: 'api', projectId, proxy: 'billing', operation: key });
   await page.click('回到工作台');
   // 实机只记 pathname，回程把 settings 的分类和操作丢掉，误落到默认成员页。
-  expect(page.path()).toBe(`/projects/${projectId}/settings`);
-  expect(page.search()).toEqual({ tab: 'resources', resource: 'api', proxy: 'billing', operation: key });
-  expect(document.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe('开发资源');
+  expect(page.path()).toBe(`/projects/${projectId}/resources`);
+  expect(page.search()).toEqual({ section: 'api', proxy: 'billing', operation: key });
+  expect(document.querySelector('[aria-label="资源主题"] [aria-current="page"]')?.textContent).toContain('API 接口');
   expect(page.text()).toContain(key); expect(f.writes()).toHaveLength(0);
   await page.back(); expect(page.path()).toBe('/admin/capabilities');
-  await page.back(); expect(page.search()).toMatchObject({ resource: 'api', operation: key });
+  await page.back(); expect(page.search()).toMatchObject({ section: 'api', operation: key });
 });
 
 test('旧接入列表保留搜索、类型、状态、负责人及翻页位置', async () => {

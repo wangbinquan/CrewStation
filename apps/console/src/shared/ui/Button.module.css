@@ -39,3 +39,5 @@
   background: transparent;
   font-weight: 400;
 }
+
+.button[hidden] { display: none; }

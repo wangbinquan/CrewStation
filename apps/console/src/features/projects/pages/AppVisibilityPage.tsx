@@ -6,6 +6,8 @@ import { useApiQuery } from '../../../shared/api/useApi';
 import { useT } from '../../../shared/lib/useT';
 import { Button } from '../../../shared/ui/Button';
 import { PageHeader } from '../../../shared/ui/PageHeader';
+import { Stack } from '../../../shared/ui/Stack';
+import { ActionRow } from '../../../shared/ui/ActionRow';
 import { QueryStatus } from '../../../shared/ui/QueryStatus';
 import { AppVisibilitySettings } from '../components/visibility/AppVisibilitySettings';
 
@@ -20,9 +22,9 @@ export function AppVisibilityPage({ embedded = false }: { readonly embedded?: bo
   const unavailable = me.isPending || visibility.isPending || presentation.isPending || Boolean(me.error || visibility.error || presentation.error);
   const refreshing = me.isFetching || visibility.isFetching || presentation.isFetching;
   const canConfigure = Boolean(visibility.data?.canConfigure && (me.data?.isAdmin || me.data?.memberships?.some((membership) => membership.projectId === projectId && membership.role === 'owner')));
-  return <>
-    {!embedded ? <PageHeader title={t('projects.visibility.title')} description={[t('projects.visibility.intro')]} actions={<Button onClick={() => { void reload(); }}>{t('projects.visibility.refresh')}</Button>} /> : <Button onClick={() => { void reload(); }}>{t('projects.visibility.refresh')}</Button>}
+  return <Stack>
+    {!embedded ? <PageHeader title={t('projects.visibility.title')} description={[t('projects.visibility.intro')]} actions={<Button onClick={() => { void reload(); }}>{t('projects.visibility.refresh')}</Button>} /> : <ActionRow><Button onClick={() => { void reload(); }}>{t('projects.visibility.refresh')}</Button></ActionRow>}
     <QueryStatus isPending={me.isPending || visibility.isPending || presentation.isPending} error={me.error ?? visibility.error ?? presentation.error} />
     {visibility.data && presentation.data ? <AppVisibilitySettings key={`${me.data?.id}:${projectId}`} projectId={projectId} visibility={visibility.data} presentation={presentation.data} canConfigure={canConfigure} unavailable={unavailable} refreshing={refreshing} reload={reload} /> : null}
-  </>;
+  </Stack>;
 }

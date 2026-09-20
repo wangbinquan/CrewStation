@@ -20,7 +20,8 @@
 
 已部署 `cs-console:rfc009-20260920-3` 并实机操作默认入口、变量草稿往返、错误聚焦、离开确认和五资源主题。
 最终真实 E2E **11 pass／0 fail／274 assertions**；1280／390／320px 中文浅色、390px 英文深色九主题均无整页横向溢出。
-配置／成员／应用／资源候选 46 项、API／边界 14 项回归通过，console 构建通过；与 RFC-008 共用最终完整 gate，结果与上库 CI 待回填。
+配置／成员／应用／资源候选 46 项、API／边界 14 项回归通过，console 构建通过；与 RFC-008 共用最终完整 gate，
+**1684 pass／5 skip／0 fail，9534 assertions，228.33 秒**，架构、lint、两套类型全部通过。本批精确上库与 CI 继续核验。
 没有实际修改演示项目配置、成员权限或归档。真实只读 API 试调在原有容器网关通道超时，页面原因与输入保留；
 未得到 HTTP／trace，PS-11 的真实成功响应欠证，因此 RFC-009 仍 **In Progress**。实现、自动化与实机证据分别见
 `proposal/rfc/RFC-009-project-settings-ux/acceptance.md`。保留并行 RFC-008 的全部输出，Git 发布串行协调。

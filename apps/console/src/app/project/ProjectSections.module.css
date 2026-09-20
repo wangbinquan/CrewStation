@@ -1,3 +1,5 @@
 .page { min-width: 0; }
 .page > header { margin-bottom: 12px; }
 .actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; margin: 0 0 8px; }
+.heading { font-size: 18px; margin: 0 0 6px; }
+.note { color: var(--cs-color-text-muted); margin: 0; }

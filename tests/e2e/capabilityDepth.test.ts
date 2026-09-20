@@ -29,9 +29,14 @@ const PROJECT_DEPTH = [
     parts: ['健康状态', '告警与通知', '日志', '事件投递', '调用链回放'],
   },
   {
-    capability: '项目设置：成员、可见性、配置、资源、仓库、生命周期',
+    capability: '项目设置：环境变量、应用展示、成员与角色、高级',
     suffix: '/settings',
-    parts: ['成员', '应用可见性', '配置与密钥', '开发资源', '仓库', '生命周期'],
+    parts: ['环境变量', '应用展示', '成员与角色', '高级', '新增变量'],
+  },
+  {
+    capability: '开发资源：五个独立主题',
+    suffix: '/resources',
+    parts: ['API 接口', '事件', '数据与存储', '项目与仓库', '平台接入'],
   },
   {
     capability: '成员管理：三种角色与负责人转移规则',
@@ -76,6 +81,7 @@ describe.skipIf(!project)('数字人项目的能力构成没有退化', () => {
     '%s',
     async (_capability, suffix, parts) => {
       await open(session!.admin, `/projects/${project!.id}${suffix}`);
+      if (suffix.endsWith('tab=members')) { await session!.admin.eval(`Array.from(document.querySelectorAll('button')).find(button => button.textContent === '添加成员').click()`); await session!.admin.waitUntil(`!!document.querySelector('form select[aria-label="成员角色"]')`); }
       const text = await session!.admin.text();
       for (const part of parts) expect(text).toContain(part);
       expect(session!.admin.takeErrors()).toEqual([]);

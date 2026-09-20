@@ -10,7 +10,7 @@ import styles from './ConfigItemTable.module.css';
 
 export interface ConfigItemTableProps {
   readonly items: readonly ConfigItemDto[];
-  readonly onEdit: (item: ConfigItemDto) => void;
+  readonly onEdit: (item: ConfigItemDto, button: HTMLButtonElement) => void;
   readonly onDelete: (name: string) => void;
   readonly deletingName: string | undefined;
   readonly disabled?: boolean;
@@ -21,30 +21,25 @@ export interface ConfigItemTableProps {
 export function ConfigItemTable({ items, onEdit, onDelete, deletingName, disabled = false, readOnly = false }: ConfigItemTableProps): ReactElement {
   const t = useT();
   const dateText = useDateText();
-  const columns = [
-    t('config.items.name'), t('config.items.value'), t('config.items.version'),
-    t('config.items.updatedBy'), t('config.items.updatedAt'), ...(!readOnly ? [t('config.items.actions')] : []),
-  ];
+  const columns = [t('config.items.name'), t('config.items.value'), ...(!readOnly ? [t('config.items.actions')] : [])];
   return (
     <DataTable columns={columns} className={styles.table}>
       {items.map((item) => (
         <tr key={item.name}>
           <td>
             <code>{item.name}</code>
+            <details><summary>{t('config.itemDetails')}</summary><div className={styles.metadata}>
+              <span>{t('config.items.version')}: {item.version}</span>
+              <span>{t('config.items.updatedBy')}: {item.updatedBy}</span>
+              <span>{t('config.items.updatedAt')}: {dateText(item.updatedAt)}</span>
+            </div></details>
           </td>
           <td>
             <ConfigItemValue item={item} />
           </td>
-          <td>{item.version}</td>
-          <td>
-            <span className={styles.actor} title={item.updatedBy}>
-              {item.updatedBy}
-            </span>
-          </td>
-          <td className={styles.muted}>{dateText(item.updatedAt)}</td>
           {!readOnly ? <td className={styles.actions}>
-            <Button variant="ghost" disabled={disabled} onClick={() => onEdit(item)}>
-              {t('config.items.edit')}
+            <Button variant="ghost" disabled={disabled} onClick={(event) => onEdit(item, event.currentTarget)}>
+              {t(item.isSecret ? 'config.updateSecret' : 'config.items.edit')}
             </Button>
             <InlineConfirm
               variant="ghost"
