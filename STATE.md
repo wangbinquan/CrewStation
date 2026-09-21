@@ -7,7 +7,7 @@
 
 基线三件套（v0.3.3）的第一轮实现已在本机 kind 集群上跑通并推上 main；**RFC-001（算力归平台）与 RFC-002（管理空间与租户空间分离）已实现、实跑确认并推上 main；RFC-004 已被 RFC-006 取代（Superseded）；RFC-006（算力档位合并运行环境、每个 Agent 一个 Pod）已实现、实机验收完毕并推上 main，已 Done（P1–P8、ADR-0005 与 I17–I19 待作者复核）；RFC-003 工作台已按设计附件完成并整体部署到本机，52／52 项 UX-AT 全部实机通过、本地 gate 与精确 SHA CI 通过，已 Done；RFC-005（OIDC／OAuth 2.0 公司登录）代码、测试与 OA-01…OA-31 实机验收全部完成，已 Done；RFC-007（开发环境 OAuth 2.0 一键换角色）代码、四角色 Chrome 实机验收、本地 gate 与精确 SHA CI 全部完成，已 Done**。
 
-## RFC-017 项目资源配置与共享规格模板（2026-09-21）
+## RFC-017 项目资源配置与共享规格模板已 Done（2026-09-21）
 
 作者提出服务套餐和任务容器套餐属于项目资源管控，并在确认两层方案后要求“改”。已将两类套餐收进 **项目管理 → 资源规格模板**，原菜单地址保留跳转；项目目录的“资源配置”集中服务范围、Agent／开发容器、任务并发配额和读取时占用，各卡片独立保存、重读和保护草稿。
 
@@ -15,7 +15,7 @@
 
 本机 `docker-desktop` 已更新四项：cs-api／cs-controller／mcp-capabilities 为 `cs-control-plane:rfc017-20260921`，console 为 `cs-console:rfc017-20260921`，全部 Ready；05:12Z 的专用迁移 Job 仅应用 `project/0011_service_plan_policies.sql`。真实 dev-admin 页面、项目 API、1280／320px 和模板双语核对通过，没有修改已有项目的资源配置。
 
-分层回归覆盖空清单、项目隔离、并发冲突、配额边界、读取错误和跨卡草稿。发布前两处校验均做去掉修复即失败的变异验证。完整门禁 **2072 pass／8 skip／0 fail**，13131 assertions；新增可执行行覆盖 391／391。已完成本机验收，远端发布与精确 SHA CI 在收尾，见 [RFC-017 实施与验证](proposal/rfc/RFC-017-project-resource-management/plan.md)。本次另修一处网关重建测试的固定日期夹具，使新文档与评估时钟一致，避免两小时后自发变红。
+分层回归覆盖空清单、项目隔离、并发冲突、配额边界、读取错误和跨卡草稿。发布前两处校验均做去掉修复即失败的变异验证。完整门禁 **2072 pass／8 skip／0 fail**，13131 assertions；新增可执行行覆盖 391／391。实现 `38d1f3a` 与测试修复 `9d6ee70` 已上库；[CI 35564949555](https://github.com/wangbinquan/CrewStation/actions/runs/35564949555) 六项全部成功，T1–T6／PR-01…PR-10 已完成，见 [RFC-017 实施与验证](proposal/rfc/RFC-017-project-resource-management/plan.md)。本次另修一处网关重建测试的固定日期夹具，使新文档与评估时钟一致，避免两小时后自发变红。
 
 ## 扩盘、登录恢复与残留清理（2026-09-21 04:30–05:10Z）
 
