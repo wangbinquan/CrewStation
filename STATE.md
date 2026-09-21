@@ -38,7 +38,7 @@
 
 **线上已用这笔修复本身恢复，并留了前后对照。** 只滚动做服务域判定的 `cs-auth` 一个部署到 `cs-control-plane:gateway-heal-20260921`（构建时工作树里后端没有任何未提交改动，镜像即 `a841e83` 的后端；上一版 `cs-control-plane:rfc013-20260921-4` 保留可回退），其余六个控制面部署没动。同一个业务 Pod（`cs-demo/demo-blue`）同一次调用：修复前 `403 放行表尚未生成`，修复后 `200 {"ok":true,"service":"cs-api"}`；库里多出 v40（`identityVersion` 2、11 个调用方，生成于重启后的第一个服务域请求），`cs-auth` 日志有一条 warn `allowlist rebuilt on demand`。判定没有因此变松：未登记的 `test-gitlab:GET:/v4/users` 仍被 403 并给出精确原因。节点磁盘导入后余 5.1GB（96%）。console 的两处修复没有单独部署——工作树里有另一个会话未提交的 console 在制品，不想替它带上集群；下一次 console 部署会自然带上。
 
-**CI。** `a841e83` 的 [run 35557168622](https://github.com/wangbinquan/CrewStation/actions/runs/35557168622) 五层用例全绿，`gate` 红：新增代码防护报「`app/router/router.ts` 有可执行逻辑，但没有任何用例加载它」——我对它只做了源码文本断言，那不算加载。已把断言换成真正 import 生产路由器核对 `defaultErrorComponent`，并在本机按 `be60d47` 基线预跑 `test:patch` 通过（119／120 行，99.2%）。
+**CI。** `a841e83` 的 [run 35557168622](https://github.com/wangbinquan/CrewStation/actions/runs/35557168622) 五层用例全绿，`gate` 红：新增代码防护报「`app/router/router.ts` 有可执行逻辑，但没有任何用例加载它」——我对它只做了源码文本断言，那不算加载。已把断言换成真正 import 生产路由器核对 `defaultErrorComponent`，并在本机按 `be60d47` 基线预跑 `test:patch` 通过（119／120 行，99.2%）。修正提交 `56a5a0a` 的 [run 35557939893](https://github.com/wangbinquan/CrewStation/actions/runs/35557939893) 六个作业全部成功；推送后 `HEAD == origin/main == 56a5a0a`。
 
 两条教训已落进 `dev-gotchas.md`（契约变更、前端与测试两节）。模块用例本机借用正在运行的 `cs-rfc013-test-pg`（`CS_TEST_DATABASE_URL=…@127.0.0.1:63764/…`，每条用例自建自删独立库）：gateway／identity／platform／api-catalog 共 169 pass／0 fail；默认的 `cs-dev-pg`（55432）13 小时前已退出，没有去动它。
 
