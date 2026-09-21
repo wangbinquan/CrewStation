@@ -263,6 +263,17 @@ RFC-001 一次性把 `agentProfiles` 的 `driver` / `model` 换成 `compute`，�
 
 判据很简单：**列出所有会因这次变更而失败的入口，看其中有没有「修复它本身要走的那一个」。**
 
+### 抬高持久化派生文档的版本号时，要同时回答「谁来把它重建出来」
+
+RFC-013 把放行表的 `identityVersion` 升到 2，读取侧随之把旧文档当作不存在——这一步是对的，旧文档里的授权还是按操作键写的，
+不能沿用。**漏掉的是另一半**：放行表只在授权／目录变更与手动「重算」时重建，升级本身不触发任何一个。于是本机升级后库里最新一份
+仍是旧格式（v39），服务域 ForwardAuth 对每个请求都回 `403 放行表尚未生成`，业务调平台 API、开发容器里的 Agent 连 MCP 全部被拒，
+而用户域的浏览器旅程一切正常，验收因此没撞上（2026-09-21，从业务 Pod 里 `fetch('http://api.svc.cs.internal/healthz')` 才看见）。
+现在评估侧发现没有当前版本的文档会就地重建一次（同进程合并、跨进程靠主键冲突兜底），管理页的读取仍是纯读取。
+
+判据：**给任何「派生后落库、带格式版本」的文档抬版本时，列出它的全部重建触发点，确认升级之后至少有一个会自己发生**；
+验收里要有一条走服务域的真实调用，浏览器里看不出这类故障。
+
 ### `.strict()` 是必需的，但错误信息要自带出路
 
 zod 默认剥掉未知键：不加 `.strict()`，旧写法的 `driver` / `model` 会被静默丢弃，
@@ -301,6 +312,16 @@ Claude in Chrome 的 `resize_window` 到 390／320 会被 macOS Chrome 的最小
 在页面里注入同源 `<iframe src=location.pathname style="width:390px">` 即可得到真实的 390px 布局视口（cookie 同站、媒体查询按 iframe 宽度生效），
 用 `contentDocument.documentElement.scrollWidth` 比 `contentWindow.innerWidth` 判断整页横向溢出；1280×720 的高度量测同理。
 
+
+### 路由库不会替你装错误边界：没有 `defaultErrorComponent`，一页渲染抛错整个工作台就没了
+
+TanStack Router 只给声明了 `errorComponent`（或路由器上有 `defaultErrorComponent`）的路由装 `CatchBoundary`。两样都没有时，
+任何页面在渲染期抛错都会一路冒到根上，顶栏、左栏连同页面一起被库自带的英文 “Something went wrong!” 顶掉。
+2026-09-21 实撞：网关页对放行表响应直接 `allowlist.data?.entries.length`，响应缺 `entries` 就是这个下场。
+现在 `app/router/router.ts` 配了 `defaultErrorComponent: RouteErrorPanel`（`renderApp` 同步配了同一项，整页旅程用例看到的出错形态才和生产一致），
+出错只换掉那一页；面板的「重试」会先丢掉无人订阅的查询缓存再重画，否则读到的还是让它崩掉的那份数据。
+**边界只是兜底**：页面读响应仍要先过形状检查，把「格式不合」转成读取失败显示出来（`MarketPage`、`gatewayStatus.ts` 都是这个写法），
+而且读取失败时不要拿 `?? 0` 充数——「0 条」「为空」是会被当真的结论。
 
 ### happy-dom 里 React 的 onChange 走 IE 时代的 input 事件 polyfill：先 focus，再 keyup
 

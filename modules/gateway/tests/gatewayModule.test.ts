@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
-import type { ServiceId, WorkloadIdentity } from '@crewstation/contracts';
+import type { AllowlistDocument, ServiceId, WorkloadIdentity } from '@crewstation/contracts';
 import { eventbusMigrations } from '@crewstation/eventbus';
 import type { FakeK8sClient } from '@crewstation/k8s';
 import { createFakeK8sClient } from '@crewstation/k8s';
@@ -20,11 +20,9 @@ const services = [
 ];
 let prodPhysical: 'blue' | 'green' = 'blue';
 
-beforeAll(async () => {
-  if (!available) return;
-  tdb = await createTestDatabase([eventbusMigrations, gatewayMigrations]);
-  k8s = createFakeK8sClient();
-  gateway = createGatewayModule({
+/** 同一个库上的一个新模块实例＝一个刚启动的进程：自己的放行表缓存是空的。 */
+function newGateway(): GatewayModule {
+  return createGatewayModule({
     db: tdb.db, k8s,
     services: { listServices: async () => services, getService: async (id) => services.find((s) => s.serviceId === id), serviceIdOfProject: async () => demoId },
     slots: { slotRoles: async () => ({ prod: prodPhysical, preview: prodPhysical === 'blue' ? 'green' : 'blue' }) },
@@ -37,6 +35,13 @@ beforeAll(async () => {
     isAdmin: async () => true,
     settings: { systemNamespace: 'crewstation-system', serviceDomain: 'svc.cs.internal', userAuthMiddleware: 'forward-auth-user', serviceAuthMiddleware: 'forward-auth-service', dropIdentityHeadersMiddleware: 'drop-identity-headers', allowlistMaxStaleSeconds: 300, consumerName: 'test.gateway' },
   });
+}
+
+beforeAll(async () => {
+  if (!available) return;
+  tdb = await createTestDatabase([eventbusMigrations, gatewayMigrations]);
+  k8s = createFakeK8sClient();
+  gateway = newGateway();
 });
 afterAll(async () => { await tdb?.drop(); });
 
@@ -92,6 +97,28 @@ describe.skipIf(!available)('gateway module', () => {
     expect((await gateway.api.evaluate({ ...caller, identity: 'ghost/ghost' }, { host: 'demo.svc.cs.internal', method: 'POST', path: '/events/gitlab' })).allowed).toBe(false);
 
     expect((await gateway.api.rebuildAllowlist()).version).toBe(2);
+  });
+
+  // 锁的真实故障（2026-09-21 本机实撞）：RFC-013 把放行表的 identityVersion 升到 2，升级后库里最新一份仍是旧格式；
+  // 读取侧把它当作不存在，而重建只由授权／目录变更或手动「重算」触发——没人触发，服务域调用于是全部 403「放行表尚未生成」。
+  test('升级后库里最新一份是旧身份版本的放行表：首个服务域请求就地重建，而不是一直被拒', async () => {
+    const { allowlists } = await import('../adapters/persistence/tables');
+    // 形状取自本机升级前的真实文档：没有 identityVersion 与 operationRoutes，默认开放项还是操作键而不是资源 ID。
+    const legacy = { version: 40, generatedAt: '2026-09-20T12:53:55.831Z', defaultOpen: ['issues:GET:/v1/issues/{id}'], maxStaleSeconds: 300, entries: [{ caller: 'demo/demo', operations: [], platformApi: true, platformHosts: ['platformApi', 'mcpCapabilities', 'mcpOperations'] }] };
+    await tdb.db.insert(allowlists).values({ version: legacy.version, document: legacy as unknown as AllowlistDocument, generatedAt: new Date(legacy.generatedAt) });
+    // 管理页的读取是纯读取：旧文档照实报告为「没有可用的放行表」，不因为有人打开页面就写库。
+    const [first, second] = [newGateway(), newGateway()];
+    expect(await first.api.currentAllowlist()).toBeUndefined();
+    // 升级＝新进程：cs-auth 与 cs-api 都装配了 gateway，各自没有缓存，同时迎来第一批服务域请求。
+    const verdicts = await Promise.all([first, second, first].map((instance) => instance.api.evaluate(caller, { host: 'api.svc.cs.internal', method: 'POST', path: '/v1/business-tasks' })));
+    expect(verdicts.map((verdict) => verdict.allowed)).toEqual([true, true, true]);
+    expect(await first.api.currentAllowlist()).toMatchObject({ identityVersion: 2, version: 41 });
+    expect((await second.api.currentAllowlist())?.version).toBe(41);
+    // 两个进程抢着重建也只落一份新版本：抢输的一方改用赢家落库的那份，不把主键冲突漏给调用方。
+    const versions = (await tdb.db.select({ version: allowlists.version }).from(allowlists)).map((row) => row.version).sort((a, b) => a - b);
+    expect(versions).toEqual([1, 2, 40, 41]);
+    // 旧文档里按操作键写的授权不会被沿用：重建后的判定来自当前的授权数据。
+    expect((await first.api.evaluate(caller, { host: 'api.svc.cs.internal', method: 'DELETE', path: '/api/issues/v1/issues/42' })).allowed).toBe(false);
   });
 
   test('Pod 身份索引：按 IP 反查，物理槽映射为角色，删除后不可查', async () => {
