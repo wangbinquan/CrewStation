@@ -7,6 +7,19 @@
 
 基线三件套（v0.3.3）的第一轮实现已在本机 kind 集群上跑通并推上 main；**RFC-001（算力归平台）与 RFC-002（管理空间与租户空间分离）已实现、实跑确认并推上 main；RFC-004 已被 RFC-006 取代（Superseded）；RFC-006（算力档位合并运行环境、每个 Agent 一个 Pod）已实现、实机验收完毕并推上 main，已 Done（P1–P8、ADR-0005 与 I17–I19 待作者复核）；RFC-003 工作台已按设计附件完成并整体部署到本机，52／52 项 UX-AT 全部实机通过、本地 gate 与精确 SHA CI 通过，已 Done；RFC-005（OIDC／OAuth 2.0 公司登录）代码、测试与 OA-01…OA-31 实机验收全部完成，已 Done；RFC-007（开发环境 OAuth 2.0 一键换角色）代码、四角色 Chrome 实机验收、本地 gate 与精确 SHA CI 全部完成，已 Done**。
 
+## 本机集群整体升到 main（2026-09-21 04:00Z）
+
+作者要求「在本机环境部署最新代码」。此前集群是五个构建拼起来的：cs-api／cs-controller／cs-storage-probe 在 `rfc015-20260921-3`（不含 gateway 放行表自愈修复）、cs-auth 在 `gateway-heal-20260921`、cs-session／cs-events／mcp-\* 在 `rfc013-20260921-4`、console 在 `polling-20260921`，而 `runtimes/task` 今天 09:45（RFC-016 预览进程启停）改过之后没有任何镜像包含它。因此走整套 `./deploy/local/install-platform.sh`（含任务容器镜像重建），退出码 0。
+
+结果：八个平台 Deployment 与 `cs-storage-probe` 全部是同一份 `cs-control-plane:dev`／`cs-console:dev`（源自 `13f3d42`），03:57–03:59Z 起全部 Ready；迁移 Job `crewstation-migrate-dzxtf` 用新镜像跑完；平台底座已推进集群内仓库 `…/crewstation/task-runtime:dev @ sha256:dfa2f246…`。`./deploy/local/verify.sh` 四项全 PASS（A 从集群内仓库拉取、B 两种 Host 路由、C 源 Pod IP 与 `X-Forwarded-For`／`X-Real-Ip` 一致、D ForwardAuth 200／401 分流）。节点根分区从 5.0GB 降到 4.3GB（97%），没有清理任何镜像。`crewstation-dev-auth` 仍留在 `rfc013-20260921-2`：它跑的 `tools/dev-auth` 最后一次改动是 2026-09-20 21:23，早于该镜像构建时间，重滚只会多一次登录中断，没有收益。
+
+两点如实记录，都不是这次部署造成的：
+
+- `seed-catalog.sh` 结尾报 `HTTP 403 用户名密码登录已被管理员关闭，请使用公司身份登录`。本机早已切到 dev-oidc，密码登录关闭，这一步在本机环境注定失败；目录本来就已配置，安装脚本仍以 0 退出。要么给它一条公司身份的路径，要么在本机跳过它。
+- cs-session 重启后有 **7 个 taskId 在 `runner protocol mismatch`（`runnerProtocol: 1`）上死循环重连**，四分钟里每个约 430 次。这些是 9-13～9-15 遗留的 RFC-003／RFC-006 验收容器（镜像还是 `cs-task-runtime:rfc003-*`），早于 RFC-006 把 TaskRunner 协议提到 2。证据是它们在我 03:57 部署之前就在循环：`cs-rfc003-verify-workbench/cli-01a0a54a…` 的 runner 日志从 03:30:20Z 起就在反复「session link connected, hello sent」。同时有 5 个协议 2 的 runner 正常连上。处理办法是释放这些已完成的验收会话（会删容器，属于作者的决定，我没有动）。
+
+轮询修复的实机证据见上一节；`cs-console:dev` 与当时核对过的 `polling-20260921` 出自同一份源码（`13f3d42`）。
+
 ## 界面定期闪一下、滚动条回顶：轮询改为部分更新（2026-09-21）
 
 作者实机反馈「界面总是定期会闪一下，是不是有自动刷新，刷新了之后滚动条还回到了最上方……就算刷新也是部分更新啊，不能自动触发页面刷新」。
