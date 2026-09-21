@@ -1,6 +1,6 @@
 # RFC-013 验证与部署记录
 
-状态：代码已联合发布，精确 SHA CI 六项成功；2026-09-21 已完成本机正式数据库 UUID 升级和 8 个核心 Deployment 更新。开发登录器初始化受当前密码登录关闭策略阻塞，登录入口恢复及升级后的浏览器验收仍未完成；RFC 保持 In Progress。
+状态：Done · 2026-09-21。原库 UUID 升级、登录恢复、浏览器与新旧运行链验收完成；兼容修复 `9a67e12d75e94ea150237470c5a61af91518b508` 已部署并上库，精确 SHA CI `35547465024` 六项全部成功。原始切换和早期阻塞按时间保留，当前结果见最后两节。
 
 ## 数据升级
 
@@ -70,10 +70,70 @@
 
 8 个核心 Deployment（console、cs-api、cs-auth、cs-controller、cs-session、cs-events、两个 MCP）均已恢复原副本数。控制面为 `cs-control-plane:rfc013-20260921-2`，工作台为 `cs-console:rfc013-20260921`；后续新任务使用集群仓库的 `crewstation/task-runtime:rfc013-20260921-2`。当前数据迁移已生效，不能把它描述为仅在副本演练。
 
-### 尚未完成的登录恢复与验收
+### 登录恢复前的阻塞（历史记录）
 
 开发登录器 `crewstation-dev-auth` 启动时用已有管理员密码播种本机 OIDC，但数据库原有策略已关闭密码登录，因此收到 `403 /auth/login：用户名密码登录已被管理员关闭，请使用公司身份登录`，尚未 Ready。核心服务健康不代表用户登录旅程可用。专用验收浏览器的现有可见页面正常请求 `/v1/me` 均为 401。
 
 读取并暂存专用浏览器管理员会话的操作被自动审批以“缺少特定会话凭据读取授权”为由拒绝，未执行。作者已被询问是否授权使用仓库内置 `CS_PASSWORD_LOGIN=force-on` 临时恢复：启动读此配置的 cs-auth 与 cs-api、让开发登录器完成初始化，随后移除开关并再次确认密码登录关闭。授权尚待回复，不自行修改该策略或签发替代会话。
 
 T13 仍缺登录恢复后的浏览器与新建运行实例验收，T14 不作 Done 收尾。正式核验日志为 `/private/tmp/cs-rfc013-live-columns.log`、`/private/tmp/cs-rfc013-live-json.log`、`/private/tmp/cs-rfc013-live-counts.log` 和 `/private/tmp/cs-rfc013-physical-verified.json`。
+
+
+## 登录恢复与运行验收（2026-09-21）
+
+作者明确回复「授权」后，临时启用仓库内置 `CS_PASSWORD_LOGIN=force-on`，让开发登录器完成播种；随后将 cs-auth／cs-api 的该环境变量恢复为切换前状态。九个应用 Deployment 均为 1/1，开发登录器 `/readyz` 返回 200。正常浏览器 OIDC 登录返回用户 UUID `01a0c12a-de09-7005-b0f9-d55a8676540b`；登录策略再次确认 `passwordLoginEnabled=false`、`forcedOn=false`。没有读取或持久保存浏览器会话凭据。证据：`/private/tmp/cs-rfc013-login-recovery-verified.json`。
+
+升级后真实浏览器用例 **41 pass／1 skip／0 fail，393 assertions**，覆盖工作台与管理页、中文／英文、明暗主题和 1280／390／320px；跳过的是未配置的独立非管理员登录。日志 `/private/tmp/cs-rfc013-live-e2e.log`。
+
+### 历史快照引用兼容修复
+
+创建档位时，数据库写入成功，但详情查询遍历上线版本遇到早于 RFC-001 的 `stub/echo` 快照（没有 `compute` 字段）而返回 500。仅修复 `releaseQueries.deployedComputeReferences`，只收集显式 `{ kind: 'profile', profileId }` 引用；保留原始快照，不给早期 stub 自动指定默认算力。新增真实 PostgreSQL 回归先复现同一 TypeError，再验证查询结果及原快照不变。发布模块 7／7、连同档位身份用例 9／9 通过，修复可执行改动行 3／3 覆盖（100%）。
+
+七个控制面服务已更新至 `cs-control-plane:rfc013-20260921-4`（Docker SHA-256 `7c9097095b6f7a0d08ade162211fd225fffb4fc6c66aa7bb34e6ff189910d99a`）。工作台仍为 `cs-console:rfc013-20260921`，开发登录器保留健康的 `rfc013-20260921-2` 进程；后者不使用此次发布查询。所有应用均为 1/1。
+
+### 档位创建、改名、复制与实际运行
+
+通过正常 OIDC 浏览器调用真实 API：创建／复制均返回 201，改名返回 200；资源和子资源均为 36 字符小写 UUIDv7。默认的 1 核／2 GiB 套餐因本机 CPU／内存余量不足而无法调度，记录失败并清理专属临时档位；最终改用现有 UUID `01a0c12a-de0c-7004-98d6-74e668d7e755` 的 100m／512Mi／1Gi 套餐，未更改全局默认或现有业务实例。
+
+| 实际运行 | testId | taskId | 结果 |
+|---|---|---|---|
+| 新档位、新 Runner 镜像 | `01a0c153-7193-7001-a8b6-2e11a6216127` | `01a0c153-753e-7000-b27d-a7a6258f2c5f` | passed；步骤 34ms、终端命令 1ms |
+| 复制档位、新 Runner 镜像 | `01a0c153-951a-7001-be0d-6cedffb9a69d` | `01a0c153-98de-7000-ba9e-5537cf82d60b` | passed；步骤 86ms、终端命令 2ms |
+| 复制档位改用固定旧镜像 | `01a0c153-acc2-7000-bd52-036a359cf1de` | `01a0c153-b09e-7000-92ff-6065ac1d5005` | passed；步骤 78ms、终端命令 20ms |
+
+新镜像摘要 `c27f51e281f0ec0c9006362bb4d05f849f22e7e4bd249c53dbf75349df2a2b7e`；旧 `rfc008-scroll-20260920` 镜像摘要 `1afe7bbad507de9aa23f36e7a2be07049e2da4de4d98a335ef4173a3357147b9`。每次均完成拉取镜像、握手、UUID 步骤和终端探测，得到 `UUID_STEP_OK` 与 `UUID_RUNTIME_OK`。旧镜像经兼容入口运行，不能用测试 DTO 中的规范协议号代替镜像本身的旧协议版本证据。
+
+原档位 `01a0c153-7193-7000-bb40-214845d0d50d` 改名后保持 ID、修订 1 及步骤 ID；副本 `01a0c153-951a-7000-a4a3-9ea0ad192dd8` 的档位、步骤和凭据 ID 均独立，复制凭据仍已配置。两个档位最后 DELETE 返回 204，测试环境全部为 released，临时 Pod 已由任务生命周期回收。失败试跑的本任务档位同样已删除。完整回执在 `/private/tmp/cs-rfc013-live-smoke-results.json`，容量不足试跑单独保留在 `/private/tmp/cs-rfc013-live-smoke-capacity-results.json`。
+
+### 配置按 ID 的真实写入与删除
+
+在既有专用验收项目 `01a0c12a-de0c-7011-9767-361603923342` 创建唯一测试绑定，定义 UUID `01a0c152-9168-7000-bc43-094ef111d373`，开发／生产取值 UUID 分别为 `01a0c152-9168-7001-b008-809c77a5f982`、`01a0c152-917a-7000-a828-d30c4a513204`。改展示名保持定义／取值 ID 和变量绑定不变；开发值更新不改变生产值，旧版本记录保留原名称及引用。过期版本返回 409，名称代替资源 ID 返回 400；两个临时取值最后按 UUID 删除并返回 204。定义及版本历史按产品规则保留。证据：`/private/tmp/cs-rfc013-live-config-results.json`。
+
+
+### 最终本地候选与逐项结论
+
+历史快照补丁的最终完整门禁：**1946 pass／5 skip／0 fail，1951 tests、327 files、12261 assertions、302.05s**；结构检查、ESLint、根／工作台类型检查全部通过，修复行防护 3/3（100%）。日志 `/private/tmp/cs-rfc013-final-recovery-check.log`，独立覆盖率产物 `coverage/rfc013-final/`。源码校验和在门禁前后相同。此轮含共享工作树中下拉样式任务的 8 项用例；该任务源码不随本次兼容补丁提交，也未部署到工作台。此前未配置数据库和正确管理员身份的共享门禁失败仍保留，不能替代本轮结果。
+
+| 编号 | 结论与证据 |
+|---|---|
+| ID-01 | 完整 UUIDv7 生成和严格 Schema 通过；跨模块旧库全量映射核验、线上目录与本次新建／复制对象均符合格式。`packages/kernel/ids.test.ts`、`packages/contracts/ids.test.ts`。 |
+| ID-02 | 套餐同名独立、改名沿用 ID；算力改名不变修订／步骤／凭据，复制子资源独立。`modules/project/tests/catalogIdentity.test.ts`、`modules/agent-runtime/tests/profileIdentity.test.ts`，另有上述实机链。 |
+| ID-03 | 套餐、模板及项目副本声明使用 UUID，重试不改变指向；模块创建／开通回归与本次按任务套餐 UUID 启动通过。`modules/scm/tests/templateIdentity.test.ts`、项目及 provisioning 用例。 |
+| ID-04 | 固定修订、凭据、步骤、测试、授权及默认引用迁移通过；复制凭据配置保留，旧／新镜像实测执行同一规范资源引用。档位身份及项目授权模块用例通过。 |
+| ID-05 | 目录、发布、改名、退役不破坏 operationId 或 Grant；路由与网关模块用例通过。`modules/api-catalog/tests/catalogIdentity.test.ts`、`apiCatalogModule.test.ts`。 |
+| ID-06 | 生产方、事件类型、订阅、收件、投递迁移通过；新旧业务输入去重投递到相同 UUID，事件及投递模块回归通过。`modules/events/tests/eventIdentity.test.ts`。 |
+| ID-07 | 定义与两环境取值分离、改名／删后重建／并发声明／历史快照回归通过；上述实机配置 CRUD、409 与 400 均符合契约。`modules/config/tests/configIdentity.test.ts`。 |
+| ID-08 | 全模块旧库事务升级、失败回滚、重跑、类型与作用域隔离通过；正式库 35 迁移、原数量／关系／摘要与备份对应。`modules/platform/tests/resourceIdentityUpgrade.test.ts`、`packages/persistence/identity/identityMigration.test.ts`。 |
+| ID-09 | 历史 Manifest、旧业务 v1、比较链接、令牌、Runner 2 有显式适配并通过回归；原在线 4 Runner 续接及固定旧镜像运行通过；早期 stub 快照读取补丁保留原含义。兼容入口与剩余旧进程见上表。 |
+| ID-10 | 原 26 Pod／12 PVC 的 name、UID 保持；原在线 Runner 续接成功。保卷复用、旧标签、已受理恢复指纹由 `modules/task-runtime/tests/legacyPhysicalIdentity.test.ts` 回归，正式切换未重建原卷。新任务物理名称含完整 UUID 的无连字符表示。 |
+| ID-11 | console／CLI／MCP 按 ID 传参、路由和缓存；可读标签、长 UUID 与窄屏由组件／协议／实浏览器用例通过，旧比较链接失效不会跳到别的 Agent。 |
+| ID-12 | 本地完整门禁和变更行防护通过；本机迁移、登录、浏览器、真实运行与清理证据分别记录。兼容修复 `9a67e12` 的精确 SHA hosted CI 六项全部成功，见下节。 |
+
+本次没有重复执行 Claude Code／OpenCode 的真实模型交互、Linux Ctrl+C 专用场景或破坏性重建原业务工作卷；这不应被上述终端探测或数据库核验冒充。原来离线的协议 1 Runner 仍保持原有不兼容状态；当前支持的旧协议 2 有明确适配与通过证据。
+
+
+## 最终发布结论
+
+兼容修复 `9a67e12d75e94ea150237470c5a61af91518b508` 已正常推送到 main；[CI 35547465024](https://github.com/wangbinquan/CrewStation/actions/runs/35547465024) 的 static、unit、module、console、gate、e2e 六个作业全部成功。发布后 fetch 确认本地与远端一致。修复提交只含 `modules/release/application/queries.ts` 和其回归用例；本机实际控制面镜像包含此相同源码。
+
+T1–T14 和 ID-01…ID-12 已逐项核对，RFC 三件套与索引标记 Done。最终文档提交包含共享 STATE 中已有的并行下拉框任务接力，完整保留原输出；该任务的产品和测试文件不在本次提交范围。文档收尾未改变通过门禁的生产候选，不重复运行本地完整门禁；最终文档 SHA 的远端 CI 在交付时单独核实。

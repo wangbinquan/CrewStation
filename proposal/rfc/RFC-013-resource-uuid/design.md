@@ -1,11 +1,11 @@
 # RFC-013｜资源 UUIDv7 技术设计
 
-> 状态：In Progress · 2026-09-20。作者已确认 UUIDv7 格式，并批准实施、部署及提交上库。
+> 状态：Done · 2026-09-21；标准 UUIDv7 已实施并正式升级，兼容边界和分层验收见 [acceptance.md](./acceptance.md)。
 > 事实与源码锚点见 [audit.md](./audit.md)；需求、影响清单见 [proposal.md](./proposal.md)。
 
 ## 1. 身份约束
 
-- 平台自有资源 ID 一律为小写、36 字符、带连字符的 UUIDv7，形状 `xxxxxxxx-xxxx-7xxx-[89ab]xxx-xxxxxxxxxxxx`，保留全部 128 位。由服务端统一分配，已有 ID 不允许修改。
+- 平台自有资源 ID 一律为小写、36 字符、带连字符的 UUIDv7，形状 `xxxxxxxx-xxxx-7xxx-[89ab]xxx-xxxxxxxxxxxx`，保留全部 128 位。顶层资源由服务端统一分配；Manifest 和编辑器的内联声明首次生成合法 UUIDv7 后持久保存，服务端严格验证。已有 ID 不允许修改。
 - `packages/kernel/ids.ts` 提供无业务前缀的生成器；`packages/contracts/ids.ts` 统一格式验证，保留 ProjectId、ServiceId 等品牌类型，补齐目前退化为普通 string 的资源 ID。不要靠字符串前缀判断类型。
 - 名称是展示与搜索属性。编辑名称不改主键；复制实体及独立子资源分配新 UUIDv7；同名冲突有明确规则，不能用名称 upsert 意外覆盖。
 - HTTP 路径中的 method／path、环境变量名、事件编码、项目 slug 等若承担业务协议意义，使用独立 code／slug／path 字段。它们不等于显示名称，不能用 UUID 替换真实协议内容。
@@ -69,17 +69,17 @@
 | API `operationKey` 请求／策略／撤销 | `operationId`；展示使用 proxy label、method 和 path |
 | `allowedProfiles/defaultProfile/devTaskProfile` | `allowedProfileIds/defaultProfileId/devTaskProfileId` |
 | 创建项目的 template／plan | `templateId/servicePlanId`；服务端根据已登记默认值补齐，不能在 Schema 内硬编码一个安装相关 ID |
-| Runner 的 compute／profile 名称 | `computeProfileId`、`profileId + revision`；必要的显示名称作为快照字段 |
+| Runner 的 compute／profile 名称 | 平台从资源目录按 UUID 解析后传入现有 `compute`／`profile` 字段，Runner 不按名称查目录；固定执行配置使用 `profileId + revision`，显示名称为独立快照字段 |
 
 所有改动同步 contracts、OpenAPI、api-client、console、CLI 与 MCP。错误要区分 malformed ID、找不到资源、作用域不匹配、版本冲突；保留字段级错误和表单草稿。
 
 控制台列表仍显示名称；详情提供完整 ID 的复制入口。选择器 value、React key、TanStack Query key、路由参数及草稿作用域用 ID。重新命名后保留选中项和页面位置。长 ID 在 320／390px 宽度下可换行或局部滚动，不挤出整页。
 
-新资源 UUID 由服务端分配；编辑器临时行用独立 clientKey，保存成功后绑定服务端 stepId，避免浏览器生成 UUIDv4 后误存为正式资源。新 API 不允许 `id || name`、`getById ?? getByName` 这类模糊解析。
+顶层资源 UUID 由服务端分配；编辑器中的步骤与凭据声明使用共享 UUIDv7 生成器，首次生成后跨草稿／重试保持，服务端校验后作为正式声明身份保存。复制时分配新 UUIDv7，浏览器不能生成 UUIDv4 混入资源引用。新 API 不允许 `id || name`、`getById ?? getByName` 这类模糊解析。
 
 ## 5. Manifest、业务协议与固定快照
 
-建议新增 `crewstation/v2`，旧版 parser 与新版 parser 显式分开；不要把 v1 的字段原地收紧后使已发布历史无法读取。
+已采用 `crewstation/v2`，旧版 parser 与新版 parser 显式分开；不要把 v1 的字段原地收紧后使已发布历史无法读取。
 
 - 新版 service 引用 servicePlanId，tasks 引用 taskProfileId，Agent 选算力使用显式默认选择器或 computeProfileId。
 - API 申请用 operationId，事件订阅用 eventTypeId，环境变量用 configDefinitionId；变量名、handlerPath 和业务调用 URL 保持协议内容。

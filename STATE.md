@@ -7,6 +7,14 @@
 
 基线三件套（v0.3.3）的第一轮实现已在本机 kind 集群上跑通并推上 main；**RFC-001（算力归平台）与 RFC-002（管理空间与租户空间分离）已实现、实跑确认并推上 main；RFC-004 已被 RFC-006 取代（Superseded）；RFC-006（算力档位合并运行环境、每个 Agent 一个 Pod）已实现、实机验收完毕并推上 main，已 Done（P1–P8、ADR-0005 与 I17–I19 待作者复核）；RFC-003 工作台已按设计附件完成并整体部署到本机，52／52 项 UX-AT 全部实机通过、本地 gate 与精确 SHA CI 通过，已 Done；RFC-005（OIDC／OAuth 2.0 公司登录）代码、测试与 OA-01…OA-31 实机验收全部完成，已 Done；RFC-007（开发环境 OAuth 2.0 一键换角色）代码、四角色 Chrome 实机验收、本地 gate 与精确 SHA CI 全部完成，已 Done**。
 
+## 下拉框统一外观（2026-09-21）
+
+按作者「所有下拉框统一修改」要求，在 `shared/ui/selection/Select.css` 集中覆盖工作台 31 个文件的 47 处下拉及嵌入 API 文档的单选下拉：主题边框、箭头、菜单圆角／阴影、选中勾选、禁用／错误／焦点状态、长列表滚动与视口边缘翻转。页面原生表单与键盘语义保留，开发工作台维持 28px、列表筛选维持 32px 的紧凑高度。支持 `appearance: base-select` 的浏览器同时定制展开面板；不支持时入口采用统一样式，选项面板仍由系统绘制。
+
+新增 `tests/e2e/selectAppearance.test.ts`，在独立浏览器上下文装载生产样式，不依赖登录／业务数据；1280／390／320px、明暗主题、鼠标／键盘、必填与禁用、80 项滚动、底部翻转和渐进降级共 **8 pass／0 fail，86 assertions**。截图 `/private/tmp/cs-select-evidence/`。完整检查自然结束为 **1599 pass／331 skip／21 fail**：20 项当前部署的登录／页面 E2E 失败、1 项历史链接异步断言失败；测试数据库不可用，相关模块用例跳过。日志 `/private/tmp/crewstation-select-check.log`。没有把该轮记为完整通过，也未提交、推送或部署；共享工作树出现的 `modules/release/` 并行改动未触碰。
+
+最终静态检查（架构、lint、两套类型检查）与工作台生产构建均通过。完整检查中的既有失败保留，未重复启动全量门禁。
+
 ## RFC 状态
 
 **RFC-003 工作台 UX 重设计已 Done（2026-09-16）：52／52 项 UX-AT 全部实机通过，本地 gate 与精确 SHA CI 通过。RFC-004（管理员定义 Agent 启动前 Hook）已按 RFC-006 的裁定 C8 置为 Superseded，其 AR 实机验收不再执行。** RFC-001 与 RFC-002 都已 Done，见 `proposal/rfc/README.md` 的索引表。**RFC-005（OIDC／OAuth 2.0 公司登录）于 2026-09-18 落档、同日按作者会话目标「完整实现整个RFC并提交上库」实施完毕并实机验收，已 Done。** **RFC-006（算力档位合并运行环境）2026-09-18 落档，同日作者设定会话目标「完整实现RFC并提交上库」，同日实施完成并 Done：CP-01…CP-22 实机核对完毕，基线三件套回填到 v0.3.4，见下方接力。** **RFC-007 于 2026-09-20 完成 T1–T8，本机 Chrome 四角色、旧页签恢复、本地 gate 与精确 SHA CI 全部通过，已 Done。**
@@ -1173,3 +1181,14 @@ RFC-013 最终候选门禁现已通过：**1937 pass／5 skip／0 fail**，326 �
 8 个核心 Deployment 已就绪（控制面 `rfc013-20260921-2`，console `rfc013-20260921`），全局新任务镜像已切到集群仓库 `task-runtime:rfc013-20260921-2`。**本机登录入口尚未恢复**：开发登录器启动播种需要管理员密码，而原策略已关闭密码登录；`crewstation-dev-auth` 0/1，报 `403 /auth/login`。专用验收页当前请求 `/v1/me` 均 401；会话读取被自动审批拒绝，未执行。已异步请求作者允许内置 `CS_PASSWORD_LOGIN=force-on` 临时恢复流程，必须等具体答复；先恢复 cs-auth／cs-api，再重启开发登录器，成功后移除开关并验证密码登录保持关闭。不要伪造会话、修改账号角色或绕过审批。登录恢复后继续真实浏览器和新任务验收，RFC-013 T13／T14 仍 In Progress。
 
 临时部署脚本 `/private/tmp/cs-rfc013-deploy.py` 的迁移阶段已完成；不要再次运行 quiesce 或重复创建迁移 Job。原始切换快照与完整证据见 RFC-013 acceptance.md。恢复服务后已产生新心跳，不用旧备份直接覆盖当前库。未发布的会话初始化替代方案只保存在 `/private/tmp/cs-rfc013-optional-session-recovery.patch`，不属于本次候选；工作树生产代码保持与已验证发布版本一致。
+
+
+## RFC-013 登录恢复与实机验收（2026-09-21）
+
+作者再次明确回复「授权」，已完成临时 `CS_PASSWORD_LOGIN=force-on` 恢复：开发登录器完成播种后恢复 cs-auth／cs-api 的原变量，正常 OIDC 登录成功；`passwordLoginEnabled=false`、`forcedOn=false`，九个应用 Deployment 全部 1/1。上方“登录恢复待授权”是历史过程记录，阻塞已解除。
+
+本轮实机补齐升级后浏览器 41 pass／1 skip，以及档位创建、保持 ID 改名、复制独立步骤／凭据、新旧 Runner 镜像三次真实终端探测。配置定义与两环境取值按 UUID 写入、改名、旧版本 409、名称代替 ID 400、历史保留和按 ID 删除全部通过；专属临时档位／取值已清理、任务 released、Pod 已回收。原在线 Runner 与原卷的切换证据保持有效；原离线协议 1 Runner 仍为原有不兼容，不冒充恢复。
+
+验收发现的早期 stub Manifest 无 compute 字段导致档位详情 500 已修复；只跳过不存在的算力引用，不改历史快照或自动补默认档位。`9a67e12d75e94ea150237470c5a61af91518b508` 已推送，七个控制面更新到 `rfc013-20260921-4`；console 与健康的开发登录器保持原镜像。最终本地门禁 **1946 pass／5 skip／0 fail，12261 assertions**，修复行防护 **3/3（100%）**，源码门禁前后相同。[精确 SHA CI 35547465024](https://github.com/wangbinquan/CrewStation/actions/runs/35547465024) 六项全部成功，T1–T14／ID-01…ID-12 已核对，RFC 三件套与索引均标记 Done。逐项结论和任务 ID 见 `proposal/rfc/RFC-013-resource-uuid/acceptance.md`。
+
+本次 STATE 文件保留并包含并行下拉框任务已经写入的完整接力段落；该任务的产品源码和独立测试仍由原任务持有，不随 UUID 兼容补丁或收尾文档发布，也未部署到工作台。共享全量门禁包含其在制用例，不代表这些未发布文件已有远端 CI 证明。
