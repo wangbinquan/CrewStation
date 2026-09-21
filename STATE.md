@@ -11,7 +11,7 @@
 
 作者实机反馈「界面总是定期会闪一下，是不是有自动刷新，刷新了之后滚动条还回到了最上方……就算刷新也是部分更新啊，不能自动触发页面刷新」。
 先核实**不是整页刷新**：console 源码里没有 `location.reload`，本机也没有 CrewStation 的 vite（唯一在跑的 vite 属于 agent-workflow），线上是构建产物。
-真正的原因是四处轮询把「重取在途」当成「数据不可信」，把内容整块卸载或改写；`AppShell` 的 `main` 自己是滚动容器（`overflow: auto`），内容塌掉时浏览器把 scrollTop 夹回 0，数据回来也没人恢复，于是看着像页面自己刷新了一遍。
+真正的原因是四处轮询把「重取在途」当成「数据不可信」，把内容整块卸载或改写。内容一塌，浏览器就把滚动位置夹回 0，数据回来也没人恢复，于是看着像页面自己刷新了一遍。（滚动容器随视口而定：`AppShell` 用的是 `min-height: 100vh`，视口装不下时 `main` 会长到内容高度、它自己的 `overflow: auto` 不生效，实际滚动的是文档；1728×873 实测 `document.scrollingElement` 就是 `html`。）
 
 - **`/admin/cluster`（30 秒一次，最明显）**：`cluster-management/wiring.ts` 的采集每 30 秒产生新快照，`snapshotId` 进了 `resources`／`detail` 的查询键；前台 15 秒的摘要轮询一拿到新 id，两个查询就都变成新键、`data` 变 undefined，表格和详情一起塌成「载入中」。详情面板还会在 `r?.uid` 重新出现时再次 `panel.focus()`，把滚动又拽到面板。
 - **首页／市场（15 秒一次）**：`useMarketQuery` 的 `current` 判据里带 `!query.isFetching`，`MarketPage` 的载入态又是 `isPending || isFetching`，每一轮刷新都把整片卡片网格换成一行「载入中」。这是 RFC-003 implementation 第六批写下的「刷新期间不保留旧授权卡片」。
@@ -24,7 +24,9 @@
 
 用例：三条真实路由回归都做过变异验证（去掉修复即变红，红时页面正是「符合筛选的资源：—」＋「载入中…」）——`clusterManagement.test.tsx` 换快照在途保留列表与详情且是同一批 DOM 节点、`appMarket.test.tsx` 例行刷新在途保留卡片、`adminDirectory.test.tsx` 例行重读不改入口而手动刷新照旧暂停；`versionComparisonView.test.tsx` 例行核验在途不弹过期提示、按钮不跳文案而手动点照旧；另加纯判定用例 `clusterReads.test.ts`。两个 fixture 补了扣回执与换快照的开关。
 
-验证：`arch:check`／lint／两个 typecheck 全过；unit 343、module 788／319 skip、console 556，全部 0 fail。完整 `bun run check` 的 24 个 e2e 红是本机缺 `CS_E2E_AUTH=dev-oidc CS_E2E_USERNAME=dev-admin`（与左栏分组那轮同一批 24 个），带上后 `platformCapabilities` 18 pass／1 skip／0 fail。**尚未部署**：线上仍是 RFC-015 会话 10:34 构建的 `cs-console:rfc015-20260921-2`，本次改动只在共享工作树里，未提交、未推送；作者要看实机效果需要重新构建 console（届时会一并带上并行会话的在制品）。
+验证：`arch:check`／lint／两个 typecheck 全过；unit 343、module 788／319 skip、console 556，全部 0 fail。完整 `bun run check` 的 24 个 e2e 红是本机缺 `CS_E2E_AUTH=dev-oidc CS_E2E_USERNAME=dev-admin`（与左栏分组那轮同一批 24 个），带上后 `platformCapabilities` 18 pass／1 skip／0 fail。已提交 `68ac057`（按显式路径，含并行会话当时在 `ClusterPage.tsx`／`ClusterDetail.tsx` 里的在制品，作者同意），**尚未推送**。已构建 `cs-console:polling-20260921` 导入节点并 rollout（Recreate，console 短暂不可用）。
+
+**实机证据（无头以外的真实 Chrome，dev-admin，1728×873）**：`/admin/cluster` 滚到 `document.scrollingElement.scrollTop = 900`，页面显示的采集时间从 `2026/9/21 11:38:11` 前进到 `11:42:41`（即确实换过好几轮快照），同时 scrollTop 仍是 900、文档高度 3374 不变、首行 `[data-cluster-resource]` 还是同一个 DOM 节点、全程没有出现「载入中」或「符合筛选的资源：—」。隐藏标签页按设计不轮询（RFC-010 §8），所以这次是用伪造 `visibilityState` ＋ `visibilitychange`／`focus` 事件触发的同一条采纳路径。
 
 ## 顺手发现的两个问题一并处理：服务域全被拒、页面崩溃拆掉整个工作台（2026-09-21）
 
