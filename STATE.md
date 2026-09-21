@@ -7,6 +7,25 @@
 
 基线三件套（v0.3.3）的第一轮实现已在本机 kind 集群上跑通并推上 main；**RFC-001（算力归平台）与 RFC-002（管理空间与租户空间分离）已实现、实跑确认并推上 main；RFC-004 已被 RFC-006 取代（Superseded）；RFC-006（算力档位合并运行环境、每个 Agent 一个 Pod）已实现、实机验收完毕并推上 main，已 Done（P1–P8、ADR-0005 与 I17–I19 待作者复核）；RFC-003 工作台已按设计附件完成并整体部署到本机，52／52 项 UX-AT 全部实机通过、本地 gate 与精确 SHA CI 通过，已 Done；RFC-005（OIDC／OAuth 2.0 公司登录）代码、测试与 OA-01…OA-31 实机验收全部完成，已 Done；RFC-007（开发环境 OAuth 2.0 一键换角色）代码、四角色 Chrome 实机验收、本地 gate 与精确 SHA CI 全部完成，已 Done**。
 
+## 界面定期闪一下、滚动条回顶：轮询改为部分更新（2026-09-21）
+
+作者实机反馈「界面总是定期会闪一下，是不是有自动刷新，刷新了之后滚动条还回到了最上方……就算刷新也是部分更新啊，不能自动触发页面刷新」。
+先核实**不是整页刷新**：console 源码里没有 `location.reload`，本机也没有 CrewStation 的 vite（唯一在跑的 vite 属于 agent-workflow），线上是构建产物。
+真正的原因是四处轮询把「重取在途」当成「数据不可信」，把内容整块卸载或改写；`AppShell` 的 `main` 自己是滚动容器（`overflow: auto`），内容塌掉时浏览器把 scrollTop 夹回 0，数据回来也没人恢复，于是看着像页面自己刷新了一遍。
+
+- **`/admin/cluster`（30 秒一次，最明显）**：`cluster-management/wiring.ts` 的采集每 30 秒产生新快照，`snapshotId` 进了 `resources`／`detail` 的查询键；前台 15 秒的摘要轮询一拿到新 id，两个查询就都变成新键、`data` 变 undefined，表格和详情一起塌成「载入中」。详情面板还会在 `r?.uid` 重新出现时再次 `panel.focus()`，把滚动又拽到面板。
+- **首页／市场（15 秒一次）**：`useMarketQuery` 的 `current` 判据里带 `!query.isFetching`，`MarketPage` 的载入态又是 `isPending || isFetching`，每一轮刷新都把整片卡片网格换成一行「载入中」。这是 RFC-003 implementation 第六批写下的「刷新期间不保留旧授权卡片」。
+- **管理总览待办、`/projects` 列表、项目概览（30 秒一次）**：`busy = me.isFetching || query.isFetching` 被用来判断入口能不能点，于是每轮轮询把 `<Link>` 换成纯文本、抽走「下一步」横幅。
+- **开发会话的版本比较面板（10 秒一次）**：`isFetching` 同时驱动「重新检查」按钮的文案和「旧结果可能已过期，请重新检查……」这句提示，于是每 10 秒整句提示进出一次、按钮文案在「重新检查」与「更新中…」之间跳。
+
+作者逐项裁定（当面，直接修改并加带日期的修订说明，不另立 RFC）：集群页**自动采纳新快照但原地替换**；首页**保留卡片、原地替换**；三处列表**后台例行重读不改界面**，只有用户点的刷新才暂停入口。版本比较面板是同一轮排查里找到的第四处，按同一条裁定一并改掉（作者未逐项过目，若不同意只需回退这一处）。
+
+实现：`useApiQuery` 新增 `keepPrevious(previousKey)`，除 `snapshotId` 外条件一致时用 `placeholderData` 留住上一份回执（判定在新文件 `features/cluster/model/clusterReads.ts`）；`ClusterPage`／`ClusterDetail` 用它，「下一页」的游标改为跟随该页回执自己的 `snapshotId`（原来跟摘要新读到的快照，翻页时会被服务端判游标不匹配）；`useMarketQuery` 去掉 `!query.isFetching`（失败与撤权仍立即撤下旧卡片，性质不变）；新增 `shared/lib/useManualRefresh.ts`，`useAdminRead` 与 `useProjectSummaries` 的轮询走静默路径、只有手动刷新抬 `refreshing`，`ProjectDirectory`／两张待办卡／`ProjectListPage`／`ProjectOverviewPage`／`TesterProjectPage` 改用它；`useVersionComparison` 同样只在用户点「重新检查」时抬 `refreshing`，过期提示只看 `isError` 与 `freshness === 'stale'`（这两条是真信号）。
+
+用例：三条真实路由回归都做过变异验证（去掉修复即变红，红时页面正是「符合筛选的资源：—」＋「载入中…」）——`clusterManagement.test.tsx` 换快照在途保留列表与详情且是同一批 DOM 节点、`appMarket.test.tsx` 例行刷新在途保留卡片、`adminDirectory.test.tsx` 例行重读不改入口而手动刷新照旧暂停；`versionComparisonView.test.tsx` 例行核验在途不弹过期提示、按钮不跳文案而手动点照旧；另加纯判定用例 `clusterReads.test.ts`。两个 fixture 补了扣回执与换快照的开关。
+
+验证：`arch:check`／lint／两个 typecheck 全过；unit 343、module 788／319 skip、console 556，全部 0 fail。完整 `bun run check` 的 24 个 e2e 红是本机缺 `CS_E2E_AUTH=dev-oidc CS_E2E_USERNAME=dev-admin`（与左栏分组那轮同一批 24 个），带上后 `platformCapabilities` 18 pass／1 skip／0 fail。**尚未部署**：线上仍是 RFC-015 会话 10:34 构建的 `cs-console:rfc015-20260921-2`，本次改动只在共享工作树里，未提交、未推送；作者要看实机效果需要重新构建 console（届时会一并带上并行会话的在制品）。
+
 ## 顺手发现的两个问题一并处理：服务域全被拒、页面崩溃拆掉整个工作台（2026-09-21）
 
 做左栏分组时顺带发现的问题，作者回复「你发现问题就一并处理掉」。两笔修复都是先写能复现的红用例再改。
@@ -14,6 +33,10 @@
 **服务域调用全部 403（RFC-013 的漏网缺陷，影响面最大）。** 从业务 Pod 里 `fetch('http://api.svc.cs.internal/healthz')` 实测得到 `403 放行表尚未生成`。原因：RFC-013 把放行表的 `identityVersion` 升到 2，读取侧（`modules/gateway/application/allowlist.ts`）把旧文档当作不存在；而重建只由授权／目录变更与手动「重算」触发，升级本身不触发任何一个。本机库里最新一份仍是升级前的 v39（无 `identityVersion`），于是业务调平台 API、开发容器里的 Agent 连 MCP 全部被拒；用户域的浏览器旅程不受影响，RFC-013 的验收因此没撞上。修法：评估侧发现没有当前身份版本的文档就地重建一次——同进程的并发请求合并成一次；推导期间别的进程已写出可用版本就直接用它；两边真的同时落库由主键冲突兜底改用赢家那份；重建彻底失败仍按原语义拒绝并记 error，下次评估再试。管理页的读取保持纯读取，不因为有人打开页面就写库。全新安装「一份都没有」走同一条路。用例：就近的方法级 UT 7 条（内存仓库，确定性覆盖抢占与失败路径），模块级 1 条（真实 PostgreSQL，两个新模块实例同时评估）。
 
 **网关页遇到格式不合的响应会把整个工作台拆掉。** `GatewaySection` 直接 `allowlist.data?.entries.length`，响应缺 `entries` 就在渲染期抛错；工作台又没有任何路由级错误边界（TanStack Router 只给声明了 `errorComponent` 的路由装边界），顶栏、左栏连同页面一起被库自带的英文 “Something went wrong!” 顶掉。修了两层：网关页两个响应先过形状检查（`features/admin/model/gatewayStatus.ts`），同组件里另两处同类问题一并修掉（路由条目缺 `target` 同样会崩；放行表读取失败时不报错还显示伪造的「0 条」）；`router.ts` 配 `defaultErrorComponent: RouteErrorPanel`，一页出错只换掉那一页，`renderApp` 同步配了同一项。网关页此前一条专门用例都没有，补 8 条；错误边界 4 条，含一条「不配时整个外壳都没了」的对照。已用线上真实响应核过形状检查不会误伤：11 个服务 43 条路由全部通过。
+
+**线上已用这笔修复本身恢复，并留了前后对照。** 只滚动做服务域判定的 `cs-auth` 一个部署到 `cs-control-plane:gateway-heal-20260921`（构建时工作树里后端没有任何未提交改动，镜像即 `a841e83` 的后端；上一版 `cs-control-plane:rfc013-20260921-4` 保留可回退），其余六个控制面部署没动。同一个业务 Pod（`cs-demo/demo-blue`）同一次调用：修复前 `403 放行表尚未生成`，修复后 `200 {"ok":true,"service":"cs-api"}`；库里多出 v40（`identityVersion` 2、11 个调用方，生成于重启后的第一个服务域请求），`cs-auth` 日志有一条 warn `allowlist rebuilt on demand`。判定没有因此变松：未登记的 `test-gitlab:GET:/v4/users` 仍被 403 并给出精确原因。节点磁盘导入后余 5.1GB（96%）。console 的两处修复没有单独部署——工作树里有另一个会话未提交的 console 在制品，不想替它带上集群；下一次 console 部署会自然带上。
+
+**CI。** `a841e83` 的 [run 35557168622](https://github.com/wangbinquan/CrewStation/actions/runs/35557168622) 五层用例全绿，`gate` 红：新增代码防护报「`app/router/router.ts` 有可执行逻辑，但没有任何用例加载它」——我对它只做了源码文本断言，那不算加载。已把断言换成真正 import 生产路由器核对 `defaultErrorComponent`，并在本机按 `be60d47` 基线预跑 `test:patch` 通过（119／120 行，99.2%）。
 
 两条教训已落进 `dev-gotchas.md`（契约变更、前端与测试两节）。模块用例本机借用正在运行的 `cs-rfc013-test-pg`（`CS_TEST_DATABASE_URL=…@127.0.0.1:63764/…`，每条用例自建自删独立库）：gateway／identity／platform／api-catalog 共 169 pass／0 fail；默认的 `cs-dev-pg`（55432）13 小时前已退出，没有去动它。
 

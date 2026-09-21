@@ -5,9 +5,9 @@ import { join } from 'node:path';
 import { act } from 'react';
 import { createMemoryHistory, createRootRoute, createRoute, createRouter, Link, Outlet, RouterProvider } from '@tanstack/react-router';
 import { RouteErrorPanel } from '../app/router/RouteErrorPanel';
+import { router as productionRouter } from '../app/router/router';
 import { useApiQuery } from '../shared/api/useApi';
 import { renderElement } from './renderElement';
-import { consoleSources, sourceAt } from './sourceScan';
 
 const originalFetch = globalThis.fetch;
 let rendered: Awaited<ReturnType<typeof renderElement>> | undefined;
@@ -69,9 +69,9 @@ describe('路由的默认错误面板', () => {
   });
 
   test('生产路由与整页旅程用例都接上了这块面板', () => {
-    const files = consoleSources();
-    expect(sourceAt(files, 'app/router/router.ts').code).toContain('defaultErrorComponent: RouteErrorPanel');
-    // renderApp 自己建路由；不同步这一项，整页旅程用例看到的出错形态就和生产不一样。sourceScan 不扫 tests 目录，这里直接读。
+    // 加载真正的生产路由器来核对，而不是只读源码文本：新增代码防护也要求改到的生产文件被用例加载。
+    expect(productionRouter.options.defaultErrorComponent).toBe(RouteErrorPanel);
+    // renderApp 自己建路由；不同步这一项，整页旅程用例看到的出错形态就和生产不一样。
     expect(readFileSync(join(import.meta.dir, 'renderApp.tsx'), 'utf8')).toContain('defaultErrorComponent: RouteErrorPanel');
   });
 });
