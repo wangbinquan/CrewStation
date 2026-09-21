@@ -19,6 +19,8 @@
 
 **与并行 RFC-015 的交叉（接手者请看）**：我在 10:33 前后把 console 滚到从共享工作树构建的 `cs-console:admin-nav-20260921`（Recreate，console 短暂不可用；RFC-015 的最终 e2e 若恰在此刻变红，请以此为因重跑）；10:37 RFC-015 会话又滚到它 10:34 构建的 `cs-console:rfc015-20260921-2`，该镜像同样出自共享工作树、已包含本次左栏改动（线上 `index-CseL2141.js` 实测分组正确），所以我没有再覆盖它。部署前节点 `/` 只剩 748MB（100%，PostgreSQL 此前已因此重启过一次），按 dev-gotchas 的做法只删除了 24 个**无标签且未被任何容器引用**的悬空镜像与 `import-2026-09-15` 残留，未动任何带标签的回退镜像、卷、构建缓存和带仓库摘要名的镜像；回收后余 5.7GB（95%）。
 
+**最终 CI：实现提交 `4d4414a` 的 [run 35554919408](https://github.com/wangbinquan/CrewStation/actions/runs/35554919408) 六个作业全部成功**——unit 319、module 1078／8 skip、console 532（较上一笔多出本次新增的 6 条）、e2e 32／18 skip，全部 0 fail；`gate` 的新增代码防护通过。推送后 `HEAD == origin/main == 4d4414a520f9757d92b958eed19f69c86e2370d4`。本机 console 层的 537 比 CI 多 5 条，是并行 RFC-015 未提交的 `clusterMetrics.test.tsx`。
+
 ## RFC-016 开发会话预览进程的自主启停与调试（2026-09-21）
 
 意图 Agent 改坏预览后此前没有任何修复或诊断手段：Runner 早有 `restartPreview`、工作台经 WS 在用，但 cs-api 一条预览路由都没有，MCP 够不到；`previewStatus` 的 `restarts`／`lastError` 在 `sessionLifecycle.ts` 被丢弃，Agent 只看得到一个光秃秃的 `crashed`；预览输出只混在 Pod 日志里。
