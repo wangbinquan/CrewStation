@@ -1,4 +1,5 @@
 export interface PlatformSettings {
+  clusterMetrics?: { enabled: boolean; exporterToken: string; prometheusUrl: string; prometheusToken: string; probeToken: string; probeRoot: string; probePort: number };
   databaseUrl: string;
   userDomain: string;
   serviceDomain: string;
@@ -44,6 +45,7 @@ export function loadPlatformSettings(env: Record<string, string | undefined> = p
   const dataAdminUrl = env.CS_DATA_POSTGRES_ADMIN_URL ?? databaseUrl;
   const visible = new URL(env.CS_DATA_POSTGRES_VISIBLE_URL ?? dataAdminUrl);
   return {
+    clusterMetrics: { enabled: env.CS_CLUSTER_METRICS_ENABLED === 'true', exporterToken: env.CS_CLUSTER_METRICS_TOKEN ?? '', prometheusUrl: env.CS_PROMETHEUS_URL ?? `http://prometheus.${systemNamespace}.svc.cluster.local:9090`, prometheusToken: env.CS_PROMETHEUS_TOKEN ?? '', probeToken: env.CS_STORAGE_PROBE_TOKEN ?? '', probeRoot: env.CS_STORAGE_PROBE_HOST_ROOT ?? '', probePort: num(env.CS_STORAGE_PROBE_PORT, 8095) },
     databaseUrl,
     userDomain: env.CS_USER_DOMAIN ?? 'cs.localhost',
     serviceDomain,

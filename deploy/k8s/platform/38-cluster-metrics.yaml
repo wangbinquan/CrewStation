@@ -1,0 +1,164 @@
+# RFC-015: internal history storage and read-only local-path accounting.
+# Run deploy/local/configure-metrics.ts before applying this file to provision dedicated credentials.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: crewstation-metrics-env
+  namespace: crewstation-system
+data:
+  CS_CLUSTER_METRICS_ENABLED: "true"
+  CS_PROMETHEUS_URL: http://prometheus.crewstation-system.svc.cluster.local:9090
+  CS_STORAGE_PROBE_HOST_ROOT: /var/local-path-provisioner
+  CS_STORAGE_PROBE_PORT: "8095"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: crewstation-system
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+      scrape_timeout: 10s
+      evaluation_interval: 15s
+    scrape_configs:
+      - job_name: crewstation-cluster
+        metrics_path: /internal/cluster/metrics
+        authorization:
+          credentials_file: /etc/metrics-secret/CS_CLUSTER_METRICS_TOKEN
+        static_configs:
+          - targets: ['cs-controller.crewstation-system.svc.cluster.local:8082']
+        sample_limit: 100000
+        label_limit: 16
+        body_size_limit: 32MB
+      - job_name: prometheus
+        basic_auth:
+          username: crewstation
+          password_file: /etc/metrics-secret/CS_PROMETHEUS_TOKEN
+        static_configs:
+          - targets: ['localhost:9090']
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus
+  namespace: crewstation-system
+  labels: { app.kubernetes.io/name: prometheus, app.kubernetes.io/part-of: crewstation }
+spec:
+  selector: { app.kubernetes.io/name: prometheus }
+  ports: [{ name: http, port: 9090, targetPort: 9090 }]
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: prometheus
+  namespace: crewstation-system
+  labels: { app.kubernetes.io/name: prometheus, app.kubernetes.io/part-of: crewstation }
+spec:
+  serviceName: prometheus
+  replicas: 1
+  selector:
+    matchLabels: { app.kubernetes.io/name: prometheus }
+  template:
+    metadata:
+      labels: { app.kubernetes.io/name: prometheus, app.kubernetes.io/part-of: crewstation }
+    spec:
+      automountServiceAccountToken: false
+      securityContext: { runAsUser: 65534, runAsGroup: 65534, fsGroup: 65534, runAsNonRoot: true }
+      containers:
+        - name: prometheus
+          image: prom/prometheus:v3.13.3
+          args: ["--config.file=/etc/prometheus/prometheus.yml", "--web.config.file=/etc/metrics-secret/web.yml", "--storage.tsdb.path=/prometheus", "--storage.tsdb.retention.time=8d", "--web.listen-address=:9090", "--query.max-concurrency=8", "--query.timeout=15s", "--query.max-samples=5000000"]
+          ports: [{ name: http, containerPort: 9090 }]
+          resources: { requests: { cpu: 25m, memory: 128Mi }, limits: { cpu: "1", memory: 768Mi } }
+          securityContext: { allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: { drop: [ALL] } }
+          # Prometheus authentication covers health endpoints; TCP does not embed credentials in the pod spec.
+          readinessProbe: { tcpSocket: { port: 9090 }, periodSeconds: 5 }
+          livenessProbe: { tcpSocket: { port: 9090 }, periodSeconds: 15, initialDelaySeconds: 30 }
+          volumeMounts:
+            - { name: data, mountPath: /prometheus }
+            - { name: config, mountPath: /etc/prometheus, readOnly: true }
+            - { name: credentials, mountPath: /etc/metrics-secret, readOnly: true }
+      volumes:
+        - name: config
+          configMap: { name: prometheus-config }
+        - name: credentials
+          secret: { secretName: crewstation-metrics, defaultMode: 0440 }
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests: { storage: 10Gi }
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: cs-storage-probe
+  namespace: crewstation-system
+  labels: { app.kubernetes.io/name: cs-storage-probe, app.kubernetes.io/part-of: crewstation }
+spec:
+  selector:
+    matchLabels: { app: cs-storage-probe }
+  template:
+    metadata:
+      labels: { app: cs-storage-probe, app.kubernetes.io/name: cs-storage-probe, app.kubernetes.io/part-of: crewstation }
+    spec:
+      automountServiceAccountToken: false
+      nodeSelector: { kubernetes.io/os: linux }
+      tolerations: [{ operator: Exists }]
+      containers:
+        - name: probe
+          image: cs-control-plane:dev
+          imagePullPolicy: IfNotPresent
+          args: ["apps/cs-storage-probe/src/main.ts"]
+          ports: [{ name: http, containerPort: 8095 }]
+          env:
+            - name: CS_STORAGE_PROBE_TOKEN
+              valueFrom: { secretKeyRef: { name: crewstation-metrics, key: CS_STORAGE_PROBE_TOKEN } }
+            - { name: CS_STORAGE_PROBE_ROOT, value: /volumes }
+          securityContext: { runAsUser: 0, runAsGroup: 0, allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: { drop: [ALL], add: [DAC_READ_SEARCH] } }
+          resources: { requests: { cpu: 10m, memory: 32Mi }, limits: { cpu: 200m, memory: 256Mi } }
+          readinessProbe: { httpGet: { path: /healthz, port: 8095 }, periodSeconds: 5 }
+          livenessProbe: { httpGet: { path: /healthz, port: 8095 }, periodSeconds: 15 }
+          volumeMounts:
+            - { name: local-volumes, mountPath: /volumes, readOnly: true }
+      volumes:
+        - name: local-volumes
+          hostPath: { path: /var/local-path-provisioner, type: Directory }
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: crewstation-storage-probe
+  namespace: crewstation-system
+spec:
+  podSelector: { matchLabels: { app: cs-storage-probe } }
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from: [{ podSelector: { matchLabels: { app.kubernetes.io/name: cs-controller } } }]
+      ports: [{ protocol: TCP, port: 8095 }]
+  egress: []
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: crewstation-prometheus
+  namespace: crewstation-system
+spec:
+  podSelector: { matchLabels: { app.kubernetes.io/name: prometheus } }
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector: { matchLabels: { app.kubernetes.io/name: cs-api } }
+        - podSelector: { matchLabels: { app.kubernetes.io/name: cs-controller } }
+      ports: [{ protocol: TCP, port: 9090 }]
+  egress:
+    - to: [{ podSelector: { matchLabels: { app.kubernetes.io/name: cs-controller } } }]
+      ports: [{ protocol: TCP, port: 8082 }]
+    - to:
+        - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: kube-system } }
+          podSelector: { matchLabels: { k8s-app: kube-dns } }
+      ports: [{ protocol: UDP, port: 53 }, { protocol: TCP, port: 53 }]

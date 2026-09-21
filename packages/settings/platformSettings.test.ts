@@ -14,3 +14,8 @@ test('session 副本地址使用实际监听端口，不读取 Kubernetes 同名
 test('无集群注入时默认副本地址与监听一致', () => {
   expect(loadPlatformSettings({ ...base, POD_IP: undefined }).selfAddress).toBe('http://127.0.0.1:8083');
 });
+
+test('cluster metrics is opt-in and uses independent installation credentials and node root', () => {
+  expect(loadPlatformSettings(base).clusterMetrics).toMatchObject({ enabled: false, probePort: 8095, probeRoot: '' });
+  expect(loadPlatformSettings({ ...base, CS_SYSTEM_NAMESPACE: 'platform', CS_CLUSTER_METRICS_ENABLED: 'true', CS_CLUSTER_METRICS_TOKEN: 'export', CS_PROMETHEUS_TOKEN: 'query', CS_STORAGE_PROBE_TOKEN: 'probe', CS_STORAGE_PROBE_HOST_ROOT: '/local', CS_STORAGE_PROBE_PORT: '9000' }).clusterMetrics).toEqual({ enabled: true, exporterToken: 'export', prometheusUrl: 'http://prometheus.platform.svc.cluster.local:9090', prometheusToken: 'query', probeToken: 'probe', probeRoot: '/local', probePort: 9000 });
+});

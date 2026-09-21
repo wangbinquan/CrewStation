@@ -73,10 +73,20 @@ jobs:
     env:
       CS_TEST_DATABASE_URL: postgres://crewstation:crewstation-dev@127.0.0.1:55432/crewstation
       # 数据库是这个作业自己起的：连不上是故障。不点名的话，依赖它的六十来组用例会整层跳过、作业照绿。
-      CS_TEST_REQUIRE: database
+      CS_TEST_REQUIRE: database,prometheus
+      CS_TEST_PROMETHEUS_BIN: /tmp/prometheus-test/prometheus
+      CS_TEST_PROMTOOL_BIN: /tmp/prometheus-test/promtool
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-workspace
+      - name: install pinned Prometheus for real TSDB regression
+        run: |
+          mkdir -p /tmp/prometheus-test
+          cd /tmp/prometheus-test
+          curl --fail --location --retry 2 https://github.com/prometheus/prometheus/releases/download/v3.13.3/prometheus-3.13.3.linux-amd64.tar.gz -o prometheus-3.13.3.linux-amd64.tar.gz
+          curl --fail --location --retry 2 https://github.com/prometheus/prometheus/releases/download/v3.13.3/sha256sums.txt -o sha256sums.txt
+          sha256sum --ignore-missing --check sha256sums.txt
+          tar xzf prometheus-3.13.3.linux-amd64.tar.gz --strip-components=1
       - run: bun run test:module --cover
       - name: upload tier results
         if: always()

@@ -3,6 +3,7 @@ import type { ClusterConfig } from './config';
 import type { K8sObject, ResourceRef, WatchEventType } from './resources';
 import { refOf, resourcePath } from './resources';
 import { readWatchStream } from './watch';
+import { boundedMetricsText } from './metrics';
 
 export interface ListOptions { labelSelector?: string; fieldSelector?: string; limit?: number; continue?: string; signal?: AbortSignal }
 export interface ListPage<T> { items: T[]; resourceVersion: string; continue: string }
@@ -18,6 +19,7 @@ export interface LogOptions { container?: string; follow?: boolean; previous?: b
 
 /** 平台只需要的 API Server 操作；模块通过它而不是 kubectl 管理对象。 */
 export interface K8sClient {
+  nodeMetrics(node: string, endpoint: 'summary' | 'cadvisor', signal?: AbortSignal): Promise<string>;
   get<T extends K8sObject>(ref: ResourceRef, name: string, namespace?: string, signal?: AbortSignal): Promise<T | undefined>;
   list<T extends K8sObject>(ref: ResourceRef, namespace?: string, options?: ListOptions): Promise<T[]>;
   listPage<T extends K8sObject>(ref: ResourceRef, namespace?: string, options?: ListOptions): Promise<ListPage<T>>;
@@ -56,6 +58,11 @@ export function createK8sClient(config: ClusterConfig, fetchImpl: typeof fetch =
     return { items: body.items.map((item) => ({ ...item, apiVersion: item.apiVersion ?? ref.apiVersion, kind: item.kind ?? ref.kind })), resourceVersion: body.metadata?.resourceVersion ?? '', continue: body.metadata?.continue ?? '' };
   };
   return {
+    nodeMetrics: async (node, endpoint, signal) => {
+      if (!/^[a-z0-9][a-z0-9.-]{0,252}$/.test(node) || !['summary', 'cadvisor'].includes(endpoint)) throw validation('Invalid node metrics target');
+      const path = endpoint === 'summary' ? 'stats/summary' : 'metrics/cadvisor';
+      return boundedMetricsText(await request('GET', `/api/v1/nodes/${encodeURIComponent(node)}/proxy/${path}`, { signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(10_000)]) : AbortSignal.timeout(10_000) }));
+    },
     get: async (ref, name, namespace, signal) => {
       const res = await request('GET', resourcePath(ref, namespace, name), signal ? { signal } : {});
       if (res.status === 404) return undefined;

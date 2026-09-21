@@ -12,3 +12,5 @@ export { deploymentObject, jobObject, podObject, podTemplate } from './objects/w
 export { buildEgressNetworkPolicy, configMapObject, namespaceObject, projectNetworkPolicy, pvcObject, resourceQuotaObject, secretObject, serviceObject, taskEgressNetworkPolicy } from './objects/cluster';
 export type { MiddlewareRef, RouteTarget } from './objects/traefik';
 export { dropIdentityHeadersMiddleware, forwardAuthMiddleware, ingressRouteObject, stripPrefixMiddleware } from './objects/traefik';
+
+export { boundedMetricsText, parseMetricsJson } from './metrics';

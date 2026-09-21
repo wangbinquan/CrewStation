@@ -1,0 +1,9 @@
+{
+  "name": "@crewstation/cs-storage-probe",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Read-only per-node filesystem measurement process",
+  "scripts": { "start": "bun run src/main.ts" },
+  "dependencies": { "@crewstation/filesystem-metrics": "workspace:*" }
+}

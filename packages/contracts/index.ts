@@ -57,3 +57,6 @@ export { LegacyManifestSchema } from './manifest/legacy/manifest';
 export type { Manifest as LegacyManifest } from './manifest/legacy/manifest';
 
 export * from './api/legacyBusinessTask';
+
+export * from './api/cluster/metrics';
+export * from './api/cluster/history';

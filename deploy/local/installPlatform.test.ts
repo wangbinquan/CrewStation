@@ -12,7 +12,7 @@ function fixture() {
   mkdirSync(join(root, 'deploy/local'), { recursive: true });
   mkdirSync(join(root, 'bin'));
   writeFileSync(join(root, 'deploy/local/lib.sh'), '# test: cluster commands are stubbed\n');
-  for (const name of ['install-platform.sh', 'admin-credentials.sh', 'initial-admin.sh']) {
+  for (const name of ['install-platform.sh', 'admin-credentials.sh', 'initial-admin.sh', 'configure-metrics.ts']) {
     const source = join(import.meta.dir, name);
     if (existsSync(source)) copyFileSync(source, join(root, 'deploy/local', name));
   }
@@ -30,6 +30,7 @@ case "$*" in
   *bootstrap-admin*) if [ "\${TEST_BOOTSTRAP_FAIL:-}" = 1 ]; then echo 'bootstrap failed: database unavailable' >&2; exit 1; fi ;;
   *'apply -f -'*) cat >/dev/null ;;
 esac`);
+  executable('bin/bun', `echo 'metrics configured'`);
   executable('bin/curl', `printf '{"mode":"%s"}' "\${TEST_MODE:-bootstrap}"`);
   executable('deploy/local/seed-catalog.sh', `touch "$TEST_ROOT/catalog-seeded"`);
   executable('deploy/local/install-dev-auth.sh', `touch "$TEST_ROOT/dev-auth-installed"`);
@@ -50,6 +51,9 @@ describe('首次安装必须交由用户创建管理员', () => {
     const root = fixture();
     const result = await install(root);
     expect(result.code).toBe(0);
+    expect(result.commands).toContain('38-cluster-metrics.yaml');
+    expect(result.commands).toContain('rollout status statefulset/prometheus');
+    expect(result.commands).toContain('rollout status daemonset/cs-storage-probe');
     expect(result.commands).not.toContain('bootstrap-admin');
     expect(existsSync(join(root, '.local/admin.env'))).toBe(false);
     expect(existsSync(join(root, 'catalog-seeded'))).toBe(false);

@@ -23,6 +23,8 @@ spec:
           ports: [{ name: http, containerPort: 8082 }]
           envFrom:
             - configMapRef: { name: crewstation-env }
+            - configMapRef: { name: crewstation-metrics-env, optional: true }
+            - secretRef: { name: crewstation-metrics, optional: true }
             - secretRef: { name: crewstation-secrets }
           env:
             - { name: POD_IP, valueFrom: { fieldRef: { fieldPath: status.podIP } } }

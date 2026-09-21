@@ -27,6 +27,8 @@ export interface ResourceRef {
 }
 
 const KNOWN: ResourceRef[] = [
+  { apiVersion: 'v1', kind: 'Node', plural: 'nodes', namespaced: false },
+  { apiVersion: 'v1', kind: 'PersistentVolume', plural: 'persistentvolumes', namespaced: false },
   { apiVersion: 'v1', kind: 'Namespace', plural: 'namespaces', namespaced: false },
   { apiVersion: 'v1', kind: 'Pod', plural: 'pods', namespaced: true },
   { apiVersion: 'v1', kind: 'Service', plural: 'services', namespaced: true },

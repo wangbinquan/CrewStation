@@ -49,7 +49,7 @@ export interface PlatformModuleApi {
   /** 引导首位管理员这一条运维路径需要它：安装脚本在容器内以子命令调用（RFC-005 §8）。 */
   readonly initializePlatformRoles: () => Promise<{ initialized: number }>;
   readonly bootstrapAdmin: (raw: unknown) => Promise<UserDto>;
-  readonly routers: { api: Hono<AppEnv>[]; auth: Hono<AppEnv>[]; session: Hono<AppEnv>[]; events: Hono<AppEnv>[] };
+  readonly routers: { controller: Hono<AppEnv>[]; api: Hono<AppEnv>[]; auth: Hono<AppEnv>[]; session: Hono<AppEnv>[]; events: Hono<AppEnv>[] };
   readonly background: { controller: Lifecycle[]; session: Lifecycle[]; events: Lifecycle[] };
   readonly websocket: unknown;
   readonly migrations: MigrationSet[];
@@ -371,6 +371,7 @@ export function createPlatformModule(deps: PlatformModuleDeps): PlatformModule {
     initializePlatformRoles: () => m.identity.api.initializePlatformRoles(),
     bootstrapAdmin: (raw) => m.identity.api.bootstrapAdmin(raw),
     routers: {
+      controller: m.cluster.internalHttp,
       // devSessionGate 只挂中间件不占路径，必须排在最前：Hono 按注册顺序执行，晚于业务路由就来不及改判身份。
       api: [...m.identity.http.devSessionGate, ...m.project.http, ...m.identity.http.users, ...m.config.http, ...m.agentRuntime.http, ...m.egress.http, ...m.data.http, ...m.scm.http, ...m.apiCatalog.http, ...m.release.http, ...m.gateway.http, ...m.taskRuntime.http, ...m.devSession.http, m.businessTask.http.service, m.businessTask.http.user, ...m.events.http.query, ...m.observability.http, ...m.cluster.http, ...m.capabilities.http, ...m.provisioning.http],
       auth: [...m.identity.http.auth, ...m.identity.http.forwardAuth, ...m.agentRuntime.forwardAuth],
@@ -419,7 +420,7 @@ function composeCluster(deps: CompositionDeps, core: ReturnType<typeof composeCo
     const env = await tasks.getEnvironment((op.action === 'restart' ? op.domainOperationId : op.target.taskId) as TaskId);
     return { done: op.action === 'delete' ? !env || env.state === 'released' : env?.state === 'running' && env.connected || env?.state === 'failed', failed: op.action === 'restart' && env?.state === 'failed', reason: env?.message ?? (op.action === 'delete' ? '等待执行环境回收' : '等待新执行连接') };
   };
-  return createClusterManagementModule({ resolveReleaseId: (legacy) => deps.identities.resolve('release', [legacy]), physicalOperationId: async (id) => (await deps.identities.aliases('cluster-operation', id)).find((keys) => keys.length === 1 && keys[0] !== id)?.[0] ?? id, db: deps.db, k8s: deps.k8s, instance: deps.instance, logger: deps.logger, systemNamespace: deps.settings.systemNamespace, catalog: installedSystemComponents().map((c) => c.kind === 'Namespace' ? { ...c, name: deps.settings.systemNamespace } : c), isAdmin: core.identity.api.isAdmin,
+  return createClusterManagementModule({ metrics: deps.settings.clusterMetrics, resolveReleaseId: (legacy) => deps.identities.resolve('release', [legacy]), physicalOperationId: async (id) => (await deps.identities.aliases('cluster-operation', id)).find((keys) => keys.length === 1 && keys[0] !== id)?.[0] ?? id, db: deps.db, k8s: deps.k8s, instance: deps.instance, logger: deps.logger, systemNamespace: deps.settings.systemNamespace, catalog: installedSystemComponents().map((c) => c.kind === 'Namespace' ? { ...c, name: deps.settings.systemNamespace } : c), isAdmin: core.identity.api.isAdmin,
     metadata: { read: async () => {
       const [projects, taskFacts, slots, plans] = await Promise.all([core.project.api.listClusterProjects(), tasks.listClusterTasks(), release.listClusterSlots(), core.project.api.listServicePlans()]);
       const releases = slots.flatMap((slot) => { const project = projects.find((p) => p.serviceId === slot.serviceId); return project ? [{ ...slot, namespace: project.namespace, serviceName: project.serviceName!, ...(slot.plan ? { maxReplicas: plans.find((p) => p.id === slot.plan)?.maxReplicas ?? 0 } : {}) }] : []; });

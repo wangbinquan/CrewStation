@@ -58,6 +58,8 @@ kubectl -n $NS create secret generic crewstation-secrets \
   --from-literal=CS_BOOTSTRAP_TOKEN="$BOOTSTRAP_TOKEN" \
   --dry-run=client -o yaml | kubectl apply -f - >/dev/null
 
+log "配置集群指标凭据"
+bun run "$ROOT/deploy/local/configure-metrics.ts"
 log "应用平台清单"
 kubectl apply -f "$ROOT/deploy/k8s/platform/00-rbac.yaml" -f "$ROOT/deploy/k8s/platform/10-config.yaml" >/dev/null
 kubectl -n $NS delete job crewstation-migrate --ignore-not-found >/dev/null
@@ -67,11 +69,13 @@ if ! kubectl -n $NS wait --for=condition=complete job/crewstation-migrate --time
   kubectl -n $NS logs job/crewstation-migrate --tail=50 || true
   echo "迁移失败" >&2; exit 1
 fi
-for f in 30-cs-api 31-cs-auth 32-cs-controller 33-cs-session 34-cs-events 35-console 36-mcp-capabilities 37-mcp-operations 40-gateway 41-registry-gateway; do kubectl apply -f "$ROOT/deploy/k8s/platform/$f.yaml" >/dev/null; done
+for f in 30-cs-api 31-cs-auth 32-cs-controller 33-cs-session 34-cs-events 35-console 36-mcp-capabilities 37-mcp-operations 38-cluster-metrics 40-gateway 41-registry-gateway; do kubectl apply -f "$ROOT/deploy/k8s/platform/$f.yaml" >/dev/null; done
 for d in cs-api cs-auth cs-controller cs-session cs-events console mcp-capabilities mcp-operations; do
   kubectl -n $NS rollout restart deployment/$d >/dev/null 2>&1 || true
   kubectl -n $NS rollout status deployment/$d --timeout=180s
 done
+kubectl -n $NS rollout status statefulset/prometheus --timeout=180s
+kubectl -n $NS rollout status daemonset/cs-storage-probe --timeout=180s
 # 首次安装只提供初始化入口；只有明确的无人值守选项才允许提前建号。
 source "$ROOT/deploy/local/initial-admin.sh"
 source "$ROOT/deploy/local/admin-credentials.sh"

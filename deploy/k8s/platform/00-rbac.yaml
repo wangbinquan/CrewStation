@@ -9,6 +9,13 @@ kind: ClusterRole
 metadata:
   name: crewstation-control
 rules:
+  # nodes/proxy is not path-scoped by Kubernetes RBAC. The client only calls stats/summary and metrics/cadvisor.
+  - apiGroups: [""]
+    resources: [nodes, persistentvolumes]
+    verbs: [get, list, watch]
+  - apiGroups: [""]
+    resources: [nodes/proxy]
+    verbs: [get]
   - apiGroups: [""]
     resources: [namespaces]
     verbs: [get, list, watch, create, patch, update]

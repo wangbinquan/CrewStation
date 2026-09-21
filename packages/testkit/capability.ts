@@ -7,7 +7,7 @@
  *
  * 本文件零依赖：仓库根 `tests/` 不是工作区单元，只能按相对路径引用它。
  */
-export const TEST_CAPABILITIES = ['database', 'gitlab', 'e2e'] as const;
+export const TEST_CAPABILITIES = ['database', 'gitlab', 'e2e', 'prometheus'] as const;
 export type TestCapability = (typeof TEST_CAPABILITIES)[number];
 
 type Env = Readonly<Record<string, string | undefined>>;

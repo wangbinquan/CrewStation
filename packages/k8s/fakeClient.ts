@@ -26,6 +26,7 @@ export function createFakeK8sClient(): FakeK8sClient {
       && Object.entries(selector).every(([k, v]) => o.metadata.labels?.[k] === v));
   };
   return {
+    nodeMetrics: async () => { throw new Error('Fake kubelet metrics not configured'); },
     objects,
     applied,
     deleted,

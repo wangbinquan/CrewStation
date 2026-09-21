@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "受管 Kubernetes 资源快照、归属用途与持久化运维操作",
+  "description": "\u53d7\u7ba1 Kubernetes \u8d44\u6e90\u5feb\u7167\u3001\u5f52\u5c5e\u7528\u9014\u4e0e\u6301\u4e45\u5316\u8fd0\u7ef4\u64cd\u4f5c",
   "exports": {
     ".": "./index.ts"
   },
@@ -19,7 +19,8 @@
     "@crewstation/persistence": "workspace:*",
     "@crewstation/queue": "workspace:*",
     "hono": "4.13.7",
-    "zod": "4.6.2"
+    "zod": "4.6.2",
+    "@crewstation/filesystem-metrics": "workspace:*"
   },
   "devDependencies": {
     "@crewstation/testkit": "workspace:*"

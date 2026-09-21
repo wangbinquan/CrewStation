@@ -11,10 +11,10 @@ const input = async (selector: string, value: string) => {
   const node = document.querySelector<HTMLInputElement>(selector)!;
   await act(async () => { node.focus(); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(node, value); node.dispatchEvent(new Event('input', { bubbles: true })); node.dispatchEvent(new KeyboardEvent('keyup', { key: 'a', bubbles: true })); }); await page!.settle();
 };
-test('cluster route enforces admin guard, exposes all six tabs, server totals, partial sources and snapshot pagination', async () => {
+test('cluster route enforces admin guard, exposes resource and observability tabs, server totals, partial sources and snapshot pagination', async () => {
   const f = clusterFixture({ partial: true }); page = await renderApp('/admin/cluster', '/admin');
   expect(page.text()).toContain('集群管理'); expect(page.text()).toContain('符合筛选的资源：205'); expect(page.text()).toContain('部分来源缺失或过期');
-  expect([...document.querySelectorAll('[role="tab"]')].map((n) => n.textContent)).toEqual(['工作负载', 'Pod', '网络', '存储与配置', '命名空间', '操作记录']);
+  expect([...document.querySelectorAll('[role="tab"]')].map((n) => n.textContent)).toEqual(['工作负载', 'Pod', '网络', '存储与配置', '节点', '最近 7 天趋势', '命名空间', '操作记录']);
   expect(page.text()).toContain('运行 30 · 就绪 29'); await page.click('下一页');
   expect(page.search()).toMatchObject({ snapshotId: 'snapshot-1', cursor: 'cursor-2' }); expect(f.calls.at(-1)?.query.get('cursor')).toBe('cursor-2');
   await page.back(); expect(page.search().cursor).toBeUndefined(); await page.click('cluster-demo-green');

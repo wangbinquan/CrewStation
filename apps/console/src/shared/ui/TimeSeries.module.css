@@ -1,0 +1,13 @@
+.figure { margin: 0; min-width: 0; border: 1px solid var(--cs-color-border); border-radius: 8px; padding: 12px; }
+.figure figcaption { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; font-weight: 600; }
+.figure figcaption span, .range { color: var(--cs-color-text-muted); font-size: 10px; font-weight: 400; }
+.figure svg { display: block; width: 100%; height: auto; margin-top: 12px; overflow: visible; }
+.axis { stroke: var(--cs-color-border); }
+.average, .peak { fill: none; stroke-width: 2; vector-effect: non-scaling-stroke; stroke-linecap: round; }
+.average { stroke: var(--cs-color-primary, #4b78df); }
+.peak { stroke: var(--cs-color-warning, #ac751c); stroke-dasharray: 4 3; opacity: .75; }
+.range { display: flex; justify-content: space-between; gap: 12px; }
+.control { display: flex; flex-direction: column; gap: 4px; margin-top: 10px; font-size: 11px; }
+.control input { width: 100%; min-width: 0; }
+.output { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 11px; font-variant-numeric: tabular-nums; }
+.output time { flex-basis: 100%; color: var(--cs-color-text-muted); }

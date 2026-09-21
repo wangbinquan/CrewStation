@@ -186,7 +186,7 @@ CI 的 `module` 作业设 `CS_TEST_REQUIRE=database`，`e2e` 作业设 `CS_TEST_
 |---|---|---|---|
 | `static`（结构规则 · lint · 类型） | `bun run check:static`：`arch:check` → lint → 两次类型检查 | 无 | 任一步失败 |
 | `unit`（方法级 UT） | `bun run test:unit --cover` | **不起任何服务** | 用例失败；出现任何跳过；有用例文件没被执行 |
-| `module`（模块级 UT） | `bun run test:module --cover` | 真实 PostgreSQL 17，`CS_TEST_REQUIRE=database` | 用例失败；数据库不可达；有用例文件没被执行 |
+| `module`（模块级 UT） | `bun run test:module --cover` | 真实 PostgreSQL 17 与隔离 Prometheus 3.13.3 TSDB，`CS_TEST_REQUIRE=database,prometheus` | 用例失败；数据库不可达；有用例文件没被执行 |
 | `console`（工作台） | `bun run test:console --cover` → 工作台构建 | 无 | 用例失败；出现任何跳过；构建失败 |
 | `gate`（汇总 · 新增代码防护） | 下载三层产物 → 合并报告与分层审计 → **新增代码防护** → 核对四个作业都绿 | 无 | 任何一层红；审计不过；新增代码防护未通过 |
 | `e2e`（实机端到端） | kind 建集群 → `bootstrap.sh` → `install-platform.sh` → 无头 Chrome → `bun run test:e2e --cover` → 报告；失败时打印集群诊断 | 真实部署、浏览器、PostgreSQL，`CS_TEST_REQUIRE=e2e,database` | 任一步失败；网关、浏览器、管理员登录或数据库不可用 |
@@ -270,3 +270,7 @@ bun run migrations:lock <迁移文件>… # 新迁移入锁（只追加）；共
 bun run contracts:lock [--breaking "<依据>"]          # 业务契约面金样入锁
 CS_TEST_REQUIRE=database bun test   # 数据库缺席时报错而不是跳过
 ```
+
+### RFC-015 的真实时序存储环境
+
+`modules/cluster-management/tests/prometheusHistory.test.ts` 使用 `prometheus` 能力闸门；本机设置 `CS_TEST_PROMETHEUS_BIN` 和 `CS_TEST_PROMTOOL_BIN`，CI 的 module 作业下载并校验固定 3.13.3 版本，要求能力存在。每次建立专属临时 TSDB，验证七天查询、断档、过期源时间、八天内部清理和重启持久化，结束清理。种子历史仅用于隔离测试，不能写入部署的生产指标卷。

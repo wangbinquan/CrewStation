@@ -5,13 +5,13 @@ import { objectArray, objectRecord, stringRecord } from './inventory';
 export function containerDetails(obj: ResourceObject): ClusterContainer[] {
   const spec = objectRecord(obj.spec), status = objectRecord(obj.status);
   const pod = obj.kind === 'Pod' ? spec : objectRecord(objectRecord(spec.template).spec);
-  return [false, true].flatMap((init) => objectArray(pod[init ? 'initContainers' : 'containers']).map((c) => {
-    const live = objectArray(status[init ? 'initContainerStatuses' : 'containerStatuses']).find((s) => s.name === c.name) ?? {};
+  return ['application', 'init', 'ephemeral'].flatMap((type) => { const init = type === 'init'; return objectArray(pod[type === 'ephemeral' ? 'ephemeralContainers' : init ? 'initContainers' : 'containers']).map((c) => {
+    const live = objectArray(status[type === 'ephemeral' ? 'ephemeralContainerStatuses' : init ? 'initContainerStatuses' : 'containerStatuses']).find((s) => s.name === c.name) ?? {};
     const state = objectRecord(live.state), last = objectRecord(objectRecord(live.lastState).terminated);
     const details = objectRecord(state.waiting ?? state.terminated ?? state.running), limits = objectRecord(c.resources);
-    return { name: String(c.name), init, image: String(c.image ?? ''), ready: live.ready === true, restarts: Number(live.restartCount ?? 0), state: Object.keys(state)[0] ?? 'unknown', requests: stringRecord(limits.requests), limits: stringRecord(limits.limits), ports: objectArray(c.ports).map((p) => Number(p.containerPort)),
+    return { name: String(c.name), init, type: (init && c.restartPolicy === 'Always' ? 'sidecar' : type) as ClusterContainer['type'], image: String(c.image ?? ''), ready: live.ready === true, restarts: Number(live.restartCount ?? 0), state: Object.keys(state)[0] ?? 'unknown', requests: stringRecord(limits.requests), limits: stringRecord(limits.limits), ports: objectArray(c.ports).map((p) => Number(p.containerPort)),
       ...(details.reason || last.reason ? { reason: String(details.reason ?? last.reason) } : {}), ...(details.message ? { message: String(details.message) } : {}), ...(details.exitCode !== undefined || last.exitCode !== undefined ? { exitCode: Number(details.exitCode ?? last.exitCode) } : {}) };
-  }));
+  }); });
 }
 export function resourceStatus(obj: ResourceObject, containers: ClusterContainer[]) {
   const spec = objectRecord(obj.spec), status = objectRecord(obj.status), conditions = objectArray(status.conditions);
@@ -26,6 +26,7 @@ export function resourceStatus(obj: ResourceObject, containers: ClusterContainer
 }
 export function visibleFacts(obj: ResourceObject): Record<string, string> {
   const spec = objectRecord(obj.spec), facts: Record<string, string> = {};
+  if (obj.kind === 'Pod') { facts.qos = String(objectRecord(obj.status).qosClass ?? ''); }
   if (obj.kind === 'Service') { facts.type = String(spec.type ?? 'ClusterIP'); facts.clusterIP = String(spec.clusterIP ?? ''); facts.ports = objectArray(spec.ports).map((p) => `${p.port} → ${p.targetPort}/${p.protocol}`).join(', '); }
   if (obj.kind === 'PersistentVolumeClaim') { facts.storageClass = String(spec.storageClassName ?? 'default'); facts.capacity = JSON.stringify(objectRecord(objectRecord(obj.status).capacity)); facts.requested = JSON.stringify(objectRecord(objectRecord(spec.resources).requests)); }
   if (['Secret', 'ConfigMap'].includes(obj.kind)) { facts.keys = [...Object.keys(objectRecord(obj.data)), ...Object.keys(objectRecord(obj.binaryData))].sort().join(', '); if (obj.kind === 'Secret') facts.type = String(obj.type ?? 'Opaque'); }

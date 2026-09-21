@@ -22,11 +22,11 @@ if (process.argv[2] === 'migrate') {
 }
 
 const app = createApp({ name, readiness: () => databaseReady(db) });
-for (const router of []) app.route('/', router);
+for (const router of platform.api.routers.controller) app.route('/', router);
 const background = platform.api.background.controller;
 for (const item of background) item.start();
 const server = serve(app, { port: portFrom(process.env, name, 8082) });
-logger.info('listening', { port: server.port, role: 'controller', routers: ([]).length, background: background.length });
+logger.info('listening', { port: server.port, role: 'controller', routers: platform.api.routers.controller.length, background: background.length });
 installShutdown(logger, [
   { name: 'background', stop: async () => { for (const item of background) await item.stop(); } },
   { name: 'server', stop: () => server.stop() },

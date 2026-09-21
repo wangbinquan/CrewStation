@@ -23,6 +23,7 @@
     "modules/cluster-management/adapters/persistence/migrations/0003_snapshot_sequence.sql": "2349c5cb8f0186ff9a8a365b957a53118e4b6176bc5d8eda48f1da669395c079",
     "modules/cluster-management/adapters/persistence/migrations/0004_resource_identity.sql": "177884dbefc714f69dd56f748acf09a70e1829e28b15bf4d97e6f28b29ad8545",
     "modules/cluster-management/adapters/persistence/migrations/0005_resource_identity.identity.json": "69e219271cc5612f1484cf4ea82a0fb9da1b0ffbbe0389c36d6b047ea659291a",
+    "modules/cluster-management/adapters/persistence/migrations/0006_resource_observability.sql": "14c665837fb05aa150d5e1719d1cced98e2c4b854b762704ad0536f7bdb0c933",
     "modules/config/adapters/persistence/migrations/0001_create_schema.sql": "aa20e4fabcb97d3e8433f71c03a30c3c23e34752284a5bce898041648ff64170",
     "modules/config/adapters/persistence/migrations/0002_config_tables.sql": "01f6e1c32458bd380f3766b40bce8626a9234d725ff7fb3278eeaee0f745e60b",
     "modules/config/adapters/persistence/migrations/0003_resource_identity.sql": "3f3bd87718e4f07e40f7eb2138676e02a3e13d2efdd564674717fc8351e96b5b",

@@ -111,6 +111,13 @@
         "@crewstation/settings": "workspace:*",
       },
     },
+    "apps/cs-storage-probe": {
+      "name": "@crewstation/cs-storage-probe",
+      "version": "0.0.0",
+      "dependencies": {
+        "@crewstation/filesystem-metrics": "workspace:*",
+      },
+    },
     "apps/mcp-capabilities": {
       "name": "@crewstation/mcp-capabilities",
       "version": "0.0.0",
@@ -207,6 +214,7 @@
       "version": "0.0.0",
       "dependencies": {
         "@crewstation/contracts": "workspace:*",
+        "@crewstation/filesystem-metrics": "workspace:*",
         "@crewstation/http": "workspace:*",
         "@crewstation/k8s": "workspace:*",
         "@crewstation/kernel": "workspace:*",
@@ -567,6 +575,13 @@
         "@crewstation/testkit": "workspace:*",
       },
     },
+    "packages/filesystem-metrics": {
+      "name": "@crewstation/filesystem-metrics",
+      "version": "0.0.0",
+      "dependencies": {
+        "zod": "4.6.2",
+      },
+    },
     "packages/gitlab-client": {
       "name": "@crewstation/gitlab-client",
       "version": "0.0.0",
@@ -781,7 +796,11 @@
 
     "@crewstation/cs-session": ["@crewstation/cs-session@workspace:apps/cs-session"],
 
+    "@crewstation/cs-storage-probe": ["@crewstation/cs-storage-probe@workspace:apps/cs-storage-probe"],
+
     "@crewstation/eventbus": ["@crewstation/eventbus@workspace:packages/eventbus"],
+
+    "@crewstation/filesystem-metrics": ["@crewstation/filesystem-metrics@workspace:packages/filesystem-metrics"],
 
     "@crewstation/gitlab-client": ["@crewstation/gitlab-client@workspace:packages/gitlab-client"],
 

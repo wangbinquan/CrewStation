@@ -226,3 +226,13 @@ docker exec desktop-control-plane rm -rf '/etc/containerd/certs.d/registry.crews
 # CoreDNS: remove the marked rewrite block from `kubectl -n kube-system edit configmap coredns`, then
 kubectl -n kube-system rollout restart deployment/coredns
 ```
+
+## 集群容量、实时用量与七天历史（RFC-015）
+
+`install-platform.sh` 安装 `38-cluster-metrics.yaml`：内部 Prometheus 3.13.3、10Gi 指标 PVC、固定卷根的只读 `cs-storage-probe` DaemonSet，以及独立监控凭据。`configure-metrics.ts` 首次生成三把凭据，重复执行保留既有值；不要删除 `crewstation-metrics` Secret 来重复安装。Prometheus 仅提供内部 Service，API 使用固定查询模板；对外不暴露 PromQL、probe 或 kubelet 代理。
+
+安装前核对 **节点实际可用磁盘**。local-path 的 PVC `requests.storage` 不是硬配额或新增物理容量；10Gi 申请成功不代表磁盘有 10Gi 空闲。指标保留为 8 天，管理界面查询最近 7 天，留一天清理缓冲；没有按磁盘大小提前截断历史。采集从首次部署时刻开始，过去无数据的区间保留缺口。物理盘不足须扩容，不能删业务卷或伪称已有七天数据。
+
+`crewstation-metrics-env` 的 `CS_STORAGE_PROBE_HOST_ROOT` 与 DaemonSet 的 `local-volumes.hostPath.path` 必须指向同一固定节点卷根（默认 `/var/local-path-provisioner`）；换存储供应器时同时修改这两处。probe 内挂载始终为只读 `/volumes`，请求只能指定经过 PV/PVC 绑定和节点归属校验的相对目录。CSI 提供原生卷统计时优先使用；不支持的卷给出原因，不显示假 0。Prometheus 的 PVC 大小／StorageClass 可在首次应用 StatefulSet 前配置，已有 PVC 按存储供应器的扩容流程调整。
+
+API 与 controller 读取 `crewstation-metrics-env`、`crewstation-metrics`，修改后滚动重启对应 Deployment；变更 Prometheus scrape 配置后重启 StatefulSet。节点／Pod 指标约 15 秒采集，卷扫描独立约 60 秒。页面同时显示来源时间、采集覆盖率、缺失／过期／错误；应用与节点网络、文件系统别名、共享 PVC 都不相加冒充物理总量。完整验收和当前部署数据起点记录在 RFC-015 的 acceptance.md。

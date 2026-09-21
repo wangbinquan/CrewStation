@@ -1,0 +1,9 @@
+{
+  "name": "@crewstation/filesystem-metrics",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Bounded read-only allocated-block directory measurement and authenticated HTTP protocol",
+  "exports": { ".": "./index.ts" },
+  "dependencies": { "zod": "4.6.2" }
+}
