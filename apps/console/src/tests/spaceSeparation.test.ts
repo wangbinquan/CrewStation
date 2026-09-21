@@ -20,11 +20,14 @@ describe('两个空间的结构约定（RFC-002）', () => {
     expect(top.code).toContain("t('nav.projects')");
   });
 
-  test('管理左栏的供给与审批入口及守卫都在管理布局这一侧', () => {
-    const nav = sourceAt(files, 'layout/AdminNav.tsx');
-    for (const path of ['/admin/users', '/admin/compute', '/admin/service-plans', '/admin/task-profiles', '/admin/capabilities', '/admin/requests', '/admin/egress', '/admin/gateway']) {
-      expect(nav.code).toContain(`'${path}'`);
+  test('管理入口只登记在管理分组定义里，只有管理左栏与管理总览读它，守卫在管理布局这一侧', () => {
+    const definition = sourceAt(files, 'shared/admin/adminNavigation.ts');
+    for (const path of ['/admin/users', '/admin/authentication', '/admin/compute', '/admin/service-plans', '/admin/task-profiles', '/admin/projects', '/admin/capabilities', '/admin/requests', '/admin/egress', '/admin/cluster', '/admin/gateway']) {
+      expect(definition.code).toContain(`'${path}'`);
     }
+    // 分组定义放在 shared 是为了让左栏与总览共用一份；租户一侧的任何文件读它，都等于把管理入口带出了管理空间。
+    const consumers = files.filter((file) => file.code.includes('admin/adminNavigation')).map((file) => file.path).sort();
+    expect(consumers).toEqual(['app/layout/AdminNav.tsx', 'features/admin/components/AdminOverviewCards.tsx']);
     expect(sourceAt(files, 'layout/AdminLayout.tsx').code).toMatch(/<AdminGuard(?:\s[^>]*)?>/);
   });
 

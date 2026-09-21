@@ -4,6 +4,12 @@
   gap: var(--cs-space-2);
 }
 
+/* 分组标题与上方「待处理事项」同级同样式；组间距交给 Stack。 */
+.heading {
+  margin: 0 0 var(--cs-space-2);
+  font-size: var(--cs-font-size);
+}
+
 .hint {
   margin: 0 0 var(--cs-space-2);
   color: var(--cs-color-text-muted);

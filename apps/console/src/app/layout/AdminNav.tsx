@@ -6,49 +6,9 @@ import { ProjectNavSection } from './ProjectNavSection';
 import { api } from '../../shared/api/client';
 import { queryKeys } from '../../shared/api/queryKeys';
 import { useApiQuery } from '../../shared/api/useApi';
+import { ADMIN_ENTRY_GROUPS, ADMIN_PENDING_PAGES } from '../../shared/admin/adminNavigation';
+import type { AdminNavPage } from '../../shared/admin/adminNavigation';
 import styles from './SideNav.module.css';
-
-type AdminPagePath =
-  | '/admin'
-  | '/admin/projects'
-  | '/admin/users'
-  | '/admin/authentication'
-  | '/admin/compute'
-  | '/admin/service-plans'
-  | '/admin/task-profiles'
-  | '/admin/capabilities'
-  | '/admin/requests'
-  | '/admin/egress'
-  | '/admin/gateway'
-  | '/admin/cluster';
-
-interface AdminPageItem {
-  readonly to: AdminPagePath;
-  readonly labelKey: string;
-  readonly exact?: boolean;
-}
-
-/** 管理空间按工作分组（RFC-003 §4）：待处理 → 供给与接入 → 平台设置；每页保留独立 URL（RFC-002 §2.1）。 */
-const ADMIN_GROUPS: readonly { readonly titleKey?: string; readonly pages: readonly AdminPageItem[] }[] = [
-  { pages: [
-    { to: '/admin', labelKey: 'nav.admin.overview', exact: true },
-    { to: '/admin/requests', labelKey: 'nav.admin.requests' },
-  ] },
-  { titleKey: 'nav.admin.groupSupply', pages: [
-    { to: '/admin/projects', labelKey: 'nav.admin.projects' },
-    { to: '/admin/capabilities', labelKey: 'nav.admin.capabilities' },
-  ] },
-  { titleKey: 'nav.admin.groupSettings', pages: [
-    { to: '/admin/users', labelKey: 'nav.admin.users' },
-    { to: '/admin/authentication', labelKey: 'nav.admin.authentication' },
-    { to: '/admin/compute', labelKey: 'nav.admin.compute' },
-    { to: '/admin/service-plans', labelKey: 'nav.admin.servicePlans' },
-    { to: '/admin/task-profiles', labelKey: 'nav.admin.taskProfiles' },
-    { to: '/admin/egress', labelKey: 'nav.admin.egress' },
-    { to: '/admin/cluster', labelKey: 'cluster.title' },
-    { to: '/admin/gateway', labelKey: 'nav.admin.gateway' },
-  ] },
-];
 
 export function AdminNav(): ReactElement {
   const t = useT();
@@ -72,14 +32,21 @@ export function AdminNav(): ReactElement {
   );
 }
 
+/** 分组树只在 shared/admin/adminNavigation 定义一次；总览页的入口卡片读的是同一份。 */
 function AdminGlobalLinks() {
   const t = useT();
   return <>
-    {ADMIN_GROUPS.map((group, index) => <div key={group.titleKey ?? index} className={styles.section}>
-      {group.titleKey ? <div className={styles.groupTitle}>{t(group.titleKey)}</div> : null}
-      <ul className={styles.list}>
-        {group.pages.map((item) => <li key={item.to}><Link to={item.to} className={styles.link} activeProps={{ className: styles.linkActive }} activeOptions={{ exact: item.exact ?? false }}>{t(item.labelKey)}</Link></li>)}
-      </ul>
-    </div>)}
+    <AdminLinkSection pages={ADMIN_PENDING_PAGES} />
+    {ADMIN_ENTRY_GROUPS.map((group) => <AdminLinkSection key={group.id} title={t(group.titleKey)} pages={group.pages} />)}
   </>;
+}
+
+function AdminLinkSection({ title, pages }: { readonly title?: string; readonly pages: readonly AdminNavPage[] }) {
+  const t = useT();
+  return <div className={styles.section}>
+    {title ? <div className={styles.groupTitle}>{title}</div> : null}
+    <ul className={styles.list}>
+      {pages.map((item) => <li key={item.to}><Link to={item.to} className={styles.link} activeProps={{ className: styles.linkActive }} activeOptions={{ exact: item.exact ?? false }}>{t(item.labelKey)}</Link></li>)}
+    </ul>
+  </div>;
 }
