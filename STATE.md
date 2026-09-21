@@ -7,6 +7,21 @@
 
 基线三件套（v0.3.3）的第一轮实现已在本机 kind 集群上跑通并推上 main；**RFC-001（算力归平台）与 RFC-002（管理空间与租户空间分离）已实现、实跑确认并推上 main；RFC-004 已被 RFC-006 取代（Superseded）；RFC-006（算力档位合并运行环境、每个 Agent 一个 Pod）已实现、实机验收完毕并推上 main，已 Done（P1–P8、ADR-0005 与 I17–I19 待作者复核）；RFC-003 工作台已按设计附件完成并整体部署到本机，52／52 项 UX-AT 全部实机通过、本地 gate 与精确 SHA CI 通过，已 Done；RFC-005（OIDC／OAuth 2.0 公司登录）代码、测试与 OA-01…OA-31 实机验收全部完成，已 Done；RFC-007（开发环境 OAuth 2.0 一键换角色）代码、四角色 Chrome 实机验收、本地 gate 与精确 SHA CI 全部完成，已 Done**。
 
+## 扩盘、登录恢复与残留清理（2026-09-21 04:30–05:10Z）
+
+作者问「为什么只有 5G 存储，能不能扩到 50G」。查清不是配额：kind 节点的 `/` 就是 Docker Desktop 那块虚拟盘（`DiskSizeMiB=122070`≈119GiB），107G 已用、剩 4.2G，被本机所有 Docker 内容共用。最大单项是**一个 34.39GB 的孤儿卷**：PG17 数据目录，`postmaster.pid` 停在 8-31 01:46、`pg_control` 最后写 9-3 15:32、无任何容器引用，按命名与时间推断是 agent-workflow 某个已删容器留下的。
+
+作者逐项批准后执行：删孤儿卷、清构建缓存 2.585GB、删三个两年前的 kubeflow 大镜像与 20 个月前的 playwright、删 19 个 CrewStation 旧标签（每类留 `:dev` 加一个「上一步」回退源 `cs-control-plane:gateway-heal-20260921`／`cs-console:polling-20260921`，docker 侧标签是重新 `ctr import` 回节点的唯一来源）。**节点 `/` 从 4.2G 可用变成 49G**。随后按作者要求把 `DiskSizeMiB` 改到 204800 并重启 Docker Desktop（先退出再改，防止退出时覆盖设置；原文件备份为 `settings-store.json.bak-20260921-polling`）：**节点 `/` 现为 197G，可用 124G**；Mac 剩余空间同时从 176GiB 回到 220GiB。重启后 GitLab 三件套与 kind 相关容器自动回来，重启策略为 `no` 的四个（`cs-rfc013-test-pg`、`aw-pg-w57`、`aw-pg-ac6b`、`aw-rfc359-pg`）由我 `docker start` 拉回。
+
+**Docker Desktop 重启把本机登录打断了，原因是个已知雷的第二次触发。** 开发登录器每次启动都要先用管理员**密码**登录平台才能注册 Provider 并播种，而库内策略 `identity.auth_login_policy.password_login_enabled` 自 2026-09-20 12:27Z 起是 `f`。它此前一直 Ready 只是因为它一直没重启。作者授权后按 STATE 既有流程恢复：`CS_PASSWORD_LOGIN=force-on` → 重启 cs-auth／cs-api → 让开发登录器重新播种 → 移除开关 → 再重启两个服务。恢复过程中发现两件事：
+
+- 直接重启开发登录器**必失败**：新 Pod 起来时旧 Pod 还在 Service 端点里（`publishNotReadyAddresses: true`），而每个 Pod 的 OIDC 路由前缀是启动时随机生成的（`/oidc/<随机>`），cs-auth 的 discovery 打到旧 Pod 就是 404，于是 `自动发现失败且没有可用的手工端点`。改为对**当前唯一** Pod 打它自己的 `POST /reseed`（页面上那个「重新准备」按钮的接口）即刻成功。
+- 收尾核对：`CS_PASSWORD_LOGIN` 已空、`password_login_enabled` 仍为 `f`、开发登录器 Ready，即并行会话设的策略没有被我改动。
+
+**释放残留**：作者要求把 16 项未释放环境全部释放。实际只完成了三个 Pod（`rfc003-ux`、`rfc003-verify-files`、`rfc003-verify-delivery`，经 `/admin/cluster` 的 inspect→confirm 审计路径，操作记录 `succeeded`）。其余走不通，且不是权限或操作问题，而是产品缺口，已记为 **I22**：`failed` 状态的开发会话既不能被释放接口找到（七个项目全部 404），`/admin/cluster` 的删除又会路由回同一个领域拿到同样的 404，九个 `-work` PVC 的删除能力则被「平台保留此资源；必须通过所属业务流程清理」有意关掉。三个 `development-workspace` Pod 与九个工作卷因此仍在集群里，等作者对 I22 裁定后再动，我没有绕过产品路径直接删 Kubernetes 对象。
+
+顺带修正上一节的一处说法：`crewstation-dev-auth` 现已滚到 `cs-control-plane:dev`（与其他服务一致），不再是 `rfc013-20260921-2`。
+
 ## 本机集群整体升到 main（2026-09-21 04:00Z）
 
 作者要求「在本机环境部署最新代码」。此前集群是五个构建拼起来的：cs-api／cs-controller／cs-storage-probe 在 `rfc015-20260921-3`（不含 gateway 放行表自愈修复）、cs-auth 在 `gateway-heal-20260921`、cs-session／cs-events／mcp-\* 在 `rfc013-20260921-4`、console 在 `polling-20260921`，而 `runtimes/task` 今天 09:45（RFC-016 预览进程启停）改过之后没有任何镜像包含它。因此走整套 `./deploy/local/install-platform.sh`（含任务容器镜像重建），退出码 0。
