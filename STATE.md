@@ -24,7 +24,7 @@
 
 用例：三条真实路由回归都做过变异验证（去掉修复即变红，红时页面正是「符合筛选的资源：—」＋「载入中…」）——`clusterManagement.test.tsx` 换快照在途保留列表与详情且是同一批 DOM 节点、`appMarket.test.tsx` 例行刷新在途保留卡片、`adminDirectory.test.tsx` 例行重读不改入口而手动刷新照旧暂停；`versionComparisonView.test.tsx` 例行核验在途不弹过期提示、按钮不跳文案而手动点照旧；另加纯判定用例 `clusterReads.test.ts`。两个 fixture 补了扣回执与换快照的开关。
 
-验证：`arch:check`／lint／两个 typecheck 全过；unit 343、module 788／319 skip、console 556，全部 0 fail。完整 `bun run check` 的 24 个 e2e 红是本机缺 `CS_E2E_AUTH=dev-oidc CS_E2E_USERNAME=dev-admin`（与左栏分组那轮同一批 24 个），带上后 `platformCapabilities` 18 pass／1 skip／0 fail。已提交 `68ac057`（按显式路径，含并行会话当时在 `ClusterPage.tsx`／`ClusterDetail.tsx` 里的在制品，作者同意），**尚未推送**。已构建 `cs-console:polling-20260921` 导入节点并 rollout（Recreate，console 短暂不可用）。
+验证：`arch:check`／lint／两个 typecheck 全过；unit 343、module 788／319 skip、console 556，全部 0 fail。完整 `bun run check` 的 24 个 e2e 红是本机缺 `CS_E2E_AUTH=dev-oidc CS_E2E_USERNAME=dev-admin`（与左栏分组那轮同一批 24 个），带上后 `platformCapabilities` 18 pass／1 skip／0 fail。已提交 `68ac057`（按显式路径，含并行会话当时在 `ClusterPage.tsx`／`ClusterDetail.tsx` 里的在制品，作者同意）与 `9c874b7`。两笔随并行会话 03:44:34Z 的推送一起上了 main（`HEAD == origin/main == a912378`），**该 SHA 的 [CI 35558544351](https://github.com/wangbinquan/CrewStation/actions/runs/35558544351) 六个作业全部成功**——static、unit、module、console、gate（含新增代码防护）、e2e 都是 success；本机那 24 个 e2e 红确系缺环境变量，CI 里 e2e 是绿的。已构建 `cs-console:polling-20260921` 导入节点并 rollout（Recreate，console 短暂不可用）。
 
 **实机证据（无头以外的真实 Chrome，dev-admin，1728×873）**：`/admin/cluster` 滚到 `document.scrollingElement.scrollTop = 900`，页面显示的采集时间从 `2026/9/21 11:38:11` 前进到 `11:42:41`（即确实换过好几轮快照），同时 scrollTop 仍是 900、文档高度 3374 不变、首行 `[data-cluster-resource]` 还是同一个 DOM 节点、全程没有出现「载入中」或「符合筛选的资源：—」。隐藏标签页按设计不轮询（RFC-010 §8），所以这次是用伪造 `visibilityState` ＋ `visibilitychange`／`focus` 事件触发的同一条采纳路径。
 
