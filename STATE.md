@@ -17,7 +17,9 @@ T1–T9 已落地并推送：Runner 新增 `startPreview`／`stopPreview`／`pre
 
 实现中推翻了三处初版设计，已回填 design.md：`attempt` 不能复用 `restarts`（`restart()` 会清零，那样重启前后的行都标 1，缓冲跨重启保留就白做了，故另立永不清零的 `runs`）；缓冲**不做脱敏**（`CS_RUNNER_TOKEN`／`CS_SESSION_URL` 已由 `buildChildEnv` 从所有子进程环境剔除，余下是项目自己的配置，读者本就能在同容器终端读到）；`asPreviewStatusResult` 是死代码而非事件路径仍需要，已删。
 
-CI 在精确 SHA `7e40104` 上 `static`／`unit`／`module`／`console` 成功，`gate` 因「`PreviewPane.tsx` 有可执行逻辑但没有任何用例加载它」失败——查证后确认它自 `58ea7cd` 起全仓零引用，实际渲染的是 `DevelopmentPreview`，已连同样式模块与孤立的 `previewStateTone` 删除，并补了三条预览路由的 HTTP 用例。改动行覆盖 288／292（98.6%）本身达标。
+**最终 CI：`55187d0` 的 [run 35552484798](https://github.com/wangbinquan/CrewStation/actions/runs/35552484798) 六个作业全部成功**——unit 319、module 1078／8 skip、console 526、e2e 32／18 skip，全部 0 fail。途中两次红都是本次改动自己的问题：`7e40104` 的 `gate` 报「`PreviewPane.tsx` 有可执行逻辑但没有任何用例加载它」（查证确认它自 `58ea7cd` 起全仓零引用，已删，并补了三条预览路由的 HTTP 用例；改动行覆盖 288／292＝98.6% 本身达标）；`0a3c169` 的 `static` 报删函数后遗留的未使用导入。两条教训都已落进 `development-rules.md`：目录级 pathspec 会让 `git commit` 扫进别人的工作树改动；并行在制品刷红本机门禁时要按改动文件单独 `eslint`。
+
+实现中发现的设计缺口记为 **I21**：RFC-006 之后 Agent 跑在自己的执行 Pod 里，`127.0.0.1:<预览端口>` 到不了预览进程，用户域主机又有 ForwardAuth，于是 Agent 能把预览救活、能读它的输出，却没法验证「改完之后页面真的对了」。工具描述已按事实写明，三个选项待作者裁定。
 
 **实机验收 PV-01…PV-18 未执行**，需要本机集群上的真实开发会话；而本机部署会把并行 RFC-015 未提交且编译不过的在制品一起推上集群，故本轮不做，等其落地后再补。同因并行在制品，本轮没有跑通完整 `bun run check`：`arch:check` 通过，`lint`／`typecheck` 的报错全部落在 `apps/console/src/features/cluster/`、`modules/cluster-management/`、`packages/filesystem-metrics/`、`apps/cs-storage-probe/`。
 

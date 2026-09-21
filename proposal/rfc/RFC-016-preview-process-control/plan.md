@@ -25,7 +25,16 @@
 
 实现过程中被真实用例推翻的三处初版设计，已逐条回填进 design.md：`attempt` 不能复用 `restarts`、缓冲不做对不上号的脱敏、`asPreviewStatusResult` 变成死代码而非仍被事件路径需要。
 
-**CI 复核（`7e40104`，run 35551970193）**：`static`／`unit`／`module`／`console` 四个作业成功——`static` 通过即证明提交在干净 checkout 上自洽，没有带上并行会话的未追踪文件。`gate` 失败一项：改动行 292 行执行到 288 行（98.6%，下限 80%）没问题，卡的是按文件那条——`PreviewPane.tsx`「有可执行逻辑，但没有任何用例加载它」。查证后确认它自 `58ea7cd` 起全仓零引用，已连同样式模块与随之孤立的 `previewStateTone` 删除；同时补 `modules/dev-session/tests/previewRoutes.test.ts` 覆盖三条路由的查询串解析、动作枚举与两档授权（原先 `devSessionRoutes.ts` 有四行未被执行）。
+## CI（T9 收口）
+
+**最终：`55187d0` 的 [run 35552484798](https://github.com/wangbinquan/CrewStation/actions/runs/35552484798) 六个作业全部成功**——`static`、`unit`（319 pass／0 fail）、`module`（1078 pass／8 skip／0 fail）、`console`（526 pass／0 fail）、`gate`、`e2e`（32 pass／18 skip／0 fail）。`93f35ff` 的 run 35552381780 同样六项成功。
+
+途中两次红，都是本次改动自己的问题，记录在此以免后人重走：
+
+1. **`7e40104` 的 `gate`**：改动行 292 行执行到 288 行（98.6%，下限 80%）没问题，卡的是按文件那条——`PreviewPane.tsx`「有可执行逻辑，但没有任何用例加载它」。查证确认它自 `58ea7cd` 起全仓零引用，实际在渲染的是 `DevelopmentPreview`，RFC-016 改到它纯属改死代码。已连同样式模块与随之孤立的 `previewStateTone` 删除；同时补 `modules/dev-session/tests/previewRoutes.test.ts` 覆盖三条路由的查询串解析、动作枚举与两档授权（原先 `devSessionRoutes.ts` 有四行未被执行）。
+2. **`0a3c169` 的 `static`**：删 `previewStateTone` 后 `PreviewState` 成了未使用导入。删函数时只重跑了 typecheck 没重跑 lint，而本机全量 lint 的输出被并行会话在制品的四条报错淹没。教训已写进 `development-rules.md` §3：CI 检查的是提交树、看不到未提交改动，所以要按本次改动的文件单独 `eslint` 一遍。
+
+`static` 通过即证明提交在干净 checkout 上自洽，没有带上并行会话的未追踪文件。**注意 `e2e` 不覆盖本 RFC 的 Runner 改动**：该作业设了 `CS_SKIP_TASK_RUNTIME=1`（见 I20），任务容器不在 CI 实机范围内，所以 `startPreview`／`stopPreview`／`previewLogs` 在真实容器里的行为只有 `runnerLifecycle.test.ts` 那几条用真实进程跑的用例作证。
 
 ## 验收清单
 
