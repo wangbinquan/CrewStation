@@ -61,6 +61,9 @@ export const messages = {
 
   'ui.status.loading': '载入中…',
   'ui.status.error': '读取失败：{message}',
+  'ui.routeError.message': '这个页面显示时出错：{message}',
+  'ui.routeError.hint': '导航与其他页面不受影响。可以重试；仍然出错时，请把上面的原因反馈给平台管理员。',
+  'ui.routeError.retry': '重试',
   'ui.connection.offline': '当前离线，读取已暂停；已有数据可能过期。联网后会继续读取，已发出的操作仍需核对结果。',
   'ui.connection.notSent': '操作时处于离线状态，本次操作未发送。联网后请重新检查并操作。',
   'ui.confirm.yes': '确认',

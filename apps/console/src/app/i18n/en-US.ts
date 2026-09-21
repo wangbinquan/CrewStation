@@ -59,6 +59,9 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
 
   'ui.status.loading': 'Loading…',
   'ui.status.error': 'Failed to load: {message}',
+  'ui.routeError.message': 'This page failed to render: {message}',
+  'ui.routeError.hint': 'Navigation and other pages still work. Try again; if it keeps failing, report the reason above to a platform administrator.',
+  'ui.routeError.retry': 'Try again',
   'ui.connection.offline': 'You are offline. Reads are paused and existing data may be outdated. Reads resume when you reconnect; verify the results of actions already sent.',
   'ui.connection.notSent': 'This action was not sent because you were offline. Once connected, check the current state and try again.',
   'ui.confirm.yes': 'Confirm',

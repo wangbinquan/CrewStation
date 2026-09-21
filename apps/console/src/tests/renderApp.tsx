@@ -3,6 +3,7 @@ import { RouterProvider, createMemoryHistory, createRouter } from '@tanstack/rea
 import type { RouterHistory } from '@tanstack/react-router';
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
+import { RouteErrorPanel } from '../app/router/RouteErrorPanel';
 import { routeTree } from '../app/router/routeTree';
 import { messages as appZh } from '../app/i18n/zh-CN';
 import { messages as adminZh } from '../features/admin/i18n/zh-CN';
@@ -55,7 +56,7 @@ export interface RenderedApp {
 
 /** 用真实路由树渲染整个工作台；只有 fetch 是假的。 */
 export async function renderApp(initialPath: string, previousPath?: string, history?: RouterHistory, options?: { readonly scrollRestoration?: boolean }): Promise<RenderedApp> {
-  const router = createRouter({ routeTree, history: history ?? createMemoryHistory({ initialEntries: previousPath ? [previousPath, initialPath] : [initialPath] }), scrollRestoration: options?.scrollRestoration });
+  const router = createRouter({ routeTree, history: history ?? createMemoryHistory({ initialEntries: previousPath ? [previousPath, initialPath] : [initialPath] }), scrollRestoration: options?.scrollRestoration, defaultErrorComponent: RouteErrorPanel });
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
   const host = document.createElement('div');
   document.body.appendChild(host);
