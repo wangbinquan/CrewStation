@@ -1,6 +1,6 @@
 import type { CreateServicePlan, CreateTaskProfile, Actor, ProjectId, QuotaDto, ServicePlanDto, ServicePlanWrite, SetQuotaRequest, TaskProfileDto, TaskProfileWrite } from '@crewstation/contracts';
 import { ResourceIdSchema } from '@crewstation/contracts';
-import { forbidden, newResourceId, notFound } from '@crewstation/kernel';
+import { conflict, forbidden, newResourceId, notFound } from '@crewstation/kernel';
 import { authorizationUseCases } from './authorization';
 import type { ProjectUseCaseDeps } from './dependencies';
 
@@ -21,7 +21,9 @@ export function quotaAndPlanUseCases(deps: ProjectUseCaseDeps) {
     setQuota: async (actor: Actor, projectId: ProjectId, input: SetQuotaRequest): Promise<QuotaDto> => {
       adminOnly(actor);
       await authorize(actor, projectId, 'manage-quota');
-      await uow.run((scope) => scope.quotas.upsert({ projectId, maxConcurrentTasks: input.maxConcurrentTasks }));
+      const quota = { projectId, maxConcurrentTasks: input.maxConcurrentTasks };
+      if (input.expectedMaxConcurrentTasks === undefined) await uow.run((scope) => scope.quotas.upsert(quota));
+      else if (!await uow.run((scope) => scope.quotas.compareAndSet(quota, input.expectedMaxConcurrentTasks!))) throw conflict('项目任务配额已变化，请重新读取后核对；本次修改未保存');
       return { maxConcurrentTasks: input.maxConcurrentTasks, running: await taskUsage.runningTasks(projectId) };
     },
     /** 供 task-runtime 原子准入时读取上限。 */

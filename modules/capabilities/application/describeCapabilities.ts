@@ -21,7 +21,7 @@ export function describeCapabilitiesUseCase(sources: CapabilitySources, settings
     if (!svc) throw notFound('项目服务', projectId);
     const [quota, plans, computeProfiles, devKeys, prodKeys, data, operations, subscriptions, forwarding] = await Promise.all([
       sources.quota(actor, projectId).catch(() => undefined),
-      sources.servicePlans(),
+      sources.servicePlans(actor, projectId),
       sources.computeProfiles(actor, projectId),
       sources.configKeys(actor, projectId, 'development'),
       sources.configKeys(actor, projectId, 'production'),

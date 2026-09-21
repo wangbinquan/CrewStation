@@ -5,6 +5,7 @@ import { drizzleCatalogRepository, drizzleQuotaRepository } from './drizzleCatal
 import { drizzleMembershipRepository, drizzleProjectRepository, drizzleServiceRepository } from './drizzleProjectRepositories';
 import { drizzleAppListings } from './drizzleAppListings';
 import { drizzleProjectPages } from './drizzleProjectPages';
+import { drizzleServicePolicies } from './drizzleServicePolicies';
 
 export function scopeOver(executor: Executor): RepositoryScope {
   return {
@@ -15,6 +16,7 @@ export function scopeOver(executor: Executor): RepositoryScope {
     catalog: drizzleCatalogRepository(executor),
     appListings: drizzleAppListings(executor),
     projectPages: drizzleProjectPages(executor),
+    servicePolicies: drizzleServicePolicies(executor),
     events: { publish: async (topic, payload) => { await publishDomainEvent(executor, topic, payload); } },
   };
 }

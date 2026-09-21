@@ -18,7 +18,7 @@ export const projectComputeMessages = {
   'admin.projectCompute.effect': 'Affects future starts and releases. Accepted agents keep their profile; running development containers are not resized.',
   'admin.projectCompute.save': 'Save project access',
   'admin.projectCompute.saved': 'Project compute access saved.',
-  'admin.projectCompute.reload': 'Reload',
+  'admin.projectCompute.reload': 'Reload agent configuration',
   'admin.projectCompute.discard': 'Discard your changes and reload project access?',
   'admin.projectCompute.identityChanged': 'Administrator identity changed. Reload before making changes.',
   'admin.projectCompute.invalidDefault': 'Choose an allowed profile that supports business agents.',

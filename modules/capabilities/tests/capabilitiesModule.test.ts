@@ -8,6 +8,8 @@ const actor: Actor = { userId: '01a0bf5d-8f4b-7793-867c-efd7527b386b' as UserId,
 
 describe('capabilities module', () => {
   test('聚合服务的主机、约定、配置键、数据、操作与订阅', async () => {
+    let servicePlanAllowed = true;
+    const servicePlanReads: { actor: Actor; projectId: ProjectId }[] = [];
     const { api } = createCapabilitiesModule({
       isAdmin: async () => false,
       market: { list: async () => ({ items: [] }), get: async () => { throw new Error('unused'); }, slots: async () => [] },
@@ -19,7 +21,10 @@ describe('capabilities module', () => {
         resolveServiceOfProject: async () => ({ serviceId: '01a0bf5d-8f4b-76c5-866c-f1feda3d63bb' as ServiceId, slug: 'demo', name: 'demo', identity: 'demo/demo', namespace: 'cs-demo' }),
         authorize: async () => undefined,
         quota: async () => ({ maxConcurrentTasks: 3, running: 1 }),
-        servicePlans: async () => [{ id: '01a0bf5d-8f4b-7000-9e4b-b54e91ee9d10', name: 'standard-small', cpu: '500m', memory: '512Mi', maxReplicas: 3, description: '' }],
+        servicePlans: async (requestedActor, requestedProject) => {
+          servicePlanReads.push({ actor: requestedActor, projectId: requestedProject });
+          return servicePlanAllowed ? [{ id: '01a0bf5d-8f4b-7000-9e4b-b54e91ee9d10', name: 'standard-small', cpu: '500m', memory: '512Mi', maxReplicas: 3, description: '' }] : [];
+        },
 
         computeProfiles: async () => [{ id: '01a0bf5d-8f4b-780f-843c-911b2aa70862', name: 'balanced', description: '样例', terminalOnly: false, isDefault: true, available: true }, { id: '01a0bf5d-8f4b-7b73-8e41-4e3721e1e3db', name: 'tool-cli', description: '终端', terminalOnly: true, isDefault: false, available: false, reason: '档位 tool-cli 正在测试' }],
         configKeys: async (_a, _p, env) => (env === 'production' ? ['GREETING'] : ['GREETING', 'DEBUG']),
@@ -42,5 +47,9 @@ describe('capabilities module', () => {
     expect(dto.computeProfiles.map((p) => [p.name, p.isDefault, p.terminalOnly, p.available])).toEqual([['balanced', true, false, true], ['tool-cli', false, true, false]]);
     expect(JSON.stringify(dto.computeProfiles)).not.toMatch(/image|binaryPath|model/);
     expect(dto.businessTaskApi.length).toBeGreaterThan(3);
+    // 撤回项目分配后，能力说明不能继续推荐全局默认服务规格。
+    servicePlanAllowed = false;
+    expect((await api.describe(actor, projectId)).plan).toBeUndefined();
+    expect(servicePlanReads).toEqual([{ actor, projectId }, { actor, projectId }]);
   });
 });

@@ -39,6 +39,7 @@ export interface MembershipRepository {
 export interface QuotaRepository {
   get(projectId: ProjectId): Promise<TaskQuota | undefined>;
   upsert(quota: TaskQuota): Promise<void>;
+  compareAndSet(quota: TaskQuota, expectedMaxConcurrentTasks: number): Promise<boolean>;
 }
 
 export interface CatalogRepository {

@@ -1,3 +1,4 @@
+import { projectResourceMessages } from './projectResources.en-US';
 import type { MessagesShapedLike } from '../../../shared/lib/i18n';
 import type { messages as zhCN } from './zh-CN';
 import { authMessages } from './auth.en-US';
@@ -6,6 +7,7 @@ import { computeMessages } from './compute.en-US';
 
 export const messages: MessagesShapedLike<typeof zhCN> = {
   ...projectComputeMessages,
+  ...projectResourceMessages,
   "admin.users.role": "Platform role",
   "admin.users.roleFor": "Role for {name}",
   "admin.users.saveRole": "Save role",
@@ -18,7 +20,7 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   "admin.overview.hint": "Review pending work and manage projects, capabilities and runtime resources.",
   "admin.retryIdentity": "Check permissions again",
   "admin.directory.title": "Project directory",
-  "admin.directory.description": "Browse all project types and manage provisioning, members and lifecycle.",
+  "admin.directory.description": "Browse all project types and manage resources, shared templates, provisioning, members and lifecycle.",
   "admin.directory.search": "Name or slug",
   "admin.directory.kind": "Project type",
   "admin.directory.state": "Provisioning state",
@@ -161,7 +163,7 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   'admin.resource.edit': 'Edit',
   'admin.resource.prepare': 'Review and save',
   'admin.resource.busy': 'Working…',
-  'admin.resource.hint.name': 'Required, 3–40 lowercase letters, digits or hyphens. Start with a letter; end with a letter or digit. The same name overwrites; a new name creates an entry.',
+  'admin.resource.hint.name': 'Required, 1–80 characters for display. Editing preserves the resource ID; creating a template assigns a new ID.',
   'admin.resource.hint.cpu': 'Required CPU quantity, such as 500m or 1.',
   'admin.resource.hint.memory': 'Required memory quantity, such as 512Mi or 2Gi.',
   'admin.resource.hint.storage': 'Required task volume capacity, such as 10Gi.',

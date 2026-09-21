@@ -40,7 +40,7 @@ export function deploySteps(deps: ReleaseUseCaseDeps, ctx: PipelineContext): Dep
   const { uow, clock } = deps;
 
   const startDeploy: DeploySteps['startDeploy'] = async (release, svc, manifest) => {
-    const plan = await deps.plans.getServicePlan(manifest.spec.service.servicePlanId);
+    const plan = await deps.plans.getServicePlan(manifest.spec.service.servicePlanId, release.projectId);
     if (!plan) return ctx.fail(release, `服务套餐 ${manifest.spec.service.servicePlanId} 不存在`);
     if (manifest.spec.service.replicas > plan.maxReplicas) return ctx.fail(release, `副本数 ${manifest.spec.service.replicas} 超过套餐上限 ${plan.maxReplicas}`);
     const replicas = await uow.read.maintenance.override(release.serviceId, release.targetSlot) ?? manifest.spec.service.replicas;

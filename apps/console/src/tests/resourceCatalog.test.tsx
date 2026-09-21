@@ -75,7 +75,7 @@ test('套餐失败、换编辑对象和新建都保留草稿，放弃只替换�
   await edit('standard-small'); expect(field('CPU').value).toBe('3'); await page.click('继续编辑');
   await page.click('新建服务套餐'); expect(field('CPU').value).toBe('3'); await page.click('继续编辑');
   f.state.saveFailure = true; await page.click('检查并保存'); await page.click('确认覆盖'); expect(page.text()).toContain('套餐保存失败'); expect(field('CPU').value).toBe('3');
-  await page.click('继续编辑'); await page.requestNavigate('/admin'); expect(page.path()).toBe('/admin/service-plans'); await page.click('继续编辑');
+  await page.click('继续编辑'); await page.requestNavigate('/admin'); expect(page.path()).toBe('/admin/projects/resource-templates'); await page.click('继续编辑');
   await page.click('新建服务套餐'); await page.click('放弃输入并载入'); expect(field('名称').value).toBe(''); expect(f.writes).toHaveLength(1);
 });
 
@@ -91,7 +91,7 @@ test('套餐在途操作互斥、表单锁定；确认离开后迟到成功不�
   const f = fixture(); let finish!: () => void; f.state.hold = new Promise<void>((resolve) => { finish = resolve; });
   page = await renderApp('/admin/service-plans'); await edit('standard-small'); await input('CPU', '4'); await page.click('检查并保存');
   await page.click('确认覆盖'); await page.click('确认覆盖'); expect(f.writes).toHaveLength(1); expect(field('CPU').disabled).toBe(true);
-  await page.requestNavigate('/admin'); expect(page.path()).toBe('/admin/service-plans'); await page.click('放弃输入并离开');
+  await page.requestNavigate('/admin'); expect(page.path()).toBe('/admin/projects/resource-templates'); await page.click('放弃输入并离开');
   await act(async () => { finish(); }); await page.settle(); expect(page.path()).toBe('/admin'); expect(f.writes).toHaveLength(1);
 });
 

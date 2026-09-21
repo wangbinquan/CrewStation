@@ -1,13 +1,6 @@
-import type { ReactElement } from 'react';
-import { useT } from '../../../shared/lib/useT';
-import { ServicePlansSection } from '../components/ServicePlansSection';
-import { AdminSection } from './AdminSection';
+import { Navigate } from '@tanstack/react-router';
 
-export function AdminServicePlansPage(): ReactElement {
-  const t = useT();
-  return (
-    <AdminSection title={t('nav.admin.servicePlans')} description={t('admin.plans.hint')}>
-      <ServicePlansSection />
-    </AdminSection>
-  );
+/** 旧书签继续定位到项目管理下的共享模板。 */
+export function AdminServicePlansPage() {
+  return <Navigate to="/admin/projects/resource-templates" search={{ kind: 'service' }} replace />;
 }

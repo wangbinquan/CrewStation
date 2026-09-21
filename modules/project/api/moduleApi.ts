@@ -1,4 +1,5 @@
 import type {
+  ProjectServicePolicyDto, SaveProjectServicePolicy,
   CreateServicePlan, CreateTaskProfile,  ProjectCreationCatalog, ProjectPage, ProjectPageEntry, ProjectPageQuery,
   Actor, CreateProjectRequest, ListProjectsQuery, ManifestKind, MemberDto, ProjectDto, ProjectId, ProjectState, QuotaDto, ServiceDto,
   ServiceId, ServicePlanDto, ServicePlanWrite, TaskProfileWrite, SetMemberRequest, SetQuotaRequest, TaskProfileDto, UserId,
@@ -84,6 +85,10 @@ export interface ProjectModuleApi {
   getQuota(actor: Actor, projectId: ProjectId): Promise<QuotaDto>;
   setQuota(actor: Actor, projectId: ProjectId, input: SetQuotaRequest): Promise<QuotaDto>;
   quotaLimit(projectId: ProjectId): Promise<number | undefined>;
+  getServicePolicy(actor: Actor, projectId: ProjectId): Promise<ProjectServicePolicyDto>;
+  listProjectServicePlans(actor: Actor, projectId: ProjectId): Promise<ServicePlanDto[]>;
+  saveServicePolicy(actor: Actor, projectId: ProjectId, input: SaveProjectServicePolicy): Promise<ProjectServicePolicyDto>;
+  resolveProjectServicePlan(projectId: ProjectId, planId: string): Promise<ServicePlanDto | undefined>;
   listServicePlans(): Promise<ServicePlanDto[]>;
   createServicePlan(actor: Actor, plan: CreateServicePlan): Promise<ServicePlanDto>;
   updateServicePlan(actor: Actor, id: string, plan: ServicePlanWrite): Promise<ServicePlanDto>;

@@ -54,7 +54,7 @@ export const MemberDtoSchema = z.object({ userId: UserIdSchema, role: MemberRole
 export const SetMemberRequestSchema = z.object({ userId: UserIdSchema, role: MemberRoleSchema });
 
 export const QuotaDtoSchema = z.object({ maxConcurrentTasks: z.number().int().min(1), running: z.number().int().min(0) });
-export const SetQuotaRequestSchema = z.object({ maxConcurrentTasks: z.number().int().min(1).max(100) });
+export const SetQuotaRequestSchema = z.object({ maxConcurrentTasks: z.number().int().min(1).max(100), expectedMaxConcurrentTasks: z.number().int().min(1).optional() });
 
 export const ServicePlanInputSchema = z.object({ name: z.string().trim().min(1).max(80), cpu: z.string(), memory: z.string(), maxReplicas: z.number().int().min(1), description: z.string().default('') }).strict();
 export const TaskProfileInputSchema = z.object({ name: z.string().trim().min(1).max(80), cpu: z.string(), memory: z.string(), storage: z.string(), description: z.string().default('') }).strict();

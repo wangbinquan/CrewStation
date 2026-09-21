@@ -3,7 +3,7 @@ import { clusterRoute } from './clusterRoute';
 // 两棵子树（RFC-002）：workbenchRoute 是租户空间，adminRoute 是平台管理空间。
 import {
   adminAuthenticationRoute, adminComputeRoute, adminEgressRoute, adminGatewayRoute, adminOverviewRoute, adminProjectsRoute,
-  adminProjectComputeRoute, adminRoute, adminServicePlansRoute, adminTaskProfilesRoute, adminUsersRoute,
+  adminProjectComputeRoute, adminProjectResourcesRoute, adminResourceTemplatesRoute, adminRoute, adminServicePlansRoute, adminTaskProfilesRoute, adminUsersRoute,
 } from '../../features/admin';
 import { capabilitiesRoute, marketHomeRoute, marketRoute, marketLegacyRoute } from '../../features/capabilities';
 import { catalogRoute } from '../../features/catalog';
@@ -48,6 +48,8 @@ export const routeTree = rootRoute.addChildren([
     adminOverviewRoute,
     adminProjectsRoute,
     adminProjectComputeRoute,
+    adminProjectResourcesRoute,
+    adminResourceTemplatesRoute,
     adminProjectCreateRoute,
     adminProjectProvisioningRoute,
     adminProjectRoutes,

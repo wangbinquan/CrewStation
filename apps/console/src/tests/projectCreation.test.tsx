@@ -179,8 +179,8 @@ test('创建草稿：在途离开需确认，重复 submit 只写一次，迟到
   await act(async () => { for (let i = 0; i < 2; i++) form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); }); await page.settle();
   expect(f.writes()).toHaveLength(1); expect(page.text()).toContain('离开不会撤销创建或开通');
   await page.requestNavigate('/admin/service-plans'); expect(page.path()).toBe('/admin/projects/new'); await page.click('继续编辑'); expect(page.text()).toContain('新数字人');
-  await page.requestNavigate('/admin/service-plans'); await page.click('放弃输入并离开'); expect(page.path()).toBe('/admin/service-plans');
-  await act(async () => { finish(); }); await page.settle(); expect(page.path()).toBe('/admin/service-plans'); expect(f.writes()).toHaveLength(1);
+  await page.requestNavigate('/admin/service-plans'); await page.click('放弃输入并离开'); expect(page.path()).toBe('/admin/projects/resource-templates');
+  await act(async () => { finish(); }); await page.settle(); expect(page.path()).toBe('/admin/projects/resource-templates'); expect(f.writes()).toHaveLength(1);
 });
 
 test('创建草稿：不匹配或无效创建回执保留复核材料，不导航到错误项目也不自动重试', async () => {

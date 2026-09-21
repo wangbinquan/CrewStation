@@ -28,6 +28,8 @@ export function buildSteps(deps: ReleaseUseCaseDeps, ctx: PipelineContext, start
     let manifest: Manifest;
     try {
       manifest = await loadManifest(release);
+      // 项目收回规格后，迁移也不能先执行；迁移完成到部署之间还会重查一次。
+      if (!await deps.plans.getServicePlan(manifest.spec.service.servicePlanId, release.projectId)) throw validation(`服务套餐 ${manifest.spec.service.servicePlanId} 不存在`);
       assertMigrationAllowed(manifest.spec.release.migration, deps.settings.maintenanceWindow);
     } catch (error) {
       return ctx.fail(release, isPlatformError(error) ? error.message : `Manifest 无效：${String(error)}`);

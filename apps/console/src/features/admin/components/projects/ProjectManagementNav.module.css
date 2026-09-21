@@ -1,0 +1,3 @@
+.nav { display: flex; flex-wrap: wrap; gap: 8px; border-bottom: 1px solid var(--cs-color-border); padding-bottom: 8px; }
+.nav a { padding: 8px 12px; border-radius: 6px; color: var(--cs-color-text-muted); text-decoration: none; overflow-wrap: anywhere; }
+.nav a:hover, .nav .active { color: var(--cs-color-text); background: var(--cs-color-surface-muted); font-weight: 600; }

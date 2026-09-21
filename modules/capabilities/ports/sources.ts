@@ -5,7 +5,7 @@ export interface CapabilitySources {
   resolveServiceOfProject(projectId: ProjectId): Promise<{ serviceId: ServiceId; slug: string; name: string; identity: string; namespace: string } | undefined>;
   authorize(actor: Actor, projectId: ProjectId, action: 'view'): Promise<unknown>;
   quota(actor: Actor, projectId: ProjectId): Promise<QuotaDto>;
-  servicePlans(): Promise<ServicePlanDto[]>;
+  servicePlans(actor: Actor, projectId: ProjectId): Promise<ServicePlanDto[]>;
   /** 本平台可用的算力档位（RFC-001）：只有名字与说明。 */
   computeProfiles(actor: Actor, projectId: ProjectId): Promise<ComputeProfileSummaryDto[]>;
   configKeys(actor: Actor, projectId: ProjectId, env: 'development' | 'production'): Promise<string[]>;

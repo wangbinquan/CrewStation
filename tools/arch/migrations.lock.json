@@ -80,6 +80,7 @@
     "modules/project/adapters/persistence/migrations/0008_drop_compute_profiles.sql": "24478396f6e4507e2cc1eec3f5da317dd73fbd577bb76c43c76c4d93874013c0",
     "modules/project/adapters/persistence/migrations/0009_resource_identity.sql": "9a6ecaaabd15630a442ca413a40e169449cea0289b2d66f1a96469c43dd626ed",
     "modules/project/adapters/persistence/migrations/0010_resource_identity.identity.json": "8d20150b843ea2c5a4fd3e33c06abb5df38fed611c8befe03f4384014b17173b",
+    "modules/project/adapters/persistence/migrations/0011_service_plan_policies.sql": "24e2001b35f02869f63eefd4fba5af065a274f003b4e57cb8855563f430d8b71",
     "modules/release/adapters/persistence/migrations/0001_create_schema.sql": "6f470ab4cfc16eecbcd191f5e69317dcaaeb701bde96f4d2fcc854aad7c921b0",
     "modules/release/adapters/persistence/migrations/0002_releases.sql": "02d9ea5c04aa1a3a138a5b812f95069531cd668c4ea2b509cb8d427474da85cc",
     "modules/release/adapters/persistence/migrations/0003_traffic_switch_previous_release.sql": "2c3ddc7cffe002714c50a92d3dcc1b5b01ea30bfdb33215b801350626a152047",

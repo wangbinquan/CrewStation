@@ -9,7 +9,8 @@ export interface ServiceResolver {
 }
 
 export interface PlanCatalog {
-  getServicePlan(name: string): Promise<ServicePlanDto | undefined>;
+  /** 发布必须传 projectId 校验项目范围；已运行实例维护只读取原规格。 */
+  getServicePlan(name: string, projectId?: ProjectId): Promise<ServicePlanDto | undefined>;
   /**
    * 算力档位（RFC-001、RFC-006）：发布时校验 Manifest 引用的档位存在且不是通用终端协议；`default` 解析到当前默认档位。
    * 不看测试状态：能不能用在起 Agent 时判定。

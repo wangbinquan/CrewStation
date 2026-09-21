@@ -18,7 +18,7 @@ export const projectComputeMessages = {
   'admin.projectCompute.effect': '保存后影响后续启动和发布。已受理的 Agent 保持原档位；运行中的开发容器不原地调整。',
   'admin.projectCompute.save': '保存项目授权',
   'admin.projectCompute.saved': '项目算力授权已保存。',
-  'admin.projectCompute.reload': '重新读取',
+  'admin.projectCompute.reload': '重新读取 Agent 配置',
   'admin.projectCompute.discard': '放弃当前修改，重新读取项目授权？',
   'admin.projectCompute.identityChanged': '管理员身份已变化，请重新读取后操作。',
   'admin.projectCompute.invalidDefault': '请选择允许范围内支持业务 Agent 的档位。',

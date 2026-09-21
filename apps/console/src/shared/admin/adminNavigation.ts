@@ -9,8 +9,6 @@ export type AdminPagePath =
   | '/admin/users'
   | '/admin/authentication'
   | '/admin/compute'
-  | '/admin/service-plans'
-  | '/admin/task-profiles'
   | '/admin/egress';
 
 export interface AdminNavPage {
@@ -57,8 +55,6 @@ export const ADMIN_ENTRY_GROUPS: readonly AdminEntryGroup[] = [
   ] },
   { id: 'resources', titleKey: 'nav.admin.groupResources', pages: [
     { to: '/admin/compute', labelKey: 'nav.admin.compute', hintKey: 'admin.overview.compute' },
-    { to: '/admin/service-plans', labelKey: 'nav.admin.servicePlans', hintKey: 'admin.overview.servicePlans' },
-    { to: '/admin/task-profiles', labelKey: 'nav.admin.taskProfiles', hintKey: 'admin.overview.taskProfiles' },
     { to: '/admin/egress', labelKey: 'nav.admin.egress', hintKey: 'admin.overview.egress' },
   ] },
 ];

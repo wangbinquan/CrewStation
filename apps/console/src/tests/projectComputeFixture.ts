@@ -24,6 +24,9 @@ export function projectComputeFixture() {
       }
       return Response.json(state.policy);
     }
+    if (path === `/v1/projects/${computeProjectId}/service-policy`) return Response.json({ projectId: computeProjectId, revision: 0, policy: { mode: 'inherit', allowedPlanIds: [] }, updatedAt: null });
+    if (path === `/v1/projects/${computeProjectId}/quota`) return Response.json({ maxConcurrentTasks: 3, running: 2 });
+    if (path === '/v1/catalog/service-plans') return Response.json({ items: [] });
     if (path === `/v1/projects/${computeProjectId}`) return Response.json(project);
     if (path === '/v1/admin/compute-profiles') return Response.json({ items: state.profiles });
     if (path === '/v1/catalog/task-profiles') return Response.json({ items: [{ id: profileIdOf('coding-medium'), name: 'coding-medium', cpu: '1', memory: '2Gi', storage: '10Gi', description: '' }, { id: profileIdOf('coding-large'), name: 'coding-large', cpu: '2', memory: '4Gi', storage: '20Gi', description: '' }] });

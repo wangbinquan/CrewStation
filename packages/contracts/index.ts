@@ -60,3 +60,5 @@ export * from './api/legacyBusinessTask';
 
 export * from './api/cluster/metrics';
 export * from './api/cluster/history';
+
+export * from './api/workbench/projectResources';

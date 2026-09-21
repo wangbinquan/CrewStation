@@ -25,6 +25,7 @@ const ADMIN_PAGES = [
   { path: '/admin/compute', marker: '算力档位', capability: '算力档位（RFC-001）' },
   { path: '/admin/service-plans', marker: '服务套餐', capability: '数字人服务套餐' },
   { path: '/admin/task-profiles', marker: '任务容器套餐', capability: '任务容器套餐' },
+  { path: '/admin/projects/resource-templates?kind=service', marker: '全平台共享模板', capability: '项目管理下的共享资源规格模板' },
   { path: '/admin/capabilities', marker: '能力接入', capability: '接入容器与开放策略' },
   { path: '/admin/requests', marker: '申请审批', capability: '定向开放与出站申请审批' },
   { path: '/admin/egress', marker: '出站白名单', capability: '出站域名白名单' },
@@ -98,12 +99,19 @@ describe.skipIf(!session)('平台能力在当前部署的前台验收', () => {
 // 项目空间要有一个已开通、有服务的数字人项目才谈得上验收。全新集群（CI 就是）里一个都没有，
 // 这时整组显式跳过——比让断言在「没有对象」上失败或假装通过都更诚实。
 describe.skipIf(!project)('数字人项目的能力面', () => {
-  test('管理员能打开指定项目的算力授权页，读取真实授权与项目可选档位', async () => {
+  test('管理员能从旧算力入口进入资源配置，读取真实服务范围、配额和 Agent 授权', async () => {
     await open(session!.admin, `/admin/projects/${project!.id}/compute`);
     expect(await session!.admin.text()).toContain('Agent 档位范围');
     expect(await session!.admin.text()).toContain('开发容器资源套餐');
+    expect(await session!.admin.text()).toContain('服务运行资源');
+    expect(await session!.admin.text()).toContain('任务并发配额');
+    expect(await session!.admin.eval<string>('location.pathname')).toBe(`/admin/projects/${project!.id}/resources`);
     const policy = await apiGet<{ projectId: string; revision: number }>(session!.admin, `/v1/projects/${project!.id}/compute-policy`);
     const profiles = await apiGet<{ items: unknown[] }>(session!.admin, `/v1/projects/${project!.id}/compute-profiles`);
+    const service = await apiGet<{ projectId: string; revision: number }>(session!.admin, `/v1/projects/${project!.id}/service-policy`);
+    const quota = await apiGet<{ maxConcurrentTasks: number; running: number }>(session!.admin, `/v1/projects/${project!.id}/quota`);
+    expect(service.projectId).toBe(project!.id); expect(service.revision).toBeGreaterThanOrEqual(0);
+    expect(quota.maxConcurrentTasks).toBeGreaterThanOrEqual(1); expect(quota.running).toBeGreaterThanOrEqual(0);
     expect(policy.projectId).toBe(project!.id); expect(policy.revision).toBeGreaterThanOrEqual(0);
     expect(Array.isArray(profiles.items)).toBe(true); expect(session!.admin.takeErrors()).toEqual([]);
   }, 45_000);

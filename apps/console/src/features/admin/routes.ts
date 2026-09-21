@@ -9,7 +9,8 @@ import { AdminOverviewPage } from './pages/AdminOverviewPage';
 import { AdminServicePlansPage } from './pages/AdminServicePlansPage';
 import { AdminTaskProfilesPage } from './pages/AdminTaskProfilesPage';
 import { AdminUsersPage } from './pages/AdminUsersPage';
-import { AdminProjectComputePage } from './pages/AdminProjectComputePage';
+import { AdminProjectComputePage, AdminProjectComputeLegacyPage } from './pages/AdminProjectComputePage';
+import { AdminResourceTemplatesPage } from './pages/AdminResourceTemplatesPage';
 import { AdminProjectsPage } from './pages/AdminProjectsPage';
 import { parseProjectDirectorySearch } from '../../shared/admin/projectDirectorySearch';
 import { parseComputeSearch } from './model/computeSearch';
@@ -28,4 +29,9 @@ export const adminTaskProfilesRoute = createRoute({ getParentRoute: () => adminR
 export const adminEgressRoute = createRoute({ getParentRoute: () => adminRoute, path: 'egress', component: AdminEgressPage });
 export const adminGatewayRoute = createRoute({ getParentRoute: () => adminRoute, path: 'gateway', component: AdminGatewayPage });
 
-export const adminProjectComputeRoute = createRoute({ getParentRoute: () => adminRoute, path: 'projects/$projectId/compute', component: AdminProjectComputePage });
+export const adminProjectComputeRoute = createRoute({ getParentRoute: () => adminRoute, path: 'projects/$projectId/compute', component: AdminProjectComputeLegacyPage });
+
+export const adminProjectResourcesRoute = createRoute({ getParentRoute: () => adminRoute, path: 'projects/$projectId/resources', component: AdminProjectComputePage });
+export const adminResourceTemplatesRoute = createRoute({ getParentRoute: () => adminRoute, path: 'projects/resource-templates', component: AdminResourceTemplatesPage,
+  validateSearch: (search: Record<string, unknown>): { kind: 'service' | 'task' } => ({ kind: search.kind === 'task' ? 'task' : 'service' }),
+});

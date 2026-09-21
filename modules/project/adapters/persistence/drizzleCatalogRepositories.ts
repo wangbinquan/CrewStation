@@ -1,12 +1,14 @@
 import type { ProjectId } from '@crewstation/contracts';
 import type { Executor } from '@crewstation/persistence';
 import { conflict } from '@crewstation/kernel';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import type { CatalogRepository, QuotaRepository } from '../../ports/repositories';
 import { servicePlans, taskProfiles, taskQuotas } from './tables';
 
 export function drizzleQuotaRepository(db: Executor): QuotaRepository {
   return {
+    compareAndSet: async (quota, expected) => (await db.update(taskQuotas).set({ maxConcurrentTasks: quota.maxConcurrentTasks })
+      .where(and(eq(taskQuotas.projectId, quota.projectId), eq(taskQuotas.maxConcurrentTasks, expected))).returning({ projectId: taskQuotas.projectId })).length === 1,
     get: async (projectId) => {
       const row = (await db.select().from(taskQuotas).where(eq(taskQuotas.projectId, projectId)))[0];
       return row ? { projectId: row.projectId as ProjectId, maxConcurrentTasks: row.maxConcurrentTasks } : undefined;
@@ -30,4 +32,3 @@ export function drizzleCatalogRepository(db: Executor): CatalogRepository {
     updateTaskProfile: async (profile) => (await db.update(taskProfiles).set(profile).where(eq(taskProfiles.id, profile.id)).returning({ id: taskProfiles.id })).length === 1,
   };
 }
-

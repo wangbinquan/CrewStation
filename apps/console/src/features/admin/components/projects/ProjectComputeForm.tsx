@@ -41,7 +41,7 @@ export function ProjectComputeForm({ initial, profiles, tasks, viewerId, onReloa
     lock.current = true; setSaved(false); save.mutate(policy, { onSettled: () => { lock.current = false; } });
   };
   const known = new Set(profiles.map((profile) => profile.id));
-  return <Card stacked title={t('admin.projectCompute.title')} footer={t('admin.projectCompute.effect')}>
+  return <Card stacked title={t('admin.resources.compute')} footer={t('admin.projectCompute.effect')}>
     <UnsavedChangesGuard dirty={dirty || save.isPending} scope={t('admin.projectCompute.title')} isNavigationBusy={() => save.isPending} />
     <form ref={root} onSubmit={(event) => { event.preventDefault(); submit(); }}><Stack>
       <FormField label={t('admin.projectCompute.mode')} hint={t('admin.projectCompute.modeHint')}><select value={draft.mode} disabled={save.isPending} onChange={(event) => change({ mode: event.target.value as ProjectComputePolicy['mode'] })}>

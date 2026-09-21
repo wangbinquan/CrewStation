@@ -25,6 +25,7 @@ const projectId = '01a0bf5d-8f4b-7178-82e1-9a99060b1192' as ProjectId;
 let manifestYaml = '';
 let tagCounter = 0;
 let defaultProfile: string | undefined = 'balanced';
+let servicePlanAllowed = true;
 
 const baseManifest = (migration: string, compute = 'default') => `
 apiVersion: crewstation/v2
@@ -57,7 +58,10 @@ beforeAll(async () => {
     authorizer: { authorize: async (actor, _p, action) => { if (action === 'switch-traffic' && actor.userId !== owner.userId) throw new Error('forbidden'); } },
     services: { resolveServiceById: async () => ({ projectId, slug: 'demo', name: 'demo', namespace: 'cs-demo' }) },
     plans: {
-      getServicePlan: async (id) => (id === BUILTIN_RESOURCES.servicePlanSmall ? { id, name: 'standard-small', cpu: '500m', memory: '512Mi', maxReplicas: 3, description: '' } : undefined),
+      getServicePlan: async (id, project) => {
+        if (project && !servicePlanAllowed) { expect(project).toBe(projectId); throw forbidden('项目未获分配服务规格'); }
+        return id === BUILTIN_RESOURCES.servicePlanSmall ? { id, name: 'standard-small', cpu: '500m', memory: '512Mi', maxReplicas: 3, description: '' } : undefined;
+      },
       lookupComputeProfile: async (selector, id) => { expect(id).toBe(projectId); const name = selector.kind === "default" ? "default" : [...computeIds].find(([, value]) => value === selector.profileId)?.[0]; if (name === 'private') throw forbidden('项目未获授权使用 private 档位'); return (name === 'default' ? (defaultProfile ? { name: defaultProfile, terminalOnly: false } : undefined) : name === 'balanced' ? { name, terminalOnly: false } : name === 'term-cli' ? { name, terminalOnly: true } : undefined); },
       listComputeProfiles: async () => ['balanced', 'term-cli'],
     },
@@ -182,6 +186,33 @@ describe.skipIf(!available)('release module', () => {
     expect(k8s.applied.filter((o) => o.kind === 'Deployment' && (o.metadata.name as string).includes(dto.id.slice(-6))).length).toBe(0);
     defaultProfile = 'balanced';
     manifestYaml = baseManifest('migration: { compatibility: none, destructive: false, rollback: switch-back }');
+  });
+
+  test('项目未获分配服务规格时，拒绝部署且不会先运行数据迁移', async () => {
+    servicePlanAllowed = false;
+    manifestYaml = baseManifest('migrationCommand: [bun, run, db:migrate]\n    migration: { compatibility: expand-only, destructive: false, rollback: switch-back }');
+    try {
+      const dto = await release.api.publish(owner, serviceId, { branch: 'main', version: 'patch' });
+      const before = k8s.applied.filter((o) => o.kind === 'Deployment').length;
+      await release.api.runPipelineStep(dto.id); await markJob(`build-${dto.id.replaceAll('-', '')}`, true); await release.api.runPipelineStep(dto.id);
+      expect(await release.api.getRelease(owner, dto.id)).toMatchObject({ status: 'failed', message: expect.stringContaining('未获分配服务规格') });
+      expect(k8s.applied.some((o) => o.metadata.name === `migrate-${dto.id.replaceAll('-', '')}`)).toBe(false);
+      expect(k8s.applied.filter((o) => o.kind === 'Deployment')).toHaveLength(before);
+    } finally { servicePlanAllowed = true; }
+  });
+
+  test('迁移期间撤回服务规格，在实际部署前重新检查并保留拒绝原因', async () => {
+    manifestYaml = baseManifest('migrationCommand: [bun, run, db:migrate]\n    migration: { compatibility: expand-only, destructive: false, rollback: switch-back }');
+    const dto = await release.api.publish(owner, serviceId, { branch: 'main', version: 'patch' });
+    const before = k8s.applied.filter((o) => o.kind === 'Deployment').length;
+    await release.api.runPipelineStep(dto.id); await markJob(`build-${dto.id.replaceAll('-', '')}`, true); await release.api.runPipelineStep(dto.id);
+    expect((await release.api.getRelease(owner, dto.id)).status).toBe('migrating');
+    servicePlanAllowed = false;
+    try {
+      await markJob(`migrate-${dto.id.replaceAll('-', '')}`, true); await release.api.runPipelineStep(dto.id);
+      expect(await release.api.getRelease(owner, dto.id)).toMatchObject({ status: 'failed', message: expect.stringContaining('未获分配服务规格') });
+      expect(k8s.applied.filter((o) => o.kind === 'Deployment')).toHaveLength(before);
+    } finally { servicePlanAllowed = true; }
   });
 
   test('两个槽当前版本引用的档位按 UUID 列出，经 default 的不计（RFC-006 P8）', async () => {

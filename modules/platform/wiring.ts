@@ -181,7 +181,7 @@ function composeDelivery(deps: CompositionDeps, core: ReturnType<typeof composeC
       },
     },
     plans: {
-      getServicePlan: async (name) => (await project.api.listServicePlans()).find((p) => p.id === name),
+      getServicePlan: async (name, projectId) => projectId ? project.api.resolveProjectServicePlan(projectId, name) : (await project.api.listServicePlans()).find((p) => p.id === name),
       lookupComputeProfile: (name, projectId) => core.agentRuntime.api.lookupForProjectRelease(projectId, name),
       listComputeProfiles: () => core.agentRuntime.api.listNames(),
     },
@@ -318,7 +318,7 @@ function composeAggregates(deps: PlatformModuleDeps, core: ReturnType<typeof com
       releases: delivery.release.api.listReleases, switches: delivery.release.api.listTrafficSwitches },
     settings: { userDomain: settings.userDomain, serviceDomain: settings.serviceDomain, mcp: [{ name: 'capabilities', url: settings.mcp.capabilitiesUrl }, { name: 'operations', url: settings.mcp.operationsUrl }], defaultServicePlan: settings.defaultServicePlan },
     sources: {
-      resolveServiceOfProject: serviceOfProject, authorize: project.api.authorize, quota: project.api.getQuota, servicePlans: project.api.listServicePlans,
+      resolveServiceOfProject: serviceOfProject, authorize: project.api.authorize, quota: project.api.getQuota, servicePlans: project.api.listProjectServicePlans,
       computeProfiles: core.agentRuntime.api.listProjectSummaries,
       configKeys: async (actor, projectId, env) => (await config.api.listItems(actor, projectId, env)).map((i) => i.name),
       dataResources: data.api.listResources, operations: (actor, serviceId) => apiCatalog.api.listOperations(actor, serviceId),

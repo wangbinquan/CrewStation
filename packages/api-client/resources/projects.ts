@@ -1,11 +1,13 @@
 import type { ProjectComputePolicyDto, SaveProjectComputePolicy, AppPresentationDto, AppVisibilityCheckDto, AppVisibilityDto, ManifestKind, MemberCandidateDto, MemberDto, ProjectDto, QuotaDto, SetAppPresentationRequest, SetAppVisibilityRequest, SetMemberRequest, SetQuotaRequest } from '@crewstation/contracts';
-import type { ProjectPage, ProjectPageQuery } from '@crewstation/contracts';
+import type { ProjectPage, ProjectPageQuery, ProjectServicePolicyDto, SaveProjectServicePolicy } from '@crewstation/contracts';
 import type { Transport } from '../httpTransport';
 import type { ItemsPage } from '../itemsPage';
 import type { CreateProjectInput } from '../requestInputs';
 import { segment } from '../requestUrl';
 
 export interface ProjectsResource {
+  getServicePolicy(projectId: string): Promise<ProjectServicePolicyDto>;
+  saveServicePolicy(projectId: string, input: SaveProjectServicePolicy): Promise<ProjectServicePolicyDto>;
   getComputePolicy(projectId: string): Promise<ProjectComputePolicyDto>;
   saveComputePolicy(projectId: string, input: SaveProjectComputePolicy): Promise<ProjectComputePolicyDto>;
   /**
@@ -42,6 +44,8 @@ export interface ProjectsResource {
 export function projectsResource(transport: Transport): ProjectsResource {
   const base = (projectId: string) => `/v1/projects/${segment(projectId)}`;
   return {
+    getServicePolicy: (id) => transport.request('GET', `${base(id)}/service-policy`),
+    saveServicePolicy: (id, input) => transport.request('PUT', `${base(id)}/service-policy`, { body: input }),
     getComputePolicy: (id) => transport.request('GET', `${base(id)}/compute-policy`),
     saveComputePolicy: (id, input) => transport.request('PUT', `${base(id)}/compute-policy`, { body: input }),
     list: (kinds) => transport.request<ItemsPage<ProjectDto>>('GET', '/v1/projects', kinds === undefined ? {} : { query: { kind: kinds.join(',') } }),

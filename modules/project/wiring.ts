@@ -14,6 +14,8 @@ import { createProjectUseCase } from './application/createProject';
 import type { ProjectUseCaseDeps } from './application/dependencies';
 import { memberUseCases } from './application/manageMembers';
 import { quotaAndPlanUseCases } from './application/manageQuotaAndPlans';
+import { servicePolicyUseCases } from './application/servicePolicies';
+import { servicePolicyRoutes } from './http/servicePolicyRoutes';
 import { queryProjectUseCases } from './application/queryProjects';
 import { catalogRoutes } from './http/catalogRoutes';
 import { projectRoutes } from './http/projectRoutes';
@@ -72,9 +74,10 @@ export function createProjectModule(deps: ProjectModuleDeps): ProjectModule {
     ...queryProjectUseCases(useCaseDeps),
     ...memberUseCases(useCaseDeps),
     ...quotaAndPlanUseCases(useCaseDeps),
+    ...servicePolicyUseCases(useCaseDeps),
     ...appVisibilityUseCases(useCaseDeps),
     ...marketListingUseCases(useCaseDeps),
     ...projectPageUseCases(useCaseDeps),
   };
-  return { api, http: [projectRoutes(api), catalogRoutes(api), appListingRoutes(api)], migrations: projectMigrations };
+  return { api, http: [projectRoutes(api), catalogRoutes(api), appListingRoutes(api), servicePolicyRoutes(api)], migrations: projectMigrations };
 }

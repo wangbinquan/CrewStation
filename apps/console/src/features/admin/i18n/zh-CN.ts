@@ -1,3 +1,4 @@
+import { projectResourceMessages } from './projectResources.zh-CN';
 import type { Messages } from '../../../shared/lib/i18n';
 import { authMessages } from './auth.zh-CN';
 import { projectComputeMessages } from './projectCompute.zh-CN';
@@ -5,6 +6,7 @@ import { computeMessages } from './compute.zh-CN';
 
 export const messages = {
   ...projectComputeMessages,
+  ...projectResourceMessages,
   "admin.users.role": "平台角色",
   "admin.users.roleFor": "{name} 的角色",
   "admin.users.saveRole": "保存角色",
@@ -17,7 +19,7 @@ export const messages = {
   "admin.overview.hint": "处理当前待办，管理项目、能力供给和运行资源。",
   "admin.retryIdentity": "重新检查权限",
   "admin.directory.title": "项目目录",
-  "admin.directory.description": "查看所有类型的项目，直接处理开通、成员和生命周期。",
+  "admin.directory.description": "查看所有类型的项目，管理资源配置、共享规格模板、开通、成员和生命周期。",
   "admin.directory.search": "名称或标识",
   "admin.directory.kind": "项目类型",
   "admin.directory.state": "开通状态",

@@ -1,13 +1,6 @@
-import type { ReactElement } from 'react';
-import { useT } from '../../../shared/lib/useT';
-import { TaskProfilesSection } from '../components/TaskProfilesSection';
-import { AdminSection } from './AdminSection';
+import { Navigate } from '@tanstack/react-router';
 
-export function AdminTaskProfilesPage(): ReactElement {
-  const t = useT();
-  return (
-    <AdminSection title={t('nav.admin.taskProfiles')} description={t('admin.profiles.hint')}>
-      <TaskProfilesSection />
-    </AdminSection>
-  );
+/** 旧书签继续定位到项目管理下的共享模板。 */
+export function AdminTaskProfilesPage() {
+  return <Navigate to="/admin/projects/resource-templates" search={{ kind: 'task' }} replace />;
 }
