@@ -1,4 +1,4 @@
-import type { AgentInstanceState, DevSessionState, PreviewState, TaskDataBindingState } from '@crewstation/contracts';
+import type { AgentInstanceState, DevSessionState, TaskDataBindingState } from '@crewstation/contracts';
 import type { BadgeTone } from '../../../shared/ui/Badge';
 import type { StreamStatus } from './taskStreamSocket';
 
