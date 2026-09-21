@@ -64,20 +64,20 @@ export function releaseQueries(deps: Pick<ReleaseUseCaseDeps, 'uow' | 'authorize
       return { physical: slots.active, namespace: svc.namespace, kubernetesService: `${svc.name}-${slots.active}`, port: release?.manifest?.spec.service.port ?? 80 };
     },
     /**
-     * 供 agent-runtime 删除档位前列出受影响项目（RFC-006 P8）：两个槽当前部署的版本里，Manifest 按名称引用的算力档位。
-     * 经 `default` 间接引用的不在其中——改默认档位不需要确认。
+     * 供 agent-runtime 删除档位前列出受影响项目（RFC-006 P8）：两个槽当前部署的版本里，Manifest 明确引用的算力档位 UUID。
+     * 经 `default` 间接引用或早期 stub 快照中尚不存在的算力档位不在其中。
      */
     deployedComputeReferences: async (serviceId: ServiceId): Promise<string[]> => {
       const slots = await uow.read.slots.get(serviceId);
       if (!slots) return [];
-      const names = new Set<string>();
+      const profileIds = new Set<string>();
       for (const physical of ['blue', 'green'] as PhysicalSlot[]) {
         const id = slots[physical].releaseId;
         const manifest = id ? (await uow.read.releases.getById(id))?.manifest : undefined;
         if (manifest?.kind !== 'DigitalWorker') continue;
-        for (const profile of manifest.spec.tasks?.agentProfiles ?? []) if (profile.compute.kind === 'profile') names.add(profile.compute.profileId);
+        for (const profile of manifest.spec.tasks?.agentProfiles ?? []) if (profile.compute?.kind === 'profile') profileIds.add(profile.compute.profileId);
       }
-      return [...names].sort();
+      return [...profileIds].sort();
     },
     /** 供 gateway：两个物理槽当前的角色，用于把 Host 路由到对应 Service。 */
     slotRoles: async (serviceId: ServiceId): Promise<{ prod: PhysicalSlot; preview: PhysicalSlot } | undefined> => {

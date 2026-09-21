@@ -4,6 +4,7 @@ const computeId = (name: string): string => { if (!computeIds.has(name)) compute
 const computeSelector = (name: string) => name === 'default' ? { kind: 'default' as const } : { kind: 'profile' as const, profileId: computeId(name) };
 import { forbidden } from '@crewstation/kernel';
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
+import { sql } from 'drizzle-orm';
 import type { Actor, ProjectId, ReleaseId, ServiceId, UserId } from '@crewstation/contracts';
 import { eventbusMigrations } from '@crewstation/eventbus';
 import type { FakeK8sClient } from '@crewstation/k8s';
@@ -192,6 +193,12 @@ describe.skipIf(!available)('release module', () => {
     }
     expect(await release.api.deployedComputeReferences(serviceId)).toContain(computeId('balanced'));
     expect(await release.api.deployedComputeReferences(serviceId)).not.toContain('default');
+    // UUID 升级保留的早期 stub 快照没有 compute；它不能使全局档位详情／创建报 500，也不能被改指向默认档位。
+    const legacy = { id: Bun.randomUUIDv7(), name: 'historical-stub', driver: 'stub', model: 'stub/echo', permission: 'read-only' };
+    await tdb.db.execute(sql`UPDATE release.releases SET manifest = jsonb_set(manifest, '{spec,tasks,agentProfiles}', (manifest #> '{spec,tasks,agentProfiles}') || ${JSON.stringify([legacy])}::text::jsonb) WHERE id = ${dto.id}`);
+    expect(await release.api.deployedComputeReferences(serviceId)).toEqual([computeId('balanced')]);
+    const snapshot = await tdb.db.execute(sql`SELECT manifest #> '{spec,tasks,agentProfiles}' AS profiles FROM release.releases WHERE id = ${dto.id}`) as unknown as { profiles: unknown[] }[];
+    expect(snapshot[0]!.profiles.at(-1)).toEqual(legacy);
     manifestYaml = baseManifest('migration: { compatibility: none, destructive: false, rollback: switch-back }');
   });
 });
