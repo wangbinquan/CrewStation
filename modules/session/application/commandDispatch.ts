@@ -5,6 +5,9 @@ import type { RunnerHub } from './runnerHub';
 import { commandTimeout } from '../domain/commandTimeout';
 import { assertLaunchSupported } from '../domain/runtimeNegotiation';
 
+/** RFC-016 新增的三条命令，需要 Runner 宣告 `previewControl`。 */
+const PREVIEW_CONTROL_COMMANDS: ReadonlySet<RunnerCommand['type']> = new Set(['startPreview', 'stopPreview', 'previewLogs']);
+
 /** 命令派发：本副本持有连接就直接发，否则按注册表转发到持有副本；无人持有即 TaskRunner 离线。 */
 export function commandDispatch(deps: Pick<SessionUseCaseDeps, 'registry' | 'forwarder' | 'settings' | 'clock'>, hub: Pick<RunnerHub, 'connections'>) {
   const sendLocal = (taskId: TaskId, command: RunnerCommand): Promise<unknown> | undefined => {
@@ -12,6 +15,10 @@ export function commandDispatch(deps: Pick<SessionUseCaseDeps, 'registry' | 'for
     if (!connection) return undefined;
     // 在写入旧 Runner 的 socket 前协商，未知命令不得干扰正在运行的 CLI。
     if (command.type === 'invokeApi' && connection.hello.capabilities.apiInvocations !== 1) throw new PlatformError('precondition', '当前开发容器不支持 API 试调；请保存工作并在容器更新后重新开启会话', { code: 'api_invocations_unavailable' });
+    // RFC-016：旧镜像的 Runner 不懂这三条；previewStatus 与 restartPreview 不在此列，存量会话照常可用。
+    if (PREVIEW_CONTROL_COMMANDS.has(command.type) && connection.hello.capabilities.previewControl !== 1) {
+      throw new PlatformError('precondition', '当前开发容器不支持停止／启动预览与读取预览输出；请保存工作并在容器更新后重建会话', { code: 'preview_control_unavailable' });
+    }
     assertLaunchSupported(command, connection.hello.capabilities);
     return (async () => {
       const wire = connection.legacy ? await connection.legacy.outgoing(command) : command;

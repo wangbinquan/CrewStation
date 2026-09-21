@@ -1,25 +1,33 @@
 # RFC-016｜实施与验证
 
-状态：Draft · 2026-09-21 · 待作者批准，尚未开工。所有任务为未执行。
+状态：In Progress · 2026-09-21 · 作者批准「完整实现 RFC 并推送提交上库」。T1–T9 已完成，T10 实机验收未执行。
 
 ## 任务
 
-| 编号 | 内容 | 依赖 |
+| 编号 | 内容 | 状态 |
 |---|---|---|
-| RFC-016-T1 | 契约：`startPreview`／`stopPreview`／`previewLogs` 命令与结果、hello 的 `previewControl: 1`、`PreviewStatusDto`／`PreviewLogsDto` | — |
-| RFC-016-T2 | `previewOutputBuffer.ts`：双上限环形缓冲、单行截断、`attempt` 标记、脱敏 | T1 |
-| RFC-016-T3 | `PreviewSupervisor` 接缓冲；`start()` 幂等与计数语义；三条命令接进 `commandHandlers.ts`；`runner.ts` 宣告能力位 | T2 |
-| RFC-016-T4 | `commandDispatch.ts` 按 `previewControl` 挡旧容器，错误码 `preview_control_unavailable` | T1 |
-| RFC-016-T5 | `modules/dev-session/application/previewControl.ts`：状态／控制／日志三个用例、两档授权、未连接与无会话分支；接进 `moduleApi.ts` 与 `wiring.ts` | T1 |
-| RFC-016-T6 | 五条 cs-api 路由 ＋ `packages/api-client/resources/devSession.ts` 五个方法 | T5 |
-| RFC-016-T7 | 操作 MCP：`read_preview_status` 补全，新增 `control_preview`、`read_preview_logs`，工具描述写明两条消歧 | T6 |
-| RFC-016-T8 | 工作台：store 命令迁 REST（事件订阅保持），停止／启动按钮与文案，停止态与崩溃态分开表达 | T6 |
-| RFC-016-T9 | 各层测试补齐（见 design.md §验证），本地完整门禁 | T3、T4、T7、T8 |
-| RFC-016-T10 | 本机集群部署，PV-01…PV-18 实机验收，回填本文件与 `STATE.md` | T9 |
+| RFC-016-T1 | 契约：`startPreview`／`stopPreview`／`previewLogs` 命令与结果、hello 的 `previewControl: 1`、`PreviewStatusDto`／`PreviewLogsDto` | 完成 |
+| RFC-016-T2 | `previewOutputBuffer.ts`：双上限环形缓冲、按字节的单行截断、`attempt` 标记 | 完成（脱敏一项经核实取消，理由见 design.md） |
+| RFC-016-T3 | `PreviewSupervisor` 接缓冲；`requestStart`／`requestStop`；`runs` 与 `restarts` 分离；三条命令接进 `commandHandlers.ts`；`runner.ts` 宣告能力位 | 完成 |
+| RFC-016-T4 | `commandDispatch.ts` 按 `previewControl` 挡旧容器，错误码 `preview_control_unavailable` | 完成 |
+| RFC-016-T5 | `modules/dev-session/application/previewControl.ts`：状态／控制／日志三个用例、两档授权、未连接与无会话分支；接进 `moduleApi.ts` 与 `wiring.ts` | 完成 |
+| RFC-016-T6 | 三条 cs-api 路由（控制为参数化的一条）＋ `packages/api-client/resources/devSession.ts` 三个方法 | 完成 |
+| RFC-016-T7 | 操作 MCP：新增 `previewTools.ts`，`read_preview_status` 补全并移入，新增 `control_preview`、`read_preview_logs` | 完成 |
+| RFC-016-T8 | 工作台：store 命令迁 REST（事件订阅保持），停止／启动按钮与文案，停止态与崩溃态分开表达 | 完成 |
+| RFC-016-T9 | 各层测试补齐（见 design.md §验证），本地静态检查与定向用例 | 完成 |
+| RFC-016-T10 | 本机集群部署，PV-01…PV-18 实机验收，回填本文件与 `STATE.md` | **未执行** |
+
+## 本地验证（T9，2026-09-21）
+
+`arch:check` 通过（54 个单元、1846 个源码文件）。`typecheck`、`typecheck:console`、`lint` 在本次改动涉及的全部文件上无问题。
+
+定向用例：`modules/dev-session`、`modules/session`、`packages/mcp-server`、`packages/contracts`、`packages/api-client`、`runtimes/task`、`apps/console` 合计 **874 pass／1 fail**，唯一失败是并行会话未提交的 RFC-015 集群页用例（`apps/console/src/tests/clusterManagement.test.tsx`），与本 RFC 无关。同因并行在制品，本轮**没有跑通完整 `bun run check`**：`lint` 与 `typecheck` 在 `apps/console/src/features/cluster/`、`modules/cluster-management/`、`packages/filesystem-metrics/`、`apps/cs-storage-probe/` 上报错，均非本次改动的文件。
+
+实现过程中被真实用例推翻的三处初版设计，已逐条回填进 design.md：`attempt` 不能复用 `restarts`、缓冲不做对不上号的脱敏、`asPreviewStatusResult` 变成死代码而非仍被事件路径需要。
 
 ## 验收清单
 
-未执行。每项须记录实际观察，不得由代码推断。
+**未执行**：以下各项需要本机集群上的真实开发会话，本轮只完成代码与自动化用例。每项须记录实际观察，不得由代码推断。
 
 ### Agent 自主修复链（经操作 MCP，真实开发会话）
 

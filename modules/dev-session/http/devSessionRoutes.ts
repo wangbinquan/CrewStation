@@ -3,6 +3,7 @@ import { OpenDevSessionRequestSchema, ProjectIdSchema, PublishDevSessionRequestS
 import { ComparisonDetailQuerySchema, ComparisonTargetSchema } from '@crewstation/contracts';
 import { ApiInvocationRequestSchema } from '@crewstation/contracts';
 import { RebuildDevSessionRequestSchema } from '@crewstation/contracts';
+import { PreviewActionSchema, PreviewLogsQuerySchema } from '@crewstation/contracts';
 import type { AppEnv } from '@crewstation/http';
 import { actorFrom, parseBody, parseParams, parseQuery } from '@crewstation/http';
 import type { Context } from 'hono';
@@ -22,6 +23,18 @@ export function devSessionRoutes(api: DevSessionModuleApi, isAdmin: (userId: Use
   r.get('/v1/projects/:projectId/dev-session/rebuild', async (c) => { c.header('cache-control', 'no-store'); return c.json(await api.inspectSessionRebuild(await actor(c), parseParams(c, projectParams).projectId)); });
   r.post('/v1/projects/:projectId/dev-session/rebuild', async (c) => c.json(await api.rebuildSession(await actor(c), parseParams(c, projectParams).projectId, await parseBody(c, RebuildDevSessionRequestSchema)), 202));
   r.get('/v1/projects/:projectId/dev-session/workspace-status', async (c) => c.json(await api.workspaceStatus(await actor(c), parseParams(c, projectParams).projectId as ProjectId)));
+  // RFC-016 预览进程：工作台、CLI 与操作 MCP 共用这一条入口，授权判定只有用例层一处。
+  r.get('/v1/projects/:projectId/dev-session/preview', async (c) => { c.header('cache-control', 'no-store'); return c.json(await api.previewStatus(await actor(c), parseParams(c, projectParams).projectId as ProjectId)); });
+  r.get('/v1/projects/:projectId/dev-session/preview/logs', async (c) => {
+    c.header('cache-control', 'no-store');
+    return c.json(await api.previewLogs(await actor(c), parseParams(c, projectParams).projectId as ProjectId, parseQuery(c, PreviewLogsQuerySchema)));
+  });
+  // 一条参数化路由而不是三条字面量：动作由契约枚举校验，不合法的动作得到点名三种取值的 400，
+  // 也让客户端构造出的路径与后端声明逐段对得上（接口面锁 `platformSurface.test.ts`）。
+  r.post('/v1/projects/:projectId/dev-session/preview/:action', async (c) => {
+    const params = parseParams(c, projectParams.extend({ action: PreviewActionSchema }));
+    return c.json(await api.controlPreview(await actor(c), params.projectId as ProjectId, params.action));
+  });
   r.post('/v1/projects/:projectId/dev-session/api-invocations', async (c) => { c.header('cache-control', 'no-store'); return c.json(await api.invokeApi(await actor(c), parseParams(c, projectParams).projectId as ProjectId, await parseBody(c, ApiInvocationRequestSchema))); });
   r.get('/v1/projects/:projectId/dev-session/version-comparison', async (c) => {
     const query = parseQuery(c, z.object({ target: ComparisonTargetSchema.default('prod') }));

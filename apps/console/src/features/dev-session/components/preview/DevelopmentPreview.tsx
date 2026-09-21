@@ -10,9 +10,13 @@ export function DevelopmentPreview({ preview, previewHost, connected, logs }: { 
   const t = useT();
   const [generation, setGeneration] = useState(0);
   const url = connected && preview.confirmed ? previewUrl(previewHost, preview.status.state) : undefined;
+  const running = preview.status.state === 'starting' || preview.status.state === 'ready';
   return <section className={styles.preview} aria-busy={preview.busy}>
     <header><strong>{t('devSession.native.developmentPreview')}</strong><span>{t(!connected || !preview.confirmed ? 'devSession.native.lifecycle.unknown' : `devSession.previewState.${preview.status.state}`)}</span>
-      <Button variant="ghost" disabled={!connected || preview.busy} onClick={() => { setGeneration((value) => value + 1); preview.refresh(); }}>{t('devSession.preview.refresh')}</Button><Button variant="ghost" disabled={!connected || preview.busy} onClick={preview.restart}>{t('devSession.preview.restart')}</Button>
+      <Button variant="ghost" disabled={!connected || preview.busy} onClick={() => { setGeneration((value) => value + 1); preview.refresh(); }}>{t('devSession.preview.refresh')}</Button><Button variant="ghost" disabled={!connected || preview.busy} onClick={() => preview.run('restart')}>{t('devSession.preview.restart')}</Button>
+      {running
+        ? <Button variant="ghost" disabled={!connected || preview.busy} onClick={() => preview.run('stop')}>{t('devSession.preview.stop')}</Button>
+        : <Button variant="ghost" disabled={!connected || preview.busy || preview.status.state === 'disabled'} onClick={() => preview.run('start')}>{t('devSession.preview.start')}</Button>}
       {logs}
       {url ? <a href={url} target="_blank" rel="noreferrer">{t('devSession.native.openPreview')}</a> : null}
     </header>

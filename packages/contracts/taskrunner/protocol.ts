@@ -37,6 +37,11 @@ export const RunnerHelloSchema = z.object({
     pty: z.boolean(),
     preview: z.boolean(),
     apiInvocations: z.literal(1).optional(),
+    /**
+     * RFC-016：懂 startPreview／stopPreview／previewLogs。用能力位而不是升协议版本——
+     * 开发会话是长活对象，升版会让集群里正跑的旧镜像容器握手即被拒，等于强制所有人释放会话。
+     */
+    previewControl: z.literal(1).optional(),
     /** 容器内实际可用的脚本解释器清单；缺少所需语言的启动在执行前被拒。 */
     interpreters: z.array(RunnerInterpreterSchema).optional(),
   }),
@@ -114,6 +119,12 @@ export const ProbeTerminalResultSchema = z.object({
   }).optional(),
 });
 
+/**
+ * RFC-016 预览输出缓冲的界（Runner 侧内存，不持久化）。
+ * `maxBytes` 与 exec 结果的上限取齐，不引入第二套尺度；行数与字节数任一触顶都从头丢弃。
+ */
+export const PREVIEW_LOG_LIMITS = { maxLines: 2000, maxBytes: 256 * 1024, maxLineBytes: 8 * 1024, defaultLimit: 200 } as const;
+
 export const RunnerCommandSchema = z.discriminatedUnion('type', [
   StartAgentCommandSchema,
   StartAgentTerminalCommandSchema,
@@ -142,12 +153,25 @@ export const RunnerCommandSchema = z.discriminatedUnion('type', [
   z.object({ ...cmd('fetchComparisonHistory'), url: z.string().min(1), targetSha: GitObjectIdSchema.optional() }),
   z.object({ ...cmd('previewStatus') }),
   z.object({ ...cmd('restartPreview') }),
+  z.object({ ...cmd('startPreview') }),
+  z.object({ ...cmd('stopPreview') }),
+  z.object({ ...cmd('previewLogs'), limit: z.number().int().min(1).max(PREVIEW_LOG_LIMITS.maxLines).default(PREVIEW_LOG_LIMITS.defaultLimit), stream: z.enum(['stdout', 'stderr']).optional() }),
   z.object({ ...cmd('verifyContract'), subtaskId: SubtaskIdSchema, contract: OutputContractSchema, cwd: z.string().optional() }),
   z.object({ ...cmd('shutdown'), graceSeconds: z.number().int().min(0).max(300).default(30) }),
 ]);
 
 export const FileEntrySchema = z.object({ name: z.string(), kind: z.enum(['file', 'dir', 'symlink', 'other']), size: z.number().int().min(0), modifiedAt: z.iso.datetime() });
 export const PreviewStateSchema = z.enum(['disabled', 'stopped', 'starting', 'ready', 'crashed']);
+
+/** 一行预览进程输出；`attempt` 是写入时的第几次运行，跨重启保留，用来区分崩溃前后的输出。 */
+export const PreviewLogLineSchema = z.object({
+  at: z.iso.datetime(),
+  stream: z.enum(['stdout', 'stderr']),
+  attempt: z.number().int().min(1),
+  text: z.string(),
+  /** 单行超过 maxLineBytes 被截断。 */
+  truncated: z.boolean().optional(),
+});
 
 export const RunnerResultPayloads = {
   invokeApi: ApiInvocationResultSchema,
@@ -164,6 +188,8 @@ export const RunnerResultPayloads = {
   readFile: z.object({ path: z.string(), content: z.string(), version: z.string(), size: z.number().int().min(0) }),
   writeFile: z.object({ path: z.string(), version: z.string() }),
   previewStatus: z.object({ state: PreviewStateSchema, port: z.number().int().optional(), restarts: z.number().int().min(0), lastError: z.string().optional() }),
+  /** `dropped` 是自会话开始被挤掉的行数；`attempt` 是当前运行序号，与行上的 attempt 同源。 */
+  previewLogs: z.object({ lines: z.array(PreviewLogLineSchema), dropped: z.number().int().min(0), attempt: z.number().int().min(1) }),
   verifyContract: z.object({ ok: z.boolean(), missing: z.array(z.string()), schemaErrors: z.array(z.string()) }),
   /** exec 且 wait=true 的结果；stdout/stderr 各最多 256 KiB，超出即 truncated。 */
   exec: z.object({ execId: z.string(), exitCode: z.number().int().nullable(), stdout: z.string(), stderr: z.string(), durationMs: z.number().int().min(0), truncated: z.boolean() }),
@@ -211,4 +237,7 @@ export type RunnerEvent = z.infer<typeof RunnerEventSchema>;
 export type RunnerMessage = z.infer<typeof RunnerMessageSchema>;
 export type SessionMessage = z.infer<typeof SessionMessageSchema>;
 export type PreviewState = z.infer<typeof PreviewStateSchema>;
+export type PreviewLogLine = z.infer<typeof PreviewLogLineSchema>;
+export type PreviewStatusPayload = z.infer<(typeof RunnerResultPayloads)['previewStatus']>;
+export type PreviewLogsPayload = z.infer<(typeof RunnerResultPayloads)['previewLogs']>;
 export type FileEntry = z.infer<typeof FileEntrySchema>;

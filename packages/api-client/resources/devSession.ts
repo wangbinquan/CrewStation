@@ -5,6 +5,7 @@ import type { SaveWorkspaceLayoutRequest, WorkspaceLayoutDto } from '@crewstatio
 import type { AgentActivityPage, AgentActivityQuery, ReadAgentActivityRequest } from '@crewstation/contracts';
 import type { ApiInvocationRequest, ApiInvocationResponse } from '@crewstation/contracts';
 import type { DevSessionRebuildDto, DevSessionRebuildInspection, RebuildDevSessionRequest } from '@crewstation/contracts';
+import type { PreviewAction, PreviewLogsDto, PreviewLogsQuery, PreviewStatusDto } from '@crewstation/contracts';
 import { API_INVOCATION_TIMEOUT_MS } from '@crewstation/contracts';
 import type { Transport } from '../httpTransport';
 import type { ItemsPage } from '../itemsPage';
@@ -41,6 +42,15 @@ export interface DevSessionResource {
   getNativeTerminalSnapshot(taskId: string, agentId: string): Promise<NativeTerminalSnapshotDto>;
   /** GET /v1/projects/:projectId/dev-session；没有会话时抛 not_found（404）。 */
   get(projectId: string): Promise<DevSessionDto>;
+  /**
+   * RFC-016 开发容器里的预览进程（**不是 preview 部署槽**）。
+   * 读需要项目 view，控制需要 develop；容器未连接时抛 precondition，不返回 stopped。
+   */
+  previewStatus(projectId: string): Promise<PreviewStatusDto>;
+  /** start／restart 只保证命令已受理，`ready` 要等健康探测，返回里通常仍是 `starting`。 */
+  controlPreview(projectId: string, action: PreviewAction): Promise<PreviewStatusDto>;
+  /** 预览进程自己的最近输出；跨重启保留，按 `attempt` 区分是哪一次运行。 */
+  previewLogs(projectId: string, query?: Partial<PreviewLogsQuery>): Promise<PreviewLogsDto>;
   /** 只读、无副作用的释放／发布前检查；无会话 404，断线或 Git 失败返回 unavailable。 */
   workspaceStatus(projectId: string): Promise<WorkspaceStatusDto>;
   versionComparison(projectId: string, target?: ComparisonTarget): Promise<VersionComparisonDto>;
@@ -68,6 +78,7 @@ export interface DevSessionResource {
 
 export function devSessionResource(transport: Transport): DevSessionResource {
   const project = (projectId: string) => `/v1/projects/${segment(projectId)}`;
+  const preview = (projectId: string) => `${project(projectId)}/dev-session/preview`;
   const agents = (taskId: string) => `/v1/tasks/${segment(taskId)}/agents`;
   const terminals = (taskId: string) => `/v1/tasks/${segment(taskId)}/agent-terminals`;
   return {
@@ -83,6 +94,9 @@ export function devSessionResource(transport: Transport): DevSessionResource {
     stopNativeTerminal: (taskId, agentId) => transport.request('POST', `${terminals(taskId)}/${segment(agentId)}/stop`),
     getNativeTerminalSnapshot: (taskId, agentId) => transport.request('GET', `${terminals(taskId)}/${segment(agentId)}/snapshot`),
     get: (projectId) => transport.request<DevSessionDto>('GET', `${project(projectId)}/dev-session`),
+    previewStatus: (projectId) => transport.request<PreviewStatusDto>('GET', `${preview(projectId)}`),
+    controlPreview: (projectId, action) => transport.request<PreviewStatusDto>('POST', `${preview(projectId)}/${action}`),
+    previewLogs: (projectId, query) => transport.request<PreviewLogsDto>('GET', `${preview(projectId)}/logs`, { query }),
     workspaceStatus: (projectId) => transport.request<WorkspaceStatusDto>('GET', `${project(projectId)}/dev-session/workspace-status`),
     versionComparison: (projectId, target) => transport.request<VersionComparisonDto>('GET', `${project(projectId)}/dev-session/version-comparison`, { query: { target } }),
     versionComparisonDetails: (projectId, comparisonId, query) => transport.request<ComparisonDetails>('GET', `${project(projectId)}/dev-session/version-comparisons/${segment(comparisonId)}`, { query }),

@@ -30,7 +30,6 @@ export function editorWorkspaceFixture() {
         if (!files.has(command.path)) { queueMicrotask(() => this.receive({ type: 'error', id: command.id, code: 'not_found', message: `文件不存在：${command.path}` })); return; }
         payload = { path: command.path, content: files.get(command.path), version: 'version-1', size: 10 };
       }
-      else if (command.type === 'previewStatus') payload = preview;
       else if (command.type === 'writeFile') {
         pendingWrite = (failure) => {
           if (failure) { this.receive({ type: 'error', id: command.id, ...failure }); return; }
@@ -53,6 +52,9 @@ export function editorWorkspaceFixture() {
     else if (path.endsWith('/agent-activity')) body = { ...f.page, states: [], items: [], unread: [] };
     else if (path.endsWith('/version-comparison')) { status = 503; body = { error: 'unavailable', message: '比较暂不可用，编辑器仍可使用' }; }
     else if (path.endsWith('/workspace-status')) body = { status: 'ready', taskId: activityTaskId, branch: 'main', headSha: 'a'.repeat(40), checkedAt: activityTime, shallow: false, fingerprint: 'fp', uncommitted: [], uncommittedCount: 0, uncommittedTruncated: false, unpushed: { status: 'ready', count: 0, commits: [], truncated: false }, upstream: { status: 'missing' } };
+    // RFC-016：预览状态与控制走 cs-api，不再是任务流命令；控制动作回最新状态。
+    else if (/\/dev-session\/preview(\/(start|stop|restart))?$/.test(path)) body = { taskId: activityTaskId, previewHost: 'preview.localhost', ...preview, ...(preview.state === 'ready' ? { url: '//preview.localhost' } : {}) };
+    else if (path.endsWith('/dev-session/preview/logs')) body = { taskId: activityTaskId, lines: [], dropped: 0, attempt: 1 };
     else if (path.endsWith('/dev-session')) body = { taskId: activityTaskId, projectId: activityProjectId, createdBy: activityUserId, branch: 'main', ...sessionState, lastActivityAt: activityTime, previewHost: 'preview.localhost' };
     return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
   }) as typeof fetch;

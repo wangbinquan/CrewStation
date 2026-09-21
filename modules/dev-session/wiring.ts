@@ -23,6 +23,7 @@ import { nativeTerminalUseCases, clusterNativeUseCases } from './application/nat
 import type { DevSessionUseCaseDeps } from './application/dependencies';
 import { idleReminderUseCase } from './application/idleReminder';
 import { publishFromSessionUseCase } from './application/publishFromSession';
+import { previewControlUseCases } from './application/previewControl';
 import { rebuildSessionUseCases, sessionLifecycleUseCases } from './application/sessionLifecycle';
 import { workspaceStatusUseCase } from './application/workspaceStatus';
 import { versionComparisonUseCases } from './application/versionComparison';
@@ -88,7 +89,7 @@ export function createDevSessionModule(deps: DevSessionModuleDeps): DevSessionMo
     // 子 Runner 连上时由组合根调用：headless Agent 的执行环境先认领，其余按「＋ CLI」处理（RFC-006）。
     dispatchPendingNativeExecution: async (executionTaskId) => { if (!(await agentExecutions.dispatchExecution(executionTaskId))) await native.dispatchPendingNativeExecution(executionTaskId); },
     reconcileNativeExecutions: async () => { await Promise.all([native.reconcileNativeExecutions(), agentExecutions.sweep()]); },
-    ...rebuildSessionUseCases(useCaseDeps),
+    ...rebuildSessionUseCases(useCaseDeps), ...previewControlUseCases(useCaseDeps),
     ...versionComparisonUseCases(useCaseDeps), workspaceStatus: workspaceStatusUseCase(useCaseDeps), publish: publishFromSessionUseCase(useCaseDeps), sendIdleReminders: remind,
     async listNativeTerminals(actor, taskId) {
       const pageQuery = boundedNativeRead(activity.getAgentActivity(actor, taskId, { limit: 1 })).catch((error: unknown) => {

@@ -6,31 +6,9 @@ import type { OperationsContext } from './operationsContext';
 
 const tool = toolFactory<OperationsContext>();
 
-/** 预览与日志：只读，供 Agent 自查刚做的改动有没有跑起来。 */
+/** 平台聚合日志：只读。预览进程的状态与输出在 previewTools.ts，那是 Runner 内存里的东西，不是这里的日志源。 */
 export function observabilityTools(): Array<McpToolDefinition<OperationsContext>> {
-  return [readPreviewStatus(), tailLogs()];
-}
-
-function readPreviewStatus(): McpToolDefinition<OperationsContext> {
-  return tool({
-    name: 'read_preview_status',
-    title: '查看预览状态',
-    description: [
-      '一次看两件事：开发会话里预览进程的守护状态与预览地址，以及 preview／prod 两个部署槽当前是哪个 Release、副本是否就绪。',
-      '改完代码先看这里，再决定要不要发布。',
-    ].join(''),
-    input: {},
-    run: async (_args, ctx) => {
-      const project = await ctx.project();
-      const client = ctx.client();
-      const session = await client.devSession.get(project.projectId);
-      const slots = await client.services.listSlots(project.serviceId);
-      return {
-        devSession: { state: session.state, branch: session.branch, previewHost: session.previewHost, preview: session.preview },
-        slots: slots.items,
-      };
-    },
-  });
+  return [tailLogs()];
 }
 
 function tailLogs(): McpToolDefinition<OperationsContext> {

@@ -1,16 +1,27 @@
 import type { PreviewStatusResult } from '@crewstation/api-client';
+import type { PreviewAction } from '@crewstation/contracts';
 import { RunnerEventSchema } from '@crewstation/contracts';
+import { errorMessage } from '../../../../shared/api/useApi';
 import type { TaskStreamChannel } from '../../hooks/useTaskStream';
 import { UNKNOWN_PREVIEW, applyPreviewEvent } from '../previewSnapshot';
-import { asPreviewStatusResult } from '../runnerResults';
-import { streamErrorMessage } from '../runnerErrors';
+
+/**
+ * RFC-016：状态读取与控制走 cs-api，与操作 MCP、CLI 同一条路由、同一处授权判定。
+ * 事件仍从任务流来（见 `activate`），所以实时性不受影响。
+ */
+export interface PreviewCommands {
+  status(): Promise<PreviewStatusResult>;
+  control(action: PreviewAction): Promise<PreviewStatusResult>;
+}
 
 interface PreviewSnapshot {
   readonly status: PreviewStatusResult;
   readonly busy: boolean;
   readonly confirmed: boolean;
   readonly loadError?: string;
-  readonly restartError?: string;
+  /** 上一次控制动作没能确认；`actionLabel` 用来在文案里说清是哪个动作。 */
+  readonly actionError?: string;
+  readonly actionLabel?: PreviewAction;
 }
 
 /** 一个连接世代的预览事实；快照不得覆盖请求发出后收到的状态事件。 */
@@ -21,7 +32,11 @@ export class PreviewStatusStore {
   private ticket = 0;
   private eventRevision = 0;
   private unsubscribe: (() => void) | undefined;
-  constructor(private readonly channel: TaskStreamChannel, private readonly source: { connected: boolean; generation: number }) {}
+  constructor(
+    private readonly channel: Pick<TaskStreamChannel, 'subscribe'>,
+    private readonly commands: PreviewCommands,
+    private readonly source: { connected: boolean; generation: number },
+  ) {}
   getSnapshot = (): PreviewSnapshot => this.state;
   subscribe = (listener: () => void): (() => void) => { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; };
   private update(patch: Partial<PreviewSnapshot>): void {
@@ -48,23 +63,26 @@ export class PreviewStatusStore {
     if (!this.current(ticket)) return;
     const revision = this.eventRevision;
     try {
-      const status = asPreviewStatusResult(await this.channel.send({ type: 'previewStatus' }));
+      const status = await this.commands.status();
       if (this.current(ticket) && revision === this.eventRevision) this.update({ status, confirmed: true, loadError: undefined });
     } catch (cause) {
-      if (this.current(ticket) && revision === this.eventRevision) this.update({ confirmed: false, loadError: streamErrorMessage(cause) });
+      if (this.current(ticket) && revision === this.eventRevision) this.update({ confirmed: false, loadError: errorMessage(cause) });
     } finally { if (this.current(ticket)) this.update({ busy: false }); }
   }
   refresh = (): void => {
     if (!this.active || !this.source.connected || this.state.busy) return;
     this.update({ busy: true }); void this.read(++this.ticket);
   };
-  restart = (): void => {
+  run = (action: PreviewAction): void => {
     if (!this.active || !this.source.connected || this.state.busy) return;
-    this.update({ busy: true, confirmed: false, restartError: undefined }); void this.runRestart(++this.ticket);
+    this.update({ busy: true, confirmed: false, actionError: undefined, actionLabel: undefined });
+    void this.runAction(++this.ticket, action);
   };
-  private async runRestart(ticket: number): Promise<void> {
-    try { await this.channel.send({ type: 'restartPreview' }); }
-    catch (cause) { if (this.current(ticket)) this.update({ restartError: streamErrorMessage(cause) }); }
+  private async runAction(ticket: number, action: PreviewAction): Promise<void> {
+    // 动作的回执也带状态，但这里仍统一回读一次：`read` 里有「不得覆盖请求发出后到达的事件」那道判定，
+    // 直接用回执会绕过它。多一次往返换掉一类竞态，值得。
+    try { await this.commands.control(action); }
+    catch (cause) { if (this.current(ticket)) this.update({ actionError: errorMessage(cause), actionLabel: action }); }
     finally { if (this.current(ticket)) await this.read(ticket); }
   }
 }

@@ -56,11 +56,73 @@ describe('预览监督', () => {
     expect(session.eventsOf('previewState').filter((e) => e.event.state === 'starting')).toHaveLength(3);
   }, 20_000);
 
-  test('未配置预览：状态 disabled，restartPreview 报 preview_disabled', async () => {
+  test('未配置预览：状态 disabled，四条控制命令都报 preview_disabled', async () => {
     const { session } = await boot();
+    expect(session.hellos[0]?.capabilities.previewControl).toBe(1);
     expect(await session.call({ id: 'v5', type: 'previewStatus' })).toEqual({ state: 'disabled', restarts: 0 });
-    expect(await failureCode(session.call({ id: 'v6', type: 'restartPreview' }))).toBe('preview_disabled');
+    for (const [id, type] of [['v6', 'restartPreview'], ['v7', 'startPreview'], ['v8', 'stopPreview']] as const) {
+      expect(await failureCode(session.call({ id, type }))).toBe('preview_disabled');
+    }
+    // 读日志不报 preview_disabled：没有预览就是没有输出，空结果比报错更好用。
+    expect(RunnerResultPayloads.previewLogs.parse(await session.call({ id: 'v9', type: 'previewLogs', limit: 10 }))).toEqual({ lines: [], dropped: 0, attempt: 1 });
   });
+
+  test('stopPreview 停住且不自动拉起，startPreview 重新起来；已在跑再 start 被拒', async () => {
+    const port = freePort();
+    const serve = `Bun.serve({ port: ${port}, fetch: () => new Response('ok') }); console.log('preview listening');`;
+    const { session } = await boot({
+      preview: { command: ['bun', '-e', serve], port, healthPath: '/' },
+      previewPolicy: { maxRestarts: 5, baseDelayMs: 10, pollIntervalMs: 20, probeTimeoutMs: 500 },
+    });
+    await session.waitForEvent('previewState', (e) => e.state === 'ready', 15_000);
+    expect(await failureCode(session.call({ id: 's1', type: 'startPreview' }))).toBe('preview_already_running');
+
+    expect(await session.call({ id: 's2', type: 'stopPreview' })).toEqual({});
+    await session.waitForEvent('previewState', (e) => e.state === 'stopped', 10_000);
+    // 退避上限是 10ms：等足够久，自动重启若还在生效这里就会看到 starting。
+    await Bun.sleep(300);
+    expect(RunnerResultPayloads.previewStatus.parse(await session.call({ id: 's3', type: 'previewStatus' })).state).toBe('stopped');
+
+    expect(await session.call({ id: 's4', type: 'startPreview' })).toEqual({});
+    await session.waitFor(() => (session.eventsOf('previewState').filter((e) => e.event.state === 'ready').length >= 2 ? true : undefined), 15_000, 'ready again');
+    expect(RunnerResultPayloads.previewStatus.parse(await session.call({ id: 's5', type: 'previewStatus' }))).toMatchObject({ state: 'ready', restarts: 0 });
+  }, 40_000);
+
+  test('previewLogs 取预览自己的输出，跨重启保留并按 attempt 分辨', async () => {
+    const port = freePort();
+    const serve = `console.log('boot'); console.error('warming'); Bun.serve({ port: ${port}, fetch: () => new Response('ok') });`;
+    const { session } = await boot({ preview: { command: ['bun', '-e', serve], port, healthPath: '/' } });
+    let call = 0;
+    const readLogs = (extra: Record<string, unknown> = {}) => session.call({ id: `l${(call += 1)}`, type: 'previewLogs', limit: 50, ...extra })
+      .then((payload) => RunnerResultPayloads.previewLogs.parse(payload));
+    // 就绪由健康探测判定，stdout 的行可能还在管道里；等到缓冲里真出现目标行再断言。
+    const until = async (want: (p: Awaited<ReturnType<typeof readLogs>>) => boolean) => {
+      const deadline = Date.now() + 10_000;
+      for (;;) {
+        const payload = await readLogs();
+        if (want(payload) || Date.now() > deadline) return payload;
+        await Bun.sleep(20);
+      }
+    };
+
+    await session.waitForEvent('previewState', (e) => e.state === 'ready', 15_000);
+    const first = await until((p) => p.lines.some((line) => line.text === 'boot'));
+    expect(first.attempt).toBe(1);
+    expect(first.lines.map((line) => line.text)).toContain('boot');
+    expect(first.lines.every((line) => line.attempt === 1)).toBe(true);
+    expect(first.dropped).toBe(0);
+
+    await session.call({ id: 'restart-logs', type: 'restartPreview' });
+    await session.waitFor(() => (session.eventsOf('previewState').filter((e) => e.event.state === 'ready').length >= 2 ? true : undefined), 15_000, 'second ready');
+    const second = await until((p) => p.lines.some((line) => line.attempt === 2));
+    // 第一次运行的行没有被清掉，这正是崩溃后还能查到原因的依据。
+    expect(second.lines.filter((line) => line.attempt === 1).length).toBeGreaterThan(0);
+    expect(second.lines.filter((line) => line.attempt === 2).length).toBeGreaterThan(0);
+    expect((await readLogs({ limit: 1 })).lines).toHaveLength(1);
+    const stderrOnly = await readLogs({ stream: 'stderr' });
+    expect(stderrOnly.lines.every((line) => line.stream === 'stderr')).toBe(true);
+    expect(stderrOnly.lines.map((line) => line.text)).toContain('warming');
+  }, 40_000);
 });
 
 describe('verifyContract', () => {

@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { matchesOperationPath } from '../gateway/allowlist';
-import { RunnerCommandSchema, RunnerMessageSchema, TASKRUNNER_PROTOCOL_VERSION } from './protocol';
+import { PREVIEW_LOG_LIMITS, RunnerCommandSchema, RunnerMessageSchema, RunnerResultPayloads, TASKRUNNER_PROTOCOL_VERSION } from './protocol';
 
 const beforeStart = { profile: '01a0bf5d-8f4b-7c09-8050-88ba5b806778', revision: 3, contentHash: 'h', steps: [], vars: {}, secrets: {}, configFile: { kind: 'none' }, captureOutput: false };
 const startAgent = { id: 'c1', type: 'startAgent', agentId: 'a1', compute: '01a0bf5d-8f4b-7c09-8050-88ba5b806778', profileRevision: 3, launch: { protocol: 'claude-code', binaryPath: '/usr/local/bin/claude' }, permission: 'edit', mode: 'interactive', beforeStart, processAttemptId: 'a1:1' };
@@ -34,6 +34,29 @@ describe('TaskRunner 协议', () => {
   });
   test('未知命令类型被拒', () => {
     expect(RunnerCommandSchema.safeParse({ id: 'c1', type: 'format-disk' }).success).toBe(false);
+  });
+  test('RFC-016：预览控制三条命令与 previewLogs 的上下界', () => {
+    for (const type of ['startPreview', 'stopPreview'] as const) {
+      expect(RunnerCommandSchema.safeParse({ id: 'c1', type }).success, type).toBe(true);
+    }
+    const parsed = RunnerCommandSchema.parse({ id: 'c1', type: 'previewLogs' });
+    expect(parsed.type === 'previewLogs' && parsed.limit).toBe(PREVIEW_LOG_LIMITS.defaultLimit);
+    expect(parsed.type === 'previewLogs' && parsed.stream).toBeUndefined();
+    expect(RunnerCommandSchema.safeParse({ id: 'c1', type: 'previewLogs', limit: PREVIEW_LOG_LIMITS.maxLines }).success).toBe(true);
+    expect(RunnerCommandSchema.safeParse({ id: 'c1', type: 'previewLogs', limit: PREVIEW_LOG_LIMITS.maxLines + 1 }).success).toBe(false);
+    expect(RunnerCommandSchema.safeParse({ id: 'c1', type: 'previewLogs', limit: 0 }).success).toBe(false);
+    expect(RunnerCommandSchema.safeParse({ id: 'c1', type: 'previewLogs', stream: 'both' }).success).toBe(false);
+  });
+  test('RFC-016：previewLogs 结果逐行带 attempt；previewControl 是可选能力位，缺席即旧容器', () => {
+    const line = { at: new Date().toISOString(), stream: 'stderr', attempt: 2, text: 'boom', truncated: true };
+    expect(RunnerResultPayloads.previewLogs.safeParse({ lines: [line], dropped: 3, attempt: 2 }).success).toBe(true);
+    expect(RunnerResultPayloads.previewLogs.safeParse({ lines: [line], dropped: 0, attempt: 0 }).success).toBe(false);
+    expect(RunnerResultPayloads.previewLogs.safeParse({ lines: [{ ...line, stream: 'combined' }], dropped: 0, attempt: 1 }).success).toBe(false);
+    const capabilities = { protocols: ['claude-code'], pty: true, preview: true };
+    const hello = { type: 'hello', protocolVersion: TASKRUNNER_PROTOCOL_VERSION, taskId: Bun.randomUUIDv7(), runnerToken: 't', workdir: '/work' };
+    expect(RunnerMessageSchema.safeParse({ ...hello, capabilities }).success).toBe(true);
+    expect(RunnerMessageSchema.safeParse({ ...hello, capabilities: { ...capabilities, previewControl: 1 } }).success).toBe(true);
+    expect(RunnerMessageSchema.safeParse({ ...hello, capabilities: { ...capabilities, previewControl: 2 } }).success).toBe(false);
   });
   test('事件帧解析', () => {
     const msg = RunnerMessageSchema.parse({ type: 'event', seq: 1, at: new Date().toISOString(), event: { kind: 'terminalOutput', terminalId: 't1', data: 'hi' } });

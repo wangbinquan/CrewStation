@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { IDENTITY_HEADERS } from '@crewstation/contracts';
+import { IDENTITY_HEADERS, PREVIEW_LOG_LIMITS } from '@crewstation/contracts';
 import type { McpToolDefinition, OperationsContext } from '../index';
 import { createMcpApp, operationsContextFor, operationsServerDefinition } from '../index';
 import type { CapturedRequest } from './fakePlatform';
@@ -9,6 +9,7 @@ import {
 
 const PLATFORM = 'http://api.svc.cs.internal';
 const INTERNAL = 'http://api.svc.cs.internal/api/';
+const TASK_ID = '01a0bf5d-8f4b-75cd-8578-3f54c85da51e';
 
 const DEFINITION = operationsServerDefinition('0.1.0');
 const toolNamed = (name: string): McpToolDefinition<OperationsContext> => {
@@ -22,7 +23,12 @@ function route(request: CapturedRequest): Response {
   if (path === '/v1/projects') return jsonResponse(200, projectPage());
   if (path === `/v1/projects/${PROJECT_ID}/publish`) return jsonResponse(202, { id: '01a0bf5d-8f4b-7033-8d68-9e5bbb2ec163', tag: 'v0.1.1', status: 'building' });
   if (path === `/v1/projects/${PROJECT_ID}/branches`) return jsonResponse(200, { items: [{ name: 'main', headSha: 'abc1234', isDefault: true, behindPreview: 0, behindProd: 2 }] });
-  if (path === `/v1/projects/${PROJECT_ID}/dev-session`) return jsonResponse(200, { state: 'running', branch: 'main', previewHost: 'dev.demo.cs.localhost', preview: { state: 'ready' } });
+  if (path === `/v1/projects/${PROJECT_ID}/dev-session`) return jsonResponse(200, { state: 'running', branch: 'main', previewHost: 'dev.demo.cs.localhost', preview: 'ready' });
+  if (path === `/v1/projects/${PROJECT_ID}/dev-session/preview`) return jsonResponse(200, { taskId: TASK_ID, state: 'crashed', port: 3000, restarts: 5, lastError: 'exited with code 7', previewHost: 'dev.demo.cs.localhost' });
+  if (path.startsWith(`/v1/projects/${PROJECT_ID}/dev-session/preview/logs`)) return jsonResponse(200, { taskId: TASK_ID, lines: [{ at: '2026-09-21T00:00:00.000Z', stream: 'stderr', attempt: 2, text: 'boom' }], dropped: 4, attempt: 2 });
+  for (const action of ['start', 'stop', 'restart']) {
+    if (path === `/v1/projects/${PROJECT_ID}/dev-session/preview/${action}`) return jsonResponse(200, { taskId: TASK_ID, state: action === 'stop' ? 'stopped' : 'starting', port: 3000, restarts: 0, previewHost: 'dev.demo.cs.localhost' });
+  }
   if (path === `/v1/services/${SERVICE_ID}/slots`) return jsonResponse(200, { items: [{ name: 'preview', active: false, state: 'ready' }, { name: 'prod', active: true, state: 'ready' }] });
   if (path.startsWith(`/v1/projects/${PROJECT_ID}/logs`)) return jsonResponse(200, { items: [{ ts: '2026-09-11T00:00:00.000Z', source: 'slot', stream: 'stdout', message: 'hello' }] });
   if (path.startsWith('/v1/catalog/operations')) return jsonResponse(200, { items: [operation('gitlab', '/projects', true), operation('crm', '/customers', false)] });
@@ -46,11 +52,19 @@ const call = (app: ReturnType<typeof appFor>['app'], name: string, args: unknown
   rpc(app, { jsonrpc: '2.0', id: nextId++, method: 'tools/call', params: { name, arguments: args } }, { headers });
 
 describe('操作 MCP：工具目录', () => {
-  test('暴露六个工具，名字与顺序固定', () => {
+  test('暴露八个工具，名字与顺序固定', () => {
     expect(DEFINITION.tools.map((tool) => tool.name)).toEqual([
-      'publish_release', 'list_branches', 'list_internal_apis', 'call_internal_api', 'read_preview_status', 'tail_logs',
+      'publish_release', 'list_branches', 'list_internal_apis', 'call_internal_api',
+      'read_preview_status', 'control_preview', 'read_preview_logs', 'tail_logs',
     ]);
     expect(DEFINITION.resources).toHaveLength(0);
+  });
+
+  test('预览三工具都说清与部署槽的区别，控制与日志还写明改 Manifest 要重建会话', () => {
+    for (const name of ['read_preview_status', 'control_preview', 'read_preview_logs']) {
+      expect(toolNamed(name).description, name).toContain('部署槽');
+    }
+    expect(toolNamed('control_preview').description).toContain('重建开发会话');
   });
 
   test('每个工具都有能照着做的描述', () => {
@@ -85,6 +99,19 @@ describe('操作 MCP：入参校验', () => {
       expect(toolNamed(name).checkInput({}).ok).toBe(true);
       expect(toolNamed(name).checkInput(undefined).ok).toBe(true);
     }
+  });
+
+  test('control_preview 的动作是枚举；read_preview_logs 的上限与流向有界', () => {
+    const control = toolNamed('control_preview');
+    expect(control.checkInput({}).ok).toBe(false);
+    expect(control.checkInput({ action: 'stop' })).toEqual({ ok: true, value: { action: 'stop' } });
+    expect(control.checkInput({ action: 'kill' }).ok).toBe(false);
+    const logs = toolNamed('read_preview_logs');
+    expect(logs.checkInput({}).ok).toBe(true);
+    expect(logs.checkInput({ limit: 0 }).ok).toBe(false);
+    expect(logs.checkInput({ limit: PREVIEW_LOG_LIMITS.maxLines }).ok).toBe(true);
+    expect(logs.checkInput({ limit: PREVIEW_LOG_LIMITS.maxLines + 1 }).ok).toBe(false);
+    expect(logs.checkInput({ stream: 'combined' }).ok).toBe(false);
   });
 
   test('list_internal_apis 的 proxy 可选', () => {
@@ -185,12 +212,44 @@ describe('操作 MCP：调用路径', () => {
     expect(firstText(payload)).toContain('放行表未允许');
   });
 
-  test('read_preview_status 同时给出会话预览与两个槽', async () => {
+  test('read_preview_status 给出崩溃原因与重启次数，外加两个槽', async () => {
     const { app } = appFor();
     const { payload } = await call(app, 'read_preview_status', {});
-    const value = JSON.parse(firstText(payload)) as { devSession: { previewHost: string }; slots: Array<{ name: string; active: boolean }> };
-    expect(value.devSession.previewHost).toBe('dev.demo.cs.localhost');
+    const value = JSON.parse(firstText(payload)) as { devSession: { branch: string }; preview: Record<string, unknown>; slots: Array<{ name: string }> };
+    // 这两项是 RFC-016 的要点：此前 Agent 只能看到一个光秃秃的 crashed。
+    expect(value.preview).toMatchObject({ state: 'crashed', restarts: 5, lastError: 'exited with code 7', port: 3000 });
+    expect(value.devSession.branch).toBe('main');
     expect(value.slots.map((slot) => slot.name)).toEqual(['preview', 'prod']);
+  });
+
+  test('control_preview 三个动作各打各的路由，返回动作后的状态', async () => {
+    for (const [action, state] of [['start', 'starting'], ['stop', 'stopped'], ['restart', 'starting']] as const) {
+      const { app, platform } = appFor();
+      const { payload } = await call(app, 'control_preview', { action });
+      expect(JSON.parse(firstText(payload))).toMatchObject({ state });
+      const sent = platform.calls.find((c) => c.url.includes('/dev-session/preview/'));
+      expect(sent?.url).toBe(`${PLATFORM}/v1/projects/${PROJECT_ID}/dev-session/preview/${action}`);
+      expect(sent?.method).toBe('POST');
+      expect(sent?.headers.get(IDENTITY_HEADERS.sourceService)).toBe(CALLER_IDENTITY);
+    }
+  });
+
+  test('read_preview_logs 把上限与流向带进查询串，dropped 原样透出', async () => {
+    const { app, platform } = appFor();
+    const { payload } = await call(app, 'read_preview_logs', { limit: 25, stream: 'stderr' });
+    const value = JSON.parse(firstText(payload)) as { lines: Array<{ attempt: number; text: string }>; dropped: number };
+    expect(value.lines[0]).toMatchObject({ attempt: 2, text: 'boom' });
+    expect(value.dropped).toBe(4);
+    const sent = platform.calls.find((c) => c.url.includes('/preview/logs'));
+    expect(sent?.url).toContain('limit=25');
+    expect(sent?.url).toContain('stream=stderr');
+  });
+
+  test('read_preview_logs 不给参数时不往查询串塞空值', async () => {
+    const { app, platform } = appFor();
+    await call(app, 'read_preview_logs', {});
+    const sent = platform.calls.find((c) => c.url.includes('/preview/logs'));
+    expect(sent?.url).toBe(`${PLATFORM}/v1/projects/${PROJECT_ID}/dev-session/preview/logs`);
   });
 
   test('tail_logs 把来源与上限带进查询串', async () => {

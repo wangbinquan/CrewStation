@@ -1,5 +1,5 @@
-import type { ListFilesResult, PreviewStatusResult, ReadFileResult, WriteFileResult } from '@crewstation/api-client';
-import type { FileEntry, PreviewState } from '@crewstation/contracts';
+import type { ListFilesResult, ReadFileResult, WriteFileResult } from '@crewstation/api-client';
+import type { FileEntry } from '@crewstation/contracts';
 import { StreamCommandError } from './streamCommandQueue';
 
 /**
@@ -38,15 +38,4 @@ export function asReadFileResult(payload: unknown): ReadFileResult {
 export function asWriteFileResult(payload: unknown): WriteFileResult {
   const value = record(payload, 'writeFile');
   return { path: text(value.path), version: text(value.version) };
-}
-
-const PREVIEW_STATES: readonly PreviewState[] = ['disabled', 'stopped', 'starting', 'ready', 'crashed'];
-
-export function asPreviewStatusResult(payload: unknown): PreviewStatusResult {
-  const value = record(payload, 'previewStatus');
-  const state = PREVIEW_STATES.find((candidate) => candidate === value.state);
-  if (!state || !Number.isSafeInteger(value.restarts) || Number(value.restarts) < 0) throw new StreamCommandError('malformed_result', 'previewStatus 未返回有效预览状态，结果未确认');
-  const port = typeof value.port === 'number' ? { port: value.port } : {};
-  const lastError = typeof value.lastError === 'string' ? { lastError: value.lastError } : {};
-  return { state, restarts: count(value.restarts), ...port, ...lastError };
 }

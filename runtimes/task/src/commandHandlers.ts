@@ -58,6 +58,9 @@ export function buildCommandHandlers(targets: CommandTargets): CommandHandlers {
     fetchComparisonHistory: (c) => targets.fetchComparisonHistory(c.url, c.targetSha).then(ack),
     previewStatus: async () => targets.preview.status(),
     restartPreview: () => targets.preview.restart().then(ack),
+    startPreview: async () => { targets.preview.requestStart(); return ack(); },
+    stopPreview: () => targets.preview.requestStop().then(ack),
+    previewLogs: async (c) => targets.preview.logs({ limit: c.limit, ...(c.stream === undefined ? {} : { stream: c.stream }) }),
     verifyContract: (c) => targets.verifyContract(c),
     shutdown: async (c) => {
       targets.requestShutdown(c.graceSeconds);

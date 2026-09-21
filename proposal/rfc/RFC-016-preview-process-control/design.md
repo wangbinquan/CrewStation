@@ -1,6 +1,6 @@
 # RFC-016｜设计
 
-状态：Draft · 2026-09-21 · 待作者批准。
+状态：In Progress · 2026-09-21 · 作者已批准实施并要求提交上库。本文档已按落地实现回填，实现时推翻的三处初版判断（`attempt` 计数、脱敏、`asPreviewStatusResult` 存留）在正文中逐条写明。
 
 ## 实现定位
 
@@ -39,11 +39,13 @@ hello 的 `capabilities` 加 `previewControl: z.literal(1).optional()`，照 `ap
 `previewOutputBuffer.ts` 独立成文件，不把 `previewSupervisor.ts`（现 165 行）推向 600 行上限，也让容量与截断规则可以单独测。
 
 - 双上限：**行数 2000** 与**总字节 256 KiB**，任一触顶即从头丢弃，`dropped` 累计丢弃行数。256 KiB 与 `exec` 结果的现有上限（`protocol.ts:169`）取齐，不引入第二套尺度。
-- 单行截断到 8 KiB，截断标记进该行。
-- 每行带 `attempt`（= 写入时的 `restarts + 1`），**跨重启不清空**：崩溃前那一次的输出正是要看的东西，清掉等于把证据删了。`stopPreview` 同样不清空。
+- 单行截断到 8 KiB，按**字节**切，再用非严格解码把切开的多字节字符收成 U+FFFD 并去掉，截断标记进该行。
+- 每行带 `attempt`，**跨重启不清空**：崩溃前那一次的输出正是要看的东西，清掉等于把证据删了。`stopPreview` 同样不清空。
 - 缓冲接在 `forwardOutput`（`previewSupervisor.ts:106`）已有的行分割器上，与现有的日志转发并列，不替换它——Pod 日志侧的行为保持原样。
 
-**脱敏**：预览进程继承容器环境，输出里可能带凭据。缓冲复用终端探针那一份 `sensitiveValues` 脱敏（`runtimes/task/src/agents/terminalProbe.ts:80`）。这不构成新的暴露面（同样的文本本来就进 Pod 日志、也在开发者自己的终端里），但经 MCP 取回时会被 Agent 完整读到，所以按同一把尺子过一遍。
+**`attempt` 必须与 `restarts` 分开**（实现时发现，初版写成 `restarts + 1` 是错的）：`restart()`／`requestStart()` 会把 `restarts` 清零以恢复自动重试预算，若 `attempt` 跟着它走，显式重启前后的行就都标 `1`，缓冲跨重启保留也就白做了。因此 supervisor 另立一个**永不清零**的 `runs` 计数，每次真正拉起进程加一；`restarts` 仍只表示「自动重试烧掉了几次」并照常进 `previewStatus`。
+
+**不做脱敏。** 初版设计写的是复用终端探针那份 `sensitiveValues`，核实后不成立：那份脱敏要的是档位的 `beforeStart.secrets`，预览进程根本不从档位材料启动，没有这份清单。真正的平台凭据 `CS_RUNNER_TOKEN` 与 `CS_SESSION_URL` 已由 `buildChildEnv`（`runtimes/task/src/process/childEnvironment.ts:2`）从**所有**子进程环境里剔除，预览进程打不出来；余下能出现的是项目自己的配置，而能读这份缓冲的 owner／developer／admin 本来就能在同一容器的终端里读到它们（tester 只有 `view-preview`，够不到开发会话）。加一层对不上号的脱敏只会制造安全错觉。
 
 ## 平台 API
 
@@ -52,10 +54,10 @@ hello 的 `capabilities` 加 `previewControl: z.literal(1).optional()`，照 `ap
 | 路由 | 权限 | 说明 |
 |---|---|---|
 | `GET /v1/projects/:projectId/dev-session/preview` | `view` | `PreviewStatusDto`：`state`／`port`／`restarts`／`lastError`／`previewHost`／`url` |
-| `POST …/dev-session/preview/start` | `develop` | 回最新 `PreviewStatusDto` |
-| `POST …/dev-session/preview/stop` | `develop` | 同上 |
-| `POST …/dev-session/preview/restart` | `develop` | 同上 |
+| `POST …/dev-session/preview/:action` | `develop` | `action` ∈ `start`／`stop`／`restart`，回最新 `PreviewStatusDto` |
 | `GET …/dev-session/preview/logs?limit=&stream=` | `view` | `PreviewLogsDto` |
+
+控制是**一条参数化路由**而不是三条字面量：动作由 `PreviewActionSchema` 在 params 上校验，不合法的动作得到点名三种取值的 400 而不是裸 404；更要紧的是客户端构造的是 `preview/${action}`，写成三条字面量会让接口面锁（`apps/console/src/tests/platformSurface.test.ts`）判定客户端有一条后端没声明的路径——那条锁是对的，路径逐段对不上就是对不上。
 
 授权沿用 `authorizer.authorize(actor, projectId, …)`（`sessionLifecycle.ts:44`）：读用 `view`，任何改变运行状态的动作用 `develop`——与「开会话」同级，因为它改的是同一个容器的运行状态。没有开发会话时 404；容器未连接时 `precondition`，不静默返回 `stopped`。
 
@@ -65,11 +67,15 @@ hello 的 `capabilities` 加 `previewControl: z.literal(1).optional()`，照 `ap
 
 ## 操作 MCP
 
+三个工具移进新文件 `packages/mcp-server/operations/previewTools.ts`；`observabilityTools.ts` 只剩 `tail_logs`——预览进程的控制不是可观测性，`read_preview_status` 原先放在那里本就是混编。
+
 | 工具 | 变化 |
 |---|---|
 | `read_preview_status` | 改读新端点，返回 `{ devSession, preview: {state, port, restarts, lastError, url}, slots }`。现有的两槽部分保留 |
 | `control_preview`（新） | 入参 `action: 'start' \| 'stop' \| 'restart'`，返回动作后的状态 |
 | `read_preview_logs`（新） | 入参 `limit`、`stream`，返回缓冲行与 `dropped` |
+
+`read_preview_status` 三个请求并发取，任一失败整条失败：容器断线时 Agent 拿到的是平台原话「开发容器未连接」，这正是它此刻该知道的事，比返回半份数据让它继续猜要好。这与操作 MCP 自己的说明书一致——「被拒绝时错误文本里是平台的原话，按它说的去补条件」。
 
 日志**不并进 `tail_logs`**：`tail_logs` 的 `source` 是平台侧聚合日志源（`LogSourceSchema`，`packages/contracts/api/observability.ts:5`），backing store 与分页语义都不同；把一个 Runner 内存缓冲伪装成第六个 source 会让两种失效模式（Pod 被换掉 vs 缓冲被挤掉）长得一样。
 
@@ -77,9 +83,11 @@ hello 的 `capabilities` 加 `previewControl: z.literal(1).optional()`，照 `ap
 
 ## 工作台迁移
 
-`previewStatusStore.ts` 现在两件事：订阅 `previewState` 事件（`:34`）与用 `channel.send` 发两条命令（`:51`、`:66`）。迁移**只动后者**——事件仍从任务流来，实时性不变；`applyPreviewEvent` 的按字段合并逻辑（`previewSnapshot.ts:12`）原样保留，因为事件依旧只带 `state`／`port`／`message`。
+`previewStatusStore.ts` 原先做两件事：订阅 `previewState` 事件与用 `channel.send` 发两条命令。迁移**只动后者**——事件仍从任务流来，实时性不变；`applyPreviewEvent` 的按字段合并逻辑（`previewSnapshot.ts:12`）原样保留，因为事件依旧只带 `state`／`port`／`message`。命令改经一个 `PreviewCommands` 端口注入，用例可以直接给假实现，不必再伪造一条流。
 
-`asPreviewStatusResult` 的手写校验（`runnerResults.ts:45`）在 REST 路径上由 api-client 的类型承担，但**事件路径仍需要它**，不删。
+控制动作**仍统一回读一次状态**，不直接采用动作回执：`read()` 里有「不得覆盖请求发出后到达的事件」那道判定，用回执会绕过它。多一次往返换掉一类竞态。
+
+`asPreviewStatusResult`（`runnerResults.ts`）随迁移**变成死代码并删除**。初版设计说「事件路径仍需要它」是错的：事件路径走的是 `RunnerEventSchema.safeParse`，从来没用过它。相应地，畸形 REST 响应不再被这层手写校验拦住——这与控制台其余所有 api-client 调用的姿态一致，不为一条端点单开一套校验；服务端在 Runner 边界已用 `RunnerResultPayloads` 解析过。
 
 界面上 `devSession.preview.*` 增停止／启动两个动作与相应文案，把「已停止（你停的）」与「已崩溃」分开表达。`busy` 互斥、`confirmed` 语义、冲突文案沿用现有 store 的处理方式。
 

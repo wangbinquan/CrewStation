@@ -58,7 +58,7 @@ export function DevSessionWorkbench({ projectId, session, access, canDevelop, se
   const tree = useWorkspaceTree(channel, state.generation, state.runnerConnected);
   const editor = useFileEditor(channel);
   const location = useDevelopmentLocation(taskId, editor, state.runnerConnected);
-  const preview = usePreviewStatus(channel, state.generation, state.runnerConnected);
+  const preview = usePreviewStatus(channel, projectId, state.generation, state.runnerConnected);
   const data = useDataBindings(projectId, taskId, serviceId, { canDevelop, canManage: access.isOwner });
   const [dataDirty, setDataDirty] = useState(false);
   const draftScope = [editor.dirty ? t('devSession.editor.draftScope', { path: editor.file?.path ?? '' }) : '', dataDirty ? t('devSession.data.title') : ''].filter(Boolean).join(' / ');

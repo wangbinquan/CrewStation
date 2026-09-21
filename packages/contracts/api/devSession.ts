@@ -2,7 +2,7 @@ import { ComputeProfileSelectorSchema } from './compute/computeProfile';
 import { z } from 'zod';
 import { ProjectIdSchema, ResourceIdSchema, TaskIdSchema, UserIdSchema } from '../ids';
 import { AgentPermissionSchema } from '../manifest/tasks';
-import { PreviewStateSchema } from '../taskrunner/protocol';
+import { PREVIEW_LOG_LIMITS, PreviewLogLineSchema, PreviewStateSchema } from '../taskrunner/protocol';
 import { PublishRequestSchema } from './release';
 import { ApiInvocationInputSchema, ApiInvocationResultSchema } from '../taskrunner/apiInvocation';
 import { DevSessionRebuildDtoSchema } from './devSessionRecovery';
@@ -31,6 +31,42 @@ export const DevSessionDtoSchema = z.object({
   connectionIssue: z.object({ code: z.literal('protocol_mismatch'), runnerProtocol: z.number().int().nullable(), requiredProtocol: z.number().int(), message: z.string(), at: z.iso.datetime() }).optional(),
   rebuild: DevSessionRebuildDtoSchema.optional(),
 });
+
+/**
+ * RFC-016：开发会话预览进程的完整状态。`DevSessionDto.preview` 仍是会话卡片用的概要枚举，
+ * 控制与诊断读这里——Runner 的 previewStatus 本来就带 restarts／lastError，此前在用例层被丢掉了。
+ * 注意这是开发容器里的预览进程，不是 preview 部署槽。
+ */
+export const PreviewStatusDtoSchema = z.object({
+  taskId: TaskIdSchema,
+  state: PreviewStateSchema,
+  port: z.number().int().optional(),
+  restarts: z.number().int().min(0),
+  lastError: z.string().optional(),
+  previewHost: z.string(),
+  /** 只在 ready 时给出，与工作台 previewUrl 的判定同源。 */
+  url: z.string().optional(),
+});
+
+export const PreviewActionSchema = z.enum(['start', 'stop', 'restart']);
+
+export const PreviewLogsQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(PREVIEW_LOG_LIMITS.maxLines).default(PREVIEW_LOG_LIMITS.defaultLimit),
+  stream: z.enum(['stdout', 'stderr']).optional(),
+}).strict();
+
+export const PreviewLogsDtoSchema = z.object({
+  taskId: TaskIdSchema,
+  lines: z.array(PreviewLogLineSchema),
+  /** 自容器启动被挤掉的行数；非 0 说明更早的输出已经看不到了。 */
+  dropped: z.number().int().min(0),
+  attempt: z.number().int().min(1),
+});
+
+export type PreviewStatusDto = z.infer<typeof PreviewStatusDtoSchema>;
+export type PreviewAction = z.infer<typeof PreviewActionSchema>;
+export type PreviewLogsQuery = z.infer<typeof PreviewLogsQuerySchema>;
+export type PreviewLogsDto = z.infer<typeof PreviewLogsDtoSchema>;
 
 export const OpenDevSessionRequestSchema = z.object({ branch: z.string().min(1) });
 export const PublishDevSessionRequestSchema = PublishRequestSchema.extend({ expectedTaskId: TaskIdSchema.optional() });

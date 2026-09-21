@@ -7,6 +7,26 @@
 
 基线三件套（v0.3.3）的第一轮实现已在本机 kind 集群上跑通并推上 main；**RFC-001（算力归平台）与 RFC-002（管理空间与租户空间分离）已实现、实跑确认并推上 main；RFC-004 已被 RFC-006 取代（Superseded）；RFC-006（算力档位合并运行环境、每个 Agent 一个 Pod）已实现、实机验收完毕并推上 main，已 Done（P1–P8、ADR-0005 与 I17–I19 待作者复核）；RFC-003 工作台已按设计附件完成并整体部署到本机，52／52 项 UX-AT 全部实机通过、本地 gate 与精确 SHA CI 通过，已 Done；RFC-005（OIDC／OAuth 2.0 公司登录）代码、测试与 OA-01…OA-31 实机验收全部完成，已 Done；RFC-007（开发环境 OAuth 2.0 一键换角色）代码、四角色 Chrome 实机验收、本地 gate 与精确 SHA CI 全部完成，已 Done**。
 
+## RFC-016 开发会话预览进程的自主启停与调试（2026-09-21）
+
+意图 Agent 改坏预览后此前没有任何修复或诊断手段：Runner 早有 `restartPreview`、工作台经 WS 在用，但 cs-api 一条预览路由都没有，MCP 够不到；`previewStatus` 的 `restarts`／`lastError` 在 `sessionLifecycle.ts` 被丢弃，Agent 只看得到一个光秃秃的 `crashed`；预览输出只混在 Pod 日志里。
+
+作者当面裁定三处取舍：重启之外**加停止／启动**、调试靠**预览输出环形缓冲**、控制统一走 cs-api 且**工作台一并迁过来**。三件套在 `proposal/rfc/RFC-016-preview-process-control/`。
+
+T1–T9 已落地并推送：Runner 新增 `startPreview`／`stopPreview`／`previewLogs`，用 hello 的 `previewControl: 1` 能力位协商而**不升协议版本**（升版会让集群里正跑的旧镜像容器握手即被拒，等于强制所有人释放会话）；`previewOutputBuffer.ts` 双上限 2000 行／256 KiB、按字节截断单行、跨重启保留；三条 cs-api 路由（控制是参数化的一条）；操作 MCP 新增 `previewTools.ts` 三个工具；工作台命令迁 REST 而事件订阅不动，实时性不变。
+
+实现中推翻了三处初版设计，已回填 design.md：`attempt` 不能复用 `restarts`（`restart()` 会清零，那样重启前后的行都标 1，缓冲跨重启保留就白做了，故另立永不清零的 `runs`）；缓冲**不做脱敏**（`CS_RUNNER_TOKEN`／`CS_SESSION_URL` 已由 `buildChildEnv` 从所有子进程环境剔除，余下是项目自己的配置，读者本就能在同容器终端读到）；`asPreviewStatusResult` 是死代码而非事件路径仍需要，已删。
+
+**实机验收 PV-01…PV-18 未执行**，需要本机集群上的真实开发会话。本轮受并行 RFC-015 在制品影响没有跑通完整 `bun run check`：`arch:check` 通过，`lint`／`typecheck` 的报错全部落在 `apps/console/src/features/cluster/`、`modules/cluster-management/`、`packages/filesystem-metrics/`、`apps/cs-storage-probe/`；定向用例 874 pass／1 fail，唯一失败是并行会话的集群页用例。
+
+## RFC-015 集群容量、用量与七天趋势（2026-09-21）
+
+作者追加三项要求：存储申请／实际使用、Pod 容器及对应资源申请／节点、全局节点与全部关键容量／实时 CPU／存储／网络等；随后明确选择“同时保留最近 7 天趋势”。已完成源码和实机只读核查，三件套与 audit 位于 `proposal/rfc/RFC-015-cluster-resource-observability/`，索引 Draft。现有 RFC-010 的 Done 状态不变，新能力未写生产代码、未安装或应用 RBAC。
+
+实机 1 节点，Summary 可读 CPU／内存／网络／节点文件系统，cAdvisor 有设备 I/O 计数；12 个 local-path PVC 没有 pvcRef 卷统计。方案包含全集群只读容量＋受管分项、结构化容器／PVC 资源表、kubelet 采集、固定卷根只读 probe 及内部 Prometheus 的七天趋势。历史断档、同名新 UID、已删除对象、峰值和保留边界均列入 RO-01…RO-29 验收。观测时节点仅约 1.15GiB 可用，后续部署必须重新盘点指标卷的实际容量，不能因 PVC 申请成功就当已扩容。
+
+作者现已明确回复“批准实施、部署、提交上库”，RO-D1…D4、七天趋势、节点读取／proxy、只读卷采集器及内部指标存储部署均获批，RFC 进入 In Progress。下拉框与历史会话测试已由原任务提交；本任务保留其输出，按精确路径发布。
+
 ## 下拉框统一外观（2026-09-21）
 
 按作者「所有下拉框统一修改」要求，在 `shared/ui/selection/Select.css` 集中覆盖工作台 31 个文件的 47 处下拉及嵌入 API 文档的单选下拉：主题边框、箭头、菜单圆角／阴影、选中勾选、禁用／错误／焦点状态、长列表滚动与视口边缘翻转。页面原生表单与键盘语义保留，开发工作台维持 28px、列表筛选维持 32px 的紧凑高度。支持 `appearance: base-select` 的浏览器同时定制展开面板；不支持时入口采用统一样式，选项面板仍由系统绘制。

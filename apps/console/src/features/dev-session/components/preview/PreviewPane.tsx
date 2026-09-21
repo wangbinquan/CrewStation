@@ -15,11 +15,12 @@ export interface PreviewPaneProps {
   readonly previewHost: string;
 }
 
-/** 预览进程：状态、端口、重启次数与最近一次错误；TaskRunner 协议只给了重启，没有单独启停。 */
+/** 预览进程：状态、端口、重启次数与最近一次错误，外加启动／停止／重启（RFC-016）。 */
 export function PreviewPane({ preview, previewHost }: PreviewPaneProps): ReactElement {
   const t = useT();
   const { status } = preview;
   const url = previewUrl(previewHost, status.state);
+  const running = status.state === 'starting' || status.state === 'ready';
   return (
     <Pane
       title={t('devSession.preview.title')}
@@ -29,9 +30,18 @@ export function PreviewPane({ preview, previewHost }: PreviewPaneProps): ReactEl
           <Button disabled={preview.busy} onClick={preview.refresh}>
             {t('devSession.preview.refresh')}
           </Button>
-          <Button disabled={preview.busy} onClick={preview.restart}>
+          <Button disabled={preview.busy} onClick={() => preview.run('restart')}>
             {t('devSession.preview.restart')}
           </Button>
+          {running ? (
+            <Button disabled={preview.busy} onClick={() => preview.run('stop')}>
+              {t('devSession.preview.stop')}
+            </Button>
+          ) : (
+            <Button disabled={preview.busy || status.state === 'disabled'} onClick={() => preview.run('start')}>
+              {t('devSession.preview.start')}
+            </Button>
+          )}
         </>
       }
     >
@@ -54,7 +64,8 @@ export function PreviewPane({ preview, previewHost }: PreviewPaneProps): ReactEl
       )}
       {status.lastError !== undefined ? <PaneNotice tone="warning">{status.lastError}</PaneNotice> : null}
       {preview.error !== undefined ? <PaneNotice tone="warning">{preview.error}</PaneNotice> : null}
-      <PaneNotice tone="muted">{t('devSession.preview.controlsHint')}</PaneNotice>
+      {/* 「已停止」是有人停的、不会自己回来；「已崩溃」是连续失败后放弃重试。两者都靠启动／重启救回。 */}
+      <PaneNotice tone="muted">{t(status.state === 'stopped' ? 'devSession.preview.stoppedHint' : 'devSession.preview.controlsHint')}</PaneNotice>
     </Pane>
   );
 }
