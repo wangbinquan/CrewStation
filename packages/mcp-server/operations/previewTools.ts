@@ -27,7 +27,8 @@ function readPreviewStatus(): McpToolDefinition<OperationsContext> {
     description: [
       '一次看两件事：开发会话预览进程的状态（含端口、已重启次数与上次失败原因），',
       '以及 preview／prod 两个部署槽当前是哪个 Release、副本是否就绪。改完代码先看这里，再决定要不要发布。',
-      '容器内自测请直接访问 `http://127.0.0.1:<port>`；返回的 url 是给浏览器用的协议相对地址。',
+      '判断预览有没有跑起来就看 state 与 lastError，看它做了什么用 read_preview_logs——',
+      '你运行在自己的执行 Pod 里，不在开发容器内，预览端口不在你的本机回环上；返回的 url 是给人在浏览器里打开的。',
       SLOT_NOTE,
     ].join(''),
     input: {},

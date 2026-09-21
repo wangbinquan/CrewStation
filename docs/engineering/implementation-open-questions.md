@@ -242,3 +242,11 @@
 **为什么是问题**：管理员代建项目 → 建仓 → 首标签构建 → preview 槽 → 切流／回退、开发会话、业务子任务，是平台最核心的几条链路（AT-01、03、33、38、47）。它们的回归目前取决于「改动的人恰好在一台环境齐全的机器上跑了全量用例」；CI 是绿的并不说明这些链路没坏。`docs/engineering/testing.md` §10 已把它登记为头号防护缺口，`CS_TEST_REQUIRE` 里也预留了 `gitlab` 能力，但提供这项能力需要先决定下面的做法。
 
 **可选做法**：(a) 仓库里补一套可复现的 GitLab 引导（compose＋`gitlab-rails runner` 建根令牌、`crewstation-test` 组与受保护标签权限），CI 新增一个定时或手动触发的 `full-e2e` 作业：起 gitlab-ce、装任务容器镜像、`CS_TEST_REQUIRE=e2e,gitlab,database` 跑全部实机用例；代价是作业耗时（gitlab-ce 冷启动数分钟、镜像约 1.5 GB）与 runner 内存余量需要先实测，且要先还上「GitLab 定义丢失」这笔债；(b) 写一个只实现平台用到的那部分 GitLab 兼容接口（项目、分支、标签、保护规则、Git HTTP）的轻量替身供 CI 使用；代价是替身与真实 GitLab 行为漂移的风险（令牌生效延迟、分支列表 30 秒缓存这类坑正是替身测不出来的）；(c) 维持现状，把「推送前在环境齐全的机器上跑全量」写成发布类改动的硬性要求，CI 只兜不依赖 GitLab 的部分。
+
+## I21. 开发会话的 Agent 能观测预览，却调不到它
+
+**现状**：RFC-016 让 Agent 经操作 MCP 读预览状态与输出、启停重启预览进程，但**没有给它一条调用预览的路**。RFC-006 之后每个 Agent 跑在自己的执行 Pod 里，不在开发容器内，所以 `127.0.0.1:<预览端口>` 是 Agent 自己的回环，到不了预览进程；`PreviewStatusDto.url` 指向用户域主机 `dev.<slug>.<domain>`，那上面有 ForwardAuth 登录跳转，而 Agent 手里的开发会话令牌是给 cs-api 用的、不是网关用户域的凭据。任务 Pod 确有一个 Service（`modules/task-runtime/adapters/k8s/taskObjects.ts` 在配置了预览时按 `env.podName` 建，80 → 预览端口），但 Agent 既不知道它的名字，平台也没有把它作为约定暴露过。
+
+**为什么是问题**：Agent 能把预览救活、能读它打了什么，却没法验证「改完之后这个页面真的对了」——而这正是「改代码 → 自查 → 发布」闭环里最后一步。目前只能退回到让人在浏览器里看。工具描述已按事实写明这一点，不让 Agent 去撞 `127.0.0.1`。
+
+**可选做法**：(a) `PreviewStatusDto` 增一项集群内地址（任务 Pod 的 Service，如 `http://<podName>`），并在能力说明里登记为约定；需要先确认 Agent 执行 Pod 与开发容器同命名空间、且网络策略放行；(b) 给操作 MCP 加一个 `call_preview` 工具，由平台代为请求预览并回正文，授权与放行判定留在平台侧，和 `call_internal_api` 同构；(c) 维持现状，预览验证仍由人在浏览器里做，Agent 只负责把进程弄活。
