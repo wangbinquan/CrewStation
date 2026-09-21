@@ -93,3 +93,19 @@ test('管理身份读取失败可重试；身份撤销后移除管理内容且�
   await page.click('刷新项目目录'); expect(page.text()).toContain('仅平台管理员可见'); expect(page.text()).not.toContain('管理项目 0');
   expect(f.calls.filter((c) => c.url.pathname === '/v1/projects/page')).toHaveLength(before); expect(f.writes()).toHaveLength(0);
 });
+
+test('例行重读不改界面，入口只在手动刷新时暂停', async () => {
+  const f = adminDirectoryFixture(); page = await renderApp('/admin');
+  const entry = () => [...document.querySelectorAll('a, span')].find((node) => node.textContent === f.apiRequests[0]!.operationId)!;
+  expect(entry().tagName).toBe('A');
+  // 回到前台走的是同一条例行重读：在途也不把入口换成纯文本。
+  let release!: () => void; f.state.holdApi = new Promise<void>((r) => { release = r; });
+  await act(async () => { document.dispatchEvent(new Event('visibilitychange')); }); await page.settle();
+  const reads = () => f.calls.filter((c) => c.url.pathname === '/v1/api-requests/page').length;
+  expect(reads()).toBe(2); expect(entry().tagName).toBe('A');
+  await act(async () => release()); await page.settle(); expect(entry().tagName).toBe('A');
+  // 手动刷新是用户自己触发的：在途期间仍然暂停入口，读完恢复。
+  f.state.holdApi = new Promise<void>((r) => { release = r; });
+  await page.click('刷新 API 待办'); expect(reads()).toBe(3); expect(entry().tagName).toBe('SPAN');
+  f.state.holdApi = undefined; await act(async () => release()); await page.settle(); expect(entry().tagName).toBe('A');
+});

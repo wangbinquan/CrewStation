@@ -4,9 +4,11 @@ export function clusterFixture(options: { admin?: boolean; loseReceipt?: boolean
   const calls: Array<{ path: string; method: string; body: Record<string, unknown>; query: URLSearchParams }> = [];
   const time = new Date().toISOString(), projectId = '01a0bf5d-8f4b-7e1e-8dde-c9c2ae13ed34';
   const row: ClusterResource = { resourceId: 'resource-uid', apiVersion: 'apps/v1', kind: 'Deployment', namespace: 'cs-cluster-demo', name: 'cluster-demo-green', uid: 'uid-original', resourceVersion: '1', revision: 'spec-1', observedAt: time, generation: 2, view: 'workloads', ownership: { scope: 'project', projectId, projectName: '集群验收', slug: 'cluster-demo', projectKind: 'DigitalWorker', archived: false }, purpose: 'digital-worker-service', phase: 'Active', ready: true, abnormal: false, reason: '', topLevel: true, standalone: false, desired: 1, actual: 1, readyReplicas: 1, restarts: 0, labels: {}, owners: [], references: [], containers: [{ name: 'main', init: false, image: 'worker:v1', state: 'running', ready: true, restarts: 0, requests: { cpu: '1' }, limits: { memory: '1Gi' }, ports: [3000] }], facts: {}, physicalSlot: 'green', slotRole: 'preview', availableActions: (['restart', 'scale', 'restore-replicas', 'delete'] as const).map((action) => ({ action, enabled: action !== 'delete', reason: action === 'delete' ? '工作卷仍被引用' : '', executionRoute: 'release', impactSummary: ['保留发布历史'], minReplicas: 1, maxReplicas: 3 })) };
-  const summary: ClusterSummary = { snapshotId: 'snapshot-1', startedAt: time, finishedAt: time, complete: !options.partial, total: 250, workloads: 205, pods: 32, runningPods: 30, readyPods: 29, standalonePods: 6, services: 5, pvcs: 8, abnormal: 3, kinds: { Deployment: 205, Pod: 32 }, phases: { Running: 30 }, purposes: {}, projects: [{ id: projectId, name: '集群验收' }], sources: options.partial ? [{ key: 'cs-cluster-demo/Pod', kind: 'Pod', namespace: 'cs-cluster-demo', batchId: 'batch', resourceVersion: 'v1', state: 'stale', count: 32, observedAt: time, reason: '采集暂时不可达' }] : [] };
+  let summary: ClusterSummary = { snapshotId: 'snapshot-1', startedAt: time, finishedAt: time, complete: !options.partial, total: 250, workloads: 205, pods: 32, runningPods: 30, readyPods: 29, standalonePods: 6, services: 5, pvcs: 8, abnormal: 3, kinds: { Deployment: 205, Pod: 32 }, phases: { Running: 30 }, purposes: {}, projects: [{ id: projectId, name: '集群验收' }], sources: options.partial ? [{ key: 'cs-cluster-demo/Pod', kind: 'Pod', namespace: 'cs-cluster-demo', batchId: 'batch', resourceVersion: 'v1', state: 'stale', count: 32, observedAt: time, reason: '采集暂时不可达' }] : [] };
   ClusterResourceSchema.parse(row); ClusterSummarySchema.parse(summary);
   let inspection: ClusterInspection | undefined, operation: ClusterOperation | undefined;
+  // 保留回执不返回，用来断言换快照在途时页面上还剩什么。
+  let held: Promise<void> | undefined, heldPaths: readonly string[] = [];
   globalThis.fetch = (async (raw, init) => {
     const url = new URL(String(raw), 'http://localhost'), method = init?.method ?? 'GET', body = init?.body ? JSON.parse(String(init.body)) as Record<string, unknown> : {};
     calls.push({ path: url.pathname, method, body, query: url.searchParams }); let data: unknown = { items: [] }, status = 200;
@@ -26,7 +28,14 @@ export function clusterFixture(options: { admin?: boolean; loseReceipt?: boolean
     else if (url.pathname.endsWith('/refresh')) data = { refreshId: 'refresh-1' };
     else if (url.pathname === '/v1/me/activity') data = { items: [] };
     else throw new Error(`Unconfigured cluster fixture: ${method} ${url.pathname}`);
+    if (held && heldPaths.some((path) => url.pathname.endsWith(path))) await held;
     return Response.json(data, { status });
   }) as typeof fetch;
-  return { calls, row, summary, projectId, attention: () => { if (operation) operation = { ...operation, phase: 'needs-attention', httpStatus: 504, reason: '等待期限已到' }; } };
+  // summary 是初始快照的取值；newSnapshot 之后由服务端回执反映新的 snapshotId。
+  return { calls, row, projectId, summary,
+    /** 后台采集换了一份快照：下一次摘要读取给出新的 snapshotId。 */
+    newSnapshot: (snapshotId: string) => { summary = { ...summary, snapshotId }; },
+    /** 扣住给定路径的回执，返回放行函数。 */
+    hold: (...paths: readonly string[]) => { let open = () => {}; heldPaths = paths; held = new Promise<void>((resolve) => { open = () => { held = undefined; heldPaths = []; resolve(); }; }); return open; },
+    attention: () => { if (operation) operation = { ...operation, phase: 'needs-attention', httpStatus: 504, reason: '等待期限已到' }; } };
 }

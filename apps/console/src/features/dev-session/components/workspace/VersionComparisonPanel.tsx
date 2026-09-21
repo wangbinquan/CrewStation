@@ -19,24 +19,24 @@ export function VersionComparisonPanel({ projectId, taskId, channel, canDevelop,
 }): ReactElement {
   const t = useT();
   const date = useDateText();
-  const { query, history } = useVersionComparison(projectId, taskId, channel, target);
+  const { query, history, recheck, refreshing } = useVersionComparison(projectId, taskId, channel, target);
   const [expanded, setExpanded] = useState(initiallyExpanded);
   const data = query.data;
   if (compact) return <section className={styles.strip} aria-label={t('devSession.compare.title')}>
     {data ? <ComparisonSummary comparison={data} compact /> : <QueryStatus isPending={query.isPending} error={query.error} />}
-    <Button variant="ghost" disabled={query.isFetching || history.isPending} onClick={() => void query.refetch()}>{t(query.isFetching ? 'devSession.compare.refreshing' : 'devSession.workspace.recheck')}</Button>
+    <Button variant="ghost" disabled={refreshing || history.isPending} onClick={() => void recheck()}>{t(refreshing ? 'devSession.compare.refreshing' : 'devSession.workspace.recheck')}</Button>
     {data && (query.isError || data.freshness === 'stale') ? <span title={`${date(data.checkedAt)} · ${t('devSession.compare.staleHint')}`}>{t('devSession.compare.staleShort')}</span> : null}
   </section>;
   return <Card compact className={styles.panel} title={t(target === 'preview' ? 'devSession.compare.previewTitle' : 'devSession.compare.title')} extra={<>
     {onTargetChange ? <select aria-label={t('devSession.compare.target')} value={target} disabled={history.isPending} onChange={(e) => onTargetChange(e.target.value as ComparisonTarget)}>
       <option value="prod">{t('devSession.compare.production')}</option><option value="preview">{t('devSession.compare.preview')}</option></select> : null}
-    <Button variant="ghost" disabled={query.isFetching || history.isPending} onClick={() => void query.refetch()}>{t(query.isFetching ? 'devSession.compare.refreshing' : 'devSession.workspace.recheck')}</Button>
+    <Button variant="ghost" disabled={refreshing || history.isPending} onClick={() => void recheck()}>{t(refreshing ? 'devSession.compare.refreshing' : 'devSession.workspace.recheck')}</Button>
     <Button variant="ghost" onClick={() => setExpanded(!expanded)} aria-expanded={expanded}>{t(expanded ? 'devSession.compare.collapse' : 'devSession.compare.details')}</Button>
   </>}>
     <QueryStatus isPending={query.isPending} error={query.error} />
     {data ? <>
       <ComparisonSummary comparison={data} />
-      <p className={styles.meta}>{t('devSession.workspace.checked', { at: date(data.checkedAt) })}{query.isFetching || query.isError || data.freshness === 'stale' ? ` · ${t('devSession.compare.staleHint')}` : ''}</p>
+      <p className={styles.meta}>{t('devSession.workspace.checked', { at: date(data.checkedAt) })}{query.isError || data.freshness === 'stale' ? ` · ${t('devSession.compare.staleHint')}` : ''}</p>
       {expanded ? <>
         <p className={styles.meta}>{t('devSession.workspace.refsHint')}</p>
         <p className={styles.meta}>{t('devSession.compare.historyHint')}</p>

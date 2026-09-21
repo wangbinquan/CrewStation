@@ -2,7 +2,7 @@ import { useEffect, useId, useRef } from 'react';
 import { api } from '../../../shared/api/client';
 import { queryKeys } from '../../../shared/api/queryKeys';
 import { useApiQuery, errorMessage } from '../../../shared/api/useApi';
-import { usePollingRefetch } from '../../../shared/lib/usePollingRefetch';
+import { usePolledRefresh } from '../../../shared/lib/useManualRefresh';
 import { useDateText } from '../../../shared/lib/useDateText';
 import { useT } from '../../../shared/lib/useT';
 import { ActionNote } from '../../../shared/ui/ActionNote';
@@ -23,7 +23,7 @@ export function DeploymentVersions({ projectId, serviceId, canSwitch, actions, o
   const slots = useApiQuery(queryKeys.slots(serviceId), () => api.services.listSlots(serviceId));
   const releases = useApiQuery(queryKeys.releases(serviceId), () => api.services.listReleases(serviceId));
   const inProgress = !releases.error ? releases.data?.items.find((release) => isInFlight(release.status)) : undefined;
-  usePollingRefetch(slots.refetch, 5_000);
+  const { refresh, refreshing } = usePolledRefresh(slots.refetch, 5_000);
   let versions: DeployedVersions = {}, readError: string | undefined;
   try { if (slots.data) versions = deployedVersions(slots.data.items); } catch (cause) { readError = t(errorMessage(cause)); }
   const known = !!slots.data && !slots.error && !readError;
@@ -34,7 +34,7 @@ export function DeploymentVersions({ projectId, serviceId, canSwitch, actions, o
     <textarea ref={reasonInput} name="trafficReason" rows={2} value={p.reason} disabled={p.busy} aria-invalid={!!p.fieldError} aria-describedby={`${id}-hint${p.fieldError ? ` ${id}-error` : ''}`} aria-errormessage={p.fieldError ? `${id}-error` : undefined} onChange={(event) => { p.setReason(event.target.value); p.setFieldError(undefined); }} />
   </FormField>;
   return <section className={styles.section} aria-label={t('release.versions.title')}>
-    <div className={styles.tools}><span>{t('release.versions.checked', { time: date(slots.dataUpdatedAt ? new Date(slots.dataUpdatedAt).toISOString() : undefined) })}</span><Button disabled={slots.isFetching} onClick={() => void slots.refetch()}>{t('release.versions.refresh')}</Button></div>
+    <div className={styles.tools}><span>{t('release.versions.checked', { time: date(slots.dataUpdatedAt ? new Date(slots.dataUpdatedAt).toISOString() : undefined) })}</span><Button disabled={refreshing} onClick={() => void refresh()}>{t('release.versions.refresh')}</Button></div>
     {slots.isPending ? <p>{t('release.versions.loading')}</p> : null}
     {slots.error || readError ? <ActionNote tone="error">{slots.error ? errorMessage(slots.error) : readError}</ActionNote> : null}
     <div className={styles.grid}>{(['prod', 'preview'] as const).map((role) => <DeployedVersionCard key={role} role={role} slot={versions[role]} known={known} onSelect={onSelect} />)}</div>

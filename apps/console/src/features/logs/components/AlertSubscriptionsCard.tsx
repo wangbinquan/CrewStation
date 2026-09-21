@@ -14,7 +14,7 @@ import { AlertSubscriptionForm } from './AlertSubscriptionForm';
 export function AlertSubscriptionsCard({ projectId, canManage }: { readonly projectId: string; readonly canManage: boolean }) {
   const t = useT(), p = useAlertSubscriptions(projectId, canManage), review = p.review;
   const target = review?.kind === 'save' ? review.input : review?.before;
-  return <Card stacked compact title={t('logs.alerts.subscription.title')} extra={<Button disabled={p.busy || p.query.isFetching} onClick={() => void p.query.refetch()}>{t('logs.alerts.subscription.refresh')}</Button>}>
+  return <Card stacked compact title={t('logs.alerts.subscription.title')} extra={<Button disabled={p.busy || p.refreshing} onClick={() => void p.refresh()}>{t('logs.alerts.subscription.refresh')}</Button>}>
     <UnsavedChangesGuard dirty={p.dirty || p.busy} scope={t('logs.alerts.subscription.form')} allowNavigate={(current, next) => current.pathname === next.pathname && 'tab' in next.search && next.search.tab === 'alerts'} />
     <ActionNote tone="neutral">{t('logs.alerts.subscription.deliveryUnavailable')}</ActionNote>
     <QueryStatus isPending={p.query.isPending} error={p.query.error} />

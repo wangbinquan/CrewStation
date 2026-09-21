@@ -3,7 +3,7 @@ import { api } from '../../../shared/api/client';
 import { queryKeys } from '../../../shared/api/queryKeys';
 import { useApiQuery } from '../../../shared/api/useApi';
 import { useT } from '../../../shared/lib/useT';
-import { usePollingRefetch } from '../../../shared/lib/usePollingRefetch';
+import { usePolledRefresh } from '../../../shared/lib/useManualRefresh';
 import { useProjectScope } from '../../../shared/project/ProjectScope';
 import { PROJECT_PATHS } from '../../../shared/project/projectPaths';
 import { Card } from '../../../shared/ui/Card';
@@ -17,9 +17,9 @@ import { isInFlight } from '../model/releaseStatus';
 export function SelectedRelease({ releaseId, serviceId }: { readonly releaseId: string; readonly serviceId: string }) {
   const t = useT(), { projectId, space } = useProjectScope();
   const query = useApiQuery(queryKeys.release(releaseId), () => api.services.getRelease(releaseId));
-  usePollingRefetch(query.refetch, 5_000, !!query.data && isInFlight(query.data.status));
+  const { refresh, refreshing } = usePolledRefresh(query.refetch, 5_000, !!query.data && isInFlight(query.data.status));
   const release = query.data?.id === releaseId && query.data.serviceId === serviceId && !query.error ? query.data : undefined;
-  return <Card compact title={t('release.detail.title')} extra={<Button disabled={query.isFetching} onClick={() => void query.refetch()}>{t('release.detail.refresh')}</Button>}>
+  return <Card compact title={t('release.detail.title')} extra={<Button disabled={refreshing} onClick={() => void refresh()}>{t('release.detail.refresh')}</Button>}>
     <code>{releaseId}</code><QueryStatus isPending={query.isPending} error={query.error} />
     {query.data && !release && !query.error ? <ActionNote tone="error">{t('release.detail.mismatch')}</ActionNote> : null}
     {release ? <>

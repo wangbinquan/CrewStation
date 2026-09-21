@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { api } from '../../../shared/api/client';
 import { queryKeys } from '../../../shared/api/queryKeys';
 import { errorMessage, useApiMutation, useApiQuery } from '../../../shared/api/useApi';
-import { usePollingRefetch } from '../../../shared/lib/usePollingRefetch';
+import { usePolledRefresh } from '../../../shared/lib/useManualRefresh';
 import { useT } from '../../../shared/lib/useT';
 import { PROJECT_PATHS } from '../../../shared/project/projectPaths';
 import { ActionNote } from '../../../shared/ui/ActionNote';
@@ -22,14 +22,14 @@ export function ProjectProvisioningPage({ projectId }: { projectId: string }) {
   const project = useApiQuery(queryKeys.project(projectId), () => api.projects.get(projectId));
   const retry = useApiMutation(() => retryProvisioning(projectId), { invalidate: [queryKeys.projects()], onSuccess: () => setRetryWatch(true) });
   useEffect(() => { if (!retryWatch) return; const timer = setTimeout(() => setRetryWatch(false), 60_000); return () => clearTimeout(timer); }, [retryWatch]);
-  usePollingRefetch(project.refetch, 5000, project.data?.state === 'provisioning' || (retryWatch && project.data?.state === 'failed'));
+  const { refresh, refreshing } = usePolledRefresh(project.refetch, 5000, project.data?.state === 'provisioning' || (retryWatch && project.data?.state === 'failed'));
   const requeue = async () => {
     if (busy.current || project.error) return;
     busy.current = true;
     try { await retry.mutateAsync(); } catch { /* 保留失败内容与原状态供重试。 */ } finally { busy.current = false; }
   };
   const item = project.data, paths = PROJECT_PATHS[item?.kind === 'DigitalWorker' ? 'workbench' : 'admin'];
-  return <Card stacked compact title={t('projects.provision.title')} extra={<Button disabled={project.isFetching || retry.isPending} onClick={() => void project.refetch()}>{t('projects.provision.refresh')}</Button>}>
+  return <Card stacked compact title={t('projects.provision.title')} extra={<Button disabled={refreshing || retry.isPending} onClick={() => void refresh()}>{t('projects.provision.refresh')}</Button>}>
     <QueryStatus isPending={project.isPending} error={project.error} loadingKey="projects.overview.loading" errorKey="projects.overview.error" />
     {item && !project.error ? <>
       <DefinitionList layout="grid" items={[{ label: t('projects.self.projectId'), value: item.id }, { label: t('projects.create.name'), value: item.name }, { label: t('projects.create.slug'), value: item.slug },

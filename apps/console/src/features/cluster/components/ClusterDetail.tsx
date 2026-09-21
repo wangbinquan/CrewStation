@@ -11,10 +11,13 @@ import { QueryStatus } from '../../../shared/ui/QueryStatus';
 import { ClusterTable, Ownership } from './ClusterTable';
 import { ClusterResourceMetrics } from './ClusterResourceMetrics';
 import { ClusterActionPanel } from './ClusterActionPanel';
+import { sameApartFromSnapshot } from '../model/clusterReads';
 import styles from './Cluster.module.css';
 export function ClusterDetail({ resourceId, snapshotId, close, select, onOperation }: { resourceId: string; snapshotId?: string; close: () => void; select: (row: ClusterResource) => void; onOperation: (id: string) => void }) {
   const t = useT(), [tab, setTab] = useState('overview');
-  const detail = useApiQuery(queryKeys.cluster('detail', [resourceId, snapshotId]), () => api.cluster.detail(resourceId, snapshotId));
+  const request = { resourceId, snapshotId };
+  // 换快照不重挂详情：清空会让面板塌成一行，随后 uid 再次出现又把焦点抢回来并滚动到面板。
+  const detail = useApiQuery(queryKeys.cluster('detail', request), () => api.cluster.detail(resourceId, snapshotId), { keepPrevious: (previous) => sameApartFromSnapshot(previous, request) });
   const r = detail.data?.resource, panel = useRef<HTMLElement>(null);
   useEffect(() => { if (r?.uid) panel.current?.focus(); }, [r?.uid]);
   return <section ref={panel} tabIndex={-1} aria-label={t('cluster.detail')}><Card title={r?.name ?? t('cluster.detail')} extra={<Button onClick={close}>{t('cluster.close')}</Button>} className={styles.detail} stacked><QueryStatus isPending={detail.isPending} error={detail.error} />{r ? <>

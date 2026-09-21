@@ -207,3 +207,28 @@ test('尚未部署默认展示未提交改动；不可比较页签解释原因�
   expect(requests.filter((request) => request.includes('version-comparisons/')).every((request) => request.includes('tab=uncommitted'))).toBe(true);
   expect(page.text()).not.toContain('旧结果可能已过期');
 });
+
+test('例行重新核验在途不改结论：不弹「可能已过期」，读取失败才提示', async () => {
+  const page = await render(comparison());
+  expect(page.text()).toContain('检查时间'); expect(page.text()).not.toContain('旧结果可能已过期');
+  // 每 10 秒的前台核验、回到前台重查都走同一条路径：在途期间已显示的比较结论不变。
+  const inner = globalThis.fetch;
+  let release!: () => void; const gate = new Promise<void>((resolve) => { release = resolve; });
+  globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+    if (!String(input).includes('version-comparisons/')) await gate;
+    return inner(input, init);
+  }) as typeof fetch;
+  await act(async () => { focusManager.setFocused(false); focusManager.setFocused(true); }); await page.settle();
+  expect(page.text()).not.toContain('旧结果可能已过期'); expect(page.text()).not.toContain('更新中');
+  await act(async () => release()); await page.settle();
+  expect(page.text()).not.toContain('旧结果可能已过期'); expect(page.text()).not.toContain('更新中');
+  // 用户自己点重新检查才进入更新中，读完恢复。
+  let second!: () => void; const again = new Promise<void>((resolve) => { second = resolve; });
+  globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+    if (!String(input).includes('version-comparisons/')) await again;
+    return inner(input, init);
+  }) as typeof fetch;
+  await act(async () => { page.button('重新检查').click(); }); await page.settle();
+  expect(page.text()).toContain('更新中');
+  await act(async () => second()); await page.settle(); expect(page.text()).not.toContain('更新中');
+});

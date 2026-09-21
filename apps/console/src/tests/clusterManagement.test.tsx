@@ -1,6 +1,7 @@
 import './domSetup';
 import { afterEach, expect, test } from 'bun:test';
 import { act } from 'react';
+import { focusManager } from '@tanstack/react-query';
 import { renderApp } from './renderApp';
 import { clusterFixture } from './clusterManagementFixture';
 const originalFetch = globalThis.fetch;
@@ -52,4 +53,18 @@ test('namespace filter is URL state; events/containers/logs use selected UID, pr
 });
 test('expired snapshot offers a real refresh path and does not silently retain the expired cursor', async () => {
   clusterFixture(); page = await renderApp('/admin/cluster?snapshotId=expired&cursor=old'); expect(page.text()).toContain('快照已过期'); await page.click('读取最新快照'); expect(page.search().snapshotId).toBeUndefined(); expect(page.search().cursor).toBeUndefined();
+});
+
+test('采集换快照时列表与详情原地替换，不卸载、不闪回载入中', async () => {
+  const f = clusterFixture(); page = await renderApp('/admin/cluster?resourceId=resource-uid');
+  expect(page.text()).toContain('符合筛选的资源：205'); expect(page.text()).toContain('uid-original');
+  const row = () => document.querySelector('[data-cluster-resource="resource-uid"]'), before = row();
+  const release = f.hold('/resources', '/resource-uid'); f.newSnapshot('snapshot-2');
+  await act(async () => { focusManager.setFocused(false); focusManager.setFocused(true); }); await page.settle();
+  expect(f.calls.some((c) => c.path.endsWith('/resources') && c.query.get('snapshotId') === 'snapshot-2')).toBe(true);
+  // 新快照的回执还没到：表格与详情留在页面上，不塌成一行，滚动容器的高度不变。
+  expect(page.text()).toContain('符合筛选的资源：205'); expect(page.text()).toContain('uid-original');
+  expect(page.text()).not.toContain('载入中'); expect(row()).toBe(before);
+  await act(async () => release()); await page.settle();
+  expect(page.text()).toContain('符合筛选的资源：205'); expect(row()).toBe(before);
 });

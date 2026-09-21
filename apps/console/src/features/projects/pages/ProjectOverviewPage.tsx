@@ -24,16 +24,16 @@ import styles from '../components/summary/ProjectSummary.module.css';
 export function ProjectOverviewPage(): ReactElement {
   const t = useT();
   const { projectId, space } = useProjectScope();
-  const identity = useProjectIdentity(projectId), { me, query, refresh } = useProjectSummary(projectId);
+  const identity = useProjectIdentity(projectId), { me, query, refresh, refreshing } = useProjectSummary(projectId);
   const error = me.error ?? query.error, item = [401, 403, 404].includes(error?.status ?? 0) ? undefined : query.data;
-  const project = item?.project ?? identity.data, available = !error && !query.isPending && !me.isFetching && !query.isFetching;
+  const project = item?.project ?? identity.data, available = !error && !query.isPending && !refreshing;
   return (
     <>
       <PageHeader
         title={project?.name ?? t('projects.overview.title')}
         actions={<>
           {item ? <ProjectSummaryActions item={item} space={space} available={available} /> : null}
-          <Button disabled={me.isFetching || query.isFetching} onClick={() => void refresh()}>{t('projects.summary.refreshOverview')}</Button>
+          <Button disabled={refreshing} onClick={() => void refresh()}>{t('projects.summary.refreshOverview')}</Button>
         </>}
       />
       {project !== undefined ? (

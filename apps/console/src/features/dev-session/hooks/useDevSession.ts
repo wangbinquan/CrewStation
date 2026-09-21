@@ -4,6 +4,7 @@ import type { UseMutationResult } from '@tanstack/react-query';
 import { api } from '../../../shared/api/client';
 import { queryKeys } from '../../../shared/api/queryKeys';
 import { useApiMutation, useApiQuery } from '../../../shared/api/useApi';
+import { useManualRefresh } from '../../../shared/lib/useManualRefresh';
 import type { ApiClientError } from '../../../shared/api/useApi';
 
 export interface DevSessionHandle {
@@ -22,6 +23,8 @@ export interface DevSessionHandle {
 export function useDevSession(projectId: string): DevSessionHandle {
   const key = queryKeys.devSession(projectId);
   const query = useApiQuery(key, () => api.devSession.get(projectId), { refetchIntervalMs: 10_000 });
+  // 每 10 秒的例行重取不改界面；refreshing 只表示用户自己点了刷新。
+  const { refresh, refreshing } = useManualRefresh(query.refetch);
   // 释放之后重新取会得到 404，而 React Query 仍留着上一次成功的数据；
   // 已释放的会话也不算活着。两种情况都按“没有会话”处理，否则会同时渲染工作区与开会话表单。
   const absent = query.error?.kind === 'not_found' || query.data?.state === 'released';
@@ -30,7 +33,7 @@ export function useDevSession(projectId: string): DevSessionHandle {
     isPending: query.isPending,
     missing: absent,
     loadError: absent ? null : query.error,
-    refresh: query.refetch, refreshing: query.isFetching,
+    refresh, refreshing,
     open: useApiMutation((branch: string) => api.devSession.open(projectId, { branch }), { invalidate: [key] }),
     release: useApiMutation((force: boolean) => api.devSession.release(projectId, { force, ...(query.data ? { expectedTaskId: query.data.taskId } : {}) }), { invalidate: [key] }),
   };

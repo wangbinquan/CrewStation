@@ -19,13 +19,14 @@ let saved: AppVisibilityDto;
 function fixture(owner = false, application = app()) {
   saved = { mode: 'members', userIds: [], users: [], revision: 0, updatedAt: null, canConfigure: owner };
   const calls: Array<{ url: string; method: string; body?: Record<string, unknown> }> = [];
-  let conflict = false, queryFailure = false, marketFailure = false, slowReload = false;
+  let conflict = false, queryFailure = false, marketFailure = false, slowReload = false, holdMarket: Promise<void> | undefined;
   globalThis.fetch = (async (raw: RequestInfo | URL, init?: RequestInit) => {
     const url = String(raw), method = init?.method ?? 'GET', body = init?.body ? JSON.parse(String(init.body)) : undefined;
     calls.push({ url, method, body });
     let result: unknown = { items: [] }, status = 200;
     if (url.endsWith('/v1/me')) result = { id: userId, name: '使用者', email: 'user@example.com', platformRole: owner ? 'developer' : 'user', isAdmin: false, memberships: owner ? [{ projectId, role: 'owner' }] : [], authMethod: 'password' as const };
     else if (url.includes('/market/apps')) {
+      if (holdMarket) await holdMarket;
       if (marketFailure) { result = { error: 'not_found', message: '应用不存在或不可见' }; status = 404; }
       else result = url.includes(`/apps/${projectId}`) ? application : { items: [application] };
     } else if (url.endsWith('/app-visibility')) {
@@ -37,7 +38,9 @@ function fixture(owner = false, application = app()) {
     else if (url.includes('/member-candidates')) result = { items: [user] };
     return new Response(JSON.stringify(result), { status, headers: { 'content-type': 'application/json' } });
   }) as typeof fetch;
-  return { calls, conflict: (value: boolean) => { conflict = value; }, queryFailure: () => { queryFailure = true; }, revoke: () => { marketFailure = true; }, slowReload: () => { slowReload = true; } };
+  return { calls, conflict: (value: boolean) => { conflict = value; }, queryFailure: () => { queryFailure = true; }, revoke: () => { marketFailure = true; }, slowReload: () => { slowReload = true; },
+    /** 扣住市场回执，返回放行函数：用来断言例行刷新在途时页面上还剩什么。 */
+    hold: () => { let open = () => {}; holdMarket = new Promise<void>((resolve) => { open = () => { holdMarket = undefined; resolve(); }; }); return open; } };
 }
 async function input(node: HTMLInputElement | HTMLSelectElement, value: string) {
   await act(async () => {
@@ -134,5 +137,17 @@ describe('保存后的后台重读', () => {
     expect(page.text()).toContain('已保存'); expect(page.text()).not.toContain('暂不能保存');
     await act(async () => { await new Promise((resolve) => setTimeout(resolve, 400)); }); await page.settle();
     expect(page.text()).toContain('已保存第 1 版'); expect(page.text()).not.toContain('暂不能保存'); expect(page.text()).toContain('全部登录用户');
+  });
+  test('例行刷新在途保留当前卡片，回执到达后原地替换，不卸载整片网格', async () => {
+    const f = fixture(); page = await renderApp('/market');
+    const card = () => document.querySelector('main h2'), before = card();
+    expect(page.text()).toContain('知识助理');
+    const release = f.hold();
+    await act(async () => { focusManager.setFocused(false); focusManager.setFocused(true); }); await page.settle();
+    expect(f.calls.filter((call) => call.url.includes('/market/apps'))).toHaveLength(2);
+    // 刷新在途：卡片还在，且是同一批 DOM 节点，不是清空后重挂。
+    expect(page.text()).toContain('知识助理'); expect(page.text()).not.toContain('载入中'); expect(card()).toBe(before);
+    await act(async () => release()); await page.settle();
+    expect(page.text()).toContain('知识助理'); expect(card()).toBe(before);
   });
 });

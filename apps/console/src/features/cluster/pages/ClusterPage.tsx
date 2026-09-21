@@ -20,6 +20,7 @@ import { ClusterHistoryBrowser } from '../components/ClusterHistory';
 import { ClusterOperations } from '../components/ClusterOperations';
 import type { ClusterSearch } from '../model/clusterSearch';
 import { parseClusterSearch, clusterFilter, changeClusterFilter } from '../model/clusterSearch';
+import { sameApartFromSnapshot, sameUsageScope } from '../model/clusterReads';
 import styles from '../components/Cluster.module.css';
 
 export function ClusterPage() {
@@ -28,9 +29,11 @@ export function ClusterPage() {
   const change = (patch: ClusterSearch) => go(changeClusterFilter(search, patch));
   const summary = useApiQuery(queryKeys.cluster('summary', filter), () => api.cluster.summary(filter), { refetchIntervalMs: 15_000, refetchOnWindowFocus: true });
   const snapshotId = search.snapshotId ?? summary.data?.snapshotId;
-  const rows = useApiQuery(queryKeys.cluster('resources', { ...filter, snapshotId }), () => api.cluster.resources({ ...filter, snapshotId }), { enabled: !!snapshotId && !['operations', 'nodes', 'history'].includes(search.tab ?? '') });
+  const resourceQuery = { ...filter, snapshotId };
+  // 采集换快照只换读取目标：先留住当前页，等新快照的回执到达再原地替换，不整块卸载。
+  const rows = useApiQuery(queryKeys.cluster('resources', resourceQuery), () => api.cluster.resources(resourceQuery), { enabled: !!snapshotId && !['operations', 'nodes', 'history'].includes(search.tab ?? ''), keepPrevious: (previous) => sameApartFromSnapshot(previous, resourceQuery) });
   const usageQuery = { resourceIds: rows.data?.items.filter((r) => r.kind === 'Pod' || r.kind === 'PersistentVolumeClaim').map((r) => r.resourceId) ?? [], scope: filter.scope, projectId: filter.projectId };
-  const usage = useApiQuery(queryKeys.cluster('page-usage', usageQuery), () => api.cluster.usage(usageQuery), { enabled: !!rows.data && (search.tab === 'pods' || search.tab === 'storage'), refetchIntervalMs: 15_000 });
+  const usage = useApiQuery(queryKeys.cluster('page-usage', usageQuery), () => api.cluster.usage(usageQuery), { enabled: !!rows.data && (search.tab === 'pods' || search.tab === 'storage'), refetchIntervalMs: 15_000, keepPrevious: (previous) => sameUsageScope(previous, usageQuery) });
   const refresh = useApiMutation(() => api.cluster.refresh(), { invalidate: [['cluster']], onSuccess: () => change({}) });
   const s = summary.data;
   const cards = [
@@ -48,7 +51,7 @@ export function ClusterPage() {
           <QueryStatus isPending={rows.isPending} error={rows.error} isEmpty={rows.data?.complete === true && rows.data.total === 0} emptyTitle={t('cluster.empty')} />{rows.error?.status === 410 ? <Button onClick={() => change({})}>{t('cluster.newSnapshot')}</Button> : null}
           {search.tab === 'pods' || search.tab === 'storage' ? <><QueryStatus isPending={usage.isPending} error={usage.error} />{usage.data ? <UsageSummary title={t('cluster.metrics.selectedScope')} data={usage.data.summary} /> : null}</> : null}
           {rows.data ? search.tab === 'storage' ? <ClusterStorage rows={rows.data.items} usages={usage.data?.items ?? []} select={(row) => go({ ...search, resourceId: row.resourceId })} /> : <ClusterTable rows={rows.data.items} usages={usage.data?.items} select={(row) => go({ ...search, resourceId: row.resourceId })} /> : null}
-          <ActionRow>{search.cursor ? <Button onClick={() => change({})}>{t('cluster.firstPage')}</Button> : null}{rows.data?.nextCursor ? <Button onClick={() => go({ ...search, cursor: rows.data!.nextCursor, snapshotId, resourceId: undefined })}>{t('cluster.nextPage')}</Button> : null}</ActionRow>
+          <ActionRow>{search.cursor ? <Button onClick={() => change({})}>{t('cluster.firstPage')}</Button> : null}{rows.data?.nextCursor ? <Button onClick={() => go({ ...search, cursor: rows.data!.nextCursor, snapshotId: rows.data!.snapshotId, resourceId: undefined })}>{t('cluster.nextPage')}</Button> : null}</ActionRow>
         </Card>}
       </Tabs>
       {search.resourceId ? <ClusterDetail key={search.resourceId} resourceId={search.resourceId} snapshotId={snapshotId} close={() => { void navigate({ to: '/admin/cluster', search: { ...search, resourceId: undefined }, resetScroll: false }).then(() => document.querySelector<HTMLButtonElement>(`[data-cluster-resource="${search.resourceId}"]`)?.focus()); }} select={(row) => go({ ...search, resourceId: row.resourceId })} onOperation={(id) => go({ ...search, operationId: id })} /> : null}
