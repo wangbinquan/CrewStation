@@ -1,4 +1,4 @@
-.workspace { min-width: 0; font-size: 14px; }
+.workspace { min-width: 0; font-size: 14px; --cs-select-height: 28px; --cs-select-padding-block: 3px; --cs-select-font-size: 12px; }
 /* 开发页的页签与工具栏比普通页面更紧：1280×720 下首窗距产品顶端要在 210px 以内（development-workspace.md §2）。 */
 .workspace [role="tab"] { padding: 5px 10px; }
 .workspace [role="tabpanel"] { padding-top: 4px; }

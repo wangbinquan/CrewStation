@@ -11,9 +11,13 @@
 
 按作者「所有下拉框统一修改」要求，在 `shared/ui/selection/Select.css` 集中覆盖工作台 31 个文件的 47 处下拉及嵌入 API 文档的单选下拉：主题边框、箭头、菜单圆角／阴影、选中勾选、禁用／错误／焦点状态、长列表滚动与视口边缘翻转。页面原生表单与键盘语义保留，开发工作台维持 28px、列表筛选维持 32px 的紧凑高度。支持 `appearance: base-select` 的浏览器同时定制展开面板；不支持时入口采用统一样式，选项面板仍由系统绘制。
 
-新增 `tests/e2e/selectAppearance.test.ts`，在独立浏览器上下文装载生产样式，不依赖登录／业务数据；1280／390／320px、明暗主题、鼠标／键盘、必填与禁用、80 项滚动、底部翻转和渐进降级共 **8 pass／0 fail，86 assertions**。截图 `/private/tmp/cs-select-evidence/`。完整检查自然结束为 **1599 pass／331 skip／21 fail**：20 项当前部署的登录／页面 E2E 失败、1 项历史链接异步断言失败；测试数据库不可用，相关模块用例跳过。日志 `/private/tmp/crewstation-select-check.log`。没有把该轮记为完整通过，也未提交、推送或部署；共享工作树出现的 `modules/release/` 并行改动未触碰。
+新增 `tests/e2e/selectAppearance.test.ts`，在独立浏览器上下文装载生产样式，不依赖登录／业务数据；1280／390／320px、明暗主题、鼠标／键盘、必填与禁用、80 项滚动、底部翻转和渐进降级共 **8 pass／0 fail，86 assertions**。首次完整检查为 **1599 pass／331 skip／21 fail**：20 项部署登录／页面 E2E 失败、1 项历史链接异步断言失败；测试数据库不可用，相关模块用例跳过。该轮日志 `/private/tmp/crewstation-select-check.log`，未冒记完整通过。
 
-最终静态检查（架构、lint、两套类型检查）与工作台生产构建均通过。完整检查中的既有失败保留，未重复启动全量门禁。
+作者随后要求「部署并提交上库」。控制台镜像 `cs-console:select-style-20260921` 已部署到本机 `docker-desktop`／`crewstation-system`，滚动更新完成、Ready **1／1**。真实管理员项目目录在 1280px 浅色、390px 深色及 320px 浅色下菜单正常、筛选控件保持 32px、无整页横向溢出或控制台异常；服务返回的 CSS 为 HTTP 200，SHA-256 与本次生产构建一致。截图与结果在 `/private/tmp/cs-select-evidence/`、`/private/tmp/cs-select-live-result.json`。
+
+历史链接用例已用受控名册回执稳定复现原失败，改为等待实际名册加载完成后断言，不修改业务行为；相关 **10 pass／0 fail，98 assertions**。登录服务恢复后使用已有 `dev-admin` 的 OIDC 登录及独立测试 PostgreSQL 补齐完整检查，不改登录策略或用户角色。并行 RFC-013 文档提交已保留，代码候选哈希未变。
+
+最终完整 `bun run check` 通过：**1946 pass／5 skip／0 fail，12263 assertions，327 文件，319.72s**；静态检查与工作台生产构建通过。5 项跳过为非管理员身份、显式集群能力与原生 CLI 环境相关用例。日志 `/private/tmp/cs-select-release-check.log`，代码／测试候选哈希 `/private/tmp/cs-select-candidate.json`；按 9 个相关文件精确提交，推送后继续核对最终 SHA 的 `gate` 与 `e2e`。
 
 ## RFC 状态
 

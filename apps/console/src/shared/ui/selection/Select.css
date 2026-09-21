@@ -1,0 +1,139 @@
+/* 所有页面和嵌入的 API 文档共用下拉外观；保留原生表单、标签及键盘语义。 */
+:root select:not([multiple]):not([size]),
+:root select[size='1']:not([multiple]) {
+  appearance: none;
+  min-width: 0;
+  max-width: 100%;
+  min-height: var(--cs-select-height, 36px);
+  padding: var(--cs-select-padding-block, 6px) 32px var(--cs-select-padding-block, 6px) var(--cs-space-3);
+  border: 1px solid var(--cs-color-border);
+  border-radius: var(--cs-radius-md);
+  background-color: var(--cs-color-surface);
+  background-image: linear-gradient(45deg, transparent 50%, var(--cs-color-text-muted) 50%), linear-gradient(135deg, var(--cs-color-text-muted) 50%, transparent 50%);
+  background-position: calc(100% - 16px) 50%, calc(100% - 11px) 50%;
+  background-size: 5px 5px;
+  background-repeat: no-repeat;
+  color: var(--cs-color-text);
+  font-family: var(--cs-font-sans);
+  font-size: var(--cs-select-font-size, inherit);
+  font-weight: 400;
+  line-height: 1.5;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  box-shadow: var(--cs-shadow-sm);
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+:root select:not([multiple]):not([size]):hover:not(:disabled):not(:focus-visible):not(:open),
+:root select[size='1']:not([multiple]):hover:not(:disabled):not(:focus-visible):not(:open) {
+  border-color: var(--cs-color-text-muted);
+}
+
+:root select:not([multiple]):not([size]):focus-visible,
+:root select[size='1']:not([multiple]):focus-visible {
+  border-color: var(--cs-color-primary);
+  outline: 2px solid var(--cs-color-focus);
+  outline-offset: 2px;
+}
+
+:root select:not([multiple]):not([size])[aria-invalid='true'],
+:root select[size='1']:not([multiple])[aria-invalid='true'] {
+  border-color: var(--cs-color-danger);
+}
+
+:root select:not([multiple]):not([size]):disabled,
+:root select[size='1']:not([multiple]):disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  background-color: var(--cs-color-surface-muted);
+  box-shadow: none;
+}
+
+/* 支持可定制 select 的浏览器同时绘制菜单；旧浏览器保留可用的系统选项面板。 */
+@supports (appearance: base-select) {
+  :root select:not([multiple]):not([size]),
+  :root select[size='1']:not([multiple]) {
+    appearance: base-select;
+    padding-inline-end: var(--cs-space-3);
+    background-image: none;
+    gap: var(--cs-space-3);
+    align-items: center;
+    overflow: hidden;
+  }
+
+  select:where(:not([multiple]):is(:not([size]), [size='1']))::picker(select) {
+    appearance: base-select;
+    /* position-area 为 none 时显式启用控件的隐式锚点，避免菜单落到视口原点。 */
+    position-anchor: auto;
+    inline-size: max(anchor-size(width), 160px);
+    min-inline-size: anchor-size(width);
+    max-inline-size: calc(100vw - 16px);
+    max-block-size: min(320px, 60dvh);
+    position-area: none;
+    inset: auto;
+    top: anchor(bottom);
+    left: anchor(left);
+    position-try-fallbacks: flip-block, flip-inline, flip-block flip-inline;
+    margin-block: 6px;
+    padding: var(--cs-space-1);
+    border: 1px solid var(--cs-color-border);
+    border-radius: var(--cs-radius-md);
+    background: var(--cs-color-surface);
+    color: var(--cs-color-text);
+    box-shadow: var(--cs-shadow-popover);
+    overflow: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: var(--cs-color-border) transparent;
+  }
+
+  select:where(:not([multiple]):is(:not([size]), [size='1']))::picker-icon {
+    content: '';
+    width: 7px;
+    height: 7px;
+    margin: -3px 2px 0 auto;
+    flex-shrink: 0;
+    border-right: 1.5px solid currentColor;
+    border-bottom: 1.5px solid currentColor;
+    color: var(--cs-color-text-muted);
+    rotate: 45deg;
+    transition: rotate 120ms ease;
+  }
+
+  select:open::picker-icon { rotate: 225deg; margin-block-start: 3px; }
+  :root select:not([multiple]):not([size]):open,
+  :root select[size='1']:not([multiple]):open { border-color: var(--cs-color-primary); }
+
+  select:where(:not([multiple]):is(:not([size]), [size='1'])) option {
+    display: flex;
+    align-items: center;
+    gap: var(--cs-space-3);
+    min-height: 34px;
+    padding: 7px var(--cs-space-3);
+    border: 0;
+    border-radius: var(--cs-radius-sm);
+    background: var(--cs-color-surface);
+    color: var(--cs-color-text);
+    font: inherit;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    cursor: pointer;
+  }
+
+  select:where(:not([multiple]):is(:not([size]), [size='1'])) option:checked { background: var(--cs-color-tint); color: var(--cs-tone-info-fg); font-weight: 600; }
+  select:where(:not([multiple]):is(:not([size]), [size='1'])) option:hover:not(:disabled) { background: var(--cs-color-surface-muted); }
+  select:where(:not([multiple]):is(:not([size]), [size='1'])) option:checked:hover { background: var(--cs-color-tint); }
+  select:where(:not([multiple]):is(:not([size]), [size='1'])) option:focus-visible { outline: 2px solid var(--cs-color-focus); outline-offset: -2px; }
+  select:where(:not([multiple]):is(:not([size]), [size='1'])) option:disabled { color: var(--cs-color-text-muted); opacity: 0.55; cursor: not-allowed; }
+  select:where(:not([multiple]):is(:not([size]), [size='1'])) option::checkmark { order: 1; margin-inline-start: auto; color: var(--cs-tone-info-fg); }
+  select:where(:not([multiple]):is(:not([size]), [size='1'])) optgroup { padding: var(--cs-space-1); color: var(--cs-color-text-muted); font-size: var(--cs-font-size-sm); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root select, select::picker-icon { transition: none; }
+}
+
+@media (forced-colors: active) {
+  :root select:not([multiple]):not([size]), :root select[size='1']:not([multiple]) { border-color: ButtonText; }
+  select option:checked { outline: 1px solid Highlight; outline-offset: -1px; }
+}

@@ -1,4 +1,4 @@
-.filters { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--cs-space-2); margin-bottom: var(--cs-space-3); }
+.filters { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--cs-space-2); margin-bottom: var(--cs-space-3); --cs-select-height: 32px; --cs-select-padding-block: 4px; }
 .filters label { display: flex; flex-direction: column; gap: var(--cs-space-1); min-width: 0; max-width: 100%; color: var(--cs-color-text-muted); }
 .filters label:first-child { flex: 1 1 180px; }
 .filters input, .filters select { box-sizing: border-box; min-width: 0; max-width: 100%; min-height: 32px; padding: var(--cs-space-1) var(--cs-space-2); border: 1px solid var(--cs-color-border); border-radius: var(--cs-radius-sm); background: var(--cs-color-surface); color: var(--cs-color-text); font: inherit; }

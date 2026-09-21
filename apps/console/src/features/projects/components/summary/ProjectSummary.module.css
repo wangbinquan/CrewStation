@@ -1,5 +1,5 @@
 .filters, .toolbar, .actions { display: flex; flex-wrap: wrap; align-items: end; gap: var(--cs-space-2); }
-.filters { margin-bottom: var(--cs-space-3); }
+.filters { margin-bottom: var(--cs-space-3); --cs-select-height: 32px; --cs-select-padding-block: 4px; }
 .filters label { display: grid; gap: var(--cs-space-1); font-size: var(--cs-font-size-sm); }
 .filters label:first-child { flex: 1 1 200px; }
 .filters input, .filters select { box-sizing: border-box; min-width: 0; min-height: 32px; padding: var(--cs-space-1) var(--cs-space-2); border: 1px solid var(--cs-color-border); border-radius: var(--cs-radius-sm); background: var(--cs-color-surface); color: var(--cs-color-text); }

@@ -1,3 +1,5 @@
+@import '../../shared/ui/selection/Select.css';
+
 /* 全局基线：盒模型、字体、链接、代码；页面与组件样式在各自的 CSS Module 中。 */
 *,
 *::before,

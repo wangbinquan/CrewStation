@@ -71,7 +71,14 @@ test('返回 CLI 先保护未发送输入，在途不允许放弃，取消保留
 });
 
 test('未知历史链接不回落到另一 Agent，选择已有对象和同页链接切换保留各自草稿', async () => {
-  fixture = historicalConversationFixture(); page = await renderApp(`${path}?agent=missing-agent`);
+  const rosterReady = Promise.withResolvers<void>();
+  fixture = historicalConversationFixture(rosterReady.promise); page = await renderApp(`${path}?agent=missing-agent`);
+  expect(input().disabled).toBe(true);
+  // 未知链接的提示依赖名册回执，显式等待已有对象出现，避免把加载中的空态当作最终结果。
+  await act(async () => rosterReady.resolve());
+  const readyBy = Date.now() + 1000;
+  while (!rosterTab(historyAgentA) && Date.now() < readyBy) await page.settle();
+  expect(rosterTab(historyAgentA)).toBeDefined();
   expect(input().disabled).toBe(true); expect(page.text()).toContain('指定的历史 Agent 不存在或当前不可访问');
   expect(document.querySelectorAll('[role="tab"][aria-selected="true"]')).toHaveLength(0);
   await select(historyAgentA); await edit('A 的独立输入'); await page.navigate(`${path}?agent=${historyAgentB}`); expect(input().value).toBe('');
