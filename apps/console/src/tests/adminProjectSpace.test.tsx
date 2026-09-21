@@ -9,7 +9,7 @@ const project = { id: projectId, serviceId, name: '公司接口接入', slug: 'c
 let page: Awaited<ReturnType<typeof renderApp>> | undefined;
 afterEach(() => { page?.unmount(); page = undefined; globalThis.fetch = originalFetch; });
 
-function fixture(options: { admin?: boolean; pendingMe?: boolean; meFailure?: boolean; projectFailure?: boolean; digitalWorker?: boolean } = {}) {
+function fixture(options: { admin?: boolean; pendingMe?: boolean; meFailure?: boolean; projectFailure?: boolean; projectMissing?: boolean; digitalWorker?: boolean } = {}) {
   const calls: string[] = [];
   const state = { ...options };
   globalThis.fetch = (async (raw) => {
@@ -20,7 +20,8 @@ function fixture(options: { admin?: boolean; pendingMe?: boolean; meFailure?: bo
       if (state.meFailure) { status = 503; body = { error: 'unavailable', message: '身份读取失败' }; }
       else body = { id: 'user', name: '管理员', email: 'admin@example.invalid', platformRole: (state.admin !== false) ? 'admin' : 'developer', isAdmin: state.admin !== false, memberships: [] };
     } else if (url.endsWith(`/v1/projects/${projectId}`)) {
-      if (state.projectFailure) { status = 503; body = { error: 'unavailable', message: '项目目录读取失败' }; }
+      if (state.projectMissing) { status = 404; body = { error: 'not_found', message: '项目不存在' }; }
+      else if (state.projectFailure) { status = 503; body = { error: 'unavailable', message: '项目目录读取失败' }; }
       else body = { ...project, kind: state.digitalWorker ? 'DigitalWorker' : 'APIProxy' };
     } else if (url.includes('/v1/projects/page?')) body = { items: [{ project: { ...project, ownerUserId: '01a0bf5d-8f4b-7f8b-8136-e631380738b0' }, role: 'admin', ownerName: '管理员' }] };
     else if (url.includes('/v1/projects?')) body = { items: [project] };
@@ -32,20 +33,32 @@ function fixture(options: { admin?: boolean; pendingMe?: boolean; meFailure?: bo
 }
 
 describe('管理接入容器复用业务页面', () => {
-  test('管理列表直接打开管理详情，项目导航及发布／设置始终保留空间', async () => {
-    fixture(); page = await renderApp('/admin/integrations');
+  test.each(['/admin/projects', '/admin/integrations'])('%s 打开项目后，子页面返回项目管理并高亮正确菜单', async (entry) => {
+    fixture(); page = await renderApp(entry);
     await page.click('公司接口接入'); expect(page.path()).toBe(`/admin/integrations/${projectId}`);
     expect(document.querySelector('[aria-label="项目页面"]')?.textContent).toContain('发布与上线');
-    expect(page.text()).toContain('返回接入容器');
-    expect(document.querySelector('nav details')).not.toBeNull();
-    expect(document.querySelector('nav details')!.hasAttribute('open')).toBe(false);
+    expect(page.text()).toContain('返回项目管理');
+    expect(document.querySelector('nav details')).toBeNull();
     await page.click('发布与上线'); expect(page.path()).toBe(`/admin/integrations/${projectId}/release`);
     await page.click('项目设置'); expect(page.path()).toBe(`/admin/integrations/${projectId}/settings`);
     expect(page.text()).not.toContain('应用可见性');
     await page.click('环境变量'); await page.click('生产');
     expect(page.search()).toMatchObject({ tab: 'config', env: 'production' });
     expect(page.path()).toBe(`/admin/integrations/${projectId}/settings`);
-    await page.click('返回接入容器'); expect(page.path()).toBe('/admin/capabilities'); expect(page.search().tab).toBe('integrations');
+    // 从项目管理进入后，旧返回链接却写死到了能力接入。
+    await page.click('返回项目管理'); expect(page.path()).toBe('/admin/projects');
+    expect(document.querySelector('nav[aria-label="主导航"] a[aria-current="page"]')?.textContent).toBe('项目管理');
+  });
+
+  test('项目深链接的顶栏返回平台管理也落在项目目录', async () => {
+    fixture(); page = await renderApp(`/admin/integrations/${projectId}/release`);
+    await page.click('平台管理'); expect(page.path()).toBe('/admin/projects');
+    expect(document.querySelector('nav[aria-label="主导航"] a[aria-current="page"]')?.textContent).toBe('项目管理');
+  });
+
+  test('缺失项目正文中的返回链接也回项目管理', async () => {
+    fixture({ projectMissing: true }); page = await renderApp(`/admin/integrations/${projectId}`);
+    expect(document.querySelector('main a[href="/admin/projects"]')?.textContent).toBe('返回项目管理');
   });
 
   test('旧租户日志链接逐级 replace 到管理诊断，任务条件和返回栈保持', async () => {

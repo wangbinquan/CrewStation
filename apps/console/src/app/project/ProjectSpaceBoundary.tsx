@@ -35,7 +35,7 @@ export function ProjectSpaceBoundary({ children }: { readonly children: ReactNod
   if (pending) notice = <QueryStatus isPending error={null} />;
   else if (denied) notice = <EmptyState title={t('admin.denied.title')} description={t('admin.denied.description')} action={<Link to="/">{t('admin.denied.back')}</Link>} />;
   else if (missing) notice = <EmptyState title={t('projectContext.missingTitle')} description={t('projectContext.missingDescription', { projectId })} action={<>
-    {space === 'admin' ? <Link to="/admin/capabilities" search={{ tab: 'integrations' }}>{t('nav.admin.backToIntegrations')}</Link> : <Link to="/projects">{t('projectContext.backToProjects')}</Link>}
+    {space === 'admin' ? <Link to="/admin/projects">{t('nav.admin.backToProjects')}</Link> : <Link to="/projects">{t('projectContext.backToProjects')}</Link>}
     <Button variant="ghost" onClick={() => void project.refetch()}>{t('projectContext.retry')}</Button></>} />;
   else if (failed) notice = <><QueryStatus isPending={false} error={project.error ?? me.error} /><Button onClick={() => { void project.refetch(); if (me.error) void me.refetch(); }}>{t('projectContext.retry')}</Button></>;
   else notice = <><QueryStatus isPending={false} error={project.error} />{project.previewOnly ? <TesterProjectPage /> : null}</>;

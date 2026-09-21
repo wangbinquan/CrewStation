@@ -20,6 +20,28 @@ async function enter(label: string, value: string) {
   }); await page!.settle();
 }
 
+test.each(['DigitalWorker', 'APIProxy'] as const)('%s 概览快捷入口集中呈现用途，点击保留项目和目标分类', async (kind) => {
+  const f = summaryFixture(); f.item.project.kind = kind;
+  const base = `${kind === 'DigitalWorker' ? '/projects' : '/admin/integrations'}/${f.item.project.id}`;
+  const targets = ['/release', '/settings?tab=members', '/resources?section=project', '/resources?section=api'];
+  const labels = ['前往发布', '成员与角色', '仓库', '开发资源'];
+  page = await renderApp(base);
+  // 旧概览只是四个散落的文本链接；集中为可辨识的导航区，避免只修 CSS 却丢失入口或项目上下文。
+  const links = [...document.querySelectorAll<HTMLAnchorElement>('main nav[aria-label="项目快捷入口"] a')];
+  expect(links.map((link) => link.querySelector('strong')?.textContent)).toEqual(labels);
+  expect(links.map((link) => link.getAttribute('href'))).toEqual(targets.map((target) => base + target));
+  expect(links.every((link) => !!link.querySelector('small')?.textContent)).toBe(true);
+  for (const [index, target] of targets.entries()) {
+    if (index > 0) await page.navigate(base);
+    const link = document.querySelectorAll<HTMLAnchorElement>('main nav[aria-label="项目快捷入口"] a')[index]!;
+    await act(async () => link.click()); await page.settle();
+    const expected = new URL(base + target, 'http://test');
+    expect(page.path()).toBe(expected.pathname);
+    for (const [key, value] of expected.searchParams) expect(page.search()[key]).toBe(value);
+  }
+  expect(f.writes).toEqual([]);
+});
+
 describe('项目列表的真实分页与独立状态', () => {
   test('回到前台重读当前身份与摘要，保留尚未应用的搜索输入；离开后不继续读取', async () => {
     const f = summaryFixture(); let visible = true;

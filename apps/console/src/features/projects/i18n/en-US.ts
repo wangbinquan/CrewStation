@@ -160,6 +160,11 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   'projects.overview.error': 'Failed to load the project: {message}',
   'projects.overview.noService': 'No service has been provisioned yet; slots and the repository appear once provisioning finishes.',
   'projects.overview.goRelease': 'Go to release',
+  'projects.overview.quickLinks': 'Project shortcuts',
+  'projects.overview.quickLinks.release': 'Versions, releases and rollout',
+  'projects.overview.quickLinks.members': 'Collaborators and project roles',
+  'projects.overview.quickLinks.repository': 'Source repository and conventions',
+  'projects.overview.quickLinks.resources': 'APIs and development capabilities',
 
   'projects.slots.title': 'Deployment slots',
   'projects.slot.preview': 'preview slot',

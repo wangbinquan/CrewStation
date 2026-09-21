@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Link, useLocation, useNavigate } from '@tanstack/react-router';
+import { Link, useLocation, useNavigate, useParams } from '@tanstack/react-router';
 import { useT } from '../../shared/lib/useT';
 import { api } from '../../shared/api/client';
 import { queryKeys } from '../../shared/api/queryKeys';
@@ -14,6 +14,8 @@ import styles from './TopBar.module.css';
 /** Space navigation follows the current platform role; the brand always opens applications. */
 export function TopBar() {
   const t = useT(), { pathname: path, href } = useLocation(), navigate = useNavigate();
+  const { projectId: currentProjectId } = useParams({ strict: false });
+  const adminTarget = currentProjectId && (path.startsWith('/projects/') || path.startsWith('/admin/')) ? '/admin/projects' : '/admin';
   const me = useApiQuery(queryKeys.me(), () => api.me.get());
   const role = !me.error && !me.isPending ? me.data?.platformRole : undefined;
   const projectId = /^\/projects\/([0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:\/|$)/.exec(path)?.[1];
@@ -37,7 +39,7 @@ export function TopBar() {
       <nav className={styles.globalNav} aria-label={t('nav.global')}>
         <Link to="/market" className={pill(path === '/' || path.startsWith('/market'))}>{t('nav.market')}</Link>
         {role === 'developer' || role === 'admin' ? <Link to="/projects" onClick={(event) => { event.preventDefault(); void development(); }} className={pill(path.startsWith('/projects'))}>{t('nav.projects')}</Link> : null}
-        {role === 'admin' ? <Link to="/admin" className={pill(path.startsWith('/admin'))}>{t('app.adminSpace')}</Link> : null}
+        {role === 'admin' ? <Link to={adminTarget} className={pill(path.startsWith('/admin'))}>{t('app.adminSpace')}</Link> : null}
       </nav>
     </div>
     <div className={styles.right}><LocaleSwitch /><CurrentUserChip /></div>

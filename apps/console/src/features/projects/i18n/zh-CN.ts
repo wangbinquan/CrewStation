@@ -159,6 +159,11 @@ export const messages = {
   'projects.overview.error': '加载项目失败：{message}',
   'projects.overview.noService': '项目尚未开通服务；开通完成后在此显示部署槽与源码仓库。',
   'projects.overview.goRelease': '前往发布',
+  'projects.overview.quickLinks': '项目快捷入口',
+  'projects.overview.quickLinks.release': '查看版本、发布与上线',
+  'projects.overview.quickLinks.members': '管理协作者与项目角色',
+  'projects.overview.quickLinks.repository': '查看源码仓库与工作约定',
+  'projects.overview.quickLinks.resources': '查阅 API 与可用开发能力',
 
   'projects.slots.title': '部署槽',
   'projects.slot.preview': 'preview 槽',

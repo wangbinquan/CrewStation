@@ -115,7 +115,7 @@ describe('管理空间与租户空间分离（RFC-002）', () => {
     app = await renderApp(`/projects/${projectId}/release`);
     expect(app.path()).toBe(`/projects/${projectId}/release`);
     await app.click('平台管理');
-    expect(app.path()).toBe('/admin');
+    expect(app.path()).toBe('/admin/projects');
     await app.click('项目开发');
     expect(app.path()).toBe(`/projects/${projectId}/release`);
   });

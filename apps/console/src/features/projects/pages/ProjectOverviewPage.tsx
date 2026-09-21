@@ -18,6 +18,7 @@ import { DeploymentCard } from '../components/summary/DeploymentCard';
 import { ProjectNextStepBanner } from '../components/summary/ProjectNextStepBanner';
 import { ProjectRecentActivity } from '../components/summary/ProjectRecentActivity';
 import { ProjectSummaryAttention } from '../components/summary/ProjectSummaryAttention';
+import { ProjectQuickLinks } from '../components/summary/ProjectQuickLinks';
 import styles from '../components/summary/ProjectSummary.module.css';
 
 /** 项目概览保留运行版本，成员、仓库与资源通过设置入口查看。 */
@@ -66,12 +67,7 @@ export function ProjectOverviewPage(): ReactElement {
         {available ? <ProjectSummaryAttention item={item} space={space} /> : null}
         <ProjectRecentActivity item={item} space={space} />
       </div> : null}
-      <div className={styles.toolbar}>
-        <Link to={PROJECT_PATHS[space].release} params={{ projectId }}>{t('projects.overview.goRelease')}</Link>
-        <Link to={PROJECT_PATHS[space].settings} params={{ projectId }} search={{ tab: 'members' }}>{t('settings.tab.members')}</Link>
-        <Link to={PROJECT_PATHS[space].resources} params={{ projectId }} search={{ section: 'project' }}>{t('settings.tab.repository')}</Link>
-        <Link to={PROJECT_PATHS[space].resources} params={{ projectId }} search={{ section: 'api' }}>{t('settings.tab.resources')}</Link>
-      </div>
+      <ProjectQuickLinks />
     </>
   );
 }

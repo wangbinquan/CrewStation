@@ -108,10 +108,6 @@
   font-weight: 600;
 }
 
-.globalTools { min-width: 0; }
-.globalTools > summary { cursor: pointer; padding: 6px var(--cs-space-3); color: var(--cs-nav-text-muted); font-size: var(--cs-font-size-sm); }
-.globalTools[open] > summary { margin-bottom: 6px; }
-
 @media (max-width: 800px) {
   .nav {
     flex-direction: row;

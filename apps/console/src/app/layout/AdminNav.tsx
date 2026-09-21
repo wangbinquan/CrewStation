@@ -20,8 +20,7 @@ export function AdminNav(): ReactElement {
   if (inProject) {
     return (
       <nav className={styles.nav} aria-label={t('nav.aria')}>
-        <ProjectNavSection projectId={projectId} space="admin" backTo={<Link to="/admin/capabilities" search={{ tab: 'integrations' }} className={styles.back}>← {t('nav.admin.backToIntegrations')}</Link>} />
-        <details className={styles.globalTools}><summary>{t('nav.admin.section')}</summary><AdminGlobalLinks /></details>
+        <ProjectNavSection projectId={projectId} space="admin" backTo={<Link to="/admin/projects" className={styles.back}>← {t('nav.admin.backToProjects')}</Link>} />
       </nav>
     );
   }

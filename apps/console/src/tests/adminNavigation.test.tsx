@@ -67,10 +67,15 @@ describe('管理空间的分组树（2026-09-21 修订 RFC-003 §4）', () => {
     expect(current).toEqual(['网关']);
   });
 
-  test('接入容器项目内折叠的平台菜单是同一棵树', async () => {
+  test('接入项目只显示项目导航，不再嵌套折叠的平台菜单', async () => {
     asAdmin(); page = await renderApp(`/admin/integrations/${projectId}`);
-    expect(document.querySelector('nav details summary')?.textContent).toBe('平台管理');
-    expect(linkTree(document.querySelector('nav details'))).toEqual([...EXPECTED_TREE]);
+    // 项目侧栏曾重复整棵平台菜单，折叠后仍与项目导航混在一起。
+    const nav = document.querySelector('nav[aria-label="主导航"]')!;
+    expect(nav.querySelector('details') === null).toBe(true);
+    expect(nav.querySelectorAll('ul')).toHaveLength(1);
+    expect(nav.querySelector('[aria-label="项目页面"]')).not.toBeNull();
+    expect(nav.querySelector('a[href="/admin/projects"]')?.textContent).toContain('返回项目管理');
+    expect(nav.textContent).not.toContain('能力接入');
   });
 
   test('总览入口卡片按同样的分组显示，补齐认证与集群管理，不重复待处理入口', async () => {

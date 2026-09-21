@@ -132,6 +132,7 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   'projectContext.missingDescription': 'Project {projectId} does not exist, or you are not one of its members; the platform does not tell the two apart. Ask the project owner or a platform administrator for access.',
   'projectContext.backToProjects': 'Back to projects',
   'nav.admin.backToIntegrations': 'Back to integrations',
+  'nav.admin.backToProjects': 'Back to project management',
   'nav.admin.section': 'Platform admin',
   'nav.admin.overview': 'Overview',
   'nav.admin.users': 'Users and roles',

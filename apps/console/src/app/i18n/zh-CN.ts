@@ -134,6 +134,7 @@ export const messages = {
   'projectContext.missingDescription': '项目 {projectId} 不存在，或你不是它的成员；平台不区分这两种情况。需要访问时请联系该项目负责人或平台管理员。',
   'projectContext.backToProjects': '返回数字人项目',
   'nav.admin.backToIntegrations': '返回接入容器',
+  'nav.admin.backToProjects': '返回项目管理',
   'nav.admin.section': '平台管理',
   'nav.admin.overview': '总览',
   'nav.admin.users': '用户与权限',
