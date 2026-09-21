@@ -37,15 +37,17 @@ T1–T9 已落地并推送：Runner 新增 `startPreview`／`stopPreview`／`pre
 
 **实机验收 PV-01…PV-18 未执行**，需要本机集群上的真实开发会话；而本机部署会把并行 RFC-015 未提交且编译不过的在制品一起推上集群，故本轮不做，等其落地后再补。同因并行在制品，本轮没有跑通完整 `bun run check`：`arch:check` 通过，`lint`／`typecheck` 的报错全部落在 `apps/console/src/features/cluster/`、`modules/cluster-management/`、`packages/filesystem-metrics/`、`apps/cs-storage-probe/`。
 
-## RFC-015 集群容量、用量与七天趋势（2026-09-21）
+## RFC-015 集群容量、用量与七天趋势已 Done（2026-09-21）
 
-作者追加三项要求：存储申请／实际使用、Pod 容器及对应资源申请／节点、全局节点与全部关键容量／实时 CPU／存储／网络等；随后明确选择“同时保留最近 7 天趋势”。已完成源码和实机只读核查，三件套与 audit 位于 `proposal/rfc/RFC-015-cluster-resource-observability/`，索引 In Progress。现有 RFC-010 的 Done 状态不变；本轮容量、用量、七天趋势的代码与部署已落地，正在完成最终门禁与发布。
+作者追加三项要求：存储申请／实际使用、Pod 容器及对应资源申请／节点、全局节点与全部关键容量／实时 CPU／存储／网络等；随后明确选择“同时保留最近 7 天趋势”。三件套、audit 与 acceptance 位于 `proposal/rfc/RFC-015-cluster-resource-observability/`，T1–T12／RO-01…RO-29 已完成，索引 Done。现有 RFC-010 的 Done 状态不变；本轮容量、用量、七天趋势的实现、部署、本机验收与精确 SHA CI 均已完成。
 
 实机 1 节点，Summary 可读 CPU／内存／网络／节点文件系统，cAdvisor 有设备 I/O 计数；12 个 local-path PVC 没有 pvcRef 卷统计。方案包含全集群只读容量＋受管分项、结构化容器／PVC 资源表、kubelet 采集、固定卷根只读 probe 及内部 Prometheus 的七天趋势。历史断档、同名新 UID、已删除对象、峰值和保留边界均列入 RO-01…RO-29 验收。观测时节点仅约 1.15GiB 可用，后续部署必须重新盘点指标卷的实际容量，不能因 PVC 申请成功就当已扩容。
 
-作者现已明确回复“批准实施、部署、提交上库”，RO-D1…D4、七天趋势、节点读取／proxy、只读卷采集器及内部指标存储部署均获批，RFC 进入 In Progress。下拉框与历史会话测试已由原任务提交；本任务保留其输出，按精确路径发布。
+作者已明确回复“批准实施、部署、提交上库”，RO-D1…D4、七天趋势、节点读取／proxy、只读卷采集器及内部指标存储部署均获批。下拉框与历史会话测试已由原任务提交；本任务保留其输出，按精确路径发布。
 
-已部署 cs-api／controller／只读 probe `cs-control-plane:rfc015-20260921-3`、console `cs-console:rfc015-20260921-2` 和内部 Prometheus 3.13.3（8 天内部保留、对外最近 7 天）。专用 PVC 的 2,101,248 字节与节点 du 一致，卸载后用量保持；三档宽度、双语／主题、键盘共 12 组实机检查通过。真实 TSDB 七天／清理／归属变化／重启用例通过。最终完整 check **2029 pass／5 skip／0 fail，12863 assertions，343 文件，343.84s**；候选代码哈希与开跑时一致，改动行防护 **1219／1232 = 98.9%**，所有新生产文件有用例加载；正在精确提交／推送并等待最终 SHA CI。详见 RFC-015 acceptance.md。
+已部署 cs-api／controller／只读 probe `cs-control-plane:rfc015-20260921-3`、console `cs-console:rfc015-20260921-2` 和内部 Prometheus 3.13.3（8 天内部保留、对外最近 7 天；真实 CPU 数据起点 2026-09-21 10:12:14 Asia/Shanghai）。专用 PVC 的 2,101,248 字节与节点 du 一致，卸载后用量保持；三档宽度、双语／主题、键盘共 12 组实机检查通过。真实 TSDB 七天／清理／归属变化／重启用例通过。最终完整 check **2029 pass／5 skip／0 fail，12863 assertions，343 文件，343.84s**；候选代码哈希与开跑时一致，本地改动行防护 **1219／1232 = 98.9%**，所有新生产文件有用例加载。
+
+实现 **`3266e75f1704f4c0bc5ab8950abd936e8a814b03`** 已上库；共享 main 随后包含管理导航状态记录，实际推送并验证的 SHA 为 **`f5f42adfdc3315e8de8b0583409fb636bebcd5fc`**，包含完整实现。[CI 35555330886](https://github.com/wangbinquan/CrewStation/actions/runs/35555330886) 六项全部成功：unit 336、module 1098／8 skip、console 538、e2e 36／18 skip，全部 0 fail；新增代码防护 1219／1233（98.9%）。新增实机四项与真实 Prometheus 三项均在 hosted 环境执行通过。推送后核实本地与远端同步；本次只做文档结项，详见 RFC-015 acceptance.md。
 
 镜像导入期间节点物理盘短暂耗尽，PostgreSQL 重启后已恢复。仅删除本轮首个候选镜像、零副本控制器修订和精确构建缓存，保留全部既有回退镜像与业务卷；本轮精确清理后余量约 768MiB，随后共享环境释放空间，最终复核约 **5.6GiB** 可用。指标 PVC 申请 10Gi 不代表已扩充底层磁盘。
 

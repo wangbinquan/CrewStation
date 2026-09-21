@@ -1,6 +1,6 @@
 # RFC-015｜技术设计
 
-> 状态：In Progress · 日期：2026-09-21
+> 状态：Done · 2026-09-21 · 部署与 RO-01…RO-29 核对完成，见 [验收记录](./acceptance.md)
 > 配套：[提案](./proposal.md) · [计划](./plan.md) · [核对证据](./audit.md)
 
 ## 目录
