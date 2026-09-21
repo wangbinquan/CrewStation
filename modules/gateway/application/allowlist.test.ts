@@ -5,6 +5,8 @@ import type { GatewayUseCaseDeps } from './dependencies';
 
 const caller: WorkloadIdentity = { identity: 'demo/demo', project: 'demo', service: 'demo', kind: 'service', slot: 'prod' };
 const platformCall = { host: 'api.svc.cs.internal', method: 'POST', path: '/v1/business-tasks' };
+// 评估以真实时间计算陈旧度；重建场景的文档必须保持新鲜，不能在某个固定日期两小时后自行变红。
+const generatedAt = new Date().toISOString();
 /** 升级前留下的旧文档：没有 identityVersion。 */
 const legacy = { version: 40, generatedAt: '2026-09-20T12:53:55.831Z', defaultOpen: [], maxStaleSeconds: 300, entries: [] } as unknown as AllowlistDocument;
 
@@ -25,7 +27,7 @@ function harness(stored: AllowlistDocument[], beforeSave?: (store: AllowlistDocu
     services: { listServices: async () => { composed += 1; return [{ identity: 'demo/demo', kind: 'DigitalWorker' as const }]; } },
     grants: { listCallers: async () => [], grantedOperations: async () => ({ operations: [], defaultOpen: [], operationRoutes: [] }) },
     settings: { allowlistMaxStaleSeconds: 300, serviceDomain: 'svc.cs.internal' },
-    clock: { now: () => new Date('2026-09-21T03:00:00.000Z') },
+    clock: { now: () => new Date(generatedAt) },
     logger: { debug: log('debug'), info: log('info'), warn: log('warn'), error: log('error') },
   } as unknown as GatewayUseCaseDeps;
   return { useCases: allowlistUseCases(deps), stored, logs, composed: () => composed };
@@ -55,7 +57,7 @@ describe('放行表的按需重建', () => {
   });
 
   test('别的进程在本进程落库前抢到了同一个版本号：改用它落库的那份，不把主键冲突漏给调用方', async () => {
-    const winner = { identityVersion: 2, operationRoutes: [], version: 41, generatedAt: '2026-09-21T03:00:00.000Z', defaultOpen: [], entries: [{ caller: 'demo/demo', operations: [], platformApi: true, platformHosts: ['platformApi'] }], maxStaleSeconds: 300 } as AllowlistDocument;
+    const winner = { identityVersion: 2, operationRoutes: [], version: 41, generatedAt, defaultOpen: [], entries: [{ caller: 'demo/demo', operations: [], platformApi: true, platformHosts: ['platformApi'] }], maxStaleSeconds: 300 } as AllowlistDocument;
     const h = harness([legacy], (store) => { if (!store.includes(winner)) store.push(winner); });
     expect((await h.useCases.evaluate(caller, platformCall)).allowed).toBe(true);
     expect(h.stored.map((doc) => doc.version)).toEqual([40, 41]);
@@ -67,7 +69,7 @@ describe('放行表的按需重建', () => {
     const h = harness(stored);
     // 本进程读到 40 之后、推导内容期间，另一个进程落了 41。
     const pending = h.useCases.evaluate(caller, platformCall);
-    stored.push({ identityVersion: 2, operationRoutes: [], version: 41, generatedAt: '2026-09-21T03:00:00.000Z', defaultOpen: [], entries: [{ caller: 'demo/demo', operations: [], platformApi: true, platformHosts: ['platformApi'] }], maxStaleSeconds: 300 } as AllowlistDocument);
+    stored.push({ identityVersion: 2, operationRoutes: [], version: 41, generatedAt, defaultOpen: [], entries: [{ caller: 'demo/demo', operations: [], platformApi: true, platformHosts: ['platformApi'] }], maxStaleSeconds: 300 });
     expect((await pending).allowed).toBe(true);
     expect(stored.map((doc) => doc.version)).toEqual([40, 41]);
   });
