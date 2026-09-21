@@ -53,6 +53,7 @@ git push origin main
 
 - **只提交自己改过的文件**：按路径精确 `git add <file>`，**不要 `git add .` / `git add -A`**。
 - **提交也要带 pathspec**：`git commit -- <你的路径…>`。精确 `git add` **挡不住**这件事——共享工作树的 index 是共用的，别人可能早已 `git add` 过在制品，而裸 `git commit` 提交的是**整个暂存区**。
+- **pathspec 要给到文件，不要给目录**。`git commit -- <paths>` 提交的是这些路径的**工作树内容**，不是你暂存的那份；给一个目录就会把别人在该目录下的未提交改动一并提走。2026-09-21 实撞：RFC-016 按 36 个文件 `git add` 后用 `git commit -- packages/contracts runtimes/task …` 目录级提交，结果扫进并行会话的 9 个 RFC-015 在制品文件，其中 `packages/contracts/index.ts` 还 `export *` 了两个**未追踪**的新文件——那笔提交在干净 checkout 上根本编译不过，推上去就是全员红。**提交后先 `git show --name-only HEAD` 对一遍文件清单**；多出来的路径，用 `git restore --source=HEAD~1 --staged -- <那些文件>` 把索引还原再 `git commit --amend`（只动索引，不碰别人的工作树），不要 `reset --hard`，也不要手工改回文件内容。
 - **推之前看一眼暂存区**：`git diff --cached --stat`，出现任何你没打算提的路径就停下。
 - **绝不删除、绝不回退别人的改动**：包括别人改过的行、新增的文件、共享索引里别人加的条目、`package.json` 与锁文件里别人加的依赖。认不出来源的 hunk 一律先问，不要猜。
 - **别人的未追踪文件不要主动 `git add`**，让对方自己提。

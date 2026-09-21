@@ -89,7 +89,9 @@ hello 的 `capabilities` 加 `previewControl: z.literal(1).optional()`，照 `ap
 
 `asPreviewStatusResult`（`runnerResults.ts`）随迁移**变成死代码并删除**。初版设计说「事件路径仍需要它」是错的：事件路径走的是 `RunnerEventSchema.safeParse`，从来没用过它。相应地，畸形 REST 响应不再被这层手写校验拦住——这与控制台其余所有 api-client 调用的姿态一致，不为一条端点单开一套校验；服务端在 Runner 边界已用 `RunnerResultPayloads` 解析过。
 
-界面上 `devSession.preview.*` 增停止／启动两个动作与相应文案，把「已停止（你停的）」与「已崩溃」分开表达。`busy` 互斥、`confirmed` 语义、冲突文案沿用现有 store 的处理方式。
+界面上 `devSession.preview.*` 增停止／启动两个动作与相应文案，把「已停止（你停的，不会自己回来）」与「已崩溃（连续失败后放弃重试）」分开表达。`busy` 互斥、`confirmed` 语义、冲突文案沿用现有 store 的处理方式。
+
+`PreviewPane.tsx` 与其样式模块**一并删除**：改到它时才发现自 `58ea7cd` 起全仓零引用，实际在渲染的是 `DevelopmentPreview`。新增代码防护正是这样发现的——「有可执行逻辑，但没有任何用例加载它」。它唯一的消费者 `previewStateTone` 随之成为孤儿导出，一并移除。
 
 ## 失败模式
 

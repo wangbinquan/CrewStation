@@ -25,12 +25,6 @@ export function agentStateTone(state: AgentInstanceState): BadgeTone {
   return state === 'completed' ? 'success' : 'neutral';
 }
 
-export function previewStateTone(state: PreviewState): BadgeTone {
-  if (state === 'ready') return 'success';
-  if (state === 'crashed') return 'danger';
-  return state === 'starting' ? 'info' : 'neutral';
-}
-
 export function bindingStateTone(state: TaskDataBindingState): BadgeTone {
   if (state === 'active' || state === 'approved') return 'success';
   if (state === 'requested') return 'info';

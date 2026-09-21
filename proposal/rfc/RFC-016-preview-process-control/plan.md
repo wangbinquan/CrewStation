@@ -25,6 +25,8 @@
 
 实现过程中被真实用例推翻的三处初版设计，已逐条回填进 design.md：`attempt` 不能复用 `restarts`、缓冲不做对不上号的脱敏、`asPreviewStatusResult` 变成死代码而非仍被事件路径需要。
 
+**CI 复核（`7e40104`，run 35551970193）**：`static`／`unit`／`module`／`console` 四个作业成功——`static` 通过即证明提交在干净 checkout 上自洽，没有带上并行会话的未追踪文件。`gate` 失败一项：改动行 292 行执行到 288 行（98.6%，下限 80%）没问题，卡的是按文件那条——`PreviewPane.tsx`「有可执行逻辑，但没有任何用例加载它」。查证后确认它自 `58ea7cd` 起全仓零引用，已连同样式模块与随之孤立的 `previewStateTone` 删除；同时补 `modules/dev-session/tests/previewRoutes.test.ts` 覆盖三条路由的查询串解析、动作枚举与两档授权（原先 `devSessionRoutes.ts` 有四行未被执行）。
+
 ## 验收清单
 
 **未执行**：以下各项需要本机集群上的真实开发会话，本轮只完成代码与自动化用例。每项须记录实际观察，不得由代码推断。

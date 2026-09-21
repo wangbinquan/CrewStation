@@ -17,7 +17,9 @@ T1–T9 已落地并推送：Runner 新增 `startPreview`／`stopPreview`／`pre
 
 实现中推翻了三处初版设计，已回填 design.md：`attempt` 不能复用 `restarts`（`restart()` 会清零，那样重启前后的行都标 1，缓冲跨重启保留就白做了，故另立永不清零的 `runs`）；缓冲**不做脱敏**（`CS_RUNNER_TOKEN`／`CS_SESSION_URL` 已由 `buildChildEnv` 从所有子进程环境剔除，余下是项目自己的配置，读者本就能在同容器终端读到）；`asPreviewStatusResult` 是死代码而非事件路径仍需要，已删。
 
-**实机验收 PV-01…PV-18 未执行**，需要本机集群上的真实开发会话。本轮受并行 RFC-015 在制品影响没有跑通完整 `bun run check`：`arch:check` 通过，`lint`／`typecheck` 的报错全部落在 `apps/console/src/features/cluster/`、`modules/cluster-management/`、`packages/filesystem-metrics/`、`apps/cs-storage-probe/`；定向用例 874 pass／1 fail，唯一失败是并行会话的集群页用例。
+CI 在精确 SHA `7e40104` 上 `static`／`unit`／`module`／`console` 成功，`gate` 因「`PreviewPane.tsx` 有可执行逻辑但没有任何用例加载它」失败——查证后确认它自 `58ea7cd` 起全仓零引用，实际渲染的是 `DevelopmentPreview`，已连同样式模块与孤立的 `previewStateTone` 删除，并补了三条预览路由的 HTTP 用例。改动行覆盖 288／292（98.6%）本身达标。
+
+**实机验收 PV-01…PV-18 未执行**，需要本机集群上的真实开发会话；而本机部署会把并行 RFC-015 未提交且编译不过的在制品一起推上集群，故本轮不做，等其落地后再补。同因并行在制品，本轮没有跑通完整 `bun run check`：`arch:check` 通过，`lint`／`typecheck` 的报错全部落在 `apps/console/src/features/cluster/`、`modules/cluster-management/`、`packages/filesystem-metrics/`、`apps/cs-storage-probe/`。
 
 ## RFC-015 集群容量、用量与七天趋势（2026-09-21）
 

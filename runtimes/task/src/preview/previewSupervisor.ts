@@ -53,6 +53,9 @@ export function createPreviewSupervisor(deps: PreviewSupervisorDeps): PreviewSup
 /**
  * 预览进程监督：启动 → 轮询健康路径至 2xx 记 ready；意外退出按指数退避重启，超过上限记 crashed；
  * restartPreview 清零计数重来。每次状态迁移都发 previewState 事件。
+ *
+ * RFC-016 另加显式停止与启动：`stopPreview` 后**不自动拉起**（`stopping` 挡住 `onExit` 的重试），
+ * 端口因此腾给开发者自己在终端里跑；`startPreview` 再把它拉回来。
  */
 class ProcessPreviewSupervisor implements PreviewSupervisor {
   private state: PreviewState;
