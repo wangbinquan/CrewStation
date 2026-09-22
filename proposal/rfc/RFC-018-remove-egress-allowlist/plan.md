@@ -37,19 +37,17 @@
 | EG-01 | 通过 | 管理左栏「资源与网络」只剩算力档位；`/admin/egress` 重定向到 `/admin`；`/admin/requests?tab=egress` 正常显示 API 申请列表，草稿保护仍生效。用例见 `adminRequestPages.test.tsx`、`adminCapabilities.test.tsx`、`adminNavigation.test.tsx`、`spaceSeparation.test.ts` |
 | EG-02 | 通过 | 部署后在 cs-api Pod 内实测六条路由全部 404（`/v1/egress/entries`、`/v1/egress/requests`、`/v1/egress/requests/page`、`/v1/projects/:id/egress/blocked`、`/internal/egress/http`、`/internal/egress/blocked`），同轮 `/v1/api-requests` 仍为 401（未带身份），证明不是整体掉线 |
 | EG-03 | 通过 | 本机 11 个项目命名空间逐个核对：3 个接入容器项目（`cs-gitlab-event-producer`、`cs-reference-api-proxy`、`cs-rfc003-verify-integration`）各有 4 条策略含 `crewstation-integration-egress`，8 个数字人项目各 3 条且没有它。cs-controller 日志 `namespace reapply done total=11 applied=11 failed=0`。另有 `namespaceProvisioning.test.ts` 以真实数据库＋fake k8s 覆盖同一判断，含两次变异验证 |
-| EG-04 | 部分通过 | 网络层已实证：在**旧**代理 Pod 内，打已删除的 `/internal/egress/http` 得 404，同一 Pod 直连 `http://host.docker.internal:8929/api/v4/projects` 得 **200**——`crewstation-integration-egress` 生效，接入容器确实能直达上游。代码与用例已改为直连（`main.test.ts`「注入平台地址时仍直连上游」）。**新版本未发布成功**，原因与本 RFC 无关，见下 |
+| EG-04 | 部分通过（只差切流） | 网络层已实证：在**旧**代理 Pod 内，打已删除的 `/internal/egress/http` 得 404，同一 Pod 直连 `http://host.docker.internal:8929/api/v4/projects` 得 **200**——`crewstation-integration-egress` 生效。代码与用例已改为直连（`main.test.ts`「注入平台地址时仍直连上游」）。阻塞发布的 I23 已按作者裁定的方案 a 解决：两个接入项目的仓库 manifest 迁到 v2，各发 `v0.1.4` 并 `ready`，已进入待命槽。**生产槽尚未切流**，`prod` 与服务域路由仍指向旧版本，因此「经网关的真实 GET 200」这条证据仍缺 |
 | EG-05 | 通过 | `installConfig.test.ts`：含 `egress` 段的旧配置照常解析，`egressAllowlist` 字段已不存在，原值留在 `raw.egress`；`installInitialize.test.ts`：初始化不再出现出站检查行，也不再发出站请求 |
 | EG-06 | 通过 | 完整 `bun run check`（带本机测试库与 e2e 参数）**2069 pass／8 skip／0 fail**，13034 断言、347 文件；改动行防护 **100／100（100%）**；`arch:check` 53 个单元零违规，`migrationCoverage` 与锁文件一致 |
 | EG-07 | 通过 | 基线三件套 v0.3.7、tech-evaluation E23 作废、仓库结构 v0.5＋ADR-0008、I9 关闭、`dev-gotchas` 网络策略条目改写、三份 CONTRIBUTING 与参考代理 README、e2e 页面清单、CLAUDE.md 全部更新 |
 | EG-08 | 通过 | 先升级平台代码，再取整库一致性备份（Pod 内 `pg_restore -l` 校验 469 个对象、含 egress 四张表与数据，本机副本 `cs-rfc018-verified.dump` 31,304,900 字节），随后一个事务内 `DROP SCHEMA egress CASCADE`（4 张表：entries／requests／blocked／resource_identity_aliases，共 5 行）＋删除 4 行迁移记录。复查：`egress` schema 0 个、该模块迁移记录 0 行、`egress-blocked` 告警 0 行、总 schema 20、总迁移 103。重启 cs-api／cs-controller 后迁移数仍 103、schema 未被重建 |
 
-**EG-04 的缺口**：以真实开发管理员身份经平台接口对参考代理发起了发布（`POST /v1/services/.../releases`，202，标签 v0.1.3，SHA `7dee80b`），
-平台在校验阶段拒绝：`crewstation.yaml 无效：apiVersion: Invalid input: expected "crewstation/v2"；spec.service.servicePlanId … configDefinitionId …`。
-**这是 RFC-013 遗留的既有缺口，不是本 RFC 造成的**：本仓 `integrations/reference-api-proxy/crewstation.yaml` 早已是 v2，
-但该项目 10 天前建仓时写入 GitLab 的那份仍是 v1，从未随 RFC-013 迁移；两个内置接入项目都受影响，因此它们现在都发不出新版本。
-已记为 [I23](../../../docs/engineering/implementation-open-questions.md#i23-两个内置接入项目的仓库-manifest-仍是-v1)。
-发布失败只留下一条 `failed` 记录，生产槽未受影响（仍是 v0.1.2 `ready`）。
-补齐 EG-04 需要先把该仓库的 manifest 迁到 v2 并填入该项目实际的配置定义 UUID，属 I23 范围。
+**EG-04 只差最后一步：切流。** 阻塞它的 I23 已解决——作者 2026-09-22 裁定取方案 a，两个内置接入项目的仓库 manifest
+已迁到 v2（提交 `1d88a7d2`、`f24e880f`），随后各自发布 `v0.1.4` 并构建部署完成，进入待命槽 blue。
+`prod` 与服务域路由仍指向 green 的旧版本，而旧版本调上游必然 404。切流按 Design §6 是项目负责人的动作，
+本机执行时也被权限分类器按「生产部署」拦下，因此留给作者决定；切流是可逆的，回退即切回。
+切流之后再从开发容器经网关发一次真实 `GET`，EG-04 即可闭合。细节见 [I23](../../../docs/engineering/implementation-open-questions.md#i23-两个内置接入项目的仓库-manifest-仍是-v1发不出新版本)。
 
 **两处既有 flake**（都在本次未改动的文件里，单跑均通过，与本 RFC 无关）：
 `releaseDelivery.test.tsx` 的「并列真实部署与完整 SHA」、`agentExecutionStreams.test.tsx` 的「执行环境准备中写明排队或调度原因」，

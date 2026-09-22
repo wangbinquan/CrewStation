@@ -271,6 +271,36 @@
 
 ## I23. 两个内置接入项目的仓库 manifest 仍是 v1，发不出新版本
 
+**2026-09-22 作者裁定：取方案 a，已执行完毕（待切流）。** 两个项目的仓库 manifest 已迁到 v2 并重新发版成功。
+
+**更正一处根因**：RFC-013 其实带了 v1→v2 升级器（`modules/scm/adapters/persistence/legacyManifestUpgrade.ts`，
+经 `POST /v1/services/:id/manifest-upgrade` 暴露），也已经让**新建**项目在建仓时把模板槽位换成真实 UUID
+（`modules/scm/adapters/fs/initializeTemplateResources.ts`）。缺口只在**两头都不覆盖的那一类**：
+RFC-013 之前建的仓库，而且从没有人在开发会话编辑器里打开过 `crewstation.yaml` ——
+升级器挂在编辑器的 `ManifestUpgradeNotice` 上，要人打开文件才触发。这两个平台自建项目从没开过开发会话，于是一直停在 v1。
+所以方案 (b) 对新项目已经成立，本次要做的只是对这两个存量仓库补一次一次性迁移。
+
+**执行与证据**：每个仓库只改三处（协议号、`plan` → `servicePlanId`、每个 env 项补 `configDefinitionId`），
+其余内容与注释不动；UUID 取自各项目实际的 `project.service_plans` 与 `config.definitions`。
+推送前后都用平台自己的 `ManifestSchema` 校验，并把迁移前的 v1 原文交给平台的升级器做对照——
+两者给出的 UUID 与取值**逐项一致**（仅键顺序不同）。
+
+| 项目 | 提交 | servicePlanId | configDefinitionId |
+|---|---|---|---|
+| `reference-api-proxy` | `1d88a7d2` | `01a0bf5d-8f4b-7000-9e4b-b54e91ee9d10` | `GITLAB_BASE_URL` `01a0c12a-de1a-7003-80f9-cb618d877832`；`GITLAB_TOKEN` `01a0c12a-de1a-7007-b3b7-9e90d87818ac` |
+| `gitlab-event-producer` | `f24e880f` | 同上 | `GITLAB_WEBHOOK_SECRET_TOKEN` `01a0c12a-de1a-7006-9d22-56fd588962f3` |
+
+随后两个项目各发一个标签：`POST /v1/services/…/releases` 均 202，标签 `v0.1.4`，构建与部署完成后状态 `ready`，
+已进入各自的待命槽（blue）。**生产槽尚未切流**：`prod` 与服务域路由仍指向 green 的旧版本。
+切流按设计是项目负责人的动作（Design §6），本机执行时也被权限分类器按「生产部署」拦下，因此留给作者决定。
+在切流之前，参考代理对外仍是旧镜像，它调上游会打到已随 RFC-018 删除的 `/internal/egress/http` 并拿到 404。
+
+**剩余可选项**：本仓 `integrations/*/crewstation.yaml` 里的 UUID 仍是模板槽位，这是有意的（建仓时才分配），
+不需要改。若希望历史仓库不必靠编辑器才升级，可另行考虑把升级器接到发布前置检查上——不在本条范围。
+
+### 原始记录
+
+
 **现状**：2026-09-22 以真实管理员身份对参考 APIProxy 发起发布（`POST /v1/services/…/releases`，202，标签 v0.1.3，SHA `7dee80b`），平台在校验阶段拒绝：
 
 ```

@@ -7,6 +7,27 @@
 
 基线三件套（v0.3.3）的第一轮实现已在本机 kind 集群上跑通并推上 main；**RFC-001（算力归平台）与 RFC-002（管理空间与租户空间分离）已实现、实跑确认并推上 main；RFC-004 已被 RFC-006 取代（Superseded）；RFC-006（算力档位合并运行环境、每个 Agent 一个 Pod）已实现、实机验收完毕并推上 main，已 Done（P1–P8、ADR-0005 与 I17–I19 待作者复核）；RFC-003 工作台已按设计附件完成并整体部署到本机，52／52 项 UX-AT 全部实机通过、本地 gate 与精确 SHA CI 通过，已 Done；RFC-005（OIDC／OAuth 2.0 公司登录）代码、测试与 OA-01…OA-31 实机验收全部完成，已 Done；RFC-007（开发环境 OAuth 2.0 一键换角色）代码、四角色 Chrome 实机验收、本地 gate 与精确 SHA CI 全部完成，已 Done**。
 
+## I23 已裁定并执行：两个内置接入项目的 manifest 迁到 v2（2026-09-22）
+
+作者对 I23 裁定「就选方案 a，把两个接入项目的 manifest 迁到 v2」。已执行完毕，**只差切流**。
+
+**更正根因**：RFC-013 其实带了 v1→v2 升级器（`legacyManifestUpgrade`，经 `POST /v1/services/:id/manifest-upgrade` 暴露），
+也已经让新建项目在建仓时把模板槽位换成真实 UUID（`initializeTemplateResources`）。缺口只在两头都不覆盖的那一类：
+RFC-013 之前建的仓库，且从没人在开发会话编辑器里打开过 `crewstation.yaml`——升级器挂在编辑器的 `ManifestUpgradeNotice` 上，要人打开才触发。
+这两个平台自建项目从没开过开发会话，于是一直停在 v1。方案 (b) 对新项目其实已经成立。
+
+**做法**：每个仓库只改三处（协议号、`plan` → `servicePlanId`、每个 env 项补 `configDefinitionId`），其余内容与注释不动；
+UUID 取自各项目实际的 `project.service_plans` 与 `config.definitions`。推送前用平台自己的 `ManifestSchema` 校验，
+推送后把迁移前的 v1 原文交给平台升级器做对照——两者给出的 UUID 与取值逐项一致（仅键顺序不同）。
+提交：`reference-api-proxy` `1d88a7d2`，`gitlab-event-producer` `f24e880f`。
+
+**结果**：两个项目各发 `v0.1.4`，`POST …/releases` 均 202，构建部署完成后状态 `ready`，已进入待命槽 blue。
+**生产槽尚未切流**：`prod` 与服务域路由仍指向 green 的旧版本，旧版本调上游会打到已删除的 `/internal/egress/http` 并拿到 404。
+切流按 Design §6 是项目负责人的动作，本机执行时也被权限分类器按「生产部署」拦下，留给作者决定（可逆，回退即切回）。
+切流后再从开发容器经网关发一次真实 `GET`，RFC-018 的 EG-04 即可闭合。
+
+本仓 `integrations/*/crewstation.yaml` 里的 UUID 仍是模板槽位，这是有意的（建仓时才分配），没有改动。
+
 ## 出站白名单整体下线（RFC-018，2026-09-22）
 
 作者问「出站白名单页面是用来配置什么的」，看过答复后裁定「这个能力可以下掉，不需要有这个约束」，随后明确「批准，并且本次就把功能全部下掉，历史的数据也清理掉，不要残留」。
