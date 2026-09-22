@@ -11,9 +11,8 @@ import { PageHeader } from '../../../shared/ui/PageHeader';
 import { QueryStatus } from '../../../shared/ui/QueryStatus';
 import { Button } from '../../../shared/ui/Button';
 import { PublishForm } from '../components/PublishForm';
-import { ReleaseHistoryCard } from '../components/ReleaseHistoryCard';
 import { TagCard } from '../components/TagCard';
-import { TrafficSwitchCard } from '../components/TrafficSwitchCard';
+import { ReleaseTimeline } from '../components/ReleaseTimeline';
 import { SelectedRelease } from '../components/SelectedRelease';
 import { DeploymentVersions } from '../components/DeploymentVersions';
 import { useServiceOfProject } from '../model/useServiceOfProject';
@@ -21,7 +20,7 @@ import { useReleaseActions } from '../model/useReleaseActions';
 import { UnsavedChangesGuard } from '../../../shared/navigation/UnsavedChangesGuard';
 import styles from './ReleasePage.module.css';
 
-/** 发布页：发布控制、发布历史、切流记录与标签列表。 */
+/** 发布页：两张部署版本卡（上线／回退在待验证卡上）、发布准备、合并的发布记录时间线与标签列表（RFC-020 §6）。 */
 export function ReleasePage(): ReactElement {
   const { projectId } = useProjectScope();
   return <ReleaseWorkspace key={projectId} />;
@@ -45,11 +44,10 @@ function ReleaseWorkspace(): ReactElement {
       {serviceId === undefined && !isPending && !error ? <p className={styles.note}>{t('release.noService')}</p> : null}
       {serviceId !== undefined ? (
         <div className={styles.stack}>
-          <DeploymentVersions projectId={projectId} serviceId={serviceId} canSwitch={canSwitch && !error} actions={actions} onSelect={(release) => updateSearch({ ...search, release })} />
+          <DeploymentVersions projectId={projectId} serviceId={serviceId} canSwitch={canSwitch && !error} actions={actions} autoCheck={!!search.switch} onSelect={(release) => updateSearch({ ...search, release })} />
           {search.source ? <PublishForm serviceId={serviceId} projectId={projectId} source={search.source} canPublish={canPublish && !error} actions={actions} onSource={(source) => updateSearch({ ...search, source })} onClose={() => updateSearch({ release: search.release })} onAccepted={(release) => updateSearch({ release: release.id })} /> : null}
           {search.release ? <SelectedRelease key={search.release} releaseId={search.release} serviceId={serviceId} /> : null}
-          <ReleaseHistoryCard serviceId={serviceId} onSelect={(release) => updateSearch({ ...search, release })} />
-          <TrafficSwitchCard serviceId={serviceId} />
+          <ReleaseTimeline projectId={projectId} serviceId={serviceId} onSelect={(release) => updateSearch({ ...search, release })} />
           <details><summary>{t('release.tags.title')}</summary><TagCard serviceId={serviceId} /></details>
         </div>
       ) : null}

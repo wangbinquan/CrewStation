@@ -20,7 +20,9 @@ async function input(name: string, value: string) {
   const prototype = field.tagName === 'TEXTAREA' ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
   await act(async () => { field.focus(); Object.getOwnPropertyDescriptor(prototype, 'value')!.set!.call(field, value); field.dispatchEvent(new Event('input', { bubbles: true })); field.dispatchEvent(new KeyboardEvent('keyup', { key: 'a', bubbles: true })); }); await page!.settle();
 }
-const check = () => click('检查上线／回退至 v1.1.0');
+// RFC-020 §6：上线／回退按钮在待验证卡上，文案按发布时间预判是上线还是回退。
+const action = () => button('上线 v1.1.0') ?? button('回退到 v1.1.0');
+async function check() { expect(action()).toBeDefined(); await act(async () => action()!.click()); await page!.settle(); }
 
 test('并列真实部署与完整 SHA，具名确认双版本；首次上线显式发送空正式版本', async () => {
   const f = releaseDeliveryFixture(); f.state.slots[0] = { ...f.state.slots[0]!, releaseId: undefined, tag: undefined, commitSha: undefined, state: 'empty', replicas: 0, readyReplicas: 0 };
@@ -76,22 +78,22 @@ test('重复发布在途阻止切换；受理发布后保留切换说明且无�
   const f = releaseDeliveryFixture(); page = await renderApp(`/projects/${projectId}/release?source=repository`);
   await check(); await input('trafficReason', '试用确认后上线'); await click('取消切换'); await click('检查发布来源'); await click('确认版本');
   let resolve!: () => void; f.state.hold = new Promise<void>((done) => { resolve = done; });
-  await click('确认发布到待验证版本'); expect(button('检查上线／回退至 v1.1.0')?.disabled).toBe(true); await act(async () => resolve()); await page.settle();
+  await click('确认发布到待验证版本'); expect(action()?.disabled).toBe(true); await act(async () => resolve()); await page.settle();
   expect(page.search().release).toBe(targetId); expect(page.search().source).toBeUndefined(); expect(document.querySelector<HTMLTextAreaElement>('[name="trafficReason"]')?.value).toBe('试用确认后上线'); expect(document.querySelector('[role="alertdialog"]')).toBeNull();
 });
 
 test('错误发布身份、未知槽与无副本都不可试用或切换；错误回执不显示成功', async () => {
   const f = releaseDeliveryFixture(); page = await renderApp(`/projects/${projectId}/release`); f.state.badRelease = true; await check(); expect(page.text()).toContain('部署记录与发布身份不一致'); expect(button('确认上线 v1.1.0')).toBeUndefined();
-  f.state.badRelease = false; f.state.slots[1]!.readyReplicas = 0; await click('刷新部署版本'); expect(button('检查上线／回退至 v1.1.0')?.disabled).toBe(true); expect(document.querySelector('a[href="//preview.demo.cs.localhost"]')).toBeNull();
+  f.state.badRelease = false; f.state.slots[1]!.readyReplicas = 0; await click('刷新部署版本'); expect(action()?.disabled).toBe(true); expect(document.querySelector('a[href="//preview.demo.cs.localhost"]')).toBeNull();
   f.state.slots[1]!.readyReplicas = 1; await click('刷新部署版本'); await check(); f.state.mismatch = true; await click('确认上线 v1.1.0'); expect(page.text()).toContain('返回的切换对象无法确认'); expect(page.text()).not.toContain('已登记正式版本切换');
 });
 
 test('开发者可准备发布但无切换按钮，测试者无发布权；管理员保持管理空间，概览不再重复切流', async () => {
-  const f = releaseDeliveryFixture(); f.state.role = 'developer'; page = await renderApp(`/projects/${projectId}/release`); expect(button('准备发布')?.disabled).toBe(false); expect(button('检查上线／回退至 v1.1.0')).toBeUndefined();
-  page.unmount(); f.state.role = 'tester'; f.reads.length = 0; page = await renderApp(`/projects/${projectId}/release`); expect(page.text()).toContain('Beta'); expect(button('准备发布')).toBeUndefined(); expect(button('检查上线／回退至 v1.1.0')).toBeUndefined();
+  const f = releaseDeliveryFixture(); f.state.role = 'developer'; page = await renderApp(`/projects/${projectId}/release`); expect(button('准备发布')?.disabled).toBe(false); expect(action()).toBeUndefined(); expect(page.text()).toContain('由项目负责人上线');
+  page.unmount(); f.state.role = 'tester'; f.reads.length = 0; page = await renderApp(`/projects/${projectId}/release`); expect(page.text()).toContain('Beta'); expect(button('准备发布')).toBeUndefined(); expect(action()).toBeUndefined();
   expect(f.reads.some((path) => /\/slots|\/releases|\/branches/.test(path))).toBe(false);
   page.unmount(); f.state.admin = true; page = await renderApp(`/admin/integrations/${projectId}/release`); await check(); await click('取消切换'); await click('v1.1.0'); expect(page.path()).toBe(`/admin/integrations/${projectId}/release`); expect(page.search().release).toBe(targetId);
-  await page.navigate(`/admin/integrations/${projectId}`); expect(page.text()).not.toContain('将用户流量切'); expect(button('检查上线／回退至 v1.1.0')).toBeUndefined();
+  await page.navigate(`/admin/integrations/${projectId}`); expect(page.text()).not.toContain('将用户流量切'); expect(action()).toBeUndefined();
 });
 
 test('切流受理后工作树对正式版本的比较与详情重新读取', async () => {
@@ -104,7 +106,7 @@ test('切流受理后工作树对正式版本的比较与详情重新读取', as
   }
   const ui = await renderElement(<ComparisonWithDelivery />, messages);
   try {
-    await ui.click('检查上线／回退至 v1.1.0'); const before = { ...reads };
+    await ui.click('上线 v1.1.0'); const before = { ...reads };
     await ui.click('确认上线 v1.1.0'); expect(reads.comparison).toBeGreaterThan(before.comparison); expect(reads.details).toBeGreaterThan(before.details);
   } finally { ui.unmount(); }
 });
@@ -112,6 +114,6 @@ test('切流受理后工作树对正式版本的比较与详情重新读取', as
 test('其他发布进行中保留当前部署信息并阻止切换，可精确定位该发布', async () => {
   const f = releaseDeliveryFixture(); f.releases[2]!.status = 'building';
   page = await renderApp(`/projects/${projectId}/release`);
-  expect(page.text()).toContain('发布 v0.9.0 正在进行'); expect(button('检查上线／回退至 v1.1.0')?.disabled).toBe(true);
+  expect(page.text()).toContain('发布 v0.9.0 正在进行'); expect(action()?.disabled).toBe(true);
   await click('查看进行中的发布'); expect(page.search().release).toBe(historyId); expect(f.writes).toHaveLength(0);
 });

@@ -18,7 +18,7 @@
 | RFC-020-T4 | 概览：页头链接行、三张状态卡（复用发布页版本卡）、横幅新增数据访问待批、最近动态时间线、删除重复卡 | T3 | 已完成（2026-09-23，提交 b927a15） |
 | RFC-020-T5 | 开发工作区：`WorkspaceLayout.tool` 契约与迁移、`ToolPanel`、一条工具行（`SplitButton`、布局菜单、「⋯」）、URL 与布局同步 | T3 | 已完成（2026-09-23，见 §4） |
 | RFC-020-T6 | 六个面板内容：变更列表去页签、数据面板合并资源表、参考面板三段（侧栏紧凑＋放大完整，承接原开发资源全部内容与五条重定向）、会话面板内嵌日志 | T5 | 已完成（2026-09-23，见 §4）；目录「表在前、详情在旁」与事件投递摘要留在 T8 |
-| RFC-020-T7 | 发布与上线：上线／回退上卡与 `switch=1`、`releaseTimeline` 与 `ReleaseTimeline`、人名与标签解析、失败条目日志入口 | T3 | 未开始 |
+| RFC-020-T7 | 发布与上线：上线／回退上卡与 `switch=1`、`releaseTimeline` 与 `ReleaseTimeline`、人名与标签解析、失败条目日志入口 | T3 | 已完成（2026-09-23，见 §4） |
 | RFC-020-T8 | 目录页「表在前、详情在旁」与事件段投递摘要（供参考面板放大形态）；项目设置「项目信息」组；删除开发资源装配页与左栏入口 | T3 | 未开始 |
 | RFC-020-T9 | 工作台用例（design §10 表）、契约用例、中英文文案、e2e 用例更新与新增 | T4–T8 | 未开始 |
 | RFC-020-T10 | 本机部署 console 镜像、真实浏览器按 WS-01…WS-18 验收（两身份、1440／1280／1024／390、明暗、键盘）、完整 `bun run check`、`test:patch`、精确 SHA CI、既有 RFC 修订说明、STATE 与索引收口 | T9 | 未开始 |
@@ -68,3 +68,9 @@ T3 之后的 T4、T5、T7、T8 互不依赖，可以分批提交；每批都要�
 - **行为变化，实机验收时要看**：开发工作区按任务重建（`key=taskId`），会话被替换时参考面板里的试调／Swagger 输入随之清空，旧输入不可能发到新会话；`apiInvocationForm`／`swaggerApiInvocation` 两条用例已按此改写。
 - **用例基础设施**：`renderApp.click` 不再点到闭合 `<details>` 里的项（菜单要先点开），并给目标最多再等几拍；一个失败的 `expect(<DOM 元素>).toBeNull()` 会让 bun 花几十秒序列化 happy-dom 节点，看起来像卡死——断言 DOM 存在性时只比较数量或文本。`configImpact` 的「槽读取失败不冒充未部署」在整套并跑时偶发（发布记录查询未落地），单跑稳定，未改。
 - **新增用例**：`devSessionPanel`、`devSessionToolbar`、`referencePanel`，`workspaceLayout` 增两条（契约 `tool`、地址互译）；`versionComparisonView` 全部改为分组模型；`nativeWorkspace`、`sessionNavigation`、`developmentLocation`、`editorWorkspace`、`projectResources`、`projectNavigation`、`adminCapabilities`、`catalogConsumption` 按面板模型改写。
+
+### T7 发布与上线（2026-09-23）
+
+- 上线／回退按钮在待验证卡上（`DeployedVersionCard.actions`），文案按两条发布记录的创建时间预判「上线 vX」或「回退到 vX」，确认面板仍以核对快照为准；核对后才出现「重新核对两个版本」。无权限时卡上一行「由项目负责人上线」。`release?switch=1` 进入即核对一次——路由把 `1` 解析成数字，`parseReleaseSearch` 一并接受。
+- `ReleaseTimeline` 取代「发布历史」与「切流记录」两张表：`releaseTimeline()` 合并倒序，人名来自成员目录（当前用户用 `me`），标签在发布列表里解析，都找不到显示短 ID；失败条目带「构建日志」；标签即详情入口；镜像地址只在详情。两类记录一类读不到只列另一类并说明，成员名单读不到只说明一行。
+- 用例：`releaseTimeline.test.ts`（三种解析结果、回退判定、同时刻排序）、`releaseTimelinePage.test.tsx`（合并列表、人名与标签、日志入口、失败模式、`switch=1`）；`releaseDelivery` 按新文案改写。
