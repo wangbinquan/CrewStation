@@ -1,0 +1,205 @@
+/* 设计附件专用：外壳布局、评审用主题强制、形态图的语义色与状态提示。生产实现时语义色进入 tokens.css，其余进入组件的 CSS module。 */
+
+/* 评审工具强制主题：复制 tokens.css 的两套取值，只为在同一台机器上看浅／深两色。 */
+:root[data-theme="light"] {
+  --cs-color-bg: #f5f7fa; --cs-color-surface: #ffffff; --cs-color-surface-muted: #edf1f7; --cs-color-border: #dce3ed; --cs-color-text: #182438; --cs-color-text-muted: #59677c;
+  --cs-color-primary: #235bd8; --cs-color-primary-hover: #1c4db8; --cs-color-tint: #eaf1ff; --cs-color-focus: #8db3ff; --cs-color-danger: #b02f39;
+  --cs-tone-neutral-fg: #59677c; --cs-tone-neutral-bg: #edf1f7; --cs-tone-info-fg: #235bd8; --cs-tone-info-bg: #eaf1ff; --cs-tone-success-fg: #176746; --cs-tone-success-bg: #eaf6ef;
+  --cs-tone-warning-fg: #86520a; --cs-tone-warning-bg: #fff5df; --cs-tone-danger-fg: #b02f39; --cs-tone-danger-bg: #fff0f1; --cs-nav-active-text: #235bd8;
+  --cs-shadow-sm: 0 1px 2px rgba(24, 36, 56, 0.04); --cs-shadow-popover: 0 8px 28px rgba(24, 36, 56, 0.14), 0 2px 6px rgba(24, 36, 56, 0.06); color-scheme: light;
+}
+:root[data-theme="dark"] {
+  --cs-color-bg: #11151c; --cs-color-surface: #191f29; --cs-color-surface-muted: #222b39; --cs-color-border: #344154; --cs-color-text: #e7edf6; --cs-color-text-muted: #adbacd;
+  --cs-color-primary: #3970df; --cs-color-primary-hover: #4d84ee; --cs-color-tint: #20365b; --cs-color-focus: #8db3ff; --cs-color-danger: #ffa4ad;
+  --cs-tone-neutral-fg: #adbacd; --cs-tone-neutral-bg: #222b39; --cs-tone-info-fg: #8db3ff; --cs-tone-info-bg: #20365b; --cs-tone-success-fg: #87d9b1; --cs-tone-success-bg: #18372b;
+  --cs-tone-warning-fg: #f4c976; --cs-tone-warning-bg: #392f1c; --cs-tone-danger-fg: #ffa4ad; --cs-tone-danger-bg: #40242a; --cs-nav-active-text: #8db3ff;
+  --cs-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4); --cs-shadow-popover: 0 12px 32px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(0, 0, 0, 0.24); color-scheme: dark;
+}
+
+/* 形态图语义色（借鉴 Archify 的固定语义色词汇：颜色只表达含义）。浅色一套、深色一套。 */
+:root {
+  --topo-gateway-stroke: #0e7490; --topo-gateway-fill: rgba(34, 211, 238, 0.16);
+  --topo-security-stroke: #be123c; --topo-security-fill: rgba(251, 113, 133, 0.16);
+  --topo-service-stroke: #047857; --topo-service-fill: rgba(52, 211, 153, 0.18);
+  --topo-development-stroke: #1d4ed8; --topo-development-fill: rgba(96, 165, 250, 0.2);
+  --topo-business-stroke: #c2410c; --topo-business-fill: rgba(251, 146, 60, 0.18);
+  --topo-build-stroke: #b45309; --topo-build-fill: rgba(251, 191, 36, 0.2);
+  --topo-data-stroke: #6d28d9; --topo-data-fill: rgba(167, 139, 250, 0.2);
+  --topo-platform-stroke: #334155; --topo-platform-fill: rgba(100, 116, 139, 0.14);
+  --topo-external-stroke: #64748b; --topo-external-fill: rgba(148, 163, 184, 0.12);
+  --topo-edge: #7b8798; --topo-grid: rgba(24, 36, 56, 0.1);
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --topo-gateway-stroke: #22d3ee; --topo-gateway-fill: rgba(34, 211, 238, 0.14);
+  --topo-security-stroke: #fb7185; --topo-security-fill: rgba(251, 113, 133, 0.14);
+  --topo-service-stroke: #34d399; --topo-service-fill: rgba(52, 211, 153, 0.16);
+  --topo-development-stroke: #60a5fa; --topo-development-fill: rgba(96, 165, 250, 0.16);
+  --topo-business-stroke: #fb923c; --topo-business-fill: rgba(251, 146, 60, 0.16);
+  --topo-build-stroke: #fbbf24; --topo-build-fill: rgba(251, 191, 36, 0.16);
+  --topo-data-stroke: #a78bfa; --topo-data-fill: rgba(167, 139, 250, 0.18);
+  --topo-platform-stroke: #cbd5e1; --topo-platform-fill: rgba(148, 163, 184, 0.14);
+  --topo-external-stroke: #94a3b8; --topo-external-fill: rgba(148, 163, 184, 0.1);
+  --topo-edge: #8f9db0; --topo-grid: rgba(231, 237, 246, 0.1);
+} }
+:root[data-theme="dark"] {
+  --topo-gateway-stroke: #22d3ee; --topo-gateway-fill: rgba(34, 211, 238, 0.14);
+  --topo-security-stroke: #fb7185; --topo-security-fill: rgba(251, 113, 133, 0.14);
+  --topo-service-stroke: #34d399; --topo-service-fill: rgba(52, 211, 153, 0.16);
+  --topo-development-stroke: #60a5fa; --topo-development-fill: rgba(96, 165, 250, 0.16);
+  --topo-business-stroke: #fb923c; --topo-business-fill: rgba(251, 146, 60, 0.16);
+  --topo-build-stroke: #fbbf24; --topo-build-fill: rgba(251, 191, 36, 0.16);
+  --topo-data-stroke: #a78bfa; --topo-data-fill: rgba(167, 139, 250, 0.18);
+  --topo-platform-stroke: #cbd5e1; --topo-platform-fill: rgba(148, 163, 184, 0.14);
+  --topo-external-stroke: #94a3b8; --topo-external-fill: rgba(148, 163, 184, 0.1);
+  --topo-edge: #8f9db0; --topo-grid: rgba(231, 237, 246, 0.1);
+}
+.sem-gateway { --topo-stroke: var(--topo-gateway-stroke); --topo-fill: var(--topo-gateway-fill); }
+.sem-security { --topo-stroke: var(--topo-security-stroke); --topo-fill: var(--topo-security-fill); }
+.sem-service { --topo-stroke: var(--topo-service-stroke); --topo-fill: var(--topo-service-fill); }
+.sem-development { --topo-stroke: var(--topo-development-stroke); --topo-fill: var(--topo-development-fill); }
+.sem-business { --topo-stroke: var(--topo-business-stroke); --topo-fill: var(--topo-business-fill); }
+.sem-build { --topo-stroke: var(--topo-build-stroke); --topo-fill: var(--topo-build-fill); }
+.sem-data { --topo-stroke: var(--topo-data-stroke); --topo-fill: var(--topo-data-fill); }
+.sem-platform { --topo-stroke: var(--topo-platform-stroke); --topo-fill: var(--topo-platform-fill); }
+.sem-external { --topo-stroke: var(--topo-external-stroke); --topo-fill: var(--topo-external-fill); }
+.status-ready { --topo-status: var(--cs-tone-success-fg); }
+.status-running { --topo-status: var(--cs-tone-info-fg); }
+.status-pending, .status-unknown { --topo-status: var(--cs-tone-warning-fg); }
+.status-failed { --topo-status: var(--cs-tone-danger-fg); }
+.status-succeeded, .status-terminating, .status-idle { --topo-status: var(--cs-tone-neutral-fg); }
+
+/* 外壳 */
+.homeHeader { min-height: 52px; padding: 6px 24px; display: flex; align-items: center; gap: 24px; background: var(--cs-color-surface); border-bottom: 1px solid var(--cs-color-border); }
+.brandAction { padding: 4px 0; }
+.spaceNavigation { display: flex; align-items: center; gap: 8px; flex: 1; }
+.spaceNavigation [aria-current="page"] { background: var(--cs-color-tint); color: var(--cs-color-primary); }
+.account { display: flex; align-items: center; gap: 9px; flex-shrink: 0; font-size: 13px; }
+.account small { display: block; color: var(--cs-color-text-muted); font-size: 11px; }
+.avatar { display: grid; place-items: center; height: 32px; width: 32px; border-radius: 50%; color: var(--cs-color-primary); background: var(--cs-color-tint); font-weight: 650; }
+.shellBody { display: flex; min-height: calc(100vh - 120px); }
+.sideNav { width: 208px; flex-shrink: 0; border-right: 1px solid var(--cs-color-border); background: var(--cs-color-surface); padding: 16px 12px; display: flex; flex-direction: column; gap: 12px; }
+.sideProject { padding: 4px 8px 8px; border-bottom: 1px solid var(--cs-color-border); }
+.sideProject small { display: block; color: var(--cs-color-text-muted); font-size: 12px; }
+.sideNav nav { display: flex; flex-direction: column; gap: 2px; }
+.sideNav a { display: block; padding: 8px 10px; border-radius: 6px; color: var(--cs-color-text); text-decoration: none; font-size: 14px; }
+.sideNav a:hover { background: var(--cs-color-surface-muted); }
+.sideNav a[aria-current="page"] { background: var(--cs-color-tint); color: var(--cs-color-primary); font-weight: 600; }
+.pageMain { flex: 1; min-width: 0; padding: 20px 24px 32px; display: flex; flex-direction: column; gap: 16px; max-width: 1200px; }
+.projectMeta { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; font-size: 13px; color: var(--cs-color-text-muted); }
+.versionGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.prototypeFooter { padding: 12px 24px 24px; color: var(--cs-color-text-muted); font-size: 11px; border-top: 1px solid var(--cs-color-border); }
+.reviewTools { display: flex; flex-wrap: wrap; gap: 16px 24px; align-items: end; margin-top: 12px; }
+.reviewTools select { min-width: 120px; font-size: 12px; }
+.clusterCards { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
+.clusterStat { display: grid; text-align: left; gap: 6px; padding: 14px; border: 1px solid var(--cs-color-border); border-radius: 8px; background: var(--cs-color-surface); color: var(--cs-color-text); cursor: pointer; }
+.clusterStat strong { font-size: 26px; line-height: 1.2; }
+.clusterStat span { color: var(--cs-color-text-muted); font-size: 12px; }
+
+/* 形态页布局 */
+.topo-page { display: grid; gap: 14px; min-width: 0; }
+.topo-layers { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.topo-breadcrumb { margin-left: 8px; font-size: 13px; color: var(--cs-color-text-muted); display: inline-flex; align-items: center; gap: 6px; }
+.topo-workspace { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; align-items: start; }
+@media (min-width: 1100px) { .topo-workspace.has-detail { grid-template-columns: minmax(0, 1fr) 380px; } .topo-workspace.has-detail .topo-detail { position: sticky; top: 16px; } }
+.topo-main { display: grid; gap: 12px; min-width: 0; }
+.topo-frame { border: 1px solid var(--cs-color-border); border-radius: 10px; overflow: auto; background: var(--cs-color-surface); }
+.topo-svg { display: block; }
+.topo-frame-compact .topo-svg { height: 300px; width: auto; max-width: 100%; margin: 0 auto; }
+.topo-canvas { fill: var(--cs-color-surface); }
+.topo-grid-dot { fill: var(--topo-grid); }
+.topo-lane { font: 700 10.5px var(--cs-font-mono); letter-spacing: 0.12em; fill: var(--cs-color-text-muted); }
+.topo-band-box { fill: var(--topo-fill); fill-opacity: 0.32; stroke: var(--topo-stroke); stroke-width: 1; stroke-dasharray: 6 4; }
+.topo-band-title { font: 600 11px var(--cs-font-mono); letter-spacing: 0.04em; fill: var(--topo-stroke); }
+.topo-band-note { font-weight: 400; fill: var(--cs-color-text-muted); }
+.topo-node { cursor: pointer; transition: opacity 160ms ease; outline: none; }
+.topo-node-box { fill: var(--topo-fill); stroke: var(--topo-stroke); stroke-width: 1.5; transition: stroke-width 140ms ease; }
+.topo-node:hover .topo-node-box { stroke-width: 2.2; }
+.topo-node.is-selected .topo-node-box { stroke-width: 2.6; filter: drop-shadow(0 0 6px var(--topo-stroke)); }
+.topo-node:focus-visible .topo-node-box { stroke: var(--cs-color-focus); stroke-width: 3; }
+.topo-node.is-dim, .topo-edge.is-dim { opacity: 0.22; }
+.topo-sigil { fill: none; stroke: var(--topo-stroke); stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.topo-title { font: 600 13px var(--cs-font-sans); fill: var(--cs-color-text); }
+.topo-subtitle { font: 400 11px var(--cs-font-sans); fill: var(--cs-color-text-muted); }
+.topo-meta { font: 400 10.5px var(--cs-font-mono); fill: var(--cs-color-text-muted); }
+.topo-meta-key { font-weight: 600; }
+.topo-status-dot { fill: var(--topo-status); }
+.topo-status-text { font: 600 10.5px var(--cs-font-mono); fill: var(--cs-color-text-muted); }
+.status-pending .topo-node-box { stroke-dasharray: 6 4; }
+.status-unknown .topo-node-box { stroke-dasharray: 2 3; }
+.status-failed .topo-node-box { stroke: var(--cs-tone-danger-fg); }
+.status-terminating { opacity: 0.6; }
+.status-succeeded .topo-node-box { fill-opacity: 0.45; }
+.kind-external .topo-node-box, .status-idle.kind-summary .topo-node-box { stroke-dasharray: 3 3; }
+.topo-warn { fill: var(--cs-tone-warning-bg); stroke: var(--cs-tone-warning-fg); stroke-width: 1.4; stroke-linejoin: round; }
+.topo-edge { transition: opacity 160ms ease; }
+.topo-edge-path { fill: none; stroke: var(--topo-edge); stroke-width: 1.5; }
+.topo-arrow { fill: var(--topo-edge); }
+.edge-routes .topo-edge-path { stroke: var(--topo-gateway-stroke); stroke-width: 2; }
+.topo-arrow.edge-routes { fill: var(--topo-gateway-stroke); }
+.edge-uses .topo-edge-path, .edge-mounts .topo-edge-path { stroke: var(--topo-data-stroke); }
+.topo-arrow.edge-uses, .topo-arrow.edge-mounts { fill: var(--topo-data-stroke); }
+.edge-child .topo-edge-path { stroke-dasharray: 2 3; }
+.edge-push .topo-edge-path { stroke: var(--topo-business-stroke); }
+.topo-arrow.edge-push { fill: var(--topo-business-stroke); }
+.edge-control .topo-edge-path { stroke: var(--topo-build-stroke); }
+.topo-arrow.edge-control { fill: var(--topo-build-stroke); }
+.edge-dial .topo-edge-path { stroke: var(--topo-development-stroke); }
+.topo-arrow.edge-dial { fill: var(--topo-development-stroke); }
+.evidence-static .topo-edge-path { stroke-dasharray: 5 4; }
+.topo-edge-label { font: 400 10px var(--cs-font-mono); fill: var(--cs-color-text-muted); paint-order: stroke; stroke: var(--cs-color-surface); stroke-width: 4px; stroke-linejoin: round; }
+
+/* 图例、筛选、观测行 */
+.topo-legend { display: grid; gap: 6px; font-size: 12px; color: var(--cs-color-text-muted); }
+.topo-legend-group { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; }
+.topo-legend-heading { font: 700 10.5px var(--cs-font-mono); letter-spacing: 0.1em; color: var(--cs-color-text-muted); }
+.topo-legend-item { display: inline-flex; align-items: center; gap: 5px; color: var(--cs-color-text); }
+.topo-legend-item b { font: 600 11px var(--cs-font-mono); color: var(--cs-color-text-muted); background: var(--cs-color-surface-muted); border-radius: 999px; padding: 0 6px; }
+.topo-swatch { display: inline-block; width: 12px; height: 12px; border-radius: 3px; border: 1.5px solid var(--topo-stroke, var(--cs-color-border)); background: var(--topo-fill, transparent); }
+.topo-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--topo-status, var(--cs-tone-neutral-fg)); flex-shrink: 0; }
+.topo-line { display: inline-block; width: 22px; height: 0; border-top: 2px solid var(--topo-edge); }
+.edge-routes .topo-line { border-color: var(--topo-gateway-stroke); }
+.edge-uses .topo-line, .edge-mounts .topo-line { border-color: var(--topo-data-stroke); }
+.edge-child .topo-line { border-top-style: dotted; }
+.edge-push .topo-line { border-color: var(--topo-business-stroke); }
+.edge-control .topo-line { border-color: var(--topo-build-stroke); }
+.edge-dial .topo-line { border-color: var(--topo-development-stroke); }
+.topo-line-static { border-top-style: dashed; }
+.topo-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.topo-filters-label { font: 700 10.5px var(--cs-font-mono); letter-spacing: 0.1em; color: var(--cs-color-text-muted); margin-right: 2px; }
+.topo-filters-label + .topo-chip { margin-left: 0; }
+.topo-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--cs-color-border); background: var(--cs-color-surface); color: var(--cs-color-text); font-size: 12px; cursor: pointer; }
+.topo-chip[aria-pressed="true"] { border-color: var(--topo-stroke, var(--cs-color-primary)); background: var(--topo-fill, var(--cs-color-tint)); font-weight: 600; }
+.topo-chip:disabled { opacity: 0.5; cursor: default; }
+.topo-chip-attention[aria-pressed="true"] { border-color: var(--cs-tone-warning-fg); background: var(--cs-tone-warning-bg); }
+.topo-chip:focus-visible { outline: 2px solid var(--cs-color-focus); outline-offset: 2px; }
+.topo-observed { margin: 0; font-size: 12px; color: var(--cs-color-text-muted); }
+.topo-observed-partial { padding: 8px 12px; border: 1px solid var(--cs-color-border); border-left: 3px solid var(--cs-tone-warning-fg); border-radius: 6px; color: var(--cs-color-text); }
+.topo-summary-line { margin: 0 0 10px; font-size: 13px; }
+.topo-summary-line b { font-family: var(--cs-font-mono); }
+.topo-muted { margin: 0; font-size: 12px; color: var(--cs-color-text-muted); }
+
+/* 窄屏列表与详情 */
+.topo-list { display: grid; gap: 14px; }
+.topo-list-band ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.topo-list-title { margin: 0 0 6px; font: 600 12px var(--cs-font-mono); color: var(--topo-stroke); display: flex; align-items: center; gap: 6px; }
+.topo-list-title small { color: var(--cs-color-text-muted); font-weight: 400; }
+.topo-list-row { width: 100%; display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid var(--cs-color-border); border-left: 3px solid var(--topo-stroke); border-radius: 6px; background: var(--cs-color-surface); color: var(--cs-color-text); text-align: left; cursor: pointer; }
+.topo-list-row.is-selected, .topo-list-row[aria-pressed="true"] { background: var(--cs-color-tint); }
+.topo-list-main { flex: 1; min-width: 0; display: grid; }
+.topo-list-main strong { font-size: 13px; overflow-wrap: anywhere; }
+.topo-list-main small { color: var(--cs-color-text-muted); font-size: 11px; }
+.topo-list-status { font: 600 11px var(--cs-font-mono); color: var(--cs-color-text-muted); white-space: nowrap; }
+.topo-detail { min-width: 0; overflow-wrap: anywhere; }
+.topo-detail-line { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 13px; color: var(--cs-color-text-muted); }
+.topo-detail-stack { display: grid; gap: 12px; }
+.topo-detail-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.topo-related, .topo-events { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.topo-events li { display: grid; gap: 2px; padding: 8px 10px; border: 1px solid var(--cs-color-border); border-radius: 6px; font-size: 12px; }
+.topo-events small { color: var(--cs-color-text-muted); }
+.topo-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.topo-table th, .topo-table td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--cs-color-border); }
+.topo-table th { color: var(--cs-color-text-muted); font-weight: 600; }
+
+@media (max-width: 900px) { .clusterCards { grid-template-columns: repeat(3, minmax(0, 1fr)); } .versionGrid { grid-template-columns: 1fr; } .sideNav { display: none; } .pageMain { padding: 16px; } }
+@media (max-width: 640px) { .homeHeader { flex-wrap: wrap; gap: 8px 12px; padding: 10px 16px; } .clusterCards { grid-template-columns: repeat(2, minmax(0, 1fr)); } .reviewTools { gap: 10px 16px; } }
+@media (prefers-reduced-motion: reduce) { .topo-node, .topo-edge, .topo-node-box { transition: none; } }

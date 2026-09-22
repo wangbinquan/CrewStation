@@ -7,6 +7,20 @@
 
 基线三件套（v0.3.3）的第一轮实现已在本机 kind 集群上跑通并推上 main；**RFC-001（算力归平台）与 RFC-002（管理空间与租户空间分离）已实现、实跑确认并推上 main；RFC-004 已被 RFC-006 取代（Superseded）；RFC-006（算力档位合并运行环境、每个 Agent 一个 Pod）已实现、实机验收完毕并推上 main，已 Done（P1–P8、ADR-0005 与 I17–I19 待作者复核）；RFC-003 工作台已按设计附件完成并整体部署到本机，52／52 项 UX-AT 全部实机通过、本地 gate 与精确 SHA CI 通过，已 Done；RFC-005（OIDC／OAuth 2.0 公司登录）代码、测试与 OA-01…OA-31 实机验收全部完成，已 Done；RFC-007（开发环境 OAuth 2.0 一键换角色）代码、四角色 Chrome 实机验收、本地 gate 与精确 SHA CI 全部完成，已 Done**。
 
+## RFC-019 部署与运行形态图：原型评审中（2026-09-22）
+
+作者要「引入 archify 组件」给每个项目呈现部署与运行形态（几个工作负载、几个 Pod、执行时间、Pod 信息），集群管理页也要图形化呈现系统元素与部署状态，并要求先充分反问、再出原型、看过再动手。
+查明 **Archify（tt-a1i/archify）不是运行时组件**：Agent 技能加 Node CLI，把 JSON IR 渲染成自包含 HTML（含 775KB Viewer），无 npm 包、无浏览器可 import 的渲染器、无喂活数据接口，节点也没有健康状态样式。
+十四个对齐问题作者答复「按你推进的来做」，并说明「说 archify 是指它渲染的图好看」，认可借鉴视觉自写组件。
+
+**已做**：`proposal/rfc/RFC-019-deployment-topology/prototype/` 交互设计稿（沿用 RFC-009／011 的 `preview.ts --serve` 方式，端口 5202，复用生产 Card／Tabs／Badge／DefinitionList／Button 与主题）：
+工作台自绘的 SVG 形态图组件（`TopologyDiagram` ＋ 确定性分层排布 `topologyLayout` ＋ 语义／状态／证据模型 `topologyModel`），三条路径：项目概览缩略图、运行与诊断「部署与运行形态」页签、集群管理「拓扑」页签（系统层 → 项目层 → Pod 层，右侧只读详情）。
+借鉴 Archify 的固定语义色词汇、语义色描边＋半透明填充节点、类型线框小图标、虚线边界框、正交圆角连线与遮罩标签、带计数图例、聚焦压暗、明暗两套；观测关系实线、静态架构标注虚线并在图例明写「不是实测」；≤640px 降级为分组列表；异常项目置顶、超过 60 个折叠；零新依赖。
+另用 Archify 真生成了一张平台静态架构图作对照（`prototype/archify/*.architecture.json` 经 `validate` 零错误后 `deliver`；生成的 830KB HTML 只在本机，未入库）。
+真实 Chrome 核对：三条路径、点选详情、快照推进不重排、浅色主题、320／390px 无横向溢出、无 console 错误；`arch:check`／全仓 lint／console 类型检查通过。记录见 [prototype-review.md](proposal/rfc/RFC-019-deployment-topology/prototype-review.md)，README 已登记 Draft。
+
+**下一步**：等作者看过原型并回复 prototype-review.md §5 的五个取舍，再写三件套（development-rules §5），批准后实施。实现要点：项目成员需要新的项目范围只读盘点接口（同一份 RFC-010 快照按项目过滤，走成员校验）；`--topo-*` 语义色进 tokens.css；组件放 `apps/console/src/shared/ui/`。
+
 ## I23 已裁定并执行：两个内置接入项目的 manifest 迁到 v2（2026-09-22）
 
 作者对 I23 裁定「就选方案 a，把两个接入项目的 manifest 迁到 v2」。已执行完毕，**只差切流**。

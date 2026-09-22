@@ -1,0 +1,487 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "CrewStation 平台架构",
+    "subtitle": "本机 kind 集群 · crewstation-system 与项目命名空间 · 2026-09-22",
+    "locale": "zh-CN",
+    "visual_preset": "classic",
+    "animation": "trace",
+    "views": [
+      {
+        "id": "user-path",
+        "label": "用户域请求",
+        "focus": [
+          "users",
+          "traefik",
+          "auth",
+          "console",
+          "api",
+          "slots"
+        ],
+        "note": "浏览器经网关登录后到达工作台、API 或数字人服务槽。"
+      },
+      {
+        "id": "dev-path",
+        "label": "开发会话",
+        "focus": [
+          "sessions",
+          "session",
+          "mcp",
+          "controller",
+          "kube"
+        ],
+        "note": "TaskRunner 回连 cs-session，Agent 经会话令牌访问 MCP。"
+      },
+      {
+        "id": "release-path",
+        "label": "发布与数据",
+        "focus": [
+          "controller",
+          "buildkit",
+          "registry",
+          "postgres",
+          "gitlab",
+          "events"
+        ],
+        "note": "标签触发构建、迁移与部署；事件经服务域推送到线上槽。"
+      }
+    ]
+  },
+  "layout": {
+    "mode": "grid",
+    "origin": [
+      40,
+      90
+    ],
+    "cols": 5,
+    "gapX": 56,
+    "gapY": 34,
+    "cellW": 150,
+    "cellH": 62
+  },
+  "components": [
+    {
+      "id": "users",
+      "type": "external",
+      "label": "用户浏览器",
+      "sublabel": "用户域 · 公司登录",
+      "row": 0,
+      "col": 0
+    },
+    {
+      "id": "slots",
+      "type": "backend",
+      "label": "服务槽 ×20",
+      "sublabel": "数字人／接入项目",
+      "row": 1,
+      "col": 0,
+      "tag": "项目命名空间"
+    },
+    {
+      "id": "sessions",
+      "type": "frontend",
+      "label": "开发会话与 Agent",
+      "sublabel": "TaskRunner · CLI",
+      "row": 2,
+      "col": 0,
+      "tag": "项目命名空间"
+    },
+    {
+      "id": "subtasks",
+      "type": "messagebus",
+      "label": "业务子任务",
+      "sublabel": "oneshot · interactive",
+      "row": 3,
+      "col": 0,
+      "tag": "项目命名空间"
+    },
+    {
+      "id": "traefik",
+      "type": "security",
+      "label": "Traefik",
+      "sublabel": "用户域 · 服务域",
+      "row": 0,
+      "col": 1
+    },
+    {
+      "id": "auth",
+      "type": "security",
+      "label": "cs-auth",
+      "sublabel": "ForwardAuth · 身份注入",
+      "row": 3,
+      "col": 1
+    },
+    {
+      "id": "console",
+      "type": "frontend",
+      "label": "cs-console",
+      "sublabel": "工作台 SPA",
+      "row": 0,
+      "col": 2
+    },
+    {
+      "id": "api",
+      "type": "backend",
+      "label": "cs-api",
+      "sublabel": "REST · 盘点 · MCP 后端",
+      "row": 1,
+      "col": 2
+    },
+    {
+      "id": "session",
+      "type": "backend",
+      "label": "cs-session",
+      "sublabel": "会话 · 终端 · 文件流",
+      "row": 2,
+      "col": 2
+    },
+    {
+      "id": "controller",
+      "type": "backend",
+      "label": "cs-controller",
+      "sublabel": "容器 · 构建 · 发布 · 路由",
+      "row": 3,
+      "col": 2
+    },
+    {
+      "id": "events",
+      "type": "messagebus",
+      "label": "cs-events",
+      "sublabel": "去重 · 持久化 · 推送",
+      "row": 4,
+      "col": 2
+    },
+    {
+      "id": "mcp",
+      "type": "backend",
+      "label": "MCP ×2",
+      "sublabel": "能力描述 · 操作",
+      "row": 5,
+      "col": 2
+    },
+    {
+      "id": "postgres",
+      "type": "database",
+      "label": "PostgreSQL 17",
+      "sublabel": "平台库 ＋ 24 个业务库",
+      "row": 0,
+      "col": 3
+    },
+    {
+      "id": "registry",
+      "type": "cloud",
+      "label": "registry",
+      "sublabel": "平台镜像仓库",
+      "row": 1,
+      "col": 3
+    },
+    {
+      "id": "buildkit",
+      "type": "cloud",
+      "label": "BuildKit",
+      "sublabel": "镜像构建",
+      "row": 2,
+      "col": 3
+    },
+    {
+      "id": "prometheus",
+      "type": "cloud",
+      "label": "Prometheus",
+      "sublabel": "容量与用量指标",
+      "row": 3,
+      "col": 3
+    },
+    {
+      "id": "gitlab",
+      "type": "external",
+      "label": "GitLab",
+      "sublabel": "仓库 · 标签 · webhook",
+      "row": 4,
+      "col": 4
+    },
+    {
+      "id": "oidc",
+      "type": "external",
+      "label": "OIDC 身份提供方",
+      "sublabel": "公司登录",
+      "row": 6,
+      "col": 4
+    },
+    {
+      "id": "kube",
+      "type": "external",
+      "label": "Kubernetes API",
+      "sublabel": "命名空间 · Pod",
+      "row": 7,
+      "col": 4
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "crewstation-system 命名空间",
+      "wraps": [
+        "traefik",
+        "auth",
+        "console",
+        "api",
+        "session",
+        "controller",
+        "events",
+        "mcp",
+        "postgres",
+        "registry",
+        "buildkit",
+        "prometheus"
+      ],
+      "pad": 18
+    },
+    {
+      "kind": "security-group",
+      "label": "项目命名空间 ×11",
+      "wraps": [
+        "slots",
+        "sessions",
+        "subtasks"
+      ],
+      "pad": 12
+    }
+  ],
+  "connections": [
+    {
+      "from": "users",
+      "to": "traefik",
+      "label": "HTTPS",
+      "variant": "emphasis"
+    },
+    {
+      "from": "traefik",
+      "to": "auth",
+      "label": "ForwardAuth",
+      "variant": "security",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        352,
+        264
+      ]
+    },
+    {
+      "from": "traefik",
+      "to": "console",
+      "label": "工作台",
+      "variant": "emphasis"
+    },
+    {
+      "from": "traefik",
+      "to": "api",
+      "label": "/v1",
+      "route": "orthogonal-h",
+      "labelAt": [
+        409,
+        168
+      ]
+    },
+    {
+      "from": "traefik",
+      "to": "slots",
+      "label": "用户域路由",
+      "fromSide": "bottom",
+      "toSide": "right",
+      "labelAt": [
+        228,
+        196
+      ]
+    },
+    {
+      "from": "slots",
+      "to": "api",
+      "label": "服务域 · 经网关",
+      "variant": "dashed",
+      "labelAt": [
+        409,
+        238
+      ]
+    },
+    {
+      "from": "sessions",
+      "to": "session",
+      "label": "Runner 回连",
+      "variant": "dashed",
+      "labelAt": [
+        203,
+        300
+      ]
+    },
+    {
+      "from": "sessions",
+      "to": "mcp",
+      "label": "会话令牌",
+      "variant": "dashed",
+      "via": [
+        [
+          203,
+          312
+        ],
+        [
+          203,
+          600
+        ]
+      ],
+      "labelAt": [
+        330,
+        590
+      ]
+    },
+    {
+      "from": "events",
+      "to": "traefik",
+      "label": "事件推送",
+      "variant": "dashed",
+      "fromSide": "left",
+      "toSide": "right",
+      "labelAt": [
+        409,
+        300
+      ]
+    },
+    {
+      "from": "api",
+      "to": "postgres",
+      "label": "SQL",
+      "route": "orthogonal-h",
+      "labelAt": [
+        615,
+        168
+      ]
+    },
+    {
+      "from": "session",
+      "to": "postgres",
+      "route": "orthogonal-h"
+    },
+    {
+      "from": "controller",
+      "to": "postgres",
+      "route": "orthogonal-h"
+    },
+    {
+      "from": "api",
+      "to": "prometheus",
+      "label": "指标",
+      "variant": "dashed",
+      "route": "orthogonal-h",
+      "labelAt": [
+        615,
+        330
+      ]
+    },
+    {
+      "from": "controller",
+      "to": "buildkit",
+      "label": "构建",
+      "route": "orthogonal-h",
+      "labelAt": [
+        615,
+        361
+      ]
+    },
+    {
+      "from": "buildkit",
+      "to": "registry",
+      "label": "推送镜像",
+      "fromSide": "top",
+      "toSide": "bottom",
+      "labelAt": [
+        790,
+        265
+      ]
+    },
+    {
+      "from": "controller",
+      "to": "gitlab",
+      "label": "仓库与标签",
+      "via": [
+        [
+          615,
+          408
+        ],
+        [
+          615,
+          504
+        ]
+      ],
+      "labelAt": [
+        800,
+        490
+      ]
+    },
+    {
+      "from": "auth",
+      "to": "oidc",
+      "label": "公司登录",
+      "variant": "security",
+      "fromSide": "bottom",
+      "toSide": "left",
+      "via": [
+        [
+          306,
+          696
+        ]
+      ],
+      "labelAt": [
+        640,
+        682
+      ]
+    },
+    {
+      "from": "controller",
+      "to": "kube",
+      "label": "命名空间与 Pod",
+      "via": [
+        [
+          632,
+          408
+        ],
+        [
+          632,
+          792
+        ]
+      ],
+      "labelAt": [
+        760,
+        778
+      ]
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "两个域",
+      "items": [
+        "用户域：ForwardAuth 登录，注入身份头与服务绑定令牌",
+        "服务域：按源 Pod IP 识别调用方，本地评估放行表",
+        "接入项目直连公司系统，不经平台出站代理"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "一任务一 Pod",
+      "items": [
+        "开发会话是常驻 Pod，TaskRunner 回连 cs-session",
+        "每个 CLI／Agent／业务子任务各一个执行 Pod",
+        "工作卷随开发容器；业务任务可选持久卷"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "数据",
+      "items": [
+        "每服务一份生产库与一份开发库，两槽共用生产库",
+        "本机所有库在同一个 PostgreSQL 实例，与 Design §9.2 有差距",
+        "发布时迁移 Job 使用迁移身份，必须与线上槽兼容"
+      ]
+    }
+  ]
+}

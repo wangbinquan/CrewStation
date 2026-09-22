@@ -1,0 +1,12 @@
+{
+  "extends": "../../../../apps/console/tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true, "types": ["bun"],
+    "typeRoots": ["../../../../apps/console/node_modules/@types", "../../../../node_modules/@types", "../../../../node_modules"],
+    "paths": {
+      "react": ["../../../../apps/console/node_modules/@types/react"], "react/jsx-runtime": ["../../../../apps/console/node_modules/@types/react/jsx-runtime"],
+      "react-dom/client": ["../../../../apps/console/node_modules/@types/react-dom/client"]
+    }
+  },
+  "include": ["./*.ts", "./*.tsx", "./env.d.ts"]
+}
