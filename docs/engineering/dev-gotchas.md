@@ -171,6 +171,14 @@ sql`kind = ANY(ARRAY[${sql.join(kinds.map((k) => sql`${k}`), sql`, `)}]::text[])
 而管理面的认证页由 cs-api 应答、它的 `forcedOn` 还是 `false`，于是卡片写着「已关闭」、还给出一个按下去必然 409 的开关。
 改这类开关前先 `grep` 一遍谁读它（`packages/settings` 的字段名最好找），把读它的进程一起重启，运维文档也要写全。
 
+### 滚控制面镜像时别把开发登录器一起滚（本机，2026-09-22 实撞）
+
+`crewstation-dev-auth`（本机 dev-oidc 登录器）跑的是 `cs-control-plane` 同一个镜像，按标签批量 `kubectl set image` 滚控制面时它也会被重建。
+它每次启动都要先用管理员**密码**登录平台播种，而库内策略 `password_login_enabled` 自 2026-09-20 起是关的，于是 `readyz` 一直 503，
+Recreate 策略又已经删掉旧 Pod——本机从此登不进（浏览器会话一过期就没有第二条路），e2e 层整层 skip 或超时失败，只能走上面那条破窗口流程恢复，而那一步要作者授权。
+滚镜像前先 `kubectl -n crewstation-system get deploy -o 'custom-columns=NAME:.metadata.name,IMAGE:.spec.template.spec.containers[0].image'` 看清谁在用这个镜像，把 `crewstation-dev-auth` 排除在外；
+`rollout undo` 救不回来，回滚出来的 Pod 一样要播种。
+
 ### 按任务建的资源，路由也要按任务建
 
 开发预览的目标 Service 是随任务 Pod 建的，放进 gateway 的「按服务重算路由」里对不上生命周期。

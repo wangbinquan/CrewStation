@@ -21,10 +21,15 @@ describe.skipIf(!session)('deployed deployment topology (RFC-019)', () => {
     expect(await page.eval<string>(`document.querySelector('[data-node-id="cs-api"]').getAttribute('aria-label')`)).toContain('副本');
     const summary = ClusterSummarySchema.parse(await apiGet(page, '/v1/admin/cluster/summary'));
     if (summary.complete) expect(summary.projects.every((p) => typeof p.pods === 'number' && typeof p.workloads === 'number')).toBe(true);
-    await clickButton(page, `项目层 · ${summary.projects.length}`);
-    await page.waitUntil(`document.querySelectorAll('[data-node-id^="project:"]').length > 0`, 30_000, 300);
-    expect((await nodeIds(page)).filter((id) => id.startsWith('project:'))).toHaveLength(summary.projects.length);
-    expect(await page.bodyText()).toContain('个项目');
+    const count = summary.projects.length;
+    await clickButton(page, `项目层 · ${count}`);
+    await page.waitUntil(`document.body.innerText.includes('异常项目置顶')`, 30_000, 300);
+    if (count > 0) {
+      // 有项目的部署（本机）：每个项目一张卡；CI 的空平台没有项目，项目层只剩提示与空态。
+      await page.waitUntil(`document.querySelectorAll('[data-node-id^="project:"]').length > 0`, 30_000, 300);
+      expect(await page.bodyText()).toContain('个项目');
+    }
+    expect((await nodeIds(page)).filter((id) => id.startsWith('project:'))).toHaveLength(count);
     expect(page.takeErrors()).toEqual([]);
   }, 120_000);
 
