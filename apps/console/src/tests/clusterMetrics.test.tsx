@@ -10,7 +10,7 @@ async function tab(name: string) { await act(async () => { const element = [...d
 async function select(label: string, value: string) { const element = [...document.querySelectorAll('label')].find((l) => l.firstChild?.textContent === label)?.querySelector('select'); expect(element).toBeDefined(); await act(async () => { element!.value = value; element!.dispatchEvent(new Event('change', { bubbles: true })); }); await page!.settle(); }
 test('global totals stay visible above project filters; Pods show containers, requests, actual usage and node', async () => {
   const f = clusterMetricsFixture(); page = await renderApp(`/admin/cluster?tab=pods&projectId=${f.projectId}`);
-  expect(page.text()).toContain('全局资源总览'); expect(page.text()).toContain('已观测 1/2'); expect(page.text()).toContain('活跃 Pod 5'); expect(page.text()).toContain('worker-node-a'); expect(page.text()).toContain('CPU 申请／实际');
+  expect(page.text()).toContain('集群容量 · 整个集群'); expect(page.text()).toContain('已观测 1/2'); expect(page.text()).toContain('活跃 Pod 5'); expect(page.text()).toContain('worker-node-a'); expect(page.text()).toContain('CPU 申请／实际');
   expect(f.calls.find((u) => u.pathname.endsWith('/capacity'))?.search).toBe('');
   await page.click('cluster-demo-green'); expect(page.text()).toContain('QoS: Burstable'); expect(page.text()).toContain('此 Pod 共享节点网络');
   await tab('容器'); for (const text of ['应用容器', '初始化容器', '常驻 sidecar', '临时调试容器', 'cpu: 250m', 'memory: 128Mi', 'worker:v1', '未设置']) expect(page.text()).toContain(text);
@@ -35,7 +35,7 @@ test('history supports all ranges, custom constraints, ended resources, gaps and
   expect(document.querySelectorAll('svg path').length).toBeGreaterThan(2);
   await select('资源', f.pvc.resourceId); expect(page.text()).toContain('old-pvc-uid'); expect(page.text()).toContain('已结束／删除');
   await select('时间范围', 'custom'); expect(document.querySelectorAll('input[type="datetime-local"]')).toHaveLength(2);
-  f.historyFailure(); await select('时间范围', '6h'); expect(page.text()).toContain('历史查询失败'); expect(page.text()).toContain('HTTP 503'); expect(page.text()).toContain('全局资源总览');
+  f.historyFailure(); await select('时间范围', '6h'); expect(page.text()).toContain('历史查询失败'); expect(page.text()).toContain('HTTP 503'); expect(page.text()).toContain('集群容量 · 整个集群');
 });
 test('resource formatters preserve real zero, unavailable values and overcommit', () => {
   expect(amount(undefined)).toBe('—'); expect(amount('not numeric')).toBe('—'); expect(amount('0', 'cores')).toBe('0 CPU'); expect(amount('1024', 'bytes/s')).toBe('1 KiB/s'); expect(amount('2', 'ops/s')).toBe('2/s');

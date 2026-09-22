@@ -28,7 +28,8 @@ export function QueryStatus({
   emptyDescription,
 }: QueryStatusProps): ReactElement | null {
   const t = useT();
-  if (isPending) return <p className={styles.hint}>{t(loadingKey)}</p>;
+  // data-query-state 让外层容器（useHeldHeight）看得见这里正在载入，换查询时先撑住高度再等回执。
+  if (isPending) return <p className={styles.hint} data-query-state="pending">{t(loadingKey)}</p>;
   if (error !== null && error !== undefined) {
     return (
       <p className={styles.error} role="alert">

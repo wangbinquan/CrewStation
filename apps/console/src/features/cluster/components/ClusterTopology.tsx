@@ -13,6 +13,7 @@ import { Button } from '../../../shared/ui/Button';
 import { Card } from '../../../shared/ui/Card';
 import { DefinitionList } from '../../../shared/ui/DefinitionList';
 import { QueryStatus } from '../../../shared/ui/QueryStatus';
+import { Segmented } from '../../../shared/ui/Segmented';
 import { SUMMARY_METRICS } from '../../../shared/ui/topology/topologyLayout';
 import { TopologyWorkspace } from '../../../shared/ui/topology/TopologyWorkspace';
 import { useContainerWidth } from '../../../shared/ui/topology/useContainerWidth';
@@ -72,12 +73,9 @@ export function ClusterTopology({ search, change, go, summary, snapshotId }: Pro
       {node.id.startsWith('project:') ? <div className={styles.actions}><Button variant="primary" onClick={() => openProject(node.id.slice('project:'.length))}>{t('cluster.topology.expand')}</Button></div> : null}
     </Card>) : undefined;
   return <div ref={main} className={styles.stack}>
-    <div className={styles.actions} role="group" aria-label={t('cluster.topology.layers')}>
-      <Button variant={layer === 'system' ? 'secondary' : 'ghost'} aria-pressed={layer === 'system'} onClick={() => change({ layer: 'system' })}>{t('cluster.topology.system')}</Button>
-      <Button variant={layer === 'projects' ? 'secondary' : 'ghost'} aria-pressed={layer === 'projects'} onClick={() => change({ layer: 'projects' })}>{t('cluster.topology.projects', { count: summary?.projects.length ?? '—' })}</Button>
-      <Button variant={layer === 'project' ? 'secondary' : 'ghost'} aria-pressed={layer === 'project'} disabled={!projectId} onClick={() => projectId && change({ layer: 'project', projectId })}>{projectId ? t('cluster.topology.project', { name: projectName(projectId) ?? projectId }) : t('cluster.topology.projectNone')}</Button>
-      {layer === 'project' && projectId ? <span className={styles.muted}>{t('cluster.topology.breadcrumb', { name: projectName(projectId) ?? projectId })} <Button variant="ghost" onClick={() => change({ layer: 'projects', projectId: undefined, scope: 'all' })}>{t('cluster.topology.back')}</Button></span> : null}
-    </div>
+    <Segmented label={t('cluster.topology.layers')} value={layer} onChange={(value) => { if (value === 'system') change({ layer: 'system' }); else if (value === 'projects') change({ layer: 'projects' }); else if (projectId) change({ layer: 'project', projectId }); }}
+      items={[{ value: 'system', label: t('cluster.topology.system') }, { value: 'projects', label: t('cluster.topology.projects', { count: summary?.projects.length ?? '—' }) }, { value: 'project', label: projectId ? t('cluster.topology.project', { name: projectName(projectId) ?? projectId }) : t('cluster.topology.projectNone'), disabled: !projectId }]}
+      extra={layer === 'project' && projectId ? <>{t('cluster.topology.breadcrumb', { name: projectName(projectId) ?? projectId })} <Button variant="ghost" onClick={() => change({ layer: 'projects', projectId: undefined, scope: 'all' })}>{t('cluster.topology.back')}</Button></> : undefined} />
     <p className={styles.muted}>{layer === 'system' ? t('cluster.topology.systemHint') : layer === 'projects' ? t('cluster.topology.projectsHint') : t('cluster.topology.projectHint')}</p>
     <QueryStatus isPending={!error && !topology && (layer !== 'projects' || !summary)} error={error} isEmpty={topology !== undefined && topology.nodes.length === 0} emptyTitle={t('cluster.empty')} />
     {topology && topology.nodes.length > 0 ? <TopologyWorkspace key={topology.id} topology={topology} label={topology.title} selectedId={selected} onSelect={select} metrics={layer === 'projects' ? SUMMARY_METRICS : undefined} filters={layer !== 'projects'} legend={layer !== 'projects'} detail={detail} /> : null}

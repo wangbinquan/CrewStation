@@ -6,7 +6,8 @@ import styles from './Cluster.module.css';
 export function ClusterFilters({ search, summary, change }: { search: ClusterSearch; summary?: ClusterSummary; change: (patch: ClusterSearch) => void }) {
   const t = useT();
   const project = <label>{t('cluster.project')}<select value={search.projectId ?? ''} onChange={(e) => change({ projectId: e.target.value || undefined, scope: e.target.value ? 'project' : 'all' })}><option value="">{t('cluster.allProjects')}</option>{summary?.projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>;
-  if (search.tab === 'history') return <div className={styles.filters}>{project}</div>;
+  // 趋势与操作记录只认项目，其余筛选项对它们没有作用，不摆出来误导。
+  if (search.tab === 'history' || search.tab === 'operations') return <div className={styles.filters}>{project}</div>;
   return <div className={styles.filters}>
     <label>{t('cluster.scope')}<select value={search.scope ?? 'all'} onChange={(e) => change({ scope: e.target.value as ClusterSearch['scope'], projectId: undefined })}>{['all', 'project', 'system', 'unresolved'].map((s) => <option key={s} value={s}>{t(`cluster.${s}`)}</option>)}</select></label>
     {project}

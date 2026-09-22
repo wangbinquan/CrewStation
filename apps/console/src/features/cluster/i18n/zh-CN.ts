@@ -129,7 +129,6 @@ export const messages = {
   "cluster.description": "查看 CrewStation 的项目资源与平台内置服务，按实际实例执行管理操作。",
   "cluster.refresh": "请求刷新",
   "cluster.detail": "资源详情",
-  "cluster.resources": "资源列表",
   "cluster.resource": "资源",
   "cluster.owner": "所属项目／组件",
   "cluster.purpose": "用途",
@@ -264,4 +263,12 @@ export const messages = {
   'cluster.topology.systemHint': '节点状态来自集群盘点；虚线调用关系是静态架构标注，不是实测流量。',
   'cluster.topology.projectsHint': '异常项目置顶；正常项目超过 60 个时折叠，点击「还有 N 个」展开。点选项目卡片后可在详情里展开它的 Pod 层。',
   'cluster.topology.projectHint': '与项目运行与诊断的形态图同一组件、同一份快照；点节点打开资源详情，事件、日志与管理动作都在那里。',
+  // 页面结构（2026-09-23 裁定：指标条＋「拓扑｜资源清单」两级页签）
+  'cluster.overview': '集群总览',
+  'cluster.views': '集群视图',
+  'cluster.inventory': '资源清单',
+  'cluster.filters': '筛选清单',
+  'cluster.capacityGroup': '集群容量 · 整个集群',
+  'cluster.metrics.capacityObserved': '容量指标 {time} · {state}',
+  'cluster.strip.more': '容量明细、受管分项与来源状态',
 } as const;

@@ -186,13 +186,19 @@ sql`kind = ANY(ARRAY[${sql.join(kinds.map((k) => sql`${k}`), sql`, `)}]::text[])
 `no servers found for crewstation-system/crewstation-dev-auth`，整条 router 被丢掉——现象是 **404 而不是 503**，连那个写着「重新准备」按钮的页面都打不开。
 **判据**：网关对某个 Service 404 而 Endpoints 看着有地址时，先 `kubectl get endpointslice -o yaml` 看 `conditions.serving`，别去查 IngressRoute。
 
-**已治本**（1、2、3 全拆开）：`CS_DEV_AUTH_ROUTE_ID` 与 `CS_DEV_AUTH_CLIENT_SECRET` 改由 `install-dev-auth.sh` 一次生成、写进
+**已治本**（四条一起）：`CS_DEV_AUTH_ROUTE_ID` 与 `CS_DEV_AUTH_CLIENT_SECRET` 改由 `install-dev-auth.sh` 一次生成、写进
 `crewstation-dev-auth` Secret 并跨重装沿用，库里那条 Provider 因此能活过重启；`/readyz` 只看端口，播种状态改看 `/` 与 `/status.json`；
-Service 不再依赖 `publishNotReadyAddresses`。现在滚镜像只会丢掉「一键换角色」的同步，登录本身不断。
+Service 不再依赖 `publishNotReadyAddresses`；**管理员会话优先走 dev-auth 自己的 OIDC**，密码登录只作首次注册与漂移时的回落。
+实测：密码登录关闭时冷启动仍能播种到 `ready`，滚镜像后登录与「一键换角色」都自愈。
 
-剩下的注意：**换了那两个 Secret 字段（或重建了这个 Secret）就等于作废库里的 Provider**，而重新注册又要密码登录；
-`install-dev-auth.sh` 已经会先读旧值，别绕过它直接 `kubectl create secret`。真需要重新注册时，流程还是上面那条破窗口
-（`CS_PASSWORD_LOGIN=force-on` → 重启 cs-auth 与 cs-api → `install-dev-auth.sh` → 去掉开关再重启两个服务），这一步要作者授权。
+**固定前缀带来的第二个竞态**：issuer 不再变，cs-auth 的 Provider／JWKS 缓存就会活过 dev-auth 重启，而新进程换了签名 kid，
+首轮播种会撞 `/start` 503（旧 issuer）或 `/callback` 400（旧公钥），几十秒后自行收敛。播种失败已自动重试 5 轮兜住它，
+日志里每一轮都记原因；看到这两条别当成配置错了。
+
+剩下的注意：**换了那两个 Secret 字段（或重建了这个 Secret）就等于作废库里的 Provider**，而重新注册要密码登录；
+`install-dev-auth.sh` 已经会先读旧值，别绕过它直接 `kubectl create secret`。只有这种情况（以及全新安装、固定账户被降权）
+才需要上面那条破窗口（`CS_PASSWORD_LOGIN=force-on` → 重启 cs-auth 与 cs-api → `install-dev-auth.sh` → 去掉开关再重启两个服务），
+这一步要作者授权。日常重启、滚镜像都不再需要它。
 
 ### 按任务建的资源，路由也要按任务建
 
@@ -451,6 +457,15 @@ TanStack Router 只给声明了 `errorComponent`（或路由器上有 `defaultEr
 
 探测要校验回来的东西对不对，别只看抛没抛：网关要求状态码 < 500，调试浏览器要求 `/json/version`
 真的给出 `webSocketDebuggerUrl`。见 `tests/e2e/consoleSession.ts`。
+
+### 换查询时面板塌成一行，浏览器会把滚动位置钳住
+
+2026-09-21 换快照回顶用 `useApiQuery` 的 `keepPrevious` 解决（条件没变只换快照，留住旧数据）。2026-09-22 集群管理切页签又撞上同一类：
+条件变了必须重读，面板只剩一行「载入中」，文档变短，浏览器把 `scrollY` 钳到新的最大值（实测 979 → 262），回执到了页面也不会滚回去，页签条和列表一起被顶出视口。
+**判据**：切页签／换筛选的瞬间量 `scrollY` 与 `document.documentElement.scrollHeight`，文档高度掉下去再回来而 `scrollY` 没回来，就是这个。
+**做法**：条件没变用 `keepPrevious`；条件变了用 `shared/lib/useHeldHeight(contentKey)` 把面板撑在上一次的高度，等 `QueryStatus` 的 `data-query-state="pending"` 消失再放开。
+下限必须在**换内容的那次提交**就带上（hook 按内容键在渲染期判断）：先塌再在效应里撑是没用的——同一次提交里别处的布局读取（页签条量宽度）已经让浏览器按塌掉的高度钳了滚动位置，之后撑高也回不来（2026-09-23 第二次实机就红在这里）。
+也不要用固定 `min-height` 兜底——它挡不住深滚动位置，还会在内容真的变短时留一大块空白。
 
 ## 用例与 CI
 

@@ -12,15 +12,30 @@ const input = async (selector: string, value: string) => {
   const node = document.querySelector<HTMLInputElement>(selector)!;
   await act(async () => { node.focus(); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(node, value); node.dispatchEvent(new Event('input', { bubbles: true })); node.dispatchEvent(new KeyboardEvent('keyup', { key: 'a', bubbles: true })); }); await page!.settle();
 };
-test('cluster route enforces admin guard, exposes resource and observability tabs, server totals, partial sources and snapshot pagination', async () => {
+test('cluster route enforces admin guard, opens on the topology under the metrics strip, keeps the inventory one tab away with server totals, partial sources and snapshot pagination', async () => {
   const f = clusterFixture({ partial: true }); page = await renderApp('/admin/cluster', '/admin');
-  expect(page.text()).toContain('集群管理'); expect(page.text()).toContain('符合筛选的资源：205'); expect(page.text()).toContain('部分来源缺失或过期');
-  expect([...document.querySelectorAll('[role="tab"]')].map((n) => n.textContent)).toEqual(['拓扑', '工作负载', 'Pod', '网络', '存储与配置', '节点', '最近 7 天趋势', '命名空间', '操作记录']);
-  expect(page.text()).toContain('运行 30 · 就绪 29'); await page.click('下一页');
+  // 2026-09-23 裁定：顶部指标条＋「拓扑｜资源清单」两个顶层页签，缺省拓扑；清单类型、筛选条与表格都在「资源清单」里。
+  expect(page.text()).toContain('集群管理'); expect(page.text()).toContain('部分来源缺失或过期'); expect(page.text()).toContain('运行 30 · 就绪 29');
+  expect([...document.querySelectorAll('[role="tab"]')].map((n) => n.textContent)).toEqual(['拓扑', '资源清单']);
+  expect(document.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe('拓扑');
+  expect(page.text()).not.toContain('符合筛选的资源'); expect(page.text()).not.toContain('筛选清单');
+  await act(async () => { ([...document.querySelectorAll<HTMLElement>('button')].find((n) => n.textContent === 'Pod 总数32运行 30 · 就绪 29') as HTMLElement).click(); }); await page.settle();
+  expect(page.search()).toMatchObject({ tab: 'pods' }); expect(document.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe('资源清单');
+  const views = () => [...document.querySelectorAll<HTMLElement>('[role="group"][aria-label="资源清单"] button')];
+  expect(views().map((n) => n.textContent)).toEqual(['工作负载', 'Pod', '网络', '存储与配置', '命名空间', '节点', '最近 7 天趋势', '操作记录']);
+  expect(views().find((n) => n.getAttribute('aria-pressed') === 'true')?.textContent).toBe('Pod');
+  expect(page.text()).toContain('筛选清单'); expect(page.text()).toContain('符合筛选的资源：205');
+  await act(async () => { views().find((n) => n.textContent === '工作负载')!.click(); }); await page.settle(); expect(page.search()).toMatchObject({ tab: 'workloads' });
+  await page.click('下一页');
   expect(page.search()).toMatchObject({ snapshotId: 'snapshot-1', cursor: 'cursor-2' }); expect(f.calls.at(-1)?.query.get('cursor')).toBe('cursor-2');
   await page.back(); expect(page.search().cursor).toBeUndefined(); await page.click('cluster-demo-green');
   expect(page.search().resourceId).toBe('resource-uid'); expect(page.text()).toContain('uid-original'); expect(page.text()).toContain('工作卷仍被引用');
   await page.click('关闭详情'); expect(document.activeElement?.textContent).toBe('cluster-demo-green');
+  // 顶层切回拓扑再切回清单：回到上次看的那类清单，筛选条只在清单里出现；操作记录只留项目筛选。
+  await tab('拓扑'); expect(page.search()).toMatchObject({ tab: 'topology' }); expect(page.text()).not.toContain('筛选清单');
+  await tab('资源清单'); expect(page.search()).toMatchObject({ tab: 'workloads' }); expect(page.text()).toContain('筛选清单');
+  await act(async () => { views().find((n) => n.textContent === '操作记录')!.click(); }); await page.settle();
+  expect([...document.querySelectorAll('label')].map((l) => l.firstChild?.textContent)).toEqual(['项目', '目标资源 UID', '操作阶段']);
   page.unmount(); page = undefined; clusterFixture({ admin: false }); page = await renderApp('/admin/cluster'); expect(page.text()).toContain('仅平台管理员可见'); expect(page.text()).not.toContain('符合筛选');
 });
 test('scale validates every bound, inspects without writing, confirms once and exposes operation/HTTP/trace', async () => {

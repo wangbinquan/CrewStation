@@ -1,9 +1,28 @@
 .stack { display: grid; gap: 16px; min-width: 0; }
-.cards { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
-.stat { display: grid; text-align: left; gap: 6px; padding: 14px; border: 1px solid var(--cs-color-border); border-radius: 8px; background: var(--cs-color-surface); color: var(--cs-color-text); cursor: pointer; }
-.stat strong { font-size: 26px; line-height: 1.2; }
-.stat span, .muted { color: var(--cs-color-text-muted); font-size: 12px; }
-.filters { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+/* 顶部指标条（2026-09-23 裁定）：集群容量五格＋受管资源计数五格一行；容器不够宽时两组各占一行，640px 以下每组两列。 */
+.overview { display: grid; gap: 10px; min-width: 0; }
+.strip { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: stretch; }
+.group { min-width: 0; display: grid; grid-template-rows: auto 1fr; gap: 6px; }
+/* 容量格文字多、计数格只有一个数：宽度 3:2 分配，1280 宽仍能并排；再窄两组各占一行。 */
+.capacityGroup { flex: 3 1 480px; }
+.countGroup { flex: 2 1 320px; }
+.groupTitle { margin: 0; font: 700 10.5px var(--cs-font-mono); letter-spacing: 0.1em; color: var(--cs-color-text-muted); }
+.tiles { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; align-items: stretch; }
+.tile { display: grid; align-content: start; gap: 2px; min-width: 0; margin: 0; padding: 8px 10px; border: 1px solid var(--cs-color-border); border-radius: 8px; background: var(--cs-color-surface); color: var(--cs-color-text); font: inherit; text-align: left; }
+button.tile { cursor: pointer; }
+button.tile:hover { background: var(--cs-color-surface-muted); }
+button.tile:focus-visible { outline: 2px solid var(--cs-color-focus); outline-offset: 2px; }
+.tileTitle { font-size: 12px; color: var(--cs-color-text-muted); }
+.hero { display: block; font-size: 19px; line-height: 1.25; font-weight: 600; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.hero strong { font-size: inherit; font-weight: inherit; }
+.rate { font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.rate strong { font-size: inherit; }
+.tile small { display: block; font-size: 11px; line-height: 1.35; color: var(--cs-color-text-muted); overflow-wrap: anywhere; }
+.tileDanger .hero { color: var(--cs-tone-danger-fg); }
+.status { display: grid; gap: 4px; font-size: 12px; }
+.status p { margin: 0; }
+.status h3 { margin: 10px 0 4px; font-size: 12px; }
+.filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)); gap: 12px; }
 .filters label { display: grid; gap: 6px; min-width: 0; font-size: 12px; color: var(--cs-color-text-muted); }
 .filters input, .filters select, .input { box-sizing: border-box; width: 100%; min-width: 0; border: 1px solid var(--cs-color-border); border-radius: 6px; padding: 8px; background: var(--cs-color-surface); color: var(--cs-color-text); }
 .table { min-width: 850px; }
@@ -16,7 +35,8 @@
 .log { max-height: 400px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; padding: 12px; background: var(--cs-color-surface-alt); border-radius: 6px; }
 .warning { padding: 10px 12px; border: 1px solid var(--cs-color-border); border-left: 3px solid var(--cs-color-warning, #b7791f); border-radius: 6px; overflow-wrap: anywhere; }
 .error { color: var(--cs-color-danger, #bf3434); overflow-wrap: anywhere; }
+.muted { color: var(--cs-color-text-muted); font-size: 12px; }
 .actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .action { display: grid; gap: 4px; flex: 1 1 150px; min-width: 0; }
 .operation { border-top: 1px solid var(--cs-color-border); padding-top: 12px; overflow-wrap: anywhere; }
-@media (max-width: 640px) { .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } .filters { grid-template-columns: minmax(0, 1fr); } .facts { grid-template-columns: minmax(0, 1fr); gap: 4px; } .facts dd { margin-bottom: 8px; } }
+@media (max-width: 640px) { .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } .filters { grid-template-columns: minmax(0, 1fr); } .facts { grid-template-columns: minmax(0, 1fr); gap: 4px; } .facts dd { margin-bottom: 8px; } }
