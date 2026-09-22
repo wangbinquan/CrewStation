@@ -29,6 +29,7 @@
 - [I18. 发布构建 Job 的资源写死 1 CPU／2Gi](#i18-发布构建-job-的资源写死-1-cpu2gi)
 - [I19. read-only／edit 两档去掉 bash，与只认「OpenCode 内」请求的模型服务相冲](#i19-read-onlyedit-两档去掉-bash与只认opencode-内请求的模型服务相冲)
 - [I20. CI 里没有 GitLab：核心业务链路在 CI 没有实机证明](#i20-ci-里没有-gitlab核心业务链路在-ci-没有实机证明)
+- [I23. 两个内置接入项目的仓库 manifest 仍是 v1，发不出新版本](#i23-两个内置接入项目的仓库-manifest-仍是-v1发不出新版本)
 
 ## I1. 操作 MCP 的「以本服务身份调用内部 API」用的是谁的身份
 
@@ -267,3 +268,28 @@
 **为什么是问题**：清不掉的开发会话容器会一直占配额、占磁盘，并且它们的 TaskRunner 会永远重连（本机观察到 7 个旧容器合计每秒约两次握手，全被 `runner protocol mismatch` 拒掉，只刷日志）。作者要求「释放」时，平台没有任何入口能执行，只剩绕过产品路径直接删 Kubernetes 对象——而那会让记录与实际不一致，正是 RFC-010 想消灭的状态。本机这批是 9-12～9-20 的验收遗留，在真实企业里会是任何一次节点重启之后的常态。
 
 **可选做法**：(a) 释放用例不再只认「当前会话」：按 `projectId`（或环境 id）查出未释放的环境，`failed` 也可释放，清理容器、PVC 与记录，幂等；(b) 只放开 `/admin/cluster`：`development-workspace` 的删除在领域返回「对象不存在」时降级为受管资源删除，并把降级写进操作记录与审计；(c) 新增一条管理员专用的「强制回收项目残留」项目级操作（RFC-010 的项目生命周期里已有同类入口），一次清掉某项目所有未释放环境的 Pod 与工作卷；(d) 维持现状，残留由作者按需手工清理，并在文档里写明这是已知缺口。
+
+## I23. 两个内置接入项目的仓库 manifest 仍是 v1，发不出新版本
+
+**现状**：2026-09-22 以真实管理员身份对参考 APIProxy 发起发布（`POST /v1/services/…/releases`，202，标签 v0.1.3，SHA `7dee80b`），平台在校验阶段拒绝：
+
+```
+crewstation.yaml 无效：apiVersion: Invalid input: expected "crewstation/v2"；
+spec.service.servicePlanId: expected string, received undefined；
+spec.env.0.configDefinitionId / spec.env.1.configDefinitionId: expected string, received undefined
+```
+
+本仓 `integrations/reference-api-proxy/crewstation.yaml` 早已是 Manifest v2，但 10 天前建仓时写进 GitLab 的那份还是 RFC-013 之前的 v1，从未迁移。
+内置 GitLab EventProducer 由同一条 `bootstrap-integrations.sh` 路径建仓，同样受影响。发布失败只留 `failed` 记录，生产槽不受影响。
+
+**为什么是问题**：这两个项目是平台自带的接入样例，也是「接入容器怎么写」的参考。它们现在处在「能跑但改不动」的状态——
+任何需要重新发版的修复都推不出去。RFC-018 把 `/internal/egress/http` 删掉之后，集群里跑的 v0.1.2 会一直打到 404，
+直到这条路打通为止（网络层已经具备条件：同一 Pod 直连上游实测 200）。
+
+**为什么不在 RFC-018 里顺手修**：manifest v2 要求 `servicePlanId` 与每个 `configDefinitionId` 都是该项目**实际**的资源 UUID，
+本仓那份里是模板槽位。填对需要先读该项目已有的配置定义与套餐，再决定是改仓库内容还是让平台在建仓时生成——这是产品决定，不是改一行。
+
+**可选做法**：(a) 一次性迁移两个既有项目的仓库 manifest：读出各自的实际 UUID 写回 `crewstation.yaml` 并推送，之后正常发版；
+(b) 让 `bootstrap-integrations.sh` 与建仓流程在写入模板时就把模板槽位替换成该项目分配到的 UUID，并对既有两个项目补跑一次；
+(c) 平台对 v1 manifest 保留一条读时兼容（按名字解析套餐与配置定义），代价是 RFC-013 的「名称只作展示」又开一个口子；
+(d) 维持现状，两个内置项目冻结在当前版本，文档写明它们不可再发布。

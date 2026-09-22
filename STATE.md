@@ -7,6 +7,31 @@
 
 基线三件套（v0.3.3）的第一轮实现已在本机 kind 集群上跑通并推上 main；**RFC-001（算力归平台）与 RFC-002（管理空间与租户空间分离）已实现、实跑确认并推上 main；RFC-004 已被 RFC-006 取代（Superseded）；RFC-006（算力档位合并运行环境、每个 Agent 一个 Pod）已实现、实机验收完毕并推上 main，已 Done（P1–P8、ADR-0005 与 I17–I19 待作者复核）；RFC-003 工作台已按设计附件完成并整体部署到本机，52／52 项 UX-AT 全部实机通过、本地 gate 与精确 SHA CI 通过，已 Done；RFC-005（OIDC／OAuth 2.0 公司登录）代码、测试与 OA-01…OA-31 实机验收全部完成，已 Done；RFC-007（开发环境 OAuth 2.0 一键换角色）代码、四角色 Chrome 实机验收、本地 gate 与精确 SHA CI 全部完成，已 Done**。
 
+## 出站白名单整体下线（RFC-018，2026-09-22）
+
+作者问「出站白名单页面是用来配置什么的」，看过答复后裁定「这个能力可以下掉，不需要有这个约束」，随后明确「批准，并且本次就把功能全部下掉，历史的数据也清理掉，不要残留」。
+按能力收缩型 RFC 走完流程：[RFC-018](proposal/rfc/RFC-018-remove-egress-allowlist/proposal.md) 的八项能力影响清单获批，Q1 取方案 C、Q2 取方案 b。
+
+**查清的前提**：这条约束此前基本是空的。出站代理（E23／Q23）从未落地，开发会话、业务任务与构建 Pod 的命名空间策略自开通起就是出向全放行（代码注释自己标着「临时」）。
+清单唯一真实执行点是 cs-api 给 APIProxy 的 `/internal/egress/http` 通道（I9(a)），参考代理经它访问上游——因为接入容器的服务槽只能到 DNS 与系统命名空间。
+
+**删除**：`egress` 模块整体（L3，38 个文件）、契约与 api-client 资源、九条路由、工作台出站白名单页与出站申请页签、管理总览出站待办、`egress-blocked` 告警类型、安装器 `egress` 配置与预检播种、参考代理的平台转发通道。
+**新增**：`integrationEgressNetworkPolicy` 只对 `APIProxy`／`EventProducer` 项目下发，放开 `workload=service` 出向；provisioning 增加启动重下发，遍历未归档项目重跑 `ensureNamespace`——命名空间对象只在开通时下发过一次，没有这一步存量项目拿不到新策略。
+
+**实机证据**（本机全部滚到 `:dev`，九个 Deployment Ready）：11 个项目命名空间逐个核对，3 个接入容器项目各 4 条策略含 `crewstation-integration-egress`、8 个数字人项目各 3 条且没有它；cs-controller 日志 `namespace reapply done total=11 applied=11 failed=0`。
+cs-api Pod 内六条出站路由全部 404，同轮 `/v1/api-requests` 仍 401。在**旧**代理 Pod 内打已删除通道得 404、同一 Pod 直连 `host.docker.internal:8929` 得 **200**——新策略在网络层确已生效。
+
+**历史数据已清理**：先升代码，再取整库一致性备份（Pod 内 `pg_restore -l` 校验 469 个对象、含 egress 四张表与数据；本机副本 31,304,900 字节），一个事务内 `DROP SCHEMA egress CASCADE`（entries／requests／blocked／resource_identity_aliases，共 5 行）＋删 4 行迁移记录。
+复查：`egress` schema 0、该模块迁移记录 0、`egress-blocked` 告警 0、总 schema 20、总迁移 103；重启 cs-api／cs-controller 后迁移数仍 103、schema 未被重建。
+
+**门禁**：完整 `bun run check`（带 `CS_TEST_DATABASE_URL=…@127.0.0.1:59561/…` 与 `CS_E2E_AUTH=dev-oidc CS_E2E_USERNAME=dev-admin`）**2069 pass／8 skip／0 fail**，13034 断言、347 文件；改动行防护 **100／100（100%）**；`arch:check` 53 个单元（原 54）零违规。
+迁移锁按 `testing.md` §7 的手工例外删掉 egress 四条并在提交说明写明原因；结构后果见 ADR-0008，仓库结构升 v0.5（模块 19→18）；基线三件套回填 v0.3.7（R52／D47 出站部分／T4.12／AT-51 作废，新增 D54，Q23 与 E23 关闭，I9 关闭）。
+
+**两点如实记录**：
+
+- **EG-04 未闭环**。以真实管理员身份对参考代理发起发布（202，v0.1.3，SHA `7dee80b`），平台校验拒绝：仓库里的 `crewstation.yaml` 还是 Manifest v1。本仓那份早已是 v2，但 10 天前建仓写进 GitLab 的没随 RFC-013 迁移，两个内置接入项目都发不出新版本。这是既有缺口，记为 **I23**，不在本 RFC 内顺手改（要填该项目实际的套餐与配置定义 UUID，是产品决定）。集群里跑的 v0.1.2 会一直打到 404，直到 I23 有结论。
+- **三处既有 flake**，都在本次未改动的文件里、单跑均通过：`releaseDelivery.test.tsx`「并列真实部署与完整 SHA」、`agentExecutionStreams.test.tsx`「执行环境准备中写明排队或调度原因」，以及 e2e 的 `clusterMetrics` 历史新鲜度（RFC-015 范围，在本次部署之前的旧镜像上同样红过）。
+
 ## 开发会话页左栏与其他页签同宽（2026-09-22）
 
 作者实机反馈「开发会话页面的左侧栏宽度和其他页签不一样了」。确有其事，而且写在设计里：RFC-003 设计附件 §6 定了「桌面全局导航约 208px，开发模式约 156px」，`AppShell` 于是在路径以 `/dev-session` 结尾时挂 `compactShell`，把 `--cs-nav-width` 改写成 156px，进出开发会话整条左栏跳一下。顺带查出同一判断的另一半：只有**精确** `/dev-session` 才窄，子页「历史对话」仍是 208px，开发区内部同样在跳。
