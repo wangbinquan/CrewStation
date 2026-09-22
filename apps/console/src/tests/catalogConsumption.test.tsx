@@ -15,6 +15,8 @@ function fixture(admin = false) {
     const url = String(raw); let status = 200, body: unknown = { items: [] };
     if (url.endsWith('/v1/me')) body = { id: '01a0bf5d-8f4b-7fae-8c2f-e82b0fa04985', name: '开发者', platformRole: (admin) ? 'admin' : 'developer', isAdmin: admin, memberships: [{ projectId, role: 'owner' }] };
     else if (url.endsWith(`/v1/projects/${projectId}`)) body = { id: projectId, serviceId, name: '知识助理', slug: 'knowledge', kind: 'DigitalWorker', state: 'active' };
+    // RFC-020 D2：接口目录住在开发页的参考面板里；没有开发会话时也能打开，所以这里明确“没有会话”。
+    else if (url.endsWith('/dev-session')) { status = 404; body = { error: 'not_found', message: '没有开发会话' }; }
     else if (url.includes('/catalog/operations')) body = { items: [{ id: '01a0bf5d-8f4b-76a3-876b-499013b49883', proxyId: '01a0bf5d-8f4b-7274-8cd7-e347cbc132cf', proxy: 'billing', method: 'GET', path: '/invoices', openPolicy: 'targeted', granted: false }] };
     else if (init?.method === 'POST') {
       writes.push({ url, body: JSON.parse(String(init.body)) });

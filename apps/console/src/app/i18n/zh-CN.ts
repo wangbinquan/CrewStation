@@ -188,6 +188,7 @@ export const messages = {
   "ui.readAt": "读取于 {time}",
   "ui.refresh": "刷新",
   "ui.refreshing": "刷新中…",
+  "reference.openFull": "放大查看全部 ⤢",
   "resources.description": "查找可用能力，以及在代码中接入它们的方法。",
   "resources.groups": "资源主题",
   "resources.section.api": "API 接口",

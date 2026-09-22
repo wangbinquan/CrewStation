@@ -1,19 +1,22 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import type { ReactElement, ReactNode } from 'react';
-import type { NativeTerminalDto } from '@crewstation/contracts';
+import type { NativeTerminalDto, WorkspaceToolName } from '@crewstation/contracts';
 import { errorMessage } from '../../../../shared/api/useApi';
 import { useT } from '../../../../shared/lib/useT';
 import { Button } from '../../../../shared/ui/Button';
-import { Tabs } from '../../../../shared/ui/Tabs';
 import { SplitGrid } from '../../../../shared/ui/split/SplitGrid';
 import { useWorkspaceLayout } from '../../hooks/layout/useWorkspaceLayout';
+import { useToolPanel } from '../../hooks/layout/useToolPanel';
 import { useNativeTerminals } from '../../hooks/native/useNativeTerminals';
 import type { TaskStreamChannel } from '../../hooks/useTaskStream';
 import type { StreamState } from '../../model/taskStreamSocket';
-import { moveTerminal, reconcileWorkspaceLayout, updateWorkspaceTab } from '../../model/layout/workspaceLayout';
+import { layoutTool, moveTerminal, reconcileWorkspaceLayout, updateWorkspaceTab } from '../../model/layout/workspaceLayout';
 import { NativeTerminalCard } from './NativeTerminalCard';
 import { NativeToolbar } from './NativeToolbar';
 import { NativeWorkspaceTabs } from './NativeWorkspaceTabs';
+import { ToolPanel } from '../panel/ToolPanel';
+import type { ToolPane } from '../panel/ToolPanel';
+import { PanelGutter } from '../panel/PanelGutter';
 import styles from './NativeWorkspace.module.css';
 import { useAgentActivity } from '../../../../shared/activity/AgentActivityProvider';
 import { activityCounts } from '../../../../shared/activity/agentActivityView';
@@ -21,29 +24,24 @@ import type { ActivityTarget } from '../../../../shared/activity/agentActivityVi
 import { useActivityTarget } from '../../hooks/native/useActivityTarget';
 import { useWorkspaceLocation } from '../../hooks/layout/useWorkspaceLocation';
 import type { WorkspaceLocation } from '../../model/layout/developmentLocation';
-import { locationView } from '../../model/layout/developmentLocation';
 
-export function NativeWorkspace({ projectId, taskId, userId, channel, stream, canDevelop, onActivity, preview, editor, changes, activityTarget, editorDirty = false, location, data, environment, dataDirty = false, version, blockedReason, isAdmin = false }: {
+export interface NativeWorkspaceProps {
   readonly projectId: string; readonly taskId: string; readonly userId: string; readonly channel: TaskStreamChannel; readonly stream: StreamState; readonly canDevelop: boolean;
   readonly onActivity: () => void; readonly preview: ReactNode; readonly editor: ReactNode; readonly changes: ReactNode;
-  readonly data?: ReactNode; readonly environment?: ReactNode; readonly dataDirty?: boolean; readonly version?: ReactNode;
-  readonly blockedReason?: string; readonly isAdmin?: boolean;
-  readonly activityTarget?: ActivityTarget;
-  readonly editorDirty?: boolean;
-  readonly location?: WorkspaceLocation;
-}): ReactElement {
+  readonly data?: ReactNode; readonly environment?: ReactNode; readonly reference?: ReactNode; readonly dataDirty?: boolean; readonly version?: ReactNode;
+  readonly blockedReason?: string; readonly isAdmin?: boolean; readonly activityTarget?: ActivityTarget; readonly editorDirty?: boolean; readonly location?: WorkspaceLocation;
+}
+
+/**
+ * 开发工作区（RFC-020 D1）：左边终端工作区（一条工具行＋分屏终端），右边工具面板（预览／代码／变更／数据／参考／会话），
+ * 可拖宽、收起、放大；底部是版本比较状态条。面板状态与地址都由个人布局的 `tool` 表达。
+ */
+export function NativeWorkspace(props: NativeWorkspaceProps): ReactElement {
+  const { projectId, taskId, userId, channel, stream, canDevelop, onActivity, activityTarget, editorDirty = false, location, dataDirty = false, blockedReason, isAdmin = false } = props;
   const t = useT();
   const { store, state } = useWorkspaceLayout(taskId, userId, t('devSession.native.defaultTab'));
-  const layout = state.layout;
-  const [localPage, setLocalPage] = useState<'data' | 'session'>();
-  const selectedPage = location ? locationView(location.search) : localPage;
-  // 明确的地址优先于其他浏览器页保存的个人视图；重获焦点只同步窗口排布，不跳走当前功能页。
-  const view = selectedPage === 'split' ? 'cli' : selectedPage === 'diff' ? 'changes' : selectedPage && selectedPage !== 'conversation' ? selectedPage : layout.view;
-  const selectView = (value: string) => {
-    if (value === 'data' || value === 'session') { if (!location) setLocalPage(value); }
-    else { setLocalPage(undefined); store.update((current) => current.view === value ? current : { ...current, view: value as 'cli' | 'preview' | 'code' | 'changes' }); }
-    if (location) location.selectView(value === 'changes' ? 'diff' : value === 'cli' && layout.previewAlongside ? 'split' : value as 'cli' | 'preview' | 'code' | 'data' | 'session');
-  };
+  const layout = state.layout, stage = useRef<HTMLDivElement>(null);
+  const panel = useToolPanel(layout, store, location, stage);
   const onStarted = useCallback((terminal: NativeTerminalDto) => {
     store.update((value) => moveTerminal(value, terminal.terminalId, value.tabs.some((tab) => tab.id === layout.activeTabId) ? layout.activeTabId : value.activeTabId));
     onActivity();
@@ -52,7 +50,8 @@ export function NativeWorkspace({ projectId, taskId, userId, channel, stream, ca
   const roster = native.query.data?.items;
   const activity = useAgentActivity(), task = activity.snapshot.tasks.find((task) => task.taskId === taskId);
   const targetError = useActivityTarget(taskId, activityTarget, roster, state.loaded, store, t('devSession.native.defaultTab'));
-  const locationError = useWorkspaceLocation(taskId, location, roster, store, state.loaded, !!activityTarget, t('devSession.native.defaultTab'));
+  const savedTool = layoutTool(layout);
+  const locationError = useWorkspaceLocation(taskId, location, roster, store, state.loaded, !!activityTarget, t('devSession.native.defaultTab'), `${savedTool?.name ?? ''}:${savedTool?.mode ?? ''}`);
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | undefined;
     const unsubscribe = channel.subscribe((event) => { if (event.kind !== 'nativeActivity' && event.kind !== 'nativeTerminal') return; if (timer) clearTimeout(timer); timer = setTimeout(() => void activity.store?.refresh(taskId), 150); });
@@ -63,29 +62,35 @@ export function NativeWorkspace({ projectId, taskId, userId, channel, stream, ca
   const visible = layout.maximizedTerminalId && tab.paneOrder.includes(layout.maximizedTerminalId) ? [layout.maximizedTerminalId] : tab.paneOrder;
   const screen = <SplitGrid mode={tab.layout} ratios={tab.ratios} onResize={(ratios) => store.update((value) => updateWorkspaceTab(value, tab.id, (current) => ({ ...current, ratios })))} separatorLabel={(axis, index) => t(`devSession.native.resize.${axis}`, { index })}
     items={visible.map((terminalId) => ({ id: terminalId, content: <NativeTerminalCard terminalId={terminalId} terminal={roster?.find((item) => item.terminalId === terminalId)} activity={task} activitySync={native.query.data?.activitySync} layout={layout} store={store} channel={channel} stream={stream} onStop={(id) => native.stop.mutate(id)} onTerminalChange={native.query.refetch} onRetry={canDevelop && stream.runnerConnected && !native.start.isPending && !native.retryingOriginal ? (terminal) => native.launch(terminal.compute, terminal.permission) : undefined} onActivity={onActivity} canDevelop={canDevelop} /> }))} />;
-  const terminalContent = visible.length === 0 ? <div className={styles.empty}><strong>{t(blockedReason ? 'devSession.native.notReady' : 'devSession.native.empty')}</strong><p>{blockedReason ?? t('devSession.native.emptyHint')}</p>{blockedReason && environment ? <Button onClick={() => selectView('session')}>{t('devSession.connection.details')}</Button> : null}</div> : screen;
+  const terminalContent = visible.length === 0 ? <div className={styles.empty}><strong>{t(blockedReason ? 'devSession.native.notReady' : 'devSession.native.empty')}</strong><p>{blockedReason ?? t('devSession.native.emptyHint')}</p>{blockedReason && props.environment ? <Button onClick={() => panel.select('session')}>{t('devSession.connection.details')}</Button> : null}</div> : screen;
   const counts = activityCounts(task);
+  const panes: ToolPane[] = [];
+  panes.push({ name: 'preview', content: props.preview });
+  panes.push({ name: 'code', content: props.editor, keepMounted: true, suffix: editorDirty ? t('devSession.editor.dirty') : undefined });
+  panes.push({ name: 'changes', content: props.changes });
+  if (props.data !== undefined) panes.push({ name: 'data', content: props.data, keepMounted: true, suffix: dataDirty ? t('devSession.editor.dirty') : undefined });
+  if (props.reference !== undefined) panes.push({ name: 'reference', content: props.reference, keepMounted: true });
+  if (props.environment !== undefined) panes.push({ name: 'session', content: props.environment, keepMounted: true });
+  const columns = panel.mode === 'side' ? `minmax(0, ${1 - (panel.tool?.ratio ?? 0.45)}fr) 6px minmax(0, ${panel.tool?.ratio ?? 0.45}fr)` : panel.mode === 'full' ? '0 0 minmax(0, 1fr)' : 'minmax(0, 1fr) 0 auto';
   return <section className={styles.workspace}>
     {state.phase === 'loading' ? <p role="status">{t('devSession.native.layoutLoading')}</p> : null}
     {targetError ? <p className={styles.error} role="status">{t(targetError)}</p> : null}
     {locationError ? <p className={styles.error} role="status">{t(locationError)}</p> : null}
     {state.error ? <div className={styles.error} role="status">{state.error}<Button onClick={() => void (state.loaded ? store.reapply() : store.load())}>{t('devSession.native.reapply')}</Button>{state.loaded ? <Button onClick={() => void store.useRemote()}>{t('devSession.native.useRemote')}</Button> : null}</div> : null}
-    <Tabs label={t('devSession.navigation')} value={view} items={(['cli', 'preview', 'code', 'changes', 'data', 'session'] as const).map((value) => ({ value,
-      label: `${t(`devSession.native.view.${value}`)}${value === 'code' && editorDirty || value === 'data' && dataDirty ? ` · ${t('devSession.editor.dirty')}` : ''}${value === 'cli' && counts.pending ? ` · ${t('activity.pendingCount', { count: counts.pending })}` : ''}` }))} onChange={selectView}>
-      <div hidden={view !== 'cli'}>
+    <div className={styles.stage} ref={stage} data-panel={panel.mode} style={{ gridTemplateColumns: columns }}>
+      <div className={styles.main} hidden={panel.mode === 'full'}>
         {native.query.error || native.start.error || native.stop.error ? <p className={styles.error} role="status">{errorMessage(native.query.error ?? native.start.error ?? native.stop.error)}{native.query.error ? <Button onClick={() => void native.query.refetch()}>{t('devSession.connection.check')}</Button> : null}</p> : null}
-        <NativeWorkspaceTabs taskId={taskId} layout={layout} store={store} loaded={state.loaded} roster={roster}>
-          <NativeToolbar projectId={projectId} layout={layout} store={store} native={native} canStart={state.loaded && canDevelop && stream.runnerConnected && !blockedReason} blockedReason={blockedReason ?? (!state.loaded ? t('devSession.native.layoutLoading') : !canDevelop ? t('devSession.connection.noPermission') : undefined)} isAdmin={isAdmin} onPreviewAlongside={location ? (show) => location.selectView(show ? 'split' : 'cli') : undefined} />
-          <div className={styles.stage}>{view === 'cli' ? layout.previewAlongside ? <SplitGrid items={[{ id: 'terminals', content: terminalContent }, { id: 'preview', content: preview }]} mode="columns" ratios={{ columns: [layout.previewRatio, 1 - layout.previewRatio], rows: [1] }} separatorLabel={(axis, index) => t(`devSession.native.resize.${axis}`, { index })} onResize={(ratios) => store.update((value) => ({ ...value, previewRatio: Math.max(0.25, Math.min(0.75, ratios.columns[0] ?? 0.5)) }))} /> : terminalContent : null}</div>
+        <NativeWorkspaceTabs taskId={taskId} layout={layout} store={store} loaded={state.loaded}
+          toolbar={<NativeToolbar projectId={projectId} taskId={taskId} layout={layout} store={store} native={native} roster={roster} canStart={state.loaded && canDevelop && stream.runnerConnected && !blockedReason} blockedReason={blockedReason ?? (!state.loaded ? t('devSession.native.layoutLoading') : !canDevelop ? t('devSession.connection.noPermission') : undefined)} isAdmin={isAdmin} />}>
+          <div className={styles.terminals}>{terminalContent}</div>
         </NativeWorkspaceTabs>
-        {version}
       </div>
-      {view === 'preview' ? <div className={styles.contentStage}>{preview}</div> : null}
-      <div hidden={view !== 'code'} className={styles.contentStage}>{editor}</div>
-      {view === 'changes' ? <div className={styles.contentStage}>{changes}</div> : null}
-      <div hidden={view !== 'data'} className={styles.information}>{data}</div>
-      <div hidden={view !== 'session'} className={styles.information}>{environment}</div>
-    </Tabs>
-    <footer className={styles.footer}><span>{editorDirty ? t('devSession.editor.draftLifetime') : t('devSession.native.sharedHint')}</span><span>{state.phase === 'saving' || state.dirty && !state.error ? t('devSession.native.savingLayout') : state.loaded && !state.error && state.revision > 0 ? t('devSession.native.personalLayout') : ''}</span></footer>
+      <PanelGutter hidden={panel.mode !== 'side'} ratio={panel.tool?.ratio ?? 0.45} container={stage} onResize={panel.resize} label={t('devSession.panel.resize')} />
+      <ToolPanel active={panel.tool?.name} mode={panel.mode} panes={panes} forcedFull={panel.forcedFull} onSelect={(name: WorkspaceToolName) => panel.select(name)} onToggleMode={panel.toggleMode} onClose={panel.close} />
+    </div>
+    <footer className={styles.footer}>
+      <div className={styles.status}>{props.version}{counts.pending ? <span className={styles.waiting}>{t('activity.pendingCount', { count: counts.pending })}</span> : null}</div>
+      <span>{editorDirty ? t('devSession.editor.draftLifetime') : t('devSession.native.sharedHint')}</span><span>{state.phase === 'saving' || state.dirty && !state.error ? t('devSession.native.savingLayout') : state.loaded && !state.error && state.revision > 0 ? t('devSession.native.personalLayout') : ''}</span>
+    </footer>
   </section>;
 }

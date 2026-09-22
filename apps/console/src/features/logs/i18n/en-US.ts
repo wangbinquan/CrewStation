@@ -150,6 +150,8 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   'logs.topology.readOnly': 'Management actions (restart, scale, delete) stay in the cluster resource detail; this view is read-only.',
   'logs.topology.emptyTitle': 'No managed resources in this project yet',
   'logs.topology.invalidResponse': 'The topology inventory response is incomplete; refresh and try again.',
+  'logs.tail.title': 'Recent logs',
+  'logs.tail.hint': 'Last 200 lines of this development session, refreshed every 5 seconds; filters and other sources are under Operations → Logs.',
   'logs.topology.emptyDescription': 'The topology appears here once a release is deployed or a development session is opened.',
   'logs.topology.truncated': 'More than 500 resources; only the first 500 are shown, Pods and workloads first.',
 };

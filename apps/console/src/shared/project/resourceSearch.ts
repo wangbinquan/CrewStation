@@ -2,10 +2,7 @@ import { parseSettingsSearch, searchText } from './settingsSearch';
 import type { SettingsSearch } from './settingsSearch';
 import type { DevelopmentSearch } from './developmentSearch';
 
-/**
- * 「开发资源」的五个主题（RFC-009）。RFC-020 取消了这个入口（作者裁定 D2）：主题各归其家，
- * 这里只剩解析旧地址、算出新家；`api`／`events`／`guide` 三个主题在参考面板落地前仍由原页面渲染。
- */
+/** 「开发资源」的五个主题（RFC-009）。RFC-020 取消了这个入口（作者裁定 D2）：主题各归其家，这里只剩解析旧地址、算出新家。 */
 export const RESOURCE_SECTIONS = ['api', 'events', 'data', 'project', 'guide'] as const;
 export const GUIDE_TOPICS = ['identity', 'environment', 'mcp', 'tasks'] as const;
 export type ResourceSection = typeof RESOURCE_SECTIONS[number];
@@ -37,15 +34,11 @@ export type ResourceTarget =
   | { readonly page: 'settings'; readonly search: { readonly tab: 'info' } }
   | { readonly page: 'development'; readonly search: DevelopmentSearch };
 
-/**
- * 主题的新家：数据 → 开发页数据面板；项目与仓库 → 项目设置「项目信息」；其余三个主题 → 开发页参考面板（放大形态），
- * 参数原样带过去。参考面板落地前对这三个主题返回 undefined，让旧页面继续渲染。
- */
-export function resourceTarget(search: ResourceSearch, referencePanelReady = false): ResourceTarget | undefined {
+/** 主题的新家：数据 → 开发页数据面板；项目与仓库 → 项目设置「项目信息」；其余三个主题 → 开发页参考面板（放大形态），参数原样带过去。 */
+export function resourceTarget(search: ResourceSearch): ResourceTarget {
   const section = search.section ?? 'api';
   if (section === 'data') return { page: 'development', search: { view: 'data' } };
   if (section === 'project') return { page: 'settings', search: { tab: 'info' } };
-  if (!referencePanelReady) return undefined;
   return { page: 'development', search: { view: 'reference', panel: 'full', topic: section,
-    ...(search.proxy ? { proxy: search.proxy } : {}), ...(search.operation ? { operation: search.operation } : {}), ...(search.subscription ? { subscription: search.subscription } : {}) } };
+    ...(search.proxy ? { proxy: search.proxy } : {}), ...(search.operation ? { operation: search.operation } : {}), ...(search.subscription ? { subscription: search.subscription } : {}), ...(search.topic ? { guide: search.topic } : {}) } };
 }

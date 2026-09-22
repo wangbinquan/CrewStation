@@ -25,7 +25,7 @@ export function ProjectOperationsPage() {
       {tab === 'alerts' ? <AlertsPage key={projectId} projectId={projectId} search={search} change={change} onLogs={logs} /> : null}
       {tab === 'trace' ? <TracePage key={`${projectId}:${search.traceId ?? ''}`} projectId={projectId} traceId={search.traceId} onTrace={(traceId) => change({ tab: 'trace', traceId })} /> : null}
       {tab === 'deliveries' ? <>
-        <div className={styles.actions}><Link to={PROJECT_PATHS[space].resources} params={{ projectId }} search={{ section: 'events', subscription: search.subscription }}>{t('operations.viewSubscriptions')}</Link></div>
+        <div className={styles.actions}><Link to={PROJECT_PATHS[space].development} params={{ projectId }} search={{ view: 'reference', panel: 'full', topic: 'events', subscription: search.subscription }}>{t('operations.viewSubscriptions')}</Link></div>
         <DeliveriesCard key={`${projectId}:${search.subscription ?? ''}`} projectId={projectId} subscription={search.subscription} onClearSubscription={() => change({ tab })} onTrace={(traceId) => change({ tab: 'trace', traceId })} />
       </> : null}
     </Tabs>

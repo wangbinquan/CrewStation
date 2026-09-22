@@ -13,13 +13,15 @@ export interface CatalogContentProps {
   /** 已确定的服务 ID：目录的 granted 与裁剪都以它为准，页面在拿到之前不渲染本组件。 */
   readonly serviceId: string;
   readonly canDevelop?: boolean;
+  /** 紧凑形态：只列已授权操作与试调，不含申请记录与 Swagger。 */
+  readonly compact?: boolean;
   readonly proxy?: string;
   readonly operation?: string;
   readonly onClearContext?: () => void;
 }
 
 /** 目录页正文：操作表、本服务的申请、内嵌 Swagger。 */
-export function CatalogContent({ projectId, serviceId, canDevelop = false, proxy, operation, onClearContext }: CatalogContentProps): ReactElement {
+export function CatalogContent({ projectId, serviceId, canDevelop = false, compact = false, proxy, operation, onClearContext }: CatalogContentProps): ReactElement {
   const { operations, requests, proxies } = useCatalogData(projectId, serviceId);
   const actions = useCatalogActions(serviceId);
   const parsed = ApiOperationDtoSchema.array().safeParse(operations.data?.items);
@@ -34,10 +36,10 @@ export function CatalogContent({ projectId, serviceId, canDevelop = false, proxy
         loadError={operations.error}
         actions={actions}
         proxy={proxy} operation={operation} onClearContext={onClearContext}
-        onInvoke={canDevelop ? open : undefined}
+        onInvoke={canDevelop ? open : undefined} grantedOnly={compact}
       />
-      <RequestsPanel requests={requests.data?.items ?? []} loading={requests.isPending} loadError={requests.error} />
-      <SwaggerPanel serviceId={serviceId} proxies={proxies.data?.items ?? []} initialProxy={proxy} invocation={{ controller, operations: context.operations, canDevelop }} />
+      {compact ? null : <RequestsPanel requests={requests.data?.items ?? []} loading={requests.isPending} loadError={requests.error} />}
+      {compact ? null : <SwaggerPanel serviceId={serviceId} proxies={proxies.data?.items ?? []} initialProxy={proxy} invocation={{ controller, operations: context.operations, canDevelop }} />}
       </>}</ApiInvocationWorkspace>
     </div>
   );

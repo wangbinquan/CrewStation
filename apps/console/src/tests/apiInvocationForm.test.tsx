@@ -5,9 +5,9 @@ import { TaskIdSchema } from '@crewstation/contracts';
 import { renderApp } from './renderApp';
 import { apiInvocationFixture, invocationClick, invocationField, invocationInput, invocationOperation, invocationResponse, invocationRoute, invocationTaskId, refreshInvocationQueries } from './apiInvocationFixture';
 
-const originalFetch = globalThis.fetch;
+const originalFetch = globalThis.fetch, originalSocket = globalThis.WebSocket, originalUrl = window.location.href;
 let page: Awaited<ReturnType<typeof renderApp>> | undefined;
-afterEach(() => { page?.unmount(); page = undefined; globalThis.fetch = originalFetch; });
+afterEach(() => { page?.unmount(); page = undefined; globalThis.fetch = originalFetch; globalThis.WebSocket = originalSocket; window.location.href = originalUrl; });
 
 test('详情表单展示约束和全部字段错误，真实请求按固定会话发送并呈现 HTTP 错误与截断', async () => {
   const f = apiInvocationFixture(); page = await renderApp(invocationRoute); await invocationClick(page, '试调');
@@ -38,9 +38,11 @@ test('失败、收起、取消切操作均保留输入；确认切换只丢弃�
 });
 
 test('会话替换后不会把旧输入自动发到新会话，失败重读保留，再明确绑定才允许发送', async () => {
-  const f = apiInvocationFixture(); page = await renderApp(invocationRoute); await invocationClick(page, '试调'); await invocationInput(page, invocationField('路径参数 id'), 'retained');
+  const f = apiInvocationFixture(); page = await renderApp(invocationRoute); await invocationClick(page, '试调'); await invocationInput(page, invocationField('路径参数 id'), 'stale');
   f.state.taskId = TaskIdSchema.parse('01a0bf5d-8f4b-7d55-84d0-6a2289a856b4'); await refreshInvocationQueries(page);
-  await invocationClick(page, '发送请求'); expect(f.calls).toHaveLength(0); expect(page.text()).toContain('会话已变化'); expect(invocationField('路径参数 id').value).toBe('retained');
+  // RFC-020：目录住在开发工作区里，工作区按任务重建——换了会话就没有旧表单，旧输入不可能发到新会话；重新打开的表单先绑定新会话。
+  expect(f.calls).toHaveLength(0); expect([...document.querySelectorAll<HTMLInputElement>('input')].some((node) => node.value === 'stale')).toBe(false);
+  await invocationClick(page, '试调'); await invocationInput(page, invocationField('路径参数 id'), 'retained');
   f.state.sessionFailure = true; await invocationClick(page, '重新检查并绑定当前会话'); expect(page.text()).toContain('没有已确认'); expect(invocationField('路径参数 id').value).toBe('retained');
   f.state.sessionFailure = false; await invocationClick(page, '重新检查并绑定当前会话'); await invocationClick(page, '发送请求'); expect(f.calls[0]!.input.expectedTaskId).toBe(f.state.taskId);
 });
@@ -69,5 +71,6 @@ test('测试者深链接回到版本试用；开发者无会话时明确说明�
   expect([...document.querySelectorAll('button')].some((node) => node.textContent === '试调')).toBe(false); expect(f.calls).toHaveLength(0); expect(page.text()).toContain('Beta');
   expect(f.reads.some((url) => /\/catalog\/|\/dev-session/.test(url))).toBe(false);
   page.unmount(); page = undefined; f.state.role = 'developer'; f.state.malformedSession = true; page = await renderApp(invocationRoute); await invocationClick(page, '试调');
-  expect(page.text()).toContain('没有已确认'); expect(document.querySelector('textarea')).toBeNull(); expect(f.calls).toHaveLength(0);
+  // 数据访问面板收起时仍挂在树上（带草稿），它的申请理由框不算试调表单：只看可见的输入框。
+  expect(page.text()).toContain('没有已确认'); expect([...document.querySelectorAll('textarea')].filter((node) => !node.closest('[hidden]'))).toHaveLength(0); expect(f.calls).toHaveLength(0);
 });

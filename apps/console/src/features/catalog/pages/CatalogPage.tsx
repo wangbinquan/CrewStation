@@ -11,7 +11,7 @@ import { PageHeader } from '../../../shared/ui/PageHeader';
 import { CatalogContent } from '../components/CatalogContent';
 
 /** 接口目录：调用方身份是项目的服务，先解析 serviceId，再按它取目录与授权。 */
-export function CatalogPage({ embedded = false, proxy, operation, onClearContext }: { readonly embedded?: boolean; readonly proxy?: string; readonly operation?: string; readonly onClearContext?: () => void }): ReactElement {
+export function CatalogPage({ embedded = false, compact = false, proxy, operation, onClearContext }: { readonly embedded?: boolean; /** 紧凑形态（参考面板在侧栏时）：只列已授权操作与试调。 */ readonly compact?: boolean; readonly proxy?: string; readonly operation?: string; readonly onClearContext?: () => void }): ReactElement {
   const t = useT();
   const { projectId } = useProjectScope();
   const project = useApiQuery(queryKeys.project(projectId), () => api.projects.get(projectId));
@@ -28,8 +28,9 @@ export function CatalogPage({ embedded = false, proxy, operation, onClearContext
       {!project.isPending && project.error === null && serviceId === undefined ? (
         <EmptyState title={t('catalog.service.missingTitle')} description={t('catalog.service.missingDescription')} />
       ) : null}
-      {!me.error && me.data?.isAdmin === true ? <p><Link to="/admin/capabilities" search={{ tab: 'api', projectId, proxy, operation }}>{t('catalog.admin.openManagement')}</Link> · <Link to="/admin/requests" search={{ projectId, state: 'pending' }}>{t('catalog.admin.openRequests')}</Link></p> : null}
-      {serviceId !== undefined ? <CatalogContent key={`${projectId}:${proxy ?? ''}:${operation ?? ''}`} projectId={projectId} serviceId={serviceId} canDevelop={canDevelop && !project.error} proxy={proxy} operation={operation} onClearContext={onClearContext} /> : null}
+      {serviceId !== undefined ? <CatalogContent key={`${projectId}:${proxy ?? ''}:${operation ?? ''}`} projectId={projectId} serviceId={serviceId} canDevelop={canDevelop && !project.error} compact={compact} proxy={proxy} operation={operation} onClearContext={onClearContext} /> : null}
+      {/* 管理员的管理动作留在管理空间（RFC-002）；这里只留一行入口，不再放在页首。 */}
+      {!compact && !me.error && me.data?.isAdmin === true ? <p><Link to="/admin/capabilities" search={{ tab: 'api', projectId, proxy, operation }}>{t('catalog.admin.openManagement')}</Link> · <Link to="/admin/requests" search={{ projectId, state: 'pending' }}>{t('catalog.admin.openRequests')}</Link></p> : null}
     </>
   );
 }

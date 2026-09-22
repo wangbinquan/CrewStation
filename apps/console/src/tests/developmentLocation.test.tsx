@@ -13,6 +13,10 @@ let page: Awaited<ReturnType<typeof renderApp>> | undefined, fixture: ReturnType
 afterEach(async () => { page?.unmount(); page = undefined; await new Promise((resolve) => setTimeout(resolve, 0)); fixture?.restore(); fixture = undefined; });
 const path = `/projects/${activityProjectId}/dev-session`;
 const content = () => document.querySelector<HTMLElement>('.cm-content');
+/** 工具面板当前页签（工作区页签在前，不能用第一个 aria-selected）。 */
+const panelTab = () => document.querySelector('[aria-label="工具面板"] [role="tab"][aria-selected="true"]')?.textContent;
+const addTab = async () => { await act(async () => document.querySelector<HTMLButtonElement>('button[aria-label="＋ 工作区"]')!.click()); await page!.settle(); };
+const openMenu = async () => { await act(async () => [...document.querySelectorAll<HTMLElement>('summary')].find((node) => node.getAttribute('aria-label') === '工作区设置')!.click()); await page!.settle(); };
 async function edit(text: string) { const view = EditorView.findFromDOM(content()!)!;
   await act(async () => view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: text } })); await page!.settle(); }
 
@@ -62,18 +66,19 @@ test('中文路径完整传入读取，非法视图／控制字符参数不会�
   fixture = editorWorkspaceFixture(); const file = 'src/中文 参数.ts'; fixture.files.set(file, '含空格的路径');
   page = await renderApp(`${path}?file=${encodeURIComponent(file)}`); expect(content()?.textContent).toBe('含空格的路径'); expect(fixture.commands.some((c) => c.type === 'readFile' && c.path === file)).toBe(true);
   expect(parseDevelopmentSearch({ view: ['cli'], file: 'a\n.ts', target: 'invalid' })).toEqual({});
-  await page.navigate(`${path}?target=preview`); expect(document.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toContain('变更');
+  await page.navigate(`${path}?target=preview`); expect(panelTab()).toContain('变更');
 });
 
 test('差异别名与待验证目标接到实际查询，空 CLI 工作区也能打开并排预览', async () => {
   fixture = editorWorkspaceFixture(); const base = globalThis.fetch, calls: URL[] = [];
   globalThis.fetch = (async (raw, init) => { calls.push(new URL(String(raw), 'http://localhost')); return base(raw, init); }) as typeof fetch;
   page = await renderApp(`${path}?view=changes&target=preview`);
-  expect(document.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toContain('变更');
+  expect(panelTab()).toContain('变更');
   expect(calls.some((url) => url.pathname.endsWith('/version-comparison') && url.searchParams.get('target') === 'preview')).toBe(true);
   expect(page.text()).toContain('工作树与待验证版本'); await page.navigate(`${path}?view=split`);
   expect(page.text()).toContain('开发预览'); expect(page.text()).toContain('创建第一个开发Agent会话');
-  await page.click('代码'); await page.click('CLI 工作区'); await page.click('＋ 工作区'); expect(page.search().view).toBe('split'); expect(page.text()).toContain('工作区 2');
+  // RFC-020：工具在右侧面板里，「收起」回到纯终端（view=cli）；新建工作区不碰面板。
+  await page.click('代码'); expect(page.search().view).toBe('code'); await page.click('收起'); expect(page.search().view).toBe('cli'); await addTab(); expect(page.text()).toContain('工作区 2');
   expect(fixture.commands.some((c) => c.type === 'startAgentTerminal' || c.type === 'stopAgentTerminal')).toBe(false);
 });
 
@@ -97,7 +102,7 @@ test('普通 Agent 链接恢复已存在窗口并覆盖个人视图，不标记�
   page = await renderApp(`${path}?agent=${f.terminal.agentId}&terminal=${f.terminal.terminalId}&task=${activityTaskId}`);
   expect(document.querySelectorAll(`[data-native-terminal="${f.terminal.terminalId}"]`)).toHaveLength(1);
   expect([...document.querySelectorAll('[role="tab"][aria-selected="true"]')].map((node) => node.textContent)).toContain('已有页签 · 1');
-  await page.click('代码'); await page.click('CLI 工作区'); await page.click('放入当前页签'); expect(page.search().view).toBe('cli');
+  await page.click('代码'); await page.click('收起'); await openMenu(); await page.click('放入当前页签'); expect(page.search().view).toBe('cli');
   expect(fixture.writes.every((w) => w.path.endsWith('/workspace-layout'))).toBe(true);
   expect(fixture.commands.some((c) => ['startAgentTerminal', 'stopAgentTerminal', 'claimTerminalControl', 'terminalInput'].includes(c.type))).toBe(false);
 });

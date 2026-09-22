@@ -134,11 +134,15 @@ export const WorkspaceTabSchema = z.object({
   paneOrder: z.array(PaneIdSchema).max(32),
   ratios: z.object({ columns: SplitWeightsSchema, rows: SplitWeightsSchema }).strict(),
 }).strict();
+/** 工具面板（RFC-020 D1）：终端旁的一个工具及其形态；`view`／`previewAlongside` 保留给旧读者，写入时由工作台回填一致的值。 */
+export const WorkspaceToolNameSchema = z.enum(['preview', 'code', 'changes', 'data', 'reference', 'session']);
+export const WorkspaceToolSchema = z.object({ name: WorkspaceToolNameSchema, mode: z.enum(['side', 'full']), ratio: z.number().min(0.3).max(0.6) }).strict();
 export const WorkspaceLayoutSchema = z.object({
   activeTabId: ResourceIdSchema, tabs: z.array(WorkspaceTabSchema).min(1).max(16), hiddenTerminalIds: z.array(PaneIdSchema).max(256),
   view: z.enum(['cli', 'preview', 'code', 'changes']), previewAlongside: z.boolean(), previewRatio: z.number().min(0.25).max(0.75),
   selectedTerminalId: PaneIdSchema.nullable(), maximizedTerminalId: PaneIdSchema.nullable(),
   preferredCompute: ResourceIdSchema.optional(),
+  tool: WorkspaceToolSchema.optional(),
 }).strict().superRefine((layout, ctx) => {
   const ids = layout.tabs.map((tab) => tab.id);
   if (new Set(ids).size !== ids.length) ctx.addIssue({ code: 'custom', path: ['tabs'], message: '页签 ID 不能重复' });
@@ -154,5 +158,7 @@ export const WorkspaceLayoutDtoSchema = z.object({ revision: z.number().int().mi
 export const SaveWorkspaceLayoutRequestSchema = z.object({ expectedRevision: z.number().int().min(0), layout: WorkspaceLayoutSchema }).strict();
 export type WorkspaceTab = z.infer<typeof WorkspaceTabSchema>;
 export type WorkspaceLayout = z.infer<typeof WorkspaceLayoutSchema>;
+export type WorkspaceTool = z.infer<typeof WorkspaceToolSchema>;
+export type WorkspaceToolName = z.infer<typeof WorkspaceToolNameSchema>;
 export type WorkspaceLayoutDto = z.infer<typeof WorkspaceLayoutDtoSchema>;
 export type SaveWorkspaceLayoutRequest = z.infer<typeof SaveWorkspaceLayoutRequestSchema>;

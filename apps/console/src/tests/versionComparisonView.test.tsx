@@ -16,6 +16,8 @@ let ui: Awaited<ReturnType<typeof renderElement>> | undefined;
 const channel: TaskStreamChannel = { send: async () => ({}), subscribe: () => () => {} };
 const defaultFiles = [{ path: 'file.txt', status: 'M', additions: 1, deletions: 1, binary: false, untracked: false }];
 afterEach(() => { ui?.unmount(); ui = undefined; requests.length = 0; historyTargets.length = 0; globalThis.fetch = originalFetch; focusManager.setFocused(undefined); });
+/** RFC-020：四组改动是同一列表上的分组标题（可展开按钮），不再是页签；这里列出当前展开的组。 */
+const expanded = () => [...(ui?.host.querySelectorAll('h4 > button[aria-expanded="true"]') ?? [])].map((node) => node.textContent);
 
 function comparison(): VersionComparisonDto {
   return VersionComparisonDtoSchema.parse({
@@ -81,10 +83,10 @@ test('未提交列表解释暂存区与工作区，未跟踪和二进制不混�
 
 test('比较重查后保留正在阅读的文件，加载新快照的 Patch', async () => {
   const data = comparison(), page = await render(data);
-  await page.click('查看差异'); await page.click('未提交改动'); await page.click('file.txt');
+  await page.click('查看差异'); await page.click('待上线提交'); await page.click('未提交改动'); await page.click('file.txt');
   data.comparisonId = 'comparison-2'; await page.click('重新检查');
-  // 实机十秒重查曾因 comparisonId 作为 React key，强制退回第一个页签并关闭 Patch。
-  expect(page.host.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe('未提交改动');
+  // 实机十秒重查曾因 comparisonId 作为 React key，强制退回第一组并关闭 Patch。
+  expect(expanded()).toEqual(['未提交改动']);
   expect(page.text()).toContain('comparison-2');
   expect(requests.at(-1)).toContain('version-comparisons/comparison-2?tab=uncommitted');
   expect(requests.at(-1)).toContain('path=file.txt');
@@ -93,10 +95,10 @@ test('比较重查后保留正在阅读的文件，加载新快照的 Patch', as
 test('新比较保留详情页签，但不能复用上一个快照的分页游标', async () => {
   const data = comparison(), details: { nextCursor?: string } = { nextCursor: 'old-cursor' };
   const page = await render(data, true, 'prod', undefined, false, details);
-  await page.click('查看差异'); await page.click('相对生产的文件差异'); await page.click('下一页');
+  await page.click('查看差异'); await page.click('待上线提交'); await page.click('相对生产的文件差异'); await page.click('下一页');
   expect(requests.at(-1)).toContain('cursor=old-cursor');
   data.comparisonId = 'comparison-2'; delete details.nextCursor; await page.click('重新检查');
-  expect(page.host.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe('相对生产的文件差异');
+  expect(expanded()).toEqual(['相对生产的文件差异']);
   expect(requests.at(-1)).toContain('version-comparisons/comparison-2?tab=files');
   expect(requests.at(-1)).not.toContain('cursor=');
 });
@@ -181,15 +183,16 @@ test('比较摘要仍保留不同失败原因，去重不隐藏独立问题', as
   expect(page.text()).toContain('暂不可比较');
 });
 
-test('共享页签支持方向键，选中标签与面板名称关联', async () => {
+test('分组标题是可展开按钮，展开区与标题关联；收起的组不再读取', async () => {
   const page = await render(comparison());
   await page.click('查看差异');
-  const first = page.host.querySelector<HTMLButtonElement>('[role="tab"]')!;
-  await act(async () => { first.focus(); first.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true })); });
-  await page.settle();
-  const selected = page.host.querySelector('[role="tab"][aria-selected="true"]')!;
-  expect(selected.textContent).toBe('缺少的生产提交');
-  expect(page.host.querySelector('[role="tabpanel"]')?.getAttribute('aria-labelledby')).toBe(selected.id);
+  const toggles = [...page.host.querySelectorAll<HTMLButtonElement>('h4 > button[aria-expanded]')];
+  expect(toggles.map((node) => node.textContent)).toEqual(['待上线提交', '缺少的生产提交', '相对生产的文件差异', '未提交改动']);
+  expect(expanded()).toEqual(['待上线提交']);
+  expect(document.getElementById(toggles[0]!.getAttribute('aria-controls')!)?.getAttribute('role')).toBe('region');
+  const before = requests.length;
+  await page.click('待上线提交'); expect(expanded()).toEqual([]); expect(page.host.querySelector('[role="region"]')).toBeNull();
+  await page.click('缺少的生产提交'); expect(expanded()).toEqual(['缺少的生产提交']); expect(requests.slice(before).some((request) => request.includes('tab=behind'))).toBe(true);
 });
 
 test('尚未部署默认展示未提交改动；不可比较页签解释原因，不发送必然失败的详情请求', async () => {
@@ -199,9 +202,9 @@ test('尚未部署默认展示未提交改动；不可比较页签解释原因�
   data.files = { status: 'unavailable', reason: '尚无生产版本可比较文件' };
   const page = await render(data);
   await page.click('查看差异');
-  expect(page.host.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe('未提交改动');
+  expect(expanded()).toEqual(['未提交改动']);
   await page.click('待上线提交');
-  expect(page.host.querySelector('[role="tabpanel"]')?.textContent).toContain('尚无生产版本');
+  expect(page.host.querySelector('[role="region"][aria-label="待上线提交"]')?.textContent).toContain('尚无生产版本');
   await page.click('相对生产的文件差异');
   expect(page.text()).toContain('尚无生产版本可比较文件');
   expect(requests.filter((request) => request.includes('version-comparisons/')).every((request) => request.includes('tab=uncommitted'))).toBe(true);

@@ -1,0 +1,20 @@
+.panel { grid-column: 3; display: flex; flex-direction: column; min-width: 0; min-height: 0; border: 1px solid var(--cs-color-border); border-radius: var(--cs-radius-md); background: var(--cs-color-surface); overflow: hidden; }
+.panel[hidden] { display: none; }
+.panel > div { display: flex; flex-direction: column; min-height: 0; flex: 1; }
+.panel [role="tab"] { padding: 6px 10px; white-space: nowrap; }
+.panel [role="tabpanel"] { flex: 1; min-height: 0; overflow: auto; padding: 0; }
+.pane { padding: var(--cs-space-2) var(--cs-space-3); min-width: 0; overflow-wrap: anywhere; }
+.pane[hidden] { display: none; }
+.control { padding: 3px 8px; font-size: 12px; }
+.note { font-size: 12px; color: var(--cs-color-text-muted); padding: 0 8px; }
+.gutter { grid-column: 2; align-self: stretch; cursor: col-resize; border-radius: 3px; background: linear-gradient(var(--cs-color-border), var(--cs-color-border)) center / 2px 100% no-repeat; }
+.gutter:hover, .gutter:focus-visible { background: linear-gradient(var(--cs-color-primary), var(--cs-color-primary)) center / 2px 100% no-repeat; outline: none; }
+.gutter[hidden] { display: none; }
+.noSession { display: grid; grid-template-rows: minmax(0, 1fr); min-height: 420px; gap: 0; }
+.noSessionMain { grid-column: 1; min-width: 0; }
+.noSessionMain[hidden] { display: none; }
+.linkButton { border: 0; background: transparent; padding: 0; color: var(--cs-color-primary); font: inherit; cursor: pointer; }
+.linkButton:hover { text-decoration: underline; }
+/* 收起形态：右缘一条竖排页签栏，点任一项在旁边打开面板。 */
+.rail { grid-column: 3; display: flex; flex-direction: column; gap: 4px; padding: 6px 4px; border: 1px solid var(--cs-color-border); border-radius: var(--cs-radius-md); background: var(--cs-color-surface); min-height: 0; overflow: auto; }
+.railTab { writing-mode: vertical-rl; padding: 10px 4px; font-size: 12px; white-space: nowrap; }

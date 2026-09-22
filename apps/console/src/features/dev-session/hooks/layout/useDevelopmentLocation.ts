@@ -5,7 +5,8 @@ import { parseDevelopmentSearch } from '../../../../shared/project/developmentSe
 import type { DevelopmentSearch, DevelopmentView } from '../../../../shared/project/developmentSearch';
 import { PROJECT_PATHS } from '../../../../shared/project/projectPaths';
 import { useProjectScope } from '../../../../shared/project/ProjectScope';
-import { locationView } from '../../model/layout/developmentLocation';
+import { locationView, toolSearch } from '../../model/layout/developmentLocation';
+import type { WorkspaceToolName } from '@crewstation/contracts';
 import type { FileEditorHandle } from '../useFileEditor';
 
 /** 显式地址优先；只读指定文件，不触发写入、CLI 启停或取得终端控制。 */
@@ -29,13 +30,15 @@ export function useDevelopmentLocation(taskId: string, editor: FileEditorHandle,
     if (closed && search.file) go({ ...search, file: undefined }, true);
   }, [editor.file, search, go]);
   const selectView = (selected: DevelopmentView) => go({ view: selected, file: search.file, target: search.target });
+  // 面板状态写进地址：只保留文件、比较目标与参考面板的定位参数，不带活动定位的一次性参数。
+  const selectTool = (tool: { name: WorkspaceToolName; mode: 'side' | 'full' } | null, replace = false) => go(toolSearch(tool, { file: search.file, target: search.target, topic: search.topic, guide: search.guide, proxy: search.proxy, operation: search.operation, subscription: search.subscription }), replace);
   const fileChange = (next: NavigationLocation) => {
     const value = parseDevelopmentSearch(next.search as Record<string, unknown>);
     return next.pathname === location.pathname && locationView(value) === 'code' && (!value.task || value.task === taskId) && value.file !== editor.file?.path ? value.file : undefined;
   };
-  return { key, search, selectView, wrongTask, fileChange,
-    openFile: (next: string) => go({ view: 'code', file: next, target: search.target }),
-    selectTarget: (target: 'prod' | 'preview') => go({ view: 'diff', file: search.file, target }),
+  return { key, search, selectView, selectTool, wrongTask, fileChange,
+    openFile: (next: string) => go({ view: 'code', file: next, target: search.target, ...(search.panel ? { panel: search.panel } : {}) }),
+    selectTarget: (target: 'prod' | 'preview') => go({ view: 'changes', file: search.file, target, ...(search.panel ? { panel: search.panel } : {}) }),
     approveFile: (next: NavigationLocation) => { const nextFile = fileChange(next); if (nextFile) {
       approved.current = { file: nextFile, draft: editor.draft, source: editor.file?.path, revision: editor.file?.revision }; editor.cancelDiscard();
     } },

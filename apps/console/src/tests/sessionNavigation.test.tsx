@@ -13,10 +13,11 @@ let page: Awaited<ReturnType<typeof renderApp>> | undefined, f: ReturnType<typeo
 afterEach(async () => { page?.unmount(); page = undefined; await new Promise((resolve) => setTimeout(resolve, 0)); f?.restore(); f = undefined; });
 const path = `/projects/${activityProjectId}/dev-session`;
 
-test('六个功能页签与个人工作区分层，往返保留代码和数据申请草稿，地址可刷新直达', async () => {
+test('六个工具页签与个人工作区分层，往返保留代码和数据申请草稿，地址可刷新直达', async () => {
   f = editorWorkspaceFixture(); page = await renderApp(`${path}?view=code&file=a.ts`);
-  const tabs = document.querySelector('[role="tablist"][aria-label="开发会话功能"]')!;
-  expect([...tabs.querySelectorAll('[role="tab"]')].map((node) => node.textContent)).toEqual(['CLI 工作区', '预览', '代码', '变更', '数据访问', '会话与环境']);
+  // RFC-020 D1：工具在终端旁的面板里，一排页签；终端工作区的页签是另一层。
+  const tabs = document.querySelector('[role="tablist"][aria-label="工具面板"]')!;
+  expect([...tabs.querySelectorAll('[role="tab"]')].map((node) => node.textContent)).toEqual(['预览', '代码', '变更', '数据访问', '参考', '会话与环境']);
   const editor = document.querySelector<HTMLElement>('.cm-content')!, view = EditorView.findFromDOM(editor)!;
   await act(async () => view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: '跨功能页保留的代码' } }));
   await page.click('数据访问'); expect(page.search().view).toBe('data');
@@ -29,7 +30,7 @@ test('六个功能页签与个人工作区分层，往返保留代码和数据�
   expect(f.writes.every((write) => write.path.endsWith('/workspace-layout'))).toBe(true);
   expect(f.commands.some((command) => ['writeFile', 'startAgentTerminal', 'stopAgentTerminal'].includes(command.type))).toBe(false);
   page.unmount(); page = await renderApp(`${path}?view=session`); expect(page.search().view).toBe('session');
-  expect(document.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe('会话与环境');
+  expect(document.querySelector('[aria-label="工具面板"] [role="tab"][aria-selected="true"]')?.textContent).toBe('会话与环境');
 });
 
 test('普通环境失联给出检查与日志，不获得重建入口；页面重连保持编辑草稿且不重复发送写入', async () => {

@@ -14,10 +14,10 @@
 |---|---|---|---|
 | RFC-020-T1 | 实机审查、元素与路径清单、三件套与交互设计稿 | — | 已完成（本目录） |
 | RFC-020-T2 | 作者裁定 D1–D7，按裁定改写三件套与设计稿 | T1 | 已完成：D1 (a)、D2 (b)、D3 (b)、D4 (a)、D5 (a)、D6 随 D2、D7 (a)；作者「批准实施并提交上库」 |
-| RFC-020-T3 | 外壳：左栏五项、页头「读取于 ↻」、运行与诊断五个页签（状态合并）、全部参数解析与旧地址重定向 | T2 | 未开始 |
-| RFC-020-T4 | 概览：页头链接行、三张状态卡（复用发布页版本卡）、横幅新增数据访问待批、最近动态时间线、删除重复卡 | T3 | 未开始 |
-| RFC-020-T5 | 开发工作区：`WorkspaceLayout.tool` 契约与迁移、`ToolPanel`、一条工具行（`SplitButton`、布局菜单、「⋯」）、URL 与布局同步 | T3 | 未开始 |
-| RFC-020-T6 | 六个面板内容：变更列表去页签、数据面板合并资源表、参考面板三段（侧栏紧凑＋放大完整，承接原开发资源全部内容与五条重定向）、会话面板内嵌日志 | T5 | 未开始 |
+| RFC-020-T3 | 外壳：左栏五项、页头「读取于 ↻」、运行与诊断五个页签（状态合并）、全部参数解析与旧地址重定向 | T2 | 已完成（2026-09-23，提交 b927a15） |
+| RFC-020-T4 | 概览：页头链接行、三张状态卡（复用发布页版本卡）、横幅新增数据访问待批、最近动态时间线、删除重复卡 | T3 | 已完成（2026-09-23，提交 b927a15） |
+| RFC-020-T5 | 开发工作区：`WorkspaceLayout.tool` 契约与迁移、`ToolPanel`、一条工具行（`SplitButton`、布局菜单、「⋯」）、URL 与布局同步 | T3 | 已完成（2026-09-23，见 §4） |
+| RFC-020-T6 | 六个面板内容：变更列表去页签、数据面板合并资源表、参考面板三段（侧栏紧凑＋放大完整，承接原开发资源全部内容与五条重定向）、会话面板内嵌日志 | T5 | 已完成（2026-09-23，见 §4）；目录「表在前、详情在旁」与事件投递摘要留在 T8 |
 | RFC-020-T7 | 发布与上线：上线／回退上卡与 `switch=1`、`releaseTimeline` 与 `ReleaseTimeline`、人名与标签解析、失败条目日志入口 | T3 | 未开始 |
 | RFC-020-T8 | 目录页「表在前、详情在旁」与事件段投递摘要（供参考面板放大形态）；项目设置「项目信息」组；删除开发资源装配页与左栏入口 | T3 | 未开始 |
 | RFC-020-T9 | 工作台用例（design §10 表）、契约用例、中英文文案、e2e 用例更新与新增 | T4–T8 | 未开始 |
@@ -56,3 +56,15 @@ T3 之后的 T4、T5、T7、T8 互不依赖，可以分批提交；每批都要�
 3. WS-01…WS-18 每项有可核对证据（用例名或实机截图／量测），写进本目录 `acceptance.md`。
 4. 精确 SHA 的 GitHub `gate` 与 `e2e` 成功。
 5. RFC 索引、STATE.md、既有 RFC 的修订说明同步；未全部达成时如实分别报告，不标 Done。
+
+## 4. 实施记录
+
+### T5／T6 开发工作区与六个面板（2026-09-23）
+
+- **面板状态的真源是地址**（design §5.2）：`useToolPanel` 只读地址与个人布局，选择／放大／收起都经 `location.selectTool` 改地址，`useWorkspaceLocation` 再把地址同步进布局并回填旧字段；无参数进入时把布局里的 `tool` `replace` 写回地址。分隔线拖动只写比例，`previewRatio` 兼作面板宽度记忆，收起再打开仍是上次宽度；`initialWorkspaceLayout` 的缺省比例从 0.5 改为 0.45（与设计稿一致）。收起形态是右缘一条竖排页签栏，工具始终在手边。
+- **参考面板由 app 层装配**（`app/project/ReferencePanel.tsx`），三个 feature 的公开组件在此组合；侧栏紧凑只列已授权操作，放大即原「开发资源」整页；`resources?section=guide&topic=…` 的小节参数改名 `guide` 进入开发页地址。会话未知（404 或读取失败）时参考面板照常可用，开会话表单只在确认没有会话时出现。
+- **变更面板**：四组改动改成同一列表上的可展开分组标题（`aria-expanded`／`aria-controls` 的 disclosure 按钮，计数在标题旁），每组展开才读取；分页游标只对产生它的快照有效，新比较到来时保留正在阅读的文件、丢掉旧游标。
+- **顺手修掉的缺陷**：① `useDevSession` 对没有数据的查询，每次重取（10 秒轮询、目录面板再次订阅同一键）都会被 React Query 置回 pending 并清掉错误——旧页面的开会话表单因此每 10 秒卸载一次；现在 404 作为数据 `null` 留在缓存里，只有第一次读取算「读取中」。② `sessionAccess` 在身份缺成员列表时整页崩溃。③ 没有 `taskId` 的会话响应会在连任务流时崩掉整页，现在按无法识别的响应报错。
+- **行为变化，实机验收时要看**：开发工作区按任务重建（`key=taskId`），会话被替换时参考面板里的试调／Swagger 输入随之清空，旧输入不可能发到新会话；`apiInvocationForm`／`swaggerApiInvocation` 两条用例已按此改写。
+- **用例基础设施**：`renderApp.click` 不再点到闭合 `<details>` 里的项（菜单要先点开），并给目标最多再等几拍；一个失败的 `expect(<DOM 元素>).toBeNull()` 会让 bun 花几十秒序列化 happy-dom 节点，看起来像卡死——断言 DOM 存在性时只比较数量或文本。`configImpact` 的「槽读取失败不冒充未部署」在整套并跑时偶发（发布记录查询未落地），单跑稳定，未改。
+- **新增用例**：`devSessionPanel`、`devSessionToolbar`、`referencePanel`，`workspaceLayout` 增两条（契约 `tool`、地址互译）；`versionComparisonView` 全部改为分组模型；`nativeWorkspace`、`sessionNavigation`、`developmentLocation`、`editorWorkspace`、`projectResources`、`projectNavigation`、`adminCapabilities`、`catalogConsumption` 按面板模型改写。

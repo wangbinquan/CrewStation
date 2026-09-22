@@ -11,17 +11,19 @@ afterEach(() => { page?.unmount(); page = undefined; globalThis.fetch = original
 for (const admin of [false, true]) {
   const prefix = admin ? '/admin/integrations' : '/projects';
   test.each([
-    ['resources&resource=api&proxy=billing&operation=billing.get', { section: 'api', proxy: 'billing', operation: 'billing.get' }],
-    ['resources&resource=events&subscription=01a0bf5d-8f4b-7b9c-8c07-a2ef94c840cd', { section: 'events', subscription: '01a0bf5d-8f4b-7b9c-8c07-a2ef94c840cd' }],
+    ['resources&resource=api&proxy=billing&operation=billing.get', { view: 'reference', panel: 'full', topic: 'api', proxy: 'billing', operation: 'billing.get' }],
+    ['resources&resource=events&subscription=01a0bf5d-8f4b-7b9c-8c07-a2ef94c840cd', { view: 'reference', panel: 'full', topic: 'events', subscription: '01a0bf5d-8f4b-7b9c-8c07-a2ef94c840cd' }],
   ])(`旧设置迁移保留空间与参数 ${prefix} / %s`, async (tab, expected) => {
+    // RFC-020 D2：三个参考主题住在开发页的参考面板里，旧地址落到放大的面板并保留定位参数。
     projectResourcesFixture(admin); page = await renderApp(`${prefix}/${id}/settings?tab=${tab}`, admin ? '/admin' : '/projects');
-    expect(page.path()).toBe(`${prefix}/${id}/resources`); expect(page.search()).toMatchObject(expected);
+    expect(page.path()).toBe(`${prefix}/${id}/dev-session`); expect(page.search()).toMatchObject(expected);
     await page.back(); expect(page.path()).toBe(admin ? '/admin' : '/projects');
   });
   // RFC-020 D2／D6：「项目与仓库」的家是项目设置 → 项目信息，「数据与存储」的家是开发页的数据面板；旧地址一次 replace 到位。
   test.each([
     ['settings?tab=resources&resource=overview&operation=stale.operation', 'settings', { tab: 'info' }], ['settings?tab=repository', 'settings', { tab: 'info' }],
     ['resources?section=project', 'settings', { tab: 'info' }], ['resources?section=data&proxy=leak', 'dev-session', { view: 'data' }],
+    ['resources?section=guide&topic=environment', 'dev-session', { view: 'reference', panel: 'full', topic: 'guide', guide: 'environment' }],
   ])(`主题各归其家 ${prefix} / %s`, async (from, page_, expected) => {
     projectResourcesFixture(admin); page = await renderApp(`${prefix}/${id}/${from}`, admin ? '/admin' : '/projects');
     expect(page.path()).toBe(`${prefix}/${id}/${page_}`); expect(page.search()).toEqual(expected);
@@ -46,7 +48,7 @@ test('订阅来自代码，保留订阅 ID 与投递路径，并指向当前项�
   expect(links.find((link) => link.textContent?.includes('打开订阅声明'))?.getAttribute('href')).toContain('file=crewstation.yaml');
   expect(links.find((link) => link.textContent?.includes('查看事件投递'))?.getAttribute('href')).toContain('subscription=01a0bf5d-8f4b-7b9c-8c07-a2ef94c840cd');
   await page.click('查看事件投递'); expect(page.search()).toEqual({ tab: 'deliveries', subscription: '01a0bf5d-8f4b-7b9c-8c07-a2ef94c840cd' });
-  await page.click('查看订阅'); expect(page.search()).toMatchObject({ section: 'events', subscription: '01a0bf5d-8f4b-7b9c-8c07-a2ef94c840cd' });
+  await page.click('查看订阅'); expect(page.search()).toMatchObject({ view: 'reference', topic: 'events', subscription: '01a0bf5d-8f4b-7b9c-8c07-a2ef94c840cd' });
 });
 
 test('平台接入按主题展开，正确说明转发来源且保留环境名、路径、MCP、业务任务接口', async () => {
@@ -57,12 +59,13 @@ test('平台接入按主题展开，正确说明转发来源且保留环境名�
   expect(page.text()).not.toContain('应用展示');
 });
 
-test('窄屏原生主题选择使用同一参数与权限路径，错误留在当前主题可重试', async () => {
+test('参考面板主题切换使用同一参数与权限路径，错误留在当前主题可重试', async () => {
   const f = projectResourcesFixture(); f.state.fail = 'capabilities'; page = await renderApp(`/projects/${id}/resources?section=guide&topic=environment`);
   expect(page.text()).toContain('本主题暂不可用'); f.state.fail = ''; await page.click('重新读取资源'); expect(page.text()).toContain('CS_API_BASE');
-  const select = [...document.querySelectorAll('label')].find((node) => node.textContent?.startsWith('资源主题'))!.querySelector('select')!;
-  await act(async () => { select.value = 'events'; select.dispatchEvent(new Event('change', { bubbles: true })); }); await page.settle();
-  expect(page.search()).toEqual({ section: 'events', subscription: undefined }); expect(page.text()).toContain('source.changed');
+  const tab = [...document.querySelectorAll<HTMLButtonElement>('[role="tablist"][aria-label="资源主题"] [role="tab"]')].find((node) => node.textContent === '事件')!;
+  await act(async () => tab.click()); await page.settle();
+  // 换主题只留主题本身：上一主题的小节与定位参数不带过去。
+  expect(page.search()).toEqual({ view: 'reference', panel: 'full', topic: 'events' }); expect(page.text()).toContain('source.changed');
 });
 
 test('资源参数不泄露无关上下文；主题与长度异常回到合理默认', () => {

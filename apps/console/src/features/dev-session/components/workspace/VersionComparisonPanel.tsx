@@ -13,9 +13,10 @@ import { ComparisonDetailsView } from './ComparisonDetailsView';
 import { ComparisonSummary } from './ComparisonSummary';
 import styles from './VersionComparisonPanel.module.css';
 
-export function VersionComparisonPanel({ projectId, taskId, channel, canDevelop, compact = false, initiallyExpanded = false, target = 'prod', onTargetChange, onOpenFile }: {
+export function VersionComparisonPanel({ projectId, taskId, channel, canDevelop, compact = false, initiallyExpanded = false, target = 'prod', onTargetChange, onOpenFile, onDetails }: {
   readonly projectId: string; readonly taskId: string; readonly channel: TaskStreamChannel; readonly canDevelop: boolean; readonly compact?: boolean; readonly initiallyExpanded?: boolean;
   readonly target?: ComparisonTarget; readonly onTargetChange?: (target: ComparisonTarget) => void; readonly onOpenFile?: (path: string) => void;
+  /** 紧凑状态条上的「查看变更」：打开变更面板。 */ readonly onDetails?: () => void;
 }): ReactElement {
   const t = useT();
   const date = useDateText();
@@ -24,6 +25,7 @@ export function VersionComparisonPanel({ projectId, taskId, channel, canDevelop,
   const data = query.data;
   if (compact) return <section className={styles.strip} aria-label={t('devSession.compare.title')}>
     {data ? <ComparisonSummary comparison={data} compact /> : <QueryStatus isPending={query.isPending} error={query.error} />}
+    {onDetails ? <Button variant="ghost" onClick={onDetails}>{t('devSession.compare.viewDetails')}</Button> : null}
     <Button variant="ghost" disabled={refreshing || history.isPending} onClick={() => void recheck()}>{t(refreshing ? 'devSession.compare.refreshing' : 'devSession.workspace.recheck')}</Button>
     {data && (query.isError || data.freshness === 'stale') ? <span title={`${date(data.checkedAt)} · ${t('devSession.compare.staleHint')}`}>{t('devSession.compare.staleShort')}</span> : null}
   </section>;

@@ -1,18 +1,18 @@
 import type { ReactNode } from 'react';
-import type { NativeTerminalDto, WorkspaceLayout } from '@crewstation/contracts';
+import type { WorkspaceLayout } from '@crewstation/contracts';
 import { useT } from '../../../../shared/lib/useT';
 import { Button } from '../../../../shared/ui/Button';
 import { Tabs } from '../../../../shared/ui/Tabs';
 import { useAgentActivity } from '../../../../shared/activity/AgentActivityProvider';
-import { activityCounts, activityStatus } from '../../../../shared/activity/agentActivityView';
+import { activityCounts } from '../../../../shared/activity/agentActivityView';
 import type { WorkspaceLayoutStore } from '../../model/layout/workspaceLayoutStore';
-import { addWorkspaceTab, moveTerminal } from '../../model/layout/workspaceLayout';
+import { addWorkspaceTab } from '../../model/layout/workspaceLayout';
 import styles from './NativeWorkspace.module.css';
 
-/** 第二层只管理个人工作区；创建工作区不会启动 CLI，收起窗口也不会结束进程。 */
-export function NativeWorkspaceTabs({ taskId, layout, store, loaded, roster, children }: {
+/** 一条工具行：左边个人工作区页签与「＋」，右边 toolbar（创建 CLI、布局、更多）。创建工作区不会启动 CLI，收起窗口也不会结束进程。 */
+export function NativeWorkspaceTabs({ taskId, layout, store, loaded, toolbar, children }: {
   readonly taskId: string; readonly layout: WorkspaceLayout; readonly store: WorkspaceLayoutStore; readonly loaded: boolean;
-  readonly roster: NativeTerminalDto[] | undefined; readonly children: ReactNode;
+  readonly toolbar: ReactNode; readonly children: ReactNode;
 }) {
   const t = useT(), activity = useAgentActivity(), task = activity.snapshot.tasks.find((item) => item.taskId === taskId);
   return <Tabs label={t('devSession.native.tabs')} value={layout.activeTabId}
@@ -20,13 +20,11 @@ export function NativeWorkspaceTabs({ taskId, layout, store, loaded, roster, chi
       {counts.pending ? <b className={styles.waiting}> · {t('activity.pendingCount', { count: counts.pending })}</b> : null}
       {counts.completions ? <b className={styles.completed}> · {t('activity.completedCount', { count: counts.completions })}</b> : null}
       {counts.running ? <span> · {t('activity.runningCount', { count: counts.running })}</span> : null}</span> }; })}
-    onChange={(value) => store.update((current) => ({ ...current, activeTabId: value, view: 'cli' }))}
-    extra={<><Button variant="ghost" disabled={!loaded || layout.tabs.length >= 16} onClick={() => store.update((value) => addWorkspaceTab(value, t('devSession.native.numberedTab', { count: value.tabs.length + 1 })))}>{t('devSession.native.addTab')}</Button>
-      <details className={styles.menu}><summary>{t('devSession.native.roster', { count: roster?.length ?? 0 })}</summary><div className={styles.roster}>
-        {roster?.map((terminal) => <div key={terminal.terminalId}><code>CLI {terminal.agentId.slice(-6)}</code><span>{terminal.computeName ?? terminal.compute} · {t(`activity.status.${activityStatus(terminal, task?.page?.states.find((item) => item.terminalId === terminal.terminalId) ?? terminal.activity, task?.page, task?.stale)}`)}</span>
-          <Button onClick={() => store.update((value) => ({ ...moveTerminal(value, terminal.terminalId, value.activeTabId), view: 'cli' }))}>{t('devSession.native.restore')}</Button></div>)}
-        <small>{t('devSession.native.sharedHint')}</small>
-      </div></details></>}>
+    onChange={(value) => store.update((current) => ({ ...current, activeTabId: value }))}
+    extra={<div className={styles.toolbar}>
+      <Button variant="ghost" title={t('devSession.native.addTab')} aria-label={t('devSession.native.addTab')} disabled={!loaded || layout.tabs.length >= 16} onClick={() => store.update((value) => addWorkspaceTab(value, t('devSession.native.numberedTab', { count: value.tabs.length + 1 })))}>＋</Button>
+      {toolbar}
+    </div>}>
     {children}
   </Tabs>;
 }

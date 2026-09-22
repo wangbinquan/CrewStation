@@ -13,7 +13,8 @@ export interface SessionAccess {
 function ownsProject(me: CurrentUserDto, project: ProjectDto | undefined): boolean {
   if (me.isAdmin) return true;
   if (project?.ownerUserId === me.id) return true;
-  return me.memberships.some((membership) => membership.projectId === project?.id && membership.role === 'owner');
+  // 身份接口偶尔缺成员列表（catalogConsumption 用例）：按“不是负责人”处理，不让整页崩掉。
+  return me.memberships?.some((membership) => membership.projectId === project?.id && membership.role === 'owner') ?? false;
 }
 
 export function sessionAccess(me: CurrentUserDto | undefined, project: ProjectDto | undefined, session: DevSessionDto | undefined): SessionAccess {

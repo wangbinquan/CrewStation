@@ -26,7 +26,7 @@ test('真实工作台的 CodeMirror 草稿跨预览／CLI 保留；离开确认�
   await page.click('代码'); await page.click('a.ts'); expect(content().textContent).toBe('磁盘原文');
   await edit('正在编写的函数'); expect(page.text()).toContain('代码 · 未保存');
   await page.click('预览'); expect(page.text()).toContain('编辑器有未保存输入');
-  await page.click('CLI 工作区'); await page.click('工作区 1'); await page.click('代码 · 未保存'); expect(content().textContent).toBe('正在编写的函数');
+  await page.click('收起'); await page.click('工作区 1'); await page.click('代码 · 未保存'); expect(content().textContent).toBe('正在编写的函数');
   await page.requestNavigate(`${path}?view=code`); expect(page.text()).not.toContain('放弃输入并离开');
   await page.requestNavigate(`${path}?view=conversation`); expect(page.path()).toBe(path); expect(page.text()).toContain('放弃输入并离开'); await page.click('继续编辑');
   await page.requestNavigate(`/projects/${activityProjectId}/release`);

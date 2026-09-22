@@ -5,7 +5,7 @@ import { TaskIdSchema } from '@crewstation/contracts';
 import { renderApp } from './renderApp';
 import { apiInvocationFixture, invocationClick, invocationField, invocationInput, invocationOperation, invocationResponse, invocationRoute, invocationTaskId, refreshInvocationQueries } from './apiInvocationFixture';
 
-const originalFetch = globalThis.fetch;
+const originalFetch = globalThis.fetch, originalSocket = globalThis.WebSocket;
 const originalUrl = window.location.href;
 const locationFields = ['hash', 'host', 'hostname', 'href', 'origin', 'pathname', 'port', 'protocol', 'search'];
 let page: Awaited<ReturnType<typeof renderApp>> | undefined;
@@ -15,7 +15,7 @@ beforeEach(() => {
   for (const key of locationFields) Object.defineProperty(window.location, key, { ...Object.getOwnPropertyDescriptor(Object.getPrototypeOf(window.location), key), configurable: true, enumerable: true });
 });
 afterEach(() => {
-  page?.unmount(); page = undefined; globalThis.fetch = originalFetch;
+  page?.unmount(); page = undefined; globalThis.fetch = originalFetch; globalThis.WebSocket = originalSocket;
   for (const key of locationFields) Reflect.deleteProperty(window.location, key);
   window.location.href = originalUrl;
 });
@@ -53,11 +53,12 @@ test('实际 Swagger 的 Try it out 与 Execute 走固定会话 HTTP，原服务
 
 test('Swagger 输入先绑定会话；会话变化或读取失败后不发送，明确重绑才可继续', async () => {
   const f = apiInvocationFixture(); page = await renderApp(`${invocationRoute}&proxy=${invocationOperation.proxyId}`); await expand();
-  const block = document.querySelector('.opblock-post')!;
-  await invocationInput(page, block.querySelector<HTMLInputElement>('input[placeholder="id"]')!, 'old-draft');
-  f.state.taskId = TaskIdSchema.parse('01a0bf5d-8f4b-7d55-84d0-6a2289a856b4'); await refreshInvocationQueries(page); await invocationClick(page, 'Execute', block);
-  await until('.opblock-post .live-responses-table');
-  expect(f.calls).toHaveLength(0); expect(block.textContent).toContain('试调会话已变化'); expect(block.querySelector<HTMLInputElement>('input[placeholder="id"]')!.value).toBe('old-draft');
+  await invocationInput(page, document.querySelector<HTMLInputElement>('.opblock-post input[placeholder="id"]')!, 'old-draft');
+  f.state.taskId = TaskIdSchema.parse('01a0bf5d-8f4b-7d55-84d0-6a2289a856b4'); await refreshInvocationQueries(page);
+  // RFC-020：目录住在开发工作区里，工作区按任务重建——换了会话就没有旧表单，旧输入不可能发到新会话；重新展开的表单先绑定新会话再发送。
+  expect(f.calls).toHaveLength(0); expect(document.querySelector<HTMLInputElement>('.opblock-post input[placeholder="id"]')?.value ?? '').not.toBe('old-draft');
+  await expand(); const block = document.querySelector('.opblock-post')!;
+  await invocationInput(page, block.querySelector<HTMLInputElement>('input[placeholder="id"]')!, 'new-draft');
   await invocationClick(page, '重新检查并绑定当前会话'); await invocationClick(page, 'Execute', block); expect(f.calls).toHaveLength(1); expect(f.calls[0]!.input.expectedTaskId).toBe(f.state.taskId);
 });
 

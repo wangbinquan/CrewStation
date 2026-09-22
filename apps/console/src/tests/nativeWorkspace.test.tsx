@@ -31,23 +31,25 @@ function setup(errorStatus = 412) {
 const element = (location?: WorkspaceLocation) => <NativeWorkspace projectId="project-1" taskId="task-1" userId="user-1" location={location} channel={{ send: async () => ({}), subscribe: () => () => {} }} stream={{ ...INITIAL_STREAM_STATE, status: 'open', runnerConnected: true, generation: 1 }} canDevelop onActivity={() => {}} preview={<div>真实预览位置</div>} editor={<div>代码位置</div>} changes={<div>差异位置</div>} />;
 
 describe('紧凑原生工作台', () => {
-  test('重获焦点读到其他页签的代码视图时，当前 CLI 地址仍控制功能页且可以继续选择', async () => {
-    const f = setup(), base = globalThis.fetch;
-    page = await renderElement(element({ key: 'cli', search: { view: 'cli' }, selectView: () => {} }), messages);
+  test('重获焦点读到其他页签的代码视图时，当前 CLI 地址仍控制面板且选择走地址', async () => {
+    const f = setup(), base = globalThis.fetch, selected: unknown[] = [];
+    page = await renderElement(element({ key: 'cli', search: { view: 'cli' }, selectView: () => {}, selectTool: (tool) => { selected.push(tool); } }), messages);
     globalThis.fetch = (async (raw, init) => String(raw).endsWith('/workspace-layout') && (init?.method ?? 'GET') === 'GET'
       ? Response.json({ revision: 3, layout: { ...initialWorkspaceLayout('远端工作区'), view: 'code' }, updatedAt: '2026-09-20T00:00:00Z' }) : base(raw, init)) as typeof fetch;
     await act(async () => { window.dispatchEvent(new Event('focus')); }); await page.settle();
-    // 实机两个浏览器页共用个人布局，旧实现会留在代码页且点击同一个 CLI 地址也无法返回。
-    expect(page.host.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe('CLI 工作区');
-    await page.click('CLI 工作区'); page.unmount(); page = undefined;
+    // 实机两个浏览器页共用个人布局，旧实现会留在代码页且点击同一个 CLI 地址也无法返回；RFC-020 后面板形态以地址为准，收起态是右缘一条页签栏。
+    expect(page.host.querySelector('aside[data-mode]')?.getAttribute('data-mode')).toBe('closed');
+    expect(page.host.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe('远端工作区 · 0');
+    await page.click('代码'); expect(selected.at(-1)).toEqual({ name: 'code', mode: 'side' });
+    page.unmount(); page = undefined;
     await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(f.saves.at(-1)).toMatchObject({ layout: { view: 'cli' } });
+    expect(f.saves.at(-1)).toMatchObject({ layout: { view: 'cli' } }); expect((f.saves.at(-1) as { layout: { tool?: unknown } }).layout.tool).toBeUndefined();
   });
   test('新页签不启动 CLI，保存空布局；关闭工作区后仍有工作区', async () => {
     const f = setup(); page = await renderElement(element(), messages);
-    await page.click('＋ 工作区');
+    await act(async () => page!.host.querySelector<HTMLButtonElement>('button[aria-label="＋ 工作区"]')!.click()); await page.settle();
     expect(page.text()).toContain('工作区 2'); expect(f.starts).toHaveLength(0);
-    const settings = [...page.host.querySelectorAll('summary')].find((node) => node.textContent === '工作区设置')!;
+    const settings = [...page.host.querySelectorAll('summary')].find((node) => node.getAttribute('aria-label') === '工作区设置')!;
     await act(async () => settings.click());
     await page.click('关闭工作区');
     expect(page.text()).toContain('工作区 1'); expect(page.text()).not.toContain('工作区 2');

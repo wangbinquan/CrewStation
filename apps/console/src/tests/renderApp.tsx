@@ -84,8 +84,10 @@ export async function renderApp(initialPath: string, previousPath?: string, hist
     navigate: async (href) => { await act(async () => { await router.navigate({ href }); }); await settle(); },
     requestNavigate: async (href) => { await act(async () => { void router.navigate({ href }); }); await settle(); },
     click: async (label) => {
-      const nodes = [...host.querySelectorAll('button, a')];
-      const target = nodes.find((node) => !node.closest('[hidden]') && (node.textContent ?? '').includes(label));
+      // 闭合 <details> 里的内容和 hidden 一样看不见：菜单要先点开 summary 才能点里面的项。目标可能还在等一次读取，最多再等几拍。
+      const find = () => [...host.querySelectorAll('button, a')].find((node) => !node.closest('[hidden]') && !node.closest('details:not([open])') && (node.textContent ?? '').includes(label));
+      let target = find();
+      for (let attempt = 0; target === undefined && attempt < 8; attempt++) { await settle(); target = find(); }
       if (target === undefined) throw new Error(`点不到「${label}」，当前页面文本：${host.textContent ?? ''}`);
       await act(async () => { (target as HTMLElement).click(); });
       await settle();

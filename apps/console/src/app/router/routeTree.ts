@@ -8,7 +8,7 @@ import {
 import { capabilitiesRoute, marketHomeRoute, marketRoute, marketLegacyRoute } from '../../features/capabilities';
 import { catalogRoute } from '../../features/catalog';
 import { configRoute } from '../../features/config';
-import { devSessionRoute, historicalConversationsRoute } from '../../features/dev-session';
+import { historicalConversationsRoute } from '../../features/dev-session';
 import { eventsRoute } from '../../features/events';
 import { logsRoute } from '../../features/logs';
 import { selfProjectCreateRoute, selfProjectProvisioningRoute, projectListRoute, projectOverviewRoute } from '../../features/projects';
@@ -16,7 +16,7 @@ import { releaseRoute } from '../../features/release';
 import { projectRoute } from './projectRoute';
 import { adminProjectRoutes } from './adminProjectRoutes';
 import { adminCapabilitiesRoute, adminRequestsRoute, adminIntegrationsLegacyRoute, adminCatalogLegacyRoute, adminEgressLegacyRoute, adminProjectCreateRoute, adminProjectProvisioningRoute } from './adminGlobalRoutes';
-import { projectSettingsRoute, projectOperationsRoute, projectResourcesRoute } from './projectSections';
+import { projectDevelopmentRoute, projectSettingsRoute, projectOperationsRoute, projectResourcesRoute } from './projectSections';
 import { rootRoute } from './rootRoute';
 import { workbenchRoute } from './workbenchRoute';
 
@@ -33,7 +33,7 @@ export const routeTree = rootRoute.addChildren([
       projectSettingsRoute,
       projectResourcesRoute,
       projectOperationsRoute,
-      devSessionRoute,
+      projectDevelopmentRoute,
       historicalConversationsRoute,
       releaseRoute,
       configRoute,

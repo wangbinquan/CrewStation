@@ -11,3 +11,14 @@
 .reasons > summary { cursor: pointer; color: var(--cs-tone-warning-fg); }
 .reasons > summary:focus-visible { outline: 2px solid var(--cs-color-primary); }
 .reasons > div { position: absolute; z-index: 8; left: 0; right: 0; top: 100%; padding: 6px; background: var(--cs-color-surface); border: 1px solid var(--cs-color-border); border-radius: var(--cs-radius-sm); box-shadow: var(--cs-shadow-sm); }
+/* 四组改动的分组标题（RFC-020）：details 代替嵌套页签，计数在标题上。 */
+.groups { display: flex; flex-direction: column; gap: var(--cs-space-2); }
+.groups > details { border: 1px solid var(--cs-color-border); border-radius: var(--cs-radius-md); padding: var(--cs-space-2) var(--cs-space-3); }
+.groups > details > summary { cursor: pointer; font-weight: 600; }
+.group { border-top: 1px solid var(--cs-color-border); padding: 4px 0; }
+.groupTitle { display: flex; align-items: center; gap: 6px; margin: 0; font-size: 13px; font-weight: 600; }
+.groupCount { color: var(--cs-color-text-muted); font-weight: 500; }
+.groupToggle { display: flex; gap: 6px; align-items: center; padding: 6px 4px; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; border-radius: var(--cs-radius-sm); }
+.groupToggle::before { content: '▸'; color: var(--cs-color-text-muted); }
+.groupToggle[aria-expanded='true']::before { content: '▾'; }
+.groupToggle:hover { background: var(--cs-color-surface-muted); }

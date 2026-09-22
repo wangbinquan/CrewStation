@@ -16,6 +16,16 @@ export function invocationResponse(input: ApiInvocationRequest, overrides: Recor
 }
 
 export function apiInvocationFixture() {
+  // RFC-020：目录住在开发页的参考面板里，有会话时工作区会连任务流。给一个不联网的 WebSocket，并保证页面地址是绝对地址（happy-dom 默认 about:blank）。
+  if (!/^https?:/.test(window.location.href)) window.location.href = 'http://localhost/';
+  globalThis.WebSocket = class {
+    static OPEN = 1; readyState = 1; url: string; onopen?: () => void; onclose?: () => void; onmessage?: (message: { data: string }) => void;
+    constructor(url = '') { this.url = url; queueMicrotask(() => this.receive({ type: 'streamReady', connected: true, replayed: 0 })); }
+    receive(frame: object) { if (this.readyState === 1) this.onmessage?.({ data: JSON.stringify(frame) }); }
+    // 工作区的文件树、预览等命令一律回“不可用”：这些用例只看目录面板，命令不能悬而不决。
+    send(data: string) { const command = JSON.parse(data) as { id: string }; queueMicrotask(() => this.receive({ type: 'error', id: command.id, code: 'unavailable', message: 'fixture' })); }
+    close() { this.readyState = 3; this.onclose?.(); }
+  } as unknown as typeof WebSocket;
   const calls: Array<{ url: string; input: ApiInvocationRequest }> = [], reads: string[] = [];
   const state = { taskId: invocationTaskId, role: 'developer', sessionFailure: false, catalogFailure: false, granted: true, documentFailure: false, documentVersion: '1.0.0', malformedSession: false };
   const pending: { handle?: (input: ApiInvocationRequest) => Promise<Response> } = {};
@@ -32,6 +42,9 @@ export function apiInvocationFixture() {
     if (url.endsWith(`/v1/market/apps/${invocationProjectId}`)) return Response.json(trialMarketFixture(invocationProjectId));
     if (url.endsWith(`/v1/workbench/project-summaries/${invocationProjectId}`)) return Response.json(testerSummaryFixture(invocationProjectId, serviceId));
     if (url.endsWith(`/v1/projects/${invocationProjectId}`)) return Response.json({ id: invocationProjectId, serviceId, name: '知识助理', slug: 'knowledge', kind: 'DigitalWorker', state: 'active' });
+    // 开发页的工作区会读写个人布局与名册：给出合法回执，否则布局存储会对着 { items: [] } 反复重试。
+    if (url.endsWith('/workspace-layout')) return init?.method === 'PUT' ? Response.json({ revision: 1, layout: JSON.parse(String(init.body)).layout, updatedAt: '2026-09-13T01:00:00.000Z' }) : Response.json({ revision: 0, layout: null, updatedAt: null });
+    if (url.endsWith('/agent-terminals')) return Response.json({ items: [], connection: 'connected', runnerId: null, checkedAt: '2026-09-13T01:00:00.000Z' });
     if (url.endsWith('/dev-session')) {
       if (state.sessionFailure) return Response.json({ error: 'unavailable', message: '会话目录暂不可用' }, { status: 503 });
       return Response.json({ taskId: state.taskId, projectId: state.malformedSession ? 'wrong-project' : invocationProjectId, state: 'running', branch: 'main', previewHost: 'dev.fixture.invalid', preview: 'ready', createdBy: userId, createdAt: '2026-09-13T01:00:00.000Z', lastActivityAt: '2026-09-13T01:00:00.000Z' });

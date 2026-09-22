@@ -1,8 +1,9 @@
 import { describe, expect, test } from 'bun:test';
-import { WorkspaceLayoutSchema } from '@crewstation/contracts';
+import { WorkspaceLayoutSchema, WorkspaceToolSchema } from '@crewstation/contracts';
 import { ApiClientError } from '@crewstation/api-client';
 import type { WorkspaceLayoutDto } from '@crewstation/contracts';
-import { addWorkspaceTab, closeWorkspaceTab, initialWorkspaceLayout, moveTerminal, reconcileWorkspaceLayout, reorderTerminal } from '../features/dev-session/model/layout/workspaceLayout';
+import { addWorkspaceTab, closeWorkspaceTab, initialWorkspaceLayout, layoutTool, moveTerminal, reconcileWorkspaceLayout, reorderTerminal, withTool } from '../features/dev-session/model/layout/workspaceLayout';
+import { locationTool, toolSearch } from '../features/dev-session/model/layout/developmentLocation';
 import { WorkspaceLayoutStore } from '../features/dev-session/model/layout/workspaceLayoutStore';
 
 function deferred<T>() { let resolve!: (value: T) => void; let reject!: (cause: Error) => void; const promise = new Promise<T>((yes, no) => { resolve = yes; reject = no; }); return { promise, resolve, reject }; }
@@ -75,5 +76,34 @@ describe('个人布局与保存竞争', () => {
     expect(writes).toBe(1); expect(remote.layout?.view).toBe('code');
     await store.reapply();
     expect(remote).toMatchObject({ revision: 3, layout: { view: 'preview' } });
+  });
+});
+
+describe('工具面板状态（RFC-020 D1）', () => {
+  test('旧布局按 view／previewAlongside 推导工具；写入回填旧字段并夹住比例', () => {
+    const base = initialWorkspaceLayout('一');
+    expect(layoutTool(base)).toBeUndefined();
+    expect(layoutTool({ ...base, view: 'code' })).toEqual({ name: 'code', mode: 'full', ratio: 0.45 });
+    expect(layoutTool({ ...base, previewAlongside: true, previewRatio: 0.7 })).toEqual({ name: 'preview', mode: 'side', ratio: 0.6 });
+    const next = withTool(base, { name: 'data', mode: 'side', ratio: 0.5 });
+    expect(next.tool).toEqual({ name: 'data', mode: 'side', ratio: 0.5 }); expect(next.view).toBe('cli'); expect(next.previewAlongside).toBe(false);
+    // 旧读者只认 view 与 previewAlongside：放大的代码回填 view=code，预览在旁回填 previewAlongside 与比例。
+    expect(withTool(base, { name: 'code', mode: 'full', ratio: 0.5 }).view).toBe('code');
+    const preview = withTool(base, { name: 'preview', mode: 'side', ratio: 0.35 }); expect(preview.previewAlongside).toBe(true); expect(preview.previewRatio).toBe(0.35);
+    expect(withTool(next, { name: 'data', mode: 'side', ratio: 0.5 })).toBe(next);
+    const closed = withTool(next, undefined); expect(closed.tool).toBeUndefined(); expect(closed.view).toBe('cli'); expect(closed.previewAlongside).toBe(false);
+    expect(WorkspaceLayoutSchema.safeParse(next).success).toBe(true);
+    expect(WorkspaceLayoutSchema.safeParse({ ...next, tool: { name: 'terminal', mode: 'side', ratio: 0.5 } }).success).toBe(false);
+    expect(WorkspaceToolSchema.safeParse({ name: 'code', mode: 'side', ratio: 0.2 }).success).toBe(false);
+    expect(WorkspaceToolSchema.safeParse({ name: 'code', mode: 'side', ratio: 0.5, extra: true }).success).toBe(false);
+  });
+  test('地址与面板互译：view=cli 收起，split 是预览在旁，diff／target 是变更，panel=full 放大', () => {
+    expect(locationTool({})).toBeUndefined(); expect(locationTool({ view: 'conversation' })).toBeUndefined(); expect(locationTool({ view: 'cli' })).toBeNull();
+    expect(locationTool({ view: 'split' })).toEqual({ name: 'preview', mode: 'side' });
+    expect(locationTool({ view: 'changes' })).toEqual({ name: 'changes', mode: 'side' }); expect(locationTool({ target: 'preview' })).toEqual({ name: 'changes', mode: 'side' });
+    expect(locationTool({ view: 'reference', panel: 'full' })).toEqual({ name: 'reference', mode: 'full' }); expect(locationTool({ file: 'a.ts' })).toEqual({ name: 'code', mode: 'side' });
+    expect(toolSearch(null, { view: 'code', panel: 'full', file: 'a.ts' })).toEqual({ view: 'cli', file: 'a.ts' });
+    expect(toolSearch({ name: 'data', mode: 'full' }, { topic: 'api' })).toEqual({ view: 'data', panel: 'full', topic: 'api' });
+    expect(toolSearch({ name: 'preview', mode: 'side' }, { view: 'cli', panel: 'full' })).toEqual({ view: 'preview' });
   });
 });

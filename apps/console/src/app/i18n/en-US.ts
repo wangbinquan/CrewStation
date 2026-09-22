@@ -186,6 +186,7 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   "ui.readAt": "Read at {time}",
   "ui.refresh": "Refresh",
   "ui.refreshing": "Refreshing…",
+  "reference.openFull": "Maximize to see everything ⤢",
   "resources.description": "Find available capabilities and how to use them in your code.",
   "resources.groups": "Resource topic",
   "resources.section.api": "APIs",
