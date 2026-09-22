@@ -157,7 +157,7 @@ cs-api Pod 内六条出站路由全部 404，同轮 `/v1/api-requests` 仍 401�
 
 完整 `bun run check` 通过：**2081 pass／8 skip／0 fail**，13189 assertions、350 个文件；`test:patch --base origin/main` 判定本次没有需要用例防护的新增生产代码。本机 console 已部署 `cs-console:navwidth-20260922` 并 Ready，其余部署未动，无迁移。真实 dev-admin 浏览器核对：概览／开发会话／历史对话／发布与上线四页左栏都是 208px，开发会话正文仍是 `8px 12px`；1280／1024 无横向溢出，390／320 仍是横排导航条且无溢出，英文六项在 208px 内不换行。部署后 e2e 层复跑 **54 pass／1 skip／0 fail**。本机没有可用的运行中开发会话（三个 dev-session Pod 都是 I22 的 `Failed` 残留），终端工作区的实机外观这次没有新证据。
 
-本机环境两点记在这里，省得下一个 session 再查：默认测试库 `cs-dev-pg`（55432）仍是退出状态，模块层用例借运行中的 `cs-rfc013-test-pg`，Docker Desktop 重启后它的端口由 63764 变成 **59561**（`CS_TEST_DATABASE_URL=postgres://crewstation:crewstation-dev@127.0.0.1:59561/crewstation`）；e2e 层必须带 `CS_E2E_AUTH=dev-oidc CS_E2E_USERNAME=dev-admin`，否则会话停在登录页——本轮第一次 check 的 26 个红全部由这两件事造成，另一条 `pollingVisibility` 单跑通过，记为既有 flake。
+本机环境两点记在这里，省得下一个 session 再查：e2e 层必须带 `CS_E2E_AUTH=dev-oidc CS_E2E_USERNAME=dev-admin`，否则会话停在登录页。~~默认测试库 `cs-dev-pg`（55432）仍是退出状态，模块层用例借运行中的 `cs-rfc013-test-pg`（59561）~~ **（2026-09-22 已订正）默认测试库 `cs-dev-pg` 已恢复，模块层直接用默认 URL，不必再传 `CS_TEST_DATABASE_URL`。** 它此前 exit 1 是 2026-09-20 Docker 磁盘满时崩溃恢复写不下 checkpoint（`No space left on device`）所致，空间回来后 `docker start` 即完成 WAL 重做，数据卷原样保留。实测 `CS_TEST_REQUIRE=database bun run test:module` **1106 pass／7 skip／0 fail**（189 文件，142s），7 个跳过全是 `prometheus` 能力，需 `CS_TEST_PROMETHEUS_BIN`／`CS_TEST_PROMTOOL_BIN`。本轮第一次 check 的 26 个红由缺 e2e 参数与测试库不可达造成，另一条 `pollingVisibility` 单跑通过，记为既有 flake。
 
 ## 新建项目的开发容器连内置 MCP 报 403，归档项目的路由删不掉（2026-09-22）
 
