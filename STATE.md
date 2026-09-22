@@ -25,7 +25,12 @@ cs-api Pod 内六条出站路由全部 404，同轮 `/v1/api-requests` 仍 401�
 复查：`egress` schema 0、该模块迁移记录 0、`egress-blocked` 告警 0、总 schema 20、总迁移 103；重启 cs-api／cs-controller 后迁移数仍 103、schema 未被重建。
 
 **门禁**：完整 `bun run check`（带 `CS_TEST_DATABASE_URL=…@127.0.0.1:59561/…` 与 `CS_E2E_AUTH=dev-oidc CS_E2E_USERNAME=dev-admin`）**2069 pass／8 skip／0 fail**，13034 断言、347 文件；改动行防护 **100／100（100%）**；`arch:check` 53 个单元（原 54）零违规。
+实现提交 `5a51d38` 的 [CI 35710784089](https://github.com/wangbinquan/CrewStation/actions/runs/35710784089) 六项全部成功（含 `gate` 与 `e2e`）。
 迁移锁按 `testing.md` §7 的手工例外删掉 egress 四条并在提交说明写明原因；结构后果见 ADR-0008，仓库结构升 v0.5（模块 19→18）；基线三件套回填 v0.3.7（R52／D47 出站部分／T4.12／AT-51 作废，新增 D54，Q23 与 E23 关闭，I9 关闭）。
+
+**第一次推送五个作业全红**，原因与实现无关：删模块只改了 `package.json`，没重跑 `bun install`，
+`bun.lock` 里还留着 `@crewstation/module-egress`，CI 的 `--frozen-lockfile` 在装依赖这一步就失败。
+本机不带这个开关所以一路绿。修复在 `5a51d38`，判据已写进 `dev-gotchas.md` 工具链一节。
 
 **两点如实记录**：
 
