@@ -1,6 +1,6 @@
 # RFC-020｜技术与交互设计
 
-> Draft · 2026-09-23；与 [proposal.md](./proposal.md) 配套，按其 §8 每项的 (a) 写成，裁定后改写。只改工作台组织与一个可选的契约字段，不新增后端接口。
+> Draft · 2026-09-23；与 [proposal.md](./proposal.md) 配套。D1、D2、D4、D5 已按作者裁定改写（D2 取 (b)：开发资源入口取消，三主题进开发页参考面板）；D3、D7 仍按 (a) 写成。只改工作台组织与一个可选的契约字段，不新增后端接口。
 
 ## 目录
 
@@ -22,9 +22,9 @@
 
 | 位置 | 职责 |
 |---|---|
-| `apps/console/src/app/layout/ProjectNavSection.tsx` | 左栏顺序改为六项生命周期顺序；顺序只定义这一处 |
+| `apps/console/src/app/layout/ProjectNavSection.tsx` | 左栏改为五项生命周期顺序（去掉 `resources`）；顺序只定义这一处 |
 | `apps/console/src/app/project/ProjectOperationsPage.tsx` | 改用 `SectionNavigation`；`status` 段装配健康卡＋形态图 |
-| `apps/console/src/app/project/ProjectResourcesPage.tsx` | 三主题；`data`／`project` 重定向 |
+| `apps/console/src/app/project/ProjectResourcesPage.tsx` | 只剩重定向：`section` 五个取值各自 `replace` 到新家（§2）；页面本体删除 |
 | `apps/console/src/app/project/ProjectSettingsPage.tsx` | 新增 `info` 组，装配 `ProjectInfoSection`（projects feature 公开） |
 | `apps/console/src/app/project/ProjectPageHeader.tsx`（新增） | 项目页统一页头：标题、说明、主动作、「读取于 ↻」 |
 | `apps/console/src/shared/project/{developmentSearch,operationsSearch,resourceSearch,settingsSearch}.ts` | 参数解析：`panel`、`status`、`info`、三主题 |
@@ -35,15 +35,15 @@
 | `apps/console/src/features/projects/pages/ProjectInfoSection.tsx`（新增） | 项目信息只读组；复用 `RepositoryCard`、`CapabilityIdentity`、`CapabilityQuota` 的数据 hook |
 | `apps/console/src/features/release/components/` | `DeployedVersionCard` 承接上线／回退按钮；`ReleaseTimeline.tsx` 取代 `ReleaseHistoryCard`＋`TrafficSwitchCard` |
 | `apps/console/src/features/release/model/releaseTimeline.ts`（新增） | 纯函数：发布与切流合并排序、人名解析、标签解析 |
-| `apps/console/src/features/dev-session/components/panel/`（新增目录） | `ToolPanel.tsx`（页签、拖宽、收起、放大）、`ReferencePanel.tsx`（参考镜像）、`DataPanel.tsx`（资源＋绑定）、`SessionPanel.tsx`（连接、恢复、内嵌日志、释放） |
+| `apps/console/src/features/dev-session/components/panel/`（新增目录） | `ToolPanel.tsx`（页签、拖宽、收起、放大）、`ReferencePanel.tsx`（三段；侧栏紧凑、放大完整，承接原开发资源）、`DataPanel.tsx`（资源＋绑定）、`SessionPanel.tsx`（连接、恢复、内嵌日志、释放） |
 | `apps/console/src/features/dev-session/components/native/NativeToolbar.tsx` | 合并为一条工具行：工作区页签＋「＋」、`SplitButton`、「布局 ▾」、「⋯」 |
 | `apps/console/src/features/dev-session/model/layout/` | `WorkspaceLayout` 的 `tool` 字段读写与旧布局迁移（纯函数） |
 | `packages/contracts/api/devSession.ts` | `WorkspaceLayoutSchema` 增加可选 `tool`（§5.2） |
-| `apps/console/src/features/{catalog,events,capabilities}/` | API 页表在前详情在旁；事件页顶部投递摘要；参考面板用的紧凑公开组件 |
+| `apps/console/src/features/{catalog,events,capabilities}/` | 各自导出紧凑与完整两种公开组件供参考面板装配：`CatalogPage` 改为表在前、详情在旁（放大形态）；事件段顶部投递摘要；`CapabilitiesPage` 只保留 `guide` 与 `data` 两种嵌入形态 |
 | 各 feature `i18n/` 与 `app/i18n/` | 中英文文案 |
 | `apps/console/src/tests/`、`tests/e2e/` | §10 |
 
-承担的结构改进：左栏顺序、二级导航形态、页头与刷新各只在一处定义；删除两份重复的版本卡之一（概览改用 release feature 公开的 `DeployedVersionCard`，需要把它导出为 feature 公开入口）。
+承担的结构改进：左栏顺序、二级导航形态、页头与刷新各只在一处定义；删除两份重复的版本卡之一（概览改用 release feature 公开的 `DeployedVersionCard`，需要把它导出为 feature 公开入口）；`app/project/` 少一个装配页（开发资源），`features/capabilities` 的整页聚合形态退役。
 不新增后端模块、不改 layer、不引入跨 feature 深 import。`dev-session/components/` 当前 20 个文件已到目录上限，新组件按语义放进 `components/panel/` 子目录；`projects/components/summary/` 有 12 个文件，删 `ProjectQuickLinks` 后加 `StatusCards`。
 
 ## 2. 路由与兼容
@@ -53,14 +53,14 @@
 | URL | 含义 |
 |---|---|
 | `/projects/$id/dev-session` | 主区终端；面板按个人布局（默认收起） |
-| `dev-session?view=preview\|code\|changes\|data\|reference\|session` | 打开对应面板，形态取 `panel` |
+| `dev-session?view=preview\|code\|changes\|data\|reference\|session` | 打开对应面板，形态取 `panel`；`view=reference` 另带 `topic=api\|events\|guide`（缺省 `api`）与 `proxy`／`operation`／`subscription` |
 | `dev-session?panel=side\|full` | 面板在侧／放大；缺省 `side`。`panel=closed` 不写进 URL，收起就是去掉 `view` |
 | `dev-session?view=split` | 等价 `view=preview&panel=side`，保留 |
 | `dev-session?view=cli` | 面板收起 |
 | `dev-session?view=diff` | 等价 `view=changes` |
 | `dev-session?view=conversation` | 仍重定向到 `/dev-session/conversations` |
 | `operations?tab=status\|logs\|alerts\|deliveries\|trace` | 五段；`tab=health`、`tab=topology` → `status`（`replace`），日志的 `source/slot/taskId/releaseId` 与 `traceId`、`subscription` 不变 |
-| `resources?section=api\|events\|guide` | 三主题；`section=data` → `dev-session?view=data`；`section=project` → `settings?tab=info`（都 `replace`） |
+| `resources?section=…` | 只剩重定向（`replace`）：`api\|events\|guide` → `dev-session?view=reference&topic=…&panel=full`（参数保留）；`data` → `dev-session?view=data`；`project` → `settings?tab=info`；缺省 → `topic=api` |
 | `settings?tab=config\|visibility\|members\|info\|advanced` | 五组 |
 | `release?source=…&release=…` | 不变 |
 
@@ -69,8 +69,8 @@
 
 ## 3. 外壳：左栏、页头、刷新
 
-- 左栏顺序：`overview`、`development`、`release`、`operations`、`resources`、`settings`；测试者仍只有 `overview`（版本试用）。
-- `ProjectPageHeader`：标题（项目名或页面名）、一行说明（可选）、右侧主动作、`PageRefresh`。概览、发布与上线、运行与诊断、开发资源、项目设置都用它；开发页保留自己的紧凑页头（终端优先）。
+- 左栏顺序：`overview`、`development`、`release`、`operations`、`settings`；`resources` 从 `PROJECT_PAGES` 删除但 `PROJECT_PATHS` 里保留路径供重定向；测试者仍只有 `overview`（版本试用）。
+- `ProjectPageHeader`：标题（项目名或页面名）、一行说明（可选）、右侧主动作、`PageRefresh`。概览、发布与上线、运行与诊断、项目设置都用它；开发页保留自己的紧凑页头（终端优先）。
 - `PageRefresh` 接收本页主要 query 的 `dataUpdatedAt` 与一个 `refetchAll`，显示「读取于 hh:mm」与图标按钮；卡片内不再放刷新按钮。轮询周期沿用现有 `usePolledRefresh`／`useManualRefresh` 与 `keepPrevious`，不新增轮询。
 - 页面主体宽度沿用 2026-09-22 裁定（无 1200px 上限）。
 
@@ -120,7 +120,7 @@ tool: z.object({ name: z.enum(['preview', 'code', 'changes', 'data', 'reference'
 | 代码 | 不变；面板宽度不足 480px 时文件树可收起 | `EditorPane` |
 | 变更 | 现有 `VersionComparisonPanel` 展开形态；四个内嵌页签改成同一列表上的分组标题（待上线提交、缺少的生产提交、文件差异、未提交），不再是页签 | `VersionComparisonPanel`、`ComparisonDetailsView` |
 | 数据 | 上：数据资源表（原开发资源 → 数据与存储，`CapabilityData`）；下：绑定与申请（`DataBindingPane`） | 两者已有 |
-| 参考 | 三段折叠：API（已授权操作列表＋「试调」，用 `ApiInvocationWorkspace`；「全部操作与 Swagger →」链接开发资源）、事件（本项目订阅＋事件类型，`SubscriptionsCard`、`EventTypesCard`）、平台接入（`CapabilityConventions` 的身份头与环境变量组，可复制） | catalog、events、capabilities 各自导出的紧凑公开组件 |
+| 参考 | 三段，由 `topic` 选中：**侧栏形态**——API（已授权操作列表＋「试调」，`ApiInvocationWorkspace`）、事件（本项目订阅＋事件类型）、平台接入（身份头与环境变量，可复制）；**放大形态**——API 段是原目录页的完整内容（操作全表带筛选、选中行详情栏：文档／授权／申请／试调，`RequestsPanel`，折叠的 `SwaggerPanel`，管理员页脚链接）、事件段全表＋投递摘要、平台接入四段。侧栏里每段末尾一个「放大查看全部」。没有会话时可打开，只有试调禁用并说明 | catalog、events、capabilities 各自导出的紧凑与完整公开组件 |
 | 会话 | 连接与恢复（`ConnectionGuide` 详情、`StreamStatus`）、内嵌最近 200 行会话日志（`LogList` 复用，`source=dev-session&taskId`，带「完整日志 →」）、历史对话链接、`SessionCard`（技术详情折叠，释放在末尾） | 已有＋ logs feature 公开 `LogList` |
 
 面板页签用现有 `Tabs`；标签后缀沿用现在的「· 未保存」「· n 待处理」。放大按钮 `aria-pressed`，收起按钮有可见文字标签（窄屏显示图标＋`aria-label`）。
@@ -128,7 +128,7 @@ tool: z.object({ name: z.enum(['preview', 'code', 'changes', 'data', 'reference'
 
 ### 5.4 没有会话、连接异常
 
-- 没有会话：主区 `OpenSessionForm`（含失败会话的恢复入口，不变）；面板只显示「参考」，其余页签禁用并说明「开始开发后可用」。
+- 没有会话：主区 `OpenSessionForm`（含失败会话的恢复入口，不变）；面板只显示「参考」（可放大，即原开发资源整页），其余页签禁用并说明「开始开发后可用」。
 - 连接异常：`ConnectionGuide` 横幅仍在页头之下；工具行的「＋ CLI」禁用并给原因（现有 `blockedReason`）；面板可用（预览按连接世代显示不可用）。
 
 ## 6. 发布与上线
@@ -141,7 +141,7 @@ tool: z.object({ name: z.enum(['preview', 'code', 'changes', 'data', 'reference'
 ## 7. 运行与诊断、开发资源、项目设置
 
 - 运行与诊断改用 `SectionNavigation`，五段。`status` 段：`HealthCards` 在上（保留「查看此版本日志」）、`TopologyPage` 在下；两者各自的查询与轮询不变。`TracePage` 空态文案改为说明 trace_id 的来源并给事件投递链接。
-- 开发资源三主题：`api`（`CatalogPage` 改为 `OperationsTable` 在前、选中操作时右侧 `OperationDetail`——文档、授权状态、申请表单、试调；`SwaggerPanel` 折叠；管理员链接改页脚一行）、`events`（顶部一行「最近投递 n 条 · 死信 m 条 →」来自 `api.events.listDeliveries` 的一页计数）、`guide`（不变）。`SectionNavigation` 的每项说明文案更新。
+- 参考面板的三段内容见 §5.3；`CatalogPage` 的「表在前、详情在旁」（`OperationsTable` → 选中行右侧 `OperationDetail`：文档、授权状态、申请表单、试调；`SwaggerPanel` 折叠；管理员链接改页脚一行）只在放大形态渲染；事件段顶部一行「最近投递 n 条 · 死信 m 条 →」来自 `api.events.listDeliveries` 的一页计数。
 - 项目设置 `info` 组：`ProjectInfoSection` 用 `DefinitionList`：仓库（路径、默认分支、状态、打开）、地址（两槽域名、开发预览域名）、服务身份（服务名、命名空间）、配额与套餐（`CapabilityQuota` 的数据）、折叠技术详情（项目 ID、服务 ID、命名空间，可复制）。只读，不画输入框。
 
 ## 8. 名称、ID 与状态文案
@@ -179,14 +179,14 @@ tool: z.object({ name: z.enum(['preview', 'code', 'changes', 'data', 'reference'
 | `releaseTimeline.test.ts`（新） | 合并排序、标签与人名三种解析、失败条目日志参数 |
 | `releaseDelivery.test.tsx`、`releaseInspection.test.tsx`（改） | 上线按钮在待验证卡；`switch=1` 自动检查；两张表被时间线取代 |
 | `projectOperations.test.tsx`（新） | 五段导航、`health`／`topology` 重定向、状态段两部分、调用链空态 |
-| `projectResources.test.tsx`（改） | 三主题、两条重定向、API 表在前详情在旁、事件页投递摘要 |
+| `projectResources.test.tsx`（改名 `referencePanel.test.tsx`） | 五条重定向与参数保留、三段在侧栏与放大两种形态的内容、无会话时可打开而试调禁用、API 表在前详情在旁、事件段投递摘要 |
 | `projectSettingsInfo.test.tsx`（新） | 项目信息组内容、只读、技术详情折叠与复制 |
 | `i18nParity.test.ts` | 中英文键对齐（现有） |
 
 契约：`packages/contracts/api/devSession.ts` 的 `tool` 字段正向解析与 `strict` 拒绝未知键（就近用例）。
-实机（`tests/e2e/`）：`platformCapabilities.test.ts` 的 `PROJECT_PAGES` 加开发资源一行并更新标记词；`projectSettingsUx.test.ts` 路由表改为三主题＋`info`；`layoutSpacing.test.ts` 加开发页面板在 1280／1024 的宽度与无溢出；`topology.test.ts` 的运行与诊断入口改为 `tab=status`；新增 `projectWorkspaceIa.test.ts`：概览一屏（1440×900 下主区不出现纵向滚动条）、面板打开后终端仍可见、旧地址重定向、时间线无 36 位 ID。
+实机（`tests/e2e/`）：`platformCapabilities.test.ts` 的 `PROJECT_PAGES` 更新标记词并加一行「参考面板放大形态渲染 API 全表」；`projectSettingsUx.test.ts` 路由表改为设置五组＋参考面板三段；`layoutSpacing.test.ts` 加开发页面板在 1280／1024 的宽度与无溢出；`topology.test.ts` 的运行与诊断入口改为 `tab=status`；新增 `projectWorkspaceIa.test.ts`：概览一屏（1440×900 下主区不出现纵向滚动条）、面板打开后终端仍可见、旧地址重定向、时间线无 36 位 ID。
 每个新增页面或组件按 `testing.md` §4 带载入、空、错、成功四态。
 
 ## 11. 与既有 RFC 的关系
 
-批准后在以下 RFC 的对应节追加带日期的修订说明（不改其 Done 状态）：RFC-003 proposal §4（五个入口→六项顺序）、design §2.2（概览）、§2.3（工作区工具由页签改为面板）、§2.4（切流记录并入时间线、上线按钮上卡）、§2.5（运行与诊断分段）；RFC-008 proposal §3（六个页签→面板）；RFC-009 proposal §3.1（开发资源三主题与位置）、§3.5（数据与项目主题去向）；RFC-019 proposal §2.2（入口改为 `tab=status`）。基线三件套需要回填的只有 Design §14.6／Plan AT 的入口名称，随实施提交。
+批准后在以下 RFC 的对应节追加带日期的修订说明（不改其 Done 状态）：RFC-003 proposal §4（五个入口→六项顺序）、design §2.2（概览）、§2.3（工作区工具由页签改为面板）、§2.4（切流记录并入时间线、上线按钮上卡）、§2.5（运行与诊断分段）；RFC-008 proposal §3（六个页签→面板）；RFC-009 proposal §3.1（开发资源独立入口取消，内容进参考面板与设置）、§3.5（五主题各自去向）；RFC-019 proposal §2.2（入口改为 `tab=status`）。基线三件套需要回填的只有 Design §14.6／Plan AT 的入口名称，随实施提交。
