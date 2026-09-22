@@ -25,7 +25,9 @@
 
 本机 console 已部署 `cs-console:rfc020-20260923b` 并 Ready。本机 `check:static` 绿；`CS_E2E_AUTH=dev-oidc CS_E2E_USERNAME=dev-admin bun run test:cover` **2152 pass／9 skip／0 fail**（365 个文件，含 e2e 全套与新增 8 条）；`test:patch --base origin/main` 判定本批无需用例防护的新增生产代码。CI：T5／T6 `b8b64e2` 六项成功（35768120059）；T7 `8448a29` 的 `module` 作业红在后端 `session module` 的一条库竞态用例（本 RFC 未触及后端），T8 `f1a19bc` 同一后端六项成功（35769593471）；验收批 `3b7ec74` 六项全部成功（[CI 35771402142](https://github.com/wangbinquan/CrewStation/actions/runs/35771402142)，含 `gate` 新增代码防护与 `e2e`）。
 
-**下一个 session 注意**：作者尚未亲手看实机，T2 裁定里的形态以本机 `cs-console:rfc020-20260923b` 为准；概览形态卡与最近动态并排是实测后的偏差（设计稿叠放），作者不认可就改回并收窄两卡。`e2e/capabilityDepth` 等断言已按新结构改写，回退任何一批都要连用例一起退。
+**本机整套已重新部署（2026-09-23，作者「部署到本机环境」）**：`./deploy/local/install-platform.sh`（`SKIP_TASK_RUNTIME_BUILD=1`，任务容器镜像自 09-21 未变）从 `3b7ec74` 重建 `cs-control-plane:dev`／`cs-builder:dev`／`cs-console:dev` 并导入节点，迁移 Job 成功，八个 Deployment 全部滚到 `:dev` 且 Ready；`verify.sh` A–D 全 PASS；e2e `projectWorkspaceIa`＋`capabilityDepth` 15/15。这次必须连控制面一起滚：`WorkspaceLayoutSchema` 是 `.strict()`，旧 cs-api 会把带 `tool` 的布局保存打回——重部署后实机核对 dev-admin 的个人布局 PUT 成功（revision 51，`tool: {changes, full, 0.5}`，页面「个人布局已保存」）。安装脚本最后一步以 `platform-admin` 密码登录播种套餐目录报 403（密码登录自 09-20 起关闭，目录早已播种），脚本因此退出 1，与部署无关。
+
+**下一个 session 注意**：作者尚未亲手看实机，T2 裁定里的形态以本机 `cs-console:dev`（自 `3b7ec74` 构建）为准；概览形态卡与最近动态并排是实测后的偏差（设计稿叠放），作者不认可就改回并收窄两卡。`e2e/capabilityDepth` 等断言已按新结构改写，回退任何一批都要连用例一起退。
 
 ## RFC-020 项目工作台信息架构重构：Draft，等作者裁定（2026-09-23）
 
