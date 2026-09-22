@@ -350,10 +350,11 @@ function composeAggregates(deps: PlatformModuleDeps, core: ReturnType<typeof com
         // 接入容器代公司系统转发，服务槽直接出站（RFC-018 Q1＝C）；数字人服务槽不放行，走接口目录与网关放行表。
         if (f.kind !== 'DigitalWorker') await k8s.apply(integrationEgressNetworkPolicy({ namespace: f.namespace }));
       },
-      // 走与开通链同一个装载器，形状和过滤规则只有一份；启动时跑一次，N+1 次查询可以接受。
+      // 走与开通链同一个装载器：它自己会挡掉已归档和没有服务的项目，过滤规则只有这一份。
+      // 启动时跑一次，N+1 次查询可以接受。
       listProjects: async () => {
         const directory = await project.api.listClusterProjects();
-        const facts = await Promise.all(directory.filter((p) => p.state !== 'archived').map((p) => project.api.getProvisioningProject(p.projectId as ProjectId)));
+        const facts = await Promise.all(directory.map((p) => project.api.getProvisioningProject(p.projectId as ProjectId)));
         return facts.filter((f): f is ProjectFacts => f !== undefined);
       },
       ensureRepository: async (f) => { await core.scm.api.ensureRepository(f.serviceId, f.projectId, { slug: f.slug, templateId: f.template, ...(f.initialPlan === undefined ? {} : { initialPlan: f.initialPlan }) }); },
