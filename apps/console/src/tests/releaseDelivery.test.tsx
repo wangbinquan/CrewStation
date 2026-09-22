@@ -26,7 +26,7 @@ test('并列真实部署与完整 SHA，具名确认双版本；首次上线显�
   const f = releaseDeliveryFixture(); f.state.slots[0] = { ...f.state.slots[0]!, releaseId: undefined, tag: undefined, commitSha: undefined, state: 'empty', replicas: 0, readyReplicas: 0 };
   page = await renderApp(`/projects/${projectId}/release`);
   expect(page.text()).toContain('待验证版本'); expect(page.text()).toContain('b'.repeat(40)); expect(page.text()).toContain('试用也可能写入生产数据');
-  expect(document.querySelector<HTMLAnchorElement>('a[href="//preview.demo.cs.localhost"]')?.textContent).toBe('试用待验证版本');
+  expect(document.querySelector<HTMLAnchorElement>('a[href="//preview.demo.cs.localhost"]')?.textContent).toBe('打开试用');
   expect(document.querySelector('a[href="//demo.cs.localhost"]')).toBeNull();
   await check(); expect(page.text()).toContain('正式版本 尚未部署 → v1.1.0'); expect(f.writes).toHaveLength(0);
   await click('确认上线 v1.1.0'); expect(f.writes).toEqual([{ path: `/v1/services/${serviceId}/traffic-switch`, body: { toSlot: 'preview', expectedActiveRelease: null, expectedTargetRelease: targetId } }]);

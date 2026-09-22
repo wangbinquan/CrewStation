@@ -1,6 +1,8 @@
-import { FullCommitShaSchema, ReleaseDtoSchema, SlotDtoSchema } from '@crewstation/contracts';
+import { ReleaseDtoSchema, SlotDtoSchema } from '@crewstation/contracts';
 import type { ReleaseDto, SlotDto } from '@crewstation/contracts';
 import { api } from '../../../shared/api/client';
+import { slotCanOpen, slotIdentityKnown } from '../../../shared/project/deployedSlot';
+export { slotCanOpen, slotIdentityKnown };
 
 export interface DeployedVersions { prod?: SlotDto; preview?: SlotDto }
 export interface TrafficSnapshot { prod?: ReleaseDto; target: ReleaseDto; checkedAt: string; rollback: boolean }
@@ -12,12 +14,6 @@ export function deployedVersions(items: readonly SlotDto[]): DeployedVersions {
   const prod = slots.find((slot) => slot.name === 'prod'), preview = slots.find((slot) => slot.name === 'preview');
   if (slots.length !== 2 || !prod?.active || !preview || preview.active) throw new Error('release.versions.inconsistent');
   return { prod, preview };
-}
-export function slotIdentityKnown(slot: SlotDto | undefined): boolean {
-  return !!slot?.releaseId && !!slot.tag && FullCommitShaSchema.safeParse(slot.commitSha).success;
-}
-export function slotCanOpen(slot: SlotDto | undefined): boolean {
-  return slotIdentityKnown(slot) && slot?.state === 'ready' && slot.replicas > 0 && slot.readyReplicas > 0 && !!slot.host.trim();
 }
 export function trafficSnapshotMatches(snapshot: TrafficSnapshot, versions: DeployedVersions): boolean {
   return (versions.prod?.releaseId ?? null) === (snapshot.prod?.id ?? null) && versions.prod?.commitSha === snapshot.prod?.commitSha &&

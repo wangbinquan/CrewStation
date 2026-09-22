@@ -63,7 +63,8 @@ test('资源说明读取失败展示原因，可原地重试而不需要离开�
   expect(page.text()).toContain('资源查询失败'); expect(attempts).toBe(1);
   await page.click('重新读取资源');
   expect(attempts).toBe(2); expect(page.text()).toContain('资源查询仍不可用');
-  expect(page.path()).toBe(`/projects/${projectId}/resources`);
+  // 旧「约定与资源」地址现在落到项目设置的「项目信息」（RFC-020 D2／D6）。
+  expect(page.path()).toBe(`/projects/${projectId}/settings`); expect(page.search().tab).toBe('info');
 });
 
 test('资源说明结构不完整时给出可重试错误，不让整个设置页崩溃', async () => {
@@ -75,16 +76,17 @@ test('资源说明结构不完整时给出可重试错误，不让整个设置�
   expect(page.search().tab).toBe('members');
 });
 
-describe('六个项目入口与旧链接兼容', () => {
-  test('项目名与 slug 取实际项目，六项导航；概览不再请求成员和仓库详情', async () => {
+describe('五个项目入口与旧链接兼容', () => {
+  test('项目名与 slug 取实际项目，五项生命周期顺序导航；概览页头请求一次仓库地址，不请求配额与形态之外的详情', async () => {
     const f = fixture(); page = await renderApp(`/projects/${projectId}`);
     const links = [...document.querySelectorAll('[aria-label="项目页面"] a')];
-    expect(links.map((link) => link.textContent)).toEqual(['概览', '开发', '开发资源', '发布与上线', '运行与诊断', '项目设置']);
+    // RFC-020 D2：「开发资源」不再是入口，左栏顺序即生命周期。
+    expect(links.map((link) => link.textContent)).toEqual(['概览', '开发', '发布与上线', '运行与诊断', '项目设置']);
     expect(page.text()).toContain('团队知识助理'); expect(page.text()).toContain('team-knowledge');
     expect(document.querySelector('header.bar')?.textContent).not.toContain(projectId);
+    // 页头的仓库链接跟着摘要走：这份夹具没有摘要，就不该去读仓库或成员。
     expect(f.calls.some((call) => call.url.pathname.endsWith('/members') || call.url.pathname.endsWith('/repository'))).toBe(false);
     await page.click('项目设置'); expect(page.search()).toMatchObject({ tab: 'config', env: 'development' });
-    expect(f.calls.some((call) => call.url.pathname.endsWith('/members'))).toBe(false);
   });
 
   test('开发会话及其子页的左栏与其他项目页同宽，只有正文收紧密度', async () => {
@@ -245,19 +247,19 @@ describe('诊断、订阅与配置的上下文', () => {
 });
 
 test.each([
-  // 2026-09-22 RFC-019 在健康之后加了「部署与运行形态」页签，页签索引与量测值随之变成六个。
-  { from: 'logs', to: 'deliveries', start: 3, end: 4, key: 'ArrowRight', before: 0, after: 192 },
-  { from: 'health', to: 'trace', start: 0, end: 5, key: 'ArrowLeft', before: 0, after: 300 },
-  { from: 'trace', to: 'health', start: 5, end: 0, key: 'Home', before: 300, after: 0 },
-  { from: 'health', to: 'trace', start: 0, end: 5, key: 'End', before: 0, after: 300 },
-  { from: 'trace', to: 'health', start: 5, end: 0, key: 'ArrowRight', before: 300, after: 0 },
+  // 2026-09-23 RFC-020 D3 把健康状态与部署与运行形态合并为「状态」，页签回到五个：状态、日志、告警与通知、事件投递、调用链。
+  { from: 'logs', to: 'alerts', start: 1, end: 2, key: 'ArrowRight', before: 0, after: 32 },
+  { from: 'status', to: 'trace', start: 0, end: 4, key: 'ArrowLeft', before: 0, after: 192 },
+  { from: 'trace', to: 'status', start: 4, end: 0, key: 'Home', before: 192, after: 0 },
+  { from: 'status', to: 'trace', start: 0, end: 4, key: 'End', before: 0, after: 192 },
+  { from: 'trace', to: 'status', start: 4, end: 0, key: 'ArrowRight', before: 192, after: 0 },
 ])('窄屏键盘 $key / $from → $to 保留焦点滚动', async ({ from, to, start, end, key, before, after }) => {
   fixture(); page = await renderApp(`/projects/${projectId}/operations?tab=${from}`, undefined, undefined, { scrollRestoration: true });
   const list = document.querySelector<HTMLElement>('[role="tablist"][aria-label="运行与诊断"]')!;
   const tabs = [...list.querySelectorAll<HTMLButtonElement>('[role="tab"]')];
   const source = tabs[start]!, target = tabs[end]!;
   // 实机 320px 的标签条 [16, 304]；Happy DOM 没有布局，只注入这些量测值。
-  const offsets = [0, 94, 216, 324, 390, 484], widths = [90, 118, 104, 62, 90, 104];
+  const offsets = [0, 94, 216, 324, 390], widths = [90, 118, 104, 62, 90];
   Object.defineProperty(list, 'clientWidth', { value: 288 });
   list.getBoundingClientRect = () => new DOMRect(16, 0, 288, 42);
   tabs.forEach((tab, index) => { tab.getBoundingClientRect = () => new DOMRect(16 + offsets[index]! - list.scrollLeft, 0, widths[index]!, 34); });

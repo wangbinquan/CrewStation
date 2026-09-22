@@ -15,7 +15,7 @@ import type { DeployedVersions } from '../model/deployedVersions';
 import type { ReleaseActions } from '../model/useReleaseActions';
 import { useTrafficConfirmation } from '../model/useTrafficConfirmation';
 import { isInFlight } from '../model/releaseStatus';
-import { DeployedVersionCard } from './DeployedVersionCard';
+import { DeployedVersionCard } from '../../../shared/project/DeployedVersionCard';
 import styles from './DeploymentVersions.module.css';
 
 export function DeploymentVersions({ projectId, serviceId, canSwitch, actions, onSelect }: { readonly projectId: string; readonly serviceId: string; readonly canSwitch: boolean; readonly actions: ReleaseActions; readonly onSelect: (id: string) => void }) {

@@ -20,25 +20,23 @@ async function enter(label: string, value: string) {
   }); await page!.settle();
 }
 
-test.each(['DigitalWorker', 'APIProxy'] as const)('%s 概览快捷入口集中呈现用途，点击保留项目和目标分类', async (kind) => {
-  const f = summaryFixture(); f.item.project.kind = kind;
+test.each(['DigitalWorker', 'APIProxy'] as const)('%s 概览一屏：页头一行仓库与地址链接保留项目与空间，没有重复左栏的快捷入口卡', async (kind) => {
+  const f = summaryFixture(), time = new Date().toISOString(); f.item.project.kind = kind;
+  f.item.slots = { status: 'ready', checkedAt: time, value: [
+    { name: 'prod', active: true, tag: 'v1.0.0', commitSha: 'a'.repeat(40), releaseId: '01a0bf5d-8f4b-7574-87e3-e3a9645702f6' as ReleaseId, host: 'formal.test', state: 'ready', replicas: 1, readyReplicas: 1 },
+    { name: 'preview', active: false, state: 'deploying', host: 'trial.test', replicas: 1, readyReplicas: 0 },
+  ] };
   const base = `${kind === 'DigitalWorker' ? '/projects' : '/admin/integrations'}/${f.item.project.id}`;
-  const targets = ['/release', '/settings?tab=members', '/resources?section=project', '/resources?section=api'];
-  const labels = ['前往发布', '成员与角色', '仓库', '开发资源'];
   page = await renderApp(base);
-  // 旧概览只是四个散落的文本链接；集中为可辨识的导航区，避免只修 CSS 却丢失入口或项目上下文。
-  const links = [...document.querySelectorAll<HTMLAnchorElement>('main nav[aria-label="项目快捷入口"] a')];
-  expect(links.map((link) => link.querySelector('strong')?.textContent)).toEqual(labels);
-  expect(links.map((link) => link.getAttribute('href'))).toEqual(targets.map((target) => base + target));
-  expect(links.every((link) => !!link.querySelector('small')?.textContent)).toBe(true);
-  for (const [index, target] of targets.entries()) {
-    if (index > 0) await page.navigate(base);
-    const link = document.querySelectorAll<HTMLAnchorElement>('main nav[aria-label="项目快捷入口"] a')[index]!;
-    await act(async () => link.click()); await page.settle();
-    const expected = new URL(base + target, 'http://test');
-    expect(page.path()).toBe(expected.pathname);
-    for (const [key, value] of expected.searchParams) expect(page.search()[key]).toBe(value);
-  }
+  // RFC-020 D4：快捷入口卡（左栏的重复）删除；地址只在实际就绪时是链接，未就绪的槽只显示域名。
+  expect(document.querySelector('main nav[aria-label="项目快捷入口"]')).toBeNull();
+  const header = document.querySelector('main header')!;
+  expect(header.querySelector('a[href="//formal.test"]')?.textContent).toBe('formal.test ↗');
+  expect(header.querySelector('a[href="//trial.test"]')).toBeNull(); expect(header.textContent).toContain('trial.test');
+  const info = header.querySelector<HTMLAnchorElement>('a[href*="tab=info"]')!;
+  expect(info.textContent).toBe('项目信息 →'); expect(info.getAttribute('href')).toBe(`${base}/settings?tab=info`);
+  await act(async () => info.click()); await page.settle();
+  expect(page.path()).toBe(`${base}/settings`); expect(page.search().tab).toBe('info');
   expect(f.writes).toEqual([]);
 });
 
@@ -106,13 +104,14 @@ test.each(['列表', '概览'])('%s 的会话分支明确标为创建时记录�
   f.item.development = { status: 'ready', checkedAt: time, value: session };
   page = await renderApp(view === '列表' ? '/projects' : `/projects/${f.item.project.id}`);
   const branch = [...document.querySelectorAll('code')].find((node) => node.textContent === 'main')!;
-  // 实机已切到 codex/rfc003-files，摘要仍显示创建时 main；不能把元数据冒充当前工作树。
-  expect(branch.parentElement?.textContent).toBe('创建时分支：main');
+  // 实机已切到 codex/rfc003-files，摘要仍显示创建时 main；不能把元数据冒充当前工作树。列表写明「创建时分支」，概览的会话卡只放分支名。
+  expect(branch.parentElement?.textContent).toBe(view === '列表' ? '创建时分支：main' : 'main · 0 个 CLI');
   f.item.development.value = { ...session, branch: undefined };
-  await page.click(view === '列表' ? '刷新项目' : '刷新概览');
-  expect(page.text()).toContain('创建时分支：分支未知');
-  // 概览顶栏仍可读取会话元数据；摘要不为分支文字追加容器工作树请求。
-  expect(f.calls.some((url) => url.includes('workspace-status') || url.includes('version-comparison'))).toBe(false);
+  await page.click(view === '列表' ? '刷新项目' : '刷新');
+  expect(page.text()).toContain(view === '列表' ? '创建时分支：分支未知' : '分支未知');
+  // 列表不为分支文字追加容器工作树请求；概览的会话卡按 RFC-020 §4.2 读一次版本比较拿待上线与未提交数，但仍不读工作树状态。
+  expect(f.calls.some((url) => url.includes('workspace-status'))).toBe(false);
+  expect(f.calls.some((url) => url.includes('version-comparison'))).toBe(view === '概览');
   if (view === '列表') expect(f.calls.some((url) => /\/dev-session|\/tasks\//.test(url))).toBe(false);
   expect(f.writes).toEqual([]);
 });
@@ -125,11 +124,11 @@ describe('概览按实际状态选择下一步', () => {
       { name: 'preview', active: false, tag: 'v1.0.1', commitSha: 'b'.repeat(40), releaseId: '01a0bf5d-8f4b-7645-8cca-c128d59001d1' as ReleaseId, host: 'trial.test', state: 'ready', replicas: 1, readyReplicas: 1 },
     ] };
     page = await renderApp(`/projects/${f.item.project.id}`);
-    expect(document.querySelector('a[href="//formal.test"]')?.textContent).toBe('打开正式应用');
-    expect(document.querySelector('a[href="//trial.test"]')?.textContent).toBe('打开试用'); expect(page.text()).toContain('共享生产数据');
-    expect(page.text()).toContain('需要处理或确认'); expect(document.querySelector('a[href*="operations?tab=health"]')).not.toBeNull();
-    f.item.slots.value[0]!.state = 'degraded'; await page.click('刷新概览'); expect(document.querySelector('a[href="//formal.test"]')).toBeNull();
-    f.error = true; await page.click('刷新概览'); expect(document.querySelector('a[href="//trial.test"]')).toBeNull(); expect(page.text()).toContain('上次读取的记录');
+    const openLinks = () => [...document.querySelectorAll('a[href="//formal.test"], a[href="//trial.test"]')].map((node) => node.textContent);
+    expect(openLinks()).toEqual(['formal.test ↗', 'trial.test ↗', '打开正式应用', '打开试用']); expect(page.text()).toContain('共享生产数据');
+    expect(page.text()).toContain('运行健康需要确认'); expect(document.querySelector('a[href*="operations?tab=status"]')).not.toBeNull();
+    f.item.slots.value[0]!.state = 'degraded'; await page.click('刷新'); expect(document.querySelector('a[href="//formal.test"]')).toBeNull();
+    f.error = true; await page.click('刷新'); expect(document.querySelector('a[href="//trial.test"]')).toBeNull(); expect(page.text()).toContain('上次读取的记录');
     expect(document.querySelector('[data-primary-project-action]')).toBeNull();
   });
   test('开通失败给管理员或负责人具名恢复入口，普通开发成员只能联系管理员', async () => {
@@ -137,9 +136,9 @@ describe('概览按实际状态选择下一步', () => {
     page = await renderApp(`/projects/${f.item.project.id}`); expect(page.text()).toContain('模板缺少配置');
     const action = document.querySelector('[data-primary-project-action]') as HTMLAnchorElement;
     expect(action.textContent).toContain('查看开通问题'); expect(action.getAttribute('href')).toContain(`/admin/projects/${f.item.project.id}/provisioning`);
-    f.admin = false; f.item.role = 'owner'; await page.click('刷新概览');
+    f.admin = false; f.item.role = 'owner'; await page.click('刷新');
     expect(document.querySelector('[data-primary-project-action]')?.getAttribute('href')).toBe(`/projects/${f.item.project.id}/provisioning`);
-    f.item.role = 'developer'; await page.click('刷新概览'); expect(document.querySelector('[data-primary-project-action]')).toBeNull(); expect(page.text()).toContain('联系管理员处理开通问题');
+    f.item.role = 'developer'; await page.click('刷新'); expect(document.querySelector('[data-primary-project-action]')).toBeNull(); expect(page.text()).toContain('联系管理员处理开通问题');
   });
   test('最新发布失败直达该发布，次动作继续开发；没有会话时开始开发只导航', async () => {
     const f = summaryFixture(), time = new Date().toISOString();
@@ -148,7 +147,7 @@ describe('概览按实际状态选择下一步', () => {
     page = await renderApp(`/projects/${f.item.project.id}`);
     expect(document.querySelector('[data-primary-project-action]')?.textContent).toContain('处理 v1.0.2 发布问题');
     expect(document.querySelector('[data-primary-project-action]')?.getAttribute('href')).toContain('release=01a0bf5d-8f4b-7645-8cca-c128d59001d1');
-    f.item.releases = { status: 'ready', checkedAt: time, value: [] }; await page.click('刷新概览');
+    f.item.releases = { status: 'ready', checkedAt: time, value: [] }; await page.click('刷新');
     expect(document.querySelector('[data-primary-project-action]')?.textContent).toContain('开始开发');
     await page.click('开始开发'); expect(page.path()).toBe(`/projects/${f.item.project.id}/dev-session`); expect(f.writes).toEqual([]);
   });
@@ -156,8 +155,8 @@ describe('概览按实际状态选择下一步', () => {
     const f = summaryFixture(), time = new Date().toISOString(); f.item.development = { status: 'ready', checkedAt: time, value: {
       taskId: '01a0bf5d-8f4b-7e52-8b45-4a547fd10e4f' as TaskId, state: 'running', connected: false, branch: 'main', createdAt: time, lastActivityAt: time } };
     page = await renderApp(`/projects/${f.item.project.id}`); expect(document.querySelector('[data-primary-project-action]')?.textContent).toContain('继续开发');
-    expect(page.text()).toContain('会话运行中'); expect(page.text()).toContain('连接已断开'); expect(page.text()).toContain('健康状态暂不可用');
-    f.error = true; await page.click('刷新概览'); expect(page.text()).toContain('摘要读取失败'); expect(document.querySelector('[data-primary-project-action]')).toBeNull();
+    expect(page.text()).toContain('会话运行中'); expect(page.text()).toContain('连接已断开'); expect(page.text()).toContain('运行健康需要确认');
+    f.error = true; await page.click('刷新'); expect(page.text()).toContain('摘要读取失败'); expect(document.querySelector('[data-primary-project-action]')).toBeNull();
     expect(f.calls.some((url) => url.includes('/slots') || url.includes('/health'))).toBe(false);
   });
 });

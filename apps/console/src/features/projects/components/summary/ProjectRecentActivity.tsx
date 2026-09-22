@@ -2,23 +2,35 @@ import type { ProjectSummaryDetail } from '@crewstation/contracts';
 import { Link } from '@tanstack/react-router';
 import { PROJECT_PATHS } from '../../../../shared/project/projectPaths';
 import type { ProjectSpace } from '../../../../shared/project/projectPaths';
+import { releaseTimeline, shortId } from '../../../../shared/project/releaseTimeline';
 import { useT } from '../../../../shared/lib/useT';
 import { useDateText } from '../../../../shared/lib/useDateText';
+import { Badge } from '../../../../shared/ui/Badge';
 import { Card } from '../../../../shared/ui/Card';
+import { Timeline } from '../../../../shared/ui/Timeline';
+import type { TimelineItem } from '../../../../shared/ui/Timeline';
 import { summaryIsFresh } from '../../model/projectSummaryState';
 import { SummaryUnavailable } from './SummaryFacts';
 import styles from './ProjectSummary.module.css';
 
-export function ProjectRecentActivity({ item, space }: { readonly item: ProjectSummaryDetail; readonly space: ProjectSpace }) {
+const LIMIT = 5;
+
+/** 最近动态：发布与上线／回退合并成一条时间线（RFC-020 D5），人名与标签代替 UUID；完整记录在发布页。 */
+export function ProjectRecentActivity({ item, space, names }: { readonly item: ProjectSummaryDetail; readonly space: ProjectSpace; readonly names: ReadonlyMap<string, string> }) {
   const t = useT(), date = useDateText(), params = { projectId: item.project.id };
-  return <Card compact title={t('projects.summary.activity')} footer={t('projects.summary.activityLimit')}>
-    <h3>{t('projects.summary.releases')}</h3>{item.releases.status !== 'ready' || !summaryIsFresh(item.releases) ? <SummaryUnavailable part={item.releases} /> :
-      item.releases.value.length === 0 ? <p className={styles.muted}>{t('projects.summary.noReleases')}</p> : <ul className={styles.activity}>{item.releases.value.map((r) => <li key={r.id}>
-        <Link to={PROJECT_PATHS[space].release} params={params} search={{ release: r.id }}>{r.tag} · {t(`release.status.${r.status}`)}</Link><small>{date(r.createdAt)}</small>
-      </li>)}</ul>}
-    <h3>{t('projects.summary.switches')}</h3>{item.switches.status !== 'ready' || !summaryIsFresh(item.switches) ? <SummaryUnavailable part={item.switches} /> :
-      item.switches.value.length === 0 ? <p className={styles.muted}>{t('projects.summary.noSwitches')}</p> : <ul className={styles.activity}>{item.switches.value.map((s) => <li key={s.id}>
-        <Link to={PROJECT_PATHS[space].release} params={params} search={{ release: s.releaseId }}>{s.reason || t('projects.summary.trafficRecorded')}</Link><small>{date(s.createdAt)}</small>
-      </li>)}</ul>}
+  const releases = item.releases.status === 'ready' && summaryIsFresh(item.releases) ? item.releases.value : undefined;
+  const switches = item.switches.status === 'ready' && summaryIsFresh(item.switches) ? item.switches.value : undefined;
+  const entries = releaseTimeline(releases ?? [], switches ?? [], names).slice(0, LIMIT);
+  const items: TimelineItem[] = entries.map((entry) => entry.kind === 'release'
+    ? { id: entry.id, tone: entry.release.status === 'ready' ? 'success' : entry.release.status === 'failed' ? 'danger' : 'info', time: date(entry.at),
+      primary: <Link to={PROJECT_PATHS[space].release} params={params} search={{ release: entry.release.id }}>{entry.release.tag}</Link>,
+      secondary: <><Badge tone={entry.release.status === 'ready' ? 'success' : entry.release.status === 'failed' ? 'danger' : 'info'}>{t(`release.status.${entry.release.status}`)}</Badge>{entry.release.slot ? ` · ${t(`slot.${entry.release.slot}`)}` : ''}{entry.release.status === 'failed' && entry.release.message ? ` · ${entry.release.message}` : ''}</> }
+    : { id: entry.id, tone: 'info', shape: 'square', time: date(entry.at),
+      primary: <Link to={PROJECT_PATHS[space].release} params={params} search={{ release: entry.entry.releaseId }}>{t(entry.rollback ? 'timeline.rollback' : 'timeline.switch', { actor: entry.actorName ?? t('timeline.unknownActor', { id: shortId(entry.entry.actorUserId) }), tag: entry.tag ?? t('timeline.unknownTag', { id: shortId(entry.entry.releaseId) }) })}</Link>,
+      secondary: entry.entry.reason ? t('timeline.reason', { reason: entry.entry.reason }) : undefined });
+  return <Card compact title={t('projects.summary.activity')} extra={<Link to={PROJECT_PATHS[space].release} params={params}>{t('projects.summary.activityAll')}</Link>}>
+    {!releases ? <SummaryUnavailable part={item.releases} /> : !switches ? <SummaryUnavailable part={item.switches} /> : null}
+    {releases && switches && items.length === 0 ? <p className={styles.muted}>{t('projects.summary.noActivity')}</p> : null}
+    {items.length > 0 ? <Timeline items={items} label={t('projects.summary.activity')} /> : null}
   </Card>;
 }

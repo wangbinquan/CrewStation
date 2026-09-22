@@ -78,7 +78,7 @@ describe('管理接入容器复用业务页面', () => {
 
   test('数字人误入接入容器路径时回到自己的工作台页面，保留分类', async () => {
     fixture({ digitalWorker: true }); page = await renderApp(`/admin/integrations/${projectId}/settings?tab=repository`);
-    expect(page.path()).toBe(`/projects/${projectId}/resources`); expect(page.search().section).toBe('project');
+    expect(page.path()).toBe(`/projects/${projectId}/settings`); expect(page.search().tab).toBe('info');
     expect(page.text()).toContain('项目开发');
   });
 
@@ -101,7 +101,7 @@ test('旧租户接入链接不能覆盖原工作台返回位置', async () => {
 test('直接打开旧接入链接时，返回工作台使用初始位置，不在两空间循环', async () => {
   rememberWorkbenchPath('/'); // 模拟整页载入时空间记忆的初始值。
   fixture(); page = await renderApp(`/projects/${projectId}/settings?tab=repository`);
-  expect(page.path()).toBe(`/admin/integrations/${projectId}/resources`);
+  expect(page.path()).toBe(`/admin/integrations/${projectId}/settings`);
   await page.click('项目开发');
   expect(page.path()).toBe('/projects'); expect(page.text()).toContain('项目开发');
 });
@@ -111,7 +111,7 @@ test('旧接入项目读取失败再恢复，不会把待识别地址保存成�
   await page.navigate(`/projects/${projectId}/settings?tab=repository`);
   expect(page.text()).toContain('项目目录读取失败');
   f.state.projectFailure = false; await page.click('重新读取项目');
-  expect(page.path()).toBe(`/admin/integrations/${projectId}/resources`);
+  expect(page.path()).toBe(`/admin/integrations/${projectId}/settings`);
   await page.click('项目开发');
   expect(page.path()).toBe('/projects'); expect(page.search().q).toBe('keep-on-error');
 });
@@ -135,9 +135,9 @@ describe('管理详情保持守卫的加载、失败与拒绝语义', () => {
 
   test('项目读取失败不跳错空间，显式重试可接回正确页面', async () => {
     const f = fixture({ projectFailure: true }); page = await renderApp(`/projects/${projectId}/settings?tab=repository`);
-    expect(page.path()).toBe(`/projects/${projectId}/resources`); expect(page.text()).toContain('项目目录读取失败');
+    expect(page.path()).toBe(`/projects/${projectId}/settings`); expect(page.text()).toContain('项目目录读取失败');
     f.state.projectFailure = false; await page.click('重新读取项目');
-    expect(page.path()).toBe(`/admin/integrations/${projectId}/resources`); expect(page.search().section).toBe('project');
+    expect(page.path()).toBe(`/admin/integrations/${projectId}/settings`); expect(page.search().tab).toBe('info');
   });
 
   test('普通成员收到接入项目信息仍保留拒绝页，不挂载业务操作', async () => {

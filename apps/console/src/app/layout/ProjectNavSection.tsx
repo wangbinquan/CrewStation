@@ -12,11 +12,13 @@ interface ProjectPageItem {
   readonly exact?: boolean;
 }
 
-/** 项目内页面入口的顺序即工作台左栏的顺序；路径与各 feature 的 routes.ts 一一对应。 */
+/**
+ * 项目内页面入口的顺序即工作台左栏的顺序，也是数字人的生命周期：做 → 验 → 上线 → 运行 → 设置（RFC-020 §4.1）。
+ * 「开发资源」不再是入口（作者裁定 D2）：资料进开发页的参考面板，仓库与地址进项目设置的「项目信息」。路径与各 feature 的 routes.ts 一一对应。
+ */
 const PROJECT_PAGES: readonly ProjectPageItem[] = [
   { page: 'overview', labelKey: 'nav.overview', exact: true },
   { page: 'development', labelKey: 'nav.devSession' },
-  { page: 'resources', labelKey: 'nav.resources' },
   { page: 'release', labelKey: 'nav.release' },
   { page: 'operations', labelKey: 'nav.operations' },
   { page: 'settings', labelKey: 'nav.settings' },

@@ -18,12 +18,12 @@ test('概览的下一步横幅只从有效的槽与发布事实推导：待验�
   expect(page.text()).toContain('v1.0.1 已发布，等待验证');
   expect(document.querySelector(`a[href*="release=${previewRelease}"]`)?.textContent).toBe('查看版本 →');
   // 版本卡以标签为标题，副本与地址各一行；两处访问入口文字保持既有断言。
-  expect(page.text()).toContain('1／1 副本就绪'); expect(document.querySelector('a[href="//trial.test"]')?.textContent).toBe('打开试用');
+  expect(page.text()).toContain('1／1 副本就绪'); expect([...document.querySelectorAll('a[href="//trial.test"]')].map((node) => node.textContent)).toContain('打开试用');
   // 待验证与正式是同一发布：没有“等待验证”的下一步。
-  f.item.slots.value[1] = { ...slot('preview', 'v1.0.0', prodRelease, 'trial.test') }; await page.click('刷新概览');
+  f.item.slots.value[1] = { ...slot('preview', 'v1.0.0', prodRelease, 'trial.test') }; await page.click('刷新');
   expect(page.text()).not.toContain('等待验证');
   // 尚无正式版本但待验证就绪：提示首次上线，而不是把待命槽当作已上线。
-  f.item.slots.value = [{ name: 'prod', active: true, state: 'empty', replicas: 0, readyReplicas: 0, host: 'formal.test' }, slot('preview', 'v1.0.1', previewRelease, 'trial.test')]; await page.click('刷新概览');
+  f.item.slots.value = [{ name: 'prod', active: true, state: 'empty', replicas: 0, readyReplicas: 0, host: 'formal.test' }, slot('preview', 'v1.0.1', previewRelease, 'trial.test')]; await page.click('刷新');
   expect(page.text()).toContain('v1.0.1 可试用，尚无正式版本'); expect(page.text()).toContain('尚未部署');
 });
 
@@ -34,8 +34,8 @@ test('最新发布失败或进行中时横幅优先说明该发布；测试者�
   f.item.releases = { status: 'ready', checkedAt: time, value: [release('failed')] };
   page = await renderApp(`/projects/${f.item.project.id}`);
   expect(page.text()).toContain('v1.0.2 发布失败'); expect(page.text()).not.toContain('等待验证');
-  f.item.releases.value = [release('building')]; await page.click('刷新概览');
+  f.item.releases.value = [release('building')]; await page.click('刷新');
   expect(page.text()).toContain('v1.0.2 正在发布');
-  f.item.role = 'tester'; f.admin = false; await page.click('刷新概览');
+  f.item.role = 'tester'; f.admin = false; await page.click('刷新');
   expect(page.text()).not.toContain('正在发布'); expect(page.text()).not.toContain('等待验证');
 });

@@ -31,11 +31,13 @@ export const queryKeys = {
   trafficSwitches: (serviceId: string) => ['services', serviceId, 'traffic-switches'] as const,
   branches: (projectId: string) => ['projects', projectId, 'branches'] as const,
   devSession: (projectId: string) => ['projects', projectId, 'dev-session'] as const,
+  nativeTerminals: (taskId: string) => ['tasks', taskId, 'native-terminals'] as const,
   versionComparison: (projectId: string, taskId: string) => ['projects', projectId, 'dev-session', taskId, 'comparison'] as const,
   comparisonDetails: (projectId: string, comparisonId: string, tab: string, cursor?: string, path?: string) => ['projects', projectId, 'comparison-details', comparisonId, tab, cursor, path] as const,
   task: (taskId: string) => ['tasks', taskId] as const,
   agents: (taskId: string) => ['tasks', taskId, 'agents'] as const,
   dataBindings: (projectId: string) => ['projects', projectId, 'data-bindings'] as const,
+  pendingDataBindings: (projectId: string) => ['projects', projectId, 'data-bindings', 'pending'] as const,
   dataResources: (projectId: string) => ['projects', projectId, 'data-resources'] as const,
   /** 项目成员的只读盘点（RFC-019）：挂在项目前缀下，快照 id 不进键，靠轮询换数据。 */
   projectClusterResources: (projectId: string) => ['projects', projectId, 'cluster-resources'] as const,

@@ -2,6 +2,7 @@
 import { useMemo } from 'react';
 import type { ReactElement } from 'react';
 import { Link, useNavigate } from '@tanstack/react-router';
+import { ProjectClusterResourcesSchema } from '@crewstation/contracts';
 import type { ProjectSummaryDetail } from '@crewstation/contracts';
 import { api } from '../../../../shared/api/client';
 import { queryKeys } from '../../../../shared/api/queryKeys';
@@ -20,7 +21,7 @@ import styles from './ProjectSummary.module.css';
 
 export function DeploymentTopologyCard({ item, space }: { readonly item: ProjectSummaryDetail; readonly space: ProjectSpace }): ReactElement | null {
   const t = useT(), navigate = useNavigate(), projectId = item.project.id;
-  const inventory = useApiQuery(queryKeys.projectClusterResources(projectId), () => api.cluster.projectResources(projectId), { enabled: item.role !== 'tester', refetchIntervalMs: 15_000, refetchOnWindowFocus: true, keepPrevious: () => true });
+  const inventory = useApiQuery(queryKeys.projectClusterResources(projectId), async () => { const parsed = ProjectClusterResourcesSchema.safeParse(await api.cluster.projectResources(projectId)); if (!parsed.success) throw new Error(t('projects.summary.topology.invalidResponse')); return parsed.data; }, { enabled: item.role !== 'tester', refetchIntervalMs: 15_000, refetchOnWindowFocus: true, keepPrevious: () => true });
   const dataResources = useApiQuery(queryKeys.dataResources(projectId), () => api.tasks.listDataResources(projectId), { enabled: item.role !== 'tester' });
   const topology = useMemo(() => {
     if (!inventory.data) return undefined;
@@ -32,9 +33,9 @@ export function DeploymentTopologyCard({ item, space }: { readonly item: Project
     }, t);
   }, [inventory.data, dataResources.data, item, projectId, t]);
   if (item.role === 'tester') return null;
-  const open = () => { void navigate({ to: PROJECT_PATHS[space].operations, params: { projectId }, search: { tab: 'topology' } }); };
+  const open = () => { void navigate({ to: PROJECT_PATHS[space].operations, params: { projectId }, search: { tab: 'status' } }); };
   const pods = topology?.nodes.filter((n) => n.kind === 'pod') ?? [], abnormal = topology?.nodes.filter((n) => n.abnormal).length ?? 0;
-  return <Card compact title={t('projects.summary.topology.title')} extra={<Link to={PROJECT_PATHS[space].operations} params={{ projectId }} search={{ tab: 'topology' }}>{t('projects.summary.topology.open')}</Link>}>
+  return <Card compact title={t('projects.summary.topology.title')} extra={<Link to={PROJECT_PATHS[space].operations} params={{ projectId }} search={{ tab: 'status' }}>{t('projects.summary.topology.open')}</Link>}>
     <QueryStatus isPending={inventory.isPending} error={inventory.error ?? dataResources.error} />
     {topology ? <>
       <p className={styles.fact}>{t('projects.summary.topology.counts', { workloads: topology.nodes.filter((n) => n.kind === 'workload' || n.kind === 'job').length, pods: pods.length, ready: pods.filter((n) => n.status === 'ready').length, running: pods.filter((n) => n.status === 'running').length })}{abnormal > 0 ? <> · <Badge tone="warning">{t('projects.summary.topology.attention', { count: abnormal })}</Badge></> : null}</p>

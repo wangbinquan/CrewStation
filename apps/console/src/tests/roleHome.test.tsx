@@ -73,7 +73,7 @@ test.each(['developer', 'admin'] as const)('%s 项目列表和新建页不重复
   expect(Boolean(document.querySelector('nav[aria-label="主导航"]'))).toBe(false);
   await page.navigate(`/projects/${projectId}/settings`);
   const nav = document.querySelector('nav[aria-label="主导航"]')!;
-  expect(nav.querySelectorAll('[aria-label="项目页面"] a')).toHaveLength(6);
+  expect(nav.querySelectorAll('[aria-label="项目页面"] a')).toHaveLength(5);
   expect(Boolean(nav.querySelector('a[href="/market"]'))).toBe(false);
   const back = nav.querySelector<HTMLAnchorElement>('a[href="/projects"]')!;
   await act(async () => back.click()); await page.settle();

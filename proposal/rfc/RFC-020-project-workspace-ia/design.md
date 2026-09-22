@@ -1,6 +1,6 @@
 # RFC-020｜技术与交互设计
 
-> Draft · 2026-09-23；与 [proposal.md](./proposal.md) 配套。D1、D2、D4、D5 已按作者裁定改写（D2 取 (b)：开发资源入口取消，三主题进开发页参考面板）；D3、D7 仍按 (a) 写成。只改工作台组织与一个可选的契约字段，不新增后端接口。
+> In Progress · 2026-09-23；与 [proposal.md](./proposal.md) 配套，已按作者对 D1–D7 的裁定改写（D2 取 (b)：开发资源入口取消，三主题进开发页参考面板；D3 取 (b)：运行与诊断保留横向页签，合并为五个）。只改工作台组织与一个可选的契约字段，不新增后端接口。
 
 ## 目录
 
@@ -23,7 +23,7 @@
 | 位置 | 职责 |
 |---|---|
 | `apps/console/src/app/layout/ProjectNavSection.tsx` | 左栏改为五项生命周期顺序（去掉 `resources`）；顺序只定义这一处 |
-| `apps/console/src/app/project/ProjectOperationsPage.tsx` | 改用 `SectionNavigation`；`status` 段装配健康卡＋形态图 |
+| `apps/console/src/app/project/ProjectOperationsPage.tsx` | 仍用 `Tabs`，五个页签；`status` 页签装配健康卡＋形态图；`health`／`topology` 一次 `replace` 到 `status` |
 | `apps/console/src/app/project/ProjectResourcesPage.tsx` | 只剩重定向：`section` 五个取值各自 `replace` 到新家（§2）；页面本体删除 |
 | `apps/console/src/app/project/ProjectSettingsPage.tsx` | 新增 `info` 组，装配 `ProjectInfoSection`（projects feature 公开） |
 | `apps/console/src/app/project/ProjectPageHeader.tsx`（新增） | 项目页统一页头：标题、说明、主动作、「读取于 ↻」 |
@@ -59,7 +59,7 @@
 | `dev-session?view=cli` | 面板收起 |
 | `dev-session?view=diff` | 等价 `view=changes` |
 | `dev-session?view=conversation` | 仍重定向到 `/dev-session/conversations` |
-| `operations?tab=status\|logs\|alerts\|deliveries\|trace` | 五段；`tab=health`、`tab=topology` → `status`（`replace`），日志的 `source/slot/taskId/releaseId` 与 `traceId`、`subscription` 不变 |
+| `operations?tab=status\|logs\|alerts\|deliveries\|trace` | 五个页签；`tab=health`、`tab=topology` → `status`（`replace`），日志的 `source/slot/taskId/releaseId` 与 `traceId`、`subscription` 不变 |
 | `resources?section=…` | 只剩重定向（`replace`）：`api\|events\|guide` → `dev-session?view=reference&topic=…&panel=full`（参数保留）；`data` → `dev-session?view=data`；`project` → `settings?tab=info`；缺省 → `topic=api` |
 | `settings?tab=config\|visibility\|members\|info\|advanced` | 五组 |
 | `release?source=…&release=…` | 不变 |
@@ -140,7 +140,7 @@ tool: z.object({ name: z.enum(['preview', 'code', 'changes', 'data', 'reference'
 
 ## 7. 运行与诊断、开发资源、项目设置
 
-- 运行与诊断改用 `SectionNavigation`，五段。`status` 段：`HealthCards` 在上（保留「查看此版本日志」）、`TopologyPage` 在下；两者各自的查询与轮询不变。`TracePage` 空态文案改为说明 trace_id 的来源并给事件投递链接。
+- 运行与诊断保留 `Tabs`，五个页签。`status` 页签：`HealthCards` 在上（保留「查看此版本日志」）、`TopologyPage` 在下；两者各自的查询与轮询不变。`TracePage` 空态文案改为说明 trace_id 的来源并给事件投递链接。
 - 参考面板的三段内容见 §5.3；`CatalogPage` 的「表在前、详情在旁」（`OperationsTable` → 选中行右侧 `OperationDetail`：文档、授权状态、申请表单、试调；`SwaggerPanel` 折叠；管理员链接改页脚一行）只在放大形态渲染；事件段顶部一行「最近投递 n 条 · 死信 m 条 →」来自 `api.events.listDeliveries` 的一页计数。
 - 项目设置 `info` 组：`ProjectInfoSection` 用 `DefinitionList`：仓库（路径、默认分支、状态、打开）、地址（两槽域名、开发预览域名）、服务身份（服务名、命名空间）、配额与套餐（`CapabilityQuota` 的数据）、折叠技术详情（项目 ID、服务 ID、命名空间，可复制）。只读，不画输入框。
 
@@ -178,7 +178,7 @@ tool: z.object({ name: z.enum(['preview', 'code', 'changes', 'data', 'reference'
 | `sessionNavigation.test.tsx`（改） | 会话面板内嵌日志与「完整日志」链接参数 |
 | `releaseTimeline.test.ts`（新） | 合并排序、标签与人名三种解析、失败条目日志参数 |
 | `releaseDelivery.test.tsx`、`releaseInspection.test.tsx`（改） | 上线按钮在待验证卡；`switch=1` 自动检查；两张表被时间线取代 |
-| `projectOperations.test.tsx`（新） | 五段导航、`health`／`topology` 重定向、状态段两部分、调用链空态 |
+| `projectOperations.test.tsx`（新） | 五个页签、`health`／`topology` 重定向、状态页签两部分、调用链空态 |
 | `projectResources.test.tsx`（改名 `referencePanel.test.tsx`） | 五条重定向与参数保留、三段在侧栏与放大两种形态的内容、无会话时可打开而试调禁用、API 表在前详情在旁、事件段投递摘要 |
 | `projectSettingsInfo.test.tsx`（新） | 项目信息组内容、只读、技术详情折叠与复制 |
 | `i18nParity.test.ts` | 中英文键对齐（现有） |

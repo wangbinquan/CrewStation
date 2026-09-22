@@ -148,6 +148,7 @@ export const messages = {
   'logs.topology.viewLogs': '查看日志',
   'logs.topology.readOnly': '管理动作（重启、扩缩、删除）仍在集群管理的资源详情里，这里只读。',
   'logs.topology.emptyTitle': '这个项目还没有受管资源',
+  'logs.topology.invalidResponse': '形态盘点返回不完整，请刷新后重试。',
   'logs.topology.emptyDescription': '发布一个版本或开启开发会话后，形态图会出现在这里。',
   'logs.topology.truncated': '资源超过 500 个，只显示 Pod 与工作负载优先的前 500 个。',
 } satisfies Messages;

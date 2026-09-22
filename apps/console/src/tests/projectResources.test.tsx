@@ -13,22 +13,30 @@ for (const admin of [false, true]) {
   test.each([
     ['resources&resource=api&proxy=billing&operation=billing.get', { section: 'api', proxy: 'billing', operation: 'billing.get' }],
     ['resources&resource=events&subscription=01a0bf5d-8f4b-7b9c-8c07-a2ef94c840cd', { section: 'events', subscription: '01a0bf5d-8f4b-7b9c-8c07-a2ef94c840cd' }],
-    ['resources&resource=overview&operation=stale.operation', { section: 'project' }], ['repository', { section: 'project' }],
   ])(`旧设置迁移保留空间与参数 ${prefix} / %s`, async (tab, expected) => {
     projectResourcesFixture(admin); page = await renderApp(`${prefix}/${id}/settings?tab=${tab}`, admin ? '/admin' : '/projects');
     expect(page.path()).toBe(`${prefix}/${id}/resources`); expect(page.search()).toMatchObject(expected);
     await page.back(); expect(page.path()).toBe(admin ? '/admin' : '/projects');
   });
+  // RFC-020 D2／D6：「项目与仓库」的家是项目设置 → 项目信息，「数据与存储」的家是开发页的数据面板；旧地址一次 replace 到位。
+  test.each([
+    ['settings?tab=resources&resource=overview&operation=stale.operation', 'settings', { tab: 'info' }], ['settings?tab=repository', 'settings', { tab: 'info' }],
+    ['resources?section=project', 'settings', { tab: 'info' }], ['resources?section=data&proxy=leak', 'dev-session', { view: 'data' }],
+  ])(`主题各归其家 ${prefix} / %s`, async (from, page_, expected) => {
+    projectResourcesFixture(admin); page = await renderApp(`${prefix}/${id}/${from}`, admin ? '/admin' : '/projects');
+    expect(page.path()).toBe(`${prefix}/${id}/${page_}`); expect(page.search()).toEqual(expected);
+    await page.back(); expect(page.path()).toBe(admin ? '/admin' : '/projects');
+  });
 }
 
-test('资源按目的分组：项目不混入接入参数；配额未知不冒充零，仓库有真实链接', async () => {
-  projectResourcesFixture(); page = await renderApp(`/projects/${id}/resources?section=project`);
-  expect(page.text()).toContain('尚未设置配额'); expect(page.text()).toContain('尚未选择服务套餐'); expect(page.text()).toContain('demo/demo');
+test('项目信息只读：仓库有真实链接，地址与服务身份直接可见，配额未知不冒充零，不混入接入参数', async () => {
+  projectResourcesFixture(); page = await renderApp(`/projects/${id}/settings?tab=info`);
+  expect(page.text()).toContain('尚未设置配额'); expect(page.text()).toContain('尚未选择服务套餐'); expect(page.text()).toContain('demo/demo'); expect(page.text()).toContain('https://preview.demo.test');
   expect(page.text()).not.toContain('X-User-Id'); expect(page.text()).not.toContain('CS_DATABASE_URL');
   expect(document.querySelector('a[href="https://repo.test/crew/demo"]')).not.toBeNull();
-  await page.click('数据与存储'); expect(page.search().section).toBe('data'); expect(page.text()).toContain('CS_DATABASE_URL');
-  const dataLink = [...document.querySelectorAll('a')].find((link) => link.textContent?.includes('查看或申请数据访问'))!;
-  expect(dataLink.getAttribute('href')).toContain(`/projects/${id}/dev-session?view=data`);
+  // 只读组不画输入框；ID 在折叠的技术详情里。
+  expect(document.querySelector('main form')).toBeNull();
+  expect([...document.querySelectorAll('main details summary')].some((node) => node.textContent === '技术详情')).toBe(true);
 });
 
 test('订阅来自代码，保留订阅 ID 与投递路径，并指向当前项目 Manifest', async () => {
@@ -50,11 +58,11 @@ test('平台接入按主题展开，正确说明转发来源且保留环境名�
 });
 
 test('窄屏原生主题选择使用同一参数与权限路径，错误留在当前主题可重试', async () => {
-  const f = projectResourcesFixture(); f.state.fail = 'capabilities'; page = await renderApp(`/projects/${id}/resources?section=data`);
-  expect(page.text()).toContain('本主题暂不可用'); f.state.fail = ''; await page.click('重新读取资源'); expect(page.text()).toContain('CS_DATABASE_URL');
+  const f = projectResourcesFixture(); f.state.fail = 'capabilities'; page = await renderApp(`/projects/${id}/resources?section=guide&topic=environment`);
+  expect(page.text()).toContain('本主题暂不可用'); f.state.fail = ''; await page.click('重新读取资源'); expect(page.text()).toContain('CS_API_BASE');
   const select = [...document.querySelectorAll('label')].find((node) => node.textContent?.startsWith('资源主题'))!.querySelector('select')!;
-  await act(async () => { select.value = 'project'; select.dispatchEvent(new Event('change', { bubbles: true })); }); await page.settle();
-  expect(page.search()).toEqual({ section: 'project' }); expect(page.text()).toContain('crew/demo');
+  await act(async () => { select.value = 'events'; select.dispatchEvent(new Event('change', { bubbles: true })); }); await page.settle();
+  expect(page.search()).toEqual({ section: 'events', subscription: undefined }); expect(page.text()).toContain('source.changed');
 });
 
 test('资源参数不泄露无关上下文；主题与长度异常回到合理默认', () => {

@@ -1,6 +1,7 @@
 // 运行与诊断「部署与运行形态」页签（RFC-019）：项目范围只读盘点＋槽＋开发会话＋数据资源组装成图；15 秒轮询、换快照不卸载。
 import { useMemo, useState } from 'react';
 import type { ReactElement } from 'react';
+import { ProjectClusterResourcesSchema } from '@crewstation/contracts';
 import { api } from '../../../shared/api/client';
 import { queryKeys } from '../../../shared/api/queryKeys';
 import { useApiQuery } from '../../../shared/api/useApi';
@@ -15,7 +16,8 @@ import { TopologyDetail } from '../components/TopologyDetail';
 export function TopologyPage({ projectId, onLogs }: { readonly projectId: string; readonly onLogs: (next: OperationsSearch) => void }): ReactElement {
   const t = useT(), identity = useProjectIdentity(projectId), [selected, setSelected] = useState<string>();
   const project = identity.data, serviceId = project?.serviceId;
-  const inventory = useApiQuery(queryKeys.projectClusterResources(projectId), () => api.cluster.projectResources(projectId), { refetchIntervalMs: 15_000, refetchOnWindowFocus: true, keepPrevious: () => true });
+  // 响应先过形状检查：缺 sources／snapshotId 的回执按读取失败处理，不能让整页在 `.sources.filter` 上崩掉。
+  const inventory = useApiQuery(queryKeys.projectClusterResources(projectId), async () => { const parsed = ProjectClusterResourcesSchema.safeParse(await api.cluster.projectResources(projectId)); if (!parsed.success) throw new Error(t('logs.topology.invalidResponse')); return parsed.data; }, { refetchIntervalMs: 15_000, refetchOnWindowFocus: true, keepPrevious: () => true });
   const slots = useApiQuery(queryKeys.slots(serviceId ?? ''), () => api.services.listSlots(serviceId!), { enabled: !!serviceId, refetchIntervalMs: 15_000 });
   const devSession = useApiQuery(queryKeys.devSession(projectId), () => api.devSession.get(projectId), { refetchIntervalMs: 15_000 });
   const dataResources = useApiQuery(queryKeys.dataResources(projectId), () => api.tasks.listDataResources(projectId));

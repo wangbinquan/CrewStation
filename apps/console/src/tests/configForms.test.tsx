@@ -181,5 +181,5 @@ test('开发保存迟到时只关闭开发编辑器，生产草稿保留且不�
   expect(visible<HTMLInputElement>('input[placeholder="DATABASE_URL"]').value).toBe('PROD_UNSAVED');
   expect(visible<HTMLInputElement>('input[placeholder="写入后生效于下一次注入"]').value).toBe('production draft');
   expect(f.writes).toHaveLength(1); expect(f.writes[0]!.path).toContain('/development');
-  await click('开发'); expect(visible('input')).toBeUndefined(); await page.click('开发资源'); expect(page.search().tab).toBe('config');
+  await click('开发'); expect(visible('input')).toBeUndefined(); await page.click('运行与诊断'); expect(page.search().tab).toBe('config');
 });
