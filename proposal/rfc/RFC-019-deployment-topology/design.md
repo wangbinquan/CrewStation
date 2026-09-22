@@ -34,6 +34,8 @@
 | `apps/console/src/shared/ui/topology/` | 无业务含义的渲染：`TopologyDiagram`、`topologyLayout`、`topologyModel`（图的类型与纯函数）、`TopologyLegend`、`TopologyFilters`、`TopologyList`、`useContainerWidth`、`Topology.module.css` |
 | `apps/console/src/shared/topology/` | CrewStation 语义的组装：`projectTopology`（盘点＋槽＋开发会话＋数据资源 → 图）、`bandSummary`（横带汇总卡）、`systemTopology`（盘点＋静态架构模型）、`projectsLayer`（摘要 → 项目卡）、`staticArchitecture`（静态调用关系表） |
 | `apps/console/src/features/projects/` | 概览页「部署与运行形态」卡（横带汇总） |
+
+2026-09-23 修订说明（[RFC-020](../RFC-020-project-workspace-ia/design.md) D3／D4）：概览的形态卡保留，与「最近发布活动」并排放在三张状态卡之下以保证 1440×900 一屏；运行与诊断的「部署与运行形态」页签并入「状态」页签（健康卡在上、全图在下），旧 `tab=topology`／`tab=health` 改写为 `tab=status`。
 | `apps/console/src/features/logs/` | 运行与诊断新页签 `topology`：查询、筛选、全图、只读详情 `TopologyDetail`；`shared/project/operationsSearch.ts` 的页签枚举加 `topology` |
 | `apps/console/src/features/cluster/` | 「拓扑」页签：层级切换、面包屑、项目层折叠、Pod 层与系统层复用 `ClusterDetail` |
 | `tests/e2e/` | 三处入口的真实浏览器用例 |

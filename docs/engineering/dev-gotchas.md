@@ -577,3 +577,15 @@ Bun 在 `CI=true` 时拒绝 `.only`（`.only is disabled in CI environments`）�
 
 会话限流或额度用尽时，Agent 会在任意一步停下，留下能过 lint 但过不了 typecheck 的半成品。
 接手时先 `bun run typecheck` 定位断面，再决定是补完还是回退。
+
+### 对 happy-dom 节点的失败断言看起来像整套用例卡死
+
+`expect(document.querySelector('textarea')).toBeNull()` 失败时，bun 会去序列化那个 happy-dom 节点（带 parent／ownerDocument 的循环引用），
+一条断言能花几十秒到几分钟，进程被 alarm 杀掉后缓冲的输出也一并丢失——表现就是「整套文件不出任何一行结果」，单独跑某条又是绿的（2026-09-23，RFC-020）。
+断言 DOM 存在性只比较数量或文本：`expect([...querySelectorAll('textarea')].filter((n) => !n.closest('[hidden]'))).toHaveLength(0)`。
+反过来，真卡死时先在 `beforeEach`／`afterEach` 用 `appendFileSync` 打点定位，不要相信 stdout。
+
+### `renderApp.click` 不点闭合 `<details>` 里的项，目标可能还要等一拍
+
+工具行的「⋯」菜单与拆分按钮都是 `<details>`；闭合时里面的按钮用户看不见，用例也点不到，先点开 `summary`。
+`click` 找不到目标时会再等几拍（最多 8 次 `settle`），因为面板里的内容常在一次读取之后才出现——不要在用例里再手写 `settle` 循环。

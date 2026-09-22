@@ -33,6 +33,7 @@
 .banner p { margin-top: 2px; }
 .banner a { font-weight: 600; white-space: nowrap; }
 .statusGrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--cs-space-3); }
+.bottom { display: grid; grid-template-columns: repeat(auto-fit, minmax(440px, 1fr)); gap: var(--cs-space-3); align-items: start; }
 .sessionLine { font-weight: 600; }
 .primarySmall { display: inline-flex; align-items: center; padding: 3px var(--cs-space-3); border-radius: var(--cs-radius-md); background: var(--cs-color-primary); color: var(--cs-color-on-primary); font-weight: 600; white-space: nowrap; }
 .primarySmall:hover { background: var(--cs-color-primary-hover); text-decoration: none; }

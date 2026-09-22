@@ -35,6 +35,7 @@ const ADMIN_PAGES = [
 /** 租户空间：一个数字人项目从概览到发布、运行、设置的能力面。 */
 const PROJECT_PAGES = [
   { suffix: '', marker: '正式版本', capability: '项目概览与两个部署槽' },
+  { suffix: '/dev-session', marker: '开发会话', capability: '开发会话、终端工作区与工具面板（RFC-020）' },
   { suffix: '/release', marker: '发布与上线', capability: '发布、上线与回退' },
   { suffix: '/operations', marker: '运行与诊断', capability: '健康、日志、事件投递与调用链' },
   { suffix: '/settings', marker: '项目设置', capability: '成员、可见性、配置与资源' },

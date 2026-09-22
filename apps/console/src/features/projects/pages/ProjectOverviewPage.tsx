@@ -62,8 +62,11 @@ export function ProjectOverviewPage(): ReactElement {
         {!summaryIsFresh(item) ? <ActionNote tone="neutral">{t('projects.summary.stale')}</ActionNote> : null}
         {available ? <><ProjectNextStepBanner item={item} space={space} /><ProjectAttentionBanners item={item} space={space} /></> : null}
         <StatusCards item={item} space={space} available={available} />
-        <DeploymentTopologyCard item={item} space={space} />
-        {tester ? null : <ProjectRecentActivity item={item} space={space} names={names} />}
+        {/* 形态与最近动态并排：1440×900 实测两者叠放时页面 1050px，超出一屏（WS-02）。 */}
+        <div className={styles.bottom}>
+          <DeploymentTopologyCard item={item} space={space} />
+          {tester ? null : <ProjectRecentActivity item={item} space={space} names={names} />}
+        </div>
       </div> : null}
     </>
   );

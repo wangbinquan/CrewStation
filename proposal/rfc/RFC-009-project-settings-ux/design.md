@@ -22,6 +22,8 @@
 | `apps/console/src/app/project/ProjectResourcesPage.tsx`（新增） | 装配五个开发资源主题，复用各 feature 公开组件 |
 | `apps/console/src/app/router/{projectSections,adminProjectRoutes,routeTree}.ts` | 两空间的新路由与兼容重定向 |
 | `apps/console/src/app/layout/ProjectNavSection.tsx` | 新增开发资源导航；保持测试者入口限制 |
+
+2026-09-23 修订说明（[RFC-020](../RFC-020-project-workspace-ia/design.md) D2／D6）：`ProjectResourcesPage.tsx` 与左栏「开发资源」已删除。五个主题各归其家：API 接口／事件／平台接入在开发页参考面板（`app/project/ReferencePanel.tsx` 装配），数据与存储在开发页数据面板，项目与仓库在项目设置新增的只读「项目信息」组；`resources?section=…` 与 `settings?tab=resources` 的旧地址一次 `replace` 重定向并保留定位参数。本表其余行不变。
 | `apps/console/src/shared/project/{settingsSearch,projectPaths}.ts` 与 `resourceSearch.ts`（新增） | 类型化路径和参数纯解析，不调用业务 API |
 | `apps/console/src/features/config/components/` | 列表和具名编辑区拆分、历史按需展开；既有 hooks 继续负责写入 |
 | `apps/console/src/features/projects/components/visibility/` 与 `members/` | 先摘要／列表，再编辑；保留独立保存、确认与草稿 |
