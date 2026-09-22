@@ -7,6 +7,14 @@
 
 基线三件套（v0.3.3）的第一轮实现已在本机 kind 集群上跑通并推上 main；**RFC-001（算力归平台）与 RFC-002（管理空间与租户空间分离）已实现、实跑确认并推上 main；RFC-004 已被 RFC-006 取代（Superseded）；RFC-006（算力档位合并运行环境、每个 Agent 一个 Pod）已实现、实机验收完毕并推上 main，已 Done（P1–P8、ADR-0005 与 I17–I19 待作者复核）；RFC-003 工作台已按设计附件完成并整体部署到本机，52／52 项 UX-AT 全部实机通过、本地 gate 与精确 SHA CI 通过，已 Done；RFC-005（OIDC／OAuth 2.0 公司登录）代码、测试与 OA-01…OA-31 实机验收全部完成，已 Done；RFC-007（开发环境 OAuth 2.0 一键换角色）代码、四角色 Chrome 实机验收、本地 gate 与精确 SHA CI 全部完成，已 Done**。
 
+## 开发页「卡住、自己在到处跳」的实机排查（2026-09-23）
+
+作者反馈后用 CDP 在真实浏览器复现（从左栏点「开发」，1440／1200／1100／1040／1024／1000／980 各采样 6 秒），查到三件事：
+
+1. **无参数进入把个人布局里的面板连「放大」一起写回地址**：先出终端，布局读到后（约 0.4–0.8 s）整页切成放大的预览把终端盖住。加上验收脚本一直以作者同一个 `dev-admin` 身份在演示项目上切换工具，作者每次进页都落到不同的面板。已改：无参数进入只恢复「在旁」；内容区窄于 800px 时连在旁也不恢复（否则等于放大），面板保持收起、终端可见；窄屏切换加迟滞（<800 放大、≥840 才回并排，避免 1040px 窗口滚动条一出现就来回切）。提交 `d65d186`（含 `devSessionPanel` 三条新旧用例、plan §4、dev-gotchas），本机 console 已滚到 `cs-console:rfc020-20260923d` 并实机核对：1024 进页保持收起，1440 进页恢复在旁 `?view=code`，终端始终可见。跑完把作者的个人布局收起（`?view=cli`）。
+2. **演示会话的 TaskRunner 在 23:13:41 因 90 s 无帧断链后，7 分钟内一直 `Failed to connect`（code 1006）**，而同一容器里新起一个 `bun -e` 进程 2 ms 就能开 WebSocket，cs-session 的 `/healthz`、`/runner` 升级（101）、`/internal/tasks/…/connection` 都正常且仍认为 Runner「已连接」（旧连接没收到关闭）。期间 cs-api 对该任务的 `workspaceStatus`／原生动态命令全部超时，网关对 `GET /v1/projects/{id}/dev-session` 返回 502（每次约 4 s，Traefik 自己的 Bad Gateway 正文），页面因此在错误提示与重试之间来回。23:20:58 Runner 自行重连成功（`resumeFromSeq 16960`），此后接口全部 200（dev-session 8 ms、version-comparison 120 ms）。**未定位到根因**：Runner 进程（Bun 1.3.13，`bun run --watch`）的 `ReconnectingWebSocketClient` 每次新建 `WebSocket` 都失败，与网络、cs-session、fd（82）、内存（128 MiB/1 GiB）都无关；cs-session 对半开的旧连接没有及时判定失联也是一处可疑点（`runnerStaleMs`）。留给下一个 session 排查：`packages/ws/reconnectingClient.ts`、`modules/session/application/runnerHub.ts`、以及 cs-api 读会话时哪一步会拖满 4 s 让网关回 502。
+3. cs-session 启动后有 23 条未处理的 `DOMException TimeoutError`（`modules/session/adapters/http/fetchForwarder.ts` 的副本间转发在 Runner 尚未接入时超时），只是日志噪音，但应当兜住。
+
 ## RFC-020 项目工作台信息架构重构：Done，T3–T10 全部完成并实机验收（2026-09-23）
 
 作者逐项裁定（D1 右侧工具面板、D2 取消「开发资源」全部并入面板与设置、D3 横向页签只合并状态、D4 概览一屏、D5 发布记录合并时间线、D6 随 D2 新增只读「项目信息」组、D7 保留「发布与上线」「运行与诊断」文案）并「批准实施并提交上库」。四批提交、全部按显式路径：
