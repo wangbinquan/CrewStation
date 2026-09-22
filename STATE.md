@@ -20,7 +20,9 @@
 
 **卡住的地方**：滚 `cs-control-plane` 新镜像时 `crewstation-dev-auth` 也换了镜像并被 Recreate 策略重建，它启动要先用管理员**密码**登录平台播种，而库内策略仍是密码登录关闭（本文件已记两次的同一颗雷），`readyz` 持续 503、旧 Pod 已不在。后果：本机 dev-oidc 登不进（浏览器会话过期后无法再登录，e2e 层整层 skip），TP-16 的 1280／1024／390、TP-17 的键盘与浅色主题、`factText` 的实机复核都停在这里。恢复需要本文件既有的破窗口流程（`CS_PASSWORD_LOGIN=force-on` → 重启 cs-auth／cs-api → 开发登录器重新播种 → 移除开关 → 再重启两个服务），按惯例要作者授权，未做。
 
-**下一步**：作者授权后走破窗口恢复 dev-auth；用已滚出的 `cs-console:rfc019-20260922b` 复核剩余 TP 项并让 e2e 层跑一遍，把 acceptance.md 的「待复核」改成实测；推送后记录精确 SHA 的 CI 六项结果，README 收口为 Done。
+**已推送**：`44f5ac1`（实现）、`f087007`（基线 v0.3.8）、`2ce5ba0`（e2e 用例接受空平台＋dev-gotchas）。CI：[run 35743094030](https://github.com/wangbinquan/CrewStation/actions/runs/35743094030)（`f087007`）五项成功、新增代码防护 99.2%（1229 行中 1219 行），e2e 唯一失败是系统层用例在没有项目的 CI 平台上等项目卡片；[run 35744347320](https://github.com/wangbinquan/CrewStation/actions/runs/35744347320)（`2ce5ba0`）六项全部成功，e2e 40 pass／20 skip／0 fail，其中 RFC-019 的系统层与 1280／1024／390 宽度用例通过（TP-16 由此闭合），Pod 层与成员用例因 CI 无项目 skip。
+
+**下一步**：作者授权后走破窗口恢复 dev-auth；用已滚出的 `cs-console:rfc019-20260922b` 复核 TP-17 的键盘与浅色主题、`factText` 的显示，并让本机 e2e 层跑一遍；README 收口为 Done。
 
 ## I23 已裁定并执行：两个内置接入项目的 manifest 迁到 v2（2026-09-22）
 

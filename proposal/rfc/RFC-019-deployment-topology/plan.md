@@ -1,6 +1,6 @@
 # RFC-019｜实施计划
 
-> 状态：In Progress · 2026-09-22 · T1–T8 与 T10 完成，T9 实机部分完成，收尾等本机 dev-auth 恢复（见 [acceptance.md](./acceptance.md)）
+> 状态：In Progress · 2026-09-22 · T1–T8 与 T10 完成，T9 实机部分完成、精确 SHA CI 六项成功，收尾等本机 dev-auth 恢复（见 [acceptance.md](./acceptance.md)）
 > 配套：[提案](./proposal.md) · [技术设计](./design.md) · [交互设计稿核对](./prototype-review.md)
 
 ## 目录
@@ -21,7 +21,7 @@
 | RFC-019-T6 | 项目概览「部署与运行形态」卡；运行与诊断 `topology` 页签、筛选、只读详情；中英文 | T3、T5 | 已完成 |
 | RFC-019-T7 | 集群管理「拓扑」页签：三层、面包屑、项目层折叠、复用 `ClusterDetail`；中英文 | T3、T5 | 已完成 |
 | RFC-019-T8 | 窄屏列表、键盘、`prefers-reduced-motion`、浅深主题核对；e2e 三处入口与测试员 403 | T6、T7 | 已完成（窄屏列表、键盘、明暗令牌在 console 用例覆盖；e2e 已写，本机因 dev-auth 未就绪整层 skip） |
-| RFC-019-T9 | 本机构建部署、真实浏览器与 `kubectl` 对账（TP-01…TP-18）、完整 gate、改动行防护、精确 SHA CI，`acceptance.md` | T8 | 部分完成（本机部署、接口对账、三处入口实机核对、完整 gate 通过；1280／1024／390、键盘、浅色主题的实机复核与 e2e 层等 dev-auth 恢复；精确 SHA CI 待推送后记录） |
+| RFC-019-T9 | 本机构建部署、真实浏览器与 `kubectl` 对账（TP-01…TP-18）、完整 gate、改动行防护、精确 SHA CI，`acceptance.md` | T8 | 部分完成（本机部署、接口对账、三处入口实机核对、完整 gate 通过；CI 35744347320 六项成功、e2e 的 1280／1024／390 宽度用例通过；键盘、浅色主题的本机实机复核与本机 e2e 层等 dev-auth 恢复） |
 | RFC-019-T10 | 基线回填：Proposal §3／§6 新增需求行、Design §2 与 §8 增补、Plan 新增 AT 与矩阵行，版本升 v0.3.8；README 状态收口 | T9 | 已完成（v0.3.8：Proposal §0.2／§3／§6 R55，Design §2.3／§14.6／D55，Plan AT-56 与矩阵行） |
 
 ## 2. 验收清单
