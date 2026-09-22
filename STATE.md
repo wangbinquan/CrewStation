@@ -7,6 +7,18 @@
 
 基线三件套（v0.3.3）的第一轮实现已在本机 kind 集群上跑通并推上 main；**RFC-001（算力归平台）与 RFC-002（管理空间与租户空间分离）已实现、实跑确认并推上 main；RFC-004 已被 RFC-006 取代（Superseded）；RFC-006（算力档位合并运行环境、每个 Agent 一个 Pod）已实现、实机验收完毕并推上 main，已 Done（P1–P8、ADR-0005 与 I17–I19 待作者复核）；RFC-003 工作台已按设计附件完成并整体部署到本机，52／52 项 UX-AT 全部实机通过、本地 gate 与精确 SHA CI 通过，已 Done；RFC-005（OIDC／OAuth 2.0 公司登录）代码、测试与 OA-01…OA-31 实机验收全部完成，已 Done；RFC-007（开发环境 OAuth 2.0 一键换角色）代码、四角色 Chrome 实机验收、本地 gate 与精确 SHA CI 全部完成，已 Done**。
 
+## 开发会话页左栏与其他页签同宽（2026-09-22）
+
+作者实机反馈「开发会话页面的左侧栏宽度和其他页签不一样了」。确有其事，而且写在设计里：RFC-003 设计附件 §6 定了「桌面全局导航约 208px，开发模式约 156px」，`AppShell` 于是在路径以 `/dev-session` 结尾时挂 `compactShell`，把 `--cs-nav-width` 改写成 156px，进出开发会话整条左栏跳一下。顺带查出同一判断的另一半：只有**精确** `/dev-session` 才窄，子页「历史对话」仍是 208px，开发区内部同样在跳。
+
+作者裁定统一成 208px。`compactShell` 连同那条 CSS 规则删除，左栏宽度只剩 tokens 一个来源；开发页的密度只留在正文（`compact` 仍是 8–12px 内边距并去掉最大宽度），终端照旧占满内容区，只少 52px。开发会话内各面板都是 `min-width: 0` 的流式布局，少这 52px 不改变任何窗格的下限。RFC-003 §6 已按裁定改写并注明 2026-09-22。
+
+回归写在 `projectNavigation.test.tsx`：概览 → 开发会话 → 历史对话三处外壳类名必须一致、正文仍带 `compact`，并断言全部 CSS 里 `--cs-nav-width` 只有 `app/theme/tokens.css` 一处声明（为此给 `sourceScan.ts` 加了 `consoleStyles()`）。两半都做了去掉修复即失败的验证：把 `compactShell` 加回去红在「`shell` 对 `shell compactShell`」，只留 CSS 规则则红在声明来源多出一处。
+
+完整 `bun run check` 通过：**2081 pass／8 skip／0 fail**，13189 assertions、350 个文件；`test:patch --base origin/main` 判定本次没有需要用例防护的新增生产代码。本机 console 已部署 `cs-console:navwidth-20260922` 并 Ready，其余部署未动，无迁移。真实 dev-admin 浏览器核对：概览／开发会话／历史对话／发布与上线四页左栏都是 208px，开发会话正文仍是 `8px 12px`；1280／1024 无横向溢出，390／320 仍是横排导航条且无溢出，英文六项在 208px 内不换行。部署后 e2e 层复跑 **54 pass／1 skip／0 fail**。本机没有可用的运行中开发会话（三个 dev-session Pod 都是 I22 的 `Failed` 残留），终端工作区的实机外观这次没有新证据。
+
+本机环境两点记在这里，省得下一个 session 再查：默认测试库 `cs-dev-pg`（55432）仍是退出状态，模块层用例借运行中的 `cs-rfc013-test-pg`，Docker Desktop 重启后它的端口由 63764 变成 **59561**（`CS_TEST_DATABASE_URL=postgres://crewstation:crewstation-dev@127.0.0.1:59561/crewstation`）；e2e 层必须带 `CS_E2E_AUTH=dev-oidc CS_E2E_USERNAME=dev-admin`，否则会话停在登录页——本轮第一次 check 的 26 个红全部由这两件事造成，另一条 `pollingVisibility` 单跑通过，记为既有 flake。
+
 ## 新建项目的开发容器连内置 MCP 报 403，归档项目的路由删不掉（2026-09-22）
 
 作者反馈开发容器调内置 MCP 报 403。本机复现：在 `cs-demo` 里起一个带 `crewstation.io/workload=dev-session` 标签、项目名未登记的 Pod，`POST http://mcp-capabilities.svc.cs.internal/mcp` 得到 403「不能调用平台端点 mcp-capabilities.svc.cs.internal」；同一个 Pod 换成已登记身份是 200。网络层没有问题：任务容器的 NetworkPolicy 出向全放行，CoreDNS 的 `*.svc.cs.internal` 改写也在。

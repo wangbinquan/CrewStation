@@ -20,8 +20,7 @@
   max-width: var(--cs-content-max-width);
   margin: 0 auto;
 }
-/* 开发页：左栏收窄、内容区去掉最大宽度与大内边距，终端成为主体。 */
-.compactShell { --cs-nav-width: 156px; }
+/* 开发页：内容区去掉最大宽度与大内边距，终端成为主体；左栏宽度与其他页面一致，不在这里改写 --cs-nav-width。 */
 .compact { padding: 8px 12px; }
 .compact > .content { max-width: none; }
 

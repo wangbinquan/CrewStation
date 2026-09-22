@@ -15,7 +15,7 @@ export interface AppShellProps {
 export function AppShell({ nav, children }: AppShellProps): ReactElement {
   const compact = useRouterState({ select: (state) => state.location.pathname.endsWith('/dev-session') });
   return (
-    <div className={[styles.shell, !nav && styles.noNav, compact && styles.compactShell].filter(Boolean).join(' ')}>
+    <div className={[styles.shell, !nav && styles.noNav].filter(Boolean).join(' ')}>
       {nav}
       <TopBar />
       <main className={[styles.main, compact && styles.compact].filter(Boolean).join(' ')}>
