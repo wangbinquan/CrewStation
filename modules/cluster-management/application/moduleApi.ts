@@ -1,13 +1,14 @@
 import type { ClusterManagementModuleApi } from '../api/moduleApi';
 import { notFound } from '@crewstation/kernel';
 import type { ClusterDeps } from './dependencies';
-import { requireAdmin, readSnapshot, snapshotSummary, pageResources, resourceIn, relatedResources, completeSnapshot } from './queries';
+import { requireAdmin, readSnapshot, snapshotSummary, pageResources, resourceIn, relatedResources, completeSnapshot, projectResources } from './queries';
 import { operationUseCases } from './operations';
 export function clusterApi(deps: ClusterDeps): ClusterManagementModuleApi {
   return {
     name: 'cluster-management', ...operationUseCases(deps),
     summary: async (actor, q) => { await requireAdmin(deps, actor); return snapshotSummary(await readSnapshot(deps, q.snapshotId), q); },
     resources: async (actor, q) => { await requireAdmin(deps, actor); return pageResources(await readSnapshot(deps, q.snapshotId), q); },
+    projectResources: (actor, projectId, snapshotId) => projectResources(deps, actor, projectId, snapshotId),
     detail: async (actor, id, snapshotId) => { await requireAdmin(deps, actor); const s = await readSnapshot(deps, snapshotId), resource = resourceIn(s, id); return { resource, related: relatedResources(s, resource), complete: completeSnapshot(s), sources: s.sources }; },
     events: async (actor, id) => { await requireAdmin(deps, actor); return deps.cluster.events(resourceIn(await readSnapshot(deps), id)); },
     logs: async (actor, id, q) => { await requireAdmin(deps, actor); return deps.cluster.logs(resourceIn(await readSnapshot(deps), id), q); },

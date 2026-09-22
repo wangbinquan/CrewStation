@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ProjectIdSchema } from '../../ids';
 
 export const ClusterViewSchema = z.enum(['workloads', 'pods', 'network', 'storage', 'namespaces']);
 export const ClusterPurposeSchema = z.enum(['development-workspace', 'development-cli', 'development-agent', 'business-workspace', 'business-subtask', 'profile-test', 'digital-worker-service', 'api-proxy', 'event-producer', 'build', 'migration', 'platform-service', 'platform-infrastructure', 'unknown']);
@@ -20,7 +21,13 @@ export const ClusterResourceSchema = z.object({
 });
 export const ClusterSourceSchema = z.object({ key: z.string(), kind: z.string(), namespace: z.string(), batchId: z.string(), observedAt: z.string().optional(), resourceVersion: z.string(), state: z.enum(['complete', 'stale', 'error', 'unsupported']), count: z.number(), reason: z.string().optional() });
 export const ClusterFilterSchema = z.object({ snapshotId: z.string().optional(), view: ClusterViewSchema.optional(), scope: z.enum(['all', 'project', 'system', 'unresolved']).default('all'), projectId: z.string().optional(), namespace: z.string().optional(), kind: z.string().optional(), purpose: ClusterPurposeSchema.optional(), status: z.string().optional(), q: z.string().max(200).optional(), cursor: z.string().max(3000).optional(), limit: z.coerce.number().int().min(1).max(100).default(50) });
-export const ClusterSummarySchema = z.object({ snapshotId: z.string(), startedAt: z.string(), finishedAt: z.string(), complete: z.boolean(), sources: z.array(ClusterSourceSchema), total: z.number(), workloads: z.number(), pods: z.number(), runningPods: z.number(), readyPods: z.number(), standalonePods: z.number(), services: z.number(), pvcs: z.number(), abnormal: z.number(), kinds: z.record(z.string(), z.number()), phases: z.record(z.string(), z.number()), purposes: z.record(z.string(), z.number()), projects: z.array(z.object({ id: z.string(), name: z.string() })) });
+/** 每项目计数只在快照完整时给出（RFC-019）；缺席表示来源失败，不能用 0 冒充。 */
+export const ClusterProjectCountsSchema = z.object({ id: z.string(), name: z.string(), workloads: z.number().optional(), pods: z.number().optional(), readyPods: z.number().optional(), abnormal: z.number().optional(), devSessions: z.number().optional() });
+export const ClusterSummarySchema = z.object({ snapshotId: z.string(), startedAt: z.string(), finishedAt: z.string(), complete: z.boolean(), sources: z.array(ClusterSourceSchema), total: z.number(), workloads: z.number(), pods: z.number(), runningPods: z.number(), readyPods: z.number(), standalonePods: z.number(), services: z.number(), pvcs: z.number(), abnormal: z.number(), kinds: z.record(z.string(), z.number()), phases: z.record(z.string(), z.number()), purposes: z.record(z.string(), z.number()), projects: z.array(ClusterProjectCountsSchema) });
+/** 项目成员的只读盘点（RFC-019）：同一份快照按项目过滤，没有管理动作。 */
+export const ProjectClusterResourcesParamsSchema = z.object({ projectId: ProjectIdSchema });
+export const ProjectClusterResourcesQuerySchema = z.object({ snapshotId: z.string().max(200).optional() });
+export const ProjectClusterResourcesSchema = z.object({ snapshotId: z.string(), observedAt: z.string(), complete: z.boolean(), sources: z.array(ClusterSourceSchema), items: z.array(ClusterResourceSchema), truncated: z.boolean() });
 export const ClusterPageSchema = z.object({ snapshotId: z.string(), complete: z.boolean(), items: z.array(ClusterResourceSchema), total: z.number(), nextCursor: z.string().optional() });
 export const ClusterDetailSchema = z.object({ resource: ClusterResourceSchema, related: z.array(ClusterResourceSchema), complete: z.boolean(), sources: z.array(ClusterSourceSchema) });
 export const ClusterEventsSchema = z.object({ items: z.array(z.object({ uid: z.string(), type: z.string(), reason: z.string(), message: z.string(), count: z.number(), at: z.string().optional() })) });
@@ -40,3 +47,6 @@ export type ClusterContainer = z.infer<typeof ClusterContainerSchema>;
 export type ClusterEvents = z.infer<typeof ClusterEventsSchema>;
 export type ClusterLogsQuery = z.infer<typeof ClusterLogsQuerySchema>;
 export type ClusterLogs = z.infer<typeof ClusterLogsSchema>;
+export type ClusterProjectCounts = z.infer<typeof ClusterProjectCountsSchema>;
+export type ProjectClusterResourcesQuery = z.infer<typeof ProjectClusterResourcesQuerySchema>;
+export type ProjectClusterResources = z.infer<typeof ProjectClusterResourcesSchema>;

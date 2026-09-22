@@ -15,6 +15,7 @@ import { summaryIsFresh } from '../model/projectSummaryState';
 import { ProjectSummaryActions } from '../components/summary/ProjectSummaryActions';
 import { DevelopmentFact, HealthFact, SummaryChecked } from '../components/summary/SummaryFacts';
 import { DeploymentCard } from '../components/summary/DeploymentCard';
+import { DeploymentTopologyCard } from '../components/summary/DeploymentTopologyCard';
 import { ProjectNextStepBanner } from '../components/summary/ProjectNextStepBanner';
 import { ProjectRecentActivity } from '../components/summary/ProjectRecentActivity';
 import { ProjectSummaryAttention } from '../components/summary/ProjectSummaryAttention';
@@ -60,6 +61,7 @@ export function ProjectOverviewPage(): ReactElement {
           <DeploymentCard item={item} name="prod" canOpen={available && summaryIsFresh(item)} />
           <DeploymentCard item={item} name="preview" canOpen={available && summaryIsFresh(item)} />
         </div>
+        <DeploymentTopologyCard item={item} space={space} />
         <Card compact title={t('projects.summary.development')} extra={available && item.role !== 'tester' && item.project.state === 'active' ? <Link to={PROJECT_PATHS[space].development} params={{ projectId }}>{t(item.development.status === 'ready' && item.development.value ? 'projects.summary.continue' : 'projects.summary.openDevelopment')}</Link> : undefined}>
           <DevelopmentFact item={item} /><SummaryChecked checkedAt={item.development.checkedAt} /></Card>
         <Card compact title={t('projects.summary.health')} extra={<Link to={PROJECT_PATHS[space].operations} params={{ projectId }} search={{ tab: 'health' }}>{t('projects.summary.diagnostics')}</Link>}>

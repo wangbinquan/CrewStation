@@ -1,6 +1,6 @@
 # RFC-019｜技术设计
 
-> 状态：Draft · 2026-09-22 · 待作者批准
+> 状态：In Progress · 2026-09-22 · 作者已批准；实施与实机证据见 [acceptance.md](./acceptance.md)
 > 配套：[提案](./proposal.md) · [计划](./plan.md) · [交互设计稿核对](./prototype-review.md)
 
 ## 目录

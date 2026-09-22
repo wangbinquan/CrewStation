@@ -36,6 +36,9 @@ export const queryKeys = {
   task: (taskId: string) => ['tasks', taskId] as const,
   agents: (taskId: string) => ['tasks', taskId, 'agents'] as const,
   dataBindings: (projectId: string) => ['projects', projectId, 'data-bindings'] as const,
+  dataResources: (projectId: string) => ['projects', projectId, 'data-resources'] as const,
+  /** 项目成员的只读盘点（RFC-019）：挂在项目前缀下，快照 id 不进键，靠轮询换数据。 */
+  projectClusterResources: (projectId: string) => ['projects', projectId, 'cluster-resources'] as const,
   config: (projectId: string, env: string) => ['projects', projectId, 'config', env] as const,
   operations: (serviceId?: string) => (serviceId === undefined ? (['operations'] as const) : (['operations', serviceId] as const)),
   /** 代理清单挂在 operations 前缀下：授权变化时按前缀一次失效即可连带刷新。 */

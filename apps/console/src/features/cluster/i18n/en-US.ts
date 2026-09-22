@@ -250,5 +250,18 @@ export const messages = {
   "cluster.operationPhase": "Operation phase",
   "cluster.allPhases": "All phases",
   "cluster.actor": "Operator",
-  "cluster.created": "Accepted at"
+  "cluster.created": "Accepted at",
+  // Topology tab (RFC-019)
+  'cluster.tab.topology': 'Topology',
+  'cluster.topology.layers': 'Layers',
+  'cluster.topology.system': 'System layer',
+  'cluster.topology.projects': 'Project layer · {count}',
+  'cluster.topology.project': 'Pod layer · {name}',
+  'cluster.topology.projectNone': 'Pod layer',
+  'cluster.topology.breadcrumb': 'Project layer › {name}',
+  'cluster.topology.back': 'Back to project layer',
+  'cluster.topology.expand': "Expand this project's Pod layer",
+  'cluster.topology.systemHint': 'Node states come from the cluster inventory; dashed call relations are static architecture notes, not measured traffic.',
+  'cluster.topology.projectsHint': 'Projects needing attention come first; beyond 60 healthy projects the rest fold, click "N more" to expand. Select a project card to expand its Pod layer from the detail.',
+  'cluster.topology.projectHint': "Same component and snapshot as the project's Operations topology; select a node to open the resource detail with events, logs and actions.",
 } as const;

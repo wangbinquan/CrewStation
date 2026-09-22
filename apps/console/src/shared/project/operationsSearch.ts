@@ -2,7 +2,7 @@ import { LogQuerySchema, LogSourceSchema, ReleaseIdSchema, TaskIdSchema, TraceId
 import type { LogSource, SlotName } from '@crewstation/contracts';
 import { searchText } from './settingsSearch';
 
-export const OPERATIONS_TABS = ['health', 'alerts', 'logs', 'deliveries', 'trace'] as const;
+export const OPERATIONS_TABS = ['health', 'topology', 'alerts', 'logs', 'deliveries', 'trace'] as const;
 export interface OperationsSearch {
   readonly tab?: typeof OPERATIONS_TABS[number];
   readonly source?: LogSource;

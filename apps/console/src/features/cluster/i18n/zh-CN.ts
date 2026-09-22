@@ -250,5 +250,18 @@ export const messages = {
   "cluster.operationPhase": "操作阶段",
   "cluster.allPhases": "全部阶段",
   "cluster.actor": "操作者",
-  "cluster.created": "受理时间"
+  "cluster.created": "受理时间",
+  // 拓扑页签（RFC-019）
+  'cluster.tab.topology': '拓扑',
+  'cluster.topology.layers': '层级',
+  'cluster.topology.system': '系统层',
+  'cluster.topology.projects': '项目层 · {count}',
+  'cluster.topology.project': 'Pod 层 · {name}',
+  'cluster.topology.projectNone': 'Pod 层',
+  'cluster.topology.breadcrumb': '项目层 › {name}',
+  'cluster.topology.back': '返回项目层',
+  'cluster.topology.expand': '展开该项目的 Pod 层',
+  'cluster.topology.systemHint': '节点状态来自集群盘点；虚线调用关系是静态架构标注，不是实测流量。',
+  'cluster.topology.projectsHint': '异常项目置顶；正常项目超过 60 个时折叠，点击「还有 N 个」展开。点选项目卡片后可在详情里展开它的 Pod 层。',
+  'cluster.topology.projectHint': '与项目运行与诊断的形态图同一组件、同一份快照；点节点打开资源详情，事件、日志与管理动作都在那里。',
 } as const;

@@ -59,6 +59,18 @@
 
   --cs-nav-width: 208px;
   --cs-topbar-height: 52px;
+
+  /* 形态图语义色（RFC-019）：颜色只表达语义，九组描边／填充，浅深各一套。 */
+  --cs-topo-gateway-stroke: #0e7490; --cs-topo-gateway-fill: rgba(34, 211, 238, 0.16);
+  --cs-topo-security-stroke: #be123c; --cs-topo-security-fill: rgba(251, 113, 133, 0.16);
+  --cs-topo-service-stroke: #047857; --cs-topo-service-fill: rgba(52, 211, 153, 0.18);
+  --cs-topo-development-stroke: #1d4ed8; --cs-topo-development-fill: rgba(96, 165, 250, 0.2);
+  --cs-topo-business-stroke: #c2410c; --cs-topo-business-fill: rgba(251, 146, 60, 0.18);
+  --cs-topo-build-stroke: #b45309; --cs-topo-build-fill: rgba(251, 191, 36, 0.2);
+  --cs-topo-data-stroke: #6d28d9; --cs-topo-data-fill: rgba(167, 139, 250, 0.2);
+  --cs-topo-platform-stroke: #334155; --cs-topo-platform-fill: rgba(100, 116, 139, 0.14);
+  --cs-topo-external-stroke: #64748b; --cs-topo-external-fill: rgba(148, 163, 184, 0.12);
+  --cs-topo-edge: #7b8798; --cs-topo-grid: rgba(24, 36, 56, 0.1);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -87,6 +99,16 @@
     --cs-tone-danger-bg: #40242a;
 
     --cs-nav-active-text: #8db3ff;
+    --cs-topo-gateway-stroke: #22d3ee; --cs-topo-gateway-fill: rgba(34, 211, 238, 0.14);
+    --cs-topo-security-stroke: #fb7185; --cs-topo-security-fill: rgba(251, 113, 133, 0.14);
+    --cs-topo-service-stroke: #34d399; --cs-topo-service-fill: rgba(52, 211, 153, 0.16);
+    --cs-topo-development-stroke: #60a5fa; --cs-topo-development-fill: rgba(96, 165, 250, 0.16);
+    --cs-topo-business-stroke: #fb923c; --cs-topo-business-fill: rgba(251, 146, 60, 0.16);
+    --cs-topo-build-stroke: #fbbf24; --cs-topo-build-fill: rgba(251, 191, 36, 0.16);
+    --cs-topo-data-stroke: #a78bfa; --cs-topo-data-fill: rgba(167, 139, 250, 0.18);
+    --cs-topo-platform-stroke: #cbd5e1; --cs-topo-platform-fill: rgba(148, 163, 184, 0.14);
+    --cs-topo-external-stroke: #94a3b8; --cs-topo-external-fill: rgba(148, 163, 184, 0.1);
+    --cs-topo-edge: #8f9db0; --cs-topo-grid: rgba(231, 237, 246, 0.1);
     --cs-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
     --cs-shadow-popover: 0 12px 32px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(0, 0, 0, 0.24);
   }

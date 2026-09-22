@@ -1,0 +1,64 @@
+import './domSetup';
+import { afterEach, expect, test } from 'bun:test';
+import { act, useState } from 'react';
+import { FULL_METRICS } from '../shared/ui/topology/topologyLayout';
+import { TopologyList } from '../shared/ui/topology/TopologyList';
+import { TopologyWorkspace } from '../shared/ui/topology/TopologyWorkspace';
+import { renderElement } from './renderElement';
+import { layoutFixture } from './topologyFixture';
+
+// RFC-019 design §5：节点是可聚焦的 button，点选／键盘选中后压暗无关节点，筛选只压暗不移除，Esc 关闭详情，标签只在放得下时画。
+let rendered: Awaited<ReturnType<typeof renderElement>> | undefined;
+afterEach(() => { rendered?.unmount(); rendered = undefined; });
+const nodeEl = (id: string) => document.querySelector<SVGGElement>(`[data-node-id="${id}"]`)!;
+const dimmed = (id: string) => nodeEl(id).getAttribute('data-dim') === 'true';
+
+function Harness({ laneGap }: { laneGap?: number }) {
+  const [selected, setSelected] = useState<string>();
+  return <><TopologyWorkspace topology={layoutFixture} label="夹具形态图" selectedId={selected} onSelect={setSelected} metrics={laneGap ? { ...FULL_METRICS, laneGap } : undefined}
+    detail={selected ? <aside aria-label="详情">{selected}</aside> : undefined} /><output aria-label="选中">{selected ?? ''}</output></>;
+}
+
+test('nodes render as focusable buttons; click and Enter select; selection dims non-neighbours and Esc clears it', async () => {
+  rendered = await renderElement(<Harness />, {});
+  expect(document.querySelectorAll('[role="button"][data-node-id]')).toHaveLength(5);
+  expect(document.querySelector('svg[role="group"]')?.getAttribute('aria-label')).toBe('夹具形态图');
+  expect(nodeEl('route').getAttribute('tabindex')).toBe('0');
+  await act(async () => { nodeEl('route').dispatchEvent(new MouseEvent('click', { bubbles: true })); }); await rendered.settle();
+  expect(nodeEl('route').getAttribute('aria-pressed')).toBe('true'); expect(document.querySelector('[aria-label="详情"]')?.textContent).toBe('route');
+  expect(dimmed('deploy')).toBe(false); expect(dimmed('pod')).toBe(false); expect(dimmed('ws')).toBe(true); expect(dimmed('cli')).toBe(true);
+  await act(async () => { window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })); }); await rendered.settle();
+  expect(document.querySelector('[aria-label="详情"]')).toBeNull(); expect(dimmed('ws')).toBe(false);
+  await act(async () => { nodeEl('cli').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); }); await rendered.settle();
+  expect(document.querySelector('[aria-label="选中"]')?.textContent).toBe('cli');
+  expect(nodeEl('cli').getAttribute('aria-label')).toContain('cli，等待中');
+});
+
+test('filters dim without removing, the attention chip counts abnormal nodes, and the legend counts semantics, statuses and edge evidence', async () => {
+  rendered = await renderElement(<Harness />, {});
+  await rendered.click('开发会话');
+  expect(dimmed('route')).toBe(true); expect(dimmed('ws')).toBe(false); expect(document.querySelectorAll('[data-node-id]')).toHaveLength(5);
+  await rendered.click('清除筛选'); expect(dimmed('route')).toBe(false);
+  await rendered.click('只看需要关注（1）'); expect(dimmed('ws')).toBe(true); expect(dimmed('cli')).toBe(false);
+  const legend = document.querySelector('[aria-label="图例"]')!.textContent ?? '';
+  for (const part of ['网关入口1', '服务槽2', '开发会话2', '等待中1', '运行中1', '就绪3', '实线为观测到的关系', '虚线为静态架构标注，不是实测']) expect(legend).toContain(part);
+  expect(document.querySelectorAll('[data-evidence="static"]')).toHaveLength(2);
+  expect(rendered.text()).toContain('快照完整');
+});
+
+test('edge labels are drawn only when the longest horizontal run has room for them', async () => {
+  rendered = await renderElement(<Harness />, {});
+  expect([...document.querySelectorAll('svg text')].some((n) => n.textContent === '线上流量')).toBe(false);
+  rendered.unmount(); rendered = await renderElement(<Harness laneGap={160} />, {});
+  expect([...document.querySelectorAll('svg text')].some((n) => n.textContent === '线上流量')).toBe(true);
+});
+
+test('the narrow-screen list keeps bands, semantics and status wording and toggles selection', async () => {
+  let selected: string | undefined;
+  rendered = await renderElement(<TopologyList topology={layoutFixture} selectedId="pod" onSelect={(id) => { selected = id; }} />, {});
+  const rows = [...document.querySelectorAll('button[aria-pressed]')];
+  expect(rows).toHaveLength(5); expect(rows.find((r) => r.textContent?.includes('pod'))?.getAttribute('aria-pressed')).toBe('true');
+  expect(rendered.text()).toContain('线上槽 prod · blue'); expect(rendered.text()).toContain('开发会话'); expect(rendered.text()).toContain('等待中 ⚠');
+  await act(async () => { (rows.find((r) => r.textContent?.includes('pod')) as HTMLButtonElement).click(); }); expect(selected).toBeUndefined();
+  await act(async () => { (rows.find((r) => r.textContent?.includes('cli')) as HTMLButtonElement).click(); }); expect(selected).toBe('cli');
+});

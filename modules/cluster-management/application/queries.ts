@@ -1,4 +1,4 @@
-import type { Actor, ClusterFilter, ClusterResource, ClusterSummary } from '@crewstation/contracts';
+import type { Actor, ClusterFilter, ClusterProjectCounts, ClusterResource, ClusterSummary, ProjectClusterResources } from '@crewstation/contracts';
 import { conflict, forbidden, notFound, PlatformError, validation } from '@crewstation/kernel';
 import type { InventorySnapshot } from '../domain/inventory';
 import { digest } from '../domain/projection';
@@ -17,7 +17,26 @@ export const matches = (r: ClusterResource, q: ClusterFilter): boolean =>
 export function snapshotSummary(s: InventorySnapshot, q: ClusterFilter): ClusterSummary {
   const rows = s.resources.filter((r) => matches(r, { ...q, view: undefined, kind: undefined, status: undefined, purpose: undefined })), count = (fn: (r: ClusterResource) => boolean) => rows.filter(fn).length;
   const distribution = (key: 'kind' | 'phase' | 'purpose') => rows.reduce<Record<string, number>>((acc, row) => ({ ...acc, [row[key]]: (acc[row[key]] ?? 0) + 1 }), {});
-  return { snapshotId: s.id, startedAt: s.startedAt, finishedAt: s.finishedAt, complete: completeSnapshot(s), sources: s.sources, total: rows.length, workloads: count((r) => r.view === 'workloads' && r.topLevel), pods: count((r) => r.kind === 'Pod'), runningPods: count((r) => r.kind === 'Pod' && r.phase === 'Running'), readyPods: count((r) => r.kind === 'Pod' && r.ready), standalonePods: count((r) => r.standalone), services: count((r) => r.kind === 'Service'), pvcs: count((r) => r.kind === 'PersistentVolumeClaim'), abnormal: count((r) => r.kind === 'Pod' && r.abnormal), kinds: distribution('kind'), phases: distribution('phase'), purposes: distribution('purpose'), projects: s.facts.projects.map((p) => ({ id: p.projectId, name: p.name })) };
+  return { snapshotId: s.id, startedAt: s.startedAt, finishedAt: s.finishedAt, complete: completeSnapshot(s), sources: s.sources, total: rows.length, workloads: count((r) => r.view === 'workloads' && r.topLevel), pods: count((r) => r.kind === 'Pod'), runningPods: count((r) => r.kind === 'Pod' && r.phase === 'Running'), readyPods: count((r) => r.kind === 'Pod' && r.ready), standalonePods: count((r) => r.standalone), services: count((r) => r.kind === 'Service'), pvcs: count((r) => r.kind === 'PersistentVolumeClaim'), abnormal: count((r) => r.kind === 'Pod' && r.abnormal), kinds: distribution('kind'), phases: distribution('phase'), purposes: distribution('purpose'), projects: projectCounts(s) };
+}
+/** 每项目计数（RFC-019 项目层）：只在快照完整时给数字，来源失败时整组缺席而不是 0。 */
+export function projectCounts(s: InventorySnapshot): ClusterProjectCounts[] {
+  const complete = completeSnapshot(s);
+  return s.facts.projects.map((p) => {
+    const rows = s.resources.filter((r) => r.ownership.scope === 'project' && r.ownership.projectId === p.projectId), count = (fn: (r: ClusterResource) => boolean) => rows.filter(fn).length;
+    return { id: p.projectId, name: p.name, ...(complete ? { workloads: count((r) => r.view === 'workloads' && r.topLevel), pods: count((r) => r.kind === 'Pod'), readyPods: count((r) => r.kind === 'Pod' && r.ready), abnormal: count((r) => r.kind === 'Pod' && r.abnormal), devSessions: count((r) => r.kind === 'Pod' && r.purpose === 'development-workspace') } : {}) };
+  });
+}
+const PROJECT_RESOURCE_LIMIT = 500;
+const kindRank = (r: ClusterResource): number => (r.kind === 'Pod' ? 0 : r.view === 'workloads' ? 1 : r.kind === 'PersistentVolumeClaim' ? 2 : r.kind === 'Service' ? 3 : 4);
+/** 项目成员的只读盘点：同一份快照按项目过滤，Pod 与工作负载优先保留，管理动作一律清空。 */
+export function projectResourcesIn(s: InventorySnapshot, projectId: string): ProjectClusterResources {
+  const rows = s.resources.filter((r) => r.ownership.scope === 'project' && r.ownership.projectId === projectId).sort((a, b) => kindRank(a) - kindRank(b) || `${a.kind}/${a.name}/${a.uid}`.localeCompare(`${b.kind}/${b.name}/${b.uid}`));
+  return { snapshotId: s.id, observedAt: s.finishedAt, complete: completeSnapshot(s), sources: s.sources, items: rows.slice(0, PROJECT_RESOURCE_LIMIT).map((r) => ({ ...r, availableActions: [] })), truncated: rows.length > PROJECT_RESOURCE_LIMIT };
+}
+export async function projectResources(deps: ClusterDeps, actor: Actor, projectId: string, snapshotId?: string): Promise<ProjectClusterResources> {
+  await deps.authorizeProject(actor, projectId);
+  return projectResourcesIn(await readSnapshot(deps, snapshotId), projectId);
 }
 export function pageResources(s: InventorySnapshot, q: ClusterFilter) {
   const { cursor, snapshotId: _snapshotId, limit, ...filters } = q, fingerprint = digest(filters);

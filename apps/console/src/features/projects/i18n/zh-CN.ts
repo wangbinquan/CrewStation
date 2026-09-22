@@ -393,5 +393,11 @@ export const messages = {
   "projects.members.cancel": "取消成员编辑",
   "projects.members.discardQuestion": "放弃未保存的成员设置？",
   "projects.members.discard": "放弃成员设置",
-
+  // 概览的部署与运行形态卡（RFC-019）
+  'projects.summary.topology.title': '部署与运行形态',
+  'projects.summary.topology.open': '查看完整形态 →',
+  'projects.summary.topology.counts': '工作负载 {workloads} · Pod {pods}，就绪 {ready}，运行 {running}',
+  'projects.summary.topology.attention': '{count} 个需要关注',
+  'projects.summary.topology.hint': '每张卡汇总一条横带；点击进入运行与诊断查看完整形态。',
+  'projects.summary.topology.empty': '还没有受管资源；发布或开启开发会话后会出现在这里。',
 } satisfies Messages;

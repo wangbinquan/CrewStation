@@ -1,5 +1,5 @@
 import type { ClusterCapacity, ClusterNode, ClusterNodesPage, ClusterObservationQuery, ClusterUsagePage, ClusterUsageQuery, ClusterHistory, ClusterHistoryQuery, ClusterHistoryResources, ClusterHistoryResourcesQuery } from '@crewstation/contracts';
-import type { ClusterSummary, ClusterFilter, ClusterPage, ClusterDetail, ClusterEvents, ClusterLogs, ClusterLogsQuery, ClusterInspection, ClusterInspectRequest, ClusterOperation, ClusterOperationRequest, ClusterOperationQuery } from '@crewstation/contracts';
+import type { ClusterSummary, ClusterFilter, ClusterPage, ClusterDetail, ClusterEvents, ClusterLogs, ClusterLogsQuery, ClusterInspection, ClusterInspectRequest, ClusterOperation, ClusterOperationRequest, ClusterOperationQuery, ProjectClusterResources, ProjectClusterResourcesQuery } from '@crewstation/contracts';
 import type { Transport } from '../httpTransport';
 import { segment } from '../requestUrl';
 export function clusterResource(transport: Transport) {
@@ -22,6 +22,8 @@ export function clusterResource(transport: Transport) {
     operations: (query: Partial<ClusterOperationQuery> = {}) => transport.request<{ items: ClusterOperation[] }>('GET', `${base}/operations`, { query }),
     reconcile: (id: string) => transport.request<ClusterOperation>('POST', `${base}/operations/${segment(id)}/reconcile`),
     operation: (id: string) => transport.request<ClusterOperation>('GET', `${base}/operations/${segment(id)}`),
+    /** 项目成员的只读盘点（RFC-019）：不在 admin 前缀下，按项目成员身份读同一份快照。 */
+    projectResources: (projectId: string, query: ProjectClusterResourcesQuery = {}) => transport.request<ProjectClusterResources>('GET', `/v1/projects/${segment(projectId)}/cluster-resources`, { query }),
   };
 }
 export type ClusterResourceClient = ReturnType<typeof clusterResource>;

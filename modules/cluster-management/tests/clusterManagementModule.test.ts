@@ -14,7 +14,7 @@ const k8s = createFakeK8sClient();
 beforeAll(async () => {
   if (!available) return;
   tdb = await createTestDatabase([queueMigrations, clusterManagementMigrations]);
-  module = createClusterManagementModule({ db: tdb.db, k8s, metadata: { read: async () => structuredClone(facts) }, domains: { inspect: async () => { throw new Error('unexpected domain'); }, execute: async () => { throw new Error('unexpected domain'); }, observe: async () => { throw new Error('unexpected domain'); } }, isAdmin: async (id) => id === admin.userId, systemNamespace: 'crewstation-system', catalog, instance: 'test', observationMs: 100, wait: async () => undefined });
+  module = createClusterManagementModule({ db: tdb.db, k8s, metadata: { read: async () => structuredClone(facts) }, domains: { inspect: async () => { throw new Error('unexpected domain'); }, execute: async () => { throw new Error('unexpected domain'); }, observe: async () => { throw new Error('unexpected domain'); } }, authorizeProject: async () => { throw new Error('unexpected project authorization'); }, isAdmin: async (id) => id === admin.userId, systemNamespace: 'crewstation-system', catalog, instance: 'test', observationMs: 100, wait: async () => undefined });
 });
 afterAll(async () => { await tdb?.drop(); });
 describe.skipIf(!available)('cluster-management durable module', () => {

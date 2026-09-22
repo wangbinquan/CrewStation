@@ -15,7 +15,7 @@ const input = async (selector: string, value: string) => {
 test('cluster route enforces admin guard, exposes resource and observability tabs, server totals, partial sources and snapshot pagination', async () => {
   const f = clusterFixture({ partial: true }); page = await renderApp('/admin/cluster', '/admin');
   expect(page.text()).toContain('集群管理'); expect(page.text()).toContain('符合筛选的资源：205'); expect(page.text()).toContain('部分来源缺失或过期');
-  expect([...document.querySelectorAll('[role="tab"]')].map((n) => n.textContent)).toEqual(['工作负载', 'Pod', '网络', '存储与配置', '节点', '最近 7 天趋势', '命名空间', '操作记录']);
+  expect([...document.querySelectorAll('[role="tab"]')].map((n) => n.textContent)).toEqual(['拓扑', '工作负载', 'Pod', '网络', '存储与配置', '节点', '最近 7 天趋势', '命名空间', '操作记录']);
   expect(page.text()).toContain('运行 30 · 就绪 29'); await page.click('下一页');
   expect(page.search()).toMatchObject({ snapshotId: 'snapshot-1', cursor: 'cursor-2' }); expect(f.calls.at(-1)?.query.get('cursor')).toBe('cursor-2');
   await page.back(); expect(page.search().cursor).toBeUndefined(); await page.click('cluster-demo-green');

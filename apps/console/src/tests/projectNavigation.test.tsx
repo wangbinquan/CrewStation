@@ -245,18 +245,19 @@ describe('诊断、订阅与配置的上下文', () => {
 });
 
 test.each([
-  { from: 'logs', to: 'deliveries', start: 2, end: 3, key: 'ArrowRight', before: 0, after: 70 },
-  { from: 'trace', to: 'health', start: 4, end: 0, key: 'Home', before: 178, after: 0 },
-  { from: 'health', to: 'trace', start: 0, end: 4, key: 'End', before: 0, after: 178 },
-  { from: 'health', to: 'trace', start: 0, end: 4, key: 'ArrowLeft', before: 0, after: 178 },
-  { from: 'trace', to: 'health', start: 4, end: 0, key: 'ArrowRight', before: 178, after: 0 },
+  // 2026-09-22 RFC-019 在健康之后加了「部署与运行形态」页签，页签索引与量测值随之变成六个。
+  { from: 'logs', to: 'deliveries', start: 3, end: 4, key: 'ArrowRight', before: 0, after: 192 },
+  { from: 'health', to: 'trace', start: 0, end: 5, key: 'ArrowLeft', before: 0, after: 300 },
+  { from: 'trace', to: 'health', start: 5, end: 0, key: 'Home', before: 300, after: 0 },
+  { from: 'health', to: 'trace', start: 0, end: 5, key: 'End', before: 0, after: 300 },
+  { from: 'trace', to: 'health', start: 5, end: 0, key: 'ArrowRight', before: 300, after: 0 },
 ])('窄屏键盘 $key / $from → $to 保留焦点滚动', async ({ from, to, start, end, key, before, after }) => {
   fixture(); page = await renderApp(`/projects/${projectId}/operations?tab=${from}`, undefined, undefined, { scrollRestoration: true });
   const list = document.querySelector<HTMLElement>('[role="tablist"][aria-label="运行与诊断"]')!;
   const tabs = [...list.querySelectorAll<HTMLButtonElement>('[role="tab"]')];
   const source = tabs[start]!, target = tabs[end]!;
   // 实机 320px 的标签条 [16, 304]；Happy DOM 没有布局，只注入这些量测值。
-  const offsets = [0, 94, 202, 268, 362], widths = [90, 104, 62, 90, 104];
+  const offsets = [0, 94, 216, 324, 390, 484], widths = [90, 118, 104, 62, 90, 104];
   Object.defineProperty(list, 'clientWidth', { value: 288 });
   list.getBoundingClientRect = () => new DOMRect(16, 0, 288, 42);
   tabs.forEach((tab, index) => { tab.getBoundingClientRect = () => new DOMRect(16 + offsets[index]! - list.scrollLeft, 0, widths[index]!, 34); });

@@ -394,5 +394,11 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   "projects.members.cancel": "Cancel member editing",
   "projects.members.discardQuestion": "Discard unsaved member changes?",
   "projects.members.discard": "Discard member changes",
-
+  // Deployment topology card on the overview (RFC-019)
+  'projects.summary.topology.title': 'Deployment topology',
+  'projects.summary.topology.open': 'Open the full topology →',
+  'projects.summary.topology.counts': 'Workloads {workloads} · Pods {pods}, {ready} ready, {running} running',
+  'projects.summary.topology.attention': '{count} need attention',
+  'projects.summary.topology.hint': 'Each card summarises one band; click to open the full topology under Operations.',
+  'projects.summary.topology.empty': 'No managed resources yet; they appear here after a release or a development session.',
 };

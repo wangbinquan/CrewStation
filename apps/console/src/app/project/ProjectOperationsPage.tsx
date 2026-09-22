@@ -1,6 +1,6 @@
 import { Link, useNavigate, useSearch } from '@tanstack/react-router';
 import { DeliveriesCard } from '../../features/events';
-import { AlertsPage, HealthCards, LogsPage, TracePage } from '../../features/logs';
+import { AlertsPage, HealthCards, LogsPage, TopologyPage, TracePage } from '../../features/logs';
 import { useT } from '../../shared/lib/useT';
 import { PROJECT_PATHS } from '../../shared/project/projectPaths';
 import { useProjectScope } from '../../shared/project/ProjectScope';
@@ -18,6 +18,7 @@ export function ProjectOperationsPage() {
     <PageHeader title={t('nav.operations')} />
     <Tabs label={t('nav.operations')} value={tab} items={OPERATIONS_TABS.map((value) => ({ value, label: t(`operations.tab.${value}`) }))} onChange={(value) => change({ tab: OPERATIONS_TABS.find((item) => item === value) })}>
       {tab === 'health' ? <HealthCards key={projectId} projectId={projectId} onLogs={(slot) => change({ tab: 'logs', source: 'slot', slot })} /> : null}
+      {tab === 'topology' ? <TopologyPage key={projectId} projectId={projectId} onLogs={(next) => change({ ...next, tab: 'logs' })} /> : null}
       {tab === 'logs' ? <LogsPage key={projectId} filters={search} changeFilters={(next) => change({ ...next, tab: 'logs' }, true)} /> : null}
       {tab === 'alerts' ? <AlertsPage key={projectId} projectId={projectId} search={search} change={change} onLogs={(slot) => change({ tab: 'logs', source: 'slot', slot })} /> : null}
       {tab === 'trace' ? <TracePage key={`${projectId}:${search.traceId ?? ''}`} projectId={projectId} traceId={search.traceId} onTrace={(traceId) => change({ tab: 'trace', traceId })} /> : null}

@@ -1,6 +1,6 @@
 # RFC-019｜部署与运行形态图
 
-> 状态：Draft · 2026-09-22 · 三件套待作者批准；交互设计稿已评审两轮，见 [prototype-review.md](./prototype-review.md)
+> 状态：In Progress · 2026-09-22 · 作者批准三件套并裁定 §7；T1–T8、T10 完成，T9 实机验收部分完成（见 [acceptance.md](./acceptance.md)）；交互设计稿评审见 [prototype-review.md](./prototype-review.md)
 > 日期：2026-09-22
 > 配套：[技术设计](./design.md) · [实施计划](./plan.md) · [交互设计稿核对](./prototype-review.md)
 
@@ -116,3 +116,5 @@
 **项目成员看 Pod 级信息的边界。** 建议：项目成员看到的 Pod 事实与管理员在集群管理里看到的同一投影（名称、用途、状态与原因、重启、创建时间、节点名、镜像、容器状态、上级任务／Agent／终端 id、发布与槽），
 **不含**环境变量值、Secret、完整注解、原始 YAML（RFC-010 的投影本来就不含），并且 `availableActions` 恒为空；事件、日志、管理动作仍只在集群管理里给管理员。
 作者若认为节点名或镜像不该给项目成员，请指出，实施时按裁定裁剪。
+
+**作者 2026-09-22 裁定：按建议实施**（「按你的建议来做，批准」）。实施结果：成员经 `GET /v1/projects/{projectId}/cluster-resources` 拿到 RFC-010 同一份投影（须有该项目的 `develop` 授权），`availableActions` 恒为空；成员详情里的「查看日志」进本项目日志页，Kubernetes 事件与管理动作仍只在集群管理。

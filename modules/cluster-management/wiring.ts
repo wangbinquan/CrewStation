@@ -1,5 +1,5 @@
 import { join } from 'node:path';
-import type { UserId } from '@crewstation/contracts';
+import type { Actor, UserId } from '@crewstation/contracts';
 import type { K8sClient } from '@crewstation/k8s';
 import type { Clock, Logger } from '@crewstation/kernel';
 import { noopLogger, systemClock } from '@crewstation/kernel';
@@ -22,7 +22,7 @@ import { metricsExporter, metricsRoutes } from './http/metricsRoutes';
 import { measureStorageTargets } from './adapters/http/storageProbe';
 import { metricsWorkers } from './workers/metricsWorker';
 import type { MetricsOptions } from './ports/metrics';
-export interface ClusterManagementModuleDeps { metrics?: MetricsOptions; resolveReleaseId?: (legacy: string) => Promise<string | undefined>; physicalOperationId?: (id: string) => Promise<string>; db: Database; k8s: K8sClient; metadata: ClusterMetadata; domains: DomainOperations; isAdmin(id: UserId): Promise<boolean>; systemNamespace: string; catalog: SystemComponent[]; instance: string; logger?: Logger; clock?: Clock; wait?: (ms: number) => Promise<void>; observationMs?: number }
+export interface ClusterManagementModuleDeps { metrics?: MetricsOptions; resolveReleaseId?: (legacy: string) => Promise<string | undefined>; physicalOperationId?: (id: string) => Promise<string>; db: Database; k8s: K8sClient; metadata: ClusterMetadata; domains: DomainOperations; isAdmin(id: UserId): Promise<boolean>; authorizeProject(actor: Actor, projectId: string): Promise<void>; systemNamespace: string; catalog: SystemComponent[]; instance: string; logger?: Logger; clock?: Clock; wait?: (ms: number) => Promise<void>; observationMs?: number }
 export const clusterManagementMigrations: MigrationSet = { module: 'cluster-management', layer: 6, files: readMigrationDir(join(import.meta.dir, 'adapters/persistence/migrations')) };
 export function createClusterManagementModule(input: ClusterManagementModuleDeps) {
   const repository = drizzleClusterRepository(input.db), logger = input.logger ?? noopLogger;
