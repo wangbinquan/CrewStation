@@ -18,7 +18,8 @@
 ## 决策
 
 1. **删除 `modules/egress` 整个目录**，包括 `api/ domain/ application/ ports/ adapters/ http/ workers/ tests/`、`wiring.ts`、`index.ts`、`package.json` 与 `README.md`。
-2. **删除依赖边**：`modules/platform` 与 `modules/task-runtime` 的 `package.json` 去掉 `@crewstation/module-egress`。
+2. **删除依赖边**：`modules/platform` 与 `modules/task-runtime` 的 `package.json` 去掉 `@crewstation/module-egress`，
+   然后**跑一次 `bun install` 并提交 `bun.lock`**——锁文件仍记着这个工作区包，CI 的 `--frozen-lockfile` 会在装依赖这一步让所有作业失败。
    `task-runtime` 的这条依赖在代码里从未使用，删除不影响其行为；仓库结构 §5 的模块清单与分层图同步去掉该模块。
 3. **迁移锁按例外路径处理**：`testing.md` §7 规定已入锁的迁移不可删除，这是为了防止有人改写历史迁移。
    模块整体退役是该规则预留的手工例外，因此手工编辑 `tools/arch/migrations.lock.json` 删除四条 `modules/egress/...` 条目，
@@ -30,7 +31,7 @@
 
 ## 后果
 
-- 模块总数从 19 降到 18；L3 少一个模块，`task-runtime` 的依赖从五个降到四个。
+- 模块总数从 20 降到 19；L3 少一个模块，`task-runtime` 的依赖从五个降到四个。
 - `platform_infra.migrations` 与磁盘迁移文件重新一一对应，`modules/platform/tests/migrationCoverage.test.ts` 继续以锁文件为准。
 - 退役后若需回退平台版本，旧版本会重新应用四个迁移并重建空表；功能数据不会回来，回退前须从备份恢复。这一点写进 RFC-018 的失败模式表。
 - 本仓首次出现「删除一个已上线模块」，流程由本 ADR 固定：ADR 记结构后果、RFC 记产品影响、锁文件手工退出并在提交说明留痕、数据清理有备份与复查。

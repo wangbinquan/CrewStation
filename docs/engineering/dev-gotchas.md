@@ -24,6 +24,15 @@
 `typescript-eslint@8.70` 遇到 TypeScript 7 直接报 `does not support TS 7.0` 并整轮 lint 红。
 根 `package.json` 的 `typescript` 锁 `6`，升级前先确认 typescript-eslint 的支持矩阵。
 
+### 删掉一个工作区包之后，本机照绿而 CI 在装依赖这一步就全红
+
+`bun.lock` 记着每个工作区包。删模块时改完 `package.json` 的依赖行还不够——**必须再跑一次 `bun install` 并把锁文件一起提交**。
+本机的 `bun install` 会顺手修好锁文件，所以本地门禁一路绿；CI 的 setup 用的是 `bun install --frozen-lockfile`，
+于是停在 `error: lockfile had changes, but lockfile is frozen`，**五个作业一个不剩全红**，而日志里看不到任何跟你改动有关的字样。
+
+看到「全部作业都失败」先去看最早那个作业的 setup 步骤，不要从用例错误往回找。
+本机要复现只需带上同一个开关：`bun install --frozen-lockfile`。2026-09-22 RFC-018 删 `modules/egress` 时实撞。
+
 ### `bun install --production=false` 不是合法参数
 
 控制面镜像最初写了这一条，构建当场 `exit code 1`。Bun 没有这个开关，装全量依赖就是**不带任何参数**的 `bun install`。
