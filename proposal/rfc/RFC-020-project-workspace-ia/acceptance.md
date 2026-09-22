@@ -46,4 +46,4 @@ console 镜像 `cs-console:rfc020-20260923b`（节点导入 manifest `sha256:d5f
 - `bun run check:static` 绿（arch:check 无违规、eslint、两份 tsc）。
 - `CS_E2E_AUTH=dev-oidc CS_E2E_USERNAME=dev-admin bun run test:cover`：**2152 pass／9 skip／0 fail**，13647 assertions，365 个文件，337.8 s；其中 e2e 全套通过（首轮 69 pass 时新增文件 3 条红，修正概览并排与两处断言后该文件 8/8 通过）。
 - `bun run test:patch --base origin/main`：本批改动没有触及需要用例防护的生产源码（前四批各自经 CI `gate` 的新增代码防护）。
-- 按精确 SHA 的 CI：T5／T6 `b8b64e2` 六项成功（run 35768120059）；T7 `8448a29` 的 `module` 作业红在 `session module > hello 之后紧跟的事件帧不会被当成第二个 hello`（后端会话模块，本 RFC 未触及，`delete session.connections` 查询失败的库竞态），T8 `f1a19bc` 同一后端六项成功（run 35769593471）；本批（验收提交）的 CI 结论记在 STATE.md。
+- 按精确 SHA 的 CI：T5／T6 `b8b64e2` 六项成功（run 35768120059）；T7 `8448a29` 的 `module` 作业红在 `session module > hello 之后紧跟的事件帧不会被当成第二个 hello`（后端会话模块，本 RFC 未触及，`delete session.connections` 查询失败的库竞态），T8 `f1a19bc` 同一后端六项成功（run 35769593471）；验收批 `3b7ec74` 六项全部成功（run 35771402142）。

@@ -23,7 +23,7 @@
 
 **行为变化，作者看实机时注意**：开发工作区按任务重建（`key=taskId`），会话被替换时参考面板里的试调／Swagger 输入随之清空，旧输入不可能发到新会话。1024 视口的内容区是 792px，按设计阈值只有放大形态。
 
-本机 console 已部署 `cs-console:rfc020-20260923b` 并 Ready。本机 `check:static` 绿；`CS_E2E_AUTH=dev-oidc CS_E2E_USERNAME=dev-admin bun run test:cover` **2152 pass／9 skip／0 fail**（365 个文件，含 e2e 全套与新增 8 条）；`test:patch --base origin/main` 判定本批无需用例防护的新增生产代码。CI：T5／T6 `b8b64e2` 六项成功（35768120059）；T7 `8448a29` 的 `module` 作业红在后端 `session module` 的一条库竞态用例（本 RFC 未触及后端），T8 `f1a19bc` 同一后端六项成功（35769593471）；本批推送后的 CI 见下一条记录。
+本机 console 已部署 `cs-console:rfc020-20260923b` 并 Ready。本机 `check:static` 绿；`CS_E2E_AUTH=dev-oidc CS_E2E_USERNAME=dev-admin bun run test:cover` **2152 pass／9 skip／0 fail**（365 个文件，含 e2e 全套与新增 8 条）；`test:patch --base origin/main` 判定本批无需用例防护的新增生产代码。CI：T5／T6 `b8b64e2` 六项成功（35768120059）；T7 `8448a29` 的 `module` 作业红在后端 `session module` 的一条库竞态用例（本 RFC 未触及后端），T8 `f1a19bc` 同一后端六项成功（35769593471）；验收批 `3b7ec74` 六项全部成功（[CI 35771402142](https://github.com/wangbinquan/CrewStation/actions/runs/35771402142)，含 `gate` 新增代码防护与 `e2e`）。
 
 **下一个 session 注意**：作者尚未亲手看实机，T2 裁定里的形态以本机 `cs-console:rfc020-20260923b` 为准；概览形态卡与最近动态并排是实测后的偏差（设计稿叠放），作者不认可就改回并收窄两卡。`e2e/capabilityDepth` 等断言已按新结构改写，回退任何一批都要连用例一起退。
 
