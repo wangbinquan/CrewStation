@@ -81,6 +81,6 @@ bun run proposal/rfc/RFC-019-deployment-topology/prototype/preview.ts --serve
 3. **项目成员看 Pod 级信息的边界。** 附件按 Q6 推荐给出镜像、节点名、容器状态，不含环境变量；实现时需要新的项目范围只读接口（同一份快照按项目过滤）。
 4. **语义色是否进 `tokens.css`。** 附件把九组 `--topo-*` 放在 `prototype.css`；实现时建议进 tokens.css 作为正式令牌，其余样式进组件的 CSS module。
 5. **Archify 对照图的去留。** 若你觉得静态架构图有价值，可作为集群页「系统架构」的静态附件定期重生成；否则只作本次对照，不入库。
-6. **1200px 内容上限是否全局去掉。** 你已裁定形态页面用满宽度；生产外壳的 `--cs-content-max-width` 目前对除开发页外的所有页面生效。只给运行与诊断、集群管理、项目概览去掉，还是所有页面一起去掉？
+6. **1200px 内容上限是否全局去掉。** 你已裁定形态页面用满宽度；生产外壳的 `--cs-content-max-width` 目前对除开发页外的所有页面生效。只给运行与诊断、集群管理、项目概览去掉，还是所有页面一起去掉？**作者答复（2026-09-22）：全部页面一起去掉。** 已直接改生产：`AppShell.module.css` 的 `.content` 去掉 `max-width`，`tokens.css` 删除 `--cs-content-max-width`，`projectNavigation.test.tsx` 加回归，RFC-003 §6 回填。
 
 作者看过后：批准则写三件套并按 development-rules §5 走实施；要改则在本稿上继续改。

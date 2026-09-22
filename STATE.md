@@ -21,7 +21,11 @@
 
 作者看过第一版后裁定「界面宽度需要用满」：原型已改为形态图随容器铺满（节点撑宽、1:1 不缩放）、项目层列数随宽度 2–8 列、概览缩略改为一行横带汇总卡；实施时生产外壳的 `--cs-content-max-width: 1200px` 至少对这三处页面去掉，是否全局去掉待作者答复。
 
-**下一步**：等作者看过原型并回复 prototype-review.md §5 的六个取舍，再写三件套（development-rules §5），批准后实施。实现要点：项目成员需要新的项目范围只读盘点接口（同一份 RFC-010 快照按项目过滤，走成员校验）；`--topo-*` 语义色进 tokens.css；组件放 `apps/console/src/shared/ui/`。
+作者随后裁定「全部页面一起去掉 1200px 上限」，按小型界面调整直接改生产并回填：`AppShell.module.css` 的 `.content` 去掉 `max-width`（只留 `min-width: 0`），`tokens.css` 删除 `--cs-content-max-width`，`projectNavigation.test.tsx` 新增回归（令牌不得再出现、外壳不得再写 max-width 声明），RFC-003 设计 §6 追加 2026-09-22 裁定。
+完整 `bun run check`（带本机测试库与 dev-admin 登录）**2070 pass／8 skip／1 fail**：唯一失败是 `releaseDelivery.test.tsx`「其他发布进行中保留当前部署信息并阻止切换」，未改动的文件，单跑三次 10／10 通过，记为该文件既有 flake（STATE 此前已记同文件另一条）；随后 `test:cover` 全绿 **2071 pass／8 skip／0 fail**，`test:patch --base origin/main` 判定本次没有需要用例防护的生产源码（CSS 与用例）。
+本机 console 已部署 `cs-console:fullwidth-20260922`（`sha256:2e52b750…`），部署后 e2e 层 **53 pass／1 skip／0 fail**；真实 dev-admin 浏览器：1728px 视口下 `main` 1728px、内容区 1680px、`max-width: none`、无横向溢出。
+
+**下一步**：等作者看过原型并回复 prototype-review.md §5 的其余五个取舍，再写三件套（development-rules §5），批准后实施。实现要点：项目成员需要新的项目范围只读盘点接口（同一份 RFC-010 快照按项目过滤，走成员校验）；`--topo-*` 语义色进 tokens.css；组件放 `apps/console/src/shared/ui/`。
 
 ## I23 已裁定并执行：两个内置接入项目的 manifest 迁到 v2（2026-09-22）
 

@@ -4,7 +4,7 @@ import { act } from 'react';
 import { parseOperationsSearch } from '../shared/project/operationsSearch';
 import { parseSettingsSearch } from '../shared/project/settingsSearch';
 import { renderApp } from './renderApp';
-import { consoleStyles } from './sourceScan';
+import { consoleStyles, sourceAt } from './sourceScan';
 
 const originalFetch = globalThis.fetch;
 const projectId = '01a0bf5d-8f4b-7e1e-8dde-c9c2ae13ed34', serviceId = '01a0bf5d-8f4b-760b-86b6-0bb9f08a9eaa', taskId = '01a0bf5d-8f4b-7e52-8b45-4a547fd10e4f', releaseId = '01a0bf5d-8f4b-762d-81e1-f95f4dd57c2d', traceId = 'e'.repeat(32);
@@ -99,6 +99,13 @@ describe('六个项目入口与旧链接兼容', () => {
     expect(shell()).toBe(other);
     // 宽度只能有一个来源：任何页面级改写都会让这条红，而不是等实机看出来。
     expect(consoleStyles().filter((file) => /--cs-nav-width\s*:/.test(file.code)).map((file) => file.path)).toEqual(['app/theme/tokens.css']);
+  });
+
+  test('内容区没有最大宽度：全部页面随窗口铺满', () => {
+    // 2026-09-22 作者裁定全部页面去掉 1200px 上限（RFC-019 原型评审时提出，回填 RFC-003 §6）：令牌不能再出现，外壳的 .content 也不能再写 max-width 声明。
+    const styles = consoleStyles();
+    expect(styles.filter((file) => /--cs-content-max-width/.test(file.code)).map((file) => file.path)).toEqual([]);
+    expect(/^\s*max-width\s*:/m.test(sourceAt(styles, 'app/layout/AppShell.module.css').code)).toBe(false);
   });
 
   test('旧日志深链接 replace，完整发布与时间条件实际进入接口；返回回到旧链接之前', async () => {
