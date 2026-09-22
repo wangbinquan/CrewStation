@@ -29,7 +29,8 @@ spec:
             - { name: CS_CONSOLE_ORIGIN, value: "http://console.cs.localhost" }
             - { name: CS_PLATFORM_ORIGIN, value: "http://traefik.crewstation-system.svc.cluster.local" }
             - { name: CS_PLATFORM_HOST, value: "console.cs.localhost" }
-          readinessProbe: { httpGet: { path: /readyz, port: 7460 }, periodSeconds: 2, failureThreshold: 90 }
+          # 就绪只等 IdP 端口起来，不等角色播种（播种状态看 / 与 /status.json）。
+          readinessProbe: { httpGet: { path: /readyz, port: 7460 }, periodSeconds: 2, failureThreshold: 15 }
           livenessProbe: { httpGet: { path: /healthz, port: 7460 }, periodSeconds: 15, initialDelaySeconds: 5 }
           resources: { requests: { cpu: 20m, memory: 64Mi }, limits: { cpu: "250m", memory: 256Mi } }
 ---
@@ -39,9 +40,8 @@ metadata:
   name: crewstation-dev-auth
   namespace: crewstation-system
 spec:
-  # readiness 代表真实 OIDC 播种完成；播种期间 cs-auth 已需要回调这里取 discovery／token，
-  # 因而 Service 必须先把尚未 Ready 的唯一 Pod 发布出来，避免 readiness 自锁。
-  publishNotReadyAddresses: true
+  # 不再用 publishNotReadyAddresses 防自锁：它在 Traefik 3.7 上本就不管用（EndpointSlice 按 `serving`
+  # 过滤，而该字段只抬 `ready`）。现在改由 /readyz 保证：它只看端口，播种失败也是 Ready。
   selector: { app.kubernetes.io/name: crewstation-dev-auth }
   ports: [{ name: http, port: 7460, targetPort: 7460 }]
 ---

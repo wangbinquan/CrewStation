@@ -1,10 +1,10 @@
-import { describe, expect, test } from 'bun:test';
+import { describe, expect, spyOn, test } from 'bun:test';
 import { createHash, randomBytes } from 'node:crypto';
 import { importJWK, jwtVerify } from 'jose';
 import { DEV_ROLES, findDevRole } from './roles';
 import { createDevOidc } from './oidc';
 import { renderDevAuthPage } from './page';
-import { safeReturnTo, selectableProjects } from './server';
+import { devAuthOidcIdentity, safeReturnTo, selectableProjects, startDevAuthServer } from './server';
 
 describe('开发角色', () => {
   test('映射 CrewStation 的四个安全视角，不包含会转移所有权的 owner', () => {
@@ -131,8 +131,118 @@ test('生产源码不包含开发 Provider 或固定账号', async () => {
   expect(violations).toEqual([]);
 });
 
-test('本机 Service 在 readiness 前发布 dev-auth，避免 discovery 播种自锁', async () => {
+test('本机清单不再拿 publishNotReadyAddresses 防自锁，就绪只看端口', async () => {
   const manifest = await Bun.file('deploy/local/dev-auth.yaml').text();
-  expect(manifest).toContain('publishNotReadyAddresses: true');
   expect(manifest).toContain('path: /readyz');
+  // 注释里还会提到它（记录为什么拿掉），所以只看字段本身在不在。
+  expect(manifest).not.toMatch(/^\s*publishNotReadyAddresses:/m);
+});
+
+describe('开发 IdP 的身份要能跨重启不变', () => {
+  const restoreEnv = (): void => {
+    delete process.env.CS_DEV_AUTH_ROUTE_ID;
+    delete process.env.CS_DEV_AUTH_CLIENT_SECRET;
+  };
+
+  test('配齐就用固定前缀与口令，平台里那条 Provider 才能活过重启', () => {
+    restoreEnv();
+    expect(devAuthOidcIdentity({ routeId: 'abc12345', clientSecret: 'fixed-client-secret' }))
+      .toEqual({ routePrefix: '/oidc/abc12345', clientSecret: 'fixed-client-secret' });
+  });
+
+  test('没配就退回临时值，并把「重启后要重新注册」说出来', () => {
+    restoreEnv();
+    const warn = spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const first = devAuthOidcIdentity();
+      const second = devAuthOidcIdentity();
+      expect(first.routePrefix).toMatch(/^\/oidc\/[0-9a-f]{12}$/);
+      expect(second.routePrefix).not.toBe(first.routePrefix);
+      expect(warn.mock.calls.flat().join(' ')).toContain('CS_DEV_AUTH_ROUTE_ID');
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  test('前缀只收小写字母数字，挡住能改路由形状的取值', () => {
+    restoreEnv();
+    for (const routeId of ['short', 'UPPERCASE1', 'has-dash-1', '../escape', 'a'.repeat(65)]) {
+      expect(() => devAuthOidcIdentity({ routeId, clientSecret: 's' })).toThrow('CS_DEV_AUTH_ROUTE_ID');
+    }
+  });
+});
+
+test('播种失败不再拖垮 IdP：端口就绪，discovery 仍在固定前缀上应答', async () => {
+  const server = await startDevAuthServer({
+    port: 0, routeId: 'fixedroute01', clientSecret: 'fixed-client-secret',
+    // 127.0.0.1:1 必定拒绝连接，等价于本机那次「密码登录关了，播种进不去」。
+    platformOrigin: 'http://127.0.0.1:1', adminUsername: 'dev-admin', adminPassword: 'not-used',
+    publicOrigin: 'http://dev-auth.test', internalOrigin: 'http://dev-auth.internal:7460', consoleOrigin: 'http://console.test',
+    seedRetries: 0,
+  });
+  try {
+    const base = `http://127.0.0.1:${server.port}`;
+    expect(server.routePrefix).toBe('/oidc/fixedroute01');
+    expect((await fetch(`${base}/readyz`)).status).toBe(200);
+    const discovery = await fetch(`${base}/oidc/fixedroute01/.well-known/openid-configuration`);
+    expect(discovery.status).toBe(200);
+    expect(await discovery.json()).toMatchObject({
+      issuer: 'http://dev-auth.internal:7460/oidc/fixedroute01',
+      authorization_endpoint: 'http://dev-auth.test/oidc/fixedroute01/authorize',
+      jwks_uri: 'http://dev-auth.internal:7460/oidc/fixedroute01/jwks.json',
+    });
+
+    let state: { status: string; error?: string } = { status: 'pending' };
+    for (let attempt = 0; attempt < 200 && state.status !== 'error'; attempt += 1) {
+      state = await (await fetch(`${base}/status.json`)).json() as typeof state;
+      if (state.status !== 'error') await Bun.sleep(25);
+    }
+    expect(state.status).toBe('error');
+    expect((await fetch(`${base}/readyz`)).status).toBe(200);
+    expect(await (await fetch(`${base}/`)).text()).toContain('准备失败');
+  } finally {
+    server.stop();
+  }
+});
+
+test('安装脚本沿用已有前缀与口令，并单独核对播种结果', async () => {
+  const script = await Bun.file('deploy/local/install-dev-auth.sh').text();
+  for (const key of ['CS_DEV_AUTH_ROUTE_ID', 'CS_DEV_AUTH_CLIENT_SECRET']) {
+    expect(script).toContain(`jsonpath='{.data.${key}}'`);
+    expect(script).toContain(`--from-literal=${key}=`);
+  }
+  expect(script).toContain('/status.json');
+});
+
+test('播种撞上平台缓存时自动重试，重试用尽才判失败', async () => {
+  const hits: string[] = [];
+  const platform = Bun.serve({ port: 0, hostname: '127.0.0.1', fetch: (request) => {
+    hits.push(new URL(request.url).pathname);
+    return Response.json({ message: '用户名密码登录已被管理员关闭' }, { status: 403 });
+  } });
+  const logged = spyOn(console, 'error').mockImplementation(() => {});
+  const server = await startDevAuthServer({
+    port: 0, routeId: 'retryroute01', clientSecret: 'fixed-client-secret',
+    platformOrigin: `http://127.0.0.1:${platform.port}`, adminUsername: 'dev-admin', adminPassword: 'not-used',
+    consoleOrigin: 'http://console.test', seedRetries: 2, seedRetryDelayMs: 10,
+  });
+  try {
+    const base = `http://127.0.0.1:${server.port}`;
+    let state: { status: string } = { status: 'pending' };
+    for (let attempt = 0; attempt < 200 && state.status !== 'error'; attempt += 1) {
+      state = await (await fetch(`${base}/status.json`)).json() as typeof state;
+      if (state.status !== 'error') await Bun.sleep(25);
+    }
+    expect(state.status).toBe('error');
+    // 首轮＋两次重试，每轮都从管理员登录重新开始。
+    expect(hits.filter((path) => path === '/auth/login')).toHaveLength(3);
+    expect((await fetch(`${base}/readyz`)).status).toBe(200);
+    const said = logged.mock.calls.flat().join(' ');
+    expect(said).toContain('稍后重试');
+    expect(said).toContain('不再重试');
+  } finally {
+    logged.mockRestore();
+    server.stop();
+    platform.stop(true);
+  }
 });

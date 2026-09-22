@@ -7,6 +7,33 @@
 
 基线三件套（v0.3.3）的第一轮实现已在本机 kind 集群上跑通并推上 main；**RFC-001（算力归平台）与 RFC-002（管理空间与租户空间分离）已实现、实跑确认并推上 main；RFC-004 已被 RFC-006 取代（Superseded）；RFC-006（算力档位合并运行环境、每个 Agent 一个 Pod）已实现、实机验收完毕并推上 main，已 Done（P1–P8、ADR-0005 与 I17–I19 待作者复核）；RFC-003 工作台已按设计附件完成并整体部署到本机，52／52 项 UX-AT 全部实机通过、本地 gate 与精确 SHA CI 通过，已 Done；RFC-005（OIDC／OAuth 2.0 公司登录）代码、测试与 OA-01…OA-31 实机验收全部完成，已 Done；RFC-007（开发环境 OAuth 2.0 一键换角色）代码、四角色 Chrome 实机验收、本地 gate 与精确 SHA CI 全部完成，已 Done**。
 
+## 本机 OAuth 2.0 跳转登录修复：开发登录器不再反过来依赖平台登录（2026-09-22）
+
+作者问「为什么本机 oauth 2.0 的跳转登陆坏了」，查清后答复「修」，并在破窗口那一步答复「你来跑」。**登录已完全恢复，根因已治本。**
+
+**根因不是一条，是三条耦合在一起。** `crewstation-dev-auth` 跑 `cs-control-plane` 同一个镜像，RFC-019 按标签批量滚镜像时把它一起滚了；随后：
+
+1. 它启动要先用管理员**密码**登录平台播种，而库内策略自 2026-09-20 起关闭密码登录 → `403 /auth/login`；
+2. `routePrefix` 与 client secret **每次进程启动现摇**，写回平台的 `ensureProvider` 排在密码登录之后 → 库里 `identity.oidc_providers` 那条 `dev-roles` 的 `issuer_url` 停在已死 Pod 的 `…/oidc/ed6450578657`（`updated_at` 2026-09-21 04:42），`/auth/oidc/dev-roles/start` 返回 503 `endpoints-unresolved`（新 Pod 内实测该前缀 404）；
+3. `/readyz` 绑在播种结果上 → Pod 0/1。
+
+第 3 条另带一坑：清单里 `publishNotReadyAddresses: true`（注释写着防 readiness 自锁）**在 Traefik 3.7 上本就不管用**——它只抬 EndpointSlice 的 `ready`，`serving` 仍为 false，而 Traefik 按 `serving` 过滤，日志 `no servers found for crewstation-system/crewstation-dev-auth`，整条 router 被丢，`dev-auth.cs.localhost` 是 **404 而不是 503**，连带那个「重新准备」按钮的页面都打不开。
+
+**改了什么**（只动本机开发工具与部署清单，产品代码未动）：
+
+- `tools/dev-auth/server.ts`：新增 `devAuthOidcIdentity()`，前缀与 client secret 改从 `CS_DEV_AUTH_ROUTE_ID`／`CS_DEV_AUTH_CLIENT_SECRET` 取，没配才退回临时值**并打降级日志**；`/readyz` 只看端口，播种状态移到 `/` 与 `/status.json`；播种失败自动重试 5 轮（`SEED_RETRIES`／`SEED_RETRY_DELAY_MS`，可注入）。
+- `deploy/local/dev-auth.yaml`：删掉 `publishNotReadyAddresses`，`failureThreshold` 90→15。
+- `deploy/local/install-dev-auth.sh`：那两个值一次生成、跨重装沿用（先读旧 Secret）；rollout 之后**单独**核对 `/status.json` 的播种结果，失败如实报原因并退出 1。
+- `tools/dev-auth/devAuth.test.ts` +6 条；`docs/engineering/dev-gotchas.md` 原条目重写。
+
+**重试是实机新发现的第二个竞态**：前缀固定之后 issuer 不再变，cs-auth 的 Provider／JWKS 缓存因此会**活过 dev-auth 重启**，而新进程换了签名 `kid` → 首轮播种撞 `/start` 503（旧 issuer）或 `/callback` 400（旧公钥），几十秒后自行收敛。实测同一 Pod 重放播种即 `ready`／8 个项目。
+
+**破窗口与恢复（作者两次明确授权，窗口已收回）**：`CS_PASSWORD_LOGIN=force-on` 加到 cs-auth 与 cs-api → 跑改过的 `install-dev-auth.sh`（生成并固定 `8899cb0ced2d0765`，重新注册 Provider）→ 移除开关重启两个服务。核对：`/auth/status` 回到 `passwordLoginEnabled:false`，两个 Deployment 的 `CS_PASSWORD_LOGIN` 已移除。用的是 Secret 里那份管理员口令——`.local/admin.env`（9月18）那份指纹不同，可能已过期。
+
+**实机证据**：Pod 1/1（播种失败也 Ready）、EndpointSlice `serving:true`、`publishNotReadyAddresses` 已空、`dev-auth.cs.localhost` 404→**200**；密码登录关闭下手工走完整跳转链 `/start`→302→`/authorize`→302→`/callback`→302，`/v1/me` 分别拿到 `dev-admin`（admin）与 `dev-developer`（developer）。**回归本身**：`rollout restart` 一次 dev-auth，**+3s 登录链即回到 302，全程没开密码登录**；日志无「未配置」警告、五轮重试如实记账。
+
+**仍然如此、不要误读**：密码登录关闭时播种必然失败，所以 dev-auth 页的「一键换角色／同步项目」保持不可用（登录本身不受影响，公司身份入口的角色选择页由 IdP 自己渲染，四个角色都能进）。**要让它也自足**，得让 `seed()` 先用自己的 OIDC 拿 `dev-role-admin` 会话、只在首次注册时回落密码——那动 RFC-007 的落地方式，算设计，未做，等作者裁。另：换掉那两个 Secret 字段等于作废库里的 Provider。
+
 ## RFC-019 部署与运行形态图：Done（2026-09-22）
 
 作者批准三件套并裁定提案 §7（成员看到与管理员相同的 Pod 投影，不含环境变量值／Secret／注解／YAML；管理动作只在集群管理）。T1–T10 全部做完：

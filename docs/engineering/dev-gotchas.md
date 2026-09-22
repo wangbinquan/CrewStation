@@ -171,13 +171,28 @@ sql`kind = ANY(ARRAY[${sql.join(kinds.map((k) => sql`${k}`), sql`, `)}]::text[])
 而管理面的认证页由 cs-api 应答、它的 `forcedOn` 还是 `false`，于是卡片写着「已关闭」、还给出一个按下去必然 409 的开关。
 改这类开关前先 `grep` 一遍谁读它（`packages/settings` 的字段名最好找），把读它的进程一起重启，运维文档也要写全。
 
-### 滚控制面镜像时别把开发登录器一起滚（本机，2026-09-22 实撞）
+### 开发登录器不该反过来依赖平台登录（本机，2026-09-22 实撞，当天已治本）
 
 `crewstation-dev-auth`（本机 dev-oidc 登录器）跑的是 `cs-control-plane` 同一个镜像，按标签批量 `kubectl set image` 滚控制面时它也会被重建。
-它每次启动都要先用管理员**密码**登录平台播种，而库内策略 `password_login_enabled` 自 2026-09-20 起是关的，于是 `readyz` 一直 503，
-Recreate 策略又已经删掉旧 Pod——本机从此登不进（浏览器会话一过期就没有第二条路），e2e 层整层 skip 或超时失败，只能走上面那条破窗口流程恢复，而那一步要作者授权。
-滚镜像前先 `kubectl -n crewstation-system get deploy -o 'custom-columns=NAME:.metadata.name,IMAGE:.spec.template.spec.containers[0].image'` 看清谁在用这个镜像，把 `crewstation-dev-auth` 排除在外；
-`rollout undo` 救不回来，回滚出来的 Pod 一样要播种。
+当时这一滚把本机登录整条锁死了，**因为它把三件事绑成了一件**：
+
+1. 启动时先用管理员**密码**登录平台播种角色，而库内策略 `password_login_enabled` 自 2026-09-20 起是关的；
+2. `routePrefix` 与客户端口令都是**每次进程启动现摇**的，而写回平台的 `ensureProvider` 排在密码登录之后——
+   于是库里 `identity.oidc_providers` 那条 `dev-roles` 的 `issuer_url` 指向上一个已死 Pod 的前缀，`/auth/oidc/dev-roles/start` 直接 503 `endpoints-unresolved`；
+3. `/readyz` 绑在播种结果上，于是 Pod 不 Ready。
+
+第 3 条还带出一个单独的坑：清单里那句 `publishNotReadyAddresses: true`（写着是为了避免 readiness 自锁）**在 Traefik 3.7 上本就不管用**：
+它只把 EndpointSlice 的 `ready` 抬成 true，`serving` 仍是 false，而 Traefik 按 `serving` 过滤，日志里是
+`no servers found for crewstation-system/crewstation-dev-auth`，整条 router 被丢掉——现象是 **404 而不是 503**，连那个写着「重新准备」按钮的页面都打不开。
+**判据**：网关对某个 Service 404 而 Endpoints 看着有地址时，先 `kubectl get endpointslice -o yaml` 看 `conditions.serving`，别去查 IngressRoute。
+
+**已治本**（1、2、3 全拆开）：`CS_DEV_AUTH_ROUTE_ID` 与 `CS_DEV_AUTH_CLIENT_SECRET` 改由 `install-dev-auth.sh` 一次生成、写进
+`crewstation-dev-auth` Secret 并跨重装沿用，库里那条 Provider 因此能活过重启；`/readyz` 只看端口，播种状态改看 `/` 与 `/status.json`；
+Service 不再依赖 `publishNotReadyAddresses`。现在滚镜像只会丢掉「一键换角色」的同步，登录本身不断。
+
+剩下的注意：**换了那两个 Secret 字段（或重建了这个 Secret）就等于作废库里的 Provider**，而重新注册又要密码登录；
+`install-dev-auth.sh` 已经会先读旧值，别绕过它直接 `kubectl create secret`。真需要重新注册时，流程还是上面那条破窗口
+（`CS_PASSWORD_LOGIN=force-on` → 重启 cs-auth 与 cs-api → `install-dev-auth.sh` → 去掉开关再重启两个服务），这一步要作者授权。
 
 ### 按任务建的资源，路由也要按任务建
 

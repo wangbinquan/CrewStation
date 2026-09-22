@@ -17,6 +17,10 @@ interface ServerOptions {
   readonly platformHost?: string;
   readonly adminUsername?: string;
   readonly adminPassword?: string;
+  readonly routeId?: string;
+  readonly clientSecret?: string;
+  readonly seedRetries?: number;
+  readonly seedRetryDelayMs?: number;
 }
 
 interface SeededState {
@@ -31,6 +35,14 @@ export interface StartedDevAuthServer {
   readonly routePrefix: string;
   stop(): void;
 }
+
+/**
+ * 平台刚收下注册时，它自己的 Provider 与 JWKS 缓存还没换过来，首轮播种会撞上：
+ * 前缀固定之后 issuer 不再变，缓存因此会活过 dev-auth 重启，而新进程换了签名 kid——
+ * 现象是 `/start` 503（旧 issuer）或 `/callback` 400（旧公钥），几十秒后自行收敛。所以自动重试几轮再判失败。
+ */
+const SEED_RETRIES = 5;
+const SEED_RETRY_DELAY_MS = 6000;
 
 const responseHeaders = { 'cache-control': 'no-store', 'content-type': 'text/html; charset=utf-8' };
 const html = (body: string, status = 200): Response => new Response(body, { status, headers: responseHeaders });
@@ -84,37 +96,59 @@ function required(value: string | undefined, name: string): string {
   return value;
 }
 
-export async function startDevAuthServer(input: ServerOptions = {}): Promise<StartedDevAuthServer> {
-  const port = input.port ?? Number(process.env.CS_DEV_AUTH_PORT ?? 7460);
-  const publicOrigin = input.publicOrigin ?? process.env.CS_DEV_AUTH_PUBLIC_ORIGIN ?? 'http://dev-auth.cs.localhost';
-  const internalOrigin = input.internalOrigin ?? process.env.CS_DEV_AUTH_INTERNAL_ORIGIN ?? 'http://crewstation-dev-auth.crewstation-system.svc.cluster.local:7460';
-  const consoleOrigin = input.consoleOrigin ?? process.env.CS_CONSOLE_ORIGIN ?? 'http://console.cs.localhost';
-  const routePrefix = `/oidc/${randomBytes(6).toString('hex')}`;
-  const actionToken = randomBytes(24).toString('base64url');
-  const clientSecret = randomBytes(32).toString('base64url');
-  const issuer = `${internalOrigin}${routePrefix}`;
-  const oidc = await createDevOidc({ issuer: () => issuer, authorizationOrigin: () => publicOrigin, allowedRedirectOrigin: consoleOrigin, clientSecret });
-  const platform = new PlatformClient({
+function platformClientFrom(input: ServerOptions): PlatformClient {
+  return new PlatformClient({
     origin: input.platformOrigin ?? process.env.CS_PLATFORM_ORIGIN ?? 'http://traefik.crewstation-system.svc.cluster.local',
     host: input.platformHost ?? process.env.CS_PLATFORM_HOST ?? 'console.cs.localhost',
     username: required(input.adminUsername ?? process.env.CS_ADMIN_USERNAME, 'CS_ADMIN_USERNAME'),
     password: required(input.adminPassword ?? process.env.CS_ADMIN_PASSWORD, 'CS_ADMIN_PASSWORD'),
   });
+}
+
+/**
+ * 路径前缀与客户端口令必须能跨重启保持不变：写回平台的 `ensureProvider` 排在管理员登录之后，
+ * 一旦每次启动现摇，库里那条 `dev-roles` 记录就会被任意一次重启废掉，而重新注册又反过来依赖登录。
+ * 没配就退回临时值，但要在日志里看得见这次是降级的。
+ */
+export function devAuthOidcIdentity(input: Pick<ServerOptions, 'routeId' | 'clientSecret'> = {}): { readonly routePrefix: string; readonly clientSecret: string } {
+  const routeId = input.routeId ?? process.env.CS_DEV_AUTH_ROUTE_ID;
+  const clientSecret = input.clientSecret ?? process.env.CS_DEV_AUTH_CLIENT_SECRET;
+  if (routeId !== undefined && !/^[a-z0-9]{8,64}$/.test(routeId)) throw new Error('CS_DEV_AUTH_ROUTE_ID 只接受 8–64 位小写字母或数字');
+  if (!routeId || !clientSecret) console.warn('[dev-auth] 未配置 CS_DEV_AUTH_ROUTE_ID／CS_DEV_AUTH_CLIENT_SECRET：本次用临时值，重启后平台必须重新注册这个 Provider');
+  return {
+    routePrefix: `/oidc/${routeId ?? randomBytes(6).toString('hex')}`,
+    clientSecret: clientSecret ?? randomBytes(32).toString('base64url'),
+  };
+}
+
+export async function startDevAuthServer(input: ServerOptions = {}): Promise<StartedDevAuthServer> {
+  const port = input.port ?? Number(process.env.CS_DEV_AUTH_PORT ?? 7460);
+  const publicOrigin = input.publicOrigin ?? process.env.CS_DEV_AUTH_PUBLIC_ORIGIN ?? 'http://dev-auth.cs.localhost';
+  const internalOrigin = input.internalOrigin ?? process.env.CS_DEV_AUTH_INTERNAL_ORIGIN ?? 'http://crewstation-dev-auth.crewstation-system.svc.cluster.local:7460';
+  const consoleOrigin = input.consoleOrigin ?? process.env.CS_CONSOLE_ORIGIN ?? 'http://console.cs.localhost';
+  const { routePrefix, clientSecret } = devAuthOidcIdentity(input);
+  const actionToken = randomBytes(24).toString('base64url');
+  const issuer = `${internalOrigin}${routePrefix}`;
+  const oidc = await createDevOidc({ issuer: () => issuer, authorizationOrigin: () => publicOrigin, allowedRedirectOrigin: consoleOrigin, clientSecret });
+  const platform = platformClientFrom(input);
+  const seedRetries = input.seedRetries ?? SEED_RETRIES, seedRetryDelayMs = input.seedRetryDelayMs ?? SEED_RETRY_DELAY_MS;
   let pageState: DevAuthPageState = { status: 'pending', startedAt: Date.now(), projects: [] };
   let seeded: SeededState | undefined;
   let seeding: Promise<void> | undefined;
   let mutation = Promise.resolve();
 
-  const startSeed = (): void => {
+  const startSeed = (attempt = 0): void => {
     if (seeding) return;
-    pageState = { status: 'pending', startedAt: Date.now(), projects: [] };
+    pageState = { status: 'pending', startedAt: attempt === 0 ? Date.now() : pageState.startedAt, projects: [] };
     seeding = seed(platform, oidc, issuer, routePrefix, clientSecret).then((result) => {
       seeded = result;
       pageState = { status: 'ready', startedAt: pageState.startedAt, projects: selectableProjects(result.projects) };
     }).catch((error: unknown) => {
       seeded = undefined;
-      pageState = { status: 'error', startedAt: pageState.startedAt, projects: [], error: error instanceof Error ? error.message : String(error) };
-      console.error(`[dev-auth] 准备失败：${pageState.error}`);
+      const message = error instanceof Error ? error.message : String(error), again = attempt < seedRetries;
+      pageState = { status: again ? 'pending' : 'error', startedAt: pageState.startedAt, projects: [], error: message };
+      console.error(`[dev-auth] 准备失败（第 ${attempt + 1} 次${again ? '，稍后重试' : '，不再重试'}）：${message}`);
+      if (again) setTimeout(() => startSeed(attempt + 1), seedRetryDelayMs).unref?.();
     }).finally(() => { seeding = undefined; });
   };
 
@@ -149,7 +183,8 @@ export async function startDevAuthServer(input: ServerOptions = {}): Promise<Sta
     if (url.pathname.startsWith(routePrefix)) return oidc.fetch(request, routePrefix);
     if (url.pathname === '/' && request.method === 'GET') return html(renderDevAuthPage(pageState, actionToken));
     if (url.pathname === '/healthz') return new Response('ok\n');
-    if (url.pathname === '/readyz') return new Response(pageState.status === 'ready' ? 'ready\n' : `${pageState.status}\n`, { status: pageState.status === 'ready' ? 200 : 503 });
+    // 就绪只代表 IdP 在服务：播种失败时仍要能进这个页面重试，也不能让网关把路由摘掉。
+    if (url.pathname === '/readyz') return new Response(pageState.status === 'ready' ? 'ready\n' : `ready · 播种${pageState.status}\n`);
     if (url.pathname === '/status.json') return new Response(JSON.stringify(pageState), { headers: { 'cache-control': 'no-store', 'content-type': 'application/json' } });
     if (url.pathname === '/reseed' && request.method === 'POST') {
       const form = await request.formData();
