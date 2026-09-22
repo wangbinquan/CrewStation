@@ -1,6 +1,6 @@
 # RFC-019｜部署与运行形态图
 
-> 状态：In Progress · 2026-09-22 · 作者批准三件套并裁定 §7；T1–T8、T10 完成，T9 实机验收部分完成（见 [acceptance.md](./acceptance.md)）；交互设计稿评审见 [prototype-review.md](./prototype-review.md)
+> 状态：Done · 2026-09-22 · 作者批准三件套并裁定 §7；T1–T10 完成，TP-01…TP-18 见 [acceptance.md](./acceptance.md)；交互设计稿评审见 [prototype-review.md](./prototype-review.md)
 > 日期：2026-09-22
 > 配套：[技术设计](./design.md) · [实施计划](./plan.md) · [交互设计稿核对](./prototype-review.md)
 

@@ -7,22 +7,24 @@
 
 基线三件套（v0.3.3）的第一轮实现已在本机 kind 集群上跑通并推上 main；**RFC-001（算力归平台）与 RFC-002（管理空间与租户空间分离）已实现、实跑确认并推上 main；RFC-004 已被 RFC-006 取代（Superseded）；RFC-006（算力档位合并运行环境、每个 Agent 一个 Pod）已实现、实机验收完毕并推上 main，已 Done（P1–P8、ADR-0005 与 I17–I19 待作者复核）；RFC-003 工作台已按设计附件完成并整体部署到本机，52／52 项 UX-AT 全部实机通过、本地 gate 与精确 SHA CI 通过，已 Done；RFC-005（OIDC／OAuth 2.0 公司登录）代码、测试与 OA-01…OA-31 实机验收全部完成，已 Done；RFC-007（开发环境 OAuth 2.0 一键换角色）代码、四角色 Chrome 实机验收、本地 gate 与精确 SHA CI 全部完成，已 Done**。
 
-## RFC-019 部署与运行形态图：已实现并部署本机，收尾待作者破窗口（2026-09-22）
+## RFC-019 部署与运行形态图：Done（2026-09-22）
 
-作者批准三件套并裁定提案 §7（成员看到与管理员相同的 Pod 投影，不含环境变量值／Secret／注解／YAML；管理动作只在集群管理）。T1–T8 与 T10 已做完，T9 做到一半：
+作者批准三件套并裁定提案 §7（成员看到与管理员相同的 Pod 投影，不含环境变量值／Secret／注解／YAML；管理动作只在集群管理）。T1–T10 全部做完：
 
 - **契约与后端**：`ProjectClusterResourcesSchema`、`summary.projects[]` 计数、api-client `cluster.projectResources`。`cluster-management` 已到 40 文件上限，只扩既有文件：`queries.ts` 加 `projectCounts`／`projectResourcesIn`／`projectResources`（`kindRank` 排序、500 条截断、`availableActions` 恒空），`dependencies.ts` 加 `authorizeProject`，路由 `GET /v1/projects/:projectId/cluster-resources`（先取 actor 再解析参数），组合根注入 `project.api.authorize(actor, projectId, 'develop')`。模块用例 `tests/projectResources.test.ts`（真实 PostgreSQL：成员读取、计数、测试员／陌生人／未知项目／410、HTTP 401／400／403／200、截断）。
 - **工作台**：`tokens.css` 九组 `--cs-topo-*` 语义色（明暗两套）；`shared/ui/topology/`（模型、确定性排布、`fitMetrics` 铺满、SVG 图、图例、筛选、窄屏列表、工作区）；`shared/topology/`（项目形态、横带汇总、系统层静态表、系统形态、项目层折叠、文案）；三处入口：概览 `DeploymentTopologyCard`、运行与诊断 `topology` 页签（`TopologyPage`＋只读 `TopologyDetail`）、集群管理「拓扑」页签（`ClusterTopology` 三层，复用 `ClusterDetail`）。中英文各 200 余键。
-- **测试**：console 六个 topology 用例文件（排布、组装、图组件、三处页面、令牌回归、夹具），导航与集群页既有用例更新；`tests/e2e/topology.test.ts`（三层、Pod 层与运行诊断页签、1280／1024／390 宽度、成员 403）。完整 `bun run check`（带本机测试库）**2060 pass／55 skip／0 fail**——55 个 skip 全是 e2e 层，原因见下；`test:cover` 三层全绿（e2e 层 28 项因登不进而超时失败，同一原因），`test:patch --base origin/main --worktree` 改动行 522／522（100%）。
+- **测试**：console 六个 topology 用例文件（排布、组装、图组件、三处页面、令牌回归、夹具），导航与集群页既有用例更新；`tests/e2e/topology.test.ts`（三层、Pod 层与运行诊断页签、1280／1024／390／320 宽度、浅色主题与键盘、PVC 事实显示、成员 200／非成员 404）。完整 `bun run check`（带本机测试库）**2060 pass／55 skip／0 fail**——55 个 skip 全是 e2e 层，原因见下；`test:cover` 三层全绿（e2e 层 28 项因登不进而超时失败，同一原因），`test:patch --base origin/main --worktree` 改动行 522／522（100%）。
 - **本机部署与实机核对**（`cs-control-plane:rfc019-20260922`、`cs-console:rfc019-20260922`，dev-admin 真实 Chrome）：项目范围盘点接口返回演示数字人 3 Pod／2 Deployment／1 PVC、`availableActions` 全空、快照完整，摘要计数与 `kubectl -n cs-demo` 一致；系统层 21 节点／20 条静态线、1728 视口下 SVG 1467px 铺满 1470px 容器；项目层 11 个项目、2 个需要关注；Pod 层 11 节点按 UID 对上、面包屑可返回；运行与诊断页签点 Pod 出只读详情（镜像、发布、槽、UID，无副本／重启入口，「查看日志」进日志页）；概览卡「工作负载 2 · Pod 3，就绪 3，运行 0」三条横带，点卡进全图；无 console 错误。逐项见 [acceptance.md](proposal/rfc/RFC-019-deployment-topology/acceptance.md)。
 - **基线回填 v0.3.8**：Proposal §0.2 变更表、§3 能力行、§6 R55；Design §2.3 指引、§14.6、D55；Plan AT-56 与矩阵行。
-- **顺手修的**：PVC 的 facts 值是 JSON（`{"storage":"10Gi"}`）原样上图，加 `factText` 取量显示为 `capacity 10Gi`（已有用例；已重建并滚出 `cs-console:rfc019-20260922b`，实机复核待登录恢复）。
+- **顺手修的**：PVC 的 facts 值是 JSON（`{"storage":"10Gi"}`）原样上图，加 `factText` 取量显示为 `capacity 10Gi`（已有用例；已重建并滚出 `cs-console:rfc019-20260922b`，e2e 断言卡片文本不含 JSON，本机通过）。
 
-**卡住的地方**：滚 `cs-control-plane` 新镜像时 `crewstation-dev-auth` 也换了镜像并被 Recreate 策略重建，它启动要先用管理员**密码**登录平台播种，而库内策略仍是密码登录关闭（本文件已记两次的同一颗雷），`readyz` 持续 503、旧 Pod 已不在。后果：本机 dev-oidc 登不进（浏览器会话过期后无法再登录，e2e 层整层 skip），TP-16 的 1280／1024／390、TP-17 的键盘与浅色主题、`factText` 的实机复核都停在这里。恢复需要本文件既有的破窗口流程（`CS_PASSWORD_LOGIN=force-on` → 重启 cs-auth／cs-api → 开发登录器重新播种 → 移除开关 → 再重启两个服务），按惯例要作者授权，未做。
+**原卡住的地方（2026-09-22 当天已解除）**：滚 `cs-control-plane` 新镜像时 `crewstation-dev-auth` 也被一起重建，它启动要先用管理员密码登录平台播种、而密码登录是关的，于是本机 dev-oidc 登不进、e2e 层整层 skip。根因已按上一节治本（前缀与 client secret 固定进 Secret、`/readyz` 与播种解绑、播种自动重试），破窗口已在作者授权下走完并收回，登录与 e2e 层均已恢复。TP-17 的键盘与浅色主题、`factText` 的显示随后由本机 e2e 闭合（见下）。
 
 **已推送**：`44f5ac1`（实现）、`f087007`（基线 v0.3.8）、`2ce5ba0`（e2e 用例接受空平台＋dev-gotchas）。CI：[run 35743094030](https://github.com/wangbinquan/CrewStation/actions/runs/35743094030)（`f087007`）五项成功、新增代码防护 99.2%（1229 行中 1219 行），e2e 唯一失败是系统层用例在没有项目的 CI 平台上等项目卡片；[run 35744347320](https://github.com/wangbinquan/CrewStation/actions/runs/35744347320)（`2ce5ba0`）六项全部成功，e2e 40 pass／20 skip／0 fail，其中 RFC-019 的系统层与 1280／1024／390 宽度用例通过（TP-16 由此闭合），Pod 层与成员用例因 CI 无项目 skip。
 
-**下一步**：作者授权后走破窗口恢复 dev-auth；用已滚出的 `cs-console:rfc019-20260922b` 复核 TP-17 的键盘与浅色主题、`factText` 的显示，并让本机 e2e 层跑一遍；README 收口为 Done。
+**dev-auth 恢复后（本机）**：e2e 层 **57 pass／2 skip／1 fail**（唯一失败 `clusterMetrics.test.ts`「live node, pod and storage observations…」为既有用例、单跑通过，时序 flake）；`tests/e2e/topology.test.ts` 补了 320px、浅色主题令牌切换、Enter／Escape、PVC 事实显示与非成员 404（`project` 模块 `authorize` 对非成员按项目不存在处理，模块用例与 RFC 文案已同步），visitor 为 dev-tester 与 dev-developer 各跑 **8／8**；`fd7c09c` 的 [run 35749904351](https://github.com/wangbinquan/CrewStation/actions/runs/35749904351) 六项成功、e2e 41 pass／21 skip／0 fail（Pod 层、成员与浅色键盘用例因 CI 无项目 skip）。跑完后我移除了 cs-auth／cs-api 部署上的 `CS_PASSWORD_LOGIN`（当时两处仍是 `force-on`）并各自滚动重启，核对 `password_login_enabled` 仍为 `f`、两处环境变量为空、dev-auth 仍 Ready、登录页只有「公司身份」入口且没有密码输入框；关窗后拓扑 e2e 再跑一次 8／8。
+
+**收口**：README 与三件套状态改 Done；acceptance.md 每项有证据，TP-05／06／15 只有用例覆盖（原因写在各行）。
 
 ## I23 已裁定并执行：两个内置接入项目的 manifest 迁到 v2（2026-09-22）
 
