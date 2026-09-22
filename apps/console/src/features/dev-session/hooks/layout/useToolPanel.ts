@@ -19,14 +19,15 @@ export const MIN_RATIO = 0.3, MAX_RATIO = 0.6;
 export function useToolPanel(layout: WorkspaceLayout, store: WorkspaceLayoutStore, location: WorkspaceLocation | undefined, root: RefObject<HTMLDivElement | null>) {
   const saved = layoutTool(layout), instruction = location ? locationTool(location.search) : undefined;
   const savedKey = saved ? `${saved.name}:${saved.mode}:${saved.ratio}` : '', instructionKey = instruction === undefined ? 'none' : instruction === null ? 'closed' : `${instruction.name}:${instruction.mode}`;
+  const [narrow, setNarrow] = useState(false);
   const tool = useMemo((): WorkspaceTool | undefined => {
     const [name, mode, ratio] = savedKey.split(':'), base = savedKey ? { name: name as WorkspaceToolName, mode: mode as 'side' | 'full', ratio: Number(ratio) } : undefined;
-    if (instructionKey === 'none') return base;
+    // 窄内容区里布局记住的工具只能放大，会把终端盖住：没有地址指令时不自动打开它，等用户自己点。
+    if (instructionKey === 'none') return narrow ? undefined : base;
     if (instructionKey === 'closed') return undefined;
     const [toolName, toolMode] = instructionKey.split(':');
     return { name: toolName as WorkspaceToolName, mode: toolMode as 'side' | 'full', ratio: base?.ratio ?? 0.45 };
-  }, [savedKey, instructionKey]);
-  const [narrow, setNarrow] = useState(false);
+  }, [savedKey, instructionKey, narrow]);
   useEffect(() => {
     const element = root.current; if (!element || typeof ResizeObserver === 'undefined') return;
     const observer = new ResizeObserver(([entry]) => { if (entry) { const width = entry.contentRect.width; setNarrow((current) => width > 0 && width < (current ? NARROW_LEAVE_WIDTH : NARROW_WIDTH)); } });
@@ -41,5 +42,5 @@ export function useToolPanel(layout: WorkspaceLayout, store: WorkspaceLayoutStor
   const close = useCallback(() => apply(undefined), [apply]);
   const resize = useCallback((ratio: number) => { if (tool) store.update((current) => withTool(current, { ...tool, ratio: Math.min(MAX_RATIO, Math.max(MIN_RATIO, ratio)) })); }, [store, tool]);
   const mode: 'side' | 'full' | 'closed' = !tool ? 'closed' : narrow ? 'full' : tool.mode;
-  return { tool, mode, forcedFull: narrow && !!tool, select, toggleMode, close, resize };
+  return { tool, mode, forcedFull: narrow && !!tool, narrow, select, toggleMode, close, resize };
 }

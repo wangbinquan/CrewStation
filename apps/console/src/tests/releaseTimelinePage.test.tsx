@@ -21,10 +21,12 @@ function withTimeline(options: { readonly switchesFail?: boolean; readonly membe
   return f;
 }
 const rows = () => [...document.querySelectorAll('ul[aria-label="发布记录"] li')].map((node) => node.textContent ?? '');
+/** 发布、切流、成员三份查询都到齐才有完整时间线；整套并跑时慢半拍，最多再等几拍。 */
+async function untilRows(count: number) { for (let i = 0; i < 12 && rows().length < count; i++) await page!.settle(); }
 
 test('发布页时间线合并发布与切流：倒序、人名与标签代替 UUID、失败条目有构建日志入口、标签可选中详情', async () => {
   const f = withTimeline(); f.releases[2]!.status = 'failed'; f.releases[2]!.message = '构建失败：缺少依赖';
-  page = await renderApp(`/projects/${projectId}/release`);
+  page = await renderApp(`/projects/${projectId}/release`); await untilRows(5);
   // 此前是两张表各自一列 UUID（RFC-020 audit §3.5）。
   expect(rows()).toHaveLength(5); expect(rows()[0]).toStartWith('v1.1.0 就绪bbbbbbb · main'); expect(rows()[3]).toStartWith('v1.0.0 就绪aaaaaaa · main'); expect(rows()[4]).toStartWith('v0.9.0 失败');
   expect(rows()[1]).toContain('成员 01a0bf5d… 把 版本 01a0bf5d… 切为正式版本');
@@ -39,7 +41,7 @@ test('发布页时间线合并发布与切流：倒序、人名与标签代替 U
 
 test('切流或成员读取失败时只列能读到的一类并说明；负责人在待验证卡上直接上线，switch=1 进入即核对', async () => {
   withTimeline({ switchesFail: true, membersFail: true });
-  page = await renderApp(`/projects/${projectId}/release?switch=1`); await page.settle(); await page.settle();
+  page = await renderApp(`/projects/${projectId}/release?switch=1`); await untilRows(3); await page.settle(); await page.settle();
   expect(page.text()).toContain('切流记录读取失败：切流服务不可用'); expect(page.text()).toContain('成员名单暂不可读'); expect(rows()).toHaveLength(3); expect(page.text()).not.toContain('尚无发布记录');
   // 概览的「上线 vX…」带 switch=1 进来：不用再点一次，确认面板已经打开。
   expect(page.text()).toContain('正式版本 v1.0.0 → v1.1.0'); expect([...document.querySelectorAll('button')].some((node) => node.textContent === '确认上线 v1.1.0')).toBe(true);

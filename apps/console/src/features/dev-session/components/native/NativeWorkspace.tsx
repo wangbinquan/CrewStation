@@ -51,7 +51,7 @@ export function NativeWorkspace(props: NativeWorkspaceProps): ReactElement {
   const activity = useAgentActivity(), task = activity.snapshot.tasks.find((task) => task.taskId === taskId);
   const targetError = useActivityTarget(taskId, activityTarget, roster, state.loaded, store, t('devSession.native.defaultTab'));
   const savedTool = layoutTool(layout);
-  const locationError = useWorkspaceLocation(taskId, location, roster, store, state.loaded, !!activityTarget, t('devSession.native.defaultTab'), `${savedTool?.name ?? ''}:${savedTool?.mode ?? ''}`);
+  const locationError = useWorkspaceLocation(taskId, location, roster, store, state.loaded, !!activityTarget, t('devSession.native.defaultTab'), `${savedTool?.name ?? ''}:${savedTool?.mode ?? ''}`, panel.narrow);
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | undefined;
     const unsubscribe = channel.subscribe((event) => { if (event.kind !== 'nativeActivity' && event.kind !== 'nativeTerminal') return; if (timer) clearTimeout(timer); timer = setTimeout(() => void activity.store?.refresh(taskId), 150); });

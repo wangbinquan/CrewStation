@@ -14,17 +14,18 @@ const path = `/projects/${activityProjectId}/dev-session`;
 const panel = () => document.querySelector<HTMLElement>('aside[aria-label="工具面板"]')!;
 const panelTab = () => document.querySelector('[aria-label="工具面板"] [role="tab"][aria-selected="true"]')?.textContent;
 const workspaceHidden = () => document.querySelector('[role="tablist"][aria-label="个人工作区"]')?.closest('[hidden]') !== null;
-/** 记录个人布局的保存内容，并可指定服务端返回的初始布局。 */
-function layoutFixture(saved?: WorkspaceLayout) {
+/** 记录个人布局的保存内容，并可指定服务端返回的初始布局；`hold` 让布局读取等到用例放行（模拟布局晚于窗口量测到达）。 */
+function layoutFixture(saved?: WorkspaceLayout, hold = false) {
   const f = editorWorkspaceFixture(), base = globalThis.fetch, saves: WorkspaceLayout[] = [];
+  let release = () => {}; const gate = new Promise<void>((resolve) => { release = resolve; });
   globalThis.fetch = (async (raw, init) => {
     if (String(raw).endsWith('/workspace-layout')) {
       if (init?.method === 'PUT') saves.push(JSON.parse(String(init.body)).layout as WorkspaceLayout);
-      else if (saved) return Response.json({ revision: 1, layout: saved, updatedAt: '2026-09-20T00:00:00.000Z' });
+      else if (saved) { if (hold) await gate; return Response.json({ revision: 1, layout: saved, updatedAt: '2026-09-20T00:00:00.000Z' }); }
     }
     return base(raw, init);
   }) as typeof fetch;
-  fixture = f; return { f, saves };
+  fixture = f; return { f, saves, release };
 }
 
 test('无参数进入按个人布局打开面板并把形态写回地址；放大、还原、收起与右缘页签栏都走地址', async () => {
@@ -69,6 +70,18 @@ test('内容区窄于 800px 时面板只有放大形态：不改地址，恢复�
   expect(panel().dataset.mode).toBe('side'); expect(page.text()).not.toContain('窗口较窄');
   await act(async () => { for (const notify of observers) notify([{ contentRect: { width: 810 } }]); }); await page.settle();
   expect(panel().dataset.mode).toBe('side');
+});
+
+test('窄内容区里不自动打开布局记住的工具：面板保持收起，终端可见，地址不写回', async () => {
+  const observers: Array<(entries: Array<{ contentRect: { width: number } }>) => void> = [];
+  globalThis.ResizeObserver = class { constructor(callback: (entries: Array<{ contentRect: { width: number } }>) => void) { observers.push(callback); } observe() {} unobserve() {} disconnect() {} } as unknown as typeof ResizeObserver;
+  const { release } = layoutFixture({ ...initialWorkspaceLayout('工作区 1'), tool: { name: 'preview', mode: 'full', ratio: 0.45 } }, true);
+  page = await renderApp(path);
+  // 实机 1024 视口：终端先出现，布局晚 700ms 到达，原来会整页切成放大的预览把终端盖住。
+  await act(async () => { for (const notify of observers) notify([{ contentRect: { width: 700 } }]); }); await page.settle();
+  await act(async () => { release(); }); await page.settle(); await page.settle();
+  expect(page.search()).toEqual({}); expect(panel().dataset.mode).toBe('closed'); expect(workspaceHidden()).toBe(false);
+  await page.click('预览'); expect(page.search()).toEqual({ view: 'preview' }); expect(panel().dataset.mode).toBe('full');
 });
 
 test('分隔线用方向键调宽度，限制在 30%–60% 并保存到个人布局', async () => {
