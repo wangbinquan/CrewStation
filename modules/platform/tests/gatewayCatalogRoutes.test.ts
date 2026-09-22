@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
-import type { Actor, Manifest, ProjectId, ReleaseId, ServiceId } from '@crewstation/contracts';
+import type { Actor, Manifest, ProjectId, ReleaseId, ServiceId, WorkloadIdentity } from '@crewstation/contracts';
 import { DomainTopic, ManifestSchema } from '@crewstation/contracts';
 import { publishDomainEvent } from '@crewstation/eventbus';
 import { createFakeK8sClient, Resources } from '@crewstation/k8s';
@@ -130,6 +130,36 @@ describe.skipIf(!available)('平台装配的目录与网关路由', () => {
       await earlier;
       k8s.apply = apply;
     }
+  });
+
+  /**
+   * 放行表与路由都是「当前在册服务」的投影，而组合根原先把两件事都只接在别处：
+   * - 建项目只重算路由，放行表要等某次无关的授权／目录变更才顺带把新服务带上，
+   *   这中间新项目的开发容器连内置 MCP 都是 403「不能调用平台端点」（2026-09-22 本机实撞）；
+   * - 归档先于事件落库，而 `serviceIdOfProject` 与 `getService` 都建在「在册服务」上，
+   *   消费者跑到时这个服务已经查不到，`removeService` 直接返回，路由永远留在集群里继续对外服务。
+   * 两条都只在真实组合根上才看得见：网关模块自己的用例用的是夹具目录。
+   */
+  test('建项目与归档项目：路由与放行表都跟着当前在册服务走', async () => {
+    const { gateway, project } = platform.modules;
+    await gateway.subscriptions.runOnce();
+    // 先落一版不含新服务的放行表，免得下面第一发评估走「没有可用文档」的就地重建而顺手把它带上。
+    await gateway.api.rebuildAllowlist();
+    const created = await project.api.createProject(actor, { slug: 'newbie-worker', name: 'Newbie worker', kind: 'DigitalWorker', ownerUserId: actor.userId, template: '01a0bf5d-8f4b-7002-9560-94caf593fb19' });
+    const devContainer: WorkloadIdentity = { identity: 'newbie-worker/newbie-worker', project: 'newbie-worker', service: 'newbie-worker', kind: 'dev-session' };
+    const toMcp = () => gateway.api.evaluate(devContainer, { host: 'mcp-capabilities.svc.cs.internal', method: 'POST', path: '/mcp' });
+    const serviceRoute = () => k8s.get(Resources.IngressRoute!, 'newbie-worker-service', 'cs-newbie-worker');
+    expect((await toMcp()).reason).toBe('newbie-worker/newbie-worker 不能调用平台端点 mcp-capabilities.svc.cs.internal');
+
+    expect(await gateway.subscriptions.runOnce()).toBe(1);
+    expect((await toMcp()).allowed).toBe(true);
+    expect(await serviceRoute()).toBeDefined();
+
+    await project.api.setProjectState(created.id, 'active');
+    await project.api.archiveProject(actor, created.id);
+    expect(await gateway.subscriptions.runOnce()).toBe(1);
+    expect(await serviceRoute()).toBeUndefined();
+    expect((await toMcp()).allowed).toBe(false);
   });
 
   test('目录已提交而网关应用失败时，消费重试会修复路由且不重复登记操作', async () => {

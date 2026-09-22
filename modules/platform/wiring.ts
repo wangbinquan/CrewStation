@@ -26,7 +26,7 @@ import { createIdentityModule } from '@crewstation/module-identity';
 import { createObservabilityModule } from '@crewstation/module-observability';
 import { createProjectModule } from '@crewstation/module-project';
 import { createProvisioningModule } from '@crewstation/module-provisioning';
-import type { ProjectModuleApi } from '@crewstation/module-project';
+import type { ProjectModuleApi, ResolvedService } from '@crewstation/module-project';
 import { createReleaseModule } from '@crewstation/module-release';
 import type { ReleaseModuleApi } from '@crewstation/module-release';
 import { createScmModule } from '@crewstation/module-scm';
@@ -192,11 +192,18 @@ function composeDelivery(deps: CompositionDeps, core: ReturnType<typeof composeC
     data: { envFor: data.api.envFor },
     settings: { userDomain: settings.userDomain, serviceDomain: settings.serviceDomain, registryBase: settings.registryBase, maintenanceWindow: settings.maintenanceWindow, buildTimeoutSeconds: 1800, deployTimeoutSeconds: 600, builderImage: settings.builderImage, buildkitAddress: settings.buildkitAddress, workerOwner: `${deps.instance}.release` },
   });
-  const listServices = async () => (await project.api.listServices()).map((s) => ({ serviceId: s.serviceId, projectId: s.projectId, projectSlug: s.slug, serviceName: s.name, namespace: s.namespace, identity: s.identity, kind: s.kind }));
+  const directoryService = (s: ResolvedService) => ({ serviceId: s.serviceId, projectSlug: s.slug, serviceName: s.name, namespace: s.namespace, identity: s.identity, kind: s.kind, archived: s.state === 'archived' });
+  // `listServices` 只给在册服务（project 模块已滤掉归档的）；按 id／按项目的解析必须能查到归档的，
+  // 否则 `project.archived` 到达网关时服务已经查不到，那个项目的路由就永远留在集群里。
+  const listServices = async () => (await project.api.listServices()).map(directoryService);
   const gateway = createGatewayModule({
     identities: deps.identities,
     db, k8s, hosts, logger, isAdmin: (id) => isAdmin(id),
-    services: { listServices, getService: async (id) => (await listServices()).find((s) => s.serviceId === id), serviceIdOfProject: async (projectId) => (await listServices()).find((s) => s.projectId === projectId)?.serviceId },
+    services: {
+      listServices,
+      getService: async (id) => { const s = await resolveById(id); return s ? directoryService(s) : undefined; },
+      serviceIdOfProject: async (projectId) => (await project.api.resolveServiceOfProject(projectId))?.serviceId,
+    },
     slots: { slotRoles: release.api.slotRoles },
     grants: { grantedOperations: apiCatalog.api.grantedOperations, listCallers: async () => [], proxyNameOf: apiCatalog.api.activeProxyNameOf },
     settings: { systemNamespace: settings.systemNamespace, serviceDomain: settings.serviceDomain, userAuthMiddleware: 'forward-auth-user', serviceAuthMiddleware: 'forward-auth-service', dropIdentityHeadersMiddleware: 'drop-identity-headers', allowlistMaxStaleSeconds: 300, consumerName: 'gateway' },

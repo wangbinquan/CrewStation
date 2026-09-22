@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
-import type { AllowlistDocument, ServiceId, WorkloadIdentity } from '@crewstation/contracts';
-import { eventbusMigrations } from '@crewstation/eventbus';
+import type { AllowlistDocument, ProjectId, ServiceId, WorkloadIdentity } from '@crewstation/contracts';
+import { DomainTopic } from '@crewstation/contracts';
+import { eventbusMigrations, publishDomainEvent } from '@crewstation/eventbus';
 import type { FakeK8sClient } from '@crewstation/k8s';
 import { createFakeK8sClient } from '@crewstation/k8s';
 import type { TestDatabase } from '@crewstation/testkit';
@@ -14,17 +15,26 @@ let k8s: FakeK8sClient;
 let gateway: GatewayModule;
 const demoId = '01a0bf5d-8f4b-76c5-866c-f1feda3d63bb' as ServiceId;
 const issuesId = '01a0bf5d-8f4b-7549-872a-18d62f6a1f6d' as ServiceId;
+const newbieId = '01a0bf5d-8f4b-7b0e-9f0a-3c7d5e2a1b44' as ServiceId;
+const newbieProjectId = '01a0bf5d-8f4b-7b0f-8e21-4d6c9f3b2a55' as ProjectId;
 const services = [
-  { serviceId: demoId, projectSlug: 'demo', serviceName: 'demo', namespace: 'cs-demo', identity: 'demo/demo', kind: 'DigitalWorker' as const },
-  { serviceId: issuesId, projectSlug: 'issues', serviceName: 'issues', namespace: 'cs-issues', identity: 'issues/issues', kind: 'APIProxy' as const },
+  { serviceId: demoId, projectId: '01a0bf5d-8f4b-7b10-9a12-5e7d8c4b3a66' as ProjectId, projectSlug: 'demo', serviceName: 'demo', namespace: 'cs-demo', identity: 'demo/demo', kind: 'DigitalWorker' as const, archived: false },
+  { serviceId: issuesId, projectId: '01a0bf5d-8f4b-7b11-b833-6f8e9d5c4b77' as ProjectId, projectSlug: 'issues', serviceName: 'issues', namespace: 'cs-issues', identity: 'issues/issues', kind: 'APIProxy' as const, archived: false },
 ];
+const ingressRoutesOf = (namespace: string): string[] =>
+  [...k8s.objects.values()].filter((o) => o.kind === 'IngressRoute' && o.metadata.namespace === namespace).map((o) => o.metadata.name).sort();
 let prodPhysical: 'blue' | 'green' = 'blue';
 
 /** 同一个库上的一个新模块实例＝一个刚启动的进程：自己的放行表缓存是空的。 */
 function newGateway(): GatewayModule {
   return createGatewayModule({
     db: tdb.db, k8s,
-    services: { listServices: async () => services, getService: async (id) => services.find((s) => s.serviceId === id), serviceIdOfProject: async () => demoId },
+    // 两个取值范围与真实实现一致：清单只给在册服务，按 id／按项目的解析连归档的一起查得到。
+    services: {
+      listServices: async () => services.filter((s) => !s.archived),
+      getService: async (id) => services.find((s) => s.serviceId === id),
+      serviceIdOfProject: async (projectId) => services.find((s) => s.projectId === projectId)?.serviceId,
+    },
     slots: { slotRoles: async () => ({ prod: prodPhysical, preview: prodPhysical === 'blue' ? 'green' : 'blue' }) },
     grants: {
       grantedOperations: async (caller) => ({ operations: caller === 'demo/demo' ? ['01a0bf5d-8f4b-7155-8e96-d9844e02dfa4'] : [], defaultOpen: ['01a0bf5d-8f4b-73dc-813d-bb1eeb744398'], operationRoutes: [{ id: '01a0bf5d-8f4b-7155-8e96-d9844e02dfa4', proxy: 'issues', method: 'POST', path: '/v1/issues' }, { id: '01a0bf5d-8f4b-73dc-813d-bb1eeb744398', proxy: 'issues', method: 'GET', path: '/v1/issues/{id}' }] }),
@@ -46,6 +56,9 @@ beforeAll(async () => {
 afterAll(async () => { await tdb?.drop(); });
 
 const caller: WorkloadIdentity = { identity: 'demo/demo', project: 'demo', service: 'demo', kind: 'service', slot: 'prod' };
+/** 新项目开发容器里的 Agent 连能力说明 MCP：正是本机撞到 403 的那一发。 */
+const devContainer: WorkloadIdentity = { identity: 'newbie/newbie', project: 'newbie', service: 'newbie', kind: 'dev-session' };
+const toMcp = () => gateway.api.evaluate(devContainer, { host: 'mcp-capabilities.svc.cs.internal', method: 'POST', path: '/mcp' });
 
 describe.skipIf(!available)('gateway module', () => {
   test('路由生成：用户域两主机、服务域主机、内部 API 前缀；切流后重算指向', async () => {
@@ -119,6 +132,34 @@ describe.skipIf(!available)('gateway module', () => {
     expect(versions).toEqual([1, 2, 40, 41]);
     // 旧文档里按操作键写的授权不会被沿用：重建后的判定来自当前的授权数据。
     expect((await first.api.evaluate(caller, { host: 'api.svc.cs.internal', method: 'DELETE', path: '/api/issues/v1/issues/42' })).allowed).toBe(false);
+  });
+
+  // 放行表是「当前已登记服务」的投影。建项目原先只重算路由，新服务根本不在表里，于是新项目的
+  // 开发容器连内置 MCP 都是 403「不能调用平台端点」，要等某次无关的授权／目录变更才顺带带上
+  // （2026-09-22 本机实撞：给一个未登记身份的 Pod 发 POST /mcp，网关回的就是这句）。
+  test('建项目：路由与放行表一起重算，新项目的开发容器立刻连得上内置 MCP', async () => {
+    const occurredAt = new Date().toISOString();
+    services.push({ serviceId: newbieId, projectId: newbieProjectId, projectSlug: 'newbie', serviceName: 'newbie', namespace: 'cs-newbie', identity: 'newbie/newbie', kind: 'DigitalWorker', archived: false });
+    expect((await toMcp()).reason).toBe('newbie/newbie 不能调用平台端点 mcp-capabilities.svc.cs.internal');
+
+    await publishDomainEvent(tdb.db, DomainTopic.projectCreated, { occurredAt, projectId: newbieProjectId, slug: 'newbie', kind: 'DigitalWorker', namespace: 'cs-newbie' });
+    expect(await gateway.subscriptions.runOnce()).toBe(1);
+    expect((await toMcp()).allowed).toBe(true);
+    expect(ingressRoutesOf('cs-newbie')).toEqual(['newbie-preview', 'newbie-prod', 'newbie-service']);
+  });
+
+  // 归档同样只做了一半：`serviceIdOfProject` 与 `getService` 都建在「在册服务」上，而归档先于事件落库，
+  // 于是消费者跑到时这个服务已经查不到，`removeService` 直接返回——路由永远留在集群里继续对外服务。
+  test('归档项目：路由真的被删掉，放行表条目也跟着消失', async () => {
+    const newbie = services.find((s) => s.serviceId === newbieId)!;
+    newbie.archived = true;
+    await publishDomainEvent(tdb.db, DomainTopic.projectArchived, { occurredAt: new Date().toISOString(), projectId: newbieProjectId });
+    expect(await gateway.subscriptions.runOnce()).toBe(1);
+    expect(ingressRoutesOf('cs-newbie')).toEqual([]);
+    expect((await toMcp()).allowed).toBe(false);
+    // 解析范围放宽不等于让归档服务复活：再触发一次重算也不会把路由建回来。
+    expect(await gateway.api.reconcileService(newbieId)).toEqual([]);
+    expect(ingressRoutesOf('cs-newbie')).toEqual([]);
   });
 
   test('Pod 身份索引：按 IP 反查，物理槽映射为角色，删除后不可查', async () => {

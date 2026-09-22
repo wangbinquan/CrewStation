@@ -12,7 +12,8 @@ export function routeUseCases(deps: GatewayUseCaseDeps) {
   };
   const reconcileService = async (serviceId: ServiceId): Promise<RouteEntry[]> => {
     const svc = await deps.services.getService(serviceId);
-    if (!svc) return [];
+    // 已归档的服务解析得到、但不再生成路由：解析范围放宽是为了删得掉它，不是为了让它复活。
+    if (!svc || svc.archived) return [];
     const roles = (await deps.slots.slotRoles(serviceId)) ?? { prod: 'blue' as const, preview: 'green' as const };
     const proxyName = await deps.grants.proxyNameOf(serviceId);
     const routes = planServiceRoutes({

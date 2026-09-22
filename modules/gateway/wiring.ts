@@ -73,9 +73,20 @@ export function createGatewayModule(deps: GatewayModuleDeps): GatewayModule {
   const pods = podIdentityUseCases(useCaseDeps);
   const api: GatewayModuleApi = { name: 'gateway', ...routes, ...allowlist, evaluate: allowlist.evaluate, lookupByIp: pods.lookupByIp };
   // 发布登记的投影由目录提交后的组合根回调刷新；再独立消费同一发布会让迟到的旧计划覆盖新路由。
+  // 放行表是「当前已登记服务」的投影，这个集合一变就得重算：建项目原先只重算路由，新服务于是
+  // 根本不在表里，它的开发容器连内置 MCP 与平台 API 全是 403「不能调用平台端点」，要等某次无关的
+  // 授权／目录变更或管理员手动「重算」才顺带带上（2026-09-22 本机实撞）。归档同理，反过来。
   const subscriptions = createEventConsumer({ db: deps.db, consumer: deps.settings.consumerName, logger })
-    .on(DomainTopic.projectCreated, async (e) => { const id = await deps.services.serviceIdOfProject(e.payload.projectId); if (id) await routes.reconcileService(id); })
-    .on(DomainTopic.projectArchived, async (e) => { const id = await deps.services.serviceIdOfProject(e.payload.projectId); if (id) await routes.removeService(id); })
+    .on(DomainTopic.projectCreated, async (e) => {
+      const id = await deps.services.serviceIdOfProject(e.payload.projectId);
+      if (id) await routes.reconcileService(id);
+      await allowlist.rebuildAllowlist();
+    })
+    .on(DomainTopic.projectArchived, async (e) => {
+      const id = await deps.services.serviceIdOfProject(e.payload.projectId);
+      if (id) await routes.removeService(id);
+      await allowlist.rebuildAllowlist();
+    })
     .on(DomainTopic.trafficSwitched, async (e) => { await routes.reconcileService(e.payload.serviceId); })
     .on(DomainTopic.grantChanged, async () => { await allowlist.rebuildAllowlist(); });
   return {
