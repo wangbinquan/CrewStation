@@ -1,6 +1,6 @@
 # RFC-018｜设计
 
-状态：In Progress · 2026-09-22。作者已确认能力影响清单并裁定 Q1＝C、Q2＝b。落位依据 `docs/engineering/repository-structure.md` v0.4。本 RFC 只删代码、改网络策略、加一处启动重下发、清理历史数据；不新增模块，不新增跨模块 import。
+状态：Done · 2026-09-22。作者已确认能力影响清单并裁定 Q1＝C、Q2＝b。落位依据 `docs/engineering/repository-structure.md` v0.4。本 RFC 只删代码、改网络策略、加一处启动重下发、清理历史数据；不新增模块，不新增跨模块 import。
 
 ## 目录
 

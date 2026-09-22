@@ -176,6 +176,20 @@ sql`kind = ANY(ARRAY[${sql.join(kinds.map((k) => sql`${k}`), sql`, `)}]::text[])
 开发预览的目标 Service 是随任务 Pod 建的，放进 gateway 的「按服务重算路由」里对不上生命周期。
 这类资源的 IngressRoute 要**随 Pod 建、随 Pod 删**（`modules/task-runtime/adapters/k8s/taskCluster.ts`）。
 
+### Pod 连 Service ClusterIP 不通，直连 Pod IP 正常（本机 kind，2026-09-22 起）
+
+同一个 Pod 里做对照就能分辨：Traefik 的 ClusterIP `10.96.199.52:80` 连不上（`Unable to connect`），
+它的 Pod IP `:8000` 返回 200。DNS 是好的——`api.svc.cs.internal` 正确解析到那个 ClusterIP，
+坏的是 kube-proxy 的 VIP 转换。同一现象还表现为 cs-api 连不上 Prometheus、e2e 的 `clusterMetrics`
+历史新鲜度时红时绿。注意它**不是**全面失效：cs-api 经 Service 名连 PostgreSQL 一直正常。
+
+**判据**：实机验证里出现「网关／某个平台服务连不上」，先在同一个 Pod 内用 Pod IP 对照一次，
+再去查网络策略或平台代码。策略是放行的（`crewstation-default` 允许到 `crewstation-system`），查策略会白费时间。
+
+**绕过办法**：验证时用目标的 Pod IP 加 `Host:` 头发起，例如
+`fetch('http://<traefik-pod-ip>:8000/api/<proxy>/...', { headers: { host: 'api.svc.cs.internal' } })`。
+这样绕过的只是 VIP 转换，网关路由、源 Pod IP 身份解析、放行表判定都照常经过。
+
 ### 项目命名空间的出站由标签决定，不同负载看到的网络不一样
 
 一个项目命名空间里有三到四条 NetworkPolicy，取并集生效，所以「这个 Pod 能不能出站」要看它的标签：

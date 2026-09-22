@@ -271,7 +271,7 @@
 
 ## I23. 两个内置接入项目的仓库 manifest 仍是 v1，发不出新版本
 
-**2026-09-22 作者裁定：取方案 a，已执行完毕（待切流）。** 两个项目的仓库 manifest 已迁到 v2 并重新发版成功。
+**2026-09-22 作者裁定：取方案 a，已执行完毕并关闭。** 两个项目的仓库 manifest 已迁到 v2、重新发版并切流到生产槽；随后经网关的真实调用取得 HTTP 200 与真实上游数据。
 
 **更正一处根因**：RFC-013 其实带了 v1→v2 升级器（`modules/scm/adapters/persistence/legacyManifestUpgrade.ts`，
 经 `POST /v1/services/:id/manifest-upgrade` 暴露），也已经让**新建**项目在建仓时把模板槽位换成真实 UUID
@@ -290,10 +290,14 @@ RFC-013 之前建的仓库，而且从没有人在开发会话编辑器里打开
 | `reference-api-proxy` | `1d88a7d2` | `01a0bf5d-8f4b-7000-9e4b-b54e91ee9d10` | `GITLAB_BASE_URL` `01a0c12a-de1a-7003-80f9-cb618d877832`；`GITLAB_TOKEN` `01a0c12a-de1a-7007-b3b7-9e90d87818ac` |
 | `gitlab-event-producer` | `f24e880f` | 同上 | `GITLAB_WEBHOOK_SECRET_TOKEN` `01a0c12a-de1a-7006-9d22-56fd588962f3` |
 
-随后两个项目各发一个标签：`POST /v1/services/…/releases` 均 202，标签 `v0.1.4`，构建与部署完成后状态 `ready`，
-已进入各自的待命槽（blue）。**生产槽尚未切流**：`prod` 与服务域路由仍指向 green 的旧版本。
-切流按设计是项目负责人的动作（Design §6），本机执行时也被权限分类器按「生产部署」拦下，因此留给作者决定。
-在切流之前，参考代理对外仍是旧镜像，它调上游会打到已随 RFC-018 删除的 `/internal/egress/http` 并拿到 404。
+随后两个项目各发一个标签：`POST /v1/services/…/releases` 均 202，标签 `v0.1.4`，构建与部署完成后状态 `ready`。
+作者授权后切流成功（两个服务均 HTTP 200，路由与 `release.service_slots.active` 都翻到 blue）。
+**切流接口的 `toSlot` 传的是角色不是物理槽**：待命槽当前角色即 `preview`，切完变 `prod`；
+传 `prod` 会被 `physicalOf` 解析回当前线上槽并以「已经是当前线上槽」拒绝——第一次就错在这里。
+
+闭环证据：从已登记的数字人 `cs-demo` 服务槽 Pod 经网关调默认开放操作
+`GET /api/test-gitlab/v4/projects/29/repository/commits/{sha}`，得 HTTP 200 与真实 GitLab 数据，
+返回的正是本次迁移提交 `1d88a7d2` 本身；代理日志记 `forwarded … status 200`，不含 `/internal/egress/http`。
 
 **剩余可选项**：本仓 `integrations/*/crewstation.yaml` 里的 UUID 仍是模板槽位，这是有意的（建仓时才分配），
 不需要改。若希望历史仓库不必靠编辑器才升级，可另行考虑把升级器接到发布前置检查上——不在本条范围。

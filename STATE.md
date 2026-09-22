@@ -21,10 +21,18 @@ UUID 取自各项目实际的 `project.service_plans` 与 `config.definitions`�
 推送后把迁移前的 v1 原文交给平台升级器做对照——两者给出的 UUID 与取值逐项一致（仅键顺序不同）。
 提交：`reference-api-proxy` `1d88a7d2`，`gitlab-event-producer` `f24e880f`。
 
-**结果**：两个项目各发 `v0.1.4`，`POST …/releases` 均 202，构建部署完成后状态 `ready`，已进入待命槽 blue。
-**生产槽尚未切流**：`prod` 与服务域路由仍指向 green 的旧版本，旧版本调上游会打到已删除的 `/internal/egress/http` 并拿到 404。
-切流按 Design §6 是项目负责人的动作，本机执行时也被权限分类器按「生产部署」拦下，留给作者决定（可逆，回退即切回）。
-切流后再从开发容器经网关发一次真实 `GET`，RFC-018 的 EG-04 即可闭合。
+**结果**：两个项目各发 `v0.1.4` 并 `ready`，作者授权后切流成功，两个服务均 HTTP 200，路由与 `release.service_slots.active` 都翻到 blue。
+**切流接口的 `toSlot` 传的是角色不是物理槽**：待命槽当前角色即 `preview`，切完变 `prod`；传 `prod` 会被 `physicalOf` 解析回当前线上槽并以「已经是当前线上槽」拒绝——第一次就错在这里。
+
+**EG-04 已闭合**：从已登记的数字人 `cs-demo` 服务槽 Pod 经网关调默认开放操作
+`GET /api/test-gitlab/v4/projects/29/repository/commits/{sha}`，得 **HTTP 200 与真实 GitLab 数据**，
+返回的正是本次迁移提交 `1d88a7d2` 自身；代理日志 `forwarded … status 200`，最近 500 行不含 `/internal/egress/http`。
+同轮对照：同一调用方请求未开放的操作得 403，网关放行判定照常生效。RFC-018 八项验收全部通过，三件套已标 Done。
+
+**本机基础设施问题（与本次改动无关，但会绊住下一个 session）**：这台 kind 节点上 Pod 访问 Service ClusterIP 不通，
+直连 Pod IP 正常——同一 Pod 内对照，Traefik 的 `10.96.199.52:80` 连不上，其 Pod IP `:8000` 返回 200。
+它同样解释了此前 cs-api 连 Prometheus 失败、以及 e2e `clusterMetrics` 历史新鲜度时红时绿。
+上面的真实调用因此用 Pod IP 加 `Host:` 头发起，绕过的只是 kube-proxy 的 VIP 转换。
 
 本仓 `integrations/*/crewstation.yaml` 里的 UUID 仍是模板槽位，这是有意的（建仓时才分配），没有改动。
 
