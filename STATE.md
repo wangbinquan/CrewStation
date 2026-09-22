@@ -25,7 +25,9 @@
 完整 `bun run check`（带本机测试库与 dev-admin 登录）**2070 pass／8 skip／1 fail**：唯一失败是 `releaseDelivery.test.tsx`「其他发布进行中保留当前部署信息并阻止切换」，未改动的文件，单跑三次 10／10 通过，记为该文件既有 flake（STATE 此前已记同文件另一条）；随后 `test:cover` 全绿 **2071 pass／8 skip／0 fail**，`test:patch --base origin/main` 判定本次没有需要用例防护的生产源码（CSS 与用例）。
 本机 console 已部署 `cs-console:fullwidth-20260922`（`sha256:2e52b750…`），部署后 e2e 层 **53 pass／1 skip／0 fail**；真实 dev-admin 浏览器：1728px 视口下 `main` 1728px、内容区 1680px、`max-width: none`、无横向溢出。
 
-**下一步**：等作者看过原型并回复 prototype-review.md §5 的其余五个取舍，再写三件套（development-rules §5），批准后实施。实现要点：项目成员需要新的项目范围只读盘点接口（同一份 RFC-010 快照按项目过滤，走成员校验）；`--topo-*` 语义色进 tokens.css；组件放 `apps/console/src/shared/ui/`。
+作者随后答复其余取舍：详情放右侧、静态线默认显示、语义色进 tokens、Archify 图不入库；成员可见 Pod 事实的边界未答。三件套已写：`proposal.md`（三处入口、视觉规则、十九项裁定表、§7 待确认）、`design.md`（落位：`cluster-management` 已到 40 文件上限故不加生产文件，只在 `queries.ts`／`clusterRoutes.ts`／`dependencies.ts` 加项目范围只读盘点与摘要计数；形态在工作台 `shared/topology/` 组装，渲染在 `shared/ui/topology/`；接口、组装规则、排布、失败模式、测试策略）、`plan.md`（T1–T10、TP-01…TP-18）。README 状态仍为 Draft。
+
+**下一步**：等作者批准三件套并裁定提案 §7，再写三件套（development-rules §5），批准后实施。实现要点：项目成员需要新的项目范围只读盘点接口（同一份 RFC-010 快照按项目过滤，走成员校验）；`--topo-*` 语义色进 tokens.css；组件放 `apps/console/src/shared/ui/`。
 
 ## I23 已裁定并执行：两个内置接入项目的 manifest 迁到 v2（2026-09-22）
 
