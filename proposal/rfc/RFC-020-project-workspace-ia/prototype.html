@@ -1,0 +1,325 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RFC-020 交互设计稿｜项目工作台信息架构</title>
+<style>
+  /* 令牌取自 apps/console/src/app/theme/tokens.css，只保留本稿用到的。全部数据为演示。 */
+  :root {
+    --font: system-ui, -apple-system, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --bg: #f5f7fa; --surface: #ffffff; --surface-muted: #edf1f7; --border: #dce3ed; --text: #182438; --muted: #59677c;
+    --primary: #235bd8; --primary-hover: #1c4db8; --on-primary: #fff; --tint: #eaf1ff; --focus: #8db3ff;
+    --ok-fg: #176746; --ok-bg: #eaf6ef; --warn-fg: #86520a; --warn-bg: #fff5df; --danger-fg: #b02f39; --danger-bg: #fff0f1; --info-fg: #235bd8; --info-bg: #eaf1ff;
+    --term-bg: #0d1117; --term-fg: #d0d7de;
+  }
+  [data-theme="dark"] {
+    --bg: #11151c; --surface: #191f29; --surface-muted: #222b39; --border: #344154; --text: #e7edf6; --muted: #adbacd;
+    --primary: #3970df; --primary-hover: #4d84ee; --tint: #20365b; --danger-fg: #ffa4ad;
+    --ok-fg: #87d9b1; --ok-bg: #18372b; --warn-fg: #f4c976; --warn-bg: #392f1c; --danger-bg: #40242a; --info-fg: #8db3ff; --info-bg: #20365b;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.6 var(--font); background: var(--bg); color: var(--text); }
+  a { color: var(--primary); text-decoration: none; } a:hover { text-decoration: underline; }
+  code { font-family: var(--mono); font-size: 12px; background: var(--surface-muted); padding: 1px 5px; border-radius: 4px; }
+  h1 { font-size: 22px; margin: 0; } h2 { font-size: 15px; margin: 0; } h3 { font-size: 13px; margin: 0; color: var(--muted); font-weight: 600; }
+  .rfcbar { position: sticky; top: 0; z-index: 9; display: flex; flex-wrap: wrap; gap: 6px 18px; align-items: center; padding: 6px 16px; font-size: 12px; background: var(--surface-muted); border-bottom: 1px solid var(--border); }
+  .rfcbar strong { color: var(--primary); }
+  .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+  .seg button { border: 0; background: var(--surface); color: var(--muted); padding: 2px 8px; cursor: pointer; font: inherit; font-size: 12px; }
+  .seg button[aria-pressed="true"] { background: var(--tint); color: var(--primary); font-weight: 600; }
+  .shell { display: grid; grid-template-columns: 208px minmax(0, 1fr); grid-template-rows: 52px minmax(0, 1fr); grid-template-areas: 'top top' 'nav main'; min-height: calc(100vh - 34px); }
+  .topbar { grid-area: top; display: flex; align-items: center; gap: 16px; padding: 4px 16px; background: var(--surface); border-bottom: 1px solid var(--border); }
+  .brand { font-weight: 700; display: flex; align-items: center; gap: 8px; } .brand i { display: inline-block; width: 22px; height: 22px; border-radius: 50%; background: var(--primary); }
+  .pill { padding: 4px 8px; border-radius: 6px; color: var(--muted); font-weight: 500; } .pill.on { background: var(--tint); color: var(--primary); }
+  .topbar .right { margin-left: auto; color: var(--muted); display: flex; gap: 12px; align-items: center; }
+  .nav { grid-area: nav; padding: 16px 12px; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; gap: 4px; }
+  .nav .back { padding: 0 12px; font-size: 12px; } .nav .pname { padding: 4px 12px 0; font-weight: 700; } .nav .pslug { padding: 0 12px 8px; font-family: var(--mono); font-size: 11px; color: var(--muted); }
+  .nav button { text-align: left; border: 0; background: transparent; color: var(--text); font: inherit; padding: 7px 12px; border-radius: 8px; cursor: pointer; display: flex; justify-content: space-between; }
+  .nav button small { color: var(--muted); font-size: 11px; } .nav button:hover { background: var(--surface-muted); } .nav button.on { background: var(--tint); color: var(--primary); font-weight: 600; }
+  .main { grid-area: main; padding: 24px; overflow: auto; min-width: 0; } .main.compact { padding: 8px 12px; }
+  .screen { display: none; } .screen.on { display: block; }
+  .phead { display: flex; align-items: flex-start; gap: 16px; margin-bottom: 12px; } .phead .grow { flex: 1; min-width: 0; } .phead .actions { display: flex; gap: 8px; align-items: center; flex-shrink: 0; }
+  .meta { color: var(--muted); font-size: 13px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 4px; }
+  .readat { color: var(--muted); font-size: 12px; display: inline-flex; gap: 6px; align-items: center; }
+  .btn { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); font: inherit; font-weight: 500; cursor: pointer; white-space: nowrap; line-height: 1.4; }
+  .btn:hover { background: var(--surface-muted); } .btn.primary { background: var(--primary); border-color: var(--primary); color: var(--on-primary); } .btn.primary:hover { background: var(--primary-hover); }
+  .btn.ghost { border-color: transparent; background: transparent; font-weight: 400; } .btn.sm { padding: 3px 8px; font-size: 12px; } .btn.icon { padding: 6px 8px; }
+  .splitbtn { display: inline-flex; } .splitbtn .btn:first-child { border-radius: 8px 0 0 8px; } .splitbtn .btn:last-child { border-radius: 0 8px 8px 0; border-left-color: rgba(255,255,255,.35); padding: 6px 8px; }
+  .badge { display: inline-block; white-space: nowrap; padding: 1px 7px; border-radius: 999px; font-size: 12px; font-weight: 600; background: var(--surface-muted); color: var(--muted); }
+  .badge.ok { background: var(--ok-bg); color: var(--ok-fg); } .badge.warn { background: var(--warn-bg); color: var(--warn-fg); } .badge.danger { background: var(--danger-bg); color: var(--danger-fg); } .badge.info { background: var(--info-bg); color: var(--info-fg); }
+  .card { border: 1px solid var(--border); border-radius: 8px; background: var(--surface); box-shadow: 0 1px 2px rgba(24,36,56,.04); min-width: 0; }
+  .card > .ch { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 14px; border-bottom: 1px solid var(--border); } .card > .cb { padding: 12px 14px; } .card > .cf { padding: 8px 14px; border-top: 1px solid var(--border); color: var(--muted); font-size: 12px; }
+  .stack { display: flex; flex-direction: column; gap: 16px; } .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  .banner { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: 8px; background: var(--info-bg); color: var(--text); border: 1px solid transparent; } .banner.warn { background: var(--warn-bg); } .banner .grow { flex: 1; } .banner small { color: var(--muted); display: block; }
+  .cards3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; } .cards2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .vcard .tag { font-size: 24px; font-weight: 700; line-height: 1.2; } .vcard .sub { color: var(--muted); font-size: 12px; margin: 4px 0 10px; } .vcard .foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; border-top: 1px solid var(--border); padding-top: 10px; margin-top: 4px; }
+  .band { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; padding: 10px; border: 1px dashed var(--border); border-radius: 8px; background: radial-gradient(circle, var(--border) 1px, transparent 1px) 0 0 / 16px 16px; }
+  .bnode { border: 1.5px solid var(--ok-fg); border-radius: 8px; padding: 8px 10px; background: var(--surface); font-size: 12px; } .bnode.dev { border-color: var(--primary); } .bnode b { display: block; font-size: 13px; }
+  .tl { list-style: none; margin: 0; padding: 0; } .tl li { display: grid; grid-template-columns: 18px 1fr auto; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); align-items: baseline; } .tl li:last-child { border-bottom: 0; }
+  .tl .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--ok-fg); display: inline-block; position: relative; top: 1px; } .tl .dot.sw { background: var(--primary); border-radius: 2px; } .tl .dot.fail { background: var(--danger-fg); }
+  .tl small { color: var(--muted); } .tl .when { color: var(--muted); font-size: 12px; white-space: nowrap; }
+  .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 12px; } .tabs button { border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--muted); padding: 7px 10px; font: inherit; cursor: pointer; } .tabs button.on { color: var(--primary); border-bottom-color: var(--primary); font-weight: 600; }
+  .secnav { display: grid; grid-template-columns: 180px minmax(0, 1fr); gap: 16px; } .secnav nav { display: flex; flex-direction: column; gap: 4px; }
+  .secnav nav button { text-align: left; border: 1px solid transparent; background: transparent; color: var(--text); font: inherit; padding: 8px 12px; border-radius: 8px; cursor: pointer; } .secnav nav button small { display: block; color: var(--muted); font-size: 11px; } .secnav nav button.on { border-color: var(--border); background: var(--surface); }
+  .dl { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 0; } .dl dt { color: var(--muted); } .dl dd { margin: 0; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; } th { text-align: left; color: var(--muted); font-weight: 600; padding: 6px 8px; border-bottom: 1px solid var(--border); } td { padding: 8px; border-bottom: 1px solid var(--border); vertical-align: top; } tr.sel td { background: var(--tint); }
+  .muted { color: var(--muted); } .small { font-size: 12px; }
+  /* 开发页 */
+  .devhead { display: flex; align-items: center; gap: 10px; padding: 4px 0 8px; } .devhead h1 { font-size: 18px; } .chip { display: inline-flex; align-items: center; gap: 6px; padding: 2px 8px; border-radius: 999px; background: var(--ok-bg); color: var(--ok-fg); font-size: 12px; cursor: pointer; }
+  .devbody { display: grid; grid-template-columns: minmax(0, 1fr) 0 0; height: calc(100vh - 34px - 52px - 44px - 44px - 20px); min-height: 480px; }
+  .devbody[data-panel="side"] { grid-template-columns: minmax(0, 1fr) 6px minmax(0, 45%); } .devbody[data-panel="full"] { grid-template-columns: 0 0 minmax(0, 1fr); }
+  .devbody[data-panel="full"] .workspace, .devbody[data-panel="closed"] .panel { display: none; }
+  .workspace { grid-column: 1; display: flex; flex-direction: column; min-width: 0; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); overflow: hidden; }
+  .gutter { grid-column: 2; cursor: col-resize; background: transparent; } .devbody[data-panel="side"] .gutter { background: linear-gradient(var(--border), var(--border)) center / 2px 100% no-repeat; }
+  .toolbar { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+  .wstab { border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--muted); padding: 5px 8px; font: inherit; font-size: 13px; cursor: pointer; } .wstab.on { color: var(--primary); border-bottom-color: var(--primary); font-weight: 600; }
+  .grow { flex: 1; }
+  .terms { flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 6px; min-height: 0; }
+  .term { display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; min-height: 0; } .term .th { display: flex; align-items: center; gap: 8px; padding: 4px 8px; font-size: 12px; background: var(--surface-muted); } .term .th .r { margin-left: auto; color: var(--muted); }
+  .term pre { flex: 1; margin: 0; padding: 8px; background: var(--term-bg); color: var(--term-fg); font: 12px/1.5 var(--mono); overflow: auto; white-space: pre-wrap; }
+  .panel { grid-column: 3; display: flex; flex-direction: column; min-width: 0; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); overflow: hidden; }
+  .ptabs { display: flex; align-items: center; gap: 2px; padding: 0 6px; border-bottom: 1px solid var(--border); } .ptabs .ctl { margin-left: auto; display: flex; gap: 2px; }
+  .ptabs button.t { border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--muted); padding: 8px 8px; font: inherit; font-size: 13px; cursor: pointer; } .ptabs button.t.on { color: var(--primary); border-bottom-color: var(--primary); font-weight: 600; }
+  .pbody { flex: 1; overflow: auto; padding: 12px; min-height: 0; } .pane, .sec { display: none; } .pane.on, .sec.on { display: block; }
+  .statusbar { display: flex; align-items: center; gap: 12px; padding: 6px 8px; margin-top: 8px; border-top: 1px solid var(--border); font-size: 12px; color: var(--muted); }
+  .pagetabs { display: none; } .d1-tabs .pagetabs { display: flex; } .d1-tabs .ptabs { display: none !important; } .d1-tabs .devbody[data-panel="side"] { grid-template-columns: 0 0 minmax(0, 1fr); }
+  .preview-box { border: 1px solid var(--border); border-radius: 6px; height: 260px; display: grid; place-items: center; color: var(--muted); background: var(--surface-muted); }
+  .tree { font-family: var(--mono); font-size: 12px; line-height: 1.8; color: var(--muted); } .tree b { color: var(--text); font-weight: 500; }
+  details { border: 1px solid var(--border); border-radius: 8px; padding: 6px 12px; } details + details { margin-top: 8px; } summary { cursor: pointer; font-weight: 600; }
+  .note { font-size: 12px; color: var(--muted); }
+  .hidden { display: none !important; }
+  @media (max-width: 800px) { .shell { grid-template-columns: 1fr; grid-template-areas: 'top' 'nav' 'main'; grid-template-rows: auto auto 1fr; } .nav { flex-direction: row; flex-wrap: wrap; border-right: 0; border-bottom: 1px solid var(--border); } .cards3, .cards2, .secnav { grid-template-columns: 1fr; } .devbody[data-panel="side"] { grid-template-columns: 0 0 1fr; } .devbody[data-panel="side"] .workspace { display: none; } }
+</style>
+</head>
+<body>
+<div class="rfcbar">
+  <strong>RFC-020 交互设计稿</strong> <span>数据均为演示，不连接任何接口</span>
+  <span>D1 开发工具 <span class="seg" data-toggle="d1"><button aria-pressed="true" data-v="panel">侧栏面板</button><button aria-pressed="false" data-v="tabs">整页页签</button></span></span>
+  <span>D2 开发资源 <span class="seg" data-toggle="d2"><button aria-pressed="true" data-v="keep">保留入口</button><button aria-pressed="false" data-v="fold">并入面板与设置</button></span></span>
+  <span>D4 概览 <span class="seg" data-toggle="d4"><button aria-pressed="true" data-v="one">一屏</button><button aria-pressed="false" data-v="long">保留现有段落</button></span></span>
+  <span>D7 文案 <span class="seg" data-toggle="d7"><button aria-pressed="true" data-v="long">发布与上线／运行与诊断</button><button aria-pressed="false" data-v="short">发布／运行</button></span></span>
+  <span>主题 <span class="seg" data-toggle="theme"><button aria-pressed="true" data-v="light">浅</button><button aria-pressed="false" data-v="dark">深</button></span></span>
+</div>
+<div class="shell">
+  <header class="topbar">
+    <span class="brand"><i></i>CrewStation</span>
+    <span class="pill">应用</span><span class="pill on">项目开发</span><span class="pill">平台管理</span>
+    <span class="right"><span class="seg"><button aria-pressed="true">中文</button><button aria-pressed="false">EN</button></span><span>dev-admin <span class="badge warn">管理员</span></span><span>登出</span></span>
+  </header>
+  <nav class="nav" aria-label="项目页面">
+    <a class="back" href="#">← 项目开发</a>
+    <div class="pname">演示数字人</div><div class="pslug">demo · 数字人</div>
+    <button data-screen="overview" class="on">概览</button>
+    <button data-screen="dev">开发</button>
+    <button data-screen="release"><span data-label="release">发布与上线</span></button>
+    <button data-screen="ops"><span data-label="ops">运行与诊断</span></button>
+    <button data-screen="res" data-d2="keep">开发资源</button>
+    <button data-screen="settings">项目设置</button>
+  </nav>
+  <main class="main" id="main">
+
+    <!-- 概览 -->
+    <section class="screen on" id="overview">
+      <div class="phead">
+        <div class="grow">
+          <h1>演示数字人</h1>
+          <div class="meta"><code>demo</code><span>数字人</span><span class="badge ok">已开通</span><span>负责人 CrewStation Admin</span></div>
+          <div class="meta"><span>仓库 <a href="#">crewstation/demo ↗</a></span><span>·</span><a href="#">demo.cs.localhost ↗</a><span>·</span><a href="#">preview.demo.cs.localhost ↗</a></div>
+        </div>
+        <div class="actions"><button class="btn primary">继续开发</button><span class="readat">读取于 00:10 <button class="btn ghost sm icon" title="刷新">↻</button></span></div>
+      </div>
+      <div class="stack">
+        <div class="banner"><div class="grow"><strong>v0.1.2 已发布，等待验证</strong><small>打开试用验证，再由负责人正式上线；试用与正式共享生产数据。</small></div><a href="#" data-go="release">查看版本 →</a></div>
+        <div class="cards3">
+          <div class="card vcard"><div class="ch"><h2>正式版本</h2><span class="badge ok">健康</span></div><div class="cb"><div class="tag">v0.1.4</div><div class="sub"><code>9fd01fc</code> · 1 / 1 副本就绪 · 9月12日 18:54</div><div class="foot"><span class="muted small">demo.cs.localhost</span><button class="btn sm">打开正式应用</button></div></div></div>
+          <div class="card vcard"><div class="ch"><h2>待验证版本</h2><span class="badge ok">健康</span></div><div class="cb"><div class="tag">v0.1.2</div><div class="sub"><code>3975d02</code> · 1 / 1 副本就绪 · 9月11日 23:55</div><div class="foot"><span class="muted small">preview.demo.cs.localhost</span><span class="row" style="gap:6px"><button class="btn sm">打开试用</button><button class="btn sm primary" data-go="release">上线 v0.1.2…</button></span></div></div></div>
+          <div class="card vcard"><div class="ch"><h2>开发会话</h2><span class="badge ok">运行中</span></div><div class="cb"><div class="tag" style="font-size:18px">main · 1 个 CLI</div><div class="sub">待上线 0 个提交 · 未提交 0 个文件 · 已连接</div><div class="foot"><span class="muted small">检查于 00:10</span><button class="btn sm" data-go="dev">继续开发</button></div></div></div>
+        </div>
+        <div class="card"><div class="ch"><h2>部署与运行形态</h2><a href="#" data-go="ops">查看完整形态 →</a></div><div class="cb"><div class="muted small" style="margin-bottom:8px">工作负载 2 · Pod 3，就绪 3，运行 0</div><div class="band"><div class="bnode"><b>线上槽 prod · blue</b>v0.1.4 就绪 · Pod 1 · 1 就绪</div><div class="bnode"><b>待命槽 preview · green</b>v0.1.2 就绪 · Pod 1 · 1 就绪</div><div class="bnode dev"><b>开发会话</b>分支 main · 1 个 Agent · Pod 1 · 1 就绪</div></div></div></div>
+        <div class="card"><div class="ch"><h2>最近动态</h2><a href="#" data-go="release">全部记录 →</a></div><div class="cb"><ul class="tl">
+          <li><span class="dot sw"></span><span><b>dev-admin</b> 把 <b>v0.1.2</b> 切为正式版本 <small>· 原因 —</small></span><span class="when">9月22日 20:03</span></li>
+          <li><span class="dot"></span><span><b>v0.1.4</b> 发布就绪 · 正式 <small>· 9fd01fc · main</small></span><span class="when">9月12日 18:54</span></li>
+          <li><span class="dot sw"></span><span><b>CrewStation Admin</b> 回退到 <b>v0.1.2</b> <small>· 回滚到 v0.1.2</small></span><span class="when">9月12日 00:14</span></li>
+          <li><span class="dot"></span><span><b>v0.1.3</b> 已被替代 <small>· 3975d02 · main</small></span><span class="when">9月12日 00:13</span></li>
+          <li><span class="dot fail"></span><span><b>v0.1.1</b> 发布失败 <small>· 构建失败：Job has reached the specified backoff limit</small> <a href="#" data-go="ops">日志</a></span><span class="when">9月11日 23:52</span></li>
+        </ul></div></div>
+        <div class="card d4-long"><div class="ch"><h2>当前开发（D4 b 才保留）</h2><a href="#" data-go="dev">继续开发</a></div><div class="cb">会话运行中 · 已连接 · 创建时分支 <code>main</code> · 环境已连接<br><span class="muted small">读取于 00:10</span></div></div>
+        <div class="card d4-long"><div class="ch"><h2>运行健康（D4 b 才保留）</h2><a href="#" data-go="ops">查看诊断</a></div><div class="cb">正式版本 · 健康<br>待验证版本 · 健康<br><span class="muted small">读取于 00:10</span></div></div>
+        <div class="card d4-long"><div class="ch"><h2>项目快捷入口（D4 b 才保留）</h2></div><div class="cb cards2"><span>前往发布 →</span><span>成员与角色 →</span><span>仓库 →</span><span>开发资源 →</span></div></div>
+      </div>
+    </section>
+
+    <!-- 开发 -->
+    <section class="screen" id="dev">
+      <div class="devhead"><h1>开发会话</h1><span class="chip" data-panel-open="session" title="打开会话面板">● 已连接</span><code>main</code><span class="muted small">原工作树已恢复</span><span class="grow"></span><button class="btn">⧉ 预览</button><button class="btn primary" data-go="release">准备发布</button></div>
+      <div class="tabs pagetabs"><button class="on" data-pt="cli">CLI 工作区</button><button data-pt="preview">预览</button><button data-pt="code">代码</button><button data-pt="changes">变更</button><button data-pt="data">数据访问</button><button data-pt="session">会话与环境</button></div>
+      <div class="devbody" data-panel="closed" id="devbody">
+        <div class="workspace">
+          <div class="toolbar">
+            <button class="wstab on">工作区 1 · 2</button><button class="wstab">工作区 2 · 1</button><button class="btn ghost sm" title="新建工作区">＋</button>
+            <span class="grow"></span>
+            <span class="splitbtn"><button class="btn primary sm">＋ CLI</button><button class="btn primary sm" title="档位与权限">▾</button></span>
+            <button class="btn sm">布局 ▾</button><button class="btn sm" title="重命名、关闭工作区、已启动 5">⋯</button>
+          </div>
+          <div class="terms">
+            <div class="term"><div class="th">CLI fcb070 <span class="badge ok">运行中</span><span class="r">volc-glm-5-2 · 150m · 1Gi</span></div><pre>$ claude
+› 把 /chat 的回复改成流式输出
+
+⏺ 读取 src/routes/chat.ts …
+⏺ 修改 src/routes/chat.ts (+18 -4)
+⏺ 运行 bun test src/routes … 通过
+
+› █</pre></div>
+            <div class="term"><div class="th">CLI a91c33 <span class="badge warn">需要你处理</span><span class="r">volc-glm-5-2 · 150m · 1Gi</span></div><pre>$ opencode
+› 给 README 补一节部署说明
+
+? 是否允许写入 README.md？ (y/n) █</pre></div>
+          </div>
+        </div>
+        <div class="gutter" title="拖动调整面板宽度"></div>
+        <aside class="panel" aria-label="工具面板">
+          <div class="ptabs">
+            <button class="t" data-pane="preview">预览</button><button class="t" data-pane="code">代码</button><button class="t" data-pane="changes">变更</button><button class="t" data-pane="data">数据</button><button class="t" data-pane="reference">参考</button><button class="t" data-pane="session">会话</button>
+            <span class="ctl"><button class="btn ghost sm icon" data-panel-mode="toggle" title="放大／还原">⤢</button><button class="btn ghost sm icon" data-panel-mode="closed" title="收起">×</button></span>
+          </div>
+          <div class="pbody">
+            <div class="pane" data-pane="preview"><div class="row" style="justify-content:space-between;margin-bottom:8px"><span><code>dev.demo.cs.localhost</code> <span class="badge ok">运行中</span> · 开发数据</span><span class="row" style="gap:6px"><button class="btn sm">刷新</button><button class="btn sm">重启预览</button><button class="btn sm">新标签打开</button></span></div><div class="preview-box">当前工作树的真实预览（iframe）</div></div>
+            <div class="pane" data-pane="code"><div class="row" style="justify-content:space-between;margin-bottom:8px"><span><code>crewstation.yaml</code> · 已保存</span><button class="btn sm">保存</button></div><div style="display:grid;grid-template-columns:150px 1fr;gap:8px"><div class="tree">▸ src<br>· <b>crewstation.yaml</b><br>· Dockerfile<br>· openapi.yaml<br>· package.json<br>· README.md</div><pre style="margin:0;border:1px solid var(--border);border-radius:6px;padding:8px;font:12px/1.5 var(--mono);min-height:200px">version: 2
+service:
+  servicePlanId: 01a0c12a-…
+events:
+  subscriptions:
+    - type: gitlab.push
+      handlerPath: /events/gitlab</pre></div></div>
+            <div class="pane" data-pane="changes"><div class="row" style="justify-content:space-between;margin-bottom:8px"><span>当前工作树 <code>main @ 9fd01fc</code> 对 <select><option>生产部署 v0.1.4</option><option>待验证 v0.1.2</option></select></span><button class="btn sm">重新检查</button></div><div class="stack" style="gap:8px"><div><h3>待上线提交 · 0</h3><div class="note">没有这类改动。</div></div><div><h3>缺少的生产提交 · 0</h3><div class="note">没有这类改动。</div></div><div><h3>相对生产的文件差异 · 0</h3><div class="note">没有这类改动。</div></div><div><h3>未提交改动 · 0</h3><div class="note">工作树干净 · 上游 origin/main 未推送 0。</div></div></div><p class="note">四组由页签改为同一列表上的分组标题；检查不会拉取或修改文件。</p></div>
+            <div class="pane" data-pane="data"><h3>数据资源</h3><table style="margin:6px 0 14px"><tr><th>类型</th><th>环境</th><th>规格</th><th>状态</th><th>环境变量名</th></tr><tr><td><code>postgres</code></td><td>生产</td><td>db-small</td><td><span class="badge ok">ready</span></td><td><code>CS_DATABASE_URL</code> <button class="btn ghost sm">复制</button></td></tr><tr><td><code>postgres</code></td><td>开发</td><td>db-small</td><td><span class="badge ok">ready</span></td><td><code>CS_DATABASE_URL</code> <button class="btn ghost sm">复制</button></td></tr></table><h3>本会话的数据访问</h3><p class="note">开发数据默认可读写，跨会话保留。生产只读／读写需项目负责人批准，覆盖整个开发会话。</p><div class="row"><select><option>生产数据只读</option><option>生产数据读写</option></select><input placeholder="申请理由（可选）" style="flex:1;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text)"><button class="btn sm primary">提交申请</button></div><p class="note" style="margin-top:8px">当前没有额外绑定记录。</p></div>
+            <div class="pane" data-pane="reference"><details open><summary>API 接口 · 已授权 3 个操作</summary><table style="margin:6px 0"><tr><th>代理</th><th>方法</th><th>路径</th><th></th></tr><tr><td>test-gitlab</td><td><code>GET</code></td><td><code>/v4/projects</code></td><td><button class="btn ghost sm">试调</button></td></tr><tr><td>test-gitlab</td><td><code>GET</code></td><td><code>/v4/projects/{id}/repository/commits/{sha}</code></td><td><button class="btn ghost sm">试调</button></td></tr><tr><td>rfc003-verify-delivery</td><td><code>GET</code></td><td><code>/api/hello</code></td><td><button class="btn ghost sm">试调</button></td></tr></table><a href="#" data-go="res" class="d2-keep">全部 24 个操作、申请与 Swagger →</a><span class="d2-fold note">全部操作与 Swagger 在此面板放大后显示（D2 b）。</span></details><details><summary>事件 · 本项目订阅 1 条</summary><table style="margin:6px 0"><tr><th>事件类型</th><th>处理路径</th><th>状态</th></tr><tr><td><code>gitlab.push</code></td><td><code>/events/gitlab</code></td><td><span class="badge ok">生效</span></td></tr></table><p class="note">订阅在 <code>crewstation.yaml</code> 中声明，发布时登记。可订阅类型 8 个 · <a href="#" data-go="ops">最近投递 4 条 →</a></p></details><details><summary>平台接入 · 身份头、环境变量、MCP</summary><dl class="dl small"><dt>用户身份头</dt><dd><code>x-cs-user-id</code> <code>x-cs-user-name</code> <code>x-cs-user-email</code></dd><dt>服务令牌</dt><dd><code>CS_SERVICE_TOKEN</code></dd><dt>操作 MCP</dt><dd><code>http://mcp-operations.svc.cs.internal/mcp</code></dd></dl></details></div>
+            <div class="pane" data-pane="session"><div class="card" style="margin-bottom:10px"><div class="ch"><h2>连接与恢复</h2><span class="badge ok">已连接</span></div><div class="cb small">开发环境由平台创建并自动连接；TaskRunner 已连接 cs-session，已回放最近 2000 条。<br><a href="#">历史对话会话 →</a></div></div><div class="card" style="margin-bottom:10px"><div class="ch"><h2>最近日志</h2><a href="#" data-go="ops">完整日志 →</a></div><div class="cb"><pre style="margin:0;font:12px/1.5 var(--mono);color:var(--muted)">00:03:12  runner  preview process started (pid 41)
+00:03:14  preview listening on :3000
+00:10:02  runner  workspace check ok · clean</pre></div></div><div class="card"><div class="ch"><h2>当前会话</h2></div><div class="cb"><dl class="dl small"><dt>创建时分支</dt><dd><code>main</code></dd><dt>创建时间</dt><dd>9月12日 18:54</dd><dt>归属</dt><dd>CrewStation Admin</dd><dt>开发预览域名</dt><dd><code>dev.demo.cs.localhost</code></dd></dl><details style="margin-top:8px"><summary>技术详情</summary><dl class="dl small"><dt>任务</dt><dd><code>01a0c12a-de2a-705a-9de5-2680b8ed75c1</code></dd><dt>开发容器</dt><dd><code>task-r-01a0c7fc4f737000a561b1d65a740cd0</code></dd></dl></details></div><div class="cf"><strong>结束开发并释放环境</strong> · 确认后销毁容器与工作卷，未提交或未推送的代码会丢失。 <button class="btn sm">释放会话…</button></div></div></div>
+          </div>
+        </aside>
+      </div>
+      <div class="statusbar"><span>当前工作树 <code>main @ 9fd01fc</code></span><span>生产部署 <code>v0.1.4 @ 9fd01fc</code></span><span class="badge ok">提交一致</span><span>待上线 0 · 未提交 0 · 未推送 0</span><span class="grow"></span><button class="btn ghost sm" data-panel-open="changes">查看变更</button><button class="btn ghost sm">重新检查</button></div>
+    </section>
+
+    <!-- 发布与上线 -->
+    <section class="screen" id="release">
+      <div class="phead"><div class="grow"><h1 data-label="release">发布与上线</h1><div class="meta">先准备待验证版本，试用后由负责人正式上线。</div></div><div class="actions"><button class="btn primary">准备发布</button><span class="readat">读取于 00:10 <button class="btn ghost sm icon">↻</button></span></div></div>
+      <div class="stack">
+        <div class="cards2">
+          <div class="card vcard"><div class="ch"><h2>正式版本</h2><span class="badge ok">健康</span></div><div class="cb"><div class="tag">v0.1.4</div><div class="sub"><code>9fd01fc</code> · 1 / 1 副本就绪 · 9月12日 18:54</div><div class="foot"><span class="muted small">demo.cs.localhost</span><button class="btn sm">打开正式应用</button></div></div></div>
+          <div class="card vcard"><div class="ch"><h2>待验证版本</h2><span class="badge ok">健康</span></div><div class="cb"><div class="tag">v0.1.2</div><div class="sub"><code>3975d02</code> · 1 / 1 副本就绪 · 9月11日 23:55</div><div class="foot"><span class="muted small">preview.demo.cs.localhost</span><span class="row" style="gap:6px"><button class="btn sm">试用</button><button class="btn sm primary" id="switchBtn">上线 v0.1.2…</button></span></div><div id="switchPanel" class="hidden" style="margin-top:10px;border:1px solid var(--border);border-radius:8px;padding:10px"><strong>正式版本 v0.1.4 → v0.1.2？</strong><p class="note">这是回退：v0.1.2 比 v0.1.4 早。快照 9fd01fc → 3975d02，检查于 00:11；回退不会恢复生产数据。</p><input placeholder="原因（可选）" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text);margin-bottom:8px"><div class="row" style="gap:6px"><button class="btn sm primary">确认回退到 v0.1.2</button><button class="btn sm">取消</button></div></div></div></div>
+        </div>
+        <p class="note">两个版本共用生产数据，试用也可能写入生产数据；就绪反映部署记录，网关切换可能稍后生效。</p>
+        <div class="card"><div class="ch"><h2>发布记录</h2><span class="muted small">发布与上线合并，按时间排列</span></div><div class="cb"><ul class="tl">
+          <li><span class="dot sw"></span><span><b>dev-admin</b> 把 <b>v0.1.2</b> 切为正式版本 <small>· 原因 —</small></span><span class="when">9月22日 20:03</span></li>
+          <li><span class="dot"></span><span><b>v0.1.4</b> <span class="badge ok">就绪</span> 正式 <small>· 9fd01fc · main</small> <a href="#">详情</a></span><span class="when">9月12日 18:54</span></li>
+          <li><span class="dot sw"></span><span><b>CrewStation Admin</b> 回退到 <b>v0.1.2</b> <small>· 回滚到 v0.1.2</small></span><span class="when">9月12日 00:14</span></li>
+          <li><span class="dot"></span><span><b>v0.1.3</b> <span class="badge">已被替代</span> <small>· 3975d02 · main</small> <a href="#">详情</a></span><span class="when">9月12日 00:13</span></li>
+          <li><span class="dot sw"></span><span><b>CrewStation Admin</b> 把 <b>v0.1.3</b> 切为正式版本 <small>· 晋级 v0.1.3</small></span><span class="when">9月12日 00:13</span></li>
+          <li><span class="dot sw"></span><span><b>CrewStation Admin</b> 把 <b>v0.1.2</b> 切为正式版本 <small>· 首次晋级</small></span><span class="when">9月12日 00:10</span></li>
+          <li><span class="dot"></span><span><b>v0.1.2</b> <span class="badge ok">就绪</span> 待验证 <small>· 3975d02 · main</small> <a href="#">详情</a></span><span class="when">9月11日 23:55</span></li>
+          <li><span class="dot fail"></span><span><b>v0.1.1</b> <span class="badge danger">失败</span> <small>· 构建失败：Job has reached the specified backoff limit</small> <a href="#" data-go="ops">日志</a></span><span class="when">9月11日 23:52</span></li>
+          <li><span class="dot fail"></span><span><b>v0.1.0</b> <span class="badge danger">失败</span> <small>· 生产组配置缺少 Manifest env 段声明的键：GREETING</small> <a href="#" data-go="settings">环境变量</a></span><span class="when">9月11日 23:48</span></li>
+        </ul></div></div>
+        <details><summary>标签（非平台标签）</summary><p class="note">手动推送的标签不会触发发布；这里列出仓库里的全部标签。</p></details>
+      </div>
+    </section>
+
+    <!-- 运行与诊断 -->
+    <section class="screen" id="ops">
+      <div class="phead"><div class="grow"><h1 data-label="ops">运行与诊断</h1></div><div class="actions"><span class="readat">读取于 00:10 <button class="btn ghost sm icon">↻</button></span></div></div>
+      <div class="secnav">
+        <nav aria-label="运行与诊断"><button class="on" data-sec="ops-status">状态<small>两槽健康与运行形态</small></button><button data-sec="ops-logs">日志<small>部署槽、构建、迁移、会话</small></button><button data-sec="ops-alerts">告警与通知<small>记录与订阅</small></button><button data-sec="ops-deliv">事件投递<small>投递、重试与死信</small></button><button data-sec="ops-trace">调用链<small>按 trace_id 追溯</small></button></nav>
+        <div>
+          <div class="sec on" data-sec="ops-status"><div class="stack"><div class="cards2"><div class="card"><div class="ch"><h2>正式版本（prod）</h2><span class="badge ok">健康</span></div><div class="cb"><dl class="dl small"><dt>就绪副本</dt><dd>1 / 1</dd><dt>重启次数</dt><dd>1</dd><dt>最近变化</dt><dd>9月21日 12:18</dd></dl><button class="btn sm" style="margin-top:8px">查看此版本日志</button></div></div><div class="card"><div class="ch"><h2>待验证版本（preview）</h2><span class="badge ok">健康</span></div><div class="cb"><dl class="dl small"><dt>就绪副本</dt><dd>1 / 1</dd><dt>重启次数</dt><dd>1</dd><dt>最近变化</dt><dd>9月21日 12:17</dd></dl><button class="btn sm" style="margin-top:8px">查看此版本日志</button></div></div></div><div class="card"><div class="ch"><h2>部署与运行形态</h2><span class="muted small">入口 → 工作负载 → Pod → 数据与存储</span></div><div class="cb"><div class="band" style="grid-template-columns:repeat(4,1fr)"><div class="bnode"><b>网关</b>demo.cs.localhost → prod</div><div class="bnode"><b>Deployment demo-blue</b>v0.1.4 · 1/1</div><div class="bnode"><b>Pod demo-blue-7c…</b>就绪 · 节点 4</div><div class="bnode" style="border-color:#6d28d9"><b>postgres 生产</b>db-small · ready</div></div><p class="note">RFC-019 全图不变，只是与健康卡同页。</p></div></div></div></div>
+          <div class="sec" data-sec="ops-logs"><div class="card"><div class="ch"><h2>日志</h2><span class="muted small">本页 1 / 1 条</span></div><div class="cb"><div class="row" style="margin-bottom:8px"><select><option>部署槽</option><option>构建</option><option>迁移</option><option>开发会话</option></select><select><option>正式版本（prod）</option><option>待验证版本（preview）</option><option>全部部署槽</option></select><select><option>200</option></select><input placeholder="在本页内过滤" style="flex:1;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text)"><button class="btn sm primary">跟随中</button></div><pre style="margin:0;font:12px/1.5 var(--mono);border:1px solid var(--border);border-radius:6px;padding:8px;min-height:160px">12:18:58  LOG  部署槽·prod  {"msg":"listening","port":3000,"slot":"blue"}</pre></div><div class="cf">仅显示最新日志片段，不代表完整历史。</div></div></div>
+          <div class="sec" data-sec="ops-alerts"><div class="card"><div class="ch"><h2>告警记录</h2></div><div class="cb"><div class="tabs"><button class="on">全部</button><button>触发中</button><button>已恢复</button></div><table><tr><th>类型</th><th>状态</th><th>详情</th><th>触发时间</th></tr><tr><td>健康检查失败</td><td><span class="badge">已恢复</span></td><td>preview 槽健康检查未通过（unhealthy）</td><td>9月21日 12:18</td></tr></table></div></div></div>
+          <div class="sec" data-sec="ops-deliv"><div class="card"><div class="ch"><h2>投递记录</h2><span class="muted small">订阅 1 条 · <a href="#" data-go="res">开发资源 → 事件</a></span></div><div class="cb"><table><tr><th>事件类型</th><th>状态</th><th>尝试</th><th>trace_id</th><th>投递时间</th><th></th></tr><tr><td><code>gitlab.push</code></td><td><span class="badge ok">已投递</span></td><td>1</td><td><code>01a0a99a…</code> <button class="btn ghost sm">复制</button></td><td>9月16日 17:44</td><td><a href="#">调用链</a></td></tr><tr><td><code>gitlab.push</code></td><td><span class="badge ok">已投递</span></td><td>5</td><td><code>01a09163…</code> <button class="btn ghost sm">复制</button></td><td>9月12日 00:55</td><td><a href="#">调用链</a></td></tr></table></div><div class="cf">只有死信可以重放，且只有项目负责人有权限。</div></div></div>
+          <div class="sec" data-sec="ops-trace"><div class="card"><div class="ch"><h2>调用链</h2></div><div class="cb"><p class="note">从事件投递、日志或业务任务的 trace_id 进入；也可以粘贴一个 trace_id。</p><div class="row"><input placeholder="Trace ID" style="flex:1;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text)"><button class="btn sm">查询</button></div></div></div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 开发资源 -->
+    <section class="screen" id="res">
+      <div class="phead"><div class="grow"><h1>开发资源</h1><div class="meta">这个项目能用什么，代码怎么接入。</div></div><div class="actions"><span class="readat">读取于 00:10 <button class="btn ghost sm icon">↻</button></span></div></div>
+      <div class="secnav">
+        <nav aria-label="开发资源"><button class="on" data-sec="res-api">API 接口<small>文档、申请与试调</small></button><button data-sec="res-events">事件<small>事件类型与订阅</small></button><button data-sec="res-guide">平台接入<small>身份、环境变量与 MCP</small></button></nav>
+        <div>
+          <div class="sec on" data-sec="res-api"><div style="display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:12px"><div class="card"><div class="ch"><h2>可调用的操作 · 24</h2><span class="row" style="gap:6px"><select><option>全部代理</option></select><select><option>全部授权</option><option>已授权</option><option>未授权</option></select></span></div><div class="cb"><table><tr><th>代理</th><th>方法</th><th>路径</th><th>开放策略</th><th>本服务</th></tr><tr class="sel"><td>test-gitlab</td><td><code>GET</code></td><td><code>/v4/projects</code></td><td><span class="badge warn">定向开放</span></td><td><span class="badge ok">已授权</span></td></tr><tr><td>test-gitlab</td><td><code>GET</code></td><td><code>/v4/projects/{id}/repository/commits/{sha}</code></td><td><span class="badge">默认开放</span></td><td><span class="badge ok">已授权</span></td></tr><tr><td>rfc003-verify-delivery</td><td><code>GET</code></td><td><code>/api/hello</code></td><td><span class="badge warn">定向开放</span></td><td><span class="badge">未授权</span></td></tr></table></div><div class="cf">管理员：在管理空间处理开放策略与申请 →</div></div><div class="card"><div class="ch"><h2>GET /v4/projects</h2><span class="badge ok">已授权</span></div><div class="cb small"><p class="muted">列出项目 · 代理 test-gitlab · 定向开放，2026-09-12 由管理员批准。</p><dl class="dl"><dt>操作键</dt><dd><code>01a0c12a-de18-…</code> <button class="btn ghost sm">复制</button></dd><dt>调用地址</dt><dd><code>/api/test-gitlab/v4/projects</code></dd></dl><div class="row" style="margin-top:10px;gap:6px"><button class="btn sm primary">在当前会话试调</button><button class="btn sm">查看文档</button></div><p class="note" style="margin-top:8px">试调以本服务身份从开发容器发出，可能改变业务数据。</p></div></div></div><details style="margin-top:12px"><summary>内嵌 Swagger</summary><p class="note">按本服务的授权裁剪，与 MCP 同源。</p></details></div>
+          <div class="sec" data-sec="res-events"><div class="stack"><p class="note">订阅在 <code>crewstation.yaml</code> 中声明，发布时登记。 <a href="#" data-go="dev">打开订阅声明 →</a> · 最近投递 4 条、死信 0 条 <a href="#" data-go="ops">查看投递 →</a></p><div class="cards2"><div class="card"><div class="ch"><h2>本项目的订阅</h2></div><div class="cb"><table><tr><th>事件类型</th><th>处理路径</th><th>状态</th></tr><tr><td><code>gitlab.push</code></td><td><code>/events/gitlab</code></td><td><span class="badge ok">生效</span></td></tr></table></div></div><div class="card"><div class="ch"><h2>可订阅的事件类型</h2></div><div class="cb"><table><tr><th>事件类型</th><th>生产方</th></tr><tr><td><code>gitlab.issue</code></td><td>gitlab-event-producer</td></tr><tr><td><code>gitlab.merge-request</code></td><td>gitlab-event-producer</td></tr><tr><td><code>gitlab.push</code></td><td>gitlab-event-producer</td></tr></table></div></div></div></div></div>
+          <div class="sec" data-sec="res-guide"><div class="stack"><details open><summary>身份转发与请求头</summary><dl class="dl small" style="margin-top:6px"><dt>用户 ID</dt><dd><code>x-cs-user-id</code></dd><dt>用户名</dt><dd><code>x-cs-user-name</code></dd><dt>服务令牌</dt><dd><code>x-cs-service-token</code></dd></dl></details><details><summary>环境变量、路径与事件约定</summary></details><details><summary>平台 MCP 服务器</summary></details><details><summary>业务子任务接口</summary></details></div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 项目设置 -->
+    <section class="screen" id="settings">
+      <div class="phead"><div class="grow"><h1>项目设置</h1><div class="meta">管理应用变量、展示方式、协作成员与项目信息。</div></div><div class="actions"><span class="readat">读取于 00:10 <button class="btn ghost sm icon">↻</button></span></div></div>
+      <div class="secnav">
+        <nav aria-label="项目设置"><button data-sec="set-config">环境变量<small>应用运行参数与密钥</small></button><button data-sec="set-vis">应用展示<small>用途、图标与可见范围</small></button><button data-sec="set-members">成员与角色<small>谁参与开发和试用</small></button><button class="on" data-sec="set-info">项目信息<small>仓库、地址、配额与 ID</small></button><button data-sec="set-adv">高级<small>项目状态与归档</small></button></nav>
+        <div>
+          <div class="sec" data-sec="set-config"><div class="tabs"><button class="on">开发</button><button>生产</button></div><div class="card"><div class="ch"><h2>开发变量</h2><button class="btn sm primary">新增变量</button></div><div class="cb muted">这一组还没有取值。开发会话容器读取这一组；与生产库、生产密钥相互独立。</div><div class="cf">版本历史 ▸ · <a href="#" data-go="res">平台自动注入的变量 →</a></div></div></div>
+          <div class="sec" data-sec="set-vis"><div class="card"><div class="ch"><h2>应用展示资料</h2><button class="btn sm">修改展示资料</button></div><div class="cb muted">尚未填写应用用途。</div></div></div>
+          <div class="sec" data-sec="set-members"><div class="card"><div class="ch"><h2>成员</h2><button class="btn sm primary">添加成员</button></div><div class="cb"><table><tr><th>成员</th><th>邮箱</th><th>角色</th><th></th></tr><tr><td>CrewStation Admin</td><td>admin@demo.invalid</td><td><span class="badge info">项目负责人</span></td><td class="muted">当前负责人</td></tr><tr><td>dev-developer</td><td>dev-developer@roles.localhost</td><td><span class="badge">开发者</span></td><td><a href="#">修改角色</a> · <a href="#">移除</a></td></tr></table></div></div></div>
+          <div class="sec on" data-sec="set-info"><div class="stack"><div class="card"><div class="ch"><h2>源码仓库</h2><a href="#">在 GitLab 中打开 ↗</a></div><div class="cb"><dl class="dl"><dt>路径</dt><dd><code>crewstation/demo</code></dd><dt>默认分支</dt><dd><code>main</code></dd><dt>状态</dt><dd><span class="badge ok">就绪</span></dd></dl></div></div><div class="card"><div class="ch"><h2>地址与服务身份</h2></div><div class="cb"><dl class="dl"><dt>正式版本</dt><dd><a href="#">demo.cs.localhost ↗</a></dd><dt>待验证版本</dt><dd><a href="#">preview.demo.cs.localhost ↗</a></dd><dt>开发预览</dt><dd><code>dev.demo.cs.localhost</code></dd><dt>服务名</dt><dd><code>demo</code> <button class="btn ghost sm">复制</button></dd></dl></div></div><div class="card"><div class="ch"><h2>配额与套餐</h2><span class="muted small">调整请联系平台管理员</span></div><div class="cb"><dl class="dl"><dt>并发任务上限</dt><dd>3（运行中 1）</dd><dt>服务套餐</dt><dd>standard-small · 500m · 512Mi · 副本上限 3</dd></dl></div></div><details><summary>技术详情</summary><dl class="dl small" style="margin-top:6px"><dt>Project ID</dt><dd><code>01a0c12a-de0c-7009-83f4-d05f95c9a0a2</code> <button class="btn ghost sm">复制</button></dd><dt>Service ID</dt><dd><code>01a0c12a-de0d-7000-ae0d-4db3617b49e1</code> <button class="btn ghost sm">复制</button></dd><dt>Namespace</dt><dd><code>cs-demo</code></dd></dl></details></div></div>
+          <div class="sec" data-sec="set-adv"><div class="card"><div class="ch"><h2>归档项目</h2></div><div class="cb"><p>归档将项目标记为已归档，并异步移除服务路由。源码仓库、数据库与文件保留。</p><button class="btn sm">归档项目…</button></div></div></div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+<script>
+  const $ = (s, r = document) => r.querySelector(s), $$ = (s, r = document) => [...r.querySelectorAll(s)];
+  const main = $('#main');
+  function showScreen(id) {
+    $$('.screen').forEach((s) => s.classList.toggle('on', s.id === id));
+    $$('.nav button[data-screen]').forEach((b) => b.classList.toggle('on', b.dataset.screen === id));
+    main.classList.toggle('compact', id === 'dev');
+    main.scrollTop = 0;
+  }
+  $$('.nav button[data-screen]').forEach((b) => b.addEventListener('click', () => showScreen(b.dataset.screen)));
+  $$('[data-go]').forEach((a) => a.addEventListener('click', (e) => { e.preventDefault(); showScreen(a.dataset.go); }));
+  $$('.secnav nav button').forEach((b) => b.addEventListener('click', () => {
+    const nav = b.closest('.secnav'); $$('nav button', nav).forEach((x) => x.classList.toggle('on', x === b)); $$('.sec', nav).forEach((s) => s.classList.toggle('on', s.dataset.sec === b.dataset.sec));
+  }));
+  // 工具面板
+  const body = $('#devbody'); let lastMode = 'side';
+  function openPane(name, mode) {
+    $$('.ptabs .t').forEach((t) => t.classList.toggle('on', t.dataset.pane === name));
+    $$('.pbody .pane').forEach((p) => p.classList.toggle('on', p.dataset.pane === name));
+    if (mode) lastMode = mode;
+    body.dataset.panel = document.body.classList.contains('d1-tabs') ? (name === 'cli' ? 'closed' : 'full') : lastMode;
+  }
+  $$('.ptabs .t').forEach((t) => t.addEventListener('click', () => openPane(t.dataset.pane)));
+  $$('[data-panel-open]').forEach((b) => b.addEventListener('click', () => { showScreen('dev'); openPane(b.dataset.panelOpen, body.dataset.panel === 'full' ? 'full' : 'side'); }));
+  $$('[data-panel-mode]').forEach((b) => b.addEventListener('click', () => {
+    if (b.dataset.panelMode === 'closed') { body.dataset.panel = 'closed'; return; }
+    body.dataset.panel = lastMode = body.dataset.panel === 'full' ? 'side' : 'full';
+  }));
+  $$('.pagetabs button').forEach((t) => t.addEventListener('click', () => { $$('.pagetabs button').forEach((x) => x.classList.toggle('on', x === t)); openPane(t.dataset.pt === 'cli' ? 'cli' : t.dataset.pt); }));
+  $('#switchBtn').addEventListener('click', () => $('#switchPanel').classList.toggle('hidden'));
+  // 裁定开关
+  const state = { d1: 'panel', d2: 'keep', d4: 'one', d7: 'long', theme: 'light' };
+  function apply() {
+    document.body.classList.toggle('d1-tabs', state.d1 === 'tabs');
+    if (state.d1 === 'tabs' && body.dataset.panel === 'side') body.dataset.panel = 'closed';
+    $$('[data-d2="keep"], .d2-keep').forEach((el) => el.classList.toggle('hidden', state.d2 === 'fold'));
+    $$('.d2-fold').forEach((el) => el.classList.toggle('hidden', state.d2 !== 'fold'));
+    $$('.d4-long').forEach((el) => el.classList.toggle('hidden', state.d4 === 'one'));
+    $$('[data-label="release"]').forEach((el) => el.textContent = state.d7 === 'short' ? '发布' : '发布与上线');
+    $$('[data-label="ops"]').forEach((el) => el.textContent = state.d7 === 'short' ? '运行' : '运行与诊断');
+    document.documentElement.dataset.theme = state.theme;
+  }
+  $$('.rfcbar .seg[data-toggle]').forEach((seg) => $$('button', seg).forEach((b) => b.addEventListener('click', () => {
+    state[seg.dataset.toggle] = b.dataset.v; $$('button', seg).forEach((x) => x.setAttribute('aria-pressed', String(x === b))); apply();
+  })));
+  if (matchMedia('(prefers-color-scheme: dark)').matches) { state.theme = 'dark'; $$('.seg[data-toggle="theme"] button').forEach((x) => x.setAttribute('aria-pressed', String(x.dataset.v === 'dark'))); }
+  apply(); openPane('preview', 'side');
+</script>
+</body>
+</html>
