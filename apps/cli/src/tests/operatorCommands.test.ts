@@ -60,7 +60,7 @@ describe('install', () => {
 
   test('未实现的阶段如实报未实现，整体不算成功（退出码 1）', async () => {
     const cluster = fakeCluster(HEALTHY_CLUSTER);
-    const respond = routes({ 'GET /v1/egress/entries': jsonResponse(200, { items: [] }), 'POST /v1/egress/entries': jsonResponse(201, {}) });
+    const respond = routes({});
     const result = await runForTest(['install', '--config', '/install.yaml', '--bundle', '/bundle', '--json'], { files: FILES, cluster, respond });
     expect(result.code).toBe(1);
     const report = JSON.parse(result.out.join('\n')) as { outcome: string; phases: { id: string; outcome: string }[] };

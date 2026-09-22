@@ -38,7 +38,7 @@
 | E20 | 观测与追溯 | OpenTelemetry；平台事件表 | **OpenTelemetry SDK＋Collector；execution_events 表承载任务链路** | 同 | OTel SDK 在 Bun 下的兼容 |
 | E21 | 发行与安装 | Helm；安装器 | **Helm chart＋Bun 单文件二进制安装器** | 纯 Helm | 离线引导 |
 | E22 | 本地验证 | Docker 与 K8s | **仅 kind；HA 逻辑存在但故障切换在多节点测试集群验证** | — | Q19 |
-| E23 | 出站代理 | 未定 | **按域名执行全局与项目级白名单的出站代理，记录被阻请求（G23）；候选待定** | 仅 L3/4 NetworkPolicy（不能按域名） | 候选选定；与 NetworkPolicy 配合；性能 |
+| E23 | 出站代理 | **已作废（2026-09-22，RFC-018）** | 出站 FQDN 白名单整体下线，不再需要按域名执行的出站代理；项目命名空间的出向由 NetworkPolicy 按负载标签决定 | — | — |
 | E24 | 日志采集与存储 | 未定 | **集群日志采集与存储，供工作台日志页按服务、槽、任务、Job 查询（G9）；候选待定** | 对接公司日志平台 | 数百服务日志量；查询时延 |
 | E25 | 告警通知渠道 | 未定 | **部署健康态与项目级告警订阅（G22）；渠道待定** | 公司 IM／邮件 | Q20 |
 
@@ -250,3 +250,4 @@
 | E18–E22 | 采纳建议：React、Vite、TanStack、CodeMirror、xterm.js、Swagger UI；官方 MCP SDK 两个服务；OpenTelemetry 加 execution_events；Helm 加 Bun 安装器；本地仅 kind | 2026-09-11 |
 | E06、E08、E10、E11、E12、E19 修订 | 依据设计门检视裁定 G1、G2、G5、G6、G7、G25 修订：源 Pod IP 身份、本地放行表、流式交互、关闭 Claude 沙箱、复制单元重划、TaskRunner 独立 UID | 2026-09-11 |
 | E23–E25 | 新增待定候选：出站代理、日志采集、告警渠道；结论在 T0.8、T0.12 形成 | 2026-09-11 |
+| E23 | 作废：RFC-018 下线出站白名单，出站代理不再选型 | 2026-09-22 |

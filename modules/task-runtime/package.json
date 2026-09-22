@@ -18,7 +18,6 @@
     "@crewstation/kernel": "workspace:*",
     "@crewstation/module-config": "workspace:*",
     "@crewstation/module-data": "workspace:*",
-    "@crewstation/module-egress": "workspace:*",
     "@crewstation/module-project": "workspace:*",
     "@crewstation/persistence": "workspace:*",
     "@crewstation/queue": "workspace:*",

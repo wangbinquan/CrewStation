@@ -1,6 +1,6 @@
 import type { ApiClient, CreateProjectInput } from '@crewstation/api-client';
 import { isApiClientError } from '@crewstation/api-client';
-import { BUILTIN_RESOURCES, EgressFqdnPatternSchema } from '@crewstation/contracts';
+import { BUILTIN_RESOURCES } from '@crewstation/contracts';
 import type { CheckLine, OperatorContext } from './installReport';
 import { checkLine as line } from './installReport';
 import type { BundleProfiles } from './releaseBundle';
@@ -14,12 +14,11 @@ export async function initializePlatform(ctx: OperatorContext): Promise<readonly
   const client = ctx.client;
   if (ctx.dryRun) return [line('初始化', 'skipped', '--dry-run 只出计划，不写平台目录')];
   if (client === undefined) {
-    return [line('初始化', 'pending-config', '没有平台令牌，无法写套餐、白名单与接入容器项目；先用 --token 或 CS_TOKEN 提供管理员令牌')];
+    return [line('初始化', 'pending-config', '没有平台令牌，无法写套餐与接入容器项目；先用 --token 或 CS_TOKEN 提供管理员令牌')];
   }
   const api = client();
   return [
     ...(await seedCatalog(ctx, api)),
-    await seedEgress(ctx, api),
     await seedIntegrationProjects(ctx, api),
     line('最小样例模板', 'not-implemented', '模板由 cs-controller 建项目时从发行包取；平台 API 没有注册模板的路由'),
     line('源码托管连接、上游连接与开放策略', 'not-implemented', '这三项的管理端路由尚未在 cs-api 落地（Plan M4）'),
@@ -49,24 +48,6 @@ async function seedPlans(api: ApiClient, profiles: BundleProfiles, suffix: strin
   const failures = results.filter(([, result]) => result.kind === 'failed').map(([name, result]) => `${name}：${result.kind === 'failed' ? result.problem : ''}`);
   if (failures.length > 0) return line(label, 'failed', failures.join('；'));
   return line(label, 'ok', `写入 ${results.length} 条${suffix}`);
-}
-
-/** 全局出站白名单：install.yaml 的示例含 `<model-endpoints>` 这类占位符，按契约的 FQDN 规则筛掉并点名。 */
-async function seedEgress(ctx: OperatorContext, api: ApiClient): Promise<CheckLine> {
-  const label = '全局出站白名单';
-  const wanted = ctx.config.egressAllowlist;
-  if (wanted.length === 0) return line(label, 'pending-config', 'egress.allowlist 为空');
-  const valid = wanted.filter((fqdn) => EgressFqdnPatternSchema.safeParse(fqdn).success);
-  const invalid = wanted.filter((fqdn) => !EgressFqdnPatternSchema.safeParse(fqdn).success);
-  const existing = await attemptValue(() => api.egress.listEntries());
-  if (typeof existing === 'string') return line(label, 'failed', existing);
-  const present = new Set(existing.items.map((entry) => entry.fqdn));
-  const todo = valid.filter((fqdn) => !present.has(fqdn));
-  const results = await Promise.all(todo.map(async (fqdn) => [fqdn, await attempt(() => api.egress.addEntry({ fqdn, scope: 'global', note: '安装器写入' }))] as const));
-  const failures = results.filter(([, result]) => result.kind === 'failed').map(([fqdn, result]) => `${fqdn}：${result.kind === 'failed' ? result.problem : ''}`);
-  const skipped = invalid.length === 0 ? '' : `；占位符未写入：${invalid.join('、')}`;
-  if (failures.length > 0) return line(label, 'failed', failures.join('；') + skipped);
-  return line(label, invalid.length > 0 ? 'limited' : 'ok', `新增 ${todo.length} 条，已存在 ${valid.length - todo.length} 条${skipped}`);
 }
 
 /** 内置 GitLab EventProducer 与参考 APIProxy 的平台项目：这里只建项目，首个标签仍走平台发布流程。 */

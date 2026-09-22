@@ -22,11 +22,13 @@ describe('两个空间的结构约定（RFC-002）', () => {
 
   test('管理入口只登记在管理分组定义里，只有管理左栏与管理总览读它，守卫在管理布局这一侧', () => {
     const definition = sourceAt(files, 'shared/admin/adminNavigation.ts');
-    for (const path of ['/admin/users', '/admin/authentication', '/admin/compute', '/admin/projects', '/admin/capabilities', '/admin/requests', '/admin/egress', '/admin/cluster', '/admin/gateway']) {
+    for (const path of ['/admin/users', '/admin/authentication', '/admin/compute', '/admin/projects', '/admin/capabilities', '/admin/requests', '/admin/cluster', '/admin/gateway']) {
       expect(definition.code).toContain(`'${path}'`);
     }
     expect(definition.code).not.toContain('/admin/service-plans');
     expect(definition.code).not.toContain('/admin/task-profiles');
+    // RFC-018 下线出站白名单：导航里不能再登记它，否则左栏与总览都会出现死入口。
+    expect(definition.code).not.toContain('/admin/egress');
     // 分组定义放在 shared 是为了让左栏与总览共用一份；租户一侧的任何文件读它，都等于把管理入口带出了管理空间。
     const consumers = files.filter((file) => file.code.includes('admin/adminNavigation')).map((file) => file.path).sort();
     expect(consumers).toEqual(['app/layout/AdminNav.tsx', 'features/admin/components/AdminOverviewCards.tsx']);

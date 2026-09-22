@@ -41,7 +41,7 @@ export function errorLines(error: unknown): string[] {
 
 /** 服务端错误体：第一行是服务端消息，其后按已知的 details 形状补可操作信息。 */
 function apiErrorLines(message: string, status: number, kind: string, details: Readonly<Record<string, unknown>>): string[] {
-  const lines = ['错误：' + message, status === 0 ? '  连接失败；检查 --api 地址、网络与出站代理' : `  HTTP ${status}｜${kind}`];
+  const lines = ['错误：' + message, status === 0 ? '  连接失败；检查 --api 地址、网络与本机代理设置' : `  HTTP ${status}｜${kind}`];
   lines.push(...uncommittedLines(details));
   const reason = details.reason;
   if (typeof reason === 'string' && reason.length > 0) lines.push('  原因：' + reason);

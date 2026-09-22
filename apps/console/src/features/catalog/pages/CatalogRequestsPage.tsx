@@ -33,7 +33,7 @@ export function CatalogRequestsPage({ projectId, state, cursor, active, onPage, 
       renderService={(serviceId) => {
         const item = shown.find((request) => request.serviceId === serviceId), project = item?.project;
         return <p>{item ? <Link to="/admin/capabilities" search={{ tab: 'api', projectId: item.projectId }}>{project ? `${project.name} · ${project.slug}` : item.projectId}</Link> : null} · <code>{serviceId}</code>
-          {item ? <> · <Link to="/admin/requests" search={{ tab: 'api', state, projectId: item.projectId }}>{t('admin.requests.filterProject')}</Link></> : null}</p>;
+          {item ? <> · <Link to="/admin/requests" search={{ state, projectId: item.projectId }}>{t('admin.requests.filterProject')}</Link></> : null}</p>;
       }}
       management={{ busy: paused, onDecide: submit, decisionFor: drafts.read, onDecisionChange: (id, value) => {
         const item = shown.find((request) => request.id === id); if (item) drafts.change(id, `${item.project?.name ?? item.projectId} · ${item.operationId}`, value);

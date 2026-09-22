@@ -167,10 +167,23 @@ sql`kind = ANY(ARRAY[${sql.join(kinds.map((k) => sql`${k}`), sql`, `)}]::text[])
 开发预览的目标 Service 是随任务 Pod 建的，放进 gateway 的「按服务重算路由」里对不上生命周期。
 这类资源的 IngressRoute 要**随 Pod 建、随 Pod 删**（`modules/task-runtime/adapters/k8s/taskCluster.ts`）。
 
-### 项目命名空间到宿主机的出站是被网络策略挡住的
+### 项目命名空间的出站由标签决定，不同负载看到的网络不一样
 
-`crewstation-system` 能到 `host.docker.internal:8929`，项目命名空间不能。
-部署在项目命名空间里的接入容器访问本机测试 GitLab 会 504，这不是代理的 bug。
+一个项目命名空间里有三到四条 NetworkPolicy，取并集生效，所以「这个 Pod 能不能出站」要看它的标签：
+
+| 负载 | 策略 | 出向 |
+|---|---|---|
+| 默认（含数字人服务槽） | `crewstation-default` | 只到 DNS 与 `crewstation-system` |
+| `workload=dev-session`／`business-task` | `crewstation-task-egress` | 全放行 |
+| `component=build` | `crewstation-build-egress` | 全放行 |
+| `workload=service`，且项目是 `APIProxy`／`EventProducer` | `crewstation-integration-egress` | 全放行（RFC-018） |
+
+因此同一个命名空间里，开发容器连得上 `host.docker.internal:8929`，数字人服务槽连不上——这不是代理或业务代码的 bug。
+接入容器项目自 RFC-018 起有自己的放行策略；数字人服务槽访问公司系统要经接口目录与网关放行表。
+
+**策略形状变了，存量命名空间不会自己跟上。** 开通链只在建项目时跑过一次，所以 `packages/k8s/objects/cluster.ts` 里改了策略之后，
+要靠 cs-controller 启动时的命名空间重下发（`modules/provisioning/workers/namespaceReapply.ts`）把新形状铺到已有项目上。
+换过版没见到新策略，先看 cs-controller 日志里的 `namespace reapply done`。
 
 ## GitLab
 

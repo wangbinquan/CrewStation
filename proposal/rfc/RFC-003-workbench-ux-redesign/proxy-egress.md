@@ -1,5 +1,8 @@
 # I9｜代理服务的受控 HTTP 出站
 
+> **已作废（2026-09-22，[RFC-018](../RFC-018-remove-egress-allowlist/proposal.md)）**：出站 FQDN 白名单整体下线，本文描述的 `/internal/egress/http` 通道已删除。
+> 接入容器改为直连上游，由命名空间的 `crewstation-integration-egress` 网络策略放开服务槽出向。以下内容保留为历史记录，不再反映实现。
+
 作者已在 2026-09-15 全权委托后选定 I9(a)：代理服务复用管理员维护的全局及项目白名单。此文件展开该批准范围，属于 RFC-003 的真实 API 调用旅程。
 
 现有 `egress` 模块负责条目、审批、被阻记录，尚无运行时执行器；当前项目网络只允许代理 Pod 访问平台和 DNS。标准 NetworkPolicy 无法完整表达已有通配 FQDN 语义，因此不把域名临时解析为 IP，也不放开代理的直接出站。

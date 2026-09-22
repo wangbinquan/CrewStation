@@ -22,7 +22,6 @@ export type { ServicesResource } from './resources/services';
 export type { DevSessionResource, ReleaseDevSessionOptions, ReleaseDevSessionResult } from './resources/devSession';
 export type { TaskEnvironmentDto, TaskEnvironmentState, TasksResource } from './resources/tasks';
 export type { ConfigResource } from './resources/config';
-export type { EgressProjectQuery, EgressResource } from './resources/egress';
 export type { ApiCatalogResource } from './resources/apiCatalog';
 export type { EventsResource } from './resources/events';
 export type { GatewayAllowlistDto, GatewayReconcileResult, GatewayResource, GatewayServiceRoutes } from './resources/gateway';

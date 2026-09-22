@@ -8,8 +8,7 @@ export type AdminPagePath =
   | '/admin/capabilities'
   | '/admin/users'
   | '/admin/authentication'
-  | '/admin/compute'
-  | '/admin/egress';
+  | '/admin/compute';
 
 export interface AdminNavPage {
   readonly to: AdminPagePath;
@@ -53,8 +52,8 @@ export const ADMIN_ENTRY_GROUPS: readonly AdminEntryGroup[] = [
     { to: '/admin/users', labelKey: 'nav.admin.users', hintKey: 'admin.overview.users' },
     { to: '/admin/authentication', labelKey: 'nav.admin.authentication', hintKey: 'admin.auth.pageHint' },
   ] },
+  // RFC-018 下线出站白名单后本组只剩算力档位；两类资源规格模板在 /admin/projects 下（RFC-017）。
   { id: 'resources', titleKey: 'nav.admin.groupResources', pages: [
     { to: '/admin/compute', labelKey: 'nav.admin.compute', hintKey: 'admin.overview.compute' },
-    { to: '/admin/egress', labelKey: 'nav.admin.egress', hintKey: 'admin.overview.egress' },
   ] },
 ];

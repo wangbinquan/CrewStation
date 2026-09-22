@@ -36,8 +36,8 @@ export function resourceQuotaObject(spec: { name: string; namespace: string; har
 }
 
 /**
- * 项目命名空间默认网络策略（T1.13）：只接受网关所在命名空间的入向；出向只允许 DNS、平台系统命名空间与出站代理。
- * 业务到公司系统的流量必须经代理，因此不放行任意外网。
+ * 项目命名空间默认网络策略（T1.13）：只接受网关所在命名空间的入向；出向只允许 DNS 与平台系统命名空间。
+ * 数字人服务槽到公司系统的流量走接口目录与网关放行表，因此这里不放行任意外网。
  */
 export function projectNetworkPolicy(spec: { namespace: string; systemNamespace: string }): K8sObject {
   return {
@@ -57,7 +57,8 @@ export function projectNetworkPolicy(spec: { namespace: string; systemNamespace:
 }
 
 /**
- * 任务容器与构建 Job 的出站放开（临时）：在出站代理（E23）落地前，这两类 Pod 需要直接访问源码托管与模型 API。
+ * 任务容器与构建 Job 的出站：这两类 Pod 直接访问源码托管、依赖源与模型 API。
+ * RFC-018 下线出站白名单后这是最终形态，不再有按域名收窄的后续步骤。
  * NetworkPolicy 取并集，因此只对带对应标签的 Pod 生效；其余业务 Pod 仍受 projectNetworkPolicy 约束。
  */
 export function taskEgressNetworkPolicy(spec: { namespace: string }): K8sObject {
@@ -79,5 +80,19 @@ export function buildEgressNetworkPolicy(spec: { namespace: string }): K8sObject
     kind: 'NetworkPolicy',
     metadata: { name: 'crewstation-build-egress', namespace: spec.namespace, labels: platformLabels() },
     spec: { podSelector: { matchLabels: { 'app.kubernetes.io/component': 'build' } }, policyTypes: ['Egress'], egress: [{}] },
+  };
+}
+
+/**
+ * 接入容器服务槽的出站（RFC-018，作者裁定 Q1＝C）：`APIProxy` 与 `EventProducer` 的职责就是代公司系统转发，
+ * 因此它们的服务槽 Pod 直接访问上游，不再经平台转发通道。只对接入项目的命名空间下发；
+ * 数字人项目不下发，其服务槽仍只到 DNS 与平台系统命名空间，访问公司系统必须经接口目录与网关放行表。
+ */
+export function integrationEgressNetworkPolicy(spec: { namespace: string }): K8sObject {
+  return {
+    apiVersion: 'networking.k8s.io/v1',
+    kind: 'NetworkPolicy',
+    metadata: { name: 'crewstation-integration-egress', namespace: spec.namespace, labels: platformLabels() },
+    spec: { podSelector: { matchLabels: { 'crewstation.io/workload': 'service' } }, policyTypes: ['Egress'], egress: [{}] },
   };
 }

@@ -23,7 +23,6 @@
     "@crewstation/module-config": "workspace:*",
     "@crewstation/module-data": "workspace:*",
     "@crewstation/module-dev-session": "workspace:*",
-    "@crewstation/module-egress": "workspace:*",
     "@crewstation/module-events": "workspace:*",
     "@crewstation/module-gateway": "workspace:*",
     "@crewstation/module-identity": "workspace:*",

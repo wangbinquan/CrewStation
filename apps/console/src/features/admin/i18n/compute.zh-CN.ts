@@ -267,7 +267,7 @@ export const computeMessages = {
   'admin.profile.test.outcome.before-start-failed': '启动前步骤失败：定位到失败的步骤修改后再保存。',
   'admin.profile.test.outcome.spawn-failed': '二进制无法启动：核对二进制路径、可执行权限与镜像里的依赖。',
   'admin.profile.test.outcome.auth-missing': '缺少鉴权：二进制能启动，但模型调用未通过认证；检查凭据或配置文件。',
-  'admin.profile.test.outcome.network-blocked': '网络不可达：模型端点连不上（区域限制、代理、DNS 或出站白名单）。',
+  'admin.profile.test.outcome.network-blocked': '网络不可达：模型端点连不上（区域限制、代理、DNS 或命名空间网络策略）。',
   'admin.profile.test.outcome.model-call-failed': '模型调用失败：限流、服务不可用或模型未开通；未填模型时二进制用了自己的默认模型。',
   'admin.profile.test.outcome.stream-nonconforming': '不符合协议：没有得到可解析的事件、会话或约定标记；二进制可能不讲所选协议。',
   'admin.profile.test.outcome.output-mismatch': '测试命令的输出不匹配期望正则，或退出码不为 0。',

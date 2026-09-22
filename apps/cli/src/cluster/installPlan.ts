@@ -9,7 +9,7 @@ import type { ReleaseBundle } from './releaseBundle';
 /** Design §11.4 的七个阶段；第 7 步“结果报告”由 installCommand 渲染，不是一个执行阶段。 */
 export const INSTALL_PHASES: readonly OperatorPhase[] = [
   { id: 'preflight', title: '1 预检与计划', run: preflight },
-  { id: 'base', title: '2 基础组件', run: async (ctx) => [chartPhase(ctx, 'CRD 与 Controller、出站代理、日志采集')] },
+  { id: 'base', title: '2 基础组件', run: async (ctx) => [chartPhase(ctx, 'CRD 与 Controller、日志采集')] },
   { id: 'data', title: '3 数据底座', run: async (ctx) => [chartPhase(ctx, '平台与业务 PostgreSQL、对象存储、registry')] },
   { id: 'platform', title: '4 平台应用', run: async (ctx) => [chartPhase(ctx, '网关、五个常驻服务、两个 MCP、任务容器镜像与带锁迁移任务')] },
   { id: 'initialize', title: '5 初始化', run: initializePlatform },
@@ -45,7 +45,6 @@ async function preflight(ctx: OperatorContext): Promise<readonly CheckLine[]> {
   checks.push(bundleCheck(ctx.bundle));
   checks.push(sourceIpCheck(ctx.config));
   checks.push(line('源码托管建仓、推送与保护标签资格', 'not-implemented', `需要以 ${ctx.config.sourceControlBaseUrl} 的凭据实测建仓与打标签；安装器尚未接管 SCM 预检`));
-  checks.push(egressCheck(ctx.config));
   return checks;
 }
 
@@ -87,7 +86,3 @@ function sourceIpCheck(config: InstallConfig): CheckLine {
   return line('CNI 保留源 IP（Q21）', 'not-implemented', `${declared}；实测需在集群内下发探针负载并比对 X-Forwarded-For，参考 deploy/local/verify.sh 的检查 C`);
 }
 
-function egressCheck(config: InstallConfig): CheckLine {
-  if (config.egressAllowlist.length === 0) return line('出站白名单', 'pending-config', 'egress.allowlist 为空，模型端点与依赖源都会被拦');
-  return line('出站代理可达性', 'not-implemented', `白名单 ${config.egressAllowlist.length} 条；逐条实测可达需要出站代理已就位`);
-}

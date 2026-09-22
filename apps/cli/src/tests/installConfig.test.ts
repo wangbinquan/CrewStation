@@ -43,7 +43,10 @@ describe('install.yaml', () => {
     expect(config.sourceControlGroupId).toBe('1234');
     expect(config.gitlabEventProducer).toBe(true);
     expect(config.referenceApiProxy).toBe(false);
-    expect(config.egressAllowlist).toEqual(['git.example.com', '*.mirror.example.com']);
+    expect(config.defaultConcurrentTasksPerWorker).toBe(3);
+    // RFC-018：旧配置里的 egress 段被忽略而不是报错，原样留在 raw 里，升级不必先改配置文件。
+    expect('egressAllowlist' in config).toBe(false);
+    expect(config.raw.egress).toEqual({ mode: 'proxy', allowlist: ['git.example.com', '*.mirror.example.com'] });
   });
 
   test('没写 namespace 时落到默认值', () => {

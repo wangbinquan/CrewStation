@@ -47,8 +47,6 @@ describe('安装第 5 步：能做的真做', () => {
     const respond = routes({
       'POST /v1/catalog/service-plans': jsonResponse(200, {}),
       'POST /v1/catalog/task-profiles': jsonResponse(200, {}),
-      'GET /v1/egress/entries': jsonResponse(200, { items: [] }),
-      'POST /v1/egress/entries': jsonResponse(201, {}),
     });
     const { checks, calls } = await initialize(filesFor('[git.example.com]'), respond);
     expect(checks.find((check) => check.label.includes('服务套餐'))?.outcome).toBe('ok');
@@ -56,29 +54,23 @@ describe('安装第 5 步：能做的真做', () => {
     expect(calls.filter((call) => call.url.includes('/catalog/'))).toHaveLength(2);
   });
 
-  test('出站白名单里的占位符被筛掉并点名，结论是受限', async () => {
+  /** RFC-018：旧 install.yaml 里的 egress 段被忽略——不报错、不出检查行、不发请求。 */
+  test('旧配置里的出站白名单被忽略，初始化不再播种也不再报出站检查行', async () => {
     const respond = routes({
       'POST /v1/catalog/service-plans': jsonResponse(200, {}),
       'POST /v1/catalog/task-profiles': jsonResponse(200, {}),
-      'GET /v1/egress/entries': jsonResponse(200, { items: [{ id: 'e1', fqdn: 'git.example.com', scope: 'global', createdBy: ADMIN.id, createdAt: '2026-09-11T08:00:00.000Z' }] }),
-      'POST /v1/egress/entries': jsonResponse(201, {}),
     });
     const { checks, calls } = await initialize(filesFor('["<model-endpoints>", git.example.com, registry.example.com]'), respond);
-    const egress = checks.find((check) => check.label === '全局出站白名单');
-    expect(egress?.outcome).toBe('limited');
-    expect(egress?.detail).toContain('<model-endpoints>');
-    expect(egress?.detail).toContain('已存在 1 条');
-    const added = calls.filter((call) => call.method === 'POST' && call.url.endsWith('/v1/egress/entries'));
-    expect(added).toHaveLength(1);
-    expect(added[0]?.body).toMatchObject({ fqdn: 'registry.example.com', scope: 'global' });
+    expect(checks.some((check) => check.label.includes('出站'))).toBe(false);
+    expect(calls.some((call) => call.url.includes('egress'))).toBe(false);
+    // 其余初始化照常完成，说明忽略的只是这一段。
+    expect(checks.find((check) => check.label.includes('服务套餐'))?.outcome).toBe('ok');
   });
 
   test('启用的接入容器按管理员身份代建平台项目', async () => {
     const respond = routes({
       'POST /v1/catalog/service-plans': jsonResponse(200, {}),
       'POST /v1/catalog/task-profiles': jsonResponse(200, {}),
-      'GET /v1/egress/entries': jsonResponse(200, { items: [] }),
-      'POST /v1/egress/entries': jsonResponse(201, {}),
       'GET /v1/me': jsonResponse(200, ADMIN),
       'POST /v1/projects': jsonResponse(201, {}),
     });
@@ -95,8 +87,6 @@ describe('安装第 5 步：能做的真做', () => {
     const respond = routes({
       'POST /v1/catalog/service-plans': jsonResponse(200, {}),
       'POST /v1/catalog/task-profiles': jsonResponse(200, {}),
-      'GET /v1/egress/entries': jsonResponse(200, { items: [] }),
-      'POST /v1/egress/entries': jsonResponse(201, {}),
       'GET /v1/me': jsonResponse(200, ADMIN),
       'POST /v1/projects': jsonResponse(409, { error: 'conflict', message: 'slug 已占用', details: {} }),
     });
@@ -111,8 +101,6 @@ describe('安装第 5 步：能做的真做', () => {
     const respond = routes({
       'POST /v1/catalog/service-plans': jsonResponse(200, {}),
       'POST /v1/catalog/task-profiles': jsonResponse(200, {}),
-      'GET /v1/egress/entries': jsonResponse(200, { items: [] }),
-      'POST /v1/egress/entries': jsonResponse(201, {}),
       'GET /v1/me': jsonResponse(200, { ...ADMIN, platformRole: 'user', isAdmin: false }),
     });
     const files = filesFor('[git.example.com]', '{ gitlabEventProducer: { enabled: true }, referenceApiProxy: { enabled: false } }');
@@ -131,8 +119,6 @@ describe('安装第 5 步：能做的真做', () => {
     const respond = routes({
       'POST /v1/catalog/service-plans': jsonResponse(200, {}),
       'POST /v1/catalog/task-profiles': jsonResponse(200, {}),
-      'GET /v1/egress/entries': jsonResponse(200, { items: [] }),
-      'POST /v1/egress/entries': jsonResponse(201, {}),
     });
     const { checks } = await initialize(filesFor('[git.example.com]'), respond);
     const notImplemented = checks.filter((check) => check.outcome === 'not-implemented').map((check) => check.label);
@@ -144,8 +130,6 @@ describe('安装第 5 步：能做的真做', () => {
     const respond = routes({
       'POST /v1/catalog/service-plans': jsonResponse(200, {}),
       'POST /v1/catalog/task-profiles': jsonResponse(200, {}),
-      'GET /v1/egress/entries': jsonResponse(200, { items: [] }),
-      'POST /v1/egress/entries': jsonResponse(201, {}),
     });
     const files = memoryFiles({
       '/install.yaml': yaml('[git.example.com]', '{ gitlabEventProducer: { enabled: false }, referenceApiProxy: { enabled: false } }'),

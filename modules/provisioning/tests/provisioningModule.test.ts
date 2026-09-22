@@ -15,6 +15,7 @@ describe('provisioning', () => {
     const states: string[] = [];
     const make = (failAt?: string, from: ProjectFacts = facts): ProvisioningSteps => ({
       loadProject: async () => from,
+      listProjects: async () => [from],
       ensureNamespace: async () => { calls.push('ns'); },
       ensureRepository: async () => { calls.push('repo'); if (failAt === 'repo') throw new Error('gitlab down'); },
       ensureData: async () => { calls.push('data'); },
@@ -36,6 +37,7 @@ describe('provisioning', () => {
     const failed: ProjectFacts = { ...facts, state: 'failed' };
     const steps: ProvisioningSteps = {
       loadProject: async () => failed,
+      listProjects: async () => [failed],
       ensureNamespace: async () => undefined,
       ensureRepository: async () => { throw new Error('git 缺失'); },
       ensureData: async () => undefined,
@@ -52,6 +54,7 @@ describe('provisioning', () => {
     const active: ProjectFacts = { ...facts, state: 'active' };
     const steps: ProvisioningSteps = {
       loadProject: async () => active,
+      listProjects: async () => [active],
       ensureNamespace: async () => undefined,
       ensureRepository: async () => undefined,
       ensureData: async () => undefined,

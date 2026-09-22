@@ -27,8 +27,7 @@ const ADMIN_PAGES = [
   { path: '/admin/task-profiles', marker: '任务容器套餐', capability: '任务容器套餐' },
   { path: '/admin/projects/resource-templates?kind=service', marker: '全平台共享模板', capability: '项目管理下的共享资源规格模板' },
   { path: '/admin/capabilities', marker: '能力接入', capability: '接入容器与开放策略' },
-  { path: '/admin/requests', marker: '申请审批', capability: '定向开放与出站申请审批' },
-  { path: '/admin/egress', marker: '出站白名单', capability: '出站域名白名单' },
+  { path: '/admin/requests', marker: '申请审批', capability: '定向开放申请审批' },
   { path: '/admin/cluster', marker: '集群管理', capability: '受管 Kubernetes 资源与运维操作（RFC-010）' },
   { path: '/admin/gateway', marker: '网关', capability: '网关路由与放行表' },
 ] as const;

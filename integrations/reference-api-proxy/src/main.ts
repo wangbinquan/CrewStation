@@ -12,7 +12,6 @@ import { PROXY_NAME } from './proxy/catalog';
 import { TRACE_HEADER } from './proxy/upstreamRequest';
 import { proxyError } from './proxy/upstreamResponse';
 import { CONFIG_ENV, readDeploymentInfo } from './platform/environment';
-import { platformEgressFetch } from './platform/egressTransport';
 
 export type LogFn = (msg: string, fields: Record<string, unknown>) => void;
 
@@ -28,7 +27,8 @@ export interface AppOptions {
 
 export function createApp(options: AppOptions = {}): Hono {
   const deployment = readDeploymentInfo(options.env ?? process.env);
-  const upstreamFetch = deployment.platformApiUrl ? platformEgressFetch(deployment.platformApiUrl, options.upstreamFetch) : options.upstreamFetch;
+  // RFC-018 起直接请求上游：命名空间的 `crewstation-integration-egress` 策略给接入容器服务槽放开出向。
+  const upstreamFetch = options.upstreamFetch;
   const log = options.log ?? logJsonLine;
   const app = new Hono();
 

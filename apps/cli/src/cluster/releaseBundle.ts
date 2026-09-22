@@ -6,7 +6,7 @@ import type { FileAccess } from '../runtime/commandContext';
 /** Design §11.2 的发行包目录；安装器逐项检查，缺什么就说缺什么。 */
 export const BUNDLE_ENTRIES: readonly { readonly path: string; readonly dir: boolean; readonly purpose: string }[] = [
   { path: 'release.lock.yaml', dir: false, purpose: '版本、镜像摘要、依赖兼容与最低条件' },
-  { path: 'charts', dir: true, purpose: '平台与依赖 Charts，含出站代理与日志采集' },
+  { path: 'charts', dir: true, purpose: '平台与依赖 Charts，含日志采集' },
   { path: 'images', dir: true, purpose: '离线镜像或受控导入清单，含任务容器镜像' },
   { path: 'schemas', dir: true, purpose: '安装配置与三种 Manifest 的 Schema' },
   { path: 'templates/minimal-sample', dir: true, purpose: '最小样例模板' },

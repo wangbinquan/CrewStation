@@ -28,7 +28,7 @@ export const LogEntryDtoSchema = z.object({
 export const HealthStateSchema = z.enum(['healthy', 'degraded', 'crash-looping', 'unhealthy', 'unknown']);
 export const HealthDtoSchema = z.object({ slot: SlotNameSchema, state: HealthStateSchema, readyReplicas: z.number().int().min(0), replicas: z.number().int().min(0), restarts: z.number().int().min(0), lastTransitionAt: z.iso.datetime() });
 
-export const AlertTypeSchema = z.enum(['crash-loop', 'health-failing', 'delivery-dead', 'task-failed', 'quota-exhausted', 'egress-blocked']);
+export const AlertTypeSchema = z.enum(['crash-loop', 'health-failing', 'delivery-dead', 'task-failed', 'quota-exhausted']);
 export const AlertDtoSchema = z.object({ id: z.string(), projectId: ProjectIdSchema, type: AlertTypeSchema, state: z.enum(['firing', 'resolved']), detail: z.string(), firedAt: z.iso.datetime(), resolvedAt: z.iso.datetime().optional(), slot: SlotNameSchema.optional() });
 export const AlertSubscriptionDtoSchema = z.object({ projectId: ProjectIdSchema, userId: UserIdSchema, channel: z.enum(['workbench', 'webhook']), target: z.string().optional() });
 export const SetAlertSubscriptionRequestSchema = AlertSubscriptionDtoSchema.omit({ projectId: true });

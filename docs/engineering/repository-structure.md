@@ -1,7 +1,7 @@
 # 仓库结构、模块划分与依赖原则
 
 > 状态：已确认（2026-09-11 作者裁定第 13 节四项），作为 Design §15.1 的展开并进入 Plan T0.2  
-> 版本：0.4 · 日期：2026-09-20（0.4：按 ADR-0007 补用例落位与两条新规则、`tools/testguard`，§10 指向用例防护体系；0.3：根目录补 RFC／根级说明文件，模块清单补 ADR-0003 的两个模块，§11 指向开发规则）  
+> 版本：0.5 · 日期：2026-09-22（0.5：按 ADR-0008 退役 `egress` 模块，模块数 19→18；0.4：按 ADR-0007 补用例落位与两条新规则、`tools/testguard`，§10 指向用例防护体系；0.3：根目录补 RFC／根级说明文件，模块清单补 ADR-0003 的两个模块，§11 指向开发规则）  
 > 适用范围：CrewStation 代码仓（Bun workspaces monorepo）的全部代码，包括控制面、任务容器、工作台、CLI、部署与测试
 
 ## 目录
@@ -56,7 +56,7 @@ crewstation/
 │  ├─ console/                   # 工作台 SPA（React）
 │  └─ cli/                       # crewstation 命令行
 ├─ modules/                      # 领域模块：按限界上下文划分；不知道自己跑在哪个进程里
-│  ├─ identity/  project/  scm/  config/  data/  egress/  api-catalog/  events/  agent-runtime/
+│  ├─ identity/  project/  scm/  config/  data/  api-catalog/  events/  agent-runtime/
 │  ├─ release/  task-runtime/  dev-session/  business-task/  session/  gateway/
 │  └─ observability/  cluster-management/  capabilities/  provisioning/  platform/
 ├─ packages/                     # 技术库：与领域无关，删掉所有业务概念后仍然成立
@@ -194,12 +194,11 @@ modules/<name>/
 | L3 | `scm` | SourceRepositoryBinding、建仓、代推、标签与保护标签、会话级短期 Git 凭据 | project |
 | L3 | `config` | ConfigItem、SecretValue、开发与生产两组值、版本快照、注入渲染 | project |
 | L3 | `data` | DataResource、DataBinding、TaskDataBinding 三模式与审批、Provider 端口（postgres、s3、pvc） | project |
-| L3 | `egress` | 全局与项目级出站白名单、追加申请、被阻请求记录 | project |
 | L3 | `api-catalog` | APIProxy 登记、操作键（proxy＋method＋path）、开放策略、APIGrant、APIRequest、Swagger 裁剪 | project |
 | L3 | `events` | EventProducer 登记、事件类型、inbox 去重、订阅、投递状态机、死信、推送 | project |
 | L3 | `agent-runtime` | 算力档位（RFC-006）：协议、镜像、二进制、启动前步骤、凭据、修订、测试记录、默认与引用确认、平台仓库推送凭据；TaskProfile 目录、发布引用与测试执行经 ports 由 platform 回填（ADR-0004、ADR-0005） | —（不 import 其他模块） |
 | L4 | `release` | Manifest 校验、Release、构建、迁移、DeploymentSlot、TrafficSwitch、发布并发控制；发布 `release.registered` | project、scm、config、data |
-| L4 | `task-runtime` | TaskEnvironment 生命周期、Pod 与两种持久卷模式、配额原子准入、每个 Agent 一个执行环境（「＋ CLI」／headless／业务子任务）、档位测试执行、TaskRunner 归属与协议服务端语义 | project、config、data、egress |
+| L4 | `task-runtime` | TaskEnvironment 生命周期、Pod 与两种持久卷模式、配额原子准入、每个 Agent 一个执行环境（「＋ CLI」／headless／业务子任务）、档位测试执行、TaskRunner 归属与协议服务端语义 | project、config、data |
 | L5 | `dev-session` | 一项目一会话、分支与落后提交数、空闲提醒、强制释放、发布入口 | task-runtime、release、scm |
 | L5 | `business-task` | 业务任务、SubtaskRun 契约层、oneshot／interactive、attempt、契约校验、文件与结果读取 | task-runtime、release |
 | L5 | `session` | TaskRunner 出向连接与浏览器流的中枢：租约、游标、重连、帧路由 | task-runtime |
@@ -213,9 +212,9 @@ modules/<name>/
 ```mermaid
 flowchart BT
   identity --> project
-  project --> scm & config & data & egress & api-catalog & events
+  project --> scm & config & data & api-catalog & events
   scm & config & data --> release
-  config & data & egress --> task-runtime
+  config & data --> task-runtime
   task-runtime & release & scm --> dev-session
   task-runtime & release --> business-task
   task-runtime --> session
@@ -238,7 +237,7 @@ flowchart BT
 |---|---|
 | `cs-api` | 全部模块的 `http`（identity 仅管理面）、`capabilities`、`observability`、`cluster-management` 查询与运维受理 |
 | `cs-auth` | `identity` 运行面（登录、ForwardAuth 用户域与服务域、JWKS、凭据服务）、`gateway` 的查表评估 |
-| `cs-controller` | `release`、`task-runtime`、`data`、`scm`、`gateway`、`egress`、`project`（命名空间）、`cluster-management` 的 `workers` |
+| `cs-controller` | `release`、`task-runtime`、`data`、`scm`、`gateway`、`project`（命名空间）、`provisioning`、`cluster-management` 的 `workers` 与启动任务 |
 | `cs-session` | `session` 的 WS 入口与 `workers` |
 | `cs-events` | `events` 的 ingress `http` 与投递 `workers` |
 | `mcp-capabilities`、`mcp-operations` | 不挂模块，只经 `api-client` 调 `cs-api` |
@@ -344,5 +343,6 @@ apps/console/src/
 | 任务相关模块 | 拆为 `task-runtime`、`dev-session`、`business-task`、`session` 四个 |
 | 尺寸硬上限 | 源码文件 600 行、目录 20 个文件、函数 80 行；超限 CI 阻断 |
 | 工程文档位置 | `docs/engineering/` 与 `docs/adr/`，与 `proposal/` 分开（规划者选定，未提出异议） |
+| 模块退役（2026-09-22，ADR-0008） | 删模块要同时删依赖边、手工退出迁移锁条目并在提交说明写明原因、按 RFC 处理数据库 schema；模块数 19→18 |
 
-后续对本文的修改走 ADR：新增模块、调整 layer、调整尺寸上限、任何例外。
+后续对本文的修改走 ADR：新增模块、**删除模块**、调整 layer、调整尺寸上限、任何例外。

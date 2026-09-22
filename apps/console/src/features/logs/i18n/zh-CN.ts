@@ -32,7 +32,6 @@ export const messages = {
   "logs.alerts.type.delivery-dead": "事件投递失败",
   "logs.alerts.type.task-failed": "任务失败",
   "logs.alerts.type.quota-exhausted": "配额耗尽",
-  "logs.alerts.type.egress-blocked": "出站请求受阻",
   "logs.alerts.cancel": "取消",
   "logs.alerts.channel.workbench": "工作台通知",
   "logs.alerts.channel.webhook": "Webhook",

@@ -7,9 +7,9 @@ export interface RequestReviewPageProps extends RequestPageScope {
   readonly active: boolean; readonly onPage: (cursor?: string) => void; readonly onDirtyChange: (dirty: boolean) => void;
 }
 
-/** 两种来源使用不同游标；切页签不改变承载草稿的查询范围。 */
+/** 草稿绑定在查询范围上：改项目、状态或翻页才换范围，其余导航保留输入。 */
 export function requestScopeKey(search: RequestSearch) {
-  return JSON.stringify([search.projectId, search.state, search.apiCursor, search.egressCursor]);
+  return JSON.stringify([search.projectId, search.state, search.apiCursor]);
 }
 export function keepRequestDrafts(current: { pathname: string; search: object }, next: { pathname: string; search: object }) {
   return current.pathname === '/admin/requests' && next.pathname === current.pathname &&

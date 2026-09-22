@@ -3,7 +3,6 @@ import { rootRoute } from '../../app/router/rootRoute';
 import { AdminLayout } from '../../app/layout/AdminLayout';
 import { AdminAuthenticationPage } from './pages/AdminAuthenticationPage';
 import { AdminComputePage } from './pages/AdminComputePage';
-import { AdminEgressPage } from './pages/AdminEgressPage';
 import { AdminGatewayPage } from './pages/AdminGatewayPage';
 import { AdminOverviewPage } from './pages/AdminOverviewPage';
 import { AdminServicePlansPage } from './pages/AdminServicePlansPage';
@@ -26,7 +25,6 @@ export const adminAuthenticationRoute = createRoute({ getParentRoute: () => admi
 export const adminComputeRoute = createRoute({ getParentRoute: () => adminRoute, path: 'compute', component: AdminComputePage, validateSearch: (search: Record<string, unknown>) => parseComputeSearch(search) });
 export const adminServicePlansRoute = createRoute({ getParentRoute: () => adminRoute, path: 'service-plans', component: AdminServicePlansPage });
 export const adminTaskProfilesRoute = createRoute({ getParentRoute: () => adminRoute, path: 'task-profiles', component: AdminTaskProfilesPage });
-export const adminEgressRoute = createRoute({ getParentRoute: () => adminRoute, path: 'egress', component: AdminEgressPage });
 export const adminGatewayRoute = createRoute({ getParentRoute: () => adminRoute, path: 'gateway', component: AdminGatewayPage });
 
 export const adminProjectComputeRoute = createRoute({ getParentRoute: () => adminRoute, path: 'projects/$projectId/compute', component: AdminProjectComputeLegacyPage });

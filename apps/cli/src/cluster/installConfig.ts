@@ -16,8 +16,6 @@ export interface InstallConfig {
   readonly protectedTagPattern: string;
   readonly gitlabEventProducer: boolean;
   readonly referenceApiProxy: boolean;
-  readonly egressMode: string;
-  readonly egressAllowlist: readonly string[];
   readonly defaultConcurrentTasksPerWorker: number;
   readonly raw: Readonly<Record<string, unknown>>;
 }
@@ -41,7 +39,7 @@ export function parseInstallConfig(text: string, path: string): InstallConfig {
   const network = asRecord(root.network) ?? {};
   const scm = asRecord(root.sourceControl) ?? {};
   const integrations = asRecord(root.integrations) ?? {};
-  const egress = asRecord(root.egress) ?? {};
+  // RFC-018 下线出站白名单后不再读 `egress` 段；旧配置文件里留着它不报错，也不出预检行。
   const config: InstallConfig = {
     profile: enumField(root.profile, PROFILES, 'profile', problems),
     namespace: stringField(root.namespace, 'namespace', problems, DEFAULT_NAMESPACE),
@@ -56,8 +54,6 @@ export function parseInstallConfig(text: string, path: string): InstallConfig {
     protectedTagPattern: stringField(scm.protectedTagPattern, 'sourceControl.protectedTagPattern', problems, 'v*'),
     gitlabEventProducer: asRecord(integrations.gitlabEventProducer)?.enabled === true,
     referenceApiProxy: asRecord(integrations.referenceApiProxy)?.enabled === true,
-    egressMode: stringField(egress.mode, 'egress.mode', problems, 'proxy'),
-    egressAllowlist: stringList(egress.allowlist, 'egress.allowlist', problems),
     defaultConcurrentTasksPerWorker: intField(asRecord(root.quotas)?.defaultConcurrentTasksPerWorker, 'quotas.defaultConcurrentTasksPerWorker', problems, 3),
     raw: root,
   };
@@ -90,11 +86,3 @@ function enumField<T extends string>(value: unknown, allowed: readonly T[], name
   return allowed[0] as T;
 }
 
-function stringList(value: unknown, name: string, problems: string[]): readonly string[] {
-  if (value === undefined) return [];
-  if (!Array.isArray(value)) {
-    problems.push(`${name} 必须是字符串数组`);
-    return [];
-  }
-  return value.filter((item): item is string => typeof item === 'string');
-}

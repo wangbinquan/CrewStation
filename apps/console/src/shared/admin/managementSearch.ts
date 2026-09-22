@@ -5,7 +5,8 @@ import type { ProjectDirectorySearch } from './projectDirectorySearch';
 export type CapabilityTab = 'integrations' | 'api' | 'events';
 export type RequestStatus = 'pending' | 'approved' | 'rejected' | 'all';
 export interface CapabilitySearch extends ProjectDirectorySearch { tab: CapabilityTab; projectId?: string; proxy?: string; operation?: string }
-export interface RequestSearch { tab: 'api' | 'egress'; projectId?: string; state: RequestStatus; apiCursor?: string; egressCursor?: string }
+/** RFC-018 下线出站申请后只剩 API 一类；旧链接上的 `tab`／`egressCursor` 被忽略，不报错也不空页。 */
+export interface RequestSearch { projectId?: string; state: RequestStatus; apiCursor?: string }
 const text = (value: unknown, limit: number) => typeof value === 'string' && value.length > 0 && value.length <= limit && !/[\u0000-\u001f]/u.test(value) ? value : undefined;
 
 export function parseCapabilitySearch(search: Record<string, unknown>): CapabilitySearch {
@@ -18,8 +19,8 @@ export function parseCapabilitySearch(search: Record<string, unknown>): Capabili
 }
 
 export function parseRequestSearch(search: Record<string, unknown>): RequestSearch {
-  const apiCursor = text(search.apiCursor, 2048), egressCursor = text(search.egressCursor, 2048);
-  return { tab: search.tab === 'egress' ? 'egress' : 'api', projectId: ProjectIdSchema.safeParse(search.projectId).data,
+  const apiCursor = text(search.apiCursor, 2048);
+  return { projectId: ProjectIdSchema.safeParse(search.projectId).data,
     state: search.state === 'all' || search.state === 'approved' || search.state === 'rejected' ? search.state : 'pending',
-    ...(apiCursor ? { apiCursor } : {}), ...(egressCursor ? { egressCursor } : {}) };
+    ...(apiCursor ? { apiCursor } : {}) };
 }

@@ -44,7 +44,7 @@ const EXPECTED_TREE: readonly RenderedGroup[] = [
   { title: '运行与观测', pages: ['集群管理', '网关'] },
   { title: '供给与接入', pages: ['项目管理', '能力接入'] },
   { title: '身份与访问', pages: ['用户与权限', '认证'] },
-  { title: '资源与网络', pages: ['算力档位', '出站白名单'] },
+  { title: '资源与网络', pages: ['算力档位'] },
 ];
 
 describe('管理空间的分组树（2026-09-21 修订 RFC-003 §4）', () => {

@@ -8,16 +8,25 @@ const originalFetch = globalThis.fetch;
 let page: Awaited<ReturnType<typeof renderApp>> | undefined;
 afterEach(() => { page?.unmount(); page = undefined; globalThis.fetch = originalFetch; });
 
-test('管理总览显示三类真实待办，各取五条；失败来源保持错误，入口只导航', async () => {
-  const f = adminDirectoryFixture(); f.state.egressError = true; page = await renderApp('/admin');
+test('管理总览显示两类真实待办，各取五条；失败来源保持错误，入口只导航', async () => {
+  const f = adminDirectoryFixture(); page = await renderApp('/admin');
   expect(page.text()).toContain('待处理事项'); expect(page.text()).toContain(f.apiRequests[0]!.operationId);
-  expect(page.text()).toContain('出站待办离线'); expect(page.text()).toContain('生产配置尚未补齐');
+  expect(page.text()).toContain('生产配置尚未补齐');
   expect(page.text()).not.toContain(f.apiRequests[5]!.operationId);
   const requests = f.calls.filter((c) => c.url.pathname.endsWith('/page'));
-  expect(requests).toHaveLength(3); expect(requests.every((c) => c.url.searchParams.get('limit') === '5')).toBe(true);
+  // RFC-018：出站待办已删除，只剩 API 申请与项目开通两类。
+  expect(requests).toHaveLength(2); expect(requests.every((c) => c.url.searchParams.get('limit') === '5')).toBe(true);
+  expect(page.text()).not.toContain('待审批出站申请');
+  expect(f.calls.some((c) => c.url.pathname.includes('egress'))).toBe(false);
   expect(f.calls.some((c) => c.url.pathname === '/v1/projects')).toBe(false);
   await page.click(f.apiRequests[0]!.operationId); expect(page.path()).toBe('/admin/requests');
-  expect(page.search()).toMatchObject({ tab: 'api', state: 'pending', projectId: f.projects[0]!.project.id }); expect(f.writes()).toHaveLength(0);
+  expect(page.search()).toMatchObject({ state: 'pending', projectId: f.projects[0]!.project.id }); expect(f.writes()).toHaveLength(0);
+});
+
+test('API 待办离线时保留错误，不用 0 覆盖', async () => {
+  const f = adminDirectoryFixture(); f.state.apiError = true; page = await renderApp('/admin');
+  expect(page.text()).toContain('API 待办离线'); expect(page.text()).toContain('生产配置尚未补齐');
+  expect(f.writes()).toHaveLength(0);
 });
 
 test('全项目管理是实际管理员路由，默认分页 20，不拉全量目录', async () => {
@@ -53,7 +62,7 @@ test('待办独立加载、空态与错误不混淆，失败来源单独重读�
   const f = adminDirectoryFixture(); let release!: () => void; f.state.holdApi = new Promise<void>((r) => { release = r; });
   page = await renderApp('/admin');
   const card = () => [...document.querySelectorAll('section')].find((s) => s.querySelector('h2')?.textContent === '待审批 API 申请')!;
-  expect(card().textContent).toContain('数量未确认'); expect(card().textContent).not.toContain('当前没有待处理事项'); expect(page.text()).toContain('api-0.example.test');
+  expect(card().textContent).toContain('数量未确认'); expect(card().textContent).not.toContain('当前没有待处理事项');
   f.state.apiError = true; await act(async () => release()); await page.settle(); expect(card().textContent).toContain('API 待办离线');
   expect(card().textContent).not.toContain('本次显示 0 项'); f.state.holdApi = undefined; f.state.apiError = false;
   await page.click('刷新 API 待办'); expect(card().textContent).toContain(f.apiRequests[0]!.operationId); expect(card().textContent).toContain('还有更多');

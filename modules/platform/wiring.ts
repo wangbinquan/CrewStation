@@ -6,7 +6,7 @@ import type { ClusterResource, ClusterInspectRequest, ClusterOperation, ClusterI
 import type { Actor, ComputeProfileSelector, ComputeUsage, ProjectId, ServiceId, UserDto, UserId } from '@crewstation/contracts';
 import type { EventConsumer } from '@crewstation/eventbus';
 import type { K8sClient } from '@crewstation/k8s';
-import { buildEgressNetworkPolicy, namespaceObject, projectNetworkPolicy, resourceQuotaObject, secretObject, taskEgressNetworkPolicy } from '@crewstation/k8s';
+import { buildEgressNetworkPolicy, integrationEgressNetworkPolicy, namespaceObject, projectNetworkPolicy, resourceQuotaObject, secretObject, taskEgressNetworkPolicy } from '@crewstation/k8s';
 import type { Logger } from '@crewstation/kernel';
 import { forbidden, precondition } from '@crewstation/kernel';
 import { createAgentRuntimeModule } from '@crewstation/module-agent-runtime';
@@ -17,7 +17,6 @@ import { createCapabilitiesModule } from '@crewstation/module-capabilities';
 import { createConfigModule } from '@crewstation/module-config';
 import { createDataModule } from '@crewstation/module-data';
 import { createDevSessionModule } from '@crewstation/module-dev-session';
-import { createEgressModule } from '@crewstation/module-egress';
 import type { EventsModuleApi } from '@crewstation/module-events';
 import { createEventsModule } from '@crewstation/module-events';
 import { createGatewayModule } from '@crewstation/module-gateway';
@@ -26,6 +25,7 @@ import { createIdentityModule } from '@crewstation/module-identity';
 import { createObservabilityModule } from '@crewstation/module-observability';
 import { createProjectModule } from '@crewstation/module-project';
 import { createProvisioningModule } from '@crewstation/module-provisioning';
+import type { ProjectFacts } from '@crewstation/module-provisioning';
 import type { ProjectModuleApi, ResolvedService } from '@crewstation/module-project';
 import { createReleaseModule } from '@crewstation/module-release';
 import type { ReleaseModuleApi } from '@crewstation/module-release';
@@ -121,7 +121,6 @@ function composeCore(deps: CompositionDeps, late: Late) {
   const resolveById = (serviceId: ServiceId) => project.api.resolveServiceById(serviceId);
 
   const config = createConfigModule({ db, project: project.api, settings: { secretKeyBase64: settings.secretKeyBase64 } });
-  const egress = createEgressModule({ db, project: project.api });
   // 算力档位（RFC-006、ADR-0005）：测试执行在 task-runtime（L4）、已上线引用在 release（L4）、资源套餐在 project（L2），都由这里回填。
   const agentRuntime = createAgentRuntimeModule({
     db, logger, isAdmin: (id) => identity.api.isAdmin(id),
@@ -160,7 +159,7 @@ function composeCore(deps: CompositionDeps, late: Late) {
       resolveServiceIdentity: async (identity) => { const r = await project.api.resolveServiceIdentity(identity); return r ? { projectId: r.projectId, serviceId: r.serviceId, slug: r.slug, identity: r.identity } : undefined; },
     },
   });
-  return { identity, project, config, egress, data, scm, apiCatalog, agentRuntime, hosts, isAdmin, resolveById };
+  return { identity, project, config, data, scm, apiCatalog, agentRuntime, hosts, isAdmin, resolveById };
 }
 
 function composeDelivery(deps: CompositionDeps, core: ReturnType<typeof composeCore>, late: Late) {
@@ -348,6 +347,14 @@ function composeAggregates(deps: PlatformModuleDeps, core: ReturnType<typeof com
         await k8s.apply(projectNetworkPolicy({ namespace: f.namespace, systemNamespace: settings.systemNamespace }));
         await k8s.apply(taskEgressNetworkPolicy({ namespace: f.namespace }));
         await k8s.apply(buildEgressNetworkPolicy({ namespace: f.namespace }));
+        // 接入容器代公司系统转发，服务槽直接出站（RFC-018 Q1＝C）；数字人服务槽不放行，走接口目录与网关放行表。
+        if (f.kind !== 'DigitalWorker') await k8s.apply(integrationEgressNetworkPolicy({ namespace: f.namespace }));
+      },
+      // 走与开通链同一个装载器，形状和过滤规则只有一份；启动时跑一次，N+1 次查询可以接受。
+      listProjects: async () => {
+        const directory = await project.api.listClusterProjects();
+        const facts = await Promise.all(directory.filter((p) => p.state !== 'archived').map((p) => project.api.getProvisioningProject(p.projectId as ProjectId)));
+        return facts.filter((f): f is ProjectFacts => f !== undefined);
       },
       ensureRepository: async (f) => { await core.scm.api.ensureRepository(f.serviceId, f.projectId, { slug: f.slug, templateId: f.template, ...(f.initialPlan === undefined ? {} : { initialPlan: f.initialPlan }) }); },
       ensureData: async (f) => { await data.api.ensureServiceData(f.serviceId); },
@@ -366,7 +373,7 @@ function composeModules(deps: CompositionDeps) {
   const runtime = composeRuntime(deps, core, delivery, late);
   const aggregates = composeAggregates(deps, core, delivery, runtime);
   const cluster = composeCluster(deps, core, delivery, runtime);
-  return { cluster, identity: core.identity, project: core.project, config: core.config, egress: core.egress, data: core.data, scm: core.scm, apiCatalog: core.apiCatalog, agentRuntime: core.agentRuntime, ...delivery, ...runtime, ...aggregates };
+  return { cluster, identity: core.identity, project: core.project, config: core.config, data: core.data, scm: core.scm, apiCatalog: core.apiCatalog, agentRuntime: core.agentRuntime, ...delivery, ...runtime, ...aggregates };
 }
 
 export function createPlatformModule(deps: PlatformModuleDeps): PlatformModule {
@@ -380,18 +387,18 @@ export function createPlatformModule(deps: PlatformModuleDeps): PlatformModule {
     routers: {
       controller: m.cluster.internalHttp,
       // devSessionGate 只挂中间件不占路径，必须排在最前：Hono 按注册顺序执行，晚于业务路由就来不及改判身份。
-      api: [...m.identity.http.devSessionGate, ...m.project.http, ...m.identity.http.users, ...m.config.http, ...m.agentRuntime.http, ...m.egress.http, ...m.data.http, ...m.scm.http, ...m.apiCatalog.http, ...m.release.http, ...m.gateway.http, ...m.taskRuntime.http, ...m.devSession.http, m.businessTask.http.service, m.businessTask.http.user, ...m.events.http.query, ...m.observability.http, ...m.cluster.http, ...m.capabilities.http, ...m.provisioning.http],
+      api: [...m.identity.http.devSessionGate, ...m.project.http, ...m.identity.http.users, ...m.config.http, ...m.agentRuntime.http, ...m.data.http, ...m.scm.http, ...m.apiCatalog.http, ...m.release.http, ...m.gateway.http, ...m.taskRuntime.http, ...m.devSession.http, m.businessTask.http.service, m.businessTask.http.user, ...m.events.http.query, ...m.observability.http, ...m.cluster.http, ...m.capabilities.http, ...m.provisioning.http],
       auth: [...m.identity.http.auth, ...m.identity.http.forwardAuth, ...m.agentRuntime.forwardAuth],
       session: [m.session.http.runner, m.session.http.stream, m.session.http.internal],
       events: [...m.events.http.ingress],
     },
     background: {
-      controller: [...m.cluster.workers, ...m.release.workers, ...m.gateway.workers, consumerLifecycle(m.gateway.subscriptions), ...m.taskRuntime.workers, ...m.agentRuntime.workers, ...m.devSession.workers, ...m.businessTask.workers, consumerLifecycle(m.businessTask.subscriptions), ...m.apiCatalog.subscriptions.map(consumerLifecycle), ...m.observability.workers, ...m.provisioning.workers, consumerLifecycle(m.provisioning.subscriptions)],
+      controller: [...m.cluster.workers, ...m.release.workers, ...m.gateway.workers, consumerLifecycle(m.gateway.subscriptions), ...m.taskRuntime.workers, ...m.agentRuntime.workers, ...m.devSession.workers, ...m.businessTask.workers, consumerLifecycle(m.businessTask.subscriptions), ...m.apiCatalog.subscriptions.map(consumerLifecycle), ...m.observability.workers, ...m.provisioning.workers, ...m.provisioning.startupTasks, consumerLifecycle(m.provisioning.subscriptions)],
       session: [...m.session.workers],
       events: [...m.events.workers, ...m.events.subscriptions.map(consumerLifecycle)],
     },
     websocket: m.session.websocket,
-    migrations: [queueMigrations, eventbusMigrations, m.identity.migrations, m.project.migrations, m.config.migrations, m.agentRuntime.migrations, m.egress.migrations, m.data.migrations, m.scm.migrations, m.apiCatalog.migrations, m.events.migrations, m.release.migrations, m.taskRuntime.migrations, m.devSession.migrations, m.businessTask.migrations, m.session.migrations, m.gateway.migrations, m.observability.migrations, m.cluster.migrations],
+    migrations: [queueMigrations, eventbusMigrations, m.identity.migrations, m.project.migrations, m.config.migrations, m.agentRuntime.migrations, m.data.migrations, m.scm.migrations, m.apiCatalog.migrations, m.events.migrations, m.release.migrations, m.taskRuntime.migrations, m.devSession.migrations, m.businessTask.migrations, m.session.migrations, m.gateway.migrations, m.observability.migrations, m.cluster.migrations],
   };
   migrations = api.migrations;
   return { api, modules: m };
@@ -432,7 +439,12 @@ function composeCluster(deps: CompositionDeps, core: ReturnType<typeof composeCo
       const [projects, taskFacts, slots, plans] = await Promise.all([core.project.api.listClusterProjects(), tasks.listClusterTasks(), release.listClusterSlots(), core.project.api.listServicePlans()]);
       const releases = slots.flatMap((slot) => { const project = projects.find((p) => p.serviceId === slot.serviceId); return project ? [{ ...slot, namespace: project.namespace, serviceName: project.serviceName!, ...(slot.plan ? { maxReplicas: plans.find((p) => p.id === slot.plan)?.maxReplicas ?? 0 } : {}) }] : []; });
       const retained = projects.filter((p) => p.serviceName).flatMap((p) => ['blue', 'green'].map((slot) => ({ namespace: p.namespace, kind: 'Service', name: `${p.serviceName}-${slot}`, reason: '发布槽 Service 跨发布保留' })));
-      for (const p of projects) { retained.push({ namespace: p.namespace, kind: 'ResourceQuota', name: 'crewstation-project', reason: '项目配额' }); for (const name of ['crewstation-default', 'crewstation-task-egress', 'crewstation-build-egress']) retained.push({ namespace: p.namespace, kind: 'NetworkPolicy', name, reason: '项目网络配置' }); }
+      for (const p of projects) {
+        retained.push({ namespace: p.namespace, kind: 'ResourceQuota', name: 'crewstation-project', reason: '项目配额' });
+        // 接入容器的服务槽出向独有一条策略（RFC-018）；数字人项目没有它，登记进来会让清单显示不存在的资源。
+        const policies = ['crewstation-default', 'crewstation-task-egress', 'crewstation-build-egress', ...(p.kind === 'DigitalWorker' ? [] : ['crewstation-integration-egress'])];
+        for (const name of policies) retained.push({ namespace: p.namespace, kind: 'NetworkPolicy', name, reason: '项目网络配置' });
+      }
       return { projects, tasks: taskFacts, releases, retained, complete: true };
     } },
     domains: { inspect: async (actor, target, request) => {

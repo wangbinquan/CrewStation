@@ -1,6 +1,6 @@
 # RFC-018｜设计
 
-状态：Draft · 2026-09-22。落位依据 `docs/engineering/repository-structure.md` v0.4。本 RFC 只删代码、改网络策略、加一处启动重下发；不新增模块，不新增跨模块 import。
+状态：In Progress · 2026-09-22。作者已确认能力影响清单并裁定 Q1＝C、Q2＝b。落位依据 `docs/engineering/repository-structure.md` v0.4。本 RFC 只删代码、改网络策略、加一处启动重下发、清理历史数据；不新增模块，不新增跨模块 import。
 
 ## 目录
 
@@ -48,28 +48,35 @@
 
 ## 3. 网络策略
 
-按 proposal §4 Q1 的裁定二选一。
+作者裁定取方案 C。方案 A 留作记录，不实施。
 
-方案 C（建议）：
+方案 C（已采纳）：
 
 - `packages/k8s/objects/cluster.ts` 新增 `integrationEgressNetworkPolicy({ namespace })`：`podSelector` 为 `crewstation.io/workload=service`，`policyTypes: [Egress]`，`egress: [{}]`，名称 `crewstation-integration-egress`。
 - `ensureNamespace` 只在 `facts.kind !== 'DigitalWorker'` 时下发它；数字人项目不下发。`projectNetworkPolicy`、任务与构建两条策略不变，只改注释（去掉「临时、待出站代理」）。
 - 保留资源清单新增该策略名（只对接入容器项目登记）。
 
-方案 A：`projectNetworkPolicy` 的 `egress` 改为 `[{}]`；删除任务与构建两条策略；重下发时同时删除现有命名空间里的两条旧策略。
+方案 A（未采纳）：`projectNetworkPolicy` 的 `egress` 改为 `[{}]`；删除任务与构建两条策略；重下发时同时删除现有命名空间里的两条旧策略。
 
-两种方案共同部分：
+此外：
 
 - **启动重下发**：`modules/provisioning`（L6）新增一个启动工作器，遍历未归档项目、对每个项目调用现有 `ensureNamespace` 步骤（`k8s.apply` 幂等）；单个项目失败只记日志，不阻塞其他项目与进程启动。组合根把它挂在 `controller` 角色（provisioning 的 workers 已在 cs-controller）。这一步也补上「策略形状变化不能触达存量命名空间」的缺口。
 - 网关放行表、身份索引、路由不变。
 
 ## 4. 数据
 
-按 proposal §4 Q2 的裁定：
+作者裁定取方案 b：本次就清理，不留残留。
 
-- a：不动库。RFC plan 与 dev-gotchas 记录残留：schema `egress`（三张表＋身份迁移记录）与 `platform_infra.migrations` 中 `module = 'egress'` 的四行。
-- b：本机部署后、参考代理重新发布前，停写备份 → `DROP SCHEMA egress CASCADE` → `DELETE FROM platform_infra.migrations WHERE module = 'egress'`；记录行数与备份位置。
-- 两种情况下，本机库里若存在 `type = 'egress-blocked'` 的告警行（预期为 0，无生产者），实现时先核对再处理。
+顺序（本机与生产升级说明相同）：
+
+1. 先升级平台代码。新平台不再装配 `egress` 模块，因此不再读写该 schema，也不再把它列进迁移清单。
+2. 停写备份整库并校验（`pg_dump` 后核对字节数与可恢复性），记录路径与权限。
+3. `DROP SCHEMA egress CASCADE`：删除 `entries`、`requests`、`blocked` 与 `resource_identity_aliases` 四张表。
+4. `DELETE FROM platform_infra.migrations WHERE module = 'egress'`：删除四行记录。不删这四行的话，它们会永远指向磁盘上已不存在的迁移文件。运行器只遍历传入的迁移集，多余记录不会报错，但属于残留。
+5. 核对 `egress-blocked` 告警行：`SELECT count(*) FROM observability.alerts WHERE type = 'egress-blocked'`，预期 0（全仓无生产者）；非 0 则一并删除，并在 plan 记录行数。
+6. 核对结果：`\dn` 查不到 `egress`；迁移表中该模块行数为 0；平台重启后照常就绪，`migrations` 无新增。
+
+顺序上先升代码再删数据：反过来的话，旧平台仍在读这些表。备份在删除之前，不在之后。
 
 ## 5. 接口与契约变化
 
@@ -86,7 +93,8 @@
 | 启动重下发某个命名空间失败 | 记日志并继续；下次启动重试；开通失败的项目仍可用「重新开通」 |
 | 旧链接 `/admin/egress`、`?tab=egress` | 重定向／归一，不 404 |
 | 旧安装配置含 `egress` 键 | 忽略，不报错、不输出预检行 |
-| 本机库残留 `egress` schema（Q2 a） | 平台不读它；`migrationCoverage` 只看锁文件与空库 |
+| 删库步骤在升级平台之前执行 | 旧平台仍在读这些表，会报表不存在。操作顺序固定为先升代码、再备份、再删 |
+| 删除后想回退平台版本 | 旧版本会在启动时重新应用 `egress` 的四个迁移并重建空表，功能数据不会回来。回退前需从备份恢复 |
 
 ## 7. 测试策略
 

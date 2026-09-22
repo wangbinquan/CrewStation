@@ -55,8 +55,6 @@ export function defaultInstallConfig(apiUrl: string): InstallConfig {
     protectedTagPattern: 'v*',
     gitlabEventProducer: false,
     referenceApiProxy: false,
-    egressMode: 'proxy',
-    egressAllowlist: [],
     defaultConcurrentTasksPerWorker: 3,
     raw: {},
   };

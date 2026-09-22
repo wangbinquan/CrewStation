@@ -14,7 +14,7 @@ afterEach(() => { page?.unmount(); page = undefined; globalThis.fetch = original
 
 function fixture(options: { admin?: boolean; meFailure?: boolean; pendingMe?: boolean; producerSlug?: string } = {}) {
   const calls: Array<{ url: URL; method: string; body?: Record<string, unknown> }> = [];
-  const state = { projectsFailure: false, operationsFailure: false, apiFailure: false, egressFailure: false, decisionFailure: false, grant: true, policy: 'targeted', requestState: 'pending', decision: undefined as string | undefined };
+  const state = { projectsFailure: false, operationsFailure: false, apiFailure: false, decisionFailure: false, grant: true, policy: 'targeted', requestState: 'pending', decision: undefined as string | undefined };
   const request = () => ({ id: '01a0bf5d-8f4b-7835-8ec6-0f5b147720c4', serviceId, operationId: key, state: state.requestState, reason: '查询账单', requestedBy: project.ownerUserId, createdAt, decision: state.decision });
   globalThis.fetch = (async (raw, init) => {
     const url = new URL(String(raw), 'http://localhost'), method = init?.method ?? 'GET';
@@ -53,10 +53,9 @@ function fixture(options: { admin?: boolean; meFailure?: boolean; pendingMe?: bo
     } else if (url.pathname === '/v1/api-requests/01a0bf5d-8f4b-7835-8ec6-0f5b147720c4/decision') {
       if (state.decisionFailure) { status = 503; body = { error: 'unavailable', message: '审批服务失败' }; }
       else { state.requestState = data!.approve ? 'approved' : 'rejected'; state.decision = data!.decision as string; body = request(); }
-    } else if (url.pathname === '/v1/egress/requests' || url.pathname === '/v1/egress/requests/page') {
-      if (state.egressFailure) { status = 503; body = { error: 'unavailable', message: '出站申请读取失败' }; }
-      else body = { items: [{ id: '01a0bf5d-8f4b-7ac2-817e-9026d79e6c6d', projectId, project, fqdn: 'example.invalid', reason: '模型调用', state: 'pending', createdAt, requestedBy: project.ownerUserId }]
-        .filter((r) => url.pathname !== '/v1/egress/requests/page' || url.searchParams.get('state') === 'all' || r.state === url.searchParams.get('state')) };
+    // RFC-018：出站接口已删除，打到它就是 500，界面上任何残留调用都会立刻红。
+    } else if (url.pathname.startsWith('/v1/egress') || url.pathname.includes('/egress/')) {
+      status = 500; body = { error: 'unexpected', message: '出站接口已下线，不应被调用' };
     } else if (url.pathname === '/v1/catalog/event-types') body = { items: [{ eventType: 'billing.changed', producer: 'billing-events', producerProject: options.producerSlug ?? integrationId }] };
     else if (url.pathname.endsWith('/dev-session')) { status = 404; body = { error: 'not_found', message: '没有开发会话' }; }
     return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
@@ -113,38 +112,34 @@ describe('管理员能力与审批入口', () => {
     expect(page.text()).toContain('未找到指定项目'); expect(page.text()).not.toContain('改为默认开放');
   });
 
-  test('两类审批页签保留各自草稿；API 失败保留理由，成功后展示决定并刷新项目结果', async () => {
+  test('审批草稿在筛选变化前受保护；API 失败保留理由，成功后展示决定并刷新项目结果', async () => {
     const f = fixture(); page = await renderApp(`/admin/requests?projectId=${projectId}`);
     expect(page.text()).not.toContain('01a0bf5d-8f4b-7fa5-8125-ce76ae48be7c'); await input(visible<HTMLTextAreaElement>('textarea'), '用途尚需补充');
-    await page.click('出站申请'); await input(visible<HTMLInputElement>('input'), '允许模型出口');
-    await page.click('API 申请'); expect(visible<HTMLTextAreaElement>('textarea').value).toBe('用途尚需补充');
-    await page.click('出站申请'); expect(visible<HTMLInputElement>('input').value).toBe('允许模型出口'); await page.click('API 申请');
     f.state.decisionFailure = true; await page.click('拒绝'); expect(page.text()).toContain('审批服务失败');
     expect(visible<HTMLTextAreaElement>('textarea').value).toBe('用途尚需补充');
     f.state.decisionFailure = false; await page.click('拒绝'); expect(f.writes().at(-1)!.body).toEqual({ approve: false, decision: '用途尚需补充' });
+    // 裁定成功即清掉该申请的草稿，因此改筛选不再有未保存输入要确认。
     expect(page.text()).toContain('申请已拒绝'); await input(document.querySelector('select option[value="all"]')!.parentElement as HTMLSelectElement, 'all');
-    expect(page.text()).toContain('审批意见有未保存的输入'); await page.click('放弃输入并离开');
     expect(page.text()).toContain('01a0bf5d-8f4b-7fa5-8125-ce76ae48be7c'); expect(page.text()).toContain('用途尚需补充');
+    expect(page.text()).not.toContain('审批意见有未保存的输入');
     await page.navigate(`/projects/${projectId}/settings?tab=resources&resource=api`);
     expect(page.text()).toContain('已拒绝'); expect([...document.querySelectorAll('button')].some((node) => node.textContent === '批准')).toBe(false);
   });
 
-  test('申请的两种数据源各自失败和恢复，不把失败显示为空；出站规则入口仍可到审批', async () => {
-    const f = fixture(); f.state.egressFailure = true; page = await renderApp('/admin/requests');
-    expect(page.text()).toContain(key); await page.click('出站申请'); expect(page.text()).toContain('出站申请读取失败');
-    f.state.egressFailure = false; await page.click('刷新出站申请'); expect(page.text()).toContain('example.invalid');
-    await page.click('查看出站放行规则'); expect(page.path()).toBe('/admin/egress');
-    await page.click('处理出站申请'); expect(page.search().tab).toBe('egress');
+  test('RFC-018：审批页只剩一类，不再有出站页签、出站规则入口或出站读取', async () => {
+    const f = fixture(); page = await renderApp('/admin/requests');
+    expect(page.text()).toContain(key);
+    for (const gone of ['出站申请', '查看出站放行规则', '处理出站申请', '刷新出站申请']) expect(page.text()).not.toContain(gone);
+    expect(f.calls.some((c) => c.url.pathname.includes('egress'))).toBe(false);
+    // 旧地址落到管理总览，不是 404。
+    await page.navigate('/admin/egress'); expect(page.path()).toBe('/admin');
+    expect(f.writes()).toHaveLength(0);
   });
 
-  test('审批意见约束首屏可见，API 超限或出站留空都不发请求', async () => {
+  test('审批意见约束首屏可见，超限不发请求', async () => {
     const f = fixture(); page = await renderApp('/admin/requests'); expect(page.text()).toContain('最多 500 字');
     await input(visible<HTMLTextAreaElement>('textarea'), '字'.repeat(501)); await page.click('批准');
     expect(visible<HTMLTextAreaElement>('textarea').getAttribute('aria-invalid')).toBe('true'); expect(f.writes()).toHaveLength(0);
-    await page.click('出站申请');
-    const approve = [...document.querySelectorAll<HTMLButtonElement>('button')].find((node) => node.textContent === '批准' && !node.closest('[hidden]'))!;
-    await act(async () => approve.click()); await page.settle();
-    expect(visible<HTMLInputElement>('input').getAttribute('aria-invalid')).toBe('true'); expect(f.writes()).toHaveLength(0);
   });
 
   test('刷新失败保留意见草稿但不能按旧申请审批；恢复后可继续', async () => {
@@ -153,10 +148,7 @@ describe('管理员能力与审批入口', () => {
     await page.click('刷新 API 申请'); expect(visible<HTMLTextAreaElement>('textarea').value).toBe('保留 API 意见');
     expect(page.text()).toContain('请刷新成功后再审批'); await page.click('批准'); expect(f.writes()).toHaveLength(0);
     f.state.apiFailure = false; await page.click('刷新 API 申请'); expect(visible<HTMLTextAreaElement>('textarea').disabled).toBe(false);
-    await page.click('出站申请'); await input(visible<HTMLInputElement>('input'), '保留出站意见'); f.state.egressFailure = true;
-    await page.click('刷新出站申请'); expect(visible<HTMLInputElement>('input').value).toBe('保留出站意见'); expect(visible<HTMLInputElement>('input').disabled).toBe(true);
-    expect(f.writes()).toHaveLength(0); f.state.egressFailure = false; await page.click('刷新出站申请');
-    expect(visible<HTMLInputElement>('input').value).toBe('保留出站意见'); expect(visible<HTMLInputElement>('input').disabled).toBe(false);
+    expect(visible<HTMLTextAreaElement>('textarea').value).toBe('保留 API 意见'); expect(f.writes()).toHaveLength(0);
   });
 });
 
@@ -206,7 +198,8 @@ test('管理身份待定和错误时不提前读取供给或审批接口', async
 test('管理分类只保留适用的有界参数', () => {
   expect(parseCapabilitySearch({ tab: 'events', projectId, operation: key })).toEqual({ tab: 'events' });
   expect(parseCapabilitySearch({ tab: 'api', projectId: 'bad', proxy: '\nfoo', operation: 'x'.repeat(2049) })).toEqual({ tab: 'api', projectId: undefined, proxy: undefined, operation: undefined });
-  expect(parseRequestSearch({ tab: 'unknown', projectId, state: 'unknown' })).toEqual({ tab: 'api', projectId, state: 'pending' });
+  // RFC-018：申请页只剩一类，旧链接上的 tab 与 egressCursor 一并丢弃。
+  expect(parseRequestSearch({ tab: 'egress', projectId, state: 'unknown', egressCursor: 'egress:20' })).toEqual({ projectId, state: 'pending' });
 });
 
 

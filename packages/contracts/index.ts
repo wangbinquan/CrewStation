@@ -41,8 +41,6 @@ export type { Actor, ServiceActor } from './api/actor';
 export * from './api/scm';
 export * from './api/auth/session';
 export * from './api/auth/oidc';
-export * from './api/egress';
-export * from './api/egressHttp';
 export * from './api/capabilities';
 export * from './api/market/appListing';
 export * from './api/workbench/projectPage';

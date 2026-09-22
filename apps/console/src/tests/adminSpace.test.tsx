@@ -99,7 +99,7 @@ describe('管理空间与租户空间分离（RFC-002）', () => {
     app = await renderApp('/admin');
     // 已经在管理空间，切换控件指回工作台。
     expect(app.html()).toContain('href="/projects"');
-    for (const label of ['用户与权限', '算力档位', '项目管理', '能力接入', '申请审批', '出站白名单', '网关']) expect(app.text()).toContain(label);
+    for (const label of ['用户与权限', '算力档位', '项目管理', '能力接入', '申请审批', '网关']) expect(app.text()).toContain(label);
     // 套餐归属项目管理，总览不再保留平级供给入口。
     expect(app.html()).not.toContain('/admin/service-plans');
     expect(app.html()).not.toContain('/admin/task-profiles');

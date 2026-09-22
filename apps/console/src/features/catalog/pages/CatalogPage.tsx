@@ -28,7 +28,7 @@ export function CatalogPage({ embedded = false, proxy, operation, onClearContext
       {!project.isPending && project.error === null && serviceId === undefined ? (
         <EmptyState title={t('catalog.service.missingTitle')} description={t('catalog.service.missingDescription')} />
       ) : null}
-      {!me.error && me.data?.isAdmin === true ? <p><Link to="/admin/capabilities" search={{ tab: 'api', projectId, proxy, operation }}>{t('catalog.admin.openManagement')}</Link> · <Link to="/admin/requests" search={{ tab: 'api', projectId, state: 'pending' }}>{t('catalog.admin.openRequests')}</Link></p> : null}
+      {!me.error && me.data?.isAdmin === true ? <p><Link to="/admin/capabilities" search={{ tab: 'api', projectId, proxy, operation }}>{t('catalog.admin.openManagement')}</Link> · <Link to="/admin/requests" search={{ projectId, state: 'pending' }}>{t('catalog.admin.openRequests')}</Link></p> : null}
       {serviceId !== undefined ? <CatalogContent key={`${projectId}:${proxy ?? ''}:${operation ?? ''}`} projectId={projectId} serviceId={serviceId} canDevelop={canDevelop && !project.error} proxy={proxy} operation={operation} onClearContext={onClearContext} /> : null}
     </>
   );

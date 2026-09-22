@@ -1,9 +1,9 @@
-import type { ApiRequestPage, EgressRequestPage, ProjectId, ProjectPageEntry, ServiceId, UserId } from '@crewstation/contracts';
+import type { ApiRequestPage, ProjectId, ProjectPageEntry, ServiceId, UserId } from '@crewstation/contracts';
 
 const userId = '01a0bf5d-8f4b-7f8b-8136-e631380738b0' as UserId, now = '2026-09-14T00:00:00.000Z';
 export function adminDirectoryFixture() {
   const calls: Array<{ url: URL; method: string }> = [];
-  const state = { admin: true, identityError: false, projectError: false, detailError: false, apiError: false, egressError: false, invalidProject: false,
+  const state = { admin: true, identityError: false, projectError: false, detailError: false, apiError: false, invalidProject: false,
     holdApi: undefined as Promise<void> | undefined };
   const projects: ProjectPageEntry[] = Array.from({ length: 48 }, (_, i) => ({ role: 'admin', ownerName: '负责人甲', project: {
     id: `01a0bf5d-8f4b-7a01-8000-${i.toString(16).padStart(12, '0')}` as ProjectId, serviceId: `01a0bf5d-8f4b-7a02-8000-${i.toString(16).padStart(12, '0')}` as ServiceId, ownerUserId: userId,
@@ -12,8 +12,6 @@ export function adminDirectoryFixture() {
   } }));
   const apiRequests: ApiRequestPage['items'] = projects.slice(0, 8).map(({ project }, i) => ({ id: `01a0bf5d-8f4b-7a04-8000-${i.toString(16).padStart(12, '0')}`, projectId: project.id, project,
     serviceId: project.serviceId!, operationId: `01a0bf5d-8f4b-7a06-8000-${i.toString(16).padStart(12, '0')}`, state: 'pending', requestedBy: userId, createdAt: now, reason: `查询账单 ${i}` }));
-  const egressRequests: EgressRequestPage['items'] = projects.slice(0, 7).map(({ project }, i) => ({ id: `01a0bf5d-8f4b-7a05-8000-${i.toString(16).padStart(12, '0')}`, projectId: project.id, project,
-    fqdn: `api-${i}.example.test`, state: 'pending', requestedBy: userId, createdAt: now, reason: `开发依赖 ${i}` }));
   globalThis.fetch = (async (input, init) => {
     const url = new URL(String(input), 'http://localhost'), method = init?.method ?? 'GET'; calls.push({ url, method });
     let body: unknown = { items: [] }, status = 200;
@@ -32,9 +30,9 @@ export function adminDirectoryFixture() {
       if (state.holdApi) await state.holdApi;
       if (state.apiError) { status = 503; body = { error: 'unavailable', message: 'API 待办离线' }; }
       else { const limit = Number(url.searchParams.get('limit') ?? 20); body = { items: apiRequests.slice(0, limit), ...(limit < apiRequests.length ? { nextCursor: 'next-api' } : {}) }; }
-    } else if (url.pathname === '/v1/egress/requests/page') {
-      if (state.egressError) { status = 503; body = { error: 'unavailable', message: '出站待办离线' }; }
-      else { const limit = Number(url.searchParams.get('limit') ?? 20); body = { items: egressRequests.slice(0, limit), ...(limit < egressRequests.length ? { nextCursor: 'next-egress' } : {}) }; }
+    // RFC-018：出站待办已删除，总览不该再读它。
+    } else if (url.pathname.startsWith('/v1/egress') || url.pathname.includes('/egress/')) {
+      status = 500; body = { error: 'unexpected', message: '出站接口已下线，不应被调用' };
     } else if (url.pathname.startsWith('/v1/projects/')) {
       const project = projects.find((p) => url.pathname === `/v1/projects/${p.project.id}`)?.project;
       if (project && state.detailError) { status = 503; body = { error: 'unavailable', message: '调用方资料离线' }; }
@@ -43,5 +41,5 @@ export function adminDirectoryFixture() {
     }
     return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
   }) as typeof fetch;
-  return { calls, state, projects, apiRequests, egressRequests, writes: () => calls.filter((r) => r.method !== 'GET') };
+  return { calls, state, projects, apiRequests, writes: () => calls.filter((r) => r.method !== 'GET') };
 }

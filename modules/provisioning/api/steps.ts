@@ -17,6 +17,11 @@ export interface ProjectFacts {
 /** 每一步都必须幂等：开通任务可能因任一步失败而整体重跑。 */
 export interface ProvisioningSteps {
   loadProject(projectId: ProjectId): Promise<ProjectFacts | undefined>;
+  /**
+   * 全部未归档项目的开通事实，供启动重下发遍历（RFC-018）。
+   * 命名空间对象的形状会随版本变化，而开通链只在建项目时跑过一次；没有这一步，存量命名空间永远停在旧形状。
+   */
+  listProjects(): Promise<ProjectFacts[]>;
   ensureNamespace(facts: ProjectFacts): Promise<void>;
   ensureRepository(facts: ProjectFacts): Promise<void>;
   ensureData(facts: ProjectFacts): Promise<void>;

@@ -15,7 +15,6 @@ export const queryKeys = {
   adminProjects: () => ['projects', 'admin'] as const,
   adminProjectPage: (search: unknown) => ['projects', 'admin', 'page', search] as const,
   accessRequestPage: (search: unknown) => ['access-requests', 'page', search] as const,
-  egressRequestPage: (search: unknown) => ['egress', 'requests', 'page', search] as const,
   /** 按 kind 过滤的项目列表（RFC-002）：挂在 projects 前缀下，建项目后一次失效连带刷新。 */
   projectsByKind: (kinds: readonly string[]) => ['projects', 'kind', kinds.join(',')] as const,
   project: (projectId: string) => ['projects', projectId] as const,
@@ -55,9 +54,6 @@ export const queryKeys = {
   alertSubscriptions: (projectId: string) => ['projects', projectId, 'alert-subscriptions'] as const,
   trace: (traceId: string) => ['traces', traceId] as const,
   capabilities: (projectId: string) => ['projects', projectId, 'capabilities'] as const,
-  egressEntries: (projectId?: string) => (projectId === undefined ? (['egress', 'entries'] as const) : (['egress', 'entries', projectId] as const)),
-  egressRequests: (projectId?: string) => (projectId === undefined ? (['egress', 'requests'] as const) : (['egress', 'requests', projectId] as const)),
-  egressBlocked: (projectId: string) => ['egress', 'blocked', projectId] as const,
   servicePlans: () => ['service-plans'] as const,
   projectTemplates: () => ['project-templates', 'admin'] as const,
   taskProfiles: () => ['task-profiles'] as const,

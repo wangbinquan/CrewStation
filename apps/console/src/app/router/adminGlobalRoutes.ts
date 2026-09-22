@@ -20,3 +20,7 @@ export const adminCatalogLegacyRoute = createRoute({ getParentRoute: () => admin
   validateSearch: (search: Record<string, unknown>) => parseCapabilitySearch({ ...search, tab: 'api' }),
   beforeLoad: ({ search }) => { throw redirect({ to: '/admin/capabilities', search, replace: true }); },
 });
+/** RFC-018 下线出站白名单；旧书签与旧文档里的链接仍然可用，落到管理总览而不是 404。 */
+export const adminEgressLegacyRoute = createRoute({ getParentRoute: () => adminRoute, path: 'egress',
+  beforeLoad: () => { throw redirect({ to: '/admin', replace: true }); },
+});

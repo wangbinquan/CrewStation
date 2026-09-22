@@ -19,30 +19,39 @@ async function type(node: HTMLInputElement | HTMLTextAreaElement | HTMLSelectEle
     node.dispatchEvent(new KeyboardEvent('keyup', { key: 'a', bubbles: true })); }); await page!.settle();
 }
 
-test('审批只读取活动来源的 20 项分页，两类游标独立且切页签与历史保留范围', async () => {
+test('审批只读取 20 项分页，游标随翻页进 URL，历史返回保留范围', async () => {
   const f = adminRequestPagesFixture(); page = await renderApp('/admin/requests');
   const apiCalls = () => f.calls.filter((c) => c.url.pathname === '/v1/api-requests/page');
   expect(apiCalls()).toHaveLength(1); expect(apiCalls()[0]!.url.searchParams.get('limit')).toBe('20');
-  expect(f.calls.some((c) => ['/v1/projects', '/v1/api-requests', '/v1/egress/requests', '/v1/egress/requests/page'].includes(c.url.pathname))).toBe(false);
+  expect(f.calls.some((c) => ['/v1/projects', '/v1/api-requests'].includes(c.url.pathname))).toBe(false);
   expect(page.text()).toContain('申请项目 0'); expect(page.text()).toContain('tenant-0'); expect(page.text()).toContain('本页 20 项');
   await click('下一页'); expect(page.search().apiCursor).toBe('api:20'); expect(page.text()).toContain(f.apiRequests[20]!.operationId); expect(page.text()).not.toContain('账单申请 0');
-  await page.click('出站申请'); expect(page.search().apiCursor).toBe('api:20');
-  await click('下一页'); expect(page.search().egressCursor).toBe('egress:20'); expect(page.text()).toContain('model-20.example.invalid');
-  await page.click('API 申请'); expect(page.search()).toMatchObject({ apiCursor: 'api:20', egressCursor: 'egress:20' });
-  expect(f.calls.filter((c) => c.url.pathname === '/v1/egress/requests/page').every((c) => !c.url.searchParams.get('cursor') || c.url.searchParams.get('cursor')!.startsWith('egress:'))).toBe(true);
-  await page.back(); expect(page.search().tab).toBe('egress'); expect(page.search().egressCursor).toBe('egress:20'); expect(f.writes()).toHaveLength(0);
+  await page.back(); expect(page.search().apiCursor).toBeUndefined(); expect(f.writes()).toHaveLength(0);
 });
 
-test('切页签保留两类意见；改变页码或筛选先确认，取消保留输入，确认后按新范围读取', async () => {
+test('RFC-018：页面不再读出站接口，旧的 tab／egressCursor 参数被忽略而不是空页', async () => {
+  const f = adminRequestPagesFixture(); page = await renderApp('/admin/requests?tab=egress&egressCursor=egress%3A20');
+  // 旧链接照常落到申请列表的第一页，不是空页也不是错误页；URL 上残留的参数不驱动任何读取。
+  expect(page.text()).toContain('本页 20 项'); expect(page.text()).toContain(f.apiRequests[0]!.operationId);
+  expect(f.calls.filter((c) => c.url.pathname === '/v1/api-requests/page').every((c) => !c.url.searchParams.has('cursor'))).toBe(true);
+  expect(f.calls.some((c) => c.url.pathname.includes('egress'))).toBe(false);
+  // 出站页签与它的入口都不该还在。
+  expect(page.text()).not.toContain('出站申请'); expect(page.text()).not.toContain('查看出站放行规则');
+  expect(f.writes()).toHaveLength(0);
+});
+
+test('/admin/egress 旧地址重定向到管理总览', async () => {
+  adminRequestPagesFixture(); page = await renderApp('/admin/egress');
+  expect(page.path()).toBe('/admin');
+});
+
+test('改变筛选先确认，取消保留输入，确认后按新范围读取', async () => {
   const f = adminRequestPagesFixture(); page = await renderApp('/admin/requests');
-  await type(visible<HTMLTextAreaElement>('textarea')[0]!, 'API 草稿'); await page.click('出站申请');
-  await type(visible<HTMLInputElement>('input')[0]!, '出站草稿'); await page.click('API 申请');
-  expect(visible<HTMLTextAreaElement>('textarea')[0]!.value).toBe('API 草稿');
+  await type(visible<HTMLTextAreaElement>('textarea')[0]!, 'API 草稿');
   await click('下一页'); expect(page.search().apiCursor).toBeUndefined(); expect(page.text()).toContain('审批意见有未保存的输入');
   await page.click('继续编辑'); expect(visible<HTMLTextAreaElement>('textarea')[0]!.value).toBe('API 草稿');
-  await page.click('出站申请'); expect(visible<HTMLInputElement>('input')[0]!.value).toBe('出站草稿');
   await type(visible<HTMLSelectElement>('select[aria-label="申请状态"]')[0]!, 'approved'); expect(page.search().state ?? 'pending').toBe('pending');
-  await page.click('放弃输入并离开'); expect(page.search().state).toBe('approved'); expect(page.search().apiCursor).toBeUndefined(); expect(page.search().egressCursor).toBeUndefined();
+  await page.click('放弃输入并离开'); expect(page.search().state).toBe('approved'); expect(page.search().apiCursor).toBeUndefined();
   expect(f.calls.at(-1)!.url.searchParams.get('state')).toBe('approved'); expect(f.writes()).toHaveLength(0);
 });
 
@@ -60,19 +69,17 @@ test('刷新移走申请时保留具名意见供核对；失败保留原草稿�
   expect(page.text()).toContain('申请已批准'); await page.navigate('/admin'); expect(page.path()).toBe('/admin');
 });
 
-test('出站裁定失败保留输入，同轮重复点击只提交一次，成功只清掉目标申请的意见', async () => {
-  const f = adminRequestPagesFixture(); page = await renderApp('/admin/requests?tab=egress');
-  await type(visible<HTMLInputElement>('input')[0]!, '  允许模型服务  '); await type(visible<HTMLInputElement>('input')[1]!, '另一个域名待核对');
-  f.state.decisionError = true; await click('批准'); expect(page.text()).toContain('裁定提交失败'); expect(visible<HTMLInputElement>('input')[0]!.value).toBe('  允许模型服务  ');
+test('裁定失败保留输入，同轮重复点击只提交一次，成功只清掉目标申请的意见', async () => {
+  const f = adminRequestPagesFixture(); page = await renderApp('/admin/requests');
+  await type(visible<HTMLTextAreaElement>('textarea')[0]!, '  允许账单查询  '); await type(visible<HTMLTextAreaElement>('textarea')[1]!, '另一条待核对');
+  f.state.decisionError = true; await click('批准'); expect(page.text()).toContain('裁定提交失败'); expect(visible<HTMLTextAreaElement>('textarea')[0]!.value).toBe('  允许账单查询  ');
   f.state.decisionError = false; let finish!: () => void; f.state.holdDecision = new Promise<void>((resolve) => { finish = resolve; });
   const approve = visible<HTMLButtonElement>('button').find((b) => b.textContent === '批准')!;
   await act(async () => { approve.click(); approve.click(); }); await page.settle(); expect(f.writes()).toHaveLength(2);
-  expect(f.writes()[1]!.url.pathname).toBe(`/v1/egress/requests/${f.egressRequests[0]!.id}/decision`);
-  expect(f.writes()[1]!.body).toEqual({ approve: true, decision: '允许模型服务' }); expect(visible<HTMLInputElement>('input')[0]!.disabled).toBe(true);
-  await act(async () => finish()); await page.settle(); expect(page.text()).toContain('model-0.example.invalid 申请已批准');
-  expect(visible<HTMLInputElement>('input')[0]!.value).toBe('另一个域名待核对'); expect(visible<HTMLTextAreaElement>('textarea[readonly]')).toHaveLength(0);
-  await page.requestNavigate('/admin/egress'); expect(page.text()).toContain('审批意见有未保存的输入'); await page.click('继续编辑');
-  expect(visible<HTMLInputElement>('input')[0]!.value).toBe('另一个域名待核对');
+  expect(f.writes()[1]!.url.pathname).toBe(`/v1/api-requests/${f.apiRequests[0]!.id}/decision`);
+  expect(f.writes()[1]!.body).toEqual({ approve: true, decision: '  允许账单查询  ' });
+  await act(async () => finish()); await page.settle(); expect(page.text()).toContain('申请已批准');
+  expect(visible<HTMLTextAreaElement>('textarea')[0]!.value).toBe('另一条待核对');
 });
 
 test('空 API 意见在途也保护离开；确认离开后的迟到裁定不会拉回旧页或再次提交', async () => {
@@ -89,7 +96,7 @@ test('空 API 意见在途也保护离开；确认离开后的迟到裁定不会
 });
 
 test('错误游标可回第一页；重复或错项目资料不当成空页，项目名称缺失时保留真实 ID', async () => {
-  const f = adminRequestPagesFixture(); page = await renderApp('/admin/requests?apiCursor=egress%3A20');
+  const f = adminRequestPagesFixture(); page = await renderApp('/admin/requests?apiCursor=bad%3A20');
   expect(page.text()).toContain('申请游标不匹配'); expect(page.text()).toContain('本页数量未确认');
   await click('回到第一页'); expect(page.search().apiCursor).toBeUndefined(); expect(page.text()).toContain('本页 20 项');
   f.state.invalidApi = true; await page.click('刷新 API 申请'); expect(page.text()).toContain('申请分页返回无效');
@@ -110,28 +117,28 @@ test('返回错误申请的裁定不显示成功，不清除意见或自动重�
   expect(page.text()).toContain('审批结果以最新申请记录为准'); expect(f.writes()).toHaveLength(1);
 });
 
-test('出站申请不再出现在本页或读取被拒绝时，输入副本可见但旧申请不能继续裁定', async () => {
-  const f = adminRequestPagesFixture(); page = await renderApp('/admin/requests?tab=egress');
-  await type(visible<HTMLInputElement>('input')[0]!, '出站核对副本'); f.state.egressError = 403;
-  await page.click('刷新出站申请'); expect(page.text()).toContain('出站分页读取失败');
+test('读取被拒绝时输入副本可见但旧申请不能继续裁定；恢复后仍是同一份输入', async () => {
+  const f = adminRequestPagesFixture(); page = await renderApp('/admin/requests');
+  await type(visible<HTMLTextAreaElement>('textarea')[0]!, '核对副本'); f.state.apiError = 403;
+  await page.click('刷新 API 申请'); expect(page.text()).toContain('API 分页读取失败');
   expect(visible<HTMLButtonElement>('button').filter((b) => b.textContent === '批准')).toHaveLength(0);
-  expect(visible<HTMLTextAreaElement>('textarea[readonly]')[0]!.value).toBe('出站核对副本');
-  f.state.egressError = 0; await page.click('刷新出站申请'); expect(visible<HTMLInputElement>('input')[0]!.value).toBe('出站核对副本');
-  f.egressRequests[0]!.state = 'rejected'; await page.click('刷新出站申请');
-  expect(visible<HTMLTextAreaElement>('textarea[readonly]')[0]!.value).toBe('出站核对副本');
-  await click('清除这条意见'); await page.navigate('/admin/egress'); expect(page.path()).toBe('/admin/egress'); expect(f.writes()).toHaveLength(0);
+  expect(visible<HTMLTextAreaElement>('textarea[readonly]')[0]!.value).toBe('核对副本');
+  f.state.apiError = 0; await page.click('刷新 API 申请'); expect(visible<HTMLTextAreaElement>('textarea')[0]!.value).toBe('核对副本');
+  f.apiRequests[0]!.state = 'rejected'; await page.click('刷新 API 申请');
+  expect(visible<HTMLTextAreaElement>('textarea[readonly]')[0]!.value).toBe('核对副本');
+  await click('清除这条意见'); await page.navigate('/admin'); expect(page.path()).toBe('/admin'); expect(f.writes()).toHaveLength(0);
 });
 
-test('当前行可进入项目申请范围；改变项目清除两类游标，浏览器返回仍保护当前意见', async () => {
-  const f = adminRequestPagesFixture(), path = '/admin/requests?apiCursor=api%3A20&egressCursor=egress%3A20';
+test('当前行可进入项目申请范围；改变项目清除游标，浏览器返回仍保护当前意见', async () => {
+  const f = adminRequestPagesFixture(), path = '/admin/requests?apiCursor=api%3A20';
   const history = browserHistoryFixture([path]); page = await renderApp(path, undefined, history.history);
   const projectId = f.apiRequests[20]!.projectId; await page.click('查看此项目申请');
-  expect(page.search()).toMatchObject({ tab: 'api', projectId }); expect(page.search().apiCursor).toBeUndefined(); expect(page.search().egressCursor).toBeUndefined();
+  expect(page.search()).toMatchObject({ projectId }); expect(page.search().apiCursor).toBeUndefined();
   const last = f.calls.filter((c) => c.url.pathname === '/v1/api-requests/page').at(-1)!;
   expect(last.url.searchParams.get('projectId')).toBe(projectId); expect(last.url.searchParams.has('cursor')).toBe(false);
   await type(visible<HTMLTextAreaElement>('textarea')[0]!, '项目范围意见'); await page.back();
   expect(page.search().projectId).toBe(projectId); expect(page.text()).toContain('审批意见有未保存的输入');
   await page.click('继续编辑'); expect(visible<HTMLTextAreaElement>('textarea')[0]!.value).toBe('项目范围意见');
   await page.click('查看所有项目'); await page.click('放弃输入并离开'); expect(page.search().projectId).toBeUndefined();
-  expect(page.search().apiCursor).toBeUndefined(); expect(page.search().egressCursor).toBeUndefined(); expect(f.writes()).toHaveLength(0);
+  expect(page.search().apiCursor).toBeUndefined(); expect(f.writes()).toHaveLength(0);
 });

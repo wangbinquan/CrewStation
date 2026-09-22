@@ -16,8 +16,6 @@ import type { ConfigResource } from './resources/config';
 import { configResource } from './resources/config';
 import type { DevSessionResource } from './resources/devSession';
 import { devSessionResource } from './resources/devSession';
-import type { EgressResource } from './resources/egress';
-import { egressResource } from './resources/egress';
 import type { EventsResource } from './resources/events';
 import { eventsResource } from './resources/events';
 import type { GatewayResource } from './resources/gateway';
@@ -56,7 +54,6 @@ export interface ApiClient {
   readonly devSession: DevSessionResource;
   readonly tasks: TasksResource;
   readonly config: ConfigResource;
-  readonly egress: EgressResource;
   readonly apiCatalog: ApiCatalogResource;
   readonly events: EventsResource;
   readonly gateway: GatewayResource;
@@ -82,7 +79,6 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
     devSession: devSessionResource(transport),
     tasks: tasksResource(transport),
     config: configResource(transport),
-    egress: egressResource(transport),
     apiCatalog: apiCatalogResource(transport),
     events: eventsResource(transport),
     gateway: gatewayResource(transport),

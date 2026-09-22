@@ -33,7 +33,6 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   "logs.alerts.type.delivery-dead": "Event delivery failure",
   "logs.alerts.type.task-failed": "Task failure",
   "logs.alerts.type.quota-exhausted": "Quota exhausted",
-  "logs.alerts.type.egress-blocked": "Egress request blocked",
   "logs.alerts.cancel": "Cancel",
   "logs.alerts.channel.workbench": "Workbench notification",
   "logs.alerts.channel.webhook": "Webhook",

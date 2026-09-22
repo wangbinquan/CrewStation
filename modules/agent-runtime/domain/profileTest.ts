@@ -73,7 +73,7 @@ const OUTCOME_SENTENCE: Record<ProfileTestOutcome, string> = {
   'before-start-failed': '启动前步骤失败',
   'spawn-failed': '二进制无法启动，请核对二进制路径与镜像内容',
   'auth-missing': 'CLI 已启动但鉴权失败，请核对凭据',
-  'network-blocked': 'CLI 已启动但连不上模型端点，请核对网络、代理或出站白名单',
+  'network-blocked': 'CLI 已启动但连不上模型端点，请核对网络、代理或命名空间网络策略',
   'model-call-failed': 'CLI 已鉴权但模型调用失败（限流、不可用或无权使用该模型）',
   'stream-nonconforming': 'CLI 的输出不符合所选协议，或没有原样回显测试标记',
   'output-mismatch': '测试命令的输出与期望不符',

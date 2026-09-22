@@ -43,15 +43,16 @@ async function caught(call: () => Promise<unknown>): Promise<ApiClientError> {
 }
 
 describe('createApiClient：请求形状', () => {
-  test('两类申请分页保留真实服务端游标、项目和状态，不改旧全量调用', async () => {
+  test('申请分页保留真实服务端游标、项目和状态，不改旧全量调用', async () => {
     const f = fakeFetch(() => json(200, { items: [], nextCursor: 'cursor-next' })), client = createApiClient({ baseUrl: 'https://console.test', fetch: f.fetchImpl });
     const query = { projectId: '01a0bf5d-8f4b-7fc7-8b88-18362617594b' as ProjectId, state: 'pending' as const, limit: 5, cursor: 'opaque/value?x=1' };
     expect(await client.apiCatalog.listRequestPage(query)).toEqual({ items: [], nextCursor: 'cursor-next' });
-    await client.egress.listRequestPage(query);
-    expect(f.calls.map((c) => new URL(c.url).pathname)).toEqual(['/v1/api-requests/page', '/v1/egress/requests/page']);
+    expect(f.calls.map((c) => new URL(c.url).pathname)).toEqual(['/v1/api-requests/page']);
     for (const call of f.calls) { expect(call.method).toBe('GET'); expect(Object.fromEntries(new URL(call.url).searchParams)).toEqual({ ...query, limit: '5' }); }
-    await client.apiCatalog.listRequests(); await client.egress.listRequests();
-    expect(f.calls.slice(2).map((c) => new URL(c.url).pathname)).toEqual(['/v1/api-requests', '/v1/egress/requests']);
+    await client.apiCatalog.listRequests();
+    expect(f.calls.slice(1).map((c) => new URL(c.url).pathname)).toEqual(['/v1/api-requests']);
+    // RFC-018：出站资源已删除，客户端上不该再冒出一个 egress 门面。
+    expect('egress' in client).toBe(false);
   });
   test('有界项目页与摘要准确传递分页、筛选和详情对象', async () => {
     const f = fakeFetch(() => json(200, { items: [], nextCursor: 'next' })); const client = createApiClient({ fetch: f.fetchImpl });

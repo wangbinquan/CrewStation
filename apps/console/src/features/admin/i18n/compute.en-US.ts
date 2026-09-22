@@ -268,7 +268,7 @@ export const computeMessages: MessagesShapedLike<typeof zhCN> = {
   'admin.profile.test.outcome.before-start-failed': 'A before-start step failed: go to the failed step, fix it and save again.',
   'admin.profile.test.outcome.spawn-failed': 'The binary could not start: check the binary path, its execute permission and its dependencies in the image.',
   'admin.profile.test.outcome.auth-missing': 'Authentication is missing: the binary starts, but the model call was not authenticated; check the credentials or the configuration file.',
-  'admin.profile.test.outcome.network-blocked': 'The network is unreachable: the model endpoint could not be reached (region restriction, proxy, DNS or egress allowlist).',
+  'admin.profile.test.outcome.network-blocked': 'The network is unreachable: the model endpoint could not be reached (region restriction, proxy, DNS or the namespace network policy).',
   'admin.profile.test.outcome.model-call-failed': 'The model call failed: rate limiting, service unavailable or model not enabled; with no model set, the binary used its own default model.',
   'admin.profile.test.outcome.stream-nonconforming': 'Nonconforming: no parseable events, session or agreed marker came back; the binary may not speak the chosen protocol.',
   'admin.profile.test.outcome.output-mismatch': 'The test command output did not match the expected pattern, or the exit code was not 0.',
