@@ -7,27 +7,20 @@
 
 基线三件套（v0.3.3）的第一轮实现已在本机 kind 集群上跑通并推上 main；**RFC-001（算力归平台）与 RFC-002（管理空间与租户空间分离）已实现、实跑确认并推上 main；RFC-004 已被 RFC-006 取代（Superseded）；RFC-006（算力档位合并运行环境、每个 Agent 一个 Pod）已实现、实机验收完毕并推上 main，已 Done（P1–P8、ADR-0005 与 I17–I19 待作者复核）；RFC-003 工作台已按设计附件完成并整体部署到本机，52／52 项 UX-AT 全部实机通过、本地 gate 与精确 SHA CI 通过，已 Done；RFC-005（OIDC／OAuth 2.0 公司登录）代码、测试与 OA-01…OA-31 实机验收全部完成，已 Done；RFC-007（开发环境 OAuth 2.0 一键换角色）代码、四角色 Chrome 实机验收、本地 gate 与精确 SHA CI 全部完成，已 Done**。
 
-## RFC-019 部署与运行形态图：原型评审中（2026-09-22）
+## RFC-019 部署与运行形态图：已实现并部署本机，收尾待作者破窗口（2026-09-22）
 
-作者要「引入 archify 组件」给每个项目呈现部署与运行形态（几个工作负载、几个 Pod、执行时间、Pod 信息），集群管理页也要图形化呈现系统元素与部署状态，并要求先充分反问、再出原型、看过再动手。
-查明 **Archify（tt-a1i/archify）不是运行时组件**：Agent 技能加 Node CLI，把 JSON IR 渲染成自包含 HTML（含 775KB Viewer），无 npm 包、无浏览器可 import 的渲染器、无喂活数据接口，节点也没有健康状态样式。
-十四个对齐问题作者答复「按你推进的来做」，并说明「说 archify 是指它渲染的图好看」，认可借鉴视觉自写组件。
+作者批准三件套并裁定提案 §7（成员看到与管理员相同的 Pod 投影，不含环境变量值／Secret／注解／YAML；管理动作只在集群管理）。T1–T8 与 T10 已做完，T9 做到一半：
 
-**已做**：`proposal/rfc/RFC-019-deployment-topology/prototype/` 交互设计稿（沿用 RFC-009／011 的 `preview.ts --serve` 方式，端口 5202，复用生产 Card／Tabs／Badge／DefinitionList／Button 与主题）：
-工作台自绘的 SVG 形态图组件（`TopologyDiagram` ＋ 确定性分层排布 `topologyLayout` ＋ 语义／状态／证据模型 `topologyModel`），三条路径：项目概览缩略图、运行与诊断「部署与运行形态」页签、集群管理「拓扑」页签（系统层 → 项目层 → Pod 层，右侧只读详情）。
-借鉴 Archify 的固定语义色词汇、语义色描边＋半透明填充节点、类型线框小图标、虚线边界框、正交圆角连线与遮罩标签、带计数图例、聚焦压暗、明暗两套；观测关系实线、静态架构标注虚线并在图例明写「不是实测」；≤640px 降级为分组列表；异常项目置顶、超过 60 个折叠；零新依赖。
-另用 Archify 真生成了一张平台静态架构图作对照（`prototype/archify/*.architecture.json` 经 `validate` 零错误后 `deliver`；生成的 830KB HTML 只在本机，未入库）。
-真实 Chrome 核对：三条路径、点选详情、快照推进不重排、浅色主题、320／390px 无横向溢出、无 console 错误；`arch:check`／全仓 lint／console 类型检查通过。记录见 [prototype-review.md](proposal/rfc/RFC-019-deployment-topology/prototype-review.md)，README 已登记 Draft。
+- **契约与后端**：`ProjectClusterResourcesSchema`、`summary.projects[]` 计数、api-client `cluster.projectResources`。`cluster-management` 已到 40 文件上限，只扩既有文件：`queries.ts` 加 `projectCounts`／`projectResourcesIn`／`projectResources`（`kindRank` 排序、500 条截断、`availableActions` 恒空），`dependencies.ts` 加 `authorizeProject`，路由 `GET /v1/projects/:projectId/cluster-resources`（先取 actor 再解析参数），组合根注入 `project.api.authorize(actor, projectId, 'develop')`。模块用例 `tests/projectResources.test.ts`（真实 PostgreSQL：成员读取、计数、测试员／陌生人／未知项目／410、HTTP 401／400／403／200、截断）。
+- **工作台**：`tokens.css` 九组 `--cs-topo-*` 语义色（明暗两套）；`shared/ui/topology/`（模型、确定性排布、`fitMetrics` 铺满、SVG 图、图例、筛选、窄屏列表、工作区）；`shared/topology/`（项目形态、横带汇总、系统层静态表、系统形态、项目层折叠、文案）；三处入口：概览 `DeploymentTopologyCard`、运行与诊断 `topology` 页签（`TopologyPage`＋只读 `TopologyDetail`）、集群管理「拓扑」页签（`ClusterTopology` 三层，复用 `ClusterDetail`）。中英文各 200 余键。
+- **测试**：console 六个 topology 用例文件（排布、组装、图组件、三处页面、令牌回归、夹具），导航与集群页既有用例更新；`tests/e2e/topology.test.ts`（三层、Pod 层与运行诊断页签、1280／1024／390 宽度、成员 403）。完整 `bun run check`（带本机测试库）**2060 pass／55 skip／0 fail**——55 个 skip 全是 e2e 层，原因见下；`test:cover` 三层全绿（e2e 层 28 项因登不进而超时失败，同一原因），`test:patch --base origin/main --worktree` 改动行 522／522（100%）。
+- **本机部署与实机核对**（`cs-control-plane:rfc019-20260922`、`cs-console:rfc019-20260922`，dev-admin 真实 Chrome）：项目范围盘点接口返回演示数字人 3 Pod／2 Deployment／1 PVC、`availableActions` 全空、快照完整，摘要计数与 `kubectl -n cs-demo` 一致；系统层 21 节点／20 条静态线、1728 视口下 SVG 1467px 铺满 1470px 容器；项目层 11 个项目、2 个需要关注；Pod 层 11 节点按 UID 对上、面包屑可返回；运行与诊断页签点 Pod 出只读详情（镜像、发布、槽、UID，无副本／重启入口，「查看日志」进日志页）；概览卡「工作负载 2 · Pod 3，就绪 3，运行 0」三条横带，点卡进全图；无 console 错误。逐项见 [acceptance.md](proposal/rfc/RFC-019-deployment-topology/acceptance.md)。
+- **基线回填 v0.3.8**：Proposal §0.2 变更表、§3 能力行、§6 R55；Design §2.3 指引、§14.6、D55；Plan AT-56 与矩阵行。
+- **顺手修的**：PVC 的 facts 值是 JSON（`{"storage":"10Gi"}`）原样上图，加 `factText` 取量显示为 `capacity 10Gi`（已有用例；已重建并滚出 `cs-console:rfc019-20260922b`，实机复核待登录恢复）。
 
-作者看过第一版后裁定「界面宽度需要用满」：原型已改为形态图随容器铺满（节点撑宽、1:1 不缩放）、项目层列数随宽度 2–8 列、概览缩略改为一行横带汇总卡；实施时生产外壳的 `--cs-content-max-width: 1200px` 至少对这三处页面去掉，是否全局去掉待作者答复。
+**卡住的地方**：滚 `cs-control-plane` 新镜像时 `crewstation-dev-auth` 也换了镜像并被 Recreate 策略重建，它启动要先用管理员**密码**登录平台播种，而库内策略仍是密码登录关闭（本文件已记两次的同一颗雷），`readyz` 持续 503、旧 Pod 已不在。后果：本机 dev-oidc 登不进（浏览器会话过期后无法再登录，e2e 层整层 skip），TP-16 的 1280／1024／390、TP-17 的键盘与浅色主题、`factText` 的实机复核都停在这里。恢复需要本文件既有的破窗口流程（`CS_PASSWORD_LOGIN=force-on` → 重启 cs-auth／cs-api → 开发登录器重新播种 → 移除开关 → 再重启两个服务），按惯例要作者授权，未做。
 
-作者随后裁定「全部页面一起去掉 1200px 上限」，按小型界面调整直接改生产并回填：`AppShell.module.css` 的 `.content` 去掉 `max-width`（只留 `min-width: 0`），`tokens.css` 删除 `--cs-content-max-width`，`projectNavigation.test.tsx` 新增回归（令牌不得再出现、外壳不得再写 max-width 声明），RFC-003 设计 §6 追加 2026-09-22 裁定。
-完整 `bun run check`（带本机测试库与 dev-admin 登录）**2070 pass／8 skip／1 fail**：唯一失败是 `releaseDelivery.test.tsx`「其他发布进行中保留当前部署信息并阻止切换」，未改动的文件，单跑三次 10／10 通过，记为该文件既有 flake（STATE 此前已记同文件另一条）；随后 `test:cover` 全绿 **2071 pass／8 skip／0 fail**，`test:patch --base origin/main` 判定本次没有需要用例防护的生产源码（CSS 与用例）。
-本机 console 已部署 `cs-console:fullwidth-20260922`（`sha256:2e52b750…`），部署后 e2e 层 **53 pass／1 skip／0 fail**；真实 dev-admin 浏览器：1728px 视口下 `main` 1728px、内容区 1680px、`max-width: none`、无横向溢出。
-
-作者随后答复其余取舍：详情放右侧、静态线默认显示、语义色进 tokens、Archify 图不入库；成员可见 Pod 事实的边界未答。三件套已写：`proposal.md`（三处入口、视觉规则、十九项裁定表、§7 待确认）、`design.md`（落位：`cluster-management` 已到 40 文件上限故不加生产文件，只在 `queries.ts`／`clusterRoutes.ts`／`dependencies.ts` 加项目范围只读盘点与摘要计数；形态在工作台 `shared/topology/` 组装，渲染在 `shared/ui/topology/`；接口、组装规则、排布、失败模式、测试策略）、`plan.md`（T1–T10、TP-01…TP-18）。README 状态仍为 Draft。
-
-**下一步**：等作者批准三件套并裁定提案 §7，再写三件套（development-rules §5），批准后实施。实现要点：项目成员需要新的项目范围只读盘点接口（同一份 RFC-010 快照按项目过滤，走成员校验）；`--topo-*` 语义色进 tokens.css；组件放 `apps/console/src/shared/ui/`。
+**下一步**：作者授权后走破窗口恢复 dev-auth；用已滚出的 `cs-console:rfc019-20260922b` 复核剩余 TP 项并让 e2e 层跑一遍，把 acceptance.md 的「待复核」改成实测；推送后记录精确 SHA 的 CI 六项结果，README 收口为 Done。
 
 ## I23 已裁定并执行：两个内置接入项目的 manifest 迁到 v2（2026-09-22）
 
