@@ -284,25 +284,6 @@
         "@crewstation/testkit": "workspace:*",
       },
     },
-    "modules/egress": {
-      "name": "@crewstation/module-egress",
-      "version": "0.0.0",
-      "dependencies": {
-        "@crewstation/contracts": "workspace:*",
-        "@crewstation/http": "workspace:*",
-        "@crewstation/kernel": "workspace:*",
-        "@crewstation/module-project": "workspace:*",
-        "@crewstation/persistence": "workspace:*",
-        "drizzle-orm": "0.45.2",
-        "hono": "4.13.7",
-        "zod": "4.6.2",
-      },
-      "devDependencies": {
-        "@crewstation/eventbus": "workspace:*",
-        "@crewstation/module-identity": "workspace:*",
-        "@crewstation/testkit": "workspace:*",
-      },
-    },
     "modules/events": {
       "name": "@crewstation/module-events",
       "version": "0.0.0",
@@ -400,7 +381,6 @@
         "@crewstation/module-config": "workspace:*",
         "@crewstation/module-data": "workspace:*",
         "@crewstation/module-dev-session": "workspace:*",
-        "@crewstation/module-egress": "workspace:*",
         "@crewstation/module-events": "workspace:*",
         "@crewstation/module-gateway": "workspace:*",
         "@crewstation/module-identity": "workspace:*",
@@ -527,7 +507,6 @@
         "@crewstation/kernel": "workspace:*",
         "@crewstation/module-config": "workspace:*",
         "@crewstation/module-data": "workspace:*",
-        "@crewstation/module-egress": "workspace:*",
         "@crewstation/module-project": "workspace:*",
         "@crewstation/persistence": "workspace:*",
         "@crewstation/queue": "workspace:*",
@@ -833,8 +812,6 @@
     "@crewstation/module-data": ["@crewstation/module-data@workspace:modules/data"],
 
     "@crewstation/module-dev-session": ["@crewstation/module-dev-session@workspace:modules/dev-session"],
-
-    "@crewstation/module-egress": ["@crewstation/module-egress@workspace:modules/egress"],
 
     "@crewstation/module-events": ["@crewstation/module-events@workspace:modules/events"],
 
