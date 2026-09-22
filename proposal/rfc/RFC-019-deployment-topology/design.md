@@ -123,7 +123,7 @@ ClusterSummarySchema.projects[i] += { workloads?, pods?, readyPods?, abnormal?, 
 
 | 改动 | 用例 | 位置 |
 |---|---|---|
-| 新路由 `GET /v1/projects/:id/cluster-resources` | 成功路径（负责人、开发者、管理员），测试员 403，非成员 403，未登录 401，项目不存在 404，`snapshotId` 非法 400，过期 410，`availableActions` 恒空，`truncated` 边界 | `modules/cluster-management/tests/`（真实 PostgreSQL） |
+| 新路由 `GET /v1/projects/:id/cluster-resources` | 成功路径（负责人、开发者、管理员），测试员 403，非成员 404（`authorize` 对非成员按项目不存在处理，不暴露项目），未登录 401，项目不存在 404，`snapshotId` 非法 400，过期 410，`availableActions` 恒空，`truncated` 边界 | `modules/cluster-management/tests/`（真实 PostgreSQL） |
 | `summary.projects[]` 计数 | 每项目计数与逐项过滤一致；部分来源失败时计数不为 0 而是缺席 | 同上 |
 | 契约 Schema | 正向解析、`strict` 拒绝未知键、可选计数缺席兼容 | `packages/contracts/api/cluster/` 旁 |
 | `projectTopology`／`systemTopology`／`projectsLayer`／`bandSummary` | 每条横带的进入条件、边的生成、状态归一、待核对不猜用途、折叠阈值、时长计算 | `apps/console/src/tests/topologyAssembly.test.ts` |

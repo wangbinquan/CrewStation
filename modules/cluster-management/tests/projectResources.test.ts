@@ -13,7 +13,7 @@ import { projectResourcesIn } from '../application/queries';
 import type { InventorySnapshot } from '../domain/inventory';
 import { admin, facts, catalog, object, query } from './inventoryFixture';
 
-// RFC-019：项目成员经 develop 动作读本项目的受管资源；测试员、非成员与不存在的项目在授权处被拒，管理动作一律清空。
+// RFC-019：项目成员经 develop 动作读本项目的受管资源；测试员 403、非成员与不存在的项目 404（授权处的约定），管理动作一律清空。
 const available = await testDatabaseAvailable();
 const projectId = facts.projects[0]!.projectId;
 const member: Actor = { userId: '01a0bf5d-8f4b-7a01-8f0e-0d6b1c3f0001' as UserId, isAdmin: false };
@@ -21,9 +21,9 @@ const tester: Actor = { userId: '01a0bf5d-8f4b-7a01-8f0e-0d6b1c3f0002' as UserId
 let tdb: TestDatabase, module: ClusterManagementModule;
 const k8s = createFakeK8sClient();
 const authorizeProject = async (actor: Actor, id: string): Promise<void> => {
-  if (id !== projectId) throw notFound('项目', id);
-  if (actor.isAdmin || actor.userId === member.userId) return;
-  throw forbidden('需要项目开发权限');
+  // 与 project 模块的 authorize 同一约定：非成员与不存在的项目都按「项目不存在」拒绝（不暴露项目），成员角色不够才是 forbidden。
+  if (id !== projectId || (!actor.isAdmin && actor.userId !== member.userId && actor.userId !== tester.userId)) throw notFound('项目', id);
+  if (actor.userId === tester.userId) throw forbidden('角色 tester 不能执行 develop');
 };
 beforeAll(async () => {
   if (!available) return;
@@ -66,7 +66,7 @@ describe.skipIf(!available)('project-scoped read-only inventory (RFC-019)', () =
   });
   test('tester, stranger and unknown project are refused at authorization; expired snapshot is 410', async () => {
     await expect(module.api.projectResources(tester, projectId)).rejects.toMatchObject({ kind: 'forbidden' });
-    await expect(module.api.projectResources({ userId: '01a0bf5d-8f4b-7a01-8f0e-0d6b1c3f0009' as UserId, isAdmin: false }, projectId)).rejects.toMatchObject({ kind: 'forbidden' });
+    await expect(module.api.projectResources({ userId: '01a0bf5d-8f4b-7a01-8f0e-0d6b1c3f0009' as UserId, isAdmin: false }, projectId)).rejects.toMatchObject({ kind: 'not_found' });
     await expect(module.api.projectResources(member, '01a0bf5d-8f4b-7a01-8f0e-0d6b1c3f0010')).rejects.toMatchObject({ kind: 'not_found' });
     await expect(module.api.projectResources(member, projectId, 'snapshot-that-never-existed')).rejects.toMatchObject({ kind: 'not_found', details: { status: 410 } });
   });

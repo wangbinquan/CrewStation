@@ -10,6 +10,8 @@ afterAll(async () => { await session?.close(); }, 30_000);
 const nodeIds = (page: Page) => page.eval<string[]>(`[...document.querySelectorAll('[data-node-id]')].map((n) => n.getAttribute('data-node-id'))`);
 const clickButton = (page: Page, text: string) => page.eval<boolean>(`(() => { const b = [...document.querySelectorAll('button')].find((n) => n.textContent === ${JSON.stringify(text)}); if (!b) throw new Error('no button ' + ${JSON.stringify(text)}); b.click(); return true; })()`);
 const waitForNodes = (page: Page) => page.waitUntil(`document.querySelectorAll('[data-node-id]').length > 0`, 60_000, 500);
+const pressKey = async (page: Page, key: string, windowsVirtualKeyCode: number) => { await page.cmd('Input.dispatchKeyEvent', { type: 'keyDown', key, windowsVirtualKeyCode }); await page.cmd('Input.dispatchKeyEvent', { type: 'keyUp', key, windowsVirtualKeyCode }); };
+const colourScheme = (page: Page, value: 'light' | 'dark') => page.cmd('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value }] });
 
 describe.skipIf(!session)('deployed deployment topology (RFC-019)', () => {
   test('cluster topology: the system layer shows observed platform components with static edges and the project layer lists every project with counts', async () => {
@@ -43,6 +45,9 @@ describe.skipIf(!session)('deployed deployment topology (RFC-019)', () => {
     expect(await page.bodyText()).toContain('项目层 ›');
     await open(page, `/projects/${id}/operations?tab=topology`); await waitForNodes(page);
     ids = await nodeIds(page); for (const pod of pods) expect(ids).toContain(pod.uid);
+    // 盘点里 PVC 的 facts 值是 JSON（如 capacity {"storage":"10Gi"}），卡片上要显示成量，不能原样上图。
+    const pvc = inventory.items.find((item) => item.kind === 'PersistentVolumeClaim' && Object.values(item.facts).some((value) => value.startsWith('{')));
+    if (pvc) expect(await page.eval<string>(`document.querySelector('[data-node-id="${pvc.uid}"]').textContent`)).not.toContain('{"');
     const first = pods[0];
     if (first) {
       await page.eval(`document.querySelector('[data-node-id="${first.uid}"]').dispatchEvent(new MouseEvent('click', { bubbles: true }))`);
@@ -52,7 +57,7 @@ describe.skipIf(!session)('deployed deployment topology (RFC-019)', () => {
     expect(page.takeErrors()).toEqual([]);
   }, 150_000);
 
-  test.each([1280, 1024, 390])('the topology fills the content width at %i px and degrades to a grouped list on phones', async (width) => {
+  test.each([1280, 1024, 390, 320])('the topology fills the content width at %i px and degrades to a grouped list on phones', async (width) => {
     const page = session!.admin;
     await page.cmd('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: false });
     try {
@@ -69,13 +74,40 @@ describe.skipIf(!session)('deployed deployment topology (RFC-019)', () => {
     } finally { await page.cmd('Emulation.clearDeviceMetricsOverride'); }
   }, 90_000);
 
-  test.skipIf(!session?.project || visitor === undefined)('the project inventory route answers a non-admin by membership: develop passes, tester or stranger is refused', async () => {
+  test.skipIf(!session?.project)('under a light colour scheme the topology tokens switch, and Enter / Escape drive the read-only detail from the keyboard', async () => {
+    const page = session!.admin, id = session!.project!.id;
+    const stroke = () => page.eval<string>(`getComputedStyle(document.documentElement).getPropertyValue('--cs-topo-gateway-stroke').trim()`);
+    await colourScheme(page, 'light');
+    try {
+      await open(page, `/projects/${id}/operations?tab=topology`); await waitForNodes(page);
+      expect(await page.eval<boolean>(`matchMedia('(prefers-color-scheme: light)').matches`)).toBe(true);
+      const light = await stroke(); expect(light).not.toBe('');
+      await colourScheme(page, 'dark'); expect(await stroke()).not.toBe(light); await colourScheme(page, 'light');
+      const pod = ProjectClusterResourcesSchema.parse(await apiGet(page, `/v1/projects/${id}/cluster-resources`)).items.find((item) => item.kind === 'Pod');
+      if (pod) {
+        await page.eval(`document.querySelector('[data-node-id="${pod.uid}"]').focus()`);
+        await pressKey(page, 'Enter', 13);
+        await page.waitUntil(`document.body.innerText.includes('这里只读')`, 10_000, 200);
+        expect(await page.eval<string>(`document.querySelector('[data-node-id="${pod.uid}"]').getAttribute('aria-pressed')`)).toBe('true');
+        await pressKey(page, 'Escape', 27);
+        await page.waitUntil(`!document.body.innerText.includes('这里只读')`, 10_000, 200);
+        expect(await page.eval<string | null>(`document.querySelector('[data-node-id="${pod.uid}"]').getAttribute('aria-pressed')`)).not.toBe('true');
+        // 键盘焦点仍在节点上，邻域高亮（压暗其他节点）随焦点保留，这是设计；焦点移走后才全部恢复。
+        await page.eval(`document.activeElement.blur()`);
+        expect(await page.eval<number>(`document.querySelectorAll('[data-dim="true"]').length`)).toBe(0);
+      }
+      expect(page.takeErrors()).toEqual([]);
+    } finally { await page.cmd('Emulation.setEmulatedMedia', { features: [] }); }
+  }, 90_000);
+
+  test.skipIf(!session?.project || visitor === undefined)('the project inventory route answers a non-admin by membership: develop passes, a tester is refused, a stranger is told the project does not exist', async () => {
     const id = session!.project!.id, page = await signIn(session!.browser, visitor!.username, visitor!.password);
     try {
       const me = await apiGet<{ isAdmin?: boolean; memberships?: { projectId: string; role: string }[] }>(page, '/v1/me');
       const role = me.memberships?.find((m) => m.projectId === id)?.role;
       const status = await page.eval<number>(`fetch('/v1/projects/${id}/cluster-resources').then((r) => r.status)`);
-      expect(status).toBe(me.isAdmin || role === 'owner' || role === 'developer' ? 200 : 403);
+      // project 模块的 authorize：非成员按项目不存在处理（404，不暴露项目），成员角色不够才是 403。
+      expect(status).toBe(me.isAdmin || role === 'owner' || role === 'developer' ? 200 : role === 'tester' ? 403 : 404);
     } finally { await page.close(); }
   }, 60_000);
 });
