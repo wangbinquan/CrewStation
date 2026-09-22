@@ -17,7 +17,9 @@
 
 完整 `bun run check` 通过：**2080 pass／8 skip／0 fail**，13177 assertions、350 个文件。（另有一次跑出现 2 红，都在 release 模块「其他发布进行中…阻止切换」那条时序用例上，单独跑 module 层与随后两次完整 check 均 0 fail，本次未改 release，记为既有 flake。）
 
-本机集群已部署 `cs-control-plane:allowlist-20260922`，七个平台部署（cs-api／cs-auth／cs-controller／cs-session／cs-events／mcp-capabilities／mcp-operations）全部 Ready，本次没有迁移；`crewstation-dev-auth` 仍在 `:dev`，未动。实机验收用一次性项目 `mcp-403-verify` 走完整条链：建项目后 **2 秒内放行表 v40→v41**、新条目带 `mcpCapabilities`／`mcpOperations`，在 `cs-mcp-403-verify` 里起的 dev-session 标签 Pod 对两个 MCP 都是 **200**；归档后 **1 秒内 v43 条目消失**，命名空间里三条 IngressRoute 全部被删。部署后 e2e 层复跑 **54 pass／1 skip／0 fail**。三个探针 Pod 已删除、身份索引行均已标记删除；节点磁盘 35%。归档项目留下命名空间、green 部署与 GitLab 仓库（归档按设计不删这些，属既有残留清理缺口）。
+本机集群已部署 `cs-control-plane:allowlist-20260922`，七个平台部署（cs-api／cs-auth／cs-controller／cs-session／cs-events／mcp-capabilities／mcp-operations）全部 Ready，本次没有迁移；`crewstation-dev-auth` 仍在 `:dev`，未动。实机验收用一次性项目 `mcp-403-verify` 走完整条链：建项目后 **2 秒内放行表 v40→v41**、新条目带 `mcpCapabilities`／`mcpOperations`，在 `cs-mcp-403-verify` 里起的 dev-session 标签 Pod 对两个 MCP 都是 **200**；归档后 **1 秒内 v43 条目消失**，命名空间里三条 IngressRoute 全部被删。部署后 e2e 层复跑 **54 pass／1 skip／0 fail**。三个探针 Pod 已删除、身份索引行均已标记删除；节点磁盘 35%。
+
+验收项目 `mcp-403-verify` 随后整体清除：GitLab 仓库永久删除（延迟删除后再带 `permanently_remove=true`）、命名空间连同 Deployment／Job／Service／Secret／三条 NetworkPolicy／ResourceQuota／三条 IngressRoute 一起删除、生产与开发两个库及两个同名角色 DROP、仓库 manifest 与节点镜像清除、17 行平台元数据（17 张表）在一个事务内按 `projectId`／`serviceId` 精确删除，最后重算网关：放行表 v45 共 11 条、路由 43 条 11 个服务，库里与集群里都查不到 `mcp-403` 任何痕迹。**这一整套只能手工做**：平台没有「删除项目」这一操作，归档按设计只冻结访问、不回收任何资源——残留清理缺口现在有了一份完整的手工拆除清单为证。
 
 两条判据记进 `dev-gotchas.md`：派生文档的重建触发点要覆盖输入集合的每一次增删，不只是格式升级；一个「已过滤」的清单不能同时当解析器用。实现见 `259f6c0`。
 
