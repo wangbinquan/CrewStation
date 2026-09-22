@@ -8,6 +8,8 @@ import { layoutTool, withTool } from '../../model/layout/workspaceLayout';
 
 /** 内容区窄于这个宽度时面板只有放大形态：终端与面板并排都不可用（RFC-020 design §5.1）。 */
 export const NARROW_WIDTH = 800;
+/** 回到并排要更宽一些：出现滚动条会让内容区少十几像素，没有这段迟滞会在阈值附近来回切（2026-09-23 实机 1040px 窗口）。 */
+export const NARROW_LEAVE_WIDTH = 840;
 export const MIN_RATIO = 0.3, MAX_RATIO = 0.6;
 
 /**
@@ -27,7 +29,7 @@ export function useToolPanel(layout: WorkspaceLayout, store: WorkspaceLayoutStor
   const [narrow, setNarrow] = useState(false);
   useEffect(() => {
     const element = root.current; if (!element || typeof ResizeObserver === 'undefined') return;
-    const observer = new ResizeObserver(([entry]) => { if (entry) setNarrow(entry.contentRect.width > 0 && entry.contentRect.width < NARROW_WIDTH); });
+    const observer = new ResizeObserver(([entry]) => { if (entry) { const width = entry.contentRect.width; setNarrow((current) => width > 0 && width < (current ? NARROW_LEAVE_WIDTH : NARROW_WIDTH)); } });
     observer.observe(element); return () => observer.disconnect();
   }, [root]);
   const apply = useCallback((next: WorkspaceTool | undefined) => {

@@ -43,12 +43,15 @@ test('无参数进入按个人布局打开面板并把形态写回地址；放�
   expect(saves.at(-1)).toMatchObject({ tool: { name: 'preview', mode: 'side', ratio: 0.4 }, view: 'cli', previewAlongside: true, previewRatio: 0.4 });
 });
 
-test('旧布局（只有 view）迁移成放大的工具，并把迁移结果保存回个人布局', async () => {
+test('旧布局（只有 view）与上次留下的放大形态：无参数进入只恢复在旁，终端不被盖住，迁移结果保存回个人布局', async () => {
   const { saves } = layoutFixture({ ...initialWorkspaceLayout('工作区 1'), view: 'code' });
   page = await renderApp(path);
-  expect(page.search()).toEqual({ view: 'code', panel: 'full' }); expect(panel().dataset.mode).toBe('full'); expect(panelTab()).toBe('代码');
+  // 旧布局的 view=code 等价于放大的代码，但进页面只恢复在旁：放大是一次性的阅读形态（2026-09-23 实机）。
+  expect(page.search()).toEqual({ view: 'code' }); expect(panel().dataset.mode).toBe('side'); expect(panelTab()).toBe('代码'); expect(workspaceHidden()).toBe(false);
   page.unmount(); page = undefined; await new Promise((resolve) => setTimeout(resolve, 0));
-  expect(saves.at(-1)).toMatchObject({ tool: { name: 'code', mode: 'full', ratio: 0.45 }, view: 'code' });
+  expect(saves.at(-1)).toMatchObject({ tool: { name: 'code', mode: 'side', ratio: 0.45 }, view: 'cli' });
+  page = await renderApp(path);
+  expect(page.search()).toEqual({ view: 'code' }); expect(panel().dataset.mode).toBe('side');
 });
 
 test('内容区窄于 800px 时面板只有放大形态：不改地址，恢复宽度后回到在旁', async () => {
@@ -59,8 +62,13 @@ test('内容区窄于 800px 时面板只有放大形态：不改地址，恢复�
   await act(async () => { for (const notify of observers) notify([{ contentRect: { width: 600 } }]); }); await page.settle();
   expect(panel().dataset.mode).toBe('full'); expect(page.text()).toContain('窗口较窄'); expect(page.search()).toEqual({ view: 'code' });
   expect([...document.querySelectorAll('button')].some((node) => node.textContent === '还原')).toBe(false);
-  await act(async () => { for (const notify of observers) notify([{ contentRect: { width: 1200 } }]); }); await page.settle();
+  // 迟滞：出现滚动条让内容区少十几像素时不能在阈值附近来回切——810 仍放大，840 起才回到在旁。
+  await act(async () => { for (const notify of observers) notify([{ contentRect: { width: 810 } }]); }); await page.settle();
+  expect(panel().dataset.mode).toBe('full');
+  await act(async () => { for (const notify of observers) notify([{ contentRect: { width: 850 } }]); }); await page.settle();
   expect(panel().dataset.mode).toBe('side'); expect(page.text()).not.toContain('窗口较窄');
+  await act(async () => { for (const notify of observers) notify([{ contentRect: { width: 810 } }]); }); await page.settle();
+  expect(panel().dataset.mode).toBe('side');
 });
 
 test('分隔线用方向键调宽度，限制在 30%–60% 并保存到个人布局', async () => {
