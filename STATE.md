@@ -67,6 +67,7 @@
 
 **用例**：`clusterManagement.test.tsx` 改为断言两级结构、缺省拓扑、计数格进清单、视图顺序、筛选卡只在清单里、操作记录只留项目筛选；`clusterMetrics.test.tsx` 文案对齐；新 `useHeldHeight.test.tsx`（渲染期下限、效应兜底、缓存命中不撑、首次不撑；happy-dom 无排版，`offsetHeight` 读 `data-h`）；新 e2e `clusterLayout.test.ts`（1440／1280 首屏内有页签与图；切视图 `scrollY` 不动）。本机：check:static 通过；unit 349／module 1106（7 skip）／console 601，0 fail；e2e 63 pass／2 skip／0 fail（含新加的 `clusterLayout` 三项）。
 **回填**：RFC-010 proposal §3、RFC-015 proposal §2.1、RFC-019 proposal §4 各加 2026-09-23 修订引文；`dev-gotchas.md` 前端一节记「换查询面板塌掉钳滚动」的判据与两件工具。
+**已推送**：`d2c3e9f`（24 个文件；STATE.md 与 dev-gotchas.md 同时带上了并行 dev-auth 会话已在工作树的段落，原样提交）。[CI 35754806948](https://github.com/wangbinquan/CrewStation/actions/runs/35754806948) 六项全部成功（含 `gate` 新增代码防护与 `e2e`，新加的 `clusterLayout` 三项在 CI 空平台上也通过）。本机 console 停在 `cs-console:cluster-layout-20260923c`，其余部署未动；两个中间镜像标签已从 docker 与节点删除，节点根分区 37%。
 
 ## RFC-019 部署与运行形态图：Done（2026-09-22）
 
