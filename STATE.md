@@ -19,7 +19,9 @@
 另用 Archify 真生成了一张平台静态架构图作对照（`prototype/archify/*.architecture.json` 经 `validate` 零错误后 `deliver`；生成的 830KB HTML 只在本机，未入库）。
 真实 Chrome 核对：三条路径、点选详情、快照推进不重排、浅色主题、320／390px 无横向溢出、无 console 错误；`arch:check`／全仓 lint／console 类型检查通过。记录见 [prototype-review.md](proposal/rfc/RFC-019-deployment-topology/prototype-review.md)，README 已登记 Draft。
 
-**下一步**：等作者看过原型并回复 prototype-review.md §5 的五个取舍，再写三件套（development-rules §5），批准后实施。实现要点：项目成员需要新的项目范围只读盘点接口（同一份 RFC-010 快照按项目过滤，走成员校验）；`--topo-*` 语义色进 tokens.css；组件放 `apps/console/src/shared/ui/`。
+作者看过第一版后裁定「界面宽度需要用满」：原型已改为形态图随容器铺满（节点撑宽、1:1 不缩放）、项目层列数随宽度 2–8 列、概览缩略改为一行横带汇总卡；实施时生产外壳的 `--cs-content-max-width: 1200px` 至少对这三处页面去掉，是否全局去掉待作者答复。
+
+**下一步**：等作者看过原型并回复 prototype-review.md §5 的六个取舍，再写三件套（development-rules §5），批准后实施。实现要点：项目成员需要新的项目范围只读盘点接口（同一份 RFC-010 快照按项目过滤，走成员校验）；`--topo-*` 语义色进 tokens.css；组件放 `apps/console/src/shared/ui/`。
 
 ## I23 已裁定并执行：两个内置接入项目的 manifest 迁到 v2（2026-09-22）
 

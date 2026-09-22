@@ -10,6 +10,7 @@ import { SUMMARY_METRICS } from './topologyLayout';
 import { ObservedLine, TopologyDetail, TopologyFilters, TopologyLegend, TopologyList, useNarrow } from './TopologyPanels';
 import type { TopologyFilter } from './topologyModel';
 import { DEMO_PROJECTS, manyProjects, projectLayerTopology, projectTopology, systemTopology } from './demoData';
+import { useContainerWidth } from './useContainerWidth';
 
 const CLUSTER_TABS = ['工作负载', 'Pod', '网络', '存储与配置', '节点', '最近 7 天趋势', '命名空间', '操作记录'].map((label) => ({ value: label, label }));
 type Layer = 'system' | 'projects' | `project:${string}`;
@@ -23,9 +24,12 @@ export function ClusterDemo({ tick, partial, many, selected, onSelect }: Cluster
   const [filter, setFilter] = useState<TopologyFilter>({});
   const projects = useMemo(() => (many ? manyProjects() : DEMO_PROJECTS), [many]);
   const narrow = useNarrow();
+  const [main, mainWidth] = useContainerWidth<HTMLDivElement>();
+  // 项目层的列数随宽度：每列至少 210px 宽，2–8 列。
+  const columns = mainWidth > 0 ? Math.max(2, Math.min(8, Math.floor((mainWidth - 36 + 24) / (210 + 24)))) : 4;
   const projectId = layer.startsWith('project:') ? layer.slice('project:'.length) : undefined;
   const project = projects.find((p) => p.id === projectId);
-  const topology = useMemo(() => layer === 'system' ? systemTopology(partial) : layer === 'projects' ? projectLayerTopology(projects, partial, expanded) : projectTopology(project ?? DEMO_PROJECTS.find((p) => p.id === 'demo')!, tick, partial), [layer, partial, projects, expanded, project, tick]);
+  const topology = useMemo(() => layer === 'system' ? systemTopology(partial) : layer === 'projects' ? projectLayerTopology(projects, partial, expanded, columns) : projectTopology(project ?? DEMO_PROJECTS.find((p) => p.id === 'demo')!, tick, partial), [layer, partial, projects, expanded, project, tick, columns]);
   const switchLayer = (next: Layer) => { setLayer(next); onSelect(undefined); setFilter({}); };
   const select = (id: string | undefined) => { if (id === 'project:more') { setExpanded(true); return; } onSelect(id); };
   const pods = partial ? '—' : many ? '257' : '38';
@@ -45,7 +49,7 @@ export function ClusterDemo({ tick, partial, many, selected, onSelect }: Cluster
         {layer === 'system' ? <p className="topo-muted">节点状态来自集群盘点；虚线调用关系是静态架构标注，不是实测流量。</p> : null}
         {layer !== 'projects' ? <TopologyFilters topology={topology} filter={filter} onChange={setFilter} /> : <p className="topo-muted">异常项目置顶；正常项目超过 60 个时折叠，点击「还有 N 个」展开。点选项目卡片后可在详情里展开它的 Pod 层。</p>}
         <div className={`topo-workspace${selected ? ' has-detail' : ''}`}>
-          <div className="topo-main">
+          <div className="topo-main" ref={main}>
             {narrow ? <TopologyList topology={topology} selectedId={selected} onSelect={select} filter={filter} /> : <TopologyDiagram key={topology.id} topology={topology} metrics={layer === 'projects' ? SUMMARY_METRICS : undefined} label={topology.title} selectedId={selected} onSelect={select} filter={filter} />}
             {layer !== 'projects' ? <TopologyLegend topology={topology} /> : null}
           </div>

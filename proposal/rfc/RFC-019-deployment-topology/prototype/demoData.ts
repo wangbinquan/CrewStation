@@ -183,8 +183,7 @@ export function systemTopology(partial: boolean): Topology {
 }
 
 /** 集群项目层：每个项目一张卡；需要关注的置顶；超过 60 个时按状态折叠。 */
-export function projectLayerTopology(projects: readonly DemoProject[], partial: boolean, expanded: boolean): Topology {
-  const columns = 4;
+export function projectLayerTopology(projects: readonly DemoProject[], partial: boolean, expanded: boolean, columns = 4): Topology {
   const attention = projects.filter((p) => p.abnormal > 0), calm = projects.filter((p) => p.abnormal === 0);
   const fold = projects.length > 60 && !expanded;
   const shownCalm = fold ? calm.slice(0, 12) : calm;

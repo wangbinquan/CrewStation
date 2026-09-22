@@ -8,15 +8,16 @@ import { DefinitionList } from '../../../../apps/console/src/shared/ui/Definitio
 import { PageHeader } from '../../../../apps/console/src/shared/ui/PageHeader';
 import { Tabs } from '../../../../apps/console/src/shared/ui/Tabs';
 import { TopologyDiagram } from './TopologyDiagram';
-import { COMPACT_METRICS } from './topologyLayout';
+import { SUMMARY_METRICS } from './topologyLayout';
 import { ObservedLine, TopologyDetail, TopologyFilters, TopologyLegend, TopologyList, useNarrow } from './TopologyPanels';
 import type { TopologyFilter } from './topologyModel';
+import { bandSummaryTopology } from './topologyModel';
 import { DEMO_PROJECTS, projectTopology } from './demoData';
 
 export interface ProjectDemoProps { tick: number; partial: boolean; go: (path: string) => void; selected?: string; onSelect: (id: string | undefined) => void }
 const demo = DEMO_PROJECTS.find((p) => p.id === 'demo')!;
 
-export function ProjectOverviewDemo({ tick, partial, go, selected, onSelect }: ProjectDemoProps): ReactElement {
+export function ProjectOverviewDemo({ tick, partial, go }: Omit<ProjectDemoProps, 'selected' | 'onSelect'>): ReactElement {
   const topology = useMemo(() => projectTopology(demo, tick, partial), [tick, partial]);
   const abnormal = topology.nodes.filter((n) => n.abnormal).length, pods = topology.nodes.filter((n) => n.kind === 'pod');
   const greenReady = tick >= 2;
@@ -29,8 +30,8 @@ export function ProjectOverviewDemo({ tick, partial, go, selected, onSelect }: P
     </div>
     <Card compact title="部署与运行形态" extra={<Button variant="ghost" onClick={() => go('/projects/demo/operations')}>查看完整形态 →</Button>}>
       <p className="topo-summary-line">工作负载 <b>{topology.nodes.filter((n) => n.kind === 'workload' || n.kind === 'job').length}</b> · Pod <b>{pods.length}</b>，就绪 <b>{pods.filter((n) => n.status === 'ready').length}</b>，运行 <b>{pods.filter((n) => n.status === 'running').length}</b>{abnormal ? <> · <Badge tone="warning">{abnormal} 个需要关注</Badge></> : null}</p>
-      <TopologyDiagram topology={topology} metrics={COMPACT_METRICS} compact label="演示数字人的部署与运行形态缩略图" selectedId={selected} onSelect={(id) => { onSelect(id); if (id) go('/projects/demo/operations'); }} />
-      <p className="topo-muted">点击任一节点进入运行与诊断查看详情。{topology.complete ? '' : ' 部分来源失败，数据与存储列为上次成功结果。'}</p>
+      <TopologyDiagram topology={bandSummaryTopology(topology)} metrics={SUMMARY_METRICS} label="演示数字人的部署与运行形态缩略" onSelect={(id) => { if (id) go('/projects/demo/operations'); }} />
+      <p className="topo-muted">每张卡汇总一条横带；点击进入运行与诊断查看完整形态。{topology.complete ? '' : ' 部分来源失败，数据与存储列为上次成功结果。'}</p>
     </Card>
     <Card compact title="开发会话" extra={<Button variant="ghost">继续开发 →</Button>}><p>林晓 · 分支 main · Runner 已连接 · {tick >= 1 ? 3 : 2} 个 Agent 运行中</p></Card>
   </>;

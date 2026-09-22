@@ -10,6 +10,13 @@ export const FULL_METRICS: LayoutMetrics = { nodeW: 200, nodeH: 62, laneGap: 64,
 export const SUMMARY_METRICS: LayoutMetrics = { ...FULL_METRICS, nodeW: 210, nodeH: 92, laneGap: 24, laneHeader: 0 };
 export const COMPACT_METRICS: LayoutMetrics = { nodeW: 150, nodeH: 44, laneGap: 40, rowGap: 10, bandPad: 10, bandTitle: 20, bandGap: 14, margin: 10, laneHeader: 0 };
 
+/** 按容器宽度把节点撑宽：泳道数与间距不变，节点宽度在 [基准×0.9, 360] 之间取值；容器再窄就由 CSS 等比缩小。 */
+export function fitMetrics(base: LayoutMetrics, lanes: number, containerWidth: number): LayoutMetrics {
+  if (containerWidth <= 0 || lanes <= 0) return base;
+  const nodeW = Math.floor((containerWidth - 2 - 2 * base.margin - (lanes - 1) * base.laneGap) / lanes);
+  return { ...base, nodeW: Math.max(Math.round(base.nodeW * 0.9), Math.min(360, nodeW)) };
+}
+
 export interface Rect { readonly x: number; readonly y: number; readonly w: number; readonly h: number }
 export interface PlacedNode { readonly node: TopologyNode; readonly x: number; readonly y: number; readonly w: number; readonly h: number }
 export interface PlacedBox { readonly box: TopologyBox; readonly rect: Rect }

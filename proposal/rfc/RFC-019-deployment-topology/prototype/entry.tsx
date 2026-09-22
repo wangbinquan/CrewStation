@@ -27,7 +27,7 @@ function PreviewApp() {
   // 换页时清掉选中：上一页选中的节点在别的图里不存在，留着会把整张图压暗。
   const go = (next: string) => { window.location.hash = next; setPath(next); setSelected(undefined); };
   const admin = path.startsWith('/admin'), nav = admin ? ADMIN_NAV : PROJECT_NAV;
-  const page = path === '/projects/demo' ? <ProjectOverviewDemo tick={tick} partial={partial} go={go} selected={selected} onSelect={setSelected} />
+  const page = path === '/projects/demo' ? <ProjectOverviewDemo tick={tick} partial={partial} go={go} />
     : path === '/projects/demo/operations' ? <ProjectOperationsDemo tick={tick} partial={partial} selected={selected} onSelect={setSelected} />
       : path === '/admin/cluster' ? <ClusterDemo tick={tick} partial={partial} many={many} selected={selected} onSelect={setSelected} />
         : <p className="topo-muted">「{nav.find(([, href]) => href === path)?.[0] ?? path}」沿用现有页面，本设计稿只覆盖概览、运行与诊断、集群管理三处。</p>;

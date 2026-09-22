@@ -84,7 +84,8 @@
 .sideNav a { display: block; padding: 8px 10px; border-radius: 6px; color: var(--cs-color-text); text-decoration: none; font-size: 14px; }
 .sideNav a:hover { background: var(--cs-color-surface-muted); }
 .sideNav a[aria-current="page"] { background: var(--cs-color-tint); color: var(--cs-color-primary); font-weight: 600; }
-.pageMain { flex: 1; min-width: 0; padding: 20px 24px 32px; display: flex; flex-direction: column; gap: 16px; max-width: 1200px; }
+/* 作者裁定：界面宽度用满。内容区不设最大宽度；生产外壳现有的 --cs-content-max-width: 1200px 需在实施时对这些页面去掉。 */
+.pageMain { flex: 1; min-width: 0; padding: 20px 24px 32px; display: flex; flex-direction: column; gap: 16px; }
 .projectMeta { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; font-size: 13px; color: var(--cs-color-text-muted); }
 .versionGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
 .prototypeFooter { padding: 12px 24px 24px; color: var(--cs-color-text-muted); font-size: 11px; border-top: 1px solid var(--cs-color-border); }
@@ -104,7 +105,7 @@
 .topo-main { display: grid; gap: 12px; min-width: 0; }
 .topo-frame { border: 1px solid var(--cs-color-border); border-radius: 10px; overflow: auto; background: var(--cs-color-surface); }
 .topo-svg { display: block; }
-.topo-frame-compact .topo-svg { height: 300px; width: auto; max-width: 100%; margin: 0 auto; }
+.topo-frame-compact .topo-svg { max-width: 100%; height: auto; }
 .topo-canvas { fill: var(--cs-color-surface); }
 .topo-grid-dot { fill: var(--topo-grid); }
 .topo-lane { font: 700 10.5px var(--cs-font-mono); letter-spacing: 0.12em; fill: var(--cs-color-text-muted); }

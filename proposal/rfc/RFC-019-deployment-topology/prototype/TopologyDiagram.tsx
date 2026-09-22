@@ -4,7 +4,8 @@ import { useMemo, useState } from 'react';
 import type { KeyboardEvent, ReactElement } from 'react';
 import type { NodeKind, Topology, TopologyFilter, TopologyNode } from './topologyModel';
 import { STATUS_LABEL, matchesFilter, neighbours } from './topologyModel';
-import { layoutTopology, FULL_METRICS } from './topologyLayout';
+import { fitMetrics, layoutTopology, FULL_METRICS } from './topologyLayout';
+import { useContainerWidth } from './useContainerWidth';
 import type { LayoutMetrics, PlacedNode } from './topologyLayout';
 
 /** 16×16 线框小图标：类型的非颜色提示。 */
@@ -32,7 +33,9 @@ export interface TopologyDiagramProps {
   readonly compact?: boolean;
 }
 
-export function TopologyDiagram({ topology, metrics = FULL_METRICS, selectedId, onSelect, filter, label, compact = false }: TopologyDiagramProps): ReactElement {
+export function TopologyDiagram({ topology, metrics: base = FULL_METRICS, selectedId, onSelect, filter, label, compact = false }: TopologyDiagramProps): ReactElement {
+  const [frame, frameWidth] = useContainerWidth<HTMLDivElement>();
+  const metrics = useMemo(() => fitMetrics(base, topology.lanes.length, frameWidth), [base, topology.lanes.length, frameWidth]);
   const layout = useMemo(() => layoutTopology(topology, metrics), [topology, metrics]);
   const [hover, setHover] = useState<string>();
   const focus = hover ?? selectedId;
@@ -40,8 +43,8 @@ export function TopologyDiagram({ topology, metrics = FULL_METRICS, selectedId, 
   const filtered = useMemo(() => new Set(topology.nodes.filter((node) => !filter || matchesFilter(node, filter)).map((node) => node.id)), [topology, filter]);
   const dimNode = (node: TopologyNode) => (near ? !near.has(node.id) : false) || !filtered.has(node.id);
   const dimEdge = (from: string, to: string) => (near ? !(focus === from || focus === to) : false) || !(filtered.has(from) && filtered.has(to));
-  return <div className={`topo-frame${compact ? ' topo-frame-compact' : ''}`}>
-    <svg className="topo-svg" viewBox={`0 0 ${layout.width} ${layout.height}`} width={compact ? undefined : layout.width} style={compact ? undefined : { maxWidth: '100%', height: 'auto', minWidth: Math.min(layout.width, 900) }} role="group" aria-label={label} onMouseLeave={() => setHover(undefined)}>
+  return <div ref={frame} className={`topo-frame${compact ? ' topo-frame-compact' : ''}`}>
+    <svg className="topo-svg" viewBox={`0 0 ${layout.width} ${layout.height}`} width={layout.width} style={{ maxWidth: '100%', height: 'auto' }} role="group" aria-label={label} onMouseLeave={() => setHover(undefined)}>
       <defs>
         <pattern id="topo-grid" width="24" height="24" patternUnits="userSpaceOnUse"><circle cx="1" cy="1" r="0.9" className="topo-grid-dot" /></pattern>
         {EDGE_KINDS.map((kind) => <marker key={kind} id={`topo-arrow-${kind}`} viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M1 1.5 8.5 5 1 8.5z" className={`topo-arrow edge-${kind}`} /></marker>)}

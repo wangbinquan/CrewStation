@@ -92,6 +92,23 @@ export function semanticCounts(topology: Topology): readonly SemanticCount[] {
   return (Object.keys(SEMANTIC_LABEL) as Semantic[]).filter((s) => counts.has(s)).map((semantic) => ({ semantic, count: counts.get(semantic)! }));
 }
 
+/** 概览缩略：每个横带汇成一张卡（最差状态、Pod 与就绪数、需要关注数），一行铺满宽度；点卡片进完整形态。 */
+export function bandSummaryTopology(topology: Topology): Topology {
+  const nodes: TopologyNode[] = topology.bands.map((band, lane) => {
+    const members = topology.nodes.filter((node) => node.band === band.id);
+    const pods = members.filter((node) => node.kind === 'pod');
+    const worst = STATUS_ORDER.find((status) => members.some((node) => node.status === status)) ?? 'idle';
+    const abnormal = members.filter((node) => node.abnormal).length;
+    const byStatus = statusCounts({ ...topology, nodes: members }).map(([status, count]) => `${count} ${STATUS_LABEL[status]}`).join(' · ');
+    return {
+      id: `band:${band.id}`, kind: 'summary', semantic: band.semantic, title: band.title, subtitle: band.note, status: worst,
+      statusText: abnormal > 0 ? `${abnormal} 个需要关注` : STATUS_LABEL[worst], lane, band: 'summary', abnormal: abnormal > 0,
+      counts: [['Pod', pods.length > 0 ? `${pods.length} · ${pods.filter((pod) => pod.status === 'ready').length} 就绪` : '无'], ['状态', byStatus || '空'], ['节点', `${members.length}`]],
+    };
+  });
+  return { ...topology, id: `${topology.id}-summary`, lanes: topology.bands.map(() => ''), bands: [{ id: 'summary', title: '', semantic: 'platform' }], nodes, edges: [] };
+}
+
 export function statusCounts(topology: Topology): readonly (readonly [NodeStatus, number])[] {
   const counts = new Map<NodeStatus, number>();
   for (const node of topology.nodes) counts.set(node.status, (counts.get(node.status) ?? 0) + 1);
