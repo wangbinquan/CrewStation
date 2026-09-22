@@ -46,8 +46,9 @@ test('订阅来自代码，保留订阅 ID 与投递路径，并指向当前项�
   expect(document.querySelector('tr[aria-current="true"]')?.textContent).toContain('source.changed');
   const links = [...document.querySelectorAll('a')];
   expect(links.find((link) => link.textContent?.includes('打开订阅声明'))?.getAttribute('href')).toContain('file=crewstation.yaml');
-  expect(links.find((link) => link.textContent?.includes('查看事件投递'))?.getAttribute('href')).toContain('subscription=01a0bf5d-8f4b-7b9c-8c07-a2ef94c840cd');
-  await page.click('查看事件投递'); expect(page.search()).toEqual({ tab: 'deliveries', subscription: '01a0bf5d-8f4b-7b9c-8c07-a2ef94c840cd' });
+  // RFC-020 §7：事件段顶部一行投递摘要即投递页入口，带着当前订阅。
+  expect(links.find((link) => link.textContent?.includes('最近投递'))?.getAttribute('href')).toContain('subscription=01a0bf5d-8f4b-7b9c-8c07-a2ef94c840cd');
+  await page.click('最近投递'); expect(page.search()).toEqual({ tab: 'deliveries', subscription: '01a0bf5d-8f4b-7b9c-8c07-a2ef94c840cd' });
   await page.click('查看订阅'); expect(page.search()).toMatchObject({ view: 'reference', topic: 'events', subscription: '01a0bf5d-8f4b-7b9c-8c07-a2ef94c840cd' });
 });
 

@@ -32,6 +32,9 @@ export const messages = {
   'events.eventTypes.emptyDescription': '管理员发布 EventProducer 接入容器后，其登记的事件类型出现在这里。',
 
   'events.deliveries.title': '投递记录',
+  'events.summary.line': '最近投递 {count} 条 · 死信 {dead} 条 →',
+  'events.summary.loading': '读取最近投递…',
+  'events.summary.error': '投递记录暂不可读 →',
   'events.deliveries.autoRefresh': '每 10 秒自动刷新',
   'events.deliveries.filterLabel': '状态',
   'events.deliveries.filterAll': '全部',

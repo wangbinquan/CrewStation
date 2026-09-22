@@ -13,7 +13,8 @@ import { ApiInvocationForm } from './ApiInvocationForm';
 import { ApiInvocationResult } from './ApiInvocationResult';
 import styles from './ApiInvocation.module.css';
 
-export function ApiInvocationWorkspace({ context, children }: { readonly context: ApiInvocationContext; readonly children: (controller: ApiInvocationController, open: (operation: ApiOperationDto) => void) => ReactNode }) {
+/** 试调工作区：会话绑定、表单与结果合成一个 `panel` 交给调用方摆放（紧凑形态在表下，放大形态在详情栏）。 */
+export function ApiInvocationWorkspace({ context, children }: { readonly context: ApiInvocationContext; readonly children: (controller: ApiInvocationController, open: (operation: ApiOperationDto) => void, panel: ReactNode) => ReactNode }) {
   const t = useT(), controller = useApiInvocation(context);
   const [selected, setSelected] = useState<ApiOperationDto>(), [replacement, setReplacement] = useState<ApiOperationDto>(), [visible, setVisible] = useState(true);
   const formHost = useRef<HTMLDivElement>(null);
@@ -24,8 +25,7 @@ export function ApiInvocationWorkspace({ context, children }: { readonly context
     if (selected?.id === operation.id) { setVisible(true); return; }
     if (selected && controller.dirtySources.includes('detail')) setReplacement(operation); else choose(operation);
   };
-  return <>
-    <UnsavedChangesGuard dirty={controller.dirty || controller.pending} scope={t('catalog.invoke.draftScope')} />
+  const panel = <>
     {context.canDevelop || selected ? <Card stacked compact title={t('catalog.invoke.title')} extra={<Button disabled={controller.pending || controller.checking || controller.session.isFetching || !context.canDevelop} onClick={() => { void controller.rebind(); }}>{t('catalog.invoke.rebind')}</Button>}>
       <p className={styles.note}>{t('catalog.invoke.scope')}</p>
       {selected || controller.taskId ? <p className={styles.note}>{t('catalog.invoke.limits')}</p> : <details><summary>{t('catalog.invoke.limitsTitle')}</summary><p className={styles.note}>{t('catalog.invoke.limits')}</p></details>}
@@ -38,6 +38,9 @@ export function ApiInvocationWorkspace({ context, children }: { readonly context
     {replacement ? <ConfirmationPanel question={t('catalog.invoke.replaceQuestion', { operation: replacement.id })} hint={t('catalog.invoke.replaceHint')} confirmLabel={t('catalog.invoke.replace')} cancelLabel={t('catalog.invoke.keep')} busy={controller.pending || controller.checking} onConfirm={() => choose(replacement)} onCancel={() => setReplacement(undefined)} /> : null}
     {selected ? <div ref={formHost} hidden={!visible}><ApiInvocationForm key={selected.id} operation={selected} controller={controller} onClose={() => setVisible(false)} /></div> : null}
     {controller.outcome ? <ApiInvocationResult outcome={controller.outcome} /> : null}
-    {children(controller, open)}
+  </>;
+  return <>
+    <UnsavedChangesGuard dirty={controller.dirty || controller.pending} scope={t('catalog.invoke.draftScope')} />
+    {children(controller, open, panel)}
   </>;
 }

@@ -69,3 +69,5 @@
 .proxyCell { min-width: 90px; }
 .pathCell { min-width: 130px; }
 .actionsCell { width: 32%; min-width: 210px; max-width: 360px; }
+.keyButton { padding: 0; font: inherit; text-align: left; }
+tr[aria-current='true'] > td { background: var(--cs-tone-info-bg); }

@@ -105,6 +105,12 @@ export const messages = {
   'catalog.error.write': '操作失败：{message}',
 
   'catalog.operations.title': '可调用的操作',
+  'catalog.detail.title': '操作详情',
+  'catalog.detail.empty': '在左侧表里点选一个操作，这里显示它的文档、授权状态、申请与试调。',
+  'catalog.detail.select': '查看详情',
+  'catalog.detail.endpoint': '接口',
+  'catalog.detail.clear': '取消选中',
+  'catalog.detail.missing': '目录里没有操作 {id}；它可能已下线或属于别的服务。',
   'catalog.operations.key': '操作键',
   'catalog.operations.proxy': '代理',
   'catalog.operations.method': '方法',

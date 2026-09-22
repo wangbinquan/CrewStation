@@ -27,19 +27,21 @@ export interface OperationsPanelProps {
   readonly onInvoke?: (operation: ApiOperationDto) => void;
   /** 紧凑形态：初始只看已授权的操作。 */
   readonly grantedOnly?: boolean;
+  /** 放大形态：`operation` 是选中而不是筛选，表仍列全部；申请表单在详情栏展开。 */
+  readonly onSelect?: (operation: ApiOperationDto, options?: { readonly request?: boolean }) => void;
 }
 
 /** 操作列表与筛选；写操作的失败原因原样显示，不吞掉服务端的说明。 */
-export function OperationsPanel({ operations, requests, loading, loadError, actions, proxy, operation, onClearContext, onInvoke, grantedOnly = false }: OperationsPanelProps): ReactElement {
+export function OperationsPanel({ operations, requests, loading, loadError, actions, proxy, operation, onClearContext, onInvoke, grantedOnly = false, onSelect }: OperationsPanelProps): ReactElement {
   const t = useT();
   const [filter, setFilter] = useState<OperationFilterValue>(grantedOnly ? { ...INITIAL_FILTER, grant: 'granted' } : INITIAL_FILTER);
   const proxies = useMemo(() => [...new Map(operations.map((operation) => [operation.proxyId, { id: operation.proxyId, name: operation.proxy }])).values()].sort((a, b) => a.name.localeCompare(b.name)), [operations]);
   const pendingByKey = useMemo(() => indexPending(requests), [requests]);
-  const visible = useMemo(() => operations.filter((item) => (!operation || item.id === operation) && (!proxy || item.proxyId === proxy) && matches(item, filter)), [operations, filter, operation, proxy]);
+  const visible = useMemo(() => operations.filter((item) => (!operation || !!onSelect || item.id === operation) && (!proxy || item.proxyId === proxy) && matches(item, filter)), [operations, filter, operation, proxy, onSelect]);
   const writeError = actions.requestAccess.error;
   return (
     <Card compact title={t('catalog.operations.title')}>
-      {operation || proxy ? <p>{t('catalog.context')} <code>{operation ?? proxy}</code> <Button onClick={onClearContext}>{t('catalog.clearContext')}</Button></p> : null}
+      {(operation && !onSelect) || proxy ? <p>{t('catalog.context')} <code>{onSelect ? proxy : operation ?? proxy}</code> <Button onClick={onClearContext}>{t('catalog.clearContext')}</Button></p> : null}
       <OperationFilters value={filter} proxies={proxies} count={visible.length} onChange={setFilter} />
       <QueryStatus
         isPending={loading}
@@ -51,7 +53,7 @@ export function OperationsPanel({ operations, requests, loading, loadError, acti
         emptyDescription={t('catalog.operations.emptyDescription')}
       />
       {writeError ? <ActionNote tone="error">{t('catalog.error.write', { message: errorMessage(writeError) })}</ActionNote> : null}
-      {visible.length > 0 ? <OperationsTable operations={visible} renderActions={(item) => <><OperationActions operation={item} pendingRequest={pendingByKey.get(item.id)} actions={actions} />{onInvoke && item.granted ? <Button disabled={loading || !!loadError} onClick={() => onInvoke(item)}>{t('catalog.invoke.open')}</Button> : null}</>} /> : null}
+      {visible.length > 0 ? <OperationsTable operations={visible} selected={onSelect ? operation : undefined} onSelect={onSelect ? (item) => onSelect(item) : undefined} renderActions={(item) => <><OperationActions operation={item} pendingRequest={pendingByKey.get(item.id)} actions={actions} onRequest={onSelect ? (target) => onSelect(target, { request: true }) : undefined} />{onInvoke && item.granted ? <Button disabled={loading || !!loadError} onClick={() => onInvoke(item)}>{t('catalog.invoke.open')}</Button> : null}</>} /> : null}
     </Card>
   );
 }

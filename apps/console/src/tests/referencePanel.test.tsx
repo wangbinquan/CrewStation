@@ -33,7 +33,7 @@ test('有会话时参考面板与其他工具并列；事件主题的链接指�
   expect(panelTab()).toBe('参考'); expect(topicTab()).toBe('事件');
   const links = [...document.querySelectorAll('a')];
   expect(links.find((link) => link.textContent?.includes('打开订阅声明'))?.getAttribute('href')).toContain('file=crewstation.yaml');
-  expect(links.find((link) => link.textContent?.includes('查看事件投递'))?.getAttribute('href')).toContain('tab=deliveries');
+  expect(links.find((link) => link.textContent?.includes('最近投递'))?.getAttribute('href')).toContain('tab=deliveries');
   await page.click('打开订阅声明'); expect(page.search()).toMatchObject({ view: 'code', file: 'crewstation.yaml' }); expect(panelTab()).toBe('代码');
   expect(fixture.commands.some((command) => command.type === 'readFile' && command.path === 'crewstation.yaml')).toBe(true);
 });

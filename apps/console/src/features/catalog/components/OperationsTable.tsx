@@ -2,6 +2,7 @@ import type { ApiOperationDto } from '@crewstation/contracts';
 import type { ReactElement, ReactNode } from 'react';
 import { useT } from '../../../shared/lib/useT';
 import { Badge } from '../../../shared/ui/Badge';
+import { Button } from '../../../shared/ui/Button';
 import { DataTable } from '../../../shared/ui/DataTable';
 import styles from './OperationsPanel.module.css';
 
@@ -9,10 +10,13 @@ export interface OperationsTableProps {
   readonly operations: readonly ApiOperationDto[];
   readonly serviceContext?: boolean;
   readonly renderActions: (operation: ApiOperationDto) => ReactNode;
+  /** 放大形态：选中行标 aria-current，操作键可点选（详情在旁）。 */
+  readonly selected?: string;
+  readonly onSelect?: (operation: ApiOperationDto) => void;
 }
 
 /** 操作表：键、代理、方法、路径、开放策略、本服务是否已可调。 */
-export function OperationsTable({ operations, serviceContext = true, renderActions }: OperationsTableProps): ReactElement {
+export function OperationsTable({ operations, serviceContext = true, renderActions, selected, onSelect }: OperationsTableProps): ReactElement {
   const t = useT();
   const columns = [
     t('catalog.operations.key'), t('catalog.operations.proxy'), t('catalog.operations.method'), t('catalog.operations.path'),
@@ -21,9 +25,9 @@ export function OperationsTable({ operations, serviceContext = true, renderActio
   return (
     <DataTable columns={columns} className={styles.operationsTable}>
       {operations.map((operation) => (
-        <tr key={operation.id}>
+        <tr key={operation.id} aria-current={selected === operation.id ? true : undefined}>
           <td>
-            <code>{operation.id}</code>
+            {onSelect ? <Button variant="ghost" className={styles.keyButton} title={t('catalog.detail.select')} onClick={() => onSelect(operation)}><code>{operation.id}</code></Button> : <code>{operation.id}</code>}
             {operation.summary !== undefined ? <p className={styles.summary}>{operation.summary}</p> : null}
           </td>
           <td className={styles.proxyCell}>{operation.proxy}</td>

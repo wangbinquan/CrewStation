@@ -14,12 +14,15 @@ export interface OperationActionsProps {
   /** 本服务对该操作尚未有结论的申请；有则不再重复申请。 */
   readonly pendingRequest: ApiRequestDto | undefined;
   readonly actions: CatalogActions;
+  /** 给了就不在这里展开表单，而是交给调用方（放大形态里表单在详情栏）。 */
+  readonly onRequest?: (operation: ApiOperationDto) => void;
+  readonly initiallyRequesting?: boolean;
 }
 
 /** 项目只消费能力；失败保留理由，成功受理后才收起申请。 */
-export function OperationActions({ operation, pendingRequest, actions }: OperationActionsProps): ReactElement {
+export function OperationActions({ operation, pendingRequest, actions, onRequest, initiallyRequesting = false }: OperationActionsProps): ReactElement {
   const t = useT();
-  const [requesting, setRequesting] = useState(false);
+  const [requesting, setRequesting] = useState(initiallyRequesting && !onRequest);
   const submitting = useRef(false);
   const needsRequest = operation.openPolicy === 'targeted' && operation.granted !== true;
   if (requesting) {
@@ -40,7 +43,7 @@ export function OperationActions({ operation, pendingRequest, actions }: Operati
     <div className={styles.rowActions}>
       {pendingRequest !== undefined ? <Badge tone="info">{t('catalog.request.pending')}</Badge> : null}
       {needsRequest && pendingRequest === undefined ? (
-        <Button variant="ghost" onClick={() => setRequesting(true)}>
+        <Button variant="ghost" onClick={() => (onRequest ? onRequest(operation) : setRequesting(true))}>
           {t('catalog.request.action')}
         </Button>
       ) : null}

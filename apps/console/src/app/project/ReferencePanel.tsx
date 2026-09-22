@@ -2,7 +2,7 @@ import { Link, useNavigate, useSearch } from '@tanstack/react-router';
 import type { ReactElement } from 'react';
 import { CapabilitiesPage } from '../../features/capabilities';
 import { CatalogPage } from '../../features/catalog';
-import { EventResources } from '../../features/events';
+import { DeliveriesSummary, EventResources } from '../../features/events';
 import { useT } from '../../shared/lib/useT';
 import { parseDevelopmentSearch, REFERENCE_TOPICS } from '../../shared/project/developmentSearch';
 import type { DevelopmentSearch, ReferenceTopic } from '../../shared/project/developmentSearch';
@@ -28,10 +28,10 @@ export function ReferencePanel(): ReactElement {
     <Tabs label={t('resources.groups')} value={topic} items={REFERENCE_TOPICS.map((value) => ({ value, label: t(`resources.section.${value}`) }))} onChange={(value) => go({ topic: value as ReferenceTopic, proxy: undefined, operation: undefined, subscription: undefined })}
       extra={panel && !full ? <Button variant="ghost" onClick={panel.maximize}>{t('reference.openFull')}</Button> : undefined}>
       <p className={styles.note}>{t(`resources.note.${topic}`)}</p>
-      {topic === 'api' ? <CatalogPage key={`api:${full}`} embedded compact={!full} proxy={search.proxy} operation={search.operation} onClearContext={() => go({ proxy: undefined, operation: undefined })} /> : null}
+      {topic === 'api' ? <CatalogPage key={`api:${full}`} embedded compact={!full} proxy={search.proxy} operation={search.operation} onClearContext={() => go({ proxy: undefined, operation: undefined })} onSelect={(operation) => go({ operation: operation?.id })} /> : null}
       {topic === 'events' ? <><ActionRow>
         <Link to={PROJECT_PATHS[space].development} params={{ projectId }} search={{ view: 'code', file: 'crewstation.yaml' }}>{t('resources.openManifest')}</Link>
-        <Link to={PROJECT_PATHS[space].operations} params={{ projectId }} search={{ tab: 'deliveries', subscription: search.subscription }}>{t('resources.openDeliveries')}</Link>
+        <DeliveriesSummary projectId={projectId} subscription={search.subscription} />
       </ActionRow><EventResources projectId={projectId} subscription={search.subscription} /></> : null}
       {topic === 'guide' ? <><Link to={PROJECT_PATHS[space].settings} params={{ projectId }} search={{ tab: 'config', env: 'development' }}>{t('resources.openConfig')}</Link><CapabilitiesPage embedded section="guide" topic={search.guide ?? 'identity'} /></> : null}
     </Tabs>

@@ -106,6 +106,12 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   'catalog.error.write': 'Action failed: {message}',
 
   'catalog.operations.title': 'Callable operations',
+  'catalog.detail.title': 'Operation details',
+  'catalog.detail.empty': 'Select an operation in the table to see its documentation, access state, request form and try-out here.',
+  'catalog.detail.select': 'Show details',
+  'catalog.detail.endpoint': 'Endpoint',
+  'catalog.detail.clear': 'Clear selection',
+  'catalog.detail.missing': 'Operation {id} is not in the catalog; it may be retired or belong to another service.',
   'catalog.operations.key': 'Operation key',
   'catalog.operations.proxy': 'Proxy',
   'catalog.operations.method': 'Method',

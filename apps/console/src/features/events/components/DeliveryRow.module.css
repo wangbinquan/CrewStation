@@ -29,3 +29,4 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+.summary { margin: 0; font-size: var(--cs-font-size-sm); }

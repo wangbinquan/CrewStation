@@ -158,6 +158,7 @@ describe('五个项目入口与旧链接兼容', () => {
     // RFC-020 D2：接口目录住在开发页的参考面板里，旧链接落到放大的参考面板。
     expect(page.path()).toBe(`/projects/${projectId}/dev-session`); expect(page.search()).toMatchObject({ view: 'reference', panel: 'full', topic: 'api', proxy: '01a0bf5d-8f4b-7e4c-802d-e2023d65b4fe', operation: '01a0bf5d-8f4b-7735-8981-22e6031d8202' });
     expect(page.text()).toContain('/invoices/{id}'); expect(page.text()).not.toContain('/articles/{id}');
+    expect(document.querySelector('tr[aria-current="true"]')?.textContent).toContain('/invoices/{id}'); expect(document.querySelector('aside[aria-label="操作详情"]')?.textContent).toContain('GET /invoices/{id}');
     expect(page.text()).not.toContain('管理员模式');
     await page.click('查看全部接口'); expect(page.search().operation).toBeUndefined(); expect(page.text()).toContain('/articles/{id}');
     expect(f.calls.some((call) => call.method !== 'GET')).toBe(false);
@@ -166,7 +167,8 @@ describe('五个项目入口与旧链接兼容', () => {
   test('旧能力链接保留 API 操作，不存在的操作不偷偷展示其他操作', async () => {
     fixture(); page = await renderApp(`/projects/${projectId}/capabilities?operation=missing.operation`);
     expect(page.search()).toMatchObject({ view: 'reference', topic: 'api', operation: 'missing.operation' });
-    expect(page.text()).toContain('missing.operation'); expect(page.text()).not.toContain('/invoices/{id}');
+    // RFC-020：放大形态里 operation 是选中而不是筛选——表照常列出目录，详情栏如实说明没有这个操作，没有任何一行被选中。
+    expect(page.text()).toContain('目录里没有操作 missing.operation'); expect(document.querySelector('tr[aria-current="true"]')).toBeNull(); expect(page.text()).toContain('/invoices/{id}');
   });
 
 });
