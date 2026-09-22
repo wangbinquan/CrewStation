@@ -2,7 +2,7 @@ import { describe, expect, spyOn, test } from 'bun:test';
 import { createHash, randomBytes } from 'node:crypto';
 import { importJWK, jwtVerify } from 'jose';
 import { DEV_ROLES, findDevRole } from './roles';
-import { createDevOidc } from './oidc';
+import { DEV_OIDC_CLIENT_ID, createDevOidc } from './oidc';
 import { renderDevAuthPage } from './page';
 import { devAuthOidcIdentity, safeReturnTo, selectableProjects, startDevAuthServer } from './server';
 
@@ -245,4 +245,94 @@ test('播种撞上平台缓存时自动重试，重试用尽才判失败', async
     server.stop();
     platform.stop(true);
   }
+});
+
+/** 代替平台：只实现播种走到的那几个端点，并记下真实请求顺序。`registered=false` 时 `\/start` 报 503，等同 Provider 还没注册。 */
+function stubPlatform(routePrefix: string, consoleOrigin: string, registeredAtStart: boolean) {
+  const hits: string[] = [], sessions = new Map<string, string>();
+  let registered = registeredAtStart, issued = 0;
+  const server = Bun.serve({ port: 0, hostname: '127.0.0.1', fetch: (request) => {
+    const url = new URL(request.url), cookie = (request.headers.get('cookie') ?? '').replace(/^cs_session=/, '');
+    hits.push(`${request.method} ${url.pathname}`);
+    if (url.pathname === '/auth/oidc/dev-roles/start') {
+      if (!registered) return Response.json({ message: '无法解析该身份提供方的授权端点' }, { status: 503 });
+      issued += 1;
+      const query = new URLSearchParams({
+        response_type: 'code', client_id: DEV_OIDC_CLIENT_ID, redirect_uri: `${consoleOrigin}/auth/oidc/dev-roles/callback`,
+        scope: 'openid profile email', state: `st${issued}`, nonce: `n${issued}`, code_challenge: `c${issued}`, code_challenge_method: 'S256',
+      });
+      return new Response(null, { status: 302, headers: { location: `http://dev-auth.test${routePrefix}/authorize?${query}` } });
+    }
+    if (url.pathname === '/auth/oidc/dev-roles/callback') {
+      const key = `s${sessions.size + 1}`;
+      sessions.set(key, `u${sessions.size + 1}`);
+      return new Response(null, { status: 303, headers: { location: '/', 'set-cookie': `cs_session=${key}; Path=/; HttpOnly` } });
+    }
+    if (url.pathname === '/auth/login') {
+      sessions.set('pw', 'u-admin');
+      return new Response(null, { status: 303, headers: { location: '/', 'set-cookie': 'cs_session=pw; Path=/; HttpOnly' } });
+    }
+    if (url.pathname === '/v1/me') {
+      const id = sessions.get(cookie) ?? 'unknown';
+      return Response.json({ id, name: id, email: `${id}@roles.test`, isAdmin: true, platformRole: 'admin', memberships: [] });
+    }
+    if (url.pathname === '/v1/admin/auth/providers') {
+      if (request.method !== 'GET') { registered = true; return Response.json({ id: 'p1', slug: 'dev-roles' }); }
+      return Response.json({ items: [] });
+    }
+    if (url.pathname === '/v1/users') return Response.json({ items: [...sessions.values()].map((id) => ({ id, platformRole: 'admin' })) });
+    if (url.pathname.startsWith('/v1/users/')) return Response.json({ ok: true });
+    if (url.pathname === '/v1/projects') return Response.json({ items: [] });
+    return new Response('unexpected route', { status: 404 });
+  } });
+  return { server, hits };
+}
+
+async function seedUntilSettled(base: string): Promise<{ status: string; error?: string }> {
+  let state: { status: string; error?: string } = { status: 'pending' };
+  for (let attempt = 0; attempt < 200 && state.status === 'pending'; attempt += 1) {
+    state = await (await fetch(`${base}/status.json`)).json() as typeof state;
+    if (state.status === 'pending') await Bun.sleep(25);
+  }
+  return state;
+}
+
+describe('管理员会话优先走自己的 OIDC', () => {
+  const start = (platformOrigin: string, routeId: string) => startDevAuthServer({
+    port: 0, routeId, clientSecret: 'fixed-client-secret', platformOrigin,
+    adminUsername: 'platform-admin', adminPassword: 'not-used', consoleOrigin: 'http://console.test',
+    publicOrigin: 'http://dev-auth.test', internalOrigin: 'http://dev-auth.internal:7460', seedRetries: 0,
+  });
+
+  test('Provider 已注册时全程不碰密码登录，也不重写 Provider', async () => {
+    const stub = stubPlatform('/oidc/seededroute1', 'http://console.test', true);
+    const server = await start(`http://127.0.0.1:${stub.server.port}`, 'seededroute1');
+    try {
+      expect((await seedUntilSettled(`http://127.0.0.1:${server.port}`)).status).toBe('ready');
+      expect(stub.hits).not.toContain('POST /auth/login');
+      expect(stub.hits).not.toContain('POST /v1/admin/auth/providers');
+      // 四个角色加上先取管理员会话那一次。
+      expect(stub.hits.filter((hit) => hit === 'GET /auth/oidc/dev-roles/start')).toHaveLength(DEV_ROLES.length + 1);
+    } finally {
+      server.stop();
+      stub.server.stop(true);
+    }
+  });
+
+  test('Provider 还没注册时回落密码登录、重新注册，并把回落记一笔', async () => {
+    const stub = stubPlatform('/oidc/freshroute01', 'http://console.test', false);
+    const warned = spyOn(console, 'warn').mockImplementation(() => {});
+    const server = await start(`http://127.0.0.1:${stub.server.port}`, 'freshroute01');
+    try {
+      expect((await seedUntilSettled(`http://127.0.0.1:${server.port}`)).status).toBe('ready');
+      expect(stub.hits).toContain('POST /auth/login');
+      expect(stub.hits).toContain('POST /v1/admin/auth/providers');
+      expect(stub.hits.indexOf('POST /auth/login')).toBeLessThan(stub.hits.lastIndexOf('GET /auth/oidc/dev-roles/start'));
+      expect(warned.mock.calls.flat().join(' ')).toContain('回落密码登录');
+    } finally {
+      warned.mockRestore();
+      server.stop();
+      stub.server.stop(true);
+    }
+  });
 });

@@ -5,7 +5,7 @@
 ## 自动验证
 
 - `bun test tools/dev-auth/devAuth.test.ts`：8 pass／0 fail／32 assertions。
-- 覆盖四角色且无 owner、无项目／错误态、只选未归档数字人项目、表单令牌、旧页面令牌失效后的可恢复提示、站内回跳、discovery、PKCE S256、授权码一次性消费、RS256 ID token 与 JWKS 验签、生产源码隔离、readiness 播种自锁回归。
+- 覆盖四角色且无 owner、无项目／错误态、只选未归档数字人项目、表单令牌、旧页面令牌失效后的可恢复提示、站内回跳、discovery、PKCE S256、授权码一次性消费、RS256 ID token 与 JWKS 验签、生产源码隔离；2026-09-22 起改为「就绪只看端口」「身份跨重启固定」「播种失败自动重试」「管理员会话优先走 OIDC」四条回归。
 - `bunx tsc -p tsconfig.json --noEmit` 与 `bunx eslint tools/dev-auth --no-warn-ignored` 通过。
 - 统一冻结候选的最终 `bun run check`：1614 pass／5 skip／0 fail，8995 assertions；`arch:check`、全仓 ESLint、根 TypeScript 与 console TypeScript 全部通过。
 - 缺少或过期表单令牌的真实 `POST /login/developer` 返回 HTTP 403，同时返回带新令牌的完整角色页；地址清回 `/`，用户可直接重新点击，不再暴露原始错误文本。
@@ -14,7 +14,8 @@
 
 - `crewstation-dev-auth` Deployment 为 1／1 Ready，镜像 `cs-control-plane:dev`，只执行 `tools/dev-auth/main.ts`。
 - `http://dev-auth.cs.localhost/status.json` 返回 `status=ready`，项目清单只含 6 个未归档 `DigitalWorker`；两个接入容器没有进入下拉。
-- 首次部署发现 Service 只发布 Ready Endpoint，导致 cs-auth 无法在播种阶段访问 discovery，readiness 自锁。修正为 `publishNotReadyAddresses: true` 后，播种完成才由 `/readyz` 变为 200；回归用例固定该约束。
+- 首次部署发现 Service 只发布 Ready Endpoint，导致 cs-auth 无法在播种阶段访问 discovery，readiness 自锁。当时修正为 `publishNotReadyAddresses: true`。
+- **2026-09-22 推翻上一条**：该字段在 Traefik 3.7 上并不生效（只抬 EndpointSlice 的 `ready`，Traefik 按 `serving` 过滤，router 被整条丢掉，网关返回 404 而不是 503），而且 readiness 本就不该等播种。现在 `/readyz` 只看端口、字段已删除，回归用例改为固定这条新约束。同批把身份固定进 Secret、播种失败自动重试、管理员会话优先走自己的 OIDC——实测密码登录关闭时冷启动仍能播种到 `ready`。
 - 安装器连续运行并重启 dev-auth 后仍就绪；Provider 按 slug 原位更新，固定 subject 命中既有账户。日志只含页面地址与监听端口，没有管理员口令、Cookie、授权码、token 或 client secret。
 - 最终重启后 Provider 仍为 `idp_01a0bd7cba6b7000804a1ede41f9c22a`；四个固定账户 ID 均未变化，证明随机 issuer／密钥／client secret 轮换没有重复建号。
 

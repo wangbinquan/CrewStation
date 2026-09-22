@@ -78,9 +78,28 @@ async function reconcileMemberships(platform: PlatformClient, seeded: SeededStat
   }
 }
 
+/**
+ * 管理员会话优先走自己的 OIDC：Provider 注册过之后，dev-auth 就不再需要平台开着密码登录，
+ * 重启与滾镜像都能自愈。只有首次注册、或 Provider 漂了（issuer／口令被改、被停用，
+ * 固定账户被降权）才回落密码登录，顺手把 Provider 重新写对。回落是不正常的，所以要记一笔。
+ */
+async function adminSession(platform: PlatformClient, oidc: DevOidc, routePrefix: string, issuer: string, clientSecret: string): Promise<string> {
+  const admin = findDevRole('admin');
+  if (!admin) throw new Error('开发角色表缺少管理员');
+  try {
+    const cookie = await authorizeRole(platform, oidc, routePrefix, admin, '/');
+    if ((await platform.me(cookie)).platformRole === 'admin') return cookie;
+    console.warn('[dev-auth] 固定管理员账户当前不是平台管理员，回落密码登录校准');
+  } catch (error) {
+    console.warn(`[dev-auth] 公司身份取管理员会话未成功，回落密码登录并重新注册 Provider：${error instanceof Error ? error.message : String(error)}`);
+  }
+  const cookie = await platform.loginAdmin();
+  await platform.ensureProvider(cookie, issuer, clientSecret);
+  return cookie;
+}
+
 async function seed(platform: PlatformClient, oidc: DevOidc, issuer: string, routePrefix: string, clientSecret: string): Promise<SeededState> {
-  const adminCookie = await platform.loginAdmin();
-  await platform.ensureProvider(adminCookie, issuer, clientSecret);
+  const adminCookie = await adminSession(platform, oidc, routePrefix, issuer, clientSecret);
   const users = new Map<string, string>();
   for (const role of DEV_ROLES) {
     const roleCookie = await authorizeRole(platform, oidc, routePrefix, role, '/');
