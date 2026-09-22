@@ -7,6 +7,20 @@
 
 基线三件套（v0.3.3）的第一轮实现已在本机 kind 集群上跑通并推上 main；**RFC-001（算力归平台）与 RFC-002（管理空间与租户空间分离）已实现、实跑确认并推上 main；RFC-004 已被 RFC-006 取代（Superseded）；RFC-006（算力档位合并运行环境、每个 Agent 一个 Pod）已实现、实机验收完毕并推上 main，已 Done（P1–P8、ADR-0005 与 I17–I19 待作者复核）；RFC-003 工作台已按设计附件完成并整体部署到本机，52／52 项 UX-AT 全部实机通过、本地 gate 与精确 SHA CI 通过，已 Done；RFC-005（OIDC／OAuth 2.0 公司登录）代码、测试与 OA-01…OA-31 实机验收全部完成，已 Done；RFC-007（开发环境 OAuth 2.0 一键换角色）代码、四角色 Chrome 实机验收、本地 gate 与精确 SHA CI 全部完成，已 Done**。
 
+## 新建项目的开发容器连内置 MCP 报 403，归档项目的路由删不掉（2026-09-22）
+
+作者反馈开发容器调内置 MCP 报 403。本机复现：在 `cs-demo` 里起一个带 `crewstation.io/workload=dev-session` 标签、项目名未登记的 Pod，`POST http://mcp-capabilities.svc.cs.internal/mcp` 得到 403「不能调用平台端点 mcp-capabilities.svc.cs.internal」；同一个 Pod 换成已登记身份是 200。网络层没有问题：任务容器的 NetworkPolicy 出向全放行，CoreDNS 的 `*.svc.cs.internal` 改写也在。
+
+根因是放行表的重建触发点漏了一整类：它是「当前在册服务」的投影，而只有授权变更、能力目录变更和管理员手动「重算」会触发重建，**建项目一个都不触发**，`project.created` 只重算了该服务的路由。新项目的服务于是根本不在表里，两个内置 MCP 与平台 API 全被拒，要等某次无关的授权／目录变更才顺带被带上。排查中翻出对称的另一半：组合根把网关要的三件事都接在已滤掉归档项目的 `listServices()` 上，而归档先于事件落库，消费者跑到时按 projectId 与按 serviceId 都查不到，`removeService` 一进门就 return——**归档项目的 IngressRoute 原样留在集群里继续对外服务**，而工作台上它已经「冻结访问」。
+
+两处都已修：`project.created` / `project.archived` 补 `rebuildAllowlist()`；`ServiceDirectory` 的两个方法取值范围分开写进契约（`listServices` 不含归档，`getService` 解析任一服务并带 `archived` 标记），组合根改走 `resolveServiceById` / `resolveServiceOfProject`，`reconcileService` 见到归档服务不再规划路由。回归主力放在 `modules/platform/tests/gatewayCatalogRoutes.test.ts`：两个缺陷都长在组合根里，网关模块自己的用例用的是夹具目录，看不见。逐项确认过红——去掉全部修复红在「建项目后 MCP 仍不可达」，只把解析范围改回「在册服务」红在「归档后 IngressRoute 还在」。
+
+完整 `bun run check` 通过：**2080 pass／8 skip／0 fail**，13177 assertions、350 个文件。（另有一次跑出现 2 红，都在 release 模块「其他发布进行中…阻止切换」那条时序用例上，单独跑 module 层与随后两次完整 check 均 0 fail，本次未改 release，记为既有 flake。）
+
+本机集群已部署 `cs-control-plane:allowlist-20260922`，七个平台部署（cs-api／cs-auth／cs-controller／cs-session／cs-events／mcp-capabilities／mcp-operations）全部 Ready，本次没有迁移；`crewstation-dev-auth` 仍在 `:dev`，未动。实机验收用一次性项目 `mcp-403-verify` 走完整条链：建项目后 **2 秒内放行表 v40→v41**、新条目带 `mcpCapabilities`／`mcpOperations`，在 `cs-mcp-403-verify` 里起的 dev-session 标签 Pod 对两个 MCP 都是 **200**；归档后 **1 秒内 v43 条目消失**，命名空间里三条 IngressRoute 全部被删。部署后 e2e 层复跑 **54 pass／1 skip／0 fail**。三个探针 Pod 已删除、身份索引行均已标记删除；节点磁盘 35%。归档项目留下命名空间、green 部署与 GitLab 仓库（归档按设计不删这些，属既有残留清理缺口）。
+
+两条判据记进 `dev-gotchas.md`：派生文档的重建触发点要覆盖输入集合的每一次增删，不只是格式升级；一个「已过滤」的清单不能同时当解析器用。实现见 `259f6c0`。
+
 ## 项目导航归属与概览快捷入口修正（2026-09-21）
 
 作者实机反馈项目侧栏多了一套折叠的平台管理菜单、返回后选中能力接入，以及概览底部四个入口样式松散。已按裁定修订 RFC-003 §2.7：接入项目侧栏只保留项目页面和“返回项目管理”，返回统一进入 `/admin/projects` 并选中项目管理；管理员在数字人／接入项目点击顶栏“平台管理”也返回该目录，项目不存在时正文返回入口一致。能力接入自己的列表与旧链接继续可用。
