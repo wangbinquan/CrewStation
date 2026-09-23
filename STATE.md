@@ -15,7 +15,8 @@
 - **根因**：TanStack Router 在跳转一开始就把 `stores.location` 换成目标地址，目标页提交前开发页仍挂着。`useDevelopmentLocation` 读的是 `useLocation()`，`useWorkspaceLocation` 于是把离开途中没有 `view` 的 `/release` 当成「无参数进入」，把个人布局里的「参考」用 `replace` 写回开发页地址。自 `b8b64e2`（RFC-020 T5／T6 起无参数进入写回地址）起，只要个人布局里开着面板就会发生。
 - **修复**：`useDevelopmentLocation` 新增 `usePageLocation`——路径不是本页时沿用本页最后一次的地址，离开途中也不发 `replace` 写回；离开途中按别的页参数改个人布局、主区闪一下的可能随之消除。同类排查：其余读 `useLocation()` 的组件（顶栏、空间切换、左栏、活动菜单）只做高亮或记住位置，`ProjectSpaceBoundary` 只在项目种类与空间不符时重定向，都不受影响。dev-gotchas「前端与测试」补了一条。
 - **用例**：`devSessionPanel` 新增「开着面板从左栏去别的页，不被拽回开发页」（去发布页；回开发页仍按设计恢复在旁；再去运行与诊断），改前红、改后绿。本机 `check:static` 通过，console 层 630 pass／0 fail；完整 `bun run check` 里只有 `tests/e2e/` 六个文件红，都停在登录页（本机没带 `CS_E2E_AUTH=dev-oidc CS_E2E_USERNAME=dev-admin`；没有补跑，因为 e2e 以作者身份运行会改掉作者的个人布局）。
-- **部署**：从 `44c5717` 的提交内容加这处修复构建 `cs-console:nav-leave-20260923`（不含工作树里并行会话的拓扑与 `OperationDetail` 在制品），导入节点并滚动 console（原为同出自 `44c5717` 的 `unfold-20260923`），线上包 `index-BC2E1ukh.js`。在作者 Chrome 里点左栏的实机复验被自动模式分类器拦下，未做。
+- **部署**：从 `44c5717` 的提交内容加这处修复构建 `cs-console:nav-leave-20260923`（不含工作树里并行会话的拓扑与 `OperationDetail` 在制品），导入节点并滚动 console（原为同出自 `44c5717` 的 `unfold-20260923`），线上包 `index-BC2E1ukh.js`。
+- **实机复验**（作者要求用 Chrome 扩展自己验；线上包 `index-BC2E1ukh.js`，演示项目 `?view=reference`）：点「发布与上线」只有一次 `pushState(/release)`，停在发布页；左栏回「开发」按设计 23 ms 后 `replace` 成 `?view=reference`；再点「运行与诊断」「← 项目开发」和顶栏「平台管理」（作者被拽回的正是去 `/admin/projects?q=` 这一下），都只有一次 `pushState` 并停在目标页。途中几次点击没反应，查明是扩展窗口被遮挡（`visibilityState: hidden`）时点击根本没进页面，先截图再点即正常，与应用无关（dev-gotchas 补了一条）。`87b6595` 的 [CI 35804444594](https://github.com/wangbinquan/CrewStation/actions/runs/35804444594) 六项全部成功。
 
 ## 项目工作台去掉整段折叠：标签表、项目信息、版本历史、部署版本对照、Swagger、可见性检查（2026-09-23）
 

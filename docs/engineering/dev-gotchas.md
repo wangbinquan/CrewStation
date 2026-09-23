@@ -400,6 +400,13 @@ Claude in Chrome 的 `resize_window` 到 390／320 会被 macOS Chrome 的最小
 在页面里注入同源 `<iframe src=location.pathname style="width:390px">` 即可得到真实的 390px 布局视口（cookie 同站、媒体查询按 iframe 宽度生效），
 用 `contentDocument.documentElement.scrollWidth` 比 `contentWindow.innerWidth` 判断整页横向溢出；1280×720 的高度量测同理。
 
+### Chrome 扩展的点击在窗口被遮挡时会被丢掉：先截图再点
+
+2026-09-23 实撞：扩展新开的窗口被作者自己的窗口挡住（页面 `document.visibilityState === 'hidden'`），导航之后按坐标或 ref 的 `left_click`
+在页面里一个 `pointerdown` 都收不到，看起来像「点了没反应」，差点误判成应用又拦下了跳转。
+**判据**：在 `window` 捕获阶段挂 `pointerdown`／`mousedown`／`click` 监听，点击后一个事件都没有；同一页先 `screenshot` 再点同一坐标，事件与跳转立刻正常。
+**做法**：导航或长时间等待之后、点击之前先截一张图（缩小比例即可）；断定「应用拦了点击」之前，先用上面的监听排除这一层。
+
 
 ### 路由库不会替你装错误边界：没有 `defaultErrorComponent`，一页渲染抛错整个工作台就没了
 
