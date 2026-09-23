@@ -13,7 +13,7 @@ export interface ReadinessLimits {
   readonly minVisible: number;
 }
 
-export const DEFAULT_READINESS_LIMITS: ReadinessLimits = { quietMs: 500, timeoutMs: 45_000, minVisible: 1 };
+export const DEFAULT_READINESS_LIMITS: ReadinessLimits = { quietMs: 500, timeoutMs: 90_000, minVisible: 1 };
 
 export type ReadinessVerdict = 'screen' | 'timeout';
 

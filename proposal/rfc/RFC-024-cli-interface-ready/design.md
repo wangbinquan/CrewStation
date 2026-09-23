@@ -1,6 +1,6 @@
 # RFC-024｜技术设计
 
-> 状态：Done · 2026-09-23 · 作者批准三件套，Q1–Q3 取推荐方案（静止 500 ms、超时 45 秒、代答查询另立 RFC）；实机验收见 [acceptance.md](./acceptance.md)
+> 状态：Done · 2026-09-23 · 作者批准三件套，Q1–Q3 取推荐方案（静止 500 ms、超时 45 秒（验收后修订为 90 秒）、代答查询另立 RFC）；实机验收见 [acceptance.md](./acceptance.md)
 > 配套：[提案](./proposal.md) · [实施计划](./plan.md)
 
 ## 目录
@@ -13,6 +13,7 @@
 - [6. 兼容与失败模式](#6-兼容与失败模式)
 - [7. 测试策略](#7-测试策略)
 - [8. 本 RFC 承担的结构演进与留下的债](#8-本-rfc-承担的结构演进与留下的债)
+- [9. 修订记录](#9-修订记录)
 
 ## 1. 落位
 
@@ -62,7 +63,7 @@ type ReadinessInput =
   | { kind: 'output'; at: number; visibleChars: number }  // 一次写入完成后的屏幕统计
   | { kind: 'tick'; at: number };                          // 计时器到点
 interface ReadinessState { spawnedAt: number; lastOutputAt?: number; visible: number; done?: 'screen' | 'timeout' }
-function stepReadiness(state, input, limits = { quietMs: 500, timeoutMs: 45_000, minVisible: 1 }): { state; nextTickAt?: number }
+function stepReadiness(state, input, limits = { quietMs: 500, timeoutMs: 90_000, minVisible: 1 }): { state; nextTickAt?: number }
 ```
 
 - 可见文字：当前活动缓冲区（normal 或 alternate）视口内非空白字符数 ≥ `minVisible`。
@@ -140,7 +141,7 @@ function stepReadiness(state, input, limits = { quietMs: 500, timeoutMs: 45_000,
 |---|---|
 | 旧任务底座（Runner 不写 `ui`） | `interface` 段跳过，进程拉起即就绪，与今天一致 |
 | 平台已升级、工作台未升级 | 部署同批；若旧工作台遇到 `interface` 种类，契约解析失败——因此部署顺序为工作台与平台同一批，写进计划 |
-| CLI 从不输出可见文字（卡在查询、无人应答） | 45 秒超时放行，段内写明 |
+| CLI 从不输出可见文字（卡在查询、无人应答） | 90 秒超时放行，段内写明（原 45 秒，见 §9） |
 | CLI 画出第一帧后又停顿超过 500 ms 才画完 | 提前放行，用户可能看到界面补画；Q1 实机测后再调 |
 | Runner 在判定前重启 | 平台按现有规则把 CLI 判为 runner-restarted，进行中的 `interface` 段失败 |
 | ready 事件丢失（未入库） | 组合保持 running；名册兜底读到 `record.ui.state === 'ready'` 时按本次时刻补上 |
@@ -149,7 +150,7 @@ function stepReadiness(state, input, limits = { quietMs: 500, timeoutMs: 45_000,
 
 | 层 | 文件 | 必写用例 |
 |---|---|---|
-| unit | `runtimes/task/src/terminal/interfaceReadiness.test.ts` | 可见文字＋静止 500 ms 判 screen；静止期内有新输出顺延；只有查询（可见 0）不判完成、到 45 秒判 timeout；判定后忽略输入；`nextTickAt` 取值 |
+| unit | `runtimes/task/src/terminal/interfaceReadiness.test.ts` | 可见文字＋静止 500 ms 判 screen；静止期内有新输出顺延；只有查询（可见 0）不判完成、到 90 秒判 timeout；判定后忽略输入；`nextTickAt` 取值 |
 | unit | `runtimes/task/src/terminal/terminalScreen.test.ts`（新增） | 真无头 xterm：只写查询序列可见 0；进备用屏写文字后按活动缓冲区计数；退出备用屏后回到 normal 缓冲区计数 |
 | unit | `runtimes/task/tests/nativeSupervisor.test.ts` | running 事件带 `ui.waiting`；真 PTY 的 shell 提示出现并静止后发 `ui.ready/screen`（判据调小）；无输出到超时发 `ui.ready/timeout`；判定前退出不再发 ready、计时器已清 |
 | unit | `modules/dev-session/domain/nativeTerminalProjection.test.ts` | 新 Runner 等待中为七段且整体 running；ready 后七段首尾相接、整体 ready；timeout 的 detail；旧 Runner 段跳过且整体 ready 时刻与今天相同；初始化中退出记失败（agent-start-failed）；初始化中被关闭记取消 |
@@ -163,3 +164,9 @@ function stepReadiness(state, input, limits = { quietMs: 500, timeoutMs: 45_000,
 
 - 演进：界面判定写成纯函数状态机，与 PTY、计时器解耦，Runner 里第一个「从屏幕推导状态」的点有了可复用的形状。
 - 债：`nativeSupervisor.ts` 继续承担接线（判定、控制、活动通道都在一个类里）。若后续再加屏幕推导（例如 Q3 的代答查询），应把每个 CLI 的屏幕相关职责抽成 `NativeScreenSession`，本 RFC 不做。
+
+## 9. 修订记录
+
+| 日期 | 修订 | 依据 |
+|---|---|---|
+| 2026-09-23 | 超时放行 45 秒 → **90 秒**（`DEFAULT_READINESS_LIMITS.timeoutMs`），只改 Runner，任务底座重建、默认档位另存修订；控制面与工作台不变 | 验收实测 OpenCode 43.2 秒才画出界面，作者裁定放大（[验收 §3](./acceptance.md)） |
