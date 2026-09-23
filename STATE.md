@@ -7,6 +7,19 @@
 
 基线三件套（v0.3.3）的第一轮实现已在本机 kind 集群上跑通并推上 main；**RFC-001（算力归平台）与 RFC-002（管理空间与租户空间分离）已实现、实跑确认并推上 main；RFC-004 已被 RFC-006 取代（Superseded）；RFC-006（算力档位合并运行环境、每个 Agent 一个 Pod）已实现、实机验收完毕并推上 main，已 Done（P1–P8、ADR-0005 与 I17–I19 待作者复核）；RFC-003 工作台已按设计附件完成并整体部署到本机，52／52 项 UX-AT 全部实机通过、本地 gate 与精确 SHA CI 通过，已 Done；RFC-005（OIDC／OAuth 2.0 公司登录）代码、测试与 OA-01…OA-31 实机验收全部完成，已 Done；RFC-007（开发环境 OAuth 2.0 一键换角色）代码、四角色 Chrome 实机验收、本地 gate 与精确 SHA CI 全部完成，已 Done**。
 
+## 开发页右侧面板：预览与代码占满面板高度（2026-09-23）
+
+作者反馈「开发界面右侧栏，各个页签的内容没有把页面高度用满」。缺陷修复：RFC-003 development-workspace §2 要求独立预览占满工作内容区，RFC-020 design §5.3 写的是预览、代码「不变」；RFC-020 plan §4 记了实施记录，不涉及修订。提交 `c8c5b8d`，[CI 35809162288](https://github.com/wangbinquan/CrewStation/actions/runs/35809162288) 六项全部成功。
+
+- **实量**（1440×900，dev-developer，演示项目）：面板正文 651px，预览只占 266px（iframe 停在 `min-height` 200px）、代码 241px；打开 `crewstation.yaml` 后编辑器反而按全文撑高到 736px，连「保存」一起在面板里滚走。放大形态同样。
+- **根因**：RFC-020 T5／T6（`b8b64e2`）把两者从定高的整页（原 `.contentStage`）搬进面板，包每个面板的 `.pane` 没有高度，`DevelopmentPreview`／`EditorPane` 自己的 `height: 100%` 落了空。
+- **修复**：`ToolPane.fill`（只给预览、代码）→ `.fill { height: 100% }`，内容占满面板正文、在自己内部滚动。变更、数据、参考、会话是文档式内容，仍从顶部排、长了由面板正文滚动（RFC-020 之前也是自然高度）。
+- **用例**：`devSessionPanel` 新增一条（六个面板里只有预览与代码带 `fill`；`.fill`、`.preview`、`EditorPane` 的 `.pane` 三处 `height: 100%` 的样式链），改前红；e2e `projectWorkspaceIa` 新增 WS-07 一条（内容底边距面板正文底边不超过 12px、正文不滚动），对改前的线上包实跑红（差 377px）。console 层 649 pass／0 fail，`check:static` 绿。
+- **实机核对（未部署）**：从 `ec33c69`＋本修复构建镜像，无头 Chrome 用 CDP 只换 `/assets/*` 的 JS／CSS（登录、接口、任务流走真实后端，不动共享 console；做法与两个坑写进 dev-gotchas）：1280×720／1440×900／1920×1080／1024×768／390×844 下预览与代码在旁、放大都占满（内容底边距正文底边 8px，即内边距；正文不滚动），预览 iframe 1440 下 569px（原 200px）、1920 下 749px，编辑器在 CodeMirror 里滚（954／354）；其余四个面板行为不变；无横向溢出、无控制台错误。**新 e2e 条还没对部署后的包跑过。**
+- **部署待作者批准**：`cs-console:panel-fill-20260923b`（`git archive 79a3ede` 构建，只在本机 docker）的导入与 `kubectl set image` 被 Claude Code 自动模式分类器按「共享集群变更」拦下，没有执行；本机 console 仍是 `detail-top-20260923b`，**不含本修复**（也不含 `0a92896`、`ae7ee76`，见下一节）。批准后应从当时的 HEAD 重建一次再滚，随后跑 `CS_E2E_AUTH=dev-oidc CS_E2E_USERNAME=dev-developer bun test tests/e2e/projectWorkspaceIa.test.ts`（用 dev-developer，免得改掉作者 dev-admin 的个人布局）。
+- **提交时的并行写入**：`git add` 之后、`git commit -- <路径>` 之前，并行会话往 `dev-gotchas.md` 写了一段「终端程序的查询也会产生『输入』」，一度被一起提走；推送前用临时索引把它从本提交里拿掉，那段仍在工作树里，归原会话提交。
+- **留给作者的**：工作区整体用 `calc(100dvh - 210px)` 定高，状态条下方 1280×720／1440×900 留 47px、1920×1080 留 67px 空白，没改；变更、参考等文档式面板内容短时下方留白，也没改。
+
 ## 开发页 CLI 操作即自动取得输入控制、占用人实时显示；动作型链接改为按钮样式（2026-09-23）
 
 作者问「系统里还有多少跳转用超链接原始格式、能不能换成按钮」，并反馈「获取控制权的按钮一点都不显眼；没被别人占用时操作 CLI 就该自动获取，被占用就提示谁在占用」。先分析、再两轮提问裁定：**直接改＋回填 RFC-003（不另立 RFC）**，收尾「提交推送＋部署＋两身份实机验证」。
