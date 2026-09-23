@@ -7,6 +7,52 @@
 
 基线三件套（v0.3.3）的第一轮实现已在本机 kind 集群上跑通并推上 main；**RFC-001（算力归平台）与 RFC-002（管理空间与租户空间分离）已实现、实跑确认并推上 main；RFC-004 已被 RFC-006 取代（Superseded）；RFC-006（算力档位合并运行环境、每个 Agent 一个 Pod）已实现、实机验收完毕并推上 main，已 Done（P1–P8、ADR-0005 与 I17–I19 待作者复核）；RFC-003 工作台已按设计附件完成并整体部署到本机，52／52 项 UX-AT 全部实机通过、本地 gate 与精确 SHA CI 通过，已 Done；RFC-005（OIDC／OAuth 2.0 公司登录）代码、测试与 OA-01…OA-31 实机验收全部完成，已 Done；RFC-007（开发环境 OAuth 2.0 一键换角色）代码、四角色 Chrome 实机验收、本地 gate 与精确 SHA CI 全部完成，已 Done**。
 
+## 升级时自动迁到 Calico；安装与升级预检实测 NetworkPolicy（2026-09-23，Design D60）
+
+作者问「新部署集群或者升级，会不会自动升到目标网络架构」。
+答复：本机新建集群会（bootstrap.sh 第一步就迁）；已有集群只跑 install-platform.sh 升级不会；产品安装器按设计不替换网络插件，而它的预检只查源 IP 保留，不查 NetworkPolicy 是否真的执行。
+问答裁定：本机升级「自动迁移并重建全部 Pod」；产品预检「预检实测」。流程沿用「直接改＋回填」，取 D60／v0.3.12（crewstation-51 确认；RFC-023 以后的回填用 v0.3.13／D61）。
+
+- **本机**：
+  - `install-platform.sh` 开头先跑 `calico-cni.sh --check`：0 表示已迁完；10 表示要迁移，先迁移再安装；其他退出码表示检查本身出错，停止安装。
+  - `calico-cni.sh` 第 3 步改为 `rebuild-old-range-pods.ts`，重建旧地址上的全部 Pod：
+    - 有控制器的按依赖分四批删 Pod 重建：系统组件 → 平台底座 → 网关与平台服务 → 各项目。每批等工作负载的新 Pod 就绪。
+    - 用删 Pod 而不是滚动重启：本机 CPU 请求占满时，滚动多出来的新 Pod 会一直 Pending。
+    - 任务 Pod 以管理员身份走集群管理（RFC-010）的运维操作：
+      - 开发会话按「管理员重启工作区」换新容器、保留工作卷，会话里的 CLI 随之结束，要重开；
+      - 业务任务能重启就重启，否则删除；档位测试删除；
+      - 处理不了的逐个列出，kindnet 的地址转换链保留。
+  - 管理员登录（`platform-admin-session.ts`）先用口令（环境变量或 `.local/admin.env`）。本机口令登录已被关掉，这时走开发角色登录器（`as=dev-role-admin`）。
+  - 旧网段只算 Running／Pending 且不在终止中的 Pod：CI 里 Completed 的迁移 Job Pod 状态里还留着地址，算上它每次安装都会以为要迁移。命名空间按整名匹配。
+  - 用例：calicoCni 7 条、rebuildOldRangePods 15 条、platformAdminSession 8 条，installPlatform 新增 3 条。
+  - 实机：
+    - 本机集群已迁完，`calico-cni.sh --check` 返回 0（「network plugin: Calico; nothing on the old range」）；
+    - 以当前 Calico 网段做 `--dry-run --prefix 10.244.`：以开发角色登录器取得管理员会话；38 个有控制器的 Pod 分四批
+      （系统 4、底座 4、网关与平台服务 11、项目 21）；demo 与 rfc003-verify-workbench 两个开发会话经集群管理查到，动作为重启。未执行任何改动。
+- **产品**（Design D60）：
+  - CLI 的安装与升级预检新增「NetworkPolicy 实测（D60）」（`apps/cli/src/cluster/networkPolicyProbe.ts`）：
+    - 临时命名空间里放一个应答端和两个探针 Pod，镜像取发行包里的控制面镜像；
+    - 套了禁止出站策略的必须连不上，没套的必须连得上，测完删掉命名空间；
+    - 发行包里没有控制面镜像时报「待配置」。
+  - 预检有失败项时，后面的阶段一律不执行、记为跳过（`runPhases`）：升级既不迁移也不滚动。
+  - kubectl 访问层支持经标准输入传清单。用例：networkPolicyProbe 7 条、kubectlAccess 2 条。
+  - 实机：用本机的 `cs-control-plane:dev` 充当发行包镜像，在本机集群上跑 `install --only preflight`，这一项「成功：套了禁止出站策略的探针连不上，对照探针连得上」，临时命名空间随后删除。
+    探针 Pod 的优雅退出期设为 1 秒：bun 作为 1 号进程不处理 SIGTERM，不设的话删命名空间要等满 30 秒。
+  - 回填（基线 v0.3.12）：
+    - Design §11.1、§11.4、§12.2 与 D60；顺带删掉 §11.3 配置示例里 RFC-018 已下线的 `egress` 段；
+    - Proposal §0.2 变更表与风险表；
+    - Plan T6.1、T6.4、AT-16、AT-17a，开头「本计划依据」一句跟上 v0.3.12／R01–R58／D01–D60。
+  - dev-gotchas「本机集群的网络插件是 Calico」同步补上自动迁移与旧网段判定。
+- **提交与 CI**：
+  - 三笔提交：`dc3c7ab`（本机迁移）、`0d1aebf`（CLI 预检）、`5baa128`（基线 v0.3.12）。
+  - 提交前在「e34bdeb＋本批」的干净导出上：`check:static` 通过；方法级 464 条、CLI 145 条全过；新文件行覆盖 97% 以上。
+  - [CI 35854019083](https://github.com/wangbinquan/CrewStation/actions/runs/35854019083) 六项全绿。e2e 的日志：
+    - bootstrap 在全新集群上由新工具重建第 1 批的 4 个系统 Pod，报「旧地址上已经没有 Pod」，同一次就删掉了地址转换链；
+    - install-platform 开头的检查报「network plugin: Calico; nothing on the old range」，没有触发迁移。
+- **没验证的**：
+  - 真正从 kindnet 迁移、带开发会话的整条路径只在用例里跑过：本机已经迁完，CI 每次都是全新集群；
+  - 产品探针在「网络插件不执行 NetworkPolicy」时判失败，这一支只在用例里验证过：本机集群造不出这种插件。
+
 ## RFC-023 数据库驱动换成 postgres.js：实施、部署与 72 小时观察（2026-09-23）
 
 作者对 I16（Bun 内置 SQL 的连接池在并发突发下错位）裁定 (b) 换 postgres.js，随后批准 RFC-023。Q1 不保留切回开关，Q2 观察 72 小时，Q3 显式设置连接回收参数。**RFC-023 为 In Progress**：DB-01…DB-07 通过，DB-08 观察到 **09-26 11:16Z**。
