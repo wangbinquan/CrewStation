@@ -162,47 +162,48 @@ describe.skipIf(!available)('release module', () => {
     expect((await release.api.getSlots(owner, serviceId)).find((s) => s.name === 'prod')?.state).toBe('ready');
 
     manifestYaml = baseManifest('migration: { compatibility: destructive, destructive: true, rollback: blocked }');
-    const destructive = await release.api.publish(owner, serviceId, { branch: 'main', version: 'minor' });
-    await release.api.runPipelineStep(destructive.id);
-    await markJob(`build-${destructive.id.replaceAll('-', '')}`, true);
-    await release.api.runPipelineStep(destructive.id);
-    // RFC-021 M14、M17：维护窗口＝项目维护中且三个开关都拦；拒绝原因说清出路。
-    expect((await release.api.getRelease(owner, destructive.id))).toMatchObject({ status: 'failed', message: expect.stringContaining('只能在项目维护期间发布') });
+    const count = (await release.api.listReleases(owner, serviceId)).length;
+    // RFC-021 M14、M17：维护窗口＝项目维护中且三个开关都拦；拒绝原因说清出路。RFC-025 统一预检：发布受理时就拒绝，不打标签、不登记发布。
+    try {
+      await expect(release.api.publish(owner, serviceId, { branch: 'main', version: 'minor' })).rejects.toMatchObject({ kind: 'precondition', message: expect.stringContaining('只能在项目维护期间发布'), details: { code: 'maintenance-window-required' } });
+      expect(await release.api.listReleases(owner, serviceId)).toHaveLength(count);
+    } finally { manifestYaml = baseManifest('migration: { compatibility: none, destructive: false, rollback: switch-back }'); }
   });
 
-  /** 发布只看档位存在性与协议（RFC-006 §4.4）：三种拒绝都在部署前发生，不会部署半截。 */
+  /** 发布只看档位存在性与协议（RFC-006 §4.4）：四种拒绝都在发布受理时发生（RFC-025 统一预检），不打标签、不登记发布，更不会部署半截。 */
   test.each([
-    ['private', '未获授权', 'private'],
-    ['nope', '算力档位 nope 不存在', 'balanced'],
-    ['term-cli', '通用终端协议', '「＋ CLI」'],
-    ['default', '尚未设置默认档位', '平台管理'],
-  ])('算力档位 %s：发布被拒，不进部署（RFC-001、RFC-006）', async (compute, first, second) => {
+    ['private', '未获授权', 'private', 'profile-denied'],
+    ['nope', '算力档位 nope 不存在', 'balanced', 'profile-missing'],
+    ['term-cli', '通用终端协议', '「＋ CLI」', 'profile-terminal-only'],
+    ['default', '尚未设置默认档位', '平台管理', 'profile-default-unset'],
+  ])('算力档位 %s：发布被拒，不进部署（RFC-001、RFC-006）', async (compute, first, second, code) => {
     if (compute === 'default') defaultProfile = undefined;
     manifestYaml = baseManifest('migration: { compatibility: none, destructive: false, rollback: switch-back }', compute);
-    const dto = await release.api.publish(owner, serviceId, { branch: 'main', version: 'patch' });
-    await release.api.runPipelineStep(dto.id);
-    await markJob(`build-${dto.id.replaceAll('-', '')}`, true);
-    await release.api.runPipelineStep(dto.id);
-    const failed = await release.api.getRelease(owner, dto.id);
-    expect(failed.status).toBe('failed');
-    expect(failed.message).toContain(compute === 'nope' ? `算力档位 ${computeId(compute)} 不存在` : first);
-    expect(failed.message).toContain(second);
-    // 部署一步都没走：没有新的 Deployment。
-    expect(k8s.applied.filter((o) => o.kind === 'Deployment' && (o.metadata.name as string).includes(dto.id.slice(-6))).length).toBe(0);
-    defaultProfile = 'balanced';
-    manifestYaml = baseManifest('migration: { compatibility: none, destructive: false, rollback: switch-back }');
+    const count = (await release.api.listReleases(owner, serviceId)).length, tags = tagCounter, deployments = k8s.applied.filter((o) => o.kind === 'Deployment').length;
+    try {
+      const refused = release.api.publish(owner, serviceId, { branch: 'main', version: 'patch' });
+      await expect(refused).rejects.toMatchObject({ kind: 'precondition', details: { code } });
+      const message = await refused.catch((error: Error) => error.message);
+      expect(message).toContain(compute === 'nope' ? `算力档位 ${computeId(compute)} 不存在` : first);
+      expect(message).toContain(second);
+      expect(await release.api.listReleases(owner, serviceId)).toHaveLength(count);
+      expect(tagCounter).toBe(tags);
+      expect(k8s.applied.filter((o) => o.kind === 'Deployment')).toHaveLength(deployments);
+    } finally {
+      defaultProfile = 'balanced';
+      manifestYaml = baseManifest('migration: { compatibility: none, destructive: false, rollback: switch-back }');
+    }
   });
 
-  test('项目未获分配服务规格时，拒绝部署且不会先运行数据迁移', async () => {
+  test('项目未获分配服务规格时，发布受理时就拒绝（套餐不可用），不打标签、不构建、不先运行数据迁移', async () => {
     servicePlanAllowed = false;
     manifestYaml = baseManifest('migrationCommand: [bun, run, db:migrate]\n    migration: { compatibility: expand-only, destructive: false, rollback: switch-back }');
+    const count = (await release.api.listReleases(owner, serviceId)).length, jobs = k8s.applied.filter((o) => o.kind === 'Job').length, deployments = k8s.applied.filter((o) => o.kind === 'Deployment').length;
     try {
-      const dto = await release.api.publish(owner, serviceId, { branch: 'main', version: 'patch' });
-      const before = k8s.applied.filter((o) => o.kind === 'Deployment').length;
-      await release.api.runPipelineStep(dto.id); await markJob(`build-${dto.id.replaceAll('-', '')}`, true); await release.api.runPipelineStep(dto.id);
-      expect(await release.api.getRelease(owner, dto.id)).toMatchObject({ status: 'failed', message: expect.stringContaining('未获分配服务规格') });
-      expect(k8s.applied.some((o) => o.metadata.name === `migrate-${dto.id.replaceAll('-', '')}`)).toBe(false);
-      expect(k8s.applied.filter((o) => o.kind === 'Deployment')).toHaveLength(before);
+      await expect(release.api.publish(owner, serviceId, { branch: 'main', version: 'patch' })).rejects.toMatchObject({ kind: 'precondition', message: expect.stringContaining('未获分配服务规格'), details: { code: 'plan-unavailable' } });
+      expect(await release.api.listReleases(owner, serviceId)).toHaveLength(count);
+      expect(k8s.applied.filter((o) => o.kind === 'Job')).toHaveLength(jobs);
+      expect(k8s.applied.filter((o) => o.kind === 'Deployment')).toHaveLength(deployments);
     } finally { servicePlanAllowed = true; }
   });
 

@@ -13,11 +13,14 @@ import { renderSlotEnv } from './pipelineEnv';
 
 const PROFILE_HINT = '在 crewstation.yaml 里改用现有档位后发布新版本，或请管理员恢复档位';
 
+/** 部署前检查读到的依赖：套餐与档位、运维副本覆盖、生产配置与数据连接、平台域名。 */
+export type DeployCheckDeps = Pick<ReleaseUseCaseDeps, 'plans' | 'uow' | 'config' | 'data' | 'settings'>;
+
 /**
  * Manifest 的 tasks.agentProfiles 引用的档位问题（RFC-006 §4.4）：不存在（档位被删）、是通用终端协议、写了 default 而平台没有默认档位。
  * 只看存在性与协议，不看测试状态。没有问题返回 undefined。
  */
-async function computeReason(deps: ReleaseUseCaseDeps, manifest: Manifest, projectId: ProjectId): Promise<PrecheckReason | undefined> {
+async function computeReason(deps: Pick<ReleaseUseCaseDeps, 'plans'>, manifest: Manifest, projectId: ProjectId): Promise<PrecheckReason | undefined> {
   const wanted = manifest.kind === 'DigitalWorker' ? [...new Set((manifest.spec.tasks?.agentProfiles ?? []).map((p) => p.compute))] : [];
   const found = await Promise.all(wanted.map(async (name) => {
     try { return { name, profile: await deps.plans.lookupComputeProfile(name, projectId), error: undefined }; }
@@ -35,27 +38,42 @@ async function computeReason(deps: ReleaseUseCaseDeps, manifest: Manifest, proje
 
 export interface SlotDeployPlan { readonly plan: ServicePlanDto; readonly replicas: number; readonly env: RenderedEnv }
 
+/** 要部署的是哪个项目、哪个服务（发布记录或发布受理前的一次提交）。 */
+export interface DeployTarget { readonly projectId: ProjectId; readonly serviceId: Release['serviceId'] }
+
 /**
  * 部署到某个槽之前的全部检查与环境渲染（统一预检的领域部分，RFC-025 设计 §5）：Manifest 按当前写法、套餐与副本（含运维覆盖）、
  * 算力档位、生产配置。有问题返回标准原因，不写任何东西；发布流水线据此把发布记为失败，重新部署据此直接拒绝（RFC-021 §4）。
  */
-export async function prepareSlotDeploy(deps: ReleaseUseCaseDeps, release: Release, svc: ResolvedService, manifest: Manifest, physical: PhysicalSlot): Promise<SlotDeployPlan | { readonly reason: PrecheckReason }> {
+export async function prepareSlotDeploy(deps: DeployCheckDeps, release: Release, svc: ResolvedService, manifest: Manifest, physical: PhysicalSlot): Promise<SlotDeployPlan | { readonly reason: PrecheckReason }> {
   // 发布记录里的 Manifest 是当时校验过的；平台之后收紧了写法的旧版本（如 RFC-001 之前的 driver／model）按当前写法说清原因，
   // 不带进后面的检查（2026-09-23 实机：demo 重新部署 v0.1.2 在读 compute 时 500）。
   const current = ManifestSchema.safeParse(manifest);
   if (!current.success) {
     return { reason: precheckReason('manifest-outdated', `${release.tag} 的 Manifest 不符合当前平台的写法，不能部署：${describeManifestFailure(current.error)}`, '发布记录里的 Manifest 随标签固定，请改好仓库里的 crewstation.yaml 后发布新版本') };
   }
-  const plan = await deps.plans.getServicePlan(manifest.spec.service.servicePlanId, release.projectId);
-  if (!plan) return { reason: precheckReason('plan-unavailable', `服务套餐 ${manifest.spec.service.servicePlanId} 不存在或已不对本项目开放`, '请管理员恢复套餐或把它开放给本项目，或在 crewstation.yaml 里换一个可用的套餐后发布新版本') };
+  return deployChecks(deps, release, svc, manifest, physical);
+}
+
+/** 按当前写法校验过的 Manifest 部署到某个槽之前的检查：套餐与副本（含运维覆盖）、算力档位、生产配置。 */
+const PLAN_HINT = '请管理员恢复套餐或把它开放给本项目，或在 crewstation.yaml 里换一个可用的套餐后发布新版本';
+
+export async function deployChecks(deps: DeployCheckDeps, target: DeployTarget, svc: ResolvedService, manifest: Manifest, physical: PhysicalSlot): Promise<SlotDeployPlan | { readonly reason: PrecheckReason }> {
+  let plan: ServicePlanDto | undefined;
+  // 套餐被收回（项目不再获准使用）时 project 模块直接拒绝：同样是套餐不可用，给同一个原因码。
+  try { plan = await deps.plans.getServicePlan(manifest.spec.service.servicePlanId, target.projectId); } catch (error) {
+    if (!isPlatformError(error)) throw error;
+    return { reason: precheckReason('plan-unavailable', error.message, PLAN_HINT) };
+  }
+  if (!plan) return { reason: precheckReason('plan-unavailable', `服务套餐 ${manifest.spec.service.servicePlanId} 不存在或已不对本项目开放`, PLAN_HINT) };
   if (manifest.spec.service.replicas > plan.maxReplicas) return { reason: precheckReason('replicas-over-plan', `副本数 ${manifest.spec.service.replicas} 超过套餐上限 ${plan.maxReplicas}`, '把 crewstation.yaml 里的 replicas 调到上限以内后发布新版本，或换更大的套餐') };
-  const replicas = await deps.uow.read.maintenance.override(release.serviceId, physical) ?? manifest.spec.service.replicas;
+  const replicas = await deps.uow.read.maintenance.override(target.serviceId, physical) ?? manifest.spec.service.replicas;
   if (replicas > plan.maxReplicas) return { reason: precheckReason('replicas-override-over-plan', `运维副本覆盖 ${replicas} 超过套餐上限 ${plan.maxReplicas}`, '请管理员调整或恢复发布配置') };
   // 算力档位有问题就不进部署（RFC-001、RFC-006），与引用不存在的服务套餐同等对待。
-  const profile = await computeReason(deps, manifest, release.projectId);
+  const profile = await computeReason(deps, manifest, target.projectId);
   if (profile) return { reason: profile };
   try {
-    return { plan, replicas, env: await renderSlotEnv(deps, { projectId: release.projectId, serviceId: release.serviceId, projectSlug: svc.slug, serviceName: svc.name, physical, manifest }) };
+    return { plan, replicas, env: await renderSlotEnv(deps, { projectId: target.projectId, serviceId: target.serviceId, projectSlug: svc.slug, serviceName: svc.name, physical, manifest }) };
   } catch (error) {
     if (isPlatformError(error)) return { reason: precheckReason('config-incomplete', error.message, '在项目设置里补齐生产组配置后重试') };
     throw error;

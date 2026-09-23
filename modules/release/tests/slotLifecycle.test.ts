@@ -29,7 +29,7 @@ const manifest = (migration = '{ compatibility: none, destructive: false, rollba
 
 async function fixture() {
   database = await createTestDatabase([eventbusMigrations, queueMigrations, releaseMigrations]);
-  const state = { now: new Date('2026-09-23T00:00:00.000Z'), yaml: manifest(), window: false, version: 0, rejectDryRun: undefined as string | undefined, rejectDeploy: undefined as string | undefined, planGone: false };
+  const state = { now: new Date('2026-09-23T00:00:00.000Z'), yaml: manifest() as string | undefined, window: false, version: 0, rejectDryRun: undefined as string | undefined, rejectDeploy: undefined as string | undefined, planGone: false, manifestRefs: [] as string[] };
   // API Server 的拒绝：dry-run（统一预检）与真正部署各自可以设一个原因，只针对 Deployment。
   const fake = createFakeK8sClient();
   const apply = (async (obj, options) => {
@@ -44,7 +44,7 @@ async function fixture() {
     // 负责人与管理员可以下线、推迟、重新部署、切流；开发者可以发布与查看（与 project 模块的角色表一致）。
     authorizer: { authorize: async (actor, _p, action) => { if ((action === 'manage-slots' || action === 'switch-traffic') && actor.userId !== owner.userId && !actor.isAdmin) throw forbidden(`角色 developer 不能执行 ${action}`); } },
     tagger: { createReleaseTag: async () => ({ tag: `v0.0.${++state.version}`, commitSha: `${state.version}`.padStart(40, 'a') }) },
-    repo: { readFile: async (_s, _r, path) => (path === 'crewstation.yaml' ? state.yaml : undefined), repositoryUrl: async () => ({ httpUrl: 'https://repo.invalid/lifecycle', credentialSecretName: 'lifecycle-git' }) },
+    repo: { readFile: async (_s, ref, path) => { if (path !== 'crewstation.yaml') return undefined; state.manifestRefs.push(ref); return state.yaml; }, repositoryUrl: async () => ({ httpUrl: 'https://repo.invalid/lifecycle', credentialSecretName: 'lifecycle-git' }) },
     services: { resolveServiceById: async () => ({ projectId, slug: 'lifecycle', name: 'lifecycle', namespace: ns }) },
     plans: { getServicePlan: async () => (state.planGone ? undefined : { id: '01a0bf5d-8f4b-781d-8b8e-bbbbc69c6c6a', name: 'small', cpu: '1', memory: '1Gi', maxReplicas: 3, description: '' }), lookupComputeProfile: async () => undefined, listComputeProfiles: async () => [] },
     config: { render: async () => ({ values: {}, version: 3 }), validate: async () => ({ missing: [] }) }, data: { envFor: async () => ({}) },
@@ -181,6 +181,25 @@ describe.skipIf(!available)('RFC-021 待命槽生命周期', () => {
     expect(await f.preview()).toMatchObject({ state: 'empty', offline: { releaseId: v1.id } });
   });
 
+  test('统一预检：发布受理时按要打标签的那次提交读 Manifest——不在、不是合法 YAML、写法不对都 412，不打标签、不登记发布', async () => {
+    const f = await fixture();
+    const sha = 'c'.repeat(40);
+    f.state.yaml = undefined;
+    await expect(f.release.api.publish(owner, serviceId, { branch: 'main', expectedCommitSha: sha, version: 'patch' })).rejects.toMatchObject({
+      kind: 'precondition', message: `main 的提交 cccccccc 上没有 crewstation.yaml。在仓库根目录提交 crewstation.yaml 后再发布`, details: { code: 'manifest-missing' },
+    });
+    expect(f.state.manifestRefs).toEqual([sha]);
+    f.state.yaml = 'spec: [unclosed';
+    await expect(f.release.api.publish(owner, serviceId, { branch: 'main', version: 'patch' })).rejects.toMatchObject({ kind: 'precondition', message: expect.stringContaining('分支 main 上的 crewstation.yaml 不是合法的 YAML'), details: { code: 'manifest-invalid' } });
+    expect(f.state.manifestRefs.at(-1)).toBe('main');
+    f.state.yaml = 'apiVersion: crewstation/v2\nkind: DigitalWorker\nspec: {}\n';
+    await expect(f.release.api.publish(owner, serviceId, { branch: 'main', version: 'patch' })).rejects.toMatchObject({ kind: 'precondition', message: expect.stringContaining('分支 main 上的 crewstation.yaml 无效'), details: { code: 'manifest-invalid', hint: '改好仓库里的 crewstation.yaml 并提交后再发布' } });
+    expect(f.state.version).toBe(0);
+    expect(await f.release.api.listReleases(owner, serviceId)).toEqual([]);
+    f.state.yaml = manifest();
+    expect((await f.publish()).status).toBe('ready');
+  });
+
   test('受理之后的部署失败记进发布记录：返回失败的发布，不抛 500；待验证槽记为失败', async () => {
     const f = await fixture();
     const v1 = await f.publish();
@@ -272,11 +291,9 @@ describe.skipIf(!available)('RFC-021 待命槽生命周期', () => {
     const f = await fixture();
     const v1 = await f.publish(); await f.goLive(v1);
     f.state.yaml = manifest('{ compatibility: destructive, destructive: true, rollback: blocked }');
-    const refused = await f.release.api.publish(owner, serviceId, { branch: 'main', version: 'minor' });
-    await f.release.api.runPipelineStep(refused.id);
-    await f.k8s.mergePatch(Resources.Job!, `build-${refused.id.replaceAll('-', '')}`, ns, { status: { succeeded: 1 } });
-    await f.release.api.runPipelineStep(refused.id);
-    expect(await f.release.api.getRelease(owner, refused.id)).toMatchObject({ status: 'failed', message: expect.stringContaining('只能在项目维护期间发布') });
+    // RFC-025 统一预检：不在维护窗口里时发布受理时就拒绝，不打标签、不登记发布。
+    await expect(f.release.api.publish(owner, serviceId, { branch: 'main', version: 'minor' })).rejects.toMatchObject({ kind: 'precondition', message: expect.stringContaining('只能在项目维护期间发布'), details: { code: 'maintenance-window-required' } });
+    expect(await f.release.api.listReleases(owner, serviceId)).toHaveLength(1);
     f.state.window = true;
     const v2 = await f.publish();
     expect(v2.status).toBe('ready');

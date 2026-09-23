@@ -19,6 +19,12 @@ test.skipIf(!available)('两个发布在打标时并行，首次部署也只登�
       services: { resolveServiceById: async () => ({ projectId, slug: 'demo', name: 'demo', namespace: 'cs-demo' }) },
       tagger: { createReleaseTag: async (_id, input) => { tags.push(input.version!); if (tags.length === 2) bothTagged(); await tagsReady; return { tag: input.version!, commitSha: 'a'.repeat(40) }; } },
       jobs: { enqueuePipelineStep: async (id) => { queued.push(id); } },
+      // 统一预检读得到一份合法的 Manifest、套餐与生产配置（RFC-025 设计 §5）。
+      repo: { readFile: async () => 'apiVersion: crewstation/v2\nkind: DigitalWorker\nspec:\n  service: { command: [bun], port: 3000, healthPath: /healthz, servicePlanId: 01a0bf5d-8f4b-781d-8b8e-bbbbc69c6c6a, replicas: 1 }\n', repositoryUrl: async () => ({ httpUrl: 'https://repo.invalid/demo', credentialSecretName: 'demo-git' }) },
+      plans: { getServicePlan: async () => ({ id: '01a0bf5d-8f4b-781d-8b8e-bbbbc69c6c6a', name: 'small', cpu: '1', memory: '1Gi', maxReplicas: 3, description: '' }), lookupComputeProfile: async () => undefined, listComputeProfiles: async () => [] },
+      maintenance: { open: async () => false },
+      config: { render: async () => ({ values: {}, version: 1 }), validate: async () => ({ missing: [] }) }, data: { envFor: async () => ({}) },
+      settings: { registryBase: 'registry', buildTimeoutSeconds: 10, deployTimeoutSeconds: 600, serviceDomain: 'svc.internal', userDomain: 'cs.localhost' },
     });
     const results = await Promise.allSettled(['v1.0.0', 'v1.1.0'].map((version) => publish(actor, serviceId, { branch: 'main', version })));
     expect(tags).toHaveLength(2); expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
