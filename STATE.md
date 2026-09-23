@@ -7,6 +7,32 @@
 
 基线三件套（v0.3.3）的第一轮实现已在本机 kind 集群上跑通并推上 main；**RFC-001（算力归平台）与 RFC-002（管理空间与租户空间分离）已实现、实跑确认并推上 main；RFC-004 已被 RFC-006 取代（Superseded）；RFC-006（算力档位合并运行环境、每个 Agent 一个 Pod）已实现、实机验收完毕并推上 main，已 Done（P1–P8、ADR-0005 与 I17–I19 待作者复核）；RFC-003 工作台已按设计附件完成并整体部署到本机，52／52 项 UX-AT 全部实机通过、本地 gate 与精确 SHA CI 通过，已 Done；RFC-005（OIDC／OAuth 2.0 公司登录）代码、测试与 OA-01…OA-31 实机验收全部完成，已 Done；RFC-007（开发环境 OAuth 2.0 一键换角色）代码、四角色 Chrome 实机验收、本地 gate 与精确 SHA CI 全部完成，已 Done**。
 
+## 删除项目级告警订阅，首版不做告警通知（2026-09-23，Design D61）
+
+作者问「运行与诊断 → 告警与通知」里的「添加订阅」是干什么的。答复：订阅只存通知对象与渠道（工作台通知或 Webhook），通知渠道一直待定（Q20），告警触发时平台只在 cs-controller 日志里写一行、从未投递；五种告警类型里也只有两种会触发。
+作者：「没用的话，就彻底删除这个功能和代码」。问答裁定：首版不做告警通知（Q20 关闭，E25 作废）；三种从未触发的类型一并删除；页签改名「告警」；流程「直接改＋回填」，提交、推送并部署本机。
+版本号：原先留给 RFC-023 的 v0.3.13／D61 由 crewstation-51 让出，RFC-023 的 T8 回填到时取下一个号。
+
+- **删了什么**（64bd5349）：
+  - observability：订阅表（迁移 0004 删表）、订阅仓储、三条订阅接口（`GET`／`PUT`／`DELETE /v1/projects/:id/alert-subscriptions`）、通知器端口。组合根里只写日志的告警通知器、项目权限 `manage-alerts` 一并删除。
+  - contracts／api-client：订阅 DTO 与三个客户端方法；`AlertType` 只留 `crash-loop`、`health-failing`。
+  - console：通知订阅卡片、两个弹窗、hook 与 42 条文案；负责人角色说明去掉「告警订阅」；页签「告警与通知」改名「告警」（英文 Alerts）。
+  - 保留：告警记录、每 30 秒的两槽健康巡检与自动恢复、告警详情跳到对应版本的日志。
+- **用例**：订阅表不存在、三条订阅接口 404 而同前缀的告警列表仍是 401（module）；客户端没有订阅方法（unit）；负责人和管理员都看不到「添加订阅」、页面不请求订阅接口（console）；e2e 改为断言告警页没有「添加订阅」，两处页签数组改名。
+- **顺手修**：RFC-013 升级用例模拟旧库时，把排在身份迁移之后的迁移也提前跑了。此前这些迁移都只加不删，所以一直没暴露；这次的删表迁移会让 0003 身份迁移去读一张已删掉的表。改为每个模块只跑到第一个 `resource_identity` 迁移为止，和真实的旧库一致。
+- **回填**（b8845804，基线 v0.3.13）：Design D61、D44、Q20、§1.2、§2.1、§3.1、§3.2、§4.2、§4.3、§5.7、§7.3、§11.3；Proposal R51 与 §0.2；Plan T0.12、T5.9、门槛 G5、AT-49、延后项；tech-evaluation E25；CLAUDE.md、repository-structure；RFC-003 design §2.5、RFC-020 proposal §4.5 各一条修订注记。历史记录（RFC-003 的 implementation 与 acceptance-audit、RFC-020 的 audit 与 acceptance、设计门检视）保留原样。
+- **门禁与 CI**：提交前在「60ef91b2＋本批」的干净导出上，check:static 通过，unit 484、module 1182（12 跳过）、console 796 条全过。
+- **CI**：64bd5349 的 [CI 35859654268](https://github.com/wangbinquan/CrewStation/actions/runs/35859654268) 与 b8845804 的 [CI 35859724746](https://github.com/wangbinquan/CrewStation/actions/runs/35859724746) 各项全绿（含 e2e 与 gate）。
+- **部署**（12:27–12:28Z）：镜像 `cs-control-plane:alerts-trim-20260923`、`cs-console:alerts-trim-20260923`，都用 `git archive b8845804` 构建，只含已提交代码。
+  - 迁移 Job `crewstation-migrate-alerts` 在 12:27:39Z 只执行了 `observability/0004_drop_alert_subscriptions.sql`（applied 1）。
+  - 随后滚 cs-api（12:28:02Z）、cs-controller（12:28:07Z）、console（12:28:44Z），都一次就绪，重启 0 次。
+  - RFC-023 的 72 小时观察：cs-api、cs-controller 的 Pod 在 12:28Z 换新（cs-controller 此前 11:30Z 已换过一次）。
+- **实机**：
+  - 删除前：订阅表存在但 0 行（本机没人存过订阅，不丢数据）；告警 20 条，全是「健康检查失败／已恢复」。不带身份请求 cs-api，`alerts` 与 `alert-subscriptions` 都回 401，说明订阅路由还在。
+  - 删除后：订阅表不存在；`alerts` 仍回 401，`alert-subscriptions` 的 GET 与 DELETE 都回 404；告警记录不变。
+  - dev-admin 在无头 Chrome（CDP 9333）打开演示项目的告警页（包 `index-Ddf05WAJ.js`）：六个页签依次是部署与运行形态、健康状态、日志、告警、事件投递、调用链回放；没有「添加订阅」和「通知订阅」，告警记录照常显示；页面无报错，核对完已关页。
+  - cs-controller 重启后一分钟内有 3 条 `task-runtime.native-execution` 重试（「Agent 执行环境操作尚未完成」），是执行环境的正常重试，第二次就完成，与本批无关。
+
 ## 运行与诊断拆回两个页签；重新部署 500、关掉的 CLI 又出现、概览 CLI 计数三处修复；RFC-025 统一资源管理中心在问答中（2026-09-23）
 
 作者实机连报四件事：「部署健康态和部署拓扑分成两个页签，把拓扑显示放第一个」；「开发容器都已经关闭了，在拓扑显示上还有一个开发会话存在，为什么没清理掉」；「部署待验证版本的时候，报内部错误无法部署」；「刚关闭的 cli 会话，切出开发界面再切回去，还会出现在原处，只是提示不可用，然后我还可以再关闭一次」。随后要求「整个系统要有一个统一的资源管理中心，来管理资源分配、释放、流量等等与 pod、容器、服务相关的生命周期管理，界面回显信息也是基于这个系统标准输出来的」。
