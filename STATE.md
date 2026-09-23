@@ -67,7 +67,7 @@
 - **等作者裁定**：开发会话释放时，要不要立即收回它的数据绑定（现在要等到期）。
 - **下一个 session 注意**：
   - 09-26 11:16Z 之后，核对 cs-api、cs-session、cs-controller、cs-events 的重启次数与日志里的 I16 特征行（`ERR_POSTGRES`、`JSON Parse error`、`Failed to read data`、`INVALID_MESSAGE`、`UNSUPPORTED_INTEGER`）。都为 0 才能把 DB-08 记为通过。
-  - 然后做 T8 回填：Design §3、tech-evaluation E04，基线版本取 v0.3.13，需要决策号取 D61，已与 crewstation-9c 对过。I16 关闭，RFC 置 Done。
+  - 然后做 T8 回填：Design §3、tech-evaluation E04。基线版本与决策号取 T8 当时的下一个号：v0.3.13／D61 已由 crewstation-f7 用于删除告警订阅，v0.3.12／D60 是 crewstation-9c 的网络插件预检。I16 关闭，RFC 置 Done。
   - 原生 SQL 读时间列得到字符串、int8 得到字符串，写新代码时照 dev-gotchas 那条来。
 
 ## 本机集群的网络插件换成 Calico：Runner 反复掉线的根因（2026-09-23）
