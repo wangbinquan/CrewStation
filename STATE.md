@@ -16,6 +16,7 @@
 - 用例：`releaseTimelinePage` 新增「标签卡是最后一张、不在 `<details>` 里、列出全部标签」；`projectResources` 改写项目信息用例（前两张卡是「项目信息」「源码仓库」、三行标签与值），新增开通未完成一条（夹具加 `noService` 开关）。改前均为红。
 - 第一批提交 `374cd64`，[CI 35801959757](https://github.com/wangbinquan/CrewStation/actions/runs/35801959757) 六项成功（`module` 作业各步骤均成功，GitHub 作业级状态停在 in_progress，`gate` 在它之后成功）；本机 console 从提交内容（`git archive`，不含工作树里并行会话的拓扑在制品）构建 `cs-console:tags-info-20260923` 并滚动，CDP 实机核对：发布页最后一张卡是「标签」、不在 `<details>` 里；项目信息页卡片顺序「项目信息／源码仓库／服务身份／域名与地址／配额与套餐」；1440 与 320 无横向溢出、无控制台错误；e2e `projectSettingsUx`＋`projectWorkspaceIa` 12/12。
 - 第二批（同类排查后作者全选）：环境变量卡页脚「版本历史」恢复 `h3` 标题直接展示；生产「生产配置与部署版本」卡直接列两槽快照对照（删掉 `config.impact.snapshots`）；参考面板放大形态「内嵌 Swagger」直接展示，`proxy` 只作初始代理；应用展示「检查保存后的效果」改为一张卡（只对能配置的人）。RFC-009 proposal §3.3／§3.4、design §3.1 与 RFC-020 proposal §4.7、design §7 加同日修订说明。用例 `configImpact`、`visibilitySettings` 各新增一条，`catalogDetail` 两条改写，改前均为红。行级折叠（行详情、ID、响应头）与集群、管理空间里的折叠未动。
+- 第二批提交 `44c5717`，[CI 35802957520](https://github.com/wangbinquan/CrewStation/actions/runs/35802957520) 六项成功。本机 console 滚到 `cs-console:unfold-20260923`（同样由 `git archive` 的提交内容构建），中间镜像 `cs-console:tags-info-20260923` 已从 docker 与节点删除。CDP 实机核对六处（版本历史、部署版本对照、检查保存后的效果、内嵌 Swagger、标签、项目信息）在 1440 与 320 下都直接展示、不在 `<details>` 里、无横向溢出、无控制台错误；e2e `projectSettingsUx`／`projectWorkspaceIa`／`capabilityDepth`／`apiInvocation` 21/21。
 - 本机全量 `bun run check`：静态检查全绿；未带 `CS_E2E_AUTH=dev-oidc` 时 e2e 32 条因拿不到管理员会话失败（本机密码登录自 09-20 关闭），与改动无关；工作台层 627/627（一次并跑偶发 `agentExecutionStreams`，单跑与重跑均绿）。
 
 ## 开发页「卡住、自己在到处跳」的实机排查（2026-09-23）
