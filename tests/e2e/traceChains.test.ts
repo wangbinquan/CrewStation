@@ -38,7 +38,9 @@ describe.skipIf(!session?.project)('调用链（运行与诊断）', () => {
         const fill = await page.eval<{ page: number; listBottom: number; asideBottom: number; aside: string; scroller: boolean }>(`(() => {
           const list = document.querySelector(${JSON.stringify(LIST)}), aside = [...document.querySelectorAll('section')].find((s) => s.querySelector('h2')?.textContent === '调用链详情').parentElement;
           const scroll = list.parentElement, col = list.closest('section').parentElement;
-          return { page: document.documentElement.scrollHeight - innerHeight, listBottom: col.getBoundingClientRect().bottom, asideBottom: aside.getBoundingClientRect().bottom,
+          const main = document.querySelector('main');
+          // 新旧外壳都成立：文档滚动（旧）与 main 独立滚动（2026-09-23 起宽屏外壳定高）两种多出来的高度都算。
+          return { page: Math.max(0, document.documentElement.scrollHeight - innerHeight) + Math.max(0, main.scrollHeight - main.clientHeight), listBottom: col.getBoundingClientRect().bottom, asideBottom: aside.getBoundingClientRect().bottom,
             aside: getComputedStyle(aside).overflowY, scroller: scroll.scrollHeight <= scroll.clientHeight + 1 || getComputedStyle(scroll).overflowY === 'auto' };
         })()`);
         expect(fill.page).toBeLessThanOrEqual(1);
