@@ -77,7 +77,7 @@ export function MaintenanceForm({ projectId, serviceId, current, actions, onClos
     {error ? <ActionNote tone="error">{error}</ActionNote> : null}
     <ActionRow>
       <Button type="submit" variant="primary" disabled={busy}>{t(busy ? 'release.maintenance.saving' : updating ? 'release.maintenance.submitUpdate' : 'release.maintenance.submitEnter')}</Button>
-      <Button disabled={busy} onClick={() => onClose()}>{t('release.maintenance.cancel')}</Button>
+      <Button variant="ghost" disabled={busy} onClick={() => onClose()}>{t('release.maintenance.cancel')}</Button>
     </ActionRow>
   </form>;
 }

@@ -55,6 +55,5 @@ function AdminMemberDirectory({ disabled, onSelect, error }: Pick<PickerProps, '
         if (user) onSelect({ userId: user.id, name: user.name, email: user.email, platformRole: user.platformRole });
       }}><option value="">{t('projects.members.userPlaceholder')}</option>{users.data?.items.map((user) => <option value={user.id} key={user.id}>{user.name} · {user.email}</option>)}</select>
     </FormField>
-    {users.isError ? <Button disabled={users.isFetching} onClick={() => { void users.refetch(); }}>{t('projects.members.refreshDirectory')}</Button> : null}
   </>;
 }

@@ -68,7 +68,7 @@ test('管理员仍可维护生产组；身份刷新失败保护草稿并禁写�
   expect(draft.value).toBe('保留的生产草稿'); expect(draft.closest('[hidden]')).not.toBeNull();
   await act(async () => { draft.closest('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); });
   await page.settle(); expect(f.writes).toHaveLength(0);
-  f.state.failIdentity = false; await click('重新检查权限'); await click('保存');
+  f.state.failIdentity = false; await page!.reread(); await click('保存');
   expect(f.writes).toHaveLength(1); expect(f.writes[0]?.path).toBe(`/v1/projects/${projectId}/config/production`);
 });
 

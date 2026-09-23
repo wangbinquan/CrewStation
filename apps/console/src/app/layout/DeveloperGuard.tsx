@@ -5,11 +5,9 @@ import { api } from '../../shared/api/client';
 import { queryKeys } from '../../shared/api/queryKeys';
 import { useApiQuery } from '../../shared/api/useApi';
 import { useT } from '../../shared/lib/useT';
-import { Button } from '../../shared/ui/Button';
 import { EmptyState } from '../../shared/ui/EmptyState';
 import { QueryStatus } from '../../shared/ui/QueryStatus';
 import { ButtonLink } from '../../shared/ui/navigation/ButtonLink';
-import { ActionRow } from '../../shared/ui/ActionRow';
 
 export function DeveloperGuard({ children }: { readonly children: ReactNode }) {
   const t = useT(), { projectId } = useParams({ strict: false });
@@ -21,10 +19,10 @@ export function DeveloperGuard({ children }: { readonly children: ReactNode }) {
   const allowed = !me.isPending && !me.error && !previewOnly && (me.data?.platformRole === 'developer' || me.data?.platformRole === 'admin');
   if (allowed && !visited) setVisitedUser(me.data!.id);
   if (!visited && !me.isPending && !me.error && previewOnly) return <Navigate to="/market" replace />;
-  const notice = me.isPending || me.error ? <><QueryStatus isPending={me.isPending} error={me.error} />
-    {me.error ? <Button onClick={() => void me.refetch()}>{t('admin.retryIdentity')}</Button> : null}</>
+  // 身份每 15 秒重读、读取失败自动重试，权限一旦恢复页面自己回来；这里不提供「重新检查」按钮（2026-09-23 裁定）。
+  const notice = me.isPending || me.error ? <QueryStatus isPending={me.isPending} error={me.error} />
     : !allowed ? <EmptyState title={t('development.denied')} description={t(visited ? 'development.suspended' : 'development.deniedHint')}
-      action={<ActionRow><ButtonLink to="/market">{t('nav.market')}</ButtonLink><Button onClick={() => void me.refetch()}>{t('admin.retryIdentity')}</Button></ActionRow>} /> : null;
+      action={<ButtonLink to="/market">{t('nav.market')}</ButtonLink>} /> : null;
   // Preserve existing drafts across a failed identity refresh; first-time visitors never mount protected content.
   return <>{notice}<div key={me.data?.id} hidden={!allowed} inert={!allowed} style={allowed ? { display: 'contents' } : undefined}>{allowed || visited ? children : null}</div></>;
 }

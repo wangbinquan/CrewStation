@@ -1,6 +1,4 @@
 import type { ReactElement, ReactNode } from 'react';
-import { PageRefresh } from './PageRefresh';
-import type { PageRefreshProps } from './PageRefresh';
 import styles from './PageHeader.module.css';
 
 export interface PageHeaderProps {
@@ -9,12 +7,11 @@ export interface PageHeaderProps {
   readonly description?: string | readonly string[];
   /** 标题下的元数据行（标识、状态、链接），由页面自己排版。 */
   readonly meta?: ReactNode;
+  /** 本页的主动作（标准尺寸，主按钮排最左）；页面数据自动重读，页头不放刷新按钮（2026-09-23 裁定）。 */
   readonly actions?: ReactNode;
-  /** 页头右侧的「读取于 ↻」；给了就是本页唯一的刷新入口。 */
-  readonly refresh?: PageRefreshProps;
 }
 
-export function PageHeader({ title, description, meta, actions, refresh }: PageHeaderProps): ReactElement {
+export function PageHeader({ title, description, meta, actions }: PageHeaderProps): ReactElement {
   const lines = description === undefined ? [] : typeof description === 'string' ? [description] : description;
   return (
     <header className={styles.header}>
@@ -27,7 +24,7 @@ export function PageHeader({ title, description, meta, actions, refresh }: PageH
         ))}
         {meta !== undefined ? <div className={styles.meta}>{meta}</div> : null}
       </div>
-      {actions !== undefined || refresh !== undefined ? <div className={styles.actions}>{actions}{refresh !== undefined ? <PageRefresh {...refresh} /> : null}</div> : null}
+      {actions !== undefined ? <div className={styles.actions}>{actions}</div> : null}
     </header>
   );
 }

@@ -31,7 +31,7 @@ test('概览：正式版本维护中有角标与原因，待验证卡写明自�
   expect(card('正式版本')).toContain('维护中'); expect(card('正式版本')).toContain('维护中：换库');
   expect(card('待验证版本')).toContain('前仍无人访问将自动下线'); expect(card('待验证版本')).not.toContain('维护中');
   f.item.slots.value[1] = { name: 'preview', active: false, state: 'empty', replicas: 0, readyReplicas: 0, host: 'preview.test', offline: { releaseId: previewRelease, tag: 'v1.0.1', at: time, reason: 'idle' } } as never;
-  await page.click('刷新');
+  await page.reread();
   expect(card('待验证版本')).toContain('已下线'); expect(card('待验证版本')).toContain('v1.0.1 已于'); expect(card('待验证版本')).toContain('长期无人访问，平台自动下线');
   expect(document.querySelector('a[href="//preview.test"]')).toBeNull();
 });

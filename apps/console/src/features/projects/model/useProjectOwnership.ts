@@ -12,10 +12,10 @@ export interface ProjectOwnership {
   readonly reload: () => Promise<unknown>;
 }
 
-/** 最新身份读取失败不沿用旧身份提供保存；保留草稿由各设置编辑器负责。 */
+/** 最新身份读取失败不沿用旧身份提供保存；保留草稿由各设置编辑器负责。身份每 15 秒由守卫重读，重读期间不算「不可用」。 */
 export function useProjectOwnership(projectId: string): ProjectOwnership {
   const me = useApiQuery(queryKeys.me(), () => api.me.get());
   const known = !me.isPending && !me.error, isAdmin = known && me.data?.isAdmin === true;
   const isOwner = known && (isAdmin || (me.data?.memberships ?? []).some((m) => m.projectId === projectId && m.role === 'owner'));
-  return { isAdmin, isOwner, unavailable: !known || me.isFetching, error: me.error, reload: me.refetch };
+  return { isAdmin, isOwner, unavailable: !known, error: me.error, reload: me.refetch };
 }

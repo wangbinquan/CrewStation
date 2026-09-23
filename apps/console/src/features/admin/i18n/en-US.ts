@@ -20,7 +20,6 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   "admin.users.hint": "Users use applications, developers create and develop projects, and administrators also manage the platform. Project membership determines access to individual projects and trials.",
 
   "admin.overview.hint": "Review pending work and manage projects, capabilities and runtime resources.",
-  "admin.retryIdentity": "Check permissions again",
   "admin.directory.title": "Project directory",
   "admin.directory.description": "Browse all project types and manage resources, shared templates, provisioning, members and lifecycle.",
   "admin.directory.search": "Name or slug",

@@ -31,9 +31,7 @@ export function RepositoryCard({ serviceId }: { readonly serviceId: string }): R
   return (
     <Card
       title={t('projects.repository.title')}
-      extra={binding === undefined ? undefined : (
-        <ExternalButtonLink size="small" href={binding.httpUrl}>{t('projects.repository.open')}</ExternalButtonLink>
-      )}
+      actions={binding === undefined ? undefined : <ExternalButtonLink href={binding.httpUrl}>{t('projects.repository.open')}</ExternalButtonLink>}
     >
       <QueryStatus isPending={repository.isPending} error={repository.error} loadingKey="projects.repository.loading" errorKey="projects.repository.error" />
       {facts.length > 0 ? <DefinitionList items={facts} /> : null}

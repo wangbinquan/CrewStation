@@ -11,6 +11,8 @@ export interface ConfirmationPanelProps {
   readonly cancelLabel: string;
   readonly busy?: boolean;
   readonly confirmDisabled?: boolean;
+  /** 不可撤销的动作：确认键红底白字。 */
+  readonly danger?: boolean;
   readonly onConfirm: () => void;
   readonly onCancel: () => void;
 }
@@ -34,7 +36,7 @@ function restoreFocus(target: HTMLElement | null): void {
  * 受控确认面板：先展示对象与检查材料，再由用户确认；用于需要异步预检的动作。
  * 打开时把焦点移到面板本身（读屏先读到问题，Tab 才到按钮，不会误按确认），关闭时焦点回到打开它的控件（RFC-003 UX-AT-26）。
  */
-export function ConfirmationPanel({ question, hint, children, confirmLabel, cancelLabel, busy = false, confirmDisabled = false, onConfirm, onCancel }: ConfirmationPanelProps): ReactElement {
+export function ConfirmationPanel({ question, hint, children, confirmLabel, cancelLabel, busy = false, confirmDisabled = false, danger = false, onConfirm, onCancel }: ConfirmationPanelProps): ReactElement {
   const root = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const active = document.activeElement instanceof HTMLElement && document.activeElement !== document.body ? document.activeElement : null;
@@ -49,8 +51,8 @@ export function ConfirmationPanel({ question, hint, children, confirmLabel, canc
       {hint !== undefined ? <p className={styles.hint}>{hint}</p> : null}
       {children}
       <div className={styles.actions}>
-        <Button variant="primary" onClick={onConfirm} disabled={busy || confirmDisabled}>{confirmLabel}</Button>
-        <Button onClick={onCancel} disabled={busy}>{cancelLabel}</Button>
+        <Button variant={danger ? 'dangerPrimary' : 'primary'} onClick={onConfirm} disabled={busy || confirmDisabled}>{confirmLabel}</Button>
+        <Button variant="ghost" onClick={onCancel} disabled={busy}>{cancelLabel}</Button>
       </div>
     </div>
   );

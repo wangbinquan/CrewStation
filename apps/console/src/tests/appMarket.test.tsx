@@ -124,7 +124,7 @@ describe('能力市场与负责人设置真实路由', () => {
   });
   test('最新设置读取失败时保留已经输入的草稿，不能把表单卸载清空', async () => {
     const f = fixture(true); page = await renderApp(`/projects/${projectId}/settings?tab=visibility`); await page.click('修改可见范围');
-    await input(scopeSelect(), 'authenticated'); f.queryFailure(); await page.click('读取最新设置');
+    await input(scopeSelect(), 'authenticated'); f.queryFailure(); await page.reread();
     expect(page.text()).toContain('暂时无法读取设置'); expect(scopeSelect().value).toBe('authenticated');
   });
 });

@@ -30,7 +30,6 @@ export function SelfCreateProject() {
   const key = `cs-project-draft:${me.data?.id ?? ''}`;
   return <><PageHeader title={t('projects.self.title')} description={t('projects.self.intro')} actions={<ButtonLink to="/projects">{t('projects.provision.backProjects')}</ButtonLink>} />
     <QueryStatus isPending={catalog.isPending} error={catalog.error} />
-    {catalog.error ? <Button onClick={() => void catalog.refetch()}>{t('projects.wizard.refreshCatalog')}</Button> : null}
     {catalog.data ? <p>{t('projects.self.resources', { plan: catalog.data.defaultServicePlan, count: catalog.data.maxConcurrentTasks })}</p> : null}
     {catalog.data?.templates.length === 0 ? <ActionNote tone="neutral">{t('projects.wizard.noTemplates')}</ActionNote> : null}
     <SelfCreationFields key={key} storageKey={key} userId={me.data?.id} userName={me.data?.name} templates={catalog.data?.templates ?? []} available={!me.error && (me.data?.platformRole === 'developer' || me.data?.platformRole === 'admin') && !!catalog.data && !catalog.error && !catalog.isFetching}

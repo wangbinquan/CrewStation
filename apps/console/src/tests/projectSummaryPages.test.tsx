@@ -60,7 +60,7 @@ describe('项目列表的真实分页与独立状态', () => {
     const f = summaryFixture(); f.meError = true; page = await renderApp('/projects');
     expect(page.text()).toContain('身份读取失败'); expect(page.text()).not.toContain('加载项目…'); expect(page.text()).not.toContain('本页 0 项');
     expect(f.calls.some((url) => url.startsWith('/v1/workbench/project-summaries'))).toBe(false);
-    f.meError = false; await page.click('重新检查权限'); expect(page.text()).toContain('数字助手 1');
+    f.meError = false; await page.reread(); expect(page.text()).toContain('数字助手 1');
   });
   test('紧凑列表只请求当前摘要页，基本信息可展开，未知健康不显示正常', async () => {
     const f = summaryFixture(); page = await renderApp('/projects');
@@ -95,15 +95,15 @@ describe('项目列表的真实分页与独立状态', () => {
     expect(page.text()).toContain('加载项目'); expect(page.text()).not.toContain('尚无项目'); page.unmount(); page = undefined;
     f.hang = false; f.empty = true; page = await renderApp('/projects'); expect(page.text()).toContain('尚无项目'); expect(page.text()).toContain('新建项目');
     await page.navigate('/projects?q=不存在'); expect(page.text()).toContain('没有符合条件的项目'); expect(page.text()).not.toContain('尚无项目');
-    f.error = true; await page.click('刷新项目'); expect(page.text()).toContain('摘要读取失败'); expect(page.text()).not.toContain('没有符合条件');
-    f.error = false; f.invalid = true; await page.click('刷新项目'); expect(page.text()).toContain('项目摘要格式无法确认'); expect(page.text()).not.toContain('尚无项目');
-    f.invalid = false; f.empty = false; await page.click('刷新项目'); expect(page.text()).toContain('数字助手 1');
+    f.error = true; await page.reread(); expect(page.text()).toContain('摘要读取失败'); expect(page.text()).not.toContain('没有符合条件');
+    f.error = false; f.invalid = true; await page.reread(); expect(page.text()).toContain('项目摘要格式无法确认'); expect(page.text()).not.toContain('尚无项目');
+    f.invalid = false; f.empty = false; await page.reread(); expect(page.text()).toContain('数字助手 1');
   });
   test('过期记录明确提示，读取失败后不保留可打开的旧试用地址，测试者无开发动作', async () => {
     const f = summaryFixture(); f.item.checkedAt = f.item.slots.checkedAt = '2020-01-01T00:00:00.000Z'; page = await renderApp('/projects');
     expect(page.text()).toContain('记录已过期'); expect(page.text()).not.toContain('打开试用');
     f.item = { ...f.item, role: 'tester' }; f.admin = false; f.item.development = { status: 'restricted', checkedAt: new Date().toISOString() };
-    await page.click('刷新项目'); expect(page.text()).toContain('preview 测试者'); expect(page.text()).not.toContain('开始开发'); expect(page.text()).not.toContain('继续开发');
+    await page.reread(); expect(page.text()).toContain('preview 测试者'); expect(page.text()).not.toContain('开始开发'); expect(page.text()).not.toContain('继续开发');
   });
 });
 
@@ -116,7 +116,7 @@ test.each(['列表', '概览'])('%s 的会话分支明确标为创建时记录�
   // 实机已切到 codex/rfc003-files，摘要仍显示创建时 main；不能把元数据冒充当前工作树。列表写明「创建时分支」，概览的会话卡只放分支名。
   expect(branch.parentElement?.textContent).toBe(view === '列表' ? '创建时分支：main' : 'main · 0 个 CLI');
   f.item.development.value = { ...session, branch: undefined };
-  await page.click(view === '列表' ? '刷新项目' : '刷新');
+  await page.reread();
   expect(page.text()).toContain(view === '列表' ? '创建时分支：分支未知' : '分支未知');
   // 列表不为分支文字追加容器工作树请求；概览的会话卡按 RFC-020 §4.2 读一次版本比较拿待上线与未提交数，但仍不读工作树状态。
   expect(f.calls.some((url) => url.includes('workspace-status'))).toBe(false);
@@ -136,8 +136,8 @@ describe('概览按实际状态选择下一步', () => {
     const openLinks = () => [...document.querySelectorAll('a[href="//formal.test"], a[href="//trial.test"]')].map((node) => node.textContent);
     expect(openLinks()).toEqual(['formal.test ↗', 'trial.test ↗', '打开正式应用', '打开试用']); expect(page.text()).toContain('共享生产数据');
     expect(page.text()).toContain('运行健康需要确认'); expect(document.querySelector('a[href*="operations?tab=status"]')).not.toBeNull();
-    f.item.slots.value[0]!.state = 'degraded'; await page.click('刷新'); expect(document.querySelector('a[href="//formal.test"]')).toBeNull();
-    f.error = true; await page.click('刷新'); expect(document.querySelector('a[href="//trial.test"]')).toBeNull(); expect(page.text()).toContain('上次读取的记录');
+    f.item.slots.value[0]!.state = 'degraded'; await page.reread(); expect(document.querySelector('a[href="//formal.test"]')).toBeNull();
+    f.error = true; await page.reread(); expect(document.querySelector('a[href="//trial.test"]')).toBeNull(); expect(page.text()).toContain('上次读取的记录');
     expect(document.querySelector('[data-primary-project-action]')).toBeNull();
   });
   test('开通失败给管理员或负责人具名恢复入口，普通开发成员只能联系管理员', async () => {
@@ -145,9 +145,9 @@ describe('概览按实际状态选择下一步', () => {
     page = await renderApp(`/projects/${f.item.project.id}`); expect(page.text()).toContain('模板缺少配置');
     const action = document.querySelector('[data-primary-project-action]') as HTMLAnchorElement;
     expect(action.textContent).toContain('查看开通问题'); expect(action.getAttribute('href')).toContain(`/admin/projects/${f.item.project.id}/provisioning`);
-    f.admin = false; f.item.role = 'owner'; await page.click('刷新');
+    f.admin = false; f.item.role = 'owner'; await page.reread();
     expect(document.querySelector('[data-primary-project-action]')?.getAttribute('href')).toBe(`/projects/${f.item.project.id}/provisioning`);
-    f.item.role = 'developer'; await page.click('刷新'); expect(document.querySelector('[data-primary-project-action]')).toBeNull(); expect(page.text()).toContain('联系管理员处理开通问题');
+    f.item.role = 'developer'; await page.reread(); expect(document.querySelector('[data-primary-project-action]')).toBeNull(); expect(page.text()).toContain('联系管理员处理开通问题');
   });
   test('最新发布失败直达该发布，次动作继续开发；没有会话时开始开发只导航', async () => {
     const f = summaryFixture(), time = new Date().toISOString();
@@ -156,7 +156,7 @@ describe('概览按实际状态选择下一步', () => {
     page = await renderApp(`/projects/${f.item.project.id}`);
     expect(document.querySelector('[data-primary-project-action]')?.textContent).toContain('处理 v1.0.2 发布问题');
     expect(document.querySelector('[data-primary-project-action]')?.getAttribute('href')).toContain('release=01a0bf5d-8f4b-7645-8cca-c128d59001d1');
-    f.item.releases = { status: 'ready', checkedAt: time, value: [] }; await page.click('刷新');
+    f.item.releases = { status: 'ready', checkedAt: time, value: [] }; await page.reread();
     expect(document.querySelector('[data-primary-project-action]')?.textContent).toContain('开始开发');
     await page.click('开始开发'); expect(page.path()).toBe(`/projects/${f.item.project.id}/dev-session`); expect(f.writes).toEqual([]);
   });
@@ -165,7 +165,7 @@ describe('概览按实际状态选择下一步', () => {
       taskId: '01a0bf5d-8f4b-7e52-8b45-4a547fd10e4f' as TaskId, state: 'running', connected: false, branch: 'main', createdAt: time, lastActivityAt: time } };
     page = await renderApp(`/projects/${f.item.project.id}`); expect(document.querySelector('[data-primary-project-action]')?.textContent).toContain('继续开发');
     expect(page.text()).toContain('会话运行中'); expect(page.text()).toContain('连接已断开'); expect(page.text()).toContain('运行健康需要确认');
-    f.error = true; await page.click('刷新'); expect(page.text()).toContain('摘要读取失败'); expect(document.querySelector('[data-primary-project-action]')).toBeNull();
+    f.error = true; await page.reread(); expect(page.text()).toContain('摘要读取失败'); expect(document.querySelector('[data-primary-project-action]')).toBeNull();
     expect(f.calls.some((url) => url.includes('/slots') || url.includes('/health'))).toBe(false);
   });
 });

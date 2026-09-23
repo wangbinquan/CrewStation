@@ -23,7 +23,7 @@ export function CreateProjectForm({ scope, onCreated }: { scope: CreationScope; 
   const fields = { draft, errors, catalog, scope, disabled: create.isPending, setField: state.setField };
   return <>
     <UnsavedChangesGuard dirty={state.dirty} scope={t(`projects.wizard.title.${scope}`)} />
-    <Card compact title={t(`projects.wizard.step${step + 1}`)} extra={<Button disabled={create.isPending || users.isFetching || templates.isFetching || plans.isFetching} onClick={() => { void Promise.all([users.refetch(), templates.refetch(), plans.refetch()]); }}>{t('projects.wizard.refreshCatalog')}</Button>}>
+    <Card compact title={t(`projects.wizard.step${step + 1}`)}>
     <ol className={styles.steps} aria-label={t('projects.wizard.steps')}>
       {[0, 1, 2].map((item) => <li key={item} aria-current={step === item ? 'step' : undefined}><Badge tone={step === item ? 'info' : 'neutral'}>{item + 1} · {t(`projects.wizard.step${item + 1}`)}</Badge></li>)}
     </ol>
@@ -35,8 +35,8 @@ export function CreateProjectForm({ scope, onCreated }: { scope: CreationScope; 
       {state.resultError ? <ActionNote tone="error">{state.resultError}</ActionNote> : null}
       {create.isPending ? <ActionNote tone="neutral">{t('projects.wizard.pendingNote')}</ActionNote> : null}
       <div className={styles.submit}>
-        {step > 0 ? <Button disabled={create.isPending} onClick={state.back}>{t('projects.wizard.back')}</Button> : null}
         <Button type="submit" variant="primary" disabled={create.isPending || !state.available}>{t(create.isPending ? 'projects.create.submitting' : step === 2 ? 'projects.create.submit' : 'projects.wizard.next')}</Button>
+        {step > 0 ? <Button disabled={create.isPending} onClick={state.back}>{t('projects.wizard.back')}</Button> : null}
       </div>
     </form>
   </Card></>;

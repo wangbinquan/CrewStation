@@ -26,7 +26,7 @@ export function MembersCard({ projectId, ownership }: MembersCardProps) {
   const { confirmation, ...editor } = useMemberPanel();
   const blocked = pending || unavailable || ownership.unavailable;
   const columns = [t('projects.members.columnName'), t('projects.members.columnEmail'), t('projects.members.columnRole'), t('projects.members.columnActions')];
-  return <Card stacked compact title={t('projects.members.title')} extra={<>{canManage ? <Button variant="primary" disabled={blocked} onClick={(event) => editor.select(null, event.currentTarget)}>{t('projects.members.add')}</Button> : null}<Button disabled={pending || members.isFetching} onClick={() => { void Promise.all([members.refetch(), ownership.reload()]); }}>{t('projects.members.refresh')}</Button></>}>
+  return <Card stacked compact title={t('projects.members.title')} extra={canManage ? <Button variant="primary" disabled={blocked} onClick={(event) => editor.select(null, event.currentTarget)}>{t('projects.members.add')}</Button> : undefined}>
     <QueryStatus isPending={members.isPending} error={ownership.error ?? members.error} loadingKey="projects.members.loading" errorKey="projects.members.error" />
     {ownership.error ? <ActionNote tone="neutral">{t('projects.members.identityUnconfirmed')}</ActionNote> : !canManage ? <p>{t('projects.members.readOnly')}</p> : null}
     {pending ? <ActionNote tone="neutral">{t('projects.members.pendingNote')}</ActionNote> : null}
@@ -34,7 +34,7 @@ export function MembersCard({ projectId, ownership }: MembersCardProps) {
     {items.length > 0 ? <DataTable columns={columns}>{items.map((member) => <tr key={member.userId}>
       <td>{member.name}</td><td>{member.email}</td>
       <td><Badge tone={member.role === 'owner' ? 'info' : 'neutral'}>{t(`projects.role.${member.role}`)}</Badge></td>
-      <td><ActionRow>{canManage && (member.role !== 'owner' || isAdmin) ? <Button variant="ghost" disabled={blocked} onClick={(event) => editor.select(member, event.currentTarget)}>{t('projects.members.editRole')}</Button> : null}{canManage && member.role !== 'owner' ? <InlineConfirm variant="ghost" label={t('projects.members.remove')} question={t('projects.members.removeQuestion', { name: member.name, email: member.email })} confirmLabel={t('projects.members.confirmRemove')} busy={pending || unavailable || ownership.unavailable} onConfirm={() => { void management.removeMember(member); }} /> : member.role === 'owner' ? t('projects.members.currentOwner') : null}</ActionRow></td>
+      <td><ActionRow>{canManage && (member.role !== 'owner' || isAdmin) ? <Button size="small" disabled={blocked} onClick={(event) => editor.select(member, event.currentTarget)}>{t('projects.members.editRole')}</Button> : null}{canManage && member.role !== 'owner' ? <InlineConfirm variant="danger" size="small" label={t('projects.members.remove')} question={t('projects.members.removeQuestion', { name: member.name, email: member.email })} confirmLabel={t('projects.members.confirmRemove')} busy={pending || unavailable || ownership.unavailable} onConfirm={() => { void management.removeMember(member); }} /> : member.role === 'owner' ? t('projects.members.currentOwner') : null}</ActionRow></td>
     </tr>)}</DataTable> : null}
     {save.isError ? <ActionNote tone="error">{t('projects.members.saveError', { message: errorMessage(save.error) })}</ActionNote> : null}
     {remove.isError ? <ActionNote tone="error">{t('projects.members.removeError', { message: errorMessage(remove.error) })}</ActionNote> : null}

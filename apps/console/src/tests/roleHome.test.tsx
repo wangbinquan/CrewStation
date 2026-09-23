@@ -160,7 +160,7 @@ test('开发身份刷新失败不丢自建草稿且暂停创建，恢复后仍�
   expect(field.value).toBe('保留输入'); expect(field.closest('[hidden]')).not.toBeNull();
   await act(async () => field.closest('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
   expect(f.calls.some((call) => call.method === 'POST')).toBe(false);
-  f.state.denied = false; await page.click('重新检查权限'); expect(document.querySelector<HTMLInputElement>('[name="name"]')?.value).toBe('保留输入');
+  f.state.denied = false; await page.reread(); expect(document.querySelector<HTMLInputElement>('[name="name"]')?.value).toBe('保留输入');
   expect(f.calls.some((call) => call.method === 'POST')).toBe(false);
 });
 

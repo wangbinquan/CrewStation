@@ -61,7 +61,7 @@ export function ReleaseTimeline({ projectId, serviceId, onSelect, onRedeploy }: 
     : entry.kind === 'switch' ? { id: entry.id, tone: 'info', shape: 'square', time: date(entry.at),
       primary: t(entry.rollback ? 'timeline.rollback' : 'timeline.switch', { actor: entry.actorName ?? t('timeline.unknownActor', { id: shortId(entry.entry.actorUserId) }), tag: entry.tag ?? t('timeline.unknownTag', { id: shortId(entry.entry.releaseId) }) }),
       secondary: entry.entry.reason ? t('timeline.reason', { reason: entry.entry.reason }) : undefined,
-      action: <Button variant="ghost" onClick={() => onSelect(entry.entry.releaseId)}>{t('release.timeline.details')}</Button> }
+      action: <Button size="small" onClick={() => onSelect(entry.entry.releaseId)}>{t('release.timeline.details')}</Button> }
     : lifecycleTimelineItem(entry, t, date));
   const loading = releases.isPending || switches.isPending;
   return <Card title={t('release.timeline.title')} extra={running ? <span className={styles.polling}>{t('release.history.polling')}</span> : undefined}>

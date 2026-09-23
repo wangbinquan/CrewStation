@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react';
-import { errorMessage } from '../api/useApi';
+import { errorMessage, retryableReadError } from '../api/useApi';
 import { useT } from '../lib/useT';
 import { EmptyState } from './EmptyState';
 import styles from './QueryStatus.module.css';
@@ -17,7 +17,7 @@ export interface QueryStatusProps {
   readonly emptyDescription?: string;
 }
 
-/** 读操作的载入中／失败／为空三态；都不成立时返回 null，由调用方接着渲染内容。 */
+/** 读操作的载入中／失败／为空三态；都不成立时返回 null，由调用方接着渲染内容。网络中断与 5xx 会自动重读（useApiQuery），失败文案后面说明这一点，不给重试按钮。 */
 export function QueryStatus({
   isPending,
   error,
@@ -33,7 +33,7 @@ export function QueryStatus({
   if (error !== null && error !== undefined) {
     return (
       <p className={styles.error} role="alert">
-        {t(errorKey, { message: errorMessage(error) })}
+        {t(errorKey, { message: errorMessage(error) })}{retryableReadError(error) ? ` ${t('ui.status.autoRetry')}` : ''}
       </p>
     );
   }

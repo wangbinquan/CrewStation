@@ -97,7 +97,7 @@ test('管理身份读取失败可重试；身份撤销后移除管理内容且�
   const f = adminDirectoryFixture(); page = await renderApp('/admin/projects'); f.state.identityError = true;
   await page.click('刷新项目目录'); expect(page.text()).toContain('管理身份离线');
   expect([...document.querySelectorAll('a')].filter((node) => !node.closest('[hidden]')).some((node) => node.textContent?.includes('管理项目 0'))).toBe(false);
-  f.state.identityError = false; await page.click('重新检查权限'); expect(page.text()).toContain('管理项目 0');
+  f.state.identityError = false; await page.reread(); expect(page.text()).toContain('管理项目 0');
   f.state.admin = false; const before = f.calls.filter((c) => c.url.pathname === '/v1/projects/page').length;
   await page.click('刷新项目目录'); expect(page.text()).toContain('仅平台管理员可见'); expect(page.text()).not.toContain('管理项目 0');
   expect(f.calls.filter((c) => c.url.pathname === '/v1/projects/page')).toHaveLength(before); expect(f.writes()).toHaveLength(0);

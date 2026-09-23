@@ -77,16 +77,5 @@
   font-size: var(--cs-font-size-sm);
 }
 
-/* 新窗口打开的外部地址：末尾的 ↗ 由样式生成，不进链接文字；支持替代文本的浏览器读屏也不念。 */
-.external {
-  column-gap: var(--cs-space-1);
-}
-
-.external::after {
-  content: '↗';
-  content: '↗' / '';
-  font-size: 0.9em;
-  opacity: 0.8;
-}
 
 .button[hidden] { display: none; }

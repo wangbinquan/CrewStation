@@ -51,6 +51,8 @@ export interface RenderedApp {
   /** 点击第一个文本匹配的按钮或链接；找不到就抛，免得断言在「什么都没发生」上通过。 */
   readonly click: (label: string) => Promise<void>;
   readonly settle: () => Promise<void>;
+  /** 模拟一次自动重读：页面上正在用的查询在原位重读（生产里由定时重读与回到前台补读完成，页面没有刷新按钮）。 */
+  readonly reread: () => Promise<void>;
   readonly unmount: () => void;
 }
 
@@ -93,6 +95,7 @@ export async function renderApp(initialPath: string, previousPath?: string, hist
       await settle();
     },
     settle,
+    reread: async () => { await act(async () => { await queryClient.refetchQueries({ type: 'active' }); }); await settle(); },
     unmount: () => {
       act(() => root.unmount());
       host.remove();

@@ -2,7 +2,6 @@ import { createLink } from '@tanstack/react-router';
 import type { ComponentPropsWithRef, ReactElement } from 'react';
 import type { ButtonSize, ButtonVariant } from '../Button';
 import { buttonClassName } from '../Button';
-import styles from '../Button.module.css';
 
 interface ButtonAnchorProps extends ComponentPropsWithRef<'a'> {
   readonly variant?: ButtonVariant;
@@ -21,7 +20,10 @@ function ButtonAnchor({ variant, size, className, ...rest }: ButtonAnchorProps):
  */
 export const ButtonLink = createLink(ButtonAnchor);
 
-/** 新窗口打开外部地址的按钮样式链接，末尾由样式带 ↗（不进文字、读屏不念），文案里不要再写。 */
-export function ExternalButtonLink({ className, ...props }: Omit<ButtonAnchorProps, 'target' | 'rel'> & { readonly href: string }): ReactElement {
-  return <ButtonAnchor target="_blank" rel="noreferrer" className={[styles.external, className].filter(Boolean).join(' ')} {...props} />;
+/**
+ * 新窗口打开外部地址的按钮样式链接。2026-09-23 作者裁定：按钮上不放＋、箭头这类非正式符号，原先样式生成的 ↗ 去掉；
+ * 文案本身说清去向（「打开正式应用」「在 GitLab 中打开」）。
+ */
+export function ExternalButtonLink(props: Omit<ButtonAnchorProps, 'target' | 'rel'> & { readonly href: string }): ReactElement {
+  return <ButtonAnchor target="_blank" rel="noreferrer" {...props} />;
 }

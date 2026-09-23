@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { Link } from '@tanstack/react-router';
 import { useProjectScope } from '../../../shared/project/ProjectScope';
 import { PROJECT_PATHS } from '../../../shared/project/projectPaths';
@@ -11,7 +12,7 @@ import type { PublishSource } from '../../../shared/project/releaseSearch';
 import type { PublishPreparation } from '../model/usePublishPreparation';
 import { ButtonLink } from '../../../shared/ui/navigation/ButtonLink';
 
-export function PublishSourceFields({ preparation: p, onSource }: { readonly preparation: PublishPreparation; readonly onSource: (source: PublishSource) => void }) {
+export function PublishSourceFields({ preparation: p, onSource, close }: { readonly preparation: PublishPreparation; readonly onSource: (source: PublishSource) => void; readonly close: ReactNode }) {
   const t = useT(), { projectId, space } = useProjectScope(), query = p.source === 'session' ? p.workspace : p.branches;
   const workspace = p.workspace.data;
   return <>
@@ -33,6 +34,6 @@ export function PublishSourceFields({ preparation: p, onSource }: { readonly pre
       </> : null}
       <ButtonLink to={PROJECT_PATHS[space].development} params={{ projectId }} search={p.sessionMissing ? {} : { view: 'diff' }}>{t(p.sessionMissing ? 'release.prepare.enterDevelopment' : 'release.prepare.openDevelopment')}</ButtonLink>
     </>}
-    <Button variant="primary" disabled={p.busy || !p.canPublish} onClick={() => void p.check()}>{t(p.checking ? 'release.prepare.checking' : 'release.prepare.check')}</Button>
+    <ActionRow><Button variant="primary" disabled={p.busy || !p.canPublish} onClick={() => void p.check()}>{t(p.checking ? 'release.prepare.checking' : 'release.prepare.check')}</Button>{close}</ActionRow>
   </>;
 }

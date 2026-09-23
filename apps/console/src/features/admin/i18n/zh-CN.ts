@@ -19,7 +19,6 @@ export const messages = {
   "admin.users.hint": "用户使用应用；开发者创建和开发项目；管理员同时管理平台。项目成员决定具体的开发或试用范围。",
 
   "admin.overview.hint": "处理当前待办，管理项目、能力供给和运行资源。",
-  "admin.retryIdentity": "重新检查权限",
   "admin.directory.title": "项目目录",
   "admin.directory.description": "查看所有类型的项目，管理资源配置、共享规格模板、开通、成员和生命周期。",
   "admin.directory.search": "名称或标识",

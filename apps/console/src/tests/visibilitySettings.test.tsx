@@ -26,7 +26,7 @@ test('身份或任一设置读取失败都会暂停写入，保留两份输入�
   const f = visibilitySettingsFixture(); page = await renderApp(visibilitySettingsRoute);
   await editSetting(page, '市场可见范围', 'authenticated'); await editSetting(page, '应用用途', '不能丢失的用途');
   for (const failure of ['app-visibility', 'app-presentation', 'me'] as const) {
-    f.state.failure = failure; await clickSetting(page, '读取最新设置');
+    f.state.failure = failure; await page.reread();
     expect(page.text()).toContain('最新设置暂不可读取');
     expect(settingsField('市场可见范围').value).toBe('authenticated'); expect(settingsField('应用用途').value).toBe('不能丢失的用途');
     // 旧表单只禁用保存中按钮，仍可按失败前的旧查询结果发出保存。
@@ -34,7 +34,7 @@ test('身份或任一设置读取失败都会暂停写入，保留两份输入�
     else { expect(settingsButton('保存可见范围').disabled).toBe(true); expect(settingsButton('保存展示资料').disabled).toBe(true); }
     await act(async () => { for (const label of ['市场可见范围', '应用用途']) settingsForm(label).dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); });
     await page.settle(); expect(f.writes).toHaveLength(0);
-    f.state.failure = ''; await clickSetting(page, failure === 'me' ? '重新检查权限' : '读取最新设置');
+    f.state.failure = ''; await page.reread();
     expect(settingsButton('保存可见范围').disabled).toBe(false); expect(settingsButton('保存展示资料').disabled).toBe(false);
   }
   expect(f.writes).toHaveLength(0); await clickSetting(page, '保存展示资料'); expect(f.writes).toHaveLength(1);
@@ -81,10 +81,10 @@ test('保存中的重复 submit 只写一次；明确离开不会撤销请求，
 test('负责人身份变化后保留可检查的草稿并停止保存，恢复后继续；初始只读用户不出现编辑入口', async () => {
   const f = visibilitySettingsFixture(); page = await renderApp(visibilitySettingsRoute);
   await editSetting(page, '应用用途', '角色变化前的草稿'); await editSetting(page, '市场可见范围', 'authenticated');
-  f.state.role = 'developer'; f.state.visibility = { ...f.state.visibility, canConfigure: false }; await clickSetting(page, '读取最新设置');
+  f.state.role = 'developer'; f.state.visibility = { ...f.state.visibility, canConfigure: false }; await page.reread();
   expect(settingsField('应用用途').value).toBe('角色变化前的草稿'); expect(settingsButton('保存展示资料').disabled).toBe(true); expect(settingsButton('保存可见范围').disabled).toBe(true);
   await page.click('高级'); expect(page.search().tab).toBe('visibility'); await clickSetting(page, '继续编辑');
-  f.state.role = 'owner'; f.state.visibility = { ...f.state.visibility, canConfigure: true }; await clickSetting(page, '读取最新设置');
+  f.state.role = 'owner'; f.state.visibility = { ...f.state.visibility, canConfigure: true }; await page.reread();
   await clickSetting(page, '保存展示资料'); expect(f.writes[0]!.input.description).toBe('角色变化前的草稿');
   page.unmount(); page = undefined; f.state.role = 'developer'; f.state.visibility = { ...f.state.visibility, canConfigure: false };
   page = await renderApp(visibilitySettingsRoute); expect(document.querySelector('textarea')).toBeNull(); expect(settingsButton('保存展示资料')).toBeUndefined();

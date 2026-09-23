@@ -139,7 +139,7 @@ test('来源或标签目录失败可恢复，失败不当作无分支，标签�
   f.state.failBranches = false; await click('检查发布来源'); await click('确认版本');
   f.state.failTags = true; await page.navigate(`/projects/${projectId}`); await page.navigate(`/projects/${projectId}/release?source=repository`); await review();
   expect(page.text()).toContain('标签读取失败'); const submit = [...document.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent === '确认发布到待验证版本')!; expect(submit.disabled).toBe(true);
-  f.state.failTags = false; await click('重读标签'); expect(page.text()).toContain('v0.1.2'); expect(submit.disabled).toBe(false); expect(f.writes).toHaveLength(0);
+  f.state.failTags = false; await page.reread(); expect(page.text()).toContain('v0.1.2'); expect(submit.disabled).toBe(false); expect(f.writes).toHaveLength(0);
 });
 
 test('在途只提交一次，离开后的回执不会把用户拉回发布页；错误服务回执不标成功', async () => {
@@ -165,7 +165,7 @@ test('关闭准备与切项目先确认，取消保留草稿；测试者不能�
 test('指定的未知发布不替换为最新记录；详情与日志保持管理空间和精确 ID', async () => {
   const f = fixture(); f.state.admin = true; f.state.kind = 'APIProxy'; f.state.releaseMissing = true;
   page = await renderApp(`/admin/integrations/${projectId}/release?release=${releaseId}`); expect(page.text()).toContain('发布记录不存在'); expect(page.text()).not.toContain('v0.1.2');
-  f.state.releaseMissing = false; await click('刷新发布'); expect(page.text()).toContain('排队中');
+  f.state.releaseMissing = false; await page.reread(); expect(page.text()).toContain('排队中');
   await page.click('本次迁移日志'); expect(page.path()).toBe(`/admin/integrations/${projectId}/operations`); expect(page.search()).toMatchObject({ tab: 'logs', source: 'migration', releaseId });
 });
 

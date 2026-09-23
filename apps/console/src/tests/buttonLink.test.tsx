@@ -47,15 +47,15 @@ test('按钮样式链接：仍是带真实地址的 <a>，外观与同档位按�
   expect(rendered!.host.textContent).toContain('审批列表');
 });
 
-test('外部地址：新窗口打开且不带来源，↗ 由样式生成、不进链接文字', async () => {
+test('外部地址：新窗口打开且不带来源；按钮上不再有样式生成的 ↗（2026-09-23 裁定）', async () => {
   await render();
   const external = anchor('打开正式应用');
   expect(external.getAttribute('href')).toBe('//formal.test');
   expect(external.getAttribute('target')).toBe('_blank');
   expect(external.getAttribute('rel')).toBe('noreferrer');
-  expect(external.className.split(' ')).toEqual(['button', 'secondary', 'small', 'external']);
+  expect(external.className.split(' ')).toEqual(['button', 'secondary', 'small']);
   const css = sourceAt(consoleStyles(), 'shared/ui/Button.module.css').code;
-  expect(css).toMatch(/\.external::after \{[^}]*content: '↗' \/ '';/);
+  expect(css).not.toContain('↗');
   // 全局 a:hover 会给链接加下划线；按钮样式链接必须自己关掉。
   expect(css).toMatch(/\.button:hover \{\s*text-decoration: none;/);
 });

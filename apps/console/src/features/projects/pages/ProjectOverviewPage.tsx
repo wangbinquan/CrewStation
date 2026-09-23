@@ -24,15 +24,15 @@ import styles from '../components/summary/ProjectSummary.module.css';
 import { ButtonLink } from '../../../shared/ui/navigation/ButtonLink';
 
 /**
- * 项目概览一屏（RFC-020 D4）：页头（身份、主动作、读取于）→ 仓库与两个地址 → 只在需要处理时出现的横幅 → 三张状态卡 → 形态 → 最近动态。
+ * 项目概览一屏（RFC-020 D4）：页头（身份、主动作）→ 仓库与两个地址 → 只在需要处理时出现的横幅 → 三张状态卡 → 形态 → 最近动态。
  * 成员、配额、归档都不在这里；地址与仓库的家是项目设置 → 项目信息，这里只放链接。
  */
 export function ProjectOverviewPage(): ReactElement {
   const t = useT();
   const { projectId, space } = useProjectScope();
-  const identity = useProjectIdentity(projectId), { me, query, refresh, refreshing } = useProjectSummary(projectId);
+  const identity = useProjectIdentity(projectId), { me, query } = useProjectSummary(projectId);
   const error = me.error ?? query.error, item = [401, 403, 404].includes(error?.status ?? 0) ? undefined : query.data;
-  const project = item?.project ?? identity.data, available = !error && !query.isPending && !refreshing;
+  const project = item?.project ?? identity.data, available = !error && !query.isPending;
   const tester = item?.role === 'tester', serviceId = project?.serviceId;
   const repository = useApiQuery(queryKeys.repository(serviceId ?? ''), async () => { const parsed = RepositoryBindingDtoSchema.safeParse(await api.services.getRepository(serviceId!)); if (!parsed.success) throw new Error(t('projects.repository.error', { message: t('projects.summary.invalid') })); return parsed.data; }, { enabled: !!serviceId && !!item && !tester });
   const members = useApiQuery(queryKeys.members(projectId), () => api.projects.listMembers(projectId), { enabled: !!item && !tester });
@@ -53,7 +53,6 @@ export function ProjectOverviewPage(): ReactElement {
           </div> : null}
         </> : undefined}
         actions={item ? <ProjectSummaryActions item={item} space={space} available={available} /> : undefined}
-        refresh={{ readAt: item?.checkedAt, onRefresh: () => void refresh(), refreshing }}
       />
       {project?.state === 'failed' && project.message !== undefined ? <p className={styles.failure} role="alert">{t('projects.list.failureLabel')}{project.message}</p> : null}
       <QueryStatus isPending={!error && (me.isPending || query.isPending)} error={error} loadingKey="projects.overview.loading" errorKey="projects.overview.error" />

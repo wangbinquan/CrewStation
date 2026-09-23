@@ -29,12 +29,28 @@
   flex-wrap: wrap;
 }
 
-.compact > .header, .compact > .body, .compact > .footer { padding: var(--cs-space-2) var(--cs-space-3); }
+.compact > .header, .compact > .body, .compact > .actions, .compact > .footer { padding: var(--cs-space-2) var(--cs-space-3); }
 .compact > .header { flex-wrap: wrap; gap: var(--cs-space-2); }
 
 .body {
   padding: var(--cs-space-4);
   flex: 1;
+}
+
+/* 对象卡片的底部操作条：一条细线隔开，按钮靠左排、可换行。 */
+.actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--cs-space-2);
+  padding: var(--cs-space-3) var(--cs-space-4);
+  border-top: 1px solid var(--cs-color-border);
+}
+
+/* 操作条里的按钮都隐藏时（例如编辑表单打开时藏起的「修改」），整条连同分隔线一起不显示。 */
+.actions:empty,
+.actions:not(:has(> :not([hidden]))) {
+  display: none;
 }
 
 .footer {

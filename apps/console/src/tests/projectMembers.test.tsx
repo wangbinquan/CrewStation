@@ -107,10 +107,10 @@ test('在途请求锁住身份、角色和全部成员变更；读取失败保�
   await page.click('移除'); await page.click('添加或改角色'); await page.click('确认移除'); await page.click('保存中'); await page.click('更换成员');
   expect(f.writes()).toHaveLength(1); expect(role().disabled).toBe(true); expect(page.text()).toContain('已选择 小林');
   await act(async () => { finish(); }); await page.settle(); f.state.hold = undefined;
-  await page.click('取消'); await selectMember(); f.state.failRead = true; await page.click('刷新成员');
+  await page.click('取消'); await selectMember(); f.state.failRead = true; await page.reread();
   expect(page.text()).toContain('成员读取失败'); expect(page.text()).toContain('已选择 小林');
   await page.click('添加或改角色'); expect(f.writes()).toHaveLength(1); expect(role().disabled).toBe(true);
-  f.state.failRead = false; await page.click('刷新成员'); expect(role().disabled).toBe(false);
+  f.state.failRead = false; await page.reread(); expect(role().disabled).toBe(false);
   await page.click('添加或改角色'); expect(f.writes()).toHaveLength(2);
 });
 
@@ -165,12 +165,12 @@ test('成员草稿：未完成查找和已选角色都保护离开，取消导�
 
 test('成员草稿：身份读取失败或角色撤销后保留目标和角色，暂停变更，恢复后再显式保存', async () => {
   const f = fixture(); page = await renderApp(`/projects/${projectId}/settings?tab=members`); if (f.state.role !== 'developer' || f.state.admin) await page.click('添加成员'); await selectMember(); await input(role(), 'tester');
-  f.state.failIdentity = true; await page.click('刷新成员');
+  f.state.failIdentity = true; await page.reread();
   expect(page.text()).toContain('当前身份读取失败'); expect(role().disabled).toBe(true); expect(role().value).toBe('tester'); expect(page.text()).toContain('已选择 小林');
   await act(async () => { role().closest('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); }); await page.settle(); expect(f.writes()).toHaveLength(0);
-  f.state.failIdentity = false; f.state.role = 'developer'; await page.click('重新检查权限');
+  f.state.failIdentity = false; f.state.role = 'developer'; await page.reread();
   expect(role().value).toBe('tester'); expect(role().disabled).toBe(true); await page.click('高级'); expect(page.search().tab).toBe('members'); await page.click('继续编辑');
-  f.state.role = 'owner'; await page.click('刷新成员'); expect(role().disabled).toBe(false); expect(f.writes()).toHaveLength(0);
+  f.state.role = 'owner'; await page.reread(); expect(role().disabled).toBe(false); expect(f.writes()).toHaveLength(0);
   await page.click('添加或改角色'); expect(f.writes()[0]?.body).toEqual({ userId: memberId, role: 'tester' });
 });
 
@@ -187,12 +187,12 @@ test('成员草稿：在途保存保护离开，重复 submit 不增加写入，
 test('成员草稿：转移确认期间失去管理员身份仍保留材料，但负责人角色本身不足以继续转移', async () => {
   const f = fixture(); f.state.admin = true; page = await renderApp(`/projects/${projectId}/settings?tab=members`); if (f.state.role !== 'developer' || f.state.admin) await page.click('添加成员');
   await selectMember(); await input(role(), 'owner'); await page.click('添加或改角色');
-  f.state.admin = false; await page.click('刷新成员');
+  f.state.admin = false; await page.reread();
   expect(page.text()).toContain('将负责人从负责人甲转移给小林');
   // 旧确认只检查可管理成员；管理员降为项目负责人后仍显示可提交的转移按钮。
   const confirm = [...document.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent === '确认转移负责人')!;
   expect(confirm.disabled).toBe(true); await page.click('确认转移负责人'); expect(f.writes()).toHaveLength(0);
-  f.state.admin = true; await page.click('刷新成员'); await page.click('确认转移负责人');
+  f.state.admin = true; await page.reread(); await page.click('确认转移负责人');
   expect(f.writes()[0]?.body).toEqual({ userId: memberId, role: 'owner' });
 });
 

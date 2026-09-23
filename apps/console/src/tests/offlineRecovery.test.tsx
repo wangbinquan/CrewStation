@@ -24,7 +24,7 @@ test('断网时解释读取暂停，保留搜索草稿与焦点，联网后读�
   // 实机 Offline 后刷新会暂停，原页面却只显示上次的空态，没有解释暂停原因。
   expect(page.text()).toContain('当前离线，读取已暂停'); expect(page.text()).toContain('已有数据可能过期');
   expect(document.activeElement).toBe(field); expect(field.value).toBe('尚未查询的草稿');
-  await page.click('刷新项目'); expect(f.calls).toHaveLength(before); expect(page.text()).toContain('数字助手 1');
+  await page.reread(); expect(f.calls).toHaveLength(before); expect(page.text()).toContain('数字助手 1');
   f.item.project.name = '联网后读取的新项目'; await connection(true);
   expect(page.text()).toContain('联网后读取的新项目'); expect(page.text()).not.toContain('当前离线');
   expect(field.value).toBe('尚未查询的草稿'); expect(page.search().q).toBe(''); expect(f.writes).toEqual([]);

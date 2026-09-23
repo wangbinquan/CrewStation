@@ -4,8 +4,6 @@
 .tagButton:hover:not(:disabled) { background: transparent; color: var(--cs-color-primary); }
 .meta { display: flex; flex-wrap: wrap; gap: var(--cs-space-1) var(--cs-space-3); color: var(--cs-color-text-muted); font-size: var(--cs-font-size-sm); }
 .meta code { overflow-wrap: anywhere; }
-.footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--cs-space-2); margin-top: var(--cs-space-1); padding-top: var(--cs-space-3); border-top: 1px solid var(--cs-color-border); }
-.host { color: var(--cs-color-text-muted); overflow-wrap: anywhere; }
-.actions { display: inline-flex; align-items: center; flex-wrap: wrap; gap: var(--cs-space-2); }
+.host { margin: 0; color: var(--cs-color-text-muted); overflow-wrap: anywhere; }
 .note { margin: 0; color: var(--cs-color-text-muted); font-size: var(--cs-font-size-sm); }
 .notice { margin: 0; font-size: var(--cs-font-size-sm); overflow-wrap: anywhere; }

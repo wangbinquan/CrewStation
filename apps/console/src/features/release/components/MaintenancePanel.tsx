@@ -10,7 +10,6 @@ import { useT } from '../../../shared/lib/useT';
 import { shortId } from '../../../shared/project/releaseTimeline';
 import type { useServiceMaintenance } from '../../../shared/project/useServiceMaintenance';
 import { ActionNote } from '../../../shared/ui/ActionNote';
-import { ActionRow } from '../../../shared/ui/ActionRow';
 import { Badge } from '../../../shared/ui/Badge';
 import { Button } from '../../../shared/ui/Button';
 import { Card } from '../../../shared/ui/Card';
@@ -56,16 +55,18 @@ export function MaintenancePanel({ projectId, serviceId, canManage, actions, mai
     </Card>;
   }
   if (!current) return error || done ? <div className={styles.panel}>{notes}</div> : null;
-  return <Card compact title={t('release.maintenance.activeTitle')} extra={<Badge tone="warning">{t('slot.maintenance.badge')}</Badge>}>
+  // 维护是一个对象：调整、退出放在卡片底部操作条（2026-09-23 裁定）。
+  const manage = canManage ? <>
+    <Button disabled={!!actions.busy} onClick={() => { setDone(undefined); onEditing(true); }}>{t('release.maintenance.adjust')}</Button>
+    <InlineConfirm label={t('release.maintenance.exit')} busy={exiting || !!actions.busy} {...(exiting ? { busyLabel: t('release.maintenance.exiting') } : {})}
+      question={t('release.maintenance.exitQuestion')} confirmLabel={t('release.maintenance.exitConfirm')} onConfirm={() => void exit(current.revision)} />
+  </> : undefined;
+  return <Card compact title={t('release.maintenance.activeTitle')} extra={<Badge tone="warning">{t('slot.maintenance.badge')}</Badge>} actions={manage}>
     <div className={styles.panel}>
       <MaintenanceFacts projectId={projectId} current={current} checkedAt={query.dataUpdatedAt} />
       {fullMaintenanceWindow(current.switches) ? <p className={styles.muted}>{t('release.maintenance.fullWindow')}</p> : null}
       {current.switches.events ? <p className={styles.muted}>{t('release.maintenance.eventsHeld')}</p> : null}
-      {canManage ? <ActionRow>
-        <Button disabled={!!actions.busy} onClick={() => { setDone(undefined); onEditing(true); }}>{t('release.maintenance.adjust')}</Button>
-        <InlineConfirm label={t('release.maintenance.exit')} busy={exiting || !!actions.busy} {...(exiting ? { busyLabel: t('release.maintenance.exiting') } : {})}
-          question={t('release.maintenance.exitQuestion')} confirmLabel={t('release.maintenance.exitConfirm')} onConfirm={() => void exit(current.revision)} />
-      </ActionRow> : <p className={styles.muted}>{t('release.maintenance.ownerOnly')}</p>}
+      {canManage ? null : <p className={styles.muted}>{t('release.maintenance.ownerOnly')}</p>}
       {notes}
     </div>
   </Card>;

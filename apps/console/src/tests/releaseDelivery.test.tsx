@@ -47,9 +47,9 @@ test('负责人回退仅指向仍部署的较旧发布；迁移拒绝保留说�
 
 test('已确认目标被替换或读取失败时确认失效，重新核对才接受新目标', async () => {
   const f = releaseDeliveryFixture(); page = await renderApp(`/projects/${projectId}/release`); await check();
-  f.state.failSlots = true; await click('刷新部署版本'); expect(page.text()).toContain('确认后的部署已变化或无法读取'); expect(button('确认上线 v1.1.0')?.disabled).toBe(true);
+  f.state.failSlots = true; await page!.reread(); expect(page.text()).toContain('确认后的部署已变化或无法读取'); expect(button('确认上线 v1.1.0')?.disabled).toBe(true);
   expect(document.querySelector('a[href="//preview.demo.cs.localhost"]')).toBeNull();
-  f.state.failSlots = false; f.state.slots[1] = { ...f.state.slots[1]!, releaseId: f.releases[2]!.id, tag: 'v0.9.0', commitSha: 'c'.repeat(40) }; await click('刷新部署版本');
+  f.state.failSlots = false; f.state.slots[1] = { ...f.state.slots[1]!, releaseId: f.releases[2]!.id, tag: 'v0.9.0', commitSha: 'c'.repeat(40) }; await page!.reread();
   expect(button('确认上线 v1.1.0')?.disabled).toBe(true); expect(f.writes).toHaveLength(0);
   await click('重新核对两个版本'); expect(page.text()).toContain('正式版本 v1.0.0 → v0.9.0'); await click('确认回退至 v0.9.0'); expect(f.writes[0]?.body.expectedTargetRelease).toBe(historyId);
 });
@@ -84,8 +84,8 @@ test('重复发布在途阻止切换；受理发布后保留切换说明且无�
 
 test('错误发布身份、未知槽与无副本都不可试用或切换；错误回执不显示成功', async () => {
   const f = releaseDeliveryFixture(); page = await renderApp(`/projects/${projectId}/release`); f.state.badRelease = true; await check(); expect(page.text()).toContain('部署记录与发布身份不一致'); expect(button('确认上线 v1.1.0')).toBeUndefined();
-  f.state.badRelease = false; f.state.slots[1]!.readyReplicas = 0; await click('刷新部署版本'); expect(action()?.disabled).toBe(true); expect(document.querySelector('a[href="//preview.demo.cs.localhost"]')).toBeNull();
-  f.state.slots[1]!.readyReplicas = 1; await click('刷新部署版本'); await check(); f.state.mismatch = true; await click('确认上线 v1.1.0'); expect(page.text()).toContain('返回的切换对象无法确认'); expect(page.text()).not.toContain('已登记正式版本切换');
+  f.state.badRelease = false; f.state.slots[1]!.readyReplicas = 0; await page!.reread(); expect(action()?.disabled).toBe(true); expect(document.querySelector('a[href="//preview.demo.cs.localhost"]')).toBeNull();
+  f.state.slots[1]!.readyReplicas = 1; await page!.reread(); await check(); f.state.mismatch = true; await click('确认上线 v1.1.0'); expect(page.text()).toContain('返回的切换对象无法确认'); expect(page.text()).not.toContain('已登记正式版本切换');
 });
 
 test('开发者可准备发布但无切换按钮，测试者无发布权；管理员保持管理空间，概览不再重复切流', async () => {

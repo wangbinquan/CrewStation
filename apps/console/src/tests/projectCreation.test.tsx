@@ -112,9 +112,9 @@ test('目录暂时失败保留输入但不能创建；恢复后选择仍在，�
   const f = fixture(); page = await renderApp('/admin/projects/new?scope=integration');
   await field('name', '接入'); await field('slug', 'billing'); await field('ownerUserId', userId); await page.click('下一步');
   await field('template', '01a0bf5d-8f4b-7003-9dbe-4adc78f388e9'); await field('plan', '01a0bf5d-8f4b-76b5-8a28-f084e91fddf4');
-  f.state.catalogFailure = true; await page.click('重新读取目录'); expect(page.text()).toContain('模板目录离线');
+  f.state.catalogFailure = true; await page.reread(); expect(page.text()).toContain('模板目录离线');
   await page.click('下一步'); expect(f.writes()).toHaveLength(0); expect(document.querySelector<HTMLSelectElement>('[name="template"]')!.value).toBe('01a0bf5d-8f4b-7003-9dbe-4adc78f388e9');
-  f.state.catalogFailure = false; await page.click('重新读取目录'); await page.click('上一步'); await field('kind', 'EventProducer'); await page.click('下一步');
+  f.state.catalogFailure = false; await page.reread(); await page.click('上一步'); await field('kind', 'EventProducer'); await page.click('下一步');
   expect(document.querySelector<HTMLSelectElement>('[name="template"]')!.value).toBe('');
   expect(document.querySelector('[name="template"] option[value="01a0bf5d-8f4b-7003-9dbe-4adc78f388e9"]')).toBeNull();
   expect(document.querySelector('[name="template"] option[value="01a0bf5d-8f4b-7004-9cf7-0eb8bf66ffbc"]')).not.toBeNull();
@@ -125,10 +125,10 @@ test('开通失败可补生产配置与排队重试；202 和 active 都不冒�
   expect(page.text()).toContain('缺少 GITLAB_TOKEN'); f.state.retryFailure = true; await page.click('重新开通'); expect(page.text()).toContain('排队失败');
   f.state.retryFailure = false; await page.click('重新开通'); expect(page.text()).toContain('排队成功不代表开通已完成'); expect(page.text()).toContain('开通失败');
   await page.click('补充生产配置'); expect(page.path()).toBe(`/admin/integrations/${projectId}/settings`); expect(page.search()).toMatchObject({ tab: 'config', env: 'production' });
-  await page.navigate(`/admin/projects/${projectId}/provisioning`); f.state.projectFailure = true; await page.click('刷新开通状态');
+  await page.navigate(`/admin/projects/${projectId}/provisioning`); f.state.projectFailure = true; await page.reread();
   expect(page.text()).toContain('状态暂时无法读取'); expect(document.querySelectorAll('button')).not.toHaveLength(0);
   expect([...document.querySelectorAll('button')].some((button) => button.textContent === '重新开通')).toBe(false);
-  f.state.projectFailure = false; f.state.status = 'active'; await page.click('刷新开通状态');
+  f.state.projectFailure = false; f.state.status = 'active'; await page.reread();
   expect(page.text()).toContain('首个版本的构建与部署结果'); await page.click('查看发布与上线'); expect(page.path()).toBe(`/admin/integrations/${projectId}/release`);
 });
 
@@ -164,9 +164,9 @@ test('创建草稿：返回管理入口和切换创建类型先确认，取消�
 test('创建草稿：目录和创建失败不清除离开保护，空白向导可直接返回', async () => {
   const f = fixture(); page = await renderApp('/admin/projects/new');
   await page.click('返回管理总览'); expect(page.path()).toBe('/admin'); await page.navigate('/admin/projects/new'); await readyToCreate();
-  f.state.catalogFailure = true; await page.click('重新读取目录'); await page.click('返回管理总览');
+  f.state.catalogFailure = true; await page.reread(); await page.click('返回管理总览');
   expect(page.path()).toBe('/admin/projects/new'); await page.click('继续编辑');
-  f.state.catalogFailure = false; await page.click('重新读取目录'); f.state.createFailure = true; await page.click('创建项目');
+  f.state.catalogFailure = false; await page.reread(); f.state.createFailure = true; await page.click('创建项目');
   await page.click('返回管理总览'); expect(page.path()).toBe('/admin/projects/new'); await page.click('继续编辑');
   expect(document.querySelector<HTMLInputElement>('[name="name"]')?.value).toBe('新数字人'); expect(f.writes()).toHaveLength(1);
   f.state.createFailure = false; await field('slug', 'retry-worker'); await page.click('下一步'); await page.click('下一步'); await page.click('创建项目');
