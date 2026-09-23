@@ -14,11 +14,13 @@ export interface SplitButtonProps extends Omit<ButtonProps, 'children'> {
 
 /** 主键＋展开：主键按记住的选项直接执行，箭头展开可换选项（RFC-020 §4.3 的「＋ CLI ▾」）。 */
 export function SplitButton({ label, menuLabel, menu, menuDisabled = false, variant = 'primary', className, ...rest }: SplitButtonProps): ReactElement {
+  const caret = [styles.caret, styles[variant], menuDisabled ? styles.caretDisabled : ''].filter(Boolean).join(' ');
   return <span className={[styles.split, className].filter(Boolean).join(' ')}>
     <Button variant={variant} className={styles.main} {...rest}>{label}</Button>
-    <details className={styles.menu}>
-      <summary className={[styles.caret, styles[variant], menuDisabled ? styles.caretDisabled : ''].filter(Boolean).join(' ')} title={menuLabel} aria-label={menuLabel} aria-disabled={menuDisabled}>▾</summary>
+    {/* 置灰时箭头是 disabled 的按钮：和主键一样点不了、不进 Tab 顺序，已经展开的菜单随之收起。 */}
+    {menuDisabled ? <button type="button" className={caret} title={menuLabel} aria-label={menuLabel} disabled>▾</button> : <details className={styles.menu}>
+      <summary className={caret} title={menuLabel} aria-label={menuLabel}>▾</summary>
       <div className={styles.body}>{menu}</div>
-    </details>
+    </details>}
   </span>;
 }

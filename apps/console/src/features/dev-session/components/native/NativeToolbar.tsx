@@ -40,9 +40,11 @@ export function NativeToolbar({ projectId, taskId, layout, store, native, canSta
   const tab = layout.tabs.find((tab) => tab.id === layout.activeTabId)!;
   const nameInvalid = rename !== null && (!rename.trim() || rename.trim().length > 40);
   const starting = native.start.isPending || native.retryingOriginal;
+  // 环境未就绪、正在创建、档位读不到、工作区已满时展开也帮不上，箭头与主键一起置灰；只有档位被阻断时箭头保持可用——换档位要靠它。
+  const unavailable = !canStart || native.start.isPending || profiles.isPending || profiles.isError || tab.paneOrder.length >= 32;
   return <>
     <SplitButton label={t(native.start.isPending ? 'devSession.agents.starting' : native.retryingOriginal ? 'devSession.native.retryStart' : 'devSession.native.add')} menuLabel={t('devSession.native.startOptions')}
-      disabled={!canStart || native.start.isPending || profiles.isPending || profiles.isError || block !== undefined || tab.paneOrder.length >= 32} onClick={() => native.launch(compute, permission)}
+      disabled={unavailable || block !== undefined} menuDisabled={unavailable} onClick={() => native.launch(compute, permission)}
       menu={<>
         <label>{t('devSession.agents.compute')}<select aria-label={t('devSession.agents.compute')} value={compute} disabled={starting} onChange={(event) => store.update((value) => ({ ...value, preferredCompute: event.target.value || undefined }))}><ComputeOptions items={items} /></select></label>
         <label>{t('devSession.agents.permission')}<select aria-label={t('devSession.agents.permission')} value={permission} disabled={starting} onChange={(event) => setPermission(event.target.value as AgentPermission)}>{AGENT_PERMISSIONS.map((p) => <option key={p} value={p}>{t(`devSession.agentPermission.${p}`)}</option>)}</select></label>
