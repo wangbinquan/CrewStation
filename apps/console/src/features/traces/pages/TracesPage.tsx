@@ -1,4 +1,5 @@
 import type { TraceSource, TraceStatus, TraceWindow } from '@crewstation/contracts';
+import { useRef } from 'react';
 import type { ReactElement } from 'react';
 import { TraceDetail } from '../components/TraceDetail';
 import { TraceListCard } from '../components/TraceListCard';
@@ -23,13 +24,19 @@ const toSearch = (filters: TraceFilters): TracesSearch => ({
  * 可粘贴 trace_id 直接打开），右边是选中那条的分层回放；窄时列表在上、详情在下。
  */
 export function TracesPage({ projectId, search, onChange }: { readonly projectId: string; readonly search: TracesSearch; readonly onChange: (next: TracesSearch, replace?: boolean) => void }): ReactElement {
-  const filters = filtersFromSearch(search);
+  const filters = filtersFromSearch(search), aside = useRef<HTMLDivElement>(null);
+  const open = (traceId: string) => {
+    onChange({ ...toSearch(filters), traceId });
+    // 窄屏时详情排在列表下面，选中后屏幕上看不到变化：把详情滚进视野。宽屏左右并排时不动。
+    const detail = aside.current, list = detail?.previousElementSibling;
+    if (detail && list && detail.getBoundingClientRect().top >= list.getBoundingClientRect().bottom - 1) detail.scrollIntoView({ block: 'start', behavior: 'smooth' });
+  };
   return <div className={styles.host}>
     <div className={styles.columns}>
       <TraceListCard projectId={projectId} filters={filters} selected={search.traceId}
         onFilters={(next) => onChange({ ...(search.traceId ? { traceId: search.traceId } : {}), ...toSearch(next) }, true)}
-        onOpen={(traceId) => onChange({ ...toSearch(filters), traceId })} />
-      <div className={styles.aside}><TraceDetail projectId={projectId} traceId={search.traceId} /></div>
+        onOpen={open} />
+      <div ref={aside} className={styles.aside}><TraceDetail projectId={projectId} traceId={search.traceId} /></div>
     </div>
   </div>;
 }

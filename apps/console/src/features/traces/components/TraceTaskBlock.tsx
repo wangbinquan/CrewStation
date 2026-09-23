@@ -42,7 +42,8 @@ export function TraceTaskBlock({ projectId, traceId, task, names }: TraceTaskBlo
       <Badge tone={statusTone(task.status)}>{t(`traces.status.${task.status}`)}</Badge>
     </div>
     <p className={styles.facts}>{facts.map((fact) => <span key={fact} className={styles.factPart}>{fact}</span>)}</p>
-    {task.message && task.status === 'failed' ? <p className={styles.error}>{task.message}</p> : null}
+    {/* 环境备注只在环境本身失败时才是原因（如 OOMKilled）；正常释放时它是「released: business」这类内部记录，子任务失败也不靠它说明。 */}
+    {task.message && task.state === 'failed' ? <p className={styles.error}>{task.message}</p> : null}
     {task.status === 'running' ? <ActionRow>
       <ButtonLink size="small" to={PROJECT_PATHS[space].operations} params={{ projectId }} search={{ tab: 'logs', source: task.kind === 'dev-session' ? 'dev-session' : 'business-task', taskId: task.taskId }}>{t('traces.task.logs')}</ButtonLink>
       {task.kind === 'dev-session' ? <ButtonLink size="small" to={PROJECT_PATHS[space].development} params={{ projectId }}>{t('traces.task.openDev')}</ButtonLink> : null}

@@ -25,7 +25,7 @@ const older = TraceSummaryDtoSchema.parse({ traceId: olderTrace, status: 'ended'
 const businessChain: TraceChainDto = TraceChainDtoSchema.parse({
   traceId: eventTrace, status: 'failed', startedAt: '2026-09-23T10:20:00.000Z', lastActivityAt: '2026-09-23T10:21:00.000Z', sources: ['event', 'business-task'],
   event: { deliveryId: '01a0bf5d-8f4b-7e66-8b45-4a547fd10e4f', eventId: '01a0bf5d-8f4b-7e67-8b45-4a547fd10e4f', eventType: 'gitlab.push', state: 'delivered', attempts: 1, createdAt: '2026-09-23T10:20:00.000Z', deliveredAt: '2026-09-23T10:20:01.000Z' },
-  tasks: [{ taskId: businessTask, kind: 'business', state: 'released', status: 'failed', createdAt: '2026-09-23T10:20:02.000Z', lastActivityAt: '2026-09-23T10:21:00.000Z', endedAt: '2026-09-23T10:21:00.000Z',
+  tasks: [{ taskId: businessTask, kind: 'business', state: 'released', status: 'failed', createdAt: '2026-09-23T10:20:02.000Z', lastActivityAt: '2026-09-23T10:21:00.000Z', endedAt: '2026-09-23T10:21:00.000Z', message: 'released: business',
     business: { state: 'closed', callerIdentity: 'team-knowledge/team-knowledge', closedAt: '2026-09-23T10:21:00.000Z' },
     executions: [{ taskId: subtaskRun, purpose: 'subtask', agentId: 'agent-1', profileName: 'coding-medium', protocol: 'opencode', status: 'failed', startedAt: '2026-09-23T10:20:03.000Z', endedAt: '2026-09-23T10:20:50.000Z',
       subtaskId: '01a0bf5d-8f4b-7e68-8b45-4a547fd10e4f', sessionIds: ['ses_3f2a9d0c11'], events: 3 }],
@@ -41,6 +41,13 @@ const sessionChain: TraceChainDto = TraceChainDtoSchema.parse({
 /** 满满一页（50 条）：两条真实形态的链加 48 条已结束的会话，末尾给游标。 */
 const fullPage = [...rows, ...Array.from({ length: 48 }, (_, i) => TraceSummaryDtoSchema.parse({ traceId: (i + 1).toString(16).padStart(32, '0'), status: 'ended', startedAt: '2026-09-22T09:00:00.000Z',
   lastActivityAt: '2026-09-22T09:10:00.000Z', sources: ['dev-session'], devSession: { clis: 0, agents: 0 } }))];
+
+const lostTrace = 'd'.repeat(32);
+const lostChain: TraceChainDto = TraceChainDtoSchema.parse({
+  traceId: lostTrace, status: 'failed', startedAt: '2026-09-22T08:00:00.000Z', lastActivityAt: '2026-09-22T08:30:00.000Z', sources: ['dev-session'],
+  tasks: [{ taskId: '01a0bf5d-8f4b-7e69-8b45-4a547fd10e4f', kind: 'dev-session', state: 'failed', status: 'failed', createdAt: '2026-09-22T08:00:00.000Z', lastActivityAt: '2026-09-22T08:30:00.000Z',
+    endedAt: '2026-09-22T08:30:00.000Z', message: '开发容器被 OOMKilled', executions: [], subtasks: [] }],
+});
 
 interface FixtureOptions { readonly list?: 'rows' | 'full' | 'empty' | 'error' | 'partial' }
 function fixture(options: FixtureOptions = {}) {
@@ -61,6 +68,7 @@ function fixture(options: FixtureOptions = {}) {
       else body = { items: rows };
     } else if (url.pathname === `/v1/projects/${projectId}/traces/${eventTrace}`) body = businessChain;
     else if (url.pathname === `/v1/projects/${projectId}/traces/${sessionTrace}`) body = sessionChain;
+    else if (url.pathname === `/v1/projects/${projectId}/traces/${lostTrace}`) body = lostChain;
     else if (url.pathname === `/v1/projects/${projectId}/traces/${eventTrace}/executions/${subtaskRun}/events`) body = cursor
       ? { items: [{ seq: 9, at: '2026-09-23T10:20:50.000Z', kind: 'agent', type: 'error', error: '额度用尽' }] }
       : { items: [{ seq: 1, at: '2026-09-23T10:20:04.000Z', kind: 'agent', type: 'tool-start', tool: { name: 'bash' } }, { seq: 2, at: '2026-09-23T10:20:10.000Z', kind: 'agent', type: 'text', text: '分析完成' }], nextCursor: '2' };
@@ -155,6 +163,32 @@ describe('调用链回放', () => {
     const logs = [...document.querySelectorAll<HTMLAnchorElement>('a')].find((a) => a.textContent === '日志')!;
     expect(new URL(logs.href, 'http://localhost').search).toBe(`?tab=logs&source=dev-session&taskId=${sessionTask}`);
     expect([...document.querySelectorAll('a')].some((a) => a.textContent === '打开开发页')).toBe(true);
+  });
+
+  test('环境备注只在环境本身失败时显示：正常释放的内部备注不显示，容器失败的原因显示', async () => {
+    fixture(); page = await renderApp(operations(`&traceId=${eventTrace}`));
+    // 2026-09-23 实机：子任务失败的业务任务下面多出一行「released: business」，那是环境正常释放时的内部备注。
+    expect(page.text()).toContain('输出不符合契约'); expect(page.text()).not.toContain('released: business');
+    page.unmount(); page = await renderApp(operations(`&traceId=${lostTrace}`));
+    expect(page.text()).toContain('开发容器被 OOMKilled');
+  });
+
+  test('窄屏（详情排在列表下面）选中一条后把详情滚进视野；宽屏左右并排时不滚', async () => {
+    fixture(); page = await renderApp(operations());
+    const scrolled: Element[] = [], original = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = function (this: Element) { scrolled.push(this); };
+    try {
+      // happy-dom 没有布局：按实机 390px 与 1440px 的相对位置注入列表与详情的边框。
+      const list = document.querySelector('[aria-label="本应用的调用链"]')!.closest('section')!, aside = list.nextElementSibling!;
+      const rect = (top: number, bottom: number) => () => new DOMRect(0, top, 300, bottom - top);
+      list.getBoundingClientRect = rect(0, 900); aside.getBoundingClientRect = rect(912, 1400);
+      // 只比较数量与同一性：对 happy-dom 节点做 toEqual，失败时序列化节点会让整套用例像卡死（dev-gotchas）。
+      await page.click('开发会话 · 小林');
+      expect(scrolled.length).toBe(1); expect(scrolled[0] === aside).toBe(true); expect(page.search().traceId).toBe(sessionTrace);
+      aside.getBoundingClientRect = rect(0, 600);
+      await page.click('事件 gitlab.push → 业务任务');
+      expect(scrolled.length).toBe(1); expect(page.search().traceId).toBe(eventTrace);
+    } finally { Element.prototype.scrollIntoView = original; }
   });
 
   test('本项目里没有这条链时写明原因（可能属于别的项目）', async () => {
