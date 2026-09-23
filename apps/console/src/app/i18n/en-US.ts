@@ -11,6 +11,7 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   'ui.progress.total': '{time} total',
   'ui.progress.position': '{index}/{total}',
   'ui.progress.log': 'View container log',
+  'ui.progress.logPending': 'Collecting the container log…',
   'ui.progress.duration.seconds': '{value} s',
   'ui.progress.duration.minutes': '{minutes} min {seconds} s',
   'ui.progress.state.pending': 'Not started',

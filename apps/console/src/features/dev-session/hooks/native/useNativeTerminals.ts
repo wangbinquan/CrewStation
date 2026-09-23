@@ -6,9 +6,9 @@ import { useApiMutation, useApiQuery } from '../../../../shared/api/useApi';
 import type { TaskStreamChannel } from '../useTaskStream';
 import type { StreamState } from '../../model/taskStreamSocket';
 import { creatorClaims } from '../../model/native/creatorClaims';
-import { stampReceived } from '../../../../shared/ui/progress/stageProgressView';
+import { progressPollMs, stampReceived } from '../../../../shared/ui/progress/stageProgressView';
 
-/** 有 CLI 在启动时每秒读一次名册（RFC-022 B9）：执行容器连上之前没有任何推送，阶段靠读；其余时候 10 秒。 */
+/** 有 CLI 在启动时每秒读一次名册（RFC-022 B9）：执行容器连上之前没有任何推送，阶段靠读；刚失败、日志还没补上的也每秒；其余时候 10 秒。 */
 export const STARTUP_POLL_MS = 1_000;
 const ROSTER_POLL_MS = 10_000;
 
@@ -18,7 +18,7 @@ export function useNativeTerminals(taskId: string, channel: TaskStreamChannel, s
   const query = useApiQuery(key, async () => {
     const list = await api.devSession.listNativeTerminals(taskId), receivedAt = Date.now();
     return { ...list, items: list.items.map((item) => (item.startup ? { ...item, startup: stampReceived(item.startup, receivedAt)! } : item)) };
-  }, { refetchIntervalMs: (data) => (data?.items.some((item) => item.startup?.state === 'running') ? STARTUP_POLL_MS : ROSTER_POLL_MS) });
+  }, { refetchIntervalMs: (data) => progressPollMs(data?.items.map((item) => item.startup) ?? [], STARTUP_POLL_MS, ROSTER_POLL_MS) });
   const { refetch } = query;
   const pending = useRef<{ request: StartNativeTerminalRequest; replaces?: string } | null>(null);
   const locked = useRef(false);

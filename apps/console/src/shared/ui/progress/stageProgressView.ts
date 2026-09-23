@@ -33,6 +33,22 @@ export function stampReceived<P extends { readonly observedAt?: string }>(progre
   return progress ? { ...progress, receivedAt } : undefined;
 }
 
+/** 失败的段要等回收流程补上日志，比「失败」晚几秒到：这段时间里页面仍按启动中的节奏读，展开的日志尽快出现。 */
+export const FAILURE_LOG_WAIT_MS = 20_000;
+
+/** 刚失败、失败段还没有日志，且失败不到 FAILURE_LOG_WAIT_MS（都按服务器时间比，observedAt 每次读取都会前进）。 */
+export function awaitingFailureLog(progress: Progress | undefined): boolean {
+  if (progress?.state !== 'failed') return false;
+  const failed = progress.stages.find((stage) => stage.state === 'failed');
+  if (!failed || failed.logTail) return false;
+  return Date.parse(progress.observedAt ?? '') - Date.parse(failed.endedAt ?? progress.endedAt ?? '') < FAILURE_LOG_WAIT_MS;
+}
+
+/** 取数间隔（RFC-022）：有进行中的，或刚失败、日志还没补上的，用 busyMs；其余用 idleMs。 */
+export function progressPollMs(progresses: readonly (Progress | undefined)[], busyMs: number, idleMs: number): number {
+  return progresses.some((progress) => progress?.state === 'running' || awaitingFailureLog(progress)) ? busyMs : idleMs;
+}
+
 /** 服务器时钟减本机时钟（收到这份进度的那一刻）：进行中的计时用本机时间加上它，不受本机时钟快慢影响。 */
 export function clockSkew(observedAt: string | undefined, receivedAt: number): number {
   const server = observedAt ? Date.parse(observedAt) : Number.NaN;

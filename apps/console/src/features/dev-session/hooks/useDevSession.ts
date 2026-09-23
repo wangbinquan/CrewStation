@@ -6,7 +6,7 @@ import { queryKeys } from '../../../shared/api/queryKeys';
 import { isApiClientError, useApiMutation, useApiQuery } from '../../../shared/api/useApi';
 import { useManualRefresh } from '../../../shared/lib/useManualRefresh';
 import { useT } from '../../../shared/lib/useT';
-import { stampReceived } from '../../../shared/ui/progress/stageProgressView';
+import { progressPollMs, stampReceived } from '../../../shared/ui/progress/stageProgressView';
 import type { ApiClientError } from '../../../shared/api/useApi';
 
 export interface DevSessionHandle {
@@ -35,7 +35,7 @@ export function useDevSession(projectId: string): DevSessionHandle {
     }
     catch (error) { if (isApiClientError(error) && error.kind === 'not_found') return null; throw error; }
     // 开始开发或重建期间每秒读一次（RFC-022 B9）：Runner 连上之前没有推送，阶段靠读。
-  }, { refetchIntervalMs: (data) => (data?.startup?.state === 'running' ? 1_000 : 10_000) });
+  }, { refetchIntervalMs: (data) => progressPollMs([data?.startup], 1_000, 10_000) });
   // 每 10 秒的例行重取不改界面；refreshing 只表示用户自己点了刷新。
   const { refresh, refreshing } = useManualRefresh(query.refetch);
   // 同一查询键也被目录面板的会话绑定订阅，它的取数函数把 404 当错误；已释放的会话也不算活着。三种情况都按“没有会话”处理，

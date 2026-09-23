@@ -109,7 +109,7 @@ test('创建者的窗口：用户这时正在别处输入就只取得、不抢�
   expect(other.claims()).toBe(0);
 });
 
-test('启动失败：停在出错的那一段，写出原因，给「重试」与「查看执行容器日志」；没有留下日志时展开是说明', async () => {
+test('启动失败：停在出错的那一段，写出原因，给「重试」与「查看执行容器日志」；日志未到先写正在收集，等不到才是说明', async () => {
   const failed: StartupProgress = { ...running, state: 'failed', endedAt: at(9), stages: [running.stages[0]!, running.stages[1]!, running.stages[2]!,
     { kind: 'prepare', state: 'failed', startedAt: at(4.5), endedAt: at(9), durationMs: 4500, count: { done: 0, total: 2 }, error: { code: 'before-start-failed', message: '启动前步骤「安装依赖」失败：退出码 1' }, logTail: 'npm ERR! code E404' },
     { kind: 'agent', state: 'pending' }, { kind: 'ready', state: 'pending' }] };
@@ -122,6 +122,10 @@ test('启动失败：停在出错的那一段，写出原因，给「重试」�
   expect(retried.map((item) => item.agentId)).toEqual([terminal.agentId]);
   await page.click('查看执行容器日志');
   expect(page.host.querySelector('pre')!.textContent).toBe('npm ERR! code E404');
-  await act(async () => update({ ...terminal, startup: { ...failed, stages: failed.stages.map(({ logTail: _dropped, ...stage }) => stage) } })); await page.settle();
+  // 日志由回收流程补上，比「失败」晚几秒：失败后 20 秒内（服务器时间）先写「正在收集」，过了还没有才是说明。
+  const withoutLog = { ...failed, stages: failed.stages.map(({ logTail: _dropped, ...stage }) => stage) };
+  await act(async () => update({ ...terminal, startup: { ...withoutLog, observedAt: at(10) } })); await page.settle();
+  expect(page.text()).toContain('正在收集容器日志…');
+  await act(async () => update({ ...terminal, startup: { ...withoutLog, observedAt: at(30) } })); await page.settle();
   expect(page.text()).toContain('执行容器没有留下日志（容器没有启动，或者日志为空），原因见上。');
 });

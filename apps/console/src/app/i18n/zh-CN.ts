@@ -11,6 +11,7 @@ export const messages = {
   'ui.progress.total': '共 {time}',
   'ui.progress.position': '{index}/{total}',
   'ui.progress.log': '查看容器日志',
+  'ui.progress.logPending': '正在收集容器日志…',
   'ui.progress.duration.seconds': '{value} 秒',
   'ui.progress.duration.minutes': '{minutes} 分 {seconds} 秒',
   'ui.progress.state.pending': '未开始',

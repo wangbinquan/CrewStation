@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { useT } from '../../lib/useT';
 import { Button } from '../Button';
 import type { Progress, ProgressStage } from './stageProgressView';
-import { clockSkew, formatDuration, stageElapsed, stageLabel, stagePosition, totalElapsed } from './stageProgressView';
+import { awaitingFailureLog, clockSkew, formatDuration, stageElapsed, stageLabel, stagePosition, totalElapsed } from './stageProgressView';
 import styles from './StageProgress.module.css';
 
 const ICON: Record<ProgressStage['state'], string> = { succeeded: '✓', running: '●', pending: '○', failed: '✕', skipped: '–' };
@@ -64,7 +64,7 @@ export function StageProgress<S extends ProgressStage>({ progress, title, label,
           {stage.detail && stage.state !== 'pending' ? <p className={styles.detail}>{stage.detail}</p> : null}
           {stage.warning ? <p className={styles.warning}>{stage.warning}</p> : null}
           {stage.error ? <p className={styles.error}>{stage.error.message}</p> : null}
-          {stage === failed && logOpen ? (stage.logTail ? <pre className={styles.log} aria-label={logLabel ?? t('ui.progress.log')}>{stage.logTail}</pre> : <p className={styles.detail}>{emptyLogText}</p>) : null}
+          {stage === failed && logOpen ? (stage.logTail ? <pre className={styles.log} aria-label={logLabel ?? t('ui.progress.log')}>{stage.logTail}</pre> : <p className={styles.detail}>{awaitingFailureLog(progress) ? t('ui.progress.logPending') : emptyLogText}</p>) : null}
           {extra !== null && extra !== undefined && extra !== false ? <div className={styles.extra}>{extra}</div> : null}
         </li>;
       })}
