@@ -553,6 +553,21 @@ happy-dom 不排版，渲染用例照绿。
 （预览 iframe 仍是 200px，关掉后 569px）。核对前在页面里确认 `document.styleSheets` 里有新规则，免得核对的是线上包。
 **前端依赖尚未部署的契约时**（2026-09-23，CLI 标签组）：线上 cs-api 的 strict 校验会拒掉带新字段的保存，页面满是「布局格式无效」。在同一个 `Fetch.enable` 里再加一条 `*workspace-layout*`（`requestStage: 'Request'`），把 PUT 用 `fulfillRequest` 就地回一个 `revision + 1` 的回执，GET 照常走线上：交互与规整都能核对，服务端一个字都没写。别的身份的布局也不会被动——核对用 dev-developer，作者用的是 dev-admin。
 
+### 实机核对不可撤销的操作：用 CDP Fetch 在浏览器里拦下写请求
+
+2026-09-23 核对归档、删除、释放会话的确认弹窗时，要走完「输入确认词 → 确认 → 请求发出 → 页面显示结果」整条路，又不能真把共享集群上的项目归档、档位删掉、会话释放。
+做法是在页面会话上 `Fetch.enable({ patterns: [{ urlPattern: '*/v1/*', requestStage: 'Request' }] })`，在 `Fetch.requestPaused` 里按「方法＋路径」挑出要拦的写请求，
+用 `Fetch.fulfillRequest` 就地回一个 503（正文写明是验收拦截），其余一律 `Fetch.continueRequest`。
+每个暂停的请求必须恰好应答一次，所以只注册一个监听。要改响应（例如把工作区检查回执改成「有未提交文件」），就在请求阶段 `continueRequest({ interceptResponse: true })`，
+再在响应阶段（`responseStatusCode` 有值）先 `getResponseBody`、再 `fulfillRequest`。同一请求挂两个监听、各自应答，请求会卡住，页面停在「检查中」。
+事后直接查库，核对被试删的对象都还在。这层拦截是真用得上的：那次核对集群「删除／结束」时，挑中的可删资源是 demo 会话的一个 CLI Pod。
+
+### 面板里会自动长高的区域会让按坐标的点击落空：用键盘激活
+
+同日，开发页「会话与环境」面板里的最近日志每 5 秒追加一次。`scrollIntoView` 之后再取按钮中心坐标、派发鼠标事件，经常点到错位后的位置，「释放会话」没点上，脚本等「确认释放」一直超时。
+改成先 `focus()` 按钮、再派发 Enter 的 keyDown 和 keyUp（键盘用户的真实路径），就稳定了。
+另外，要验证「点击让按钮获得焦点，关闭弹窗后焦点回到它」时注意：程序化的 `element.click()` 不会聚焦按钮，用例和脚本里要先 `focus()` 再点。
+
 ## 用例与 CI
 
 规范正文在 `testing.md`；这里只记撞过的坑。
@@ -640,6 +655,12 @@ git reset -q HEAD -- <自己的路径>                     # 共享暂存区里�
 
 核对要加 `--no-renames`：搬文件默认被识别成改名、只显示新路径，删除侧漏没漏看不出来（见上文 `git mv` 一条）。
 建好私有索引到提交之间 HEAD 可能被并行会话推进，提交前再比一次 `git rev-parse HEAD`，变了就从新 HEAD 重建。
+
+### zsh 不拆分未加引号的变量：干净树里没拷进文件，门禁照样绿
+
+2026-09-23 实撞：Claude Code 的 shell 是 zsh。用 `MINE="a b c"; for f in $MINE; do cp "$f" …; done` 把本批文件拷进草稿区的干净树，zsh 不对 `$MINE` 做单词拆分，
+整串被当成一个文件名，`cp` 报 File name too long。紧接着那次 `check:static` 其实是在共享工作树里跑的，结果照绿，差点被当成干净树的结论。
+文件清单写成一行一个的文件，再用 `while read f; do …; done < 清单`（或 zsh 的 `${=MINE}`）逐个拷；拷完用 `cmp` 逐个核对，并确认门禁确实是在干净树目录里跑的。
 
 ### ADR、RFC 与待决问题的编号会被并行会话抢占：提交前再看一眼
 
