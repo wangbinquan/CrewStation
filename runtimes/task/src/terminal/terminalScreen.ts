@@ -2,16 +2,21 @@ import { createRequire } from 'node:module';
 import type * as XtermHeadless from '@xterm/headless';
 import { SerializeAddon } from '@xterm/addon-serialize';
 import { terminalSnapshotView } from './terminalSnapshotView';
+import { installQueryReplies } from './terminalQueryReplies';
 
 // 6.0.0 的 module 字段指向缺失的文件；官方 main 是有效的 CJS 入口。
 const { Terminal } = createRequire(import.meta.url)('@xterm/headless') as typeof XtermHeadless;
 export const TERMINAL_SCROLLBACK_LIMIT = 500;
 const MAX_SNAPSHOT_BYTES = 2 * 1024 * 1024;
 
-/** 模拟完整 ANSI 状态后序列化，不把有界原始字节尾部当成可恢复屏幕。 */
-export function createTerminalScreen(cols: number, rows: number) {
+/**
+ * 模拟完整 ANSI 状态后序列化，不把有界原始字节尾部当成可恢复屏幕。
+ * 给了 `reply` 时由这块屏幕应答 CLI 的终端查询（RFC-026），快照随之声明 `repliesQueries`，浏览器据此不再应答。
+ */
+export function createTerminalScreen(cols: number, rows: number, options: { readonly reply?: (data: string) => void } = {}) {
   const terminal = new Terminal({ cols, rows, scrollback: TERMINAL_SCROLLBACK_LIMIT, allowProposedApi: true });
   const mouseEncoding = trackMouseEncoding(terminal);
+  const replies = options.reply ? installQueryReplies(terminal, options.reply) : undefined;
   const serialize = new SerializeAddon();
   terminal.loadAddon({
     activate: () => serialize.activate(terminalSnapshotView(terminal) as unknown as Parameters<SerializeAddon['activate']>[0]),
@@ -36,7 +41,7 @@ export function createTerminalScreen(cols: number, rows: number) {
       let data = serialize.serialize();
       let clipped = truncated;
       if (Buffer.byteLength(data) > MAX_SNAPSHOT_BYTES) { data = serialize.serialize({ scrollback: 0 }); clipped = true; }
-      return { data: data + mouseEncoding.serialize(), throughSeq, cols: terminal.cols, rows: terminal.rows, truncated: clipped, scrollbackLimit: TERMINAL_SCROLLBACK_LIMIT };
+      return { data: data + mouseEncoding.serialize(), throughSeq, cols: terminal.cols, rows: terminal.rows, truncated: clipped, scrollbackLimit: TERMINAL_SCROLLBACK_LIMIT, ...(replies ? { repliesQueries: true } : {}) };
     },
     /** RFC-024：当前活动缓冲区（普通或备用屏）视口里的非空白字符数，判定 CLI 界面是否画出用。 */
     async visibleChars(): Promise<number> {
@@ -46,7 +51,7 @@ export function createTerminalScreen(cols: number, rows: number) {
       for (let row = buffer.viewportY; row < buffer.viewportY + terminal.rows; row++) count += buffer.getLine(row)?.translateToString(true).replace(/\s/g, '').length ?? 0;
       return count;
     },
-    async dispose(): Promise<void> { await tail; mouseEncoding.dispose(); terminal.dispose(); },
+    async dispose(): Promise<void> { await tail; replies?.dispose(); mouseEncoding.dispose(); terminal.dispose(); },
   };
 }
 

@@ -1,6 +1,6 @@
 # RFC-026｜终端查询由 Runner 应答：无人持有输入控制时 CLI 也能画出界面
 
-> 状态：Draft · 2026-09-23
+> 状态：In Progress · 2026-09-23 · 作者批准实施，Q1–Q3、C1、C2 按推荐
 > 配套：[技术设计](./design.md) · [实施计划](./plan.md)
 > 前序：[RFC-022 启动进度](../RFC-022-startup-progress/proposal.md) · [RFC-024 CLI 界面就绪](../RFC-024-cli-interface-ready/proposal.md)
 

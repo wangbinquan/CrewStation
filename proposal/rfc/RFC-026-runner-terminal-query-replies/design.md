@@ -1,6 +1,6 @@
 # RFC-026｜技术设计
 
-> 状态：Draft · 2026-09-23
+> 状态：In Progress · 2026-09-23 · 作者批准实施，Q1–Q3、C1、C2 按推荐
 > 配套：[提案](./proposal.md) · [实施计划](./plan.md)
 
 ## 目录
@@ -23,31 +23,37 @@
 | 快照声明 `repliesQueries` | `packages/contracts/taskrunner/nativeTerminal.ts`（`TerminalSnapshotSchema`） | 契约 |
 | 浏览器拦截 | `apps/console/src/features/dev-session/model/native/terminalQueryFilter.ts`（新文件）；`nativeTerminalSurface.ts` 按快照声明装上 | 工作台 |
 
-不经过控制面：应答在 Runner 内部完成，cs-session／cs-api 只透传快照字段（schema 非 strict，旧控制面也会透传——需在 T1 核对，否则同批部署）。
+不经过控制面：应答在 Runner 内部完成。快照经 cs-session 转给浏览器时是原样透传（Runner 结果帧的 `payload` 为 `z.unknown()`，`packages/contracts/taskrunner/protocol.ts:221`；`modules/session/application/browserStreams.ts:44-45`），控制面不用重新部署（T1 核对）。
 按 RFC-024 设计 §8 留下的债，把屏幕相关职责从 `nativeSupervisor` 挪出一步：应答逻辑独立成文件，supervisor 只接线。
 
 ## 2. 现状实测
 
-`@xterm/headless` 6.0.0 对常见查询的应答（2026-09-23 本机脚本实测）：
+**OpenCode 1.18.29 启动时发出的查询**（T1，2026-09-23：任务底座镜像里用 PTY 起 OpenCode 录原始输出）：
+OSC 10／11／12／13–17／19（前景、背景、光标等颜色）、OSC 4（调色板逐色）、XTVERSION `CSI > 0 q`、DSR `CSI 6 n`、XTGETTCAP `DCS + q`、
+DECRQM `CSI ? 1016／2027／2031／1004／2004／2026 $ p`、kitty 键盘 `CSI ? u`、OSC 99、OSC 1337、OSC 66、窗口像素 `CSI 14 t`、kitty 图形查询 `APC G … a=q`、DA1 `CSI c`。
 
-| 查询 | 应答 |
-|---|---|
-| DA1 `CSI c` | `CSI ? 1 ; 2 c` |
-| DA2 `CSI > c` | `CSI > 0 ; 276 ; 0 c` |
-| DSR `CSI 6 n` / `CSI 5 n` | `CSI 1 ; 1 R` / `CSI 0 n` |
-| DECRQM `CSI ? 2026 $ p` | `CSI ? 2026 ; 2 $ y` |
-| DECRQSS `DCS $ q m ST` | `DCS 1 $ r 0 m ST` |
-| OSC 10／11／4 查询 | **无应答**（无头终端没有主题服务） |
-| kitty 键盘 `CSI ? u`、XTVERSION `CSI > 0 q` | 无应答（浏览器 xterm.js 同样不答） |
+**不应答时 OpenCode 会等**：同一镜像、0.5 CPU，一条都不应答时 3.2 秒发出查询、3.5 秒画出空白帧，**11.6 秒**才重画、12.0 秒出现完整界面，
+中间约 8 秒在等应答超时。这就是「无人持有控制时一直空白、有人取得后十秒内画出」的来由；RFC-024 验收里 43 秒的首屏也包含这段等待。
 
-OpenCode 1.18.29 启动时具体发哪些、在等哪几条，T1 在实机抓 PTY 输出确认；上表之外若还有它等待的查询，按同样方式补答。
+**应答基准：浏览器 xterm.js 6 对上述查询的应答**（调试 Chrome 里加载仓库的 `@xterm/xterm` 6.0.0 实测）与 **`@xterm/headless` 6.0.0** 的对照：
+
+| 查询 | 浏览器 xterm.js | 无头 xterm |
+|---|---|---|
+| DA1 `CSI c` | `CSI ? 1 ; 2 c` | 相同 |
+| DSR `CSI 6 n` | `CSI 行 ; 列 R` | 相同 |
+| DECRQM `CSI ? n $ p`（1016／1004／2004／2026 支持，2027／2031 不支持） | `CSI ? n ; 2 $ y` ／ `CSI ? n ; 0 $ y` | 相同 |
+| OSC 10／11／12 `?` | `OSC n ; rgb:rrrr/gggg/bbbb ST` | **无应答** |
+| OSC 4 `i ; ?` | `OSC 4 ; i ; rgb:… ST` | **无应答** |
+| OSC 13–19、XTVERSION、XTGETTCAP、kitty、OSC 99／1337、`CSI 14 t`、kitty 图形 | 无应答 | 无应答 |
+
+结论：让 Runner 的应答与今天浏览器的应答**逐条一致**，只需在无头 xterm 上补答 OSC 4／10／11／12；其余由无头 xterm 自己答。
 
 ## 3. Runner：统一应答
 
 - `createTerminalScreen` 增加 `onReply(listener)`：转发无头 xterm 的 `onData`（这里只会出现应答，无头终端没有键盘）。
 - `terminalQueryReplies.ts`：
   - 在无头 xterm 上注册 `parser.registerOscHandler(10 | 11 | 12 | 4, …)`：参数为 `?` 时按固定配色（Q2）生成 `OSC n ; rgb:rrrr/gggg/bbbb ST` 经 `onReply` 发出，返回 `true`；其余参数返回 `false`，交给 xterm 默认处理。
-  - 配色取工作台深色主题的终端前景、背景与 16 色（与 `apps/console/src/features/dev-session/model/terminalTheme.ts` 的深色值一致，写成契约常量 `TERMINAL_REPLY_PALETTE`，两边各有用例锁住一致）。
+  - 配色（Q2 a）：前景、背景、光标取工作台深色主题令牌（`apps/console/src/app/theme/tokens.css` 深色段的 `--cs-color-text`／`--cs-color-surface`／`--cs-color-primary`），写成契约常量 `TERMINAL_REPLY_PALETTE`，工作台用例解析 tokens.css 锁住一致；调色板 0–255 与浏览器 xterm.js 的默认调色板一致（工作台主题不设 ANSI 色）。
 - `nativeSupervisor`：进程拉起后，`screen.onReply((data) => entry.session?.write(data))`；进程结束即停。应答顺序与 PTY 输出顺序一致（在屏幕写入回调里产生）。
 - 光标位置等状态类应答以无头屏幕为准：它的尺寸由 `resize` 与 PTY 同步，是 CLI 真正所在的那块屏幕。
 

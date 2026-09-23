@@ -36,6 +36,8 @@ export const TerminalSnapshotSchema = TerminalSizeSchema.extend({
   terminalId: z.string(), runnerId: z.uuid(), throughSeq: z.number().int().nonnegative(),
   data: z.string(), scrollbackLimit: z.number().int().nonnegative(), truncated: z.boolean(),
   control: TerminalControlStateSchema.optional(),
+  /** RFC-026：终端查询由 Runner 统一应答，浏览器据此拦下查询、不再应答。旧 Runner 没有这一项，浏览器照旧应答。 */
+  repliesQueries: z.boolean().optional(),
 });
 export const TerminalControlSchema = z.object({
   controlled: z.boolean(), expiresAt: z.iso.datetime().nullable(),
@@ -48,3 +50,9 @@ export type TerminalSnapshot = z.infer<typeof TerminalSnapshotSchema>;
 export type TerminalHolder = z.infer<typeof TerminalHolderSchema>;
 export type TerminalControlState = z.infer<typeof TerminalControlStateSchema>;
 export type TerminalControl = z.infer<typeof TerminalControlSchema>;
+
+/**
+ * RFC-026：Runner 应答配色查询（OSC 10／11／12）时报的前景、背景、光标色，取工作台深色主题令牌
+ * （`apps/console/src/app/theme/tokens.css` 深色段的 --cs-color-text／--cs-color-surface／--cs-color-primary），工作台用例锁住两边一致。
+ */
+export const TERMINAL_REPLY_PALETTE = { foreground: '#e7edf6', background: '#191f29', cursor: '#3970df' } as const;

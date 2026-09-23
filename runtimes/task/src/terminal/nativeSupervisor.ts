@@ -81,7 +81,7 @@ export class NativeTerminalSupervisor {
       revision: 0, lifecycle: 'starting', startedAt: new Date().toISOString(), cols: command.cols, rows: command.rows,
     };
     const control = createTerminalControl((state) => this.deps.emit({ kind: 'terminalControl', terminalId: command.terminalId, runnerId: this.runnerId, control: state }));
-    const entry: NativeEntry = { record, fingerprint: command.requestFingerprint, start: Promise.resolve(record), accepted: Promise.resolve(), control, screen: createTerminalScreen(command.cols, command.rows), outputSeq: 0, stopped: false };
+    const entry: NativeEntry = { record, fingerprint: command.requestFingerprint, start: Promise.resolve(record), accepted: Promise.resolve(), control, screen: createTerminalScreen(command.cols, command.rows, { reply: (data) => this.reply(entry, data) }), outputSeq: 0, stopped: false };
     this.entries.set(command.agentId, entry);
     this.byTerminal.set(command.terminalId, entry);
     this.emit(entry);
@@ -161,6 +161,12 @@ export class NativeTerminalSupervisor {
       this.deps.emit({ kind: 'terminalOutput', terminalId: entry.record.terminalId, runnerId: this.runnerId, terminalSeq, data });
       if (entry.readiness && !entry.readiness.done) this.stepInterface(entry, { kind: 'output', at: Date.now(), visibleChars: await entry.screen.visibleChars() });
     }).catch((error: unknown) => this.deps.logger.error('native terminal screen write failed', { agentId: entry.record.agentId, error: String(error) }));
+  }
+
+  /** RFC-026：屏幕替 CLI 应答终端查询，写回 PTY；进程没在跑（刚退出）时丢弃。 */
+  private reply(entry: NativeEntry, data: string): void {
+    if (entry.record.lifecycle !== 'running' || !entry.session) return;
+    try { entry.session.write(data); } catch (error) { this.deps.logger.debug('terminal query reply dropped', { agentId: entry.record.agentId, error: String(error) }); }
   }
 
   /** RFC-024：进程拉起后按屏幕判定界面是否画出；到点 tick，判定后发一次 ui.ready。 */

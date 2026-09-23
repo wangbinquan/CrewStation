@@ -289,3 +289,13 @@ test('RFC-024：判定前进程就退出，不再上报 ui.ready（计时器已�
   await Bun.sleep(450);
   expect(uiStates(f, 'ui-exit').some((ui) => ui.state === 'ready')).toBe(false);
 });
+
+// RFC-026：以前只有持有输入控制的浏览器窗口应答终端查询，没人持有控制时 CLI 拿不到应答、迟迟不画界面。
+test('RFC-026：没有任何视图持有控制，CLI 的终端查询也由 Runner 应答；快照声明 repliesQueries', async () => {
+  const script = "printf '\\033[6n\\033]11;?\\007'; IFS= read -rs -d R pos; IFS= read -rs -d '\\' color; printf 'pos=%s color=%s\\n' \"${pos#*[}\" \"${color#*;}\"; sleep 2";
+  const f = await fixture({ cmd: ['bash', '--noprofile', '--norc', '-c', script] });
+  await f.native.start(f.command('replies'));
+  await settled(f, 'replies');
+  await outputContains(f, 'terminal-replies', 'pos=1;1 color=rgb:1919/1f1f/2929');
+  expect((await f.native.attach('terminal-replies', f.native.runnerId)).repliesQueries).toBe(true);
+});
