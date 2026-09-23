@@ -1,6 +1,6 @@
 # RFC-024｜CLI 界面就绪：启动步骤条等到 CLI 画出界面再撤
 
-> 状态：In Progress · 2026-09-23 · 作者批准三件套，Q1–Q3 取推荐方案（静止 500 ms、超时 45 秒、代答查询另立 RFC）
+> 状态：Done · 2026-09-23 · 作者批准三件套，Q1–Q3 取推荐方案（静止 500 ms、超时 45 秒、代答查询另立 RFC）；实机验收见 [acceptance.md](./acceptance.md)
 > 配套：[技术设计](./design.md) · [实施计划](./plan.md)
 > 前序：[RFC-022 启动进度](../RFC-022-startup-progress/proposal.md)
 
