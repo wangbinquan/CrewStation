@@ -100,6 +100,9 @@ describe('CLI 标签组', () => {
     expect(tab(stranger.terminalId).textContent).not.toContain('76540b');
   });
 
+});
+
+describe('菜单、放大、分隔线、改名与新开', () => {
   test('右键菜单向右分屏出第二组；双击标签放大所在组、再双击还原；只有一组时菜单里的放大不可用', async () => {
     setup(); page = await renderElement(element(), messages);
     await fire(tab(other.terminalId), new MouseEvent('contextmenu', { bubbles: true, clientX: 50, clientY: 40 }));
@@ -111,6 +114,19 @@ describe('CLI 标签组', () => {
     expect(groups()).toEqual([[other.terminalId]]); expect(shown()).toEqual([other.terminalId]);
     await fire(tab(other.terminalId), new MouseEvent('dblclick', { bubbles: true }));
     expect(groups()).toHaveLength(2);
+  });
+
+  test('两组之间的分隔线：方向键每次挪 3%，双击均分，大小记进个人布局', async () => {
+    const f = setup(); page = await renderElement(element(), messages);
+    await fire(tab(other.terminalId), new MouseEvent('contextmenu', { bubbles: true, clientX: 50, clientY: 40 }));
+    await act(async () => menuItem('向右分屏').click()); await page.settle();
+    const divider = () => page!.host.querySelector<HTMLElement>('[role="separator"][aria-label="拖动调整左右宽度，双击均分"]')!;
+    expect(divider().getAttribute('aria-orientation')).toBe('vertical'); expect(divider().getAttribute('aria-valuenow')).toBe('50');
+    await fire(divider(), new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true })); expect(divider().getAttribute('aria-valuenow')).toBe('53');
+    await fire(divider(), new MouseEvent('dblclick', { bubbles: true })); expect(divider().getAttribute('aria-valuenow')).toBe('50');
+    await fire(divider(), new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }));
+    await flush();
+    expect((f.saves.at(-1)?.dock as { sizes?: number[] } | undefined)?.sizes).toEqual([0.94, 1.06]);
   });
 
   test('F2 原地改名：回车保存到个人布局，只改自己看到的名字；Esc 放弃', async () => {

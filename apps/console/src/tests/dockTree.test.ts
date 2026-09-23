@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import type { DockNode } from '../shared/ui/dock/dockTree';
-import { alignGroups, dockGroups, equalizeSizes, minimumSize, nodeAt, removeGroup, setSizes, splitGroup, tidy, withinLimits } from '../shared/ui/dock/dockTree';
+import { adjustSplit, alignGroups, dockGroups, equalizeSizes, minimumSize, nodeAt, removeGroup, setSizes, splitGroup, tidy, withinLimits } from '../shared/ui/dock/dockTree';
 import { boxPixels, boxStyle, placeDock } from '../shared/ui/dock/dockPlacement';
 import type { DockGeometry } from '../shared/ui/dock/dockDrop';
 import { resolveDrop } from '../shared/ui/dock/dockDrop';
@@ -58,6 +58,12 @@ describe('分屏树（CLI 标签组的排列）', () => {
     expect(equalizeSizes(resized, [1])).toEqual(tree);
     expect(setSizes(tree, [1], [1, 1, 1])).toBe(tree); expect(setSizes(tree, [0], [1, 1])).toBe(tree);
     expect(minimumSize(tree, { width: 260, height: 160 }, 6)).toEqual({ width: 526, height: 326 });
+  });
+
+  test('拖分隔线只在相邻两块之间挪比例，总占比不变、其余不跳动；每块不小于下限（两块都放不下时平分）', () => {
+    expect(adjustSplit([0.3, 0.3, 0.4], 0, 0.1, 0.1)).toEqual([0.4, 0.19999999999999996, 0.4]);
+    expect(adjustSplit([0.5, 0.5], 0, -1, 0.2)).toEqual([0.2, 0.8]);
+    expect(adjustSplit([0.1, 0.1], 0, 0.5, 0.2)).toEqual([0.1, 0.1]);
   });
 });
 

@@ -150,6 +150,15 @@ export function equalizeSizes(root: DockNode, path: DockPath): DockNode {
   return target && !isLeaf(target) ? setSizes(root, path, target.children.map(() => 1)) : root;
 }
 
+/** 拖一条分隔线：相邻两块的总占比不变，其余子项不跳动；每块不小于 `minimum`（两块都放不下时平分）。 */
+export function adjustSplit(values: readonly number[], index: number, delta: number, minimum: number): number[] {
+  const next = [...values], total = (next[index] ?? 0) + (next[index + 1] ?? 0);
+  const min = Math.min(minimum, total / 2);
+  next[index] = Math.max(min, Math.min(total - min, (next[index] ?? 0) + delta));
+  next[index + 1] = total - next[index]!;
+  return next;
+}
+
 /** 整棵树不再压缩时需要的最小尺寸：左右排开的宽度相加、上下排开的取最大，分隔条计入。 */
 export function minimumSize(node: DockNode, leaf: { width: number; height: number }, gutter: number): { width: number; height: number } {
   if (isLeaf(node)) return leaf;

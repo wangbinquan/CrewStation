@@ -6,8 +6,7 @@ import { DockDragController, measureDock } from './dockDrag';
 import type { DockDivider as Divider } from './dockPlacement';
 import { FULL_BOX, boxPixels, boxStyle, placeDock } from './dockPlacement';
 import type { DockDirection, DockNode, DockPath } from './dockTree';
-import { dockGroups, minimumSize } from './dockTree';
-import { adjustSplit } from '../split/splitGeometry';
+import { adjustSplit, dockGroups, minimumSize } from './dockTree';
 import styles from './DockLayout.module.css';
 
 /** 两组之间分隔条的宽度（像素）。 */
