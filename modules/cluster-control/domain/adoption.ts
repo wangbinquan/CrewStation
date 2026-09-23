@@ -23,6 +23,8 @@ export interface AdoptionInput {
   readonly legacyTask?: LegacyTask | 'missing';
   /** 标签上的旧 ID 经身份目录换成的现 ID（与标签不同时才有）。 */
   readonly legacyTaskId?: string;
+  /** 这个任务环境在台账里已有记录（记录不认领这个对象，所以它是记录不要的遗留物）。 */
+  readonly taskRecorded?: boolean;
   /** 平台组件所在的系统命名空间（设计 §6.4：不在回收范围）。 */
   readonly systemNamespace?: string;
   readonly now?: Date;
@@ -40,8 +42,10 @@ function taskCandidate(object: ObservedObject, task: LegacyTask): ResourceKind {
   return task.kind === 'dev-session' ? 'dev-workspace' : 'business-workspace';
 }
 
-function byTask(object: ObservedObject, taskId: string, task: LegacyTask | 'missing' | undefined, now: Date): Omit<AdoptionItem, 'kind' | 'name'> {
+function byTask(object: ObservedObject, taskId: string, task: LegacyTask | 'missing' | undefined, now: Date, recorded: boolean): Omit<AdoptionItem, 'kind' | 'name'> {
   const volumeNote = object.kind === 'PersistentVolumeClaim' ? '；工作卷只进入待回收，由管理员确认后删除' : '';
+  // 任务环境已在台账里、记录却不列它：重建换下的旧 Runner Secret、RFC-013 改名前留下的同 Host 预览路由（与孤儿回收同一判定）。
+  if (recorded) return { verdict: 'orphan', owner: 'task-runtime', ownerRef: taskId, reason: `任务环境 ${taskId} 的台账记录不列这个对象（重建或改名留下的旧对象）${volumeNote}` };
   if (!task || task === 'missing') return { verdict: 'orphan', owner: 'task-runtime', ownerRef: taskId, reason: `任务环境 ${taskId} 的记录已不存在${volumeNote}` };
   if (LIVE_TASK_STATES.includes(task.state)) return { verdict: 'adoptable', candidateKind: taskCandidate(object, task), owner: 'task-runtime', ownerRef: taskId, reason: `任务环境 ${taskId} 仍在（${task.state}），收编时生成记录并认领` };
   if (task.state === 'failed' && task.kind === 'dev-session' && !task.execution) {
@@ -73,7 +77,7 @@ export function classifyObject(input: AdoptionInput): AdoptionItem {
   if (input.systemNamespace && object.metadata.namespace === input.systemNamespace && !labels[TASK_LABEL]) return { ...identity, verdict: 'platform', reason: '平台组件（安装器管理），不在收编与回收范围' };
   if (labels[RESOURCE_ID_LABEL]) return { ...identity, verdict: 'orphan', resourceId: labels[RESOURCE_ID_LABEL], reason: '带资源标签，但台账里没有记录认领它' };
   const taskId = labels[TASK_LABEL];
-  if (taskId) return { ...identity, ...byTask(object, input.legacyTaskId ?? taskId, input.legacyTask, input.now ?? new Date()) };
+  if (taskId) return { ...identity, ...byTask(object, input.legacyTaskId ?? taskId, input.legacyTask, input.now ?? new Date(), input.taskRecorded === true) };
   return { ...identity, ...(byRelease(labels) ?? { verdict: 'unclassified', reason: '没有可识别的归属标签' }) };
 }
 

@@ -29,11 +29,11 @@ function sortItems(items: AdoptionItem[]): AdoptionItem[] {
 export async function adoptionReport(deps: AdoptionDeps): Promise<AdoptionReport> {
   const taskScoped = async (kind: 'Secret' | 'Service' | 'IngressRoute') => (await deps.reader.list(kind)).filter((object) => object.metadata.labels?.['crewstation.io/task']);
   const objects: ObservedObject[] = [...(await deps.reader.list('Pod')), ...(await deps.reader.list('PersistentVolumeClaim')), ...(await taskScoped('Secret')), ...(await taskScoped('Service')), ...(await taskScoped('IngressRoute'))];
-  const tasks = new Map<string, Promise<{ readonly id: string; readonly task: LegacyTask | 'missing' }>>();
+  const tasks = new Map<string, Promise<{ readonly id: string; readonly task: LegacyTask | 'missing'; readonly recorded: boolean }>>();
   // 旧对象上的任务标签可能还是 RFC-013 之前的 tsk_…：先经身份目录换成现在的 ID，否则活着的会话会被判成孤儿。
   const lookup = async (label: string) => {
     const id = label.startsWith('tsk_') ? (await deps.legacy.resolveTaskId(label)) ?? label : label;
-    return { id, task: (await deps.legacy.task(id)) ?? ('missing' as const) };
+    return { id, task: (await deps.legacy.task(id)) ?? ('missing' as const), recorded: (await deps.ledger.get(id)) !== undefined };
   };
   const taskOf = (label: string) => {
     if (!tasks.has(label)) tasks.set(label, lookup(label));
@@ -48,7 +48,7 @@ export async function adoptionReport(deps: AdoptionDeps): Promise<AdoptionReport
     const legacy = !claimedBy && label ? await taskOf(label) : undefined;
     items.push(classifyObject({
       object, systemNamespace: deps.systemNamespace, now, ...(claimedBy ? { claimedBy } : {}),
-      ...(legacy ? { legacyTask: legacy.task, ...(legacy.id !== label ? { legacyTaskId: legacy.id } : {}) } : {}),
+      ...(legacy ? { legacyTask: legacy.task, taskRecorded: legacy.recorded, ...(legacy.id !== label ? { legacyTaskId: legacy.id } : {}) } : {}),
     }));
   }
   return { generatedAt: deps.clock.now().toISOString(), dryRun: true, counts: countVerdicts(items), items: sortItems(items).slice(0, MAX_ITEMS) };

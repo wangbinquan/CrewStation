@@ -26,6 +26,10 @@ export interface LedgerObservations {
   observe(input: { readonly resourceId?: string; readonly child: ResourceChild; readonly gone?: boolean; readonly conditions?: readonly ObservedCondition[] }): Promise<{ readonly status: 'recorded' | 'unchanged' | 'unowned' }>;
   /** 写只归资源中心的条件（不附带子对象观测），例如工作卷的「待回收」。 */
   observeConditions(resourceId: string, conditions: readonly ObservedCondition[]): Promise<{ readonly status: 'recorded' | 'unchanged' | 'unowned' }>;
+  /**
+   * 孤儿 PVC（集群里有、台账里没有）：建一条归资源中心的工作卷记录认领它，并写「待回收」（设计 §6.4）；卷不删，等管理员确认。
+   */
+  adoptOrphanVolume(child: { readonly kind: string; readonly namespace?: string; readonly name: string; readonly uid: string }): Promise<void>;
   /** 挂在某条记录下的记录（含已结束的）：上级结束时调和器据此把工作卷排进队列。 */
   children(parentId: string): Promise<readonly LedgerRecordView[]>;
   /** 只读：认领这个集群对象的记录 ID（收编报告用，不写库）。 */

@@ -9,6 +9,7 @@ import { kubernetesClusterWriter, managedObjectFeed, managedObjectReader } from 
 import { adoptionReport } from './application/adoptionReport';
 import type { ObservationStats } from './application/observeChange';
 import { newObservationStats, observeChange } from './application/observeChange';
+import { sweepOrphans } from './application/orphanSweep';
 import { reconcileRecord } from './application/reconcileObservations';
 import { adoptionRoutes } from './http/adoptionRoutes';
 import type { ClusterWriter, ManagedObjectFeed, ManagedObjectReader } from './ports/cluster';
@@ -16,6 +17,8 @@ import type { LedgerObservations, LegacyOwners } from './ports/ledger';
 import type { LedgerReconcilerOptions } from './workers/ledgerReconciler';
 import { ledgerReconciler } from './workers/ledgerReconciler';
 import { observationWorker } from './workers/observationWorker';
+import type { OrphanSweeperOptions } from './workers/orphanSweeper';
+import { orphanSweeper } from './workers/orphanSweeper';
 
 /** 装配期注入：台账入口与旧所属对象由组合根从 resources／task-runtime 接上。 */
 export interface ClusterControlModuleDeps {
@@ -34,6 +37,8 @@ export interface ClusterControlModuleDeps {
   readonly cluster?: ClusterWriter;
   readonly summaryMs?: number;
   readonly reconciler?: LedgerReconcilerOptions;
+  /** 孤儿回收（设计 §6.4）：false 关掉；缺省建出满 10 分钟才判孤儿，同步后 10 分钟起每 10 分钟一轮。 */
+  readonly orphanSweep?: false | (OrphanSweeperOptions & { readonly minAgeMs?: number });
 }
 
 export interface ClusterControlModule {
@@ -61,10 +66,11 @@ export function createClusterControlModule(deps: ClusterControlModuleDeps): Clus
   const watcher = observationWorker(feed, (change) => observeChange(deps.ledger, clock, deps.systemNamespace, stats, change), () => ({ ...stats }), logger, deps.summaryMs);
   const cluster = deps.cluster ?? kubernetesClusterWriter(deps.k8s);
   const reconciler = ledgerReconciler(deps.ledger, feed, (id, enqueue) => reconcileRecord({ ledger: deps.ledger, feed, cluster, clock, systemNamespace: deps.systemNamespace, stats, logger }, id, enqueue), logger, deps.reconciler);
-  // 先开观测缓存，再开按记录核对的队列（它等缓存同步完成才开始）。
+  const sweep = deps.orphanSweep === false ? undefined : orphanSweeper(feed, () => sweepOrphans({ feed, ledger: deps.ledger, legacy: deps.legacy, cluster, clock, logger, stats, minAgeMs: (deps.orphanSweep || {}).minAgeMs ?? 600_000 }), logger, deps.orphanSweep || {});
+  // 先开观测缓存，再开按记录核对的队列与孤儿回收（它们都等缓存同步完成才开始）。
   const observer = {
-    start: () => { watcher.start(); reconciler.start(); },
-    stop: async () => { await reconciler.stop(); await watcher.stop(); },
+    start: () => { watcher.start(); reconciler.start(); sweep?.start(); },
+    stop: async () => { await sweep?.stop(); await reconciler.stop(); await watcher.stop(); },
   };
   return { api, http: [adoptionRoutes(api, (id) => deps.isAdmin(id as UserId))], observer, stats: () => ({ ...stats }), reconciled: () => reconciler.drained() };
 }

@@ -17,6 +17,8 @@ export interface ManagedObjectFeed {
   synced(): Promise<void>;
   /** 观测缓存里的对象；同步完成之前的「没有」不能当成对象不存在。 */
   cached(kind: ObservedKind, namespace: string | undefined, name: string): ObservedObject | undefined;
+  /** 观测缓存里这一种的全部对象（孤儿回收逐个核对）。 */
+  list(kind: ObservedKind): readonly ObservedObject[];
 }
 
 /** 一次性列出受管对象（收编空跑报告在 cs-api 里按需算，不开 watch）。 */

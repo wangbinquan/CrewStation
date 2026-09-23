@@ -71,6 +71,9 @@ describe('收编空跑的判定（设计 §6.5）', () => {
     expect(classifyObject({ object: labeled(task), legacyTask: { kind: 'dev-session', state: 'failed', execution: true } })).toMatchObject({ verdict: 'orphan', reason: '任务环境 t1 已失败，对象仍在' });
     expect(classifyObject({ object: labeled(task), legacyTask: { kind: 'business', state: 'released', execution: false } }).reason).toBe('任务环境 t1 已释放，对象仍在');
     expect(classifyObject({ object: labeled(task, 'PersistentVolumeClaim'), legacyTask: 'missing' }).reason).toBe('任务环境 t1 的记录已不存在；工作卷只进入待回收，由管理员确认后删除');
+    // 任务环境已在台账里、记录却不列这个对象（重建换下的旧 Secret、改名前的同 Host 路由）：孤儿，与孤儿回收同一判定。
+    expect(classifyObject({ object: labeled(task, 'Secret'), taskRecorded: true, legacyTask: { kind: 'dev-session', state: 'running', execution: false } }))
+      .toMatchObject({ verdict: 'orphan', reason: '任务环境 t1 的台账记录不列这个对象（重建或改名留下的旧对象）' });
   });
 
   test('系统命名空间里的平台组件单列，不在收编与回收范围；档位测试的 Pod 带任务标签，按任务判定', () => {

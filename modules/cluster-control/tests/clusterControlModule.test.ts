@@ -36,6 +36,7 @@ function manualFeed(): ManagedObjectFeed & { emit(change: ObjectChange): Promise
       await handle?.(change);
     },
     cached: (kind, namespace, name) => cache.get(`${kind}/${namespace ?? ''}/${name}`),
+    list: (kind) => [...cache.entries()].filter(([at]) => at.startsWith(`${kind}/`)).map(([, object]) => object),
   };
 }
 
@@ -77,7 +78,10 @@ describe.skipIf(!available)('cluster-control：观测写回台账与收编空跑
         observe: (input) => resources.api.observe(input), claimOf: (child) => resources.api.claimOf(child), get: (id) => resources.api.get(id),
         listLive: () => resources.api.list({}), changesSince: resources.api.changesSince, latestChange: resources.api.latestChange,
         observeConditions: (id, conditions) => resources.api.observeConditions(id, conditions), children: (parentId) => resources.api.list({ parentId, includeStopped: true }),
+        adoptOrphanVolume: async () => undefined,
       },
+      // 孤儿回收单独在 orphanSweep.test.ts 里核对；这里关掉，免得它的定时轮次与本文件的用例交错。
+      orphanSweep: false,
       reconciler: { pollMs: 20 },
       legacy: { resolveTaskId: async (legacyId) => (legacyId === 'tsk_01a0954107447000b7936485fb80d15d' ? 't-live' : undefined), task: async (taskId) => tasks.get(taskId) },
     });
