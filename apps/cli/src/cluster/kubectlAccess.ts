@@ -9,13 +9,13 @@ export function createKubectlAccess(options: { readonly context: string | undefi
   const prefix = options.context === undefined ? [] : ['--context', options.context];
   return {
     target: [binary, ...prefix].join(' '),
-    run: async (args) => spawnKubectl(binary, [...prefix, ...args]),
+    run: async (args, input) => spawnKubectl(binary, [...prefix, ...args], input),
   };
 }
 
-async function spawnKubectl(binary: string, args: readonly string[]): Promise<ClusterResult> {
+async function spawnKubectl(binary: string, args: readonly string[], input: string | undefined): Promise<ClusterResult> {
   try {
-    const child = Bun.spawn([binary, ...args], { stdout: 'pipe', stderr: 'pipe', stdin: 'ignore' });
+    const child = Bun.spawn([binary, ...args], { stdout: 'pipe', stderr: 'pipe', stdin: input === undefined ? 'ignore' : new Blob([input]) });
     const [stdout, stderr, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited]);
     return { code, stdout, stderr };
   } catch (cause) {

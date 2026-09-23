@@ -2,6 +2,7 @@ import type { ClusterAccess } from './clusterAccess';
 import { firstProblem, ok } from './clusterAccess';
 import type { CheckLine, OperatorContext, OperatorPhase } from './installReport';
 import { checkLine as line } from './installReport';
+import { networkPolicyCheck } from './networkPolicyProbe';
 import { join } from './releaseBundle';
 
 /**
@@ -30,6 +31,8 @@ async function upgradePreflight(ctx: OperatorContext): Promise<readonly CheckLin
     ? line('目标版本', 'pending-config', '发行包没有 release.lock.yaml 或其中没有 version')
     : line('目标版本', 'ok', `${ctx.bundle.version}${ctx.bundle.images.length > 0 ? `，${ctx.bundle.images.length} 个镜像` : ''}`));
   checks.push(await installedDeployments(ctx));
+  // 网络插件可能在两次安装之间被换掉或出故障；不通过就不滚动（D60）。
+  checks.push(await networkPolicyCheck(ctx));
   checks.push(line('依赖兼容与在途资源', 'not-implemented', '网关、数据库 Operator 与 CRD 走各自的发布流程（Design §12.1），CLI 不检查它们的兼容矩阵'));
   return checks;
 }

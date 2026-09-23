@@ -59,14 +59,17 @@ export function memoryFiles(files: Readonly<Record<string, string>>, dirs: reado
 const OK: ClusterResult = { code: 0, stdout: '', stderr: '' };
 
 /** 按 kubectl 参数前缀匹配的假集群；未命中返回失败，免得测试误以为某步成功了。 */
-export function fakeCluster(script: Readonly<Record<string, ClusterResult>>, target = 'kubectl（测试）'): ClusterAccess & { readonly commands: string[] } {
+export function fakeCluster(script: Readonly<Record<string, ClusterResult>>, target = 'kubectl（测试）'): ClusterAccess & { readonly commands: string[]; readonly inputs: Record<string, string> } {
   const commands: string[] = [];
+  const inputs: Record<string, string> = {};
   return {
     target,
     commands,
-    run: async (args) => {
+    inputs,
+    run: async (args, input) => {
       const key = args.join(' ');
       commands.push(key);
+      if (input !== undefined) inputs[`${commands.length - 1}`] = input;
       const hit = Object.entries(script).find(([prefix]) => key.startsWith(prefix));
       return hit?.[1] ?? { code: 1, stdout: '', stderr: `测试脚本里没有 kubectl ${key}` };
     },

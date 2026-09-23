@@ -64,9 +64,17 @@ export function reportSucceeded(reports: readonly PhaseReport[]): boolean {
 }
 
 /** 阶段按顺序串行执行：后一阶段的前提是前一阶段的产物，不能并发。 */
+/**
+ * 预检有失败项（例如网络插件不执行 NetworkPolicy，D60）时，后面的阶段一律不执行、记为跳过，整体结论仍是失败。
+ * 待配置与未实现的预检项不拦：它们说明的是本仓库或配置的缺口，不是集群不满足前提。
+ */
 export async function runPhases(phases: readonly OperatorPhase[], ctx: OperatorContext): Promise<readonly PhaseReport[]> {
   const reports: PhaseReport[] = [];
-  for (const phase of phases) reports.push({ id: phase.id, title: phase.title, checks: await phase.run(ctx) });
+  for (const phase of phases) {
+    const blocked = reports.some((report) => report.id === 'preflight' && phaseOutcome(report) === 'failed');
+    const checks = blocked ? [checkLine('未执行', 'skipped', '预检有失败项，这一阶段不执行')] : await phase.run(ctx);
+    reports.push({ id: phase.id, title: phase.title, checks });
+  }
   return reports;
 }
 

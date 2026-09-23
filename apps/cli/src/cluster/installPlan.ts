@@ -4,6 +4,7 @@ import type { InstallConfig } from './installConfig';
 import { initializePlatform } from './installInitialize';
 import type { CheckLine, OperatorContext, OperatorPhase } from './installReport';
 import { checkLine as line } from './installReport';
+import { networkPolicyCheck } from './networkPolicyProbe';
 import type { ReleaseBundle } from './releaseBundle';
 
 /** Design §11.4 的七个阶段；第 7 步“结果报告”由 installCommand 渲染，不是一个执行阶段。 */
@@ -44,6 +45,7 @@ async function preflight(ctx: OperatorContext): Promise<readonly CheckLine[]> {
   }
   checks.push(bundleCheck(ctx.bundle));
   checks.push(sourceIpCheck(ctx.config));
+  if (reachable.outcome !== 'failed') checks.push(await networkPolicyCheck(ctx));
   checks.push(line('源码托管建仓、推送与保护标签资格', 'not-implemented', `需要以 ${ctx.config.sourceControlBaseUrl} 的凭据实测建仓与打标签；安装器尚未接管 SCM 预检`));
   return checks;
 }

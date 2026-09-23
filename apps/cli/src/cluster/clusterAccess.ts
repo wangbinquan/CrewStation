@@ -13,7 +13,8 @@ export interface ClusterResult {
 export interface ClusterAccess {
   /** 人读的目标描述，进报告用，例如 `kubectl --context docker-desktop`。 */
   readonly target: string;
-  run(args: readonly string[]): Promise<ClusterResult>;
+  /** input 经标准输入交给 kubectl，例如 `apply -f -` 的清单。 */
+  run(args: readonly string[], input?: string): Promise<ClusterResult>;
 }
 
 export function ok(result: ClusterResult): boolean {
