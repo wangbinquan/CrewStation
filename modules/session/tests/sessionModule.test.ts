@@ -42,6 +42,19 @@ beforeAll(async () => {
 });
 afterAll(async () => { server?.stop(true); await tdb?.drop(); });
 
+/**
+ * 事件落库与断开回调都是异步的：按条件轮询到成立为止，不用固定 sleep。
+ * 2026-09-23 CI 35809676244 实撞：负载下 150／200ms 内最后一条事件还没落库，断言红；失败又跳过了关连接，afterAll 丢库时断开回调还在写注册表。
+ */
+async function eventually<T>(read: () => Promise<T> | T, ok: (value: T) => boolean, timeoutMs = 5000): Promise<T> {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    const value = await read();
+    if (ok(value) || Date.now() > deadline) return value;
+    await Bun.sleep(20);
+  }
+}
+
 describe.skipIf(!available)('session module', () => {
   test('原生状态写入 agent 索引，可按单 CLI 和游标分页读取，不混入其他会话', async () => {
     const store = drizzleRunnerEventStore(tdb.db);
@@ -68,8 +81,7 @@ describe.skipIf(!available)('session module', () => {
     good.ws.send(JSON.stringify({ type: 'event', seq: 1, at: new Date().toISOString(), event: { kind: 'agent', event: { agentId: 'a1', seq: 0, at: new Date().toISOString(), type: 'text', text: 'hello' } } }));
     good.ws.send(JSON.stringify({ type: 'event', seq: 2, at: new Date().toISOString(), event: { kind: 'terminalOutput', terminalId: 't1', data: 'ephemeral' } }));
     good.ws.send(JSON.stringify({ type: 'event', seq: 1, at: new Date().toISOString(), event: { kind: 'agent', event: { agentId: 'a1', seq: 0, at: new Date().toISOString(), type: 'text', text: 'duplicate' } } }));
-    await Bun.sleep(150);
-    const stored = await session.api.listEvents(taskId, {});
+    const stored = await eventually(() => session.api.listEvents(taskId, {}), (events) => events.length >= 1);
     expect(stored.map((e) => [e.seq, e.event.kind])).toEqual([[1, 'agent']]);
 
     const browser = await openSocket(`ws://${base}/v1/tasks/${taskId}/stream?sinceSeq=0`, { [IDENTITY_HEADERS.userId]: '01a0bf5d-8f4b-7793-867c-efd7527b386b' });
@@ -86,6 +98,8 @@ describe.skipIf(!available)('session module', () => {
     const cmd2 = await good.next((f) => (f as { type: string; id?: string }).id === 'c2') as { id: string };
     good.ws.send(JSON.stringify({ type: 'result', id: cmd2.id, payload: { path: '.', entries: [] } }));
     expect(await (await internal).json()).toEqual({ payload: { path: '.', entries: [] } });
+    // 同一连接的帧串行处理：上面两条命令的回执都到了，更早发出的重复 seq 与终端输出一定已处理完——都没有落库。
+    expect((await session.api.listEvents(taskId, {})).map((e) => [e.seq, e.event.kind])).toEqual([[1, 'agent']]);
 
     good.ws.send(JSON.stringify({ type: 'event', seq: 3, at: new Date().toISOString(), event: { kind: 'previewState', state: 'ready', port: 3000 } }));
     expect(await browser.next((f) => (f as { seq?: number }).seq === 3)).toMatchObject({ type: 'event' });
@@ -94,8 +108,7 @@ describe.skipIf(!available)('session module', () => {
     expect(await stranger.next((f) => (f as { type: string }).type === 'error')).toMatchObject({ code: 'forbidden' });
 
     good.ws.close();
-    await Bun.sleep(150);
-    expect(connectedEvents).toEqual(['up', 'down']);
+    expect(await eventually(() => [...connectedEvents], (events) => events.includes('down'))).toEqual(['up', 'down']);
     expect(await browser.next((f) => (f as { type: string }).type === 'runnerDisconnected')).toBeDefined();
     await expect(session.api.sendCommand(taskId, { id: 'c3', type: 'previewStatus' })).rejects.toMatchObject({ kind: 'unavailable' });
     browser.ws.close(); stranger.ws.close(); bad.ws.close();
@@ -111,13 +124,17 @@ describe.skipIf(!available)('session module', () => {
     for (let seq = 1; seq <= 5; seq += 1) {
       runner.ws.send(JSON.stringify({ type: 'event', seq, at, event: { kind: 'agent', event: { agentId: 'a1', seq, at, type: 'text', text: `burst ${seq}` } } }));
     }
-    expect(await runner.next((f) => (f as { type: string }).type === 'welcome')).toMatchObject({ resumeFromSeq: 0 });
-    await Bun.sleep(200);
-    expect(runner.frames.some((f) => (f as { type: string }).type === 'error')).toBe(false);
-    expect(runner.ws.readyState).toBe(WebSocket.OPEN);
-    expect((await session.api.listEvents(burstTask, {})).map((e) => e.seq)).toEqual([1, 2, 3, 4, 5]);
-    runner.ws.close();
-    // 断开回调要写注册表，等它落地再让 afterAll 丢库。
-    await Bun.sleep(150);
+    try {
+      expect(await runner.next((f) => (f as { type: string }).type === 'welcome')).toMatchObject({ resumeFromSeq: 0 });
+      // 若第 2 帧被当成第二个 hello，连接会以 1008 断开，后面的事件就永远落不了库。
+      const burst = await eventually(() => session.api.listEvents(burstTask, {}), (events) => events.length >= 5);
+      expect(burst.map((e) => e.seq)).toEqual([1, 2, 3, 4, 5]);
+      expect(runner.frames.some((f) => (f as { type: string }).type === 'error')).toBe(false);
+      expect(runner.ws.readyState).toBe(WebSocket.OPEN);
+    } finally {
+      runner.ws.close();
+      // 断开回调要写注册表，等它落地再让 afterAll 丢库。
+      await eventually(() => session.api.connectionStatus(burstTask), (status) => !status.connected);
+    }
   });
 });
