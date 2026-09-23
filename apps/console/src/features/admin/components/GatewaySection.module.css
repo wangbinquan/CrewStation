@@ -15,7 +15,7 @@
 
 .facts {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
   gap: var(--cs-space-2) var(--cs-space-4);
   margin: 0 0 var(--cs-space-4) 0;
 }

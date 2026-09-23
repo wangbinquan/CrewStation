@@ -301,6 +301,14 @@ TaskRunner 收到 welcome 后立刻补发重放事件，**本机集群里稳定�
 上面那条改完，`onRunnerConnected` 里若 `await` 一个需要 TaskRunner 回执的命令，
 **回执要经同一条串行链回来**，必然自锁到命令超时。这类回调里的派发要 fire-and-forget 并记日志。
 
+### 终端程序的查询也会产生「输入」：别拿输入当人在操作的证据
+
+原生 TUI（OpenCode 等）会不时向终端查询能力、光标位置、配色（DECRQM、DSR、OSC 4/10/11），xterm 自动回应答，
+应答和键盘输入一样从 `onData` 出来、走 `terminalInput`。Runner 的输入控制租约在每次输入时续期，于是人已经离开，
+这些应答仍在替他续租：2026-09-23 实机，离开终端 8 秒后一串应答把释放从 30 秒推迟到 39.5 秒，TUI 查询得勤就永远不释放。
+「人还在不在」要按页面的焦点／可见性判断，由页面自己按时限释放（`nativeTerminalAttachment` 的 `CONTROL_RELEASE_MS`）；
+租约只兜「页面关掉、断线」。另外，没取得控制的视图 `disableStdin`，这些查询它不会应答——只有持有控制的那个视图在替 TUI 回话。
+
 ### Runner 的错误码到浏览器只剩 `PlatformError.kind`
 
 Runner 回的 error 帧带具体 code（如 `terminal_read_only`、`terminal_ended`），cs-session 把它包成 `PlatformError('precondition', message, { code })` 再发给浏览器，
