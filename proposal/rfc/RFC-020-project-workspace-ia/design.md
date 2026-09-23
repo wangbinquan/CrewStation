@@ -158,6 +158,22 @@ tool: z.object({ name: z.enum(['preview', 'code', 'changes', 'data', 'reference'
 
 - 运行与诊断保留 `Tabs`，五个页签。`status` 页签：`HealthCards` 在上（保留「查看此版本日志」）、`TopologyPage` 在下；两者各自的查询与轮询不变。`TracePage` 空态文案改为说明 trace_id 的来源并给事件投递链接。
 
+> **2026-09-23 修订（作者当面裁定，直接修改＋回填，不另立 RFC；Design §14.7、D62）。** `TracePage` 由 `features/traces` 的 `TracesPage` 取代：
+> - **布局**：左 `TraceListCard`，右 `TraceDetail`，按页签内容宽度（容器查询 760px）并排或上下。
+>   - `TraceListCard`：`TraceFilterBar` 放来源、状态、时间三个筛选，`TraceOpenForm` 粘贴 trace_id，列表用 `ResourceRow`，底部「加载更多」。
+>   - `TraceDetail`：`TraceTaskBlock` → `TraceExecutionNode` → 展开 `TraceEvents`。
+> - **地址参数**：新增 `traceSource`、`traceStatus`、`traceWindow`，缺省即全部；`traceId` 不变。
+> - **接口**：旧的平铺回放 `TraceReplayDto` 删除，改为三条：
+>   - `GET /v1/projects/{projectId}/traces`，参数 `source`、`status`、`window`、`cursor`、`limit`；
+>   - `/traces/{traceId}`，分层回放，本项目没有这条链时 404；
+>   - `/traces/{traceId}/executions/{taskId}/events`，`cursor` 是序号。
+> - **服务端**：每次读取都按项目取数。task-runtime、events、business-task、session 各提供按项目的查询，observability 合并；两个来源合并翻页时，按「各来源都已完整扫描到的下界」截断，不丢不重。
+> - **公共件**：`ResourceRow` 加可选 `plain`，首行用正文字体。
+> - **用例**：
+>   - 工作台：`traces` 新增 10 条，`projectNavigation` 的调用链两条改写；
+>   - 模块：`traceChains`、`traceRoutes`，以及四个模块的 `traceQueries`、`traceTasks`、`eventSummary`；
+>   - e2e：新增 `traceChains`；`projectWorkspaceIa`、`capabilityDepth`、`layoutSpacing` 跟着改名与新表单。
+
 > **2026-09-23 修订（作者当面裁定，直接修改＋回填，不另立 RFC）。** `OPERATIONS_TABS` 改为 `topology`、`health`、`logs`、`alerts`、`deliveries`、`trace` 六个，缺省 `topology`；`TopologyPage` 与 `HealthCards` 各占一个页签，各自的查询与轮询不变。`hasLegacyOperationsTab` 只认 `tab=status`，路由把它改写为 `tab=topology`，`health`／`topology` 重新是正式页签名；概览 `DeploymentTopologyCard` 链到 `tab=topology`，`ProjectAttentionBanners` 的健康横幅链到 `tab=health`。
 
 - 参考面板的三段内容见 §5.3；`CatalogPage` 的「表在前、详情在旁」（`OperationsTable` → 选中行右侧 `OperationDetail`：文档、授权状态、申请表单、试调；`SwaggerPanel` 折叠；管理员链接改页脚一行）只在放大形态渲染；事件段顶部一行「最近投递 n 条 · 死信 m 条 →」来自 `api.events.listDeliveries` 的一页计数。

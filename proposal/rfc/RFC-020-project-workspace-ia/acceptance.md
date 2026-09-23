@@ -32,6 +32,8 @@ console 镜像 `cs-console:rfc020-20260923b`（节点导入 manifest `sha256:d5f
 | WS-17 | 通过 | 项目设置五组（环境变量／应用展示／成员与角色／项目信息／高级），项目信息只读、技术详情折叠（`projectResources` 用例；e2e `projectSettingsUx`） |
 | WS-18 | 通过（无头 Chrome） | 四个宽度横向溢出 0，控制台错误 0；暗色主题下参考面板放大两栏；面板页签方向键切换、收起后右缘页签栏可打开（e2e `projectWorkspaceIa`）；中英文文案对账（`i18nParity` 用例）。320px 未单独量测 |
 
+> **2026-09-23 补记。** WS-15 的判据里有两项当时没有落实：一是「调用链空态说明来源」，二是 proposal §4.5 的「名称去掉『回放』」。页签仍叫「调用链回放」，页面只有一个 trace_id 输入框，这一行却记成了通过。今天随调用链列表一并落实（proposal §4.5 同日修订），由用例 `traces`、`projectNavigation` 与 e2e `projectWorkspaceIa`、`traceChains` 覆盖。
+
 **没有做的**：测试者身份只在渲染用例里验证（`releaseDelivery`、`apiInvocationForm` 的 tester 分支），实机只用了 `dev-admin`；Claude Code 登录仍受本机限制，与本 RFC 无关。
 
 ## 顺手修掉的缺陷

@@ -810,6 +810,12 @@ git reset -q HEAD -- <自己的路径>                     # 共享暂存区里�
 工具行的「⋯」菜单与拆分按钮都是 `<details>`；闭合时里面的按钮用户看不见，用例也点不到，先点开 `summary`。
 `click` 找不到目标时会再等几拍（最多 8 次 `settle`），因为面板里的内容常在一次读取之后才出现——不要在用例里再手写 `settle` 循环。
 
+### 新 feature 的文案要加进 `renderApp` 的测试目录：生产靠 `import.meta.glob`，bun test 里没有
+
+2026-09-23 实撞（调用链页）：新建 `features/traces` 后，整页旅程用例里页面显示成 `traces.list.title` 这样的键名，按文案点击全部落空。
+生产的文案目录由 Vite 在编译期按 `features/*/i18n/<locale>.ts` 自动收集（`app/i18n/messageCatalog.ts`），bun test 没有这个能力；
+`apps/console/src/tests/renderApp.tsx` 手工列出各 feature 的 zh-CN 文案。新增 feature 时在那里加一行。`renderElement` 单测组件时文案作为参数传入，不受影响。
+
 ### 实机验收脚本会改掉验收身份的个人布局，作者看到的页面会跟着跳
 
 开发页的面板状态存在**每个用户每个任务**的个人布局里，e2e／量测脚本以 `dev-admin` 打开 `?view=code`、`panel=full` 等地址都会保存进去；
