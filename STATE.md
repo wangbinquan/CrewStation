@@ -34,7 +34,7 @@
 - `0a92896` 实机发现：离开终端后 OpenCode 查询终端能力、光标与配色，xterm 的自动应答走 `terminalInput`、每条都续租，释放拖到 39.5 秒（CDP 抓 WebSocket 帧确认）；改为离开满 `CONTROL_RELEASE_MS` 页面主动 detach。[CI 35809030255](https://github.com/wangbinquan/CrewStation/actions/runs/35809030255) 成功。
 - `ae7ee76` 顺手修：概览底部 `.bottom` 的 `minmax(440px, 1fr)`（RFC-020 `3b7ec74`）在 390／320 宽下把主区撑到 456px、右侧被裁；同类六处统一 `minmax(min(100%, Npx), 1fr)`，新增 `responsiveGrid.test.ts`。
 
-**本机部署**：cs-session 滚到 `cs-control-plane:terminal-control-20260923`（`git archive ec33c69` 构建）；console 先滚 `cs-console:terminal-control-20260923`，之后被并行会话的 `detail-top-20260923(b)` 覆盖——后者含 `ec33c69`、`6825ca7`，**不含 `0a92896`、`ae7ee76`**，要等下一次 console 部署。任务底座 `crewstation/task-runtime:terminal-control-20260923`（`sha256:669e3c94…`）推进集群仓库，`:dev` 底座未动；默认档位 `volc-glm-5-2` 换成新底座重新保存为**修订 4**，档位测试全部通过（拉镜像、Runner 握手、预置配置、起 CLI、真实模型轮次）。修订 4 之前起的 CLI 仍是旧 Runner。
+**本机部署**：cs-session 滚到 `cs-control-plane:terminal-control-20260923`（`git archive ec33c69` 构建）；console 先滚 `cs-console:terminal-control-20260923`，之后经并行会话的 `detail-top-20260923(b)`，现为 crewstation-14 从 `fa542b8` 构建的 `cs-console:fill-height-20260923`（含本节全部提交）。任务底座 `crewstation/task-runtime:terminal-control-20260923`（`sha256:669e3c94…`）推进集群仓库，`:dev` 底座未动；默认档位 `volc-glm-5-2` 换成新底座重新保存为**修订 4**，档位测试全部通过（拉镜像、Runner 握手、预置配置、起 CLI、真实模型轮次）。修订 4 之前起的 CLI 仍是旧 Runner。
 
 **实机两身份核对**（无头 Chrome＋CDP，dev-admin＋dev-developer，演示数字人，新开一个修订 4 的 CLI）：两边空闲 → dev-developer 点进终端得「你正在输入」＋绿框、dev-admin 同时看到「dev-developer 正在输入 · 只读」→ dev-admin 点进被拒且不报错 → dev-developer 点到页面标题离开，两边回到空闲（当时 41 秒，即上面 `0a92896` 修的问题）→ dev-admin 点进取得、对方看到「dev-admin 正在输入」→ dev-admin 离开窗口后在第二个窗口点进，控制直接转过去、第一个窗口显示「你在另一个窗口中输入」。无控制台错误。作者的两个旧 Runner CLI 只读观察（均显示空闲），没有点。
 
@@ -42,7 +42,9 @@
 
 **并行会话的 console 宕机约 6 分钟（09:57–10:03）**：对方滚 `cs-console:detail-top-20260923` 时用 `NODE=$(… source deploy/local/lib.sh; echo $NODE)` 取节点名，但 lib.sh 只定义 `NODE_CONTAINER` 且开 `set -u`，导入静默失败、ImagePullBackOff，Recreate 策略下网关 404。我把对方已构建好的同一镜像导入节点、删掉卡住的 Pod，按对方的选择完成 rollout。
 
-**下一个 session 注意**：`0a92896`（离开约 30 秒释放）与 `ae7ee76`（概览 390／320 不裁切）等下一次 console 部署后实机复核；复核离开释放时注意 OpenCode 的查询应答仍会在离开后的几秒内继续发出，那是正常的。
+**复核（`fill-height-20260923` 上）**：离开终端后 **30.4 秒**释放（修复前 39.5–41 秒；页面在 30 秒时 detach，Runner 随即推「已空闲」）；概览在 390／320 宽下主区 `scrollWidth` 等于可视宽度，不再裁切。复核又临时把演示额度 3→4→3、起一个 CLI 后 stop、按原样还原 dev-developer 的布局。另补 `b23078e`：会话模块用例四处固定 sleep 改按条件轮询（CI 35809676244 的 module 红即此），[CI 35810497939](https://github.com/wangbinquan/CrewStation/actions/runs/35810497939) 六项成功。
+
+**观察（非本次引入，待作者定）**：新开的 CLI 在有人取得输入之前一直是空白——OpenCode 启动要先等终端回答能力／配色查询，而只有持有控制的视图会回话（未持有的 `disableStdin`）；取得后十秒内即渲染出界面。原来要点「获取输入控制」按钮，现在点进终端即可。若希望新开即显示，可以讨论「谁点的 ＋ 就替谁自动取得」。
 
 ## 拓扑详情栏独立滚动、侧栏操作按钮移到顶部、图上方说明行改为时间标签（2026-09-23）
 
