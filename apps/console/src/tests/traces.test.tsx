@@ -173,22 +173,33 @@ describe('调用链回放', () => {
     expect(page.text()).toContain('开发容器被 OOMKilled');
   });
 
-  test('窄屏（详情排在列表下面）选中一条后把详情滚进视野；宽屏左右并排时不滚', async () => {
+  test('窄屏（详情排在列表下面）选中一条后把详情滚进视野；宽屏左右并排时不滚页面，只把详情栏滚回顶', async () => {
     fixture(); page = await renderApp(operations());
     const scrolled: Element[] = [], original = Element.prototype.scrollIntoView;
     Element.prototype.scrollIntoView = function (this: Element) { scrolled.push(this); };
     try {
-      // happy-dom 没有布局：按实机 390px 与 1440px 的相对位置注入列表与详情的边框。
-      const list = document.querySelector('[aria-label="本应用的调用链"]')!.closest('section')!, aside = list.nextElementSibling!;
+      // happy-dom 没有布局：按实机 390px 与 1440px 的相对位置注入列表栏与详情栏的边框。
+      const list = document.querySelector('[aria-label="本应用的调用链"]')!.closest('section')!.parentElement!, aside = list.nextElementSibling as HTMLElement;
       const rect = (top: number, bottom: number) => () => new DOMRect(0, top, 300, bottom - top);
       list.getBoundingClientRect = rect(0, 900); aside.getBoundingClientRect = rect(912, 1400);
       // 只比较数量与同一性：对 happy-dom 节点做 toEqual，失败时序列化节点会让整套用例像卡死（dev-gotchas）。
       await page.click('开发会话 · 小林');
       expect(scrolled.length).toBe(1); expect(scrolled[0] === aside).toBe(true); expect(page.search().traceId).toBe(sessionTrace);
-      aside.getBoundingClientRect = rect(0, 600);
+      aside.getBoundingClientRect = rect(0, 600); aside.scrollTop = 240;
       await page.click('事件 gitlab.push → 业务任务');
-      expect(scrolled.length).toBe(1); expect(page.search().traceId).toBe(eventTrace);
+      expect(scrolled.length).toBe(1); expect(aside.scrollTop).toBe(0); expect(page.search().traceId).toBe(eventTrace);
     } finally { Element.prototype.scrollIntoView = original; }
+  });
+
+  test('两栏的高度量到窗口底边：窗口变了重新量，窗口过矮时不低于 360px', async () => {
+    fixture(); page = await renderApp(operations());
+    const host = document.querySelector('[aria-label="本应用的调用链"]')!.closest('section')!.parentElement!.parentElement!.parentElement!;
+    host.getBoundingClientRect = () => new DOMRect(0, 180, 1000, 400);
+    await act(async () => { window.dispatchEvent(new Event('resize')); });
+    expect(host.style.getPropertyValue('--trace-fill')).toBe(`${window.innerHeight - 180}px`);
+    host.getBoundingClientRect = () => new DOMRect(0, window.innerHeight - 100, 1000, 400);
+    await act(async () => { window.dispatchEvent(new Event('resize')); });
+    expect(host.style.getPropertyValue('--trace-fill')).toBe('360px');
   });
 
   test('本项目里没有这条链时写明原因（可能属于别的项目）', async () => {

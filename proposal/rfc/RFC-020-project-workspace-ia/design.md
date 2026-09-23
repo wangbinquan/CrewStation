@@ -174,6 +174,8 @@ tool: z.object({ name: z.enum(['preview', 'code', 'changes', 'data', 'reference'
 >   - 模块：`traceChains`、`traceRoutes`，以及四个模块的 `traceQueries`、`traceTasks`、`eventSummary`；
 >   - e2e：新增 `traceChains`；`projectWorkspaceIa`、`capabilityDepth`、`layoutSpacing` 跟着改名与新表单。
 
+> **2026-09-23 修订二（作者反馈「左侧太长了，搞出来整页滚动条」，直接修改＋回填，不另立 RFC）。** 宽屏（页签内容宽于 760px）时两栏长满到窗口底边、各自滚动，整页不出纵向滚动条：`useViewportFill` 量出容器顶边到窗口底边的高度（扣主区下内边距，不低于 360px，窗口或主区尺寸变化时重量）；`TraceListCard` 的筛选与「按 trace_id 打开」固定在卡片上部，行与「加载更多」在卡片内的滚动区里；详情栏自己滚，换选一条时滚回顶部。窄屏上下排不变（选中后把详情滚进视野）。用例：`traces` 改写滚动一条、新增量高一条；e2e `traceChains` 在 1280px 断言整页不纵向滚、两栏底边在窗口内。
+
 > **2026-09-23 修订（作者当面裁定，直接修改＋回填，不另立 RFC）。** `OPERATIONS_TABS` 改为 `topology`、`health`、`logs`、`alerts`、`deliveries`、`trace` 六个，缺省 `topology`；`TopologyPage` 与 `HealthCards` 各占一个页签，各自的查询与轮询不变。`hasLegacyOperationsTab` 只认 `tab=status`，路由把它改写为 `tab=topology`，`health`／`topology` 重新是正式页签名；概览 `DeploymentTopologyCard` 链到 `tab=topology`，`ProjectAttentionBanners` 的健康横幅链到 `tab=health`。
 
 - 参考面板的三段内容见 §5.3；`CatalogPage` 的「表在前、详情在旁」（`OperationsTable` → 选中行右侧 `OperationDetail`：文档、授权状态、申请表单、试调；`SwaggerPanel` 折叠；管理员链接改页脚一行）只在放大形态渲染；事件段顶部一行「最近投递 n 条 · 死信 m 条 →」来自 `api.events.listDeliveries` 的一页计数。

@@ -31,11 +31,13 @@ export function TraceListCard({ projectId, filters, selected, onFilters, onOpen 
   const last = pages.at(-1), cursor = last?.nextCursor;
   // 一页没找够就给了游标：服务端扫到了轮数上限，写明查到了哪一刻，按钮改叫「继续往前查找」。
   const partial = Boolean(cursor && last && last.items.length < TRACE_PAGE_SIZE);
-  return <Card stacked compact title={t('traces.list.title')}>
+  // 行与「加载更多」在一个滚动区里：宽屏两栏长满可视高度时只有它滚，筛选与「按 trace_id 打开」停在上面。
+  return <Card stacked compact className={styles.listCard} title={t('traces.list.title')}>
     <TraceFilterBar filters={filters} onChange={onFilters} />
     <TraceOpenForm onOpen={onOpen} />
     <QueryStatus isPending={list.isPending} error={list.error} />
     {list.data && rows.length === 0 && !cursor ? <EmptyState title={t(filtered ? 'traces.list.emptyFiltered' : 'traces.list.empty')} {...(filtered ? {} : { description: t('traces.list.emptyHint') })} /> : null}
+    {rows.length > 0 || cursor ? <div className={styles.listScroll}>
     {rows.length > 0 ? <ul className={styles.rows} aria-label={t('traces.list.label')}>
       {rows.map((row) => <ResourceRow key={row.traceId} plain current={row.traceId === selected} onActivate={() => onOpen(row.traceId)} activateLabel={row.traceId}
         title={rowTitle(row, names, t)} meta={<MetaLine parts={[dateText(row.startedAt), ...rowFacts(row, t)]} />}
@@ -44,6 +46,7 @@ export function TraceListCard({ projectId, filters, selected, onFilters, onOpen 
     {cursor ? <div className={styles.more}>
       <Button disabled={list.isFetchingNextPage} onClick={() => void list.fetchNextPage()}>{t(partial ? 'traces.list.keepLooking' : 'traces.list.more')}</Button>
       {partial ? <span className={styles.muted}>{t('traces.list.scanned', { time: dateText(cursor.split('~')[0]) })}</span> : null}
+    </div> : null}
     </div> : null}
   </Card>;
 }

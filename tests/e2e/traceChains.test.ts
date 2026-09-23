@@ -5,7 +5,7 @@ import { openAdminSession } from './session';
 
 /**
  * 运行与诊断 → 调用链（2026-09-23 作者裁定，修订 RFC-020 §4.5）：左边列出本应用全部调用链，右边是选中那条的分层回放；
- * 窄屏列表在上、详情在下。只量结构、接口作用域与形态，不断言会变的业务数据。
+ * 宽屏两栏长满到窗口底边、各自滚动（整页不出纵向滚动条），窄屏列表在上、详情在下。只量结构、接口作用域与形态，不断言会变的业务数据。
  */
 const session = await e2eAvailable() ? await openAdminSession() : undefined;
 afterAll(async () => { await session?.close(); }, 30_000);
@@ -32,8 +32,19 @@ describe.skipIf(!session?.project)('调用链（运行与诊断）', () => {
         const detail = [...document.querySelectorAll('section')].find((node) => node.querySelector('h2')?.textContent === '调用链详情').getBoundingClientRect();
         return { listRight: list.right, listBottom: list.bottom, detailLeft: detail.left, detailTop: detail.top };
       })()`);
-      if (width >= 1024) expect(layout.detailLeft).toBeGreaterThanOrEqual(layout.listRight);
-      else {
+      if (width >= 1024) {
+        expect(layout.detailLeft).toBeGreaterThanOrEqual(layout.listRight);
+        // 2026-09-23 作者：列表太长撑出了整页滚动条。两栏底边落在窗口内，整页不纵向滚；行多时滚的是列表自己的滚动区。
+        const fill = await page.eval<{ page: number; listBottom: number; asideBottom: number; aside: string; scroller: boolean }>(`(() => {
+          const list = document.querySelector(${JSON.stringify(LIST)}), aside = [...document.querySelectorAll('section')].find((s) => s.querySelector('h2')?.textContent === '调用链详情').parentElement;
+          const scroll = list.parentElement, col = list.closest('section').parentElement;
+          return { page: document.documentElement.scrollHeight - innerHeight, listBottom: col.getBoundingClientRect().bottom, asideBottom: aside.getBoundingClientRect().bottom,
+            aside: getComputedStyle(aside).overflowY, scroller: scroll.scrollHeight <= scroll.clientHeight + 1 || getComputedStyle(scroll).overflowY === 'auto' };
+        })()`);
+        expect(fill.page).toBeLessThanOrEqual(1);
+        expect(fill.listBottom).toBeLessThanOrEqual(900); expect(fill.asideBottom).toBeLessThanOrEqual(900);
+        expect(fill.aside).toBe('auto'); expect(fill.scroller).toBe(true);
+      } else {
         expect(layout.detailTop).toBeGreaterThanOrEqual(layout.listBottom);
         // 2026-09-23 实机：窄屏点选后详情仍在列表下方两千多像素处——路由导航复位滚动，冲掉了滚向详情的动作。
         // 详情很短时页面滚到底也到不了顶部（实测停在 659px，整块可见），所以只要求它的顶部进入可视区、至少露出 60px。
