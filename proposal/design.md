@@ -3,7 +3,7 @@
 
 > RFC-013 基线补充（2026-09-21）：平台资源与引用统一为 36 字符、小写、带连字符的 UUIDv7；名称用于展示和搜索。Manifest v2、业务 API v2、Runner v3 及历史兼容边界见 [资源身份设计](./rfc/RFC-013-resource-uuid/design.md)。实施与发布证据见该 RFC 的 plan。
 > 状态：设计草案，待原型与评审验证  
-> 版本：0.3.11 · 整理日期：2026-09-10
+> 版本：0.3.12 · 整理日期：2026-09-10
 > 修订日期：2026-09-11（v0.2.0：任务级执行环境、代码托管与持续意图修改）  
 > 修订日期：2026-09-11（v0.3.0：与 Proposal v0.3.0 同步，平台职责收窄、标签发布、网关鉴权、接入容器与事件中心、规模目标；删除 ZIP 与知识飞轮）  
 > 修订日期：2026-09-11（v0.3.1：选型按 tech-evaluation.md 确认并回填 §3）  
@@ -17,6 +17,7 @@
 > 修订日期：2026-09-23（v0.3.9：RFC-021 回填——待验证版本下线、到期自动下线与从发布记录重新部署；正式版本维护的三个开关与临时放行；项目维护即破坏性迁移窗口；新增 §6.9、D56、D57，作废暂停项目）
 > 修订日期：2026-09-23（v0.3.10：RFC-022 回填——启动进度：分段、来源、保存与显示；创建者窗口自动取得输入控制；新增 §5.10、D58）
 > 修订日期：2026-09-23（v0.3.11：Agent 不再分权限档——开发会话与业务子任务一律完全权限，Manifest `agentProfiles[].permission` 作废、旧值照收不用；新增 D59，§13.4 补一条接受的风险；另记 §5.10 的 RFC-022 同日修订：重新开始时回收失败会话的容器与工作卷）
+> 修订日期：2026-09-23（v0.3.12：安装与升级预检实测网络插件确实执行 NetworkPolicy，预检有失败项即停止；新增 D60，改 §11.1、§11.4、§12.2；顺带删掉 §11.3 配置示例里 RFC-018 已下线的 `egress` 段）
 > 配套文档：[Proposal](./proposal.md) · [Plan](./plan.md) · [Tech Evaluation](./tech-evaluation.md) · [设计门检视](./reviews/design-gate-2026-09-11.md)
 
 ## 目录
@@ -882,7 +883,7 @@ TaskRunner 出向连接 cs-session：携带绑定 cs-session audience 的投影�
 
 ### 11.1 安装边界与模式
 
-“空集群”指节点、网络、DNS 与容器运行条件可用但未安装 CrewStation。管理员还需提供公司源码托管地址、目标 Group 与建仓、推送、创建标签资格，身份体系与模型访问，以及集群可达的依赖源。安装预检必须验证所选 CNI 在 Pod 到网关路径上保留源 IP。
+“空集群”指节点、网络、DNS 与容器运行条件可用但未安装 CrewStation。管理员还需提供公司源码托管地址、目标 Group 与建仓、推送、创建标签资格，身份体系与模型访问，以及集群可达的依赖源。安装预检必须验证所选 CNI 在 Pod 到网关路径上保留源 IP，并实测它确实执行 NetworkPolicy（D60）：项目命名空间的出站隔离（D54）全靠 NetworkPolicy，而不执行它的网络插件照样建得出策略、只是不生效。
 
 | 模式 | 用途 | 限制 |
 |---|---|---|
@@ -944,9 +945,6 @@ sourceControl:
 integrations:
   gitlabEventProducer: { enabled: true, webhookSecretRef: gitlab-webhook-secret }
   referenceApiProxy: { enabled: true, upstreamConnection: test-gitlab }
-egress:
-  mode: proxy
-  allowlist: [<model-endpoints>, git.example.com, registry.example.com, <dependency-mirrors>]
 logging: { mode: bundled }
 alerts: { channel: <tbd> }               # Q20
 storage: { mode: existing, blockStorageClass: company-block }
@@ -963,7 +961,7 @@ backup: { configurationSecretRef: off-cluster-backup }
 
 ### 11.4 安装阶段
 
-1. **预检与计划**：权限、节点、资源余量、镜像来源、入口、DNS、证书、CSI、Secret 引用、模型与公司接入、CNI 源 IP 保留；源码托管另验建仓、推送、创建与保护标签。
+1. **预检与计划**：权限、节点、资源余量、镜像来源、入口、DNS、证书、CSI、Secret 引用、模型与公司接入、CNI 源 IP 保留、NetworkPolicy 实测（D60：临时命名空间里放一个应答端和两个探针 Pod，套了禁止出站策略的必须连不上、没套的必须连得上，测完删除）；源码托管另验建仓、推送、创建与保护标签。预检有失败项时后续阶段不执行，报告记为失败。
 2. **基础组件**：CRD 与 Controller 就绪；日志采集。
 3. **数据底座**：平台与业务 PostgreSQL（高可用）、对象存储、必要 registry；验证账号隔离。
 4. **平台应用**：网关（用户域与服务域）、五个自研服务多副本、两个 MCP、任务容器镜像；数据库迁移经带锁任务运行。
@@ -986,7 +984,7 @@ backup: { configurationSecretRef: off-cluster-backup }
 
 ### 12.2 平台升级
 
-`crewstation upgrade --bundle ./new-release --config ./install.yaml`。先做新旧版本都能读取的扩展迁移，再滚动各服务副本；cs-session 排空时 TaskRunner 连接重连到其他副本，不重发用户指令；cs-controller 通过租约交接；网关放行表与身份索引版本连续。签名密钥轮换保留重叠期。回退只覆盖框架管理的资源。
+`crewstation upgrade --bundle ./new-release --config ./install.yaml`。升级预检同样实测网络插件执行 NetworkPolicy（D60）：两次安装之间插件可能被换掉或出故障，预检有失败项就不迁移、不滚动。通过后先做新旧版本都能读取的扩展迁移，再滚动各服务副本；cs-session 排空时 TaskRunner 连接重连到其他副本，不重发用户指令；cs-controller 通过租约交接；网关放行表与身份索引版本连续。签名密钥轮换保留重叠期。回退只覆盖框架管理的资源。
 
 ### 12.3 业务服务升级
 
@@ -1162,6 +1160,7 @@ Kubernetes 原生动作使用 UID/resourceVersion 条件；开发工作区经保
 | D57 | 正式版本只有「维护中」、不停机：用户流量、服务域调用、事件推送三个独立开关，只有负责人与管理员能进入、调整、退出，成员、管理员与临时指定的人照常进入，项目自己的负载不拦，维护跟着正式入口走、手动退出；平台维护页与市场标注；项目维护且三个开关都拦即破坏性迁移窗口（部署与切流都要求），替代全平台 `CS_MAINTENANCE_WINDOW`；基线的「暂停项目」作废 | 要求（作者 2026-09-23 裁定 RFC-021 M3、M4、M6–M9、M13–M18、M20、M25、M27） |
 | D58 | 启动进度由后端统一产出并保存：分段种类、起止时间与细节来自 Pod、Events 与 Runner 事件，只进不退、首尾相接，只有平台判定才记失败（Kubernetes 自己还在重试的记为警告）；工作台、CLI 与档位测试共用一个步骤条组件，失败给出重试（开发会话按失败位置，CLI 原位替换）与日志；点击创建的窗口自动取得新 CLI 的输入控制，Runner 在启动中接受取得（协议号不变） | 要求（作者 2026-09-23 批准 RFC-022 并裁定其提案 D1–D8、Q1–Q4） |
 | D59 | Agent 不再分权限档：开发会话的 CLI、历史 Agent 与业务子任务的 Agent 一律以完全权限启动，界面与启动接口不再有权限；Manifest `agentProfiles[].permission` 作废、旧值照收不用；访问生产数据只由负责人批准的 TaskDataBinding 控制 | 要求（作者 2026-09-23 当面裁定：「为什么要限制呢，都是开发容器。只有连生产库才有对生产库的权限控制才对」；业务子任务一并适用，旧写法接受并忽略） |
+| D60 | 安装与升级预检实测网络插件确实执行 NetworkPolicy：临时命名空间里放一个应答端和两个探针 Pod，套了禁止出站策略的必须连不上、没套的必须连得上，测完删除；不通过就停止，不继续安装、不迁移也不滚动。项目命名空间的出站隔离（D54）全靠 NetworkPolicy，而不执行它的网络插件照样建得出策略、只是不生效 | 要求（作者 2026-09-23 裁定；起因是本机 kind 集群自带的 kindnet 执行策略有缺陷，导致 Runner 反复掉线，见 `docs/engineering/dev-gotchas.md`「本机集群的网络插件是 Calico」） |
 
 ### 15.3 待决项与退出条件
 
