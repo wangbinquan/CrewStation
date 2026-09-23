@@ -1,6 +1,6 @@
 # RFC-022｜技术设计
 
-> 状态：Draft · 2026-09-23 · 作者裁定见 [提案](./proposal.md) §4，待裁定见提案 §8
+> 状态：In Progress · 2026-09-23 · 作者裁定见 [提案](./proposal.md) §4 与 §8（第三轮批准并实施）
 > 配套：[提案](./proposal.md) · [计划](./plan.md)
 
 ## 目录
@@ -204,7 +204,7 @@ task-runtime 的适配器（`adapters/k8s/taskCluster.ts`）增加 `observeStart
 
 `DevSessionDto.startup` 就是开发会话环境的 `startup`：五段全部由 task-runtime 产出（§3.2），dev-session 在 `toDto`（`application/sessionLifecycle.ts:11-17`）里原样带出。重建由 `requestRebuild` 重置为重建的五段，旧的启动过程被替换（提案 B10）；`DevSessionDto.rebuild` 照旧保留。
 
-重试（提案 Q1，推荐方案）只在工作台组合已有动作：失败在 `checkout` 或更早时，调用释放与开始开发（同一分支）；失败在 `connect` 时，打开现有恢复流程（`inspectRebuild`／`requestRebuild`）。后端不加接口。
+重试（提案 Q1）只在工作台组合已有动作：失败在 `checkout` 或更早时，调用释放与开始开发（同一分支）；失败在 `connect` 时，打开现有恢复流程（`inspectRebuild`／`requestRebuild`）。后端不加接口。
 
 ## 6. 档位测试迁移
 
@@ -258,7 +258,7 @@ task-runtime 的适配器（`adapters/k8s/taskCluster.ts`）增加 `observeStart
 
 - `LiveNativeTerminalView`（`components/native/NativeTerminalView.tsx:52-96`）：`startup` 存在且未就绪时，在终端区域上层居中显示 `StageProgress`；xterm 照常挂载、照常接上（为了 §7 的提前取得），只是被盖住。就绪后移除步骤条。
 - 状态条：启动中显示「启动中 x/6 · 当前段名 · 细节 · 计时」；失败显示「启动失败 · 段名：原因」；就绪后恢复今天的输入控制状态行。标签头的「启动中」后加「x/6」。
-- 失败时的按钮：「重试」按提案 Q2；「查看执行容器日志」展开 `logTail`，执行容器还在时另给日志页入口（`source: dev-session`、`taskId`＝执行任务，日志按 Pod 标签 `crewstation.io/task` 读取，执行 Pod 带这个标签：`modules/task-runtime/adapters/k8s/taskObjects.ts:49`）。
+- 失败时的按钮：「重试」按提案 Q2（原位替换：同样的档位选择、权限、工作目录新开一个，在本人的布局里占据失败标签的位置）；「查看执行容器日志」展开 `logTail`，执行容器还在时另给日志页入口（`source: dev-session`、`taskId`＝执行任务，日志按 Pod 标签 `crewstation.io/task` 读取，执行 Pod 带这个标签：`modules/task-runtime/adapters/k8s/taskObjects.ts:49`）。
 - 已结束、已失败的 CLI 仍走 `SavedNativeTerminalView`；启动阶段就失败的（没有末屏）显示冻结的步骤条代替空白末屏。
 
 ### 8.3 开发会话

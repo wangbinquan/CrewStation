@@ -1,6 +1,6 @@
 # RFC-022｜实施计划
 
-> 状态：Draft · 2026-09-23 · 三件套待作者批准；提案 §8 的 Q1–Q4 待裁定
+> 状态：In Progress · 2026-09-23 · 作者批准三件套并裁定 Q1–Q4（提案 §8）
 > 配套：[提案](./proposal.md) · [技术设计](./design.md)
 
 ## 目录
@@ -13,7 +13,7 @@
 
 | 任务 | 内容 | 依赖 | 状态 |
 |---|---|---|---|
-| RFC-022-T1 | 作者两轮裁定 D1–D8；三件套落档并登记 | 作者 | 落档完成（2026-09-23），待批准与 Q1–Q4 |
+| RFC-022-T1 | 作者两轮裁定 D1–D8；三件套落档并登记；第三轮批准并裁定 Q1–Q4 | 作者 | 已完成（2026-09-23，Draft `84eec38`，作者「批准并实施」） |
 | RFC-022-T2 | 契约：`api/progress/startupProgress.ts`（三个 Schema、`currentStage`）；`NativeTerminalDto`、`DevSessionDto` 的 `startup`；`ProfileTestStage` 改为公共阶段的扩展、旧种类可读；Schema 用例；`contracts:lock` 确认不涉及业务契约面 | T1 | 未开始 |
 | RFC-022-T3 | `packages/k8s/podStartup.ts`：从 Pod 与 Events 读出调度、容器起止、镜像拉取；夹具用例 | T1 | 未开始 |
 | RFC-022-T4 | task-runtime 存储与推导：`startup` 列、迁移 `0009_environment_startup.sql` 与迁移锁、部分索引、仓储映射；`domain/podFailures.ts` 更名 `domain/podStartup.ts` 并加推导；设计 §3.2 的全部写入点；环境视图带 `startup`；单元与模块用例 | T2、T3 | 未开始 |
@@ -26,7 +26,7 @@
 | RFC-022-T11 | 工作台创建者自动取得：本窗口登记、启动中提前取得与旧 Runner 回退、焦点规则、`resize` 延后；用例 | T7、T10 | 未开始 |
 | RFC-022-T12 | 工作台开发会话：创建与重建的步骤条、页头芯片、重试（按 Q1）、启动期间每秒刷新；用例 | T4、T8 | 未开始 |
 | RFC-022-T13 | `crewstation session open／show` 打印启动过程；用例 | T2 | 未开始 |
-| RFC-022-T14 | 按 Q3、Q4 的裁定补做（就绪后查看启动过程；运维 MCP 工具）或记为不做 | Q3、Q4 | 未开始 |
+| RFC-022-T14 | Q3、Q4：作者未勾选，按题面不做（就绪后不提供查看入口；运维 MCP 不加工具） | Q3、Q4 | 不做（2026-09-23 裁定） |
 | RFC-022-T15 | 本地 gate、改动行防护、提交推送、精确 SHA CI 六项 | T2–T14 | 未开始 |
 | RFC-022-T16 | 本机部署（控制面、工作台、任务底座镜像；默认档位用新底座重建镜像并另存修订）与实机验收 SP-01…SP-13，写 `acceptance.md` | T15 | 未开始 |
 | RFC-022-T17 | 回填：RFC-003、RFC-006、RFC-008 加修订记录；基线 Design §5 增加启动进度，Plan 新增验收编号（回填时分配）；README、STATE.md 收口 | T16 | 未开始 |
