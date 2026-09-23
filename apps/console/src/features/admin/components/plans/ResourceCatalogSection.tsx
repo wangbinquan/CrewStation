@@ -3,16 +3,16 @@ import { UnsavedChangesGuard } from '../../../../shared/navigation/UnsavedChange
 import { ActionNote } from '../../../../shared/ui/ActionNote';
 import { Button } from '../../../../shared/ui/Button';
 import { Card } from '../../../../shared/ui/Card';
-import { ConfirmationPanel } from '../../../../shared/ui/ConfirmationPanel';
 import { DataTable } from '../../../../shared/ui/DataTable';
 import { QueryStatus } from '../../../../shared/ui/QueryStatus';
+import { ConfirmationDialog } from '../../../../shared/ui/dialog/ConfirmationDialog';
 import { useResourceCatalogDraft } from '../../hooks/useResourceCatalogDraft';
 import { useResourceCatalogWrite } from '../../hooks/useResourceCatalogWrite';
 import type { ResourceCatalogKind } from '../../model/resourceCatalogDraft';
 import { ResourceCatalogConfirmation } from './ResourceCatalogConfirmation';
 import { ResourceCatalogForm } from './ResourceCatalogForm';
 
-/** 服务与任务资源各自调用原目录端点；只共用字段、草稿和确认交互。 */
+/** 服务与任务资源各自调用原目录端点；只共用字段、草稿和确认交互。载入前的放弃确认与保存前的核对是确认弹窗（2026-09-23 起）。 */
 export function ResourceCatalogSection({ kind }: { readonly kind: ResourceCatalogKind }) {
   const t = useT(), editor = useResourceCatalogDraft(kind), writer = useResourceCatalogWrite(kind, editor.load);
   const { query, save, busy, unavailable } = writer, prefix = kind === 'service' ? 'plans' : 'profiles';
@@ -24,7 +24,7 @@ export function ResourceCatalogSection({ kind }: { readonly kind: ResourceCatalo
       <td>{entry.name}<br /><code>{entry.id}</code></td><td>{entry.cpu}</td><td>{entry.memory}</td><td>{'maxReplicas' in entry ? entry.maxReplicas : entry.storage}</td><td>{entry.description || t('admin.none')}</td>
       <td><Button size="small" disabled={busy || frozen || unavailable} onClick={() => { writer.resetFeedback(); editor.requestLoad(entry); }}>{t('admin.resource.edit')}</Button></td>
     </tr>)}</DataTable> : null}
-    {editor.replacement !== undefined ? <ConfirmationPanel question={t('admin.resource.replaceQuestion', { name: editor.replacement?.name ?? t('admin.resource.emptyDraft') })} confirmLabel={t('admin.resource.replace')} cancelLabel={t('ui.draft.stay')} onConfirm={editor.replace} onCancel={editor.cancelReplacement} busy={busy} /> : null}
+    {editor.replacement !== undefined ? <ConfirmationDialog question={t('admin.resource.replaceQuestion', { name: editor.replacement?.name ?? t('admin.resource.emptyDraft') })} confirmLabel={t('admin.resource.replace')} cancelLabel={t('ui.draft.stay')} focus="cancel" onConfirm={editor.replace} onCancel={editor.cancelReplacement} busy={busy} /> : null}
     <ResourceCatalogConfirmation kind={kind} writer={writer} />
     {writer.error ? <ActionNote tone="error">{writer.error}</ActionNote> : null}
     {busy ? <ActionNote tone="neutral">{t('admin.resource.pendingNote')}</ActionNote> : null}

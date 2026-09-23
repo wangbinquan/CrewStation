@@ -110,13 +110,16 @@ describe('复制档位与推送凭据（RFC-006）', () => {
   test('复制：新名称先过长度校验，成功后直接打开副本的编辑页', async () => {
     await open();
     await clickIn(await actions('claude-daily'), '复制');
-    const name = (await actions('claude-daily')).querySelector<HTMLInputElement>('form input')!;
+    // 2026-09-23 起新名称在弹窗里填。
+    expect(openDialog().textContent).toContain('复制档位「claude-daily」');
+    const name = openDialog().querySelector<HTMLInputElement>('input')!;
     expect(name.value).toBe('claude-daily-copy');
     await type(name, 'x'.repeat(81));
-    expect((await actions('claude-daily')).textContent).toContain('名称需为 1–80 个字符。');
-    expect(buttonIn(await actions('claude-daily'), '复制为新档位')!.disabled).toBe(true);
-    await type((await actions('claude-daily')).querySelector<HTMLInputElement>('form input')!, 'claude-weekly');
-    await clickIn(await actions('claude-daily'), '复制为新档位');
+    expect(openDialog().textContent).toContain('名称需为 1–80 个字符。');
+    expect(buttonIn(openDialog(), '复制为新档位')!.disabled).toBe(true);
+    await type(openDialog().querySelector<HTMLInputElement>('input')!, 'claude-weekly');
+    await clickIn(openDialog(), '复制为新档位');
+    expect(document.querySelectorAll('dialog[open]').length).toBe(0);
     expect(backend!.writes).toEqual([{ method: 'POST', path: `/v1/admin/compute-profiles/${profileIdOf('claude-daily')}/copy`, query: '', body: { name: 'claude-weekly' } }]);
     expect(page!.search()).toEqual({ profile: backend!.state.profiles.find((p) => p.name === 'claude-weekly')!.id });
     expect(page!.text()).toContain('claude-weekly');
@@ -160,7 +163,7 @@ describe('复制档位与推送凭据（RFC-006）', () => {
   });
 });
 
-test('更多操作独立占整行；收起保留复制草稿，Escape 返回触发按钮并撤销待确认操作', async () => {
+test('更多操作独立占整行；复制弹窗关窗与收起都保留草稿、清空回到默认名，Escape 返回触发按钮并撤销待确认操作', async () => {
   await open();
   const target = row('opencode-lite'), trigger = buttonIn(target, '更多操作')!;
   expect(trigger.getAttribute('aria-expanded')).toBe('false');
@@ -171,12 +174,22 @@ test('更多操作独立占整行；收起保留复制草稿，Escape 返回触�
   expect(panel.closest('td')?.colSpan).toBe(4);
   expect(panel.getAttribute('aria-label')).toContain('opencode-lite');
   expect(trigger.getAttribute('aria-expanded')).toBe('true');
+  // 表格行里的动作是紧凑档（2026-09-23 按钮统一）；删除红字红框。
+  for (const label of ['编辑', '更多操作']) expect(buttonIn(target, label)!.className.split(' ')).toContain('small');
+  for (const label of ['复制', '设为默认', '停用', '删除']) expect(buttonIn(panel, label)!.className.split(' ')).toContain('small');
+  expect(buttonIn(panel, '删除')!.className.split(' ')).toContain('danger');
   await clickIn(panel, '复制');
-  await type(panel.querySelector<HTMLInputElement>('form input')!, 'my-profile-copy');
+  await type(openDialog().querySelector<HTMLInputElement>('input')!, 'my-profile-copy');
+  await clickIn(openDialog(), '取消');
+  expect(document.querySelectorAll('dialog').length).toBe(0);
   await clickIn(target, '更多操作');
   expect(document.getElementById(trigger.getAttribute('aria-controls')!)).toBeNull();
   const reopened = await actions('opencode-lite');
-  expect(reopened.querySelector<HTMLInputElement>('form input')!.value).toBe('my-profile-copy');
+  await clickIn(reopened, '复制');
+  expect(openDialog().querySelector<HTMLInputElement>('input')!.value).toBe('my-profile-copy');
+  await clickIn(openDialog(), '清空');
+  expect(openDialog().querySelector<HTMLInputElement>('input')!.value).toBe('opencode-lite-copy');
+  await clickIn(openDialog(), '取消');
   // 鼠标点按钮会先让它获得焦点；程序化 click 不会，所以先聚焦再点。
   const remove = buttonIn(reopened, '删除')!; remove.focus(); await act(async () => remove.click()); await page!.settle();
   // 弹窗里的 Esc 只关弹窗，不连带收起操作面板；焦点回到「删除」。

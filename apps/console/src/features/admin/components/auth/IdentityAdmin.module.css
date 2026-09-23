@@ -33,3 +33,5 @@
 .container > header > * { min-width: 0; max-width: 100%; }
 .container > header span { white-space: normal; overflow-wrap: anywhere; }
 .fieldStack > span { justify-self: start; }
+/* 分组页签里的字段组：只用来整体禁用，不画 fieldset 的边框与留白。 */
+.bare { border: 0; padding: 0; margin: 0; min-width: 0; }

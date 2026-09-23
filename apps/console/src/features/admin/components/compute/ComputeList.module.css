@@ -41,7 +41,6 @@
 .profileTable .actionRow > td { background: var(--cs-color-bg); padding-top: 0; }
 .actionPanel { display: grid; gap: var(--cs-space-3); padding: var(--cs-space-3); border: 1px solid var(--cs-color-border); border-radius: var(--cs-radius-md); }
 .destructive > button:not(:disabled) { color: var(--cs-color-danger); }
-.copyForm { display: grid; gap: var(--cs-space-2); max-width: 32rem; padding-top: var(--cs-space-3); border-top: 1px solid var(--cs-color-border); }
 
 @media (max-width: 1000px) {
   .profileTable { min-width: 0; }

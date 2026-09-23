@@ -21,9 +21,9 @@ export const settingsMessages: MessagesShapedLike<typeof zhCN> = {
   'admin.settings.autoOffline.defaults': 'Using the platform defaults; never changed.',
   'admin.settings.autoOffline.updatedAt': 'Last changed {time}.',
   'admin.settings.autoOffline.edit': 'Change',
+  'admin.settings.autoOffline.editTitle': 'Edit auto-offline durations',
   'admin.settings.autoOffline.save': 'Save',
   'admin.settings.autoOffline.saving': 'Saving…',
-  'admin.settings.autoOffline.cancel': 'Cancel',
   'admin.settings.autoOffline.note': 'Shortening does not take already-expired versions offline at once: the owner is reminded first and the version goes offline only after the reminder period.',
   'admin.settings.autoOffline.saved': 'Saved. Every project’s deadlines are recalculated with the new periods.',
 };

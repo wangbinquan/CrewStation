@@ -1,6 +1,6 @@
 import './domSetup';
 import { afterEach, expect, test } from 'bun:test';
-import { clickIdentityField, setIdentityField as field } from './identityUiHelpers';
+import { clickIdentityField, identityField, setIdentityField as field } from './identityUiHelpers';
 import { adminAuthenticationFixture, provider } from './adminAuthenticationFixture';
 import { renderApp } from './renderApp';
 
@@ -134,7 +134,7 @@ test('项目覆盖：填项目与字段后保存，删除覆盖回到全局默�
 });
 
 
-test('新增身份提供方一次标出所有必填错误，并允许取消；非法输入不发送请求', async () => {
+test('新增身份提供方一次标出所有必填错误；取消只关窗、草稿留着，清空才重起一份；非法输入不发送请求', async () => {
   const f = adminAuthenticationFixture();
   page = await renderApp('/admin/authentication');
   await page.click('新增身份提供方'); await page.click('新增');
@@ -145,10 +145,9 @@ test('新增身份提供方一次标出所有必填错误，并允许取消；�
   expect(document.activeElement?.closest('label')?.textContent).toContain('标识');
   await page.click('新增');
   expect(page.text()).toContain('1–64'); expect(f.writes()).toEqual([]);
-  await page.click('取消编辑');
-  expect(page.text()).toContain('有未保存的输入');
-  await page.click('放弃输入并离开');
-  expect(document.querySelector('input[type="password"]')).toBeNull();
-  await page.click('新增身份提供方');
-  expect(document.querySelector<HTMLInputElement>('input[type="password"]')?.value).toBe('');
+  // 2026-09-23 起是弹窗：取消只关窗，草稿留着；再点「新增身份提供方」恢复；「清空」才重起一份空白表单。
+  await page.click('取消'); expect(document.querySelectorAll('dialog').length).toBe(0); expect(document.querySelector('input[type="password"]')).toBeNull();
+  await page.click('新增身份提供方'); expect(identityField('标识').value).toBe('Wrong Slug');
+  await page.click('清空'); expect(identityField('标识').value).toBe('');
+  expect(document.querySelector<HTMLInputElement>('input[type="password"]')?.value).toBe(''); expect(f.writes()).toEqual([]);
 });

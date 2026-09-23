@@ -1,8 +1,8 @@
 import { act } from 'react';
 
-/** 当前打开的确认弹窗；没有就抛，免得断言在「什么都没弹出来」上通过。 */
+/** 当前打开的弹窗里最上层（最后打开）的那个：确认弹窗常叠在编辑弹窗上。没有就抛，免得断言在「什么都没弹出来」上通过。 */
 export function openDialog(): HTMLDialogElement {
-  const dialog = document.querySelector<HTMLDialogElement>('dialog[open]');
+  const dialog = [...document.querySelectorAll<HTMLDialogElement>('dialog[open]')].at(-1);
   if (!dialog) throw new Error('没有打开的确认弹窗');
   return dialog;
 }

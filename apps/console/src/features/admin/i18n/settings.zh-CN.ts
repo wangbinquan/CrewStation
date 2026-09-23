@@ -19,9 +19,9 @@ export const settingsMessages = {
   'admin.settings.autoOffline.defaults': '使用平台默认值，尚未修改过。',
   'admin.settings.autoOffline.updatedAt': '最近一次修改于 {time}。',
   'admin.settings.autoOffline.edit': '修改',
+  'admin.settings.autoOffline.editTitle': '修改自动下线时长',
   'admin.settings.autoOffline.save': '保存',
   'admin.settings.autoOffline.saving': '保存中…',
-  'admin.settings.autoOffline.cancel': '取消',
   'admin.settings.autoOffline.note': '调短后已经过期的版本不会立刻下线：先提醒负责人，满提前量后才下线。',
   'admin.settings.autoOffline.saved': '已保存，所有项目的到期时间按新时长重新计算。',
 };

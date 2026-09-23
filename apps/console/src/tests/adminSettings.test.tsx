@@ -59,6 +59,21 @@ test('平台设置：别人先保存过时 409，说明原因且不重发', asyn
   expect(page.text()).toContain('平台设置已被他人修改，请刷新后重新确认'); expect(f.writes).toHaveLength(1); expect(field('回退目标保留').value).toBe('96');
 });
 
+// 2026-09-23 起修改在弹窗里：取消只关窗、改过的输入再点「修改」恢复；清空回到此刻的时长；改过就进离开确认，确认后才丢。
+test('平台设置：修改弹窗取消保留输入、清空回到当前值，离开前确认', async () => {
+  const f = settingsFixture(); page = await renderApp('/admin/settings');
+  const dialogs = () => document.querySelectorAll('dialog[open]').length, top = () => [...document.querySelectorAll('dialog[open]')].at(-1)?.textContent ?? '';
+  await click('修改'); expect(top()).toContain('修改自动下线时长'); await type('回退目标保留', '96'); await click('取消');
+  expect(dialogs()).toBe(0); expect(page.text()).toContain('72 小时');
+  await click('修改'); expect(field('回退目标保留').value).toBe('96');
+  await click('清空'); expect(dialogs()).toBe(1); expect(field('回退目标保留').value).toBe('72');
+  await type('提前提醒', '12'); await click('取消');
+  await page.requestNavigate('/admin/users'); expect(top()).toContain('待验证版本自动下线有未保存的输入'); await click('继续编辑');
+  expect(page.path()).toBe('/admin/settings'); expect(dialogs()).toBe(0);
+  await page.requestNavigate('/admin/users'); await click('放弃输入并离开'); expect(page.path()).toBe('/admin/users');
+  await page.navigate('/admin/settings'); await click('修改'); expect(field('提前提醒').value).toBe('24'); expect(f.writes).toHaveLength(0);
+});
+
 // 管理页自己不判权限：非管理员由管理布局的守卫挡住，页面不读平台设置。
 test('非管理员进不了平台设置，也不读取它', async () => {
   const f = settingsFixture(false); page = await renderApp('/admin/settings');

@@ -28,7 +28,9 @@ function fixture() {
   return { state, admin, member, developer };
 }
 
-async function openMember() { await clickIdentitySelector('button[aria-label*="member@example.test"]'); await page!.settle(); }
+/** 鼠标点按钮会先让它获得焦点，程序化 click 不会；弹窗关闭后焦点回到打开它的按钮，所以先聚焦再点。 */
+async function openUser(email: string) { const button = document.querySelector<HTMLButtonElement>(`button[aria-label*="${email}"]`)!; await act(async () => { button.focus(); button.click(); }); await page!.settle(); }
+async function openMember() { await openUser('member@example.test'); }
 async function choose(role: PlatformRole) { await clickIdentitySelector(`input[type="radio"][value="${role}"]`); }
 
 test('用户默认仅目录，按 ID 标记自己；组合搜索和角色过滤，与无匹配状态分开', async () => {
@@ -43,14 +45,29 @@ test('用户默认仅目录，按 ID 标记自己；组合搜索和角色过滤�
   await page.click('清除筛选'); expect(document.querySelectorAll('button[aria-label^="管理"]')).toHaveLength(3);
 });
 
+// 2026-09-23 起角色在弹窗里改：取消只关窗、选择留着，再点同一位用户恢复；清空回到当前角色；焦点回到打开它的按钮。
 test('单人编辑保留筛选、完整身份和关闭焦点；选择与取消不发送写请求', async () => {
   const f = fixture(); page = await renderApp('/admin/users'); await field('查找用户', 'member'); await openMember();
-  expect(page.text()).toContain(f.member.id); expect(document.querySelectorAll('input[type="radio"]')).toHaveLength(3);
+  expect(document.querySelector('dialog[open]')?.textContent).toContain(f.member.id); expect(document.querySelectorAll('input[type="radio"]')).toHaveLength(3);
   expect((document.activeElement as HTMLInputElement).value).toBe('user'); await choose('developer'); expect(f.state.writes).toEqual([]);
   await page.click('检查变更'); expect(document.querySelector('[role="alertdialog"]')?.textContent).toContain('用户→开发者'); await page.click('取消');
-  await page.click('收起'); await act(async () => { await new Promise((resolve) => requestAnimationFrame(resolve)); });
+  expect(document.querySelectorAll('dialog[open]')).toHaveLength(1); await page.click('取消');
+  expect(document.querySelectorAll('dialog[open]')).toHaveLength(0);
   expect(document.activeElement?.getAttribute('aria-label')).toContain('member@example.test');
   expect(document.querySelector<HTMLInputElement>('input[type="search"]')?.value).toBe('member'); expect(f.state.writes).toEqual([]);
+  await openMember(); expect(document.querySelector<HTMLInputElement>('input[value="developer"]')?.checked).toBe(true);
+  await page.click('清空'); expect(document.querySelector<HTMLInputElement>('input[value="user"]')?.checked).toBe(true); expect(document.querySelectorAll('dialog[open]')).toHaveLength(1);
+  expect(f.state.writes).toEqual([]);
+});
+
+// 改了没保存时去改另一位：先确认；继续编辑回到原来那份，放弃才换人。
+test('有未保存的角色选择时去管理另一位先确认，继续编辑回到原选择', async () => {
+  const f = fixture(); page = await renderApp('/admin/users'); await openMember(); await choose('admin'); await page.click('取消');
+  await openUser('developer@example.test'); expect(document.querySelector('[role="alertdialog"]')?.textContent).toContain('同名用户 的角色有未保存的输入');
+  await page.click('继续编辑'); expect(document.querySelector('dialog[open]')?.textContent).toContain('member@example.test'); expect(document.querySelector<HTMLInputElement>('input[value="admin"]')?.checked).toBe(true);
+  await page.click('取消'); await openUser('developer@example.test'); await page.click('放弃输入并离开');
+  expect(document.querySelector('dialog[open]')?.textContent).toContain(f.developer.id); expect(document.querySelector<HTMLInputElement>('input[value="developer"]')?.checked).toBe(true);
+  expect(f.state.writes).toEqual([]);
 });
 
 test('缺少邮箱的同名账号明确说明缺失，编辑入口用完整 ID 消歧', async () => {

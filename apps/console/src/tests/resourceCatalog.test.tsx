@@ -55,7 +55,9 @@ test('具名编辑与保存前对照当前值；取消不写入，覆盖后说�
   const f = fixture(); page = await renderApp('/admin/service-plans'); await edit('standard-small');
   expect(field('CPU').value).toBe('500m'); await input('CPU', '2'); await page.click('检查并保存');
   expect(page.text()).toContain('覆盖服务套餐 standard-small'); expect(page.text()).toContain('目录当前值'); expect(page.text()).toContain('本次保存值'); expect(f.writes).toHaveLength(0);
-  await page.click('继续编辑'); expect(field('CPU').value).toBe('2'); await page.click('检查并保存'); await page.click('确认覆盖');
+  // 2026-09-23 起核对材料在确认弹窗里，不在卡片里展开。
+  const confirm = document.querySelector('dialog[open][role="alertdialog"]'); expect(confirm?.textContent).toContain('目录当前值'); expect(confirm?.querySelectorAll('tbody tr').length).toBe(5);
+  await page.click('继续编辑'); expect(document.querySelectorAll('dialog[open]').length).toBe(0); expect(field('CPU').value).toBe('2'); await page.click('检查并保存'); await page.click('确认覆盖');
   expect(f.writes[0]?.input).toEqual({ name: 'standard-small', cpu: '2', memory: '512Mi', maxReplicas: 3, description: '原服务套餐' });
   expect(page.text()).toContain('已保存服务套餐 standard-small'); expect(page.text()).toContain('下次发布');
   await page.navigate('/admin'); expect(page.path()).toBe('/admin');
@@ -72,7 +74,8 @@ test('套餐读取失败保留输入并暂停保存；目录变化先更新确�
 
 test('套餐失败、换编辑对象和新建都保留草稿，放弃只替换表单且不会偷偷写入', async () => {
   const f = fixture(); page = await renderApp('/admin/service-plans'); await edit('standard-small'); await input('CPU', '3');
-  await edit('standard-small'); expect(field('CPU').value).toBe('3'); await page.click('继续编辑');
+  await edit('standard-small'); expect(field('CPU').value).toBe('3');
+  expect(document.querySelector('dialog[open][role="alertdialog"]')?.textContent).toContain('放弃当前输入并载入「standard-small」？'); await page.click('继续编辑');
   await page.click('新建服务套餐'); expect(field('CPU').value).toBe('3'); await page.click('继续编辑');
   f.state.saveFailure = true; await page.click('检查并保存'); await page.click('确认覆盖'); expect(page.text()).toContain('套餐保存失败'); expect(field('CPU').value).toBe('3');
   await page.click('继续编辑'); await page.requestNavigate('/admin'); expect(page.path()).toBe('/admin/projects/resource-templates'); await page.click('继续编辑');
