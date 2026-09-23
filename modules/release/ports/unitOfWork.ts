@@ -1,6 +1,7 @@
-import type { ServiceSlots } from '../domain/slots';
+import type { PhysicalSlot, ServiceSlots } from '../domain/slots';
+import type { SlotRecordRef } from './ledger';
 import type { MaintenanceRepository } from './repositories';
-import type { DomainPayload, DomainTopicName } from '@crewstation/contracts';
+import type { DomainPayload, DomainTopicName, ServiceId } from '@crewstation/contracts';
 import type { OfflinePolicyRepository, ReleaseRepository, SlotEventRepository, SlotRepository, TrafficSwitchRepository } from './repositories';
 
 export interface DomainEventPublisher {
@@ -15,8 +16,11 @@ export interface RepositoryScope {
   readonly slotEvents: SlotEventRepository;
   readonly offlinePolicy: OfflinePolicyRepository;
   readonly events: DomainEventPublisher;
-  /** 配了资源台账（RFC-025）时：在当前事务里把一个服务的两个槽投影进台账（保存槽时仓储已自动投影，补投影才直接调它）。 */
-  readonly ledger?: { sync(slots: ServiceSlots): Promise<void> };
+  /**
+   * 配了资源台账（RFC-025）时：sync 在当前事务里把一个服务的两个槽投影进台账（保存槽时仓储已自动投影，补投影才直接调它）；
+   * slot 读一个物理槽的台账记录（读不到当作没有）。
+   */
+  readonly ledger?: { sync(slots: ServiceSlots): Promise<void>; slot(serviceId: ServiceId, physical: PhysicalSlot): Promise<SlotRecordRef | undefined> };
 }
 
 export interface UnitOfWork {

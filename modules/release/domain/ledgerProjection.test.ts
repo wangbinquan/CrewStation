@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import type { ProjectId, ReleaseId, ServiceId } from '@crewstation/contracts';
-import { projectSlots } from './ledgerProjection';
+import { projectSlots, slotStateFromLedger } from './ledgerProjection';
 import { initialSlots, withSlot } from './slots';
 
 const now = new Date('2026-09-23T12:00:00.000Z');
@@ -31,5 +31,17 @@ describe('服务槽投影到资源台账（RFC-025 第三期）', () => {
     expect(standby.display).toMatchObject({ releaseId: r2, tag: 'v0.1.1' });
     const failed = withSlot(initialSlots(serviceId, now), { physical: 'green', releaseId: r2, state: 'failed', replicas: 1, readyReplicas: 0, updatedAt: at }, now);
     expect(projectSlots(failed, service, () => undefined)[1]?.conditions[1]).toEqual({ type: 'Failed', status: 'true', reason: 'deploy-failed', message: '部署未能就绪', since: at });
+  });
+
+  test('旧接口状态：流水线推进中、空槽、已判失败以流水线为准；就绪之后照台账：降级、失败、重新铺开是部署中', () => {
+    expect(slotStateFromLedger('deploying', 'ready')).toBe('deploying');
+    expect(slotStateFromLedger('empty', 'stopped')).toBe('empty');
+    expect(slotStateFromLedger('failed', 'ready')).toBe('failed');
+    expect(slotStateFromLedger('ready', undefined)).toBe('ready');
+    expect(slotStateFromLedger('ready', 'ready')).toBe('ready');
+    expect(slotStateFromLedger('ready', 'degraded')).toBe('degraded');
+    expect(slotStateFromLedger('ready', 'failed')).toBe('failed');
+    expect(slotStateFromLedger('ready', 'starting')).toBe('deploying');
+    expect(slotStateFromLedger('ready', 'stopping')).toBe('ready');
   });
 });

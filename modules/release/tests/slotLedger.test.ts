@@ -8,6 +8,7 @@ import { queueMigrations } from '@crewstation/queue';
 import type { TestDatabase } from '@crewstation/testkit';
 import { createTestDatabase, testDatabaseAvailable } from '@crewstation/testkit';
 import { drizzleUnitOfWork } from '../adapters/persistence/drizzleUnitOfWork';
+import { loadSlotDtos } from '../application/queries';
 import { resyncSlotLedger } from '../application/slotLedgerResync';
 import { initialSlots, withSlot } from '../domain/slots';
 import type { SlotLedger } from '../ports/ledger';
@@ -71,9 +72,26 @@ describe.skipIf(!available)('服务槽投影进资源台账（RFC-025 第三期�
     const uow = drizzleUnitOfWork(database.db, { ledger, services, logger });
     expect(await resyncSlotLedger(uow, logger)).toBeGreaterThanOrEqual(1);
     expect(await slotRecord(later, 'blue')).toMatchObject({ phase: 'stopped', display: { role: 'prod' } });
-    const broken = drizzleUnitOfWork(database.db, { ledger: { within: () => ({ declare: async () => { throw new Error('台账暂时不可用'); } }) }, services, logger });
+    const broken = drizzleUnitOfWork(database.db, { ledger: { within: () => ({ declare: async () => { throw new Error('台账暂时不可用'); }, find: async () => { throw new Error('台账暂时不可用'); } }) }, services, logger });
     await broken.run(async (scope) => { await scope.slots.save({ ...(await scope.slots.get(later))!, updatedAt: now }); });
     expect(warnings).toContain('resource ledger slot projection failed');
+    // 读台账失败当作没有记录：槽的旧接口照流水线的状态给出，不报错。
+    expect(await broken.read.ledger?.slot(later, 'blue')).toBeUndefined();
+  });
+
+  test('槽的旧接口状态：流水线判定就绪之后照台账的观测——副本后来没全就绪是降级；流水线推进中以流水线为准', async () => {
+    const uow = drizzleUnitOfWork(database.db, { ledger, services, logger });
+    await uow.run(async (scope) => {
+      const slots = (await scope.slots.get(serviceId))!;
+      await scope.slots.save(withSlot(slots, { physical: 'green', releaseId, state: 'ready', replicas: 1, readyReplicas: 1, updatedAt: now }, now));
+    });
+    const green = (await slotRecord(serviceId, 'green'))!;
+    await resources.api.observe({ child: { kind: 'Deployment', namespace: 'cs-demo', name: 'demo-green', uid: 'uid-demo-green-2', phase: 'Unready', ready: false, reason: '副本 0／1 就绪' } });
+    expect((await resources.api.get(green.id))?.phase).toBe('degraded');
+    const slots = (await uow.read.slots.get(serviceId))!;
+    const [, standby] = await loadSlotDtos(uow.read, slots, 'demo', { prodHost: () => 'demo.cs.localhost', previewHost: () => 'preview.demo.cs.localhost' });
+    expect(standby).toMatchObject({ name: 'preview', state: 'degraded' });
+    expect((await loadSlotDtos(drizzleUnitOfWork(database.db).read, slots, 'demo', { prodHost: () => 'd', previewHost: () => 'p' }))[1]?.state).toBe('ready');
   });
 
   test('补投影工作器：启动即跑一次、此后按周期；失败只记告警；停止时等本轮跑完', async () => {

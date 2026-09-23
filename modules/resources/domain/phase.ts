@@ -51,9 +51,13 @@ export function computePhase(record: PhaseInput): PhaseResult {
   return rule.primaryChild === 'Deployment' ? deploymentPhase(primary) : workloadPhase(record, rule, primary);
 }
 
-/** Deployment → 阶段：观测把它归成 Available（副本都就绪且是新版本）、Progressing、Stalled（推进超时）、ScaledDown（副本为 0）。 */
+/**
+ * Deployment → 阶段：观测把它归成 Available（副本都就绪且是新版本）、Progressing（还在铺新版本）、Unready（铺完后副本没全就绪）、
+ * Stalled（推进超时）、ScaledDown（副本为 0）。
+ */
 function deploymentPhase(deployment: ResourceChild): PhaseResult {
   if (deployment.phase === 'Available') return { phase: 'ready' };
+  if (deployment.phase === 'Unready') return { phase: 'degraded', reason: reasonOf('pods-unready', deployment.reason ?? '副本没有全部就绪') };
   if (deployment.phase === 'Stalled') return { phase: 'degraded', reason: reasonOf('rollout-stalled', deployment.reason ?? '部署停止推进') };
   if (deployment.phase === 'ScaledDown') return { phase: 'degraded', reason: reasonOf('scaled-down', deployment.reason ?? '副本数为 0') };
   return { phase: 'starting', ...(deployment.reason ? { reason: reasonOf('rolling-out', deployment.reason) } : {}) };

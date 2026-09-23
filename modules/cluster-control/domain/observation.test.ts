@@ -40,6 +40,9 @@ describe('Pod 与 PVC 的观测映射（RFC-025 设计 §6.2）', () => {
     expect(deploymentChild(deployment(1, { observedGeneration: 3, replicas: 1, conditions: [{ type: 'Progressing', status: 'False', reason: 'ProgressDeadlineExceeded', message: 'ReplicaSet "demo-green-x" has timed out progressing.' }] }), at))
       .toMatchObject({ phase: 'Stalled', reason: 'ReplicaSet "demo-green-x" has timed out progressing.' });
     expect(deploymentChild(deployment(0, {}), at).phase).toBe('ScaledDown');
+    // 新版本已铺完、副本又没全就绪（崩溃重启、探针失败）：降级，不是「还在启动」。
+    expect(deploymentChild(deployment(1, { observedGeneration: 3, replicas: 1, updatedReplicas: 1, readyReplicas: 0, conditions: [{ type: 'Progressing', status: 'True', reason: 'NewReplicaSetAvailable' }] }), at)).toMatchObject({ phase: 'Unready', ready: false, reason: '副本 0／1 就绪' });
+    expect(deploymentChild(deployment(1, { observedGeneration: 3, replicas: 1, updatedReplicas: 1, readyReplicas: 0, conditions: [{ type: 'Progressing', status: 'True', reason: 'ReplicaSetUpdated' }] }), at).phase).toBe('Progressing');
     expect(deploymentChild({ ...deployment(1, {}), metadata: { name: 'demo-green', namespace: 'cs-demo', deletionTimestamp: at } }, at)).toMatchObject({ phase: 'Terminating', ready: false });
   });
 

@@ -330,6 +330,8 @@ ResourceActionSchema = z.object({ id: ResourceActionIdSchema, enabled: z.boolean
 
 迁移期间旧接口保留、字段不删，值改由记录推导（提案 Q8）：例如 `GET /v1/tasks/:taskId/agent-terminals` 的 `lifecycle` 由阶段映射（§4.3），`stopRequested` 期间为 `running`，另加可选字段 `phase`；槽的 `state` 由槽记录映射。契约锁按「只增不删」处理，业务契约面不受影响。
 
+> **实施补记（2026-09-23，第三期）**：槽的 `state` 先做到「就绪之后照台账」：部署流水线推进中（deploying）、槽为空、流水线已判失败时仍以流水线为准——期望刚变的那一瞬台账沿用旧版本 Deployment 的观测，会误报就绪；流水线判定就绪之后以观测为准：副本后来没全就绪（新版本已铺完而崩溃重启、探针失败，观测记 `Unready`）是 `degraded`，被重新铺开（运维重启）是 `deploying`，失败是 `failed`。发布页、概览与命令行读的都是这份 DTO。CLI 名册的 `lifecycle` 仍在工作台合并（§10 补记），服务端推导随后做。
+
 ## 12. 失败模式与并发
 
 | 情形 | 处理 |

@@ -94,6 +94,7 @@ describe('条件、子对象、计数与可做操作', () => {
     expect(computePhase(slot({ phase: 'Progressing', ready: false, reason: '副本 0／1 就绪' }))).toEqual({ phase: 'starting', reason: { code: 'rolling-out', message: '副本 0／1 就绪' } });
     expect(computePhase(slot({ phase: 'Stalled', ready: false, reason: 'ProgressDeadlineExceeded' })).reason?.code).toBe('rollout-stalled');
     expect(computePhase(slot({ phase: 'ScaledDown', ready: false })).reason?.code).toBe('scaled-down');
+    expect(computePhase(slot({ phase: 'Unready', ready: false, reason: '副本 0／1 就绪' }))).toEqual({ phase: 'degraded', reason: { code: 'pods-unready', message: '副本 0／1 就绪' } });
     expect(computePhase(slot()).phase).toBe('provisioning');
     const offline = cond('Serving', 'false', { reason: 'offline-idle', message: '待验证版本无人访问，已自动下线' });
     expect(computePhase(slot(undefined, [offline]))).toEqual({ phase: 'stopped', reason: { code: 'offline-idle', message: '待验证版本无人访问，已自动下线' } });

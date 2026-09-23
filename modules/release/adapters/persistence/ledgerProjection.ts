@@ -1,9 +1,9 @@
-import type { ReleaseId } from '@crewstation/contracts';
+import type { ReleaseId, ServiceId } from '@crewstation/contracts';
 import type { Logger } from '@crewstation/kernel';
 import type { Executor } from '@crewstation/persistence';
 import { projectSlots } from '../../domain/ledgerProjection';
-import type { ServiceSlots } from '../../domain/slots';
-import type { SlotLedger } from '../../ports/ledger';
+import type { PhysicalSlot, ServiceSlots } from '../../domain/slots';
+import type { SlotLedger, SlotRecordRef } from '../../ports/ledger';
 import type { ServiceResolver } from '../../ports/platform';
 import type { ReleaseRepository, SlotRepository } from '../../ports/repositories';
 
@@ -35,6 +35,11 @@ export async function syncSlotLedger(executor: Executor, deps: SlotProjectionDep
   } catch (error) {
     deps.logger.warn('resource ledger slot projection failed', { serviceId: slots.serviceId, error: error instanceof Error ? error.message : String(error) });
   }
+}
+
+/** 读一个物理槽的台账记录：包在保存点里，台账读不到当作没有，不让调用方的事务因此中止。 */
+export async function findSlotRecord(executor: Executor, deps: SlotProjectionDeps, serviceId: ServiceId, physical: PhysicalSlot): Promise<SlotRecordRef | undefined> {
+  try { return await executor.transaction((savepoint) => deps.ledger.within(savepoint).find(`${serviceId}/${physical}`, 'service-slot')); } catch { return undefined; }
 }
 
 /** 槽仓储的投影装饰：每次保存之后，在同一事务里同步台账。 */

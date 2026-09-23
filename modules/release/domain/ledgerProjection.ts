@@ -1,5 +1,5 @@
 import type { ProjectId, ReleaseId, ResourceConditionStatus } from '@crewstation/contracts';
-import type { OfflineReason, PhysicalSlot, ServiceSlots, SlotState } from './slots';
+import type { OfflineReason, PhysicalSlot, ServiceSlots, SlotHealth, SlotState } from './slots';
 import { roleOf } from './slots';
 
 /**
@@ -58,4 +58,15 @@ export function projectSlot(slots: ServiceSlots, physical: PhysicalSlot, service
 export function projectSlots(slots: ServiceSlots, service: SlotService, tagOf: (releaseId: ReleaseId) => string | undefined): ProjectedSlot[] {
   const order: PhysicalSlot[] = slots.active === 'blue' ? ['blue', 'green'] : ['green', 'blue'];
   return order.map((physical) => projectSlot(slots, physical, service, tagOf));
+}
+
+/**
+ * 槽的旧接口状态由台账推导（设计 §11.2）：部署流水线在推进时（deploying）、槽为空或流水线已判失败时，以流水线为准——
+ * 期望刚变、观测还没跟上的那一瞬台账会沿用旧版本的观测；流水线判定就绪之后，以观测为准：副本后来没全就绪是降级，
+ * 被重新铺开（运维重启）是部署中，失败是失败。
+ */
+export function slotStateFromLedger(state: SlotHealth, phase: string | undefined): SlotHealth {
+  if (state !== 'ready' || !phase) return state;
+  if (phase === 'degraded' || phase === 'failed') return phase;
+  return phase === 'pending' || phase === 'provisioning' || phase === 'starting' ? 'deploying' : state;
 }
