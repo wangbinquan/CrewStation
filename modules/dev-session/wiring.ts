@@ -14,7 +14,7 @@ import { drizzleWorkspaceLayouts } from './adapters/persistence/drizzleWorkspace
 import { drizzleNativeActivity } from './adapters/persistence/drizzleNativeActivity';
 import { drizzleAgentStarts } from './adapters/persistence/drizzleAgentStarts';
 import { AgentExecutionLifecycle } from './application/agentExecution';
-import { boundedNativeRead, nativeActivityUseCases } from './application/nativeActivity';
+import { boundedNativeRead, nativeActivityUseCases, rosterActivity } from './application/nativeActivity';
 import { workspaceLayoutUseCases } from './application/workspaceLayout';
 import { workspaceLayoutRoutes } from './http/workspaceLayoutRoutes';
 import type { DevSessionModuleApi } from './api/moduleApi';
@@ -82,6 +82,12 @@ export function createDevSessionModule(deps: DevSessionModuleDeps): DevSessionMo
   const terminals = drizzleNativeTerminals(deps.db);
   const activity = nativeActivityUseCases(useCaseDeps, drizzleNativeActivity(deps.db), terminals);
   const native = nativeTerminalUseCases(useCaseDeps, terminals);
+  // 启动中名册每秒读一次（RFC-022），原生活动页不跟着每秒做：同一任务、同一人 5 秒内复用。
+  const activityPage = rosterActivity((actor, taskId) => boundedNativeRead(activity.getAgentActivity(actor, taskId, { limit: 1 })).catch((error: unknown) => {
+    if (isPlatformError(error) && ['forbidden', 'unauthenticated', 'not_found'].includes(error.kind)) throw error;
+    useCaseDeps.logger.warn('native activity query unavailable', { taskId });
+    return undefined;
+  }), useCaseDeps.clock);
   const api: DevSessionModuleApi = {
     invokeApi: apiInvocationUseCase(useCaseDeps),
     ...clusterAgentUseCases(useCaseDeps, agentStarts, agentExecutions), ...clusterNativeUseCases(useCaseDeps, terminals),
@@ -92,11 +98,7 @@ export function createDevSessionModule(deps: DevSessionModuleDeps): DevSessionMo
     ...rebuildSessionUseCases(useCaseDeps), ...previewControlUseCases(useCaseDeps),
     ...versionComparisonUseCases(useCaseDeps), workspaceStatus: workspaceStatusUseCase(useCaseDeps), publish: publishFromSessionUseCase(useCaseDeps), sendIdleReminders: remind,
     async listNativeTerminals(actor, taskId) {
-      const pageQuery = boundedNativeRead(activity.getAgentActivity(actor, taskId, { limit: 1 })).catch((error: unknown) => {
-        if (isPlatformError(error) && ['forbidden', 'unauthenticated', 'not_found'].includes(error.kind)) throw error;
-        useCaseDeps.logger.warn('native activity query unavailable', { taskId });
-        return undefined;
-      });
+      const pageQuery = activityPage(actor, taskId);
       const [roster, page] = await Promise.all([native.listNativeTerminals(actor, taskId), pageQuery]);
       return { ...roster, activitySync: page?.sync ?? 'unavailable', items: roster.items.map((item) => ({ ...item, activity: page?.states.find((state) => state.agentId === item.agentId && state.terminalId === item.terminalId && state.runnerId === item.runnerId) })) };
     },

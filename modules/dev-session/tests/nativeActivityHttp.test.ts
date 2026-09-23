@@ -23,7 +23,8 @@ describe.skipIf(!available)('动态资源实际装配与 HTTP', () => {
     f.state.result = { runnerId: record.runnerId, terminals: [record] };
     await drizzleNativeTerminals(db.db).reserve({ taskId, record, createdBy: workspaceActor.userId, clientRequestId: crypto.randomUUID(), fingerprint: 'http', profile: { profileId: computeId('balanced'), revision: 1 }, input: { clientRequestId: crypto.randomUUID(), permission: 'edit', cols: 80, rows: 24 } });
     f.deps.runner.listEvents = async (_task, query) => query?.sinceSeq ? [] : [{ seq: 1, at: checkedAt, event: { kind: 'nativeActivity', activity: { agentId: record.agentId, terminalId: record.terminalId, runnerId: record.runnerId, seq: 1, turnOrdinal: 0, eventId: 'source-ready', signal: { kind: 'source-ready', nativeSessionId: null, turnId: null, occurredAt: checkedAt, source: 'claude-code/2.1.268', sourceEventId: 'ready' } } } }];
-    const module = createDevSessionModule({ ...f.deps, db: db.db, isAdmin: async () => false });
+    let now = Date.parse(checkedAt);
+    const module = createDevSessionModule({ ...f.deps, db: db.db, isAdmin: async () => false, clock: { now: () => new Date(now) } });
     const app = createApp({ name: 'activity-test' }); for (const route of module.http) app.route('/', route);
     const url = `/v1/tasks/${taskId}/agent-activity`;
     const headers = { [IDENTITY_HEADERS.userId]: workspaceActor.userId, 'content-type': 'application/json' };
@@ -38,10 +39,14 @@ describe.skipIf(!available)('动态资源实际装配与 HTTP', () => {
     await ready;
     let timer: ReturnType<typeof setTimeout>;
     try {
+      // 名册顺带的活动页同一任务、同一人 5 秒内复用（启动中名册每秒读一次，RFC-022）：存储被锁也照样拿到上一次的。
+      expect(await module.api.listNativeTerminals(workspaceActor, taskId)).toMatchObject({ activitySync: 'ready', items: [{ activity: { source: 'ready' } }] });
+      now += 5000;
       const response = await Promise.race([module.api.listNativeTerminals(workspaceActor, taskId), new Promise<string>((resolve) => { timer = setTimeout(() => resolve('still waiting'), 3200); })]);
       // 活动存储等待不能拖住健康终端的名册；降级后保留原进程身份。
       expect(response).toMatchObject({ activitySync: 'unavailable', items: [{ agentId: record.agentId, lifecycle: 'running' }] });
     } finally { clearTimeout(timer!); unlock(); await blocked; }
+    now += 5000;
     expect((await module.api.listNativeTerminals(workspaceActor, taskId)).activitySync).toBe('ready');
     expect((await app.request(`${url}?limit=101`, { headers })).status).toBe(400);
     expect((await app.request(`${url}?cursor=1.5`, { headers })).status).toBe(400);
@@ -54,6 +59,7 @@ describe.skipIf(!available)('动态资源实际装配与 HTTP', () => {
     expect((await app.request(url)).status).toBe(401);
     await db.db.execute(sql`alter table dev_session.native_activity_items rename to native_activity_items_unavailable`);
     try {
+      now += 5000;
       const degraded = await module.api.listNativeTerminals(workspaceActor, taskId);
       expect(degraded).toMatchObject({ activitySync: 'unavailable', items: [{ lifecycle: 'running' }] });
       expect(degraded.items[0]?.activity).toBeUndefined();
