@@ -74,7 +74,7 @@ export function DeploymentVersions({ projectId, serviceId, canSwitch, actions, o
     </div>
     {lifecycle.error ? <ActionNote tone="error">{lifecycle.error}</ActionNote> : null}
     {lifecycle.done ? <ActionNote tone="success">{lifecycle.done}</ActionNote> : null}
-    {redeployTarget ? <RedeployDialog key={redeployTarget.id} release={redeployTarget} standby={versions.preview} lifecycle={lifecycle} blocked={lifecycleBlocked} onClose={onRedeployClose} /> : null}
+    {redeployTarget ? <RedeployDialog key={redeployTarget.id} release={redeployTarget} releases={items} standby={versions.preview} lifecycle={lifecycle} blocked={lifecycleBlocked} onClose={onRedeployClose} /> : null}
     <MaintenancePanel projectId={projectId} serviceId={serviceId} canManage={canSwitch} actions={actions} maintenance={maintenance} editor={maintenanceEditor} />
     <p className={styles.note}>{t('release.versions.sharedData')}</p>
     {inProgress ? <ActionNote tone="neutral">{t('release.traffic.inProgress', { tag: inProgress.tag })} <Button onClick={() => onSelect(inProgress.id)}>{t('release.traffic.openInProgress')}</Button></ActionNote> : null}

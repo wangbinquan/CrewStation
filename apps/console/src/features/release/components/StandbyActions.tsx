@@ -3,6 +3,7 @@ import type { ReleaseDto, SlotDto } from '@crewstation/contracts';
 import { useT } from '../../../shared/lib/useT';
 import { Button } from '../../../shared/ui/Button';
 import { InlineConfirm } from '../../../shared/ui/InlineConfirm';
+import { defaultRedeployTarget } from '../model/redeployCandidates';
 import { periodText } from '../model/useSlotLifecycle';
 import type { SlotLifecycle } from '../model/useSlotLifecycle';
 
@@ -31,17 +32,18 @@ export function StandbyActions({ slot, lifecycle, disabled }: StandbyActionsProp
 }
 
 /**
- * 待验证卡上负责人的动作：有版本时是推迟与下线（排在访问入口之后）；已下线且那个版本还能重新部署时，
- * 「重新部署」就是这张卡的主动作（蓝色、排最左）。不是负责人或管理员（`lifecycle` 为空）时什么都不画。
+ * 待验证卡上负责人的动作：有版本时是推迟与下线（排在访问入口之后）；空着（已下线或尚未部署）且有可部署的版本时，
+ * 「部署版本…」就是这张卡的主动作（蓝色、排最左）：打开重新部署确认，在里面选版本，默认选刚下线的那个（2026-09-23 裁定）。
+ * 不是负责人或管理员（`lifecycle` 为空）时什么都不画。
  */
 export function standbyLifecycle(slot: SlotDto | undefined, releases: readonly ReleaseDto[], lifecycle: SlotLifecycle | undefined, disabled: boolean, onRedeploy: (releaseId: string) => void): { readonly primary?: ReactNode; readonly actions?: ReactNode } {
   if (!lifecycle || !slot) return {};
   if (slot.releaseId) return { actions: <StandbyActions slot={slot} lifecycle={lifecycle} disabled={disabled} /> };
-  const gone = slot.offline ? releases.find((release) => release.id === slot.offline!.releaseId) : undefined;
-  return gone?.redeployable ? { primary: <RedeployShortcut release={gone} disabled={disabled || !!lifecycle.pending} onRedeploy={onRedeploy} /> } : {};
+  const target = defaultRedeployTarget(slot, releases);
+  return target ? { primary: <DeployVersionButton target={target} disabled={disabled || !!lifecycle.pending} onRedeploy={onRedeploy} /> } : {};
 }
 
-function RedeployShortcut({ release, disabled, onRedeploy }: { readonly release: ReleaseDto; readonly disabled: boolean; readonly onRedeploy: (releaseId: string) => void }): ReactElement {
+function DeployVersionButton({ target, disabled, onRedeploy }: { readonly target: ReleaseDto; readonly disabled: boolean; readonly onRedeploy: (releaseId: string) => void }): ReactElement {
   const t = useT();
-  return <Button variant="primary" disabled={disabled} onClick={() => onRedeploy(release.id)}>{t('release.redeploy.action', { tag: release.tag })}</Button>;
+  return <Button variant="primary" disabled={disabled} onClick={() => onRedeploy(target.id)}>{t('release.redeploy.choose')}</Button>;
 }
