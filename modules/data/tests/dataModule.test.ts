@@ -19,18 +19,20 @@ const taskId = '01a0bf5d-8f4b-7418-8a3f-7cbb4a1fd751' as TaskId;
 const owner: Actor = { userId: '01a0bf5d-8f4b-7793-867c-efd7527b386b' as UserId, isAdmin: false };
 const dev: Actor = { userId: '01a0bf5d-8f4b-7a4e-8eb2-04fca5c047bf' as UserId, isAdmin: false };
 
+type DataDeps = Parameters<typeof createDataModule>[0];
+let deps: Omit<DataDeps, 'db'>;
 beforeAll(async () => {
   if (!available) return;
   tdb = await createTestDatabase([dataMigrations]);
   const url = new URL(adminUrl);
-  data = createDataModule({
-    db: tdb.db,
+  deps = {
     users: { displayName: async (id) => id === dev.userId ? '开发者小李' : id === owner.userId ? '负责人小周' : undefined },
     authorizer: { authorize: async (actor, _p, action) => { if (action === 'approve-data-access' && actor.userId !== owner.userId) throw new Error('forbidden'); } },
     services: { resolveServiceById: async () => ({ projectId, slug }) },
     isAdmin: async () => false,
     settings: { defaultPlan: 'db-small', secretKeyBase64: generateSecretKey(), postgres: { adminUrl, visibleHost: url.hostname, visiblePort: Number(url.port) } },
-  });
+  };
+  data = createDataModule({ ...deps, db: tdb.db });
 });
 afterAll(async () => {
   if (!available) return;
@@ -91,5 +93,26 @@ describe.skipIf(!available)('data module', () => {
     await data.api.revokeTaskBinding(owner, rw2.id);
     expect((await data.api.envForTask(taskId)).CS_PROD_DATABASE_URL).toBeUndefined();
     expect(await canQuery(env2.CS_PROD_DATABASE_URL!, 'SELECT 1')).toBe(false);
+  });
+  test('到期的绑定由后台任务收掉：标成已过期、删掉临时角色（2026-09-23 前 expireBindings 没有接到任何后台任务）', async () => {
+    let now = Date.now();
+    const expiring = createDataModule({ ...deps, db: tdb.db, clock: { now: () => new Date(now) }, expiryIntervalMs: 20 });
+    expect(expiring.workers).toHaveLength(1);
+    const requested = await expiring.api.requestTaskBinding(dev, { taskId, serviceId }, { mode: 'diagnostic-readonly', reason: '到期回收', ttlMinutes: 5 });
+    await expiring.api.decideTaskBinding(owner, requested.id, { approve: true });
+    const role = `cs_t_${requested.id.replaceAll('-', '')}`;
+    const admin = postgres(adminUrl, { max: 1, onnotice: () => undefined });
+    const roles = async () => Number((await admin`SELECT count(*)::int AS n FROM pg_roles WHERE rolname = ${role}`)[0]?.n);
+    const stateOf = async () => (await expiring.api.listTaskBindings(owner, taskId)).find((b) => b.id === requested.id)?.state;
+    try {
+      expect(await stateOf()).toBe('active');
+      expect(await roles()).toBe(1);
+      now += 6 * 60_000;
+      expiring.workers[0]!.start();
+      for (let i = 0; i < 100 && (await stateOf()) !== 'expired'; i++) await Bun.sleep(20);
+      await expiring.workers[0]!.stop();
+      expect(await stateOf()).toBe('expired');
+      expect(await roles()).toBe(0);
+    } finally { await expiring.workers[0]!.stop(); await admin.end(); }
   });
 });

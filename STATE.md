@@ -7,6 +7,23 @@
 
 基线三件套（v0.3.3）的第一轮实现已在本机 kind 集群上跑通并推上 main；**RFC-001（算力归平台）与 RFC-002（管理空间与租户空间分离）已实现、实跑确认并推上 main；RFC-004 已被 RFC-006 取代（Superseded）；RFC-006（算力档位合并运行环境、每个 Agent 一个 Pod）已实现、实机验收完毕并推上 main，已 Done（P1–P8、ADR-0005 与 I17–I19 待作者复核）；RFC-003 工作台已按设计附件完成并整体部署到本机，52／52 项 UX-AT 全部实机通过、本地 gate 与精确 SHA CI 通过，已 Done；RFC-005（OIDC／OAuth 2.0 公司登录）代码、测试与 OA-01…OA-31 实机验收全部完成，已 Done；RFC-007（开发环境 OAuth 2.0 一键换角色）代码、四角色 Chrome 实机验收、本地 gate 与精确 SHA CI 全部完成，已 Done**。
 
+## RFC-023 数据库驱动换成 postgres.js：实施、部署与 72 小时观察（2026-09-23）
+
+作者对 I16（Bun 内置 SQL 的连接池在并发突发下错位）裁定 (b) 换 postgres.js，随后批准 RFC-023。Q1 不保留切回开关，Q2 观察 72 小时，Q3 显式设置连接回收参数。**RFC-023 为 In Progress**：DB-01…DB-07 通过，DB-08 观察到 **09-26 11:16Z**。
+
+- **改了什么**（e34bdeb）：
+  - 连接层改用 postgres.js：上限 10，连接超时 10 秒，空闲 60 秒回收，连接寿命 30 分钟。会话默认值照旧经连接串的 options 生效。
+  - 测试库与数据模块的建库适配器同步换驱动，依赖 postgres 3.4.9。
+  - 原生 SQL 里直接传的 Date、对象改为先转文本；dev-gotchas 新增一条。
+- **证据**：同一套突发脚本打一个隔离的 cs-api 副本。旧驱动 6 轮每轮都被探针重启，共 102 行 I16 特征报错；新驱动 6 轮 0 报错、0 重启，50,579 个请求全部 2xx。CI 35851282033 六项成功，e2e 用新驱动全新安装。
+- **本机部署**：11:14Z 其余六个部署、11:15:56Z cs-api 换成 `cs-control-plane:pgjs-20260923`；迁移 Job 没有待应用的迁移。验收项目 `rfc023-verify` 保留。
+- **顺手修**：数据模块的 `expireBindings` 一直没接后台任务，到期的只读／可写绑定显示生效中、临时角色不删。本批改为 cs-controller 每分钟收一次，部署后生效。
+- **等作者裁定**：开发会话释放时，要不要立即收回它的数据绑定（现在要等到期）。
+- **下一个 session 注意**：
+  - 09-26 11:16Z 之后，核对 cs-api、cs-session、cs-controller、cs-events 的重启次数与日志里的 I16 特征行（`ERR_POSTGRES`、`JSON Parse error`、`Failed to read data`、`INVALID_MESSAGE`、`UNSUPPORTED_INTEGER`）。都为 0 才能把 DB-08 记为通过。
+  - 然后做 T8 回填：Design §3、tech-evaluation E04，基线版本取 v0.3.13，需要决策号取 D61，已与 crewstation-9c 对过。I16 关闭，RFC 置 Done。
+  - 原生 SQL 读时间列得到字符串、int8 得到字符串，写新代码时照 dev-gotchas 那条来。
+
 ## 本机集群的网络插件换成 Calico：Runner 反复掉线的根因（2026-09-23）
 
 crewstation-51 报来一个现象：演示项目的两个旧 CLI 执行 Pod 和 rfc003 工作台会话的 Runner，每隔几分钟就 90 秒空闲断线，之后约 5 分钟连不上。

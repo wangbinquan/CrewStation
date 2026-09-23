@@ -30,11 +30,21 @@ export interface DataModuleDeps {
   provider?: PostgresProvider;
   clock?: Clock;
   logger?: Logger;
+  /** 收到期绑定的间隔，缺省 BINDING_EXPIRY_INTERVAL_MS；用例里调短。 */
+  expiryIntervalMs?: number;
 }
+
+/** 到期绑定每分钟收一次。 */
+export const BINDING_EXPIRY_INTERVAL_MS = 60_000;
 
 export interface DataModule {
   readonly api: DataModuleApi;
   readonly http: Hono<AppEnv>[];
+  /**
+   * 收到期绑定：标成已过期、删掉临时角色。2026-09-23 之前 expireBindings 没有接到任何后台任务，
+   * 到期的绑定一直显示生效中，临时角色留在库里（数据库按 VALID UNTIL 拒绝它登录）。
+   */
+  readonly workers: Array<{ start(): void; stop(): Promise<void> }>;
   readonly migrations: MigrationSet;
 }
 
@@ -60,5 +70,15 @@ export function createDataModule(deps: DataModuleDeps): DataModule {
   const service = serviceDataUseCases(useCaseDeps);
   const bindings = taskBindingUseCases(useCaseDeps);
   const api: DataModuleApi = { name: 'data', ensureServiceData: service.ensureServiceData, envFor: service.envFor, listResources: service.listResources, ...bindings };
-  return { api, http: [dataRoutes(api, deps.isAdmin)], migrations: dataMigrations };
+  let timer: ReturnType<typeof setInterval> | undefined, expiring = false;
+  const expireTick = () => {
+    if (expiring) return;
+    expiring = true;
+    void api.expireBindings().catch((error: unknown) => useCaseDeps.logger.error('data binding expiry failed', { error: String(error) })).finally(() => { expiring = false; });
+  };
+  const expiry = {
+    start: () => { timer ??= setInterval(expireTick, deps.expiryIntervalMs ?? BINDING_EXPIRY_INTERVAL_MS); },
+    stop: async () => { if (timer) clearInterval(timer); timer = undefined; },
+  };
+  return { api, http: [dataRoutes(api, deps.isAdmin)], workers: [expiry], migrations: dataMigrations };
 }
