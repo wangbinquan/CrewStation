@@ -22,6 +22,16 @@
 **并行会话**：crewstation-14 同时在改「开发页撑满窗口高度」，与本批共用 `NativeWorkspace.module.css`（`.workspace`／`.stage`／窄屏块）与 `DevSessionWorkbench.tsx`（两处 `<Stack fill>`）。本批用临时索引只提交自己的 hunk，这两个文件里对方的改动留在工作树等对方提交。
 **提交前的实机核对**（不动共享部署）：从「HEAD＋本批」导出的干净树构建工作台包，dev-developer 身份的无头 Chrome 里用 CDP 只换 `/assets/index-*`，并把布局 PUT 就地应答（线上 cs-api 仍是旧的 strict 契约）。1440／1280／1024：两个在运行的 CLI 自动成为标签，右键菜单向右分屏、拖到另一组下边（落点区与跟手名字）、双击放大与还原、拖分隔线与双击均分、F2 改名、Shift+F10 键盘菜单（分屏后焦点跟到移动的标签）全部按预期，无横向溢出、无控制台错误；390 宽两组放不下时合并为一条标签栏。只动标签、不点进终端（点进会自动取得输入控制），不结束任何在运行的 CLI。
 
+## 开发页撑到窗口底边、文档式面板把最后一张卡拉到底（2026-09-23）
+
+作者看完上一轮留下的两处留白后裁定「改」，并批准部署。直接修改、不另立 RFC：RFC-020 design §5.1／§5.3 加同日修订说明，plan §4 有记录。提交 `fa542b8`，[CI 35811586600](https://github.com/wangbinquan/CrewStation/actions/runs/35811586600) 六项全部成功。
+
+- **撑到窗口底边**：开发页的 `main`（`.compact`）、`.content`、`NativeWorkspace` 的 `.workspace` 一路是纵向弹性列，`.stage` 由 `calc(100dvh - 210px)` 改为 `flex: 1 1 0`（下限 360px）。1280×720／1440×900／1920×1080 状态条贴着内容区底边、整页不滚动，主区分别高出 47／47／67px；有连接横幅时主区变矮，仍是一屏。手机宽度（≤600px）第一版实量主区被外壳挤到 360px、打开文件时编辑器只剩 0px，改为下限 `max(360px, 70dvh)`（即原定高），页面照旧滚动；601–800px 按桌面规则撑满、不再整页滚动。没有会话的项目页同样长满。
+- **最后一张卡拉到底**：文档式面板（变更、数据、参考、会话）是 `.flow`，至少一屏高、最后一项长满；`Stack`、`Tabs` 加可选 `fill`，紧凑目录（`CatalogPage`／`CatalogContent`）加 `fill`，数据、会话、参考三处点名。`Tabs` 的 `fill` 用 `.tabs.fill > .panel` 写死 `flex: 1 0 auto; overflow: visible`，压住工具面板那条也会命中嵌套页签的 `.panel [role="tabpanel"]`，否则参考面板里会再套一层滚动。变更卡整页时代的 `margin-bottom` 删掉。
+- **用例**：新增 `workspaceHeight`（样式链、四个文档式面板的结构、`fill` 只在点名时生效），改前四条全红；e2e `projectWorkspaceIa` 新增两条 WS-07（三个宽度下状态条贴底且整页不滚动；四个文档式面板最后一张卡离面板正文底边不超过 12px），对改前的线上包实跑为红（留白 47px、变更差 142px）。console 层 685 pass／1 fail——红的是已知偶发的 `pollingVisibility`（只渲染两个轮询 hook，单跑 3/3 绿，与本批无关）；「HEAD＋本批」的干净树 `tsc` 通过（工作树里并行会话未追踪的 `terminalGroups.test.ts` 有类型错，不是本批）。
+- **部署与实机**：`cs-console:fill-height-20260923`（`git archive fa542b8`，与部署前换包核对的镜像 ID 相同 `c9735fa4…`）导入 `desktop-control-plane` 并滚动 console，同时带上了 `0a92896`、`ae7ee76`（crewstation-51 已在其上复核，见 `1198f57`）。部署前用 CDP 只换 `/assets/*` 在真实后端上核对四个宽度与没有会话的项目页：预览 iframe 1440 下 615px、1920 下 816px，编辑器在内部滚动，无控制台错误。部署后 e2e：`projectWorkspaceIa` 11/11（dev-developer）；`projectSettingsUx`／`capabilityDepth`／`apiInvocation`／`layoutSpacing`／`platformCapabilities` 用 dev-developer 跑出的 22 条红全是管理员／负责人专属断言，这些改用 dev-admin 重跑 30 pass／1 skip／0 fail，dev-admin 的个人布局前后一致（revision 162）。中间镜像已删，节点上只多了 `fill-height-20260923`。
+- **并行协调**：与 crewstation-c3（CLI 区改 Xshell 式标签组，未提交）共用 `NativeWorkspace.module.css`、`DevSessionWorkbench.tsx`，事先发消息约定各提各的 hunk；这两个文件用临时索引写入「HEAD＋本批」，c3 的在制品仍在工作树里；结构用例放进新文件，没碰他们在改的 `devSessionPanel.test.tsx`。
+
 ## 开发页右侧面板：预览与代码占满面板高度（2026-09-23）
 
 作者反馈「开发界面右侧栏，各个页签的内容没有把页面高度用满」。缺陷修复：RFC-003 development-workspace §2 要求独立预览占满工作内容区，RFC-020 design §5.3 写的是预览、代码「不变」；RFC-020 plan §4 记了实施记录，不涉及修订。提交 `c8c5b8d`，[CI 35809162288](https://github.com/wangbinquan/CrewStation/actions/runs/35809162288) 六项全部成功。
@@ -31,9 +41,9 @@
 - **修复**：`ToolPane.fill`（只给预览、代码）→ `.fill { height: 100% }`，内容占满面板正文、在自己内部滚动。变更、数据、参考、会话是文档式内容，仍从顶部排、长了由面板正文滚动（RFC-020 之前也是自然高度）。
 - **用例**：`devSessionPanel` 新增一条（六个面板里只有预览与代码带 `fill`；`.fill`、`.preview`、`EditorPane` 的 `.pane` 三处 `height: 100%` 的样式链），改前红；e2e `projectWorkspaceIa` 新增 WS-07 一条（内容底边距面板正文底边不超过 12px、正文不滚动），对改前的线上包实跑红（差 377px）。console 层 649 pass／0 fail，`check:static` 绿。
 - **实机核对（未部署）**：从 `ec33c69`＋本修复构建镜像，无头 Chrome 用 CDP 只换 `/assets/*` 的 JS／CSS（登录、接口、任务流走真实后端，不动共享 console；做法与两个坑写进 dev-gotchas）：1280×720／1440×900／1920×1080／1024×768／390×844 下预览与代码在旁、放大都占满（内容底边距正文底边 8px，即内边距；正文不滚动），预览 iframe 1440 下 569px（原 200px）、1920 下 749px，编辑器在 CodeMirror 里滚（954／354）；其余四个面板行为不变；无横向溢出、无控制台错误。**新 e2e 条还没对部署后的包跑过。**
-- **部署待作者批准**：`cs-console:panel-fill-20260923b`（`git archive 79a3ede` 构建，只在本机 docker）的导入与 `kubectl set image` 被 Claude Code 自动模式分类器按「共享集群变更」拦下，没有执行；本机 console 仍是 `detail-top-20260923b`，**不含本修复**（也不含 `0a92896`、`ae7ee76`，见下一节）。批准后应从当时的 HEAD 重建一次再滚，随后跑 `CS_E2E_AUTH=dev-oidc CS_E2E_USERNAME=dev-developer bun test tests/e2e/projectWorkspaceIa.test.ts`（用 dev-developer，免得改掉作者 dev-admin 的个人布局）。
+- **部署**：作者批准后与下一批一起部署，见上一节（`cs-console:fill-height-20260923`）；当时构建的 `panel-fill-20260923b` 没有部署，已删。
 - **提交时的并行写入**：`git add` 之后、`git commit -- <路径>` 之前，并行会话往 `dev-gotchas.md` 写了一段「终端程序的查询也会产生『输入』」，一度被一起提走；推送前用临时索引把它从本提交里拿掉，那段仍在工作树里，归原会话提交。
-- **留给作者的**：工作区整体用 `calc(100dvh - 210px)` 定高，状态条下方 1280×720／1440×900 留 47px、1920×1080 留 67px 空白，没改；变更、参考等文档式面板内容短时下方留白，也没改。
+- **两处留白**（工作区定高下方的空白、文档式面板内容短时下方的空白）：作者裁定都改，见上一节。
 
 ## 开发页 CLI 操作即自动取得输入控制、占用人实时显示；动作型链接改为按钮样式（2026-09-23）
 
