@@ -44,9 +44,10 @@ test('槽的计时与下线字段可选：旧响应照常解析，新字段按�
   const offline = { releaseId, tag: 'v0.1.2', at: '2026-09-23T01:00:00.000Z', reason: 'rollback-expired' };
   expect(SlotDtoSchema.parse({ ...base, offline }).offline as unknown).toEqual(offline);
   expect(SlotDtoSchema.safeParse({ ...base, offline: { ...offline, reason: 'expired' } }).success).toBe(false);
-  const retention = { kind: 'pending', since: '2026-09-23T01:00:00.000Z', deadline: '2026-10-07T01:00:00.000Z', postponements: 0 };
+  const retention = { kind: 'pending', since: '2026-09-23T01:00:00.000Z', deadline: '2026-10-07T01:00:00.000Z', postponements: 0, periodHours: 336 };
   expect(SlotDtoSchema.parse({ ...base, state: 'ready', retention }).retention as unknown).toEqual(retention);
   expect(SlotDtoSchema.safeParse({ ...base, retention: { ...retention, postponements: -1 } }).success).toBe(false);
+  expect(SlotDtoSchema.safeParse({ ...base, retention: { ...retention, periodHours: 0 } }).success).toBe(false);
   const release = { id: releaseId, serviceId: Bun.randomUUIDv7(), tag: 'v0.1.2', commitSha: 'a'.repeat(40), branch: 'main', status: 'offline', createdBy: Bun.randomUUIDv7(), createdAt: '2026-09-23T01:00:00.000Z', updatedAt: '2026-09-23T01:00:00.000Z', redeployable: true };
   expect(ReleaseDtoSchema.parse(release).status).toBe('offline');
 });

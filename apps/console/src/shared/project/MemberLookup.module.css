@@ -1,0 +1,7 @@
+.stack { display: grid; gap: var(--cs-space-3); min-width: 0; }
+.search { display: flex; gap: var(--cs-space-2); align-items: start; flex-wrap: wrap; }
+.search > label { flex: 1; min-width: min(250px, 100%); }
+.search > button { margin-top: 21px; }
+.person { display: flex; gap: var(--cs-space-3); align-items: center; justify-content: space-between; }
+.person > span { min-width: 0; overflow-wrap: anywhere; }
+@media (max-width: 480px) { .search > button { margin-top: 0; } }

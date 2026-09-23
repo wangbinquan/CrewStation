@@ -9,6 +9,10 @@ export const messages = {
   "market.entry.ready": "可使用",
   "market.entry.unavailable": "暂不可用",
   "market.entry.unknown": "状态待确认",
+  "market.maintenance.badge": "维护中",
+  "market.maintenance.reason": "维护中：{reason}",
+  "market.maintenance.until": "预计 {time} 恢复",
+  "market.maintenance.blocked": "维护中，暂不可用",
   "market.pageEmpty": "本页暂无可用应用",
   "market.pageEmptyHint": "可以继续查看下一页，或重新搜索。",
 

@@ -102,7 +102,7 @@ test('切流受理后工作树对正式版本的比较与详情重新读取', as
     const actions = useReleaseActions();
     useApiQuery(queryKeys.versionComparison(projectId, 'task-example'), async () => { reads.comparison += 1; return { production: prodId }; });
     useApiQuery(queryKeys.comparisonDetails(projectId, 'comparison-example', 'net'), async () => { reads.details += 1; return { files: [] }; });
-    return <DeploymentVersions projectId={projectId} serviceId={serviceId} canSwitch actions={actions} onSelect={() => {}} />;
+    return <DeploymentVersions projectId={projectId} serviceId={serviceId} canSwitch actions={actions} onSelect={() => {}} onRedeploy={() => {}} onRedeployClose={() => {}} />;
   }
   const ui = await renderElement(<ComparisonWithDelivery />, messages);
   try {

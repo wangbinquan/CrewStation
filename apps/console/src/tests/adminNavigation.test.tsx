@@ -45,15 +45,20 @@ const EXPECTED_TREE: readonly RenderedGroup[] = [
   { title: '供给与接入', pages: ['项目管理', '能力接入'] },
   { title: '身份与访问', pages: ['用户与权限', '认证'] },
   { title: '资源与网络', pages: ['算力档位'] },
+  // RFC-021 M28、B10：平台级参数单独成组放在末尾，上面四组不动。
+  { title: '平台', pages: ['平台设置'] },
 ];
 
 describe('管理空间的分组树（2026-09-21 修订 RFC-003 §4）', () => {
   // 锁的是作者反馈的真实问题：集群管理、网关是看运行状态的呈现类页面，曾和六个配置页一起挂在「平台设置」下。
   // 这里同时锁分组、组序与组内顺序；谁把呈现类页面挪回配置分组，这条就红。
-  test('左栏：待处理 → 运行与观测 → 供给与接入 → 身份与访问 → 资源与网络', async () => {
+  test('左栏：待处理 → 运行与观测 → 供给与接入 → 身份与访问 → 资源与网络 → 平台', async () => {
     asAdmin(); page = await renderApp('/admin');
-    expect(linkTree(document.querySelector('nav[aria-label="主导航"]'))).toEqual([...EXPECTED_TREE]);
-    expect(page.text()).not.toContain('平台设置');
+    const tree = linkTree(document.querySelector('nav[aria-label="主导航"]'));
+    expect(tree).toEqual([...EXPECTED_TREE]);
+    // 旧的「平台设置」分组曾把集群管理、网关这类呈现类页面和配置页挂在一起；现在「平台设置」只是「平台」组里的一页，不能再成为分组。
+    expect(tree.map((group) => group.title)).not.toContain('平台设置');
+    expect(tree.find((group) => group.title === '平台')?.pages).toEqual(['平台设置']);
   });
 
   test('左栏每一项都是独立 URL，点击后落在对应页面并标为当前页', async () => {

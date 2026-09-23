@@ -30,6 +30,7 @@ const ADMIN_PAGES = [
   { path: '/admin/requests', marker: '申请审批', capability: '定向开放申请审批' },
   { path: '/admin/cluster', marker: '集群管理', capability: '受管 Kubernetes 资源与运维操作（RFC-010）' },
   { path: '/admin/gateway', marker: '网关', capability: '网关路由与放行表' },
+  { path: '/admin/settings', marker: '待验证版本自动下线', capability: '平台设置：待验证版本自动下线的时长（RFC-021）' },
 ] as const;
 
 /** 租户空间：一个数字人项目从概览到发布、运行、设置的能力面。 */

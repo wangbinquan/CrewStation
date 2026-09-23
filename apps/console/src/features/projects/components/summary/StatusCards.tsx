@@ -6,6 +6,7 @@ import { useApiQuery } from '../../../../shared/api/useApi';
 import { PROJECT_PATHS } from '../../../../shared/project/projectPaths';
 import type { ProjectSpace } from '../../../../shared/project/projectPaths';
 import { DeployedVersionCard } from '../../../../shared/project/DeployedVersionCard';
+import { useServiceMaintenance } from '../../../../shared/project/useServiceMaintenance';
 import { useT } from '../../../../shared/lib/useT';
 import { Badge } from '../../../../shared/ui/Badge';
 import type { BadgeTone } from '../../../../shared/ui/Badge';
@@ -15,9 +16,9 @@ import { SummaryUnavailable } from './SummaryFacts';
 import styles from './ProjectSummary.module.css';
 import { ButtonLink } from '../../../../shared/ui/navigation/ButtonLink';
 
-/** 概览的三张状态卡（RFC-020 §4.2）：正式版本、待验证版本、开发会话；版本卡与发布页同一个组件。 */
+/** 概览的三张状态卡（RFC-020 §4.2）：正式版本、待验证版本、开发会话；版本卡与发布页同一个组件，维护角标与到期提示也一样（RFC-021）。 */
 export function StatusCards({ item, space, available }: { readonly item: ProjectSummaryDetail; readonly space: ProjectSpace; readonly available: boolean }): ReactElement {
-  const t = useT(), projectId = item.project.id, tester = item.role === 'tester';
+  const t = useT(), projectId = item.project.id, tester = item.role === 'tester', maintenance = useServiceMaintenance(item.project.serviceId);
   const slotOf = (name: 'prod' | 'preview'): { slot?: SlotDto; known: boolean; part: { status: string; checkedAt: string } | undefined } => {
     const part = name === 'preview' && tester ? item.preview : item.slots;
     if (!part || part.status !== 'ready' || !summaryIsFresh(part)) return { known: false, part };
@@ -31,7 +32,7 @@ export function StatusCards({ item, space, available }: { readonly item: Project
       const { slot, known, part } = slotOf(name);
       if (!part) return <Card key={name} compact title={t(`slot.${name}`)}><span className={styles.muted}>{t('projects.summary.unknown')}</span></Card>;
       if (!known) return <Card key={name} compact title={t(`slot.${name}`)}><SummaryUnavailable part={part} /></Card>;
-      return <DeployedVersionCard key={name} role={name} slot={slot} known={available} sha="short" health={health(name)}
+      return <DeployedVersionCard key={name} role={name} slot={slot} known={available} sha="short" health={health(name)} maintenance={name === 'prod' ? maintenance.current : undefined}
         actions={name === 'preview' && available && switchTarget ? <ButtonLink variant="primary" size="small" to={PROJECT_PATHS[space].release} params={{ projectId }} search={{ switch: true }}>{t('projects.summary.goLive', { tag: slot?.tag ?? '' })}</ButtonLink> : undefined} />;
     })}
     {tester ? null : <DevelopmentCard item={item} space={space} available={available} />}

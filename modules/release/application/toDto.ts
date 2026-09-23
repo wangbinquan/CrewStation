@@ -2,7 +2,7 @@ import type { ReleaseDto, SlotDto, TrafficSwitchDto } from '@crewstation/contrac
 import type { Release } from '../domain/release';
 import { isRedeployable } from '../domain/release';
 import type { OfflinePolicy } from '../domain/slotLifecycle';
-import { DEFAULT_OFFLINE_POLICY, offlineDeadline } from '../domain/slotLifecycle';
+import { DEFAULT_OFFLINE_POLICY, offlineDeadline, retentionPeriodMs } from '../domain/slotLifecycle';
 import type { PhysicalSlot, ServiceSlots, SlotState } from '../domain/slots';
 import { roleOf } from '../domain/slots';
 import type { HostNaming } from '../ports/platform';
@@ -34,7 +34,7 @@ function lifecycleOf(slot: SlotState, role: 'prod' | 'preview', releases: Map<st
     retention: {
       kind: slot.retention.kind, since: slot.retention.since.toISOString(), deadline: offlineDeadline(slot.retention, policy).toISOString(),
       ...(slot.retention.remindedAt && slot.retention.remindedFor?.getTime() === offlineDeadline(slot.retention, policy).getTime() ? { remindedAt: slot.retention.remindedAt.toISOString() } : {}),
-      postponements: slot.retention.postponements,
+      postponements: slot.retention.postponements, periodHours: retentionPeriodMs(slot.retention.kind, policy) / 3_600_000,
     },
   } : {};
   const tag = slot.offline ? releases.get(slot.offline.releaseId)?.tag : undefined;

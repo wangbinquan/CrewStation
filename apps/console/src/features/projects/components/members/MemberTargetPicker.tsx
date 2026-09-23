@@ -8,7 +8,7 @@ import { Button } from '../../../../shared/ui/Button';
 import { FormField } from '../../../../shared/ui/FormField';
 import { QueryStatus } from '../../../../shared/ui/QueryStatus';
 import type { MemberTargetMode } from '../../model/useMemberEditor';
-import { MemberLookup } from '../visibility/MemberLookup';
+import { MemberLookup } from '../../../../shared/project/MemberLookup';
 import styles from '../MemberForm.module.css';
 
 interface PickerProps {

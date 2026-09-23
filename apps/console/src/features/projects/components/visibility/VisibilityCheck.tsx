@@ -3,7 +3,7 @@ import { api } from '../../../../shared/api/client';
 import { errorMessage, useApiMutation } from '../../../../shared/api/useApi';
 import { useT } from '../../../../shared/lib/useT';
 import { ActionNote } from '../../../../shared/ui/ActionNote';
-import { MemberLookup } from './MemberLookup';
+import { MemberLookup } from '../../../../shared/project/MemberLookup';
 import styles from './Visibility.module.css';
 
 export function VisibilityCheck({ projectId, revision }: { readonly projectId: string; readonly revision: number }) {

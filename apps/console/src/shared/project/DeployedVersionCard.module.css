@@ -8,3 +8,4 @@
 .host { color: var(--cs-color-text-muted); overflow-wrap: anywhere; }
 .actions { display: inline-flex; align-items: center; flex-wrap: wrap; gap: var(--cs-space-2); }
 .note { margin: 0; color: var(--cs-color-text-muted); font-size: var(--cs-font-size-sm); }
+.notice { margin: 0; font-size: var(--cs-font-size-sm); overflow-wrap: anywhere; }

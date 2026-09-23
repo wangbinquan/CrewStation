@@ -2,7 +2,7 @@ import type { ProjectSummaryDetail } from '@crewstation/contracts';
 import { Link } from '@tanstack/react-router';
 import { PROJECT_PATHS } from '../../../../shared/project/projectPaths';
 import type { ProjectSpace } from '../../../../shared/project/projectPaths';
-import { releaseTimeline, shortId } from '../../../../shared/project/releaseTimeline';
+import { isReleaseOrSwitch, releaseTimeline, shortId } from '../../../../shared/project/releaseTimeline';
 import { useT } from '../../../../shared/lib/useT';
 import { useDateText } from '../../../../shared/lib/useDateText';
 import { Badge } from '../../../../shared/ui/Badge';
@@ -21,7 +21,7 @@ export function ProjectRecentActivity({ item, space, names }: { readonly item: P
   const t = useT(), date = useDateText(), params = { projectId: item.project.id };
   const releases = item.releases.status === 'ready' && summaryIsFresh(item.releases) ? item.releases.value : undefined;
   const switches = item.switches.status === 'ready' && summaryIsFresh(item.switches) ? item.switches.value : undefined;
-  const entries = releaseTimeline(releases ?? [], switches ?? [], names).slice(0, LIMIT);
+  const entries = releaseTimeline(releases ?? [], switches ?? [], names).filter(isReleaseOrSwitch).slice(0, LIMIT);
   const items: TimelineItem[] = entries.map((entry) => entry.kind === 'release'
     ? { id: entry.id, tone: entry.release.status === 'ready' ? 'success' : entry.release.status === 'failed' ? 'danger' : 'info', time: date(entry.at),
       primary: <Link to={PROJECT_PATHS[space].release} params={params} search={{ release: entry.release.id }}>{entry.release.tag}</Link>,

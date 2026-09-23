@@ -4,9 +4,11 @@ import type { messages as zhCN } from './zh-CN';
 import { authMessages } from './auth.en-US';
 import { projectComputeMessages } from './projectCompute.en-US';
 import { computeMessages } from './compute.en-US';
+import { settingsMessages } from './settings.en-US';
 
 export const messages: MessagesShapedLike<typeof zhCN> = {
   ...projectComputeMessages,
+  ...settingsMessages,
   ...projectResourceMessages,
   "admin.users.role": "Platform role",
   "admin.users.roleFor": "Role for {name}",

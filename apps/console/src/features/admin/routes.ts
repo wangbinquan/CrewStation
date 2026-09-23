@@ -11,6 +11,7 @@ import { AdminUsersPage } from './pages/AdminUsersPage';
 import { AdminProjectComputePage, AdminProjectComputeLegacyPage } from './pages/AdminProjectComputePage';
 import { AdminResourceTemplatesPage } from './pages/AdminResourceTemplatesPage';
 import { AdminProjectsPage } from './pages/AdminProjectsPage';
+import { AdminSettingsPage } from './pages/AdminSettingsPage';
 import { parseProjectDirectorySearch } from '../../shared/admin/projectDirectorySearch';
 import { parseComputeSearch } from './model/computeSearch';
 import { parseAuthenticationSearch } from './model/authenticationSearch';
@@ -26,6 +27,8 @@ export const adminComputeRoute = createRoute({ getParentRoute: () => adminRoute,
 export const adminServicePlansRoute = createRoute({ getParentRoute: () => adminRoute, path: 'service-plans', component: AdminServicePlansPage });
 export const adminTaskProfilesRoute = createRoute({ getParentRoute: () => adminRoute, path: 'task-profiles', component: AdminTaskProfilesPage });
 export const adminGatewayRoute = createRoute({ getParentRoute: () => adminRoute, path: 'gateway', component: AdminGatewayPage });
+/** 平台设置（RFC-021 M28）。 */
+export const adminSettingsRoute = createRoute({ getParentRoute: () => adminRoute, path: 'settings', component: AdminSettingsPage });
 
 export const adminProjectComputeRoute = createRoute({ getParentRoute: () => adminRoute, path: 'projects/$projectId/compute', component: AdminProjectComputeLegacyPage });
 

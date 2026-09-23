@@ -8,7 +8,8 @@ export type AdminPagePath =
   | '/admin/capabilities'
   | '/admin/users'
   | '/admin/authentication'
-  | '/admin/compute';
+  | '/admin/compute'
+  | '/admin/settings';
 
 export interface AdminNavPage {
   readonly to: AdminPagePath;
@@ -23,7 +24,7 @@ export interface AdminEntryPage extends AdminNavPage {
 
 export interface AdminEntryGroup {
   /** 稳定标识：元素 id 与用例定位用，不随文案变。 */
-  readonly id: 'observability' | 'supply' | 'identity' | 'resources';
+  readonly id: 'observability' | 'supply' | 'identity' | 'resources' | 'platform';
   readonly titleKey: string;
   readonly pages: readonly AdminEntryPage[];
 }
@@ -55,5 +56,9 @@ export const ADMIN_ENTRY_GROUPS: readonly AdminEntryGroup[] = [
   // RFC-018 下线出站白名单后本组只剩算力档位；两类资源规格模板在 /admin/projects 下（RFC-017）。
   { id: 'resources', titleKey: 'nav.admin.groupResources', pages: [
     { to: '/admin/compute', labelKey: 'nav.admin.compute', hintKey: 'admin.overview.compute' },
+  ] },
+  // RFC-021 M28、B10：平台级参数单独成组放在末尾，不改动上面四组；以后其他平台级参数也放这里。
+  { id: 'platform', titleKey: 'nav.admin.groupPlatform', pages: [
+    { to: '/admin/settings', labelKey: 'nav.admin.settings', hintKey: 'admin.settings.hint' },
   ] },
 ];

@@ -1,12 +1,12 @@
 import type { MemberCandidateDto } from '@crewstation/contracts';
 import { useId, useState } from 'react';
-import { api } from '../../../../shared/api/client';
-import { errorMessage, useApiMutation } from '../../../../shared/api/useApi';
-import { useT } from '../../../../shared/lib/useT';
-import { ActionNote } from '../../../../shared/ui/ActionNote';
-import { Button } from '../../../../shared/ui/Button';
-import { FormField } from '../../../../shared/ui/FormField';
-import styles from './Visibility.module.css';
+import { api } from '../api/client';
+import { errorMessage, useApiMutation } from '../api/useApi';
+import { useT } from '../lib/useT';
+import { ActionNote } from '../ui/ActionNote';
+import { Button } from '../ui/Button';
+import { FormField } from '../ui/FormField';
+import styles from './MemberLookup.module.css';
 
 interface MemberLookupProps {
   readonly projectId: string;
@@ -17,7 +17,7 @@ interface MemberLookupProps {
   readonly inputState?: { readonly value: string; readonly onChange: (value: string) => void };
 }
 
-/** 精确查询，不请求全局用户目录。查询失败保留输入，变更输入使旧候选立即失效。 */
+/** 精确查询，不请求全局用户目录。查询失败保留输入，变更输入使旧候选立即失效。可见范围、成员与正式版本维护（RFC-021）共用。 */
 export function MemberLookup({ projectId, onSelect, actionKey = 'projects.visibility.addUser', disabled = false, selectionError, inputState }: MemberLookupProps) {
   const t = useT(), id = useId(), [localIdentity, setIdentity] = useState(''), [error, setError] = useState<string>();
   const identity = inputState?.value ?? localIdentity;

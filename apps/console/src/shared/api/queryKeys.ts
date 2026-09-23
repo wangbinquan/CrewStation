@@ -29,6 +29,10 @@ export const queryKeys = {
   releases: (serviceId: string) => ['services', serviceId, 'releases'] as const,
   release: (releaseId: string) => ['releases', releaseId] as const,
   trafficSwitches: (serviceId: string) => ['services', serviceId, 'traffic-switches'] as const,
+  /** RFC-021：待命槽的下线、重新部署、推迟与提醒记录，并进发布记录时间线。 */
+  slotEvents: (serviceId: string) => ['services', serviceId, 'slot-events'] as const,
+  /** RFC-021：正式版本的维护状态与记录；发布页与概览共用一份缓存。 */
+  maintenance: (serviceId: string) => ['services', serviceId, 'maintenance'] as const,
   branches: (projectId: string) => ['projects', projectId, 'branches'] as const,
   devSession: (projectId: string) => ['projects', projectId, 'dev-session'] as const,
   nativeTerminals: (taskId: string) => ['tasks', taskId, 'native-terminals'] as const,
@@ -76,4 +80,6 @@ export const queryKeys = {
   gateway: () => ['gateway'] as const,
   gatewayRoutes: () => ['gateway', 'routes'] as const,
   gatewayAllowlist: () => ['gateway', 'allowlist'] as const,
+  /** RFC-021：平台设置里的自动下线时长（仅管理员）。 */
+  autoOfflinePolicy: () => ['platform-settings', 'auto-offline'] as const,
 } as const;

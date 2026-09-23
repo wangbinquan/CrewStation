@@ -42,6 +42,8 @@ export const SlotRetentionDtoSchema = z.object({
   /** 已为当前到期时间发过提醒。 */
   remindedAt: z.iso.datetime().optional(),
   postponements: z.number().int().min(0),
+  /** 一个周期的小时数（回退保留期或无人访问期限）：推迟按它加，界面据此写「推迟 72 小时／14 天」。 */
+  periodHours: z.number().int().positive(),
 });
 
 /** 待命槽已下线：下线的版本、时间、原因；平台自动下线时没有操作人。 */

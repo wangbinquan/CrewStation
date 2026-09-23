@@ -6,7 +6,7 @@ import { ActionNote } from '../../../../shared/ui/ActionNote';
 import { Button } from '../../../../shared/ui/Button';
 import { FormField } from '../../../../shared/ui/FormField';
 import type { useVisibilityEditor } from '../../model/useVisibilityEditor';
-import { MemberLookup } from './MemberLookup';
+import { MemberLookup } from '../../../../shared/project/MemberLookup';
 import styles from './Visibility.module.css';
 
 const MODES = ['members', 'authenticated', 'selected'] as const;

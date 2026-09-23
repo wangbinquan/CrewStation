@@ -10,6 +10,10 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   "market.entry.ready": "Available",
   "market.entry.unavailable": "Unavailable",
   "market.entry.unknown": "Status unconfirmed",
+  "market.maintenance.badge": "Under maintenance",
+  "market.maintenance.reason": "Under maintenance: {reason}",
+  "market.maintenance.until": "expected back {time}",
+  "market.maintenance.blocked": "Under maintenance, unavailable for now",
   "market.pageEmpty": "No applications on this page",
   "market.pageEmptyHint": "Continue to the next page or search again.",
 

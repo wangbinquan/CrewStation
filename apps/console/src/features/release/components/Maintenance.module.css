@@ -1,0 +1,12 @@
+.panel { display: flex; flex-direction: column; gap: var(--cs-space-3); min-width: 0; }
+.form { display: flex; flex-direction: column; gap: var(--cs-space-3); min-width: 0; }
+.switches { display: grid; gap: var(--cs-space-2); margin: 0; padding: 0; border: 0; min-width: 0; }
+.legend { padding: 0; font-weight: 600; }
+.switch { display: flex; align-items: flex-start; gap: var(--cs-space-2); cursor: pointer; }
+.switch > input { margin-top: 3px; flex: none; }
+.switch > span { display: flex; flex-direction: column; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
+.muted { color: var(--cs-color-text-muted); font-size: var(--cs-font-size-sm); }
+.people { display: flex; flex-direction: column; gap: var(--cs-space-2); min-width: 0; }
+.list { display: grid; gap: var(--cs-space-1); margin: 0; padding: 0; list-style: none; }
+.person { display: flex; align-items: center; justify-content: space-between; gap: var(--cs-space-3); }
+.person > span { min-width: 0; overflow-wrap: anywhere; }

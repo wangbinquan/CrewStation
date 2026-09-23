@@ -73,7 +73,7 @@ describe.skipIf(!available)('RFC-021 待命槽生命周期', () => {
     const f = await fixture();
     const v1 = await f.publish(); await f.goLive(v1);
     const v2 = await f.publish(); f.at(H); await f.goLive(v2);
-    expect((await f.preview()).retention).toEqual({ kind: 'rollback-target', since: new Date(Date.parse('2026-09-23T00:00:00.000Z') + H).toISOString(), deadline: new Date(Date.parse('2026-09-23T00:00:00.000Z') + 73 * H).toISOString(), postponements: 0 });
+    expect((await f.preview()).retention).toEqual({ kind: 'rollback-target', since: new Date(Date.parse('2026-09-23T00:00:00.000Z') + H).toISOString(), deadline: new Date(Date.parse('2026-09-23T00:00:00.000Z') + 73 * H).toISOString(), postponements: 0, periodHours: 72 });
     f.at(48 * H); expect((await f.release.api.sweepSlotLifecycle()).reminded).toBe(0);
     f.at(49 * H); expect((await f.release.api.sweepSlotLifecycle()).reminded).toBe(1);
     expect(f.notices.at(-1)).toMatchObject({ users: [owner.userId], message: expect.stringContaining(v1.tag) });
@@ -101,7 +101,7 @@ describe.skipIf(!available)('RFC-021 待命槽生命周期', () => {
     const f = await fixture();
     await f.publish();
     const start = Date.parse('2026-09-23T00:00:00.000Z');
-    expect((await f.preview()).retention).toMatchObject({ kind: 'pending', deadline: new Date(start + 14 * D).toISOString() });
+    expect((await f.preview()).retention).toMatchObject({ kind: 'pending', deadline: new Date(start + 14 * D).toISOString(), periodHours: 336 });
     f.at(3 * D); await f.release.api.notePreviewAccess(serviceId);
     expect((await f.preview()).retention?.deadline).toBe(new Date(start + 17 * D).toISOString());
     f.at(3 * D + 60_000); await f.release.api.notePreviewAccess(serviceId);
@@ -201,7 +201,7 @@ describe.skipIf(!available)('RFC-021 待命槽生命周期', () => {
     await expect(f.release.api.setAutoOfflinePolicy(admin, { rollbackRetentionHours: 12, idleOfflineDays: 7, reminderLeadHours: 12, expectedRevision: 0 })).rejects.toMatchObject({ kind: 'validation' });
     const saved = await f.release.api.setAutoOfflinePolicy(admin, { rollbackRetentionHours: 48, idleOfflineDays: 7, reminderLeadHours: 12, expectedRevision: 0 });
     expect(saved).toMatchObject({ rollbackRetentionHours: 48, idleOfflineDays: 7, reminderLeadHours: 12, revision: 1, updatedBy: admin.userId });
-    expect((await f.preview()).retention?.deadline).toBe(new Date(Date.parse('2026-09-23T00:00:00.000Z') + 7 * D).toISOString());
+    expect((await f.preview()).retention).toMatchObject({ deadline: new Date(Date.parse('2026-09-23T00:00:00.000Z') + 7 * D).toISOString(), periodHours: 168 });
     await expect(f.release.api.setAutoOfflinePolicy(admin, { rollbackRetentionHours: 48, idleOfflineDays: 7, reminderLeadHours: 12, expectedRevision: 0 })).rejects.toMatchObject({ kind: 'conflict' });
   });
 

@@ -151,3 +151,19 @@ describe('保存后的后台重读', () => {
     expect(page.text()).toContain('知识助理'); expect(card()).toBe(before);
   });
 });
+
+describe('维护中的应用（RFC-021）', () => {
+  // RFC-021 M13：维护中的应用带「维护中」与原因、预计恢复时间；被网关拦住的人没有打开入口，放行的人照常打开。
+  test('正式版本维护中：卡片标注维护与原因；被拦住的人没有打开链接，放行的人照常打开', async () => {
+    const deployed = { entry: { kind: 'production' as const, status: 'ready' as const, host: 'knowledge.example.test' }, production: { status: 'deployed' as const, state: 'ready' as const, host: 'knowledge.example.test', tag: 'v1.2.3', commitSha: 'abc123', freshness: 'current' as const, checkedAt: '2026-09-13T00:00:00.000Z' } };
+    fixture(false, app({ ...deployed, maintenance: { reason: '迁移订单表', expectedEndAt: '2026-09-13T04:00:00.000Z', blocked: true } }));
+    page = await renderApp('/market');
+    expect(page.text()).toContain('维护中'); expect(page.text()).toContain('维护中：迁移订单表'); expect(page.text()).toContain('预计'); expect(page.text()).toContain('维护中，暂不可用');
+    expect(document.querySelector('a[href="http://knowledge.example.test"]')).toBeNull();
+    page.unmount();
+    fixture(false, app({ ...deployed, maintenance: { reason: '迁移订单表', blocked: false } }));
+    page = await renderApp('/market');
+    expect(page.text()).toContain('维护中：迁移订单表'); expect(page.text()).not.toContain('维护中，暂不可用');
+    expect(document.querySelector('a[href="http://knowledge.example.test"]')?.textContent).toBe('知识助理');
+  });
+});
