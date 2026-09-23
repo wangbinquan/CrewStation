@@ -1,5 +1,8 @@
 import { join } from 'node:path';
 import type { UserId } from '@crewstation/contracts';
+import { DomainTopic } from '@crewstation/contracts';
+import type { EventConsumer } from '@crewstation/eventbus';
+import { createEventConsumer } from '@crewstation/eventbus';
 import type { AppEnv } from '@crewstation/http';
 import type { Clock, Logger } from '@crewstation/kernel';
 import { noopLogger, systemClock } from '@crewstation/kernel';
@@ -12,6 +15,7 @@ import type { PostgresProviderSettings } from './adapters/postgres/postgresProvi
 import { postgresJsProvider } from './adapters/postgres/postgresProvider';
 import type { DataModuleApi } from './api/moduleApi';
 import type { DataUseCaseDeps } from './application/dependencies';
+import { revokeBindingsOfReleasedTask } from './application/releasedTask';
 import { serviceDataUseCases } from './application/serviceData';
 import { taskBindingUseCases } from './application/taskBindings';
 import type { UserDirectory } from './ports/userDirectory';
@@ -45,6 +49,8 @@ export interface DataModule {
    * 到期的绑定一直显示生效中，临时角色留在库里（数据库按 VALID UNTIL 拒绝它登录）。
    */
   readonly workers: Array<{ start(): void; stop(): Promise<void> }>;
+  /** 任务已释放 → 收回它名下还没结束的绑定（2026-09-23 作者裁定：释放已有弹窗确认，直接收回）。 */
+  readonly subscriptions: EventConsumer[];
   readonly migrations: MigrationSet;
 }
 
@@ -80,5 +86,8 @@ export function createDataModule(deps: DataModuleDeps): DataModule {
     start: () => { timer ??= setInterval(expireTick, deps.expiryIntervalMs ?? BINDING_EXPIRY_INTERVAL_MS); },
     stop: async () => { if (timer) clearInterval(timer); timer = undefined; },
   };
-  return { api, http: [dataRoutes(api, deps.isAdmin)], workers: [expiry], migrations: dataMigrations };
+  const revokeReleased = revokeBindingsOfReleasedTask(useCaseDeps);
+  const consumer = createEventConsumer({ db: deps.db, consumer: 'data', ...(deps.logger ? { logger: deps.logger } : {}) })
+    .on(DomainTopic.taskReleased, async (event) => { await revokeReleased(event.payload.taskId); });
+  return { api, http: [dataRoutes(api, deps.isAdmin)], workers: [expiry], subscriptions: [consumer], migrations: dataMigrations };
 }

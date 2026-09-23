@@ -252,6 +252,7 @@
       "version": "0.0.0",
       "dependencies": {
         "@crewstation/contracts": "workspace:*",
+        "@crewstation/eventbus": "workspace:*",
         "@crewstation/http": "workspace:*",
         "@crewstation/kernel": "workspace:*",
         "@crewstation/module-project": "workspace:*",

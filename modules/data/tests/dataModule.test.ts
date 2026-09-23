@@ -1,6 +1,8 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import postgres from 'postgres';
 import type { Actor, ProjectId, ServiceId, TaskId, UserId } from '@crewstation/contracts';
+import { DomainTopic } from '@crewstation/contracts';
+import { eventbusMigrations, publishDomainEvent } from '@crewstation/eventbus';
 import { generateSecretKey } from '@crewstation/secretbox';
 import type { TestDatabase } from '@crewstation/testkit';
 import { DEFAULT_TEST_DATABASE_URL, createTestDatabase, testDatabaseAvailable } from '@crewstation/testkit';
@@ -23,7 +25,7 @@ type DataDeps = Parameters<typeof createDataModule>[0];
 let deps: Omit<DataDeps, 'db'>;
 beforeAll(async () => {
   if (!available) return;
-  tdb = await createTestDatabase([dataMigrations]);
+  tdb = await createTestDatabase([eventbusMigrations, dataMigrations]);
   const url = new URL(adminUrl);
   deps = {
     users: { displayName: async (id) => id === dev.userId ? '开发者小李' : id === owner.userId ? '负责人小周' : undefined },
@@ -114,5 +116,28 @@ describe.skipIf(!available)('data module', () => {
       expect(await stateOf()).toBe('expired');
       expect(await roles()).toBe(0);
     } finally { await expiring.workers[0]!.stop(); await admin.end(); }
+  });
+  test('开发会话释放（任务已释放事件）时收回它名下还没结束的绑定：生效中的删掉临时角色，申请中的一并收回，别的任务不受影响；重复投递无副作用（2026-09-23 作者裁定）', async () => {
+    const released = '01a0bf5d-8f4b-7418-8a3f-7cbb4a1fd760' as TaskId;
+    const active = await data.api.requestTaskBinding(dev, { taskId: released, serviceId }, { mode: 'diagnostic-readonly', reason: '释放即收回', ttlMinutes: 30 });
+    await data.api.decideTaskBinding(owner, active.id, { approve: true });
+    const pending = await data.api.requestTaskBinding(dev, { taskId: released, serviceId }, { mode: 'production-change', ttlMinutes: 10 });
+    const other = await data.api.requestTaskBinding(dev, { taskId, serviceId }, { mode: 'development', ttlMinutes: 120 });
+    const role = `cs_t_${active.id.replaceAll('-', '')}`;
+    const admin = postgres(adminUrl, { max: 1, onnotice: () => undefined });
+    const roles = async () => Number((await admin`SELECT count(*)::int AS n FROM pg_roles WHERE rolname = ${role}`)[0]?.n);
+    const statesOf = async (task: TaskId) => Object.fromEntries((await data.api.listTaskBindings(owner, task)).map((b) => [b.id, b.state]));
+    const release = () => publishDomainEvent(tdb.db, DomainTopic.taskReleased, { occurredAt: new Date().toISOString(), projectId, taskId: released, kind: 'dev-session', reason: 'user' });
+    try {
+      expect(await roles()).toBe(1);
+      await release();
+      expect(await data.subscriptions[0]!.runOnce()).toBe(1);
+      expect(await statesOf(released)).toEqual({ [active.id]: 'revoked', [pending.id]: 'revoked' });
+      expect(await roles()).toBe(0);
+      expect((await statesOf(taskId))[other.id]).toBe('active');
+      await release();
+      await data.subscriptions[0]!.runOnce();
+      expect(await statesOf(released)).toEqual({ [active.id]: 'revoked', [pending.id]: 'revoked' });
+    } finally { await admin.end(); }
   });
 });
