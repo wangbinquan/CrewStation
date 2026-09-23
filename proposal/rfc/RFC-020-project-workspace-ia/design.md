@@ -157,6 +157,9 @@ tool: z.object({ name: z.enum(['preview', 'code', 'changes', 'data', 'reference'
 ## 7. 运行与诊断、开发资源、项目设置
 
 - 运行与诊断保留 `Tabs`，五个页签。`status` 页签：`HealthCards` 在上（保留「查看此版本日志」）、`TopologyPage` 在下；两者各自的查询与轮询不变。`TracePage` 空态文案改为说明 trace_id 的来源并给事件投递链接。
+
+> **2026-09-23 修订（作者当面裁定，直接修改＋回填，不另立 RFC）。** `OPERATIONS_TABS` 改为 `topology`、`health`、`logs`、`alerts`、`deliveries`、`trace` 六个，缺省 `topology`；`TopologyPage` 与 `HealthCards` 各占一个页签，各自的查询与轮询不变。`hasLegacyOperationsTab` 只认 `tab=status`，路由把它改写为 `tab=topology`，`health`／`topology` 重新是正式页签名；概览 `DeploymentTopologyCard` 链到 `tab=topology`，`ProjectAttentionBanners` 的健康横幅链到 `tab=health`。
+
 - 参考面板的三段内容见 §5.3；`CatalogPage` 的「表在前、详情在旁」（`OperationsTable` → 选中行右侧 `OperationDetail`：文档、授权状态、申请表单、试调；`SwaggerPanel` 折叠；管理员链接改页脚一行）只在放大形态渲染；事件段顶部一行「最近投递 n 条 · 死信 m 条 →」来自 `api.events.listDeliveries` 的一页计数。
 
 > **2026-09-23 修订（作者当面裁定，直接修改，不另立 RFC）。** `SwaggerPanel` 不再包 `<details>`，直接渲染在 `RequestsPanel` 之下；`proxy` 参数只作为它的初始代理（`catalogDetail` 用例相应改写）。§5.3 表中「折叠的 `SwaggerPanel`」同此。

@@ -67,8 +67,8 @@ test('the overview shows one summary card per band and links to the full topolog
   page = await renderApp(`/projects/${f.item.project.id}`);
   expect(page.text()).toContain('部署与运行形态'); expect(page.text()).toContain('工作负载 1 · Pod 2，就绪 1，运行 0'); expect(page.text()).toContain('1 个需要关注');
   expect(nodes()).toEqual(['band:slot:prod', 'band:business']);
-  expect([...document.querySelectorAll('a[href*="tab=status"]')].map((node) => node.textContent)).toContain('查看完整形态');
-  await clickNode('band:business'); expect(page.search()).toMatchObject({ tab: 'status' });
+  expect([...document.querySelectorAll('a[href*="tab=topology"]')].map((node) => node.textContent)).toContain('查看完整形态');
+  await clickNode('band:business'); expect(page.search()).toMatchObject({ tab: 'topology' });
 });
 
 test('cluster topology tab walks system → projects → pod layer and reuses the resource detail', async () => {

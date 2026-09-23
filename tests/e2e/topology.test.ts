@@ -44,8 +44,8 @@ describe.skipIf(!session)('deployed deployment topology (RFC-019)', () => {
     await open(page, `/admin/cluster?tab=topology&layer=project&projectId=${id}&scope=project`); await waitForNodes(page);
     let ids = await nodeIds(page); for (const pod of pods) expect(ids).toContain(pod.uid);
     expect(await page.bodyText()).toContain('项目层 ›');
-    // RFC-020 D3：拓扑并入「状态」页签；旧的 tab=topology 由路由改写。
-    await open(page, `/projects/${id}/operations?tab=status`); await waitForNodes(page);
+    // 2026-09-23 修订 RFC-020 D3：拓扑重新是自己的页签（在最前）。
+    await open(page, `/projects/${id}/operations?tab=topology`); await waitForNodes(page);
     ids = await nodeIds(page); for (const pod of pods) expect(ids).toContain(pod.uid);
     // 盘点里 PVC 的 facts 值是 JSON（如 capacity {"storage":"10Gi"}），卡片上要显示成量，不能原样上图。
     const pvc = inventory.items.find((item) => item.kind === 'PersistentVolumeClaim' && Object.values(item.facts).some((value) => value.startsWith('{')));
@@ -81,8 +81,9 @@ describe.skipIf(!session)('deployed deployment topology (RFC-019)', () => {
     const stroke = () => page.eval<string>(`getComputedStyle(document.documentElement).getPropertyValue('--cs-topo-gateway-stroke').trim()`);
     await colourScheme(page, 'light');
     try {
-      await open(page, `/projects/${id}/operations?tab=topology`); await waitForNodes(page);
-      expect(await page.eval<string>('location.search')).toContain('tab=status');
+      // 合并期间的 tab=status 由路由改写成形态页签。
+      await open(page, `/projects/${id}/operations?tab=status`); await waitForNodes(page);
+      expect(await page.eval<string>('location.search')).toContain('tab=topology');
       expect(await page.eval<boolean>(`matchMedia('(prefers-color-scheme: light)').matches`)).toBe(true);
       const light = await stroke(); expect(light).not.toBe('');
       await colourScheme(page, 'dark'); expect(await stroke()).not.toBe(light); await colourScheme(page, 'light');

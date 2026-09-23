@@ -149,7 +149,7 @@ describe('五个项目入口与旧链接兼容', () => {
   });
 
   test('健康状态可定位对应槽日志，查询失败保留错误而不显示正常', async () => {
-    const f = fixture(); page = await renderApp(`/projects/${projectId}/operations`);
+    const f = fixture(); page = await renderApp(`/projects/${projectId}/operations?tab=health`);
     f.failLogs(); await page.click('查看此版本日志');
     expect(page.search()).toMatchObject({ tab: 'logs', source: 'slot', slot: 'prod' });
     expect(page.text()).toContain('读取 Pod 日志失败'); expect(page.text()).not.toContain('build fixture line');
@@ -251,20 +251,31 @@ describe('诊断、订阅与配置的上下文', () => {
   });
 });
 
+// 2026-09-23 作者当面裁定：健康与形态重新分成两个页签，部署与运行形态在最前、也是默认（修订 RFC-020 D3）；合并期间的 tab=status 落到形态。
+test('运行与诊断六个页签：部署与运行形态在最前并默认打开，健康卡只在健康状态页签；旧的 tab=status 换成形态', async () => {
+  fixture(); page = await renderApp(`/projects/${projectId}/operations`);
+  const tabs = () => [...document.querySelectorAll('[role="tablist"][aria-label="运行与诊断"] [role="tab"]')];
+  expect(tabs().map((tab) => tab.textContent)).toEqual(['部署与运行形态', '健康状态', '日志', '告警与通知', '事件投递', '调用链回放']);
+  expect(tabs()[0]?.getAttribute('aria-selected')).toBe('true'); expect(page.text()).not.toContain('查看此版本日志');
+  await page.click('健康状态'); expect(page.search()).toEqual({ tab: 'health' }); expect(page.text()).toContain('查看此版本日志');
+  page.unmount(); page = await renderApp(`/projects/${projectId}/operations?tab=status`);
+  expect(page.search()).toEqual({ tab: 'topology' }); expect(tabs()[0]?.getAttribute('aria-selected')).toBe('true');
+});
+
 test.each([
-  // 2026-09-23 RFC-020 D3 把健康状态与部署与运行形态合并为「状态」，页签回到五个：状态、日志、告警与通知、事件投递、调用链。
-  { from: 'logs', to: 'alerts', start: 1, end: 2, key: 'ArrowRight', before: 0, after: 32 },
-  { from: 'status', to: 'trace', start: 0, end: 4, key: 'ArrowLeft', before: 0, after: 192 },
-  { from: 'trace', to: 'status', start: 4, end: 0, key: 'Home', before: 192, after: 0 },
-  { from: 'status', to: 'trace', start: 0, end: 4, key: 'End', before: 0, after: 192 },
-  { from: 'trace', to: 'status', start: 4, end: 0, key: 'ArrowRight', before: 192, after: 0 },
+  // 2026-09-23 修订 RFC-020 D3：健康与形态重新分开，六个页签：部署与运行形态、健康状态、日志、告警与通知、事件投递、调用链回放。
+  { from: 'logs', to: 'alerts', start: 2, end: 3, key: 'ArrowRight', before: 0, after: 98 },
+  { from: 'topology', to: 'trace', start: 0, end: 5, key: 'ArrowLeft', before: 0, after: 300 },
+  { from: 'trace', to: 'topology', start: 5, end: 0, key: 'Home', before: 300, after: 0 },
+  { from: 'topology', to: 'trace', start: 0, end: 5, key: 'End', before: 0, after: 300 },
+  { from: 'trace', to: 'topology', start: 5, end: 0, key: 'ArrowRight', before: 300, after: 0 },
 ])('窄屏键盘 $key / $from → $to 保留焦点滚动', async ({ from, to, start, end, key, before, after }) => {
   fixture(); page = await renderApp(`/projects/${projectId}/operations?tab=${from}`, undefined, undefined, { scrollRestoration: true });
   const list = document.querySelector<HTMLElement>('[role="tablist"][aria-label="运行与诊断"]')!;
   const tabs = [...list.querySelectorAll<HTMLButtonElement>('[role="tab"]')];
   const source = tabs[start]!, target = tabs[end]!;
   // 实机 320px 的标签条 [16, 304]；Happy DOM 没有布局，只注入这些量测值。
-  const offsets = [0, 94, 216, 324, 390], widths = [90, 118, 104, 62, 90];
+  const offsets = [0, 122, 216, 282, 390, 484], widths = [118, 90, 62, 104, 90, 104];
   Object.defineProperty(list, 'clientWidth', { value: 288 });
   list.getBoundingClientRect = () => new DOMRect(16, 0, 288, 42);
   tabs.forEach((tab, index) => { tab.getBoundingClientRect = () => new DOMRect(16 + offsets[index]! - list.scrollLeft, 0, widths[index]!, 34); });
@@ -312,5 +323,6 @@ test('分类参数只接受有效且相关的值，未知对象不降级为另�
   expect(parseSettingsSearch({ tab: 'config', env: 'bad', proxy: 'foo' })).toEqual({ tab: 'config', env: 'development' });
   expect(parseOperationsSearch({ tab: 'logs', source: 'build', taskId, releaseId, limit: 5000, since: 'bad' })).toEqual({ tab: 'logs', source: 'build', releaseId, since: undefined, limit: 200 });
   expect(parseOperationsSearch({ tab: 'trace', traceId: 'not-a-trace', releaseId })).toEqual({ tab: 'trace', traceId: undefined });
+  expect([parseOperationsSearch({}), parseOperationsSearch({ tab: 'status' }), parseOperationsSearch({ tab: 'health', slot: 'preview' })]).toEqual([{ tab: 'topology' }, { tab: 'topology' }, { tab: 'health' }]);
   expect(parseSettingsSearch({ tab: 'resources', resource: 'api', operation: 'x'.repeat(2049), proxy: '\nfoo' })).toEqual({ tab: 'resources', resource: 'api', operation: undefined, proxy: undefined });
 });

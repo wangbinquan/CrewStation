@@ -31,6 +31,6 @@ export const projectResourcesRoute = createRoute({ getParentRoute: () => project
   beforeLoad: ({ params, search }) => { redirectResource(params, search); },
 });
 export const projectOperationsRoute = createRoute({ getParentRoute: () => projectRoute, path: 'operations', validateSearch: parseOperationsSearch, component: ProjectOperationsPage,
-  // 旧页签名（health／topology）已并入「状态」：一次 replace 让地址与页面一致，其余参数照旧。
+  // 旧页签名 status（RFC-020 D3 合并期间）落到部署与运行形态：一次 replace 让地址与页面一致，其余参数照旧。
   beforeLoad: ({ params, search, location }) => { if (hasLegacyOperationsTab(location.searchStr)) throw redirect({ to: '/projects/$projectId/operations', params, search, replace: true }); },
 });

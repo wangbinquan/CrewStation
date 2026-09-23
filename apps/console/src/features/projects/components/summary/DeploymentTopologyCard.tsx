@@ -34,9 +34,9 @@ export function DeploymentTopologyCard({ item, space }: { readonly item: Project
     }, t);
   }, [inventory.data, dataResources.data, item, projectId, t]);
   if (item.role === 'tester') return null;
-  const open = () => { void navigate({ to: PROJECT_PATHS[space].operations, params: { projectId }, search: { tab: 'status' } }); };
+  const open = () => { void navigate({ to: PROJECT_PATHS[space].operations, params: { projectId }, search: { tab: 'topology' } }); };
   const pods = topology?.nodes.filter((n) => n.kind === 'pod') ?? [], abnormal = topology?.nodes.filter((n) => n.abnormal).length ?? 0;
-  return <Card compact title={t('projects.summary.topology.title')} actions={<ButtonLink to={PROJECT_PATHS[space].operations} params={{ projectId }} search={{ tab: 'status' }}>{t('projects.summary.topology.open')}</ButtonLink>}>
+  return <Card compact title={t('projects.summary.topology.title')} actions={<ButtonLink to={PROJECT_PATHS[space].operations} params={{ projectId }} search={{ tab: 'topology' }}>{t('projects.summary.topology.open')}</ButtonLink>}>
     <QueryStatus isPending={inventory.isPending} error={inventory.error ?? dataResources.error} />
     {topology ? <>
       <p className={styles.fact}>{t('projects.summary.topology.counts', { workloads: topology.nodes.filter((n) => n.kind === 'workload' || n.kind === 'job').length, pods: pods.length, ready: pods.filter((n) => n.status === 'ready').length, running: pods.filter((n) => n.status === 'running').length })}{abnormal > 0 ? <> · <Badge tone="warning">{t('projects.summary.topology.attention', { count: abnormal })}</Badge></> : null}</p>

@@ -36,6 +36,8 @@
 | `apps/console/src/features/projects/` | 概览页「部署与运行形态」卡（横带汇总） |
 
 2026-09-23 修订说明（[RFC-020](../RFC-020-project-workspace-ia/design.md) D3／D4）：概览的形态卡保留，与「最近发布活动」并排放在三张状态卡之下以保证 1440×900 一屏；运行与诊断的「部署与运行形态」页签并入「状态」页签（健康卡在上、全图在下），旧 `tab=topology`／`tab=health` 改写为 `tab=status`。
+
+2026-09-23 再修订（作者当面裁定，修订 RFC-020 D3）：「部署与运行形态」重新是运行与诊断的独立页签，排在第一个、也是默认；健康状态另成一个页签；合并期间的 `tab=status` 改写为 `tab=topology`。
 | `apps/console/src/features/logs/` | 运行与诊断新页签 `topology`：查询、筛选、全图、只读详情 `TopologyDetail`；`shared/project/operationsSearch.ts` 的页签枚举加 `topology` |
 | `apps/console/src/features/cluster/` | 「拓扑」页签：层级切换、面包屑、项目层折叠、Pod 层与系统层复用 `ClusterDetail` |
 | `tests/e2e/` | 三处入口的真实浏览器用例 |

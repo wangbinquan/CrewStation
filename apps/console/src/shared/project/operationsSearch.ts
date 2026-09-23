@@ -2,11 +2,14 @@ import { LogQuerySchema, LogSourceSchema, ReleaseIdSchema, TaskIdSchema, TraceId
 import type { LogSource, SlotName } from '@crewstation/contracts';
 import { searchText } from './settingsSearch';
 
-/** 运行与诊断的五个页签（RFC-020 D3）：健康状态与部署与运行形态合并为「状态」。 */
-export const OPERATIONS_TABS = ['status', 'logs', 'alerts', 'deliveries', 'trace'] as const;
+/**
+ * 运行与诊断的六个页签：部署与运行形态在最前，也是进来时的默认；健康状态单独一个页签
+ * （2026-09-23 作者当面裁定，修订 RFC-020 D3 的「合并为状态」）。
+ */
+export const OPERATIONS_TABS = ['topology', 'health', 'logs', 'alerts', 'deliveries', 'trace'] as const;
 export type OperationsTab = typeof OPERATIONS_TABS[number];
-/** RFC-019 之前的两个页签名仍会出现在书签与旧链接里：都落到「状态」，路由再把地址 replace 成新名。 */
-const LEGACY_TABS: Readonly<Record<string, OperationsTab>> = { health: 'status', topology: 'status' };
+/** RFC-020 D3 合并期间的「状态」仍会出现在书签与旧链接里：落到部署与运行形态，路由再把地址 replace 成新名。 */
+const LEGACY_TABS: Readonly<Record<string, OperationsTab>> = { status: 'topology' };
 export interface OperationsSearch {
   readonly tab?: OperationsTab;
   readonly source?: LogSource;
@@ -22,7 +25,7 @@ export interface OperationsSearch {
 }
 
 export function parseOperationsSearch(raw: Record<string, unknown>): OperationsSearch {
-  const tab = OPERATIONS_TABS.find((value) => value === raw.tab) ?? LEGACY_TABS[String(raw.tab)] ?? 'status';
+  const tab = OPERATIONS_TABS.find((value) => value === raw.tab) ?? LEGACY_TABS[String(raw.tab)] ?? 'topology';
   if (tab === 'alerts') return { tab, alertId: searchText(raw.alertId, 128), alertState: raw.alertState === 'firing' || raw.alertState === 'resolved' ? raw.alertState : 'all' };
   if (tab === 'trace') return { tab, traceId: TraceIdSchema.safeParse(raw.traceId).data };
   if (tab === 'deliveries') return { tab, subscription: searchText(raw.subscription) };
@@ -40,5 +43,5 @@ export function parseOperationsSearch(raw: Record<string, unknown>): OperationsS
 
 /** 地址里带的是旧页签名：路由据此做一次 replace，让地址与页面一致。 */
 export function hasLegacyOperationsTab(searchStr: string): boolean {
-  return /[?&]tab=(health|topology)(?:&|$)/.test(searchStr);
+  return /[?&]tab=status(?:&|$)/.test(searchStr);
 }

@@ -23,7 +23,7 @@ export function ProjectAttentionBanners({ item, space }: { readonly item: Projec
   return <>
     {unhealthy || healthUnknown ? <div className={styles.banner} data-tone={unhealthy ? 'warning' : 'info'} role="status">
       <div><strong>{t(unhealthy ? 'projects.summary.attention.unhealthy' : 'projects.summary.attention.healthUnknown')}</strong><p className={styles.muted}>{t('projects.summary.attention.healthHint')}</p></div>
-      <ButtonLink to={PROJECT_PATHS[space].operations} params={params} search={{ tab: 'status' }}>{t(unhealthy ? 'projects.summary.fixHealth' : 'projects.summary.checkHealth')}</ButtonLink>
+      <ButtonLink to={PROJECT_PATHS[space].operations} params={params} search={{ tab: 'health' }}>{t(unhealthy ? 'projects.summary.fixHealth' : 'projects.summary.checkHealth')}</ButtonLink>
     </div> : null}
     {count > 0 ? <div className={styles.banner} data-tone="info" role="status">
       <div><strong>{t('projects.summary.attention.dataAccess', { count })}</strong><p className={styles.muted}>{t('projects.summary.attention.dataAccessHint')}</p></div>

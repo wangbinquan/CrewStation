@@ -139,11 +139,12 @@ describe.skipIf(!session?.project)('项目工作台信息架构（RFC-020）', (
     expect(page.takeErrors()).toEqual([]);
   }, 45_000);
 
-  test('WS-15／WS-17／WS-16：运行与诊断五页签且旧页签改写；项目设置五组；开发资源旧地址落到参考面板', async () => {
+  // 2026-09-23 修订 RFC-020 D3：健康与形态重新分成两个页签，部署与运行形态在最前；合并期间的 tab=status 由路由改写。
+  test('WS-15／WS-17／WS-16：运行与诊断六页签且旧页签改写；项目设置五组；开发资源旧地址落到参考面板', async () => {
     const page = session!.admin, id = session!.project!.id;
-    await viewport(page, 1280); await open(page, `/projects/${id}/operations?tab=health`);
-    expect(await page.eval<string>('location.search')).toContain('tab=status');
-    expect(await texts(page, '[role="tablist"][aria-label="运行与诊断"] [role="tab"]')).toEqual(['状态', '日志', '告警与通知', '事件投递', '调用链回放']);
+    await viewport(page, 1280); await open(page, `/projects/${id}/operations?tab=status`);
+    expect(await page.eval<string>('location.search')).toContain('tab=topology');
+    expect(await texts(page, '[role="tablist"][aria-label="运行与诊断"] [role="tab"]')).toEqual(['部署与运行形态', '健康状态', '日志', '告警与通知', '事件投递', '调用链回放']);
     await open(page, `/projects/${id}/settings`);
     const groups = await texts(page, 'nav[aria-label="设置分组"] button');
     // 分组按钮带一行说明（RFC-009），只比对标题。

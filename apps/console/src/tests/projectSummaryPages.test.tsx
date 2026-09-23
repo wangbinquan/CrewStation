@@ -141,7 +141,7 @@ describe('概览按实际状态选择下一步', () => {
     page = await renderApp(`/projects/${f.item.project.id}`);
     const openLinks = () => [...document.querySelectorAll('a[href="//formal.test"], a[href="//trial.test"]')].map((node) => node.textContent);
     expect(openLinks()).toEqual(['打开正式应用', '打开试用']); expect(page.text()).toContain('共享生产数据');
-    expect(page.text()).toContain('运行健康需要确认'); expect(document.querySelector('a[href*="operations?tab=status"]')).not.toBeNull();
+    expect(page.text()).toContain('运行健康需要确认'); expect(document.querySelector('a[href*="operations?tab=health"]')).not.toBeNull();
     f.item.slots.value[0]!.state = 'degraded'; await page.reread(); expect(document.querySelector('a[href="//formal.test"]')).toBeNull();
     f.error = true; await page.reread(); expect(document.querySelector('a[href="//trial.test"]')).toBeNull(); expect(page.text()).toContain('上次读取的记录');
     expect(document.querySelector('[data-primary-project-action]')).toBeNull();
