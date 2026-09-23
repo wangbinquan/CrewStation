@@ -14,6 +14,8 @@ async function viewport(page: Page, width: number, height = 900) {
   await page.cmd('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: width < 600 });
 }
 const overflow = (page: Page) => page.eval<number>('document.documentElement.scrollWidth - innerWidth');
+/** 纵向多出一屏的高度：宽屏（2026-09-23 起）滚的是内容区 main，窄屏滚的是窗口，两处加起来量，新旧外壳都成立。 */
+const PAGE_OVERFLOW = `Math.max(0, document.documentElement.scrollHeight - innerHeight) + Math.max(0, document.querySelector('main').scrollHeight - document.querySelector('main').clientHeight)`;
 const texts = (page: Page, selector: string) => page.eval<string[]>(`[...document.querySelectorAll(${JSON.stringify(selector)})].map((node) => node.textContent.trim())`);
 async function key(page: Page, name: string, code: number) {
   await page.cmd('Input.dispatchKeyEvent', { type: 'keyDown', key: name, code: name, windowsVirtualKeyCode: code });
@@ -25,7 +27,7 @@ describe.skipIf(!session?.project)('项目工作台信息架构（RFC-020）', (
     const page = session!.admin, id = session!.project!.id;
     await viewport(page, 1440); await open(page, `/projects/${id}`);
     expect(await texts(page, 'ul[aria-label="项目页面"] a')).toEqual(['概览', '开发', '发布与上线', '运行与诊断', '项目设置']);
-    expect(await page.eval<number>('document.documentElement.scrollHeight')).toBeLessThanOrEqual(901);
+    expect(await page.eval<number>(PAGE_OVERFLOW)).toBeLessThanOrEqual(1);
     expect(await overflow(page)).toBeLessThanOrEqual(1);
     const text = await page.text();
     expect(text).toContain('正式版本'); expect(text).toContain('待验证版本'); expect(text).not.toContain('快捷入口');
@@ -99,7 +101,7 @@ describe.skipIf(!session?.project)('项目工作台信息架构（RFC-020）', (
       const fit = await page.eval<{ gap: number; scroll: number }>(`(() => {
         const footer = document.querySelector('aside[aria-label="工具面板"]').closest('section').querySelector(':scope > footer');
         const pad = parseFloat(getComputedStyle(document.querySelector('main')).paddingBottom);
-        return { gap: Math.round(innerHeight - pad - footer.getBoundingClientRect().bottom), scroll: document.documentElement.scrollHeight - innerHeight };
+        return { gap: Math.round(innerHeight - pad - footer.getBoundingClientRect().bottom), scroll: ${PAGE_OVERFLOW} };
       })()`);
       expect([width, Math.abs(fit.gap) <= 1, fit.scroll <= 1]).toEqual([width, true, true]);
     }

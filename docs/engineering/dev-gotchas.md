@@ -636,6 +636,22 @@ happy-dom 不排版，渲染用例照绿。
 
 个人布局存储把写请求串行化（迟到的回执不覆盖后续编辑）。2026-09-23 一次 PUT 在旧驱动的 cs-api 里挂了 490 秒（网关记 499），此后的保存全排在它后面，页面一直「布局保存中…」。现在读写各最多等 15 秒：先按超时失败、再 abort 请求，沿用失败后的「重新应用（先核对服务端）／采用已保存布局」。别的串行化存储照此处理，用例里用永不结束的假请求加很短的上限验证。
 
+### 宽屏滚的是内容区 `main`，不是窗口：量滚动、吸顶、路由复位与键盘翻页
+
+2026-09-23 作者裁定：外壳在 ≥801px 时正好一屏高，顶栏与左栏不动，`main` 是唯一的纵向滚动区；≤800px 仍是窗口在滚。跟着变的四件事：
+- **量滚动**：宽屏 `window.scrollY` 恒为 0、`document.documentElement.scrollHeight` 恒等于视口高，e2e 按文档量「整页不滚动」会恒真，量「滚动位置不变」会恒为 0。
+  整页多出的高度取「文档溢出＋`main` 溢出」，滚动位置取 `scrollY + main.scrollTop`，新旧外壳下都成立。要制造「超过一屏」不必依赖环境数据：
+  往 `main` 的内容末尾临时放一块 3000px 的占位（e2e `shellScroll`）。
+- **吸顶**：Chrome 的 `position: sticky` 按滚动容器的内容框算吸附位置。`main` 有 24px 上内边距，`top: 0` 的保存栏停在内容区顶边往下 24px 处，
+  上方露出一条滚过去的内容（实量停在 76px，内容区顶边在 52px）。要贴住顶边用外壳给的 `top: var(--cs-main-sticky-top)`：宽屏 −24px，开发页 −8px，窄屏 0。
+  反过来，页面为了让吸顶生效去改写 `:global(main)` 的 `overflow`（改前算力档位编辑页与集群拓扑详情都这么做过），会让整页重新滚起来，`shellScroll.test.tsx` 阻断。
+- **路由复位**：TanStack Router 的 `scrollRestoration` 只管窗口。内容区靠 `scrollToTopSelectors` 与 `main` 上的 `data-scroll-restoration-id`，
+  返回时恢复位置也按这个标记找元素。页签内的选中与切换传 `resetScroll: false`，窗口与内容区都不动。
+- **键盘翻页**：页面刚打开、焦点还在 `body` 上时，Chrome 把 PageDown 与空格交给根滚动，而根已经不能滚，内容区不动。
+  在内容区里点一下，或 Tab 进去之后就正常（实测点击后 PageDown 滚了 808px）。
+**判据**：宽屏量到 `scrollY` 为 0 而页面明明滚过；或吸顶元素上方露出一条内容。
+**换包核对不必 `docker build`**：在 `git archive` 导出树里 `bun install`，再 `cd apps/console && bun run build`，几秒就有 `dist/`，按上面「CDP 只换 `/assets/*`」一条换进浏览器。
+
 ## 用例与 CI
 
 规范正文在 `testing.md`；这里只记撞过的坑。

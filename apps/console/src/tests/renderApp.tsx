@@ -3,6 +3,7 @@ import { RouterProvider, createMemoryHistory, createRouter } from '@tanstack/rea
 import type { RouterHistory } from '@tanstack/react-router';
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
+import { MAIN_SCROLL_SELECTOR } from '../app/layout/AppShell';
 import { RouteErrorPanel } from '../app/router/RouteErrorPanel';
 import { routeTree } from '../app/router/routeTree';
 import { messages as appZh } from '../app/i18n/zh-CN';
@@ -48,7 +49,8 @@ export interface RenderedApp {
   readonly path: () => string;
   readonly search: () => Record<string, unknown>;
   readonly back: () => Promise<void>;
-  readonly navigate: (href: string) => Promise<void>;
+  /** `resetScroll: false` 对应页签内不复位滚动位置的导航（调用链、集群管理）。 */
+  readonly navigate: (href: string, options?: { readonly resetScroll?: boolean }) => Promise<void>;
   /** 发起导航并返回当前渲染，用于需要用户先回应应用内草稿确认的路径。 */
   readonly requestNavigate: (href: string) => Promise<void>;
   /** 点击第一个文本匹配的按钮或链接；找不到就抛，免得断言在「什么都没发生」上通过。 */
@@ -61,7 +63,7 @@ export interface RenderedApp {
 
 /** 用真实路由树渲染整个工作台；只有 fetch 是假的。 */
 export async function renderApp(initialPath: string, previousPath?: string, history?: RouterHistory, options?: { readonly scrollRestoration?: boolean }): Promise<RenderedApp> {
-  const router = createRouter({ routeTree, history: history ?? createMemoryHistory({ initialEntries: previousPath ? [previousPath, initialPath] : [initialPath] }), scrollRestoration: options?.scrollRestoration, defaultErrorComponent: RouteErrorPanel });
+  const router = createRouter({ routeTree, history: history ?? createMemoryHistory({ initialEntries: previousPath ? [previousPath, initialPath] : [initialPath] }), scrollRestoration: options?.scrollRestoration, scrollToTopSelectors: [MAIN_SCROLL_SELECTOR], defaultErrorComponent: RouteErrorPanel });
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
   const host = document.createElement('div');
   document.body.appendChild(host);
@@ -86,7 +88,7 @@ export async function renderApp(initialPath: string, previousPath?: string, hist
     path: () => router.state.location.pathname,
     search: () => router.state.location.search,
     back: async () => { await act(async () => { router.history.back(); }); await settle(); },
-    navigate: async (href) => { await act(async () => { await router.navigate({ href }); }); await settle(); },
+    navigate: async (href, options) => { await act(async () => { await router.navigate({ href, ...options }); }); await settle(); },
     requestNavigate: async (href) => { await act(async () => { void router.navigate({ href }); }); await settle(); },
     click: async (label) => {
       // 闭合 <details> 里的内容和 hidden 一样看不见：菜单要先点开 summary 才能点里面的项。目标可能还在等一次读取，最多再等几拍。

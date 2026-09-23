@@ -24,12 +24,10 @@
 .profileSummary { display: grid; gap: var(--cs-space-1); }
 .profileSummary > .hint { font-weight: 400; }
 .editorCard > header { flex-wrap: wrap; }
-/* 此页随文档滚动；移除壳层未限高的滚动容器，保存栏才能吸附到实际视口。 */
-:global(main):has(.editorCard) { overflow: visible; }
 .editorCard input, .editorCard textarea, .editorCard select { scroll-margin-top: 160px; }
 .saveBar {
   position: sticky;
-  top: 0;
+  top: var(--cs-main-sticky-top, 0px);
   z-index: 2;
   display: grid;
   gap: var(--cs-space-2);

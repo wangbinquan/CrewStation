@@ -1,3 +1,5 @@
+/* 宽屏外壳正好一屏高：顶栏与左栏不动，内容区（main）是唯一的纵向滚动区，滚动条在内容区右侧（2026-09-23 作者裁定，RFC-003 §6 回填）。
+   页面样式不得改写 main 的 overflow，也不要按窗口的滚动量排版；窄屏仍是整页滚动，见文末。 */
 .shell {
   display: grid;
   grid-template-columns: var(--cs-nav-width) minmax(0, 1fr);
@@ -5,7 +7,7 @@
   grid-template-areas:
     'topbar topbar'
     'nav main';
-  min-height: 100vh;
+  height: 100dvh;
 }
 
 .noNav { grid-template-columns: minmax(0, 1fr); grid-template-areas: 'topbar' 'main'; }
@@ -14,6 +16,8 @@
   grid-area: main;
   padding: var(--cs-space-5);
   overflow: auto;
+  /* 吸顶元素要贴住内容区顶边时用 top: var(--cs-main-sticky-top)：宽屏滚的是 main，吸附位置会被它的上内边距往下推一截、露出滚过去的内容。 */
+  --cs-main-sticky-top: calc(-1 * var(--cs-space-5));
 }
 
 /* 内容区随窗口铺满：2026-09-22 作者裁定全部页面去掉 1200px 上限（RFC-003 §6 回填），内容宽度令牌已删除。 */
@@ -22,11 +26,14 @@
 }
 /* 开发页：收紧内边距，终端成为主体；内容区是纵向弹性列、长满到窗口底边，工作区在其中长满剩余高度（2026-09-23）。
    左栏宽度与其他页面一致，不在这里改写 --cs-nav-width。 */
-.compact { padding: 8px 12px; display: flex; flex-direction: column; }
+.compact { padding: 8px 12px; display: flex; flex-direction: column; --cs-main-sticky-top: -8px; }
 .compact > .content { flex: 1 0 auto; display: flex; flex-direction: column; }
 
+/* 窄屏左栏变成内容上方的横条：外壳随内容长高、整页滚动，顶栏与横条一起滚走（2026-09-23 作者裁定）。 */
 @media (max-width: 800px) {
   .shell {
+    height: auto;
+    min-height: 100vh;
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto auto minmax(0, 1fr);
     grid-template-areas:
@@ -37,8 +44,12 @@
 
   .noNav { grid-template-rows: auto minmax(0, 1fr); grid-template-areas: 'topbar' 'main'; }
 
+  /* 窄屏内容区不自成滚动区：只有窗口在滚，吸顶元素吸在窗口顶上；宽度仍由网格列决定（各页没有靠 main 横向滚动的内容，2026-09-23 实量）。 */
   .main {
     padding: var(--cs-space-4);
+    overflow: visible;
+    min-width: 0;
+    --cs-main-sticky-top: 0px;
   }
   .compact { padding: 8px; }
 }

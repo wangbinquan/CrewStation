@@ -9,6 +9,8 @@
   background: var(--cs-nav-bg);
   color: var(--cs-nav-text);
   border-right: 1px solid var(--cs-nav-border);
+  /* 宽屏左栏与内容区各自滚动：条目比窗口高时（管理空间在 1280×720 下约 711px）只滚左栏（2026-09-23）。 */
+  overflow-y: auto;
 }
 
 .brand {
@@ -117,6 +119,7 @@
     padding: var(--cs-space-2) var(--cs-space-3);
     border-right: 0;
     border-bottom: 1px solid var(--cs-nav-border);
+    overflow-y: visible;
   }
 
   .brand, .sectionTitle { padding: 0; }
