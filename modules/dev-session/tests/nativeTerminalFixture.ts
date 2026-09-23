@@ -22,6 +22,7 @@ export function memoryNativeRepository(): NativeTerminalRepository {
       if (r?.execution && !r.execution.screen && result.status !== 'pending') { r.execution.screen = result.status; snapshots.set(agent, result); }
     },
     getSnapshot: async (_task, agent) => snapshots.get(agent) ?? { status: 'pending' },
+    async saveStartup(task, agent, startup) { const r = records.find((r) => r.taskId === task && r.record.agentId === agent); if (r?.execution) r.execution.startup = structuredClone(startup); },
     async finalize(task, agent) { const r = records.find((r) => r.taskId === task && r.record.agentId === agent); if (r?.execution?.screen) r.execution.finalized = true; },
     findRequest: async (task, user, request) => records.find((r) => r.taskId === task && r.createdBy === user && r.clientRequestId === request),
     async reserve(input) {

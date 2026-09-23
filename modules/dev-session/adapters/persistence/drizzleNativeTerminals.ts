@@ -45,6 +45,9 @@ export function drizzleNativeTerminals(db: Database): NativeTerminalRepository {
         .where(and(agentKey(taskId, agentId), isNotNull(table.executionTaskId), sql`${table.execution}->>'screen' IS NULL`, sql`${table.record}->>'lifecycle' IN ('ended', 'failed')`,
           snapshot ? and(sql`${table.record}->>'terminalId' = ${snapshot.terminalId}`, sql`${table.record}->>'runnerId' = ${snapshot.runnerId}`) : undefined));
     },
+    async saveStartup(taskId, agentId, startup) {
+      await db.update(table).set({ execution: sql`jsonb_set(${table.execution}, '{startup}', ${JSON.stringify(startup)}::text::jsonb)` }).where(and(agentKey(taskId, agentId), isNotNull(table.executionTaskId)));
+    },
     async getSnapshot(taskId, agentId) {
       const row = (await db.select({ snapshot: table.snapshot, execution: table.execution }).from(table).where(agentKey(taskId, agentId)))[0];
       return { status: row?.execution?.screen ?? 'pending', ...(row?.snapshot ? { snapshot: row.snapshot } : {}) };

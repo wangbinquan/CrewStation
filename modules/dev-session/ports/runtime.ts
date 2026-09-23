@@ -1,4 +1,4 @@
-import type { Actor, ProjectId, RunnerCommand, RunnerEvent, ServiceId, TaskId, TraceId, UserId } from '@crewstation/contracts';
+import type { Actor, ProjectId, RunnerCommand, RunnerEvent, ServiceId, StartupRecord, TaskId, TraceId, UserId } from '@crewstation/contracts';
 import type { DevSessionDto, DevSessionRebuildDto, DevSessionRebuildInspection, RebuildDevSessionRequest } from '@crewstation/contracts';
 
 export interface EnvironmentView {
@@ -13,6 +13,8 @@ export interface EnvironmentView {
   traceId: string;
   message?: string;
   connectionIssue?: DevSessionDto['connectionIssue'];
+  /** RFC-022：task-runtime 产出的最近一次启动进度（存储形状）；升级前创建的环境没有。 */
+  startup?: StartupRecord;
   createdAt: string;
   lastActivityAt: string;
 }
@@ -26,6 +28,8 @@ export interface CreateExecutionInput {
 /** 由 task-runtime 提供。 */
 export interface Environments {
   createNativeExecution(input: CreateExecutionInput): Promise<EnvironmentView>;
+  /** RFC-022：CLI 在准备环境或 Agent 启动中失败时，回收之前留下执行环境主容器日志的尾部（已打码）；读不到返回 undefined。 */
+  captureStartupLog(taskId: TaskId): Promise<string | undefined>;
   inspectRebuild(projectId: ProjectId): Promise<DevSessionRebuildInspection>;
   requestRebuild(projectId: ProjectId, input: RebuildDevSessionRequest): Promise<DevSessionRebuildDto>;
   getRebuild(taskId: TaskId): Promise<DevSessionRebuildDto | undefined>;

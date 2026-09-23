@@ -1,6 +1,7 @@
-import type { NativeTerminalDto, NativeTerminalRecord, NativeTerminalRoster, ServiceId, TaskId } from '@crewstation/contracts';
+import type { BeforeStartExecution, NativeTerminalDto, NativeTerminalRecord, NativeTerminalRoster, ServiceId, StartupRecord, TaskId } from '@crewstation/contracts';
 import { IDENTITY_HEADERS, RunnerResultPayloads } from '@crewstation/contracts';
 import { isPlatformError, newId } from '@crewstation/kernel';
+import { composeCliStartup } from '../domain/nativeTerminalProjection';
 import type { NativeTerminalRepository, NativeTerminalStart } from '../ports/nativeTerminals';
 import type { EnvironmentView } from '../ports/runtime';
 import type { DevSessionUseCaseDeps } from './dependencies';
@@ -50,9 +51,38 @@ export class NativeExecutionLifecycle {
       }
     } else if (!nativeEnded(record) && env) record = await this.finishRecord(start, env.native?.failureReason ? 'environment-failed' : 'stopped', env.native?.failureReason);
     const lifecycle = nativeEnded(record) || record.lifecycle === 'starting' ? record.lifecycle : connection === 'connected' ? record.lifecycle : 'unknown';
+    const startup = await this.startupOf(start, env, record);
     return { ...record, lifecycle, taskId: start.taskId, createdBy: start.createdBy, clientRequestId: start.clientRequestId, connection,
+      ...(startup ? { startup: { ...startup, observedAt: this.deps.clock.now().toISOString() } } : {}),
       execution: { taskId: start.execution!.taskId, state: env?.native?.state ?? (nativeEnded(record) ? 'finished' : 'queued'), profile: env?.native?.profile, message: start.execution!.stopRequested && !nativeEnded(record) ? '正在结束此 CLI' : env?.message },
       ...(nativeEnded(record) ? { finalScreen: start.execution!.screen ?? 'pending' } : {}) };
+  }
+  /**
+   * RFC-022 六段启动进度：执行环境的前三段＋执行任务的 beforeStart／nativeTerminal 事件（执行任务里只有这一个 CLI）。
+   * 就绪、失败或取消后冻结进受理记录，之后不再读事件；读事件失败时照常返回但不冻结，下次再算。
+   */
+  private async startupOf(start: NativeTerminalStart, env: EnvironmentView | undefined, record: NativeTerminalRecord): Promise<StartupRecord | undefined> {
+    if (start.execution?.startup) return start.execution.startup;
+    if (env && !env.startup) return undefined;
+    const connected = env?.startup?.stages.some((stage) => stage.kind === 'connect' && stage.state === 'succeeded');
+    const events = connected ? await this.deps.runner.listEvents(env!.id, { kinds: ['beforeStart', 'nativeTerminal'], limit: 500 }).catch(() => undefined) : [];
+    let beforeStart: BeforeStartExecution | undefined, runningAt: string | undefined;
+    for (const stored of events ?? []) {
+      if (stored.event.kind === 'beforeStart' && stored.event.execution.agentId === record.agentId) beforeStart = stored.event.execution;
+      if (stored.event.kind === 'nativeTerminal' && stored.event.terminal.agentId === record.agentId && stored.event.terminal.lifecycle === 'running') runningAt ??= stored.at;
+    }
+    // 进程已拉起而事件还没读到（或事件表读不到）：以这次看到的时刻为准。
+    if (!runningAt && record.lifecycle === 'running') runningAt = this.deps.clock.now().toISOString();
+    const startup = composeCliStartup({ accepted: start.record.startedAt, environment: { exists: !!env, ...(env?.startup ? { startup: env.startup } : {}) }, ...(beforeStart ? { beforeStart } : {}), ...(runningAt ? { runningAt } : {}), record });
+    if (startup && startup.state !== 'running' && events) await this.repo.saveStartup(start.taskId, start.record.agentId, startup);
+    return startup;
+  }
+  /** 准备环境或 Agent 启动中失败：回收执行环境之前留下主容器日志的尾部（B8）。 */
+  private async keepFailureLog(start: NativeTerminalStart, env: EnvironmentView) {
+    const startup = start.execution?.startup, failed = startup?.stages.find((stage) => stage.state === 'failed');
+    if (!startup || !failed || failed.logTail || (failed.kind !== 'prepare' && failed.kind !== 'agent')) return;
+    const logTail = await this.deps.environments.captureStartupLog(env.id).catch(() => undefined);
+    if (logTail) await this.repo.saveStartup(start.taskId, start.record.agentId, { ...startup, stages: startup.stages.map((stage) => (stage === failed ? { ...stage, logTail } : stage)) });
   }
   private async startCommand(start: NativeTerminalStart, env: EnvironmentView) {
     const credential = await this.deps.credentials.issueDevSessionToken({ taskId: start.taskId, projectId: env.projectId, serviceId: env.serviceId as ServiceId, userId: start.createdBy });
@@ -83,6 +113,7 @@ export class NativeExecutionLifecycle {
     }
     // 先提交末屏，再把清理意图交给 task-runtime；清理请求回执丢失由本名册继续重试。
     if ((await this.repo.getSnapshot(start.taskId, start.record.agentId)).status === 'pending') return;
+    if (env && !['cleaning', 'finished'].includes(env.native?.state ?? '')) await this.keepFailureLog(start, env);
     if (env) await this.deps.environments.releaseEnvironment(env.id, 'user');
     await this.repo.finalize(start.taskId, start.record.agentId);
   }

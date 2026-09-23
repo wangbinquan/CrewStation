@@ -41,6 +41,22 @@ describe.skipIf(!available)('原生 CLI 持久名册', () => {
     await expect(repo.saveSnapshot(taskId, input.record.agentId, { status: 'available', snapshot: { ...snapshot, data: 'x'.repeat(2 * 1024 * 1024 + 1) } })).rejects.toMatchObject({ kind: 'validation' });
   });
 
+  test('RFC-022：冻结的启动进度写进 execution 文档，保留其余字段，另一实例读得到；没有执行绑定的旧记录不写', async () => {
+    const repo = drizzleNativeTerminals(database.db), other = drizzleNativeTerminals(database.db), taskId = TaskIdSchema.parse(newId('tsk'));
+    const record = { agentId: newId('agt'), terminalId: newId('pty'), runnerId: crypto.randomUUID(), compute: computeId('balanced'), permission: 'edit' as const, revision: 1, lifecycle: 'starting' as const, startedAt: new Date().toISOString(), cols: 80, rows: 24 };
+    const input: NativeTerminalStart = { taskId, createdBy: workspaceActor.userId, clientRequestId: crypto.randomUUID(), fingerprint: 'startup', input: { clientRequestId: crypto.randomUUID(), permission: 'edit', cols: 80, rows: 24 },
+      execution: { taskId: TaskIdSchema.parse(newId('tsk')), taskProfile: '01a0bf5d-8f4b-7dd6-8102-2aa5cc3255b1' }, record };
+    await repo.reserve(input);
+    const startup = { state: 'ready' as const, startedAt: record.startedAt, endedAt: record.startedAt, stages: [{ kind: 'ready' as const, state: 'succeeded' as const, startedAt: record.startedAt, endedAt: record.startedAt, durationMs: 0 }] };
+    await repo.saveStartup(taskId, record.agentId, startup);
+    expect((await other.findAgent(taskId, record.agentId))?.execution).toEqual({ ...input.execution!, startup });
+    const legacy: NativeTerminalStart = { ...input, clientRequestId: crypto.randomUUID(), record: { ...record, agentId: newId('agt') } };
+    delete legacy.execution;
+    await repo.reserve(legacy);
+    await repo.saveStartup(taskId, legacy.record.agentId, startup);
+    expect((await other.findAgent(taskId, legacy.record.agentId))?.execution).toBeUndefined();
+  });
+
   test('不同模块实例对同一执行串行，其他执行仍能推进', async () => {
     const repo = drizzleNativeTerminals(database.db), other = drizzleNativeTerminals(database.db), id = TaskIdSchema.parse(newId('tsk')), trace: string[] = [];
     let entered!: () => void, finish!: () => void;

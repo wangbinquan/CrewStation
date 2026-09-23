@@ -98,6 +98,7 @@ export class NativeTerminalSupervisor {
       const failure = error instanceof BeforeStartFailure ? error : undefined;
       const cancelled = entry.stopped || failure?.code === 'cancelled';
       this.deps.beforeStart.release(command.agentId);
+      entry.control.dispose();
       entry.record = { ...entry.record, lifecycle: cancelled ? 'ended' : 'failed', endedAt: new Date().toISOString(), reason: cancelled ? 'stopped' : 'before-start-failed',
         ...(cancelled ? {} : { error: `环境准备失败：${failure?.stepId ? `步骤 ${failure.stepId}，` : ''}${error instanceof Error ? error.message : String(error)}` }) };
       this.emit(entry);
@@ -127,6 +128,7 @@ export class NativeTerminalSupervisor {
     } catch (error) {
       entry.activity?.close();
       entry.prepared?.dispose();
+      entry.control.dispose();
       this.deps.beforeStart.release(command.agentId);
       entry.record = { ...entry.record, lifecycle: 'failed', endedAt: new Date().toISOString(), reason: 'start-failed', error: error instanceof Error ? error.message : 'CLI 启动失败' };
       this.emit(entry);
@@ -136,6 +138,7 @@ export class NativeTerminalSupervisor {
 
   private endStopped(entry: NativeEntry): NativeTerminalRecord {
     this.deps.beforeStart.release(entry.record.agentId);
+    entry.control.dispose();
     entry.record = { ...entry.record, lifecycle: 'ended', endedAt: new Date().toISOString(), reason: 'stopped' };
     this.emit(entry);
     return { ...entry.record };
@@ -176,10 +179,14 @@ export class NativeTerminalSupervisor {
     return { terminalId, runnerId: this.runnerId, ...screen, control: entry.control.state() };
   }
 
+  /**
+   * 启动中（进程拉起前）也可以取得（RFC-022 B7）：创建者的窗口提前取得，CLI 第一次查询终端时就有窗口回答；
+   * 输入与改尺寸仍要等进程拉起。已结束或失败的 CLI 不能取得。
+   */
   claim(terminalId: string, viewId: string, runnerId: string, holder?: TerminalHolder): TerminalControl {
     this.assertRunner(runnerId);
     const entry = this.lookup(terminalId);
-    this.assertRunning(entry);
+    if (entry.record.lifecycle !== 'starting') this.assertRunning(entry);
     return entry.control.claim(viewId, holder);
   }
 

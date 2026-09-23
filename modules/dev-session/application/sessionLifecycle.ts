@@ -14,6 +14,8 @@ export function sessionLifecycleUseCases(deps: DevSessionUseCaseDeps) {
     createdAt: env.createdAt, lastActivityAt: env.lastActivityAt, ...(reminderAt ? { idleReminderSentAt: reminderAt.toISOString() } : {}), ...(env.message ? { message: env.message } : {}),
     rebuild: await environments.getRebuild(env.id),
     ...(env.connectionIssue ? { connectionIssue: env.connectionIssue } : {}),
+    // RFC-022：开始开发或重建的五段，全部由 task-runtime 产出；observedAt 供页面校正本机时钟。
+    ...(env.startup ? { startup: { ...env.startup, observedAt: clock.now().toISOString() } } : {}),
   });
 
   const previewOf = async (env: EnvironmentView): Promise<PreviewState> => {

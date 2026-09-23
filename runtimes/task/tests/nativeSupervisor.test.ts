@@ -211,6 +211,19 @@ test('启动前步骤失败不创建进程，名册写明失败步骤并释放�
   expect(f.launches()).toBe(0);
 });
 
+test('RFC-022：启动中（启动前步骤还在跑）就能取得输入控制，好让 CLI 第一次查询终端时有窗口回答；输入与改尺寸仍要等进程拉起；结束后不能再取得', async () => {
+  const f = await fixture();
+  const record = await f.native.start(f.command('early', { beforeStart: material([{ kind: 'script', stepId: 'wait', name: '等待', language: 'shell', argv: [], timeoutMs: 30000, source: 'sleep 30' }]) }));
+  expect(record.lifecycle).toBe('starting');
+  expect(f.native.claim(record.terminalId, 'creator-view', f.native.runnerId)).toMatchObject({ controlled: true, control: { held: true } });
+  expect(f.native.claim(record.terminalId, 'other-view', f.native.runnerId).controlled).toBe(false);
+  expect(() => f.native.input(record.terminalId, 'x', 'creator-view')).toThrow('CLI 进程尚未运行或已经结束');
+  await expect(f.native.resize(record.terminalId, 100, 30, 'creator-view')).rejects.toThrow('CLI 进程尚未运行或已经结束');
+  await f.native.stop('early', f.native.runnerId);
+  expect(() => f.native.claim(record.terminalId, 'creator-view', f.native.runnerId)).toThrow('CLI 进程尚未运行或已经结束');
+  expect(f.launches()).toBe(0);
+});
+
 test('通用终端协议（RFC-006 C6、C16）：原样拉起档位二进制，CS_MCP_* 进进程环境，启动前步骤可用 {{mcp.*}}，不产生 Agent 动态', async () => {
   const f = await fixture({ realPrepare: true });
   const token = 'dev-session-token-native';

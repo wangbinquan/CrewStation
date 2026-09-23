@@ -1,0 +1,87 @@
+import { expect, test } from 'bun:test';
+import type { BeforeStartExecution, NativeTerminalRecord, RunnerEvent, StartupRecord, StartupStage } from '@crewstation/contracts';
+import { DevSessionDtoSchema, NativeTerminalDtoSchema } from '@crewstation/contracts';
+import { sessionLifecycleUseCases } from '../application/sessionLifecycle';
+import { isolatedNativeFixture } from './isolatedNativeFixture';
+import { workspaceActor as actor, workspaceFixture, workspaceProject, workspaceTask as taskId } from './workspaceFixture';
+
+const at = (second: number) => new Date(Date.UTC(2026, 8, 23, 3, 0, 0) + second * 1000).toISOString();
+const done = (kind: StartupStage['kind'], from: number, to: number): StartupStage => ({ kind, state: 'succeeded', startedAt: at(from), endedAt: at(to), durationMs: Math.round((to - from) * 1000) });
+const connected: StartupRecord = { state: 'ready', startedAt: at(1), endedAt: at(5.2), stages: [done('queue', 1, 1.5), done('container', 1.5, 4.6), done('connect', 4.6, 5.2), done('ready', 5.2, 5.2)] };
+const execution = (agentId: string, state: BeforeStartExecution['state'], stepState: 'running' | 'succeeded' | 'failed'): BeforeStartExecution => ({
+  executionId: 'exec', agentId, processAttemptId: 'p', profile: { profileId: '01a0bf5d-8f4b-7001-8458-107366e7de39', revision: 1 } as BeforeStartExecution['profile'], state, queuedAt: at(5.2), startedAt: at(5.3),
+  ...(state === 'running' ? { currentStepId: 's0' } : { endedAt: at(5.7) }), steps: [{ stepId: 's0', name: '安装依赖', kind: 'script', state: stepState } as BeforeStartExecution['steps'][number]],
+  ...(state === 'failed' ? { error: { message: '退出码 1' } as BeforeStartExecution['error'] } : {}),
+});
+
+async function startingCli() {
+  const f = isolatedNativeFixture(), terminal = await f.start(), executionTaskId = terminal.execution!.taskId;
+  f.environments.get(executionTaskId)!.startup = connected;
+  const record = f.rosters.get(executionTaskId)!.terminals[0]!;
+  record.lifecycle = 'starting';
+  const events: Array<{ seq: number; at: string; event: RunnerEvent }> = [], reads: string[] = [];
+  f.deps.runner.listEvents = async (id, options) => { reads.push(`${id}:${options?.kinds?.join(',')}`); return structuredClone(events); };
+  return { f, terminal, executionTaskId, record, events, reads };
+}
+
+test('名册带六段启动进度：执行环境的前三段加上 Runner 的启动前步骤与进程拉起；就绪即冻结，之后不再读事件', async () => {
+  const { f, terminal, executionTaskId, record, events, reads } = await startingCli();
+  events.push({ seq: 1, at: at(5.3), event: { kind: 'beforeStart', execution: execution(terminal.agentId, 'running', 'running') } });
+  let item = NativeTerminalDtoSchema.parse((await f.api.listNativeTerminals(actor, taskId)).items[0]);
+  expect(item.startup?.state).toBe('running');
+  expect(item.startup?.observedAt).toBe(f.deps.clock.now().toISOString());
+  expect(item.startup?.stages.map((stage) => `${stage.kind}:${stage.state}`)).toEqual(['queue:succeeded', 'container:succeeded', 'connect:succeeded', 'prepare:running', 'agent:pending', 'ready:pending']);
+  expect(item.startup?.stages[3]).toMatchObject({ count: { done: 0, total: 1 }, detail: '安装依赖' });
+  expect(reads).toEqual([`${executionTaskId}:beforeStart,nativeTerminal`]);
+  expect((await f.repository.findExecution(executionTaskId))!.execution!.startup).toBeUndefined();
+
+  events.push({ seq: 2, at: at(5.7), event: { kind: 'beforeStart', execution: execution(terminal.agentId, 'succeeded', 'succeeded') } },
+    { seq: 3, at: at(10.5), event: { kind: 'nativeTerminal', terminal: { ...(record as NativeTerminalRecord), lifecycle: 'running', revision: 5 } } },
+    { seq: 4, at: at(11), event: { kind: 'nativeTerminal', terminal: { ...(record as NativeTerminalRecord), lifecycle: 'running', revision: 6 } } });
+  record.lifecycle = 'running';
+  item = NativeTerminalDtoSchema.parse((await f.api.listNativeTerminals(actor, taskId)).items[0]);
+  expect(item.startup).toMatchObject({ state: 'ready', endedAt: at(10.5) });
+  expect(item.startup?.stages.at(-2)).toEqual({ kind: 'agent', state: 'succeeded', startedAt: at(5.7), endedAt: at(10.5), durationMs: 4800 });
+  const frozen = (await f.repository.findExecution(executionTaskId))!.execution!.startup!;
+  expect(frozen.state).toBe('ready');
+  await f.api.listNativeTerminals(actor, taskId);
+  expect(reads).toHaveLength(2);
+});
+
+test('启动前步骤失败：冻结为失败，回收执行环境之前留下主容器日志的尾部', async () => {
+  const { f, terminal, executionTaskId, record, events } = await startingCli();
+  events.push({ seq: 1, at: at(5.7), event: { kind: 'beforeStart', execution: execution(terminal.agentId, 'failed', 'failed') } });
+  Object.assign(record, { lifecycle: 'failed', reason: 'before-start-failed', error: '环境准备失败：步骤 s0，退出码 1', endedAt: at(5.8), revision: record.revision + 1 });
+  const captured: string[] = [];
+  f.deps.environments.captureStartupLog = async (id) => { captured.push(id); f.steps.push(`log:${id}`); return 'npm ERR! code E404'; };
+  await f.run(terminal);
+  await f.run(terminal);
+  const saved = (await f.repository.findExecution(executionTaskId))!.execution!.startup!;
+  expect(saved.state).toBe('failed');
+  expect(saved.stages[3]).toMatchObject({ kind: 'prepare', state: 'failed', logTail: 'npm ERR! code E404', error: { code: 'before-start-failed', message: '启动前步骤「安装依赖」失败：退出码 1' } });
+  expect(captured).toEqual([executionTaskId]);
+  expect(f.steps.indexOf(`log:${executionTaskId}`)).toBeLessThan(f.steps.indexOf(`release:${executionTaskId}`));
+  // 已留下日志的不再重复读。
+  await f.api.reconcileNativeExecutions();
+  expect(captured).toHaveLength(1);
+});
+
+test('升级前受理的执行环境没有启动进度：名册不读事件、不带 startup', async () => {
+  const f = isolatedNativeFixture(), reads: string[] = [];
+  f.deps.runner.listEvents = async (id) => { reads.push(id); return []; };
+  await f.start();
+  expect((await f.api.listNativeTerminals(actor, taskId)).items[0]!.startup).toBeUndefined();
+  expect(reads).toEqual([]);
+});
+
+test('开发会话 DTO 带 task-runtime 产出的五段与读出时刻；升级前的会话没有', async () => {
+  const f = workspaceFixture();
+  f.state.connected = false;
+  const session = sessionLifecycleUseCases(f.deps), original = f.deps.environments.findDevSession;
+  const checkout: StartupRecord = { state: 'running', startedAt: at(0), stages: [done('queue', 0, 0.1), done('container', 0.1, 3), { kind: 'checkout', state: 'running', startedAt: at(3), subject: 'main', detail: '正在克隆分支 main' }, { kind: 'connect', state: 'pending' }, { kind: 'ready', state: 'pending' }] };
+  f.deps.environments.findDevSession = async (...args) => { const env = await original(...args); return env ? { ...env, state: 'creating', startup: checkout } : env; };
+  const dto = DevSessionDtoSchema.parse(await session.getSession(actor, workspaceProject));
+  expect(dto.startup).toEqual({ ...checkout, observedAt: f.deps.clock.now().toISOString() });
+  f.deps.environments.findDevSession = original;
+  expect((await session.getSession(actor, workspaceProject))!.startup).toBeUndefined();
+});
