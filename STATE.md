@@ -7,6 +7,30 @@
 
 基线三件套（v0.3.3）的第一轮实现已在本机 kind 集群上跑通并推上 main；**RFC-001（算力归平台）与 RFC-002（管理空间与租户空间分离）已实现、实跑确认并推上 main；RFC-004 已被 RFC-006 取代（Superseded）；RFC-006（算力档位合并运行环境、每个 Agent 一个 Pod）已实现、实机验收完毕并推上 main，已 Done（P1–P8、ADR-0005 与 I17–I19 待作者复核）；RFC-003 工作台已按设计附件完成并整体部署到本机，52／52 项 UX-AT 全部实机通过、本地 gate 与精确 SHA CI 通过，已 Done；RFC-005（OIDC／OAuth 2.0 公司登录）代码、测试与 OA-01…OA-31 实机验收全部完成，已 Done；RFC-007（开发环境 OAuth 2.0 一键换角色）代码、四角色 Chrome 实机验收、本地 gate 与精确 SHA CI 全部完成，已 Done**。
 
+## 开发页 CLI 操作即自动取得输入控制、占用人实时显示；动作型链接改为按钮样式（2026-09-23）
+
+作者问「系统里还有多少跳转用超链接原始格式、能不能换成按钮」，并反馈「获取控制权的按钮一点都不显眼；没被别人占用时操作 CLI 就该自动获取，被占用就提示谁在占用」。先分析、再两轮提问裁定：**直接改＋回填 RFC-003（不另立 RFC）**，收尾「提交推送＋部署＋两身份实机验证」。
+
+**链接现状**（生产代码 94 处 `<Link>`／`<a>`）：导航 12、已手写成按钮样子 9（四份各自的 CSS）、引用型（名字、标签、路径、地址）13、市场整卡 1、**动作型原始蓝字 59**。裁定「动作型全部改」：新增 `shared/ui/navigation/ButtonLink.tsx`（`ButtonLink`／`ExternalButtonLink`，仍是 `<a>`，↗ 由样式生成、不进文字），`Button` 加 `size="small"`；59＋9 处统一改用、四份手写样式删除、文案去掉 →／←／↗；`apps/console/src/tests/actionLinks.test.ts` 拦下文案取自 `t(...)` 的裸 `<Link>`／`<a>`（带 className／activeProps 的导航项与引用型不算）。
+
+**输入控制裁定**：点进／Tab 进／按键／切回停着焦点的终端即自动取得，只打开页面不取；焦点在终端才续约，离开满 30 秒页面主动 detach；同一用户换窗口直接转移（占用只对别人成立）；每个 CLI 各一把；占用人常驻实时显示。实现是 **Runner 记持有人**：cs-session 按连接的网关身份（用户 ID＋显示名）注入取得命令（浏览器自带的丢弃），Runner 换人／释放／到期推 `terminalControl`（只实时转发、不落库、带单调 `revision`），`attachTerminal` 快照带当前状态；hello 能力位 `terminalControl: 1`，**协议号不变**。旧 Runner 没有这些字段时退回「其他窗口正在输入 · 只读」、不实时。状态条：你正在输入（绿，整窗绿框）／空闲 · 点击终端即可输入（蓝）／你在另一个窗口中输入（蓝）／某某 正在输入 · 只读（黄）。回填：RFC-003 `development-workspace.md` 第 5 节修订、`design.md` §6、开发规则 §7、dev-gotchas 两条（Runner 错误码到浏览器只剩 kind；终端自动应答会续租）。
+
+**提交**（均按显式路径；共享暂存区里并行会话的条目未动）：
+- `ec33c69` 功能主体，97 个文件。`topologyPages.test.tsx` 混着并行会话的在制品，只把「HEAD＋自己那一行」用 `update-index --cacheinfo` 放进暂存区再 `commit -i`。[CI 35807300617](https://github.com/wangbinquan/CrewStation/actions/runs/35807300617) 六项成功（含 e2e、gate）。提交前本机 `test:cover`（带 dev-oidc）2186 pass／9 skip／0 fail，`test:patch --worktree` 改动行 315／318（99.1%）。
+- `6825ca7` 顺手修：RFC-020 `b927a15` 把「打开正式应用／打开试用」挪到 `slot.open.*` 后，项目列表的 SummaryFacts 还用已删的 `projects.summary.openProduction／openPreview`，按钮上直接显示键名（中英键集合一致，i18nParity 看不出）。改用 `slot.open.${name}`；新增 `i18nKeysInCode.test.ts`（`t(...)` 写死的 a.b.c 键必须在文案表里，全仓只命中这两处）。[CI 35808537879](https://github.com/wangbinquan/CrewStation/actions/runs/35808537879) 成功。
+- `0a92896` 实机发现：离开终端后 OpenCode 查询终端能力、光标与配色，xterm 的自动应答走 `terminalInput`、每条都续租，释放拖到 39.5 秒（CDP 抓 WebSocket 帧确认）；改为离开满 `CONTROL_RELEASE_MS` 页面主动 detach。[CI 35809030255](https://github.com/wangbinquan/CrewStation/actions/runs/35809030255) 成功。
+- `ae7ee76` 顺手修：概览底部 `.bottom` 的 `minmax(440px, 1fr)`（RFC-020 `3b7ec74`）在 390／320 宽下把主区撑到 456px、右侧被裁；同类六处统一 `minmax(min(100%, Npx), 1fr)`，新增 `responsiveGrid.test.ts`。
+
+**本机部署**：cs-session 滚到 `cs-control-plane:terminal-control-20260923`（`git archive ec33c69` 构建）；console 先滚 `cs-console:terminal-control-20260923`，之后被并行会话的 `detail-top-20260923(b)` 覆盖——后者含 `ec33c69`、`6825ca7`，**不含 `0a92896`、`ae7ee76`**，要等下一次 console 部署。任务底座 `crewstation/task-runtime:terminal-control-20260923`（`sha256:669e3c94…`）推进集群仓库，`:dev` 底座未动；默认档位 `volc-glm-5-2` 换成新底座重新保存为**修订 4**，档位测试全部通过（拉镜像、Runner 握手、预置配置、起 CLI、真实模型轮次）。修订 4 之前起的 CLI 仍是旧 Runner。
+
+**实机两身份核对**（无头 Chrome＋CDP，dev-admin＋dev-developer，演示数字人，新开一个修订 4 的 CLI）：两边空闲 → dev-developer 点进终端得「你正在输入」＋绿框、dev-admin 同时看到「dev-developer 正在输入 · 只读」→ dev-admin 点进被拒且不报错 → dev-developer 点到页面标题离开，两边回到空闲（当时 41 秒，即上面 `0a92896` 修的问题）→ dev-admin 点进取得、对方看到「dev-admin 正在输入」→ dev-admin 离开窗口后在第二个窗口点进，控制直接转过去、第一个窗口显示「你在另一个窗口中输入」。无控制台错误。作者的两个旧 Runner CLI 只读观察（均显示空闲），没有点。
+
+**对环境的临时改动（都已还原）**：演示数字人并发额度 3→4→3 两次（被会话＋两个运行中的 CLI 占满；第一次起 CLI 被额度拒绝，名册里留一条 failed 启动记录）；两次各起一个验收 CLI，均已 stop；dev-admin／dev-developer 的个人布局按开始前整份 PUT 还原。
+
+**并行会话的 console 宕机约 6 分钟（09:57–10:03）**：对方滚 `cs-console:detail-top-20260923` 时用 `NODE=$(… source deploy/local/lib.sh; echo $NODE)` 取节点名，但 lib.sh 只定义 `NODE_CONTAINER` 且开 `set -u`，导入静默失败、ImagePullBackOff，Recreate 策略下网关 404。我把对方已构建好的同一镜像导入节点、删掉卡住的 Pod，按对方的选择完成 rollout。
+
+**下一个 session 注意**：`0a92896`（离开约 30 秒释放）与 `ae7ee76`（概览 390／320 不裁切）等下一次 console 部署后实机复核；复核离开释放时注意 OpenCode 的查询应答仍会在离开后的几秒内继续发出，那是正常的。
+
 ## 拓扑详情栏独立滚动、侧栏操作按钮移到顶部、图上方说明行改为时间标签（2026-09-23）
 
 作者反馈集群拓扑 Pod 层点业务 Pod 后右侧详情很长、整页被拉长，底部四个操作按钮够不着；并要求排查其他侧栏的底部按钮、去掉图上方两行说明。提交 `da0b1f7`：
