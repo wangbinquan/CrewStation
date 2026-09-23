@@ -1,4 +1,4 @@
-import type { MarketAppDto, ProjectSummaryDetail, UserId } from '@crewstation/contracts';
+import type { MarketAppDto, ProjectSummaryDetail, ResourceRecord, UserId } from '@crewstation/contracts';
 
 export function trialMarketFixture(projectId: string): MarketAppDto {
   const checkedAt = new Date().toISOString();
@@ -25,7 +25,7 @@ export function testerSummaryFixture(projectId: string, serviceId: string): Proj
 }
 
 export function summaryFixture() {
-  const state = { item: summaryFixtureItem(), admin: true, meError: false, projectDenied: false, error: false, invalid: false, empty: false, hang: false, calls: [] as string[], writes: [] as string[], terminals: [] as Array<{ readonly lifecycle: string }> };
+  const state = { item: summaryFixtureItem(), admin: true, meError: false, projectDenied: false, error: false, invalid: false, empty: false, hang: false, calls: [] as string[], writes: [] as string[], terminals: [] as Array<{ readonly lifecycle: string }>, records: [] as ResourceRecord[] };
   globalThis.fetch = (async (raw, init) => {
     const url = new URL(String(raw), 'http://test'); state.calls.push(url.pathname + url.search);
     if (init?.method && init.method !== 'GET') state.writes.push(url.pathname);
@@ -42,6 +42,7 @@ export function summaryFixture() {
       else body = { items: state.empty ? [] : url.searchParams.has('cursor') ? [summaryFixtureItem(2)] : [state.item], ...(url.searchParams.has('cursor') || state.empty ? {} : { nextCursor: 'next-page' }) };
     } else if (url.pathname.endsWith('/dev-session')) { status = 404; body = { error: 'not_found', message: '没有开发会话' }; }
     else if (url.pathname.endsWith('/agent-terminals')) body = { items: state.terminals };
+    else if (url.pathname === `/v1/projects/${state.item.project.id}/resources`) body = { items: state.records, counts: {}, cursor: 1 };
     else if (url.pathname === `/v1/projects/${state.item.project.id}`) {
       if (state.projectDenied) { status = 403; body = { error: 'forbidden', message: '角色 tester 不能执行 view' }; }
       else body = state.item.project;

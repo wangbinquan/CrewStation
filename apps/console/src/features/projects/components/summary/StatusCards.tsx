@@ -1,9 +1,11 @@
 import type { DevelopmentSummary, ProjectSummaryDetail, SlotDto } from '@crewstation/contracts';
+import { isLiveResourcePhase } from '@crewstation/contracts';
 import type { ReactElement } from 'react';
 import { api } from '../../../../shared/api/client';
 import { queryKeys } from '../../../../shared/api/queryKeys';
 import { useApiQuery } from '../../../../shared/api/useApi';
 import { PROJECT_PATHS } from '../../../../shared/project/projectPaths';
+import { useProjectResources } from '../../../../shared/resources/useProjectResources';
 import type { ProjectSpace } from '../../../../shared/project/projectPaths';
 import { DeployedVersionCard } from '../../../../shared/project/DeployedVersionCard';
 import { useServiceMaintenance } from '../../../../shared/project/useServiceMaintenance';
@@ -46,18 +48,18 @@ function DevelopmentCard({ item, space, available }: { readonly item: ProjectSum
   const t = useT(), projectId = item.project.id, part = item.development;
   const session: DevelopmentSummary | null | undefined = part.status === 'ready' && summaryIsFresh(part) ? part.value : undefined;
   const live = !!session && session.state === 'running' && session.connected;
-  const terminals = useApiQuery(queryKeys.nativeTerminals(session?.taskId ?? ''), () => api.devSession.listNativeTerminals(session!.taskId), { enabled: !!session && session.state === 'running', refetchIntervalMs: 30_000 });
+  const records = useProjectResources(projectId, { enabled: !!session });
   const comparison = useApiQuery(queryKeys.versionComparison(projectId, session?.taskId ?? ''), () => api.devSession.versionComparison(projectId), { enabled: live, staleTimeMs: 60_000 });
   const commits = comparison.data?.commits, workspace = comparison.data?.workspace;
-  // 只数没结束的：已结束、失败的 CLI 是历史记录（2026-09-23 盘点：demo 一个都不在跑，卡上却写「14 个 CLI」）。
-  const openClis = terminals.data?.items.filter((terminal) => terminal.lifecycle !== 'ended' && terminal.lifecycle !== 'failed').length ?? 0;
+  // 只数在运行的 CLI（RFC-025：来自资源台账的 Agent 执行记录；结束中、已结束、失败的都不算。2026-09-23 盘点：demo 一个都不在跑，卡上却写「14 个 CLI」）。
+  const openClis = records.data?.items.filter((record) => record.kind === 'agent-execution' && record.purpose === 'development-cli' && record.parentId === session?.taskId && isLiveResourcePhase(record.phase)).length ?? 0;
   const open = available && item.project.state === 'active', known = part.status === 'ready' && summaryIsFresh(part);
   // 开发会话是一个对象：开始／继续开发放在卡片底部操作条（2026-09-23 裁定）。
   const enter = open && known ? <ButtonLink variant="primary" to={PROJECT_PATHS[space].development} params={{ projectId }}>{t(session ? 'projects.summary.continue' : 'projects.summary.start')}</ButtonLink> : undefined;
   return <Card compact title={t('projects.summary.developmentCard')} extra={session ? <Badge tone={SESSION_TONE[session.state] ?? 'neutral'}>{t(`projects.summary.session.${session.state}`)}</Badge> : undefined} actions={enter}>
     {!known ? <SummaryUnavailable part={part} /> : !session ? <div className={styles.fact}><span className={styles.muted}>{t('projects.summary.noSession')}</span></div>
       : <div className={styles.fact}>
-        <span className={styles.sessionLine}><code>{session.branch ?? t('projects.summary.branchUnknown')}</code>{terminals.data && !terminals.error ? ` · ${t('projects.summary.cliCount', { count: openClis })}` : ''}</span>
+        <span className={styles.sessionLine}><code>{session.branch ?? t('projects.summary.branchUnknown')}</code>{records.data && !records.error ? ` · ${t('projects.summary.cliCount', { count: openClis })}` : ''}</span>
         <small className={styles.muted}>{t(session.connected ? 'projects.summary.connected' : 'projects.summary.disconnected')}{session.message ? ` · ${session.message}` : ''}</small>
         <small className={styles.muted}>{commits && 'ahead' in commits && workspace?.status === 'ready' ? t('projects.summary.pendingWork', { ahead: commits.ahead, dirty: workspace.uncommittedCount }) : t('projects.summary.unchecked')}</small>
       </div>}

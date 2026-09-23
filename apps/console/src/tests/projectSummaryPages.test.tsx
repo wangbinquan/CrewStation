@@ -1,9 +1,10 @@
 import './domSetup';
 import { afterEach, describe, expect, test } from 'bun:test';
 import { act } from 'react';
-import type { ReleaseId, TaskId } from '@crewstation/contracts';
+import type { ReleaseId, ResourceRecord, TaskId } from '@crewstation/contracts';
 import { renderApp } from './renderApp';
 import { summaryFixture, summaryUserId } from './projectSummaryFixture';
+import { resourceRecord } from './resourceRecordFixture';
 
 const originalFetch = globalThis.fetch;
 let page: Awaited<ReturnType<typeof renderApp>> | undefined;
@@ -114,10 +115,13 @@ describe('项目列表的真实分页与独立状态', () => {
 });
 
 // 2026-09-23 盘点：demo 有 14 条 CLI 记录（8 已结束、6 失败），一个都不在跑，概览开发卡却写「14 个 CLI」。
-test('概览开发卡的 CLI 数只数没结束的：已结束与失败的是历史记录，不算进去', async () => {
-  const f = summaryFixture(), time = new Date().toISOString();
-  f.item.development = { status: 'ready', checkedAt: time, value: { taskId: '01a0bf5d-8f4b-7e52-8b45-4a547fd10e4f' as TaskId, state: 'running', connected: true, branch: 'main', createdAt: time, lastActivityAt: time } };
-  f.terminals = ['running', 'starting', 'unknown', 'ended', 'failed', 'ended'].map((lifecycle) => ({ lifecycle }));
+// RFC-025 起数的是资源台账里这个会话下在运行的 CLI 执行记录：结束中、已结束、失败的，别的会话的，Agent 执行都不算。
+test('概览开发卡的 CLI 数只数在运行的：来自资源台账，结束中、已结束与失败的都不算', async () => {
+  const f = summaryFixture(), time = new Date().toISOString(), taskId = '01a0bf5d-8f4b-7e52-8b45-4a547fd10e4f';
+  f.item.development = { status: 'ready', checkedAt: time, value: { taskId: taskId as TaskId, state: 'running', connected: true, branch: 'main', createdAt: time, lastActivityAt: time } };
+  const cli = (n: number, phase: ResourceRecord['phase'], over: Partial<ResourceRecord> = {}) => resourceRecord({ id: `01a0bf5d-8f4b-7e52-8b45-4a547fd10f0${n}`, kind: 'agent-execution', purpose: 'development-cli', parentId: taskId, phase, ...over });
+  f.terminals = ['running', 'running', 'running', 'running'].map((lifecycle) => ({ lifecycle }));
+  f.records = [cli(1, 'ready'), cli(2, 'starting'), cli(3, 'degraded'), cli(4, 'stopping'), cli(5, 'stopped'), cli(6, 'failed'), cli(7, 'ready', { purpose: 'development-agent' }), cli(8, 'ready', { parentId: '01a0bf5d-8f4b-7e52-8b45-4a547fd10fff' })];
   page = await renderApp(`/projects/${f.item.project.id}`);
   expect([...document.querySelectorAll('code')].find((node) => node.textContent === 'main')?.parentElement?.textContent).toBe('main · 3 个 CLI');
 });

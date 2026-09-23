@@ -1,15 +1,16 @@
 import './domSetup';
 import { afterEach, expect, test } from 'bun:test';
 import { act } from 'react';
-import type { ClusterResource } from '@crewstation/contracts';
+import type { ClusterResource, ResourceRecord } from '@crewstation/contracts';
 import { renderApp } from './renderApp';
 import { clusterFixture } from './clusterManagementFixture';
 import { summaryFixture } from './projectSummaryFixture';
+import { FakeEventSource, resourceRecord, resourceView } from './resourceRecordFixture';
 
 // RFC-019 三处入口：运行与诊断的形态页签（成员只读盘点）、概览的横带汇总卡、集群管理的拓扑页签三层。
 const originalFetch = globalThis.fetch;
 let page: Awaited<ReturnType<typeof renderApp>> | undefined;
-afterEach(() => { page?.unmount(); page = undefined; globalThis.fetch = originalFetch; sessionStorage.clear(); });
+afterEach(() => { page?.unmount(); page = undefined; globalThis.fetch = originalFetch; sessionStorage.clear(); delete (globalThis as { EventSource?: unknown }).EventSource; FakeEventSource.reset(); });
 const projectId = '01a0bf5d-8f4b-7e1e-8dde-c9c2ae13ed34', serviceId = '01a0bf5d-8f4b-760b-86b6-0bb9f08a9eaa', time = new Date().toISOString();
 const project = { id: projectId, serviceId, name: '团队知识助理', slug: 'team-knowledge', kind: 'DigitalWorker', state: 'active', namespace: 'cs-team-knowledge', ownerUserId: '01a0bf5d-8f4b-7f8b-8136-e631380738b0', createdAt: time };
 const resource = (over: Partial<ClusterResource> & { name: string; kind: string }): ClusterResource => ({ resourceId: `r-${over.name}`, apiVersion: 'v1', namespace: 'cs-team-knowledge', uid: `uid-${over.name}`, resourceVersion: '1', revision: '1', observedAt: time, createdAt: time, view: over.kind === 'Pod' ? 'pods' : 'workloads', ownership: { scope: 'project', projectId, projectName: '团队知识助理', slug: 'team-knowledge', projectKind: 'DigitalWorker', archived: false }, purpose: 'digital-worker-service', phase: 'Running', ready: true, abnormal: false, reason: '', topLevel: over.kind !== 'Pod', standalone: false, restarts: 0, labels: {}, owners: [], references: [], containers: [], facts: {}, availableActions: [], ...over });
@@ -18,6 +19,11 @@ const inventory = { snapshotId: 'snap-1', observedAt: time, complete: true, sour
   resource({ name: 'team-knowledge-blue-1', kind: 'Pod', slotRole: 'prod', physicalSlot: 'blue', node: 'node-a', containers: [{ name: 'app', init: false, image: 'knowledge:v1', ready: true, restarts: 0, state: 'running', requests: {}, limits: {}, ports: [] }] }),
   resource({ name: 'subtask-9', kind: 'Pod', purpose: 'business-subtask', phase: 'Pending', ready: false, abnormal: true, reason: 'Insufficient cpu', taskId: 'sub-9' }),
 ] };
+// RFC-025：业务子任务的状态来自资源台账；盘点里同一个 Pod（按 UID 对上）只补容器与日志入口。
+const subtaskId = '01a0bf5d-8f4b-7e1e-8dde-c9c2ae13ef09';
+const subtask = resourceRecord({ id: subtaskId, kind: 'agent-execution', purpose: 'business-subtask', phase: 'starting', reason: { code: 'waiting-container', message: '0/1 nodes are available: 1 Insufficient cpu.' },
+  children: [{ kind: 'Pod', namespace: 'cs-team-knowledge', name: 'subtask-9', uid: 'uid-subtask-9', phase: 'Pending', ready: false }] });
+let records: ResourceRecord[] = [subtask];
 const nodes = () => [...document.querySelectorAll('[role="button"][data-node-id]')].map((n) => n.getAttribute('data-node-id'));
 const byText = (selector: string, text: string) => [...document.querySelectorAll(selector)].find((n) => n.textContent?.trim() === text) ?? null;
 // 详情栏的操作按钮在事实与表格之前：详情很长时不必滚到底才够得着。
@@ -36,6 +42,7 @@ function memberFixture(refused = false) {
     else if (url.pathname.endsWith('/slots')) body = { items: [{ name: 'prod', active: true, tag: 'v1.0.0', commitSha: 'a'.repeat(40), replicas: 1, readyReplicas: 1, state: 'ready', host: 'knowledge.cs.localhost' }] };
     else if (url.pathname.endsWith('/dev-session')) { status = 404; body = { error: 'not_found', message: '没有开发会话' }; }
     else if (url.pathname.endsWith('/data/resources')) body = { items: [{ id: 'd1', projectId, kind: 'postgres', env: 'production', plan: 'db-small', state: 'ready', envVar: 'CS_DATABASE_URL', createdAt: time }] };
+    else if (url.pathname === `/v1/projects/${projectId}/resources`) body = resourceView(records);
     return Response.json(body, { status });
   }) as typeof fetch;
   return calls;
@@ -45,13 +52,34 @@ test('operations tab assembles the member inventory with slots and data into the
   const calls = memberFixture(); page = await renderApp(`/projects/${projectId}/operations?tab=topology`);
   expect(calls.some((path) => path === `/v1/projects/${projectId}/cluster-resources`)).toBe(true);
   expect(page.text()).toContain('观测于'); expect(page.text()).toContain('线上槽 prod · blue'); expect(page.text()).toContain('业务任务');
-  expect(nodes().sort()).toEqual(['db:production', 'route:prod', 'uid-subtask-9', 'uid-team-knowledge-blue', 'uid-team-knowledge-blue-1'].sort());
-  expect(document.querySelector('[data-node-id="uid-subtask-9"]')?.getAttribute('aria-label')).toContain('Insufficient cpu');
+  expect(calls).toContain(`/v1/projects/${projectId}/resources`);
+  expect(nodes().sort()).toEqual(['db:production', 'route:prod', subtaskId, 'uid-team-knowledge-blue', 'uid-team-knowledge-blue-1'].sort());
+  expect(document.querySelector(`[data-node-id="${subtaskId}"]`)?.getAttribute('aria-label')).toContain('启动中 · 0/1 nodes are available: 1 Insufficient cpu.');
   await clickNode('uid-team-knowledge-blue-1');
   expect(page.text()).toContain('knowledge:v1'); expect(page.text()).toContain('管理动作（重启、扩缩、删除）仍在集群管理的资源详情里');
   expect(page.text()).not.toContain('调整副本');
   expect(precedes(byText('button', '查看日志'), document.querySelector('dl'))).toBe(true);
   await page.click('查看日志'); expect(page.search()).toMatchObject({ tab: 'logs', source: 'slot', slot: 'prod' });
+});
+
+// RFC-025 RC-02：关掉的 CLI 由推送流带来「结束中」「已结束」，图上随之变化，不必等 15 秒一次的盘点。
+test('the diagram follows the resource stream: a closing CLI turns to stopping and disappears once stopped, without re-reading', async () => {
+  const workspaceId = '01a0bf5d-8f4b-7e1e-8dde-c9c2ae13ef01', cliId = '01a0bf5d-8f4b-7e1e-8dde-c9c2ae13ef02';
+  const workspace = resourceRecord({ id: workspaceId, purpose: 'development-workspace', display: { branch: 'main' }, children: [{ kind: 'Pod', namespace: 'cs-team-knowledge', name: 'task-ws', uid: 'uid-task-ws', phase: 'Running', ready: true }] });
+  const cli = resourceRecord({ id: cliId, kind: 'agent-execution', purpose: 'development-cli', parentId: workspaceId, display: { terminal: 'term-1' }, children: [{ kind: 'Pod', namespace: 'cs-team-knowledge', name: 'task-cli', uid: 'uid-task-cli', phase: 'Running', ready: true }] });
+  records = [workspace, cli];
+  (globalThis as { EventSource?: unknown }).EventSource = FakeEventSource;
+  const calls = memberFixture(); page = await renderApp(`/projects/${projectId}/operations?tab=topology`);
+  try {
+    expect(nodes()).toContain(cliId); expect(FakeEventSource.opened.map((source) => source.url)).toEqual([`/v1/projects/${projectId}/resources/stream?cursor=1`]);
+    await act(async () => { FakeEventSource.opened[0]!.emit({ type: 'upsert', record: { ...cli, phase: 'stopping', version: 2, reason: { code: 'execution-ended', message: '执行已结束' } }, counts: {}, cursor: 2 }); });
+    await page.settle();
+    expect(document.querySelector(`[data-node-id="${cliId}"]`)?.getAttribute('aria-label')).toContain('结束中 · 执行已结束');
+    await act(async () => { FakeEventSource.opened[0]!.emit({ type: 'upsert', record: { ...cli, phase: 'stopped', version: 3, children: [] }, counts: {}, cursor: 3 }); });
+    await page.settle();
+    expect(nodes()).not.toContain(cliId); expect(nodes()).toContain(workspaceId);
+    expect(calls.filter((path) => path === `/v1/projects/${projectId}/resources`)).toHaveLength(1);
+  } finally { records = [subtask]; }
 });
 
 test('a refused member sees the refusal from the inventory route, not an empty diagram', async () => {
@@ -63,6 +91,7 @@ test('a refused member sees the refusal from the inventory route, not an empty d
 test('the overview shows one summary card per band and links to the full topology', async () => {
   const f = summaryFixture(), inner = globalThis.fetch;
   f.item.slots = { status: 'ready', checkedAt: time, value: [{ name: 'prod', active: true, tag: 'v1.0.0', commitSha: 'a'.repeat(40), replicas: 1, readyReplicas: 1, state: 'ready', host: 'formal.test' }] };
+  f.records = [subtask];
   globalThis.fetch = (async (raw, init) => String(raw).endsWith('/cluster-resources') ? Response.json({ ...inventory, items: inventory.items.map((item) => ({ ...item, ownership: { ...item.ownership, projectId: f.item.project.id } })) }) : inner(raw, init)) as typeof fetch;
   page = await renderApp(`/projects/${f.item.project.id}`);
   expect(page.text()).toContain('部署与运行形态'); expect(page.text()).toContain('工作负载 1 · Pod 2，就绪 1，运行 0'); expect(page.text()).toContain('1 个需要关注');

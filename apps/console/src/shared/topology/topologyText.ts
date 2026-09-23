@@ -1,7 +1,7 @@
 // 形态图组装共用的小规则：Pod 状态归一（沿用 RFC-010 §4 口径）、用途到语义、时长文案。全部纯函数，文案经 i18n。
-import type { ClusterResource } from '@crewstation/contracts';
+import type { ClusterResource, DataResourceDto } from '@crewstation/contracts';
 import type { Translate } from '../lib/useT';
-import type { NodeStatus, Semantic } from '../ui/topology/topologyModel';
+import type { NodeStatus, Semantic, TopologyNode } from '../ui/topology/topologyModel';
 
 export function purposeSemantic(purpose: ClusterResource['purpose']): Semantic {
   switch (purpose) {
@@ -64,4 +64,10 @@ export function podFacts(r: ClusterResource, t: Translate): (readonly [string, s
     ...(r.physicalSlot ? [[t('topology.fact.slot'), `${r.physicalSlot}${r.slotRole ? ` · ${r.slotRole}` : ''}`] as const] : []),
     [t('topology.fact.uid'), r.uid],
   ];
+}
+
+/** 数据资源（生产库、开发库）的节点：盘点与台账两条组装路径共用。 */
+export function databaseNode(d: DataResourceDto, band: string, t: Translate): TopologyNode {
+  const status = d.state === 'ready' ? 'ready' : d.state === 'failed' ? 'failed' : d.state === 'releasing' ? 'terminating' : d.state === 'released' ? 'idle' : 'pending';
+  return { id: `db:${d.env}`, kind: 'database', semantic: 'data', title: t(d.env === 'production' ? 'topology.data.production' : 'topology.data.development'), subtitle: t('topology.data.plan', { plan: d.plan }), status, statusText: t(`topology.data.state.${d.state}`), lane: 3, band, meta: [t('topology.data.envVar', { name: d.envVar })], facts: [[t('topology.fact.kind'), d.kind], [t('topology.fact.env'), d.env], [t('topology.fact.plan'), d.plan], [t('topology.fact.envVar'), d.envVar], ...(d.message ? [[t('topology.fact.message'), d.message] as const] : [])] };
 }

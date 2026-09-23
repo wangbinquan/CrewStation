@@ -10,6 +10,7 @@ import { buildProjectTopology } from '../shared/topology/projectTopology';
 import { buildProjectsLayer, FOLD_SHOWN, MORE_NODE_ID } from '../shared/topology/projectsLayer';
 import { STATIC_EDGES } from '../shared/topology/staticArchitecture';
 import { buildSystemTopology } from '../shared/topology/systemTopology';
+import { resourceRecord } from './resourceRecordFixture';
 
 // RFC-019 design §4：形态的组装规则——每条横带的进入条件、边的生成、状态归一、用途待核对不猜、折叠阈值。
 const catalog = { ...appMessages, ...clusterMessages } as Messages;
@@ -120,5 +121,52 @@ describe('projects layer and system layer', () => {
     expect(system.lanes).toEqual(['调用方', '网关与身份', '平台服务', '基础组件', '外部系统']);
     const ids = new Set(system.nodes.map((n) => n.id)); for (const e of system.edges) { expect(ids.has(e.from)).toBe(true); expect(ids.has(e.to)).toBe(true); }
     expect(buildSystemTopology({ resources: [], summary: { ...summary, complete: false }, snapshot: { ...snapshot, complete: false } }, t).nodes.find((n) => n.id === 'slots')).toMatchObject({ status: 'unknown', statusText: '— 个 Pod' });
+  });
+});
+
+// RFC-025 设计 §10：给了资源台账记录时，开发会话与业务任务两带只照记录画——阶段与原因来自记录，已结束的不画，
+// 盘点里的同一 Pod 只补详情（容器、日志入口、需要关注），不再按用途单独成节点、也不落进「待核对」。
+describe('record-based task bands', () => {
+  const at = (minutes: number) => new Date(Date.parse('2026-09-22T11:00:00.000Z') + minutes * 60_000).toISOString();
+  const pod = (name: string, phase: string, extra: Record<string, unknown> = {}) => ({ kind: 'Pod', namespace: 'cs-demo', name, uid: `uid-${name}`, phase, ready: phase === 'Running', ...extra });
+  const workspace = resourceRecord({ id: 'ws-1', purpose: 'development-workspace', display: { profile: 'coding-medium', branch: 'feature/x' }, createdAt: at(10), children: [pod('task-1', 'Running', { node: 'node-a', restarts: 2 })] });
+  const failedWorkspace = resourceRecord({ id: 'ws-0', purpose: 'development-workspace', phase: 'failed', reason: { code: 'checkout-failed', message: '检出失败' }, createdAt: at(1), children: [pod('task-0', 'absent')] });
+  const cliReady = resourceRecord({ id: 'cli-1', kind: 'agent-execution', purpose: 'development-cli', parentId: 'ws-1', display: { terminal: 'term-1', profile: 'OpenCode 默认' }, children: [pod('agent-1', 'Running')] });
+  const cliStopping = resourceRecord({ id: 'cli-2', kind: 'agent-execution', purpose: 'development-cli', parentId: 'ws-1', phase: 'stopping', reason: { code: 'execution-ended', message: '执行已结束' }, children: [pod('agent-2', 'Running')] });
+  const cliStopped = resourceRecord({ id: 'cli-3', kind: 'agent-execution', purpose: 'development-cli', parentId: 'ws-1', phase: 'stopped', children: [] });
+  const volume = resourceRecord({ id: 'vol-1', kind: 'volume', parentId: 'ws-1', children: [{ kind: 'PersistentVolumeClaim', namespace: 'cs-demo', name: 'task-1-work', uid: 'uid-task-1-work', phase: 'Bound', ready: true }] });
+  const subtask = resourceRecord({ id: 'sub-1', kind: 'agent-execution', purpose: 'business-subtask', phase: 'starting', reason: { code: 'waiting-container', message: 'Insufficient cpu' }, children: [pod('subtask-1', 'Pending')] });
+  const records = [workspace, failedWorkspace, cliReady, cliStopping, cliStopped, volume, subtask];
+  // 记录沿用任务环境的 ID：开发会话的 taskId 就是工作区记录的 ID。
+  const session = { ...input.devSession, taskId: 'ws-1' as never };
+  const topology = () => buildProjectTopology({ ...input, devSession: session, records }, t), byId = (id: string) => topology().nodes.find((n) => n.id === id);
+
+  test('nodes come from records; stopped ones are not drawn and the inventory task pods are not duplicated or left as unknown', () => {
+    const ids = topology().nodes.map((n) => n.id);
+    for (const id of ['ws-1', 'ws-0', 'cli-1', 'cli-2', 'vol-1', 'sub-1', 'route:dev', 'db:development']) expect(ids).toContain(id);
+    expect(ids).not.toContain('cli-3');
+    for (const id of ['uid-task-1', 'uid-agent-1', 'uid-subtask-1', 'uid-task-1-work']) expect(ids).not.toContain(id);
+    expect(topology().bands.map((b) => b.id)).toEqual(['slot:prod', 'slot:preview', 'dev', 'business', 'jobs', 'other']);
+    expect(topology().nodes.filter((n) => n.band === 'other').map((n) => n.id)).toEqual(['uid-mystery']);
+    expect(topology().bands.find((b) => b.id === 'dev')?.note).toBe('分支 feature/x · 2 个 Agent');
+  });
+  test('status and reason are the record phase in the standard words; the running workspace carries the preview route and the development database', () => {
+    expect(byId('ws-1')).toMatchObject({ status: 'ready', statusText: '运行中', title: 'task-1', meta: ['重启 2', '存活 1 小时 30 分'], resourceId: 'r-task-1' });
+    expect(byId('ws-0')).toMatchObject({ status: 'failed', statusText: '失败 · 检出失败', abnormal: true });
+    expect(byId('cli-2')).toMatchObject({ status: 'terminating', statusText: '结束中 · 执行已结束' });
+    expect(byId('sub-1')).toMatchObject({ status: 'pending', statusText: '启动中 · Insufficient cpu', abnormal: true, band: 'business', resourceId: 'r-subtask-1' });
+    expect(byId('vol-1')).toMatchObject({ kind: 'volume', status: 'ready', statusText: '运行中', meta: ['capacity 10Gi', 'requested 10Gi'] });
+    expect(byId('route:dev')).toMatchObject({ status: 'ready', statusText: '运行中' });
+    expect(edge(topology(), 'route:dev', 'ws-1')).toMatchObject({ kind: 'routes' });
+    expect(edge(topology(), 'ws-1', 'cli-1')).toMatchObject({ kind: 'child' }); expect(edge(topology(), 'ws-1', 'cli-2')).toMatchObject({ kind: 'child' });
+    expect(edge(topology(), 'ws-1', 'vol-1')).toMatchObject({ kind: 'mounts' }); expect(edge(topology(), 'cli-1', 'vol-1')).toMatchObject({ kind: 'mounts' });
+    expect(edge(topology(), 'ws-1', 'db:development')).toMatchObject({ kind: 'uses' }); expect(edge(topology(), 'ws-0', 'db:development')).toBeUndefined();
+    expect(byId('cli-1')?.facts).toContainEqual(['终端', 'term-1']);
+  });
+  test('an execution whose workspace is no longer drawn is still shown; no records means no task bands', () => {
+    const orphan = buildProjectTopology({ ...input, records: [cliReady] }, t);
+    expect(orphan.nodes.find((n) => n.id === 'cli-1')?.band).toBe('dev'); expect(orphan.bands.find((b) => b.id === 'dev')?.note).toBe('没有运行中的会话');
+    const none = buildProjectTopology({ ...input, records: [cliStopped] }, t);
+    expect(none.bands.map((b) => b.id)).toEqual(['slot:prod', 'slot:preview', 'jobs', 'other']);
   });
 });

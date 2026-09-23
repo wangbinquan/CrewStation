@@ -1,4 +1,5 @@
 // 运行与诊断「部署与运行形态」页签（RFC-019）：项目范围只读盘点＋槽＋开发会话＋数据资源组装成图；15 秒轮询、换快照不卸载。
+// RFC-025：开发会话、CLI 与业务任务改读资源台账（快照＋推送流），关掉的 CLI、释放的会话随推送立即从图上消失。
 import { useMemo, useState } from 'react';
 import type { ReactElement } from 'react';
 import { ProjectClusterResourcesSchema } from '@crewstation/contracts';
@@ -8,6 +9,7 @@ import { useApiQuery } from '../../../shared/api/useApi';
 import { useT } from '../../../shared/lib/useT';
 import type { OperationsSearch } from '../../../shared/project/operationsSearch';
 import { useProjectIdentity } from '../../../shared/project/useProjectIdentity';
+import { useProjectResources } from '../../../shared/resources/useProjectResources';
 import { buildProjectTopology } from '../../../shared/topology/projectTopology';
 import { QueryStatus } from '../../../shared/ui/QueryStatus';
 import { TopologyWorkspace } from '../../../shared/ui/topology/TopologyWorkspace';
@@ -21,15 +23,17 @@ export function TopologyPage({ projectId, onLogs }: { readonly projectId: string
   const slots = useApiQuery(queryKeys.slots(serviceId ?? ''), () => api.services.listSlots(serviceId!), { enabled: !!serviceId, refetchIntervalMs: 15_000 });
   const devSession = useApiQuery(queryKeys.devSession(projectId), () => api.devSession.get(projectId), { refetchIntervalMs: 15_000 });
   const dataResources = useApiQuery(queryKeys.dataResources(projectId), () => api.tasks.listDataResources(projectId));
-  const topology = useMemo(() => project && inventory.data ? buildProjectTopology({
+  const records = useProjectResources(projectId);
+  // 开发会话与业务任务只按台账画：台账还没读到时先不出图，免得先按盘点画一版、再整块换成记录。
+  const topology = useMemo(() => project && inventory.data && records.data ? buildProjectTopology({
     project: { id: project.id, name: project.name, kind: project.kind, namespace: project.namespace }, resources: inventory.data.items, slots: slots.data?.items ?? [],
-    devSession: devSession.data && !devSession.error ? devSession.data : undefined, dataResources: dataResources.data?.items ?? [],
+    devSession: devSession.data && !devSession.error ? devSession.data : undefined, dataResources: dataResources.data?.items ?? [], records: records.data.items,
     snapshot: { id: inventory.data.snapshotId, observedAt: inventory.data.observedAt, complete: inventory.data.complete, incompleteReason: inventory.data.complete ? undefined : inventory.data.sources.filter((s) => s.state === 'error' || s.state === 'stale').map((s) => `${s.kind}${s.reason ? `（${s.reason}）` : ''}`).join('、') },
-  }, t) : undefined, [project, inventory.data, slots.data, devSession.data, devSession.error, dataResources.data, t]);
+  }, t) : undefined, [project, inventory.data, slots.data, devSession.data, devSession.error, dataResources.data, records.data, t]);
   // 开发会话不存在是 404，不是页面错误；其余查询的错误照常显示。
-  const error = identity.error ?? inventory.error ?? slots.error ?? dataResources.error ?? (devSession.error && devSession.error.status !== 404 ? devSession.error : null);
+  const error = identity.error ?? inventory.error ?? slots.error ?? dataResources.error ?? records.error ?? (devSession.error && devSession.error.status !== 404 ? devSession.error : null);
   return <>
-    <QueryStatus isPending={!error && (identity.isPending || inventory.isPending)} error={error} isEmpty={topology !== undefined && topology.nodes.length === 0} emptyTitle={t('logs.topology.emptyTitle')} emptyDescription={t('logs.topology.emptyDescription')} />
+    <QueryStatus isPending={!error && (identity.isPending || inventory.isPending || records.isPending)} error={error} isEmpty={topology !== undefined && topology.nodes.length === 0} emptyTitle={t('logs.topology.emptyTitle')} emptyDescription={t('logs.topology.emptyDescription')} />
     {topology && topology.nodes.length > 0 ? <TopologyWorkspace topology={topology} label={topology.title} selectedId={selected} onSelect={setSelected}
       before={inventory.data?.truncated ? <p>{t('logs.topology.truncated')}</p> : undefined}
       detail={selected ? <TopologyDetail topology={topology} nodeId={selected} resources={inventory.data?.items ?? []} onSelect={setSelected} onClose={() => setSelected(undefined)} onLogs={onLogs} /> : undefined} /> : null}
