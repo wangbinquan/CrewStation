@@ -1,0 +1,13 @@
+# deploy/local/verify.sh 的 E 项：带这个标签的 Pod 一律不许出站。用来确认本机网络插件（Calico）真的在执行 NetworkPolicy，
+# 而不是装了策略却没人执行（kindnet 被删、或 Docker Desktop 重置集群后网络插件换了）。
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: verify-deny-egress
+  namespace: crewstation-verify
+spec:
+  podSelector:
+    matchLabels:
+      crewstation.io/verify-policy: deny-egress
+  policyTypes:
+    - Egress

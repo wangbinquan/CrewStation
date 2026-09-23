@@ -216,9 +216,36 @@ Service 不再依赖 `publishNotReadyAddresses`；**管理员会话优先走 dev
 **判据**：实机验证里出现「网关／某个平台服务连不上」，先在同一个 Pod 内用 Pod IP 对照一次，
 再去查网络策略或平台代码。策略是放行的（`crewstation-default` 允许到 `crewstation-system`），查策略会白费时间。
 
+**2026-09-23 补**：这条很可能和下一条同源——kindnet 的 NFQUEUE 裁决卡住时，经 ClusterIP 的新连接排在队列里等不到放行。本机已换成 Calico；再遇到时先按下一条的判据看队列，别先去改平台代码。
+
 **绕过办法**：验证时用目标的 Pod IP 加 `Host:` 头发起，例如
 `fetch('http://<traefik-pod-ip>:8000/api/<proxy>/...', { headers: { host: 'api.svc.cs.internal' } })`。
 这样绕过的只是 VIP 转换，网关路由、源 Pod IP 身份解析、放行表判定都照常经过。
+
+### 本机集群的网络插件是 Calico：Docker Desktop 自带的 kindnet 会让任务 Pod 的长连接整体卡住（2026-09-23 换掉）
+
+现象：Runner 每十几分钟集体报「no frame from cs-session within idle timeout」（90 秒），随后 1006「Failed to connect」持续五到七分钟。
+同一时刻 cs-session 健康、没有重启、探针正常，不同命名空间的 Runner 几乎同时断，恢复也是一起恢复。
+
+根因：kindnet 用 kube-network-policies 在用户态执行 NetworkPolicy。nftables 把进出策略 Pod 的包送进 NFQUEUE 101，
+kindnet 裁决后给连接打 conntrack 标签 28，之后的包走 `ct label 28 ct state established` 快路径。本机上这个标签打不上，
+日志里持续出现「failed to set verdict with label … netlink send: i/o timeout」，每小时 30 到 100 次。于是任务 Pod 的**每一个包**都要进队列：
+实测同一条保持连接发 50 个请求，队列编号涨了 108。每次 nftables 规则同步（一次要 33 秒）还会丢掉队列里等裁决的包
+（[kube-network-policies#402](https://github.com/kubernetes-sigs/kube-network-policies/issues/402)，修复 PR #403 尚未合并）。
+任务 Pod 越多、规则同步越频繁，长连接越容易整体停摆。
+
+判据：`docker exec desktop-control-plane cat /proc/net/netfilter/nfnetlink_queue` 的第三列是在队列里等裁决的包数，
+它不为 0 而且只涨不降；kindnet 日志里有上面那条报错。
+
+处理：`deploy/local/calico-cni.sh`（bootstrap.sh 第一步）装 Calico v3.32.2，并删掉 kindnet。清单的版本与校验和钉死在 `calico-manifest.ts`。
+地址池 `10.244.128.0/17` 有两个考虑：一是它在 kube-proxy 的 clusterCIDR `10.244.0.0/16` 之内，集群内不做源地址转换，网关才能按源 Pod IP 认身份
+（verify.sh C 项核对）；二是它避开了节点 podCIDR `10.244.0.0/24`，原地迁移时新旧 Pod 不撞地址。
+原地迁移后，Pod 要重建才会挂到 Calico 上。重建之前，旧 Pod 不受任何 NetworkPolicy 约束，出站还靠 kindnet 留下的 `KIND-MASQ-AGENT`；
+全部重建后重跑脚本，就会把这条规则删掉。verify.sh E 项确认 kindnet 不在、Calico 真的在挡流量。
+**Docker Desktop 重置 Kubernetes 集群后 kindnet 会回来**，重跑 bootstrap.sh。
+
+同日另一个教训：不要在 kindnet（或任何节点守护进程）的容器里跑 `<二进制> --help` 看参数。kindnetd 不认 `--help`，
+直接又起了一个完整实例，和原进程并行跑了几分钟，直到输出管道断开才退出。看参数去读上游源码或 README。
 
 ### 项目命名空间的出站由标签决定，不同负载看到的网络不一样
 

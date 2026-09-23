@@ -3,15 +3,16 @@
 # cluster. Safe to re-run: every step is an apply, a create-if-absent, or a no-op when already done.
 #
 # Order
-#   1. Namespace crewstation-system
-#   2. Secret postgres-credentials (random password, created only if absent, never printed)
-#   3. Traefik CRDs (server-side apply) and wait until Established
-#   4. PostgreSQL, registry, Traefik RBAC + Deployment + LoadBalancer Service, BuildKit
-#   5. Wait for readiness and for the LoadBalancer address
-#   6. CoreDNS rewrite  *.svc.cs.internal -> Traefik      (deploy/local/coredns-rewrite.sh)
-#   7. containerd hosts.toml on the node for the registry (deploy/local/node-registry-hosts.sh)
-#   8. Verifications A-D                                   (deploy/local/verify.sh) unless --skip-verify
-#   9. Summary table with real outputs
+#   1. Network plugin: Calico instead of Docker Desktop's kindnet (deploy/local/calico-cni.sh)
+#   2. Namespace crewstation-system
+#   3. Secret postgres-credentials (random password, created only if absent, never printed)
+#   4. Traefik CRDs (server-side apply) and wait until Established
+#   5. PostgreSQL, registry, Traefik RBAC + Deployment + LoadBalancer Service, BuildKit
+#   6. Wait for readiness and for the LoadBalancer address
+#   7. CoreDNS rewrite  *.svc.cs.internal -> Traefik      (deploy/local/coredns-rewrite.sh)
+#   8. containerd hosts.toml on the node for the registry (deploy/local/node-registry-hosts.sh)
+#   9. Verifications A-E                                   (deploy/local/verify.sh) unless --skip-verify
+#  10. Summary table with real outputs
 #
 # Usage: deploy/local/bootstrap.sh [--skip-verify]
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib.sh"
@@ -61,7 +62,10 @@ traefik_has_lb() {
 }
 
 collect_status() {
-  local user pgver catalog tver lb hostcode workers marker hosts
+  local user pgver catalog tver lb hostcode workers marker hosts calico kindnet
+  calico="$(kc -n kube-system get daemonset calico-node -o jsonpath='{.status.numberReady}/{.status.desiredNumberScheduled}' 2>/dev/null || true)"
+  kindnet="$(kc -n kube-system get daemonset kindnet -o name 2>/dev/null || true)"
+  row cni "$(kc -n kube-system get daemonset calico-node -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null || echo calico)" "calico-node ready ${calico:-NONE}; pool $(kc get ippools.crd.projectcalico.org default-ipv4-ippool -o jsonpath='{.spec.cidr}' 2>/dev/null || echo NONE); kindnet: ${kindnet:-absent}"
   user="$(kc -n "${SYSTEM_NS}" get secret postgres-credentials -o jsonpath='{.data.username}' | base64 -d)"
   pgver="$(kc -n "${SYSTEM_NS}" exec statefulset/postgres -c postgres -- psql -U "${user}" -d crewstation -Atc 'select version()' 2>/dev/null | cut -d, -f1 || true)"
   row postgres docker.io/library/postgres:17.11 "${pgver:-NOT REACHABLE}; Service postgres:5432, db/user crewstation, PVC data-postgres-0 10Gi"
@@ -105,16 +109,19 @@ main() {
   log "cluster"
   kc get nodes -o wide
 
-  log "1/8 namespace"
+  log "1/9 network plugin (Calico)"
+  "${LOCAL_DIR}/calico-cni.sh"
+
+  log "2/9 namespace"
   kc apply -f "${SYSTEM_DIR}/00-namespace.yaml"
 
-  log "2/8 postgres credentials"
+  log "3/9 postgres credentials"
   ensure_postgres_secret
 
-  log "3/8 Traefik CRDs (server-side apply)"
+  log "4/9 Traefik CRDs (server-side apply)"
   apply_traefik_crds
 
-  log "4/8 components"
+  log "5/9 components"
   kc apply \
     -f "${SYSTEM_DIR}/10-postgres.yaml" \
     -f "${SYSTEM_DIR}/20-registry.yaml" \
@@ -122,7 +129,7 @@ main() {
     -f "${SYSTEM_DIR}/32-traefik.yaml" \
     -f "${SYSTEM_DIR}/40-buildkitd.yaml"
 
-  log "5/8 waiting for readiness"
+  log "6/9 waiting for readiness"
   kc -n "${SYSTEM_NS}" rollout status statefulset/postgres --timeout=300s
   kc -n "${SYSTEM_NS}" rollout status deployment/registry --timeout=300s
   kc -n "${SYSTEM_NS}" rollout status deployment/traefik --timeout=300s
@@ -131,16 +138,16 @@ main() {
     || warn "traefik Service has no LoadBalancer address after 120s (is the kind-cloud-provider container running?)"
   kc -n "${SYSTEM_NS}" get pods,svc,pvc
 
-  log "6/8 CoreDNS rewrite"
+  log "7/9 CoreDNS rewrite"
   "${LOCAL_DIR}/coredns-rewrite.sh"
 
-  log "7/8 node containerd hosts.toml"
+  log "8/9 node containerd hosts.toml"
   "${LOCAL_DIR}/node-registry-hosts.sh"
 
   if [ "${SKIP_VERIFY}" = "1" ]; then
-    log "8/8 verification skipped (--skip-verify)"
+    log "9/9 verification skipped (--skip-verify)"
   else
-    log "8/8 verification"
+    log "9/9 verification"
     VERIFY_RESULTS_FILE="$(mktemp)"
     export VERIFY_RESULTS_FILE
     "${LOCAL_DIR}/verify.sh" || warn "one or more verifications failed; see the summary"

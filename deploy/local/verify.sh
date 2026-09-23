@@ -4,6 +4,8 @@
 #   B. Traefik user path  host curl -> localhost:80 (LoadBalancer) -> Traefik -> Host whoami.cs.localhost
 #   C. source IP (Q21)    pod curl -> whoami.svc.cs.internal (CoreDNS rewrite) -> Traefik -> whoami
 #   D. ForwardAuth        Middleware to a 200 stand-in passes the request; to a 401 stand-in blocks it
+#   E. NetworkPolicy      Calico is the CNI and kindnet is gone; a pod under a deny-egress policy cannot reach whoami,
+#                         the same image without the label can (deploy/local/calico-cni.sh)
 # Uses deploy/k8s/verify/*.yaml in namespace crewstation-verify, deleted at the end (--keep keeps it).
 # When VERIFY_RESULTS_FILE is set, one `id|status|detail` line per check is appended to that file
 # (bootstrap.sh uses it for the final summary). Exit code 1 if any check FAILs.
@@ -147,6 +149,47 @@ verify_d() {
   fi
 }
 
+# 一次出站请求的 HTTP 状态码；连不上是 000。按 Pod IP 直连 whoami，避开 DNS：禁止出站的策略也会挡住 DNS，那样测不出 TCP 是否被挡。
+egress_code() { # pod target
+  # 超时时 curl 自己会输出 000 并以非零退出，这里只在完全没有输出时补 000。
+  local code
+  code="$(kc -n "${VERIFY_NS}" exec "$1" -- curl -sS --max-time 5 -o /dev/null -w '%{http_code}' "http://$2/" 2>/dev/null || true)"
+  printf '%s' "${code:-000}"
+}
+
+verify_e() {
+  log "E. NetworkPolicy: Calico enforces it, kindnet is gone (deploy/local/calico-cni.sh)"
+  local kindnet calico target pod allowed denied
+  kindnet="$(kc -n kube-system get daemonset kindnet -o name 2>/dev/null || true)"
+  calico="$(kc -n kube-system get daemonset calico-node -o jsonpath='{.status.numberReady}/{.status.desiredNumberScheduled}' 2>/dev/null || true)"
+  echo "calico-node ready: ${calico:-<none>}    kindnet DaemonSet: ${kindnet:-absent}"
+  kc apply -f "${VERIFY_DIR}/30-deny-egress.yaml" >/dev/null
+  target="$(kc -n "${VERIFY_NS}" get pod -l app=whoami -o jsonpath='{.items[0].status.podIP}')"
+  for pod in verify-allowed verify-denied; do
+    kc -n "${VERIFY_NS}" delete pod "${pod}" --ignore-not-found --wait=true >/dev/null
+  done
+  kc -n "${VERIFY_NS}" run verify-allowed --image=docker.io/curlimages/curl:8.22.0 --restart=Never --command -- sleep 600 >/dev/null
+  kc -n "${VERIFY_NS}" run verify-denied --image=docker.io/curlimages/curl:8.22.0 --restart=Never \
+    --labels=crewstation.io/verify-policy=deny-egress --command -- sleep 600 >/dev/null
+  if ! kc -n "${VERIFY_NS}" wait --for=condition=Ready pod/verify-allowed pod/verify-denied --timeout=120s >/dev/null; then
+    record E FAIL "verify-allowed / verify-denied pods did not become Ready"
+    return 0
+  fi
+  allowed="$(egress_code verify-allowed "${target}")"
+  denied="$(egress_code verify-denied "${target}")"
+  echo "whoami pod ${target}: without the label -> HTTP ${allowed}; under verify-deny-egress -> HTTP ${denied} (000 = blocked)"
+  if [ -n "${kindnet}" ]; then
+    record E FAIL "kindnet DaemonSet is back (Docker Desktop reset?); run deploy/local/calico-cni.sh"
+  elif [ -z "${calico}" ] || [ "${calico%%/*}" != "${calico##*/}" ]; then
+    record E FAIL "calico-node not ready (${calico:-absent}); run deploy/local/calico-cni.sh"
+  elif [ "${allowed}" = "200" ] && [ "${denied}" = "000" ]; then
+    record E PASS "Calico ${calico} ready, kindnet absent; deny-egress pod blocked, unlabelled pod reaches whoami (HTTP 200)"
+  else
+    record E FAIL "expected HTTP 200 without the label and 000 under the policy, got ${allowed} and ${denied}"
+  fi
+  kc -n "${VERIFY_NS}" delete pod verify-allowed verify-denied --ignore-not-found --wait=false >/dev/null
+}
+
 cleanup() {
   if [ "${KEEP}" = "1" ]; then
     echo "keeping namespace ${VERIFY_NS} (--keep)"
@@ -172,6 +215,7 @@ main() {
   verify_b
   verify_c
   verify_d
+  verify_e
   cleanup
   print_summary
   if printf '%s' "${RESULTS}" | grep -q '|FAIL|'; then
