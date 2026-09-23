@@ -1,6 +1,6 @@
 # RFC-021｜实施计划
 
-> 状态：Done · 2026-09-23（T1–T13 已完成；实机验收见 [acceptance.md](./acceptance.md)）
+> 状态：Done · 2026-09-23（T1–T14 已完成，T14 是同日的修订；实机验收见 [acceptance.md](./acceptance.md)）
 > 配套：[提案](./proposal.md) · [技术设计](./design.md)
 
 ## 目录
@@ -26,7 +26,7 @@
 | RFC-021-T11 | 本地 gate、改动行防护、提交推送、精确 SHA CI 六项 | T10 | 已完成（最后一笔 80c4e1b 的 CI 35825463850 六项成功；逐笔见 acceptance.md） |
 | RFC-021-T12 | 本机部署（控制面与工作台镜像，迁移 Job）与五个身份的实机验收，`acceptance.md` | T11 | 已完成（2026-09-23，见 [acceptance.md](./acceptance.md)） |
 | RFC-021-T13 | 基线回填：Proposal／Design／Plan 升版本（新需求、决策、验收编号；作废暂停项目；改写维护窗口）；README、STATE.md 收口 | T12 | 已完成（基线 v0.3.9：Proposal R56、R57 与改写的 R19；Design §6.9、D56、D57，暂停项目作废；Plan AT-57、AT-58 与矩阵行） |
-| RFC-021-T14 | 2026-09-23 修订（作者当面裁定，不另立 RFC）：① 提醒发出之后才能推迟——领域 `canPostpone`、`SlotRetentionDto.postponable`、推迟接口 412、待验证卡只在可推迟时显示「推迟 72 小时下线」／「推迟 14 天下线」、平台设置说明；② 待验证版本可以选版本部署——空着时卡片主按钮「部署版本…」，重新部署确认第一行是版本下拉（`redeployCandidates`）；单元、模块、工作台与只读 e2e 用例；本机部署与实机核对 | T13 | 进行中（① cd80eac） |
+| RFC-021-T14 | 2026-09-23 修订（作者当面裁定，不另立 RFC）：① 提醒发出之后才能推迟——领域 `canPostpone`、`SlotRetentionDto.postponable`、推迟接口 412、待验证卡只在可推迟时显示「推迟 72 小时下线」／「推迟 14 天下线」、平台设置说明；② 待验证版本可以选版本部署——空着时卡片主按钮「部署版本…」，重新部署确认第一行是版本下拉（`redeployCandidates`）；单元、模块、工作台与只读 e2e 用例；本机部署与实机核对 | T13 | 已完成（① cd80eac、② 8e51443；本机 `postpone-20260923` 部署与实机见 [acceptance.md](./acceptance.md#2026-09-23-修订t14的实机核对)） |
 
 ## 2. 验收清单
 
