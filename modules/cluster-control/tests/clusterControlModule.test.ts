@@ -62,6 +62,15 @@ describe.skipIf(!available)('cluster-control：观测写回台账与收编空跑
   // 调和器的调试日志（路由在等中间件时记一条）：用例据此确认那一支真的走到了。
   const debugs: string[] = [];
   const writer = kubernetesClusterWriter(k8s);
+  // 命名空间、额度与网络策略的应用（第四期）：同样用真实适配器落到假集群，写了就报一次变化。
+  const nsApplies: string[] = [];
+  const settled = async (outcome: 'applied' | 'unchanged', current: unknown, kind: 'Namespace' | 'ResourceQuota' | 'NetworkPolicy', name: string, namespace?: string) => {
+    if (outcome !== 'applied') return outcome;
+    nsApplies.push(`${current ? 'drift' : 'missing'}:${kind}/${name}`);
+    const stored = await k8s.get<K8sObject>(Resources[kind]!, name, namespace);
+    if (stored) await feed.emit({ kind, object: stored, gone: false });
+    return outcome;
+  };
   const cluster: ClusterWriter = {
     remove: async ({ kind, namespace, name, uid }) => {
       removals.push(`${kind}/${name}`);
@@ -85,6 +94,9 @@ describe.skipIf(!available)('cluster-control：观测写回台账与收编空跑
       if (stored) await feed.emit({ kind: 'Middleware', object: stored, gone: false });
       return outcome;
     },
+    applyNamespace: async (namespace, current) => settled(await writer.applyNamespace(namespace, current), current, 'Namespace', namespace.name),
+    applyQuota: async (namespace, current) => settled(await writer.applyQuota(namespace, current), current, 'ResourceQuota', namespace.quota.name, namespace.name),
+    applyNetworkPolicy: async (policy, current) => settled(await writer.applyNetworkPolicy(policy, current), current, 'NetworkPolicy', policy.name, policy.namespace),
   };
   let control: ReturnType<typeof createClusterControlModule>;
   let ledger: LedgerObservations;
@@ -364,6 +376,61 @@ describe.skipIf(!available)('cluster-control：观测写回台账与收编空跑
     await gateway.requestRelease(record.id, { code: 'project-archived', message: '项目已归档' });
     await until('中间件删掉', async () => (await resources.api.get(record.id))?.phase === 'stopped');
     expect(removals).toEqual(expect.arrayContaining(['Middleware/rate-limit-user', 'Middleware/in-flight-platform-api']));
+  });
+
+  // RFC-025 T11：命名空间、额度与网络策略由调和器照 provisioning 的记录渲染；只建、只改回，从不删。
+  test('命名空间与网络策略：缺了按期望建出（网络策略等命名空间），都在即运行中；额度与标签被改（generation 不变）改回；被删的补回；期望不完整的不渲染', async () => {
+    type Quota = K8sObject & { spec: { hard: Record<string, string> } };
+    const provisioning = resources.api.owner('provisioning');
+    const policyNames = ['crewstation-default', 'crewstation-task-egress'];
+    const policies = await provisioning.declare({ kind: 'network-policy-set', ref: 'p-shop', projectId: PROJECT, spec: {
+      children: policyNames.map((name) => ({ kind: 'NetworkPolicy', namespace: 'cs-shop', name })), systemNamespace: 'crewstation-system' } });
+    // 命名空间还没建出来：网络策略先不动。
+    await until('网络策略在等命名空间', () => debugs.includes('resource network policy waiting for namespace'));
+    expect(await k8s.get(Resources.NetworkPolicy!, 'crewstation-default', 'cs-shop')).toBeUndefined();
+    const nsSpec = (labels: Record<string, string>) => ({
+      children: [{ kind: 'Namespace', name: 'cs-shop' }, { kind: 'ResourceQuota', namespace: 'cs-shop', name: 'crewstation-project' }], labels, quota: { hard: { pods: '30', 'requests.cpu': '8' } },
+    });
+    const namespace = await provisioning.declare({ kind: 'namespace', ref: 'p-shop', projectId: PROJECT, spec: nsSpec({ 'crewstation.io/project': 'shop' }) });
+    await until('命名空间运行中', async () => (await resources.api.get(namespace.id))?.phase === 'ready');
+    await until('网络策略运行中', async () => (await resources.api.get(policies.id))?.phase === 'ready');
+    // 命名空间先建出来；额度随它、网络策略在另一条记录里，两者先后不定。
+    expect(nsApplies[0]).toBe('missing:Namespace/cs-shop');
+    expect([...nsApplies].sort()).toEqual(['missing:Namespace/cs-shop', 'missing:NetworkPolicy/crewstation-default', 'missing:NetworkPolicy/crewstation-task-egress', 'missing:ResourceQuota/crewstation-project']);
+    expect((await k8s.get<K8sObject>(Resources.Namespace!, 'cs-shop'))?.metadata.labels).toEqual({ 'app.kubernetes.io/managed-by': 'crewstation', 'crewstation.io/project': 'shop' });
+    expect((await k8s.get<Quota>(Resources.ResourceQuota!, 'crewstation-project', 'cs-shop'))?.spec.hard).toEqual({ pods: '30', 'requests.cpu': '8' });
+    // 与期望一致：展示字段变了、再核对也不写。
+    await provisioning.declare({ kind: 'namespace', ref: 'p-shop', projectId: PROJECT, spec: nsSpec({ 'crewstation.io/project': 'shop' }), display: { namespace: 'cs-shop' } });
+    await control.reconciled();
+    expect(nsApplies).toHaveLength(4);
+    // 额度上限被人改大：ResourceQuota 不带 generation，观测不变、台账不记变更——观测到变化就核对认领它的记录，改回。
+    const quota = await k8s.get<Quota>(Resources.ResourceQuota!, 'crewstation-project', 'cs-shop');
+    const raised: Quota = { ...quota!, spec: { hard: { pods: '300', 'requests.cpu': '8' } } };
+    await k8s.apply(raised);
+    await feed.emit({ kind: 'ResourceQuota', object: raised, gone: false });
+    await until('额度改回', () => nsApplies.length === 5);
+    expect(nsApplies[4]).toBe('drift:ResourceQuota/crewstation-project');
+    expect((await k8s.get<Quota>(Resources.ResourceQuota!, 'crewstation-project', 'cs-shop'))?.spec.hard).toEqual({ pods: '30', 'requests.cpu': '8' });
+    // 命名空间的项目标签被改：同样改回。
+    const current = await k8s.get<K8sObject>(Resources.Namespace!, 'cs-shop');
+    const relabeled: K8sObject = { ...current!, metadata: { ...current!.metadata, labels: { 'app.kubernetes.io/managed-by': 'crewstation', 'crewstation.io/project': 'other' } } };
+    await k8s.apply(relabeled);
+    await feed.emit({ kind: 'Namespace', object: relabeled, gone: false });
+    await until('标签改回', () => nsApplies.length === 6);
+    expect((await k8s.get<K8sObject>(Resources.Namespace!, 'cs-shop'))?.metadata.labels?.['crewstation.io/project']).toBe('shop');
+    // 网络策略被人删了：补回，记录回到运行中。
+    const policy = feed.cache.get('NetworkPolicy/cs-shop/crewstation-default')!;
+    await k8s.delete(Resources.NetworkPolicy!, 'crewstation-default', 'cs-shop');
+    await feed.emit({ kind: 'NetworkPolicy', object: policy, gone: true });
+    await until('网络策略补回', () => nsApplies.includes('missing:NetworkPolicy/crewstation-default') && nsApplies.length === 7);
+    expect(await k8s.get(Resources.NetworkPolicy!, 'crewstation-default', 'cs-shop')).toBeDefined();
+    await until('网络策略又运行中', async () => (await resources.api.get(policies.id))?.phase === 'ready');
+    // 期望不完整（不认识的模板）、在系统命名空间：不渲染。
+    await provisioning.declare({ kind: 'network-policy-set', ref: 'p-broken', projectId: PROJECT, spec: { children: [{ kind: 'NetworkPolicy', namespace: 'cs-shop', name: 'crewstation-egress-allowlist' }], systemNamespace: 'crewstation-system' } });
+    await provisioning.declare({ kind: 'namespace', ref: 'p-system', projectId: PROJECT, spec: { ...nsSpec({}), children: [{ kind: 'Namespace', name: 'crewstation-system' }, { kind: 'ResourceQuota', namespace: 'crewstation-system', name: 'q' }] } });
+    await control.reconciled();
+    expect(nsApplies).toHaveLength(7);
+    expect(await k8s.get(Resources.NetworkPolicy!, 'crewstation-egress-allowlist', 'cs-shop')).toBeUndefined();
   });
 
   // RFC-025 设计 §7.4：身份索引改读观测缓存，全平台只剩这一条 Pod watch。

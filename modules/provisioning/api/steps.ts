@@ -18,10 +18,14 @@ export interface ProjectFacts {
 export interface ProvisioningSteps {
   loadProject(projectId: ProjectId): Promise<ProjectFacts | undefined>;
   /**
-   * 全部未归档项目的开通事实，供启动重下发遍历（RFC-018）。
-   * 命名空间对象的形状会随版本变化，而开通链只在建项目时跑过一次；没有这一步，存量命名空间永远停在旧形状。
+   * 全部未归档项目的开通事实，供启动重下发遍历（RFC-018）：把每个项目命名空间的期望再写一遍（RFC-025 第四期起是台账记录，
+   * 台账接上之前建的项目由它第一次写进台账；项目该有的网络策略变了也由它改期望）。
    */
   listProjects(): Promise<ProjectFacts[]>;
+  /**
+   * 命名空间、额度与网络策略。模块自己实现（RFC-025 第四期）：开通链里写台账期望、等记录运行中再走下一步；启动重下发只写期望。
+   * 组合根不再提供它（见 ExternalSteps）。
+   */
   ensureNamespace(facts: ProjectFacts): Promise<void>;
   ensureRepository(facts: ProjectFacts): Promise<void>;
   ensureData(facts: ProjectFacts): Promise<void>;
@@ -30,6 +34,9 @@ export interface ProvisioningSteps {
   ensureFirstRelease(facts: ProjectFacts): Promise<void>;
   setProjectState(projectId: ProjectId, state: ProjectState, message?: string): Promise<void>;
 }
+
+/** 组合根提供的步骤：命名空间那一步由模块自己写台账期望。 */
+export type ExternalSteps = Omit<ProvisioningSteps, 'ensureNamespace'>;
 
 export interface ProvisioningJobs {
   enqueue(projectId: ProjectId): Promise<void>;

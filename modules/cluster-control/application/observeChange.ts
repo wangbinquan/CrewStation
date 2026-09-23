@@ -14,7 +14,7 @@ export interface ObservationStats {
   removed: number;
   /** 上级已结束、写上「待回收」的工作卷。 */
   reclaimable: number;
-  /** 按期望建出或改回的子对象（第三期后半：路由）。 */
+  /** 按期望建出或改回的子对象（路由、中间件，第四期起还有命名空间、额度与网络策略）。 */
   applied: number;
 }
 
@@ -39,13 +39,14 @@ function conditionsOf(change: ObjectChange, controlled: boolean) {
 /**
  * 一个受管对象的变化 → 子对象观测写回台账（设计 §6.2 第 3 步）。Deployment、Job 管的 Pod（服务槽的副本、构建与迁移的 Pod）带上它的控制者：
  * 认领控制者的记录也认领它；服务槽副本的崩溃重启不按单个 Pod 写，由调和器汇总这个 Deployment 名下所有 Pod 后写（G22）。
+ * 返回认领它的记录（平台组件与没人认领的没有）。
  */
-export async function observeChange(ledger: LedgerObservations, clock: Clock, systemNamespace: string, stats: ObservationStats, change: ObjectChange): Promise<void> {
+export async function observeChange(ledger: LedgerObservations, clock: Clock, systemNamespace: string, stats: ObservationStats, change: ObjectChange): Promise<{ readonly id: string } | undefined> {
   const { object, gone } = change;
   // 平台组件不在台账范围；带任务标签（档位测试）或资源 ID 标签（资源中心渲染的，例如平台接口的限流中间件）的照常观测。
   if (object.metadata.namespace === systemNamespace && !object.metadata.labels?.['crewstation.io/task'] && !object.metadata.labels?.[RESOURCE_ID_LABEL]) {
     stats.platform += 1;
-    return;
+    return undefined;
   }
   const observedAt = clock.now().toISOString();
   const child = gone ? goneChild(object) : childOf(change.kind, object, observedAt);
@@ -54,4 +55,5 @@ export async function observeChange(ledger: LedgerObservations, clock: Clock, sy
   const conditions = conditionsOf(change, owner !== undefined);
   const outcome = await ledger.observe({ ...(resourceId ? { resourceId } : {}), child, ...(owner ? { owner } : {}), ...(gone ? { gone } : {}), ...(conditions ? { conditions } : {}) });
   stats[outcome.status] += 1;
+  return outcome.record ? { id: outcome.record.id } : undefined;
 }

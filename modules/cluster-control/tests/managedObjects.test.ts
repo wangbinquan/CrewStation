@@ -40,8 +40,14 @@ describe('受管对象的列表与变化流（设计 §6.1）', () => {
     const scripts: Record<string, { type: WatchEventType; object: K8sObject }[]> = {
       Pod: [{ type: 'MODIFIED', object: object('Pod', 'a', '5') }, { type: 'DELETED', object: object('Pod', 'a', '6') }],
       PersistentVolumeClaim: [], Secret: [{ type: 'ADDED', object: { ...object('Secret', 's', '3'), data: { token: 'c2VjcmV0' } } }], Service: [], IngressRoute: [], Deployment: [], Job: [], Middleware: [],
+      Namespace: [], ResourceQuota: [{ type: 'MODIFIED', object: object('ResourceQuota', 'crewstation-project', '4') }], NetworkPolicy: [],
     };
-    const lists: Record<string, K8sObject[]> = { Pod: [object('Pod', 'a', '1')], PersistentVolumeClaim: [object('PersistentVolumeClaim', 'w', '1')], Secret: [], Service: [object('Service', 'task-1', '1')], IngressRoute: [], Deployment: [object('Deployment', 'demo-green', '1')], Job: [object('Job', 'build-1', '1')], Middleware: [object('Middleware', 'rate-limit-user', '1')] };
+    // 命名空间是集群级对象：不带命名空间，按名字进缓存。
+    const namespace: K8sObject = { apiVersion: 'v1', kind: 'Namespace', metadata: { name: 'cs-demo', uid: 'uid-ns', resourceVersion: '1', labels: managed } };
+    const lists: Record<string, K8sObject[]> = {
+      Pod: [object('Pod', 'a', '1')], PersistentVolumeClaim: [object('PersistentVolumeClaim', 'w', '1')], Secret: [], Service: [object('Service', 'task-1', '1')], IngressRoute: [], Deployment: [object('Deployment', 'demo-green', '1')],
+      Job: [object('Job', 'build-1', '1')], Middleware: [object('Middleware', 'rate-limit-user', '1')], Namespace: [namespace], ResourceQuota: [object('ResourceQuota', 'crewstation-project', '1')], NetworkPolicy: [object('NetworkPolicy', 'crewstation-default', '1')],
+    };
     const k8s = {
       listPage: async (ref: { kind: string }, _ns: unknown, options: { labelSelector?: string }) => {
         selectors.push(options.labelSelector ?? '');
@@ -59,8 +65,13 @@ describe('受管对象的列表与变化流（设计 §6.1）', () => {
     const deadline = Date.now() + 2_000;
     while (!seen.some((c) => c.gone) && Date.now() < deadline) await Bun.sleep(5);
     await feed.stop();
-    expect(selectors).toEqual(Array.from({ length: 8 }, () => 'app.kubernetes.io/managed-by=crewstation'));
+    expect(selectors).toEqual(Array.from({ length: 11 }, () => 'app.kubernetes.io/managed-by=crewstation'));
     expect(seen.some((c) => c.kind === 'Middleware' && c.object.metadata.name === 'rate-limit-user')).toBe(true);
+    // 第四期：命名空间（集群级）、额度与网络策略也观测；额度的状态变化（已用数）照样报来，由调和器决定改不改。
+    expect(seen.some((c) => c.kind === 'Namespace' && c.object.metadata.name === 'cs-demo')).toBe(true);
+    expect(feed.cached('Namespace', undefined, 'cs-demo')?.metadata.uid).toBe('uid-ns');
+    expect(seen.filter((c) => c.kind === 'ResourceQuota').at(-1)?.object.metadata).toMatchObject({ name: 'crewstation-project', resourceVersion: '4' });
+    expect(seen.some((c) => c.kind === 'NetworkPolicy' && c.object.metadata.name === 'crewstation-default')).toBe(true);
     expect(seen.some((c) => c.kind === 'Deployment' && c.object.metadata.name === 'demo-green')).toBe(true);
     expect(seen.some((c) => c.kind === 'Job' && c.object.metadata.name === 'build-1')).toBe(true);
     expect(seen.some((c) => c.kind === 'PersistentVolumeClaim' && c.object.metadata.name === 'w' && !c.gone)).toBe(true);

@@ -183,6 +183,12 @@ ResourceActionSchema = z.object({ id: ResourceActionIdSchema, enabled: z.boolean
 
 子对象的渲染代码从今天的位置迁入（`task-runtime/adapters/k8s/taskObjects.ts`、`nativeExecutions.ts`、`release/adapters/k8s/slotDeployer.ts`、`buildKitBuilder.ts`、`migrationJob.ts`、`gateway` 的 IngressRoute 适配器、`provisioning` 的 `ensureNamespace`），按种类一个文件，领域模块不再直接调 Kubernetes。
 
+> **实施补记（2026-09-24，第四期第一步：命名空间、额度与网络策略）**：provisioning 给每个项目写两条稳定记录，引用都是项目 ID：`namespace`（子对象是 Namespace 与额度 `crewstation-project`，期望里写项目标签与四项上限）与 `network-policy-set`（子对象是这个项目该有的每条网络策略——默认、任务出站、构建出站，接入容器另有服务槽出站；期望里写默认策略放行的系统命名空间）。开通链写期望后按阶段推进：两条都运行中（期望里的子对象都观测到了）才去建仓，最多等 60 秒，等不到就开通失败并写明还缺哪个对象、作业照常重试；启动重下发只写期望（同样的期望台账不写库）。组合根不再直接 apply 这些对象。
+>
+> - **渲染**：调和器与原来同一组构造函数、同样的标签（不加资源 ID 标签，按名字归记录，线上对象一个字段都不用改）；网络策略按名字取模板，平台换版改了策略形状时调和器发现不一致即按新形状改回，不再靠启动重下发。缺了或不一致才 apply；先命名空间后额度，网络策略等所在命名空间观测到了再建；命名空间删除中不动（记录是降级，原因写明删完后补回），消失后按「缺了」再建；期望不完整的不渲染，只告警。命名空间、额度与网络策略调和器只建、只改回，从不删（§6.4）；项目归档时两条记录不释放，归档后的收尾待裁定（[I27](../../../docs/engineering/implementation-open-questions.md#i27-项目归档后命名空间记录与命名空间怎样收尾)）。
+> - **观测**：观测缓存加上 Namespace（集群级）、ResourceQuota 与 NetworkPolicy。额度与命名空间没有 `generation`，有人改了上限或标签，观测不变、台账不记变更；所以调和器渲染的种类（路由、中间件、命名空间、额度、网络策略）一观测到变化就直接核对认领它的记录，不一致即改回——此前路由的标签被改也要等 10 分钟一次的全量核对。额度的已用数一变也会触发一次核对，比对一致不写。
+> - 切换之前按新渲染逐个比对本机 14 个项目的 73 个对象（14 个命名空间、14 个额度、45 条网络策略），全部一致，也没有期望之外的受管网络策略，所以换写入者不改动线上对象。
+
 ### 6.3 多副本分工（RC-13）
 
 `cs-controller` 多副本各跑一套调和器。处理一条资源前 `INSERT … ON CONFLICT DO UPDATE … WHERE expires_at < now()` 抢 `leases` 一行（持有期 30 秒，处理中续约）；抢不到就跳过（持有者会处理）。持有者崩溃后租约过期，另一副本在下一轮接手。观测缓存每个副本各自一份（只读，不需要分工）。

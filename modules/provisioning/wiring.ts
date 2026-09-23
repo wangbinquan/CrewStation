@@ -13,14 +13,20 @@ import type { ProvisioningModuleApi } from './api/moduleApi';
 import { provisionProjectUseCase } from './application/provisionProject';
 import { reapplyNamespacesUseCase } from './application/reapplyNamespaces';
 import { provisioningRoutes } from './http/provisioningRoutes';
-import type { ProvisioningSteps } from './api/steps';
+import type { ExternalSteps } from './api/steps';
+import type { NamespaceSettings } from './application/namespaceRecords';
+import { namespaceRecords } from './application/namespaceRecords';
+import type { NamespaceLedger } from './ports/ledger';
 import { PROVISION_JOB_KIND, provisionJobHandler } from './workers/provisionHandler';
 import type { StartupTask } from './workers/namespaceReapply';
 import { namespaceReapplyTask } from './workers/namespaceReapply';
 
 export interface ProvisioningModuleDeps {
   db: Database;
-  steps: ProvisioningSteps;
+  steps: ExternalSteps;
+  /** 资源中心的写入口（RFC-025 第四期）：命名空间与网络策略写成台账记录，由调和器建出。 */
+  ledger: NamespaceLedger;
+  namespaces: NamespaceSettings;
   workerOwner: string;
   consumerName: string;
   isAdmin: (userId: UserId) => Promise<boolean>;
@@ -39,8 +45,9 @@ export interface ProvisioningModule {
 
 export function createProvisioningModule(deps: ProvisioningModuleDeps): ProvisioningModule {
   const logger = deps.logger ?? noopLogger;
-  const provision = provisionProjectUseCase(deps.steps, logger);
-  const reapply = reapplyNamespacesUseCase(deps.steps, logger);
+  const namespaces = namespaceRecords(deps.ledger, deps.namespaces);
+  const provision = provisionProjectUseCase({ ...deps.steps, ensureNamespace: namespaces.ensure }, logger);
+  const reapply = reapplyNamespacesUseCase({ ...deps.steps, ensureNamespace: namespaces.declare }, logger);
   const enqueue = async (projectId: string): Promise<void> => { await enqueueJob(deps.db, PROVISION_JOB_KIND, { projectId }, { dedupKey: projectId, maxAttempts: 5 }); };
   const api: ProvisioningModuleApi = { name: 'provisioning', provisionProject: provision, retry: enqueue, reapplyNamespaces: reapply };
   return {

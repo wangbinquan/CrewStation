@@ -1,9 +1,13 @@
 import type { MiddlewareRender } from '../domain/middlewareRender';
+import type { NamespaceRender, NetworkPolicyRender } from '../domain/namespaceRender';
 import type { ObservedObject } from '../domain/observation';
 import type { RouteRender } from '../domain/routeRender';
 
-/** 观测与调和的种类：任务类容器的子对象（Pod、PVC、Runner Secret、预览 Service 与路由），服务槽的 Deployment，构建与迁移的 Job，限流的 Middleware。 */
-export type ObservedKind = 'Pod' | 'PersistentVolumeClaim' | 'Secret' | 'Service' | 'IngressRoute' | 'Deployment' | 'Job' | 'Middleware';
+/**
+ * 观测与调和的种类：任务类容器的子对象（Pod、PVC、Runner Secret、预览 Service 与路由），服务槽的 Deployment，构建与迁移的 Job，限流的 Middleware，
+ * 项目的命名空间（集群级）、额度与网络策略。
+ */
+export type ObservedKind = 'Pod' | 'PersistentVolumeClaim' | 'Secret' | 'Service' | 'IngressRoute' | 'Deployment' | 'Job' | 'Middleware' | 'Namespace' | 'ResourceQuota' | 'NetworkPolicy';
 
 export interface ObjectChange {
   readonly kind: ObservedKind;
@@ -48,4 +52,8 @@ export interface ClusterWriter {
   applyRoute(route: RouteRender, current: ObservedObject | undefined): Promise<'applied' | 'unchanged'>;
   /** 按限流策略渲染 Middleware（带所属记录的资源 ID 标签），同样缺了或不一致才 apply。 */
   applyMiddleware(middleware: MiddlewareRender, resourceId: string, current: ObservedObject | undefined): Promise<'applied' | 'unchanged'>;
+  /** 按命名空间记录渲染 Namespace 与它的额度（第四期），各自缺了或不一致才 apply；命名空间从不由调和器删除。 */
+  applyNamespace(namespace: NamespaceRender, current: ObservedObject | undefined): Promise<'applied' | 'unchanged'>;
+  applyQuota(namespace: NamespaceRender, current: ObservedObject | undefined): Promise<'applied' | 'unchanged'>;
+  applyNetworkPolicy(policy: NetworkPolicyRender, current: ObservedObject | undefined): Promise<'applied' | 'unchanged'>;
 }

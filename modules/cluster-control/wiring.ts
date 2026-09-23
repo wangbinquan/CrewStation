@@ -12,13 +12,19 @@ import { newObservationStats, observeChange } from './application/observeChange'
 import { sweepOrphans } from './application/orphanSweep';
 import { reconcileRecord } from './application/reconcileObservations';
 import { adoptionRoutes } from './http/adoptionRoutes';
-import type { ClusterWriter, ManagedObjectFeed, ManagedObjectReader, ObjectChange, PodSubscriber } from './ports/cluster';
+import type { ClusterWriter, ManagedObjectFeed, ManagedObjectReader, ObjectChange, ObservedKind, PodSubscriber } from './ports/cluster';
 import type { LedgerObservations, LegacyOwners } from './ports/ledger';
 import type { LedgerReconcilerOptions } from './workers/ledgerReconciler';
 import { ledgerReconciler } from './workers/ledgerReconciler';
 import { observationWorker } from './workers/observationWorker';
 import type { OrphanSweeperOptions } from './workers/orphanSweeper';
 import { orphanSweeper } from './workers/orphanSweeper';
+
+/**
+ * 调和器按期望渲染的种类：有人改了它们（标签、命名空间的额度上限）时 generation 不一定变、台账不记变更，
+ * 所以观测到变化就直接核对认领它的记录，缺了或被改就改回。
+ */
+const RENDERED_KINDS: ReadonlySet<ObservedKind> = new Set(['IngressRoute', 'Middleware', 'Namespace', 'ResourceQuota', 'NetworkPolicy']);
 
 /** 装配期注入：台账入口与旧所属对象由组合根从 resources／task-runtime 接上。 */
 export interface ClusterControlModuleDeps {
@@ -65,15 +71,16 @@ export function createClusterControlModule(deps: ClusterControlModuleDeps): Clus
       return adoptionReport({ reader, ledger: deps.ledger, legacy: deps.legacy, clock, systemNamespace: deps.systemNamespace });
     },
   };
-  // Pod 先交给身份索引（来源 IP 认人，越早越好），再写台账观测；两边失败互不耽误。
-  const handle = async (change: ObjectChange) => {
-    if (change.kind === 'Pod' && deps.pods) await deps.pods.changed(change.object, change.gone).catch((error: unknown) => logger.warn('pod identity sync failed', { name: change.object.metadata.name, error: String(error) }));
-    await observeChange(deps.ledger, clock, deps.systemNamespace, stats, change);
-  };
-  const watcher = observationWorker(feed, handle, () => ({ ...stats }), logger, deps.summaryMs);
   const cluster = deps.cluster ?? kubernetesClusterWriter(deps.k8s);
   const reconcileDeps = { ledger: deps.ledger, feed, cluster, clock, systemNamespace: deps.systemNamespace, stats, logger, ...(deps.reconciler?.retryMs ? { retryMs: deps.reconciler.retryMs } : {}) };
   const reconciler = ledgerReconciler(deps.ledger, feed, (id, enqueue) => reconcileRecord(reconcileDeps, id, enqueue), logger, deps.reconciler);
+  // Pod 先交给身份索引（来源 IP 认人，越早越好），再写台账观测；两边失败互不耽误。调和器渲染的对象一有变化就把认领它的记录排进去核对。
+  const handle = async (change: ObjectChange) => {
+    if (change.kind === 'Pod' && deps.pods) await deps.pods.changed(change.object, change.gone).catch((error: unknown) => logger.warn('pod identity sync failed', { name: change.object.metadata.name, error: String(error) }));
+    const owner = await observeChange(deps.ledger, clock, deps.systemNamespace, stats, change);
+    if (owner && RENDERED_KINDS.has(change.kind)) reconciler.enqueue(owner.id);
+  };
+  const watcher = observationWorker(feed, handle, () => ({ ...stats }), logger, deps.summaryMs);
   const sweep = deps.orphanSweep === false ? undefined : orphanSweeper(feed, () => sweepOrphans({ feed, ledger: deps.ledger, legacy: deps.legacy, cluster, clock, logger, stats, minAgeMs: (deps.orphanSweep || {}).minAgeMs ?? 600_000 }), logger, deps.orphanSweep || {});
   // 先开观测缓存，再开按记录核对的队列与孤儿回收（它们都等缓存同步完成才开始）；同步完成后身份索引按全量清一次旧行。
   const observer = {

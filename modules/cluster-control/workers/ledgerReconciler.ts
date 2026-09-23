@@ -18,7 +18,7 @@ export interface LedgerReconcilerOptions {
 export function ledgerReconciler(ledger: LedgerObservations, feed: ManagedObjectFeed, reconcile: (id: string, enqueue: (id: string, afterMs?: number) => void) => Promise<void>, logger: Logger, options: LedgerReconcilerOptions = {}) {
   // 处理一条记录时可以把相关记录（例如上级结束后的工作卷）再排进同一个去重队列，或约一个到期复核（例如崩溃重启的窗口过去之后）。
   const queue: ReturnType<typeof createWorkQueue> = createWorkQueue((id) => reconcile(id, (next, afterMs) => (afterMs ? queue.addAfter(next, afterMs) : queue.add(next))), { logger, concurrency: options.concurrency ?? 4 });
-  let running = false;
+  let running = false, synced = false;
   let cursor: number | undefined;
   let tailTimer: ReturnType<typeof setTimeout> | undefined;
   let resyncTimer: ReturnType<typeof setInterval> | undefined;
@@ -50,12 +50,15 @@ export function ledgerReconciler(ledger: LedgerObservations, feed: ManagedObject
       queue.start();
       void feed.synced().then(async () => {
         if (!running) return;
+        synced = true;
         cursor = await ledger.latestChange().catch(() => undefined);
         await resync();
         void tail();
         resyncTimer = setInterval(() => void resync(), options.resyncMs ?? 600_000);
       });
     },
+    /** 观测到调和器渲染的对象有变化时直接排进来（改标签、改额度上限不变 generation，台账不记变更）；同步完成之前的忽略——首轮全量会处理。 */
+    enqueue: (id: string) => { if (running && synced) queue.add(id); },
     stop: async () => {
       running = false;
       if (tailTimer) clearTimeout(tailTimer);

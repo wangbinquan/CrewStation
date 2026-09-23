@@ -29,7 +29,7 @@ export interface LedgerObservations {
   observe(input: {
     readonly resourceId?: string; readonly child: ResourceChild; readonly owner?: { readonly kind: string; readonly namespace?: string; readonly name: string };
     readonly gone?: boolean; readonly conditions?: readonly ObservedCondition[];
-  }): Promise<{ readonly status: 'recorded' | 'unchanged' | 'unowned' }>;
+  }): Promise<{ readonly status: 'recorded' | 'unchanged' | 'unowned'; readonly record?: { readonly id: string } }>;
   /** 写只归资源中心的条件（不附带子对象观测），例如工作卷的「待回收」。 */
   observeConditions(resourceId: string, conditions: readonly ObservedCondition[]): Promise<{ readonly status: 'recorded' | 'unchanged' | 'unowned' }>;
   /**

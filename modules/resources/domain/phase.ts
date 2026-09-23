@@ -3,7 +3,7 @@ import { jsonHash } from '@crewstation/kernel';
 import type { KindRule } from './kinds';
 import { kindRule } from './kinds';
 import type { LedgerRecord } from './record';
-import { expectedChildren, isPresent } from './record';
+import { childKey, expectedChildren, isPresent } from './record';
 
 /**
  * 阶段只由三类输入算出（RFC-025 设计 §2.3）：期望（要不要）、子对象观测、条件。
@@ -44,16 +44,27 @@ export function computePhase(record: PhaseInput): PhaseResult {
     const reason = reasonOf(serving.reason ?? 'not-serving', serving.message ?? '当前没有运行的工作负载');
     return present.length ? { phase: 'stopping', reason } : { phase: 'stopped', reason };
   }
+  if (rule.allChildren) return allChildrenPhase(record, present);
   if (!rule.primaryChild) return byConditions(record, rule);
   const primary = expectedChildren(record).find((child) => child.kind === rule.primaryChild);
   if (rule.primaryChild === 'Job') return jobPhase(record, primary);
-  // 限流策略：期望里的中间件都在即生效，缺哪个就还在分配中。
-  if (rule.primaryChild === 'Middleware') return expectedChildren(record).every(isPresent) ? { phase: 'ready' } : { phase: 'provisioning' };
   if (!primary || !isPresent(primary)) return condition(record, 'Prepared')?.status === 'false' ? { phase: 'pending', reason: QUEUED } : { phase: 'provisioning' };
   if (rule.primaryChild === 'PersistentVolumeClaim') return volumePhase(primary);
   // 路由：IngressRoute 在即生效；删除中（换名、摘除）按启动中算。
   if (rule.primaryChild === 'IngressRoute') return primary.phase === 'Terminating' ? { phase: 'starting', reason: reasonOf('route-replacing', '路由正在替换') } : { phase: 'ready' };
   return rule.primaryChild === 'Deployment' ? deploymentPhase(record, primary) : workloadPhase(record, rule, primary);
+}
+
+/**
+ * 限流策略、命名空间与额度、网络策略：期望里的子对象都观测到了即运行中，缺哪个就还在分配中；有一个正在删除（有人删了命名空间或策略）是降级——
+ * 它还在、却要没了，删完之后调和器按期望补回。
+ */
+function allChildrenPhase(record: PhaseInput, present: readonly ResourceChild[]): PhaseResult {
+  const observed = new Map(present.map((child) => [childKey(child), child]));
+  const expected = record.spec.children.map((child) => observed.get(childKey(child)));
+  if (expected.some((child) => child === undefined)) return { phase: 'provisioning' };
+  const leaving = expected.find((child) => child?.phase === 'Terminating');
+  return leaving ? { phase: 'degraded', reason: reasonOf('child-terminating', `${leaving.kind} ${leaving.name} 正在删除，删完后按期望补回`) } : { phase: 'ready' };
 }
 
 /**

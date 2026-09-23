@@ -4,11 +4,13 @@ import type { Logger } from '@crewstation/kernel';
 import { isPlatformError } from '@crewstation/kernel';
 import { createInformer, createWorkQueue } from '@crewstation/resource-runtime';
 import type { ClusterWriter, ManagedObjectFeed, ManagedObjectReader, ObjectChange, ObservedKind } from '../../ports/cluster';
+import { objectCovered } from './coverage';
 import { middlewareObject } from './middlewareObjects';
-import { routeCovered, routeObject } from './routeObjects';
+import { namespaceObjectOf, networkPolicyObjectOf, quotaObjectOf } from './namespaceObjects';
+import { routeObject } from './routeObjects';
 
 const SELECTOR = `${LABELS.managedBy}=${MANAGED_BY}`;
-const KINDS: readonly ObservedKind[] = ['Pod', 'PersistentVolumeClaim', 'Secret', 'Service', 'IngressRoute', 'Deployment', 'Job', 'Middleware'];
+const KINDS: readonly ObservedKind[] = ['Pod', 'PersistentVolumeClaim', 'Secret', 'Service', 'IngressRoute', 'Deployment', 'Job', 'Middleware', 'Namespace', 'ResourceQuota', 'NetworkPolicy'];
 
 /** Secret 的内容一律不进缓存、不经调和器（设计 §13：只留调和要用的字段）。 */
 export function withoutSecretData(obj: K8sObject): K8sObject {
@@ -24,26 +26,25 @@ export function managedObjectReader(k8s: K8sClient): ManagedObjectReader {
 
 /**
  * 调和器的删除：带 UID 前置条件（设计 §6.2）；Pod 给 30 秒优雅退出。对象已经没了算完成；UID 对不上（同名的新对象）
- * 不是它要删的，也算完成——下一轮按新的观测再判断。路由按期望渲染，与观测到的一致就不写，否则服务端 apply（同一字段管理者）。
+ * 不是它要删的，也算完成——下一轮按新的观测再判断。路由、中间件、命名空间、额度与网络策略按期望渲染，与观测到的一致就不写，
+ * 否则服务端 apply（同一字段管理者）。
  */
 export function kubernetesClusterWriter(k8s: K8sClient): ClusterWriter {
+  const apply = async (desired: K8sObject, current: Parameters<typeof objectCovered>[0]): Promise<'applied' | 'unchanged'> => {
+    if (objectCovered(current, desired)) return 'unchanged';
+    await k8s.apply(desired);
+    return 'applied';
+  };
   return {
     remove: async ({ kind, namespace, name, uid }) => {
       try { await k8s.delete(Resources[kind]!, name, namespace, { preconditions: { uid }, ...(kind === 'Pod' ? { gracePeriodSeconds: 30 } : {}) }); }
       catch (error) { if (!isPlatformError(error) || error.kind !== 'conflict') throw error; }
     },
-    applyRoute: async (route, current) => {
-      const desired = routeObject(route);
-      if (routeCovered(current, desired)) return 'unchanged';
-      await k8s.apply(desired);
-      return 'applied';
-    },
-    applyMiddleware: async (middleware, resourceId, current) => {
-      const desired = middlewareObject(middleware, resourceId);
-      if (routeCovered(current, desired)) return 'unchanged';
-      await k8s.apply(desired);
-      return 'applied';
-    },
+    applyRoute: (route, current) => apply(routeObject(route), current),
+    applyMiddleware: (middleware, resourceId, current) => apply(middlewareObject(middleware, resourceId), current),
+    applyNamespace: (namespace, current) => apply(namespaceObjectOf(namespace), current),
+    applyQuota: (namespace, current) => apply(quotaObjectOf(namespace), current),
+    applyNetworkPolicy: (policy, current) => apply(networkPolicyObjectOf(policy), current),
   };
 }
 

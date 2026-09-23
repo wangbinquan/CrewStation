@@ -8,7 +8,7 @@ import type { ClusterResource, ClusterInspectRequest, ClusterOperation, ClusterI
 import type { Actor, ComputeProfileSelector, ComputeUsage, ProjectId, ServiceId, UserDto, UserId } from '@crewstation/contracts';
 import type { EventConsumer } from '@crewstation/eventbus';
 import type { K8sClient } from '@crewstation/k8s';
-import { buildEgressNetworkPolicy, integrationEgressNetworkPolicy, namespaceObject, projectNetworkPolicy, resourceQuotaObject, secretObject, taskEgressNetworkPolicy } from '@crewstation/k8s';
+import { secretObject } from '@crewstation/k8s';
 import type { Logger } from '@crewstation/kernel';
 import { forbidden, precondition } from '@crewstation/kernel';
 import { createAgentRuntimeModule } from '@crewstation/module-agent-runtime';
@@ -372,17 +372,11 @@ function composeAggregates(deps: PlatformModuleDeps, core: ReturnType<typeof com
       if (role !== 'owner' && role !== 'admin') throw forbidden('只有负责人或管理员可以重新开通项目');
       if ((await project.api.getProject(actor, id)).state !== 'failed') throw precondition('只有开通失败的项目可以重试');
     },
+    // 命名空间、额度与网络策略写成台账记录（RFC-025 第四期），由 cluster-control 的调和器建出、被改或被删就补回。
+    ledger: { declare: (input) => resources.api.owner('provisioning').declare(input), get: (id) => resources.api.get(id) },
+    namespaces: { systemNamespace: settings.systemNamespace },
     steps: {
       loadProject: project.api.getProvisioningProject,
-      ensureNamespace: async (f) => {
-        await k8s.apply(namespaceObject(f.namespace, { 'crewstation.io/project': f.slug }));
-        await k8s.apply(resourceQuotaObject({ name: 'crewstation-project', namespace: f.namespace, hard: { pods: '30', 'requests.cpu': '8', 'requests.memory': '16Gi', persistentvolumeclaims: '20' } }));
-        await k8s.apply(projectNetworkPolicy({ namespace: f.namespace, systemNamespace: settings.systemNamespace }));
-        await k8s.apply(taskEgressNetworkPolicy({ namespace: f.namespace }));
-        await k8s.apply(buildEgressNetworkPolicy({ namespace: f.namespace }));
-        // 接入容器代公司系统转发，服务槽直接出站（RFC-018 Q1＝C）；数字人服务槽不放行，走接口目录与网关放行表。
-        if (f.kind !== 'DigitalWorker') await k8s.apply(integrationEgressNetworkPolicy({ namespace: f.namespace }));
-      },
       // 走与开通链同一个装载器：它自己会挡掉已归档和没有服务的项目，过滤规则只有这一份。
       // 启动时跑一次，N+1 次查询可以接受。
       listProjects: async () => {

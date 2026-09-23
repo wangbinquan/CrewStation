@@ -116,6 +116,19 @@ describe('条件、子对象、计数与可做操作', () => {
     expect(STABLE_KINDS).toContain('rate-limit-policy');
   });
 
+  test('命名空间与网络策略（第四期）：Namespace 与额度都在、每条网络策略都在才运行中；稳定记录', () => {
+    const children = [{ kind: 'Namespace', name: 'cs-demo' }, { kind: 'ResourceQuota', namespace: 'cs-demo', name: 'crewstation-project' }];
+    const ns = (present: readonly string[]) => record({ kind: 'namespace', spec: { children },
+      children: children.map((child) => ({ ...child, phase: present.includes(child.kind) ? 'Present' : 'absent', ready: present.includes(child.kind) })) });
+    expect(computePhase(ns(['Namespace', 'ResourceQuota']))).toEqual({ phase: 'ready' });
+    expect(computePhase(ns(['Namespace'])).phase).toBe('provisioning');
+    expect(computePhase(record({ kind: 'network-policy-set', spec: { children: [{ kind: 'NetworkPolicy', namespace: 'cs-demo', name: 'crewstation-default' }] }, children: [] })).phase).toBe('provisioning');
+    expect(STABLE_KINDS).toEqual(expect.arrayContaining(['namespace', 'network-policy-set']));
+    // 有人删了命名空间：它还在（删除中）、却要没了——降级并写明，删完后调和器补回。
+    const deleting = record({ kind: 'namespace', spec: { children }, children: [{ ...children[0]!, phase: 'Terminating', ready: false }, { ...children[1]!, phase: 'Present', ready: true }] });
+    expect(computePhase(deleting)).toEqual({ phase: 'degraded', reason: { code: 'child-terminating', message: 'Namespace cs-demo 正在删除，删完后按期望补回' } });
+  });
+
   test('路由：IngressRoute 还没观测到是分配中，在即运行中，删除中按启动中算；稳定记录', () => {
     const route = (child?: Partial<ResourceChild>) => record({ kind: 'route', spec: { children: [{ kind: 'IngressRoute', namespace: 'cs-demo', name: 'demo-prod' }] },
       children: child ? [{ kind: 'IngressRoute', namespace: 'cs-demo', name: 'demo-prod', phase: 'Present', ready: true, ...child }] : [] });
