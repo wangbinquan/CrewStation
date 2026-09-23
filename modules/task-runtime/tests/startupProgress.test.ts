@@ -7,6 +7,8 @@ import { testDatabaseAvailable } from '@crewstation/testkit';
 import { drizzleEnvironmentRepository } from '../adapters/persistence/drizzleRepositories';
 import type { CreateNativeExecutionInput } from '../api/moduleApi';
 import { rebuildFixture } from './rebuildFixture';
+import type { TaskEnvironment } from '../domain/taskEnvironment';
+import { POD_CREATE_GRACE_MS } from '../domain/taskEnvironment';
 
 const available = await testDatabaseAvailable();
 let f: Awaited<ReturnType<typeof rebuildFixture>> | undefined;
@@ -144,5 +146,39 @@ describe.skipIf(!available)('启动进度（RFC-022）', () => {
     expect((await repo.listStarting({ limit: 1 })).map((env) => env.id)).toEqual([first]);
     expect((await repo.listStarting({ after: first, limit: 5 })).map((env) => env.id)).toEqual([second]);
     expect((await repo.listStarting({ limit: 5 })).map((env) => env.id)).not.toContain(f.env.id);
+  });
+  /** 建 Pod 卡在 Kubernetes 那一步：记录已提交、Pod 还没建出来（2026-09-23 实机撞上的空档）。 */
+  const creatingWithoutPod = async () => {
+    f = await rebuildFixture({ kind: 'business', running: true });
+    f.state.quota = 5;
+    const create = f.k8s.create.bind(f.k8s);
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    f.k8s.create = (async (object: K8sObject) => { if (object.kind === 'Pod') await gate; return create(object); }) as typeof f.k8s.create;
+    const pending = f.runtime.api.createEnvironment({ serviceId: f.serviceId, kind: 'dev-session', branch: 'main' });
+    let dev: TaskEnvironment | undefined;
+    for (let i = 0; i < 200 && !dev; i++) { dev = (await f.uow.read.environments.listByStates(['creating'])).find((env) => env.kind === 'dev-session'); if (!dev) await Bun.sleep(5); }
+    return { dev: dev!, pending, release };
+  };
+
+  test('记录先于 Pod 提交：Pod 还没建出来时，每秒观测与对账都不判「容器不存在」；建出后照常推进', async () => {
+    const { dev, pending, release } = await creatingWithoutPod();
+    expect(await f!.runtime.api.observeStartup()).toBe(0);
+    await f!.runtime.api.reconcile();
+    expect((await f!.uow.read.environments.getById(dev.id))!.state).toBe('creating');
+    release();
+    await pending;
+    expect(kinds(await startupOf(dev.id))).toEqual(['queue:succeeded', 'container:running', 'checkout:pending', 'connect:pending', 'ready:pending']);
+  });
+
+  test('超过两分钟仍没有 Pod（建 Pod 的进程中途没了）：照旧判容器不存在，停在排队', async () => {
+    const { dev, pending, release } = await creatingWithoutPod();
+    f!.advance(POD_CREATE_GRACE_MS);
+    expect(await f!.runtime.api.observeStartup()).toBe(1);
+    const failed = (await f!.uow.read.environments.getById(dev.id))!;
+    expect(failed.state).toBe('failed');
+    expect(failed.startup!.stages[0]).toMatchObject({ kind: 'queue', state: 'failed', error: { code: 'pod-missing' } });
+    release();
+    await pending;
   });
 });

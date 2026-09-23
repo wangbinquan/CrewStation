@@ -119,6 +119,17 @@ export function canPause(env: TaskEnvironment): boolean {
   return env.kind === 'business' && env.volumeMode === 'persistent' && env.state === 'running';
 }
 
+/** 建 Pod 的宽限：记录先于 Pod 提交，Pod 建出并记下实例（podUid）之前，读到「Pod 不存在」是还没建成。 */
+export const POD_CREATE_GRACE_MS = 2 * 60_000;
+
+/**
+ * 还在建 Pod：环境刚创建、还没记下 Pod 实例。RFC-022 的启动观测每秒读一次 Pod，常扫到「记录已提交、Pod 还没建」这段空档，
+ * 这时的 Missing 不算失败；超过宽限仍没有 Pod（建 Pod 的进程中途没了），照旧判容器不存在。执行环境与重建各自在建好 Pod 后才进入可判定状态。
+ */
+export function awaitingPodCreation(env: TaskEnvironment, now: Date, graceMs = POD_CREATE_GRACE_MS): boolean {
+  return env.state === 'creating' && !env.native && !env.rebuildId && !env.podUid && now.getTime() - env.createdAt.getTime() < graceMs;
+}
+
 export function podNameFor(taskId: TaskId): string {
   return `task-${taskId.replaceAll('-', '')}`;
 }

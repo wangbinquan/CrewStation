@@ -1,7 +1,7 @@
 import type { EnvironmentRebuild } from '../domain/environmentRebuild';
 import { CONTAINER_START_FAILURES, IMAGE_PULL_FAILURES, RUNNER_UNAVAILABLE_HINT, advanceStartup, runningStage } from '../domain/podStartup';
 import type { TaskEnvironment } from '../domain/taskEnvironment';
-import { EXECUTION_NOUN, purposeOf } from '../domain/taskEnvironment';
+import { EXECUTION_NOUN, awaitingPodCreation, purposeOf } from '../domain/taskEnvironment';
 import type { PodPhaseReading } from '../ports/cluster';
 import type { TaskRuntimeUseCaseDeps } from './dependencies';
 import type { lifecycleUseCases } from './lifecycle';
@@ -88,6 +88,8 @@ async function judgeEnvironment(deps: TaskRuntimeUseCaseDeps, lifecycle: Lifecyc
     await lifecycle.markFailed(env.id, `新环境启动超过 5 分钟仍未连接，原工作卷保留；请检查套餐和容器镜像后重试${message ? `；${message}` : ''}`, env.podName, 'creating', 'connect-timeout');
     return true;
   }
+  // Pod 还在建：记录先提交、Pod 后建，这段空档里的 Missing 不是失败（RFC-022 每秒观测常扫到它）。
+  if (phase === 'Missing' && awaitingPodCreation(env, deps.clock.now())) return false;
   if (phase === 'Failed' || phase === 'Succeeded' || phase === 'Missing') {
     const summary = phase === 'Missing' ? '容器不存在' : phase === 'Failed' ? '容器运行失败' : '容器已退出';
     // 执行容器从未连上就退出：多半是镜像不是基于平台底座构建（没有 Runner 启动路径）。
