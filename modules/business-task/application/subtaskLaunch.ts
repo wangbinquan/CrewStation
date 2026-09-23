@@ -10,17 +10,25 @@ import { subtaskRefresh } from './subtaskRefresh';
 
 interface ExecResult { execId: string; exitCode: number | null; stdout: string; stderr: string; truncated: boolean }
 
-/** 构造与启动子任务：Agent 走 startAgent，命令走 exec(wait) 并在后台收尾。 */
-export function subtaskLaunch(deps: BusinessTaskUseCaseDeps) {
+/**
+ * 构造与启动子任务：Agent 走 startAgent，命令走 exec(wait) 并在后台收尾。
+ * `awaiting` 记着本进程还在等结果的 exec：读子任务时按退出事件收尾的路径见到它就让开（见 subtaskRefresh）。
+ */
+export function subtaskLaunch(deps: BusinessTaskUseCaseDeps, awaiting: Set<string> = new Set()) {
   const { uow, environments, runner, settings, clock, logger } = deps;
   const { finish } = subtaskRefresh(deps);
   const launchAgent = subtaskAgentLaunch(deps, finish);
 
   const settleCommand = async (run: SubtaskRun, r: ExecResult): Promise<void> => {
     const current = await uow.read.subtasks.getById(run.id);
-    if (!current || isTerminal(current)) return;
+    if (!current) return;
     const exitCode = r.exitCode ?? -1;
     const output = `${r.stdout}${r.stderr ? `\n[stderr]\n${r.stderr}` : ''}`.slice(0, settings.outputLimitBytes);
+    if (isTerminal(current)) {
+      // 另一个进程（多副本，或等结果的进程重启过）已按退出事件收尾，那条路径拿不到输出：同一退出码时补上输出，不改状态。
+      if (current.kind === 'command' && current.output === undefined && current.exitCode === exitCode) await uow.run((scope) => scope.subtasks.update({ ...current, output }));
+      return;
+    }
     await finish(current, transition(current, exitCode === 0 ? 'succeeded' : 'failed', clock.now(), { exitCode, output, ...(exitCode === 0 ? {} : { error: `命令退出码 ${exitCode}` }) }));
   };
 
@@ -44,9 +52,11 @@ export function subtaskLaunch(deps: BusinessTaskUseCaseDeps) {
     const started = transition(run, 'running', clock.now(), { startedAt: clock.now() });
     await uow.run((scope) => scope.subtasks.update(started));
     const execId = run.runnerRef ?? '';
+    awaiting.add(execId);
     void runner.sendCommand(run.taskId, { id: `exec-${execId}`, type: 'exec', execId, command: run.command ?? [], ...(run.cwd ? { cwd: run.cwd } : {}), env: {}, timeoutSeconds: run.timeoutSeconds ?? 3600, wait: true })
       .then((result) => settleCommand(run, result as ExecResult))
-      .catch((error: unknown) => failCommand(run, error));
+      .catch((error: unknown) => failCommand(run, error))
+      .finally(() => { awaiting.delete(execId); });
     return started;
   };
 

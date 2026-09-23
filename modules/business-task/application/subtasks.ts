@@ -14,9 +14,11 @@ import { subtaskToDto } from './toDto';
 export function subtaskUseCases(deps: BusinessTaskUseCaseDeps) {
   const { uow, runner, settings, clock } = deps;
   const { ownedTask } = taskLifecycleUseCases(deps);
-  const { refresh, finish, releaseExecution } = subtaskRefresh(deps);
+  // 本进程还在等结果的命令子任务 exec：启动它的一侧登记，读子任务的收尾路径据此让开（同一个集合传给两边）。
+  const awaiting = new Set<string>();
+  const { refresh, finish, releaseExecution } = subtaskRefresh(deps, awaiting);
 
-  const { launch, build, dispatchPending } = subtaskLaunch(deps), load = loadSubtask(deps);
+  const { launch, build, dispatchPending } = subtaskLaunch(deps, awaiting), load = loadSubtask(deps);
 
   return {
     dispatchPendingSubtasks: dispatchPending,

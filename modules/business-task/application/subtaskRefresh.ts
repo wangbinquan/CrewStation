@@ -7,8 +7,8 @@ import type { BusinessTaskUseCaseDeps } from './dependencies';
 
 type AgentRunnerEvent = Extract<RunnerEvent, { kind: 'agent' }>;
 
-/** 从 TaskRunner 的持久事件推进子任务状态；契约在 Agent 结束后由 TaskRunner 校验（AT-26）。 */
-export function subtaskRefresh(deps: BusinessTaskUseCaseDeps) {
+/** 从 TaskRunner 的持久事件推进子任务状态；契约在 Agent 结束后由 TaskRunner 校验（AT-26）。`awaiting`：本进程还在等结果的 exec（见 subtaskLaunch）。 */
+export function subtaskRefresh(deps: BusinessTaskUseCaseDeps, awaiting: ReadonlySet<string> = new Set()) {
   const { uow, runner, environments, settings, clock, logger } = deps;
 
   /** 子任务结束后把它的执行环境交给 task-runtime 回收（Pod 与额度）；回执丢失由工作器按 released 标记重试。 */
@@ -72,6 +72,9 @@ export function subtaskRefresh(deps: BusinessTaskUseCaseDeps) {
   };
 
   const refreshCommand = async (run: SubtaskRun): Promise<SubtaskRun> => {
+    // 本进程还在等 exec 的结果（带输出）时由它收尾：退出事件常先于结果落下，按事件收尾拿不到输出，
+    // 抢先结成终态会让随后带着输出的收尾直接放弃（2026-09-24 CI 实撞：succeeded 而输出为空）。只有等结果的进程不在了才按事件收尾。
+    if (run.runnerRef && awaiting.has(run.runnerRef)) return run;
     const exited = (await runner.listEvents(run.taskId, { kinds: ['execExited'], limit: 5000 })).map((e) => e.event).find((e): e is Extract<RunnerEvent, { kind: 'execExited' }> => e.kind === 'execExited' && e.execId === run.runnerRef);
     if (!exited) return run;
     const exitCode = exited.exitCode ?? -1;

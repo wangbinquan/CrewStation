@@ -14,6 +14,8 @@ const fixtureResource = (key: string) => { if (!fixtureIds.has(key)) fixtureIds.
 const available = await testDatabaseAvailable();
 let tdb: TestDatabase;
 let bt: BusinessTaskModule;
+/** 同一套依赖：用例可以再起一个模块实例，模拟另一个副本（各自只记得自己在等的 exec）。 */
+let moduleDeps: Parameters<typeof createBusinessTaskModule>[0];
 const serviceId = newResourceId() as ServiceId;
 const projectId = newResourceId() as ProjectId;
 const caller: ServiceActor = { identity: 'demo/demo', project: 'demo', service: 'demo', slot: 'prod' };
@@ -24,6 +26,17 @@ const routed: Array<{ taskId: string; command: RunnerCommand }> = [];
 /** Agent 子任务的执行环境（每个 Agent 一个 Pod）；connected 模拟子 Runner 是否已连上。 */
 const executions = new Map<string, EnvironmentView>();
 const executionControls = { connected: true, reject: undefined as unknown };
+/** 设了 hold 时，exec 先把 execExited 记进事件、再等 hold 才返回结果：生产上退出事件常先于 wait 的结果落下。 */
+const execControls = { hold: undefined as Promise<void> | undefined };
+/** 按条件轮询代替固定 sleep：CI 负载下后台收尾的耗时不固定（b23078e 同理）。 */
+async function eventually<T>(read: () => Promise<T>, ok: (value: T) => boolean, timeoutMs = 5000): Promise<T> {
+  const started = Date.now();
+  for (;;) {
+    const value = await read();
+    if (ok(value) || Date.now() - started > timeoutMs) return value;
+    await Bun.sleep(20);
+  }
+}
 const events = new Map<string, Array<{ seq: number; at: string; event: RunnerEvent }>>();
 const released: string[] = [];
 /** 某条命令发往的 Runner 任务 ID（Agent 子任务的是它的执行环境）。 */
@@ -57,7 +70,7 @@ const fakeCompute: ComputeCatalog = {
 beforeAll(async () => {
   if (!available) return;
   tdb = await createTestDatabase([eventbusMigrations, businessTaskMigrations]);
-  bt = createBusinessTaskModule({
+  moduleDeps = {
     db: tdb.db,
     environments: {
       createEnvironment: async (input) => ({ id: newResourceId() as TaskId, projectId, profile: BUILTIN_RESOURCES.taskProfileMedium, state: 'running', connected: true, traceId: input.traceId ?? '0123456789abcdef0123456789abcdef', podName: 'task-1' }),
@@ -82,7 +95,7 @@ beforeAll(async () => {
       sendCommand: async (taskId, command) => {
         commands.push(command);
         routed.push({ taskId, command });
-        if (command.type === 'exec') { emit(taskId, { kind: 'execExited', execId: command.execId, exitCode: command.command.includes('fail') ? 2 : 0, durationMs: 5 }); return { execId: command.execId, exitCode: command.command.includes('fail') ? 2 : 0, stdout: 'done\n', stderr: '', durationMs: 5, truncated: false }; }
+        if (command.type === 'exec') { emit(taskId, { kind: 'execExited', execId: command.execId, exitCode: command.command.includes('fail') ? 2 : 0, durationMs: 5 }); if (execControls.hold) await execControls.hold; return { execId: command.execId, exitCode: command.command.includes('fail') ? 2 : 0, stdout: 'done\n', stderr: '', durationMs: 5, truncated: false }; }
         if (command.type === 'verifyContract') return { ok: !command.contract.required.includes('missing.md'), missing: command.contract.required.filter((f) => f === 'missing.md'), schemaErrors: [] };
         return {};
       },
@@ -93,7 +106,8 @@ beforeAll(async () => {
     compute: fakeCompute,
     isAdmin: async () => false,
     settings: { mcp: [{ name: 'operations', url: 'http://mcp-operations.svc.cs.internal/mcp' }], outputLimitBytes: 65536, consumerName: 'test.business-task' },
-  });
+  };
+  bt = createBusinessTaskModule(moduleDeps);
   await bt.api.registerContracts({ occurredAt: new Date().toISOString(), projectId, serviceId, releaseId: newResourceId() as ReleaseId, tag: 'v0.1.0', commitSha: 'abc', manifest: { apiVersion: 'crewstation/v2', kind: 'DigitalWorker', spec: { service: { command: ['bun'], port: 3000, healthPath: '/healthz', servicePlanId: BUILTIN_RESOURCES.servicePlanSmall, replicas: 1, releaseMode: 'rolling-compatible' }, env: [], apis: { requested: [] }, subscriptions: [], release: { migration: { compatibility: 'none', destructive: false, rollback: 'switch-back' } }, tasks: { taskProfileId: BUILTIN_RESOURCES.taskProfileMedium, defaultVolumeMode: 'follow-container', agentProfiles: [{ id: fixtureResource('agent:chat-v1'), name: 'chat-v1', compute: { kind: 'profile', profileId: fixtureResource('compute:sample-opencode') }, permission: 'read-only' }, { id: fixtureResource('agent:chat-default'), name: 'chat-default', compute: { kind: 'default' }, permission: 'read-only' }], outputContracts: [{ id: fixtureResource('output:report-v1'), name: 'report-v1', required: ['reports/analysis.md'] }, { id: fixtureResource('output:strict-v1'), name: 'strict-v1', required: ['missing.md'] }] } } } });
 });
 afterAll(async () => { await tdb?.drop(); });
@@ -113,8 +127,7 @@ describe.skipIf(!available)('business-task module', () => {
     // 档位由平台解析后再下发，业务只登记了档位名；命令带固定修订与显式二进制（RFC-006）。
     // Manifest 登记的 chat-v1 写着 permission: read-only，已作废、照收不用：派发一律完全权限（D59）。
     expect(start).toMatchObject({ compute: fixtureResource('compute:sample-opencode'), profileRevision: 1, launch: { protocol: 'opencode', binaryPath: '/usr/local/bin/opencode', model: 'opencode/one' }, permission: 'full', mode: 'oneshot', initialPrompt: '分析', mcp: [{ name: 'operations' }] });
-    await Bun.sleep(50);
-    expect((await bt.api.getSubtask(caller, task.id, command.id))).toMatchObject({ state: 'succeeded', exitCode: 0 });
+    expect(await eventually(() => bt.api.getSubtask(caller, task.id, command.id), (s) => s.state === 'succeeded')).toMatchObject({ state: 'succeeded', exitCode: 0 });
     expect(await bt.api.subtaskOutput(caller, task.id, command.id)).toBe('done\n');
 
     expect((await bt.api.getSubtask(caller, task.id, agent.id)).state).toBe('running');
@@ -158,6 +171,39 @@ describe.skipIf(!available)('business-task module', () => {
     expect(agentRunners.filter((id) => released.includes(id))).toHaveLength(agentRunners.length - 1);
     await expect(bt.api.submitSubtask(caller, task.id, { kind: 'command', name: 'late', command: ['ls'], timeoutSeconds: 10 })).rejects.toMatchObject({ kind: 'precondition' });
     expect((await bt.api.listProjectTasks({ userId: '01a0bf5d-8f4b-7793-867c-efd7527b386b' as never, isAdmin: false }, projectId)).length).toBe(1);
+  });
+
+  test('命令的退出事件先于 exec 结果落下：读子任务不按事件抢先收尾，结束时带着输出', async () => {
+    // 2026-09-24 CI 35907697639 实撞：execExited 已记下、exec 结果还没落库时有人读子任务（业务轮询或每 5 秒的清扫），
+    // 按事件收尾的路径先把子任务结成 succeeded 且不带输出；随后带着输出的收尾看到已是终态直接放弃，输出永久是空的。
+    let release!: () => void;
+    execControls.hold = new Promise<void>((resolve) => { release = resolve; });
+    try {
+      const task = await bt.api.createTask(caller, { labels: {} });
+      const command = await bt.api.submitSubtask(caller, task.id, { kind: 'command', name: 'held', command: ['bun', 'test'], timeoutSeconds: 60 });
+      await eventually(async () => events.get(task.id) ?? [], (list) => list.some((e) => e.event.kind === 'execExited'));
+      expect((await bt.api.getSubtask(caller, task.id, command.id)).state).toBe('running');
+      release();
+      expect(await eventually(() => bt.api.getSubtask(caller, task.id, command.id), (s) => s.state === 'succeeded')).toMatchObject({ state: 'succeeded', exitCode: 0 });
+      expect(await bt.api.subtaskOutput(caller, task.id, command.id)).toBe('done\n');
+    } finally { execControls.hold = undefined; }
+  });
+
+  test('另一个副本先按退出事件收尾：等结果的一侧拿到结果后补上输出，不改状态', async () => {
+    // 多副本（或等结果的进程重启过）时，按事件收尾的一侧不知道别处还在等结果；它结成的终态没有输出，拿到结果的一侧要把输出补上。
+    let release!: () => void;
+    execControls.hold = new Promise<void>((resolve) => { release = resolve; });
+    try {
+      const other = createBusinessTaskModule(moduleDeps);
+      const task = await bt.api.createTask(caller, { labels: {} });
+      const command = await bt.api.submitSubtask(caller, task.id, { kind: 'command', name: 'other-replica', command: ['bun', 'test'], timeoutSeconds: 60 });
+      await eventually(async () => events.get(task.id) ?? [], (list) => list.some((e) => e.event.kind === 'execExited'));
+      expect(await other.api.getSubtask(caller, task.id, command.id)).toMatchObject({ state: 'succeeded', exitCode: 0 });
+      expect(await bt.api.subtaskOutput(caller, task.id, command.id)).toBe('');
+      release();
+      expect(await eventually(() => bt.api.subtaskOutput(caller, task.id, command.id), (output) => output !== '')).toBe('done\n');
+      expect(await bt.api.getSubtask(caller, task.id, command.id)).toMatchObject({ state: 'succeeded', exitCode: 0 });
+    } finally { execControls.hold = undefined; }
   });
 
   test('容器未连接时子任务留在 pending，TaskRunner 连上后补发', async () => {
