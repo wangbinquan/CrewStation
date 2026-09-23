@@ -1,8 +1,12 @@
 .button {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: var(--cs-space-2);
-  padding: 6px var(--cs-space-3);
+  /* 两档高度只在这里与 .small 定义（标准 32、紧凑 26，2026-09-23 裁定）；页面样式不得再改按钮的高度、内边距与字号。 */
+  min-height: 32px;
+  padding: 0 var(--cs-space-3);
+  font-size: var(--cs-font-size);
   font-weight: 500;
   border: 1px solid var(--cs-color-border);
   border-radius: var(--cs-radius-md);
@@ -46,8 +50,30 @@
   font-weight: 400;
 }
 
+/* 不可撤销动作的触发按钮：红字红框；最终确认是红底白字。 */
+.danger {
+  border-color: var(--cs-color-danger);
+  color: var(--cs-color-danger);
+}
+
+.danger:hover:not(:disabled) {
+  background: var(--cs-tone-danger-bg);
+}
+
+.dangerPrimary {
+  border-color: var(--cs-color-danger-solid);
+  background: var(--cs-color-danger-solid);
+  color: var(--cs-color-on-danger);
+}
+
+.dangerPrimary:hover:not(:disabled) {
+  border-color: var(--cs-color-danger-solid-hover);
+  background: var(--cs-color-danger-solid-hover);
+}
+
 .small {
-  padding: 3px var(--cs-space-2);
+  min-height: 26px;
+  padding: 0 var(--cs-space-2);
   font-size: var(--cs-font-size-sm);
 }
 

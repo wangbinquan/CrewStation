@@ -1,8 +1,18 @@
 import type { ComponentPropsWithRef, ReactElement } from 'react';
 import styles from './Button.module.css';
 
-export type ButtonVariant = 'primary' | 'secondary' | 'ghost';
-/** 表格行、卡片角、开发页工具行这类紧凑位置用 `small`。 */
+/**
+ * 全站按钮规范（2026-09-23 作者裁定，见 RFC-003 design §6）：
+ * - `primary`（蓝底）：每组（页头、卡片操作条、表单、确认）最多一个，排在一组最左。
+ * - `secondary`（白底描边）：其余动作；表格行、时间线行里的动作也是描边按钮，不用无边框文字。
+ * - `danger`（红字红框）：下线、移除、删除、归档、结束进程这类不可撤销动作的触发按钮；最终确认用 `dangerPrimary`（红底白字）。
+ * - `ghost`（无边框）：只用于「取消」「收起」这类放弃当前操作的按钮。
+ */
+export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'dangerPrimary';
+/**
+ * 两档高度：不传是标准 32px（页头、卡片、表单、空状态）；`small` 是紧凑 26px（表格行、列表行、时间线行、
+ * 复制这类紧贴文字的小工具、开发页工具条）。同一行、同一张卡里不混用两档，页面也不再自己改按钮的高度、内边距与字号。
+ */
 export type ButtonSize = 'small';
 
 export interface ButtonProps extends ComponentPropsWithRef<'button'> {

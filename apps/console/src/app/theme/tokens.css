@@ -24,6 +24,10 @@
   --cs-color-tint: #eaf1ff;
   --cs-color-focus: #8db3ff;
   --cs-color-danger: #b02f39;
+  /* 危险动作的最终确认按钮：红底白字（暗色主题下 --cs-color-danger 是浅粉，不能直接当底色）。 */
+  --cs-color-danger-solid: #b02f39;
+  --cs-color-danger-solid-hover: #952630;
+  --cs-color-on-danger: #ffffff;
 
   --cs-tone-neutral-fg: #59677c;
   --cs-tone-neutral-bg: #edf1f7;
@@ -86,6 +90,8 @@
     --cs-color-tint: #20365b;
     --cs-color-focus: #8db3ff;
     --cs-color-danger: #ffa4ad;
+    --cs-color-danger-solid: #c93d48;
+    --cs-color-danger-solid-hover: #d9525c;
 
     --cs-tone-neutral-fg: #adbacd;
     --cs-tone-neutral-bg: #222b39;
