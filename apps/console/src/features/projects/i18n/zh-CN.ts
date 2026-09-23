@@ -201,6 +201,8 @@ export const messages = {
   'projects.info.projectId': '项目 ID',
   'projects.info.serviceId': '服务 ID',
   'projects.info.namespace': '命名空间',
+  'projects.info.repository': '仓库',
+  'projects.info.repositoryUnread': '暂未读取到',
 
   'projects.repository.title': '源码仓库',
   'projects.repository.path': '路径',
@@ -379,8 +381,7 @@ export const messages = {
   'projects.summary.topology.hint': '每张卡汇总一条横带；点击进入运行与诊断查看完整形态。',
   'projects.summary.topology.empty': '还没有受管资源；发布或开启开发会话后会出现在这里。',
   'projects.summary.topology.invalidResponse': '形态盘点返回不完整。',
-  // 概览一屏（RFC-020 D4）：页头链接行、三张状态卡、横幅与最近动态。
-  'projects.summary.repository': '仓库',
+  // 概览一屏（RFC-020 D4）：页头「项目信息」入口、三张状态卡、横幅与最近动态（仓库与地址不在页头，2026-09-23）。
   'projects.summary.projectInfo': '项目信息',
   'projects.summary.developmentCard': '开发会话',
   'projects.summary.cliCount': '{count} 个 CLI',

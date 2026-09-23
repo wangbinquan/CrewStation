@@ -20,7 +20,7 @@ async function enter(label: string, value: string) {
   }); await page!.settle();
 }
 
-test.each(['DigitalWorker', 'APIProxy'] as const)('%s 概览一屏：页头一行仓库与地址链接保留项目与空间，没有重复左栏的快捷入口卡', async (kind) => {
+test.each(['DigitalWorker', 'APIProxy'] as const)('%s 概览一屏：页头不放仓库与应用地址，「项目信息」在身份那一行末尾并保留项目与空间，没有重复左栏的快捷入口卡', async (kind) => {
   const f = summaryFixture(), time = new Date().toISOString(); f.item.project.kind = kind;
   f.item.slots = { status: 'ready', checkedAt: time, value: [
     { name: 'prod', active: true, tag: 'v1.0.0', commitSha: 'a'.repeat(40), releaseId: '01a0bf5d-8f4b-7574-87e3-e3a9645702f6' as ReleaseId, host: 'formal.test', state: 'ready', replicas: 1, readyReplicas: 1 },
@@ -28,13 +28,19 @@ test.each(['DigitalWorker', 'APIProxy'] as const)('%s 概览一屏：页头一�
   ] };
   const base = `${kind === 'DigitalWorker' ? '/projects' : '/admin/integrations'}/${f.item.project.id}`;
   page = await renderApp(base);
-  // RFC-020 D4：快捷入口卡（左栏的重复）删除；地址只在实际就绪时是链接，未就绪的槽只显示域名。
+  // RFC-020 D4：快捷入口卡（左栏的重复）删除。
   expect(document.querySelector('main nav[aria-label="项目快捷入口"]')).toBeNull();
+  // 2026-09-23 作者裁定：应用地址不再放页头（版本卡上有「打开正式应用」「打开试用」），仓库链接移进项目设置 → 项目信息卡，概览不再读仓库。
   const header = document.querySelector('main header')!;
-  expect(header.querySelector('a[href="//formal.test"]')?.textContent).toBe('formal.test ↗');
-  expect(header.querySelector('a[href="//trial.test"]')).toBeNull(); expect(header.textContent).toContain('trial.test');
+  expect(header.querySelectorAll('a[href^="//"]').length).toBe(0);
+  for (const gone of ['formal.test', 'trial.test', '仓库']) expect(header.textContent).not.toContain(gone);
+  expect(f.calls.some((url) => url.includes('/repository'))).toBe(false);
   const info = header.querySelector<HTMLAnchorElement>('a[href*="tab=info"]')!;
   expect(info.textContent).toBe('项目信息'); expect(info.getAttribute('href')).toBe(`${base}/settings?tab=info`);
+  // 排在标识、状态、角色那一行的末尾，页头元数据只剩这一行。
+  const row = info.parentElement!;
+  expect(row.querySelector('code')?.textContent).toBe(f.item.project.slug); expect(row.textContent).toContain('王负责人');
+  expect(row.lastElementChild === info).toBe(true); expect(row.parentElement!.children.length).toBe(1);
   await act(async () => info.click()); await page.settle();
   expect(page.path()).toBe(`${base}/settings`); expect(page.search().tab).toBe('info');
   expect(f.writes).toEqual([]);
@@ -134,7 +140,7 @@ describe('概览按实际状态选择下一步', () => {
     ] };
     page = await renderApp(`/projects/${f.item.project.id}`);
     const openLinks = () => [...document.querySelectorAll('a[href="//formal.test"], a[href="//trial.test"]')].map((node) => node.textContent);
-    expect(openLinks()).toEqual(['formal.test ↗', 'trial.test ↗', '打开正式应用', '打开试用']); expect(page.text()).toContain('共享生产数据');
+    expect(openLinks()).toEqual(['打开正式应用', '打开试用']); expect(page.text()).toContain('共享生产数据');
     expect(page.text()).toContain('运行健康需要确认'); expect(document.querySelector('a[href*="operations?tab=status"]')).not.toBeNull();
     f.item.slots.value[0]!.state = 'degraded'; await page.reread(); expect(document.querySelector('a[href="//formal.test"]')).toBeNull();
     f.error = true; await page.reread(); expect(document.querySelector('a[href="//trial.test"]')).toBeNull(); expect(page.text()).toContain('上次读取的记录');

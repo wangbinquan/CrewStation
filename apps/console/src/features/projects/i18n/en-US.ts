@@ -203,6 +203,8 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   'projects.info.projectId': 'Project ID',
   'projects.info.serviceId': 'Service ID',
   'projects.info.namespace': 'Namespace',
+  'projects.info.repository': 'Repository',
+  'projects.info.repositoryUnread': 'Not loaded yet',
 
   'projects.repository.title': 'Source repository',
   'projects.repository.path': 'Path',
@@ -381,8 +383,7 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   'projects.summary.topology.hint': 'Each card summarises one band; click to open the full topology under Operations.',
   'projects.summary.topology.empty': 'No managed resources yet; they appear here after a release or a development session.',
   'projects.summary.topology.invalidResponse': 'The topology inventory response is incomplete.',
-  // Overview on one screen (RFC-020 D4): header links, three status cards, banners and recent activity.
-  'projects.summary.repository': 'Repository',
+  // Overview on one screen (RFC-020 D4): the header's project-info entry, three status cards, banners and recent activity (no repository or addresses in the header, 2026-09-23).
   'projects.summary.projectInfo': 'Project info',
   'projects.summary.developmentCard': 'Development session',
   'projects.summary.cliCount': '{count} CLI',

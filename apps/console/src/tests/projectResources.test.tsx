@@ -35,8 +35,8 @@ for (const admin of [false, true]) {
   });
 }
 
-test('项目信息只读：最上面是直接展开的项目信息卡，仓库有真实链接，地址与服务身份直接可见，配额未知不冒充零，不混入接入参数', async () => {
-  projectResourcesFixture(); page = await renderApp(`/projects/${id}/settings?tab=info`);
+test('项目信息只读：最上面是直接展开的项目信息卡（末行是仓库外链），仓库有真实链接，地址与服务身份直接可见，配额未知不冒充零，不混入接入参数', async () => {
+  const f = projectResourcesFixture(); page = await renderApp(`/projects/${id}/settings?tab=info`);
   expect(page.text()).toContain('尚未设置配额'); expect(page.text()).toContain('尚未选择服务套餐'); expect(page.text()).toContain('demo/demo'); expect(page.text()).toContain('https://preview.demo.test');
   expect(page.text()).not.toContain('X-User-Id'); expect(page.text()).not.toContain('CS_DATABASE_URL');
   expect(document.querySelector('a[href="https://repo.test/crew/demo"]')).not.toBeNull();
@@ -47,15 +47,27 @@ test('项目信息只读：最上面是直接展开的项目信息卡，仓库�
   expect(titles.slice(0, 2).map((node) => node.textContent)).toEqual(['项目信息', '源码仓库']);
   const card = titles[0]!.closest('section')!;
   expect(card.closest('details') === null).toBe(true);
-  expect([...card.querySelectorAll('dt')].map((node) => node.textContent)).toEqual(['项目 ID', '服务 ID', '命名空间']);
-  expect([...card.querySelectorAll('dd')].map((node) => node.textContent)).toEqual([id, resourcesServiceId, 'cs-demo']);
+  expect([...card.querySelectorAll('dt')].map((node) => node.textContent)).toEqual(['项目 ID', '服务 ID', '命名空间', '仓库']);
+  expect([...card.querySelectorAll('dd')].map((node) => node.textContent)).toEqual([id, resourcesServiceId, 'cs-demo', 'crew/demo ↗']);
+  // 2026-09-23 作者裁定：仓库链接从概览页头移到这张卡，新窗口打开；与下方源码仓库卡读同一份绑定，只请求一次。
+  const repository = card.querySelector<HTMLAnchorElement>('a[href="https://repo.test/crew/demo"]');
+  expect(repository?.getAttribute('target')).toBe('_blank'); expect(repository?.getAttribute('rel')).toBe('noreferrer'); expect(repository?.hasAttribute('data-button')).toBe(false);
+  expect(f.calls.filter((path) => path.endsWith('/repository')).length).toBe(1);
+});
+
+test('仓库读取失败时项目信息卡写「暂未读取到」，不以「—」冒充没有仓库，失败原因留在源码仓库卡', async () => {
+  const f = projectResourcesFixture(); f.state.fail = 'repository'; page = await renderApp(`/projects/${id}/settings?tab=info`);
+  const titles = [...document.querySelectorAll('main section > header > h2')];
+  expect([...titles[0]!.closest('section')!.querySelectorAll('dd')].map((node) => node.textContent)).toEqual([id, resourcesServiceId, 'cs-demo', '暂未读取到']);
+  expect(document.querySelectorAll('a[href="https://repo.test/crew/demo"]').length).toBe(0);
+  expect(titles[1]?.textContent).toBe('源码仓库'); expect(titles[1]!.closest('section')!.textContent).toContain('读取仓库绑定失败');
 });
 
 test('开通未完成时项目信息卡照样在最上面，服务 ID 用「—」占位，没有仓库卡并说明原因', async () => {
   const f = projectResourcesFixture(); f.state.noService = true; page = await renderApp(`/projects/${id}/settings?tab=info`);
   const titles = [...document.querySelectorAll('main section > header > h2')];
   expect(titles[0]?.textContent).toBe('项目信息'); expect(titles.map((node) => node.textContent)).not.toContain('源码仓库');
-  expect([...titles[0]!.closest('section')!.querySelectorAll('dd')].map((node) => node.textContent)).toEqual([id, '—', 'cs-demo']);
+  expect([...titles[0]!.closest('section')!.querySelectorAll('dd')].map((node) => node.textContent)).toEqual([id, '—', 'cs-demo', '—']);
   expect(page.text()).toContain('项目尚未开通服务'); expect(f.calls.some((path) => path.endsWith('/repository'))).toBe(false);
 });
 

@@ -1,8 +1,5 @@
 import type { RepositoryBindingDto } from '@crewstation/contracts';
 import type { ReactElement } from 'react';
-import { api } from '../../../shared/api/client';
-import { queryKeys } from '../../../shared/api/queryKeys';
-import { useApiQuery } from '../../../shared/api/useApi';
 import { useT } from '../../../shared/lib/useT';
 import { Badge } from '../../../shared/ui/Badge';
 import type { BadgeTone } from '../../../shared/ui/Badge';
@@ -11,6 +8,7 @@ import { DefinitionList } from '../../../shared/ui/DefinitionList';
 import type { DefinitionItem } from '../../../shared/ui/DefinitionList';
 import { QueryStatus } from '../../../shared/ui/QueryStatus';
 import { ExternalButtonLink } from '../../../shared/ui/navigation/ButtonLink';
+import { useRepositoryBinding } from '../model/useRepositoryBinding';
 
 function repositoryTone(state: RepositoryBindingDto['state']): BadgeTone {
   if (state === 'ready') return 'success';
@@ -20,7 +18,7 @@ function repositoryTone(state: RepositoryBindingDto['state']): BadgeTone {
 /** 一个服务 ↔ 一个托管仓库；建不出来时 message 说明卡在哪一步。 */
 export function RepositoryCard({ serviceId }: { readonly serviceId: string }): ReactElement {
   const t = useT();
-  const repository = useApiQuery(queryKeys.repository(serviceId), () => api.services.getRepository(serviceId));
+  const repository = useRepositoryBinding(serviceId);
   const binding = repository.data;
   const facts: readonly DefinitionItem[] = binding === undefined ? [] : [
     { label: t('projects.repository.path'), value: <code>{binding.pathWithNamespace}</code> },

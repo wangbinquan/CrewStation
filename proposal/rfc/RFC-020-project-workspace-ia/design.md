@@ -87,6 +87,8 @@
 - 最近动态：`Timeline` 渲染 `releaseTimeline()` 的前 5 条（§6），页脚链接到发布页。
 - 删除：`ProjectQuickLinks`、「当前开发」「运行健康」「需要关注」三张卡、「刷新概览」按钮、各卡的「读取于」。
 
+> **2026-09-23 修订（作者当面裁定，直接修改，不另立 RFC）。** 页头第二行（仓库路径、两槽域名）去掉，概览不再读仓库：`ProjectOverviewPage` 删掉仓库查询与 `hostLink`，「项目信息」按钮（`ButtonLink` 紧凑档）并到身份那一行末尾，页头元数据只剩这一行。应用地址由 `DeployedVersionCard` 的打开按钮承担，仓库链接移到 `ProjectInfoCard`（§7 同日修订）；本节开头的「两个已有查询」只剩版本比较摘要。
+
 ## 5. 开发工作区与工具面板
 
 ### 5.1 布局
@@ -171,6 +173,8 @@ tool: z.object({ name: z.enum(['preview', 'code', 'changes', 'data', 'reference'
 
 > **2026-09-23 修订（作者当面裁定，直接修改，不另立 RFC）。** 技术详情就是项目信息：`ProjectInfoCard`（`features/projects/components`）作为 `info` 组第一张卡直接展示项目 ID、服务 ID、命名空间，不再折叠；三个标签改走 `projects.info.*` 文案（原为写死的英文）。其后的仓库卡与 `CapabilitiesPage section="project"` 不变（`projectResources` 用例断言卡片顺序与内容）。
 
+> **2026-09-23 修订（作者当面裁定，直接修改，不另立 RFC）。** `ProjectInfoCard` 末行加「仓库」：`pathWithNamespace ↗` 外链（`target="_blank"`、`rel="noreferrer"`；引用型文字链接，不是按钮）。仓库绑定由新增的 `features/projects/model/useRepositoryBinding` 读取，`ProjectInfoCard` 与 `RepositoryCard` 共用同一个查询键与取数函数，只请求一次（原先概览带格式校验、源码仓库卡不带，两份取数函数挂在同一个查询键上，随概览不再读仓库一并归一）。没有 `serviceId`（开通未完成）时不读、该行为「—」；读取中或读取失败写「暂未读取到」（`projects.info.repositoryUnread`），失败原因仍由源码仓库卡的 `QueryStatus` 给出。文案键 `projects.summary.repository` 随概览页头删除。
+
 ## 8. 名称、ID 与状态文案
 
 - 36 位 ID 只出现在技术详情或 `title`＋复制；表格列显示名字、标签或短 ID（前 8 位）。
@@ -189,6 +193,8 @@ tool: z.object({ name: z.enum(['preview', 'code', 'changes', 'data', 'reference'
 | 会话面板内嵌日志读取失败 | 面板内就地错误与重试，不影响连接信息 |
 | 内容区窄于 800 | 面板只有放大形态；`panel=side` 被忽略但不改写 URL |
 | 旧地址重定向 | 一次 `replace`，参数保留；`resources?section=data` 带 `proxy` 之类无关参数时丢弃 |
+
+> 2026-09-23 修订：概览不再读仓库，「概览的仓库或比较摘要读取失败」一行只剩比较摘要；仓库读取失败改在项目设置 → 项目信息表现——项目信息卡的「仓库」一行写「暂未读取到」，源码仓库卡给出失败原因（§7 同日修订）。
 
 ## 10. 测试策略
 
