@@ -10,6 +10,8 @@ export interface AllowlistRepository {
 export interface PodIdentityRepository {
   upsert(record: Omit<PodIdentityRecord, 'version'>): Promise<PodIdentityRecord>;
   markDeleted(podName: string, namespace: string, at: Date): Promise<void>;
+  /** 全量重列之后：`before` 以来没被刷新过的在册行都是已经不在的 Pod，标为删除；返回条数。 */
+  pruneStale(before: Date, at: Date): Promise<number>;
   byIp(ip: string): Promise<PodIdentityRecord | undefined>;
   listActive(): Promise<PodIdentityRecord[]>;
 }

@@ -103,7 +103,7 @@ export function createGatewayModule(deps: GatewayModuleDeps): GatewayModule {
   return {
     api,
     http: [gatewayRoutes(api, deps.isAdmin), maintenanceRoutes(api, deps.isAdmin)],
-    workers: [podWatcher(deps.k8s, pods.syncPod, logger)],
+    workers: [podWatcher(deps.k8s, pods.syncPod, logger, pods.relistPods)],
     subscriptions,
     migrations: gatewayMigrations,
   };

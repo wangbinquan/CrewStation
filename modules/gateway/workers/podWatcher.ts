@@ -12,8 +12,11 @@ export interface PodWatcher {
   runOnce(): Promise<number>;
 }
 
-/** list 全量后 watch 增量；watch 结束或出错即退避重连，从最新 resourceVersion 续接。 */
-export function podWatcher(k8s: K8sClient, sync: (pod: ObservedPod) => Promise<void>, logger: Logger): PodWatcher {
+/**
+ * list 全量后 watch 增量；watch 结束或出错即退避重连，从最新 resourceVersion 续接。
+ * `relist` 给出时全量那一步交给它（同步并清掉这次没列到的旧行），否则逐个 `sync`。
+ */
+export function podWatcher(k8s: K8sClient, sync: (pod: ObservedPod) => Promise<void>, logger: Logger, relist?: (pods: readonly ObservedPod[]) => Promise<number>): PodWatcher {
   const selector = `${LABELS.managedBy}=${MANAGED_BY}`;
   let controller: AbortController | undefined;
   let running = false;
@@ -26,7 +29,12 @@ export function podWatcher(k8s: K8sClient, sync: (pod: ObservedPod) => Promise<v
 
   const runOnce = async (): Promise<number> => {
     const pods = await k8s.list<PodObject>(Resources.Pod!, undefined, { labelSelector: selector });
-    for (const pod of pods) await sync(observe(pod, Boolean(pod.metadata.deletionTimestamp)));
+    const observed = pods.map((pod) => observe(pod, Boolean(pod.metadata.deletionTimestamp)));
+    if (!relist) for (const pod of observed) await sync(pod);
+    else {
+      const pruned = await relist(observed);
+      if (pruned > 0) logger.info('pod identities pruned after relist', { pruned });
+    }
     return pods.length;
   };
 

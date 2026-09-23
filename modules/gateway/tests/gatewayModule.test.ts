@@ -184,4 +184,18 @@ describe.skipIf(!available)('gateway module', () => {
     await repo.markDeleted('demo-green-abc', 'cs-demo', new Date());
     expect(await gateway.api.lookupByIp('10.244.0.10')).toBeUndefined();
   });
+
+  // 2026-09-23 本机：watch 断开期间被删的 Pod 收不到 DELETED，行一直在册（52 个 Pod、144 条在册行）；
+  // IP 被业务 Pod 复用时反查取到死去的平台 Pod，把业务调用当成平台调用放行。
+  test('全量重列：这次没列到的在册行标为删除，复用同一 IP 的新 Pod 反查到自己', async () => {
+    const { drizzlePodIdentityRepository } = await import('../adapters/persistence/drizzleRepositories');
+    const repo = drizzlePodIdentityRepository(tdb.db);
+    await repo.upsert({ ip: '10.244.0.30', podName: 'mcp-capabilities-gone', namespace: 'crewstation-system', project: 'platform', service: 'mcp-capabilities', workload: 'platform', updatedAt: new Date(Date.now() - 3_600_000) });
+    expect(await gateway.api.lookupByIp('10.244.0.30')).toMatchObject({ kind: 'platform' });
+    const labels = { 'app.kubernetes.io/managed-by': 'crewstation', 'crewstation.io/project': 'demo', 'crewstation.io/service': 'demo', 'crewstation.io/workload': 'service', 'crewstation.io/slot': 'blue' };
+    await k8s.create({ apiVersion: 'v1', kind: 'Pod', metadata: { name: 'demo-blue-new', namespace: 'cs-demo', labels }, status: { podIP: '10.244.0.30', phase: 'Running' } } as never);
+    expect(await gateway.workers[0]!.runOnce()).toBe(1);
+    expect(await gateway.api.lookupByIp('10.244.0.30')).toMatchObject({ identity: 'demo/demo', kind: 'service' });
+    expect((await repo.listActive()).map((p) => p.podName)).toEqual(['demo-blue-new']);
+  });
 });
