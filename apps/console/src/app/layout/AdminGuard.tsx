@@ -6,6 +6,7 @@ import { useApiQuery } from '../../shared/api/useApi';
 import { useT } from '../../shared/lib/useT';
 import { EmptyState } from '../../shared/ui/EmptyState';
 import { QueryStatus } from '../../shared/ui/QueryStatus';
+import { DialogVisibility } from '../../shared/ui/dialog/DialogHost';
 import { ButtonLink } from '../../shared/ui/navigation/ButtonLink';
 
 /**
@@ -33,5 +34,5 @@ export function AdminGuard({ children }: { readonly children: ReactNode }): Reac
         action={<ButtonLink to="/">{t('admin.denied.back')}</ButtonLink>}
       />
     ) : null;
-  return <>{notice}<div key={me.data?.id} hidden={!allowed} inert={!allowed} style={allowed ? { display: 'contents' } : undefined}>{allowed || visited && !!me.error ? children : null}</div></>;
+  return <>{notice}<div key={me.data?.id} hidden={!allowed} inert={!allowed} style={allowed ? { display: 'contents' } : undefined}>{allowed || visited && !!me.error ? <DialogVisibility hidden={!allowed}>{children}</DialogVisibility> : null}</div></>;
 }

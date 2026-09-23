@@ -10,6 +10,7 @@ import { PROJECT_PATHS, projectPageFromPath } from '../../shared/project/project
 import { useProjectIdentity } from '../../shared/project/useProjectIdentity';
 import { EmptyState } from '../../shared/ui/EmptyState';
 import { QueryStatus } from '../../shared/ui/QueryStatus';
+import { DialogVisibility } from '../../shared/ui/dialog/DialogHost';
 import { TesterProjectPage } from '../../features/projects/pages/TesterProjectPage';
 import { ButtonLink } from '../../shared/ui/navigation/ButtonLink';
 
@@ -39,6 +40,6 @@ export function ProjectSpaceBoundary({ children }: { readonly children: ReactNod
     action={space === 'admin' ? <ButtonLink to="/admin/projects">{t('nav.admin.backToProjects')}</ButtonLink> : <ButtonLink to="/projects">{t('projectContext.backToProjects')}</ButtonLink>} />;
   else if (failed) notice = <QueryStatus isPending={false} error={project.error ?? me.error} />;
   else notice = <><QueryStatus isPending={false} error={project.error} />{project.previewOnly ? <TesterProjectPage /> : null}</>;
-  // 只保留曾经打开的页面，避免身份刷新清掉草稿；首次以测试者进入不挂载内部页面。
-  return <>{notice}<div hidden={!visible} style={visible ? { display: 'contents' } : undefined}>{visible || visited ? children : null}</div></>;
+  // 只保留曾经打开的页面，避免身份刷新清掉草稿；首次以测试者进入不挂载内部页面。藏起时里面的弹窗也不画（草稿仍在）。
+  return <>{notice}<div hidden={!visible} style={visible ? { display: 'contents' } : undefined}>{visible || visited ? <DialogVisibility hidden={!visible}>{children}</DialogVisibility> : null}</div></>;
 }

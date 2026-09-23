@@ -37,6 +37,8 @@ export interface ConfirmationDialogProps {
   /** 输入与初始值不同：「清空」只在这时可点。 */
   readonly dirty?: boolean;
   readonly size?: DialogSize;
+  /** 所在的一片被藏起时仍显示：只给离开确认（见 Dialog 的 persistent）。 */
+  readonly persistent?: boolean;
 }
 
 /**
@@ -44,7 +46,7 @@ export interface ConfirmationDialogProps {
  * 包括需要异步预检的动作与「放弃未保存输入／离开页面」一类提示；一行式的 InlineConfirm 仍在行内。
  * 不可撤销、要输入确认词的动作用 ConfirmDialog。
  */
-export function ConfirmationDialog({ title, question, hint, children, confirmLabel, cancelLabel, busy = false, busyLabel, confirmDisabled = false, danger = false, onConfirm, onCancel, focus = 'dialog', actions, onClear, dirty = false, size = 'small' }: ConfirmationDialogProps): ReactElement {
+export function ConfirmationDialog({ title, question, hint, children, confirmLabel, cancelLabel, busy = false, busyLabel, confirmDisabled = false, danger = false, onConfirm, onCancel, focus = 'dialog', actions, onClear, dirty = false, size = 'small', persistent = false }: ConfirmationDialogProps): ReactElement {
   const t = useT(), questionId = useId(), hintId = useId(), cancelButton = useRef<HTMLButtonElement>(null);
   const footer = <ActionRow>
     <Button variant={danger ? 'dangerPrimary' : 'primary'} disabled={busy || confirmDisabled} onClick={onConfirm}>{busy ? (busyLabel ?? confirmLabel) : confirmLabel}</Button>
@@ -55,7 +57,7 @@ export function ConfirmationDialog({ title, question, hint, children, confirmLab
   const describedBy = title !== undefined ? questionId : hint !== undefined ? hintId : undefined;
   // 没有标题时问句就是标题；问句、说明与核对材料都没有时不画正文，免得标题与按钮之间空出一截。
   const empty = title === undefined && hint === undefined && (children === undefined || children === null || children === false);
-  return <Dialog title={title ?? question} role="alertdialog" size={size} busy={busy} onClose={onCancel} footer={footer} initialFocus={focus === 'cancel' ? cancelButton : 'dialog'} {...(describedBy ? { describedBy } : {})}>
+  return <Dialog title={title ?? question} role="alertdialog" size={size} busy={busy} onClose={onCancel} footer={footer} initialFocus={focus === 'cancel' ? cancelButton : 'dialog'} persistent={persistent} {...(describedBy ? { describedBy } : {})}>
     {empty ? null : <>
       {title !== undefined ? <p id={questionId} className={styles.question}>{question}</p> : null}
       {hint !== undefined ? <p id={hintId} className={styles.hint}>{hint}</p> : null}

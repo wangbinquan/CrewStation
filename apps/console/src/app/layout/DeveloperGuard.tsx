@@ -7,6 +7,7 @@ import { useApiQuery } from '../../shared/api/useApi';
 import { useT } from '../../shared/lib/useT';
 import { EmptyState } from '../../shared/ui/EmptyState';
 import { QueryStatus } from '../../shared/ui/QueryStatus';
+import { DialogVisibility } from '../../shared/ui/dialog/DialogHost';
 import { ButtonLink } from '../../shared/ui/navigation/ButtonLink';
 
 export function DeveloperGuard({ children }: { readonly children: ReactNode }) {
@@ -24,5 +25,5 @@ export function DeveloperGuard({ children }: { readonly children: ReactNode }) {
     : !allowed ? <EmptyState title={t('development.denied')} description={t(visited ? 'development.suspended' : 'development.deniedHint')}
       action={<ButtonLink to="/market">{t('nav.market')}</ButtonLink>} /> : null;
   // Preserve existing drafts across a failed identity refresh; first-time visitors never mount protected content.
-  return <>{notice}<div key={me.data?.id} hidden={!allowed} inert={!allowed} style={allowed ? { display: 'contents' } : undefined}>{allowed || visited ? children : null}</div></>;
+  return <>{notice}<div key={me.data?.id} hidden={!allowed} inert={!allowed} style={allowed ? { display: 'contents' } : undefined}>{allowed || visited ? <DialogVisibility hidden={!allowed}>{children}</DialogVisibility> : null}</div></>;
 }

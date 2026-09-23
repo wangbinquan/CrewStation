@@ -4,7 +4,7 @@ import { createPortal } from 'react-dom';
 import { currentOpener, returnFocus } from '../../lib/focusReturn';
 import { useT } from '../../lib/useT';
 import { Button } from '../Button';
-import { useDialogHost } from './DialogHost';
+import { useDialogHost, useDialogsHidden } from './DialogHost';
 import styles from './Dialog.module.css';
 
 /** 三档宽度：`small` 480（确认）、`medium` 600（一般表单，默认）、`large` 880（多页签、多步骤的大表单）。 */
@@ -33,6 +33,11 @@ export interface DialogProps {
    * 不给就聚焦正文里第一个可编辑控件，没有就聚焦弹窗本身。
    */
   readonly initialFocus?: RefObject<HTMLElement | null> | 'dialog';
+  /**
+   * 所在的一片被藏起（DialogVisibility）时仍然显示。只给离开确认用：它回应的是一次正在等待的导航，藏起来就再也答不了；
+   * 其余弹窗随所在的一片藏起、重新显示时照原样回来。
+   */
+  readonly persistent?: boolean;
 }
 
 /** 正文里可编辑的控件：打开弹窗、清空输入后焦点落在第一个上。 */
@@ -49,8 +54,14 @@ const ISOLATE = { onClick: stop, onDoubleClick: stop, onContextMenu: stop, onKey
  * 全站弹窗的底座：页面内的模态 `<dialog>`（`showModal`），不是浏览器原生 alert／confirm，不会冻住调试用的浏览器自动化。
  * 调用方挂载即打开、卸载即关闭；✕、Esc 关闭，点遮罩不关；打开时焦点进弹窗，关闭后回到打开它的控件；
  * 弹窗里的 Esc 不再冒泡到外层的键盘处理；浏览器强行关掉弹窗（连续 Esc 的防滥用规则）时按关闭处理，免得留下看不见的弹窗。
+ * 所在的一片被守卫或页签藏起时不画（见 DialogVisibility），除非是 `persistent` 的离开确认。
  */
-export function Dialog({ title, children, footer, onClose, busy = false, size = 'medium', role = 'dialog', describedBy, onSubmit, initialFocus }: DialogProps): ReactElement {
+export function Dialog(props: DialogProps): ReactElement | null {
+  const hidden = useDialogsHidden();
+  return hidden && !props.persistent ? null : <DialogFrame {...props} />;
+}
+
+function DialogFrame({ title, children, footer, onClose, busy = false, size = 'medium', role = 'dialog', describedBy, onSubmit, initialFocus }: DialogProps): ReactElement {
   const t = useT(), titleId = useId(), host = useDialogHost();
   const dialog = useRef<HTMLDialogElement>(null), body = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {

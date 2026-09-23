@@ -44,9 +44,11 @@ async function input(node: HTMLInputElement, value: string) {
   await act(async () => { node.focus(); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(node, value); node.dispatchEvent(new Event('input', { bubbles: true })); node.dispatchEvent(new KeyboardEvent('keyup', { key: 'a', bubbles: true })); });
   await page!.settle();
 }
+/** 有弹窗开着时只点得到最上层弹窗里的按钮：模态弹窗后面的页面是惰性的（2026-09-23 起新增与修改都在弹窗里）。 */
 async function click(label: string) {
   if (label === '保存') label = `保存到${page!.search().env === 'production' ? '生产' : '开发'}`;
-  const button = [...document.querySelectorAll<HTMLButtonElement>('button')].find((element) => !element.closest('[hidden]') && element.textContent === label)!;
+  const scope: ParentNode = [...document.querySelectorAll('dialog[open]')].at(-1) ?? document;
+  const button = [...scope.querySelectorAll<HTMLButtonElement>('button')].find((element) => !element.closest('[hidden]') && element.textContent === label)!;
   expect(button).toBeDefined(); await act(async () => { button.click(); }); await page!.settle();
 }
 
@@ -67,11 +69,11 @@ test('管理员仍可维护生产组；身份刷新失败保护草稿并禁写�
   await input(visible('input[placeholder="DATABASE_URL"]'), 'ADMIN_VALUE');
   await input(visible('input[placeholder="写入后生效于下一次注入"]'), '保留的生产草稿'); f.state.failIdentity = true; await page!.reread();
   expect(page.text()).toContain('身份读取失败');
-  const draft = document.querySelector<HTMLInputElement>('input[placeholder="写入后生效于下一次注入"]')!;
-  expect(draft.value).toBe('保留的生产草稿'); expect(draft.closest('[hidden]')).not.toBeNull();
-  await act(async () => { draft.closest('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); });
-  await page.settle(); expect(f.writes).toHaveLength(0);
-  f.state.failIdentity = false; await page!.reread(); await click('保存');
+  // 身份守卫把页面藏起时草稿弹窗也不画（DialogVisibility），输入留在组件里，没有可提交的入口。
+  expect(document.querySelectorAll('dialog[open]').length).toBe(0); expect(document.querySelector('input[placeholder="写入后生效于下一次注入"]') === null).toBe(true);
+  expect(f.writes).toHaveLength(0);
+  f.state.failIdentity = false; await page!.reread();
+  expect(visible<HTMLInputElement>('input[placeholder="写入后生效于下一次注入"]').value).toBe('保留的生产草稿'); await click('保存');
   expect(f.writes).toHaveLength(1); expect(f.writes[0]?.path).toBe(`/v1/projects/${projectId}/config/production`);
 });
 
@@ -96,25 +98,32 @@ test('键名规则与空值语义首屏可见；非法键有字段反馈并聚�
   await input(key, 'EMPTY_VALUE'); await click('保存'); expect(f.writes[0]?.body).toMatchObject({ name: 'EMPTY_VALUE', value: '' });
 });
 
-test('填入普通键保留可读值，密钥不预填；两组失败草稿各自保留', async () => {
-  const f = fixture(); f.state.failSave = true; page = await renderApp(`/projects/${projectId}/settings?tab=config`); await click('新增变量');
-  await click('修改'); expect(visible<HTMLInputElement>('input[placeholder="写入后生效于下一次注入"]').value).toBe('当前值');
-  expect(page.html()).toContain('01a0bf5d-8f4b-741b-855a-427597babed5');
-  const secretRow = [...document.querySelectorAll<HTMLTableRowElement>('tr')].find((row) => !row.closest('[hidden]') && row.textContent?.includes('API_TOKEN'))!;
-  await act(async () => { secretRow.querySelector('button')!.click(); }); await page.settle();
+test('填入普通键保留可读值，密钥不预填；两组失败草稿各自保留，关窗后再点同一项恢复', async () => {
+  const f = fixture(); f.state.failSave = true; page = await renderApp(`/projects/${projectId}/settings?tab=config`);
+  await click('修改'); expect(openDialog().textContent).toContain('修改 GREETING'); expect(visible<HTMLInputElement>('input[placeholder="写入后生效于下一次注入"]').value).toBe('当前值');
+  expect(page.html()).toContain('01a0bf5d-8f4b-741b-855a-427597babed5'); await click('取消');
+  const secretRow = () => [...document.querySelectorAll<HTMLTableRowElement>('tr')].find((row) => !row.closest('[hidden]') && row.textContent?.includes('API_TOKEN'))!;
+  await act(async () => { secretRow().querySelector('button')!.click(); }); await page.settle();
   expect(visible<HTMLInputElement>('input[placeholder="写入后生效于下一次注入"]').value).toBe(''); expect(page.text()).toContain('旧密钥无法读回');
   await input(visible('input[placeholder="写入后生效于下一次注入"]'), '开发草稿'); await click('保存');
+  expect(openDialog().textContent).toContain('配置服务暂不可用'); await click('取消');
   await page.click('生产'); await click('新增变量'); await input(visible('input[placeholder="DATABASE_URL"]'), 'PRODUCTION_VALUE');
   await input(visible('input[placeholder="写入后生效于下一次注入"]'), '生产草稿'); await click('保存');
-  expect(f.writes.at(-1)?.path).toBe(`/v1/projects/${projectId}/config/production`);
-  await click('开发'); expect(visible<HTMLInputElement>('input[placeholder="写入后生效于下一次注入"]').value).toBe('开发草稿');
-  await page.click('生产'); expect(visible<HTMLInputElement>('input[placeholder="写入后生效于下一次注入"]').value).toBe('生产草稿');
+  expect(f.writes.at(-1)?.path).toBe(`/v1/projects/${projectId}/config/production`); await click('取消');
+  await click('开发'); expect(document.querySelectorAll('dialog[open]').length).toBe(0);
+  await act(async () => { secretRow().querySelector('button')!.click(); }); await page.settle();
+  expect(visible<HTMLInputElement>('input[placeholder="写入后生效于下一次注入"]').value).toBe('开发草稿'); await click('取消');
+  await page.click('生产'); await click('新增变量'); expect(visible<HTMLInputElement>('input[placeholder="写入后生效于下一次注入"]').value).toBe('生产草稿');
 });
 
 test('删除配置项走弹窗：写清对象与后果，Secret 另有提示，输入 delete 才发出 DELETE', async () => {
   const f = fixture(); page = await renderApp(`/projects/${projectId}/settings?tab=config`);
   const deleteIn = (name: string) => [...document.querySelectorAll<HTMLTableRowElement>('tr')].find((row) => !row.closest('[hidden]') && row.querySelector('td span')?.textContent === name)!
     .querySelectorAll('button')[1]!;
+  // 表格行里的动作是紧凑档描边按钮，删除红字红框（2026-09-23 按钮统一）。
+  const row = [...document.querySelectorAll<HTMLTableRowElement>('tr')].find((node) => !node.closest('[hidden]') && node.querySelector('td span')?.textContent === 'GREETING')!;
+  const [edit, remove] = [...row.querySelectorAll('button')].map((node) => node.className.split(' '));
+  expect(edit).toEqual(['button', 'secondary', 'small']); expect(remove).toEqual(['button', 'danger', 'small']);
   await act(async () => { deleteIn('API_TOKEN').click(); }); await page.settle();
   expect(openDialog().textContent).toContain('删除配置项「API_TOKEN」（API_TOKEN）？'); expect(openDialog().textContent).toContain('删除后只能重新写入');
   await typeConfirmWord('delet'); expect(dialogConfirmButton().disabled).toBe(true);
@@ -132,7 +141,11 @@ test('保存进行中防止清空、切编辑项、重复保存与删除；暂�
   const f = fixture(); page = await renderApp(`/projects/${projectId}/settings?tab=config`); await click('新增变量');
   await input(visible('input[placeholder="DATABASE_URL"]'), 'EDIT_VALUE'); await input(visible('input[placeholder="写入后生效于下一次注入"]'), '草稿');
   let finish!: () => void; f.state.hold = new Promise<void>((resolve) => { finish = resolve; });
-  await click('保存'); await click('保存中…'); await click('取消编辑'); await click('修改'); await click('删除');
+  await click('保存'); await click('保存中…'); await click('取消');
+  // 保存进行中：弹窗的取消与 ✕ 都不可用，页面上的修改、删除与新增也都停用（它们本来就在模态弹窗后面）。
+  const pageButtons = [...document.querySelectorAll<HTMLButtonElement>('button')].filter((node) => !node.closest('dialog') && !node.closest('[hidden]') && ['修改', '删除', '新增变量'].includes(node.textContent ?? ''));
+  expect(pageButtons.length).toBeGreaterThan(0); expect(pageButtons.every((node) => node.disabled)).toBe(true);
+  expect(document.querySelectorAll('dialog[open]').length).toBe(1);
   expect(f.writes).toHaveLength(1); expect(visible<HTMLInputElement>('input[placeholder="写入后生效于下一次注入"]').value).toBe('草稿');
   await act(async () => { finish(); }); await page.settle(); f.state.hold = undefined; await click('新增变量'); await input(visible('input[placeholder="DATABASE_URL"]'), 'SECOND_VALUE');
   await input(visible('input[placeholder="写入后生效于下一次注入"]'), '未提交的新内容'); f.state.failRead = true; await page!.reread();
@@ -145,28 +158,32 @@ test('保存进行中防止清空、切编辑项、重复保存与删除；暂�
 test('编辑另一配置或离开设置前可保留未保存输入，确认放弃后才跳转', async () => {
   fixture(); page = await renderApp(`/projects/${projectId}/settings?tab=config`); await click('新增变量');
   await input(visible('input[placeholder="DATABASE_URL"]'), 'DRAFT_KEY');
-  await input(visible('input[placeholder="写入后生效于下一次注入"]'), '不可丢的草稿'); await click('修改');
-  // 旧界面直接换 key 重挂表单，未保存值随组件被销毁。
-  expect(visible<HTMLInputElement>('input[placeholder="写入后生效于下一次注入"]').value).toBe('不可丢的草稿');
-  await click('继续编辑'); await page.click('高级');
-  expect(page.search().tab).toBe('config'); expect(page.text()).toContain('未保存的输入');
+  await input(visible('input[placeholder="写入后生效于下一次注入"]'), '不可丢的草稿'); await click('取消'); await click('修改');
+  // 旧界面直接换 key 重挂表单，未保存值随组件被销毁。现在先确认；「继续编辑」回到原来那份草稿。
+  expect(document.querySelector('[role="alertdialog"]')?.textContent).toContain('开发有未保存的输入。放弃后载入「GREETING」？');
   await click('继续编辑'); expect(visible<HTMLInputElement>('input[placeholder="写入后生效于下一次注入"]').value).toBe('不可丢的草稿');
+  await click('取消'); await page.click('高级');
+  expect(page.search().tab).toBe('config'); expect(page.text()).toContain('未保存的输入');
+  await click('继续编辑'); expect(document.querySelectorAll('dialog[open]').length).toBe(0);
+  await click('新增变量'); expect(visible<HTMLInputElement>('input[placeholder="写入后生效于下一次注入"]').value).toBe('不可丢的草稿'); await click('取消');
   await page.click('高级'); await click('放弃输入并离开'); expect(page.search().tab).toBe('advanced');
 });
 
-test('放弃载入与清空都明确确认；成功保存后的空值不再被误判为未保存', async () => {
+test('放弃载入要确认；取消只关窗、清空回到载入时的值；成功保存后的空值不再被误判为未保存', async () => {
   const f = fixture(); page = await renderApp(`/projects/${projectId}/settings?tab=config`); await click('新增变量');
-  await input(visible('input[placeholder="DATABASE_URL"]'), 'FIRST_DRAFT'); await click('修改'); await click('放弃输入并载入');
+  await input(visible('input[placeholder="DATABASE_URL"]'), 'FIRST_DRAFT'); await click('取消'); await click('修改'); await click('放弃输入并载入');
   expect(visible<HTMLInputElement>('input[placeholder="写入后生效于下一次注入"]').value).toBe('当前值');
-  await input(visible('input[placeholder="写入后生效于下一次注入"]'), '新值'); await click('取消编辑'); expect(page.text()).toContain('放弃开发未保存的输入'); await click('继续编辑');
-  expect(visible<HTMLInputElement>('input[placeholder="写入后生效于下一次注入"]').value).toBe('新值');
+  await input(visible('input[placeholder="写入后生效于下一次注入"]'), '新值'); await click('取消'); expect(document.querySelectorAll('dialog[open]').length).toBe(0);
+  await click('修改'); expect(visible<HTMLInputElement>('input[placeholder="写入后生效于下一次注入"]').value).toBe('新值');
+  await click('清空'); expect(visible<HTMLInputElement>('input[placeholder="写入后生效于下一次注入"]').value).toBe('当前值'); expect(document.querySelectorAll('dialog[open]').length).toBe(1);
+  await input(visible('input[placeholder="写入后生效于下一次注入"]'), '新值');
   await click('保存'); await page.click('高级'); expect(page.search().tab).toBe('advanced'); expect(f.writes).toHaveLength(1);
 });
 
 test('后台环境草稿也会阻止离开；一次只确认第一个目的地，取消和返回均不写入', async () => {
   const f = fixture(), initial = `/projects/${projectId}/settings?tab=config`;
   const browser = browserHistoryFixture(['/projects', initial]); page = await renderApp(initial, undefined, browser.history); await click('新增变量');
-  await input(visible('input[placeholder="DATABASE_URL"]'), 'DEV_HIDDEN'); await page.click('生产');
+  await input(visible('input[placeholder="DATABASE_URL"]'), 'DEV_HIDDEN'); await click('取消'); await page.click('生产');
   await page.click('高级'); await page.requestNavigate(`/projects/${projectId}/settings?tab=members`);
   expect(document.querySelectorAll('[role="alertdialog"]')).toHaveLength(1); expect(page.search().tab).toBe('config');
   await click('放弃输入并离开'); expect(page.search().tab).toBe('advanced'); expect(f.writes).toHaveLength(0);
@@ -184,22 +201,24 @@ test('设置默认只显示开发变量列表；新增、取消和保存的焦�
   expect([...document.querySelectorAll('details')].every((node) => !node.open)).toBe(true);
   const add = [...document.querySelectorAll<HTMLButtonElement>('button')].find((node) => !node.closest('[hidden]') && node.textContent === '新增变量')!;
   await act(async () => { add.focus(); add.click(); }); await page.settle();
-  expect(document.activeElement).toBe(visible('input[placeholder="DATABASE_URL"]'));
-  await click('取消编辑'); expect(visible('input')).toBeUndefined(); expect(document.activeElement).toBe(add);
+  expect(document.activeElement === visible('input[placeholder="DATABASE_URL"]')).toBe(true);
+  await click('取消'); expect(visible('input')).toBeUndefined(); expect(document.activeElement === add).toBe(true);
   await click('新增变量'); await input(visible('input[placeholder="DATABASE_URL"]'), 'LIST_FIRST'); await click('保存');
-  expect(visible('input')).toBeUndefined(); expect(document.activeElement).toBe(add); expect(page.text()).toContain('第 4 版');
+  expect(visible('input')).toBeUndefined(); expect(document.activeElement === add).toBe(true); expect(page.text()).toContain('第 4 版');
 });
 
 test('开发保存迟到时只关闭开发编辑器，生产草稿保留且不会自动提交', async () => {
   const f = fixture(); page = await renderApp(`/projects/${projectId}/settings`); await click('新增变量');
   await input(visible('input[placeholder="DATABASE_URL"]'), 'DEV_PENDING');
   let finish!: () => void; f.state.hold = new Promise<void>((resolve) => { finish = resolve; });
-  await click('保存'); await click('生产'); await click('新增变量');
+  // 保存进行中弹窗关不掉；用浏览器导航换到生产组：开发组连同它的弹窗藏起，保存照常完成。
+  await click('保存'); await page.requestNavigate(`/projects/${projectId}/settings?tab=config&env=production`); await click('新增变量');
   await input(visible('input[placeholder="DATABASE_URL"]'), 'PROD_UNSAVED');
   await input(visible('input[placeholder="写入后生效于下一次注入"]'), 'production draft');
   await act(async () => { finish(); }); await page.settle();
   expect(visible<HTMLInputElement>('input[placeholder="DATABASE_URL"]').value).toBe('PROD_UNSAVED');
   expect(visible<HTMLInputElement>('input[placeholder="写入后生效于下一次注入"]').value).toBe('production draft');
   expect(f.writes).toHaveLength(1); expect(f.writes[0]!.path).toContain('/development');
-  await click('开发'); expect(visible('input')).toBeUndefined(); await page.click('运行与诊断'); expect(page.search().tab).toBe('config');
+  await click('取消'); await click('开发'); expect(visible('input')).toBeUndefined(); expect(document.querySelectorAll('dialog[open]').length).toBe(0);
+  await page.click('运行与诊断'); expect(page.search().tab).toBe('config');
 });

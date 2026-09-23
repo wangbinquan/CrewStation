@@ -77,7 +77,7 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   "config.draft.replace": "{env} has unsaved input. Discard it and load “{name}”?",
   "config.draft.blank": "Blank form",
   "config.draft.discard": "Discard input and load",
-  "config.draft.lifetime": "Drafts for both groups stay on this page. Refreshing or closing the page loses unsaved input.",
+  "config.draft.lifetime": "Closing the dialog keeps your input; open the same item (or Add variable) again to continue. Development and production each keep one draft. Refreshing or closing the page loses unsaved input.",
   "config.impact.title": "Production config and deployments",
   "config.impact.note": "These are production config snapshot versions recorded by each deployed release. Its Manifest determines which keys are injected. Saving config does not reload existing processes.",
   "config.impact.current": "Currently saved production config: version {version}.",
@@ -105,7 +105,6 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   "config.impact.state.failed": "Failed",
   "config.add": "Add variable",
   "config.edit": "Edit {name}",
-  "config.cancel": "Cancel editing",
   "config.saveTo": "Save to {env}",
   "config.itemDetails": "Change details",
   "config.updateSecret": "Update secret",
@@ -113,7 +112,5 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   "config.variables.production": "Production variables",
   "config.description": "Configure runtime values for your app; mark confidential values as secrets.",
   "config.platformGuide": "Platform variables and integration guide",
-  "config.draft.cancel": "Discard unsaved input for {env}?",
-  "config.draft.confirmCancel": "Discard input and close",
 
 };

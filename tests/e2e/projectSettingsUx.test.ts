@@ -45,8 +45,8 @@ describe.skipIf(!session?.project)('项目设置与资源的真实布局', () =>
     await settle(page);
     expect(await page.eval<number>('document.documentElement.scrollWidth - innerWidth')).toBeLessThanOrEqual(1);
     expect(await page.eval<string | null>('document.activeElement?.getAttribute("placeholder")')).toBe('DATABASE_URL');
-    // 只提交空表单验证字段错误，绝不写入真实项目配置。
-    await page.eval('document.querySelector("main form").requestSubmit()'); await settle(page);
+    // 只提交空表单验证字段错误，绝不写入真实项目配置。2026-09-23 起新增变量是弹窗，表单在弹窗里。
+    await page.eval('document.querySelector("dialog[open] form").requestSubmit()'); await settle(page);
     expect(await page.eval<string | null>('document.activeElement?.getAttribute("aria-invalid")')).toBe('true');
     expect(page.takeErrors()).toEqual([]);
   }, 120_000);

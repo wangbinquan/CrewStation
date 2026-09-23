@@ -11,7 +11,7 @@ import styles from './ConfigItemTable.module.css';
 
 export interface ConfigItemTableProps {
   readonly items: readonly ConfigItemDto[];
-  readonly onEdit: (item: ConfigItemDto, button: HTMLButtonElement) => void;
+  readonly onEdit: (item: ConfigItemDto) => void;
   readonly onDelete: (item: ConfigItemDto) => void;
   readonly deletingName: string | undefined;
   readonly disabled?: boolean;
@@ -44,10 +44,10 @@ export function ConfigItemTable({ items, onEdit, onDelete, deletingName, disable
             <ConfigItemValue item={item} />
           </td>
           {!readOnly ? <td className={styles.actions}>
-            <Button variant="ghost" disabled={disabled} onClick={(event) => onEdit(item, event.currentTarget)}>
+            <Button size="small" disabled={disabled} onClick={() => onEdit(item)}>
               {t(item.isSecret ? 'config.updateSecret' : 'config.items.edit')}
             </Button>
-            <Button variant="danger" disabled={disabled || deletingName === item.id} onClick={() => setConfirming(item)}>
+            <Button variant="danger" size="small" disabled={disabled || deletingName === item.id} onClick={() => setConfirming(item)}>
               {t(deletingName === item.id ? 'config.items.deleting' : 'config.items.delete')}
             </Button>
           </td> : null}

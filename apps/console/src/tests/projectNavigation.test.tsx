@@ -223,14 +223,14 @@ describe('诊断、订阅与配置的上下文', () => {
     const f = fixture(); page = await renderApp(`/projects/${projectId}/config`);
     expect(page.search()).toMatchObject({ tab: 'config', env: 'development' });
     expect(document.querySelector('[aria-label="项目页面"] a[aria-current="page"]')?.textContent).toBe('项目设置');
-    await page.click('新增变量');
-    const nameInput = document.querySelector<HTMLInputElement>('input[placeholder="DATABASE_URL"]')!;
-    await input(nameInput, 'DEV_DRAFT'); await page.click('生产');
-    expect(page.search().env).toBe('production'); expect(nameInput.closest('[hidden]')).not.toBeNull();
-    await page.click('新增变量');
-    const prodName = [...document.querySelectorAll<HTMLInputElement>('input[placeholder="DATABASE_URL"]')].find((node) => !node.closest('[hidden]'))!;
-    await input(prodName, 'PROD_DRAFT'); await page.back();
-    expect(page.search().env).toBe('development'); expect(nameInput.value).toBe('DEV_DRAFT'); expect(prodName.value).toBe('PROD_DRAFT');
+    // 2026-09-23 起新增变量是弹窗：关窗保留草稿；切到另一组时这一组连同它的弹窗藏起，草稿仍在。
+    const draftName = () => document.querySelector<HTMLInputElement>('dialog[open] input[placeholder="DATABASE_URL"]');
+    await page.click('新增变量'); await input(draftName()!, 'DEV_DRAFT'); await page.click('取消'); await page.click('生产');
+    expect(page.search().env).toBe('production');
+    await page.click('新增变量'); await input(draftName()!, 'PROD_DRAFT'); await page.back();
+    expect(page.search().env).toBe('development'); expect(document.querySelectorAll('dialog[open]').length).toBe(0);
+    await page.click('新增变量'); expect(draftName()?.value).toBe('DEV_DRAFT'); await page.click('取消');
+    await page.click('生产'); expect(draftName()?.value).toBe('PROD_DRAFT');
     expect(f.calls.some((call) => call.method !== 'GET')).toBe(false);
   });
 

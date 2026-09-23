@@ -22,3 +22,19 @@ export function DialogHost({ children }: { readonly children: ReactNode }): Reac
 export function useDialogHost(): HTMLElement | null {
   return useContext(DialogHostContext);
 }
+
+const DialogsHiddenContext = createContext(false);
+
+/**
+ * 包住「藏起但仍挂载」的一片：身份守卫停用的页面、页签后面的另一组取值。弹窗经 portal 画在顶层，不会随容器 `hidden`
+ * 一起藏起，由它告诉里面的弹窗此刻不画；草稿与开关状态都在调用方，容器重新显示时弹窗照原样回来。可以嵌套，任一层藏起就藏起。
+ */
+export function DialogVisibility({ hidden, children }: { readonly hidden: boolean; readonly children: ReactNode }): ReactElement {
+  const parent = useContext(DialogsHiddenContext);
+  return <DialogsHiddenContext.Provider value={parent || hidden}>{children}</DialogsHiddenContext.Provider>;
+}
+
+/** 所在的一片此刻是否藏起（见 DialogVisibility）。 */
+export function useDialogsHidden(): boolean {
+  return useContext(DialogsHiddenContext);
+}

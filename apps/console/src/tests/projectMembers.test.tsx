@@ -180,10 +180,10 @@ test('成员草稿：关窗不丢，未完成查找和已选角色都保护离�
 test('成员草稿：身份读取失败或角色撤销后保留目标和角色，暂停变更，恢复后再显式保存', async () => {
   const f = fixture(); page = await renderApp(`/projects/${projectId}/settings?tab=members`); if (f.state.role !== 'developer' || f.state.admin) await page.click('添加成员'); await selectMember(); await input(role(), 'tester');
   f.state.failIdentity = true; await page.reread();
-  expect(page.text()).toContain('当前身份读取失败'); expect(role().disabled).toBe(true); expect(role().value).toBe('tester'); expect(page.text()).toContain('已选择 小林');
-  await act(async () => { role().closest('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); }); await page.settle(); expect(f.writes()).toHaveLength(0);
+  // 身份守卫把页面藏起时成员弹窗也不画（DialogVisibility），草稿留在组件里，没有可提交的入口。
+  expect(page.text()).toContain('当前身份读取失败'); expect(document.querySelectorAll('dialog[open]').length).toBe(0); expect(role() === null).toBe(true); expect(f.writes()).toHaveLength(0);
   f.state.failIdentity = false; f.state.role = 'developer'; await page.reread();
-  expect(role().value).toBe('tester'); expect(role().disabled).toBe(true);
+  expect(page.text()).toContain('已选择 小林'); expect(role().value).toBe('tester'); expect(role().disabled).toBe(true);
   await page.requestNavigate(`/projects/${projectId}/settings?tab=advanced`); expect(page.search().tab).toBe('members'); await page.click('继续编辑');
   f.state.role = 'owner'; await page.reread(); expect(role().disabled).toBe(false); expect(f.writes()).toHaveLength(0);
   await page.click('添加或改角色'); expect(f.writes()[0]?.body).toEqual({ userId: memberId, role: 'tester' });

@@ -18,6 +18,7 @@ export interface UnsavedChangesGuardProps {
 
 /**
  * 一次只确认一个导航：以页面内的确认弹窗提示（2026-09-23 起；表单都在弹窗里，页内的提示会被表单弹窗挡住），默认聚焦「继续编辑」。
+ * 页面被身份守卫藏起时也显示（persistent）：导航正等着这个回答。
  * 不使用会冻结页面的浏览器模态框，也不持久化草稿值。
  */
 export function UnsavedChangesGuard({ dirty, scope, allowNavigate, confirmationForNavigation, isNavigationBusy, onDiscard }: UnsavedChangesGuardProps) {
@@ -35,5 +36,5 @@ export function UnsavedChangesGuard({ dirty, scope, allowNavigate, confirmationF
   const finish = (blocked: boolean) => { const resolve = resolver.current, next = target.current; resolver.current = undefined; target.current = undefined;
     if (!blocked && next) onDiscard?.(next); setPending(false); resolve?.(blocked); };
   if (!pending) return null;
-  return <ConfirmationDialog question={confirmation!.question} hint={t('ui.draft.hint')} confirmLabel={confirmation!.confirmLabel} cancelLabel={t('ui.draft.stay')} confirmDisabled={isNavigationBusy?.(confirmation!.next)} focus="cancel" onConfirm={() => finish(false)} onCancel={() => finish(true)} />;
+  return <ConfirmationDialog question={confirmation!.question} hint={t('ui.draft.hint')} confirmLabel={confirmation!.confirmLabel} cancelLabel={t('ui.draft.stay')} confirmDisabled={isNavigationBusy?.(confirmation!.next)} focus="cancel" persistent onConfirm={() => finish(false)} onCancel={() => finish(true)} />;
 }

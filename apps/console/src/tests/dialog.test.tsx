@@ -4,7 +4,7 @@ import { act, useState } from 'react';
 import type { ReactNode } from 'react';
 import { messages } from '../app/i18n/zh-CN';
 import { Dialog } from '../shared/ui/dialog/Dialog';
-import { DialogHost } from '../shared/ui/dialog/DialogHost';
+import { DialogHost, DialogVisibility } from '../shared/ui/dialog/DialogHost';
 import { FormDialog } from '../shared/ui/dialog/FormDialog';
 import { ConfirmationDialog } from '../shared/ui/dialog/ConfirmationDialog';
 import { openDialog } from './confirmDialogDriver';
@@ -253,4 +253,26 @@ test('弹窗之上再开确认弹窗：点击只落在最上层，取消后回�
   expect(openDialog().textContent).toContain('添加成员');
   await rendered.click('取消');
   expect(document.querySelectorAll('dialog').length).toBe(0);
+});
+
+/** 守卫停用页面、页签后面的另一组：容器 hidden 但仍挂载；外层可以再包一层（任一层藏起就藏起）。 */
+function VisibilityProbe() {
+  const [hidden, setHidden] = useState(false);
+  return <>
+    <button type="button" data-toggle="" onClick={() => setHidden((value) => !value)}>切换</button>
+    <DialogVisibility hidden={hidden}>
+      <DialogVisibility hidden={false}><Dialog title="草稿" onClose={() => undefined}><input defaultValue="x" /></Dialog></DialogVisibility>
+      <Dialog title="离开确认" persistent onClose={() => undefined}>{null}</Dialog>
+    </DialogVisibility>
+  </>;
+}
+
+// 弹窗经 portal 画在顶层，不随容器 hidden 藏起：由 DialogVisibility 告诉它此刻不画；离开确认（persistent）照样显示，导航在等它的回答。
+test('所在的一片藏起时弹窗不画、重新显示时回来；离开确认照样显示', async () => {
+  rendered = await renderElement(<VisibilityProbe />, messages);
+  const titles = () => [...document.querySelectorAll('dialog[open] h2')].map((node) => node.textContent).join('、');
+  const toggle = async () => { await act(async () => { rendered!.host.querySelector<HTMLButtonElement>('[data-toggle]')!.click(); }); await rendered!.settle(); };
+  expect(titles()).toBe('草稿、离开确认');
+  await toggle(); expect(titles()).toBe('离开确认'); expect(document.querySelectorAll('dialog').length).toBe(1);
+  await toggle(); expect(titles()).toBe('草稿、离开确认');
 });

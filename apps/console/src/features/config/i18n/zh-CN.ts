@@ -77,7 +77,7 @@ export const messages = {
   "config.draft.replace": "{env}有未保存的输入。放弃后载入「{name}」？",
   "config.draft.blank": "空白表单",
   "config.draft.discard": "放弃输入并载入",
-  "config.draft.lifetime": "两组草稿分别保留在当前页面；刷新或关闭页面会丢失未保存输入。",
+  "config.draft.lifetime": "关掉弹窗会保留输入，再点同一项（或「新增变量」）接着编辑；开发与生产两组各留一份。刷新或关闭页面会丢失未保存的输入。",
   "config.impact.title": "生产配置与部署版本",
   "config.impact.note": "下方显示两槽发布记录中的生产配置快照版本。实际注入键由各版本的 Manifest 决定；保存配置不会自动加载到现有进程。",
   "config.impact.current": "当前已保存的生产配置：第 {version} 版。",
@@ -105,7 +105,6 @@ export const messages = {
   "config.impact.state.failed": "失败",
   "config.add": "新增变量",
   "config.edit": "修改 {name}",
-  "config.cancel": "取消编辑",
   "config.saveTo": "保存到{env}",
   "config.itemDetails": "修改记录",
   "config.updateSecret": "更新密钥",
@@ -113,7 +112,5 @@ export const messages = {
   "config.variables.production": "生产变量",
   "config.description": "为应用配置运行参数；需要保密的值可设为密钥。",
   "config.platformGuide": "查看平台自动注入的变量与接入说明",
-  "config.draft.cancel": "放弃{env}未保存的输入？",
-  "config.draft.confirmCancel": "放弃输入并关闭",
 
 } satisfies Messages;
