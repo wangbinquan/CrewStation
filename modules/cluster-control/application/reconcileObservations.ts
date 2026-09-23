@@ -5,8 +5,8 @@ import type { LedgerObservations, LedgerRecordView } from '../ports/ledger';
 import type { ObservationStats } from './observeChange';
 import { observeChange } from './observeChange';
 
-/** 删的顺序（设计 §6.2）：先 Pod，再 Secret、Service、路由；PVC 只随工作卷记录删。 */
-const REMOVAL_ORDER: readonly ObservedKind[] = ['Pod', 'Secret', 'Service', 'IngressRoute', 'PersistentVolumeClaim'];
+/** 删的顺序（设计 §6.2）：先工作负载（Deployment、Pod），再 Secret、Service、路由；PVC 只随工作卷记录删。 */
+const REMOVAL_ORDER: readonly ObservedKind[] = ['Deployment', 'Pod', 'Secret', 'Service', 'IngressRoute', 'PersistentVolumeClaim'];
 const isObserved = (kind: string): kind is ObservedKind => (REMOVAL_ORDER as readonly string[]).includes(kind);
 const key = (child: { readonly kind: string; readonly namespace?: string; readonly name: string }) => `${child.kind}/${child.namespace ?? ''}/${child.name}`;
 const RETENTION_EXPIRED = 'retention-expired';

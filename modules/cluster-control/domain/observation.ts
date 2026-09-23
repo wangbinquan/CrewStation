@@ -7,6 +7,7 @@ export interface ObservedObject {
     readonly name: string;
     readonly namespace?: string;
     readonly uid?: string;
+    readonly generation?: number;
     readonly labels?: Readonly<Record<string, string>>;
     readonly deletionTimestamp?: string;
     readonly creationTimestamp?: string;
@@ -88,6 +89,34 @@ export function pvcChild(pvc: ObservedObject, observedAt: string): ResourceChild
   return {
     kind: 'PersistentVolumeClaim', ...(pvc.metadata.namespace ? { namespace: pvc.metadata.namespace } : {}), name: pvc.metadata.name, ...(pvc.metadata.uid ? { uid: pvc.metadata.uid } : {}),
     phase, ready: !deleting && phase === 'Bound', ...(deleting ? { reason: 'Terminating' } : {}), observedAt,
+  };
+}
+
+interface DeploymentStatus {
+  readonly observedGeneration?: number;
+  readonly replicas?: number;
+  readonly updatedReplicas?: number;
+  readonly readyReplicas?: number;
+  readonly availableReplicas?: number;
+  readonly conditions?: readonly { readonly type: string; readonly status: string; readonly reason?: string; readonly message?: string }[];
+}
+
+/**
+ * Deployment → 子对象观测（服务槽，第三期）：副本都更新到新版本、都就绪、控制器已看过最新期望，才是 Available；
+ * 推进超时（Progressing=False）是 Stalled；期望副本为 0 是 ScaledDown；其余 Progressing。原因写就绪副本数。
+ */
+export function deploymentChild(deployment: ObservedObject, observedAt: string): ResourceChild {
+  const status = (deployment.status ?? {}) as DeploymentStatus;
+  const desired = (deployment.spec as { replicas?: number } | undefined)?.replicas ?? 1, ready = status.readyReplicas ?? 0;
+  const generation = deployment.metadata.generation ?? 0;
+  const deleting = Boolean(deployment.metadata.deletionTimestamp);
+  const stalled = status.conditions?.find((entry) => entry.type === 'Progressing' && entry.status === 'False');
+  const current = (status.observedGeneration ?? 0) >= generation && (status.updatedReplicas ?? 0) === desired && (status.replicas ?? 0) === desired;
+  const phase = deleting ? 'Terminating' : desired === 0 ? 'ScaledDown' : current && ready === desired ? 'Available' : stalled ? 'Stalled' : 'Progressing';
+  const reason = deleting ? 'Terminating' : stalled && phase === 'Stalled' ? clip(stalled.message ?? stalled.reason ?? 'ProgressDeadlineExceeded') : `副本 ${ready}／${desired} 就绪`;
+  return {
+    kind: 'Deployment', ...(deployment.metadata.namespace ? { namespace: deployment.metadata.namespace } : {}), name: deployment.metadata.name, ...(deployment.metadata.uid ? { uid: deployment.metadata.uid } : {}),
+    phase, ready: phase === 'Available', reason, observedAt,
   };
 }
 

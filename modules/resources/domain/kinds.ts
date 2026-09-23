@@ -8,7 +8,7 @@ export interface KindRule {
   /** 占几个并发额度单位（D31、RFC-006：开发会话、业务任务、每个 Agent 执行各一个）。 */
   readonly quotaUnits: number;
   /** 就绪看哪一种子对象；没有就只看条件。 */
-  readonly primaryChild?: 'Pod' | 'PersistentVolumeClaim';
+  readonly primaryChild?: 'Pod' | 'PersistentVolumeClaim' | 'Deployment';
   /** 就绪还要这些领域条件为真（所属模块上报）。 */
   readonly readyConditions: readonly string[];
   /** 失败后保留多久供诊断（D9：开发会话 72 小时）；没有就不保留。 */
@@ -28,7 +28,8 @@ export const KIND_RULES: Readonly<Record<ResourceKind, KindRule>> = {
   volume: { quotaUnits: 0, primaryChild: 'PersistentVolumeClaim', readyConditions: [], releasable: false },
   namespace: GENERIC,
   'network-policy-set': GENERIC,
-  'service-slot': GENERIC,
+  // 服务槽（第三期）：Deployment 就绪即运行中；领域条件 Serving 为假（已下线、尚未部署）时按已结束算。不占任务额度。
+  'service-slot': { quotaUnits: 0, primaryChild: 'Deployment', readyConditions: [], releasable: false },
   'build-job': GENERIC,
   'migration-job': GENERIC,
   route: GENERIC,

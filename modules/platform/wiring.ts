@@ -166,10 +166,12 @@ function composeCore(deps: CompositionDeps, late: Late) {
   return { identity, project, config, data, scm, apiCatalog, agentRuntime, hosts, isAdmin, resolveById };
 }
 
-function composeDelivery(deps: CompositionDeps, core: ReturnType<typeof composeCore>, late: Late) {
+function composeDelivery(deps: CompositionDeps, core: ReturnType<typeof composeCore>, late: Late, resources: ReturnType<typeof composeLedger>) {
   const { db, k8s, settings, logger } = deps;
   const { project, config, data, scm, apiCatalog, hosts, isAdmin, resolveById } = core;
   const release = createReleaseModule({
+    // 服务槽投影进资源台账（RFC-025 第三期）：在 release 自己的事务里写期望与领域条件。
+    ledger: { within: (tx) => resources.api.owner('release').within(tx as object) },
     physicalOperationId: async (id) => (await deps.identities.aliases('cluster-operation', id)).find((keys) => keys.length === 1 && keys[0] !== id)?.[0] ?? id,
     db, k8s, hosts, logger, isAdmin: (id) => isAdmin(id), authorizer: project.api, services: { resolveServiceById: resolveById },
     tagger: { createReleaseTag: (serviceId, { branch, version, expectedCommitSha }) => scm.api.createReleaseTag(serviceId, { branch, ...(expectedCommitSha ? { expectedCommitSha } : {}), ...(version.startsWith('v') ? { tag: version } : { bump: version as 'major' | 'minor' | 'patch' }) }) },
@@ -428,7 +430,7 @@ function composeModules(deps: CompositionDeps) {
   const late: Late = {};
   const core = composeCore(deps, late);
   const resources = composeLedger(deps, core);
-  const delivery = composeDelivery(deps, core, late);
+  const delivery = composeDelivery(deps, core, late, resources);
   const runtime = composeRuntime(deps, core, delivery, late, resources);
   const aggregates = composeAggregates(deps, core, delivery, runtime);
   const cluster = composeCluster(deps, core, delivery, runtime);

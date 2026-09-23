@@ -87,6 +87,19 @@ describe('条件、子对象、计数与可做操作', () => {
     expect(mergeConditions([], [{ type: 'Failed', status: 'true', since: future }], t1)[0]?.since).toBe(t1.toISOString());
   });
 
+  test('服务槽：Deployment 就绪是运行中、推进中是启动中、推进超时与副本为 0 是降级；Serving 为假（已下线、尚未部署）是已结束，工作负载还在时是结束中', () => {
+    const slot = (child?: Partial<ResourceChild>, conditions: ResourceCondition[] = []) => record({ kind: 'service-slot', spec: { children: [{ kind: 'Deployment', namespace: 'cs-demo', name: 'demo-green' }] }, conditions,
+      children: child ? [{ kind: 'Deployment', namespace: 'cs-demo', name: 'demo-green', phase: 'Available', ready: true, ...child }] : [] });
+    expect(computePhase(slot({})).phase).toBe('ready');
+    expect(computePhase(slot({ phase: 'Progressing', ready: false, reason: '副本 0／1 就绪' }))).toEqual({ phase: 'starting', reason: { code: 'rolling-out', message: '副本 0／1 就绪' } });
+    expect(computePhase(slot({ phase: 'Stalled', ready: false, reason: 'ProgressDeadlineExceeded' })).reason?.code).toBe('rollout-stalled');
+    expect(computePhase(slot({ phase: 'ScaledDown', ready: false })).reason?.code).toBe('scaled-down');
+    expect(computePhase(slot()).phase).toBe('provisioning');
+    const offline = cond('Serving', 'false', { reason: 'offline-idle', message: '待验证版本无人访问，已自动下线' });
+    expect(computePhase(slot(undefined, [offline]))).toEqual({ phase: 'stopped', reason: { code: 'offline-idle', message: '待验证版本无人访问，已自动下线' } });
+    expect(computePhase(slot({}, [offline])).phase).toBe('stopping');
+  });
+
   test('待回收的工作卷：上级已结束、卷还在，按已结束算，原因写明；受理删除后照常是结束中', () => {
     const volume = (extra: Partial<LedgerRecord> = {}) => record({ kind: 'volume', spec: { children: [{ kind: 'PersistentVolumeClaim', namespace: 'cs-demo', name: 'task-1-work' }] }, children: [{ kind: 'PersistentVolumeClaim', namespace: 'cs-demo', name: 'task-1-work', phase: 'Bound', ready: true }], ...extra });
     expect(computePhase(volume({ conditions: [cond('PendingReclaim', 'true', { reason: 'retention-expired', message: '失败保留期已满' })] }))).toEqual({ phase: 'stopped', reason: { code: 'retention-expired', message: '失败保留期已满' } });

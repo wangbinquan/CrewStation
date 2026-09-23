@@ -28,6 +28,9 @@ import type { ImageBuilder, MigrationRunner, SlotDeployer } from './ports/delive
 import type { ConfigSource, DataSource, HostNaming, MaintenanceWindow, PlanCatalog, ProjectAuthorizer, ProjectOwners, ReleaseSettings, ServiceResolver, SlotNotifier } from './ports/platform';
 import type { ReleaseTagger, RepoReader } from './ports/sourceControl';
 import { PIPELINE_JOB_KIND, pipelineJobHandler } from './workers/pipelineHandler';
+import { slotLedgerResyncWorker } from './workers/slotLedgerResync';
+import { resyncSlotLedger } from './application/slotLedgerResync';
+import type { SlotLedger } from './ports/ledger';
 
 export interface ReleaseModuleDeps {
   physicalOperationId?: (id: string) => Promise<string>;
@@ -49,6 +52,8 @@ export interface ReleaseModuleDeps {
   settings: ReleaseSettings & { builderImage: string; buildkitAddress: string; workerOwner: string };
   /** 测试可替换的交付适配器；默认用 Kubernetes 实现。 */
   delivery?: { builder?: ImageBuilder; migrator?: MigrationRunner; deployer?: SlotDeployer };
+  /** 资源台账（RFC-025 第三期）：给了就把服务槽投影进台账（保存槽的同一事务），并定期补投影。 */
+  ledger?: SlotLedger;
   clock?: Clock;
   logger?: Logger;
 }
@@ -76,7 +81,7 @@ export function createReleaseModule(deps: ReleaseModuleDeps): ReleaseModule {
   const logger = deps.logger ?? noopLogger;
   const jobs = queueReleaseJobs(deps.db);
   const useCaseDeps: ReleaseUseCaseDeps = {
-    uow: drizzleUnitOfWork(deps.db),
+    uow: drizzleUnitOfWork(deps.db, deps.ledger ? { ledger: deps.ledger, services: deps.services, logger } : undefined),
     tagger: deps.tagger,
     repo: deps.repo,
     builder: deps.delivery?.builder ?? buildKitBuilder(deps.k8s, { builderImage: deps.settings.builderImage, buildkitAddress: deps.settings.buildkitAddress, timeoutSeconds: deps.settings.buildTimeoutSeconds }),
@@ -113,7 +118,8 @@ export function createReleaseModule(deps: ReleaseModuleDeps): ReleaseModule {
   return {
     api,
     http: [releaseRoutes(api, deps.isAdmin)],
-    workers: [createWorker({ db: deps.db, kinds: [PIPELINE_JOB_KIND], owner: deps.settings.workerOwner, concurrency: 4, logger, handler: pipelineJobHandler(api, jobs) }), sweep],
+    workers: [createWorker({ db: deps.db, kinds: [PIPELINE_JOB_KIND], owner: deps.settings.workerOwner, concurrency: 4, logger, handler: pipelineJobHandler(api, jobs) }), sweep,
+      ...(deps.ledger ? [slotLedgerResyncWorker(() => resyncSlotLedger(useCaseDeps.uow, logger), logger)] : [])],
     migrations: releaseMigrations,
   };
 }

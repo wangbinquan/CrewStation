@@ -1,5 +1,5 @@
 import type { Clock } from '@crewstation/kernel';
-import { goneChild, podChild, podConditions, presentChild, pvcChild, RESOURCE_ID_LABEL } from '../domain/observation';
+import { deploymentChild, goneChild, podChild, podConditions, presentChild, pvcChild, RESOURCE_ID_LABEL } from '../domain/observation';
 import type { ObjectChange } from '../ports/cluster';
 import type { LedgerObservations } from '../ports/ledger';
 
@@ -20,6 +20,12 @@ export function newObservationStats(): ObservationStats {
   return { recorded: 0, unchanged: 0, unowned: 0, platform: 0, removed: 0, reclaimable: 0 };
 }
 
+function childOf(kind: ObjectChange['kind'], object: ObjectChange['object'], observedAt: string) {
+  if (kind === 'Pod') return podChild(object, observedAt);
+  if (kind === 'PersistentVolumeClaim') return pvcChild(object, observedAt);
+  return kind === 'Deployment' ? deploymentChild(object, observedAt) : presentChild(object, observedAt);
+}
+
 /** 一个受管对象的变化 → 子对象观测写回台账（设计 §6.2 第 3 步）。 */
 export async function observeChange(ledger: LedgerObservations, clock: Clock, systemNamespace: string, stats: ObservationStats, change: ObjectChange): Promise<void> {
   const { object, gone } = change;
@@ -28,7 +34,7 @@ export async function observeChange(ledger: LedgerObservations, clock: Clock, sy
     return;
   }
   const observedAt = clock.now().toISOString();
-  const child = gone ? goneChild(object) : change.kind === 'Pod' ? podChild(object, observedAt) : change.kind === 'PersistentVolumeClaim' ? pvcChild(object, observedAt) : presentChild(object, observedAt);
+  const child = gone ? goneChild(object) : childOf(change.kind, object, observedAt);
   const resourceId = object.metadata.labels?.[RESOURCE_ID_LABEL];
   const conditions = !gone && change.kind === 'Pod' ? podConditions(object) : undefined;
   const outcome = await ledger.observe({ ...(resourceId ? { resourceId } : {}), child, ...(gone ? { gone } : {}), ...(conditions ? { conditions } : {}) });

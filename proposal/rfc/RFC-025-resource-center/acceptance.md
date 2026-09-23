@@ -101,3 +101,22 @@
 
 实机（浏览器，管理员身份，运行与诊断的形态页签）：页面先读快照（`GET …/resources`），随后开着 `GET …/resources/stream?cursor=68`；在 rfc023-verify 开会话后，开发会话带不等 15 秒一次的盘点就出现（工作区「启动中」→「运行中」、工作卷）；开 CLI 后 CLI 节点出现，写着「启动中 · 0/1 nodes are available…」；结束 CLI 后约 1 秒节点消失（「0 个 Agent」）；释放会话后整条开发会话带消失——当天「开发容器已关闭、拓扑上还有开发会话」的现象不再出现。同时发现记录节点的存活时长按记录进台账的时刻算（demo 的工作区显示「存活 40 分钟」），已在 4126f4b2 改为按盘点里同一 Pod 的创建时刻。开发页标签的「结束中」由组件用例驱动推送流核对（浏览器的登录在第二次核对时已过期，没有替作者重新登录）。
 
+### 3.3 第二步：回收移交与保留期（99e93569）
+
+- 门禁（干净导出树）：check:static 通过；unit 564、module 1260（12 跳过）、console 864；改动行 136／136。CI [35887283150](https://github.com/wangbinquan/CrewStation/actions/runs/35887283150) 六项成功。
+- 部署（UTC）：16:22:16 cs-controller、16:22:19 cs-api、16:22:25 cs-session 换到 `cs-control-plane:rc025-p2b-20260923`（`git archive 99e93569`），无迁移，各一次就绪、0 重启。首轮观测汇总 `recorded 4、unchanged 10、unowned 149、platform 7、removed 0`（多观测了 Secret、Service、IngressRoute，unowned 多出来的是服务槽的 Service 与路由、Git 凭据等第三期才认领的对象）；补投影 21 条。
+- 子对象与建出的名字一一对上：3 个运行中会话的工作区各有 Pod、Runner Secret、预览 Service 与 IngressRoute，都观测为在（demo 的是 `task-r-01a0cda7…`、`task-r-01a0cda7…-runner`、`task-01a0c12ade2a705a…`），失败会话的预览 Service 与路由同样被认领。
+- 保留期起点更正：3 个 09-21 04:18:35 失败的旧会话（rfc006-verify、rfc003-verify-delivery、rfc003-verify-files）的「失败」起点改为 09-21 04:18:35，保留到 **09-24 04:18:35**；rfc022-verify 的两个到 09-26 06:35。到期后由维护作业改成「不要了」、调和器删容器与路由、工作卷写「待回收」、task-runtime 把环境记为已释放——届时补记实机结果。
+- 删除没有误伤：部署时台账里没有「不要了」而子对象还在的记录（部署前查库核对），`removed 0`。
+- 收编空跑（新判定前）：`owned 27、adoptable 31、orphan 3`；其中 11 个「可收编」实为遗留物——demo、rfc003-ux、rfc003-verify-workbench 各有 RFC-013 改名前的同 Host 预览 Service 与 IngressRoute（`task-01a095410744` 等，Service 选择器是旧 `tsk_…` 标签，端点为空），以及 5 个重建换下的旧 Runner Secret（demo 当前 Pod 的 `envFrom` 只引用 `task-r-01a0cda7…-runner`）。第三步据此把「任务环境已在台账、记录却不列」判为孤儿。
+
+### 3.4 第三步：孤儿回收（4d492e70）
+
+- 门禁（干净导出树）：check:static 通过；unit 564、module 1263（12 跳过）、console 864；改动行 75／77（97.4%）。CI [35889214736](https://github.com/wangbinquan/CrewStation/actions/runs/35889214736) 六项成功。
+- 部署（UTC）：16:38:18 cs-controller、16:38:25 cs-api 换到 `cs-control-plane:rc025-p2c-20260923`，无迁移，各一次就绪、0 重启。部署后的收编空跑（同一判定）：`owned 27、adoptable 20、orphan 14`——14 个孤儿即下面 11 个删除与 3 个登记。
+- **16:48:25 第一轮孤儿回收**（观测缓存同步后 10 分钟）：`removed 11、volumes 3`，逐条日志——
+  - 5 个重建换下的旧 Runner Secret：cs-demo 的 `task-01a095410744-r-e4e5aa6e256b-runner`（旧 `tsk_…` 标签）与 `task-r-01a0c7fc…-runner`，cs-rfc003-verify-workbench 的 3 个；
+  - 3 对 RFC-013 改名前的同 Host 预览 Service＋IngressRoute：cs-demo、cs-rfc003-ux、cs-rfc003-verify-workbench 的 `task-01a095410744`、`task-01a0985a8624`、`task-01a09eb4f03f`（Service 的选择器是旧 `tsk_…` 标签，端点为空）；
+  - 3 个已释放环境的 PVC（cs-rfc006-verify 一个、cs-rfc010-cluster-qa 两个）登记为资源中心名下的工作卷记录，阶段「已结束」、原因 `orphaned`，PVC 本身不动（`kubectl get pvc` 前后都是 11 个）。
+- 之后：每个开发预览主机只剩一条 IngressRoute（此前 demo、rfc003-ux、rfc003-verify-workbench 各两条同 Host）；受管 Runner Secret 只剩 3 个运行中会话各自当前的那个；`dev.demo.cs.localhost` 经网关照常到 ForwardAuth（未登录 401），当前会话的预览路由与 Service（有端点）未受影响。
+

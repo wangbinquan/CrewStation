@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { classifyObject, countVerdicts } from './adoption';
 import type { ObservedObject } from './observation';
-import { goneChild, podChild, podConditions, presentChild, pvcChild } from './observation';
+import { deploymentChild, goneChild, podChild, podConditions, presentChild, pvcChild } from './observation';
 
 const at = '2026-09-23T12:00:00.000Z';
 const pod = (status: unknown, patch: Partial<ObservedObject['metadata']> = {}, spec: unknown = { nodeName: 'desktop-worker' }): ObservedObject => ({
@@ -30,6 +30,17 @@ describe('Pod 与 PVC 的观测映射（RFC-025 设计 §6.2）', () => {
   test('崩溃重启循环报条件 CrashLooping；恢复后报为假', () => {
     expect(podConditions(pod({ containerStatuses: [{ state: { waiting: { reason: 'CrashLoopBackOff', message: 'back-off 5m0s' } } }] }))).toEqual([{ type: 'CrashLooping', status: 'true', reason: 'CrashLoopBackOff', message: 'back-off 5m0s' }]);
     expect(podConditions(pod({ phase: 'Running' }))).toEqual([{ type: 'CrashLooping', status: 'false' }]);
+  });
+
+  test('Deployment：新版本的副本都就绪才是 Available；推进超时是 Stalled；副本为 0 是 ScaledDown；其余 Progressing，原因写就绪副本数', () => {
+    const deployment = (spec: number, status: Record<string, unknown>, generation = 3): ObservedObject => ({ kind: 'Deployment', metadata: { name: 'demo-green', namespace: 'cs-demo', uid: 'u-dep', generation }, spec: { replicas: spec }, status });
+    expect(deploymentChild(deployment(1, { observedGeneration: 3, replicas: 1, updatedReplicas: 1, readyReplicas: 1 }), at)).toEqual({ kind: 'Deployment', namespace: 'cs-demo', name: 'demo-green', uid: 'u-dep', phase: 'Available', ready: true, reason: '副本 1／1 就绪', observedAt: at });
+    expect(deploymentChild(deployment(1, { observedGeneration: 2, replicas: 1, updatedReplicas: 1, readyReplicas: 1 }), at).phase).toBe('Progressing');
+    expect(deploymentChild(deployment(2, { observedGeneration: 3, replicas: 2, updatedReplicas: 2, readyReplicas: 1 }), at)).toMatchObject({ phase: 'Progressing', ready: false, reason: '副本 1／2 就绪' });
+    expect(deploymentChild(deployment(1, { observedGeneration: 3, replicas: 1, conditions: [{ type: 'Progressing', status: 'False', reason: 'ProgressDeadlineExceeded', message: 'ReplicaSet "demo-green-x" has timed out progressing.' }] }), at))
+      .toMatchObject({ phase: 'Stalled', reason: 'ReplicaSet "demo-green-x" has timed out progressing.' });
+    expect(deploymentChild(deployment(0, {}), at).phase).toBe('ScaledDown');
+    expect(deploymentChild({ ...deployment(1, {}), metadata: { name: 'demo-green', namespace: 'cs-demo', deletionTimestamp: at } }, at)).toMatchObject({ phase: 'Terminating', ready: false });
   });
 
   test('Runner Secret、预览 Service 与路由：在即就绪，删除中记 Terminating', () => {

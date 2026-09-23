@@ -38,10 +38,25 @@ export function computePhase(record: PhaseInput): PhaseResult {
   const failed = condition(record, 'Failed');
   if (failed?.status === 'true') return { phase: 'failed', reason: reasonOf(failed.reason ?? 'failed', failed.message ?? '平台判定失败') };
   if (condition(record, 'Paused')?.status === 'true') return present.length ? { phase: 'stopping', reason: PAUSING } : { phase: 'stopped', reason: PAUSED };
+  // 不该有工作负载（服务槽已下线、尚未部署，设计 §4.3、D13）：期望仍在，只是此刻不运行——与暂停同一规则，原因照条件写。
+  const serving = condition(record, 'Serving');
+  if (serving?.status === 'false') {
+    const reason = reasonOf(serving.reason ?? 'not-serving', serving.message ?? '当前没有运行的工作负载');
+    return present.length ? { phase: 'stopping', reason } : { phase: 'stopped', reason };
+  }
   if (!rule.primaryChild) return byConditions(record, rule);
   const primary = expectedChildren(record).find((child) => child.kind === rule.primaryChild);
   if (!primary || !isPresent(primary)) return condition(record, 'Prepared')?.status === 'false' ? { phase: 'pending', reason: QUEUED } : { phase: 'provisioning' };
-  return rule.primaryChild === 'PersistentVolumeClaim' ? volumePhase(primary) : workloadPhase(record, rule, primary);
+  if (rule.primaryChild === 'PersistentVolumeClaim') return volumePhase(primary);
+  return rule.primaryChild === 'Deployment' ? deploymentPhase(primary) : workloadPhase(record, rule, primary);
+}
+
+/** Deployment → 阶段：观测把它归成 Available（副本都就绪且是新版本）、Progressing、Stalled（推进超时）、ScaledDown（副本为 0）。 */
+function deploymentPhase(deployment: ResourceChild): PhaseResult {
+  if (deployment.phase === 'Available') return { phase: 'ready' };
+  if (deployment.phase === 'Stalled') return { phase: 'degraded', reason: reasonOf('rollout-stalled', deployment.reason ?? '部署停止推进') };
+  if (deployment.phase === 'ScaledDown') return { phase: 'degraded', reason: reasonOf('scaled-down', deployment.reason ?? '副本数为 0') };
+  return { phase: 'starting', ...(deployment.reason ? { reason: reasonOf('rolling-out', deployment.reason) } : {}) };
 }
 
 function workloadPhase(record: PhaseInput, rule: KindRule, pod: ResourceChild): PhaseResult {

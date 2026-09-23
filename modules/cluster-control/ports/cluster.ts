@@ -1,7 +1,7 @@
 import type { ObservedObject } from '../domain/observation';
 
-/** 观测与调和的种类：第二期任务类容器的子对象（Pod、PVC、Runner Secret、预览 Service 与路由）；后续各期加入 Deployment、Job、Middleware…… */
-export type ObservedKind = 'Pod' | 'PersistentVolumeClaim' | 'Secret' | 'Service' | 'IngressRoute';
+/** 观测与调和的种类：任务类容器的子对象（Pod、PVC、Runner Secret、预览 Service 与路由），服务槽的 Deployment；后续各期加入 Job、Middleware…… */
+export type ObservedKind = 'Pod' | 'PersistentVolumeClaim' | 'Secret' | 'Service' | 'IngressRoute' | 'Deployment';
 
 export interface ObjectChange {
   readonly kind: ObservedKind;
