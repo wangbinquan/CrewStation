@@ -1,7 +1,7 @@
 import type { ObservedObject } from '../domain/observation';
 
-/** 第一期观测的种类；后续各期逐个加入 Secret、Service、Deployment、Job、IngressRoute…… */
-export type ObservedKind = 'Pod' | 'PersistentVolumeClaim';
+/** 观测与调和的种类：第二期任务类容器的子对象（Pod、PVC、Runner Secret、预览 Service 与路由）；后续各期加入 Deployment、Job、Middleware…… */
+export type ObservedKind = 'Pod' | 'PersistentVolumeClaim' | 'Secret' | 'Service' | 'IngressRoute';
 
 export interface ObjectChange {
   readonly kind: ObservedKind;
@@ -22,4 +22,9 @@ export interface ManagedObjectFeed {
 /** 一次性列出受管对象（收编空跑报告在 cs-api 里按需算，不开 watch）。 */
 export interface ManagedObjectReader {
   list(kind: ObservedKind): Promise<ObservedObject[]>;
+}
+
+/** 调和器对集群的写（第二期只有删除）：一律带 UID 前置条件，同名的新对象不会被误删；建与改随凭据的裁定（I25）再移交。 */
+export interface ClusterWriter {
+  remove(target: { readonly kind: ObservedKind; readonly namespace?: string; readonly name: string; readonly uid: string }): Promise<void>;
 }

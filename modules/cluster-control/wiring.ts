@@ -5,13 +5,13 @@ import type { Clock, Logger } from '@crewstation/kernel';
 import { forbidden, noopLogger, systemClock } from '@crewstation/kernel';
 import type { Hono } from 'hono';
 import type { ClusterControlModuleApi } from './api/moduleApi';
-import { managedObjectFeed, managedObjectReader } from './adapters/k8s/managedObjects';
+import { kubernetesClusterWriter, managedObjectFeed, managedObjectReader } from './adapters/k8s/managedObjects';
 import { adoptionReport } from './application/adoptionReport';
 import type { ObservationStats } from './application/observeChange';
 import { newObservationStats, observeChange } from './application/observeChange';
-import { reconcileObservations } from './application/reconcileObservations';
+import { reconcileRecord } from './application/reconcileObservations';
 import { adoptionRoutes } from './http/adoptionRoutes';
-import type { ManagedObjectFeed, ManagedObjectReader } from './ports/cluster';
+import type { ClusterWriter, ManagedObjectFeed, ManagedObjectReader } from './ports/cluster';
 import type { LedgerObservations, LegacyOwners } from './ports/ledger';
 import type { LedgerReconcilerOptions } from './workers/ledgerReconciler';
 import { ledgerReconciler } from './workers/ledgerReconciler';
@@ -30,6 +30,8 @@ export interface ClusterControlModuleDeps {
   /** 测试替身：不给就用真实集群的观测缓存与列表。 */
   readonly feed?: ManagedObjectFeed;
   readonly reader?: ManagedObjectReader;
+  /** 调和器对集群的删除；不给就用真实集群（用例给假的）。 */
+  readonly cluster?: ClusterWriter;
   readonly summaryMs?: number;
   readonly reconciler?: LedgerReconcilerOptions;
 }
@@ -57,7 +59,8 @@ export function createClusterControlModule(deps: ClusterControlModuleDeps): Clus
     },
   };
   const watcher = observationWorker(feed, (change) => observeChange(deps.ledger, clock, deps.systemNamespace, stats, change), () => ({ ...stats }), logger, deps.summaryMs);
-  const reconciler = ledgerReconciler(deps.ledger, feed, (id) => reconcileObservations({ ledger: deps.ledger, feed, clock, systemNamespace: deps.systemNamespace, stats }, id), logger, deps.reconciler);
+  const cluster = deps.cluster ?? kubernetesClusterWriter(deps.k8s);
+  const reconciler = ledgerReconciler(deps.ledger, feed, (id, enqueue) => reconcileRecord({ ledger: deps.ledger, feed, cluster, clock, systemNamespace: deps.systemNamespace, stats, logger }, id, enqueue), logger, deps.reconciler);
   // 先开观测缓存，再开按记录核对的队列（它等缓存同步完成才开始）。
   const observer = {
     start: () => { watcher.start(); reconciler.start(); },

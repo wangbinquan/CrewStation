@@ -91,6 +91,15 @@ export function pvcChild(pvc: ObservedObject, observedAt: string): ResourceChild
   };
 }
 
+/** Pod、PVC 以外的子对象（Runner Secret、预览 Service 与路由）：在即就绪；删除中的记 Terminating、不算就绪。 */
+export function presentChild(obj: ObservedObject, observedAt: string): ResourceChild {
+  const deleting = Boolean(obj.metadata.deletionTimestamp);
+  return {
+    kind: obj.kind, ...(obj.metadata.namespace ? { namespace: obj.metadata.namespace } : {}), name: obj.metadata.name, ...(obj.metadata.uid ? { uid: obj.metadata.uid } : {}),
+    phase: deleting ? 'Terminating' : 'Present', ready: !deleting, observedAt,
+  };
+}
+
 /** 对象消失时的观测：只留身份，阶段记 absent。 */
 export function goneChild(obj: ObservedObject): ResourceChild {
   return { kind: obj.kind, ...(obj.metadata.namespace ? { namespace: obj.metadata.namespace } : {}), name: obj.metadata.name, ...(obj.metadata.uid ? { uid: obj.metadata.uid } : {}), phase: 'absent', ready: false };

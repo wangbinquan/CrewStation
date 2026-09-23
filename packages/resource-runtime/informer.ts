@@ -18,7 +18,11 @@ export interface InformerOptions {
   readonly pageSize?: number;
   readonly backoff?: { readonly initialMs: number; readonly maxMs: number };
   readonly now?: () => number;
+  /** 进缓存之前裁剪对象（设计 §13：只留调和要用的字段；Secret 的内容一律不进缓存）。 */
+  readonly transform?: (obj: K8sObject) => K8sObject;
 }
+
+const shaped = <T extends K8sObject>(options: InformerOptions, obj: T): T => (options.transform ? options.transform(obj) as T : obj);
 
 export interface Informer<T> {
   start(): void;
@@ -48,7 +52,7 @@ async function relist<T extends K8sObject>(k8s: K8sClient, ref: ResourceRef, eve
   let next: string | undefined;
   do {
     const page = await k8s.listPage<T>(ref, options.namespace, { ...(options.labelSelector ? { labelSelector: options.labelSelector } : {}), limit: options.pageSize ?? 500, ...(next ? { continue: next } : {}), signal: state.controller.signal });
-    for (const item of page.items) seen.set(keyOf(item), item);
+    for (const item of page.items) seen.set(keyOf(item), shaped(options, item));
     resourceVersion = page.resourceVersion;
     next = page.continue || undefined;
   } while (next);
@@ -72,7 +76,8 @@ async function watchOnce<T extends K8sObject>(k8s: K8sClient, ref: ResourceRef, 
   let expired = false;
   const attempt = new AbortController();
   const signal = AbortSignal.any([state.controller.signal, attempt.signal]);
-  await k8s.watch<T>(ref, options.namespace, { ...(options.labelSelector ? { labelSelector: options.labelSelector } : {}), resourceVersion: from, timeoutSeconds: options.watchTimeoutSeconds ?? 300, signal }, (type, obj) => {
+  await k8s.watch<T>(ref, options.namespace, { ...(options.labelSelector ? { labelSelector: options.labelSelector } : {}), resourceVersion: from, timeoutSeconds: options.watchTimeoutSeconds ?? 300, signal }, (type, raw) => {
+    const obj = type === 'ERROR' ? raw : shaped(options, raw);
     state.contact = (options.now ?? Date.now)();
     if (type === 'ERROR') {
       expired = true;

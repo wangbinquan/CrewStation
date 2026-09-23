@@ -407,6 +407,7 @@ function composeControl(deps: CompositionDeps, core: ReturnType<typeof composeCo
     ledger: {
       observe: (input) => ledger.api.observe(input), claimOf: (child) => ledger.api.claimOf(child), get: (id) => ledger.api.get(id),
       listLive: () => ledger.api.list({}), changesSince: ledger.api.changesSince, latestChange: ledger.api.latestChange,
+      observeConditions: (id, conditions) => ledger.api.observeConditions(id, conditions), children: (parentId) => ledger.api.list({ parentId, includeStopped: true }),
     },
     legacy: {
       resolveTaskId: (legacyId) => deps.identities.resolve('task', [legacyId]),

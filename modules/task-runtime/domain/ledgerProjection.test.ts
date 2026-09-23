@@ -22,7 +22,7 @@ describe('任务环境投影到资源台账（RFC-025 第二期）', () => {
       children: [{ kind: 'Pod', namespace: 'cs-demo', name: 'task-100' }], display: { profile: 'coding-medium', branch: 'main' },
       conditions: [{ type: 'Failed', status: 'false' }, { type: 'Paused', status: 'false' }, { type: 'Rebuilding', status: 'false' }],
     });
-    expect(volume).toEqual({ kind: 'volume', ref: `${env().id}/work`, projectId: env().projectId, parentId: env().id, children: [{ kind: 'PersistentVolumeClaim', namespace: 'cs-demo', name: 'task-100-work' }], display: { mode: 'follow-container' }, conditions: [] });
+    expect(volume).toEqual({ kind: 'volume', ref: `${env().id}/work`, projectId: env().projectId, parentId: env().id, children: [{ kind: 'PersistentVolumeClaim', namespace: 'cs-demo', name: 'task-100-work' }], reclaim: 'delete', display: { mode: 'follow-container' }, conditions: [] });
     expect(connected).toBe(true);
   });
 
@@ -31,8 +31,9 @@ describe('任务环境投影到资源台账（RFC-025 第二期）', () => {
     expect(queued.workload).toMatchObject({ kind: 'agent-execution', purpose: 'development-cli', parentId: env().id, display: { profile: 'OpenCode 默认', agent: 'agent-1', terminal: 'term-1' } });
     expect(queued.workload.conditions.at(-1)).toEqual({ type: 'Prepared', status: 'false' });
     expect(queued.volume).toBeUndefined();
+    // 说明写结局，不写「正在回收」这类过程：它在已结束的记录上一直显示（2026-09-23 实机）。
     const cleaning = projectEnvironment(env({ native: native({ state: 'cleaning' }), state: 'releasing', message: '此CLI已结束，正在回收执行环境' }));
-    expect(cleaning.workload.release).toEqual({ code: 'execution-ended', message: '此CLI已结束，正在回收执行环境' });
+    expect(cleaning.workload.release).toEqual({ code: 'execution-ended', message: '执行已结束' });
     expect(projectEnvironment(env({ native: native({ state: 'finished', failureReason: 'CLI 进程退出' }) })).workload.release).toEqual({ code: 'execution-ended', message: 'CLI 进程退出' });
     expect(projectEnvironment(env({ native: native({ purpose: 'subtask' }) })).workload.purpose).toBe('business-subtask');
     expect(projectEnvironment(env({ native: native({ purpose: 'agent' }) })).workload.purpose).toBe('development-agent');
@@ -40,9 +41,10 @@ describe('任务环境投影到资源台账（RFC-025 第二期）', () => {
 
   test('失败：条件「失败」带启动失败的归类与原话；暂停；重建中', () => {
     const failed = projectEnvironment(env({ state: 'failed', message: '超过 5 分钟未连接', startup: { state: 'failed', startedAt: at.toISOString(), stages: [{ kind: 'connect', state: 'failed', error: { code: 'connect-timeout', message: 'x' } }] } }));
-    expect(failed.workload.conditions[0]).toEqual({ type: 'Failed', status: 'true', reason: 'connect-timeout', message: '超过 5 分钟未连接' });
+    // 失败的发生时刻是环境进入 failed 那次落库的时间：保留期从这里算（D9），台账接上之前就失败的会话据此得到真实起点。
+    expect(failed.workload.conditions[0]).toEqual({ type: 'Failed', status: 'true', reason: 'connect-timeout', message: '超过 5 分钟未连接', since: at });
     expect(failed.workload.startup?.state).toBe('failed');
-    expect(projectEnvironment(env({ state: 'failed' })).workload.conditions[0]).toEqual({ type: 'Failed', status: 'true', reason: 'failed', message: '平台判定失败' });
+    expect(projectEnvironment(env({ state: 'failed' })).workload.conditions[0]).toEqual({ type: 'Failed', status: 'true', reason: 'failed', message: '平台判定失败', since: at });
     expect(projectEnvironment(env({ kind: 'business', state: 'paused' })).workload.conditions[1]).toEqual({ type: 'Paused', status: 'true' });
     expect(projectEnvironment(env({ state: 'creating', rebuildId: 'rb-1' })).workload.conditions[2]).toEqual({ type: 'Rebuilding', status: 'true' });
   });
@@ -60,6 +62,26 @@ describe('任务环境投影到资源台账（RFC-025 第二期）', () => {
     const test = projectEnvironment(env({ kind: 'profile-test' }));
     expect(test.workload).toMatchObject({ kind: 'agent-execution', purpose: 'profile-test' });
     expect(test.volume).toBeUndefined();
+  });
+
+  test('子对象与 task-runtime 建出的名字一一对应：执行环境与重建过的工作区有 Runner Secret；预览路由重建后沿用按环境 ID 算的原名', () => {
+    const preview = { command: ['bun', 'dev'], port: 3000, healthPath: '/' };
+    expect(projectEnvironment(env({ preview })).workload.children).toEqual([
+      { kind: 'Pod', namespace: 'cs-demo', name: 'task-100' }, { kind: 'Service', namespace: 'cs-demo', name: 'task-100' }, { kind: 'IngressRoute', namespace: 'cs-demo', name: 'task-100' },
+    ]);
+    const route = `task-${env().id.replaceAll('-', '')}`;
+    expect(projectEnvironment(env({ preview, rebuildId: 'rb-1', podName: 'task-r-9' })).workload.children).toEqual([
+      { kind: 'Pod', namespace: 'cs-demo', name: 'task-r-9' }, { kind: 'Secret', namespace: 'cs-demo', name: 'task-r-9-runner' },
+      { kind: 'Service', namespace: 'cs-demo', name: route }, { kind: 'IngressRoute', namespace: 'cs-demo', name: route },
+    ]);
+    expect(projectEnvironment(env({ podName: 'exec-101', preview, native: native() })).workload.children).toEqual([{ kind: 'Pod', namespace: 'cs-demo', name: 'exec-101' }, { kind: 'Secret', namespace: 'cs-demo', name: 'exec-101-runner' }]);
+  });
+
+  test('保留期满由平台回收：工作区不要了，跟随容器的工作卷不随之删除（只进待回收）；持久卷一律留着', () => {
+    const expired = projectEnvironment(env({ state: 'released', message: 'released: retention-expired' }));
+    expect(expired.workload.release).toEqual({ code: 'retention-expired', message: '失败保留期已满，平台自动回收' });
+    expect(expired.volume?.release).toBeUndefined(); expect(expired.volume?.reclaim).toBe('delete');
+    expect(projectEnvironment(env({ kind: 'business', volumeMode: 'persistent' })).volume?.reclaim).toBe('retain');
   });
 
   test('Runner 连接条件：连着报连上；曾经连上、现在没连报断开；从没连上不报', () => {

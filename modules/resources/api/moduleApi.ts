@@ -1,6 +1,6 @@
 import type { Actor, AdminResourceViewQuery, ProjectId, ResourceActionId, ResourceActionRequest, ResourceActionResult, ResourceView, ResourceViewQuery } from '@crewstation/contracts';
 import type {
-  ChildObservation, ExpectedChild, LedgerRecord, ObservationOutcome, OwnerTransaction, RecordFilter, ResourceActionHandler, ResourceAlias, ResourceLeases,
+  ChildObservation, ConditionUpdate, ExpectedChild, LedgerRecord, ObservationOutcome, OwnerTransaction, RecordFilter, ResourceActionHandler, ResourceAlias, ResourceLeases,
   ResourceWriter, StreamSubscription, ViewerAccess,
 } from './types';
 
@@ -15,6 +15,8 @@ export interface ResourcesModuleApi {
   owner(module: string): OwnerLedger;
   /** cluster-control 的观测入口；返回 unowned 表示台账里没有记录认领这个对象。 */
   observe(observation: ChildObservation): Promise<ObservationOutcome>;
+  /** cluster-control 写只归资源中心的条件（不附带子对象观测），例如工作卷的「待回收」。 */
+  observeConditions(resourceId: string, conditions: readonly ConditionUpdate[]): Promise<ObservationOutcome>;
   readonly leases: ResourceLeases;
   get(id: string): Promise<LedgerRecord | undefined>;
   list(filter: RecordFilter): Promise<LedgerRecord[]>;

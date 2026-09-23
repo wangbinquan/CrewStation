@@ -219,6 +219,16 @@ describe.skipIf(!available)('变更日志、租约、维护（设计 §6.3、§6
     expect(await leases.acquire(id, 'controller-a', 30_000)).toBe(true);
   });
 
+  test('资源中心只写条件（例如工作卷待回收）：认领不到的是 unowned，同样的条件不写库，写上即按新规则重算阶段', async () => {
+    expect(await h.module.api.observeConditions('01a0bf5d-8f4b-7c01-8e19-e2267320ffff', [{ type: 'PendingReclaim', status: 'true' }])).toEqual({ status: 'unowned' });
+    const volume = await h.module.api.owner('task-runtime').declare({ kind: 'volume', ref: 'c1/work', projectId: PROJECT, spec: { children: [{ kind: 'PersistentVolumeClaim', namespace: 'cs-demo', name: 'task-c1-work' }] } });
+    const marked = await h.module.api.observeConditions(volume.id, [{ type: 'PendingReclaim', status: 'true', reason: 'parent-ended', message: '上级已结束' }]);
+    expect(marked).toMatchObject({ status: 'recorded', record: { phase: 'stopped', reason: { code: 'parent-ended', message: '上级已结束' } } });
+    expect(await h.module.api.observeConditions(volume.id, [{ type: 'PendingReclaim', status: 'true', reason: 'parent-ended', message: '上级已结束' }])).toMatchObject({ status: 'unchanged' });
+    // 所属模块写不了只归资源中心的条件。
+    expect((await rejected(h.module.api.owner('task-runtime').report(volume.id, { conditions: [{ type: 'PendingReclaim', status: 'false' }] }))).kind).toBe('validation');
+  });
+
   test('保留期到了：失败的开发会话转成「不要了」（retention-expired）；没到的不动', async () => {
     const ledger = h.module.api.owner('task-runtime');
     const due = await ledger.declare(workspace('r1'));

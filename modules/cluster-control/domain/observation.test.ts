@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { classifyObject, countVerdicts } from './adoption';
 import type { ObservedObject } from './observation';
-import { goneChild, podChild, podConditions, pvcChild } from './observation';
+import { goneChild, podChild, podConditions, presentChild, pvcChild } from './observation';
 
 const at = '2026-09-23T12:00:00.000Z';
 const pod = (status: unknown, patch: Partial<ObservedObject['metadata']> = {}, spec: unknown = { nodeName: 'desktop-worker' }): ObservedObject => ({
@@ -30,6 +30,12 @@ describe('Pod 与 PVC 的观测映射（RFC-025 设计 §6.2）', () => {
   test('崩溃重启循环报条件 CrashLooping；恢复后报为假', () => {
     expect(podConditions(pod({ containerStatuses: [{ state: { waiting: { reason: 'CrashLoopBackOff', message: 'back-off 5m0s' } } }] }))).toEqual([{ type: 'CrashLooping', status: 'true', reason: 'CrashLoopBackOff', message: 'back-off 5m0s' }]);
     expect(podConditions(pod({ phase: 'Running' }))).toEqual([{ type: 'CrashLooping', status: 'false' }]);
+  });
+
+  test('Runner Secret、预览 Service 与路由：在即就绪，删除中记 Terminating', () => {
+    const route: ObservedObject = { kind: 'IngressRoute', metadata: { name: 'task-1', namespace: 'cs-demo', uid: 'u-route' } };
+    expect(presentChild(route, '2026-09-23T12:00:00.000Z')).toEqual({ kind: 'IngressRoute', namespace: 'cs-demo', name: 'task-1', uid: 'u-route', phase: 'Present', ready: true, observedAt: '2026-09-23T12:00:00.000Z' });
+    expect(presentChild({ ...route, metadata: { ...route.metadata, deletionTimestamp: '2026-09-23T12:00:00Z' } }, '2026-09-23T12:00:01.000Z')).toMatchObject({ phase: 'Terminating', ready: false });
   });
 
   test('PVC：Bound 即就绪，删除中不算；消失的对象只留身份', () => {

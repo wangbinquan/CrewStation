@@ -5,9 +5,14 @@ import type { ObservedCondition } from '../domain/observation';
 /** 台账记录里调和器用得到的部分（结构上是 resources 模块 LedgerRecord 的子集）。 */
 export interface LedgerRecordView {
   readonly id: string;
+  readonly kind: string;
+  readonly parentId?: string;
   readonly desired: 'present' | 'absent';
-  readonly spec: { readonly children: readonly { readonly kind: string; readonly namespace?: string; readonly name: string }[] };
+  readonly phase: string;
+  readonly releaseReason?: { readonly code: string; readonly message: string };
+  readonly spec: { readonly children: readonly { readonly kind: string; readonly namespace?: string; readonly name: string }[]; readonly [field: string]: unknown };
   readonly children: readonly ResourceChild[];
+  readonly conditions: readonly { readonly type: string; readonly status: string }[];
 }
 
 /** 资源中心（resources 模块）给调和器的入口，由组合根接上。 */
@@ -19,6 +24,10 @@ export interface LedgerObservations {
   latestChange(): Promise<number>;
   /** 写一条子对象观测；unowned 表示台账里没有记录认领这个对象。 */
   observe(input: { readonly resourceId?: string; readonly child: ResourceChild; readonly gone?: boolean; readonly conditions?: readonly ObservedCondition[] }): Promise<{ readonly status: 'recorded' | 'unchanged' | 'unowned' }>;
+  /** 写只归资源中心的条件（不附带子对象观测），例如工作卷的「待回收」。 */
+  observeConditions(resourceId: string, conditions: readonly ObservedCondition[]): Promise<{ readonly status: 'recorded' | 'unchanged' | 'unowned' }>;
+  /** 挂在某条记录下的记录（含已结束的）：上级结束时调和器据此把工作卷排进队列。 */
+  children(parentId: string): Promise<readonly LedgerRecordView[]>;
   /** 只读：认领这个集群对象的记录 ID（收编报告用，不写库）。 */
   claimOf(child: { readonly kind: string; readonly namespace?: string; readonly name: string; readonly uid?: string }): Promise<string | undefined>;
 }

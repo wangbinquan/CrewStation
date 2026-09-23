@@ -67,6 +67,19 @@ describe('观测缓存（RFC-025 设计 §6.1）', () => {
     expect(informer.lastContact()).toBeGreaterThan(0);
   });
 
+  test('进缓存前按 transform 裁剪：list 与 watch 来的对象都一样（Secret 的内容不进缓存）', async () => {
+    const secret = (name: string, rv: string): K8sObject => ({ apiVersion: 'v1', kind: 'Secret', metadata: { name, namespace: 'cs-demo', resourceVersion: rv }, data: { CS_RUNNER_TOKEN: 'c2VjcmV0' } });
+    const { client, calls } = scriptedClient([[secret('a', '1')]], [[{ type: 'ADDED', object: secret('b', '2') }, 'end']]);
+    const seen: unknown[] = [];
+    const strip = (obj: K8sObject): K8sObject => { const { data: _data, ...rest } = obj as K8sObject & { data?: unknown }; return rest as K8sObject; };
+    const informer = createInformer(client, Resources.Secret!, { upsert: (o) => seen.push(o), remove: () => undefined }, { logger: noopLogger, transform: strip });
+    informer.start();
+    await until(() => calls.watch.length >= 2);
+    await informer.stop();
+    expect(seen).toHaveLength(2);
+    expect(JSON.stringify([...seen, ...informer.list()])).not.toContain('c2VjcmV0');
+  });
+
   test('版本过期（ERROR 事件）重新全量：没变的不再回调，列表里没了的报消失', async () => {
     const { client, calls } = scriptedClient([[pod('a', '1'), pod('b', '1')], [pod('a', '1'), pod('c', '5')]], [[{ type: 'ERROR', object: { apiVersion: 'v1', kind: 'Status', metadata: { name: '' }, code: 410 } }]]);
     const events: string[] = [];

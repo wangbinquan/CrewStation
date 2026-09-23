@@ -10,6 +10,7 @@ import type { TestDatabase } from '@crewstation/testkit';
 import { createTestDatabase, testDatabaseAvailable } from '@crewstation/testkit';
 import { drizzleUnitOfWork } from '../adapters/persistence/drizzleUnitOfWork';
 import { resyncLedger } from '../application/ledgerResync';
+import { recoverableDevSession } from '../application/rebuildInspection';
 import type { EnvironmentLedger } from '../ports/ledger';
 import { ledgerResyncWorker } from '../workers/ledgerResyncWorker';
 import type { TaskRuntimeModuleDeps } from '../wiring';
@@ -96,6 +97,30 @@ describe.skipIf(!available)('任务环境投影进资源台账（RFC-025 第二�
     expect((await resources.api.get(before.id))?.desired).toBe('present');
     await resyncLedger(uow, ledger, logger);
     expect(await resources.api.get(before.id)).toMatchObject({ desired: 'absent', releaseReason: { code: 'business', message: '业务释放' } });
+  });
+
+  test('失败保留期满（资源中心把记录改成「不要了」）：补投影把环境记为已释放，不删卷、不能再恢复；保留期从失败时刻算', async () => {
+    const k8s = createFakeK8sClient();
+    const runtime = createTaskRuntimeModule(runtimeDeps(tdb.db, k8s, ledger, logger));
+    const created = await runtime.api.createEnvironment({ serviceId, kind: 'dev-session', branch: 'work' });
+    await runtime.api.markFailed(created.id, '容器运行失败');
+    const uow = drizzleUnitOfWork(tdb.db, { ledger, logger });
+    const failedAt = (await uow.read.environments.getById(created.id))!.updatedAt;
+    const record = await resources.api.get(created.id);
+    expect(record).toMatchObject({ phase: 'failed' });
+    // 保留到期 = 判失败的时刻（环境进入 failed 那次落库）＋ 72 小时。
+    expect(record?.retainUntil?.toISOString()).toBe(new Date(failedAt.getTime() + 72 * 3_600_000).toISOString());
+    await expect(recoverableDevSession(uow.read, created.projectId)).resolves.toMatchObject({ id: created.id });
+    // 资源中心的维护作业到期后做的就是这一步（resources 的 expireRetention）。
+    await resources.api.owner('task-runtime').requestRelease(created.id, { code: 'retention-expired', message: '失败保留期已满，平台自动回收' });
+    const refused = await recoverableDevSession(uow.read, created.projectId).then(() => 'resolved', (error: Error) => error.message);
+    expect(refused).toContain('72 小时保留期');
+    await resyncLedger(uow, ledger, logger);
+    expect(await runtime.api.getEnvironment(created.id)).toMatchObject({ state: 'released', message: 'released: retention-expired' });
+    const volume = (await resources.api.list({ parentId: created.id, includeStopped: true }))[0];
+    expect(volume).toMatchObject({ kind: 'volume', desired: 'present' });
+    expect((await resources.api.get(created.id))?.releaseReason?.code).toBe('retention-expired');
+    expect(k8s.deleted.filter((key) => key.includes('PersistentVolumeClaim'))).toEqual([]);
   });
 
   test('补投影工作器：启动即跑一次、此后按周期；失败只记告警；停止时等本轮跑完', async () => {

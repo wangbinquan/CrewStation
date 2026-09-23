@@ -65,6 +65,7 @@ export function createResourcesModule(deps: ResourcesModuleDeps): ResourcesModul
     name: 'resources',
     owner,
     observe: observer.observe,
+    observeConditions: observer.observeConditions,
     leases: { acquire: uow.read.leases.acquire, renew: uow.read.leases.renew, release: uow.read.leases.release },
     get: (id) => uow.read.records.get(id),
     list: (filter) => uow.read.records.list(filter),

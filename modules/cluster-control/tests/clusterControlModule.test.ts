@@ -2,15 +2,15 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import type { Actor, ProjectId, UserId } from '@crewstation/contracts';
 import { AdoptionReportSchema, IDENTITY_HEADERS } from '@crewstation/contracts';
 import { createApp } from '@crewstation/http';
-import type { K8sClient, K8sObject } from '@crewstation/k8s';
-import { createFakeK8sClient } from '@crewstation/k8s';
+import type { FakeK8sClient, K8sObject } from '@crewstation/k8s';
+import { createFakeK8sClient, Resources } from '@crewstation/k8s';
 import { isPlatformError } from '@crewstation/kernel';
 import type { ResourcesModule } from '@crewstation/module-resources';
 import { createResourcesModule, resourcesMigrations } from '@crewstation/module-resources';
 import type { TestDatabase } from '@crewstation/testkit';
 import { createTestDatabase, testDatabaseAvailable } from '@crewstation/testkit';
 import type { LegacyTask } from '../domain/adoption';
-import type { ManagedObjectFeed, ObjectChange } from '../ports/cluster';
+import type { ClusterWriter, ManagedObjectFeed, ObjectChange } from '../ports/cluster';
 import { createClusterControlModule } from '../wiring';
 
 const available = await testDatabaseAvailable();
@@ -47,8 +47,18 @@ describe.skipIf(!available)('cluster-control：观测写回台账与收编空跑
     ['t-failed', { kind: 'dev-session', state: 'failed', execution: false }],
     ['t-released', { kind: 'business', state: 'released', execution: false }],
   ]);
-  const k8s: K8sClient = createFakeK8sClient();
+  const k8s: FakeK8sClient = createFakeK8sClient();
   const feed = manualFeed();
+  // 调和器的删除：按 UID 删假集群里的对象，并像真实观测缓存那样随即报一次消失。
+  const removals: string[] = [];
+  const cluster: ClusterWriter = {
+    remove: async ({ kind, namespace, name, uid }) => {
+      removals.push(`${kind}/${name}`);
+      await k8s.delete(Resources[kind]!, name, namespace, { preconditions: { uid } });
+      const cached = feed.cache.get(`${kind}/${namespace ?? ''}/${name}`);
+      if (cached?.metadata.uid === uid) await feed.emit({ kind, object: cached, gone: true });
+    },
+  };
   let control: ReturnType<typeof createClusterControlModule>;
 
   beforeAll(async () => {
@@ -57,13 +67,16 @@ describe.skipIf(!available)('cluster-control：观测写回台账与收编空跑
     const system: K8sObject = { ...pod('cs-api-1'), metadata: { ...pod('cs-api-1').metadata, namespace: 'crewstation-system' } };
     const objects = [pod('task-owned'), pod('task-live', { 'crewstation.io/task': 't-live' }), pod('task-failed', { 'crewstation.io/task': 't-failed' }), pod('task-gone', { 'crewstation.io/task': 't-missing' }),
       pvc('work-released', { 'crewstation.io/task': 't-released' }), pod('svc-prod', { 'crewstation.io/workload': 'service', 'crewstation.io/release': 'rel-1' }), pod('loose'), system,
-      pvc('work-legacy', { 'crewstation.io/task': 'tsk_01a0954107447000b7936485fb80d15d' }), pvc('work-legacy-gone', { 'crewstation.io/task': 'tsk_unknown' })];
+      pvc('work-legacy', { 'crewstation.io/task': 'tsk_01a0954107447000b7936485fb80d15d' }), pvc('work-legacy-gone', { 'crewstation.io/task': 'tsk_unknown' }),
+      // 第二期起也列带任务标签的 Runner Secret 与预览路由；不带任务标签的（服务槽的 Service、Git 凭据）留给第三期，不列。
+      { ...pvc('task-rel-runner', { 'crewstation.io/task': 't-released' }), kind: 'Secret' }, { ...pvc('demo-green', { 'crewstation.io/workload': 'service' }), kind: 'Service' }];
     control = createClusterControlModule({
-      k8s, feed, isAdmin: async (id) => id === ADMIN.userId, systemNamespace: 'crewstation-system',
+      k8s, feed, cluster, isAdmin: async (id) => id === ADMIN.userId, systemNamespace: 'crewstation-system',
       reader: { list: async (kind) => objects.filter((o) => o.kind === kind) },
       ledger: {
         observe: (input) => resources.api.observe(input), claimOf: (child) => resources.api.claimOf(child), get: (id) => resources.api.get(id),
         listLive: () => resources.api.list({}), changesSince: resources.api.changesSince, latestChange: resources.api.latestChange,
+        observeConditions: (id, conditions) => resources.api.observeConditions(id, conditions), children: (parentId) => resources.api.list({ parentId, includeStopped: true }),
       },
       reconciler: { pollMs: 20 },
       legacy: { resolveTaskId: async (legacyId) => (legacyId === 'tsk_01a0954107447000b7936485fb80d15d' ? 't-live' : undefined), task: async (taskId) => tasks.get(taskId) },
@@ -102,13 +115,57 @@ describe.skipIf(!available)('cluster-control：观测写回台账与收编空跑
     expect((await resources.api.get(record.id))?.children[0]?.phase).toBe('absent');
   });
 
+  const until = async (label: string, predicate: () => Promise<boolean> | boolean, ms = 3_000) => {
+    const deadline = Date.now() + ms;
+    while (!(await predicate())) { if (Date.now() > deadline) throw new Error(`等待超时：${label}`); await Bun.sleep(20); }
+  };
+  const child = (kind: string, name: string, uid = `uid-${name}`, extra: Record<string, unknown> = {}): K8sObject => ({ apiVersion: kind === 'IngressRoute' ? 'traefik.io/v1alpha1' : 'v1', kind, metadata: { name, namespace: 'cs-demo', uid, labels: { 'app.kubernetes.io/managed-by': 'crewstation' } }, ...extra });
+  const place = async (object: K8sObject) => { await k8s.create(object); await feed.emit({ kind: object.kind as ObjectChange['kind'], object, gone: false }); };
+
+  test('「不要了」的记录：按 Pod、Secret、Service、路由的顺序按 UID 删子对象；删除中的不重复删，系统命名空间的平台组件不碰；删完进入已结束', async () => {
+    const names = ['Pod/task-rel', 'Secret/task-rel-runner', 'Service/task-rel', 'IngressRoute/task-rel'];
+    const record = await resources.api.owner('task-runtime').declare({ kind: 'agent-execution', ref: 'rel', projectId: PROJECT, spec: { children: [...names, 'Pod/task-rel-old'].map((entry) => ({ kind: entry.split('/')[0]!, namespace: 'cs-demo', name: entry.split('/')[1]! })) } });
+    for (const entry of names) await place(child(entry.split('/')[0]!, entry.split('/')[1]!, `uid-${entry}`, entry.startsWith('Pod') ? { spec: {}, status: { phase: 'Running' } } : {}));
+    // 已在删除中的旧 Pod：不再发删除，等它自己消失。
+    const terminating = child('Pod', 'task-rel-old', 'uid-old', { spec: {}, status: { phase: 'Running' } });
+    await place({ ...terminating, metadata: { ...terminating.metadata, deletionTimestamp: '2026-09-23T12:00:00Z' } });
+    await resources.api.owner('task-runtime').requestRelease(record.id, { code: 'execution-ended', message: '执行已结束' });
+    await until('子对象删除', () => removals.length >= 4);
+    await control.reconciled();
+    expect(removals).toEqual(['Pod/task-rel', 'Secret/task-rel-runner', 'Service/task-rel', 'IngressRoute/task-rel']);
+    expect((await resources.api.get(record.id))?.phase).toBe('stopping');
+    await feed.emit({ kind: 'Pod', object: terminating, gone: true });
+    expect((await resources.api.get(record.id))?.phase).toBe('stopped');
+    expect(control.stats().removed).toBe(4);
+  });
+
+  test('工作卷：上级保留期满或持久卷的上级结束时写「待回收」（按已结束算，卷不删）；跟随容器的卷等所属模块自己标「不要了」', async () => {
+    const owner = resources.api.owner('task-runtime');
+    const scenario = async (ref: string, reclaim: 'delete' | 'retain', reason: string) => {
+      const workload = await owner.declare({ kind: 'dev-workspace', ref, projectId: PROJECT, spec: { children: [{ kind: 'Pod', namespace: 'cs-demo', name: `task-${ref}` }] } });
+      const volume = await owner.declare({ kind: 'volume', ref: `${ref}/work`, projectId: PROJECT, parentId: workload.id, spec: { children: [{ kind: 'PersistentVolumeClaim', namespace: 'cs-demo', name: `task-${ref}-work` }], reclaim } });
+      await place(child('PersistentVolumeClaim', `task-${ref}-work`, `uid-${ref}-work`, { status: { phase: 'Bound' } }));
+      await owner.requestRelease(workload.id, { code: reason, message: reason });
+      return volume.id;
+    };
+    const expired = await scenario('exp', 'delete', 'retention-expired'), persistent = await scenario('keep', 'retain', 'business'), follow = await scenario('follow', 'delete', 'user');
+    await until('待回收', async () => (await resources.api.get(expired))?.phase === 'stopped' && (await resources.api.get(persistent))?.phase === 'stopped');
+    expect((await resources.api.get(expired))?.reason?.code).toBe('retention-expired');
+    expect((await resources.api.get(persistent))?.reason?.code).toBe('parent-ended');
+    await control.reconciled();
+    expect((await resources.api.get(follow))?.phase).toBe('ready');
+    expect(removals.some((entry) => entry.endsWith('-work'))).toBe(false);
+    expect(control.stats().reclaimable).toBe(2);
+  });
+
   test('收编空跑：逐个判定归属，孤儿排在前面，计数覆盖全部；只读，不写台账', async () => {
     const before = (await resources.api.list({ includeStopped: true })).length;
     const report = AdoptionReportSchema.parse(await control.api.adoptionReport(ADMIN));
     expect(report.dryRun).toBe(true);
-    expect(report.counts).toEqual({ owned: 1, adoptable: 3, orphan: 3, retained: 1, platform: 1, unclassified: 1 });
+    expect(report.counts).toEqual({ owned: 1, adoptable: 3, orphan: 4, retained: 1, platform: 1, unclassified: 1 });
     expect(report.items.at(-1)).toMatchObject({ name: 'cs-api-1', verdict: 'platform' });
-    expect(report.items.slice(0, 3).map((i) => i.name).sort()).toEqual(['task-gone', 'work-legacy-gone', 'work-released']);
+    expect(report.items.slice(0, 4).map((i) => i.name).sort()).toEqual(['task-gone', 'task-rel-runner', 'work-legacy-gone', 'work-released']);
+    expect(report.items.some((i) => i.name === 'demo-green')).toBe(false);
     // RFC-013 之前的旧 ID 经身份目录换成现 ID：它的会话还在，工作卷是可收编，不是孤儿
     expect(report.items.find((i) => i.name === 'work-legacy')).toMatchObject({ verdict: 'adoptable', candidateKind: 'volume', ownerRef: 't-live' });
     expect(report.items.find((i) => i.name === 'work-legacy-gone')).toMatchObject({ verdict: 'orphan', ownerRef: 'tsk_unknown' });

@@ -1,17 +1,28 @@
 import type { ResourceCondition, ResourceConditionStatus, ResourceCounts, ResourceKind } from '@crewstation/contracts';
 import { jsonHash } from '@crewstation/kernel';
 
-/** 所属模块或调和器报来的一条条件；`since` 由台账按「状态变了才换」自己记。 */
+/** 所属模块或调和器报来的一条条件；`since` 缺省由台账按「状态变了才换」自己记。 */
 export interface ConditionUpdate {
   readonly type: string;
   readonly status: ResourceConditionStatus;
   readonly reason?: string;
   readonly message?: string;
+  /**
+   * 报告方知道的发生时刻（例如任务环境判失败的时刻）：台账接上之前就已发生的条件（补投影、收编）据此得到真实的起点，
+   * 失败的保留期从这里算（D9）。晚于现在的不认；同一状态已记的起点只会往早改，不会往晚改。
+   */
+  readonly since?: Date;
+}
+
+function sinceOf(previous: ResourceCondition | undefined, update: ConditionUpdate, now: Date): string {
+  const reported = update.since && update.since.getTime() <= now.getTime() ? update.since : undefined;
+  if (!previous || previous.status !== update.status) return (reported ?? now).toISOString();
+  return reported && reported.getTime() < Date.parse(previous.since) ? reported.toISOString() : previous.since;
 }
 
 /**
- * 合并条件：同类型的状态变了才换起始时间，只改说明不换；新类型追加。返回原数组表示没有变化，
- * 调用方据此跳过写库（重复上报不产生变更日志）。
+ * 合并条件：同类型的状态变了才换起始时间（报告方给了发生时刻就用它），只改说明不换；新类型追加。
+ * 返回原数组表示没有变化，调用方据此跳过写库（重复上报不产生变更日志）。
  */
 export function mergeConditions(existing: readonly ResourceCondition[], updates: readonly ConditionUpdate[], now: Date): readonly ResourceCondition[] {
   let changed = false;
@@ -19,7 +30,7 @@ export function mergeConditions(existing: readonly ResourceCondition[], updates:
   for (const update of updates) {
     const at = next.findIndex((entry) => entry.type === update.type);
     const previous = at >= 0 ? next[at] : undefined;
-    const since = previous && previous.status === update.status ? previous.since : now.toISOString();
+    const since = sinceOf(previous, update, now);
     const merged: ResourceCondition = { type: update.type, status: update.status, ...(update.reason ? { reason: update.reason } : {}), ...(update.message ? { message: update.message } : {}), since };
     if (previous && jsonHash(previous) === jsonHash(merged)) continue;
     changed = true;

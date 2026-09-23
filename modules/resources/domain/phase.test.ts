@@ -51,12 +51,16 @@ describe('阶段规则（RFC-025 设计 §2.3）', () => {
     expect(computePhase(volume('Bound', 'absent')).phase).toBe('stopping');
   });
 
-  test('收束：阶段变了才换起始时间；开发会话进入失败写 72 小时保留，离开失败清掉；没有变化返回同一对象', () => {
+  test('收束：阶段变了才换起始时间；开发会话失败保留 72 小时、从失败的时刻起算，离开失败清掉；没有变化返回同一对象', () => {
     const t1 = new Date(t0.getTime() + 60_000);
+    // 「失败」条件自 t0 起成立（所属模块报来的发生时刻）：保留到 t0＋72 小时，不是记录进入失败的 t1。
     const failed = settlePhase(record({ conditions: [cond('Failed', 'true')] }), t1);
     expect(failed.phase).toBe('failed'); expect(failed.phaseSince).toEqual(t1);
-    expect(failed.retainUntil?.toISOString()).toBe(new Date(t1.getTime() + 72 * 3_600_000).toISOString());
+    expect(failed.retainUntil?.toISOString()).toBe(new Date(t0.getTime() + 72 * 3_600_000).toISOString());
     expect(settlePhase(failed, new Date(t1.getTime() + 5_000))).toBe(failed);
+    // 台账接上之前两天就失败的会话（补投影）：只剩一天。
+    const legacy = settlePhase(record({ conditions: [cond('Failed', 'true', { since: new Date(t0.getTime() - 48 * 3_600_000).toISOString() })] }), t1);
+    expect(legacy.retainUntil?.toISOString()).toBe(new Date(t0.getTime() + 24 * 3_600_000).toISOString());
     const cli = settlePhase(record({ kind: 'agent-execution', conditions: [cond('Failed', 'true')] }), t1);
     expect(cli.retainUntil).toBeUndefined();
     const retried = settlePhase({ ...failed, conditions: [cond('Failed', 'false')] }, t1);
@@ -72,6 +76,22 @@ describe('条件、子对象、计数与可做操作', () => {
     const reworded = mergeConditions(first, [{ type: 'RunnerConnected', status: 'true', message: '已连接' }], t1);
     expect(reworded[0]).toEqual({ type: 'RunnerConnected', status: 'true', message: '已连接', since: t0.toISOString() });
     expect(mergeConditions(reworded, [{ type: 'RunnerConnected', status: 'false' }], t1)[0]?.since).toBe(t1.toISOString());
+  });
+
+  test('报告方给了发生时刻：状态变化时用它；同一状态只往早改；晚于现在的不认', () => {
+    const t1 = new Date(t0.getTime() + 60_000), earlier = new Date(t0.getTime() - 3_600_000), future = new Date(t1.getTime() + 60_000);
+    const first = mergeConditions([], [{ type: 'Failed', status: 'true', since: t0 }], t1);
+    expect(first[0]?.since).toBe(t0.toISOString());
+    expect(mergeConditions(first, [{ type: 'Failed', status: 'true', since: earlier }], t1)[0]?.since).toBe(earlier.toISOString());
+    expect(mergeConditions(first, [{ type: 'Failed', status: 'true', since: t1 }], t1)).toBe(first);
+    expect(mergeConditions([], [{ type: 'Failed', status: 'true', since: future }], t1)[0]?.since).toBe(t1.toISOString());
+  });
+
+  test('待回收的工作卷：上级已结束、卷还在，按已结束算，原因写明；受理删除后照常是结束中', () => {
+    const volume = (extra: Partial<LedgerRecord> = {}) => record({ kind: 'volume', spec: { children: [{ kind: 'PersistentVolumeClaim', namespace: 'cs-demo', name: 'task-1-work' }] }, children: [{ kind: 'PersistentVolumeClaim', namespace: 'cs-demo', name: 'task-1-work', phase: 'Bound', ready: true }], ...extra });
+    expect(computePhase(volume({ conditions: [cond('PendingReclaim', 'true', { reason: 'retention-expired', message: '失败保留期已满' })] }))).toEqual({ phase: 'stopped', reason: { code: 'retention-expired', message: '失败保留期已满' } });
+    expect(computePhase(volume({ conditions: [cond('PendingReclaim', 'true')] })).reason?.code).toBe('pending-reclaim');
+    expect(computePhase(volume({ desired: 'absent', conditions: [cond('PendingReclaim', 'true')] })).phase).toBe('stopping');
   });
 
   test('子对象合并：期望的都在（没观测到记 absent），期望里没了但还在的旧对象留到它消失', () => {

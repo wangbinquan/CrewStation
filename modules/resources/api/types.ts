@@ -59,12 +59,14 @@ export interface LedgerRecord {
   readonly compactedAt?: Date;
 }
 
-/** 所属模块或调和器报来的一条条件；`since` 由台账按「状态变了才换」自己记。 */
+/** 所属模块或调和器报来的一条条件；`since` 缺省由台账按「状态变了才换」自己记。 */
 export interface ConditionUpdate {
   readonly type: string;
   readonly status: ResourceConditionStatus;
   readonly reason?: string;
   readonly message?: string;
+  /** 报告方知道的发生时刻：晚于现在的不认；同一状态已记的起点只会往早改（失败的保留期从这里算，D9）。 */
+  readonly since?: Date;
 }
 
 /** 所属模块声明一条资源：新建或整体替换期望（设计 §2.1）。 */

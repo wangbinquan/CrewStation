@@ -6,6 +6,8 @@ export interface LedgerRecordRef {
   readonly desired: 'present' | 'absent';
   readonly owner: { readonly module: string; readonly ref: string };
   readonly conditions: readonly { readonly type: string; readonly status: ResourceConditionStatus }[];
+  /** 期望「不要了」的原因；资源中心替所属模块改期望只有一种：失败保留期满（retention-expired）。 */
+  readonly releaseReason?: { readonly code: string; readonly message: string };
 }
 
 export interface LedgerConditionUpdate {
@@ -13,6 +15,8 @@ export interface LedgerConditionUpdate {
   readonly status: ResourceConditionStatus;
   readonly reason?: string;
   readonly message?: string;
+  /** 发生时刻；台账只会把已记的起点往早改。 */
+  readonly since?: Date;
 }
 
 export interface LedgerDeclaration {
@@ -22,7 +26,7 @@ export interface LedgerDeclaration {
   readonly projectId?: ProjectId;
   readonly parentId?: string;
   readonly purpose?: ClusterPurpose;
-  readonly spec: { readonly children: readonly { readonly kind: string; readonly namespace?: string; readonly name: string }[] };
+  readonly spec: { readonly children: readonly { readonly kind: string; readonly namespace?: string; readonly name: string }[]; readonly reclaim?: 'delete' | 'retain' };
   readonly display?: Readonly<Record<string, string>>;
   readonly conditions?: readonly LedgerConditionUpdate[];
 }

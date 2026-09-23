@@ -1,5 +1,5 @@
 import type { Clock } from '@crewstation/kernel';
-import { goneChild, podChild, podConditions, pvcChild, RESOURCE_ID_LABEL } from '../domain/observation';
+import { goneChild, podChild, podConditions, presentChild, pvcChild, RESOURCE_ID_LABEL } from '../domain/observation';
 import type { ObjectChange } from '../ports/cluster';
 import type { LedgerObservations } from '../ports/ledger';
 
@@ -10,10 +10,14 @@ export interface ObservationStats {
   unowned: number;
   /** 系统命名空间里的平台组件（没有任务标签的）：不在台账范围（设计 §6.4），不查不写。档位测试的 Pod 也在系统命名空间，但带任务标签，照常观测。 */
   platform: number;
+  /** 调和器按 UID 删掉的子对象（所属记录已「不要了」）。 */
+  removed: number;
+  /** 上级已结束、写上「待回收」的工作卷。 */
+  reclaimable: number;
 }
 
 export function newObservationStats(): ObservationStats {
-  return { recorded: 0, unchanged: 0, unowned: 0, platform: 0 };
+  return { recorded: 0, unchanged: 0, unowned: 0, platform: 0, removed: 0, reclaimable: 0 };
 }
 
 /** 一个受管对象的变化 → 子对象观测写回台账（设计 §6.2 第 3 步）。 */
@@ -24,7 +28,7 @@ export async function observeChange(ledger: LedgerObservations, clock: Clock, sy
     return;
   }
   const observedAt = clock.now().toISOString();
-  const child = gone ? goneChild(object) : change.kind === 'Pod' ? podChild(object, observedAt) : pvcChild(object, observedAt);
+  const child = gone ? goneChild(object) : change.kind === 'Pod' ? podChild(object, observedAt) : change.kind === 'PersistentVolumeClaim' ? pvcChild(object, observedAt) : presentChild(object, observedAt);
   const resourceId = object.metadata.labels?.[RESOURCE_ID_LABEL];
   const conditions = !gone && change.kind === 'Pod' ? podConditions(object) : undefined;
   const outcome = await ledger.observe({ ...(resourceId ? { resourceId } : {}), child, ...(gone ? { gone } : {}), ...(conditions ? { conditions } : {}) });

@@ -22,6 +22,7 @@ const PAUSING = reasonOf('pausing', '已暂停，正在回收容器');
 const PAUSED = reasonOf('paused', '已暂停，工作卷保留；恢复后重新启动');
 const QUEUED = reasonOf('queued', '已受理，排队等待分配');
 const WAIT_CONNECT = reasonOf('waiting-connect', '容器已运行，等待环境连接');
+const PENDING_RECLAIM = '工作卷待回收：上级已结束，由管理员确认后删除';
 
 export function condition(record: Pick<LedgerRecord, 'conditions'>, type: string): ResourceCondition | undefined {
   return record.conditions.find((entry) => entry.type === type);
@@ -31,6 +32,9 @@ export function computePhase(record: PhaseInput): PhaseResult {
   const rule = kindRule(record.kind);
   const present = record.children.filter(isPresent);
   if (record.desired === 'absent') return present.length ? { phase: 'stopping', reason: record.releaseReason ?? STOPPING } : { phase: 'stopped', ...(record.releaseReason ? { reason: record.releaseReason } : {}) };
+  // 待回收（D8）：工作卷的上级已结束，卷留着等管理员确认删除——它已不在用，按已结束算，不占什么也不算失败。
+  const reclaim = condition(record, 'PendingReclaim');
+  if (reclaim?.status === 'true') return { phase: 'stopped', reason: reasonOf(reclaim.reason ?? 'pending-reclaim', reclaim.message ?? PENDING_RECLAIM) };
   const failed = condition(record, 'Failed');
   if (failed?.status === 'true') return { phase: 'failed', reason: reasonOf(failed.reason ?? 'failed', failed.message ?? '平台判定失败') };
   if (condition(record, 'Paused')?.status === 'true') return present.length ? { phase: 'stopping', reason: PAUSING } : { phase: 'stopped', reason: PAUSED };
@@ -67,14 +71,24 @@ function byConditions(record: PhaseInput, rule: KindRule): PhaseResult {
 }
 
 /**
- * 重算阶段并收束随阶段变化的字段：阶段变了才换 phaseSince；进入「失败」时按种类写保留到期（D9），
- * 离开失败（重试、恢复）时清掉。返回同一对象表示没有变化。
+ * 失败从什么时候算：所属模块报的「失败」条件带着发生时刻（台账接上之前就失败的会话据此得到真实起点），
+ * 否则是记录进入失败的时刻。
+ */
+function failedSince(record: LedgerRecord, phaseChanged: boolean, now: Date): Date {
+  const failed = condition(record, 'Failed');
+  if (failed?.status === 'true') return new Date(failed.since);
+  return phaseChanged ? now : record.phaseSince;
+}
+
+/**
+ * 重算阶段并收束随阶段变化的字段：阶段变了才换 phaseSince；失败时按种类写保留到期（D9：从失败的时刻起算，
+ * 每次按条件重算），离开失败（重试、恢复）时清掉。返回同一对象表示没有变化。
  */
 export function settlePhase(record: LedgerRecord, now: Date): LedgerRecord {
   const next = computePhase(record);
   const rule = kindRule(record.kind);
   const phaseChanged = next.phase !== record.phase;
-  const retainUntil = next.phase === 'failed' ? record.retainUntil ?? (rule.failedRetentionMs ? new Date(now.getTime() + rule.failedRetentionMs) : undefined) : undefined;
+  const retainUntil = next.phase === 'failed' && rule.failedRetentionMs ? new Date(failedSince(record, phaseChanged, now).getTime() + rule.failedRetentionMs) : undefined;
   const sameReason = jsonHash(next.reason ?? null) === jsonHash(record.reason ?? null);
   const sameRetention = (retainUntil?.getTime() ?? null) === (record.retainUntil?.getTime() ?? null);
   if (!phaseChanged && sameReason && sameRetention) return record;

@@ -3,7 +3,7 @@ import type { Executor } from '@crewstation/persistence';
 import type { ProjectedRecord } from '../../domain/ledgerProjection';
 import { projectEnvironment, runnerCondition } from '../../domain/ledgerProjection';
 import type { TaskEnvironment } from '../../domain/taskEnvironment';
-import type { EnvironmentLedger, LedgerWriter } from '../../ports/ledger';
+import type { EnvironmentLedger, LedgerRecordRef, LedgerWriter } from '../../ports/ledger';
 import type { EnvironmentRepository } from '../../ports/repositories';
 
 /**
@@ -21,7 +21,7 @@ async function syncRecord(writer: LedgerWriter, record: ProjectedRecord, connect
   const saved = await writer.declare({
     ...(record.id ? { id: record.id } : {}), kind: record.kind, ref: record.ref, projectId: record.projectId,
     ...(record.parentId ? { parentId: record.parentId } : {}), ...(record.purpose ? { purpose: record.purpose } : {}),
-    spec: { children: record.children }, display: record.display, conditions: [...record.conditions, ...runner],
+    spec: { children: record.children, ...(record.reclaim ? { reclaim: record.reclaim } : {}) }, display: record.display, conditions: [...record.conditions, ...runner],
   });
   if (record.startup) await writer.report(saved.id, { startup: record.startup });
   if (record.release) await writer.requestRelease(saved.id, record.release);
@@ -42,6 +42,15 @@ export async function syncEnvironmentLedger(executor: Executor, ledger: Environm
   } catch (error) {
     logger.warn('resource ledger projection failed', { taskId: env.id, error: error instanceof Error ? error.message : String(error) });
   }
+}
+
+/**
+ * 在当前事务里读这个环境的工作负载记录（资源中心可能已替它改了期望：失败保留期满）。包在保存点里：
+ * 台账读不到（暂时不可用）当作没有，不让所属模块的事务因此中止。
+ */
+export async function findWorkloadRecord(executor: Executor, ledger: EnvironmentLedger, env: TaskEnvironment): Promise<LedgerRecordRef | undefined> {
+  const { workload } = projectEnvironment(env);
+  try { return await executor.transaction((savepoint) => ledger.within(savepoint).find(workload.ref, workload.kind)); } catch { return undefined; }
 }
 
 /** 环境仓储的投影装饰：每次落库之后，在同一事务里同步台账。其余读方法原样透传。 */

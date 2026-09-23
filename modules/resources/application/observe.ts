@@ -2,6 +2,7 @@ import type { ResourceChild } from '@crewstation/contracts';
 import type { Clock } from '@crewstation/kernel';
 import { jsonHash } from '@crewstation/kernel';
 import type { ChildObservation, ObservationOutcome } from '../api/types';
+import type { ConditionUpdate } from '../domain/conditions';
 import { mergeConditions } from '../domain/conditions';
 import type { LedgerRecord } from '../domain/record';
 import { childKey, unobservedChild } from '../domain/record';
@@ -46,9 +47,20 @@ export async function observeIn(scope: LedgerScope, observation: ChildObservatio
   return saved === record ? { status: 'unchanged', record } : { status: 'recorded', record: saved };
 }
 
+/** 只归资源中心的条件、不附带子对象观测（例如工作卷的上级已结束时写「待回收」）。 */
+export async function observeConditionsIn(scope: LedgerScope, id: string, conditions: readonly ConditionUpdate[], now: Date): Promise<ObservationOutcome> {
+  const record = await scope.records.get(id, { forUpdate: true });
+  if (!record) return { status: 'unowned' };
+  const merged = mergeConditions(record.conditions, conditions, now);
+  if (merged === record.conditions) return { status: 'unchanged', record };
+  const saved = await commitRecord(scope, record, { ...record, conditions: merged }, now);
+  return saved === record ? { status: 'unchanged', record } : { status: 'recorded', record: saved };
+}
+
 /** 调和器的观测写入口：每条观测一个短事务，同一记录的写入由行锁串行。 */
 export function observationWriter(uow: LedgerUnitOfWork, clock: Clock) {
   return {
     observe: (observation: ChildObservation) => uow.run((scope) => observeIn(scope, observation, clock.now())),
+    observeConditions: (id: string, conditions: readonly ConditionUpdate[]) => uow.run((scope) => observeConditionsIn(scope, id, conditions, clock.now())),
   };
 }

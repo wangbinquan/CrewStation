@@ -8,7 +8,7 @@ import { NATIVE_EXECUTION_JOB_KIND } from '../../ports/repositories';
 import type { RepositoryScope, UnitOfWork } from '../../ports/unitOfWork';
 import { drizzleAdmissionRepository, drizzleEnvironmentRepository } from './drizzleRepositories';
 import { drizzleRebuildRepository } from './drizzleRebuildRepository';
-import { ledgerEnvironmentRepository, syncEnvironmentLedger } from './ledgerProjection';
+import { findWorkloadRecord, ledgerEnvironmentRepository, syncEnvironmentLedger } from './ledgerProjection';
 import type { EnvironmentLedger } from '../../ports/ledger';
 import type { TaskEnvironment } from '../../domain/taskEnvironment';
 
@@ -23,7 +23,7 @@ export function scopeOver(executor: Executor, projection?: LedgerProjection): Re
   const sync = projection ? (env: TaskEnvironment) => syncEnvironmentLedger(executor, projection.ledger, env, projection.logger ?? noopLogger) : undefined;
   return {
     environments: sync ? ledgerEnvironmentRepository(environments, sync) : environments,
-    ...(sync ? { ledger: { sync } } : {}),
+    ...(sync && projection ? { ledger: { sync, workload: (env: TaskEnvironment) => findWorkloadRecord(executor, projection.ledger, env) } } : {}),
     admissions: drizzleAdmissionRepository(executor),
     rebuilds: drizzleRebuildRepository(executor),
     rebuildQueue: { enqueue: async (requestId) => { await enqueueJob(executor, REBUILD_JOB_KIND, { requestId }, { dedupKey: requestId, maxAttempts: 5 }); } },
