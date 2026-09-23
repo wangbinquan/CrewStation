@@ -21,6 +21,8 @@
 **回填**：RFC-003 development-workspace §2.1（主修订）、§2.2（契约）、§5（×）、§9（状态），RFC-003 proposal／design、RFC-008 design、RFC-020 proposal §4.3 与 design §5.1 各加同日修订说明。
 **并行会话**：crewstation-14 同时在改「开发页撑满窗口高度」，与本批共用 `NativeWorkspace.module.css`（`.workspace`／`.stage`／窄屏块）与 `DevSessionWorkbench.tsx`（两处 `<Stack fill>`）。本批用临时索引只提交自己的 hunk，这两个文件里对方的改动留在工作树等对方提交。
 **提交前的实机核对**（不动共享部署）：从「HEAD＋本批」导出的干净树构建工作台包，dev-developer 身份的无头 Chrome 里用 CDP 只换 `/assets/index-*`，并把布局 PUT 就地应答（线上 cs-api 仍是旧的 strict 契约）。1440／1280／1024：两个在运行的 CLI 自动成为标签，右键菜单向右分屏、拖到另一组下边（落点区与跟手名字）、双击放大与还原、拖分隔线与双击均分、F2 改名、Shift+F10 键盘菜单（分屏后焦点跟到移动的标签）全部按预期，无横向溢出、无控制台错误；390 宽两组放不下时合并为一条标签栏。只动标签、不点进终端（点进会自动取得输入控制），不结束任何在运行的 CLI。
+**已推送并部署**：`7c0deb9`，[CI 35812358725](https://github.com/wangbinquan/CrewStation/actions/runs/35812358725) 六项全部成功（含 `gate` 新增代码防护与 `e2e`）。本机从提交内容（`git archive`）构建 `cs-control-plane:dock-20260923` 与 `cs-console:dock-20260923` 并导入节点；因为布局契约是 strict，先只滚 `cs-api`（其余控制面服务、`crewstation-dev-auth` 与 `cs-session` 未动），核对它收下带 `dock` 的布局（200）、拒绝一组出现两次的树（400），再滚 console（线上包 `index-DmlpCj-g.js`）。实机（dev-developer，不换资源、不拦请求）：旧布局读入即迁移并保存（revision 递增、带分屏树），两个在运行的 CLI 成为标签，右键向右分屏后刷新仍是两组，无错误；e2e `cliTabs`＋`projectWorkspaceIa` 以 `CS_E2E_AUTH=dev-oidc CS_E2E_USERNAME=dev-admin CS_TEST_REQUIRE=e2e` 跑 13 pass／0 fail（作者的个人布局因此被迁移成标签组，这与作者下次进页自己迁移结果相同）。
+**下一个 session 注意**：作者尚未亲手看新 CLI 区。圆点、信息条折行、窄区合并、「其他人」等细节以作者实机反馈为准；在 390 宽的手机上两组放不下时会合并成一条标签栏（布局里的分屏保留）。
 
 ## 开发页撑到窗口底边、文档式面板把最后一张卡拉到底（2026-09-23）
 

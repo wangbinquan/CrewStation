@@ -519,6 +519,7 @@ happy-dom 不排版，渲染用例照绿。
 **坑**：不要连文档（`resourceType: 'Document'`）一起换成本地的 `index.html`——2026-09-23 这样做时开发页一直「重连中」，预览与编辑器都出不来，
 只换 assets 时同一个包「已连接」；原因没有深究。还要先 `Network.setCacheDisabled`：缓存命中的 `index-*.js` 不经过拦截，同一脚本不关缓存时量到的是线上包
 （预览 iframe 仍是 200px，关掉后 569px）。核对前在页面里确认 `document.styleSheets` 里有新规则，免得核对的是线上包。
+**前端依赖尚未部署的契约时**（2026-09-23，CLI 标签组）：线上 cs-api 的 strict 校验会拒掉带新字段的保存，页面满是「布局格式无效」。在同一个 `Fetch.enable` 里再加一条 `*workspace-layout*`（`requestStage: 'Request'`），把 PUT 用 `fulfillRequest` 就地回一个 `revision + 1` 的回执，GET 照常走线上：交互与规整都能核对，服务端一个字都没写。别的身份的布局也不会被动——核对用 dev-developer，作者用的是 dev-admin。
 
 ## 用例与 CI
 
