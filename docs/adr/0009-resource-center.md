@@ -1,6 +1,6 @@
 # 0009. 资源中心：新增 resources（L1）、cluster-control 与 data-control（L2）、resource-runtime 包
 
-- 状态：提议（随 RFC-025 三件套一起等作者批准）
+- 状态：已接受；作者于 2026-09-23 「批准并实施」RFC-025（含本 ADR）
 - 日期：2026-09-23
 - 关联：[RFC-025](../../proposal/rfc/RFC-025-resource-center/proposal.md)；修订 [ADR-0006](./0006-cluster-management-module.md) 的所有权描述
 
