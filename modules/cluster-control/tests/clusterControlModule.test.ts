@@ -59,6 +59,8 @@ describe.skipIf(!available)('cluster-control：观测写回台账与收编空跑
   const removals: string[] = [], routeApplies: string[] = [];
   // 身份索引（gateway）收到的 Pod：变化逐条、首次全量同步后一份全量；名字是 pod-identity-broken 的模拟身份索引出错。
   const podEvents: string[] = [], relisted: number[] = [];
+  // 调和器的调试日志（路由在等中间件时记一条）：用例据此确认那一支真的走到了。
+  const debugs: string[] = [];
   const writer = kubernetesClusterWriter(k8s);
   const cluster: ClusterWriter = {
     remove: async ({ kind, namespace, name, uid }) => {
@@ -104,11 +106,12 @@ describe.skipIf(!available)('cluster-control：观测写回台账与收编空跑
     };
     control = createClusterControlModule({
       k8s, feed, cluster, isAdmin: async (id) => id === ADMIN.userId, systemNamespace: 'crewstation-system',
+      logger: { ...noopLogger, debug: (msg: string) => { debugs.push(msg); } },
       reader: { list: async (kind) => objects.filter((o) => o.kind === kind) },
       ledger,
       // 孤儿回收单独在 orphanSweep.test.ts 里核对；这里关掉，免得它的定时轮次与本文件的用例交错。
       orphanSweep: false,
-      reconciler: { pollMs: 20 },
+      reconciler: { pollMs: 20, retryMs: 50 },
       pods: {
         changed: async (object, gone) => {
           if (object.metadata.name === 'pod-identity-broken') throw new Error('身份索引暂时不可用');
@@ -306,16 +309,23 @@ describe.skipIf(!available)('cluster-control：观测写回台账与收编空跑
     await until('改回', () => routeApplies.length === 2);
     expect(routeApplies[1]).toBe('drift:shop-prod');
     expect((await k8s.get<Route>(Resources.IngressRoute!, 'shop-prod', 'cs-demo'))?.spec.routes[0]?.['services']).toEqual([{ name: 'shop-blue', port: 80, namespace: 'cs-demo' }]);
+    // 引用的项目中间件还没建出来：线上那一版不动，等中间件出现后再建（T10：限流中间件由限流记录渲染，可能晚一步）。
+    const waiting = await gateway.declare({ kind: 'route', ref: 'svc-shop/service', projectId: PROJECT, spec: spec('shop-service', 'cs-demo', { middlewares: [...chain, { name: 'rate-limit-source' }] }) });
+    await until('调和器在等中间件', () => debugs.includes('resource route waiting for middleware'));
+    expect(await k8s.get(Resources.IngressRoute!, 'shop-service', 'cs-demo')).toBeUndefined();
+    await place({ ...child('Middleware', 'rate-limit-source'), apiVersion: 'traefik.io/v1alpha1' });
+    await until('中间件出现后建出路由', async () => (await resources.api.get(waiting.id))?.phase === 'ready');
+    expect(routeApplies).toContain('missing:shop-service');
     // 期望不完整、在系统命名空间：不渲染。
     await gateway.declare({ kind: 'route', ref: 'svc-shop/broken', projectId: PROJECT, spec: spec('shop-broken', 'cs-demo', { target: { namespace: 'cs-demo' } }) });
     await gateway.declare({ kind: 'route', ref: 'svc-shop/system', projectId: PROJECT, spec: spec('shop-system', 'crewstation-system') });
     await control.reconciled();
-    expect(routeApplies).toHaveLength(2);
+    expect(routeApplies).toHaveLength(3);
     // 不要了：IngressRoute 删掉，记录进入已结束。
     await gateway.requestRelease(record.id, { code: 'route-retired', message: '不再需要这条路由' });
     await until('路由删掉', async () => (await resources.api.get(record.id))?.phase === 'stopped');
     expect(removals).toContain('IngressRoute/shop-prod');
-    expect(routeApplies).toHaveLength(2);
+    expect(routeApplies).toHaveLength(3);
   });
 
   // RFC-025 T10：限流策略的 Middleware 由调和器照记录渲染；系统命名空间里的（平台接口）带资源 ID 标签，照常观测与回收。

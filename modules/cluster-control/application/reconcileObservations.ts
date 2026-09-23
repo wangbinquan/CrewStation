@@ -13,6 +13,8 @@ const REMOVAL_ORDER: readonly ObservedKind[] = ['Deployment', 'Job', 'Pod', 'Sec
 const isObserved = (kind: string): kind is ObservedKind => (REMOVAL_ORDER as readonly string[]).includes(kind);
 const key = (child: { readonly kind: string; readonly namespace?: string; readonly name: string }) => `${child.kind}/${child.namespace ?? ''}/${child.name}`;
 const RETENTION_EXPIRED = 'retention-expired';
+/** 路由引用的项目中间件还没建出来时，隔多久再核对一次。 */
+const MIDDLEWARE_WAIT_MS = 2_000;
 
 /** 把一条记录（再）排进调和队列；带延迟的是到期复核（例如崩溃重启的判定窗口过去之后）。 */
 export type Enqueue = (id: string, afterMs?: number) => void;
@@ -25,6 +27,8 @@ export interface ReconcileDeps {
   readonly systemNamespace: string;
   readonly stats: ObservationStats;
   readonly logger: Logger;
+  /** 路由等中间件时的复核间隔（用例调短）；缺省 2 秒。 */
+  readonly retryMs?: number;
 }
 
 /** 期望里的与观测到的子对象（期望里已经没有、但还在集群里的旧对象也在内，例如重建换下的 Pod）。 */
@@ -113,15 +117,22 @@ async function observeControlledPods(deps: ReconcileDeps, record: LedgerRecordVi
 
 /**
  * 路由（第三期后半，设计 §7.1）：期望在、IngressRoute 缺了或与期望不一致时按期望 apply——网关写期望，调和器应用。
- * 删除中的等它消失再建；系统命名空间不碰；期望不完整的不渲染，只告警。
+ * 删除中的等它消失再建；系统命名空间不碰；期望不完整的不渲染，只告警。引用的项目中间件（前缀剥离、限流）还没建出来时先不动：
+ * Traefik 遇到不存在的中间件会让整条路由失效，线上那一版照旧服务，过一会儿再核对。
  */
-async function applyRoute(deps: ReconcileDeps, record: LedgerRecordView): Promise<void> {
+async function applyRoute(deps: ReconcileDeps, record: LedgerRecordView, enqueue: Enqueue): Promise<void> {
   const route = routeRenderOf(record.spec);
   if (!route) {
     deps.logger.warn('resource route spec incomplete', { resourceId: record.id });
     return;
   }
   if (route.namespace === deps.systemNamespace) return;
+  const waiting = route.middlewares.find((entry) => (!entry.namespace || entry.namespace === route.namespace) && !deps.feed.cached('Middleware', route.namespace, entry.name));
+  if (waiting) {
+    deps.logger.debug('resource route waiting for middleware', { resourceId: record.id, middleware: waiting.name });
+    enqueue(record.id, deps.retryMs ?? MIDDLEWARE_WAIT_MS);
+    return;
+  }
   const current = deps.feed.cached('IngressRoute', route.namespace, route.name);
   if (current?.metadata.deletionTimestamp) return;
   if ((await deps.cluster.applyRoute(route, current)) !== 'applied') return;
@@ -157,7 +168,7 @@ export async function reconcileRecord(deps: ReconcileDeps, id: string, enqueue: 
   if (!record) return;
   await observeRecord(deps, record);
   await observeControlledPods(deps, record, enqueue);
-  if (record.kind === 'route' && record.desired === 'present') await applyRoute(deps, record);
+  if (record.kind === 'route' && record.desired === 'present') await applyRoute(deps, record, enqueue);
   if (record.kind === 'rate-limit-policy' && record.desired === 'present') await applyMiddlewares(deps, record);
   if (record.desired === 'absent') await removeChildren(deps, record);
   await settleVolume(deps, record);

@@ -72,7 +72,8 @@ export function createClusterControlModule(deps: ClusterControlModuleDeps): Clus
   };
   const watcher = observationWorker(feed, handle, () => ({ ...stats }), logger, deps.summaryMs);
   const cluster = deps.cluster ?? kubernetesClusterWriter(deps.k8s);
-  const reconciler = ledgerReconciler(deps.ledger, feed, (id, enqueue) => reconcileRecord({ ledger: deps.ledger, feed, cluster, clock, systemNamespace: deps.systemNamespace, stats, logger }, id, enqueue), logger, deps.reconciler);
+  const reconcileDeps = { ledger: deps.ledger, feed, cluster, clock, systemNamespace: deps.systemNamespace, stats, logger, ...(deps.reconciler?.retryMs ? { retryMs: deps.reconciler.retryMs } : {}) };
+  const reconciler = ledgerReconciler(deps.ledger, feed, (id, enqueue) => reconcileRecord(reconcileDeps, id, enqueue), logger, deps.reconciler);
   const sweep = deps.orphanSweep === false ? undefined : orphanSweeper(feed, () => sweepOrphans({ feed, ledger: deps.ledger, legacy: deps.legacy, cluster, clock, logger, stats, minAgeMs: (deps.orphanSweep || {}).minAgeMs ?? 600_000 }), logger, deps.orphanSweep || {});
   // 先开观测缓存，再开按记录核对的队列与孤儿回收（它们都等缓存同步完成才开始）；同步完成后身份索引按全量清一次旧行。
   const observer = {

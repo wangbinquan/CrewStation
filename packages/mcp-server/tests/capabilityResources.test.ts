@@ -75,6 +75,8 @@ describe('能力说明 MCP：资源目录', () => {
     expect(text).toContain(IDENTITY_HEADERS.sourceService);
     expect(text).toContain('CS_INTERNAL_API_BASE');
     expect(text).toContain('git push` 不是发布');
+    // RFC-025 T10：写明数字人会收到 429 与 Retry-After。
+    expect(text).toContain('超额返回 `429`，带 `Retry-After`（秒）');
     expect(platform.calls).toHaveLength(0);
     expect(conventionGuide()).toBe(text);
   });

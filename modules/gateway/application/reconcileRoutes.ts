@@ -1,4 +1,5 @@
 import type { RouteEntry, ServiceId } from '@crewstation/contracts';
+import { jsonHash } from '@crewstation/kernel';
 import type { RoutedService, SystemMiddlewares } from '../domain/routeProjection';
 import { projectRoute, routeRef, SERVICE_ROUTE_KINDS } from '../domain/routeProjection';
 import { planServiceRoutes } from '../domain/routePlan';
@@ -46,9 +47,11 @@ export function routeUseCases(deps: GatewayUseCaseDeps, project?: ProjectLedgerH
     userAuthMiddleware: deps.settings.userAuthMiddleware,
     serviceAuthMiddleware: deps.settings.serviceAuthMiddleware,
     dropIdentityHeadersMiddleware: deps.settings.dropIdentityHeadersMiddleware,
+    rateLimits: Boolean(deps.ledger),
   };
   const system: SystemMiddlewares = { names: new Set([names.userAuthMiddleware, names.serviceAuthMiddleware, names.dropIdentityHeadersMiddleware]), namespace: names.systemNamespace };
-  const reconcileService = async (serviceId: ServiceId): Promise<RouteEntry[]> => {
+  // previous：补投影时网关存的上一版计划，没变就不记日志（每 5 分钟每个服务一行没有信息量）。
+  const reconcile = async (serviceId: ServiceId, previous?: readonly RouteEntry[]): Promise<RouteEntry[]> => {
     const svc = await deps.services.getService(serviceId);
     // 已归档的服务解析得到、但不再生成路由：解析范围放宽是为了删得掉它，不是为了让它复活。
     if (!svc || svc.archived) return [];
@@ -68,9 +71,10 @@ export function routeUseCases(deps: GatewayUseCaseDeps, project?: ProjectLedgerH
       await project?.declare(svc.projectId);
       await declareRoutes(deps.ledger, system, svc, routes);
     }
-    deps.logger.info('routes reconciled', { service: svc.identity, routes: routes.length });
+    if (!previous || jsonHash(previous) !== jsonHash(routes)) deps.logger.info('routes reconciled', { service: svc.identity, routes: routes.length });
     return routes;
   };
+  const reconcileService = (serviceId: ServiceId): Promise<RouteEntry[]> => reconcile(serviceId);
   return {
     reconcileService,
     reconcileAll: async (): Promise<number> => {
@@ -89,8 +93,8 @@ export function routeUseCases(deps: GatewayUseCaseDeps, project?: ProjectLedgerH
       }
     },
     /**
-     * 路由的台账补投影（RFC-025 第三期后半）：按网关自己存的路由表逐个服务再声明一次，漏写的（台账暂时不可用）由它追上；
-     * 归档的服务照空计划声明（它的记录标「不要了」）。一个服务失败只告警，不挡其余。
+     * 路由的台账补投影（RFC-025 第三期后半）：逐个服务按当前计划重算再声明，漏写的（台账暂时不可用）与计划的变化
+     *（例如挂上限流，T10）都由它追上；归档的服务照空计划声明（它的记录标「不要了」）。一个服务失败只告警，不挡其余。
      */
     resyncRouteLedger: async (): Promise<number> => {
       const ledger = deps.ledger;
@@ -100,7 +104,8 @@ export function routeUseCases(deps: GatewayUseCaseDeps, project?: ProjectLedgerH
         const svc = await deps.services.getService(entry.serviceId as ServiceId);
         if (!svc) continue;
         try {
-          await declareRoutes(ledger, system, svc, svc.archived ? [] : entry.routes);
+          if (svc.archived) await declareRoutes(ledger, system, svc, []);
+          else await reconcile(svc.serviceId, entry.routes);
           synced += 1;
         } catch (error) {
           deps.logger.warn('resource ledger route projection failed', { serviceId: svc.serviceId, error: error instanceof Error ? error.message : String(error) });

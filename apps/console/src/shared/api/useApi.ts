@@ -12,11 +12,21 @@ export { isApiClientError };
  */
 export const AUTO_REFRESH = { refetchIntervalMs: 30_000, refetchOnWindowFocus: true } as const;
 
-/** 读取失败后多久自动再读：网络中断与 5xx 会自己恢复；4xx（权限、校验、不存在、冲突）不会，不重试。 */
+/** 读取失败后多久自动再读：网络中断与 5xx 会自己恢复；4xx（权限、校验、不存在、冲突）不会，不重试——网关限流的 429 除外。 */
 export const FAILED_READ_RETRY_MS = 15_000;
 
+/**
+ * 读取被网关限流（429 `rate_limited`，RFC-025 设计 §7.3）：按 `Retry-After` 的秒数再读；并发上限的 429 不带它，1 秒后再读。
+ * 不是限流返回 undefined。写请求不自动重发（useApiMutation 的 retry 为 0），只写明原因。
+ */
+export function rateLimitedRetryMs(error: unknown): number | undefined {
+  if (!isApiClientError(error) || error.kind !== 'rate_limited') return undefined;
+  const seconds = error.details['retryAfter'];
+  return (typeof seconds === 'number' && seconds > 0 ? seconds : 1) * 1000;
+}
+
 export function retryableReadError(error: unknown): boolean {
-  return !(isApiClientError(error) && error.status >= 400 && error.status < 500);
+  return rateLimitedRetryMs(error) !== undefined || !(isApiClientError(error) && error.status >= 400 && error.status < 500);
 }
 
 /**
@@ -37,6 +47,8 @@ export function useApiQuery<T>(key: QueryKey, fetcher: () => Promise<T>, options
   const { keepPrevious, refetchIntervalMs } = options;
   const refetchInterval = (query: { state: { data: T | undefined; status: string; error: ApiClientError | null } }) => {
     const configured = typeof refetchIntervalMs === 'function' ? refetchIntervalMs(query.state.data) : refetchIntervalMs;
+    const limited = query.state.status === 'error' ? rateLimitedRetryMs(query.state.error) : undefined;
+    if (limited !== undefined) return limited;
     if (query.state.status === 'error' && retryableReadError(query.state.error)) return Math.min(configured ?? FAILED_READ_RETRY_MS, FAILED_READ_RETRY_MS);
     return configured ?? false;
   };

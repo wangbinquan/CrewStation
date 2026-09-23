@@ -4,8 +4,9 @@ import { focusManager, QueryClientProvider } from '@tanstack/react-query';
 import type { QueryClient } from '@tanstack/react-query';
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
+import { ApiClientError } from '@crewstation/api-client';
 import { createQueryClient } from '../shared/api/queryClient';
-import { useApiQuery } from '../shared/api/useApi';
+import { rateLimitedRetryMs, retryableReadError, useApiQuery } from '../shared/api/useApi';
 
 // 定时重读的查询在后台暂停、回到前台补读（与 usePollingRefetch 同一规则）。2026-09-23 形态图实机：15 秒重读的页面
 // 切走 18 秒再切回，又等了 10 秒才重读——全局 30 秒的新鲜期挡掉了补读。这里用生产的 QueryClient 配置，
@@ -76,4 +77,27 @@ test('不例行重读的查询、显式关掉补读的查询与显式给了新�
   const pushed = await mount(createQueryClient(), { refetchIntervalMs: 15_000, staleTimeMs: Number.POSITIVE_INFINITY });
   await awayAndBack(40_000);
   expect(pushed.reads()).toBe(1);
+});
+
+// RFC-025 T10：网关限流的 429 会自己过去——读请求按 Retry-After 自动再读（并发上限的 429 不带它，1 秒后），其余 4xx 照旧不重试。
+test('读取被限流：按 Retry-After 自动再读，没给就 1 秒；别的 4xx 不重试', async () => {
+  const limited = (retryAfter?: number) => new ApiClientError(429, { error: 'rate_limited', message: '请求过于频繁', details: retryAfter === undefined ? {} : { retryAfter } });
+  expect(rateLimitedRetryMs(limited(3))).toBe(3_000);
+  expect(rateLimitedRetryMs(limited())).toBe(1_000);
+  expect(rateLimitedRetryMs(new ApiClientError(429, { error: 'quota_exceeded', message: '额度已满', details: {} }))).toBeUndefined();
+  expect(retryableReadError(limited())).toBe(true);
+  expect(retryableReadError(new ApiClientError(403, { error: 'forbidden', message: '无权', details: {} }))).toBe(false);
+  let reads = 0;
+  function View() { const query = useApiQuery(['limited-probe'], async () => { reads += 1; if (reads === 1) throw limited(); return reads; }); return <p>{query.data ?? (query.error ? 'limited' : '—')}</p>; }
+  const host = document.createElement('div'); document.body.appendChild(host);
+  const root = createRoot(host), client = createQueryClient();
+  await act(async () => { root.render(<QueryClientProvider client={client}><View /></QueryClientProvider>); });
+  await flush();
+  mounted.push(() => { act(() => root.unmount()); host.remove(); client.clear(); });
+  expect(host.textContent).toBe('limited');
+  const deadline = Date.now() + 3_000;
+  while (reads < 2 && Date.now() < deadline) await act(async () => { await new Promise((resolve) => setTimeout(resolve, 50)); });
+  await flush();
+  expect(reads).toBe(2);
+  expect(host.textContent).toBe('2');
 });

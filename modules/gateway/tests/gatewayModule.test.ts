@@ -257,22 +257,28 @@ describe.skipIf(!available)('gateway module', () => {
       ['internal-api', 'api.svc.cs.internal', 'cs-issues/issues-green'], ['preview', 'preview.issues.cs.localhost', 'cs-issues/issues-blue'],
       ['prod', 'issues.cs.localhost', 'cs-issues/issues-green'], ['service', 'issues.svc.cs.internal', 'cs-issues/issues-green'],
     ]);
+    // 服务域在 ForwardAuth 之后挂限流（按来源服务、按目标，T10），前缀剥离在最后。
     expect(records.get(`${issuesId}/internal-api`)?.spec).toMatchObject({ priority: 100, middlewares: [
-      { name: 'drop-identity-headers', namespace: 'crewstation-system' }, { name: 'forward-auth-service', namespace: 'crewstation-system' }, { name: 'strip-api-issues' },
+      { name: 'drop-identity-headers', namespace: 'crewstation-system' }, { name: 'forward-auth-service', namespace: 'crewstation-system' },
+      { name: 'rate-limit-source' }, { name: 'rate-limit-target' }, { name: 'strip-api-issues' },
     ] });
+    // 用户域在 ForwardAuth 之后按用户、按主机。
+    expect(records.get(`${issuesId}/prod`)?.spec.middlewares?.map((entry) => entry.name)).toEqual(['drop-identity-headers', 'forward-auth-user', 'rate-limit-user', 'rate-limit-host']);
     // gateway 只建路由引用的前缀剥离中间件；IngressRoute 由调和器照记录应用。
     expect(k8s.applied.slice(applied).map((o) => `${o.kind}/${o.metadata.name}`)).toEqual(['Middleware/strip-api-issues']);
-    // 补投影：台账接上之前就有的路由（这里清空假台账来模拟）照网关自己存的路由表声明，不碰集群。
+    // 补投影：台账接上之前就有的路由（这里清空假台账来模拟）按当前计划重算再声明；只幂等地再 apply 前缀剥离中间件，不建 IngressRoute。
     records.clear();
     const before = k8s.applied.length;
     expect(await withLedger.api.resyncRouteLedger()).toBeGreaterThanOrEqual(1);
     expect([...records.keys()].filter((ref) => ref.startsWith(issuesId))).toHaveLength(4);
-    expect(k8s.applied.length).toBe(before);
+    expect(k8s.applied.slice(before).every((o) => o.kind === 'Middleware')).toBe(true);
     // 归档：记录标「不要了」（IngressRoute 由调和器删），gateway 不直接删。
     const deletedBefore = k8s.deleted.length;
     await withLedger.api.removeService(issuesId);
     expect([...records.entries()].filter(([ref]) => ref.startsWith(issuesId)).every(([, r]) => r.desired === 'absent')).toBe(true);
-    expect(releases).toHaveLength(4);
+    // 四条路由，外加这个项目的限流记录（T10：归档时一起释放）。
+    expect(releases).toHaveLength(5);
+    expect(records.get('project:01a0bf5d-8f4b-7b11-b833-6f8e9d5c4b77')?.desired).toBe('absent');
     expect(k8s.deleted.length).toBe(deletedBefore);
     // 摘掉之后又出现（这里是同一服务再次计划路由）：已释放的记录不能重新声明，顺延到 ~2 各建一条新记录。
     await withLedger.api.reconcileService(issuesId);

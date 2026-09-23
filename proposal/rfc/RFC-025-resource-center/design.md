@@ -243,6 +243,8 @@ ResourceActionSchema = z.object({ id: ResourceActionIdSchema, enabled: z.boolean
 >
 > **实施补记（2026-09-24，T10 第二步：策略进台账、调和器渲染中间件）**：gateway 把生效策略写成 `rate-limit-policy` 记录——平台一条（系统命名空间里的 `rate-limit-platform-api` 与 `in-flight-platform-api`，按 `x-cs-user-id` 分桶），每个在册项目一条（项目命名空间里的 `rate-limit-user`、`rate-limit-host`、`rate-limit-source`、`rate-limit-target`：用户域按用户与按主机，服务域按 `x-cs-source-service` 与按目标）；改平台默认时写平台与全部项目，改项目覆盖时只写那个项目，按服务重算路由时先写该项目的（路由要引用它的中间件），归档时那条标「不要了」，每 5 分钟补投影一次。调和器照记录渲染 Traefik Middleware（令牌桶是周期 1 秒的 `rateLimit`，并发上限是 `inFlightReq`），与观测比对、缺了或不一致才 apply；渲染出的对象带所属记录的资源 ID 标签，系统命名空间里带这个标签的照常观测与回收。中间件都在即记录运行中。这一步还没有路由引用这些中间件，不改变放行。
 >
+> **实施补记（2026-09-24，T10 第三步：挂上限流）**：项目的正式、待验证路由在用户 ForwardAuth 之后挂 `rate-limit-user`、`rate-limit-host`；服务域与 `/api/<proxy>` 路由在服务 ForwardAuth 之后挂 `rate-limit-source`、`rate-limit-target`（前缀剥离在最后）；只在配了资源台账时挂（中间件由限流记录渲染）。调和器应用路由前先看它引用的项目中间件是否都已建出，缺了就不动线上那一版、过两秒再核对（Traefik 遇到不存在的中间件会让整条路由失效）；路由的补投影改为按当前计划重算，已有服务才能挂上。平台接口：`console-api` 在用户 ForwardAuth 之后挂 `rate-limit-platform-api` 与 `in-flight-platform-api`；两条资源推送流（`/v1/projects/:id/resources/stream`、`/v1/admin/resources/stream`）拆成单独的 `console-resource-streams`，只限建连频率、不挂并发上限；任务流本来就走 `console-stream`，不挂。两个平台中间件以默认值写进安装清单（装好就有），之后由调和器按平台设置改写。工作台读请求遇到 `rate_limited` 按 `Retry-After` 自动重读（并发上限的 429 不带它，1 秒后），写请求不自动重发；命令行直接打印原因；能力说明 MCP 的接入约定写明超额返回 429 与 `Retry-After`。未登录请求的按 IP 限流（登录前的 `/auth`）没有做，Q4 也没给取值，留待 T15 校准时一并报作者。
+>
 > **T2 实测（2026-09-23，本机 Traefik v3.7.13，临时探针路由测完已删）**：
 >
 > - `rateLimit` 超额：429，带 `Retry-After`（向上取整的秒数，2 次／秒时为 `1`）与 `X-Retry-In`（毫秒精度），正文是纯文本 `Too Many Requests`、不是平台错误体——`packages/api-client` 据此把它认作 `rate_limited`（平台额度不足的 429 带 `quota_exceeded` 错误体，不混淆）。

@@ -7,6 +7,8 @@ export interface LedgerReconcilerOptions {
   readonly pollMs?: number;
   readonly resyncMs?: number;
   readonly concurrency?: number;
+  /** 路由等中间件时的复核间隔（用例调短）。 */
+  readonly retryMs?: number;
 }
 
 /**
