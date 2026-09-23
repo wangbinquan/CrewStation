@@ -7,6 +7,11 @@
 #     what the source-Pod-IP identity lookup (Design Q21) relies on.
 #   - `--providers.kubernetescrd.allowCrossNamespace=true`: IngressRoutes may reference Middlewares
 #     and Services in other namespaces (platform-owned middlewares, per-project namespaces).
+#   - `--providers.kubernetescrd.allowEmptyServices=true`: keep a router whose Service has no ready
+#     endpoints. Without it Traefik drops the router and answers a bare 404, so the ForwardAuth
+#     middleware never runs: a standby slot taken offline (RFC-021) could not show the platform's
+#     "not deployed" page. With it the middleware answers first; a service that is simply not ready
+#     yet gets 503 instead of 404.
 #   - `--api.dashboard=false`, `--log.level=INFO`, `--accesslog=true` as required.
 #   - The container listens on unprivileged ports 8000/8443 as uid 65532; the Service maps 80/443.
 #
@@ -68,6 +73,7 @@ spec:
             - --accesslog=true
             - --providers.kubernetescrd=true
             - --providers.kubernetescrd.allowCrossNamespace=true
+            - --providers.kubernetescrd.allowEmptyServices=true
             - --providers.kubernetesingress=true
           ports:
             - name: web
