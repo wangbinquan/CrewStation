@@ -4,10 +4,11 @@ import { api } from '../../../../shared/api/client';
 import { useAgentActivity } from '../../../../shared/activity/AgentActivityProvider';
 import type { ActivityTarget } from '../../../../shared/activity/agentActivityView';
 import type { WorkspaceLayoutStore } from '../../model/layout/workspaceLayoutStore';
-import { revealActivityTerminal } from '../../model/layout/workspaceLayout';
+import { isTerminalShown } from '../../model/layout/terminalGroups';
+import { revealTerminal } from '../../model/layout/workspaceLayout';
 
 /** 用户显式点击后才展开并标记个人已读；会话及终端身份不符时不碰当前布局。 */
-export function useActivityTarget(taskId: string, target: ActivityTarget | undefined, terminals: NativeTerminalDto[] | undefined, loaded: boolean, layoutStore: WorkspaceLayoutStore, tabName: string) {
+export function useActivityTarget(taskId: string, target: ActivityTarget | undefined, terminals: NativeTerminalDto[] | undefined, loaded: boolean, layoutStore: WorkspaceLayoutStore) {
   const { store } = useAgentActivity();
   const handled = useRef<string | undefined>(undefined);
   const revealedTarget = useRef<string | undefined>(undefined);
@@ -17,14 +18,14 @@ export function useActivityTarget(taskId: string, target: ActivityTarget | undef
   const targetKey = `${targetTaskId}:${eventId}:${navigationId ?? ''}`;
   const terminal = terminals?.find((item) => item.agentId === target?.agentId && item.terminalId === target?.terminalId);
   const invalid = target && (target.taskId !== taskId || terminals && !terminal);
-  const located = Boolean(!invalid && terminal && loaded && layout.view === 'cli' && layout.selectedTerminalId === terminalId && layout.tabs.find((tab) => tab.id === layout.activeTabId)?.paneOrder.includes(terminalId!));
+  const located = Boolean(!invalid && terminal && loaded && layout.view === 'cli' && layout.selectedTerminalId === terminalId && isTerminalShown(layout, terminalId!));
   useEffect(() => {
     if (invalid || !terminalId || !terminal || !loaded) return;
     if (revealedTarget.current === targetKey) return;
     revealedTarget.current = targetKey;
-    const revealed = revealActivityTerminal(layout, terminalId, tabName);
+    const revealed = revealTerminal(layout, terminalId);
     if (revealed !== layout) layoutStore.update(() => revealed);
-  }, [invalid, terminalId, terminal, loaded, layout, layoutStore, tabName, targetKey]);
+  }, [invalid, terminalId, terminal, loaded, layout, layoutStore, targetKey]);
   useEffect(() => {
     if (!located || !agentId || !terminalId || !eventId || targetTaskId !== taskId) return;
     const key = targetKey;

@@ -13,7 +13,7 @@ const originalFetch = globalThis.fetch;
 let page: Awaited<ReturnType<typeof renderElement>> | undefined;
 afterEach(async () => { page?.unmount(); await new Promise((resolve) => setTimeout(resolve, 0)); page = undefined; globalThis.fetch = originalFetch; });
 
-/** 一条工具行（RFC-020 §4.3）：拆分按钮、布局菜单、工作区设置菜单；这里只替代 HTTP 边界。 */
+/** 新开 CLI 的唯一入口（2026-09-23 起在页头，原工具行去掉）：拆分按钮主键直接创建、展开换档位与权限；这里只替代 HTTP 边界。 */
 function setup(options: { readonly layout?: WorkspaceLayout; readonly roster?: NativeTerminalDto[]; readonly profiles?: Record<string, unknown>[] } = {}) {
   const starts: Record<string, unknown>[] = [];
   globalThis.fetch = (async (raw: RequestInfo | URL, init?: RequestInit) => {
@@ -45,23 +45,15 @@ test('主键按记住的档位直接创建；展开菜单换权限后随请求�
   expect(f.starts).toHaveLength(1); expect(f.starts[0]).toMatchObject({ permission: chosen }); expect(page.text()).toContain('演示拒绝');
 });
 
-test('没有窗口时没有「布局」菜单；有窗口时可换排布，工作区设置菜单可重命名并列出已启动', async () => {
+test('没有 CLI 与有 CLI 时，CLI 区都只有标签：没有工作区页签、布局菜单与工作区设置，展开的只有新开按钮的箭头', async () => {
   setup(); page = await renderElement(element(), messages);
-  expect(summaries().map((node) => node.textContent)).not.toContain('布局 ▾');
+  expect(summaries().map((node) => node.getAttribute('aria-label'))).toEqual(['选择档位与权限']);
   page.unmount(); page = undefined; await new Promise((resolve) => setTimeout(resolve, 0));
   const terminal = activityFixture().terminal, layout = initialWorkspaceLayout('工作区 1'); layout.tabs[0]!.paneOrder = [terminal.terminalId];
   setup({ layout, roster: [terminal] }); page = await renderElement(element(), messages);
-  const layoutMenu = summaries().find((node) => node.textContent === '布局 ▾')!;
-  expect(layoutMenu).toBeDefined(); await act(async () => layoutMenu.click()); await page.settle();
-  await page.click('纵排'); expect(page.host.querySelector('button[aria-pressed="true"]')?.textContent).toBe('纵排');
-  const settings = summaries().find((node) => node.getAttribute('aria-label') === '工作区设置')!;
-  await act(async () => settings.click()); await page.settle();
-  expect(page.text()).toContain('已启动 1');
-  await page.click('重命名');
-  const input = page.host.querySelector<HTMLInputElement>('input[aria-label="页签名称"]')!;
-  await act(async () => { input.focus(); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, '排错'); input.dispatchEvent(new Event('input', { bubbles: true })); input.dispatchEvent(new KeyboardEvent('keyup', { key: 'a', bubbles: true })); }); await page.settle();
-  await act(async () => { input.closest('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); }); await page.settle();
-  expect(page.host.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toContain('排错 · 1');
+  expect(summaries().map((node) => node.getAttribute('aria-label'))).toEqual(['选择档位与权限']);
+  expect(page.host.querySelector(`[data-dock-tab="${terminal.terminalId}"]`)).not.toBeNull();
+  for (const gone of ['＋ 工作区', '布局 ▾', '工作区设置', '收起窗口', '向前排列']) expect(page.text()).not.toContain(gone);
 });
 
 const startButton = () => [...page!.host.querySelectorAll<HTMLButtonElement>('button')].find((node) => node.textContent === '＋ 创建开发Agent会话')!;

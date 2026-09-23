@@ -14,7 +14,8 @@ afterEach(async () => { page?.unmount(); page = undefined; await new Promise((re
 const path = `/projects/${activityProjectId}/dev-session`;
 const panel = () => document.querySelector<HTMLElement>('aside[aria-label="工具面板"]')!;
 const panelTab = () => document.querySelector('[aria-label="工具面板"] [role="tab"][aria-selected="true"]')?.textContent;
-const workspaceHidden = () => document.querySelector('[role="tablist"][aria-label="个人工作区"]')?.closest('[hidden]') !== null;
+/** CLI 区被放大的面板盖住（`hidden`）；找不到 CLI 区同样算看不见。 */
+const workspaceHidden = () => { const area = document.querySelector('[role="region"][aria-label="CLI 区"]'); return !area || area.closest('[hidden]') !== null; };
 /** 记录个人布局的保存内容，并可指定服务端返回的初始布局；`hold` 让布局读取等到用例放行（模拟布局晚于窗口量测到达）。 */
 function layoutFixture(saved?: WorkspaceLayout, hold = false) {
   const f = editorWorkspaceFixture(), base = globalThis.fetch, saves: WorkspaceLayout[] = [];

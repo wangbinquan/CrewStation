@@ -42,10 +42,10 @@ describe('算力档位是唯一的执行配置（RFC-006）', () => {
   });
 
   test('租户面的档位下拉只读名称、说明、仅终端与可用性，不读镜像、二进制与模型', () => {
-    for (const suffix of ['agents/ComputeOptions.tsx', 'dev-session/model/computeChoices.ts', 'agents/StartAgentForm.tsx', 'native/NativeToolbar.tsx']) {
+    for (const suffix of ['agents/ComputeOptions.tsx', 'dev-session/model/computeChoices.ts', 'agents/StartAgentForm.tsx', 'native/useCliLauncher.ts', 'native/NewCliButton.tsx']) {
       expect(sourceAt(files, suffix).code).not.toMatch(/binaryPath|imageDigest|\.image\b|\.model\b|protocol/);
     }
-    expect(sourceAt(files, 'native/NativeToolbar.tsx').code).toContain("choicesFor(profiles.data?.items ?? [], 'cli')");
+    expect(sourceAt(files, 'native/useCliLauncher.ts').code).toContain("choicesFor(profiles.data?.items ?? [], 'cli')");
     expect(sourceAt(files, 'agents/StartAgentForm.tsx').code).toContain("choicesFor(profiles.data?.items ?? [], 'agent')");
   });
 });

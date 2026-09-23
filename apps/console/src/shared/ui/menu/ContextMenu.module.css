@@ -1,0 +1,8 @@
+.menu { position: fixed; z-index: 40; min-width: 180px; max-width: min(90vw, 320px); padding: 4px; display: flex; flex-direction: column; background: var(--cs-color-surface); color: var(--cs-color-text); border: 1px solid var(--cs-color-border); border-radius: var(--cs-radius-sm); box-shadow: var(--cs-shadow-popover); font-size: 12px; }
+.separated { margin-top: 4px; padding-top: 4px; border-top: 1px solid var(--cs-color-border); }
+.item { display: flex; align-items: center; justify-content: space-between; gap: 16px; width: 100%; min-height: 28px; padding: 4px 10px; border: 0; border-radius: var(--cs-radius-sm); background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.item:hover:not(:disabled), .item:focus-visible { background: var(--cs-color-surface-muted); outline: none; }
+.item:focus-visible { box-shadow: inset 0 0 0 2px var(--cs-color-focus); }
+.item:disabled { color: var(--cs-color-text-muted); opacity: 0.6; cursor: not-allowed; }
+.danger { color: var(--cs-color-danger); }
+.shortcut { color: var(--cs-color-text-muted); font-family: var(--cs-font-sans); font-size: 11px; }

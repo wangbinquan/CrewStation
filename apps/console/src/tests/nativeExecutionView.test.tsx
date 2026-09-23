@@ -33,8 +33,10 @@ afterEach(async () => { page?.unmount(); page = undefined; await new Promise((do
 const terminal = (name: string, digit: string): NativeTerminalDto => ({ ...activityFixture().terminal, agentId: `agent-${name}`, terminalId: `terminal-${name}`, runnerId: crypto.randomUUID(),
   execution: { taskId: TaskIdSchema.parse(`01a0bf5d-8f4b-7abc-8123-${digit.repeat(12)}`), state: 'running', profile: { name: 'cli', cpu: '1', memory: '2Gi', storage: '2Gi' } } });
 
-test('两窗接入不同 Runner，父连接断开仍能附着；切页签只关显示连接，不停止 CLI', async () => {
-  const one = { ...terminal('one', '4'), protocol: 'opencode' as const }, two = { ...terminal('two', '5'), protocol: 'terminal' as const }, layout = initialWorkspaceLayout('工作区 1');
+test('两窗接入不同 Runner，父连接断开仍能附着；放大另一组只断开显示连接，不停止 CLI', async () => {
+  const one = { ...terminal('one', '4'), protocol: 'opencode' as const }, two = { ...terminal('two', '5'), protocol: 'terminal' as const };
+  // 旧布局（一个工作区里平铺两窗、没有分屏树）读入后迁移成并排的两组，两窗仍同时显示。
+  const { dock: _dock, ...layout } = initialWorkspaceLayout('工作区 1');
   window.location.href = 'http://localhost/';
   layout.tabs[0]!.paneOrder = [one.terminalId, two.terminalId];
   globalThis.WebSocket = Socket as unknown as typeof WebSocket;
@@ -62,8 +64,11 @@ test('两窗接入不同 Runner，父连接断开仍能附着；切页签只关�
   expect(Socket.instances.find((socket) => socket.url.includes(one.execution!.taskId))?.sent.filter((command) => command.type === 'claimTerminalControl')).toHaveLength(1);
   expect(document.querySelector('[data-native-terminal="terminal-two"] [data-activity]')).toBeNull();
   expect(document.querySelector('[data-native-terminal="terminal-one"] [data-activity]')).not.toBeNull();
-  await act(async () => page!.host.querySelector<HTMLButtonElement>('button[aria-label="＋ 工作区"]')!.click()); await page.settle();
-  expect(Socket.instances.every((socket) => socket.readyState === 3)).toBe(true);
+  // 双击标签放大 one 所在的组：two 的画面卸载、显示连接断开；one 仍连着，谁的进程都不结束。
+  await act(async () => page!.host.querySelector('[data-dock-tab="terminal-one"]')!.dispatchEvent(new window.MouseEvent('dblclick', { bubbles: true }))); await page.settle();
+  expect(page.host.querySelector('[data-native-terminal="terminal-two"]')).toBeNull();
+  expect(Socket.instances.find((socket) => socket.url.includes(two.execution!.taskId))?.readyState).toBe(3);
+  expect(Socket.instances.find((socket) => socket.url.includes(one.execution!.taskId))?.readyState).toBe(1);
   expect(Socket.instances.flatMap((socket) => socket.sent).some((command) => command.type === 'stopAgentTerminal' || command.type === 'startAgentTerminal')).toBe(false);
 });
 

@@ -1,43 +1,31 @@
 /* 工作区长满页面剩余高度（开发页撑到窗口底边，2026-09-23）：主区在其中再长满，状态条贴着底边。 */
 .workspace { display: flex; flex-direction: column; flex: 1 0 auto; min-width: 0; font-size: 14px; --cs-select-height: 28px; --cs-select-padding-block: 3px; --cs-select-font-size: 12px; }
-/* 开发页的页签与工具栏比普通页面更紧：1280×720 下首窗距产品顶端要在 210px 以内（development-workspace.md §2）。 */
+/* 开发页的页签比普通页面更紧：1280×720 下首窗距产品顶端要在 210px 以内（development-workspace.md §2）。 */
 .workspace [role="tab"] { padding: 5px 10px; }
 .workspace [role="tabpanel"] { padding-top: 4px; }
-.toolbar, .controlLine, .terminalHeader, .footer { display: flex; align-items: center; gap: 6px; min-width: 0; }
-.toolbar { flex-wrap: wrap; justify-content: flex-end; padding: 0 0 4px; }
-.toolbar, .terminalHeader { position: relative; }
-.workspace button, .workspace a[data-button], .toolbar select { min-height: 28px; padding: 3px 8px; font-size: 12px; }
-/* 算力选择带可见标签；布局按钮合成一组分段控件靠右，当前项淡蓝底。 */
-.inlineField { display: inline-flex; align-items: center; gap: 6px; color: var(--cs-color-text-muted); font-size: 12px; }
-.segment { display: inline-flex; margin-left: auto; border: 1px solid var(--cs-color-border); border-radius: var(--cs-radius-md); overflow: hidden; }
-.segment > button { border: 0; border-radius: 0; border-left: 1px solid var(--cs-color-border); min-height: 26px; }
-.segment > button:first-child { border-left: 0; }
-.segment > button[aria-pressed="true"] { background: var(--cs-color-tint); color: var(--cs-color-primary); font-weight: 600; }
-.toolbar select, .menuBody select, .rename input { max-width: 180px; min-width: 0; background: var(--cs-color-surface); color: var(--cs-color-text); border: 1px solid var(--cs-color-border); border-radius: var(--cs-radius-sm); padding: 4px; }
-.separator { width: 1px; height: 18px; background: var(--cs-color-border); }
-/* 主区（终端）＋分隔线＋工具面板三列；列宽由内联样式按面板形态给出，子项固定列位，隐藏任何一项都不会错列。 */
+.controlLine, .footer { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.workspace button, .workspace a[data-button] { min-height: 28px; padding: 3px 8px; font-size: 12px; }
+/* 主区（CLI 区）＋分隔线＋工具面板三列；列宽由内联样式按面板形态给出，子项固定列位，隐藏任何一项都不会错列。 */
 .stage { display: grid; grid-template-rows: minmax(0, 1fr); flex: 1 1 0; min-height: 360px; min-width: 0; }
-/* 手机上外壳占高：主区撑到底，但不小于 70dvh（原定高），外壳太高时页面照旧滚动。 */
-@media (max-width: 600px) { .stage { min-height: max(360px, 70dvh); } }
 .main { grid-column: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 .main[hidden] { display: none; }
-.main > div { display: flex; flex-direction: column; min-height: 0; flex: 1; }
-.main [role="tabpanel"] { flex: 1; min-height: 0; display: flex; flex-direction: column; }
-.terminals { flex: 1; min-height: 0; min-width: 0; overflow: auto; }
-.terminalCard { display: flex; flex-direction: column; height: 100%; min-width: 0; min-height: 0; border: 1px solid var(--cs-color-border); border-radius: var(--cs-radius-md); background: var(--cs-color-surface); overflow: hidden; }
+.terminals { flex: 1; min-height: 0; min-width: 0; }
+/* 标签组里当前标签的画面：细信息条＋终端，占满组的画面。 */
+.terminalCard { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; border: 1px solid var(--cs-color-border); border-radius: var(--cs-radius-md); background: var(--cs-color-surface); overflow: hidden; }
 .terminalCard:focus-within { border-color: var(--cs-color-primary); }
-.terminalHeader { flex-wrap: wrap; border-bottom: 1px solid var(--cs-color-border); padding: 3px 8px; font-size: 12px; flex-shrink: 0; background: var(--cs-color-surface); }
-.terminalHeader > strong { font-weight: 600; }
+/* 一条细信息条：左边轮次状态 · 档位 · 资源，右边谁在输入（带色）。 */
+.statusBar { display: flex; align-items: stretch; flex-wrap: wrap; flex-shrink: 0; min-width: 0; background: var(--cs-color-surface-muted); border-bottom: 1px solid var(--cs-color-border); font-size: 12px; }
+.info { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; min-width: 0; padding: 3px 8px; color: var(--cs-color-text-muted); }
+.info > small { font-size: 11px; }
+.statusBar > .controlLine { flex: 1 1 auto; justify-content: flex-end; }
 /* 轮次状态做成小色块：执行中蓝、需处理黄、完成绿、结束灰，不只靠文字。 */
 .lifecycle { color: var(--cs-color-text-muted); font-size: 12px; }
-.terminalHeader > .lifecycle[data-activity] { padding: 0 6px; border-radius: var(--cs-radius-sm); background: var(--cs-tone-neutral-bg); color: var(--cs-tone-neutral-fg); }
-.terminalHeader > .lifecycle[data-activity="running"] { background: var(--cs-tone-info-bg); color: var(--cs-tone-info-fg); }
-.terminalHeader > .lifecycle[data-activity="waiting"], .terminalHeader > .lifecycle[data-activity="failed"], .terminalHeader > .lifecycle[data-activity="runtime-failed"] { background: var(--cs-tone-warning-bg); color: var(--cs-tone-warning-fg); }
-.terminalHeader > .lifecycle[data-activity="completed"] { background: var(--cs-tone-success-bg); color: var(--cs-tone-success-fg); }
-.waiting, .lifecycle[data-activity="waiting"], .lifecycle[data-activity="failed"], .lifecycle[data-activity="runtime-failed"] { color: var(--cs-tone-warning-fg); }
-.completed, .lifecycle[data-activity="completed"] { color: var(--cs-tone-success-fg); }
-.lifecycle[data-activity="running"] { color: var(--cs-color-primary); }
-.compute { color: var(--cs-color-text-muted); margin-left: auto; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.info > .lifecycle[data-activity] { padding: 0 6px; border-radius: var(--cs-radius-sm); background: var(--cs-tone-neutral-bg); color: var(--cs-tone-neutral-fg); }
+.info > .lifecycle[data-activity="running"] { background: var(--cs-tone-info-bg); color: var(--cs-tone-info-fg); }
+.info > .lifecycle[data-activity="waiting"], .info > .lifecycle[data-activity="failed"], .info > .lifecycle[data-activity="runtime-failed"], .info > .lifecycle[data-activity="start-failed"] { background: var(--cs-tone-warning-bg); color: var(--cs-tone-warning-fg); }
+.info > .lifecycle[data-activity="completed"] { background: var(--cs-tone-success-bg); color: var(--cs-tone-success-fg); }
+.waiting { color: var(--cs-tone-warning-fg); }
+.compute { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .controlLine { flex-shrink: 0; flex-wrap: wrap; padding: 0 8px; color: var(--cs-color-text-muted); font-size: 11px; background: var(--cs-color-surface-muted); }
 .controlLine button { padding: 0 4px; min-height: 22px; margin-left: auto; }
 /* 输入控制状态条（2026-09-23）：谁在输入一眼可辨——自己绿、可以点进来蓝、别人占着黄、只读灰；自己持有时整窗再加一圈绿框。 */
@@ -52,31 +40,20 @@
 .terminalSurface { flex: 1; min-height: 0; min-width: 0; overflow: auto; padding: 2px 4px; }
 .terminalSurface:focus-visible { outline: 2px solid var(--cs-color-primary); outline-offset: -2px; }
 .terminalSurface :global(.xterm) { height: 100%; }
-.menu { position: relative; font-size: 12px; }
-/* 窄屏摘要可能换到行首；菜单跟随整条工具栏或窗口标题定位。 */
-.toolbar .menu, .terminalHeader .menu { position: static; }
-.menu summary { cursor: pointer; border-radius: var(--cs-radius-sm); padding: 5px 7px; white-space: nowrap; }
-.menu summary:focus-visible { outline: 2px solid var(--cs-color-primary); }
-.menuBody { position: absolute; z-index: 8; right: 0; top: 100%; width: 280px; max-width: min(90vw, 360px); max-height: 360px; overflow: auto; padding: 8px; background: var(--cs-color-surface); border: 1px solid var(--cs-color-border); border-radius: var(--cs-radius-sm); box-shadow: var(--cs-shadow-popover); display: flex; flex-direction: column; gap: 6px; }
-.roster { display: flex; flex-direction: column; gap: 6px; padding-top: 6px; border-top: 1px solid var(--cs-color-border); }
-.menuBody label { display: flex; flex-direction: column; gap: 4px; }
-.menuBody { max-width: 100%; }
-.roster > div { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; border-bottom: 1px solid var(--cs-color-border); padding-bottom: 6px; }
-.roster > div > button { margin-left: auto; }
-.empty { display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 8px; height: 100%; border: 1px dashed var(--cs-color-border); padding: 16px; text-align: center; color: var(--cs-color-text-muted); }
+.empty { display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 8px; height: 100%; border: 1px dashed var(--cs-color-border); border-radius: var(--cs-radius-md); padding: 16px; text-align: center; color: var(--cs-color-text-muted); }
+.empty p { max-width: 540px; }
 .error { color: var(--cs-tone-warning-fg); background: var(--cs-tone-warning-bg); padding: 4px 8px; margin: 0; overflow-wrap: anywhere; font-size: 12px; }
+/* 档位读不到或不可用时 CLI 区上方的一行：原因＋刷新档位／管理算力档位。 */
+.notice { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; margin: 0 0 6px; padding: 4px 8px; border-radius: var(--cs-radius-sm); background: var(--cs-tone-warning-bg); color: var(--cs-tone-warning-fg); font-size: 12px; overflow-wrap: anywhere; }
+.headerFallback { display: flex; justify-content: flex-end; margin-bottom: 4px; }
 .footer { justify-content: space-between; flex-wrap: wrap; padding-top: 4px; font-size: 11px; color: var(--cs-color-text-muted); }
 .status { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; min-width: 0; flex: 1; }
-.rename { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; width: 100%; }
-
-/* 功能页与个人工作区各占一层；hidden 保留草稿但不参与布局。 */
-.workspace [hidden] { display: none; }
-.workspace [role="tab"] { white-space: nowrap; }
-.blockReason { flex-basis: 100%; font-size: 12px; color: var(--cs-color-text-muted); }
-.helpActions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 12px; width: 100%; }
-.empty p { max-width: 540px; }
 @media (max-width: 600px) {
-  .segment { margin-left: 0; flex-wrap: wrap; }
-  .toolbar select { max-width: min(180px, 52vw); }
+  /* 手机上外壳占高：主区撑到底，但不小于 70dvh（原定高），外壳太高时页面照旧滚动。 */
+  .stage { min-height: max(360px, 70dvh); }
   .workspace [role="tab"] { padding: 7px 8px; }
 }
+
+/* 功能页与草稿区各占一层；hidden 保留草稿但不参与布局。 */
+.workspace [hidden] { display: none; }
+.workspace [role="tab"] { white-space: nowrap; }

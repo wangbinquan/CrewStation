@@ -37,6 +37,22 @@ describe.skipIf(!available)('个人工作区布局', () => {
     expect((await api.getWorkspaceLayout(other, workspaceTask)).layout?.view).toBe('preview');
     expect(f.calls.filter((c) => c.type === 'stopAgentTerminal')).toHaveLength(0);
   });
+  test('标签组布局（分屏树、每组当前标签、个人起的名字）原样存取；名字指向布局外的 CLI、分屏树里一组出现两次都被拒绝', async () => {
+    const f = nativeFixture(), api = workspaceLayoutUseCases(f.deps, drizzleWorkspaceLayouts(database.db), f.repository);
+    const one = await f.api.startNativeTerminal(workspaceActor, workspaceTask, f.input()), two = await f.api.startNativeTerminal(workspaceActor, workspaceTask, f.input());
+    const [left, right] = [Bun.randomUUIDv7(), Bun.randomUUIDv7()], ratios = { columns: [1, 1], rows: [1, 1] };
+    const grouped: WorkspaceLayout = {
+      ...layout(one.terminalId), activeTabId: right, selectedTerminalId: two.terminalId,
+      tabs: [{ id: left, name: '开发', layout: 'grid', paneOrder: [one.terminalId], ratios, activeTerminalId: one.terminalId }, { id: right, name: '开发', layout: 'grid', paneOrder: [two.terminalId], ratios, activeTerminalId: two.terminalId }],
+      dock: { direction: 'row', children: [{ group: left }, { group: right }], sizes: [1.5, 0.5] }, terminalNames: [{ terminalId: two.terminalId, name: '前端' }],
+    };
+    const user = { ...workspaceActor, userId: Bun.randomUUIDv7() as UserId };
+    expect((await api.saveWorkspaceLayout(user, workspaceTask, { expectedRevision: 0, layout: grouped })).layout).toEqual(grouped);
+    expect((await api.getWorkspaceLayout(user, workspaceTask)).layout).toEqual(grouped);
+    await expect(api.saveWorkspaceLayout(user, workspaceTask, { expectedRevision: 1, layout: { ...grouped, terminalNames: [{ terminalId: 'outside-terminal', name: '外面' }] } })).rejects.toMatchObject({ kind: 'validation' });
+    await expect(api.saveWorkspaceLayout(user, workspaceTask, { expectedRevision: 1, layout: { ...grouped, dock: { direction: 'row', children: [{ group: left }, { group: left }], sizes: [1, 1] } } })).rejects.toMatchObject({ kind: 'validation' });
+    expect(f.calls.filter((c) => c.type === 'stopAgentTerminal')).toHaveLength(0);
+  });
   test('拒绝跨会话终端、重复位置、未知字段；授权失效时读写都不可继续', async () => {
     const f = nativeFixture();
     const api = workspaceLayoutUseCases(f.deps, drizzleWorkspaceLayouts(database.db), f.repository);

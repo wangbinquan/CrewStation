@@ -39,22 +39,20 @@ describe('紧凑原生工作台', () => {
     await act(async () => { window.dispatchEvent(new Event('focus')); }); await page.settle();
     // 实机两个浏览器页共用个人布局，旧实现会留在代码页且点击同一个 CLI 地址也无法返回；RFC-020 后面板形态以地址为准，收起态是右缘一条页签栏。
     expect(page.host.querySelector('aside[data-mode]')?.getAttribute('data-mode')).toBe('closed');
-    expect(page.host.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe('远端工作区 · 0');
+    expect(page.host.querySelector('[role="tablist"][aria-label="标签组"]')).toBeNull(); expect(page.text()).toContain('创建第一个开发Agent会话');
     await page.click('代码'); expect(selected.at(-1)).toEqual({ name: 'code', mode: 'side' });
     page.unmount(); page = undefined;
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(f.saves.at(-1)).toMatchObject({ layout: { view: 'cli' } }); expect((f.saves.at(-1) as { layout: { tool?: unknown } }).layout.tool).toBeUndefined();
   });
-  test('新页签不启动 CLI，保存空布局；关闭工作区后仍有工作区', async () => {
+  test('没有 CLI 时 CLI 区中间也有「＋ 创建开发Agent会话」，与页头是同一个动作；只打开页面不写个人布局', async () => {
     const f = setup(); page = await renderElement(element(), messages);
-    await act(async () => page!.host.querySelector<HTMLButtonElement>('button[aria-label="＋ 工作区"]')!.click()); await page.settle();
-    expect(page.text()).toContain('工作区 2'); expect(f.starts).toHaveLength(0);
-    const settings = [...page.host.querySelectorAll('summary')].find((node) => node.getAttribute('aria-label') === '工作区设置')!;
-    await act(async () => settings.click());
-    await page.click('关闭工作区');
-    expect(page.text()).toContain('工作区 1'); expect(page.text()).not.toContain('工作区 2');
+    const buttons = [...page.host.querySelectorAll<HTMLButtonElement>('button')].filter((node) => node.textContent === '＋ 创建开发Agent会话');
+    expect(buttons).toHaveLength(2);
+    await act(async () => buttons[1]!.click()); await page.settle();
+    expect(f.starts).toHaveLength(1); expect(page.text()).toContain('演示档位不支持原生 CLI');
     page.unmount(); page = undefined; await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(f.saves).toHaveLength(1); expect(f.saves[0]).toMatchObject({ expectedRevision: 0 });
+    expect(f.saves).toHaveLength(0);
   });
   test('双击只提交一次；明确拒绝后可以改算力档位恢复', async () => {
     const f = setup(); page = await renderElement(element(), messages);

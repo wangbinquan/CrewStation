@@ -1,0 +1,14 @@
+/* 一组的画面：确认条在上，终端占满其余；拖动落点区盖在上面。 */
+.body { position: relative; flex: 1; display: flex; flex-direction: column; gap: 4px; min-width: 0; min-height: 0; padding-top: 4px; }
+/* 标签圆点：执行中蓝、需处理黄、本轮完成绿、已结束灰，等待任务与未确认是空心。 */
+.dot { width: 8px; height: 8px; flex-shrink: 0; border-radius: 50%; border: 1.5px solid var(--cs-color-text-muted); background: transparent; box-sizing: border-box; }
+.dot[data-tone="info"] { border-color: var(--cs-tone-info-fg); background: var(--cs-tone-info-fg); }
+.dot[data-tone="warning"] { border-color: var(--cs-tone-warning-fg); background: var(--cs-tone-warning-fg); }
+.dot[data-tone="success"] { border-color: var(--cs-tone-success-fg); background: var(--cs-tone-success-fg); }
+.dot[data-tone="neutral"] { border-color: var(--cs-tone-neutral-fg); background: var(--cs-tone-neutral-bg); }
+.name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.creator { color: var(--cs-color-text-muted); font-weight: 400; }
+.creator::before { content: '· '; }
+.hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.rename { min-width: 0; max-width: 200px; padding: 0 4px; font: inherit; font-weight: 400; border: 1px solid var(--cs-color-primary); border-radius: var(--cs-radius-sm); background: var(--cs-color-surface); color: var(--cs-color-text); }
+.rename[aria-invalid="true"] { border-color: var(--cs-color-danger); }

@@ -1,0 +1,38 @@
+/* 各组与分隔条都是同一容器里的绝对定位兄弟，位置由 dockPlacement 算成 calc(百分比 + 像素)。 */
+.dock { position: relative; width: 100%; height: 100%; min-width: 0; min-height: 0; overflow: hidden; }
+.group { position: absolute; display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; }
+.columnHandle, .rowHandle { position: absolute; z-index: 1; touch-action: none; border-radius: var(--cs-radius-sm); background: linear-gradient(var(--cs-color-border), var(--cs-color-border)) center / 2px 100% no-repeat; }
+.rowHandle { background-size: 100% 2px; }
+.columnHandle { cursor: col-resize; }
+.rowHandle { cursor: row-resize; }
+.columnHandle:hover, .rowHandle:hover, .columnHandle:focus-visible, .rowHandle:focus-visible { background: var(--cs-color-primary); outline: 2px solid var(--cs-color-focus); outline-offset: 0; }
+
+/* 标签栏：下划线式，与页面页签一致；新开的 CLI 落在的那一组，当前标签用主色，其余组的当前标签用正文色。 */
+.bar { position: relative; flex-shrink: 0; min-width: 0; border-bottom: 1px solid var(--cs-color-border); }
+.tabs { display: flex; gap: 2px; overflow-x: auto; overflow-y: hidden; margin-bottom: -1px; scrollbar-width: thin; }
+/* 选择器多一层：放在页面样式（如 `.workspace [role="tab"]`、`.workspace button`）里时仍以这里为准。 */
+.bar .tabs > .tab { position: relative; flex: 0 0 auto; display: inline-flex; align-items: center; gap: 4px; max-width: 240px; padding: 4px 6px 4px 10px; border-bottom: 2px solid transparent; color: var(--cs-color-text-muted); font-size: 12px; cursor: pointer; user-select: none; white-space: nowrap; }
+.bar .tabs > .tab:hover { color: var(--cs-color-text); background: var(--cs-color-surface-muted); }
+.bar .tabs > .tab[aria-selected="true"] { color: var(--cs-color-text); border-bottom-color: var(--cs-color-text-muted); font-weight: 600; }
+.bar[data-focused="true"] .tabs > .tab[aria-selected="true"] { color: var(--cs-color-primary); border-bottom-color: var(--cs-color-primary); }
+.bar .tabs > .tab:focus-visible { outline: 2px solid var(--cs-color-focus); outline-offset: -2px; }
+.tabLabel { display: inline-flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.tab .close { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; min-height: 0; padding: 0; border: 0; border-radius: var(--cs-radius-sm); background: transparent; color: inherit; font-size: 14px; line-height: 1; cursor: pointer; opacity: 0.55; }
+.tab:hover .close, .tab[aria-selected="true"] .close { opacity: 1; }
+.tab .close:hover { background: var(--cs-color-border); color: var(--cs-color-text); }
+/* 拖到标签栏：插入位置一条竖线。 */
+.tab[data-marker]::before { content: ''; position: absolute; top: 3px; bottom: 3px; width: 2px; background: var(--cs-color-primary); border-radius: 1px; }
+.tab[data-marker="before"]::before { left: -2px; }
+.tab[data-marker="after"]::before { right: -2px; }
+
+/* 拖到画面：分到哪一边就标出那一半，并入就整块。 */
+.zone { position: absolute; z-index: 5; pointer-events: none; inset: 0; border: 2px solid var(--cs-color-primary); border-radius: var(--cs-radius-sm); }
+.zone::before { content: ''; position: absolute; inset: 0; background: var(--cs-color-tint); opacity: 0.7; }
+.zone[data-zone="left"] { right: 50%; }
+.zone[data-zone="right"] { left: 50%; }
+.zone[data-zone="top"] { bottom: 50%; }
+.zone[data-zone="bottom"] { top: 50%; }
+.ghost { position: fixed; z-index: 30; pointer-events: none; padding: 3px 10px; border-radius: var(--cs-radius-sm); background: var(--cs-color-surface); color: var(--cs-color-text); border: 1px solid var(--cs-color-border); box-shadow: var(--cs-shadow-popover); font-size: 12px; white-space: nowrap; opacity: 0.92; }
+.ghost[data-dropping="false"] { opacity: 0.6; }
+:global(body[data-dock-dragging]) { user-select: none; cursor: grabbing; }
+:global(body[data-dock-dragging]) iframe { pointer-events: none; }

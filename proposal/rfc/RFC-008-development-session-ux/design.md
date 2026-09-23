@@ -84,6 +84,9 @@
 
 2026-09-23 修订说明（[RFC-020](../RFC-020-project-workspace-ia/design.md) D1）：整页替换终端的功能页签改为终端旁的工具面板——预览／代码／变更／数据／参考／会话六个页签，可拖宽（30%–60%）、收起成右缘页签栏、放大到整个内容区，内容区窄于 800px 只有放大形态；地址仍以 `view` 表达当前工具并新增 `panel=full`，`split`／`diff` 保留为别名；个人布局 `WorkspaceLayout` 加可选 `tool`，旧 `view`／`previewAlongside` 读时推导、写时回填。本节其余约束（显式地址优先、草稿保护、个人工作区页签只在终端区）不变。
 个人工作区页签只出现在 CLI 视图内；增加、命名、关闭、跨页移动继续用原布局持久化，不把功能页签写成 CLI 工作区。
+
+> 2026-09-23 修订：个人工作区页签已取消，CLI 区改为 Xshell 式标签组（每个 CLI 一个标签，拖动排列与分屏），仍用原布局接口持久化，见 [RFC-003 development-workspace.md §2.1](../RFC-003-workbench-ux-redesign/development-workspace.md#21-页签与分屏规则) 同日修订。
+
 数据访问表单不再处于浮层，按说明、现有记录、申请／审批顺序排列。会话详情分为连接与恢复、环境资料、历史记录、释放区域。
 
 复用 Tabs、Card、Stack、ActionRow、Button、FormField、DefinitionList、ConfirmationPanel、QueryStatus；颜色取主题令牌。

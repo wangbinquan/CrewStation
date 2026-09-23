@@ -78,19 +78,22 @@ export function DevSessionWorkbench({ projectId, session, access, canDevelop, se
         isNavigationBusy={(next) => !!location.fileChange(next) && editor.busy}
         allowNavigate={(current, next) => current.pathname === next.pathname && !('view' in next.search && next.search.view === 'conversation') && (!editor.dirty || !location.fileChange(next))}
         confirmationForNavigation={(next) => { const file = location.fileChange(next); return file ? { question: t('devSession.editor.openQuestion', { from: editor.file?.path ?? '', to: file }), confirmLabel: t('devSession.editor.discardOpen', { path: file }) } : undefined; }} onDiscard={location.approveFile} />
-      <header className={styles.context}>
-        <div className={styles.titleRow}><h1 className={styles.title}>{t('devSession.title')}</h1>
-          {/* 连接状态芯片可点：直接打开会话面板（RFC-020 §4.3）。 */}
-          <button type="button" className={styles.chip} onClick={() => location.selectTool({ name: 'session', mode: 'side' })} title={t('devSession.connection.details')}><StreamStatus state={state} sessionState={session.state} compact /></button>
-          <code className={styles.branch} title={session.branch}>{session.branch}</code>
-          {health === 'ready' && session.rebuild?.state === 'ready' ? <span className={styles.note} title={session.rebuild.message}>{t('devSession.rebuild.ready')}</span> : null}</div>
-        <div className={styles.actions}>
-          {previewLink ? <ExternalButtonLink size="small" href={previewLink}>{t('devSession.native.openPreview')}</ExternalButtonLink> : null}
-          <ButtonLink variant="primary" size="small" to={PROJECT_PATHS[space].release} params={{ projectId }} search={{ source: 'session' }}>{t('devSession.native.prepareRelease')}</ButtonLink>
-        </div>
-      </header>
-      <div className={styles.guide}><ConnectionGuide {...diagnostics} onEnvironment={location.search.view === 'session' ? undefined : () => location.selectTool({ name: 'session', mode: 'side' })} /></div>
-      <NativeWorkspace projectId={projectId} taskId={taskId} userId={userId} channel={channel} stream={state} canDevelop={canDevelop} onActivity={touch} activityTarget={activityTarget} editorDirty={editor.dirty} location={location}
+      <NativeWorkspace header={(newCli) => <>
+        <header className={styles.context}>
+          <div className={styles.titleRow}><h1 className={styles.title}>{t('devSession.title')}</h1>
+            {/* 连接状态芯片可点：直接打开会话面板（RFC-020 §4.3）。 */}
+            <button type="button" className={styles.chip} onClick={() => location.selectTool({ name: 'session', mode: 'side' })} title={t('devSession.connection.details')}><StreamStatus state={state} sessionState={session.state} compact /></button>
+            <code className={styles.branch} title={session.branch}>{session.branch}</code>
+            {health === 'ready' && session.rebuild?.state === 'ready' ? <span className={styles.note} title={session.rebuild.message}>{t('devSession.rebuild.ready')}</span> : null}</div>
+          {/* 新开 CLI 只有这一个入口（2026-09-23：原工具行整条去掉）。 */}
+          <div className={styles.actions}>
+            {newCli}
+            {previewLink ? <ExternalButtonLink size="small" href={previewLink}>{t('devSession.native.openPreview')}</ExternalButtonLink> : null}
+            <ButtonLink variant="primary" size="small" to={PROJECT_PATHS[space].release} params={{ projectId }} search={{ source: 'session' }}>{t('devSession.native.prepareRelease')}</ButtonLink>
+          </div>
+        </header>
+        <div className={styles.guide}><ConnectionGuide {...diagnostics} onEnvironment={location.search.view === 'session' ? undefined : () => location.selectTool({ name: 'session', mode: 'side' })} /></div>
+      </>} projectId={projectId} taskId={taskId} userId={userId} channel={channel} stream={state} canDevelop={canDevelop} onActivity={touch} activityTarget={activityTarget} editorDirty={editor.dirty} location={location}
         isAdmin={isAdmin} dataDirty={dataDirty} blockedReason={health !== 'ready' ? t(`devSession.connection.${health}`) : undefined}
         version={health === 'ready' ? <VersionComparisonPanel projectId={projectId} taskId={taskId} channel={channel} canDevelop={canDevelop} compact onDetails={() => location.selectTool({ name: 'changes', mode: 'side' })} /> : null}
         data={<Stack fill><DataResourcesTable projectId={projectId} /><DataBindingPane data={data} onDirtyChange={setDataDirty} /></Stack>}

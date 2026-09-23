@@ -5,7 +5,7 @@ import { messages } from '../app/i18n/zh-CN';
 import { AgentActivityProvider, useAgentActivity } from '../shared/activity/AgentActivityProvider';
 import type { ActivityTarget } from '../shared/activity/agentActivityView';
 import { useActivityTarget } from '../features/dev-session/hooks/native/useActivityTarget';
-import { initialWorkspaceLayout, revealActivityTerminal } from '../features/dev-session/model/layout/workspaceLayout';
+import { initialWorkspaceLayout, revealTerminal } from '../features/dev-session/model/layout/workspaceLayout';
 import { WorkspaceLayoutStore } from '../features/dev-session/model/layout/workspaceLayoutStore';
 import { activityFixture, activityProjectId, activityTaskId, activityUserId } from './agentActivityFixture';
 import { renderElement } from './renderElement';
@@ -36,7 +36,7 @@ function Harness({ f, target }: { readonly f: Awaited<ReturnType<typeof fixture>
   const { store } = useAgentActivity();
   useEffect(() => { store?.register(activityTaskId, activityProjectId, '验收应用'); }, [store]);
   const state = useSyncExternalStore(f.layout.subscribe, f.layout.getState);
-  const error = useActivityTarget(activityTaskId, target, f.roster.items, state.loaded, f.layout, '新工作区');
+  const error = useActivityTarget(activityTaskId, target, f.roster.items, state.loaded, f.layout);
   return <div><output>{state.layout.view}</output><span>{error ?? ''}</span><button onClick={() => f.layout.update((layout) => ({ ...layout, view: 'code' }))}>去代码</button><section data-native-terminal={f.terminal.terminalId} tabIndex={-1}>原 CLI</section></div>;
 }
 
@@ -56,11 +56,14 @@ test('旧会话或错误终端的定位不改布局、不标记已读', async ()
   expect(f.layout.getState().layout.view).toBe('code'); expect(f.writes).toEqual([]); expect(rendered.text()).toContain('activity.invalidTarget');
 });
 
-test('已保留的页签定位保持顺序，隐藏窗口恢复，满窗时选择另一页签', () => {
-  const first = initialWorkspaceLayout('第一组'); first.tabs[0]!.paneOrder = ['a', 'b']; first.selectedTerminalId = 'a';
-  const second = revealActivityTerminal(first, 'b', '新工作区');
-  expect(second.tabs[0]?.paneOrder).toEqual(['a', 'b']); expect(second.selectedTerminalId).toBe('b'); expect(revealActivityTerminal(second, 'b', '新工作区')).toBe(second);
-  second.tabs[0]!.paneOrder = Array.from({ length: 32 }, (_, i) => `cli-${i}`); second.hiddenTerminalIds = ['hidden'];
-  const restored = revealActivityTerminal(second, 'hidden', '新工作区');
+test('定位已在标签里的 CLI 只把它设为当前标签、不重排；已关掉的在运行 CLI 回到标签里，焦点组满了在右边分出一组', () => {
+  const first = initialWorkspaceLayout('第一组'); first.tabs[0]!.paneOrder = ['a', 'b']; first.tabs[0]!.activeTerminalId = 'a'; first.selectedTerminalId = 'a';
+  const second = revealTerminal(first, 'b');
+  expect(second.tabs[0]?.paneOrder).toEqual(['a', 'b']); expect(second.tabs[0]?.activeTerminalId).toBe('b'); expect(second.selectedTerminalId).toBe('b');
+  expect(revealTerminal(second, 'b')).toBe(second);
+  const full = { ...second, tabs: [{ ...second.tabs[0]!, paneOrder: Array.from({ length: 32 }, (_, i) => `cli-${i}`), activeTerminalId: 'cli-0' }], selectedTerminalId: 'cli-0', hiddenTerminalIds: ['hidden'] };
+  const restored = revealTerminal(full, 'hidden');
   expect(restored.tabs).toHaveLength(2); expect(restored.hiddenTerminalIds).toEqual([]); expect(restored.tabs[1]?.paneOrder).toEqual(['hidden']);
+  expect(restored.dock).toEqual({ direction: 'row', children: [{ group: full.tabs[0]!.id }, { group: restored.tabs[1]!.id }], sizes: [1, 1] });
+  expect(restored.activeTabId).toBe(restored.tabs[1]!.id); expect(restored.selectedTerminalId).toBe('hidden');
 });

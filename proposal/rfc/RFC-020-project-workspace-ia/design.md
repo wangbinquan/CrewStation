@@ -100,6 +100,8 @@
 
 档位不可用、没有默认档位、名册加载失败等文案保留，显示在展开的菜单里与工具行下方一行（`blockReason` 现有逻辑）。
 
+> **2026-09-23 修订（作者当面裁定，直接修改，不另立 RFC）。** 工作区内部不再沿用 `NativeWorkspaceTabs`＋`SplitGrid`，上表的工具行整条去掉：`NativeToolbar`／`NativeWorkspaceTabs` 删除，改为 `CliDock`（组装）＋`TerminalGroup`（一组的标签栏与画面）＋`NewCliButton`（页头的拆分按钮；`DevSessionWorkbench` 经 `NativeWorkspace` 的 `header` 渲染参数把它放进页头，没有页头时单独一行）。通用部件在 `shared/ui/dock/`（分屏树 `dockTree`、按树算成 calc 绝对定位的 `DockLayout`——重新排列不改 DOM 父子关系，终端不因排列重挂——、可拖的 `DockTabs`、纯函数落点判定 `dockDrop`、拖动控制 `dockDrag`）与 `shared/ui/menu/ContextMenu`；布局运算与旧布局迁移在 `model/layout/terminalGroups.ts`，存储在读入与每次改动后规整。档位不可用等说明改为 CLI 区上方一行（`NewCliNotice`）。契约见 [RFC-003 development-workspace.md §2.2](../RFC-003-workbench-ux-redesign/development-workspace.md#22-布局状态落位) 同日修订。
+
 > **2026-09-23 修订（作者裁定，直接修改，不另立 RFC）。** 工作区撑到窗口底边：开发页的内容区、工作区、主区一路是纵向弹性列，主区长满页头与状态条之外的全部高度，取代原来按视口猜的 `calc(100dvh - 210px)`（1280×720／1440×900 状态条下方空 47px、1920×1080 空 67px）；有连接提示横幅时主区相应变矮，页面仍是一屏。主区下限 360px；手机宽度（≤600px）外壳占高，下限保持原来的 70dvh，外壳太高时页面照旧滚动。没有会话时开会话表单与参考面板那一层同样长满。
 
 ### 5.2 面板状态与契约

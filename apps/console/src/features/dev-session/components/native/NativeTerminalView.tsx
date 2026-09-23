@@ -1,7 +1,7 @@
 import type { NativeTerminalDto } from '@crewstation/contracts';
 import { NativeTerminalSnapshotDtoSchema } from '@crewstation/contracts';
 import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
-import type { ReactElement } from 'react';
+import type { ReactElement, ReactNode } from 'react';
 import type { Translate } from '../../../../shared/lib/useT';
 import { useT } from '../../../../shared/lib/useT';
 import { Button } from '../../../../shared/ui/Button';
@@ -21,13 +21,17 @@ interface NativeTerminalViewProps {
   readonly terminal: NativeTerminalDto; readonly channel: TaskStreamChannel; readonly stream: StreamState; readonly onActivity: () => void; readonly canDevelop: boolean;
   /** 当前用户：输入控制在自己另一个窗口时据此显示「你在另一个窗口中输入」。 */
   readonly viewerId?: string;
+  /** 与输入控制同一条细信息条的左半：轮次状态、档位、资源（2026-09-23 起每窗不再有标题栏）。 */
+  readonly info?: ReactNode;
+  /** 信息条之下、终端之上的说明（准备中、失败与重试）。 */
+  readonly notices?: ReactNode;
 }
 
 export function NativeTerminalView(props: NativeTerminalViewProps): ReactElement {
-  return props.terminal.execution && ['ended', 'failed'].includes(props.terminal.lifecycle) ? <SavedNativeTerminalView terminal={props.terminal} /> : <LiveNativeTerminalView {...props} />;
+  return props.terminal.execution && ['ended', 'failed'].includes(props.terminal.lifecycle) ? <SavedNativeTerminalView terminal={props.terminal} info={props.info} notices={props.notices} /> : <LiveNativeTerminalView {...props} />;
 }
 
-function SavedNativeTerminalView({ terminal }: Pick<NativeTerminalViewProps, 'terminal'>): ReactElement {
+function SavedNativeTerminalView({ terminal, info, notices }: Pick<NativeTerminalViewProps, 'terminal' | 'info' | 'notices'>): ReactElement {
   const t = useT(), host = useRef<HTMLDivElement>(null), surface = useMemo(() => new NativeTerminalSurface(terminal.protocol), [terminal.protocol]);
   const screen = useApiQuery(['tasks', terminal.taskId, 'native-screen', terminal.agentId], async () => {
     const result = NativeTerminalSnapshotDtoSchema.parse(await api.devSession.getNativeTerminalSnapshot(terminal.taskId, terminal.agentId));
@@ -37,13 +41,15 @@ function SavedNativeTerminalView({ terminal }: Pick<NativeTerminalViewProps, 'te
   useEffect(() => { if (host.current) surface.mount(host.current, () => {}, () => {}); return () => surface.dispose(); }, [surface]);
   useEffect(() => { if (screen.data?.snapshot) void surface.restore(screen.data.snapshot); }, [surface, screen.data]);
   return <>
-    <div className={styles.controlLine}><span>{t(`devSession.native.finalScreen.${screen.data?.status ?? 'pending'}`)}</span>{screen.data?.snapshot?.truncated ? <span title={t('devSession.native.scrollback')}>{t('devSession.native.bounded')}</span> : null}</div>
+    <div className={styles.statusBar}>{info ? <span className={styles.info}>{info}</span> : null}
+      <div className={styles.controlLine}><span>{t(`devSession.native.finalScreen.${screen.data?.status ?? 'pending'}`)}</span>{screen.data?.snapshot?.truncated ? <span title={t('devSession.native.scrollback')}>{t('devSession.native.bounded')}</span> : null}</div></div>
+    {notices}
     {screen.error ? <p className={styles.error} role="status">{errorMessage(screen.error)}<Button onClick={() => void screen.refetch()}>{t('devSession.native.reattach')}</Button></p> : null}
     <div className={styles.terminalSurface} ref={host} role="region" tabIndex={0} aria-label={t('devSession.native.screen', { id: terminal.agentId.slice(-6) })} />
   </>;
 }
 
-function LiveNativeTerminalView({ terminal, channel, stream, onActivity, canDevelop, viewerId }: NativeTerminalViewProps): ReactElement {
+function LiveNativeTerminalView({ terminal, channel, stream, onActivity, canDevelop, viewerId, info, notices }: NativeTerminalViewProps): ReactElement {
   const t = useT();
   const host = useRef<HTMLDivElement>(null);
   const activity = useRef(onActivity);
@@ -75,12 +81,14 @@ function LiveNativeTerminalView({ terminal, channel, stream, onActivity, canDeve
   useTerminalFocus(host, onFocusChange, take);
   const view = terminal.lifecycle === 'running' ? terminalControlView(state, viewerId, canDevelop) : undefined;
   return <>
+    <div className={styles.statusBar}>{info ? <span className={styles.info}>{info}</span> : null}
     <div className={styles.controlLine} data-control={view?.tone} role="status" aria-live="polite">
       {view ? <strong className={styles.controlState}>{controlText(t, view)}</strong> : <span>{t(`devSession.native.attach.${state.phase}`)}</span>}
       {terminal.protocol === 'opencode' && state.phase === 'ready' ? <span title={t('devSession.native.historyHelp')}>{t(state.controlled ? 'devSession.native.historyControlled' : 'devSession.native.historyReadOnly')}</span> : null}
       {state.truncated ? <span title={t('devSession.native.scrollback')}>{t('devSession.native.bounded')}</span> : null}
       {state.phase === 'error' ? <Button variant="ghost" onClick={() => void attachment.refresh()}>{t('devSession.native.reattach')}</Button> : null}
-    </div>
+    </div></div>
+    {notices}
     {state.error ? <p className={styles.error} role="status">{state.error}</p> : null}
     <div className={styles.terminalSurface} ref={host} role="region" tabIndex={state.controlled ? -1 : 0} aria-label={t('devSession.native.screen', { id: terminal.agentId.slice(-6) })}
       onPointerDown={take} onKeyDown={state.controlled ? undefined : take} />

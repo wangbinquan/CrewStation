@@ -2,7 +2,9 @@ import { describe, expect, test } from 'bun:test';
 import { WorkspaceLayoutSchema, WorkspaceToolSchema } from '@crewstation/contracts';
 import { ApiClientError } from '@crewstation/api-client';
 import type { WorkspaceLayoutDto } from '@crewstation/contracts';
-import { addWorkspaceTab, closeWorkspaceTab, initialWorkspaceLayout, layoutTool, moveTerminal, reconcileWorkspaceLayout, reorderTerminal, withTool } from '../features/dev-session/model/layout/workspaceLayout';
+import type { SaveWorkspaceLayoutRequest, WorkspaceLayout } from '@crewstation/contracts';
+import { initialWorkspaceLayout, layoutTool, withTool } from '../features/dev-session/model/layout/workspaceLayout';
+import { normalizeGroups } from '../features/dev-session/model/layout/terminalGroups';
 import { locationTool, toolSearch } from '../features/dev-session/model/layout/developmentLocation';
 import { WorkspaceLayoutStore } from '../features/dev-session/model/layout/workspaceLayoutStore';
 
@@ -10,25 +12,22 @@ function deferred<T>() { let resolve!: (value: T) => void; let reject!: (cause: 
 const dto = (layout: WorkspaceLayoutDto['layout'], revision = 1): WorkspaceLayoutDto => ({ layout, revision, updatedAt: '2026-09-13T00:00:00.000Z' });
 
 describe('个人布局与保存竞争', () => {
-  test('移动、排序、关闭最后页签和恢复均保留真实 CLI 身份', () => {
-    let layout = initialWorkspaceLayout('一');
-    const one = layout.activeTabId;
-    layout = moveTerminal(moveTerminal(layout, '01a0bf5d-8f4b-7dac-8e19-e226732a75a4', one), '01a0bf5d-8f4b-7b34-8c40-a2ff43c1a8f6', one);
-    layout = reorderTerminal(layout, one, '01a0bf5d-8f4b-7b34-8c40-a2ff43c1a8f6', -1);
-    expect(layout.tabs[0]?.paneOrder).toEqual(['01a0bf5d-8f4b-7b34-8c40-a2ff43c1a8f6', '01a0bf5d-8f4b-7dac-8e19-e226732a75a4']);
-    layout = addWorkspaceTab(layout, '二');
-    layout = moveTerminal(layout, '01a0bf5d-8f4b-7dac-8e19-e226732a75a4', layout.activeTabId);
-    layout = closeWorkspaceTab(layout, one, '三');
-    expect(layout.hiddenTerminalIds).toEqual(['01a0bf5d-8f4b-7b34-8c40-a2ff43c1a8f6']);
-    layout = closeWorkspaceTab(layout, layout.activeTabId, '三');
-    expect(layout.tabs).toHaveLength(1);
-    expect(layout.tabs[0]?.paneOrder).toEqual([]);
-    expect(layout.hiddenTerminalIds).toEqual(['01a0bf5d-8f4b-7b34-8c40-a2ff43c1a8f6', '01a0bf5d-8f4b-7dac-8e19-e226732a75a4']);
-    layout = moveTerminal(layout, '01a0bf5d-8f4b-7b34-8c40-a2ff43c1a8f6', layout.activeTabId);
-    layout = reconcileWorkspaceLayout(layout, ['01a0bf5d-8f4b-7dac-8e19-e226732a75a4', '01a0bf5d-8f4b-7b34-8c40-a2ff43c1a8f6', '01a0bf5d-8f4b-74b4-891b-9e2229ecaa32']);
-    expect(layout.tabs[0]?.paneOrder).toEqual(['01a0bf5d-8f4b-7b34-8c40-a2ff43c1a8f6']);
-    expect(layout.hiddenTerminalIds).toEqual(['01a0bf5d-8f4b-7dac-8e19-e226732a75a4', '01a0bf5d-8f4b-74b4-891b-9e2229ecaa32']);
-    expect(WorkspaceLayoutSchema.safeParse(layout).success).toBe(true);
+  test('读入旧布局（工作区页签＋平铺）即迁移成标签组、通过契约校验并只保存一次；之后没有变化的更新不再保存', async () => {
+    const [one, two, added] = ['01a0bf5d-8f4b-7c01-8e19-e226732a75a4', '01a0bf5d-8f4b-7c02-8e19-e226732a75a4', '01a0bf5d-8f4b-7c03-8e19-e226732a75a4'];
+    const [a, b, c] = ['01a0bf5d-8f4b-7dac-8e19-e226732a75a4', '01a0bf5d-8f4b-7b34-8c40-a2ff43c1a8f6', '01a0bf5d-8f4b-74b4-891b-9e2229ecaa32'];
+    const ratios = { columns: [2, 1], rows: [1, 1] };
+    const legacy: WorkspaceLayout = { activeTabId: one, tabs: [{ id: one, name: '一', layout: 'columns', paneOrder: [a, b], ratios }, { id: two, name: '二', layout: 'grid', paneOrder: [c], ratios }],
+      hiddenTerminalIds: [], view: 'cli', previewAlongside: false, previewRatio: 0.45, selectedTerminalId: b, maximizedTerminalId: null };
+    const saves: SaveWorkspaceLayoutRequest[] = [];
+    const store = new WorkspaceLayoutStore({ get: async () => dto(legacy), save: async (input) => { saves.push(input); return dto(input.layout, input.expectedRevision + 1); } }, initialWorkspaceLayout('默认'), (layout) => normalizeGroups(layout, () => added));
+    await store.load();
+    const layout = store.getState().layout;
+    // 当前工作区里横排的两窗各成一组、按原比例左右排开；另一个工作区的 CLI 成为第一组的后台标签；焦点在原来选中的那窗。
+    expect(layout.tabs.map((tab) => [tab.id, tab.paneOrder, tab.activeTerminalId])).toEqual([[one, [a, c], a], [added, [b], b]]);
+    expect(layout.dock).toEqual({ direction: 'row', children: [{ group: one }, { group: added }], sizes: [1.3333, 0.6667] });
+    expect(layout.activeTabId).toBe(added); expect(WorkspaceLayoutSchema.safeParse(layout).success).toBe(true);
+    expect(store.getState().dirty).toBe(true); await store.flush(); expect(saves).toHaveLength(1); expect(saves[0]?.layout).toEqual(layout);
+    store.update((value) => ({ ...value })); await store.flush(); expect(saves).toHaveLength(1);
   });
   test('写请求串行；旧回执和晚到刷新不能覆盖后续编辑', async () => {
     const initial = initialWorkspaceLayout('原始');

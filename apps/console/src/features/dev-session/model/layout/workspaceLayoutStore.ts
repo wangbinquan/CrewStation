@@ -24,7 +24,8 @@ export class WorkspaceLayoutStore {
   private timer?: ReturnType<typeof setTimeout>;
   private version = 0;
   private savedVersion = 0;
-  constructor(private readonly transport: LayoutTransport, private readonly initial: WorkspaceLayout) {
+  /** `normalize` 在读入与每次改动后修正布局（旧形状迁移、与分组对齐）；读入时修正出了差别就记一次改动，随后保存。 */
+  constructor(private readonly transport: LayoutTransport, private readonly initial: WorkspaceLayout, private readonly normalize: (layout: WorkspaceLayout) => WorkspaceLayout = (layout) => layout) {
     this.state = { layout: initial, revision: 0, phase: 'loading', loaded: false, dirty: false };
   }
   readonly getState = () => this.state;
@@ -35,14 +36,14 @@ export class WorkspaceLayoutStore {
     const version = this.version;
     this.loading = this.transport.get().then((remote) => {
       if (version !== this.version) return;
-      this.patch({ layout: remote.layout ?? this.state.layout, revision: remote.revision, phase: 'ready', loaded: true, error: undefined });
+      this.adopt(remote.layout ?? this.state.layout, remote.revision);
     }).catch((error: unknown) => this.patch({ phase: 'error', error: errorMessage(error) })).finally(() => { this.loading = undefined; });
     return this.loading;
   };
   readonly update = (update: (layout: WorkspaceLayout) => WorkspaceLayout): void => {
     if (!this.state.loaded || this.state.phase === 'loading') return;
-    const layout = update(this.state.layout);
-    if (layout === this.state.layout) return;
+    const changed = update(this.state.layout), layout = changed === this.state.layout ? changed : this.normalize(changed);
+    if (layout === this.state.layout || JSON.stringify(layout) === JSON.stringify(this.state.layout)) return;
     this.version++;
     this.patch({ layout });
     if (this.state.phase === 'ready') this.schedule();
@@ -55,9 +56,15 @@ export class WorkspaceLayoutStore {
     try {
       const remote = await this.transport.get();
       this.savedVersion = this.version;
-      this.patch({ layout: remote.layout ?? this.initial, revision: remote.revision, phase: 'ready', loaded: true, error: undefined });
+      this.adopt(remote.layout ?? this.initial, remote.revision);
     } catch (error) { this.patch({ phase: 'error', error: errorMessage(error) }); }
   };
+  private adopt(layout: WorkspaceLayout, revision: number): void {
+    const normalized = this.normalize(layout);
+    if (normalized !== layout) this.version++;
+    this.patch({ layout: normalized, revision, phase: 'ready', loaded: true, error: undefined });
+    if (normalized !== layout) this.schedule();
+  }
   /** 错误之后先查实际 revision；回执丢失但保存已成功时直接对账，不重复写。 */
   readonly reapply = async (): Promise<void> => {
     if (this.saving || this.loading) return;

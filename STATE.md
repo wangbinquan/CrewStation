@@ -7,6 +7,21 @@
 
 基线三件套（v0.3.3）的第一轮实现已在本机 kind 集群上跑通并推上 main；**RFC-001（算力归平台）与 RFC-002（管理空间与租户空间分离）已实现、实跑确认并推上 main；RFC-004 已被 RFC-006 取代（Superseded）；RFC-006（算力档位合并运行环境、每个 Agent 一个 Pod）已实现、实机验收完毕并推上 main，已 Done（P1–P8、ADR-0005 与 I17–I19 待作者复核）；RFC-003 工作台已按设计附件完成并整体部署到本机，52／52 项 UX-AT 全部实机通过、本地 gate 与精确 SHA CI 通过，已 Done；RFC-005（OIDC／OAuth 2.0 公司登录）代码、测试与 OA-01…OA-31 实机验收全部完成，已 Done；RFC-007（开发环境 OAuth 2.0 一键换角色）代码、四角色 Chrome 实机验收、本地 gate 与精确 SHA CI 全部完成，已 Done**。
 
+## 开发页 CLI 区改为 Xshell 式标签组（2026-09-23）
+
+作者反馈「开发界面的开发 cli 区的可操作性太差了，包括 cli 窗的排列，分 tab 页，那些按钮简直反直觉，能不能直接做成 xshell 那种窗口，然后拖动排列就行了，实际上就只有新开、排列两个功能」。两轮问答（含 ASCII 预览）裁定，流程取「直接改＋回填，提交并部署本机」：
+
+- **模型**：每个 CLI 是一个标签，一组一次显示一个；拖标签到别组标签栏＝移过去，拖到画面左／右／上／下边＝分出新组，组空了就消失；拖分隔线调大小，双击均分。× ＝结束进程并关闭（在运行的先行内确认，别人开的写明是谁开的；已结束的直接关掉）；没有「收起」与「已启动」名册，任何人新开的在运行 CLI 都自动作为后台标签进自己的焦点组。
+- **新开入口**只在页头「＋ 创建开发Agent会话 ▾」（沿用作者 2026-09-20 定的按钮名，问答里的「新开 CLI」只是描述），新 CLI 落在焦点组并成为当前标签；没有 CLI 时 CLI 区中间也有。
+- **隐式操作**：双击标签放大／还原所在组；右键（Shift+F10）重命名（F2，只改自己看到的名字）、放大／还原、四向分屏、结束进程。每窗标题栏去掉，状态、档位、资源与「谁在输入」合成一条细信息条。区域放不下分屏树（每组至少 260×160）时只显示焦点组、标签栏列出全部 CLI。
+- **去掉的能力**（作者逐项确认）：工作区页签、「布局 ▾」、「⋯」工作区设置与已启动名册、每窗「···」、↗ 放大按钮；RFC-003 §5「收起只断开显示」改为 × 即结束进程。
+
+**实现**：契约 `WorkspaceLayout` 只增不删（可选 `dock` 分屏树、`terminalNames`，`WorkspaceTab.activeTerminalId`；服务端只校验树自身，旧工作台改页签不被拒）；`tabs[]` 每项就是一组，旧布局读入即迁移（并排的窗各成一组按原排布摆开，被收起而仍在运行的 CLI 回到标签）并保存一次。通用部件 `shared/ui/dock/`（分屏树、按树算成 `calc()` 绝对定位的 `DockLayout`——重新排列不改 DOM 父子关系，终端不因排列重挂——、可拖的 `DockTabs`、纯函数落点判定、拖动控制）与 `shared/ui/menu/ContextMenu`；`model/layout/terminalGroups.ts` 管迁移、对账与各项操作，布局存储在读入与每次改动后规整。`NativeToolbar`／`NativeWorkspaceTabs` 删除，改为 `CliDock`／`TerminalGroup`／`NewCliButton`，页头经 `NativeWorkspace` 的 `header` 渲染参数放入。建者名字查不到（如不是成员的平台管理员）时写「其他人」，不挂用户 ID 末六位（实机发现）。
+**用例**：新增 `dockTree`（树、落位、落点）、`terminalGroups`（迁移、规整、对账、拖放、关闭、放大、改名，每个结果过契约）、`cliDock`（标签、×与确认、别人的 CLI、菜单分屏、双击放大、F2、页头新开、指针拖放与 Esc、窄区合并）、`contextMenu`、契约 `devSession.test.ts`、模块 `workspaceLayout` 新增一条（真实 PostgreSQL）；改写 `nativeWorkspace`、`newCliButton`（原 `devSessionToolbar`）、`developmentLocation`、`nativeExecutionView`（旧布局迁移成两组并排、放大只断开另一组的显示连接）、`agentActivityTarget`、`workspaceLayout`、`editorWorkspace`、`devSessionPanel`、`computeOnly`；新增 e2e `cliTabs`（只读）。工作台层 686 pass／0 fail；`check:static` 通过。
+**回填**：RFC-003 development-workspace §2.1（主修订）、§2.2（契约）、§5（×）、§9（状态），RFC-003 proposal／design、RFC-008 design、RFC-020 proposal §4.3 与 design §5.1 各加同日修订说明。
+**并行会话**：crewstation-14 同时在改「开发页撑满窗口高度」，与本批共用 `NativeWorkspace.module.css`（`.workspace`／`.stage`／窄屏块）与 `DevSessionWorkbench.tsx`（两处 `<Stack fill>`）。本批用临时索引只提交自己的 hunk，这两个文件里对方的改动留在工作树等对方提交。
+**提交前的实机核对**（不动共享部署）：从「HEAD＋本批」导出的干净树构建工作台包，dev-developer 身份的无头 Chrome 里用 CDP 只换 `/assets/index-*`，并把布局 PUT 就地应答（线上 cs-api 仍是旧的 strict 契约）。1440／1280／1024：两个在运行的 CLI 自动成为标签，右键菜单向右分屏、拖到另一组下边（落点区与跟手名字）、双击放大与还原、拖分隔线与双击均分、F2 改名、Shift+F10 键盘菜单（分屏后焦点跟到移动的标签）全部按预期，无横向溢出、无控制台错误；390 宽两组放不下时合并为一条标签栏。只动标签、不点进终端（点进会自动取得输入控制），不结束任何在运行的 CLI。
+
 ## 开发页右侧面板：预览与代码占满面板高度（2026-09-23）
 
 作者反馈「开发界面右侧栏，各个页签的内容没有把页面高度用满」。缺陷修复：RFC-003 development-workspace §2 要求独立预览占满工作内容区，RFC-020 design §5.3 写的是预览、代码「不变」；RFC-020 plan §4 记了实施记录，不涉及修订。提交 `c8c5b8d`，[CI 35809162288](https://github.com/wangbinquan/CrewStation/actions/runs/35809162288) 六项全部成功。
