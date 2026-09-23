@@ -1,6 +1,6 @@
 import type { StartupErrorCode, TaskId } from '@crewstation/contracts';
 import { maskDiagnosticsText } from '../domain/diagnosticsText';
-import { CHECKOUT_CONTAINER, advanceStartup, defaultFailureCode, failStartup, failureCode, runningStage } from '../domain/podStartup';
+import { CHECKOUT_CONTAINER, advanceStartup, defaultFailureCode, failStartup, failureCode, runningStage, startupLogLines } from '../domain/podStartup';
 import { hashRunnerToken, newRunnerToken } from '../domain/runnerToken';
 import { rebuildIsActive } from '../domain/environmentRebuild';
 import { occupiesQuota, transition } from '../domain/taskEnvironment';
@@ -13,8 +13,9 @@ export async function startupLogTail(deps: TaskRuntimeUseCaseDeps, env: TaskEnvi
   const kind = runningStage(env.startup);
   const target = container ?? (kind === 'checkout' ? CHECKOUT_CONTAINER : kind === 'connect' ? env.podName : undefined);
   if (!target) return undefined;
-  const raw = await deps.cluster.tailLog(env, target, 100).catch(() => undefined);
-  return raw?.trim() ? maskDiagnosticsText(raw).slice(-16_384) : undefined;
+  // 多读一些再滤：Runner 的 debug 行占了绝大多数。
+  const kept = startupLogLines((await deps.cluster.tailLog(env, target, 400).catch(() => undefined)) ?? '');
+  return kept.trim() ? maskDiagnosticsText(kept).slice(-16_384) : undefined;
 }
 
 export function failEnvironment(deps: TaskRuntimeUseCaseDeps) {

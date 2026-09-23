@@ -18,6 +18,19 @@ export interface StartupObservation {
   readonly pulls: ReadonlyArray<{ readonly container: string; readonly image?: string; readonly startedAt?: string; readonly endedAt?: string; readonly cached: boolean; readonly took?: string; readonly failure?: string }>;
 }
 
+/**
+ * 启动失败时留下的日志：去掉 Runner 的 debug 结构化行——名册每秒几条「command done」，会把那几行有用的挤出尾部窗口
+ * （2026-09-23 实机：展开「查看执行容器日志」全是它们）。info／warn／error 与非结构化的原文（git 输出、堆栈）都留着。
+ */
+export function startupLogLines(raw: string): string {
+  return raw.split('\n').filter((line) => !isDebugLine(line)).join('\n');
+}
+
+function isDebugLine(line: string): boolean {
+  if (!line.startsWith('{')) return false;
+  try { return (JSON.parse(line) as { level?: unknown }).level === 'debug'; } catch { return false; }
+}
+
 /** 开发会话检出源码的 init 容器名（`adapters/k8s/taskObjects.ts`）。 */
 export const CHECKOUT_CONTAINER = 'checkout';
 

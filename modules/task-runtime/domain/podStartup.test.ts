@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test';
 import type { StartupRecord } from '@crewstation/contracts';
 import type { StartupObservation } from './podStartup';
-import { advanceStartup, cancelStartup, completeStage, completeThrough, defaultFailureCode, failAtStage, failStartup, failureCode, initialStartup, runningStage } from './podStartup';
+import { advanceStartup, cancelStartup, completeStage, completeThrough, defaultFailureCode, failAtStage, failStartup, failureCode, initialStartup, runningStage, startupLogLines } from './podStartup';
 import type { TaskEnvironment } from './taskEnvironment';
 import { transition } from './taskEnvironment';
 
@@ -139,4 +139,22 @@ test('环境状态迁移顺带收束启动进度：连上即就绪、失败即�
   expect(transition(env, 'failed', new Date(at(5)), { startup: explicit }).startup).toBe(explicit);
   const legacy = { id: 'old', state: 'creating' } as unknown as TaskEnvironment;
   expect(transition(legacy, 'running', new Date(at(5))).startup).toBeUndefined();
+});
+
+test('失败时留下的日志去掉 Runner 的 debug 结构化行，info／warn／error 与非结构化原文照留（2026-09-23 实机：展开全是 command done）', () => {
+  const raw = [
+    '{"ts":"t1","level":"info","msg":"taskrunner starting","service":"taskrunner"}',
+    '{"ts":"t2","level":"debug","msg":"command done","type":"listAgentTerminals","durationMs":0}',
+    '{"ts":"t3","level":"warn","msg":"before-start step failed","stepId":"s1","code":"script_failed"}',
+    '{"ts":"t4","level":"debug","msg":"command done","type":"listAgentTerminals","durationMs":1}',
+    'fatal: Remote branch rfc022-no-such-branch not found in upstream origin',
+    '{not json',
+  ].join('\n');
+  expect(startupLogLines(raw).split('\n')).toEqual([
+    '{"ts":"t1","level":"info","msg":"taskrunner starting","service":"taskrunner"}',
+    '{"ts":"t3","level":"warn","msg":"before-start step failed","stepId":"s1","code":"script_failed"}',
+    'fatal: Remote branch rfc022-no-such-branch not found in upstream origin',
+    '{not json',
+  ]);
+  expect(startupLogLines('')).toBe('');
 });
