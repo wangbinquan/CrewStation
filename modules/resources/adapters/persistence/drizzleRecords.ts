@@ -1,7 +1,8 @@
 import type { ClusterPurpose, ProjectId, ResourceChild, ResourceCondition, ResourceKind, ResourceOwner, ResourcePhase, ResourceReason, StartupRecord } from '@crewstation/contracts';
 import { conflict } from '@crewstation/kernel';
 import type { Executor } from '@crewstation/persistence';
-import { and, asc, eq, inArray, isNull, lt, notInArray, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, lt, notInArray, or, sql } from 'drizzle-orm';
+import { STABLE_KINDS } from '../../domain/kinds';
 import type { LedgerRecord, RecordFilter, ResourceAlias, ResourceSpec } from '../../domain/record';
 import { childKey } from '../../domain/record';
 import type { RecordRepository, StoredChild } from '../../ports/repositories';
@@ -21,6 +22,8 @@ interface ObservedChild {
   readonly reason?: string;
   readonly node?: string;
   readonly restarts?: number;
+  readonly replicas?: number;
+  readonly readyReplicas?: number;
 }
 
 type RecordRow = typeof records.$inferSelect;
@@ -34,6 +37,7 @@ function toChild(row: ChildRow): ResourceChild {
     kind: row.kind, ...optional('namespace', row.namespace || undefined), name: row.name, ...optional('uid', row.uid),
     phase: observed?.phase ?? 'absent', ready: observed?.ready ?? false,
     ...optional('reason', observed?.reason), ...optional('node', observed?.node), ...optional('restarts', observed?.restarts),
+    ...optional('replicas', observed?.replicas), ...optional('readyReplicas', observed?.readyReplicas),
     ...optional('observedAt', row.observedAt?.toISOString()),
   };
 }
@@ -65,6 +69,7 @@ function childRow(resourceId: string, stored: StoredChild): typeof children.$inf
   const { child } = stored;
   const observed: ObservedChild | null = child.phase === 'absent' && !child.uid ? null : {
     phase: child.phase, ready: child.ready, ...optional('reason', child.reason), ...optional('node', child.node), ...optional('restarts', child.restarts),
+    ...optional('replicas', child.replicas), ...optional('readyReplicas', child.readyReplicas),
   };
   return {
     resourceId, kind: child.kind, namespace: child.namespace ?? '', name: child.name, uid: child.uid ?? null, expected: stored.expected,
@@ -89,7 +94,8 @@ function filterOf(filter: RecordFilter) {
     filter.projectId ? eq(records.projectId, filter.projectId) : undefined,
     filter.kind ? eq(records.kind, filter.kind) : undefined,
     filter.parentId ? eq(records.parentId, filter.parentId) : undefined,
-    filter.includeStopped ? undefined : notInArray(records.phase, STOPPED_PHASES),
+    // 缺省不列已结束的一次性记录；稳定记录（服务槽）已结束也列（种类注册表的 stable）。
+    filter.includeStopped ? undefined : or(notInArray(records.phase, STOPPED_PHASES), inArray(records.kind, [...STABLE_KINDS])),
   );
 }
 
@@ -160,8 +166,9 @@ export function drizzleRecordRepository(db: Executor): RecordRepository {
     resolveAlias: async (alias) => (await db.select({ id: aliases.resourceId }).from(aliases).where(and(eq(aliases.source, alias.source), eq(aliases.alias, alias.alias))))[0]?.id,
     retentionDue: async (limit) => hydrate(await db.select().from(records)
       .where(and(lt(records.retainUntil, sql`now()`), eq(records.desired, 'present'), eq(records.phase, 'failed'))).orderBy(asc(records.retainUntil)).limit(limit)),
+    // 只压缩终态：期望已是「不要了」且已结束。期望仍在、此刻已结束的（下线的服务槽、暂停的业务工作区、待回收的工作卷）不是终态。
     compactable: async (stoppedBefore, limit) => (await db.select({ id: records.id }).from(records)
-      .where(and(eq(records.phase, 'stopped'), lt(records.phaseSince, stoppedBefore), isNull(records.compactedAt))).orderBy(asc(records.phaseSince)).limit(limit)).map((row) => row.id),
+      .where(and(eq(records.desired, 'absent'), eq(records.phase, 'stopped'), lt(records.phaseSince, stoppedBefore), isNull(records.compactedAt))).orderBy(asc(records.phaseSince)).limit(limit)).map((row) => row.id),
     countByKind: async (projectId, kinds, phases) => {
       if (!kinds.length || !phases.length) return {};
       const rows = await db.select({ kind: records.kind, count: sql<number>`count(*)::int` }).from(records)

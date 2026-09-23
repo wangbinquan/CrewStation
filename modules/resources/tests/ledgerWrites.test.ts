@@ -219,6 +219,23 @@ describe.skipIf(!available)('变更日志、租约、维护（设计 §6.3、§6
     expect(await leases.acquire(id, 'controller-a', 30_000)).toBe(true);
   });
 
+  test('按上级认领（服务槽的副本）：对象本身没被认领时，认领它上级 Deployment 的记录也认领它；副本数随观测落库、读回不丢', async () => {
+    const slot = await h.module.api.owner('release').declare({ kind: 'service-slot', ref: 'svc-a/blue', projectId: PROJECT, spec: { children: [{ kind: 'Deployment', namespace: 'cs-demo', name: 'shop-blue' }] } });
+    await h.module.api.observe({ child: { kind: 'Deployment', namespace: 'cs-demo', name: 'shop-blue', uid: 'uid-shop-blue', phase: 'Available', ready: true, reason: '副本 2／2 就绪', replicas: 2, readyReplicas: 2 } });
+    const owner = { kind: 'Deployment', namespace: 'cs-demo', name: 'shop-blue' };
+    const attached = await h.module.api.observe({ child: pod('shop-blue-5d8f7c-a1', { uid: 'uid-shop-a1', restarts: 1 }), owner });
+    expect(attached.status).toBe('recorded');
+    const stored = (await h.module.api.get(slot.id))!;
+    expect(stored.phase).toBe('ready');
+    expect(stored.children.find((child) => child.kind === 'Deployment')).toMatchObject({ replicas: 2, readyReplicas: 2 });
+    expect(stored.children.find((child) => child.kind === 'Pod')).toMatchObject({ name: 'shop-blue-5d8f7c-a1', restarts: 1 });
+    expect(await h.module.api.claimOf({ kind: 'Pod', namespace: 'cs-demo', name: 'shop-blue-5d8f7c-a1' })).toBe(slot.id);
+    // 上级没人认领的仍是 unowned；副本消失即从子对象里删去（它不在期望里）。
+    expect((await h.module.api.observe({ child: pod('stray-5d8f7c-z'), owner: { ...owner, name: 'stray' } })).status).toBe('unowned');
+    await h.module.api.observe({ child: pod('shop-blue-5d8f7c-a1', { uid: 'uid-shop-a1' }), owner, gone: true });
+    expect((await h.module.api.get(slot.id))?.children.map((child) => child.kind)).toEqual(['Deployment']);
+  });
+
   test('资源中心只写条件（例如工作卷待回收）：认领不到的是 unowned，同样的条件不写库，写上即按新规则重算阶段', async () => {
     expect(await h.module.api.observeConditions('01a0bf5d-8f4b-7c01-8e19-e2267320ffff', [{ type: 'PendingReclaim', status: 'true' }])).toEqual({ status: 'unowned' });
     const volume = await h.module.api.owner('task-runtime').declare({ kind: 'volume', ref: 'c1/work', projectId: PROJECT, spec: { children: [{ kind: 'PersistentVolumeClaim', namespace: 'cs-demo', name: 'task-c1-work' }] } });
@@ -251,6 +268,22 @@ describe.skipIf(!available)('变更日志、租约、维护（设计 §6.3、§6
     expect(compacted?.compactedAt).toBeInstanceOf(Date);
     const log = (await h.database.db.execute(sql`SELECT change FROM resources.changes WHERE resource_id = ${old.id} ORDER BY seq DESC LIMIT 1`)) as unknown as { change: string }[];
     expect(log[0]?.change).toBe('remove');
+    // 期望仍在、此刻已结束的不是终态，不压缩：待回收的工作卷（留着认领那个 PVC）、下线的服务槽（稳定记录）。
+    const volume = await ledger.declare({ kind: 'volume', ref: 'p2/work', projectId: PROJECT, spec: { children: [{ kind: 'PersistentVolumeClaim', namespace: 'cs-demo', name: 'task-p2-work' }] } });
+    await h.module.api.observeConditions(volume.id, [{ type: 'PendingReclaim', status: 'true', reason: 'parent-ended', message: '上级已结束' }]);
+    const slot = await h.module.api.owner('release').declare({ kind: 'service-slot', ref: 'svc-p/green', projectId: PROJECT, spec: { children: [{ kind: 'Deployment', namespace: 'cs-demo', name: 'p-green' }] } });
+    await h.module.api.owner('release').report(slot.id, { conditions: [{ type: 'Serving', status: 'false', reason: 'not-deployed', message: '尚未部署' }] });
+    await h.database.db.execute(sql`UPDATE resources.records SET phase_since = now() - interval '8 days' WHERE id IN (${volume.id}, ${slot.id})`);
+    await h.module.maintainOnce();
+    expect(await h.module.api.get(volume.id)).toMatchObject({ phase: 'stopped', children: [{ name: 'task-p2-work' }] });
+    expect((await h.module.api.get(volume.id))?.compactedAt).toBeUndefined();
+    expect((await h.module.api.get(slot.id))?.compactedAt).toBeUndefined();
+    expect(await h.module.api.claimOf({ kind: 'PersistentVolumeClaim', namespace: 'cs-demo', name: 'task-p2-work' })).toBe(volume.id);
+    // 视图缺省不列已结束的一次性记录，稳定记录（服务槽）已结束也列。
+    const listed = (await h.module.api.list({ projectId: PROJECT })).map((record) => record.id);
+    expect(listed).toContain(slot.id);
+    expect(listed).not.toContain(old.id);
+    expect(listed).not.toContain(volume.id);
     await h.database.db.execute(sql`UPDATE resources.changes SET at = now() - interval '2 days'`);
     await h.module.maintainOnce();
     const left = (await h.database.db.execute(sql`SELECT count(*)::int AS n FROM resources.changes`)) as unknown as { n: number }[];

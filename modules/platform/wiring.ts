@@ -321,12 +321,17 @@ function composeRuntime(deps: CompositionDeps, core: ReturnType<typeof composeCo
   return { taskRuntime, devSession, businessTask, events, session, sessionClient: runner };
 }
 
-function composeAggregates(deps: PlatformModuleDeps, core: ReturnType<typeof composeCore>, delivery: ReturnType<typeof composeDelivery>, runtime: ReturnType<typeof composeRuntime>) {
+function composeAggregates(deps: PlatformModuleDeps, core: ReturnType<typeof composeCore>, delivery: ReturnType<typeof composeDelivery>, runtime: ReturnType<typeof composeRuntime>, resources: ReturnType<typeof composeLedger>) {
   const { db, k8s, settings, logger } = deps;
   const { project, config, data, apiCatalog, isAdmin } = core;
   const serviceOfProject = project.api.resolveServiceOfProject;
   const observability = createObservabilityModule({
     db, k8s, logger, isAdmin: (id) => isAdmin(id), authorizer: project.api, services: { resolveServiceOfProject: serviceOfProject }, slots: delivery.release.api,
+    // 健康与告警巡检照服务槽记录（RFC-025 第三期）：资源中心观测 Deployment 与它的 Pod，汇总崩溃重启。
+    records: {
+      slotRecords: async (projectId) => (await resources.api.list({ projectId, kind: 'service-slot', includeStopped: true }))
+        .map((record) => ({ physical: record.display['physical'] ?? '', children: record.children, conditions: record.conditions, phaseSince: record.phaseSince.toISOString() })),
+    },
     // 调用链（Design §14）：每个来源都按项目取数——同一个事件投给多个订阅项目时共用 traceId，别的项目的记录不能带出来。
     traces: {
       environments: { traceKeys: runtime.taskRuntime.api.traceKeys, activeTraceIds: runtime.taskRuntime.api.activeTraceIds, list: runtime.taskRuntime.api.listTraceEnvironments },
@@ -432,7 +437,7 @@ function composeModules(deps: CompositionDeps) {
   const resources = composeLedger(deps, core);
   const delivery = composeDelivery(deps, core, late, resources);
   const runtime = composeRuntime(deps, core, delivery, late, resources);
-  const aggregates = composeAggregates(deps, core, delivery, runtime);
+  const aggregates = composeAggregates(deps, core, delivery, runtime, resources);
   const cluster = composeCluster(deps, core, delivery, runtime);
   const clusterControl = composeControl(deps, core, resources, runtime);
   return { cluster, resources, clusterControl, identity: core.identity, project: core.project, config: core.config, data: core.data, scm: core.scm, apiCatalog: core.apiCatalog, agentRuntime: core.agentRuntime, ...delivery, ...runtime, ...aggregates };

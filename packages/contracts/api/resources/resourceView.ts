@@ -11,7 +11,7 @@ export const ResourceCountsSchema = z.record(z.string(), z.record(z.string(), z.
 export const ResourceViewQuerySchema = z.object({
   kind: ResourceKindSchema.optional(),
   parent: ResourceIdSchema.optional(),
-  /** 带上已结束（`stopped`）的记录；缺省只给在运行、结束中与失败保留中的。 */
+  /** 带上已结束（`stopped`）的记录；缺省只给在运行、结束中与失败保留中的，外加稳定记录（服务槽，已结束也给）。 */
   includeStopped: z.enum(['true', 'false']).default('false'),
 }).strict();
 

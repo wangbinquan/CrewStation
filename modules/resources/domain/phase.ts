@@ -48,14 +48,16 @@ export function computePhase(record: PhaseInput): PhaseResult {
   const primary = expectedChildren(record).find((child) => child.kind === rule.primaryChild);
   if (!primary || !isPresent(primary)) return condition(record, 'Prepared')?.status === 'false' ? { phase: 'pending', reason: QUEUED } : { phase: 'provisioning' };
   if (rule.primaryChild === 'PersistentVolumeClaim') return volumePhase(primary);
-  return rule.primaryChild === 'Deployment' ? deploymentPhase(primary) : workloadPhase(record, rule, primary);
+  return rule.primaryChild === 'Deployment' ? deploymentPhase(record, primary) : workloadPhase(record, rule, primary);
 }
 
 /**
  * Deployment → 阶段：观测把它归成 Available（副本都就绪且是新版本）、Progressing（还在铺新版本）、Unready（铺完后副本没全就绪）、
- * Stalled（推进超时）、ScaledDown（副本为 0）。
+ * Stalled（推进超时）、ScaledDown（副本为 0）。资源中心判定槽的 Pod 在崩溃重启（条件 CrashLooping）时，副本眼下都就绪也是降级（设计 §4.3）。
  */
-function deploymentPhase(deployment: ResourceChild): PhaseResult {
+function deploymentPhase(record: PhaseInput, deployment: ResourceChild): PhaseResult {
+  const looping = condition(record, 'CrashLooping');
+  if (looping?.status === 'true') return { phase: 'degraded', reason: reasonOf('crash-looping', looping.message ?? '容器反复重启') };
   if (deployment.phase === 'Available') return { phase: 'ready' };
   if (deployment.phase === 'Unready') return { phase: 'degraded', reason: reasonOf('pods-unready', deployment.reason ?? '副本没有全部就绪') };
   if (deployment.phase === 'Stalled') return { phase: 'degraded', reason: reasonOf('rollout-stalled', deployment.reason ?? '部署停止推进') };

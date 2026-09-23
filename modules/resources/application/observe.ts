@@ -37,7 +37,7 @@ function sameObservation(a: ResourceChild, b: ResourceChild): boolean {
 }
 
 export async function observeIn(scope: LedgerScope, observation: ChildObservation, now: Date): Promise<ObservationOutcome> {
-  const id = observation.resourceId ?? await scope.records.findByChild(observation.child);
+  const id = observation.resourceId ?? await scope.records.findByChild(observation.child) ?? (observation.owner ? await scope.records.findByChild(observation.owner) : undefined);
   if (!id) return { status: 'unowned' };
   const record = await scope.records.get(id, { forUpdate: true });
   if (!record) return { status: 'unowned' };

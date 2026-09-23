@@ -1,16 +1,20 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import type { Actor, ProjectId, UserId } from '@crewstation/contracts';
-import { AdoptionReportSchema, IDENTITY_HEADERS } from '@crewstation/contracts';
+import { AdoptionReportSchema, healthOfSlotRecord, IDENTITY_HEADERS } from '@crewstation/contracts';
 import { createApp } from '@crewstation/http';
 import type { FakeK8sClient, K8sObject } from '@crewstation/k8s';
 import { createFakeK8sClient, Resources } from '@crewstation/k8s';
-import { isPlatformError } from '@crewstation/kernel';
+import { isPlatformError, noopLogger } from '@crewstation/kernel';
 import type { ResourcesModule } from '@crewstation/module-resources';
 import { createResourcesModule, resourcesMigrations } from '@crewstation/module-resources';
 import type { TestDatabase } from '@crewstation/testkit';
 import { createTestDatabase, testDatabaseAvailable } from '@crewstation/testkit';
+import { newObservationStats } from '../application/observeChange';
+import { reconcileRecord } from '../application/reconcileObservations';
 import type { LegacyTask } from '../domain/adoption';
+import { CRASH_LOOP_WINDOW_MS } from '../domain/observation';
 import type { ClusterWriter, ManagedObjectFeed, ObjectChange } from '../ports/cluster';
+import type { LedgerObservations } from '../ports/ledger';
 import { createClusterControlModule } from '../wiring';
 
 const available = await testDatabaseAvailable();
@@ -61,6 +65,7 @@ describe.skipIf(!available)('cluster-control：观测写回台账与收编空跑
     },
   };
   let control: ReturnType<typeof createClusterControlModule>;
+  let ledger: LedgerObservations;
 
   beforeAll(async () => {
     database = await createTestDatabase([resourcesMigrations]);
@@ -71,15 +76,16 @@ describe.skipIf(!available)('cluster-control：观测写回台账与收编空跑
       pvc('work-legacy', { 'crewstation.io/task': 'tsk_01a0954107447000b7936485fb80d15d' }), pvc('work-legacy-gone', { 'crewstation.io/task': 'tsk_unknown' }),
       // 第二期起也列带任务标签的 Runner Secret 与预览路由；不带任务标签的（服务槽的 Service、Git 凭据）留给第三期，不列。
       { ...pvc('task-rel-runner', { 'crewstation.io/task': 't-released' }), kind: 'Secret' }, { ...pvc('demo-green', { 'crewstation.io/workload': 'service' }), kind: 'Service' }];
+    ledger = {
+      observe: (input) => resources.api.observe(input), claimOf: (child) => resources.api.claimOf(child), get: (id) => resources.api.get(id),
+      listLive: () => resources.api.list({}), changesSince: resources.api.changesSince, latestChange: resources.api.latestChange,
+      observeConditions: (id, conditions) => resources.api.observeConditions(id, conditions), children: (parentId) => resources.api.list({ parentId, includeStopped: true }),
+      adoptOrphanVolume: async () => undefined,
+    };
     control = createClusterControlModule({
       k8s, feed, cluster, isAdmin: async (id) => id === ADMIN.userId, systemNamespace: 'crewstation-system',
       reader: { list: async (kind) => objects.filter((o) => o.kind === kind) },
-      ledger: {
-        observe: (input) => resources.api.observe(input), claimOf: (child) => resources.api.claimOf(child), get: (id) => resources.api.get(id),
-        listLive: () => resources.api.list({}), changesSince: resources.api.changesSince, latestChange: resources.api.latestChange,
-        observeConditions: (id, conditions) => resources.api.observeConditions(id, conditions), children: (parentId) => resources.api.list({ parentId, includeStopped: true }),
-        adoptOrphanVolume: async () => undefined,
-      },
+      ledger,
       // 孤儿回收单独在 orphanSweep.test.ts 里核对；这里关掉，免得它的定时轮次与本文件的用例交错。
       orphanSweep: false,
       reconciler: { pollMs: 20 },
@@ -189,5 +195,59 @@ describe.skipIf(!available)('cluster-control：观测写回台账与收编空跑
     const ok = await app.request('/v1/admin/resources/adoption-report', { headers: as(ADMIN) });
     expect(ok.status).toBe(200);
     expect(AdoptionReportSchema.parse(await ok.json()).counts.owned).toBe(1);
+  });
+
+  // RFC-025 第三期：服务槽的副本由槽记录认领（设计 §6.5「第三期由对应记录认领」），崩溃重启按 G22 汇总成条件。
+  const deployment = (ready: number): K8sObject => ({ ...child('Deployment', 'shop-blue', 'uid-shop-blue'), apiVersion: 'apps/v1', metadata: { ...child('Deployment', 'shop-blue', 'uid-shop-blue').metadata, generation: 1 }, spec: { replicas: 2 },
+    status: { observedGeneration: 1, replicas: 2, updatedReplicas: 2, readyReplicas: ready, conditions: [{ type: 'Progressing', status: 'True', reason: 'NewReplicaSetAvailable' }] } });
+  const replica = (name: string, restartCount = 0, finishedAt?: string, replicaSet = 'shop-blue-5d8f7c'): K8sObject => ({
+    ...pod(name, { 'pod-template-hash': '5d8f7c' }, { phase: 'Running', conditions: [{ type: 'Ready', status: 'True' }], containerStatuses: [{ ready: true, restartCount, ...(finishedAt ? { lastState: { terminated: { finishedAt } } } : {}) }] }),
+    metadata: { ...pod(name, { 'pod-template-hash': '5d8f7c' }).metadata, ownerReferences: [{ apiVersion: 'apps/v1', kind: 'ReplicaSet', name: replicaSet, uid: `uid-${replicaSet}`, controller: true }] },
+  });
+
+  test('服务槽：Deployment 名下的 Pod 作为观测到的子对象入账（新建的与台账接上前就在的）；副本数照观测；崩溃重启汇总后判降级，副本消失后撤掉', async () => {
+    const slot = await resources.api.owner('release').declare({ kind: 'service-slot', ref: 'svc-shop/blue', projectId: PROJECT, spec: { children: [{ kind: 'Deployment', namespace: 'cs-demo', name: 'shop-blue' }] }, display: { physical: 'blue', role: 'prod' } });
+    await resources.api.owner('release').report(slot.id, { conditions: [{ type: 'Serving', status: 'true' }] });
+    // 台账接上之前就在的副本：只在观测缓存里，按记录核对时认领。
+    feed.cache.set('Pod/cs-demo/shop-blue-5d8f7c-early', replica('shop-blue-5d8f7c-early'));
+    await feed.emit({ kind: 'Deployment', object: deployment(2), gone: false });
+    await feed.emit({ kind: 'Pod', object: replica('shop-blue-5d8f7c-a1'), gone: false });
+    const pods = async () => (await resources.api.get(slot.id))?.children.filter((entry) => entry.kind === 'Pod').map((entry) => entry.name).sort();
+    await until('两个副本入账', async () => (await pods())?.length === 2);
+    await control.reconciled();
+    const ready = (await resources.api.get(slot.id))!;
+    expect(await pods()).toEqual(['shop-blue-5d8f7c-a1', 'shop-blue-5d8f7c-early']);
+    expect(ready).toMatchObject({ phase: 'ready' });
+    expect(ready.children.find((entry) => entry.kind === 'Deployment')).toMatchObject({ replicas: 2, readyReplicas: 2 });
+    expect(ready.conditions.find((entry) => entry.type === 'CrashLooping')?.status).toBe('false');
+    // 一个副本 10 分钟内重启到第 3 次：汇总成立，副本眼下都就绪也是降级；旧健康接口是 crash-looping。
+    await feed.emit({ kind: 'Pod', object: replica('shop-blue-5d8f7c-a1', 3, new Date(Date.now() - 60_000).toISOString()), gone: false });
+    await until('崩溃重启', async () => (await resources.api.get(slot.id))?.phase === 'degraded');
+    const looping = (await resources.api.get(slot.id))!;
+    expect(looping.reason).toMatchObject({ code: 'crash-looping', message: '容器反复重启：累计重启 3 次，10 分钟内仍有重启' });
+    expect(healthOfSlotRecord({ ...looping, phaseSince: looping.phaseSince.toISOString() })).toMatchObject({ state: 'crash-looping', replicas: 2, readyReplicas: 2, restarts: 3 });
+    // 那个副本被换掉：子对象随之删去，汇总只剩没重启过的副本，条件撤掉，回到运行中。
+    await feed.emit({ kind: 'Pod', object: replica('shop-blue-5d8f7c-a1', 3), gone: true });
+    await until('恢复', async () => (await resources.api.get(slot.id))?.phase === 'ready');
+    expect(await pods()).toEqual(['shop-blue-5d8f7c-early']);
+    // 别的 Deployment 的副本与裸 Pod 不会被这条记录认领。
+    await feed.emit({ kind: 'Pod', object: replica('other-blue-5d8f7c-z', 0, undefined, 'other-blue-5d8f7c'), gone: false });
+    await control.reconciled();
+    expect(await pods()).toEqual(['shop-blue-5d8f7c-early']);
+  });
+
+  test('崩溃重启的到期复核：成立时按最近一次退出满 10 分钟约下一次核对，到时不再重启就撤掉', async () => {
+    const slot = await resources.api.owner('release').declare({ kind: 'service-slot', ref: 'svc-shop/green', projectId: PROJECT, spec: { children: [{ kind: 'Deployment', namespace: 'cs-demo', name: 'shop-green' }] } });
+    const exited = new Date('2026-09-24T01:00:00.000Z');
+    feed.cache.set('Pod/cs-demo/shop-green-5d8f7c-b1', replica('shop-green-5d8f7c-b1', 4, exited.toISOString(), 'shop-green-5d8f7c'));
+    const queued: [string, number | undefined][] = [];
+    const at = (ms: number) => ({ ledger, feed, cluster, clock: { now: () => new Date(exited.getTime() + ms) }, systemNamespace: 'crewstation-system', stats: newObservationStats(), logger: noopLogger });
+    await reconcileRecord(at(120_000), slot.id, (id, afterMs) => { queued.push([id, afterMs]); });
+    expect(queued).toEqual([[slot.id, CRASH_LOOP_WINDOW_MS - 120_000]]);
+    expect((await resources.api.get(slot.id))?.conditions.find((entry) => entry.type === 'CrashLooping')?.status).toBe('true');
+    await reconcileRecord(at(CRASH_LOOP_WINDOW_MS), slot.id, (id, afterMs) => { queued.push([id, afterMs]); });
+    expect(queued).toHaveLength(1);
+    expect((await resources.api.get(slot.id))?.conditions.find((entry) => entry.type === 'CrashLooping')?.status).toBe('false');
+    feed.cache.delete('Pod/cs-demo/shop-green-5d8f7c-b1');
   });
 });

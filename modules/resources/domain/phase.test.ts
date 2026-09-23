@@ -99,6 +99,11 @@ describe('条件、子对象、计数与可做操作', () => {
     const offline = cond('Serving', 'false', { reason: 'offline-idle', message: '待验证版本无人访问，已自动下线' });
     expect(computePhase(slot(undefined, [offline]))).toEqual({ phase: 'stopped', reason: { code: 'offline-idle', message: '待验证版本无人访问，已自动下线' } });
     expect(computePhase(slot({}, [offline])).phase).toBe('stopping');
+    // 资源中心判定槽的 Pod 在崩溃重启：副本眼下都就绪也是降级，原因照条件写；条件撤掉就回到运行中。
+    const looping = cond('CrashLooping', 'true', { reason: 'restarting', message: '容器反复重启：累计重启 4 次，10 分钟内仍有重启' });
+    expect(computePhase(slot({}, [looping]))).toEqual({ phase: 'degraded', reason: { code: 'crash-looping', message: '容器反复重启：累计重启 4 次，10 分钟内仍有重启' } });
+    expect(computePhase(slot({}, [{ ...looping, status: 'false' }])).phase).toBe('ready');
+    expect(computePhase(slot({}, [cond('CrashLooping', 'true')])).reason?.message).toBe('容器反复重启');
   });
 
   test('待回收的工作卷：上级已结束、卷还在，按已结束算，原因写明；受理删除后照常是结束中', () => {

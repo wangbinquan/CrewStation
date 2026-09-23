@@ -1,5 +1,5 @@
 import type { Clock } from '@crewstation/kernel';
-import { deploymentChild, goneChild, podChild, podConditions, presentChild, pvcChild, RESOURCE_ID_LABEL } from '../domain/observation';
+import { deploymentChild, goneChild, ownerDeploymentOf, podChild, podConditions, presentChild, pvcChild, RESOURCE_ID_LABEL } from '../domain/observation';
 import type { ObjectChange } from '../ports/cluster';
 import type { LedgerObservations } from '../ports/ledger';
 
@@ -26,7 +26,10 @@ function childOf(kind: ObjectChange['kind'], object: ObjectChange['object'], obs
   return kind === 'Deployment' ? deploymentChild(object, observedAt) : presentChild(object, observedAt);
 }
 
-/** 一个受管对象的变化 → 子对象观测写回台账（设计 §6.2 第 3 步）。 */
+/**
+ * 一个受管对象的变化 → 子对象观测写回台账（设计 §6.2 第 3 步）。Deployment 管的 Pod（服务槽的副本）带上所属的 Deployment：
+ * 认领 Deployment 的记录也认领它；它的崩溃重启不按单个 Pod 写，由调和器汇总这个 Deployment 名下所有 Pod 后写（G22）。
+ */
 export async function observeChange(ledger: LedgerObservations, clock: Clock, systemNamespace: string, stats: ObservationStats, change: ObjectChange): Promise<void> {
   const { object, gone } = change;
   if (object.metadata.namespace === systemNamespace && !object.metadata.labels?.['crewstation.io/task']) {
@@ -36,7 +39,8 @@ export async function observeChange(ledger: LedgerObservations, clock: Clock, sy
   const observedAt = clock.now().toISOString();
   const child = gone ? goneChild(object) : childOf(change.kind, object, observedAt);
   const resourceId = object.metadata.labels?.[RESOURCE_ID_LABEL];
-  const conditions = !gone && change.kind === 'Pod' ? podConditions(object) : undefined;
-  const outcome = await ledger.observe({ ...(resourceId ? { resourceId } : {}), child, ...(gone ? { gone } : {}), ...(conditions ? { conditions } : {}) });
+  const owner = change.kind === 'Pod' ? ownerDeploymentOf(object) : undefined;
+  const conditions = !gone && change.kind === 'Pod' && !owner ? podConditions(object) : undefined;
+  const outcome = await ledger.observe({ ...(resourceId ? { resourceId } : {}), child, ...(owner ? { owner } : {}), ...(gone ? { gone } : {}), ...(conditions ? { conditions } : {}) });
   stats[outcome.status] += 1;
 }

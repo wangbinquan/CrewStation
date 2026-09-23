@@ -98,6 +98,36 @@ describe.skipIf(!available)('observability module', () => {
     expect((await obs.api.listTraceEvents(actor, projectId, TRACE, execution.id, { limit: 10 })).items[0]).toMatchObject({ type: 'text', text: 'hi' });
   });
 
+  // RFC-025 第三期：健康与巡检照服务槽记录（资源中心观测 Deployment 与它的 Pod、汇总崩溃重启）；没有这个槽的记录、台账读失败时退回按请求读集群。
+  test('健康照服务槽记录：副本、重启与崩溃重启来自记录；没有记录的槽按请求读集群；台账读失败整体退回并记告警；巡检照记录触发崩溃重启告警', async () => {
+    const since = '2026-09-24T01:00:00.000Z', otherProject = '01a0bf5d-8f4b-7178-82e1-9a99060b1193' as ProjectId;
+    let failing = false;
+    const warnings: string[] = [];
+    const logger = { debug: () => undefined, info: () => undefined, warn: (msg: string) => { warnings.push(msg); }, error: () => undefined, child: () => logger };
+    const blue = {
+      physical: 'blue', phaseSince: since, conditions: [{ type: 'CrashLooping', status: 'true' as const, reason: 'restarting', since }],
+      children: [{ kind: 'Deployment', namespace: 'cs-demo', name: 'demo-blue', phase: 'Available', ready: true, replicas: 2, readyReplicas: 2 }, { kind: 'Pod', namespace: 'cs-demo', name: 'demo-blue-5d8f7c-a1', phase: 'Running', ready: true, restarts: 4 }],
+    };
+    const recorded = createObservabilityModule({
+      db: tdb.db, k8s: createFakeK8sClient(), isAdmin: async () => false, logger,
+      authorizer: { authorize: async () => undefined },
+      services: { resolveServiceOfProject: async () => ({ serviceId: '01a0bf5d-8f4b-76c5-866c-f1feda3d63bb' as ServiceId, slug: 'demo', name: 'demo', namespace: 'cs-demo' }) },
+      slots: { slotRoles: async () => ({ prod: 'blue', preview: 'green' }) },
+      records: { slotRecords: async () => { if (failing) throw new Error('台账暂时不可用'); return [blue]; } },
+      cluster: { observeDeployment: async (_ns, name) => (name === 'demo-green' ? { replicas: 1, readyReplicas: 1, restarts: 0, lastTransitionAt: '2026-09-24T00:00:00.000Z' } : undefined), tailLogs: async () => [] },
+      traces: { environments: { traceKeys: async () => [], activeTraceIds: async () => [], list: async () => [] }, deliveries: { traceKeys: async () => [], activeTraceIds: async () => [], list: async () => [] }, businessTasks: { list: async () => [] }, sessions: { summarize: async () => [], events: async () => [] } },
+    });
+    expect(await recorded.api.health(actor, otherProject)).toEqual([
+      { slot: 'prod', state: 'crash-looping', replicas: 2, readyReplicas: 2, restarts: 4, lastTransitionAt: since },
+      { slot: 'preview', state: 'healthy', replicas: 1, readyReplicas: 1, restarts: 0, lastTransitionAt: '2026-09-24T00:00:00.000Z' },
+    ]);
+    expect(await recorded.api.sweepProject(otherProject)).toBe(1);
+    expect((await recorded.api.listAlerts(actor, otherProject)).map((alert) => [alert.type, alert.slot])).toEqual([['crash-loop', 'prod']]);
+    failing = true;
+    expect((await recorded.api.health(actor, otherProject)).map((h) => [h.slot, h.state])).toEqual([['prod', 'unknown'], ['preview', 'healthy']]);
+    expect(warnings).toContain('slot records unavailable, reading the cluster');
+  });
+
   // 基线 v0.3.13（D61）删除了项目级告警订阅：迁移删掉订阅表，三条订阅接口不再挂载；告警列表接口不受影响。
   test('告警订阅已删除：订阅表不存在，订阅接口 404，告警列表接口仍在', async () => {
     expect([...(await tdb.db.execute(`SELECT to_regclass('observability.alert_subscriptions') AS table_name`))]).toEqual([{ table_name: null }]);

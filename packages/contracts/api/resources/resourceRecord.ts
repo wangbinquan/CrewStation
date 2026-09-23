@@ -48,6 +48,9 @@ export const ResourceChildSchema = z.object({
   reason: z.string().max(2000).optional(),
   node: z.string().max(253).optional(),
   restarts: z.number().int().nonnegative().optional(),
+  /** Deployment 的期望副本数与就绪副本数（服务槽，旧健康接口据此推导）。 */
+  replicas: z.number().int().nonnegative().optional(),
+  readyReplicas: z.number().int().nonnegative().optional(),
   observedAt: z.iso.datetime().optional(),
 }).strict();
 
@@ -71,7 +74,8 @@ export const ResourceRecordSchema = z.object({
   phaseSince: z.iso.datetime(),
   reason: ResourceReasonSchema.optional(),
   conditions: z.array(ResourceConditionSchema).max(32),
-  children: z.array(ResourceChildSchema).max(32),
+  /** 服务槽的 Pod 随副本数（至多 20）与滚动更新增减，换版本时新旧两批同时在，上限按它留足。 */
+  children: z.array(ResourceChildSchema).max(64),
   /** RFC-022 的启动进度，归入标准记录。 */
   startup: StartupProgressSchema.optional(),
   /** 种类声明的展示字段（版本号、档位名、分支……），期望里其余内容界面不解读。 */

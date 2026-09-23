@@ -7,6 +7,7 @@
 - [1. 第一期：基础（T2–T5）](#1-第一期基础t2t5)
 - [2. 与验收清单的对应](#2-与验收清单的对应)
 - [3. 第二期：任务类容器（T6、T7）](#3-第二期任务类容器t6t7)
+- [4. 第三期：服务槽（T8）](#4-第三期服务槽t8)
 
 ## 1. 第一期：基础（T2–T5）
 
@@ -119,4 +120,18 @@
   - 3 对 RFC-013 改名前的同 Host 预览 Service＋IngressRoute：cs-demo、cs-rfc003-ux、cs-rfc003-verify-workbench 的 `task-01a095410744`、`task-01a0985a8624`、`task-01a09eb4f03f`（Service 的选择器是旧 `tsk_…` 标签，端点为空）；
   - 3 个已释放环境的 PVC（cs-rfc006-verify 一个、cs-rfc010-cluster-qa 两个）登记为资源中心名下的工作卷记录，阶段「已结束」、原因 `orphaned`，PVC 本身不动（`kubectl get pvc` 前后都是 11 个）。
 - 之后：每个开发预览主机只剩一条 IngressRoute（此前 demo、rfc003-ux、rfc003-verify-workbench 各两条同 Host）；受管 Runner Secret 只剩 3 个运行中会话各自当前的那个；`dev.demo.cs.localhost` 经网关照常到 ForwardAuth（未登录 401），当前会话的预览路由与 Service（有端点）未受影响。
+
+## 4. 第三期：服务槽（T8）
+
+| 提交 | 门禁（干净导出树） | CI | 部署（UTC） |
+|---|---|---|---|
+| `4aeaa892` 服务槽投影进台账，调和器观测 Deployment | check:static 通过；unit 568、module 1266（12 跳过）、console 867；改动行 121／122（99.2%） | [35891997767](https://github.com/wangbinquan/CrewStation/actions/runs/35891997767) 六项成功 | 17:02:17 cs-controller、17:02:19 cs-api 换到 `cs-control-plane:rc025-p3a-20260923` |
+| `6d54a25f` 槽的旧接口状态就绪之后照台账 | check:static 通过；unit 569、module 1267（12 跳过）、console 867；改动行 21／21 | [35893472583](https://github.com/wangbinquan/CrewStation/actions/runs/35893472583) 六项成功 | 17:17:59 cs-controller、17:18:01 cs-api 换到 `cs-control-plane:rc025-p3b-20260923` |
+| `7c3e68d0` 形态图槽带的入口与 Deployment 状态照槽记录 | check:static 通过；unit 569、module 1279、console 868；改动行 4／4 | [35894218920](https://github.com/wangbinquan/CrewStation/actions/runs/35894218920) 六项成功 | 17:22:38 console 换到 `cs-console:rc025-p3c-20260924` |
+
+镜像都由 `git archive <提交>` 构建，只含已提交内容；无迁移，各一次就绪、0 重启。
+
+- **槽记录接上真实数据**（p3a 部署后）：补投影 14 个服务、28 条记录。20 条「运行中」，各自的 Deployment 观测为 Available、原因「副本 1／1 就绪」；8 条「已结束」——demo 的绿槽原因 `offline-manual`（已由成员手动下线），其余 7 条 `not-deployed`（rfc003-ux、rfc003-verify-files、rfc006-verify、rfc010-cluster-qa、rfc011-role-home、rfc022-verify、rfc023-verify 各有一个从没部署过的物理槽）。
+- **p3b 部署后**：20 条在跑的槽记录仍全是「运行中」、Deployment 都是 Available，槽的旧接口状态不变（只在流水线判定就绪之后、观测不是运行中时才改写）。降级那一支（新版本铺完后副本没全就绪）由模块用例 `slotLedger.test.ts` 核对；实机上要对共享集群里的槽做一次运维重启才能看到，这一步被权限拦下，没有做。
+- **p3c 部署后**：工作台已换新；浏览器的登录已过期，没有替作者重新登录，形态图槽带的显示由组件用例 `topologyAssembly.test.ts` 核对。
 

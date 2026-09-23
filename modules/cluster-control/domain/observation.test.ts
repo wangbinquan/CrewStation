@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { classifyObject, countVerdicts } from './adoption';
 import type { ObservedObject } from './observation';
-import { deploymentChild, goneChild, podChild, podConditions, presentChild, pvcChild } from './observation';
+import { CRASH_LOOP_WINDOW_MS, crashLoopingOf, deploymentChild, goneChild, ownerDeploymentOf, podChild, podConditions, presentChild, pvcChild } from './observation';
 
 const at = '2026-09-23T12:00:00.000Z';
 const pod = (status: unknown, patch: Partial<ObservedObject['metadata']> = {}, spec: unknown = { nodeName: 'desktop-worker' }): ObservedObject => ({
@@ -34,7 +34,8 @@ describe('Pod 与 PVC 的观测映射（RFC-025 设计 §6.2）', () => {
 
   test('Deployment：新版本的副本都就绪才是 Available；推进超时是 Stalled；副本为 0 是 ScaledDown；其余 Progressing，原因写就绪副本数', () => {
     const deployment = (spec: number, status: Record<string, unknown>, generation = 3): ObservedObject => ({ kind: 'Deployment', metadata: { name: 'demo-green', namespace: 'cs-demo', uid: 'u-dep', generation }, spec: { replicas: spec }, status });
-    expect(deploymentChild(deployment(1, { observedGeneration: 3, replicas: 1, updatedReplicas: 1, readyReplicas: 1 }), at)).toEqual({ kind: 'Deployment', namespace: 'cs-demo', name: 'demo-green', uid: 'u-dep', phase: 'Available', ready: true, reason: '副本 1／1 就绪', observedAt: at });
+    expect(deploymentChild(deployment(1, { observedGeneration: 3, replicas: 1, updatedReplicas: 1, readyReplicas: 1 }), at))
+      .toEqual({ kind: 'Deployment', namespace: 'cs-demo', name: 'demo-green', uid: 'u-dep', phase: 'Available', ready: true, reason: '副本 1／1 就绪', replicas: 1, readyReplicas: 1, observedAt: at });
     expect(deploymentChild(deployment(1, { observedGeneration: 2, replicas: 1, updatedReplicas: 1, readyReplicas: 1 }), at).phase).toBe('Progressing');
     expect(deploymentChild(deployment(2, { observedGeneration: 3, replicas: 2, updatedReplicas: 2, readyReplicas: 1 }), at)).toMatchObject({ phase: 'Progressing', ready: false, reason: '副本 1／2 就绪' });
     expect(deploymentChild(deployment(1, { observedGeneration: 3, replicas: 1, conditions: [{ type: 'Progressing', status: 'False', reason: 'ProgressDeadlineExceeded', message: 'ReplicaSet "demo-green-x" has timed out progressing.' }] }), at))
@@ -44,6 +45,28 @@ describe('Pod 与 PVC 的观测映射（RFC-025 设计 §6.2）', () => {
     expect(deploymentChild(deployment(1, { observedGeneration: 3, replicas: 1, updatedReplicas: 1, readyReplicas: 0, conditions: [{ type: 'Progressing', status: 'True', reason: 'NewReplicaSetAvailable' }] }), at)).toMatchObject({ phase: 'Unready', ready: false, reason: '副本 0／1 就绪' });
     expect(deploymentChild(deployment(1, { observedGeneration: 3, replicas: 1, updatedReplicas: 1, readyReplicas: 0, conditions: [{ type: 'Progressing', status: 'True', reason: 'ReplicaSetUpdated' }] }), at).phase).toBe('Progressing');
     expect(deploymentChild({ ...deployment(1, {}), metadata: { name: 'demo-green', namespace: 'cs-demo', deletionTimestamp: at } }, at)).toMatchObject({ phase: 'Terminating', ready: false });
+  });
+
+  test('Deployment 管的 Pod：控制者是 ReplicaSet、名字是 Deployment 名加 pod-template-hash；裸 Pod、Job 的 Pod 没有所属 Deployment', () => {
+    const owned = (owner: { kind: string; name: string; controller?: boolean }, hash = '56fb8ffff9') => pod({}, { labels: { 'pod-template-hash': hash }, ownerReferences: [owner] });
+    expect(ownerDeploymentOf(owned({ kind: 'ReplicaSet', name: 'demo-blue-56fb8ffff9', controller: true }))).toEqual({ kind: 'Deployment', namespace: 'cs-demo', name: 'demo-blue' });
+    expect(ownerDeploymentOf(owned({ kind: 'ReplicaSet', name: 'demo-blue-56fb8ffff9' }))).toBeUndefined();
+    expect(ownerDeploymentOf(owned({ kind: 'Job', name: 'build-1', controller: true }))).toBeUndefined();
+    expect(ownerDeploymentOf(owned({ kind: 'ReplicaSet', name: 'standalone-rs', controller: true }))).toBeUndefined();
+    expect(ownerDeploymentOf(owned({ kind: 'ReplicaSet', name: '-56fb8ffff9', controller: true }))).toBeUndefined();
+    expect(ownerDeploymentOf(pod({}))).toBeUndefined();
+  });
+
+  test('崩溃重启（G22）：一个 Deployment 名下各容器重启累计至少 3 次、最近一次退出在 10 分钟内；成立时给出复核时刻', () => {
+    const now = new Date('2026-09-23T12:10:00.000Z');
+    const replica = (restartCount: number, finishedAt?: string) => pod({ containerStatuses: [{ restartCount, ...(finishedAt ? { lastState: { terminated: { finishedAt } } } : {}) }] });
+    const looping = crashLoopingOf([replica(2, '2026-09-23T12:05:00Z'), replica(1, '2026-09-23T12:08:00Z')], now);
+    expect(looping).toEqual({ condition: { type: 'CrashLooping', status: 'true', reason: 'restarting', message: '容器反复重启：累计重启 3 次，10 分钟内仍有重启' }, recheckAfterMs: CRASH_LOOP_WINDOW_MS - 120_000 });
+    expect(crashLoopingOf([replica(5, '2026-09-23T11:59:00Z')], now)).toEqual({ condition: { type: 'CrashLooping', status: 'false' } });
+    expect(crashLoopingOf([replica(2, '2026-09-23T12:09:00Z')], now).condition.status).toBe('false');
+    expect(crashLoopingOf([replica(4)], now).condition.status).toBe('false');
+    expect(crashLoopingOf([replica(3, 'not-a-time')], now).condition.status).toBe('false');
+    expect(crashLoopingOf([], now).condition.status).toBe('false');
   });
 
   test('Runner Secret、预览 Service 与路由：在即就绪，删除中记 Terminating', () => {

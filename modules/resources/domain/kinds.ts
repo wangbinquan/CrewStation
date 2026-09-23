@@ -15,6 +15,11 @@ export interface KindRule {
   readonly failedRetentionMs?: number;
   /** 界面能不能对它发起「释放」。 */
   readonly releasable: boolean;
+  /**
+   * 稳定记录：随上级长期存在、此刻已结束也还是它（服务槽每个服务两条，下线、尚未部署时按已结束算）。视图缺省也列出它们，
+   * 页面才能画出已下线的槽；已结束的一次性记录（会话、执行）缺省不列。
+   */
+  readonly stable?: boolean;
 }
 
 const HOUR = 3_600_000;
@@ -29,7 +34,7 @@ export const KIND_RULES: Readonly<Record<ResourceKind, KindRule>> = {
   namespace: GENERIC,
   'network-policy-set': GENERIC,
   // 服务槽（第三期）：Deployment 就绪即运行中；领域条件 Serving 为假（已下线、尚未部署）时按已结束算。不占任务额度。
-  'service-slot': { quotaUnits: 0, primaryChild: 'Deployment', readyConditions: [], releasable: false },
+  'service-slot': { quotaUnits: 0, primaryChild: 'Deployment', readyConditions: [], releasable: false, stable: true },
   'build-job': GENERIC,
   'migration-job': GENERIC,
   route: GENERIC,
@@ -41,3 +46,6 @@ export const KIND_RULES: Readonly<Record<ResourceKind, KindRule>> = {
 export function kindRule(kind: ResourceKind): KindRule {
   return KIND_RULES[kind];
 }
+
+/** 视图缺省也列出的稳定种类（见 KindRule.stable）。 */
+export const STABLE_KINDS: readonly ResourceKind[] = (Object.keys(KIND_RULES) as ResourceKind[]).filter((kind) => KIND_RULES[kind].stable);

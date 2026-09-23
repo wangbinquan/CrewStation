@@ -15,7 +15,7 @@ import type { ObservabilityUseCaseDeps } from './application/dependencies';
 import { logsAndHealthUseCases } from './application/logsAndHealth';
 import { traceChainUseCases } from './application/traceChains';
 import { observabilityRoutes } from './http/observabilityRoutes';
-import type { ClusterObserver, ProjectAuthorizer, ServiceResolver, SlotRoles } from './ports/sources';
+import type { ClusterObserver, ProjectAuthorizer, ServiceResolver, SlotRecords, SlotRoles } from './ports/sources';
 import type { TraceChainSources } from './ports/traceSources';
 
 export interface ObservabilityModuleDeps {
@@ -24,6 +24,8 @@ export interface ObservabilityModuleDeps {
   authorizer: ProjectAuthorizer;
   services: ServiceResolver;
   slots: SlotRoles;
+  /** 服务槽记录（RFC-025 第三期），由组合根接到资源中心；缺省时健康与巡检按请求读集群。 */
+  records?: SlotRecords;
   /** 调用链的数据来源（Design §14），由组合根接到 task-runtime、events、business-task 与 session。 */
   traces: TraceChainSources;
   isAdmin: (userId: UserId) => Promise<boolean>;
@@ -51,7 +53,7 @@ export function createObservabilityModule(deps: ObservabilityModuleDeps): Observ
   const logger = deps.logger ?? noopLogger;
   const useCaseDeps: ObservabilityUseCaseDeps = {
     alerts: drizzleAlertRepository(deps.db), cluster: deps.cluster ?? kubernetesClusterObserver(deps.k8s),
-    authorizer: deps.authorizer, services: deps.services, slots: deps.slots, clock: deps.clock ?? systemClock, logger,
+    authorizer: deps.authorizer, services: deps.services, slots: deps.slots, ...(deps.records ? { records: deps.records } : {}), clock: deps.clock ?? systemClock, logger,
   };
   const alerting = alertingUseCases(useCaseDeps);
   const api: ObservabilityModuleApi = {

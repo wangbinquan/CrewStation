@@ -62,8 +62,6 @@ export const queryKeys = {
   /** 事件类型目录是平台级的，与项目无关。 */
   eventTypes: () => ['catalog', 'event-types'] as const,
   logs: (projectId: string) => ['projects', projectId, 'logs'] as const,
-  /** 健康态的路由是 /v1/projects/:projectId/health，键也按项目定位。 */
-  projectHealth: (projectId: string) => ['projects', projectId, 'health'] as const,
   alerts: (projectId: string) => ['projects', projectId, 'alerts'] as const,
   trace: (traceId: string) => ['traces', traceId] as const,
   capabilities: (projectId: string) => ['projects', projectId, 'capabilities'] as const,

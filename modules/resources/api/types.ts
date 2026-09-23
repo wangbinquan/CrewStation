@@ -115,6 +115,11 @@ export interface ChildObservation {
   /** 对象标签 `crewstation.io/resource-id` 上的记录 ID；没有就按子对象身份找。 */
   readonly resourceId?: string;
   readonly child: ResourceChild;
+  /**
+   * 控制这个对象的上级对象（ReplicaSet 管的 Pod 所属的 Deployment）：对象本身还没被认领时，认领上级的记录也认领它，
+   * 作为观测到的子对象入账（服务槽的 Pod，RFC-025 第三期）。
+   */
+  readonly owner?: ExpectedChild;
   /** 对象已从集群里消失。 */
   readonly gone?: boolean;
   /** 资源中心据观测得出的条件（例如 CrashLooping）。 */
@@ -131,7 +136,7 @@ export interface RecordFilter {
   readonly projectId?: ProjectId;
   readonly kind?: ResourceKind;
   readonly parentId?: string;
-  /** 带上已结束的；缺省只要在运行、结束中与失败保留中的。 */
+  /** 带上已结束的；缺省只要在运行、结束中与失败保留中的，外加稳定记录（服务槽，已结束也列）。 */
   readonly includeStopped?: boolean;
   readonly limit?: number;
 }

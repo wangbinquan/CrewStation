@@ -5,7 +5,7 @@ export interface RecordFilter {
   readonly projectId?: ProjectId;
   readonly kind?: ResourceKind;
   readonly parentId?: string;
-  /** 带上已结束的；缺省只要在运行、结束中与失败保留中的。 */
+  /** 带上已结束的；缺省只要在运行、结束中与失败保留中的，外加稳定记录（服务槽，已结束也列）。 */
   readonly includeStopped?: boolean;
   readonly limit?: number;
 }

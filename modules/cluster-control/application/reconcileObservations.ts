@@ -1,5 +1,6 @@
 import type { Clock, Logger } from '@crewstation/kernel';
 import type { ObservedObject } from '../domain/observation';
+import { crashLoopingOf, ownerDeploymentOf } from '../domain/observation';
 import type { ClusterWriter, ManagedObjectFeed, ObservedKind } from '../ports/cluster';
 import type { LedgerObservations, LedgerRecordView } from '../ports/ledger';
 import type { ObservationStats } from './observeChange';
@@ -10,6 +11,9 @@ const REMOVAL_ORDER: readonly ObservedKind[] = ['Deployment', 'Pod', 'Secret', '
 const isObserved = (kind: string): kind is ObservedKind => (REMOVAL_ORDER as readonly string[]).includes(kind);
 const key = (child: { readonly kind: string; readonly namespace?: string; readonly name: string }) => `${child.kind}/${child.namespace ?? ''}/${child.name}`;
 const RETENTION_EXPIRED = 'retention-expired';
+
+/** 把一条记录（再）排进调和队列；带延迟的是到期复核（例如崩溃重启的判定窗口过去之后）。 */
+export type Enqueue = (id: string, afterMs?: number) => void;
 
 export interface ReconcileDeps {
   readonly ledger: LedgerObservations;
@@ -84,13 +88,35 @@ async function settleVolume(deps: ReconcileDeps, volume: LedgerRecordView): Prom
 }
 
 /**
+ * 服务槽（期望里有 Deployment 的记录，第三期）：观测缓存里这个 Deployment 名下的 Pod 都作为观测到的子对象入账——新建的副本、
+ * 台账接上之前就在的副本；再汇总它们写崩溃重启（G22），成立时到期复核，之后不再重启就撤掉。
+ */
+async function observeDeploymentPods(deps: ReconcileDeps, record: LedgerRecordView, enqueue: Enqueue): Promise<void> {
+  const deployments = new Set(record.spec.children.filter((child) => child.kind === 'Deployment').map(key));
+  if (!deployments.size || record.desired === 'absent') return;
+  const pods = deps.feed.list('Pod').filter((pod) => {
+    const owner = ownerDeploymentOf(pod);
+    return owner !== undefined && deployments.has(key(owner));
+  });
+  const recorded = new Set(record.children.filter((child) => child.kind === 'Pod').map(key));
+  for (const pod of pods) {
+    if (recorded.has(key({ kind: 'Pod', ...(pod.metadata.namespace ? { namespace: pod.metadata.namespace } : {}), name: pod.metadata.name }))) continue;
+    await observeChange(deps.ledger, deps.clock, deps.systemNamespace, deps.stats, { kind: 'Pod', object: pod, gone: false });
+  }
+  const { condition, recheckAfterMs } = crashLoopingOf(pods, deps.clock.now());
+  await deps.ledger.observeConditions(record.id, [condition]);
+  if (recheckAfterMs !== undefined) enqueue(record.id, recheckAfterMs);
+}
+
+/**
  * 调和一条记录：先按期望补观测；「不要了」的删子对象；工作卷看上级是否已结束。上级进入「已结束」时把挂在它下面的记录
  * 重新排进队列（工作卷的「待回收」要在这之后判定）。只在观测缓存同步完成后调用。
  */
-export async function reconcileRecord(deps: ReconcileDeps, id: string, enqueue: (id: string) => void): Promise<void> {
+export async function reconcileRecord(deps: ReconcileDeps, id: string, enqueue: Enqueue): Promise<void> {
   const record = await deps.ledger.get(id);
   if (!record) return;
   await observeRecord(deps, record);
+  await observeDeploymentPods(deps, record, enqueue);
   if (record.desired === 'absent') await removeChildren(deps, record);
   await settleVolume(deps, record);
   if (record.kind !== 'volume' && record.desired === 'absent' && record.phase === 'stopped') {

@@ -1,11 +1,12 @@
 import type { Actor, HealthDto, LogEntryDto, LogQuery, ProjectId } from '@crewstation/contracts';
 import { notFound } from '@crewstation/kernel';
-import { healthOf } from '../domain/health';
 import type { ObservabilityUseCaseDeps } from './dependencies';
+import { slotHealthReader } from './slotHealth';
 
-/** 日志页与健康态：首版直接读集群（Pod 日志尾部与 Deployment 状态），不落库；采集与保留在 T2.13 的后续里补。 */
+/** 日志页与健康态：日志直接读集群（Pod 日志尾部），不落库，采集与保留在 T2.13 的后续里补；健康照服务槽记录（RFC-025 第三期）。 */
 export function logsAndHealthUseCases(deps: ObservabilityUseCaseDeps) {
   const { authorizer, services, slots, cluster } = deps;
+  const slotHealth = slotHealthReader(deps);
   const svcOf = async (actor: Actor, projectId: ProjectId) => {
     await authorizer.authorize(actor, projectId, 'view');
     const svc = await services.resolveServiceOfProject(projectId);
@@ -29,14 +30,9 @@ export function logsAndHealthUseCases(deps: ObservabilityUseCaseDeps) {
       const svc = await svcOf(actor, projectId);
       const roles = await slots.slotRoles(svc.serviceId);
       if (!roles) return [];
-      const out: HealthDto[] = [];
-      for (const role of ['prod', 'preview'] as const) {
-        const o = await cluster.observeDeployment(svc.namespace, `${svc.name}-${roles[role]}`);
-        out.push(o
-          ? { slot: role, state: healthOf(o), readyReplicas: o.readyReplicas, replicas: o.replicas, restarts: o.restarts, lastTransitionAt: o.lastTransitionAt }
-          : { slot: role, state: 'unknown', readyReplicas: 0, replicas: 0, restarts: 0, lastTransitionAt: deps.clock.now().toISOString() });
-      }
-      return out;
+      return (await slotHealth({ projectId, name: svc.name, namespace: svc.namespace, roles })).map(({ slot, health }): HealthDto => (health
+        ? { slot, ...health }
+        : { slot, state: 'unknown', readyReplicas: 0, replicas: 0, restarts: 0, lastTransitionAt: deps.clock.now().toISOString() }));
     },
   };
 }

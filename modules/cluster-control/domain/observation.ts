@@ -11,6 +11,7 @@ export interface ObservedObject {
     readonly labels?: Readonly<Record<string, string>>;
     readonly deletionTimestamp?: string;
     readonly creationTimestamp?: string;
+    readonly ownerReferences?: readonly { readonly kind: string; readonly name: string; readonly controller?: boolean }[];
   };
   readonly spec?: unknown;
   readonly status?: unknown;
@@ -30,6 +31,7 @@ export interface ObservedCondition {
 interface ContainerStatus {
   readonly ready?: boolean;
   readonly restartCount?: number;
+  readonly lastState?: { readonly terminated?: { readonly finishedAt?: string } };
   readonly state?: { readonly waiting?: { readonly reason?: string; readonly message?: string }; readonly terminated?: { readonly reason?: string; readonly exitCode?: number } };
 }
 
@@ -118,7 +120,43 @@ export function deploymentChild(deployment: ObservedObject, observedAt: string):
   const reason = deleting ? 'Terminating' : stalled && phase === 'Stalled' ? clip(stalled.message ?? stalled.reason ?? 'ProgressDeadlineExceeded') : `副本 ${ready}／${desired} 就绪`;
   return {
     kind: 'Deployment', ...(deployment.metadata.namespace ? { namespace: deployment.metadata.namespace } : {}), name: deployment.metadata.name, ...(deployment.metadata.uid ? { uid: deployment.metadata.uid } : {}),
-    phase, ready: phase === 'Available', reason, observedAt,
+    phase, ready: phase === 'Available', reason, replicas: desired, readyReplicas: ready, observedAt,
+  };
+}
+
+/**
+ * ReplicaSet 管的 Pod 属于哪个 Deployment：控制者是 ReplicaSet，且它的名字是 Deployment 名加 `-<pod-template-hash>`
+ * （Kubernetes 给 Deployment 建 ReplicaSet 的命名规则）；不是这样的（裸 Pod、Job 的 Pod）返回 undefined。
+ */
+export function ownerDeploymentOf(pod: ObservedObject): { readonly kind: 'Deployment'; readonly namespace?: string; readonly name: string } | undefined {
+  const owner = pod.metadata.ownerReferences?.find((entry) => entry.controller);
+  const hash = pod.metadata.labels?.['pod-template-hash'];
+  if (owner?.kind !== 'ReplicaSet' || !hash || !owner.name.endsWith(`-${hash}`) || owner.name.length <= hash.length + 1) return undefined;
+  return { kind: 'Deployment', ...(pod.metadata.namespace ? { namespace: pod.metadata.namespace } : {}), name: owner.name.slice(0, -(hash.length + 1)) };
+}
+
+/** 崩溃重启的判定窗口与次数（G22，与旧的健康判定一致）。 */
+export const CRASH_LOOP_WINDOW_MS = 600_000;
+const CRASH_LOOP_RESTARTS = 3;
+
+/**
+ * 一个 Deployment 名下的 Pod 是否在崩溃重启（G22）：各容器的重启数之和至少 3 次，且最近一次退出在 10 分钟内。
+ * 成立时给出何时该复核（最近一次退出满 10 分钟的时刻）：之后不再重启，条件就撤掉。
+ */
+export function crashLoopingOf(pods: readonly ObservedObject[], now: Date): { readonly condition: ObservedCondition; readonly recheckAfterMs?: number } {
+  let restarts = 0, lastExit: number | undefined;
+  for (const pod of pods) {
+    for (const container of ((pod.status ?? {}) as PodStatus).containerStatuses ?? []) {
+      restarts += container.restartCount ?? 0;
+      const finished = container.lastState?.terminated?.finishedAt ? Date.parse(container.lastState.terminated.finishedAt) : Number.NaN;
+      if (!Number.isNaN(finished)) lastExit = Math.max(lastExit ?? finished, finished);
+    }
+  }
+  const age = lastExit === undefined ? undefined : now.getTime() - lastExit;
+  if (restarts < CRASH_LOOP_RESTARTS || age === undefined || age >= CRASH_LOOP_WINDOW_MS) return { condition: { type: 'CrashLooping', status: 'false' } };
+  return {
+    condition: { type: 'CrashLooping', status: 'true', reason: 'restarting', message: `容器反复重启：累计重启 ${restarts} 次，10 分钟内仍有重启` },
+    recheckAfterMs: CRASH_LOOP_WINDOW_MS - Math.max(0, age),
   };
 }
 

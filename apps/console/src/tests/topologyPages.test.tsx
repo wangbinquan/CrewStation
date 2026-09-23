@@ -82,6 +82,29 @@ test('the diagram follows the resource stream: a closing CLI turns to stopping a
   } finally { records = [subtask]; }
 });
 
+test('the health tab reads the service-slot records: both slots from the snapshot, crash looping arrives through the stream without re-reading', async () => {
+  const at = '2026-09-24T01:00:00.000Z';
+  const deployment = (name: string, replicas: number, readyReplicas: number) => ({ kind: 'Deployment', namespace: 'cs-team-knowledge', name, phase: replicas ? 'Available' : 'absent', ready: replicas === readyReplicas && replicas > 0, ...(replicas ? { replicas, readyReplicas } : {}) });
+  const prod = resourceRecord({ id: '01a0bf5d-8f4b-7e1e-8dde-c9c2ae13ef21', kind: 'service-slot', owner: { module: 'release', ref: `${serviceId}/blue` }, phaseSince: at, display: { physical: 'blue', role: 'prod' },
+    children: [deployment('team-knowledge-blue', 1, 1), { kind: 'Pod', namespace: 'cs-team-knowledge', name: 'team-knowledge-blue-5d8f7c-a1', phase: 'Running', ready: true, restarts: 0 }] });
+  const preview = resourceRecord({ id: '01a0bf5d-8f4b-7e1e-8dde-c9c2ae13ef22', kind: 'service-slot', owner: { module: 'release', ref: `${serviceId}/green` }, phase: 'stopped', phaseSince: at, reason: { code: 'offline-manual', message: '已由成员手动下线' },
+    display: { physical: 'green', role: 'preview' }, children: [deployment('team-knowledge-green', 0, 0)] });
+  records = [prod, preview];
+  (globalThis as { EventSource?: unknown }).EventSource = FakeEventSource;
+  const calls = memberFixture(); page = await renderApp(`/projects/${projectId}/operations?tab=health`);
+  const card = (label: string) => [...document.querySelectorAll('dl')].map((facts) => facts.parentElement!).find((slot) => slot.textContent?.includes(label))?.textContent ?? '';
+  try {
+    expect(card('正式版本（prod）')).toContain('健康'); expect(card('正式版本（prod）')).toContain('1 / 1');
+    expect(card('待验证版本（preview）')).toContain('未知'); expect(card('待验证版本（preview）')).toContain('0 / 0');
+    await act(async () => { FakeEventSource.opened[0]!.emit({ type: 'upsert', record: { ...prod, phase: 'degraded', version: 2, conditions: [{ type: 'CrashLooping', status: 'true', reason: 'restarting', since: at }],
+      children: [deployment('team-knowledge-blue', 1, 1), { kind: 'Pod', namespace: 'cs-team-knowledge', name: 'team-knowledge-blue-5d8f7c-a1', phase: 'Running', ready: true, restarts: 3 }] }, counts: {}, cursor: 2 }); });
+    await page.settle();
+    expect(card('正式版本（prod）')).toContain('反复重启'); expect(card('正式版本（prod）')).toContain('3');
+    expect(calls.some((path) => path.endsWith('/health'))).toBe(false);
+    expect(calls.filter((path) => path === `/v1/projects/${projectId}/resources`)).toHaveLength(1);
+  } finally { records = [subtask]; }
+});
+
 test('a refused member sees the refusal from the inventory route, not an empty diagram', async () => {
   // 测试员进不了运行与诊断页（路由层已拦），这里模拟的是权限被撤后接口 403 的成员。
   memberFixture(true); page = await renderApp(`/projects/${projectId}/operations?tab=topology`);

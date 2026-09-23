@@ -22,8 +22,14 @@ export interface LedgerObservations {
   listLive(): Promise<readonly LedgerRecordView[]>;
   changesSince(cursor: number, limit: number): Promise<readonly { readonly seq: number; readonly resourceId: string }[]>;
   latestChange(): Promise<number>;
-  /** 写一条子对象观测；unowned 表示台账里没有记录认领这个对象。 */
-  observe(input: { readonly resourceId?: string; readonly child: ResourceChild; readonly gone?: boolean; readonly conditions?: readonly ObservedCondition[] }): Promise<{ readonly status: 'recorded' | 'unchanged' | 'unowned' }>;
+  /**
+   * 写一条子对象观测；unowned 表示台账里没有记录认领这个对象。owner 是控制它的上级对象（ReplicaSet 管的 Pod 所属的 Deployment）：
+   * 对象本身没被认领时，认领上级的记录也认领它。
+   */
+  observe(input: {
+    readonly resourceId?: string; readonly child: ResourceChild; readonly owner?: { readonly kind: string; readonly namespace?: string; readonly name: string };
+    readonly gone?: boolean; readonly conditions?: readonly ObservedCondition[];
+  }): Promise<{ readonly status: 'recorded' | 'unchanged' | 'unowned' }>;
   /** 写只归资源中心的条件（不附带子对象观测），例如工作卷的「待回收」。 */
   observeConditions(resourceId: string, conditions: readonly ObservedCondition[]): Promise<{ readonly status: 'recorded' | 'unchanged' | 'unowned' }>;
   /**

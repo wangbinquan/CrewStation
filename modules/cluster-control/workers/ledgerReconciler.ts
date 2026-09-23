@@ -13,9 +13,9 @@ export interface LedgerReconcilerOptions {
  * 调和器的工作队列（设计 §6.1）：键是资源 ID，同一资源在队列里只有一项。触发来源：台账变更（尾随变更日志）、
  * 观测缓存同步完成后的一次全量、此后每 10 分钟一次全量核对。处理函数每次都读最新的记录与观测缓存。
  */
-export function ledgerReconciler(ledger: LedgerObservations, feed: ManagedObjectFeed, reconcile: (id: string, enqueue: (id: string) => void) => Promise<void>, logger: Logger, options: LedgerReconcilerOptions = {}) {
-  // 处理一条记录时可以把相关记录（例如上级结束后的工作卷）再排进同一个去重队列。
-  const queue: ReturnType<typeof createWorkQueue> = createWorkQueue((id) => reconcile(id, (next) => queue.add(next)), { logger, concurrency: options.concurrency ?? 4 });
+export function ledgerReconciler(ledger: LedgerObservations, feed: ManagedObjectFeed, reconcile: (id: string, enqueue: (id: string, afterMs?: number) => void) => Promise<void>, logger: Logger, options: LedgerReconcilerOptions = {}) {
+  // 处理一条记录时可以把相关记录（例如上级结束后的工作卷）再排进同一个去重队列，或约一个到期复核（例如崩溃重启的窗口过去之后）。
+  const queue: ReturnType<typeof createWorkQueue> = createWorkQueue((id) => reconcile(id, (next, afterMs) => (afterMs ? queue.addAfter(next, afterMs) : queue.add(next))), { logger, concurrency: options.concurrency ?? 4 });
   let running = false;
   let cursor: number | undefined;
   let tailTimer: ReturnType<typeof setTimeout> | undefined;

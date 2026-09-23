@@ -4,6 +4,7 @@ import { act } from 'react';
 import { parseOperationsSearch } from '../shared/project/operationsSearch';
 import { parseSettingsSearch } from '../shared/project/settingsSearch';
 import { renderApp } from './renderApp';
+import { resourceRecord, resourceView } from './resourceRecordFixture';
 import { consoleStyles, sourceAt } from './sourceScan';
 
 const originalFetch = globalThis.fetch;
@@ -24,7 +25,9 @@ function fixture(logItems?: unknown[], admin = false) {
     else if (url.pathname === `/v1/projects/01a0bf5d-8f4b-7927-8d04-a341edee681a`) body = { ...project, id: '01a0bf5d-8f4b-70bd-8586-401e32bbc3b4', name: '另一个应用', slug: 'another-app' };
     else if (url.pathname === `/v1/services/${serviceId}`) body = { id: serviceId, projectId };
     else if (url.pathname.endsWith('/dev-session')) { status = 404; body = { error: 'not_found', message: '没有开发会话' }; }
-    else if (url.pathname.endsWith('/health')) body = { items: [{ slot: 'prod', state: 'unknown', readyReplicas: 0, replicas: 1, restarts: 2, lastTransitionAt: '2026-09-13T01:00:00.000Z' }] };
+    // 健康卡照服务槽记录（RFC-025 第三期）：线上槽副本 0／1 就绪、重启过 2 次。
+    else if (url.pathname.endsWith('/resources')) body = resourceView([resourceRecord({ id: '01a0bf5d-8f4b-7e1e-8dde-c9c2ae13ed40', kind: 'service-slot', owner: { module: 'release', ref: `${serviceId}/blue` }, phase: 'degraded', display: { physical: 'blue', role: 'prod' },
+      children: [{ kind: 'Deployment', namespace: 'cs-team-knowledge', name: 'team-knowledge-blue', phase: 'Unready', ready: false, replicas: 1, readyReplicas: 0 }, { kind: 'Pod', namespace: 'cs-team-knowledge', name: 'team-knowledge-blue-5d8f7c-a1', phase: 'Running', ready: false, restarts: 2 }] })]);
     else if (url.pathname.endsWith('/logs') && logFailure) { status = 503; body = { error: 'unavailable', message: '读取 Pod 日志失败' }; }
     else if (url.pathname.endsWith('/logs')) body = { items: logItems ?? [{ ts: '2026-09-13T01:01:00.000Z', source: 'build', stream: 'stderr', message: 'build fixture line' }] };
     else if (url.pathname.includes('/openapi')) { status = 503; body = { error: 'unavailable', message: '文档暂不可用' }; }
