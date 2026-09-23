@@ -134,7 +134,11 @@ export class NativeExecutionLifecycle {
     }
     // 先提交末屏，再把清理意图交给 task-runtime；清理请求回执丢失由本名册继续重试。
     if ((await this.repo.getSnapshot(start.taskId, start.record.agentId)).status === 'pending') return;
-    if (env && !['cleaning', 'finished'].includes(env.native?.state ?? '')) await this.keepFailureLog(start, env);
+    if (env && !['cleaning', 'finished'].includes(env.native?.state ?? '')) {
+      // 回收前先把启动进度算出来并冻结：没人读过名册时它还没冻结，失败的那一段就挂不上日志（RFC-022 实机：留不留全看时序）。
+      const startup = await this.startupOf(start, env, start.record);
+      await this.keepFailureLog(startup ? { ...start, execution: { ...start.execution!, startup } } : start, env);
+    }
     if (env) await this.deps.environments.releaseEnvironment(env.id, 'user');
     await this.repo.finalize(start.taskId, start.record.agentId);
   }

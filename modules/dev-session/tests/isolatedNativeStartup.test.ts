@@ -116,6 +116,18 @@ test('启动前步骤失败：冻结为失败，回收执行环境之前留下�
   expect(captured).toHaveLength(1);
 });
 
+test('没人读过名册、记录已经结束时直接回收：回收前照样算出并冻结启动进度，留下日志（RFC-022 实机：原来留不留看时序）', async () => {
+  const { f, terminal, executionTaskId, events } = await startingCli();
+  events.push({ seq: 1, at: at(5.7), event: { kind: 'beforeStart', execution: execution(terminal.agentId, 'failed', 'failed') } });
+  const stored = (await f.repository.findExecution(executionTaskId))!.record;
+  await f.repository.saveRecord(taskId, { ...stored, lifecycle: 'failed', reason: 'before-start-failed', error: '环境准备失败', endedAt: at(5.8), revision: stored.revision + 1 });
+  f.deps.environments.captureStartupLog = async () => '{"level":"warn","msg":"before-start step failed"}';
+  await f.run(terminal);
+  const frozen = (await f.repository.findExecution(executionTaskId))!.execution!.startup!;
+  expect(frozen.state).toBe('failed');
+  expect(frozen.stages.find((stage) => stage.state === 'failed')).toMatchObject({ kind: 'prepare', logTail: '{"level":"warn","msg":"before-start step failed"}' });
+});
+
 test('升级前受理的执行环境没有启动进度：名册不读事件、不带 startup', async () => {
   const f = isolatedNativeFixture(), reads: string[] = [];
   f.deps.runner.listEvents = async (id) => { reads.push(id); return []; };
