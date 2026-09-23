@@ -647,8 +647,9 @@ happy-dom 不排版，渲染用例照绿。
   反过来，页面为了让吸顶生效去改写 `:global(main)` 的 `overflow`（改前算力档位编辑页与集群拓扑详情都这么做过），会让整页重新滚起来，`shellScroll.test.tsx` 阻断。
 - **路由复位**：TanStack Router 的 `scrollRestoration` 只管窗口。内容区靠 `scrollToTopSelectors` 与 `main` 上的 `data-scroll-restoration-id`，
   返回时恢复位置也按这个标记找元素。页签内的选中与切换传 `resetScroll: false`，窗口与内容区都不动。
-- **键盘翻页**：页面刚打开、焦点还在 `body` 上时，Chrome 把 PageDown 与空格交给根滚动，而根已经不能滚，内容区不动。
-  在内容区里点一下，或 Tab 进去之后就正常（实测点击后 PageDown 滚了 808px）。
+- **键盘翻页**：焦点在 `body` 或左栏上时，Chrome 把 PageDown 与空格交给根滚动，而根已经不能滚，内容区不动（实测 0px，在内容区里点一下之后 808px）。
+  现在外壳在页面打开与换了路径之后把焦点放到内容区（`main` 的 `tabIndex=-1`，`.main:focus` 不画框；焦点已在内容区或弹窗里不抢，只改地址参数不动）。
+  e2e 用真实按键验证：翻页键发 `rawKeyDown`；回车要发 `keyDown` 加 `text: '\r'` 才会激活链接。
 **判据**：宽屏量到 `scrollY` 为 0 而页面明明滚过；或吸顶元素上方露出一条内容。
 **换包核对不必 `docker build`**：在 `git archive` 导出树里 `bun install`，再 `cd apps/console && bun run build`，几秒就有 `dist/`，按上面「CDP 只换 `/assets/*`」一条换进浏览器。
 

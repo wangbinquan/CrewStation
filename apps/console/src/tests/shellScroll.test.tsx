@@ -1,5 +1,6 @@
 import './domSetup';
 import { afterEach, expect, test } from 'bun:test';
+import { act } from 'react';
 import { MAIN_SCROLL_SELECTOR } from '../app/layout/AppShell';
 import { router as productionRouter } from '../app/router/router';
 import { adminDirectoryFixture } from './adminDirectoryFixture';
@@ -83,4 +84,21 @@ test('切页时内容区回到顶部、返回时恢复原位置；resetScroll: f
   expect([page.path(), main().scrollTop]).toEqual(['/admin/projects', 480]);
   await page.navigate('/admin/requests', { resetScroll: false });
   expect([page.path(), main().scrollTop]).toEqual(['/admin/requests', 480]);
+});
+
+test('页面打开与换页后焦点落在内容区，只改地址参数时不动，内容区不画焦点框', async () => {
+  // 2026-09-23 作者裁定：焦点停在 body 或左栏时 PageDown／空格交给已经不能滚的根，内容区不动（实测要先在内容区里点一下）。
+  adminDirectoryFixture();
+  page = await renderApp('/admin/projects');
+  const main = () => document.querySelector<HTMLElement>(MAIN_SCROLL_SELECTOR)!;
+  expect([main().tabIndex, document.activeElement === main()]).toEqual([-1, true]);
+  // 从左栏换页：焦点先在左栏的链接上，新页面渲染完成后落到内容区。
+  const link = [...document.querySelectorAll<HTMLAnchorElement>('nav[aria-label="主导航"] a')].find((a) => a.textContent === '用户与权限')!;
+  await act(async () => { link.focus(); link.click(); }); await page.settle();
+  expect([page.path(), document.activeElement === main()]).toEqual(['/admin/users', true]);
+  // 只改地址参数（页签、筛选、选中）：焦点留在原处，键盘切页签不会被打断。
+  await act(async () => { link.focus(); });
+  await page.navigate('/admin/users?q=member');
+  expect(document.activeElement === link).toBe(true);
+  expect(declarations(split(SHELL).wide, '.main:focus')).toMatch(/outline:\s*none/);
 });

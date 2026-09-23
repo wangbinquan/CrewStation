@@ -27,6 +27,20 @@ const scrollBoth = (page: Page) => page.eval<Scrolled>(`(() => {
     barTop: Math.round(bar.getBoundingClientRect().top), navBefore, navAfter: nav ? Math.round(nav.getBoundingClientRect().top) : null };
 })()`);
 
+const TALL = `(() => { const main = document.querySelector('main'); const spacer = document.createElement('div'); spacer.style.height = '3000px'; main.firstElementChild.append(spacer); main.scrollTop = 0; })()`;
+const mainFocused = (page: Page) => page.eval<boolean>(`document.activeElement === document.querySelector('main')`);
+const mainScrolled = (page: Page) => page.waitUntil(`document.querySelector('main').scrollTop > 100`, 5_000, 100);
+/** 真实按键：带字符的键（回车）要发 keyDown＋text，链接才会被激活；翻页键发 rawKeyDown。 */
+async function press(page: Page, key: string, code: number, text?: string) {
+  await page.cmd('Input.dispatchKeyEvent', { type: text ? 'keyDown' : 'rawKeyDown', key, code: key, windowsVirtualKeyCode: code, ...(text ? { text } : {}) });
+  await page.cmd('Input.dispatchKeyEvent', { type: 'keyUp', key, code: key, windowsVirtualKeyCode: code });
+}
+/** 左栏里某个链接的中心点：用真实鼠标事件点它，链接会像用户点击时一样拿到焦点。 */
+const navLink = (page: Page, text: string) => page.eval<{ x: number; y: number }>(`(() => {
+  const link = [...document.querySelectorAll('nav[aria-label="主导航"] a')].find((a) => a.textContent.trim() === ${JSON.stringify(text)}), rect = link.getBoundingClientRect();
+  return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+})()`);
+
 /** 管理空间（有左栏）、项目开发列表（没有左栏）与项目页（租户左栏，环境里有项目时）。 */
 function pages(): string[] {
   return ['/admin', '/projects', ...(session?.project ? [`/projects/${session.project.id}/release`] : [])];
@@ -59,6 +73,26 @@ describe.skipIf(!session)('外壳滚动：宽屏只有内容区滚动，窄屏�
     await page.eval(`[...document.querySelectorAll('nav[aria-label="主导航"] a')].find((a) => a.textContent.trim() === '网关').click()`);
     await page.waitUntil(`location.pathname === '/admin/gateway'`); await settle(page);
     expect(await page.eval<number>(`Math.round(document.querySelector('main').scrollTop)`)).toBe(0);
+    expect(page.takeErrors()).toEqual([]);
+  }, 60_000);
+
+  test('打开页面与从左栏换页之后焦点在内容区：PageDown 直接滚内容区，键盘换页也不给内容区画焦点框', async () => {
+    // 2026-09-23 作者裁定：改前焦点停在 body 或左栏上，PageDown／空格交给已经不能滚的根，要先在内容区里点一下（实测 0px，点过之后 808px）。
+    const page = session!.admin;
+    await viewport(page, 1440, 900); await open(page, '/admin'); await page.eval(TALL);
+    expect(await mainFocused(page)).toBe(true);
+    await press(page, 'PageDown', 34); await mainScrolled(page);
+    const at = await navLink(page, '网关');
+    for (const type of ['mousePressed', 'mouseReleased']) await page.cmd('Input.dispatchMouseEvent', { type, x: at.x, y: at.y, button: 'left', clickCount: 1 });
+    await page.waitUntil(`location.pathname === '/admin/gateway'`); await settle(page); await page.eval(TALL);
+    expect(await mainFocused(page)).toBe(true);
+    await press(page, 'PageDown', 34); await mainScrolled(page);
+    // 键盘换页：焦点在左栏链接上按回车。最后一次操作是键盘，内容区按 :focus-visible 算，但不画焦点框。
+    await page.eval(`[...document.querySelectorAll('nav[aria-label="主导航"] a')].find((a) => a.textContent.trim() === '用户与权限').focus()`);
+    await press(page, 'Enter', 13, '\r');
+    await page.waitUntil(`location.pathname === '/admin/users'`); await settle(page);
+    expect(await mainFocused(page)).toBe(true);
+    expect(await page.eval<string>(`getComputedStyle(document.querySelector('main')).outlineStyle`)).toBe('none');
     expect(page.takeErrors()).toEqual([]);
   }, 60_000);
 
