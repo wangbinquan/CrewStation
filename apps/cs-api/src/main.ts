@@ -24,7 +24,7 @@ if (process.argv[2] === 'migrate') {
 
 const app = createApp({ name, readiness: () => databaseReady(db) });
 for (const router of platform.api.routers.api) app.route('/', router);
-const background: Array<{ start(): void; stop(): Promise<void> }> = [];
+const background = platform.api.background.api;
 for (const item of background) item.start();
 const server = serve(app, { port: portFrom(process.env, name, 8080) });
 logger.info('listening', { port: server.port, role: 'api', routers: (platform.api.routers.api).length, background: background.length });

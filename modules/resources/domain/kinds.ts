@@ -1,0 +1,42 @@
+import type { ResourceKind } from '@crewstation/contracts';
+
+/**
+ * 种类注册表（RFC-025 设计 §2.2）：纯数据。各期实施时逐个种类补齐；尚未接入的种类用通用规则，
+ * 它们在台账里还没有记录，规则只是让注册表完整。
+ */
+export interface KindRule {
+  /** 占几个并发额度单位（D31、RFC-006：开发会话、业务任务、每个 Agent 执行各一个）。 */
+  readonly quotaUnits: number;
+  /** 就绪看哪一种子对象；没有就只看条件。 */
+  readonly primaryChild?: 'Pod' | 'PersistentVolumeClaim';
+  /** 就绪还要这些领域条件为真（所属模块上报）。 */
+  readonly readyConditions: readonly string[];
+  /** 失败后保留多久供诊断（D9：开发会话 72 小时）；没有就不保留。 */
+  readonly failedRetentionMs?: number;
+  /** 界面能不能对它发起「释放」。 */
+  readonly releasable: boolean;
+}
+
+const HOUR = 3_600_000;
+const WORKLOAD: KindRule = { quotaUnits: 1, primaryChild: 'Pod', readyConditions: ['RunnerConnected'], releasable: true };
+const GENERIC: KindRule = { quotaUnits: 0, readyConditions: ['Applied'], releasable: false };
+
+export const KIND_RULES: Readonly<Record<ResourceKind, KindRule>> = {
+  'dev-workspace': { ...WORKLOAD, failedRetentionMs: 72 * HOUR },
+  'agent-execution': WORKLOAD,
+  'business-workspace': WORKLOAD,
+  volume: { quotaUnits: 0, primaryChild: 'PersistentVolumeClaim', readyConditions: [], releasable: false },
+  namespace: GENERIC,
+  'network-policy-set': GENERIC,
+  'service-slot': GENERIC,
+  'build-job': GENERIC,
+  'migration-job': GENERIC,
+  route: GENERIC,
+  'rate-limit-policy': GENERIC,
+  database: GENERIC,
+  'data-binding': GENERIC,
+};
+
+export function kindRule(kind: ResourceKind): KindRule {
+  return KIND_RULES[kind];
+}

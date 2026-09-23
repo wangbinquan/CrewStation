@@ -56,7 +56,7 @@ export function createTransport(options: TransportOptions = {}): Transport {
         throw networkError(cause);
       }
       const payload = await readPayload(response);
-      if (!response.ok) throw errorFromResponse(response.status, payload);
+      if (!response.ok) throw errorFromResponse(response.status, payload, response.headers);
       return payload as T;
     },
   };

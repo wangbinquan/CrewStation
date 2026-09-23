@@ -209,6 +209,22 @@
         "@crewstation/testkit": "workspace:*",
       },
     },
+    "modules/cluster-control": {
+      "name": "@crewstation/module-cluster-control",
+      "version": "0.0.0",
+      "dependencies": {
+        "@crewstation/contracts": "workspace:*",
+        "@crewstation/http": "workspace:*",
+        "@crewstation/k8s": "workspace:*",
+        "@crewstation/kernel": "workspace:*",
+        "@crewstation/module-resources": "workspace:*",
+        "@crewstation/resource-runtime": "workspace:*",
+        "hono": "4.13.7",
+      },
+      "devDependencies": {
+        "@crewstation/testkit": "workspace:*",
+      },
+    },
     "modules/cluster-management": {
       "name": "@crewstation/module-cluster-management",
       "version": "0.0.0",
@@ -380,6 +396,7 @@
         "@crewstation/module-api-catalog": "workspace:*",
         "@crewstation/module-business-task": "workspace:*",
         "@crewstation/module-capabilities": "workspace:*",
+        "@crewstation/module-cluster-control": "workspace:*",
         "@crewstation/module-cluster-management": "workspace:*",
         "@crewstation/module-config": "workspace:*",
         "@crewstation/module-data": "workspace:*",
@@ -391,6 +408,7 @@
         "@crewstation/module-project": "workspace:*",
         "@crewstation/module-provisioning": "workspace:*",
         "@crewstation/module-release": "workspace:*",
+        "@crewstation/module-resources": "workspace:*",
         "@crewstation/module-scm": "workspace:*",
         "@crewstation/module-session": "workspace:*",
         "@crewstation/module-task-runtime": "workspace:*",
@@ -456,6 +474,22 @@
         "@crewstation/module-scm": "workspace:*",
         "@crewstation/persistence": "workspace:*",
         "@crewstation/queue": "workspace:*",
+        "drizzle-orm": "0.45.2",
+        "hono": "4.13.7",
+        "zod": "4.6.2",
+      },
+      "devDependencies": {
+        "@crewstation/testkit": "workspace:*",
+      },
+    },
+    "modules/resources": {
+      "name": "@crewstation/module-resources",
+      "version": "0.0.0",
+      "dependencies": {
+        "@crewstation/contracts": "workspace:*",
+        "@crewstation/http": "workspace:*",
+        "@crewstation/kernel": "workspace:*",
+        "@crewstation/persistence": "workspace:*",
         "drizzle-orm": "0.45.2",
         "hono": "4.13.7",
         "zod": "4.6.2",
@@ -637,6 +671,14 @@
         "@crewstation/testkit": "workspace:*",
       },
     },
+    "packages/resource-runtime": {
+      "name": "@crewstation/resource-runtime",
+      "version": "0.0.0",
+      "dependencies": {
+        "@crewstation/k8s": "workspace:*",
+        "@crewstation/kernel": "workspace:*",
+      },
+    },
     "packages/secretbox": {
       "name": "@crewstation/secretbox",
       "version": "0.0.0",
@@ -810,6 +852,8 @@
 
     "@crewstation/module-capabilities": ["@crewstation/module-capabilities@workspace:modules/capabilities"],
 
+    "@crewstation/module-cluster-control": ["@crewstation/module-cluster-control@workspace:modules/cluster-control"],
+
     "@crewstation/module-cluster-management": ["@crewstation/module-cluster-management@workspace:modules/cluster-management"],
 
     "@crewstation/module-config": ["@crewstation/module-config@workspace:modules/config"],
@@ -834,6 +878,8 @@
 
     "@crewstation/module-release": ["@crewstation/module-release@workspace:modules/release"],
 
+    "@crewstation/module-resources": ["@crewstation/module-resources@workspace:modules/resources"],
+
     "@crewstation/module-scm": ["@crewstation/module-scm@workspace:modules/scm"],
 
     "@crewstation/module-session": ["@crewstation/module-session@workspace:modules/session"],
@@ -843,6 +889,8 @@
     "@crewstation/persistence": ["@crewstation/persistence@workspace:packages/persistence"],
 
     "@crewstation/queue": ["@crewstation/queue@workspace:packages/queue"],
+
+    "@crewstation/resource-runtime": ["@crewstation/resource-runtime@workspace:packages/resource-runtime"],
 
     "@crewstation/secretbox": ["@crewstation/secretbox@workspace:packages/secretbox"],
 

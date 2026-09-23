@@ -91,6 +91,13 @@
 
 额度（B3）：受理时 `SELECT … FOR UPDATE` 锁 `resources.project_locks(project_id)` 一行，在同一事务里数该项目「占额度的种类」里阶段属于 `pending／provisioning／starting／ready／degraded／stopping` 的单位数，达到上限（经 `QuotaLimits` 端口从 `project` 取）就拒绝。释放不需要做减法：阶段一离开占额度的集合，额度自然回来。
 
+> **实施补记（2026-09-23，第一期）**：表按上面落地（`modules/resources/adapters/persistence/migrations/0002_ledger.sql`），细节如下。
+>
+> - `children` 的主键含命名空间 `(resource_id, kind, namespace, name)`，另有唯一索引 `(kind, namespace, name)`：一个集群对象只属于一条记录，被别的记录认领时声明直接以 `conflict` 拒绝。期望里的子对象在记录「要」的时候一直在表里（没观测到的记 `absent`）；记录「不要了」且子对象都已回收时这些行删掉，名字随即可再用。
+> - `changes` 的序号在**提交时**才盖：插入时 `seq` 为空，延迟约束触发器在提交前一刻取全局咨询锁再 `nextval`，锁到提交结束才放。于是序号顺序就是提交顺序，尾随器按 `seq` 读不会跳过「先取号、后提交」的早序号（先插入后提交的事务拿到更大的号，模块用例 `ledgerWrites.test.ts` 实测）；代价是提交阶段全局串行一小段。列名写作 `change`（与资源种类的 `kind` 区分）。
+> - `records` 另有 `desired`（要／不要了）与 `release_reason`（期望的一部分，只由所属模块写）；`status` 里是条件、启动进度、原因与展示字段。
+> - 所属模块可以在自己的事务里写期望（`owner(module).within(tx)`），与它自己的状态一同提交或回滚；领域模块不能写只归资源中心的条件（`Observed`、`Applied`、`ReconcileError`、`SpecDrift`、`CrashLooping`、`Superseded`、`PendingReclaim`、`ContainersReady`），写了按 `validation` 拒绝。
+
 ## 4. 契约
 
 ### 4.1 标准记录（`packages/contracts/api/resources/`）
@@ -119,6 +126,8 @@ ResourceActionSchema = z.object({ id: ResourceActionIdSchema, enabled: z.boolean
 - `GET /v1/projects/:projectId/resources?kind=&parent=` → `{ items, counts, cursor }`：`counts` 按种类×阶段算好；`cursor` 是快照时刻的 `changes.seq`。
 - `GET /v1/projects/:projectId/resources/stream`（SSE，§8）；管理员 `GET /v1/admin/resources` 与 `/stream` 是全平台版本（集群管理、系统层拓扑）。
 - 可做操作经 `POST /v1/resources/:id/actions/:action` 统一受理，转给所属模块的用例执行（例如「释放会话」仍由 dev-session 核对未推送提交、负责人强制等领域规则），结果回到同一条记录。
+
+> **实施补记（2026-09-23，第一期）**：续传游标也可放在查询参数 `cursor`（与 `Last-Event-ID` 等价，头优先），给带不了自定义头的客户端；可做操作受理成功返回 202，前置条件不满足 412（`details.code` 为 `action-disabled`／`action-unsupported`），版本对不上 409；没有权限的人看到的不可用原因是权限，而不是阶段条件。另有管理员只读的收编空跑报告 `GET /v1/admin/resources/adoption-report`（§6.5）。
 
 ### 4.3 旧词汇的映射
 
@@ -185,6 +194,8 @@ ResourceActionSchema = z.object({ id: ResourceActionIdSchema, enabled: z.boolean
 2. 可改的标签改成新标签（Pod、Deployment、Service、IngressRoute、PVC 的标签都可改）；名字不可改的保留别名。
 3. 认领不到的受管对象按 §6.4 的孤儿规则处理——今天实查到的遗留对象（audit §1）在这一步收掉；PVC 只进「待回收」。
 
+> **实施补记（2026-09-23，第一期空跑）**：空跑报告在 cs-api 按需计算，只读：一次性列出受管 Pod 与 PVC；按资源标签或期望子对象认领的是「已认领」；按 `crewstation.io/task` 查任务环境，仍在的是「可收编」（给出候选种类），失败的开发会话是「保留中」，已释放、已失败或查不到的是「孤儿」（PVC 只进待回收）；服务槽、构建与迁移的 Pod 是「可收编」（第三期由对应记录认领）；其余「未归类」。cs-controller 里的观测工作器照常把 Pod、PVC 的变化写回台账（第一期台账为空，绝大多数是 unowned），首次全量完成与此后每 10 分钟记一行汇总。
+
 ### 6.6 `data-control`
 
 `database`：按期望在数据面建库与角色、轮换凭据、释放时删除（生产库的释放只随项目归档，沿用 data 模块现有规则）；`data-binding`：按期望授权与回收（到期回收由 7d12f70 接到了 cs-controller，迁入后由调和器按 `retain_until` 执行）。数据面的执行代码从 `data` 模块的供给适配器迁入；三种访问模式、审批与负责人规则仍在 `data`。
@@ -241,6 +252,12 @@ ResourceActionSchema = z.object({ id: ResourceActionIdSchema, enabled: z.boolean
 - 每个 cs-api 副本一个尾随器：按 `seq` 递增读 `changes`（有新行时连续读，没有时 250 毫秒一轮），按项目分发给本副本上的订阅者；每个订阅者有有界缓冲，溢出发 `reset` 并断开。
 - 连上时按项目核对 `develop`／`view` 授权；项目成员变化的领域事件到达时，重新核对该项目上的连接，失权的断开（不变量：角色变化复核既有连接）。每个用户同时打开的流有上限（写在平台设置里）。
 - 经 Traefik：流路由关闭响应缓冲，不挂 `inFlightReq`（§7.3）。
+
+> **实施补记（2026-09-23，第一期）**：
+>
+> - 推送流的请求关掉 Bun 默认 10 秒的空闲断开（`server.timeout(req, 0)`），靠 15 秒心跳维持；经 Traefik 的缓冲与空闲超时在 T2 实测后补记于此。
+> - 失权断开的机制与上文不同：平台里没有成员或角色变化的领域事件，第一期沿用 cs-session 会话流的先例（`modules/session/application/authorizedSink.ts`）——发出带资源内容的事件前复核授权（至多每 5 秒一次），不通过只发一个 `reset`（`forbidden`）后断开，事件不会发给失权的人；空闲的流每 60 秒复核一次。待作者裁定（`docs/engineering/implementation-open-questions.md` I24）。
+> - 每个连接的缓冲 256 条，溢出只发 `reset` 后断开；同一批里同一资源只推最后一次（中间态可能合并，顺序不倒退）。每人同时打开的流上限第一期是模块默认值 8，平台设置项随 T10（限流设置）一并加入。
 
 ### 8.3 保留与压缩
 

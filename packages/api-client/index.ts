@@ -1,8 +1,8 @@
 // 手写的类型化平台 API 客户端；console、cli、mcp-* 共用。唯一公开入口，其余文件不直接 import。
 export { createApiClient } from './createApiClient';
 export type { ApiClient, ApiClientOptions, TaskStreamResource } from './createApiClient';
-export { ApiClientError, isApiClientError, kindForStatus, parseErrorEnvelope } from './apiClientError';
-export type { ApiErrorKind } from './apiClientError';
+export { ApiClientError, isApiClientError, kindForStatus, parseErrorEnvelope, retryAfterSeconds } from './apiClientError';
+export type { ApiErrorEnvelope, ApiErrorKind } from './apiClientError';
 export type { FetchInput, FetchLike, HttpMethod, RequestOptions, Transport, TransportOptions } from './httpTransport';
 export type { ItemsPage } from './itemsPage';
 export type {
@@ -30,4 +30,5 @@ export type { TraceListInput, TracesResource } from './resources/traces';
 export type { CapabilitiesResource } from './resources/capabilities';
 export type { ComputeProfilesResource } from './resources/computeProfiles';
 export type { ClusterResourceClient } from './resources/cluster';
+export type { ResourcesResource } from './resources/resources';
 export { newDraftResourceId } from './resourceId';

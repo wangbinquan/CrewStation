@@ -1,6 +1,8 @@
 import { BUILTIN_RESOURCES } from '@crewstation/contracts';
 import { resourceIdentityDirectory, type ResourceIdentityDirectory } from '@crewstation/persistence';
 import { createClusterManagementModule } from '@crewstation/module-cluster-management';
+import { createClusterControlModule } from '@crewstation/module-cluster-control';
+import { createResourcesModule } from '@crewstation/module-resources';
 import { installedSystemComponents } from './domain/systemComponents';
 import type { ClusterResource, ClusterInspectRequest, ClusterOperation, ClusterInspection, TaskId, ProfileTestId, RebuildDevSessionRequest } from '@crewstation/contracts';
 import type { Actor, ComputeProfileSelector, ComputeUsage, ProjectId, ServiceId, UserDto, UserId } from '@crewstation/contracts';
@@ -50,7 +52,7 @@ export interface PlatformModuleApi {
   readonly initializePlatformRoles: () => Promise<{ initialized: number }>;
   readonly bootstrapAdmin: (raw: unknown) => Promise<UserDto>;
   readonly routers: { controller: Hono<AppEnv>[]; api: Hono<AppEnv>[]; auth: Hono<AppEnv>[]; session: Hono<AppEnv>[]; events: Hono<AppEnv>[] };
-  readonly background: { controller: Lifecycle[]; session: Lifecycle[]; events: Lifecycle[] };
+  readonly background: { controller: Lifecycle[]; api: Lifecycle[]; session: Lifecycle[]; events: Lifecycle[] };
   readonly websocket: unknown;
   readonly migrations: MigrationSet[];
 }
@@ -383,14 +385,40 @@ function composeAggregates(deps: PlatformModuleDeps, core: ReturnType<typeof com
   return { observability, capabilities, provisioning };
 }
 
+/**
+ * RFC-025 资源中心：台账（L1）只依赖 project 的额度与授权，装在领域模块之前，之后各期的所属模块在构造时就能拿到写入口；
+ * 调和器（L2）要按旧标签查任务环境做收编空跑，装在 runtime 之后。
+ */
+function composeLedger(deps: CompositionDeps, core: ReturnType<typeof composeCore>) {
+  const project = core.project.api;
+  return createResourcesModule({
+    db: deps.db, logger: deps.logger, isAdmin: core.identity.api.isAdmin,
+    quotas: { limitFor: project.quotaLimit },
+    authorizer: { projectAccess: async (actor, projectId) => ({ operate: (await project.authorize(actor, projectId, 'view')) !== 'tester' }) },
+  });
+}
+
+function composeControl(deps: CompositionDeps, core: ReturnType<typeof composeCore>, ledger: ReturnType<typeof composeLedger>, runtime: ReturnType<typeof composeRuntime>) {
+  return createClusterControlModule({
+    k8s: deps.k8s, logger: deps.logger, isAdmin: core.identity.api.isAdmin,
+    ledger: { observe: (input) => ledger.api.observe(input), claimOf: (child) => ledger.api.claimOf(child) },
+    legacy: { task: async (taskId) => {
+      const env = await runtime.taskRuntime.api.getEnvironment(taskId as TaskId);
+      return env ? { kind: env.kind, state: env.state, execution: Boolean(env.native) } : undefined;
+    } },
+  });
+}
+
 function composeModules(deps: CompositionDeps) {
   const late: Late = {};
   const core = composeCore(deps, late);
+  const resources = composeLedger(deps, core);
   const delivery = composeDelivery(deps, core, late);
   const runtime = composeRuntime(deps, core, delivery, late);
   const aggregates = composeAggregates(deps, core, delivery, runtime);
   const cluster = composeCluster(deps, core, delivery, runtime);
-  return { cluster, identity: core.identity, project: core.project, config: core.config, data: core.data, scm: core.scm, apiCatalog: core.apiCatalog, agentRuntime: core.agentRuntime, ...delivery, ...runtime, ...aggregates };
+  const clusterControl = composeControl(deps, core, resources, runtime);
+  return { cluster, resources, clusterControl, identity: core.identity, project: core.project, config: core.config, data: core.data, scm: core.scm, apiCatalog: core.apiCatalog, agentRuntime: core.agentRuntime, ...delivery, ...runtime, ...aggregates };
 }
 
 export function createPlatformModule(deps: PlatformModuleDeps): PlatformModule {
@@ -404,18 +432,20 @@ export function createPlatformModule(deps: PlatformModuleDeps): PlatformModule {
     routers: {
       controller: m.cluster.internalHttp,
       // devSessionGate 只挂中间件不占路径，必须排在最前：Hono 按注册顺序执行，晚于业务路由就来不及改判身份。
-      api: [...m.identity.http.devSessionGate, ...m.project.http, ...m.identity.http.users, ...m.config.http, ...m.agentRuntime.http, ...m.data.http, ...m.scm.http, ...m.apiCatalog.http, ...m.release.http, ...m.gateway.http, ...m.taskRuntime.http, ...m.devSession.http, m.businessTask.http.service, m.businessTask.http.user, ...m.events.http.query, ...m.observability.http, ...m.cluster.http, ...m.capabilities.http, ...m.provisioning.http],
+      api: [...m.identity.http.devSessionGate, ...m.project.http, ...m.identity.http.users, ...m.config.http, ...m.agentRuntime.http, ...m.data.http, ...m.scm.http, ...m.apiCatalog.http, ...m.release.http, ...m.gateway.http, ...m.taskRuntime.http, ...m.devSession.http, m.businessTask.http.service, m.businessTask.http.user, ...m.events.http.query, ...m.observability.http, ...m.cluster.http, ...m.capabilities.http, ...m.provisioning.http, ...m.clusterControl.http, ...m.resources.http],
       auth: [...m.identity.http.auth, ...m.identity.http.forwardAuth, ...m.agentRuntime.forwardAuth],
       session: [m.session.http.runner, m.session.http.stream, m.session.http.internal],
       events: [...m.events.http.ingress],
     },
     background: {
-      controller: [...m.cluster.workers, ...m.data.workers, ...m.release.workers, ...m.gateway.workers, consumerLifecycle(m.gateway.subscriptions), ...m.taskRuntime.workers, ...m.agentRuntime.workers, ...m.devSession.workers, ...m.businessTask.workers, consumerLifecycle(m.businessTask.subscriptions), ...m.apiCatalog.subscriptions.map(consumerLifecycle), ...m.data.subscriptions.map(consumerLifecycle), ...m.observability.workers, ...m.provisioning.workers, ...m.provisioning.startupTasks, consumerLifecycle(m.provisioning.subscriptions)],
+      controller: [...m.cluster.workers, ...m.data.workers, ...m.release.workers, ...m.gateway.workers, consumerLifecycle(m.gateway.subscriptions), ...m.taskRuntime.workers, ...m.agentRuntime.workers, ...m.devSession.workers, ...m.businessTask.workers, consumerLifecycle(m.businessTask.subscriptions), ...m.apiCatalog.subscriptions.map(consumerLifecycle), ...m.data.subscriptions.map(consumerLifecycle), ...m.observability.workers, ...m.provisioning.workers, ...m.provisioning.startupTasks, consumerLifecycle(m.provisioning.subscriptions), m.resources.maintenanceWorker, m.clusterControl.observer],
+      // 资源推送流的尾随器（RFC-025 设计 §8.2）：每个 cs-api 副本一个。
+      api: [m.resources.streamWorker],
       session: [...m.session.workers],
       events: [...m.events.workers, ...m.events.subscriptions.map(consumerLifecycle)],
     },
     websocket: m.session.websocket,
-    migrations: [queueMigrations, eventbusMigrations, m.identity.migrations, m.project.migrations, m.config.migrations, m.agentRuntime.migrations, m.data.migrations, m.scm.migrations, m.apiCatalog.migrations, m.events.migrations, m.release.migrations, m.taskRuntime.migrations, m.devSession.migrations, m.businessTask.migrations, m.session.migrations, m.gateway.migrations, m.observability.migrations, m.cluster.migrations],
+    migrations: [queueMigrations, eventbusMigrations, m.resources.migrations, m.identity.migrations, m.project.migrations, m.config.migrations, m.agentRuntime.migrations, m.data.migrations, m.scm.migrations, m.apiCatalog.migrations, m.events.migrations, m.release.migrations, m.taskRuntime.migrations, m.devSession.migrations, m.businessTask.migrations, m.session.migrations, m.gateway.migrations, m.observability.migrations, m.cluster.migrations],
   };
   migrations = api.migrations;
   return { api, modules: m };

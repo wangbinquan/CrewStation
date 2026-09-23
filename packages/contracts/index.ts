@@ -63,3 +63,8 @@ export * from './api/cluster/metrics';
 export * from './api/cluster/history';
 
 export * from './api/workbench/projectResources';
+
+export * from './api/resources/resourceRecord';
+export * from './api/resources/resourceView';
+export * from './api/resources/adoption';
+export * from './api/resources/legacyPhases';

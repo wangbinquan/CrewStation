@@ -1,0 +1,25 @@
+{
+  "name": "@crewstation/module-cluster-control",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "RFC-025 调和器：受管 Kubernetes 对象的观测映射、调和、孤儿回收与旧对象收编（第一期只观测与空跑报告）",
+  "exports": {
+    ".": "./index.ts"
+  },
+  "crewstation": {
+    "layer": 2
+  },
+  "dependencies": {
+    "@crewstation/contracts": "workspace:*",
+    "@crewstation/http": "workspace:*",
+    "@crewstation/k8s": "workspace:*",
+    "@crewstation/kernel": "workspace:*",
+    "@crewstation/module-resources": "workspace:*",
+    "@crewstation/resource-runtime": "workspace:*",
+    "hono": "4.13.7"
+  },
+  "devDependencies": {
+    "@crewstation/testkit": "workspace:*"
+  }
+}

@@ -20,6 +20,8 @@
     "@crewstation/module-api-catalog": "workspace:*",
     "@crewstation/module-business-task": "workspace:*",
     "@crewstation/module-capabilities": "workspace:*",
+    "@crewstation/module-cluster-control": "workspace:*",
+    "@crewstation/module-cluster-management": "workspace:*",
     "@crewstation/module-config": "workspace:*",
     "@crewstation/module-data": "workspace:*",
     "@crewstation/module-dev-session": "workspace:*",
@@ -30,6 +32,7 @@
     "@crewstation/module-project": "workspace:*",
     "@crewstation/module-provisioning": "workspace:*",
     "@crewstation/module-release": "workspace:*",
+    "@crewstation/module-resources": "workspace:*",
     "@crewstation/module-scm": "workspace:*",
     "@crewstation/module-session": "workspace:*",
     "@crewstation/module-task-runtime": "workspace:*",
@@ -37,8 +40,7 @@
     "@crewstation/queue": "workspace:*",
     "@crewstation/session-client": "workspace:*",
     "@crewstation/settings": "workspace:*",
-    "hono": "4.13.7",
-    "@crewstation/module-cluster-management": "workspace:*"
+    "hono": "4.13.7"
   },
   "devDependencies": {
     "@crewstation/testkit": "workspace:*",

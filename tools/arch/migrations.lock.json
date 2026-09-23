@@ -87,6 +87,8 @@
     "modules/release/adapters/persistence/migrations/0005_resource_identity.sql": "afc235ed25609a79b5553a8087d888a3d55711bdaec23fb828d3269554e206f7",
     "modules/release/adapters/persistence/migrations/0006_resource_identity.identity.json": "f32f512451897f34570756b14d13db91f4ffe6802ce386ae6eb876620f04876c",
     "modules/release/adapters/persistence/migrations/0007_slot_lifecycle.sql": "1c33e5e8d8c86d30a25dcef9eaccb935c0bc09e8c136c18f97fb06d0f4c48573",
+    "modules/resources/adapters/persistence/migrations/0001_create_schema.sql": "a075d08686eaee7334e8c6d2829beb180af1489e81ee967f68fdd0263fedbc68",
+    "modules/resources/adapters/persistence/migrations/0002_ledger.sql": "ddc7b01edfbd6bb14249a369b0f6d23f11af2bacde5473b514ec53544f8918af",
     "modules/scm/adapters/persistence/migrations/0001_create_schema.sql": "0a0e92858337281680702a44eaf024a468dbbcd2791c91b1fa100ea999289db0",
     "modules/scm/adapters/persistence/migrations/0002_repository_bindings_and_credentials.sql": "d6c3215d20651a749609fda72c9a19f315932ec82ecfcef52f451643f4ecac74",
     "modules/scm/adapters/persistence/migrations/0003_resource_identity.identity.json": "fd6312055a1c4eeb5284f8faa5d20948b49582453f45d5856dd42b951506ed45",

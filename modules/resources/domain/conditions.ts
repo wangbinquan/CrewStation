@@ -1,0 +1,50 @@
+import type { ResourceCondition, ResourceConditionStatus, ResourceCounts, ResourceKind } from '@crewstation/contracts';
+import { jsonHash } from '@crewstation/kernel';
+
+/** 所属模块或调和器报来的一条条件；`since` 由台账按「状态变了才换」自己记。 */
+export interface ConditionUpdate {
+  readonly type: string;
+  readonly status: ResourceConditionStatus;
+  readonly reason?: string;
+  readonly message?: string;
+}
+
+/**
+ * 合并条件：同类型的状态变了才换起始时间，只改说明不换；新类型追加。返回原数组表示没有变化，
+ * 调用方据此跳过写库（重复上报不产生变更日志）。
+ */
+export function mergeConditions(existing: readonly ResourceCondition[], updates: readonly ConditionUpdate[], now: Date): readonly ResourceCondition[] {
+  let changed = false;
+  const next = [...existing];
+  for (const update of updates) {
+    const at = next.findIndex((entry) => entry.type === update.type);
+    const previous = at >= 0 ? next[at] : undefined;
+    const since = previous && previous.status === update.status ? previous.since : now.toISOString();
+    const merged: ResourceCondition = { type: update.type, status: update.status, ...(update.reason ? { reason: update.reason } : {}), ...(update.message ? { message: update.message } : {}), since };
+    if (previous && jsonHash(previous) === jsonHash(merged)) continue;
+    changed = true;
+    if (at >= 0) next[at] = merged;
+    else next.push(merged);
+  }
+  return changed ? next : existing;
+}
+
+/** 视图的计数：种类 × 阶段。 */
+export function countByKindPhase(records: readonly { readonly kind: ResourceKind; readonly phase: string }[]): ResourceCounts {
+  const counts: Record<string, Record<string, number>> = {};
+  for (const record of records) {
+    const byPhase = (counts[record.kind] ??= {});
+    byPhase[record.phase] = (byPhase[record.phase] ?? 0) + 1;
+  }
+  return counts;
+}
+
+/**
+ * 只由资源中心（调和器与观测）写的条件；所属模块上报这些类型会被拒绝（设计 §2.1：实况只由资源中心写）。
+ * 所属模块写的是领域条件：RunnerConnected、InterfaceReady、Failed、Paused、Rebuilding、Prepared……
+ */
+export const CENTER_CONDITIONS: ReadonlySet<string> = new Set(['Observed', 'Applied', 'ReconcileError', 'SpecDrift', 'CrashLooping', 'Superseded', 'PendingReclaim', 'ContainersReady']);
+
+export function ownerConditionViolation(updates: readonly ConditionUpdate[]): string | undefined {
+  return updates.find((update) => CENTER_CONDITIONS.has(update.type))?.type;
+}

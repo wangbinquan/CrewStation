@@ -1,0 +1,25 @@
+{
+  "name": "@crewstation/module-resources",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "RFC-025 资源中心台账：平台资源的期望与实况、种类注册表与阶段规则、受理与额度推导、保留期、可做操作、标准视图与推送流",
+  "exports": {
+    ".": "./index.ts"
+  },
+  "crewstation": {
+    "layer": 1
+  },
+  "dependencies": {
+    "@crewstation/contracts": "workspace:*",
+    "@crewstation/http": "workspace:*",
+    "@crewstation/kernel": "workspace:*",
+    "@crewstation/persistence": "workspace:*",
+    "drizzle-orm": "0.45.2",
+    "hono": "4.13.7",
+    "zod": "4.6.2"
+  },
+  "devDependencies": {
+    "@crewstation/testkit": "workspace:*"
+  }
+}

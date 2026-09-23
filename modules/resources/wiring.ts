@@ -1,0 +1,106 @@
+import { join } from 'node:path';
+import type { Actor, ProjectId, UserId } from '@crewstation/contracts';
+import { AdminResourceViewQuerySchema, ResourceViewQuerySchema } from '@crewstation/contracts';
+import type { Clock, Logger } from '@crewstation/kernel';
+import { forbidden, noopLogger, systemClock } from '@crewstation/kernel';
+import type { Database, Executor, MigrationSet } from '@crewstation/persistence';
+import { readMigrationDir } from '@crewstation/persistence';
+import type { Hono } from 'hono';
+import type { AppEnv } from '@crewstation/http';
+import type { OwnerLedger, ResourcesModuleApi } from './api/moduleApi';
+import type { ResourceActionHandler, ViewerAccess } from './api/types';
+import { performAction } from './application/actions';
+import { maintainLedger } from './application/maintenance';
+import { observationWriter } from './application/observe';
+import { ownerWriter } from './application/ownerWrites';
+import type { StreamOptions } from './application/streamHub';
+import { createStreamHub, DEFAULT_STREAM_OPTIONS } from './application/streamHub';
+import { readView } from './application/views';
+import { drizzleLedgerUnitOfWork } from './adapters/persistence/drizzleLedger';
+import type { QuotaLimits, ResourceAuthorizer } from './ports/platform';
+import { resourceRoutes } from './http/resourceRoutes';
+
+export const resourcesMigrations: MigrationSet = { module: 'resources', layer: 1, files: readMigrationDir(join(import.meta.dir, 'adapters', 'persistence', 'migrations')) };
+
+/** 装配期注入：额度上限与授权由组合根从 project／identity 模块回答。 */
+export interface ResourcesModuleDeps {
+  readonly db: Database;
+  readonly quotas: QuotaLimits;
+  readonly authorizer: ResourceAuthorizer;
+  isAdmin(id: UserId): Promise<boolean>;
+  readonly clock?: Clock;
+  readonly logger?: Logger;
+  readonly stream?: Partial<StreamOptions>;
+  /** 维护（保留期、压缩、清理）的周期；只在 cs-controller 里跑。 */
+  readonly maintenanceMs?: number;
+}
+
+export interface ResourcesModule {
+  readonly api: ResourcesModuleApi;
+  readonly http: Hono<AppEnv>[];
+  /** cs-api：推送流的尾随器。 */
+  readonly streamWorker: { start(): void; stop(): Promise<void> };
+  /** cs-controller：保留期到期、压缩、变更日志与租约清理。 */
+  readonly maintenanceWorker: { start(): void; stop(): Promise<void> };
+  readonly migrations: MigrationSet;
+  maintainOnce(): Promise<void>;
+}
+
+export function createResourcesModule(deps: ResourcesModuleDeps): ResourcesModule {
+  const clock = deps.clock ?? systemClock, logger = deps.logger ?? noopLogger;
+  const uow = drizzleLedgerUnitOfWork(deps.db);
+  const hub = createStreamHub(uow.read, clock, logger, { ...DEFAULT_STREAM_OPTIONS, ...deps.stream });
+  const handlers = new Map<string, ResourceActionHandler>();
+  const observer = observationWriter(uow, clock);
+  const projectAccess = async (actor: Actor, projectId: ProjectId): Promise<ViewerAccess> => ({ operate: (await deps.authorizer.projectAccess(actor, projectId)).operate, admin: actor.isAdmin });
+  const adminAccess = async (actor: Actor): Promise<ViewerAccess> => {
+    if (!actor.isAdmin) throw forbidden('只有管理员可以查看全平台的资源');
+    return { operate: true, admin: true };
+  };
+  const owner = (module: string): OwnerLedger => ({
+    ...ownerWriter(module, uow.run, deps.quotas, clock),
+    within: (tx) => ownerWriter(module, (fn) => fn(uow.within(tx as Executor)), deps.quotas, clock),
+  });
+  const api: ResourcesModuleApi = {
+    name: 'resources',
+    owner,
+    observe: observer.observe,
+    leases: { acquire: uow.read.leases.acquire, renew: uow.read.leases.renew, release: uow.read.leases.release },
+    get: (id) => uow.read.records.get(id),
+    list: (filter) => uow.read.records.list(filter),
+    resolveAlias: (alias) => uow.read.records.resolveAlias(alias),
+    claimOf: (child) => uow.read.records.findByChild(child),
+    view: async (actor, projectId, query) => {
+      const access = await projectAccess(actor, projectId);
+      const parsed = ResourceViewQuerySchema.parse(query);
+      return readView(uow.read, { projectId, ...(parsed.kind ? { kind: parsed.kind } : {}), ...(parsed.parent ? { parentId: parsed.parent } : {}), includeStopped: parsed.includeStopped === 'true' }, access, clock.now());
+    },
+    adminView: async (actor, query) => {
+      const access = await adminAccess(actor);
+      const parsed = AdminResourceViewQuerySchema.parse(query);
+      return readView(uow.read, { ...(parsed.projectId ? { projectId: parsed.projectId } : {}), ...(parsed.kind ? { kind: parsed.kind } : {}), ...(parsed.parent ? { parentId: parsed.parent } : {}), includeStopped: parsed.includeStopped === 'true' }, access, clock.now());
+    },
+    projectAccess,
+    adminAccess,
+    checkStreamCapacity: hub.checkCapacity,
+    subscribe: hub.subscribe,
+    performAction: (actor, id, action, request) => performAction({
+      read: uow.read, clock, handlers,
+      access: (who, record) => (record.projectId ? projectAccess(who, record.projectId) : adminAccess(who)),
+    }, actor, id, action, request),
+    registerActionHandler: (module, handler) => { handlers.set(module, handler); },
+  };
+  let timer: ReturnType<typeof setInterval> | undefined;
+  const maintainOnce = () => maintainLedger(uow, clock, logger);
+  return {
+    api,
+    http: [resourceRoutes(api, (id) => deps.isAdmin(id as UserId))],
+    streamWorker: { start: hub.start, stop: hub.stop },
+    maintenanceWorker: {
+      start: () => { timer ??= setInterval(() => void maintainOnce(), deps.maintenanceMs ?? 60_000); },
+      stop: async () => { if (timer) clearInterval(timer); timer = undefined; },
+    },
+    migrations: resourcesMigrations,
+    maintainOnce,
+  };
+}
