@@ -9,6 +9,7 @@
 - [3. 第二期：任务类容器（T6、T7）](#3-第二期任务类容器t6t7)
 - [4. 第三期：服务槽（T8）](#4-第三期服务槽t8)
 - [5. 第三期后半：路由（T9）](#5-第三期后半路由t9)
+- [6. 第三期：限流（T10）](#6-第三期限流t10)
 
 ## 1. 第一期：基础（T2–T5）
 
@@ -170,6 +171,7 @@
 | `0c97dfb5` 服务路由的 IngressRoute 改由调和器照记录建、改、删 | check:static 通过；unit 588、module 1302、console 874；改动行 90／90 | [35921300629](https://github.com/wangbinquan/CrewStation/actions/runs/35921300629) 六项成功 | 21:24:33 cs-controller、21:24:34 cs-api、21:25:06 cs-session 换到 `cs-control-plane:rc025-t9c-20260924`；**21:26 回滚**到 `rc025-t9b-20260924`（见下） |
 | `5a5591f2` 身份索引改由 cluster-control 的观测缓存驱动，gateway 的 Pod watch 去掉 | check:static 通过；unit 588、module 1304、console 874；改动行 29／29 | 随 cb13edb7 一起跑（下一行） | 随 cb13edb7 上线 |
 | `cb13edb7` 台账比较子对象不看先后，观测里的 generation 存得下、读得回 | check:static 通过；unit 588、module 1306、console 874；改动行 10／10 | [35923652797](https://github.com/wangbinquan/CrewStation/actions/runs/35923652797) 六项成功 | 21:46:58 cs-controller、21:47:00 cs-api、21:47:32 cs-session 换到 `cs-control-plane:rc025-t9d-20260924`（含 0c97dfb5、5a5591f2） |
+| `3de12b3a` 放行表每 10 分钟全量核对，不一致就重算并在服务域路由记录上写 `AllowlistDrift` | check:static 通过；unit 591、module 1308、console 874；改动行 46／46 | [35925776928](https://github.com/wangbinquan/CrewStation/actions/runs/35925776928) 六项成功 | 22:08:51 cs-controller、22:08:53 cs-api、22:09:25 cs-session 换到 `cs-control-plane:rc025-t9e-20260924` |
 
 镜像由 `git archive <提交>` 构建；无迁移，各一次就绪、0 重启；三个服务上线后没有告警或错误日志。
 
@@ -180,5 +182,21 @@
   - 查的时候发现此前每分钟约 1800 条的底子本身也是这种循环：6 条开发工作区记录（3 个运行中的会话、3 个失败的会话）每条每秒被空写 4–8 次，隔一秒取两次快照内容完全相同而 `version` 在涨（其中一条已写到 14 万次）；按小时统计，从 09-23 16:22（99e93569 上线，开发工作区记录从 1 个子对象变成 4 个）起每小时约 11 万行。根因是子对象从库里按种类与名字读回、合并却按期望里的顺序排，按数组一比就「变了」，整组重写并追加一行变更，这行变更又触发下一次核对。开着的工作台概览会随记录变化重读摘要，也跟着被拉高。
   - cb13edb7 修掉两处：比较子对象不看先后，`generation` 随观测存下、读回；两条回归用例在修复前的代码上都失败。21:46:58 上线后，21:47 这一分钟台账变更 28 条（上线本身的补投影与观测），此后空闲时为 0；首轮 `applied 0`，55 条路由对象部署前后逐条不变，路由子对象的观测都带上了 `generation`。上线后 1 秒内有 9 条「路由期望不完整」告警：回滚期间旧代码把路由记录的期望写回了旧形状，补投影完成（21:47:00.95）之后不再出现。
 - **身份索引改读观测（5a5591f2，随 cb13edb7 上线）**：观测缓存首次同步后 30 条在册身份全部被刷新（`pod identities pruned after relist` 清掉 1 条旧行）；新起的 cs-controller、cs-api、cs-session Pod 拿到 IP 后约 1 秒内入索引；gateway 自己的 Pod watch 已删去，全平台只剩观测缓存这一条 Pod watch。改动路由对象后「改回」由模块用例核对（在共享集群上手工改线上路由没有做）。
+- **放行表核对（3de12b3a 部署后）**：启动时的第一轮核对没有告警——库里最新一版（第 61 版，09-23 11:19 生成）与按当前在册服务和授权推导的内容一致，没有重算；14 条服务域路由记录各写了一次 `AllowlistDrift` 为假（22:08 这一分钟台账正好 14 条变更），之后台账无变更。不一致时重算与写真由模块用例核对（在共享集群上改授权没有做）。
 - **墓碑清理（aed62f71 部署后）**：部署前 `gateway.pod_identities` 在册 30 行、墓碑 727 行（最早 09-11 14:54），其中 189 行标为删除已超过 7 天；上线 2 秒后 `pod identity tombstones purged`（189），之后墓碑 541 行、最早 09-18 05:18，没有超过 7 天的，在册 30 行不变。这次首轮观测汇总 `recorded 19、unchanged 106、unowned 47`——上一轮的 99 里有 55 个是服务路由，这次已被路由记录认领。三个补投影作业改用 `periodicJob` 后日志照旧（槽 14、任务环境 21、路由 14）。
+
+## 6. 第三期：限流（T10）
+
+| 提交 | 门禁（干净导出树） | CI | 部署（UTC） |
+|---|---|---|---|
+| `cef5b880` 限流策略的存取与管理接口（平台默认与项目覆盖） | check:static 通过；unit 595、module 1312、console 874；改动行 126／126 | [35927939112](https://github.com/wangbinquan/CrewStation/actions/runs/35927939112) 六项成功 | 随 989e07f7 上线 |
+| `989e07f7` 策略写成 `rate-limit-policy` 记录，调和器照记录渲染 Traefik Middleware | check:static 通过；unit 602、module 1315、console 874；改动行 134／134 | [35929308762](https://github.com/wangbinquan/CrewStation/actions/runs/35929308762) 六项成功 | 22:45:19 迁移 Job 应用 `gateway/0006_rate_limits.sql`；22:45:32 cs-controller、22:45:38 cs-api、22:46:10 cs-session 换到 `cs-control-plane:rc025-t10b-20260924` |
+| `de9dcb5b` 用户域、服务域与平台接口的路由挂上限流，工作台读请求按 `Retry-After` 自动重读 | check:static 通过；unit 604、module 1315、console 875；改动行 37／37 | [35930651526](https://github.com/wangbinquan/CrewStation/actions/runs/35930651526) 六项成功 | 23:01:35 cs-controller、23:01:37 cs-api、23:02:09 cs-session 换到 `cs-control-plane:rc025-t10c-20260924`；23:02 `kubectl apply -f deploy/k8s/platform/40-gateway.yaml`；23:03:31 console 换到 `cs-console:rc025-t10c-20260924` |
+
+镜像由 `git archive <提交>` 构建；这次有一个迁移，先用新镜像跑一次 `cs-api migrate` 的 Job（`deploy/k8s/platform/20-migrate-job.yaml` 换镜像）再滚动服务；各一次就绪、0 重启，三个服务上线后没有告警或错误日志。
+
+- **策略进台账、中间件建出（989e07f7 部署后）**：上线 3 秒内调和器建出 58 个限流中间件（`resource child applied` 58 条）——系统命名空间里的 `rate-limit-platform-api`（`rateLimit` 平均 20、突发 40、周期 1 秒，按 `x-cs-user-id`）与 `in-flight-platform-api`（`inFlightReq` 16），14 个项目命名空间各 4 个（`rate-limit-user`、`rate-limit-host`、`rate-limit-source`、`rate-limit-target`）；15 条 `rate-limit-policy` 记录（平台 1 条、项目 14 条）全部运行中，平台那条的展示字段是 `20/s·40`、`16`。渲染出的中间件都带平台标签、组件标签 `rate-limit` 与所属记录的资源 ID。22:45 这一分钟台账变更 73 条（一次性声明与观测），之后空闲时为 0。这一步还没有路由引用这些中间件，放行不变。
+- 管理接口（平台默认与项目覆盖的读写、409、403、404）由模块用例经 HTTP 核对；实机上这些接口在网关登录之后，没有替作者登录去调。
+- **挂上限流（de9dcb5b 部署后）**：上线 4 秒内补投影按新计划重算 14 个服务，调和器改写 55 条服务路由（`resource child applied` 55 条）；逐条核对线上对象，正式与待验证路由的链是 `drop-identity-headers → forward-auth-user → rate-limit-user → rate-limit-host`，服务域与内部 API 是 `… → forward-auth-service → rate-limit-source → rate-limit-target（→ strip-api-<proxy>）`，55／55。Traefik 没有「中间件不存在」一类的错误（日志里只有部署前就有的 7 个从没部署过的物理槽的 `service not found`）。系统路由清单应用后，`console-api` 的链末尾是 `rate-limit-platform-api → in-flight-platform-api`，新路由 `console-resource-streams`（两条资源推送流）只挂令牌桶；两个平台中间件的取值与资源 ID 标签在 `kubectl apply` 之后保留。未登录的请求照旧在 ForwardAuth 被拒（`/v1/me`、资源推送流、工作台首页、demo 正式主机都是 401）。
+- **服务域突发实测**：从 cs-api 的 Pod 同时向 `demo.svc.cs.internal/healthz` 发 130 个请求——100 个 200、30 个 429 且带 `Retry-After: 1`，正是「每个来源服务对每个目标」那只桶的突发 100；停 3 秒后再发 60 个全是 200（按每秒 50 补回）。平台接口与用户域的突发要登录后才能打到限流（在 ForwardAuth 之后），没有替作者登录；留给 T15 校准时与作者一起测。
 
