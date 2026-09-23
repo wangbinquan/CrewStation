@@ -710,6 +710,14 @@ git reset -q HEAD -- <自己的路径>                     # 共享暂存区里�
 同类的另一个坑（2026-09-23 实撞）：zsh 里 `path` 是与 `PATH` 绑定的数组，`while read mode blob stage path; do git …; done` 一读就把 `PATH` 换掉了，循环里每条命令都报 command not found（这次是给私有索引逐条 `git update-index`，一条也没写进去）。循环变量别用 `path`、`cdpath`、`fpath`、`manpath` 这些名字，改用 `fname` 之类。
 第三个（2026-09-23 实撞）：zsh 把紧跟在变量名后的 `:t`、`:h`、`:r`、`:e`、`:a` 等当成修饰符。给私有索引取「某提交里的文件」时写 `git show $BASE:tools/arch/migrations.lock.json`，`:t` 被当成取末段，实际执行的是 `git show <SHA>ools/arch/migrations.lock.json`，报 `ambiguous argument`，后面依赖它的步骤全没做。一律写成 `git show "${BASE}:路径"`。
 
+### 在 `git archive` 导出树里跑门禁：独立项目各装一次依赖，别拷 `.local`，别用 `git rm`
+
+2026-09-23 实撞（项目设置三处减法那批）：
+- `templates/minimal-sample`、`integrations/gitlab-event-producer`、`integrations/reference-api-proxy` 不是工作区成员，各有自己的 `bun.lock`。导出树只在根目录 `bun install` 时，这三处的用例报 `Cannot find package 'hono'`，门禁记成 3 fail／3 errors。在这三个目录各跑一次 `bun install --frozen-lockfile` 再跑。
+- 别把 `.local/` 拷进导出树：有了口令、调试浏览器又开着，门禁里的 e2e 就拿线上还没部署新代码的工作台去跑，还会以 dev-admin 改作者的个人布局。不带口令时 e2e 按设计跳过，部署后另行实机核对。
+- 共享文件里夹着别人未提交的 hunk 时，导出树里放「HEAD＋自己的 hunk」重放出来的版本，不拷整份工作树文件：这次把别人从 `ProjectAction` 删 `'manage-alerts'` 的半截改动带了进去，typecheck 当场报 `modules/platform/wiring.ts` 类型不符。
+- 删文件用普通 `rm`：在共享树上 `git rm` 会把删除写进共享暂存区，别人不带路径的 `git commit` 会捎上它。删除只在私有索引里做（`git update-index --force-remove` 或 `git rm --cached`）。
+
 ### ADR、RFC 与待决问题的编号会被并行会话抢占：提交前再看一眼
 
 2026-09-20 实撞：写 ADR-0006 的五分钟前，另一个会话已经建了未提交的 `docs/adr/0006-cluster-management-module.md` 并在它的 RFC 里引用了四处。

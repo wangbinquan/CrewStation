@@ -61,6 +61,11 @@
   - 成员弹窗：查找、候选、选中、用户 ID、管理员目录、修改角色都核对了；可见范围弹窗的查找也核对了。深浅两色、390 宽下都没有横向溢出、没有控制台错误。
   - 应用展示只剩两张卡；生产变量页只有「生产变量」一张卡，资源计时里没有 `/slots` 与 `/v1/releases/` 请求。
   - 全程只开弹窗、查账号，没有保存任何东西。
+- **已推送并部署**：`1d7af589`，[CI 35858597265](https://github.com/wangbinquan/CrewStation/actions/runs/35858597265) 六项全部成功（含 `gate` 新增代码防护与 `e2e`）。
+  - 本机从 `git archive 1d7af589` 构建 `cs-control-plane:settings-trim-20260923` 与 `cs-console:settings-trim-20260923` 并导入节点。滚前核对 `platform_infra.migrations`：108 个锁定迁移全部已执行（含 crewstation-d9 的 scm 0004）。
+  - 12:11:49Z–12:12:28Z 只滚 cs-api 与 console（线上包 `index-CynD0weh.js`），滚前通知了各并行会话。
+  - 部署后实机（dev-admin，不换资源）：检查接口 404，可见范围与账号查找 200；成员弹窗、应用展示两张卡、生产变量页一张卡与部署前一致；发布页「进入维护」弹窗的账号查找也换成了同样的卡片。无横向溢出、无控制台错误，全程没有提交任何表单。
+  - 本机没跑 e2e：`capabilityDepth` 会以 dev-admin 打开开发页、改动作者的个人布局；以 CI 的 e2e 为准。
 - **环境变量都不是实时生效**（作者同时问到，结论来自源码）：
   - 开发组在新建容器时注入（`modules/task-runtime/application/containerEnv.ts`）。新开的 CLI／Agent 执行 Pod 继承父环境的 kind（`nativeExecution.ts:67`），会拿到新值；开发容器本身和其中的预览进程要「重建开发环境」才拿到。
   - 生产组在部署时写进 Deployment 的 env（`modules/release/adapters/k8s/slotDeployer.ts:19`）。只有发布新版本或从发布记录重新部署才采用，重启 Pod 也不会。
