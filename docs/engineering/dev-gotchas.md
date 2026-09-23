@@ -237,6 +237,24 @@ Service 不再依赖 `publishNotReadyAddresses`；**管理员会话优先走 dev
 要靠 cs-controller 启动时的命名空间重下发（`modules/provisioning/workers/namespaceReapply.ts`）把新形状铺到已有项目上。
 换过版没见到新策略，先看 cs-controller 日志里的 `namespace reapply done`。
 
+### Traefik 默认丢掉没有 endpoint 的路由：服务缩到零后连 ForwardAuth 都不走
+
+2026-09-23 RFC-021 实撞：待命槽下线（删 Deployment、留 Service）后，preview 地址回的是 Traefik 自己的 `404 page not found`，
+而不是 cs-auth 该给的「未部署」说明页。kubernetescrd provider 默认在 Service 一个 endpoint 都没有时把整条路由丢掉，
+挂在路由上的 ForwardAuth 中间件也就不执行。判据：`kubectl -n <ns> get endpointslices` 为空，而同一个 Host 回的是纯文本 404。
+现在 Traefik 带 `--providers.kubernetescrd.allowEmptyServices=true`（`deploy/k8s/system/32-traefik.yaml`，80c4e1b）：路由保留，
+ForwardAuth 照常执行，由 cs-auth 回说明页或 503 JSON；认证放行而后端没有 endpoint 时由 Traefik 回 503。
+只改 Traefik 的一项参数也会滚动它，所有入口中断约 10 秒，共享集群上先和并行会话约好窗口。
+
+### 按 watch 增量维护的表收不到断线期间的删除：全量重列时要清掉没列到的行
+
+2026-09-23 RFC-021 SM-10 实撞：网关的 Pod 身份索引（`gateway.pod_identities`）靠 watch 的 ADDED／MODIFIED／DELETED 维护，
+watch 断开期间（控制面重启、apiserver 超时）被删的 Pod 收不到 DELETED，行一直在册：本机 52 个 Pod 对 144 条在册行。
+IP 被新 Pod 复用时按更新时间取最新一行，demo 的服务槽一度被认成两天前就不在了的平台 Pod，服务域的放行与维护拦截都按这个错的身份判断。
+判据：`select ip, count(*) from gateway.pod_identities where deleted_at is null group by ip having count(*) > 1`。
+现在全量重列（启动与重连后）先记下开始时刻，逐个同步后把 `updated_at` 早于它的在册行标删除（692207c，部署后首次重列清掉 125 行）。
+任何「watch＋本地表」的写法都要这样收尾；以重列开始时刻为界，别的副本在这之后写进来的行不会被误删。
+
 ## GitLab
 
 ### 刚签发的项目访问令牌偶尔还没在 Git HTTP 认证路径上生效
@@ -572,6 +590,27 @@ Bun 在 `CI=true` 时拒绝 `.only`（`.only is disabled in CI environments`）�
 `tools/testguard` 只是多了一个没有任何依赖的 `package.json`，`bun.lock` 的 workspaces 段也会多一条。
 本机不装照样能跑，CI 的 `bun install --frozen-lockfile` 会当场失败。加完单元跑一次 `bun install`，确认 lock 的 diff 只有自己那一条，再一起提交。
 
+### `bun test` 不做类型检查：最后一次改用例之后要再跑 typecheck
+
+2026-09-23 实撞（RFC-021，1eeb576）：工作台用例本机全绿，`check:static` 却是在写最后一批用例之前跑的，推上去 CI 的 static 层红在新用例里
+（把品牌类型的返回值直接和对象字面量比较，TS2769）。Bun 运行 TypeScript 只剥类型、不检查，用例文件里的类型错误只有
+`typecheck`／`typecheck:console` 看得到。提交前的最后一步是 `bun run check`（至少 `check:static`），而不是最后一次 `bun test`。
+
+### 用例开始在事务里发领域事件后，同模块其他用例的测试库也要带事件表
+
+2026-09-23 实撞（56ff345）：`setOpenPolicy` 改成在同一事务里发 `api-catalog.open-policy-changed`，改动所在的用例文件带了
+`eventbusMigrations`，本机跑绿；同目录的 `catalogIdentity.test.ts` 用 `createTestDatabase([apiCatalogMigrations])` 建库，也走到这个用例，
+module 层 CI 连红两个提交（635359d 补上）。改了用例的副作用（新发事件、新写别的 schema）之后跑整层 `bun run test:module`，
+不要只跑自己改的文件；判据：`grep -rn createTestDatabase modules/<模块>/tests` 看每个库的迁移清单。
+
+### Claude Code 的 shell 带 `FORCE_COLOR=3`：子进程的 `console.error` 会带上颜色码
+
+2026-09-23 实撞：在 Claude Code 里跑 `bun run test:module`，`runtimes/task/tests/runnerLifecycle.test.ts` 的预览日志用例红了：
+收到的是 `"\u001B[0m\u001B[31mwarming\u001B[0m"`，不是 `"warming"`。原因是这个 shell 环境带 `FORCE_COLOR=3`，
+子进程继承下来，Bun 的 `console.error` 就给整行上了红色；CI 不设这个变量，所以 CI 一直是绿的。判据：`env | grep FORCE_COLOR`；
+`env -u FORCE_COLOR bun test <文件>` 转绿。断言子进程输出原文的用例，子进程里用 `process.stdout.write`／`process.stderr.write` 写原始字节（b22b6d8 就是这样修的），
+或者比较前先去掉 ANSI 转义；不要去改测试进程的 `process.env`，同一进程里的其他文件会一起受影响。
+
 ## 并发开发与 Agent 协作
 
 ### 就地改写共享文件：`open(p,'w').write(f(open(p).read()))` 会先清空再读
@@ -583,6 +622,24 @@ Bun 在 `CI=true` 时拒绝 `.only`（`.only is disabled in CI environments`）�
 改写任何共享文件都按这个顺序：**先读进变量、算出新内容、断言通过，再写临时文件并 `os.replace`**（`Path.write_text(new)` 也必须在 `new` 已经算好之后）。
 `STATE.md` 是全仓最热的共享文件，别的会话的未提交内容随时都在里面；只想提交自己那一段时，用 `git hash-object -w` 加
 `git update-index --cacheinfo` 把「HEAD 版本＋自己的段落」放进暂存区，工作树里的别人内容原样留着。
+
+### 共享暂存区里有别人的条目：用私有索引提交，核对时关掉改名检测
+
+2026-09-23 RFC-021 提交时撞上：共享暂存区里有并行会话已 `git add` 的文件，「暂存区＝自己的清单」的核对一直多出别人的条目；
+同一文件里混着别人未提交的段落时，`git commit -- <路径>` 又会把整份工作树文件提上去。做法是从 HEAD 起一个私有索引，只放自己的内容：
+
+```
+export GIT_INDEX_FILE=$TMP/idx; git read-tree HEAD
+git add -- <整份都是自己的文件>
+git update-index --cacheinfo 100644,$(git hash-object -w <HEAD 版本＋自己段落的临时文件>),<路径>
+git rm --cached -q -- <自己删掉的文件>
+git diff --cached --no-renames --name-status HEAD   # 逐行对清单
+git commit …; unset GIT_INDEX_FILE
+git reset -q HEAD -- <自己的路径>                     # 共享暂存区里这些路径跟上新 HEAD，别人的条目不动
+```
+
+核对要加 `--no-renames`：搬文件默认被识别成改名、只显示新路径，删除侧漏没漏看不出来（见上文 `git mv` 一条）。
+建好私有索引到提交之间 HEAD 可能被并行会话推进，提交前再比一次 `git rev-parse HEAD`，变了就从新 HEAD 重建。
 
 ### ADR、RFC 与待决问题的编号会被并行会话抢占：提交前再看一眼
 

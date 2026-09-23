@@ -1,6 +1,6 @@
 # RFC-021｜实施计划
 
-> 状态：In Progress · 2026-09-23
+> 状态：Done · 2026-09-23（T1–T13 已完成；实机验收见 [acceptance.md](./acceptance.md)）
 > 配套：[提案](./proposal.md) · [技术设计](./design.md)
 
 ## 目录
@@ -14,18 +14,18 @@
 | 任务 | 内容 | 依赖 | 状态 |
 |---|---|---|---|
 | RFC-021-T1 | 作者七轮裁定 M1–M28；三件套落档并登记 | 作者 | 已完成（2026-09-23，作者要求「实施＋部署＋实机验收」） |
-| RFC-021-T2 | 契约：槽的 `retention`／`offline`、`redeployable`、三个请求、`SlotEventDto`、自动下线策略；`maintenance.ts`；`ReleaseStatus.offline`、`DeliveryState.held`、`gateway.maintenance-changed`；`MarketAppDto.maintenance`；删 `ProjectState.paused`；Schema 用例；api-client 方法 | T1 | 未开始 |
-| RFC-021-T3 | `release` 领域：`slotLifecycle.ts`（计时、推迟、提醒、下线迁移、旧槽归一、策略校验）；`slots.ts` 切流写回退目标；`release.ts` 新迁移；纯函数用例 | T2 | 未开始 |
-| RFC-021-T4 | `release` 用例与适配器：下线、推迟、重新部署、巡检、访问记录、策略；表、仓储、迁移、`removeWorkload`；路由；RFC-010 槽删除改走下线；破坏性迁移改用 `MaintenanceWindow` 端口（部署与切流）；删 `maintenanceWindow` 设置；模块用例 | T3 | 未开始 |
-| RFC-021-T5 | `gateway`：维护领域、用例、表与迁移、路由、领域事件、缓存；`evaluate` 的服务域判定；`userEntry`；模块用例 | T2 | 未开始 |
-| RFC-021-T6 | `identity`：`ServiceEntry` 端口、ForwardAuth 两域 503、维护页与未部署页；用例 | T5 | 未开始 |
-| RFC-021-T7 | `events`：`DeliveryHold` 端口、暂存、补发、兜底巡检、事件消费；用例 | T5 | 未开始 |
-| RFC-021-T8 | `project` 两个新动作、删 `paused`；`capabilities` 市场维护标注；`cluster-management` 文案；组合根接线；用例 | T4–T7 | 未开始 |
-| RFC-021-T9 | 工作台：发布页维护与待验证卡、重新部署、时间线、概览版本卡、市场卡片、平台设置页、事件暂存状态、去掉暂停；`MemberLookup` 移到 `shared/project/`；中英文；工作台用例 | T2、T8 | 未开始 |
-| RFC-021-T10 | e2e：平台设置页、维护入口与两类 503 的实机用例 | T9 | 未开始 |
-| RFC-021-T11 | 本地 gate、改动行防护、提交推送、精确 SHA CI 六项 | T10 | 未开始 |
-| RFC-021-T12 | 本机部署（控制面与工作台镜像，迁移 Job）与五个身份的实机验收，`acceptance.md` | T11 | 未开始 |
-| RFC-021-T13 | 基线回填：Proposal／Design／Plan 升版本（新需求、决策、验收编号；作废暂停项目；改写维护窗口）；README、STATE.md 收口 | T12 | 未开始 |
+| RFC-021-T2 | 契约：槽的 `retention`／`offline`、`redeployable`、三个请求、`SlotEventDto`、自动下线策略；`maintenance.ts`；`ReleaseStatus.offline`、`DeliveryState.held`、`gateway.maintenance-changed`；`MarketAppDto.maintenance`；删 `ProjectState.paused`；Schema 用例；api-client 方法 | T1 | 已完成（1c3586c） |
+| RFC-021-T3 | `release` 领域：`slotLifecycle.ts`（计时、推迟、提醒、下线迁移、旧槽归一、策略校验）；`slots.ts` 切流写回退目标；`release.ts` 新迁移；纯函数用例 | T2 | 已完成（1c3586c） |
+| RFC-021-T4 | `release` 用例与适配器：下线、推迟、重新部署、巡检、访问记录、策略；表、仓储、迁移、`removeWorkload`；路由；RFC-010 槽删除改走下线；破坏性迁移改用 `MaintenanceWindow` 端口（部署与切流）；删 `maintenanceWindow` 设置；模块用例 | T3 | 已完成（1c3586c；验收中补 2e2600b：下线同时认 RFC-013 之前的旧 `rel_…` 标签） |
+| RFC-021-T5 | `gateway`：维护领域、用例、表与迁移、路由、领域事件、缓存；`evaluate` 的服务域判定；`userEntry`；模块用例 | T2 | 已完成（1c3586c；验收中补 692207c：Pod 身份索引重列后清旧行） |
+| RFC-021-T6 | `identity`：`ServiceEntry` 端口、ForwardAuth 两域 503、维护页与未部署页；用例 | T5 | 已完成（1c3586c；验收中补 80c4e1b：Traefik `allowEmptyServices`，否则未部署页出不来） |
+| RFC-021-T7 | `events`：`DeliveryHold` 端口、暂存、补发、兜底巡检、事件消费；用例 | T5 | 已完成（1c3586c） |
+| RFC-021-T8 | `project` 两个新动作、删 `paused`；`capabilities` 市场维护标注；`cluster-management` 文案；组合根接线；用例 | T4–T7 | 已完成（1c3586c；验收中补 56ff345：改开放策略后立即重算放行表） |
+| RFC-021-T9 | 工作台：发布页维护与待验证卡、重新部署、时间线、概览版本卡、市场卡片、平台设置页、事件暂存状态、去掉暂停；`MemberLookup` 移到 `shared/project/`；中英文；工作台用例 | T2、T8 | 已完成（1eeb576、3c4076e） |
+| RFC-021-T10 | e2e：平台设置页、维护入口与两类 503 的实机用例 | T9 | 已完成（1eeb576；本机部署后实跑 4／4） |
+| RFC-021-T11 | 本地 gate、改动行防护、提交推送、精确 SHA CI 六项 | T10 | 已完成（最后一笔 80c4e1b 的 CI 35825463850 六项成功；逐笔见 acceptance.md） |
+| RFC-021-T12 | 本机部署（控制面与工作台镜像，迁移 Job）与五个身份的实机验收，`acceptance.md` | T11 | 已完成（2026-09-23，见 [acceptance.md](./acceptance.md)） |
+| RFC-021-T13 | 基线回填：Proposal／Design／Plan 升版本（新需求、决策、验收编号；作废暂停项目；改写维护窗口）；README、STATE.md 收口 | T12 | 已完成（基线 v0.3.9：Proposal R56、R57 与改写的 R19；Design §6.9、D56、D57，暂停项目作废；Plan AT-57、AT-58 与矩阵行） |
 
 ## 2. 验收清单
 

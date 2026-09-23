@@ -7,6 +7,27 @@
 
 基线三件套（v0.3.3）的第一轮实现已在本机 kind 集群上跑通并推上 main；**RFC-001（算力归平台）与 RFC-002（管理空间与租户空间分离）已实现、实跑确认并推上 main；RFC-004 已被 RFC-006 取代（Superseded）；RFC-006（算力档位合并运行环境、每个 Agent 一个 Pod）已实现、实机验收完毕并推上 main，已 Done（P1–P8、ADR-0005 与 I17–I19 待作者复核）；RFC-003 工作台已按设计附件完成并整体部署到本机，52／52 项 UX-AT 全部实机通过、本地 gate 与精确 SHA CI 通过，已 Done；RFC-005（OIDC／OAuth 2.0 公司登录）代码、测试与 OA-01…OA-31 实机验收全部完成，已 Done；RFC-007（开发环境 OAuth 2.0 一键换角色）代码、四角色 Chrome 实机验收、本地 gate 与精确 SHA CI 全部完成，已 Done**。
 
+## RFC-021 待验证版本下线与正式版本维护：实施、部署与实机验收（2026-09-23）
+
+作者问「现在是不是没能力下线待验证版本，下线正式版本？待验证版本长期开着pod也浪费资源、正式版本也需要临时进入维护装备不被非开发者调用」，七轮问答裁定 M1–M28，要求「实施＋部署＋实机验收」。**RFC-021 已 Done**，基线回填到 v0.3.9（Proposal R56、R57、改写 R19；Design §6.9、D56、D57，「暂停项目」作废；Plan AT-57、AT-58 与矩阵行）。
+
+- **能力**：负责人与管理员下线待命槽（删 Deployment，留 Service 与发布记录，preview 显示「未部署」说明页）。回退目标 72 小时、待验证版本闲置 14 天自动下线，提前 24 小时提醒、可无限推迟；三个时长在管理空间「平台设置」（`/admin/settings`）统一调。从发布记录重新部署不重建、不重迁移。正式版本「进入维护」有用户流量、服务域调用、事件推送三个开关；成员、管理员与临时指定的人放行，项目自己的负载不拦，维护跟随切流。项目完整维护（三开关全拦）即破坏性迁移窗口，部署与切流都查。`CS_MAINTENANCE_WINDOW` 与项目状态 `paused` 已删除。
+- **提交**：1c3586c 后端、1eeb576 工作台、3c4076e 修用例类型；验收中修 56ff345（改开放策略后立即重算放行表）、2e2600b（下线认 RFC-013 之前的旧 `rel_…` 标签）、635359d（用例库带事件表）、692207c（Pod 身份索引重列后清旧行）、80c4e1b（Traefik `allowEmptyServices`）；收尾时顺手修 b22b6d8（`runtimes/task` 预览日志用例在 `FORCE_COLOR` 下变红，与本 RFC 无关）。精确 SHA CI 逐笔见 acceptance.md：1eeb576、56ff345、2e2600b 红过，均由下一笔修复；最后一笔 80c4e1b 的 [CI 35825463850](https://github.com/wangbinquan/CrewStation/actions/runs/35825463850) 六项成功。
+- **本机部署**：迁移 `events/0005`、`release/0007`、`gateway/0005` 05:12Z 应用。验收用的是 crewstation-51 从 692207c 构建的 `cs-control-plane:startup-20260923b` 与 `cs-console:ui-6a75f9a`；之后 crewstation-51 从 3b95126 重建滚动为 `cs-control-plane:startup-20260923c`（七个控制面部署）与 `cs-console:startup-20260923b`，06:36Z 只读复核（e2e `slotLifecycle` 4／4、验收项目的槽与维护、平台设置）没有变化。Traefik 线上已加 `allowEmptyServices`，与清单一致。本批构建的 `rfc021-20260923*` 三个镜像已从节点与宿主删除（只剩 0 副本的旧 ReplicaSet 引用它们，回滚到那几版会拉不到镜像）。
+- **实机验收**：SM-01…SM-18 全部通过，身份为 dev-developer（负责人，兼 demo 的开发者）、dev-tester、dev-member、dev-admin；逐项证据在 `proposal/rfc/RFC-021-slot-offline-maintenance/acceptance.md`。会改状态的操作只在 `rfc021-verify` 上做，要推到期时间时只改它的一行 JSON，由真实巡检执行。
+- **别的项目会被自动下线**：升级时已有的待命槽从 05:14:23Z 起算，分两类：
+  - 回退目标：demo、gitlab-event-producer、reference-api-proxy、rfc003-verify-delivery、rfc003-verify-integration。**09-25 05:14Z 提醒，09-26 05:14Z 自动下线。**
+  - 待验证版本：rfc003-verify-workbench、rfc006-verify、rfc011-role-home，10-07 到期，有人访问 preview 会后推。
+  - 另外两个：`rfc021-verify` 的回退目标 09-26 06:14Z 到期；crewstation-51 的 RFC-022 验收项目的待验证版本 10-07 到期。
+
+  要保留的，在发布页点「推迟」。
+- **事故**：05:35–05:51Z cs-api 连环重启（Bun SQL 连接错位，I16 第四次）。诱因是无头浏览器里没关的页面：本会话的 9344 上有 26 个，共用的 9333 上有 109 个。页面已全部关掉，本会话的驱动改成结束即关页；crewstation-51 在 3b95126 修好了 e2e 登录失败时不关页的问题，并在 dev-gotchas 与 I16 记下这次重启循环。
+- **遗留**：
+  - `rfc021-verify` 保留作证据：正式版本 v0.2.1 声明了破坏性迁移；待命槽是回退目标 v0.1.1；`/api/hello` 默认开放；可见范围为所有登录用户。
+  - 提醒目前只写记录与日志（Q20 没有通知渠道）。
+  - 时间线把非成员管理员显示成「成员 01a0c12a…」，这是 RFC-020 既有的写法。
+- **下一个 session 注意**：09-25 与 09-26 是自动下线第一次按真实时间触发，看一眼 cs-controller 日志里的 `slot offline notice` 与各槽的记录是否按期出现。不要为了测试调短平台设置的时长，那会作用于所有项目；要测就像本批一样只改验收项目自己那一行。
+
 ## 开发页 CLI 区改为 Xshell 式标签组（2026-09-23）
 
 作者反馈「开发界面的开发 cli 区的可操作性太差了，包括 cli 窗的排列，分 tab 页，那些按钮简直反直觉，能不能直接做成 xshell 那种窗口，然后拖动排列就行了，实际上就只有新开、排列两个功能」。两轮问答（含 ASCII 预览）裁定，流程取「直接改＋回填，提交并部署本机」：

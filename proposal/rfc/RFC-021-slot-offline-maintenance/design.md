@@ -1,6 +1,6 @@
 # RFC-021｜技术设计
 
-> 状态：In Progress · 2026-09-23 · 作者裁定见 [提案](./proposal.md) §4
+> 状态：Done · 2026-09-23 · 作者裁定见 [提案](./proposal.md) §4；实施补记见 §14，验收见 [acceptance.md](./acceptance.md)
 > 配套：[提案](./proposal.md) · [计划](./plan.md)
 
 ## 目录
@@ -18,6 +18,7 @@
 - [11. 失败模式与并发](#11-失败模式与并发)
 - [12. 测试策略](#12-测试策略)
 - [13. 偏离与债](#13-偏离与债)
+- [14. 实施补记（2026-09-23）](#14-实施补记2026-09-23)
 
 ## 1. 现状与落位
 
@@ -265,3 +266,15 @@ preview 主机（B6）：同一个 `ServiceEntry.check(userId, slug, 'preview')`
 - 提醒的送达仍然只到日志与工作台（Q20 未定），与开发会话空闲提醒相同。
 - 正式槽从未上线时，prod 地址的表现（网关报错）不在本 RFC 范围。
 - 事件补发按接收顺序重新入队，之后与平时一样并发投递，不保证严格串行。
+
+## 14. 实施补记（2026-09-23）
+
+实机验收（[acceptance.md](./acceptance.md)）中发现、当天修复的四处实现缺口，不改变任何裁定：
+
+| 缺口 | 现象 | 处理 |
+|---|---|---|
+| 未部署页依赖网关先执行 ForwardAuth | 待命槽下线后 Service 没有 endpoint，Traefik 默认丢掉整条路由、回裸 404，§6 的未部署说明页（B6）出不来 | Traefik 加 `--providers.kubernetescrd.allowEmptyServices=true`（`deploy/k8s/system/32-traefik.yaml`，80c4e1b）；只是还没就绪的服务由 404 变为 503 |
+| 下线认不出 RFC-013 之前的工作负载 | Deployment 标签是旧 `rel_…` ID，`removeWorkload` 只认 UUID，槽记已下线而 Pod 一直在跑 | 按 UUID 与 `legacyResourceId` 一起匹配；标签属于别的版本时仍不删（2e2600b） |
+| 默认开放不立即生效（既有缺陷，SM-10 撞见） | `setOpenPolicy` 不发事件，放行表要等无关的重算 | 同一事务发 `api-catalog.open-policy-changed`，网关据此重算（56ff345） |
+| 服务域调用方认错（既有缺陷，SM-10 撞见） | Pod 身份索引不清 watch 断开期间删掉的 Pod，IP 被复用时认成死去的平台 Pod | 全量重列后把没刷新到的在册行标为删除（692207c） |
+
