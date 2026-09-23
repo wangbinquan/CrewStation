@@ -107,6 +107,15 @@ describe('条件、子对象、计数与可做操作', () => {
     expect(computePhase(slot({}, [cond('CrashLooping', 'true')])).reason?.message).toBe('容器反复重启');
   });
 
+  test('限流策略：期望里的中间件都在即运行中，缺一个就还在分配中；稳定记录', () => {
+    const children = ['rate-limit-user', 'rate-limit-host'].map((name) => ({ kind: 'Middleware', namespace: 'cs-demo', name }));
+    const policy = (present: readonly string[]) => record({ kind: 'rate-limit-policy', spec: { children },
+      children: children.map((child) => ({ ...child, phase: present.includes(child.name) ? 'Present' : 'absent', ready: present.includes(child.name) })) });
+    expect(computePhase(policy(['rate-limit-user', 'rate-limit-host']))).toEqual({ phase: 'ready' });
+    expect(computePhase(policy(['rate-limit-user'])).phase).toBe('provisioning');
+    expect(STABLE_KINDS).toContain('rate-limit-policy');
+  });
+
   test('路由：IngressRoute 还没观测到是分配中，在即运行中，删除中按启动中算；稳定记录', () => {
     const route = (child?: Partial<ResourceChild>) => record({ kind: 'route', spec: { children: [{ kind: 'IngressRoute', namespace: 'cs-demo', name: 'demo-prod' }] },
       children: child ? [{ kind: 'IngressRoute', namespace: 'cs-demo', name: 'demo-prod', phase: 'Present', ready: true, ...child }] : [] });

@@ -8,7 +8,7 @@ export interface KindRule {
   /** 占几个并发额度单位（D31、RFC-006：开发会话、业务任务、每个 Agent 执行各一个）。 */
   readonly quotaUnits: number;
   /** 就绪看哪一种子对象；没有就只看条件。 */
-  readonly primaryChild?: 'Pod' | 'PersistentVolumeClaim' | 'Deployment' | 'Job' | 'IngressRoute';
+  readonly primaryChild?: 'Pod' | 'PersistentVolumeClaim' | 'Deployment' | 'Job' | 'IngressRoute' | 'Middleware';
   /** 就绪还要这些领域条件为真（所属模块上报）。 */
   readonly readyConditions: readonly string[];
   /** 失败后保留多久供诊断（D9：开发会话 72 小时）；没有就不保留。 */
@@ -41,7 +41,8 @@ export const KIND_RULES: Readonly<Record<ResourceKind, KindRule>> = {
   'migration-job': JOB,
   // 路由（第三期后半）：gateway 按服务写的正式、待验证、服务域与内部 API 路由；IngressRoute 在即运行中。每个服务几条、长期存在，是稳定记录。
   route: { quotaUnits: 0, primaryChild: 'IngressRoute', readyConditions: [], releasable: false, stable: true },
-  'rate-limit-policy': GENERIC,
+  // 限流策略（第三期后半，T10）：gateway 写的平台一条、每个项目一条，子对象是它们的 Traefik Middleware；中间件都在即运行中。稳定记录。
+  'rate-limit-policy': { quotaUnits: 0, primaryChild: 'Middleware', readyConditions: [], releasable: false, stable: true },
   database: GENERIC,
   'data-binding': GENERIC,
 };

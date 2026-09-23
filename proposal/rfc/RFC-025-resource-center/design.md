@@ -241,6 +241,8 @@ ResourceActionSchema = z.object({ id: ResourceActionIdSchema, enabled: z.boolean
 
 > **实施补记（2026-09-24，T10 第一步：策略的存取）**：限流策略由 gateway 自己存（`gateway.rate_limits`：平台默认一行，项目覆盖每个项目最多一行，按版本号乐观并发），校验照契约（令牌桶的突发不能小于平均，0 与过大的值不收），库里读出来再校验一遍、不合格的按没有处理。管理接口：`GET/PUT /v1/admin/settings/rate-limits`（平台默认，没人改过时是内置默认、版本 0）与 `GET/PUT /v1/admin/projects/:projectId/rate-limits`（项目覆盖：只覆盖用户域与服务域，写了哪一项整项照它；`override: null` 撤掉），只给管理员。Q4 的两个「合计」只给了平均，突发按平均的两倍。投影成 `rate-limit-policy` 记录、调和器渲染中间件、路由挂上中间件与界面在后面几步；这一步不改变任何请求的放行。
 >
+> **实施补记（2026-09-24，T10 第二步：策略进台账、调和器渲染中间件）**：gateway 把生效策略写成 `rate-limit-policy` 记录——平台一条（系统命名空间里的 `rate-limit-platform-api` 与 `in-flight-platform-api`，按 `x-cs-user-id` 分桶），每个在册项目一条（项目命名空间里的 `rate-limit-user`、`rate-limit-host`、`rate-limit-source`、`rate-limit-target`：用户域按用户与按主机，服务域按 `x-cs-source-service` 与按目标）；改平台默认时写平台与全部项目，改项目覆盖时只写那个项目，按服务重算路由时先写该项目的（路由要引用它的中间件），归档时那条标「不要了」，每 5 分钟补投影一次。调和器照记录渲染 Traefik Middleware（令牌桶是周期 1 秒的 `rateLimit`，并发上限是 `inFlightReq`），与观测比对、缺了或不一致才 apply；渲染出的对象带所属记录的资源 ID 标签，系统命名空间里带这个标签的照常观测与回收。中间件都在即记录运行中。这一步还没有路由引用这些中间件，不改变放行。
+>
 > **T2 实测（2026-09-23，本机 Traefik v3.7.13，临时探针路由测完已删）**：
 >
 > - `rateLimit` 超额：429，带 `Retry-After`（向上取整的秒数，2 次／秒时为 `1`）与 `X-Retry-In`（毫秒精度），正文是纯文本 `Too Many Requests`、不是平台错误体——`packages/api-client` 据此把它认作 `rate_limited`（平台额度不足的 429 带 `quota_exceeded` 错误体，不混淆）。

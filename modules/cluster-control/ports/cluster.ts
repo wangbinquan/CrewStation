@@ -1,8 +1,9 @@
+import type { MiddlewareRender } from '../domain/middlewareRender';
 import type { ObservedObject } from '../domain/observation';
 import type { RouteRender } from '../domain/routeRender';
 
-/** 观测与调和的种类：任务类容器的子对象（Pod、PVC、Runner Secret、预览 Service 与路由），服务槽的 Deployment，构建与迁移的 Job；后续各期加入 Middleware…… */
-export type ObservedKind = 'Pod' | 'PersistentVolumeClaim' | 'Secret' | 'Service' | 'IngressRoute' | 'Deployment' | 'Job';
+/** 观测与调和的种类：任务类容器的子对象（Pod、PVC、Runner Secret、预览 Service 与路由），服务槽的 Deployment，构建与迁移的 Job，限流的 Middleware。 */
+export type ObservedKind = 'Pod' | 'PersistentVolumeClaim' | 'Secret' | 'Service' | 'IngressRoute' | 'Deployment' | 'Job' | 'Middleware';
 
 export interface ObjectChange {
   readonly kind: ObservedKind;
@@ -45,4 +46,6 @@ export interface ClusterWriter {
   remove(target: { readonly kind: ObservedKind; readonly namespace?: string; readonly name: string; readonly uid: string }): Promise<void>;
   /** 按路由期望渲染 IngressRoute，与观测缓存里的对象（current）比对：缺了或不一致才 apply。 */
   applyRoute(route: RouteRender, current: ObservedObject | undefined): Promise<'applied' | 'unchanged'>;
+  /** 按限流策略渲染 Middleware（带所属记录的资源 ID 标签），同样缺了或不一致才 apply。 */
+  applyMiddleware(middleware: MiddlewareRender, resourceId: string, current: ObservedObject | undefined): Promise<'applied' | 'unchanged'>;
 }

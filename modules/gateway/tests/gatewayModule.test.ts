@@ -233,14 +233,14 @@ describe.skipIf(!available)('gateway module', () => {
 
   // RFC-025 第三期后半：服务的路由写成 route 记录，IngressRoute 由调和器照记录应用（gateway 只建前缀剥离中间件）；补投影按网关自己存的路由表；归档的标「不要了」。
   test('路由写进资源台账：每条一条记录、期望写全；配了台账不直接建 IngressRoute；补投影追上漏写的；归档的标「不要了」；台账写失败时重算报错、补投影只告警', async () => {
-    type Spec = { readonly host: string; readonly middlewares: readonly { readonly name: string; readonly namespace?: string }[]; readonly priority?: number };
+    type Spec = { readonly host?: string; readonly middlewares?: readonly { readonly name: string; readonly namespace?: string }[]; readonly priority?: number };
     const records = new Map<string, { id: string; desired: 'present' | 'absent'; spec: Spec; target: string }>(), releases: string[] = [], warnings: string[] = [];
     let failing = false;
     const ledger = {
       declare: async (input: { ref: string; spec: Spec; display: Readonly<Record<string, string>> }) => {
         if (failing) throw new Error('台账暂时不可用');
         const id = records.get(input.ref)?.id ?? `rec-${records.size + 1}`;
-        records.set(input.ref, { id, desired: 'present', spec: input.spec, target: input.display['target']! });
+        records.set(input.ref, { id, desired: 'present', spec: input.spec, target: input.display['target'] ?? '' });
         return { id };
       },
       find: async (ref: string) => records.get(ref),
@@ -251,7 +251,9 @@ describe.skipIf(!available)('gateway module', () => {
     const withLedger = newGateway({ ledger, logger });
     const applied = k8s.applied.length;
     await withLedger.api.reconcileService(issuesId);
-    expect([...records.entries()].map(([ref, r]) => [ref.split('/')[1], r.spec.host, r.target]).sort()).toEqual([
+    // 路由之前先写了这个项目的限流记录（路由要引用它的中间件）。
+    expect([...records.keys()].filter((ref) => ref.startsWith('project:'))).toEqual(['project:01a0bf5d-8f4b-7b11-b833-6f8e9d5c4b77']);
+    expect([...records.entries()].filter(([ref]) => ref.startsWith(issuesId)).map(([ref, r]) => [ref.split('/')[1], r.spec.host, r.target]).sort()).toEqual([
       ['internal-api', 'api.svc.cs.internal', 'cs-issues/issues-green'], ['preview', 'preview.issues.cs.localhost', 'cs-issues/issues-blue'],
       ['prod', 'issues.cs.localhost', 'cs-issues/issues-green'], ['service', 'issues.svc.cs.internal', 'cs-issues/issues-green'],
     ]);

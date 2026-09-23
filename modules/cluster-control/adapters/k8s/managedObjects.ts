@@ -4,10 +4,11 @@ import type { Logger } from '@crewstation/kernel';
 import { isPlatformError } from '@crewstation/kernel';
 import { createInformer, createWorkQueue } from '@crewstation/resource-runtime';
 import type { ClusterWriter, ManagedObjectFeed, ManagedObjectReader, ObjectChange, ObservedKind } from '../../ports/cluster';
+import { middlewareObject } from './middlewareObjects';
 import { routeCovered, routeObject } from './routeObjects';
 
 const SELECTOR = `${LABELS.managedBy}=${MANAGED_BY}`;
-const KINDS: readonly ObservedKind[] = ['Pod', 'PersistentVolumeClaim', 'Secret', 'Service', 'IngressRoute', 'Deployment', 'Job'];
+const KINDS: readonly ObservedKind[] = ['Pod', 'PersistentVolumeClaim', 'Secret', 'Service', 'IngressRoute', 'Deployment', 'Job', 'Middleware'];
 
 /** Secret 的内容一律不进缓存、不经调和器（设计 §13：只留调和要用的字段）。 */
 export function withoutSecretData(obj: K8sObject): K8sObject {
@@ -33,6 +34,12 @@ export function kubernetesClusterWriter(k8s: K8sClient): ClusterWriter {
     },
     applyRoute: async (route, current) => {
       const desired = routeObject(route);
+      if (routeCovered(current, desired)) return 'unchanged';
+      await k8s.apply(desired);
+      return 'applied';
+    },
+    applyMiddleware: async (middleware, resourceId, current) => {
+      const desired = middlewareObject(middleware, resourceId);
       if (routeCovered(current, desired)) return 'unchanged';
       await k8s.apply(desired);
       return 'applied';

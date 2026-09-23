@@ -29,6 +29,7 @@ import type { GrantSource, HostNaming, ProjectAccess, ServiceDirectory, SlotRole
 import type { GatewayApplier, GatewaySettings } from './ports/gatewayApply';
 import { allowlistCheckWorker } from './workers/allowlistCheck';
 import { identityTombstoneWorker } from './workers/identityTombstones';
+import { rateLimitLedgerResyncWorker } from './workers/rateLimitLedgerResync';
 import { routeLedgerResyncWorker } from './workers/routeLedgerResync';
 import type { RouteLedger } from './ports/ledger';
 
@@ -88,11 +89,11 @@ export function createGatewayModule(deps: GatewayModuleDeps): GatewayModule {
     clock: deps.clock ?? systemClock,
     logger,
   };
-  const routes = routeUseCases(useCaseDeps);
+  const limits = rateLimitUseCases(useCaseDeps);
+  const routes = routeUseCases(useCaseDeps, { declare: limits.declareProjectRateLimits, release: limits.releaseProjectRateLimits });
   const maintenance = maintenanceUseCases(useCaseDeps);
   const allowlist = allowlistUseCases(useCaseDeps, maintenance.serviceCallBlock);
   const pods = podIdentityUseCases(useCaseDeps);
-  const limits = rateLimitUseCases(useCaseDeps);
   const api: GatewayModuleApi = {
     name: 'gateway', ...routes, ...allowlist, evaluate: allowlist.evaluate, lookupByIp: pods.lookupByIp, purgeIdentityTombstones: pods.purgeTombstones, ...maintenance, ...limits,
     checkAllowlist: () => checkAllowlist(useCaseDeps, allowlist.verifyAllowlist),
@@ -122,7 +123,7 @@ export function createGatewayModule(deps: GatewayModuleDeps): GatewayModule {
     http: [gatewayRoutes(api, deps.isAdmin), maintenanceRoutes(api, deps.isAdmin), rateLimitRoutes(api, deps.isAdmin)],
     workers: [
       identityTombstoneWorker(pods.purgeTombstones, logger), allowlistCheckWorker(api.checkAllowlist, logger),
-      ...(deps.ledger ? [routeLedgerResyncWorker(routes.resyncRouteLedger, logger)] : []),
+      ...(deps.ledger ? [routeLedgerResyncWorker(routes.resyncRouteLedger, logger), rateLimitLedgerResyncWorker(limits.resyncRateLimitLedger, logger)] : []),
     ],
     subscriptions,
     migrations: gatewayMigrations,

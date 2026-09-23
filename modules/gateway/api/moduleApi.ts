@@ -63,4 +63,6 @@ export interface GatewayModuleApi {
   setProjectRateLimits(actor: Actor, projectId: ProjectId, input: SetProjectRateLimitsRequest): Promise<ProjectRateLimitsDto>;
   /** 项目生效的用户域与服务域（覆盖＋平台默认），渲染网关中间件用。 */
   effectiveRateLimits(projectId: ProjectId): Promise<Pick<RateLimits, 'userDomain' | 'serviceDomain'>>;
+  /** 限流策略的台账补投影（平台一条与全部在册项目各一条），返回声明的条数；cs-controller 每 5 分钟跑一次。 */
+  resyncRateLimitLedger(): Promise<number>;
 }

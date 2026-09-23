@@ -32,8 +32,15 @@ export async function declareRoutes(ledger: RouteLedger, system: SystemMiddlewar
   }
 }
 
+/** 路由之外、按项目随路由一起写进台账的东西：限流记录（路由引用它的中间件，先于路由声明；归档时一起释放）。 */
+export interface ProjectLedgerHooks {
+  declare(projectId: ServiceProjectId): Promise<void>;
+  release(projectId: ServiceProjectId): Promise<void>;
+}
+type ServiceProjectId = RoutedService['projectId'];
+
 /** 路由生成是幂等的：任何触发（建项目、切流、发布登记）都重算该服务的全部路由再 apply。 */
-export function routeUseCases(deps: GatewayUseCaseDeps) {
+export function routeUseCases(deps: GatewayUseCaseDeps, project?: ProjectLedgerHooks) {
   const names = {
     systemNamespace: deps.settings.systemNamespace,
     userAuthMiddleware: deps.settings.userAuthMiddleware,
@@ -57,7 +64,10 @@ export function routeUseCases(deps: GatewayUseCaseDeps) {
     if (deps.ledger) await deps.applier.applyMiddlewares(svc.namespace, routes);
     else await deps.applier.applyRoutes(svc.serviceName, svc.namespace, routes);
     await deps.routes.saveForService(svc.serviceId, svc.serviceName, routes);
-    if (deps.ledger) await declareRoutes(deps.ledger, system, svc, routes);
+    if (deps.ledger) {
+      await project?.declare(svc.projectId);
+      await declareRoutes(deps.ledger, system, svc, routes);
+    }
     deps.logger.info('routes reconciled', { service: svc.identity, routes: routes.length });
     return routes;
   };
@@ -73,7 +83,10 @@ export function routeUseCases(deps: GatewayUseCaseDeps) {
       if (!svc) return;
       if (!deps.ledger) await deps.applier.removeRoutes(svc.serviceName, svc.namespace);
       await deps.routes.saveForService(svc.serviceId, svc.serviceName, []);
-      if (deps.ledger) await declareRoutes(deps.ledger, system, svc, []);
+      if (deps.ledger) {
+        await declareRoutes(deps.ledger, system, svc, []);
+        await project?.release(svc.projectId);
+      }
     },
     /**
      * 路由的台账补投影（RFC-025 第三期后半）：按网关自己存的路由表逐个服务再声明一次，漏写的（台账暂时不可用）由它追上；

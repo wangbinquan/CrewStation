@@ -42,7 +42,8 @@ function conditionsOf(change: ObjectChange, controlled: boolean) {
  */
 export async function observeChange(ledger: LedgerObservations, clock: Clock, systemNamespace: string, stats: ObservationStats, change: ObjectChange): Promise<void> {
   const { object, gone } = change;
-  if (object.metadata.namespace === systemNamespace && !object.metadata.labels?.['crewstation.io/task']) {
+  // 平台组件不在台账范围；带任务标签（档位测试）或资源 ID 标签（资源中心渲染的，例如平台接口的限流中间件）的照常观测。
+  if (object.metadata.namespace === systemNamespace && !object.metadata.labels?.['crewstation.io/task'] && !object.metadata.labels?.[RESOURCE_ID_LABEL]) {
     stats.platform += 1;
     return;
   }

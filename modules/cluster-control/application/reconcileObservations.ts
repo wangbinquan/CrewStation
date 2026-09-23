@@ -1,14 +1,15 @@
 import type { Clock, Logger } from '@crewstation/kernel';
 import type { ObservedObject } from '../domain/observation';
-import { controllerOf, crashLoopingOf } from '../domain/observation';
+import { middlewareRendersOf } from '../domain/middlewareRender';
+import { controllerOf, crashLoopingOf, RESOURCE_ID_LABEL } from '../domain/observation';
 import { routeRenderOf } from '../domain/routeRender';
 import type { ClusterWriter, ManagedObjectFeed, ObservedKind } from '../ports/cluster';
 import type { LedgerObservations, LedgerRecordView } from '../ports/ledger';
 import type { ObservationStats } from './observeChange';
 import { observeChange } from './observeChange';
 
-/** 删的顺序（设计 §6.2）：先工作负载（Deployment、Job、Pod），再 Secret、Service、路由；PVC 只随工作卷记录删。 */
-const REMOVAL_ORDER: readonly ObservedKind[] = ['Deployment', 'Job', 'Pod', 'Secret', 'Service', 'IngressRoute', 'PersistentVolumeClaim'];
+/** 删的顺序（设计 §6.2）：先工作负载（Deployment、Job、Pod），再 Secret、Service、路由与它引用的中间件；PVC 只随工作卷记录删。 */
+const REMOVAL_ORDER: readonly ObservedKind[] = ['Deployment', 'Job', 'Pod', 'Secret', 'Service', 'IngressRoute', 'Middleware', 'PersistentVolumeClaim'];
 const isObserved = (kind: string): kind is ObservedKind => (REMOVAL_ORDER as readonly string[]).includes(kind);
 const key = (child: { readonly kind: string; readonly namespace?: string; readonly name: string }) => `${child.kind}/${child.namespace ?? ''}/${child.name}`;
 const RETENTION_EXPIRED = 'retention-expired';
@@ -64,7 +65,7 @@ async function removeChildren(deps: ReconcileDeps, record: LedgerRecordView): Pr
     for (const child of targets.filter((target) => target.kind === kind)) {
       const cached = deps.feed.cached(kind, child.namespace, child.name), uid = cached?.metadata.uid;
       if (!cached || !uid || cached.metadata.deletionTimestamp) continue;
-      if (cached.metadata.namespace === deps.systemNamespace && !cached.metadata.labels?.['crewstation.io/task']) continue;
+      if (cached.metadata.namespace === deps.systemNamespace && !cached.metadata.labels?.['crewstation.io/task'] && !cached.metadata.labels?.[RESOURCE_ID_LABEL]) continue;
       await deps.cluster.remove({ kind, ...(cached.metadata.namespace ? { namespace: cached.metadata.namespace } : {}), name: cached.metadata.name, uid });
       deps.stats.removed += 1;
       deps.logger.info('resource child removed', { resourceId: record.id, kind, namespace: cached.metadata.namespace, name: cached.metadata.name, reason: record.releaseReason?.code });
@@ -129,7 +130,26 @@ async function applyRoute(deps: ReconcileDeps, record: LedgerRecordView): Promis
 }
 
 /**
- * 调和一条记录：先按期望补观测；路由按期望应用；「不要了」的删子对象；工作卷看上级是否已结束。上级进入「已结束」时把挂在它下面的记录
+ * 限流策略（第三期后半，T10，设计 §7.3）：期望在、Middleware 缺了或与期望不一致时按期望 apply。系统命名空间里的（平台接口的限流）
+ * 同样由它渲染——它们带所属记录的资源 ID 标签，是台账里的对象；删除中的等它消失再建；期望不完整的整条不渲染，只告警。
+ */
+async function applyMiddlewares(deps: ReconcileDeps, record: LedgerRecordView): Promise<void> {
+  const renders = middlewareRendersOf(record.spec);
+  if (!renders) {
+    deps.logger.warn('resource rate-limit spec incomplete', { resourceId: record.id });
+    return;
+  }
+  for (const middleware of renders) {
+    const current = deps.feed.cached('Middleware', middleware.namespace, middleware.name);
+    if (current?.metadata.deletionTimestamp) continue;
+    if ((await deps.cluster.applyMiddleware(middleware, record.id, current)) !== 'applied') continue;
+    deps.stats.applied += 1;
+    deps.logger.info('resource child applied', { resourceId: record.id, kind: 'Middleware', namespace: middleware.namespace, name: middleware.name, reason: current ? 'drift' : 'missing' });
+  }
+}
+
+/**
+ * 调和一条记录：先按期望补观测；路由与限流中间件按期望应用；「不要了」的删子对象；工作卷看上级是否已结束。上级进入「已结束」时把挂在它下面的记录
  * 重新排进队列（工作卷的「待回收」要在这之后判定）。只在观测缓存同步完成后调用。
  */
 export async function reconcileRecord(deps: ReconcileDeps, id: string, enqueue: Enqueue): Promise<void> {
@@ -138,6 +158,7 @@ export async function reconcileRecord(deps: ReconcileDeps, id: string, enqueue: 
   await observeRecord(deps, record);
   await observeControlledPods(deps, record, enqueue);
   if (record.kind === 'route' && record.desired === 'present') await applyRoute(deps, record);
+  if (record.kind === 'rate-limit-policy' && record.desired === 'present') await applyMiddlewares(deps, record);
   if (record.desired === 'absent') await removeChildren(deps, record);
   await settleVolume(deps, record);
   if (record.kind !== 'volume' && record.desired === 'absent' && record.phase === 'stopped') {

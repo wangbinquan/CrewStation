@@ -25,10 +25,7 @@ async function rejected(promise: Promise<unknown>): Promise<string> {
   throw new Error('expected rejection');
 }
 
-beforeAll(async () => {
-  if (!available) return;
-  tdb = await createTestDatabase([eventbusMigrations, gatewayMigrations]);
-  gateway = createGatewayModule({
+const gatewayDeps = (): Parameters<typeof createGatewayModule>[0] => ({
     db: tdb.db, k8s: createFakeK8sClient(),
     services: { listServices: async () => services, getService: async (id) => services.find((s) => s.serviceId === id), serviceIdOfProject: async (p) => services.find((s) => s.projectId === p)?.serviceId },
     slots: { slotRoles: async () => ({ prod: 'blue', preview: 'green' }), standbyEntry: async () => ({ empty: false }), notePreviewAccess: async () => {} },
@@ -38,7 +35,12 @@ beforeAll(async () => {
     users: { describe: async () => undefined },
     isAdmin: async (id) => id === admin.userId,
     settings: { systemNamespace: 'crewstation-system', serviceDomain: 'svc.cs.internal', userAuthMiddleware: 'forward-auth-user', serviceAuthMiddleware: 'forward-auth-service', dropIdentityHeadersMiddleware: 'drop-identity-headers', allowlistMaxStaleSeconds: 300, consumerName: 'test.rate-limits' },
-  });
+});
+
+beforeAll(async () => {
+  if (!available) return;
+  tdb = await createTestDatabase([eventbusMigrations, gatewayMigrations]);
+  gateway = createGatewayModule(gatewayDeps());
 });
 afterAll(async () => { await tdb?.drop(); });
 
@@ -72,6 +74,41 @@ describe.skipIf(!available)('网关限流策略（RFC-025 设计 §7.3、T10）'
     expect(await rejected(gateway.api.getProjectRateLimits(developer, demoProject))).toBe('forbidden');
   });
 
+  test('写进资源台账：改平台默认声明平台与每个项目各一条，改项目覆盖只声明那个项目；补投影全部再声明；归档释放；台账写失败只告警', async () => {
+    const declared: Array<{ ref: string; display: Readonly<Record<string, string>> }> = [], released: string[] = [], warnings: string[] = [];
+    let failing = false;
+    const ledger = {
+      declare: async (input: { ref: string; display: Readonly<Record<string, string>> }) => { if (failing) throw new Error('台账暂时不可用'); declared.push({ ref: input.ref, display: input.display }); return { id: `rec-${input.ref}` }; },
+      find: async (ref: string) => (declared.some((entry) => entry.ref === ref) ? { id: `rec-${ref}`, desired: 'present' as const } : undefined),
+      requestRelease: async (id: string) => { released.push(id); },
+      report: async () => undefined,
+    };
+    const logger = { debug: () => undefined, info: () => undefined, warn: (msg: string) => { warnings.push(msg); }, error: () => undefined, child: () => logger };
+    const withLedger = createGatewayModule({ ...gatewayDeps(), ledger, logger });
+    const current = await withLedger.api.getRateLimits(admin);
+    await withLedger.api.setRateLimits(admin, { ...DEFAULT_RATE_LIMITS, expectedRevision: current.revision });
+    expect(declared.map((entry) => entry.ref)).toEqual(['platform', `project:${demoProject}`]);
+    expect(declared[0]?.display).toMatchObject({ scope: 'platform', perUser: '20/s·40' });
+    declared.length = 0;
+    const own = await withLedger.api.getProjectRateLimits(admin, demoProject);
+    await withLedger.api.setProjectRateLimits(admin, demoProject, { override: { userDomain: { perUser: { average: 5, burst: 10 }, perHost: { average: 50, burst: 100 } } }, expectedRevision: own.revision });
+    expect(declared).toEqual([{ ref: `project:${demoProject}`, display: expect.objectContaining({ override: 'true', userPerUser: '5/s·10' }) }]);
+    expect(await withLedger.api.resyncRateLimitLedger()).toBe(2);
+    // 策略已经存下，台账暂时写不进：设置照常保存，只告警。
+    failing = true;
+    const latest = await withLedger.api.getRateLimits(admin);
+    expect((await withLedger.api.setRateLimits(admin, { ...DEFAULT_RATE_LIMITS, expectedRevision: latest.revision })).revision).toBe(latest.revision + 1);
+    expect(warnings).toContain('resource ledger rate limit projection failed');
+    failing = false;
+    // 归档：项目那条标「不要了」；没有记录的项目不动。
+    await withLedger.api.removeService(demoId);
+    expect(released).toEqual([`rec-project:${demoProject}`]);
+    await createGatewayModule({ ...gatewayDeps(), ledger: { ...ledger, find: async () => undefined } }).api.removeService(demoId);
+    expect(released).toHaveLength(1);
+    // 没配台账：补投影是 0。
+    expect(await gateway.api.resyncRateLimitLedger()).toBe(0);
+  });
+
   test('HTTP：管理员读写平台默认与项目覆盖；非管理员 403；不合规的请求体 400', async () => {
     const app = createApp({ name: 'rate-limits-test' }); for (const r of gateway.http) app.route('/', r);
     const as = (actor: Actor) => ({ [IDENTITY_HEADERS.userId]: actor.userId, [IDENTITY_HEADERS.userName]: 'n', [IDENTITY_HEADERS.userEmail]: 'e@x', 'content-type': 'application/json' });
@@ -82,9 +119,11 @@ describe.skipIf(!available)('网关限流策略（RFC-025 设计 §7.3、T10）'
     expect(put.status).toBe(200);
     expect(await put.json()).toMatchObject({ revision: settings.revision + 1 });
     const path = `/v1/admin/projects/${demoProject}/rate-limits`;
-    expect((await app.request(path, { headers: as(admin) })).status).toBe(200);
-    const override = await app.request(path, { method: 'PUT', headers: as(admin), body: JSON.stringify({ override: { serviceDomain: DEFAULT_RATE_LIMITS.serviceDomain }, expectedRevision: 0 }) });
-    expect(await override.json()).toMatchObject({ override: { serviceDomain: DEFAULT_RATE_LIMITS.serviceDomain }, revision: 1 });
-    expect((await app.request(path, { method: 'PUT', headers: as(developer), body: JSON.stringify({ override: null, expectedRevision: 1 }) })).status).toBe(403);
+    const read = await app.request(path, { headers: as(admin) });
+    expect(read.status).toBe(200);
+    const { revision } = await read.json() as { revision: number };
+    const override = await app.request(path, { method: 'PUT', headers: as(admin), body: JSON.stringify({ override: { serviceDomain: DEFAULT_RATE_LIMITS.serviceDomain }, expectedRevision: revision }) });
+    expect(await override.json()).toMatchObject({ override: { serviceDomain: DEFAULT_RATE_LIMITS.serviceDomain }, revision: revision + 1 });
+    expect((await app.request(path, { method: 'PUT', headers: as(developer), body: JSON.stringify({ override: null, expectedRevision: revision + 1 }) })).status).toBe(403);
   });
 });

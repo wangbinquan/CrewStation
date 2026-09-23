@@ -75,6 +75,14 @@ describe.skipIf(!available)('cluster-control：观测写回台账与收编空跑
       if (stored) await feed.emit({ kind: 'IngressRoute', object: stored, gone: false });
       return outcome;
     },
+    applyMiddleware: async (middleware, resourceId, current) => {
+      const outcome = await writer.applyMiddleware(middleware, resourceId, current);
+      if (outcome !== 'applied') return outcome;
+      routeApplies.push(`${current ? 'drift' : 'missing'}:${middleware.namespace}/${middleware.name}`);
+      const stored = await k8s.get<K8sObject>(Resources.Middleware!, middleware.name, middleware.namespace);
+      if (stored) await feed.emit({ kind: 'Middleware', object: stored, gone: false });
+      return outcome;
+    },
   };
   let control: ReturnType<typeof createClusterControlModule>;
   let ledger: LedgerObservations;
@@ -308,6 +316,44 @@ describe.skipIf(!available)('cluster-control：观测写回台账与收编空跑
     await until('路由删掉', async () => (await resources.api.get(record.id))?.phase === 'stopped');
     expect(removals).toContain('IngressRoute/shop-prod');
     expect(routeApplies).toHaveLength(2);
+  });
+
+  // RFC-025 T10：限流策略的 Middleware 由调和器照记录渲染；系统命名空间里的（平台接口）带资源 ID 标签，照常观测与回收。
+  test('限流策略：中间件缺了按期望建出（含系统命名空间里的），都在即运行中；被人改了改回；与期望一致不写；不要了的删掉', async () => {
+    type Middleware = K8sObject & { spec: Record<string, unknown> };
+    const gateway = resources.api.owner('gateway');
+    const middlewares = [
+      { namespace: 'cs-demo', name: 'rate-limit-user', rateLimit: { average: 30, burst: 60, key: { header: 'x-cs-user-id' } } },
+      { namespace: 'crewstation-system', name: 'in-flight-platform-api', inFlight: { amount: 16, key: { header: 'x-cs-user-id' } } },
+    ];
+    const spec = { children: middlewares.map((entry) => ({ kind: 'Middleware', namespace: entry.namespace, name: entry.name })), middlewares };
+    const record = await gateway.declare({ kind: 'rate-limit-policy', ref: 'policy-test', projectId: PROJECT, spec });
+    await until('策略运行中', async () => (await resources.api.get(record.id))?.phase === 'ready');
+    const user = await k8s.get<Middleware>(Resources.Middleware!, 'rate-limit-user', 'cs-demo');
+    expect(user?.spec).toEqual({ rateLimit: { average: 30, burst: 60, period: '1s', sourceCriterion: { requestHeaderName: 'x-cs-user-id' } } });
+    expect(user?.metadata.labels?.['crewstation.io/resource-id']).toBe(record.id);
+    expect((await k8s.get<Middleware>(Resources.Middleware!, 'in-flight-platform-api', 'crewstation-system'))?.spec).toEqual({ inFlightReq: { amount: 16, sourceCriterion: { requestHeaderName: 'x-cs-user-id' } } });
+    const applies = routeApplies.filter((entry) => entry.includes('/')).length;
+    expect(applies).toBe(2);
+    // 与期望一致：再核对也不写。
+    await gateway.declare({ kind: 'rate-limit-policy', ref: 'policy-test', projectId: PROJECT, spec, display: { scope: 'project' } });
+    await control.reconciled();
+    expect(routeApplies.filter((entry) => entry.includes('/'))).toHaveLength(2);
+    // 被人把平均改大了（generation 加一）：改回。
+    const drifted: Middleware = { ...user!, metadata: { ...user!.metadata, generation: 2 }, spec: { rateLimit: { average: 9999, burst: 9999, period: '1s', sourceCriterion: { requestHeaderName: 'x-cs-user-id' } } } };
+    await k8s.apply(drifted);
+    await feed.emit({ kind: 'Middleware', object: drifted, gone: false });
+    await until('改回', () => routeApplies.filter((entry) => entry.includes('/')).length === 3);
+    expect((await k8s.get<Middleware>(Resources.Middleware!, 'rate-limit-user', 'cs-demo'))?.spec).toMatchObject({ rateLimit: { average: 30 } });
+    // 期望不完整（缺桶的取值）：整条不渲染。
+    await gateway.declare({ kind: 'rate-limit-policy', ref: 'policy-broken', projectId: PROJECT, spec: { children: [{ kind: 'Middleware', namespace: 'cs-demo', name: 'rate-limit-broken' }], middlewares: [{ namespace: 'cs-demo', name: 'rate-limit-broken' }] } });
+    await control.reconciled();
+    expect(await k8s.get(Resources.Middleware!, 'rate-limit-broken', 'cs-demo')).toBeUndefined();
+    expect(routeApplies.filter((entry) => entry.includes('/'))).toHaveLength(3);
+    // 不要了：两个中间件都删掉（系统命名空间里的也删，它带资源 ID 标签），记录进入已结束。
+    await gateway.requestRelease(record.id, { code: 'project-archived', message: '项目已归档' });
+    await until('中间件删掉', async () => (await resources.api.get(record.id))?.phase === 'stopped');
+    expect(removals).toEqual(expect.arrayContaining(['Middleware/rate-limit-user', 'Middleware/in-flight-platform-api']));
   });
 
   // RFC-025 设计 §7.4：身份索引改读观测缓存，全平台只剩这一条 Pod watch。

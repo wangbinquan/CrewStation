@@ -47,6 +47,8 @@ export function computePhase(record: PhaseInput): PhaseResult {
   if (!rule.primaryChild) return byConditions(record, rule);
   const primary = expectedChildren(record).find((child) => child.kind === rule.primaryChild);
   if (rule.primaryChild === 'Job') return jobPhase(record, primary);
+  // 限流策略：期望里的中间件都在即生效，缺哪个就还在分配中。
+  if (rule.primaryChild === 'Middleware') return expectedChildren(record).every(isPresent) ? { phase: 'ready' } : { phase: 'provisioning' };
   if (!primary || !isPresent(primary)) return condition(record, 'Prepared')?.status === 'false' ? { phase: 'pending', reason: QUEUED } : { phase: 'provisioning' };
   if (rule.primaryChild === 'PersistentVolumeClaim') return volumePhase(primary);
   // 路由：IngressRoute 在即生效；删除中（换名、摘除）按启动中算。
