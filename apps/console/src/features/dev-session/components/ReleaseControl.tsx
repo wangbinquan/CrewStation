@@ -107,7 +107,7 @@ export function ReleaseControl({ projectId, taskId, access, release, unsavedFile
   }
   return (
     <div className={styles.control}>
-      {/* 释放会话收回容器与工作卷，是危险动作：红字红框，最终确认红底（2026-09-23 裁定）；在卡片底部操作条里靠左，标准尺寸。 */}
+      {/* 释放会话收回容器与工作卷，是危险动作：红字红框，最终确认红底（2026-09-23 裁定）；在卡片底部操作条里靠左，尺寸由开发页的紧凑区域给出。 */}
       <Button variant="danger" onClick={() => { setAsking(true); inspect(); }} disabled={release.isPending}>
         {release.isPending ? t('devSession.release.pending') : t('devSession.release.action')}
       </Button>

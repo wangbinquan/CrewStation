@@ -35,6 +35,15 @@
   - 实现要点：`ToolPanel` 收起与打开两种形态的树不同，面板从收起到打开时内容整块重挂。所以页头的点击次数和「已处理」都记在 `DevSessionWorkbench`，只在会话面板可见时交给 `ReleaseControl`；它在渲染时并入状态，提交后发检查并回报。第一版把「已处理」记在卡片里，从收起状态点页头时卡片重挂，请求被吞，新用例当场变红。
 - **用例**：新增 `sessionReleaseEntry` 4 条：面板顺序与按钮位置（含样式锁）；从收起状态点页头，打开、聚焦，再点一次重新检查，收起再开不会自己展开；面板开着别的工具时点页头；无权者没有入口。开发页相关的旧用例 57 条不改全过；其中 `editorWorkspace`、`developmentLocation` 里的「释放会话」现在点到的是页头入口，断言不变。
 - **回填**：RFC-003 development-workspace §2、RFC-008 proposal 与 design、RFC-020 proposal 与 design，各加一条 2026-09-23 修订注记。
+- **门禁与 CI**：
+  - 提交前在「98fccd27＋本批」干净导出树上跑 `bun run check`：check:static 通过；2609 pass／90 skip／3 fail。3 条失败是导出树里 `templates/`、`integrations/` 找不到 `hono`，与本批无关。新增的 4 条用例在旧代码上 4 条全红。
+  - 提交 `4a1fd27e`；[CI 35874838682](https://github.com/wangbinquan/CrewStation/actions/runs/35874838682) 六项全绿，新增代码防护为改动的可执行行 30 行全部被执行（100.0%）。
+- **部署**：14:32:56Z 只滚 console，14:33:27Z 就绪 → `cs-console:release-entry-20260923`（`git archive 4a1fd27e`，即当时的 origin/main，含 crewstation-bd 已部署的调用链改动；包 `index-Cz_Ge4uH.js`），重启 0 次，没有迁移。
+- **实机**（无头 Chrome，dev-admin，演示项目）：用 CDP 把个人布局的 PUT 就地回执，任何 DELETE 一律回 503，作者的布局没被改，也没有发出任何释放请求。
+  - 1440×900：页头按钮依次为「创建开发Agent会话」「选择算力档位」「新窗口打开预览」「准备发布」「释放会话」。点「释放会话」后地址变为 `?view=session`，面板顺序是当前会话、连接与恢复、历史对话会话、最近日志；卡片里展开「强制释放他人的开发会话？」（dev-admin 不是创建者），焦点在确认上，检查结果为未提交 0、未推送 0。取消后，卡片里的按钮距卡片左边 17px（卡宽 575px），灰字说明在操作条下面。
+  - 390×844：页头按钮换行，「释放会话」排在「准备发布」后面，横向溢出 0；点了之后面板放大占满，顺序同上，焦点在确认上。控制台没有报错。
+  - 卡片按钮量出来是 26px：开发页整片包在 `ButtonSizeContext` 的紧凑档里，这是 09-23 按钮统一定的。当初在 `ReleaseControl` 写的「标准尺寸」注释是错的，已随下一笔提交改正。
+  - 应 crewstation-bd 之请，滚完后跑 `tests/e2e/traceChains.test.ts`（dev-oidc，dev-admin）：3 pass。
 
 ## 调用链：列出本应用全部调用链并分层回放；修复回放跨项目取任务的越权（2026-09-23，Design D62）
 
