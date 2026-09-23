@@ -8,6 +8,7 @@
 - [2. 与验收清单的对应](#2-与验收清单的对应)
 - [3. 第二期：任务类容器（T6、T7）](#3-第二期任务类容器t6t7)
 - [4. 第三期：服务槽（T8）](#4-第三期服务槽t8)
+- [5. 第三期后半：路由（T9）](#5-第三期后半路由t9)
 
 ## 1. 第一期：基础（T2–T5）
 
@@ -121,6 +122,19 @@
   - 3 个已释放环境的 PVC（cs-rfc006-verify 一个、cs-rfc010-cluster-qa 两个）登记为资源中心名下的工作卷记录，阶段「已结束」、原因 `orphaned`，PVC 本身不动（`kubectl get pvc` 前后都是 11 个）。
 - 之后：每个开发预览主机只剩一条 IngressRoute（此前 demo、rfc003-ux、rfc003-verify-workbench 各两条同 Host）；受管 Runner Secret 只剩 3 个运行中会话各自当前的那个；`dev.demo.cs.localhost` 经网关照常到 ForwardAuth（未登录 401），当前会话的预览路由与 Service（有端点）未受影响。
 
+### 3.5 第四步：额度经台账受理（84e1fc50）
+
+- 门禁（干净导出树）：check:static 通过；unit 577、module 1296、console 874；改动行 54／54。CI [35913161843](https://github.com/wangbinquan/CrewStation/actions/runs/35913161843) 六项成功。
+- 部署（UTC）：20:09:11 cs-controller、20:09:13 cs-api、20:09:45 cs-session 换到 `cs-control-plane:rc025-t6a-20260924`（`git archive 84e1fc50`；cs-session 此前还是 `rc025-p2b-20260923`），无迁移，各一次就绪、0 重启；三个服务上线后 2 分钟内没有告警或错误日志。
+- 切换前查库：每个项目的台账占用（占额度的种类、阶段在运行或结束中的记录数）与旧计数器 `task_runtime.admissions.running` 一致。
+- 20:32 复核：3 个项目各有一条运行中的开发工作区记录、各占 1 个额度，与集群里 3 个在跑的任务 Pod（cs-demo、cs-rfc003-ux、cs-rfc003-verify-workbench）一一对上；旧计数器停在各 1，不再随受理与释放变化（只剩行锁的用处）。
+- 到上限拒绝（文案照各入口原来的说法、台账不多一条）、释放之后额度回来、结束中仍占、暂停后恢复与失败后重建重新受理，由模块用例 `ledgerAdmission.test.ts` 与 task-runtime 的额度用例核对；实机上开会话与 CLI 要在网关登录之后，没有替作者登录。
+
+### 3.6 CLI 名册照台账（7551a493，§11.2）
+
+- 门禁（干净导出树）：check:static 通过；unit 578、module 1296、console 874；改动行 11／11。CI [35914868755](https://github.com/wangbinquan/CrewStation/actions/runs/35914868755) 六项成功。
+- 部署：随 3ddccf23 的镜像一起上线（§5）。名册接口在网关登录之后，没有替作者登录去调；执行记录已结束即 `ended`（Runner 报的 `failed` 照旧）、失败即 `failed`、结束中仍报 `running`、读不到台账时照 Runner 的说法，由 `terminalPhase.test.ts` 逐条核对。上线后 cs-api 没有这个接口的告警或错误日志。
+
 ## 4. 第三期：服务槽（T8）
 
 | 提交 | 门禁（干净导出树） | CI | 部署（UTC） |
@@ -133,6 +147,7 @@
 | `b2e19fdc` 统一预检接到发布侧：标准原因、集群 dry-run、预检查询，受理之后的失败记进发布记录 | check:static 通过；unit 575、module 1289、console 871；改动行 149／152（98.0%） | [35904861577](https://github.com/wangbinquan/CrewStation/actions/runs/35904861577) 六项成功 | 18:57:03 cs-controller、18:57:05 cs-api 换到 `cs-control-plane:rc025-p3f-20260924`，18:57:37 console 换到 `cs-console:rc025-p3f-20260924` |
 | `c2be2128` 发布受理时就按那次提交的 Manifest 预检 | check:static 通过；unit 575、module 1290、console 871；改动行 46／47（97.9%） | [35906164790](https://github.com/wangbinquan/CrewStation/actions/runs/35906164790) 六项成功 | 19:06:57 cs-controller、19:06:59 cs-api 换到 `cs-control-plane:rc025-p3g-20260924` |
 | `3c5315e0` 构建与迁移 Job 进台账，结束时记下结果 | check:static 通过；unit 577、module 1292、console 873；改动行 73／73 | [35908456352](https://github.com/wangbinquan/CrewStation/actions/runs/35908456352) 六项成功 | 19:27:10 cs-controller、19:27:11 cs-api 换到 `cs-control-plane:rc025-p3h-20260924`，19:27:43 console 换到 `cs-console:rc025-p3h-20260924` |
+| `26033e7c` 概览摘要随推送流立即重读；发布页与概览共用按记录重读的钩子 | check:static 通过；unit 577、module 1292、console 874；改动行 18／18 | [35910235072](https://github.com/wangbinquan/CrewStation/actions/runs/35910235072) 六项成功 | 19:44:18 cs-controller、19:44:20 cs-api 换到 `cs-control-plane:rc025-p3i-20260924`（含其他会话的 9413aa8f、8406d9a6），19:44:56 console 换到 `cs-console:rc025-p3i-20260924` |
 
 镜像都由 `git archive <提交>` 构建，只含已提交内容；无迁移，各一次就绪、0 重启。
 
@@ -145,4 +160,25 @@
 - **2b61586f 部署后**：补投影 14 个服务后，10 个在计时的待命槽记录都带上 `RetentionDeadline`，到期时刻与按平台策略（回退目标 72 小时、无人访问 14 天、提前 24 小时提醒）手算的一致——4 个回退目标到 09-26 05:14:23Z（09-23 05:14 切流起 72 小时），1 个推迟过一次的回退目标到 09-27 07:41:20Z，5 个待验证版本按就绪或最近一次访问起 14 天（其中一个按 09-23 10:22:25Z 的访问推后到 10-07 10:22:25Z）；4 个空的待命槽条件为假、没有到期字段。都还没到提醒时刻，没有提醒字段。发布页槽卡的推送重读由组件用例核对（浏览器登录已过期）。
 - **统一预检（RC-07）**：四种情形由模块用例逐一核对——旧写法 Manifest（`manifest-outdated`，重新部署）、档位被删（`profile-missing`，发布受理与流水线部署）、套餐被收回（`plan-unavailable`，重新部署与发布受理；project 模块直接拒绝时同样归为它）、额度已满（任务类入口，`quota_exceeded`，随 T6 的额度经台账受理再核对一次）；每种都返回 412、原因码与出路，发布与槽不变、台账没有新记录。实机上这些接口在网关登录之后，没有替作者登录去点；集群 dry-run 与现在的部署用同一个动词与身份（cs-api 的服务账号对 Deployment 与 Service 做服务端 apply）。
 - **3c5315e0 部署后**：观测缓存加上 Job 之后照常同步（首轮 `recorded 19、unchanged 51、unowned 102`，本机眼下没有受管的 Job），cs-controller 的服务账号 `crewstation-control` 可在全集群 list／watch Job（部署前 `kubectl auth can-i` 核对）。真正跑一次构建与迁移要在共享集群上发布（会在 GitLab 打标签），没有得到许可不做；Job 记录的认领、阶段与 TTL 之后的结果由模块用例核对。
+
+## 5. 第三期后半：路由（T9）
+
+| 提交 | 门禁（干净导出树） | CI | 部署（UTC） |
+|---|---|---|---|
+| `3ddccf23` 服务的路由投影成 `route` 记录，每 5 分钟按路由表补投影 | check:static 通过；unit 581、module 1298、console 874；改动行 65／70（92.9%，未执行的 5 行是一个右括号与四行注释，由 5cb1060b 修正合并规则后为 65／65） | [35917333817](https://github.com/wangbinquan/CrewStation/actions/runs/35917333817) 六项成功 | 20:47:14 cs-controller、20:47:16 cs-api、20:47:48 cs-session 换到 `cs-control-plane:rc025-t9a-20260924`（`git archive 3ddccf23`，含 7551a493） |
+| `aed62f71` 身份索引墓碑保留 7 天、每小时清理；定时作业收成 `periodicJob` | check:static 通过；unit 582、module 1301、console 874；改动行 47／47 | [35918700319](https://github.com/wangbinquan/CrewStation/actions/runs/35918700319) 六项成功 | 21:00:39 cs-controller、21:00:42 cs-api、21:01:14 cs-session 换到 `cs-control-plane:rc025-t9b-20260924` |
+| `0c97dfb5` 服务路由的 IngressRoute 改由调和器照记录建、改、删 | check:static 通过；unit 588、module 1302、console 874；改动行 90／90 | [35921300629](https://github.com/wangbinquan/CrewStation/actions/runs/35921300629) 六项成功 | 21:24:33 cs-controller、21:24:34 cs-api、21:25:06 cs-session 换到 `cs-control-plane:rc025-t9c-20260924`；**21:26 回滚**到 `rc025-t9b-20260924`（见下） |
+| `5a5591f2` 身份索引改由 cluster-control 的观测缓存驱动，gateway 的 Pod watch 去掉 | check:static 通过；unit 588、module 1304、console 874；改动行 29／29 | 随 cb13edb7 一起跑（下一行） | 随 cb13edb7 上线 |
+| `cb13edb7` 台账比较子对象不看先后，观测里的 generation 存得下、读得回 | check:static 通过；unit 588、module 1306、console 874；改动行 10／10 | [35923652797](https://github.com/wangbinquan/CrewStation/actions/runs/35923652797) 六项成功 | 21:46:58 cs-controller、21:47:00 cs-api、21:47:32 cs-session 换到 `cs-control-plane:rc025-t9d-20260924`（含 0c97dfb5、5a5591f2） |
+
+镜像由 `git archive <提交>` 构建；无迁移，各一次就绪、0 重启；三个服务上线后没有告警或错误日志。
+
+- **路由进台账**：上线 1 秒后补投影完成（`resource ledger routes resynced`，14 个服务），台账里 55 条 `route` 记录全是「运行中」——正式、待验证、服务域各 14 条，内部 API 前缀 13 条；每条的 IngressRoute 子对象都已观测到（`resources.children` 55／55）。集群里按 `<服务>-{prod,preview,service,internal-api}` 命名的 IngressRoute 正好 55 条，一一对应；其余是系统命名空间的平台路由（不入台账）与开发预览路由（仍挂在开发工作区记录下）。
+- 首轮观测汇总 `recorded 22、unchanged 52、unowned 99` 在路由记录建出之前（20:47:16，补投影在 20:47:17），所以这 55 个 IngressRoute 在那一轮仍算未认领；认领由子对象表核实。
+- **空写循环：发现、回滚与修复**：
+  - 0c97dfb5 上线后首轮汇总 `applied 0`——新渲染与线上 55 条服务路由一致，部署前后每条的 resourceVersion 与 generation 都没变；但观测新加的 `generation` 没写进台账的 `observed` 列，读回来少一个字段，同样的观测每次都算变化，按记录核对自己跟自己转圈：21:25 这一分钟台账变更 4629 条。21:26 把三个服务回滚到 aed62f71 的镜像，路由记录的空写随即停下。
+  - 查的时候发现此前每分钟约 1800 条的底子本身也是这种循环：6 条开发工作区记录（3 个运行中的会话、3 个失败的会话）每条每秒被空写 4–8 次，隔一秒取两次快照内容完全相同而 `version` 在涨（其中一条已写到 14 万次）；按小时统计，从 09-23 16:22（99e93569 上线，开发工作区记录从 1 个子对象变成 4 个）起每小时约 11 万行。根因是子对象从库里按种类与名字读回、合并却按期望里的顺序排，按数组一比就「变了」，整组重写并追加一行变更，这行变更又触发下一次核对。开着的工作台概览会随记录变化重读摘要，也跟着被拉高。
+  - cb13edb7 修掉两处：比较子对象不看先后，`generation` 随观测存下、读回；两条回归用例在修复前的代码上都失败。21:46:58 上线后，21:47 这一分钟台账变更 28 条（上线本身的补投影与观测），此后空闲时为 0；首轮 `applied 0`，55 条路由对象部署前后逐条不变，路由子对象的观测都带上了 `generation`。上线后 1 秒内有 9 条「路由期望不完整」告警：回滚期间旧代码把路由记录的期望写回了旧形状，补投影完成（21:47:00.95）之后不再出现。
+- **身份索引改读观测（5a5591f2，随 cb13edb7 上线）**：观测缓存首次同步后 30 条在册身份全部被刷新（`pod identities pruned after relist` 清掉 1 条旧行）；新起的 cs-controller、cs-api、cs-session Pod 拿到 IP 后约 1 秒内入索引；gateway 自己的 Pod watch 已删去，全平台只剩观测缓存这一条 Pod watch。改动路由对象后「改回」由模块用例核对（在共享集群上手工改线上路由没有做）。
+- **墓碑清理（aed62f71 部署后）**：部署前 `gateway.pod_identities` 在册 30 行、墓碑 727 行（最早 09-11 14:54），其中 189 行标为删除已超过 7 天；上线 2 秒后 `pod identity tombstones purged`（189），之后墓碑 541 行、最早 09-18 05:18，没有超过 7 天的，在册 30 行不变。这次首轮观测汇总 `recorded 19、unchanged 106、unowned 47`——上一轮的 99 里有 55 个是服务路由，这次已被路由记录认领。三个补投影作业改用 `periodicJob` 后日志照旧（槽 14、任务环境 21、路由 14）。
 
