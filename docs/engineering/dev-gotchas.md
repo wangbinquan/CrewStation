@@ -369,6 +369,11 @@ TaskRunner 收到 welcome 后立刻补发重放事件，**本机集群里稳定�
 「人还在不在」要按页面的焦点／可见性判断，由页面自己按时限释放（`nativeTerminalAttachment` 的 `CONTROL_RELEASE_MS`）；
 租约只兜「页面关掉、断线」。另外，没取得控制的视图 `disableStdin`，这些查询它不会应答——只有持有控制的那个视图在替 TUI 回话。
 
+**2026-09-23 结论（RFC-026）**：新 Runner 的无头终端统一应答终端查询（配色查询按固定配色补答），快照带 `repliesQueries` 时浏览器拦下查询、不再应答，
+应答续租与「没人持有控制就一直空白」一起消失；旧 Runner 的 CLI 仍是上面的情况。另一个坑：`@xterm/headless` 没有主题服务，**不答** OSC 4／10／11／12，
+要自己 `registerOscHandler` 补答，否则 OpenCode 会等这几条应答约 8 秒才画界面。
+
+
 ### Runner 的错误码到浏览器只剩 `PlatformError.kind`
 
 Runner 回的 error 帧带具体 code（如 `terminal_read_only`、`terminal_ended`），cs-session 把它包成 `PlatformError('precondition', message, { code })` 再发给浏览器，

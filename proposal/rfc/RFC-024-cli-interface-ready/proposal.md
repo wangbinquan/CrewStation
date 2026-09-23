@@ -38,7 +38,7 @@ RFC-022 让新开的 CLI 在终端区域中间显示步骤条，「已就绪」�
 **非目标**
 
 - N1 不缩短 CLI 本身的启动时间（CPU 额度、OpenCode 冷启动不在本 RFC）。
-- N2 不让无人持有控制时也能画出界面。STATE.md 已记录的观察（OpenCode 要等终端回答查询、只有持有控制的视图会回答）仍待
+- N2 不让无人持有控制时也能画出界面（**已由 [RFC-026](../RFC-026-runner-terminal-query-replies/proposal.md) 解决**：终端查询改由 Runner 统一应答）。STATE.md 已记录的观察（OpenCode 要等终端回答查询、只有持有控制的视图会回答）仍待
   作者另行决定；本 RFC 只保证这种情况下按超时放行，不比今天更差。
 - N3 不改档位测试（`ProfileTestPanel`）的阶段：档位测试跑的是一轮模型调用，不是交互界面。
 - N4 不用 Agent 动态（OpenCode 插件 `ready`、Claude `SessionStart`）作判据：它们只说明后端加载好了，不说明画面出来了。

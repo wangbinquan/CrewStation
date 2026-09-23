@@ -1,6 +1,6 @@
 # RFC-026｜技术设计
 
-> 状态：In Progress · 2026-09-23 · 作者批准实施，Q1–Q3、C1、C2 按推荐
+> 状态：Done · 2026-09-23 · 作者批准实施，Q1–Q3、C1、C2 按推荐；实机验收见 [acceptance.md](./acceptance.md)
 > 配套：[提案](./proposal.md) · [实施计划](./plan.md)
 
 ## 目录

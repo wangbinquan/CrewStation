@@ -31,6 +31,20 @@
   - e2e（`CS_E2E_AUTH=dev-oidc`）：dev-developer 下开发页相关的 `projectWorkspaceIa`、`cliTabs`、`referenceResources` 通过；`platformCapabilities` 要管理员身份，dev-admin 下 20 条通过。
 - **顺手修**：e2e WS-14 的断言没跟上 RFC-021 待验证版本「已下线」的卡面。演示项目的待验证版本 15:55 被手动下线后卡上是「已下线 v0.1.2 … 部署版本…」，这条断言在任何包上都会红（发布页卡面由数据状态决定，与开发页改动无关）。改为同时认「已下线」与「部署版本…」，dev-admin 下复跑通过。
 
+## RFC-026 终端查询由 Runner 应答：无人持有输入控制时 CLI 也能画出界面（2026-09-23）—— ✅ Done
+
+根因（T1 实测，设计 §2）：OpenCode 1.18.29 启动时发十几类终端查询，一条都不应答时要等约 8 秒超时才画界面；以前只有持有输入控制的浏览器窗口应答，
+没人持有控制时 CLI 一直空白，应答还会给控制续租。`@xterm/headless` 自己答 DA／DSR／DECRQM，但**不答配色 OSC 4／10／11／12**。
+
+- **改了什么**（ac0b7c3f）：Runner 的无头终端统一应答，配色按工作台深色主题与 xterm.js 默认调色板补答（与浏览器 xterm.js 6 逐条一致，256 色 0 差异）；
+  快照带 `repliesQueries`，浏览器据此拦下查询；旧 Runner 照旧由浏览器应答。控制面不动。
+- **CI**：[35866042993](https://github.com/wangbinquan/CrewStation/actions/runs/35866042993) 六项成功。
+- **本机部署**：13:29Z console → `cs-console:replies-20260923b`（`git archive origin/main` = `009c0be3`，含并行会话刚部署的调用链修复，未回退它）；
+  任务底座 `crewstation/task-runtime:replies-20260923`（同时带上 RFC-024 T9 的 **90 秒超时**）；默认档位 `volc-glm-5-2` 另存**修订 7**，测试通过。
+  **部署顺序必须先工作台、后任务底座**：新 Runner 配旧工作台会双份应答，多出的一份作为乱码进 TUI 输入框。
+- **实机**：无人持有控制时 OpenCode 按屏幕判定画出界面（CLI 初始化 33.7 秒）；只读查看者的页面 0 条 `terminalInput`。见 acceptance.md。
+- **RFC-024 T9**：超时 45 → 90 秒（75c45cbc），随本次任务底座上线。
+
 ## RFC-024 CLI 界面就绪：步骤条等到 CLI 画出界面再撤（2026-09-23）—— ✅ Done
 
 作者反馈：新开 OpenCode 时步骤条在进程拉起那一刻就撤掉，之后终端黑屏十来秒，像卡死。根因是 RFC-022 把「已就绪」记在 PTY 进程拉起。
