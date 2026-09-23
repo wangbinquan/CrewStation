@@ -670,6 +670,8 @@ module 层 CI 连红两个提交（635359d 补上）。改了用例的副作用�
 `STATE.md` 是全仓最热的共享文件，别的会话的未提交内容随时都在里面；只想提交自己那一段时，用 `git hash-object -w` 加
 `git update-index --cacheinfo` 把「HEAD 版本＋自己的段落」放进暂存区，工作树里的别人内容原样留着。
 
+**临时文件会丢掉可执行位**（2026-09-23 实撞，439b61e）：`open(tmp,'w')` 新建的文件是默认的 644，`os.replace` 之后原来 755 的脚本就不可执行了；私有索引若按工作树权限写入（`[ -x "$f" ]` 选 100755／100644），提交里也跟着成了 644，CI e2e 执行 `deploy/local/bootstrap.sh` 报 Permission denied（exit 126）。改脚本时在 `os.replace` 之前 `shutil.copymode(p, tmp)`；提交前看一眼 `git diff --cached --summary HEAD`，出现意料之外的 `mode change` 就停下。
+
 ### 共享暂存区里有别人的条目：用私有索引提交，核对时关掉改名检测
 
 2026-09-23 RFC-021 提交时撞上：共享暂存区里有并行会话已 `git add` 的文件，「暂存区＝自己的清单」的核对一直多出别人的条目；
