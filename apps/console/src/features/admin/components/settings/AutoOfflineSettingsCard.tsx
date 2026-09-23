@@ -37,13 +37,14 @@ export function AutoOfflineSettingsCard(): ReactElement {
   const field = (name: (typeof AUTO_OFFLINE_FIELDS)[number]) => <AdminField key={name} label={t(`admin.settings.autoOffline.${name}`)} hint={t(`admin.settings.autoOffline.hint.${name}`)} inputMode="numeric"
     value={editing?.draft[name] ?? ''} disabled={save.isPending} {...(errors[name] ? { error: t(errors[name]!) } : {})}
     onChange={(value) => { setEditing((previous) => (previous ? { ...previous, draft: { ...previous.draft, [name]: value } } : previous)); setErrors((previous) => ({ ...previous, [name]: undefined })); }} />;
-  return <Card title={t('admin.settings.autoOffline.title')} extra={current && !editing ? <Button onClick={() => { setDone(undefined); save.reset(); setErrors({}); setEditing({ draft: autoOfflineDraft(current), revision: current.revision }); }}>{t('admin.settings.autoOffline.edit')}</Button> : undefined}>
+  // 自动下线时长是一个对象：「修改」在卡片底部操作条（2026-09-23 裁定）。
+  return <Card title={t('admin.settings.autoOffline.title')} actions={current && !editing ? <Button onClick={() => { setDone(undefined); save.reset(); setErrors({}); setEditing({ draft: autoOfflineDraft(current), revision: current.revision }); }}>{t('admin.settings.autoOffline.edit')}</Button> : undefined}>
     <p>{t('admin.settings.autoOffline.description')}</p>
     <QueryStatus isPending={policy.isPending} error={policy.error} />
     {current && !editing ? <PolicyFacts policy={current} date={date} /> : null}
     {editing ? <AdminForm submitLabel={t('admin.settings.autoOffline.save')} busyLabel={t('admin.settings.autoOffline.saving')} busy={save.isPending} incomplete={false}
       note={t('admin.settings.autoOffline.note')} {...(save.error ? { error: errorMessage(save.error) } : {})} onSubmit={submit}
-      extraActions={<Button disabled={save.isPending} onClick={() => { setEditing(undefined); setErrors({}); save.reset(); }}>{t('admin.settings.autoOffline.cancel')}</Button>}>
+      extraActions={<Button variant="ghost" disabled={save.isPending} onClick={() => { setEditing(undefined); setErrors({}); save.reset(); }}>{t('admin.settings.autoOffline.cancel')}</Button>}>
       {AUTO_OFFLINE_FIELDS.map(field)}
     </AdminForm> : null}
     {done ? <ActionNote tone="success">{done}</ActionNote> : null}

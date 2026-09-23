@@ -67,7 +67,7 @@ export function ProjectComputeForm({ initial, profiles, tasks, viewerId, onReloa
       </select></FormField>
       {save.error ? <ActionNote tone="error">{errorMessage(save.error)}</ActionNote> : null}{saved ? <ActionNote tone="success">{t('admin.projectCompute.saved')}</ActionNote> : null}
       <ActionRow><Button type="submit" variant="primary" disabled={save.isPending || !dirty}>{t(save.isPending ? 'admin.profile.working' : 'admin.projectCompute.save')}</Button>
-        {dirty ? <InlineConfirm label={t('admin.projectCompute.reload')} question={t('admin.projectCompute.discard')} busy={save.isPending} onConfirm={onReload} /> : <Button disabled={save.isPending} onClick={onReload}>{t('admin.projectCompute.reload')}</Button>}
+        {dirty ? <InlineConfirm variant="ghost" label={t('admin.projectCompute.discardAction')} question={t('admin.projectCompute.discard')} busy={save.isPending} onConfirm={onReload} /> : null}
       </ActionRow>
     </Stack></form>
   </Card>;

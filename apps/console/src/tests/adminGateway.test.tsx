@@ -64,7 +64,7 @@ describe('网关状态页', () => {
     expect(page.text()).toContain('demo.cs.localhost');
     expect(page.text()).toContain('重算路由与放行表');
     stub.state.allowlist = ALLOWLIST;
-    await page.click('重新读取');
+    await page!.reread();
     expect(fact('放行表条目')).toBe('2');
     expect(page.text()).not.toContain('放行表的响应格式不符合预期');
   });
@@ -75,7 +75,7 @@ describe('网关状态页', () => {
     expect(fact('放行表条目')).toBeUndefined();
     expect(page.text()).toContain('demo.cs.localhost');
     stub.state.allowlistStatus = 200;
-    await page.click('重新读取');
+    await page!.reread();
     expect(fact('放行表版本')).toBe('7');
     expect(stub.reads('/v1/gateway/allowlist')).toBe(2);
   });
@@ -87,7 +87,7 @@ describe('网关状态页', () => {
     expect(page.text()).not.toContain('路由表是空的');
     expect(fact('放行表版本')).toBe('7');
     stub.state.routes = undefined; stub.state.routesStatus = 503;
-    await page.click('重新读取');
+    await page!.reread();
     expect(page.text()).toContain('路由表暂不可读');
     expect(page.text()).not.toContain('路由表是空的');
   });

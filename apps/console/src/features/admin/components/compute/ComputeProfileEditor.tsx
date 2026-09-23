@@ -49,7 +49,7 @@ function ExistingProfileEditor({ name, onClose, onCreated }: Required<ComputePro
   usePollingRefetch(query.refetch, 2000, testRunning(query.data?.latestTest) || query.data?.availability.state === 'testing');
   if (!query.data) {
     return (
-      <Card title={t('admin.profile.editTitle', { name })} extra={<Button onClick={onClose}>{t('admin.profile.close')}</Button>}>
+      <Card title={t('admin.profile.editTitle', { name })} extra={<Button variant="ghost" onClick={onClose}>{t('admin.profile.close')}</Button>}>
         <QueryStatus isPending={query.isPending} error={query.error} />
       </Card>
     );
@@ -97,7 +97,7 @@ function ProfileEditorForm({ detail, onClose, onCreated }: { readonly detail?: C
     return { value, label: <span className={styles.toolbar}>{t(`admin.profile.editor.tab.${value}`)}{count ? <Badge tone="danger">{count}</Badge> : null}</span> };
   });
   return (
-    <Card className={styles.editorCard} title={<EditorTitle detail={detail} />} extra={<Button onClick={onClose}>{t('admin.profile.close')}</Button>}>
+    <Card className={styles.editorCard} title={<EditorTitle detail={detail} />} extra={<Button variant="ghost" onClick={onClose}>{t('admin.profile.close')}</Button>}>
       <div ref={root} className={styles.contents}>
       <UnsavedChangesGuard dirty={editor.dirty || busy} scope={t('admin.profile.title')} />
       <ProfileEditorFeedback editor={editor} saving={saving} creating={creating} />

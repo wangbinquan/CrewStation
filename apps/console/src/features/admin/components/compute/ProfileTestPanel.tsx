@@ -94,7 +94,7 @@ function TestStageExtra({ stage, onLocate }: { readonly stage: ProfileTestStage;
     <div className={styles.toolbar}>
       {stage.error ? <code>{stage.error.code}</code> : null}
       {hasExit ? <span className={styles.hint}>{t('admin.profile.test.exitCode', { code: stage.exitCode! })}</span> : null}
-      {stage.stepId ? <Button variant="ghost" onClick={() => onLocate(stage.stepId!)}>{t('admin.profile.test.locate')}</Button> : null}
+      {stage.stepId ? <Button size="small" onClick={() => onLocate(stage.stepId!)}>{t('admin.profile.test.locate')}</Button> : null}
     </div>
     {log ? <pre className={styles.log} aria-label={t('admin.profile.test.log')}>{log}</pre> : null}
   </div>;

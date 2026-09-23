@@ -12,6 +12,8 @@ afterEach(() => { page?.unmount(); page = undefined; globalThis.fetch = original
 function fixture() {
   const state = { failSave: false, failRead: false, failVersions: false, failIdentity: false, role: 'owner' as 'owner' | 'developer', admin: false, hold: undefined as Promise<void> | undefined };
   const writes: Array<{ path: string; method: string; body?: Record<string, unknown> }> = [];
+  // 删掉的项之后不再出现在列表里：成功提示不能依赖删除后重读的列表取名字（2026-09-23 实机：提示里出现 UUID）。
+  const deleted = new Set<string>();
   const item = { id: '01a0bf5d-8f4b-741b-855a-427597babed5', definitionId: '01a0bf5d-8f4b-712d-84fa-c34dfa1810f3', bindingName: 'GREETING', name: 'GREETING', value: '当前值', isSecret: false, version: 3, env: 'development', updatedBy: userId, updatedAt: '2026-09-13T01:00:00.000Z' };
   globalThis.fetch = (async (raw, init) => {
     const path = new URL(String(raw), 'http://localhost').pathname, method = init?.method ?? 'GET';
@@ -20,7 +22,7 @@ function fixture() {
       const input = init?.body ? JSON.parse(String(init.body)) as Record<string, unknown> : undefined; writes.push({ path, method, body: input });
       if (state.hold) await state.hold;
       if (state.failSave) { status = 503; body = { error: 'unavailable', message: '配置服务暂不可用' }; }
-      else if (method === 'DELETE') return new Response(null, { status: 204 });
+      else if (method === 'DELETE') { deleted.add(path.split('/').at(-1)!); return new Response(null, { status: 204 }); }
       else body = { ...item, ...input, version: 4 };
     } else if (path === '/v1/me') {
       if (state.failIdentity) { status = 503; body = { error: 'unavailable', message: '身份读取失败' }; }
@@ -29,7 +31,7 @@ function fixture() {
     else if (path === `/v1/projects/${projectId}`) body = { id: projectId, serviceId, slug: 'demo', name: '演示应用', kind: 'DigitalWorker', ownerUserId: userId, state: 'active' };
     else if (/\/config\/(development|production)$/.test(path)) {
       if (state.failRead) { status = 503; body = { error: 'unavailable', message: '配置读取失败' }; }
-      else body = { items: [{ ...item, env: path.endsWith('production') ? 'production' : 'development' }, { ...item, id: '01a0bf5d-8f4b-795e-8427-5e5540ef37fa', definitionId: '01a0bf5d-8f4b-7cd5-8fa7-42c6e13d2afb', bindingName: 'API_TOKEN', name: 'API_TOKEN', isSecret: true, value: undefined }] };
+      else body = { items: [{ ...item, env: path.endsWith('production') ? 'production' : 'development' }, { ...item, id: '01a0bf5d-8f4b-795e-8427-5e5540ef37fa', definitionId: '01a0bf5d-8f4b-7cd5-8fa7-42c6e13d2afb', bindingName: 'API_TOKEN', name: 'API_TOKEN', isSecret: true, value: undefined }].filter((entry) => !deleted.has(entry.id)) };
     } else if (path.endsWith('/versions') && state.failVersions) { status = 503; body = { error: 'unavailable', message: '历史服务暂不可用' }; }
     else if (path.endsWith('/dev-session')) { status = 404; body = { error: 'not_found', message: '无会话' }; }
     return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
@@ -63,7 +65,7 @@ test('真实开发者可编辑开发组；生产组只读且不显示保存、�
 test('管理员仍可维护生产组；身份刷新失败保护草稿并禁写，恢复后可继续', async () => {
   const f = fixture(); f.state.role = 'developer'; f.state.admin = true; page = await renderApp(`/projects/${projectId}/settings?tab=config&env=production`); await click('新增变量');
   await input(visible('input[placeholder="DATABASE_URL"]'), 'ADMIN_VALUE');
-  await input(visible('input[placeholder="写入后生效于下一次注入"]'), '保留的生产草稿'); f.state.failIdentity = true; await click('刷新配置');
+  await input(visible('input[placeholder="写入后生效于下一次注入"]'), '保留的生产草稿'); f.state.failIdentity = true; await page!.reread();
   expect(page.text()).toContain('身份读取失败');
   const draft = document.querySelector<HTMLInputElement>('input[placeholder="写入后生效于下一次注入"]')!;
   expect(draft.value).toBe('保留的生产草稿'); expect(draft.closest('[hidden]')).not.toBeNull();
@@ -133,10 +135,10 @@ test('保存进行中防止清空、切编辑项、重复保存与删除；暂�
   await click('保存'); await click('保存中…'); await click('取消编辑'); await click('修改'); await click('删除');
   expect(f.writes).toHaveLength(1); expect(visible<HTMLInputElement>('input[placeholder="写入后生效于下一次注入"]').value).toBe('草稿');
   await act(async () => { finish(); }); await page.settle(); f.state.hold = undefined; await click('新增变量'); await input(visible('input[placeholder="DATABASE_URL"]'), 'SECOND_VALUE');
-  await input(visible('input[placeholder="写入后生效于下一次注入"]'), '未提交的新内容'); f.state.failRead = true; await click('刷新配置');
+  await input(visible('input[placeholder="写入后生效于下一次注入"]'), '未提交的新内容'); f.state.failRead = true; await page!.reread();
   expect(page.text()).toContain('配置读取失败'); expect(visible<HTMLInputElement>('input[placeholder="写入后生效于下一次注入"]').value).toBe('未提交的新内容');
   await click('保存'); expect(f.writes).toHaveLength(1);
-  f.state.failRead = false; f.state.failVersions = true; await click('刷新配置'); expect(page.text()).toContain('历史服务暂不可用');
+  f.state.failRead = false; f.state.failVersions = true; await page!.reread(); expect(page.text()).toContain('历史服务暂不可用');
   expect(visible<HTMLInputElement>('input[placeholder="写入后生效于下一次注入"]').disabled).toBe(false); await click('保存'); expect(f.writes).toHaveLength(2);
 });
 
@@ -165,7 +167,7 @@ test('后台环境草稿也会阻止离开；一次只确认第一个目的地�
   const f = fixture(), initial = `/projects/${projectId}/settings?tab=config`;
   const browser = browserHistoryFixture(['/projects', initial]); page = await renderApp(initial, undefined, browser.history); await click('新增变量');
   await input(visible('input[placeholder="DATABASE_URL"]'), 'DEV_HIDDEN'); await page.click('生产');
-  await page.click('高级'); await page.click('成员与角色');
+  await page.click('高级'); await page.requestNavigate(`/projects/${projectId}/settings?tab=members`);
   expect(document.querySelectorAll('[role="alertdialog"]')).toHaveLength(1); expect(page.search().tab).toBe('config');
   await click('放弃输入并离开'); expect(page.search().tab).toBe('advanced'); expect(f.writes).toHaveLength(0);
   await page.back(); expect(page.search().tab).toBe('config'); await click('新增变量');

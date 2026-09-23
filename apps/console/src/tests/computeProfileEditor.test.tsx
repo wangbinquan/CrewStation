@@ -138,7 +138,7 @@ describe('编辑页分组与定位', () => {
 
   test('保存时自动打开有错误的分组和步骤，并聚焦第一个错误字段', async () => {
     backend = computeBackend(); page = await renderApp(`/admin/compute?profile=${profileIdOf('claude-daily')}`);
-    await openTab('启动流程'); await press('＋ 预置文件');
+    await openTab('启动流程'); await press('添加预置文件');
     await openTab('基础配置'); await press('保存');
     expect(activeTab()).toContain('启动流程');
     expect(control('步骤 ID').value).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);

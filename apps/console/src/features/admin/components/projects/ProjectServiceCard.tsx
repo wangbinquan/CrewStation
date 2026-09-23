@@ -3,7 +3,6 @@ import { ProjectServicePolicyDtoSchema, ServicePlanDtoSchema } from '@crewstatio
 import { api } from '../../../../shared/api/client';
 import { useAdminPage } from '../../../../shared/admin/useAdminRead';
 import { useT } from '../../../../shared/lib/useT';
-import { Button } from '../../../../shared/ui/Button';
 import { Card } from '../../../../shared/ui/Card';
 import { QueryStatus } from '../../../../shared/ui/QueryStatus';
 import { ProjectServiceForm } from './ProjectServiceForm';
@@ -18,7 +17,6 @@ export function ProjectServiceCard({ projectId, viewerId }: { readonly projectId
   });
   return <Card stacked title={t('admin.resources.service')} footer={t('admin.resources.serviceEffect')}>
     <QueryStatus isPending={query.isPending} error={query.error} />
-    {query.error ? <Button onClick={() => void query.refetch()}>{t('admin.resources.reloadService')}</Button> : null}
     {query.data && !query.error ? <ProjectServiceForm key={generation} initial={query.data.policy} plans={query.data.plans} viewerId={viewerId} onReload={() => setGeneration((value) => value + 1)} /> : null}
   </Card>;
 }

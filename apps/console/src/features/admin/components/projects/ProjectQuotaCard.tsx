@@ -22,7 +22,6 @@ export function ProjectQuotaCard({ projectId, viewerId }: Props) {
   const { query } = useAdminPage(['project-quota-editor', projectId, generation], async () => QuotaDtoSchema.parse(await api.projects.getQuota(projectId)));
   return <Card stacked title={t('admin.resources.quota')} footer={t('admin.resources.quotaEffect')}>
     <QueryStatus isPending={query.isPending} error={query.error} />
-    {query.error ? <Button onClick={() => void query.refetch()}>{t('admin.resources.reloadQuota')}</Button> : null}
     {query.data && !query.error ? <QuotaForm key={generation} projectId={projectId} viewerId={viewerId} initial={query.data} onReload={() => setGeneration((value) => value + 1)} /> : null}
   </Card>;
 }
@@ -50,7 +49,7 @@ function QuotaForm({ projectId, viewerId, initial, onReload }: Props & { readonl
     </FormField>
     {save.error ? <ActionNote tone="error">{errorMessage(save.error)}</ActionNote> : null}{save.isSuccess ? <ActionNote tone="success">{t('admin.resources.quotaSaved')}</ActionNote> : null}
     <ActionRow><Button type="submit" variant="primary" disabled={save.isPending || !dirty}>{t(save.isPending ? 'admin.profile.working' : 'admin.resources.saveQuota')}</Button>
-      {dirty ? <InlineConfirm label={t('admin.resources.reloadQuota')} question={t('admin.resources.discardQuota')} busy={save.isPending} onConfirm={onReload} /> : <Button disabled={save.isPending} onClick={onReload}>{t('admin.resources.reloadQuota')}</Button>}
+      {dirty ? <InlineConfirm variant="ghost" label={t('admin.resources.discardQuotaAction')} question={t('admin.resources.discardQuota')} busy={save.isPending} onConfirm={onReload} /> : null}
     </ActionRow>
   </Stack></form>;
 }

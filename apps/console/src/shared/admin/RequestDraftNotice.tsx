@@ -12,6 +12,6 @@ export function RequestDraftNotice({ drafts, pendingIds, busy, onDiscard }: {
     <h3>{t('ui.requestDraft.title')}</h3><p>{t('ui.requestDraft.hint')}</p>
     {orphaned.map((draft) => <div className={styles.draft} key={draft.id}><strong>{draft.label}</strong><code>{draft.id}</code>
       <textarea readOnly rows={2} aria-label={t('ui.requestDraft.value', { id: draft.id })} value={draft.value} />
-      <Button disabled={busy} onClick={() => onDiscard(draft.id)}>{t('ui.requestDraft.discard')}</Button></div>)}
+      <Button variant="ghost" disabled={busy} onClick={() => onDiscard(draft.id)}>{t('ui.requestDraft.discard')}</Button></div>)}
   </section>;
 }

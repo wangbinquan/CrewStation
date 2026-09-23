@@ -25,7 +25,7 @@ export interface ConfigEnvPanelProps {
   readonly onDirtyChange: (env: ConfigEnv, dirty: boolean) => void;
 }
 
-/** 写入入口按当前身份和取值组展示；身份重读失败时保留草稿并停写。 */
+/** 写入入口按当前身份和取值组展示；身份重读失败时保留草稿并停写。列表卡片：「新增变量」在卡片头右侧，行内动作在行末。 */
 export function ConfigEnvPanel({ projectId, env, onDirtyChange }: ConfigEnvPanelProps): ReactElement {
   const t = useT();
   const me = useApiQuery(queryKeys.me(), () => api.me.get());
@@ -35,7 +35,8 @@ export function ConfigEnvPanel({ projectId, env, onDirtyChange }: ConfigEnvPanel
   const { confirmation, ...editor } = useConfigDraft(env, onDirtyChange);
   const writeLock = useRef(false);
   const list = items.data?.items ?? [];
-  const busy = save.isPending || remove.isPending, disabled = items.isPending || !!items.error || me.isPending || me.isFetching || !!me.error || !editable;
+  // 例行重读（取值与身份都会定时重读）不算停写，否则按钮每 30 秒变灰一次；首次读取或读取失败才停写。
+  const busy = save.isPending || remove.isPending, disabled = items.isPending || !!items.error || me.isPending || !!me.error || !editable;
   const changeItem = async (input: Parameters<typeof save.mutateAsync>[0]) => {
     if (writeLock.current || disabled) throw new Error('当前无法保存配置');
     writeLock.current = true;
@@ -44,12 +45,12 @@ export function ConfigEnvPanel({ projectId, env, onDirtyChange }: ConfigEnvPanel
   const deleteItem = async (item: ConfigItemDto) => {
     if (writeLock.current || disabled) return;
     writeLock.current = true;
-    try { await remove.mutateAsync({ id: item.id, version: item.version }); } catch { /* 错误由面板显示。 */ } finally { writeLock.current = false; }
+    try { await remove.mutateAsync({ id: item.id, version: item.version, name: item.name }); } catch { /* 错误由面板显示。 */ } finally { writeLock.current = false; }
   };
   return (
     <Card stacked compact
       title={t(`config.variables.${env}`)}
-      extra={<>{editable ? <Button variant="primary" disabled={disabled || busy} onClick={(event) => editor.select({ name: '', isSecret: false }, event.currentTarget)}>{t('config.add')}</Button> : null}<Badge tone={env === 'production' ? 'warning' : 'info'}>{t(`config.env.${env}Role`)}</Badge><Button disabled={busy || me.isFetching || items.isFetching || versions.isFetching} onClick={() => { void me.refetch(); void items.refetch(); void versions.refetch(); }}>{t('config.refresh')}</Button></>}
+      extra={<><Badge tone={env === 'production' ? 'warning' : 'info'}>{t(`config.env.${env}Role`)}</Badge>{editable ? <Button variant="primary" disabled={disabled || busy} onClick={(event) => editor.select({ name: '', isSecret: false }, event.currentTarget)}>{t('config.add')}</Button> : null}</>}
       footer={
         <Stack>
           <h3 className={styles.versionsTitle}>{t('config.versions.title')}</h3>
@@ -86,7 +87,7 @@ export function ConfigEnvPanel({ projectId, env, onDirtyChange }: ConfigEnvPanel
       <WriteError action="config.error.save" error={save.error} />
       <WriteError action="config.error.delete" error={remove.error} />
       {save.isSuccess ? <ActionNote tone="success">{t('config.saved', { name: save.data.name, version: save.data.version, env: t(`config.env.${env}`) })} {t(`config.effect.${env}`)}</ActionNote> : null}
-      {remove.isSuccess ? <ActionNote tone="success">{t('config.deleted', { name: list.find((item) => item.id === remove.variables?.id)?.name ?? remove.variables?.id ?? '', env: t(`config.env.${env}`) })} {t(`config.effect.${env}`)}</ActionNote> : null}
+      {remove.isSuccess ? <ActionNote tone="success">{t('config.deleted', { name: remove.variables?.name ?? '', env: t(`config.env.${env}`) })} {t(`config.effect.${env}`)}</ActionNote> : null}
       {editor.next ? <div ref={confirmation}><ConfirmationPanel question={t(editor.next.draft ? 'config.draft.replace' : 'config.draft.cancel', { env: t(`config.env.${env}`), name: editor.next.draft?.name || t('config.draft.blank') })} confirmLabel={t(editor.next.draft ? 'config.draft.discard' : 'config.draft.confirmCancel')} cancelLabel={t('ui.draft.stay')} busy={busy} onConfirm={editor.confirm} onCancel={editor.keep} /></div> : null}
       {editor.draft ? <Stack>
         <h3 className={styles.formTitle}>{t(editor.draft.name ? 'config.edit' : 'config.add', { name: editor.draft.name })}</h3>

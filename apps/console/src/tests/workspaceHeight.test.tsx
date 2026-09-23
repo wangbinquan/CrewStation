@@ -52,6 +52,17 @@ test('文档式面板内容短时把最后一张卡拉到面板底边：面板�
   expect(declarations('features/catalog/components/CatalogContent.module.css', '.fill > :last-child')).toMatch(/flex-grow:\s*1/);
 });
 
+test('CLI 区的紧凑页签只作用于 CLI 区：不命中右侧工具面板，工具面板正文没有上内边距（不依赖样式加载顺序）', () => {
+  // 2026-09-23 实撞：`.workspace [role="tabpanel"]` 与 `.panel [role="tabpanel"]` 同特异性，换一版打包后前者生效，
+  // 工具面板正文多出 4px，操作条不再贴住顶边（e2e WS-07）。
+  const workspace = 'features/dev-session/components/native/NativeWorkspace.module.css';
+  const code = sourceAt(consoleStyles(), workspace).code;
+  expect(code).not.toContain('.workspace [role="tabpanel"]');
+  expect(code).not.toMatch(/\.workspace \[role="tab"\] \{[^}]*padding/);
+  expect(declarations(workspace, '.main [role="tabpanel"]')).toMatch(/padding-top:\s*4px/);
+  expect(declarations('features/dev-session/components/panel/ToolPanel.module.css', '.panel [role="tabpanel"]')).toMatch(/padding:\s*0/);
+});
+
 test('开发页三个文档式面板都按 flow 排，最后一项一路点名长满：数据与会话的 Stack，可使用资源的 Stack、Tabs 与紧凑目录；变更铺满、操作条定在顶端', async () => {
   fixture = editorWorkspaceFixture();
   const path = `/projects/${activityProjectId}/dev-session`;

@@ -32,14 +32,13 @@ export function UsersSection() {
         </select></FormField>
       </div>
       <QueryStatus isPending={users.isPending} error={users.error} isEmpty={!items.length} emptyTitle={t('admin.users.emptyTitle')} emptyDescription={t('admin.users.emptyDescription')} />
-      {users.error ? <Button onClick={() => void users.refetch()}>{t('admin.identity.retry')}</Button> : null}
       {!users.isPending && !users.error && items.length > 0 && !matches.length ? <EmptyState title={t('admin.users.noMatch')} description={t('admin.users.noMatchHint')} action={<Button onClick={() => { setQuery(''); setRole(''); }}>{t('admin.users.clearFilters')}</Button>} /> : null}
       <div aria-label={t('admin.users.directory')}>{matches.map((user) => <div key={user.id} className={styles.row}>
         <div className={styles.identity}><span className={styles.avatar} aria-hidden="true">{Array.from(user.name.trim() || user.email).slice(0, 1).join('').toUpperCase()}</span>
           <div className={styles.details}><div className={styles.name}><strong>{user.name}</strong>{user.id === me.data?.id ? <Badge>{t('admin.users.you')}</Badge> : null}</div><span className={styles.muted}>{user.email || t('admin.users.noEmail')}</span></div>
         </div>
         <Badge tone={user.platformRole === 'admin' ? 'info' : 'neutral'}>{t(`topBar.role.${user.platformRole}`)}</Badge>
-        <Button variant="ghost" aria-label={t('admin.users.manageFor', { name: user.name, email: user.email || user.id })} aria-expanded={editing?.id === user.id} disabled={Boolean(editing)} onClick={(e) => { opener.current = e.currentTarget; setEditing(user); }}>{t('admin.users.manage')}</Button>
+        <Button size="small" aria-label={t('admin.users.manageFor', { name: user.name, email: user.email || user.id })} aria-expanded={editing?.id === user.id} disabled={Boolean(editing)} onClick={(e) => { opener.current = e.currentTarget; setEditing(user); }}>{t('admin.users.manage')}</Button>
       </div>)}</div>
     </Card>
     {editing ? <UserRoleEditor key={editing.id} user={editing} onClose={close} refresh={async () => {

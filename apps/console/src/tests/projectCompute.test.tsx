@@ -38,7 +38,7 @@ test('取消默认档位的授权时显示字段错误并保留草稿；并发�
   await check('private-large'); f.state.conflict = true;
   await page.click('保存项目授权'); expect(page.text()).toContain('本次修改未保存');
   expect(select('项目默认 Agent 档位').value).toBe(profileIdOf('private-large'));
-  await page.click('重新读取 Agent 配置'); expect(page.text()).toContain('放弃当前修改'); expect(select('项目默认 Agent 档位').value).toBe(profileIdOf('private-large'));
+  await page.click('放弃 Agent 配置修改'); expect(page.text()).toContain('放弃当前修改'); expect(select('项目默认 Agent 档位').value).toBe(profileIdOf('private-large'));
   await page.click('确认'); expect(select('Agent 档位范围').value).toBe('inherit');
 });
 
@@ -47,7 +47,7 @@ test('目录为空仍可明确禁止全部 Agent，读失败可重试；载入�
   page = await renderApp(computePagePath); expect(button('保存项目授权')).toBeUndefined();
   f.state.error = true; finish(); await page.settle(); expect(page.text()).toContain('授权目录离线');
   f.state.error = false; f.state.hold = undefined; f.state.profiles = [];
-  await page.click('重新读取 Agent 配置'); await setSelect('Agent 档位范围', 'restricted');
+  await page.reread(); await setSelect('Agent 档位范围', 'restricted');
   await page.click('保存项目授权');
   expect(f.writes).toEqual([{ expectedRevision: 0, policy: { mode: 'restricted', allowedProfiles: [], defaultProfile: null, devTaskProfile: null } }]);
 });

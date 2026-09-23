@@ -7,5 +7,4 @@
 .list p { margin: var(--cs-space-1) 0 0; }
 .title { font-weight: 600; }
 .muted { color: var(--cs-color-text-muted); font-size: var(--cs-font-size-sm); overflow-wrap: anywhere; }
-.footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--cs-space-2); }
 @media (max-width: 1100px) { .grid { grid-template-columns: 1fr; } }

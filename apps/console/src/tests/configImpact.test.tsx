@@ -59,19 +59,19 @@ test('生产变量卡的版本历史与部署版本对照直接展示，不用�
 
 test('刷新失败不保留旧的一致结论；发布快照缺失与不一致分别保留未知并可恢复', async () => {
   const f = fixture(); page = await renderApp(`/projects/${projectId}/settings?tab=config&env=production`);
-  f.state.historyFailure = true; f.state.releaseFailure = true; await page.click('刷新版本对照');
+  f.state.historyFailure = true; f.state.releaseFailure = true; await page.reread();
   expect(page.text()).toContain('当前保存版本尚未确认'); expect(row('正式版本').textContent).toContain('正式发布读取失败'); expect(row('正式版本').textContent).not.toContain('第 3 版');
   expect(row('待验证版本').textContent).not.toContain('与当前保存版本一致');
-  f.state.historyFailure = false; f.state.releaseFailure = false; f.state.prodVersion = undefined; await page.click('刷新版本对照');
+  f.state.historyFailure = false; f.state.releaseFailure = false; f.state.prodVersion = undefined; await page.reread();
   expect(row('正式版本').textContent).toContain('配置快照版本未确认'); expect(row('正式版本').textContent).not.toContain('与当前保存版本一致');
-  f.state.prodVersion = 3; f.state.mismatch = true; await page.click('刷新版本对照'); expect(row('正式版本').textContent).toContain('发布记录不一致');
-  f.state.mismatch = false; await page.click('刷新版本对照'); expect(row('正式版本').textContent).toContain('记录为第 3 版');
+  f.state.prodVersion = 3; f.state.mismatch = true; await page.reread(); expect(row('正式版本').textContent).toContain('发布记录不一致');
+  f.state.mismatch = false; await page.reread(); expect(row('正式版本').textContent).toContain('记录为第 3 版');
 });
 
 test('空槽、缺少槽、未开通服务与全组空版本各自显示真实状态', async () => {
   const f = fixture(); f.state.emptyProd = true; page = await renderApp(`/projects/${projectId}/settings?tab=config&env=production`);
   expect(row('正式版本').textContent).toContain('尚未部署'); expect(f.calls.some((call) => call.path === `/v1/releases/${prodId}`)).toBe(false);
-  f.state.missingSlot = true; await page.click('刷新版本对照'); expect(row('正式版本').textContent).toContain('部署记录未确认'); expect(row('正式版本').textContent).not.toContain('尚未部署');
+  f.state.missingSlot = true; await page.reread(); expect(row('正式版本').textContent).toContain('部署记录未确认'); expect(row('正式版本').textContent).not.toContain('尚未部署');
   page.unmount(); f.state.noService = true; f.calls.length = 0; f.state.history = []; page = await renderApp(`/projects/${projectId}/settings?tab=config&env=production`);
   expect(page.text()).toContain('项目尚未开通服务'); expect(page.text()).toContain('当前已保存的生产配置：第 0 版');
   expect(f.calls.some((call) => call.path.endsWith('/slots') || call.path.startsWith('/v1/releases/'))).toBe(false);
@@ -80,6 +80,6 @@ test('空槽、缺少槽、未开通服务与全组空版本各自显示真实�
 test('槽读取失败不冒充未部署，保存历史滞后不把已部署配置说成更新尚未采用', async () => {
   const f = fixture(); f.state.history = [1]; page = await renderApp(`/projects/${projectId}/settings?tab=config&env=production`);
   expect(row('正式版本').textContent).toContain('保存历史早于部署记录'); expect(row('正式版本').textContent).not.toContain('已有更新的配置');
-  f.state.slotsFailure = true; await page.click('刷新版本对照'); expect(page.text()).toContain('部署槽读取失败');
+  f.state.slotsFailure = true; await page.reread(); expect(page.text()).toContain('部署槽读取失败');
   expect(page.text()).not.toContain('v1.0.0'); expect(page.text()).not.toContain('尚未部署');
 });

@@ -60,8 +60,7 @@
 .stepList { display: grid; gap: var(--cs-space-2); list-style: none; margin: 0; padding: 0; }
 .stepList > li { border: 1px solid var(--cs-color-border); border-radius: var(--cs-radius-md); overflow: hidden; }
 .stepList > .selected { background: var(--cs-color-tint); border-color: var(--cs-color-primary); }
-.stepList .rowActions { border-top: 1px solid var(--cs-color-border); gap: 0; padding: var(--cs-space-1); }
-.stepList .rowActions > button { padding: var(--cs-space-1) var(--cs-space-2); }
+.stepList .rowActions { border-top: 1px solid var(--cs-color-border); gap: var(--cs-space-1); padding: var(--cs-space-2); }
 .stepChoice { width: 100%; align-items: flex-start; text-align: left; white-space: normal; padding: var(--cs-space-3); border-radius: 0; }
 .stepNumber { display: grid; place-items: center; flex-shrink: 0; width: 24px; height: 24px; border-radius: var(--cs-radius-sm); background: var(--cs-color-surface-muted); font-size: var(--cs-font-size-sm); }
 .selected .stepNumber { color: var(--cs-color-on-primary); background: var(--cs-color-primary); }
@@ -69,7 +68,6 @@
 .stepTarget { font-family: var(--cs-font-mono); font-size: var(--cs-font-size-sm); color: var(--cs-color-text-muted); overflow-wrap: anywhere; }
 .stepEditor { display: grid; gap: var(--cs-space-4); min-width: 0; padding: var(--cs-space-4); border: 1px solid var(--cs-color-border); border-radius: var(--cs-radius-md); }
 .stepEmpty { padding: var(--cs-space-5); margin: 0; border: 1px dashed var(--cs-color-border); border-radius: var(--cs-radius-md); color: var(--cs-color-text-muted); font-size: var(--cs-font-size-sm); }
-.dangerAction { color: var(--cs-color-danger); }
 .testContext { display: grid; gap: var(--cs-space-3); padding: var(--cs-space-3); background: var(--cs-color-bg); border-radius: var(--cs-radius-md); font-size: var(--cs-font-size-sm); }
 .testContext code { background: transparent; padding: 0; overflow-wrap: anywhere; }
 .testContext summary { cursor: pointer; color: var(--cs-color-text-muted); }

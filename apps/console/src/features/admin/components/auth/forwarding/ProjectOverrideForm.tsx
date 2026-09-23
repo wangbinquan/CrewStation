@@ -29,7 +29,7 @@ export function ProjectOverrideForm({ projects, candidates, defaults, initial, o
   return <div ref={root}>
     <UnsavedChangesGuard dirty={dirty || save.isPending} scope={t('admin.auth.overridesTitle')} isNavigationBusy={() => save.isPending} />
     <AdminForm stacked busy={save.isPending} incomplete={false} submitLabel={t('admin.auth.setOverride')} busyLabel={t('admin.auth.saving')}
-      note={t('admin.auth.overrideNote')} error={save.error?.message} extraActions={<Button disabled={save.isPending} onClick={() => dirty ? setDiscard(true) : onClose()}>{t('admin.auth.cancelEdit')}</Button>}
+      note={t('admin.auth.overrideNote')} error={save.error?.message} extraActions={<Button variant="ghost" disabled={save.isPending} onClick={() => dirty ? setDiscard(true) : onClose()}>{t('admin.auth.cancelEdit')}</Button>}
       onSubmit={() => { const next = { project: !projectId, fields: !UpdateIdentityForwardingRequestSchema.safeParse({ fields }).success }; setErrors(next); setAttempt((n) => n + 1); if (!next.project && !next.fields && !save.isPending && !discard) save.mutate(); }}>
       <div className={styles.fieldStack}>
         <AdminField label={t('admin.auth.project')} value={projectId} disabled={Boolean(initial) || save.isPending} onChange={setProjectId} hint={t('admin.identity.projectHint')} error={errors.project ? t('admin.identity.projectRequired') : undefined}

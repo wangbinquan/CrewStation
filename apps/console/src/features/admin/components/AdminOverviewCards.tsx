@@ -16,9 +16,8 @@ export function AdminOverviewCards(): ReactElement {
           <h2 className={styles.heading} id={`admin-entries-${group.id}`}>{t(group.titleKey)}</h2>
           <div className={styles.grid}>
             {group.pages.map((entry) => (
-              <Card compact key={entry.to} title={t(entry.labelKey)}>
+              <Card compact key={entry.to} title={t(entry.labelKey)} actions={<ButtonLink to={entry.to}>{t('admin.overview.open', { page: t(entry.labelKey) })}</ButtonLink>}>
                 <p className={styles.hint}>{t(entry.hintKey)}</p>
-                <ButtonLink size="small" to={entry.to}>{t('admin.overview.open', { page: t(entry.labelKey) })}</ButtonLink>
               </Card>
             ))}
           </div>

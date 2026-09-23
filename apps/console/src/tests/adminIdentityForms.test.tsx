@@ -104,7 +104,7 @@ test('项目目录失败仍保留现有 ID 和过期字段；显式移除后才�
   page = await renderApp('/admin/authentication?tab=fields'); expect(page.text()).toContain(f.projectId); expect(page.text()).toContain('legacy-key');
   await page.click('编辑'); expect(page.text()).toContain('来源已不可用'); await page.click('保存项目覆盖');
   expect(f.writes().at(-1)?.body).toEqual({ fields: ['name', 'legacy-key'] });
-  fail = false; await page.click('重新加载项目目录'); expect(page.text()).toContain('团队助理');
+  fail = false; await page.reread(); expect(page.text()).toContain('团队助理');
   await page.click('编辑'); await clickIdentityField('legacy-key'); await page.click('保存项目覆盖'); expect(f.writes().at(-1)?.body).toEqual({ fields: ['name'] });
 });
 

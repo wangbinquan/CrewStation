@@ -25,7 +25,6 @@ export function LoginMethodsCard() {
   const effectiveOn = data && (data.forcedOn || data.passwordLoginEnabled);
   return <Card stacked title={t('admin.identity.localLogin')}>
     <QueryStatus isPending={policy.isPending} error={policy.error} />
-    {policy.error ? <Button onClick={() => void policy.refetch()}>{t('admin.identity.retry')}</Button> : null}
     {data ? <>
       <div className={styles.sectionHeading}><dl className={styles.summary}><div><dt>{t('admin.auth.passwordLogin')}</dt><dd><Badge tone={effectiveOn ? 'info' : 'neutral'}>{t(effectiveOn ? 'admin.auth.on' : 'admin.auth.off')}</Badge></dd></div></dl>
         {data.forcedOn || (data.passwordLoginEnabled && reason) ? null : data.passwordLoginEnabled ? <InlineConfirm

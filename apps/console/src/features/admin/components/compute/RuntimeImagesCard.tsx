@@ -19,7 +19,7 @@ function CopyButton({ text, label }: { readonly text: string; readonly label: st
   const t = useT();
   const [state, setState] = useState<'idle' | 'copied' | 'failed'>('idle');
   const copy = async () => { try { await navigator.clipboard.writeText(text); setState('copied'); } catch { setState('failed'); } };
-  return <Button variant="ghost" aria-label={label} onClick={() => void copy()}>{state === 'copied' ? t('admin.images.copied') : state === 'failed' ? t('admin.images.copyFailed') : t('admin.images.copy')}</Button>;
+  return <Button size="small" aria-label={label} onClick={() => void copy()}>{state === 'copied' ? t('admin.images.copied') : state === 'failed' ? t('admin.images.copyFailed') : t('admin.images.copy')}</Button>;
 }
 
 /** 一次性显示的推送凭据（C18）：只在这次响应里出现，关掉就没有了；到期后仓库拒绝。 */
@@ -37,7 +37,7 @@ function CredentialNote({ credential, onDismiss }: { readonly credential: Regist
         { label: t('admin.images.login'), value: <span className={styles.toolbar}><code className={styles.breakable}>{login}</code><CopyButton text={login} label={t('admin.images.copyLogin')} /></span> },
       ]} />
       <p className={styles.hint}>{t('admin.images.credentialOnce')}</p>
-      <div className={styles.toolbar}><Button onClick={onDismiss}>{t('admin.images.dismiss')}</Button></div>
+      <div className={styles.toolbar}><Button variant="ghost" onClick={onDismiss}>{t('admin.images.dismiss')}</Button></div>
     </div>
   );
 }
@@ -53,7 +53,8 @@ export function RuntimeImagesCard(): ReactElement {
   const issue = useApiMutation(() => api.computeProfiles.issuePushCredential(), { onSuccess: (issued) => setCredential(issued) });
   const data = info.data;
   return (
-    <Card stacked title={t('admin.images.title')} footer={t('admin.images.hint')}>
+    <Card stacked title={t('admin.images.title')} footer={t('admin.images.hint')}
+      actions={data ? <Button variant="primary" disabled={issue.isPending} onClick={() => issue.mutate(undefined)}>{issue.isPending ? t('admin.images.issuing') : t('admin.images.issue')}</Button> : undefined}>
       <QueryStatus isPending={info.isPending} error={info.error} />
       {data ? (
         <>
@@ -66,10 +67,7 @@ export function RuntimeImagesCard(): ReactElement {
           {data.baseImage.error ? <ActionNote tone="error">{t('admin.images.baseImageError', { message: data.baseImage.error })}</ActionNote> : null}
           <p className={styles.hint}>{t('admin.images.dockerfileHint')}</p>
           <pre className={styles.log} aria-label={t('admin.images.sampleDockerfile')}>{data.sampleDockerfile}</pre>
-          <div className={styles.toolbar}>
-            <Button variant="primary" disabled={issue.isPending} onClick={() => issue.mutate(undefined)}>{issue.isPending ? t('admin.images.issuing') : t('admin.images.issue')}</Button>
-            <span className={styles.hint}>{t('admin.images.issueHint')}</span>
-          </div>
+          <p className={styles.hint}>{t('admin.images.issueHint')}</p>
           {issue.error ? <ActionNote tone="error">{t('admin.images.issueError', { message: errorMessage(issue.error) })}</ActionNote> : null}
           {credential ? <CredentialNote credential={credential} onDismiss={() => setCredential(undefined)} /> : null}
         </>

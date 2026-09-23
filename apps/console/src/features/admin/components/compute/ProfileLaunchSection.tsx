@@ -48,7 +48,7 @@ export function ProfileLaunchSection({ draft, errors, disabled, taskProfiles, ta
         <div className={styles.wide}>
           <AdminField label={t('admin.profile.field.image')} value={draft.image} onChange={(image) => set({ image })} disabled={disabled} placeholder={images.data ? `${images.data.pullReference}/…` : undefined}
             hint={t('admin.profile.field.imageHint')} error={err('image')} />
-          {base && draft.image.trim() !== base ? <div className={styles.toolbar}><Button variant="ghost" disabled={disabled} onClick={() => set({ image: base })}>{t('admin.profile.field.useBaseImage')}</Button></div> : null}
+          {base && draft.image.trim() !== base ? <div className={styles.toolbar}><Button size="small" disabled={disabled} onClick={() => set({ image: base })}>{t('admin.profile.field.useBaseImage')}</Button></div> : null}
         </div>
         <AdminField label={t('admin.profile.field.binaryPath')} value={draft.binaryPath} onChange={(binaryPath) => set({ binaryPath })} disabled={disabled} hint={t(`admin.profile.field.binaryPathHint.${p}`)} error={err('binaryPath')} />
         {showsField(p, 'model') ? <AdminField label={t('admin.profile.field.model')} value={draft.model} onChange={(model) => set({ model })} disabled={disabled} placeholder={t('admin.profile.field.modelPlaceholder')} hint={t('admin.profile.field.modelHint')} /> : null}

@@ -86,7 +86,7 @@ test('用户目录加载、失败重试与真正空目录独立；本人角色�
   }) as typeof fetch;
   page = await renderApp('/admin/users'); expect(page.text()).toContain('载入'); expect(page.text()).not.toContain('还没有用户');
   f.state.failRead = true; await act(async () => release?.()); await page.settle(); globalThis.fetch = base;
-  expect(page.text()).toContain('目录读取失败'); f.state.failRead = false; f.state.items = []; await page.click('重新加载'); expect(page.text()).toContain('还没有用户');
+  expect(page.text()).toContain('目录读取失败'); f.state.failRead = false; f.state.items = []; await page.reread(); expect(page.text()).toContain('还没有用户');
   page.unmount(); f.state.items = [f.admin]; page = await renderApp('/admin/users');
   await clickIdentitySelector('button[aria-label*="admin@example.test"]'); await choose('user'); await page.click('检查变更'); await page.click('保存角色');
   expect(page.text()).toContain('管理员'); expect(document.querySelector('input[type="radio"]')).toBeNull();

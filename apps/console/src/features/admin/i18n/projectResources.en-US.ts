@@ -23,7 +23,7 @@ export const projectResourceMessages = {
   'admin.resources.serviceEffect': 'Checked before future deployments. Saving does not edit project files, restart services or change traffic switches between existing releases.',
   'admin.resources.serviceSaved': 'Project service specification access saved.',
   'admin.resources.saveService': 'Save service resources',
-  'admin.resources.reloadService': 'Reload service configuration',
+  'admin.resources.discardServiceAction': 'Discard service changes',
   'admin.resources.discardService': 'Discard service changes and reload? Drafts in other sections are preserved.',
   'admin.resources.quota': 'Task concurrency quota',
   'admin.resources.quotaLimit': 'Maximum concurrent tasks',
@@ -32,7 +32,7 @@ export const projectResourceMessages = {
   'admin.resources.quotaEffect': 'Applies to future task admission. Lowering the limit does not stop existing tasks; new tasks wait until usage is below the new limit.',
   'admin.resources.saveQuota': 'Save task quota',
   'admin.resources.quotaSaved': 'Project task quota saved.',
-  'admin.resources.reloadQuota': 'Reload quota',
+  'admin.resources.discardQuotaAction': 'Discard quota changes',
   'admin.resources.discardQuota': 'Discard quota changes and reload? Drafts in other sections are preserved.',
   'admin.resources.invalidReceipt': 'The saved response does not match your input. Reload to verify. Your draft is preserved.',
 } as const;

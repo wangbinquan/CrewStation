@@ -42,7 +42,7 @@ export function ProfileVariablesEditor({ draft, errors, credentials, disabled, o
           <div key={index} className={styles.variable}>
             <AdminField label={t('admin.profile.vars.name')} value={variable.name} onChange={(name) => setVar(index, { name })} disabled={disabled} error={errors[`vars.${index}.name`] ? t(`admin.profile.error.${errors[`vars.${index}.name`]}`) : undefined} />
             <AdminField label={t('admin.profile.vars.value')} value={variable.value} onChange={(value) => setVar(index, { value })} disabled={disabled} />
-            <Button variant="ghost" className={styles.dangerAction} disabled={disabled} onClick={() => onChange((d) => ({ ...d, vars: d.vars.filter((_, i) => i !== index) }))}>{t('admin.profile.vars.remove')}</Button>
+            <Button size="small" variant="danger" disabled={disabled} onClick={() => onChange((d) => ({ ...d, vars: d.vars.filter((_, i) => i !== index) }))}>{t('admin.profile.vars.remove')}</Button>
           </div>
         ))}
         <div className={styles.toolbar}><Button disabled={disabled} onClick={() => onChange((d) => ({ ...d, vars: [...d.vars, { name: '', value: '' }] }))}>{t('admin.profile.vars.add')}</Button></div>
@@ -71,7 +71,7 @@ export function ProfileVariablesEditor({ draft, errors, credentials, disabled, o
                   </FormField>
                 ) : null}
               </div>
-              <Button variant="ghost" className={styles.dangerAction} disabled={disabled} onClick={() => undeclare(id)}>{t('admin.profile.secrets.remove')}</Button>
+              <Button size="small" variant="danger" disabled={disabled} onClick={() => undeclare(id)}>{t('admin.profile.secrets.remove')}</Button>
             </div>
           );
         })}

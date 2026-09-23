@@ -20,7 +20,7 @@ export function MappingFields({ draft }: { readonly draft: ProviderDraftState })
       <AdminField label={t('admin.identity.mappingKey', { number: index + 1 })} value={mapping.key} onChange={(value) => change(index, 'key', value)} error={draft.errors[`claimMappings.${index}.key`] ? t('admin.identity.mappingKeyError') : undefined} />
       <span aria-hidden="true" className={styles.mappingArrow}>←</span>
       <AdminField label={t('admin.identity.mappingClaim', { number: index + 1 })} value={mapping.claim} onChange={(value) => change(index, 'claim', value)} error={draft.errors[`claimMappings.${index}.claim`] ? t('admin.auth.invalid.claim') : undefined} />
-      <Button variant="ghost" aria-label={t('admin.identity.removeMapping', { number: index + 1 })} onClick={() => draft.set('claimMappings', draft.value.claimMappings.filter((_, i) => i !== index))}>{t('admin.auth.remove')}</Button>
+      <Button size="small" variant="danger" aria-label={t('admin.identity.removeMapping', { number: index + 1 })} onClick={() => draft.set('claimMappings', draft.value.claimMappings.filter((_, i) => i !== index))}>{t('admin.auth.remove')}</Button>
     </div>)}
   </div>;
 }

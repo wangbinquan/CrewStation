@@ -23,7 +23,7 @@ export const projectResourceMessages = {
   'admin.resources.serviceEffect': '保存后在后续部署前校验。不会修改项目文件、重启现有服务或改变已有版本的切流。',
   'admin.resources.serviceSaved': '项目服务规格范围已保存。',
   'admin.resources.saveService': '保存服务资源',
-  'admin.resources.reloadService': '重新读取服务配置',
+  'admin.resources.discardServiceAction': '放弃服务配置修改',
   'admin.resources.discardService': '放弃服务规格修改并重新读取？其他区域的草稿会保留。',
   'admin.resources.quota': '任务并发配额',
   'admin.resources.quotaLimit': '最大并发任务数',
@@ -32,7 +32,7 @@ export const projectResourceMessages = {
   'admin.resources.quotaEffect': '保存后影响后续任务受理。降低配额不会终止已有任务；占用降到新上限以下后才能新增。',
   'admin.resources.saveQuota': '保存任务配额',
   'admin.resources.quotaSaved': '项目任务配额已保存。',
-  'admin.resources.reloadQuota': '重新读取配额',
+  'admin.resources.discardQuotaAction': '放弃配额修改',
   'admin.resources.discardQuota': '放弃配额修改并重新读取？其他区域的草稿会保留。',
   'admin.resources.invalidReceipt': '保存回执与本次输入不一致，请重新读取核对。草稿已保留。',
 } as const;

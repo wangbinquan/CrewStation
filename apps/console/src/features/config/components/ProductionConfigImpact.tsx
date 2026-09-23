@@ -1,37 +1,29 @@
 import type { SlotDto } from '@crewstation/contracts';
-import { useQueryClient } from '@tanstack/react-query';
-import { useRef, useState } from 'react';
 import { api } from '../../../shared/api/client';
 import { queryKeys } from '../../../shared/api/queryKeys';
-import { errorMessage, useApiQuery } from '../../../shared/api/useApi';
+import { AUTO_REFRESH, errorMessage, useApiQuery } from '../../../shared/api/useApi';
 import { useT } from '../../../shared/lib/useT';
 import { PROJECT_PATHS } from '../../../shared/project/projectPaths';
 import { useProjectScope } from '../../../shared/project/ProjectScope';
 import { ActionNote } from '../../../shared/ui/ActionNote';
-import { Button } from '../../../shared/ui/Button';
 import { Badge } from '../../../shared/ui/Badge';
 import { Card } from '../../../shared/ui/Card';
 import { DataTable } from '../../../shared/ui/DataTable';
 import { QueryStatus } from '../../../shared/ui/QueryStatus';
 import { ButtonLink } from '../../../shared/ui/navigation/ButtonLink';
 
-/** 只读实际两槽及其 Release 的配置快照；不把当前取值版本当作已部署版本。 */
+/**
+ * 只读实际两槽及其 Release 的配置快照；不把当前取值版本当作已部署版本。
+ * 槽、版本历史与各槽的发布每 30 秒在原位重读，不提供刷新按钮（2026-09-23 裁定）；「发布记录」在卡片底部操作条。
+ */
 export function ProductionConfigImpact() {
-  const t = useT(), { projectId, space } = useProjectScope(), client = useQueryClient();
-  const project = useApiQuery(queryKeys.project(projectId), () => api.projects.get(projectId));
+  const t = useT(), { projectId, space } = useProjectScope();
+  const project = useApiQuery(queryKeys.project(projectId), () => api.projects.get(projectId), AUTO_REFRESH);
   const serviceId = project.data?.serviceId;
-  const slots = useApiQuery(queryKeys.slots(serviceId ?? 'pending'), () => api.services.listSlots(serviceId!), { enabled: Boolean(serviceId) && !project.error });
-  const versions = useApiQuery([...queryKeys.config(projectId, 'production'), 'versions'], () => api.config.listVersions(projectId, 'production'));
+  const slots = useApiQuery(queryKeys.slots(serviceId ?? 'pending'), () => api.services.listSlots(serviceId!), { ...AUTO_REFRESH, enabled: Boolean(serviceId) && !project.error });
+  const versions = useApiQuery([...queryKeys.config(projectId, 'production'), 'versions'], () => api.config.listVersions(projectId, 'production'), AUTO_REFRESH);
   const currentVersion = versions.isSuccess ? versions.data.items.reduce((latest, item) => Math.max(latest, item.version), 0) : undefined;
-  const [refreshing, setRefreshing] = useState(false), lock = useRef(false);
-  const refresh = async () => {
-    if (lock.current) return; lock.current = true; setRefreshing(true);
-    try {
-      const [updatedSlots] = await Promise.all([serviceId ? slots.refetch() : Promise.resolve(undefined), project.refetch(), versions.refetch()]);
-      await Promise.all((updatedSlots?.data?.items ?? []).filter((slot) => slot.releaseId).map((slot) => client.refetchQueries({ queryKey: queryKeys.release(slot.releaseId!), exact: true })));
-    } finally { lock.current = false; setRefreshing(false); }
-  };
-  return <Card stacked compact title={t('config.impact.title')} extra={<Button disabled={refreshing || project.isFetching || slots.isFetching || versions.isFetching} onClick={() => { void refresh(); }}>{t('config.impact.refresh')}</Button>}>
+  return <Card stacked compact title={t('config.impact.title')} actions={<ButtonLink to={PROJECT_PATHS[space].release} params={{ projectId }}>{t('config.impact.releases')}</ButtonLink>}>
     <p>{t('config.effect.production')}</p>
     <QueryStatus isPending={project.isPending || Boolean(serviceId) && slots.isPending} error={project.error ?? slots.error} />
     <QueryStatus isPending={versions.isPending} error={versions.error} errorKey="config.error.versions" />
@@ -41,13 +33,12 @@ export function ProductionConfigImpact() {
     {serviceId && slots.isSuccess && !project.error ? <DataTable columns={[t('config.impact.slot'), t('config.impact.release'), t('config.impact.snapshot')]}>
       {(['prod', 'preview'] as const).map((name) => <ConfigSlotRow key={name} name={name} serviceId={serviceId} slot={slots.data.items.find((item) => item.name === name)} currentVersion={currentVersion} />)}
     </DataTable> : null}
-    <ButtonLink to={PROJECT_PATHS[space].release} params={{ projectId }}>{t('config.impact.releases')}</ButtonLink>
   </Card>;
 }
 
 function ConfigSlotRow({ name, serviceId, slot, currentVersion }: { readonly name: 'prod' | 'preview'; readonly serviceId: string; readonly slot: SlotDto | undefined; readonly currentVersion: number | undefined }) {
   const t = useT(), releaseId = slot?.releaseId;
-  const release = useApiQuery(queryKeys.release(releaseId ?? 'pending'), () => api.services.getRelease(releaseId!), { enabled: Boolean(releaseId) });
+  const release = useApiQuery(queryKeys.release(releaseId ?? 'pending'), () => api.services.getRelease(releaseId!), { ...AUTO_REFRESH, enabled: Boolean(releaseId) });
   const data = release.data;
   const matches = data?.id === releaseId && data?.serviceId === serviceId && (!slot?.commitSha || slot.commitSha === data?.commitSha);
   const version = matches && release.isSuccess ? data?.configVersion : undefined;

@@ -28,7 +28,7 @@ export function ProviderForm({ initial, busy, error, onSubmit, onCancel }: Provi
   return <div ref={root}>
     <UnsavedChangesGuard dirty={draft.dirty || busy} scope={initial?.displayName ?? t('admin.auth.providerNew')} isNavigationBusy={() => busy} />
     <AdminForm stacked submitLabel={t(initial ? 'admin.auth.providerSave' : 'admin.auth.providerAdd')} busyLabel={t('admin.auth.saving')} busy={busy} incomplete={false}
-      extraActions={onCancel ? <Button disabled={busy} onClick={() => draft.dirty ? setDiscard(true) : onCancel()}>{t('admin.auth.cancelEdit')}</Button> : undefined}
+      extraActions={onCancel ? <Button variant="ghost" disabled={busy} onClick={() => draft.dirty ? setDiscard(true) : onCancel()}>{t('admin.auth.cancelEdit')}</Button> : undefined}
       error={error} note={t('admin.auth.providerNote')} onSubmit={() => { if (busy || discard) return; const body = draft.validate(); if (body) onSubmit(body); }}>
       <Tabs label={t('admin.identity.providerGroups')} value={draft.group} onChange={(group) => draft.setGroup(group as ProviderGroup)} items={providerGroups.map((group) => {
         const count = Object.keys(draft.errors).filter((key) => providerFieldGroup(key) === group).length;

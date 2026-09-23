@@ -44,10 +44,10 @@ export function BeforeStartStepList({ steps, selected, errors, disabled, onSelec
                 </Button>
                 {index === selected ? (
                   <div className={styles.rowActions}>
-                    <Button variant="ghost" disabled={disabled || index === 0} aria-label={`${t('admin.profile.step.up')} ${step.stepId}`} onClick={() => onMove(index, -1)}>↑</Button>
-                    <Button variant="ghost" disabled={disabled || index === steps.length - 1} aria-label={`${t('admin.profile.step.down')} ${step.stepId}`} onClick={() => onMove(index, 1)}>↓</Button>
-                    <Button variant="ghost" disabled={disabled || full} onClick={() => onDuplicate(index)}>{t('admin.profile.step.duplicate')}</Button>
-                    <Button variant="ghost" className={styles.dangerAction} disabled={disabled} onClick={() => onRemove(index)}>{t('admin.profile.step.remove')}</Button>
+                    <Button size="small" disabled={disabled || index === 0} aria-label={`${t('admin.profile.step.up')} ${step.stepId}`} onClick={() => onMove(index, -1)}>{t('admin.profile.step.up')}</Button>
+                    <Button size="small" disabled={disabled || index === steps.length - 1} aria-label={`${t('admin.profile.step.down')} ${step.stepId}`} onClick={() => onMove(index, 1)}>{t('admin.profile.step.down')}</Button>
+                    <Button size="small" disabled={disabled || full} onClick={() => onDuplicate(index)}>{t('admin.profile.step.duplicate')}</Button>
+                    <Button size="small" variant="danger" disabled={disabled} onClick={() => onRemove(index)}>{t('admin.profile.step.remove')}</Button>
                   </div>
                 ) : null}
               </li>

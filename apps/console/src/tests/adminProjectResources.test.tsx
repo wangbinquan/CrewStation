@@ -38,7 +38,7 @@ test('冲突保留选择，服务重读仅放弃本卡草稿，Agent 与配额�
   await select('Agent 档位范围', 'restricted'); await input('最大并发任务数', '7');
   await select('服务规格范围', 'restricted'); await choosePlan(); f.state.conflict = true; await page.click('保存服务资源');
   expect(page.text()).toContain('本次修改未保存'); expect(field('服务规格范围').value).toBe('restricted');
-  await page.click('重新读取服务配置'); expect(page.text()).toContain('其他区域的草稿会保留'); await page.click('确认');
+  await page.click('放弃服务配置修改'); expect(page.text()).toContain('其他区域的草稿会保留'); await page.click('确认');
   expect(field('服务规格范围').value).toBe('inherit'); expect(field('Agent 档位范围').value).toBe('restricted'); expect(field('最大并发任务数').value).toBe('7');
 });
 
@@ -56,7 +56,7 @@ test('配额所有边界显示字段错误；降低额度提交旧值，保存�
 test('服务配置不可读时不出现可保存空表，其他卡片可用；目录为空与读取错误可区分', async () => {
   const f = projectResourcesFixture(); f.state.serviceError = true; page = await renderApp(resourcePagePath);
   expect(page.text()).toContain('服务范围暂不可读'); expect(page.text()).not.toContain('保存服务资源'); expect(page.text()).toContain('保存任务配额');
-  f.state.serviceError = false; f.state.plans = []; await page.click('重新读取服务配置'); await select('服务规格范围', 'restricted');
+  f.state.serviceError = false; f.state.plans = []; await page.reread(); await select('服务规格范围', 'restricted');
   expect(page.text()).toContain('共享目录暂无服务规格'); await page.click('保存服务资源'); expect(f.writes[0]?.body.policy).toEqual({ mode: 'restricted', allowedPlanIds: [] });
 });
 
@@ -64,7 +64,7 @@ test('配额冲突和不匹配回执保留草稿，重新读取需确认；身�
   const f = projectResourcesFixture(); page = await renderApp(resourcePagePath); await input('最大并发任务数', '8');
   f.state.conflict = true; await page.click('保存任务配额'); expect(field('最大并发任务数').value).toBe('8'); expect(page.text()).toContain('本次修改未保存');
   f.state.conflict = false; f.state.mismatch = true; await page.click('保存任务配额'); expect(page.text()).toContain('保存回执与本次输入不一致'); expect(field('最大并发任务数').value).toBe('8');
-  f.state.mismatch = false; await page.click('重新读取配额'); await page.click('确认'); expect(field('最大并发任务数').value).toBe('8');
+  f.state.mismatch = false; await page.click('放弃配额修改'); await page.click('确认'); expect(field('最大并发任务数').value).toBe('8');
   await input('最大并发任务数', '9'); f.compute.state.admin = false; await page.click('保存任务配额'); expect(f.writes).toHaveLength(2); expect(page.text()).toContain('管理员身份已变化');
 });
 
@@ -83,13 +83,13 @@ test('不存在的服务规格逐项提示，错误回执不显示保存成功�
   expect(document.querySelector('fieldset[aria-invalid="true"]')).not.toBeNull(); expect(f.writes).toHaveLength(0);
   await act(async () => { [...document.querySelectorAll('fieldset label')].find((node) => node.textContent?.includes(missing))!.querySelector<HTMLInputElement>('input')!.click(); }); await page.settle();
   f.state.mismatch = true; await page.click('保存服务资源'); expect(page.text()).toContain('保存回执与本次输入不一致'); expect(page.text()).not.toContain('项目服务规格范围已保存');
-  f.state.mismatch = false; await page.click('重新读取服务配置'); await page.click('确认');
+  f.state.mismatch = false; await page.click('放弃服务配置修改'); await page.click('确认');
   expect(page.text()).not.toContain(missing); expect(field('服务规格范围').value).toBe('restricted');
 });
 
 test('服务保存中的重复提交只写一次且离开按钮暂不可用；配额读失败可以独立恢复', async () => {
   const f = projectResourcesFixture(); f.state.quotaError = true; page = await renderApp(resourcePagePath);
-  expect(page.text()).toContain('配额暂不可读'); f.state.quotaError = false; await page.click('重新读取配额'); expect(field('最大并发任务数').value).toBe('3');
+  expect(page.text()).toContain('配额暂不可读'); f.state.quotaError = false; await page.reread(); expect(field('最大并发任务数').value).toBe('3');
   await select('服务规格范围', 'restricted'); await choosePlan();
   let finish!: () => void; f.state.hold = new Promise<void>((resolve) => { finish = resolve; }); await page.click('保存服务资源');
   await act(async () => { const form = field('服务规格范围').closest('form')!; form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); });

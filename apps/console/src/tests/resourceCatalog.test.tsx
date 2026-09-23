@@ -64,7 +64,7 @@ test('具名编辑与保存前对照当前值；取消不写入，覆盖后说�
 test('套餐读取失败保留输入并暂停保存；目录变化先更新确认材料，再次确认才覆盖', async () => {
   const f = fixture(); page = await renderApp('/admin/service-plans'); await edit('standard-small'); await input('内存', '4Gi');
   f.state.readFailure = true; await page.click('检查并保存'); expect(page.text()).toContain('套餐目录读取失败'); expect(field('内存').value).toBe('4Gi'); expect(f.writes).toHaveLength(0);
-  f.state.readFailure = false; await page.click('重新读取套餐'); await page.click('检查并保存');
+  f.state.readFailure = false; await page.reread(); await page.click('检查并保存');
   f.state.service.cpu = '1500m'; await page.click('确认覆盖');
   expect(f.writes).toHaveLength(0); expect(page.text()).toContain('目录已变化'); expect(page.text()).toContain('1500m');
   await page.click('确认覆盖'); expect(f.writes[0]?.input.cpu).toBe('500m'); expect(f.writes[0]?.input.memory).toBe('4Gi');
@@ -97,12 +97,12 @@ test('套餐在途操作互斥、表单锁定；确认离开后迟到成功不�
 
 test('目录与保存回执无效时不显示空目录或假成功，保存后的查询失败与写入结果分开', async () => {
   const f = fixture(); page = await renderApp('/admin/service-plans'); await edit('standard-small'); await input('CPU', '2');
-  f.state.readOverride = { items: [{ name: 'broken' }] }; await page.click('重新读取套餐');
+  f.state.readOverride = { items: [{ name: 'broken' }] }; await page.reread();
   expect(page.text()).toContain('套餐目录格式无法确认'); expect(page.text()).not.toContain('还没有服务套餐'); expect(field('CPU').value).toBe('2');
-  f.state.readOverride = undefined; await page.click('重新读取套餐'); await page.click('检查并保存');
+  f.state.readOverride = undefined; await page.reread(); await page.click('检查并保存');
   f.state.writeOverride = { name: 'different-name' }; await page.click('确认覆盖');
   expect(page.text()).toContain('保存回执无法与本次输入对应'); expect(page.text()).not.toContain('已保存服务套餐'); expect(field('CPU').value).toBe('2');
-  await page.click('继续编辑'); f.state.writeOverride = undefined; await page.click('重新读取套餐'); await page.click('检查并保存');
+  await page.click('继续编辑'); f.state.writeOverride = undefined; await page.reread(); await page.click('检查并保存');
   let finish!: () => void; f.state.hold = new Promise<void>((resolve) => { finish = resolve; }); await page.click('确认覆盖');
   f.state.readFailure = true; await act(async () => { finish(); }); await page.settle();
   expect(page.text()).toContain('已保存服务套餐 standard-small'); expect(page.text()).toContain('套餐目录读取失败'); expect(f.writes).toHaveLength(2);

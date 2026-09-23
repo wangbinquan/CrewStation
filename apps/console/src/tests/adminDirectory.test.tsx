@@ -65,15 +65,15 @@ test('待办独立加载、空态与错误不混淆，失败来源单独重读�
   expect(card().textContent).toContain('数量未确认'); expect(card().textContent).not.toContain('当前没有待处理事项');
   f.state.apiError = true; await act(async () => release()); await page.settle(); expect(card().textContent).toContain('API 待办离线');
   expect(card().textContent).not.toContain('本次显示 0 项'); f.state.holdApi = undefined; f.state.apiError = false;
-  await page.click('刷新 API 待办'); expect(card().textContent).toContain(f.apiRequests[0]!.operationId); expect(card().textContent).toContain('还有更多');
-  f.apiRequests.length = 0; await page.click('刷新 API 待办'); expect(card().textContent).toContain('当前没有待处理事项'); expect(card().textContent).toContain('本次显示 0 项');
+  await page.reread(); expect(card().textContent).toContain(f.apiRequests[0]!.operationId); expect(card().textContent).toContain('还有更多');
+  f.apiRequests.length = 0; await page.reread(); expect(card().textContent).toContain('当前没有待处理事项'); expect(card().textContent).toContain('本次显示 0 项');
 });
 
 test('管理目录读取失败保留材料但暂停管理动作，无效回执不冒充空目录', async () => {
   const f = adminDirectoryFixture(); page = await renderApp('/admin/projects'); f.state.projectError = true;
-  await page.click('刷新项目目录'); expect(page.text()).toContain('管理项目目录离线'); expect(page.text()).toContain('显示上次读取的项目');
+  await page.reread(); expect(page.text()).toContain('管理项目目录离线'); expect(page.text()).toContain('显示上次读取的项目');
   expect(document.querySelectorAll('a[href$="/provisioning"]').length).toBe(0); expect(page.text()).not.toContain('本页 0 个项目');
-  f.state.projectError = false; await page.click('刷新项目目录'); expect(document.querySelectorAll('a[href$="/provisioning"]').length).toBe(12);
+  f.state.projectError = false; await page.reread(); expect(document.querySelectorAll('a[href$="/provisioning"]').length).toBe(12);
   await page.click('管理成员'); expect(page.path()).toBe(`/projects/${f.projects[0]!.project.id}/settings`); expect(page.search().tab).toBe('members');
   f.state.invalidProject = true; await page.navigate('/admin/projects?q=unknown'); expect(page.text()).toContain('管理项目目录或当前管理身份未确认');
   expect(page.text()).not.toContain('此范围没有项目'); expect(page.text()).toContain('本页数量未确认'); expect(f.writes()).toHaveLength(0);
@@ -95,15 +95,16 @@ test('空筛选可恢复；前台重读保留未提交搜索，卸载清理监�
 
 test('管理身份读取失败可重试；身份撤销后移除管理内容且不再读取目录', async () => {
   const f = adminDirectoryFixture(); page = await renderApp('/admin/projects'); f.state.identityError = true;
-  await page.click('刷新项目目录'); expect(page.text()).toContain('管理身份离线');
+  await page.reread(); expect(page.text()).toContain('管理身份离线');
   expect([...document.querySelectorAll('a')].filter((node) => !node.closest('[hidden]')).some((node) => node.textContent?.includes('管理项目 0'))).toBe(false);
   f.state.identityError = false; await page.reread(); expect(page.text()).toContain('管理项目 0');
+  // 定时重读先核对身份再读目录（useAdminRead）：回到前台触发的就是这一条，身份撤销后不再读目录。
   f.state.admin = false; const before = f.calls.filter((c) => c.url.pathname === '/v1/projects/page').length;
-  await page.click('刷新项目目录'); expect(page.text()).toContain('仅平台管理员可见'); expect(page.text()).not.toContain('管理项目 0');
+  await act(async () => { document.dispatchEvent(new Event('visibilitychange')); }); await page.settle(); expect(page.text()).toContain('仅平台管理员可见'); expect(page.text()).not.toContain('管理项目 0');
   expect(f.calls.filter((c) => c.url.pathname === '/v1/projects/page')).toHaveLength(before); expect(f.writes()).toHaveLength(0);
 });
 
-test('例行重读不改界面，入口只在手动刷新时暂停', async () => {
+test('例行重读不改界面：在途也不把入口换成纯文本（2026-09-23 起没有手动刷新）', async () => {
   const f = adminDirectoryFixture(); page = await renderApp('/admin');
   const entry = () => [...document.querySelectorAll('a, span')].find((node) => node.textContent === f.apiRequests[0]!.operationId)!;
   expect(entry().tagName).toBe('A');
@@ -112,9 +113,5 @@ test('例行重读不改界面，入口只在手动刷新时暂停', async () =>
   await act(async () => { document.dispatchEvent(new Event('visibilitychange')); }); await page.settle();
   const reads = () => f.calls.filter((c) => c.url.pathname === '/v1/api-requests/page').length;
   expect(reads()).toBe(2); expect(entry().tagName).toBe('A');
-  await act(async () => release()); await page.settle(); expect(entry().tagName).toBe('A');
-  // 手动刷新是用户自己触发的：在途期间仍然暂停入口，读完恢复。
-  f.state.holdApi = new Promise<void>((r) => { release = r; });
-  await page.click('刷新 API 待办'); expect(reads()).toBe(3); expect(entry().tagName).toBe('SPAN');
   f.state.holdApi = undefined; await act(async () => release()); await page.settle(); expect(entry().tagName).toBe('A');
 });

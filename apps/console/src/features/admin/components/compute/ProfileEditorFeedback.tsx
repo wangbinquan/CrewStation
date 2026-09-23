@@ -35,7 +35,7 @@ export function ProfileEditorFeedback({ editor, saving, creating }: FeedbackProp
         {t('admin.profile.conflict', { revision: saving.conflict })}
         <span className={styles.toolbar}>
           <Button onClick={() => { editor.adoptRevision(saving.conflict!); saving.clearConflict(); }}>{t('admin.profile.adoptConflict', { revision: saving.conflict })}</Button>
-          <Button onClick={() => saving.reload.mutate(undefined)}>{t('admin.profile.discard')}</Button>
+          <Button variant="ghost" onClick={() => saving.reload.mutate(undefined)}>{t('admin.profile.discard')}</Button>
         </span>
       </ActionNote>
     ) : saving.save.error ? <ActionNote tone="error">{t('admin.profile.saveError', { message: errorMessage(saving.save.error) })}</ActionNote> : null}

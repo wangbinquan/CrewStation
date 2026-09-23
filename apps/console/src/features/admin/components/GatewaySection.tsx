@@ -1,7 +1,7 @@
 import type { ReactElement } from 'react';
 import { api } from '../../../shared/api/client';
 import { queryKeys } from '../../../shared/api/queryKeys';
-import { useApiMutation, useApiQuery } from '../../../shared/api/useApi';
+import { AUTO_REFRESH, useApiMutation, useApiQuery } from '../../../shared/api/useApi';
 import { useDateText } from '../../../shared/lib/useDateText';
 import { useT } from '../../../shared/lib/useT';
 import { Button } from '../../../shared/ui/Button';
@@ -21,31 +21,26 @@ export function GatewaySection(): ReactElement {
     const services = readServiceRoutes(await api.gateway.listRoutes());
     if (services === undefined) throw new Error(t('admin.gateway.routesInvalid'));
     return services;
-  });
+  }, AUTO_REFRESH);
   const allowlist = useApiQuery(queryKeys.gatewayAllowlist(), async () => {
     const facts = readAllowlistFacts(await api.gateway.allowlist());
     if (facts === undefined) throw new Error(t('admin.gateway.allowlistInvalid'));
     return facts;
-  });
+  }, AUTO_REFRESH);
   // 重算同时改路由表与放行表，按 gateway 前缀一次失效两份。
   const reconcile = useApiMutation(() => api.gateway.reconcile(), { invalidate: [queryKeys.gateway()] });
   // 读取失败时不拿上一份数据充数：放行表「0 条」与路由表「为空」都是会被当真的结论。
   const facts = allowlist.error ? undefined : allowlist.data, services = routes.error ? undefined : routes.data;
-  const reread = (): void => { if (routes.error) void routes.refetch(); if (allowlist.error) void allowlist.refetch(); };
+  // 路由表与放行表每 30 秒在原位重读、读取失败自动重试；「重新下发」是这张卡的主动作，在底部操作条（2026-09-23 裁定）。
   return (
-    <Card title={t('admin.gateway.title')} footer={t('admin.gateway.hint')}>
+    <Card title={t('admin.gateway.title')} footer={t('admin.gateway.hint')}
+      actions={<Button variant="primary" disabled={reconcile.isPending} onClick={() => reconcile.mutate(undefined)}>{reconcile.isPending ? t('admin.gateway.reconciling') : t('admin.gateway.reconcile')}</Button>}>
       <MutationError error={reconcile.error} messageKey="admin.gateway.reconcileError" />
-      <div className={styles.actions}>
-        <Button variant="primary" disabled={reconcile.isPending} onClick={() => reconcile.mutate(undefined)}>
-          {reconcile.isPending ? t('admin.gateway.reconciling') : t('admin.gateway.reconcile')}
-        </Button>
-        {routes.error || allowlist.error ? <Button disabled={routes.isFetching || allowlist.isFetching} onClick={reread}>{t('admin.gateway.reread')}</Button> : null}
-        {reconcile.data === undefined ? null : (
-          <span className={styles.result} role="status">
-            {t('admin.gateway.reconciled', { routes: reconcile.data.routes, allowlist: reconcile.data.allowlist })}
-          </span>
-        )}
-      </div>
+      {reconcile.data === undefined ? null : (
+        <p className={styles.result} role="status">
+          {t('admin.gateway.reconciled', { routes: reconcile.data.routes, allowlist: reconcile.data.allowlist })}
+        </p>
+      )}
       <QueryStatus isPending={allowlist.isPending} error={allowlist.error} />
       {facts === undefined ? null : <AllowlistFactList facts={facts} />}
       <p className={styles.subtitle}>{t('admin.gateway.routesTitle')}</p>

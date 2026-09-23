@@ -48,7 +48,7 @@ export function ProjectServiceForm({ initial, plans, viewerId, onReload }: { rea
     {save.error ? <ActionNote tone="error">{errorMessage(save.error)}</ActionNote> : null}
     {save.isSuccess ? <ActionNote tone="success">{t('admin.resources.serviceSaved')}</ActionNote> : null}
     <ActionRow><Button type="submit" variant="primary" disabled={save.isPending || !dirty}>{t(save.isPending ? 'admin.profile.working' : 'admin.resources.saveService')}</Button>
-      {dirty ? <InlineConfirm label={t('admin.resources.reloadService')} question={t('admin.resources.discardService')} busy={save.isPending} onConfirm={onReload} /> : <Button disabled={save.isPending} onClick={onReload}>{t('admin.resources.reloadService')}</Button>}
+      {dirty ? <InlineConfirm variant="ghost" label={t('admin.resources.discardServiceAction')} question={t('admin.resources.discardService')} busy={save.isPending} onConfirm={onReload} /> : null}
     </ActionRow>
   </Stack></form>;
 }
