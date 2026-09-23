@@ -5,7 +5,7 @@ import { NativeTerminalAttachment } from '../features/dev-session/model/native/n
 import { StreamCommandError } from '../features/dev-session/model/streamCommandQueue';
 
 const runnerId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
-interface FixtureOptions { readonly now?: () => number; readonly renewMs?: number }
+interface FixtureOptions { readonly now?: () => number; readonly renewMs?: number; readonly releaseMs?: number }
 function fixture(options: FixtureOptions = {}) {
   let receive: (event: RunnerEvent, seq: number) => void = () => {};
   const calls: TaskStreamCommandInput[] = [], writes: string[] = [], sizes: number[][] = [];
@@ -85,6 +85,23 @@ describe('原生终端附着', () => {
     f.attachment.setActive(false); await Bun.sleep(5); const stopped = claimTypes(f); await Bun.sleep(30);
     expect(claimTypes(f)).toBe(stopped);
     f.attachment.setActive(true); await Bun.sleep(30); expect(claimTypes(f)).toBeGreaterThan(stopped);
+    f.attachment.dispose();
+  });
+
+  // 2026-09-23 实机：离开终端 8 秒后 OpenCode 查询终端，xterm 的一串自动应答走 terminalInput 把租约续到了 39.5 秒才释放；
+  // TUI 查询得勤，人走了租约可能永远不到期。所以离开满时限要主动 detach，不能只靠 Runner 的租约。
+  test('离开终端满时限主动释放（detach），期间终端的自动应答延长不了；时限内回来则不释放', async () => {
+    const f = fixture({ renewMs: 1000, releaseMs: 30 }); await ready(f);
+    f.attachment.setActive(true); await f.attachment.claim();
+    f.attachment.setActive(false);
+    f.attachment.input('\u001b[1;1R'); await Bun.sleep(15); f.attachment.input('\u001b[O');
+    expect(f.attachment.getState().controlled).toBe(true);
+    await Bun.sleep(40);
+    expect(f.calls.map((c) => c.type).slice(-3)).toEqual(['terminalInput', 'terminalInput', 'detachTerminal']);
+    expect(f.attachment.getState().controlled).toBe(false);
+    await f.attachment.claim(); f.attachment.setActive(false); await Bun.sleep(10); f.attachment.setActive(true); await Bun.sleep(40);
+    expect(f.calls.filter((c) => c.type === 'detachTerminal')).toHaveLength(1);
+    expect(f.attachment.getState().controlled).toBe(true);
     f.attachment.dispose();
   });
 

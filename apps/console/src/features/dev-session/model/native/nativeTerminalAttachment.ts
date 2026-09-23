@@ -22,6 +22,11 @@ export interface NativeAttachmentState {
 
 /** 持有控制时的续约间隔；Runner 的租约是 30 秒。 */
 export const CONTROL_RENEW_MS = 10_000;
+/**
+ * 离开终端多久后主动释放。不能只等 Runner 的租约到期：原生 TUI 会不时查询终端（能力、光标位置、配色），
+ * xterm 的自动应答走 terminalInput，每一条都会续租，人走了租约也可能一直不到期（2026-09-23 实机：离开 8 秒后一串应答把释放推迟到 39.5 秒）。
+ */
+export const CONTROL_RELEASE_MS = 30_000;
 /** 连续点击或按键不重复发取得命令；被拒后也不每个按键都去撞一次。 */
 const CLAIM_THROTTLE_MS = 1_000;
 
@@ -30,7 +35,7 @@ const newer = (current: TerminalControlState | undefined, next: TerminalControlS
 /**
  * 先订阅再取屏幕快照，按终端 seq 衔接；任何缺口都重新附着，不重放输入或启动进程。
  * 输入控制（2026-09-23 裁定）：操作终端即自动取得（`ensureControl`），只在终端处于活动状态（有焦点、页面在前台）时续约，
- * 离开后不再续约、由 Runner 的租约到期释放；谁在输入由 Runner 推来的 `terminalControl` 实时更新。
+ * 离开 `CONTROL_RELEASE_MS` 后主动释放（页面关掉、断线时才靠 Runner 的租约兜底）；谁在输入由 Runner 推来的 `terminalControl` 实时更新。
  */
 export class NativeTerminalAttachment {
   private state: NativeAttachmentState = { phase: 'offline', controlled: false, truncated: false, refused: false };
@@ -50,10 +55,12 @@ export class NativeTerminalAttachment {
   private ownRevision?: number;
   private active = false;
   private renewTimer?: ReturnType<typeof setInterval>;
+  private releaseTimer?: ReturnType<typeof setTimeout>;
   private readonly now: () => number;
   private readonly renewMs: number;
-  constructor(private readonly channel: TaskStreamChannel, readonly terminalId: string, readonly runnerId: string, private readonly sink: NativeTerminalSink, options: { readonly now?: () => number; readonly renewMs?: number } = {}) {
-    this.now = options.now ?? Date.now; this.renewMs = options.renewMs ?? CONTROL_RENEW_MS;
+  private readonly releaseMs: number;
+  constructor(private readonly channel: TaskStreamChannel, readonly terminalId: string, readonly runnerId: string, private readonly sink: NativeTerminalSink, options: { readonly now?: () => number; readonly renewMs?: number; readonly releaseMs?: number } = {}) {
+    this.now = options.now ?? Date.now; this.renewMs = options.renewMs ?? CONTROL_RENEW_MS; this.releaseMs = options.releaseMs ?? CONTROL_RELEASE_MS;
   }
   start(): void { this.disposed = false; this.unsubscribe ??= this.channel.subscribe((event) => this.receive(event)); }
   readonly getState = () => this.state;
@@ -111,7 +118,7 @@ export class NativeTerminalAttachment {
       return controlled;
     } catch (error) { if (this.current(generation)) { this.loseControl(); this.patch({ error: streamErrorMessage(error) }); } return false; }
   };
-  /** 终端是否处于活动状态（有焦点且页面在前台）；只有活动时才续约，离开后租约自然到期。 */
+  /** 终端是否处于活动状态（有焦点且页面在前台）；只有活动时才续约，离开满 `CONTROL_RELEASE_MS` 主动释放。 */
   setActive(active: boolean): void { this.active = active; this.syncRenewal(); }
   input(data: string): void {
     if (!this.canInput()) { void this.ensureControl(); return; }
@@ -122,7 +129,7 @@ export class NativeTerminalAttachment {
     if (this.canInput()) this.command({ type: 'terminalResize', terminalId: this.terminalId, cols: Math.max(10, Math.min(300, cols)), rows: Math.max(2, Math.min(120, rows)) });
   }
   dispose(): void {
-    this.disposed = true; this.generation++; this.stopRenewal(); this.unsubscribe?.(); this.unsubscribe = undefined;
+    this.disposed = true; this.generation++; this.stopRenewal(); this.clearRelease(); this.unsubscribe?.(); this.unsubscribe = undefined;
     this.refreshPromise = undefined; this.claimPromise = undefined;
     if (this.connected) void this.channel.send({ type: 'detachTerminal', terminalId: this.terminalId, viewId: 'browser' }).catch(() => undefined);
     this.listeners.clear(); this.buffered = [];
@@ -130,11 +137,21 @@ export class NativeTerminalAttachment {
   private current(generation: number): boolean { return !this.disposed && this.connected && generation === this.generation; }
   private canInput(): boolean { return this.connected && !this.disposed && this.state.phase === 'ready' && this.state.controlled; }
   private syncRenewal(): void {
-    if (this.state.controlled && this.active) this.renewTimer ??= setInterval(() => void this.claim(), this.renewMs);
-    else this.stopRenewal();
+    if (this.state.controlled && this.active) { this.clearRelease(); this.renewTimer ??= setInterval(() => void this.claim(), this.renewMs); return; }
+    this.stopRenewal();
+    if (this.state.controlled) this.releaseTimer ??= setTimeout(() => this.release(), this.releaseMs);
+    else this.clearRelease();
   }
   private stopRenewal(): void { if (this.renewTimer) clearInterval(this.renewTimer); this.renewTimer = undefined; }
-  private loseControl(): void { this.stopRenewal(); this.ownRevision = undefined; if (this.state.controlled) this.patch({ controlled: false }); }
+  private clearRelease(): void { if (this.releaseTimer) clearTimeout(this.releaseTimer); this.releaseTimer = undefined; }
+  /** detach 只释放输入控制，画面照常附着；Runner 随即推「已空闲」。 */
+  private release(): void {
+    this.releaseTimer = undefined;
+    if (this.disposed || !this.connected || this.active || !this.state.controlled) return;
+    void this.channel.send({ type: 'detachTerminal', terminalId: this.terminalId, viewId: 'browser' }).catch(() => undefined);
+    this.loseControl();
+  }
+  private loseControl(): void { this.stopRenewal(); this.clearRelease(); this.ownRevision = undefined; if (this.state.controlled) this.patch({ controlled: false }); }
   private acceptControl(control: TerminalControlState): void {
     const latest = newer(this.state.control, control);
     if (latest !== control) return;
