@@ -26,8 +26,9 @@ const ingressRoutesOf = (namespace: string): string[] =>
 let prodPhysical: 'blue' | 'green' = 'blue';
 
 /** 同一个库上的一个新模块实例＝一个刚启动的进程：自己的放行表缓存是空的。 */
-function newGateway(): GatewayModule {
+function newGateway(extra: Partial<Pick<Parameters<typeof createGatewayModule>[0], 'ledger' | 'logger'>> = {}): GatewayModule {
   return createGatewayModule({
+    ...extra,
     db: tdb.db, k8s,
     // 两个取值范围与真实实现一致：清单只给在册服务，按 id／按项目的解析连归档的一起查得到。
     services: {
@@ -197,5 +198,47 @@ describe.skipIf(!available)('gateway module', () => {
     expect(await gateway.workers[0]!.runOnce()).toBe(1);
     expect(await gateway.api.lookupByIp('10.244.0.30')).toMatchObject({ identity: 'demo/demo', kind: 'service' });
     expect((await repo.listActive()).map((p) => p.podName)).toEqual(['demo-blue-new']);
+  });
+
+  // RFC-025 第三期后半：服务的路由投影成 route 记录（IngressRoute 仍由 gateway 建删）；补投影按网关自己存的路由表；归档的标「不要了」。
+  test('路由投影进资源台账：每条一条记录，同样的期望重复声明无妨；补投影把已有路由写进台账；归档的服务的记录标「不要了」；台账写失败只告警', async () => {
+    const records = new Map<string, { id: string; desired: 'present' | 'absent'; host: string; target: string }>(), releases: string[] = [], warnings: string[] = [];
+    let failing = false;
+    const ledger = {
+      declare: async (input: { ref: string; spec: { host: string }; display: Readonly<Record<string, string>> }) => {
+        if (failing) throw new Error('台账暂时不可用');
+        const id = records.get(input.ref)?.id ?? `rec-${records.size + 1}`;
+        records.set(input.ref, { id, desired: 'present', host: input.spec.host, target: input.display['target']! });
+        return { id };
+      },
+      find: async (ref: string) => records.get(ref),
+      requestRelease: async (id: string) => { releases.push(id); for (const [ref, record] of records) if (record.id === id) records.set(ref, { ...record, desired: 'absent' }); },
+    };
+    const logger = { debug: () => undefined, info: () => undefined, warn: (msg: string) => { warnings.push(msg); }, error: () => undefined, child: () => logger };
+    const withLedger = newGateway({ ledger, logger });
+    await withLedger.api.reconcileService(issuesId);
+    expect([...records.entries()].map(([ref, r]) => [ref.split('/')[1], r.host, r.target]).sort()).toEqual([
+      ['internal-api', 'api.svc.cs.internal', 'cs-issues/issues-green'], ['preview', 'preview.issues.cs.localhost', 'cs-issues/issues-blue'],
+      ['prod', 'issues.cs.localhost', 'cs-issues/issues-green'], ['service', 'issues.svc.cs.internal', 'cs-issues/issues-green'],
+    ]);
+    // 补投影：台账接上之前就有的路由（这里清空假台账来模拟）照网关自己存的路由表投影，不重新 apply。
+    records.clear();
+    const applied = k8s.applied.length;
+    expect(await withLedger.api.resyncRouteLedger()).toBeGreaterThanOrEqual(1);
+    expect([...records.keys()].filter((ref) => ref.startsWith(issuesId))).toHaveLength(4);
+    expect(k8s.applied.length).toBe(applied);
+    // 归档：路由删掉，记录标「不要了」。
+    await withLedger.api.removeService(issuesId);
+    expect([...records.entries()].filter(([ref]) => ref.startsWith(issuesId)).every(([, r]) => r.desired === 'absent')).toBe(true);
+    expect(releases).toHaveLength(4);
+    // 摘掉之后又出现（这里是同一服务再次计划路由）：已释放的记录不能重新声明，顺延到 ~2 各建一条新记录。
+    await withLedger.api.reconcileService(issuesId);
+    expect([...records.entries()].filter(([ref, r]) => ref.startsWith(issuesId) && r.desired === 'present').map(([ref]) => ref.split('/')[1]).sort())
+      .toEqual(['internal-api~2', 'preview~2', 'prod~2', 'service~2']);
+    await withLedger.api.reconcileService(issuesId);
+    expect([...records.keys()].filter((ref) => ref.startsWith(issuesId))).toHaveLength(8);
+    failing = true;
+    await withLedger.api.reconcileService(demoId);
+    expect(warnings).toContain('resource ledger route projection failed');
   });
 });

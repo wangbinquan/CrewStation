@@ -219,6 +219,8 @@ ResourceActionSchema = z.object({ id: ResourceActionIdSchema, enabled: z.boolean
 - **一个 Host 一条生效路由**：调和器按 Host 聚合，多于一条时按上级阶段的优先级（`ready` ＞ `starting` ＞ 其余）取一条，其余摘除并写条件 `Superseded`（原因写明被谁压下）。
 - 切流：release 改槽的期望（哪个物理槽是正式）并发 `trafficSwitched`；网关改写两个 Host 的路由期望；调和器应用。
 
+> **实施补记（2026-09-24，第三期后半第一步）**：路由先投影、后移交。gateway 每次按服务重算路由（建项目、切流、发布登记、归档）之后，把每条路由写成一条 `route` 记录（`ref` 为 `<服务 ID>/<种类>`，种类是正式、待验证、服务域与内部 API 前缀），子对象是它的 IngressRoute，期望里带 Host、路径前缀、目标 Service 与中间件链，展示字段是种类、Host、前缀与目标；不在新计划里的几种（例如不再暴露内部 API、服务归档）标「不要了」；台账不重新声明已释放的记录，同一种路由摘掉之后再出现是一条新记录，`ref` 顺延为 `~2`、`~3`……路由是稳定记录（每个服务几条，视图缺省也列出）。阶段按 IngressRoute 的观测：在即运行中，删除中按启动中算。gateway 每 5 分钟按自己存的路由表补投影一次（不重新 apply）；台账写失败只告警。IngressRoute 的建删、说明页、同 Host 唯一与开发预览路由（今天挂在开发工作区记录下，由 task-runtime 建）在后面几步。
+
 ### 7.2 说明页
 
 - cs-api 新增 `GET /_crewstation/unavailable/:routeId`（经说明页路由的 `replacePath` 中间件到达，仍在 ForwardAuth 之后）。按路由的上级记录渲染：主机、原因（「某时由某人下线」「到期自动下线」「尚未部署」「尚未上线」）、成员看到「去发布与上线重新部署」的入口。

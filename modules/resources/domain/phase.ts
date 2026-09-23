@@ -49,6 +49,8 @@ export function computePhase(record: PhaseInput): PhaseResult {
   if (rule.primaryChild === 'Job') return jobPhase(record, primary);
   if (!primary || !isPresent(primary)) return condition(record, 'Prepared')?.status === 'false' ? { phase: 'pending', reason: QUEUED } : { phase: 'provisioning' };
   if (rule.primaryChild === 'PersistentVolumeClaim') return volumePhase(primary);
+  // 路由：IngressRoute 在即生效；删除中（换名、摘除）按启动中算。
+  if (rule.primaryChild === 'IngressRoute') return primary.phase === 'Terminating' ? { phase: 'starting', reason: reasonOf('route-replacing', '路由正在替换') } : { phase: 'ready' };
   return rule.primaryChild === 'Deployment' ? deploymentPhase(record, primary) : workloadPhase(record, rule, primary);
 }
 

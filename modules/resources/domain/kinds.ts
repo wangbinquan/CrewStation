@@ -8,7 +8,7 @@ export interface KindRule {
   /** 占几个并发额度单位（D31、RFC-006：开发会话、业务任务、每个 Agent 执行各一个）。 */
   readonly quotaUnits: number;
   /** 就绪看哪一种子对象；没有就只看条件。 */
-  readonly primaryChild?: 'Pod' | 'PersistentVolumeClaim' | 'Deployment' | 'Job';
+  readonly primaryChild?: 'Pod' | 'PersistentVolumeClaim' | 'Deployment' | 'Job' | 'IngressRoute';
   /** 就绪还要这些领域条件为真（所属模块上报）。 */
   readonly readyConditions: readonly string[];
   /** 失败后保留多久供诊断（D9：开发会话 72 小时）；没有就不保留。 */
@@ -39,7 +39,8 @@ export const KIND_RULES: Readonly<Record<ResourceKind, KindRule>> = {
   // 构建与迁移 Job（第三期）：Job 在跑是运行中，结束后照资源中心记下的 Finished 是已结束或失败——Kubernetes 的 TTL 删掉 Job 之后结果仍在（提案 §5.1）。
   'build-job': JOB,
   'migration-job': JOB,
-  route: GENERIC,
+  // 路由（第三期后半）：gateway 按服务写的正式、待验证、服务域与内部 API 路由；IngressRoute 在即运行中。每个服务几条、长期存在，是稳定记录。
+  route: { quotaUnits: 0, primaryChild: 'IngressRoute', readyConditions: [], releasable: false, stable: true },
   'rate-limit-policy': GENERIC,
   database: GENERIC,
   'data-binding': GENERIC,

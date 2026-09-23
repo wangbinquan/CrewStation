@@ -208,6 +208,8 @@ function composeDelivery(deps: CompositionDeps, core: ReturnType<typeof composeC
   const gateway = createGatewayModule({
     identities: deps.identities,
     db, k8s, hosts, logger, isAdmin: (id) => isAdmin(id),
+    // RFC-025 第三期后半：服务的路由投影成 route 记录（IngressRoute 仍由 gateway 建删）。
+    ledger: resources.api.owner('gateway'),
     services: {
       listServices,
       getService: async (id) => { const s = await resolveById(id); return s ? directoryService(s) : undefined; },

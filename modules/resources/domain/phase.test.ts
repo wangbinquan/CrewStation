@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import type { ResourceChild, ResourceCondition } from '@crewstation/contracts';
 import { actionsFor } from './actions';
 import { countByKindPhase, mergeConditions } from './conditions';
+import { STABLE_KINDS } from './kinds';
 import { computePhase, settlePhase } from './phase';
 import type { LedgerRecord } from './record';
 import { childKey, expectedChildren, mergeChildren } from './record';
@@ -104,6 +105,15 @@ describe('条件、子对象、计数与可做操作', () => {
     expect(computePhase(slot({}, [looping]))).toEqual({ phase: 'degraded', reason: { code: 'crash-looping', message: '容器反复重启：累计重启 4 次，10 分钟内仍有重启' } });
     expect(computePhase(slot({}, [{ ...looping, status: 'false' }])).phase).toBe('ready');
     expect(computePhase(slot({}, [cond('CrashLooping', 'true')])).reason?.message).toBe('容器反复重启');
+  });
+
+  test('路由：IngressRoute 还没观测到是分配中，在即运行中，删除中按启动中算；稳定记录', () => {
+    const route = (child?: Partial<ResourceChild>) => record({ kind: 'route', spec: { children: [{ kind: 'IngressRoute', namespace: 'cs-demo', name: 'demo-prod' }] },
+      children: child ? [{ kind: 'IngressRoute', namespace: 'cs-demo', name: 'demo-prod', phase: 'Present', ready: true, ...child }] : [] });
+    expect(computePhase(route()).phase).toBe('provisioning');
+    expect(computePhase(route({}))).toEqual({ phase: 'ready' });
+    expect(computePhase(route({ phase: 'Terminating', ready: false }))).toEqual({ phase: 'starting', reason: { code: 'route-replacing', message: '路由正在替换' } });
+    expect(STABLE_KINDS).toContain('route');
   });
 
   test('构建、迁移 Job：还没建是分配中，建了没跑起来是启动中（原因照 Pod），在跑是运行中；资源中心记下结束后照它——Job 被 TTL 删掉结果也在', () => {

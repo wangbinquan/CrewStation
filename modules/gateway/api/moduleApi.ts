@@ -18,6 +18,8 @@ export interface GatewayModuleApi {
   readonly name: 'gateway';
   reconcileService(serviceId: ServiceId): Promise<RouteEntry[]>;
   reconcileAll(): Promise<number>;
+  /** 路由的台账补投影（RFC-025）：按网关存的路由表逐个服务再投影一次，不重新 apply；返回处理的服务数。 */
+  resyncRouteLedger(): Promise<number>;
   removeService(serviceId: ServiceId): Promise<void>;
   listRoutes(): Promise<Array<{ serviceId: string; serviceName: string; routes: RouteEntry[] }>>;
   rebuildAllowlist(): Promise<AllowlistDocument>;

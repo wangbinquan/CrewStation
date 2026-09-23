@@ -25,6 +25,8 @@ import type { GrantSource, HostNaming, ProjectAccess, ServiceDirectory, SlotRole
 import type { GatewayApplier, GatewaySettings } from './ports/gatewayApply';
 import type { PodWatcher } from './workers/podWatcher';
 import { podWatcher } from './workers/podWatcher';
+import { routeLedgerResyncWorker } from './workers/routeLedgerResync';
+import type { RouteLedger } from './ports/ledger';
 
 export interface GatewayModuleDeps {
   identities?: ResourceIdentityDirectory;
@@ -40,6 +42,8 @@ export interface GatewayModuleDeps {
   isAdmin: (userId: UserId) => Promise<boolean>;
   settings: GatewaySettings & { consumerName: string };
   applier?: GatewayApplier;
+  /** 资源台账（RFC-025 第三期后半）：路由投影成 route 记录；缺省不投影。 */
+  ledger?: RouteLedger;
   clock?: Clock;
   logger?: Logger;
 }
@@ -47,7 +51,8 @@ export interface GatewayModuleDeps {
 export interface GatewayModule {
   readonly api: GatewayModuleApi;
   readonly http: Hono<AppEnv>[];
-  readonly workers: PodWatcher[];
+  /** 第一个是身份索引的 Pod watch；配了资源台账时另有路由补投影。 */
+  readonly workers: readonly [PodWatcher, ...Array<{ start(): void; stop(): Promise<void> }>];
   readonly subscriptions: EventConsumer;
   readonly migrations: MigrationSet;
 }
@@ -69,6 +74,7 @@ export function createGatewayModule(deps: GatewayModuleDeps): GatewayModule {
     access: deps.access,
     users: deps.users,
     applier: deps.applier ?? traefikApplier(deps.k8s, deps.settings),
+    ...(deps.ledger ? { ledger: deps.ledger } : {}),
     services: deps.services,
     slots: deps.slots,
     grants: deps.grants,
@@ -103,7 +109,7 @@ export function createGatewayModule(deps: GatewayModuleDeps): GatewayModule {
   return {
     api,
     http: [gatewayRoutes(api, deps.isAdmin), maintenanceRoutes(api, deps.isAdmin)],
-    workers: [podWatcher(deps.k8s, pods.syncPod, logger, pods.relistPods)],
+    workers: [podWatcher(deps.k8s, pods.syncPod, logger, pods.relistPods), ...(deps.ledger ? [routeLedgerResyncWorker(routes.resyncRouteLedger, logger)] : [])],
     subscriptions,
     migrations: gatewayMigrations,
   };
