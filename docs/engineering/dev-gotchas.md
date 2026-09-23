@@ -652,6 +652,14 @@ happy-dom 不排版，渲染用例照绿。
 **判据**：宽屏量到 `scrollY` 为 0 而页面明明滚过；或吸顶元素上方露出一条内容。
 **换包核对不必 `docker build`**：在 `git archive` 导出树里 `bun install`，再 `cd apps/console && bun run build`，几秒就有 `dist/`，按上面「CDP 只换 `/assets/*`」一条换进浏览器。
 
+### 定时重读的查询被全局新鲜期挡掉「回前台补读」：切回、进入时显示的比刷新页面还旧
+
+2026-09-23 实撞（形态图「必须刷新页面才会刷新」）：`createQueryClient` 的全局 `staleTime` 是 30 秒，`refetchOnWindowFocus` 与挂载时的重读都只在数据「过期」时才发生。
+15 秒重读的页面切走 18 秒再切回，数据还算新鲜，不补读；后台期间跳过的那次定时重读（`refetchIntervalInBackground: false`）也不补，又等了 10 秒才重读。
+刷新页面则总是立即读，于是用户觉得「刷新才有」。现在 `useApiQuery` 对设了 `refetchIntervalMs` 的查询把新鲜期缩到自己的重读周期（只缩短、不延长 QueryClient 的缺省），
+并默认开启「回前台补读」（周期函数给 `undefined` 时不开）。自己另写查询时照此办：定时重读的数据，新鲜期不能长过重读周期。
+**判据**：切回标签页或从别的页面点进来之后，页面上的数据时间比刷新页面拿到的旧。
+
 ## 用例与 CI
 
 规范正文在 `testing.md`；这里只记撞过的坑。
@@ -709,6 +717,14 @@ module 层 CI 连红两个提交（635359d 补上）。改了用例的副作用�
 子进程继承下来，Bun 的 `console.error` 就给整行上了红色；CI 不设这个变量，所以 CI 一直是绿的。判据：`env | grep FORCE_COLOR`；
 `env -u FORCE_COLOR bun test <文件>` 转绿。断言子进程输出原文的用例，子进程里用 `process.stdout.write`／`process.stderr.write` 写原始字节（b22b6d8 就是这样修的），
 或者比较前先去掉 ANSI 转义；不要去改测试进程的 `process.env`，同一进程里的其他文件会一起受影响。
+
+### React Query 的 `focusManager` 是进程级单例：用例改了它要恢复成原来的样子
+
+`bun test` 在一个进程里依次跑全部用例文件。前面的用例（`apiInvocationFixture`、`roleHome`、`rebuildSession`）用 `focusManager.setFocused(false)`、`setFocused(true)` 模拟回到前台，之后焦点一直钉在 `true`。
+2026-09-23 `apiQueryPolling` 第一版在前后把它复位成「未定」（`setFocused(undefined)`，改由 `document.visibilityState` 决定），并改写了 `document.visibilityState`。
+那几轮全量运行里，后面 release 系页面的用例（`releaseDelivery`、`releaseMaintenance`）首个断言时仍在「读取…」，偶发红得多：带它 7 次红 4 次，不带 3 次全绿。
+改成只用 `setFocused(false／true)`、结束时回到 `true` 之后，交替对照两轮都是全绿。
+用例要模拟切走、切回，就用 `setFocused`，并在 `afterEach` 里 `setFocused(true)`；要拨时钟用 `setSystemTime`，并在 `afterEach` 里 `setSystemTime()` 复原。
 
 ## 并发开发与 Agent 协作
 
