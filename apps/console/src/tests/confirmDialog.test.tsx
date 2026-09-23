@@ -48,8 +48,9 @@ test('以模态弹窗打开：标题、问句与后果都在弹窗里，焦点�
   expect(dialog.textContent).toContain('当前没有恢复归档的入口');
   expect(dialog.textContent).toContain('输入 archive 以确认');
   expect(document.activeElement === dialog.querySelector('input')).toBe(true);
-  const buttons = [...dialog.querySelectorAll('button')].map((node) => node.textContent);
-  expect(buttons).toEqual(['确认归档', '取消']);
+  // 标题栏右上角的 ✕ 与「取消」同效（2026-09-23 作者裁定所有弹窗都带 ✕）。
+  const buttons = [...dialog.querySelectorAll('button')].map((node) => node.getAttribute('aria-label') ?? node.textContent);
+  expect(buttons).toEqual(['关闭', '确认归档', '取消']);
   expect(dialogConfirmButton().disabled).toBe(true);
   await typeConfirmWord('归档');
   expect(dialogConfirmButton().disabled).toBe(true);

@@ -38,12 +38,32 @@ export function visibilitySettingsFixture() {
   return { state, writes };
 }
 
-export const settingsField = (label: string) => [...document.querySelectorAll('label')].find((node) => node.textContent?.startsWith(label))!.querySelector<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>('input, textarea, select')!;
-export const settingsButton = (label: string, root: ParentNode = document) => [...root.querySelectorAll<HTMLButtonElement>('button')].find((node) => !node.closest('[hidden]') && node.textContent === label)!;
+/** 开着的设置弹窗：展示资料与可见范围各是一个弹窗（2026-09-23 起），同一时刻只开一个。 */
+export const openSettingDialog = () => document.querySelector<HTMLDialogElement>('dialog[open]');
+/** 设置字段：开着弹窗时在弹窗里找（背后页面上的查找框同名）。 */
+export const settingsField = (label: string) => [...(openSettingDialog() ?? document).querySelectorAll('label')].find((node) => node.textContent?.startsWith(label))!.querySelector<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>('input, textarea, select')!;
+export const settingsButton = (label: string, root?: ParentNode) => {
+  const find = (scope: ParentNode) => [...scope.querySelectorAll<HTMLButtonElement>('button')].find((node) => !node.closest('[hidden]') && node.textContent === label);
+  const dialog = openSettingDialog();
+  return (root ? find(root) : (dialog ? find(dialog) : undefined) ?? find(document))!;
+};
 export const settingsForm = (label: string) => settingsField(label).closest('form')!;
+/** 字段属于哪个弹窗：弹窗标题就是打开它的按钮文案。 */
+const DIALOG_OF: Record<string, string> = { 市场可见范围: '修改可见范围', '完整邮箱或用户 ID': '修改可见范围', 应用用途: '修改展示资料', 应用图标: '修改展示资料' };
+/** 关掉开着的设置弹窗：「取消」只关窗，草稿留着。 */
+export async function closeSetting(page: RenderedApp) {
+  const dialog = openSettingDialog();
+  if (dialog) await clickSetting(page, '取消', dialog);
+}
+/** 打开某个设置弹窗；另一个开着就先关掉它。 */
+export async function openSetting(page: RenderedApp, opener: string) {
+  const dialog = openSettingDialog();
+  if (dialog?.querySelector('h2')?.textContent === opener) return;
+  if (dialog) await closeSetting(page);
+  await clickSetting(page, opener);
+}
 export async function editSetting(page: RenderedApp, label: string, value: string) {
-  if (label === '市场可见范围' && !document.querySelector('form select option[value="members"]')) await clickSetting(page, '修改可见范围');
-  if ((label === '应用用途' || label === '应用图标') && !document.querySelector('textarea')) await clickSetting(page, '修改展示资料');
+  await openSetting(page, DIALOG_OF[label]!);
   const field = settingsField(label);
   await act(async () => {
     field.focus();
@@ -54,7 +74,7 @@ export async function editSetting(page: RenderedApp, label: string, value: strin
   });
   await page.settle();
 }
-export async function clickSetting(page: RenderedApp, label: string, root: ParentNode = document) {
+export async function clickSetting(page: RenderedApp, label: string, root?: ParentNode) {
   const button = settingsButton(label, root);
   if (!button) throw new Error(`找不到设置操作：${label}`);
   await act(async () => { button.focus(); button.click(); }); await page.settle();

@@ -40,9 +40,11 @@ test('负责人回退仅指向仍部署的较旧发布；迁移拒绝保留说�
   page = await renderApp(`/projects/${projectId}/release?release=${historyId}`);
   await check(); expect(page.text()).toContain('回退只切换流量，不恢复生产数据'); await input('trafficReason', '接口回归，回退验证');
   await click('确认回退至 v1.1.0'); expect(f.writes[0]?.body).toMatchObject({ expectedActiveRelease: prodId, expectedTargetRelease: targetId, reason: '接口回归，回退验证' });
-  expect(page.text()).toContain('破坏性迁移'); expect(page.text()).toContain('请发布修复版本'); expect(document.querySelector<HTMLTextAreaElement>('[name="trafficReason"]')?.value).toBe('接口回归，回退验证');
+  expect(page.text()).toContain('破坏性迁移'); expect(page.text()).toContain('请发布修复版本');
   expect(button('确认回退至 v1.1.0')).toBeUndefined(); await page.settle(); expect(f.writes).toHaveLength(1);
-  expect(page.search().release).toBe(historyId);
+  // 2026-09-23 起确认是弹窗：失败后弹窗关掉、原因留在页面上，切换说明是页面上的草稿，再次核对时恢复。
+  await check(); expect(document.querySelector<HTMLTextAreaElement>('[name="trafficReason"]')?.value).toBe('接口回归，回退验证'); await click('取消切换');
+  expect(f.writes).toHaveLength(1); expect(page.search().release).toBe(historyId);
 });
 
 test('已确认目标被替换或读取失败时确认失效，重新核对才接受新目标', async () => {
@@ -54,32 +56,40 @@ test('已确认目标被替换或读取失败时确认失效，重新核对才�
   await click('重新核对两个版本'); expect(page.text()).toContain('正式版本 v1.0.0 → v0.9.0'); await click('确认回退至 v0.9.0'); expect(f.writes[0]?.body.expectedTargetRelease).toBe(historyId);
 });
 
-test('说明约束、错误焦点、取消与单次离开确认；发布草稿和切换草稿都保留', async () => {
+test('说明约束、错误焦点、取消与单次离开确认；发布草稿和切换草稿关弹窗都保留', async () => {
   const f = releaseDeliveryFixture(); page = await renderApp(`/projects/${projectId}/release?source=repository`);
   await click('检查发布来源'); await click('确认版本'); await input('message', '候选发布说明');
+  // 发布准备与上线确认都是弹窗（2026-09-23）：先关掉发布准备才点得到版本卡上的上线；关掉不丢输入，也不弹离开确认。
+  await click('取消'); expect(page.search().source).toBeUndefined(); expect(document.querySelectorAll('[role="alertdialog"]').length).toBe(0);
   await check(); expect(page.text()).toContain('可选，最多 500 字'); await input('trafficReason', '字'.repeat(501)); await click('确认上线 v1.1.0');
   expect(document.activeElement?.getAttribute('name')).toBe('trafficReason'); expect(document.querySelector('[name="trafficReason"]')?.getAttribute('aria-invalid')).toBe('true'); expect(f.writes).toHaveLength(0);
-  await input('trafficReason', '保留切换说明'); await click('取消切换'); expect(document.querySelector<HTMLTextAreaElement>('[name="trafficReason"]')?.value).toBe('保留切换说明');
-  await page.requestNavigate(`/projects/${projectId}`); expect(document.querySelectorAll('[role="alertdialog"]')).toHaveLength(1); await click('继续编辑');
-  expect(document.querySelector<HTMLTextAreaElement>('[name="message"]')?.value).toBe('候选发布说明'); expect(document.querySelector<HTMLTextAreaElement>('[name="trafficReason"]')?.value).toBe('保留切换说明');
-  await click('收起准备'); await click('放弃输入并离开'); expect(page.search().source).toBeUndefined(); expect(document.querySelector<HTMLTextAreaElement>('[name="trafficReason"]')?.value).toBe('保留切换说明');
+  await input('trafficReason', '保留切换说明'); await click('取消切换'); expect(document.querySelectorAll('[name="trafficReason"]').length).toBe(0);
+  // 离开本页才会丢：一次确认，写明是哪两份草稿。
+  await page.requestNavigate(`/projects/${projectId}`); expect(document.querySelectorAll('[role="alertdialog"]').length).toBe(1);
+  expect(page.text()).toContain('发布准备、切换说明有未保存的输入'); await click('继续编辑'); expect(page.path()).toBe(`/projects/${projectId}/release`);
+  await click('准备发布'); await click('检查发布来源'); await click('确认版本'); expect(document.querySelector<HTMLTextAreaElement>('[name="message"]')?.value).toBe('候选发布说明'); await click('取消');
+  await check(); expect(document.querySelector<HTMLTextAreaElement>('[name="trafficReason"]')?.value).toBe('保留切换说明'); await click('取消切换');
+  await page.requestNavigate(`/projects/${projectId}`); await click('放弃输入并离开'); expect(page.path()).toBe(`/projects/${projectId}`); expect(f.writes).toHaveLength(0);
 });
 
-test('在途切换只发一次并阻止另一发布；离开后的回执不跨项目导航', async () => {
-  const f = releaseDeliveryFixture(); page = await renderApp(`/projects/${projectId}/release?source=repository`);
-  await click('检查发布来源'); await click('确认版本'); await check();
+test('在途切换只发一次并锁住弹窗、挡住发布；离开后的回执不跨项目导航', async () => {
+  const f = releaseDeliveryFixture(); page = await renderApp(`/projects/${projectId}/release`); await check();
   let resolve!: () => void; f.state.hold = new Promise<void>((done) => { resolve = done; });
-  await act(async () => { button('确认上线 v1.1.0')!.click(); button('确认上线 v1.1.0')!.click(); document.querySelector('form[aria-label="发布准备"]')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); }); await page.settle();
-  expect(f.writes).toHaveLength(1); expect(button('确认发布到待验证版本')?.disabled).toBe(true);
+  await act(async () => { button('确认上线 v1.1.0')!.click(); button('确认上线 v1.1.0')!.click(); }); await page.settle();
+  expect(f.writes).toHaveLength(1); expect(button('取消切换')?.disabled).toBe(true);
+  expect(document.querySelector<HTMLButtonElement>('dialog[open] button[aria-label="关闭"]')?.disabled).toBe(true);
+  // 页上的写操作互斥：切换在途时发布准备不能开始检查。
+  expect(button('准备发布')?.disabled).toBe(false); await click('准备发布'); expect(button('检查发布来源')?.disabled).toBe(true);
   await page.requestNavigate(`/projects/${projectId}`); await click('放弃输入并离开'); await act(async () => resolve()); await page.settle(); expect(page.path()).toBe(`/projects/${projectId}`);
 });
 
 test('重复发布在途阻止切换；受理发布后保留切换说明且无需第二次离开确认', async () => {
-  const f = releaseDeliveryFixture(); page = await renderApp(`/projects/${projectId}/release?source=repository`);
-  await check(); await input('trafficReason', '试用确认后上线'); await click('取消切换'); await click('检查发布来源'); await click('确认版本');
+  const f = releaseDeliveryFixture(); page = await renderApp(`/projects/${projectId}/release`);
+  await check(); await input('trafficReason', '试用确认后上线'); await click('取消切换'); await click('准备发布'); await click('检查发布来源'); await click('确认版本');
   let resolve!: () => void; f.state.hold = new Promise<void>((done) => { resolve = done; });
   await click('确认发布到待验证版本'); expect(action()?.disabled).toBe(true); await act(async () => resolve()); await page.settle();
-  expect(page.search().release).toBe(targetId); expect(page.search().source).toBeUndefined(); expect(document.querySelector<HTMLTextAreaElement>('[name="trafficReason"]')?.value).toBe('试用确认后上线'); expect(document.querySelector('[role="alertdialog"]')).toBeNull();
+  expect(page.search().release).toBe(targetId); expect(page.search().source).toBeUndefined(); expect(document.querySelectorAll('[role="alertdialog"]').length).toBe(0);
+  await check(); expect(document.querySelector<HTMLTextAreaElement>('[name="trafficReason"]')?.value).toBe('试用确认后上线');
 });
 
 test('错误发布身份、未知槽与无副本都不可试用或切换；错误回执不显示成功', async () => {

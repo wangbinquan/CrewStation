@@ -93,6 +93,8 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   'ui.confirm.yes': 'Confirm',
   'ui.confirm.no': 'Cancel',
   'ui.dialog.typeToConfirm': 'Type {word} to confirm',
+  'ui.dialog.close': 'Close',
+  'ui.dialog.clear': 'Clear',
   'app.brand': 'CrewStation',
   'activity.title': "Agent activity",
   'activity.pendingCount': "{count} needs attention",

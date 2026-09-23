@@ -5,3 +5,4 @@
 .actions { display: flex; gap: var(--cs-space-2); align-items: center; flex-wrap: wrap; }
 .actions > span { color: var(--cs-color-text-muted); font-size: 12px; }
 .iconChoice { display: flex; gap: var(--cs-space-3); align-items: center; }
+.status { color: var(--cs-color-text-muted); font-size: var(--cs-font-size-sm); }

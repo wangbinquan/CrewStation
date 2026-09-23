@@ -61,6 +61,22 @@ test('保存被拒绝时保留输入；未提交的维护表单离开前要确�
   await click('继续编辑'); expect(reason().value).toBe('紧急修复');
 });
 
+// 2026-09-23 作者裁定页内展开的表单改弹窗：取消、✕、Esc 只关窗，草稿留在页面上、再打开恢复；「清空」回到此刻的维护状态；
+// 离开本页才丢，离开确认写明是「维护设置」。
+test('维护弹窗关掉不丢输入、再打开恢复；清空回到初始值；离开前的确认写明维护设置', async () => {
+  const f = slotLifecycleFixture(); page = await renderApp(`/projects/${projectId}/release`);
+  const enter = button('进入维护')!; enter.focus(); await click('进入维护');
+  expect(document.querySelectorAll('dialog[open]').length).toBe(1); expect(document.activeElement === box('users')).toBe(true);
+  await type(reason(), '换库'); await act(async () => box('events').click()); await page.settle();
+  await click('取消'); expect(document.querySelectorAll('dialog').length).toBe(0); expect(document.activeElement === button('进入维护')).toBe(true);
+  await click('进入维护'); expect(reason().value).toBe('换库'); expect(box('events').checked).toBe(false);
+  await click('清空'); expect(reason().value).toBe(''); expect(box('events').checked).toBe(true); expect(document.querySelectorAll('dialog[open]').length).toBe(1);
+  await type(reason(), '换库'); await act(async () => { document.querySelector('dialog[open]')!.dispatchEvent(new Event('cancel', { cancelable: true })); }); await page.settle();
+  expect(document.querySelectorAll('dialog').length).toBe(0);
+  await page.requestNavigate(`/projects/${projectId}`); expect(page.text()).toContain('维护设置有未保存的输入'); await click('放弃输入并离开');
+  expect(page.path()).toBe(`/projects/${projectId}`); expect(f.writes).toHaveLength(0);
+});
+
 // M8：开发者看得到维护的事实，但没有进入、调整与退出。
 test('开发者看得到维护中的开关、原因与放行名单，没有任何维护动作', async () => {
   const f = slotLifecycleFixture('developer');

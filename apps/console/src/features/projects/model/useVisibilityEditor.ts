@@ -12,10 +12,11 @@ export function useVisibilityEditor(projectId: string, saved: AppVisibilityDto, 
   });
   if (!dirty && !save.isPending && saved.revision > base.revision) { setDraft(saved); setBase(saved); }
   const conflict = saved.revision > base.revision;
-  const submit = (form: HTMLFormElement) => {
+  /** `root`：表单字段所在的元素，校验失败时把焦点放回出错的输入。 */
+  const submit = (root: ParentNode) => {
     if (!canSave || conflict || lock.current) return;
     const userIds = draft.mode === 'selected' ? draft.userIds : [];
-    if (draft.mode === 'selected' && userIds.length === 0) { setInvalid(true); form.querySelector('input')?.focus(); return; }
+    if (draft.mode === 'selected' && userIds.length === 0) { setInvalid(true); root.querySelector('input')?.focus(); return; }
     setInvalid(false); lock.current = true;
     void save.mutateAsync({ mode: draft.mode, userIds, expectedRevision: base.revision }).catch(() => { void reload(); }).finally(() => { lock.current = false; });
   };

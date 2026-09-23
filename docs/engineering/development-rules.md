@@ -156,13 +156,14 @@ RFC 写完必须得到用户批准才能进入实现阶段。**不要边写 RFC 
 
 任何新增或改动的工作台界面——按钮、弹窗、表单、列表行、页签、空状态、页面 header——必须**优先复用 `apps/console/src/shared/` 里的既有组件与样式**，禁止为了「快一点」落原生元素、自写 chrome、自写 CSS。
 
-- 动手前先扫一遍 `apps/console/src/shared/ui/` 与 `shared/lib/`：`Card`、`Button`、`Badge`、`DataTable`、`FormField`、`QueryStatus`、`InlineConfirm`、`ActionNote`、`EmptyState`、`PageHeader`、`DefinitionList`、`PageHeader`，以及 `usePollingRefetch`、`useDateText`。**清单以源码为准**，不在本文重复以免过时。
+- 动手前先扫一遍 `apps/console/src/shared/ui/` 与 `shared/lib/`：`Card`、`Button`、`Badge`、`DataTable`、`FormField`、`QueryStatus`、`InlineConfirm`、`ActionNote`、`EmptyState`、`PageHeader`、`DefinitionList`、`dialog/`（`FormDialog`、`ConfirmationDialog`、`ConfirmDialog`），以及 `usePollingRefetch`、`useDateText`。**清单以源码为准**，不在本文重复以免过时。
 - 现有组件差一两个 prop 时**最小扩展它**（加可选 prop、向后兼容），让所有调用方一起受益；**不要** fork 一份或绕开。
 - **动作型跳转用按钮样式**（2026-09-23 裁定）：新建、返回、查看日志、打开外部地址这类「点了去做事」的跳转用 `shared/ui/navigation/ButtonLink.tsx`（`ButtonLink`／`ExternalButtonLink`，仍是 `<a>`）；名字、标签、路径、域名这类引用才用文字链接。`apps/console/src/tests/actionLinks.test.ts` 会拦下文案取自 `t(...)` 的裸 `<Link>`／`<a>`。
 - 卡片直接组合表单、表格、提示与操作时用 `Card stacked`；卡片之外的纵向内容用 `Stack`，同组按钮用 `ActionRow`。卡片的 `padding` 只管外框留白，按钮组的 `gap` 只管组内间隔，内容块之间的间距由父布局承担。
 - 真的需要全新一类组件时，按「新增公共组件」对待：放进 `shared/ui/<Name>.tsx`、配同名 CSS module、文案走 `useT()`。初版就要考虑被别人复用的形态。
 - 颜色一律走 `app/theme/tokens.css` 的变量，**不写裸色值**。
-- **禁止 `alert` / `confirm` / `prompt`**：浏览器模态框会冻住本仓用来调试的浏览器自动化。一般的确认用行内 UI（`InlineConfirm`、`ConfirmationPanel`）。**不可撤销的动作**（归档项目、删除、结束或删除集群资源、丢弃未提交内容的释放会话）改用页面内的模态弹窗 `shared/ui/dialog/ConfirmDialog`：写清对象与后果，要输入英文确认词（`archive`／`delete`／`discard`）确认键才可用（2026-09-23 作者裁定）。它是页面里的 `<dialog>`，不是浏览器原生弹窗，不会冻住自动化。
+- **表单与确认用弹窗，不在页内展开**（2026-09-23 作者裁定）：点了才出现的表单用 `shared/ui/dialog/FormDialog`；带核对材料或输入的确认，以及放弃／切换／离开类提示（含 `UnsavedChangesGuard`）用 `ConfirmationDialog`。它们都搭在 `Dialog` 底座上：页面内的模态 `<dialog>`，经应用根上的 `DialogHost` 渲染（不嵌在打开它的表单或隐藏面板里），标题栏右上角 ✕、Esc 关闭、点遮罩不关，打开时焦点进弹窗、关闭后回到打开它的控件，进行中锁住关闭。**关窗不丢草稿**：草稿放在打开者那一层（弹窗只是视图），再打开恢复；底部最右的「清空」回到初始值、弹窗不关；只有离开页面才丢，离开确认写明是哪几份草稿。仍留在行内的只有两类：一行式的是／否确认（`InlineConfirm`），以及工作区干净时释放开发会话的确认（`ConfirmationPanel`）。
+- **禁止 `alert` / `confirm` / `prompt`**：浏览器模态框会冻住本仓用来调试的浏览器自动化，上面的弹窗都不是浏览器原生弹窗。**不可撤销的动作**（归档项目、删除、结束或删除集群资源、丢弃未提交内容的释放会话）改用页面内的模态弹窗 `shared/ui/dialog/ConfirmDialog`：写清对象与后果，要输入英文确认词（`archive`／`delete`／`discard`）确认键才可用（2026-09-23 作者裁定）。它是页面里的 `<dialog>`，不是浏览器原生弹窗，不会冻住自动化。
 - **判定原则**：犹豫「要不要自己写一个」时，默认答案是「不要」。
 
 2026-09-12 实撞：十个页面由四个并行 Agent 写成，各自被禁止改 `shared/`，同一个东西被抄了三到五份，事后要专门开一轮把 19 份副本收回去。**并行派活时必须指定一个 `shared/` 的所有者**，或者先把公共件建好再派。

@@ -145,7 +145,7 @@ test('来源或标签目录失败可恢复，失败不当作无分支，标签�
 test('在途只提交一次，离开后的回执不会把用户拉回发布页；错误服务回执不标成功', async () => {
   const f = fixture(); page = await renderApp(`/projects/${projectId}/release?source=repository`); await review();
   let release: () => void; f.state.hold = new Promise<void>((resolve) => { release = resolve; });
-  const form = document.querySelector<HTMLFormElement>('form[aria-label="发布准备"]')!;
+  const form = document.querySelector<HTMLFormElement>('dialog[open] form')!;
   await act(async () => { form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); }); await page.settle(); expect(f.writes).toHaveLength(1);
   await page.requestNavigate(`/projects/${projectId}`); await click('放弃输入并离开'); expect(page.path()).toBe(`/projects/${projectId}`);
   await act(async () => release!()); await page.settle(); expect(page.path()).toBe(`/projects/${projectId}`);
@@ -153,12 +153,16 @@ test('在途只提交一次，离开后的回执不会把用户拉回发布页�
   expect(page.search().release).toBeUndefined(); expect(page.text()).toContain('返回的服务或提交无法确认');
 });
 
-test('关闭准备与切项目先确认，取消保留草稿；测试者不能发布', async () => {
+test('关掉发布准备只收起弹窗、草稿留着，再打开恢复；切项目先确认；测试者不能发布', async () => {
   const f = fixture(); page = await renderApp(`/projects/${projectId}/release?source=repository`); await review(); await input('message', '未保存的发布说明');
-  await click('收起准备'); expect(page.text()).toContain('未保存'); await click('继续编辑'); expect(document.querySelector<HTMLTextAreaElement>('[name="message"]')?.value).toBe('未保存的发布说明');
-  await page.requestNavigate(`/projects/${projectId}`); await click('放弃输入并离开'); expect(f.writes).toHaveLength(0);
+  // 2026-09-23 起发布准备是弹窗：取消只关窗，不弹离开确认；输入是页面上的草稿，再打开从检查来源重走一遍、说明还在。
+  await click('取消'); expect(page.search().source).toBeUndefined(); expect(document.querySelectorAll('dialog').length).toBe(0);
+  await click('准备发布'); await review(); expect(document.querySelector<HTMLTextAreaElement>('[name="message"]')?.value).toBe('未保存的发布说明');
+  // 清空：输入回到初始值，检查也从头来。
+  await click('清空'); expect(document.querySelectorAll('[name="message"]').length).toBe(0); await review(); expect(document.querySelector<HTMLTextAreaElement>('[name="message"]')?.value).toBe('');
+  await input('message', '未保存的发布说明'); await page.requestNavigate(`/projects/${projectId}`); expect(page.text()).toContain('发布准备有未保存的输入'); await click('放弃输入并离开'); expect(f.writes).toHaveLength(0);
   f.state.role = 'tester'; page.unmount(); f.reads.length = 0; page = await renderApp(`/projects/${projectId}/release?source=repository`); expect(page.text()).toContain('Beta');
-  expect(document.querySelector('form[aria-label="发布准备"]') === null).toBe(true);
+  expect(document.querySelectorAll('dialog').length).toBe(0);
   expect(f.reads.some((path) => /\/branches|\/tags|\/workspace-status/.test(path))).toBe(false);
 });
 

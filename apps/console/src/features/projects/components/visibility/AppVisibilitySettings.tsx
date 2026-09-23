@@ -1,15 +1,14 @@
 import type { AppPresentationDto, AppVisibilityDto } from '@crewstation/contracts';
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { useT } from '../../../../shared/lib/useT';
 import { UnsavedChangesGuard } from '../../../../shared/navigation/UnsavedChangesGuard';
 import { ActionNote } from '../../../../shared/ui/ActionNote';
 import { Button } from '../../../../shared/ui/Button';
 import { Card } from '../../../../shared/ui/Card';
-import { ConfirmationPanel } from '../../../../shared/ui/ConfirmationPanel';
 import { usePresentationEditor } from '../../model/usePresentationEditor';
 import { useVisibilityEditor } from '../../model/useVisibilityEditor';
-import { AppPresentationForm } from './AppPresentationForm';
-import { AppVisibilityForm } from './AppVisibilityForm';
+import { AppPresentationDialog, AppPresentationSummary } from './AppPresentationDialog';
+import { AppVisibilityDialog, AppVisibilitySummary } from './AppVisibilityDialog';
 import { VisibilityCheck } from './VisibilityCheck';
 import styles from './Visibility.module.css';
 
@@ -24,40 +23,36 @@ interface SettingsProps {
   readonly reload: () => Promise<unknown>;
 }
 
-/** 两个独立修订共用一次导航确认，成功保存只清除所属草稿。读取失败保留已挂载编辑器。 */
+/**
+ * 应用展示：卡片只显示已保存的一版，「修改展示资料」「修改可见范围」各开一个弹窗（2026-09-23 起）。
+ * 两份草稿都在这一层：关窗不丢、再打开恢复，成功保存只清除所属草稿；离开页面共用一次确认，写明哪几份会丢。读取失败保留草稿。
+ */
 export function AppVisibilitySettings({ projectId, visibility, presentation, canConfigure, unavailable, refreshing = false, reload }: SettingsProps) {
-  const t = useT(), [discard, setDiscard] = useState<'scope' | 'presentation'>();
-  const panel = useRef<HTMLDivElement>(null), trigger = useRef<HTMLButtonElement | null>(null);
-  const [editing, setEditing] = useState({ scope: false, presentation: false });
-  const openers = useRef<Partial<Record<'scope' | 'presentation', HTMLButtonElement>>>({});
-  const close = (kind: 'scope' | 'presentation') => { setEditing((current) => ({ ...current, [kind]: false })); requestAnimationFrame(() => openers.current[kind]?.focus()); };
-  const open = (kind: 'scope' | 'presentation', button: HTMLButtonElement) => { openers.current[kind] = button; setEditing((current) => ({ ...current, [kind]: true })); };
-  const canSave = canConfigure && !unavailable && !refreshing && !discard;
-  const scopeEditor = useVisibilityEditor(projectId, visibility, reload, canSave, () => close('scope'));
-  const presentationEditor = usePresentationEditor(projectId, presentation, reload, canSave, () => close('presentation'));
+  const t = useT(), [open, setOpen] = useState<'scope' | 'presentation'>();
+  const canSave = canConfigure && !unavailable && !refreshing;
+  const scopeEditor = useVisibilityEditor(projectId, visibility, reload, canSave, () => setOpen(undefined));
+  const presentationEditor = usePresentationEditor(projectId, presentation, reload, canSave, () => setOpen(undefined));
   const pending = scopeEditor.save.isPending || presentationEditor.save.isPending;
   const dirty = scopeEditor.dirty || presentationEditor.dirty;
-  const requestDiscard = (kind: 'scope' | 'presentation', button: HTMLButtonElement) => {
-    if (pending) return;
-    const editor = kind === 'scope' ? scopeEditor : presentationEditor;
-    if (!editor.dirty) { editor.cancel(); close(kind); return; }
-    trigger.current = button; setDiscard(kind);
-  };
-  const finishDiscard = (confirmed: boolean) => {
-    if (confirmed && discard) { (discard === 'scope' ? scopeEditor : presentationEditor).cancel(); close(discard); trigger.current = null; }
-    setDiscard(undefined);
-  };
-  useEffect(() => {
-    if (discard) panel.current?.querySelector<HTMLButtonElement>('button:last-child')?.focus();
-    else { trigger.current?.focus(); trigger.current = null; }
-  }, [discard]);
+  const drafts = [presentationEditor.dirty ? t('projects.visibility.presentation') : undefined, scopeEditor.dirty ? t('projects.visibility.scope') : undefined].filter(Boolean);
+  // 读取失败、后台重读或失去配置权限时仍能打开弹窗查看自己的草稿，只是保存暂停（canSubmit）；没有权限又没有草稿时不给入口。
+  const available = (kind: 'scope' | 'presentation') => canConfigure || (kind === 'scope' ? scopeEditor : presentationEditor).dirty;
+  const opener = (kind: 'scope' | 'presentation') => available(kind)
+    ? <Button disabled={pending} onClick={() => setOpen(kind)}>{t(kind === 'scope' ? 'projects.visibility.editScope' : 'projects.visibility.editPresentation')}</Button> : null;
   return <div className={styles.stack}>
-    <UnsavedChangesGuard dirty={dirty || pending} scope={t('projects.visibility.title')} />
+    <UnsavedChangesGuard dirty={dirty || pending} scope={drafts.join(t('projects.visibility.separator')) || t('projects.visibility.title')} />
     {unavailable ? <ActionNote tone="neutral">{t('projects.visibility.unavailable')}</ActionNote> : !canConfigure && dirty ? <ActionNote tone="neutral">{t('projects.visibility.roleChanged')}</ActionNote> : null}
     {pending ? <ActionNote tone="neutral">{t('projects.visibility.pendingNote')}</ActionNote> : null}
-    {discard ? <div ref={panel}><ConfirmationPanel question={t('projects.visibility.discardQuestion', { scope: t(`projects.visibility.${discard}`) })} hint={t('projects.visibility.discardHint')} confirmLabel={t('projects.visibility.discard')} cancelLabel={t('ui.draft.stay')} onConfirm={() => finishDiscard(true)} onCancel={() => finishDiscard(false)} /></div> : null}
-    <Card stacked compact title={t('projects.visibility.presentation')} actions={canConfigure ? <Button hidden={editing.presentation} ref={(node) => { if (node) openers.current.presentation = node; }} disabled={pending || unavailable || refreshing || Boolean(discard)} onClick={(event) => open('presentation', event.currentTarget)}>{t('projects.visibility.editPresentation')}</Button> : null}><AppPresentationForm saved={presentation} editor={presentationEditor} editing={editing.presentation} canConfigure={canConfigure} frozen={Boolean(discard)} cancelDisabled={pending} onCancel={(button) => requestDiscard('presentation', button)} />{!editing.presentation && presentationEditor.save.isSuccess ? <ActionNote tone="success">{t('projects.visibility.saved')}</ActionNote> : null}</Card>
-    <Card stacked compact title={t('projects.visibility.scope')} actions={canConfigure ? <Button hidden={editing.scope} ref={(node) => { if (node) openers.current.scope = node; }} disabled={pending || unavailable || refreshing || Boolean(discard)} onClick={(event) => open('scope', event.currentTarget)}>{t('projects.visibility.editScope')}</Button> : null}><AppVisibilityForm projectId={projectId} saved={visibility} editor={scopeEditor} editing={editing.scope} canConfigure={canConfigure} frozen={Boolean(discard)} cancelDisabled={pending} onCancel={(button) => requestDiscard('scope', button)} />{!editing.scope && scopeEditor.save.isSuccess ? <ActionNote tone="success">{t('projects.visibility.saved')}</ActionNote> : null}</Card>
+    <Card stacked compact title={t('projects.visibility.presentation')} actions={opener('presentation')}>
+      <AppPresentationSummary saved={presentation} />
+      {open !== 'presentation' && presentationEditor.save.isSuccess ? <ActionNote tone="success">{t('projects.visibility.saved')}</ActionNote> : null}
+    </Card>
+    <Card stacked compact title={t('projects.visibility.scope')} actions={opener('scope')}>
+      <AppVisibilitySummary saved={visibility} canConfigure={canConfigure} />
+      {open !== 'scope' && scopeEditor.save.isSuccess ? <ActionNote tone="success">{t('projects.visibility.saved')}</ActionNote> : null}
+    </Card>
     {canConfigure && !unavailable ? <Card stacked compact title={t('projects.visibility.check')}><VisibilityCheck projectId={projectId} revision={visibility.revision} /></Card> : null}
+    {open === 'presentation' && available('presentation') ? <AppPresentationDialog saved={presentation} editor={presentationEditor} onClose={() => setOpen(undefined)} /> : null}
+    {open === 'scope' && available('scope') ? <AppVisibilityDialog projectId={projectId} saved={visibility} editor={scopeEditor} onClose={() => setOpen(undefined)} /> : null}
   </div>;
 }

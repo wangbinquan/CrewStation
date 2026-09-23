@@ -1,0 +1,108 @@
+/*
+ * 居中模态弹窗（2026-09-23 作者裁定：页内展开的表单与确认一律改弹窗）：
+ * 标题栏（右上角 ✕）与底部操作条固定，正文在弹窗内部滚动；窄屏两侧各留 16px。
+ */
+.dialog {
+  --dialog-width: 600px;
+  width: min(var(--dialog-width), calc(100vw - 32px));
+  max-width: none;
+  max-height: calc(100dvh - 32px);
+  padding: 0;
+  border: 1px solid var(--cs-color-border);
+  border-radius: var(--cs-radius-md);
+  background: var(--cs-color-surface);
+  color: var(--cs-color-text);
+  box-shadow: var(--cs-shadow-popover);
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
+/* 只给打开的弹窗排版：关着的 <dialog> 要保留浏览器的 display: none。 */
+.dialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+
+.small { --dialog-width: 480px; }
+.large { --dialog-width: 880px; }
+
+.dialog::backdrop {
+  background: var(--cs-color-backdrop);
+}
+
+/* 弹窗开着时背后的页面不跟着滚。 */
+:global(html:has(dialog[data-cs-dialog][open])) {
+  overflow: hidden;
+}
+
+.frame {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--cs-space-3);
+  padding: var(--cs-space-4) var(--cs-space-4) var(--cs-space-3) var(--cs-space-5);
+  border-bottom: 1px solid var(--cs-color-border);
+}
+
+.title {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding-top: 2px;
+  font-size: var(--cs-font-size-lg);
+  font-weight: 600;
+}
+
+.close {
+  flex: none;
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--cs-space-3);
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: var(--cs-space-4) var(--cs-space-5);
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.footer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--cs-space-2);
+  padding: var(--cs-space-3) var(--cs-space-5) var(--cs-space-4);
+  border-top: 1px solid var(--cs-color-border);
+}
+
+/* 「清空」在操作条最右：与提交、取消分开，不会顺手点到。 */
+.clear {
+  margin-left: auto;
+}
+
+.question {
+  font-weight: 600;
+}
+
+.hint {
+  color: var(--cs-color-text-muted);
+}
+
+/* 不可撤销动作的后果清单。 */
+.consequences {
+  display: flex;
+  flex-direction: column;
+  gap: var(--cs-space-2);
+  min-width: 0;
+}
+
+.consequences ul {
+  margin: 0;
+  padding-left: 1.2em;
+}

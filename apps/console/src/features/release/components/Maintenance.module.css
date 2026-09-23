@@ -1,5 +1,4 @@
 .panel { display: flex; flex-direction: column; gap: var(--cs-space-3); min-width: 0; }
-.form { display: flex; flex-direction: column; gap: var(--cs-space-3); min-width: 0; }
 .switches { display: grid; gap: var(--cs-space-2); margin: 0; padding: 0; border: 0; min-width: 0; }
 .legend { padding: 0; font-weight: 600; }
 .switch { display: flex; align-items: flex-start; gap: var(--cs-space-2); cursor: pointer; }

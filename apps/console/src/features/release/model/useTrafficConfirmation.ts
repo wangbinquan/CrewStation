@@ -17,9 +17,10 @@ export function useTrafficConfirmation(projectId: string, serviceId: string, can
   const { markDraft } = actions;
   useEffect(() => { markDraft('traffic', reason !== '' || busy); return () => markDraft('traffic', false); }, [reason, busy, markDraft]);
   const describe = (cause: unknown) => { const message = errorMessage(cause); return message.startsWith('release.') ? t(message) : message; };
-  const check = async () => {
+  // 确认弹窗里「重新核对」保留当前核对（`keep`），弹窗不因重新读取而关掉又弹出；读不到时核对留着、原因显示在弹窗里。
+  const check = async (keep = false) => {
     if (lock.current || !canSwitch || !actions.begin('traffic')) return;
-    lock.current = true; setChecking(true); setError(undefined); setDone(undefined); setSnapshot(undefined);
+    lock.current = true; setChecking(true); setError(undefined); setDone(undefined); if (!keep) setSnapshot(undefined);
     try { const next = await loadTrafficSnapshot(serviceId); if (mounted.current) setSnapshot(next); await refresh(); }
     catch (cause) { if (mounted.current) setError(describe(cause)); }
     finally { lock.current = false; setChecking(false); actions.finish('traffic'); }

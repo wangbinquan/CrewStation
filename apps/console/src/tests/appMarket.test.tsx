@@ -101,7 +101,7 @@ describe('能力市场与负责人设置真实路由', () => {
     expect(document.querySelector('main a')).toBeNull(); expect(page.text()).toContain('暂不可用');
     expect(page.text()).not.toContain('负责人尚未填写');
   });
-  test('指定名单约束首屏展示；空名单字段错误；精确查找去重与取消不保存', async () => {
+  test('指定名单约束首屏展示；空名单字段错误；精确查找去重；清空与取消都不保存', async () => {
     const f = fixture(true); page = await renderApp(`/projects/${projectId}/settings?tab=visibility`); await page.click('修改可见范围');
     await input(scopeSelect(), 'selected');
     expect(page.text()).toContain('至少选择一位，最多 200 位'); await page.click('保存可见范围');
@@ -109,8 +109,9 @@ describe('能力市场与负责人设置真实路由', () => {
     await input(document.querySelector<HTMLInputElement>('input')!, 'lin@example.com'); await page.click('查找账号');
     await page.click('加入指定名单'); await page.click('加入指定名单');
     expect(document.querySelectorAll('ul.people li')).toHaveLength(1);
-    await page.click('取消修改'); expect(scopeSelect().value).toBe('selected'); await page.click('放弃这份修改');
-    expect(document.querySelector('form select option[value="members"]')).toBeNull(); expect(page.text()).toContain('项目成员'); expect(f.calls.filter((call) => call.method === 'PUT')).toHaveLength(0);
+    // 2026-09-23 起是弹窗：「清空」回到已保存的范围、弹窗不关；「取消」只关窗。
+    await page.click('清空'); expect(scopeSelect().value).toBe('members'); await page.click('取消');
+    expect(document.querySelectorAll('dialog').length).toBe(0); expect(page.text()).toContain('项目成员'); expect(f.calls.filter((call) => call.method === 'PUT')).toHaveLength(0);
   });
   test('并发保存保留草稿和最新范围，显式采用最新修订后再次保存', async () => {
     const f = fixture(true); page = await renderApp(`/projects/${projectId}/settings?tab=visibility`); await page.click('修改可见范围');

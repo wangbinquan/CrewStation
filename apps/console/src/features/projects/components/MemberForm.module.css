@@ -1,15 +1,13 @@
+/* 成员弹窗的正文：左边选人，右边选角色；说明占满一行。 */
 .form {
   display: grid;
   min-width: 0;
-  grid-template-columns: minmax(0, 1.5fr) minmax(220px, 1fr);
+  grid-template-columns: minmax(0, 1.5fr) minmax(200px, 1fr);
   gap: var(--cs-space-3);
   align-items: end;
-  margin-top: var(--cs-space-4);
-  padding-top: var(--cs-space-4);
-  border-top: 1px solid var(--cs-color-border);
 }
 .picker { display: grid; gap: var(--cs-space-2); min-width: 0; }
 .actions, .target { display: flex; gap: var(--cs-space-2); align-items: center; flex-wrap: wrap; }
 .target p { min-width: 0; overflow-wrap: anywhere; }
-.form > p, .form > .actions, .form > [role="alertdialog"] { grid-column: 1 / -1; }
-@media (max-width: 760px) { .form { grid-template-columns: minmax(0, 1fr); } }
+.form > p { grid-column: 1 / -1; }
+@media (max-width: 640px) { .form { grid-template-columns: minmax(0, 1fr); } }

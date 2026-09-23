@@ -12,9 +12,10 @@ export function usePresentationEditor(projectId: string, saved: AppPresentationD
   });
   if (!dirty && !save.isPending && saved.revision > base.revision) { setDraft(saved); setBase(saved); }
   const conflict = saved.revision > base.revision;
-  const submit = (form: HTMLFormElement) => {
+  /** `root`：表单字段所在的元素，校验失败时把焦点放回出错的输入。 */
+  const submit = (root: ParentNode) => {
     if (!canSave || conflict || lock.current) return;
-    if (draft.description.trim().length > 400) { setInvalid(true); form.querySelector('textarea')?.focus(); return; }
+    if (draft.description.trim().length > 400) { setInvalid(true); root.querySelector('textarea')?.focus(); return; }
     setInvalid(false); lock.current = true;
     void save.mutateAsync({ description: draft.description, icon: draft.icon, expectedRevision: base.revision }).catch(() => { void reload(); }).finally(() => { lock.current = false; });
   };

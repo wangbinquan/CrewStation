@@ -5,7 +5,8 @@
   align-items: end;
 }
 
-@media (max-width: 720px) {
+/* 弹窗在窄屏两侧各留 16px：版本号与说明折成一列。 */
+@media (max-width: 640px) {
   .form {
     grid-template-columns: 1fr;
   }
@@ -21,3 +22,4 @@
   color: var(--cs-color-text-muted);
 }
 .steps [aria-current="step"] { color: var(--cs-color-text); font-weight: 600; }
+.note { color: var(--cs-color-text-muted); font-size: var(--cs-font-size-sm); }

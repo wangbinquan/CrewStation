@@ -84,15 +84,24 @@ describe.skipIf(!session)('卡片操作区的真实布局间距', () => {
 });
 
 describe.skipIf(!session?.project)('项目操作区的真实布局间距', () => {
-  test.each([1280, 390])('%dpx：发布检查按钮上下留白，来源按钮之间留白', async (width) => {
+  test.each([1280, 390])('%dpx：发布准备弹窗的底部按钮上下留白、不超出窗口，来源按钮之间留白', async (width) => {
     const page = session!.admin;
     await viewport(page, width);
     await open(page, `/projects/${session!.project!.id}/release`);
     await click(page, '准备发布');
-    const actual = await spacing(page, '检查发布来源');
-    // 原表单按钮同时贴住上方字段与下方说明，修复必须覆盖两侧。
-    expect(actual.before!).toBeGreaterThanOrEqual(8);
-    expect(actual.after!).toBeGreaterThanOrEqual(8);
+    // 2026-09-23 起发布准备是弹窗，按钮在弹窗底部的操作条里：量它与操作条上下边的留白，以及弹窗离窗口两侧的距离。
+    const actual = await page.eval<{ top: number; bottom: number; left: number; right: number; width: number; containerWidth: number; overflow: number }>(`(() => {
+      const dialog = document.querySelector('dialog[open]');
+      if (!dialog) throw new Error('Missing dialog');
+      const button = [...dialog.querySelectorAll('button')].find((node) => node.textContent.trim() === '检查发布来源');
+      if (!button) throw new Error('Missing button: 检查发布来源');
+      const footer = button.parentElement.parentElement.getBoundingClientRect(), rect = button.getBoundingClientRect(), frame = dialog.getBoundingClientRect();
+      return { top: rect.top - footer.top, bottom: footer.bottom - rect.bottom, left: frame.left, right: innerWidth - frame.right, width: rect.width, containerWidth: footer.width, overflow: document.documentElement.scrollWidth - innerWidth };
+    })()`);
+    expect(actual.top).toBeGreaterThanOrEqual(8);
+    expect(actual.bottom).toBeGreaterThanOrEqual(8);
+    expect(actual.left).toBeGreaterThanOrEqual(15);
+    expect(actual.right).toBeGreaterThanOrEqual(15);
     expect(actual.width).toBeLessThan(actual.containerWidth);
     expect(actual.overflow).toBeLessThanOrEqual(1);
     const sourceGap = await page.eval<number>(`(() => {
@@ -103,7 +112,7 @@ describe.skipIf(!session?.project)('项目操作区的真实布局间距', () =>
     })()`);
     expect(sourceGap).toBeGreaterThanOrEqual(8);
     expect(page.takeErrors()).toEqual([]);
-    await click(page, '收起准备');
+    await click(page, '取消');
   }, 45_000);
 
   test('告警订阅与调用链查询的操作按钮有独立间隔', async () => {

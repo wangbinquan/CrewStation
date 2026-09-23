@@ -95,6 +95,8 @@ export const messages = {
   'ui.confirm.yes': '确认',
   'ui.confirm.no': '取消',
   'ui.dialog.typeToConfirm': '输入 {word} 以确认',
+  'ui.dialog.close': '关闭',
+  'ui.dialog.clear': '清空',
   'app.brand': 'CrewStation',
   'activity.title': "Agent 动态",
   'activity.pendingCount': "待处理 {count}",

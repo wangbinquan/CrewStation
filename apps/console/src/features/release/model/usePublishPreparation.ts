@@ -11,13 +11,15 @@ import { candidateReleaseTag, isPublishVersion } from './releaseVersion';
 import { publishSourceStillMatches, repositoryPublishSnapshot, sessionPublishSnapshot } from './publishSource';
 import type { PublishSnapshot } from './publishSource';
 import { uncommittedPaths } from './publishPrecondition';
+import type { PublishDraft } from './usePublishDraft';
 import type { ReleaseActions } from './useReleaseActions';
 
-export function usePublishPreparation(projectId: string, serviceId: string, source: PublishSource, canPublish: boolean, actions: ReleaseActions, onAccepted: (release: ReleaseDto) => void) {
-  const t = useT(), lock = useRef(false), accepted = useRef(false), mounted = useRef(true);
-  const [complete, setComplete] = useState(false);
+/** 发布准备弹窗的检查与提交；用户填的分支、版本号与说明在页面上的草稿里（usePublishDraft），关弹窗不丢。 */
+export function usePublishPreparation(projectId: string, serviceId: string, source: PublishSource, canPublish: boolean, actions: ReleaseActions, draft: PublishDraft, onAccepted: (release: ReleaseDto) => void) {
+  const t = useT(), lock = useRef(false), mounted = useRef(true);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
-  const [branch, setBranch] = useState(''), [version, setVersion] = useState('patch'), [message, setMessage] = useState('');
+  const { branch, version, message } = draft.values;
+  const setBranch = (value: string) => draft.set({ branch: value }), setVersion = (value: string) => draft.set({ version: value }), setMessage = (value: string) => draft.set({ message: value });
   const [snapshot, setSnapshot] = useState<PublishSnapshot>(), [step, setStep] = useState(0), [checking, setChecking] = useState(false), [error, setError] = useState<string>();
   const [showHistoryReminder, setShowHistoryReminder] = useState(false);
   const [errors, setErrors] = useState<{ version?: string; message?: string }>({});
@@ -29,8 +31,6 @@ export function usePublishPreparation(projectId: string, serviceId: string, sour
   const selected = branch || branches.data?.items.find((entry) => entry.isDefault)?.name || branches.data?.items[0]?.name || '';
   const publication = useApiMutation((input: PublishDevSessionInput) => source === 'session' ? api.devSession.publish(projectId, input) : api.services.publish(serviceId, input), { invalidate: [queryKeys.releases(serviceId), queryKeys.slots(serviceId), queryKeys.tags(serviceId), queryKeys.branches(projectId)] });
   const busy = checking || publication.isPending, current = snapshot?.source === source ? snapshot : undefined;
-  const dirty = !complete && (branch !== '' || version !== 'patch' || message !== ''), { markDraft } = actions;
-  useEffect(() => { markDraft('publish', !accepted.current && (dirty || busy)); return () => markDraft('publish', false); }, [dirty, busy, markDraft]);
   const stale = !!current && (!!(source === 'session' ? workspace.error : branches.error) || !publishSourceStillMatches(current, workspace.data, branches.data?.items ?? []));
   const resetCheck = () => { if (lock.current) return false; setSnapshot(undefined); setStep(0); setError(undefined); setShowHistoryReminder(false); setFailedPaths([]); return true; };
   const check = async () => {
@@ -53,12 +53,14 @@ export function usePublishPreparation(projectId: string, serviceId: string, sour
       const result = await publication.mutateAsync({ branch: current.branch, version: version.trim(), expectedCommitSha: current.commitSha, ...(current.taskId ? { expectedTaskId: current.taskId } : {}), ...(message.trim() ? { message: message.trim() } : {}) });
       const parsed = ReleaseDtoSchema.safeParse(result);
       if (!parsed.success || parsed.data.serviceId !== serviceId || parsed.data.commitSha !== current.commitSha) throw new Error(t('release.prepare.responseUnknown'));
-      accepted.current = true; setComplete(true); markDraft('publish', false); actions.finish('publish'); if (mounted.current) onAccepted(parsed.data);
+      draft.reset(); actions.finish('publish'); if (mounted.current) onAccepted(parsed.data);
     } catch (cause) { setError(errorMessage(cause)); setShowHistoryReminder(!(isApiClientError(cause) && cause.status === 0 && cause.details.requestSent === false)); setFailedPaths(uncommittedPaths(cause) ?? []); setSnapshot(undefined); setStep(0); void tags.refetch(); if (source === 'repository') void branches.refetch(); }
     finally { lock.current = false; actions.finish('publish'); }
   };
   return { source, branches, workspace, tags, selected, branch, version, message, setVersion, setMessage, setBranch, step: current ? step : 0, setStep, snapshot: current, resetCheck, check, submit, busy, checking, error, errors, setErrors, failedPaths, canPublish, stale,
-    dirty, accepted, sessionMissing, showHistoryReminder,
+    dirty: draft.dirty, sessionMissing, showHistoryReminder,
+    /** 「清空」：输入回到初始值，检查也从头来。 */
+    clear: () => { if (resetCheck()) { draft.reset(); setErrors({}); } },
     candidate: tags.data && !tags.error ? candidateReleaseTag(tags.data.items.map((tag) => tag.name), version) : undefined };
 }
 export type PublishPreparation = ReturnType<typeof usePublishPreparation>;

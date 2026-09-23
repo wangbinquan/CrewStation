@@ -16,8 +16,9 @@ import { Card } from '../../../shared/ui/Card';
 import { DefinitionList } from '../../../shared/ui/DefinitionList';
 import { InlineConfirm } from '../../../shared/ui/InlineConfirm';
 import { blockingText, fullMaintenanceWindow } from '../model/maintenanceDraft';
+import type { MaintenanceEditor } from '../model/useMaintenanceEditor';
 import type { ReleaseActions } from '../model/useReleaseActions';
-import { MaintenanceForm } from './MaintenanceForm';
+import { MaintenanceDialog } from './MaintenanceDialog';
 import styles from './Maintenance.module.css';
 
 interface MaintenancePanelProps {
@@ -27,16 +28,15 @@ interface MaintenancePanelProps {
   readonly canManage: boolean;
   readonly actions: ReleaseActions;
   readonly maintenance: ReturnType<typeof useServiceMaintenance>;
-  /** 表单开着（「进入维护」按钮在正式版本卡上，所以开关状态由版本区持有）。 */
-  readonly editing: boolean;
-  readonly onEditing: (editing: boolean) => void;
+  /** 维护弹窗的开关与草稿：「进入维护」按钮在正式版本卡上，所以由版本区持有。 */
+  readonly editor: MaintenanceEditor;
 }
 
 /**
  * 正式版本维护（RFC-021 M3、M4、M6、M7、M13）：维护中时成员都看到拦了什么、原因、预计恢复与放行名单；
- * 负责人和管理员进入、调整、退出。不在维护且没打开表单时什么都不画，入口在正式版本卡上。
+ * 负责人和管理员进入、调整（弹窗，2026-09-23 起）、退出。不在维护时只画结果提示，入口在正式版本卡上。
  */
-export function MaintenancePanel({ projectId, serviceId, canManage, actions, maintenance, editing, onEditing }: MaintenancePanelProps): ReactElement | null {
+export function MaintenancePanel({ projectId, serviceId, canManage, actions, maintenance, editor }: MaintenancePanelProps): ReactElement | null {
   const t = useT(), client = useQueryClient(), { query, current } = maintenance;
   const [exiting, setExiting] = useState(false), [error, setError] = useState<string>(), [done, setDone] = useState<string>();
   const refresh = () => client.invalidateQueries({ queryKey: queryKeys.maintenance(serviceId) });
@@ -48,28 +48,29 @@ export function MaintenancePanel({ projectId, serviceId, canManage, actions, mai
     finally { await refresh(); setExiting(false); actions.finish('maintenance'); }
   };
   const notes = <>{error ? <ActionNote tone="error">{error}</ActionNote> : null}{done ? <ActionNote tone="success">{done}</ActionNote> : null}</>;
-  if (query.error) return <ActionNote tone="error">{t('release.maintenance.readError', { message: errorMessage(query.error) })}</ActionNote>;
-  if (editing && canManage && current !== undefined) {
-    return <Card compact title={t(current ? 'release.maintenance.updateTitle' : 'release.maintenance.enterTitle')}>
-      <MaintenanceForm projectId={projectId} serviceId={serviceId} current={current} actions={actions} onSettled={refresh} onClose={(message) => { onEditing(false); setError(undefined); setDone(message); }} />
+  // 弹窗固定挂在第二个位置：维护状态在它开着时变了（别人先进入了维护、重读失败），也不会被卸载重挂而丢掉失败原因。
+  const dialog = editor.isOpen && canManage ? <MaintenanceDialog projectId={projectId} serviceId={serviceId} editor={editor} actions={actions} onSettled={refresh} onSaved={(message) => { setError(undefined); setDone(message); }} /> : null;
+  let body: ReactElement | null = null;
+  if (query.error) body = <ActionNote tone="error">{t('release.maintenance.readError', { message: errorMessage(query.error) })}</ActionNote>;
+  else if (!current) body = error || done ? <div className={styles.panel}>{notes}</div> : null;
+  else {
+    // 维护是一个对象：调整、退出放在卡片底部操作条（2026-09-23 裁定）。
+    const manage = canManage ? <>
+      <Button disabled={!!actions.busy} onClick={() => { setDone(undefined); editor.open(); }}>{t('release.maintenance.adjust')}</Button>
+      <InlineConfirm label={t('release.maintenance.exit')} busy={exiting || !!actions.busy} {...(exiting ? { busyLabel: t('release.maintenance.exiting') } : {})}
+        question={t('release.maintenance.exitQuestion')} confirmLabel={t('release.maintenance.exitConfirm')} onConfirm={() => void exit(current.revision)} />
+    </> : undefined;
+    body = <Card compact title={t('release.maintenance.activeTitle')} extra={<Badge tone="warning">{t('slot.maintenance.badge')}</Badge>} actions={manage}>
+      <div className={styles.panel}>
+        <MaintenanceFacts projectId={projectId} current={current} checkedAt={query.dataUpdatedAt} />
+        {fullMaintenanceWindow(current.switches) ? <p className={styles.muted}>{t('release.maintenance.fullWindow')}</p> : null}
+        {current.switches.events ? <p className={styles.muted}>{t('release.maintenance.eventsHeld')}</p> : null}
+        {canManage ? null : <p className={styles.muted}>{t('release.maintenance.ownerOnly')}</p>}
+        {notes}
+      </div>
     </Card>;
   }
-  if (!current) return error || done ? <div className={styles.panel}>{notes}</div> : null;
-  // 维护是一个对象：调整、退出放在卡片底部操作条（2026-09-23 裁定）。
-  const manage = canManage ? <>
-    <Button disabled={!!actions.busy} onClick={() => { setDone(undefined); onEditing(true); }}>{t('release.maintenance.adjust')}</Button>
-    <InlineConfirm label={t('release.maintenance.exit')} busy={exiting || !!actions.busy} {...(exiting ? { busyLabel: t('release.maintenance.exiting') } : {})}
-      question={t('release.maintenance.exitQuestion')} confirmLabel={t('release.maintenance.exitConfirm')} onConfirm={() => void exit(current.revision)} />
-  </> : undefined;
-  return <Card compact title={t('release.maintenance.activeTitle')} extra={<Badge tone="warning">{t('slot.maintenance.badge')}</Badge>} actions={manage}>
-    <div className={styles.panel}>
-      <MaintenanceFacts projectId={projectId} current={current} checkedAt={query.dataUpdatedAt} />
-      {fullMaintenanceWindow(current.switches) ? <p className={styles.muted}>{t('release.maintenance.fullWindow')}</p> : null}
-      {current.switches.events ? <p className={styles.muted}>{t('release.maintenance.eventsHeld')}</p> : null}
-      {canManage ? null : <p className={styles.muted}>{t('release.maintenance.ownerOnly')}</p>}
-      {notes}
-    </div>
-  </Card>;
+  return body || dialog ? <>{body}{dialog}</> : null;
 }
 
 /**
