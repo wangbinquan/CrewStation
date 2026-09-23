@@ -167,6 +167,8 @@ sql`kind = ANY(ARRAY[${sql.join(kinds.map((k) => sql`${k}`), sql`, `)}]::text[])
 放行表的判定逻辑在 `modules/gateway`，但**执行判定的是 cs-auth**（ForwardAuth）。
 只重启 cs-api 与 cs-controller，403 照旧。**先想清楚这段代码跑在哪个进程里**，再决定重启谁。
 
+2026-09-23 又撞一次：Runner 就绪后的派发（业务子任务、等容器就绪的开发会话 CLI 与历史 Agent）跑在 **cs-session** 的 `onRunnerReady`（`modules/platform/wiring.ts`），不在 cs-api／cs-controller。D59 只滚了这两个：新 cs-api 写进记录的 CLI／历史 Agent 看起来都对，业务子任务却仍按 Manifest 的 read-only 派发，直到实机跑 `/chat`、读 Runner 的 started 事件才发现。改了派发命令的内容，cs-session 也要滚。
+
 同一个 ConfigMap 开关往往被**多个进程**读，只重启一个会让界面与实际各说各话。
 2026-09-18 实撞：`CS_PASSWORD_LOGIN=force-on`（RFC-005 的破窗口）只重启 cs-auth 后，登录页照收密码，
 而管理面的认证页由 cs-api 应答、它的 `forcedOn` 还是 `false`，于是卡片写着「已关闭」、还给出一个按下去必然 409 的开关。
