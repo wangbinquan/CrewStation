@@ -1,6 +1,6 @@
 # RFC-022｜实施计划
 
-> 状态：In Progress · 2026-09-23 · 作者批准三件套并裁定 Q1–Q4（提案 §8）
+> 状态：Done · 2026-09-23 · 作者批准三件套并裁定 Q1–Q4（提案 §8）；T2–T17 完成，实机证据见 [验收记录](./acceptance.md)
 > 配套：[提案](./proposal.md) · [技术设计](./design.md)
 
 ## 目录
@@ -14,22 +14,22 @@
 | 任务 | 内容 | 依赖 | 状态 |
 |---|---|---|---|
 | RFC-022-T1 | 作者两轮裁定 D1–D8；三件套落档并登记；第三轮批准并裁定 Q1–Q4 | 作者 | 已完成（2026-09-23，Draft `84eec38`，作者「批准并实施」） |
-| RFC-022-T2 | 契约：`api/progress/startupProgress.ts`（三个 Schema、`currentStage`）；`NativeTerminalDto`、`DevSessionDto` 的 `startup`；`ProfileTestStage` 改为公共阶段的扩展、旧种类可读；Schema 用例；`contracts:lock` 确认不涉及业务契约面 | T1 | 未开始 |
-| RFC-022-T3 | `packages/k8s/podStartup.ts`：从 Pod 与 Events 读出调度、容器起止、镜像拉取；夹具用例 | T1 | 未开始 |
-| RFC-022-T4 | task-runtime 存储与推导：`startup` 列、迁移 `0009_environment_startup.sql` 与迁移锁、部分索引、仓储映射；`domain/podFailures.ts` 更名 `domain/podStartup.ts` 并加推导；设计 §3.2 的全部写入点；环境视图带 `startup`；单元与模块用例 | T2、T3 | 未开始 |
-| RFC-022-T5 | task-runtime 观测与留日志：`observeStartupUseCase`、对账循环体提成 `judgeEnvironment`、每秒计时器；适配器 `observeStartup` 与读日志尾部；模块接口 `captureStartupLog`；判定失败时写 `logTail`；用例（含原对账用例全部照过） | T4 | 未开始 |
-| RFC-022-T6 | dev-session：`composeCliStartup`；`read()` 组合与冻结进 `execution` 文档；失败先留日志再回收；`EnvironmentView.startup` 与开发会话 DTO；单元与模块用例 | T4、T5 | 未开始 |
-| RFC-022-T7 | `runtimes/task`：`claim` 在 `starting` 接受，`input`／`resize` 仍拒绝；三条启动失败路径释放控制计时器；用例；构建新底座镜像 | T1 | 未开始 |
-| RFC-022-T8 | 工作台公共组件：`shared/ui/progress/`（`StageProgress`、样式、`stageProgressView`）与应用级中英文案；用例 | T2 | 未开始 |
-| RFC-022-T9 | 档位测试迁移：执行器改读环境阶段、`agent` 段、结论归类；`ProfileTestPanel` 换公共组件并保留定位、退出码、输出尾部；用例（既有用例改期望） | T5、T8 | 未开始 |
-| RFC-022-T10 | 工作台 CLI：步骤条覆盖层、状态条、标签头「x/6」、失败时的重试（按 Q2）与日志展开、启动阶段就失败时的冻结步骤条、启动期间每秒刷新；用例 | T6、T8 | 未开始 |
-| RFC-022-T11 | 工作台创建者自动取得：本窗口登记、启动中提前取得与旧 Runner 回退、焦点规则、`resize` 延后；用例 | T7、T10 | 未开始 |
-| RFC-022-T12 | 工作台开发会话：创建与重建的步骤条、页头芯片、重试（按 Q1）、启动期间每秒刷新；用例 | T4、T8 | 未开始 |
-| RFC-022-T13 | `crewstation session open／show` 打印启动过程；用例 | T2 | 未开始 |
+| RFC-022-T2 | 契约：`api/progress/startupProgress.ts`（三个 Schema、`currentStage`）；`NativeTerminalDto`、`DevSessionDto` 的 `startup`；`ProfileTestStage` 改为公共阶段的扩展、旧种类可读；Schema 用例；`contracts:lock` 确认不涉及业务契约面 | T1 | 已完成（cca9a37） |
+| RFC-022-T3 | `packages/k8s/podStartup.ts`：从 Pod 与 Events 读出调度、容器起止、镜像拉取；夹具用例 | T1 | 已完成（cca9a37） |
+| RFC-022-T4 | task-runtime 存储与推导：`startup` 列、迁移 `0009_environment_startup.sql` 与迁移锁、部分索引、仓储映射；`domain/podFailures.ts` 更名 `domain/podStartup.ts` 并加推导；设计 §3.2 的全部写入点；环境视图带 `startup`；单元与模块用例 | T2、T3 | 已完成（cca9a37） |
+| RFC-022-T5 | task-runtime 观测与留日志：`observeStartupUseCase`、对账循环体提成 `judgeEnvironment`、每秒计时器；适配器 `observeStartup` 与读日志尾部；模块接口 `captureStartupLog`；判定失败时写 `logTail`；用例（含原对账用例全部照过） | T4 | 已完成（cca9a37；验收中补：完成的段只留结果说明 4a6788d，留日志去掉 debug 行 1d45592） |
+| RFC-022-T6 | dev-session：`composeCliStartup`；`read()` 组合与冻结进 `execution` 文档；失败先留日志再回收；`EnvironmentView.startup` 与开发会话 DTO；单元与模块用例 | T4、T5 | 已完成（e56ae13；验收中补：启动中读名册不等慢 Runner 4a6788d，排队从受理时刻算 5cfc795，回收前先冻结再留日志 见验收记录） |
+| RFC-022-T7 | `runtimes/task`：`claim` 在 `starting` 接受，`input`／`resize` 仍拒绝；三条启动失败路径释放控制计时器；用例；构建新底座镜像 | T1 | 已完成（e56ae13；新底座 `task-runtime:startup-20260923`） |
+| RFC-022-T8 | 工作台公共组件：`shared/ui/progress/`（`StageProgress`、样式、`stageProgressView`）与应用级中英文案；用例 | T2 | 已完成（0fd8d89；上下居中 4a6788d） |
+| RFC-022-T9 | 档位测试迁移：执行器改读环境阶段、`agent` 段、结论归类；`ProfileTestPanel` 换公共组件并保留定位、退出码、输出尾部；用例（既有用例改期望） | T5、T8 | 已完成（0fd8d89；两段补上用时 5cfc795） |
+| RFC-022-T10 | 工作台 CLI：步骤条覆盖层、状态条、标签头「x/6」、失败时的重试（按 Q2）与日志展开、启动阶段就失败时的冻结步骤条、启动期间每秒刷新；用例 | T6、T8 | 已完成（0fd8d89；启动中不提示回看历史 5cfc795） |
+| RFC-022-T11 | 工作台创建者自动取得：本窗口登记、启动中提前取得与旧 Runner 回退、焦点规则、`resize` 延后；用例 | T7、T10 | 已完成（0fd8d89；PTY 有输出即放开输入 5cfc795） |
+| RFC-022-T12 | 工作台开发会话：创建与重建的步骤条、页头芯片、重试（按 Q1）、启动期间每秒刷新；用例 | T4、T8 | 已完成（0fd8d89） |
+| RFC-022-T13 | `crewstation session open／show` 打印启动过程；用例 | T2 | 已完成（0fd8d89） |
 | RFC-022-T14 | Q3、Q4：作者未勾选，按题面不做（就绪后不提供查看入口；运维 MCP 不加工具） | Q3、Q4 | 不做（2026-09-23 裁定） |
-| RFC-022-T15 | 本地 gate、改动行防护、提交推送、精确 SHA CI 六项 | T2–T14 | 未开始 |
-| RFC-022-T16 | 本机部署（控制面、工作台、任务底座镜像；默认档位用新底座重建镜像并另存修订）与实机验收 SP-01…SP-13，写 `acceptance.md` | T15 | 未开始 |
-| RFC-022-T17 | 回填：RFC-003、RFC-006、RFC-008 加修订记录；基线 Design §5 增加启动进度，Plan 新增验收编号（回填时分配）；README、STATE.md 收口 | T16 | 未开始 |
+| RFC-022-T15 | 本地 gate、改动行防护、提交推送、精确 SHA CI 六项 | T2–T14 | 已完成（本地 gate 每批一次；CI 见验收记录 SP-14） |
+| RFC-022-T16 | 本机部署（控制面、工作台、任务底座镜像；默认档位用新底座重建镜像并另存修订）与实机验收 SP-01…SP-13，写 `acceptance.md` | T15 | 已完成（2026-09-23，SP-01…SP-13 见验收记录；验收中发现的缺陷当天修复并部署） |
+| RFC-022-T17 | 回填：RFC-003、RFC-006、RFC-008 加修订记录；基线 Design §5 增加启动进度，Plan 新增验收编号（回填时分配）；README、STATE.md 收口 | T16 | 已完成（2026-09-23） |
 
 ## 2. 验收清单
 

@@ -115,6 +115,13 @@ TaskRunner 增加 `startAgentTerminal`／名册查询等协议及终端 started 
 
 平台在 dev-session L5 解析档位，继续注入已有 MCP、权限、环境与 Git 身份。`packages/agent-drivers` 各自生成原生 TUI 启动计划，`runtimes/task` 复用 PTY／进程监督；租户 API 不接受任意驱动 flags，也不在普通 shell 内拼字符串来间接启动。具体 argv 以实施时安装的 CLI 帮助与原生交互实跑确认；同时保留现有 headless 计划及 oneshot 测试。
 
+2026-09-23 修订说明（[RFC-022](../RFC-022-startup-progress/design.md) D1–D3、Q2）：
+
+- **启动中。** 终端区域中间是六段步骤条：排队分配容器、容器启动中、容器已启动等待连接、准备环境（启动前步骤 x/y）、Agent 启动中、已就绪。状态条显示当前段，各段带用时与细节。
+- **启动失败。** 停在出错的那一段并写明原因，给出「重试」和「查看执行容器日志」。重试时新 CLI 原位替换原标签，档位按当前修订。
+- **启动中关闭。** 记为取消，不提示失败。
+- **自动取得输入控制。** 谁点的「＋ 创建开发Agent会话」，就在那个窗口替谁取得这个 CLI 的输入控制：新 Runner 在启动中就接受「取得」，旧 Runner 在进程拉起后再取，都不报错，也不抢别处的焦点。其他窗口仍按本节规则。
+
 ## 6. 工作树与部署的比较契约
 
 新增 `GET /v1/projects/:projectId/dev-session/version-comparison?target=prod|preview`，默认 prod。dev-session L5 经既有 releases port 读取目标实际 releaseId／tag／SHA，经 runner port 读取当前容器的实际分支、HEAD、Git index 与文件状态；不向 SCM 的远端分支查询借用“当前 HEAD”。
