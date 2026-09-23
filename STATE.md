@@ -7,6 +7,70 @@
 
 基线三件套（v0.3.3）的第一轮实现已在本机 kind 集群上跑通并推上 main；**RFC-001（算力归平台）与 RFC-002（管理空间与租户空间分离）已实现、实跑确认并推上 main；RFC-004 已被 RFC-006 取代（Superseded）；RFC-006（算力档位合并运行环境、每个 Agent 一个 Pod）已实现、实机验收完毕并推上 main，已 Done（P1–P8、ADR-0005 与 I17–I19 待作者复核）；RFC-003 工作台已按设计附件完成并整体部署到本机，52／52 项 UX-AT 全部实机通过、本地 gate 与精确 SHA CI 通过，已 Done；RFC-005（OIDC／OAuth 2.0 公司登录）代码、测试与 OA-01…OA-31 实机验收全部完成，已 Done；RFC-007（开发环境 OAuth 2.0 一键换角色）代码、四角色 Chrome 实机验收、本地 gate 与精确 SHA CI 全部完成，已 Done**。
 
+## 调用链：列出本应用全部调用链并分层回放；修复回放跨项目取任务的越权（2026-09-23，Design D62）
+
+作者：「运行与诊断里的调用链回放，我从哪去找 ID？这个页面功能太烂了吧，能不能显示该应用的所有调用链列表？」
+
+答复：原来界面上只有「事件投递」表里能拿到 trace_id，开发会话与业务任务的 trace_id 哪里都看不到；从投递点过去几乎都是「没有可用的关联记录」（回放只查任务，本机 64 条投递链路一条都没触发任务）；一条会话链里有 8.9 万条平台自己的 git 命令结束事件，每个任务只取前 2000 条。
+
+问答裁定（两轮）：
+- 三类来源都列：业务任务、开发会话、事件投递，跨类的合成一条。
+- 布局左列表右详情（窄屏上下），详情用分层时间线。
+- 来源、状态、时间范围、粘贴 trace_id 打开四种筛选与查找都要。
+- 状态三档「进行中／已结束／失败」；时间范围按有活动算。
+- 流程「直接改＋回填」，提交、推送并部署本机。
+- 版本号取 v0.3.14／D62（crewstation-f7 用了 v0.3.13／D61），之后的基线回填取 v0.3.15／D63（已告知 crewstation-90）。
+
+- **越权（同批修复）**：
+  - 问题：回放只校验「是本项目成员」，却按 trace_id 跨项目取任务、子任务与 Agent 输出摘要。一个事件投给多个订阅项目时共用 trace_id，本机一个 trace_id 出现在 12 个项目里。
+  - 实机对照：dev-developer（demo 的成员，不是 rfc006-verify 的成员）拿 rfc006-verify 一条开发会话链的 trace_id：
+    - 直接查 rfc006-verify 回 404；
+    - 旧 cs-api（`alerts-trim-20260923`，12:56:01Z）经自己的 demo 项目查，回 200，带出对方 8 个任务、21 条事件（3 条带 Agent 输出摘要）、2 个会话 ID；
+    - 新 cs-api（12:57:10Z）同一请求回 404。
+  - 跨项目的 task-runtime `listByTrace` 与 business-task `listProjectSubtasksInternal` 已删除。
+- **后端**（feb367cc）：
+  - task-runtime、events 各加三个查询：按 traceId 分组的时间键、时间窗内有活动的链、按 trace 取本项目记录。
+  - business-task 加按 trace 取业务任务与子任务（含重试与执行环境）。
+  - session 加按任务汇总事件（条数、原生会话 ID、协议）。
+  - observability 合并成三条接口：`GET /v1/projects/:id/traces`、`/traces/:traceId`、`/traces/:traceId/executions/:taskId/events`。
+  - 两个来源合并翻页，按「给满一页的来源都已扫描到」的下界截断。去掉下界后「一密一疏两来源＋筛选」的用例变红。
+  - 平台自己执行的命令不进回放；思考事件不带文字。
+  - 契约：新增 `api/trace/traceChain.ts`，删 `TraceReplayDto`；api-client 新增 `traces` 资源。
+- **工作台**：
+  - `features/traces` 取代 logs 的 `TracePage`；页签按 RFC-020 原批准改名「调用链」（90 那条修订注记沿用的旧名随之更新，作者在那边没有对名字另作裁定）。
+  - 地址参数 `traceSource`／`traceStatus`／`traceWindow`；`ResourceRow` 加可选 `plain`。
+  - 702e7ac3 补两处实机发现：窄屏选中后把详情滚进视野；任务的环境备注只在环境本身失败时显示（原先子任务失败的业务任务下面多出一行「released: business」）。
+  - 009c0be3：702e7ac3 上线后实测窄屏滚动仍没生效——路由开着 `scrollRestoration`，每次导航把滚动复位到顶，冲掉了刚发起的滚动；宽屏在长列表下方点选也会整页跳回顶部。调用链页签内的导航改为 `resetScroll: false`（同集群管理），e2e 的 390 宽用例补上「点选后详情在可视区上半部」。
+- **用例**：
+  - 契约 5；task-runtime 4、events 3、business-task 2、session 1；observability 领域 17、用例层 8、路由 4；api-client 2。
+  - 工作台：traces 12、traceEventText 4，projectNavigation 两条改写。
+  - e2e：新增 traceChains 3 条；projectWorkspaceIa、capabilityDepth、layoutSpacing 跟着改名与新表单。
+- **回填**（4608aab6）：
+  - 基线 v0.3.14：Design §14.7 与 D62、§4.3 接口表、§14.4；Proposal §0.2 与 R24；Plan T5.4、AT-44 与依据句。
+  - RFC-020：proposal §4.5 与 design §7 各一条修订注记；acceptance 补记 WS-15 当时误记通过的两项（改名、空态说明来源）。
+  - dev-gotchas：新 feature 的文案要加进测试的 `renderApp` 目录。
+- **门禁与 CI**：
+  - feb367cc 提交前，在「870f2681＋本批」干净导出上：check:static 通过；全部用例 2534 pass／90 skip／0 fail；新增代码防护 98.9%（1094 行里 1082 行被执行）。
+  - [CI 35862690809](https://github.com/wangbinquan/CrewStation/actions/runs/35862690809) 六项全绿。
+  - 702e7ac3 在「ebc40acc＋本批」干净导出上 check:static 通过；test:console 822 pass、1 fail，失败项见最后一条。[CI 35865381834](https://github.com/wangbinquan/CrewStation/actions/runs/35865381834) 六项全绿。
+  - 009c0be3 在「4e6fc781＋本批」干净导出上 check:static 通过，test:console 827 pass／0 fail；[CI 35866971172](https://github.com/wangbinquan/CrewStation/actions/runs/35866971172) 六项全绿。
+- **部署**：
+  - 12:56:29Z 滚 cs-api 到 `cs-control-plane:traces-20260923`，12:57:02Z 滚 console 到 `cs-console:traces-20260923`，都用 `git archive feb367cc` 构建，没有迁移，都一次就绪、重启 0 次。
+  - 之后 crewstation-5c 把 console 滚到 `loading-20260923`（ebc40acc，含 feb367cc）。
+  - 13:20:46Z console → `cs-console:traces-20260923b`（`git archive 702e7ac3`＝ebc40acc＋702e7ac3）。
+  - 为 009c0be3 备好了 `cs-console:traces-20260923c`（`git archive 702e7ac3` 再换上 009c0be3 的 `ProjectOperationsPage.tsx`，刻意不带 ac0b7c3f RFC-026 的前端改动），但要滚时线上已经是别的会话在 21:29 构建的 `cs-console:replies-20260923b`（RFC-026，构建晚于 009c0be3，已含本节全部前端改动），守卫没有覆盖它，c 没有上线。
+- **实机**：
+  - 接口（dev-developer，demo）：共 24 条链（事件 8、业务任务 5、开发会话 11），每页 10 条、3 页取完，68ms，无重复，严格倒序；六种筛选都对；会话链回放 12 个 CLI 执行，事件按序号翻页。
+  - e2e（CS_E2E_AUTH=dev-oidc，dev-admin）：traceChains 3 条（1280 并排、390 上下、项目外 trace_id 404）、layoutSpacing 调用链一条、capabilityDepth 运行与诊断一条，全过。
+  - projectWorkspaceIa 的 WS-15 那条会以 dev-admin 打开开发页、改作者的个人布局，没在实机跑；页签名由工作台用例覆盖。
+  - 截图（dev-developer）：1440 宽会话链、1280 宽失败的业务任务链、390 宽列表，横向溢出 0，控制台无报错。
+  - 窄屏滚动（390 宽，点一条业务任务链）：702e7ac3 上线后详情顶部仍在 2099px（导航复位滚动）；replies-20260923b（含 009c0be3）上线后是 659px。那条链的详情很短，页面已滚到底，整块可见。e2e 的判据因此从「顶部在上半屏」放宽为「顶部进入可视区、至少露出 60px」，traceChains 实机 3 条通过。
+- **没做／留给作者**：
+  - Design §14.1 的独立 execution_events 表与 `otel_trace_id` 关联仍未实现（§14.7 写明）；回放读的是各模块自己的表与 cs-session 的 Runner 事件。
+  - 很多 CLI 执行没有原生会话 ID（旧 Runner 不报），回放里那一行就不显示会话。
+  - 事件时间写完整日期，同一天的也不省略。
+  - 满负载的全量工作台用例里，RFC-021 的 releaseLifecycle／overviewSlotLifecycle 偶发各红一条，两次不是同一条，单跑全过。原因像是 `renderApp.settle` 固定只等三轮，多个查询接力的页面来不及。本批没动。
+
 ## 开发页连接就绪前整页只显示加载层（2026-09-23）
 
 作者：「开发界面，连接尚未就绪的时候，就显示整个页面的loading就行了，并且呈现loading的状态，不用先渲染所有元素但是出来还没法操作」。两轮问答（含 ASCII 预览）裁定：就绪之后再断线「保持工作区＋提示条」；加载层内容用「步骤清单」；进来时就失败用「整页状态卡＋恢复动作」；卡在「等待开发环境响应」时「超过 1 分钟给『仍然打开工作区』」；流程「直接改＋回填，提交推送并部署本机」。
