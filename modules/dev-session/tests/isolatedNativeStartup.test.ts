@@ -49,6 +49,23 @@ test('名册带六段启动进度：执行环境的前三段加上 Runner 的启
   expect(reads).toHaveLength(2);
 });
 
+test('排队分配容器从受理时刻算起：Runner 回报的记录把 startedAt 改成进程启动时间之后，排队段与整体开始时间不变', async () => {
+  const { f, executionTaskId, record } = await startingCli();
+  const acceptedAt = (await f.repository.findExecution(executionTaskId))!.execution!.acceptedAt!;
+  expect(acceptedAt).toBeDefined();
+  const t = (second: number) => new Date(Date.parse(acceptedAt) + second * 1000).toISOString();
+  const span = (kind: StartupStage['kind'], from: number, to: number): StartupStage => ({ kind, state: 'succeeded', startedAt: t(from), endedAt: t(to), durationMs: Math.round((to - from) * 1000) });
+  f.environments.get(executionTaskId)!.startup = { state: 'ready', startedAt: t(0.5), endedAt: t(4), stages: [span('queue', 0.5, 1), span('container', 1, 3), span('connect', 3, 4), span('ready', 4, 4)] };
+  // Runner 的记录带它自己的 startedAt（进程启动时间，晚于受理）；读名册时它会被存成受理记录（2026-09-23 实机：排队段因此成了 0 毫秒）。
+  Object.assign(record, { startedAt: t(5), revision: record.revision + 1 });
+  await f.api.listNativeTerminals(actor, taskId);
+  const item = NativeTerminalDtoSchema.parse((await f.api.listNativeTerminals(actor, taskId)).items[0]);
+  expect((await f.repository.findExecution(executionTaskId))!.record.startedAt).toBe(t(5));
+  expect(item.startup?.startedAt).toBe(acceptedAt);
+  expect(item.startup?.stages[0]).toEqual({ kind: 'queue', state: 'succeeded', startedAt: acceptedAt, endedAt: t(1), durationMs: 1000 });
+  expect(item.startup?.stages[1]).toMatchObject({ kind: 'container', startedAt: t(1) });
+});
+
 test('启动中 Runner 回名册慢：名册不等它（约 1 秒即返回、按已连接），进度照常从事件读；同一执行环境并发读只问一次', async () => {
   const { f, terminal, executionTaskId, events } = await startingCli();
   events.push({ seq: 1, at: at(5.3), event: { kind: 'beforeStart', execution: execution(terminal.agentId, 'running', 'running') } });

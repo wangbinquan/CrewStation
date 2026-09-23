@@ -43,6 +43,18 @@ describe('RFC-022：CLI 进程拉起之前', () => {
     expect(f.calls.filter((c) => c.type === 'terminalResize')).toHaveLength(1);
   });
 
+  test('PTY 一有输出就当作进程已拉起：CLI 启动时查询的自动应答照常发出，记下的尺寸先补发（2026-09-23 实机：OpenCode 因此空白）', async () => {
+    const f = fixture(); await ready(f);
+    f.attachment.setProcessRunning(false);
+    expect(await f.attachment.ensureControl({ quiet: true })).toBe(true);
+    f.attachment.resize(132, 40);
+    f.emit(1, '\x1b[c');
+    f.attachment.input('\x1b[?1;2c');
+    expect(f.calls.map((c) => c.type)).toEqual(['attachTerminal', 'claimTerminalControl', 'terminalResize', 'terminalInput']);
+    expect(f.calls.at(-2)).toMatchObject({ cols: 132, rows: 40 });
+    expect(f.writes.at(-1)).toBe('\x1b[c');
+  });
+
   test('静默取得被拒（旧 Runner 在启动中不接受）不显示错误；普通取得被拒照常显示', async () => {
     const f = fixture(); await ready(f);
     f.control.result = async () => { throw new StreamCommandError('precondition', 'CLI 进程尚未运行或已经结束'); };

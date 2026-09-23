@@ -108,7 +108,7 @@ function LiveNativeTerminalView({ terminal, channel, stream, onActivity, canDeve
     <div className={styles.statusBar}>{info ? <span className={styles.info}>{info}</span> : null}
     <div className={styles.controlLine} data-control={startup ? undefined : view?.tone} role="status" aria-live="polite">
       {startup ? <StageSummary progress={startup} /> : view ? <strong className={styles.controlState}>{controlText(t, view)}</strong> : <span>{t(`devSession.native.attach.${state.phase}`)}</span>}
-      {terminal.protocol === 'opencode' && state.phase === 'ready' ? <span title={t('devSession.native.historyHelp')}>{t(state.controlled ? 'devSession.native.historyControlled' : 'devSession.native.historyReadOnly')}</span> : null}
+      {!startup && terminal.protocol === 'opencode' && state.phase === 'ready' ? <span title={t('devSession.native.historyHelp')}>{t(state.controlled ? 'devSession.native.historyControlled' : 'devSession.native.historyReadOnly')}</span> : null}
       {state.truncated ? <span title={t('devSession.native.scrollback')}>{t('devSession.native.bounded')}</span> : null}
       {state.phase === 'error' ? <Button variant="ghost" onClick={() => void attachment.refresh()}>{t('devSession.native.reattach')}</Button> : null}
     </div></div>

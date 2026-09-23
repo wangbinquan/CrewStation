@@ -23,7 +23,7 @@ const running: StartupProgress = {
     { kind: 'agent', state: 'pending' }, { kind: 'ready', state: 'pending' },
   ],
 };
-const base = (): NativeTerminalDto => ({ ...activityFixture().terminal, clientRequestId: crypto.randomUUID(), lifecycle: 'starting', computeName: 'volc-glm-5-2', startup: running,
+const base = (): NativeTerminalDto => ({ ...activityFixture().terminal, clientRequestId: crypto.randomUUID(), lifecycle: 'starting', computeName: 'volc-glm-5-2', protocol: 'opencode', startup: running,
   execution: { taskId: TaskIdSchema.parse('01a0bf5d-8f4b-7abc-8123-777777777777'), state: 'running', message: '此CLI的执行容器已运行，等待环境连接' } });
 const connected = { ...INITIAL_STREAM_STATE, status: 'open' as const, runnerConnected: true };
 
@@ -64,12 +64,15 @@ test('启动中：终端区域中间是六段步骤条，状态条显示当前�
   expect(pane.getAttribute('aria-label')).toBe('正在启动 CLI · volc-glm-5-2');
   expect([...page.host.querySelectorAll('li')].map((li) => li.getAttribute('data-state'))).toEqual(['succeeded', 'succeeded', 'succeeded', 'running', 'pending', 'pending']);
   expect(page.host.querySelector('[role="status"]')!.textContent).toContain('启动中 4/6 · 准备环境（启动前步骤 1/2） · 写入 settings.json');
+  // 步骤条盖着终端时不提示「回看会话历史」（2026-09-23 实机：启动中就取得了控制，提示跟着出来）。
+  expect(page.host.querySelector('[role="status"]')!.textContent).not.toContain('回看会话历史');
   expect(f.sent.some((command) => command.type === 'attachTerminal')).toBe(true);
   expect(page.host.querySelector('[role="region"]')).not.toBeNull();
   // 就绪后换回终端：步骤条移除，状态条回到输入控制。
   await act(async () => update({ ...terminal, lifecycle: 'running', startup: { ...running, state: 'ready', stages: running.stages.map((stage) => ({ ...stage, state: 'succeeded' as const })) } })); await page.settle();
   expect(page.host.querySelector('section[data-state]')).toBeNull();
   expect(page.host.querySelector('[role="status"]')!.textContent).toContain('空闲 · 点击终端即可输入');
+  expect(page.host.querySelector('[role="status"]')!.textContent).toContain('回看会话历史');
 });
 
 test('创建者的窗口：启动中就提前取得（新 Runner）；旧 Runner 拒绝时不报错，进程拉起后再取，并把焦点移进终端；只做一次', async () => {

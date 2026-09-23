@@ -94,7 +94,7 @@ export class NativeExecutionLifecycle {
     }
     // 进程已拉起而事件还没读到（或事件表读不到）：以这次看到的时刻为准。
     if (!runningAt && record.lifecycle === 'running') runningAt = this.deps.clock.now().toISOString();
-    const startup = composeCliStartup({ accepted: start.record.startedAt, environment: { exists: !!env, ...(env?.startup ? { startup: env.startup } : {}) }, ...(beforeStart ? { beforeStart } : {}), ...(runningAt ? { runningAt } : {}), record });
+    const startup = composeCliStartup({ accepted: start.execution?.acceptedAt ?? start.record.startedAt, environment: { exists: !!env, ...(env?.startup ? { startup: env.startup } : {}) }, ...(beforeStart ? { beforeStart } : {}), ...(runningAt ? { runningAt } : {}), record });
     if (startup && startup.state !== 'running' && events) await this.repo.saveStartup(start.taskId, start.record.agentId, startup);
     return startup;
   }

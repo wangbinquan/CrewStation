@@ -205,8 +205,12 @@ export class NativeTerminalAttachment {
     if (event.terminalSeq <= this.seq) return;
     if (event.terminalSeq !== this.seq + 1) throw new Error('终端输出有缺口，请重新附着');
     this.seq = event.terminalSeq;
-    if (event.kind === 'terminalOutput') this.sink.write(event.data);
-    else this.sink.resize(event.cols, event.rows);
+    if (event.kind === 'terminalOutput') {
+      // PTY 有输出就说明进程已经拉起：先放开输入，xterm 对 CLI 启动时查询（终端能力、配色）的自动应答才发得出去。
+      // 名册要到下一次读才说「运行中」，那之前的应答被挡掉，OpenCode 等不到回答就一直空白（2026-09-23 实机）。
+      if (!this.processRunning) this.setProcessRunning(true);
+      this.sink.write(event.data);
+    } else this.sink.resize(event.cols, event.rows);
   }
   private patch(change: Partial<NativeAttachmentState>): void { this.state = { ...this.state, ...change }; for (const listener of this.listeners) listener(); }
 }

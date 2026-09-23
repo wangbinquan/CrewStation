@@ -119,7 +119,7 @@ async function cliVersion(s: Session): Promise<string | null> {
  */
 async function observeProtocolTurn(s: Session): Promise<ProfileTestRunResult> {
   const { input, runner, env, timing } = s;
-  const agentId = s.context.agentId!;
+  const agentId = s.context.agentId!, sentAt = s.deps.clock.now().toISOString();
   try {
     await runner.sendCommand(env.id, {
       id: `pft-start-${input.testId}`, type: 'startAgent', agentId, compute: input.profile, profileRevision: input.revision, launch: input.launch, permission: 'full',
@@ -138,7 +138,7 @@ async function observeProtocolTurn(s: Session): Promise<ProfileTestRunResult> {
     if (event.kind === 'agent' && event.event.agentId === agentId) probe = absorbAgentEvent(probe, event.event);
   };
   const stages = (timedOut: boolean): ProfileTestStage[] => [
-    ...(execution ? stagesFromBeforeStart(execution) : []), launchStage(probe, execution?.state === 'succeeded' || probe.started), modelVerdict(probe, input.expectedReply, timedOut, !!input.launch.model, secrets).stage,
+    ...(execution ? stagesFromBeforeStart(execution) : []), launchStage(probe, execution?.state === 'succeeded' || probe.started, execution?.endedAt ?? sentAt), modelVerdict(probe, input.expectedReply, timedOut, !!input.launch.model, secrets).stage,
   ];
   const finish = (timedOut: boolean): ProfileTestRunResult => {
     if (execution?.state === 'failed' || execution?.state === 'cancelled') return result(s, 'failed', 'before-start-failed', execution.error?.message ?? '启动前步骤失败', stages(false));

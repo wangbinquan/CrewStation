@@ -21,11 +21,11 @@ class NativeTerminals {
     return dto;
   }
   private async reserve(actor: Actor, taskId: TaskId, input: StartNativeTerminalRequest, projectId: ProjectId) {
-    const profile = await nativeCompute(this.deps, projectId, input.compute);
+    const profile = await nativeCompute(this.deps, projectId, input.compute), now = this.deps.clock.now().toISOString();
     return this.repository.reserve({
       taskId, createdBy: actor.userId, clientRequestId: input.clientRequestId, fingerprint: fingerprintOf(input), input,
-      profile: { profileId: profile.id, revision: profile.revision }, execution: { taskId: newId('tsk') as TaskId, image: profile.image, ...(profile.taskProfile ? { taskProfile: profile.taskProfile } : {}) },
-      record: { agentId: newId('agt'), terminalId: newId('pty'), runnerId: Bun.randomUUIDv7(), compute: profile.id, computeName: profile.name, permission: input.permission, revision: 0, lifecycle: 'starting', startedAt: this.deps.clock.now().toISOString(), cols: input.cols, rows: input.rows, profileRevision: profile.revision, protocol: profile.protocol },
+      profile: { profileId: profile.id, revision: profile.revision }, execution: { taskId: newId('tsk') as TaskId, image: profile.image, ...(profile.taskProfile ? { taskProfile: profile.taskProfile } : {}), acceptedAt: now },
+      record: { agentId: newId('agt'), terminalId: newId('pty'), runnerId: Bun.randomUUIDv7(), compute: profile.id, computeName: profile.name, permission: input.permission, revision: 0, lifecycle: 'starting', startedAt: now, cols: input.cols, rows: input.rows, profileRevision: profile.revision, protocol: profile.protocol },
     });
   }
   async start(actor: Actor, taskId: TaskId, input: StartNativeTerminalRequest): Promise<NativeTerminalDto> {

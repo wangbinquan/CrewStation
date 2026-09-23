@@ -48,6 +48,8 @@ export function stagesFromBeforeStart(execution: BeforeStartExecution): ProfileT
 /** 一次协议测试轮次的观测：是否起了进程、原生会话 ID、回文、CLI 原始输出的尾部与终态。 */
 export interface ProtocolProbe {
   started: boolean;
+  /** 进程拉起的时刻（started 事件）：「Agent 启动中」到此结束、「真实模型轮次」从此开始。 */
+  startedAt?: string;
   sessionId?: string;
   text: string;
   /**
@@ -65,7 +67,7 @@ export function absorbAgentEvent(probe: ProtocolProbe, event: AgentEvent): Proto
   const raw = event.type === 'started' ? undefined : rawLineOf(event.raw);
   const next = raw ? { ...withSession, diagnostics: `${withSession.diagnostics}${raw}\n`.slice(-DIAGNOSTICS_CAP) } : withSession;
   switch (event.type) {
-    case 'started': return { ...next, started: true };
+    case 'started': return { ...next, started: true, startedAt: next.startedAt ?? event.at };
     case 'text': return { ...next, text: (next.text + (event.text ?? '')).slice(-8192) };
     case 'completed': return { ...next, outcome: { kind: 'completed', exitCode: event.result?.exitCode ?? null, at: event.at } };
     case 'error': return { ...next, outcome: { kind: 'error', message: event.error?.message ?? 'Agent 报错', ...(event.error?.code ? { code: event.error.code } : {}), at: event.at } };
@@ -86,14 +88,21 @@ function rawLineOf(raw: unknown): string | undefined {
 /** 驱动在创建 CLI 进程之前就失败的错误码：二进制不存在、起不来或参数装配失败，不是模型的问题。 */
 const LAUNCH_FAILURES = new Set(['driver_not_installed', 'spawn_failed', 'driver_setup_failed', 'cli_config_invalid']);
 
-export function launchStage(probe: ProtocolProbe, beforeStartDone: boolean): ProfileTestStage {
+/** 段的起止与用时：两端都知道才算用时（迁到公共步骤条后，这两段原来没有时间，显示上缺一格，RFC-022 实机）。 */
+function timed(from: string | undefined, to: string | undefined): Pick<ProfileTestStage, 'startedAt' | 'endedAt' | 'durationMs'> {
+  const duration = from && to ? Math.max(0, Date.parse(to) - Date.parse(from)) : undefined;
+  return { ...(from ? { startedAt: from } : {}), ...(to ? { endedAt: to } : {}), ...(duration === undefined ? {} : { durationMs: duration }) };
+}
+
+/** from：这一段开始的时刻（启动前步骤结束，没有步骤时是发出启动命令的时刻）。 */
+export function launchStage(probe: ProtocolProbe, beforeStartDone: boolean, from?: string): ProfileTestStage {
   const base = { id: TEST_STAGE.agent, kind: 'agent' as const, name: 'Agent 启动中' };
   if (probe.outcome?.kind === 'error' && probe.outcome.code && LAUNCH_FAILURES.has(probe.outcome.code)) {
-    return { ...base, state: 'failed', endedAt: probe.outcome.at, error: { code: probe.outcome.code, message: probe.outcome.message ?? '' } };
+    return { ...base, state: 'failed', ...timed(from, probe.outcome.at), error: { code: probe.outcome.code, message: probe.outcome.message ?? '' } };
   }
-  if (probe.started) return { ...base, state: 'succeeded', detail: 'CLI 进程已按档位的二进制与参数创建' };
+  if (probe.started) return { ...base, state: 'succeeded', ...timed(from, probe.startedAt), detail: 'CLI 进程已按档位的二进制与参数创建' };
   if (probe.outcome) return { ...base, state: 'skipped' };
-  return { ...base, state: beforeStartDone ? 'running' : 'pending' };
+  return beforeStartDone ? { ...base, state: 'running', ...timed(from, undefined) } : { ...base, state: 'pending' };
 }
 
 /** 通过条件（agent-workflow 的判定）：退出码 0、捕获到原生会话 ID、回文里原样出现 nonce。 */
@@ -110,11 +119,11 @@ export interface ModelVerdict { stage: ProfileTestStage; outcome?: ProfileTestOu
  */
 export function modelVerdict(probe: ProtocolProbe, expectedReply: string, timedOut: boolean, modelConfigured: boolean, knownSecrets: readonly string[] = []): ModelVerdict {
   const base = { id: TEST_STAGE.model, kind: 'model' as const, name: '真实模型轮次' };
-  if (!probe.outcome && !timedOut) return { stage: { ...base, state: probe.started ? 'running' : 'pending' } };
+  if (!probe.outcome && !timedOut) return { stage: probe.started ? { ...base, state: 'running', ...timed(probe.startedAt, undefined) } : { ...base, state: 'pending' } };
   if (probe.outcome?.kind === 'cancelled') return { stage: { ...base, state: 'skipped', endedAt: probe.outcome.at, detail: '测试被取消' } };
   if (probe.outcome?.kind === 'error' && probe.outcome.code && LAUNCH_FAILURES.has(probe.outcome.code)) return { stage: { ...base, state: 'skipped' }, outcome: 'spawn-failed', error: probe.outcome.message ?? '二进制无法启动' };
   if (probe.outcome?.kind === 'error' && probe.outcome.code === 'before_start_failed') return { stage: { ...base, state: 'skipped' }, outcome: 'before-start-failed', error: probe.outcome.message ?? '启动前步骤失败' };
-  if (conforms(probe, expectedReply)) return { stage: { ...base, state: 'succeeded', endedAt: probe.outcome!.at, detail: `捕获到会话 ${probe.sessionId}，模型原样回显了测试标记` } };
+  if (conforms(probe, expectedReply)) return { stage: { ...base, state: 'succeeded', ...timed(probe.startedAt, probe.outcome!.at), detail: `捕获到会话 ${probe.sessionId}，模型原样回显了测试标记` } };
   const outcome = classifyProtocolFailure({ timedOut: timedOut && !probe.outcome, haystack: `${probe.outcome?.message ?? ''}\n${probe.text}\n${probe.diagnostics}` });
   const reasons = [
     probe.outcome ? undefined : '在时限内没有结束',
@@ -128,7 +137,7 @@ export function modelVerdict(probe: ProtocolProbe, expectedReply: string, timedO
   const evidence = outputTail(maskDiagnosticsText(probe.diagnostics, knownSecrets), EVIDENCE_CAP);
   const message = `${reasons.join('；') || '协议轮次没有完成'}${evidence ? ` — CLI 原文：${evidence}` : ''}`;
   const log = probe.diagnostics ? { log: { stdoutTail: maskDiagnosticsText(probe.diagnostics, knownSecrets).slice(-4000), stderrTail: maskDiagnosticsText(probe.outcome?.message ?? '', knownSecrets) } } : {};
-  return { stage: { ...base, state: 'failed', ...(probe.outcome ? { endedAt: probe.outcome.at } : {}), error: { code: outcome, message }, ...log, ...(excerpt(probe.text) ? { detail: excerpt(probe.text) } : {}) }, outcome, error: message };
+  return { stage: { ...base, state: 'failed', ...timed(probe.startedAt, probe.outcome?.at), error: { code: outcome, message }, ...log, ...(excerpt(probe.text) ? { detail: excerpt(probe.text) } : {}) }, outcome, error: message };
 }
 
 /** 通用终端的测试命令阶段：退出码 0 且输出匹配期望正则才算通过（C11）。 */

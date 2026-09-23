@@ -8,6 +8,21 @@ const probeOf = (events: Array<Partial<AgentEvent> & Pick<AgentEvent, 'type'>>):
   events.reduce<ProtocolProbe>((probe, e, i) => absorbAgentEvent(probe, { agentId: 'a', seq: i, at, ...e }), { started: false, text: '', diagnostics: '' });
 
 describe('档位测试阶段判定（RFC-006 §6.2）', () => {
+  test('Agent 启动中与真实模型轮次带起止与用时（RFC-022：迁到公共步骤条后这两段原来没有时间）', () => {
+    const t = (second: number) => new Date(Date.parse(at) + second * 1000).toISOString();
+    const running = probeOf([{ type: 'started', at: t(5) }, { type: 'session', sessionId: 'ses-1', at: t(6) }]);
+    expect(running.startedAt).toBe(t(5));
+    expect(launchStage(running, true, t(2))).toMatchObject({ state: 'succeeded', startedAt: t(2), endedAt: t(5), durationMs: 3000 });
+    expect(modelVerdict(running, 'crewstation-test-1', false, true).stage).toMatchObject({ state: 'running', startedAt: t(5) });
+    const done = probeOf([{ type: 'started', at: t(5) }, { type: 'session', sessionId: 'ses-1', at: t(6) }, { type: 'text', text: 'crewstation-test-1', at: t(7) }, { type: 'completed', result: { exitCode: 0 }, at: t(40) }]);
+    expect(modelVerdict(done, 'crewstation-test-1', false, true).stage).toMatchObject({ state: 'succeeded', startedAt: t(5), endedAt: t(40), durationMs: 35_000 });
+    // 还没拉起：从开始的时刻计时；没有步骤、也没发出命令时没有起点，就不写时间。
+    expect(launchStage({ started: false, text: '', diagnostics: '' }, true, t(2))).toEqual({ id: 'agent', kind: 'agent', name: 'Agent 启动中', state: 'running', startedAt: t(2) });
+    expect(launchStage(done, true)).not.toHaveProperty('durationMs');
+    const failed = probeOf([{ type: 'started', at: t(5) }, { type: 'completed', result: { exitCode: 1 }, at: t(9) }]);
+    expect(modelVerdict(failed, 'crewstation-test-1', false, true).stage).toMatchObject({ state: 'failed', startedAt: t(5), endedAt: t(9), durationMs: 4000 });
+  });
+
   test('通过要求退出码 0、捕获到会话、回显 nonce；缺一即按分类失败并写清原因', () => {
     const ok = probeOf([{ type: 'started' }, { type: 'session', sessionId: 'ses-1' }, { type: 'text', text: 'token crewstation-test-1' }, { type: 'completed', result: { exitCode: 0 } }]);
     expect(modelVerdict(ok, 'crewstation-test-1', false, true)).toMatchObject({ stage: { state: 'succeeded' } });
