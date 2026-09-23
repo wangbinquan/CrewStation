@@ -9,6 +9,7 @@ import { useT } from '../../../../shared/lib/useT';
 import { ActionNote } from '../../../../shared/ui/ActionNote';
 import { Button } from '../../../../shared/ui/Button';
 import { InlineConfirm } from '../../../../shared/ui/InlineConfirm';
+import { ConfirmDialog } from '../../../../shared/ui/dialog/ConfirmDialog';
 import { AdminField } from '../AdminField';
 import styles from './ComputeList.module.css';
 
@@ -31,6 +32,7 @@ export interface ProfileRowActionsProps {
 /**
  * 一行的操作：编辑、复制、设为默认、启用／停用、删除。照 agent-workflow（C19）：默认档位不能停用也不能删除，
  * 通用终端档位不能设为默认（default 会被 Manifest 的业务子任务引用）；删除被已上线版本引用的档位要二次确认。
+ * 删除与「仍然删除」都不可撤销，走弹窗并输入 delete（2026-09-23 作者裁定）；请求结束后弹窗关闭，结果显示在面板里。
  */
 export function ProfileRowActions({ profile, onOpen, children }: ProfileRowActionsProps): ReactElement {
   const t = useT();
@@ -38,6 +40,8 @@ export function ProfileRowActions({ profile, onOpen, children }: ProfileRowActio
   const [expanded, setExpanded] = useState(false);
   const [copying, setCopying] = useState(false);
   const [copyName, setCopyName] = useState('');
+  // 「仍然删除」时记下当时列出的引用项目：请求一发出错误就清空，弹窗里的清单不能跟着消失。
+  const [removing, setRemoving] = useState<{ readonly references?: readonly string[] }>();
   const copy = useApiMutation((name: string) => api.computeProfiles.copy(profile.id, { name }), { invalidate: INVALIDATE, onSuccess: (detail) => { setCopying(false); onOpen(detail.id); } });
   const setDefault = useApiMutation(() => api.computeProfiles.setDefault(profile.id), { invalidate: INVALIDATE });
   const visibility = useApiMutation((value: boolean) => api.computeProfiles.setDefaultVisible(profile.id, value), { invalidate: INVALIDATE });
@@ -65,7 +69,7 @@ export function ProfileRowActions({ profile, onOpen, children }: ProfileRowActio
               busy={toggle.isPending} busyLabel={t('admin.profile.working')} onConfirm={() => toggle.mutate(!profile.enabled)} />}
         {profile.isDefault ? <Button disabled title={t('admin.profile.visibilityLocked')}>{t('admin.profile.defaultVisible')}</Button> : <InlineConfirm label={t(profile.defaultVisible === false ? 'admin.profile.defaultVisible' : 'admin.profile.defaultHidden')} question={t('admin.profile.visibilityQuestion', { name: profile.name })} busy={visibility.isPending} onConfirm={() => visibility.mutate(profile.defaultVisible === false)} />}
         <span className={styles.destructive}>{profile.isDefault ? <Button disabled title={t('admin.profile.defaultLocked')}>{t('admin.profile.remove')}</Button>
-          : <InlineConfirm label={t('admin.profile.remove')} question={t('admin.profile.removeQuestion', { name: profile.name })} busy={remove.isPending} busyLabel={t('admin.profile.removing')} onConfirm={() => remove.mutate(false)} />}</span>
+          : <Button variant="danger" disabled={busy} onClick={() => { remove.reset(); setRemoving({}); }}>{remove.isPending ? t('admin.profile.removing') : t('admin.profile.remove')}</Button>}</span>
         </div>
       {profile.isDefault ? <p className={styles.hint}>{t('admin.profile.defaultLocked')}</p> : null}
       {copying ? (
@@ -84,9 +88,15 @@ export function ProfileRowActions({ profile, onOpen, children }: ProfileRowActio
       {references ? (
         <ActionNote tone="error">
           {t('admin.profile.referencedBy', { projects: references.join('、') })}{' '}
-          <InlineConfirm label={t('admin.profile.removeAnyway')} question={t('admin.profile.removeAnywayQuestion', { name: profile.name, count: references.length })} busy={remove.isPending} busyLabel={t('admin.profile.removing')} onConfirm={() => remove.mutate(true)} />
+          <Button variant="danger" disabled={busy} onClick={() => setRemoving({ references })}>{t('admin.profile.removeAnyway')}</Button>
         </ActionNote>
       ) : remove.error ? <ActionNote tone="error">{t('admin.profile.removeError', { message: errorMessage(remove.error) })}</ActionNote> : null}
+      {removing ? <ConfirmDialog title={t(removing.references ? 'admin.profile.removeAnyway' : 'admin.profile.removeTitle')} confirmWord="delete"
+        question={removing.references ? t('admin.profile.removeAnywayQuestion', { name: profile.name, count: removing.references.length }) : t('admin.profile.removeQuestion', { name: profile.name })}
+        confirmLabel={t(removing.references ? 'admin.profile.removeAnyway' : 'admin.profile.removeConfirm')} busy={remove.isPending} busyLabel={t('admin.profile.removing')}
+        onConfirm={() => remove.mutate(!!removing.references, { onSettled: () => setRemoving(undefined) })} onCancel={() => setRemoving(undefined)}>
+        <p>{removing.references ? t('admin.profile.referencedBy', { projects: removing.references.join('、') }) : t('admin.profile.removeHint')}</p>
+      </ConfirmDialog> : null}
       </div></td></tr> : null}
     </>
   );

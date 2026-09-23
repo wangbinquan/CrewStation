@@ -1,11 +1,12 @@
 import type { ConfigItemDto } from '@crewstation/contracts';
+import { useState } from 'react';
 import type { ReactElement } from 'react';
 import { useDateText } from '../../../shared/lib/useDateText';
 import { useT } from '../../../shared/lib/useT';
 import { Badge } from '../../../shared/ui/Badge';
 import { Button } from '../../../shared/ui/Button';
 import { DataTable } from '../../../shared/ui/DataTable';
-import { InlineConfirm } from '../../../shared/ui/InlineConfirm';
+import { ConfirmDialog } from '../../../shared/ui/dialog/ConfirmDialog';
 import styles from './ConfigItemTable.module.css';
 
 export interface ConfigItemTableProps {
@@ -17,12 +18,17 @@ export interface ConfigItemTableProps {
   readonly readOnly?: boolean;
 }
 
-/** 取值列表；删除走行内两步确认，不使用会冻结页面的 window.confirm。 */
+/**
+ * 取值列表。删除不可撤销，走弹窗并输入 delete（2026-09-23 作者裁定）；删除由面板发起，确认后弹窗即关，
+ * 进行中的反馈在该行的删除键上，结果由面板显示。
+ */
 export function ConfigItemTable({ items, onEdit, onDelete, deletingName, disabled = false, readOnly = false }: ConfigItemTableProps): ReactElement {
   const t = useT();
   const dateText = useDateText();
+  const [confirming, setConfirming] = useState<ConfigItemDto>();
   const columns = [t('config.items.name'), t('config.items.value'), ...(!readOnly ? [t('config.items.actions')] : [])];
   return (
+    <>
     <DataTable columns={columns} className={styles.table}>
       {items.map((item) => (
         <tr key={item.id}>
@@ -41,18 +47,19 @@ export function ConfigItemTable({ items, onEdit, onDelete, deletingName, disable
             <Button variant="ghost" disabled={disabled} onClick={(event) => onEdit(item, event.currentTarget)}>
               {t(item.isSecret ? 'config.updateSecret' : 'config.items.edit')}
             </Button>
-            <InlineConfirm
-              variant="ghost"
-              label={t('config.items.delete')}
-              question={t('config.items.confirmDelete', { name: item.name })}
-              busy={disabled || deletingName === item.id}
-              busyLabel={t(deletingName === item.id ? 'config.items.deleting' : 'config.items.delete')}
-              onConfirm={() => onDelete(item)}
-            />
+            <Button variant="danger" disabled={disabled || deletingName === item.id} onClick={() => setConfirming(item)}>
+              {t(deletingName === item.id ? 'config.items.deleting' : 'config.items.delete')}
+            </Button>
           </td> : null}
         </tr>
       ))}
     </DataTable>
+    {confirming ? <ConfirmDialog title={t('config.items.deleteTitle')} question={t('config.items.deleteQuestion', { name: confirming.name, binding: confirming.bindingName })} confirmWord="delete"
+      confirmLabel={t('config.items.deleteConfirm')} confirmDisabled={disabled} onConfirm={() => { setConfirming(undefined); onDelete(confirming); }} onCancel={() => setConfirming(undefined)}>
+      <p>{t('config.items.deleteHint')}</p>
+      {confirming.isSecret ? <p>{t('config.items.deleteSecretHint')}</p> : null}
+    </ConfirmDialog> : null}
+    </>
   );
 }
 

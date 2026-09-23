@@ -95,6 +95,8 @@ A2 取代本轮早先一次「自动失效、无开关」的答复：作者随�
 
 列：slug（等宽）、显示名、Issuer、开通策略、启用状态、操作（编辑／删除）。空态引导新建。删除有 `InlineConfirm`；常规登录已关闭时，最后一个启用 Provider 不可停用、不可删除（后端同样拒绝）。
 
+> **2026-09-23 修订（作者当面裁定，直接修改，不另立 RFC）。** 删除接入方改为页面内的模态弹窗 `shared/ui/dialog/ConfirmDialog`：写清是哪个接入方以及删除后登录入口消失、仍有用户关联时会被拒绝，输入 `delete` 才能确认。请求结束后弹窗关闭，失败原因照旧显示在编辑页。见 RFC-003 design §6 同日一条。
+
 ### 6.3 Provider 表单：与 agent-workflow 的配置项对齐
 
 四组分区与 agent-workflow 的 `OidcProviderDialog` 同序同组，字段逐项对齐：

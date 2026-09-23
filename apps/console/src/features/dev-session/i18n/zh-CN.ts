@@ -166,6 +166,8 @@ export const messages = {
   'devSession.release.confirmForce': '强制释放他人的开发会话？',
   'devSession.release.hint': '确认后销毁容器与工作卷，未提交或未推送的代码会丢失。运行中的 Agent 和终端可能继续写入，请先停止并保存；下方是本次检查结果。',
   'devSession.release.submit': '确认释放',
+  'devSession.release.discardSubmit': '丢弃并释放',
+  'devSession.release.discardHint': '释放会销毁容器与工作卷：下面列出的未提交文件、未推送的提交和页面上没保存的输入都会一起丢失，无法找回。',
   'devSession.release.cancel': '取消',
   'devSession.release.unpushed': '会话已释放，容器里还有 {count} 个提交没有推送，已随容器销毁。',
   'devSession.release.done': '会话已释放，最后检查未发现相对已知远端引用的未推送提交。',

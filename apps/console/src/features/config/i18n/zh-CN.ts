@@ -35,8 +35,12 @@ export const messages = {
   'config.items.emptyDescription': '点击“新增变量”添加应用的运行参数。',
   'config.items.edit': '修改',
   'config.items.delete': '删除',
-  'config.items.confirmDelete': '确认删除 {name}',
   'config.items.deleting': '删除中…',
+  'config.items.deleteTitle': '删除配置项',
+  'config.items.deleteQuestion': '删除配置项「{name}」（{binding}）？',
+  'config.items.deleteConfirm': '确认删除',
+  'config.items.deleteHint': '删除后不能恢复。已在运行的进程不受影响，之后新建的容器与新的发布不再注入这一项。',
+  'config.items.deleteSecretHint': '这是 Secret：平台不返回它的值，删除后只能重新写入。',
 
   'config.form.title': '新增或覆盖一项',
   'config.form.name': '显示名称',

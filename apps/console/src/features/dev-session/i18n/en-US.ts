@@ -167,6 +167,8 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   'devSession.release.confirmForce': "Force-release someone else's dev session?",
   'devSession.release.hint': 'Releasing destroys the container and volume, including uncommitted or unpushed code. Running agents and terminals may still write: stop them and save first. This inspection is shown below.',
   'devSession.release.submit': 'Release',
+  'devSession.release.discardSubmit': 'Discard and release',
+  'devSession.release.discardHint': 'Releasing destroys the container and work volume: the uncommitted files, unpushed commits and unsaved page input listed below are lost for good.',
   'devSession.release.cancel': 'Cancel',
   'devSession.release.unpushed': 'Session released. {count} commits were never pushed and went away with the container.',
   'devSession.release.done': 'Session released. The last inspection found no commits missing from known remote refs.',

@@ -2,6 +2,7 @@ import './domSetup';
 import { afterEach, expect, test } from 'bun:test';
 import { act } from 'react';
 import { adminAuthenticationFixture, provider } from './adminAuthenticationFixture';
+import { dialogConfirmButton, openDialog, typeConfirmWord } from './confirmDialogDriver';
 import { clickIdentityField, identityField, setIdentityField as field, clickIdentitySelector } from './identityUiHelpers';
 import { renderApp } from './renderApp';
 import { providerDraft, providerRequest } from '../features/admin/model/providerDraft';
@@ -73,11 +74,16 @@ test('保存失败保留草稿并能重试；切换页面标签和取消编辑�
   expect(page.search()).toEqual({ tab: 'fields' }); expect(f.state.providers[0]?.displayName).toBe('保留草稿');
 });
 
-test('删除保留后端拒绝原因，只有确认才发出 DELETE', async () => {
+test('删除走弹窗、输入 delete 才发出 DELETE，保留后端拒绝原因', async () => {
   const f = adminAuthenticationFixture(), response = rejectWrites('仍有用户关联该提供方');
   page = await renderApp('/admin/authentication'); expect(page.text()).not.toContain('删除此接入方'); await page.click('编辑');
-  await page.click('删除此接入方'); expect(f.writes()).toEqual([]); await page.click('确认'); expect(page.text()).toContain('仍有用户关联该提供方');
-  response.fail = false; await page.click('删除此接入方'); await page.click('确认'); expect(f.writes().at(-1)?.method).toBe('DELETE'); expect(page.text()).toContain('还没有身份提供方');
+  await page.click('删除此接入方'); expect(openDialog().textContent).toContain('删除接入方「公司统一身份」（corp-sso）？');
+  expect(openDialog().textContent).toContain('仍有用户关联着它时会被拒绝'); expect(dialogConfirmButton().disabled).toBe(true);
+  await typeConfirmWord('删除'); expect(dialogConfirmButton().disabled).toBe(true); expect(f.writes()).toEqual([]);
+  await typeConfirmWord('delete'); await page.click('确认删除');
+  expect(document.querySelectorAll('dialog').length).toBe(0); expect(page.text()).toContain('仍有用户关联该提供方');
+  response.fail = false; await page.click('删除此接入方'); await typeConfirmWord('DELETE'); await page.click('确认删除');
+  expect(f.writes().at(-1)?.method).toBe('DELETE'); expect(page.text()).toContain('还没有身份提供方');
 });
 
 test('项目覆盖可保存空集合；失败不丢选择，恢复默认使用 DELETE', async () => {

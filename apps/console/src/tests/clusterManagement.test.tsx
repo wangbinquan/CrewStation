@@ -2,6 +2,7 @@ import './domSetup';
 import { afterEach, expect, test } from 'bun:test';
 import { act } from 'react';
 import { focusManager } from '@tanstack/react-query';
+import { dialogConfirmButton, openDialog, typeConfirmWord } from './confirmDialogDriver';
 import { renderApp } from './renderApp';
 import { clusterFixture } from './clusterManagementFixture';
 const originalFetch = globalThis.fetch;
@@ -46,6 +47,31 @@ test('scale validates every bound, inspects without writing, confirms once and e
   expect(page.text()).toContain('pod-original'); await page.click('确认执行');
   const write = f.calls.find((c) => c.path.endsWith('/operations') && c.method === 'POST')!; expect(write.body.params).toEqual({ action: 'scale', replicas: 2 });
   expect(page.text()).toContain('operation-stable'); expect(page.text()).toContain('trace-original'); expect(page.text()).toContain('202'); expect(page.text()).toContain('1.2 s'); expect(page.search().operationId).toBe('operation-stable');
+});
+test('删除／结束不可撤销：点下去就弹窗并自动检查影响，输入 delete 才受理，受理后弹窗关闭、结果在页内', async () => {
+  const f = clusterFixture();
+  f.row.availableActions = f.row.availableActions.map((a) => a.action === 'delete' ? { ...a, enabled: true, reason: '', impactSummary: ['按 UID 删除无活动引用的受管资源，无法撤销'] } : a);
+  page = await renderApp('/admin/cluster?resourceId=resource-uid'); await page.click('删除／结束');
+  const inspections = () => f.calls.filter((c) => c.path.endsWith('/inspect-operation')), writes = () => f.calls.filter((c) => c.path.endsWith('/operations') && c.method === 'POST');
+  expect(inspections().map((c) => c.body)).toEqual([{ action: 'delete' }]);
+  const dialog = openDialog();
+  for (const part of ['确认删除／结束“cluster-demo-green”？', '按 UID 删除无活动引用的受管资源，无法撤销', 'UID: uid-original', 'Pod · pod-original', '本次确认有效至', '输入 delete 以确认']) expect(dialog.textContent).toContain(part);
+  expect(dialogConfirmButton().disabled).toBe(true); await typeConfirmWord('Delete'); expect(dialogConfirmButton().disabled).toBe(false); expect(writes()).toHaveLength(0);
+  await page.click('确认执行');
+  expect(writes().map((c) => c.body.params)).toEqual([{ action: 'delete' }]);
+  expect(document.querySelectorAll('dialog').length).toBe(0); expect(page.text()).toContain('operation-stable');
+});
+test('删除的影响检查还在路上就取消、改做重启：旧的检查结果不会挂到重启上', async () => {
+  const f = clusterFixture();
+  f.row.availableActions = f.row.availableActions.map((a) => a.action === 'delete' ? { ...a, enabled: true, reason: '' } : a);
+  page = await renderApp('/admin/cluster?resourceId=resource-uid');
+  const release = f.hold('/inspect-operation'); await page.click('删除／结束');
+  expect(openDialog().textContent).toContain('正在检查…'); expect(dialogConfirmButton().disabled).toBe(true);
+  await typeConfirmWord('delete'); expect(dialogConfirmButton().disabled).toBe(true);
+  await page.click('取消'); expect(document.querySelectorAll('dialog').length).toBe(0);
+  await page.click('重启'); await act(async () => { release(); }); await page.settle();
+  expect(document.querySelectorAll('[role="alertdialog"]').length).toBe(0); expect(page.text()).toContain('检查影响');
+  expect(f.calls.filter((c) => c.path.endsWith('/operations') && c.method === 'POST')).toHaveLength(0);
 });
 test('lost acceptance response recovers by the same key after reopening and needs-attention has a recheck action', async () => {
   const f = clusterFixture({ loseReceipt: true }); page = await renderApp('/admin/cluster?resourceId=resource-uid'); await page.click('重启'); await page.click('检查影响'); await page.click('确认执行'); await page.settle();

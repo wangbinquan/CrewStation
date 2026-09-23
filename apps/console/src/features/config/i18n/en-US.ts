@@ -35,8 +35,12 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   'config.items.emptyDescription': 'Add one with the form below; key names match the Manifest env section (upper snake case).',
   'config.items.edit': 'Fill the form',
   'config.items.delete': 'Delete',
-  'config.items.confirmDelete': 'Confirm deleting {name}',
   'config.items.deleting': 'Deleting…',
+  'config.items.deleteTitle': 'Delete variable',
+  'config.items.deleteQuestion': 'Delete the variable “{name}” ({binding})?',
+  'config.items.deleteConfirm': 'Confirm delete',
+  'config.items.deleteHint': 'This cannot be undone. Running processes are unaffected; containers created and releases made afterwards no longer receive it.',
+  'config.items.deleteSecretHint': 'This is a secret: the platform never returns its value, so after deleting it can only be written again.',
 
   'config.form.title': 'Add or overwrite an item',
   'config.form.name': 'Display name',

@@ -3,6 +3,7 @@ import './domSetup';
 import { afterEach, describe, expect, test } from 'bun:test';
 import { act } from 'react';
 import { PUSH_CREDENTIAL, computeBackend, profileDetail, profileTest, terminalProfile } from './computeProfileFixture';
+import { dialogConfirmButton, openDialog, typeConfirmWord } from './confirmDialogDriver';
 import { renderApp } from './renderApp';
 
 let page: Awaited<ReturnType<typeof renderApp>> | undefined;
@@ -73,16 +74,20 @@ describe('算力档位列表（RFC-006）', () => {
     expect(backend!.writes).toEqual([]);
   });
 
-  test('删除被上线版本引用的档位：第一次 409 列出项目，再确认一次才带 confirmReferences 删除', async () => {
+  test('删除被上线版本引用的档位：弹窗输入 delete，第一次 409 列出项目，再在弹窗里确认一次才带 confirmReferences 删除', async () => {
     await open();
     await clickIn(await actions('opencode-lite'), '删除');
-    expect((await actions('opencode-lite')).textContent).toContain('删除档位 opencode-lite？');
-    await clickIn(await actions('opencode-lite'), '确认');
+    expect(openDialog().textContent).toContain('删除档位 opencode-lite？'); expect(openDialog().textContent).toContain('删除后不能恢复');
+    expect(dialogConfirmButton().disabled).toBe(true); expect(backend!.writes).toEqual([]);
+    await typeConfirmWord('delete'); await clickIn(openDialog(), '确认删除');
     expect(backend!.writes).toEqual([{ method: 'DELETE', path: `/v1/admin/compute-profiles/${profileIdOf('opencode-lite')}`, query: '', body: {} }]);
+    expect(document.querySelectorAll('dialog').length).toBe(0);
     expect((await actions('opencode-lite')).textContent).toContain('这些项目的授权或当前上线版本引用了这个档位：crm-bot、hr-helper');
     await clickIn(await actions('opencode-lite'), '仍然删除');
-    expect((await actions('opencode-lite')).textContent).toContain('确认删除 opencode-lite？2 个项目会受影响。');
-    await clickIn(await actions('opencode-lite'), '确认');
+    // 弹窗里仍列着引用的项目；请求发出后错误清空，这份清单不能跟着消失。
+    expect(openDialog().textContent).toContain('确认删除 opencode-lite？2 个项目会受影响。'); expect(openDialog().textContent).toContain('crm-bot、hr-helper');
+    expect(dialogConfirmButton().disabled).toBe(true);
+    await typeConfirmWord('delete'); await clickIn(openDialog(), '仍然删除');
     expect(backend!.writes[1]).toMatchObject({ method: 'DELETE', query: '?confirmReferences=true' });
     expect(row('opencode-lite')).toBeUndefined();
   });
@@ -172,11 +177,18 @@ test('更多操作独立占整行；收起保留复制草稿，Escape 返回触�
   expect(document.getElementById(trigger.getAttribute('aria-controls')!)).toBeNull();
   const reopened = await actions('opencode-lite');
   expect(reopened.querySelector<HTMLInputElement>('form input')!.value).toBe('my-profile-copy');
-  await clickIn(reopened, '删除');
+  // 鼠标点按钮会先让它获得焦点；程序化 click 不会，所以先聚焦再点。
+  const remove = buttonIn(reopened, '删除')!; remove.focus(); await act(async () => remove.click()); await page!.settle();
+  // 弹窗里的 Esc 只关弹窗，不连带收起操作面板；焦点回到「删除」。
+  const dialog = openDialog();
+  await act(async () => { dialog.querySelector('input')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); dialog.dispatchEvent(new Event('cancel', { cancelable: true })); });
+  await page!.settle();
+  expect(document.querySelectorAll('dialog').length).toBe(0);
+  expect(trigger.getAttribute('aria-expanded')).toBe('true');
+  expect(document.activeElement === remove).toBe(true);
   await act(async () => reopened.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
   expect(trigger.getAttribute('aria-expanded')).toBe('false');
   expect(document.activeElement).toBe(trigger);
-  expect((await actions('opencode-lite')).textContent).not.toContain('删除档位 opencode-lite？');
   expect(backend!.writes).toEqual([]);
 });
 

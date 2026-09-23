@@ -56,10 +56,12 @@ test('提供方并发探针独立绑定；保存后旧请求迟到也不能覆�
   expect(document.querySelectorAll('[aria-live="polite"] .success')).toHaveLength(2); expect(page.text()).not.toContain('配置已更改');
 });
 
-test('提供方目录错误重试恢复；已完成诊断在配置更新后标为过期', async () => {
+test('提供方目录读取失败后自动重读恢复；已完成诊断在配置更新后标为过期', async () => {
   adminAuthenticationFixture(); const base = globalThis.fetch; let fail = true;
   globalThis.fetch = (async (input, init) => fail && String(input).endsWith('/providers') ? Response.json({ error: 'unavailable', message: '目录暂不可用' }, { status: 503 }) : base(input, init)) as typeof fetch;
-  page = await renderApp('/admin/authentication'); expect(page.text()).toContain('目录暂不可用'); fail = false; await page.click('重新加载');
+  page = await renderApp('/admin/authentication'); expect(page.text()).toContain('目录暂不可用');
+  // 没有「重新加载」按钮：失败的读取由 useApiQuery 自动重试（777f285），这里用 reread() 代替一次自动重读。
+  expect([...document.querySelectorAll('button')].some((node) => node.textContent === '重新加载')).toBe(false); fail = false; await page.reread();
   await page.click('测试连接'); await page.click('编辑'); await field('显示名', '新配置'); await page.click('保存修改');
   expect(page.text()).toContain('这份结果对应旧配置'); expect(document.querySelector('[aria-live="polite"] .success')).toBeNull();
 });

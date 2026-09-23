@@ -1,6 +1,7 @@
 import './domSetup';
 import { afterEach, expect, test } from 'bun:test';
 import { act } from 'react';
+import { dialogConfirmButton, openDialog, typeConfirmWord } from './confirmDialogDriver';
 import { renderApp } from './renderApp';
 
 const originalFetch = globalThis.fetch, projectId = '01a0bf5d-8f4b-7e1e-8dde-c9c2ae13ed34', serviceId = '01a0bf5d-8f4b-760b-86b6-0bb9f08a9eaa', ownerId = '01a0bf5d-8f4b-7ed2-8386-a4b2e1a36efb', memberId = '01a0bf5d-8f4b-7baf-8eed-680262285455';
@@ -121,16 +122,24 @@ test('普通开发者查看成员说明，不加载目录或显示成员写操�
   expect(f.calls.some((call) => call.url.pathname === '/v1/users')).toBe(false); expect(f.writes()).toHaveLength(0);
 });
 
-test('生命周期只给管理员既有归档操作，明确资源保留、异步效果、对象与取消，失败可重试', async () => {
+test('归档只给管理员：弹窗写清对象与后果，输入 archive 才能确认，失败可重试', async () => {
   const f = fixture(); page = await renderApp(`/projects/${projectId}/settings?tab=lifecycle`);
   expect(page.text()).toContain('只有管理员可以归档项目'); expect(page.text()).toContain('不会释放已有开发会话');
-  expect(page.text()).toContain('源码仓库、数据库与文件保留'); expect(page.text()).not.toContain('确认归档此项目');
+  expect(page.text()).toContain('源码仓库、数据库与文件保留'); expect(document.querySelectorAll('dialog').length).toBe(0);
   page.unmount(); f.state.admin = true; page = await renderApp(`/projects/${projectId}/settings?tab=lifecycle`);
-  await page.click('归档项目'); expect(page.text()).toContain('归档演示应用（demo）'); expect(f.writes()).toHaveLength(0);
-  await page.click('取消'); expect(f.writes()).toHaveLength(0);
-  f.state.failWrite = true; await page.click('归档项目'); await page.click('确认归档此项目'); expect(page.text()).toContain('归档失败');
-  f.state.failWrite = false; await page.click('归档项目'); await page.click('确认归档此项目');
-  expect(f.writes().at(-1)?.url.pathname).toBe(`/v1/projects/${projectId}/archive`); expect(f.writes().at(-1)?.method).toBe('POST');
+  await page.click('归档项目'); const dialog = openDialog();
+  expect(dialog.textContent).toContain('归档「演示应用」（demo）？'); expect(dialog.textContent).toContain('正式版本与待验证版本的地址都将无法访问');
+  expect(dialog.textContent).toContain('当前没有恢复归档的入口'); expect(dialog.textContent).toContain('输入 archive 以确认');
+  // 中文「归档」不算：确认词一律是英文。
+  await typeConfirmWord('归档'); expect(dialogConfirmButton().disabled).toBe(true);
+  await page.click('取消'); expect(document.querySelectorAll('dialog').length).toBe(0); expect(f.writes()).toHaveLength(0);
+  f.state.failWrite = true; await page.click('归档项目'); await typeConfirmWord('archive'); await page.click('确认归档');
+  expect(document.querySelectorAll('dialog').length).toBe(0); expect(page.text()).toContain('归档失败'); expect(f.writes()).toHaveLength(1);
+  // 重新打开时清掉上次的失败，输入框也是空的。
+  f.state.failWrite = false; await page.click('归档项目'); expect(page.text()).not.toContain('归档失败'); expect(dialogConfirmButton().disabled).toBe(true);
+  await typeConfirmWord(' ARCHIVE '); await page.click('确认归档');
+  expect(f.writes()).toHaveLength(2); expect(f.writes().at(-1)?.url.pathname).toBe(`/v1/projects/${projectId}/archive`); expect(f.writes().at(-1)?.method).toBe('POST');
+  expect(document.querySelectorAll('dialog').length).toBe(0);
   expect(page.text()).toContain('服务器已返回项目状态：已归档'); expect(page.text()).toContain('不表示容器或数据已删除');
 });
 

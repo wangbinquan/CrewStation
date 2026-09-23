@@ -1,6 +1,7 @@
 import './domSetup';
 import { afterEach, expect, test } from 'bun:test';
 import { act } from 'react';
+import { dialogConfirmButton, openDialog, typeConfirmWord } from './confirmDialogDriver';
 import { renderApp } from './renderApp';
 import { browserHistoryFixture } from './browserHistoryFixture';
 
@@ -106,6 +107,23 @@ test('填入普通键保留可读值，密钥不预填；两组失败草稿各�
   expect(f.writes.at(-1)?.path).toBe(`/v1/projects/${projectId}/config/production`);
   await click('开发'); expect(visible<HTMLInputElement>('input[placeholder="写入后生效于下一次注入"]').value).toBe('开发草稿');
   await page.click('生产'); expect(visible<HTMLInputElement>('input[placeholder="写入后生效于下一次注入"]').value).toBe('生产草稿');
+});
+
+test('删除配置项走弹窗：写清对象与后果，Secret 另有提示，输入 delete 才发出 DELETE', async () => {
+  const f = fixture(); page = await renderApp(`/projects/${projectId}/settings?tab=config`);
+  const deleteIn = (name: string) => [...document.querySelectorAll<HTMLTableRowElement>('tr')].find((row) => !row.closest('[hidden]') && row.querySelector('td span')?.textContent === name)!
+    .querySelectorAll('button')[1]!;
+  await act(async () => { deleteIn('API_TOKEN').click(); }); await page.settle();
+  expect(openDialog().textContent).toContain('删除配置项「API_TOKEN」（API_TOKEN）？'); expect(openDialog().textContent).toContain('删除后只能重新写入');
+  await typeConfirmWord('delet'); expect(dialogConfirmButton().disabled).toBe(true);
+  await click('取消'); expect(document.querySelectorAll('dialog').length).toBe(0); expect(f.writes).toHaveLength(0);
+  await act(async () => { deleteIn('GREETING').click(); }); await page.settle();
+  expect(openDialog().textContent).toContain('删除配置项「GREETING」（GREETING）？'); expect(openDialog().textContent).not.toContain('删除后只能重新写入');
+  expect(openDialog().textContent).toContain('删除后不能恢复');
+  await typeConfirmWord('delete'); await click('确认删除');
+  expect(document.querySelectorAll('dialog').length).toBe(0);
+  expect(f.writes).toEqual([{ path: `/v1/projects/${projectId}/config/development/01a0bf5d-8f4b-741b-855a-427597babed5`, method: 'DELETE', body: undefined }]);
+  expect(page.text()).toContain('已删除 开发 的 GREETING。');
 });
 
 test('保存进行中防止清空、切编辑项、重复保存与删除；暂时读取失败保留输入且可恢复', async () => {

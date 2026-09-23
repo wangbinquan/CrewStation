@@ -8,7 +8,7 @@ import { ActionRow } from '../../../../shared/ui/ActionRow';
 import { Badge } from '../../../../shared/ui/Badge';
 import { Button } from '../../../../shared/ui/Button';
 import { Card } from '../../../../shared/ui/Card';
-import { InlineConfirm } from '../../../../shared/ui/InlineConfirm';
+import { ConfirmDialog } from '../../../../shared/ui/dialog/ConfirmDialog';
 import { QueryStatus } from '../../../../shared/ui/QueryStatus';
 import { MutationError } from '../MutationError';
 import { useProviderProbe, providerVersion } from '../../hooks/useProviderProbe';
@@ -17,7 +17,7 @@ import { ProviderProbePanel } from './provider/ProviderProbePanel';
 import styles from './IdentityAdmin.module.css';
 
 export function ProvidersCard() {
-  const t = useT(), [editing, setEditing] = useState<OidcProviderDto | 'new'>();
+  const t = useT(), [editing, setEditing] = useState<OidcProviderDto | 'new'>(), [removing, setRemoving] = useState(false);
   const providers = useApiQuery(queryKeys.authProviders(), () => api.auth.listProviders());
   const probe = useProviderProbe(), openerId = useRef('');
   const close = () => { setEditing(undefined); requestAnimationFrame(() => document.getElementById(openerId.current)?.focus()); };
@@ -25,19 +25,24 @@ export function ProvidersCard() {
   const create = useApiMutation((body: CreateOidcProviderRequest) => api.auth.createProvider(body), { invalidate, onSuccess: close });
   const patch = useApiMutation((input: { id: string; body: CreateOidcProviderRequest }) => api.auth.patchProvider(input.id, input.body), { invalidate, onSuccess: (provider) => { probe.invalidate(provider.id); close(); } });
   const remove = useApiMutation((id: string) => api.auth.removeProvider(id), { invalidate, onSuccess: close });
-  const begin = (provider: OidcProviderDto | 'new') => { create.reset(); patch.reset(); remove.reset(); openerId.current = provider === 'new' ? 'provider-new' : `provider-${provider.id}`; setEditing(provider); };
+  const begin = (provider: OidcProviderDto | 'new') => { create.reset(); patch.reset(); remove.reset(); setRemoving(false); openerId.current = provider === 'new' ? 'provider-new' : `provider-${provider.id}`; setEditing(provider); };
   if (editing) return <Card className={styles.container} stacked title={editing === 'new' ? t('admin.auth.providerNew') : editing.displayName} extra={<Badge>{editing === 'new' ? t('admin.identity.newProvider') : editing.slug}</Badge>}>
     <ProviderForm key={editing === 'new' ? 'new' : editing.id} initial={editing === 'new' ? undefined : editing} busy={create.isPending || patch.isPending || remove.isPending}
       error={create.error?.message ?? patch.error?.message} onCancel={close} onSubmit={(body) => editing === 'new' ? create.mutate(body) : patch.mutate({ id: editing.id, body })} />
     {editing !== 'new' ? <div className={styles.danger}><strong>{t('admin.identity.removeProvider')}</strong><p className={styles.muted}>{t('admin.auth.removeQuestion')}</p>
-      <InlineConfirm label={t('admin.identity.removeProvider')} question={t('admin.auth.removeQuestion')} busy={remove.isPending || patch.isPending} onConfirm={() => remove.mutate(editing.id)} />
+      <Button variant="danger" disabled={remove.isPending || patch.isPending} onClick={() => { remove.reset(); setRemoving(true); }}>{t('admin.identity.removeProvider')}</Button>
+      {/* 删除不可撤销：弹窗输入 delete 才能确认（2026-09-23 作者裁定）；请求结束后关闭，失败原因显示在下面。 */}
+      {removing ? <ConfirmDialog title={t('admin.identity.removeProvider')} question={t('admin.identity.removeProviderQuestion', { name: editing.displayName, slug: editing.slug })} confirmWord="delete"
+        confirmLabel={t('admin.identity.removeProviderConfirm')} busy={remove.isPending} busyLabel={t('admin.identity.removingProvider')} confirmDisabled={patch.isPending}
+        onConfirm={() => remove.mutate(editing.id, { onSettled: () => setRemoving(false) })} onCancel={() => setRemoving(false)}>
+        <p>{t('admin.auth.removeQuestion')}</p>
+      </ConfirmDialog> : null}
       <MutationError error={remove.error} messageKey="admin.auth.providerSaveError" />
     </div> : null}
   </Card>;
   const items = providers.data?.items ?? [];
   return <Card className={styles.container} stacked title={t('admin.auth.providersTitle')} extra={<Button id="provider-new" variant="primary" onClick={() => begin('new')}>{t('admin.auth.providerNew')}</Button>} footer={t('admin.auth.providersHint')}>
     <QueryStatus isPending={providers.isPending} error={providers.error} isEmpty={!items.length} emptyTitle={t('admin.auth.providersEmptyTitle')} emptyDescription={t('admin.auth.providersEmptyDescription')} />
-    {providers.error ? <Button onClick={() => void providers.refetch()}>{t('admin.identity.retry')}</Button> : null}
     <div>{items.map((provider) => {
       const current = probe.probes[provider.id], stale = current !== undefined && current.version !== providerVersion(provider);
       return <div className={styles.providerRow} key={provider.id}>
