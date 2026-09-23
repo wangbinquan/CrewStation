@@ -4,6 +4,23 @@ import { inspectWorkspace } from './workspaceStatus';
 import type { DevSessionUseCaseDeps } from './dependencies';
 import type { EnvironmentView } from '../ports/runtime';
 
+/** 读会话时顺带取预览状态的最长等待。 */
+export const PREVIEW_PEEK_MS = 1_000;
+
+/**
+ * 读会话只顺带一个预览状态，最多等 PREVIEW_PEEK_MS：cs-session 或 Runner 卡住时，每次读都会等满命令超时（约 10 秒），
+ * 开发页停在「正在读取会话」、网关偶尔回 502（2026-09-23 实机）。等不到按读不到处理；准确状态由预览接口给出。
+ */
+async function peekPreview(runner: DevSessionUseCaseDeps['runner'], env: EnvironmentView): Promise<PreviewState> {
+  if (!env.connected) return 'stopped';
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<undefined>((resolve) => { timer = setTimeout(() => resolve(undefined), PREVIEW_PEEK_MS); });
+  try {
+    const reply = await Promise.race([runner.sendCommand(env.id, { id: `p-${Date.now()}`, type: 'previewStatus' }), deadline]) as { state: PreviewState } | undefined;
+    return reply?.state ?? 'stopped';
+  } catch { return 'stopped'; } finally { clearTimeout(timer); }
+}
+
 /** 一项目一会话（D46）：开会话选分支，容器就绪后 TaskRunner 按 Manifest 自动起预览；释放即回收。 */
 export function sessionLifecycleUseCases(deps: DevSessionUseCaseDeps) {
   const { environments, runner, scm, releases, authorizer, services, settings, clock } = deps;
@@ -18,10 +35,7 @@ export function sessionLifecycleUseCases(deps: DevSessionUseCaseDeps) {
     ...(env.startup ? { startup: { ...env.startup, observedAt: clock.now().toISOString() } } : {}),
   });
 
-  const previewOf = async (env: EnvironmentView): Promise<PreviewState> => {
-    if (!env.connected) return 'stopped';
-    try { return ((await runner.sendCommand(env.id, { id: `p-${Date.now()}`, type: 'previewStatus' })) as { state: PreviewState }).state; } catch { return 'stopped'; }
-  };
+  const previewOf = (env: EnvironmentView): Promise<PreviewState> => peekPreview(runner, env);
 
   /** 解析 Manifest；失败不抛，把原因带出去由调用方决定要不要当成失败。 */
   const readManifest = (text: string | undefined): { manifest?: Manifest; problem?: string } => {

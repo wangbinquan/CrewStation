@@ -8,6 +8,7 @@ import { createTestDatabase, testDatabaseAvailable } from '@crewstation/testkit'
 import type { EnvironmentView } from '../ports/runtime';
 import type { DevSessionModule } from '../wiring';
 import { createDevSessionModule, devSessionMigrations } from '../wiring';
+import { PREVIEW_PEEK_MS } from '../application/sessionLifecycle';
 import { readyWorkspace } from './workspaceFixture';
 import type { FakeProfile } from './computeFixture';
 import { fakeComputeCatalog } from './computeFixture';
@@ -28,6 +29,8 @@ let agentEvents: Array<{ seq: number; at: string; event: RunnerEvent }> | undefi
 const notices: string[] = [];
 const issued: Array<{ taskId: TaskId; projectId: ProjectId; serviceId: ServiceId; userId: UserId }> = [];
 let dirty = '';
+/** 模拟 Runner 收到预览查询却一直不回（cs-session 卡住）。 */
+let previewHangs = false;
 const published: unknown[] = [];
 const manifest = 'apiVersion: crewstation/v2\nkind: DigitalWorker\nspec:\n  service: { command: [bun, run, src/main.ts], port: 3000, healthPath: /healthz, servicePlanId: 01a0bf5d-8f4b-7000-9e4b-b54e91ee9d10 }\n  development: { command: [bun, run, --watch, src/main.ts], port: 3000 }\n';
 /** RFC-001 之前的写法：老仓库里还有一大堆。 */
@@ -65,7 +68,7 @@ beforeAll(async () => {
         if (command.type === 'workspaceStatus') return { ...readyWorkspace(), uncommittedCount: dirty ? 2 : 0, uncommitted: dirty ? [{ path: 'src/main.ts', status: '.M', index: '.', worktree: 'M' }, { path: 'new.ts', status: 'untracked', index: '?', worktree: '?' }] : [], unpushed: { status: 'ready', commits: [{ sha: 'abc123', subject: 'wip' }], count: 1, truncated: false } };
         if (command.type === 'exec' && command.command[0] === 'sh') return { execId: command.execId, exitCode: 0, stdout: '', stderr: '', durationMs: 1, truncated: false };
         if (command.type === 'exec') return { exitCode: 0, stdout: 'abc123 wip', stderr: '' };
-        if (command.type === 'previewStatus') return { state: 'ready', port: 3000, restarts: 0 };
+        if (command.type === 'previewStatus') return previewHangs ? new Promise(() => {}) : { state: 'ready', port: 3000, restarts: 0 };
         return {};
       },
       listEvents: async () => agentEvents ?? [
@@ -205,6 +208,16 @@ describe.skipIf(!available)('dev-session module', () => {
     expect(envs.get(first.taskId)?.state).toBe('failed');
     expect((await dev.api.getSession(developer, projectId))?.taskId).toBe(second.taskId);
     envs.clear();
+  });
+
+  test('Runner 不回预览查询时读会话照常返回，预览按读不到处理，不等满命令超时', async () => {
+    const session = await dev.api.openSession(developer, projectId, { branch: 'main' });
+    previewHangs = true;
+    try {
+      const started = performance.now();
+      expect(await dev.api.getSession(developer, projectId)).toMatchObject({ taskId: session.taskId, state: 'running', preview: 'stopped' });
+      expect(performance.now() - started).toBeLessThan(PREVIEW_PEEK_MS + 500);
+    } finally { previewHangs = false; envs.clear(); }
   });
 
   test('历史 OpenCode 等待下一轮时显示待输入，继续对话保留同一身份且不提前结束', async () => {
