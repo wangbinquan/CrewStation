@@ -45,9 +45,9 @@ describe('紧凑原生工作台', () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(f.saves.at(-1)).toMatchObject({ layout: { view: 'cli' } }); expect((f.saves.at(-1) as { layout: { tool?: unknown } }).layout.tool).toBeUndefined();
   });
-  test('没有 CLI 时 CLI 区中间也有「＋ 创建开发Agent会话」，与页头是同一个动作；只打开页面不写个人布局', async () => {
+  test('没有 CLI 时 CLI 区中间也有「创建开发Agent会话」，与页头是同一个动作；只打开页面不写个人布局', async () => {
     const f = setup(); page = await renderElement(element(), messages);
-    const buttons = [...page.host.querySelectorAll<HTMLButtonElement>('button')].filter((node) => node.textContent === '＋ 创建开发Agent会话');
+    const buttons = [...page.host.querySelectorAll<HTMLButtonElement>('button')].filter((node) => node.textContent === '创建开发Agent会话');
     expect(buttons).toHaveLength(2);
     await act(async () => buttons[1]!.click()); await page.settle();
     expect(f.starts).toHaveLength(1); expect(page.text()).toContain('演示档位不支持原生 CLI');
@@ -56,16 +56,16 @@ describe('紧凑原生工作台', () => {
   });
   test('双击只提交一次；明确拒绝后可以改算力档位恢复', async () => {
     const f = setup(); page = await renderElement(element(), messages);
-    const add = page.button('＋ 创建开发Agent会话');
+    const add = page.button('创建开发Agent会话');
     await act(async () => { add.click(); add.click(); }); await page.settle();
     expect(f.starts).toHaveLength(1); expect(f.starts[0]?.clientRequestId).toBeString();
     expect(page.text()).toContain('演示档位不支持原生 CLI');
     expect(page.host.querySelector<HTMLSelectElement>('select[aria-label="算力档位"]')?.disabled).toBe(false);
-    expect(page.button('＋ 创建开发Agent会话').disabled).toBe(false);
+    expect(page.button('创建开发Agent会话').disabled).toBe(false);
   });
   test('未确认的请求保留原 UUID 和配置，重试不变成第二次启动', async () => {
     const f = setup(503); page = await renderElement(element(), messages);
-    await page.click('＋ 创建开发Agent会话');
+    await page.click('创建开发Agent会话');
     expect(page.text()).toContain('核对并重试原请求');
     await page.click('核对并重试原请求');
     expect(f.starts).toHaveLength(2); expect(f.starts[1]).toEqual(f.starts[0]);

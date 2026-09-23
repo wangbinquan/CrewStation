@@ -1,7 +1,8 @@
 import { createLink } from '@tanstack/react-router';
+import { useContext } from 'react';
 import type { ComponentPropsWithRef, ReactElement } from 'react';
 import type { ButtonSize, ButtonVariant } from '../Button';
-import { buttonClassName } from '../Button';
+import { ButtonSizeContext, buttonClassName } from '../Button';
 
 interface ButtonAnchorProps extends ComponentPropsWithRef<'a'> {
   readonly variant?: ButtonVariant;
@@ -9,8 +10,9 @@ interface ButtonAnchorProps extends ComponentPropsWithRef<'a'> {
 }
 
 function ButtonAnchor({ variant, size, className, ...rest }: ButtonAnchorProps): ReactElement {
-  // data-button：让「按钮」这一类的局部密度规则（如开发页的 `.workspace button`）同样作用到按钮样式链接上。
-  return <a data-button="" className={buttonClassName(variant, size, className)} {...rest} />;
+  const area = useContext(ButtonSizeContext);
+  // data-button：与 Button 一样标明这是动作按钮；所在区域的缺省档位（ButtonSizeContext）同样作用到按钮样式链接上。
+  return <a data-button="" className={buttonClassName(variant, size ?? area, className)} {...rest} />;
 }
 
 /**

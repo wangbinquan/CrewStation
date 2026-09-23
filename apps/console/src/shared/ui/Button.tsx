@@ -1,3 +1,4 @@
+import { createContext, useContext } from 'react';
 import type { ComponentPropsWithRef, ReactElement } from 'react';
 import styles from './Button.module.css';
 
@@ -20,11 +21,19 @@ export interface ButtonProps extends ComponentPropsWithRef<'button'> {
   readonly size?: ButtonSize;
 }
 
+/**
+ * 一片区域里按钮的缺省档位。开发页整片是工具条密度：外层包 `ButtonSizeContext.Provider value="small"`，里面的按钮与
+ * 按钮样式链接不写 size 也是紧凑档——代替原来在页面样式里改写按钮的高度、内边距与字号（2026-09-23 裁定）。
+ */
+export const ButtonSizeContext = createContext<ButtonSize | undefined>(undefined);
+
 /** 按钮与按钮样式链接（`ButtonLink`）共用同一套外观。 */
 export function buttonClassName(variant: ButtonVariant = 'secondary', size?: ButtonSize, className?: string): string {
   return [styles.button, styles[variant], size ? styles[size] : undefined, className].filter(Boolean).join(' ');
 }
 
 export function Button({ variant = 'secondary', size, type = 'button', className, ...rest }: ButtonProps): ReactElement {
-  return <button type={type} className={buttonClassName(variant, size, className)} {...rest} />;
+  const area = useContext(ButtonSizeContext);
+  // data-button：页面样式据此区分动作按钮与页签、树节点这类原生按钮（后者可以有自己的密度，动作按钮的尺寸只在这里定）。
+  return <button type={type} data-button="" className={buttonClassName(variant, size ?? area, className)} {...rest} />;
 }

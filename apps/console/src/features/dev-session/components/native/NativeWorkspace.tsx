@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef } from 'react';
 import type { ReactElement, ReactNode } from 'react';
 import type { NativeTerminalDto, WorkspaceToolName } from '@crewstation/contracts';
-import { errorMessage } from '../../../../shared/api/useApi';
+import { errorMessage, retryableReadError } from '../../../../shared/api/useApi';
 import type { Translate } from '../../../../shared/lib/useT';
 import { useT } from '../../../../shared/lib/useT';
-import { Button } from '../../../../shared/ui/Button';
+import { Button, ButtonSizeContext } from '../../../../shared/ui/Button';
 import { useWorkspaceLayout } from '../../hooks/layout/useWorkspaceLayout';
 import { useToolPanel } from '../../hooks/layout/useToolPanel';
 import { useCliLauncher } from '../../hooks/native/useCliLauncher';
@@ -71,6 +71,8 @@ export function NativeWorkspace(props: NativeWorkspaceProps): ReactElement {
   return <>
     {props.header ? props.header(newCli) : <div className={styles.headerFallback}>{newCli}</div>}
     <NewCliNotice launcher={launcher} isAdmin={isAdmin} />
+    {/* 开发页整片是工具条密度：区域里的动作按钮一律紧凑档（2026-09-23 裁定），不再在样式里改写按钮尺寸。 */}
+    <ButtonSizeContext.Provider value="small">
     <section className={styles.workspace}>
       {state.phase === 'loading' ? <p role="status">{t('devSession.native.layoutLoading')}</p> : null}
       {targetError ? <p className={styles.error} role="status">{t(targetError)}</p> : null}
@@ -78,7 +80,7 @@ export function NativeWorkspace(props: NativeWorkspaceProps): ReactElement {
       {state.error ? <div className={styles.error} role="status">{state.error}<Button onClick={() => void (state.loaded ? store.reapply() : store.load())}>{t('devSession.native.reapply')}</Button>{state.loaded ? <Button onClick={() => void store.useRemote()}>{t('devSession.native.useRemote')}</Button> : null}</div> : null}
       <div className={styles.stage} ref={stage} data-panel={panel.mode} style={{ gridTemplateColumns: columns }}>
         <div className={styles.main} hidden={panel.mode === 'full'}>
-          {native.query.error || native.start.error || native.stop.error ? <p className={styles.error} role="status">{errorMessage(native.query.error ?? native.start.error ?? native.stop.error)}{native.query.error ? <Button onClick={() => void native.query.refetch()}>{t('devSession.connection.check')}</Button> : null}</p> : null}
+          {native.query.error || native.start.error || native.stop.error ? <p className={styles.error} role="status">{errorMessage(native.query.error ?? native.start.error ?? native.stop.error)}{native.query.error && retryableReadError(native.query.error) ? ` ${t('ui.status.autoRetry')}` : null}</p> : null}
           <div className={styles.terminals} role="region" aria-label={t('devSession.native.area')}>
             {props.startup ? <div className={styles.sessionStartup}>{props.startup}</div> : <CliDock projectId={projectId} layout={layout} store={store} roster={roster} native={native} launcher={launcher} channel={channel} stream={stream} activity={task}
               canDevelop={canDevelop} viewerId={userId} onActivity={onActivity} blockedReason={blockedReason} onDismiss={dismiss} onRetry={retry}
@@ -93,6 +95,7 @@ export function NativeWorkspace(props: NativeWorkspaceProps): ReactElement {
         <span>{props.editorDirty ? t('devSession.editor.draftLifetime') : t('devSession.native.sharedHint')}</span><span>{state.phase === 'saving' || state.dirty && !state.error ? t('devSession.native.savingLayout') : state.loaded && !state.error && state.revision > 0 ? t('devSession.native.personalLayout') : ''}</span>
       </footer>
     </section>
+    </ButtonSizeContext.Provider>
   </>;
 }
 

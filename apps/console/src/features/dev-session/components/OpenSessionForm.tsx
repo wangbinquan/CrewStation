@@ -3,7 +3,7 @@ import type { UseMutationResult } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 import type { ReactElement } from 'react';
 import type { ApiClientError } from '../../../shared/api/useApi';
-import { errorMessage } from '../../../shared/api/useApi';
+import { errorMessage, retryableReadError } from '../../../shared/api/useApi';
 import { useT } from '../../../shared/lib/useT';
 import { Button } from '../../../shared/ui/Button';
 import { ConfirmationPanel } from '../../../shared/ui/ConfirmationPanel';
@@ -45,8 +45,7 @@ export function OpenSessionForm({ branches, open, previousTaskId }: OpenSessionF
         hint={t('devSession.failed.newWorkspace')} confirmLabel={t('devSession.failed.confirm')} cancelLabel={t('devSession.failed.cancel')}
         busy={open.isPending} confirmDisabled={branches.loadError !== null || branches.isPending}
         onConfirm={() => { open.mutate(confirmedBranch); setConfirmedBranch(undefined); }} onCancel={() => setConfirmedBranch(undefined)} /></div> : null}
-      {branches.loadError !== null ? <PaneNotice tone="warning">{errorMessage(branches.loadError)}</PaneNotice> : null}
-      {branches.loadError && branches.refresh ? <Button onClick={() => void branches.refresh?.()}>{t('devSession.open.retryBranches')}</Button> : null}
+      {branches.loadError !== null ? <PaneNotice tone="warning">{errorMessage(branches.loadError)}{retryableReadError(branches.loadError) ? ` ${t('ui.status.autoRetry')}` : ''}</PaneNotice> : null}
       {!branches.isPending && !branches.loadError && branches.branches.length === 0 ? <PaneNotice tone="info">{t('devSession.open.noBranches')}</PaneNotice> : null}
       {open.error !== null ? <PaneNotice tone="warning">{errorMessage(open.error)}</PaneNotice> : null}
     </Pane>

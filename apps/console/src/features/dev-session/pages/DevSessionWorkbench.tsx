@@ -45,7 +45,7 @@ export interface DevSessionWorkbenchProps {
   readonly userId: string;
   readonly release: UseMutationResult<ReleaseDevSessionResult, ApiClientError, boolean>;
   readonly activityTarget?: ActivityTarget;
-  readonly isAdmin: boolean; readonly recovery: ReactNode; readonly refresh: () => Promise<unknown>; readonly refreshing: boolean;
+  readonly isAdmin: boolean; readonly recovery: ReactNode;
   /** 参考面板内容由 app 装配（目录、事件、平台接入分属其他 feature）。 */
   readonly reference?: ReactNode;
   /** 会话面板里内嵌的最近日志，由 app 装配（日志属于 logs feature）。 */
@@ -58,7 +58,7 @@ export interface DevSessionWorkbenchProps {
  * 有会话时的工作区：一条任务流供所有面板共用，外加发布与数据绑定。
  * 所有面板都只拿 channel，不各自开连接。
  */
-export function DevSessionWorkbench({ projectId, session, access, canDevelop, serviceId, userId, release, activityTarget, isAdmin, recovery, refresh, refreshing, reference, sessionLogs, onRestart }: DevSessionWorkbenchProps): ReactElement {
+export function DevSessionWorkbench({ projectId, session, access, canDevelop, serviceId, userId, release, activityTarget, isAdmin, recovery, reference, sessionLogs, onRestart }: DevSessionWorkbenchProps): ReactElement {
   const t = useT();
   const { space } = useProjectScope();
   const taskId = session.taskId;
@@ -75,7 +75,7 @@ export function DevSessionWorkbench({ projectId, session, access, canDevelop, se
   const draftScope = [editor.dirty ? t('devSession.editor.draftScope', { path: editor.file?.path ?? '' }) : '', dataDirty ? t('devSession.data.title') : ''].filter(Boolean).join(' / ');
   const health = sessionConnection(session, state);
   const logs = <ButtonLink size="small" to={PROJECT_PATHS[space].operations} params={{ projectId }} search={{ tab: 'logs', source: 'dev-session', taskId }}>{t('devSession.preview.logs')}</ButtonLink>;
-  const diagnostics = { session, stream: state, refresh, refreshing, reconnect, logs };
+  const diagnostics = { session, stream: state, reconnect, logs };
   const previewLink = state.runnerConnected && preview.confirmed ? previewUrl(session.previewHost, preview.status.state) : undefined;
   return (
     <>

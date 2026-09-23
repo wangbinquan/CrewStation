@@ -22,6 +22,8 @@ export async function renderElement(element: ReactElement, messages: Messages) {
   return {
     host, text: () => host.textContent ?? '', button, settle,
     click: async (label: string) => { await act(async () => button(label).click()); await settle(); },
+    /** 模拟一次自动重读：正在用的查询在原位重读（页面没有刷新按钮，生产里由定时重读完成；与 renderApp 相同）。 */
+    reread: async () => { await act(async () => { await client.refetchQueries({ type: 'active' }); }); await settle(); },
     unmount: () => { act(() => root.unmount()); host.remove(); client.clear(); },
   };
 }

@@ -19,23 +19,21 @@ export function VersionComparisonPanel({ projectId, taskId, channel, canDevelop,
 }): ReactElement {
   const t = useT();
   const date = useDateText();
-  const { query, history, recheck, refreshing } = useVersionComparison(projectId, taskId, channel, target);
+  // 对照每 10 秒、回到前台与文件变更后自动重读，不给「重新检查」（2026-09-23 裁定）；「补齐历史并重算」是服务端重算，保留。
+  const { query, history } = useVersionComparison(projectId, taskId, channel, target);
   const [expanded, setExpanded] = useState(initiallyExpanded);
   const data = query.data;
   if (compact) return <section className={styles.strip} aria-label={t('devSession.compare.title')}>
     {data ? <ComparisonSummary comparison={data} compact /> : <QueryStatus isPending={query.isPending} error={query.error} />}
-    {onDetails ? <Button variant="ghost" onClick={onDetails}>{t('devSession.compare.viewDetails')}</Button> : null}
-    <Button variant="ghost" disabled={refreshing || history.isPending} onClick={() => void recheck()}>{t(refreshing ? 'devSession.compare.refreshing' : 'devSession.workspace.recheck')}</Button>
+    {onDetails ? <Button variant="ghost" size="small" onClick={onDetails}>{t('devSession.compare.viewDetails')}</Button> : null}
     {data && (query.isError || data.freshness === 'stale') ? <span title={`${date(data.checkedAt)} · ${t('devSession.compare.staleHint')}`}>{t('devSession.compare.staleShort')}</span> : null}
   </section>;
-  const busy = refreshing || history.isPending;
   // 变更页签直接铺满：操作钉在顶端，只有下面的内容滚动（2026-09-23，不再内嵌卡片）。
   return <section className={styles.panel} aria-label={t(target === 'preview' ? 'devSession.compare.previewTitle' : 'devSession.compare.title')}>
     <header className={styles.toolbar}>
       {onTargetChange ? <label className={styles.target}>{t('devSession.compare.target')}<select value={target} disabled={history.isPending} onChange={(e) => onTargetChange(e.target.value as ComparisonTarget)}>
         <option value="prod">{t('devSession.compare.production')}</option><option value="preview">{t('devSession.compare.preview')}</option></select></label> : null}
-      <Button size="small" disabled={busy} onClick={() => void recheck()}>{t(refreshing ? 'devSession.compare.refreshing' : 'devSession.workspace.recheck')}</Button>
-      <Button size="small" title={t('devSession.compare.historyHint')} onClick={() => history.mutate(undefined)} disabled={!canDevelop || busy || query.isFetching}>{t(history.isPending ? 'devSession.compare.historyPending' : 'devSession.compare.history')}</Button>
+      <Button size="small" title={t('devSession.compare.historyHint')} onClick={() => history.mutate(undefined)} disabled={!canDevelop || history.isPending}>{t(history.isPending ? 'devSession.compare.historyPending' : 'devSession.compare.history')}</Button>
       <Button size="small" onClick={() => setExpanded(!expanded)} aria-expanded={expanded}>{t(expanded ? 'devSession.compare.collapse' : 'devSession.compare.details')}</Button>
     </header>
     <div className={styles.body}>

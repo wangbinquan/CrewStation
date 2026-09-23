@@ -14,6 +14,8 @@ const requests: string[] = [];
 const historyTargets: unknown[] = [];
 let ui: Awaited<ReturnType<typeof renderElement>> | undefined;
 const channel: TaskStreamChannel = { send: async () => ({}), subscribe: () => () => {} };
+/** 回到前台：比较照常自动重读（每 10 秒的核验走同一路径）。页面没有「重新检查」按钮（2026-09-23 裁定）。 */
+async function refocus(page: { settle: () => Promise<void> }) { await act(async () => { focusManager.setFocused(false); focusManager.setFocused(true); }); await page.settle(); }
 const defaultFiles = [{ path: 'file.txt', status: 'M', additions: 1, deletions: 1, binary: false, untracked: false }];
 afterEach(() => { ui?.unmount(); ui = undefined; requests.length = 0; historyTargets.length = 0; globalThis.fetch = originalFetch; focusManager.setFocused(undefined); });
 /** RFC-020：四组改动是同一列表上的分组标题（可展开按钮），不再是页签；这里列出当前展开的组。 */
@@ -84,7 +86,7 @@ test('未提交列表解释暂存区与工作区，未跟踪和二进制不混�
 test('比较重查后保留正在阅读的文件，加载新快照的 Patch', async () => {
   const data = comparison(), page = await render(data);
   await page.click('查看差异'); await page.click('待上线提交'); await page.click('未提交改动'); await page.click('file.txt');
-  data.comparisonId = 'comparison-2'; await page.click('重新检查');
+  data.comparisonId = 'comparison-2'; await refocus(page);
   // 实机十秒重查曾因 comparisonId 作为 React key，强制退回第一组并关闭 Patch。
   expect(expanded()).toEqual(['未提交改动']);
   expect(page.text()).toContain('comparison-2');
@@ -97,7 +99,7 @@ test('新比较保留详情页签，但不能复用上一个快照的分页游�
   const page = await render(data, true, 'prod', undefined, false, details);
   await page.click('查看差异'); await page.click('待上线提交'); await page.click('相对生产的文件差异'); await page.click('下一页');
   expect(requests.at(-1)).toContain('cursor=old-cursor');
-  data.comparisonId = 'comparison-2'; delete details.nextCursor; await page.click('重新检查');
+  data.comparisonId = 'comparison-2'; delete details.nextCursor; await refocus(page);
   expect(expanded()).toEqual(['相对生产的文件差异']);
   expect(requests.at(-1)).toContain('version-comparisons/comparison-2?tab=files');
   expect(requests.at(-1)).not.toContain('cursor=');
@@ -110,7 +112,7 @@ test('正在看的文件从新比较中移除时，仍能返回文件列表', as
   globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => String(input).includes('comparison-2?') && new URL(String(input), 'http://localhost').searchParams.get('path') === 'file.txt'
     ? new Response(JSON.stringify({ error: 'not_found', message: '文件已不在差异中' }), { status: 404, headers: { 'content-type': 'application/json' } })
     : previousFetch(input, init)) as typeof fetch;
-  data.comparisonId = 'comparison-2'; await page.click('重新检查');
+  data.comparisonId = 'comparison-2'; await refocus(page);
   expect(page.text()).toContain('文件已不在差异中'); expect(page.text()).not.toContain('+new');
   await page.click('返回文件列表'); expect(page.text()).toContain('file.txt');
   expect(page.text()).not.toContain('文件已不在差异中');
@@ -158,7 +160,7 @@ test.each([false, true])('工作树故障传到提交和文件比较时只解释
   expect(page.text()).not.toContain('未提交文件 0'); expect(page.text()).not.toContain('待上线 0');
 });
 
-test('顶部比较条保留未知状态和可展开原因，能直接重试读取且不触发补历史', async () => {
+test('顶部比较条保留未知状态和可展开原因，自动重读且不触发补历史', async () => {
   const data = comparison(), reason = '开发容器正在重连';
   data.workspace = { status: 'unavailable', reason, checkedAt: data.checkedAt };
   data.commits = { status: 'unavailable', reason }; data.files = { status: 'unavailable', reason };
@@ -168,7 +170,7 @@ test('顶部比较条保留未知状态和可展开原因，能直接重试读�
   expect(details.open).toBe(false); expect(details.textContent).toContain(reason);
   await act(async () => details.querySelector('summary')!.click()); expect(details.open).toBe(true);
   const previous = requests.length;
-  Object.assign(data, comparison()); await page.click('重新检查');
+  expect(page.text()).not.toContain('重新检查'); Object.assign(data, comparison()); await refocus(page);
   expect(requests.length).toBe(previous + 1); expect(requests.every((request) => request.startsWith('GET'))).toBe(true);
   expect(page.text()).toContain('提交一致'); expect(page.text()).not.toContain(reason);
 });
@@ -225,13 +227,13 @@ test('例行重新核验在途不改结论：不弹「可能已过期」，读�
   expect(page.text()).not.toContain('旧结果可能已过期'); expect(page.text()).not.toContain('更新中');
   await act(async () => release()); await page.settle();
   expect(page.text()).not.toContain('旧结果可能已过期'); expect(page.text()).not.toContain('更新中');
-  // 用户自己点重新检查才进入更新中，读完恢复。
+  // 没有「重新检查」；例行核验在途时「补齐历史并重算」也不变灰（不用 isFetching 禁用入口）。
+  expect(page.text()).not.toContain('重新检查');
   let second!: () => void; const again = new Promise<void>((resolve) => { second = resolve; });
   globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
     if (!String(input).includes('version-comparisons/')) await again;
     return inner(input, init);
   }) as typeof fetch;
-  await act(async () => { page.button('重新检查').click(); }); await page.settle();
-  expect(page.text()).toContain('更新中');
-  await act(async () => second()); await page.settle(); expect(page.text()).not.toContain('更新中');
+  await refocus(page); expect(page.button('补齐历史并重算').disabled).toBe(false);
+  await act(async () => second()); await page.settle(); expect(page.button('补齐历史并重算').disabled).toBe(false);
 });

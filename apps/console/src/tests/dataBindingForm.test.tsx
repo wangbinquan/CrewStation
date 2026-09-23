@@ -60,8 +60,8 @@ test('申请准确绑定当前服务／任务，失败和读故障保留输入�
   await input(field('申请模式')!, 'production-change'); await input(field('有效时长')!, '1440'); await input(field('申请理由')!, '  修复数据  ');
   await page.click('提交申请'); expect(page.text()).toContain('数据服务暂不可用'); expect(field('申请理由')!.value).toBe('  修复数据  ');
   expect(f.requests[0]).toEqual({ path: `/v1/services/${serviceId}/tasks/${taskId}/data-bindings`, body: { mode: 'production-change', reason: '修复数据', ttlMinutes: 1440 } });
-  f.state.failRead = true; await page.click('刷新访问记录'); expect(page.text()).toContain('读取绑定失败'); expect(page.button('提交申请').disabled).toBe(true); expect(field('申请理由')!.value).toBe('  修复数据  ');
-  f.state.failRead = false; f.state.failWrite = false; await page.click('刷新访问记录'); await page.click('提交申请');
+  f.state.failRead = true; await page.reread(); expect(page.text()).toContain('读取绑定失败'); expect(page.button('提交申请').disabled).toBe(true); expect(field('申请理由')!.value).toBe('  修复数据  ');
+  f.state.failRead = false; f.state.failWrite = false; await page.reread(); await page.click('提交申请');
   expect(field('申请理由')!.value).toBe(''); expect(field('有效时长')!.value).toBe('1440'); expect(page.text()).toContain('已受理「生产数据读写」申请'); expect(page.text()).toContain('待批准');
   expect(page.text()).toContain('容器不会因批准自动加载新的连接'); expect(page.text()).not.toContain('应用已连接生产');
 });
@@ -70,7 +70,7 @@ test('空时长保持平台默认，开发模式不用生产期限；重复提�
   const f = setup([record('existing')]); let finish: () => void;
   f.state.hold = new Promise((resolve) => { finish = resolve; }); page = await renderElement(<Harness />, messages); await openDetails();
   const submit = page.button('提交申请'); await act(async () => { submit.click(); submit.click(); }); await page.settle();
-  expect(f.requests).toHaveLength(1); expect(f.requests[0]!.body).toEqual({ mode: 'diagnostic-readonly' }); expect(page.button('批准').disabled).toBe(true); expect(page.button('刷新访问记录').disabled).toBe(true);
+  expect(f.requests).toHaveLength(1); expect(f.requests[0]!.body).toEqual({ mode: 'diagnostic-readonly' }); expect(page.button('批准').disabled).toBe(true); expect(page.button('刷新访问记录')).toBeUndefined();
   await act(async () => finish!()); await page.settle();
   await input(field('有效时长')!, '5'); await input(field('申请模式')!, 'development'); expect(field('有效时长')).toBeUndefined(); expect(page.text()).toContain('不按生产访问的时长过期');
   await page.click('提交申请'); expect(f.requests.at(-1)!.body).toEqual({ mode: 'development' });
@@ -100,9 +100,9 @@ test('撤销具名对象，取消不写；只撤销目标绑定且保留另一�
 test('旧记录期限缺失不可盲批、后台状态变化不可沿用旧确认，读失败不冒充有效授权或空记录', async () => {
   const f = setup([record('old', { ttlMinutes: undefined })]); page = await renderElement(<Harness />, messages); await openDetails();
   expect(page.button('批准').disabled).toBe(true); expect(page.text()).toContain('申请时长未确认'); expect(page.button('拒绝').disabled).toBe(false);
-  f.state.items = [record('old')]; await page.click('刷新访问记录'); await page.click('批准'); await input(field('审批意见')!, '保留意见');
-  f.state.items = [record('old', { state: 'rejected' })]; await page.click('刷新访问记录'); expect(page.button('确认批准').disabled).toBe(true); expect(page.text()).toContain('记录状态已经改变');
-  f.state.failRead = true; await page.click('刷新访问记录'); expect(page.text()).toContain('访问状态未确认'); expect(page.text()).not.toContain('当前没有额外绑定记录'); expect(field('审批意见')!.value).toBe('保留意见');
+  f.state.items = [record('old')]; await page.reread(); await page.click('批准'); await input(field('审批意见')!, '保留意见');
+  f.state.items = [record('old', { state: 'rejected' })]; await page.reread(); expect(page.button('确认批准').disabled).toBe(true); expect(page.text()).toContain('记录状态已经改变');
+  f.state.failRead = true; await page.reread(); expect(page.text()).toContain('访问状态未确认'); expect(page.text()).not.toContain('当前没有额外绑定记录'); expect(field('审批意见')!.value).toBe('保留意见');
   expect(f.requests).toHaveLength(0);
 });
 

@@ -36,38 +36,39 @@ const summaries = () => [...page!.host.querySelectorAll<HTMLElement>('summary')]
 
 test('主键按记住的档位直接创建；展开菜单只换档位，没有权限可选，请求里也不带权限（D59）', async () => {
   const f = setup(); page = await renderElement(element(), messages);
-  const caret = summaries().find((node) => node.getAttribute('aria-label') === '选择算力档位')!;
+  // 2026-09-23 作者裁定拆成两个按钮：主按钮「创建开发Agent会话」＋描边按钮「选择算力档位」，没有 ＋ 与 ▾。
+  const caret = summaries().find((node) => node.textContent === '选择算力档位')!;
   expect(caret).toBeDefined(); await act(async () => caret.click()); await page.settle();
   const menu = caret.closest('details')!;
   expect(menu.querySelectorAll('select')).toHaveLength(1); expect(menu.querySelector('select[aria-label="算力档位"]')).not.toBeNull();
   for (const gone of ['权限', '只读', '可改文件', '完全权限', '控制 CLI 可以执行的操作']) expect(menu.textContent).not.toContain(gone);
-  await page.click('＋ 创建开发Agent会话');
+  await page.click('创建开发Agent会话');
   expect(f.starts).toHaveLength(1); expect(f.starts[0]).not.toHaveProperty('permission'); expect(page.text()).toContain('演示拒绝');
 });
 
-test('没有 CLI 与有 CLI 时，CLI 区都只有标签：没有工作区页签、布局菜单与工作区设置，展开的只有新开按钮的箭头', async () => {
+test('没有 CLI 与有 CLI 时，CLI 区都只有标签：没有工作区页签、布局菜单与工作区设置，能展开的只有「选择算力档位」', async () => {
   setup(); page = await renderElement(element(), messages);
-  expect(summaries().map((node) => node.getAttribute('aria-label'))).toEqual(['选择算力档位']);
+  expect(summaries().map((node) => node.textContent)).toEqual(['选择算力档位']);
   page.unmount(); page = undefined; await new Promise((resolve) => setTimeout(resolve, 0));
   const terminal = activityFixture().terminal, layout = initialWorkspaceLayout('工作区 1'); layout.tabs[0]!.paneOrder = [terminal.terminalId];
   setup({ layout, roster: [terminal] }); page = await renderElement(element(), messages);
-  expect(summaries().map((node) => node.getAttribute('aria-label'))).toEqual(['选择算力档位']);
+  expect(summaries().map((node) => node.textContent)).toEqual(['选择算力档位']);
   expect(page.host.querySelector(`[data-dock-tab="${terminal.terminalId}"]`)).not.toBeNull();
   for (const gone of ['＋ 工作区', '布局 ▾', '工作区设置', '收起窗口', '向前排列']) expect(page.text()).not.toContain(gone);
 });
 
-const startButton = () => [...page!.host.querySelectorAll<HTMLButtonElement>('button')].find((node) => node.textContent === '＋ 创建开发Agent会话')!;
-const startCaret = () => page!.host.querySelector<HTMLElement>('[aria-label="选择算力档位"]')!;
+const startButton = () => [...page!.host.querySelectorAll<HTMLButtonElement>('button')].find((node) => node.textContent === '创建开发Agent会话')!;
+const startCaret = () => [...page!.host.querySelectorAll<HTMLElement>('button, summary')].find((node) => node.textContent === '选择算力档位')!;
 
-test('环境还没就绪时主键与展开箭头一起置灰，箭头点不开', async () => {
-  // 2026-09-23 作者实机：判断开发环境的这段时间主键是灰的、右侧箭头却是亮的，要一起灰。
+test('环境还没就绪时两个按钮一起置灰，「选择算力档位」点不开', async () => {
+  // 2026-09-23 作者实机：判断开发环境的这段时间主键是灰的、右侧箭头却是亮的，要一起灰（拆成两个按钮后照旧）。
   setup(); page = await renderElement(element({ blockedReason: '正在检查开发环境' }), messages);
   expect(startButton().disabled).toBe(true);
   expect(startCaret().tagName).toBe('BUTTON'); expect((startCaret() as HTMLButtonElement).disabled).toBe(true);
   expect(page.host.querySelector('select[aria-label="算力档位"]')).toBeNull();
 });
 
-test('所选档位不可用时主键置灰，展开箭头仍可用：换档位要靠它', async () => {
+test('所选档位不可用时主按钮置灰，「选择算力档位」仍可用：换档位要靠它', async () => {
   setup({ profiles: [{ id: balanced, name: 'balanced', description: '标准', terminalOnly: false, isDefault: true, available: false }] });
   page = await renderElement(element(), messages);
   expect(startButton().disabled).toBe(true); expect(startCaret().tagName).toBe('SUMMARY');

@@ -97,7 +97,7 @@ test('已确认协议不兼容的运行中环境展示保卷恢复，确认完�
   check.reason = 'protocol_mismatch'; page = await renderApp(`/projects/${activityProjectId}/dev-session`);
   const banner = [...document.querySelectorAll('[role="alert"]')].find((node) => !node.closest('[hidden]') && node.textContent?.includes('开发环境需要更新'));
   expect(banner?.textContent).toContain('Runner 协议版本 1，平台要求 2');
-  expect([...document.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent === '＋ 创建开发Agent会话')?.disabled).toBe(true);
+  expect([...document.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent === '创建开发Agent会话')?.disabled).toBe(true);
   await page.click('恢复开发环境'); expect(page.search().view).toBe('session');
   expect(page.text()).not.toContain('从远端另建工作树'); await page.click('检查并恢复原工作树');
   expect(document.querySelector('[role="alertdialog"]')?.textContent).toContain('终止该容器内仍运行的进程');

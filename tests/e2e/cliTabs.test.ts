@@ -17,12 +17,14 @@ async function viewport(page: Page, width: number, height = 900) {
 const AREA = '[role="region"][aria-label="CLI 区"]';
 
 describe.skipIf(!devSession?.taskId)('开发页 CLI 标签组（Xshell 式）', () => {
-  test.each([1440, 1024])('%dpx：页头有「＋ 创建开发Agent会话」，CLI 区只有标签组且铺满，没有旧工具行，无横向溢出', async (width) => {
+  // 2026-09-23 作者裁定：「＋ 创建开发Agent会话 ▾」拆成主按钮「创建开发Agent会话」与描边按钮「选择算力档位」。
+  test.each([1440, 1024])('%dpx：页头有「创建开发Agent会话」与「选择算力档位」，CLI 区只有标签组且铺满，没有旧工具行，无横向溢出', async (width) => {
     const page = session!.admin, id = session!.project!.id;
     await viewport(page, width); await open(page, `/projects/${id}/dev-session?view=cli`);
     await page.waitUntil(`!!document.querySelector(${JSON.stringify(AREA)})`, 20_000);
     await page.waitUntil(`!/正在恢复个人布局/.test(document.querySelector('main')?.innerText ?? '')`, 20_000);
-    expect(await page.eval<string[]>(`[...document.querySelectorAll('main header button')].map((node) => node.textContent.trim())`)).toContain('＋ 创建开发Agent会话');
+    expect(await page.eval<string[]>(`[...document.querySelectorAll('main header button')].map((node) => node.textContent.trim())`)).toContain('创建开发Agent会话');
+    expect(await page.eval<string[]>(`[...document.querySelectorAll('main header summary, main header button')].map((node) => node.textContent.trim())`)).toContain('选择算力档位');
     const text = await page.eval<string>(`document.querySelector(${JSON.stringify(AREA)}).innerText`);
     for (const gone of ['＋ 工作区', '布局 ▾', '工作区设置', '收起窗口', '向前排列']) expect(text).not.toContain(gone);
     const shape = await page.eval<{ area: number[]; groups: number[][]; bars: number; tabs: number }>(`(() => {

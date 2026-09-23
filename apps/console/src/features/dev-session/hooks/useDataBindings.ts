@@ -19,7 +19,7 @@ export function useDataBindings(projectId: string, taskId: string, serviceId: st
     try { return await action(); } finally { lock.current = false; }
   };
   return {
-    bindings: query.data?.items ?? [], checkedAt: query.dataUpdatedAt, isPending: query.isPending, refreshing: query.isFetching, loadError: query.error, refresh: query.refetch,
+    bindings: query.data?.items ?? [], checkedAt: query.dataUpdatedAt, isPending: query.isPending, loadError: query.error,
     canRequest: Boolean(serviceId) && permissions.canDevelop, canManage: permissions.canManage, hasService: Boolean(serviceId),
     busy: request.isPending || decision.isPending || revoke.isPending, request, decision, revoke,
     requestAccess: (input: RequestTaskDataBindingInput) => run(Boolean(serviceId) && permissions.canDevelop, () => request.mutateAsync(input)),

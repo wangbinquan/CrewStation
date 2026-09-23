@@ -41,7 +41,8 @@ test('普通环境失联给出检查与日志，不获得重建入口；页面�
   expect(page.text()).toContain('页面已连接，但环境尚未响应');
   // 实机 session 服务更新后，旧成功回执不能混入新的环境失联提示。
   expect(document.querySelector('[role="alert"]')?.textContent).not.toContain('环境已连接');
-  await page.click('检查状态'); await page.click('查看会话与环境'); expect(page.search().view).toBe('session');
+  // 没有「检查状态」（2026-09-23 裁定）：会话每 10 秒自动重读。
+  expect([...document.querySelectorAll('button')].map((node) => node.textContent)).not.toContain('检查状态'); await page.click('查看会话与环境'); expect(page.search().view).toBe('session');
   expect(page.text()).not.toContain('检查并恢复原工作树');
   expect(f.writes.every((write) => write.path.endsWith('/workspace-layout'))).toBe(true);
   expect(editor.textContent).toBe('离线草稿'); expect(f.openStreams(activityTaskId)).toBe(1);
@@ -72,9 +73,10 @@ test.each([false, true])('档位读取失败有刷新及匹配身份的配置指
   expect(page.text()).toContain('算力目录暂不可读');
   expect(Boolean(document.querySelector('a[href="/admin/compute"]'))).toBe(isAdmin);
   if (!isAdmin) expect(page.text()).toContain('请联系管理员提供可用档位');
-  const create = () => [...document.querySelectorAll<HTMLButtonElement>('button')].find((node) => node.textContent === '＋ 创建开发Agent会话')!;
+  const create = () => [...document.querySelectorAll<HTMLButtonElement>('button')].find((node) => node.textContent === '创建开发Agent会话')!;
   expect(create().disabled).toBe(true);
-  available = true; await page.click('刷新档位');
+  // 没有「刷新档位」：档位目录读取失败自动重读，reread 模拟一次。
+  expect([...document.querySelectorAll('button')].map((node) => node.textContent)).not.toContain('刷新档位'); available = true; await page.reread();
   expect(create().disabled).toBe(false);
   expect(f.writes.every((write) => write.path.endsWith('/workspace-layout'))).toBe(true);
 });

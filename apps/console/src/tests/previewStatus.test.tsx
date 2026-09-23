@@ -97,7 +97,7 @@ test('畸形状态事件不能当作就绪，断线按钮与在途刷新不可�
   await act(async () => { for (const listener of f.listeners) listener({ kind: 'previewState', state: 'not-a-state', message: {} } as unknown as RunnerEvent, 2); });
   expect(h.current().confirmed).toBe(false); expect(page!.host.querySelectorAll('iframe')).toHaveLength(0); expect(page!.text()).toContain('预览状态事件无效');
   await h.change(1, false); await act(async () => { h.current().run('restart'); h.current().refresh(); }); expect(f.calls).toHaveLength(2);
-  expect(page!.button('刷新').disabled).toBe(true); expect(page!.button('重启').disabled).toBe(true);
+  expect(page!.button('重新加载').disabled).toBe(true); expect(page!.button('重启').disabled).toBe(true);
 });
 
 test('StrictMode 中切换连接世代后旧查询不回写，动作在途换任务不跨对象追加读取', async () => {

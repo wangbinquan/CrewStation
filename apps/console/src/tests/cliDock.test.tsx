@@ -65,8 +65,8 @@ describe('CLI 标签组', () => {
     expect(tab(mine.terminalId).textContent).toContain('CLI 00mine'); expect(tab(mine.terminalId).getAttribute('aria-selected')).toBe('true');
     expect(shown()).toEqual([mine.terminalId]);
     expect(page.host.querySelector('button[aria-label="＋ 工作区"]')).toBeNull();
-    expect([...page.host.querySelectorAll('summary')].map((node) => node.getAttribute('aria-label') ?? node.textContent)).toEqual(['选择算力档位']);
-    expect(page.button('＋ 创建开发Agent会话')).toBeDefined();
+    expect([...page.host.querySelectorAll('summary')].map((node) => node.textContent)).toEqual(['选择算力档位']);
+    expect(page.button('创建开发Agent会话')).toBeDefined();
   });
 
   test('点标签切换显示；已结束的点 × 直接关掉；自己在运行的先确认，确认后结束进程并关掉，名册没跟上也不放回', async () => {
@@ -146,9 +146,9 @@ describe('菜单、放大、分隔线、改名与新开', () => {
     expect(f.saves.at(-1)?.terminalNames).toEqual([{ terminalId: mine.terminalId, name: '前端排错' }]);
   });
 
-  test('页头「＋ 创建开发Agent会话」新开的 CLI 落在焦点组、成为当前标签', async () => {
+  test('页头「创建开发Agent会话」新开的 CLI 落在焦点组、成为当前标签', async () => {
     const fresh = cli('fresh'), f = setup({ start: fresh }); page = await renderElement(element(), messages);
-    await page.click('＋ 创建开发Agent会话');
+    await page.click('创建开发Agent会话');
     expect(f.starts).toHaveLength(1); expect(groups()).toEqual([[mine.terminalId, ended.terminalId, other.terminalId, fresh.terminalId]]);
     expect(tab(fresh.terminalId).getAttribute('aria-selected')).toBe('true'); expect(shown()).toEqual([fresh.terminalId]);
   });

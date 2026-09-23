@@ -6,7 +6,9 @@
 .main [role="tab"] { padding: 5px 10px; }
 .main [role="tabpanel"] { padding-top: 4px; }
 .controlLine, .footer { display: flex; align-items: center; gap: 6px; min-width: 0; }
-.workspace button, .workspace a[data-button] { min-height: 28px; padding: 3px 8px; font-size: 12px; }
+/* 动作按钮（Button／ButtonLink，带 data-button）由 ButtonSizeContext 给紧凑档，尺寸只在 Button 样式里定（2026-09-23 裁定）；
+   这里只给页签、树节点、分组开关这类原生按钮定开发页密度。 */
+.workspace button:not([data-button]) { min-height: 28px; padding: 3px 8px; font-size: 12px; }
 /* 主区（CLI 区）＋分隔线＋工具面板三列；列宽由内联样式按面板形态给出，子项固定列位，隐藏任何一项都不会错列。 */
 .stage { display: grid; grid-template-rows: minmax(0, 1fr); flex: 1 1 0; min-height: 360px; min-width: 0; }
 .main { grid-column: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
@@ -29,7 +31,8 @@
 .waiting { color: var(--cs-tone-warning-fg); }
 .compute { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .controlLine { flex-shrink: 0; flex-wrap: wrap; padding: 0 8px; color: var(--cs-color-text-muted); font-size: 11px; background: var(--cs-color-surface-muted); }
-.controlLine button { padding: 0 4px; min-height: 22px; margin-left: auto; }
+/* 细信息条里的按钮靠右；高度用紧凑档（原先另定的 22px 去掉，2026-09-23 裁定只有两档）。 */
+.controlLine button { margin-left: auto; }
 /* 输入控制状态条（2026-09-23）：谁在输入一眼可辨——自己绿、可以点进来蓝、别人占着黄、只读灰；自己持有时整窗再加一圈绿框。 */
 .controlLine[data-control] { padding: 3px 8px; font-size: 12px; }
 .controlLine[data-control="mine"] { background: var(--cs-tone-success-bg); color: var(--cs-tone-success-fg); }
@@ -56,6 +59,13 @@
 /* 档位读不到或不可用时 CLI 区上方的一行：原因＋刷新档位／管理算力档位。 */
 .notice { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; margin: 0 0 6px; padding: 4px 8px; border-radius: var(--cs-radius-sm); background: var(--cs-tone-warning-bg); color: var(--cs-tone-warning-fg); font-size: 12px; overflow-wrap: anywhere; }
 .headerFallback { display: flex; justify-content: flex-end; margin-bottom: 4px; }
+/* 页头「创建开发Agent会话」＋「选择算力档位」：两个独立按钮，档位选择在描边按钮下方展开。 */
+.newCli { display: inline-flex; align-items: center; gap: 6px; }
+.chooser { position: relative; display: inline-flex; }
+.chooser > summary { list-style: none; }
+.chooser > summary::-webkit-details-marker { display: none; }
+.chooserBody { position: absolute; z-index: 8; right: 0; top: calc(100% + 4px); min-width: 240px; max-width: min(90vw, 360px); padding: 8px; display: flex; flex-direction: column; gap: 6px; background: var(--cs-color-surface); border: 1px solid var(--cs-color-border); border-radius: var(--cs-radius-sm); box-shadow: var(--cs-shadow-popover); }
+.chooserBody label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--cs-color-text-muted); }
 .footer { justify-content: space-between; flex-wrap: wrap; padding-top: 4px; font-size: 11px; color: var(--cs-color-text-muted); }
 .status { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; min-width: 0; flex: 1; }
 @media (max-width: 600px) {

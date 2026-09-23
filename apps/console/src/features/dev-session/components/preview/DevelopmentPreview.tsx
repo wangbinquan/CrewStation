@@ -21,7 +21,7 @@ export function DevelopmentPreview({ preview, previewHost, connected, logs }: { 
   return <section className={styles.preview} aria-busy={preview.busy} aria-label={t('devSession.native.developmentPreview')}>
     <header className={styles.toolbar}>
       <span title={t('devSession.native.previewHint')}><Badge tone={stateTone(known ? preview.status.state : undefined)}>{t(known ? `devSession.previewState.${preview.status.state}` : 'devSession.native.lifecycle.unknown')}</Badge></span>
-      <Button size="small" disabled={blocked} onClick={() => { setGeneration((value) => value + 1); preview.refresh(); }}>{t('devSession.preview.refresh')}</Button>
+      <Button size="small" disabled={blocked} onClick={() => { setGeneration((value) => value + 1); preview.refresh(); }}>{t('devSession.preview.reload')}</Button>
       <Button size="small" disabled={blocked} onClick={() => preview.run('restart')}>{t('devSession.preview.restart')}</Button>
       {running
         ? <Button size="small" disabled={blocked} onClick={() => preview.run('stop')}>{t('devSession.preview.stop')}</Button>

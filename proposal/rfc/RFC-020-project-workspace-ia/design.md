@@ -74,6 +74,8 @@
 - `PageRefresh` 接收本页主要 query 的 `dataUpdatedAt` 与一个 `refetchAll`，显示「读取于 hh:mm」与图标按钮；卡片内不再放刷新按钮。轮询周期沿用现有 `usePolledRefresh`／`useManualRefresh` 与 `keepPrevious`，不新增轮询。
 - 页面主体宽度沿用 2026-09-22 裁定（无 1200px 上限）。
 
+> **2026-09-23 修订（作者裁定，直接修改，不另立 RFC；按钮统一）。** 页面不再提供刷新按钮：`PageRefresh`（「读取于 hh:mm ↻」）与各处「刷新／重新读取」按钮一并删除。页面数据每 30 秒在原位静默重读、回到前台补读一次，读取失败（网络中断、5xx）每 15 秒自动再读；`usePolledRefresh` 删除，`useManualRefresh` 只留给保存后的显式重读。规则全文见 RFC-003 design §6 同日修订。
+
 ## 4. 概览
 
 数据全部来自现有 `ProjectSummaryDetail`（slots、health、development、releases、switches）与两个已有查询：仓库（`api.services.repository`）、版本比较摘要（当前会话存在时，`api.devSession.compare` 的紧凑结果）。

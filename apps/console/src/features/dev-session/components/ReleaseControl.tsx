@@ -59,6 +59,7 @@ export function ReleaseControl({ projectId, taskId, access, release, unsavedFile
     return (
       <>
       <ConfirmationPanel
+        danger
         question={question}
         hint={t('devSession.release.hint')}
         confirmLabel={t('devSession.release.submit')}
@@ -91,7 +92,8 @@ export function ReleaseControl({ projectId, taskId, access, release, unsavedFile
   }
   return (
     <div className={styles.control}>
-      <Button onClick={() => { setAsking(true); inspect(); }} disabled={release.isPending}>
+      {/* 释放会话收回容器与工作卷，是危险动作：红字红框，最终确认红底（2026-09-23 裁定）；尺寸由开发页的紧凑区域给出。 */}
+      <Button variant="danger" onClick={() => { setAsking(true); inspect(); }} disabled={release.isPending}>
         {release.isPending ? t('devSession.release.pending') : t('devSession.release.action')}
       </Button>
       {release.error !== null ? <PaneNotice tone="warning">{errorMessage(release.error)}</PaneNotice> : null}

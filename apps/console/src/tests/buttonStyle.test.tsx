@@ -1,6 +1,7 @@
 import './domSetup';
 import { afterEach, expect, test } from 'bun:test';
-import { Button } from '../shared/ui/Button';
+import { Button, ButtonSizeContext } from '../shared/ui/Button';
+import { ExternalButtonLink } from '../shared/ui/navigation/ButtonLink';
 import { consoleStyles, sourceAt } from './sourceScan';
 import { renderElement } from './renderElement';
 
@@ -42,4 +43,20 @@ test('危险动作：触发按钮红字红框，最终确认红底白字；暗�
     expect(dark).toContain(name);
   }
   expect(light).toContain('--cs-color-on-danger:');
+});
+
+// 开发页整片是工具条密度：由区域缺省档位给出紧凑档，页面样式不再改写按钮尺寸（2026-09-23 裁定）。
+test('区域缺省档位：区域里的按钮与按钮样式链接不写 size 也是紧凑档，区域外仍是标准档；都带 data-button', async () => {
+  rendered = await renderElement(<>
+    <Button>区域外</Button>
+    <ButtonSizeContext.Provider value="small">
+      <Button variant="primary">区域内</Button>
+      <ExternalButtonLink href="//preview.test">打开预览</ExternalButtonLink>
+    </ButtonSizeContext.Provider>
+  </>, {});
+  const [outside, inside] = [...rendered.host.querySelectorAll('button')], link = rendered.host.querySelector('a')!;
+  expect(outside!.className.split(' ')).toEqual(['button', 'secondary']);
+  expect(inside!.className.split(' ')).toEqual(['button', 'primary', 'small']);
+  expect(link.className.split(' ')).toEqual(['button', 'secondary', 'small']);
+  for (const node of [outside!, inside!, link]) expect(node.hasAttribute('data-button')).toBe(true);
 });

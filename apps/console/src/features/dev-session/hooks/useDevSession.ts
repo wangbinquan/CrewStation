@@ -4,7 +4,6 @@ import type { UseMutationResult } from '@tanstack/react-query';
 import { api } from '../../../shared/api/client';
 import { queryKeys } from '../../../shared/api/queryKeys';
 import { isApiClientError, useApiMutation, useApiQuery } from '../../../shared/api/useApi';
-import { useManualRefresh } from '../../../shared/lib/useManualRefresh';
 import { useT } from '../../../shared/lib/useT';
 import { progressPollMs, stampReceived } from '../../../shared/ui/progress/stageProgressView';
 import type { ApiClientError } from '../../../shared/api/useApi';
@@ -15,8 +14,6 @@ export interface DevSessionHandle {
   /** 没有会话不是错误：GET 返回 404 就是“还没开”。 */
   readonly missing: boolean;
   readonly loadError: ApiClientError | null;
-  readonly refresh: () => Promise<unknown>;
-  readonly refreshing: boolean;
   readonly open: UseMutationResult<DevSessionDto, ApiClientError, string>;
   readonly release: UseMutationResult<ReleaseDevSessionResult, ApiClientError, boolean>;
 }
@@ -36,8 +33,7 @@ export function useDevSession(projectId: string): DevSessionHandle {
     catch (error) { if (isApiClientError(error) && error.kind === 'not_found') return null; throw error; }
     // 开始开发或重建期间每秒读一次（RFC-022 B9）：Runner 连上之前没有推送，阶段靠读。
   }, { refetchIntervalMs: (data) => progressPollMs([data?.startup], 1_000, 10_000) });
-  // 每 10 秒的例行重取不改界面；refreshing 只表示用户自己点了刷新。
-  const { refresh, refreshing } = useManualRefresh(query.refetch);
+  // 每 10 秒的例行重取不改界面；页面没有「检查状态」按钮（2026-09-23 裁定：自动局部刷新，读取失败自动重试）。
   // 同一查询键也被目录面板的会话绑定订阅，它的取数函数把 404 当错误；已释放的会话也不算活着。三种情况都按“没有会话”处理，
   // 否则会同时渲染工作区与开会话表单。
   const absent = query.data === null || query.error?.kind === 'not_found' || query.data?.state === 'released';
@@ -49,7 +45,6 @@ export function useDevSession(projectId: string): DevSessionHandle {
     isPending: firstLoad,
     missing: absent,
     loadError: absent ? null : query.error,
-    refresh, refreshing,
     open: useApiMutation((branch: string) => api.devSession.open(projectId, { branch }), { invalidate: [key] }),
     release: useApiMutation((force: boolean) => api.devSession.release(projectId, { force, ...(query.data ? { expectedTaskId: query.data.taskId } : {}) }), { invalidate: [key] }),
   };

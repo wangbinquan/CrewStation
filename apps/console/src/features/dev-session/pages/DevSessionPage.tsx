@@ -2,9 +2,8 @@ import type { ReactElement, ReactNode } from 'react';
 import { useSearch } from '@tanstack/react-router';
 import { activityTargetFromSearch } from '../../../shared/activity/agentActivityView';
 import { useProjectScope } from '../../../shared/project/ProjectScope';
-import { errorMessage } from '../../../shared/api/useApi';
+import { errorMessage, retryableReadError } from '../../../shared/api/useApi';
 import { useT } from '../../../shared/lib/useT';
-import { Button } from '../../../shared/ui/Button';
 import { PageHeader } from '../../../shared/ui/PageHeader';
 import { OpenSessionForm } from '../components/OpenSessionForm';
 import { PaneNotice } from '../components/PaneNotice';
@@ -42,7 +41,7 @@ export function DevSessionPage({ reference, sessionLogs }: DevSessionPageProps =
     <>
       {!session.session ? <PageHeader title={t('devSession.title')} description={[t('devSession.line1'), t('devSession.line2')]} /> : null}
       {session.isPending ? <PaneNotice tone="muted">{t('devSession.loading')}</PaneNotice> : null}
-      {session.loadError !== null ? <PaneNotice tone="warning">{errorMessage(session.loadError)} <Button disabled={session.refreshing} onClick={() => void session.refresh()}>{t('devSession.connection.check')}</Button></PaneNotice> : null}
+      {session.loadError !== null ? <PaneNotice tone="warning">{errorMessage(session.loadError)}{retryableReadError(session.loadError) ? ` ${t('ui.status.autoRetry')}` : ''}</PaneNotice> : null}
       {activityTarget && session.missing ? <PaneNotice tone="warning">{t('activity.invalidTarget')}</PaneNotice> : null}
       {session.release.data !== undefined ? <ReleaseOutcome result={session.release.data} /> : null}
       {/* 开会话时 Manifest 有问题：会话照样开，但要把原因摆在这儿。轮询回来的会话对象不带它，所以取开会话那次的返回值。 */}
@@ -58,7 +57,7 @@ export function DevSessionPage({ reference, sessionLogs }: DevSessionPageProps =
           userId={context.userId}
           release={session.release}
           activityTarget={activityTarget}
-          isAdmin={context.isAdmin} refresh={session.refresh} refreshing={session.refreshing}
+          isAdmin={context.isAdmin}
           reference={reference} sessionLogs={sessionLogs}
           {...(context.canDevelop ? { onRestart: () => session.open.mutate(session.session!.branch) } : {})}
           recovery={context.canDevelop && (session.session.state === 'failed' || session.session.connectionIssue || session.session.rebuild) ? <RebuildSessionControl projectId={projectId} session={session.session}
