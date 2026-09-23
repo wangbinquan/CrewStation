@@ -10,6 +10,7 @@ import { ConfirmationDialog } from '../shared/ui/dialog/ConfirmationDialog';
 import { ButtonSizeContext } from '../shared/ui/Button';
 import { openDialog } from './confirmDialogDriver';
 import { renderElement } from './renderElement';
+import { consoleStyles, sourceAt } from './sourceScan';
 
 // 2026-09-23 作者裁定：页内展开的表单与确认一律改弹窗，公共底座是 shared/ui/dialog。
 // DOM 节点断言一律比较数量与布尔值：失败时 bun 序列化 happy-dom 节点会卡几十秒（dev-gotchas）。
@@ -284,4 +285,11 @@ test('紧凑档区域里打开的弹窗：操作条按钮仍是标准档', async
   const classes = (label: string) => [...openDialog().querySelectorAll('button')].find((node) => node.textContent === label)!.className.split(' ');
   expect(classes('启动')).toEqual(['button', 'primary']); expect(classes('取消')).toEqual(['button', 'ghost']);
   expect(classes('✕')).toContain('small');
+});
+
+// 2026-09-23 实机：弹窗里 FormField 包着的「标记为 Secret」复选框被文字控件的 width: 100% 拉成整行宽、显示在正中。
+test('FormField 只让文字类控件铺满整行，复选框与单选框靠左', () => {
+  const css = sourceAt(consoleStyles(), 'shared/ui/FormField.module.css').code;
+  expect(css).toContain('.field input:not([type="checkbox"]):not([type="radio"]),');
+  expect(css).toMatch(/\.field input\[type="checkbox"\],\s*\.field input\[type="radio"\] \{\s*align-self: flex-start;/);
 });

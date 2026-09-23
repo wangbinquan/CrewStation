@@ -14,7 +14,8 @@
   color: var(--cs-color-text-muted);
 }
 
-.field input,
+/* 文字类控件铺满整行；复选框与单选框保持原样、靠左（2026-09-23 实机：弹窗里的「标记为 Secret」被拉成整行宽、显示在正中）。 */
+.field input:not([type="checkbox"]):not([type="radio"]),
 .field select,
 .field textarea {
   width: 100%;
@@ -32,6 +33,10 @@
 .field textarea:disabled {
   opacity: 0.55;
   cursor: not-allowed;
+}
+.field input[type="checkbox"],
+.field input[type="radio"] {
+  align-self: flex-start;
 }
 .error { color: var(--cs-color-danger); font-size: 12px; }
 .field textarea { resize: vertical; min-height: 72px; }
