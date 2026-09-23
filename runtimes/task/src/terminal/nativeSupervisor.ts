@@ -130,7 +130,10 @@ export class NativeTerminalSupervisor {
       entry.prepared?.dispose();
       entry.control.dispose();
       this.deps.beforeStart.release(command.agentId);
-      entry.record = { ...entry.record, lifecycle: 'failed', endedAt: new Date().toISOString(), reason: 'start-failed', error: error instanceof Error ? error.message : 'CLI 启动失败' };
+      const message = error instanceof Error ? error.message : 'CLI 启动失败';
+      // 原因也写进 Runner 日志：失败的 CLI 展开「查看执行容器日志」时能看到这一行（RFC-022 SP-05）。
+      this.deps.logger.warn('native terminal start failed', { agentId: entry.record.agentId, error: message });
+      entry.record = { ...entry.record, lifecycle: 'failed', endedAt: new Date().toISOString(), reason: 'start-failed', error: message };
       this.emit(entry);
     }
     return { ...entry.record };

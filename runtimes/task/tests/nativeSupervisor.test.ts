@@ -17,7 +17,7 @@ import { launchSpec, material } from './profileFixtures';
 const cleanups: Array<() => Promise<void>> = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
 
-interface FixtureOptions { activityFactory?: NativeSupervisorDeps['activityFactory']; runnerId?: string; realPrepare?: boolean }
+interface FixtureOptions { activityFactory?: NativeSupervisorDeps['activityFactory']; runnerId?: string; realPrepare?: boolean; logger?: NativeSupervisorDeps['logger'] }
 
 async function fixture(options: FixtureOptions = {}) {
   const root = await mkdtemp(join(tmpdir(), 'cs-native-pty-'));
@@ -33,7 +33,7 @@ async function fixture(options: FixtureOptions = {}) {
   let disposed = 0;
   const paths = await createWorkdirPaths(root);
   const native = new NativeTerminalSupervisor({
-    backend: createNativePtyBackend(launcher), launcher, paths, beforeStart, logger: noopLogger, runnerId: options.runnerId, emit,
+    backend: createNativePtyBackend(launcher), launcher, paths, beforeStart, logger: options.logger ?? noopLogger, runnerId: options.runnerId, emit,
     ...(options.activityFactory ? { activityFactory: options.activityFactory } : {}),
     ...(options.realPrepare ? {} : { prepare: async (_spec, context) => {
       launches++;
@@ -183,11 +183,14 @@ test.skipIf(process.platform !== 'linux')('Linux 任务镜像的真实 Ctrl+C �
   expect(f.launches()).toBe(1);
 });
 
-test('启动失败保留单窗失败记录，相同请求不重试进程；会话整体关闭停止所有窗口', async () => {
-  const f = await fixture();
+test('启动失败保留单窗失败记录并写一行 warn 日志，相同请求不重试进程；会话整体关闭停止所有窗口', async () => {
+  const warnings: Array<{ message: string; fields?: Record<string, unknown> }> = [];
+  const f = await fixture({ logger: { ...noopLogger, warn: (message, fields) => { warnings.push({ message, ...(fields ? { fields } : {}) }); } } });
   const failed = await f.native.start(f.command('bad', { cwd: 'missing-directory' }));
   expect(failed).toMatchObject({ lifecycle: 'failed', reason: 'start-failed' });
   expect(failed.error).toBeTruthy();
+  // 展开「查看执行容器日志」时要能看到失败原因（RFC-022 SP-05）：原因与名册里的一致。
+  expect(warnings).toContainEqual({ message: 'native terminal start failed', fields: { agentId: 'bad', error: failed.error } });
   expect(await f.native.start(f.command('bad', { cwd: 'missing-directory' }))).toMatchObject({ lifecycle: 'failed' });
   expect(f.launches()).toBe(0);
   await f.native.start(f.command('one'));
