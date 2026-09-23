@@ -46,6 +46,8 @@ describe.skipIf(!available)('资源台账：声明、观测、释放（RFC-025 �
     if (seen.status !== 'recorded') return;
     expect(seen.record).toMatchObject({ phase: 'starting', reason: { code: 'waiting-connect' } });
     expect((await h.module.api.observe({ child: pod('task-b1', { uid: 'uid-b1', node: 'node-1' }) })).status).toBe('unchanged');
+    // 只有观测时刻不同也不算变化：按记录核对会反复报同一个对象
+    expect((await h.module.api.observe({ child: pod('task-b1', { uid: 'uid-b1', node: 'node-1', observedAt: '2026-09-23T12:05:00.000Z' }) })).status).toBe('unchanged');
     const ready = await ledger.report(record.id, { conditions: [{ type: 'RunnerConnected', status: 'true' }] });
     expect(ready.phase).toBe('ready');
     // 从库里读回的条件键序与新建的不同：同样的上报仍然不写库
@@ -67,6 +69,11 @@ describe.skipIf(!available)('资源台账：声明、观测、释放（RFC-025 �
     const stopping = await ledger.requestRelease(record.id, { code: 'user', message: '用户释放' });
     expect(stopping).toMatchObject({ desired: 'absent', phase: 'stopping', reason: { code: 'user' }, generation: 2 });
     expect((await ledger.requestRelease(record.id, { code: 'user', message: '再点一次' })).version).toBe(stopping.version);
+    // 受理时说不出原因（泛泛的 released）的，之后补上的具体原因覆盖它；具体原因不会被再覆盖
+    const generic = await ledger.declare(workspace('c3', { spec: { children: [] } }));
+    await ledger.requestRelease(generic.id, { code: 'released', message: '已释放' });
+    expect((await ledger.requestRelease(generic.id, { code: 'business', message: '业务释放' })).releaseReason).toEqual({ code: 'business', message: '业务释放' });
+    expect((await ledger.requestRelease(generic.id, { code: 'failed', message: '失败后释放' })).releaseReason?.code).toBe('business');
     const stopped = await h.module.api.observe({ child: pod('task-c1', { uid: 'uid-c1' }), gone: true });
     expect(stopped.status === 'recorded' && stopped.record).toMatchObject({ phase: 'stopped', children: [] });
     expect((await rejected(ledger.declare(workspace('c1')))).kind).toBe('conflict');
@@ -185,6 +192,16 @@ describe.skipIf(!available)('变更日志、租约、维护（设计 §6.3、§6
     const slowRecord = await slow;
     const rows = (await h.database.db.execute(sql`SELECT resource_id FROM resources.changes WHERE resource_id IN (${fast.id}, ${slowRecord.id}) ORDER BY seq`)) as unknown as { resource_id: string }[];
     expect(rows.map((row) => row.resource_id)).toEqual([fast.id, slowRecord.id]);
+  });
+
+  test('调和器的尾随接口：游标之后已提交的变更按提交顺序给出资源 ID，最新游标随之前进', async () => {
+    const from = await h.module.api.latestChange();
+    const a = await h.module.api.owner('task-runtime').declare(workspace('tail-a', { spec: { children: [] } }));
+    const b = await h.module.api.owner('task-runtime').declare(workspace('tail-b', { spec: { children: [] } }));
+    const tail = await h.module.api.changesSince(from, 10);
+    expect(tail.map((entry) => entry.resourceId)).toEqual([a.id, b.id]);
+    expect(await h.module.api.latestChange()).toBe(tail.at(-1)!.seq);
+    expect(await h.module.api.changesSince(tail.at(-1)!.seq, 10)).toEqual([]);
   });
 
   test('租约：持有期内别人抢不到，持有者可续约；过期后另一副本接手；释放只认持有者', async () => {

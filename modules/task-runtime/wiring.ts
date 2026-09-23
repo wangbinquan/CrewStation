@@ -31,6 +31,9 @@ import { runProfileTestUseCase } from './application/profileTest';
 import type { ProfileTestTiming } from './application/profileTest';
 import { environmentRoutes } from './http/environmentRoutes';
 import type { TaskCluster } from './ports/cluster';
+import type { EnvironmentLedger } from './ports/ledger';
+import { resyncLedger } from './application/ledgerResync';
+import { ledgerResyncWorker } from './workers/ledgerResyncWorker';
 import type { EnvironmentSources, ProfileCatalog, ProjectAuthorizer, QuotaSource, ServiceResolver, SourceCheckoutSource, TaskRuntimeSettings, TestRunner } from './ports/platform';
 
 export interface TaskRuntimeModuleDeps {
@@ -51,6 +54,8 @@ export interface TaskRuntimeModuleDeps {
   isAdmin: (userId: UserId) => Promise<boolean>;
   settings: TaskRuntimeSettings;
   cluster?: TaskCluster;
+  /** RFC-025 资源台账：给了就在每次环境落库时投影期望与领域条件，并定期补投影。 */
+  ledger?: EnvironmentLedger;
   clock?: Clock;
   logger?: Logger;
 }
@@ -70,7 +75,7 @@ export const taskRuntimeMigrations: MigrationSet = {
 
 export function createTaskRuntimeModule(deps: TaskRuntimeModuleDeps): TaskRuntimeModule {
   const useCaseDeps: TaskRuntimeUseCaseDeps = {
-    uow: drizzleUnitOfWork(deps.db),
+    uow: drizzleUnitOfWork(deps.db, deps.ledger ? { ledger: deps.ledger, ...(deps.logger ? { logger: deps.logger } : {}) } : undefined),
     cluster: deps.cluster ?? kubernetesTaskCluster(deps.k8s, deps.settings.workerUid),
     authorizer: deps.authorizer,
     quotas: deps.quotas,
@@ -131,19 +136,27 @@ export function createTaskRuntimeModule(deps: TaskRuntimeModuleDeps): TaskRuntim
     },
     runProfileTest,
   };
-  let timer: ReturnType<typeof setInterval> | undefined;
-  let observer: ReturnType<typeof setInterval> | undefined, observing = false;
-  // 启动观测每秒一轮（RFC-022）；上一轮没跑完就跳过这一轮，不叠加。
-  const observeTick = () => {
-    if (observing) return;
-    observing = true;
-    void observeStartup().catch((e: unknown) => useCaseDeps.logger.error('startup observation failed', { error: String(e) })).finally(() => { observing = false; });
-  };
+  const ledger = deps.ledger;
   return {
     api,
     http: [environmentRoutes(api, deps.isAdmin)],
-    workers: [rebuildWorker(deps.db, recoveryDeps), nativeExecutionWorker(deps.db, executionDeps), { start: () => { timer ??= setInterval(() => void reconcile().catch((e: unknown) => useCaseDeps.logger.error('reconcile failed', { error: String(e) })), 15000); }, stop: async () => { if (timer) clearInterval(timer); timer = undefined; } },
-      { start: () => { observer ??= setInterval(observeTick, 1000); }, stop: async () => { if (observer) clearInterval(observer); observer = undefined; } }],
+    workers: [rebuildWorker(deps.db, recoveryDeps), nativeExecutionWorker(deps.db, executionDeps), ...periodicWorkers(useCaseDeps.logger, reconcile, observeStartup),
+      ...(ledger ? [ledgerResyncWorker(() => resyncLedger(useCaseDeps.uow, ledger, useCaseDeps.logger), useCaseDeps.logger)] : [])],
     migrations: taskRuntimeMigrations,
   };
+}
+
+/** 对账每 15 秒一轮；启动观测每秒一轮（RFC-022），上一轮没跑完就跳过这一轮，不叠加。 */
+function periodicWorkers(logger: Logger, reconcile: () => Promise<unknown>, observeStartup: () => Promise<unknown>) {
+  let timer: ReturnType<typeof setInterval> | undefined;
+  let observer: ReturnType<typeof setInterval> | undefined, observing = false;
+  const observeTick = () => {
+    if (observing) return;
+    observing = true;
+    void observeStartup().catch((e: unknown) => logger.error('startup observation failed', { error: String(e) })).finally(() => { observing = false; });
+  };
+  return [
+    { start: () => { timer ??= setInterval(() => void reconcile().catch((e: unknown) => logger.error('reconcile failed', { error: String(e) })), 15000); }, stop: async () => { if (timer) clearInterval(timer); timer = undefined; } },
+    { start: () => { observer ??= setInterval(observeTick, 1000); }, stop: async () => { if (observer) clearInterval(observer); observer = undefined; } },
+  ];
 }

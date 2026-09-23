@@ -69,7 +69,8 @@ export function classifyObject(input: AdoptionInput): AdoptionItem {
   const labels = object.metadata.labels ?? {};
   const identity = { kind: object.kind, ...(object.metadata.namespace ? { namespace: object.metadata.namespace } : {}), name: object.metadata.name, ...(object.metadata.uid ? { uid: object.metadata.uid } : {}) };
   if (input.claimedBy) return { ...identity, verdict: 'owned', resourceId: input.claimedBy, reason: '已由资源记录认领' };
-  if (input.systemNamespace && object.metadata.namespace === input.systemNamespace) return { ...identity, verdict: 'platform', reason: '平台组件（安装器管理），不在收编与回收范围' };
+  // 档位测试的 Pod 也在系统命名空间，但带任务标签：按任务判定。
+  if (input.systemNamespace && object.metadata.namespace === input.systemNamespace && !labels[TASK_LABEL]) return { ...identity, verdict: 'platform', reason: '平台组件（安装器管理），不在收编与回收范围' };
   if (labels[RESOURCE_ID_LABEL]) return { ...identity, verdict: 'orphan', resourceId: labels[RESOURCE_ID_LABEL], reason: '带资源标签，但台账里没有记录认领它' };
   const taskId = labels[TASK_LABEL];
   if (taskId) return { ...identity, ...byTask(object, input.legacyTaskId ?? taskId, input.legacyTask, input.now ?? new Date()) };

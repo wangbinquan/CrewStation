@@ -1,7 +1,6 @@
 import type { K8sClient, K8sObject } from '@crewstation/k8s';
 import { LABELS, MANAGED_BY, Resources } from '@crewstation/k8s';
 import type { Logger } from '@crewstation/kernel';
-import type { Informer } from '@crewstation/resource-runtime';
 import { createInformer, createWorkQueue } from '@crewstation/resource-runtime';
 import type { ManagedObjectFeed, ManagedObjectReader, ObjectChange, ObservedKind } from '../../ports/cluster';
 
@@ -37,7 +36,7 @@ export function managedObjectFeed(k8s: K8sClient, options: FeedOptions): Managed
     latest.set(key, { kind, object, gone });
     queue.add(key);
   };
-  const informers: Informer<K8sObject>[] = KINDS.map((kind) => createInformer<K8sObject>(k8s, Resources[kind]!, {
+  const informers = KINDS.map((kind) => createInformer<K8sObject>(k8s, Resources[kind]!, {
     upsert: (object) => note(kind, object, false),
     remove: (object) => note(kind, object, true),
   }, { logger: options.logger, labelSelector: SELECTOR, ...(options.relistMs ? { relistMs: options.relistMs } : {}) }));
@@ -53,5 +52,6 @@ export function managedObjectFeed(k8s: K8sClient, options: FeedOptions): Managed
     },
     // 全量完成之后，还要等全量带进来的变化都处理完，汇总才反映真实的首轮结果。
     synced: async () => { await Promise.all(informers.map((informer) => informer.synced())); await queue.drained(); },
+    cached: (kind, namespace, name) => informers[KINDS.indexOf(kind)]?.get(namespace, name),
   };
 }

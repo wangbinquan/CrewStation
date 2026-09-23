@@ -1,0 +1,42 @@
+import type { ClusterPurpose, ProjectId, ResourceConditionStatus, ResourceKind, StartupRecord } from '@crewstation/contracts';
+
+/** 台账里 task-runtime 关心的部分（结构上是 resources 模块 LedgerRecord 的子集）。 */
+export interface LedgerRecordRef {
+  readonly id: string;
+  readonly desired: 'present' | 'absent';
+  readonly owner: { readonly module: string; readonly ref: string };
+  readonly conditions: readonly { readonly type: string; readonly status: ResourceConditionStatus }[];
+}
+
+export interface LedgerConditionUpdate {
+  readonly type: string;
+  readonly status: ResourceConditionStatus;
+  readonly reason?: string;
+  readonly message?: string;
+}
+
+export interface LedgerDeclaration {
+  readonly id?: string;
+  readonly kind: ResourceKind;
+  readonly ref: string;
+  readonly projectId?: ProjectId;
+  readonly parentId?: string;
+  readonly purpose?: ClusterPurpose;
+  readonly spec: { readonly children: readonly { readonly kind: string; readonly namespace?: string; readonly name: string }[] };
+  readonly display?: Readonly<Record<string, string>>;
+  readonly conditions?: readonly LedgerConditionUpdate[];
+}
+
+/** 资源中心（RFC-025）的写入口：task-runtime 写期望与领域条件，实况由资源中心写。 */
+export interface LedgerWriter {
+  declare(input: LedgerDeclaration): Promise<LedgerRecordRef>;
+  requestRelease(id: string, reason: { readonly code: string; readonly message: string }): Promise<LedgerRecordRef>;
+  report(id: string, report: { readonly conditions?: readonly LedgerConditionUpdate[]; readonly startup?: StartupRecord | null; readonly display?: Readonly<Record<string, string>> }): Promise<LedgerRecordRef>;
+  find(ref: string, kind: ResourceKind): Promise<LedgerRecordRef | undefined>;
+}
+
+/** 由组合根接上 resources 模块：within 加入 task-runtime 自己的事务；live 列出它名下还在的记录（补投影用）。 */
+export interface EnvironmentLedger {
+  within(executor: unknown): LedgerWriter;
+  live(): Promise<readonly LedgerRecordRef[]>;
+}

@@ -67,10 +67,12 @@ describe('收编空跑的判定（设计 §6.5）', () => {
     expect(classifyObject({ object: labeled(task, 'PersistentVolumeClaim'), legacyTask: 'missing' }).reason).toBe('任务环境 t1 的记录已不存在；工作卷只进入待回收，由管理员确认后删除');
   });
 
-  test('系统命名空间里的平台组件单列，不在收编与回收范围（即便带着别的标签）', () => {
-    const platform = { ...labeled({ 'crewstation.io/task': 't9' }), metadata: { name: 'cs-api-1', namespace: 'crewstation-system', labels: { 'crewstation.io/task': 't9' } } };
-    expect(classifyObject({ object: platform, systemNamespace: 'crewstation-system', legacyTask: 'missing' })).toMatchObject({ verdict: 'platform', reason: '平台组件（安装器管理），不在收编与回收范围' });
+  test('系统命名空间里的平台组件单列，不在收编与回收范围；档位测试的 Pod 带任务标签，按任务判定', () => {
+    const platform = { ...labeled({}), metadata: { name: 'cs-api-1', namespace: 'crewstation-system', labels: { 'app.kubernetes.io/managed-by': 'crewstation' } } };
+    expect(classifyObject({ object: platform, systemNamespace: 'crewstation-system' })).toMatchObject({ verdict: 'platform', reason: '平台组件（安装器管理），不在收编与回收范围' });
     expect(classifyObject({ object: platform, systemNamespace: 'crewstation-system', claimedBy: 'r1' }).verdict).toBe('owned');
+    const profileTest = { ...labeled({}), metadata: { name: 'task-t9', namespace: 'crewstation-system', labels: { 'crewstation.io/task': 't9' } } };
+    expect(classifyObject({ object: profileTest, systemNamespace: 'crewstation-system', legacyTask: { kind: 'profile-test', state: 'running', execution: false } })).toMatchObject({ verdict: 'adoptable', candidateKind: 'agent-execution' });
   });
 
   test('服务槽、构建与迁移的 Pod 留给第三期；计数覆盖六种结论', () => {

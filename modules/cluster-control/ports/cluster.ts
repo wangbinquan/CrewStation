@@ -15,6 +15,8 @@ export interface ManagedObjectFeed {
   stop(): Promise<void>;
   /** 各种类都完成第一次全量，且全量带进来的变化都已交给处理者处理完。 */
   synced(): Promise<void>;
+  /** 观测缓存里的对象；同步完成之前的「没有」不能当成对象不存在。 */
+  cached(kind: ObservedKind, namespace: string | undefined, name: string): ObservedObject | undefined;
 }
 
 /** 一次性列出受管对象（收编空跑报告在 cs-api 里按需算，不开 watch）。 */

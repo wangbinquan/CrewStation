@@ -9,9 +9,12 @@ import { managedObjectFeed, managedObjectReader } from './adapters/k8s/managedOb
 import { adoptionReport } from './application/adoptionReport';
 import type { ObservationStats } from './application/observeChange';
 import { newObservationStats, observeChange } from './application/observeChange';
+import { reconcileObservations } from './application/reconcileObservations';
 import { adoptionRoutes } from './http/adoptionRoutes';
 import type { ManagedObjectFeed, ManagedObjectReader } from './ports/cluster';
 import type { LedgerObservations, LegacyOwners } from './ports/ledger';
+import type { LedgerReconcilerOptions } from './workers/ledgerReconciler';
+import { ledgerReconciler } from './workers/ledgerReconciler';
 import { observationWorker } from './workers/observationWorker';
 
 /** 装配期注入：台账入口与旧所属对象由组合根从 resources／task-runtime 接上。 */
@@ -28,6 +31,7 @@ export interface ClusterControlModuleDeps {
   readonly feed?: ManagedObjectFeed;
   readonly reader?: ManagedObjectReader;
   readonly summaryMs?: number;
+  readonly reconciler?: LedgerReconcilerOptions;
 }
 
 export interface ClusterControlModule {
@@ -36,6 +40,8 @@ export interface ClusterControlModule {
   /** cs-controller：观测受管对象并写回台账。 */
   readonly observer: { start(): void; stop(): Promise<void> };
   stats(): Readonly<ObservationStats>;
+  /** 按记录核对的队列处理完（用例用）。 */
+  reconciled(): Promise<void>;
 }
 
 export function createClusterControlModule(deps: ClusterControlModuleDeps): ClusterControlModule {
@@ -50,6 +56,12 @@ export function createClusterControlModule(deps: ClusterControlModuleDeps): Clus
       return adoptionReport({ reader, ledger: deps.ledger, legacy: deps.legacy, clock, systemNamespace: deps.systemNamespace });
     },
   };
-  const observer = observationWorker(feed, (change) => observeChange(deps.ledger, clock, deps.systemNamespace, stats, change), () => ({ ...stats }), logger, deps.summaryMs);
-  return { api, http: [adoptionRoutes(api, (id) => deps.isAdmin(id as UserId))], observer, stats: () => ({ ...stats }) };
+  const watcher = observationWorker(feed, (change) => observeChange(deps.ledger, clock, deps.systemNamespace, stats, change), () => ({ ...stats }), logger, deps.summaryMs);
+  const reconciler = ledgerReconciler(deps.ledger, feed, (id) => reconcileObservations({ ledger: deps.ledger, feed, clock, systemNamespace: deps.systemNamespace, stats }, id), logger, deps.reconciler);
+  // 先开观测缓存，再开按记录核对的队列（它等缓存同步完成才开始）。
+  const observer = {
+    start: () => { watcher.start(); reconciler.start(); },
+    stop: async () => { await reconciler.stop(); await watcher.stop(); },
+  };
+  return { api, http: [adoptionRoutes(api, (id) => deps.isAdmin(id as UserId))], observer, stats: () => ({ ...stats }), reconciled: () => reconciler.drained() };
 }

@@ -75,9 +75,16 @@ async function admitIn(scope: LedgerScope, module: string, input: ResourceDeclar
   return declareIn(scope, module, input, now);
 }
 
+/** 受理时还说不出原因的所属模块用这个泛泛的原因码；之后补上的具体原因会覆盖它（见 releaseIn）。 */
+export const GENERIC_RELEASE_CODE = 'released';
+
 async function releaseIn(scope: LedgerScope, module: string, id: string, reason: ResourceReason, now: Date): Promise<LedgerRecord> {
   const record = await loadOwned(scope, module, id);
-  if (record.desired === 'absent') return record;
+  if (record.desired === 'absent') {
+    // 已受理释放：期望不再变；只有原来的原因是泛泛的「已释放」时，才补上后来知道的具体原因（例如先进入释放、释放完才写明是谁释放的）。
+    if (record.releaseReason?.code !== GENERIC_RELEASE_CODE || reason.code === GENERIC_RELEASE_CODE) return record;
+    return commitRecord(scope, record, { ...record, releaseReason: reason }, now);
+  }
   return commitRecord(scope, record, { ...record, desired: 'absent', generation: record.generation + 1, releaseReason: reason }, now);
 }
 

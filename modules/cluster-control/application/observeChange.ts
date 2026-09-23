@@ -8,7 +8,7 @@ export interface ObservationStats {
   recorded: number;
   unchanged: number;
   unowned: number;
-  /** 系统命名空间里的平台组件：不在台账范围（设计 §6.4），不查不写。 */
+  /** 系统命名空间里的平台组件（没有任务标签的）：不在台账范围（设计 §6.4），不查不写。档位测试的 Pod 也在系统命名空间，但带任务标签，照常观测。 */
   platform: number;
 }
 
@@ -19,7 +19,7 @@ export function newObservationStats(): ObservationStats {
 /** 一个受管对象的变化 → 子对象观测写回台账（设计 §6.2 第 3 步）。 */
 export async function observeChange(ledger: LedgerObservations, clock: Clock, systemNamespace: string, stats: ObservationStats, change: ObjectChange): Promise<void> {
   const { object, gone } = change;
-  if (object.metadata.namespace === systemNamespace) {
+  if (object.metadata.namespace === systemNamespace && !object.metadata.labels?.['crewstation.io/task']) {
     stats.platform += 1;
     return;
   }

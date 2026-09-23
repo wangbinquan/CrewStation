@@ -38,7 +38,8 @@ export const PACKAGES_ALLOWED_BY_LAYER_DIR: Record<LayerDir, readonly string[] |
   application: ['kernel', 'contracts', 'eventbus'],
   adapters: 'any',
   http: ['kernel', 'contracts', 'http'],
-  workers: ['kernel', 'contracts', 'eventbus', 'queue', 'k8s'],
+  // resource-runtime 是调和循环骨架（观测缓存、去重队列、租约），供 cluster-control 等的工作器用（ADR-0009）。
+  workers: ['kernel', 'contracts', 'eventbus', 'queue', 'k8s', 'resource-runtime'],
   wiring: 'any',
   index: [],
   tests: 'any',

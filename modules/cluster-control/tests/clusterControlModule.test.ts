@@ -23,10 +23,20 @@ const pod = (name: string, labels: Record<string, string> = {}, status: unknown 
 });
 const pvc = (name: string, labels: Record<string, string>): K8sObject => ({ apiVersion: 'v1', kind: 'PersistentVolumeClaim', metadata: { name, namespace: 'cs-demo', uid: `uid-${name}`, labels: { 'app.kubernetes.io/managed-by': 'crewstation', ...labels } }, status: { phase: 'Bound' } });
 
-/** 手动驱动的变化流：用例决定什么时候来一条变化。 */
-function manualFeed(): ManagedObjectFeed & { emit(change: ObjectChange): Promise<void> } {
+/** 手动驱动的变化流：用例决定什么时候来一条变化；缓存里放的对象供按记录核对时查。 */
+function manualFeed(): ManagedObjectFeed & { emit(change: ObjectChange): Promise<void>; readonly cache: Map<string, K8sObject> } {
   let handle: ((change: ObjectChange) => Promise<void>) | undefined;
-  return { start: (next) => { handle = next; }, stop: async () => { handle = undefined; }, synced: async () => undefined, emit: async (change) => { await handle?.(change); } };
+  const cache = new Map<string, K8sObject>();
+  return {
+    cache, start: (next) => { handle = next; }, stop: async () => { handle = undefined; }, synced: async () => undefined,
+    // 与真实观测缓存一致：先更新缓存，再把变化交给处理者。
+    emit: async (change) => {
+      const at = `${change.kind}/${change.object.metadata.namespace ?? ''}/${change.object.metadata.name}`;
+      if (change.gone) cache.delete(at); else cache.set(at, change.object as K8sObject);
+      await handle?.(change);
+    },
+    cached: (kind, namespace, name) => cache.get(`${kind}/${namespace ?? ''}/${name}`),
+  };
 }
 
 describe.skipIf(!available)('cluster-control：观测写回台账与收编空跑（RFC-025 第一期）', () => {
@@ -51,7 +61,11 @@ describe.skipIf(!available)('cluster-control：观测写回台账与收编空跑
     control = createClusterControlModule({
       k8s, feed, isAdmin: async (id) => id === ADMIN.userId, systemNamespace: 'crewstation-system',
       reader: { list: async (kind) => objects.filter((o) => o.kind === kind) },
-      ledger: { observe: (input) => resources.api.observe(input), claimOf: (child) => resources.api.claimOf(child) },
+      ledger: {
+        observe: (input) => resources.api.observe(input), claimOf: (child) => resources.api.claimOf(child), get: (id) => resources.api.get(id),
+        listLive: () => resources.api.list({}), changesSince: resources.api.changesSince, latestChange: resources.api.latestChange,
+      },
+      reconciler: { pollMs: 20 },
       legacy: { resolveTaskId: async (legacyId) => (legacyId === 'tsk_01a0954107447000b7936485fb80d15d' ? 't-live' : undefined), task: async (taskId) => tasks.get(taskId) },
     });
     control.observer.start();
@@ -67,9 +81,25 @@ describe.skipIf(!available)('cluster-control：观测写回台账与收编空跑
     expect(observed?.phase).toBe('starting');
     await feed.emit({ kind: 'Pod', object: pod('loose'), gone: false });
     await feed.emit({ kind: 'Pod', object: { ...pod('cs-api-1'), metadata: { ...pod('cs-api-1').metadata, namespace: 'crewstation-system' } }, gone: false });
+    // 档位测试的 Pod 在系统命名空间但带任务标签：照常观测（台账里没人认领时记 unowned）
+    await feed.emit({ kind: 'Pod', object: { ...pod('task-probe', { 'crewstation.io/task': 't-probe' }), metadata: { ...pod('task-probe', { 'crewstation.io/task': 't-probe' }).metadata, namespace: 'crewstation-system' } }, gone: false });
     await feed.emit({ kind: 'Pod', object: pod('task-owned'), gone: true });
     expect((await resources.api.get(record.id))?.children[0]?.phase).toBe('absent');
-    expect(control.stats()).toEqual({ recorded: 2, unchanged: 0, unowned: 1, platform: 1 });
+    await control.reconciled();
+    // 按记录核对也会对同一对象再报一次观测（台账去重，记为 unchanged），次数取决于核对轮次，这里不数。
+    expect(control.stats()).toMatchObject({ recorded: 2, unowned: 2, platform: 1 });
+  });
+
+  test('按记录核对：对象先在、记录后声明时，从观测缓存补上观测；缓存里没了的补消失', async () => {
+    feed.cache.set('Pod/cs-demo/task-late', pod('task-late'));
+    const record = await resources.api.owner('task-runtime').declare({ kind: 'dev-workspace', ref: 'late', projectId: PROJECT, spec: { children: [{ kind: 'Pod', namespace: 'cs-demo', name: 'task-late' }] } });
+    const deadline = Date.now() + 3_000;
+    while ((await resources.api.get(record.id))?.children[0]?.phase !== 'Running' && Date.now() < deadline) await Bun.sleep(20);
+    expect((await resources.api.get(record.id))?.children[0]).toMatchObject({ name: 'task-late', uid: 'uid-task-late', phase: 'Running' });
+    feed.cache.delete('Pod/cs-demo/task-late');
+    await resources.api.owner('task-runtime').report(record.id, { display: { branch: 'dev' } });
+    while ((await resources.api.get(record.id))?.children[0]?.phase !== 'absent' && Date.now() < deadline + 3_000) await Bun.sleep(20);
+    expect((await resources.api.get(record.id))?.children[0]?.phase).toBe('absent');
   });
 
   test('收编空跑：逐个判定归属，孤儿排在前面，计数覆盖全部；只读，不写台账', async () => {

@@ -21,6 +21,10 @@ export interface ResourcesModuleApi {
   resolveAlias(alias: ResourceAlias): Promise<string | undefined>;
   /** 只读：认领这个集群对象的记录（先按 UID，再按种类＋命名空间＋名字）。 */
   claimOf(child: ExpectedChild & { readonly uid?: string }): Promise<string | undefined>;
+  /** 调和器用：某个游标之后已提交的变更（按提交顺序），只给资源 ID；台账一有变化调和器就把它排进队列。 */
+  changesSince(cursor: number, limit: number): Promise<readonly { readonly seq: number; readonly resourceId: string }[]>;
+  /** 已提交的最新游标；调和器启动时从这里开始尾随。 */
+  latestChange(): Promise<number>;
   view(actor: Actor, projectId: ProjectId, query: ResourceViewQuery): Promise<ResourceView>;
   adminView(actor: Actor, query: AdminResourceViewQuery): Promise<ResourceView>;
   /** 推送流的授权与看的人能做什么；不通过时抛错（在开流之前调用，失败就是普通的 403）。 */

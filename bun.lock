@@ -552,6 +552,7 @@
         "zod": "4.6.2",
       },
       "devDependencies": {
+        "@crewstation/module-resources": "workspace:*",
         "@crewstation/testkit": "workspace:*",
       },
     },

@@ -96,7 +96,10 @@ export interface ResourceWriter {
   declare(input: ResourceDeclaration): Promise<LedgerRecord>;
   /** 受理：占额度的种类先在项目锁下按台账数额度（设计 §3、D31），够才声明。 */
   admit(input: ResourceDeclaration): Promise<LedgerRecord>;
-  /** 期望改为「不要了」；已是就原样返回。 */
+  /**
+   * 期望改为「不要了」；已是就原样返回——只有原来的原因码是泛泛的 `released`（受理时还说不出原因）时，
+   * 才换成这次给的具体原因。
+   */
   requestRelease(id: string, reason: ResourceReason): Promise<LedgerRecord>;
   report(id: string, report: ResourceReport): Promise<LedgerRecord>;
   find(ref: string, kind: ResourceKind): Promise<LedgerRecord | undefined>;

@@ -70,6 +70,8 @@ export function createResourcesModule(deps: ResourcesModuleDeps): ResourcesModul
     list: (filter) => uow.read.records.list(filter),
     resolveAlias: (alias) => uow.read.records.resolveAlias(alias),
     claimOf: (child) => uow.read.records.findByChild(child),
+    changesSince: async (cursor, limit) => (await uow.read.changes.since(cursor, limit)).map((entry) => ({ seq: entry.seq, resourceId: entry.resourceId })),
+    latestChange: () => uow.read.changes.latest(),
     view: async (actor, projectId, query) => {
       const access = await projectAccess(actor, projectId);
       const parsed = ResourceViewQuerySchema.parse(query);

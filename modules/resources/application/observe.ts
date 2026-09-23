@@ -1,5 +1,6 @@
 import type { ResourceChild } from '@crewstation/contracts';
 import type { Clock } from '@crewstation/kernel';
+import { jsonHash } from '@crewstation/kernel';
 import type { ChildObservation, ObservationOutcome } from '../api/types';
 import { mergeConditions } from '../domain/conditions';
 import type { LedgerRecord } from '../domain/record';
@@ -20,10 +21,18 @@ function nextChildren(record: LedgerRecord, observation: ChildObservation): read
     else children.splice(at, 1);
     return children;
   }
+  // 观测内容（除观测时刻外）没变就保留原来的：否则同一个对象每报一次都算变化，按记录核对会自己跟自己转圈。
+  if (current && sameObservation(current, observation.child)) return undefined;
   const children = [...record.children];
   if (at >= 0) children[at] = observation.child;
   else children.push(observation.child);
   return children;
+}
+
+function sameObservation(a: ResourceChild, b: ResourceChild): boolean {
+  const { observedAt: _a, ...left } = a;
+  const { observedAt: _b, ...right } = b;
+  return jsonHash(left) === jsonHash(right);
 }
 
 export async function observeIn(scope: LedgerScope, observation: ChildObservation, now: Date): Promise<ObservationOutcome> {

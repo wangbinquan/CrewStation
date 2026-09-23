@@ -233,14 +233,17 @@ function computeCatalogFor(agentRuntime: AgentRuntimeModuleApi) {
   return { resolve: (name: ComputeProfileSelector | undefined, usage: ComputeUsage, projectId: ProjectId) => agentRuntime.resolveForProject(projectId, name, usage), launchMaterial: agentRuntime.launchMaterial };
 }
 
-function composeRuntime(deps: CompositionDeps, core: ReturnType<typeof composeCore>, delivery: ReturnType<typeof composeDelivery>, late: Late) {
+function composeRuntime(deps: CompositionDeps, core: ReturnType<typeof composeCore>, delivery: ReturnType<typeof composeDelivery>, late: Late, resources: ReturnType<typeof composeLedger>) {
   const { db, k8s, settings, logger } = deps;
   const { project, config, data, scm, isAdmin, resolveById } = core;
   const { release } = delivery;
   const testRunner = createSessionClient(settings.sessionInternalUrl);
   const mcp = [{ name: 'capabilities', url: settings.mcp.capabilitiesUrl }, { name: 'operations', url: settings.mcp.operationsUrl }];
+  const ledger = resources.api.owner('task-runtime');
   const taskRuntime = createTaskRuntimeModule({
     db, k8s, logger, isAdmin: (id) => isAdmin(id), authorizer: project.api, quotas: { quotaLimit: project.api.quotaLimit }, testRunner, testMcp: mcp,
+    // RFC-025 第二期：环境落库时在同一事务里投影进资源台账；live 给补投影列出台账里还挂着的 task-runtime 记录。
+    ledger: { within: (tx) => ledger.within(tx as object), live: async () => (await resources.api.list({})).filter((record) => record.owner.module === 'task-runtime') },
     profiles: { devSessionProfile: core.agentRuntime.api.projectDevTaskProfile, listTaskProfiles: project.api.listTaskProfiles, getTaskProfile: async (name) => (await project.api.listTaskProfiles()).find((p) => p.id === name) },
     services: { resolveServiceById: resolveById },
     checkout: {
@@ -401,7 +404,10 @@ function composeLedger(deps: CompositionDeps, core: ReturnType<typeof composeCor
 function composeControl(deps: CompositionDeps, core: ReturnType<typeof composeCore>, ledger: ReturnType<typeof composeLedger>, runtime: ReturnType<typeof composeRuntime>) {
   return createClusterControlModule({
     k8s: deps.k8s, logger: deps.logger, isAdmin: core.identity.api.isAdmin, systemNamespace: deps.settings.systemNamespace,
-    ledger: { observe: (input) => ledger.api.observe(input), claimOf: (child) => ledger.api.claimOf(child) },
+    ledger: {
+      observe: (input) => ledger.api.observe(input), claimOf: (child) => ledger.api.claimOf(child), get: (id) => ledger.api.get(id),
+      listLive: () => ledger.api.list({}), changesSince: ledger.api.changesSince, latestChange: ledger.api.latestChange,
+    },
     legacy: {
       resolveTaskId: (legacyId) => deps.identities.resolve('task', [legacyId]),
       task: async (taskId) => {
@@ -417,7 +423,7 @@ function composeModules(deps: CompositionDeps) {
   const core = composeCore(deps, late);
   const resources = composeLedger(deps, core);
   const delivery = composeDelivery(deps, core, late);
-  const runtime = composeRuntime(deps, core, delivery, late);
+  const runtime = composeRuntime(deps, core, delivery, late, resources);
   const aggregates = composeAggregates(deps, core, delivery, runtime);
   const cluster = composeCluster(deps, core, delivery, runtime);
   const clusterControl = composeControl(deps, core, resources, runtime);
