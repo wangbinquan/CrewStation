@@ -39,10 +39,14 @@ const iso = (value: string): string => new Date(value).toISOString();
 /** 结束不早于开始：节点与控制面的时钟、Kubernetes 的整秒时间都可能让结束时间略早。 */
 const notBefore = (start: string | undefined, at: string): string => (start && Date.parse(at) < Date.parse(start) ? start : at);
 
+/**
+ * 收束一段。成功与跳过的段去掉进行时的说明（「正在克隆分支」「等待 TaskRunner 连接」）与已经过去的警告，
+ * 结果说明由调用方另给；失败的段两者都留着，是出错时的现场（2026-09-23 实机：打勾的段还写着「正在克隆」）。
+ */
 function settle(stage: StartupStage, state: 'succeeded' | 'failed' | 'skipped', at: string): StartupStage {
-  const { warning: _cleared, ...rest } = stage;
+  const { warning: _warning, detail: _detail, ...rest } = stage;
   const endedAt = notBefore(stage.startedAt, iso(at));
-  return { ...(state === 'succeeded' ? rest : stage), state, endedAt, ...(stage.startedAt ? { durationMs: Date.parse(endedAt) - Date.parse(stage.startedAt) } : {}) };
+  return { ...(state === 'failed' ? stage : rest), state, endedAt, ...(stage.startedAt ? { durationMs: Date.parse(endedAt) - Date.parse(stage.startedAt) } : {}) };
 }
 
 /** 一段成功，下一段从同一刻开始（首尾相接）；下一段是 ready 时一并成功、整体就绪。只进不退：这一段不在进行中就原样返回。 */
@@ -50,7 +54,8 @@ export function completeStage(record: StartupRecord, kind: StartupStageKind, at:
   const index = record.stages.findIndex((stage) => stage.kind === kind);
   if (record.state !== 'running' || record.stages[index]?.state !== 'running') return record;
   const stages = [...record.stages];
-  const done = settle({ ...stages[index]!, ...patch }, 'succeeded', at);
+  const settled = settle(stages[index]!, 'succeeded', at);
+  const done = patch.detail ? { ...settled, detail: patch.detail.slice(0, 1024) } : settled;
   stages[index] = done;
   const next = stages[index + 1], end = done.endedAt!;
   if (!next || next.kind === 'ready') {
@@ -125,7 +130,9 @@ export function advanceStartup(record: StartupRecord, observation: StartupObserv
   if (runningStage(next) === 'container') {
     const first = observation.containers.find((container) => container.startedAt);
     if (!first) return patchRunning(next, containerDetail(observation));
-    next = completeStage(next, 'container', first.startedAt!);
+    // 完成的这一轮也读了事件：结果说明按这一轮写（调度到的节点、镜像已有或拉取用时），不留上一轮的「创建容器」。
+    const result = containerResult(observation);
+    next = completeStage(next, 'container', first.startedAt!, result ? { detail: result } : {});
     const checkout = observation.containers.find((container) => container.init && container.name === CHECKOUT_CONTAINER);
     if (runningStage(next) === 'checkout' && !checkout) next = skipRunning(next, iso(first.startedAt!));
   }
@@ -142,12 +149,23 @@ export function advanceStartup(record: StartupRecord, observation: StartupObserv
   return next;
 }
 
+type Pull = StartupObservation['pulls'][number];
+const firstPull = (observation: StartupObservation): Pull | undefined => observation.pulls.find((item) => item.container === observation.containers[0]?.name);
+const pulledText = (pull: Pull): string => (pull.cached ? '镜像节点上已有' : `镜像已拉取${pull.took ? `（用时 ${pull.took}）` : ''}`);
+
+/** 容器启动中这一段完成时的结果说明：调度到的节点与镜像来源；都不知道时不写。 */
+function containerResult(observation: StartupObservation): string | undefined {
+  const pull = firstPull(observation);
+  const parts = [observation.node ? `已调度到节点 ${observation.node}` : undefined, pull?.endedAt ? pulledText(pull) : undefined].filter(Boolean);
+  return parts.length ? parts.join(' · ') : undefined;
+}
+
 /** 容器启动中的细节：调度 → 拉取镜像 → 创建容器；Kubernetes 仍在重试的问题记为警告。 */
 function containerDetail(observation: StartupObservation): { detail: string; warning?: string } {
   const target = observation.containers[0];
-  const pull = observation.pulls.find((item) => item.container === target?.name);
+  const pull = firstPull(observation);
   const parts = [observation.node ? `已调度到节点 ${observation.node}` : '等待调度'];
-  if (pull?.endedAt) parts.push(pull.cached ? '镜像节点上已有' : `镜像已拉取${pull.took ? `（用时 ${pull.took}）` : ''}`, '创建容器');
+  if (pull?.endedAt) parts.push(pulledText(pull), '创建容器');
   else if (pull?.startedAt) parts.push(`正在拉取镜像 ${shortImage(pull.image ?? target?.image ?? '')}`);
   else if (observation.node) parts.push('创建容器');
   const waiting = observation.containers.map((container) => container.waiting).find((w) => w && (IMAGE_PULL_FAILURES.has(w.reason) || CONTAINER_START_FAILURES.has(w.reason)));

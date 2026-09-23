@@ -1,6 +1,7 @@
 import { expect, test } from 'bun:test';
 import type { BeforeStartExecution, NativeTerminalRecord, RunnerEvent, StartupRecord, StartupStage } from '@crewstation/contracts';
 import { DevSessionDtoSchema, NativeTerminalDtoSchema } from '@crewstation/contracts';
+import { STARTING_ROSTER_MS } from '../application/nativeExecution';
 import { sessionLifecycleUseCases } from '../application/sessionLifecycle';
 import { isolatedNativeFixture } from './isolatedNativeFixture';
 import { workspaceActor as actor, workspaceFixture, workspaceProject, workspaceTask as taskId } from './workspaceFixture';
@@ -46,6 +47,38 @@ test('名册带六段启动进度：执行环境的前三段加上 Runner 的启
   expect(frozen.state).toBe('ready');
   await f.api.listNativeTerminals(actor, taskId);
   expect(reads).toHaveLength(2);
+});
+
+test('启动中 Runner 回名册慢：名册不等它（约 1 秒即返回、按已连接），进度照常从事件读；同一执行环境并发读只问一次', async () => {
+  const { f, terminal, executionTaskId, events } = await startingCli();
+  events.push({ seq: 1, at: at(5.3), event: { kind: 'beforeStart', execution: execution(terminal.agentId, 'running', 'running') } });
+  // 受理记录也还在启动中（Runner 回启动命令时进程还没拉起）。
+  const stored = (await f.repository.findExecution(executionTaskId))!.record;
+  await f.repository.saveRecord(taskId, { ...stored, lifecycle: 'starting', revision: stored.revision + 1 });
+  const original = f.deps.runner.sendCommand, asked: string[] = [];
+  let answer: (() => void) | undefined;
+  f.deps.runner.sendCommand = async (id, command) => {
+    if (command.type !== 'listAgentTerminals' || id !== executionTaskId) return original(id, command);
+    asked.push(id);
+    await new Promise<void>((resolve) => { answer = resolve; });
+    return original(id, command);
+  };
+  const started = Date.now();
+  const [first, second] = await Promise.all([f.api.listNativeTerminals(actor, taskId), f.api.listNativeTerminals(actor, taskId)]);
+  const waited = Date.now() - started;
+  expect(waited).toBeGreaterThanOrEqual(STARTING_ROSTER_MS - 50);
+  expect(waited).toBeLessThan(STARTING_ROSTER_MS + 900);
+  expect(asked).toEqual([executionTaskId]);
+  for (const list of [first, second]) {
+    const item = NativeTerminalDtoSchema.parse(list.items[0]);
+    expect(item).toMatchObject({ lifecycle: 'starting', connection: 'connected' });
+    expect(item.startup?.stages.map((stage) => `${stage.kind}:${stage.state}`)).toEqual(['queue:succeeded', 'container:succeeded', 'connect:succeeded', 'prepare:running', 'agent:pending', 'ready:pending']);
+  }
+  // Runner 终于回话：之后的读照常用它的名册；已拉起的 CLI 不受这个上限影响。
+  answer!();
+  await Bun.sleep(0);
+  f.deps.runner.sendCommand = original;
+  expect((await f.api.listNativeTerminals(actor, taskId)).items[0]).toMatchObject({ connection: 'connected' });
 });
 
 test('启动前步骤失败：冻结为失败，回收执行环境之前留下主容器日志的尾部', async () => {

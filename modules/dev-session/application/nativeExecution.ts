@@ -9,6 +9,14 @@ import { profileLaunchFields } from './profileLaunch';
 
 export const nativeEnded = (record: Pick<NativeTerminalRecord, 'lifecycle'>) => record.lifecycle === 'ended' || record.lifecycle === 'failed';
 const rejected = (error: unknown) => isPlatformError(error) && ['precondition', 'validation', 'quota_exceeded', 'not_found', 'conflict'].includes(error.kind);
+/** 启动中的 CLI 读名册最多等执行容器的 Runner 这么久（RFC-022）。 */
+export const STARTING_ROSTER_MS = 1000;
+const SLOW = Symbol('slow');
+async function unlessSlow<T>(promise: Promise<T>, ms: number): Promise<T | typeof SLOW> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try { return await Promise.race([promise, new Promise<typeof SLOW>((resolve) => { timer = setTimeout(() => resolve(SLOW), ms); })]); }
+  finally { clearTimeout(timer); }
+}
 
 /** 独立执行只派发已经持久受理的身份；重试沿用同一 Runner 与 CLI，结束后绝不重启。 */
 export class NativeExecutionLifecycle {
@@ -34,19 +42,32 @@ export class NativeExecutionLifecycle {
       return undefined;
     }
   }
-  private async roster(taskId: TaskId): Promise<NativeTerminalRoster> { return RunnerResultPayloads.listAgentTerminals.parse(await this.deps.runner.sendCommand(taskId, { id: newId('cmd'), type: 'listAgentTerminals' })); }
+  private readonly rosters = new Map<TaskId, Promise<NativeTerminalRoster>>();
+  /** 同一执行环境同时只问一次：启动中每个查看者每秒读一次名册，慢 Runner 不该被越问越慢。 */
+  private roster(taskId: TaskId): Promise<NativeTerminalRoster> {
+    let pending = this.rosters.get(taskId);
+    if (!pending) {
+      pending = this.deps.runner.sendCommand(taskId, { id: newId('cmd'), type: 'listAgentTerminals' }).then((raw) => RunnerResultPayloads.listAgentTerminals.parse(raw)).finally(() => this.rosters.delete(taskId));
+      this.rosters.set(taskId, pending);
+    }
+    return pending;
+  }
   async read(start: NativeTerminalStart): Promise<NativeTerminalDto> {
     const env = await this.deps.environments.getEnvironment(start.execution!.taskId);
     let record = start.record, connection: NativeTerminalDto['connection'] = env?.connected ? 'unknown' : 'disconnected';
     if (!nativeEnded(record) && (!env || !['cleaning', 'finished'].includes(env.native?.state ?? ''))) {
       if (env?.connected) {
         try {
-          const current = await this.roster(env.id);
+          // 启动中的执行容器 CPU 限在档位额度里，拉起 CLI 时 Runner 可能十几秒才回话（2026-09-23 实机名册卡了 11 秒，
+          // 准备环境与 Agent 启动中两段因此看不到）。启动中不等它：进度从事件读，记录由启动命令的回执更新。
+          const current = record.lifecycle === 'starting' ? await unlessSlow(this.roster(env.id), STARTING_ROSTER_MS) : await this.roster(env.id);
           connection = 'connected';
-          if (current.runnerId !== record.runnerId) record = await this.finishRecord(start, 'runner-restarted');
-          else record = current.terminals.find((r) => r.agentId === record.agentId && r.terminalId === record.terminalId && r.runnerId === record.runnerId) ?? record;
-          record = { ...record, computeName: start.record.computeName };
-          await this.repo.saveRecord(start.taskId, record);
+          if (current !== SLOW) {
+            if (current.runnerId !== record.runnerId) record = await this.finishRecord(start, 'runner-restarted');
+            else record = current.terminals.find((r) => r.agentId === record.agentId && r.terminalId === record.terminalId && r.runnerId === record.runnerId) ?? record;
+            record = { ...record, computeName: start.record.computeName };
+            await this.repo.saveRecord(start.taskId, record);
+          }
         } catch { /* 单个 Runner 不响应不推断进程结束。 */ }
       }
     } else if (!nativeEnded(record) && env) record = await this.finishRecord(start, env.native?.failureReason ? 'environment-failed' : 'stopped', env.native?.failureReason);

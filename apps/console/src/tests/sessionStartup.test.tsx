@@ -4,6 +4,7 @@ import type { DevSessionDto, StartupStage } from '@crewstation/contracts';
 import { activityProjectId } from './agentActivityFixture';
 import { editorWorkspaceFixture } from './editorWorkspaceFixture';
 import { renderApp } from './renderApp';
+import { consoleStyles, sourceAt } from './sourceScan';
 
 let page: Awaited<ReturnType<typeof renderApp>> | undefined, fixture: ReturnType<typeof editorWorkspaceFixture> | undefined;
 afterEach(async () => { page?.unmount(); page = undefined; await new Promise((resolve) => setTimeout(resolve, 0)); fixture?.restore(); fixture = undefined; });
@@ -61,4 +62,15 @@ test('等待连接失败（握手被拒）：「重试」打开会话面板里�
   await page.click('重试');
   expect(starts).toEqual([]);
   expect(document.querySelector('aside[data-mode="side"] [role="tab"][aria-selected="true"]')?.textContent).toBe('会话与环境');
+});
+
+test('步骤条在 CLI 区上下左右都居中：外框撑满 CLI 区（.terminals 不是弹性容器，要 height: 100%），步骤条 margin: auto', () => {
+  const css = sourceAt(consoleStyles(), 'features/dev-session/components/native/NativeWorkspace.module.css').code;
+  const block = (selector: string) => new RegExp(`(?:^|\\})\\s*${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\{([^}]*)\\}`).exec(css)?.[1] ?? '';
+  const frame = block('.sessionStartup');
+  expect(frame).toMatch(/display:\s*flex\b/);
+  expect(frame).toMatch(/height:\s*100%/);
+  expect(frame).toMatch(/box-sizing:\s*border-box/);
+  expect(block('.startupPane > *, .sessionStartup > *')).toMatch(/margin:\s*auto/);
+  expect(block('.startupPane')).toMatch(/inset:\s*0/);
 });

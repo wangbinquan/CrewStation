@@ -64,6 +64,30 @@ test('开发会话：init 开始即检出，以 0 退出即等待连接；非 0 
   expect(noInit.stages[3]).toMatchObject({ startedAt: at(5), detail: '容器已启动，等待 TaskRunner 连接' });
 });
 
+test('完成的段只留结果：容器段写调度到的节点与镜像来源，检出与等待连接去掉进行时的说明，过去的警告一并去掉；失败的段保留现场', () => {
+  const start = completeStage(initialStartup(t0, { checkout: 'main' }), 'queue', at(1));
+  const started = (patch: Partial<StartupObservation>) => advanceStartup(start, observed({ containers: [{ name: 'checkout', init: true, startedAt: at(4) }, { name: 'task-1', init: false }], ...patch }));
+  // 上一轮还没看到 Pulled 事件、写着「创建容器」；完成的这一轮按这一轮的观测写结果（2026-09-23 实机）。
+  const creating = advanceStartup(start, observed({ node: 'n1' }));
+  expect(creating.stages[1]!.detail).toBe('已调度到节点 n1 · 创建容器');
+  const cached = advanceStartup(creating, observed({ node: 'n1', containers: [{ name: 'checkout', init: true, startedAt: at(4) }, { name: 'task-1', init: false }], pulls: [{ container: 'checkout', endedAt: at(3), cached: true }] }));
+  expect(cached.stages[1]).toEqual({ kind: 'container', state: 'succeeded', startedAt: at(1), endedAt: at(4), durationMs: 3000, detail: '已调度到节点 n1 · 镜像节点上已有' });
+  expect(started({ node: 'n1', pulls: [{ container: 'checkout', startedAt: at(2), endedAt: at(3), cached: false, took: '2.345s' }] }).stages[1]!.detail).toBe('已调度到节点 n1 · 镜像已拉取（用时 2.345s）');
+  expect(started({}).stages[1]!.detail).toBeUndefined();
+  // 调度不上的警告在排上之后就过去了。
+  const waited = advanceStartup(start, observed({ unschedulable: { reason: 'Unschedulable', message: '0/1 nodes are available' } }));
+  expect(waited.stages[1]!.warning).toBe('调度不上：0/1 nodes are available');
+  expect(advanceStartup(waited, observed({ node: 'n1', containers: [{ name: 'checkout', init: true, startedAt: at(9) }, { name: 'task-1', init: false }] })).stages[1]).not.toHaveProperty('warning');
+  const cloning = started({ node: 'n1' });
+  expect(cloning.stages[2]!.detail).toBe('正在克隆分支 main');
+  const connecting = advanceStartup(cloning, observed({ containers: [{ name: 'checkout', init: true, startedAt: at(4), finishedAt: at(6), exitCode: 0 }, { name: 'task-1', init: false, startedAt: at(7) }] }));
+  expect(connecting.stages[2]).toEqual({ kind: 'checkout', state: 'succeeded', subject: 'main', startedAt: at(4), endedAt: at(6), durationMs: 2000 });
+  expect(connecting.stages[3]!.detail).toBe('容器已启动，等待 TaskRunner 连接');
+  expect(completeThrough(connecting, 'connect', at(8)).stages[3]).toEqual({ kind: 'connect', state: 'succeeded', startedAt: at(6), endedAt: at(8), durationMs: 2000 });
+  const failed = failStartup(waited, at(20), { code: 'image-pull-failed', message: '镜像拉取失败' });
+  expect(failed.stages[1]).toMatchObject({ state: 'failed', detail: '等待调度', warning: '调度不上：0/1 nodes are available' });
+});
+
 test('等待连接：主容器没起来前写「等待主容器启动」，容器起不来记警告；Pod 已在而排队或替换没跟上时按 Pod 创建时间补上', () => {
   const connecting = completeStage(completeStage(initialStartup(t0), 'queue', at(1)), 'container', at(2));
   expect(advanceStartup(connecting, { containers: [{ name: 'task-1', init: false }], pulls: [] }).stages[2]!.detail).toBe('等待主容器启动');
