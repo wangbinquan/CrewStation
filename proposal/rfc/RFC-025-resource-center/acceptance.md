@@ -128,10 +128,14 @@
 | `4aeaa892` 服务槽投影进台账，调和器观测 Deployment | check:static 通过；unit 568、module 1266（12 跳过）、console 867；改动行 121／122（99.2%） | [35891997767](https://github.com/wangbinquan/CrewStation/actions/runs/35891997767) 六项成功 | 17:02:17 cs-controller、17:02:19 cs-api 换到 `cs-control-plane:rc025-p3a-20260923` |
 | `6d54a25f` 槽的旧接口状态就绪之后照台账 | check:static 通过；unit 569、module 1267（12 跳过）、console 867；改动行 21／21 | [35893472583](https://github.com/wangbinquan/CrewStation/actions/runs/35893472583) 六项成功 | 17:17:59 cs-controller、17:18:01 cs-api 换到 `cs-control-plane:rc025-p3b-20260923` |
 | `7c3e68d0` 形态图槽带的入口与 Deployment 状态照槽记录 | check:static 通过；unit 569、module 1279、console 868；改动行 4／4 | [35894218920](https://github.com/wangbinquan/CrewStation/actions/runs/35894218920) 六项成功 | 17:22:38 console 换到 `cs-console:rc025-p3c-20260924` |
+| `25bf918e` 槽的副本由槽记录认领、崩溃重启汇总成条件，健康接口、告警巡检与健康卡照槽记录；视图列出稳定记录；压缩只限终态 | check:static 通过；unit 573、module 1283、console 869；改动行 119／120（99.2%） | [35899013397](https://github.com/wangbinquan/CrewStation/actions/runs/35899013397) 六项成功 | 18:04:06 cs-controller、18:04:08 cs-api 换到 `cs-control-plane:rc025-p3d-20260924`，18:05:18 console 换到 `cs-console:rc025-p3d-20260924` |
 
 镜像都由 `git archive <提交>` 构建，只含已提交内容；无迁移，各一次就绪、0 重启。
 
 - **槽记录接上真实数据**（p3a 部署后）：补投影 14 个服务、28 条记录。20 条「运行中」，各自的 Deployment 观测为 Available、原因「副本 1／1 就绪」；8 条「已结束」——demo 的绿槽原因 `offline-manual`（已由成员手动下线），其余 7 条 `not-deployed`（rfc003-ux、rfc003-verify-files、rfc006-verify、rfc010-cluster-qa、rfc011-role-home、rfc022-verify、rfc023-verify 各有一个从没部署过的物理槽）。
 - **p3b 部署后**：20 条在跑的槽记录仍全是「运行中」、Deployment 都是 Available，槽的旧接口状态不变（只在流水线判定就绪之后、观测不是运行中时才改写）。降级那一支（新版本铺完后副本没全就绪）由模块用例 `slotLedger.test.ts` 核对；实机上要对共享集群里的槽做一次运维重启才能看到，这一步被权限拦下，没有做。
 - **p3c 部署后**：工作台已换新；浏览器的登录已过期，没有替作者重新登录，形态图槽带的显示由组件用例 `topologyAssembly.test.ts` 核对。
+- **25bf918e 部署后**：首轮观测汇总 `recorded 59、unchanged 11、unowned 102`（部署前 `unowned 122`）——20 个槽副本被各自的槽记录认领。28 条槽记录逐条核对：20 条「运行中」，各带 Deployment（观测 Available、就绪 1／期望 1）与 1 个副本 Pod（Running、重启 0），`CrashLooping` 为假；8 条「已结束」（Deployment 不在）。cs-controller 与 cs-api 3 分钟内没有告警或错误日志；告警巡检改照槽记录后没有新告警（表里只有早先已恢复的 20 条 `health-failing`）。
+- **压缩条件**：部署前查库，没有被压缩过的记录；期望仍在、已结束的有 8 条服务槽与 3 个孤儿卷，按旧条件会从 09-30 起被压掉子对象，改正后不再压缩。
+- 健康接口的返回值与工作台健康卡由模块用例与组件用例核对（接口在网关登录之后，没有替作者登录）。
 
