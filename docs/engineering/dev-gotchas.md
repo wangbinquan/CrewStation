@@ -708,6 +708,7 @@ git reset -q HEAD -- <自己的路径>                     # 共享暂存区里�
 整串被当成一个文件名，`cp` 报 File name too long。紧接着那次 `check:static` 其实是在共享工作树里跑的，结果照绿，差点被当成干净树的结论。
 文件清单写成一行一个的文件，再用 `while read f; do …; done < 清单`（或 zsh 的 `${=MINE}`）逐个拷；拷完用 `cmp` 逐个核对，并确认门禁确实是在干净树目录里跑的。
 同类的另一个坑（2026-09-23 实撞）：zsh 里 `path` 是与 `PATH` 绑定的数组，`while read mode blob stage path; do git …; done` 一读就把 `PATH` 换掉了，循环里每条命令都报 command not found（这次是给私有索引逐条 `git update-index`，一条也没写进去）。循环变量别用 `path`、`cdpath`、`fpath`、`manpath` 这些名字，改用 `fname` 之类。
+第三个（2026-09-23 实撞）：zsh 把紧跟在变量名后的 `:t`、`:h`、`:r`、`:e`、`:a` 等当成修饰符。给私有索引取「某提交里的文件」时写 `git show $BASE:tools/arch/migrations.lock.json`，`:t` 被当成取末段，实际执行的是 `git show <SHA>ools/arch/migrations.lock.json`，报 `ambiguous argument`，后面依赖它的步骤全没做。一律写成 `git show "${BASE}:路径"`。
 
 ### ADR、RFC 与待决问题的编号会被并行会话抢占：提交前再看一眼
 
