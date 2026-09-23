@@ -24,6 +24,10 @@ async function save() {
 test('真实工作台的 CodeMirror 草稿跨预览／CLI 保留；离开确认不停止任何 CLI', async () => {
   fixture = editorWorkspaceFixture(); page = await renderApp(path);
   await page.click('代码'); await page.click('a.ts'); expect(content().textContent).toBe('磁盘原文');
+  // 代码直接铺进页签：不再内嵌一张带「代码」标题的卡片；树节点带选中文件的完整路径提示。
+  const editorPane = document.querySelector('nav[aria-label="工作目录文件"]')!.closest('section')!;
+  expect(editorPane.querySelector('h2')).toBeNull(); expect(editorPane.textContent).not.toContain('编辑器');
+  expect([...document.querySelectorAll<HTMLButtonElement>('nav button')].find((node) => node.textContent === 'a.ts')?.title).toMatch(/a\.ts$/);
   await edit('正在编写的函数'); expect(page.text()).toContain('代码 · 未保存');
   await page.click('预览'); expect(page.text()).toContain('编辑器有未保存输入');
   await page.click('收起'); expect(document.querySelector('[role="region"][aria-label="CLI 区"]')?.closest('[hidden]')).toBeNull();
@@ -47,7 +51,7 @@ test('文件树换文件和工具栏关闭均明确放弃；在途保存锁住�
   await page.click('关闭'); expect(page.text()).toContain('关闭编辑器'); await page.click('继续编辑');
   const button = (text: string) => [...document.querySelectorAll<HTMLButtonElement>('button')].find((node) => node.textContent?.trim() === text)!;
   await act(async () => button('保存').click()); await page.settle();
-  expect(button('关闭').disabled).toBe(true); expect(button('·b.ts').disabled).toBe(true);
+  expect(button('关闭').disabled).toBe(true); expect(button('b.ts').disabled).toBe(true);
   await page.click('会话与环境'); await page.click('释放会话'); expect(page.text()).toContain('本页面编辑器「a.ts」有未保存输入'); expect(page.text()).toContain('未包含在下方 Git 清单中');
   expect(button('确认释放').disabled).toBe(true); expect(page.text()).toContain('编辑器正在读写文件');
   await act(async () => fixture!.finishWrite()); await page.settle();

@@ -39,7 +39,7 @@ test('无参数进入按个人布局打开面板并把形态写回地址；放�
   await page.click('放大'); expect(page.search()).toEqual({ view: 'changes', panel: 'full' }); expect(panel().dataset.mode).toBe('full'); expect(workspaceHidden()).toBe(true);
   await page.click('还原'); expect(page.search()).toEqual({ view: 'changes' }); expect(workspaceHidden()).toBe(false);
   await page.click('收起'); expect(page.search()).toEqual({ view: 'cli' }); expect(panel().dataset.mode).toBe('closed');
-  expect([...panel().querySelectorAll('button')].filter((node) => !node.closest('[hidden]')).map((node) => node.textContent)).toEqual(['预览', '代码', '变更', '数据访问', '参考', '会话与环境']);
+  expect([...panel().querySelectorAll('button')].filter((node) => !node.closest('[hidden]')).map((node) => node.textContent)).toEqual(['预览', '代码', '变更', '数据访问', '可使用资源', '会话与环境']);
   await page.click('预览'); expect(page.search()).toEqual({ view: 'preview' }); expect(panelTab()).toBe('预览'); expect(page.text()).toContain('开发预览');
   page.unmount(); page = undefined; await new Promise((resolve) => setTimeout(resolve, 0));
   // 面板状态进个人布局，并回填旧字段：预览在旁即 previewAlongside，比例沿用。
@@ -109,7 +109,7 @@ test('页头连接状态芯片打开会话面板；底部版本条的「查看�
 test('开着面板从左栏去别的页：离开途中的地址不算「无参数进入」，跳转不被拽回开发页', async () => {
   layoutFixture({ ...initialWorkspaceLayout('工作区 1'), tool: { name: 'reference', mode: 'side', ratio: 0.45 } });
   page = await renderApp(`${path}?view=reference`);
-  expect(panelTab()).toBe('参考');
+  expect(panelTab()).toBe('可使用资源');
   // 2026-09-23 实机：路由在跳转一开始就发布新地址，发布页提交前开发页仍挂着；它把 /release（没有 view）当成无参数进入，
   // 用 replace 写回 ?view=reference，左栏点什么都被拽回开发页，像是页面卡死。
   await page.click('发布与上线');
@@ -119,7 +119,7 @@ test('开着面板从左栏去别的页：离开途中的地址不算「无参�
   await page.click('运行与诊断'); expect(page.path()).toBe(`/projects/${activityProjectId}/operations`);
 });
 
-test('预览与代码占满面板正文，其余面板按内容排：包内容的那层给定高，内容自己的 height: 100% 才落得住', async () => {
+test('预览、代码与变更占满面板正文，其余面板按内容排：包内容的那层给定高，内容自己的 height: 100% 才落得住', async () => {
   layoutFixture();
   // 2026-09-23 实机 1440×900：面板正文 651px，预览只有 266px（iframe 停在 200px 下限）、编辑器 241px；打开文件后编辑器按全文撑高，
   // 连保存按钮一起在面板里滚走。RFC-020 把两者从定高的整页搬进面板，包它们的这层没有高度，height: 100% 落了空。
@@ -131,7 +131,7 @@ test('预览与代码占满面板正文，其余面板按内容排：包内容�
     expect(shown).toHaveLength(1);
     filled[view] = shown[0]!.classList.contains('fill');
   }
-  expect(filled).toEqual({ preview: true, code: true, changes: false, data: false, reference: false, session: false });
+  expect(filled).toEqual({ preview: true, code: true, changes: true, data: false, reference: false, session: false });
   const styles = consoleStyles(), fullHeight = /(?:^|[;{\s])height\s*:\s*100%/;
   const rule = (file: string, selector: string) => new RegExp(`(?:^|\\})\\s*${selector.replace('.', '\\.')}\\s*\\{([^}]*)\\}`).exec(sourceAt(styles, file).code)?.[1] ?? '';
   expect(rule('dev-session/components/panel/ToolPanel.module.css', '.fill')).toMatch(fullHeight);

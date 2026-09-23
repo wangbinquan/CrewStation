@@ -8,6 +8,8 @@ export interface PaneProps {
   readonly footer?: ReactNode;
   /** 终端与编辑器自己占满，不要内边距。 */
   readonly flush?: boolean;
+  /** 嵌在工具面板页签里：页签已是外框与标题，这里不再画卡片、不重复标题，只留工具栏。 */
+  readonly embedded?: boolean;
   readonly className?: string;
   readonly children: ReactNode;
 }
@@ -16,11 +18,11 @@ export interface PaneProps {
  * 工作区面板：定高、标题栏常驻、内容区自己滚动。
  * 不用 shared/ui 的 Card：那里的内边距对终端与编辑器不合适，而定高是四个面板并排的前提。
  */
-export function Pane({ title, extra, notice, footer, flush = false, className, children }: PaneProps): ReactElement {
+export function Pane({ title, extra, notice, footer, flush = false, embedded = false, className, children }: PaneProps): ReactElement {
   return (
-    <section className={[styles.pane, className].filter(Boolean).join(' ')}>
+    <section className={[styles.pane, embedded ? styles.embedded : undefined, className].filter(Boolean).join(' ')}>
       <header className={styles.header}>
-        <h2 className={styles.title}>{title}</h2>
+        {embedded ? null : <h2 className={styles.title}>{title}</h2>}
         {extra !== undefined ? <div className={styles.extra}>{extra}</div> : null}
       </header>
       {notice !== undefined ? <div className={styles.notice}>{notice}</div> : null}

@@ -4,7 +4,6 @@ import type { ComparisonTarget } from '@crewstation/contracts';
 import { useDateText } from '../../../../shared/lib/useDateText';
 import { useT } from '../../../../shared/lib/useT';
 import { Button } from '../../../../shared/ui/Button';
-import { Card } from '../../../../shared/ui/Card';
 import { QueryStatus } from '../../../../shared/ui/QueryStatus';
 import type { TaskStreamChannel } from '../../hooks/useTaskStream';
 import { useVersionComparison } from '../../hooks/useVersionComparison';
@@ -29,23 +28,27 @@ export function VersionComparisonPanel({ projectId, taskId, channel, canDevelop,
     <Button variant="ghost" disabled={refreshing || history.isPending} onClick={() => void recheck()}>{t(refreshing ? 'devSession.compare.refreshing' : 'devSession.workspace.recheck')}</Button>
     {data && (query.isError || data.freshness === 'stale') ? <span title={`${date(data.checkedAt)} · ${t('devSession.compare.staleHint')}`}>{t('devSession.compare.staleShort')}</span> : null}
   </section>;
-  return <Card compact title={t(target === 'preview' ? 'devSession.compare.previewTitle' : 'devSession.compare.title')} extra={<>
-    {onTargetChange ? <select aria-label={t('devSession.compare.target')} value={target} disabled={history.isPending} onChange={(e) => onTargetChange(e.target.value as ComparisonTarget)}>
-      <option value="prod">{t('devSession.compare.production')}</option><option value="preview">{t('devSession.compare.preview')}</option></select> : null}
-    <Button variant="ghost" disabled={refreshing || history.isPending} onClick={() => void recheck()}>{t(refreshing ? 'devSession.compare.refreshing' : 'devSession.workspace.recheck')}</Button>
-    <Button variant="ghost" onClick={() => setExpanded(!expanded)} aria-expanded={expanded}>{t(expanded ? 'devSession.compare.collapse' : 'devSession.compare.details')}</Button>
-  </>}>
-    <QueryStatus isPending={query.isPending} error={query.error} />
-    {data ? <>
-      <ComparisonSummary comparison={data} />
-      <p className={styles.meta}>{t('devSession.workspace.checked', { at: date(data.checkedAt) })}{query.isError || data.freshness === 'stale' ? ` · ${t('devSession.compare.staleHint')}` : ''}</p>
-      {expanded ? <>
-        <p className={styles.meta}>{t('devSession.workspace.refsHint')}</p>
-        <p className={styles.meta}>{t('devSession.compare.historyHint')}</p>
-        <Button onClick={() => history.mutate(undefined)} disabled={!canDevelop || history.isPending || query.isFetching}>{t(history.isPending ? 'devSession.compare.historyPending' : 'devSession.compare.history')}</Button>
-        <QueryStatus isPending={false} error={history.error} />
-        {data.comparisonId && data.freshness === 'current' ? <ComparisonDetailsView key={`${projectId}:${taskId}:${target}`} projectId={projectId} comparisonId={data.comparisonId} comparison={data} onOpenFile={onOpenFile} /> : <PaneNotice tone="warning">{t('devSession.compare.staleHint')}</PaneNotice>}
+  const busy = refreshing || history.isPending;
+  // 变更页签直接铺满：操作钉在顶端，只有下面的内容滚动（2026-09-23，不再内嵌卡片）。
+  return <section className={styles.panel} aria-label={t(target === 'preview' ? 'devSession.compare.previewTitle' : 'devSession.compare.title')}>
+    <header className={styles.toolbar}>
+      {onTargetChange ? <label className={styles.target}>{t('devSession.compare.target')}<select value={target} disabled={history.isPending} onChange={(e) => onTargetChange(e.target.value as ComparisonTarget)}>
+        <option value="prod">{t('devSession.compare.production')}</option><option value="preview">{t('devSession.compare.preview')}</option></select></label> : null}
+      <Button size="small" disabled={busy} onClick={() => void recheck()}>{t(refreshing ? 'devSession.compare.refreshing' : 'devSession.workspace.recheck')}</Button>
+      <Button size="small" title={t('devSession.compare.historyHint')} onClick={() => history.mutate(undefined)} disabled={!canDevelop || busy || query.isFetching}>{t(history.isPending ? 'devSession.compare.historyPending' : 'devSession.compare.history')}</Button>
+      <Button size="small" onClick={() => setExpanded(!expanded)} aria-expanded={expanded}>{t(expanded ? 'devSession.compare.collapse' : 'devSession.compare.details')}</Button>
+    </header>
+    <div className={styles.body}>
+      <QueryStatus isPending={query.isPending} error={query.error} />
+      <QueryStatus isPending={false} error={history.error} />
+      {data ? <>
+        <ComparisonSummary comparison={data} />
+        <p className={styles.meta}>{t('devSession.workspace.checked', { at: date(data.checkedAt) })}{query.isError || data.freshness === 'stale' ? ` · ${t('devSession.compare.staleHint')}` : ''}</p>
+        {expanded ? <>
+          <p className={styles.meta}>{t('devSession.workspace.refsHint')}</p>
+          {data.comparisonId && data.freshness === 'current' ? <ComparisonDetailsView key={`${projectId}:${taskId}:${target}`} projectId={projectId} comparisonId={data.comparisonId} comparison={data} onOpenFile={onOpenFile} /> : <PaneNotice tone="warning">{t('devSession.compare.staleHint')}</PaneNotice>}
+        </> : null}
       </> : null}
-    </> : null}
-  </Card>;
+    </div>
+  </section>;
 }

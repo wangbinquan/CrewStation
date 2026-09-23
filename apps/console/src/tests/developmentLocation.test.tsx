@@ -73,7 +73,7 @@ test('差异别名与待验证目标接到实际查询，空 CLI 工作区也能
   page = await renderApp(`${path}?view=changes&target=preview`);
   expect(panelTab()).toContain('变更');
   expect(calls.some((url) => url.pathname.endsWith('/version-comparison') && url.searchParams.get('target') === 'preview')).toBe(true);
-  expect(page.text()).toContain('工作树与待验证版本'); await page.navigate(`${path}?view=split`);
+  expect(document.querySelector('section[aria-label="工作树与待验证版本"]')).not.toBeNull(); await page.navigate(`${path}?view=split`);
   expect(page.text()).toContain('开发预览'); expect(page.text()).toContain('创建第一个开发Agent会话');
   // RFC-020：工具在右侧面板里，「收起」回到纯终端（view=cli）；还没有 CLI 时 CLI 区中间是创建入口。
   await page.click('代码'); expect(page.search().view).toBe('code'); await page.click('收起'); expect(page.search().view).toBe('cli');

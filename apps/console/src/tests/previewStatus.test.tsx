@@ -108,3 +108,12 @@ test('StrictMode 中切换连接世代后旧查询不回写，动作在途换任
   await next.reply(0, 'crashed'); expect(h.current().status.state).toBe('crashed'); expect(h.current().error).toBeUndefined();
   expect(next.calls.every((call) => call.type === 'previewStatus')).toBe(true); expect(f.listeners.size).toBe(0);
 });
+
+test('预览直接铺进页签：工具栏在预览页之前，不再重复「开发预览」标题，说明收进状态提示', async () => {
+  const f = transport(); await mount(f); await f.event('ready');
+  const root = page!.host.querySelector('section')!; const [toolbar, frame] = [...root.children];
+  expect(toolbar!.tagName).toBe('HEADER'); expect(frame!.tagName).toBe('IFRAME');
+  expect(toolbar!.querySelector('strong')).toBeNull(); expect(page!.text()).not.toContain(messages['devSession.native.previewHint']);
+  expect(toolbar!.querySelector(`[title="${messages['devSession.native.previewHint']}"]`)?.textContent).toBe('就绪');
+  expect([...toolbar!.querySelectorAll('a')].map((a) => a.textContent)).toEqual(['新窗口打开预览']);
+});

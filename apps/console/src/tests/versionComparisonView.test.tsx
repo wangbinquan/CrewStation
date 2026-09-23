@@ -119,7 +119,7 @@ test('正在看的文件从新比较中移除时，仍能返回文件列表', as
 test('待验证版本显示对应差距和详情名称，文件定位与补历史作用于实际目标', async () => {
   const data = comparison(); data.deployment = { ...data.deployment, target: 'preview' }; data.commits = { status: 'ahead', ahead: 2, behind: 0 };
   const opened: string[] = [], page = await render(data, true, 'preview', (file) => opened.push(file));
-  expect(page.text()).toContain('工作树与待验证版本'); expect(page.text()).not.toContain('待上线 2');
+  expect(document.querySelector('section[aria-label="工作树与待验证版本"]')).not.toBeNull(); expect(page.text()).not.toContain('待上线 2');
   expect(page.text()).toContain('工作树独有 2 个提交'); await page.click('查看差异'); await page.click('相对待验证的文件差异'); await page.click('在代码中打开');
   expect(opened).toEqual(['file.txt']); expect(requests.some((request) => request.includes('target=preview'))).toBe(true);
   await page.click('补齐历史并重算'); expect(historyTargets).toEqual(['preview']);

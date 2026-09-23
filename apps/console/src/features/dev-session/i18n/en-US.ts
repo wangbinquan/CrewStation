@@ -11,7 +11,7 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   "devSession.native.view.cli": "CLI workspace",
   "devSession.native.view.data": "Data access",
   "devSession.native.view.session": "Session & environment",
-  "devSession.native.view.reference": "Reference",
+  "devSession.native.view.reference": "Available resources",
   "devSession.panel.label": "Tool panel",
   "devSession.panel.maximize": "Maximize",
   "devSession.panel.restore": "Restore",

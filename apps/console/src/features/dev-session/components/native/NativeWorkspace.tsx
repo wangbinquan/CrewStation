@@ -100,7 +100,7 @@ function toolPanes(props: NativeWorkspaceProps, t: Translate): ToolPane[] {
   const panes: ToolPane[] = [];
   panes.push({ name: 'preview', content: props.preview, fill: true });
   panes.push({ name: 'code', content: props.editor, keepMounted: true, fill: true, suffix: props.editorDirty ? t('devSession.editor.dirty') : undefined });
-  panes.push({ name: 'changes', content: props.changes });
+  panes.push({ name: 'changes', content: props.changes, fill: true });
   if (props.data !== undefined) panes.push({ name: 'data', content: props.data, keepMounted: true, suffix: props.dataDirty ? t('devSession.editor.dirty') : undefined });
   if (props.reference !== undefined) panes.push({ name: 'reference', content: props.reference, keepMounted: true });
   if (props.environment !== undefined) panes.push({ name: 'session', content: props.environment, keepMounted: true });

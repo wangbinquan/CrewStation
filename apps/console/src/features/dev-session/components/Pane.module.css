@@ -10,6 +10,17 @@
   overflow: hidden;
 }
 
+.embedded {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.embedded .header {
+  min-height: 44px;
+  justify-content: flex-start;
+}
+
 .header {
   display: flex;
   align-items: center;
@@ -47,6 +58,10 @@
   padding: var(--cs-space-2) var(--cs-space-3);
   border-bottom: 1px solid var(--cs-color-border);
   background: var(--cs-color-surface);
+}
+
+.notice:empty {
+  display: none;
 }
 
 .bodyFlush {

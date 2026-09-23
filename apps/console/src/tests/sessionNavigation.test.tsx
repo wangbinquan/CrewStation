@@ -17,7 +17,7 @@ test('六个工具页签与个人工作区分层，往返保留代码和数据�
   f = editorWorkspaceFixture(); page = await renderApp(`${path}?view=code&file=a.ts`);
   // RFC-020 D1：工具在终端旁的面板里，一排页签；终端工作区的页签是另一层。
   const tabs = document.querySelector('[role="tablist"][aria-label="工具面板"]')!;
-  expect([...tabs.querySelectorAll('[role="tab"]')].map((node) => node.textContent)).toEqual(['预览', '代码', '变更', '数据访问', '参考', '会话与环境']);
+  expect([...tabs.querySelectorAll('[role="tab"]')].map((node) => node.textContent)).toEqual(['预览', '代码', '变更', '数据访问', '可使用资源', '会话与环境']);
   const editor = document.querySelector<HTMLElement>('.cm-content')!, view = EditorView.findFromDOM(editor)!;
   await act(async () => view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: '跨功能页保留的代码' } }));
   await page.click('数据访问'); expect(page.search().view).toBe('data');

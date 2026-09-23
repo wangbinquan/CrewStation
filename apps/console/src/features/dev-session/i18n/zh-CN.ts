@@ -10,7 +10,7 @@ export const messages = {
   "devSession.native.view.cli": "CLI 工作区",
   "devSession.native.view.data": "数据访问",
   "devSession.native.view.session": "会话与环境",
-  "devSession.native.view.reference": "参考",
+  "devSession.native.view.reference": "可使用资源",
   "devSession.panel.label": "工具面板",
   "devSession.panel.maximize": "放大",
   "devSession.panel.restore": "还原",

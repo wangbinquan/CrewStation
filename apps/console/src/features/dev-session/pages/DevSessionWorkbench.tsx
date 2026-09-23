@@ -111,7 +111,7 @@ export function DevSessionWorkbench({ projectId, session, access, canDevelop, se
           <ButtonLink size="small" to={PROJECT_PATHS[space].conversations} params={{ projectId }}>{t('devSession.native.history')}</ButtonLink>
           <SessionCard session={session} stream={state} access={access} release={release} unsavedFile={editor.dirty ? editor.file?.path : undefined} editorBusy={editor.busy} dataAccessDirty={dataDirty} dataAccessBusy={data.busy} onOpenFile={location.openFile} />
         </Stack>}
-        preview={<DevelopmentPreview preview={preview} previewHost={session.previewHost} connected={state.runnerConnected} logs={<ButtonLink variant="ghost" to={PROJECT_PATHS[space].operations} params={{ projectId }} search={{ tab: 'logs', source: 'dev-session', taskId }}>{t('devSession.preview.logs')}</ButtonLink>} />}
+        preview={<DevelopmentPreview preview={preview} previewHost={session.previewHost} connected={state.runnerConnected} logs={<ButtonLink size="small" to={PROJECT_PATHS[space].operations} params={{ projectId }} search={{ tab: 'logs', source: 'dev-session', taskId }}>{t('devSession.preview.logs')}</ButtonLink>} />}
         editor={<EditorPane tree={tree} editor={{ ...editor, openFile: location.openFile }} serviceId={serviceId} connected={state.runnerConnected} />}
         changes={<VersionComparisonPanel projectId={projectId} taskId={taskId} channel={channel} canDevelop={canDevelop} initiallyExpanded target={location.search.target ?? 'prod'} onTargetChange={location.selectTarget} onOpenFile={location.openFile} />} />
     </>

@@ -7,6 +7,8 @@
 .pane[hidden] { display: none; }
 /* 预览与代码的根是 height: 100%：外层要有定高才落得住，否则按内容缩成一截（编辑器则按全文撑高、连工具栏一起滚走）。 */
 .fill { height: 100%; }
+/* 预览与代码直接铺进页签，不再内缩成一张嵌套卡片。 */
+.pane.fill { padding: 0; }
 /* 文档式面板（变更、数据、参考、会话）：至少一屏高、最后一项长满——内容短时把最后一张卡拉到面板底边，长了由面板正文滚动。 */
 .flow { min-height: 100%; display: flex; flex-direction: column; }
 .flow > :last-child { flex-grow: 1; }

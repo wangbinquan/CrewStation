@@ -64,6 +64,7 @@ export function EditorPane({ tree, editor, serviceId, connected = true }: Editor
       title={t('devSession.editor.title')}
       className={styles.pane}
       flush
+      embedded
       extra={<Toolbar editor={editor} connected={connected} />}
       notice={<>
         {serviceId && editor.file?.path === 'crewstation.yaml' && /crewstation\/v1/.test(editor.draft) ? <ManifestUpgradeNotice serviceId={serviceId} editor={editor} /> : null}

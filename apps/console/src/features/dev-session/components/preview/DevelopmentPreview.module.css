@@ -1,5 +1,6 @@
-.preview { display: flex; flex-direction: column; height: 100%; min-height: 0; min-width: 0; border: 1px solid var(--cs-color-border); background: var(--cs-color-surface); border-radius: var(--cs-radius-sm); }
-.preview > header { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; font-size: 12px; padding: 4px 8px; border-bottom: 1px solid var(--cs-color-border); }
-.preview > p { font-size: 12px; color: var(--cs-color-text-muted); padding: 4px 8px; margin: 0; }
-.frame { flex: 1; width: 100%; min-height: 200px; border: 0; background: white; }
-.empty { padding: 12px; color: var(--cs-color-text-muted); }
+.preview { display: flex; flex-direction: column; height: 100%; min-height: 0; min-width: 0; background: var(--cs-color-surface); }
+/* 工具栏不参与滚动：根是定高的纵向 flex，只有下面的预览页占满剩余高度。 */
+.toolbar { flex-shrink: 0; display: flex; align-items: center; flex-wrap: wrap; gap: var(--cs-space-2); padding: var(--cs-space-2) var(--cs-space-3); border-bottom: 1px solid var(--cs-color-border); }
+.error { flex-shrink: 0; margin: 0; padding: var(--cs-space-1) var(--cs-space-3); font-size: 12px; color: var(--cs-tone-warning-fg); border-bottom: 1px solid var(--cs-color-border); }
+.frame { flex: 1; min-height: 0; width: 100%; border: 0; background: white; }
+.empty { flex: 1; padding: var(--cs-space-4); color: var(--cs-color-text-muted); }

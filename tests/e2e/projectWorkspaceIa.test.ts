@@ -64,26 +64,28 @@ describe.skipIf(!session?.project)('项目工作台信息架构（RFC-020）', (
     await page.eval(`[...document.querySelectorAll('button')].find((node) => node.textContent === '收起').click()`); await settle(page);
     expect(await page.eval<string>('location.search')).toContain('view=cli');
     expect(await page.eval<string>(`document.querySelector('aside[aria-label="工具面板"]').dataset.mode`)).toBe('closed');
-    await page.eval(`[...document.querySelectorAll('aside[aria-label="工具面板"] button')].find((node) => node.textContent === '参考').click()`); await settle(page);
+    await page.eval(`[...document.querySelectorAll('aside[aria-label="工具面板"] button')].find((node) => node.textContent === '可使用资源').click()`); await settle(page);
     expect(await page.eval<string>('location.search')).toContain('view=reference');
     expect(page.takeErrors()).toEqual([]);
   }, 60_000);
 
-  test('WS-07：预览与代码占满工具面板（在旁与放大），打开文件后编辑器在自己内部滚动', async () => {
+  test('WS-07：预览、代码与变更占满工具面板（在旁与放大），不内嵌卡片，顶端操作条贴住面板正文顶边，内容在自己内部滚动', async () => {
     const page = session!.admin, id = session!.project!.id;
     await viewport(page, 1440);
     // 2026-09-23 实机：面板正文 651px，预览只占 266px（iframe 停在 200px 下限）、编辑器 241px；打开文件后编辑器按全文撑高，连保存按钮一起在面板里滚走。
-    for (const query of ['view=preview', 'view=preview&panel=full', 'view=code&file=crewstation.yaml']) {
+    // 2026-09-23 作者裁定：三者直接铺进页签，不再内缩成带边框的嵌套卡片，按钮在最上面不随内容滚动。
+    for (const query of ['view=preview', 'view=preview&panel=full', 'view=code&file=crewstation.yaml', 'view=changes']) {
       await open(page, `/projects/${id}/dev-session?${query}`);
       await page.waitUntil(`document.querySelector('aside[aria-label="工具面板"]')?.dataset.mode !== 'closed'`);
       if (query.includes('file=')) await page.waitUntil(`!!document.querySelector('aside[aria-label="工具面板"] .cm-editor')`).catch(() => undefined);
-      const fit = await page.eval<{ gap: number; overflow: number }>(`(() => {
+      const fit = await page.eval<{ gap: number; overflow: number; top: number; border: number }>(`(() => {
         const body = document.querySelector('aside[aria-label="工具面板"] > div > [role="tabpanel"]');
-        const content = [...body.children].find((node) => !node.hidden).firstElementChild;
-        return { gap: Math.round(body.getBoundingClientRect().bottom - content.getBoundingClientRect().bottom), overflow: body.scrollHeight - body.clientHeight };
+        const content = [...body.children].find((node) => !node.hidden).firstElementChild, toolbar = content.querySelector('header');
+        return { gap: Math.round(body.getBoundingClientRect().bottom - content.getBoundingClientRect().bottom), overflow: body.scrollHeight - body.clientHeight,
+          top: Math.round(toolbar.getBoundingClientRect().top - body.getBoundingClientRect().top), border: parseFloat(getComputedStyle(content).borderLeftWidth) };
       })()`);
-      // 内容底边离面板正文底边只剩内边距（8px）；正文自己不出现滚动，长文件在编辑器里滚。
-      expect(fit.gap).toBeLessThanOrEqual(12); expect(fit.overflow).toBeLessThanOrEqual(1);
+      // 内容铺到面板正文底边；正文自己不出现滚动，长文件在编辑器里滚；操作条贴住顶边、外层没有卡片边框。
+      expect([query, fit.gap <= 1, fit.overflow <= 1, fit.top <= 1, fit.border]).toEqual([query, true, true, true, 0]);
     }
     expect(page.takeErrors()).toEqual([]);
   }, 60_000);
@@ -104,11 +106,11 @@ describe.skipIf(!session?.project)('项目工作台信息架构（RFC-020）', (
     expect(page.takeErrors()).toEqual([]);
   }, 60_000);
 
-  test('WS-07：文档式面板内容短时最后一张卡拉到面板底边（变更、数据访问、参考、会话与环境，1440×900 在旁）', async () => {
+  test('WS-07：文档式面板内容短时最后一张卡拉到面板底边（数据访问、可使用资源、会话与环境，1440×900 在旁）', async () => {
     const page = session!.admin, id = session!.project!.id;
     await viewport(page, 1440);
     // 2026-09-23 作者裁定：变更卡原止于 641px、面板正文到 783px，下方一大块留白。
-    for (const view of ['changes', 'data', 'reference', 'session']) {
+    for (const view of ['data', 'reference', 'session']) {
       await open(page, `/projects/${id}/dev-session?view=${view}`);
       await page.waitUntil(`document.querySelector('aside[aria-label="工具面板"]')?.dataset.mode === 'side'`);
       const reach = await page.eval<number>(`(() => {

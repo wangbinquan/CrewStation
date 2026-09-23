@@ -11,7 +11,7 @@ export interface ToolPane {
   readonly content: ReactNode;
   /** 代码与数据面板带草稿，收起也保持挂载；预览与变更只在打开时渲染。 */
   readonly keepMounted?: boolean;
-  /** 预览与代码占满面板正文、在自己内部滚动（RFC-003「独立预览占满工作内容区」）；其余是文档式内容：至少一屏高、最后一项长满，长了由面板正文滚动。 */
+  /** 预览、代码与变更占满面板正文、顶端操作条定住、在自己内部滚动（RFC-003「独立预览占满工作内容区」）；其余是文档式内容：至少一屏高、最后一项长满，长了由面板正文滚动。 */
   readonly fill?: boolean;
   /** 页签后缀：未保存、待处理数。 */
   readonly suffix?: string;

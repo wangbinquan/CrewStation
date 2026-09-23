@@ -30,7 +30,7 @@ test('没有会话时参考面板从主区打开：在旁只列已授权操作�
 
 test('有会话时参考面板与其他工具并列；事件主题的链接指向代码面板与投递页', async () => {
   fixture = editorWorkspaceFixture(); page = await renderApp(`/projects/${activityProjectId}/dev-session?view=reference&topic=events`);
-  expect(panelTab()).toBe('参考'); expect(topicTab()).toBe('事件');
+  expect(panelTab()).toBe('可使用资源'); expect(topicTab()).toBe('事件');
   const links = [...document.querySelectorAll('a')];
   expect(links.find((link) => link.textContent?.includes('打开订阅声明'))?.getAttribute('href')).toContain('file=crewstation.yaml');
   expect(links.find((link) => link.textContent?.includes('最近投递'))?.getAttribute('href')).toContain('tab=deliveries');

@@ -52,16 +52,20 @@ test('文档式面板内容短时把最后一张卡拉到面板底边：面板�
   expect(declarations('features/catalog/components/CatalogContent.module.css', '.fill > :last-child')).toMatch(/flex-grow:\s*1/);
 });
 
-test('开发页四个文档式面板都按 flow 排，最后一项一路点名长满：数据与会话的 Stack，参考的 Stack、Tabs 与紧凑目录', async () => {
+test('开发页三个文档式面板都按 flow 排，最后一项一路点名长满：数据与会话的 Stack，可使用资源的 Stack、Tabs 与紧凑目录；变更铺满、操作条定在顶端', async () => {
   fixture = editorWorkspaceFixture();
   const path = `/projects/${activityProjectId}/dev-session`;
   const shown = () => [...document.querySelector('aside[aria-label="工具面板"] [role="tabpanel"]')!.children].find((node) => !(node as HTMLElement).hidden)!;
   const classes = (node: Element | null | undefined) => node?.className.split(' ') ?? [];
-  for (const view of ['changes', 'data', 'session', 'reference']) {
-    if (page) await page.navigate(`${path}?view=${view}`); else page = await renderApp(`${path}?view=${view}`);
+  page = await renderApp(`${path}?view=changes`);
+  const changes = shown(); expect(classes(changes)).toEqual(['pane', 'fill']);
+  const [toolbar, body] = [...changes.firstElementChild!.children];
+  expect([changes.children.length, changes.firstElementChild!.tagName, toolbar!.tagName, classes(body)]).toEqual([1, 'SECTION', 'HEADER', ['body']]);
+  expect(declarations('features/dev-session/components/workspace/VersionComparisonPanel.module.css', '.body')).toMatch(/overflow:\s*auto/);
+  for (const view of ['data', 'session', 'reference']) {
+    await page.navigate(`${path}?view=${view}`);
     const pane = shown();
     expect([view, ...classes(pane)]).toEqual([view, 'pane', 'flow']);
-    if (view === 'changes') { expect(pane.children).toHaveLength(1); expect(pane.firstElementChild!.tagName).toBe('SECTION'); }
     if (view === 'data' || view === 'session') expect([view, ...classes(pane.lastElementChild)]).toContain('fill');
     if (view === 'reference') {
       const stack = pane.lastElementChild, tabs = stack?.lastElementChild, body = [...tabs?.children ?? []].find((node) => node.getAttribute('role') === 'tabpanel');
