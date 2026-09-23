@@ -6,6 +6,7 @@ import { initialWorkspaceLayout } from '../features/dev-session/model/layout/wor
 import { activityProjectId } from './agentActivityFixture';
 import { editorWorkspaceFixture } from './editorWorkspaceFixture';
 import { renderApp } from './renderApp';
+import { consoleStyles, sourceAt } from './sourceScan';
 
 let page: Awaited<ReturnType<typeof renderApp>> | undefined, fixture: ReturnType<typeof editorWorkspaceFixture> | undefined;
 const originalObserver = globalThis.ResizeObserver;
@@ -115,4 +116,24 @@ test('开着面板从左栏去别的页：离开途中的地址不算「无参�
   // 从左栏回开发页仍按设计恢复在旁；重新挂载后再离开，同样不被拽回。
   await page.navigate(path); expect(page.path()).toBe(path); expect(page.search()).toEqual({ view: 'reference' });
   await page.click('运行与诊断'); expect(page.path()).toBe(`/projects/${activityProjectId}/operations`);
+});
+
+test('预览与代码占满面板正文，其余面板按内容排：包内容的那层给定高，内容自己的 height: 100% 才落得住', async () => {
+  layoutFixture();
+  // 2026-09-23 实机 1440×900：面板正文 651px，预览只有 266px（iframe 停在 200px 下限）、编辑器 241px；打开文件后编辑器按全文撑高，
+  // 连保存按钮一起在面板里滚走。RFC-020 把两者从定高的整页搬进面板，包它们的这层没有高度，height: 100% 落了空。
+  // happy-dom 不排版：这里锁结构与样式链，实际高度由 e2e projectWorkspaceIa 量。
+  const filled: Record<string, boolean> = {};
+  for (const view of ['preview', 'code', 'changes', 'data', 'reference', 'session']) {
+    if (page) await page.navigate(`${path}?view=${view}`); else page = await renderApp(`${path}?view=${view}`);
+    const shown = [...panel().querySelector('[role="tabpanel"]')!.children].filter((node) => !(node as HTMLElement).hidden);
+    expect(shown).toHaveLength(1);
+    filled[view] = shown[0]!.classList.contains('fill');
+  }
+  expect(filled).toEqual({ preview: true, code: true, changes: false, data: false, reference: false, session: false });
+  const styles = consoleStyles(), fullHeight = /(?:^|[;{\s])height\s*:\s*100%/;
+  const rule = (file: string, selector: string) => new RegExp(`(?:^|\\})\\s*${selector.replace('.', '\\.')}\\s*\\{([^}]*)\\}`).exec(sourceAt(styles, file).code)?.[1] ?? '';
+  expect(rule('dev-session/components/panel/ToolPanel.module.css', '.fill')).toMatch(fullHeight);
+  expect(rule('dev-session/components/preview/DevelopmentPreview.module.css', '.preview')).toMatch(fullHeight);
+  expect(rule('dev-session/components/editor/EditorPane.module.css', '.pane')).toMatch(fullHeight);
 });

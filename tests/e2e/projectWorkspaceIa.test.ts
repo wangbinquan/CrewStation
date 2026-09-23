@@ -69,6 +69,25 @@ describe.skipIf(!session?.project)('项目工作台信息架构（RFC-020）', (
     expect(page.takeErrors()).toEqual([]);
   }, 60_000);
 
+  test('WS-07：预览与代码占满工具面板（在旁与放大），打开文件后编辑器在自己内部滚动', async () => {
+    const page = session!.admin, id = session!.project!.id;
+    await viewport(page, 1440);
+    // 2026-09-23 实机：面板正文 651px，预览只占 266px（iframe 停在 200px 下限）、编辑器 241px；打开文件后编辑器按全文撑高，连保存按钮一起在面板里滚走。
+    for (const query of ['view=preview', 'view=preview&panel=full', 'view=code&file=crewstation.yaml']) {
+      await open(page, `/projects/${id}/dev-session?${query}`);
+      await page.waitUntil(`document.querySelector('aside[aria-label="工具面板"]')?.dataset.mode !== 'closed'`);
+      if (query.includes('file=')) await page.waitUntil(`!!document.querySelector('aside[aria-label="工具面板"] .cm-editor')`).catch(() => undefined);
+      const fit = await page.eval<{ gap: number; overflow: number }>(`(() => {
+        const body = document.querySelector('aside[aria-label="工具面板"] > div > [role="tabpanel"]');
+        const content = [...body.children].find((node) => !node.hidden).firstElementChild;
+        return { gap: Math.round(body.getBoundingClientRect().bottom - content.getBoundingClientRect().bottom), overflow: body.scrollHeight - body.clientHeight };
+      })()`);
+      // 内容底边离面板正文底边只剩内边距（8px）；正文自己不出现滚动，长文件在编辑器里滚。
+      expect(fit.gap).toBeLessThanOrEqual(12); expect(fit.overflow).toBeLessThanOrEqual(1);
+    }
+    expect(page.takeErrors()).toEqual([]);
+  }, 60_000);
+
   test('WS-14：发布页有合并的发布记录时间线，待验证卡上是上线／回退或负责人说明', async () => {
     const page = session!.admin, id = session!.project!.id;
     await viewport(page, 1440); await open(page, `/projects/${id}/release`);

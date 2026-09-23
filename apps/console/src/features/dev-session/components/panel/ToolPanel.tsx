@@ -11,6 +11,8 @@ export interface ToolPane {
   readonly content: ReactNode;
   /** 代码与数据面板带草稿，收起也保持挂载；预览与变更只在打开时渲染。 */
   readonly keepMounted?: boolean;
+  /** 预览与代码占满面板正文、在自己内部滚动（RFC-003「独立预览占满工作内容区」）；其余按内容排，由面板正文滚动。 */
+  readonly fill?: boolean;
   /** 页签后缀：未保存、待处理数。 */
   readonly suffix?: string;
   readonly disabled?: boolean;
@@ -38,7 +40,7 @@ export function ToolPanel({ active, mode, panes, onSelect, onToggleMode, onClose
   const body = panes.map((pane) => {
     const visible = pane.name === current && mode !== 'closed';
     if (!visible && !pane.keepMounted) return null;
-    return <div key={pane.name} className={styles.pane} hidden={!visible}>{pane.disabled ? <p className={styles.note}>{t('devSession.panel.needsSession')}</p> : pane.content}</div>;
+    return <div key={pane.name} className={pane.fill ? `${styles.pane} ${styles.fill}` : styles.pane} hidden={!visible}>{pane.disabled ? <p className={styles.note}>{t('devSession.panel.needsSession')}</p> : pane.content}</div>;
   });
   if (mode === 'closed') return <aside className={styles.rail} aria-label={t('devSession.panel.label')} data-mode="closed">
     {panes.map((pane) => <Button key={pane.name} variant="ghost" className={styles.railTab} disabled={pane.disabled} title={t('devSession.panel.open', { tool: label(pane) })} onClick={() => onSelect(pane.name)}>{label(pane)}</Button>)}

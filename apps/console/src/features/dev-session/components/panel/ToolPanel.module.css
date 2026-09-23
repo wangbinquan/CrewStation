@@ -5,6 +5,8 @@
 .panel [role="tabpanel"] { flex: 1; min-height: 0; overflow: auto; padding: 0; }
 .pane { padding: var(--cs-space-2) var(--cs-space-3); min-width: 0; overflow-wrap: anywhere; }
 .pane[hidden] { display: none; }
+/* 预览与代码的根是 height: 100%：外层要有定高才落得住，否则按内容缩成一截（编辑器则按全文撑高、连工具栏一起滚走）。 */
+.fill { height: 100%; }
 .control { padding: 3px 8px; font-size: 12px; }
 .note { font-size: 12px; color: var(--cs-color-text-muted); padding: 0 8px; }
 .gutter { grid-column: 2; align-self: stretch; cursor: col-resize; border-radius: 3px; background: linear-gradient(var(--cs-color-border), var(--cs-color-border)) center / 2px 100% no-repeat; }

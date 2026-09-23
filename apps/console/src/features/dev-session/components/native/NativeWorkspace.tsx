@@ -65,8 +65,8 @@ export function NativeWorkspace(props: NativeWorkspaceProps): ReactElement {
   const terminalContent = visible.length === 0 ? <div className={styles.empty}><strong>{t(blockedReason ? 'devSession.native.notReady' : 'devSession.native.empty')}</strong><p>{blockedReason ?? t('devSession.native.emptyHint')}</p>{blockedReason && props.environment ? <Button onClick={() => panel.select('session')}>{t('devSession.connection.details')}</Button> : null}</div> : screen;
   const counts = activityCounts(task);
   const panes: ToolPane[] = [];
-  panes.push({ name: 'preview', content: props.preview });
-  panes.push({ name: 'code', content: props.editor, keepMounted: true, suffix: editorDirty ? t('devSession.editor.dirty') : undefined });
+  panes.push({ name: 'preview', content: props.preview, fill: true });
+  panes.push({ name: 'code', content: props.editor, keepMounted: true, fill: true, suffix: editorDirty ? t('devSession.editor.dirty') : undefined });
   panes.push({ name: 'changes', content: props.changes });
   if (props.data !== undefined) panes.push({ name: 'data', content: props.data, keepMounted: true, suffix: dataDirty ? t('devSession.editor.dirty') : undefined });
   if (props.reference !== undefined) panes.push({ name: 'reference', content: props.reference, keepMounted: true });

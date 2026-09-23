@@ -492,6 +492,26 @@ TanStack Router 只给声明了 `errorComponent`（或路由器上有 `defaultEr
 下限必须在**换内容的那次提交**就带上（hook 按内容键在渲染期判断）：先塌再在效应里撑是没用的——同一次提交里别处的布局读取（页签条量宽度）已经让浏览器按塌掉的高度钳了滚动位置，之后撑高也回不来（2026-09-23 第二次实机就红在这里）。
 也不要用固定 `min-height` 兜底——它挡不住深滚动位置，还会在内容真的变短时留一大块空白。
 
+### 把定高页面里的组件搬进面板：`height: 100%` 要外层有定高
+
+2026-09-23 实撞：RFC-020 把开发页的预览与编辑器从定高的整页（`.contentStage { height: calc(100dvh - 180px) }`）搬进右侧工具面板，
+包每个面板的那层 `<div>` 只有内边距、没有高度，组件自己的 `height: 100%` 就按 auto 算了：预览缩到 iframe 的 `min-height` 200px，
+编辑器反而按全文撑高（CodeMirror 的 `.cm-editor { height: 100% }` 落空后就是整篇文档的高度），连工具栏一起在面板里滚走。
+happy-dom 不排版，渲染用例照绿。
+**判据**：实量内容底边离容器底边差一大截；或容器的 `scrollHeight` 远大于 `clientHeight`，而编辑器自己的 `.cm-scroller` 不滚。
+**做法**：要占满的内容给一层有定高的外壳（`ToolPanel` 的 `.fill { height: 100% }`，它的父级面板正文是定高的弹性子项）；
+用例用 `sourceScan` 锁住整条样式链，实际高度交给 e2e 实量（`devSessionPanel`、`projectWorkspaceIa`）。
+
+### 不动共享部署，在真浏览器里核对自己构建的工作台：CDP 只换 `/assets/*`
+
+本机 console 常被并行会话来回滚动，为核对自己的改动去滚 console 会冲掉别人正在做的实机核对。做法：`docker build` 出镜像但不部署，
+`docker cp` 取出 `/srv/dist`；无头 Chrome 的页面上 `Fetch.enable({ patterns: [{ urlPattern: 'http://console.cs.localhost/assets/*' }] })`，
+在 `Fetch.requestPaused` 里把 `index-*.js`／`index-*.css` 用 `Fetch.fulfillRequest` 换成本地构建的同类文件，其余一律 `continueRequest`；
+登录、接口与任务流仍走真实后端。
+**坑**：不要连文档（`resourceType: 'Document'`）一起换成本地的 `index.html`——2026-09-23 这样做时开发页一直「重连中」，预览与编辑器都出不来，
+只换 assets 时同一个包「已连接」；原因没有深究。还要先 `Network.setCacheDisabled`：缓存命中的 `index-*.js` 不经过拦截，同一脚本不关缓存时量到的是线上包
+（预览 iframe 仍是 200px，关掉后 569px）。核对前在页面里确认 `document.styleSheets` 里有新规则，免得核对的是线上包。
+
 ## 用例与 CI
 
 规范正文在 `testing.md`；这里只记撞过的坑。
