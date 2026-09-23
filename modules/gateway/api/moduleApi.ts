@@ -26,6 +26,8 @@ export interface GatewayModuleApi {
   currentAllowlist(): Promise<AllowlistDocument | undefined>;
   evaluate(caller: WorkloadIdentity, target: EvaluationTarget): Promise<Evaluation>;
   lookupByIp(ip: string): Promise<WorkloadIdentity | undefined>;
+  /** 身份索引的墓碑清理（RFC-025 提案 Q5）：标为删除超过 7 天的行删掉；返回条数。cs-controller 每小时跑一次。 */
+  purgeIdentityTombstones(): Promise<number>;
 
   // —— RFC-021：正式版本维护 ——
   getMaintenance(actor: Actor, serviceId: ServiceId): Promise<ServiceMaintenanceView>;

@@ -251,6 +251,8 @@ ResourceActionSchema = z.object({ id: ResourceActionIdSchema, enabled: z.boolean
 - 墓碑按提案 Q5 的期限清理（今天 695 行里 666 行从未清理，audit §1.8）。
 - 放行表仍是网关的领域规则，照旧由事件触发重算；新增定时全量核对，结果不一致时写进路由记录的条件。
 
+> **实施补记（2026-09-24，墓碑）**：墓碑清理先做——cs-controller 每小时删掉标为删除超过 7 天的身份行（按 IP 反查与在册清单本就不读墓碑，同名 Pod 回来时那一行照旧复活）。补投影、墓碑清理这类定时作业共用 `packages/resource-runtime` 的 `periodicJob`（启动先跑一次、同一时刻只跑一轮、失败只告警）。身份索引改读观测在后。
+
 ## 8. 推送流
 
 ### 8.1 协议（B5）

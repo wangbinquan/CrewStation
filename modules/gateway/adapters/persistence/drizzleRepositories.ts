@@ -1,6 +1,6 @@
 import type { AllowlistDocument, RouteEntry, WorkloadKind } from '@crewstation/contracts';
 import type { Executor } from '@crewstation/persistence';
-import { and, desc, eq, isNull, lt, sql } from 'drizzle-orm';
+import { and, desc, eq, isNotNull, isNull, lt, sql } from 'drizzle-orm';
 import type { PodIdentityRecord } from '../../domain/podIdentity';
 import type { AllowlistRepository, PodIdentityRepository, RouteRepository } from '../../ports/repositories';
 import { allowlists, podIdentities, routes } from './tables';
@@ -33,6 +33,8 @@ export function drizzlePodIdentityRepository(db: Executor): PodIdentityRepositor
     },
     pruneStale: async (before, at) => (await db.update(podIdentities).set({ deletedAt: at, updatedAt: at })
       .where(and(isNull(podIdentities.deletedAt), lt(podIdentities.updatedAt, before))).returning({ podName: podIdentities.podName })).length,
+    purgeTombstones: async (before) => (await db.delete(podIdentities)
+      .where(and(isNotNull(podIdentities.deletedAt), lt(podIdentities.deletedAt, before))).returning({ podName: podIdentities.podName })).length,
     markDeleted: async (podName, namespace, at) => {
       await db.update(podIdentities).set({ deletedAt: at, updatedAt: at }).where(and(eq(podIdentities.namespace, namespace), eq(podIdentities.podName, podName)));
     },

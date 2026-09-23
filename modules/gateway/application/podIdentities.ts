@@ -1,6 +1,6 @@
 import type { WorkloadIdentity } from '@crewstation/contracts';
 import type { PodLabels } from '../domain/podIdentity';
-import { identityFromLabels, toWorkloadIdentity } from '../domain/podIdentity';
+import { identityFromLabels, TOMBSTONE_RETENTION_MS, toWorkloadIdentity } from '../domain/podIdentity';
 import type { GatewayUseCaseDeps } from './dependencies';
 
 export interface ObservedPod {
@@ -52,5 +52,7 @@ export function podIdentityUseCases(deps: GatewayUseCaseDeps) {
       return toWorkloadIdentity(record, prodPhysical);
     },
     listPodIdentities: () => deps.pods.listActive(),
+    /** 墓碑清理（RFC-025 提案 Q5）：标为删除超过 7 天的行删掉；返回条数。 */
+    purgeTombstones: () => deps.pods.purgeTombstones(new Date(deps.clock.now().getTime() - TOMBSTONE_RETENTION_MS)),
   };
 }

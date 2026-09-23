@@ -26,6 +26,9 @@ export interface PodIdentityRecord {
 
 const WORKLOADS: readonly WorkloadKind[] = ['service', 'dev-session', 'business-task', 'platform'];
 
+/** 身份索引的墓碑（Pod 已不在的行）保留多久（RFC-025 提案 Q5：7 天）；按 IP 反查与在册清单都不读墓碑，过期即删。 */
+export const TOMBSTONE_RETENTION_MS = 7 * 24 * 3_600_000;
+
 export function identityFromLabels(labels: PodLabels): { project: string; service: string; workload: WorkloadKind; physicalSlot?: string; taskId?: string } | undefined {
   if (labels['app.kubernetes.io/managed-by'] !== 'crewstation') return undefined;
   const project = labels['crewstation.io/project'];

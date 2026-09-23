@@ -186,6 +186,22 @@ describe.skipIf(!available)('gateway module', () => {
     expect(await gateway.api.lookupByIp('10.244.0.10')).toBeUndefined();
   });
 
+  // RFC-025 提案 Q5：墓碑保留 7 天。本机 09-11 以来 695 行里 666 行是从未清理的墓碑（audit §1.8）。
+  test('身份索引墓碑：标为删除超过 7 天的行删掉，7 天之内的墓碑与在册的行不动', async () => {
+    const { drizzlePodIdentityRepository } = await import('../adapters/persistence/drizzleRepositories');
+    const { podIdentities } = await import('../adapters/persistence/tables');
+    const repo = drizzlePodIdentityRepository(tdb.db);
+    const day = 24 * 3_600_000, base = { namespace: 'cs-tomb', project: 'demo', service: 'demo', workload: 'service' as const, updatedAt: new Date() };
+    for (const [podName, ip] of [['tomb-old', '10.244.9.1'], ['tomb-recent', '10.244.9.2'], ['alive', '10.244.9.3']] as const) await repo.upsert({ ...base, podName, ip });
+    await repo.markDeleted('tomb-old', 'cs-tomb', new Date(Date.now() - 8 * day));
+    await repo.markDeleted('tomb-recent', 'cs-tomb', new Date(Date.now() - day));
+    expect(await gateway.api.purgeIdentityTombstones()).toBe(1);
+    const left = (await tdb.db.select({ podName: podIdentities.podName, namespace: podIdentities.namespace }).from(podIdentities)).filter((row) => row.namespace === 'cs-tomb').map((row) => row.podName).sort();
+    expect(left).toEqual(['alive', 'tomb-recent']);
+    expect(await gateway.api.lookupByIp('10.244.9.3')).toMatchObject({ identity: 'demo/demo' });
+    expect(await gateway.api.purgeIdentityTombstones()).toBe(0);
+  });
+
   // 2026-09-23 本机：watch 断开期间被删的 Pod 收不到 DELETED，行一直在册（52 个 Pod、144 条在册行）；
   // IP 被业务 Pod 复用时反查取到死去的平台 Pod，把业务调用当成平台调用放行。
   test('全量重列：这次没列到的在册行标为删除，复用同一 IP 的新 Pod 反查到自己', async () => {

@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "调和循环骨架（RFC-025 设计 §6.1）：按种类的 list＋watch 观测缓存与定期全量核对、按资源 ID 去重的工作队列、租约、退避",
+  "description": "调和循环骨架（RFC-025 设计 §6.1）：按种类的 list＋watch 观测缓存与定期全量核对、按资源 ID 去重的工作队列、租约、退避、定时作业",
   "exports": {
     ".": "./index.ts"
   },

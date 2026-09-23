@@ -12,6 +12,8 @@ export interface PodIdentityRepository {
   markDeleted(podName: string, namespace: string, at: Date): Promise<void>;
   /** 全量重列之后：`before` 以来没被刷新过的在册行都是已经不在的 Pod，标为删除；返回条数。 */
   pruneStale(before: Date, at: Date): Promise<number>;
+  /** 删掉 `before` 之前就已标为删除的行（墓碑过了保留期）；返回条数。 */
+  purgeTombstones(before: Date): Promise<number>;
   byIp(ip: string): Promise<PodIdentityRecord | undefined>;
   listActive(): Promise<PodIdentityRecord[]>;
 }
