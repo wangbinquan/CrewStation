@@ -98,3 +98,9 @@ test('Stack 与 Tabs 只在点名 fill 时长满，其余页面不受影响', as
   expect(host.querySelector('[data-testid="filled"]')!.className).toBe('stack fill');
   expect([...host.querySelectorAll('[role="tablist"]')].map((list) => list.parentElement!.parentElement!.className)).toEqual(['tabs', 'tabs fill']);
 });
+
+// 2026-09-23 实机：没有会话时「开始开发」卡片与下面的「打开参考」只隔约 2px。样式要给这一行留一档间距。
+test('没有会话时「打开参考」那一行与上面的开始开发卡片隔开一档间距', () => {
+  const css = sourceAt(consoleStyles(), 'features/dev-session/components/panel/ToolPanel.module.css').code;
+  expect(css).toMatch(/\.noSessionMain > \.note \{[^}]*margin-top: var\(--cs-space-2\);/);
+});
