@@ -10,8 +10,8 @@ export function TopologyObserved({ topology }: { readonly topology: Topology }):
   return topology.complete ? null : <p className={styles.observedPartial}>{t('topology.observed.partial', { reason: topology.incompleteReason ?? '' })}</p>;
 }
 
-/** 观测时间标签：叠在图框右上角，快照说明放在悬停提示里。 */
+/** 观测时间标签：叠在图框右上角，精确到秒（快照每 30 秒一换，到分钟时一半的更替看不出来）；快照说明放在悬停提示里。 */
 export function TopologyStamp({ topology }: { readonly topology: Topology }): ReactElement {
-  const t = useT(), date = useDateText();
+  const t = useT(), date = useDateText('second');
   return <span className={styles.stamp} title={`${topology.complete ? t('topology.observed.complete') : t('topology.observed.partial', { reason: topology.incompleteReason ?? '' })} · ${t('topology.observed.stable')}`}>{t('topology.observed.at', { time: date(topology.observedAt) })}</span>;
 }

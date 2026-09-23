@@ -46,6 +46,8 @@ test('filters dim without removing, the attention chip counts abnormal nodes, an
   // 快照完整时不占说明行：只有图框右上角的观测时间标签，说明放在悬停提示里。
   const stamp = [...document.querySelectorAll('span[title]')].find((n) => n.textContent?.startsWith('观测于'));
   expect(stamp?.getAttribute('title')).toContain('快照完整'); expect(stamp?.parentElement?.contains(document.querySelector('svg[role="group"]'))).toBe(true);
+  // 2026-09-23 作者裁定：观测时间精确到秒（快照每 30 秒一换，到分钟时一半的更替看不出来）；悬停提示写实际节奏。
+  expect(stamp?.textContent).toMatch(/^观测于 .+\d{1,2}:\d{2}:\d{2}$/); expect(stamp?.getAttribute('title')).toContain('集群快照每 30 秒采集一次，页面每 15 秒读取');
   expect(rendered.text()).not.toContain('快照完整');
 });
 

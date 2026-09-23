@@ -320,7 +320,7 @@ export const messages = {
   'topology.observed.complete': '快照完整',
   'topology.observed.partial': '部分来源失败：{reason}',
   'topology.observed.at': '观测于 {time}',
-  'topology.observed.stable': '每 15 秒换一份快照，节点位置按 UID 固定',
+  'topology.observed.stable': '集群快照每 30 秒采集一次，页面每 15 秒读取；节点位置按 UID 固定',
   'topology.lane.entry': '入口',
   'topology.lane.workloads': '工作负载',
   'topology.lane.pods': 'Pod',

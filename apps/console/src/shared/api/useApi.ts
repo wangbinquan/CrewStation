@@ -27,6 +27,11 @@ export function retryableReadError(error: unknown): boolean {
  * 「载入中」，内容整块卸载后滚动容器塌掉，滚动位置回到顶部（2026-09-21 实机）。
  *
  * refetchIntervalMs 也可以按最近一次的数据决定（例如有对象在启动时每秒一次，RFC-022）；读取失败时另按 FAILED_READ_RETRY_MS 自动重试。
+ *
+ * 定时重读的查询在后台暂停、回到前台补读（与 `usePollingRefetch` 同一规则）：数据旧过一个重读周期就算过期（只缩短
+ * QueryClient 缺省的新鲜期，不延长），进入页面或切回标签页时立即重读。否则全局 30 秒的新鲜期会挡掉补读，后台期间跳过的
+ * 那次重读也补不回来（2026-09-23 形态图实机：15 秒重读的页面切走 18 秒再切回，又等了 10 秒才重读）。
+ * 显式给的 staleTimeMs、refetchOnWindowFocus 优先。
  */
 export function useApiQuery<T>(key: QueryKey, fetcher: () => Promise<T>, options: { enabled?: boolean; refetchIntervalMs?: number | ((data: T | undefined) => number | undefined); staleTimeMs?: number; refetchOnWindowFocus?: boolean; keepPrevious?: (previousKey: QueryKey) => boolean } = {}): UseQueryResult<T, ApiClientError> {
   const { keepPrevious, refetchIntervalMs } = options;
@@ -35,9 +40,15 @@ export function useApiQuery<T>(key: QueryKey, fetcher: () => Promise<T>, options
     if (query.state.status === 'error' && retryableReadError(query.state.error)) return Math.min(configured ?? FAILED_READ_RETRY_MS, FAILED_READ_RETRY_MS);
     return configured ?? false;
   };
+  const pollMs = (query: { state: { data: T | undefined } }) => { const ms = typeof refetchIntervalMs === 'function' ? refetchIntervalMs(query.state.data) : refetchIntervalMs; return ms !== undefined && ms > 0 ? ms : undefined; };
+  // 未设时按 React Query 自己的缺省（新鲜期 0、切回重读）；工作台的 createQueryClient 是 30 秒、切回不重读。
+  const base = useQueryClient().getDefaultOptions().queries, baseStale = base?.staleTime ?? 0, baseFocus = base?.refetchOnWindowFocus ?? true;
+  const polled = refetchIntervalMs !== undefined;
+  const staleTime = options.staleTimeMs ?? (polled && typeof baseStale === 'number' ? (query: { state: { data: T | undefined } }) => Math.min(pollMs(query) ?? baseStale, baseStale) : undefined);
+  const refetchOnWindowFocus = options.refetchOnWindowFocus ?? (polled && typeof baseFocus === 'boolean' ? (query: { state: { data: T | undefined } }) => pollMs(query) !== undefined || baseFocus : undefined);
   return useQuery<T, ApiClientError>({ queryKey: key, queryFn: fetcher, enabled: options.enabled ?? true, refetchInterval, refetchIntervalInBackground: false,
-    ...(options.staleTimeMs === undefined ? {} : { staleTime: options.staleTimeMs }),
-    ...(options.refetchOnWindowFocus === undefined ? {} : { refetchOnWindowFocus: options.refetchOnWindowFocus }),
+    ...(staleTime === undefined ? {} : { staleTime }),
+    ...(refetchOnWindowFocus === undefined ? {} : { refetchOnWindowFocus }),
     // 断言：库把 placeholderData 的数据类型收成 NonFunctionGuard<T>，泛型读取在此处无法自证，值本身仍是上一次的回执。
     ...(keepPrevious === undefined ? {} : { placeholderData: ((previous: T | undefined, previousQuery?: { queryKey: QueryKey }) => previousQuery && keepPrevious(previousQuery.queryKey) ? previous : undefined) as UseQueryOptions<T, ApiClientError, T, QueryKey>['placeholderData'] }) });
 }

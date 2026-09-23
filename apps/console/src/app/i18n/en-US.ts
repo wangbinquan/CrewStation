@@ -318,7 +318,7 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   'topology.observed.complete': 'Snapshot complete',
   'topology.observed.partial': 'Some sources failed: {reason}',
   'topology.observed.at': 'Observed at {time}',
-  'topology.observed.stable': 'A new snapshot every 15 s; node positions are fixed by UID',
+  'topology.observed.stable': 'The cluster snapshot is collected every 30 s and read by the page every 15 s; node positions are fixed by UID',
   'topology.lane.entry': 'Entry',
   'topology.lane.workloads': 'Workloads',
   'topology.lane.pods': 'Pods',
