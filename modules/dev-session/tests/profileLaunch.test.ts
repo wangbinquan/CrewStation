@@ -16,7 +16,7 @@ test('headless Agent：受理即登记独立执行环境（档位镜像、固定
   const profiles: FakeProfile[] = [{ name: 'gw', protocol: 'opencode', model: 'anthropic/m', revision: 5, taskProfile: '01a0bf5d-8f4b-7dd6-8102-2aa5cc3255b1', secrets: { KEY: 'sk-r5' } }];
   const catalog = fakeComputeCatalog(() => profiles);
   f.deps.compute = catalog;
-  const dto = await f.api.startAgent(actor, taskId, { compute: computeSelector('gw'), permission: 'edit', prompt: 'hi' });
+  const dto = await f.api.startAgent(actor, taskId, { compute: computeSelector('gw'), prompt: 'hi' });
   expect(dto).toMatchObject({ state: 'preparing', compute: computeId('gw'), profileRevision: 5, execution: { state: 'queued' } });
   expect(f.inputs[0]).toMatchObject({ purpose: 'agent', parentTaskId: taskId, agentId: dto.agentId, profile: '01a0bf5d-8f4b-7dd6-8102-2aa5cc3255b1', computeProfile: { profileId: computeId('gw'), revision: 5 } });
   expect(f.inputs[0]!.image).toContain('registry.test/runtime/gw@sha256:');
@@ -35,17 +35,17 @@ test('headless Agent：受理即登记独立执行环境（档位镜像、固定
   await f.lifecycle.dispatchExecution(executionId);
   expect(f.routed.filter((r) => r.command.type === 'startAgent')).toHaveLength(1);
   profiles[0]!.available = false;
-  await expect(f.api.startAgent(actor, taskId, { compute: computeSelector('gw'), permission: 'edit', prompt: 'hi' })).rejects.toMatchObject({ kind: 'precondition', details: { code: 'profile_unavailable' } });
+  await expect(f.api.startAgent(actor, taskId, { compute: computeSelector('gw'), prompt: 'hi' })).rejects.toMatchObject({ kind: 'precondition', details: { code: 'profile_unavailable' } });
 });
 
 test('headless Agent：额度满直接回给用户并结束受理记录；消息与取消路由到子 Runner；终态事件后回收执行环境且不重启', async () => {
   const f = agentExecutionFixture();
   f.deps.compute = fakeComputeCatalog(() => [{ name: 'gw', protocol: 'claude-code', isDefault: true }]);
   f.controls.reject = quotaExceeded('项目并发额度已满，本次 Agent 未启动，已有 Agent 与 CLI 保持运行');
-  await expect(f.api.startAgent(actor, taskId, { permission: 'edit', prompt: 'x' })).rejects.toMatchObject({ kind: 'quota_exceeded' });
+  await expect(f.api.startAgent(actor, taskId, { prompt: 'x' })).rejects.toMatchObject({ kind: 'quota_exceeded' });
   expect((await f.starts.listByTask(taskId))[0]).toMatchObject({ state: 'ended', failure: expect.stringContaining('额度已满') });
   f.controls.reject = undefined;
-  const dto = await f.api.startAgent(actor, taskId, { permission: 'edit', prompt: 'y' });
+  const dto = await f.api.startAgent(actor, taskId, { prompt: 'y' });
   const executionId = dto.execution!.taskId;
   await expect(f.api.sendMessage(actor, taskId, dto.agentId, { content: '早了' })).rejects.toMatchObject({ kind: 'precondition' });
   f.connect(executionId);
@@ -65,11 +65,11 @@ test('headless Agent：额度满直接回给用户并结束受理记录；消息
 test('headless Agent：执行环境失败（镜像拉不下来、旧底座）时 Agent 显示失败与原因；未派发即取消直接回收', async () => {
   const f = agentExecutionFixture();
   f.deps.compute = fakeComputeCatalog(() => [{ name: 'gw', protocol: 'claude-code', isDefault: true }]);
-  const broken = await f.api.startAgent(actor, taskId, { permission: 'edit', prompt: 'x' });
+  const broken = await f.api.startAgent(actor, taskId, { prompt: 'x' });
   f.fail(broken.execution!.taskId, '此Agent的镜像拉取失败（ImagePullBackOff）');
   await f.lifecycle.sweep();
   expect((await f.api.listAgents(actor, taskId)).find((a) => a.agentId === broken.agentId)).toMatchObject({ state: 'failed', execution: { message: '此Agent的镜像拉取失败（ImagePullBackOff）' } });
-  const waiting = await f.api.startAgent(actor, taskId, { permission: 'edit', prompt: 'y' });
+  const waiting = await f.api.startAgent(actor, taskId, { prompt: 'y' });
   await f.api.cancelAgent(actor, taskId, waiting.agentId);
   expect(f.releases).toContain(waiting.execution!.taskId);
   expect(f.routed.filter((r) => r.command.type === 'startAgent')).toHaveLength(0);
@@ -127,7 +127,7 @@ test('Agent 与 CLI 的档位授权使用工作区项目，拒绝时不创建执
   for (const f of [headless, cli]) f.deps.compute.resolve = async (name, usage, id) => {
     requests.push({ name, usage, id }); throw forbidden('项目未获授权使用此档位');
   };
-  await expect(headless.api.startAgent(actor, taskId, { compute: computeSelector('private'), permission: 'edit', prompt: 'x' })).rejects.toMatchObject({ kind: 'forbidden' });
+  await expect(headless.api.startAgent(actor, taskId, { compute: computeSelector('private'), prompt: 'x' })).rejects.toMatchObject({ kind: 'forbidden' });
   await expect(cli.api.startNativeTerminal(actor, taskId, { ...cli.input(), compute: computeSelector('private') })).rejects.toMatchObject({ kind: 'forbidden' });
   expect(requests).toEqual([{ name: computeSelector('private'), usage: 'agent', id: projectId }, { name: computeSelector('private'), usage: 'cli', id: projectId }]);
   expect(headless.inputs).toEqual([]); expect(cli.allocations).toEqual([]);

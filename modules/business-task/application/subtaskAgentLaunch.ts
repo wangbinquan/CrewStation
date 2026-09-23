@@ -1,4 +1,5 @@
 import type { TaskId } from '@crewstation/contracts';
+import { PLATFORM_AGENT_PERMISSION } from '@crewstation/contracts';
 import { isPlatformError, newId, notFound } from '@crewstation/kernel';
 import type { SubtaskRun } from '../domain/subtaskRun';
 import { isTerminal, transition } from '../domain/subtaskRun';
@@ -60,7 +61,9 @@ export function subtaskAgentLaunch(deps: BusinessTaskUseCaseDeps, finish: Finish
       const material = await deps.compute.launchMaterial(started.computeProfile!);
       await runner.sendCommand(env.id, {
         id: `start-${run.runnerRef}`, type: 'startAgent', agentId: run.runnerRef ?? '', compute: material.id, profileRevision: material.revision,
-        launch: material.launch, beforeStart: material.beforeStart, processAttemptId: `${run.runnerRef}:${run.attempt}`, permission: run.agentProfile!.permission,
+        launch: material.launch, beforeStart: material.beforeStart, processAttemptId: `${run.runnerRef}:${run.attempt}`,
+        // Manifest 里的 agentProfiles[].permission 已作废，照收不用：业务子任务的 Agent 一律完全权限（D59）。
+        permission: PLATFORM_AGENT_PERMISSION,
         mode: run.mode ?? 'oneshot', ...(run.cwd ? { cwd: run.cwd } : {}), initialPrompt: run.prompt ?? '', mcp: settings.mcp.map((m) => ({ name: m.name, url: m.url, headers: {} })), env: {},
       });
       return started;

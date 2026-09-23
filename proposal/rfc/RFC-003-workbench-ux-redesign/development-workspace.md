@@ -92,6 +92,8 @@
 
 新增 `POST /v1/tasks/:taskId/agent-terminals`，单窗输入为 `{clientRequestId, compute?, permission, cwd?, cols, rows}`，返回 `{agentId, terminalId, state: 'starting'}`。一次“＋ CLI”只固定一个请求 ID、启动一个进程。资源不足仅在本次新增窗口反馈，不影响已有 CLI；不引入窗口数量表单或业务 DAG。
 
+> 2026-09-23 修订（D59）：输入不再有 `permission`，带上即 400；名册里的 `permission` 如实记录派发的值，此后都是 `full`。见 §8 同日修订。
+
 以调用者＋taskId＋clientRequestId 幂等识别已受理启动；重复使用同一 ID 但内容不同必须冲突。新增失败保留既有窗口，只允许重试明确失败项；断线／超时不等于失败，先查询原 ID 的真实受理状态，再决定是否重试。
 
 新增 `GET /v1/tasks/:taskId/agent-terminals` 返回窗口名册、进程状态、terminalId、compute、permission、启动／退出时间和退出原因。名册由 dev-session 的启动记录与 TaskRunner 当前注册表对账，不靠浏览器内存假定进程存在。连接不可达时状态为未知；重连原 PTY，不自动恢复为新 CLI 进程。TaskRunner／容器重启后进程已丢失时如实显示结束／不可恢复，继续会话必须由用户显式操作。
@@ -141,6 +143,13 @@ Git 对象不在容器时，首次只读查询明确返回缺失原因；用户�
 ## 8. 数据访问的名称与真实含义
 
 会话顶部入口命名“数据访问”，完整呈现下面三类。Agent 的 `read-only／edit／full` 另放“高级 → Agent 操作权限”，保留全部选项；不能把文件权限下拉简单换成数据库名称。
+
+> **2026-09-23 修订（作者 2026-09-23 当面裁定，直接修改，不另立 RFC；基线 Design D59）：Agent 不再分权限档。** 作者看了「＋ 创建开发Agent会话 ▾」里的「只读／可改文件／完全权限」后说：「为什么要限制呢，都是开发容器。只有连生产库才有对生产库的权限控制才对」。本节「Agent 操作权限保留全部选项」与 §5 启动输入里的 `permission` 改为：
+>
+> - 开发会话的 CLI 与历史 Agent 一律以完全权限启动。「＋ 创建开发Agent会话 ▾」只选算力档位，历史 Agent 表单也没有权限。`POST /v1/tasks/:taskId/agent-terminals` 与 `POST /v1/tasks/:taskId/agents` 都不再接受 `permission`：前者带上即 400，后者直接丢弃。重启、重试也一律用完全权限。
+> - 数据访问不变：开发会话默认只连开发库，「诊断只读」「生产变更」由负责人批准、有时限，这是开发会话里唯一的权限控制。获批后会话里每个 Agent 都能直接连（G14 已接受）。
+> - 业务子任务一并适用：Manifest 的 `agentProfiles[].permission` 作废，旧值照收不用。
+> - **去掉的能力**（作者逐项确认）：在开发会话里以「只读」或「可改文件」启动 CLI 与历史 Agent；重启、重试时沿用旧档位；业务子任务按 Manifest 声明的档位限制 Agent。
 
 | 界面文案 | 现有值 | 真实含义 |
 |---|---|---|

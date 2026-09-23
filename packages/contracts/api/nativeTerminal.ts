@@ -1,13 +1,13 @@
 import { ComputeProfileSelectorSchema } from './compute/computeProfile';
 import { z } from 'zod';
 import { TaskIdSchema, UserIdSchema } from '../ids';
-import { AgentPermissionSchema } from '../manifest/tasks';
 import { NativeTerminalRecordSchema, TerminalSizeSchema, TerminalSnapshotSchema } from '../taskrunner/nativeTerminal';
 import { AgentActivityStateSchema } from './activity/nativeActivity';
 import { StartupProgressSchema } from './progress/startupProgress';
 
 export const StartNativeTerminalRequestSchema = TerminalSizeSchema.extend({
-  clientRequestId: z.uuid(), compute: ComputeProfileSelectorSchema.optional(), permission: AgentPermissionSchema.default('edit'),
+  // 没有权限字段：开发会话的 CLI 一律完全权限（D59）。
+  clientRequestId: z.uuid(), compute: ComputeProfileSelectorSchema.optional(),
   cwd: z.string().min(1).max(1024).optional(),
 }).strict();
 

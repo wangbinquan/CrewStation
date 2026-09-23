@@ -47,7 +47,7 @@ function serveCatalog(items: readonly ComputeProfileSummaryDto[], extra: (url: s
 /** 新建 Agent 表单只认草稿句柄：这里用本地状态代替 useHistoricalStart，只观察表单本身。 */
 function Form({ initial, started }: { readonly initial: string; readonly started: string[] }) {
   const [compute, setCompute] = useState(initial);
-  const creation = { compute, permission: 'edit', prompt: '整理需求', busy: false, open: true, dirty: false, setOpen: () => {}, start: () => started.push(compute),
+  const creation = { compute, prompt: '整理需求', busy: false, open: true, dirty: false, setOpen: () => {}, start: () => started.push(compute),
     edit: (change: { compute?: string }) => { if (change.compute !== undefined) setCompute(change.compute); } } as unknown as HistoricalStartHandle;
   return <StartAgentForm projectId="project-1" creation={creation} />;
 }

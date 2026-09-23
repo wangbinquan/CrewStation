@@ -7,7 +7,7 @@ export type { FetchInput, FetchLike, HttpMethod, RequestOptions, Transport, Tran
 export type { ItemsPage } from './itemsPage';
 export type {
   CreateProjectInput, ListDeliveriesInput, LogQueryInput, PublishDevSessionInput, PublishInput, RequestTaskDataBindingInput, ServicePlanInput, SetConfigItemInput,
-  StartDevAgentInput, TaskProfileInput, WithDefaults,
+  TaskProfileInput, WithDefaults,
 } from './requestInputs';
 export { parseTaskStreamFrame, taskStreamUrl } from './stream';
 export type {

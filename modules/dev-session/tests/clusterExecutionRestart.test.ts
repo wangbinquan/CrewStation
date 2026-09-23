@@ -20,7 +20,7 @@ test('single CLI reopens once from the frozen profile, links predecessor and lea
   expect(f.environments.get(sibling.execution!.taskId)?.connected).toBe(true); expect(f.state.released).toBe(false);
 });
 test('headless restart waits for predecessor cleanup and does not launch duplicate Agents', async () => {
-  const f = agentExecutionFixture(); f.deps.compute = fakeComputeCatalog(() => [{ name: 'sample-opencode', protocol: 'opencode', model: 'm' }]); const old = await f.api.startAgent(workspaceActor, workspaceTask, { compute: computeSelector('sample-opencode'), permission: 'edit', prompt: 'keep this prompt' });
+  const f = agentExecutionFixture(); f.deps.compute = fakeComputeCatalog(() => [{ name: 'sample-opencode', protocol: 'opencode', model: 'm' }]); const old = await f.api.startAgent(workspaceActor, workspaceTask, { compute: computeSelector('sample-opencode'), prompt: 'keep this prompt' });
   const commands = clusterAgentUseCases(f.deps, f.starts, f.lifecycle), op = crypto.randomUUID();
   await expect(commands.inspectClusterAgent(workspaceActor, old.execution!.taskId)).rejects.toThrow();
   const one = await commands.manageClusterAgent(admin, old.execution!.taskId, true, op), two = await commands.manageClusterAgent(admin, old.execution!.taskId, true, op);

@@ -65,7 +65,7 @@ describe('CLI 标签组', () => {
     expect(tab(mine.terminalId).textContent).toContain('CLI 00mine'); expect(tab(mine.terminalId).getAttribute('aria-selected')).toBe('true');
     expect(shown()).toEqual([mine.terminalId]);
     expect(page.host.querySelector('button[aria-label="＋ 工作区"]')).toBeNull();
-    expect([...page.host.querySelectorAll('summary')].map((node) => node.getAttribute('aria-label') ?? node.textContent)).toEqual(['选择档位与权限']);
+    expect([...page.host.querySelectorAll('summary')].map((node) => node.getAttribute('aria-label') ?? node.textContent)).toEqual(['选择算力档位']);
     expect(page.button('＋ 创建开发Agent会话')).toBeDefined();
   });
 

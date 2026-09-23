@@ -1,5 +1,5 @@
 import type { BeforeStartExecution, NativeTerminalDto, NativeTerminalRecord, NativeTerminalRoster, ServiceId, StartupRecord, TaskId } from '@crewstation/contracts';
-import { IDENTITY_HEADERS, RunnerResultPayloads } from '@crewstation/contracts';
+import { IDENTITY_HEADERS, PLATFORM_AGENT_PERMISSION, RunnerResultPayloads } from '@crewstation/contracts';
 import { isPlatformError, newId } from '@crewstation/kernel';
 import { composeCliStartup } from '../domain/nativeTerminalProjection';
 import type { NativeTerminalRepository, NativeTerminalStart } from '../ports/nativeTerminals';
@@ -111,7 +111,8 @@ export class NativeExecutionLifecycle {
     const profile = await profileLaunchFields(this.deps, start.profile, start.record.agentId);
     let record = RunnerResultPayloads.startAgentTerminal.parse(await this.deps.runner.sendCommand(env.id, {
       id: newId('cmd'), type: 'startAgentTerminal', agentId: start.record.agentId, terminalId: start.record.terminalId, runnerId: start.record.runnerId,
-      requestFingerprint: start.fingerprint, ...profile, permission: start.record.permission,
+      // 一律完全权限（D59），升级前受理、记录里还是别的档的也一样。
+      requestFingerprint: start.fingerprint, ...profile, permission: PLATFORM_AGENT_PERMISSION,
       cols: start.input.cols, rows: start.input.rows, ...(start.input.cwd ? { cwd: start.input.cwd } : {}),
       mcp: this.deps.settings.mcp.map((m) => ({ ...m, headers: { [IDENTITY_HEADERS.devSessionToken]: credential.token } })), env: {},
     }));

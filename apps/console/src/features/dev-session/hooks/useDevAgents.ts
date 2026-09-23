@@ -1,5 +1,4 @@
-import type { StartDevAgentInput } from '@crewstation/api-client';
-import type { AgentInstanceDto } from '@crewstation/contracts';
+import type { AgentInstanceDto, StartDevAgentRequest } from '@crewstation/contracts';
 import type { UseMutationResult } from '@tanstack/react-query';
 import { useCallback, useState } from 'react';
 import { api } from '../../../shared/api/client';
@@ -18,7 +17,7 @@ export interface DevAgentsHandle {
   readonly loadError: ApiClientError | null;
   /** Agent 生命周期事件到达时重读名册：状态字段只在平台侧维护。 */
   readonly refresh: () => void;
-  readonly start: UseMutationResult<AgentInstanceDto, ApiClientError, StartDevAgentInput>;
+  readonly start: UseMutationResult<AgentInstanceDto, ApiClientError, StartDevAgentRequest>;
   readonly sendMessage: UseMutationResult<void, ApiClientError, SendMessageInput>;
   readonly cancel: UseMutationResult<void, ApiClientError, string>;
 }
@@ -35,7 +34,7 @@ export function useDevAgents(taskId: string): DevAgentsHandle {
     refresh: useCallback(() => {
       void refetch();
     }, [refetch]),
-    start: useApiMutation((input: StartDevAgentInput) => api.devSession.startAgent(taskId, input), { invalidate: [key] }),
+    start: useApiMutation((input: StartDevAgentRequest) => api.devSession.startAgent(taskId, input), { invalidate: [key] }),
     sendMessage: useApiMutation(({ agentId, content }: SendMessageInput) => api.devSession.sendMessage(taskId, agentId, { content })),
     cancel: useApiMutation((agentId: string) => api.devSession.cancelAgent(taskId, agentId), { invalidate: [key] }),
   };

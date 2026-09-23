@@ -1,5 +1,5 @@
 import type { ServiceId, TaskId } from '@crewstation/contracts';
-import { IDENTITY_HEADERS } from '@crewstation/contracts';
+import { IDENTITY_HEADERS, PLATFORM_AGENT_PERMISSION } from '@crewstation/contracts';
 import { isPlatformError } from '@crewstation/kernel';
 import type { AgentStart, AgentStartRepository } from '../ports/agentStarts';
 import type { EnvironmentView } from '../ports/runtime';
@@ -50,7 +50,7 @@ export class AgentExecutionLifecycle {
     const credential = await this.deps.credentials.issueDevSessionToken({ taskId: start.taskId, projectId: env.projectId, serviceId: env.serviceId as ServiceId, userId: start.createdBy });
     const launch = await profileLaunchFields(this.deps, start.profile, start.agentId);
     await this.deps.runner.sendCommand(env.id, {
-      id: `start-${start.agentId}`, type: 'startAgent', agentId: start.agentId, ...launch, permission: start.permission, mode: 'interactive',
+      id: `start-${start.agentId}`, type: 'startAgent', agentId: start.agentId, ...launch, permission: PLATFORM_AGENT_PERMISSION, mode: 'interactive',
       ...(start.request.cwd ? { cwd: start.request.cwd } : {}), initialPrompt: start.request.prompt, ...(start.request.resumeSessionId ? { resumeSessionId: start.request.resumeSessionId } : {}),
       mcp: this.deps.settings.mcp.map((m) => ({ name: m.name, url: m.url, headers: { [IDENTITY_HEADERS.devSessionToken]: credential.token } })), env: {},
     });

@@ -41,7 +41,6 @@ spec:
         # 算力由平台统一提供：这里只引用管理员定义的档位 UUID，不写镜像、二进制与模型。
         # default 指管理员当前设为默认的档位，每次起 Agent 时解析（RFC-006）；也可以写 { kind: profile, profileId: <UUID> }。
         compute: { kind: default }
-        permission: read-only
     outputContracts: []
   release:
     migration:

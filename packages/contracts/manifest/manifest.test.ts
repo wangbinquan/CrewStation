@@ -12,7 +12,7 @@ const designExample = {
     tasks: {
       taskProfileId: '01a0bf5d-8f4b-7001-8458-107366e7de39',
       defaultVolumeMode: 'follow-container',
-      agentProfiles: [{ id: '01a0bf5d-8f4b-7f44-8e85-c4b8ea2addc7', name: 'analysis-v1', compute: { kind: 'profile', profileId: '01a0bf5d-8f4b-7c09-8050-88ba5b806778' }, permission: 'read-only' }],
+      agentProfiles: [{ id: '01a0bf5d-8f4b-7f44-8e85-c4b8ea2addc7', name: 'analysis-v1', compute: { kind: 'profile', profileId: '01a0bf5d-8f4b-7c09-8050-88ba5b806778' } }],
       outputContracts: [{ id: '01a0bf5d-8f4b-7a1a-8e62-7cb41deda432', name: 'analysis-report-v1', required: ['reports/analysis.md'], schema: './contracts/analysis-report.schema.json' }],
     },
     release: { migrationCommand: ['bun', 'run', 'db:migrate'], migration: { compatibility: 'expand-only', destructive: false, rollback: 'switch-back' } },
@@ -23,18 +23,24 @@ describe('Manifest', () => {
   test('Manifest v2 的完整资源引用示例可解析', () => {
     const parsed = ManifestSchema.parse(designExample);
     expect(parsed.kind).toBe('DigitalWorker');
-    if (parsed.kind === 'DigitalWorker') expect(parsed.spec.tasks?.agentProfiles[0]?.permission).toBe('read-only');
+  });
+  test('agentProfiles[].permission 已作废（D59）：旧仓库的写法照收，缺省也不再补一档', () => {
+    const legacy = structuredClone(designExample);
+    legacy.spec.tasks.agentProfiles = [{ ...designExample.spec.tasks.agentProfiles[0]!, permission: 'read-only' } as never];
+    expect(ManifestSchema.safeParse(legacy).success).toBe(true);
+    const parsed = ManifestSchema.parse(designExample);
+    if (parsed.kind === 'DigitalWorker') expect(parsed.spec.tasks?.agentProfiles[0]).not.toHaveProperty('permission');
   });
   test('Agent 档案只认 compute：写 driver 或 model 会被拒（RFC-001）', () => {
     // zod 默认剥掉未知键，旧写法会被静默丢弃、业务以为自己指定了驱动，因此这里必须 strict。
     const withDriver = structuredClone(designExample);
-    withDriver.spec.tasks.agentProfiles = [{ ...designExample.spec.tasks.agentProfiles[0]!, driver: 'claude-code', permission: 'read-only' } as never];
+    withDriver.spec.tasks.agentProfiles = [{ ...designExample.spec.tasks.agentProfiles[0]!, driver: 'claude-code' } as never];
     const bad = ManifestSchema.safeParse(withDriver);
     expect(bad.success).toBe(false);
     expect(JSON.stringify(bad.error?.issues)).toContain('driver');
 
     const withModel = structuredClone(designExample);
-    withModel.spec.tasks.agentProfiles = [{ ...designExample.spec.tasks.agentProfiles[0]!, model: 'anthropic/claude-opus-5', permission: 'read-only' } as never];
+    withModel.spec.tasks.agentProfiles = [{ ...designExample.spec.tasks.agentProfiles[0]!, model: 'anthropic/claude-opus-5' } as never];
     expect(ManifestSchema.safeParse(withModel).success).toBe(false);
   });
 

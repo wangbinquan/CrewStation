@@ -60,14 +60,14 @@ export function nativeFixture() {
     if (current.loseStartResult) throw new Error('response lost after spawn');
     return record;
   };
-  const input = (): StartNativeTerminalRequest => ({ clientRequestId: crypto.randomUUID(), permission: 'edit', cols: 80, rows: 24 });
+  const input = (): StartNativeTerminalRequest => ({ clientRequestId: crypto.randomUUID(), cols: 80, rows: 24 });
   const api = nativeTerminalUseCases(base.deps, repository);
   // 此夹具代表升级前已受理的旧父 Runner 名册；新执行路径使用 isolatedNativeFixture。
   const startNativeTerminal: typeof api.startNativeTerminal = async (actor, taskId, input) => {
     if (current.available && !await repository.findRequest(taskId, actor.userId, input.clientRequestId)) await repository.reserve({
-      taskId, createdBy: actor.userId, clientRequestId: input.clientRequestId, fingerprint: createHash('sha256').update(JSON.stringify([input.compute ?? null, input.permission, input.cwd ?? null, input.cols, input.rows])).digest('hex'),
+      taskId, createdBy: actor.userId, clientRequestId: input.clientRequestId, fingerprint: createHash('sha256').update(JSON.stringify([input.compute ?? null, input.cwd ?? null, input.cols, input.rows])).digest('hex'),
       input, profile: { profileId: computeId('balanced'), revision: 1 },
-      record: { agentId: newId('agt'), terminalId: newId('pty'), runnerId: current.runnerId, compute: input.compute?.kind === 'profile' ? input.compute.profileId : computeId('balanced'), permission: input.permission, revision: 0, lifecycle: 'starting', startedAt: base.deps.clock.now().toISOString(), cols: input.cols, rows: input.rows },
+      record: { agentId: newId('agt'), terminalId: newId('pty'), runnerId: current.runnerId, compute: input.compute?.kind === 'profile' ? input.compute.profileId : computeId('balanced'), permission: 'full', revision: 0, lifecycle: 'starting', startedAt: base.deps.clock.now().toISOString(), cols: input.cols, rows: input.rows },
     });
     return api.startNativeTerminal(actor, taskId, input);
   };

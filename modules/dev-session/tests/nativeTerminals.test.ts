@@ -16,8 +16,9 @@ test('逐个启动无需任务文字，重复请求查回原 CLI；另一用户�
   expect(first).not.toHaveProperty('model');
   expect(first).not.toHaveProperty('driver');
   // RFC-006：命令带固定档位修订与 launch（二进制显式），不再带 driver／model 两个裸字段。
-  expect(f.calls.find((c) => c.type === 'startAgentTerminal')).toMatchObject({ compute: computeId('balanced'), profileRevision: 1, permission: 'edit', launch: { protocol: 'claude-code', binaryPath: '/usr/local/bin/claude', model: 'anthropic/model' }, processAttemptId: expect.stringMatching(/:1$/) });
-  await expect(f.api.startNativeTerminal(actor, taskId, { ...input, permission: 'full' })).rejects.toMatchObject({ kind: 'conflict' });
+  // 请求里没有权限可选，派发一律完全权限（D59）。
+  expect(f.calls.find((c) => c.type === 'startAgentTerminal')).toMatchObject({ compute: computeId('balanced'), profileRevision: 1, permission: 'full', launch: { protocol: 'claude-code', binaryPath: '/usr/local/bin/claude', model: 'anthropic/model' }, processAttemptId: expect.stringMatching(/:1$/) });
+  await expect(f.api.startNativeTerminal(actor, taskId, { ...input, cols: 120 })).rejects.toMatchObject({ kind: 'conflict' });
   const another = { ...actor, userId: '01a0bf5d-8f4b-7a4e-8eb2-04fca5c047bf' as UserId };
   expect((await f.api.startNativeTerminal(another, taskId, input)).agentId).not.toBe(first.agentId);
   expect((await f.api.listNativeTerminals(actor, taskId)).items).toHaveLength(2);
@@ -86,11 +87,11 @@ test('明确的启动拒绝落失败记录，其他窗口继续存在；演示�
   await expect(f.api.startNativeTerminal(actor, taskId, f.input())).rejects.toMatchObject({ kind: 'precondition', details: { code: 'profile_unavailable' } });
 });
 
-test('租户输入只接受档位与会话选项，任意驱动参数和不合理窗口尺寸都拒绝', () => {
+test('租户输入只接受档位与会话选项，权限档（D59）、任意驱动参数和不合理窗口尺寸都拒绝', () => {
   const f = nativeFixture();
   const input = f.input();
   expect(StartNativeTerminalRequestSchema.safeParse(input).success).toBe(true);
-  for (const extra of [{ driver: 'opencode' }, { model: 'mine' }, { flags: ['--continue'] }, { cols: 0 }, { rows: 5000 }, { prompt: 'requires text' }]) {
+  for (const extra of [{ permission: 'read-only' }, { permission: 'full' }, { driver: 'opencode' }, { model: 'mine' }, { flags: ['--continue'] }, { cols: 0 }, { rows: 5000 }, { prompt: 'requires text' }]) {
     expect(StartNativeTerminalRequestSchema.safeParse({ ...input, ...extra }).success).toBe(false);
   }
 });

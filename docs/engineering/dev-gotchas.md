@@ -49,6 +49,7 @@
 服务端就答 `403 … OpenCode's free tier can only be used from within OpenCode`（`FreeTierError`），其余 deny（edit、webfetch）不影响。
 错误只出现在 stdout 的 `{"type":"error",…}` 那一行里，归一后的事件文案只剩「运行时报告错误」。所以：档位测试按 agent-workflow 冒烟取全放行；
 本机只有这个免费模型时，read-only／edit 的 Agent（包括最小示例的 `chat-v1`）真实轮次会被拒，这是模型服务的限制，不是平台故障。
+2026-09-23 起平台派发给所有 Agent 的都是 `full`（Design D59），平台自己起的 Agent 不再撞上；直接用 `packages/agent-drivers` 以 read-only／edit 起 CLI 的地方（驱动自己的测试、手工排查）仍会遇到。
 
 ### 两个 Agent CLI 的安装器只写 root 家目录
 

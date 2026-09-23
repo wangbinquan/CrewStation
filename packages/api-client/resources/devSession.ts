@@ -1,4 +1,4 @@
-import type { AgentInstanceDto, BranchDto, DevSessionDto, OpenDevSessionRequest, ReleaseDto, SendAgentMessageRequest, WorkspaceStatusDto } from '@crewstation/contracts';
+import type { AgentInstanceDto, BranchDto, DevSessionDto, OpenDevSessionRequest, ReleaseDto, SendAgentMessageRequest, StartDevAgentRequest, WorkspaceStatusDto } from '@crewstation/contracts';
 import type { ComparisonDetailQuery, ComparisonDetails, ComparisonTarget, VersionComparisonDto } from '@crewstation/contracts';
 import type { NativeTerminalDto, NativeTerminalList, NativeTerminalSnapshotDto, StartNativeTerminalRequest } from '@crewstation/contracts';
 import type { SaveWorkspaceLayoutRequest, WorkspaceLayoutDto } from '@crewstation/contracts';
@@ -9,7 +9,7 @@ import type { PreviewAction, PreviewLogsDto, PreviewLogsQuery, PreviewStatusDto 
 import { API_INVOCATION_TIMEOUT_MS } from '@crewstation/contracts';
 import type { Transport } from '../httpTransport';
 import type { ItemsPage } from '../itemsPage';
-import type { PublishDevSessionInput, StartDevAgentInput } from '../requestInputs';
+import type { PublishDevSessionInput } from '../requestInputs';
 import { segment } from '../requestUrl';
 
 /** DELETE /v1/projects/:projectId/dev-session 的响应：释放后的会话与容器里尚未推送的提交（`<sha> <subject>`）。 */
@@ -67,7 +67,7 @@ export interface DevSessionResource {
   /** GET /v1/tasks/:taskId/agents */
   listAgents(taskId: string): Promise<ItemsPage<AgentInstanceDto>>;
   /** POST /v1/tasks/:taskId/agents（201）：启动一个流式交互 Agent。 */
-  startAgent(taskId: string, input: StartDevAgentInput): Promise<AgentInstanceDto>;
+  startAgent(taskId: string, input: StartDevAgentRequest): Promise<AgentInstanceDto>;
   /** POST /v1/tasks/:taskId/agents/:agentId/messages（204） */
   sendMessage(taskId: string, agentId: string, input: SendAgentMessageRequest): Promise<void>;
   /** POST /v1/tasks/:taskId/agents/:agentId/cancel（204） */

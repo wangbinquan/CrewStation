@@ -15,7 +15,8 @@ export const AgentProfileSchema = z.object({
   name: SlugSchema,
   /** 管理员定义的算力档位名，或 `default`；档位封装协议、镜像、二进制、启动前步骤与模型（RFC-006）。 */
   compute: SlugSchema,
-  permission: AgentPermissionSchema.default('edit'),
+  /** 已作废（D59）：照收不用，见 v2 的同名字段。 */
+  permission: AgentPermissionSchema.optional(),
   /** 相对仓库根的系统提示文件，可选。 */
   systemPromptFile: z.string().min(1).optional(),
 }).strict();

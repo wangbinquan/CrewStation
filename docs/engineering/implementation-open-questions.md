@@ -229,6 +229,8 @@
 
 **可选做法**：(a) 维持 `full`＋占位令牌（现状）；(b) 回到 `read-only`，接受部分模型服务下的假阴性，失败原因里附原文（已实现）让管理员自己判断；(c) `full`＋给 `profile-test` 工作负载加网络策略，只放行 cs-session、平台仓库与出站代理；(d) 新增专供测试的权限档（保留 bash、拒绝写工作区以外的路径）。
 
+**2026-09-23 权限部分随 Design D59 定下**：平台派发给所有 Agent 的都是 `full`（见 I19），档位测试取 `full` 不再是例外，(b)、(d) 随之作废。测试 Pod 的出站策略（(c)）与 `{{mcp.*}}` 的占位令牌仍待裁定。
+
 ## I18. 发布构建 Job 的资源写死 1 CPU／2Gi
 
 **现状**：`modules/release/adapters/k8s/buildKitBuilder.ts` 的构建 Pod 固定请求 1 CPU、2Gi。本机节点 CPU 预约满额时它一直 Pending，约 30 分钟后发布记为「构建失败：Job was active longer than specified deadline」（2026-09-18 RFC-006 验收项目的首次发布即如此，节点余量 550m）。
@@ -240,6 +242,8 @@
 **仍待裁定**：构建资源要不要成为可配置项或跟随套餐。可选做法：(a) 安装配置增加构建资源（`CS_BUILD_CPU`／`CS_BUILD_MEMORY`）；(b) 构建资源跟随项目的服务套餐或一个管理员定义的「构建套餐」；(c) 维持固定值，发布记录在 Pending 时写明调度原因（Insufficient cpu）而不是只显示「正在构建」。
 
 ## I19. read-only／edit 两档去掉 bash，与只认「OpenCode 内」请求的模型服务相冲
+
+**2026-09-23 关闭（Design D59）**：作者裁定开发会话与业务子任务的 Agent 都不再分权限档——「都是开发容器，只有连生产库才该有对生产库的权限控制」。平台派发给 Runner 的一律 `full`（`packages/contracts/manifest/tasks.ts` 的 `PLATFORM_AGENT_PERMISSION`）；开发会话的「＋ 创建开发Agent会话 ▾」、历史 Agent 表单及两个启动接口都不再有权限；Manifest 的 `agentProfiles[].permission` 作废，旧值照收不用。生产数据仍由负责人批准的 TaskDataBinding 控制。本条的冲突随之消失，下面三种做法都不再需要；三档到各 CLI 的映射只为 TaskRunner 协议（运行中的旧 Runner）保留。
 
 **现状**：三档权限到 opencode 权限表的映射是 CrewStation 的裁定（`packages/agent-drivers/permission/opencodePermission.ts`）：read-only 与 edit 都 `bash: deny`，只有 full 放行。OpenCode Zen 免费档据此拒绝请求（见 I17）。本机没有付费模型，因此开发会话默认 edit 的 headless Agent、最小示例 `chat-v1`（read-only）等真实轮次都会被拒；平台把厂商原文写进失败原因。
 

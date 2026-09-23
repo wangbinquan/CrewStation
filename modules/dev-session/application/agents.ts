@@ -1,6 +1,7 @@
 import type {
   Actor, AgentEvent, AgentInstanceDto, AgentInstanceState, BeforeStartExecution, RunnerEvent, SendAgentMessageRequest, StartDevAgentRequest, TaskId,
 } from '@crewstation/contracts';
+import { PLATFORM_AGENT_PERMISSION } from '@crewstation/contracts';
 import { forbidden, newId, notFound, precondition } from '@crewstation/kernel';
 import type { AgentStart, AgentStartRepository } from '../ports/agentStarts';
 import type { AgentExecutionLifecycle } from './agentExecution';
@@ -32,7 +33,7 @@ export function agentUseCases(deps: DevSessionUseCaseDeps, starts: AgentStartRep
       // RFC-006：受理时解析档位（省略即 default），headless 只能用两种已知协议；此后派发只按固定修订取材料。
       const resolved = await deps.compute.resolve(input.compute, 'agent', env.projectId);
       const start: AgentStart = {
-        agentId: newId('agt'), taskId: env.id, createdBy: actor.userId, compute: resolved.id, computeName: resolved.name, profile: { profileId: resolved.id, revision: resolved.revision }, permission: input.permission,
+        agentId: newId('agt'), taskId: env.id, createdBy: actor.userId, compute: resolved.id, computeName: resolved.name, profile: { profileId: resolved.id, revision: resolved.revision }, permission: PLATFORM_AGENT_PERMISSION,
         request: { prompt: input.prompt, ...(input.cwd ? { cwd: input.cwd } : {}), ...(input.resumeSessionId ? { resumeSessionId: input.resumeSessionId } : {}) },
         execution: { taskId: newId('tsk') as TaskId, runnerId: Bun.randomUUIDv7(), image: resolved.image, ...(resolved.taskProfile ? { taskProfile: resolved.taskProfile } : {}) },
         state: 'pending', cursor: 0, finalized: false, createdAt: deps.clock.now().toISOString(),
@@ -79,8 +80,8 @@ function applyStored(agents: Map<string, AgentInstanceDto>, taskId: TaskId, stor
   if (stored.event.kind === 'beforeStart') { applyBeforeStart(agents, taskId, stored.event.execution, stored.at); return; }
   if (stored.event.kind !== 'agent') return;
   const e = stored.event;
-  // 档位与权限只在 started 事件的 spec 里；缺了就如实留空，不编造（权限编错尤其误导人）。
-  const current = agents.get(e.event.agentId) ?? { agentId: e.event.agentId, taskId, compute: '', permission: 'read-only' as const, state: 'starting' as AgentInstanceState, startedAt: stored.at };
+  // 档位只在 started 事件的 spec 里，缺了就如实留空；权限不分档（D59），缺了就是平台唯一派发的那一档。
+  const current = agents.get(e.event.agentId) ?? { agentId: e.event.agentId, taskId, compute: '', permission: PLATFORM_AGENT_PERMISSION, state: 'starting' as AgentInstanceState, startedAt: stored.at };
   const spec = e.event.spec ? { compute: e.event.spec.compute, permission: e.event.spec.permission, profileRevision: e.event.spec.profileRevision } : {};
   agents.set(e.event.agentId, {
     ...current, ...spec, ...(e.event.sessionId ? { sessionId: e.event.sessionId } : {}),
@@ -101,7 +102,7 @@ async function withExecution(deps: DevSessionUseCaseDeps, start: AgentStart, obs
 
 /** 启动前步骤的进度只影响“环境准备中／准备失败”，不会被显示成 Agent 正在执行任务（RFC-004、RFC-006）。 */
 function applyBeforeStart(agents: Map<string, AgentInstanceDto>, taskId: TaskId, execution: BeforeStartExecution, at: string): void {
-  const current = agents.get(execution.agentId) ?? { agentId: execution.agentId, taskId, compute: '', permission: 'read-only' as const, state: 'preparing' as AgentInstanceState, startedAt: at };
+  const current = agents.get(execution.agentId) ?? { agentId: execution.agentId, taskId, compute: '', permission: PLATFORM_AGENT_PERMISSION, state: 'preparing' as AgentInstanceState, startedAt: at };
   const running = execution.steps.find((s) => s.stepId === execution.currentStepId) ?? execution.steps.find((s) => s.state === 'running');
   const failed = execution.steps.find((s) => s.state === 'failed');
   const beforeStart = { executionId: execution.executionId, state: execution.state, ...(running ? { currentStep: running.name } : {}), ...(failed ? { failedStep: failed.name } : {}), ...(execution.error ? { error: execution.error.message } : {}) };
@@ -145,7 +146,7 @@ export function clusterAgentUseCases(deps: DevSessionUseCaseDeps, starts: AgentS
       await starts.withLock(old.agentId, async () => {
         if (next && !await starts.get(next.agentId)) {
           if (!env.connected || env.state !== 'running') throw precondition('父工作区未就绪，无法重开 Agent');
-          await starts.insert({ agentId: next.agentId, taskId: old.taskId, createdBy: actor.userId, compute: old.compute, computeName: old.computeName, profile: old.profile, permission: old.permission, request: old.request,
+          await starts.insert({ agentId: next.agentId, taskId: old.taskId, createdBy: actor.userId, compute: old.compute, computeName: old.computeName, profile: old.profile, permission: PLATFORM_AGENT_PERMISSION, request: old.request,
             execution: { ...old.execution, taskId: next.taskId, runnerId: Bun.randomUUIDv7(), previousTaskId: id }, state: 'pending', cursor: 0, finalized: false, createdAt: deps.clock.now().toISOString() });
         }
         await executions.end((await starts.get(old.agentId))!, { cancelled: true });

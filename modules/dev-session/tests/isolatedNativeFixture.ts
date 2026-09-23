@@ -62,7 +62,7 @@ export function isolatedNativeFixture() {
     throw new Error(`unexpected ${command.type}`);
   };
   const api = nativeTerminalUseCases(f.deps, repository);
-  const input = (): StartNativeTerminalRequest => ({ clientRequestId: crypto.randomUUID(), permission: 'edit', cols: 80, rows: 24 });
+  const input = (): StartNativeTerminalRequest => ({ clientRequestId: crypto.randomUUID(), cols: 80, rows: 24 });
   const run = (terminal: NativeTerminalDto) => api.dispatchPendingNativeExecution(terminal.execution!.taskId);
   const start = async () => { const terminal = await api.startNativeTerminal(workspaceActor, workspaceTask, input()); await run(terminal); return terminal; };
   const ended = (terminal: NativeTerminalDto) => { const r = rosters.get(terminal.execution!.taskId)!.terminals[0]!; r.lifecycle = 'ended'; r.reason = 'exited'; r.exitCode = 0; r.revision++; r.endedAt = f.deps.clock.now().toISOString(); };

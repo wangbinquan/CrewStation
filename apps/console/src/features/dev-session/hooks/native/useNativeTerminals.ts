@@ -1,4 +1,4 @@
-import type { AgentPermission, NativeTerminalDto, StartNativeTerminalRequest } from '@crewstation/contracts';
+import type { NativeTerminalDto, StartNativeTerminalRequest } from '@crewstation/contracts';
 import { isApiClientError } from '@crewstation/api-client';
 import { useCallback, useEffect, useRef } from 'react';
 import { api } from '../../../../shared/api/client';
@@ -34,10 +34,10 @@ export function useNativeTerminals(taskId: string, channel: TaskStreamChannel, s
     return () => { unsubscribe(); if (timer) clearTimeout(timer); };
   }, [channel, refetch]);
   useEffect(() => { if (stream.runnerConnected) void refetch(); }, [stream.runnerConnected, stream.generation, refetch]);
-  const launch = useCallback((compute: string, permission: AgentPermission, replaces?: string) => {
+  const launch = useCallback((compute: string, replaces?: string) => {
     if (locked.current) return;
     locked.current = true;
-    pending.current ??= { request: { clientRequestId: crypto.randomUUID(), compute: compute ? { kind: 'profile', profileId: compute } : { kind: 'default' }, permission, cols: 80, rows: 24 }, ...(replaces ? { replaces } : {}) };
+    pending.current ??= { request: { clientRequestId: crypto.randomUUID(), compute: compute ? { kind: 'profile', profileId: compute } : { kind: 'default' }, cols: 80, rows: 24 }, ...(replaces ? { replaces } : {}) };
     const attempt = pending.current;
     start.mutate(attempt.request, {
       // 本窗口创建的 CLI：进程拉起时自动替创建者取得输入控制（RFC-022 D1）。

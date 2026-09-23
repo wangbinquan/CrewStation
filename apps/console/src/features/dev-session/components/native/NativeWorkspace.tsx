@@ -66,7 +66,7 @@ export function NativeWorkspace(props: NativeWorkspaceProps): ReactElement {
   const launcher = useCliLauncher(projectId, layout, store, native, state.loaded && canDevelop && stream.runnerConnected && !blockedReason);
   const reason = blockedReason ?? (!state.loaded ? t('devSession.native.layoutLoading') : !canDevelop ? t('devSession.connection.noPermission') : launcher.profiles.isPending ? t('devSession.native.loadingProfiles') : launcher.blockText);
   const newCli = <NewCliButton launcher={launcher} reason={reason} />;
-  const retry = canDevelop && stream.runnerConnected && !native.start.isPending && !native.retryingOriginal ? (terminal: NativeTerminalDto) => native.launch(terminal.compute, terminal.permission, terminal.terminalId) : undefined;
+  const retry = canDevelop && stream.runnerConnected && !native.start.isPending && !native.retryingOriginal ? (terminal: NativeTerminalDto) => native.launch(terminal.compute, terminal.terminalId) : undefined;
   const columns = panel.mode === 'side' ? `minmax(0, ${1 - (panel.tool?.ratio ?? 0.45)}fr) 6px minmax(0, ${panel.tool?.ratio ?? 0.45}fr)` : panel.mode === 'full' ? '0 0 minmax(0, 1fr)' : 'minmax(0, 1fr) 0 auto';
   return <>
     {props.header ? props.header(newCli) : <div className={styles.headerFallback}>{newCli}</div>}

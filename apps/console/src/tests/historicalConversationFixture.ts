@@ -1,6 +1,5 @@
 import { AgentInstanceDtoSchema } from '@crewstation/contracts';
-import type { AgentEvent } from '@crewstation/contracts';
-import type { StartDevAgentInput } from '@crewstation/api-client';
+import type { AgentEvent, StartDevAgentRequest } from '@crewstation/contracts';
 import { activityProjectId, activityTaskId, activityTime } from './agentActivityFixture';
 import { editorWorkspaceFixture } from './editorWorkspaceFixture';
 
@@ -11,7 +10,7 @@ export function historicalConversationFixture(rosterReady?: Promise<void>) {
   const f = editorWorkspaceFixture(), base = globalThis.fetch;
   const agents = [historyAgentA, historyAgentB].map((agentId) => AgentInstanceDtoSchema.parse({ agentId, taskId: activityTaskId, compute: '01a0bf5d-8f4b-7111-8111-111111111111', computeName: 'standard', permission: 'edit', state: 'awaiting-input', startedAt: activityTime }));
   const sends: Array<{ agentId: string; content: string; resolve: (response: Response) => void }> = [];
-  const starts: Array<{ input: StartDevAgentInput; resolve: (response: Response) => void }> = [];
+  const starts: Array<{ input: StartDevAgentRequest; resolve: (response: Response) => void }> = [];
   const rosterRequests: string[] = [];
   let eventSequence = 1;
   globalThis.fetch = (async (raw, init) => {
@@ -26,7 +25,7 @@ export function historicalConversationFixture(rosterReady?: Promise<void>) {
   const finish = (index: number, failed = false) => sends[index]!.resolve(failed ? Response.json({ error: 'unavailable', message: '上游未确认发送结果', details: {} }, { status: 503 }) : new Response(null, { status: 204 }));
   const finishStart = (index: number, failed = false) => {
     if (failed) { starts[index]!.resolve(Response.json({ error: 'unavailable', message: '上游未确认启动结果', details: {} }, { status: 503 })); return; }
-    const agent = AgentInstanceDtoSchema.parse({ agentId: `legacy-created-${index}`, taskId: activityTaskId, compute: starts[index]!.input.compute?.kind === 'profile' ? starts[index]!.input.compute.profileId : '01a0bf5d-8f4b-7111-8111-111111111111', permission: starts[index]!.input.permission, state: 'running', startedAt: activityTime });
+    const agent = AgentInstanceDtoSchema.parse({ agentId: `legacy-created-${index}`, taskId: activityTaskId, compute: starts[index]!.input.compute?.kind === 'profile' ? starts[index]!.input.compute.profileId : '01a0bf5d-8f4b-7111-8111-111111111111', permission: 'full', state: 'running', startedAt: activityTime });
     agents.push(agent); starts[index]!.resolve(Response.json(agent, { status: 201 }));
   };
   const receiveAgent = (event: Omit<AgentEvent, 'seq' | 'at'>) => {

@@ -111,7 +111,8 @@ describe.skipIf(!available)('business-task module', () => {
     const command = await bt.api.submitSubtask(caller, task.id, { kind: 'command', name: 'tests', command: ['bun', 'test'], timeoutSeconds: 60 });
     const start = commands.find((c) => c.type === 'startAgent') as Extract<RunnerCommand, { type: 'startAgent' }>;
     // 档位由平台解析后再下发，业务只登记了档位名；命令带固定修订与显式二进制（RFC-006）。
-    expect(start).toMatchObject({ compute: fixtureResource('compute:sample-opencode'), profileRevision: 1, launch: { protocol: 'opencode', binaryPath: '/usr/local/bin/opencode', model: 'opencode/one' }, permission: 'read-only', mode: 'oneshot', initialPrompt: '分析', mcp: [{ name: 'operations' }] });
+    // Manifest 登记的 chat-v1 写着 permission: read-only，已作废、照收不用：派发一律完全权限（D59）。
+    expect(start).toMatchObject({ compute: fixtureResource('compute:sample-opencode'), profileRevision: 1, launch: { protocol: 'opencode', binaryPath: '/usr/local/bin/opencode', model: 'opencode/one' }, permission: 'full', mode: 'oneshot', initialPrompt: '分析', mcp: [{ name: 'operations' }] });
     await Bun.sleep(50);
     expect((await bt.api.getSubtask(caller, task.id, command.id))).toMatchObject({ state: 'succeeded', exitCode: 0 });
     expect(await bt.api.subtaskOutput(caller, task.id, command.id)).toBe('done\n');

@@ -112,7 +112,7 @@ export const AgentInstanceDtoSchema = z.object({
 export const StartDevAgentRequestSchema = z.object({
   /** 算力档位 UUID 选择器或默认选择器；省略即 `default`，每次启动时解析到管理员设为默认的档位（RFC-006）。 */
   compute: ComputeProfileSelectorSchema.optional(),
-  permission: AgentPermissionSchema.default('edit'),
+  // 没有权限字段：开发会话的 Agent 一律完全权限（D59）。
   prompt: z.string().min(1),
   cwd: z.string().optional(),
   resumeSessionId: z.string().optional(),

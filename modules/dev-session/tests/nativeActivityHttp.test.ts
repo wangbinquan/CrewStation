@@ -21,7 +21,7 @@ describe.skipIf(!available)('动态资源实际装配与 HTTP', () => {
     const f = workspaceFixture(); const taskId = workspaceTask;
     const record: NativeTerminalRecord = { agentId: newId('agt'), terminalId: newId('pty'), runnerId: crypto.randomUUID(), lifecycle: 'running', revision: 1, compute: computeId('balanced'), permission: 'edit', startedAt: checkedAt, cols: 80, rows: 24 };
     f.state.result = { runnerId: record.runnerId, terminals: [record] };
-    await drizzleNativeTerminals(db.db).reserve({ taskId, record, createdBy: workspaceActor.userId, clientRequestId: crypto.randomUUID(), fingerprint: 'http', profile: { profileId: computeId('balanced'), revision: 1 }, input: { clientRequestId: crypto.randomUUID(), permission: 'edit', cols: 80, rows: 24 } });
+    await drizzleNativeTerminals(db.db).reserve({ taskId, record, createdBy: workspaceActor.userId, clientRequestId: crypto.randomUUID(), fingerprint: 'http', profile: { profileId: computeId('balanced'), revision: 1 }, input: { clientRequestId: crypto.randomUUID(), cols: 80, rows: 24 } });
     f.deps.runner.listEvents = async (_task, query) => query?.sinceSeq ? [] : [{ seq: 1, at: checkedAt, event: { kind: 'nativeActivity', activity: { agentId: record.agentId, terminalId: record.terminalId, runnerId: record.runnerId, seq: 1, turnOrdinal: 0, eventId: 'source-ready', signal: { kind: 'source-ready', nativeSessionId: null, turnId: null, occurredAt: checkedAt, source: 'claude-code/2.1.268', sourceEventId: 'ready' } } } }];
     let now = Date.parse(checkedAt);
     const module = createDevSessionModule({ ...f.deps, db: db.db, isAdmin: async () => false, clock: { now: () => new Date(now) } });

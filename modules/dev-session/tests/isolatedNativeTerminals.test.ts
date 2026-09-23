@@ -15,9 +15,9 @@ test('每窗独立受理和派发，HTTP 先返回准备中；MCP 和数据身�
   await f.run(first);
   expect(f.allocations).toEqual([first.execution!.taskId]);
   expect((await f.api.listNativeTerminals(actor, taskId)).items[0]).toMatchObject({ lifecycle: 'running', connection: 'connected', execution: { profile: { name: 'cli-small' } } });
-  expect(f.commands.find((r) => r.command.type === 'startAgentTerminal')).toMatchObject({ taskId: first.execution!.taskId, command: { runnerId: first.runnerId, profileRevision: 1, launch: { model: 'opencode/one' }, permission: 'edit' } });
+  expect(f.commands.find((r) => r.command.type === 'startAgentTerminal')).toMatchObject({ taskId: first.execution!.taskId, command: { runnerId: first.runnerId, profileRevision: 1, launch: { model: 'opencode/one' }, permission: 'full' } });
   expect(f.issued).toEqual([expect.objectContaining({ taskId, userId: actor.userId })]);
-  await expect(f.api.startNativeTerminal(actor, taskId, { ...input, permission: 'full' })).rejects.toMatchObject({ kind: 'conflict' });
+  await expect(f.api.startNativeTerminal(actor, taskId, { ...input, cols: 120 })).rejects.toMatchObject({ kind: 'conflict' });
   expect(first).not.toHaveProperty('model'); expect(first).not.toHaveProperty('driver');
 });
 

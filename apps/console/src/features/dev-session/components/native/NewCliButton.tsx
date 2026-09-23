@@ -1,4 +1,3 @@
-import type { AgentPermission } from '@crewstation/contracts';
 import type { ReactElement } from 'react';
 import { errorMessage } from '../../../../shared/api/useApi';
 import { useT } from '../../../../shared/lib/useT';
@@ -6,23 +5,18 @@ import { Button } from '../../../../shared/ui/Button';
 import { SplitButton } from '../../../../shared/ui/menu/SplitButton';
 import { ButtonLink } from '../../../../shared/ui/navigation/ButtonLink';
 import type { CliLauncher } from '../../hooks/native/useCliLauncher';
-import { AGENT_PERMISSIONS } from '../../model/agentOptions';
 import { ComputeOptions } from '../agents/ComputeOptions';
 import styles from './NativeWorkspace.module.css';
 
 /**
  * 页头的「＋ 创建开发Agent会话 ▾」（2026-09-23 起 CLI 区只有这一个入口，原工具行整条去掉）：
- * 主键按记住的档位与权限直接创建，新 CLI 落在焦点组；箭头展开换档位与权限。不可用时悬停说明原因。
+ * 主键按记住的档位直接创建，新 CLI 落在焦点组；箭头展开换档位。权限不分档，一律完全权限（D59）。不可用时悬停说明原因。
  */
 export function NewCliButton({ launcher, reason }: { readonly launcher: CliLauncher; readonly reason?: string }): ReactElement {
   const t = useT();
   return <SplitButton size="small" label={launcher.label} menuLabel={t('devSession.native.startOptions')} title={launcher.disabled ? reason : undefined}
     disabled={launcher.disabled} menuDisabled={launcher.unavailable} onClick={launcher.launch}
-    menu={<>
-      <label>{t('devSession.agents.compute')}<select aria-label={t('devSession.agents.compute')} value={launcher.compute} disabled={launcher.starting} onChange={(event) => launcher.setCompute(event.target.value)}><ComputeOptions items={launcher.items} /></select></label>
-      <label>{t('devSession.agents.permission')}<select aria-label={t('devSession.agents.permission')} value={launcher.permission} disabled={launcher.starting} onChange={(event) => launcher.setPermission(event.target.value as AgentPermission)}>{AGENT_PERMISSIONS.map((permission) => <option key={permission} value={permission}>{t(`devSession.agentPermission.${permission}`)}</option>)}</select></label>
-      <small>{t('devSession.native.permissionHint')}</small>
-    </>} />;
+    menu={<label>{t('devSession.agents.compute')}<select aria-label={t('devSession.agents.compute')} value={launcher.compute} disabled={launcher.starting} onChange={(event) => launcher.setCompute(event.target.value)}><ComputeOptions items={launcher.items} /></select></label>} />;
 }
 
 /** 档位读不到、所选档位不可用、布局已满时，CLI 区上方一行说明与处理入口（刷新档位；管理员去管理算力档位，其他人联系管理员）。 */

@@ -1,6 +1,6 @@
 import { newResourceId } from '@crewstation/kernel';
 import type { BeforeStartExecution, McpConnection, ProbeTerminalResult, ProfileTestContext, ProfileTestOutcome, ProfileTestStage, RunnerEvent, TaskId } from '@crewstation/contracts';
-import { ProbeTerminalResultSchema, TASKRUNNER_PROTOCOL_VERSION, isKnownProtocol } from '@crewstation/contracts';
+import { PLATFORM_AGENT_PERMISSION, ProbeTerminalResultSchema, TASKRUNNER_PROTOCOL_VERSION, isKnownProtocol } from '@crewstation/contracts';
 import { isPlatformError } from '@crewstation/kernel';
 import type { ProfileTestRunInput, ProfileTestRunProgress, ProfileTestRunResult } from '../api/moduleApi';
 import { CONTAINER_START_FAILURES, IMAGE_PULL_FAILURES, RUNNER_UNAVAILABLE_HINT } from '../domain/podStartup';
@@ -113,16 +113,16 @@ async function cliVersion(s: Session): Promise<string | null> {
 
 /**
  * 已知协议：发一次 oneshot 的 nonce 轮次，按事件推进阶段；截止时间 = 脚本预算＋模型预算，到点主动取消。
- * 权限取 full，与 agent-workflow 冒烟的系统 persona（`permission: {}`，工具全在）一致：按最小权限去掉 bash 之后，
- * 有的模型服务会拒绝这种请求（本机实测 OpenCode Zen 免费档对没有 bash 工具的请求答 403 FreeTierError），
- * 测试就会把一个可用的档位判成不可用。测试容器是临时的空工作目录，不带项目源码、数据与租户配置，提示词固定。
+ * 权限与平台派发给所有 Agent 的一样取 full（D59），也与 agent-workflow 冒烟的系统 persona（`permission: {}`，工具全在）一致；
+ * 去掉 bash 的请求有的模型服务会拒绝（本机实测 OpenCode Zen 免费档答 403 FreeTierError）。
+ * 测试容器是临时的空工作目录，不带项目源码、数据与租户配置，提示词固定。
  */
 async function observeProtocolTurn(s: Session): Promise<ProfileTestRunResult> {
   const { input, runner, env, timing } = s;
   const agentId = s.context.agentId!, sentAt = s.deps.clock.now().toISOString();
   try {
     await runner.sendCommand(env.id, {
-      id: `pft-start-${input.testId}`, type: 'startAgent', agentId, compute: input.profile, profileRevision: input.revision, launch: input.launch, permission: 'full',
+      id: `pft-start-${input.testId}`, type: 'startAgent', agentId, compute: input.profile, profileRevision: input.revision, launch: input.launch, permission: PLATFORM_AGENT_PERMISSION,
       mode: 'oneshot', initialPrompt: input.prompt, mcp: s.mcp, env: {}, beforeStart: input.beforeStart, processAttemptId: `${input.testId}:1`,
     });
   } catch (error) {

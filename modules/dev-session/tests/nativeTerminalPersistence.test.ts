@@ -19,7 +19,7 @@ describe.skipIf(!available)('原生 CLI 持久名册', () => {
   test('执行绑定、停止意图与末屏跨实例保持；名册不携带屏幕，迟到运行态不能覆盖结束', async () => {
     const repo = drizzleNativeTerminals(database.db), other = drizzleNativeTerminals(database.db), taskId = TaskIdSchema.parse(newId('tsk'));
     const input: NativeTerminalStart = { taskId, createdBy: workspaceActor.userId, clientRequestId: crypto.randomUUID(), fingerprint: 'execution', profile: { profileId: computeId('balanced'), revision: 2 },
-      input: { clientRequestId: crypto.randomUUID(), permission: 'edit', cols: 80, rows: 24 }, execution: { taskId: TaskIdSchema.parse(newId('tsk')), taskProfile: '01a0bf5d-8f4b-7dd6-8102-2aa5cc3255b1' },
+      input: { clientRequestId: crypto.randomUUID(), cols: 80, rows: 24 }, execution: { taskId: TaskIdSchema.parse(newId('tsk')), taskProfile: '01a0bf5d-8f4b-7dd6-8102-2aa5cc3255b1' },
       record: { agentId: newId('agt'), terminalId: newId('pty'), runnerId: crypto.randomUUID(), compute: computeId('balanced'), permission: 'edit', revision: 2, lifecycle: 'running', startedAt: new Date().toISOString(), cols: 80, rows: 24 } };
     await repo.reserve(input); await other.requestStop(taskId, input.record.agentId);
     expect((await repo.findExecution(input.execution!.taskId))?.execution).toMatchObject({ taskProfile: '01a0bf5d-8f4b-7dd6-8102-2aa5cc3255b1', stopRequested: true });
@@ -44,7 +44,7 @@ describe.skipIf(!available)('原生 CLI 持久名册', () => {
   test('RFC-022：冻结的启动进度写进 execution 文档，保留其余字段，另一实例读得到；没有执行绑定的旧记录不写', async () => {
     const repo = drizzleNativeTerminals(database.db), other = drizzleNativeTerminals(database.db), taskId = TaskIdSchema.parse(newId('tsk'));
     const record = { agentId: newId('agt'), terminalId: newId('pty'), runnerId: crypto.randomUUID(), compute: computeId('balanced'), permission: 'edit' as const, revision: 1, lifecycle: 'starting' as const, startedAt: new Date().toISOString(), cols: 80, rows: 24 };
-    const input: NativeTerminalStart = { taskId, createdBy: workspaceActor.userId, clientRequestId: crypto.randomUUID(), fingerprint: 'startup', input: { clientRequestId: crypto.randomUUID(), permission: 'edit', cols: 80, rows: 24 },
+    const input: NativeTerminalStart = { taskId, createdBy: workspaceActor.userId, clientRequestId: crypto.randomUUID(), fingerprint: 'startup', input: { clientRequestId: crypto.randomUUID(), cols: 80, rows: 24 },
       execution: { taskId: TaskIdSchema.parse(newId('tsk')), taskProfile: '01a0bf5d-8f4b-7dd6-8102-2aa5cc3255b1' }, record };
     await repo.reserve(input);
     const startup = { state: 'ready' as const, startedAt: record.startedAt, endedAt: record.startedAt, stages: [{ kind: 'ready' as const, state: 'succeeded' as const, startedAt: record.startedAt, endedAt: record.startedAt, durationMs: 0 }] };
@@ -74,7 +74,7 @@ describe.skipIf(!available)('原生 CLI 持久名册', () => {
     const repo2 = drizzleNativeTerminals(database.db);
     const input: NativeTerminalStart = {
       taskId: workspaceTask, createdBy: workspaceActor.userId, clientRequestId: crypto.randomUUID(), fingerprint: 'original', profile: { profileId: computeId('balanced'), revision: 7 },
-      input: { clientRequestId: crypto.randomUUID(), permission: 'edit', cols: 80, rows: 24 },
+      input: { clientRequestId: crypto.randomUUID(), cols: 80, rows: 24 },
       record: { agentId: 'agent-one', terminalId: 'terminal-one', runnerId: crypto.randomUUID(), compute: computeId('balanced'), permission: 'edit', revision: 0, lifecycle: 'starting', startedAt: new Date().toISOString(), cols: 80, rows: 24 },
     };
     const [one, duplicate] = await Promise.all([repo1.reserve(input), repo2.reserve({ ...input, record: { ...input.record, agentId: 'agent-two' } })]);

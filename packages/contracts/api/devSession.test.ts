@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
 import type { WorkspaceDockNode, WorkspaceLayout } from './devSession';
-import { WorkspaceLayoutSchema } from './devSession';
+import { StartDevAgentRequestSchema, WorkspaceLayoutSchema } from './devSession';
 
 const id = () => Bun.randomUUIDv7();
 const [groupA, groupB, one, two] = [id(), id(), id(), id()];
@@ -33,4 +33,9 @@ test('名字只能起给布局里有位置的 CLI（含已关闭的），每个�
   expect(issues({ ...legacy, terminalNames: [{ terminalId: one, name: 'a' }, { terminalId: one, name: 'b' }] })).toContain('terminalNames');
   expect(issues({ ...legacy, terminalNames: [{ terminalId: one, name: 'x'.repeat(41) }] })).toContain('terminalNames.0.name');
   expect(issues({ ...legacy, terminalNames: [{ terminalId: one, name: '   ' }] })).toContain('terminalNames.0.name');
+});
+
+test('开发会话 Agent 的启动请求没有权限可选（D59）：升级前的页面带上的 permission 被丢掉，不会变成限制', () => {
+  const parsed = StartDevAgentRequestSchema.parse({ prompt: '整理需求', permission: 'read-only' });
+  expect(parsed).toEqual({ prompt: '整理需求' });
 });

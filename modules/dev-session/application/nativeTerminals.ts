@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import type { Actor, NativeTerminalDto, NativeTerminalList, NativeTerminalRoster, ProjectId, ServiceId, StartNativeTerminalRequest, TaskId } from '@crewstation/contracts';
-import { IDENTITY_HEADERS, NativeTerminalRecordSchema, RunnerResultPayloads } from '@crewstation/contracts';
+import { IDENTITY_HEADERS, NativeTerminalRecordSchema, PLATFORM_AGENT_PERMISSION, RunnerResultPayloads } from '@crewstation/contracts';
 import { conflict, isPlatformError, newId, newResourceId, notFound, precondition } from '@crewstation/kernel';
 import type { NativeTerminalRepository, NativeTerminalStart } from '../ports/nativeTerminals';
 import { projectNativeTerminal } from '../domain/nativeTerminalProjection';
@@ -9,7 +9,8 @@ import { nativeCompute, nativeEnvironment } from './nativeTerminalAccess';
 import { NativeExecutionLifecycle, nativeEnded } from './nativeExecution';
 import { profileLaunchFields } from './profileLaunch';
 
-const fingerprintOf = (input: StartNativeTerminalRequest) => createHash('sha256').update(JSON.stringify([input.compute ?? null, input.permission, input.cwd ?? null, input.cols, input.rows])).digest('hex');
+// 升级前受理的请求里可能还存着 permission：不计入指纹，它已不影响启动（D59）。
+const fingerprintOf = (input: StartNativeTerminalRequest) => createHash('sha256').update(JSON.stringify([input.compute ?? null, input.cwd ?? null, input.cols, input.rows])).digest('hex');
 
 class NativeTerminals {
   readonly execution: NativeExecutionLifecycle;
@@ -25,7 +26,7 @@ class NativeTerminals {
     return this.repository.reserve({
       taskId, createdBy: actor.userId, clientRequestId: input.clientRequestId, fingerprint: fingerprintOf(input), input,
       profile: { profileId: profile.id, revision: profile.revision }, execution: { taskId: newId('tsk') as TaskId, image: profile.image, ...(profile.taskProfile ? { taskProfile: profile.taskProfile } : {}), acceptedAt: now },
-      record: { agentId: newId('agt'), terminalId: newId('pty'), runnerId: Bun.randomUUIDv7(), compute: profile.id, computeName: profile.name, permission: input.permission, revision: 0, lifecycle: 'starting', startedAt: now, cols: input.cols, rows: input.rows, profileRevision: profile.revision, protocol: profile.protocol },
+      record: { agentId: newId('agt'), terminalId: newId('pty'), runnerId: Bun.randomUUIDv7(), compute: profile.id, computeName: profile.name, permission: PLATFORM_AGENT_PERMISSION, revision: 0, lifecycle: 'starting', startedAt: now, cols: input.cols, rows: input.rows, profileRevision: profile.revision, protocol: profile.protocol },
     });
   }
   async start(actor: Actor, taskId: TaskId, input: StartNativeTerminalRequest): Promise<NativeTerminalDto> {
@@ -50,7 +51,7 @@ class NativeTerminals {
       const record = RunnerResultPayloads.startAgentTerminal.parse(await this.deps.runner.sendCommand(taskId, {
         id: newId('cmd'), type: 'startAgentTerminal', agentId: start.record.agentId, terminalId: start.record.terminalId,
         runnerId: start.record.runnerId, requestFingerprint: start.fingerprint, ...profile,
-        permission: start.record.permission, cols: start.input.cols, rows: start.input.rows, ...(start.input.cwd ? { cwd: start.input.cwd } : {}),
+        permission: PLATFORM_AGENT_PERMISSION, cols: start.input.cols, rows: start.input.rows, ...(start.input.cwd ? { cwd: start.input.cwd } : {}),
         mcp: this.deps.settings.mcp.map((m) => ({ ...m, headers: { [IDENTITY_HEADERS.devSessionToken]: credential.token } })), env: {},
       }));
       await this.repository.saveRecord(taskId, record);
@@ -115,7 +116,7 @@ export function clusterNativeUseCases(deps: DevSessionUseCaseDeps, repository: N
         if (!parent?.connected || parent.state !== 'running') throw precondition('父工作区未就绪，无法重开 CLI');
         next = await repository.reserve({ taskId: old.taskId, createdBy: actor.userId, clientRequestId: operationId, input: { ...old.input, clientRequestId: operationId }, fingerprint: fingerprintOf(old.input), profile: old.profile!,
           execution: { taskId: newResourceId() as TaskId, image: old.execution!.image, taskProfile: old.execution!.taskProfile, previousTaskId: id },
-          record: { agentId: newResourceId(), terminalId: newResourceId(), runnerId: Bun.randomUUIDv7(), compute: old.record.compute, computeName: old.record.computeName, permission: old.record.permission, protocol: old.record.protocol, profileRevision: old.profile!.revision, cols: old.input.cols, rows: old.input.rows, revision: 0, lifecycle: 'starting', startedAt: deps.clock.now().toISOString() } });
+          record: { agentId: newResourceId(), terminalId: newResourceId(), runnerId: Bun.randomUUIDv7(), compute: old.record.compute, computeName: old.record.computeName, permission: PLATFORM_AGENT_PERMISSION, protocol: old.record.protocol, profileRevision: old.profile!.revision, cols: old.input.cols, rows: old.input.rows, revision: 0, lifecycle: 'starting', startedAt: deps.clock.now().toISOString() } });
       }
       await repository.requestStop(old.taskId, old.record.agentId); await execution.dispatch(id);
       return { operationId: next?.execution?.taskId ?? id };

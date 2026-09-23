@@ -101,11 +101,12 @@ describe.skipIf(!available)('dev-session module', () => {
     expect((await dev.api.getSession(developer, projectId))?.preview).toBe('ready');
     expect((await dev.api.listBranches(developer, projectId))[0]).toMatchObject({ name: 'main', behindPreview: 2 });
 
-    const agent = await dev.api.startAgent(developer, created.id, { compute: computeSelector('balanced'), permission: 'edit', prompt: '你好' });
+    const agent = await dev.api.startAgent(developer, created.id, { compute: computeSelector('balanced'), prompt: '你好' });
     expect(agent.execution).toMatchObject({ state: 'running' });
     await dev.api.dispatchPendingNativeExecution(agent.execution!.taskId);
     const start = commands.find((c) => c.type === 'startAgent');
-    expect(start).toMatchObject({ mode: 'interactive', initialPrompt: '你好', mcp: [{ name: 'capabilities' }] });
+    // 请求里没有权限可选，派发一律完全权限（D59）。
+    expect(start).toMatchObject({ mode: 'interactive', initialPrompt: '你好', permission: 'full', mcp: [{ name: 'capabilities' }] });
     // 会话级短期令牌进了 MCP 连接头，并且绑定的是本会话、本项目、本服务与启动者（Design §5.9）。
     expect(issued).toEqual([{ taskId: created.id, projectId, serviceId, userId: developer.userId }]);
     expect(start).toMatchObject({ mcp: [{ headers: { 'x-cs-dev-session-token': `tok-${created.id}` } }] });
@@ -115,8 +116,8 @@ describe.skipIf(!available)('dev-session module', () => {
     expect(listed[0]).toMatchObject({ agentId: '01a0bf5d-8f4b-7aaa-86ba-278f66412c7f', state: 'completed', sessionId: 's1', compute: computeId('balanced'), permission: 'read-only', profileRevision: 1 });
     expect(listed[0]).not.toHaveProperty('model');
     expect(listed[0]).not.toHaveProperty('driver');
-    // 没有 started 事件时留最小权限的占位，绝不谎称 edit。
-    expect(listed[1]).toMatchObject({ agentId: '01a0bf5d-8f4b-7519-855a-71aee3eae874', permission: 'read-only', compute: '' });
+    // 没有 started 事件时权限就是平台唯一派发的那一档（D59），档位如实留空。
+    expect(listed[1]).toMatchObject({ agentId: '01a0bf5d-8f4b-7519-855a-71aee3eae874', permission: 'full', compute: '' });
 
     dirty = ' M src/main.ts\n?? new.ts\n';
     await expect(dev.api.publish(developer, projectId, { branch: 'main', version: 'patch' })).rejects.toMatchObject({ kind: 'precondition', details: { uncommitted: ['src/main.ts', 'new.ts'] } });
@@ -151,21 +152,21 @@ describe.skipIf(!available)('dev-session module', () => {
       return dto;
     };
     // 省略 compute → 解析到管理员设为默认的档位，命令带上固定修订与 launch（显式二进制）。
-    await startAndDispatch({ permission: 'edit', prompt: '用默认档' });
+    await startAndDispatch({ prompt: '用默认档' });
     expect(commands.find((c) => c.type === 'startAgent')).toMatchObject({ compute: computeId('balanced'), profileRevision: 1, launch: { protocol: 'claude-code', binaryPath: '/usr/local/bin/claude', model: 'anthropic/claude-sonnet-5' }, beforeStart: { profile: computeId('balanced'), revision: 1 } });
     commands.length = 0;
-    await startAndDispatch({ compute: computeSelector('default'), permission: 'edit', prompt: '显式 default' });
+    await startAndDispatch({ compute: computeSelector('default'), prompt: '显式 default' });
     expect(commands.find((c) => c.type === 'startAgent')).toMatchObject({ compute: computeId('balanced') });
 
     // 不存在的档位：报错里要列出可选项，否则调用方只能去猜。
-    const bad = await dev.api.startAgent(developer, created.id, { compute: computeSelector('nope'), permission: 'edit', prompt: 'x' }).catch((e: unknown) => e);
+    const bad = await dev.api.startAgent(developer, created.id, { compute: computeSelector('nope'), prompt: 'x' }).catch((e: unknown) => e);
     expect(bad).toMatchObject({ kind: 'validation', details: { available: [computeId('balanced'), computeId('term-cli')] } });
     // 通用终端档位只能用于「＋ CLI」（C6）。
-    await expect(dev.api.startAgent(developer, created.id, { compute: computeSelector('term-cli'), permission: 'edit', prompt: 'x' })).rejects.toMatchObject({ kind: 'validation', details: { code: 'terminal_profile_not_allowed' } });
+    await expect(dev.api.startAgent(developer, created.id, { compute: computeSelector('term-cli'), prompt: 'x' })).rejects.toMatchObject({ kind: 'validation', details: { code: 'terminal_profile_not_allowed' } });
 
     // 默认档没配置时报 precondition，不静默挑一档——静默挑会让业务以为自己拿到了预期算力。
     computeProfiles[0]!.isDefault = false;
-    const noDefault = await dev.api.startAgent(developer, created.id, { permission: 'edit', prompt: 'y' }).catch((e: unknown) => e);
+    const noDefault = await dev.api.startAgent(developer, created.id, { prompt: 'y' }).catch((e: unknown) => e);
     expect(noDefault).toMatchObject({ kind: 'precondition', details: { code: 'no_default_profile' } });
     computeProfiles[0]!.isDefault = true;
 

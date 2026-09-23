@@ -7,6 +7,14 @@
 
 基线三件套（v0.3.3）的第一轮实现已在本机 kind 集群上跑通并推上 main；**RFC-001（算力归平台）与 RFC-002（管理空间与租户空间分离）已实现、实跑确认并推上 main；RFC-004 已被 RFC-006 取代（Superseded）；RFC-006（算力档位合并运行环境、每个 Agent 一个 Pod）已实现、实机验收完毕并推上 main，已 Done（P1–P8、ADR-0005 与 I17–I19 待作者复核）；RFC-003 工作台已按设计附件完成并整体部署到本机，52／52 项 UX-AT 全部实机通过、本地 gate 与精确 SHA CI 通过，已 Done；RFC-005（OIDC／OAuth 2.0 公司登录）代码、测试与 OA-01…OA-31 实机验收全部完成，已 Done；RFC-007（开发环境 OAuth 2.0 一键换角色）代码、四角色 Chrome 实机验收、本地 gate 与精确 SHA CI 全部完成，已 Done**。
 
+## Agent 不再分权限档（2026-09-23，Design D59）
+
+作者问「创建开发对话的右侧下拉框，只读、可改文件、完全权限都是什么意思，用起来无法理解」。看过三档实际放行的工具后（可改文件不能跑任何命令；只读挡不住平台 MCP 的发布等动作；通用终端档位下完全不起作用），作者裁定「为什么要限制呢，都是开发容器。只有连生产库才有对生产库的权限控制才对」。追问后业务子任务也一律完全权限；Manifest 旧写法「没有存量，你直接接受并忽略就行了」；流程取「直接改＋回填，部署本机」。D58／v0.3.10 已由 crewstation-51 的 RFC-022 占用，本条取 D59、基线 v0.3.11。
+
+- **行为**：平台派发给 Runner 的权限一律 `full`（`packages/contracts/manifest/tasks.ts` 的 `PLATFORM_AGENT_PERMISSION`）：开发会话 CLI（含旧路径与重启）、历史 Agent（含重启）、业务子任务、档位测试。「＋ 创建开发Agent会话 ▾」只选算力档位，历史 Agent 表单去掉权限；`POST …/agent-terminals` 带 `permission` 回 400（strict），`POST …/agents` 直接丢弃。Manifest `agentProfiles[].permission` 照收不用，金样破坏性 1 处（去掉 `default: "edit"`，依据 D59）；样例模板删掉这一行。名册与记录里的 `permission` 如实记派发值。TaskRunner 协议与 `packages/agent-drivers` 的三档映射不动（运行中的旧 Runner 照常），任务镜像不用重建。
+- **回填**：基线 v0.3.11（Design D59；§13.4 新增一条接受的风险：业务子任务的 Agent 能直接读写生产库；Proposal §0.2 变更表；Plan T3.3 注记）；RFC-003 proposal §7、development-workspace §5／§8 同日修订（含作者逐项确认的去掉的能力）；I19 关闭，I17 的权限部分定下；dev-gotchas 的 FreeTierError 条补注。
+- **注意**：部署后已打开的工作台页要刷新一次，旧页面新开 CLI 时带着 `permission`，会被新 cs-api 以 400 拒绝。
+
 ## RFC-021 修订：提醒之后才能推迟、待验证版本可以选版本部署（2026-09-23）
 
 作者实机反馈两条：「项目界面，推迟72小时按钮一直显示也一直可以点，不合理，应该是在下线前24小时才显示，并且文案应该是推迟72小时下线」（本机 demo 07:53 被连点 5 次，到期推到 15 天后）；「待验证版本，应该要可以选择版本部署吧，为什么现在只能部署上个下线版本」。两轮问答裁定，流程取「直接改＋回填 RFC-021，提交、推送并部署本机」（RFC-021 plan T14）：
