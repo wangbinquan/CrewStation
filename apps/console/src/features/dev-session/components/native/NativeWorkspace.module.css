@@ -1,4 +1,5 @@
-.workspace { min-width: 0; font-size: 14px; --cs-select-height: 28px; --cs-select-padding-block: 3px; --cs-select-font-size: 12px; }
+/* 工作区长满页面剩余高度（开发页撑到窗口底边，2026-09-23）：主区在其中再长满，状态条贴着底边。 */
+.workspace { display: flex; flex-direction: column; flex: 1 0 auto; min-width: 0; font-size: 14px; --cs-select-height: 28px; --cs-select-padding-block: 3px; --cs-select-font-size: 12px; }
 /* 开发页的页签与工具栏比普通页面更紧：1280×720 下首窗距产品顶端要在 210px 以内（development-workspace.md §2）。 */
 .workspace [role="tab"] { padding: 5px 10px; }
 .workspace [role="tabpanel"] { padding-top: 4px; }
@@ -15,7 +16,9 @@
 .toolbar select, .menuBody select, .rename input { max-width: 180px; min-width: 0; background: var(--cs-color-surface); color: var(--cs-color-text); border: 1px solid var(--cs-color-border); border-radius: var(--cs-radius-sm); padding: 4px; }
 .separator { width: 1px; height: 18px; background: var(--cs-color-border); }
 /* 主区（终端）＋分隔线＋工具面板三列；列宽由内联样式按面板形态给出，子项固定列位，隐藏任何一项都不会错列。 */
-.stage { display: grid; grid-template-rows: minmax(0, 1fr); height: calc(100dvh - 210px); min-height: 360px; min-width: 0; }
+.stage { display: grid; grid-template-rows: minmax(0, 1fr); flex: 1 1 0; min-height: 360px; min-width: 0; }
+/* 手机上外壳占高：主区撑到底，但不小于 70dvh（原定高），外壳太高时页面照旧滚动。 */
+@media (max-width: 600px) { .stage { min-height: max(360px, 70dvh); } }
 .main { grid-column: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 .main[hidden] { display: none; }
 .main > div { display: flex; flex-direction: column; min-height: 0; flex: 1; }
@@ -65,7 +68,6 @@
 .footer { justify-content: space-between; flex-wrap: wrap; padding-top: 4px; font-size: 11px; color: var(--cs-color-text-muted); }
 .status { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; min-width: 0; flex: 1; }
 .rename { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; width: 100%; }
-@media (max-width: 600px) { .stage { height: 70dvh; min-height: 360px; } }
 
 /* 功能页与个人工作区各占一层；hidden 保留草稿但不参与布局。 */
 .workspace [hidden] { display: none; }

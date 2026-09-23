@@ -8,3 +8,9 @@
 .list > button:hover { background: transparent; color: var(--cs-color-text); }
 .list > button[aria-selected="true"] { color: var(--cs-color-primary); border-bottom-color: var(--cs-color-primary); font-weight: 600; }
 .panel { padding-top: var(--cs-space-3); }
+/* 点名 fill：页签正文跟着内容长、最后一项长满，按钮与链接保持自然宽度。页签正文不自成滚动区——
+   外层（工具面板）给自己页签正文写的 flex／overflow 会命中嵌套的页签，所以这里用更具体的选择器写死。 */
+.tabs.fill { display: flex; flex-direction: column; flex-grow: 1; }
+.tabs.fill > .panel { display: flex; flex-direction: column; flex: 1 0 auto; min-height: auto; overflow: visible; }
+.tabs.fill > .panel > :last-child { flex-grow: 1; }
+.tabs.fill > .panel > :where(button, a) { align-self: flex-start; }

@@ -93,9 +93,9 @@ export function DevSessionWorkbench({ projectId, session, access, canDevelop, se
       <NativeWorkspace projectId={projectId} taskId={taskId} userId={userId} channel={channel} stream={state} canDevelop={canDevelop} onActivity={touch} activityTarget={activityTarget} editorDirty={editor.dirty} location={location}
         isAdmin={isAdmin} dataDirty={dataDirty} blockedReason={health !== 'ready' ? t(`devSession.connection.${health}`) : undefined}
         version={health === 'ready' ? <VersionComparisonPanel projectId={projectId} taskId={taskId} channel={channel} canDevelop={canDevelop} compact onDetails={() => location.selectTool({ name: 'changes', mode: 'side' })} /> : null}
-        data={<Stack><DataResourcesTable projectId={projectId} /><DataBindingPane data={data} onDirtyChange={setDataDirty} /></Stack>}
+        data={<Stack fill><DataResourcesTable projectId={projectId} /><DataBindingPane data={data} onDirtyChange={setDataDirty} /></Stack>}
         reference={reference}
-        environment={<Stack>
+        environment={<Stack fill>
           <Card compact stacked title={t('devSession.connection.title')} extra={logs}><StreamStatus state={state} sessionState={session.state} /><p>{t('devSession.connection.automatic')}</p>{recovery}</Card>
           {sessionLogs ? sessionLogs(taskId) : null}
           <ButtonLink size="small" to={PROJECT_PATHS[space].conversations} params={{ projectId }}>{t('devSession.native.history')}</ButtonLink>

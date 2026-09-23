@@ -29,7 +29,7 @@ export function VersionComparisonPanel({ projectId, taskId, channel, canDevelop,
     <Button variant="ghost" disabled={refreshing || history.isPending} onClick={() => void recheck()}>{t(refreshing ? 'devSession.compare.refreshing' : 'devSession.workspace.recheck')}</Button>
     {data && (query.isError || data.freshness === 'stale') ? <span title={`${date(data.checkedAt)} · ${t('devSession.compare.staleHint')}`}>{t('devSession.compare.staleShort')}</span> : null}
   </section>;
-  return <Card compact className={styles.panel} title={t(target === 'preview' ? 'devSession.compare.previewTitle' : 'devSession.compare.title')} extra={<>
+  return <Card compact title={t(target === 'preview' ? 'devSession.compare.previewTitle' : 'devSession.compare.title')} extra={<>
     {onTargetChange ? <select aria-label={t('devSession.compare.target')} value={target} disabled={history.isPending} onChange={(e) => onTargetChange(e.target.value as ComparisonTarget)}>
       <option value="prod">{t('devSession.compare.production')}</option><option value="preview">{t('devSession.compare.preview')}</option></select> : null}
     <Button variant="ghost" disabled={refreshing || history.isPending} onClick={() => void recheck()}>{t(refreshing ? 'devSession.compare.refreshing' : 'devSession.workspace.recheck')}</Button>

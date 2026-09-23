@@ -19,6 +19,8 @@ export interface CatalogContentProps {
   readonly canDevelop?: boolean;
   /** 紧凑形态：只列已授权操作与试调，不含申请记录与 Swagger。 */
   readonly compact?: boolean;
+  /** 紧凑形态在工具面板里：内容短时把最后一张卡（操作表）拉到面板底边。 */
+  readonly fill?: boolean;
   readonly proxy?: string;
   /** 放大形态里是选中的操作（表仍列全部）；紧凑形态里是筛选。 */
   readonly operation?: string;
@@ -28,7 +30,7 @@ export interface CatalogContentProps {
 }
 
 /** 目录页正文：放大形态「表在前、详情在旁」（RFC-020 design §7），Swagger 折叠；紧凑形态只有表与试调。 */
-export function CatalogContent({ projectId, serviceId, canDevelop = false, compact = false, proxy, operation, onClearContext, onSelect }: CatalogContentProps): ReactElement {
+export function CatalogContent({ projectId, serviceId, canDevelop = false, compact = false, fill = false, proxy, operation, onClearContext, onSelect }: CatalogContentProps): ReactElement {
   const t = useT();
   const { operations, requests, proxies } = useCatalogData(projectId, serviceId);
   const actions = useCatalogActions(serviceId);
@@ -42,7 +44,7 @@ export function CatalogContent({ projectId, serviceId, canDevelop = false, compa
   const selected = (operations.data?.items ?? []).find((item) => item.id === selectedId);
   const pending = (requests.data?.items ?? []).find((item) => item.state === 'pending' && item.operationId === selectedId);
   if (compact) return (
-    <div className={styles.stack}>
+    <div className={fill ? `${styles.stack} ${styles.fill}` : styles.stack}>
       <ApiInvocationWorkspace context={context}>{(_controller, open, panel) => <>
         {panel}
         <OperationsPanel operations={operations.data?.items ?? []} requests={requests.data?.items ?? []} loading={operations.isPending} loadError={operations.error} actions={actions} proxy={proxy} operation={operation} onClearContext={onClearContext} onInvoke={canDevelop ? open : undefined} grantedOnly />

@@ -11,10 +11,12 @@ export interface TabsProps {
   readonly onChange: (value: string) => void;
   readonly children: ReactNode;
   readonly extra?: ReactNode;
+  /** 在纵向弹性父级里长满：页签正文跟着内容长、最后一项长满（工具面板里内容短时把最后一张卡拉到面板底边）。 */
+  readonly fill?: boolean;
 }
 
 /** 受控页签：方向键／Home／End 切换，标签与面板关联；窄屏只滚动标签条。 */
-export function Tabs({ label, items, value, onChange, children, extra }: TabsProps): ReactElement {
+export function Tabs({ label, items, value, onChange, children, extra, fill = false }: TabsProps): ReactElement {
   const id = useId();
   const list = useRef<HTMLDivElement>(null);
   const index = Math.max(0, items.findIndex((item) => item.value === value));
@@ -27,7 +29,7 @@ export function Tabs({ label, items, value, onChange, children, extra }: TabsPro
     observer.observe(bar);
     return () => observer.disconnect();
   }, [value, items]);
-  return <div className={styles.tabs}>
+  return <div className={fill ? `${styles.tabs} ${styles.fill}` : styles.tabs}>
     <div className={styles.bar}><div className={styles.list} role="tablist" aria-label={label} ref={list}
       onFocus={(event) => revealTab(event.currentTarget, event.target.closest<HTMLElement>('[role="tab"]'))} onKeyDown={(event) => {
       const target = event.key === 'ArrowRight' ? (index + 1) % items.length : event.key === 'ArrowLeft' ? (index + items.length - 1) % items.length : event.key === 'Home' ? 0 : event.key === 'End' ? items.length - 1 : undefined;

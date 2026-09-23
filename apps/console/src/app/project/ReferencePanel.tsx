@@ -25,11 +25,11 @@ export function ReferencePanel(): ReactElement {
   const search = parseDevelopmentSearch(useSearch({ strict: false })), topic: ReferenceTopic = search.topic ?? 'api';
   const panel = useToolPanel(), full = panel?.mode === 'full';
   const go = (next: Partial<DevelopmentSearch>) => { void navigate({ to: PROJECT_PATHS[space].development, params: { projectId }, search: { ...search, guide: undefined, ...next }, replace: true }); };
-  return <Stack>
-    <Tabs label={t('resources.groups')} value={topic} items={REFERENCE_TOPICS.map((value) => ({ value, label: t(`resources.section.${value}`) }))} onChange={(value) => go({ topic: value as ReferenceTopic, proxy: undefined, operation: undefined, subscription: undefined })}
+  return <Stack fill>
+    <Tabs fill label={t('resources.groups')} value={topic} items={REFERENCE_TOPICS.map((value) => ({ value, label: t(`resources.section.${value}`) }))} onChange={(value) => go({ topic: value as ReferenceTopic, proxy: undefined, operation: undefined, subscription: undefined })}
       extra={panel && !full ? <Button variant="ghost" onClick={panel.maximize}>{t('reference.openFull')}</Button> : undefined}>
       <p className={styles.note}>{t(`resources.note.${topic}`)}</p>
-      {topic === 'api' ? <CatalogPage key={`api:${full}`} embedded compact={!full} proxy={search.proxy} operation={search.operation} onClearContext={() => go({ proxy: undefined, operation: undefined })} onSelect={(operation) => go({ operation: operation?.id })} /> : null}
+      {topic === 'api' ? <CatalogPage key={`api:${full}`} embedded compact={!full} fill proxy={search.proxy} operation={search.operation} onClearContext={() => go({ proxy: undefined, operation: undefined })} onSelect={(operation) => go({ operation: operation?.id })} /> : null}
       {topic === 'events' ? <><ActionRow>
         <ButtonLink size="small" to={PROJECT_PATHS[space].development} params={{ projectId }} search={{ view: 'code', file: 'crewstation.yaml' }}>{t('resources.openManifest')}</ButtonLink>
         <DeliveriesSummary projectId={projectId} subscription={search.subscription} />

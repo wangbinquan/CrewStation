@@ -6,3 +6,7 @@
 }
 
 .stack > :where(button, a) { align-self: flex-start; }
+
+/* 点名 fill：在纵向弹性父级里长满剩余高度，最后一项也长满（工具面板里内容短时把最后一张卡拉到面板底边）。 */
+.fill { flex-grow: 1; }
+.fill > :last-child { flex-grow: 1; }

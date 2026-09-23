@@ -4,6 +4,9 @@
   gap: var(--cs-space-2);
   min-width: 0;
 }
+/* 紧凑形态在工具面板里：长满剩余高度，最后一张卡（操作表）拉到面板底边。 */
+.fill { flex-grow: 1; }
+.fill > :last-child { flex-grow: 1; }
 
 /* 放大形态：表在前、详情在旁；窄于 960px 时详情落到表下。 */
 .columns { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 380px); gap: var(--cs-space-3); align-items: start; min-width: 0; }

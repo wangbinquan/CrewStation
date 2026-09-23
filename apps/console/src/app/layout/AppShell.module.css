@@ -20,8 +20,10 @@
 .content {
   min-width: 0;
 }
-/* 开发页：只收紧内边距，终端成为主体；左栏宽度与其他页面一致，不在这里改写 --cs-nav-width。 */
-.compact { padding: 8px 12px; }
+/* 开发页：收紧内边距，终端成为主体；内容区是纵向弹性列、长满到窗口底边，工作区在其中长满剩余高度（2026-09-23）。
+   左栏宽度与其他页面一致，不在这里改写 --cs-nav-width。 */
+.compact { padding: 8px 12px; display: flex; flex-direction: column; }
+.compact > .content { flex: 1 0 auto; display: flex; flex-direction: column; }
 
 @media (max-width: 800px) {
   .shell {

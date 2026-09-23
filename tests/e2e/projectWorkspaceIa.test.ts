@@ -88,6 +88,42 @@ describe.skipIf(!session?.project)('项目工作台信息架构（RFC-020）', (
     expect(page.takeErrors()).toEqual([]);
   }, 60_000);
 
+  test('WS-07：开发页撑到窗口底边，状态条贴着内容区底边、整页不滚动（1280×720／1440×900／1920×1080）', async () => {
+    const page = session!.admin, id = session!.project!.id;
+    // 2026-09-23 作者裁定：主区原按 calc(100dvh - 210px) 定高，状态条下方空 47–67px。
+    for (const [width, height] of [[1280, 720], [1440, 900], [1920, 1080]] as const) {
+      await viewport(page, width, height); await open(page, `/projects/${id}/dev-session?view=preview`);
+      await page.waitUntil(`!!document.querySelector('aside[aria-label="工具面板"]')?.closest('section')?.querySelector(':scope > footer')`);
+      const fit = await page.eval<{ gap: number; scroll: number }>(`(() => {
+        const footer = document.querySelector('aside[aria-label="工具面板"]').closest('section').querySelector(':scope > footer');
+        const pad = parseFloat(getComputedStyle(document.querySelector('main')).paddingBottom);
+        return { gap: Math.round(innerHeight - pad - footer.getBoundingClientRect().bottom), scroll: document.documentElement.scrollHeight - innerHeight };
+      })()`);
+      expect([width, Math.abs(fit.gap) <= 1, fit.scroll <= 1]).toEqual([width, true, true]);
+    }
+    expect(page.takeErrors()).toEqual([]);
+  }, 60_000);
+
+  test('WS-07：文档式面板内容短时最后一张卡拉到面板底边（变更、数据访问、参考、会话与环境，1440×900 在旁）', async () => {
+    const page = session!.admin, id = session!.project!.id;
+    await viewport(page, 1440);
+    // 2026-09-23 作者裁定：变更卡原止于 641px、面板正文到 783px，下方一大块留白。
+    for (const view of ['changes', 'data', 'reference', 'session']) {
+      await open(page, `/projects/${id}/dev-session?view=${view}`);
+      await page.waitUntil(`document.querySelector('aside[aria-label="工具面板"]')?.dataset.mode === 'side'`);
+      const reach = await page.eval<number>(`(() => {
+        const body = document.querySelector('aside[aria-label="工具面板"] > div > [role="tabpanel"]'); body.scrollTop = 0;
+        const pane = [...body.children].find((node) => !node.hidden), sections = [...pane.querySelectorAll('section')];
+        const bordered = (node) => parseFloat(getComputedStyle(node).borderBottomWidth) > 0 && node.getBoundingClientRect().height > 0;
+        const cards = sections.filter((node) => bordered(node) && !sections.some((other) => other !== node && other.contains(node) && bordered(other)));
+        return Math.round(body.getBoundingClientRect().bottom - Math.max(...cards.map((node) => node.getBoundingClientRect().bottom)));
+      })()`);
+      // 最后一张卡离面板正文底边只剩内边距（8px）；内容比一屏长时为负，超出部分由面板正文滚动。
+      expect([view, reach <= 12]).toEqual([view, true]);
+    }
+    expect(page.takeErrors()).toEqual([]);
+  }, 60_000);
+
   test('WS-14：发布页有合并的发布记录时间线，待验证卡上是上线／回退或负责人说明', async () => {
     const page = session!.admin, id = session!.project!.id;
     await viewport(page, 1440); await open(page, `/projects/${id}/release`);
