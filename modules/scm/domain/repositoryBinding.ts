@@ -10,7 +10,10 @@ export interface RepositoryBinding {
   readonly provider: 'gitlab';
   readonly remoteProjectId: string;
   readonly pathWithNamespace: string;
+  /** 克隆、构建、推送用：由平台配置的 GitLab 地址推出。 */
   readonly httpUrl: string;
+  /** 浏览器打开用：GitLab 自报的网页地址。本列加入之前建的绑定没有，第一次被读到时向 GitLab 补一次。 */
+  readonly webUrl?: string;
   readonly defaultBranch: string;
   readonly state: RepositoryBindingState;
   readonly message?: string;
@@ -34,6 +37,7 @@ export interface NewBindingInput {
   readonly remoteProjectId: string;
   readonly pathWithNamespace: string;
   readonly httpUrl: string;
+  readonly webUrl?: string;
   readonly defaultBranch: string;
   readonly now: Date;
 }

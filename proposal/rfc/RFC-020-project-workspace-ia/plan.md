@@ -143,3 +143,5 @@ T3 之后的 T4、T5、T7、T8 互不依赖，可以分批提交；每批都要�
 - `ProjectOverviewPage`：删掉页头第二行（仓库链接、两槽 `hostLink`）与概览的仓库查询；「项目信息」并到第一行末尾。应用仍由两张版本卡上的「打开正式应用」「打开试用」打开。
 - `ProjectInfoCard`：末行「仓库」外链；新增 `useRepositoryBinding`，它与 `RepositoryCard` 共用一次读取。
 - 用例：`projectSummaryPages` 改写页头一条（页头没有 `//` 外链、没有仓库字样、概览不请求 `/repository`、「项目信息」是身份行最后一个元素且元数据只剩一行）与访问入口一条（只剩两张版本卡上的打开按钮）；`projectResources` 项目信息两条改为四行，新增仓库读取失败一条（写「暂未读取到」、源码仓库卡给出失败原因）。六条对改前的代码均为红。WS-02 的「页头有仓库与两槽链接」按本修正理解为「页头只有身份行末的『项目信息』入口」；WS-17 的项目信息卡多一行仓库外链。
+
+同日续：实机发现两处打开仓库的链接指向 `http://host.docker.internal:8929/…`（由 `CS_GITLAB_URL` 拼出的克隆地址），本机浏览器解析不了。作者裁定改用 GitLab 自报的 `web_url`、读取时对旧绑定补一次、取不到时退回克隆地址，直接修改＋回填（design §7 同日修订）。用例：`scmUseCases` 建仓带回网页地址、读取时补一次且只查一次、GitLab 不可达或同路径换了项目不补也不报错、未就绪不查；`scmModule`（真实 PostgreSQL）建仓落 `web_url`、清空后经 HTTP 读取补回并落库；新增适配器用例 `gitLabGatewayAdapter.test.ts`；工作台 `projectResources` 两处链接用网页地址、缺省时退回克隆地址。

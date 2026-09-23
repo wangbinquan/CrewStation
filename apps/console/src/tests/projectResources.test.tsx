@@ -39,7 +39,7 @@ test('项目信息只读：最上面是直接展开的项目信息卡（末行�
   const f = projectResourcesFixture(); page = await renderApp(`/projects/${id}/settings?tab=info`);
   expect(page.text()).toContain('尚未设置配额'); expect(page.text()).toContain('尚未选择服务套餐'); expect(page.text()).toContain('demo/demo'); expect(page.text()).toContain('https://preview.demo.test');
   expect(page.text()).not.toContain('X-User-Id'); expect(page.text()).not.toContain('CS_DATABASE_URL');
-  expect(document.querySelector('a[href="https://repo.test/crew/demo"]')).not.toBeNull();
+  expect(document.querySelectorAll('a[href="https://gitlab.web.test/crew/demo"]').length).toBe(2);
   // 只读组不画输入框。
   expect(document.querySelector('main form')).toBeNull();
   // 2026-09-23 作者裁定：原先折叠的「技术详情」就是项目信息，作为这一组最上面的卡片直接展开（RFC-020 design §7 修订）。
@@ -50,16 +50,26 @@ test('项目信息只读：最上面是直接展开的项目信息卡（末行�
   expect([...card.querySelectorAll('dt')].map((node) => node.textContent)).toEqual(['项目 ID', '服务 ID', '命名空间', '仓库']);
   expect([...card.querySelectorAll('dd')].map((node) => node.textContent)).toEqual([id, resourcesServiceId, 'cs-demo', 'crew/demo ↗']);
   // 2026-09-23 作者裁定：仓库链接从概览页头移到这张卡，新窗口打开；与下方源码仓库卡读同一份绑定，只请求一次。
-  const repository = card.querySelector<HTMLAnchorElement>('a[href="https://repo.test/crew/demo"]');
+  // 两处打开的都是 GitLab 自报的网页地址，不是平台拼出的克隆地址（本机那个是 host.docker.internal，浏览器打不开）。
+  const repository = card.querySelector<HTMLAnchorElement>('a[href="https://gitlab.web.test/crew/demo"]');
   expect(repository?.getAttribute('target')).toBe('_blank'); expect(repository?.getAttribute('rel')).toBe('noreferrer'); expect(repository?.hasAttribute('data-button')).toBe(false);
   expect(f.calls.filter((path) => path.endsWith('/repository')).length).toBe(1);
+  const open = titles[1]!.closest('section')!.querySelector<HTMLAnchorElement>('a[data-button]');
+  expect(open?.textContent).toBe('在 GitLab 中打开'); expect(open?.getAttribute('href')).toBe('https://gitlab.web.test/crew/demo');
+});
+
+test('平台还没从 GitLab 读到网页地址时，两处打开链接退回克隆地址', async () => {
+  const f = projectResourcesFixture(); f.state.noWebUrl = true; page = await renderApp(`/projects/${id}/settings?tab=info`);
+  const titles = [...document.querySelectorAll('main section > header > h2')];
+  expect(titles[0]!.closest('section')!.querySelector('a')?.getAttribute('href')).toBe('https://repo.test/crew/demo');
+  expect(titles[1]!.closest('section')!.querySelector('a[data-button]')?.getAttribute('href')).toBe('https://repo.test/crew/demo');
 });
 
 test('仓库读取失败时项目信息卡写「暂未读取到」，不以「—」冒充没有仓库，失败原因留在源码仓库卡', async () => {
   const f = projectResourcesFixture(); f.state.fail = 'repository'; page = await renderApp(`/projects/${id}/settings?tab=info`);
   const titles = [...document.querySelectorAll('main section > header > h2')];
   expect([...titles[0]!.closest('section')!.querySelectorAll('dd')].map((node) => node.textContent)).toEqual([id, resourcesServiceId, 'cs-demo', '暂未读取到']);
-  expect(document.querySelectorAll('a[href="https://repo.test/crew/demo"]').length).toBe(0);
+  expect(document.querySelectorAll('a[href*="crew/demo"]').length).toBe(0);
   expect(titles[1]?.textContent).toBe('源码仓库'); expect(titles[1]!.closest('section')!.textContent).toContain('读取仓库绑定失败');
 });
 

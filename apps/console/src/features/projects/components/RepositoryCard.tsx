@@ -8,7 +8,7 @@ import { DefinitionList } from '../../../shared/ui/DefinitionList';
 import type { DefinitionItem } from '../../../shared/ui/DefinitionList';
 import { QueryStatus } from '../../../shared/ui/QueryStatus';
 import { ExternalButtonLink } from '../../../shared/ui/navigation/ButtonLink';
-import { useRepositoryBinding } from '../model/useRepositoryBinding';
+import { repositoryWebUrl, useRepositoryBinding } from '../model/useRepositoryBinding';
 
 function repositoryTone(state: RepositoryBindingDto['state']): BadgeTone {
   if (state === 'ready') return 'success';
@@ -29,7 +29,7 @@ export function RepositoryCard({ serviceId }: { readonly serviceId: string }): R
   return (
     <Card
       title={t('projects.repository.title')}
-      actions={binding === undefined ? undefined : <ExternalButtonLink href={binding.httpUrl}>{t('projects.repository.open')}</ExternalButtonLink>}
+      actions={binding === undefined ? undefined : <ExternalButtonLink href={repositoryWebUrl(binding)}>{t('projects.repository.open')}</ExternalButtonLink>}
     >
       <QueryStatus isPending={repository.isPending} error={repository.error} loadingKey="projects.repository.loading" errorKey="projects.repository.error" />
       {facts.length > 0 ? <DefinitionList items={facts} /> : null}

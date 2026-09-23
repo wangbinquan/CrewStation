@@ -27,11 +27,11 @@ export function ensureRepositoryUseCase(deps: ScmUseCaseDeps) {
     if (owner && owner.serviceId !== serviceId) throw conflict(`仓库 ${path} 已绑定到服务 ${owner.serviceId}`, { pathWithNamespace: path });
     const remote = await claimRemote(deps, path, existing, serviceId);
     const project = remote ?? await gitlab.createProject({ groupPath: settings.groupPath, slug: input.slug, defaultBranch: settings.defaultBranch });
-    const httpUrl = repositoryHttpUrl(settings.baseUrl, path);
+    const httpUrl = repositoryHttpUrl(settings.baseUrl, path), webUrl = project.webUrl;
     const now = clock.now();
     let binding: RepositoryBinding = existing
-      ? transition({ ...existing, remoteProjectId: project.id, pathWithNamespace: path, httpUrl }, 'creating', now)
-      : newBinding({ serviceId, projectId, remoteProjectId: project.id, pathWithNamespace: path, httpUrl, defaultBranch: settings.defaultBranch, now });
+      ? transition({ ...existing, remoteProjectId: project.id, pathWithNamespace: path, httpUrl, webUrl }, 'creating', now)
+      : newBinding({ serviceId, projectId, remoteProjectId: project.id, pathWithNamespace: path, httpUrl, webUrl, defaultBranch: settings.defaultBranch, now });
     await uow.run((scope) => scope.bindings.upsert(binding));
     try {
       await populate(deps, binding, input, remote !== undefined);

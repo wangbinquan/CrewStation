@@ -6,7 +6,7 @@ import type { GitLabGateway, RemoteBranch, RemoteProject, RemoteTag } from '../.
 /** 会话凭据只读写仓库；开发者级别，受保护的 `v*` 标签与默认分支保护都对它生效。 */
 const SESSION_TOKEN_SCOPES = ['read_repository', 'write_repository'];
 
-const toRemoteProject = (p: GitLabProject): RemoteProject => ({ id: String(p.id), pathWithNamespace: p.pathWithNamespace, defaultBranch: p.defaultBranch ?? undefined });
+const toRemoteProject = (p: GitLabProject): RemoteProject => ({ id: String(p.id), pathWithNamespace: p.pathWithNamespace, defaultBranch: p.defaultBranch ?? undefined, webUrl: p.webUrl });
 const toRemoteBranch = (b: GitLabBranch): RemoteBranch => ({ name: b.name, headSha: b.commit.id, isDefault: b.default });
 /** GitLab 的时间带本地时区偏移，统一成 UTC ISO 以满足 DTO 的 `z.iso.datetime()`。 */
 const toRemoteTag = (t: GitLabTag): RemoteTag => ({ name: t.name, commitSha: t.commit.id, createdAt: new Date(t.commit.committedDate).toISOString(), protected: t.protected });

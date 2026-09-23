@@ -8,7 +8,7 @@ import { pushBranchUseCase } from '../application/pushBranch';
 import { queryRepositoryUseCases } from '../application/queryRepository';
 import { sessionCredentialUseCases } from '../application/sessionCredentials';
 import { hashToken } from '../domain/sessionCredential';
-import { TEST_SETTINGS, fakeGit, fakeGitLab, fakeScratch, fakeTemplates, memoryUnitOfWork, mutableClock, recordingAuthorizer } from './fakeAdapters';
+import { FAKE_WEB_BASE, TEST_SETTINGS, fakeGit, fakeGitLab, fakeScratch, fakeTemplates, memoryUnitOfWork, mutableClock, recordingAuthorizer } from './fakeAdapters';
 
 const serviceId = '01a0bf5d-8f4b-7f20-83c3-08a8d54951b2' as ServiceId;
 const otherServiceId = '01a0bf5d-8f4b-76be-8473-58312e41bdd7' as ServiceId;
@@ -41,6 +41,8 @@ describe('ensureRepository', () => {
     const h = harness();
     const dto = await h.ensure(serviceId, projectId, input);
     expect(dto).toMatchObject({ serviceId, provider: 'gitlab', remoteProjectId: '100', pathWithNamespace: 'crewstation/demo', httpUrl: 'http://gitlab.test:8929/crewstation/demo.git', defaultBranch: 'main', state: 'ready', createdAt: '2026-09-11T10:00:00.000Z' });
+    // 浏览器打开用 GitLab 自报的网页地址，克隆与推送仍用平台配置拼出的 httpUrl（2026-09-23）。
+    expect(dto.webUrl).toBe(`${FAKE_WEB_BASE}/crewstation/demo`);
     expect(dto.message).toBeUndefined();
     expect(h.gitlab.calls).toEqual(['findProject crewstation/demo', 'createProject crewstation/demo', 'protect v*']);
     expect(h.templates.materialized).toEqual([{ templateId: '01a0bf5d-8f4b-7002-9560-94caf593fb19', targetDir: '/scratch/cs-scm-init-1' }]);
@@ -192,6 +194,42 @@ describe('queries', () => {
     expect(h.authorizer.calls).toEqual([`${actor.userId}:${projectId}:view`]);
     const unknownProd = await h.query.listBranches(actor, serviceId, { prodSha: 'd'.repeat(40) });
     expect(unknownProd.map((b) => [b.behindPreview, b.behindProd])).toEqual([[null, null], [null, null]]);
+  });
+
+  test('getBinding：没有网页地址的旧绑定第一次读到时向 GitLab 查一次并存下，之后不再查', async () => {
+    const h = harness();
+    await h.ensure(serviceId, projectId, input);
+    const { webUrl: _dropped, ...legacy } = h.memory.bindings.get(serviceId)!;
+    h.memory.bindings.set(serviceId, legacy);
+    const lookups = () => h.gitlab.calls.filter((call) => call === 'findProject crewstation/demo').length, before = lookups();
+    expect((await h.query.getBinding(actor, serviceId)).webUrl).toBe(`${FAKE_WEB_BASE}/crewstation/demo`);
+    expect(h.memory.bindings.get(serviceId)?.webUrl).toBe(`${FAKE_WEB_BASE}/crewstation/demo`);
+    expect((await h.query.getBinding(actor, serviceId)).webUrl).toBe(`${FAKE_WEB_BASE}/crewstation/demo`);
+    expect(lookups()).toBe(before + 1);
+  });
+
+  test('getBinding：GitLab 不可达或同路径已换成别的项目时不补、不报错（打开链接退回克隆地址），下次读取再试；未就绪的绑定不查', async () => {
+    const h = harness();
+    await h.ensure(serviceId, projectId, input);
+    const { webUrl: _dropped, ...legacy } = h.memory.bindings.get(serviceId)!;
+    h.memory.bindings.set(serviceId, legacy);
+    const findProject = h.gitlab.gateway.findProject;
+    h.gitlab.gateway.findProject = async () => { throw new Error('connect ECONNREFUSED'); };
+    const unreachable = await h.query.getBinding(actor, serviceId);
+    expect(unreachable.webUrl).toBeUndefined(); expect(unreachable.httpUrl).toBe('http://gitlab.test:8929/crewstation/demo.git');
+    h.gitlab.gateway.findProject = async (path) => ({ ...(await findProject(path))!, id: '999' });
+    expect((await h.query.getBinding(actor, serviceId)).webUrl).toBeUndefined();
+    expect(h.memory.bindings.get(serviceId)?.webUrl).toBeUndefined();
+    h.gitlab.gateway.findProject = findProject;
+    expect((await h.query.getBinding(actor, serviceId)).webUrl).toBe(`${FAKE_WEB_BASE}/crewstation/demo`);
+    const failed = harness();
+    failed.git.failNextPushes(1);
+    await failed.ensure(serviceId, projectId, input).catch(() => undefined);
+    const { webUrl: _gone, ...creating } = failed.memory.bindings.get(serviceId)!;
+    failed.memory.bindings.set(serviceId, creating);
+    const calls = failed.gitlab.calls.length;
+    expect((await failed.query.getBinding(actor, serviceId)).state).toBe('failed');
+    expect(failed.gitlab.calls).toHaveLength(calls);
   });
 
   test('getBinding 返回任何状态；listTags 要求就绪；未知服务 not_found；forbidden 透传', async () => {

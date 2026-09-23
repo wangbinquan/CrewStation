@@ -8,6 +8,8 @@ export const repositoryBindings = scmSchema.table('repository_bindings', {
   remoteProjectId: text('remote_project_id').notNull(),
   pathWithNamespace: text('path_with_namespace').notNull().unique(),
   httpUrl: text('http_url').notNull(),
+  /** 可空：0004 之前建的绑定没有，第一次被读到时补上。 */
+  webUrl: text('web_url'),
   defaultBranch: text('default_branch').notNull(),
   state: text('state').notNull(),
   message: text('message'),

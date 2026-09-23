@@ -89,6 +89,7 @@
     "modules/scm/adapters/persistence/migrations/0001_create_schema.sql": "0a0e92858337281680702a44eaf024a468dbbcd2791c91b1fa100ea999289db0",
     "modules/scm/adapters/persistence/migrations/0002_repository_bindings_and_credentials.sql": "d6c3215d20651a749609fda72c9a19f315932ec82ecfcef52f451643f4ecac74",
     "modules/scm/adapters/persistence/migrations/0003_resource_identity.identity.json": "fd6312055a1c4eeb5284f8faa5d20948b49582453f45d5856dd42b951506ed45",
+    "modules/scm/adapters/persistence/migrations/0004_repository_web_url.sql": "b9b1b5198655560661ec0dd8032509198a71862f25e824ab2c27167f77314593",
     "modules/session/adapters/persistence/migrations/0001_create_schema.sql": "57b1a7f19f85bf77098c59bdf1bed251a78060d5157ed39a7c0a6a834cf2d5bb",
     "modules/session/adapters/persistence/migrations/0002_session_tables.sql": "787aca3cc37b047ae6132b96de8e2d5b2514200b3bf47d213eed7906ff3e0364",
     "modules/session/adapters/persistence/migrations/0003_resource_identity.sql": "f222a0ea2222576f2778284f27c5ccee06526cc63aeea83655baa7c329b10da6",

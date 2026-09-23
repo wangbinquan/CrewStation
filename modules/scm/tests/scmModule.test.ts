@@ -8,7 +8,7 @@ import { createTestDatabase, testDatabaseAvailable } from '@crewstation/testkit'
 import { hashToken } from '../domain/sessionCredential';
 import type { ScmModule } from '../wiring';
 import { createScmModule, scmMigrations } from '../wiring';
-import { TEST_SETTINGS, fakeGit, fakeGitLab, fakeScratch, fakeTemplates, mutableClock } from './fakeAdapters';
+import { FAKE_WEB_BASE, TEST_SETTINGS, fakeGit, fakeGitLab, fakeScratch, fakeTemplates, mutableClock } from './fakeAdapters';
 
 const available = await testDatabaseAvailable();
 let tdb: TestDatabase;
@@ -51,6 +51,20 @@ describe.skipIf(!available)('scm module', () => {
     const rows = (await tdb.db.execute(`SELECT service_id, project_id, state, path_with_namespace, message FROM scm.repository_bindings`)) as unknown as Array<Record<string, unknown>>;
     expect(rows).toEqual([{ service_id: serviceId, project_id: projectId, state: 'ready', path_with_namespace: 'crewstation/demo', message: null }]);
     await expect(scm.api.ensureRepository('01a0bf5d-8f4b-76be-8473-58312e41bdd7' as ServiceId, projectId, { slug: 'demo', templateId: '01a0bf5d-8f4b-7002-9560-94caf593fb19' })).rejects.toMatchObject({ kind: 'conflict' });
+  });
+
+  test('网页地址：建仓时落 web_url；0004 之前的绑定（web_url 为空）第一次经 HTTP 读到时补上并落库，之后不再查 GitLab', async () => {
+    const stored = async () => ((await tdb.db.execute(`SELECT web_url FROM scm.repository_bindings WHERE service_id = '${serviceId}'`)) as unknown as Array<{ web_url: string | null }>)[0]?.web_url;
+    expect(await stored()).toBe(`${FAKE_WEB_BASE}/crewstation/demo`);
+    await tdb.db.execute(`UPDATE scm.repository_bindings SET web_url = NULL WHERE service_id = '${serviceId}'`);
+    const app = createApp({ name: 'test' });
+    for (const router of scm.http) app.route('/', router);
+    const read = async () => RepositoryBindingDtoSchema.parse(await (await app.request(`/v1/services/${serviceId}/repository`, { headers: { [IDENTITY_HEADERS.userId]: owner.userId } })).json());
+    const lookups = () => gitlab.calls.filter((call) => call === 'findProject crewstation/demo').length, before = lookups();
+    expect((await read()).webUrl).toBe(`${FAKE_WEB_BASE}/crewstation/demo`);
+    expect(await stored()).toBe(`${FAKE_WEB_BASE}/crewstation/demo`);
+    expect((await read()).webUrl).toBe(`${FAKE_WEB_BASE}/crewstation/demo`);
+    expect(lookups()).toBe(before + 1);
   });
 
   test('凭据：库里只有哈希；到期后撤销并写 revoked_at', async () => {

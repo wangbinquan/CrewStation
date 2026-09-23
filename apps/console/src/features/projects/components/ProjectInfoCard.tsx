@@ -3,7 +3,7 @@ import type { ReactElement } from 'react';
 import { useT } from '../../../shared/lib/useT';
 import { Card } from '../../../shared/ui/Card';
 import { DefinitionList } from '../../../shared/ui/DefinitionList';
-import { useRepositoryBinding } from '../model/useRepositoryBinding';
+import { repositoryWebUrl, useRepositoryBinding } from '../model/useRepositoryBinding';
 
 /**
  * 项目信息卡：平台为项目分配的标识，放在项目信息组最上面直接展示（2026-09-23 作者裁定，原为折叠的「技术详情」）。
@@ -14,7 +14,7 @@ export function ProjectInfoCard({ project }: { readonly project: ProjectDto }): 
   const t = useT();
   const binding = useRepositoryBinding(project.serviceId).data;
   const repository = binding !== undefined
-    ? <a href={binding.httpUrl} target="_blank" rel="noreferrer">{binding.pathWithNamespace} ↗</a>
+    ? <a href={repositoryWebUrl(binding)} target="_blank" rel="noreferrer">{binding.pathWithNamespace} ↗</a>
     : project.serviceId === undefined ? '—' : t('projects.info.repositoryUnread');
   return (
     <Card title={t('projects.info.title')}>

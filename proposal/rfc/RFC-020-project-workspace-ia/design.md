@@ -175,6 +175,8 @@ tool: z.object({ name: z.enum(['preview', 'code', 'changes', 'data', 'reference'
 
 > **2026-09-23 修订（作者当面裁定，直接修改，不另立 RFC）。** `ProjectInfoCard` 末行加「仓库」：`pathWithNamespace ↗` 外链（`target="_blank"`、`rel="noreferrer"`；引用型文字链接，不是按钮）。仓库绑定由新增的 `features/projects/model/useRepositoryBinding` 读取，`ProjectInfoCard` 与 `RepositoryCard` 共用同一个查询键与取数函数，只请求一次（原先概览带格式校验、源码仓库卡不带，两份取数函数挂在同一个查询键上，随概览不再读仓库一并归一）。没有 `serviceId`（开通未完成）时不读、该行为「—」；读取中或读取失败写「暂未读取到」（`projects.info.repositoryUnread`），失败原因仍由源码仓库卡的 `QueryStatus` 给出。文案键 `projects.summary.repository` 随概览页头删除。
 
+> **2026-09-23 修订（作者当面裁定，直接修改＋回填，不另立 RFC；仓库打开地址）。** 两处打开仓库的链接（项目信息卡「仓库」一行、源码仓库卡「在 GitLab 中打开」）改用 GitLab 自报的网页地址。原因：本机 `CS_GITLAB_URL` 是只在容器里解析得了的 `http://host.docker.internal:8929`，由它拼出的克隆地址 `httpUrl` 在浏览器里打不开（GitLab 自报的是 `http://127.0.0.1:8929/<组>/<项目>`）。`RepositoryBindingDto` 加可选 `webUrl`；scm 模块建仓时记下 GitLab 项目的 `web_url`（迁移 `scm/0004` 加可空列 `web_url`），这一列之前建的绑定在第一次被 `getBinding` 读到时向 GitLab 查一次并存下——只补已就绪的、远端项目 ID 须一致，查不到或 GitLab 不可达就原样返回、下次读取再试；工作台 `repositoryWebUrl()` 取 `webUrl`，没有时退回 `httpUrl`。克隆、构建、推送仍用 `httpUrl`。
+
 ## 8. 名称、ID 与状态文案
 
 - 36 位 ID 只出现在技术详情或 `title`＋复制；表格列显示名字、标签或短 ID（前 8 位）。

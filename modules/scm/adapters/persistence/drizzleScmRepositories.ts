@@ -34,13 +34,13 @@ export function drizzleSessionCredentialRepository(db: Executor): SessionCredent
 function toBinding(row: typeof repositoryBindings.$inferSelect): RepositoryBinding {
   return {
     serviceId: row.serviceId as ServiceId, projectId: row.projectId as ProjectId, provider: 'gitlab', remoteProjectId: row.remoteProjectId,
-    pathWithNamespace: row.pathWithNamespace, httpUrl: row.httpUrl, defaultBranch: row.defaultBranch, state: row.state as RepositoryBindingState,
+    pathWithNamespace: row.pathWithNamespace, httpUrl: row.httpUrl, ...(row.webUrl ? { webUrl: row.webUrl } : {}), defaultBranch: row.defaultBranch, state: row.state as RepositoryBindingState,
     ...(row.message ? { message: row.message } : {}), createdAt: row.createdAt, updatedAt: row.updatedAt,
   };
 }
 
 function toBindingRow(binding: RepositoryBinding): typeof repositoryBindings.$inferInsert {
-  return { ...binding, message: binding.message ?? null };
+  return { ...binding, webUrl: binding.webUrl ?? null, message: binding.message ?? null };
 }
 
 function toCredential(row: typeof sessionCredentials.$inferSelect): SessionCredential {

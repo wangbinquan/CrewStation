@@ -19,6 +19,9 @@ export const TEST_SETTINGS: ScmSettings = {
   defaultBranch: 'main',
 };
 
+/** 假 GitLab 自报的网页地址前缀：故意与 TEST_SETTINGS.baseUrl 不同，断言浏览器链接不是拼出来的克隆地址。 */
+export const FAKE_WEB_BASE = 'https://gitlab.web.test';
+
 export function mutableClock(start = '2026-09-11T10:00:00.000Z'): Clock & { advanceMinutes(minutes: number): void } {
   let at = new Date(start);
   return { now: () => new Date(at), advanceMinutes: (minutes) => { at = new Date(at.getTime() + minutes * 60_000); } };
@@ -44,7 +47,7 @@ export function fakeGitLab() {
     return project;
   };
   const add = (pathWithNamespace: string, id = String(nextProjectId++)): FakeRemoteProject => {
-    const entry: FakeRemoteProject = { project: { id, pathWithNamespace, defaultBranch: 'main' }, branches: new Map(), tags: [], protectedPatterns: new Set(), tokens: new Map() };
+    const entry: FakeRemoteProject = { project: { id, pathWithNamespace, defaultBranch: 'main', webUrl: `${FAKE_WEB_BASE}/${pathWithNamespace}` }, branches: new Map(), tags: [], protectedPatterns: new Set(), tokens: new Map() };
     projects.set(id, entry);
     return entry;
   };

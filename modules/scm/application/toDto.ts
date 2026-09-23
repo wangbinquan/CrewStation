@@ -9,6 +9,7 @@ export function bindingToDto(binding: RepositoryBinding): RepositoryBindingDto {
     remoteProjectId: binding.remoteProjectId,
     pathWithNamespace: binding.pathWithNamespace,
     httpUrl: binding.httpUrl,
+    ...(binding.webUrl ? { webUrl: binding.webUrl } : {}),
     defaultBranch: binding.defaultBranch,
     state: binding.state,
     ...(binding.message ? { message: binding.message } : {}),

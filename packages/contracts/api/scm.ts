@@ -26,7 +26,10 @@ export const RepositoryBindingDtoSchema = z.object({
   provider: z.literal('gitlab'),
   remoteProjectId: z.string(),
   pathWithNamespace: z.string(),
+  /** 平台与容器克隆、构建、推送用的地址，由安装配置的 GitLab 地址拼出。 */
   httpUrl: z.url(),
+  /** GitLab 自报的项目网页地址（按它的 external_url），给浏览器打开用；还没从 GitLab 读到时缺省，打开链接退回 httpUrl。 */
+  webUrl: z.url().optional(),
   defaultBranch: z.string(),
   state: z.enum(['creating', 'ready', 'failed']),
   message: z.string().optional(),
