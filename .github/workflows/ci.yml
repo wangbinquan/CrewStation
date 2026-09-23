@@ -247,8 +247,14 @@ jobs:
         run: |
           kubectl -n crewstation-system get pods -o wide || true
           kubectl -n crewstation-system get svc,ingressroute || true
-          for d in cs-api cs-auth console traefik; do
+          for d in cs-api cs-auth cs-controller cs-session cs-events console traefik; do
             echo "=== $d ==="
+            # 被探针重启过的，先打上一轮容器的尾巴：连接池错位（I16）这类故障的报错都留在被杀掉的那一轮里
+            if kubectl -n crewstation-system logs "deploy/$d" --previous --tail=80 > /tmp/previous.log 2>/dev/null; then
+              echo "--- previous container"; cat /tmp/previous.log; echo "--- current container"
+            fi
             kubectl -n crewstation-system logs "deploy/$d" --tail=60 || true
           done
+          echo "=== events ==="
+          kubectl -n crewstation-system get events --sort-by=.lastTimestamp | tail -40 || true
           curl -sS -o /dev/null -w 'console %{http_code}\n' "$CS_CONSOLE_URL/" || true
