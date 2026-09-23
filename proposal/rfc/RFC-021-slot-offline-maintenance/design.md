@@ -111,6 +111,8 @@ pending:         deadline = max(since + I, lastAccessAt + I, postponedUntil)
 
 推迟（M19、M23）：`postponedUntil = 当前 deadline + 一个周期`（回退目标 R，待验证版本 I），推迟次数加一，清掉提醒。请求带 `expectedDeadline`，页面上的到期时间过期时拒绝，避免连点两次推迟两个周期。
 
+> **2026-09-23 修订（作者当面裁定，见提案 §4 末）：提醒发出之后才能推迟。** `canPostpone(retention, policy)`＝已为**当前** `deadline` 发过提醒（`remindedFor == deadline`，与槽 DTO 带 `remindedAt` 同一个条件），也就是到期前 `lead` 起、由巡检发出提醒之后。`SlotRetentionDto` 加必填的 `postponable`，由服务端按这条规则算好；工作台据此显示「推迟 72 小时下线」／「推迟 14 天下线」，不再一直显示。`postponeOffline` 在核对 `expectedDeadline` 之后按同一条规则拒绝（412：「还没到可以推迟的时候：到期前 N 小时提醒负责人之后才能推迟」）。推迟清掉提醒、到期后移，于是连点只有第一次生效；访问推后到期或管理员改了时长，旧提醒不再算数，要等新到期时间的提醒。巡检没发提醒时（进行中的发布或集群运维操作期间跳过）不能推迟，也不会下线。
+
 访问记录（B2）：identity 的 ForwardAuth 放行 preview 请求后，经 gateway 调 `release.notePreviewAccess(serviceId)`。release 在进程内对每个服务最多每 5 分钟写一次库，写的是待命槽的 `lastAccessAt`。回退目标也记录访问时间，但不参与它的计时。
 
 巡检（`sweepSlotLifecycle`）在 cs-controller 每 60 秒跑一次（与开发会话空闲提醒一样挂在 wiring 的定时器上）：
@@ -200,7 +202,7 @@ preview 主机（B6）：同一个 `ServiceEntry.check(userId, slug, 'preview')`
 | 方法与路径 | 谁 | 语义 |
 |---|---|---|
 | `POST /v1/services/:serviceId/slots/preview/offline` `{ expectedReleaseId }` | 负责人、管理员 | 下线待验证版本；返回两个槽 |
-| `POST /v1/services/:serviceId/slots/preview/postpone` `{ expectedDeadline }` | 负责人、管理员 | 推迟一个周期；返回两个槽 |
+| `POST /v1/services/:serviceId/slots/preview/postpone` `{ expectedDeadline }` | 负责人、管理员 | 推迟一个周期；为当前到期时间发过提醒之前 412（2026-09-23 修订）；返回两个槽 |
 | `POST /v1/releases/:releaseId/redeploy` `{ expectedStandbyReleaseId: id \| null }` | 负责人、管理员 | 重新部署到待命槽（202） |
 | `GET /v1/services/:serviceId/slot-events` | `view` | 下线、重新部署、推迟、提醒记录（最近 50 条） |
 | `GET`／`PUT /v1/admin/settings/auto-offline` | 管理员 | 三个时长；`PUT` 带 `expectedRevision`，校验提醒时间短于两个周期 |
@@ -210,14 +212,14 @@ preview 主机（B6）：同一个 `ServiceEntry.check(userId, slug, 'preview')`
 
 错误约定沿用平台：未登录 401；非成员 404（项目不暴露）；成员但没有这个动作的权限 403；Schema 不合 400；前置条件不满足 412；版本冲突 409。
 
-契约变化（全部是工作台／CLI 自己消费的形状，不在业务契约金样里）：`SlotDto` 加可选的 `retention`（`deadline` 由服务端按当前策略算好）和 `offline`；`ReleaseDto` 加 `redeployable`；`ReleaseStatus` 加 `offline`；`DeliveryState` 加 `held`；`MarketAppDto` 加可选的 `maintenance { reason, expectedEndAt?, blocked }`；`ProjectState` 去掉 `paused`。新请求一律 `.strict()`。
+契约变化（全部是工作台／CLI 自己消费的形状，不在业务契约金样里）：`SlotDto` 加可选的 `retention`（`deadline` 由服务端按当前策略算好；2026-09-23 修订加必填的 `postponable`）和 `offline`；`ReleaseDto` 加 `redeployable`；`ReleaseStatus` 加 `offline`；`DeliveryState` 加 `held`；`MarketAppDto` 加可选的 `maintenance { reason, expectedEndAt?, blocked }`；`ProjectState` 去掉 `paused`。新请求一律 `.strict()`。
 
 ## 9. 工作台
 
 | 位置 | 内容 |
 |---|---|
 | 发布页正式版本卡 | 维护中时显示「维护中」角标、三个开关的状态、原因、预计恢复时间、临时指定的人；负责人和管理员看到「进入维护」／「调整」／「退出维护」。表单用行内面板：三个开关默认全开，原因必填，预计恢复时间选填，临时指定的人用已注册用户查询（现有 `member-candidates` 接口，组件从 `features/projects` 移到 `shared/project/`，两个功能共用） |
-| 发布页待验证卡 | 「将于 X 自动下线（回退保留期／无人访问）」；提醒已发出时显示提醒时间；负责人和管理员看到「推迟 72 小时」／「推迟 14 天」、「下线」（行内确认，写清不可恢复，只能从发布记录重新部署）；已下线时显示「已下线 vX · 原因 · 时间」 |
+| 发布页待验证卡 | 「将于 X 自动下线（回退保留期／无人访问）」；提醒已发出时显示提醒时间；负责人和管理员看到「下线」（行内确认，写清不可恢复，只能从发布记录重新部署），提醒发出之后（`postponable`）还有「推迟 72 小时下线」／「推迟 14 天下线」（2026-09-23 修订：此前一直显示，文案是「推迟 72 小时」）；已下线时显示「已下线 vX · 原因 · 时间」 |
 | 发布记录与时间线 | 可重新部署的版本有「重新部署」（行内确认：替换待命槽上的哪个版本、不重新构建、不重跑迁移、按当前生产配置）；时间线合并下线、重新部署、推迟、提醒，以及进入、调整、退出维护，带人名 |
 | 概览的两张版本卡 | 与发布页同一组件：维护角标、下线状态、到期提示 |
 | 市场卡片 | 「维护中」角标与原因；被拦的人没有打开入口 |
@@ -241,7 +243,7 @@ preview 主机（B6）：同一个 `ServiceEntry.check(userId, slug, 'preview')`
 |---|---|
 | 下线写库成功、删 Deployment 失败 | 槽显示已下线；巡检按 `workloadRemoved = false` 重试；只删 `release` 标签匹配的 Deployment |
 | 下线与发布同时进行 | 都要锁槽行；下线遇到进行中的发布拒绝；发布遇到已下线的待命槽照常部署（清掉 `offline`） |
-| 两次点击「推迟」 | 第二次的 `expectedDeadline` 已过期，拒绝 |
+| 两次点击「推迟」 | 第二次的 `expectedDeadline` 已过期，拒绝；页面重读后确认值是新的，但新到期时间还没提醒，同样拒绝（2026-09-23 修订） |
 | 多个 cs-controller 副本同时巡检 | 每一步都在事务里重新锁行、重新校验，只生效一次 |
 | 重新部署时配置缺键、套餐被收回 | 预检拒绝，发布记录不变 |
 | 重新部署时部署失败 | 发布 `failed`、槽 `failed`，可以再次重新部署 |

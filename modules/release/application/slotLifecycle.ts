@@ -6,7 +6,7 @@ import type { Release } from '../domain/release';
 import { advance, isRedeployable } from '../domain/release';
 import type { OfflinePolicy } from '../domain/slotLifecycle';
 import {
-  DEFAULT_OFFLINE_POLICY, assertOfflinePolicy, autoOfflineReason, hasWorkload, markReminded, markWorkloadRemoved, noteRetentionAccess,
+  DEFAULT_OFFLINE_POLICY, assertOfflinePolicy, autoOfflineReason, canPostpone, hasWorkload, markReminded, markWorkloadRemoved, noteRetentionAccess,
   offlineDeadline, postponeRetention, retentionForExisting, retentionStep, takeSlotOffline,
 } from '../domain/slotLifecycle';
 import type { PhysicalSlot, ServiceSlots } from '../domain/slots';
@@ -148,6 +148,8 @@ function offlineUseCases(deps: Deps, tools: LifecycleTools) {
         const policy = await policyOf(scope);
         const current = offlineDeadline(slot.retention, policy);
         if (current.getTime() !== new Date(input.expectedDeadline).getTime()) throw precondition('到期时间已变化，请刷新后重新确认', { expected: input.expectedDeadline, actual: current.toISOString() });
+        // 提醒之后才能推迟（2026-09-23 裁定）：推迟一次要等下一次提醒，连点不会一次次往后加。
+        if (!canPostpone(slot.retention, policy)) throw precondition(`还没到可以推迟的时候：到期前 ${policy.reminderLeadHours} 小时提醒负责人之后才能推迟`, { deadline: current.toISOString() });
         const retention = postponeRetention(slot.retention, policy);
         await scope.slots.save(withSlot(slots, { ...slot, retention }, now));
         const release = await scope.releases.getById(slot.releaseId!);

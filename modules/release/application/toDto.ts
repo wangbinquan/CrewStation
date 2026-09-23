@@ -2,7 +2,7 @@ import type { ReleaseDto, SlotDto, TrafficSwitchDto } from '@crewstation/contrac
 import type { Release } from '../domain/release';
 import { isRedeployable } from '../domain/release';
 import type { OfflinePolicy } from '../domain/slotLifecycle';
-import { DEFAULT_OFFLINE_POLICY, offlineDeadline, retentionPeriodMs } from '../domain/slotLifecycle';
+import { DEFAULT_OFFLINE_POLICY, canPostpone, offlineDeadline, retentionPeriodMs } from '../domain/slotLifecycle';
 import type { PhysicalSlot, ServiceSlots, SlotState } from '../domain/slots';
 import { roleOf } from '../domain/slots';
 import type { HostNaming } from '../ports/platform';
@@ -28,13 +28,14 @@ export function releaseToDto(release: Release, slots: ServiceSlots | undefined):
   };
 }
 
-/** 待命槽的计时与下线记录（RFC-021）：到期时间按当前平台策略即时算好，下线记录带上版本号。 */
+/** 待命槽的计时与下线记录（RFC-021）：到期时间与能不能推迟按当前平台策略即时算好，下线记录带上版本号。 */
 function lifecycleOf(slot: SlotState, role: 'prod' | 'preview', releases: Map<string, Release>, policy: OfflinePolicy): Pick<SlotDto, 'retention' | 'offline'> {
+  const postponable = slot.retention ? canPostpone(slot.retention, policy) : false;
   const retention = slot.retention && role === 'preview' ? {
     retention: {
       kind: slot.retention.kind, since: slot.retention.since.toISOString(), deadline: offlineDeadline(slot.retention, policy).toISOString(),
-      ...(slot.retention.remindedAt && slot.retention.remindedFor?.getTime() === offlineDeadline(slot.retention, policy).getTime() ? { remindedAt: slot.retention.remindedAt.toISOString() } : {}),
-      postponements: slot.retention.postponements, periodHours: retentionPeriodMs(slot.retention.kind, policy) / 3_600_000,
+      ...(postponable && slot.retention.remindedAt ? { remindedAt: slot.retention.remindedAt.toISOString() } : {}),
+      postponable, postponements: slot.retention.postponements, periodHours: retentionPeriodMs(slot.retention.kind, policy) / 3_600_000,
     },
   } : {};
   const tag = slot.offline ? releases.get(slot.offline.releaseId)?.tag : undefined;

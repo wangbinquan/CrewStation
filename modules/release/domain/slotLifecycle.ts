@@ -57,6 +57,14 @@ export function markReminded(retention: SlotRetention, deadline: Date, now: Date
   return { ...retention, remindedAt: now, remindedFor: deadline };
 }
 
+/**
+ * 能不能推迟（2026-09-23 裁定）：为**当前**到期时间发过提醒之后才能推迟，即到期前 `reminderLeadHours` 起。
+ * 推迟清掉提醒、到期后移，于是要等下一次提醒才能再推迟，不会连点累加；访问或改时长让到期时间变了，旧提醒也不再算数。
+ */
+export function canPostpone(retention: SlotRetention, policy: OfflinePolicy): boolean {
+  return retention.remindedAt !== undefined && retention.remindedFor?.getTime() === offlineDeadline(retention, policy).getTime();
+}
+
 /** 推迟一个周期（M19、M23）：当前到期时间再加一个周期，次数不限；清掉提醒，新到期前重新提醒。 */
 export function postponeRetention(retention: SlotRetention, policy: OfflinePolicy): SlotRetention {
   const postponedUntil = new Date(offlineDeadline(retention, policy).getTime() + retentionPeriodMs(retention.kind, policy));

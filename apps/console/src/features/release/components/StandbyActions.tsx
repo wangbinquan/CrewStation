@@ -15,10 +15,11 @@ interface StandbyActionsProps {
 
 /**
  * 待验证卡上负责人与管理员的两个动作（RFC-021 M8、M19、M23）：推迟一个周期（可反复）、立即下线。
+ * 「推迟」只在服务端说能推迟时出现，即为当前到期时间发过提醒之后（2026-09-23 裁定）；推迟后到期时间后移，按钮消失到下一次提醒。
  * 下线删掉工作负载、不可恢复，只能从发布记录重新部署，所以是红色并要行内确认；两者排在卡片底部操作条的访问入口之后。
  */
 export function StandbyActions({ slot, lifecycle, disabled }: StandbyActionsProps): ReactElement {
-  const t = useT(), retention = slot.retention, period = retention ? periodText(retention) : undefined, tag = slot.tag ?? '';
+  const t = useT(), retention = slot.retention, period = retention?.postponable ? periodText(retention) : undefined, tag = slot.tag ?? '';
   const busy = disabled || !!lifecycle.pending;
   return <>
     {period ? <Button disabled={busy} onClick={() => void lifecycle.postpone(slot)}>

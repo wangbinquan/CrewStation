@@ -5,7 +5,7 @@ import { advance, isRedeployable } from './release';
 import type { ServiceSlots } from './slots';
 import { initialSlots, switchTraffic } from './slots';
 import {
-  DEFAULT_OFFLINE_POLICY, assertOfflinePolicy, markReminded, markWorkloadRemoved, normalizeLegacySlot, noteRetentionAccess,
+  DEFAULT_OFFLINE_POLICY, assertOfflinePolicy, canPostpone, markReminded, markWorkloadRemoved, normalizeLegacySlot, noteRetentionAccess,
   offlineDeadline, postponeRetention, retentionForExisting, retentionStep, startRetention, takeSlotOffline,
 } from './slotLifecycle';
 
@@ -81,6 +81,19 @@ describe('提醒与下线', () => {
     const accessed = noteRetentionAccess(r, at(13 * D + H));
     expect(retentionStep(accessed, policy, at(14 * D)).action).toBe('none');
     expect(retentionStep(accessed, policy, at(26 * D + H)).action).toBe('remind');
+  });
+
+  // 2026-09-23 裁定：推迟只在为当前到期时间发过提醒之后可用，推迟一次后要等下一次提醒。
+  test('为当前到期时间提醒过才能推迟；推迟后、访问推后到期、改短时长之后，旧提醒不再算数', () => {
+    const r = startRetention('rollback-target', t0);
+    expect(canPostpone(r, policy)).toBe(false);
+    const reminded = markReminded(r, at(72 * H), at(48 * H));
+    expect(canPostpone(reminded, policy)).toBe(true);
+    expect(canPostpone(postponeRetention(reminded, policy), policy)).toBe(false);
+    expect(canPostpone(reminded, { ...policy, rollbackRetentionHours: 48 })).toBe(false);
+    const pending = markReminded(startRetention('pending', t0), at(14 * D), at(13 * D));
+    expect(canPostpone(pending, policy)).toBe(true);
+    expect(canPostpone(noteRetentionAccess(pending, at(13 * D + H)), policy)).toBe(false);
   });
 });
 

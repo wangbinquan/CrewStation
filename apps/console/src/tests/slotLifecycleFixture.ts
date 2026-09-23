@@ -17,13 +17,13 @@ function slot(name: 'prod' | 'preview', of: ReleaseDto, extra: Partial<SlotDto> 
 }
 
 /**
- * RFC-021 的假服务端：正式槽跑 v1.1.0，待命槽是切流换下的 v1.0.0（回退保留到 74 小时后），v0.9.0 已被替代、可以重新部署。
+ * RFC-021 的假服务端：正式槽跑 v1.1.0，待命槽是切流换下的 v1.0.0（回退保留到 74 小时后，50 小时时已提醒、可以推迟），v0.9.0 已被替代、可以重新部署。
  * 写请求按真实接口的形状改状态并回执；`fail` 给出时所有写请求按它失败（模拟他人先改过）。
  */
 export function slotLifecycleFixture(role: Role = 'owner', admin = false) {
   const releases = [release(prodId, 'v1.1.0', 'b', at(2), { slot: 'prod' }), release(standbyId, 'v1.0.0', 'a', at(1), { slot: 'preview' }), release(oldId, 'v0.9.0', 'c', at(0), { status: 'superseded', redeployable: true })];
   const state = {
-    slots: [slot('prod', releases[0]!), slot('preview', releases[1]!, { retention: { kind: 'rollback-target', since: at(2), deadline: at(74), postponements: 0, periodHours: 72 } })],
+    slots: [slot('prod', releases[0]!), slot('preview', releases[1]!, { retention: { kind: 'rollback-target', since: at(2), deadline: at(74), remindedAt: at(50), postponable: true, postponements: 0, periodHours: 72 } })],
     slotEvents: [] as SlotEventDto[], maintenance: null as MaintenanceDto | null, history: [] as MaintenanceEventDto[],
     fail: undefined as { readonly status: number; readonly message: string } | undefined,
   };
@@ -36,8 +36,9 @@ export function slotLifecycleFixture(role: Role = 'owner', admin = false) {
       standbyEvent('offline', gone, { reason: 'manual' }); return [{ items: state.slots }, 200];
     }
     if (path.endsWith('/slots/preview/postpone')) {
-      const retention = state.slots[1]!.retention!, deadline = new Date(Date.parse(retention.deadline) + 72 * 3_600_000).toISOString();
-      state.slots[1] = { ...state.slots[1]!, retention: { ...retention, deadline, postponements: retention.postponements + 1 } }; standbyEvent('postpone', releases[1]!, { deadline }); return [{ items: state.slots }, 200];
+      // 与服务端一致：推迟清掉提醒、到期后移，要等下一次提醒才能再推迟。
+      const { remindedAt: _remindedAt, ...retention } = state.slots[1]!.retention!, deadline = new Date(Date.parse(retention.deadline) + 72 * 3_600_000).toISOString();
+      state.slots[1] = { ...state.slots[1]!, retention: { ...retention, deadline, postponable: false, postponements: retention.postponements + 1 } }; standbyEvent('postpone', releases[1]!, { deadline }); return [{ items: state.slots }, 200];
     }
     if (path.endsWith('/redeploy')) { const target = releases.find((item) => path.includes(item.id))!; Object.assign(target, { status: 'deploying', redeployable: false }); standbyEvent('redeploy', target); return [target, 202]; }
     if (path.endsWith('/maintenance/exit')) { state.maintenance = null; return [{ current: null, history: state.history }, 200]; }

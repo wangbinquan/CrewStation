@@ -45,7 +45,7 @@ describe.skipIf(!session)('RFC-021 平台设置（不改动设置）', () => {
   }, 45_000);
 });
 
-interface Slot { readonly name: 'prod' | 'preview'; readonly releaseId?: string; readonly host: string; readonly retention?: { readonly kind: string; readonly deadline: string; readonly periodHours: number }; readonly offline?: { readonly reason: string } }
+interface Slot { readonly name: 'prod' | 'preview'; readonly releaseId?: string; readonly host: string; readonly retention?: { readonly kind: string; readonly deadline: string; readonly postponable: boolean; readonly periodHours: number }; readonly offline?: { readonly reason: string } }
 
 // 全新集群（CI）里没有已开通的数字人项目，整组显式跳过，见 tests/e2e/README.md。
 describe.skipIf(!project)('RFC-021 数字人项目的维护与待命槽（只读）', () => {
@@ -55,8 +55,14 @@ describe.skipIf(!project)('RFC-021 数字人项目的维护与待命槽（只读
     expect('current' in maintenance).toBe(true); expect(Array.isArray(maintenance.history)).toBe(true);
     expect(Array.isArray((await apiGet<{ items: unknown[] }>(session!.admin, `/v1/services/${serviceId}/slot-events`)).items)).toBe(true);
     const preview = (await apiGet<{ items: Slot[] }>(session!.admin, `/v1/services/${serviceId}/slots`)).items.find((slot) => slot.name === 'preview')!;
-    if (preview.retention) { expect(['rollback-target', 'pending']).toContain(preview.retention.kind); expect(preview.retention.periodHours).toBeGreaterThan(0); expect(Number.isNaN(Date.parse(preview.retention.deadline))).toBe(false); }
+    if (preview.retention) { expect(['rollback-target', 'pending']).toContain(preview.retention.kind); expect(preview.retention.periodHours).toBeGreaterThan(0); expect(Number.isNaN(Date.parse(preview.retention.deadline))).toBe(false); expect(typeof preview.retention.postponable).toBe('boolean'); }
     if (preview.offline) expect(['manual', 'rollback-expired', 'idle', 'cluster']).toContain(preview.offline.reason);
+    // 2026-09-23 裁定：提醒发出之前推迟被拒。离到期还远于提醒提前量时巡检不可能先发提醒，这个请求必然被拒，不改动项目。
+    const policy = await apiGet<Policy>(session!.admin, '/v1/admin/settings/auto-offline');
+    if (preview.retention && !preview.retention.postponable && Date.parse(preview.retention.deadline) - Date.now() > (policy.reminderLeadHours + 1) * 3_600_000) {
+      const early = await send('POST', `/v1/services/${serviceId}/slots/preview/postpone`, { expectedDeadline: preview.retention.deadline });
+      expect(early.status).toBe(412); expect(JSON.stringify(early.body)).toMatch(/提醒负责人之后才能推迟|到期时间已变化/);
+    }
     // 缺字段的写请求在任何状态下都被拒，不会改动项目。
     expect((await send('POST', `/v1/services/${serviceId}/slots/preview/offline`, {})).status).toBe(400);
     expect((await send('PUT', `/v1/services/${serviceId}/maintenance`, { switches: { users: true, services: true, events: true }, allowUserIds: [], reason: '', expectedRevision: 0 })).status).toBe(400);

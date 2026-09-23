@@ -70,24 +70,29 @@ async function fixture() {
 }
 
 describe.skipIf(!available)('RFC-021 待命槽生命周期', () => {
-  test('切流后原正式版本成为回退目标：72 小时到期，提前 24 小时提醒负责人；推迟不限次数；到期后平台自动下线', async () => {
+  test('切流后原正式版本成为回退目标：72 小时到期，提前 24 小时提醒负责人；提醒之后才能推迟，推迟不限次数；到期后平台自动下线', async () => {
     const f = await fixture();
     const v1 = await f.publish(); await f.goLive(v1);
     const v2 = await f.publish(); f.at(H); await f.goLive(v2);
-    expect((await f.preview()).retention).toEqual({ kind: 'rollback-target', since: new Date(Date.parse('2026-09-23T00:00:00.000Z') + H).toISOString(), deadline: new Date(Date.parse('2026-09-23T00:00:00.000Z') + 73 * H).toISOString(), postponements: 0, periodHours: 72 });
+    expect((await f.preview()).retention).toEqual({ kind: 'rollback-target', since: new Date(Date.parse('2026-09-23T00:00:00.000Z') + H).toISOString(), deadline: new Date(Date.parse('2026-09-23T00:00:00.000Z') + 73 * H).toISOString(), postponable: false, postponements: 0, periodHours: 72 });
     f.at(48 * H); expect((await f.release.api.sweepSlotLifecycle()).reminded).toBe(0);
+    // 2026-09-23 裁定：提醒发出之前不能推迟，确认值再对也不行。
+    await expect(f.release.api.postponeOffline(owner, serviceId, { expectedDeadline: (await f.preview()).retention!.deadline })).rejects.toMatchObject({ kind: 'precondition', message: expect.stringContaining('提醒负责人之后才能推迟') });
     f.at(49 * H); expect((await f.release.api.sweepSlotLifecycle()).reminded).toBe(1);
     expect(f.notices.at(-1)).toMatchObject({ users: [owner.userId], message: expect.stringContaining(v1.tag) });
     expect((await f.release.api.listSlotEvents(owner, serviceId))[0]).toMatchObject({ kind: 'reminder', releaseId: v1.id, deadline: (await f.preview()).retention!.deadline });
-    expect((await f.preview()).retention?.remindedAt).toBeDefined();
+    expect((await f.preview()).retention).toMatchObject({ remindedAt: expect.any(String), postponable: true });
     // 过期的确认值（页面停留期间别人已推迟过）被拒，不会一次推迟两个周期。
     await expect(f.release.api.postponeOffline(owner, serviceId, { expectedDeadline: '2026-09-30T00:00:00.000Z' })).rejects.toMatchObject({ kind: 'precondition' });
     await expect(f.release.api.postponeOffline(developer, serviceId, { expectedDeadline: (await f.preview()).retention!.deadline })).rejects.toMatchObject({ kind: 'forbidden' });
     const once = (await f.release.api.postponeOffline(owner, serviceId, { expectedDeadline: (await f.preview()).retention!.deadline })).find((s) => s.name === 'preview')!;
-    expect(once.retention).toMatchObject({ deadline: new Date(Date.parse('2026-09-23T00:00:00.000Z') + 145 * H).toISOString(), postponements: 1 });
+    expect(once.retention).toMatchObject({ deadline: new Date(Date.parse('2026-09-23T00:00:00.000Z') + 145 * H).toISOString(), postponable: false, postponements: 1 });
     expect(once.retention?.remindedAt).toBeUndefined();
+    // 推迟一次之后接着再点（确认值是新的）也被拒：要等新到期时间的提醒。
+    await expect(f.release.api.postponeOffline(admin, serviceId, { expectedDeadline: once.retention!.deadline })).rejects.toMatchObject({ kind: 'precondition', message: expect.stringContaining('提醒负责人之后才能推迟') });
+    f.at(121 * H); expect((await f.release.api.sweepSlotLifecycle()).reminded).toBe(1);
     const twice = (await f.release.api.postponeOffline(admin, serviceId, { expectedDeadline: once.retention!.deadline })).find((s) => s.name === 'preview')!;
-    expect(twice.retention).toMatchObject({ deadline: new Date(Date.parse('2026-09-23T00:00:00.000Z') + 217 * H).toISOString(), postponements: 2 });
+    expect(twice.retention).toMatchObject({ deadline: new Date(Date.parse('2026-09-23T00:00:00.000Z') + 217 * H).toISOString(), postponable: false, postponements: 2 });
     f.at(193 * H); expect((await f.release.api.sweepSlotLifecycle()).reminded).toBe(1);
     f.at(216 * H); expect((await f.release.api.sweepSlotLifecycle()).offline).toBe(0);
     f.at(217 * H); expect((await f.release.api.sweepSlotLifecycle()).offline).toBe(1);
@@ -233,15 +238,22 @@ describe.skipIf(!available)('RFC-021 待命槽生命周期', () => {
     expect((await post(`${base}/slots/preview/offline`, owner, { expectedReleaseId: v1.id, force: true })).status).toBe(400);
     expect((await post(`${base}/slots/preview/offline`, developer, { expectedReleaseId: v1.id })).status).toBe(403);
     const deadline = (await f.preview()).retention!.deadline;
+    // 提醒发出之前推迟被拒（412，带原因）；提醒之后同一个请求成功。
+    const early = await post(`${base}/slots/preview/postpone`, owner, { expectedDeadline: deadline });
+    expect(early.status).toBe(412);
+    expect(await early.json()).toMatchObject({ error: 'precondition', message: expect.stringContaining('提醒负责人之后才能推迟') });
+    f.at(13 * D); expect((await f.release.api.sweepSlotLifecycle()).reminded).toBe(1);
+    f.at(13 * D + H);
     const postponed = await post(`${base}/slots/preview/postpone`, owner, { expectedDeadline: deadline });
     expect(postponed.status).toBe(200);
-    expect(((await postponed.json()) as { items: SlotDto[] }).items.find((s) => s.name === 'preview')?.retention?.postponements).toBe(1);
+    expect(((await postponed.json()) as { items: SlotDto[] }).items.find((s) => s.name === 'preview')?.retention).toMatchObject({ postponable: false, postponements: 1 });
+    f.at(13 * D + 2 * H);
     const offline = await post(`${base}/slots/preview/offline`, owner, { expectedReleaseId: v1.id });
     expect(offline.status).toBe(200);
     expect(((await offline.json()) as { items: SlotDto[] }).items.find((s) => s.name === 'preview')?.offline?.reason).toBe('manual');
     const events = await app.request(`${base}/slot-events`, { headers: as(developer) });
     expect(events.status).toBe(200);
-    expect(((await events.json()) as { items: Array<{ kind: string }> }).items.map((e) => e.kind)).toEqual(['offline', 'postpone']);
+    expect(((await events.json()) as { items: Array<{ kind: string }> }).items.map((e) => e.kind)).toEqual(['offline', 'postpone', 'reminder']);
     const redeploy = await post(`/v1/releases/${v1.id}/redeploy`, owner, { expectedStandbyReleaseId: null });
     expect(redeploy.status).toBe(202);
     expect(((await redeploy.json()) as ReleaseDto).status).toBe('deploying');

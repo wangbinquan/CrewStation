@@ -41,6 +41,8 @@ export const SlotRetentionDtoSchema = z.object({
   deadline: z.iso.datetime(),
   /** 已为当前到期时间发过提醒。 */
   remindedAt: z.iso.datetime().optional(),
+  /** 现在能不能推迟：为当前到期时间发过提醒之后才能推迟（2026-09-23 裁定）；界面据此显示「推迟」，服务端同一条规则拒绝。 */
+  postponable: z.boolean(),
   postponements: z.number().int().min(0),
   /** 一个周期的小时数（回退保留期或无人访问期限）：推迟按它加，界面据此写「推迟 72 小时／14 天」。 */
   periodHours: z.number().int().positive(),

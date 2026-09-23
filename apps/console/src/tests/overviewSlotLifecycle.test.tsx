@@ -25,7 +25,7 @@ function withMaintenance(current: unknown) {
 // RFC-021 M13、B2、B6：概览的正式版本卡显示维护角标与原因，待验证卡写明何时自动下线；已下线时写明何时因何下线。
 test('概览：正式版本维护中有角标与原因，待验证卡写明自动下线时间；已下线写明原因', async () => {
   const f = summaryFixture(), time = new Date().toISOString();
-  f.item.slots = { status: 'ready', checkedAt: time, value: [slot('prod', 'v1.0.0', prodRelease), { ...slot('preview', 'v1.0.1', previewRelease), retention: { kind: 'pending', since: time, deadline: '2026-10-07T00:00:00.000Z', postponements: 0, periodHours: 336 } }] };
+  f.item.slots = { status: 'ready', checkedAt: time, value: [slot('prod', 'v1.0.0', prodRelease), { ...slot('preview', 'v1.0.1', previewRelease), retention: { kind: 'pending', since: time, deadline: '2026-10-07T00:00:00.000Z', postponable: false, postponements: 0, periodHours: 336 } }] };
   withMaintenance({ serviceId: f.item.project.serviceId, projectId: f.item.project.id, switches: { users: true, services: true, events: false }, allowUsers: [], reason: '换库', startedBy: f.item.project.ownerUserId, startedAt: time, updatedBy: f.item.project.ownerUserId, updatedAt: time, revision: 1 });
   page = await renderApp(`/projects/${f.item.project.id}`);
   expect(card('正式版本')).toContain('维护中'); expect(card('正式版本')).toContain('维护中：换库');
