@@ -4,10 +4,12 @@ import { authMessages } from './auth.zh-CN';
 import { projectComputeMessages } from './projectCompute.zh-CN';
 import { computeMessages } from './compute.zh-CN';
 import { settingsMessages } from './settings.zh-CN';
+import { rateLimitMessages } from './rateLimits.zh-CN';
 
 export const messages = {
   ...projectComputeMessages,
   ...settingsMessages,
+  ...rateLimitMessages,
   ...projectResourceMessages,
   "admin.users.role": "平台角色",
   "admin.users.roleFor": "{name} 的角色",

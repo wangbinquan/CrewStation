@@ -7,6 +7,7 @@ import { Stack } from '../../../shared/ui/Stack';
 import { ProjectComputeCard } from '../components/projects/ProjectComputeCard';
 import { ProjectServiceCard } from '../components/projects/ProjectServiceCard';
 import { ProjectQuotaCard } from '../components/projects/ProjectQuotaCard';
+import { ProjectRateLimitCard } from '../components/projects/ProjectRateLimitCard';
 import { AdminSection } from './AdminSection';
 import { ButtonLink } from '../../../shared/ui/navigation/ButtonLink';
 
@@ -24,6 +25,7 @@ export function AdminProjectComputePage() {
       <ProjectServiceCard projectId={projectId!} viewerId={me.data!.id} />
       <ProjectComputeCard projectId={projectId!} viewerId={me.data!.id} />
       <ProjectQuotaCard projectId={projectId!} viewerId={me.data!.id} />
+      <ProjectRateLimitCard projectId={projectId!} />
     </Stack> : null}
   </AdminSection>;
 }

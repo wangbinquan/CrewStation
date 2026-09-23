@@ -5,10 +5,12 @@ import { authMessages } from './auth.en-US';
 import { projectComputeMessages } from './projectCompute.en-US';
 import { computeMessages } from './compute.en-US';
 import { settingsMessages } from './settings.en-US';
+import { rateLimitMessages } from './rateLimits.en-US';
 
 export const messages: MessagesShapedLike<typeof zhCN> = {
   ...projectComputeMessages,
   ...settingsMessages,
+  ...rateLimitMessages,
   ...projectResourceMessages,
   "admin.users.role": "Platform role",
   "admin.users.roleFor": "Role for {name}",

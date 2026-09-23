@@ -86,4 +86,7 @@ export const queryKeys = {
   gatewayAllowlist: () => ['gateway', 'allowlist'] as const,
   /** RFC-021：平台设置里的自动下线时长（仅管理员）。 */
   autoOfflinePolicy: () => ['platform-settings', 'auto-offline'] as const,
+  /** RFC-025 T10：网关限流的平台默认与某个项目的单独设置。 */
+  rateLimits: () => ['platform-settings', 'rate-limits'] as const,
+  projectRateLimits: (projectId: string) => ['platform-settings', 'rate-limits', projectId] as const,
 } as const;

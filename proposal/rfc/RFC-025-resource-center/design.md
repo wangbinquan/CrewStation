@@ -245,6 +245,8 @@ ResourceActionSchema = z.object({ id: ResourceActionIdSchema, enabled: z.boolean
 >
 > **实施补记（2026-09-24，T10 第三步：挂上限流）**：项目的正式、待验证路由在用户 ForwardAuth 之后挂 `rate-limit-user`、`rate-limit-host`；服务域与 `/api/<proxy>` 路由在服务 ForwardAuth 之后挂 `rate-limit-source`、`rate-limit-target`（前缀剥离在最后）；只在配了资源台账时挂（中间件由限流记录渲染）。调和器应用路由前先看它引用的项目中间件是否都已建出，缺了就不动线上那一版、过两秒再核对（Traefik 遇到不存在的中间件会让整条路由失效）；路由的补投影改为按当前计划重算，已有服务才能挂上。平台接口：`console-api` 在用户 ForwardAuth 之后挂 `rate-limit-platform-api` 与 `in-flight-platform-api`；两条资源推送流（`/v1/projects/:id/resources/stream`、`/v1/admin/resources/stream`）拆成单独的 `console-resource-streams`，只限建连频率、不挂并发上限；任务流本来就走 `console-stream`，不挂。两个平台中间件以默认值写进安装清单（装好就有），之后由调和器按平台设置改写。工作台读请求遇到 `rate_limited` 按 `Retry-After` 自动重读（并发上限的 429 不带它，1 秒后），写请求不自动重发；命令行直接打印原因；能力说明 MCP 的接入约定写明超额返回 429 与 `Retry-After`。未登录请求的按 IP 限流（登录前的 `/auth`）没有做，Q4 也没给取值，留待 T15 校准时一并报作者。
 >
+> **实施补记（2026-09-24，T10 第四步：管理端界面）**：管理空间「平台设置」加「网关限流」卡——平台接口、用户域、服务域三组现值（每只桶写平均与突发，平台接口另写同时处理的上限），弹窗修改带开始修改时的版本号，校验与契约一致（正整数、范围、突发不能小于平均）。项目管理页（资源配置）加「限流」卡：用户域与服务域各标出「平台默认」或「单独设置」，弹窗里每组可选照平台默认或为这个项目单独设置（按生效值预填），可以撤销单独设置。
+>
 > **T2 实测（2026-09-23，本机 Traefik v3.7.13，临时探针路由测完已删）**：
 >
 > - `rateLimit` 超额：429，带 `Retry-After`（向上取整的秒数，2 次／秒时为 `1`）与 `X-Retry-In`（毫秒精度），正文是纯文本 `Too Many Requests`、不是平台错误体——`packages/api-client` 据此把它认作 `rate_limited`（平台额度不足的 429 带 `quota_exceeded` 错误体，不混淆）。
