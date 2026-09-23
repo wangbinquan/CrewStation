@@ -13,18 +13,20 @@ const input = async (selector: string, value: string) => {
   const node = document.querySelector<HTMLInputElement>(selector)!;
   await act(async () => { node.focus(); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(node, value); node.dispatchEvent(new Event('input', { bubbles: true })); node.dispatchEvent(new KeyboardEvent('keyup', { key: 'a', bubbles: true })); }); await page!.settle();
 };
-test('cluster route enforces admin guard, opens on the topology under the metrics strip, keeps the inventory one tab away with server totals, partial sources and snapshot pagination', async () => {
+test('cluster route enforces admin guard, opens on the topology with only the two tabs, keeps the inventory one tab away with server totals, partial sources and snapshot pagination', async () => {
   const f = clusterFixture({ partial: true }); page = await renderApp('/admin/cluster', '/admin');
-  // 2026-09-23 裁定：顶部指标条＋「拓扑｜资源清单」两个顶层页签，缺省拓扑；清单类型、筛选条与表格都在「资源清单」里。
-  expect(page.text()).toContain('集群管理'); expect(page.text()).toContain('部分来源缺失或过期'); expect(page.text()).toContain('运行 30 · 就绪 29');
+  // 2026-09-23 裁定：「拓扑｜资源清单」两个顶层页签，缺省拓扑；清单类型、筛选条与表格都在「资源清单」里。
+  // 同日再裁定：状态条（集群容量、受管资源计数、采集状态）挪到管理总览最上面，这里只剩拓扑与资源清单；来源缺失由拓扑的警示条说明。
+  expect(page.text()).toContain('集群管理'); expect(page.text()).toContain('部分来源失败');
+  for (const moved of ['集群容量 · 整个集群', 'CrewStation 受管资源', '运行 30 · 就绪 29', '部分来源缺失或过期', '容量明细、受管分项与来源状态']) expect(page.text()).not.toContain(moved);
   expect([...document.querySelectorAll('[role="tab"]')].map((n) => n.textContent)).toEqual(['拓扑', '资源清单']);
   expect(document.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe('拓扑');
   expect(page.text()).not.toContain('符合筛选的资源'); expect(page.text()).not.toContain('筛选清单');
-  await act(async () => { ([...document.querySelectorAll<HTMLElement>('button')].find((n) => n.textContent === 'Pod 总数32运行 30 · 就绪 29') as HTMLElement).click(); }); await page.settle();
-  expect(page.search()).toMatchObject({ tab: 'pods' }); expect(document.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe('资源清单');
+  await tab('资源清单'); expect(page.search()).toMatchObject({ tab: 'workloads' });
   const views = () => [...document.querySelectorAll<HTMLElement>('[role="group"][aria-label="资源清单"] button')];
   expect(views().map((n) => n.textContent)).toEqual(['工作负载', 'Pod', '网络', '存储与配置', '命名空间', '节点', '最近 7 天趋势', '操作记录']);
-  expect(views().find((n) => n.getAttribute('aria-pressed') === 'true')?.textContent).toBe('Pod');
+  await act(async () => { views().find((n) => n.textContent === 'Pod')!.click(); }); await page.settle();
+  expect(page.search()).toMatchObject({ tab: 'pods' }); expect(views().find((n) => n.getAttribute('aria-pressed') === 'true')?.textContent).toBe('Pod');
   expect(page.text()).toContain('筛选清单'); expect(page.text()).toContain('符合筛选的资源：205');
   await act(async () => { views().find((n) => n.textContent === '工作负载')!.click(); }); await page.settle(); expect(page.search()).toMatchObject({ tab: 'workloads' });
   await page.click('下一页');
@@ -108,7 +110,7 @@ test('namespace filter is URL state; events/containers/logs use selected UID, pr
 test('expired snapshot in the URL resets to the latest snapshot on its own: the expired cursor is dropped, no error and no refresh button', async () => {
   const f = clusterFixture(); page = await renderApp('/admin/cluster?snapshotId=expired&cursor=old');
   expect(page.search().snapshotId).toBeUndefined(); expect(page.search().cursor).toBeUndefined();
-  expect(page.text()).toContain('运行 30 · 就绪 29'); expect(page.text()).not.toContain('快照已过期');
+  expect(document.querySelectorAll('[data-node-id]').length).toBeGreaterThan(0); expect(page.text()).not.toContain('快照已过期');
   const labels = [...document.querySelectorAll('button')].map((node) => node.textContent);
   expect(labels).not.toContain('读取最新快照'); expect(labels).not.toContain('请求刷新');
   expect(f.calls.some((c) => c.path.endsWith('/refresh'))).toBe(false);
@@ -138,4 +140,26 @@ test('采集换快照时列表与详情原地替换，不卸载、不闪回载�
   expect(page.text()).not.toContain('载入中'); expect(row()).toBe(before);
   await act(async () => release()); await page.settle();
   expect(page.text()).toContain('符合筛选的资源：205'); expect(row()).toBe(before);
+});
+
+// 2026-09-23 作者裁定：资源清单宽屏长满一屏，详情在清单右侧自成一栏、各自滚动；清单卡里只有表格区滚动，表头吸顶，翻页钮留在卡底。
+test('资源清单的详情在清单右侧自成一栏；清单卡里只有表格区滚动、表头吸顶、翻页钮在卡底；关掉详情回到单栏', async () => {
+  clusterFixture(); page = await renderApp('/admin/cluster?tab=workloads&resourceId=resource-uid');
+  const detail = document.querySelector('section[aria-label="资源详情"]')!, aside = detail.parentElement!, split = aside.parentElement!;
+  const list = split.firstElementChild!, row = document.querySelector('[data-cluster-resource="resource-uid"]')!;
+  expect([split.className, list.className, aside.className, split.children.length]).toEqual(['split hasDetail', 'list', 'aside', 2]);
+  expect(list.contains(row)).toBe(true); expect(list.contains(detail)).toBe(false);
+  // 表格自己不成滚动区（否则表头只对它自己吸顶），外面一层表格区上下左右滚动，表头贴住它的顶边。
+  const table = row.closest('table')!, region = table.parentElement!.parentElement!, card = region.closest('section')!;
+  expect([table.parentElement!.className, region.className]).toEqual(['sticky', 'rows']); expect(card.className.split(' ')).toContain('listCard');
+  const next = [...card.querySelectorAll('button')].find((b) => b.textContent === '下一页')!;
+  expect(region.contains(next)).toBe(false); expect(region.compareDocumentPosition(next) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  // 整块的高度量到窗口底边，样式只在宽屏用它。
+  const inventory = split.parentElement!; expect(inventory.className).toBe('inventory'); expect(inventory.style.getPropertyValue('--viewport-fill')).toMatch(/^\d+px$/);
+  // 详情栏自己滚：换一个资源换一个栏，新详情从顶上看起。
+  aside.scrollTop = 120; await page.navigate('/admin/cluster?tab=workloads&resourceId=system-api');
+  const other = document.querySelector('section[aria-label="资源详情"]')!.parentElement!;
+  expect(other.textContent).toContain('cs-api'); expect(other === aside).toBe(false); expect(other.scrollTop).toBe(0);
+  await page.click('关闭详情');
+  expect(document.querySelector('section[aria-label="资源详情"]')).toBeNull(); expect([split.className, split.children.length]).toEqual(['split', 1]);
 });

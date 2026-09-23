@@ -114,6 +114,11 @@ ClusterSummarySchema.projects[i] += { workloads?, pods?, readyPods?, abnormal?, 
 
 2026-09-23 修订说明（作者实机反馈，直接改＋回填）：图上方的观测说明行与集群拓扑三层的提示行删除；观测时间改为叠在图框右上角的标签（`TopologyStamp`，完整度与「每 15 秒换一份快照」放在悬停提示），只有 `complete=false` 时仍在图上方留一条写明失败来源的警示。右侧详情栏（≥1100px）限高到视口并独立滚动，壳层 `main` 在有详情时放开 `overflow` 使 sticky 生效；详情里的操作按钮一律放在顶部——`ClusterDetail` 的管理动作移到页签之上（各页签都可用），项目节点卡的「展开 Pod 层」与 `TopologyDetail` 的「查看日志」移到事实列表之前，接口目录 `OperationDetail` 的申请／试调同样上移。
 
+2026-09-23 再修订（作者实机反馈「右侧详情栏已经把整个页面都搞出来滚动条了」）：上一条的「详情栏限高到视口、sticky，有详情时放开壳层 `main` 的 `overflow`」撤掉——那样图与详情再高也要整页滚动。
+`TopologyWorkspace` 宽屏（≥1100px）整块长满到窗口底边：根元素是纵向弹性列，高度取 `--viewport-fill`（`shared/lib/useViewportFill` 量容器顶边到窗口底边、扣主区下内边距，窗口、主区或主区内容的尺寸变了就重量）；
+工作区行高 `minmax(0, 1fr)`、`align-items: stretch`，左栏图框（`stage` 单行网格里的 `.frame`，`overflow: auto`）占满图例以上的高度，右栏详情与图同高、`overflow-y: auto`。
+图的排布与字号不变，比可用高度高时在图框里上下滚动。sticky、视口常数和改写 `main` 的规则都不再有（`viewportFill.test.tsx` 锁住）；窄屏照旧。集群管理与项目「部署与运行形态」共用这一套。
+
 ## 6. 权限、刷新与失败模式
 
 - 项目侧查询用 `useApiQuery` 的 15 秒轮询与 `keepPrevious`（RFC-010 §8 修订）：换快照只换数据，不卸载图；详情按 `resourceId` 固定，对象消失时提示已被替换。

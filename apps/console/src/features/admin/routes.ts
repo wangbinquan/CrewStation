@@ -4,7 +4,6 @@ import { AdminLayout } from '../../app/layout/AdminLayout';
 import { AdminAuthenticationPage } from './pages/AdminAuthenticationPage';
 import { AdminComputePage } from './pages/AdminComputePage';
 import { AdminGatewayPage } from './pages/AdminGatewayPage';
-import { AdminOverviewPage } from './pages/AdminOverviewPage';
 import { AdminServicePlansPage } from './pages/AdminServicePlansPage';
 import { AdminTaskProfilesPage } from './pages/AdminTaskProfilesPage';
 import { AdminUsersPage } from './pages/AdminUsersPage';
@@ -19,7 +18,6 @@ import { parseAuthenticationSearch } from './model/authenticationSearch';
 /** /admin：平台管理空间的根。布局与守卫在 AdminLayout，子页面只管自己的内容（RFC-002 §2.1）。 */
 export const adminRoute = createRoute({ getParentRoute: () => rootRoute, path: 'admin', component: AdminLayout });
 
-export const adminOverviewRoute = createRoute({ getParentRoute: () => adminRoute, path: '/', component: AdminOverviewPage });
 export const adminProjectsRoute = createRoute({ getParentRoute: () => adminRoute, path: 'projects', component: AdminProjectsPage, validateSearch: (search: Record<string, unknown>) => parseProjectDirectorySearch(search) });
 export const adminUsersRoute = createRoute({ getParentRoute: () => adminRoute, path: 'users', component: AdminUsersPage });
 export const adminAuthenticationRoute = createRoute({ getParentRoute: () => adminRoute, path: 'authentication', component: AdminAuthenticationPage, validateSearch: parseAuthenticationSearch });

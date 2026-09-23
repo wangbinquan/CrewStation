@@ -4,7 +4,7 @@
 .list, .aside { min-width: 0; }
 /* 宽屏两栏长满到窗口底边、各自滚动，整页不出纵向滚动条（2026-09-23 作者裁定；高度由 useViewportFill 量出）。 */
 @container (min-width: 761px) {
-  .columns { height: var(--trace-fill, auto); grid-template-rows: minmax(0, 1fr); align-items: stretch; }
+  .columns { height: var(--viewport-fill, auto); grid-template-rows: minmax(0, 1fr); align-items: stretch; }
   .list { display: flex; flex-direction: column; min-height: 0; }
   .aside { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 }

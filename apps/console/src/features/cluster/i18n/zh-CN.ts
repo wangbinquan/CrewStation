@@ -258,12 +258,13 @@ export const messages = {
   'cluster.topology.breadcrumb': '项目层 › {name}',
   'cluster.topology.back': '返回项目层',
   'cluster.topology.expand': '展开该项目的 Pod 层',
-  // 页面结构（2026-09-23 裁定：指标条＋「拓扑｜资源清单」两级页签）
-  'cluster.overview': '集群总览',
+  // 页面结构（2026-09-23 裁定：「拓扑｜资源清单」两个页签；状态条同日再裁定挪到管理总览最上面，标题「集群状态」）
+  'cluster.overview': '集群状态',
   'cluster.views': '集群视图',
   'cluster.inventory': '资源清单',
   'cluster.filters': '筛选清单',
   'cluster.capacityGroup': '集群容量 · 整个集群',
   'cluster.metrics.capacityObserved': '容量指标 {time} · {state}',
   'cluster.strip.more': '容量明细、受管分项与来源状态',
+  'cluster.invalidResponse': '集群状态返回不完整。',
 } as const;

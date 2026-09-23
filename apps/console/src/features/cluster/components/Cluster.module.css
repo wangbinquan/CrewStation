@@ -1,6 +1,22 @@
 .stack { display: grid; gap: 16px; min-width: 0; }
-/* 顶部指标条（2026-09-23 裁定）：集群容量五格＋受管资源计数五格一行；容器不够宽时两组各占一行，640px 以下每组两列。 */
+/* 资源清单（2026-09-23 作者裁定）：宽屏（≥1100px，详情放得下右侧）视图切换与筛选在上，下面清单与右侧详情长满到窗口底边
+   （useViewportFill 量出 --viewport-fill），各自滚动，整页不出纵向滚动条；清单卡只让表格区滚动，表头停在表格区顶上、翻页钮在卡底；
+   节点、趋势、操作记录在清单栏里整体滚动。窄屏详情排在清单下面，照常随内容长。 */
+.inventory { display: flex; flex-direction: column; gap: var(--cs-space-3); min-width: 0; }
+.split { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; min-width: 0; }
+.list, .aside { min-width: 0; }
+.rows { min-height: 0; overflow: auto; overscroll-behavior: contain; }
+@media (min-width: 1100px) {
+  .inventory { height: var(--viewport-fill, auto); }
+  .split { flex: 1 1 0; min-height: 0; grid-template-rows: minmax(0, 1fr); }
+  .split.hasDetail { grid-template-columns: minmax(0, 1fr) 380px; }
+  .list, .aside { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+  .listCard { height: 100%; }
+  .listCard > :last-child { min-height: 0; }
+}
+/* 集群状态条（2026-09-23 作者裁定从集群管理挪到管理总览最上面）：集群容量五格＋受管资源计数五格一行；容器不够宽时两组各占一行，640px 以下每组两列。 */
 .overview { display: grid; gap: 10px; min-width: 0; }
+.overviewTitle { margin: 0; font-size: var(--cs-font-size); }
 .strip { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: stretch; }
 .group { min-width: 0; display: grid; grid-template-rows: auto 1fr; gap: 6px; }
 /* 容量格文字多、计数格只有一个数：宽度 3:2 分配，1280 宽仍能并排；再窄两组各占一行。 */
@@ -9,9 +25,9 @@
 .groupTitle { margin: 0; font: 700 10.5px var(--cs-font-mono); letter-spacing: 0.1em; color: var(--cs-color-text-muted); }
 .tiles { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; align-items: stretch; }
 .tile { display: grid; align-content: start; gap: 2px; min-width: 0; margin: 0; padding: 8px 10px; border: 1px solid var(--cs-color-border); border-radius: 8px; background: var(--cs-color-surface); color: var(--cs-color-text); font: inherit; text-align: left; }
-button.tile { cursor: pointer; }
-button.tile:hover { background: var(--cs-color-surface-muted); }
-button.tile:focus-visible { outline: 2px solid var(--cs-color-focus); outline-offset: 2px; }
+a.tile { cursor: pointer; text-decoration: none; }
+a.tile:hover { background: var(--cs-color-surface-muted); }
+a.tile:focus-visible { outline: 2px solid var(--cs-color-focus); outline-offset: 2px; }
 .tileTitle { font-size: 12px; color: var(--cs-color-text-muted); }
 .hero { display: block; font-size: 19px; line-height: 1.25; font-weight: 600; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .hero strong { font-size: inherit; font-weight: inherit; }
@@ -22,7 +38,8 @@ button.tile:focus-visible { outline: 2px solid var(--cs-color-focus); outline-of
 .status { display: grid; gap: 4px; font-size: 12px; }
 .status p { margin: 0; }
 .status h3 { margin: 10px 0 4px; font-size: 12px; }
-.filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)); gap: 12px; }
+/* 七个筛选项在 1280 宽下排成一行（2026-09-23）：清单整块长满一屏后，筛选卡多折一行，表格区就少两行。 */
+.filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 130px), 1fr)); gap: 12px; }
 .filters label { display: grid; gap: 6px; min-width: 0; font-size: 12px; color: var(--cs-color-text-muted); }
 .filters input, .filters select, .input { box-sizing: border-box; width: 100%; min-width: 0; border: 1px solid var(--cs-color-border); border-radius: 6px; padding: 8px; background: var(--cs-color-surface); color: var(--cs-color-text); }
 .table { min-width: 850px; }

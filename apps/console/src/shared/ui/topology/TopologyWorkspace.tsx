@@ -1,6 +1,8 @@
 // 形态图的页面骨架：来源失败警示、筛选、图框右上角的观测时间标签、图或窄屏列表、图例，右侧详情插槽（作者裁定放右侧）；Esc 关闭详情。
-import { useEffect, useState } from 'react';
+// 宽屏整块长满到窗口底边，图框与详情栏各自滚动（2026-09-23 作者裁定，集群管理与项目「部署与运行形态」共用）。
+import { useEffect, useRef, useState } from 'react';
 import type { ReactElement, ReactNode } from 'react';
+import { useViewportFill } from '../../lib/useViewportFill';
 import type { LayoutMetrics } from './topologyLayout';
 import type { Topology, TopologyFilter } from './topologyModel';
 import { TopologyDiagram } from './TopologyDiagram';
@@ -36,14 +38,15 @@ export interface TopologyWorkspaceProps {
 
 export function TopologyWorkspace({ topology, label, selectedId, onSelect, metrics, detail, before, filters = true, legend = true }: TopologyWorkspaceProps): ReactElement {
   const [filter, setFilter] = useState<TopologyFilter>({});
-  const narrow = useNarrow();
+  const narrow = useNarrow(), page = useRef<HTMLDivElement>(null);
+  useViewportFill(page);
   useEffect(() => {
     if (!selectedId) return;
     const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') onSelect(undefined); };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [selectedId, onSelect]);
-  return <div className={styles.page}>
+  return <div ref={page} className={styles.page}>
     {before}
     <TopologyObserved topology={topology} />
     {filters ? <TopologyFilters topology={topology} filter={filter} onChange={setFilter} /> : null}
@@ -55,7 +58,8 @@ export function TopologyWorkspace({ topology, label, selectedId, onSelect, metri
         </div>
         {legend ? <TopologyLegend topology={topology} /> : null}
       </div>
-      {selectedId && detail ? <div className={styles.detail}>{detail}</div> : null}
+      {/* 详情栏自己滚：换选一个节点换一个栏，新详情从顶上看起，不接着上一份的滚动位置。 */}
+      {selectedId && detail ? <div key={selectedId} className={styles.detail}>{detail}</div> : null}
     </div>
   </div>;
 }

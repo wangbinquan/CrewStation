@@ -32,3 +32,13 @@
 .table tbody tr:last-child td {
   border-bottom: none;
 }
+
+/* stickyHeader：表头贴住外层滚动区的顶边，行从它下面滚过；背景不透明，免得行字透出来。 */
+.sticky th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--cs-color-surface);
+  /* 合并边框的表格里，单元格的边框不跟着吸顶走：用内阴影补上表头下沿那条线。 */
+  box-shadow: inset 0 -1px 0 var(--cs-color-border);
+}

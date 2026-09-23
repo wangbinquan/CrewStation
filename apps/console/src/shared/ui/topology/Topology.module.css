@@ -16,14 +16,19 @@
 
 .page { display: grid; gap: 14px; min-width: 0; }
 .workspace { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; align-items: start; }
-/* 详情与图解耦：限高到视口、自己滚动，操作在详情顶部；壳层 main 带 overflow 却不限高，会让 sticky 失效，有详情时放开它随文档滚动。 */
-@media (min-width: 1100px) {
-  .workspace.hasDetail { grid-template-columns: minmax(0, 1fr) 380px; }
-  .workspace.hasDetail > .detail { position: sticky; top: 16px; max-height: calc(100dvh - 32px); overflow-y: auto; overscroll-behavior: contain; }
-  :global(main):has(.workspace.hasDetail) { overflow: visible; }
-}
 .main { display: grid; gap: 12px; min-width: 0; }
 .detail { min-width: 0; overflow-wrap: anywhere; }
+/* 宽屏（≥1100px，详情放得下右侧）整块长满到窗口底边（useViewportFill 量出 --viewport-fill，2026-09-23 作者裁定）：
+   图比可用高度高时在图框里上下滚、字号不变；详情栏与图同高、自己滚动，操作在详情顶部；整页不出纵向滚动条。
+   窄屏详情排在图下面，照常随内容长。 */
+@media (min-width: 1100px) {
+  .page { display: flex; flex-direction: column; height: var(--viewport-fill, auto); }
+  .workspace { flex: 1 1 0; min-height: 0; grid-template-rows: minmax(0, 1fr); align-items: stretch; }
+  .workspace.hasDetail { grid-template-columns: minmax(0, 1fr) 380px; }
+  .main { grid-template-rows: minmax(0, 1fr) auto; min-height: 0; }
+  .stage { display: grid; grid-template-rows: minmax(0, 1fr); min-height: 0; }
+  .detail { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+}
 .frame { border: 1px solid var(--cs-color-border); border-radius: 10px; overflow: auto; background: var(--cs-color-surface); }
 .svg { display: block; max-width: 100%; height: auto; }
 .canvas { fill: var(--cs-color-surface); }

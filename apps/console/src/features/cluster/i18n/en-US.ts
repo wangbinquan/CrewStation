@@ -258,12 +258,13 @@ export const messages = {
   'cluster.topology.breadcrumb': 'Project layer › {name}',
   'cluster.topology.back': 'Back to project layer',
   'cluster.topology.expand': "Expand this project's Pod layer",
-  // Page structure (ruled 2026-09-23: metrics strip + "Topology | Resource inventory" tabs)
-  'cluster.overview': 'Cluster overview',
+  // Page structure (ruled 2026-09-23: "Topology | Resource inventory" tabs; the status strip moved to the top of the admin overview the same day, headed "Cluster status")
+  'cluster.overview': 'Cluster status',
   'cluster.views': 'Cluster views',
   'cluster.inventory': 'Resource inventory',
   'cluster.filters': 'Filter the inventory',
   'cluster.capacityGroup': 'Cluster capacity · whole cluster',
   'cluster.metrics.capacityObserved': 'Capacity metrics {time} · {state}',
   'cluster.strip.more': 'Capacity details, managed split and source status',
+  'cluster.invalidResponse': 'The cluster status response is incomplete.',
 } as const;

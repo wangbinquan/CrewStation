@@ -3,7 +3,7 @@ import { useRef } from 'react';
 import type { ReactElement } from 'react';
 import { TraceDetail } from '../components/TraceDetail';
 import { TraceListCard } from '../components/TraceListCard';
-import { useViewportFill } from '../hooks/useViewportFill';
+import { useViewportFill } from '../../../shared/lib/useViewportFill';
 import { filtersFromSearch } from '../model/traceView';
 import type { TraceFilters } from '../model/traceView';
 import styles from './TracesPage.module.css';

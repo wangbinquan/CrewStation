@@ -3,43 +3,124 @@ import type { Page } from './cdp';
 import { e2eAvailable, open } from './consoleSession';
 import { openAdminSession } from './session';
 
-// 2026-09-23 裁定的集群管理页结构在部署的集群上成立：指标条＋「拓扑｜资源清单」两级页签，缺省拓扑；切清单视图时滚动位置不动。
+// 2026-09-23 裁定的集群管理页：只有「拓扑｜资源清单」两个页签，缺省拓扑；状态条（集群容量、受管资源计数、采集状态）在管理总览最上面。
+// 宽屏（≥1100px）两个页签与项目「部署与运行形态」都长满一屏：图框、详情栏、表格区各自滚动，整页不出纵向滚动条。
+// 外壳宽屏时可能是文档滚，也可能是定高的 main 自己滚（同日另一项裁定），两种多出来的高度都算整页溢出。
 const available = await e2eAvailable(), session = available ? await openAdminSession() : undefined;
 afterAll(async () => { await session?.close(); }, 30_000);
 const clickText = (page: Page, selector: string, text: string) => page.eval<boolean>(`(() => { const b = [...document.querySelectorAll(${JSON.stringify(selector)})].find((n) => n.textContent === ${JSON.stringify(text)}); if (!b) throw new Error('no element ' + ${JSON.stringify(text)}); b.click(); return true; })()`);
 const loaded = (page: Page) => page.waitUntil(`document.querySelector('main') && !/载入中/.test(document.querySelector('main').innerText) && !!document.querySelector('main [role="tab"][aria-selected="true"]')`, 60_000, 300);
+const viewport = (page: Page, width: number, height: number) => page.cmd('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: false });
+const overflow = (page: Page) => page.eval<number>(`(() => { const main = document.querySelector('main'); return Math.max(0, document.documentElement.scrollHeight - innerHeight) + Math.max(0, main.scrollHeight - main.clientHeight); })()`);
+const scrolled = (page: Page) => page.eval<number>(`Math.round(scrollY + document.querySelector('main').scrollTop)`);
+const detailLoaded = `!!document.querySelector('section[aria-label="资源详情"]') && !/载入中/.test(document.querySelector('section[aria-label="资源详情"]').innerText)`;
+/** 形态图工作区的两栏：图框所在的左栏与紧挨着的详情栏（没打开详情时为 null），以及图例底边。 */
+const workspace = (page: Page) => page.eval<{ mainRight: number; detailLeft: number | null; detailBottom: number | null; legendBottom: number }>(`(() => {
+  const column = document.querySelector('svg[role="group"]').parentElement.parentElement.parentElement, detail = column.nextElementSibling;
+  return { mainRight: Math.round(column.getBoundingClientRect().right), detailLeft: detail ? Math.round(detail.getBoundingClientRect().left) : null,
+    detailBottom: detail ? Math.round(detail.getBoundingClientRect().bottom) : null, legendBottom: Math.round(document.querySelector('main [aria-label="图例"]').getBoundingClientRect().bottom) };
+})()`);
+const views = 'main [role="group"][aria-label="资源清单"]';
 
 describe.skipIf(!session)('deployed cluster management layout', () => {
-  test.each([1440, 1280])('at %i px the page opens on the topology with the metrics strip and both tabs inside the first screen', async (width) => {
+  test.each([[1440, 900], [1280, 800]])('at %i×%i the page opens on the topology with only two tabs and fills one screen, with the detail beside the diagram', async (width, height) => {
     const page = session!.admin;
-    await page.cmd('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: false });
+    await viewport(page, width, height);
     try {
       await open(page, '/admin/cluster'); await loaded(page);
       await page.waitUntil(`document.querySelectorAll('[data-node-id]').length > 0`, 60_000, 500);
-      const layout = await page.eval<{ selected: string; tabs: string[]; tabTop: number; diagramTop: number; overflow: number }>(`(() => {
-        const tabs = [...document.querySelectorAll('main [role="tab"]')], selected = tabs.find((n) => n.getAttribute('aria-selected') === 'true'), svg = document.querySelector('svg[role="group"]');
-        return { selected: selected.textContent, tabs: tabs.map((n) => n.textContent), tabTop: Math.round(selected.getBoundingClientRect().top + scrollY), diagramTop: Math.round(svg.getBoundingClientRect().top + scrollY), overflow: document.documentElement.scrollWidth - innerWidth };
-      })()`);
-      expect(layout.tabs).toEqual(['拓扑', '资源清单']); expect(layout.selected).toBe('拓扑');
-      // 改版前页签条在 1440 宽下距页顶 979px、1280 宽下 1174px；现在指标条压成一条，页签与图都在首屏。
-      expect(layout.tabTop).toBeLessThan(560); expect(layout.diagramTop).toBeLessThan(760); expect(layout.overflow).toBeLessThanOrEqual(1);
+      expect(await page.eval<string[]>(`[...document.querySelectorAll('main [role="tab"]')].map((n) => n.textContent)`)).toEqual(['拓扑', '资源清单']);
+      expect(await page.eval<string>(`document.querySelector('main [role="tab"][aria-selected="true"]').textContent`)).toBe('拓扑');
+      // 状态条挪到了管理总览；改版前这里是指标条，图的起点被压到 600px 以下，整页 1441px（1728×873）。
+      expect(await page.text()).not.toContain('集群容量 · 整个集群');
+      expect(await overflow(page)).toBeLessThanOrEqual(1);
+      // 图框与图例一直排到窗口底边（扣掉主区下内边距），图比可用高度高时在图框里滚。
+      const closed = await workspace(page);
+      expect(closed.legendBottom).toBeGreaterThan(height - 40); expect(closed.legendBottom).toBeLessThanOrEqual(height); expect(closed.detailLeft).toBeNull();
+      await page.eval(`document.querySelector('[data-node-id="cs-api"]').dispatchEvent(new MouseEvent('click', { bubbles: true }))`);
+      await page.waitUntil(detailLoaded, 30_000, 200);
+      // 打开详情后仍是一屏：详情栏贴在图的右侧、与图例同一条底边，内容再长也在栏里滚。
+      expect(await overflow(page)).toBeLessThanOrEqual(1);
+      const beside = await workspace(page);
+      expect(beside.detailLeft!).toBeGreaterThan(beside.mainRight); expect(Math.abs(beside.detailBottom! - beside.legendBottom)).toBeLessThanOrEqual(2);
       expect(page.takeErrors()).toEqual([]);
     } finally { await page.cmd('Emulation.clearDeviceMetricsOverride'); }
   }, 120_000);
 
-  test('switching inventory views keeps the scroll position: the panel holds its height until the new list arrives', async () => {
+  test('the inventory fills one screen: only the table region scrolls under a header that stays put, the detail opens on the right, and switching views keeps the switcher in place', async () => {
     const page = session!.admin;
-    await open(page, '/admin/cluster?tab=workloads'); await loaded(page);
-    await page.waitUntil(`document.body.innerText.includes('符合筛选的资源')`, 60_000, 300);
-    expect(await page.eval<string>(`document.querySelector('main [role="tab"][aria-selected="true"]').textContent`)).toBe('资源清单');
-    await page.eval(`document.querySelector('main [role="group"][aria-label="资源清单"]').scrollIntoView({ block: 'start' })`);
-    const before = await page.eval<number>('Math.round(scrollY)');
-    expect(before).toBeGreaterThan(100);
-    await clickText(page, 'main [role="group"][aria-label="资源清单"] button', 'Pod');
-    await page.waitUntil(`document.querySelector('main [role="group"][aria-label="资源清单"] button[aria-pressed="true"]').textContent === 'Pod' && !/载入中/.test(document.querySelector('main').innerText)`, 60_000, 200);
-    const after = await page.eval<number>('Math.round(scrollY)');
-    // 改版前这一步 scrollY 从 979 跳到 262：面板塌成一行，浏览器把滚动位置钳到新的最大值。
-    expect(Math.abs(after - before)).toBeLessThanOrEqual(2);
+    await viewport(page, 1440, 900);
+    try {
+      await open(page, '/admin/cluster?tab=workloads'); await loaded(page);
+      await page.waitUntil(`document.body.innerText.includes('符合筛选的资源')`, 60_000, 300);
+      expect(await overflow(page)).toBeLessThanOrEqual(1);
+      // 表格区是清单卡里唯一的滚动区：行多时滚下去，表头仍贴着表格区的顶边。
+      const sticky = await page.eval<{ scrollable: boolean; thTop: number; regionTop: number }>(`(() => {
+        const table = document.querySelector('[data-cluster-resource]').closest('table'), region = table.parentElement.parentElement; region.scrollTop = 200;
+        return { scrollable: region.scrollHeight > region.clientHeight, thTop: Math.round(table.querySelector('th').getBoundingClientRect().top), regionTop: Math.round(region.getBoundingClientRect().top) };
+      })()`);
+      if (sticky.scrollable) expect(Math.abs(sticky.thTop - sticky.regionTop)).toBeLessThanOrEqual(1);
+      await page.eval(`document.querySelector('[data-cluster-resource]').click()`);
+      await page.waitUntil(detailLoaded, 30_000, 200);
+      // 改版前详情排在清单下方，43 行时点一行要滚到 2560px 才看得到。
+      expect(await overflow(page)).toBeLessThanOrEqual(1);
+      const columns = await page.eval<{ listRight: number; detailLeft: number }>(`(() => { const detail = document.querySelector('section[aria-label="资源详情"]').parentElement, list = detail.previousElementSibling; return { listRight: Math.round(list.getBoundingClientRect().right), detailLeft: Math.round(detail.getBoundingClientRect().left) }; })()`);
+      expect(columns.detailLeft).toBeGreaterThan(columns.listRight);
+      const before = await page.eval<number>(`Math.round(document.querySelector(${JSON.stringify(views)}).getBoundingClientRect().top)`);
+      await clickText(page, `${views} button`, 'Pod');
+      await page.waitUntil(`document.querySelector('${views} button[aria-pressed="true"]').textContent === 'Pod' && !/载入中/.test(document.querySelector('main').innerText)`, 60_000, 200);
+      expect(await page.eval<number>(`Math.round(document.querySelector(${JSON.stringify(views)}).getBoundingClientRect().top)`)).toBe(before);
+      expect(await overflow(page)).toBeLessThanOrEqual(1);
+      expect(page.takeErrors()).toEqual([]);
+    } finally { await page.cmd('Emulation.clearDeviceMetricsOverride'); }
+  }, 120_000);
+
+  test('below 1100px the inventory flows with the page and switching views keeps the scroll position: the panel holds its height until the new list arrives', async () => {
+    const page = session!.admin;
+    await viewport(page, 1024, 800);
+    try {
+      await open(page, '/admin/cluster?tab=workloads'); await loaded(page);
+      await page.waitUntil(`document.body.innerText.includes('符合筛选的资源')`, 60_000, 300);
+      await page.eval(`document.querySelector(${JSON.stringify(views)}).scrollIntoView({ block: 'start' })`);
+      const before = await scrolled(page);
+      expect(before).toBeGreaterThan(100);
+      await clickText(page, `${views} button`, 'Pod');
+      await page.waitUntil(`document.querySelector('${views} button[aria-pressed="true"]').textContent === 'Pod' && !/载入中/.test(document.querySelector('main').innerText)`, 60_000, 200);
+      // 2026-09-22 实机：面板塌成一行时浏览器把滚动位置钳到新的最大值（979 → 262）。
+      expect(Math.abs(await scrolled(page) - before)).toBeLessThanOrEqual(2);
+      expect(page.takeErrors()).toEqual([]);
+    } finally { await page.cmd('Emulation.clearDeviceMetricsOverride'); }
+  }, 120_000);
+
+  test('the admin overview opens on the cluster status strip, before the pending items; a count tile opens the matching inventory view', async () => {
+    const page = session!.admin;
+    await open(page, '/admin');
+    await page.waitUntil(`[...document.querySelectorAll('main h2')].some((h) => h.textContent === '集群状态')`, 30_000, 300);
+    const strip = await page.eval<{ top: number; todo: number; tiles: string[] }>(`(() => {
+      const section = [...document.querySelectorAll('main h2')].find((h) => h.textContent === '集群状态').closest('section');
+      return { top: Math.round(section.getBoundingClientRect().top), todo: Math.round(document.querySelector('main section[aria-labelledby="admin-todo-title"]').getBoundingClientRect().top), tiles: [...section.querySelectorAll('a')].map((a) => a.getAttribute('href')) };
+    })()`);
+    expect(strip.top).toBeLessThan(strip.todo);
+    expect(strip.tiles).toEqual(['/admin/cluster?tab=workloads', '/admin/cluster?tab=pods', '/admin/cluster?tab=network&kind=Service', '/admin/cluster?tab=storage&kind=PersistentVolumeClaim', '/admin/cluster?tab=pods&status=abnormal']);
+    expect(await page.text()).toContain('集群容量 · 整个集群');
+    await page.eval(`document.querySelector('main a[href="/admin/cluster?tab=pods"]').click()`);
+    await page.waitUntil(`location.pathname === '/admin/cluster' && document.querySelector('${views} button[aria-pressed="true"]')?.textContent === 'Pod'`, 30_000, 200);
     expect(page.takeErrors()).toEqual([]);
+  }, 90_000);
+
+  test.skipIf(!session?.project)('the project deployment topology uses the same workspace: one screen, the read-only detail beside the diagram', async () => {
+    const page = session!.admin, id = session!.project!.id;
+    await viewport(page, 1440, 900);
+    try {
+      await open(page, `/projects/${id}/operations?tab=topology`);
+      await page.waitUntil(`document.querySelectorAll('[data-node-id]').length > 0`, 60_000, 500);
+      expect(await overflow(page)).toBeLessThanOrEqual(1);
+      await page.eval(`document.querySelector('[data-node-id]').dispatchEvent(new MouseEvent('click', { bubbles: true }))`);
+      await page.waitUntil(`!!document.querySelector('[data-node-id][aria-pressed="true"]')`, 10_000, 200); await Bun.sleep(500);
+      expect(await overflow(page)).toBeLessThanOrEqual(1);
+      const columns = await workspace(page);
+      expect(columns.detailLeft!).toBeGreaterThan(columns.mainRight); expect(Math.abs(columns.detailBottom! - columns.legendBottom)).toBeLessThanOrEqual(2);
+      expect(page.takeErrors()).toEqual([]);
+    } finally { await page.cmd('Emulation.clearDeviceMetricsOverride'); }
   }, 120_000);
 });

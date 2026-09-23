@@ -196,10 +196,10 @@ describe('调用链回放', () => {
     const host = document.querySelector('[aria-label="本应用的调用链"]')!.closest('section')!.parentElement!.parentElement!.parentElement!;
     host.getBoundingClientRect = () => new DOMRect(0, 180, 1000, 400);
     await act(async () => { window.dispatchEvent(new Event('resize')); });
-    expect(host.style.getPropertyValue('--trace-fill')).toBe(`${window.innerHeight - 180}px`);
+    expect(host.style.getPropertyValue('--viewport-fill')).toBe(`${window.innerHeight - 180}px`);
     host.getBoundingClientRect = () => new DOMRect(0, window.innerHeight - 100, 1000, 400);
     await act(async () => { window.dispatchEvent(new Event('resize')); });
-    expect(host.style.getPropertyValue('--trace-fill')).toBe('360px');
+    expect(host.style.getPropertyValue('--viewport-fill')).toBe('360px');
   });
 
   test('本项目里没有这条链时写明原因（可能属于别的项目）', async () => {

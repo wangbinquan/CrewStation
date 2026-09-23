@@ -49,6 +49,23 @@ test('filters dim without removing, the attention chip counts abnormal nodes, an
   expect(rendered.text()).not.toContain('快照完整');
 });
 
+// 2026-09-23 作者裁定：宽屏整块长满到窗口底边，详情在图的右侧自成一栏、各自滚动（集群管理与项目「部署与运行形态」共用）。
+test('the workspace measures its height down to the window bottom and gives the detail its own column beside the diagram', async () => {
+  rendered = await renderElement(<Harness />, {});
+  const root = document.querySelector('svg[role="group"]')!.closest('.page') as HTMLElement;
+  expect(root.style.getPropertyValue('--viewport-fill')).toMatch(/^\d+px$/);
+  expect(document.querySelector('.workspace')!.className).toBe('workspace');
+  await act(async () => { nodeEl('route').dispatchEvent(new MouseEvent('click', { bubbles: true })); }); await rendered.settle();
+  const detail = document.querySelector('[aria-label="详情"]')!.parentElement!;
+  expect([detail.className, detail.parentElement!.className, detail.previousElementSibling!.className]).toEqual(['detail', 'workspace hasDetail', 'main']);
+  expect(detail.previousElementSibling!.contains(document.querySelector('svg[role="group"]'))).toBe(true);
+  // 详情栏自己滚：换选另一个节点时换一个栏，新详情从顶上看起。
+  detail.scrollTop = 120;
+  await act(async () => { nodeEl('cli').dispatchEvent(new MouseEvent('click', { bubbles: true })); }); await rendered.settle();
+  const next = document.querySelector('[aria-label="详情"]')!.parentElement!;
+  expect(next.textContent).toBe('cli'); expect(next === detail).toBe(false); expect(next.scrollTop).toBe(0);
+});
+
 test('a partial snapshot still gets a warning line naming the failed sources', async () => {
   rendered = await renderElement(<TopologyWorkspace topology={{ ...layoutFixture, complete: false, incompleteReason: 'Pod（超时）' }} label="夹具形态图" onSelect={() => undefined} />, {});
   expect(rendered.text()).toContain('部分来源失败：Pod（超时）'); expect(rendered.text()).toContain('观测于');
