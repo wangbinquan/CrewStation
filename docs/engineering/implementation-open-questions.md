@@ -250,7 +250,7 @@
 
 ## I19. read-only／edit 两档去掉 bash，与只认「OpenCode 内」请求的模型服务相冲
 
-**2026-09-23 关闭（Design D59）**：作者裁定开发会话与业务子任务的 Agent 都不再分权限档——「都是开发容器，只有连生产库才该有对生产库的权限控制」。平台派发给 Runner 的一律 `full`（`packages/contracts/manifest/tasks.ts` 的 `PLATFORM_AGENT_PERMISSION`）；开发会话的「＋ 创建开发Agent会话 ▾」、历史 Agent 表单及两个启动接口都不再有权限；Manifest 的 `agentProfiles[].permission` 作废，旧值照收不用。生产数据仍由负责人批准的 TaskDataBinding 控制。本条的冲突随之消失，下面三种做法都不再需要；三档到各 CLI 的映射只为 TaskRunner 协议（运行中的旧 Runner）保留。
+**2026-09-23 关闭（Design D59）**：作者裁定开发会话与业务子任务的 Agent 都不再分权限档——「为什么要限制呢，都是开发容器。只有连生产库才有对生产库的权限控制才对」。平台派发给 Runner 的一律 `full`（`packages/contracts/manifest/tasks.ts` 的 `PLATFORM_AGENT_PERMISSION`）；开发会话的「＋ 创建开发Agent会话 ▾」、历史 Agent 表单及两个启动接口都不再有权限；Manifest 的 `agentProfiles[].permission` 作废，旧值照收不用。生产数据仍由负责人批准的 TaskDataBinding 控制。本条的冲突随之消失，下面三种做法都不再需要；三档到各 CLI 的映射只为 TaskRunner 协议（运行中的旧 Runner）保留。
 
 **现状**：三档权限到 opencode 权限表的映射是 CrewStation 的裁定（`packages/agent-drivers/permission/opencodePermission.ts`）：read-only 与 edit 都 `bash: deny`，只有 full 放行。OpenCode Zen 免费档据此拒绝请求（见 I17）。本机没有付费模型，因此开发会话默认 edit 的 headless Agent、最小示例 `chat-v1`（read-only）等真实轮次都会被拒；平台把厂商原文写进失败原因。
 

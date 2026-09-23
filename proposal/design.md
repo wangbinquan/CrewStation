@@ -3,7 +3,7 @@
 
 > RFC-013 基线补充（2026-09-21）：平台资源与引用统一为 36 字符、小写、带连字符的 UUIDv7；名称用于展示和搜索。Manifest v2、业务 API v2、Runner v3 及历史兼容边界见 [资源身份设计](./rfc/RFC-013-resource-uuid/design.md)。实施与发布证据见该 RFC 的 plan。
 > 状态：设计草案，待原型与评审验证  
-> 版本：0.3.10 · 整理日期：2026-09-10
+> 版本：0.3.11 · 整理日期：2026-09-10
 > 修订日期：2026-09-11（v0.2.0：任务级执行环境、代码托管与持续意图修改）  
 > 修订日期：2026-09-11（v0.3.0：与 Proposal v0.3.0 同步，平台职责收窄、标签发布、网关鉴权、接入容器与事件中心、规模目标；删除 ZIP 与知识飞轮）  
 > 修订日期：2026-09-11（v0.3.1：选型按 tech-evaluation.md 确认并回填 §3）  
@@ -16,6 +16,7 @@
 > 修订日期：2026-09-22（v0.3.8：RFC-019 回填——部署与运行形态图：工作台自绘 SVG、成员只读的项目范围盘点投影、集群拓扑三层；新增 §14.6 与 D55）
 > 修订日期：2026-09-23（v0.3.9：RFC-021 回填——待验证版本下线、到期自动下线与从发布记录重新部署；正式版本维护的三个开关与临时放行；项目维护即破坏性迁移窗口；新增 §6.9、D56、D57，作废暂停项目）
 > 修订日期：2026-09-23（v0.3.10：RFC-022 回填——启动进度：分段、来源、保存与显示；创建者窗口自动取得输入控制；新增 §5.10、D58）
+> 修订日期：2026-09-23（v0.3.11：Agent 不再分权限档——开发会话与业务子任务一律完全权限，Manifest `agentProfiles[].permission` 作废、旧值照收不用；新增 D59，§13.4 补一条接受的风险）
 > 配套文档：[Proposal](./proposal.md) · [Plan](./plan.md) · [Tech Evaluation](./tech-evaluation.md) · [设计门检视](./reviews/design-gate-2026-09-11.md)
 
 ## 目录
@@ -138,7 +139,7 @@ v0.3.2 依据设计门检视（`reviews/design-gate-2026-09-11.md`）的 25 项�
 | 身份 | 开发会话绑定开发者；调用内部 API 以本服务的身份经开发容器发出 | 绑定服务与当前任务 |
 | 存储 | 持久卷跟随容器，无暂停 | 默认跟随容器；可选持久卷持久与暂停恢复 |
 
-两类用途共用 RuntimeDriver、任务容器镜像、TaskRunner 与执行资源；`purpose` 字段取 `intent` 或 `business`。没有 `role` 字段；业务子任务用 `agentProfile` 选择驱动、模型与工具配置。
+两类用途共用 RuntimeDriver、任务容器镜像、TaskRunner 与执行资源；`purpose` 字段取 `intent` 或 `business`。没有 `role` 字段；业务子任务用 `agentProfile` 选择算力档位（驱动与模型由档位决定，RFC-006）与系统提示；Agent 不分权限档，一律完全权限（D59）。
 
 ## 2. 部署实体与流量路径
 
@@ -318,7 +319,6 @@ spec:
       - id: 01a0bf5d-8f4b-7101-8000-000000000001
         name: chat-v1
         compute: { kind: default }
-        permission: read-only
     outputContracts: []
   release:
     migration: { compatibility: none, destructive: false, rollback: switch-back }
@@ -837,7 +837,7 @@ interactive： Queued → Starting → Running ⇄ AwaitingInput → Verifying �
               有外部副作用且结果不明 → UnknownOutcome → 核对后确定
 ```
 
-每次重试生成新 attempt，保留原输入、输出、日志；执行记录不覆盖。Agent 子任务引用已登记的 agentProfile（驱动、模型、工具与权限配置）与 outputContract；命令子任务有 argv、cwd、退出码、输出与超时。Verifying 阶段由 TaskRunner 按契约定义校验必需产物与 Schema：缺少必要产物记 Failed 并说明；产物齐全但内容为“发现问题”记 `Succeeded, businessOutcome=findings`，不代表业务通过。契约定义只对 TaskRunner 用户可读，Agent 进程不能篡改。
+每次重试生成新 attempt，保留原输入、输出、日志；执行记录不覆盖。Agent 子任务引用已登记的 agentProfile（算力档位与系统提示；权限不分档，一律完全权限，D59）与 outputContract；命令子任务有 argv、cwd、退出码、输出与超时。Verifying 阶段由 TaskRunner 按契约定义校验必需产物与 Schema：缺少必要产物记 Failed 并说明；产物齐全但内容为“发现问题”记 `Succeeded, businessOutcome=findings`，不代表业务通过。契约定义只对 TaskRunner 用户可读，Agent 进程不能篡改。
 
 多个子任务可同时提交并并发执行，由业务程序协调；平台不排队、不串行、不判定顺序，只保证每个子任务的进程、契约与记录独立。默认每个 Agent 子任务新建模型会话；重试需恢复会话时显式指定 `resumeSessionId`，同一原生会话同一时刻只允许一个进程恢复。
 
@@ -876,7 +876,7 @@ TaskRunner 出向连接 cs-session：携带绑定 cs-session audience 的投影�
 
 ### 10.8 容器镜像、驱动配置与凭据
 
-平台底座镜像内含 tini、TaskRunner、OpenCode 与 Claude Code CLI 及模板语言工具链，版本一起锁定并记录；新镜像默认只用于新任务，运行中任务不替换。管理员可基于底座构建档位镜像（只放平台仓库，保存档位时按摘要固定），Pod 以 root 显式启动 Runner，Agent 进程仍降权运行（RFC-006）。两个 CLI 的凭据与会话存储按 agent-workflow 的方式靠环境变量与目录约定：模型凭据是算力档位的凭据（SecretBox 密文落库，派发时解密），经启动前材料进入 Agent 进程环境，容器内 Agent 可读取，这是接受并记录的残余风险；`HOME`、`XDG_DATA_HOME` 与 `CLAUDE_CONFIG_DIR` 指向任务持久卷，使持久模式恢复后会话目录仍在。远程 MCP 连接按 agent-workflow 的注入形状写入：OpenCode 的 remote 类型 MCP 配置，Claude Code 的 `--mcp-config` 文件；连接凭据为会话级短期令牌。agentProfile 的 `permission` 映射到两个 CLI 的权限参数，未映射的键拒绝。Claude Code 自带沙箱在容器内关闭。配额按数字人配置；预热池是条件性选项，复用前必须清理跨任务数据。禁止任务容器访问宿主 Docker socket；任务 Pod 不自动挂载默认 ServiceAccount 令牌，只投影所需 audience 的令牌。
+平台底座镜像内含 tini、TaskRunner、OpenCode 与 Claude Code CLI 及模板语言工具链，版本一起锁定并记录；新镜像默认只用于新任务，运行中任务不替换。管理员可基于底座构建档位镜像（只放平台仓库，保存档位时按摘要固定），Pod 以 root 显式启动 Runner，Agent 进程仍降权运行（RFC-006）。两个 CLI 的凭据与会话存储按 agent-workflow 的方式靠环境变量与目录约定：模型凭据是算力档位的凭据（SecretBox 密文落库，派发时解密），经启动前材料进入 Agent 进程环境，容器内 Agent 可读取，这是接受并记录的残余风险；`HOME`、`XDG_DATA_HOME` 与 `CLAUDE_CONFIG_DIR` 指向任务持久卷，使持久模式恢复后会话目录仍在。远程 MCP 连接按 agent-workflow 的注入形状写入：OpenCode 的 remote 类型 MCP 配置，Claude Code 的 `--mcp-config` 文件；连接凭据为会话级短期令牌。平台派发给 TaskRunner 的权限一律是 `full`（D59）：开发会话的 CLI、历史 Agent 与业务子任务都不按工具分档，Manifest 的 `agentProfiles[].permission` 作废、旧值照收不用；三档到两个 CLI 权限参数的映射只为 TaskRunner 协议与运行中的旧 Runner 保留，未映射的键拒绝。Claude Code 自带沙箱在容器内关闭。配额按数字人配置；预热池是条件性选项，复用前必须清理跨任务数据。禁止任务容器访问宿主 Docker socket；任务 Pod 不自动挂载默认 ServiceAccount 令牌，只投影所需 audience 的令牌。
 
 ## 11. 空 Kubernetes 集群的一键安装
 
@@ -1036,7 +1036,8 @@ backup: { configurationSecretRef: off-cluster-backup }
 | 风险 | 裁定 | 兜制 |
 |---|---|---|
 | 模型凭据以环境变量进入任务容器，Agent 可读取 | 接受（G13；v0.3.7 起不再有出站白名单这一层，见 RFC-018） | 审计；用量按容器统计 |
-| 获批的只读诊断与生产变更绑定进入会话容器，容器内所有进程可用 | 接受（G14） | 负责人审批；期限与范围；审计 |
+| 获批的只读诊断与生产变更绑定进入会话容器，容器内所有进程可用（D59 起 Agent 不分权限档，获批后会话里每个 Agent 都能直接连） | 接受（G14） | 负责人审批；期限与范围；审计 |
+| 业务子任务的 Agent 一律完全权限，业务任务容器默认带生产库连接串，无人值守的 Agent 能直接读写生产数据 | 接受（D59，作者 2026-09-23 当面裁定） | 业务程序决定交给 Agent 的输入与产物用途；traceId 与审计；并发配额 |
 | 上游只见平台连接主体，资源级越权由上游或业务把关 | 设计选择（G17） | 目录登记时标注资源语义；操作级放行 |
 | preview 槽与 prod 槽共用生产数据，preview 验证即操作生产数据 | 设计选择（G15） | 环境标识约定；测试者范围；业务自控副作用 |
 | 源 Pod IP 反查依赖 CNI 保留源 IP | 设计选择（G1） | 安装预检；NAT 场景不支持；索引版本与失效 |
@@ -1160,6 +1161,7 @@ Kubernetes 原生动作使用 UID/resourceVersion 条件；开发工作区经保
 | D56 | 待命槽下线是不可逆的卸下（删工作负载，留发布记录与 Service），可从发布记录重新部署、不重建不重迁移；自动下线两个触发：回退目标保留期满（默认 72 小时）、待验证版本连续无人访问（默认 14 天）；提前 24 小时提醒、可反复推迟；时长平台统一、管理员在「平台设置」调整；升级时已有的待命槽从升级时起算；只有负责人与管理员能下线、推迟、重新部署，操作入口在工作台 | 要求（作者 2026-09-23 七轮裁定 RFC-021 M1、M2、M5、M8–M12、M16、M19、M20、M22–M24、M26、M28） |
 | D57 | 正式版本只有「维护中」、不停机：用户流量、服务域调用、事件推送三个独立开关，只有负责人与管理员能进入、调整、退出，成员、管理员与临时指定的人照常进入，项目自己的负载不拦，维护跟着正式入口走、手动退出；平台维护页与市场标注；项目维护且三个开关都拦即破坏性迁移窗口（部署与切流都要求），替代全平台 `CS_MAINTENANCE_WINDOW`；基线的「暂停项目」作废 | 要求（作者 2026-09-23 裁定 RFC-021 M3、M4、M6–M9、M13–M18、M20、M25、M27） |
 | D58 | 启动进度由后端统一产出并保存：分段种类、起止时间与细节来自 Pod、Events 与 Runner 事件，只进不退、首尾相接，只有平台判定才记失败（Kubernetes 自己还在重试的记为警告）；工作台、CLI 与档位测试共用一个步骤条组件，失败给出重试（开发会话按失败位置，CLI 原位替换）与日志；点击创建的窗口自动取得新 CLI 的输入控制，Runner 在启动中接受取得（协议号不变） | 要求（作者 2026-09-23 批准 RFC-022 并裁定其提案 D1–D8、Q1–Q4） |
+| D59 | Agent 不再分权限档：开发会话的 CLI、历史 Agent 与业务子任务的 Agent 一律以完全权限启动，界面与启动接口不再有权限；Manifest `agentProfiles[].permission` 作废、旧值照收不用；访问生产数据只由负责人批准的 TaskDataBinding 控制 | 要求（作者 2026-09-23 当面裁定：「为什么要限制呢，都是开发容器。只有连生产库才有对生产库的权限控制才对」；业务子任务一并适用，旧写法接受并忽略） |
 
 ### 15.3 待决项与退出条件
 
