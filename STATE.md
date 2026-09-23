@@ -39,7 +39,7 @@
 - **操作上移**：`ClusterDetail` 管理动作移到页签之上（页签「概览与操作」改名「概览」，资源清单里的详情同样生效）；集群项目层节点卡「展开 Pod 层」、项目侧 `TopologyDetail`「查看日志」、接口目录 `OperationDetail` 申请／试调都移到事实列表之前。算力档位编辑器的保存栏本来就在顶部，没动。
 - **说明行**：集群拓扑三层提示与「快照完整 · 观测于 · 每 15 秒…」删除；观测时间做成图框右上角标签 `TopologyStamp`（完整度与刷新说明在悬停提示），`complete=false` 仍留失败来源警示条。RFC-019 design 已回填修订说明。
 - **部署与实机**：从 `git archive` 的提交内容（不含工作树里并行会话的开发页在制品）构建 `cs-console:detail-top-20260923b` 并滚动 console。CDP 1440×900 演示项目 Pod 层点 `demo-blue-…`：详情栏 868px 高、内容 1361px 在栏内滚动，「重启」在 281px、页签条在 434px，图框右上「观测于 …」，无提示行；e2e `topology`＋`clusterLayout`＋`capabilityDepth` 17 pass／1 skip。本机 `check:static` 绿，unit 351／module 1106（7 skip）／console 652 全过；不带 `CS_E2E_AUTH=dev-oidc` 的整套 `bun run check` 在 e2e 层失败并以 bun trap 5 退出，与本改动无关。
-- 中间镜像 `cs-console:detail-top-20260923`（无「概览」改名）仍在 docker 与节点里，可删。
+- `79a3ede`（含 `da0b1f7`）的 [CI 35809220809](https://github.com/wangbinquan/CrewStation/actions/runs/35809220809) 六项全部成功。中间镜像 `cs-console:detail-top-20260923` 已从 docker 与节点删除。
 
 ## 「＋ 创建开发Agent会话」的展开箭头与主键一起置灰（2026-09-23）
 
