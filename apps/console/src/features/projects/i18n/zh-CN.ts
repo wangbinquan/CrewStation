@@ -115,7 +115,6 @@ export const messages = {
 
   'projects.state.provisioning': '开通中',
   'projects.state.active': '已开通',
-  'projects.state.paused': '暂停',
   'projects.state.archived': '已归档',
   'projects.state.failed': '开通失败',
 
@@ -322,7 +321,6 @@ export const messages = {
   "projects.provision.provisioning": "开通中。此状态来自服务器，当前接口不提供逐阶段进度。",
   "projects.provision.active": "项目资源已开通。首个版本的构建与部署结果请到“发布与上线”查看。",
   "projects.provision.failed": "开通失败。按下方原因处理后，可以重新排队开通。",
-  "projects.provision.paused": "项目已暂停。当前状态不代表发布或上线完成。",
   "projects.provision.archived": "项目已归档，不会继续开通。",
   "projects.provision.queued": "已提交重新开通请求。排队成功不代表开通已完成，可刷新查看后续状态。",
   "projects.provision.config": "补充生产配置",

@@ -20,6 +20,7 @@ import { bootstrapAdminUseCases } from './application/bootstrapAdmin';
 import { renderBootstrapPage } from './application/bootstrapPage';
 import { currentUserUseCase } from './application/currentUser';
 import { renderForbiddenPage } from './application/forbiddenPage';
+import { renderUnavailablePage } from './application/unavailablePage';
 import type { IdentityUseCaseDeps } from './application/dependencies';
 import { devSessionTokenUseCases } from './application/devSessionTokens';
 import { ensureUserUseCase } from './application/ensureUser';
@@ -57,6 +58,7 @@ import type { PasswordHasher } from './ports/passwordHasher';
 import type { SecretCipher } from './ports/secretCipher';
 import type { PreviewAccess } from './ports/previewAccess';
 import type { ProjectDirectory } from './ports/projectDirectory';
+import type { ServiceEntry } from './ports/serviceEntry';
 import type { WorkloadLookup } from './ports/workloadLookup';
 
 // 应用装配需要的端口类型与内置适配器只能经根入口取得，故在此转出。
@@ -73,6 +75,7 @@ export type { PasswordHasher } from './ports/passwordHasher';
 export type { SecretCipher } from './ports/secretCipher';
 export type { PreviewAccess } from './ports/previewAccess';
 export type { ProjectDirectory } from './ports/projectDirectory';
+export type { ServiceEntry } from './ports/serviceEntry';
 export type { WorkloadLookup } from './ports/workloadLookup';
 export type { ResolvedHost, UserSlot } from './domain/hosts';
 
@@ -84,6 +87,8 @@ export interface IdentityRuntimeDeps {
   /** 缺省按 contracts HOST_PATTERNS 与 settings.userDomain 推导。 */
   hostResolver?: HostResolver;
   previewAccess?: PreviewAccess;
+  /** RFC-021：prod 主机的维护放行与 preview 主机的未部署页；缺省一律放行（不改变旧行为）。 */
+  serviceEntry?: ServiceEntry;
   /** 项目 slug → ID，供身份转发按项目取覆盖；缺省一律按全局默认。 */
   projectDirectory?: ProjectDirectory;
   workloadLookup?: WorkloadLookup;
@@ -169,6 +174,7 @@ export function createIdentityModule(deps: IdentityModuleDeps): IdentityModule {
     loginErrorPageHtml: (code) => renderLoginErrorPage(code),
     logoutRedirect: logoutUseCase(useCaseDeps),
     forbiddenPage: (message, context = {}) => renderForbiddenPage({ message, consoleUrl: `${consoleOrigin(session, context.scheme)}/` }),
+    unavailablePage: (entry, context = {}) => renderUnavailablePage({ entry, consoleUrl: `${consoleOrigin(session, context.scheme)}/`, now: clock.now() }),
     resolveSession: sessionTokenUseCases(useCaseDeps).resolveSession,
     authorizeUserRequest: forwardAuthUserUseCase(useCaseDeps, forwarding),
     authorizeServiceRequest: forwardAuthServiceUseCase(useCaseDeps),
@@ -187,10 +193,11 @@ export function createIdentityModule(deps: IdentityModuleDeps): IdentityModule {
   };
 }
 
-function runtimePorts(deps: IdentityRuntimeDeps, session: SessionSettings): Pick<IdentityUseCaseDeps, 'hosts' | 'previewAccess' | 'projects' | 'workloads' | 'allowlist' | 'memberships' | 'devSessions'> {
+function runtimePorts(deps: IdentityRuntimeDeps, session: SessionSettings): Pick<IdentityUseCaseDeps, 'hosts' | 'previewAccess' | 'serviceEntry' | 'projects' | 'workloads' | 'allowlist' | 'memberships' | 'devSessions'> {
   return {
     hosts: deps.hostResolver ?? { resolveHost: async (host) => resolveHostByPattern(host, session.userDomain) },
     previewAccess: deps.previewAccess ?? { canView: async () => false },
+    serviceEntry: deps.serviceEntry ?? { check: async () => ({ kind: 'open' }) },
     projects: deps.projectDirectory ?? { idBySlug: async () => undefined },
     workloads: deps.workloadLookup ?? { byIp: async () => undefined },
     allowlist: deps.allowlistEvaluator ?? { evaluate: async (_caller, target) => ({ allowed: false, reason: '未配置放行表评估器', targetIdentity: target.host }) },

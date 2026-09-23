@@ -1,7 +1,17 @@
-import type { AllowlistDocument, RouteEntry, ServiceId, WorkloadIdentity } from '@crewstation/contracts';
+import type { Actor, AllowlistDocument, ExitMaintenanceRequest, MaintenanceDto, OfflineReason, RouteEntry, ServiceId, ServiceMaintenanceView, SetMaintenanceRequest, UserId, WorkloadIdentity } from '@crewstation/contracts';
 
 export interface EvaluationTarget { host: string; method: string; path: string }
-export interface Evaluation { allowed: boolean; targetIdentity: string; reason?: string }
+/** `unavailable`：目标正式版本维护中（RFC-021），ForwardAuth 回 503 而不是 403。 */
+export interface Evaluation { allowed: boolean; targetIdentity: string; reason?: string; unavailable?: { message: string; retryAfterSeconds?: number } }
+
+/** 用户域入口（prod／preview 主机）在放行前的判定（RFC-021 design §6）。 */
+export type EntryVerdict =
+  | { readonly kind: 'open' }
+  | { readonly kind: 'maintenance'; readonly projectSlug: string; readonly reason: string; readonly expectedEndAt?: string; readonly retryAfterSeconds?: number }
+  | { readonly kind: 'not-deployed'; readonly projectSlug: string; readonly offline?: { readonly at: string; readonly reason: OfflineReason; readonly tag?: string } };
+
+/** 维护中的服务（供市场卡片）：开关、原因、预计恢复时间与临时指定的人。 */
+export interface MaintenanceSnapshot { switches: { users: boolean; services: boolean; events: boolean }; allowUserIds: readonly UserId[]; reason: string; expectedEndAt?: Date }
 
 /** gateway 模块对外能力：路由与放行表生成、Pod 身份反查与服务域放行评估（cs-auth 用后两者）。 */
 export interface GatewayModuleApi {
@@ -14,4 +24,16 @@ export interface GatewayModuleApi {
   currentAllowlist(): Promise<AllowlistDocument | undefined>;
   evaluate(caller: WorkloadIdentity, target: EvaluationTarget): Promise<Evaluation>;
   lookupByIp(ip: string): Promise<WorkloadIdentity | undefined>;
+
+  // —— RFC-021：正式版本维护 ——
+  getMaintenance(actor: Actor, serviceId: ServiceId): Promise<ServiceMaintenanceView>;
+  setMaintenance(actor: Actor, serviceId: ServiceId, input: SetMaintenanceRequest): Promise<MaintenanceDto>;
+  exitMaintenance(actor: Actor, serviceId: ServiceId, input: ExitMaintenanceRequest): Promise<ServiceMaintenanceView>;
+  /** cs-auth 用户域 ForwardAuth：prod 主机的维护放行、preview 主机的未部署页。 */
+  userEntry(userId: UserId, projectSlug: string, slot: 'prod' | 'preview'): Promise<EntryVerdict>;
+  /** cs-events：订阅方的事件开关是否打开（暂存）。 */
+  holdsEvents(serviceId: ServiceId): Promise<boolean>;
+  /** release：项目处于维护中且三个开关都拦（破坏性迁移窗口）。 */
+  maintenanceWindowOpen(serviceId: ServiceId): Promise<boolean>;
+  maintenanceOf(serviceId: ServiceId): Promise<MaintenanceSnapshot | undefined>;
 }

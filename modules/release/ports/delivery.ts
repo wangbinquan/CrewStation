@@ -40,6 +40,11 @@ export interface SlotDeployer {
   deploy(spec: SlotDeploySpec): Promise<void>;
   status(namespace: string, serviceName: string, physical: PhysicalSlot): Promise<SlotStatus>;
   remove(namespace: string, serviceName: string, physical: PhysicalSlot): Promise<void>;
+  /**
+   * 下线（RFC-021）：只删 Deployment，保留 Service 与路由；Deployment 的 release 标签不是 `releaseId` 时不删
+   *（那是之后新部署上来的工作负载）。返回 true 表示这个版本的工作负载已经不在了。
+   */
+  removeWorkload(namespace: string, serviceName: string, physical: PhysicalSlot, releaseId: string): Promise<boolean>;
 }
 
 export interface ReleaseJobs {

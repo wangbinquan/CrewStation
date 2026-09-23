@@ -45,6 +45,8 @@ export const MarketAppDtoSchema = z.object({
     z.object({ status: z.literal('not-deployed'), freshness: z.literal('current'), checkedAt: z.iso.datetime() }),
     z.object({ status: z.literal('unknown'), freshness: z.literal('unknown'), checkedAt: z.iso.datetime() }),
   ]),
+  /** 正式版本维护中（RFC-021）：原因、预计恢复时间，以及当前查看者是否被拦。 */
+  maintenance: z.object({ reason: z.string(), expectedEndAt: z.iso.datetime().optional(), blocked: z.boolean() }).optional(),
   checkedAt: z.iso.datetime(),
 });
 export const MarketAppsPageSchema = pageOf(MarketAppDtoSchema);

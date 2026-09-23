@@ -42,4 +42,6 @@ export interface DeliveryRepository {
   getById(id: string): Promise<Delivery | undefined>;
   /** 按创建时间倒序。 */
   listByProject(projectId: ProjectId, state: DeliveryState | undefined, limit: number): Promise<Delivery[]>;
+  /** 维护暂存的投递（RFC-021）：给了服务只列它的，按创建时间（事件接收顺序）正序。 */
+  listHeld(serviceId: ServiceId | undefined, limit: number): Promise<Delivery[]>;
 }

@@ -3,6 +3,9 @@ import { ReleaseStatusSchema, SlotNameSchema } from '../events/topics';
 import { ReleaseIdSchema, ServiceIdSchema, UserIdSchema } from '../ids';
 import { FullCommitShaSchema } from './scm';
 
+/** 待命槽下线的原因（RFC-021）：手动、切流后回退目标保留期满、待验证版本无人访问、集群管理删除。 */
+export const OfflineReasonSchema = z.enum(['manual', 'rollback-expired', 'idle', 'cluster']);
+
 export const ReleaseDtoSchema = z.object({
   id: ReleaseIdSchema,
   serviceId: ServiceIdSchema,
@@ -14,6 +17,8 @@ export const ReleaseDtoSchema = z.object({
   slot: SlotNameSchema.optional(),
   configVersion: z.number().int().optional(),
   message: z.string().optional(),
+  /** 可以从发布记录重新部署到待命槽：首次就绪过、有镜像与 Manifest、现在不在任何槽上（RFC-021 §4）。 */
+  redeployable: z.boolean().optional(),
   createdBy: UserIdSchema,
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
@@ -29,6 +34,25 @@ export const PublishRequestSchema = z.object({
   message: z.string().max(500).optional(),
 });
 
+/** 待命槽的自动下线计时（RFC-021 §3）；deadline 由服务端按当前平台策略算好。 */
+export const SlotRetentionDtoSchema = z.object({
+  kind: z.enum(['rollback-target', 'pending']),
+  since: z.iso.datetime(),
+  deadline: z.iso.datetime(),
+  /** 已为当前到期时间发过提醒。 */
+  remindedAt: z.iso.datetime().optional(),
+  postponements: z.number().int().min(0),
+});
+
+/** 待命槽已下线：下线的版本、时间、原因；平台自动下线时没有操作人。 */
+export const SlotOfflineDtoSchema = z.object({
+  releaseId: ReleaseIdSchema,
+  tag: z.string().optional(),
+  at: z.iso.datetime(),
+  reason: OfflineReasonSchema,
+  actorUserId: UserIdSchema.optional(),
+});
+
 export const SlotDtoSchema = z.object({
   name: SlotNameSchema,
   active: z.boolean(),
@@ -39,6 +63,42 @@ export const SlotDtoSchema = z.object({
   readyReplicas: z.number().int().min(0),
   state: z.enum(['empty', 'deploying', 'ready', 'degraded', 'failed']),
   host: z.string(),
+  retention: SlotRetentionDtoSchema.optional(),
+  offline: SlotOfflineDtoSchema.optional(),
+});
+
+/** 下线待验证版本：确认时看到的待命版本，已被替换时拒绝。 */
+export const TakeOfflineRequestSchema = z.object({ expectedReleaseId: ReleaseIdSchema }).strict();
+/** 推迟一个周期：确认时看到的到期时间，已变化（包括已被推迟过）时拒绝。 */
+export const PostponeOfflineRequestSchema = z.object({ expectedDeadline: z.iso.datetime() }).strict();
+/** 重新部署到待命槽：确认时待命槽上的版本，null 表示当时待命槽为空。 */
+export const RedeployRequestSchema = z.object({ expectedStandbyReleaseId: ReleaseIdSchema.nullable() }).strict();
+
+export const SlotEventKindSchema = z.enum(['offline', 'redeploy', 'postpone', 'reminder']);
+/** 待命槽的生命周期记录：下线、重新部署、推迟、提醒；进时间线。 */
+export const SlotEventDtoSchema = z.object({
+  id: z.string(),
+  serviceId: ServiceIdSchema,
+  kind: SlotEventKindSchema,
+  releaseId: ReleaseIdSchema,
+  tag: z.string(),
+  reason: OfflineReasonSchema.optional(),
+  actorUserId: UserIdSchema.optional(),
+  /** 推迟后的新到期时间，或提醒所针对的到期时间。 */
+  deadline: z.iso.datetime().optional(),
+  at: z.iso.datetime(),
+});
+
+const autoOfflineFields = {
+  rollbackRetentionHours: z.number().int().min(1).max(8760),
+  idleOfflineDays: z.number().int().min(1).max(365),
+  reminderLeadHours: z.number().int().min(1).max(720),
+};
+/** 平台统一的自动下线时长（RFC-021 M11、M12、M22）。 */
+export const AutoOfflinePolicyDtoSchema = z.object({ ...autoOfflineFields, revision: z.number().int().min(0), updatedAt: z.iso.datetime().nullable(), updatedBy: UserIdSchema.optional() });
+export const SetAutoOfflinePolicyRequestSchema = z.object({ ...autoOfflineFields, expectedRevision: z.number().int().min(0) }).strict().superRefine((value, context) => {
+  if (value.reminderLeadHours >= value.rollbackRetentionHours) context.addIssue({ code: 'custom', path: ['reminderLeadHours'], message: '提前提醒的时间必须短于回退目标保留期' });
+  if (value.reminderLeadHours >= value.idleOfflineDays * 24) context.addIssue({ code: 'custom', path: ['reminderLeadHours'], message: '提前提醒的时间必须短于无人访问期限' });
 });
 
 export const TrafficSwitchRequestSchema = z.object({
@@ -70,3 +130,13 @@ export type PublishRequest = z.infer<typeof PublishRequestSchema>;
 export type SlotDto = z.infer<typeof SlotDtoSchema>;
 export type TrafficSwitchRequest = z.infer<typeof TrafficSwitchRequestSchema>;
 export type TrafficSwitchDto = z.infer<typeof TrafficSwitchDtoSchema>;
+export type OfflineReason = z.infer<typeof OfflineReasonSchema>;
+export type SlotRetentionDto = z.infer<typeof SlotRetentionDtoSchema>;
+export type SlotOfflineDto = z.infer<typeof SlotOfflineDtoSchema>;
+export type TakeOfflineRequest = z.infer<typeof TakeOfflineRequestSchema>;
+export type PostponeOfflineRequest = z.infer<typeof PostponeOfflineRequestSchema>;
+export type RedeployRequest = z.infer<typeof RedeployRequestSchema>;
+export type SlotEventKind = z.infer<typeof SlotEventKindSchema>;
+export type SlotEventDto = z.infer<typeof SlotEventDtoSchema>;
+export type AutoOfflinePolicyDto = z.infer<typeof AutoOfflinePolicyDtoSchema>;
+export type SetAutoOfflinePolicyRequest = z.infer<typeof SetAutoOfflinePolicyRequestSchema>;

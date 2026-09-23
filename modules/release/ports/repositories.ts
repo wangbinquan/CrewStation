@@ -1,7 +1,8 @@
 import type { SlotMaintenance, ClusterSlotProjection } from '../domain/slotMaintenance';
-import type { ReleaseId, ServiceId, SlotName, UserId } from '@crewstation/contracts';
+import type { ReleaseId, ServiceId, SlotEventKind, SlotName, UserId } from '@crewstation/contracts';
 import type { Release } from '../domain/release';
-import type { ServiceSlots } from '../domain/slots';
+import type { OfflinePolicy } from '../domain/slotLifecycle';
+import type { OfflineReason, ServiceSlots } from '../domain/slots';
 
 export interface ReleaseRepository {
   insert(release: Release): Promise<void>;
@@ -17,6 +18,39 @@ export interface SlotRepository {
   initialize(slots: ServiceSlots): Promise<void>;
   get(serviceId: ServiceId): Promise<ServiceSlots | undefined>;
   save(slots: ServiceSlots): Promise<void>;
+  /** 全部服务的槽（不加锁），供自动下线巡检；写入前逐个在事务里重新 `get` 加锁。 */
+  list(): Promise<ServiceSlots[]>;
+}
+
+/** RFC-021：待命槽的下线、重新部署、推迟与提醒记录。 */
+export interface SlotEventRecord {
+  readonly id: string;
+  readonly serviceId: ServiceId;
+  readonly kind: SlotEventKind;
+  readonly releaseId: ReleaseId;
+  readonly tag: string;
+  readonly reason?: OfflineReason;
+  readonly actorUserId?: UserId;
+  readonly deadline?: Date;
+  readonly at: Date;
+}
+
+export interface SlotEventRepository {
+  insert(record: SlotEventRecord): Promise<void>;
+  listByService(serviceId: ServiceId, limit: number): Promise<SlotEventRecord[]>;
+}
+
+export interface OfflinePolicyRecord extends OfflinePolicy {
+  readonly revision: number;
+  readonly updatedBy?: UserId;
+  readonly updatedAt?: Date;
+}
+
+/** 平台统一的自动下线时长（单行）；没有记录时由用例取默认值。 */
+export interface OfflinePolicyRepository {
+  get(): Promise<OfflinePolicyRecord | undefined>;
+  /** 只在库里的版本号仍是 `expectedRevision` 时写入（首次写入时为 0）；返回是否写入。 */
+  save(record: OfflinePolicyRecord & { updatedAt: Date }, expectedRevision: number): Promise<boolean>;
 }
 
 export interface TrafficSwitchRecord {

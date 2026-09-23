@@ -5,7 +5,7 @@ import { ManifestKindSchema } from '../manifest/serviceSpec';
 import { MemberRoleSchema, PlatformRoleSchema } from './identity';
 import { ProjectTemplateDtoSchema } from './scm';
 
-export const ProjectStateSchema = z.enum(['provisioning', 'active', 'paused', 'archived', 'failed']);
+export const ProjectStateSchema = z.enum(['provisioning', 'active', 'archived', 'failed']);
 
 export const ProjectDtoSchema = z.object({
   id: ProjectIdSchema,

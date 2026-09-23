@@ -103,6 +103,8 @@ function composeCore(deps: CompositionDeps, late: Late) {
     // 身份转发按项目覆盖时要把主机里的 slug 换成项目 ID；project 装配在 identity 之后，故经端口惰性取。
     projectDirectory: { idBySlug: async (slug) => (await projectApi().resolveServiceIdentity(`${slug}/${slug}`))?.projectId },
     previewAccess: { canView: async (userId, slug) => { const r = await projectApi().resolveServiceIdentity(`${slug}/${slug}`); return r ? (await projectApi().roleOf({ userId, isAdmin: await projectApi().isAdmin(userId) }, r.projectId)) !== undefined : false; } },
+    // RFC-021：prod 主机的维护放行与 preview 主机的未部署页，判定在 gateway（L5），此处只接线。
+    serviceEntry: { check: (userId, slug, slot) => gatewayApi().userEntry(userId, slug, slot) },
     membershipLookup: { membershipsOf: (userId) => projectApi().listUserMemberships(userId) },
     workloadLookup: { byIp: (ip) => gatewayApi().lookupByIp(ip) },
     allowlistEvaluator: { evaluate: (caller, target) => gatewayApi().evaluate(caller, target) },
@@ -189,9 +191,13 @@ function composeDelivery(deps: CompositionDeps, core: ReturnType<typeof composeC
       validate: (projectId, env, keys) => config.api.validateManifestEnv(projectId, env, keys.map((configDefinitionId) => ({ name: 'CONFIG', configDefinitionId, from: 'config' as const }))),
     },
     data: { envFor: data.api.envFor },
-    settings: { userDomain: settings.userDomain, serviceDomain: settings.serviceDomain, registryBase: settings.registryBase, maintenanceWindow: settings.maintenanceWindow, buildTimeoutSeconds: 1800, deployTimeoutSeconds: 600, builderImage: settings.builderImage, buildkitAddress: settings.buildkitAddress, workerOwner: `${deps.instance}.release` },
+    // RFC-021：项目完整维护即破坏性迁移窗口（gateway 在 release 之后装配，故惰性取）；自动下线的提醒发给负责人。
+    maintenance: { open: (serviceId) => { if (!late.gateway) throw new Error('gateway 尚未装配'); return late.gateway.maintenanceWindowOpen(serviceId); } },
+    owners: { ownerOf: project.api.ownerOf },
+    notifier: { notify: async (projectId, users, message) => { logger.warn('slot offline notice', { projectId, users, message }); } },
+    settings: { userDomain: settings.userDomain, serviceDomain: settings.serviceDomain, registryBase: settings.registryBase, buildTimeoutSeconds: 1800, deployTimeoutSeconds: 600, builderImage: settings.builderImage, buildkitAddress: settings.buildkitAddress, workerOwner: `${deps.instance}.release` },
   });
-  const directoryService = (s: ResolvedService) => ({ serviceId: s.serviceId, projectSlug: s.slug, serviceName: s.name, namespace: s.namespace, identity: s.identity, kind: s.kind, archived: s.state === 'archived' });
+  const directoryService = (s: ResolvedService) => ({ serviceId: s.serviceId, projectId: s.projectId, projectSlug: s.slug, serviceName: s.name, namespace: s.namespace, identity: s.identity, kind: s.kind, archived: s.state === 'archived' });
   // `listServices` 只给在册服务（project 模块已滤掉归档的）；按 id／按项目的解析必须能查到归档的，
   // 否则 `project.archived` 到达网关时服务已经查不到，那个项目的路由就永远留在集群里。
   const listServices = async () => (await project.api.listServices()).map(directoryService);
@@ -203,8 +209,13 @@ function composeDelivery(deps: CompositionDeps, core: ReturnType<typeof composeC
       getService: async (id) => { const s = await resolveById(id); return s ? directoryService(s) : undefined; },
       serviceIdOfProject: async (projectId) => (await project.api.resolveServiceOfProject(projectId))?.serviceId,
     },
-    slots: { slotRoles: release.api.slotRoles },
+    slots: { slotRoles: release.api.slotRoles, standbyEntry: release.api.standbyEntry, notePreviewAccess: release.api.notePreviewAccess },
     grants: { grantedOperations: apiCatalog.api.grantedOperations, listCallers: async () => [], proxyNameOf: apiCatalog.api.activeProxyNameOf },
+    access: {
+      authorize: project.api.authorize,
+      isMemberOrAdmin: async (userId, projectId) => (await project.api.roleOf({ userId, isAdmin: await project.api.isAdmin(userId) }, projectId)) !== undefined,
+    },
+    users: { describe: async (userId) => { const user = await core.identity.api.getUser(userId); return user ? { name: user.name, email: user.email } : undefined; } },
     settings: { systemNamespace: settings.systemNamespace, serviceDomain: settings.serviceDomain, userAuthMiddleware: 'forward-auth-user', serviceAuthMiddleware: 'forward-auth-service', dropIdentityHeadersMiddleware: 'drop-identity-headers', allowlistMaxStaleSeconds: 300, consumerName: 'gateway' },
   });
   late.gateway = gateway.api;
@@ -275,6 +286,7 @@ function composeRuntime(deps: CompositionDeps, core: ReturnType<typeof composeCo
     db, logger, projects: project.api,
     services: { resolveService: async (id) => { const r = await resolveById(id); return r ? { projectId: r.projectId, serviceId: r.serviceId, slug: r.slug, identity: r.identity } : undefined; } },
     endpoints: { resolve: async (serviceId) => { const [ep, svc] = await Promise.all([release.api.activeEndpoint(serviceId), resolveById(serviceId)]); return ep && svc ? { baseUrl: `http://${svc.slug}.${settings.serviceDomain}` } : undefined; } },
+    hold: { holds: (serviceId) => delivery.gateway.api.holdsEvents(serviceId) },
     worker: { owner: `${deps.instance}.events`, concurrency: 4 },
   });
   const session = createSessionModule({
@@ -318,7 +330,7 @@ function composeAggregates(deps: PlatformModuleDeps, core: ReturnType<typeof com
   });
   const capabilities = createCapabilitiesModule({
     isAdmin: (id) => isAdmin(id),
-    market: { list: project.api.listMarketListings, get: project.api.getMarketListing, slots: (serviceId) => delivery.release.api.getSlots(SYSTEM_ACTOR, serviceId) },
+    market: { list: project.api.listMarketListings, get: project.api.getMarketListing, slots: (serviceId) => delivery.release.api.getSlots(SYSTEM_ACTOR, serviceId), maintenance: (serviceId) => delivery.gateway.api.maintenanceOf(serviceId) },
     projects: { list: project.api.listProjectPage, read: project.api.readProjectPageEntries, get: project.api.getProjectPageEntry,
       session: (projectId) => runtime.taskRuntime.api.findDevSession(projectId, { includeLatestFailure: true }), slots: delivery.release.api.getSlots, preview: delivery.release.api.getPreviewSlot, health: observability.api.health,
       releases: delivery.release.api.listReleases, switches: delivery.release.api.listTrafficSwitches },

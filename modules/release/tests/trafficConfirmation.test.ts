@@ -31,7 +31,7 @@ test.skipIf(!available)('两个首次上线请求读取同一服务时串行核�
       if (order === 1) { firstRead.resolve(); await firstMayProceed.promise; }
       return slots;
     } } })) };
-    const switchTraffic = switchTrafficUseCase({ uow: observed, authorizer: { authorize: async () => {} }, services: { resolveServiceById: async () => ({ projectId, slug: 'demo', name: 'demo', namespace: 'cs-demo' }) }, clock: fixedClock(now.toISOString()) });
+    const switchTraffic = switchTrafficUseCase({ uow: observed, authorizer: { authorize: async () => {} }, services: { resolveServiceById: async () => ({ projectId, slug: 'demo', name: 'demo', namespace: 'cs-demo' }) }, maintenance: { open: async () => false }, clock: fixedClock(now.toISOString()) });
     const input = { toSlot: 'preview' as const, expectedActiveRelease: null, expectedTargetRelease: releaseId };
     pending.push(switchTraffic(actor, serviceId, input)); await firstRead.promise;
     pending.push(switchTraffic(actor, serviceId, input).finally(() => { secondSettled = true; })); await secondStarted.promise;
@@ -63,7 +63,7 @@ test.skipIf(!available)('旧待命版本仍就绪时，进行中的发布阻止�
       await scope.releases.insert({ ...base, id: releaseId, tag: 'v0.1.0', status: 'ready' });
       await scope.releases.insert({ ...base, id: pendingId, tag: 'v0.2.0', status: 'pending' });
     });
-    const change = switchTrafficUseCase({ uow, authorizer: { authorize: async () => {} }, services: { resolveServiceById: async () => ({ projectId, slug: 'demo', name: 'demo', namespace: 'cs-demo' }) }, clock: fixedClock(now.toISOString()) });
+    const change = switchTrafficUseCase({ uow, authorizer: { authorize: async () => {} }, services: { resolveServiceById: async () => ({ projectId, slug: 'demo', name: 'demo', namespace: 'cs-demo' }) }, maintenance: { open: async () => false }, clock: fixedClock(now.toISOString()) });
     const input = { toSlot: 'preview' as const, expectedActiveRelease: null, expectedTargetRelease: releaseId };
     for (const status of ['pending', 'building', 'migrating', 'deploying'] as const) {
       await uow.run(async (scope) => { const release = (await scope.releases.getById(pendingId))!; await scope.releases.update({ ...release, status }); });
@@ -102,7 +102,7 @@ for (const scenario of rollbackCases) test.skipIf(!available)(scenario.name, asy
       await scope.releases.insert({ ...base, id: releaseId, tag: 'v0.2.0', targetSlot: 'blue', manifest, createdAt: new Date(now.getTime() - 10_000) });
       await scope.releases.insert({ ...base, id: targetId, tag: scenario.newer ? 'v0.3.0' : 'v0.1.0', targetSlot: 'green', createdAt: new Date(now.getTime() - (scenario.newer ? 5_000 : 20_000)) });
     });
-    const change = switchTrafficUseCase({ uow, authorizer: { authorize: async () => {} }, services: { resolveServiceById: async () => ({ projectId, slug: 'demo', name: 'demo', namespace: 'cs-demo' }) }, clock: fixedClock(now.toISOString()) });
+    const change = switchTrafficUseCase({ uow, authorizer: { authorize: async () => {} }, services: { resolveServiceById: async () => ({ projectId, slug: 'demo', name: 'demo', namespace: 'cs-demo' }) }, maintenance: { open: async () => false }, clock: fixedClock(now.toISOString()) });
     const input = { toSlot: 'preview' as const, expectedActiveRelease: releaseId, expectedTargetRelease: targetId };
     if (scenario.denial) {
       // rollback: blocked 可以单独声明；拒绝时不能虚报发生了破坏性迁移，也不能落切流记录。

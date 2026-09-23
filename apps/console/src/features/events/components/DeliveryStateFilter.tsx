@@ -4,7 +4,7 @@ import { useT } from '../../../shared/lib/useT';
 import styles from './DeliveryStateFilter.module.css';
 
 /** 空串表示不过滤；顺序按投递推进的先后。 */
-export const DELIVERY_STATES: readonly DeliveryState[] = ['pending', 'delivering', 'delivered', 'retrying', 'dead'];
+export const DELIVERY_STATES: readonly DeliveryState[] = ['pending', 'delivering', 'delivered', 'retrying', 'held', 'dead'];
 
 export interface DeliveryStateFilterProps {
   readonly value: DeliveryState | '';

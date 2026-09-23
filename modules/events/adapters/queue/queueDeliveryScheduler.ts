@@ -10,9 +10,9 @@ import { DELIVER_JOB_KIND } from '../../ports/deliveryScheduler';
  */
 export function queueDeliveryScheduler(executor: Executor, jobMaxAttempts: number): DeliveryScheduler {
   return {
-    schedule: async (deliveryId) => {
+    schedule: async (deliveryId, runAt) => {
       const payload: DeliverJobPayload = { deliveryId };
-      const queued = await enqueueJob(executor, DELIVER_JOB_KIND, payload, { dedupKey: deliveryId, maxAttempts: jobMaxAttempts });
+      const queued = await enqueueJob(executor, DELIVER_JOB_KIND, payload, { dedupKey: deliveryId, maxAttempts: jobMaxAttempts, ...(runAt ? { runAt } : {}) });
       // 死信可能已落库但旧 worker 尚未完成队列任务；去重不是新一轮重放已受理。
       if (queued.deduplicated) throw precondition('投递的上一项队列任务尚未结束，请稍后重试', { deliveryId });
     },

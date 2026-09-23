@@ -1,9 +1,25 @@
 import type { Actor, ReleaseDto, ReleaseId, ServiceId, SlotDto, TrafficSwitchDto } from '@crewstation/contracts';
 import { notFound } from '@crewstation/kernel';
 import type { Release } from '../domain/release';
-import type { PhysicalSlot } from '../domain/slots';
+import { DEFAULT_OFFLINE_POLICY } from '../domain/slotLifecycle';
+import type { PhysicalSlot, ServiceSlots } from '../domain/slots';
+import { standbyOf } from '../domain/slots';
+import type { HostNaming } from '../ports/platform';
+import type { RepositoryScope } from '../ports/unitOfWork';
 import type { ReleaseUseCaseDeps } from './dependencies';
 import { releaseToDto, slotToDto, switchToDto } from './toDto';
+
+/** 两个槽的 DTO（正式在前）：读槽上与已下线记录里的版本，按当前平台策略算到期时间。 */
+export async function loadSlotDtos(read: RepositoryScope, slots: ServiceSlots, projectSlug: string, hosts: HostNaming, only?: PhysicalSlot): Promise<SlotDto[]> {
+  const physicals: PhysicalSlot[] = only ? [only] : [slots.active, standbyOf(slots.active)];
+  const releases = new Map<string, Release>();
+  for (const id of new Set(physicals.flatMap((p) => [slots[p].releaseId, slots[p].offline?.releaseId]).filter((v): v is ReleaseId => v !== undefined))) {
+    const release = await read.releases.getById(id);
+    if (release) releases.set(release.id, release);
+  }
+  const policy = (await read.offlinePolicy.get()) ?? DEFAULT_OFFLINE_POLICY;
+  return physicals.map((p) => slotToDto(slots, p, releases, projectSlug, hosts, policy));
+}
 
 export interface ActiveEndpoint { physical: PhysicalSlot; namespace: string; kubernetesService: string; port: number }
 
@@ -31,22 +47,13 @@ export function releaseQueries(deps: Pick<ReleaseUseCaseDeps, 'uow' | 'authorize
       const svc = await svcOf(serviceId);
       await authorizer.authorize(actor, svc.projectId, 'view');
       const slots = await uow.read.slots.get(serviceId);
-      if (!slots) return [];
-      const releases = new Map<string, Release>();
-      for (const physical of ['blue', 'green'] as PhysicalSlot[]) {
-        const id = slots[physical].releaseId;
-        const release = id ? await uow.read.releases.getById(id) : undefined;
-        if (release) releases.set(release.id, release);
-      }
-      return [slotToDto(slots, slots.active, releases, svc.slug, hosts), slotToDto(slots, slots.active === 'blue' ? 'green' : 'blue', releases, svc.slug, hosts)];
+      return slots ? loadSlotDtos(uow.read, slots, svc.slug, hosts) : [];
     },
     getPreviewSlot: async (actor: Actor, serviceId: ServiceId): Promise<SlotDto | null> => {
       const svc = await svcOf(serviceId);
       await authorizer.authorize(actor, svc.projectId, 'view-preview');
       const slots = await uow.read.slots.get(serviceId); if (!slots) return null;
-      const physical = slots.active === 'blue' ? 'green' : 'blue', id = slots[physical].releaseId;
-      const release = id ? await uow.read.releases.getById(id) : undefined;
-      return slotToDto(slots, physical, new Map(release ? [[release.id, release]] : []), svc.slug, hosts);
+      return (await loadSlotDtos(uow.read, slots, svc.slug, hosts, standbyOf(slots.active)))[0] ?? null;
     },
     listTrafficSwitches: async (actor: Actor, serviceId: ServiceId): Promise<TrafficSwitchDto[]> => {
       const svc = await svcOf(serviceId);

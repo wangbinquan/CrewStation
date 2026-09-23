@@ -1,6 +1,6 @@
 import type { MaintenanceRepository } from './repositories';
 import type { DomainPayload, DomainTopicName } from '@crewstation/contracts';
-import type { ReleaseRepository, SlotRepository, TrafficSwitchRepository } from './repositories';
+import type { OfflinePolicyRepository, ReleaseRepository, SlotEventRepository, SlotRepository, TrafficSwitchRepository } from './repositories';
 
 export interface DomainEventPublisher {
   publish<T extends DomainTopicName>(topic: T, payload: DomainPayload<T>): Promise<void>;
@@ -11,6 +11,8 @@ export interface RepositoryScope {
   readonly releases: ReleaseRepository;
   readonly slots: SlotRepository;
   readonly switches: TrafficSwitchRepository;
+  readonly slotEvents: SlotEventRepository;
+  readonly offlinePolicy: OfflinePolicyRepository;
   readonly events: DomainEventPublisher;
 }
 

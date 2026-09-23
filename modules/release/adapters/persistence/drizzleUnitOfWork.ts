@@ -2,7 +2,7 @@ import { drizzleMaintenance } from './drizzleMaintenance';
 import { publishDomainEvent } from '@crewstation/eventbus';
 import type { Database, Executor } from '@crewstation/persistence';
 import type { RepositoryScope, UnitOfWork } from '../../ports/unitOfWork';
-import { drizzleReleaseRepository, drizzleSlotRepository, drizzleTrafficSwitchRepository } from './drizzleRepositories';
+import { drizzleOfflinePolicyRepository, drizzleReleaseRepository, drizzleSlotEventRepository, drizzleSlotRepository, drizzleTrafficSwitchRepository } from './drizzleRepositories';
 
 export function scopeOver(executor: Executor, lockSlots = false): RepositoryScope {
   return {
@@ -10,6 +10,8 @@ export function scopeOver(executor: Executor, lockSlots = false): RepositoryScop
     releases: drizzleReleaseRepository(executor),
     slots: drizzleSlotRepository(executor, lockSlots),
     switches: drizzleTrafficSwitchRepository(executor),
+    slotEvents: drizzleSlotEventRepository(executor),
+    offlinePolicy: drizzleOfflinePolicyRepository(executor),
     events: { publish: async (topic, payload) => { await publishDomainEvent(executor, topic, payload); } },
   };
 }

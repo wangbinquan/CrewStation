@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import type { EventId, ProjectId, ServiceId, TraceId } from '@crewstation/contracts';
 import { backoffSeconds } from './backoff';
-import { beginAttempt, markDelivered, markFailed, newDelivery, replayDelivery } from './delivery';
+import { beginAttempt, holdDelivery, markDelivered, markFailed, newDelivery, releaseHeldDelivery, replayDelivery } from './delivery';
 import { reconcileSubscriptions } from './subscription';
 
 const now = new Date('2026-09-11T00:00:00Z');
@@ -34,6 +34,21 @@ describe('投递状态机与退避', () => {
     expect(markDelivered(beginAttempt(replayed, now), now)).toMatchObject({ state: 'delivered', attempts: 1, deliveredAt: now });
     // 崩溃遗留的 delivering 可以继续尝试
     expect(beginAttempt(first, now).attempts).toBe(2);
+  });
+
+  test('维护暂存（RFC-021）：待投、重试中、崩溃遗留的投递都可以暂存且不加尝试；只有暂存的能补发，补发后回到待投', () => {
+    const d = newDelivery('dlv_h', event, { id: 'sbs_1', ...owner }, now);
+    const held = holdDelivery(d, now);
+    expect(held).toMatchObject({ state: 'held', attempts: 0 });
+    expect(held.nextAttemptAt).toBeUndefined();
+    const retrying = markFailed(beginAttempt(d, now), 'HTTP 502', now, 5, () => 0.5);
+    expect(holdDelivery(retrying, now)).toMatchObject({ state: 'held', attempts: 1, lastError: 'HTTP 502' });
+    expect(holdDelivery(beginAttempt(d, now), now)).toMatchObject({ state: 'held', attempts: 1 });
+    expect(() => holdDelivery(markDelivered(beginAttempt(d, now), now), now)).toThrow('不能暂存');
+    const later = new Date(now.getTime() + 60_000);
+    expect(releaseHeldDelivery(held, later)).toMatchObject({ state: 'pending', attempts: 0, nextAttemptAt: later });
+    expect(() => releaseHeldDelivery(d, later)).toThrow('不在暂存中');
+    expect(() => beginAttempt(held, now)).toThrow();
   });
 
   test('订阅对齐：同事件类型保留 id 并更新路径，新类型新建，未声明的移除，重复声明取第一条', () => {

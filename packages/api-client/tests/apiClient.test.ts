@@ -192,6 +192,27 @@ describe('createApiClient：请求形状', () => {
     expect(JSON.parse(calls[1]?.body ?? '{}')).toEqual({ toSlot: 'preview' });
   });
 
+  test('RFC-021：下线、推迟、重新部署、槽记录、维护三件套、平台设置各打到正确的方法与路径', async () => {
+    const { calls, fetchImpl } = fakeFetch(() => json(200, { items: [] }));
+    const client = createApiClient({ fetch: fetchImpl });
+    await client.services.takeOffline('svc_1', { expectedReleaseId: 'rel_1' as never });
+    await client.services.postponeOffline('svc_1', { expectedDeadline: '2026-09-26T00:00:00.000Z' });
+    await client.services.redeploy('rel/1', { expectedStandbyReleaseId: null });
+    await client.services.listSlotEvents('svc_1');
+    await client.services.getMaintenance('svc_1');
+    await client.services.setMaintenance('svc_1', { switches: { users: true, services: false, events: true }, allowUserIds: [], reason: '修数据', expectedRevision: 0 });
+    await client.services.exitMaintenance('svc_1', { expectedRevision: 1 });
+    await client.platformSettings.autoOffline();
+    await client.platformSettings.setAutoOffline({ rollbackRetentionHours: 72, idleOfflineDays: 14, reminderLeadHours: 24, expectedRevision: 0 });
+    expect(calls.map((c) => `${c.method} ${c.url}`)).toEqual([
+      'POST /v1/services/svc_1/slots/preview/offline', 'POST /v1/services/svc_1/slots/preview/postpone', `POST /v1/releases/${encodeURIComponent('rel/1')}/redeploy`,
+      'GET /v1/services/svc_1/slot-events', 'GET /v1/services/svc_1/maintenance', 'PUT /v1/services/svc_1/maintenance', 'POST /v1/services/svc_1/maintenance/exit',
+      'GET /v1/admin/settings/auto-offline', 'PUT /v1/admin/settings/auto-offline',
+    ]);
+    expect(JSON.parse(calls[2]?.body ?? '{}')).toEqual({ expectedStandbyReleaseId: null });
+    expect(JSON.parse(calls[6]?.body ?? '{}')).toEqual({ expectedRevision: 1 });
+  });
+
   test('204 与空体解析为 undefined', async () => {
     const { fetchImpl } = fakeFetch(() => new Response(null, { status: 204 }));
     const client = createApiClient({ fetch: fetchImpl });

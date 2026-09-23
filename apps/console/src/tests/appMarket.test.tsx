@@ -83,8 +83,8 @@ describe('能力市场与负责人设置真实路由', () => {
     expect(page.text()).not.toContain('进入项目'); expect(page.text()).not.toContain('配置可见性');
     expect(page.html()).not.toContain(`/projects/${projectId}/settings`);
   });
-  test('暂停应用保留正式版本记录，不能同时显示在线与正式打开入口', async () => {
-    fixture(false, app({ projectState: 'paused', production: { status: 'deployed', state: 'ready', host: 'knowledge.example.test', tag: 'v1.2.3', commitSha: 'abc123', freshness: 'current', checkedAt: '2026-09-13T00:00:00.000Z' } }));
+  test('项目不是已开通状态时保留正式版本记录，不能同时显示在线与正式打开入口', async () => {
+    fixture(false, app({ projectState: 'failed', production: { status: 'deployed', state: 'ready', host: 'knowledge.example.test', tag: 'v1.2.3', commitSha: 'abc123', freshness: 'current', checkedAt: '2026-09-13T00:00:00.000Z' } }));
     page = await renderApp('/market');
     expect(page.text()).toContain('暂不可用');
     expect(page.text()).not.toContain('已上线'); expect(page.text()).not.toContain('打开正式应用');

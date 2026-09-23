@@ -25,7 +25,6 @@ export interface PlatformSettings {
   sessionInternalUrl: string;
   gitlab: { baseUrl: string; groupPath: string; platformToken: string; botName: string };
   mcp: { capabilitiesUrl: string; operationsUrl: string };
-  maintenanceWindow: boolean;
   idleMinutes: number;
   selfAddress: string;
   /** 安装期下发的引导令牌；只能用来创建首位管理员，完成态以数据库为准（RFC-005 §8）。 */
@@ -68,7 +67,6 @@ export function loadPlatformSettings(env: Record<string, string | undefined> = p
     sessionInternalUrl: env.CS_SESSION_INTERNAL_URL ?? `http://cs-session.${systemNamespace}.svc.cluster.local:8083`,
     gitlab: { baseUrl: env.CS_GITLAB_URL ?? 'http://host.docker.internal:8929', groupPath: env.CS_GITLAB_GROUP ?? 'crewstation', platformToken: env.CS_GITLAB_TOKEN ?? '', botName: env.CS_GITLAB_BOT_NAME ?? 'CrewStation Bot' },
     mcp: { capabilitiesUrl: env.CS_MCP_CAPABILITIES_URL ?? `http://mcp-capabilities.${serviceDomain}/mcp`, operationsUrl: env.CS_MCP_OPERATIONS_URL ?? `http://mcp-operations.${serviceDomain}/mcp` },
-    maintenanceWindow: env.CS_MAINTENANCE_WINDOW === 'true',
     idleMinutes: num(env.CS_IDLE_MINUTES, 120),
     selfAddress: env.CS_SELF_ADDRESS ?? `http://${env.POD_IP ?? '127.0.0.1'}:${portFrom(env, 'cs-session', 8083)}`,
     bootstrapToken: env.CS_BOOTSTRAP_TOKEN || undefined,

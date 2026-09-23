@@ -1,12 +1,15 @@
-import type { Manifest, ProjectId } from '@crewstation/contracts';
+import type { Manifest, ProjectId, ServicePlanDto } from '@crewstation/contracts';
 import { isPlatformError } from '@crewstation/kernel';
 import { DomainTopic } from '@crewstation/contracts';
 import type { Release } from '../domain/release';
 import { advance } from '../domain/release';
+import { startRetention } from '../domain/slotLifecycle';
+import type { PhysicalSlot } from '../domain/slots';
 import { withSlot } from '../domain/slots';
 import type { ReleaseUseCaseDeps } from './dependencies';
 import type { PipelineContext, ResolvedService, StepResult } from './pipelineContext';
 import { DONE, WAIT } from './pipelineContext';
+import type { RenderedEnv } from './pipelineEnv';
 import { renderSlotEnv } from './pipelineEnv';
 
 export interface DeploySteps {
@@ -36,19 +39,36 @@ async function computeProblem(deps: ReleaseUseCaseDeps, manifest: Manifest, proj
   return undefined;
 }
 
+export interface SlotDeployPlan { readonly plan: ServicePlanDto; readonly replicas: number; readonly env: RenderedEnv }
+
+/**
+ * 部署到某个槽之前的全部检查与环境渲染：套餐、副本（含运维覆盖）、算力档位、生产配置。
+ * 有问题返回原因，不写任何东西；发布流水线据此把发布记为失败，重新部署据此直接拒绝（RFC-021 §4）。
+ */
+export async function prepareSlotDeploy(deps: ReleaseUseCaseDeps, release: Release, svc: ResolvedService, manifest: Manifest, physical: PhysicalSlot): Promise<SlotDeployPlan | { problem: string }> {
+  const plan = await deps.plans.getServicePlan(manifest.spec.service.servicePlanId, release.projectId);
+  if (!plan) return { problem: `服务套餐 ${manifest.spec.service.servicePlanId} 不存在` };
+  if (manifest.spec.service.replicas > plan.maxReplicas) return { problem: `副本数 ${manifest.spec.service.replicas} 超过套餐上限 ${plan.maxReplicas}` };
+  const replicas = await deps.uow.read.maintenance.override(release.serviceId, physical) ?? manifest.spec.service.replicas;
+  if (replicas > plan.maxReplicas) return { problem: `运维副本覆盖 ${replicas} 超过套餐上限 ${plan.maxReplicas}，请管理员调整或恢复发布配置` };
+  // 算力档位有问题就不进部署（RFC-001、RFC-006），与引用不存在的服务套餐同等对待。
+  const problem = await computeProblem(deps, manifest, release.projectId);
+  if (problem) return { problem };
+  try {
+    return { plan, replicas, env: await renderSlotEnv(deps, { projectId: release.projectId, serviceId: release.serviceId, projectSlug: svc.slug, serviceName: svc.name, physical, manifest }) };
+  } catch (error) {
+    if (isPlatformError(error)) return { problem: error.message };
+    throw error;
+  }
+}
+
 export function deploySteps(deps: ReleaseUseCaseDeps, ctx: PipelineContext): DeploySteps {
   const { uow, clock } = deps;
 
   const startDeploy: DeploySteps['startDeploy'] = async (release, svc, manifest) => {
-    const plan = await deps.plans.getServicePlan(manifest.spec.service.servicePlanId, release.projectId);
-    if (!plan) return ctx.fail(release, `服务套餐 ${manifest.spec.service.servicePlanId} 不存在`);
-    if (manifest.spec.service.replicas > plan.maxReplicas) return ctx.fail(release, `副本数 ${manifest.spec.service.replicas} 超过套餐上限 ${plan.maxReplicas}`);
-    const replicas = await uow.read.maintenance.override(release.serviceId, release.targetSlot) ?? manifest.spec.service.replicas;
-    if (replicas > plan.maxReplicas) return ctx.fail(release, `运维副本覆盖 ${replicas} 超过套餐上限 ${plan.maxReplicas}，请管理员调整或恢复发布配置`);
-    // 算力档位有问题就不进部署（RFC-001、RFC-006），与引用不存在的服务套餐同等对待。
-    const problem = await computeProblem(deps, manifest, release.projectId);
-    if (problem) return ctx.fail(release, problem);
-    const env = await renderSlotEnv(deps, { projectId: release.projectId, serviceId: release.serviceId, projectSlug: svc.slug, serviceName: svc.name, physical: release.targetSlot, manifest });
+    const prepared = await prepareSlotDeploy(deps, release, svc, manifest, release.targetSlot);
+    if ('problem' in prepared) return ctx.fail(release, prepared.problem);
+    const { plan, replicas, env } = prepared;
     await deps.deployer.deploy({ namespace: svc.namespace, projectSlug: svc.slug, serviceName: svc.name, physical: release.targetSlot, releaseId: release.id, image: release.image ?? '', manifest, replicas, env: env.values, plan });
     const now = clock.now();
     await uow.run(async (scope) => {
@@ -71,7 +91,9 @@ export function deploySteps(deps: ReleaseUseCaseDeps, ctx: PipelineContext): Dep
     const openapi = exposes ? await deps.repo.readFile(release.serviceId, release.tag, exposes.openapi.replace(/^\.\//, '')) : undefined;
     await uow.run(async (scope) => {
       const slots = await scope.slots.get(release.serviceId);
-      if (slots) await scope.slots.save(withSlot(slots, { ...slots[release.targetSlot], state: 'ready', replicas: status.replicas, readyReplicas: status.readyReplicas, updatedAt: now }, now));
+      // 待命槽就绪即开始「无人访问」计时（RFC-021 M2）；正式槽不计时。
+      const retention = slots && slots.active !== release.targetSlot ? { retention: startRetention('pending', now) } : {};
+      if (slots) await scope.slots.save(withSlot(slots, { ...slots[release.targetSlot], state: 'ready', replicas: status.replicas, readyReplicas: status.readyReplicas, updatedAt: now, ...retention }, now));
       await scope.events.publish(DomainTopic.releaseRegistered, {
         occurredAt: now.toISOString(), projectId: release.projectId, serviceId: release.serviceId, releaseId: release.id, tag: release.tag, commitSha: release.commitSha,
         manifest: release.manifest as Manifest, ...(openapi ? { openapiDocument: Bun.YAML.parse(openapi) } : {}),
@@ -97,7 +119,8 @@ export function deploySteps(deps: ReleaseUseCaseDeps, ctx: PipelineContext): Dep
         return WAIT;
       }
       await registerReady(release, status);
-      await ctx.save(release, 'ready');
+      // 首次就绪的时刻：只有就绪过的版本才能从发布记录重新部署（RFC-021 §4）。
+      await ctx.save(release, 'ready', { pipeline: { ...release.pipeline, readyAt: release.pipeline.readyAt ?? clock.now().toISOString() } });
       return DONE;
     },
   };

@@ -21,7 +21,8 @@ async function fixture() {
     services: { resolveServiceById: async () => ({ projectId, slug: 'maintenance', name: 'maintenance', namespace: 'cs-maintenance' }) },
     plans: { getServicePlan: async () => ({ id: '01a0bf5d-8f4b-781d-8b8e-bbbbc69c6c6a', name: 'small', cpu: '1', memory: '1Gi', maxReplicas: 3, description: '' }), lookupComputeProfile: async () => undefined, listComputeProfiles: async () => [] },
     config: { render: async () => ({ values: {}, version: 1 }), validate: async () => ({ missing: [] }) }, data: { envFor: async () => ({}) }, hosts: { prodHost: () => 'prod.invalid', previewHost: () => 'preview.invalid' },
-    settings: { registryBase: 'registry', maintenanceWindow: false, buildTimeoutSeconds: 10, deployTimeoutSeconds: 10, builderImage: 'builder', buildkitAddress: 'buildkit', workerOwner: 'slot-test', serviceDomain: 'svc.internal', userDomain: 'user.invalid' } });
+    maintenance: { open: async () => false }, owners: { ownerOf: async () => undefined }, notifier: { notify: async () => {} },
+    settings: { registryBase: 'registry', buildTimeoutSeconds: 10, deployTimeoutSeconds: 10, builderImage: 'builder', buildkitAddress: 'buildkit', workerOwner: 'slot-test', serviceDomain: 'svc.internal', userDomain: 'user.invalid' } });
   const publish = async (ready = true) => {
     const rel = await release.api.publish(admin, serviceId, { branch: 'main', version: 'patch' }); await release.api.runPipelineStep(rel.id);
     await k8s.mergePatch(Resources.Job!, `build-${rel.id.replaceAll('-', '')}`, 'cs-maintenance', { status: { succeeded: 1 } }); await release.api.runPipelineStep(rel.id);
@@ -66,7 +67,13 @@ describe.skipIf(!available)('release slot maintenance lifecycle', () => {
     expect((await f.command('scale', 2)).inspection.capability.reason).toContain('HPA');
     await f.k8s.delete(Resources.HorizontalPodAutoscaler!, 'auto', 'cs-maintenance'); expect((await f.command('scale', 4)).inspection.capability.enabled).toBe(false);
     const del = await f.command('delete'); await f.release.api.executeSlotOperation(admin, del.op, del.inspection); expect((await f.release.api.observeSlotOperation(del.op)).done).toBe(true);
-    expect((await f.release.api.listClusterSlots()).find((s) => s.physical === 'green')).toMatchObject({ state: 'empty', releaseId: rel.id });
+    // RFC-021 B7：集群管理删除非正式槽与项目侧「下线」是同一个结果——槽空、版本转已下线、原因记集群管理、可以重新部署。
+    const green = (await f.release.api.listClusterSlots()).find((s) => s.physical === 'green');
+    expect(green).toMatchObject({ state: 'empty' });
+    expect(green?.releaseId).toBeUndefined();
+    expect((await f.release.api.getSlots(admin, serviceId)).find((s) => s.name === 'preview')?.offline).toMatchObject({ releaseId: rel.id, reason: 'cluster', actorUserId: admin.userId });
+    expect(await f.release.api.getRelease(admin, rel.id)).toMatchObject({ status: 'offline', redeployable: true });
+    expect((await f.release.api.listSlotEvents(admin, serviceId))[0]).toMatchObject({ kind: 'offline', reason: 'cluster', releaseId: rel.id });
     expect(await f.k8s.get(Resources.Service!, 'maintenance-green', 'cs-maintenance')).toBeDefined();
     await expect(f.release.api.switchTraffic(admin, serviceId, { toSlot: 'preview' })).rejects.toThrow();
     await f.publish(); expect(await f.k8s.get(Resources.Deployment!, 'maintenance-green', 'cs-maintenance')).toBeDefined();

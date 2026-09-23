@@ -24,6 +24,8 @@ import type { MeResource } from './resources/me';
 import { meResource } from './resources/me';
 import type { ObservabilityResource } from './resources/observability';
 import { observabilityResource } from './resources/observability';
+import type { PlatformSettingsResource } from './resources/platformSettings';
+import { platformSettingsResource } from './resources/platformSettings';
 import type { ProjectsResource } from './resources/projects';
 import { projectsResource } from './resources/projects';
 import type { ServicesResource } from './resources/services';
@@ -62,6 +64,8 @@ export interface ApiClient {
   readonly capabilities: CapabilitiesResource;
   /** RFC-006：算力档位管理（仅管理员）。 */
   readonly computeProfiles: ComputeProfilesResource;
+  /** RFC-021：平台设置（仅管理员）。 */
+  readonly platformSettings: PlatformSettingsResource;
   readonly stream: TaskStreamResource;
 }
 
@@ -86,6 +90,7 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
     cluster: clusterResource(transport),
     capabilities: capabilitiesResource(transport),
     computeProfiles: computeProfilesResource(transport),
+    platformSettings: platformSettingsResource(transport),
     stream: { taskStreamUrl: (taskId, sinceSeq = 0, replay) => taskStreamUrl(transport.baseUrl, taskId, sinceSeq, replay) },
   };
 }

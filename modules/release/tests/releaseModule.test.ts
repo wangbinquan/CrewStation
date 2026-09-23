@@ -69,7 +69,11 @@ beforeAll(async () => {
     data: { envFor: async () => ({ CS_DATABASE_URL: 'postgres://prod' }) },
     hosts: { prodHost: (s) => `${s}.cs.localhost`, previewHost: (s) => `preview.${s}.cs.localhost` },
     isAdmin: async () => false,
-    settings: { userDomain: 'cs.localhost', serviceDomain: 'svc.cs.internal', registryBase: 'registry:5000', maintenanceWindow: false, buildTimeoutSeconds: 600, deployTimeoutSeconds: 300, builderImage: 'cs-builder:dev', buildkitAddress: 'tcp://buildkitd:1234', workerOwner: 'test' },
+    // RFC-021：项目完整维护（破坏性迁移窗口）由 gateway 经装配提供；这里的场景一律不在维护中，放行路径见 slotLifecycle.test.ts。
+    maintenance: { open: async () => false },
+    owners: { ownerOf: async () => owner.userId },
+    notifier: { notify: async () => {} },
+    settings: { userDomain: 'cs.localhost', serviceDomain: 'svc.cs.internal', registryBase: 'registry:5000', buildTimeoutSeconds: 600, deployTimeoutSeconds: 300, builderImage: 'cs-builder:dev', buildkitAddress: 'tcp://buildkitd:1234', workerOwner: 'test' },
   });
 });
 afterAll(async () => { await tdb?.drop(); });
@@ -162,7 +166,8 @@ describe.skipIf(!available)('release module', () => {
     await release.api.runPipelineStep(destructive.id);
     await markJob(`build-${destructive.id.replaceAll('-', '')}`, true);
     await release.api.runPipelineStep(destructive.id);
-    expect((await release.api.getRelease(owner, destructive.id))).toMatchObject({ status: 'failed', message: expect.stringContaining('维护窗口') });
+    // RFC-021 M14、M17：维护窗口＝项目维护中且三个开关都拦；拒绝原因说清出路。
+    expect((await release.api.getRelease(owner, destructive.id))).toMatchObject({ status: 'failed', message: expect.stringContaining('只能在项目维护期间发布') });
   });
 
   /** 发布只看档位存在性与协议（RFC-006 §4.4）：三种拒绝都在部署前发生，不会部署半截。 */

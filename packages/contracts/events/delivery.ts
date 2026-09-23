@@ -41,7 +41,8 @@ export const LegacyProducedEventSchema = z.object({
 export const ProducedEventSchema = LegacyProducedEventSchema.omit({ eventType: true }).extend({ eventTypeId: ResourceIdSchema });
 export type LegacyProducedEvent = z.infer<typeof LegacyProducedEventSchema>;
 
-export const DeliveryStateSchema = z.enum(['pending', 'delivering', 'delivered', 'retrying', 'dead']);
+/** held：订阅方正式版本维护中且事件开关打开，暂存待补发，不算尝试（RFC-021）。 */
+export const DeliveryStateSchema = z.enum(['pending', 'delivering', 'delivered', 'retrying', 'dead', 'held']);
 
 export type EventDelivery = z.infer<typeof EventDeliverySchema>;
 export type ProducedEvent = z.infer<typeof ProducedEventSchema>;

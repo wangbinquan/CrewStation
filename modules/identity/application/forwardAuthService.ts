@@ -20,6 +20,8 @@ export function forwardAuthServiceUseCase(deps: Deps) {
     if (!caller) return deny(`来源 ${ip} 不是已登记的平台工作负载`, 'unknown-workload');
     const target = { host: firstHost(request.host), method: request.method.toUpperCase(), path: pathOf(request.uri) };
     const verdict = await deps.allowlist.evaluate(caller, target);
+    // 目标正式版本维护中（RFC-021）：503 而不是 403，调用方可以按 Retry-After 稍后重试。
+    if (!verdict.allowed && verdict.unavailable) return { kind: 'unavailable', message: verdict.unavailable.message, ...(verdict.unavailable.retryAfterSeconds ? { retryAfterSeconds: verdict.unavailable.retryAfterSeconds } : {}) };
     if (!verdict.allowed) return deny(verdict.reason ?? `放行表未允许 ${caller.identity} 调用 ${target.method} ${target.host}${target.path}`, verdict.reason);
     const parsedTrace = TraceIdSchema.safeParse(request.traceId);
     const traceId: string = parsedTrace.success ? parsedTrace.data : newTraceId();

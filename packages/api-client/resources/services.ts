@@ -1,5 +1,6 @@
 import type {
-  BranchDto, ListBranchesQuery, ManifestUpgradePreview, ReleaseDto, RepositoryBindingDto, ServiceDto, SlotDto, TagDto, TrafficSwitchDto, TrafficSwitchRequest,
+  BranchDto, ExitMaintenanceRequest, ListBranchesQuery, MaintenanceDto, ManifestUpgradePreview, PostponeOfflineRequest, RedeployRequest, ReleaseDto, RepositoryBindingDto,
+  ServiceDto, ServiceMaintenanceView, SetMaintenanceRequest, SlotDto, SlotEventDto, TagDto, TakeOfflineRequest, TrafficSwitchDto, TrafficSwitchRequest,
 } from '@crewstation/contracts';
 import type { Transport } from '../httpTransport';
 import type { ItemsPage } from '../itemsPage';
@@ -29,6 +30,20 @@ export interface ServicesResource {
   switchTraffic(serviceId: string, input: TrafficSwitchRequest): Promise<TrafficSwitchDto>;
   /** GET /v1/services/:serviceId/traffic-switches */
   listTrafficSwitches(serviceId: string): Promise<ItemsPage<TrafficSwitchDto>>;
+  /** RFC-021 POST /v1/services/:serviceId/slots/preview/offline（负责人、管理员）：下线待验证版本，返回两个槽。 */
+  takeOffline(serviceId: string, input: TakeOfflineRequest): Promise<ItemsPage<SlotDto>>;
+  /** RFC-021 POST /v1/services/:serviceId/slots/preview/postpone（负责人、管理员）：自动下线推迟一个周期。 */
+  postponeOffline(serviceId: string, input: PostponeOfflineRequest): Promise<ItemsPage<SlotDto>>;
+  /** RFC-021 POST /v1/releases/:releaseId/redeploy（202，负责人、管理员）：从发布记录重新部署到待命槽。 */
+  redeploy(releaseId: string, input: RedeployRequest): Promise<ReleaseDto>;
+  /** RFC-021 GET /v1/services/:serviceId/slot-events：下线、重新部署、推迟、提醒记录。 */
+  listSlotEvents(serviceId: string): Promise<ItemsPage<SlotEventDto>>;
+  /** RFC-021 GET /v1/services/:serviceId/maintenance：当前维护与记录。 */
+  getMaintenance(serviceId: string): Promise<ServiceMaintenanceView>;
+  /** RFC-021 PUT /v1/services/:serviceId/maintenance（负责人、管理员）：进入或调整维护。 */
+  setMaintenance(serviceId: string, input: SetMaintenanceRequest): Promise<MaintenanceDto>;
+  /** RFC-021 POST /v1/services/:serviceId/maintenance/exit（负责人、管理员）：退出维护。 */
+  exitMaintenance(serviceId: string, input: ExitMaintenanceRequest): Promise<ServiceMaintenanceView>;
 }
 
 export function servicesResource(transport: Transport): ServicesResource {
@@ -45,5 +60,12 @@ export function servicesResource(transport: Transport): ServicesResource {
     listSlots: (serviceId) => transport.request<ItemsPage<SlotDto>>('GET', `${base(serviceId)}/slots`),
     switchTraffic: (serviceId, input) => transport.request<TrafficSwitchDto>('POST', `${base(serviceId)}/traffic-switch`, { body: input }),
     listTrafficSwitches: (serviceId) => transport.request<ItemsPage<TrafficSwitchDto>>('GET', `${base(serviceId)}/traffic-switches`),
+    takeOffline: (serviceId, input) => transport.request<ItemsPage<SlotDto>>('POST', `${base(serviceId)}/slots/preview/offline`, { body: input }),
+    postponeOffline: (serviceId, input) => transport.request<ItemsPage<SlotDto>>('POST', `${base(serviceId)}/slots/preview/postpone`, { body: input }),
+    redeploy: (releaseId, input) => transport.request<ReleaseDto>('POST', `/v1/releases/${segment(releaseId)}/redeploy`, { body: input }),
+    listSlotEvents: (serviceId) => transport.request<ItemsPage<SlotEventDto>>('GET', `${base(serviceId)}/slot-events`),
+    getMaintenance: (serviceId) => transport.request<ServiceMaintenanceView>('GET', `${base(serviceId)}/maintenance`),
+    setMaintenance: (serviceId, input) => transport.request<MaintenanceDto>('PUT', `${base(serviceId)}/maintenance`, { body: input }),
+    exitMaintenance: (serviceId, input) => transport.request<ServiceMaintenanceView>('POST', `${base(serviceId)}/maintenance/exit`, { body: input }),
   };
 }

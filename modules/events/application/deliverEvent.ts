@@ -2,7 +2,7 @@ import type { EventDelivery } from '@crewstation/contracts';
 import { EVENT_HEADERS, IDENTITY_HEADERS } from '@crewstation/contracts';
 import type { DeliverOutcome } from '../api/moduleApi';
 import type { Delivery } from '../domain/delivery';
-import { beginAttempt, markDead, markDelivered, markFailed } from '../domain/delivery';
+import { beginAttempt, holdDelivery, markDead, markDelivered, markFailed } from '../domain/delivery';
 import type { InboxEvent } from '../domain/inboxEvent';
 import type { EventsUseCaseDeps } from './dependencies';
 
@@ -10,7 +10,7 @@ import type { EventsUseCaseDeps } from './dependencies';
  * 一次投递尝试：定位订阅方 active 槽 → 经服务域 POST 信封 → 2xx 记 delivered；
  * 失败按退避进入 retrying，超过上限 dead；订阅或事件已不存在时直接 dead。HTTP 调用在事务之外。
  */
-export function deliverEventUseCase({ uow, endpoints, pusher, settings, clock }: EventsUseCaseDeps) {
+export function deliverEventUseCase({ uow, endpoints, pusher, settings, clock, hold }: EventsUseCaseDeps) {
   const settle = async (attempt: Delivery, error: string, fatal: boolean): Promise<DeliverOutcome> => {
     const now = clock.now();
     const next = fatal ? markDead(attempt, error, now) : markFailed(attempt, error, now, settings.maxAttempts);
@@ -20,7 +20,12 @@ export function deliverEventUseCase({ uow, endpoints, pusher, settings, clock }:
   return async (deliveryId: string): Promise<DeliverOutcome> => {
     const delivery = await uow.read.deliveries.getById(deliveryId);
     if (!delivery) return { state: 'dead', error: `投递 ${deliveryId} 不存在` };
-    if (delivery.state === 'delivered' || delivery.state === 'dead') return { state: delivery.state };
+    if (delivery.state === 'delivered' || delivery.state === 'dead' || delivery.state === 'held') return { state: delivery.state };
+    // 订阅方正式版本维护中且事件开关打开（RFC-021 M6）：暂存，不开始尝试，队列任务正常完成。
+    if (await hold.holds(delivery.serviceId)) {
+      await uow.run((scope) => scope.deliveries.update(holdDelivery(delivery, clock.now())));
+      return { state: 'held' };
+    }
     const attempt = beginAttempt(delivery, clock.now());
     await uow.run((scope) => scope.deliveries.update(attempt));
     const subscription = await uow.read.subscriptions.getById(attempt.subscriptionId);

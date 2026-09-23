@@ -1,6 +1,6 @@
 import type { DeliveryState, EventId, ProjectId, ServiceId, TraceId } from '@crewstation/contracts';
 import type { Executor } from '@crewstation/persistence';
-import { and, desc, eq } from 'drizzle-orm';
+import { and, asc, desc, eq } from 'drizzle-orm';
 import type { Delivery } from '../../domain/delivery';
 import type { InboxEvent } from '../../domain/inboxEvent';
 import type { DeliveryRepository, InboxRepository } from '../../ports/repositories';
@@ -35,6 +35,10 @@ export function drizzleDeliveryRepository(db: Executor, lockForUpdate = false): 
     listByProject: async (projectId, state, limit) => {
       const where = state === undefined ? eq(deliveries.projectId, projectId) : and(eq(deliveries.projectId, projectId), eq(deliveries.state, state));
       return (await db.select().from(deliveries).where(where).orderBy(desc(deliveries.createdAt), deliveries.id).limit(limit)).map(toDelivery);
+    },
+    listHeld: async (serviceId, limit) => {
+      const where = serviceId === undefined ? eq(deliveries.state, 'held') : and(eq(deliveries.serviceId, serviceId), eq(deliveries.state, 'held'));
+      return (await db.select().from(deliveries).where(where).orderBy(asc(deliveries.createdAt), asc(deliveries.id)).limit(limit)).map(toDelivery);
     },
   };
 }

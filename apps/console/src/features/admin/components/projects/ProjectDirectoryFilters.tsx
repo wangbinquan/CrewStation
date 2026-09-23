@@ -21,7 +21,7 @@ export function ProjectDirectoryFilters({ search, items, integration, userId, bu
       <option value="">{t('admin.directory.allKinds')}</option>{kinds.map((kind) => <option key={kind} value={kind}>{t(`projects.kind.${kind}`)}</option>)}
     </select></label>
     <label>{t('admin.directory.state')}<select aria-label={t('admin.directory.state')} value={draft.state ?? ''} onChange={(e) => setDraft({ ...draft, state: e.target.value as ProjectDirectorySearch['state'] || undefined })}>
-      <option value="">{t('admin.directory.allStates')}</option>{['provisioning', 'active', 'paused', 'archived', 'failed'].map((state) => <option key={state} value={state}>{t(`projects.state.${state}`)}</option>)}
+      <option value="">{t('admin.directory.allStates')}</option>{['provisioning', 'active', 'archived', 'failed'].map((state) => <option key={state} value={state}>{t(`projects.state.${state}`)}</option>)}
     </select></label>
     <label>{t('admin.directory.owner')}<select aria-label={t('admin.directory.owner')} value={draft.ownerUserId ?? ''} onChange={(e) => setDraft({ ...draft, ownerUserId: e.target.value || undefined })}>
       <option value="">{t('admin.directory.allOwners')}</option>{[...owners].map(([id, name]) => <option key={id} value={id}>{name}</option>)}

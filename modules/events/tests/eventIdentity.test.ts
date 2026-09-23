@@ -20,7 +20,7 @@ describe.skipIf(!available)('event resource identities', () => {
       const deps = { uow: drizzleUnitOfWork(tdb.db, { jobMaxAttempts: 5 }), clock: systemClock,
         services: { resolveService: async () => ({ projectId, serviceId, slug: 'source', identity: 'source/app' }) },
         projects: { authorize: async () => "owner" as const, isAdmin: async (_id: UserId) => true }, endpoints: { resolve: async () => ({ baseUrl: 'http://receiver' }) },
-        pusher: { push: async (_url: string, envelope: unknown) => { received.push(envelope); return { ok: true, status: 200 }; } }, settings: { maxAttempts: 3, pushTimeoutMs: 1000 } };
+        pusher: { push: async (_url: string, envelope: unknown) => { received.push(envelope); return { ok: true, status: 200 }; } }, settings: { maxAttempts: 3, pushTimeoutMs: 1000 }, hold: { holds: async () => false } };
       const register = registerReleaseUseCase(deps), service = { command: ['app'], port: 3000, servicePlanId: BUILTIN_RESOURCES.servicePlanSmall };
       const publish = (kind: string, spec: object) => register({ projectId, serviceId, releaseId: Bun.randomUUIDv7() as ReleaseId, occurredAt: new Date().toISOString(), tag: 'v1.0.0', commitSha: 'a'.repeat(40), manifest: ManifestSchema.parse({ apiVersion: 'crewstation/v2', kind, spec: { service, ...spec } }) });
       const producer = { producer: 'source', ingress: { path: '/events' }, produces: [{ eventType: 'source.updated' }] };

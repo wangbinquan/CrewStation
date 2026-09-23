@@ -12,6 +12,7 @@ export const DomainTopic = {
   releaseRegistered: 'release.registered',
   releaseStatusChanged: 'release.status-changed',
   trafficSwitched: 'release.traffic-switched',
+  maintenanceChanged: 'gateway.maintenance-changed',
   taskCreated: 'task-runtime.task-created',
   taskReleased: 'task-runtime.task-released',
   subtaskFinished: 'business-task.subtask-finished',
@@ -39,11 +40,15 @@ export const ReleaseRegisteredSchema = z.object({
   openapiDocument: z.unknown().optional(),
 });
 
-export const ReleaseStatusSchema = z.enum(['pending', 'building', 'migrating', 'deploying', 'ready', 'failed', 'superseded']);
+/** offline：所在的待命槽已下线（RFC-021），可从发布记录重新部署。 */
+export const ReleaseStatusSchema = z.enum(['pending', 'building', 'migrating', 'deploying', 'ready', 'failed', 'superseded', 'offline']);
 export const ReleaseStatusChangedSchema = z.object({ ...base, serviceId: ServiceIdSchema, releaseId: ReleaseIdSchema, status: ReleaseStatusSchema, slot: SlotNameSchema.optional(), message: z.string().optional() });
 
 /** 切流后订阅推送目标、路由与告警基线都随 active 槽变化。 */
 export const TrafficSwitchedSchema = z.object({ ...base, projectId: ProjectIdSchema, serviceId: ServiceIdSchema, fromSlot: SlotNameSchema, toSlot: SlotNameSchema, releaseId: ReleaseIdSchema, actorUserId: z.string() });
+
+/** 正式版本维护的进入、调整与退出（RFC-021）；events 据此补发暂存的投递。 */
+export const MaintenanceChangedSchema = z.object({ ...base, projectId: ProjectIdSchema, serviceId: ServiceIdSchema, active: z.boolean(), holdEvents: z.boolean() });
 
 /** profile-test：管理员档位测试的平台专属短期任务（RFC-006），跑在系统命名空间。 */
 export const TaskKindSchema = z.enum(['dev-session', 'business', 'profile-test']);
@@ -61,6 +66,7 @@ export const DomainPayloadSchemas = {
   [DomainTopic.releaseRegistered]: ReleaseRegisteredSchema,
   [DomainTopic.releaseStatusChanged]: ReleaseStatusChangedSchema,
   [DomainTopic.trafficSwitched]: TrafficSwitchedSchema,
+  [DomainTopic.maintenanceChanged]: MaintenanceChangedSchema,
   [DomainTopic.taskCreated]: TaskCreatedSchema,
   [DomainTopic.taskReleased]: TaskReleasedSchema,
   [DomainTopic.subtaskFinished]: SubtaskFinishedSchema,

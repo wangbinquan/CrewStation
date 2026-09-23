@@ -1,5 +1,6 @@
 import { kubernetesSlotControl } from './adapters/k8s/slotControl';
 import { slotMaintenanceUseCases } from './application/slotMaintenance';
+import { slotLifecycleUseCases } from './application/slotLifecycle';
 import { join } from 'node:path';
 import type { UserId } from '@crewstation/contracts';
 import type { AppEnv } from '@crewstation/http';
@@ -24,7 +25,7 @@ import { releaseQueries } from './application/queries';
 import { switchTrafficUseCase } from './application/switchTraffic';
 import { releaseRoutes } from './http/releaseRoutes';
 import type { ImageBuilder, MigrationRunner, SlotDeployer } from './ports/delivery';
-import type { ConfigSource, DataSource, HostNaming, PlanCatalog, ProjectAuthorizer, ReleaseSettings, ServiceResolver } from './ports/platform';
+import type { ConfigSource, DataSource, HostNaming, MaintenanceWindow, PlanCatalog, ProjectAuthorizer, ProjectOwners, ReleaseSettings, ServiceResolver, SlotNotifier } from './ports/platform';
 import type { ReleaseTagger, RepoReader } from './ports/sourceControl';
 import { PIPELINE_JOB_KIND, pipelineJobHandler } from './workers/pipelineHandler';
 
@@ -40,6 +41,10 @@ export interface ReleaseModuleDeps {
   config: ConfigSource;
   data: DataSource;
   hosts: HostNaming;
+  /** RFC-021：项目完整维护即破坏性迁移窗口（gateway）；提醒发给负责人（project）经通知端口。 */
+  maintenance: MaintenanceWindow;
+  owners: ProjectOwners;
+  notifier: SlotNotifier;
   isAdmin: (userId: UserId) => Promise<boolean>;
   settings: ReleaseSettings & { builderImage: string; buildkitAddress: string; workerOwner: string };
   /** 测试可替换的交付适配器；默认用 Kubernetes 实现。 */
@@ -48,12 +53,18 @@ export interface ReleaseModuleDeps {
   logger?: Logger;
 }
 
+/** 定时器形态的后台任务（与开发会话空闲提醒同一种写法）。 */
+export interface ReleaseTimer { start(): void; stop(): Promise<void> }
+
 export interface ReleaseModule {
   readonly api: ReleaseModuleApi;
   readonly http: Hono<AppEnv>[];
-  readonly workers: Worker[];
+  readonly workers: Array<Worker | ReleaseTimer>;
   readonly migrations: MigrationSet;
 }
+
+/** 自动下线巡检的间隔：提醒与下线都以小时计，一分钟一轮足够（RFC-021 design §3）。 */
+const SLOT_SWEEP_INTERVAL_MS = 60_000;
 
 export const releaseMigrations: MigrationSet = {
   module: 'release',
@@ -78,6 +89,9 @@ export function createReleaseModule(deps: ReleaseModuleDeps): ReleaseModule {
     config: deps.config,
     data: deps.data,
     hosts: deps.hosts,
+    maintenance: deps.maintenance,
+    owners: deps.owners,
+    notifier: deps.notifier,
     settings: deps.settings,
     clock: deps.clock ?? systemClock,
     logger,
@@ -89,11 +103,17 @@ export function createReleaseModule(deps: ReleaseModuleDeps): ReleaseModule {
     switchTraffic: switchTrafficUseCase(useCaseDeps),
     ...releaseQueries(useCaseDeps),
     runPipelineStep: pipelineStepUseCase(useCaseDeps),
+    ...slotLifecycleUseCases({ ...useCaseDeps, isAdmin: deps.isAdmin }),
+  };
+  let timer: ReturnType<typeof setInterval> | undefined;
+  const sweep: ReleaseTimer = {
+    start: () => { timer ??= setInterval(() => void api.sweepSlotLifecycle().catch((error: unknown) => logger.error('slot lifecycle sweep failed', { error: String(error) })), SLOT_SWEEP_INTERVAL_MS); },
+    stop: async () => { if (timer) clearInterval(timer); timer = undefined; },
   };
   return {
     api,
     http: [releaseRoutes(api, deps.isAdmin)],
-    workers: [createWorker({ db: deps.db, kinds: [PIPELINE_JOB_KIND], owner: deps.settings.workerOwner, concurrency: 4, logger, handler: pipelineJobHandler(api, jobs) })],
+    workers: [createWorker({ db: deps.db, kinds: [PIPELINE_JOB_KIND], owner: deps.settings.workerOwner, concurrency: 4, logger, handler: pipelineJobHandler(api, jobs) }), sweep],
     migrations: releaseMigrations,
   };
 }

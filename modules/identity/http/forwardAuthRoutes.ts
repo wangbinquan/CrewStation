@@ -68,10 +68,26 @@ function userResponse(c: Context<AppEnv>, decision: UserAuthDecision, api: Ident
       // 浏览器导航给人看的页面（原因＋返回工作台）；程序调用仍是 JSON。
       if ((c.req.header('accept') ?? '').includes('text/html')) return c.html(api.forbiddenPage(decision.message, { scheme: c.req.header('x-forwarded-proto') }), 403);
       return c.json({ error: 'forbidden', message: decision.message, details: {} }, 403);
+    case 'unavailable':
+      return unavailableResponse(c, decision.entry, api);
   }
 }
 
+/** RFC-021：维护页与未部署页都是 503；有预计恢复时间时带 Retry-After。 */
+function unavailableResponse(c: Context<AppEnv>, entry: Extract<UserAuthDecision, { kind: 'unavailable' }>['entry'], api: IdentityModuleApi): Response {
+  if (entry.kind === 'maintenance' && entry.retryAfterSeconds) c.header('retry-after', String(entry.retryAfterSeconds));
+  if ((c.req.header('accept') ?? '').includes('text/html')) return c.html(api.unavailablePage(entry, { scheme: c.req.header('x-forwarded-proto') }), 503);
+  if (entry.kind === 'maintenance') {
+    return c.json({ error: 'maintenance', message: `${entry.projectSlug} 正在维护：${entry.reason}`, details: { reason: entry.reason, ...(entry.expectedEndAt ? { expectedEndAt: entry.expectedEndAt } : {}) } }, 503);
+  }
+  return c.json({ error: 'not-deployed', message: `${entry.projectSlug} 当前没有待验证版本`, details: entry.offline ? { ...entry.offline } : {} }, 503);
+}
+
 function serviceResponse(c: Context<AppEnv>, decision: ServiceAuthDecision): Response {
+  if (decision.kind === 'unavailable') {
+    if (decision.retryAfterSeconds) c.header('retry-after', String(decision.retryAfterSeconds));
+    return c.json({ error: 'maintenance', message: decision.message, details: {} }, 503);
+  }
   if (decision.kind === 'forbidden') {
     return c.json({ error: 'forbidden', message: decision.message, details: decision.reason ? { reason: decision.reason } : {} }, 403);
   }

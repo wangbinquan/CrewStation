@@ -1,10 +1,12 @@
-import type { Actor, ClusterInspection, ClusterInspectRequest, ClusterOperation, ClusterResource, ServiceId } from '@crewstation/contracts';
+import type { Actor, ClusterInspection, ClusterInspectRequest, ClusterOperation, ClusterResource, ServiceId, UserId } from '@crewstation/contracts';
 import { conflict, forbidden, isPlatformError, precondition } from '@crewstation/kernel';
 import type { RepositoryScope } from '../ports/unitOfWork';
 import type { SlotControl } from '../ports/slotControl';
 import type { SlotMaintenance } from '../domain/slotMaintenance';
+import { hasWorkload } from '../domain/slotLifecycle';
 import { withSlot } from '../domain/slots';
 import type { ReleaseUseCaseDeps } from './dependencies';
+import { offlineInScope } from './slotLifecycle';
 
 type Deps = ReleaseUseCaseDeps & { slotControl: SlotControl; isAdmin(id: Actor['userId']): Promise<boolean> };
 async function check(deps: Deps, scope: RepositoryScope, actor: Actor, target: ClusterResource, request: ClusterInspectRequest, operationId?: string) {
@@ -59,7 +61,9 @@ export function slotMaintenanceUseCases(deps: Deps) {
         if (!status.failed) {
           if (operation.action === 'scale') await scope.maintenance.setOverride(id, physical, record.replicas);
           if (operation.action === 'restore-replicas') await scope.maintenance.setOverride(id, physical);
-          await scope.slots.save(withSlot(slots, { ...slots[physical], state: operation.action === 'delete' ? 'empty' : 'ready', replicas: status.replicas, readyReplicas: status.readyReplicas, updatedAt: deps.clock.now() }, deps.clock.now()));
+          // 集群管理删除非正式槽与项目侧「下线」是同一个结果（RFC-021 B7）：版本转已下线、可从发布记录重新部署。
+          if (operation.action === 'delete' && slots.active !== physical && hasWorkload(slots[physical])) await offlineInScope(scope, slots, physical, deps.clock.now(), { reason: 'cluster', actorUserId: operation.actorId as UserId, workloadRemoved: true });
+          else if (operation.action !== 'delete') await scope.slots.save(withSlot(slots, { ...slots[physical], state: 'ready', replicas: status.replicas, readyReplicas: status.readyReplicas, updatedAt: deps.clock.now() }, deps.clock.now()));
         }
         await scope.maintenance.save({ ...record, state: status.failed ? 'failed' : 'done' });
       });

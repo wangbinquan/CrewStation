@@ -1,6 +1,9 @@
 import type { ReleaseDto, SlotDto, TrafficSwitchDto } from '@crewstation/contracts';
 import type { Release } from '../domain/release';
-import type { PhysicalSlot, ServiceSlots } from '../domain/slots';
+import { isRedeployable } from '../domain/release';
+import type { OfflinePolicy } from '../domain/slotLifecycle';
+import { DEFAULT_OFFLINE_POLICY, offlineDeadline } from '../domain/slotLifecycle';
+import type { PhysicalSlot, ServiceSlots, SlotState } from '../domain/slots';
 import { roleOf } from '../domain/slots';
 import type { HostNaming } from '../ports/platform';
 import type { TrafficSwitchRecord } from '../ports/repositories';
@@ -18,13 +21,30 @@ export function releaseToDto(release: Release, slots: ServiceSlots | undefined):
     ...(onSlot && slots ? { slot: roleOf(slots, onSlot) } : {}),
     ...(release.configVersion !== undefined ? { configVersion: release.configVersion } : {}),
     ...(release.message ? { message: release.message } : {}),
+    redeployable: isRedeployable(release, !!onSlot),
     createdBy: release.createdBy,
     createdAt: release.createdAt.toISOString(),
     updatedAt: release.updatedAt.toISOString(),
   };
 }
 
-export function slotToDto(slots: ServiceSlots, physical: PhysicalSlot, releases: Map<string, Release>, projectSlug: string, hosts: HostNaming): SlotDto {
+/** 待命槽的计时与下线记录（RFC-021）：到期时间按当前平台策略即时算好，下线记录带上版本号。 */
+function lifecycleOf(slot: SlotState, role: 'prod' | 'preview', releases: Map<string, Release>, policy: OfflinePolicy): Pick<SlotDto, 'retention' | 'offline'> {
+  const retention = slot.retention && role === 'preview' ? {
+    retention: {
+      kind: slot.retention.kind, since: slot.retention.since.toISOString(), deadline: offlineDeadline(slot.retention, policy).toISOString(),
+      ...(slot.retention.remindedAt && slot.retention.remindedFor?.getTime() === offlineDeadline(slot.retention, policy).getTime() ? { remindedAt: slot.retention.remindedAt.toISOString() } : {}),
+      postponements: slot.retention.postponements,
+    },
+  } : {};
+  const tag = slot.offline ? releases.get(slot.offline.releaseId)?.tag : undefined;
+  const offline = slot.offline ? {
+    offline: { releaseId: slot.offline.releaseId, ...(tag ? { tag } : {}), at: slot.offline.at.toISOString(), reason: slot.offline.reason, ...(slot.offline.actorUserId ? { actorUserId: slot.offline.actorUserId } : {}) },
+  } : {};
+  return { ...retention, ...offline };
+}
+
+export function slotToDto(slots: ServiceSlots, physical: PhysicalSlot, releases: Map<string, Release>, projectSlug: string, hosts: HostNaming, policy: OfflinePolicy = DEFAULT_OFFLINE_POLICY): SlotDto {
   const slot = slots[physical];
   const role = roleOf(slots, physical);
   const release = slot.releaseId ? releases.get(slot.releaseId) : undefined;
@@ -37,6 +57,7 @@ export function slotToDto(slots: ServiceSlots, physical: PhysicalSlot, releases:
     readyReplicas: slot.readyReplicas,
     state: slot.state,
     host: role === 'prod' ? hosts.prodHost(projectSlug) : hosts.previewHost(projectSlug),
+    ...lifecycleOf(slot, role, releases, policy),
   };
 }
 

@@ -57,4 +57,5 @@ export const messages = {
   'events.deliveryState.delivered': '已投递',
   'events.deliveryState.retrying': '重试中',
   'events.deliveryState.dead': '死信',
+  'events.deliveryState.held': '维护暂存',
 } satisfies Messages;

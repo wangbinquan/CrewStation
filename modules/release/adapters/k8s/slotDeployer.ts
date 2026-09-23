@@ -37,5 +37,13 @@ export function kubernetesSlotDeployer(k8s: K8sClient): SlotDeployer {
       await k8s.delete(Resources.Deployment!, name, namespace);
       await k8s.delete(Resources.Service!, name, namespace);
     },
+    // 下线只删这个版本的 Deployment；标签对不上说明之后已有新版本部署上来，旧工作负载早已不在（RFC-021 design §2）。
+    removeWorkload: async (namespace, serviceName, physical, releaseId) => {
+      const name = slotName(serviceName, physical);
+      const dep = await k8s.get<K8sObject>(Resources.Deployment!, name, namespace);
+      if (!dep || dep.metadata.labels?.[LABELS.release] !== releaseId) return true;
+      await k8s.delete(Resources.Deployment!, name, namespace, { propagationPolicy: 'Background', ...(dep.metadata.uid ? { preconditions: { uid: dep.metadata.uid } } : {}) });
+      return true;
+    },
   };
 }

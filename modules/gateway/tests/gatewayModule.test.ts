@@ -35,7 +35,9 @@ function newGateway(): GatewayModule {
       getService: async (id) => services.find((s) => s.serviceId === id),
       serviceIdOfProject: async (projectId) => services.find((s) => s.projectId === projectId)?.serviceId,
     },
-    slots: { slotRoles: async () => ({ prod: prodPhysical, preview: prodPhysical === 'blue' ? 'green' : 'blue' }) },
+    slots: { slotRoles: async () => ({ prod: prodPhysical, preview: prodPhysical === 'blue' ? 'green' : 'blue' }), standbyEntry: async () => ({ empty: false }), notePreviewAccess: async () => {} },
+    access: { authorize: async () => 'admin', isMemberOrAdmin: async () => true },
+    users: { describe: async () => undefined },
     grants: {
       grantedOperations: async (caller) => ({ operations: caller === 'demo/demo' ? ['01a0bf5d-8f4b-7155-8e96-d9844e02dfa4'] : [], defaultOpen: ['01a0bf5d-8f4b-73dc-813d-bb1eeb744398'], operationRoutes: [{ id: '01a0bf5d-8f4b-7155-8e96-d9844e02dfa4', proxy: 'issues', method: 'POST', path: '/v1/issues' }, { id: '01a0bf5d-8f4b-73dc-813d-bb1eeb744398', proxy: 'issues', method: 'GET', path: '/v1/issues/{id}' }] }),
       listCallers: async () => ['demo/demo'],

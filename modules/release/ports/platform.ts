@@ -1,7 +1,23 @@
-import type { Actor, ComputeProfileSelector, ConfigEnv, ProjectId, ServiceId, ServicePlanDto } from '@crewstation/contracts';
+import type { Actor, ComputeProfileSelector, ConfigEnv, ProjectId, ServiceId, ServicePlanDto, UserId } from '@crewstation/contracts';
 
+/** `manage-slots`：下线待验证版本、推迟自动下线、重新部署历史版本（RFC-021，负责人与管理员）。 */
 export interface ProjectAuthorizer {
-  authorize(actor: Actor, projectId: ProjectId, action: 'publish' | 'switch-traffic' | 'view' | 'view-preview'): Promise<unknown>;
+  authorize(actor: Actor, projectId: ProjectId, action: 'publish' | 'switch-traffic' | 'view' | 'view-preview' | 'manage-slots'): Promise<unknown>;
+}
+
+/** 由 gateway 模块经装配提供：项目处于维护中且三个开关都拦，即破坏性迁移的维护窗口（RFC-021 M14、M17）。直接读库，不走缓存。 */
+export interface MaintenanceWindow {
+  open(serviceId: ServiceId): Promise<boolean>;
+}
+
+/** 由 project 模块提供：自动下线的提醒发给项目负责人。 */
+export interface ProjectOwners {
+  ownerOf(projectId: ProjectId): Promise<UserId | undefined>;
+}
+
+/** 提醒的送达通道；与开发会话空闲提醒同一种端口，渠道仍待 Q20（RFC-021 B9）。 */
+export interface SlotNotifier {
+  notify(projectId: ProjectId, users: UserId[], message: string): Promise<void>;
 }
 
 export interface ServiceResolver {
@@ -39,7 +55,6 @@ export interface ReleaseSettings {
   readonly userDomain: string;
   readonly serviceDomain: string;
   readonly registryBase: string;
-  readonly maintenanceWindow: boolean;
   readonly buildTimeoutSeconds: number;
   readonly deployTimeoutSeconds: number;
 }

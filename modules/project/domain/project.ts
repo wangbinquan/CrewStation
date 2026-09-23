@@ -30,8 +30,7 @@ const TRANSITIONS: Record<ProjectState, readonly ProjectState[]> = {
   provisioning: ['active', 'failed'],
   // active→active 是「重跑开通链确认一切就位」：管理员对已 active 的项目重开通时，
   // 它是唯一能把上一次的失败原因清掉的路径，否则那行原因会永远挂在工作台上。
-  active: ['active', 'paused', 'archived'],
-  paused: ['active', 'archived'],
+  active: ['active', 'archived'],
   failed: ['provisioning', 'archived'],
   archived: [],
 };

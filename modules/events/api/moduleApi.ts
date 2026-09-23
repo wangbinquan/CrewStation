@@ -1,5 +1,5 @@
 import type {
-  Actor, DeliveryDto, DeliveryState, EventTypeDto, LegacyProducedEvent, ProducedEvent, ProduceResultDto, ProjectId, ServiceActor, SubscriptionDto, UserId,
+  Actor, DeliveryDto, DeliveryState, EventTypeDto, LegacyProducedEvent, ProducedEvent, ProduceResultDto, ProjectId, ServiceActor, ServiceId, SubscriptionDto, UserId,
 } from '@crewstation/contracts';
 
 export interface DeliveryFilter {
@@ -28,4 +28,6 @@ export interface EventsModuleApi {
   replayDelivery(actor: Actor, deliveryId: string): Promise<DeliveryDto>;
   /** 内部：由投递 worker 调用，执行一次推送并推进投递状态机。 */
   deliver(deliveryId: string): Promise<DeliverOutcome>;
+  /** 补发维护暂存的投递（RFC-021）：给了服务只补它的；返回补发条数。 */
+  releaseHeld(serviceId?: ServiceId): Promise<number>;
 }

@@ -57,6 +57,18 @@ export function markDead(delivery: Delivery, error: string, now: Date): Delivery
   return { ...delivery, state: 'dead', nextAttemptAt: undefined, lastError: error, updatedAt: now };
 }
 
+/** 订阅方维护中（RFC-021 B5）：暂存，不算尝试、不进死信；崩溃遗留的 delivering 同样可以暂存。 */
+export function holdDelivery(delivery: Delivery, now: Date): Delivery {
+  if (!RESUMABLE.includes(delivery.state)) throw precondition(`投递 ${delivery.id} 处于 ${delivery.state}，不能暂存`, { state: delivery.state });
+  return { ...delivery, state: 'held', nextAttemptAt: undefined, updatedAt: now };
+}
+
+/** 退出维护或放开事件开关后补发：回到 pending，尝试次数不变。 */
+export function releaseHeldDelivery(delivery: Delivery, now: Date): Delivery {
+  if (delivery.state !== 'held') throw precondition(`投递 ${delivery.id} 不在暂存中，当前为 ${delivery.state}`, { state: delivery.state });
+  return { ...delivery, state: 'pending', nextAttemptAt: now, updatedAt: now };
+}
+
 /** 死信重放：回到 pending 并从第一次尝试重新计数。 */
 export function replayDelivery(delivery: Delivery, now: Date): Delivery {
   if (delivery.state !== 'dead') throw precondition(`只有 dead 的投递可以重放，当前为 ${delivery.state}`, { state: delivery.state });

@@ -58,4 +58,5 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   'events.deliveryState.delivered': 'Delivered',
   'events.deliveryState.retrying': 'Retrying',
   'events.deliveryState.dead': 'Dead letter',
+  'events.deliveryState.held': 'Held for maintenance',
 };

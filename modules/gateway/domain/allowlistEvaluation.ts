@@ -2,7 +2,8 @@ import type { AllowlistDocument, OperationRoute, WorkloadIdentity } from '@crews
 import { PLATFORM_PATHS, PLATFORM_SERVICE_HOSTS, matchesOperationPath } from '@crewstation/contracts';
 
 export interface EvaluationTarget { host: string; method: string; path: string }
-export interface Evaluation { allowed: boolean; targetIdentity: string; reason?: string }
+/** `unavailable`：目标正式版本维护中（RFC-021），ForwardAuth 回 503 而不是 403。 */
+export interface Evaluation { allowed: boolean; targetIdentity: string; reason?: string; unavailable?: { message: string; retryAfterSeconds?: number } }
 
 export interface DomainNames { serviceDomain: string }
 

@@ -13,7 +13,7 @@ import { ProjectStateBadge } from './ProjectStateBadge';
 export function ProjectLifecycleCard({ project, isAdmin, unavailable }: { readonly project: ProjectDto; readonly isAdmin: boolean; readonly unavailable: boolean }) {
   const t = useT(), lock = useRef(false);
   const archive = useApiMutation(() => api.projects.archive(project.id), { invalidate: [queryKeys.projects(), ['market'], queryKeys.gateway()] });
-  const canArchive = ['active', 'paused', 'failed'].includes(project.state);
+  const canArchive = ['active', 'failed'].includes(project.state);
   const submit = async () => {
     if (lock.current || unavailable || !canArchive || !isAdmin) return;
     lock.current = true;

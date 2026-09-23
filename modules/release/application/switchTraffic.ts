@@ -1,18 +1,20 @@
 import type { Actor, ServiceId, TrafficSwitchDto, TrafficSwitchRequest } from '@crewstation/contracts';
 import { DomainTopic } from '@crewstation/contracts';
 import { newId, notFound, precondition } from '@crewstation/kernel';
-import { rollbackBlockedBy } from '../domain/migrationPolicy';
+import { assertSwitchAllowed, rollbackBlockedBy } from '../domain/migrationPolicy';
 import { physicalOf, roleOf, switchTraffic } from '../domain/slots';
 import type { ReleaseUseCaseDeps } from './dependencies';
 import { switchToDto } from './toDto';
 
 /** 晋级与回退都是负责人的一次切流（G15）；破坏性迁移之后禁止切回旧版本。 */
-export function switchTrafficUseCase(deps: Pick<ReleaseUseCaseDeps, 'uow' | 'authorizer' | 'services' | 'clock'>) {
-  const { uow, authorizer, services, clock } = deps;
+export function switchTrafficUseCase(deps: Pick<ReleaseUseCaseDeps, 'uow' | 'authorizer' | 'services' | 'clock' | 'maintenance'>) {
+  const { uow, authorizer, services, clock, maintenance } = deps;
   return async (actor: Actor, serviceId: ServiceId, input: TrafficSwitchRequest): Promise<TrafficSwitchDto> => {
     const svc = await services.resolveServiceById(serviceId);
     if (!svc) throw notFound('服务', serviceId);
     await authorizer.authorize(actor, svc.projectId, 'switch-traffic');
+    // 维护窗口在事务外读（跨模块查询）；目标版本在事务内锁槽之后再核对一次是否就是它。
+    const windowOpen = await maintenance.open(serviceId);
     const now = clock.now();
     return uow.run(async (scope) => {
       const slots = await scope.slots.get(serviceId);
@@ -29,6 +31,8 @@ export function switchTrafficUseCase(deps: Pick<ReleaseUseCaseDeps, 'uow' | 'aut
         const restriction = currentRelease.manifest.spec.release.migration.destructive ? '含破坏性迁移' : '的发布配置明确禁止回退';
         throw precondition(`当前版本 ${currentRelease.tag} ${restriction}，不能切回旧版本 ${targetRelease.tag}`);
       }
+      // 切流到含破坏性迁移的版本同样要求维护窗口（Design §6.5「部署与切流」，RFC-021 M27）。
+      if (targetRelease) assertSwitchAllowed(targetRelease.manifest?.spec.release.migration, targetRelease.tag, windowOpen);
       await scope.slots.save(next);
       // 切流永远是「待命槽接管生产流量」：目标槽切之前的角色是 preview，切之后是 prod。
       // 记的是发布的迁移，不是物理槽的名字，所以 fromSlot 取目标槽的旧角色而不是当前 active 槽的角色。

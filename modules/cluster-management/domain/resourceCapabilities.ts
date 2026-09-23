@@ -22,7 +22,8 @@ export function resourceCapabilities(row: ClusterResource, facts: InventoryFacts
     allow('restart', 'release', ['保留当前发布、配置和物理槽，等待新 Pod 就绪']);
     allow('scale', 'release', ['副本覆盖保留到管理员恢复发布配置'], { minReplicas: 1, maxReplicas: Number(row.facts.maxReplicas ?? 1) });
     allow('restore-replicas', 'release', ['清除运维覆盖，应用当前发布的 Manifest 副本数']);
-    if (row.slotRole !== 'prod') allow('delete', 'release', ['删除试用槽工作负载并将槽设为不可切流；保留发布历史与 Service']);
+    // RFC-021 B7：与项目侧「下线」是同一个结果。
+    if (row.slotRole !== 'prod') allow('delete', 'release', ['下线待验证版本：删除工作负载，槽标为已下线（集群管理）；保留发布记录与 Service，负责人可从发布记录重新部署']);
     else actions.find((a) => a.action === 'delete')!.reason = '正式槽正在承接流量，请先切流到就绪目标';
     return actions;
   }

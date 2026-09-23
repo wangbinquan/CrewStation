@@ -117,7 +117,6 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
 
   'projects.state.provisioning': 'Provisioning',
   'projects.state.active': 'Provisioned',
-  'projects.state.paused': 'Paused',
   'projects.state.archived': 'Archived',
   'projects.state.failed': 'Provisioning failed',
 
@@ -324,7 +323,6 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   'projects.provision.provisioning': 'Provisioning. This is the server state; the API does not provide progress for each stage.',
   'projects.provision.active': 'Project resources are provisioned. Check the first build and deployment under Releases and rollout.',
   'projects.provision.failed': 'Provisioning failed. Address the reported cause, then requeue provisioning.',
-  'projects.provision.paused': 'The project is paused. This does not mean a release or rollout has completed.',
   'projects.provision.archived': 'The project is archived and will not continue provisioning.',
   'projects.provision.queued': 'Provisioning was requeued. Being queued does not mean it has completed. Refresh to check subsequent status.',
   'projects.provision.config': 'Set production config',

@@ -82,3 +82,24 @@ describe('市场仅聚合正式部署且保留未知', () => {
     expect(await result.json()).toMatchObject({ projectId, canPreview: false, canDevelop: false, production: { status: 'not-deployed' } });
   });
 });
+
+describe('RFC-021 市场卡片的维护标注', () => {
+  const prod = slot({ state: 'ready', tag: 'v1.0.0', commitSha: 'old', releaseId: '01a0bf5d-8f4b-7dda-8ca7-d5d5f8a92b45' as SlotDto['releaseId'] });
+  const withMaintenance = (m: { users: boolean; allow?: string[]; end?: Date } | undefined, get = async () => listing) =>
+    marketAppUseCases({ slots: async () => [prod], get, list: async () => ({ items: [listing] }), maintenance: async () => (m ? { switches: { users: m.users }, allowUserIds: m.allow ?? [], reason: '换数据库', ...(m.end ? { expectedEndAt: m.end } : {}) } : undefined) }, clock);
+
+  test('维护中对所有人显示原因与预计恢复时间；用户流量拦住时，非成员被拦、成员与临时指定的人不被拦', async () => {
+    const end = new Date('2026-09-13T06:00:00.000Z');
+    expect((await withMaintenance({ users: true, end }).getMarketApp(actor, projectId)).maintenance).toEqual({ reason: '换数据库', expectedEndAt: end.toISOString(), blocked: true });
+    expect((await withMaintenance({ users: true }, async () => ({ ...listing, canPreview: true })).getMarketApp(actor, projectId)).maintenance).toEqual({ reason: '换数据库', blocked: false });
+    expect((await withMaintenance({ users: true, allow: [actor.userId] }).getMarketApp(actor, projectId)).maintenance?.blocked).toBe(false);
+    expect((await withMaintenance({ users: false }).getMarketApp(actor, projectId)).maintenance).toEqual({ reason: '换数据库', blocked: false });
+    const listed = (await withMaintenance({ users: true }).listMarketApps(actor, { q: '', limit: 20 })).items[0]!;
+    expect(MarketAppDtoSchema.parse(listed).maintenance?.blocked).toBe(true);
+  });
+
+  test('不在维护中、或装配里没有维护来源时，卡片不带维护字段', async () => {
+    expect(await withMaintenance(undefined).getMarketApp(actor, projectId)).not.toHaveProperty('maintenance');
+    expect(await setup(async () => [prod]).getMarketApp(actor, projectId)).not.toHaveProperty('maintenance');
+  });
+});

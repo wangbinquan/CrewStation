@@ -1,7 +1,16 @@
 import type {
   SetPlatformRoleRequest, AuthMethod, CurrentUserDto, EffectiveForwardingDto, IdentityForwardingDto, JwksDocument, LoginDiscoveryDto, LoginPolicyDto,
-  OidcLoginFailureCode, OidcProbeResult, OidcProviderDto, OidcProviderId, ProjectId, ServiceId, TaskId, UserDto, UserId, WorkloadIdentity,
+  OfflineReason, OidcLoginFailureCode, OidcProbeResult, OidcProviderDto, OidcProviderId, ProjectId, ServiceId, TaskId, UserDto, UserId, WorkloadIdentity,
 } from '@crewstation/contracts';
+
+/**
+ * prod／preview 主机在放行前的入口状态（RFC-021）；与 `ports/serviceEntry.ts` 同形——api 层只能引用自己与契约，
+ * 端口层不能引用 api 层，所以两处各写一份（gateway 的 `Evaluation` 也是这么处理的）。
+ */
+export type ServiceEntryVerdict =
+  | { readonly kind: 'open' }
+  | { readonly kind: 'maintenance'; readonly projectSlug: string; readonly reason: string; readonly expectedEndAt?: string; readonly retryAfterSeconds?: number }
+  | { readonly kind: 'not-deployed'; readonly projectSlug: string; readonly offline?: { readonly at: string; readonly reason: OfflineReason; readonly tag?: string } };
 
 /** 登录提交的原始字段（表单或 JSON），由用例按契约 Schema 校验。 */
 export type LoginInput = Record<string, unknown>;
@@ -70,7 +79,9 @@ export type UserAuthDecision =
   | { kind: 'allow'; user: UserDto; audience: string; authMethod: AuthMethod; injected: InjectedUserIdentity }
   | { kind: 'login-redirect'; location: string }
   | { kind: 'unauthenticated'; message: string }
-  | { kind: 'forbidden'; message: string };
+  | { kind: 'forbidden'; message: string }
+  /** RFC-021：正式版本维护中（维护页）或待命槽上没有版本（未部署页），一律 503。 */
+  | { kind: 'unavailable'; entry: Exclude<ServiceEntryVerdict, { kind: 'open' }> };
 
 export interface ServiceAuthRequest {
   /** X-Forwarded-For；第一跳即源 Pod IP。 */
@@ -91,7 +102,9 @@ export interface InjectedServiceIdentity {
 
 export type ServiceAuthDecision =
   | { kind: 'allow'; caller: WorkloadIdentity; audience: string; traceId: string; injected: InjectedServiceIdentity }
-  | { kind: 'forbidden'; message: string; reason?: string };
+  | { kind: 'forbidden'; message: string; reason?: string }
+  /** RFC-021：目标正式版本维护中且服务域开关打开。 */
+  | { kind: 'unavailable'; message: string; retryAfterSeconds?: number };
 
 /** 一枚开发会话令牌绑定的会话、项目、服务与用户；签发与校验两侧共用这一份形状。 */
 export interface DevSessionBinding {
@@ -158,6 +171,8 @@ export interface IdentityModuleApi {
   logoutRedirect(returnTo: string | undefined, context?: LoginContext): string;
   /** 用户域上被拒绝的浏览器导航要显示的页面：原因原话＋返回工作台。 */
   forbiddenPage(message: string, context?: LoginContext): string;
+  /** RFC-021：维护页与未部署待验证版本的说明页。 */
+  unavailablePage(entry: Exclude<ServiceEntryVerdict, { kind: 'open' }>, context?: LoginContext): string;
 
   /** 会话令牌 → 用户；无效、过期或用户不存在返回 undefined。 */
   resolveSession(token: string): Promise<UserDto | undefined>;

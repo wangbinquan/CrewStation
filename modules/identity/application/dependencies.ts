@@ -11,6 +11,7 @@ import type { OidcUnitOfWork } from '../ports/oidcUnitOfWork';
 import type { PasswordHasher } from '../ports/passwordHasher';
 import type { SecretCipher } from '../ports/secretCipher';
 import type { PreviewAccess } from '../ports/previewAccess';
+import type { ServiceEntry } from '../ports/serviceEntry';
 import type { ProjectDirectory } from '../ports/projectDirectory';
 import type { TokenService } from '../ports/tokenService';
 import type { UserRepository } from '../ports/userRepository';
@@ -32,6 +33,7 @@ export interface IdentityUseCaseDeps {
   secrets: SecretCipher;
   hosts: HostResolver;
   previewAccess: PreviewAccess;
+  serviceEntry: ServiceEntry;
   projects: ProjectDirectory;
   workloads: WorkloadLookup;
   allowlist: AllowlistEvaluator;

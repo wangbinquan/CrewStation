@@ -2,6 +2,7 @@ import type { AllowlistDocument, WorkloadIdentity } from '@crewstation/contracts
 import type { Evaluation, EvaluationTarget } from '../domain/allowlistEvaluation';
 import { evaluateServiceCall } from '../domain/allowlistEvaluation';
 import type { GatewayUseCaseDeps } from './dependencies';
+import type { ServiceBlock } from './maintenance';
 
 type ServiceKind = 'DigitalWorker' | 'APIProxy' | 'EventProducer';
 
@@ -33,7 +34,7 @@ async function composeAllowlist(deps: GatewayUseCaseDeps): Promise<Pick<Allowlis
 }
 
 /** 放行表带版本整体重算；评估侧只读最新版并短暂缓存，失联时按最后一版继续放行不超过 maxStaleSeconds。 */
-export function allowlistUseCases(deps: GatewayUseCaseDeps) {
+export function allowlistUseCases(deps: GatewayUseCaseDeps, maintenanceBlock?: (caller: WorkloadIdentity, targetIdentity: string) => Promise<ServiceBlock | undefined>) {
   let cached: { doc: AllowlistDocument; at: number } | undefined;
   /**
    * `onDemand`：评估侧发现没有可用文档时的重建。推导内容期间别的进程可能已经写出可用的新版本，
@@ -87,7 +88,10 @@ export function allowlistUseCases(deps: GatewayUseCaseDeps) {
       if (!doc) return { allowed: false, targetIdentity: target.host, reason: '放行表尚未生成' };
       const ageSeconds = (Date.now() - new Date(doc.generatedAt).getTime()) / 1000;
       if (ageSeconds > doc.maxStaleSeconds * 24) deps.logger.warn('allowlist very stale', { version: doc.version, ageSeconds });
-      return evaluateServiceCall(doc, caller, target, { serviceDomain: deps.settings.serviceDomain });
+      const verdict = evaluateServiceCall(doc, caller, target, { serviceDomain: deps.settings.serviceDomain });
+      // 放行表允许之后再看目标的正式版本是否维护中（RFC-021 M7、M25）：拦下时是 503，不是 403。
+      const block = verdict.allowed && maintenanceBlock ? await maintenanceBlock(caller, verdict.targetIdentity) : undefined;
+      return block ? { allowed: false, targetIdentity: verdict.targetIdentity, reason: block.message, unavailable: block } : verdict;
     },
   };
 }

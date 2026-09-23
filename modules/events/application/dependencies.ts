@@ -1,4 +1,5 @@
 import type { Clock } from '@crewstation/kernel';
+import type { DeliveryHold } from '../ports/deliveryHold';
 import type { EventPusher } from '../ports/eventPusher';
 import type { EventsSettings } from '../ports/eventsSettings';
 import type { HandlerEndpointResolver } from '../ports/handlerEndpointResolver';
@@ -11,6 +12,7 @@ export interface EventsUseCaseDeps {
   services: ServiceResolver;
   projects: ProjectAuthorizer;
   endpoints: HandlerEndpointResolver;
+  hold: DeliveryHold;
   pusher: EventPusher;
   settings: EventsSettings;
   clock: Clock;

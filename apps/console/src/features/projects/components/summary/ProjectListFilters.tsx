@@ -16,7 +16,7 @@ export function ProjectListFilters({ search, items, userId, busy, apply }: {
   return <form className={styles.filters} onSubmit={(event) => { event.preventDefault(); if (!busy) apply({ q, state, ownerUserId: owner }); }}>
     <label>{t('projects.summary.search')}<input aria-label={t('projects.summary.search')} maxLength={120} value={q} onChange={(e) => setQ(e.target.value)} /></label>
     <label>{t('projects.summary.projectState')}<select aria-label={t('projects.summary.projectState')} value={state ?? ''} onChange={(e) => setState(e.target.value as ProjectListSearch['state'] || undefined)}>
-      <option value="">{t('projects.summary.allStates')}</option>{(['provisioning', 'active', 'paused', 'archived', 'failed'] as const).map((value) => <option key={value} value={value}>{t(`projects.state.${value}`)}</option>)}
+      <option value="">{t('projects.summary.allStates')}</option>{(['provisioning', 'active', 'archived', 'failed'] as const).map((value) => <option key={value} value={value}>{t(`projects.state.${value}`)}</option>)}
     </select></label>
     <label>{t('projects.summary.owner')}<select aria-label={t('projects.summary.owner')} value={owner ?? ''} onChange={(e) => setOwner(e.target.value || undefined)}>
       <option value="">{t('projects.summary.allOwners')}</option>{[...owners].map(([id, name]) => <option key={id} value={id}>{name}</option>)}

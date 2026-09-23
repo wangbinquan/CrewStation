@@ -28,3 +28,21 @@ export const routes = gatewaySchema.table('routes', {
   routes: jsonDocument('routes').notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
 });
+
+/** RFC-021：正式版本维护，每个服务最多一行；body 是开关、原因、预计恢复时间与临时指定的人。 */
+export const serviceMaintenance = gatewaySchema.table('service_maintenance', {
+  serviceId: text('service_id').primaryKey(),
+  projectId: text('project_id').notNull(),
+  body: jsonDocument('body').notNull(),
+  revision: integer('revision').notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
+});
+
+export const maintenanceEvents = gatewaySchema.table('maintenance_events', {
+  id: text('id').primaryKey(),
+  serviceId: text('service_id').notNull(),
+  kind: text('kind').notNull(),
+  actorUserId: text('actor_user_id').notNull(),
+  at: timestamp('at', { withTimezone: true }).notNull(),
+  body: jsonDocument('body').notNull(),
+});
