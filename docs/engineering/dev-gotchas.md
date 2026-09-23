@@ -770,3 +770,11 @@ git reset -q HEAD -- <自己的路径>                     # 共享暂存区里�
 开发页的面板状态存在**每个用户每个任务**的个人布局里，e2e／量测脚本以 `dev-admin` 打开 `?view=code`、`panel=full` 等地址都会保存进去；
 作者本人也是 `dev-admin` 时，从左栏进开发页就会落到脚本最后留下的那个面板（2026-09-23「页面自己在到处跳」）。
 跑完实机验收把布局收起（打开一次 `/dev-session?view=cli`），或改用 `dev-developer` 之类的第二身份；不要在作者正在看的会话上跑量测。
+
+### 例行重读不要用 `isFetching` 禁用入口或决定挂载
+
+2026-09-23 按钮统一把刷新按钮换成定时自动重读时连撞两处：接口目录的调用方选择把 `ready` 写成「已选项目不在重读」，每 30 秒一次的
+自动重读让下方整张接口列表卸载重建；API 申请审批的 `busy` 含 `isFetching`，批准／驳回每 30 秒变灰一闪。只在首次读取与换页
+（查询键变了，`isPending`）时禁用入口或不挂载；写操作之后的重读由 `useApiMutation` 在 `onSuccess` 里等 invalidate 完成，这期间
+`isPending` 仍为真，不需要另看 `isFetching`。`useAdminPage` 为此提供 `loading`。用例的锁法：扣住重读的回执，断言入口仍可用、
+子树还是同一个节点（`adminRequestPages`、`catalogCallerPicker`、`clusterMetrics` 的趋势前移）。
