@@ -28,8 +28,12 @@ test('轮询在后台暂停、恢复前台补查；停用与卸载移除回调',
 });
 
 test('例行轮询静默进行，只有手动刷新让界面进入重读状态', async () => {
-  let reads = 0, release: (() => void) | undefined;
-  const refetch = async () => { reads += 1; await new Promise<void>((resolve) => { release = resolve; }); };
+  // 每次读各自排队、一起放行：10ms 的轮询会在点击之后再读一次，只记最后一个 resolver 就会放掉轮询、漏掉手动那次
+  //（CI 带覆盖率更慢，2026-09-23 连红三次）。
+  let reads = 0;
+  const pending: Array<() => void> = [];
+  const release = () => { for (const resolve of pending.splice(0)) resolve(); };
+  const refetch = async () => { reads += 1; await new Promise<void>((resolve) => { pending.push(resolve); }); };
   function View() {
     const { refresh, refreshing } = usePolledRefresh(refetch, 10);
     return <button disabled={refreshing} onClick={() => void refresh()}>{refreshing ? '更新中' : '刷新'}</button>;
@@ -40,11 +44,12 @@ test('例行轮询静默进行，只有手动刷新让界面进入重读状态',
     // 轮询已经在读，但按钮不变灰、文案不跳。
     await act(async () => { await new Promise((resolve) => setTimeout(resolve, 40)); });
     expect(reads).toBeGreaterThan(0); expect(button().disabled).toBe(false); expect(button().textContent).toBe('刷新');
-    await act(async () => { release?.(); });
+    await act(async () => { release(); });
     // 用户自己点的刷新照旧显示忙，读完恢复。
     await act(async () => { button().click(); });
     expect(button().disabled).toBe(true); expect(button().textContent).toBe('更新中');
-    await act(async () => { release?.(); await Promise.resolve(); });
+    // 放行后等一个宏任务，让读取的整条 await 链走完；期间新到的轮询不影响按钮。
+    await act(async () => { release(); await new Promise((resolve) => setTimeout(resolve, 0)); });
     expect(button().disabled).toBe(false); expect(button().textContent).toBe('刷新');
-  } finally { ui.unmount(); release?.(); }
+  } finally { ui.unmount(); release(); }
 });
