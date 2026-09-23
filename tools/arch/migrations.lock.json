@@ -53,6 +53,7 @@
     "modules/gateway/adapters/persistence/migrations/0003_resource_identity.sql": "6746becca231f1446ac91c4f6c4043c61d4e7bc07b3a00ee9af64805ce776a89",
     "modules/gateway/adapters/persistence/migrations/0004_resource_identity.identity.json": "466102c56d1258cbb432aa821f64dbd11d5692e5fa4cac091fe31b62033a5181",
     "modules/gateway/adapters/persistence/migrations/0005_maintenance.sql": "caae18be785d954446470ed3a7ebec8f880b212b93c271ccd5d58446ff969516",
+    "modules/gateway/adapters/persistence/migrations/0006_rate_limits.sql": "5c2afbf73c85d332023a347f531ab187279a46b1455a5b5eadfd3c98cf84fa4c",
     "modules/identity/adapters/persistence/migrations/0001_create_schema.sql": "cb434db2edcff5c1b0d3a038e2b107403805f63fb7644c6c880a64d980e8a78d",
     "modules/identity/adapters/persistence/migrations/0002_users.sql": "f09e4e05f34763d7b8b4d5c997b054e0b649845bba7efe0ef47514cb50503909",
     "modules/identity/adapters/persistence/migrations/0003_signing_keys.sql": "481656bd24c539cbc98be9e7b5938069ddf0ab4db86490c4cc07b3eb35f24d6d",

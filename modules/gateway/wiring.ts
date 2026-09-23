@@ -11,6 +11,7 @@ import type { Database, MigrationSet, ResourceIdentityDirectory } from '@crewsta
 import { readMigrationDir } from '@crewstation/persistence';
 import type { Hono } from 'hono';
 import { traefikApplier } from './adapters/k8s/traefikApplier';
+import { drizzleRateLimitRepository } from './adapters/persistence/drizzleRateLimits';
 import { drizzleAllowlistRepository, drizzlePodIdentityRepository, drizzleRouteRepository } from './adapters/persistence/drizzleRepositories';
 import { drizzleMaintenanceUnitOfWork } from './adapters/persistence/drizzleMaintenance';
 import type { GatewayModuleApi } from './api/moduleApi';
@@ -19,9 +20,11 @@ import type { GatewayUseCaseDeps } from './application/dependencies';
 import { maintenanceUseCases } from './application/maintenance';
 import { checkAllowlist } from './application/allowlistCheck';
 import { observedPodOf, podIdentityUseCases } from './application/podIdentities';
+import { rateLimitUseCases } from './application/rateLimits';
 import { routeUseCases } from './application/reconcileRoutes';
 import { gatewayRoutes } from './http/gatewayRoutes';
 import { maintenanceRoutes } from './http/maintenanceRoutes';
+import { rateLimitRoutes } from './http/rateLimitRoutes';
 import type { GrantSource, HostNaming, ProjectAccess, ServiceDirectory, SlotRoles, UserDirectory } from './ports/directories';
 import type { GatewayApplier, GatewaySettings } from './ports/gatewayApply';
 import { allowlistCheckWorker } from './workers/allowlistCheck';
@@ -71,6 +74,7 @@ export function createGatewayModule(deps: GatewayModuleDeps): GatewayModule {
     allowlists: drizzleAllowlistRepository(deps.db),
     pods: drizzlePodIdentityRepository(deps.db),
     routes: drizzleRouteRepository(deps.db),
+    rateLimits: drizzleRateLimitRepository(deps.db),
     maintenanceUow: drizzleMaintenanceUnitOfWork(deps.db),
     access: deps.access,
     users: deps.users,
@@ -88,8 +92,9 @@ export function createGatewayModule(deps: GatewayModuleDeps): GatewayModule {
   const maintenance = maintenanceUseCases(useCaseDeps);
   const allowlist = allowlistUseCases(useCaseDeps, maintenance.serviceCallBlock);
   const pods = podIdentityUseCases(useCaseDeps);
+  const limits = rateLimitUseCases(useCaseDeps);
   const api: GatewayModuleApi = {
-    name: 'gateway', ...routes, ...allowlist, evaluate: allowlist.evaluate, lookupByIp: pods.lookupByIp, purgeIdentityTombstones: pods.purgeTombstones, ...maintenance,
+    name: 'gateway', ...routes, ...allowlist, evaluate: allowlist.evaluate, lookupByIp: pods.lookupByIp, purgeIdentityTombstones: pods.purgeTombstones, ...maintenance, ...limits,
     checkAllowlist: () => checkAllowlist(useCaseDeps, allowlist.verifyAllowlist),
     syncObservedPod: (pod, gone) => pods.syncPod(observedPodOf(pod, gone)),
     relistObservedPods: (list) => pods.relistPods(list.map((pod) => observedPodOf(pod, false))),
@@ -114,7 +119,7 @@ export function createGatewayModule(deps: GatewayModuleDeps): GatewayModule {
     .on(DomainTopic.openPolicyChanged, async () => { await allowlist.rebuildAllowlist(); });
   return {
     api,
-    http: [gatewayRoutes(api, deps.isAdmin), maintenanceRoutes(api, deps.isAdmin)],
+    http: [gatewayRoutes(api, deps.isAdmin), maintenanceRoutes(api, deps.isAdmin), rateLimitRoutes(api, deps.isAdmin)],
     workers: [
       identityTombstoneWorker(pods.purgeTombstones, logger), allowlistCheckWorker(api.checkAllowlist, logger),
       ...(deps.ledger ? [routeLedgerResyncWorker(routes.resyncRouteLedger, logger)] : []),

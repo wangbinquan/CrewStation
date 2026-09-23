@@ -46,3 +46,12 @@ export const maintenanceEvents = gatewaySchema.table('maintenance_events', {
   at: timestamp('at', { withTimezone: true }).notNull(),
   body: jsonDocument('body').notNull(),
 });
+
+/** RFC-025 T10：限流策略，平台默认一行（scope 'platform'），项目覆盖每个项目最多一行（scope 为项目 ID）。 */
+export const rateLimits = gatewaySchema.table('rate_limits', {
+  scope: text('scope').primaryKey(),
+  body: jsonDocument('body').notNull(),
+  revision: integer('revision').notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
+  updatedBy: text('updated_by').notNull(),
+});

@@ -214,6 +214,22 @@ describe('createApiClient：请求形状', () => {
     expect(JSON.parse(calls[6]?.body ?? '{}')).toEqual({ expectedRevision: 1 });
   });
 
+  test('RFC-025 T10：限流的平台默认与项目覆盖各打到正确的方法与路径', async () => {
+    const { calls, fetchImpl } = fakeFetch(() => json(200, {}));
+    const client = createApiClient({ fetch: fetchImpl });
+    const bucket = { average: 1, burst: 1 };
+    const limits = { platformApi: { perUser: bucket, inFlightPerUser: 1 }, userDomain: { perUser: bucket, perHost: bucket }, serviceDomain: { perSource: bucket, perTarget: bucket } };
+    await client.platformSettings.rateLimits();
+    await client.platformSettings.setRateLimits({ ...limits, expectedRevision: 0 });
+    await client.platformSettings.projectRateLimits('prj/1');
+    await client.platformSettings.setProjectRateLimits('prj/1', { override: null, expectedRevision: 2 });
+    expect(calls.map((c) => `${c.method} ${c.url}`)).toEqual([
+      'GET /v1/admin/settings/rate-limits', 'PUT /v1/admin/settings/rate-limits',
+      `GET /v1/admin/projects/${encodeURIComponent('prj/1')}/rate-limits`, `PUT /v1/admin/projects/${encodeURIComponent('prj/1')}/rate-limits`,
+    ]);
+    expect(JSON.parse(calls[3]?.body ?? '{}')).toEqual({ override: null, expectedRevision: 2 });
+  });
+
   test('RFC-025：重新部署的统一预检是只读的 GET', async () => {
     const { calls, fetchImpl } = fakeFetch(() => json(200, { ok: false, reason: { code: 'manifest-outdated', message: '旧写法', hint: '发布新版本' } }));
     const client = createApiClient({ fetch: fetchImpl });

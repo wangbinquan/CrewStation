@@ -239,6 +239,8 @@ ResourceActionSchema = z.object({ id: ResourceActionIdSchema, enabled: z.boolean
 - 超额：Traefik 返回 429；是否带 `Retry-After` 与多副本网关的全局计数（Traefik 的分布式后端）在 T2 实测（B9）。不带时由网关的错误页中间件补上；分布式后端不可用时，默认值按网关副本数折算并在平台设置里写明。
 - 工作台：`packages/api-client` 把 429 解析成错误种类 `rate_limited`（带 `retryAfter`）；`useApiQuery` 对它按 `retryAfter` 自动重读并显示「请求过于频繁，N 秒后自动重试」；变更请求不自动重发。命令行照同一规则提示。能力说明 MCP 写明数字人会收到 429 与 `Retry-After`。
 
+> **实施补记（2026-09-24，T10 第一步：策略的存取）**：限流策略由 gateway 自己存（`gateway.rate_limits`：平台默认一行，项目覆盖每个项目最多一行，按版本号乐观并发），校验照契约（令牌桶的突发不能小于平均，0 与过大的值不收），库里读出来再校验一遍、不合格的按没有处理。管理接口：`GET/PUT /v1/admin/settings/rate-limits`（平台默认，没人改过时是内置默认、版本 0）与 `GET/PUT /v1/admin/projects/:projectId/rate-limits`（项目覆盖：只覆盖用户域与服务域，写了哪一项整项照它；`override: null` 撤掉），只给管理员。Q4 的两个「合计」只给了平均，突发按平均的两倍。投影成 `rate-limit-policy` 记录、调和器渲染中间件、路由挂上中间件与界面在后面几步；这一步不改变任何请求的放行。
+>
 > **T2 实测（2026-09-23，本机 Traefik v3.7.13，临时探针路由测完已删）**：
 >
 > - `rateLimit` 超额：429，带 `Retry-After`（向上取整的秒数，2 次／秒时为 `1`）与 `X-Retry-In`（毫秒精度），正文是纯文本 `Too Many Requests`、不是平台错误体——`packages/api-client` 据此把它认作 `rate_limited`（平台额度不足的 429 带 `quota_exceeded` 错误体，不混淆）。

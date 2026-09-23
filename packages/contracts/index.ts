@@ -27,6 +27,7 @@ export * from './api/project';
 export * from './api/compute/computeProfile';
 export * from './api/release';
 export * from './api/maintenance';
+export * from './api/rateLimits';
 export * from './api/devSession';
 export * from './api/devSessionRecovery';
 export * from './api/nativeTerminal';

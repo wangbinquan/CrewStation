@@ -1,4 +1,4 @@
-import type { Actor, AllowlistDocument, ExitMaintenanceRequest, MaintenanceDto, OfflineReason, RouteEntry, ServiceId, ServiceMaintenanceView, SetMaintenanceRequest, UserId, WorkloadIdentity } from '@crewstation/contracts';
+import type { Actor, AllowlistDocument, ExitMaintenanceRequest, MaintenanceDto, OfflineReason, ProjectId, ProjectRateLimitsDto, RateLimits, RateLimitSettingsDto, RouteEntry, ServiceId, ServiceMaintenanceView, SetMaintenanceRequest, SetProjectRateLimitsRequest, SetRateLimitSettingsRequest, UserId, WorkloadIdentity } from '@crewstation/contracts';
 
 export interface EvaluationTarget { host: string; method: string; path: string }
 /** `unavailable`：目标正式版本维护中（RFC-021），ForwardAuth 回 503 而不是 403。 */
@@ -55,4 +55,12 @@ export interface GatewayModuleApi {
   /** release：项目处于维护中且三个开关都拦（破坏性迁移窗口）。 */
   maintenanceWindowOpen(serviceId: ServiceId): Promise<boolean>;
   maintenanceOf(serviceId: ServiceId): Promise<MaintenanceSnapshot | undefined>;
+
+  // —— RFC-025 T10：网关限流策略（平台默认与项目覆盖，仅管理员） ——
+  getRateLimits(actor: Actor): Promise<RateLimitSettingsDto>;
+  setRateLimits(actor: Actor, input: SetRateLimitSettingsRequest): Promise<RateLimitSettingsDto>;
+  getProjectRateLimits(actor: Actor, projectId: ProjectId): Promise<ProjectRateLimitsDto>;
+  setProjectRateLimits(actor: Actor, projectId: ProjectId, input: SetProjectRateLimitsRequest): Promise<ProjectRateLimitsDto>;
+  /** 项目生效的用户域与服务域（覆盖＋平台默认），渲染网关中间件用。 */
+  effectiveRateLimits(projectId: ProjectId): Promise<Pick<RateLimits, 'userDomain' | 'serviceDomain'>>;
 }

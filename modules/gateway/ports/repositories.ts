@@ -58,3 +58,22 @@ export interface RouteRepository {
   saveForService(serviceId: string, serviceName: string, routes: RouteEntry[]): Promise<void>;
   listAll(): Promise<Array<{ serviceId: string; serviceName: string; routes: RouteEntry[] }>>;
 }
+
+/** 一行限流策略：平台默认的 body 是整套限流，项目覆盖的 body 是覆盖的那几项（读出来由用例按契约校验）。 */
+export interface RateLimitRow {
+  readonly scope: string;
+  readonly body: unknown;
+  readonly revision: number;
+  readonly updatedAt: Date;
+  readonly updatedBy: UserId;
+}
+
+/** RFC-025 T10：限流策略的存取，按版本号乐观并发（expectedRevision 为 0 表示还没有这一行）。 */
+export interface RateLimitRepository {
+  get(scope: string): Promise<RateLimitRow | undefined>;
+  list(): Promise<RateLimitRow[]>;
+  /** 写成返回新的一行；版本号对不上（别人先改过）返回 undefined。 */
+  save(scope: string, body: unknown, expectedRevision: number, at: Date, by: UserId): Promise<RateLimitRow | undefined>;
+  /** 按版本号删（撤掉项目覆盖）；对不上返回 false。 */
+  remove(scope: string, expectedRevision: number): Promise<boolean>;
+}
