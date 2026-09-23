@@ -135,7 +135,8 @@ describe.skipIf(!session?.project)('项目工作台信息架构（RFC-020）', (
     const text = await page.text();
     expect(text).not.toContain('切流记录'); expect(text).toContain('发布记录');
     const actions = await texts(page, 'section[aria-label="实际部署版本"] button');
-    expect(actions.some((label) => label.startsWith('上线 ') || label.startsWith('回退到 ')) || text.includes('由项目负责人上线') || text.includes('尚未部署')).toBe(true);
+    // RFC-021：待验证版本下线后卡上是「已下线」，槽空着且有可重新部署的版本时主按钮是「部署版本…」（T14）；2026-09-23 实撞演示项目处于这一态。
+    expect(actions.some((label) => label.startsWith('上线 ') || label.startsWith('回退到 ') || label === '部署版本…') || text.includes('由项目负责人上线') || text.includes('尚未部署') || text.includes('已下线')).toBe(true);
     expect(page.takeErrors()).toEqual([]);
   }, 45_000);
 

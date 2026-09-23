@@ -26,6 +26,10 @@
   - 进页：300 ms 出现四步清单（读取会话已完成、连接页面通道进行中），450 ms 前三步完成、停在第四步（个人布局读取被拦 3 秒），放行后页头、CLI 区、工具面板一次出现，面板按个人布局直接在旁打开，没有先出终端再跳。
   - 失败：只在浏览器里把会话回执改成失败，整页是「开发环境已停止」状态卡加「恢复原工作树」卡，没有点任何恢复按钮。
   - 1440 与 390 宽、深浅两色无横向溢出、无控制台错误。`Network.setBlockedURLs` 挡不住页面的 WebSocket，「页面通道连不上」由用例覆盖。
+- **提交与 CI**：`ebc40acc`，[CI 35864470862](https://github.com/wangbinquan/CrewStation/actions/runs/35864470862) 六项全绿（含新增代码防护与 e2e）。提交前在「4608aab6＋本批」干净导出树上 `bun run check`：2507 pass／90 skip／3 fail，3 条红是 `templates/`、`integrations/` 独立项目在导出树里没有 `node_modules`（找不到 `hono`），与本批无关。
+- **部署与实机**：13:05:28Z 只滚 console → `cs-console:loading-20260923`（`git archive ebc40acc`，含 crewstation-78 的 feb367cc；包 `index-CMEoXsef.js`）。部署后不换资源、不拦请求，dev-developer 进演示项目开发页三轮，都是「空白 → 步骤清单（160–330 ms 出现）→ 完整工作区（0.7–1.4 秒）」，中间不再出现半成品工作区，无控制台错误。
+  - e2e（`CS_E2E_AUTH=dev-oidc`）：dev-developer 下开发页相关的 `projectWorkspaceIa`、`cliTabs`、`referenceResources` 通过；`platformCapabilities` 要管理员身份，dev-admin 下 20 条通过。
+- **顺手修**：e2e WS-14 的断言没跟上 RFC-021 待验证版本「已下线」的卡面。演示项目的待验证版本 15:55 被手动下线后卡上是「已下线 v0.1.2 … 部署版本…」，这条断言在任何包上都会红（发布页卡面由数据状态决定，与开发页改动无关）。改为同时认「已下线」与「部署版本…」，dev-admin 下复跑通过。
 
 ## RFC-024 CLI 界面就绪：步骤条等到 CLI 画出界面再撤（2026-09-23）—— ✅ Done
 
