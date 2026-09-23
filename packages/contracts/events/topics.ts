@@ -17,6 +17,7 @@ export const DomainTopic = {
   taskReleased: 'task-runtime.task-released',
   subtaskFinished: 'business-task.subtask-finished',
   grantChanged: 'api-catalog.grant-changed',
+  openPolicyChanged: 'api-catalog.open-policy-changed',
   configChanged: 'config.changed',
 } as const;
 
@@ -58,6 +59,8 @@ export const TaskReleasedSchema = z.object({ ...base, projectId: ProjectIdSchema
 export const SubtaskFinishedSchema = z.object({ ...base, taskId: TaskIdSchema, subtaskId: SubtaskIdSchema, state: z.enum(['succeeded', 'failed', 'cancelled']), attempt: z.number().int().min(1) });
 
 export const GrantChangedSchema = z.object({ ...base, serviceId: ServiceIdSchema, operationId: z.string(), state: z.enum(['granted', 'revoked']) });
+/** 管理员改了操作的开放策略：默认开放的操作进放行表的 defaultOpen，网关要据此重算。 */
+export const OpenPolicyChangedSchema = z.object({ ...base, operationId: z.string(), openPolicy: z.enum(['default', 'targeted']) });
 export const ConfigChangedSchema = z.object({ ...base, projectId: ProjectIdSchema, env: z.enum(['production', 'development']), version: z.number().int().min(1) });
 
 export const DomainPayloadSchemas = {
@@ -71,6 +74,7 @@ export const DomainPayloadSchemas = {
   [DomainTopic.taskReleased]: TaskReleasedSchema,
   [DomainTopic.subtaskFinished]: SubtaskFinishedSchema,
   [DomainTopic.grantChanged]: GrantChangedSchema,
+  [DomainTopic.openPolicyChanged]: OpenPolicyChangedSchema,
   [DomainTopic.configChanged]: ConfigChangedSchema,
 } as const;
 

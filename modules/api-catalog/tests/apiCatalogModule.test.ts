@@ -129,6 +129,9 @@ describe.skipIf(!available)('api-catalog module', () => {
     await expect(catalog.api.setOpenPolicy(dev, listKey, 'default')).rejects.toMatchObject({ kind: 'forbidden' });
     await expect(catalog.api.setOpenPolicy(admin, 'issues:GET:/nope', 'default')).rejects.toMatchObject({ kind: 'not_found' });
     expect((await catalog.api.setOpenPolicy(admin, listKey, 'default')).openPolicy).toBe('default');
+    // 网关靠这条事件重算放行表；被拒的两次不发（2026-09-23：此前不发，默认开放要等无关的重算才生效）。
+    const published = (await tdb.db.execute(`SELECT payload->>'operationId' AS operation_key, payload->>'openPolicy' AS policy FROM platform_infra.domain_events WHERE topic = 'api-catalog.open-policy-changed' ORDER BY id`)) as unknown as Array<{ operation_key: string; policy: string }>;
+    expect(published.map((row) => [row.operation_key, row.policy])).toEqual([[listKey, 'default']]);
     const ops = await catalog.api.listOperations(dev, demo.serviceId);
     expect(Object.fromEntries(ops.map((o) => [o.id, o.granted]))).toEqual({ [listKey]: true, [detailKey]: false, [createKey]: false, [workerKey]: false });
     await expect(catalog.api.listOperations(dev, workerB.serviceId)).rejects.toMatchObject({ kind: 'not_found' });

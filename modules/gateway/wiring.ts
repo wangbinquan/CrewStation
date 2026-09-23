@@ -98,7 +98,8 @@ export function createGatewayModule(deps: GatewayModuleDeps): GatewayModule {
       await allowlist.rebuildAllowlist();
     })
     .on(DomainTopic.trafficSwitched, async (e) => { await routes.reconcileService(e.payload.serviceId); })
-    .on(DomainTopic.grantChanged, async () => { await allowlist.rebuildAllowlist(); });
+    .on(DomainTopic.grantChanged, async () => { await allowlist.rebuildAllowlist(); })
+    .on(DomainTopic.openPolicyChanged, async () => { await allowlist.rebuildAllowlist(); });
   return {
     api,
     http: [gatewayRoutes(api, deps.isAdmin), maintenanceRoutes(api, deps.isAdmin)],

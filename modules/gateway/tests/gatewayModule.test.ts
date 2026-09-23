@@ -164,6 +164,14 @@ describe.skipIf(!available)('gateway module', () => {
     expect(ingressRoutesOf('cs-newbie')).toEqual([]);
   });
 
+  // 2026-09-23 RFC-021 实机撞见：管理员把操作改成默认开放后放行表没有重算，调用方一直 403「未对调用方开放」。
+  test('开放策略变更：放行表立即重算', async () => {
+    const before = (await gateway.api.currentAllowlist())?.version ?? 0;
+    await publishDomainEvent(tdb.db, DomainTopic.openPolicyChanged, { occurredAt: new Date().toISOString(), operationId: '01a0bf5d-8f4b-73dc-813d-bb1eeb744398', openPolicy: 'default' });
+    expect(await gateway.subscriptions.runOnce()).toBe(1);
+    expect((await gateway.api.currentAllowlist())?.version).toBe(before + 1);
+  });
+
   test('Pod 身份索引：按 IP 反查，物理槽映射为角色，删除后不可查', async () => {
     const { drizzlePodIdentityRepository } = await import('../adapters/persistence/drizzleRepositories');
     const repo = drizzlePodIdentityRepository(tdb.db);
