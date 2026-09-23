@@ -8,14 +8,14 @@ import type { Database, MigrationSet } from '@crewstation/persistence';
 import { readMigrationDir } from '@crewstation/persistence';
 import type { Hono } from 'hono';
 import { kubernetesClusterObserver } from './adapters/k8s/clusterObserver';
-import { drizzleAlertRepository, drizzleAlertSubscriptionRepository } from './adapters/persistence/drizzleRepositories';
+import { drizzleAlertRepository } from './adapters/persistence/drizzleRepositories';
 import type { ObservabilityModuleApi } from './api/moduleApi';
 import { alertingUseCases } from './application/alerting';
 import type { ObservabilityUseCaseDeps } from './application/dependencies';
 import { logsAndHealthUseCases } from './application/logsAndHealth';
 import { traceReplayUseCase } from './application/traceReplay';
 import { observabilityRoutes } from './http/observabilityRoutes';
-import type { ClusterObserver, Notifier, ProjectAuthorizer, ServiceResolver, SlotRoles, TraceSources } from './ports/sources';
+import type { ClusterObserver, ProjectAuthorizer, ServiceResolver, SlotRoles, TraceSources } from './ports/sources';
 
 export interface ObservabilityModuleDeps {
   db: Database;
@@ -24,7 +24,6 @@ export interface ObservabilityModuleDeps {
   services: ServiceResolver;
   slots: SlotRoles;
   traces: TraceSources;
-  notifier: Notifier;
   isAdmin: (userId: UserId) => Promise<boolean>;
   /** 巡检的项目来源；缺省不巡检。 */
   listProjectIds?: () => Promise<ProjectId[]>;
@@ -49,8 +48,8 @@ export const observabilityMigrations: MigrationSet = {
 export function createObservabilityModule(deps: ObservabilityModuleDeps): ObservabilityModule {
   const logger = deps.logger ?? noopLogger;
   const useCaseDeps: ObservabilityUseCaseDeps = {
-    alerts: drizzleAlertRepository(deps.db), subscriptions: drizzleAlertSubscriptionRepository(deps.db), cluster: deps.cluster ?? kubernetesClusterObserver(deps.k8s),
-    authorizer: deps.authorizer, services: deps.services, slots: deps.slots, traces: deps.traces, notifier: deps.notifier, clock: deps.clock ?? systemClock, logger,
+    alerts: drizzleAlertRepository(deps.db), cluster: deps.cluster ?? kubernetesClusterObserver(deps.k8s),
+    authorizer: deps.authorizer, services: deps.services, slots: deps.slots, traces: deps.traces, clock: deps.clock ?? systemClock, logger,
   };
   const alerting = alertingUseCases(useCaseDeps);
   const api: ObservabilityModuleApi = { name: 'observability', ...logsAndHealthUseCases(useCaseDeps), ...alerting, replayTrace: traceReplayUseCase(useCaseDeps) };

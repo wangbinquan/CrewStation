@@ -325,7 +325,6 @@ function composeAggregates(deps: PlatformModuleDeps, core: ReturnType<typeof com
       subtasksOfTask: (taskId) => runtime.businessTask.api.listProjectSubtasksInternal(taskId),
       sessionEvents: (taskId) => runtime.sessionClient.listEvents(taskId, { kinds: ['agent', 'execExited', 'previewState'], limit: 2000 }),
     },
-    notifier: { notify: async (projectId, message) => { logger.warn('alert', { projectId, message }); } },
     listProjectIds: async () => (await project.api.listServices()).map((s) => s.projectId),
   });
   const capabilities = createCapabilitiesModule({

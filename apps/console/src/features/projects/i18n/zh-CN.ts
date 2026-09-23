@@ -323,7 +323,7 @@ export const messages = {
   "projects.members.directoryHint": "管理员可从已注册用户目录选择；选中后确认成员身份与角色。",
   "projects.members.targetRequired": "请先查找并选择账号，或在高级输入中填写有效的完整用户 ID。",
   "projects.members.roleLabel": "成员角色",
-  "projects.members.roleHint.owner": "可开发与发布，并管理成员、生产配置、数据访问审批、上线回退及告警订阅。",
+  "projects.members.roleHint.owner": "可开发与发布，并管理成员、生产配置、数据访问审批与上线回退。",
   "projects.members.roleHint.developer": "可开发、发布待验证版本、维护开发配置并访问 preview。",
   "projects.members.roleHint.tester": "可访问 preview 进行验证。",
   "projects.members.ownerRule": "负责人只能由管理员转移；当前负责人须先完成转移，才能降级或移除。",

@@ -255,7 +255,7 @@ describe('诊断、订阅与配置的上下文', () => {
 test('运行与诊断六个页签：部署与运行形态在最前并默认打开，健康卡只在健康状态页签；旧的 tab=status 换成形态', async () => {
   fixture(); page = await renderApp(`/projects/${projectId}/operations`);
   const tabs = () => [...document.querySelectorAll('[role="tablist"][aria-label="运行与诊断"] [role="tab"]')];
-  expect(tabs().map((tab) => tab.textContent)).toEqual(['部署与运行形态', '健康状态', '日志', '告警与通知', '事件投递', '调用链回放']);
+  expect(tabs().map((tab) => tab.textContent)).toEqual(['部署与运行形态', '健康状态', '日志', '告警', '事件投递', '调用链回放']);
   expect(tabs()[0]?.getAttribute('aria-selected')).toBe('true'); expect(page.text()).not.toContain('查看此版本日志');
   await page.click('健康状态'); expect(page.search()).toEqual({ tab: 'health' }); expect(page.text()).toContain('查看此版本日志');
   page.unmount(); page = await renderApp(`/projects/${projectId}/operations?tab=status`);
@@ -263,7 +263,7 @@ test('运行与诊断六个页签：部署与运行形态在最前并默认打�
 });
 
 test.each([
-  // 2026-09-23 修订 RFC-020 D3：健康与形态重新分开，六个页签：部署与运行形态、健康状态、日志、告警与通知、事件投递、调用链回放。
+  // 2026-09-23 修订 RFC-020 D3：健康与形态重新分开，六个页签：部署与运行形态、健康状态、日志、告警（基线 D61 删除告警订阅后由「告警与通知」改名）、事件投递、调用链回放。
   { from: 'logs', to: 'alerts', start: 2, end: 3, key: 'ArrowRight', before: 0, after: 98 },
   { from: 'topology', to: 'trace', start: 0, end: 5, key: 'ArrowLeft', before: 0, after: 300 },
   { from: 'trace', to: 'topology', start: 5, end: 0, key: 'Home', before: 300, after: 0 },

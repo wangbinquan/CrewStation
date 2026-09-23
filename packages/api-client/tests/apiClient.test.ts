@@ -90,17 +90,12 @@ describe('createApiClient：请求形状', () => {
       ['/v1/tasks/task%20one/workspace-layout', 'GET', controller.signal], ['/v1/tasks/task%20one/workspace-layout', 'PUT', controller.signal], ['/v1/tasks/task%20one/workspace-layout', 'PUT', undefined],
     ]);
   });
-  test('告警与订阅使用既有项目作用域端点，保存和移除不发送通知测试请求', async () => {
-    const { calls, fetchImpl } = fakeFetch((call) => call.method === 'GET' ? json(200, { items: [] }) : new Response(null, { status: 204 }));
+  test('告警只读项目作用域的列表端点；告警订阅的三个方法已随基线 D61 删除', async () => {
+    const { calls, fetchImpl } = fakeFetch(() => json(200, { items: [] }));
     const client = createApiClient({ fetch: fetchImpl });
-    const input = { userId: '01a0bf5d-8f4b-799e-8662-91273789253a' as UserId, channel: 'webhook' as const, target: 'https://notice.example.test/hook' };
-    await client.observability.alerts('project one'); await client.observability.alertSubscriptions('project one');
-    await client.observability.setAlertSubscription('project one', input); await client.observability.removeAlertSubscription('project one', 'user/two');
-    expect(calls.map((call) => [call.method, call.url])).toEqual([
-      ['GET', '/v1/projects/project%20one/alerts'], ['GET', '/v1/projects/project%20one/alert-subscriptions'],
-      ['PUT', '/v1/projects/project%20one/alert-subscriptions'], ['DELETE', '/v1/projects/project%20one/alert-subscriptions/user%2Ftwo'],
-    ]);
-    expect(JSON.parse(calls[2]!.body!)).toEqual(input);
+    await client.observability.alerts('project one');
+    expect(calls.map((call) => [call.method, call.url])).toEqual([['GET', '/v1/projects/project%20one/alerts']]);
+    for (const removed of ['alertSubscriptions', 'setAlertSubscription', 'removeAlertSubscription']) expect(removed in client.observability).toBe(false);
   });
   test('两个发布来源均保留确认 SHA，开发来源另保留会话 ID，仍调用各自真实端点', async () => {
     const { calls, fetchImpl } = fakeFetch(() => json(202, {}));

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { SlotNameSchema, TaskKindSchema } from '../events/topics';
-import { ProjectIdSchema, SubtaskIdSchema, TaskIdSchema, TraceIdSchema, UserIdSchema } from '../ids';
+import { ProjectIdSchema, SubtaskIdSchema, TaskIdSchema, TraceIdSchema } from '../ids';
 
 export const LogSourceSchema = z.enum(['slot', 'dev-session', 'business-task', 'build', 'migration']);
 
@@ -28,10 +28,9 @@ export const LogEntryDtoSchema = z.object({
 export const HealthStateSchema = z.enum(['healthy', 'degraded', 'crash-looping', 'unhealthy', 'unknown']);
 export const HealthDtoSchema = z.object({ slot: SlotNameSchema, state: HealthStateSchema, readyReplicas: z.number().int().min(0), replicas: z.number().int().min(0), restarts: z.number().int().min(0), lastTransitionAt: z.iso.datetime() });
 
-export const AlertTypeSchema = z.enum(['crash-loop', 'health-failing', 'delivery-dead', 'task-failed', 'quota-exhausted']);
+/** 首版只有两槽健康巡检这一个告警来源（D61）。 */
+export const AlertTypeSchema = z.enum(['crash-loop', 'health-failing']);
 export const AlertDtoSchema = z.object({ id: z.string(), projectId: ProjectIdSchema, type: AlertTypeSchema, state: z.enum(['firing', 'resolved']), detail: z.string(), firedAt: z.iso.datetime(), resolvedAt: z.iso.datetime().optional(), slot: SlotNameSchema.optional() });
-export const AlertSubscriptionDtoSchema = z.object({ projectId: ProjectIdSchema, userId: UserIdSchema, channel: z.enum(['workbench', 'webhook']), target: z.string().optional() });
-export const SetAlertSubscriptionRequestSchema = AlertSubscriptionDtoSchema.omit({ projectId: true });
 
 /** 按 traceId 回放：任务、子任务、Agent 会话、命令、产物与日志引用。 */
 export const TraceReplayDtoSchema = z.object({
@@ -45,8 +44,6 @@ export const TraceReplayDtoSchema = z.object({
 export type LogSource = z.infer<typeof LogSourceSchema>;
 export type HealthState = z.infer<typeof HealthStateSchema>;
 export type AlertType = z.infer<typeof AlertTypeSchema>;
-export type AlertSubscriptionDto = z.infer<typeof AlertSubscriptionDtoSchema>;
-export type SetAlertSubscriptionRequest = z.infer<typeof SetAlertSubscriptionRequestSchema>;
 export type LogQuery = z.infer<typeof LogQuerySchema>;
 export type LogEntryDto = z.infer<typeof LogEntryDtoSchema>;
 export type HealthDto = z.infer<typeof HealthDtoSchema>;

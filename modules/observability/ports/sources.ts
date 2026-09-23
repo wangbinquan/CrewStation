@@ -1,7 +1,7 @@
 import type { TaskKind, Actor, LogEntryDto, ProjectId, ServiceId, SubtaskDto, TaskId } from '@crewstation/contracts';
 
 export interface ProjectAuthorizer {
-  authorize(actor: Actor, projectId: ProjectId, action: 'view' | 'manage-alerts'): Promise<unknown>;
+  authorize(actor: Actor, projectId: ProjectId, action: 'view'): Promise<unknown>;
 }
 
 export interface ServiceResolver {
@@ -32,8 +32,4 @@ export interface TraceSources {
   tasksByTrace(traceId: string): Promise<Array<{ taskId: TaskId; kind: TaskKind; createdAt: string }>>;
   subtasksOfTask(taskId: TaskId): Promise<SubtaskDto[]>;
   sessionEvents(taskId: TaskId): Promise<Array<{ seq: number; at: string; event: { kind: string; event?: { agentId?: string; sessionId?: string; type?: string; text?: string } } }>>;
-}
-
-export interface Notifier {
-  notify(projectId: ProjectId, message: string): Promise<void>;
 }

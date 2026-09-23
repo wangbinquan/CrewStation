@@ -1,4 +1,4 @@
-import type { AlertDto, AlertSubscriptionDto, HealthDto, LogEntryDto, SetAlertSubscriptionRequest, TraceReplayDto } from '@crewstation/contracts';
+import type { AlertDto, HealthDto, LogEntryDto, TraceReplayDto } from '@crewstation/contracts';
 import type { Transport } from '../httpTransport';
 import type { ItemsPage } from '../itemsPage';
 import type { LogQueryInput } from '../requestInputs';
@@ -12,9 +12,6 @@ export interface ObservabilityResource {
   health(projectId: string): Promise<ItemsPage<HealthDto>>;
   trace(projectId: string, traceId: string): Promise<TraceReplayDto>;
   alerts(projectId: string): Promise<ItemsPage<AlertDto>>;
-  alertSubscriptions(projectId: string): Promise<ItemsPage<AlertSubscriptionDto>>;
-  setAlertSubscription(projectId: string, input: SetAlertSubscriptionRequest): Promise<void>;
-  removeAlertSubscription(projectId: string, userId: string): Promise<void>;
 }
 
 export function observabilityResource(transport: Transport): ObservabilityResource {
@@ -24,8 +21,5 @@ export function observabilityResource(transport: Transport): ObservabilityResour
     health: (projectId) => transport.request<ItemsPage<HealthDto>>('GET', `${project(projectId)}/health`),
     trace: (projectId, traceId) => transport.request<TraceReplayDto>('GET', `${project(projectId)}/traces/${segment(traceId)}`),
     alerts: (projectId) => transport.request('GET', `${project(projectId)}/alerts`),
-    alertSubscriptions: (projectId) => transport.request('GET', `${project(projectId)}/alert-subscriptions`),
-    setAlertSubscription: (projectId, input) => transport.request('PUT', `${project(projectId)}/alert-subscriptions`, { body: input }),
-    removeAlertSubscription: (projectId, userId) => transport.request('DELETE', `${project(projectId)}/alert-subscriptions/${segment(userId)}`),
   };
 }

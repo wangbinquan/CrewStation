@@ -68,6 +68,7 @@
     "modules/observability/adapters/persistence/migrations/0001_create_schema.sql": "ba0d5d4fe9a3336700a6bd2d9185f7f6498552922aa8bfdcb32c33c2d22910a4",
     "modules/observability/adapters/persistence/migrations/0002_alerts.sql": "bfca6aaf814481024f2301aa84deb6560f5561519c1d13e36a3c0917b0b70cbf",
     "modules/observability/adapters/persistence/migrations/0003_resource_identity.identity.json": "15f06fb1e533e4541512033127aff3b621ba9f06bca81d6e5d0e14d5361ca6f3",
+    "modules/observability/adapters/persistence/migrations/0004_drop_alert_subscriptions.sql": "8b7c30e263c60bc6badf733a09ec8371327c9e6010a364b92a8fa8741f5a7a2b",
     "modules/project/adapters/persistence/migrations/0001_create_schema.sql": "8cb29f5022308ccafceedb3e0b1130e8bc13fc2d831e5146d9dd34abe30b8abe",
     "modules/project/adapters/persistence/migrations/0002_core_tables.sql": "29e544627de379d3f7ab195cbacf8959f234b7c661a2ed5402ab29ffc8483f22",
     "modules/project/adapters/persistence/migrations/0003_compute_profiles.sql": "1ca73704b0fa919337946e02244842673141e27d337033c111478a9405f82ba6",

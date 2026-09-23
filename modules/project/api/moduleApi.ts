@@ -9,7 +9,7 @@ import type {
 export type ProjectAction =
   | 'view' | 'develop' | 'publish' | 'switch-traffic' | 'manage-members' | 'manage-testers'
   | 'approve-data-access' | 'manage-production-config' | 'manage-development-config'
-  | 'force-release-session' | 'view-preview' | 'manage-alerts' | 'manage-quota' | 'archive'
+  | 'force-release-session' | 'view-preview' | 'manage-quota' | 'archive'
   // RFC-021：下线／推迟／重新部署待验证版本、开关正式版本维护（负责人与管理员）。
   | 'manage-slots' | 'manage-maintenance';
 

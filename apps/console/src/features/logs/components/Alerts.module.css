@@ -1,3 +1,2 @@
 .stack { display: flex; flex-direction: column; gap: var(--cs-space-3); min-width: 0; overflow-wrap: anywhere; }
-.form { display: flex; flex-direction: column; gap: var(--cs-space-2); max-width: 42rem; }
 .detail { white-space: pre-wrap; overflow-wrap: anywhere; }

@@ -14,7 +14,6 @@ import { DataTable } from '../../../shared/ui/DataTable';
 import { ActionNote } from '../../../shared/ui/ActionNote';
 import { DefinitionList } from '../../../shared/ui/DefinitionList';
 import { Segmented } from '../../../shared/ui/Segmented';
-import { AlertSubscriptionsCard } from '../components/AlertSubscriptionsCard';
 import styles from '../components/Alerts.module.css';
 
 export function AlertsPage({ projectId, search, change, onLogs }: { readonly projectId: string; readonly search: OperationsSearch; readonly change: (next: OperationsSearch) => void; readonly onLogs: (slot: SlotName) => void }) {
@@ -23,8 +22,6 @@ export function AlertsPage({ projectId, search, change, onLogs }: { readonly pro
     const response = await api.observability.alerts(projectId), parsed = AlertDtoSchema.array().safeParse(response.items);
     if (!parsed.success || parsed.data.some((row) => row.projectId !== projectId)) throw new Error(t('logs.alerts.mismatch')); return { items: parsed.data };
   }, { refetchIntervalMs: 5_000, refetchOnWindowFocus: true }); // 告警每 5 秒在原位重读，不提供刷新按钮（2026-09-23 裁定）
-  const me = useApiQuery(queryKeys.me(), () => api.me.get());
-  const canManage = !me.error && !!me.data && (me.data.isAdmin || me.data.memberships?.some((member) => member.projectId === projectId && member.role === 'owner') === true);
   const rows = !alerts.error ? alerts.data?.items ?? [] : [], filter = search.alertState ?? 'all';
   const shown = rows.filter((row) => filter === 'all' || row.state === filter), selected = rows.find((row) => row.id === search.alertId);
   return <div className={styles.stack}>
@@ -46,6 +43,5 @@ export function AlertsPage({ projectId, search, change, onLogs }: { readonly pro
         <p>{t(selected.slot ? 'logs.alerts.currentLogsHint' : 'logs.alerts.noTarget')}</p>
       </>}
     </Card> : null}
-    <AlertSubscriptionsCard projectId={projectId} canManage={canManage} />
   </div>;
 }

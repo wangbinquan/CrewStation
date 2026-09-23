@@ -77,7 +77,7 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   "settings.resource.overview": "Conventions and resources",
   "settings.resource.api": "API documentation and access",
   "settings.resource.events": "Events and subscriptions",
-  "operations.tab.alerts": "Alerts and notifications",
+  "operations.tab.alerts": "Alerts",
   "operations.tab.logs": "Logs",
   "operations.tab.deliveries": "Event deliveries",
   "operations.tab.trace": "Trace replay",

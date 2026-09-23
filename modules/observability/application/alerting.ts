@@ -1,4 +1,4 @@
-import type { Actor, AlertDto, AlertSubscriptionDto, ProjectId, UserId } from '@crewstation/contracts';
+import type { Actor, AlertDto, ProjectId } from '@crewstation/contracts';
 import { newId } from '@crewstation/kernel';
 import type { AlertCandidate } from '../domain/alertRules';
 import { alertsFromHealth, resolvedKeysForHealthy } from '../domain/alertRules';
@@ -6,14 +6,13 @@ import { healthOf } from '../domain/health';
 import type { ObservabilityUseCaseDeps } from './dependencies';
 import { alertToDto } from '../ports/repositories';
 
-/** 告警：健康态巡检触发与自动恢复；项目级订阅决定通知谁（G22）。 */
+/** 告警：健康态巡检触发与自动恢复，只在工作台告警页查看；首版不做告警通知（D61）。 */
 export function alertingUseCases(deps: ObservabilityUseCaseDeps) {
-  const { alerts, subscriptions, authorizer, services, slots, cluster, notifier, clock, logger } = deps;
+  const { alerts, authorizer, services, slots, cluster, clock } = deps;
 
   const fire = async (projectId: ProjectId, candidate: AlertCandidate): Promise<boolean> => {
     if ((await alerts.firing(projectId)).some((a) => a.key === candidate.key)) return false;
     await alerts.fire({ id: newId('alr'), projectId, type: candidate.type, key: candidate.key, state: 'firing', detail: candidate.detail, firedAt: clock.now() });
-    await notifier.notify(projectId, `[告警] ${candidate.detail}`).catch((e: unknown) => logger.warn('alert notify failed', { error: String(e) }));
     return true;
   };
 
@@ -22,18 +21,6 @@ export function alertingUseCases(deps: ObservabilityUseCaseDeps) {
     listAlerts: async (actor: Actor, projectId: ProjectId): Promise<AlertDto[]> => {
       await authorizer.authorize(actor, projectId, 'view');
       return (await alerts.list(projectId, 100)).map(alertToDto);
-    },
-    listSubscriptions: async (actor: Actor, projectId: ProjectId): Promise<AlertSubscriptionDto[]> => {
-      await authorizer.authorize(actor, projectId, 'view');
-      return (await subscriptions.list(projectId)).map((s) => ({ projectId: s.projectId, userId: s.userId, channel: s.channel, ...(s.target ? { target: s.target } : {}) }));
-    },
-    subscribe: async (actor: Actor, projectId: ProjectId, input: { userId: UserId; channel: 'workbench' | 'webhook'; target?: string }): Promise<void> => {
-      await authorizer.authorize(actor, projectId, 'manage-alerts');
-      await subscriptions.upsert({ projectId, userId: input.userId, channel: input.channel, ...(input.target ? { target: input.target } : {}) });
-    },
-    unsubscribe: async (actor: Actor, projectId: ProjectId, userId: UserId): Promise<void> => {
-      await authorizer.authorize(actor, projectId, 'manage-alerts');
-      await subscriptions.remove(projectId, userId);
     },
     /** 巡检：对每个项目的两槽算健康态，触发或恢复相应告警。 */
     sweepProject: async (projectId: ProjectId): Promise<number> => {

@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "日志采集入口与查询、部署健康态、告警订阅、execution_events、traceId 索引",
+  "description": "日志采集入口与查询、部署健康态与告警记录、execution_events、traceId 索引",
   "exports": {
     ".": "./index.ts"
   },

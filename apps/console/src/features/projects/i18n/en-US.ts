@@ -325,7 +325,7 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   "projects.members.directoryHint": "Administrators may select a registered user, then review the identity and role.",
   "projects.members.targetRequired": "Select a matching account, or enter a valid full user ID in the advanced input.",
   "projects.members.roleLabel": "Member role",
-  "projects.members.roleHint.owner": "Can develop and publish, and manage members, production config, data access approvals, traffic changes and alert subscriptions.",
+  "projects.members.roleHint.owner": "Can develop and publish, and manage members, production config, data access approvals and traffic changes.",
   "projects.members.roleHint.developer": "Can develop, publish a standby version, maintain development config and access preview.",
   "projects.members.roleHint.tester": "Can access preview for validation.",
   "projects.members.ownerRule": "Only an administrator can transfer ownership. Transfer first before downgrading or removing the current owner.",

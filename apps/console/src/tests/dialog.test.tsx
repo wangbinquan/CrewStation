@@ -132,9 +132,9 @@ interface DraftProbeProps { readonly error?: string; readonly busy?: boolean; re
 function DraftProbe({ error, busy = false, blocked = false, danger = false }: DraftProbeProps) {
   const [open, setOpen] = useState(false), [draft, setDraft] = useState(''), [saved, setSaved] = useState<string[]>([]);
   return <>
-    <button onClick={() => setOpen(true)}>添加订阅</button>
+    <button onClick={() => setOpen(true)}>新增条目</button>
     <p data-saved={saved.join('|')} />
-    {open ? <FormDialog title="添加订阅" submitLabel="保存订阅" busyLabel="保存中…" busy={busy} submitDisabled={blocked} danger={danger} {...(error ? { error } : {})} dirty={draft !== ''}
+    {open ? <FormDialog title="新增条目" submitLabel="保存条目" busyLabel="保存中…" busy={busy} submitDisabled={blocked} danger={danger} {...(error ? { error } : {})} dirty={draft !== ''}
       onClear={() => setDraft('')} onClose={() => setOpen(false)} onSubmit={() => { setSaved((all) => [...all, draft]); setDraft(''); setOpen(false); }}>
       <label>Webhook<input name="webhook" value={draft} onChange={(event) => setDraft(event.target.value)} /></label>
     </FormDialog> : null}
@@ -146,9 +146,9 @@ const labels = () => [...openDialog().querySelectorAll('button')].map((node) => 
 
 test('表单弹窗的操作条：提交在最左、取消其次、清空在最右；没改过时清空不可点', async () => {
   rendered = await renderElement(<DraftProbe />, messages);
-  await openWith('添加订阅');
-  expect(labels()).toEqual(['关闭', '保存订阅', '取消', '清空']);
-  expect(rendered.button('保存订阅').type).toBe('submit');
+  await openWith('新增条目');
+  expect(labels()).toEqual(['关闭', '保存条目', '取消', '清空']);
+  expect(rendered.button('保存条目').type).toBe('submit');
   expect(rendered.button('清空').disabled).toBe(true);
   await type(field(), 'https://hooks.example/a');
   expect(rendered.button('清空').disabled).toBe(false);
@@ -156,11 +156,11 @@ test('表单弹窗的操作条：提交在最左、取消其次、清空在最�
 
 test('取消只关窗、草稿留着，再打开恢复上次输入；清空回到初始值、弹窗不关，焦点回到第一个输入框', async () => {
   rendered = await renderElement(<DraftProbe />, messages);
-  await openWith('添加订阅');
+  await openWith('新增条目');
   await type(field(), 'https://hooks.example/a');
   await rendered.click('取消');
   expect(document.querySelectorAll('dialog').length).toBe(0);
-  await openWith('添加订阅');
+  await openWith('新增条目');
   expect(field().value).toBe('https://hooks.example/a');
   await rendered.click('清空');
   expect(document.querySelectorAll('dialog[open]').length).toBe(1);
@@ -175,16 +175,16 @@ test('取消只关窗、草稿留着，再打开恢复上次输入；清空回�
 
 test('表单弹窗：失败原因显示在操作条上方；提交键不可用时回车也不提交；进行中显示进行中文案并锁住按钮；危险提交红底', async () => {
   rendered = await renderElement(<DraftProbe error="维护状态已被他人修改" blocked />, messages);
-  await openWith('添加订阅');
+  await openWith('新增条目');
   const dialog = openDialog();
   expect(dialog.querySelector('[role="alert"]')?.textContent).toBe('维护状态已被他人修改');
-  expect(rendered.button('保存订阅').disabled).toBe(true);
+  expect(rendered.button('保存条目').disabled).toBe(true);
   await act(async () => { dialog.querySelector('form')!.requestSubmit(); });
   await rendered.settle();
   expect(rendered.host.querySelector('p')!.getAttribute('data-saved')).toBe('');
   rendered.unmount();
   rendered = await renderElement(<DraftProbe busy danger />, messages);
-  await openWith('添加订阅');
+  await openWith('新增条目');
   expect(rendered.button('保存中…').disabled).toBe(true);
   expect(rendered.button('保存中…').className.includes('dangerPrimary')).toBe(true);
   expect(rendered.button('取消').disabled).toBe(true);

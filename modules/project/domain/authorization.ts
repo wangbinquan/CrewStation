@@ -4,7 +4,7 @@ import type { MemberRole } from '@crewstation/contracts';
 export type ProjectAction =
   | 'view' | 'develop' | 'publish' | 'switch-traffic' | 'manage-members' | 'manage-testers'
   | 'approve-data-access' | 'manage-production-config' | 'manage-development-config'
-  | 'force-release-session' | 'view-preview' | 'manage-alerts' | 'manage-quota' | 'archive'
+  | 'force-release-session' | 'view-preview' | 'manage-quota' | 'archive'
   // RFC-021：下线／推迟／重新部署待验证版本、开关正式版本维护；只给负责人（管理员全部放行）。
   | 'manage-slots' | 'manage-maintenance';
 
@@ -13,7 +13,7 @@ export type EffectiveRole = MemberRole | 'admin';
 const DEVELOPER_ACTIONS: readonly ProjectAction[] = ['view', 'develop', 'publish', 'manage-development-config', 'view-preview'];
 const OWNER_ACTIONS: readonly ProjectAction[] = [
   ...DEVELOPER_ACTIONS, 'switch-traffic', 'manage-members', 'manage-testers', 'approve-data-access',
-  'manage-production-config', 'force-release-session', 'manage-alerts', 'manage-slots', 'manage-maintenance',
+  'manage-production-config', 'force-release-session', 'manage-slots', 'manage-maintenance',
 ];
 const TESTER_ACTIONS: readonly ProjectAction[] = ['view-preview'];
 

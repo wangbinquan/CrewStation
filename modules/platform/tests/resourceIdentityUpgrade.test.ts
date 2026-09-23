@@ -16,7 +16,10 @@ describe.skipIf(!available)('RFC-013 atomic resource upgrade', () => {
       const settings = loadPlatformSettings({ CS_DATABASE_URL: tdb.url, CS_SECRET_KEY: Buffer.alloc(32, 1).toString('base64'), CS_GITLAB_URL: 'http://127.0.0.1:9' });
       const platform = createPlatformModule({ db: tdb.db, settings, k8s: createFakeK8sClient(), logger: noopLogger, instance: 'identity-upgrade' });
       const migrations = platform.api.migrations;
-      await runMigrations(tdb.db, migrations.map((set) => ({ ...set, files: set.files.filter((file) => !file.name.includes('resource_identity')) })));
+      // 旧库只到各模块第一个 resource_identity 迁移为止。排在它后面的迁移在真实升级里晚于身份迁移执行：
+      // observability 0004 删掉订阅表（D61）之后，若提前跑它，0003 身份迁移就会去读一张已经不存在的表。
+      const beforeIdentity = (files: typeof migrations[number]['files']) => { const cut = files.findIndex((file) => file.name.includes('resource_identity')); return cut < 0 ? files : files.slice(0, cut); };
+      await runMigrations(tdb.db, migrations.map((set) => ({ ...set, files: beforeIdentity(set.files) })));
       const user = 'usr_00000000000000000000000000000042', project = 'prj_00000000000000000000000000000042', service = 'svc_00000000000000000000000000000042', task = 'tsk_00000000000000000000000000000042', release = 'rel_00000000000000000000000000000042';
       await tdb.db.execute(sql`INSERT INTO identity.users (id, external_id, name, email, created_at, last_login_at) VALUES (${user}, 'old:42', 'Owner', 'owner@example.com', now(), now())`);
       await tdb.db.execute(sql`INSERT INTO project.projects (id, slug, name, kind, namespace, owner_user_id, state, template, created_by, created_at, updated_at) VALUES (${project}, 'sample', 'Sample', 'DigitalWorker', 'cs-sample', ${user}, 'active', 'minimal-sample', ${user}, now(), now())`);

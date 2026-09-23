@@ -38,7 +38,7 @@ async function spacing(page: Page, label: string, row = false) {
   })()`);
 }
 
-/** 卡片头里的列表级动作（「新增身份提供方」「添加订阅」）：量标题与按钮、标题栏与正文之间的真实留白。 */
+/** 卡片头里的列表级动作（如「新增身份提供方」）：量标题与按钮、标题栏与正文之间的真实留白。 */
 async function headerSpacing(page: Page, label: string) {
   return page.eval<{ titleGap: number; bodyGap: number; height: number; width: number; containerWidth: number; overflow: number }>(`(() => {
     const button = [...document.querySelectorAll('button')].find((node) => node.textContent.trim() === ${JSON.stringify(label)});
@@ -129,13 +129,12 @@ describe.skipIf(!session?.project)('项目操作区的真实布局间距', () =>
     await click(page, '取消');
   }, 45_000);
 
-  test('告警订阅与调用链查询的操作按钮有独立间隔', async () => {
+  test('告警状态筛选与调用链查询的操作有独立间隔', async () => {
     const page = session!.admin;
     await viewport(page, 390);
     await open(page, `/projects/${session!.project!.id}/operations?tab=alerts`);
-    // 2026-09-23 起「添加订阅」在订阅卡片头（装列表的卡片，新增动作放标题行右侧）。
-    const add = await headerSpacing(page, '添加订阅');
-    expect(add.titleGap).toBeGreaterThanOrEqual(8); expect(add.bodyGap).toBeGreaterThanOrEqual(8); expect(add.width).toBeLessThan(add.containerWidth);
+    // 基线 v0.3.13（D61）删除了项目级告警订阅：告警页不再有订阅卡片和「添加订阅」。
+    expect(await page.eval<boolean>(`(() => [...document.querySelectorAll('button')].some((node) => node.textContent.trim() === '添加订阅'))()`)).toBe(false);
     // 2026-09-23 状态筛选改成分段控件后曾紧贴下方的记录或空态（0px）：量它与下一个元素的真实间距。
     const filterGap = await page.eval<number>(`(() => {
       const group = document.querySelector('main [role="group"][aria-label="状态"]'), next = group?.nextElementSibling;

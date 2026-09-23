@@ -1,4 +1,4 @@
-import type { AlertDto, AlertType, ProjectId, UserId } from '@crewstation/contracts';
+import type { AlertDto, AlertType, ProjectId } from '@crewstation/contracts';
 import { slotOfAlert } from '../domain/alertRules';
 
 export interface AlertRecord {
@@ -17,14 +17,6 @@ export interface AlertRepository {
   list(projectId: ProjectId, limit: number): Promise<AlertRecord[]>;
   fire(alert: AlertRecord): Promise<void>;
   resolve(projectId: ProjectId, key: string, at: Date): Promise<AlertRecord[]>;
-}
-
-export interface SubscriptionRecord { projectId: ProjectId; userId: UserId; channel: 'workbench' | 'webhook'; target?: string }
-
-export interface AlertSubscriptionRepository {
-  list(projectId: ProjectId): Promise<SubscriptionRecord[]>;
-  upsert(record: SubscriptionRecord): Promise<void>;
-  remove(projectId: ProjectId, userId: UserId): Promise<void>;
 }
 
 export function alertToDto(a: AlertRecord): AlertDto {
