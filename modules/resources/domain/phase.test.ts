@@ -106,6 +106,23 @@ describe('条件、子对象、计数与可做操作', () => {
     expect(computePhase(slot({}, [cond('CrashLooping', 'true')])).reason?.message).toBe('容器反复重启');
   });
 
+  test('构建、迁移 Job：还没建是分配中，建了没跑起来是启动中（原因照 Pod），在跑是运行中；资源中心记下结束后照它——Job 被 TTL 删掉结果也在', () => {
+    const job = (child?: Partial<ResourceChild>, conditions: ResourceCondition[] = [], pods: ResourceChild[] = []) => record({ kind: 'build-job', spec: { children: [{ kind: 'Job', namespace: 'cs-demo', name: 'build-1' }] }, conditions,
+      children: [...(child ? [{ kind: 'Job', namespace: 'cs-demo', name: 'build-1', phase: 'Active', ready: false, ...child }] : []), ...pods] });
+    expect(computePhase(job()).phase).toBe('provisioning');
+    expect(computePhase(job({ phase: 'Pending' }, [], [{ kind: 'Pod', namespace: 'cs-demo', name: 'build-1-x', phase: 'Pending', ready: false, reason: '0/1 nodes are available: Insufficient cpu' }])))
+      .toEqual({ phase: 'starting', reason: { code: 'waiting-container', message: '0/1 nodes are available: Insufficient cpu' } });
+    expect(computePhase(job({ phase: 'Pending' }))).toEqual({ phase: 'starting' });
+    expect(computePhase(job({}))).toEqual({ phase: 'ready' });
+    const done = cond('Finished', 'true', { reason: 'succeeded', message: '已完成' });
+    expect(computePhase(job({ phase: 'Complete', ready: true }, [done]))).toEqual({ phase: 'stopped', reason: { code: 'completed', message: '已完成' } });
+    expect(computePhase(job(undefined, [done])).phase).toBe('stopped');
+    expect(computePhase(job(undefined, [cond('Finished', 'true', { reason: 'failed', message: 'BackoffLimitExceeded' })]))).toEqual({ phase: 'failed', reason: { code: 'job-failed', message: 'BackoffLimitExceeded' } });
+    expect(computePhase(job(undefined, [cond('Finished', 'true', { reason: 'failed' })])).reason?.message).toBe('任务失败');
+    expect(computePhase(job(undefined, [cond('Finished', 'true')])).reason?.message).toBe('已完成');
+    expect(computePhase(job({}, [cond('Finished', 'false')])).phase).toBe('ready');
+  });
+
   test('待回收的工作卷：上级已结束、卷还在，按已结束算，原因写明；受理删除后照常是结束中', () => {
     const volume = (extra: Partial<LedgerRecord> = {}) => record({ kind: 'volume', spec: { children: [{ kind: 'PersistentVolumeClaim', namespace: 'cs-demo', name: 'task-1-work' }] }, children: [{ kind: 'PersistentVolumeClaim', namespace: 'cs-demo', name: 'task-1-work', phase: 'Bound', ready: true }], ...extra });
     expect(computePhase(volume({ conditions: [cond('PendingReclaim', 'true', { reason: 'retention-expired', message: '失败保留期已满' })] }))).toEqual({ phase: 'stopped', reason: { code: 'retention-expired', message: '失败保留期已满' } });

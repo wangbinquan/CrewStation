@@ -124,15 +124,52 @@ export function deploymentChild(deployment: ObservedObject, observedAt: string):
   };
 }
 
+/** 控制一个 Pod 的上级对象：服务槽的 Deployment，或构建、迁移的 Job。 */
+export interface PodController { readonly kind: 'Deployment' | 'Job'; readonly namespace?: string; readonly name: string }
+
 /**
- * ReplicaSet 管的 Pod 属于哪个 Deployment：控制者是 ReplicaSet，且它的名字是 Deployment 名加 `-<pod-template-hash>`
- * （Kubernetes 给 Deployment 建 ReplicaSet 的命名规则）；不是这样的（裸 Pod、Job 的 Pod）返回 undefined。
+ * Pod 的控制者：Job 管的就是那个 Job；ReplicaSet 管的属于哪个 Deployment——ReplicaSet 的名字是 Deployment 名加 `-<pod-template-hash>`
+ * （Kubernetes 给 Deployment 建 ReplicaSet 的命名规则）。裸 Pod 与认不出的返回 undefined。
  */
-export function ownerDeploymentOf(pod: ObservedObject): { readonly kind: 'Deployment'; readonly namespace?: string; readonly name: string } | undefined {
+export function controllerOf(pod: ObservedObject): PodController | undefined {
   const owner = pod.metadata.ownerReferences?.find((entry) => entry.controller);
+  const namespace = pod.metadata.namespace ? { namespace: pod.metadata.namespace } : {};
+  if (owner?.kind === 'Job') return { kind: 'Job', ...namespace, name: owner.name };
   const hash = pod.metadata.labels?.['pod-template-hash'];
   if (owner?.kind !== 'ReplicaSet' || !hash || !owner.name.endsWith(`-${hash}`) || owner.name.length <= hash.length + 1) return undefined;
-  return { kind: 'Deployment', ...(pod.metadata.namespace ? { namespace: pod.metadata.namespace } : {}), name: owner.name.slice(0, -(hash.length + 1)) };
+  return { kind: 'Deployment', ...namespace, name: owner.name.slice(0, -(hash.length + 1)) };
+}
+
+interface JobStatus {
+  readonly active?: number;
+  readonly succeeded?: number;
+  readonly failed?: number;
+  readonly conditions?: readonly { readonly type: string; readonly status: string; readonly reason?: string; readonly message?: string }[];
+}
+
+const jobFinish = (status: JobStatus) => ({
+  complete: status.conditions?.find((entry) => entry.type === 'Complete' && entry.status === 'True'),
+  failed: status.conditions?.find((entry) => entry.type === 'Failed' && entry.status === 'True'),
+});
+
+/** Job → 子对象观测（构建、迁移，第三期）：Complete、Failed、Active（有 Pod 在跑）、Pending（建了还没跑起来）；失败的原因照 Job 的条件。 */
+export function jobChild(job: ObservedObject, observedAt: string): ResourceChild {
+  const status = (job.status ?? {}) as JobStatus, { complete, failed } = jobFinish(status);
+  const deleting = Boolean(job.metadata.deletionTimestamp);
+  const phase = deleting ? 'Terminating' : complete ? 'Complete' : failed ? 'Failed' : (status.active ?? 0) > 0 ? 'Active' : 'Pending';
+  const reason = failed ? clip(failed.message ?? failed.reason ?? 'Job 失败') : deleting ? 'Terminating' : undefined;
+  return {
+    kind: 'Job', ...(job.metadata.namespace ? { namespace: job.metadata.namespace } : {}), name: job.metadata.name, ...(job.metadata.uid ? { uid: job.metadata.uid } : {}),
+    phase, ready: phase === 'Complete', ...(reason ? { reason } : {}), observedAt,
+  };
+}
+
+/** Job 结束了没有（只归资源中心的条件 Finished）：成功或失败都记下，Job 之后被 TTL 删掉也不改（台账留下结果）。 */
+export function jobConditions(job: ObservedObject): ObservedCondition[] {
+  const { complete, failed } = jobFinish((job.status ?? {}) as JobStatus);
+  if (complete) return [{ type: 'Finished', status: 'true', reason: 'succeeded', message: '已完成' }];
+  if (failed) return [{ type: 'Finished', status: 'true', reason: 'failed', message: clip(failed.message ?? failed.reason ?? 'Job 失败') }];
+  return [{ type: 'Finished', status: 'false' }];
 }
 
 /** 崩溃重启的判定窗口与次数（G22，与旧的健康判定一致）。 */

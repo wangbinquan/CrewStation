@@ -236,6 +236,25 @@ describe.skipIf(!available)('cluster-control：观测写回台账与收编空跑
     expect(await pods()).toEqual(['shop-blue-5d8f7c-early']);
   });
 
+  test('构建 Job：它的 Pod 由记录认领，跑起来是运行中；结束时资源中心记下结果，Job 被 TTL 删掉之后仍是已结束', async () => {
+    const record = await resources.api.owner('release').declare({ kind: 'build-job', ref: 'rel-9/build', projectId: PROJECT, spec: { children: [{ kind: 'Job', namespace: 'cs-demo', name: 'build-rel9' }] }, display: { releaseId: 'rel-9', tag: 'v0.9.0' } });
+    const job = (status: Record<string, unknown>): K8sObject => ({ ...child('Job', 'build-rel9', 'uid-build-rel9'), apiVersion: 'batch/v1', status });
+    const builder: K8sObject = { ...pod('build-rel9-x7k2p', { 'crewstation.io/release': 'rel-9' }), metadata: { ...pod('build-rel9-x7k2p').metadata, ownerReferences: [{ apiVersion: 'batch/v1', kind: 'Job', name: 'build-rel9', uid: 'uid-build-rel9', controller: true }] } };
+    await feed.emit({ kind: 'Job', object: job({ active: 1 }), gone: false });
+    await feed.emit({ kind: 'Pod', object: builder, gone: false });
+    await until('运行中', async () => (await resources.api.get(record.id))?.phase === 'ready');
+    expect((await resources.api.get(record.id))?.children.map((entry) => `${entry.kind}/${entry.name}`).sort()).toEqual(['Job/build-rel9', 'Pod/build-rel9-x7k2p']);
+    await feed.emit({ kind: 'Job', object: job({ succeeded: 1, conditions: [{ type: 'Complete', status: 'True' }] }), gone: false });
+    await until('已完成', async () => (await resources.api.get(record.id))?.phase === 'stopped');
+    expect((await resources.api.get(record.id))?.reason).toEqual({ code: 'completed', message: '已完成' });
+    // Kubernetes 的 TTL 删掉 Job 与 Pod：结果留在台账里。
+    await feed.emit({ kind: 'Pod', object: builder, gone: true });
+    await feed.emit({ kind: 'Job', object: job({ succeeded: 1 }), gone: true });
+    await control.reconciled();
+    expect(await resources.api.get(record.id)).toMatchObject({ phase: 'stopped', desired: 'present', reason: { code: 'completed' } });
+    expect((await resources.api.get(record.id))?.children.map((entry) => `${entry.kind}/${entry.phase}`)).toEqual(['Job/absent']);
+  });
+
   test('崩溃重启的到期复核：成立时按最近一次退出满 10 分钟约下一次核对，到时不再重启就撤掉', async () => {
     const slot = await resources.api.owner('release').declare({ kind: 'service-slot', ref: 'svc-shop/green', projectId: PROJECT, spec: { children: [{ kind: 'Deployment', namespace: 'cs-demo', name: 'shop-green' }] } });
     const exited = new Date('2026-09-24T01:00:00.000Z');

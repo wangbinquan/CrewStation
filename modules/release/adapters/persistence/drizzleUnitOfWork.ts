@@ -4,7 +4,7 @@ import type { Database, Executor } from '@crewstation/persistence';
 import type { RepositoryScope, UnitOfWork } from '../../ports/unitOfWork';
 import { drizzleOfflinePolicyRepository, drizzleReleaseRepository, drizzleSlotEventRepository, drizzleSlotRepository, drizzleTrafficSwitchRepository } from './drizzleRepositories';
 import type { SlotProjectionDeps } from './ledgerProjection';
-import { findSlotRecord, ledgerSlotRepository, syncSlotLedger } from './ledgerProjection';
+import { findSlotRecord, ledgerSlotRepository, projectJob, syncSlotLedger } from './ledgerProjection';
 
 /** 可选的资源台账投影（RFC-025 第三期）：给了就在每次槽保存的同一事务里同步台账。 */
 export function scopeOver(executor: Executor, lockSlots = false, projection?: SlotProjectionDeps): RepositoryScope {
@@ -17,6 +17,7 @@ export function scopeOver(executor: Executor, lockSlots = false, projection?: Sl
     ...(projection ? { ledger: {
       sync: (value: Parameters<typeof syncSlotLedger>[3]) => syncSlotLedger(executor, projection, sources, value),
       slot: (serviceId: Parameters<typeof findSlotRecord>[2], physical: Parameters<typeof findSlotRecord>[3]) => findSlotRecord(executor, projection, serviceId, physical),
+      job: (job: Parameters<typeof projectJob>[2]) => projectJob(executor, projection, job),
     } } : {}),
     switches: drizzleTrafficSwitchRepository(executor),
     slotEvents: drizzleSlotEventRepository(executor),

@@ -3,7 +3,7 @@ import type { Logger } from '@crewstation/kernel';
 import type { Executor } from '@crewstation/persistence';
 import { projectSlots } from '../../domain/ledgerProjection';
 import type { PhysicalSlot, ServiceSlots } from '../../domain/slots';
-import type { SlotLedger, SlotRecordRef } from '../../ports/ledger';
+import type { JobProjection, SlotLedger, SlotRecordRef } from '../../ports/ledger';
 import type { ServiceResolver } from '../../ports/platform';
 import type { OfflinePolicyRepository, ReleaseRepository, SlotRepository } from '../../ports/repositories';
 import { DEFAULT_OFFLINE_POLICY } from '../../domain/slotLifecycle';
@@ -37,6 +37,23 @@ export async function syncSlotLedger(executor: Executor, deps: SlotProjectionDep
     });
   } catch (error) {
     deps.logger.warn('resource ledger slot projection failed', { serviceId: slots.serviceId, error: error instanceof Error ? error.message : String(error) });
+  }
+}
+
+/**
+ * 一次发布的构建或迁移 Job 投影进台账（第三期）：`ref` 是 `<发布 ID>/build|migration`，子对象是那个 Job；Job 与它的 Pod 由资源中心观测，
+ * 结束时资源中心记下结果。包在保存点里，写失败只告警——台账的问题不挡发布流水线。
+ */
+export async function projectJob(executor: Executor, deps: SlotProjectionDeps, job: JobProjection): Promise<void> {
+  try {
+    await executor.transaction(async (savepoint) => {
+      await deps.ledger.within(savepoint).declare({
+        kind: job.kind, ref: `${job.releaseId}/${job.kind === 'build-job' ? 'build' : 'migration'}`, projectId: job.projectId,
+        spec: { children: [{ kind: 'Job', namespace: job.namespace, name: job.jobName }] }, display: { releaseId: job.releaseId, tag: job.tag },
+      });
+    });
+  } catch (error) {
+    deps.logger.warn('resource ledger job projection failed', { releaseId: job.releaseId, kind: job.kind, error: error instanceof Error ? error.message : String(error) });
   }
 }
 

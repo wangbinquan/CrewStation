@@ -108,11 +108,13 @@ function recordTaskBands(a: Assembly, records: readonly ResourceRecord[]): void 
 }
 
 function jobsBand(a: Assembly): void {
-  const { t, production } = a;
+  const { t, production, input } = a;
   const jobs = a.workloads.filter((r) => JOB_PURPOSES.has(r.purpose)), jobPods = a.pods.filter((r) => JOB_PURPOSES.has(r.purpose));
   if (jobs.length === 0 && jobPods.length === 0) return;
   a.bands.push({ id: 'jobs', title: t('topology.band.jobs'), semantic: 'build' });
-  for (const j of jobs) { const { status, statusText } = workloadStatus(j, t); a.nodes.push({ id: j.uid, kind: 'job', semantic: 'build', title: j.name, subtitle: `${j.kind} · ${t(`cluster.purpose.${j.purpose}`)}`, status, statusText, lane: LANE.workload, band: 'jobs', box: 'jobs', abnormal: j.abnormal, resourceId: j.resourceId, purpose: j.purpose, meta: [...(j.releaseId ? [`${t('topology.fact.releaseId')} ${j.releaseId.slice(0, 8)}…`] : [])], facts: [[t('topology.fact.kind'), j.kind], [t('topology.fact.phase'), j.phase], ...(j.releaseId ? [[t('topology.fact.releaseId'), j.releaseId] as const] : [])] }); }
+  // RFC-025 第三期：构建、迁移 Job 有台账记录时，状态照记录的阶段（随推送流变化）；Pod 仍按盘点补详情。
+  const recordOf = (name: string) => input.records?.find((r) => (r.kind === 'build-job' || r.kind === 'migration-job') && r.children.some((c) => c.kind === 'Job' && c.name === name));
+  for (const j of jobs) { const record = recordOf(j.name), { status, statusText } = record ? recordStatus(record, t) : workloadStatus(j, t); a.nodes.push({ id: j.uid, kind: 'job', semantic: 'build', title: j.name, subtitle: `${j.kind} · ${t(`cluster.purpose.${j.purpose}`)}`, status, statusText, lane: LANE.workload, band: 'jobs', box: 'jobs', abnormal: j.abnormal, resourceId: j.resourceId, purpose: j.purpose, meta: [...(j.releaseId ? [`${t('topology.fact.releaseId')} ${j.releaseId.slice(0, 8)}…`] : [])], facts: [[t('topology.fact.kind'), j.kind], [t('topology.fact.phase'), j.phase], ...(j.releaseId ? [[t('topology.fact.releaseId'), j.releaseId] as const] : [])] }); }
   for (const p of jobPods) {
     a.nodes.push(podNode(a, p, 'jobs', 'jobs'));
     for (const j of jobs) if (p.owners.some((o) => o.uid === j.uid)) a.edges.push({ from: j.uid, to: p.uid, kind: 'owns', evidence: 'observed' });

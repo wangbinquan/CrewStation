@@ -15,6 +15,9 @@ export interface BuildSteps {
 
 /** 构建阶段：提交构建 Job，成功后读取标签处的 Manifest，决定进入迁移还是直接部署。 */
 export function buildSteps(deps: ReleaseUseCaseDeps, ctx: PipelineContext, startDeploy: (release: Release, svc: ResolvedService, manifest: Manifest) => Promise<StepResult>): BuildSteps {
+  // 构建、迁移 Job 进资源台账（RFC-025 第三期）：Job 与它的 Pod 由资源中心观测，结束时记下结果，Job 被 TTL 删掉之后结果仍在。
+  const projectJob = (release: Release, svc: ResolvedService, kind: 'build-job' | 'migration-job', jobName: string) =>
+    deps.uow.run(async (scope) => { await scope.ledger?.job({ kind, releaseId: release.id, tag: release.tag, projectId: release.projectId, namespace: svc.namespace, jobName }); });
   const loadManifest = async (release: Release): Promise<Manifest> => {
     const text = await deps.repo.readFile(release.serviceId, release.tag, 'crewstation.yaml');
     if (!text) throw new Error('仓库中没有 crewstation.yaml');
@@ -44,6 +47,7 @@ export function buildSteps(deps: ReleaseUseCaseDeps, ctx: PipelineContext, start
       return ctx.fail(release, isPlatformError(error) ? error.message : String(error));
     }
     const { migrationRef } = await deps.migrator.start({ legacyResourceId: release.legacyResourceId, releaseId: release.id, namespace: svc.namespace, image: release.image ?? '', command, env: env.values });
+    await projectJob(release, svc, 'migration-job', migrationRef);
     await ctx.save(release, 'migrating', { manifest, configVersion: env.configVersion, pipeline: { ...release.pipeline, migrationRef } });
     return WAIT;
   };
@@ -53,6 +57,7 @@ export function buildSteps(deps: ReleaseUseCaseDeps, ctx: PipelineContext, start
       const image = `${deps.settings.registryBase}/${svc.slug}:${release.tag}`;
       const { httpUrl, credentialSecretName } = await deps.repo.repositoryUrl(release.serviceId);
       const { buildRef } = await deps.builder.start({ legacyResourceId: release.legacyResourceId, releaseId: release.id, namespace: svc.namespace, repoHttpUrl: httpUrl, credentialSecretName, ref: release.tag, image });
+      await projectJob(release, svc, 'build-job', buildRef);
       await ctx.save(release, 'building', { image, pipeline: { ...release.pipeline, buildRef } });
       return WAIT;
     },

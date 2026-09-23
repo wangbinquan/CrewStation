@@ -178,6 +178,14 @@ describe('record-based task bands', () => {
     expect(topology().nodes.find((n) => n.id === 'uid-demo-blue')).toMatchObject({ status: 'ready', statusText: '副本 1／1' });
   });
 
+  test('job nodes take their status from the build/migration job records when given; others stay from the inventory', () => {
+    const jobRecord = resourceRecord({ id: 'job-migrate', kind: 'migration-job', phase: 'failed', reason: { code: 'job-failed', message: 'BackoffLimitExceeded' },
+      children: [{ kind: 'Job', namespace: 'cs-demo', name: 'migrate-1', phase: 'Failed', ready: false }] });
+    const withJobs = buildProjectTopology({ ...input, records: [...records, jobRecord] }, t);
+    expect(withJobs.nodes.find((n) => n.id === 'uid-migrate-1')).toMatchObject({ status: 'failed', statusText: '失败 · BackoffLimitExceeded' });
+    expect(withJobs.nodes.find((n) => n.id === 'uid-build-1')?.statusText).toBe(topology().nodes.find((n) => n.id === 'uid-build-1')?.statusText);
+  });
+
   test('an execution whose workspace is no longer drawn is still shown; no records means no task bands', () => {
     const orphan = buildProjectTopology({ ...input, records: [cliReady] }, t);
     expect(orphan.nodes.find((n) => n.id === 'cli-1')?.band).toBe('dev'); expect(orphan.bands.find((b) => b.id === 'dev')?.note).toBe('没有运行中的会话');

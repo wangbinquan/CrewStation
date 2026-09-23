@@ -46,6 +46,7 @@ export function computePhase(record: PhaseInput): PhaseResult {
   }
   if (!rule.primaryChild) return byConditions(record, rule);
   const primary = expectedChildren(record).find((child) => child.kind === rule.primaryChild);
+  if (rule.primaryChild === 'Job') return jobPhase(record, primary);
   if (!primary || !isPresent(primary)) return condition(record, 'Prepared')?.status === 'false' ? { phase: 'pending', reason: QUEUED } : { phase: 'provisioning' };
   if (rule.primaryChild === 'PersistentVolumeClaim') return volumePhase(primary);
   return rule.primaryChild === 'Deployment' ? deploymentPhase(record, primary) : workloadPhase(record, rule, primary);
@@ -63,6 +64,21 @@ function deploymentPhase(record: PhaseInput, deployment: ResourceChild): PhaseRe
   if (deployment.phase === 'Stalled') return { phase: 'degraded', reason: reasonOf('rollout-stalled', deployment.reason ?? '部署停止推进') };
   if (deployment.phase === 'ScaledDown') return { phase: 'degraded', reason: reasonOf('scaled-down', deployment.reason ?? '副本数为 0') };
   return { phase: 'starting', ...(deployment.reason ? { reason: reasonOf('rolling-out', deployment.reason) } : {}) };
+}
+
+/**
+ * Job → 阶段（构建、迁移）：资源中心看到它结束时记下 Finished（成功或失败），此后 Job 被 TTL 删掉也照它——结果留在台账里；
+ * 还在跑是运行中，建了还没跑起来是启动中（原因照它的 Pod：例如调度不上），还没建是分配中。
+ */
+function jobPhase(record: PhaseInput, job: ResourceChild | undefined): PhaseResult {
+  const finished = condition(record, 'Finished');
+  if (finished?.status === 'true') {
+    return finished.reason === 'failed' ? { phase: 'failed', reason: reasonOf('job-failed', finished.message ?? '任务失败') } : { phase: 'stopped', reason: reasonOf('completed', finished.message ?? '已完成') };
+  }
+  if (!job || !isPresent(job)) return { phase: 'provisioning' };
+  if (job.phase === 'Active') return { phase: 'ready' };
+  const waiting = record.children.find((child) => child.kind === 'Pod' && child.reason);
+  return { phase: 'starting', ...(waiting?.reason ? { reason: reasonOf('waiting-container', waiting.reason) } : {}) };
 }
 
 function workloadPhase(record: PhaseInput, rule: KindRule, pod: ResourceChild): PhaseResult {

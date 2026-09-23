@@ -1,13 +1,13 @@
 import type { Clock, Logger } from '@crewstation/kernel';
 import type { ObservedObject } from '../domain/observation';
-import { crashLoopingOf, ownerDeploymentOf } from '../domain/observation';
+import { controllerOf, crashLoopingOf } from '../domain/observation';
 import type { ClusterWriter, ManagedObjectFeed, ObservedKind } from '../ports/cluster';
 import type { LedgerObservations, LedgerRecordView } from '../ports/ledger';
 import type { ObservationStats } from './observeChange';
 import { observeChange } from './observeChange';
 
-/** 删的顺序（设计 §6.2）：先工作负载（Deployment、Pod），再 Secret、Service、路由；PVC 只随工作卷记录删。 */
-const REMOVAL_ORDER: readonly ObservedKind[] = ['Deployment', 'Pod', 'Secret', 'Service', 'IngressRoute', 'PersistentVolumeClaim'];
+/** 删的顺序（设计 §6.2）：先工作负载（Deployment、Job、Pod），再 Secret、Service、路由；PVC 只随工作卷记录删。 */
+const REMOVAL_ORDER: readonly ObservedKind[] = ['Deployment', 'Job', 'Pod', 'Secret', 'Service', 'IngressRoute', 'PersistentVolumeClaim'];
 const isObserved = (kind: string): kind is ObservedKind => (REMOVAL_ORDER as readonly string[]).includes(kind);
 const key = (child: { readonly kind: string; readonly namespace?: string; readonly name: string }) => `${child.kind}/${child.namespace ?? ''}/${child.name}`;
 const RETENTION_EXPIRED = 'retention-expired';
@@ -88,21 +88,22 @@ async function settleVolume(deps: ReconcileDeps, volume: LedgerRecordView): Prom
 }
 
 /**
- * 服务槽（期望里有 Deployment 的记录，第三期）：观测缓存里这个 Deployment 名下的 Pod 都作为观测到的子对象入账——新建的副本、
- * 台账接上之前就在的副本；再汇总它们写崩溃重启（G22），成立时到期复核，之后不再重启就撤掉。
+ * 期望里有 Deployment 或 Job 的记录（服务槽、构建、迁移，第三期）：观测缓存里它名下的 Pod 都作为观测到的子对象入账——新建的、
+ * 台账接上之前就在的。服务槽再汇总副本写崩溃重启（G22），成立时到期复核，之后不再重启就撤掉。
  */
-async function observeDeploymentPods(deps: ReconcileDeps, record: LedgerRecordView, enqueue: Enqueue): Promise<void> {
-  const deployments = new Set(record.spec.children.filter((child) => child.kind === 'Deployment').map(key));
-  if (!deployments.size || record.desired === 'absent') return;
+async function observeControlledPods(deps: ReconcileDeps, record: LedgerRecordView, enqueue: Enqueue): Promise<void> {
+  const controllers = new Set(record.spec.children.filter((child) => child.kind === 'Deployment' || child.kind === 'Job').map(key));
+  if (!controllers.size || record.desired === 'absent') return;
   const pods = deps.feed.list('Pod').filter((pod) => {
-    const owner = ownerDeploymentOf(pod);
-    return owner !== undefined && deployments.has(key(owner));
+    const controller = controllerOf(pod);
+    return controller !== undefined && controllers.has(key(controller));
   });
   const recorded = new Set(record.children.filter((child) => child.kind === 'Pod').map(key));
   for (const pod of pods) {
     if (recorded.has(key({ kind: 'Pod', ...(pod.metadata.namespace ? { namespace: pod.metadata.namespace } : {}), name: pod.metadata.name }))) continue;
     await observeChange(deps.ledger, deps.clock, deps.systemNamespace, deps.stats, { kind: 'Pod', object: pod, gone: false });
   }
+  if (!record.spec.children.some((child) => child.kind === 'Deployment')) return;
   const { condition, recheckAfterMs } = crashLoopingOf(pods, deps.clock.now());
   await deps.ledger.observeConditions(record.id, [condition]);
   if (recheckAfterMs !== undefined) enqueue(record.id, recheckAfterMs);
@@ -116,7 +117,7 @@ export async function reconcileRecord(deps: ReconcileDeps, id: string, enqueue: 
   const record = await deps.ledger.get(id);
   if (!record) return;
   await observeRecord(deps, record);
-  await observeDeploymentPods(deps, record, enqueue);
+  await observeControlledPods(deps, record, enqueue);
   if (record.desired === 'absent') await removeChildren(deps, record);
   await settleVolume(deps, record);
   if (record.kind !== 'volume' && record.desired === 'absent' && record.phase === 'stopped') {

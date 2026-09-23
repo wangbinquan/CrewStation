@@ -54,7 +54,7 @@ export function countByKindPhase(records: readonly { readonly kind: ResourceKind
  * 只由资源中心（调和器与观测）写的条件；所属模块上报这些类型会被拒绝（设计 §2.1：实况只由资源中心写）。
  * 所属模块写的是领域条件：RunnerConnected、InterfaceReady、Failed、Paused、Rebuilding、Prepared……
  */
-export const CENTER_CONDITIONS: ReadonlySet<string> = new Set(['Observed', 'Applied', 'ReconcileError', 'SpecDrift', 'CrashLooping', 'Superseded', 'PendingReclaim', 'ContainersReady']);
+export const CENTER_CONDITIONS: ReadonlySet<string> = new Set(['Observed', 'Applied', 'ReconcileError', 'SpecDrift', 'CrashLooping', 'Superseded', 'PendingReclaim', 'ContainersReady', 'Finished']);
 
 export function ownerConditionViolation(updates: readonly ConditionUpdate[]): string | undefined {
   return updates.find((update) => CENTER_CONDITIONS.has(update.type))?.type;

@@ -39,9 +39,9 @@ describe('受管对象的列表与变化流（设计 §6.1）', () => {
     const selectors: string[] = [];
     const scripts: Record<string, { type: WatchEventType; object: K8sObject }[]> = {
       Pod: [{ type: 'MODIFIED', object: object('Pod', 'a', '5') }, { type: 'DELETED', object: object('Pod', 'a', '6') }],
-      PersistentVolumeClaim: [], Secret: [{ type: 'ADDED', object: { ...object('Secret', 's', '3'), data: { token: 'c2VjcmV0' } } }], Service: [], IngressRoute: [], Deployment: [],
+      PersistentVolumeClaim: [], Secret: [{ type: 'ADDED', object: { ...object('Secret', 's', '3'), data: { token: 'c2VjcmV0' } } }], Service: [], IngressRoute: [], Deployment: [], Job: [],
     };
-    const lists: Record<string, K8sObject[]> = { Pod: [object('Pod', 'a', '1')], PersistentVolumeClaim: [object('PersistentVolumeClaim', 'w', '1')], Secret: [], Service: [object('Service', 'task-1', '1')], IngressRoute: [], Deployment: [object('Deployment', 'demo-green', '1')] };
+    const lists: Record<string, K8sObject[]> = { Pod: [object('Pod', 'a', '1')], PersistentVolumeClaim: [object('PersistentVolumeClaim', 'w', '1')], Secret: [], Service: [object('Service', 'task-1', '1')], IngressRoute: [], Deployment: [object('Deployment', 'demo-green', '1')], Job: [object('Job', 'build-1', '1')] };
     const k8s = {
       listPage: async (ref: { kind: string }, _ns: unknown, options: { labelSelector?: string }) => {
         selectors.push(options.labelSelector ?? '');
@@ -59,8 +59,9 @@ describe('受管对象的列表与变化流（设计 §6.1）', () => {
     const deadline = Date.now() + 2_000;
     while (!seen.some((c) => c.gone) && Date.now() < deadline) await Bun.sleep(5);
     await feed.stop();
-    expect(selectors).toEqual(Array.from({ length: 6 }, () => 'app.kubernetes.io/managed-by=crewstation'));
+    expect(selectors).toEqual(Array.from({ length: 7 }, () => 'app.kubernetes.io/managed-by=crewstation'));
     expect(seen.some((c) => c.kind === 'Deployment' && c.object.metadata.name === 'demo-green')).toBe(true);
+    expect(seen.some((c) => c.kind === 'Job' && c.object.metadata.name === 'build-1')).toBe(true);
     expect(seen.some((c) => c.kind === 'PersistentVolumeClaim' && c.object.metadata.name === 'w' && !c.gone)).toBe(true);
     expect(seen.some((c) => c.kind === 'Service' && c.object.metadata.name === 'task-1')).toBe(true);
     // Secret 的内容不进缓存，也不交给处理者。

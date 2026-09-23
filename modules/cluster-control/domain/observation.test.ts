@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { classifyObject, countVerdicts } from './adoption';
 import type { ObservedObject } from './observation';
-import { CRASH_LOOP_WINDOW_MS, crashLoopingOf, deploymentChild, goneChild, ownerDeploymentOf, podChild, podConditions, presentChild, pvcChild } from './observation';
+import { CRASH_LOOP_WINDOW_MS, controllerOf, crashLoopingOf, deploymentChild, goneChild, jobChild, jobConditions, podChild, podConditions, presentChild, pvcChild } from './observation';
 
 const at = '2026-09-23T12:00:00.000Z';
 const pod = (status: unknown, patch: Partial<ObservedObject['metadata']> = {}, spec: unknown = { nodeName: 'desktop-worker' }): ObservedObject => ({
@@ -47,14 +47,28 @@ describe('Pod 与 PVC 的观测映射（RFC-025 设计 §6.2）', () => {
     expect(deploymentChild({ ...deployment(1, {}), metadata: { name: 'demo-green', namespace: 'cs-demo', deletionTimestamp: at } }, at)).toMatchObject({ phase: 'Terminating', ready: false });
   });
 
-  test('Deployment 管的 Pod：控制者是 ReplicaSet、名字是 Deployment 名加 pod-template-hash；裸 Pod、Job 的 Pod 没有所属 Deployment', () => {
+  test('Pod 的控制者：ReplicaSet 管的属于名字去掉 pod-template-hash 的 Deployment；Job 管的就是那个 Job；裸 Pod 与认不出的没有', () => {
     const owned = (owner: { kind: string; name: string; controller?: boolean }, hash = '56fb8ffff9') => pod({}, { labels: { 'pod-template-hash': hash }, ownerReferences: [owner] });
-    expect(ownerDeploymentOf(owned({ kind: 'ReplicaSet', name: 'demo-blue-56fb8ffff9', controller: true }))).toEqual({ kind: 'Deployment', namespace: 'cs-demo', name: 'demo-blue' });
-    expect(ownerDeploymentOf(owned({ kind: 'ReplicaSet', name: 'demo-blue-56fb8ffff9' }))).toBeUndefined();
-    expect(ownerDeploymentOf(owned({ kind: 'Job', name: 'build-1', controller: true }))).toBeUndefined();
-    expect(ownerDeploymentOf(owned({ kind: 'ReplicaSet', name: 'standalone-rs', controller: true }))).toBeUndefined();
-    expect(ownerDeploymentOf(owned({ kind: 'ReplicaSet', name: '-56fb8ffff9', controller: true }))).toBeUndefined();
-    expect(ownerDeploymentOf(pod({}))).toBeUndefined();
+    expect(controllerOf(owned({ kind: 'ReplicaSet', name: 'demo-blue-56fb8ffff9', controller: true }))).toEqual({ kind: 'Deployment', namespace: 'cs-demo', name: 'demo-blue' });
+    expect(controllerOf(owned({ kind: 'ReplicaSet', name: 'demo-blue-56fb8ffff9' }))).toBeUndefined();
+    expect(controllerOf(owned({ kind: 'Job', name: 'build-1', controller: true }))).toEqual({ kind: 'Job', namespace: 'cs-demo', name: 'build-1' });
+    expect(controllerOf(owned({ kind: 'ReplicaSet', name: 'standalone-rs', controller: true }))).toBeUndefined();
+    expect(controllerOf(owned({ kind: 'ReplicaSet', name: '-56fb8ffff9', controller: true }))).toBeUndefined();
+    expect(controllerOf(pod({}))).toBeUndefined();
+  });
+
+  test('Job（构建、迁移）：Complete、Failed、Active、Pending；结束时记 Finished（成功或失败，带原因），还没结束为假', () => {
+    const job = (status: unknown, patch: Partial<ObservedObject['metadata']> = {}): ObservedObject => ({ kind: 'Job', metadata: { name: 'build-1', namespace: 'cs-demo', uid: 'u-job', ...patch }, status });
+    expect(jobChild(job({ succeeded: 1, conditions: [{ type: 'Complete', status: 'True' }] }), at)).toEqual({ kind: 'Job', namespace: 'cs-demo', name: 'build-1', uid: 'u-job', phase: 'Complete', ready: true, observedAt: at });
+    const failed = job({ failed: 1, conditions: [{ type: 'Failed', status: 'True', reason: 'DeadlineExceeded', message: 'Job was active longer than specified deadline' }] });
+    expect(jobChild(failed, at)).toMatchObject({ phase: 'Failed', ready: false, reason: 'Job was active longer than specified deadline' });
+    expect(jobChild(job({ active: 1 }), at).phase).toBe('Active');
+    expect(jobChild(job(undefined), at).phase).toBe('Pending');
+    expect(jobChild(job({ active: 1 }, { deletionTimestamp: at }), at)).toMatchObject({ phase: 'Terminating', reason: 'Terminating' });
+    expect(jobConditions(job({ conditions: [{ type: 'Complete', status: 'True' }] }))).toEqual([{ type: 'Finished', status: 'true', reason: 'succeeded', message: '已完成' }]);
+    expect(jobConditions(failed)).toEqual([{ type: 'Finished', status: 'true', reason: 'failed', message: 'Job was active longer than specified deadline' }]);
+    expect(jobConditions(job({ failed: 1, conditions: [{ type: 'Failed', status: 'True', reason: 'BackoffLimitExceeded' }] }))[0]?.message).toBe('BackoffLimitExceeded');
+    expect(jobConditions(job({ active: 1 }))).toEqual([{ type: 'Finished', status: 'false' }]);
   });
 
   test('崩溃重启（G22）：一个 Deployment 名下各容器重启累计至少 3 次、最近一次退出在 10 分钟内；成立时给出复核时刻', () => {

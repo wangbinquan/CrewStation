@@ -114,6 +114,19 @@ describe.skipIf(!available)('服务槽投影进资源台账（RFC-025 第三期�
     expect(postponed.display).toMatchObject({ retentionDeadline: '2026-09-29T12:00:00.000Z', retentionPostponements: '1' });
   });
 
+  test('构建、迁移 Job 投影进台账：ref 是 <发布>/build|migration，子对象是那个 Job，展示字段是发布与版本；台账写失败只记告警', async () => {
+    const uow = drizzleUnitOfWork(database.db, { ledger, services, logger });
+    await uow.run(async (scope) => { await scope.ledger?.job({ kind: 'build-job', releaseId, tag: 'v0.1.0', projectId, namespace: 'cs-demo', jobName: 'build-01a0bf5d' }); });
+    await uow.run(async (scope) => { await scope.ledger?.job({ kind: 'migration-job', releaseId, tag: 'v0.1.0', projectId, namespace: 'cs-demo', jobName: 'migrate-01a0bf5d' }); });
+    const jobs = (await resources.api.list({ projectId, includeStopped: true })).filter((record) => record.kind === 'build-job' || record.kind === 'migration-job');
+    expect(jobs.map((record) => [record.kind, record.owner.ref, record.phase, record.children[0]?.name, record.display['tag']]).sort()).toEqual([
+      ['build-job', `${releaseId}/build`, 'provisioning', 'build-01a0bf5d', 'v0.1.0'], ['migration-job', `${releaseId}/migration`, 'provisioning', 'migrate-01a0bf5d', 'v0.1.0'],
+    ]);
+    const broken = drizzleUnitOfWork(database.db, { ledger: { within: () => ({ declare: async () => { throw new Error('台账暂时不可用'); }, find: async () => undefined }) }, services, logger });
+    await broken.run(async (scope) => { await scope.ledger?.job({ kind: 'build-job', releaseId, tag: 'v0.1.1', projectId, namespace: 'cs-demo', jobName: 'build-x' }); });
+    expect(warnings).toContain('resource ledger job projection failed');
+  });
+
   test('补投影工作器：启动即跑一次、此后按周期；失败只记告警；停止时等本轮跑完', async () => {
     let calls = 0;
     const seen: string[] = [];

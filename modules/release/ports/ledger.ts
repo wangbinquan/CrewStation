@@ -10,7 +10,8 @@ export interface SlotRecordRef {
 }
 
 export interface SlotDeclaration {
-  readonly kind: 'service-slot';
+  /** 服务槽，或发布的构建、迁移 Job（第三期）。 */
+  readonly kind: 'service-slot' | 'build-job' | 'migration-job';
   readonly ref: string;
   readonly projectId?: ProjectId;
   readonly spec: { readonly children: readonly { readonly kind: string; readonly namespace?: string; readonly name: string }[] };
@@ -18,10 +19,20 @@ export interface SlotDeclaration {
   readonly conditions?: readonly { readonly type: string; readonly status: ResourceConditionStatus; readonly reason?: string; readonly message?: string; readonly since?: Date }[];
 }
 
-/** 资源中心（RFC-025）的写入口：release 写服务槽的期望与领域条件，实况由资源中心写。 */
+/** 资源中心（RFC-025）的写入口：release 写服务槽与构建、迁移 Job 的期望与领域条件，实况由资源中心写。 */
 export interface SlotLedgerWriter {
   declare(input: SlotDeclaration): Promise<SlotRecordRef>;
   find(ref: string, kind: 'service-slot'): Promise<SlotRecordRef | undefined>;
+}
+
+/** 一次发布的构建或迁移 Job（台账记录一条，结果在 Job 被 TTL 删掉之后仍在）。 */
+export interface JobProjection {
+  readonly kind: 'build-job' | 'migration-job';
+  readonly releaseId: string;
+  readonly tag: string;
+  readonly projectId: ProjectId;
+  readonly namespace: string;
+  readonly jobName: string;
 }
 
 /** 由组合根接上 resources 模块：within 加入 release 自己的事务。 */
