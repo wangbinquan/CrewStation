@@ -95,10 +95,14 @@ function lifecycleTools(deps: Deps): LifecycleTools {
       const slots = await uow.read.slots.get(serviceId);
       return slots ? loadSlotDtos(uow.read, slots, svc.slug, deps.hosts) : [];
     },
-    /** 提交之后删工作负载；失败不回滚，巡检按 `workloadRemoved` 重试（design §2）。 */
+    /**
+     * 提交之后删工作负载；失败不回滚，巡检按 `workloadRemoved` 重试（design §2）。
+     * RFC-013 之前部署的 Deployment 标签上是旧 `rel_…` ID，只认 UUID 会把它当成别的版本而留着不删（2026-09-23 实机：本机 8 个待命槽全是这样）。
+     */
     removeWorkload: async (serviceId, svc, physical, releaseId) => {
       try {
-        if (!(await deps.deployer.removeWorkload(svc.namespace, svc.name, physical, releaseId))) return false;
+        const legacy = (await uow.read.releases.getById(releaseId))?.legacyResourceId;
+        if (!(await deps.deployer.removeWorkload(svc.namespace, svc.name, physical, legacy ? [releaseId, legacy] : [releaseId]))) return false;
         await uow.run(async (scope) => {
           const slots = await scope.slots.get(serviceId);
           if (slots?.[physical].offline?.releaseId === releaseId) await scope.slots.save(withSlot(slots, markWorkloadRemoved(slots[physical]), clock.now()));

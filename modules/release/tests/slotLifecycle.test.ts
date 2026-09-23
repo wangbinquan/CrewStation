@@ -7,6 +7,7 @@ import { createFakeK8sClient, LABELS, Resources } from '@crewstation/k8s';
 import { forbidden } from '@crewstation/kernel';
 import { queueMigrations } from '@crewstation/queue';
 import { createTestDatabase, testDatabaseAvailable } from '@crewstation/testkit';
+import { sql } from 'drizzle-orm';
 import type { TestDatabase } from '@crewstation/testkit';
 import { drizzleUnitOfWork } from '../adapters/persistence/drizzleUnitOfWork';
 import { withSlot } from '../domain/slots';
@@ -95,6 +96,22 @@ describe.skipIf(!available)('RFC-021 待命槽生命周期', () => {
     expect(await f.deployment('green')).toBeUndefined();
     expect(await f.k8s.get(Resources.Service!, 'lifecycle-green', ns)).toBeDefined();
     expect(await f.release.api.getRelease(owner, v1.id)).toMatchObject({ status: 'offline', redeployable: true });
+  });
+
+  // 2026-09-23 实机：RFC-013 之前部署的 Deployment 标签上是旧 `rel_…` ID，只认 UUID 时下线会把它当成别的版本留着不删（本机 8 个待命槽全是这样）。
+  test('RFC-013 之前部署的待命槽：Deployment 标签是旧 ID 时下线照样删掉；标签属于别的版本时不删', async () => {
+    const f = await fixture();
+    const v1 = await f.publish(), physical = await f.standby();
+    await database!.db.execute(sql`UPDATE release.releases SET legacy_resource_id = 'rel_legacy_v1' WHERE id = ${v1.id}`);
+    await f.k8s.mergePatch(Resources.Deployment!, `lifecycle-${physical}`, ns, { metadata: { labels: { [LABELS.release]: 'rel_legacy_v1' } } });
+    await f.release.api.takeOffline(owner, serviceId, { expectedReleaseId: v1.id });
+    expect(await f.deployment(physical)).toBeUndefined();
+
+    await f.release.api.redeploy(owner, v1.id, { expectedStandbyReleaseId: null });
+    await f.markReady(physical); await f.release.api.runPipelineStep(v1.id);
+    await f.k8s.mergePatch(Resources.Deployment!, `lifecycle-${physical}`, ns, { metadata: { labels: { [LABELS.release]: 'rel_someone_else' } } });
+    await f.release.api.takeOffline(owner, serviceId, { expectedReleaseId: v1.id });
+    expect((await f.deployment(physical))?.metadata.labels?.[LABELS.release]).toBe('rel_someone_else');
   });
 
   test('待验证版本连续 14 天无人访问才下线：访问 preview 推后到期，5 分钟内的重复访问只记一次', async () => {

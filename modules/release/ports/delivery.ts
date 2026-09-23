@@ -41,10 +41,11 @@ export interface SlotDeployer {
   status(namespace: string, serviceName: string, physical: PhysicalSlot): Promise<SlotStatus>;
   remove(namespace: string, serviceName: string, physical: PhysicalSlot): Promise<void>;
   /**
-   * 下线（RFC-021）：只删 Deployment，保留 Service 与路由；Deployment 的 release 标签不是 `releaseId` 时不删
-   *（那是之后新部署上来的工作负载）。返回 true 表示这个版本的工作负载已经不在了。
+   * 下线（RFC-021）：只删 Deployment，保留 Service 与路由。`releaseIds` 是这个版本的全部身份：UUID，以及 RFC-013
+   * 之前部署的版本在 Deployment 标签上留下的旧 `rel_…` ID；标签不是其中之一时不删（那是之后新部署上来的工作负载）。
+   * 返回 true 表示这个版本的工作负载已经不在了。
    */
-  removeWorkload(namespace: string, serviceName: string, physical: PhysicalSlot, releaseId: string): Promise<boolean>;
+  removeWorkload(namespace: string, serviceName: string, physical: PhysicalSlot, releaseIds: readonly string[]): Promise<boolean>;
 }
 
 export interface ReleaseJobs {
