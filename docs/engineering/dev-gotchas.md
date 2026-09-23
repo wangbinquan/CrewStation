@@ -685,6 +685,15 @@ Bun 在 `CI=true` 时拒绝 `.only`（`.only is disabled in CI environments`）�
 （`tools/arch/lockMigrations.ts` 只有十来行，逻辑在 `migrationLockUpdate.ts`）；入口文件本身不在防护范围内。
 需要验证「进程真的非零退出」这类只有子进程才能看到的行为时，再补一条子进程用例（`packages/testkit/capability.test.ts`）。
 
+### 同一文件既有就近用例又有模块级用例时，注释行曾被判成「未执行的改动行」
+
+2026-09-24 实撞：`modules/gateway/application/reconcileRoutes.ts` 新增了就近的方法级用例（只调用其中一个导出函数）后，新增代码防护报
+第 80–84 行未执行——那是一个右括号和一段文档注释。判据在两层的 lcov 里：方法级这层加载了文件却没调用 `routeUseCases`，
+Bun 1.3.13 把这个函数的**整段**（连注释、括号）记成 `DA:<行>,0`；模块级那层调用过它，只记真正的语句行，注释行根本不出现。
+各层 lcov 原来只是相加，两层一合并，注释行就成了「可执行、0 次」。现在 `tools/testguard/lcovReport.ts` 的合并规则是：
+一行在某层记 0 次、而另一层加载了同一文件却没记它，它不是可执行行；有命中的行照旧保留，各层都记 0 次的照样算未执行。
+所有层都没调用过的函数仍会整段计入（多算，不会漏算）。
+
 ### 不要在 `bunfig.toml` 里常开覆盖率：每次运行留一个 `.tmp`，单文件运行还会冲掉全量结果
 
 2026-09-20 实撞：为了让本机与 CI 共用一条命令，曾在 `bunfig.toml` 写了 `coverage = true`。Bun 1.3.13 每次覆盖 `coverage/lcov.info`

@@ -104,4 +104,13 @@ describe('合并各层的覆盖率', () => {
     expect([...merged.get('m/a.ts')!]).toEqual([[1, 2], [2, 3], [9, 1]]);
     expect([...merged.get('m/b.ts')!]).toEqual([[1, 0]]);
   });
+
+  // Bun 对加载了却没调用过的函数整段记 0 次（连注释与右括号）；调用过的那层只记语句行。两层一合并，注释行就成了「未执行的改动行」。
+  test('某层记 0 次、另一层加载了同一文件却不记的行不是可执行行；各层都记 0 次的照样是未执行', () => {
+    const unit = parseLcov(['SF:m/a.ts', 'DA:1,1', 'DA:5,0', 'DA:6,0', 'DA:7,0', 'end_of_record', 'SF:m/b.ts', 'DA:3,0', 'end_of_record'].join('\n'));
+    const moduleTier = parseLcov(['SF:m/a.ts', 'DA:1,1', 'DA:5,4', 'DA:7,0', 'end_of_record'].join('\n'));
+    const merged = mergeCoverage([unit, moduleTier]);
+    expect([...merged.get('m/a.ts')!]).toEqual([[1, 2], [5, 4], [7, 0]]);
+    expect([...merged.get('m/b.ts')!]).toEqual([[3, 0]]);
+  });
 });

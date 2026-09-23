@@ -221,7 +221,7 @@ CI 的 `module` 作业设 `CS_TEST_REQUIRE=database`，`e2e` 作业设 `CS_TEST_
 只有用真实外部系统才能执行到的代码，先考虑用替身补一条用例；确实不行时在 ADR 里写带期限的例外：`- exception: patch-coverage <路径或 glob> until <YYYY-MM-DD>`（格式见 `docs/adr/README.md`）。
 
 闸门在推送之后才跑，所以红了按开发规则 §3 处理：立刻补用例，或 revert 自己那笔。
-`gate` 用三层合并后的覆盖率判定（`--tiers unit,module,console`）。本机有数据库时可以提前看：先 `bun run test:cover` 跑一遍全量，再 `bun run test:patch --base origin/main`。
+`gate` 用三层合并后的覆盖率判定（`--tiers unit,module,console`）：同一行的命中次数相加；某层记 0 次、另一层加载了同一文件却没记的行不算可执行行（Bun 对加载了却没调用过的函数整段记 0，见 `dev-gotchas.md`）。本机有数据库时可以提前看：先 `bun run test:cover` 跑一遍全量，再 `bun run test:patch --base origin/main`。
 加 `--worktree` 把未提交的改动算进去——共享工作树上会连别人的在制改动一起算，而且 git 的 diff 看不见未追踪的新文件，要先 `git add` 自己的文件。
 
 ### 8.4 分支保护

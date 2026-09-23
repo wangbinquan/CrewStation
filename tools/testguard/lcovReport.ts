@@ -20,15 +20,25 @@ export function parseLcov(text: string): Coverage {
   return coverage;
 }
 
-/** 各层作业各出一份 lcov；同一行在多层都被执行到时命中次数相加。 */
+/**
+ * 各层作业各出一份 lcov；同一行在多层都被执行到时命中次数相加。
+ * Bun 对加载了却没调用过的函数把整段（连注释与右括号）记成 0 次，调用过的那层只记真正的语句行：
+ * 一行在某层记 0 次、另一层加载了同一文件却没记它，它就不是可执行行，合并时去掉。
+ */
 export function mergeCoverage(parts: readonly Coverage[]): Coverage {
   const merged = new Map<string, Map<number, number>>();
+  const tiersOf = new Map<string, LineHits[]>();
   for (const part of parts) {
     for (const [file, hits] of part) {
       const lines = merged.get(file) ?? new Map<number, number>();
       for (const [line, count] of hits) lines.set(line, (lines.get(line) ?? 0) + count);
       merged.set(file, lines);
+      tiersOf.set(file, [...(tiersOf.get(file) ?? []), hits]);
     }
+  }
+  for (const [file, lines] of merged) {
+    const tiers = tiersOf.get(file) ?? [];
+    for (const [line, count] of lines) if (count === 0 && tiers.some((hits) => !hits.has(line))) lines.delete(line);
   }
   return merged;
 }
