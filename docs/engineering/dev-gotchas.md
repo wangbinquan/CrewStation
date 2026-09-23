@@ -444,6 +444,17 @@ TanStack Router 只给声明了 `errorComponent`（或路由器上有 `defaultEr
 `/workbench/projects/$projectId`。`useParams({ from: '/projects/$projectId' })` 因此编译失败。
 用 `projectRoute.useParams()` 而不是写死 `from` 字符串——本来就不该知道 id 长什么样。
 
+### TanStack Router 在跳转一开始就发布新地址：旧页面读 `useLocation()` 会读到要去的地址
+
+`router.load()` 开头就把 `stores.location` 换成目标地址（`status: 'pending'`），新页面的匹配要等 beforeLoad、懒加载和提交之后才换上；
+这段时间旧页面仍挂着，`useLocation()` 已经是要去的地址，而 `useSearch({ strict: false })`、`useParams` 取本页的匹配，还是旧值。
+2026-09-23 实撞：开发页「无参数进入就把个人布局里的面板写回地址」读的是 `useLocation()`，把离开途中的 `/release`（没有 `view`）
+当成无参数进入，`replace` 回 `dev-session?view=reference`——左栏点什么都被拽回开发页，作者以为页面卡死。
+**判据**：Chrome 会话文件（`~/Library/Application Support/Google/Chrome/Default/Sessions/Session_*`）里同一历史条目的原始地址是要去的页、
+最终地址却是开发页；或在页面里挂钩 `history.pushState`／`replaceState`，看到 push 之后几十毫秒紧跟一个 replace。
+**做法**：按地址自动导航（`replace` 写回）或改持久状态的效应，只认本页路径上的地址——见 `useDevelopmentLocation` 的 `usePageLocation`：
+路径不是本页时沿用本页最后一次的地址，并且不发 `replace`。只做显示的读取（导航高亮、记住位置）不受影响。
+
 ### 源码层断言要先去掉注释
 
 「代码里不许出现 localStorage」这类断言，会被解释「为什么不用 localStorage」的注释绊倒。

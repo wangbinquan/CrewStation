@@ -103,3 +103,16 @@ test('页头连接状态芯片打开会话面板；底部版本条的「查看�
   expect(page.search()).toEqual({ view: 'session' }); expect(panelTab()).toBe('会话与环境'); expect(page.text()).toContain('最近日志');
   await page.click('查看变更'); expect(page.search()).toEqual({ view: 'changes' }); expect(panelTab()).toBe('变更');
 });
+
+test('开着面板从左栏去别的页：离开途中的地址不算「无参数进入」，跳转不被拽回开发页', async () => {
+  layoutFixture({ ...initialWorkspaceLayout('工作区 1'), tool: { name: 'reference', mode: 'side', ratio: 0.45 } });
+  page = await renderApp(`${path}?view=reference`);
+  expect(panelTab()).toBe('参考');
+  // 2026-09-23 实机：路由在跳转一开始就发布新地址，发布页提交前开发页仍挂着；它把 /release（没有 view）当成无参数进入，
+  // 用 replace 写回 ?view=reference，左栏点什么都被拽回开发页，像是页面卡死。
+  await page.click('发布与上线');
+  expect(page.path()).toBe(`/projects/${activityProjectId}/release`);
+  // 从左栏回开发页仍按设计恢复在旁；重新挂载后再离开，同样不被拽回。
+  await page.navigate(path); expect(page.path()).toBe(path); expect(page.search()).toEqual({ view: 'reference' });
+  await page.click('运行与诊断'); expect(page.path()).toBe(`/projects/${activityProjectId}/operations`);
+});
