@@ -69,6 +69,14 @@ export function childKey(child: { readonly kind: string; readonly namespace?: st
   return `${child.kind}/${child.namespace ?? ''}/${child.name}`;
 }
 
+/**
+ * 比较两份子对象时用的规范顺序（按种类、命名空间、名字）：库里按种类与名字读回，合并按期望里的顺序排，
+ * 直接按数组比就会把同样的内容判成变化、每次核对都重写一遍（2026-09-23 起开发工作区记录每秒被空写数次）。
+ */
+export function inKeyOrder<T>(items: readonly T[], keyOf: (item: T) => string): T[] {
+  return [...items].sort((a, b) => { const left = keyOf(a), right = keyOf(b); return left < right ? -1 : left > right ? 1 : 0; });
+}
+
 /** 还没观测到的子对象：phase 记为 absent。 */
 export function unobservedChild(expected: ExpectedChild): ResourceChild {
   return { kind: expected.kind, ...(expected.namespace ? { namespace: expected.namespace } : {}), name: expected.name, phase: 'absent', ready: false };

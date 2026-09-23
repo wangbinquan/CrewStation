@@ -38,6 +38,32 @@ describe.skipIf(!available)('资源台账：声明、观测、释放（RFC-025 �
     expect(replaced.children.map((c) => c.name)).toEqual(['task-r-a1']);
   });
 
+  // 2026-09-23 16:22 起本机实撞：开发工作区记录有四个子对象（Pod、Runner Secret、预览 Service、路由），库里按种类与名字读回的顺序
+  // 与期望里的不同，每次按记录核对都被判成变化、整组重写，每条记录每秒空写数次（台账变更一小时约 11 万行）。
+  test('多个子对象、期望里的顺序不是字母序：读回来再观测、再上报都不写库', async () => {
+    const ledger = h.module.api.owner('task-runtime');
+    const kinds = ['Pod', 'Secret', 'Service', 'IngressRoute'];
+    const child = (kind: string) => ({ kind, namespace: 'cs-demo', name: `task-o1-${kind.toLowerCase()}`, uid: `uid-o1-${kind}`, phase: kind === 'Pod' ? 'Running' : 'Present', ready: true });
+    const record = await ledger.declare(workspace('o1', { spec: { children: kinds.map((kind) => ({ kind, namespace: 'cs-demo', name: `task-o1-${kind.toLowerCase()}` })) } }));
+    for (const kind of kinds) await h.module.api.observe({ child: child(kind) });
+    const settled = (await changes(record.id)).length;
+    for (const kind of kinds) expect((await h.module.api.observe({ child: child(kind) })).status).toBe('unchanged');
+    expect(await changes(record.id)).toHaveLength(settled);
+    const ready = await ledger.report(record.id, { conditions: [{ type: 'RunnerConnected', status: 'true' }] });
+    expect(ready.phase).toBe('ready');
+    expect((await ledger.report(record.id, { conditions: [{ type: 'RunnerConnected', status: 'true' }] })).version).toBe(ready.version);
+    expect(await changes(record.id)).toHaveLength(settled + 1);
+  });
+
+  test('观测带上对象的 generation：存下去读回来一样（重复观测不写库），变了才写', async () => {
+    const record = await h.module.api.owner('gateway').declare({ kind: 'route', ref: 'svc-g/prod', projectId: PROJECT, spec: { children: [{ kind: 'IngressRoute', namespace: 'cs-demo', name: 'demo-g-prod' }] } });
+    const route = (generation: number) => ({ kind: 'IngressRoute', namespace: 'cs-demo', name: 'demo-g-prod', uid: 'uid-g-route', phase: 'Present', ready: true, generation });
+    expect((await h.module.api.observe({ child: route(3) })).status).toBe('recorded');
+    expect((await h.module.api.observe({ child: route(3) })).status).toBe('unchanged');
+    expect((await h.module.api.observe({ child: route(4) })).status).toBe('recorded');
+    expect((await h.module.api.get(record.id))?.children[0]).toMatchObject({ generation: 4 });
+  });
+
   test('观测：Pod 就绪还要 Runner 连上才是运行中；Pod 消失回到分配中；重复观测不写库', async () => {
     const ledger = h.module.api.owner('task-runtime');
     const record = await ledger.declare(workspace('b1'));
