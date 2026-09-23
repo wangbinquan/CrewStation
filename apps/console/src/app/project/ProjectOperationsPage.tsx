@@ -16,7 +16,7 @@ import { ButtonLink } from '../../shared/ui/navigation/ButtonLink';
 export function ProjectOperationsPage() {
   const t = useT(), { projectId, space } = useProjectScope(), navigate = useNavigate();
   const search = parseOperationsSearch(useSearch({ strict: false })), tab = search.tab ?? 'topology';
-  const change = (next: OperationsSearch, replace = false) => { void navigate({ to: PROJECT_PATHS[space].operations, params: { projectId }, search: next, replace }); };
+  const change = (next: OperationsSearch, replace = false, resetScroll = true) => { void navigate({ to: PROJECT_PATHS[space].operations, params: { projectId }, search: next, replace, resetScroll }); };
   const logs = (slot: 'prod' | 'preview') => change({ tab: 'logs', source: 'slot', slot });
   return <div className={styles.page}>
     <PageHeader title={t('nav.operations')} />
@@ -25,7 +25,8 @@ export function ProjectOperationsPage() {
       {tab === 'health' ? <HealthCards key={projectId} projectId={projectId} onLogs={logs} /> : null}
       {tab === 'logs' ? <LogsPage key={projectId} filters={search} changeFilters={(next) => change({ ...next, tab: 'logs' }, true)} /> : null}
       {tab === 'alerts' ? <AlertsPage key={projectId} projectId={projectId} search={search} change={change} onLogs={logs} /> : null}
-      {tab === 'trace' ? <TracesPage key={projectId} projectId={projectId} search={search} onChange={(next, replace) => change({ ...next, tab: 'trace' }, replace)} /> : null}
+      {/* 调用链页签里选中与筛选是页内的切换：不复位滚动，否则在长列表下方点选时整页跳回顶部，窄屏滚到详情的动作也被冲掉（同集群管理）。 */}
+      {tab === 'trace' ? <TracesPage key={projectId} projectId={projectId} search={search} onChange={(next, replace) => change({ ...next, tab: 'trace' }, replace, false)} /> : null}
       {tab === 'deliveries' ? <>
         <div className={styles.actions}><ButtonLink to={PROJECT_PATHS[space].development} params={{ projectId }} search={{ view: 'reference', panel: 'full', topic: 'events', subscription: search.subscription }}>{t('operations.viewSubscriptions')}</ButtonLink></div>
         <DeliveriesCard key={`${projectId}:${search.subscription ?? ''}`} projectId={projectId} subscription={search.subscription} onClearSubscription={() => change({ tab })} onTrace={(traceId) => change({ tab: 'trace', traceId })} />

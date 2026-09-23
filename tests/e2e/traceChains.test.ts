@@ -33,7 +33,11 @@ describe.skipIf(!session?.project)('调用链（运行与诊断）', () => {
         return { listRight: list.right, listBottom: list.bottom, detailLeft: detail.left, detailTop: detail.top };
       })()`);
       if (width >= 1024) expect(layout.detailLeft).toBeGreaterThanOrEqual(layout.listRight);
-      else expect(layout.detailTop).toBeGreaterThanOrEqual(layout.listBottom);
+      else {
+        expect(layout.detailTop).toBeGreaterThanOrEqual(layout.listBottom);
+        // 2026-09-23 实机：窄屏点选后详情仍在列表下方两千多像素处——路由导航复位滚动，冲掉了滚向详情的动作。
+        await page.waitUntil(`(() => { const d = [...document.querySelectorAll('section')].find((s) => s.querySelector('h2')?.textContent === '调用链详情'); const top = d.getBoundingClientRect().top; return top > -5 && top < innerHeight / 2; })()`, 5000);
+      }
     } else expect(await page.text()).toContain('每一个都会产生一条调用链');
     expect(await page.eval<number>('document.documentElement.scrollWidth - innerWidth')).toBeLessThanOrEqual(1);
     expect(page.takeErrors()).toEqual([]);
