@@ -10,7 +10,7 @@ const RETIRED = { code: 'route-retired', message: '服务已归档或不再需�
 const MAX_ROUTE_RECORDS = 64;
 
 /** 这一种路由眼下的记录：顺着第几条找到第一条还在用的；前面的都已释放时，给出下一条空着的引用。 */
-async function currentRoute(ledger: RouteLedger, serviceId: string, kind: RouteEntry['kind']) {
+export async function currentRoute(ledger: RouteLedger, serviceId: string, kind: RouteEntry['kind']) {
   for (let nth = 1; nth <= MAX_ROUTE_RECORDS; nth += 1) {
     const ref = routeRef(serviceId, kind, nth);
     const record = await ledger.find(ref, 'route');

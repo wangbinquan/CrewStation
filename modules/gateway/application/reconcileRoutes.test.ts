@@ -13,6 +13,7 @@ function fakeLedger(desiredOf: (ref: string) => 'present' | 'absent' | undefined
     declare: async (input) => { declared.push(`${input.ref} ${JSON.stringify(input.spec.middlewares)}`); return { id: input.ref }; },
     find: async (ref) => { const desired = desiredOf(ref); return desired ? { id: ref, desired } : undefined; },
     requestRelease: async (id) => { released.push(id); },
+    report: async () => undefined,
   };
   return { ledger, declared, released };
 }

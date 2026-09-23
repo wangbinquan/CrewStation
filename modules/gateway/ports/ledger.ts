@@ -5,4 +5,6 @@ export interface RouteLedger {
   declare(input: RouteDeclaration): Promise<{ readonly id: string }>;
   find(ref: string, kind: 'route'): Promise<{ readonly id: string; readonly desired: 'present' | 'absent' } | undefined>;
   requestRelease(id: string, reason: { readonly code: string; readonly message: string }): Promise<unknown>;
+  /** gateway 自己的领域条件（放行表核对的 AllowlistDrift）；同样的条件台账不写库。 */
+  report(id: string, report: { readonly conditions: readonly { readonly type: string; readonly status: 'true' | 'false'; readonly reason?: string; readonly message?: string }[] }): Promise<unknown>;
 }

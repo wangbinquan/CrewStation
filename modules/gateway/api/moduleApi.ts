@@ -30,6 +30,11 @@ export interface GatewayModuleApi {
   listRoutes(): Promise<Array<{ serviceId: string; serviceName: string; routes: RouteEntry[] }>>;
   rebuildAllowlist(): Promise<AllowlistDocument>;
   currentAllowlist(): Promise<AllowlistDocument | undefined>;
+  /**
+   * 放行表定时全量核对（RFC-025 设计 §7.4）：与按当前授权推导的内容不一致就重算一版；配了资源台账时结果写进各服务的服务域路由记录
+   * （条件 AllowlistDrift）。返回有出入的调用方、是否影响全体，与核对之后的版本。cs-controller 每 10 分钟跑一次。
+   */
+  checkAllowlist(): Promise<{ readonly callers: readonly string[]; readonly global: boolean; readonly version: number }>;
   evaluate(caller: WorkloadIdentity, target: EvaluationTarget): Promise<Evaluation>;
   lookupByIp(ip: string): Promise<WorkloadIdentity | undefined>;
   /** 身份索引的墓碑清理（RFC-025 提案 Q5）：标为删除超过 7 天的行删掉；返回条数。cs-controller 每小时跑一次。 */

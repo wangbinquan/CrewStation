@@ -1,4 +1,6 @@
 import type { AllowlistDocument, WorkloadIdentity } from '@crewstation/contracts';
+import type { AllowlistDrift } from '../domain/allowlistDrift';
+import { allowlistDrift } from '../domain/allowlistDrift';
 import type { Evaluation, EvaluationTarget } from '../domain/allowlistEvaluation';
 import { evaluateServiceCall } from '../domain/allowlistEvaluation';
 import type { GatewayUseCaseDeps } from './dependencies';
@@ -83,6 +85,18 @@ export function allowlistUseCases(deps: GatewayUseCaseDeps, maintenanceBlock?: (
   return {
     rebuildAllowlist: () => rebuild(),
     currentAllowlist: current,
+    /**
+     * 定时全量核对（RFC-025 设计 §7.4）：按当前在册服务与授权推导一份，与最新一版比内容（不看先后）。放行表照旧由事件触发重算，
+     * 这里兜住漏掉的事件：不一致就重算一版并告警。返回有出入的调用方与核对之后的版本。
+     */
+    verifyAllowlist: async (): Promise<AllowlistDrift & { readonly version: number }> => {
+      const latest = await deps.allowlists.latest();
+      const drift = allowlistDrift(latest?.identityVersion === 2 ? latest : undefined, await composeAllowlist(deps));
+      if (latest && !drift.global && drift.callers.length === 0) return { ...drift, version: latest.version };
+      const doc = await rebuild();
+      deps.logger.warn('allowlist drift repaired', { from: latest?.version, to: doc.version, callers: drift.callers, global: drift.global });
+      return { ...drift, version: doc.version };
+    },
     evaluate: async (caller: WorkloadIdentity, target: EvaluationTarget): Promise<Evaluation> => {
       const doc = await ensureCurrent();
       if (!doc) return { allowed: false, targetIdentity: target.host, reason: '放行表尚未生成' };

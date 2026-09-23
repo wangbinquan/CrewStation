@@ -17,12 +17,14 @@ import type { GatewayModuleApi } from './api/moduleApi';
 import { allowlistUseCases } from './application/allowlist';
 import type { GatewayUseCaseDeps } from './application/dependencies';
 import { maintenanceUseCases } from './application/maintenance';
+import { checkAllowlist } from './application/allowlistCheck';
 import { observedPodOf, podIdentityUseCases } from './application/podIdentities';
 import { routeUseCases } from './application/reconcileRoutes';
 import { gatewayRoutes } from './http/gatewayRoutes';
 import { maintenanceRoutes } from './http/maintenanceRoutes';
 import type { GrantSource, HostNaming, ProjectAccess, ServiceDirectory, SlotRoles, UserDirectory } from './ports/directories';
 import type { GatewayApplier, GatewaySettings } from './ports/gatewayApply';
+import { allowlistCheckWorker } from './workers/allowlistCheck';
 import { identityTombstoneWorker } from './workers/identityTombstones';
 import { routeLedgerResyncWorker } from './workers/routeLedgerResync';
 import type { RouteLedger } from './ports/ledger';
@@ -50,7 +52,7 @@ export interface GatewayModuleDeps {
 export interface GatewayModule {
   readonly api: GatewayModuleApi;
   readonly http: Hono<AppEnv>[];
-  /** 身份索引的墓碑清理；配了资源台账时另有路由补投影。身份索引本身由 cluster-control 的 Pod 观测驱动（RFC-025 设计 §7.4）。 */
+  /** 身份索引的墓碑清理、放行表定时核对；配了资源台账时另有路由补投影。身份索引本身由 cluster-control 的 Pod 观测驱动（RFC-025 设计 §7.4）。 */
   readonly workers: readonly { start(): void; stop(): Promise<void> }[];
   readonly subscriptions: EventConsumer;
   readonly migrations: MigrationSet;
@@ -88,6 +90,7 @@ export function createGatewayModule(deps: GatewayModuleDeps): GatewayModule {
   const pods = podIdentityUseCases(useCaseDeps);
   const api: GatewayModuleApi = {
     name: 'gateway', ...routes, ...allowlist, evaluate: allowlist.evaluate, lookupByIp: pods.lookupByIp, purgeIdentityTombstones: pods.purgeTombstones, ...maintenance,
+    checkAllowlist: () => checkAllowlist(useCaseDeps, allowlist.verifyAllowlist),
     syncObservedPod: (pod, gone) => pods.syncPod(observedPodOf(pod, gone)),
     relistObservedPods: (list) => pods.relistPods(list.map((pod) => observedPodOf(pod, false))),
   };
@@ -112,7 +115,10 @@ export function createGatewayModule(deps: GatewayModuleDeps): GatewayModule {
   return {
     api,
     http: [gatewayRoutes(api, deps.isAdmin), maintenanceRoutes(api, deps.isAdmin)],
-    workers: [identityTombstoneWorker(pods.purgeTombstones, logger), ...(deps.ledger ? [routeLedgerResyncWorker(routes.resyncRouteLedger, logger)] : [])],
+    workers: [
+      identityTombstoneWorker(pods.purgeTombstones, logger), allowlistCheckWorker(api.checkAllowlist, logger),
+      ...(deps.ledger ? [routeLedgerResyncWorker(routes.resyncRouteLedger, logger)] : []),
+    ],
     subscriptions,
     migrations: gatewayMigrations,
   };

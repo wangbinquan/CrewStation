@@ -26,9 +26,8 @@ const ingressRoutesOf = (namespace: string): string[] =>
 let prodPhysical: 'blue' | 'green' = 'blue';
 
 /** 同一个库上的一个新模块实例＝一个刚启动的进程：自己的放行表缓存是空的。 */
-function newGateway(extra: Partial<Pick<Parameters<typeof createGatewayModule>[0], 'ledger' | 'logger'>> = {}): GatewayModule {
+function newGateway(extra: Partial<Pick<Parameters<typeof createGatewayModule>[0], 'ledger' | 'logger' | 'grants'>> = {}): GatewayModule {
   return createGatewayModule({
-    ...extra,
     db: tdb.db, k8s,
     // 两个取值范围与真实实现一致：清单只给在册服务，按 id／按项目的解析连归档的一起查得到。
     services: {
@@ -47,6 +46,7 @@ function newGateway(extra: Partial<Pick<Parameters<typeof createGatewayModule>[0
     hosts: { prodHost: (s) => `${s}.cs.localhost`, previewHost: (s) => `preview.${s}.cs.localhost`, serviceHost: (s) => `${s}.svc.cs.internal`, platformApiHost: () => 'api.svc.cs.internal' },
     isAdmin: async () => true,
     settings: { systemNamespace: 'crewstation-system', serviceDomain: 'svc.cs.internal', userAuthMiddleware: 'forward-auth-user', serviceAuthMiddleware: 'forward-auth-service', dropIdentityHeadersMiddleware: 'drop-identity-headers', allowlistMaxStaleSeconds: 300, consumerName: 'test.gateway' },
+    ...extra,
   });
 }
 
@@ -245,6 +245,7 @@ describe.skipIf(!available)('gateway module', () => {
       },
       find: async (ref: string) => records.get(ref),
       requestRelease: async (id: string) => { releases.push(id); for (const [ref, record] of records) if (record.id === id) records.set(ref, { ...record, desired: 'absent' }); },
+      report: async () => undefined,
     };
     const logger = { debug: () => undefined, info: () => undefined, warn: (msg: string) => { warnings.push(msg); }, error: () => undefined, child: () => logger };
     const withLedger = newGateway({ ledger, logger });
@@ -283,5 +284,38 @@ describe.skipIf(!available)('gateway module', () => {
     // 归档服务的空计划不必写台账，照常算成功；其余的逐个告警。
     expect(await withLedger.api.resyncRouteLedger()).toBeLessThan((await withLedger.api.listRoutes()).length);
     expect(warnings).toContain('resource ledger route projection failed');
+  });
+
+  // RFC-025 设计 §7.4：放行表照旧由事件触发重算；定时全量核对兜住漏掉的事件，结果写进服务域路由记录的条件。
+  test('放行表定时核对：一致时不重算、条件为假；授权变了而没触发重算时，重算一版并在有出入的服务的服务域路由上写真，下一轮恢复为假', async () => {
+    const reports: Array<{ id: string; status: string; message?: string }> = [];
+    const records = new Map<string, { id: string; desired: 'present' | 'absent' }>();
+    const ledger = {
+      declare: async (input: { ref: string }) => { const id = records.get(input.ref)?.id ?? `rec-${input.ref}`; records.set(input.ref, { id, desired: 'present' }); return { id }; },
+      find: async (ref: string) => records.get(ref),
+      requestRelease: async () => undefined,
+      report: async (id: string, report: { conditions: readonly { status: string; message?: string }[] }) => { reports.push({ id, status: report.conditions[0]!.status, ...(report.conditions[0]!.message ? { message: report.conditions[0]!.message } : {}) }); },
+    };
+    const granted = new Map<string, string[]>([['demo/demo', ['01a0bf5d-8f4b-7155-8e96-d9844e02dfa4']]]);
+    const grants = {
+      grantedOperations: async (caller: string) => ({ operations: granted.get(caller) ?? [], defaultOpen: ['01a0bf5d-8f4b-73dc-813d-bb1eeb744398'], operationRoutes: [{ id: '01a0bf5d-8f4b-7155-8e96-d9844e02dfa4', proxy: 'issues', method: 'POST', path: '/v1/issues' }, { id: '01a0bf5d-8f4b-73dc-813d-bb1eeb744398', proxy: 'issues', method: 'GET', path: '/v1/issues/{id}' }] }),
+      listCallers: async () => ['demo/demo'],
+      proxyNameOf: async (id: ServiceId) => (id === issuesId ? 'issues' : undefined),
+    } as unknown as Parameters<typeof createGatewayModule>[0]['grants'];
+    const checked = newGateway({ ledger, grants });
+    await checked.api.reconcileService(demoId);
+    const demoRoute = records.get(`${demoId}/service`)!.id;
+    const before = await checked.api.rebuildAllowlist();
+    expect(await checked.api.checkAllowlist()).toEqual({ callers: [], global: false, version: before.version });
+    expect(reports.filter((entry) => entry.id === demoRoute)).toEqual([{ id: demoRoute, status: 'false' }]);
+    // demo 多了一项授权，但 grantChanged 事件丢了：放行表还是旧的。
+    granted.set('demo/demo', ['01a0bf5d-8f4b-7155-8e96-d9844e02dfa4', '01a0bf5d-8f4b-73dc-813d-bb1eeb744398']);
+    expect(await checked.api.checkAllowlist()).toEqual({ callers: ['demo/demo'], global: false, version: before.version + 1 });
+    expect((await checked.api.currentAllowlist())?.entries.find((entry) => entry.caller === 'demo/demo')?.operations).toHaveLength(2);
+    expect(reports.filter((entry) => entry.id === demoRoute).at(-1)).toEqual({ id: demoRoute, status: 'true', message: `定时核对发现放行表与当前授权不一致，已重算为第 ${before.version + 1} 版` });
+    expect(await checked.api.checkAllowlist()).toMatchObject({ callers: [], global: false, version: before.version + 1 });
+    expect(reports.filter((entry) => entry.id === demoRoute).at(-1)?.status).toBe('false');
+    // 没配资源台账：照样核对与重算，只是不写条件。
+    expect(await newGateway({ grants }).api.checkAllowlist()).toMatchObject({ callers: [], global: false });
   });
 });
