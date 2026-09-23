@@ -7,7 +7,7 @@ export function editorWorkspaceFixture() {
   const f = activityFixture(), commands: Array<TaskStreamCommandInput & { id: string }> = [], writes: Array<{ path: string; method: string }> = [];
   const files = new Map([['a.ts', '磁盘原文'], ['b.ts', '第二个文件']]);
   const preview: PreviewStatusResult = { state: 'disabled', restarts: 0 };
-  const sessionState: { state: 'running' | 'failed' | 'creating'; message?: string; rebuild?: DevSessionRebuildDto; connectionIssue?: DevSessionDto['connectionIssue'] } = { state: 'running' };
+  const sessionState: { state: 'running' | 'failed' | 'creating'; message?: string; rebuild?: DevSessionRebuildDto; connectionIssue?: DevSessionDto['connectionIssue']; startup?: DevSessionDto['startup'] } = { state: 'running' };
   const originalFetch = globalThis.fetch, originalSocket = globalThis.WebSocket, originalHref = window.location.href;
   window.location.href = 'http://localhost/';
   let pendingWrite: ((failure?: { code: string; message: string }) => void) | undefined;

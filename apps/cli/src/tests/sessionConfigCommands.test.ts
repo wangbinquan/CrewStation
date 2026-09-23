@@ -49,6 +49,34 @@ describe('session show', () => {
     expect(result.out.join('\n')).toContain('dev.demo.cs.localhost');
   });
 
+  test('RFC-022：打印启动过程——每段状态、名称、用时，其后是原因、警告或细节；--json 原样带 startup', async () => {
+    const startup = { state: 'failed', startedAt: '2026-09-11T08:00:00.000Z', endedAt: '2026-09-11T08:01:05.000Z', observedAt: '2026-09-11T08:02:00.000Z', stages: [
+      { kind: 'queue', state: 'succeeded', durationMs: 120 },
+      { kind: 'container', state: 'succeeded', durationMs: 42_300, detail: '已调度到节点 n1 · 镜像已拉取（用时 40.1s） · 创建容器' },
+      { kind: 'checkout', state: 'failed', subject: 'gone', durationMs: 65_000, error: { code: 'checkout-failed', message: '容器运行失败：checkout：Error，退出码 128' } },
+      { kind: 'connect', state: 'pending' }, { kind: 'ready', state: 'pending' }] };
+    const human = await runForTest(['session', 'show', 'demo'], { respond: routes({ ...LIST, [`GET /v1/projects/${PROJECT_ID}/dev-session`]: jsonResponse(200, { ...SESSION, state: 'failed', startup }) }) });
+    expect(human.code).toBe(0);
+    const out = human.out.join('\n');
+    expect(out).toContain('启动过程（启动失败，共 1 分 05 秒）');
+    expect(out).toContain('  ✓ 排队分配容器  0.1 秒');
+    expect(out).toContain('  ✓ 容器启动中（调度、拉取镜像）  42 秒  已调度到节点 n1 · 镜像已拉取（用时 40.1s） · 创建容器');
+    expect(out).toContain('  ✕ 检出代码（分支 gone）  1 分 05 秒  容器运行失败：checkout：Error，退出码 128');
+    expect(out).toContain('  ○ 容器已启动，等待连接');
+    const json = await runForTest(['session', 'show', 'demo', '--json'], { respond: routes({ ...LIST, [`GET /v1/projects/${PROJECT_ID}/dev-session`]: jsonResponse(200, { ...SESSION, startup }) }) });
+    expect(JSON.parse(json.out.join('\n')).startup).toEqual(startup);
+  });
+
+  test('开会话的回执带启动过程时同样打印；没有的（升级前）不打印', async () => {
+    const running = { state: 'running', startedAt: '2026-09-11T08:00:00.000Z', observedAt: '2026-09-11T08:00:01.000Z', stages: [{ kind: 'queue', state: 'succeeded', durationMs: 80 }, { kind: 'container', state: 'running', detail: '等待调度' }, { kind: 'checkout', state: 'pending', subject: 'main' }] };
+    const opened = await runForTest(['session', 'open', 'demo', '--branch', 'main'], { respond: routes({ ...LIST, [`POST /v1/projects/${PROJECT_ID}/dev-session`]: jsonResponse(201, { ...SESSION, state: 'creating', startup: running }) }) });
+    expect(opened.out.join('\n')).toContain('启动过程（启动中）');
+    expect(opened.out.join('\n')).toContain('  ● 容器启动中（调度、拉取镜像）  等待调度');
+    expect(opened.out.join('\n')).toContain('  ○ 检出代码（分支 main）');
+    const legacy = await runForTest(['session', 'show', 'demo'], { respond: routes({ ...LIST, [`GET /v1/projects/${PROJECT_ID}/dev-session`]: jsonResponse(200, SESSION) }) });
+    expect(legacy.out.join('\n')).not.toContain('启动过程');
+  });
+
   test('没有会话不是错误：退出码 0，--json 输出 null', async () => {
     const notFound = jsonResponse(404, { error: 'not_found', message: '没有开发会话', details: {} });
     const human = await runForTest(['session', 'show', 'demo'], { respond: routes({ ...LIST, [`GET /v1/projects/${PROJECT_ID}/dev-session`]: notFound }) });

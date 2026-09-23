@@ -1,5 +1,6 @@
 import type { DevSessionDto } from '@crewstation/contracts';
 import { dash, shortTime } from '../output/formatValue';
+import { startupLines } from '../output/startupLines';
 import { findDevSession, resolveProject } from '../platform/projectLookup';
 import type { CommandContext } from '../runtime/commandContext';
 import { boolFlag, requiredArg, requiredStringFlag } from '../runtime/commandContext';
@@ -15,6 +16,12 @@ export async function openSession(ctx: CommandContext): Promise<void> {
   if (ctx.json) return ctx.emit.json(session);
   ctx.emit.success(`开发会话已创建：${session.taskId}`);
   ctx.emit.fields(sessionFields(session));
+  printStartup(ctx, session);
+}
+
+/** RFC-022：开始开发或重建的启动过程，与工作台看到的是同一份。 */
+function printStartup(ctx: CommandContext, session: DevSessionDto): void {
+  if (session.startup) for (const line of startupLines(session.startup)) ctx.emit.line(line);
 }
 
 export async function showSession(ctx: CommandContext): Promise<void> {
@@ -24,6 +31,7 @@ export async function showSession(ctx: CommandContext): Promise<void> {
   if (ctx.json) return ctx.emit.json(session ?? null);
   if (session === undefined) return ctx.emit.note(`项目 ${project.slug} 当前没有开发会话`);
   ctx.emit.fields(sessionFields(session));
+  printStartup(ctx, session);
 }
 
 /** 释放会话不删除托管源码；容器里尚未推送的提交会被列出来，提醒先推送。 */

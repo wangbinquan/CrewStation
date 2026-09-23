@@ -6,6 +6,7 @@ import { queryKeys } from '../../../shared/api/queryKeys';
 import { isApiClientError, useApiMutation, useApiQuery } from '../../../shared/api/useApi';
 import { useManualRefresh } from '../../../shared/lib/useManualRefresh';
 import { useT } from '../../../shared/lib/useT';
+import { stampReceived } from '../../../shared/ui/progress/stageProgressView';
 import type { ApiClientError } from '../../../shared/api/useApi';
 
 export interface DevSessionHandle {
@@ -27,9 +28,14 @@ export function useDevSession(projectId: string): DevSessionHandle {
   // 都会被库置回 pending 并清掉错误，开会话表单会每 10 秒卸载一次、参考面板在会话未知时来回挂载。
   // 没有 taskId 的响应不是会话：整页工作区都挂在 taskId 上（任务流地址、个人布局），当成会话会让页面在连流时崩掉。
   const query = useApiQuery<DevSessionDto | null>(key, async () => {
-    try { const data = await api.devSession.get(projectId); if (typeof data?.taskId !== 'string') throw new Error(t('devSession.invalidResponse')); return data; }
+    try {
+      const data = await api.devSession.get(projectId);
+      if (typeof data?.taskId !== 'string') throw new Error(t('devSession.invalidResponse'));
+      return data.startup ? { ...data, startup: stampReceived(data.startup, Date.now())! } : data;
+    }
     catch (error) { if (isApiClientError(error) && error.kind === 'not_found') return null; throw error; }
-  }, { refetchIntervalMs: 10_000 });
+    // 开始开发或重建期间每秒读一次（RFC-022 B9）：Runner 连上之前没有推送，阶段靠读。
+  }, { refetchIntervalMs: (data) => (data?.startup?.state === 'running' ? 1_000 : 10_000) });
   // 每 10 秒的例行重取不改界面；refreshing 只表示用户自己点了刷新。
   const { refresh, refreshing } = useManualRefresh(query.refetch);
   // 同一查询键也被目录面板的会话绑定订阅，它的取数函数把 404 当错误；已释放的会话也不算活着。三种情况都按“没有会话”处理，

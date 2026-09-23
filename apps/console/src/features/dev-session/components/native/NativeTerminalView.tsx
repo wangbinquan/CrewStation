@@ -5,7 +5,9 @@ import type { ReactElement, ReactNode } from 'react';
 import type { Translate } from '../../../../shared/lib/useT';
 import { useT } from '../../../../shared/lib/useT';
 import { Button } from '../../../../shared/ui/Button';
+import { StageProgress, StageSummary } from '../../../../shared/ui/progress/StageProgress';
 import type { TaskStreamChannel } from '../../hooks/useTaskStream';
+import { useCreatorClaim } from '../../hooks/native/useCreatorClaim';
 import { useTerminalFocus } from '../../hooks/native/useTerminalFocus';
 import type { StreamState } from '../../model/taskStreamSocket';
 import { NativeTerminalAttachment } from '../../model/native/nativeTerminalAttachment';
@@ -25,10 +27,27 @@ interface NativeTerminalViewProps {
   readonly info?: ReactNode;
   /** 信息条之下、终端之上的说明（准备中、失败与重试）。 */
   readonly notices?: ReactNode;
+  /** 启动失败时步骤条上的「重试」（RFC-022 Q2：原位替换）；不给则不显示。 */
+  readonly onRetry?: (terminal: NativeTerminalDto) => void;
 }
 
 export function NativeTerminalView(props: NativeTerminalViewProps): ReactElement {
+  if (props.terminal.startup?.state === 'failed') return <StartupFailedView terminal={props.terminal} info={props.info} onRetry={props.onRetry} />;
   return props.terminal.execution && ['ended', 'failed'].includes(props.terminal.lifecycle) ? <SavedNativeTerminalView terminal={props.terminal} info={props.info} notices={props.notices} /> : <LiveNativeTerminalView {...props} />;
+}
+
+/** 启动失败（RFC-022 D3）：步骤条停在出错的那一段，写出原因，给「重试」与「查看执行容器日志」；没有末屏可看。 */
+function StartupFailedView({ terminal, info, onRetry }: Pick<NativeTerminalViewProps, 'terminal' | 'info' | 'onRetry'>): ReactElement {
+  const t = useT(), startup = terminal.startup!;
+  return <>
+    <div className={styles.statusBar}>{info ? <span className={styles.info}>{info}</span> : null}
+      <div className={styles.controlLine} data-control="failed" role="status"><StageSummary progress={startup} /></div></div>
+    <div className={styles.startupPane} data-static="">
+      <StageProgress progress={startup} title={t('devSession.native.startup.failedTitle', { profile: terminal.computeName ?? terminal.compute })}
+        logLabel={t('devSession.native.startup.log')} emptyLogText={t('devSession.native.startup.noLog')}
+        actions={onRetry ? <Button variant="primary" size="small" onClick={() => onRetry(terminal)}>{t('devSession.native.startup.retry')}</Button> : null} />
+    </div>
+  </>;
 }
 
 function SavedNativeTerminalView({ terminal, info, notices }: Pick<NativeTerminalViewProps, 'terminal' | 'info' | 'notices'>): ReactElement {
@@ -59,6 +78,8 @@ function LiveNativeTerminalView({ terminal, channel, stream, onActivity, canDeve
     return { surface, attachment: new NativeTerminalAttachment(channel, terminal.terminalId, terminal.runnerId, surface) };
   }, [channel, terminal.terminalId, terminal.runnerId, terminal.protocol]);
   const state = useSyncExternalStore(attachment.subscribe, attachment.getState);
+  // 进程拉起前 Runner 只接受「取得」：输入与改尺寸先不发（RFC-022）。要在挂载 xterm 之前设好，挂载时的第一次改尺寸才会被记下。
+  useEffect(() => attachment.setProcessRunning(terminal.lifecycle === 'running'), [attachment, terminal.lifecycle]);
   useEffect(() => {
     if (!host.current) return;
     surface.mount(host.current, (data) => { attachment.input(data); activity.current(); }, (cols, rows) => attachment.resize(cols, rows));
@@ -75,23 +96,29 @@ function LiveNativeTerminalView({ terminal, channel, stream, onActivity, canDeve
   const take = useCallback(() => {
     if (interactive) void attachment.ensureControl().then((ok) => { if (ok) { surface.setControlled(true); surface.focus(); } });
   }, [interactive, attachment, surface]);
-  const active = useRef(false);
-  const onFocusChange = useCallback((value: boolean) => { active.current = value; attachment.setActive(value); }, [attachment]);
-  useEffect(() => attachment.setActive(active.current), [attachment]);
+  const active = useRef(false), hold = useRef(false);
+  const holding = useCreatorClaim({ terminal, attachment, surface, host, phase: state.phase, canDevelop });
+  const onFocusChange = useCallback((value: boolean) => { active.current = value; attachment.setActive(value || hold.current); }, [attachment]);
+  useEffect(() => { hold.current = holding; attachment.setActive(active.current || holding); }, [attachment, holding]);
   useTerminalFocus(host, onFocusChange, take);
   const view = terminal.lifecycle === 'running' ? terminalControlView(state, viewerId, canDevelop) : undefined;
+  // 启动中（RFC-022 D3）：终端区域中间是步骤条，状态条显示当前段；xterm 照常挂载、照常附着，只是被盖住。
+  const startup = terminal.startup?.state === 'running' ? terminal.startup : undefined;
   return <>
     <div className={styles.statusBar}>{info ? <span className={styles.info}>{info}</span> : null}
-    <div className={styles.controlLine} data-control={view?.tone} role="status" aria-live="polite">
-      {view ? <strong className={styles.controlState}>{controlText(t, view)}</strong> : <span>{t(`devSession.native.attach.${state.phase}`)}</span>}
+    <div className={styles.controlLine} data-control={startup ? undefined : view?.tone} role="status" aria-live="polite">
+      {startup ? <StageSummary progress={startup} /> : view ? <strong className={styles.controlState}>{controlText(t, view)}</strong> : <span>{t(`devSession.native.attach.${state.phase}`)}</span>}
       {terminal.protocol === 'opencode' && state.phase === 'ready' ? <span title={t('devSession.native.historyHelp')}>{t(state.controlled ? 'devSession.native.historyControlled' : 'devSession.native.historyReadOnly')}</span> : null}
       {state.truncated ? <span title={t('devSession.native.scrollback')}>{t('devSession.native.bounded')}</span> : null}
       {state.phase === 'error' ? <Button variant="ghost" onClick={() => void attachment.refresh()}>{t('devSession.native.reattach')}</Button> : null}
     </div></div>
     {notices}
     {state.error ? <p className={styles.error} role="status">{state.error}</p> : null}
-    <div className={styles.terminalSurface} ref={host} role="region" tabIndex={state.controlled ? -1 : 0} aria-label={t('devSession.native.screen', { id: terminal.agentId.slice(-6) })}
-      onPointerDown={take} onKeyDown={state.controlled ? undefined : take} />
+    <div className={styles.surfaceFrame}>
+      <div className={styles.terminalSurface} ref={host} role="region" tabIndex={state.controlled ? -1 : 0} aria-label={t('devSession.native.screen', { id: terminal.agentId.slice(-6) })}
+        onPointerDown={take} onKeyDown={state.controlled ? undefined : take} />
+      {startup ? <div className={styles.startupPane}><StageProgress progress={startup} title={t('devSession.native.startup.title', { profile: terminal.computeName ?? terminal.compute })} /></div> : null}
+    </div>
   </>;
 }
 

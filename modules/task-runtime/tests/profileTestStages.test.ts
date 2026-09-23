@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import type { AgentEvent } from '@crewstation/contracts';
 import type { ProtocolProbe } from '../domain/profileTestStages';
-import { absorbAgentEvent, commandVerdict, launchStage, modelVerdict } from '../domain/profileTestStages';
+import { absorbAgentEvent, commandVerdict, containerStagesForTest, launchStage, modelVerdict } from '../domain/profileTestStages';
 
 const at = '2026-09-18T00:00:00.000Z';
 const probeOf = (events: Array<Partial<AgentEvent> & Pick<AgentEvent, 'type'>>): ProtocolProbe =>
@@ -80,4 +80,27 @@ describe('档位测试阶段判定（RFC-006 §6.2）', () => {
     expect(commandVerdict({ ...base, exitCode: null, spawnError: 'ENOENT' }, 'x')).toMatchObject({ outcome: 'spawn-failed' });
     expect(commandVerdict(undefined, 'x').stage.state).toBe('skipped');
   });
+});
+
+test('RFC-022：前三段取测试环境的启动进度（去掉「已就绪」），失败落在进行中的那段；没有进度时从排队开始', () => {
+  const at = (second: number) => new Date(Date.UTC(2026, 8, 23, 3, 0, second)).toISOString();
+  const startup = { state: 'running' as const, startedAt: at(0), stages: [
+    { kind: 'queue' as const, state: 'succeeded' as const, startedAt: at(0), endedAt: at(1), durationMs: 1000 },
+    { kind: 'container' as const, state: 'running' as const, startedAt: at(1), detail: '已调度到节点 n1 · 正在拉取镜像 x', warning: '镜像拉取失败（ImagePullBackOff）' },
+    { kind: 'connect' as const, state: 'pending' as const }, { kind: 'ready' as const, state: 'pending' as const }] };
+  expect(containerStagesForTest(startup).map((stage) => [stage.id, stage.kind, stage.name, stage.state])).toEqual([
+    ['queue', 'queue', '排队分配容器', 'succeeded'], ['container', 'container', '容器启动中（调度、拉取镜像）', 'running'], ['connect', 'connect', '容器已启动，等待连接', 'pending']]);
+  expect(containerStagesForTest(startup)[1]).toMatchObject({ detail: '已调度到节点 n1 · 正在拉取镜像 x', warning: '镜像拉取失败（ImagePullBackOff）' });
+  const failed = containerStagesForTest(startup, { code: 'image-pull-failed', message: '镜像拉取失败（ImagePullBackOff）' });
+  expect(failed[1]).toMatchObject({ state: 'failed', error: { code: 'image-pull-failed', message: '镜像拉取失败（ImagePullBackOff）' } });
+  expect(failed.filter((stage) => stage.state === 'failed')).toHaveLength(1);
+  expect(containerStagesForTest(undefined).map((stage) => stage.state)).toEqual(['running', 'pending', 'pending']);
+  expect(containerStagesForTest(undefined, { code: 'timeout', message: '超时' })[0]).toMatchObject({ state: 'failed', error: { code: 'timeout' } });
+  // 已结束的环境阶段：失败原因带过来（换成测试的错误形状），日志尾部不带；等待连接成功时可附一句细节。
+  const ended = { ...startup, state: 'ready' as const, stages: [startup.stages[0]!, { kind: 'container' as const, state: 'failed' as const, error: { code: 'pod-exited' as const, message: '容器已退出' }, logTail: 'log' },
+    { kind: 'connect' as const, state: 'succeeded' as const }] };
+  expect(containerStagesForTest(ended)[1]).toEqual({ id: 'container', kind: 'container', name: '容器启动中（调度、拉取镜像）', state: 'failed', error: { code: 'pod-exited', message: '容器已退出' } });
+  expect(containerStagesForTest(ended, undefined, { connect: 'Runner 协议 3' })[2]).toMatchObject({ state: 'succeeded', detail: 'Runner 协议 3' });
+  // 所有段都结束了还要记失败（例如握手被拒）：落在第一个失败的段上。
+  expect(containerStagesForTest(ended, { code: 'runner-protocol-mismatch', message: '协议不一致' })[1]).toMatchObject({ state: 'failed', error: { code: 'runner-protocol-mismatch' } });
 });

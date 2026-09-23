@@ -113,8 +113,12 @@ describe.skipIf(!available)('档位测试执行器（RFC-006 §6）', () => {
     const outcome = await run;
     expect(outcome).toMatchObject({ state: 'passed', outcome: 'passed' });
     expect(outcome.context).toMatchObject({ kind: 'platform-namespace', taskId, image, imageDigest: image, runnerProtocol: 3, cliVersion: 'opencode 1.18.29', interpreters: [{ language: 'shell' }], workdir: '/work' });
-    expect(outcome.stages.map((s) => [s.id, s.state])).toEqual([['step:01a0bf5d-8f4b-70f0-8aa4-08c1832abefd', 'succeeded'], ['launch', 'succeeded'], ['model', 'succeeded']]);
-    expect(progress.flatMap((p) => p.stages ?? []).filter((s) => s.id === 'runner').at(-1)).toMatchObject({ state: 'succeeded' });
+    expect(outcome.stages.map((s) => [s.id, s.state])).toEqual([['step:01a0bf5d-8f4b-70f0-8aa4-08c1832abefd', 'succeeded'], ['agent', 'succeeded'], ['model', 'succeeded']]);
+    // RFC-022：前三段取测试环境自己的启动进度，连上之后「等待连接」成功并写明 Runner 协议。
+    const reported = progress.flatMap((p) => p.stages ?? []);
+    expect(reported.filter((s) => s.id === 'connect').at(-1)).toMatchObject({ kind: 'connect', name: '容器已启动，等待连接', state: 'succeeded', detail: 'Runner 协议 3' });
+    expect(reported.filter((s) => s.id === 'queue').at(-1)).toMatchObject({ state: 'succeeded' });
+    expect(reported.some((s) => s.id === 'image' || s.id === 'runner' || s.id === 'launch')).toBe(false);
     const start = commands.find((c) => c.type === 'startAgent') as Extract<RunnerCommand, { type: 'startAgent' }>;
     expect(start).toMatchObject({ compute: '01a0bf5d-8f4b-73a2-878b-c4235f8d1a92', profileRevision: 2, launch: { protocol: 'opencode', binaryPath: '/usr/local/bin/opencode' }, beforeStart: { captureOutput: true, secrets: { KEY: 'sk-test' } }, mode: 'oneshot', permission: 'full', processAttemptId: '01a0bf5d-8f4b-7435-8062-f84a0a1cba7b:1' });
     expect((commands.find((c) => c.type === 'exec') as Extract<RunnerCommand, { type: 'exec' }>).command).toEqual(['/usr/local/bin/opencode', '--version']);
@@ -133,7 +137,7 @@ describe.skipIf(!available)('档位测试执行器（RFC-006 §6）', () => {
     await connectRunner();
     let outcome = await run;
     expect(outcome).toMatchObject({ state: 'failed', outcome: 'before-start-failed', error: '退出码 7' });
-    expect(outcome.stages.map((s) => [s.id, s.state])).toEqual([['step:01a0bf5d-8f4b-70f0-8aa4-08c1832abefd', 'failed'], ['launch', 'skipped'], ['model', 'skipped']]);
+    expect(outcome.stages.map((s) => [s.id, s.state])).toEqual([['step:01a0bf5d-8f4b-70f0-8aa4-08c1832abefd', 'failed'], ['agent', 'skipped'], ['model', 'skipped']]);
     await settled();
 
     onStart = (id, command) => { emit(id, agentEvent(command.agentId, 1, { type: 'started' })); };
@@ -150,7 +154,7 @@ describe.skipIf(!available)('档位测试执行器（RFC-006 §6）', () => {
     await setPodStatus({ phase: 'Pending', containerStatuses: [{ name: 'task', state: { waiting: { reason: 'ImagePullBackOff' } } }] });
     let outcome = await run;
     expect(outcome).toMatchObject({ state: 'failed', outcome: 'image-pull-failed' });
-    expect(outcome.stages.find((s) => s.id === 'image')).toMatchObject({ state: 'failed' });
+    expect(outcome.stages.find((s) => s.id === 'container')).toMatchObject({ state: 'failed', error: { code: 'image-pull-failed' } });
     await settled();
 
     run = runtime.api.runProfileTest(inputFor('01a0bf5d-8f4b-79c1-8d79-72343746d411'), async () => undefined, async () => true);

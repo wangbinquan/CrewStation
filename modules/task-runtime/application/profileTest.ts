@@ -6,7 +6,7 @@ import type { ProfileTestRunInput, ProfileTestRunProgress, ProfileTestRunResult 
 import { CONTAINER_START_FAILURES, IMAGE_PULL_FAILURES, RUNNER_UNAVAILABLE_HINT } from '../domain/podStartup';
 import { profileTestMcp } from '../domain/profileTestEnvironment';
 import type { ProtocolProbe } from '../domain/profileTestStages';
-import { TEST_STAGE, absorbAgentEvent, commandVerdict, imageStage, launchStage, modelVerdict, runnerStage, stagesFromBeforeStart } from '../domain/profileTestStages';
+import { TEST_STAGE, absorbAgentEvent, commandVerdict, containerStagesForTest, launchStage, modelVerdict, stagesFromBeforeStart } from '../domain/profileTestStages';
 import type { TaskEnvironment } from '../domain/taskEnvironment';
 import type { TestRunner } from '../ports/platform';
 import type { TaskRuntimeUseCaseDeps } from './dependencies';
@@ -51,7 +51,7 @@ export function runProfileTestUseCase(deps: TaskRuntimeUseCaseDeps, test: Profil
     catch (error) { return { state: 'failed', error: `无法创建测试任务：${messageOf(error)}`, stages: [] }; }
     const session: Session = { deps, timing, runner, env, input, report, heartbeat, context: { kind: 'platform-namespace', taskId: env.id, agentId: newResourceId(), image: input.image, workdir: '/work' }, mcp: profileTestMcp(input.beforeStart.steps, test.mcp ?? []) };
     try {
-      await report({ context: session.context, stages: [imageStage('running')] });
+      await report({ context: session.context, stages: containerStagesForTest(env.startup) });
       const waited = await waitForRunner(session);
       if (waited) return waited;
       await describeRunner(session);
@@ -62,39 +62,31 @@ export function runProfileTestUseCase(deps: TaskRuntimeUseCaseDeps, test: Profil
   };
 }
 
-/** 等 Runner 连上：镜像拉取失败、容器起不来（不是平台底座）、握手被拒（协议不一致）、超时各有归类；连上返回 undefined。 */
+/**
+ * 等 Runner 连上：镜像拉取失败、容器起不来（不是平台底座）、握手被拒（协议不一致）、超时各有归类；连上返回 undefined。
+ * 前三段的进度取测试环境自己的启动进度（RFC-022 D8），变了才上报；判定仍按 Pod 状态，规则不变。
+ */
 async function waitForRunner(s: Session): Promise<ProfileTestRunResult | undefined> {
   const { deps: { uow, cluster }, timing, env, context } = s;
   const deadline = Date.now() + timing.connectTimeoutMs;
-  let pulled = false;
+  let reported = JSON.stringify(env.startup ?? null);
   for (;;) {
     if (!await s.heartbeat()) return result(s, 'unknown', 'environment-lost', '测试作业租约丢失', []);
     const live = await uow.read.environments.getById(env.id);
     if (!live || live.state === 'released' || live.state === 'releasing') return result(s, 'unknown', 'environment-lost', '测试任务在 Runner 连上之前消失', []);
-    if (live.runnerRejection) {
-      const message = live.runnerRejection.message;
-      return result(s, 'failed', 'runner-protocol-mismatch', message, [imageStage('succeeded'), runnerStage('failed', { error: { code: 'runner-protocol-mismatch', message } })]);
-    }
+    const fail = (outcome: ProfileTestOutcome, message: string) => result(s, 'failed', outcome, message, containerStagesForTest(live.startup, { code: outcome, message }));
+    if (live.runnerRejection) return fail('runner-protocol-mismatch', live.runnerRejection.message);
     if (live.connected) return undefined;
     const pod = await cluster.podPhase(live);
     const note = pod.message ? `：${pod.message}` : '';
-    if (pod.waitingReason && IMAGE_PULL_FAILURES.has(pod.waitingReason)) {
-      const message = `镜像拉取失败（${pod.waitingReason}）${note}`;
-      return result(s, 'failed', 'image-pull-failed', message, [imageStage('failed', { error: { code: 'image-pull-failed', message } }), runnerStage('skipped')]);
-    }
+    if (pod.waitingReason && IMAGE_PULL_FAILURES.has(pod.waitingReason)) return fail('image-pull-failed', `镜像拉取失败（${pod.waitingReason}）${note}`);
     if (live.state === 'failed' || pod.phase === 'Failed' || pod.phase === 'Succeeded' || pod.phase === 'Missing' || (pod.waitingReason && CONTAINER_START_FAILURES.has(pod.waitingReason))) {
-      const message = `测试容器没有起来：${RUNNER_UNAVAILABLE_HINT}${note || (live.message ? `：${live.message}` : '')}`;
-      return result(s, 'failed', 'runner-unavailable', message, [imageStage(pulled || pod.imageId ? 'succeeded' : 'skipped'), runnerStage('failed', { error: { code: 'runner-unavailable', message } })]);
+      return fail('runner-unavailable', `测试容器没有起来：${RUNNER_UNAVAILABLE_HINT}${note || (live.message ? `：${live.message}` : '')}`);
     }
-    if (!pulled && (pod.phase === 'Running' || pod.imageId)) {
-      pulled = true;
-      if (pod.imageId) context.imageDigest = pod.imageId;
-      await s.report({ context, stages: [imageStage('succeeded'), runnerStage('running')] });
-    }
-    if (Date.now() > deadline) {
-      const message = `测试容器 ${Math.round(timing.connectTimeoutMs / 1000)} 秒内没有连上平台${note}`;
-      return result(s, 'failed', 'timeout', message, pulled ? [imageStage('succeeded'), runnerStage('failed', { error: { code: 'timeout', message } })] : [imageStage('failed', { error: { code: 'timeout', message } }), runnerStage('skipped')]);
-    }
+    if (pod.imageId) context.imageDigest = pod.imageId;
+    const now = JSON.stringify(live.startup ?? null);
+    if (now !== reported) { reported = now; await s.report({ context, stages: containerStagesForTest(live.startup) }); }
+    if (Date.now() > deadline) return fail('timeout', `测试容器 ${Math.round(timing.connectTimeoutMs / 1000)} 秒内没有连上平台${note}`);
     await Bun.sleep(timing.pollMs);
   }
 }
@@ -107,7 +99,8 @@ async function describeRunner(s: Session): Promise<void> {
     runnerProtocol: TASKRUNNER_PROTOCOL_VERSION, ...(pod.imageId ? { imageDigest: pod.imageId } : {}), ...(capabilities?.interpreters ? { interpreters: capabilities.interpreters } : {}),
     cliVersion: isKnownProtocol(s.input.launch.protocol) ? await cliVersion(s) : null,
   });
-  await s.report({ context: s.context, stages: [imageStage('succeeded'), runnerStage('succeeded', { detail: `Runner 协议 ${TASKRUNNER_PROTOCOL_VERSION}` })] });
+  const live = await s.deps.uow.read.environments.getById(s.env.id);
+  await s.report({ context: s.context, stages: containerStagesForTest(live?.startup, undefined, { connect: `Runner 协议 ${TASKRUNNER_PROTOCOL_VERSION}` }) });
 }
 
 async function cliVersion(s: Session): Promise<string | null> {
@@ -135,7 +128,7 @@ async function observeProtocolTurn(s: Session): Promise<ProfileTestRunResult> {
   } catch (error) {
     const message = messageOf(error);
     const beforeStart = isPlatformError(error) && error.details?.code === 'interpreter_unavailable';
-    return result(s, 'failed', beforeStart ? 'before-start-failed' : 'spawn-failed', message, [{ id: TEST_STAGE.launch, kind: 'launch', name: '启动 CLI', state: 'failed', error: { code: String((isPlatformError(error) && error.details?.code) || 'rejected'), message } }]);
+    return result(s, 'failed', beforeStart ? 'before-start-failed' : 'spawn-failed', message, [{ id: TEST_STAGE.agent, kind: 'agent', name: 'Agent 启动中', state: 'failed', error: { code: String((isPlatformError(error) && error.details?.code) || 'rejected'), message } }]);
   }
   const deadline = Date.now() + scriptBudgetOf(input) + timing.modelBudgetMs;
   const secrets = Object.values(input.beforeStart.secrets);

@@ -26,6 +26,9 @@ import { useDevelopmentLocation } from '../hooks/layout/useDevelopmentLocation';
 import type { SessionAccess } from '../model/sessionAccess';
 import type { ActivityTarget } from '../../../shared/activity/agentActivityView';
 import { ConnectionGuide } from '../components/session/ConnectionGuide';
+import { SessionStartup, sessionStartupShown } from '../components/session/SessionStartup';
+import { Badge } from '../../../shared/ui/Badge';
+import { StageSummary } from '../../../shared/ui/progress/StageProgress';
 import { sessionConnection } from '../model/connection/sessionConnection';
 import { Stack } from '../../../shared/ui/Stack';
 import { Card } from '../../../shared/ui/Card';
@@ -47,13 +50,15 @@ export interface DevSessionWorkbenchProps {
   readonly reference?: ReactNode;
   /** 会话面板里内嵌的最近日志，由 app 装配（日志属于 logs feature）。 */
   readonly sessionLogs?: (taskId: string) => ReactNode;
+  /** 启动失败在检出代码或更早时的「重试」：按原分支重新开始开发（RFC-022 Q1）。 */
+  readonly onRestart?: () => void;
 }
 
 /**
  * 有会话时的工作区：一条任务流供所有面板共用，外加发布与数据绑定。
  * 所有面板都只拿 channel，不各自开连接。
  */
-export function DevSessionWorkbench({ projectId, session, access, canDevelop, serviceId, userId, release, activityTarget, isAdmin, recovery, refresh, refreshing, reference, sessionLogs }: DevSessionWorkbenchProps): ReactElement {
+export function DevSessionWorkbench({ projectId, session, access, canDevelop, serviceId, userId, release, activityTarget, isAdmin, recovery, refresh, refreshing, reference, sessionLogs, onRestart }: DevSessionWorkbenchProps): ReactElement {
   const t = useT();
   const { space } = useProjectScope();
   const taskId = session.taskId;
@@ -82,7 +87,8 @@ export function DevSessionWorkbench({ projectId, session, access, canDevelop, se
         <header className={styles.context}>
           <div className={styles.titleRow}><h1 className={styles.title}>{t('devSession.title')}</h1>
             {/* 连接状态芯片可点：直接打开会话面板（RFC-020 §4.3）。 */}
-            <button type="button" className={styles.chip} onClick={() => location.selectTool({ name: 'session', mode: 'side' })} title={t('devSession.connection.details')}><StreamStatus state={state} sessionState={session.state} compact /></button>
+            <button type="button" className={styles.chip} onClick={() => location.selectTool({ name: 'session', mode: 'side' })} title={t('devSession.connection.details')}>
+              {session.startup?.state === 'running' ? <Badge tone="info"><StageSummary progress={session.startup} compact /></Badge> : <StreamStatus state={state} sessionState={session.state} compact />}</button>
             <code className={styles.branch} title={session.branch}>{session.branch}</code>
             {health === 'ready' && session.rebuild?.state === 'ready' ? <span className={styles.note} title={session.rebuild.message}>{t('devSession.rebuild.ready')}</span> : null}</div>
           {/* 新开 CLI 只有这一个入口（2026-09-23：原工具行整条去掉）。 */}
@@ -92,8 +98,9 @@ export function DevSessionWorkbench({ projectId, session, access, canDevelop, se
             <ButtonLink variant="primary" size="small" to={PROJECT_PATHS[space].release} params={{ projectId }} search={{ source: 'session' }}>{t('devSession.native.prepareRelease')}</ButtonLink>
           </div>
         </header>
-        <div className={styles.guide}><ConnectionGuide {...diagnostics} onEnvironment={location.search.view === 'session' ? undefined : () => location.selectTool({ name: 'session', mode: 'side' })} /></div>
-      </>} projectId={projectId} taskId={taskId} userId={userId} channel={channel} stream={state} canDevelop={canDevelop} onActivity={touch} activityTarget={activityTarget} editorDirty={editor.dirty} location={location}
+        {/* 启动中与启动失败由 CLI 区的步骤条说明（RFC-022），不再叠一条连接说明。 */}
+        {sessionStartupShown(session) ? null : <div className={styles.guide}><ConnectionGuide {...diagnostics} onEnvironment={location.search.view === 'session' ? undefined : () => location.selectTool({ name: 'session', mode: 'side' })} /></div>}
+      </>} startup={sessionStartupShown(session) ? <SessionStartup session={session} canDevelop={canDevelop} {...(onRestart ? { onRestart } : {})} onRecover={() => location.selectTool({ name: 'session', mode: 'side' })} logs={logs} /> : undefined} projectId={projectId} taskId={taskId} userId={userId} channel={channel} stream={state} canDevelop={canDevelop} onActivity={touch} activityTarget={activityTarget} editorDirty={editor.dirty} location={location}
         isAdmin={isAdmin} dataDirty={dataDirty} blockedReason={health !== 'ready' ? t(`devSession.connection.${health}`) : undefined}
         version={health === 'ready' ? <VersionComparisonPanel projectId={projectId} taskId={taskId} channel={channel} canDevelop={canDevelop} compact onDetails={() => location.selectTool({ name: 'changes', mode: 'side' })} /> : null}
         data={<Stack fill><DataResourcesTable projectId={projectId} /><DataBindingPane data={data} onDirtyChange={setDataDirty} /></Stack>}

@@ -37,6 +37,13 @@
 .controlState { font-weight: 600; }
 .controlState::before { content: '●'; margin-right: 4px; font-size: 10px; vertical-align: 1px; }
 .terminalCard:has(.controlLine[data-control="mine"]) { border-color: var(--cs-tone-success-fg); outline: 1px solid var(--cs-tone-success-fg); outline-offset: -2px; }
+/* RFC-022：xterm 与启动步骤条叠在同一块区域；步骤条在上层，就绪后移除。 */
+.surfaceFrame { position: relative; display: flex; flex: 1; min-height: 0; min-width: 0; }
+.startupPane { position: absolute; inset: 0; z-index: 1; display: flex; padding: var(--cs-space-4); overflow: auto; background: var(--cs-color-surface); }
+.startupPane[data-static] { position: static; flex: 1; min-height: 0; }
+.startupPane > *, .sessionStartup > * { margin: auto; }
+.sessionStartup { display: flex; flex: 1; min-height: 0; min-width: 0; overflow: auto; padding: var(--cs-space-4); }
+.controlLine[data-control="failed"] { padding: 3px 8px; font-size: 12px; background: var(--cs-tone-danger-bg); color: var(--cs-tone-danger-fg); }
 .terminalSurface { flex: 1; min-height: 0; min-width: 0; overflow: auto; padding: 2px 4px; }
 .terminalSurface:focus-visible { outline: 2px solid var(--cs-color-primary); outline-offset: -2px; }
 .terminalSurface :global(.xterm) { height: 100%; }

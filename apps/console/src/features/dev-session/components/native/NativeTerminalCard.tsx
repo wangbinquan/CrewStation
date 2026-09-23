@@ -56,7 +56,9 @@ function NativeTerminalFrame({ terminalId, terminal, name, channel, stream, onAc
     {terminal?.profileRevision ? <small>{t('devSession.agents.profileRevision', { revision: terminal.profileRevision })}</small> : null}
     {terminal?.execution?.profile ? <small title={t('devSession.native.resourcesHint')}>CPU {terminal.execution.profile.cpu} · {terminal.execution.profile.memory}</small> : null}
   </>;
-  const notices = <>
+  // RFC-022：有启动进度的 CLI 在就绪之前由步骤条说明排队、准备、失败与重试，不再叠一行旧说明。
+  const staged = !!terminal?.startup && terminal.startup.state !== 'ready';
+  const notices = staged ? null : <>
     {terminal?.error ? <p className={styles.error}>{terminal.error}</p> : null}
     {terminal?.lifecycle === 'failed' && onRetry ? <div className={styles.controlLine}><Button size="small" onClick={() => onRetry(terminal)}>{t('devSession.native.retryExecution')}</Button></div> : null}
     {terminal?.beforeStart && (terminal.beforeStart.state === 'queued' || terminal.beforeStart.state === 'running') ? <div className={styles.controlLine} role="status">{terminal.beforeStart.state === 'queued' ? t('devSession.native.preparingQueued') : t('devSession.native.preparing', { step: terminal.beforeStart.currentStep ?? '' })}</div> : null}
@@ -64,7 +66,7 @@ function NativeTerminalFrame({ terminalId, terminal, name, channel, stream, onAc
     {terminal?.execution && !['running', 'finished'].includes(terminal.execution.state) && !['ended', 'failed'].includes(terminal.lifecycle) ? <div className={styles.controlLine} role="status">{terminal.execution.message ?? t(`devSession.native.execution.${terminal.execution.state}`)}</div> : null}
   </>;
   return <section className={styles.terminalCard} data-native-terminal={terminalId} tabIndex={-1} aria-label={name}>
-    {terminal ? <NativeTerminalView terminal={terminal} channel={channel} stream={stream} onActivity={onActivity} canDevelop={canDevelop} viewerId={viewerId} info={info} notices={notices} />
+    {terminal ? <NativeTerminalView terminal={terminal} channel={channel} stream={stream} onActivity={onActivity} canDevelop={canDevelop} viewerId={viewerId} info={info} notices={notices} {...(onRetry ? { onRetry } : {})} />
       : <><div className={styles.statusBar}><span className={styles.info}>{info}</span></div><p className={styles.error}>{t('devSession.native.missing')}</p></>}
   </section>;
 }

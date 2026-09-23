@@ -3,7 +3,7 @@ import type { NativeTerminalDto, WorkspaceLayout } from '@crewstation/contracts'
 import { WorkspaceLayoutSchema } from '@crewstation/contracts';
 import {
   acceptsDrop, activateTerminal, closeTerminal, dropTerminal, equalizeGroups, focusGroup, isTerminalShown, maximizedGroup, migrateLegacyTabs, newGroup, normalizeGroups,
-  openTerminal, orderedTerminals, reconcileTerminals, renameTerminal, resizeGroups, splitTerminal, toggleMaximize,
+  openTerminal, orderedTerminals, reconcileTerminals, renameTerminal, replaceTerminal, resizeGroups, splitTerminal, toggleMaximize,
 } from '../features/dev-session/model/layout/terminalGroups';
 import { initialWorkspaceLayout } from '../features/dev-session/model/layout/workspaceLayout';
 
@@ -18,6 +18,26 @@ const base = (tabs: WorkspaceLayout['tabs'], extra: Partial<WorkspaceLayout> = {
 /** 两组左右排开：左 [A, B]（当前 A），右 [C]。 */
 const twoGroups = () => valid(normalizeGroups(base([newGroup(G1, '一', [A, B]), newGroup(G2, '二', [C])], { dock: { direction: 'row', children: [{ group: G1 }, { group: G2 }], sizes: [1, 1] } }), () => G4));
 const roster = (entries: [string, NativeTerminalDto['lifecycle']][]) => entries.map(([terminalId, lifecycle]) => ({ terminalId, lifecycle }));
+
+describe('RFC-022 重试原位替换', () => {
+  test('新 CLI 占据失败标签在组里的位置并成为当前标签与焦点组，自定义名字随之转过去；旧的记进已关闭列表', () => {
+    const layout = valid(renameTerminal(focusGroup(twoGroups(), G2), B, '前端'));
+    const next = valid(replaceTerminal(layout, B, D));
+    expect(next.tabs.map((tab) => [tab.paneOrder, tab.activeTerminalId])).toEqual([[[A, D], D], [[C], C]]);
+    expect(next.activeTabId).toBe(G1); expect(next.selectedTerminalId).toBe(D);
+    expect(next.hiddenTerminalIds).toEqual([B]);
+    expect(next.terminalNames).toEqual([{ terminalId: D, name: '前端' }]);
+    // 放大着的失败标签被替换后，放大的是新的。
+    const big = valid(replaceTerminal(valid(toggleMaximize(twoGroups(), A)), A, E));
+    expect(big.maximizedTerminalId).toBe(E);
+  });
+
+  test('旧标签已不在布局里（被关掉或别处删除）时按普通新开处理；新 CLI 已在布局里时不重复放', () => {
+    const closed = valid(closeTerminal(twoGroups(), B));
+    expect(valid(replaceTerminal(closed, B, D))).toEqual(valid(openTerminal(closed, D, { activate: true })));
+    expect(valid(replaceTerminal(twoGroups(), B, C))).toEqual(valid(openTerminal(twoGroups(), C, { activate: true })));
+  });
+});
 
 describe('旧布局迁移与规整', () => {
   test('当前工作区平铺的窗各成一组、按原排布摆开：横排左右、纵排上下、网格两列（单出的一格横跨）', () => {

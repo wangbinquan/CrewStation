@@ -130,24 +130,6 @@
   .saveBar { padding: var(--cs-space-2) 0; }
 }
 
-.timeline {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: var(--cs-space-2);
-}
-
-.stage {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: var(--cs-space-2);
-  align-items: start;
-  padding: var(--cs-space-3);
-  border: 1px solid var(--cs-color-border);
-  border-radius: var(--cs-radius-sm);
-}
-
 .stageBody {
   display: grid;
   gap: var(--cs-space-2);

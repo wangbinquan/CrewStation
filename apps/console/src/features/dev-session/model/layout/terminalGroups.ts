@@ -144,6 +144,23 @@ export function openTerminal(layout: WorkspaceLayout, terminalId: string, option
   return options.activate ? activateTerminal(next, terminalId) : next;
 }
 
+/**
+ * 原位替换（RFC-022 Q2）：重试启动失败的 CLI 时，新 CLI 占据旧标签在组里的位置并成为当前标签，自定义名字随之转过去；
+ * 旧的记进已关闭列表。旧标签已不在布局里时按普通新开处理。
+ */
+export function replaceTerminal(layout: WorkspaceLayout, oldId: string, newId: string): WorkspaceLayout {
+  const group = groupOf(layout, oldId);
+  if (!group || groupOf(layout, newId)) return openTerminal(layout, newId, { activate: true });
+  const swap = (id: string | null | undefined) => (id === oldId ? newId : id);
+  const tabs = layout.tabs.map((tab) => tab.id === group.id ? { ...tab, paneOrder: tab.paneOrder.map((id) => swap(id)!), activeTerminalId: newId } : tab);
+  const names = (layout.terminalNames ?? []).map((entry) => (entry.terminalId === oldId ? { ...entry, terminalId: newId } : entry));
+  return activateTerminal({
+    ...layout, tabs, hiddenTerminalIds: [...layout.hiddenTerminalIds.filter((id) => id !== oldId && id !== newId), oldId],
+    selectedTerminalId: swap(layout.selectedTerminalId) ?? null, maximizedTerminalId: swap(layout.maximizedTerminalId) ?? null,
+    ...(layout.terminalNames ? { terminalNames: names } : {}),
+  }, newId);
+}
+
 /** 让它成为所在组的当前标签、所在组成为焦点组；别的组正放大着时先还原，免得选中的看不见。 */
 export function activateTerminal(layout: WorkspaceLayout, terminalId: string): WorkspaceLayout {
   const group = groupOf(layout, terminalId);

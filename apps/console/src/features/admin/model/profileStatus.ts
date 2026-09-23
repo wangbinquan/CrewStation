@@ -1,4 +1,4 @@
-import type { ComputeProfileAvailability, ProfileTestDto, ProfileTestStage } from '@crewstation/contracts';
+import type { ComputeProfileAvailability, ProfileTestDto } from '@crewstation/contracts';
 
 /** 测试还在进行：排队或执行中。保存后服务端自动排测试，页面据此轮询到终态。 */
 export function testRunning(test: Pick<ProfileTestDto, 'state'> | undefined): boolean {
@@ -22,11 +22,6 @@ export function testTone(state: ProfileTestDto['state']): Tone {
   return state === 'superseded' ? 'neutral' : 'info';
 }
 
-export function stageTone(state: ProfileTestStage['state']): Tone {
-  if (state === 'succeeded') return 'success';
-  if (state === 'failed') return 'danger';
-  return state === 'running' ? 'info' : 'neutral';
-}
 
 /** 摘要短码：列表里只显示 sha256 的前 12 位，完整值放在 title 里。 */
 export function shortDigest(digest: string): string {

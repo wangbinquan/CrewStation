@@ -7,7 +7,7 @@ import { planCredentialWrites } from '../domain/credentialWrites';
 import type { RegistryLayout } from '../domain/imageReference';
 import { parseProfileImage, pinnedReference, pullReference, repositoryOf } from '../domain/imageReference';
 import type { ProfileTest } from '../domain/profileTest';
-import { initialStages, mergeStages, outcomeSentence, skipUnreachedStages, testPrompt } from '../domain/profileTest';
+import { completeContainerStages, initialStages, mergeStages, outcomeSentence, skipUnreachedStages, testPrompt } from '../domain/profileTest';
 import { validateProfileContent } from '../domain/profileValidation';
 import { assertJsonTemplate, placeholdersInsideStrings, stripJsonComments, validateRevisionContent } from '../domain/revisionValidation';
 
@@ -133,12 +133,16 @@ describe('修订哈希、可用性与测试阶段', () => {
     expect(failed.reason).toContain(outcomeSentence('network-blocked'));
   });
   test('阶段表按协议排好；合并按 id 覆盖；每次测试一个新 nonce', () => {
-    expect(initialStages('claude-code', [{ stepId: 'a', name: 'A' }]).map((s) => s.id)).toEqual(['image', 'runner', 'step:a', 'launch', 'model']);
-    expect(initialStages('terminal', []).map((s) => s.id)).toEqual(['image', 'runner', 'command']);
+    // RFC-022 D8：前三段与公共启动进度同名同序，「启动 CLI」改为「Agent 启动中」。
+    expect(initialStages('claude-code', [{ stepId: 'a', name: 'A' }]).map((s) => s.id)).toEqual(['queue', 'container', 'connect', 'step:a', 'agent', 'model']);
+    expect(initialStages('terminal', []).map((s) => [s.id, s.kind, s.name])).toEqual([['queue', 'queue', '排队分配容器'], ['container', 'container', '容器启动中（调度、拉取镜像）'], ['connect', 'connect', '容器已启动，等待连接'], ['command', 'command', '测试命令']]);
     const merged = mergeStages(initialStages('terminal', []), [{ id: 'command', kind: 'command', name: '测试命令', state: 'failed' }, { id: 'extra', kind: 'launch', name: 'x', state: 'succeeded' }]);
-    expect(merged.map((s) => [s.id, s.state])).toEqual([['image', 'pending'], ['runner', 'pending'], ['command', 'failed'], ['extra', 'succeeded']]);
+    expect(merged.map((s) => [s.id, s.state])).toEqual([['queue', 'pending'], ['container', 'pending'], ['connect', 'pending'], ['command', 'failed'], ['extra', 'succeeded']]);
     // 失败收尾时没走到的阶段记为跳过；已有终态的阶段不动。
-    expect(skipUnreachedStages(merged).map((s) => [s.id, s.state])).toEqual([['image', 'skipped'], ['runner', 'skipped'], ['command', 'failed'], ['extra', 'succeeded']]);
+    expect(skipUnreachedStages(merged).map((s) => [s.id, s.state])).toEqual([['queue', 'skipped'], ['container', 'skipped'], ['connect', 'skipped'], ['command', 'failed'], ['extra', 'succeeded']]);
+    // 测试通过：没收到回报的容器段（含之前记录里的 image／runner）按已完成记，别的段不动。
+    const passed = completeContainerStages([...merged, { id: 'image', kind: 'image', name: '拉取镜像', state: 'pending' }, { id: 'model', kind: 'model', name: '真实模型轮次', state: 'pending' }]);
+    expect(passed.map((s) => [s.id, s.state])).toEqual([['queue', 'succeeded'], ['container', 'succeeded'], ['connect', 'succeeded'], ['command', 'failed'], ['extra', 'succeeded'], ['image', 'succeeded'], ['model', 'pending']]);
     const [one, two] = [testPrompt(), testPrompt()];
     expect(one.prompt).toContain(one.expectedReply);
     expect(one.expectedReply).not.toBe(two.expectedReply);

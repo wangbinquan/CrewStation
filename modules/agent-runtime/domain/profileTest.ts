@@ -22,19 +22,31 @@ export interface ProfileTest {
   readonly endedAt?: Date;
 }
 
-export const TEST_STAGE = { image: 'image', runner: 'runner', launch: 'launch', model: 'model', command: 'command' } as const;
+/**
+ * 阶段编号（RFC-022 D8 起与公共启动进度一致）：queue / container / connect / step:<stepId> / agent / model / command。
+ * 之前的测试记录里是 image / runner / launch，照原样保留、只读显示。
+ */
+export const TEST_STAGE = { queue: 'queue', container: 'container', connect: 'connect', agent: 'agent', model: 'model', command: 'command' } as const;
 export const stepStageId = (stepId: string): string => `step:${stepId}`;
+/** 容器相关的前几段：测试通过时没回报到的也一定走完了。 */
+const CONTAINER_KINDS: ReadonlySet<string> = new Set(['queue', 'container', 'connect', 'image', 'runner']);
 
 /** 阶段表与步骤表一一对应，先全部 pending；真实进度由执行器逐阶段更新。 */
 export function initialStages(protocol: AgentProtocol, steps: readonly Pick<BeforeStartStep, 'stepId' | 'name'>[]): ProfileTestStage[] {
   return [
-    { id: TEST_STAGE.image, kind: 'image', name: '拉取镜像', state: 'pending' },
-    { id: TEST_STAGE.runner, kind: 'runner', name: 'Runner 握手', state: 'pending' },
+    { id: TEST_STAGE.queue, kind: 'queue', name: '排队分配容器', state: 'pending' },
+    { id: TEST_STAGE.container, kind: 'container', name: '容器启动中（调度、拉取镜像）', state: 'pending' },
+    { id: TEST_STAGE.connect, kind: 'connect', name: '容器已启动，等待连接', state: 'pending' },
     ...steps.map((step): ProfileTestStage => ({ id: stepStageId(step.stepId), kind: 'step', name: step.name, stepId: step.stepId, state: 'pending' })),
     ...(protocol === 'terminal'
       ? [{ id: TEST_STAGE.command, kind: 'command' as const, name: '测试命令', state: 'pending' as const }]
-      : [{ id: TEST_STAGE.launch, kind: 'launch' as const, name: '启动 CLI', state: 'pending' as const }, { id: TEST_STAGE.model, kind: 'model' as const, name: '真实模型轮次', state: 'pending' as const }]),
+      : [{ id: TEST_STAGE.agent, kind: 'agent' as const, name: 'Agent 启动中', state: 'pending' as const }, { id: TEST_STAGE.model, kind: 'model' as const, name: '真实模型轮次', state: 'pending' as const }]),
   ];
+}
+
+/** 测试通过：容器相关的前几段即使没收到回报，也按已完成记。 */
+export function completeContainerStages(stages: readonly ProfileTestStage[]): ProfileTestStage[] {
+  return stages.map((stage) => (CONTAINER_KINDS.has(stage.kind) && stage.state === 'pending' ? { ...stage, state: 'succeeded' as const } : stage));
 }
 
 export function isTestTerminal(state: ProfileTestState): boolean {

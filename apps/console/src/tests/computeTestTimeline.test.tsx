@@ -38,12 +38,32 @@ describe('测试时间线（RFC-006 §8）', () => {
     const view = await renderPanel(profileTest({ state: 'failed', outcome: 'before-start-failed', stages: failedStep }), (stepId) => located.push(stepId));
     try {
       const text = view.text();
-      for (const part of ['启动前步骤失败：定位到失败的步骤修改后再保存。', '镜像', 'Runner', '启动前步骤', 'CLI 启动', '模型轮次', 'file_path_in_use', '目标文件已存在且内容不同', '退出码 1', 'refusing to overwrite settings.json', '未执行', '1200 ms']) expect(text).toContain(part);
+      // 之前的测试记录（镜像 → Runner 握手 → … → 启动 CLI）照原名称显示（RFC-022 D8）。
+      for (const part of ['启动前步骤失败：定位到失败的步骤修改后再保存。', '拉取镜像', 'Runner 握手', 'Claude settings.json', '启动 CLI', '模型轮次', 'file_path_in_use', '目标文件已存在且内容不同', '退出码 1', 'refusing to overwrite settings.json', '已跳过', '1.2 秒']) expect(text).toContain(part);
+      expect([...view.host.querySelectorAll('li')].map((li) => li.getAttribute('data-state'))).toEqual(['succeeded', 'succeeded', 'failed', 'skipped', 'skipped']);
       for (const part of [testIdOf(1), TASK_ID, 'registry.cs.local/runtimes/claude:2.1', DIGEST, 'shell 5.2', '2.1.4']) expect(text).toContain(part);
       expect(view.host.querySelector('details > summary')?.textContent).toBe('查看测试环境与版本');
       expect(text).toContain('针对修订 1（c0ffee00c0ff）· 保存后自动测试');
       await view.click('定位到步骤');
       expect(located).toEqual(['01a0bf5d-8f4b-7e58-8d8a-6b38a70679a1']);
+    } finally { view.unmount(); }
+  });
+
+  test('RFC-022：前三段与公共启动进度同名（排队分配容器、容器启动中、等待连接），「启动 CLI」改为「Agent 启动中」；进行中的段带细节', async () => {
+    const stages = [
+      { id: 'queue', kind: 'queue', name: '排队分配容器', state: 'succeeded', durationMs: 300 },
+      { id: 'container', kind: 'container', name: '容器启动中（调度、拉取镜像）', state: 'succeeded', durationMs: 4200, detail: '已调度到节点 n1 · 镜像已拉取（用时 3.1s） · 创建容器' },
+      { id: 'connect', kind: 'connect', name: '容器已启动，等待连接', state: 'succeeded', durationMs: 600, detail: 'Runner 协议 3' },
+      { id: 'agent', kind: 'agent', name: 'Agent 启动中', state: 'running' },
+      { id: 'model', kind: 'model', name: '真实模型轮次', state: 'pending' },
+    ];
+    const view = await renderPanel(profileTest({ state: 'running', outcome: undefined, stages }));
+    try {
+      const rows = [...view.host.querySelectorAll('li')];
+      expect(rows.map((li) => li.getAttribute('data-state'))).toEqual(['succeeded', 'succeeded', 'succeeded', 'running', 'pending']);
+      expect(rows.map((li) => li.querySelector('span:nth-child(2)')!.firstChild!.textContent)).toEqual(['排队分配容器', '容器启动中（调度、拉取镜像）', '容器已启动，等待连接', 'Agent 启动中', '真实模型轮次']);
+      expect(rows[1]!.textContent).toContain('已调度到节点 n1 · 镜像已拉取（用时 3.1s）');
+      expect(rows[2]!.textContent).toContain('Runner 协议 3');
     } finally { view.unmount(); }
   });
 
@@ -58,7 +78,7 @@ describe('测试时间线（RFC-006 §8）', () => {
     } finally { superseded.unmount(); }
     const running = await renderPanel(profileTest({ state: 'running', outcome: undefined, trigger: 'manual', stages: [{ id: 'image', kind: 'image', name: '拉取镜像', state: 'running' }] }));
     try {
-      expect(running.text()).toContain('测试中'); expect(running.text()).toContain('手动测试'); expect(running.text()).toContain('执行中');
+      expect(running.text()).toContain('测试中'); expect(running.text()).toContain('手动测试'); expect(running.text()).toContain('（进行中）');
       expect(running.button('重新测试').disabled).toBe(true);
       expect(running.text()).not.toContain('通过：');
     } finally { running.unmount(); }

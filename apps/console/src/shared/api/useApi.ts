@@ -13,9 +13,11 @@ export { isApiClientError };
  * 由它判断旧键是否仍可用；可用就先留住上一份数据，等新回执到达再原地替换。没有它，新键会先给出
  * 「载入中」，内容整块卸载后滚动容器塌掉，滚动位置回到顶部（2026-09-21 实机）。
  */
-export function useApiQuery<T>(key: QueryKey, fetcher: () => Promise<T>, options: { enabled?: boolean; refetchIntervalMs?: number; staleTimeMs?: number; refetchOnWindowFocus?: boolean; keepPrevious?: (previousKey: QueryKey) => boolean } = {}): UseQueryResult<T, ApiClientError> {
-  const { keepPrevious } = options;
-  return useQuery<T, ApiClientError>({ queryKey: key, queryFn: fetcher, enabled: options.enabled ?? true, refetchInterval: options.refetchIntervalMs ?? false, refetchIntervalInBackground: false,
+/** refetchIntervalMs 也可以按最近一次的数据决定（例如有对象在启动时每秒一次，RFC-022）。 */
+export function useApiQuery<T>(key: QueryKey, fetcher: () => Promise<T>, options: { enabled?: boolean; refetchIntervalMs?: number | ((data: T | undefined) => number | undefined); staleTimeMs?: number; refetchOnWindowFocus?: boolean; keepPrevious?: (previousKey: QueryKey) => boolean } = {}): UseQueryResult<T, ApiClientError> {
+  const { keepPrevious, refetchIntervalMs } = options;
+  const refetchInterval = typeof refetchIntervalMs === 'function' ? (query: { state: { data: T | undefined } }) => refetchIntervalMs(query.state.data) ?? false : refetchIntervalMs ?? false;
+  return useQuery<T, ApiClientError>({ queryKey: key, queryFn: fetcher, enabled: options.enabled ?? true, refetchInterval, refetchIntervalInBackground: false,
     ...(options.staleTimeMs === undefined ? {} : { staleTime: options.staleTimeMs }),
     ...(options.refetchOnWindowFocus === undefined ? {} : { refetchOnWindowFocus: options.refetchOnWindowFocus }),
     // 断言：库把 placeholderData 的数据类型收成 NonFunctionGuard<T>，泛型读取在此处无法自证，值本身仍是上一次的回执。

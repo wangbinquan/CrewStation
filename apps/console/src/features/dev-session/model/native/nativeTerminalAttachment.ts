@@ -54,6 +54,9 @@ export class NativeTerminalAttachment {
   /** 自己这次取得时 Runner 给的序号；之后出现更大的序号就是换了人、释放或到期。 */
   private ownRevision?: number;
   private active = false;
+  /** CLI 进程是否已拉起（RFC-022）：拉起前 Runner 只接受「取得」，输入与改尺寸都会被拒，先不发；尺寸记下来拉起后补一次。 */
+  private processRunning = true;
+  private pendingSize?: { cols: number; rows: number };
   private renewTimer?: ReturnType<typeof setInterval>;
   private releaseTimer?: ReturnType<typeof setTimeout>;
   private readonly now: () => number;
@@ -93,16 +96,19 @@ export class NativeTerminalAttachment {
       .finally(() => { if (this.current(generation)) this.refreshPromise = undefined; });
     return this.refreshPromise;
   };
-  /** 操作终端（点击、聚焦、按键）时调用：没有控制就去取；已持有则顺带续约。并发与连击只发一次。 */
-  readonly ensureControl = (): Promise<boolean> => {
+  /**
+   * 操作终端（点击、聚焦、按键）时调用：没有控制就去取；已持有则顺带续约。并发与连击只发一次。
+   * quiet：创建者窗口的自动取得（RFC-022 D1）——旧 Runner 在 CLI 启动中会拒绝，不当作错误显示，拉起后再取。
+   */
+  readonly ensureControl = (options: { readonly quiet?: boolean } = {}): Promise<boolean> => {
     if (this.disposed || !this.connected || this.state.phase !== 'ready') return Promise.resolve(false);
     if (this.claimPromise) return this.claimPromise;
     // 节流只对「已持有（顺带续约）」与「刚被拒」生效；刚失去控制要马上能重新取得。
     if (this.now() - this.lastClaimAt < CLAIM_THROTTLE_MS && (this.state.controlled || this.state.refused)) return Promise.resolve(this.state.controlled);
-    this.claimPromise = this.claim().finally(() => { this.claimPromise = undefined; });
+    this.claimPromise = this.claim(options).finally(() => { this.claimPromise = undefined; });
     return this.claimPromise;
   };
-  readonly claim = async (): Promise<boolean> => {
+  readonly claim = async (options: { readonly quiet?: boolean } = {}): Promise<boolean> => {
     if (this.disposed || !this.connected || this.state.phase !== 'ready') return false;
     const generation = this.generation;
     this.lastClaimAt = this.now();
@@ -116,16 +122,24 @@ export class NativeTerminalAttachment {
       this.patch({ controlled, refused: !result.controlled, error: undefined, ...(control ? { control } : {}) });
       this.syncRenewal();
       return controlled;
-    } catch (error) { if (this.current(generation)) { this.loseControl(); this.patch({ error: streamErrorMessage(error) }); } return false; }
+    } catch (error) { if (this.current(generation)) { this.loseControl(); if (!options.quiet) this.patch({ error: streamErrorMessage(error) }); } return false; }
   };
   /** 终端是否处于活动状态（有焦点且页面在前台）；只有活动时才续约，离开满 `CONTROL_RELEASE_MS` 主动释放。 */
   setActive(active: boolean): void { this.active = active; this.syncRenewal(); }
+  /** RFC-022：CLI 进程拉起之前不发输入与改尺寸；拉起时持有控制就把记下的尺寸补发一次，让 CLI 按这个窗口的大小画第一屏。 */
+  setProcessRunning(running: boolean): void {
+    const started = running && !this.processRunning;
+    this.processRunning = running;
+    if (started && this.pendingSize) { const { cols, rows } = this.pendingSize; this.pendingSize = undefined; this.resize(cols, rows); }
+  }
   input(data: string): void {
+    if (!this.processRunning) return;
     if (!this.canInput()) { void this.ensureControl(); return; }
     // 不保留、排队或自动重发终端输入；网络回执丢失时原生 CLI 的实际屏幕是结果。
     this.command({ type: 'terminalInput', terminalId: this.terminalId, data });
   }
   resize(cols: number, rows: number): void {
+    if (!this.processRunning) { this.pendingSize = { cols, rows }; return; }
     if (this.canInput()) this.command({ type: 'terminalResize', terminalId: this.terminalId, cols: Math.max(10, Math.min(300, cols)), rows: Math.max(2, Math.min(120, rows)) });
   }
   dispose(): void {

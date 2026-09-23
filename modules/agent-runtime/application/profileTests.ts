@@ -1,7 +1,7 @@
 import type { Actor, ProfileTestDto, ProfileTestId, StartProfileTestRequest } from '@crewstation/contracts';
 import { conflict, notFound } from '@crewstation/kernel';
 import type { ProfileTest } from '../domain/profileTest';
-import { TEST_STAGE, isTestTerminal, mergeStages, skipUnreachedStages, testPrompt } from '../domain/profileTest';
+import { completeContainerStages, isTestTerminal, mergeStages, skipUnreachedStages, testPrompt } from '../domain/profileTest';
 import type { AgentRuntimeUseCaseDeps } from './dependencies';
 import { profileQueries } from './profileQueries';
 import { queuedTest } from './profileWrites';
@@ -83,7 +83,7 @@ async function runQueuedTest(deps: AgentRuntimeUseCaseDeps, testId: ProfileTestI
       stages: mergeStages(test.stages, test.stages.filter((s) => s.state === 'running').map((s) => ({ ...s, state: 'failed' as const }))) };
   }
   if (!isTestTerminal(test.state)) test = { ...test, state: 'unknown', outcome: 'environment-lost' };
-  if (test.state === 'passed') test = { ...test, outcome: 'passed', stages: test.stages.map((s) => (s.id === TEST_STAGE.image && s.state === 'pending' ? { ...s, state: 'succeeded' } : s)) };
+  if (test.state === 'passed') test = { ...test, outcome: 'passed', stages: completeContainerStages(test.stages) };
   else test = { ...test, stages: skipUnreachedStages(test.stages) };
   await save();
 }

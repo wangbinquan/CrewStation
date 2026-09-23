@@ -30,6 +30,29 @@ async function ready(f: Fixture, extra: Partial<TerminalSnapshot> = {}): Promise
 const zhang = { userId: 'user-zhang', name: '张三' }, li = { userId: 'user-li', name: '李四' };
 const claimTypes = (f: Fixture) => f.calls.filter((c) => c.type === 'claimTerminalControl').length;
 
+describe('RFC-022：CLI 进程拉起之前', () => {
+  test('启动中可以取得，但输入与改尺寸都不发；拉起时把记下的最后一次尺寸补发一次', async () => {
+    const f = fixture(); await ready(f);
+    f.attachment.setProcessRunning(false);
+    expect(await f.attachment.ensureControl({ quiet: true })).toBe(true);
+    f.attachment.input('typed too early'); f.attachment.resize(100, 30); f.attachment.resize(132, 40);
+    expect(f.calls.map((c) => c.type)).toEqual(['attachTerminal', 'claimTerminalControl']);
+    f.attachment.setProcessRunning(true);
+    expect(f.calls.at(-1)).toMatchObject({ type: 'terminalResize', cols: 132, rows: 40 });
+    f.attachment.setProcessRunning(true);
+    expect(f.calls.filter((c) => c.type === 'terminalResize')).toHaveLength(1);
+  });
+
+  test('静默取得被拒（旧 Runner 在启动中不接受）不显示错误；普通取得被拒照常显示', async () => {
+    const f = fixture(); await ready(f);
+    f.control.result = async () => { throw new StreamCommandError('precondition', 'CLI 进程尚未运行或已经结束'); };
+    expect(await f.attachment.ensureControl({ quiet: true })).toBe(false);
+    expect(f.attachment.getState().error).toBeUndefined();
+    expect(await f.attachment.claim()).toBe(false);
+    expect(f.attachment.getState().error).toBe('CLI 进程尚未运行或已经结束');
+  });
+});
+
 describe('原生终端附着', () => {
   test('快照期间缓冲；重叠事件去重，后续输出与尺寸保持顺序；卸载只 detach', async () => {
     const f = fixture(); f.attachment.connect();

@@ -1,15 +1,36 @@
-import type { AgentEvent, BeforeStartExecution, BeforeStartStepRecord, ProbeTerminalResult, ProfileTestOutcome, ProfileTestStage, ProfileTestStageState } from '@crewstation/contracts';
+import type { AgentEvent, BeforeStartExecution, BeforeStartStepRecord, ProbeTerminalResult, ProfileTestOutcome, ProfileTestStage, ProfileTestStageState, StartupRecord } from '@crewstation/contracts';
 import { maskDiagnosticsText, outputTail } from './diagnosticsText';
 import { classifyProtocolFailure } from './profileTestClassifier';
 
-/** 与 agent-runtime 的阶段编号约定一致：image / runner / step:<stepId> / launch / model / command。 */
-export const TEST_STAGE = { image: 'image', runner: 'runner', launch: 'launch', model: 'model', command: 'command' } as const;
+/**
+ * 与 agent-runtime 的阶段编号约定一致（RFC-022 起）：queue / container / connect（公共的前三段）/ step:<stepId> / agent / model / command。
+ * 之前的记录是 image / runner / launch，只读显示。
+ */
+export const TEST_STAGE = { agent: 'agent', model: 'model', command: 'command' } as const;
 export const stepStageId = (stepId: string): string => `step:${stepId}`;
 
 const STEP_STATE: Record<BeforeStartStepRecord['state'], ProfileTestStageState> = { pending: 'pending', running: 'running', succeeded: 'succeeded', failed: 'failed', skipped: 'skipped', cancelled: 'skipped' };
 
-export const imageStage = (state: ProfileTestStageState, patch: Partial<ProfileTestStage> = {}): ProfileTestStage => ({ id: TEST_STAGE.image, kind: 'image', name: '拉取镜像', state, ...patch });
-export const runnerStage = (state: ProfileTestStageState, patch: Partial<ProfileTestStage> = {}): ProfileTestStage => ({ id: TEST_STAGE.runner, kind: 'runner', name: 'Runner 握手', state, ...patch });
+type ContainerKind = 'queue' | 'container' | 'connect';
+const CONTAINER_STAGE: Record<ContainerKind, string> = { queue: '排队分配容器', container: '容器启动中（调度、拉取镜像）', connect: '容器已启动，等待连接' };
+const isContainerKind = (kind: string): kind is ContainerKind => kind in CONTAINER_STAGE;
+
+/**
+ * RFC-022 D8：测试的前三段直接取测试环境自己的启动进度（与 CLI、开发会话同一套，由启动观测维护）。
+ * 给出 failure 时，把进行中（没有就是第一个未开始）的那段记为失败，写明归类与原因；测试自己的判定规则不变。
+ */
+export function containerStagesForTest(startup: StartupRecord | undefined, failure?: { code: string; message: string }, detail?: { connect?: string }): ProfileTestStage[] {
+  const stages = (startup?.stages ?? [{ kind: 'queue' as const, state: 'running' as const }, { kind: 'container' as const, state: 'pending' as const }, { kind: 'connect' as const, state: 'pending' as const }])
+    .filter((stage) => isContainerKind(stage.kind));
+  const current = stages.findIndex((stage) => stage.state === 'running' || stage.state === 'failed');
+  const failAt = !failure ? -1 : current >= 0 ? current : stages.findIndex((stage) => stage.state === 'pending');
+  return stages.map((stage, index): ProfileTestStage => {
+    const { error, logTail: _log, kind, ...rest } = stage, name = CONTAINER_STAGE[kind as ContainerKind];
+    const base: ProfileTestStage = { ...rest, id: kind, kind, name, ...(kind === 'connect' && detail?.connect && stage.state === 'succeeded' ? { detail: detail.connect } : {}) };
+    if (index === failAt && failure) return { ...base, state: 'failed', error: { code: failure.code, message: failure.message } };
+    return error ? { ...base, error: { code: error.code, message: error.message } } : base;
+  });
+}
 
 /** 每个启动前步骤记录 → 一个测试阶段；路径、退出码与输出变量名进 detail，脚本输出尾部只在测试里保留。 */
 export function stagesFromBeforeStart(execution: BeforeStartExecution): ProfileTestStage[] {
@@ -66,7 +87,7 @@ function rawLineOf(raw: unknown): string | undefined {
 const LAUNCH_FAILURES = new Set(['driver_not_installed', 'spawn_failed', 'driver_setup_failed', 'cli_config_invalid']);
 
 export function launchStage(probe: ProtocolProbe, beforeStartDone: boolean): ProfileTestStage {
-  const base = { id: TEST_STAGE.launch, kind: 'launch' as const, name: '启动 CLI' };
+  const base = { id: TEST_STAGE.agent, kind: 'agent' as const, name: 'Agent 启动中' };
   if (probe.outcome?.kind === 'error' && probe.outcome.code && LAUNCH_FAILURES.has(probe.outcome.code)) {
     return { ...base, state: 'failed', endedAt: probe.outcome.at, error: { code: probe.outcome.code, message: probe.outcome.message ?? '' } };
   }
