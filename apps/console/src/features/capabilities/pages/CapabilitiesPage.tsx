@@ -2,13 +2,12 @@ import type { CapabilityDescriptionDto } from '@crewstation/contracts';
 import type { ResourceSection } from '../../../shared/project/resourceSearch';
 import type { ReactElement } from 'react';
 import { useProjectScope } from '../../../shared/project/ProjectScope';
-import { errorMessage } from '../../../shared/api/useApi';
+import { errorMessage, retryableReadError } from '../../../shared/api/useApi';
 import { useCapabilityDescription } from '../model/useCapabilityDescription';
 import { formatDateTime } from '../../../shared/lib/dateFormat';
 import { useI18n } from '../../../shared/lib/useI18n';
 import { useT } from '../../../shared/lib/useT';
 import { Badge } from '../../../shared/ui/Badge';
-import { Button } from '../../../shared/ui/Button';
 import { EmptyState } from '../../../shared/ui/EmptyState';
 import { PageHeader } from '../../../shared/ui/PageHeader';
 import { CapabilityConfigKeys } from '../components/CapabilityConfigKeys';
@@ -36,7 +35,8 @@ export function CapabilitiesPage({ embedded = false, section }: { readonly embed
         }
       /> : null}
       {description.isPending ? <p className={styles.muted}>{t('capabilities.loading')}</p> : null}
-      {description.error ? <><EmptyState title={t('capabilities.error', { message: errorMessage(description.error) })} /><Button onClick={() => { void description.refetch(); }}>{t('capabilities.retry')}</Button></> : null}
+      {/* 读取失败不给重试按钮：网络中断、5xx 与返回不完整由 useApiQuery 每 15 秒自动重读（2026-09-23 裁定）。 */}
+      {description.error ? <EmptyState title={t('capabilities.error', { message: errorMessage(description.error) })} description={retryableReadError(description.error) ? t('ui.status.autoRetry') : undefined} /> : null}
       {description.data !== undefined ? <CapabilitySections description={description.data} section={section} /> : null}
     </>
   );

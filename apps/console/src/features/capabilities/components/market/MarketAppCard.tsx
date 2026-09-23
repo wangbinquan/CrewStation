@@ -32,7 +32,7 @@ export function MarketAppCard({ app }: { readonly app: MarketAppDto }) {
       {maintenance ? <p className={styles.note}>{t('market.maintenance.reason', { reason: maintenance.reason })}{maintenance.expectedEndAt ? ` · ${t('market.maintenance.until', { time: date(maintenance.expectedEndAt) })}` : ''}</p> : null}
       {beta ? <p className={styles.note}>{t('market.sharedData')}</p> : null}
       <div className={styles.entry}>{href
-        ? <span className={styles.open}>{t(beta ? 'market.try' : 'market.open')} <span aria-hidden="true">↗</span></span>
+        ? <span className={styles.open}>{t(beta ? 'market.try' : 'market.open')}</span>
         : maintenance?.blocked ? <Badge tone="warning">{t('market.maintenance.blocked')}</Badge>
         : <Badge tone={status === 'unknown' ? 'warning' : 'neutral'}>{t(`market.entry.${status}`)}</Badge>}
       </div>

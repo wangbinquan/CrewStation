@@ -110,7 +110,8 @@ test('旧接入项目读取失败再恢复，不会把待识别地址保存成�
   const f = fixture({ projectFailure: true }); page = await renderApp('/projects?q=keep-on-error');
   await page.navigate(`/projects/${projectId}/settings?tab=repository`);
   expect(page.text()).toContain('项目目录读取失败');
-  f.state.projectFailure = false; await page.click('重新读取项目');
+  // 没有「重新读取项目」按钮（2026-09-23 裁定）：读取失败自动重读，reread 模拟一次。
+  f.state.projectFailure = false; await page.reread();
   expect(page.path()).toBe(`/admin/integrations/${projectId}/settings`);
   await page.click('项目开发');
   expect(page.path()).toBe('/projects'); expect(page.search().q).toBe('keep-on-error');
@@ -133,10 +134,10 @@ describe('管理详情保持守卫的加载、失败与拒绝语义', () => {
     expect(failed.calls.some((url) => url.includes('/v1/projects/'))).toBe(false);
   });
 
-  test('项目读取失败不跳错空间，显式重试可接回正确页面', async () => {
+  test('项目读取失败不跳错空间，自动重读后接回正确页面', async () => {
     const f = fixture({ projectFailure: true }); page = await renderApp(`/projects/${projectId}/settings?tab=repository`);
     expect(page.path()).toBe(`/projects/${projectId}/settings`); expect(page.text()).toContain('项目目录读取失败');
-    f.state.projectFailure = false; await page.click('重新读取项目');
+    expect(page.text()).not.toContain('重新读取项目'); f.state.projectFailure = false; await page.reread();
     expect(page.path()).toBe(`/admin/integrations/${projectId}/settings`); expect(page.search().tab).toBe('info');
   });
 

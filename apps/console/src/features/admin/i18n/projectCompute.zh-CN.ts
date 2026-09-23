@@ -20,7 +20,7 @@ export const projectComputeMessages = {
   'admin.projectCompute.saved': '项目算力授权已保存。',
   'admin.projectCompute.discardAction': '放弃 Agent 配置修改',
   'admin.projectCompute.discard': '放弃当前修改，重新读取项目授权？',
-  'admin.projectCompute.identityChanged': '管理员身份已变化，请重新读取后操作。',
+  'admin.projectCompute.identityChanged': '管理员身份已变化，本次没有保存；页面会按当前身份自动重新读取，之后再操作。',
   'admin.projectCompute.invalidDefault': '请选择允许范围内支持业务 Agent 的档位。',
   'admin.projectCompute.missingProfile': '档位已不存在，请取消勾选后重新分配。',
   'admin.projectCompute.missingTask': '套餐已不存在，请重新选择。',

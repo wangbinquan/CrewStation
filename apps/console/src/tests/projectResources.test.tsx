@@ -94,7 +94,8 @@ test('旧链接里「平台接入」的 MCP 与业务任务小节落到它们现
 
 test('参考面板主题切换使用同一参数与权限路径，错误留在当前主题可重试', async () => {
   const f = projectResourcesFixture(); f.state.fail = 'capabilities'; page = await renderApp(`/projects/${id}/resources?section=guide&topic=environment`);
-  expect(page.text()).toContain('本主题暂不可用'); f.state.fail = ''; await page.click('重新读取资源'); expect(page.text()).toContain('CS_API_BASE');
+  expect(page.text()).toContain('本主题暂不可用'); expect(page.text()).not.toContain('重新读取资源');
+  f.state.fail = ''; await page.reread(); expect(page.text()).toContain('CS_API_BASE');
   await chooseTopic('接收事件');
   // 换主题只留主题本身：上一主题的小节与定位参数不带过去。
   expect(page.search()).toEqual({ view: 'reference', panel: 'full', topic: 'events' }); expect(page.text()).toContain('source.changed');

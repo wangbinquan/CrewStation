@@ -26,7 +26,7 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   'projects.summary.fixHealth': 'Review replica or restart issues',
   'projects.summary.countUnknown': 'Current page count is unconfirmed',
   'projects.summary.filterHint': 'Name or slug: up to 120 characters. Choose an owner on the current page or yourself. Validation and production versions share production data.',
-  "projects.summary.invalid": "The project summary response could not be verified. Reload to try again.",
+  "projects.summary.invalid": "The project summary response could not be verified.",
   "projects.summary.listHint": "Your digital worker projects. Provisioning, development, deployment and health are separate; status refreshes every 30 seconds.",
   "projects.summary.search": "Search name or slug",
   "projects.summary.projectState": "Provisioning state",
@@ -380,7 +380,7 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   'projects.summary.topology.attention': '{count} need attention',
   'projects.summary.topology.hint': 'Each card summarises one band; click to open the full topology under Operations.',
   'projects.summary.topology.empty': 'No managed resources yet; they appear here after a release or a development session.',
-  'projects.summary.topology.invalidResponse': 'The topology inventory response is incomplete; refresh and try again.',
+  'projects.summary.topology.invalidResponse': 'The topology inventory response is incomplete.',
   // Overview on one screen (RFC-020 D4): header links, three status cards, banners and recent activity.
   'projects.summary.repository': 'Repository',
   'projects.summary.projectInfo': 'Project info',

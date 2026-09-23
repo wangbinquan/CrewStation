@@ -10,10 +10,8 @@ import { PROJECT_PATHS, projectPageFromPath } from '../../shared/project/project
 import { useProjectIdentity } from '../../shared/project/useProjectIdentity';
 import { EmptyState } from '../../shared/ui/EmptyState';
 import { QueryStatus } from '../../shared/ui/QueryStatus';
-import { Button } from '../../shared/ui/Button';
 import { TesterProjectPage } from '../../features/projects/pages/TesterProjectPage';
 import { ButtonLink } from '../../shared/ui/navigation/ButtonLink';
-import { ActionRow } from '../../shared/ui/ActionRow';
 
 /** 只在对象种类与身份都明确后接续空间，避免子页面先挂载和附着会话。 */
 export function ProjectSpaceBoundary({ children }: { readonly children: ReactNode }) {
@@ -36,10 +34,10 @@ export function ProjectSpaceBoundary({ children }: { readonly children: ReactNod
   let notice: ReactNode;
   if (pending) notice = <QueryStatus isPending error={null} />;
   else if (denied) notice = <EmptyState title={t('admin.denied.title')} description={t('admin.denied.description')} action={<ButtonLink to="/">{t('admin.denied.back')}</ButtonLink>} />;
-  else if (missing) notice = <EmptyState title={t('projectContext.missingTitle')} description={t('projectContext.missingDescription', { projectId })} action={<ActionRow>
-    {space === 'admin' ? <ButtonLink to="/admin/projects">{t('nav.admin.backToProjects')}</ButtonLink> : <ButtonLink to="/projects">{t('projectContext.backToProjects')}</ButtonLink>}
-    <Button variant="ghost" onClick={() => void project.refetch()}>{t('projectContext.retry')}</Button></ActionRow>} />;
-  else if (failed) notice = <><QueryStatus isPending={false} error={project.error ?? me.error} /><Button onClick={() => { void project.refetch(); if (me.error) void me.refetch(); }}>{t('projectContext.retry')}</Button></>;
+  // 没有「重新读取项目」按钮（2026-09-23 裁定）：读不到项目时每 30 秒自己再读（useProjectIdentity），网络与 5xx 失败按 15 秒重读。
+  else if (missing) notice = <EmptyState title={t('projectContext.missingTitle')} description={t('projectContext.missingDescription', { projectId })}
+    action={space === 'admin' ? <ButtonLink to="/admin/projects">{t('nav.admin.backToProjects')}</ButtonLink> : <ButtonLink to="/projects">{t('projectContext.backToProjects')}</ButtonLink>} />;
+  else if (failed) notice = <QueryStatus isPending={false} error={project.error ?? me.error} />;
   else notice = <><QueryStatus isPending={false} error={project.error} />{project.previewOnly ? <TesterProjectPage /> : null}</>;
   // 只保留曾经打开的页面，避免身份刷新清掉草稿；首次以测试者进入不挂载内部页面。
   return <>{notice}<div hidden={!visible} style={visible ? { display: 'contents' } : undefined}>{visible || visited ? children : null}</div></>;

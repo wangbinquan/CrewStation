@@ -20,7 +20,7 @@ export const messages = {
   'projects.summary.fixHealth': '查看副本不足或重启问题',
   'projects.summary.countUnknown': '本页数量尚未确认',
   'projects.summary.filterHint': '名称或标识最多 120 字；负责人可选当前页中的人或自己。待验证版本和正式版本使用同一份生产数据。',
-  "projects.summary.invalid": "项目摘要格式无法确认，请重新读取。",
+  "projects.summary.invalid": "项目摘要格式无法确认。",
   "projects.summary.listHint": "查看你参与的数字人项目。开通、开发、部署与健康分别显示，状态每 30 秒更新。",
   "projects.summary.search": "搜索名称或标识",
   "projects.summary.projectState": "开通状态",
@@ -378,7 +378,7 @@ export const messages = {
   'projects.summary.topology.attention': '{count} 个需要关注',
   'projects.summary.topology.hint': '每张卡汇总一条横带；点击进入运行与诊断查看完整形态。',
   'projects.summary.topology.empty': '还没有受管资源；发布或开启开发会话后会出现在这里。',
-  'projects.summary.topology.invalidResponse': '形态盘点返回不完整，请刷新后重试。',
+  'projects.summary.topology.invalidResponse': '形态盘点返回不完整。',
   // 概览一屏（RFC-020 D4）：页头链接行、三张状态卡、横幅与最近动态。
   'projects.summary.repository': '仓库',
   'projects.summary.projectInfo': '项目信息',

@@ -40,7 +40,7 @@ test('试用读取失败与未就绪不保留旧链接，刷新恢复可用，�
   f.state.failed = true; await refresh(); expect(page.text()).toContain('应用读取失败');
   expect(document.querySelector('a[href="http://preview.demo.test"]')).toBeNull();
   f.state.failed = false; f.state.app.entry = { kind: 'trial', status: 'unavailable' };
-  await page.click('重新查询'); expect(document.querySelector('a[href="http://preview.demo.test"]')).toBeNull();
+  await refresh(); expect(document.querySelector('a[href="http://preview.demo.test"]')).toBeNull();
   f.state.app = trialMarketFixture(projectId); await refresh();
   expect(document.querySelector('a[href="http://preview.demo.test"]')).not.toBeNull();
   f.state.app.entry = { kind: 'production', status: 'unknown' };

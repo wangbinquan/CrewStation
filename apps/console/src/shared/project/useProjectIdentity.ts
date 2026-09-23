@@ -3,6 +3,13 @@ import { queryKeys } from '../api/queryKeys';
 import { useApiQuery } from '../api/useApi';
 import { ProjectSummaryDetailSchema } from '@crewstation/contracts';
 
+/**
+ * 读不到项目（403／404 表示不存在或不是成员）时每 30 秒再读一次：刚被加入成员的人不用手动重读就能进入。
+ * 页面上没有「重新读取项目」按钮（2026-09-23 裁定：页面自动局部刷新）；读到之后不再例行重读。
+ * 网络中断与 5xx 另按 useApiQuery 的失败重读（15 秒）。
+ */
+export const projectIdentityRereadMs = (data: unknown): number | undefined => data === undefined ? 30_000 : undefined;
+
 /** 只用于项目页面的可读名称；市场上下文不读取项目内部数据。 */
 export function useProjectIdentity(projectId: string | undefined) {
   const me = useApiQuery(queryKeys.me(), () => api.me.get());
@@ -13,7 +20,7 @@ export function useProjectIdentity(projectId: string | undefined) {
     if (summary.project.id !== projectId) throw new Error('项目回执不匹配');
     return summary.project;
   // 路由切换可能先挂载对象边界，再完成市场重定向；试用成员也不能在这一帧读取项目摘要。
-  }, { enabled: Boolean(projectId) && me.isSuccess && !me.error && (me.data?.platformRole === 'admin' || me.data?.platformRole === 'developer' && !previewOnly) });
+  }, { enabled: Boolean(projectId) && me.isSuccess && !me.error && (me.data?.platformRole === 'admin' || me.data?.platformRole === 'developer' && !previewOnly), refetchIntervalMs: projectIdentityRereadMs });
   return { ...query, previewOnly, error: query.error ?? (!query.data ? me.error : null),
     isPending: !me.error && (me.isPending || query.isPending),
     refetch: async () => { const result = await me.refetch(); if (!result.error) await query.refetch(); } };

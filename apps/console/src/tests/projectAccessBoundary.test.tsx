@@ -2,6 +2,7 @@ import './domSetup';
 import { afterEach, describe, expect, test } from 'bun:test';
 import type { RenderedApp } from './renderApp';
 import { renderApp } from './renderApp';
+import { projectIdentityRereadMs } from '../shared/project/useProjectIdentity';
 
 interface Handler {
   readonly match: string;
@@ -40,21 +41,27 @@ describe('非成员打开项目地址（RFC-003 §3 无权限）', () => {
     expect(app.text()).not.toContain('读取失败');
     expect(app.html()).not.toContain(`href="/projects/${projectId}/release"`);
     expect(app.html()).not.toContain(`href="/projects/${projectId}/settings"`);
-    expect(app.text()).toContain('重新读取项目');
+    // 没有「重新读取项目」按钮（2026-09-23 裁定）：读不到项目时每 30 秒自己再读一次，刚被加入成员不必手动重读。
+    expect(app.text()).not.toContain('重新读取项目');
     expect(app.html()).toContain('href="/projects"');
     await app.click('返回数字人项目');
     expect(app.path()).toBe('/projects');
   });
 
-  test('服务端 503：仍是可重试的读取失败，入口保留', async () => {
+  test('服务端 503：读取失败会自动重读，入口保留', async () => {
     handlers = [
       { match: '/v1/me', body: MEMBER },
       { match: `/v1/projects/${projectId}`, exactPath: true, status: 503, body: { error: 'internal', message: '项目服务不可用' } },
     ];
     app = await renderApp(`/projects/${projectId}`);
     expect(app.text()).toContain('项目服务不可用');
-    expect(app.text()).toContain('重新读取项目');
+    expect(app.text()).toContain('稍后会自动重新读取'); expect(app.text()).not.toContain('重新读取项目');
     expect(app.text()).not.toContain('找不到该项目');
     expect(app.html()).toContain(`href="/projects/${projectId}/release"`);
   });
+});
+
+test('读不到项目时每 30 秒自己再读；读到之后不再例行重读', () => {
+  expect(projectIdentityRereadMs(undefined)).toBe(30_000);
+  expect(projectIdentityRereadMs({ id: projectId })).toBeUndefined();
 });

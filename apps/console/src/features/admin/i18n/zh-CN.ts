@@ -38,7 +38,7 @@ export const messages = {
   "admin.directory.lifecycle": "生命周期",
   "admin.directory.details": "更多资料",
   "admin.directory.hint": "每页最多 20 个项目；负责人选项来自当前页，也可选择自己。开通状态不代表运行健康。",
-  "admin.directory.invalid": "管理项目目录或当前管理身份未确认，请重新读取。",
+  "admin.directory.invalid": "管理项目目录或当前管理身份未确认。",
   "admin.directory.empty": "此范围没有项目",
   "admin.directory.emptyHint": "可清除筛选，或通过上方入口创建项目。",
   "admin.directory.lastRead": "显示上次读取的项目，管理操作暂不可用；页面会自动重新读取，成功后继续。",
@@ -57,7 +57,7 @@ export const messages = {
   "admin.todo.lastRead": "这是上次读取的待办；页面会自动重新读取。",
   "admin.todo.openRequests": "查看待审批列表",
   "admin.todo.openProjects": "查看开通失败项目",
-  "admin.todo.invalid": "待办来源返回无效记录，请重新读取。",
+  "admin.todo.invalid": "待办来源返回无效记录。",
 
   'admin.capabilities.hint': '维护接入容器、接口开放策略与事件来源。开发者在项目资源中使用和申请能力。',
   'admin.capabilities.integrations': '接入容器',
@@ -73,7 +73,6 @@ export const messages = {
   'admin.requests.projectContext': '当前项目',
   'admin.requests.filterProject': '查看此项目申请',
   'admin.requests.clearProject': '查看所有项目',
-  'admin.requests.retry': '重新读取申请',
   'admin.requests.lastRecords': '显示上次读取的申请，意见草稿已保留；页面会自动重新读取，成功后再审批。',
   'admin.title': '管理员',
   'admin.line1': '管理员创建项目并指定项目负责人，接入公司系统（APIProxy／EventProducer 接入容器），维护开放策略并审批定向开放申请。',
@@ -190,8 +189,8 @@ export const messages = {
   'admin.resource.replace': '放弃输入并载入',
   'admin.resource.saved': '已保存{kind} {name}。',
   'admin.resource.pendingNote': '正在处理套餐。离开不会撤销已经发送的保存请求；返回后请读取实际目录。',
-  'admin.resource.invalidRead': '套餐目录格式无法确认，请重新读取；当前输入会保留。',
-  'admin.resource.invalidWrite': '保存回执无法与本次输入对应，结果尚未确认。请重新读取目录核对，输入已保留。',
+  'admin.resource.invalidRead': '套餐目录格式无法确认；当前输入会保留。',
+  'admin.resource.invalidWrite': '保存回执无法与本次输入对应，结果尚未确认；目录会自动重新读取，核对后再保存，输入已保留。',
 
 
 

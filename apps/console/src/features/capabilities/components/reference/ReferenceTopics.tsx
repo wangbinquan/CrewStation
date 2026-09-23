@@ -1,9 +1,8 @@
 import type { CapabilityDescriptionDto } from '@crewstation/contracts';
 import type { ReactElement, ReactNode } from 'react';
-import { errorMessage } from '../../../../shared/api/useApi';
+import { errorMessage, retryableReadError } from '../../../../shared/api/useApi';
 import { useT } from '../../../../shared/lib/useT';
 import { useProjectScope } from '../../../../shared/project/ProjectScope';
-import { Button } from '../../../../shared/ui/Button';
 import { EmptyState } from '../../../../shared/ui/EmptyState';
 import { useCapabilityDescription } from '../../model/useCapabilityDescription';
 import { AgentTools } from './AgentTools';
@@ -11,11 +10,11 @@ import { EventHeaders } from './EventHeaders';
 import { RuntimeReference } from './RuntimeReference';
 import styles from './Reference.module.css';
 
-/** 三个主题共用同一份能力说明：读取中、失败可重试都留在当前主题。 */
+/** 三个主题共用同一份能力说明：读取中、失败都留在当前主题；失败由 useApiQuery 自动重读，不给重试按钮（2026-09-23 裁定）。 */
 function WithDescription({ render }: { readonly render: (description: CapabilityDescriptionDto) => ReactNode }): ReactElement {
   const t = useT(), { projectId } = useProjectScope(), description = useCapabilityDescription(projectId);
   if (description.isPending) return <p className={styles.muted}>{t('capabilities.loading')}</p>;
-  if (description.error || !description.data) return <><EmptyState title={t('capabilities.error', { message: errorMessage(description.error) })} /><div><Button onClick={() => { void description.refetch(); }}>{t('capabilities.retry')}</Button></div></>;
+  if (description.error || !description.data) return <EmptyState title={t('capabilities.error', { message: errorMessage(description.error) })} description={retryableReadError(description.error) ? t('ui.status.autoRetry') : undefined} />;
   return <>{render(description.data)}</>;
 }
 

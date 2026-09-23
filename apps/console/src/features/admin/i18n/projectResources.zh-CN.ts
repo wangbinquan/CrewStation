@@ -34,5 +34,5 @@ export const projectResourceMessages = {
   'admin.resources.quotaSaved': '项目任务配额已保存。',
   'admin.resources.discardQuotaAction': '放弃配额修改',
   'admin.resources.discardQuota': '放弃配额修改并重新读取？其他区域的草稿会保留。',
-  'admin.resources.invalidReceipt': '保存回执与本次输入不一致，请重新读取核对。草稿已保留。',
+  'admin.resources.invalidReceipt': '保存回执与本次输入不一致，结果尚未确认；页面会自动重新读取，核对后再保存。草稿已保留。',
 } as const;

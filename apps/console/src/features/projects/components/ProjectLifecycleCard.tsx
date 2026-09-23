@@ -24,12 +24,14 @@ export function ProjectLifecycleCard({ project, isAdmin, unavailable }: { readon
     try { await archive.mutateAsync(undefined); } catch { /* 真实错误由下面呈现。 */ }
     finally { lock.current = false; setConfirming(false); }
   };
-  return <Card stacked compact title={t('projects.lifecycle.archive')}>
+  // 对象卡片：「归档项目」在底部操作条，危险动作红色描边（2026-09-23 裁定）；不能归档时只在正文说明原因。
+  const archivable = project.state !== 'archived' && isAdmin && canArchive;
+  return <Card stacked compact title={t('projects.lifecycle.archive')}
+    actions={archivable ? <Button variant="danger" disabled={unavailable || archive.isPending} onClick={() => { archive.reset(); setConfirming(true); }}>{archive.isPending ? t('projects.lifecycle.archiving') : t('projects.lifecycle.archive')}</Button> : undefined}>
     <p><ProjectStateBadge state={project.state} /> {project.message}</p>
     <p>{t('projects.lifecycle.effect')}</p>
     <p>{t('projects.lifecycle.retained')}</p>
-    {project.state === 'archived' ? <ActionNote tone="neutral">{t('projects.lifecycle.archived')}</ActionNote> : !isAdmin ? <p>{t('projects.lifecycle.adminOnly')}</p> : !canArchive ? <p>{t('projects.lifecycle.provisioning')}</p>
-      : <Button variant="danger" disabled={unavailable || archive.isPending} onClick={() => { archive.reset(); setConfirming(true); }}>{archive.isPending ? t('projects.lifecycle.archiving') : t('projects.lifecycle.archive')}</Button>}
+    {project.state === 'archived' ? <ActionNote tone="neutral">{t('projects.lifecycle.archived')}</ActionNote> : !isAdmin ? <p>{t('projects.lifecycle.adminOnly')}</p> : !canArchive ? <p>{t('projects.lifecycle.provisioning')}</p> : null}
     {confirming ? <ConfirmDialog title={t('projects.lifecycle.archive')} question={t('projects.lifecycle.question', { name: project.name, slug: project.slug })} confirmWord="archive"
       confirmLabel={t('projects.lifecycle.confirm')} busy={archive.isPending} busyLabel={t('projects.lifecycle.archiving')} confirmDisabled={unavailable} onConfirm={() => { void submit(); }} onCancel={() => setConfirming(false)}>
       <ul>

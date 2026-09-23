@@ -20,7 +20,7 @@ export const projectComputeMessages = {
   'admin.projectCompute.saved': 'Project compute access saved.',
   'admin.projectCompute.discardAction': 'Discard agent changes',
   'admin.projectCompute.discard': 'Discard your changes and reload project access?',
-  'admin.projectCompute.identityChanged': 'Administrator identity changed. Reload before making changes.',
+  'admin.projectCompute.identityChanged': 'Administrator identity changed, so nothing was saved. The page reloads with the current identity automatically; try again afterwards.',
   'admin.projectCompute.invalidDefault': 'Choose an allowed profile that supports business agents.',
   'admin.projectCompute.missingProfile': 'Profile no longer exists. Deselect it and assign another profile.',
   'admin.projectCompute.missingTask': 'Resource plan no longer exists. Choose another plan.',

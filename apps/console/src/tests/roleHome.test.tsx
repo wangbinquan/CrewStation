@@ -91,11 +91,12 @@ test('首页自动更新收到异常响应时保留搜索输入，提示重试�
   // 实机自动刷新后取到没有 items 的响应，旧页面在 items.length 处崩溃。
   invalid = true;
   await act(async () => { focusManager.setFocused(false); focusManager.setFocused(true); }); await page.settle();
-  expect(page.text()).toContain('应用列表暂时无法更新，请稍后重试。');
+  expect(page.text()).toContain('应用列表返回的内容不完整。'); expect(page.text()).toContain('稍后会自动重新读取');
   expect(page.text()).not.toContain('Something went wrong');
   expect(document.querySelector<HTMLInputElement>('main input')?.value).toBe('会议草稿');
-  invalid = false; await page.click('重新查询');
-  expect(page.text()).toContain('团队助理'); expect(page.text()).not.toContain('应用列表暂时无法更新');
+  // 2026-09-23 裁定：没有「重新查询」按钮，市场每 15 秒自动重读；reread 模拟一次自动重读。
+  expect(page.text()).not.toContain('重新查询'); invalid = false; await page.reread();
+  expect(page.text()).toContain('团队助理'); expect(page.text()).not.toContain('应用列表返回的内容不完整');
   expect(document.querySelector<HTMLInputElement>('main input')?.value).toBe('会议草稿');
 });
 

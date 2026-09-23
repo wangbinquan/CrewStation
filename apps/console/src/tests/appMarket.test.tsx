@@ -69,7 +69,8 @@ describe('能力市场与负责人设置真实路由', () => {
     expect(page.text()).toContain('知识助理'); f.revoke();
     await act(async () => { focusManager.setFocused(false); focusManager.setFocused(true); }); await page.settle();
     expect(page.text()).not.toContain('知识助理'); expect(page.text()).toContain('应用不存在或不可见'); expect(page.text()).not.toContain('暂无可见应用');
-    expect(page.text()).toContain('重新查询');
+    // 没有「重新查询」按钮（2026-09-23 裁定）：市场每 15 秒自动重读，撤销恢复后自己回来。
+    expect(page.text()).not.toContain('重新查询');
   });
   test('已上线应用独立打开，负责人也没有项目编辑入口或提交信息', async () => {
     fixture(true, app({ canDevelop: true, canConfigure: true, entry: { kind: 'production', status: 'ready', host: 'knowledge.example.test' }, production: { status: 'deployed', state: 'ready', host: 'knowledge.example.test', tag: 'v1.2.3', commitSha: 'abc123', freshness: 'current', checkedAt: '2026-09-13T00:00:00.000Z' } }));

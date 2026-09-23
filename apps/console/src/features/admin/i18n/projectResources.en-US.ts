@@ -34,5 +34,5 @@ export const projectResourceMessages = {
   'admin.resources.quotaSaved': 'Project task quota saved.',
   'admin.resources.discardQuotaAction': 'Discard quota changes',
   'admin.resources.discardQuota': 'Discard quota changes and reload? Drafts in other sections are preserved.',
-  'admin.resources.invalidReceipt': 'The saved response does not match your input. Reload to verify. Your draft is preserved.',
+  'admin.resources.invalidReceipt': 'The saved response does not match your input, so the result is unconfirmed. The page reads it again automatically; check before saving again. Your draft is preserved.',
 } as const;
