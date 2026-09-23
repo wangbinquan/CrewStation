@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import type { Actor, ProjectId, ReleaseId, ServiceId, UserId } from '@crewstation/contracts';
 import { BUILTIN_RESOURCES, ManifestSchema, ResourceIdSchema } from '@crewstation/contracts';
 import { systemClock } from '@crewstation/kernel';
+import { eventbusMigrations } from '@crewstation/eventbus';
 import { createTestDatabase, testDatabaseAvailable } from '@crewstation/testkit';
 import { drizzleUnitOfWork } from '../adapters/persistence/drizzleUnitOfWork';
 import { registerReleaseUseCase } from '../application/registerRelease';
@@ -13,7 +14,8 @@ import { apiCatalogMigrations } from '../wiring';
 const available = await testDatabaseAvailable();
 describe.skipIf(!available)('API directory UUID identities', () => {
   test('releases, label changes, protocol renaming and removal retain grants and operation IDs', async () => {
-    const tdb = await createTestDatabase([apiCatalogMigrations]);
+    // 改开放策略会在同一事务里发领域事件（网关据此重算放行表），库里要有事件表。
+    const tdb = await createTestDatabase([eventbusMigrations, apiCatalogMigrations]);
     try {
       const projectId = Bun.randomUUIDv7() as ProjectId, serviceId = Bun.randomUUIDv7() as ServiceId;
       const actor: Actor = { userId: Bun.randomUUIDv7() as UserId, isAdmin: true };
