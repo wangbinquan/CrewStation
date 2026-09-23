@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { ProfileTestIdSchema, ResourceIdSchema, TaskIdSchema, UserIdSchema } from '../../ids';
 import { BeforeStartErrorSchema, BeforeStartStepsSchema, ConfigFileBindingSchema, EnvNameSchema, RunnerInterpreterSchema, StepIdSchema } from '../../taskrunner/beforeStart';
 import { AgentProtocolSchema, LaunchSpecSchema } from '../../taskrunner/launch';
+import { StartupStageKindSchema, StartupStageSchema, StartupStageStateSchema } from '../progress/startupProgress';
 
 /**
  * 算力档位（RFC-006）：一个对象就是一份完整执行配置——协议、镜像、二进制与参数、启动前步骤、变量与凭据、模型、资源套餐。
@@ -91,17 +92,17 @@ export const ProfileTestOutcomeSchema = z.enum([
   'passed', 'image-pull-failed', 'runner-unavailable', 'runner-protocol-mismatch', 'before-start-failed',
   'spawn-failed', 'auth-missing', 'network-blocked', 'model-call-failed', 'stream-nonconforming', 'output-mismatch', 'timeout', 'environment-lost',
 ]);
-export const ProfileTestStageStateSchema = z.enum(['pending', 'running', 'succeeded', 'failed', 'skipped']);
-/** 阶段：镜像 → Runner 握手 → 每个启动前步骤 → CLI 启动 → 模型轮次（已知协议）或测试命令（通用终端）。 */
-export const ProfileTestStageSchema = z.object({
+/** 与公共启动进度共用一组状态（RFC-022）。 */
+export const ProfileTestStageStateSchema = StartupStageStateSchema;
+/**
+ * 阶段（RFC-022 起）：公共的排队分配容器 → 容器启动中 → 容器已启动，等待连接 → 每个启动前步骤 → Agent 启动中 →
+ * 模型轮次（已知协议）或测试命令（通用终端）。之前的记录是 image／runner／launch，照原样可读、照原名称显示。
+ */
+export const ProfileTestStageSchema = StartupStageSchema.omit({ kind: true, detail: true, error: true }).extend({
   id: z.string().min(1),
-  kind: z.enum(['image', 'runner', 'step', 'launch', 'model', 'command']),
+  kind: z.enum([...StartupStageKindSchema.options, 'step', 'model', 'command', 'image', 'runner', 'launch'] as const),
   name: z.string().min(1),
   stepId: StepIdSchema.optional(),
-  state: ProfileTestStageStateSchema,
-  startedAt: z.iso.datetime().optional(),
-  endedAt: z.iso.datetime().optional(),
-  durationMs: z.number().int().min(0).optional(),
   /** 脱敏细节：路径、退出码、变量名、回文摘录；不含密钥、脚本源码或文件正文。 */
   detail: z.string().max(4096).optional(),
   exitCode: z.number().int().nullable().optional(),

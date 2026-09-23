@@ -14,3 +14,5 @@ export type { MiddlewareRef, RouteTarget } from './objects/traefik';
 export { dropIdentityHeadersMiddleware, forwardAuthMiddleware, ingressRouteObject, stripPrefixMiddleware } from './objects/traefik';
 
 export { boundedMetricsText, parseMetricsJson } from './metrics';
+export type { PodEventLike, PodImagePull, PodStartupContainer, PodStartupObservation } from './podStartup';
+export { podStartup } from './podStartup';

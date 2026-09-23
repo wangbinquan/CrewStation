@@ -101,6 +101,7 @@
     "modules/task-runtime/adapters/persistence/migrations/0006_pod_instance.sql": "47fbd5336a6fa56de8c0116923436a092e93cf3f90b707f830b3b7f01477633b",
     "modules/task-runtime/adapters/persistence/migrations/0007_resource_identity.sql": "db907125d6d85058bfc8a198d3f086438f5d784f33813a62043f2b32d656c107",
     "modules/task-runtime/adapters/persistence/migrations/0008_resource_identity.identity.json": "0b898778c719707d55cab513b5347d3e9bcb9a7f46a7ab258c7c4cccf6ba84c2",
+    "modules/task-runtime/adapters/persistence/migrations/0009_environment_startup.sql": "ad0540201f497a0e55b14ab14e6c3b270d412485882caf81b6632247778f4f16",
     "packages/eventbus/migrations/0001_domain_events.sql": "7ccc2ba8096db7efc7e2fa9c1818cac4042cafe73698a5bbee9652a3054225bc",
     "packages/eventbus/migrations/0002_resource_identity.sql": "b8c9081ea799d5d31a8d2a99324453003022d4d306a558b5776de0dee10b5957",
     "packages/eventbus/migrations/0003_resource_identity.identity.json": "8bfabfeaed4d5a6312b3bde66810ab01e9945b85a4e3220b55fd45107971651d",

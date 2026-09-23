@@ -9,6 +9,8 @@ export interface EnvironmentRepository {
   listByStates(states: EnvironmentState[], page?: { after?: string; limit: number }): Promise<TaskEnvironment[]>;
   listByTrace(traceId: string): Promise<TaskEnvironment[]>;
   listChildren(parentTaskId: TaskId): Promise<TaskEnvironment[]>;
+  /** RFC-022：启动进度仍在进行中的环境，按 id 翻页。 */
+  listStarting(page: { after?: string; limit: number }): Promise<TaskEnvironment[]>;
   pendingExecutions(): Promise<TaskEnvironment[]>;
   /** 开发会话：一项目同时只允许一个（D46）。 */
   findDevSession(projectId: ProjectId, options?: { includeLatestFailure?: boolean }): Promise<TaskEnvironment | undefined>;

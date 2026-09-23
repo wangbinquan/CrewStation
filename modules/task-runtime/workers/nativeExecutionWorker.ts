@@ -3,7 +3,7 @@ import { isPlatformError } from '@crewstation/kernel';
 import { createWorker } from '@crewstation/queue';
 import type { JobHandler } from '@crewstation/queue';
 import type { NativeExecutionDeps } from '../application/nativeExecution';
-import { preparationFailureReason, requireExecutionLease, runNativeExecution, scheduleExecutionCleanup } from '../application/nativeExecution';
+import { failPreparation, preparationFailureReason, requireExecutionLease, runNativeExecution } from '../application/nativeExecution';
 import { NATIVE_EXECUTION_JOB_KIND } from '../ports/repositories';
 
 export function nativeExecutionJobHandler(deps: NativeExecutionDeps): JobHandler {
@@ -20,8 +20,8 @@ export function nativeExecutionJobHandler(deps: NativeExecutionDeps): JobHandler
         const env = await scope.environments.getById(taskId);
         if (!env || env.native?.state !== 'queued') return;
         if (job.attempts >= job.maxAttempts || (isPlatformError(error) && error.kind === 'precondition')) {
-          const reason = isPlatformError(error) && error.kind === 'precondition' ? error.message : preparationFailureReason(env);
-          await scheduleExecutionCleanup(scope, env, deps.clock.now(), reason);
+          const precondition = isPlatformError(error) && error.kind === 'precondition';
+          await failPreparation(scope, env, deps.clock.now(), isPlatformError(error) && error.kind === 'precondition' ? error.message : preparationFailureReason(env), precondition);
         }
       });
       throw new Error('Agent 执行环境操作尚未完成，将按持久状态继续准备或清理');

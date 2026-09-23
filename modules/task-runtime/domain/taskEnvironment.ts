@@ -1,5 +1,6 @@
-import type { ProjectId, ServiceId, TaskId, TaskKind, TraceId, UserId, VolumeMode } from '@crewstation/contracts';
+import type { ProjectId, ServiceId, StartupRecord, TaskId, TaskKind, TraceId, UserId, VolumeMode } from '@crewstation/contracts';
 import { precondition } from '@crewstation/kernel';
+import { cancelStartup, completeThrough, defaultFailureCode, failStartup } from './podStartup';
 export interface LegacyTaskClusterIdentity {
   readonly taskId: string;
   readonly rebuildId?: string;
@@ -75,6 +76,8 @@ export interface TaskEnvironment {
   readonly release?: { reason: 'user' | 'owner-force' | 'business' | 'failed' | 'pod-lost' | 'profile-test'; occupied: boolean };
   /** Runner 握手被拒的原因（RFC-006）：旧底座镜像里的 Runner 协议不一致。只记录，不改状态、不删 Pod，也不动工作卷。 */
   readonly runnerRejection?: RunnerRejection;
+  /** RFC-022：最近一次启动（受理、重建或恢复）的阶段进度；升级前创建的环境没有。 */
+  readonly startup?: StartupRecord;
   readonly createdAt: Date;
   readonly updatedAt: Date;
   readonly lastActivityAt: Date;
@@ -91,7 +94,20 @@ const NEXT: Record<EnvironmentState, readonly EnvironmentState[]> = {
 
 export function transition(env: TaskEnvironment, state: EnvironmentState, now: Date, patch: Partial<TaskEnvironment> = {}): TaskEnvironment {
   if (!NEXT[env.state].includes(state)) throw precondition(`任务 ${env.id} 不能从 ${env.state} 进入 ${state}`, { from: env.state, to: state });
-  return { ...env, ...patch, state, updatedAt: now };
+  const next: TaskEnvironment = { ...env, ...patch, state, updatedAt: now };
+  return next.startup ? { ...next, startup: settleStartup(env.state, next, now.toISOString()) } : next;
+}
+
+/**
+ * RFC-022：状态迁移顺带收束启动进度——连上即就绪、失败即失败、释放或暂停即取消。
+ * 调用方在补丁里已经写好的（带失败归类与日志尾部的）不再进行中，这里原样保留。
+ */
+function settleStartup(from: EnvironmentState, next: TaskEnvironment, at: string): NonNullable<TaskEnvironment['startup']> {
+  const startup = next.startup!;
+  if (next.state === 'running' && from === 'creating') return completeThrough(startup, 'connect', at);
+  if (next.state === 'failed') return failStartup(startup, at, { code: defaultFailureCode(startup), message: next.message ?? '启动失败' });
+  if (next.state === 'releasing' || next.state === 'released' || next.state === 'paused') return cancelStartup(startup, at);
+  return startup;
 }
 
 /** 占用并发配额的状态：暂停与已释放不占（R43）。 */

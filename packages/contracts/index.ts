@@ -30,6 +30,7 @@ export * from './api/maintenance';
 export * from './api/devSession';
 export * from './api/devSessionRecovery';
 export * from './api/nativeTerminal';
+export * from './api/progress/startupProgress';
 export * from './api/activity/nativeActivity';
 export * from './api/workspace';
 export * from './api/businessTask';

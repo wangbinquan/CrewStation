@@ -1,6 +1,7 @@
 import type { ProjectId, ServiceId, TaskId, TaskKind, TraceId, UserId, VolumeMode } from '@crewstation/contracts';
 import { DomainTopic } from '@crewstation/contracts';
 import { conflict, newId, newTraceId, notFound, quotaExceeded, validation } from '@crewstation/kernel';
+import { completeStage, failStartup, initialStartup } from '../domain/podStartup';
 import { hashRunnerToken, newRunnerToken } from '../domain/runnerToken';
 import type { TaskEnvironment } from '../domain/taskEnvironment';
 import { podNameFor, pvcNameFor, transition } from '../domain/taskEnvironment';
@@ -61,6 +62,8 @@ export function createEnvironmentUseCase(deps: TaskRuntimeUseCaseDeps) {
       namespace: svc.namespace, podName: podNameFor(id), pvcName: pvcNameFor(id), traceId: input.traceId ?? (newTraceId() as TraceId), runnerTokenHash: hashRunnerToken(token),
       connected: false, ...(input.branch ? { branch: input.branch } : {}), ...(input.preview ? { preview: input.preview } : {}), labels: input.labels ?? {},
       ...(input.createdBy ? { createdBy: input.createdBy } : {}), createdAt: now, updatedAt: now, lastActivityAt: now,
+      // 有分支且配了检出端口才有 init 容器（sourceOf）；检出端口没给出仓库时，观测按 Pod 里没有 init 容器跳过这一段。
+      startup: initialStartup(now, input.branch && deps.checkout ? { checkout: input.branch } : {}),
     };
     await uow.run(async (scope) => {
       await scope.admissions.lock(svc.projectId);
@@ -79,8 +82,9 @@ export function createEnvironmentUseCase(deps: TaskRuntimeUseCaseDeps) {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       logger.error('task pod creation failed', { taskId: id, error: message });
+      const failedAt = clock.now();
       await uow.run(async (scope) => {
-        await scope.environments.update(transition(env, 'failed', clock.now(), { message }));
+        await scope.environments.update(transition(env, 'failed', failedAt, { message, startup: failStartup(env.startup!, failedAt.toISOString(), { code: 'pod-create-failed', message }) }));
         await scope.admissions.release(svc.projectId);
       });
       throw error;
@@ -95,6 +99,8 @@ export async function recordPodInstance(deps: TaskRuntimeUseCaseDeps, env: TaskE
   await deps.uow.run(async (scope) => {
     await scope.admissions.lock(env.projectId);
     const current = await scope.environments.getById(env.id);
-    if (current?.podName === env.podName && current.runnerTokenHash === env.runnerTokenHash) await scope.environments.update({ ...current, podUid: uid });
+    if (current?.podName !== env.podName || current.runnerTokenHash !== env.runnerTokenHash) return;
+    // 建出 Pod 即「排队分配容器」结束（RFC-022）。
+    await scope.environments.update({ ...current, podUid: uid, ...(current.startup ? { startup: completeStage(current.startup, 'queue', deps.clock.now().toISOString()) } : {}) });
   });
 }

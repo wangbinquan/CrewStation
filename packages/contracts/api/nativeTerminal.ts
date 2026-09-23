@@ -4,6 +4,7 @@ import { TaskIdSchema, UserIdSchema } from '../ids';
 import { AgentPermissionSchema } from '../manifest/tasks';
 import { NativeTerminalRecordSchema, TerminalSizeSchema, TerminalSnapshotSchema } from '../taskrunner/nativeTerminal';
 import { AgentActivityStateSchema } from './activity/nativeActivity';
+import { StartupProgressSchema } from './progress/startupProgress';
 
 export const StartNativeTerminalRequestSchema = TerminalSizeSchema.extend({
   clientRequestId: z.uuid(), compute: ComputeProfileSelectorSchema.optional(), permission: AgentPermissionSchema.default('edit'),
@@ -18,6 +19,8 @@ export const NativeTerminalDtoSchema = NativeTerminalRecordSchema.extend({
   execution: z.object({ taskId: TaskIdSchema, state: z.enum(['queued', 'starting', 'running', 'cleaning', 'finished']), message: z.string().optional(),
     profile: z.object({ name: z.string(), cpu: z.string(), memory: z.string(), storage: z.string() }).optional() }).optional(),
   finalScreen: z.enum(['pending', 'available', 'unavailable']).optional(),
+  /** RFC-022：六段启动进度；升级前受理的 CLI 没有。 */
+  startup: StartupProgressSchema.optional(),
 });
 export const NativeTerminalSnapshotDtoSchema = z.object({ status: z.enum(['pending', 'available', 'unavailable']), snapshot: TerminalSnapshotSchema.optional() });
 export const NativeTerminalListSchema = z.object({

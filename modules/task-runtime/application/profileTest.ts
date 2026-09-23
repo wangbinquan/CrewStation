@@ -3,7 +3,7 @@ import type { BeforeStartExecution, McpConnection, ProbeTerminalResult, ProfileT
 import { ProbeTerminalResultSchema, TASKRUNNER_PROTOCOL_VERSION, isKnownProtocol } from '@crewstation/contracts';
 import { isPlatformError } from '@crewstation/kernel';
 import type { ProfileTestRunInput, ProfileTestRunProgress, ProfileTestRunResult } from '../api/moduleApi';
-import { CONTAINER_START_FAILURES, IMAGE_PULL_FAILURES, RUNNER_UNAVAILABLE_HINT } from '../domain/podFailures';
+import { CONTAINER_START_FAILURES, IMAGE_PULL_FAILURES, RUNNER_UNAVAILABLE_HINT } from '../domain/podStartup';
 import { profileTestMcp } from '../domain/profileTestEnvironment';
 import type { ProtocolProbe } from '../domain/profileTestStages';
 import { TEST_STAGE, absorbAgentEvent, commandVerdict, imageStage, launchStage, modelVerdict, runnerStage, stagesFromBeforeStart } from '../domain/profileTestStages';

@@ -28,6 +28,8 @@ export const environments = taskRuntimeSchema.table('environments', {
   native: jsonDocument('native').$type<TaskEnvironment['native']>(),
   release: jsonDocument('release').$type<TaskEnvironment['release']>(),
   runnerRejection: jsonDocument('runner_rejection').$type<TaskEnvironment['runnerRejection']>(),
+  /** RFC-022：最近一次启动的阶段进度。 */
+  startup: jsonDocument('startup').$type<TaskEnvironment['startup']>(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
   lastActivityAt: timestamp('last_activity_at', { withTimezone: true }).notNull(),

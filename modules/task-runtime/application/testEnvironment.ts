@@ -1,5 +1,6 @@
 import type { TaskId, TraceId } from '@crewstation/contracts';
 import { newId, newTraceId, quotaExceeded, validation } from '@crewstation/kernel';
+import { failStartup, initialStartup } from '../domain/podStartup';
 import { hashRunnerToken, newRunnerToken } from '../domain/runnerToken';
 import { PROFILE_TEST_LABELS, PROFILE_TEST_MAX_CONCURRENT, PROFILE_TEST_PROJECT_ID, PROFILE_TEST_SERVICE_ID } from '../domain/profileTestEnvironment';
 import type { TaskEnvironment } from '../domain/taskEnvironment';
@@ -33,7 +34,7 @@ export function createTestEnvironmentUseCase(deps: TaskRuntimeUseCaseDeps) {
     const env: TaskEnvironment = {
       id, projectId: PROFILE_TEST_PROJECT_ID, serviceId: PROFILE_TEST_SERVICE_ID, kind: 'profile-test', state: 'creating', volumeMode: 'follow-container', profile: profile.id,
       namespace: settings.systemNamespace, podName: podNameFor(id), pvcName: pvcNameFor(id), traceId: newTraceId() as TraceId, runnerTokenHash: hashRunnerToken(token), connected: false,
-      labels: input.labels ?? {}, createdAt: now, updatedAt: now, lastActivityAt: now,
+      labels: input.labels ?? {}, createdAt: now, updatedAt: now, lastActivityAt: now, startup: initialStartup(now),
     };
     await uow.run(async (scope) => {
       await scope.admissions.lock(PROFILE_TEST_PROJECT_ID);
@@ -47,8 +48,9 @@ export function createTestEnvironmentUseCase(deps: TaskRuntimeUseCaseDeps) {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       logger.error('profile test pod creation failed', { taskId: id, error: message });
+      const failedAt = clock.now();
       await uow.run(async (scope) => {
-        await scope.environments.update(transition(env, 'failed', clock.now(), { message }));
+        await scope.environments.update(transition(env, 'failed', failedAt, { message, startup: failStartup(env.startup!, failedAt.toISOString(), { code: 'pod-create-failed', message }) }));
         await scope.admissions.release(PROFILE_TEST_PROJECT_ID);
       });
       throw error;

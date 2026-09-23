@@ -1,6 +1,7 @@
 import { isPlatformError, precondition } from '@crewstation/kernel';
 import type { EnvironmentRebuild } from '../domain/environmentRebuild';
 import { hashRunnerToken, newRunnerToken } from '../domain/runnerToken';
+import { completeStage } from '../domain/podStartup';
 import type { TaskEnvironment } from '../domain/taskEnvironment';
 import { transition } from '../domain/taskEnvironment';
 import type { RebuildProvisioner } from '../ports/recoveryCluster';
@@ -14,6 +15,14 @@ export type RebuildExecutionDeps = RebuildDependencies & { provisioner: RebuildP
 export type RebuildHeartbeat = () => Promise<boolean>;
 export async function requireRebuildLease(heartbeat: RebuildHeartbeat): Promise<void> {
   if (!await heartbeat()) throw new Error('恢复作业租约已被接管');
+}
+
+/** 作业开始替换：记录进入 replacing；RFC-022 的启动进度「排队分配容器」结束、「替换旧容器」开始。 */
+export async function beginReplace(deps: Pick<RebuildExecutionDeps, 'clock'>, scope: RepositoryScope, record: EnvironmentRebuild): Promise<void> {
+  const now = deps.clock.now();
+  await scope.rebuilds.update({ ...record, state: 'replacing', updatedAt: now });
+  const env = await scope.environments.getById(record.taskId);
+  if (env?.startup && env.rebuildId === record.id) await scope.environments.update({ ...env, startup: completeStage(env.startup, 'queue', now.toISOString()) });
 }
 
 /** 每次执行持有项目行锁；崩溃后通过不可变请求标签和 UID 接续已创建资源。 */
@@ -43,7 +52,8 @@ export async function executeRebuild(deps: RebuildExecutionDeps, scope: Reposito
   await deps.provisioner.ensurePreview(record, spec);
   await requireRebuildLease(heartbeat);
   const now = deps.clock.now();
-  await scope.environments.update({ ...prepared, podUid, updatedAt: now, message: '恢复容器已创建，等待调度和新环境连接' });
+  await scope.environments.update({ ...prepared, podUid, updatedAt: now, message: '恢复容器已创建，等待调度和新环境连接',
+    ...(prepared.startup ? { startup: completeStage(prepared.startup, 'replace', now.toISOString()) } : {}) });
   await scope.rebuilds.update({ ...record, state: 'starting', secretUid: secret.uid, podUid, message: '等待新环境连接，原 CLI 不会自动启动', updatedAt: now });
 }
 

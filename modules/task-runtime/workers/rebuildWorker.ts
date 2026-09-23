@@ -2,7 +2,7 @@ import { createWorker } from '@crewstation/queue';
 import type { JobHandler } from '@crewstation/queue';
 import { isPlatformError } from '@crewstation/kernel';
 import type { RebuildExecutionDeps, RebuildHeartbeat } from '../application/rebuildExecution';
-import { compensateRebuild, executeRebuild, rebuildFailureMessage, requireRebuildLease } from '../application/rebuildExecution';
+import { beginReplace, compensateRebuild, executeRebuild, rebuildFailureMessage, requireRebuildLease } from '../application/rebuildExecution';
 import { REBUILD_JOB_KIND } from '../ports/rebuilds';
 
 async function runRebuild(deps: RebuildExecutionDeps, id: string, heartbeat: RebuildHeartbeat): Promise<void> {
@@ -12,7 +12,7 @@ async function runRebuild(deps: RebuildExecutionDeps, id: string, heartbeat: Reb
     await scope.admissions.lock(original.projectId);
     await requireRebuildLease(heartbeat);
     const record = await scope.rebuilds.get(id);
-    if (record?.state === 'queued') await scope.rebuilds.update({ ...record, state: 'replacing', updatedAt: deps.clock.now() });
+    if (record?.state === 'queued') await beginReplace(deps, scope, record);
   });
   await deps.uow.run(async (scope) => {
     await scope.admissions.lock(original.projectId);

@@ -1,6 +1,7 @@
 import type { TaskId } from '@crewstation/contracts';
 import { DomainTopic } from '@crewstation/contracts';
 import { notFound, precondition } from '@crewstation/kernel';
+import { initialStartup } from '../domain/podStartup';
 import { hashRunnerToken, newRunnerToken } from '../domain/runnerToken';
 import type { TaskEnvironment } from '../domain/taskEnvironment';
 import { canPause, occupiesQuota, transition } from '../domain/taskEnvironment';
@@ -78,7 +79,9 @@ export function lifecycleUseCases(deps: TaskRuntimeUseCaseDeps) {
       await waitForPausedPodRemoval(cluster, env);
       const limit = (await deps.quotas.quotaLimit(env.projectId)) ?? 0;
       const token = newRunnerToken();
-      const resumed = transition(env, 'creating', clock.now(), { runnerTokenHash: hashRunnerToken(token), connected: false, podUid: undefined });
+      const now = clock.now();
+      // 业务任务恢复即重新启动一次（RFC-022：只有数据，本 RFC 不做业务任务的界面）。
+      const resumed = transition(env, 'creating', now, { runnerTokenHash: hashRunnerToken(token), connected: false, podUid: undefined, startup: initialStartup(now) });
       await uow.run(async (scope) => {
         if (!(await scope.admissions.tryAcquire(env.projectId, limit))) throw precondition(`并发任务已达配额上限 ${limit}`);
         await scope.environments.update(resumed);

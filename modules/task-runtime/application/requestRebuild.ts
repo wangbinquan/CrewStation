@@ -4,6 +4,7 @@ import { scheduleExecutionCleanup } from './nativeExecution';
 import { conflict, newResourceId, precondition, quotaExceeded } from '@crewstation/kernel';
 import type { EnvironmentRebuild } from '../domain/environmentRebuild';
 import { rebuildToDto } from '../domain/environmentRebuild';
+import { initialStartup } from '../domain/podStartup';
 import { hashRunnerToken, newRunnerToken } from '../domain/runnerToken';
 import { transition } from '../domain/taskEnvironment';
 import type { RebuildDependencies } from './rebuildInspection';
@@ -36,7 +37,9 @@ export function rebuildUseCases(deps: RebuildDependencies) {
       await scope.rebuilds.insert(record);
       // 即刻失效旧 Runner；替换 Pod 只复用原工作卷，不重新检出仓库。
       const patch = { rebuildId: record.id, podName, profile: input.profile.id,
-        connected: false, message: '已受理保留工作树重建，等待后台准备', runnerTokenHash: hashRunnerToken(newRunnerToken()) };
+        connected: false, message: '已受理保留工作树重建，等待后台准备', runnerTokenHash: hashRunnerToken(newRunnerToken()),
+        // RFC-022：重建的五段（保留工作卷、不重新检出），替换这个会话之前的启动过程。
+        startup: initialStartup(now, { rebuild: true }) };
       // 仅前面核验过的协议拒绝环境沿用原占额进入恢复，不开放通用 running → creating 转移。
       await scope.environments.update(env.state === 'failed' ? transition(env, 'creating', now, patch) : { ...env, ...patch, state: 'creating', updatedAt: now });
       await scope.rebuildQueue.enqueue(record.id);

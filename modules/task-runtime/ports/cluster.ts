@@ -1,3 +1,4 @@
+import type { StartupObservation } from '../domain/podStartup';
 import type { TaskEnvironment } from '../domain/taskEnvironment';
 
 /** 开发会话的源码检出：init 容器按分支克隆进工作卷，凭据只进 init 容器。 */
@@ -31,13 +32,18 @@ export interface NativeExecutionCluster {
 }
 
 export type PodPhase = 'Pending' | 'Running' | 'Succeeded' | 'Failed' | 'Unknown' | 'Missing';
+export interface PodPhaseReading { phase: PodPhase; uid?: string; message?: string; ip?: string; imageId?: string; waitingReason?: string }
 
 /** 任务容器与卷的集群操作；实现在 adapters/k8s。 */
 export interface TaskCluster {
   ensureVolume(env: TaskEnvironment, size: string): Promise<void>;
   createPod(spec: TaskPodSpec): Promise<string | void>;
   /** waitingReason：主容器的等待原因（ErrImagePull、CreateContainerError 等），档位测试据此区分镜像与 Runner 的失败。 */
-  podPhase(env: TaskEnvironment): Promise<{ phase: PodPhase; uid?: string; message?: string; ip?: string; imageId?: string; waitingReason?: string }>;
+  podPhase(env: TaskEnvironment): Promise<PodPhaseReading>;
+  /** RFC-022：一次读 Pod 同时给出对账用的 phase 与启动观测；events 为 true 时再按 Pod UID 读它的 Events（拉镜像的细节）。Pod 不在时没有观测。 */
+  observeStartup(env: TaskEnvironment, options: { events: boolean }): Promise<{ pod: PodPhaseReading; observation?: StartupObservation }>;
+  /** 一个容器日志的最后若干行；判定失败时留证用，读不到就抛错由调用方忽略。 */
+  tailLog(env: TaskEnvironment, container: string, lines: number): Promise<string>;
   deletePod(env: TaskEnvironment): Promise<void>;
   deleteVolume(env: TaskEnvironment): Promise<void>;
 }

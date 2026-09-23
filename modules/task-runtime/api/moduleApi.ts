@@ -1,5 +1,5 @@
 import type { Actor, ProjectId, ServiceId, TaskId, TaskKind, TraceId, UserId, VolumeMode } from '@crewstation/contracts';
-import type { DevSessionDto, DevSessionRebuildDto, DevSessionRebuildInspection, RebuildDevSessionRequest } from '@crewstation/contracts';
+import type { DevSessionDto, DevSessionRebuildDto, DevSessionRebuildInspection, RebuildDevSessionRequest, StartupRecord } from '@crewstation/contracts';
 import type { BeforeStartMaterial, LaunchSpec, ProfileTestContext, ProfileTestOutcome, ProfileTestStage, TerminalTest } from '@crewstation/contracts';
 
 /**
@@ -33,6 +33,8 @@ export interface EnvironmentDto {
   createdBy?: string;
   message?: string;
   connectionIssue?: DevSessionDto['connectionIssue'];
+  /** RFC-022：最近一次启动的阶段进度（存储形状；observedAt 由组装 HTTP 响应的一方填）。 */
+  startup?: StartupRecord;
   createdAt: string;
   lastActivityAt: string;
 }
@@ -98,6 +100,13 @@ export interface TaskRuntimeModuleApi {
   verifyRunnerToken(taskId: TaskId, token: string): Promise<{ ok: true; projectId: string } | { ok: false; reason: string }>;
   canOpenStream(actor: Actor, taskId: TaskId): Promise<boolean>;
   reconcile(): Promise<number>;
+  /** RFC-022：每秒看一页启动中的环境，推进阶段细节并按对账规则判定失败；返回写入次数。 */
+  observeStartup(): Promise<number>;
+  /**
+   * RFC-022：执行环境主容器日志的最后 100 行（已打码）。CLI 在准备环境或 Agent 启动中失败时，
+   * dev-session 在请求回收之前调用它，给失败的那一段留证；读不到返回 undefined。
+   */
+  captureStartupLog(taskId: TaskId): Promise<string | undefined>;
   /** RFC-004：在平台专属检查任务里执行完整 Hook 与一次最小模型调用，结束后清理任务；供 agent-runtime 的执行器端口。 */
   runProfileTest(input: ProfileTestRunInput, report: (progress: ProfileTestRunProgress) => Promise<void>, heartbeat: () => Promise<boolean>): Promise<ProfileTestRunResult>;
 }

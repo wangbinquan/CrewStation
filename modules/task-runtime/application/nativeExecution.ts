@@ -2,6 +2,7 @@ import type { TaskId } from '@crewstation/contracts';
 import { DomainTopic } from '@crewstation/contracts';
 import { conflict, notFound, precondition, quotaExceeded } from '@crewstation/kernel';
 import type { CreateNativeExecutionInput, ReleaseReason } from '../api/moduleApi';
+import { cancelStartup, completeStage, failStartup, initialStartup } from '../domain/podStartup';
 import { hashRunnerToken, newRunnerToken } from '../domain/runnerToken';
 import type { ExecutionPurpose, NativeExecution, TaskEnvironment } from '../domain/taskEnvironment';
 import { EXECUTION_NOUN, occupiesQuota, purposeOf, transition } from '../domain/taskEnvironment';
@@ -66,7 +67,7 @@ function executionEnvironment(deps: NativeExecutionDeps, input: CreateNativeExec
   return { id: input.id, projectId: parent.projectId, serviceId: parent.serviceId, kind: parent.kind, state: 'creating',
     volumeMode: 'persistent', profile: profile.id, namespace: parent.namespace, podName: `${ADMISSION[purpose].podPrefix}-${input.id.replaceAll('-', '')}`, pvcName: parent.pvcName,
     traceId: parent.traceId, runnerTokenHash: hashRunnerToken(newRunnerToken()), connected: false, labels: parent.labels, ...(input.createdBy ? { createdBy: input.createdBy } : {}),
-    native, message: `已受理，正在准备此${EXECUTION_NOUN[purpose]}的独立执行环境`, createdAt: now, updatedAt: now, lastActivityAt: now };
+    native, message: `已受理，正在准备此${EXECUTION_NOUN[purpose]}的独立执行环境`, createdAt: now, updatedAt: now, lastActivityAt: now, startup: initialStartup(now) };
 }
 
 /** 准备执行环境反复失败时给用户的话：只说这一个 Agent，不牵连其他 Agent、窗口与工作树。 */
@@ -74,10 +75,21 @@ export function preparationFailureReason(env: TaskEnvironment): string {
   return `此${EXECUTION_NOUN[purposeOf(env.native!)]}的执行环境准备失败，其他 Agent、窗口与工作树保持`;
 }
 
+/**
+ * 准备执行环境反复失败或前置条件不满足：记下失败原因并交给清理。前置条件不满足多半是原工作区断开或变化，
+ * 其余是反复建不出执行容器（RFC-022 的失败归类）。
+ */
+export async function failPreparation(scope: RepositoryScope, env: TaskEnvironment, now: Date, reason: string, workspaceLost: boolean): Promise<TaskEnvironment> {
+  const startup = env.startup ? failStartup(env.startup, now.toISOString(), { code: workspaceLost ? 'workspace-lost' : 'pod-create-failed', message: reason }) : undefined;
+  return scheduleExecutionCleanup(scope, startup ? { ...env, startup } : env, now, reason);
+}
+
 /** 清理意图先持久化并失效凭据；卷、原开发容器和其他 CLI 不参与此状态迁移。 */
 export async function scheduleExecutionCleanup(scope: RepositoryScope, env: TaskEnvironment, now: Date, failureReason?: string): Promise<TaskEnvironment> {
   if (!env.native || env.native.state === 'finished') return env;
+  // 判定失败的调用方已把启动进度记为失败（带归类与日志）；其余（停止、暂停、管理员重启）在启动中即为取消。
   const next: TaskEnvironment = { ...env, state: 'releasing', native: { ...env.native, state: 'cleaning', ...(failureReason ? { failureReason } : {}) },
+    ...(env.startup ? { startup: cancelStartup(env.startup, now.toISOString()) } : {}),
     runnerTokenHash: hashRunnerToken(newRunnerToken()), connected: false, message: failureReason ?? `此${EXECUTION_NOUN[purposeOf(env.native)]}已结束，正在回收执行环境`, updatedAt: now };
   await scope.environments.update(next);
   await scope.nativeQueue.enqueue(env.id);
@@ -113,7 +125,8 @@ export async function prepareNativeExecution(deps: NativeExecutionDeps, scope: R
   await requireExecutionLease(heartbeat);
   const now = deps.clock.now();
   await scope.environments.update({ ...env, runnerTokenHash: hashRunnerToken(prepared.token), updatedAt: now,
-    native: { ...n, state: 'starting', podUid: prepared.podUid, secretUid: prepared.secretUid, preparedAt: now.toISOString() }, message: `此${EXECUTION_NOUN[purposeOf(n)]}的执行容器已创建，等待调度和连接` });
+    native: { ...n, state: 'starting', podUid: prepared.podUid, secretUid: prepared.secretUid, preparedAt: now.toISOString() }, message: `此${EXECUTION_NOUN[purposeOf(n)]}的执行容器已创建，等待调度和连接`,
+    ...(env.startup ? { startup: completeStage(env.startup, 'queue', now.toISOString()) } : {}) });
 }
 
 export async function cleanupNativeExecution(deps: NativeExecutionDeps, scope: RepositoryScope, env: TaskEnvironment, heartbeat: ExecutionLease): Promise<void> {

@@ -1,6 +1,6 @@
-import type { K8sClient, K8sObject } from '@crewstation/k8s';
-import { LABELS, Resources, pvcObject } from '@crewstation/k8s';
-import type { TaskCluster } from '../../ports/cluster';
+import type { K8sClient, K8sObject, PodEventLike } from '@crewstation/k8s';
+import { LABELS, Resources, podStartup, pvcObject } from '@crewstation/k8s';
+import type { PodPhaseReading, TaskCluster } from '../../ports/cluster';
 import { podNameFor } from '../../domain/taskEnvironment';
 import { ensureTaskPreview, taskPodObject } from './taskObjects';
 import { removeTaskPod } from './taskRemoval';
@@ -34,6 +34,14 @@ function podMessage(pod: PodObject): string | undefined {
 }
 
 
+function phaseOf(pod: PodObject): PodPhaseReading {
+  const phase = (pod.status?.phase ?? 'Unknown') as Exclude<PodPhaseReading['phase'], 'Missing'>;
+  const message = podMessage(pod);
+  const imageId = pod.status?.containerStatuses?.[0]?.imageID;
+  const waitingReason = pod.status?.containerStatuses?.[0]?.state?.waiting?.reason ?? pod.status?.containerStatuses?.[0]?.state?.terminated?.reason;
+  return { phase, ...(pod.metadata.uid ? { uid: pod.metadata.uid } : {}), ...(pod.status?.podIP ? { ip: pod.status.podIP } : {}), ...(message ? { message } : {}), ...(imageId ? { imageId } : {}), ...(waitingReason ? { waitingReason } : {}) };
+}
+
 export function kubernetesTaskCluster(k8s: K8sClient, workerUid: number): TaskCluster {
   return {
     ensureVolume: async (env, size) => {
@@ -48,12 +56,20 @@ export function kubernetesTaskCluster(k8s: K8sClient, workerUid: number): TaskCl
     },
     podPhase: async (env) => {
       const pod = await k8s.get<PodObject>(Resources.Pod!, env.podName, env.namespace);
-      if (!pod) return { phase: 'Missing' };
-      const phase = (pod.status?.phase ?? 'Unknown') as Exclude<Awaited<ReturnType<TaskCluster['podPhase']>>['phase'], 'Missing'>;
-      const message = podMessage(pod);
-      const imageId = pod.status?.containerStatuses?.[0]?.imageID;
-      const waitingReason = pod.status?.containerStatuses?.[0]?.state?.waiting?.reason ?? pod.status?.containerStatuses?.[0]?.state?.terminated?.reason;
-      return { phase, ...(pod.metadata.uid ? { uid: pod.metadata.uid } : {}), ...(pod.status?.podIP ? { ip: pod.status.podIP } : {}), ...(message ? { message } : {}), ...(imageId ? { imageId } : {}), ...(waitingReason ? { waitingReason } : {}) };
+      return pod ? phaseOf(pod) : { phase: 'Missing' };
+    },
+    observeStartup: async (env, options) => {
+      const pod = await k8s.get<PodObject>(Resources.Pod!, env.podName, env.namespace);
+      if (!pod) return { pod: { phase: 'Missing' } };
+      const uid = pod.metadata.uid;
+      // 与集群管理读 Events 的写法相同：按 UID 过滤，只取这一个 Pod 实例的事件（RFC-022 拉镜像的细节）。
+      const events = options.events && uid ? (await k8s.list<K8sObject>(Resources.Event!, env.namespace, { fieldSelector: `involvedObject.uid=${uid}`, limit: 200 }))
+        .filter((event) => (event.involvedObject as { uid?: string } | undefined)?.uid === uid) as unknown as PodEventLike[] : [];
+      return { pod: phaseOf(pod), observation: podStartup(pod, events) };
+    },
+    tailLog: async (env, container, lines) => {
+      const stream = await k8s.logs(env.namespace, env.podName, { container, tailLines: lines, signal: AbortSignal.timeout(3000) });
+      return (await new Response(stream).text()).slice(-65_536);
     },
     deletePod: async (env) => {
       await removeTaskPod(k8s, env);

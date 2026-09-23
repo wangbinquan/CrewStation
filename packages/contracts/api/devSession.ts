@@ -7,6 +7,7 @@ import { PublishRequestSchema } from './release';
 import { ApiInvocationInputSchema, ApiInvocationResultSchema } from '../taskrunner/apiInvocation';
 import { DevSessionRebuildDtoSchema } from './devSessionRecovery';
 import { BeforeStartStateSchema } from '../taskrunner/beforeStart';
+import { StartupProgressSchema } from './progress/startupProgress';
 
 export const ApiInvocationRequestSchema = ApiInvocationInputSchema.extend({ expectedTaskId: TaskIdSchema, operationId: z.string().min(1).max(8192) }).strict();
 export const ApiInvocationResponseSchema = z.object({ taskId: TaskIdSchema, operationId: z.string().min(1).max(8192), result: ApiInvocationResultSchema }).strict();
@@ -30,6 +31,8 @@ export const DevSessionDtoSchema = z.object({
   message: z.string().optional(),
   connectionIssue: z.object({ code: z.literal('protocol_mismatch'), runnerProtocol: z.number().int().nullable(), requiredProtocol: z.number().int(), message: z.string(), at: z.iso.datetime() }).optional(),
   rebuild: DevSessionRebuildDtoSchema.optional(),
+  /** RFC-022：开始开发或重建的五段启动进度；升级前创建的会话没有。 */
+  startup: StartupProgressSchema.optional(),
 });
 
 /**

@@ -1,6 +1,6 @@
 import type { Actor, ProjectId, TaskId } from '@crewstation/contracts';
 import { TASKRUNNER_PROTOCOL_VERSION } from '@crewstation/contracts';
-import type { DevSessionDto } from '@crewstation/contracts';
+import type { DevSessionDto, StartupRecord } from '@crewstation/contracts';
 import { notFound, precondition } from '@crewstation/kernel';
 import { tokenMatches } from '../domain/runnerToken';
 import type { EnvironmentState, TaskEnvironment } from '../domain/taskEnvironment';
@@ -23,6 +23,8 @@ export interface EnvironmentDto {
   createdBy?: string;
   message?: string;
   connectionIssue?: DevSessionDto['connectionIssue'];
+  /** RFC-022：最近一次启动的阶段进度（存储形状；observedAt 由组装 HTTP 响应的一方填）。 */
+  startup?: StartupRecord;
   createdAt: string;
   lastActivityAt: string;
 }
@@ -33,6 +35,7 @@ export function environmentToDto(env: TaskEnvironment): EnvironmentDto {
     connected: env.connected && !env.runnerRejection, ...(env.branch ? { branch: env.branch } : {}), ...(env.preview ? { preview: env.preview } : {}), traceId: env.traceId, ...(env.createdBy ? { createdBy: env.createdBy } : {}), ...(env.message ? { message: env.message } : {}),
     createdAt: env.createdAt.toISOString(), lastActivityAt: env.lastActivityAt.toISOString(),
     ...(env.runnerRejection ? { connectionIssue: { ...env.runnerRejection, requiredProtocol: TASKRUNNER_PROTOCOL_VERSION } } : {}),
+    ...(env.startup ? { startup: env.startup } : {}),
     ...(env.native ? { native: { purpose: env.native.purpose ?? 'cli', parentTaskId: env.native.parentTaskId, agentId: env.native.agentId, ...(env.native.terminalId ? { terminalId: env.native.terminalId } : {}), runnerId: env.native.runnerId, state: env.native.state, profile: env.native.profile, ...(env.native.failureReason ? { failureReason: env.native.failureReason } : {}) } } : {}),
   };
 }

@@ -5,7 +5,7 @@ import { Resources } from '@crewstation/k8s';
 import { newId } from '@crewstation/kernel';
 import { testDatabaseAvailable } from '@crewstation/testkit';
 import type { CreateNativeExecutionInput } from '../api/moduleApi';
-import { RUNNER_UNAVAILABLE_HINT } from '../domain/podFailures';
+import { RUNNER_UNAVAILABLE_HINT } from '../domain/podStartup';
 import { rebuildFixture } from './rebuildFixture';
 
 const available = await testDatabaseAvailable();

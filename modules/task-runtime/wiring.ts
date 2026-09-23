@@ -19,7 +19,8 @@ import { createEnvironmentUseCase } from './application/createEnvironment';
 import type { TaskRuntimeUseCaseDeps } from './application/dependencies';
 import { lifecycleUseCases } from './application/lifecycle';
 import { environmentQueries, environmentToDto } from './application/queries';
-import { reconcileUseCase } from './application/reconcile';
+import { observeStartupUseCase, reconcileUseCase } from './application/reconcile';
+import { startupLogTail } from './application/failEnvironment';
 import { rebuildUseCases } from './application/requestRebuild';
 import { rebuildWorker } from './workers/rebuildWorker';
 import { nativeExecutionWorker } from './workers/nativeExecutionWorker';
@@ -86,6 +87,7 @@ export function createTaskRuntimeModule(deps: TaskRuntimeModuleDeps): TaskRuntim
   const lifecycle = lifecycleUseCases(useCaseDeps);
   const queries = environmentQueries(useCaseDeps);
   const reconcile = reconcileUseCase(useCaseDeps, lifecycle);
+  const observeStartup = observeStartupUseCase(useCaseDeps, lifecycle);
   const recoveryDeps = { ...useCaseDeps, recoveryCluster: kubernetesTaskRecoveryCluster(deps.k8s), provisioner: kubernetesRebuildProvisioner(deps.k8s, deps.settings.workerUid) };
   const executionDeps = { ...useCaseDeps, nativeCluster: kubernetesNativeExecutions(deps.k8s, deps.settings.workerUid) };
   const createNative = createNativeExecutionUseCase(executionDeps);
@@ -120,13 +122,26 @@ export function createTaskRuntimeModule(deps: TaskRuntimeModuleDeps): TaskRuntim
     verifyRunnerToken: queries.verifyRunnerToken,
     canOpenStream: queries.canOpenStream,
     reconcile,
+    observeStartup,
+    captureStartupLog: async (taskId) => {
+      const env = await useCaseDeps.uow.read.environments.getById(taskId);
+      return env ? startupLogTail(useCaseDeps, env, env.podName) : undefined;
+    },
     runProfileTest,
   };
   let timer: ReturnType<typeof setInterval> | undefined;
+  let observer: ReturnType<typeof setInterval> | undefined, observing = false;
+  // 启动观测每秒一轮（RFC-022）；上一轮没跑完就跳过这一轮，不叠加。
+  const observeTick = () => {
+    if (observing) return;
+    observing = true;
+    void observeStartup().catch((e: unknown) => useCaseDeps.logger.error('startup observation failed', { error: String(e) })).finally(() => { observing = false; });
+  };
   return {
     api,
     http: [environmentRoutes(api, deps.isAdmin)],
-    workers: [rebuildWorker(deps.db, recoveryDeps), nativeExecutionWorker(deps.db, executionDeps), { start: () => { timer ??= setInterval(() => void reconcile().catch((e: unknown) => useCaseDeps.logger.error('reconcile failed', { error: String(e) })), 15000); }, stop: async () => { if (timer) clearInterval(timer); timer = undefined; } }],
+    workers: [rebuildWorker(deps.db, recoveryDeps), nativeExecutionWorker(deps.db, executionDeps), { start: () => { timer ??= setInterval(() => void reconcile().catch((e: unknown) => useCaseDeps.logger.error('reconcile failed', { error: String(e) })), 15000); }, stop: async () => { if (timer) clearInterval(timer); timer = undefined; } },
+      { start: () => { observer ??= setInterval(observeTick, 1000); }, stop: async () => { if (observer) clearInterval(observer); observer = undefined; } }],
     migrations: taskRuntimeMigrations,
   };
 }

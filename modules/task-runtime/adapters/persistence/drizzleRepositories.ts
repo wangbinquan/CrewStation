@@ -16,8 +16,9 @@ export function drizzleEnvironmentRepository(db: Executor): EnvironmentRepositor
     labels: json<Record<string, string>>(r.labels), ...(r.createdBy ? { createdBy: r.createdBy as UserId } : {}), ...(r.message ? { message: r.message } : {}),
     createdAt: r.createdAt, updatedAt: r.updatedAt, lastActivityAt: r.lastActivityAt, ...(r.rebuildId ? { rebuildId: r.rebuildId } : {}),
     ...(r.native ? { native: json<TaskEnvironment['native']>(r.native) } : {}), ...(r.release ? { release: json<TaskEnvironment['release']>(r.release) } : {}), ...(r.runnerRejection ? { runnerRejection: json<TaskEnvironment['runnerRejection']>(r.runnerRejection) } : {}),
+    ...(r.startup ? { startup: json<TaskEnvironment['startup']>(r.startup) } : {}),
   });
-  const toRow = (e: TaskEnvironment): typeof environments.$inferInsert => ({ ...e, podUid: e.podUid ?? null, branch: e.branch ?? null, preview: e.preview ?? null, createdBy: e.createdBy ?? null, message: e.message ?? null, rebuildId: e.rebuildId ?? null, native: e.native ?? null, release: e.release ?? null, runnerRejection: e.runnerRejection ?? null });
+  const toRow = (e: TaskEnvironment): typeof environments.$inferInsert => ({ ...e, podUid: e.podUid ?? null, branch: e.branch ?? null, preview: e.preview ?? null, createdBy: e.createdBy ?? null, message: e.message ?? null, rebuildId: e.rebuildId ?? null, native: e.native ?? null, release: e.release ?? null, runnerRejection: e.runnerRejection ?? null, startup: e.startup ?? null });
   return {
     insert: async (e) => { await db.insert(environments).values(toRow(e)); },
     update: async (e) => { await db.update(environments).set(toRow(e)).where(eq(environments.id, e.id)); },
@@ -26,6 +27,9 @@ export function drizzleEnvironmentRepository(db: Executor): EnvironmentRepositor
     listByStates: async (states, page) => (await db.select().from(environments).where(and(inArray(environments.state, states), page?.after ? gt(environments.id, page.after) : undefined)).orderBy(environments.id).limit(page ? Math.min(500, Math.max(1, page.limit)) : 2_147_483_647)).map(toEnv),
     listByTrace: async (traceId) => (await db.select().from(environments).where(eq(environments.traceId, traceId)).orderBy(environments.createdAt)).map(toEnv),
     listChildren: async (parentTaskId) => (await db.select().from(environments).where(sql`${environments.native}->>'parentTaskId' = ${parentTaskId}`).orderBy(environments.createdAt)).map(toEnv),
+    // 部分索引 environments_starting 只覆盖启动中的行；按 id 翻页，观测用例轮流看完所有启动中的环境。
+    listStarting: async (page) => (await db.select().from(environments).where(and(sql`${environments.startup}->>'state' = 'running'`, inArray(environments.state, ['creating', 'running']), page.after ? gt(environments.id, page.after) : undefined))
+      .orderBy(environments.id).limit(Math.min(500, Math.max(1, page.limit)))).map(toEnv),
     pendingExecutions: async () => (await db.select().from(environments).where(sql`${environments.native}->>'state' IN ('queued', 'cleaning') OR (${environments.state} = 'releasing' AND ${environments.release} IS NOT NULL)`)).map(toEnv),
     findDevSession: async (projectId, options) => {
       const scope = and(eq(environments.projectId, projectId), eq(environments.kind, 'dev-session'), isNull(environments.native));
