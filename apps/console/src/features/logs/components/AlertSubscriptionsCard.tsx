@@ -14,17 +14,18 @@ import { AlertSubscriptionForm } from './AlertSubscriptionForm';
 export function AlertSubscriptionsCard({ projectId, canManage }: { readonly projectId: string; readonly canManage: boolean }) {
   const t = useT(), p = useAlertSubscriptions(projectId, canManage), review = p.review;
   const target = review?.kind === 'save' ? review.input : review?.before;
-  return <Card stacked compact title={t('logs.alerts.subscription.title')} extra={<Button disabled={p.busy || p.refreshing} onClick={() => void p.refresh()}>{t('logs.alerts.subscription.refresh')}</Button>}>
+  // 订阅是一张列表：「添加订阅」在卡片头，行内「修改」「移除」紧凑描边、移除为红色（2026-09-23 裁定）。
+  return <Card stacked compact title={t('logs.alerts.subscription.title')} extra={canManage ? <Button variant="primary" disabled={p.busy || !!review} onClick={() => p.start()}>{t('logs.alerts.subscription.add')}</Button> : undefined}>
     <UnsavedChangesGuard dirty={p.dirty || p.busy} scope={t('logs.alerts.subscription.form')} allowNavigate={(current, next) => current.pathname === next.pathname && 'tab' in next.search && next.search.tab === 'alerts'} />
     <ActionNote tone="neutral">{t('logs.alerts.subscription.deliveryUnavailable')}</ActionNote>
     <QueryStatus isPending={p.query.isPending} error={p.query.error} />
     {!p.unavailable && p.query.data?.items.length === 0 ? <p>{t('logs.alerts.subscription.empty')}</p> : null}
     {!p.unavailable && p.query.data?.items.length ? <DataTable columns={[t('logs.alerts.subscription.member'), t('logs.alerts.subscription.channel'), t('logs.alerts.subscription.target'), t('logs.alerts.actions')]}>
       {p.query.data.items.map((row) => <tr key={row.userId}><td>{p.name(row.userId)}</td><td>{t(`logs.alerts.channel.${row.channel}`)}</td><td>{row.target ?? '—'}</td><td>{canManage ? <ActionRow>
-        <Button disabled={p.busy || !!review} onClick={() => p.start(row)}>{t('logs.alerts.subscription.edit', { name: p.name(row.userId) })}</Button><Button disabled={p.busy || !!review} onClick={() => void p.prepare(row)}>{t('logs.alerts.subscription.remove', { name: p.name(row.userId) })}</Button>
+        <Button size="small" disabled={p.busy || !!review} onClick={() => p.start(row)}>{t('logs.alerts.subscription.edit', { name: p.name(row.userId) })}</Button><Button size="small" variant="danger" disabled={p.busy || !!review} onClick={() => void p.prepare(row)}>{t('logs.alerts.subscription.remove', { name: p.name(row.userId) })}</Button>
       </ActionRow> : '—'}</td></tr>)}
     </DataTable> : null}
-    {canManage ? <Button disabled={p.busy || !!review} onClick={() => p.start()}>{t('logs.alerts.subscription.add')}</Button> : <p>{t('logs.alerts.subscription.noPermission')}</p>}
+    {canManage ? null : <p>{t('logs.alerts.subscription.noPermission')}</p>}
     {p.open ? <AlertSubscriptionForm p={p} /> : null}
     {!p.open && p.dirty ? <ActionNote tone="neutral">{t('logs.alerts.subscription.unsaved')} <Button onClick={p.resume}>{t('logs.alerts.subscription.resume')}</Button></ActionNote> : null}
     {review && target ? <ConfirmationPanel question={t(review.kind === 'save' ? 'logs.alerts.subscription.saveQuestion' : 'logs.alerts.subscription.removeQuestion', { name: p.name(target.userId) })} hint={t('logs.alerts.subscription.replaceHint')} confirmLabel={t(review.kind === 'save' ? 'logs.alerts.subscription.save' : 'logs.alerts.subscription.confirmRemove')} cancelLabel={t('logs.alerts.cancel')} busy={p.busy} confirmDisabled={p.stale || !canManage} onConfirm={() => void p.confirm()} onCancel={() => p.setReview(undefined)}>

@@ -37,6 +37,26 @@ test('history supports all ranges, custom constraints, ended resources, gaps and
   await select('时间范围', 'custom'); expect(document.querySelectorAll('input[type="datetime-local"]')).toHaveLength(2);
   f.historyFailure(); await select('时间范围', '6h'); expect(page.text()).toContain('历史查询失败'); expect(page.text()).toContain('HTTP 503'); expect(page.text()).toContain('集群容量 · 整个集群');
 });
+// 2026-09-23 裁定：页面自动局部刷新，不提供刷新按钮——趋势的「请求刷新」去掉，预设时间窗每分钟自己前移（回到前台立即补一次）。
+test('preset history windows move forward on their own and keep the charts in place; custom windows stay fixed', async () => {
+  const f = clusterMetricsFixture(); page = await renderApp('/admin/cluster?tab=history');
+  expect([...document.querySelectorAll('button')].map((node) => node.textContent)).not.toContain('请求刷新');
+  const reads = () => f.calls.filter((u) => u.pathname.endsWith('/history')), end = () => Date.parse(reads().at(-1)!.searchParams.get('to')!);
+  const count = reads().length, before = end(), charts = document.querySelectorAll('svg path').length;
+  expect(charts).toBeGreaterThan(2);
+  // 扣住前移后的回执：在途期间上一份曲线留在原处，不闪回「载入中」。
+  const fixture = globalThis.fetch, waiting: URL[] = []; let release = () => {}; const held = new Promise<void>((resolve) => { release = resolve; });
+  globalThis.fetch = (async (raw, init) => { const url = new URL(String(raw), 'http://localhost'); if (url.pathname.endsWith('/history')) { waiting.push(url); await held; } return fixture(raw, init); }) as typeof fetch;
+  await new Promise((resolve) => setTimeout(resolve, 5));
+  await act(async () => { document.dispatchEvent(new Event('visibilitychange')); }); await page.settle();
+  expect(waiting).toHaveLength(1); expect(Date.parse(waiting[0]!.searchParams.get('to')!)).toBeGreaterThan(before);
+  expect(document.querySelectorAll('svg path').length).toBe(charts); expect(page.text()).not.toContain('载入中');
+  await act(async () => release()); await page.settle();
+  expect(reads().length).toBe(count + 1); expect(end()).toBeGreaterThan(before); expect(document.querySelectorAll('svg path').length).toBe(charts);
+  await select('时间范围', 'custom'); const fixed = reads().length;
+  await act(async () => { document.dispatchEvent(new Event('visibilitychange')); }); await page.settle();
+  expect(reads().length).toBe(fixed);
+});
 test('resource formatters preserve real zero, unavailable values and overcommit', () => {
   expect(amount(undefined)).toBe('—'); expect(amount('not numeric')).toBe('—'); expect(amount('0', 'cores')).toBe('0 CPU'); expect(amount('1024', 'bytes/s')).toBe('1 KiB/s'); expect(amount('2', 'ops/s')).toBe('2/s');
   expect(percent('2', '1')).toBe('200%'); expect(percent('1', '0')).toBe('—'); expect(resourceAmount('2', 'example.com/gpu')).toBe('2'); expect(resourceAmount('1024', 'hugepages-2Mi')).toBe('1 KiB');

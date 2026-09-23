@@ -7,7 +7,7 @@ export async function requireAdmin(deps: ClusterDeps, actor: Actor): Promise<voi
 export function completeSnapshot(snapshot: InventorySnapshot): boolean { return snapshot.facts.complete && snapshot.sources.every((s) => s.state === 'complete' || s.state === 'unsupported'); }
 export async function readSnapshot(deps: ClusterDeps, id?: string): Promise<InventorySnapshot> {
   const snapshot = id ? await deps.repository.snapshot(id) : await deps.repository.latest();
-  if (!snapshot) { if (!id) await deps.repository.requestRefresh(); throw new PlatformError(id ? 'not_found' : 'unavailable', id ? '快照已过期，请刷新列表' : '首次采集中，请稍后刷新', id ? { status: 410 } : {}); }
+  if (!snapshot) { if (!id) await deps.repository.requestRefresh(); throw new PlatformError(id ? 'not_found' : 'unavailable', id ? '快照已过期，请刷新列表' : '首次采集尚未完成', id ? { status: 410 } : {}); }
   if (id && deps.clock.now().getTime() - Date.parse(snapshot.finishedAt) > 600_000) throw new PlatformError('not_found', '快照已过期，请刷新列表', { status: 410 });
   return snapshot;
 }

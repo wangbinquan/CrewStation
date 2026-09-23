@@ -28,7 +28,8 @@ export function TopologyDetail({ topology, nodeId, resources, onSelect, onClose,
   const resource = resources.find((r) => r.resourceId === node.resourceId);
   const related = topology.edges.filter((edge) => edge.from === nodeId || edge.to === nodeId).map((edge) => ({ edge, other: topology.nodes.find((n) => n.id === (edge.from === nodeId ? edge.to : edge.from)), outgoing: edge.from === nodeId })).filter((r) => r.other);
   const logs = logsSearchFor(resource);
-  return <Card title={node.title} extra={<Button onClick={onClose}>{t('logs.topology.close')}</Button>} stacked>
+  // 侧栏详情的操作一律在顶部（2026-09-23 作者裁定，RFC-019 修订说明）：详情很长时底部按钮够不着；不套用对象卡的底部操作条。
+  return <Card title={node.title} extra={<Button variant="ghost" onClick={onClose}>{t('logs.topology.close')}</Button>} stacked>
     <p className={styles.line}><Badge tone={statusTone(node.status)}>{node.statusText ?? t(`topology.status.${node.status}`)}</Badge>{node.abnormal ? <Badge tone="warning">{t('logs.topology.attention')}</Badge> : null}<span>{t(`topology.semantic.${node.semantic}`)}{node.subtitle ? ` · ${node.subtitle}` : ''}</span></p>
     {logs ? <div className={styles.actions}><Button onClick={() => onLogs(logs)}>{t('logs.topology.viewLogs')}</Button></div> : null}
     <DefinitionList items={(node.facts ?? []).map(([label, value]) => ({ label, value }))} />

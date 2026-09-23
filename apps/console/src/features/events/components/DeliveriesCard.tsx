@@ -39,7 +39,7 @@ export function DeliveriesCard({ projectId, subscription, onClearSubscription, o
   ];
   return (
     <Card title={t('events.deliveries.title')} extra={<DeliveryStateFilter value={state} onChange={setState} />} footer={t('events.deliveries.replayHint')}>
-      {subscription ? <p>{t('events.deliveries.subscriptionFilter')} <code>{subscription}</code> <Button onClick={onClearSubscription}>{t('events.deliveries.clearFilter')}</Button></p> : null}
+      {subscription ? <p>{t('events.deliveries.subscriptionFilter')} <code>{subscription}</code> <Button size="small" onClick={onClearSubscription}>{t('events.deliveries.clearFilter')}</Button></p> : null}
       {replay.error === null ? null : <ActionNote tone="error">{t('events.deliveries.replayError', { message: errorMessage(replay.error) })}</ActionNote>}
       <QueryStatus
         isPending={deliveries.isPending}

@@ -38,11 +38,12 @@ async function spacing(page: Page, label: string, row = false) {
   })()`);
 }
 
-async function providerHeaderSpacing(page: Page) {
+/** 卡片头里的列表级动作（「新增身份提供方」「添加订阅」）：量标题与按钮、标题栏与正文之间的真实留白。 */
+async function headerSpacing(page: Page, label: string) {
   return page.eval<{ titleGap: number; bodyGap: number; height: number; width: number; containerWidth: number; overflow: number }>(`(() => {
-    const button = [...document.querySelectorAll('button')].find((node) => node.textContent.trim() === '新增身份提供方');
+    const button = [...document.querySelectorAll('button')].find((node) => node.textContent.trim() === ${JSON.stringify(label)});
     const header = button?.closest('header'), title = header?.querySelector('h2'), content = header?.nextElementSibling?.firstElementChild;
-    if (!button || !header || !title || !content) throw new Error('Missing identity provider header or content');
+    if (!button || !header || !title || !content) throw new Error('Missing card header or content: ' + ${JSON.stringify(label)});
     const action = button.getBoundingClientRect(), heading = title.getBoundingClientRect(), container = header.getBoundingClientRect();
     return {
       titleGap: Math.max(action.left - heading.right, action.top - heading.bottom),
@@ -53,15 +54,28 @@ async function providerHeaderSpacing(page: Page) {
   })()`);
 }
 
+/** 「签发推送凭据」与上方 Dockerfile 框之间的真实距离（2026-09-23 起按钮在卡片底部操作条里，RFC-003 design §6）。 */
+async function sampleToIssueSpacing(page: Page) {
+  return page.eval<{ gap: number; height: number; width: number; containerWidth: number; overflow: number }>(`(() => {
+    const button = [...document.querySelectorAll('button')].find((node) => node.textContent.trim() === '签发推送凭据');
+    const sample = document.querySelector('pre[aria-label="示例 Dockerfile"]');
+    if (!button || !sample) throw new Error('Missing issue button or sample Dockerfile');
+    const rect = button.getBoundingClientRect();
+    return {
+      gap: rect.top - sample.getBoundingClientRect().bottom, height: rect.height, width: rect.width,
+      containerWidth: button.parentElement.getBoundingClientRect().width, overflow: document.documentElement.scrollWidth - innerWidth,
+    };
+  })()`);
+}
+
 describe.skipIf(!session)('卡片操作区的真实布局间距', () => {
   test.each([1280, 390])('%dpx：镜像示例与凭据操作之间留白，按钮保持自然尺寸', async (width) => {
     const page = session!.admin;
     await viewport(page, width);
     await open(page, '/admin/compute');
-    const actual = await spacing(page, '签发推送凭据', true);
+    const actual = await sampleToIssueSpacing(page);
     // 实机故障是按钮与 Dockerfile 框相距 0px；DOM 存在或 className 正确都不能证明修复。
-    expect(actual.before).not.toBeNull();
-    expect(actual.before!).toBeGreaterThanOrEqual(8);
+    expect(actual.gap).toBeGreaterThanOrEqual(8);
     expect(actual.height).toBeLessThan(60);
     expect(actual.width).toBeLessThan(actual.containerWidth);
     expect(actual.overflow).toBeLessThanOrEqual(1);
@@ -72,7 +86,7 @@ describe.skipIf(!session)('卡片操作区的真实布局间距', () => {
     const page = session!.admin;
     await viewport(page, width);
     await open(page, '/admin/authentication');
-    const actual = await providerHeaderSpacing(page);
+    const actual = await headerSpacing(page, '新增身份提供方');
     // RFC-014 将新增操作移到标题栏；仍锁住标题与按钮、标题栏与列表／空态的真实间距。
     expect(actual.titleGap).toBeGreaterThanOrEqual(8);
     expect(actual.bodyGap).toBeGreaterThanOrEqual(8);
@@ -119,8 +133,9 @@ describe.skipIf(!session?.project)('项目操作区的真实布局间距', () =>
     const page = session!.admin;
     await viewport(page, 390);
     await open(page, `/projects/${session!.project!.id}/operations?tab=alerts`);
-    const add = await spacing(page, '添加订阅');
-    expect(add.before!).toBeGreaterThanOrEqual(8);
+    // 2026-09-23 起「添加订阅」在订阅卡片头（装列表的卡片，新增动作放标题行右侧）。
+    const add = await headerSpacing(page, '添加订阅');
+    expect(add.titleGap).toBeGreaterThanOrEqual(8); expect(add.bodyGap).toBeGreaterThanOrEqual(8); expect(add.width).toBeLessThan(add.containerWidth);
     await open(page, `/projects/${session!.project!.id}/operations?tab=trace`);
     const query = await spacing(page, '查询调用链');
     expect(query.before!).toBeGreaterThanOrEqual(8);

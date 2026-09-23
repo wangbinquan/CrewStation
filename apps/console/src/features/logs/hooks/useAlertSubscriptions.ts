@@ -4,7 +4,6 @@ import type { AlertSubscriptionDto, SetAlertSubscriptionRequest } from '@crewsta
 import { api } from '../../../shared/api/client';
 import { queryKeys } from '../../../shared/api/queryKeys';
 import { errorMessage, useApiQuery } from '../../../shared/api/useApi';
-import { usePolledRefresh } from '../../../shared/lib/useManualRefresh';
 import { useT } from '../../../shared/lib/useT';
 import { emptyAlertSubscription, sameSubscription, subscriptionDraft, validateAlertSubscription } from './alertSubscriptionDraft';
 import type { AlertSubscriptionDraft } from './alertSubscriptionDraft';
@@ -16,8 +15,7 @@ export function useAlertSubscriptions(projectId: string, canManage: boolean) {
     const response = await api.observability.alertSubscriptions(projectId);
     const parsed = AlertSubscriptionDtoSchema.array().safeParse(response.items);
     if (!parsed.success || parsed.data.some((row) => row.projectId !== projectId)) throw new Error(t('logs.alerts.mismatch')); return { items: parsed.data };
-  });
-  const { refresh, refreshing } = usePolledRefresh(query.refetch, 5_000);
+  }, { refetchIntervalMs: 5_000, refetchOnWindowFocus: true }); // 订阅每 5 秒在原位重读，不提供刷新按钮（2026-09-23 裁定）
   const members = useApiQuery(queryKeys.members(projectId), () => api.projects.listMembers(projectId));
   const [draft, setDraft] = useState(emptyAlertSubscription), [baseline, setBaseline] = useState(emptyAlertSubscription);
   const [open, setOpen] = useState(false), [editing, setEditing] = useState(false), [replacement, setReplacement] = useState<{ record?: AlertSubscriptionDto }>();
@@ -51,7 +49,7 @@ export function useAlertSubscriptions(projectId: string, canManage: boolean) {
     } catch (cause) { setError(errorMessage(cause)); }
     finally { setReview(undefined); await query.refetch(); lock.current = false; setBusy(false); }
   };
-  return { query, members, refresh, refreshing, draft, setDraft, open, editing, replacement, setReplacement, apply, review, setReview, busy, error, success, errors, setErrors, dirty, unavailable, stale, start, prepare, confirm, canManage,
+  return { query, members, draft, setDraft, open, editing, replacement, setReplacement, apply, review, setReview, busy, error, success, errors, setErrors, dirty, unavailable, stale, start, prepare, confirm, canManage,
     close: () => { if (!lock.current && !review) setOpen(false); }, resume: () => setOpen(true),
     name: (userId: string) => { const user = members.data?.items.find((member) => member.userId === userId); return !members.error && user ? `${user.name} · ${user.email}` : userId; } };
 }

@@ -7,13 +7,15 @@ export function clusterFixture(options: { admin?: boolean; loseReceipt?: boolean
   let summary: ClusterSummary = { snapshotId: 'snapshot-1', startedAt: time, finishedAt: time, complete: !options.partial, total: 250, workloads: 205, pods: 32, runningPods: 30, readyPods: 29, standalonePods: 6, services: 5, pvcs: 8, abnormal: 3, kinds: { Deployment: 205, Pod: 32 }, phases: { Running: 30 }, purposes: {}, projects: [{ id: projectId, name: '集群验收', ...(options.partial ? {} : { workloads: 1, pods: 1, readyPods: 1, abnormal: 0, devSessions: 0 }) }], sources: options.partial ? [{ key: 'cs-cluster-demo/Pod', kind: 'Pod', namespace: 'cs-cluster-demo', batchId: 'batch', resourceVersion: 'v1', state: 'stale', count: 32, observedAt: time, reason: '采集暂时不可达' }] : [] };
   ClusterResourceSchema.parse(row); ClusterSummarySchema.parse(summary);
   let inspection: ClusterInspection | undefined, operation: ClusterOperation | undefined;
+  // 过期（410）的快照：摘要与资源清单按它读取都得到 410。
+  const expired = new Set(['expired']);
   // 保留回执不返回，用来断言换快照在途时页面上还剩什么。
   let held: Promise<void> | undefined, heldPaths: readonly string[] = [];
   globalThis.fetch = (async (raw, init) => {
     const url = new URL(String(raw), 'http://localhost'), method = init?.method ?? 'GET', body = init?.body ? JSON.parse(String(init.body)) as Record<string, unknown> : {};
     calls.push({ path: url.pathname, method, body, query: url.searchParams }); let data: unknown = { items: [] }, status = 200;
     if (url.pathname === '/v1/me') data = { id: 'admin', name: '管理员', platformRole: options.admin === false ? 'developer' : 'admin', isAdmin: options.admin !== false, memberships: [] };
-    else if (url.pathname.endsWith('/summary')) { if (url.searchParams.get('snapshotId') === 'expired') { status = 410; data = { error: 'not_found', message: '快照已过期，请刷新列表' }; } else data = summary; }
+    else if (url.pathname.endsWith('/summary') || url.pathname.endsWith('/resources') && expired.has(url.searchParams.get('snapshotId') ?? '')) { if (expired.has(url.searchParams.get('snapshotId') ?? '')) { status = 410; data = { error: 'not_found', message: '快照已过期，请刷新列表' }; } else data = summary; }
     else if (url.pathname.endsWith('/resources') && url.searchParams.get('scope') === 'system') data = { snapshotId: summary.snapshotId, complete: summary.complete, items: [{ ...row, resourceId: 'system-api', uid: 'uid-cs-api', name: 'cs-api', namespace: 'crewstation-system', ownership: { scope: 'system', component: 'cs-api' }, purpose: 'platform-service', slotRole: undefined, physicalSlot: undefined }], total: 1 };
     else if (url.pathname.endsWith('/resources') && url.searchParams.get('scope') === 'project' && url.searchParams.get('limit') === '100') data = { snapshotId: summary.snapshotId, complete: summary.complete, items: [row], total: 1 };
     else if (url.pathname.endsWith('/resources')) data = { snapshotId: summary.snapshotId, complete: summary.complete, items: [row], total: 205, ...(url.searchParams.has('cursor') ? {} : { nextCursor: 'cursor-2' }) };
@@ -42,6 +44,8 @@ export function clusterFixture(options: { admin?: boolean; loseReceipt?: boolean
   return { calls, row, projectId, summary,
     /** 后台采集换了一份快照：下一次摘要读取给出新的 snapshotId。 */
     newSnapshot: (snapshotId: string) => { summary = { ...summary, snapshotId }; },
+    /** 快照过了保留期：之后按它读取摘要或资源清单都得到 410。 */
+    expire: (snapshotId: string) => { expired.add(snapshotId); },
     /** 扣住给定路径的回执，返回放行函数。 */
     hold: (...paths: readonly string[]) => { let open = () => {}; heldPaths = paths; held = new Promise<void>((resolve) => { open = () => { held = undefined; heldPaths = []; resolve(); }; }); return open; },
     attention: () => { if (operation) operation = { ...operation, phase: 'needs-attention', httpStatus: 504, reason: '等待期限已到' }; } };

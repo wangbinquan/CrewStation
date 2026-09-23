@@ -4,7 +4,6 @@ import { api } from '../../../shared/api/client';
 import { queryKeys } from '../../../shared/api/queryKeys';
 import { useApiQuery } from '../../../shared/api/useApi';
 import { useT } from '../../../shared/lib/useT';
-import { Button } from '../../../shared/ui/Button';
 import { QueryStatus } from '../../../shared/ui/QueryStatus';
 import type { ClusterSearch } from '../model/clusterSearch';
 import { CapacityDetails, CapacityTiles } from './ClusterCapacity';
@@ -14,9 +13,6 @@ interface Props {
   readonly summary?: ClusterSummary;
   readonly pending: boolean;
   readonly error: unknown;
-  /** 摘要用的快照已过期：给一个读取最新快照的入口。 */
-  readonly expired: boolean;
-  readonly newSnapshot: () => void;
   /** 点计数格：进「资源清单」的对应视图，带上该格的筛选。 */
   readonly select: (patch: ClusterSearch) => void;
 }
@@ -27,7 +23,7 @@ const COUNTS: readonly { readonly key: 'workloads' | 'pods' | 'services' | 'pvcs
 ];
 
 /** 顶部指标条（2026-09-23 裁定）：集群容量五格＋受管资源计数五格一行，窄屏两组各自换行；采集状态与明细在下面一行折叠。 */
-export function ClusterOverviewStrip({ summary: s, pending, error, expired, newSnapshot, select }: Props): ReactElement {
+export function ClusterOverviewStrip({ summary: s, pending, error, select }: Props): ReactElement {
   const t = useT(), capacity = useApiQuery(queryKeys.cluster('capacity'), () => api.cluster.capacity(), { refetchIntervalMs: 15_000, refetchOnWindowFocus: true });
   const c = capacity.data;
   return <section className={styles.overview} aria-label={t('cluster.overview')}>
@@ -40,7 +36,7 @@ export function ClusterOverviewStrip({ summary: s, pending, error, expired, newS
         </button>)}
       </div></div>
     </div>
-    <QueryStatus isPending={pending} error={error} />{expired ? <Button onClick={newSnapshot}>{t('cluster.newSnapshot')}</Button> : null}
+    <QueryStatus isPending={pending} error={error} />
     {s || c ? <div className={`${styles.status} ${s && !s.complete ? styles.warning : styles.muted}`}>
       <p>{s ? `${s.complete ? t('cluster.complete') : t('cluster.partial')} · ${t('cluster.observed')} ${new Date(s.finishedAt).toLocaleString()}` : null}{s && c ? ' · ' : null}{c ? t('cluster.metrics.capacityObserved', { time: new Date(c.observedAt).toLocaleString(), state: t(`cluster.metricState.${c.state}`) }) : null}</p>
       <details><summary>{t('cluster.strip.more')}</summary>

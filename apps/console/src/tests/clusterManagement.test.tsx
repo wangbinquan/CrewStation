@@ -92,8 +92,26 @@ test('namespace filter is URL state; events/containers/logs use selected UID, pr
   await page.click('关闭详情'); const namespace = [...document.querySelectorAll('label')].find((l) => l.textContent === '命名空间')!.querySelector('input')!; namespace.id = 'cluster-namespace';
   await input('#cluster-namespace', 'cs-specific'); expect(page.search().namespace).toBe('cs-specific');
 });
-test('expired snapshot offers a real refresh path and does not silently retain the expired cursor', async () => {
-  clusterFixture(); page = await renderApp('/admin/cluster?snapshotId=expired&cursor=old'); expect(page.text()).toContain('快照已过期'); await page.click('读取最新快照'); expect(page.search().snapshotId).toBeUndefined(); expect(page.search().cursor).toBeUndefined();
+// 2026-09-23 裁定：页面自动局部刷新，不提供刷新按钮——「请求刷新」「读取最新快照」都去掉，快照过期自动回到最新快照的第一页。
+test('expired snapshot in the URL resets to the latest snapshot on its own: the expired cursor is dropped, no error and no refresh button', async () => {
+  const f = clusterFixture(); page = await renderApp('/admin/cluster?snapshotId=expired&cursor=old');
+  expect(page.search().snapshotId).toBeUndefined(); expect(page.search().cursor).toBeUndefined();
+  expect(page.text()).toContain('运行 30 · 就绪 29'); expect(page.text()).not.toContain('快照已过期');
+  const labels = [...document.querySelectorAll('button')].map((node) => node.textContent);
+  expect(labels).not.toContain('读取最新快照'); expect(labels).not.toContain('请求刷新');
+  expect(f.calls.some((c) => c.path.endsWith('/refresh'))).toBe(false);
+});
+test('a list whose snapshot expires underneath it waits for the next snapshot instead of showing the expiry', async () => {
+  const f = clusterFixture(); page = await renderApp('/admin/cluster?tab=workloads'); expect(page.text()).toContain('符合筛选的资源：205');
+  // 后台换了快照、旧快照过了保留期；清单先按旧快照重读得到 410，摘要的回执还在路上。
+  f.expire('snapshot-1'); f.newSnapshot('snapshot-2'); const release = f.hold('/summary');
+  await act(async () => { focusManager.setFocused(false); focusManager.setFocused(true); }); await page.settle();
+  const lastList = () => f.calls.filter((c) => c.path.endsWith('/resources')).at(-1);
+  expect(lastList()?.query.get('snapshotId')).toBe('snapshot-1');
+  expect(page.text()).not.toContain('快照已过期'); expect([...document.querySelectorAll('button')].map((node) => node.textContent)).not.toContain('读取最新快照');
+  await act(async () => release()); await page.settle();
+  expect(lastList()?.query.get('snapshotId')).toBe('snapshot-2');
+  expect(page.text()).toContain('符合筛选的资源：205'); expect(page.text()).not.toContain('快照已过期');
 });
 
 test('采集换快照时列表与详情原地替换，不卸载、不闪回载入中', async () => {

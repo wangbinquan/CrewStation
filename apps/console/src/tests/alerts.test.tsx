@@ -24,8 +24,10 @@ test('真实告警状态、最近记录筛选和指定详情；槽由结构化�
 test('告警或订阅失败显示未确认而不是空记录，另一块仍可用；错项目记录不混入', async () => {
   const f = alertsFixture(); f.state.failAlerts = true; page = await renderApp(`${route}&alertId=${alertId}`);
   expect(page.text()).toContain('读取告警失败'); expect(page.text()).not.toContain('最近记录中没有告警'); expect(page.text()).toContain('王负责人');
-  f.state.failAlerts = false; f.state.wrongProject = true; await click('刷新告警'); expect(page.text()).toContain('返回记录与当前项目不一致');
-  f.state.wrongProject = false; await click('刷新告警'); f.state.failSubscriptions = true; await click('刷新订阅'); expect(page.text()).toContain('读取订阅失败'); expect(page.text()).not.toContain('尚未配置通知订阅'); expect(page.text()).toContain('preview 健康未通过');
+  // 2026-09-23 裁定：没有刷新按钮，告警与订阅每 5 秒自动重读；reread 模拟一次自动重读。
+  expect(button('刷新告警')).toBeUndefined(); expect(button('刷新订阅')).toBeUndefined();
+  f.state.failAlerts = false; f.state.wrongProject = true; await page.reread(); expect(page.text()).toContain('返回记录与当前项目不一致');
+  f.state.wrongProject = false; await page.reread(); f.state.failSubscriptions = true; await page.reread(); expect(page.text()).toContain('读取订阅失败'); expect(page.text()).not.toContain('尚未配置通知订阅'); expect(page.text()).toContain('preview 健康未通过');
 });
 
 test('成员选择自动填入 ID，完整字段约束和同时错误；失败保留草稿，保存不宣称送达', async () => {
@@ -40,7 +42,7 @@ test('成员选择自动填入 ID，完整字段约束和同时错误；失败�
 
 test('具名移除可取消；确认时记录变化阻止删除，重新检查后仅删除目标订阅', async () => {
   const f = alertsFixture(); page = await renderApp(route); await click('移除 王负责人 · owner@test.invalid'); await click('取消'); expect(f.writes).toHaveLength(0);
-  await click('移除 王负责人 · owner@test.invalid'); f.state.subscriptions[0]!.channel = 'webhook'; f.state.subscriptions[0]!.target = 'https://changed.example.test/hook'; await click('刷新订阅');
+  await click('移除 王负责人 · owner@test.invalid'); f.state.subscriptions[0]!.channel = 'webhook'; f.state.subscriptions[0]!.target = 'https://changed.example.test/hook'; await page.reread();
   expect(button('确认移除订阅')?.disabled).toBe(true); expect(page.text()).toContain('订阅记录已变化'); await click('取消'); await click('移除 王负责人 · owner@test.invalid'); await click('确认移除订阅');
   expect(f.writes).toEqual([{ method: 'DELETE', path: `/v1/projects/${projectId}/alert-subscriptions/${ownerId}`, body: {} }]); expect(page.text()).toContain('告警记录仍保留'); expect(page.text()).toContain('preview 健康未通过');
 });

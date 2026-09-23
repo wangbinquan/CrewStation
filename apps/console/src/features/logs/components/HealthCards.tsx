@@ -52,7 +52,7 @@ export function HealthCards({ projectId, onLogs }: { readonly projectId: string;
                 <dt>{t('logs.health.lastTransitionAt')}</dt>
                 <dd>{dateText(slot.lastTransitionAt)}</dd>
               </dl>
-              {onLogs ? <Button onClick={() => onLogs(slot.slot)}>{t('logs.health.viewLogs')}</Button> : null}
+              {onLogs ? <div className={styles.actions}><Button onClick={() => onLogs(slot.slot)}>{t('logs.health.viewLogs')}</Button></div> : null}
             </div>
           ))}
         </div>

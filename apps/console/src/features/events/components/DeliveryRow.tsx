@@ -30,12 +30,12 @@ export function DeliveryRow({ delivery, canReplay, isReplaying, onReplay, onTrac
           <DeliveryStateBadge state={delivery.state} />
         </td>
         <td className={styles.attempts}>{delivery.attempts}</td>
-        <td className={styles.trace}>{onTrace ? <Button onClick={() => onTrace(delivery.traceId)}>{delivery.traceId}</Button> : delivery.traceId}</td>
+        <td className={styles.trace}>{onTrace ? <Button variant="ghost" size="small" onClick={() => onTrace(delivery.traceId)}>{delivery.traceId}</Button> : delivery.traceId}</td>
         <td className={styles.time}>{dateText(delivery.deliveredAt)}</td>
         <td className={styles.time}>{dateText(delivery.nextAttemptAt)}</td>
         <td>
           {delivery.state === 'dead' ? (
-            <Button disabled={!replayable || isReplaying} title={replayable ? undefined : t('events.deliveries.replayHint')} onClick={() => onReplay(delivery.id)}>
+            <Button size="small" disabled={!replayable || isReplaying} title={replayable ? undefined : t('events.deliveries.replayHint')} onClick={() => onReplay(delivery.id)}>
               {isReplaying ? t('events.deliveries.replaying') : t('events.deliveries.replay')}
             </Button>
           ) : (

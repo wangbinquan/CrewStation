@@ -68,7 +68,8 @@ export function ClusterTopology({ search, change, go, summary, snapshotId }: Pro
   const error = system.error ?? projectResources.error ?? project.error ?? slots.error ?? dataResources.error ?? (devSession.error && devSession.error.status !== 404 ? devSession.error : null);
   const detail = node ? (node.resourceId ? <ClusterDetail key={node.resourceId} resourceId={node.resourceId} snapshotId={snapshotId} close={() => setSelected(undefined)} onOperation={(id) => go({ ...search, operationId: id })}
       select={(row) => { const target = topology?.nodes.find((n) => n.resourceId === row.resourceId); if (target) setSelected(target.id); else go({ ...search, tab: 'pods', resourceId: row.resourceId }); }} />
-    : <Card title={node.title} extra={<Button onClick={() => setSelected(undefined)}>{t('cluster.close')}</Button>} stacked>
+    : <Card title={node.title} extra={<Button variant="ghost" onClick={() => setSelected(undefined)}>{t('cluster.close')}</Button>} stacked>
+      {/* 侧栏详情的操作一律在顶部（2026-09-23 作者裁定，RFC-019 修订说明），不套用对象卡的底部操作条。 */}
       {node.id.startsWith('project:') ? <div className={styles.actions}><Button variant="primary" onClick={() => openProject(node.id.slice('project:'.length))}>{t('cluster.topology.expand')}</Button></div> : null}
       <DefinitionList items={(node.facts ?? []).map(([label, value]) => ({ label, value }))} />
     </Card>) : undefined;

@@ -20,7 +20,7 @@ export function ClusterDetail({ resourceId, snapshotId, close, select, onOperati
   const detail = useApiQuery(queryKeys.cluster('detail', request), () => api.cluster.detail(resourceId, snapshotId), { keepPrevious: (previous) => sameApartFromSnapshot(previous, request) });
   const r = detail.data?.resource, panel = useRef<HTMLElement>(null);
   useEffect(() => { if (r?.uid) panel.current?.focus(); }, [r?.uid]);
-  return <section ref={panel} tabIndex={-1} aria-label={t('cluster.detail')}><Card title={r?.name ?? t('cluster.detail')} extra={<Button onClick={close}>{t('cluster.close')}</Button>} className={styles.detail} stacked><QueryStatus isPending={detail.isPending} error={detail.error} />{r ? <>
+  return <section ref={panel} tabIndex={-1} aria-label={t('cluster.detail')}><Card title={r?.name ?? t('cluster.detail')} extra={<Button variant="ghost" onClick={close}>{t('cluster.close')}</Button>} className={styles.detail} stacked><QueryStatus isPending={detail.isPending} error={detail.error} />{r ? <>
     <p>{r.kind} · {r.namespace} · <Ownership row={r} /></p>
     {/* 操作放在详情顶部：概览很长，放在末尾要滚过整页才够得着；各页签都能直接操作。 */}
     <ClusterActionPanel row={r} onOperation={onOperation} />

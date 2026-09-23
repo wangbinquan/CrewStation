@@ -18,7 +18,7 @@ export function TracePage({ projectId, traceId, onTrace }: { readonly projectId:
   return <Card stacked compact title={t('operations.tab.trace')}>
     <form onSubmit={(event) => { event.preventDefault(); const result = TraceIdSchema.safeParse(draft.trim()); setInvalid(!result.success); if (result.success) onTrace(result.data); else field.current?.focus(); }}><Stack>
       <FormField label="Trace ID" hint={t('logs.trace.hint')} hintId={`${fieldId}-hint`} errorId={`${fieldId}-error`} error={invalid ? t('logs.trace.invalid') : undefined}><input ref={field} aria-describedby={`${fieldId}-hint`} aria-errormessage={invalid ? `${fieldId}-error` : undefined} aria-invalid={invalid} value={draft} onChange={(event) => setDraft(event.target.value)} /></FormField>
-      <Button type="submit">{t('logs.trace.load')}</Button>
+      <Button type="submit" variant="primary">{t('logs.trace.load')}</Button>
     </Stack></form>
     {traceId ? <QueryStatus isPending={trace.isPending} error={trace.error} isEmpty={trace.data?.events.length === 0 && trace.data.tasks.length === 0 && trace.data.subtasks.length === 0 && trace.data.sessionIds.length === 0} emptyTitle={t('logs.trace.empty')} /> : null}
     {trace.data ? <>
