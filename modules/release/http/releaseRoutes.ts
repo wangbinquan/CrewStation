@@ -26,6 +26,8 @@ export function releaseRoutes(api: ReleaseModuleApi, isAdmin: (userId: UserId) =
   r.post('/v1/services/:serviceId/slots/preview/offline', async (c) => { const who = await actor(c); return c.json({ items: await api.takeOffline(who, parseParams(c, serviceParams).serviceId as ServiceId, await parseBody(c, TakeOfflineRequestSchema)) }); });
   r.post('/v1/services/:serviceId/slots/preview/postpone', async (c) => { const who = await actor(c); return c.json({ items: await api.postponeOffline(who, parseParams(c, serviceParams).serviceId as ServiceId, await parseBody(c, PostponeOfflineRequestSchema)) }); });
   r.post('/v1/releases/:releaseId/redeploy', async (c) => { const who = await actor(c); return c.json(await api.redeploy(who, parseParams(c, z.object({ releaseId: ReleaseIdSchema })).releaseId as ReleaseId, await parseBody(c, RedeployRequestSchema)), 202); });
+  // RFC-025 统一预检：重新部署弹窗选中版本时先问一次，不通过时写明原因（只读）。
+  r.get('/v1/releases/:releaseId/redeploy-precheck', async (c) => c.json(await api.redeployPrecheck(await actor(c), parseParams(c, z.object({ releaseId: ReleaseIdSchema })).releaseId as ReleaseId)));
   r.get('/v1/services/:serviceId/slot-events', async (c) => { const who = await actor(c); return c.json({ items: await api.listSlotEvents(who, parseParams(c, serviceParams).serviceId as ServiceId) }); });
   r.get('/v1/admin/settings/auto-offline', async (c) => c.json(await api.getAutoOfflinePolicy(await actor(c))));
   r.put('/v1/admin/settings/auto-offline', async (c) => { const who = await actor(c); return c.json(await api.setAutoOfflinePolicy(who, await parseBody(c, SetAutoOfflinePolicyRequestSchema))); });

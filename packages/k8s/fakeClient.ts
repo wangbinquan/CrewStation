@@ -52,8 +52,9 @@ export function createFakeK8sClient(): FakeK8sClient {
       objects.set(key, stored);
       return stored;
     },
-    apply: async (obj) => {
+    apply: async (obj, options) => {
       const stored = stamp(obj);
+      if (options?.dryRun) return stored;
       objects.set(keyFor(refOf(obj), obj.metadata.name, obj.metadata.namespace), stored);
       applied.push(stored);
       return stored;

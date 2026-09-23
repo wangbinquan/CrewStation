@@ -38,6 +38,8 @@ export interface SlotStatus {
 /** 部署：一个物理槽对应一个 Deployment 与一个 Service，名字 `<service>-<physical>`。 */
 export interface SlotDeployer {
   deploy(spec: SlotDeploySpec): Promise<void>;
+  /** 同样的对象以服务端 dry-run 提交一次，不改集群（统一预检，RFC-025 设计 §5）；API Server 拒绝时抛出它给的原因。 */
+  dryRun(spec: SlotDeploySpec): Promise<void>;
   status(namespace: string, serviceName: string, physical: PhysicalSlot): Promise<SlotStatus>;
   remove(namespace: string, serviceName: string, physical: PhysicalSlot): Promise<void>;
   /**

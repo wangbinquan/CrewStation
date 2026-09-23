@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { ReleaseStatusSchema, SlotNameSchema } from '../events/topics';
 import { ReleaseIdSchema, ServiceIdSchema, UserIdSchema } from '../ids';
+import { ResourceReasonSchema } from './resources/resourceRecord';
 import { FullCommitShaSchema } from './scm';
 
 /** 待命槽下线的原因（RFC-021）：手动、切流后回退目标保留期满、待验证版本无人访问、集群管理删除。 */
@@ -77,6 +78,8 @@ export const TakeOfflineRequestSchema = z.object({ expectedReleaseId: ReleaseIdS
 export const PostponeOfflineRequestSchema = z.object({ expectedDeadline: z.iso.datetime() }).strict();
 /** 重新部署到待命槽：确认时待命槽上的版本，null 表示当时待命槽为空。 */
 export const RedeployRequestSchema = z.object({ expectedStandbyReleaseId: ReleaseIdSchema.nullable() }).strict();
+/** 重新部署的预检（RFC-025 设计 §5）：不通过时给标准原因（原因码、说明、出路）；确认时同样的原因以 412 返回。 */
+export const RedeployPrecheckDtoSchema = z.object({ ok: z.boolean(), reason: ResourceReasonSchema.optional() }).strict();
 
 export const SlotEventKindSchema = z.enum(['offline', 'redeploy', 'postpone', 'reminder']);
 /** 待命槽的生命周期记录：下线、重新部署、推迟、提醒；进时间线。 */
@@ -140,6 +143,7 @@ export type SlotOfflineDto = z.infer<typeof SlotOfflineDtoSchema>;
 export type TakeOfflineRequest = z.infer<typeof TakeOfflineRequestSchema>;
 export type PostponeOfflineRequest = z.infer<typeof PostponeOfflineRequestSchema>;
 export type RedeployRequest = z.infer<typeof RedeployRequestSchema>;
+export type RedeployPrecheckDto = z.infer<typeof RedeployPrecheckDtoSchema>;
 export type SlotEventKind = z.infer<typeof SlotEventKindSchema>;
 export type SlotEventDto = z.infer<typeof SlotEventDtoSchema>;
 export type AutoOfflinePolicyDto = z.infer<typeof AutoOfflinePolicyDtoSchema>;

@@ -26,6 +26,8 @@ export function slotLifecycleFixture(role: Role = 'owner', admin = false) {
     slots: [slot('prod', releases[0]!), slot('preview', releases[1]!, { retention: { kind: 'rollback-target', since: at(2), deadline: at(74), remindedAt: at(50), postponable: true, postponements: 0, periodHours: 72 } })],
     slotEvents: [] as SlotEventDto[], maintenance: null as MaintenanceDto | null, history: [] as MaintenanceEventDto[],
     fail: undefined as { readonly status: number; readonly message: string } | undefined,
+    /** 重新部署的统一预检（RFC-025）：按发布给出拒绝原因，缺省都通过。 */
+    precheck: {} as Record<string, { readonly code: string; readonly message: string; readonly hint?: string }>,
   };
   const writes: Array<{ readonly method: string; readonly path: string; readonly body: Record<string, unknown> }> = [];
   const standbyEvent = (kind: SlotEventDto['kind'], of: ReleaseDto, extra: Partial<SlotEventDto> = {}) => state.slotEvents.unshift({ id: `${kind}-${state.slotEvents.length}`, serviceId, kind, releaseId: of.id, tag: of.tag, actorUserId: ownerId, at: at(10), ...extra } as SlotEventDto);
@@ -56,6 +58,7 @@ export function slotLifecycleFixture(role: Role = 'owner', admin = false) {
     if (path === `/v1/workbench/project-summaries/${projectId}`) return [testerSummaryFixture(projectId, serviceId), 200];
     if (path.endsWith('/slots')) return [{ items: state.slots }, 200];
     if (path.endsWith('/releases')) return [{ items: releases }, 200];
+    if (path.endsWith('/redeploy-precheck')) { const reason = state.precheck[path.split('/')[3] ?? '']; return [reason ? { ok: false, reason } : { ok: true }, 200]; }
     if (path.startsWith('/v1/releases/')) return [releases.find((item) => path.endsWith(item.id)), 200];
     if (path.endsWith('/slot-events')) return [{ items: state.slotEvents }, 200];
     if (path.endsWith('/maintenance')) return [{ current: state.maintenance, history: state.history }, 200];

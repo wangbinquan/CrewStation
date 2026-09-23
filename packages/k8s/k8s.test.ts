@@ -32,6 +32,22 @@ describe('对象构造器', () => {
   });
 });
 
+describe('服务端 dry-run（RFC-025 统一预检）', () => {
+  test('dryRun 时 apply 带 dryRun=All，照常经 API Server 校验；内存客户端不落库', async () => {
+    const urls: string[] = [];
+    const client = createK8sClient({ server: 'https://cluster', token: 'token', defaultNamespace: 'default' }, (async (url: string) => { urls.push(url); return Response.json({ apiVersion: 'v1', kind: 'ConfigMap', metadata: { name: 'a' } }); }) as typeof fetch);
+    const obj = { apiVersion: 'v1', kind: 'ConfigMap', metadata: { name: 'a', namespace: 'ns' }, data: {} };
+    await client.apply(obj, { dryRun: true });
+    await client.apply(obj);
+    expect(new URL(urls[0]!).searchParams.get('dryRun')).toBe('All');
+    expect(new URL(urls[1]!).searchParams.has('dryRun')).toBe(false);
+    const fake = createFakeK8sClient();
+    await fake.apply(obj, { dryRun: true });
+    expect(fake.applied).toHaveLength(0);
+    expect(await fake.get(Resources.ConfigMap!, 'a', 'ns')).toBeUndefined();
+  });
+});
+
 describe('内存客户端', () => {
   test('apply 幂等、list 按标签过滤、delete 返回是否存在', async () => {
     const k = createFakeK8sClient();

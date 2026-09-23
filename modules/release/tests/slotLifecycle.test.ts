@@ -3,6 +3,7 @@ import type { Actor, ProjectId, ReleaseDto, ServiceId, SlotDto, UserId } from '@
 import { IDENTITY_HEADERS } from '@crewstation/contracts';
 import { eventbusMigrations } from '@crewstation/eventbus';
 import { createApp } from '@crewstation/http';
+import type { K8sClient } from '@crewstation/k8s';
 import { createFakeK8sClient, LABELS, Resources } from '@crewstation/k8s';
 import { forbidden } from '@crewstation/kernel';
 import { queueMigrations } from '@crewstation/queue';
@@ -28,8 +29,15 @@ const manifest = (migration = '{ compatibility: none, destructive: false, rollba
 
 async function fixture() {
   database = await createTestDatabase([eventbusMigrations, queueMigrations, releaseMigrations]);
-  const k8s = createFakeK8sClient();
-  const state = { now: new Date('2026-09-23T00:00:00.000Z'), yaml: manifest(), window: false, version: 0 };
+  const state = { now: new Date('2026-09-23T00:00:00.000Z'), yaml: manifest(), window: false, version: 0, rejectDryRun: undefined as string | undefined, rejectDeploy: undefined as string | undefined, planGone: false };
+  // API Server 的拒绝：dry-run（统一预检）与真正部署各自可以设一个原因，只针对 Deployment。
+  const fake = createFakeK8sClient();
+  const apply = (async (obj, options) => {
+    const refusal = obj.kind === 'Deployment' ? (options?.dryRun ? state.rejectDryRun : state.rejectDeploy) : undefined;
+    if (refusal) throw new Error(refusal);
+    return fake.apply(obj, options);
+  }) as K8sClient['apply'];
+  const k8s = { ...fake, apply };
   const notices: Array<{ users: UserId[]; message: string }> = [];
   const release = createReleaseModule({
     db: database.db, k8s, isAdmin: async (id) => id === admin.userId, clock: { now: () => new Date(state.now) },
@@ -38,7 +46,7 @@ async function fixture() {
     tagger: { createReleaseTag: async () => ({ tag: `v0.0.${++state.version}`, commitSha: `${state.version}`.padStart(40, 'a') }) },
     repo: { readFile: async (_s, _r, path) => (path === 'crewstation.yaml' ? state.yaml : undefined), repositoryUrl: async () => ({ httpUrl: 'https://repo.invalid/lifecycle', credentialSecretName: 'lifecycle-git' }) },
     services: { resolveServiceById: async () => ({ projectId, slug: 'lifecycle', name: 'lifecycle', namespace: ns }) },
-    plans: { getServicePlan: async () => ({ id: '01a0bf5d-8f4b-781d-8b8e-bbbbc69c6c6a', name: 'small', cpu: '1', memory: '1Gi', maxReplicas: 3, description: '' }), lookupComputeProfile: async () => undefined, listComputeProfiles: async () => [] },
+    plans: { getServicePlan: async () => (state.planGone ? undefined : { id: '01a0bf5d-8f4b-781d-8b8e-bbbbc69c6c6a', name: 'small', cpu: '1', memory: '1Gi', maxReplicas: 3, description: '' }), lookupComputeProfile: async () => undefined, listComputeProfiles: async () => [] },
     config: { render: async () => ({ values: {}, version: 3 }), validate: async () => ({ missing: [] }) }, data: { envFor: async () => ({}) },
     hosts: { prodHost: () => 'lifecycle.cs.localhost', previewHost: () => 'preview.lifecycle.cs.localhost' },
     maintenance: { open: async () => state.window },
@@ -131,11 +139,56 @@ describe.skipIf(!available)('RFC-021 待命槽生命周期', () => {
     expect(await f.release.api.getRelease(owner, v1.id)).toMatchObject({ status: 'offline', redeployable: true });
     await expect(f.release.api.redeploy(owner, v1.id, { expectedStandbyReleaseId: null })).rejects.toMatchObject({
       kind: 'precondition', message: expect.stringMatching(new RegExp(`^${v1.tag} 的 Manifest 不符合当前平台的写法，不能部署：.*driver.*compute: \\{ kind: default \\}.*请改好仓库里的 crewstation\\.yaml 后发布新版本$`, 's')),
+      details: { code: 'manifest-outdated', hint: '发布记录里的 Manifest 随标签固定，请改好仓库里的 crewstation.yaml 后发布新版本' },
     });
+    // RFC-025 统一预检：弹窗选中它时先问一次，同样的原因码与出路，不写任何东西。
+    expect(await f.release.api.redeployPrecheck(owner, v1.id)).toMatchObject({ ok: false, reason: { code: 'manifest-outdated', hint: expect.stringContaining('发布新版本') } });
     expect(await f.deployment(physical)).toBeUndefined();
     expect(await f.release.api.getRelease(owner, v1.id)).toMatchObject({ status: 'offline', redeployable: true });
     expect(await f.preview()).toMatchObject({ state: 'empty', offline: { releaseId: v1.id } });
     expect((await f.release.api.listSlotEvents(owner, serviceId))[0]).toMatchObject({ kind: 'offline' });
+  });
+
+  test('统一预检（RFC-025）：重新部署先问一次——能部署时通过；集群 dry-run 拒绝、有发布在进行各给原因码与出路；确认时同样 412，槽与发布都不变', async () => {
+    const f = await fixture();
+    const v1 = await f.publish(), physical = await f.standby();
+    await f.release.api.takeOffline(owner, serviceId, { expectedReleaseId: v1.id });
+    expect(await f.release.api.redeployPrecheck(owner, v1.id)).toEqual({ ok: true });
+    await expect(f.release.api.redeployPrecheck(developer, v1.id)).rejects.toMatchObject({ kind: 'forbidden' });
+    f.state.rejectDryRun = 'admission webhook "quota.example" denied the request: exceeded quota: cpu';
+    expect(await f.release.api.redeployPrecheck(owner, v1.id)).toEqual({ ok: false, reason: {
+      code: 'cluster-rejected', message: '集群拒绝了这次部署：admission webhook "quota.example" denied the request: exceeded quota: cpu', hint: '检查套餐的资源规格与项目命名空间的配额，或联系管理员',
+    } });
+    await expect(f.release.api.redeploy(owner, v1.id, { expectedStandbyReleaseId: null })).rejects.toMatchObject({ kind: 'precondition', details: { code: 'cluster-rejected' } });
+    expect(await f.deployment(physical)).toBeUndefined();
+    expect(await f.release.api.getRelease(owner, v1.id)).toMatchObject({ status: 'offline', redeployable: true });
+    expect(await f.preview()).toMatchObject({ state: 'empty', offline: { releaseId: v1.id } });
+    f.state.rejectDryRun = undefined;
+    const pending = await f.release.api.publish(owner, serviceId, { branch: 'main', version: 'patch' });
+    expect(await f.release.api.redeployPrecheck(owner, v1.id)).toMatchObject({ ok: false, reason: { code: 'release-in-progress', message: `发布 ${pending.tag} 仍在进行中（pending）`, hint: '请等待结束后再操作' } });
+    await expect(f.release.api.redeploy(owner, v1.id, { expectedStandbyReleaseId: null })).rejects.toMatchObject({ kind: 'precondition', details: { code: 'release-in-progress', releaseId: pending.id } });
+  });
+
+  test('统一预检：套餐被收回（不存在或不再对本项目开放）时重新部署给 plan-unavailable 与出路，槽不变', async () => {
+    const f = await fixture();
+    const v1 = await f.publish();
+    await f.release.api.takeOffline(owner, serviceId, { expectedReleaseId: v1.id });
+    f.state.planGone = true;
+    expect(await f.release.api.redeployPrecheck(owner, v1.id)).toEqual({ ok: false, reason: {
+      code: 'plan-unavailable', message: '服务套餐 01a0bf5d-8f4b-781d-8b8e-bbbbc69c6c6a 不存在或已不对本项目开放', hint: '请管理员恢复套餐或把它开放给本项目，或在 crewstation.yaml 里换一个可用的套餐后发布新版本',
+    } });
+    await expect(f.release.api.redeploy(owner, v1.id, { expectedStandbyReleaseId: null })).rejects.toMatchObject({ kind: 'precondition', details: { code: 'plan-unavailable' } });
+    expect(await f.preview()).toMatchObject({ state: 'empty', offline: { releaseId: v1.id } });
+  });
+
+  test('受理之后的部署失败记进发布记录：返回失败的发布，不抛 500；待验证槽记为失败', async () => {
+    const f = await fixture();
+    const v1 = await f.publish();
+    await f.release.api.takeOffline(owner, serviceId, { expectedReleaseId: v1.id });
+    f.state.rejectDeploy = 'connection reset by peer';
+    const failed = await f.release.api.redeploy(owner, v1.id, { expectedStandbyReleaseId: null });
+    expect(failed).toMatchObject({ id: v1.id, status: 'failed', message: '重新部署失败：connection reset by peer。看发布记录与槽的日志，处理后重新部署' });
+    expect(await f.preview()).toMatchObject({ state: 'failed', releaseId: v1.id });
   });
 
   test('待验证版本连续 14 天无人访问才下线：访问 preview 推后到期，5 分钟内的重复访问只记一次', async () => {
@@ -273,6 +326,11 @@ describe.skipIf(!available)('RFC-021 待命槽生命周期', () => {
     const events = await app.request(`${base}/slot-events`, { headers: as(developer) });
     expect(events.status).toBe(200);
     expect(((await events.json()) as { items: Array<{ kind: string }> }).items.map((e) => e.kind)).toEqual(['offline', 'postpone', 'reminder']);
+    // 统一预检的只读查询：负责人拿到结果，开发者 403。
+    const precheck = await app.request(`/v1/releases/${v1.id}/redeploy-precheck`, { headers: as(owner) });
+    expect(precheck.status).toBe(200);
+    expect(await precheck.json()).toEqual({ ok: true });
+    expect((await app.request(`/v1/releases/${v1.id}/redeploy-precheck`, { headers: as(developer) })).status).toBe(403);
     const redeploy = await post(`/v1/releases/${v1.id}/redeploy`, owner, { expectedStandbyReleaseId: null });
     expect(redeploy.status).toBe(202);
     expect(((await redeploy.json()) as ReleaseDto).status).toBe('deploying');

@@ -106,7 +106,7 @@ for (const scenario of rollbackCases) test.skipIf(!available)(scenario.name, asy
     const input = { toSlot: 'preview' as const, expectedActiveRelease: releaseId, expectedTargetRelease: targetId };
     if (scenario.denial) {
       // rollback: blocked 可以单独声明；拒绝时不能虚报发生了破坏性迁移，也不能落切流记录。
-      await expect(change(actor, serviceId, input)).rejects.toMatchObject({ kind: 'precondition', message: `当前版本 v0.2.0 ${scenario.denial}，不能切回旧版本 v0.1.0` });
+      await expect(change(actor, serviceId, input)).rejects.toMatchObject({ kind: 'precondition', message: `当前版本 v0.2.0 ${scenario.denial}，不能切回旧版本 v0.1.0。部署一个比当前正式版本更新的版本后再上线`, details: { code: 'rollback-blocked' } });
     } else expect((await change(actor, serviceId, input)).releaseId).toBe(targetId);
     expect((await uow.read.slots.get(serviceId))?.active).toBe(scenario.denial ? 'blue' : 'green');
     expect(await uow.read.switches.listByService(serviceId, 10)).toHaveLength(scenario.denial ? 0 : 1);

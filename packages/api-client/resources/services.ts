@@ -1,5 +1,5 @@
 import type {
-  BranchDto, ExitMaintenanceRequest, ListBranchesQuery, MaintenanceDto, ManifestUpgradePreview, PostponeOfflineRequest, RedeployRequest, ReleaseDto, RepositoryBindingDto,
+  BranchDto, ExitMaintenanceRequest, ListBranchesQuery, MaintenanceDto, ManifestUpgradePreview, PostponeOfflineRequest, RedeployPrecheckDto, RedeployRequest, ReleaseDto, RepositoryBindingDto,
   ServiceDto, ServiceMaintenanceView, SetMaintenanceRequest, SlotDto, SlotEventDto, TagDto, TakeOfflineRequest, TrafficSwitchDto, TrafficSwitchRequest,
 } from '@crewstation/contracts';
 import type { Transport } from '../httpTransport';
@@ -36,6 +36,8 @@ export interface ServicesResource {
   postponeOffline(serviceId: string, input: PostponeOfflineRequest): Promise<ItemsPage<SlotDto>>;
   /** RFC-021 POST /v1/releases/:releaseId/redeploy（202，负责人、管理员）：从发布记录重新部署到待命槽。 */
   redeploy(releaseId: string, input: RedeployRequest): Promise<ReleaseDto>;
+  /** RFC-025 GET /v1/releases/:releaseId/redeploy-precheck（负责人、管理员）：重新部署的统一预检，不通过时带标准原因。 */
+  redeployPrecheck(releaseId: string): Promise<RedeployPrecheckDto>;
   /** RFC-021 GET /v1/services/:serviceId/slot-events：下线、重新部署、推迟、提醒记录。 */
   listSlotEvents(serviceId: string): Promise<ItemsPage<SlotEventDto>>;
   /** RFC-021 GET /v1/services/:serviceId/maintenance：当前维护与记录。 */
@@ -63,6 +65,7 @@ export function servicesResource(transport: Transport): ServicesResource {
     takeOffline: (serviceId, input) => transport.request<ItemsPage<SlotDto>>('POST', `${base(serviceId)}/slots/preview/offline`, { body: input }),
     postponeOffline: (serviceId, input) => transport.request<ItemsPage<SlotDto>>('POST', `${base(serviceId)}/slots/preview/postpone`, { body: input }),
     redeploy: (releaseId, input) => transport.request<ReleaseDto>('POST', `/v1/releases/${segment(releaseId)}/redeploy`, { body: input }),
+    redeployPrecheck: (releaseId) => transport.request<RedeployPrecheckDto>('GET', `/v1/releases/${segment(releaseId)}/redeploy-precheck`),
     listSlotEvents: (serviceId) => transport.request<ItemsPage<SlotEventDto>>('GET', `${base(serviceId)}/slot-events`),
     getMaintenance: (serviceId) => transport.request<ServiceMaintenanceView>('GET', `${base(serviceId)}/maintenance`),
     setMaintenance: (serviceId, input) => transport.request<MaintenanceDto>('PUT', `${base(serviceId)}/maintenance`, { body: input }),

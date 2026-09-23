@@ -1,5 +1,5 @@
 import type { ClusterResource, ClusterInspectRequest, ClusterInspection, ClusterOperation } from '@crewstation/contracts';
-import type { Actor, AutoOfflinePolicyDto, OfflineReason, PostponeOfflineRequest, PublishRequest, RedeployRequest, ReleaseDto, ReleaseId, ServiceId, SetAutoOfflinePolicyRequest, SlotDto, SlotEventDto, TakeOfflineRequest, TrafficSwitchDto, TrafficSwitchRequest } from '@crewstation/contracts';
+import type { Actor, AutoOfflinePolicyDto, OfflineReason, PostponeOfflineRequest, PublishRequest, RedeployPrecheckDto, RedeployRequest, ReleaseDto, ReleaseId, ServiceId, SetAutoOfflinePolicyRequest, SlotDto, SlotEventDto, TakeOfflineRequest, TrafficSwitchDto, TrafficSwitchRequest } from '@crewstation/contracts';
 
 export type PhysicalSlot = 'blue' | 'green';
 
@@ -39,6 +39,8 @@ export interface ReleaseModuleApi {
   postponeOffline(actor: Actor, serviceId: ServiceId, input: PostponeOfflineRequest): Promise<SlotDto[]>;
   /** 从发布记录重新部署到待命槽，不构建、不迁移。 */
   redeploy(actor: Actor, releaseId: ReleaseId, input: RedeployRequest): Promise<ReleaseDto>;
+  /** 重新部署的统一预检（只读）：不通过时给标准原因，确认时同样的原因以 412 返回。 */
+  redeployPrecheck(actor: Actor, releaseId: ReleaseId): Promise<RedeployPrecheckDto>;
   listSlotEvents(actor: Actor, serviceId: ServiceId): Promise<SlotEventDto[]>;
   /** 自动下线巡检（cs-controller 定时调用）。 */
   sweepSlotLifecycle(): Promise<{ initialized: number; reminded: number; offline: number; repaired: number }>;

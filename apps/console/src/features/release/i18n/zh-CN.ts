@@ -166,6 +166,7 @@ export const messages = {
   "release.redeploy.emptyStandby": "空（当前没有待验证版本）",
   "release.redeploy.confirm": "确认重新部署 {tag}",
   "release.redeploy.cancel": "取消",
+  "release.redeploy.precheckFailed": "这个版本现在部署不了：{reason}",
   "release.redeploy.done": "已受理重新部署 {tag}：不重新构建、不重跑迁移，部署就绪后可在待验证版本试用。",
   "release.maintenance.enterAction": "进入维护",
   "release.maintenance.enterTitle": "进入维护",

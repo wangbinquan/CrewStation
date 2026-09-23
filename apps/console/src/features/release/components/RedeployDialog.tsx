@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import type { ReactElement } from 'react';
 import type { ReleaseDto, SlotDto } from '@crewstation/contracts';
+import { api } from '../../../shared/api/client';
+import { queryKeys } from '../../../shared/api/queryKeys';
+import { useApiQuery } from '../../../shared/api/useApi';
 import { useT } from '../../../shared/lib/useT';
 import { shortId } from '../../../shared/project/releaseTimeline';
 import { ActionNote } from '../../../shared/ui/ActionNote';
@@ -26,12 +29,15 @@ interface RedeployDialogProps {
 /**
  * 部署到待验证版本的确认弹窗（RFC-021 M5、B4）：第一行选要部署的版本（可重新部署的版本，新到旧；2026-09-23 裁定），
  * 写清会被替换的待命版本，以及不重新构建、不重跑迁移、按当前生产配置部署。失败时弹窗留着，原因显示在弹窗里；改选版本清掉上一次的失败。
+ * 选中一个版本就先问一次统一预检（RFC-025），不通过时直接写明原因与出路；版本照常可选，确认时服务端给同样的原因（2026-09-23 裁定）。
  */
 export function RedeployDialog({ release, releases, standby, lifecycle, blocked, onClose }: RedeployDialogProps): ReactElement {
   const t = useT(), [failed, setFailed] = useState(false), [selectedId, setSelectedId] = useState<string>(release.id);
   const chosen = releases.find((item) => item.id === selectedId) ?? release, listed = redeployCandidates(releases, selectedId);
   const options = listed.some((item) => item.id === chosen.id) ? listed : [chosen, ...listed], busy = lifecycle.pending === 'redeploy';
   const replacing = standby?.releaseId ? standby.tag ?? shortId(standby.releaseId) : undefined;
+  const precheck = useApiQuery(queryKeys.redeployPrecheck(chosen.id), () => api.services.redeployPrecheck(chosen.id), { enabled: chosen.redeployable, staleTimeMs: 0 });
+  const refusal = precheck.data && !precheck.data.ok && precheck.data.reason ? [precheck.data.reason.message, precheck.data.reason.hint].filter(Boolean).join('。') : undefined;
   const confirm = async () => { setFailed(false); if (await lifecycle.redeploy(chosen, standby)) onClose(); else setFailed(true); };
   return <ConfirmationDialog size="medium" title={t('release.redeploy.dialogTitle')} question={t('release.redeploy.question', { tag: chosen.tag })} hint={t('release.redeploy.hint')}
     confirmLabel={t('release.redeploy.confirm', { tag: chosen.tag })} cancelLabel={t('release.redeploy.cancel')}
@@ -42,6 +48,7 @@ export function RedeployDialog({ release, releases, standby, lifecycle, blocked,
       </select>
     </FormField>
     <DefinitionList items={[{ label: t('release.redeploy.replacing'), value: replacing ? t('release.redeploy.replacingValue', { tag: replacing }) : t('release.redeploy.emptyStandby') }]} />
+    {refusal && !failed ? <ActionNote tone="error">{t('release.redeploy.precheckFailed', { reason: refusal })}</ActionNote> : null}
     {failed && lifecycle.error ? <ActionNote tone="error">{lifecycle.error}</ActionNote> : null}
   </ConfirmationDialog>;
 }

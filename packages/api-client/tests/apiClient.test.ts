@@ -214,6 +214,13 @@ describe('createApiClient：请求形状', () => {
     expect(JSON.parse(calls[6]?.body ?? '{}')).toEqual({ expectedRevision: 1 });
   });
 
+  test('RFC-025：重新部署的统一预检是只读的 GET', async () => {
+    const { calls, fetchImpl } = fakeFetch(() => json(200, { ok: false, reason: { code: 'manifest-outdated', message: '旧写法', hint: '发布新版本' } }));
+    const client = createApiClient({ fetch: fetchImpl });
+    expect(await client.services.redeployPrecheck('rel/1')).toEqual({ ok: false, reason: { code: 'manifest-outdated', message: '旧写法', hint: '发布新版本' } });
+    expect(calls.map((c) => `${c.method} ${c.url}`)).toEqual([`GET /v1/releases/${encodeURIComponent('rel/1')}/redeploy-precheck`]);
+  });
+
   test('204 与空体解析为 undefined', async () => {
     const { fetchImpl } = fakeFetch(() => new Response(null, { status: 204 }));
     const client = createApiClient({ fetch: fetchImpl });

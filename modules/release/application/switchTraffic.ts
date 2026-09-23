@@ -1,7 +1,8 @@
 import type { Actor, ServiceId, TrafficSwitchDto, TrafficSwitchRequest } from '@crewstation/contracts';
 import { DomainTopic } from '@crewstation/contracts';
-import { newId, notFound, precondition } from '@crewstation/kernel';
+import { newId, notFound } from '@crewstation/kernel';
 import { assertSwitchAllowed, rollbackBlockedBy } from '../domain/migrationPolicy';
+import { precheckFailed, precheckReason } from '../domain/precheck';
 import { physicalOf, roleOf, switchTraffic } from '../domain/slots';
 import type { ReleaseUseCaseDeps } from './dependencies';
 import { switchToDto } from './toDto';
@@ -18,18 +19,18 @@ export function switchTrafficUseCase(deps: Pick<ReleaseUseCaseDeps, 'uow' | 'aut
     const now = clock.now();
     return uow.run(async (scope) => {
       const slots = await scope.slots.get(serviceId);
-      if (!slots) throw precondition('服务尚无任何部署');
-      if (await scope.maintenance.active(serviceId)) throw precondition('集群运维操作尚未结束，请等待后再切流');
+      if (!slots) throw precheckFailed(precheckReason('no-deployment', '服务尚无任何部署', '先发布一个版本'));
+      if (await scope.maintenance.active(serviceId)) throw precheckFailed(precheckReason('maintenance-active', '集群运维操作尚未结束', '请等待后再切流'));
       const next = switchTraffic(slots, input.toSlot, input.expectedActiveRelease, now, input.expectedTargetRelease);
       // publish 在同一槽锁内登记目标；流水线结束前不能把它将覆盖的待命槽变成线上。
       const inProgress = await scope.releases.findInProgress(serviceId);
-      if (inProgress) throw precondition(`发布 ${inProgress.tag} 仍在进行中（${inProgress.status}），请等待结束后重新确认上线或回退`, { releaseId: inProgress.id });
+      if (inProgress) throw precheckFailed(precheckReason('release-in-progress', `发布 ${inProgress.tag} 仍在进行中（${inProgress.status}）`, '请等待结束后重新确认上线或回退'), { releaseId: inProgress.id });
       const target = physicalOf(slots, input.toSlot);
       const currentRelease = slots[slots.active].releaseId ? await scope.releases.getById(slots[slots.active].releaseId!) : undefined;
       const targetRelease = slots[target].releaseId ? await scope.releases.getById(slots[target].releaseId!) : undefined;
       if (currentRelease?.manifest && targetRelease && targetRelease.createdAt < currentRelease.createdAt && rollbackBlockedBy(currentRelease.manifest.spec.release.migration)) {
         const restriction = currentRelease.manifest.spec.release.migration.destructive ? '含破坏性迁移' : '的发布配置明确禁止回退';
-        throw precondition(`当前版本 ${currentRelease.tag} ${restriction}，不能切回旧版本 ${targetRelease.tag}`);
+        throw precheckFailed(precheckReason('rollback-blocked', `当前版本 ${currentRelease.tag} ${restriction}，不能切回旧版本 ${targetRelease.tag}`, '部署一个比当前正式版本更新的版本后再上线'));
       }
       // 切流到含破坏性迁移的版本同样要求维护窗口（Design §6.5「部署与切流」，RFC-021 M27）。
       if (targetRelease) assertSwitchAllowed(targetRelease.manifest?.spec.release.migration, targetRelease.tag, windowOpen);

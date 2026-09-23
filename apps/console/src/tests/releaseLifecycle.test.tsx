@@ -87,6 +87,20 @@ test('待验证槽空着时「部署版本…」可以改选别的版本，请�
   expect(page.text()).toContain('已受理重新部署 v0.9.0');
 });
 
+// RFC-025 统一预检：选中版本就先问一次，不通过时直接写明原因与出路；版本照常可选，确认时服务端给同样的原因（2026-09-23 裁定）。
+test('部署版本弹窗选中版本即预检：不通过时写明原因与出路，改选能部署的版本就消失；确认照常可点', async () => {
+  const f = slotLifecycleFixture(); page = await renderApp(`/projects/${projectId}/release`);
+  f.state.precheck[standbyId] = { code: 'manifest-outdated', message: 'v1.0.0 的 Manifest 不符合当前平台的写法，不能部署：spec.tasks 里的 driver 已不再支持', hint: '发布记录里的 Manifest 随标签固定，请改好仓库里的 crewstation.yaml 后发布新版本' };
+  await click('下线'); await click('确认下线 v1.0.0');
+  await click('部署版本…');
+  expect(dialogText()).toContain('这个版本现在部署不了：v1.0.0 的 Manifest 不符合当前平台的写法，不能部署：spec.tasks 里的 driver 已不再支持。发布记录里的 Manifest 随标签固定，请改好仓库里的 crewstation.yaml 后发布新版本');
+  expect(button('确认重新部署 v1.0.0')?.disabled).toBe(false);
+  await chooseVersion(oldId);
+  expect(dialogText()).not.toContain('这个版本现在部署不了');
+  await click('确认重新部署 v0.9.0');
+  expect(f.writes.at(-1)).toEqual({ method: 'POST', path: `/v1/releases/${oldId}/redeploy`, body: { expectedStandbyReleaseId: null } });
+});
+
 test('待验证槽空着但没有可重新部署的版本时，卡片不给「部署版本…」', async () => {
   const f = slotLifecycleFixture();
   f.state.slots[1] = { name: 'preview', active: false, replicas: 0, readyReplicas: 0, state: 'empty', host: 'preview.demo.cs.localhost', offline: { releaseId: standbyId, tag: 'v1.0.0', at: at(10), reason: 'idle' } } as never;

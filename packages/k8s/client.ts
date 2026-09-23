@@ -25,8 +25,8 @@ export interface K8sClient {
   listPage<T extends K8sObject>(ref: ResourceRef, namespace?: string, options?: ListOptions): Promise<ListPage<T>>;
   jsonPatch<T extends K8sObject>(ref: ResourceRef, name: string, namespace: string | undefined, patch: JsonPatch[]): Promise<T>;
   create<T extends K8sObject>(obj: T): Promise<T>;
-  /** 服务端 apply：幂等写入，由 fieldManager 拥有字段。 */
-  apply<T extends K8sObject>(obj: T, options?: { fieldManager?: string; force?: boolean }): Promise<T>;
+  /** 服务端 apply：幂等写入，由 fieldManager 拥有字段。dryRun 时 API Server 照常校验、准入，但不落库。 */
+  apply<T extends K8sObject>(obj: T, options?: { fieldManager?: string; force?: boolean; dryRun?: boolean }): Promise<T>;
   mergePatch<T extends K8sObject>(ref: ResourceRef, name: string, namespace: string | undefined, patch: unknown): Promise<T>;
   /** 不存在时返回 false，不抛错。 */
   delete(ref: ResourceRef, name: string, namespace?: string, options?: DeleteOptions): Promise<boolean>;
@@ -74,6 +74,7 @@ export function createK8sClient(config: ClusterConfig, fetchImpl: typeof fetch =
     create: async (obj) => json(await request('POST', resourcePath(refOf(obj), obj.metadata.namespace), { body: JSON.stringify(obj), contentType: 'application/json' })),
     apply: async (obj, options = {}) => {
       const params = new URLSearchParams({ fieldManager: options.fieldManager ?? 'crewstation', force: String(options.force ?? true) });
+      if (options.dryRun) params.set('dryRun', 'All');
       return json(await request('PATCH', `${resourcePath(refOf(obj), obj.metadata.namespace, obj.metadata.name)}?${params}`, { body: JSON.stringify(obj), contentType: 'application/apply-patch+yaml' }));
     },
     mergePatch: async (ref, name, namespace, patch) => json(await request('PATCH', resourcePath(ref, namespace, name), { body: JSON.stringify(patch), contentType: 'application/merge-patch+json' })),

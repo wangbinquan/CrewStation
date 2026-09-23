@@ -167,6 +167,7 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   "release.redeploy.emptyStandby": "Empty (no preview version right now)",
   "release.redeploy.confirm": "Redeploy {tag}",
   "release.redeploy.cancel": "Cancel",
+  "release.redeploy.precheckFailed": "This version cannot be deployed right now: {reason}",
   "release.redeploy.done": "Redeploy of {tag} accepted: no rebuild and no migrations. Try it on the preview version once the deployment is ready.",
   "release.maintenance.enterAction": "Enter maintenance",
   "release.maintenance.enterTitle": "Enter maintenance",

@@ -1,5 +1,5 @@
 import type { ReleaseId, ServiceId, SlotName, UserId } from '@crewstation/contracts';
-import { precondition } from '@crewstation/kernel';
+import { precheckFailed, precheckReason } from './precheck';
 
 /** 蓝绿两个物理槽；prod／preview 只是角色（G15）：active 指向的物理槽承接 prod 域，另一个是待命槽承接 preview 域。 */
 export type PhysicalSlot = 'blue' | 'green';
@@ -79,14 +79,16 @@ function withoutRetention(slot: SlotState): SlotState {
 /** 确认当前与目标身份后检查就绪；null 是明确的空正式版本，不等于省略检查。 */
 export function switchTraffic(slots: ServiceSlots, toRole: SlotName, expectedActiveRelease: ReleaseId | null | undefined, now: Date, expectedTargetRelease?: ReleaseId): ServiceSlots {
   const target = physicalOf(slots, toRole);
-  if (target === slots.active) throw precondition(`${toRole} 已经是当前线上槽`);
+  if (target === slots.active) throw precheckFailed(precheckReason('already-active', `${toRole} 已经是当前线上槽`));
   const standby = slots[target];
   const current = slots[slots.active];
   if (expectedActiveRelease !== undefined && (current.releaseId ?? null) !== expectedActiveRelease) {
-    throw precondition('当前线上发布已变化，请刷新后再切流', { expected: expectedActiveRelease, actual: current.releaseId ?? null });
+    throw precheckFailed(precheckReason('active-changed', '当前线上发布已变化', '请刷新后再切流'), { expected: expectedActiveRelease, actual: current.releaseId ?? null });
   }
-  if (expectedTargetRelease !== undefined && standby.releaseId !== expectedTargetRelease) throw precondition('待命发布已变化，请重新确认上线目标', { expected: expectedTargetRelease, actual: standby.releaseId ?? null });
-  if (standby.state !== 'ready' || !standby.releaseId) throw precondition('待命槽尚未就绪，不能切流', { state: standby.state });
+  if (expectedTargetRelease !== undefined && standby.releaseId !== expectedTargetRelease) {
+    throw precheckFailed(precheckReason('standby-changed', '待命发布已变化', '请重新确认上线目标'), { expected: expectedTargetRelease, actual: standby.releaseId ?? null });
+  }
+  if (standby.state !== 'ready' || !standby.releaseId) throw precheckFailed(precheckReason('standby-not-ready', '待命槽尚未就绪，不能切流', '等待验证版本部署就绪后再上线'), { state: standby.state });
   // 原正式槽成为回退目标，从切流时起计保留期（RFC-021 M2）；新正式槽不计时。
   const previous: SlotState = current.releaseId && current.state !== 'empty'
     ? { ...current, retention: { kind: 'rollback-target', since: now, postponements: 0 } }

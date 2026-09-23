@@ -28,6 +28,8 @@ export const queryKeys = {
   tags: (serviceId: string) => ['services', serviceId, 'tags'] as const,
   releases: (serviceId: string) => ['services', serviceId, 'releases'] as const,
   release: (releaseId: string) => ['releases', releaseId] as const,
+  /** 重新部署的统一预检（RFC-025）：挂在发布键下面，发布变化时随之失效重读。 */
+  redeployPrecheck: (releaseId: string) => ['releases', releaseId, 'redeploy-precheck'] as const,
   trafficSwitches: (serviceId: string) => ['services', serviceId, 'traffic-switches'] as const,
   /** RFC-021：待命槽的下线、重新部署、推迟与提醒记录，并进发布记录时间线。 */
   slotEvents: (serviceId: string) => ['services', serviceId, 'slot-events'] as const,

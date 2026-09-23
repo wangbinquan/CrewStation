@@ -1,16 +1,14 @@
-import type { Manifest, ProjectId, ServicePlanDto } from '@crewstation/contracts';
-import { isPlatformError } from '@crewstation/kernel';
-import { DomainTopic, ManifestSchema, describeManifestFailure } from '@crewstation/contracts';
+import type { Manifest } from '@crewstation/contracts';
+import { DomainTopic } from '@crewstation/contracts';
+import { reasonText } from '../domain/precheck';
 import type { Release } from '../domain/release';
 import { advance } from '../domain/release';
 import { startRetention } from '../domain/slotLifecycle';
-import type { PhysicalSlot } from '../domain/slots';
 import { withSlot } from '../domain/slots';
 import type { ReleaseUseCaseDeps } from './dependencies';
 import type { PipelineContext, ResolvedService, StepResult } from './pipelineContext';
 import { DONE, WAIT } from './pipelineContext';
-import type { RenderedEnv } from './pipelineEnv';
-import { renderSlotEnv } from './pipelineEnv';
+import { prepareSlotDeploy } from './deployPrecheck';
 
 export interface DeploySteps {
   startDeploy(release: Release, svc: ResolvedService, manifest: Manifest): Promise<StepResult>;
@@ -19,59 +17,12 @@ export interface DeploySteps {
 }
 
 /** 部署阶段：待命槽换上新发布并标记旧发布 superseded；就绪后登记 Manifest 与 OpenAPI。 */
-/**
- * Manifest 的 tasks.agentProfiles 引用的档位问题（RFC-006 §4.4）：不存在、是通用终端协议、写了 default 而平台没有默认档位。
- * 只看存在性与协议，不看测试状态。返回给发布记录的原因文案；没有问题返回 undefined。
- */
-async function computeProblem(deps: ReleaseUseCaseDeps, manifest: Manifest, projectId: ProjectId): Promise<string | undefined> {
-  const wanted = manifest.kind === 'DigitalWorker' ? [...new Set((manifest.spec.tasks?.agentProfiles ?? []).map((p) => p.compute))] : [];
-  const found = await Promise.all(wanted.map(async (name) => {
-    try { return { name, profile: await deps.plans.lookupComputeProfile(name, projectId), error: undefined }; }
-    catch (error) { if (!isPlatformError(error)) throw error; return { name, profile: undefined, error: error.message }; }
-  }));
-  const denied = found.find((entry) => entry.error);
-  if (denied) return denied.error;
-  if (found.some((f) => f.name.kind === 'default' && !f.profile)) return '算力档位 default 指向平台默认档位，但平台尚未设置默认档位；请管理员在平台管理里设置';
-  const missing = found.filter((f) => !f.profile).map((f) => f.name.kind === 'profile' ? f.name.profileId : 'default');
-  if (missing.length > 0) return `算力档位 ${missing.join('、')} 不存在；现有档位：${(await deps.plans.listComputeProfiles()).join('、') || '（空）'}`;
-  const terminal = found.filter((f) => f.profile?.terminalOnly).map((f) => f.name.kind === 'profile' ? f.name.profileId : 'default');
-  if (terminal.length > 0) return `算力档位 ${terminal.join('、')} 是通用终端协议，只能用于「＋ CLI」，不能用于业务子任务`;
-  return undefined;
-}
-
-export interface SlotDeployPlan { readonly plan: ServicePlanDto; readonly replicas: number; readonly env: RenderedEnv }
-
-/**
- * 部署到某个槽之前的全部检查与环境渲染：套餐、副本（含运维覆盖）、算力档位、生产配置。
- * 有问题返回原因，不写任何东西；发布流水线据此把发布记为失败，重新部署据此直接拒绝（RFC-021 §4）。
- */
-export async function prepareSlotDeploy(deps: ReleaseUseCaseDeps, release: Release, svc: ResolvedService, manifest: Manifest, physical: PhysicalSlot): Promise<SlotDeployPlan | { problem: string }> {
-  // 发布记录里的 Manifest 是当时校验过的；平台之后收紧了写法的旧版本（如 RFC-001 之前的 driver／model）按当前写法说清原因，
-  // 不带进后面的检查（2026-09-23 实机：demo 重新部署 v0.1.2 在读 compute 时 500）。
-  const current = ManifestSchema.safeParse(manifest);
-  if (!current.success) return { problem: `${release.tag} 的 Manifest 不符合当前平台的写法，不能部署：${describeManifestFailure(current.error)}。发布记录里的 Manifest 随标签固定，请改好仓库里的 crewstation.yaml 后发布新版本` };
-  const plan = await deps.plans.getServicePlan(manifest.spec.service.servicePlanId, release.projectId);
-  if (!plan) return { problem: `服务套餐 ${manifest.spec.service.servicePlanId} 不存在` };
-  if (manifest.spec.service.replicas > plan.maxReplicas) return { problem: `副本数 ${manifest.spec.service.replicas} 超过套餐上限 ${plan.maxReplicas}` };
-  const replicas = await deps.uow.read.maintenance.override(release.serviceId, physical) ?? manifest.spec.service.replicas;
-  if (replicas > plan.maxReplicas) return { problem: `运维副本覆盖 ${replicas} 超过套餐上限 ${plan.maxReplicas}，请管理员调整或恢复发布配置` };
-  // 算力档位有问题就不进部署（RFC-001、RFC-006），与引用不存在的服务套餐同等对待。
-  const problem = await computeProblem(deps, manifest, release.projectId);
-  if (problem) return { problem };
-  try {
-    return { plan, replicas, env: await renderSlotEnv(deps, { projectId: release.projectId, serviceId: release.serviceId, projectSlug: svc.slug, serviceName: svc.name, physical, manifest }) };
-  } catch (error) {
-    if (isPlatformError(error)) return { problem: error.message };
-    throw error;
-  }
-}
-
 export function deploySteps(deps: ReleaseUseCaseDeps, ctx: PipelineContext): DeploySteps {
   const { uow, clock } = deps;
 
   const startDeploy: DeploySteps['startDeploy'] = async (release, svc, manifest) => {
     const prepared = await prepareSlotDeploy(deps, release, svc, manifest, release.targetSlot);
-    if ('problem' in prepared) return ctx.fail(release, prepared.problem);
+    if ('reason' in prepared) return ctx.fail(release, reasonText(prepared.reason));
     const { plan, replicas, env } = prepared;
     await deps.deployer.deploy({ namespace: svc.namespace, projectSlug: svc.slug, serviceName: svc.name, physical: release.targetSlot, releaseId: release.id, image: release.image ?? '', manifest, replicas, env: env.values, plan });
     const now = clock.now();
