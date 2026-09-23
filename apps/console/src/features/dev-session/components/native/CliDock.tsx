@@ -29,8 +29,6 @@ export interface CliDockProps {
   readonly native: ReturnType<typeof useNativeTerminals>; readonly launcher: CliLauncher;
   readonly channel: TaskStreamChannel; readonly stream: StreamState; readonly activity?: ActivityTask;
   readonly canDevelop: boolean; readonly viewerId: string; readonly onActivity: () => void; readonly blockedReason?: string;
-  /** 本页结束并关掉一个 CLI：名册还没跟上之前，对账不把它放回。 */
-  readonly onDismiss: (terminalId: string) => void;
   readonly onRetry?: (terminal: NativeTerminalDto) => void;
   /** 环境未就绪时空白区的「查看连接详情」。 */
   readonly onDetails?: () => void;
@@ -60,7 +58,8 @@ export function CliDock(props: CliDockProps): ReactElement {
     startRename: setRenaming,
     commitRename: (id, name) => { store.update((value) => renameTerminal(value, id, name)); setRenaming(undefined); },
     cancelRename: () => setRenaming(undefined),
-    confirmClose: (terminal) => native.stop.mutate(terminal.agentId, { onSuccess: () => { props.onDismiss(terminal.terminalId); store.update((value) => closeTerminal(value, terminal.terminalId)); setClosing(undefined); } }),
+    // 关掉的记进个人布局的已关闭列表：名册在进程报结束之前仍说运行中，对账也不会把它放回（包括离开再回来）。
+    confirmClose: (terminal) => native.stop.mutate(terminal.agentId, { onSuccess: () => { store.update((value) => closeTerminal(value, terminal.terminalId)); setClosing(undefined); } }),
     cancelClose: () => setClosing(undefined),
     focusGroup: (groupId) => store.update((value) => focusGroup(value, groupId)),
   };

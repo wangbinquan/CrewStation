@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import type { ProjectId, TaskId, UserId } from '@crewstation/contracts';
+import type { ProjectId, SaveWorkspaceLayoutRequest, TaskId, UserId } from '@crewstation/contracts';
 import type { FetchLike, TaskStreamFrame } from '../index';
 import { ApiClientError, createApiClient, isApiClientError, kindForStatus, parseErrorEnvelope, parseTaskStreamFrame, taskStreamUrl } from '../index';
 
@@ -77,6 +77,18 @@ describe('createApiClient：请求形状', () => {
     expect(requests).toHaveLength(1);
     expect(requests[0]).toMatchObject({ url: '/v1/projects/project%20one/dev-session/api-invocations', init: { method: 'POST', keepalive: false, redirect: 'error', signal: expect.any(AbortSignal) } });
     expect(JSON.parse(String(requests[0]!.init!.body))).toEqual(input);
+  });
+  test('个人布局的读写把调用方给的 signal 交给 fetch：布局存储据此给每次读写设上限，不给时照旧', async () => {
+    const requests: Array<{ url: string; init?: RequestInit }> = [];
+    const fetchImpl: FetchLike = async (url, init) => { requests.push({ url: String(url), init }); return json(200, { revision: 1, layout: null, updatedAt: null }); };
+    const client = createApiClient({ fetch: fetchImpl }), controller = new AbortController();
+    const input = { expectedRevision: 1, layout: {} } as unknown as SaveWorkspaceLayoutRequest;
+    await client.devSession.getWorkspaceLayout('task one', { signal: controller.signal });
+    await client.devSession.saveWorkspaceLayout('task one', input, { signal: controller.signal });
+    await client.devSession.saveWorkspaceLayout('task one', input);
+    expect(requests.map((request) => [request.url, request.init?.method, request.init?.signal])).toEqual([
+      ['/v1/tasks/task%20one/workspace-layout', 'GET', controller.signal], ['/v1/tasks/task%20one/workspace-layout', 'PUT', controller.signal], ['/v1/tasks/task%20one/workspace-layout', 'PUT', undefined],
+    ]);
   });
   test('告警与订阅使用既有项目作用域端点，保存和移除不发送通知测试请求', async () => {
     const { calls, fetchImpl } = fakeFetch((call) => call.method === 'GET' ? json(200, { items: [] }) : new Response(null, { status: 204 }));

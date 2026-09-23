@@ -46,12 +46,10 @@ export function NativeWorkspace(props: NativeWorkspaceProps): ReactElement {
   const { projectId, taskId, userId, channel, stream, canDevelop, onActivity, activityTarget, location, blockedReason, isAdmin = false } = props;
   const t = useT();
   const { store, state } = useWorkspaceLayout(taskId, userId, t('devSession.native.defaultTab'));
-  const layout = state.layout, stage = useRef<HTMLDivElement>(null), dismissed = useRef(new Set<string>());
+  const layout = state.layout, stage = useRef<HTMLDivElement>(null);
   const panel = useToolPanel(layout, store, location, stage);
-  const dismiss = useCallback((terminalId: string) => { dismissed.current.add(terminalId); }, []);
-  // 重试启动失败的 CLI 时原位替换（RFC-022 Q2）：新的占据旧标签的位置，旧的不再被名册同步重新打开。
+  // 重试启动失败的 CLI 时原位替换（RFC-022 Q2）：新的占据旧标签的位置，旧的记进已关闭列表，不再被名册同步重新打开。
   const onStarted = useCallback((terminal: NativeTerminalDto, replaces?: string) => {
-    if (replaces) dismissed.current.add(replaces);
     store.update((value) => (replaces ? replaceTerminal(value, replaces, terminal.terminalId) : openTerminal(value, terminal.terminalId, { activate: true })));
     onActivity();
   }, [store, onActivity]);
@@ -62,7 +60,7 @@ export function NativeWorkspace(props: NativeWorkspaceProps): ReactElement {
   const savedTool = layoutTool(layout);
   const locationError = useWorkspaceLocation(taskId, location, roster, store, state.loaded, !!activityTarget, `${savedTool?.name ?? ''}:${savedTool?.mode ?? ''}`, panel.narrow);
   useActivityRefresh(channel, activity.store, taskId);
-  useEffect(() => { if (roster) store.update((value) => reconcileTerminals(value, roster, dismissed.current)); }, [roster, state.loaded, store]);
+  useEffect(() => { if (roster) store.update((value) => reconcileTerminals(value, roster)); }, [roster, state.loaded, store]);
   const launcher = useCliLauncher(projectId, layout, store, native, state.loaded && canDevelop && stream.runnerConnected && !blockedReason);
   const reason = blockedReason ?? (!state.loaded ? t('devSession.native.layoutLoading') : !canDevelop ? t('devSession.connection.noPermission') : launcher.profiles.isPending ? t('devSession.native.loadingProfiles') : launcher.blockText);
   const newCli = <NewCliButton launcher={launcher} reason={reason} />;
@@ -83,7 +81,7 @@ export function NativeWorkspace(props: NativeWorkspaceProps): ReactElement {
           {native.query.error || native.start.error || native.stop.error ? <p className={styles.error} role="status">{errorMessage(native.query.error ?? native.start.error ?? native.stop.error)}{native.query.error && retryableReadError(native.query.error) ? ` ${t('ui.status.autoRetry')}` : null}</p> : null}
           <div className={styles.terminals} role="region" aria-label={t('devSession.native.area')}>
             {props.startup ? <div className={styles.sessionStartup}>{props.startup}</div> : <CliDock projectId={projectId} layout={layout} store={store} roster={roster} native={native} launcher={launcher} channel={channel} stream={stream} activity={task}
-              canDevelop={canDevelop} viewerId={userId} onActivity={onActivity} blockedReason={blockedReason} onDismiss={dismiss} onRetry={retry}
+              canDevelop={canDevelop} viewerId={userId} onActivity={onActivity} blockedReason={blockedReason} onRetry={retry}
               onDetails={blockedReason && props.environment ? () => panel.select('session') : undefined} />}
           </div>
         </div>

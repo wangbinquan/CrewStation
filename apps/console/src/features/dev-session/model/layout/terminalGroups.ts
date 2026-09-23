@@ -6,7 +6,7 @@ import { alignGroups, dockGroups, equalizeSizes, removeGroup, setSizes, splitGro
 
 /**
  * CLI 标签组（2026-09-23 裁定：Xshell 式）。布局里每个 `tabs[]` 项是一组标签，`dock` 是组的分屏树；
- * 每个在运行的 CLI 都有一个标签，× 就是结束进程，没有「收起」这回事——`hiddenTerminalIds` 只记已经关掉的、已结束的 CLI。
+ * 每个在运行的 CLI 都有一个标签（本人刚关掉、进程还在结束中的除外），× 就是结束进程，没有「收起」这回事——`hiddenTerminalIds` 只记已经关掉的、已结束的 CLI。
  * 所有函数都不改入参；没有变化时原样返回同一个对象（布局存储据此跳过保存）。
  */
 export const GROUP_LIMIT = 16, TABS_PER_GROUP = 32, LAYOUT_TERMINALS = 256;
@@ -77,6 +77,8 @@ export function normalizeGroups(layout: WorkspaceLayout, newId: () => string): W
 /**
  * 旧布局（工作区页签＋平铺）→ 标签组：当前工作区里并排显示的每个窗口各成一组、按原来的横排／纵排／网格与比例摆放，
  * 其余工作区的 CLI 作为后台标签依次放进这些组；原来只有一个窗口或放大着的，全部进一组。
+ * 旧布局的 `hiddenTerminalIds` 混着「收起而仍在运行」与已关闭两种：迁移时清空，由对账按名册重新归位——
+ * 在运行的回到标签，已结束的记为已关闭；此后这张列表只记本人关掉的。
  */
 export function migrateLegacyTabs(layout: WorkspaceLayout, newId: () => string): WorkspaceLayout {
   const active = layout.tabs.find((tab) => tab.id === layout.activeTabId) ?? layout.tabs[0]!;
@@ -93,7 +95,7 @@ export function migrateLegacyTabs(layout: WorkspaceLayout, newId: () => string):
   const arranged = shown.length > 1 ? arrange(groups.slice(0, shown.length).map((group) => ({ group: group.id })), active.layout, active.ratios) : { group: groups[0]!.id };
   const focused = groups.find((group) => layout.selectedTerminalId && group.paneOrder.includes(layout.selectedTerminalId)) ?? groups[0]!;
   // 放不进并排那几组的（极端情况下新开的组）补在最右边。
-  return { ...layout, tabs: groups, activeTabId: focused.id, maximizedTerminalId: null, dock: alignGroups(tidy(arranged), groups.map((group) => group.id)) };
+  return { ...layout, tabs: groups, activeTabId: focused.id, hiddenTerminalIds: [], maximizedTerminalId: null, dock: alignGroups(tidy(arranged), groups.map((group) => group.id)) };
 }
 
 function arrange(leaves: DockNode[], mode: WorkspaceTab['layout'], ratios: WorkspaceTab['ratios']): DockNode {
@@ -109,15 +111,16 @@ function arrange(leaves: DockNode[], mode: WorkspaceTab['layout'], ratios: Works
 }
 
 /**
- * 与名册对账：在运行的 CLI（启动中、运行中、状态未确认）都要有标签——布局里没有它的，或只在已关闭列表里的，放进焦点组做后台标签；
- * 本页刚结束并关掉、名册还没跟上的（`dismissed`）不放回。已结束或失败、布局里又没有的，只记进已关闭列表。布局从不启动或结束进程。
+ * 与名册对账：在运行的 CLI（启动中、运行中、状态未确认）都要有标签——布局里没有它的放进焦点组做后台标签；
+ * 已结束或失败、布局里又没有的，只记进已关闭列表。已关闭列表里的是本人关掉的：× 在运行的 CLI 先结束进程、成功后才关，
+ * 平台随即回收它的执行环境，所以名册没跟上、仍报运行中时也不放回——页面重进或刷新之后同样以布局为准
+ * （2026-09-23 实机：关掉的 CLI 切出开发页再切回，以「不可用」回到原处，还能再结束一次）。布局从不启动或结束进程。
  */
-export function reconcileTerminals(layout: WorkspaceLayout, roster: readonly Pick<NativeTerminalDto, 'terminalId' | 'lifecycle'>[], dismissed: ReadonlySet<string>): WorkspaceLayout {
+export function reconcileTerminals(layout: WorkspaceLayout, roster: readonly Pick<NativeTerminalDto, 'terminalId' | 'lifecycle'>[]): WorkspaceLayout {
   let next = layout;
   for (const terminal of roster) {
-    if (groupOf(next, terminal.terminalId)) continue;
-    if (isLiveTerminal(terminal) && !dismissed.has(terminal.terminalId)) next = openTerminal(next, terminal.terminalId, { activate: false });
-    else if (!next.hiddenTerminalIds.includes(terminal.terminalId)) next = { ...next, hiddenTerminalIds: [...next.hiddenTerminalIds, terminal.terminalId] };
+    if (groupOf(next, terminal.terminalId) || next.hiddenTerminalIds.includes(terminal.terminalId)) continue;
+    next = isLiveTerminal(terminal) ? openTerminal(next, terminal.terminalId, { activate: false }) : { ...next, hiddenTerminalIds: [...next.hiddenTerminalIds, terminal.terminalId] };
   }
   return settle(layout, next);
 }

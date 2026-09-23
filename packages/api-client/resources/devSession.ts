@@ -34,8 +34,9 @@ export interface DevSessionResource {
   invokeApi(projectId: string, input: ApiInvocationRequest): Promise<ApiInvocationResponse>;
   getAgentActivity(taskId: string, query?: AgentActivityQuery): Promise<AgentActivityPage>;
   readAgentActivity(taskId: string, input: ReadAgentActivityRequest): Promise<{ throughSeq: number }>;
-  getWorkspaceLayout(taskId: string): Promise<WorkspaceLayoutDto>;
-  saveWorkspaceLayout(taskId: string, input: SaveWorkspaceLayoutRequest): Promise<WorkspaceLayoutDto>;
+  /** `signal`：调用方给读写设上限（个人布局存储每次最多等 15 秒）。 */
+  getWorkspaceLayout(taskId: string, options?: { readonly signal?: AbortSignal }): Promise<WorkspaceLayoutDto>;
+  saveWorkspaceLayout(taskId: string, input: SaveWorkspaceLayoutRequest, options?: { readonly signal?: AbortSignal }): Promise<WorkspaceLayoutDto>;
   listNativeTerminals(taskId: string): Promise<NativeTerminalList>;
   startNativeTerminal(taskId: string, input: StartNativeTerminalRequest): Promise<NativeTerminalDto>;
   stopNativeTerminal(taskId: string, agentId: string): Promise<void>;
@@ -87,8 +88,8 @@ export function devSessionResource(transport: Transport): DevSessionResource {
     invokeApi: (projectId, input) => transport.request('POST', `${project(projectId)}/dev-session/api-invocations`, { body: input, keepalive: false, redirect: 'error', signal: AbortSignal.timeout(API_INVOCATION_TIMEOUT_MS + 20_000) }),
     getAgentActivity: (taskId, query) => transport.request('GET', `/v1/tasks/${segment(taskId)}/agent-activity`, { query }),
     readAgentActivity: (taskId, input) => transport.request('POST', `/v1/tasks/${segment(taskId)}/agent-activity/read`, { body: input }),
-    getWorkspaceLayout: (taskId) => transport.request('GET', `/v1/tasks/${segment(taskId)}/workspace-layout`),
-    saveWorkspaceLayout: (taskId, input) => transport.request('PUT', `/v1/tasks/${segment(taskId)}/workspace-layout`, { body: input }),
+    getWorkspaceLayout: (taskId, options) => transport.request('GET', `/v1/tasks/${segment(taskId)}/workspace-layout`, { signal: options?.signal }),
+    saveWorkspaceLayout: (taskId, input, options) => transport.request('PUT', `/v1/tasks/${segment(taskId)}/workspace-layout`, { body: input, signal: options?.signal }),
     listNativeTerminals: (taskId) => transport.request('GET', terminals(taskId)),
     startNativeTerminal: (taskId, input) => transport.request('POST', terminals(taskId), { body: input }),
     stopNativeTerminal: (taskId, agentId) => transport.request('POST', `${terminals(taskId)}/${segment(agentId)}/stop`),

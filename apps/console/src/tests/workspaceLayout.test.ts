@@ -59,6 +59,37 @@ describe('个人布局与保存竞争', () => {
     expect(writes).toBe(1);
     expect(store.getState()).toMatchObject({ phase: 'ready', revision: 2, layout: { view: 'preview' } });
   });
+  // 2026-09-23 实机：一次保存在服务端挂了 490 秒，写请求串行，后面的保存全排在它后面。
+  test('保存挂住到上限就按失败处理并取消请求，草稿保留；之后的改动不再被它挡住，重新应用先核对服务端', async () => {
+    const initial = initialWorkspaceLayout('原始');
+    let remote = dto(initial), hang = true;
+    const signals: AbortSignal[] = [];
+    const store = new WorkspaceLayoutStore({ get: async () => remote, save: (input, signal) => {
+      signals.push(signal);
+      if (hang) return new Promise<WorkspaceLayoutDto>(() => {});
+      remote = dto(input.layout, input.expectedRevision + 1); return Promise.resolve(remote);
+    } }, initial, undefined, { ms: 20, message: '布局读写超时' });
+    await store.load();
+    store.update((value) => ({ ...value, view: 'preview' })); await store.flush();
+    expect(store.getState()).toMatchObject({ phase: 'error', error: '布局读写超时', dirty: true, layout: { view: 'preview' } });
+    expect(signals[0]?.aborted).toBe(true);
+    store.update((value) => ({ ...value, view: 'code' }));
+    expect(store.getState()).toMatchObject({ phase: 'error', layout: { view: 'code' } });
+    hang = false; await store.reapply();
+    expect(store.getState()).toMatchObject({ phase: 'ready', dirty: false, revision: 2, layout: { view: 'code' } });
+    expect(remote.layout?.view).toBe('code');
+  });
+  test('读取挂住到上限也按失败处理，可以重新读取；读到之前不接受改动', async () => {
+    const initial = initialWorkspaceLayout('原始');
+    let hang = true;
+    const store = new WorkspaceLayoutStore({ get: (signal) => hang ? new Promise<WorkspaceLayoutDto>((_resolve, reject) => { signal.addEventListener('abort', () => reject(new Error('aborted'))); }) : Promise.resolve(dto({ ...initial, view: 'code' })), save: async (input) => dto(input.layout, 2) },
+      initial, undefined, { ms: 20, message: '布局读写超时' });
+    await store.load();
+    expect(store.getState()).toMatchObject({ phase: 'error', error: '布局读写超时', loaded: false });
+    store.update((value) => ({ ...value, view: 'preview' })); expect(store.getState().layout.view).toBe('cli');
+    hang = false; await store.load();
+    expect(store.getState()).toMatchObject({ phase: 'ready', loaded: true, layout: { view: 'code' } });
+  });
   test('另一窗口先保存时不自动覆盖；选择重新应用才使用最新 revision', async () => {
     const initial = initialWorkspaceLayout('原始');
     let remote = dto(initial), writes = 0;

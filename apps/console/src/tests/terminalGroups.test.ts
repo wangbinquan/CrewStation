@@ -51,12 +51,19 @@ describe('旧布局迁移与规整', () => {
     expect(grid.dock).toEqual({ direction: 'column', children: [{ direction: 'row', children: [{ group: G1 }, { group: G2 }], sizes: [1, 1] }, { group: G3 }], sizes: [1, 1] });
   });
 
-  test('只有一窗或放大着时全部进一组，其他工作区的 CLI 作为后台标签跟在后面；已收起的不进来', () => {
+  test('只有一窗或放大着时全部进一组，其他工作区的 CLI 作为后台标签跟在后面；已收起的不进来，旧的收起列表清空', () => {
     const layout = base([{ id: G1, name: '一', layout: 'grid', paneOrder: [A, B], ratios: { columns: [1, 1], rows: [1, 1] } }, { id: G2, name: '二', layout: 'grid', paneOrder: [C], ratios: { columns: [1, 1], rows: [1, 1] } }],
       { maximizedTerminalId: B, selectedTerminalId: B, hiddenTerminalIds: [D] });
     const migrated = valid(migrateLegacyTabs(layout, () => G3));
     expect(migrated.tabs.map((tab) => [tab.id, tab.paneOrder, tab.activeTerminalId])).toEqual([[G1, [B, A, C], B]]);
-    expect(migrated.dock).toEqual({ group: G1 }); expect(migrated.maximizedTerminalId).toBeNull(); expect(migrated.hiddenTerminalIds).toEqual([D]);
+    expect(migrated.dock).toEqual({ group: G1 }); expect(migrated.maximizedTerminalId).toBeNull(); expect(migrated.hiddenTerminalIds).toEqual([]);
+  });
+
+  test('旧布局里收起的 CLI 迁移后由对账归位：仍在运行的回到标签，已结束的记为已关闭', () => {
+    const legacy = base([{ id: G1, name: '一', layout: 'grid', paneOrder: [A], ratios: { columns: [1, 1], rows: [1, 1] } }], { hiddenTerminalIds: [D, E] });
+    const next = valid(reconcileTerminals(normalizeGroups(legacy, () => G2), roster([[A, 'running'], [D, 'running'], [E, 'ended']])));
+    expect(next.tabs.map((tab) => tab.paneOrder)).toEqual([[A, D]]); expect(next.tabs[0]?.activeTerminalId).toBe(A);
+    expect(next.hiddenTerminalIds).toEqual([E]);
   });
 
   test('规整修正与页签对不上的树、空组、失效的当前标签与名字，且幂等', () => {
@@ -72,22 +79,21 @@ describe('旧布局迁移与规整', () => {
 });
 
 describe('与名册对账：在运行的 CLI 都有标签', () => {
-  test('没位置的在运行 CLI 与已收起的都作为后台标签进焦点组，不抢当前标签；本页刚结束的不放回；已结束的只记进已关闭', () => {
+  test('没位置的在运行 CLI 作为后台标签进焦点组，不抢当前标签；已结束的只记进已关闭；本人关掉的名册没跟上也不放回', () => {
+    // D 是本人刚关掉的：进程还在结束中，名册仍报运行中。
     const layout = { ...twoGroups(), activeTabId: G2, hiddenTerminalIds: [D] };
-    const next = valid(reconcileTerminals(layout, roster([[A, 'running'], [D, 'running'], [E, 'starting'], [id(16), 'ended'], [id(17), 'running']]), new Set([id(17)])));
-    expect(next.tabs.find((tab) => tab.id === G2)?.paneOrder).toEqual([C, D, E]);
+    const next = valid(reconcileTerminals(layout, roster([[A, 'running'], [D, 'running'], [E, 'starting'], [id(16), 'ended'], [id(17), 'running']])));
+    expect(next.tabs.find((tab) => tab.id === G2)?.paneOrder).toEqual([C, E, id(17)]);
     expect(next.tabs.find((tab) => tab.id === G2)?.activeTerminalId).toBe(C);
-    // 本页刚结束的（id 17）名册里还是运行中：不放回标签，只记进已关闭。
-    expect(next.hiddenTerminalIds).toEqual([id(16), id(17)]);
-    expect(next.tabs.flatMap((tab) => tab.paneOrder)).not.toContain(id(17));
-    expect(reconcileTerminals(next, roster([[A, 'running'], [D, 'unknown'], [id(16), 'ended']]), new Set())).toBe(next);
-    // 页面刷新后「本页刚结束」的记忆没了：它若仍在运行，就该重新有标签。
-    expect(reconcileTerminals(next, roster([[id(17), 'running']]), new Set()).tabs.flatMap((tab) => tab.paneOrder)).toContain(id(17));
+    expect(next.hiddenTerminalIds).toEqual([D, id(16)]);
+    expect(reconcileTerminals(next, roster([[A, 'running'], [D, 'unknown'], [id(16), 'ended']]))).toBe(next);
+    // 2026-09-23 实机：离开开发页再回来（或刷新）之后仍以布局为准，关掉的不会以「不可用」回到原处。
+    expect(reconcileTerminals(next, roster([[D, 'running']]))).toBe(next);
   });
 
   test('空组收到第一个 CLI 时它就是当前标签；自己新开的成为当前标签并取得焦点，别的组放大着先还原', () => {
     const empty = initialWorkspaceLayout('空');
-    const first = valid(reconcileTerminals(empty, roster([[A, 'running']]), new Set()));
+    const first = valid(reconcileTerminals(empty, roster([[A, 'running']])));
     expect(first.tabs[0]?.activeTerminalId).toBe(A);
     const big = { ...twoGroups(), maximizedTerminalId: C, activeTabId: G1 };
     const opened = valid(openTerminal(big, E, { activate: true }));

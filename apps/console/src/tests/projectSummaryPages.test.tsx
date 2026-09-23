@@ -113,6 +113,15 @@ describe('项目列表的真实分页与独立状态', () => {
   });
 });
 
+// 2026-09-23 盘点：demo 有 14 条 CLI 记录（8 已结束、6 失败），一个都不在跑，概览开发卡却写「14 个 CLI」。
+test('概览开发卡的 CLI 数只数没结束的：已结束与失败的是历史记录，不算进去', async () => {
+  const f = summaryFixture(), time = new Date().toISOString();
+  f.item.development = { status: 'ready', checkedAt: time, value: { taskId: '01a0bf5d-8f4b-7e52-8b45-4a547fd10e4f' as TaskId, state: 'running', connected: true, branch: 'main', createdAt: time, lastActivityAt: time } };
+  f.terminals = ['running', 'starting', 'unknown', 'ended', 'failed', 'ended'].map((lifecycle) => ({ lifecycle }));
+  page = await renderApp(`/projects/${f.item.project.id}`);
+  expect([...document.querySelectorAll('code')].find((node) => node.textContent === 'main')?.parentElement?.textContent).toBe('main · 3 个 CLI');
+});
+
 test.each(['列表', '概览'])('%s 的会话分支明确标为创建时记录，缺失保持未知且不额外查询工作树', async (view) => {
   const f = summaryFixture(), time = new Date().toISOString();
   const session = { taskId: '01a0bf5d-8f4b-7e52-8b45-4a547fd10e4f' as TaskId, state: 'running' as const, connected: true, branch: 'main', createdAt: time, lastActivityAt: time };

@@ -87,6 +87,24 @@ describe('CLI 标签组', () => {
     expect(f.saves.at(-1)?.hiddenTerminalIds).toEqual([ended.terminalId, mine.terminalId]);
   });
 
+  // 2026-09-23 实机：关掉在运行的 CLI 后切出开发页再切回，名册还报运行中（进程约 2 秒后才报结束，前端名册缓存 30 秒），
+  // 「本页刚关掉」只记在页面内存里、随页面一起没了，它以「不可用」回到原处，还能再结束一次。关掉的以个人布局为准。
+  test('关掉在运行的 CLI 后离开开发页再回来：名册仍报运行中也不放回，不会被再结束一次', async () => {
+    const first = setup(); page = await renderElement(element(), messages);
+    await fire(tab(mine.terminalId).querySelector('button')!, new MouseEvent('click', { bubbles: true }));
+    await page.click('结束进程');
+    expect(first.stops).toEqual([mine.agentId]);
+    await flush();
+    const closed = first.saves.at(-1)!;
+    expect(closed.hiddenTerminalIds).toContain(mine.terminalId);
+    const again = setup({ layout: closed }); page = await renderElement(element(), messages);
+    expect(groups()).toEqual([[ended.terminalId, other.terminalId]]);
+    expect(tab(mine.terminalId)).toBeNull();
+    await flush();
+    expect(again.stops).toEqual([]);
+    expect(again.saves.flatMap((layout) => layout.tabs.flatMap((group) => group.paneOrder))).not.toContain(mine.terminalId);
+  });
+
   test('结束别人开的 CLI 时确认里写明是谁开的；开的人不在成员名单里时写「其他人」而不是一段用户 ID', async () => {
     setup(); page = await renderElement(element(), messages);
     await fire(tab(other.terminalId).querySelector('button')!, new MouseEvent('click', { bubbles: true }));

@@ -434,6 +434,7 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   "devSession.native.empty": "Create your first development agent session to start developing",
   'devSession.native.emptyHint': 'Enter your request when the terminal is ready. Each additional CLI opens as a tab; drag a tab to an edge of the screen to split.',
   "devSession.native.savingLayout": "Saving layout…",
+  "devSession.native.layoutTimeout": "The layout request got no response within {seconds} s and was cancelled; your layout is kept on this page — reapply it or use the saved one.",
   "devSession.native.personalLayout": "Personal layout saved",
   "devSession.native.view.preview": "Preview",
   "devSession.native.view.code": "Code",

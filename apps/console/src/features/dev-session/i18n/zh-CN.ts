@@ -431,6 +431,7 @@ export const messages = {
   "devSession.native.empty": "创建第一个开发Agent会话，开始开发",
   'devSession.native.emptyHint': '终端就绪后直接输入需求。可以继续创建多个，每个一个标签；把标签拖到画面四边即可分屏排列。',
   'devSession.native.savingLayout': '布局保存中…',
+  'devSession.native.layoutTimeout': '布局读写 {seconds} 秒没有回应，已取消；当前布局保留在本页，可以重新应用或采用已保存布局。',
   'devSession.native.personalLayout': '个人布局已保存',
   'devSession.native.view.preview': '预览',
   'devSession.native.view.code': '代码',
