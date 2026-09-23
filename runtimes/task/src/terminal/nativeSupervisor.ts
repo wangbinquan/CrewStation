@@ -1,4 +1,4 @@
-import type { KnownAgentProtocol, NativeTerminalRecord, RunnerEvent, StartAgentTerminalCommand, TerminalControl, TerminalSnapshot } from '@crewstation/contracts';
+import type { KnownAgentProtocol, NativeTerminalRecord, RunnerEvent, StartAgentTerminalCommand, TerminalControl, TerminalHolder, TerminalSnapshot } from '@crewstation/contracts';
 import { TerminalSizeSchema, isKnownProtocol } from '@crewstation/contracts';
 import type { Logger } from '@crewstation/kernel';
 import type { ManagedRuntimeContext, PreparedNativeTerminal } from '@crewstation/agent-drivers';
@@ -73,7 +73,8 @@ export class NativeTerminalSupervisor {
       compute: command.compute, profileRevision: command.profileRevision, protocol: command.launch.protocol, permission: command.permission,
       revision: 0, lifecycle: 'starting', startedAt: new Date().toISOString(), cols: command.cols, rows: command.rows,
     };
-    const entry: NativeEntry = { record, fingerprint: command.requestFingerprint, start: Promise.resolve(record), accepted: Promise.resolve(), control: createTerminalControl(), screen: createTerminalScreen(command.cols, command.rows), outputSeq: 0, stopped: false };
+    const control = createTerminalControl((state) => this.deps.emit({ kind: 'terminalControl', terminalId: command.terminalId, runnerId: this.runnerId, control: state }));
+    const entry: NativeEntry = { record, fingerprint: command.requestFingerprint, start: Promise.resolve(record), accepted: Promise.resolve(), control, screen: createTerminalScreen(command.cols, command.rows), outputSeq: 0, stopped: false };
     this.entries.set(command.agentId, entry);
     this.byTerminal.set(command.terminalId, entry);
     this.emit(entry);
@@ -162,6 +163,7 @@ export class NativeTerminalSupervisor {
   private exited(entry: NativeEntry, exitCode: number | null): void {
     entry.record = { ...entry.record, lifecycle: 'ended', exitCode, endedAt: new Date().toISOString(), reason: entry.stopped ? 'stopped' : 'exited' };
     entry.prepared?.dispose();
+    entry.control.dispose();
     this.deps.beforeStart.release(entry.record.agentId);
     entry.activity?.close();
     this.emit(entry);
@@ -170,14 +172,15 @@ export class NativeTerminalSupervisor {
 
   async attach(terminalId: string, runnerId: string): Promise<TerminalSnapshot> {
     this.assertRunner(runnerId);
-    return { terminalId, runnerId: this.runnerId, ...await this.lookup(terminalId).screen.snapshot() };
+    const entry = this.lookup(terminalId), screen = await entry.screen.snapshot();
+    return { terminalId, runnerId: this.runnerId, ...screen, control: entry.control.state() };
   }
 
-  claim(terminalId: string, viewId: string, runnerId: string): TerminalControl {
+  claim(terminalId: string, viewId: string, runnerId: string, holder?: TerminalHolder): TerminalControl {
     this.assertRunner(runnerId);
     const entry = this.lookup(terminalId);
     this.assertRunning(entry);
-    return entry.control.claim(viewId);
+    return entry.control.claim(viewId, holder);
   }
 
   detach(terminalId: string, viewId: string): void { this.lookup(terminalId).control.release(viewId); }

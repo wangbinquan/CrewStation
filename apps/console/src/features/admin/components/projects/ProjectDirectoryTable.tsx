@@ -5,6 +5,7 @@ import { useDateText } from '../../../../shared/lib/useDateText';
 import { DataTable } from '../../../../shared/ui/DataTable';
 import { Badge } from '../../../../shared/ui/Badge';
 import styles from './ProjectDirectory.module.css';
+import { ButtonLink } from '../../../../shared/ui/navigation/ButtonLink';
 
 export function ProjectDirectoryTable({ items, available }: { readonly items: readonly ProjectPageEntry[]; readonly available: boolean }) {
   const t = useT(), date = useDateText();
@@ -14,10 +15,10 @@ export function ProjectDirectoryTable({ items, available }: { readonly items: re
         <details><summary>{t('admin.directory.details')}</summary><div><code>{p.id}</code></div><div><code>{p.namespace}</code></div><div>{date(p.createdAt)}</div></details></td>
       <td>{t(`projects.kind.${p.kind}`)}</td><td>{ownerName ?? p.ownerUserId}</td>
       <td><Badge tone={p.state === 'failed' ? 'danger' : p.state === 'provisioning' ? 'warning' : 'neutral'}>{t(`projects.state.${p.state}`)}</Badge>{p.message ? <p className={styles.message}>{p.message}</p> : null}</td>
-      <td>{available ? <div className={styles.actions}>{p.state === 'failed' || p.state === 'provisioning' ? <Link to="/admin/projects/$projectId/provisioning" params={{ projectId: p.id }}>{t('admin.directory.provision')}</Link> : null}
-        <Link to="/admin/projects/$projectId/resources" params={{ projectId: p.id }}>{t('admin.resources.title')}</Link>
-        <Link to={p.kind === 'DigitalWorker' ? '/projects/$projectId/settings' : '/admin/integrations/$projectId/settings'} params={{ projectId: p.id }} search={{ tab: 'members' }}>{t('admin.directory.members')}</Link>
-        <Link to={p.kind === 'DigitalWorker' ? '/projects/$projectId/settings' : '/admin/integrations/$projectId/settings'} params={{ projectId: p.id }} search={{ tab: 'advanced' }}>{t('admin.directory.lifecycle')}</Link></div> : null}</td>
+      <td>{available ? <div className={styles.actions}>{p.state === 'failed' || p.state === 'provisioning' ? <ButtonLink size="small" to="/admin/projects/$projectId/provisioning" params={{ projectId: p.id }}>{t('admin.directory.provision')}</ButtonLink> : null}
+        <ButtonLink size="small" to="/admin/projects/$projectId/resources" params={{ projectId: p.id }}>{t('admin.resources.title')}</ButtonLink>
+        <ButtonLink size="small" to={p.kind === 'DigitalWorker' ? '/projects/$projectId/settings' : '/admin/integrations/$projectId/settings'} params={{ projectId: p.id }} search={{ tab: 'members' }}>{t('admin.directory.members')}</ButtonLink>
+        <ButtonLink size="small" to={p.kind === 'DigitalWorker' ? '/projects/$projectId/settings' : '/admin/integrations/$projectId/settings'} params={{ projectId: p.id }} search={{ tab: 'advanced' }}>{t('admin.directory.lifecycle')}</ButtonLink></div> : null}</td>
     </tr>)}
   </DataTable>;
 }

@@ -1,10 +1,10 @@
 import type { ProjectSummaryDetail } from '@crewstation/contracts';
-import { Link } from '@tanstack/react-router';
 import { PROJECT_PATHS } from '../../../../shared/project/projectPaths';
 import type { ProjectSpace } from '../../../../shared/project/projectPaths';
 import { useT } from '../../../../shared/lib/useT';
 import { summaryIsFresh } from '../../model/projectSummaryState';
 import styles from './ProjectSummary.module.css';
+import { ButtonLink } from '../../../../shared/ui/navigation/ButtonLink';
 
 type NextStep = { readonly tone: 'info' | 'warning'; readonly title: string; readonly hint: string; readonly releaseId?: string };
 
@@ -27,6 +27,6 @@ export function ProjectNextStepBanner({ item, space }: { readonly item: ProjectS
   if (!step) return null;
   return <div className={styles.banner} data-tone={step.tone} role="status">
     <div><strong>{step.title}</strong><p className={styles.muted}>{step.hint}</p></div>
-    {step.releaseId ? <Link to={PROJECT_PATHS[space].release} params={{ projectId: item.project.id }} search={{ release: step.releaseId }}>{t('projects.summary.next.viewRelease')}</Link> : null}
+    {step.releaseId ? <ButtonLink to={PROJECT_PATHS[space].release} params={{ projectId: item.project.id }} search={{ release: step.releaseId }}>{t('projects.summary.next.viewRelease')}</ButtonLink> : null}
   </div>;
 }

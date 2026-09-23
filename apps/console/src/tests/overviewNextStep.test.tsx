@@ -16,7 +16,7 @@ test('概览的下一步横幅只从有效的槽与发布事实推导：待验�
   f.item.slots = { status: 'ready', checkedAt: time, value: [slot('prod', 'v1.0.0', prodRelease, 'formal.test'), slot('preview', 'v1.0.1', previewRelease, 'trial.test')] };
   page = await renderApp(`/projects/${f.item.project.id}`);
   expect(page.text()).toContain('v1.0.1 已发布，等待验证');
-  expect(document.querySelector(`a[href*="release=${previewRelease}"]`)?.textContent).toBe('查看版本 →');
+  expect(document.querySelector(`a[href*="release=${previewRelease}"]`)?.textContent).toBe('查看版本');
   // 版本卡以标签为标题，副本与地址各一行；两处访问入口文字保持既有断言。
   expect(page.text()).toContain('1／1 副本就绪'); expect([...document.querySelectorAll('a[href="//trial.test"]')].map((node) => node.textContent)).toContain('打开试用');
   // 待验证与正式是同一发布：没有“等待验证”的下一步。

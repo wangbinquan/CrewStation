@@ -2,7 +2,6 @@ import { expect, test } from 'bun:test';
 import { createRequire } from 'node:module';
 import type * as XtermHeadless from '@xterm/headless';
 import { createTerminalScreen, TERMINAL_SCROLLBACK_LIMIT } from '../src/terminal/terminalScreen';
-import { createTerminalControl, TERMINAL_CONTROL_LEASE_MS } from '../src/terminal/terminalControl';
 
 const { Terminal } = createRequire(import.meta.url)('@xterm/headless') as typeof XtermHeadless;
 
@@ -133,19 +132,4 @@ test.each([false, true])('缩窄截到中文字符中间时不挤走下一行，
       expect(restored.buffer.active.getLine(1)?.getCell(0)?.getFgColor()).toBe(2);
     }
   } finally { await screen.dispose(); restored.dispose(); }
-});
-
-test('多个视图只有一个输入／尺寸控制，错误视图 detach 不抢控制，断线租约到期可重新取得', () => {
-  let time = 100_000;
-  const lease = createTerminalControl(() => time);
-  expect(lease.claim('one').controlled).toBe(true);
-  expect(lease.claim('two').controlled).toBe(false);
-  expect(() => lease.assert('two')).toThrow('未取得');
-  lease.release('two');
-  lease.assert('one');
-  time += TERMINAL_CONTROL_LEASE_MS;
-  expect(() => lease.assert('one')).toThrow('未取得');
-  expect(lease.claim('two').controlled).toBe(true);
-  lease.release('two');
-  expect(lease.claim('one').controlled).toBe(true);
 });

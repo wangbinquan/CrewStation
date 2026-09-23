@@ -1,5 +1,4 @@
 import type { ReactElement } from 'react';
-import { Link } from '@tanstack/react-router';
 import { PROJECT_PATHS } from '../../../shared/project/projectPaths';
 import { Stack } from '../../../shared/ui/Stack';
 import { useCallback, useState } from 'react';
@@ -9,6 +8,7 @@ import { Tabs } from '../../../shared/ui/Tabs';
 import { UnsavedChangesGuard } from '../../../shared/navigation/UnsavedChangesGuard';
 import { ConfigEnvPanel } from '../components/ConfigEnvPanel';
 import { ProductionConfigImpact } from '../components/ProductionConfigImpact';
+import { ButtonLink } from '../../../shared/ui/navigation/ButtonLink';
 
 /** 默认开发组；生产组独立切换，输入按项目与环境隔离。 */
 export function ConfigPage({ env, onEnvironmentChange }: { readonly env: 'development' | 'production'; readonly onEnvironmentChange: (env: 'development' | 'production') => void }): ReactElement {
@@ -23,7 +23,7 @@ export function ConfigPage({ env, onEnvironmentChange }: { readonly env: 'develo
       <Tabs label={t('config.title')} value={env} items={(['development', 'production'] as const).map((value) => ({ value, label: t(`config.env.${value}`) }))} onChange={(value) => onEnvironmentChange(value === 'production' ? 'production' : 'development')}>
         {(['development', 'production'] as const).map((group) => <div key={`${projectId}:${group}`} hidden={env !== group}><Stack><ConfigEnvPanel projectId={projectId} env={group} onDirtyChange={dirtyChanged} />{group === 'production' && env === 'production' ? <ProductionConfigImpact /> : null}</Stack></div>)}
       </Tabs>
-      <Link to={PROJECT_PATHS[space].resources} params={{ projectId }} search={{ section: 'guide', topic: 'environment' }}>{t('config.platformGuide')}</Link>
+      <ButtonLink to={PROJECT_PATHS[space].resources} params={{ projectId }} search={{ section: 'guide', topic: 'environment' }}>{t('config.platformGuide')}</ButtonLink>
     </Stack>
   );
 }

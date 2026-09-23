@@ -88,6 +88,15 @@
 
 TaskRunner 增加 `startAgentTerminal`／名册查询等协议及终端 started 事件，复用 terminalInput／Output／Resize；Agent 进程状态不通过猜测输出文字判断。cs-session 按 terminalId 路由，终端恢复有有界回放／快照及缺口说明，不能把截断后的 ANSI 尾部当作完整屏幕。多个浏览器附着同一终端时，只由显式取得输入控制的视图发送输入／尺寸，其余视图可读；这不限制不同 Agent 并行运行，也不引入工作树单写锁。
 
+> **2026-09-23 修订（作者当面裁定，直接修改，不另立 RFC）。** 作者反馈「获取控制权的按钮一点都不显眼」「没被其他人占用时，操作 CLI 框就应自动获取；被占用就提示谁在占用」。逐项裁定后，上一段的「显式取得」改为：
+>
+> - **自动取得**：点进终端、Tab 进终端、在终端里按键、切回停着焦点的终端，都自动取得输入控制；只打开页面不取得。原「获取输入控制」按钮删除。没有控制时的按键仍不排队、不重发（原规则不变），只触发取得。
+> - **焦点在终端才保持**：只在终端有焦点、页面可见且窗口在前台时每 10 秒续约；点到别处、切走标签页或窗口后不再续约，Runner 的 30 秒租约自然到期并释放。
+> - **占用只对别人成立**：同一用户的另一个窗口来取，控制直接转过去；别人占着时取得被拒。粒度仍是每个 CLI 窗口各一把，两人可以各用一个 CLI。
+> - **占用人常驻实时显示**：终端上方的状态条按颜色区分「你正在输入」（绿，整窗加绿框）「空闲 · 点击终端即可输入」（蓝）「你在另一个窗口中输入」（蓝）「某某 正在输入 · 只读」（黄）。持有人由 cs-session 按浏览器连接的网关身份（用户 ID＋显示名）注入取得命令，浏览器自带的一律丢弃；Runner 记住持有人，换人、释放、到期都推 `terminalControl` 事件（只实时转发、不落库，带单调递增的 `revision`），`attachTerminal` 快照带当前状态。Runner 在 hello 声明能力位 `terminalControl: 1`，协议号不变；旧 Runner 没有这些字段，页面退回「其他窗口正在输入 · 只读」且不实时更新——只有基于新底座重建并重新保存的算力档位新开的 CLI 才显示名字。
+>
+> 落位：契约 `packages/contracts/taskrunner/{nativeTerminal,protocol}.ts`；Runner `runtimes/task/src/terminal/terminalControl.ts`；cs-session `modules/session/domain/terminalViews.ts`、`application/browserStreams.ts`；工作台 `features/dev-session/model/native/{nativeTerminalAttachment,terminalControlView}.ts`、`hooks/native/useTerminalFocus.ts`、`components/native/NativeTerminalView.tsx`。
+
 平台在 dev-session L5 解析档位，继续注入已有 MCP、权限、环境与 Git 身份。`packages/agent-drivers` 各自生成原生 TUI 启动计划，`runtimes/task` 复用 PTY／进程监督；租户 API 不接受任意驱动 flags，也不在普通 shell 内拼字符串来间接启动。具体 argv 以实施时安装的 CLI 帮助与原生交互实跑确认；同时保留现有 headless 计划及 oneshot 测试。
 
 ## 6. 工作树与部署的比较契约

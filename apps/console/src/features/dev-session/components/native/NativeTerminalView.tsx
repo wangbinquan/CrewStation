@@ -1,19 +1,27 @@
 import type { NativeTerminalDto } from '@crewstation/contracts';
 import { NativeTerminalSnapshotDtoSchema } from '@crewstation/contracts';
-import { useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
 import type { ReactElement } from 'react';
+import type { Translate } from '../../../../shared/lib/useT';
 import { useT } from '../../../../shared/lib/useT';
 import { Button } from '../../../../shared/ui/Button';
 import type { TaskStreamChannel } from '../../hooks/useTaskStream';
+import { useTerminalFocus } from '../../hooks/native/useTerminalFocus';
 import type { StreamState } from '../../model/taskStreamSocket';
 import { NativeTerminalAttachment } from '../../model/native/nativeTerminalAttachment';
 import { NativeTerminalSurface } from '../../model/native/nativeTerminalSurface';
+import { terminalControlView } from '../../model/native/terminalControlView';
+import type { TerminalControlView } from '../../model/native/terminalControlView';
 import styles from './NativeWorkspace.module.css';
 import '@xterm/xterm/css/xterm.css';
 import { api } from '../../../../shared/api/client';
 import { errorMessage, useApiQuery } from '../../../../shared/api/useApi';
 
-interface NativeTerminalViewProps { readonly terminal: NativeTerminalDto; readonly channel: TaskStreamChannel; readonly stream: StreamState; readonly onActivity: () => void; readonly canDevelop: boolean }
+interface NativeTerminalViewProps {
+  readonly terminal: NativeTerminalDto; readonly channel: TaskStreamChannel; readonly stream: StreamState; readonly onActivity: () => void; readonly canDevelop: boolean;
+  /** 当前用户：输入控制在自己另一个窗口时据此显示「你在另一个窗口中输入」。 */
+  readonly viewerId?: string;
+}
 
 export function NativeTerminalView(props: NativeTerminalViewProps): ReactElement {
   return props.terminal.execution && ['ended', 'failed'].includes(props.terminal.lifecycle) ? <SavedNativeTerminalView terminal={props.terminal} /> : <LiveNativeTerminalView {...props} />;
@@ -35,7 +43,7 @@ function SavedNativeTerminalView({ terminal }: Pick<NativeTerminalViewProps, 'te
   </>;
 }
 
-function LiveNativeTerminalView({ terminal, channel, stream, onActivity, canDevelop }: NativeTerminalViewProps): ReactElement {
+function LiveNativeTerminalView({ terminal, channel, stream, onActivity, canDevelop, viewerId }: NativeTerminalViewProps): ReactElement {
   const t = useT();
   const host = useRef<HTMLDivElement>(null);
   const activity = useRef(onActivity);
@@ -56,15 +64,30 @@ function LiveNativeTerminalView({ terminal, channel, stream, onActivity, canDeve
     if (stream.runnerConnected && terminal.connection === 'connected') attachment.connect();
   }, [attachment, stream.runnerConnected, stream.generation, terminal.connection]);
   useEffect(() => surface.setControlled(state.controlled && state.phase === 'ready'), [surface, state.controlled, state.phase]);
+  // 操作终端（点进、Tab 进、按键、切回来）即自动取得输入（2026-09-23 裁定）；被别人占着时取得会被拒，状态条显示是谁。
+  const interactive = canDevelop && state.phase === 'ready' && terminal.lifecycle === 'running';
+  const take = useCallback(() => {
+    if (interactive) void attachment.ensureControl().then((ok) => { if (ok) { surface.setControlled(true); surface.focus(); } });
+  }, [interactive, attachment, surface]);
+  const active = useRef(false);
+  const onFocusChange = useCallback((value: boolean) => { active.current = value; attachment.setActive(value); }, [attachment]);
+  useEffect(() => attachment.setActive(active.current), [attachment]);
+  useTerminalFocus(host, onFocusChange, take);
+  const view = terminal.lifecycle === 'running' ? terminalControlView(state, viewerId, canDevelop) : undefined;
   return <>
-    <div className={styles.controlLine}>
-      <span>{t(`devSession.native.attach.${state.phase}`)}</span>
+    <div className={styles.controlLine} data-control={view?.tone} role="status" aria-live="polite">
+      {view ? <strong className={styles.controlState}>{controlText(t, view)}</strong> : <span>{t(`devSession.native.attach.${state.phase}`)}</span>}
       {terminal.protocol === 'opencode' && state.phase === 'ready' ? <span title={t('devSession.native.historyHelp')}>{t(state.controlled ? 'devSession.native.historyControlled' : 'devSession.native.historyReadOnly')}</span> : null}
       {state.truncated ? <span title={t('devSession.native.scrollback')}>{t('devSession.native.bounded')}</span> : null}
-      <Button variant="ghost" disabled={!canDevelop || state.phase !== 'ready' || terminal.lifecycle !== 'running' || state.controlled} onClick={() => void attachment.claim().then((ok) => { if (ok) { surface.setControlled(true); surface.focus(); } })}>{t(state.controlled ? 'devSession.native.controlling' : 'devSession.native.claim')}</Button>
       {state.phase === 'error' ? <Button variant="ghost" onClick={() => void attachment.refresh()}>{t('devSession.native.reattach')}</Button> : null}
     </div>
     {state.error ? <p className={styles.error} role="status">{state.error}</p> : null}
-    <div className={styles.terminalSurface} ref={host} role="region" tabIndex={state.controlled ? -1 : 0} aria-label={t('devSession.native.screen', { id: terminal.agentId.slice(-6) })} />
+    <div className={styles.terminalSurface} ref={host} role="region" tabIndex={state.controlled ? -1 : 0} aria-label={t('devSession.native.screen', { id: terminal.agentId.slice(-6) })}
+      onPointerDown={take} onKeyDown={state.controlled ? undefined : take} />
   </>;
+}
+
+function controlText(t: Translate, view: TerminalControlView): string {
+  if (view.tone !== 'other') return t(`devSession.native.control.${view.tone}`);
+  return t('devSession.native.control.other', { name: view.holder?.name || t('devSession.native.control.unnamed') });
 }

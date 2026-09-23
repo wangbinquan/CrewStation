@@ -19,8 +19,6 @@
 .table th { padding: var(--cs-space-2); }
 .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--cs-space-2); }
 .stack { display: grid; gap: var(--cs-space-3); }
-.primary { display: inline-flex; padding: var(--cs-space-1) var(--cs-space-3); border-radius: var(--cs-radius-sm); background: var(--cs-color-primary); color: var(--cs-color-on-primary); text-decoration: none; font-weight: 600; }
-.primary:hover { background: var(--cs-color-primary-hover); }
 .failure { color: var(--cs-tone-danger-fg); overflow-wrap: anywhere; }
 .activity { display: grid; gap: var(--cs-space-2); padding: 0; margin: 0; list-style: none; }
 .activity li { display: flex; justify-content: space-between; flex-wrap: wrap; gap: var(--cs-space-2); padding-block: var(--cs-space-1); border-bottom: 1px solid var(--cs-color-border); }
@@ -31,10 +29,7 @@
 .banner[data-tone="warning"] { background: var(--cs-tone-warning-bg); }
 .banner strong { display: block; }
 .banner p { margin-top: 2px; }
-.banner a { font-weight: 600; white-space: nowrap; }
 .statusGrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--cs-space-3); }
 .bottom { display: grid; grid-template-columns: repeat(auto-fit, minmax(440px, 1fr)); gap: var(--cs-space-3); align-items: start; }
 .sessionLine { font-weight: 600; }
-.primarySmall { display: inline-flex; align-items: center; padding: 3px var(--cs-space-3); border-radius: var(--cs-radius-md); background: var(--cs-color-primary); color: var(--cs-color-on-primary); font-weight: 600; white-space: nowrap; }
-.primarySmall:hover { background: var(--cs-color-primary-hover); text-decoration: none; }
 @media (max-width: 1100px) { .statusGrid { grid-template-columns: 1fr; } }

@@ -1,5 +1,4 @@
 import type { ReactElement } from 'react';
-import { Link } from '@tanstack/react-router';
 import { api } from '../../../shared/api/client';
 import { queryKeys } from '../../../shared/api/queryKeys';
 import { errorMessage, useApiQuery } from '../../../shared/api/useApi';
@@ -18,6 +17,7 @@ import type { TimelineItem } from '../../../shared/ui/Timeline';
 import { isInFlight, releaseStatusTone } from '../model/releaseStatus';
 import { ReleaseStatusBadge } from './ReleaseStatusBadge';
 import styles from './ReleaseTimeline.module.css';
+import { ButtonLink } from '../../../shared/ui/navigation/ButtonLink';
 
 /** 当前页前台有界刷新，以发现其他人新发起的发布；后台暂停。 */
 const HISTORY_POLL_MS = 5_000;
@@ -44,7 +44,7 @@ export function ReleaseTimeline({ projectId, serviceId, onSelect }: { readonly p
       primary: <><Button variant="ghost" className={styles.tag} title={t('release.timeline.details')} onClick={() => onSelect(entry.release.id)}>{entry.release.tag}</Button> <ReleaseStatusBadge status={entry.release.status} /></>,
       secondary: <>{entry.release.slot ? `${t(`slot.${entry.release.slot}`)} · ` : ''}<code>{entry.release.commitSha.slice(0, 7)}</code> · {entry.release.branch}
         {entry.release.status === 'failed' && entry.release.message ? <span className={styles.failure}> · {t('release.history.failureLabel')}{entry.release.message}</span> : null}</>,
-      action: entry.release.status === 'failed' ? <Link to={PROJECT_PATHS[space].operations} params={{ projectId }} search={{ tab: 'logs', source: 'build', releaseId: entry.release.id }}>{t('release.timeline.logs')}</Link> : undefined }
+      action: entry.release.status === 'failed' ? <ButtonLink size="small" to={PROJECT_PATHS[space].operations} params={{ projectId }} search={{ tab: 'logs', source: 'build', releaseId: entry.release.id }}>{t('release.timeline.logs')}</ButtonLink> : undefined }
     : { id: entry.id, tone: 'info', shape: 'square', time: date(entry.at),
       primary: t(entry.rollback ? 'timeline.rollback' : 'timeline.switch', { actor: entry.actorName ?? t('timeline.unknownActor', { id: shortId(entry.entry.actorUserId) }), tag: entry.tag ?? t('timeline.unknownTag', { id: shortId(entry.entry.releaseId) }) }),
       secondary: entry.entry.reason ? t('timeline.reason', { reason: entry.entry.reason }) : undefined,

@@ -30,10 +30,10 @@ test('新建历史 Agent 收起再打开保留首条指令、档位和权限，�
   await backToRoster(); await page!.click('新建 Agent');
   // 旧表单被条件卸载，点返回即销毁首条指令及已选档位。
   expect(prompt().value).toBe('尚未启动的首条指令'); expect(compute().value).toBe('01a0bf5d-8f4b-7222-8222-222222222222'); expect(permission().value).toBe('read-only');
-  await backToRoster(); await page!.click('← 返回 CLI 工作区');
+  await backToRoster(); await page!.click('返回 CLI 工作区');
   expect(page!.path()).toBe(path); expect(page!.text()).toContain('历史对话输入有未保存的输入');
   await page!.click('继续编辑'); await page!.click('新建 Agent'); expect(prompt().value).toBe('尚未启动的首条指令');
-  await page!.click('← 返回 CLI 工作区'); await page!.click('放弃输入并离开'); expect(page!.path()).toBe(cliPath);
+  await page!.click('返回 CLI 工作区'); await page!.click('放弃输入并离开'); expect(page!.path()).toBe(cliPath);
   expect(fixture!.starts).toHaveLength(0); expect(fixture!.sends).toHaveLength(0);
 });
 
@@ -43,7 +43,7 @@ test('历史 Agent 启动同步防重，失败保留固定输入且不自动重�
   await act(async () => { button('启动').click(); button('启动').click(); }); await page!.settle();
   expect(fixture!.starts).toHaveLength(1); expect(fixture!.starts[0]!.input).toEqual({ compute: { kind: 'profile', profileId: '01a0bf5d-8f4b-7222-8222-222222222222' }, permission: 'read-only', prompt: '只启动一次' });
   expect(prompt().disabled).toBe(true); expect(compute().disabled).toBe(true); expect(permission().disabled).toBe(true);
-  await page!.click('← 返回 CLI 工作区'); expect(page!.path()).toBe(path); expect(button('放弃输入并离开').disabled).toBe(true);
+  await page!.click('返回 CLI 工作区'); expect(page!.path()).toBe(path); expect(button('放弃输入并离开').disabled).toBe(true);
   await finish(0, true); expect(button('放弃输入并离开').disabled).toBe(false); await page!.click('继续编辑');
   expect(prompt().value).toBe('  只启动一次  '); expect(compute().value).toBe('01a0bf5d-8f4b-7222-8222-222222222222'); expect(permission().value).toBe('read-only');
   expect(page!.text()).toContain('上游未确认启动结果'); expect(button('启动').disabled).toBe(false); expect(fixture!.starts).toHaveLength(1);
@@ -57,12 +57,12 @@ test('新 Agent 回执不抢走已返回的历史对话，成功清除新建输�
   expect(document.querySelector('[role="tab"][aria-selected="true"]')!.textContent).toContain(historyAgentA.slice(-6));
   expect(message().value).toBe('已有 Agent 的后续草稿'); expect(document.activeElement).toBe(message()); expect(fixture!.starts).toHaveLength(1);
   await page.click('新建 Agent'); expect(prompt().value).toBe(''); expect(compute().value).toBe(''); expect(permission().value).toBe('edit');
-  await page.click('← 返回 CLI 工作区'); expect(page.path()).toBe(path); expect(page.text()).toContain('历史对话输入有未保存的输入');
+  await page.click('返回 CLI 工作区'); expect(page.path()).toBe(path); expect(page.text()).toContain('历史对话输入有未保存的输入');
 });
 
 test('停留新建表单时成功接续新 Agent，默认档位使用显式选择器且已发送输入不再阻挡离开', async () => {
   await open(); await edit(prompt(), '使用默认档位'); await page!.click('启动');
   expect(fixture!.starts[0]!.input).toEqual({ compute: { kind: 'default' }, permission: 'edit', prompt: '使用默认档位' }); await finish(0);
   expect(document.querySelector('[role="tab"][aria-selected="true"]')!.textContent).toContain('ated-0'); expect(message().value).toBe('');
-  await page!.click('← 返回 CLI 工作区'); expect(page!.path()).toBe(cliPath);
+  await page!.click('返回 CLI 工作区'); expect(page!.path()).toBe(cliPath);
 });

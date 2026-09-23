@@ -9,6 +9,7 @@ import { QueryStatus } from '../../../shared/ui/QueryStatus';
 import { DefinitionList } from '../../../shared/ui/DefinitionList';
 import type { PublishSource } from '../../../shared/project/releaseSearch';
 import type { PublishPreparation } from '../model/usePublishPreparation';
+import { ButtonLink } from '../../../shared/ui/navigation/ButtonLink';
 
 export function PublishSourceFields({ preparation: p, onSource }: { readonly preparation: PublishPreparation; readonly onSource: (source: PublishSource) => void }) {
   const t = useT(), { projectId, space } = useProjectScope(), query = p.source === 'session' ? p.workspace : p.branches;
@@ -30,7 +31,7 @@ export function PublishSourceFields({ preparation: p, onSource }: { readonly pre
         ] : [{ label: t('release.prepare.unknown'), value: workspace.reason }])]} />
         {workspace.status === 'ready' && workspace.uncommittedCount > 0 ? <><ul>{workspace.uncommitted.map((file) => <li key={file.path}><code>{file.status} </code>{file.status.includes('D') ? <code>{file.path}</code> : <Link to={PROJECT_PATHS[space].development} params={{ projectId }} search={{ view: 'code', file: file.path, task: workspace.taskId }}>{file.path}</Link>}</li>)}</ul>{workspace.uncommittedTruncated ? <p>{t('release.prepare.truncated')}</p> : null}</> : null}
       </> : null}
-      <Link to={PROJECT_PATHS[space].development} params={{ projectId }} search={p.sessionMissing ? {} : { view: 'diff' }}>{t(p.sessionMissing ? 'release.prepare.enterDevelopment' : 'release.prepare.openDevelopment')}</Link>
+      <ButtonLink to={PROJECT_PATHS[space].development} params={{ projectId }} search={p.sessionMissing ? {} : { view: 'diff' }}>{t(p.sessionMissing ? 'release.prepare.enterDevelopment' : 'release.prepare.openDevelopment')}</ButtonLink>
     </>}
     <Button variant="primary" disabled={p.busy || !p.canPublish} onClick={() => void p.check()}>{t(p.checking ? 'release.prepare.checking' : 'release.prepare.check')}</Button>
   </>;

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, useNavigate } from '@tanstack/react-router';
+import { useNavigate } from '@tanstack/react-router';
 import { CreateProjectRequestSchema, ProjectCreationCatalogSchema } from '@crewstation/contracts';
 import { api } from '../../../../shared/api/client';
 import { queryKeys } from '../../../../shared/api/queryKeys';
@@ -13,6 +13,7 @@ import { FormField } from '../../../../shared/ui/FormField';
 import { PageHeader } from '../../../../shared/ui/PageHeader';
 import { QueryStatus } from '../../../../shared/ui/QueryStatus';
 import styles from '../CreateProjectForm.module.css';
+import { ButtonLink } from '../../../../shared/ui/navigation/ButtonLink';
 
 const empty = { name: '', slug: '', template: '' };
 type Draft = typeof empty;
@@ -27,7 +28,7 @@ export function SelfCreateProject() {
   const me = useApiQuery(queryKeys.me(), () => api.me.get());
   const catalog = useApiQuery(['project-creation'], async () => ProjectCreationCatalogSchema.parse(await api.catalog.projectCreation()));
   const key = `cs-project-draft:${me.data?.id ?? ''}`;
-  return <><PageHeader title={t('projects.self.title')} description={t('projects.self.intro')} actions={<Link to="/projects">{t('projects.provision.backProjects')}</Link>} />
+  return <><PageHeader title={t('projects.self.title')} description={t('projects.self.intro')} actions={<ButtonLink to="/projects">{t('projects.provision.backProjects')}</ButtonLink>} />
     <QueryStatus isPending={catalog.isPending} error={catalog.error} />
     {catalog.error ? <Button onClick={() => void catalog.refetch()}>{t('projects.wizard.refreshCatalog')}</Button> : null}
     {catalog.data ? <p>{t('projects.self.resources', { plan: catalog.data.defaultServicePlan, count: catalog.data.maxConcurrentTasks })}</p> : null}

@@ -1,5 +1,4 @@
 import type { SlotDto } from '@crewstation/contracts';
-import { Link } from '@tanstack/react-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { useRef, useState } from 'react';
 import { api } from '../../../shared/api/client';
@@ -14,6 +13,7 @@ import { Badge } from '../../../shared/ui/Badge';
 import { Card } from '../../../shared/ui/Card';
 import { DataTable } from '../../../shared/ui/DataTable';
 import { QueryStatus } from '../../../shared/ui/QueryStatus';
+import { ButtonLink } from '../../../shared/ui/navigation/ButtonLink';
 
 /** 只读实际两槽及其 Release 的配置快照；不把当前取值版本当作已部署版本。 */
 export function ProductionConfigImpact() {
@@ -41,7 +41,7 @@ export function ProductionConfigImpact() {
     {serviceId && slots.isSuccess && !project.error ? <DataTable columns={[t('config.impact.slot'), t('config.impact.release'), t('config.impact.snapshot')]}>
       {(['prod', 'preview'] as const).map((name) => <ConfigSlotRow key={name} name={name} serviceId={serviceId} slot={slots.data.items.find((item) => item.name === name)} currentVersion={currentVersion} />)}
     </DataTable> : null}
-    <Link to={PROJECT_PATHS[space].release} params={{ projectId }}>{t('config.impact.releases')}</Link>
+    <ButtonLink to={PROJECT_PATHS[space].release} params={{ projectId }}>{t('config.impact.releases')}</ButtonLink>
   </Card>;
 }
 

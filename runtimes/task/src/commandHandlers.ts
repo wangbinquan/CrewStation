@@ -37,7 +37,7 @@ export function buildCommandHandlers(targets: CommandTargets): CommandHandlers {
     listAgentTerminals: async () => targets.nativeTerminals.list(),
     stopAgentTerminal: (c) => targets.nativeTerminals.stop(c.agentId, c.runnerId).then(ack),
     attachTerminal: (c) => targets.nativeTerminals.attach(c.terminalId, c.runnerId),
-    claimTerminalControl: async (c) => targets.nativeTerminals.claim(c.terminalId, c.viewId, c.runnerId),
+    claimTerminalControl: async (c) => targets.nativeTerminals.claim(c.terminalId, c.viewId, c.runnerId, c.holder),
     detachTerminal: async (c) => { targets.nativeTerminals.detach(c.terminalId, c.viewId); return ack(); },
     startAgent: (c) => targets.agents.start(c).then(ack),
     probeTerminal: (c) => targets.probes.run(c),

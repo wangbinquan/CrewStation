@@ -7,6 +7,7 @@ import { ProjectStateBadge } from '../ProjectStateBadge';
 import { DeploymentFact, DevelopmentFact, HealthFact, SummaryChecked } from './SummaryFacts';
 import { summaryIsFresh } from '../../model/projectSummaryState';
 import styles from './ProjectSummary.module.css';
+import { ButtonLink } from '../../../../shared/ui/navigation/ButtonLink';
 
 export function ProjectSummaryTable({ items, available }: { readonly items: readonly ProjectSummary[]; readonly available: boolean }) {
   const t = useT(), date = useDateText();
@@ -21,8 +22,8 @@ export function ProjectSummaryTable({ items, available }: { readonly items: read
         {!summaryIsFresh(item) ? <p className={styles.muted}>{t('projects.summary.stale')}</p> : null}</td>
       <td><DevelopmentFact item={item} /></td><td><DeploymentFact item={item} name="preview" canOpen={available && summaryIsFresh(item)} /></td>
       <td><DeploymentFact item={item} name="prod" canOpen={available && summaryIsFresh(item)} /></td><td><HealthFact item={item} /></td>
-      <td><div className={styles.fact}>{canDevelop ? <Link to="/projects/$projectId/dev-session" params={{ projectId: p.id }}>{t(item.development.status === 'ready' && item.development.value ? 'projects.summary.continue' : 'projects.summary.openDevelopment')}</Link> : null}
-        {available && (item.role === 'admin' || item.role === 'owner') && (p.state === 'failed' || p.state === 'provisioning') ? <Link to={item.role === 'admin' ? '/admin/projects/$projectId/provisioning' : '/projects/$projectId/provisioning'} params={{ projectId: p.id }}>{t('projects.provision.title')}</Link> : null}</div></td>
+      <td><div className={styles.fact}>{canDevelop ? <ButtonLink size="small" to="/projects/$projectId/dev-session" params={{ projectId: p.id }}>{t(item.development.status === 'ready' && item.development.value ? 'projects.summary.continue' : 'projects.summary.openDevelopment')}</ButtonLink> : null}
+        {available && (item.role === 'admin' || item.role === 'owner') && (p.state === 'failed' || p.state === 'provisioning') ? <ButtonLink size="small" to={item.role === 'admin' ? '/admin/projects/$projectId/provisioning' : '/projects/$projectId/provisioning'} params={{ projectId: p.id }}>{t('projects.provision.title')}</ButtonLink> : null}</div></td>
     </tr>;
   })}</DataTable>;
 }

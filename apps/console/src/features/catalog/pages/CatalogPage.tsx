@@ -1,6 +1,5 @@
 import type { ApiOperationDto } from '@crewstation/contracts';
 import type { ReactElement } from 'react';
-import { Link } from '@tanstack/react-router';
 import { useProjectScope } from '../../../shared/project/ProjectScope';
 import { api } from '../../../shared/api/client';
 import { queryKeys } from '../../../shared/api/queryKeys';
@@ -10,6 +9,8 @@ import { EmptyState } from '../../../shared/ui/EmptyState';
 import { Button } from '../../../shared/ui/Button';
 import { PageHeader } from '../../../shared/ui/PageHeader';
 import { CatalogContent } from '../components/CatalogContent';
+import { ButtonLink } from '../../../shared/ui/navigation/ButtonLink';
+import { ActionRow } from '../../../shared/ui/ActionRow';
 
 /** 接口目录：调用方身份是项目的服务，先解析 serviceId，再按它取目录与授权。 */
 export function CatalogPage({ embedded = false, compact = false, proxy, operation, onClearContext, onSelect }: { readonly embedded?: boolean; /** 紧凑形态（参考面板在侧栏时）：只列已授权操作与试调。 */ readonly compact?: boolean; readonly proxy?: string; readonly operation?: string; readonly onClearContext?: () => void; readonly onSelect?: (operation: ApiOperationDto | undefined) => void }): ReactElement {
@@ -31,7 +32,7 @@ export function CatalogPage({ embedded = false, compact = false, proxy, operatio
       ) : null}
       {serviceId !== undefined ? <CatalogContent key={`${projectId}:${proxy ?? ''}`} projectId={projectId} serviceId={serviceId} canDevelop={canDevelop && !project.error} compact={compact} proxy={proxy} operation={operation} onClearContext={onClearContext} onSelect={onSelect} /> : null}
       {/* 管理员的管理动作留在管理空间（RFC-002）；这里只留一行入口，不再放在页首。 */}
-      {!compact && !me.error && me.data?.isAdmin === true ? <p><Link to="/admin/capabilities" search={{ tab: 'api', projectId, proxy, operation }}>{t('catalog.admin.openManagement')}</Link> · <Link to="/admin/requests" search={{ projectId, state: 'pending' }}>{t('catalog.admin.openRequests')}</Link></p> : null}
+      {!compact && !me.error && me.data?.isAdmin === true ? <ActionRow><ButtonLink to="/admin/capabilities" search={{ tab: 'api', projectId, proxy, operation }}>{t('catalog.admin.openManagement')}</ButtonLink><ButtonLink to="/admin/requests" search={{ projectId, state: 'pending' }}>{t('catalog.admin.openRequests')}</ButtonLink></ActionRow> : null}
     </>
   );
 }

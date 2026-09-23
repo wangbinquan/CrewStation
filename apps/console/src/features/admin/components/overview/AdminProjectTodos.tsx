@@ -8,6 +8,7 @@ import { useT } from '../../../../shared/lib/useT';
 import { AdminTodoCard } from './AdminTodoCard';
 import { INTEGRATION_KINDS } from '../../model/integrationKinds';
 import styles from './AdminTodos.module.css';
+import { ButtonLink } from '../../../../shared/ui/navigation/ButtonLink';
 
 export function AdminProjectTodos() {
   const t = useT(), request = { state: 'failed' as const, kind: ['DigitalWorker', ...INTEGRATION_KINDS] as ManifestKind[], limit: 5 };
@@ -19,7 +20,7 @@ export function AdminProjectTodos() {
   const items = [401, 403, 404].includes(query.error?.status ?? 0) ? [] : query.data?.items ?? [], current = !refreshing && !query.error;
   return <AdminTodoCard title={t('admin.todo.projects')} refreshLabel={t('admin.todo.refresh.projects')} pending={query.isPending} error={query.error} busy={refreshing}
     count={query.data ? items.length : undefined} more={!!query.data?.nextCursor} checkedAt={query.dataUpdatedAt} refresh={refresh}
-    open={<Link to="/admin/projects" search={{ state: 'failed' }}>{t('admin.todo.openProjects')}</Link>}>
+    open={<ButtonLink size="small" to="/admin/projects" search={{ state: 'failed' }}>{t('admin.todo.openProjects')}</ButtonLink>}>
     {items.length ? <ul className={styles.list}>{items.map(({ project: p, ownerName }) => <li key={p.id}><div className={styles.title}>{current ? <Link to="/admin/projects/$projectId/provisioning" params={{ projectId: p.id }}>{p.name}</Link> : p.name}</div>
       <div className={styles.muted}>{p.slug} · {ownerName ?? p.ownerUserId}</div>{p.message ? <p>{p.message}</p> : null}</li>)}</ul> : null}
   </AdminTodoCard>;

@@ -12,6 +12,7 @@ import type { TimelineItem } from '../../../../shared/ui/Timeline';
 import { summaryIsFresh } from '../../model/projectSummaryState';
 import { SummaryUnavailable } from './SummaryFacts';
 import styles from './ProjectSummary.module.css';
+import { ButtonLink } from '../../../../shared/ui/navigation/ButtonLink';
 
 const LIMIT = 5;
 
@@ -28,7 +29,7 @@ export function ProjectRecentActivity({ item, space, names }: { readonly item: P
     : { id: entry.id, tone: 'info', shape: 'square', time: date(entry.at),
       primary: <Link to={PROJECT_PATHS[space].release} params={params} search={{ release: entry.entry.releaseId }}>{t(entry.rollback ? 'timeline.rollback' : 'timeline.switch', { actor: entry.actorName ?? t('timeline.unknownActor', { id: shortId(entry.entry.actorUserId) }), tag: entry.tag ?? t('timeline.unknownTag', { id: shortId(entry.entry.releaseId) }) })}</Link>,
       secondary: entry.entry.reason ? t('timeline.reason', { reason: entry.entry.reason }) : undefined });
-  return <Card compact title={t('projects.summary.activity')} extra={<Link to={PROJECT_PATHS[space].release} params={params}>{t('projects.summary.activityAll')}</Link>}>
+  return <Card compact title={t('projects.summary.activity')} extra={<ButtonLink size="small" to={PROJECT_PATHS[space].release} params={params}>{t('projects.summary.activityAll')}</ButtonLink>}>
     {!releases ? <SummaryUnavailable part={item.releases} /> : !switches ? <SummaryUnavailable part={item.switches} /> : null}
     {releases && switches && items.length === 0 ? <p className={styles.muted}>{t('projects.summary.noActivity')}</p> : null}
     {items.length > 0 ? <Timeline items={items} label={t('projects.summary.activity')} /> : null}

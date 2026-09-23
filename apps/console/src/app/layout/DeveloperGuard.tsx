@@ -1,4 +1,4 @@
-import { Link, Navigate, useParams } from '@tanstack/react-router';
+import { Navigate, useParams } from '@tanstack/react-router';
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { api } from '../../shared/api/client';
@@ -8,6 +8,8 @@ import { useT } from '../../shared/lib/useT';
 import { Button } from '../../shared/ui/Button';
 import { EmptyState } from '../../shared/ui/EmptyState';
 import { QueryStatus } from '../../shared/ui/QueryStatus';
+import { ButtonLink } from '../../shared/ui/navigation/ButtonLink';
+import { ActionRow } from '../../shared/ui/ActionRow';
 
 export function DeveloperGuard({ children }: { readonly children: ReactNode }) {
   const t = useT(), { projectId } = useParams({ strict: false });
@@ -22,7 +24,7 @@ export function DeveloperGuard({ children }: { readonly children: ReactNode }) {
   const notice = me.isPending || me.error ? <><QueryStatus isPending={me.isPending} error={me.error} />
     {me.error ? <Button onClick={() => void me.refetch()}>{t('admin.retryIdentity')}</Button> : null}</>
     : !allowed ? <EmptyState title={t('development.denied')} description={t(visited ? 'development.suspended' : 'development.deniedHint')}
-      action={<><Link to="/market">{t('nav.market')}</Link><Button onClick={() => void me.refetch()}>{t('admin.retryIdentity')}</Button></>} /> : null;
+      action={<ActionRow><ButtonLink to="/market">{t('nav.market')}</ButtonLink><Button onClick={() => void me.refetch()}>{t('admin.retryIdentity')}</Button></ActionRow>} /> : null;
   // Preserve existing drafts across a failed identity refresh; first-time visitors never mount protected content.
   return <>{notice}<div key={me.data?.id} hidden={!allowed} inert={!allowed} style={allowed ? { display: 'contents' } : undefined}>{allowed || visited ? children : null}</div></>;
 }

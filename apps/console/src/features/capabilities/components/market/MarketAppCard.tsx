@@ -5,6 +5,7 @@ import { Card } from '../../../../shared/ui/Card';
 import { GlyphIcon } from '../../../../shared/ui/icons/GlyphIcon';
 import { marketHref } from './marketHref';
 import styles from './Market.module.css';
+import { ExternalButtonLink } from '../../../../shared/ui/navigation/ButtonLink';
 
 export function MarketAppCard({ app }: { readonly app: MarketAppDto }) {
   const t = useT();
@@ -14,7 +15,7 @@ export function MarketAppCard({ app }: { readonly app: MarketAppDto }) {
   const trialHref = trial?.status === 'ready' ? marketHref(trial.host) : undefined;
   const status = app.entry.status === 'unknown' ? 'unknown' : 'unavailable';
   return <Card className={styles.appCard} footer={trial ? <div className={styles.trial}>
-    {trialHref ? <a href={trialHref} target="_blank" rel="noopener noreferrer">{t('market.trialTitle')} <span aria-hidden="true">↗</span></a>
+    {trialHref ? <ExternalButtonLink size="small" href={trialHref}>{t('market.trialTitle')}</ExternalButtonLink>
       : <span>{t('market.trialTitle')} · {t(`market.entry.${trial.status === 'unknown' ? 'unknown' : 'unavailable'}`)}</span>}
     <p className={styles.note}>{t('market.sharedData')}</p>
   </div> : undefined}>

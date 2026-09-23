@@ -193,8 +193,8 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   "resources.note.api": "Read API documentation, request access and try operations.",
   "resources.note.events": "Declare subscriptions in crewstation.yaml; they are registered on release. Open a development session to edit the file.",
   "resources.note.guide": "Use these platform conventions in your code. Maintain your own application variables in project settings.",
-  "resources.openManifest": "Open subscription declarations →",
-  "resources.openConfig": "Manage application variables →",
+  "resources.openManifest": "Open subscription declarations",
+  "resources.openConfig": "Manage application variables",
   "resources.guide.identity": "Identity forwarding and headers",
   "resources.guide.environment": "Environment, paths and event conventions",
   // Slot version card (shared by overview and release page, RFC-020 §8) and timeline.

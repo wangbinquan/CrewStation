@@ -7,6 +7,7 @@ import { useT } from '../../../../shared/lib/useT';
 import { locationTool, toolSearch } from '../../model/layout/developmentLocation';
 import { ToolPanel } from './ToolPanel';
 import styles from './ToolPanel.module.css';
+import { Button } from '../../../../shared/ui/Button';
 
 /**
  * 没有开发会话时的工作区：主区是开会话表单，面板只有「参考」（RFC-020 design §5.4）。
@@ -20,7 +21,7 @@ export function NoSessionWorkspace({ form, reference }: { readonly form: ReactNo
   const mode = open ? open.mode : 'closed';
   const columns = mode === 'side' ? 'minmax(0, 0.55fr) 6px minmax(0, 0.45fr)' : mode === 'full' ? '0 0 minmax(0, 1fr)' : 'minmax(0, 1fr) 0 0';
   return <div className={styles.noSession} data-panel={mode} style={{ gridTemplateColumns: columns }}>
-    <div className={styles.noSessionMain} hidden={mode === 'full'}>{form}{mode === 'closed' ? <p className={styles.note}><button type="button" className={styles.linkButton} onClick={() => go({ name: 'reference', mode: 'side' })}>{t('devSession.panel.openReference')}</button></p> : null}</div>
+    <div className={styles.noSessionMain} hidden={mode === 'full'}>{form}{mode === 'closed' ? <p className={styles.note}><Button size="small" onClick={() => go({ name: 'reference', mode: 'side' })}>{t('devSession.panel.openReference')}</Button></p> : null}</div>
     <div className={styles.gutter} hidden={mode !== 'side'} aria-hidden="true" />
     <ToolPanel active="reference" mode={mode} panes={[{ name: 'reference', content: reference, keepMounted: true }]} onSelect={() => go({ name: 'reference', mode: mode === 'full' ? 'full' : 'side' })} onToggleMode={() => go({ name: 'reference', mode: mode === 'full' ? 'side' : 'full' })} onClose={() => go(null)} />
   </div>;

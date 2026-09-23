@@ -1,7 +1,7 @@
 // 概览的「部署与运行形态」卡（RFC-019）：一行横带汇总卡铺满内容区；点任一卡进运行与诊断的全图。测试员不看。
 import { useMemo } from 'react';
 import type { ReactElement } from 'react';
-import { Link, useNavigate } from '@tanstack/react-router';
+import { useNavigate } from '@tanstack/react-router';
 import { ProjectClusterResourcesSchema } from '@crewstation/contracts';
 import type { ProjectSummaryDetail } from '@crewstation/contracts';
 import { api } from '../../../../shared/api/client';
@@ -18,6 +18,7 @@ import { QueryStatus } from '../../../../shared/ui/QueryStatus';
 import { TopologyDiagram } from '../../../../shared/ui/topology/TopologyDiagram';
 import { SUMMARY_METRICS } from '../../../../shared/ui/topology/topologyLayout';
 import styles from './ProjectSummary.module.css';
+import { ButtonLink } from '../../../../shared/ui/navigation/ButtonLink';
 
 export function DeploymentTopologyCard({ item, space }: { readonly item: ProjectSummaryDetail; readonly space: ProjectSpace }): ReactElement | null {
   const t = useT(), navigate = useNavigate(), projectId = item.project.id;
@@ -35,7 +36,7 @@ export function DeploymentTopologyCard({ item, space }: { readonly item: Project
   if (item.role === 'tester') return null;
   const open = () => { void navigate({ to: PROJECT_PATHS[space].operations, params: { projectId }, search: { tab: 'status' } }); };
   const pods = topology?.nodes.filter((n) => n.kind === 'pod') ?? [], abnormal = topology?.nodes.filter((n) => n.abnormal).length ?? 0;
-  return <Card compact title={t('projects.summary.topology.title')} extra={<Link to={PROJECT_PATHS[space].operations} params={{ projectId }} search={{ tab: 'status' }}>{t('projects.summary.topology.open')}</Link>}>
+  return <Card compact title={t('projects.summary.topology.title')} extra={<ButtonLink size="small" to={PROJECT_PATHS[space].operations} params={{ projectId }} search={{ tab: 'status' }}>{t('projects.summary.topology.open')}</ButtonLink>}>
     <QueryStatus isPending={inventory.isPending} error={inventory.error ?? dataResources.error} />
     {topology ? <>
       <p className={styles.fact}>{t('projects.summary.topology.counts', { workloads: topology.nodes.filter((n) => n.kind === 'workload' || n.kind === 'job').length, pods: pods.length, ready: pods.filter((n) => n.status === 'ready').length, running: pods.filter((n) => n.status === 'running').length })}{abnormal > 0 ? <> · <Badge tone="warning">{t('projects.summary.topology.attention', { count: abnormal })}</Badge></> : null}</p>

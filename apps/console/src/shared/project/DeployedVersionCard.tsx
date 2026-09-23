@@ -7,6 +7,7 @@ import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { slotCanOpen, slotIdentityKnown } from './deployedSlot';
 import styles from './DeployedVersionCard.module.css';
+import { ExternalButtonLink } from '../ui/navigation/ButtonLink';
 
 export interface DeployedVersionCardProps {
   readonly role: 'prod' | 'preview';
@@ -47,7 +48,7 @@ export function DeployedVersionCard({ role, slot, known, onSelect, health, sha =
       <div className={styles.footer}>
         <span className={styles.host}>{slot!.host}</span>
         <span className={styles.actions}>
-          {slotCanOpen(slot) ? <a className={styles.open} href={`//${slot!.host}`} target="_blank" rel="noreferrer">{t(`slot.open.${role}`)}</a> : <span className={styles.note}>{t('slot.notReady')}</span>}
+          {slotCanOpen(slot) ? <ExternalButtonLink href={`//${slot!.host}`}>{t(`slot.open.${role}`)}</ExternalButtonLink> : <span className={styles.note}>{t('slot.notReady')}</span>}
           {actions}
         </span>
       </div>

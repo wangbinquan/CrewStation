@@ -58,6 +58,25 @@ describe('TaskRunner 协议', () => {
     expect(RunnerMessageSchema.safeParse({ ...hello, capabilities: { ...capabilities, previewControl: 1 } }).success).toBe(true);
     expect(RunnerMessageSchema.safeParse({ ...hello, capabilities: { ...capabilities, previewControl: 2 } }).success).toBe(false);
   });
+  test('输入控制（2026-09-23）：取得命令可带持有人；结果、快照与 terminalControl 事件都带控制状态；旧 Runner 没有这些项', () => {
+    const holder = { userId: '01a0bf5d-8f4b-7793-867c-efd7527b386b', name: '张三' };
+    const claim = { id: 'c1', type: 'claimTerminalControl', terminalId: 't1', viewId: 'v', runnerId: crypto.randomUUID() };
+    expect(RunnerCommandSchema.safeParse(claim).success).toBe(true);
+    expect(RunnerCommandSchema.parse({ ...claim, holder })).toMatchObject({ holder });
+    expect(RunnerCommandSchema.safeParse({ ...claim, holder: { userId: '', name: '张三' } }).success).toBe(false);
+    const control = { held: true, holder, revision: 3 };
+    expect(RunnerResultPayloads.claimTerminalControl.parse({ controlled: false, expiresAt: null, control })).toMatchObject({ control });
+    expect(RunnerResultPayloads.claimTerminalControl.parse({ controlled: true, expiresAt: null }).control).toBeUndefined();
+    const snapshot = { terminalId: 't1', runnerId: claim.runnerId, throughSeq: 4, data: '', scrollbackLimit: 500, truncated: false, cols: 80, rows: 24 };
+    expect(RunnerResultPayloads.attachTerminal.parse({ ...snapshot, control: { held: false, revision: 0 } }).control).toEqual({ held: false, revision: 0 });
+    expect(RunnerResultPayloads.attachTerminal.parse(snapshot).control).toBeUndefined();
+    const event = { type: 'event', seq: 9, at: new Date().toISOString(), event: { kind: 'terminalControl', terminalId: 't1', runnerId: claim.runnerId, control } };
+    expect(RunnerMessageSchema.parse(event)).toMatchObject({ event: { control } });
+    expect(RunnerMessageSchema.safeParse({ ...event, event: { ...event.event, control: { held: true, revision: -1 } } }).success).toBe(false);
+    const hello = { type: 'hello', protocolVersion: TASKRUNNER_PROTOCOL_VERSION, taskId: Bun.randomUUIDv7(), runnerToken: 't', workdir: '/work', capabilities: { protocols: ['opencode'], pty: true, preview: true, terminalControl: 1 } };
+    expect(RunnerMessageSchema.safeParse(hello).success).toBe(true);
+    expect(RunnerMessageSchema.safeParse({ ...hello, capabilities: { ...hello.capabilities, terminalControl: 2 } }).success).toBe(false);
+  });
   test('事件帧解析', () => {
     const msg = RunnerMessageSchema.parse({ type: 'event', seq: 1, at: new Date().toISOString(), event: { kind: 'terminalOutput', terminalId: 't1', data: 'hi' } });
     expect(msg.type).toBe('event');

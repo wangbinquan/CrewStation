@@ -110,7 +110,7 @@ export const messages = {
   "config.variables.development": "开发变量",
   "config.variables.production": "生产变量",
   "config.description": "为应用配置运行参数；需要保密的值可设为密钥。",
-  "config.platformGuide": "查看平台自动注入的变量与接入说明 →",
+  "config.platformGuide": "查看平台自动注入的变量与接入说明",
   "config.draft.cancel": "放弃{env}未保存的输入？",
   "config.draft.confirmCancel": "放弃输入并关闭",
 

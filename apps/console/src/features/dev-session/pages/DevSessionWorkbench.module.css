@@ -4,12 +4,8 @@
 .title { font-size: 18px; font-weight: 700; letter-spacing: -0.01em; }
 .note { color: var(--cs-color-text-muted); }
 .actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-left: auto; font-size: 12px; }
-.primary { display: inline-flex; align-items: center; padding: 5px 12px; border-radius: var(--cs-radius-md); background: var(--cs-color-primary); color: var(--cs-color-on-primary); font-size: 13px; font-weight: 600; white-space: nowrap; }
-.primary:hover { background: var(--cs-color-primary-hover); text-decoration: none; }
 
 .branch { max-width: min(36vw, 260px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--cs-color-text-muted); }
 .guide:has(> div) { margin: var(--cs-space-2) 0 var(--cs-space-3); }
 .chip { display: inline-flex; align-items: center; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; cursor: pointer; border-radius: var(--cs-radius-sm); }
 .chip:focus-visible { outline: 2px solid var(--cs-color-focus); outline-offset: 2px; }
-.secondary { display: inline-flex; align-items: center; padding: 5px 12px; border: 1px solid var(--cs-color-border); border-radius: var(--cs-radius-md); background: var(--cs-color-surface); color: var(--cs-color-text); font-size: 13px; font-weight: 500; white-space: nowrap; }
-.secondary:hover { background: var(--cs-color-surface-muted); text-decoration: none; }

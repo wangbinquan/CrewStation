@@ -6,7 +6,7 @@ import { NativeActivityEventSchema } from './nativeActivity';
 import { RunnerApiInvocationSchema, ApiInvocationResultSchema } from './apiInvocation';
 import { RunnerWorkspaceStatusSchema } from './workspace';
 import { ComparisonDetailQuerySchema, ComparisonDetailsSchema, GitObjectIdSchema, RunnerComparisonSchema } from './workspaceComparison';
-import { NativeTerminalRecordSchema, NativeTerminalRosterSchema, TerminalControlSchema, TerminalSizeSchema, TerminalSnapshotSchema } from './nativeTerminal';
+import { NativeTerminalRecordSchema, NativeTerminalRosterSchema, TerminalControlSchema, TerminalControlStateSchema, TerminalHolderSchema, TerminalSizeSchema, TerminalSnapshotSchema } from './nativeTerminal';
 import { BeforeStartErrorSchema, BeforeStartExecutionSchema, BeforeStartMaterialSchema, RunnerInterpreterSchema } from './beforeStart';
 import { AgentProtocolSchema, LaunchSpecSchema } from './launch';
 
@@ -42,6 +42,8 @@ export const RunnerHelloSchema = z.object({
      * 开发会话是长活对象，升版会让集群里正跑的旧镜像容器握手即被拒，等于强制所有人释放会话。
      */
     previewControl: z.literal(1).optional(),
+    /** 2026-09-23：输入控制记住持有人、同一用户的另一视图直接转移，换人或释放即推 `terminalControl` 事件。同样用能力位而不升协议版本。 */
+    terminalControl: z.literal(1).optional(),
     /** 容器内实际可用的脚本解释器清单；缺少所需语言的启动在执行前被拒。 */
     interpreters: z.array(RunnerInterpreterSchema).optional(),
   }),
@@ -133,7 +135,8 @@ export const RunnerCommandSchema = z.discriminatedUnion('type', [
   z.object({ ...cmd('listAgentTerminals') }),
   z.object({ ...cmd('stopAgentTerminal'), agentId: z.string().min(1), runnerId: z.uuid() }),
   z.object({ ...cmd('attachTerminal'), terminalId: z.string().min(1), runnerId: z.uuid() }),
-  z.object({ ...cmd('claimTerminalControl'), terminalId: z.string().min(1), viewId: z.string().min(1), runnerId: z.uuid() }),
+  /** `viewId` 与 `holder` 都由 cs-session 按浏览器连接改写；旧 Runner 忽略 `holder`。 */
+  z.object({ ...cmd('claimTerminalControl'), terminalId: z.string().min(1), viewId: z.string().min(1), runnerId: z.uuid(), holder: TerminalHolderSchema.optional() }),
   z.object({ ...cmd('detachTerminal'), terminalId: z.string().min(1), viewId: z.string().min(1) }),
   z.object({ ...cmd('sendMessage'), agentId: z.string().min(1), content: z.string() }),
   z.object({ ...cmd('cancelAgent'), agentId: z.string().min(1) }),
@@ -204,6 +207,8 @@ export const RunnerEventSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('terminalOutput'), terminalId: z.string(), data: z.string(), terminalSeq: z.number().int().nonnegative().optional(), runnerId: z.uuid().optional() }),
   z.object({ kind: z.literal('terminalResized'), terminalId: z.string(), runnerId: z.uuid(), terminalSeq: z.number().int().nonnegative(), ...TerminalSizeSchema.shape }),
   z.object({ kind: z.literal('terminalClosed'), terminalId: z.string(), exitCode: z.number().int().nullable() }),
+  /** 输入控制换人、释放或到期；只做实时转发，新查看者从 attachTerminal 的快照拿当前状态。 */
+  z.object({ kind: z.literal('terminalControl'), terminalId: z.string(), runnerId: z.uuid(), control: TerminalControlStateSchema }),
   z.object({ kind: z.literal('execOutput'), execId: z.string(), stream: z.enum(['stdout', 'stderr']), data: z.string() }),
   z.object({ kind: z.literal('execExited'), execId: z.string(), exitCode: z.number().int().nullable(), durationMs: z.number().int().min(0) }),
   z.object({ kind: z.literal('previewState'), state: PreviewStateSchema, port: z.number().int().optional(), message: z.string().optional() }),

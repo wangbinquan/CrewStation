@@ -5,6 +5,7 @@ import { Button } from '../../../../shared/ui/Button';
 import type { PreviewHandle } from '../../hooks/usePreviewStatus';
 import { previewUrl } from '../../model/previewSnapshot';
 import styles from './DevelopmentPreview.module.css';
+import { ExternalButtonLink } from '../../../../shared/ui/navigation/ButtonLink';
 
 export function DevelopmentPreview({ preview, previewHost, connected, logs }: { readonly preview: PreviewHandle; readonly previewHost: string; readonly connected: boolean; readonly logs?: ReactNode }): ReactElement {
   const t = useT();
@@ -18,7 +19,7 @@ export function DevelopmentPreview({ preview, previewHost, connected, logs }: { 
         ? <Button variant="ghost" disabled={!connected || preview.busy} onClick={() => preview.run('stop')}>{t('devSession.preview.stop')}</Button>
         : <Button variant="ghost" disabled={!connected || preview.busy || preview.status.state === 'disabled'} onClick={() => preview.run('start')}>{t('devSession.preview.start')}</Button>}
       {logs}
-      {url ? <a href={url} target="_blank" rel="noreferrer">{t('devSession.native.openPreview')}</a> : null}
+      {url ? <ExternalButtonLink variant="ghost" href={url}>{t('devSession.native.openPreview')}</ExternalButtonLink> : null}
     </header>
     <p>{t('devSession.native.previewHint')}</p>
     {preview.error || preview.status.lastError ? <p role="status">{preview.error ?? preview.status.lastError}</p> : null}

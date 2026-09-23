@@ -5,7 +5,7 @@
 .toolbar, .controlLine, .terminalHeader, .footer { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .toolbar { flex-wrap: wrap; justify-content: flex-end; padding: 0 0 4px; }
 .toolbar, .terminalHeader { position: relative; }
-.workspace button, .toolbar select { min-height: 28px; padding: 3px 8px; font-size: 12px; }
+.workspace button, .workspace a[data-button], .toolbar select { min-height: 28px; padding: 3px 8px; font-size: 12px; }
 /* 算力选择带可见标签；布局按钮合成一组分段控件靠右，当前项淡蓝底。 */
 .inlineField { display: inline-flex; align-items: center; gap: 6px; color: var(--cs-color-text-muted); font-size: 12px; }
 .segment { display: inline-flex; margin-left: auto; border: 1px solid var(--cs-color-border); border-radius: var(--cs-radius-md); overflow: hidden; }
@@ -37,6 +37,15 @@
 .compute { color: var(--cs-color-text-muted); margin-left: auto; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .controlLine { flex-shrink: 0; flex-wrap: wrap; padding: 0 8px; color: var(--cs-color-text-muted); font-size: 11px; background: var(--cs-color-surface-muted); }
 .controlLine button { padding: 0 4px; min-height: 22px; margin-left: auto; }
+/* 输入控制状态条（2026-09-23）：谁在输入一眼可辨——自己绿、可以点进来蓝、别人占着黄、只读灰；自己持有时整窗再加一圈绿框。 */
+.controlLine[data-control] { padding: 3px 8px; font-size: 12px; }
+.controlLine[data-control="mine"] { background: var(--cs-tone-success-bg); color: var(--cs-tone-success-fg); }
+.controlLine[data-control="free"], .controlLine[data-control="self-elsewhere"] { background: var(--cs-tone-info-bg); color: var(--cs-tone-info-fg); }
+.controlLine[data-control="other"], .controlLine[data-control="unknown-other"] { background: var(--cs-tone-warning-bg); color: var(--cs-tone-warning-fg); }
+.controlLine[data-control="readonly"] { background: var(--cs-tone-neutral-bg); color: var(--cs-tone-neutral-fg); }
+.controlState { font-weight: 600; }
+.controlState::before { content: '●'; margin-right: 4px; font-size: 10px; vertical-align: 1px; }
+.terminalCard:has(.controlLine[data-control="mine"]) { border-color: var(--cs-tone-success-fg); outline: 1px solid var(--cs-tone-success-fg); outline-offset: -2px; }
 .terminalSurface { flex: 1; min-height: 0; min-width: 0; overflow: auto; padding: 2px 4px; }
 .terminalSurface:focus-visible { outline: 2px solid var(--cs-color-primary); outline-offset: -2px; }
 .terminalSurface :global(.xterm) { height: 100%; }

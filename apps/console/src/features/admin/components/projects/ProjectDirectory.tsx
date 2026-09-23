@@ -1,4 +1,3 @@
-import { Link } from '@tanstack/react-router';
 import { ProjectPageSchema, UserIdSchema } from '@crewstation/contracts';
 import type { ManifestKind } from '@crewstation/contracts';
 import { api } from '../../../../shared/api/client';
@@ -14,6 +13,7 @@ import { ProjectDirectoryFilters } from './ProjectDirectoryFilters';
 import { ProjectDirectoryTable } from './ProjectDirectoryTable';
 import { INTEGRATION_KINDS } from '../../model/integrationKinds';
 import styles from './ProjectDirectory.module.css';
+import { ButtonLink } from '../../../../shared/ui/navigation/ButtonLink';
 
 export function ProjectDirectory({ search, apply, integration = false }: {
   readonly search: ProjectDirectorySearch; readonly apply: (search: ProjectDirectorySearch) => void; readonly integration?: boolean;
@@ -29,8 +29,8 @@ export function ProjectDirectory({ search, apply, integration = false }: {
   const items = [401, 403, 404].includes(query.error?.status ?? 0) ? [] : query.data?.items ?? [], settled = !query.error && !query.isPending;
   return <Card compact title={t(integration ? 'admin.integrations.title' : 'admin.directory.title')} footer={t('admin.directory.hint')}
     extra={<div className={styles.actions}><Button disabled={refreshing} onClick={() => void refresh()}>{t('admin.directory.refresh')}</Button>
-      {!integration ? <Link to="/admin/projects/new" search={{ scope: 'digital-worker' }}>{t('projects.wizard.title.digital-worker')}</Link> : null}
-      <Link to="/admin/projects/new" search={{ scope: 'integration' }}>{t('projects.wizard.title.integration')}</Link></div>}>
+      {!integration ? <ButtonLink to="/admin/projects/new" search={{ scope: 'digital-worker' }}>{t('projects.wizard.title.digital-worker')}</ButtonLink> : null}
+      <ButtonLink to="/admin/projects/new" search={{ scope: 'integration' }}>{t('projects.wizard.title.integration')}</ButtonLink></div>}>
     <ProjectDirectoryFilters key={JSON.stringify(search)} search={search} items={items} userId={userId} integration={integration} busy={refreshing} apply={apply} />
     <QueryStatus isPending={query.isPending} error={query.error} isEmpty={items.length === 0} emptyTitle={t('admin.directory.empty')} emptyDescription={t('admin.directory.emptyHint')} />
     {query.error && items.length ? <ActionNote tone="neutral">{t('admin.directory.lastRead')}</ActionNote> : null}

@@ -134,6 +134,29 @@ test('真实 PTY 并发启动只建一进程；detach／attach 保留原进程�
   expect(f.disposed()).toBe(1);
 });
 
+test('输入控制带持有人：换人与释放推 terminalControl，快照带当前状态，同一用户换窗口直接转移', async () => {
+  const f = await fixture();
+  const zhang = { userId: 'user-zhang', name: '张三' }, li = { userId: 'user-li', name: '李四' };
+  const record = await f.native.start(f.command('shared'));
+  await settled(f, 'shared');
+  const controlEvents = () => f.events.filter((e) => e.kind === 'terminalControl');
+  expect((await f.native.attach(record.terminalId, f.native.runnerId)).control).toEqual({ held: false, revision: 0 });
+  expect(f.native.claim(record.terminalId, 'zhang-tab-1', f.native.runnerId, zhang)).toMatchObject({ controlled: true, control: { holder: zhang } });
+  expect(f.native.claim(record.terminalId, 'li-tab', f.native.runnerId, li)).toMatchObject({ controlled: false, control: { held: true, holder: zhang } });
+  expect(f.native.claim(record.terminalId, 'zhang-tab-2', f.native.runnerId, zhang).controlled).toBe(true);
+  expect(() => f.native.input(record.terminalId, 'x', 'zhang-tab-1')).toThrow('未取得');
+  expect((await f.native.attach(record.terminalId, f.native.runnerId)).control).toEqual({ held: true, holder: zhang, revision: 2 });
+  f.native.detach(record.terminalId, 'zhang-tab-2');
+  expect(controlEvents()).toEqual([
+    { kind: 'terminalControl', terminalId: record.terminalId, runnerId: f.native.runnerId, control: { held: true, holder: zhang, revision: 1 } },
+    { kind: 'terminalControl', terminalId: record.terminalId, runnerId: f.native.runnerId, control: { held: true, holder: zhang, revision: 2 } },
+    { kind: 'terminalControl', terminalId: record.terminalId, runnerId: f.native.runnerId, control: { held: false, revision: 3 } },
+  ]);
+  expect(f.native.claim(record.terminalId, 'li-tab', f.native.runnerId, li)).toMatchObject({ controlled: true, control: { holder: li, revision: 4 } });
+  await f.native.stop('shared', f.native.runnerId);
+  expect(controlEvents()).toHaveLength(4);
+});
+
 test('配置冲突／Runner 替换不再 spawn', async () => {
   const f = await fixture();
   const command = f.command('one');

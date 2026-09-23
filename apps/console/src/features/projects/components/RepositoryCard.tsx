@@ -10,6 +10,7 @@ import { Card } from '../../../shared/ui/Card';
 import { DefinitionList } from '../../../shared/ui/DefinitionList';
 import type { DefinitionItem } from '../../../shared/ui/DefinitionList';
 import { QueryStatus } from '../../../shared/ui/QueryStatus';
+import { ExternalButtonLink } from '../../../shared/ui/navigation/ButtonLink';
 
 function repositoryTone(state: RepositoryBindingDto['state']): BadgeTone {
   if (state === 'ready') return 'success';
@@ -31,9 +32,7 @@ export function RepositoryCard({ serviceId }: { readonly serviceId: string }): R
     <Card
       title={t('projects.repository.title')}
       extra={binding === undefined ? undefined : (
-        <a href={binding.httpUrl} target="_blank" rel="noreferrer">
-          {t('projects.repository.open')}
-        </a>
+        <ExternalButtonLink size="small" href={binding.httpUrl}>{t('projects.repository.open')}</ExternalButtonLink>
       )}
     >
       <QueryStatus isPending={repository.isPending} error={repository.error} loadingKey="projects.repository.loading" errorKey="projects.repository.error" />

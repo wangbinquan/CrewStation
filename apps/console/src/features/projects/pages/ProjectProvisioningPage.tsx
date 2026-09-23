@@ -1,4 +1,3 @@
-import { Link } from '@tanstack/react-router';
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../../../shared/api/client';
 import { queryKeys } from '../../../shared/api/queryKeys';
@@ -13,6 +12,8 @@ import { Card } from '../../../shared/ui/Card';
 import { DefinitionList } from '../../../shared/ui/DefinitionList';
 import { QueryStatus } from '../../../shared/ui/QueryStatus';
 import { retryProvisioning } from '../model/provisionRequest';
+import { ButtonLink } from '../../../shared/ui/navigation/ButtonLink';
+import { ActionRow } from '../../../shared/ui/ActionRow';
 
 /** project.state 不等于首个 Release 已部署，不能据它显示完整链路全绿。 */
 export function ProjectProvisioningPage({ projectId }: { projectId: string }) {
@@ -37,8 +38,8 @@ export function ProjectProvisioningPage({ projectId }: { projectId: string }) {
       <ActionNote tone={item.state === 'failed' ? 'error' : 'neutral'}>{t(`projects.provision.${item.state}`)}</ActionNote>
       {item.message ? <ActionNote tone="error">{item.message}</ActionNote> : null}
       {item.state === 'failed' && !me.error && (me.data?.platformRole === 'admin' || me.data?.id === item.ownerUserId) ? <Button disabled={retry.isPending} onClick={() => void requeue()}>{t(retry.isPending ? 'projects.list.retrying' : 'projects.list.retryProvision')}</Button> : null}
-      <p><Link to={paths.settings} params={{ projectId }} search={{ tab: 'config', env: 'production' }}>{t('projects.provision.config')}</Link> · <Link to={paths.release} params={{ projectId }}>{t('projects.provision.release')}</Link> · <Link to={paths.development} params={{ projectId }}>{t('projects.provision.development')}</Link></p>
-      {item.kind === 'DigitalWorker' ? <Link to="/projects">{t('projects.provision.backProjects')}</Link> : <Link to="/admin/capabilities" search={{ tab: 'integrations' }}>{t('nav.admin.backToIntegrations')}</Link>}
+      <ActionRow><ButtonLink to={paths.settings} params={{ projectId }} search={{ tab: 'config', env: 'production' }}>{t('projects.provision.config')}</ButtonLink><ButtonLink to={paths.release} params={{ projectId }}>{t('projects.provision.release')}</ButtonLink><ButtonLink to={paths.development} params={{ projectId }}>{t('projects.provision.development')}</ButtonLink></ActionRow>
+      {item.kind === 'DigitalWorker' ? <ButtonLink to="/projects">{t('projects.provision.backProjects')}</ButtonLink> : <ButtonLink to="/admin/capabilities" search={{ tab: 'integrations' }}>{t('nav.admin.backToIntegrations')}</ButtonLink>}
     </> : null}
     {retry.isError ? <ActionNote tone="error">{t('projects.list.retryFailed', { message: errorMessage(retry.error) })}</ActionNote> : null}
     {retry.isSuccess ? <ActionNote tone="success">{t('projects.provision.queued')}</ActionNote> : null}

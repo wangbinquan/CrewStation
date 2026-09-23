@@ -12,6 +12,12 @@
   cursor: pointer;
   /* 表格的操作列很窄，不禁止换行按钮文字会被压成竖排的单字。 */
   white-space: nowrap;
+  /* 按钮样式链接（ButtonLink）是 <a>：不带全局链接的下划线与主色。 */
+  text-decoration: none;
+}
+
+.button:hover {
+  text-decoration: none;
 }
 
 .button:hover:not(:disabled) {
@@ -38,6 +44,23 @@
   border-color: transparent;
   background: transparent;
   font-weight: 400;
+}
+
+.small {
+  padding: 3px var(--cs-space-2);
+  font-size: var(--cs-font-size-sm);
+}
+
+/* 新窗口打开的外部地址：末尾的 ↗ 由样式生成，不进链接文字；支持替代文本的浏览器读屏也不念。 */
+.external {
+  column-gap: var(--cs-space-1);
+}
+
+.external::after {
+  content: '↗';
+  content: '↗' / '';
+  font-size: 0.9em;
+  opacity: 0.8;
 }
 
 .button[hidden] { display: none; }

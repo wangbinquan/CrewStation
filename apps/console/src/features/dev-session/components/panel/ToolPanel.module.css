@@ -13,8 +13,6 @@
 .noSession { display: grid; grid-template-rows: minmax(0, 1fr); min-height: 420px; gap: 0; }
 .noSessionMain { grid-column: 1; min-width: 0; }
 .noSessionMain[hidden] { display: none; }
-.linkButton { border: 0; background: transparent; padding: 0; color: var(--cs-color-primary); font: inherit; cursor: pointer; }
-.linkButton:hover { text-decoration: underline; }
 /* 收起形态：右缘一条竖排页签栏，点任一项在旁边打开面板。 */
 .rail { grid-column: 3; display: flex; flex-direction: column; gap: 4px; padding: 6px 4px; border: 1px solid var(--cs-color-border); border-radius: var(--cs-radius-md); background: var(--cs-color-surface); min-height: 0; overflow: auto; }
 .railTab { writing-mode: vertical-rl; padding: 10px 4px; font-size: 12px; white-space: nowrap; }

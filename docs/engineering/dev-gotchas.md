@@ -301,6 +301,13 @@ TaskRunner 收到 welcome 后立刻补发重放事件，**本机集群里稳定�
 上面那条改完，`onRunnerConnected` 里若 `await` 一个需要 TaskRunner 回执的命令，
 **回执要经同一条串行链回来**，必然自锁到命令超时。这类回调里的派发要 fire-and-forget 并记日志。
 
+### Runner 的错误码到浏览器只剩 `PlatformError.kind`
+
+Runner 回的 error 帧带具体 code（如 `terminal_read_only`、`terminal_ended`），cs-session 把它包成 `PlatformError('precondition', message, { code })` 再发给浏览器，
+浏览器收到的 `code` 是 **kind**（`precondition`／`unavailable`），具体 code 只留在服务端的 details 里（`modules/session/application/commandDispatch.ts`）。2026-09-23 做输入控制时第一版按 `terminal_read_only` 判断「租约已过、自动重新取得」，
+读到这里才改掉——用例的通道桩可以直接回 `terminal_read_only`，照绿，实机却永远走不到这个分支。工作台要区分 Runner 的拒绝原因时，要么按 kind 判断并让后续动作把真实原因暴露出来（`nativeTerminalAttachment` 的做法：`precondition` 就重新取得，CLI 已结束会在取得失败时显示），
+要么先让 cs-session 把 details 里的 code 一起转发——别拿 Runner 的 code 直接在浏览器里比。
+
 ### 退出前要等发送队列写出
 
 `close()` 紧跟 `process.exit` 会把尾部事件丢在发送队列里。退出前等 `bufferedAmount` 归零

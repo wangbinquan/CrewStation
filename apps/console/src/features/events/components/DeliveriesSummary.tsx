@@ -1,5 +1,4 @@
 import type { ReactElement } from 'react';
-import { Link } from '@tanstack/react-router';
 import { api } from '../../../shared/api/client';
 import { queryKeys } from '../../../shared/api/queryKeys';
 import { useApiQuery } from '../../../shared/api/useApi';
@@ -7,6 +6,7 @@ import { useT } from '../../../shared/lib/useT';
 import { PROJECT_PATHS } from '../../../shared/project/projectPaths';
 import { useProjectScope } from '../../../shared/project/ProjectScope';
 import styles from './DeliveryRow.module.css';
+import { ButtonLink } from '../../../shared/ui/navigation/ButtonLink';
 
 const PAGE_SIZE = 50;
 
@@ -16,8 +16,8 @@ export function DeliveriesSummary({ projectId, subscription }: { readonly projec
   const deliveries = useApiQuery([...queryKeys.deliveries(projectId), 'summary'], () => api.events.listDeliveries(projectId, { limit: PAGE_SIZE }));
   const items = deliveries.data?.items ?? [], dead = items.filter((item) => item.state === 'dead').length;
   return <p className={styles.summary}>
-    <Link to={PROJECT_PATHS[space].operations} params={{ projectId }} search={{ tab: 'deliveries', subscription }}>
+    <ButtonLink size="small" to={PROJECT_PATHS[space].operations} params={{ projectId }} search={{ tab: 'deliveries', subscription }}>
       {deliveries.isPending ? t('events.summary.loading') : deliveries.error ? t('events.summary.error') : t('events.summary.line', { count: items.length, dead })}
-    </Link>
+    </ButtonLink>
   </p>;
 }

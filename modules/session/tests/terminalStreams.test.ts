@@ -94,6 +94,25 @@ test('控制租约绑定服务端视图，断开只 detach；不同连接不能�
   two.close();
 });
 
+test('取得输入控制的持有人只认连接的网关身份，浏览器自带的一律丢弃；换人事件实时转发、不落库', async () => {
+  const f = fixture();
+  const frames: unknown[] = [];
+  const stream = await f.streams.open(actor, taskId, { send: (raw) => frames.push(JSON.parse(raw)) }, 0, { viewerName: '张三' });
+  const forged = { id: 'claim', type: 'claimTerminalControl', terminalId: 't', runnerId: crypto.randomUUID(), viewId: 'forged', holder: { userId: 'someone-else', name: '李四' } };
+  await stream.onMessage(forged);
+  expect(f.commands[0]).toMatchObject({ type: 'claimTerminalControl', holder: { userId: actor.userId, name: '张三' } });
+  expect(terminalViewCommand(forged as RunnerCommand, 'view')).not.toHaveProperty('holder');
+  const connected = await f.hub.onHello(f.hello, { send: () => {} });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  if (!connected.ok) throw new Error(connected.message);
+  const control = { held: true, holder: { userId: actor.userId, name: '张三' }, revision: 1 };
+  await f.hub.onMessage(connected.connection, { type: 'event', seq: 1, at, event: { kind: 'terminalControl', terminalId: 't', runnerId: crypto.randomUUID(), control } });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  expect(frames).toContainEqual(expect.objectContaining({ type: 'event', seq: 1, event: expect.objectContaining({ kind: 'terminalControl', control }) }));
+  expect(f.durable).toHaveLength(0);
+  stream.close();
+});
+
 test('原生 CLI 创建和结束必须经过持久名册接口，浏览器流不能绕过；普通终端旧命令保留', () => {
   const native = StartAgentTerminalCommandSchema.parse({ id: 'start', type: 'startAgentTerminal', agentId: 'a', terminalId: 't', runnerId: crypto.randomUUID(), requestFingerprint: 'fingerprint', compute: '01a0bf5d-8f4b-7ad6-85af-678b84e2f6f6', profileRevision: 1, launch: { protocol: 'claude-code', binaryPath: '/usr/local/bin/claude', model: 'model' }, permission: 'edit', cols: 80, rows: 24,
     beforeStart: { profile: '01a0bf5d-8f4b-7ad6-85af-678b84e2f6f6', revision: 1, contentHash: 'h', steps: [], vars: {}, secrets: {}, configFile: { kind: 'none' }, captureOutput: false }, processAttemptId: 'a:1' });

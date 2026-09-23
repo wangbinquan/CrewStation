@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react';
-import { Link, useNavigate, useSearch } from '@tanstack/react-router';
+import { useNavigate, useSearch } from '@tanstack/react-router';
 import { useT } from '../../../shared/lib/useT';
 import { Card } from '../../../shared/ui/Card';
 import { EmptyState } from '../../../shared/ui/EmptyState';
@@ -12,6 +12,7 @@ import { ProjectListFilters } from '../components/summary/ProjectListFilters';
 import { parseProjectListSearch } from '../model/projectListSearch';
 import { useProjectSummaries } from '../model/useProjectSummaries';
 import styles from '../components/summary/ProjectSummary.module.css';
+import { ButtonLink } from '../../../shared/ui/navigation/ButtonLink';
 
 /**
  * 首页：管理员看全部项目并可代建，成员只看自己参与的项目。
@@ -27,14 +28,14 @@ export function ProjectListPage(): ReactElement {
   return (
     <>
       <PageHeader title={t('projects.list.title')} description={t('projects.summary.listHint')}
-        actions={<Link to="/projects/new">{t('projects.self.title')}</Link>} />
+        actions={<ButtonLink variant="primary" to="/projects/new">{t('projects.self.title')}</ButtonLink>} />
       <Card compact title={t('projects.list.cardTitle')} footer={t('projects.summary.filterHint')} extra={<Button disabled={refreshing} onClick={() => void refresh()}>{t('projects.summary.refreshList')}</Button>}>
         <ProjectListFilters key={JSON.stringify(search)} search={search} items={items} userId={me.data?.id} busy={refreshing}
           apply={(next) => { void navigate({ to: '/projects', search: next }); }} />
         <QueryStatus isPending={pending} error={error} loadingKey="projects.list.loading" errorKey="projects.list.error" />
         {error && items.length > 0 ? <ActionNote tone="neutral">{t('projects.summary.lastRead')}</ActionNote> : null}
-        {settled && items.length === 0 ? <EmptyState title={t(filtered ? 'projects.summary.noMatches' : 'projects.list.emptyTitle')} description={t(filtered ? 'projects.summary.noMatchesHint' : 'projects.list.emptyDescription')} /> : null}
-        {settled && !filtered && items.length === 0 ? <Link to="/projects/new">{t('projects.self.title')}</Link> : null}
+        {settled && items.length === 0 ? <EmptyState title={t(filtered ? 'projects.summary.noMatches' : 'projects.list.emptyTitle')} description={t(filtered ? 'projects.summary.noMatchesHint' : 'projects.list.emptyDescription')}
+          action={filtered ? undefined : <ButtonLink to="/projects/new">{t('projects.self.title')}</ButtonLink>} /> : null}
         {items.length > 0 ? <ProjectSummaryTable items={items} available={!error && !pending && !refreshing} /> : null}
         <div className={styles.toolbar}><span className={styles.muted}>{settled ? t('projects.summary.pageSize', { count: items.length }) : t('projects.summary.countUnknown')}</span>
           <div className={styles.actions}>{search.cursor ? <Button disabled={refreshing} onClick={() => void navigate({ to: '/projects', search: { ...search, cursor: undefined } })}>{t('projects.summary.firstPage')}</Button> : null}

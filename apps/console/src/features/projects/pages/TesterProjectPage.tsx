@@ -1,4 +1,3 @@
-import { Link } from '@tanstack/react-router';
 import { useProjectScope } from '../../../shared/project/ProjectScope';
 import { useT } from '../../../shared/lib/useT';
 import { PageHeader } from '../../../shared/ui/PageHeader';
@@ -9,6 +8,7 @@ import { useProjectSummary } from '../model/useProjectSummaries';
 import { summaryIsFresh } from '../model/projectSummaryState';
 import { DeploymentFact, SummaryChecked } from '../components/summary/SummaryFacts';
 import styles from '../components/summary/ProjectSummary.module.css';
+import { ButtonLink } from '../../../shared/ui/navigation/ButtonLink';
 
 /** 测试者深链接都落到已有试用能力；不挂载开发、发布和配置查询。 */
 export function TesterProjectPage() {
@@ -25,6 +25,6 @@ export function TesterProjectPage() {
       {preview ? <SummaryChecked checkedAt={preview.checkedAt} /> : null}
       <p>{t('projects.preview.data')}</p>
     </Card> : null}
-    <Link to="/projects">{t('projects.preview.back')}</Link>
+    <ButtonLink to="/projects">{t('projects.preview.back')}</ButtonLink>
   </>;
 }

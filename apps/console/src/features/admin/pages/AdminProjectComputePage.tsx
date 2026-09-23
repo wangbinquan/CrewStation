@@ -1,4 +1,4 @@
-import { Link, Navigate, useParams } from '@tanstack/react-router';
+import { Navigate, useParams } from '@tanstack/react-router';
 import { api } from '../../../shared/api/client';
 import { useAdminPage } from '../../../shared/admin/useAdminRead';
 import { useT } from '../../../shared/lib/useT';
@@ -9,6 +9,7 @@ import { ProjectComputeCard } from '../components/projects/ProjectComputeCard';
 import { ProjectServiceCard } from '../components/projects/ProjectServiceCard';
 import { ProjectQuotaCard } from '../components/projects/ProjectQuotaCard';
 import { AdminSection } from './AdminSection';
+import { ButtonLink } from '../../../shared/ui/navigation/ButtonLink';
 
 export function AdminProjectComputePage() {
   const { projectId } = useParams({ strict: false }), t = useT();
@@ -18,7 +19,7 @@ export function AdminProjectComputePage() {
     return project;
   }, !!projectId);
   return <AdminSection title={query.data ? `${query.data.name} · ${t('admin.resources.title')}` : t('admin.resources.title')} description={t('admin.resources.description')}>
-    <Link to="/admin/projects">{t('nav.admin.projects')}</Link>
+    <ButtonLink to="/admin/projects">{t('nav.admin.backToProjects')}</ButtonLink>
     <QueryStatus isPending={query.isPending} error={query.error ?? me.error} />
     {query.error ? <Button onClick={() => void query.refetch()}>{t('admin.projectCompute.reload')}</Button> : null}
     {allowed && query.data && !query.error ? <Stack key={`${projectId}:${me.data!.id}`}>

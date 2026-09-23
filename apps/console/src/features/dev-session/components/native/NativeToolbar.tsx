@@ -1,6 +1,5 @@
 import type { AgentPermission, NativeTerminalDto, WorkspaceLayout } from '@crewstation/contracts';
 import { useState } from 'react';
-import { Link } from '@tanstack/react-router';
 import type { ReactElement } from 'react';
 import { api } from '../../../../shared/api/client';
 import { queryKeys } from '../../../../shared/api/queryKeys';
@@ -17,6 +16,7 @@ import { choiceBlocked, choicesFor, resolveChoice } from '../../model/computeCho
 import { ComputeOptions, computeBlockText } from '../agents/ComputeOptions';
 import type { useNativeTerminals } from '../../hooks/native/useNativeTerminals';
 import styles from './NativeWorkspace.module.css';
+import { ButtonLink } from '../../../../shared/ui/navigation/ButtonLink';
 
 export interface NativeToolbarProps {
   readonly projectId: string; readonly taskId: string; readonly layout: WorkspaceLayout; readonly store: WorkspaceLayoutStore; readonly native: ReturnType<typeof useNativeTerminals>;
@@ -69,7 +69,7 @@ export function NativeToolbar({ projectId, taskId, layout, store, native, canSta
     {tab.paneOrder.length >= 32 ? <p className={styles.blockReason}>{t('devSession.native.fullWorkspace')}</p> : null}
     {profiles.error ? <p className={styles.error}>{errorMessage(profiles.error)}</p> : null}
     {blockText ? <p className={styles.error}>{blockText}</p> : null}
-    {profiles.error || blockText ? <div className={styles.helpActions}><Button disabled={profiles.isFetching} onClick={() => void profiles.refetch()}>{t('devSession.native.refreshProfiles')}</Button>{isAdmin ? <Link to="/admin/compute">{t('devSession.native.configureProfiles')}</Link> : <span>{t('devSession.native.askAdmin')}</span>}</div> : null}
+    {profiles.error || blockText ? <div className={styles.helpActions}><Button disabled={profiles.isFetching} onClick={() => void profiles.refetch()}>{t('devSession.native.refreshProfiles')}</Button>{isAdmin ? <ButtonLink to="/admin/compute">{t('devSession.native.configureProfiles')}</ButtonLink> : <span>{t('devSession.native.askAdmin')}</span>}</div> : null}
   </>;
 }
 

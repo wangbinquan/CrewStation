@@ -1,5 +1,4 @@
 import { RepositoryBindingDtoSchema } from '@crewstation/contracts';
-import { Link } from '@tanstack/react-router';
 import type { ReactElement } from 'react';
 import { api } from '../../../shared/api/client';
 import { queryKeys } from '../../../shared/api/queryKeys';
@@ -22,6 +21,7 @@ import { ProjectAttentionBanners } from '../components/summary/ProjectAttentionB
 import { ProjectRecentActivity } from '../components/summary/ProjectRecentActivity';
 import { StatusCards } from '../components/summary/StatusCards';
 import styles from '../components/summary/ProjectSummary.module.css';
+import { ButtonLink } from '../../../shared/ui/navigation/ButtonLink';
 
 /**
  * 项目概览一屏（RFC-020 D4）：页头（身份、主动作、读取于）→ 仓库与两个地址 → 只在需要处理时出现的横幅 → 三张状态卡 → 形态 → 最近动态。
@@ -49,7 +49,7 @@ export function ProjectOverviewPage(): ReactElement {
           {item && !tester ? <div>
             {repository.data && !repository.error ? <span>{t('projects.summary.repository')} <a href={repository.data.httpUrl} target="_blank" rel="noreferrer">{repository.data.pathWithNamespace} ↗</a></span> : null}
             {hostLink('prod')}{hostLink('preview')}
-            <Link to={PROJECT_PATHS[space].settings} params={{ projectId }} search={{ tab: 'info' }}>{t('projects.summary.projectInfo')}</Link>
+            <ButtonLink size="small" to={PROJECT_PATHS[space].settings} params={{ projectId }} search={{ tab: 'info' }}>{t('projects.summary.projectInfo')}</ButtonLink>
           </div> : null}
         </> : undefined}
         actions={item ? <ProjectSummaryActions item={item} space={space} available={available} /> : undefined}

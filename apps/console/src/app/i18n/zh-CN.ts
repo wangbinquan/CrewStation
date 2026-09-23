@@ -195,8 +195,8 @@ export const messages = {
   "resources.note.api": "查看接口文档，按需申请调用权限并试调。",
   "resources.note.events": "订阅在 crewstation.yaml 中声明，发布时登记。需要先打开开发会话，再编辑代码。",
   "resources.note.guide": "在代码中接入平台时查阅；下列内容由平台提供。应用自己的变量在项目设置中维护。",
-  "resources.openManifest": "打开订阅声明 →",
-  "resources.openConfig": "管理应用环境变量 →",
+  "resources.openManifest": "打开订阅声明",
+  "resources.openConfig": "管理应用环境变量",
   "resources.guide.identity": "身份转发与请求头",
   "resources.guide.environment": "环境变量、路径与事件约定",
   // 部署槽版本卡（概览与发布页共用，RFC-020 §8）与时间线。

@@ -110,7 +110,7 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   "config.variables.development": "Development variables",
   "config.variables.production": "Production variables",
   "config.description": "Configure runtime values for your app; mark confidential values as secrets.",
-  "config.platformGuide": "Platform variables and integration guide →",
+  "config.platformGuide": "Platform variables and integration guide",
   "config.draft.cancel": "Discard unsaved input for {env}?",
   "config.draft.confirmCancel": "Discard input and close",
 

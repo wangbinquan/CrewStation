@@ -10,6 +10,7 @@ import { ActionNote } from '../../../shared/ui/ActionNote';
 import { Button } from '../../../shared/ui/Button';
 import { RequestsPanel } from '../components/RequestsPanel';
 import { useCatalogRequestReview } from '../hooks/useCatalogRequestReview';
+import { ButtonLink } from '../../../shared/ui/navigation/ButtonLink';
 
 export function CatalogRequestsPage({ projectId, state, cursor, active, onPage, onDirtyChange }: RequestReviewPageProps) {
   const t = useT(), review = useCatalogRequestReview({ projectId, state, cursor }, active), busy = useRef(false);
@@ -33,7 +34,7 @@ export function CatalogRequestsPage({ projectId, state, cursor, active, onPage, 
       renderService={(serviceId) => {
         const item = shown.find((request) => request.serviceId === serviceId), project = item?.project;
         return <p>{item ? <Link to="/admin/capabilities" search={{ tab: 'api', projectId: item.projectId }}>{project ? `${project.name} · ${project.slug}` : item.projectId}</Link> : null} · <code>{serviceId}</code>
-          {item ? <> · <Link to="/admin/requests" search={{ state, projectId: item.projectId }}>{t('admin.requests.filterProject')}</Link></> : null}</p>;
+          {item ? <> <ButtonLink size="small" to="/admin/requests" search={{ state, projectId: item.projectId }}>{t('admin.requests.filterProject')}</ButtonLink></> : null}</p>;
       }}
       management={{ busy: paused, onDecide: submit, decisionFor: drafts.read, onDecisionChange: (id, value) => {
         const item = shown.find((request) => request.id === id); if (item) drafts.change(id, `${item.project?.name ?? item.projectId} · ${item.operationId}`, value);

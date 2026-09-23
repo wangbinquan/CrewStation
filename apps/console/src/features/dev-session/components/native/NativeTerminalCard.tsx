@@ -22,6 +22,8 @@ interface NativeTerminalCardProps {
   readonly activitySync?: 'ready' | 'catching-up' | 'unavailable';
   readonly onTerminalChange?: () => void;
   readonly onRetry?: (terminal: NativeTerminalDto) => void;
+  /** 当前用户，输入控制的状态条据此区分「自己另一个窗口」与别人。 */
+  readonly viewerId?: string;
 }
 
 export function NativeTerminalCard(props: NativeTerminalCardProps): ReactElement {
@@ -45,7 +47,7 @@ function ExecutionTerminalCard(props: NativeTerminalCardProps): ReactElement {
   return <NativeTerminalFrame {...props} channel={handle.channel} stream={handle.state} />;
 }
 
-function NativeTerminalFrame({ terminalId, terminal, layout, store, channel, stream, onStop, onActivity, canDevelop, activity, activitySync, onRetry }: NativeTerminalCardProps): ReactElement {
+function NativeTerminalFrame({ terminalId, terminal, layout, store, channel, stream, onStop, onActivity, canDevelop, activity, activitySync, onRetry, viewerId }: NativeTerminalCardProps): ReactElement {
   const t = useT();
   const [stopping, setStopping] = useState(false);
   const tabId = layout.tabs.find((tab) => tab.paneOrder.includes(terminalId))?.id ?? layout.activeTabId;
@@ -74,6 +76,6 @@ function NativeTerminalFrame({ terminalId, terminal, layout, store, channel, str
     {terminal?.beforeStart && (terminal.beforeStart.state === 'queued' || terminal.beforeStart.state === 'running') ? <div className={styles.controlLine} role="status">{terminal.beforeStart.state === 'queued' ? t('devSession.native.preparingQueued') : t('devSession.native.preparing', { step: terminal.beforeStart.currentStep ?? '' })}</div> : null}
     {terminal?.beforeStart?.state === 'failed' ? <p className={styles.error}>{t('devSession.native.preparationFailed', { step: terminal.beforeStart.failedStep ?? '' })}</p> : null}
     {terminal?.execution && !['running', 'finished'].includes(terminal.execution.state) && !['ended', 'failed'].includes(terminal.lifecycle) ? <div className={styles.controlLine} role="status">{terminal.execution.message ?? t(`devSession.native.execution.${terminal.execution.state}`)}</div> : null}
-    {terminal ? <NativeTerminalView terminal={terminal} channel={channel} stream={stream} onActivity={onActivity} canDevelop={canDevelop} /> : <p className={styles.error}>{t('devSession.native.missing')}</p>}
+    {terminal ? <NativeTerminalView terminal={terminal} channel={channel} stream={stream} onActivity={onActivity} canDevelop={canDevelop} viewerId={viewerId} /> : <p className={styles.error}>{t('devSession.native.missing')}</p>}
   </section>;
 }

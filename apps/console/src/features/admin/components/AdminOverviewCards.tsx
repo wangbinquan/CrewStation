@@ -1,10 +1,10 @@
-import { Link } from '@tanstack/react-router';
 import type { ReactElement } from 'react';
 import { ADMIN_ENTRY_GROUPS } from '../../../shared/admin/adminNavigation';
 import { useT } from '../../../shared/lib/useT';
 import { Card } from '../../../shared/ui/Card';
 import { Stack } from '../../../shared/ui/Stack';
 import styles from './AdminOverviewCards.module.css';
+import { ButtonLink } from '../../../shared/ui/navigation/ButtonLink';
 
 /** 管理目录的紧凑入口：分组、顺序与文案键都读左栏那一份，这里只多一句用途；待处理入口由上方的待办区块承担。 */
 export function AdminOverviewCards(): ReactElement {
@@ -18,7 +18,7 @@ export function AdminOverviewCards(): ReactElement {
             {group.pages.map((entry) => (
               <Card compact key={entry.to} title={t(entry.labelKey)}>
                 <p className={styles.hint}>{t(entry.hintKey)}</p>
-                <Link to={entry.to}>{t('admin.overview.open', { page: t(entry.labelKey) })}</Link>
+                <ButtonLink size="small" to={entry.to}>{t('admin.overview.open', { page: t(entry.labelKey) })}</ButtonLink>
               </Card>
             ))}
           </div>

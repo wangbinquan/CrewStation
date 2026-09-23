@@ -1,5 +1,4 @@
 import type { ProjectSummaryDetail } from '@crewstation/contracts';
-import { Link } from '@tanstack/react-router';
 import { api } from '../../../../shared/api/client';
 import { queryKeys } from '../../../../shared/api/queryKeys';
 import { useApiQuery } from '../../../../shared/api/useApi';
@@ -8,6 +7,7 @@ import type { ProjectSpace } from '../../../../shared/project/projectPaths';
 import { useT } from '../../../../shared/lib/useT';
 import { summaryIsFresh } from '../../model/projectSummaryState';
 import styles from './ProjectSummary.module.css';
+import { ButtonLink } from '../../../../shared/ui/navigation/ButtonLink';
 
 /**
  * 概览只说需要处理的事（RFC-020 §6）：运行健康异常或未知、负责人有待批准的数据访问申请。没有就不显示。
@@ -23,11 +23,11 @@ export function ProjectAttentionBanners({ item, space }: { readonly item: Projec
   return <>
     {unhealthy || healthUnknown ? <div className={styles.banner} data-tone={unhealthy ? 'warning' : 'info'} role="status">
       <div><strong>{t(unhealthy ? 'projects.summary.attention.unhealthy' : 'projects.summary.attention.healthUnknown')}</strong><p className={styles.muted}>{t('projects.summary.attention.healthHint')}</p></div>
-      <Link to={PROJECT_PATHS[space].operations} params={params} search={{ tab: 'status' }}>{t(unhealthy ? 'projects.summary.fixHealth' : 'projects.summary.checkHealth')}</Link>
+      <ButtonLink to={PROJECT_PATHS[space].operations} params={params} search={{ tab: 'status' }}>{t(unhealthy ? 'projects.summary.fixHealth' : 'projects.summary.checkHealth')}</ButtonLink>
     </div> : null}
     {count > 0 ? <div className={styles.banner} data-tone="info" role="status">
       <div><strong>{t('projects.summary.attention.dataAccess', { count })}</strong><p className={styles.muted}>{t('projects.summary.attention.dataAccessHint')}</p></div>
-      <Link to={PROJECT_PATHS[space].development} params={params} search={{ view: 'data' }}>{t('projects.summary.attention.openData')}</Link>
+      <ButtonLink to={PROJECT_PATHS[space].development} params={params} search={{ view: 'data' }}>{t('projects.summary.attention.openData')}</ButtonLink>
     </div> : null}
   </>;
 }

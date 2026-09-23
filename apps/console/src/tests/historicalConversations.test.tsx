@@ -62,11 +62,11 @@ test('不同历史 Agent 可并行发送，各自的成功和失败只更新对�
 
 test('返回 CLI 先保护未发送输入，在途不允许放弃，取消保留原对象和草稿', async () => {
   fixture = historicalConversationFixture(); page = await renderApp(path); await edit('尚未发送的历史消息');
-  await page.click('← 返回 CLI 工作区'); expect(page.path()).toBe(path); expect(page.text()).toContain('历史对话输入有未保存的输入');
+  await page.click('返回 CLI 工作区'); expect(page.path()).toBe(path); expect(page.text()).toContain('历史对话输入有未保存的输入');
   await page.click('继续编辑'); expect(input().value).toBe('尚未发送的历史消息');
-  await page.click('发送'); await page.click('← 返回 CLI 工作区'); expect(button('放弃输入并离开').disabled).toBe(true);
+  await page.click('发送'); await page.click('返回 CLI 工作区'); expect(button('放弃输入并离开').disabled).toBe(true);
   await finish(0, true); expect(button('放弃输入并离开').disabled).toBe(false); await page.click('继续编辑'); expect(input().value).toBe('尚未发送的历史消息');
-  await page.click('← 返回 CLI 工作区'); await page.click('放弃输入并离开'); expect(page.path()).toBe(cliPath);
+  await page.click('返回 CLI 工作区'); await page.click('放弃输入并离开'); expect(page.path()).toBe(cliPath);
   expect(fixture.commands.some((command) => ['startAgentTerminal', 'closeTerminal', 'stopAgent', 'stopAgentTerminal', 'terminalInput'].includes(command.type))).toBe(false);
 });
 

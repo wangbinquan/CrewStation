@@ -34,7 +34,7 @@ test.each(['DigitalWorker', 'APIProxy'] as const)('%s 概览一屏：页头一�
   expect(header.querySelector('a[href="//formal.test"]')?.textContent).toBe('formal.test ↗');
   expect(header.querySelector('a[href="//trial.test"]')).toBeNull(); expect(header.textContent).toContain('trial.test');
   const info = header.querySelector<HTMLAnchorElement>('a[href*="tab=info"]')!;
-  expect(info.textContent).toBe('项目信息 →'); expect(info.getAttribute('href')).toBe(`${base}/settings?tab=info`);
+  expect(info.textContent).toBe('项目信息'); expect(info.getAttribute('href')).toBe(`${base}/settings?tab=info`);
   await act(async () => info.click()); await page.settle();
   expect(page.path()).toBe(`${base}/settings`); expect(page.search().tab).toBe('info');
   expect(f.writes).toEqual([]);

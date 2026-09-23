@@ -20,15 +20,26 @@ export const NativeTerminalRecordSchema = TerminalSizeSchema.extend({
   beforeStart: z.object({ executionId: z.string().min(1), state: BeforeStartStateSchema, currentStep: z.string().optional(), failedStep: z.string().optional() }).optional(),
 });
 export const NativeTerminalRosterSchema = z.object({ runnerId: z.uuid(), terminals: z.array(NativeTerminalRecordSchema) });
+/** 输入控制的持有人：cs-session 按浏览器连接的网关身份注入，浏览器自己带来的一律覆盖。 */
+export const TerminalHolderSchema = z.object({ userId: z.string().min(1), name: z.string().max(200) });
+/**
+ * 一个 CLI 窗口此刻的输入控制（2026-09-23）：有没有人持有、是谁；`revision` 每次换人或释放加一，
+ * 查看者按它丢弃迟到的旧状态。旧 Runner 没有这一项，查看者据此退回「看不到是谁」。
+ */
+export const TerminalControlStateSchema = z.object({ held: z.boolean(), holder: TerminalHolderSchema.optional(), revision: z.number().int().nonnegative() });
 export const TerminalSnapshotSchema = TerminalSizeSchema.extend({
   terminalId: z.string(), runnerId: z.uuid(), throughSeq: z.number().int().nonnegative(),
   data: z.string(), scrollbackLimit: z.number().int().nonnegative(), truncated: z.boolean(),
+  control: TerminalControlStateSchema.optional(),
 });
 export const TerminalControlSchema = z.object({
   controlled: z.boolean(), expiresAt: z.iso.datetime().nullable(),
+  control: TerminalControlStateSchema.optional(),
 });
 
 export type NativeTerminalRecord = z.infer<typeof NativeTerminalRecordSchema>;
 export type NativeTerminalRoster = z.infer<typeof NativeTerminalRosterSchema>;
 export type TerminalSnapshot = z.infer<typeof TerminalSnapshotSchema>;
+export type TerminalHolder = z.infer<typeof TerminalHolderSchema>;
+export type TerminalControlState = z.infer<typeof TerminalControlStateSchema>;
 export type TerminalControl = z.infer<typeof TerminalControlSchema>;

@@ -19,7 +19,8 @@ export interface BrowserStream {
 /** 浏览器（工作台）到某任务的流：先回放持久事件到 sinceSeq 之后，再接实时广播；命令经同一派发口。 */
 export function browserStreams(deps: SessionUseCaseDeps, hub: RunnerHub, dispatch: ReturnType<typeof commandDispatch>) {
   return {
-    open: async (actor: Actor, taskId: TaskId, sink: EventSink, sinceSeq: number, options: BrowserReplayOptions = {}): Promise<BrowserStream> => {
+    /** `viewerName` 是网关注入的显示名，取得输入控制时随用户 ID 一起交给 Runner，别的查看者据此看到是谁在输入。 */
+    open: async (actor: Actor, taskId: TaskId, sink: EventSink, sinceSeq: number, options: BrowserReplayOptions & { readonly viewerName?: string } = {}): Promise<BrowserStream> => {
       if (!(await deps.taskAccess.canOpenStream(actor, taskId))) throw forbidden('无权访问该任务的会话流');
       let unsubscribe = () => {};
       const guarded = authorizedSink(sink, () => deps.taskAccess.canOpenStream(actor, taskId), () => unsubscribe());
@@ -27,7 +28,7 @@ export function browserStreams(deps: SessionUseCaseDeps, hub: RunnerHub, dispatc
       unsubscribe = replay.unsubscribe;
       const { complete } = replay;
       try { await guarded.drain(); if (!(await guarded.check())) throw forbidden('项目权限已变化'); } catch (error) { unsubscribe(); throw error; }
-      const viewId = crypto.randomUUID();
+      const viewId = crypto.randomUUID(), holder = { userId: actor.userId, name: options.viewerName ?? '' };
       const controlled = new Set<string>();
       return {
         onMessage: async (raw) => {
@@ -37,7 +38,7 @@ export function browserStreams(deps: SessionUseCaseDeps, hub: RunnerHub, dispatc
           const command: RunnerCommand = parsed.data;
           if (!complete) { sink.send(JSON.stringify({ type: 'error', id: command.id, code: 'replay_pending', message: '历史事件尚未补齐，请等待连接就绪' })); return; }
           try {
-            const scoped = terminalViewCommand(command, viewId);
+            const scoped = terminalViewCommand(command, viewId, holder);
             if (scoped.type === 'claimTerminalControl') controlled.add(scoped.terminalId);
             const payload = await dispatch.sendCommand(taskId, scoped);
             if (scoped.type === 'detachTerminal') controlled.delete(scoped.terminalId);

@@ -33,9 +33,9 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   'events.eventTypes.emptyDescription': 'Once an administrator releases an EventProducer project, the types it registers show up here.',
 
   'events.deliveries.title': 'Delivery history',
-  'events.summary.line': 'Recent deliveries {count} · dead letters {dead} →',
+  'events.summary.line': 'Recent deliveries {count} · dead letters {dead}',
   'events.summary.loading': 'Loading recent deliveries…',
-  'events.summary.error': 'Delivery history is unavailable →',
+  'events.summary.error': 'Delivery history is unavailable',
   'events.deliveries.autoRefresh': 'Refreshes every 10s',
   'events.deliveries.filterLabel': 'State',
   'events.deliveries.filterAll': 'All',

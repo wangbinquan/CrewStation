@@ -1,4 +1,4 @@
-import { Link, useNavigate, useSearch } from '@tanstack/react-router';
+import { useNavigate, useSearch } from '@tanstack/react-router';
 import type { ReactElement } from 'react';
 import { CapabilitiesPage } from '../../features/capabilities';
 import { CatalogPage } from '../../features/catalog';
@@ -14,6 +14,7 @@ import { Button } from '../../shared/ui/Button';
 import { Stack } from '../../shared/ui/Stack';
 import { Tabs } from '../../shared/ui/Tabs';
 import styles from './ProjectSections.module.css';
+import { ButtonLink } from '../../shared/ui/navigation/ButtonLink';
 
 /**
  * 开发页的参考面板（RFC-020 D2）：原「开发资源」的三主题——API 接口、事件、平台接入。
@@ -30,10 +31,10 @@ export function ReferencePanel(): ReactElement {
       <p className={styles.note}>{t(`resources.note.${topic}`)}</p>
       {topic === 'api' ? <CatalogPage key={`api:${full}`} embedded compact={!full} proxy={search.proxy} operation={search.operation} onClearContext={() => go({ proxy: undefined, operation: undefined })} onSelect={(operation) => go({ operation: operation?.id })} /> : null}
       {topic === 'events' ? <><ActionRow>
-        <Link to={PROJECT_PATHS[space].development} params={{ projectId }} search={{ view: 'code', file: 'crewstation.yaml' }}>{t('resources.openManifest')}</Link>
+        <ButtonLink size="small" to={PROJECT_PATHS[space].development} params={{ projectId }} search={{ view: 'code', file: 'crewstation.yaml' }}>{t('resources.openManifest')}</ButtonLink>
         <DeliveriesSummary projectId={projectId} subscription={search.subscription} />
       </ActionRow><EventResources projectId={projectId} subscription={search.subscription} /></> : null}
-      {topic === 'guide' ? <><Link to={PROJECT_PATHS[space].settings} params={{ projectId }} search={{ tab: 'config', env: 'development' }}>{t('resources.openConfig')}</Link><CapabilitiesPage embedded section="guide" topic={search.guide ?? 'identity'} /></> : null}
+      {topic === 'guide' ? <><ButtonLink size="small" to={PROJECT_PATHS[space].settings} params={{ projectId }} search={{ tab: 'config', env: 'development' }}>{t('resources.openConfig')}</ButtonLink><CapabilitiesPage embedded section="guide" topic={search.guide ?? 'identity'} /></> : null}
     </Tabs>
   </Stack>;
 }

@@ -1,4 +1,3 @@
-import { Link } from '@tanstack/react-router';
 import type { ReactElement, ReactNode } from 'react';
 import { useState } from 'react';
 import { api } from '../../shared/api/client';
@@ -8,6 +7,7 @@ import { useT } from '../../shared/lib/useT';
 import { EmptyState } from '../../shared/ui/EmptyState';
 import { QueryStatus } from '../../shared/ui/QueryStatus';
 import { Button } from '../../shared/ui/Button';
+import { ButtonLink } from '../../shared/ui/navigation/ButtonLink';
 
 /**
  * 管理空间的组件级守卫，三态（RFC-002 §2.2）：
@@ -31,7 +31,7 @@ export function AdminGuard({ children }: { readonly children: ReactNode }): Reac
       <EmptyState
         title={t('admin.denied.title')}
         description={t('admin.denied.description')}
-        action={<Link to="/">{t('admin.denied.back')}</Link>}
+        action={<ButtonLink to="/">{t('admin.denied.back')}</ButtonLink>}
       />
     ) : null;
   return <>{notice}<div key={me.data?.id} hidden={!allowed} inert={!allowed} style={allowed ? { display: 'contents' } : undefined}>{allowed || visited && !!me.error ? children : null}</div></>;
