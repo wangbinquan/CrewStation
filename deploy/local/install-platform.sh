@@ -13,6 +13,17 @@ import_image() { # tag
   docker save "$1" | docker exec -i "$NODE" ctr -n k8s.io images import --no-unpack=false - >/dev/null
 }
 
+# 网络插件：集群还不是 Calico（Docker Desktop 自带的 kindnet 还在、calico-node 没全部就绪，或还有 Pod 用着 kindnet
+# 分配的地址）时，先整体迁过去：装 Calico、删 kindnet、按依赖重建旧地址上的全部 Pod。开发会话走集群管理的
+# 「管理员重启工作区」，保留工作卷，会话里的 CLI 要重开（作者 2026-09-23 裁定）。已经迁完时 --check 返回 0，什么都不动。
+CNI_STATUS=0
+"$ROOT/deploy/local/calico-cni.sh" --check || CNI_STATUS=$?
+case "$CNI_STATUS" in
+  0) ;;
+  10) log "网络插件迁移到 Calico，并重建旧地址上的全部 Pod"; "$ROOT/deploy/local/calico-cni.sh" ;;
+  *) echo "检查网络插件失败（calico-cni.sh --check 退出码 $CNI_STATUS）" >&2; exit "$CNI_STATUS" ;;
+esac
+
 if [[ "${SKIP_BUILD:-}" != "1" ]]; then
   log "构建镜像"
   docker build -q -f "$ROOT/deploy/docker/control-plane.Dockerfile" -t cs-control-plane:dev "$ROOT"

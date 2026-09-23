@@ -34,6 +34,10 @@ esac`);
   executable('bin/curl', `printf '{"mode":"%s"}' "\${TEST_MODE:-bootstrap}"`);
   executable('deploy/local/seed-catalog.sh', `touch "$TEST_ROOT/catalog-seeded"`);
   executable('deploy/local/install-dev-auth.sh', `touch "$TEST_ROOT/dev-auth-installed"`);
+  // 网络插件检查与迁移另有 calicoCni.test.ts；这里只看 install-platform.sh 按 --check 的结果决定调不调迁移，且在装平台之前。
+  executable('deploy/local/calico-cni.sh', `
+printf 'calico-cni %s\\n' "\${1:-migrate}" >> "$TEST_ROOT/kubectl.log"
+if [ "\${1:-}" = --check ]; then exit "\${TEST_CNI_CHECK:-0}"; fi`);
   return root;
 }
 
@@ -110,6 +114,33 @@ describe('首次安装必须交由用户创建管理员', () => {
     expect(readFileSync(join(root, '.local/admin.env'), 'utf8')).toBe(oldCredentials);
     expect(existsSync(join(root, 'catalog-seeded'))).toBe(false);
     expect(existsSync(join(root, 'dev-auth-installed'))).toBe(false);
+  });
+
+  test('网络插件已是 Calico：只做检查，不迁移', async () => {
+    const root = fixture();
+    const result = await install(root);
+    expect(result.code).toBe(0);
+    expect(result.commands).toContain('calico-cni --check');
+    expect(result.commands).not.toContain('calico-cni migrate');
+  });
+
+  test('还不是 Calico（检查返回 10）：先迁移、重建旧地址上的 Pod，再装平台', async () => {
+    const root = fixture();
+    const result = await install(root, { TEST_CNI_CHECK: '10' });
+    expect(result.code).toBe(0);
+    const at = (text: string) => result.commands.indexOf(text);
+    expect(at('calico-cni --check')).toBeGreaterThanOrEqual(0);
+    expect(at('calico-cni migrate')).toBeGreaterThan(at('calico-cni --check'));
+    expect(at('00-rbac.yaml')).toBeGreaterThan(at('calico-cni migrate'));
+  });
+
+  test('网络插件检查本身出错：停止安装，不迁移也不装平台', async () => {
+    const root = fixture();
+    const result = await install(root, { TEST_CNI_CHECK: '1' });
+    expect(result.code).toBe(1);
+    expect(result.err).toContain('检查网络插件失败（calico-cni.sh --check 退出码 1）');
+    expect(result.commands).not.toContain('calico-cni migrate');
+    expect(result.commands).not.toContain('00-rbac.yaml');
   });
 
   test('初始化状态异常就停止，不猜测已完成或尝试建号', async () => {

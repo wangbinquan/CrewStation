@@ -250,9 +250,13 @@ kindnet 裁决后给连接打 conntrack 标签 28，之后的包走 `ct label 28
 处理：`deploy/local/calico-cni.sh`（bootstrap.sh 第一步）装 Calico v3.32.2，并删掉 kindnet。清单的版本与校验和钉死在 `calico-manifest.ts`。
 地址池 `10.244.128.0/17` 有两个考虑：一是它在 kube-proxy 的 clusterCIDR `10.244.0.0/16` 之内，集群内不做源地址转换，网关才能按源 Pod IP 认身份
 （verify.sh C 项核对）；二是它避开了节点 podCIDR `10.244.0.0/24`，原地迁移时新旧 Pod 不撞地址。
-原地迁移后，Pod 要重建才会挂到 Calico 上。重建之前，旧 Pod 不受任何 NetworkPolicy 约束，出站还靠 kindnet 留下的 `KIND-MASQ-AGENT`；
-全部重建后重跑脚本，就会把这条规则删掉。verify.sh E 项确认 kindnet 不在、Calico 真的在挡流量。
-**Docker Desktop 重置 Kubernetes 集群后 kindnet 会回来**，重跑 bootstrap.sh。
+原地迁移后，Pod 要重建才会挂到 Calico 上；重建之前，旧 Pod 不受任何 NetworkPolicy 约束，出站还靠 kindnet 留下的 `KIND-MASQ-AGENT`。
+脚本第 3 步（`rebuild-old-range-pods.ts`）重建旧地址上的全部 Pod：有控制器的按依赖分四批删掉重建；任务 Pod 以管理员身份走集群管理的运维操作，
+开发会话按「管理员重启工作区」换新容器、保留工作卷，会话里的 CLI 要重开。旧地址上没有 Pod 了才删这条规则，处理不了的逐个列出。
+verify.sh E 项确认 kindnet 不在、Calico 真的在挡流量。
+`install-platform.sh` 开头先跑 `calico-cni.sh --check`：kindnet 还在、calico-node 没全部就绪，或旧地址上还有 Pod，就先整体迁过去再安装。
+「旧地址上的 Pod」只算 Running／Pending 且不在终止中的：Completed 的 Job Pod 状态里还留着地址（CI 里的迁移 Job 就是），算上它每次安装都会以为要迁移。
+**Docker Desktop 重置 Kubernetes 集群后 kindnet 会回来**，重跑 bootstrap.sh。重启或升级 Docker Desktop 会不会把它装回来还没验证过，下次 install-platform.sh 会发现。
 
 同日另一个教训：不要在 kindnet（或任何节点守护进程）的容器里跑 `<二进制> --help` 看参数。kindnetd 不认 `--help`，
 直接又起了一个完整实例，和原进程并行跑了几分钟，直到输出管道断开才退出。看参数去读上游源码或 README。
