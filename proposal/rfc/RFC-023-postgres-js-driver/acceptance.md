@@ -48,11 +48,12 @@
 | 1 | 换驱动后，模块与包的用例 182 个一起红：`The "string" argument must be of type string … Received an instance of Object／Date`。drizzle 的 postgres-js 驱动把时间类和 json 的序列化器换成原样透传，原生 `sql` 模板里直接传的 `Date` 与对象被驱动拒绝 | e34bdeb：domain_events 与 jobs 的 payload 改为 `JSON.stringify(…)::text::jsonb`，jobs 的 `runAt` 与 oidc_flows 清理的时间改为 `toISOString()::timestamptz`。其余 40 处原生 `execute` 逐个核对过，参数都是字符串或数字。dev-gotchas 新增一条 |
 | 2 | 原生 `execute` 返回 postgres.js 的 `RowList`，带 count、command 等属性。六个测试文件直接 `toEqual(普通数组)`，类型报错，比较也不会相等 | e34bdeb：先展开成数组再比较 |
 | 3 | 突发复现的第一版客户端在持续阶段不限速：进程出错后 5xx 回得很快，一轮发出上百万个请求，远超真实负载 | 中止重跑：持续阶段每个 worker 请求间隔 100 毫秒，连不上时退避 500 毫秒。第一版的两轮只作参考，见 §2 |
-| 4 | DB-05 核对中发现：`expireBindings`（把到期绑定标成已过期、删掉临时角色）没有接到任何后台任务，到期的绑定一直显示生效中，临时角色留在库里（数据库按 VALID UNTIL 拒绝它登录）。与换驱动无关，是既有的接线遗漏 | 本批：数据模块加每分钟一次的后台任务，由 cs-controller 运行，用例覆盖到期回收。会话释放时要不要立即收回绑定，属于设计问题，没有改，已提请作者 |
+| 4 | DB-05 核对中发现：`expireBindings`（把到期绑定标成已过期、删掉临时角色）没有接到任何后台任务，到期的绑定一直显示生效中，临时角色留在库里（数据库按 VALID UNTIL 拒绝它登录）。与换驱动无关，是既有的接线遗漏 | 7d12f70：数据模块加每分钟一次的后台任务，由 cs-controller 运行，用例覆盖到期回收。11:30Z 部署后实机核对：5 分钟的只读绑定 11:36:36 到期，11:37:06 已标成已过期、临时角色已删除。会话释放时要不要立即收回绑定，属于设计问题，没有改，已提请作者 |
 
 ## 5. 部署
 
 - 11:13:54–11:14:03Z：cs-auth、cs-controller、cs-events、cs-session、mcp-capabilities、mcp-operations 换成 `cs-control-plane:pgjs-20260923`，观察一分钟，都是 0 次重启、0 行报错。
 - 11:15:24–11:15:56Z：cs-api 换成同一镜像，观察两分钟，0 次重启、0 行报错。
 - 事先通知了并行会话，突发复现期间他们不做实机核对。复现用的 `cs-api-burst` 与 `cs-burst-client` 已删除，为复现开的 rfc022-verify 会话已释放。
+- 11:30:02Z 只把 cs-controller 换成 `cs-control-plane:pgjs-20260923b`（git archive 7d12f70，驱动相同，只多了到期绑定的后台任务），观察一分钟，0 次重启、0 行报错。这是计划内的滚动，不计入 DB-08 的重启。
 - 验收项目 `rfc023-verify` 保留，供作者查看。

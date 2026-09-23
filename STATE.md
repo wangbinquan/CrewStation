@@ -63,7 +63,7 @@
   - 原生 SQL 里直接传的 Date、对象改为先转文本；dev-gotchas 新增一条。
 - **证据**：同一套突发脚本打一个隔离的 cs-api 副本。旧驱动 6 轮每轮都被探针重启，共 102 行 I16 特征报错；新驱动 6 轮 0 报错、0 重启，50,579 个请求全部 2xx。CI 35851282033 六项成功，e2e 用新驱动全新安装。
 - **本机部署**：11:14Z 其余六个部署、11:15:56Z cs-api 换成 `cs-control-plane:pgjs-20260923`；迁移 Job 没有待应用的迁移。验收项目 `rfc023-verify` 保留。
-- **顺手修**：数据模块的 `expireBindings` 一直没接后台任务，到期的只读／可写绑定显示生效中、临时角色不删。本批改为 cs-controller 每分钟收一次，部署后生效。
+- **顺手修**：数据模块的 `expireBindings` 一直没接后台任务，到期的只读／可写绑定显示生效中、临时角色不删。7d12f70 改为 cs-controller 每分钟收一次；11:30Z cs-controller 换成 `pgjs-20260923b`，实机核对 5 分钟绑定到期后 30 秒内收掉。
 - **等作者裁定**：开发会话释放时，要不要立即收回它的数据绑定（现在要等到期）。
 - **下一个 session 注意**：
   - 09-26 11:16Z 之后，核对 cs-api、cs-session、cs-controller、cs-events 的重启次数与日志里的 I16 特征行（`ERR_POSTGRES`、`JSON Parse error`、`Failed to read data`、`INVALID_MESSAGE`、`UNSUPPORTED_INTEGER`）。都为 0 才能把 DB-08 记为通过。
