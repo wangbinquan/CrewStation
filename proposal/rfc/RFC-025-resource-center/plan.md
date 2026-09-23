@@ -16,11 +16,11 @@
 | 任务 | 内容 | 依赖 | 状态 |
 |---|---|---|---|
 | RFC-025-T1 | 作者四轮裁定 D1–D13；只读盘点落档（`audit.md`）；三件套与 ADR-0009 草案落档并登记；作者「批准并实施」 | 作者 | 已完成（2026-09-23，Draft 4a60a287） |
-| RFC-025-T2 | 实测：Traefik `rateLimit`／`inFlightReq` 超额时的状态码与 `Retry-After`、计数范围（每路由还是共享）、多副本网关的分布式后端；SSE 经 Traefik 的缓冲、心跳与空闲超时；按标签 watch 在本机的稳定性；结论写进 `design.md` §7.3、§8 | T1 | 未开始 |
-| RFC-025-T3 | 契约与 api-client：`api/resources/*`（记录、阶段、条件、子对象、可做操作、视图、流事件）；旧词汇映射（设计 §4.3）的纯函数与逐行用例；429 解析为 `rate_limited`；`contracts:lock` 只增不删 | T1 | 未开始 |
-| RFC-025-T4 | `modules/resources`（L1）：schema 与迁移（登记迁移锁）、种类注册表与阶段规则、受理与平台预检、按台账推导额度、保留期、可做操作、视图 HTTP、SSE 与尾随器；`tools/arch/policy.ts` 登记；ADR-0009 转为已接受 | T3 | 未开始 |
-| RFC-025-T5 | `packages/resource-runtime` 与 `modules/cluster-control`（L2）骨架：观测缓存、工作队列、租约、退避；收编作业（第一期只报告不改动） | T4 | 未开始 |
-| RFC-025-T6 | 一期·任务类容器：`dev-workspace`、`agent-execution`、`business-workspace`、`volume`、Runner Secret、开发预览路由的期望与调和；`stopping` 受理即生效；失败的开发会话保留 72 小时；按种类回收与孤儿回收；`task-runtime`／`dev-session`／`business-task` 改为写期望、上报条件；旧接口由记录推导；额度计数器退役 | T5 | 未开始 |
+| RFC-025-T2 | 实测：Traefik `rateLimit`／`inFlightReq` 超额时的状态码与 `Retry-After`、计数范围（每路由还是共享）、多副本网关的分布式后端；SSE 经 Traefik 的缓冲、心跳与空闲超时；按标签 watch 在本机的稳定性；结论写进 `design.md` §7.3、§8 | T1 | 已完成（2026-09-23）：限流与 SSE 结论写进设计 §7.3、§8，证据见 acceptance.md §1.6；按标签 watch 在本机两次部署共约 40 分钟内没有一次中断 |
+| RFC-025-T3 | 契约与 api-client：`api/resources/*`（记录、阶段、条件、子对象、可做操作、视图、流事件）；旧词汇映射（设计 §4.3）的纯函数与逐行用例；429 解析为 `rate_limited`；`contracts:lock` 只增不删 | T1 | 已完成（2026-09-23，c9499ef6）：`contracts:lock` 无变化（资源契约不在业务面上） |
+| RFC-025-T4 | `modules/resources`（L1）：schema 与迁移（登记迁移锁）、种类注册表与阶段规则、受理与平台预检、按台账推导额度、保留期、可做操作、视图 HTTP、SSE 与尾随器；`tools/arch/policy.ts` 登记；ADR-0009 转为已接受 | T3 | 已完成（2026-09-23，c9499ef6、107883d7） |
+| RFC-025-T5 | `packages/resource-runtime` 与 `modules/cluster-control`（L2）骨架：观测缓存、工作队列、租约、退避；收编作业（第一期只报告不改动） | T4 | 已完成（2026-09-23，c9499ef6、107883d7）：收编只报告，见 acceptance.md §1.4、§1.5 |
+| RFC-025-T6 | 一期·任务类容器：`dev-workspace`、`agent-execution`、`business-workspace`、`volume`、Runner Secret、开发预览路由的期望与调和；`stopping` 受理即生效；失败的开发会话保留 72 小时；按种类回收与孤儿回收；`task-runtime`／`dev-session`／`business-task` 改为写期望、上报条件；旧接口由记录推导；额度计数器退役 | T5 | 进行中：第一步把任务环境投影进台账（期望与领域条件，K8s 仍由 task-runtime 操作），调和器按记录核对观测 |
 | RFC-025-T7 | 一期·工作台：`useProjectResources`（快照＋SSE＋续传）；开发页 CLI 标签、拓扑、概览开发卡改读记录；「结束中」；页面不自行推导状态的守卫用例 | T3、T6 | 未开始 |
 | RFC-025-T8 | 二期·服务槽与构建：`service-slot`、`build-job`、`migration-job` 的期望与调和；统一预检接入发布、重新部署与切流；`observability` 健康、发布页槽卡改读记录 | T5 | 未开始 |
 | RFC-025-T9 | 三期·路由与说明页：槽路由、服务域与 `/api/<proxy>` 路由、开发预览路由统一为 `route`；同 Host 唯一；说明页（HTML 与 503＋JSON）；身份索引改读观测、墓碑清理；去掉 Traefik 的 `allowEmptyServices` | T8 | 未开始 |
@@ -30,7 +30,7 @@
 | RFC-025-T13 | 五期·集群管理与摘要：清单与拓扑读全平台视图；运维操作经台账；「待回收的工作卷」与确认词删除；`capabilities` 摘要改读视图 | T6、T8、T9 | 未开始 |
 | RFC-025-T14 | 六期·收编正式运行：处理本机全部遗留对象（audit §1 实查清单），旧标签改写、别名入账；逐项核对 | T6–T13 | 未开始 |
 | RFC-025-T15 | 限流默认值校准：本机突发脚本打三类流量，报告实测结果，作者定 Q4 | T10 | 未开始 |
-| RFC-025-T16 | 每期：本地 gate、改动行防护、提交推送、精确 SHA CI；本机部署与实机验收（含两个 cs-controller 副本的租约与接手）；写 `acceptance.md` | 各期 | 未开始 |
+| RFC-025-T16 | 每期：本地 gate、改动行防护、提交推送、精确 SHA CI；本机部署与实机验收（含两个 cs-controller 副本的租约与接手）；写 `acceptance.md` | 各期 | 第一期已完成（acceptance.md §1）；第二期起逐期补 |
 | RFC-025-T17 | 回填：基线 Proposal（新需求号）、Design（新节、决策号，D53 修订）、Plan（验收编号与矩阵行）；RFC-003／006／010／015／019／020／021／022／024 与 ADR-0006 加修订说明；`repository-structure.md` 模块表；README、STATE.md、dev-gotchas | T16 | 未开始 |
 
 ## 2. 验收清单
