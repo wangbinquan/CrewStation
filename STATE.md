@@ -34,7 +34,7 @@
   - 会写数据的请求（归档、集群受理、删档位、删接入方、释放）都在浏览器里拦下、回 503，没有到服务端。事后直查库，档位 rfc010-cluster-qa、接入方 dev-roles、项目 rfc021-verify 都还在；demo 的 CLI Pod 仍在运行。
   - 唯一的真实写入：在 rfc021-verify 开发组里建了 `CS_CONFIRM_DIALOG_PROBE`，再用弹窗删掉，版本历史因此多了两条。
 - **发现的缺陷**：配置项删除后，成功提示把变量名显示成 UUID（「已删除 开发 的 01a0cd43-…」）。原因是 ConfigEnvPanel 在重新读取后的列表里按 id 找名字，这是原来就有的问题；configForms 的测试桩在删除后仍返回该项，所以用例没拦住。这个文件按钮统一会话当时正在改，我把原因和修法发给了它，它在 `c5e44b8` 里修好了：remove 的入参带上 name，提示改用它；configForms 的桩在 DELETE 之后不再返回被删的项，那条断言在修复前是红的。
-- **实机期间 cs-api 出现 I16**：cs-api 滚到 `startup-20260923g` 之后，08:00Z 报 `ERR_POSTGRES_INVALID_MESSAGE`，接着出现 native activity query unavailable（demo 的会话任务），存活探针失败后进程重启一次，约 08:01:30Z 恢复。当时我的核对页面停在 demo 开发页大约 2 分钟。证据已交给正在治这个问题的 crewstation-51，我没有对 cs-api 做任何操作。
+- **实机期间 cs-api 出现 I16**：cs-api 滚到 `startup-20260923g` 之后，08:00Z 报 `ERR_POSTGRES_INVALID_MESSAGE`，接着出现 native activity query unavailable（demo 的会话任务），存活探针失败后进程重启一次，约 08:01:30Z 恢复。证据交给了正在治这个问题的 crewstation-51，我没有对 cs-api 做任何操作。它的结论：这是 I16 在新进程上复发，我的核对页面不是主因。cs-api g 在 07:59:46 开始监听，第一批连接错位错误出在第一条 native activity 告警之前，原因是刚启动时积压的请求一起到达，和 05:35 那次一样。`e73d98e` 的节流只能减负；根治要换驱动或升级 Bun（I16 的 a／b 选项），需要作者裁定，crewstation-51 会提请。cs-api 08:01 被探针重启一次后，一直稳定在 1/1。
 - **并行分工**：
   - 按钮统一会话（「下线待验证和正式版本」）负责：去掉刷新按钮、去掉按钮里的符号、统一按钮尺寸与摆放。作者当面给了它「页面自动局部刷新、不要刷新按钮」和「按钮文案里不放加号、箭头」两条裁定，这两条最初也发到了本会话。
   - crewstation-db 负责全站弹窗底座 `shared/ui/dialog/Dialog`：ConfirmDialog 已在工作树里搭到底座上（未提交，对外 props 不变，`confirmDialog.test.tsx` 是行为约定）。它还会把集群的重启／调整副本、档位复制、接入方与配置项表单改成弹窗，并按作者给它的新裁定给所有弹窗右上角加 ✕。
