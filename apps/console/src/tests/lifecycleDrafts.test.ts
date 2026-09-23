@@ -16,7 +16,7 @@ test('维护草稿：默认值、从当前维护带出、变化判断与请求�
   expect(maintenanceDraftChanged(draft, draftFromMaintenance(current))).toBe(false);
   expect(maintenanceDraftChanged({ ...draft, allowUsers: [] }, draft)).toBe(true);
   expect(maintenanceDraftChanged({ ...draft, switches: { ...draft.switches, services: true } }, draft)).toBe(true);
-  expect(maintenanceRequest({ ...draft, reason: '  换库  ' }, 3)).toEqual({ switches: { users: true, services: false, events: true }, allowUserIds: ['u1'], reason: '换库', expectedEndAt: current.expectedEndAt, expectedRevision: 3 });
+  expect(maintenanceRequest({ ...draft, reason: '  换库  ' }, 3) as unknown).toEqual({ switches: { users: true, services: false, events: true }, allowUserIds: ['u1'], reason: '换库', expectedEndAt: current.expectedEndAt, expectedRevision: 3 });
   expect(maintenanceRequest({ ...draft, expectedEnd: '' }, 3).expectedEndAt).toBeNull();
 });
 
