@@ -3,7 +3,7 @@
 
 > RFC-013 基线补充（2026-09-21）：平台资源与引用统一为 36 字符、小写、带连字符的 UUIDv7；名称用于展示和搜索。Manifest v2、业务 API v2、Runner v3 及历史兼容边界见 [资源身份设计](./rfc/RFC-013-resource-uuid/design.md)。实施与发布证据见该 RFC 的 plan。
 > 状态：设计草案，待原型与评审验证  
-> 版本：0.3.12 · 整理日期：2026-09-10
+> 版本：0.3.13 · 整理日期：2026-09-10
 > 修订日期：2026-09-11（v0.2.0：任务级执行环境、代码托管与持续意图修改）  
 > 修订日期：2026-09-11（v0.3.0：与 Proposal v0.3.0 同步，平台职责收窄、标签发布、网关鉴权、接入容器与事件中心、规模目标；删除 ZIP 与知识飞轮）  
 > 修订日期：2026-09-11（v0.3.1：选型按 tech-evaluation.md 确认并回填 §3）  
@@ -18,6 +18,7 @@
 > 修订日期：2026-09-23（v0.3.10：RFC-022 回填——启动进度：分段、来源、保存与显示；创建者窗口自动取得输入控制；新增 §5.10、D58）
 > 修订日期：2026-09-23（v0.3.11：Agent 不再分权限档——开发会话与业务子任务一律完全权限，Manifest `agentProfiles[].permission` 作废、旧值照收不用；新增 D59，§13.4 补一条接受的风险；另记 §5.10 的 RFC-022 同日修订：重新开始时回收失败会话的容器与工作卷）
 > 修订日期：2026-09-23（v0.3.12：安装与升级预检实测网络插件确实执行 NetworkPolicy，预检有失败项即停止；新增 D60，改 §11.1、§11.4、§12.2；顺带删掉 §11.3 配置示例里 RFC-018 已下线的 `egress` 段）
+> 修订日期：2026-09-23（v0.3.13：删除项目级告警订阅与告警通知器，首版不做告警通知，告警只在工作台查看；告警类型只留容器反复重启与健康检查失败；新增 D61，Q20 关闭；改 §1.1 不变量 21、§1.2、§2.1、§3.1、§3.2、§4.2、§4.3、§5.7、§7.3、§11.3 与 D44）
 > 配套文档：[Proposal](./proposal.md) · [Plan](./plan.md) · [Tech Evaluation](./tech-evaluation.md) · [设计门检视](./reviews/design-gate-2026-09-11.md)
 
 ## 目录
@@ -42,7 +43,7 @@
 
 ## 0. 阅读约定
 
-需求编号 R01–R58 以 Proposal v0.3.10 §6 为准。本设计以公司 Kubernetes 集群为唯一部署目标，本机验证使用 kind 集群，不再有 Docker Compose 路径。
+需求编号 R01–R58 以 Proposal v0.3.13 §6 为准。本设计以公司 Kubernetes 集群为唯一部署目标，本机验证使用 kind 集群，不再有 Docker Compose 路径。
 
 所有 `cs-*` 名称、平台 API、Manifest、状态机、数据对象和安装命令都是拟议协议，尚不是已存在的产品接口。第三方组件选型已按 `proposal/tech-evaluation.md` 确认，但本文不声称任何组件的版本、CRD 或兼容性已经验证，版本在 Plan T0.2 锁定。原稿与对话来源见 Proposal §0.1；本文的细化属于待验证的实现建议。
 
@@ -85,7 +86,7 @@ v0.3.2 依据设计门检视（`reviews/design-gate-2026-09-11.md`）的 25 项�
 18. **执行链路可追溯。** 一个 taskId 对应一条 traceId 链路，traceId 在任务创建时由平台生成并随事件投递携带；Agent 执行以 sessionId 记录并可由 traceId 索引；知识提取留待未来。
 19. **控制面高可用与规模目标是首版约束。** cs-* 多副本、元数据库高可用、网关多副本；所有组件按数百数字人并发、数百节点评估。
 20. **接入容器与业务服务同一套项目流程。** API proxy 与 EventProducer 由管理员以平台项目开发、标签发布、蓝绿两槽，不新增常驻服务；内置 GitLab 格式 EventProducer 由安装器建为平台项目。
-21. **运营元素是平台能力。** 配置与 Secret、日志聚合与日志页、部署健康态与告警订阅、套餐与副本由平台提供，不留给业务自行解决。
+21. **运营元素是平台能力。** 配置与 Secret、日志聚合与日志页、部署健康态与告警记录、套餐与副本由平台提供，不留给业务自行解决。
 22. **TaskRunner 与 Agent 进程分权。** TaskRunner 以独立系统用户运行，凭据与契约文件只对它可读，文件接口以 realpath 校验边界。
 
 ### 1.2 核心对象
@@ -117,7 +118,7 @@ v0.3.2 依据设计门检视（`reviews/design-gate-2026-09-11.md`）的 25 项�
 | `APIOperation` / `OpenPolicy` / `APIGrant` / `APIRequest` | 目录中的操作（键为 proxy 名加方法加路径）、默认或定向开放策略、服务获得的授权、待审批申请 | 目录／策略级 |
 | `UpstreamConnection` | API proxy 使用的公司上游连接与凭据引用，由 cs-auth 按需下发 | 管理级 |
 | `EventType` / `EventSubscription` / `EventDelivery` | EventProducer 声明的事件类型、服务的订阅与处理路径、投递记录 | 服务级 |
-| `AlertSubscription` | 项目级告警订阅：事件类型与接收人 | 项目级 |
+| `AlertSubscription`（已作废，v0.3.13，D61） | 原为项目级告警订阅（事件类型与接收人）；首版不做告警通知，告警只在工作台告警页查看 | — |
 | `PreviewTester` | 负责人为 preview 域指定的非成员访问者 | 服务级 |
 | `TaskQuota` | 每数字人的并发任务配额 | 服务级 |
 | `ExecutionEvent` | 任务、子任务、Agent 会话与命令的事实记录，带 traceId、taskId、sessionId，前台触发时含 OTel trace_id | 按保留策略 |
@@ -149,7 +150,7 @@ v0.3.2 依据设计门检视（`reviews/design-gate-2026-09-11.md`）的 25 项�
 | 实体 | 主要职责 | 关键边界 |
 |---|---|---|
 | 网关（Traefik） | 统一入口；按 Host 分用户域与服务域；用户域经 ForwardAuth 到 cs-auth 鉴权并注入身份头与令牌；服务域按源 Pod IP 反查调用方身份，注入平台来源令牌，并按本地放行表放行 `/api/<proxy>/` 调用；按 Host 与路径转发页面、业务、预览、平台、会话与终端流量 | 不执行平台业务逻辑；多副本；放行表与 Pod 身份索引由控制面下发 |
-| `cs-api` | 项目、服务、成员与角色、开发会话、发布与切流请求、接口目录与开放策略、配置与 Secret、告警订阅、能力说明数据、受管集群查询与运维受理、控制台后端 | 不执行用户代码，不代理业务流量 |
+| `cs-api` | 项目、服务、成员与角色、开发会话、发布与切流请求、接口目录与开放策略、配置与 Secret、告警记录、能力说明数据、受管集群查询与运维受理、控制台后端 | 不执行用户代码，不代理业务流量 |
 | `cs-auth` | 企业登录适配与用户鉴权决策、身份头与签名令牌签发、上游凭据服务（按需向 API proxy 下发）、Pod 身份索引的维护来源之一 | 不在服务调用的同步路径上；不向用户代码提供平台长期凭据；密钥轮换有重叠期 |
 | `cs-controller` | 命名空间、任务容器与持久卷调度、配额准入、构建、发布到待命槽、切流、路由与放行表下发、Pod 身份索引下发、数据供给、GitLab 管理操作模块（建仓、受控推送、创建标签）、空闲提醒、健康态采集、受管集群采集与持久运维执行 | 受限集群权限；副作用持久化并在多副本间以租约协调 |
 | `cs-session` | 开发会话与业务任务的 Agent 会话流、终端、文件与命令流的接入端；接受各任务容器内 TaskRunner 的出向连接并在副本间转发 | 不把 TaskRunner 端口公开；多副本，会话可在副本间恢复 |
@@ -243,7 +244,7 @@ flowchart TB
 
 ### 3.1 已确认的技术基线
 
-选型已按 `proposal/tech-evaluation.md` 逐项确认，此处为结论与核心验证；版本在 Plan T0.2 锁定，待验证项由 M0 原型核实。v0.3.2 依据设计门检视新增出站代理、日志聚合、告警通知三项待定候选，并修订身份与驱动两行；v0.3.7 按 RFC-018 作废出站代理一项。
+选型已按 `proposal/tech-evaluation.md` 逐项确认，此处为结论与核心验证；版本在 Plan T0.2 锁定，待验证项由 M0 原型核实。v0.3.2 依据设计门检视新增出站代理、日志聚合、告警通知三项待定候选，并修订身份与驱动两行；v0.3.7 按 RFC-018 作废出站代理一项；v0.3.13 按 D61 作废告警通知一项（首版不做告警通知）。
 
 | 部分 | 选型 | 核心验证 |
 |---|---|---|
@@ -262,7 +263,6 @@ flowchart TB
 | 平台 MCP | 官方 MCP SDK；Streamable HTTP；两个独立服务，多副本无状态 | 容器内连接鉴权与凭据轮换 |
 | 观测与追溯 | OpenTelemetry SDK 与 Collector；execution_events 表含 trace_id 与 otel_trace_id | OTel SDK 在 Bun 下的兼容 |
 | 日志聚合 | 集群日志采集与存储，候选待定（E24） | 数百服务日志量；工作台查询时延 |
-| 告警通知 | 部署健康态与项目级告警订阅；通知渠道待定（Q20） | 公司 IM 或邮件接入 |
 | 发行与安装 | Helm chart；Bun 单文件二进制安装器；本地仅 kind | 离线引导；HA 在多节点集群验证 |
 
 Knative、OPA、Temporal、Buildpacks、Longhorn 保留为条件性选项；首版不引入 Kafka、Redis、Istio；gVisor、Kata 等额外沙箱不列为选项。
@@ -280,7 +280,7 @@ Knative、OPA、Temporal、Buildpacks、Longhorn 保留为条件性选项；首�
 - `CredentialProvider`：cs-auth 内的模块；按 UpstreamConnection 向 API proxy 按需下发短期上游凭据。
 - `ConfigInjector`：把 ConfigItem 与 SecretValue 按取值组注入槽副本（生产组）与开发会话（开发组）的环境变量。
 - `LogPipeline`：日志采集、存储与按服务、槽、任务的查询接口。
-- `AlertNotifier`：健康态与事件到告警订阅的投递，渠道待定。
+- `AlertNotifier`：已作废（v0.3.13，D61：首版不做告警通知）。
 - `EventProducer 契约`：接入容器经服务域向 cs-events 投递归一化事件的协议；`EventDelivery` 是 cs-events 经服务域向业务服务推送的协议。
 - `DataProvider`：数据库、Bucket、卷的申请、绑定、备份恢复和回收。
 - `ArtifactStore` / `ImageRegistry`：不可变镜像产物。
@@ -361,7 +361,7 @@ APIProxy 与 EventProducer 的可运行样例分别见 [API 接入模板](../int
 | upstream_connections | name、owner、credential_ref、allowed_proxies | 凭据落入 proxy 配置 |
 | event_types / subscriptions / event_inbox / deliveries | producer＋type；subscription：service＋type＋handler_path；inbox：origin＋event_id 唯一，trace_id；delivery：attempt、target_slot | 重复投递、投到非 active 槽 |
 | egress_allowlist / egress_project_grants / egress_blocked | entry：domain、scope；grant：project＋entry；blocked：project、domain、count、last_seen | 无人知晓被阻；随意放开 |
-| alert_subscriptions / alerts | project＋type＋receiver；alert：source、type、first_seen、resolved_at | 崩溃无人知 |
+| alerts | alert：source、type、first_seen、resolved_at；alert_subscriptions 已删除（v0.3.13，D61） | 崩溃无人知 |
 | service_plans / task_profiles / task_quotas | plan：id、name、limits；quota：service → max_concurrent_tasks | 超套餐；一人耗尽集群 |
 | execution_events | trace_id、otel_trace_id、task_id、subtask_id、session_id、sequence | 失去链路来源 |
 | install_runs / migrations / audit | step、version、fencing_token、result | 并发安装、误删仓库与数据 |
@@ -388,7 +388,7 @@ APIProxy 与 EventProducer 的可运行样例分别见 [API 接入模板](../int
 | `GET /v1/services/:id/config` / `PUT …/config/:key` ；`PUT /v1/services/:id/secrets/:key` | 配置与 Secret 的键值维护，分开发与生产两组；生产组仅负责人 |
 | `GET /v1/services/:id/releases` ；`POST /v1/services/:id/traffic-switches` | 发布列表；负责人切流：目标槽与预期在线 Release；回退即再次切换 |
 | `GET /v1/services/:id/logs` / `GET /v1/task-environments/:id/logs` / `GET /v1/releases/:id/build-logs` | 按槽、任务、构建与迁移 Job 查询日志 |
-| `GET /v1/services/:id/health` ；`POST /v1/projects/:id/alert-subscriptions` | 部署健康态；项目级告警订阅 |
+| `GET /v1/services/:id/health` ；`GET /v1/projects/:id/alerts` | 部署健康态；告警记录。告警订阅接口已删除（v0.3.13，D61） |
 | `POST /v1/task-environments` | 业务服务以源 Pod 身份创建业务任务，可带 volumeMode 高级参数 |
 | `POST /v1/task-environments/:id/subtasks` / `GET …/subtasks/:subtaskId` / `POST …/subtasks/:subtaskId/cancel` / `POST …/subtasks/:subtaskId/messages` | 提交、查看、取消子任务；interactive 模式下续消息 |
 | `GET /v1/task-environments/:id/files` / `GET …/events` | 读取任务容器内文件与事件流 |
@@ -522,7 +522,7 @@ TaskRunner 只接受经 cs-session 转发、带任务归属校验的指令；文
 - **代码编辑器与文件树**：经 TaskRunner 文件接口读写；写入带预期版本，冲突时提示而不覆盖。
 - **预览与发布控制**：右侧真实预览与预览进程状态；发布按钮执行 §6 流程并显示进度；负责人可见切流与回退按钮。
 - **日志页**：按槽、开发会话、业务任务、构建与迁移 Job 查看日志与基础指标。
-- **健康与告警**：两槽健康态、最近告警、告警订阅设置（负责人）。
+- **健康与告警**：两槽健康态、最近告警与告警详情；v0.3.13 删去告警订阅设置（D61）。
 - **配置与 Secret**：开发组与生产组的键值维护，生产组仅负责人；Secret 只写不读。
 - **能力说明页**：本服务已获授权的接口、数据绑定、订阅、配额、套餐与环境地址；内容与能力说明 MCP 一致。
 - **权限化 Swagger 调试页**：按本服务授权裁剪，试调请求经开发容器发出，以本服务身份被网关识别。
@@ -672,7 +672,7 @@ prod 槽 / preview 槽 / 工作台 / 开发预览：直接读取，或验签令�
 
 | 项目关系 | 对象范围内操作 |
 |---|---|
-| 负责人 `owner` | 同时具有平台开发资格；管理成员、开发发布、切流回退、数据审批、生产配置与告警，重试失败的项目开通 |
+| 负责人 `owner` | 同时具有平台开发资格；管理成员、开发发布、切流回退、数据审批与生产配置，重试失败的项目开通 |
 | 开发成员 `developer` | 同时具有平台开发资格；开发会话、Agent、终端、编辑器、发布待命槽、开发配置与申请权限；不能切流或重试他人项目开通 |
 | 试用成员 `tester` | 可以是普通用户；访问指定应用试用版本，不获得项目开发权限 |
 
@@ -946,7 +946,6 @@ integrations:
   gitlabEventProducer: { enabled: true, webhookSecretRef: gitlab-webhook-secret }
   referenceApiProxy: { enabled: true, upstreamConnection: test-gitlab }
 logging: { mode: bundled }
-alerts: { channel: <tbd> }               # Q20
 storage: { mode: existing, blockStorageClass: company-block }
 postgres: { mode: bundled, separatePlatformAndApplications: true }
 objectStorage: { mode: external, endpoint: s3.example.com, credentialsSecretRef: s3-credentials }
@@ -1144,7 +1143,7 @@ Kubernetes 原生动作使用 UID/resourceVersion 条件；开发工作区经保
 | D41 | 非用户流量全部经网关服务域，注入来源令牌，用户令牌绑定目标服务 | 要求（S9，G3） |
 | D42 | agentProfile 与 outputContract 随 Manifest 发布登记；复制单元为驱动、注入、进程管理与共享 Schema 子集，编排新写 | 要求（S9，G4、G7） |
 | D43 | 开发会话流式交互；业务子任务 oneshot 与 interactive 两种模式；Claude 自带沙箱关闭 | 要求（S9，G5、G6） |
-| D44 | 配置与 Secret 为平台对象，分开发与生产两组，负责人维护生产组；日志聚合与日志页；健康态与告警订阅 | 要求（S9，G8、G9、G22） |
+| D44 | 配置与 Secret 为平台对象，分开发与生产两组，负责人维护生产组；日志聚合与日志页；健康态与告警。告警订阅部分**已作废**（v0.3.13，D61） | 要求（S9，G8、G9、G22）；G22 的告警订阅部分作废 |
 | D45 | preview 与 prod 为同一生产服务的蓝绿两槽，共用生产数据与身份；晋级即切流；隔离边界在开发会话与生产之间 | 要求（S9，G15） |
 | D46 | 每项目一个命名空间；管理员代建项目并指定负责人；preview 测试者 | 要求（S9，G16、G18） |
 | D47 | 套餐与副本在 Manifest 声明。出站白名单部分**已作废**（v0.3.7，RFC-018） | 要求（S9，G24）；G23 部分作废 |
@@ -1161,6 +1160,7 @@ Kubernetes 原生动作使用 UID/resourceVersion 条件；开发工作区经保
 | D58 | 启动进度由后端统一产出并保存：分段种类、起止时间与细节来自 Pod、Events 与 Runner 事件，只进不退、首尾相接，只有平台判定才记失败（Kubernetes 自己还在重试的记为警告）；工作台、CLI 与档位测试共用一个步骤条组件，失败给出重试（开发会话按失败位置，CLI 原位替换）与日志；点击创建的窗口自动取得新 CLI 的输入控制，Runner 在启动中接受取得（协议号不变） | 要求（作者 2026-09-23 批准 RFC-022 并裁定其提案 D1–D8、Q1–Q4） |
 | D59 | Agent 不再分权限档：开发会话的 CLI、历史 Agent 与业务子任务的 Agent 一律以完全权限启动，界面与启动接口不再有权限；Manifest `agentProfiles[].permission` 作废、旧值照收不用；访问生产数据只由负责人批准的 TaskDataBinding 控制 | 要求（作者 2026-09-23 当面裁定：「为什么要限制呢，都是开发容器。只有连生产库才有对生产库的权限控制才对」；业务子任务一并适用，旧写法接受并忽略） |
 | D60 | 安装与升级预检实测网络插件确实执行 NetworkPolicy：临时命名空间里放一个应答端和两个探针 Pod，套了禁止出站策略的必须连不上、没套的必须连得上，测完删除；不通过就停止，不继续安装、不迁移也不滚动。项目命名空间的出站隔离（D54）全靠 NetworkPolicy，而不执行它的网络插件照样建得出策略、只是不生效 | 要求（作者 2026-09-23 裁定；起因是本机 kind 集群自带的 kindnet 执行策略有缺陷，导致 Runner 反复掉线，见 `docs/engineering/dev-gotchas.md`「本机集群的网络插件是 Calico」） |
+| D61 | 删除项目级告警订阅与告警通知器，首版不做告警通知：告警只在工作台「运行与诊断 → 告警」查看（最近记录、按状态筛选、详情、跳到对应版本的日志），由两槽健康巡检触发、恢复健康后自动转为已恢复；告警类型只保留容器反复重启与健康检查持续失败，删去从未接通的事件投递失败、任务失败、配额耗尽三种；订阅表、三条订阅接口与项目权限 `manage-alerts` 一并删除，页签「告警与通知」改名「告警」。原订阅只记录渠道与接收人、从未投递（Q20 渠道一直未定），留着只会让人以为能收到通知 | 要求（作者 2026-09-23 当面裁定：「没用的话，就彻底删除这个功能和代码」，并选定首版不做告警通知、三种未接类型一并删除；取代 G22 的告警订阅部分。以后要做告警通知另立 RFC） |
 
 ### 15.3 待决项与退出条件
 
@@ -1185,7 +1185,7 @@ Kubernetes 原生动作使用 UID/resourceVersion 条件；开发工作区经保
 | Q17 | TaskRunner 出向连接在数百容器规模下的可靠性：租约、退避、心跳、缓冲 | T0.4 定值，T6.10 压测 |
 | Q18 | 网关放行表与 Pod 身份索引在数百服务规模下的下发与缓存失效 | 网关产品能力验证与撤权时延实测 |
 | Q19 | kind 单节点无法验证真实故障切换 | 多节点测试集群补验 HA（M6） |
-| Q20 | 告警通知渠道 | 公司 IM 或邮件接入调研后定 |
+| Q20 | 已关闭（v0.3.13，D61：首版不做告警通知，不再需要通知渠道） | tech-evaluation E25 已作废 |
 | Q21 | 所选 CNI 是否在 Pod 到网关路径保留源 IP；索引更新与缓存失效时延 | T0.5 原型与安装预检 |
 | Q22 | 两个 CLI 的流式交互模式能力与实现方式 | T0.4 验证；不可用时回退 resume 起新进程 |
 | Q23 | 已关闭（v0.3.7，RFC-018：出站白名单下线，不再需要出站代理） | tech-evaluation E23 已作废 |

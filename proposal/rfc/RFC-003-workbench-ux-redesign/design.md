@@ -148,6 +148,8 @@ detach 显示与结束进程分开。关闭浏览器、切换工具、跳转发�
 
 停止跟随只停止前端定时刷新；新日志到达时用户可选择回到底部。日志尾部数据不能伪装为全历史。告警订阅与 trace 回放使用已有 HTTP 接口补齐客户端；不新增业务任务编排界面。事件投递详情包含类型、状态、attempt、最近错误、trace、重试结果及关联订阅。
 
+> **2026-09-23 修订（作者当面裁定，直接修改＋回填，不另立 RFC）。** 告警订阅已删除（基线 v0.3.13，Design D61）：首版不做告警通知，告警页只保留告警记录与详情；「告警与通知」页签改名「告警」。
+
 死信重放的项目授权在锁外完成，随后在 events 的既有事务中按投递 ID 锁行重读、转换状态并入队（`modules/events/application/replayDelivery.ts:13`、`modules/events/adapters/persistence/drizzleDeliveryRepositories.ts:32`）。事务 scope 的点查持有锁，普通查询保持快照读取；并发或迟到请求读取到 pending／delivered 后返回原 precondition，不覆盖状态。入队适配器检查去重回执（`modules/events/adapters/queue/queueDeliveryScheduler.ts:17`）；旧队列任务尚未收尾时返回 412 并回滚完整死信记录，收尾后可再次重放。重放受理状态为 pending，实际 delivered 由 worker 持久化；队列公共语义和数据库结构沿用既有实现。真实数据库、HTTP 订阅者及 worker 回归覆盖并发、迟到成功、队列收尾与恢复。
 
 日志时间取 Kubernetes `timestamps=true` 返回的容器时间，按毫秒规范化；只剥离有效 ISO 时间前缀，正文日期、数字和缩进保留。时间缺失或非法时 `ts` 缺省，界面显示“时间未知”，不以查询时间代填；这些记录保持读取顺序并排在已知时间之后。默认 Pod 日志没有逐行 stdout／stderr 来源，`stream=combined` 如实表达，正文未指明级别时显示中性 LOG；原 stdout／stderr 记录继续兼容。已有 Pod 的日志读取失败返回错误，不能静默跳过并呈现为空或完整结果。仍沿用现有标签范围与有界尾部，不扩大日志保留承诺。

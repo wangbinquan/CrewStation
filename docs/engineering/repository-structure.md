@@ -204,7 +204,7 @@ modules/<name>/
 | L5 | `session` | TaskRunner 出向连接与浏览器流的中枢：租约、游标、重连、帧路由 | task-runtime |
 | L5 | `gateway` | 用户域与服务域路由表、放行表、Pod 身份索引的生成、版本与下发 | identity、project、release、api-catalog |
 | L6 | `cluster-management` | 受管 K8s 快照、归属/用途、管理员检查与持久运维操作（ADR-0006）；副本/任务期望值仍归原模块 | project、task-runtime、release、dev-session、business-task、agent-runtime（仅注入端口） |
-| L6 | `observability` | 日志采集入口与查询、部署健康态、告警订阅、execution_events、traceId 索引 | project、task-runtime、release（只读端口） |
+| L6 | `observability` | 日志采集入口与查询、部署健康态与告警记录、execution_events、traceId 索引 | project、task-runtime、release（只读端口） |
 | L6 | `capabilities` | 能力说明聚合：本服务授权、绑定、订阅、配额、套餐、约定表 | 多个模块的公开查询 |
 | L6 | `provisioning` | 项目开通编排：命名空间→仓库→数据→路由→首个标签发布→active；失败留原因可重跑（ADR-0003） | project、scm、data、gateway、release |
 | L7 | `platform` | 组合根：按端口装配全部模块，按进程角色挑选 http 路由、后台工作器与事件订阅（ADR-0003） | 全部模块 |
