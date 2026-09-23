@@ -34,6 +34,7 @@
 - [I23. 两个内置接入项目的仓库 manifest 仍是 v1，发不出新版本](#i23-两个内置接入项目的仓库-manifest-仍是-v1发不出新版本)
 - [I24. 资源推送流：成员变化后怎样断开已开的流](#i24-资源推送流成员变化后怎样断开已开的流)
 - [I25. 调和器接手建任务容器时，凭据放在哪](#i25-调和器接手建任务容器时凭据放在哪)
+- [I26. 说明页：错误体与 RFC-021 不一致，去掉 `allowEmptyServices` 会让「暂时没有端点」变成裸 404](#i26-说明页错误体与-rfc-021-不一致去掉-allowemptyservices-会让暂时没有端点变成裸-404)
 
 ## I1. 操作 MCP 的「以本服务身份调用内部 API」用的是谁的身份
 
@@ -371,4 +372,14 @@ spec.env.0.configDefinitionId / spec.env.1.configDefinitionId: expected string, 
 **第二期的实施（2026-09-23，待裁定）**：建与删分开移交——回收、失败保留期满的回收、孤儿回收先交给调和器（删除不需要凭据）；创建与重建仍由 task-runtime 执行（它的 K8s 适配器暂时保留），等本条裁定后再移交。
 
 **可选做法**：(a) 期望里放密文：所属模块用平台密钥（`packages/secretbox`，身份、算力档位、数据模块已在用）加密后写进期望，调和器渲染 Secret 时解密；台账里只有密文。(b) 渲染时回调：调和器建 Secret 之前经端口向所属模块要值（组合根接上 task-runtime 的用例），值不落库；Runner 令牌在这一步签发、只存哈希。(c) Secret 仍由所属模块自己建（设计 §9「领域模块不再直接调 Kubernetes」的唯一例外），期望只写 Secret 名，调和器只建 Pod、Service、路由等不含凭据的对象。
+
+## I26. 说明页：错误体与 RFC-021 不一致，去掉 `allowEmptyServices` 会让「暂时没有端点」变成裸 404
+
+**现状**：RFC-025 设计 §7.1–§7.2 让槽「已结束」时路由改指 cs-api 的说明页（`GET /_crewstation/unavailable/:routeId`），接口请求得到 503 与 `{ error: 'not_deployed', message, reason }`，并去掉 Traefik 的 `allowEmptyServices`。今天 RFC-021 已经在 ForwardAuth 里给待验证主机渲染「未部署」页：cs-auth 按 `standbyEntry` 判定待命槽为空时返回 503，浏览器得到页面，接口得到 `{ error: 'not-deployed', message, details }`（`modules/identity/http/forwardAuthRoutes.ts`）；这要求没有端点的路由仍保留，所以才开了 `allowEmptyServices`。
+
+**为什么是问题**：一是错误体：设计写的 `not_deployed`＋`reason` 与已上线的 `not-deployed`＋`details` 不同，两条路径并存时同一种情况会给出两种错误码；按 C4，依赖它判断「未部署」的脚本会受影响。二是 `allowEmptyServices`：说明页只覆盖「已结束」（已下线、尚未部署），而部署中、部署失败、容器反复重启、调和器还没改写路由的那几秒，槽的 Service 同样没有就绪端点——去掉这个开关后，这些时候 Traefik 丢掉整条路由、回裸 404，ForwardAuth 不执行（RFC-021 实机撞过，`deploy/k8s/system/gatewayManifest.test.ts`）；保留时是 Traefik 的纯文本 503。
+
+**可选做法**：(a) 错误体沿用 RFC-021 的 `not-deployed`＋`details`（`details.reason` 放下线原因），说明页由 cs-api 按台账渲染、ForwardAuth 的未部署分支退役；`allowEmptyServices` 保留作兜底，只在槽运行中之外的阶段都改指说明页之后再议。(b) 照设计原文：`not_deployed`＋`reason`，去掉 `allowEmptyServices`，说明页另覆盖部署中、失败等阶段（「正在部署」「部署未能就绪」），剩下的几秒窗口接受 404。(c) 说明页仍由 ForwardAuth 出（现状），只把判定的数据源换成台账里的槽记录，并补上正式主机首次上线前的「尚未上线」；路由不改指、开关保留。
+
+**实施（2026-09-24）**：先做与本条无关的部分（路由的建与改移交调和器、同 Host 唯一、开发预览路由、身份索引）；说明页与开关等本条裁定。
 

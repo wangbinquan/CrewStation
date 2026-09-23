@@ -1,6 +1,7 @@
 import type { Clock, Logger } from '@crewstation/kernel';
 import type { ObservedObject } from '../domain/observation';
 import { controllerOf, crashLoopingOf } from '../domain/observation';
+import { routeRenderOf } from '../domain/routeRender';
 import type { ClusterWriter, ManagedObjectFeed, ObservedKind } from '../ports/cluster';
 import type { LedgerObservations, LedgerRecordView } from '../ports/ledger';
 import type { ObservationStats } from './observeChange';
@@ -110,7 +111,25 @@ async function observeControlledPods(deps: ReconcileDeps, record: LedgerRecordVi
 }
 
 /**
- * 调和一条记录：先按期望补观测；「不要了」的删子对象；工作卷看上级是否已结束。上级进入「已结束」时把挂在它下面的记录
+ * 路由（第三期后半，设计 §7.1）：期望在、IngressRoute 缺了或与期望不一致时按期望 apply——网关写期望，调和器应用。
+ * 删除中的等它消失再建；系统命名空间不碰；期望不完整的不渲染，只告警。
+ */
+async function applyRoute(deps: ReconcileDeps, record: LedgerRecordView): Promise<void> {
+  const route = routeRenderOf(record.spec);
+  if (!route) {
+    deps.logger.warn('resource route spec incomplete', { resourceId: record.id });
+    return;
+  }
+  if (route.namespace === deps.systemNamespace) return;
+  const current = deps.feed.cached('IngressRoute', route.namespace, route.name);
+  if (current?.metadata.deletionTimestamp) return;
+  if ((await deps.cluster.applyRoute(route, current)) !== 'applied') return;
+  deps.stats.applied += 1;
+  deps.logger.info('resource child applied', { resourceId: record.id, kind: 'IngressRoute', namespace: route.namespace, name: route.name, reason: current ? 'drift' : 'missing' });
+}
+
+/**
+ * 调和一条记录：先按期望补观测；路由按期望应用；「不要了」的删子对象；工作卷看上级是否已结束。上级进入「已结束」时把挂在它下面的记录
  * 重新排进队列（工作卷的「待回收」要在这之后判定）。只在观测缓存同步完成后调用。
  */
 export async function reconcileRecord(deps: ReconcileDeps, id: string, enqueue: Enqueue): Promise<void> {
@@ -118,6 +137,7 @@ export async function reconcileRecord(deps: ReconcileDeps, id: string, enqueue: 
   if (!record) return;
   await observeRecord(deps, record);
   await observeControlledPods(deps, record, enqueue);
+  if (record.kind === 'route' && record.desired === 'present') await applyRoute(deps, record);
   if (record.desired === 'absent') await removeChildren(deps, record);
   await settleVolume(deps, record);
   if (record.kind !== 'volume' && record.desired === 'absent' && record.phase === 'stopped') {

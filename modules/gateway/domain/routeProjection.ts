@@ -11,19 +11,35 @@ export interface RoutedService {
   readonly namespace: string;
 }
 
-/** 一条路由的期望（RFC-025 第三期后半）：Host、可选的路径前缀、目标 Service、中间件链；子对象是它的 IngressRoute。 */
+/**
+ * 一条路由的期望（RFC-025 第三期后半）：Host、可选的路径前缀、目标 Service、中间件链；子对象是它的 IngressRoute。
+ * 调和器照它渲染 IngressRoute（cluster-control 的 routeRender），所以写全：所属服务名、前缀路由的优先级、中间件的命名空间。
+ */
 export interface RouteDeclaration {
   readonly kind: 'route';
   readonly ref: string;
   readonly projectId: ProjectId;
   readonly spec: {
     readonly children: readonly { readonly kind: 'IngressRoute'; readonly namespace: string; readonly name: string }[];
+    /** 所属服务名（IngressRoute 的服务标签）。 */
+    readonly service: string;
     readonly host: string;
     readonly pathPrefix?: string;
+    readonly priority?: number;
     readonly target: { readonly namespace: string; readonly service: string; readonly port: number };
-    readonly middlewares: readonly string[];
+    /** 中间件链（按顺序）；平台的系统中间件带系统命名空间，跨命名空间引用。 */
+    readonly middlewares: readonly { readonly name: string; readonly namespace?: string }[];
   };
   readonly display: Readonly<Record<string, string>>;
+}
+
+/** 带路径前缀的路由（`/api/<proxy>`）排在同 Host 的整站路由之前。 */
+export const PREFIX_ROUTE_PRIORITY = 100;
+
+/** 平台的系统中间件（去身份头、两种 ForwardAuth）：名字与所在的系统命名空间。 */
+export interface SystemMiddlewares {
+  readonly names: ReadonlySet<string>;
+  readonly namespace: string;
 }
 
 /**
@@ -34,14 +50,15 @@ export const routeRef = (serviceId: string, kind: RouteEntry['kind'], nth = 1): 
 
 /**
  * 一条路由投影进资源台账（RFC-025 第三期后半）：一条 `route` 记录，子对象是它的 IngressRoute，
- * 期望里带 Host、路径前缀、目标与中间件链，展示字段是种类、Host、路径前缀与目标。IngressRoute 仍由 gateway 建删。
+ * 期望里带 Host、路径前缀、目标与中间件链，展示字段是种类、Host、路径前缀与目标。调和器照期望应用 IngressRoute。
  */
-export function projectRoute(service: RoutedService, route: RouteEntry, ref: string): RouteDeclaration {
+export function projectRoute(service: RoutedService, route: RouteEntry, ref: string, system: SystemMiddlewares): RouteDeclaration {
   return {
     kind: 'route', ref, projectId: service.projectId,
     spec: {
       children: [{ kind: 'IngressRoute', namespace: service.namespace, name: routeObjectName(service.serviceName, route.kind) }],
-      host: route.host, ...(route.pathPrefix ? { pathPrefix: route.pathPrefix } : {}), target: route.target, middlewares: route.middlewares,
+      service: service.serviceName, host: route.host, ...(route.pathPrefix ? { pathPrefix: route.pathPrefix, priority: PREFIX_ROUTE_PRIORITY } : {}), target: route.target,
+      middlewares: route.middlewares.map((name) => (system.names.has(name) ? { name, namespace: system.namespace } : { name })),
     },
     display: { role: route.kind, host: route.host, ...(route.pathPrefix ? { pathPrefix: route.pathPrefix } : {}), target: `${route.target.namespace}/${route.target.service}` },
   };

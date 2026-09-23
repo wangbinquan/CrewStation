@@ -56,7 +56,7 @@ describe.skipIf(!available)('孤儿回收（RFC-025 设计 §6.4、D8）', () =>
   afterAll(async () => { await database.drop(); });
 
   const deps = () => ({
-    feed, ledger, cluster: { remove: async (target: { kind: string; name: string }) => { removed.push(`${target.kind}/${target.name}`); } }, clock: { now: () => now }, logger: noopLogger, stats: newObservationStats(), minAgeMs: 600_000,
+    feed, ledger, cluster: { remove: async (target: { kind: string; name: string }) => { removed.push(`${target.kind}/${target.name}`); }, applyRoute: async () => 'unchanged' as const }, clock: { now: () => now }, logger: noopLogger, stats: newObservationStats(), minAgeMs: 600_000,
     legacy: { resolveTaskId: async (legacyId: string) => (legacyId === 'tsk_legacy_live' ? LIVE : undefined), task: async (taskId: string) => tasks.get(taskId) },
   });
 

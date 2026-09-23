@@ -14,10 +14,12 @@ export interface ObservationStats {
   removed: number;
   /** 上级已结束、写上「待回收」的工作卷。 */
   reclaimable: number;
+  /** 按期望建出或改回的子对象（第三期后半：路由）。 */
+  applied: number;
 }
 
 export function newObservationStats(): ObservationStats {
-  return { recorded: 0, unchanged: 0, unowned: 0, platform: 0, removed: 0, reclaimable: 0 };
+  return { recorded: 0, unchanged: 0, unowned: 0, platform: 0, removed: 0, reclaimable: 0, applied: 0 };
 }
 
 function childOf(kind: ObjectChange['kind'], object: ObjectChange['object'], observedAt: string) {

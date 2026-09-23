@@ -9,6 +9,7 @@ import type { ResourcesModule } from '@crewstation/module-resources';
 import { createResourcesModule, resourcesMigrations } from '@crewstation/module-resources';
 import type { TestDatabase } from '@crewstation/testkit';
 import { createTestDatabase, testDatabaseAvailable } from '@crewstation/testkit';
+import { kubernetesClusterWriter } from '../adapters/k8s/managedObjects';
 import { newObservationStats } from '../application/observeChange';
 import { reconcileRecord } from '../application/reconcileObservations';
 import type { LegacyTask } from '../domain/adoption';
@@ -54,14 +55,23 @@ describe.skipIf(!available)('cluster-control：观测写回台账与收编空跑
   ]);
   const k8s: FakeK8sClient = createFakeK8sClient();
   const feed = manualFeed();
-  // 调和器的删除：按 UID 删假集群里的对象，并像真实观测缓存那样随即报一次消失。
-  const removals: string[] = [];
+  // 调和器的删除：按 UID 删假集群里的对象，并像真实观测缓存那样随即报一次消失。路由的应用用真实适配器落到假集群，写了就报一次变化。
+  const removals: string[] = [], routeApplies: string[] = [];
+  const writer = kubernetesClusterWriter(k8s);
   const cluster: ClusterWriter = {
     remove: async ({ kind, namespace, name, uid }) => {
       removals.push(`${kind}/${name}`);
       await k8s.delete(Resources[kind]!, name, namespace, { preconditions: { uid } });
       const cached = feed.cache.get(`${kind}/${namespace ?? ''}/${name}`);
       if (cached?.metadata.uid === uid) await feed.emit({ kind, object: cached, gone: true });
+    },
+    applyRoute: async (route, current) => {
+      const outcome = await writer.applyRoute(route, current);
+      if (outcome !== 'applied') return outcome;
+      routeApplies.push(`${current ? 'drift' : 'missing'}:${route.name}`);
+      const stored = await k8s.get<K8sObject>(Resources.IngressRoute!, route.name, route.namespace);
+      if (stored) await feed.emit({ kind: 'IngressRoute', object: stored, gone: false });
+      return outcome;
     },
   };
   let control: ReturnType<typeof createClusterControlModule>;
@@ -253,6 +263,42 @@ describe.skipIf(!available)('cluster-control：观测写回台账与收编空跑
     await control.reconciled();
     expect(await resources.api.get(record.id)).toMatchObject({ phase: 'stopped', desired: 'present', reason: { code: 'completed' } });
     expect((await resources.api.get(record.id))?.children.map((entry) => `${entry.kind}/${entry.phase}`)).toEqual(['Job/absent']);
+  });
+
+  // RFC-025 第三期后半：路由的建与改由调和器按期望应用（设计 §7.1：网关写期望、调和器应用）。
+  test('路由：IngressRoute 缺了按期望建出，被人改了改回，与期望一致不写；期望不完整、系统命名空间的不碰；不要了的删掉', async () => {
+    type Route = K8sObject & { spec: { entryPoints?: string[]; routes: Array<Record<string, unknown>> } };
+    const gateway = resources.api.owner('gateway');
+    const chain = [{ name: 'drop-identity-headers', namespace: 'crewstation-system' }, { name: 'forward-auth-user', namespace: 'crewstation-system' }];
+    const spec = (name: string, namespace = 'cs-demo', extra: Record<string, unknown> = {}) => ({
+      children: [{ kind: 'IngressRoute', namespace, name }], service: 'shop', host: `${name}.cs.localhost`, target: { namespace: 'cs-demo', service: 'shop-blue', port: 80 }, middlewares: chain, ...extra,
+    });
+    const record = await gateway.declare({ kind: 'route', ref: 'svc-shop/prod', projectId: PROJECT, spec: spec('shop-prod') });
+    await until('路由运行中', async () => (await resources.api.get(record.id))?.phase === 'ready');
+    const created = await k8s.get<Route>(Resources.IngressRoute!, 'shop-prod', 'cs-demo');
+    expect(created?.spec).toEqual({ entryPoints: ['web'], routes: [{ match: 'Host(`shop-prod.cs.localhost`)', kind: 'Rule', services: [{ name: 'shop-blue', port: 80, namespace: 'cs-demo' }], middlewares: chain }] });
+    expect(created?.metadata.labels).toEqual({ 'app.kubernetes.io/managed-by': 'crewstation', 'crewstation.io/service': 'shop', 'app.kubernetes.io/component': 'route' });
+    // 与期望一致：展示字段变了、再核对几轮也不写。
+    await gateway.declare({ kind: 'route', ref: 'svc-shop/prod', projectId: PROJECT, spec: spec('shop-prod'), display: { role: 'prod' } });
+    await control.reconciled();
+    expect(routeApplies).toEqual(['missing:shop-prod']);
+    // 被人改了目标（generation 随之加一，观测变了）：改回。
+    const drifted: Route = { ...created!, metadata: { ...created!.metadata, generation: 2 }, spec: { ...created!.spec, routes: [{ ...created!.spec.routes[0], services: [{ name: 'shop-green', port: 80, namespace: 'cs-demo' }] }] } };
+    await k8s.apply(drifted);
+    await feed.emit({ kind: 'IngressRoute', object: drifted, gone: false });
+    await until('改回', () => routeApplies.length === 2);
+    expect(routeApplies[1]).toBe('drift:shop-prod');
+    expect((await k8s.get<Route>(Resources.IngressRoute!, 'shop-prod', 'cs-demo'))?.spec.routes[0]?.['services']).toEqual([{ name: 'shop-blue', port: 80, namespace: 'cs-demo' }]);
+    // 期望不完整、在系统命名空间：不渲染。
+    await gateway.declare({ kind: 'route', ref: 'svc-shop/broken', projectId: PROJECT, spec: spec('shop-broken', 'cs-demo', { target: { namespace: 'cs-demo' } }) });
+    await gateway.declare({ kind: 'route', ref: 'svc-shop/system', projectId: PROJECT, spec: spec('shop-system', 'crewstation-system') });
+    await control.reconciled();
+    expect(routeApplies).toHaveLength(2);
+    // 不要了：IngressRoute 删掉，记录进入已结束。
+    await gateway.requestRelease(record.id, { code: 'route-retired', message: '不再需要这条路由' });
+    await until('路由删掉', async () => (await resources.api.get(record.id))?.phase === 'stopped');
+    expect(removals).toContain('IngressRoute/shop-prod');
+    expect(routeApplies).toHaveLength(2);
   });
 
   test('崩溃重启的到期复核：成立时按最近一次退出满 10 分钟约下一次核对，到时不再重启就撤掉', async () => {

@@ -216,15 +216,16 @@ describe.skipIf(!available)('gateway module', () => {
     expect((await repo.listActive()).map((p) => p.podName)).toEqual(['demo-blue-new']);
   });
 
-  // RFC-025 第三期后半：服务的路由投影成 route 记录（IngressRoute 仍由 gateway 建删）；补投影按网关自己存的路由表；归档的标「不要了」。
-  test('路由投影进资源台账：每条一条记录，同样的期望重复声明无妨；补投影把已有路由写进台账；归档的服务的记录标「不要了」；台账写失败只告警', async () => {
-    const records = new Map<string, { id: string; desired: 'present' | 'absent'; host: string; target: string }>(), releases: string[] = [], warnings: string[] = [];
+  // RFC-025 第三期后半：服务的路由写成 route 记录，IngressRoute 由调和器照记录应用（gateway 只建前缀剥离中间件）；补投影按网关自己存的路由表；归档的标「不要了」。
+  test('路由写进资源台账：每条一条记录、期望写全；配了台账不直接建 IngressRoute；补投影追上漏写的；归档的标「不要了」；台账写失败时重算报错、补投影只告警', async () => {
+    type Spec = { readonly host: string; readonly middlewares: readonly { readonly name: string; readonly namespace?: string }[]; readonly priority?: number };
+    const records = new Map<string, { id: string; desired: 'present' | 'absent'; spec: Spec; target: string }>(), releases: string[] = [], warnings: string[] = [];
     let failing = false;
     const ledger = {
-      declare: async (input: { ref: string; spec: { host: string }; display: Readonly<Record<string, string>> }) => {
+      declare: async (input: { ref: string; spec: Spec; display: Readonly<Record<string, string>> }) => {
         if (failing) throw new Error('台账暂时不可用');
         const id = records.get(input.ref)?.id ?? `rec-${records.size + 1}`;
-        records.set(input.ref, { id, desired: 'present', host: input.spec.host, target: input.display['target']! });
+        records.set(input.ref, { id, desired: 'present', spec: input.spec, target: input.display['target']! });
         return { id };
       },
       find: async (ref: string) => records.get(ref),
@@ -232,29 +233,40 @@ describe.skipIf(!available)('gateway module', () => {
     };
     const logger = { debug: () => undefined, info: () => undefined, warn: (msg: string) => { warnings.push(msg); }, error: () => undefined, child: () => logger };
     const withLedger = newGateway({ ledger, logger });
+    const applied = k8s.applied.length;
     await withLedger.api.reconcileService(issuesId);
-    expect([...records.entries()].map(([ref, r]) => [ref.split('/')[1], r.host, r.target]).sort()).toEqual([
+    expect([...records.entries()].map(([ref, r]) => [ref.split('/')[1], r.spec.host, r.target]).sort()).toEqual([
       ['internal-api', 'api.svc.cs.internal', 'cs-issues/issues-green'], ['preview', 'preview.issues.cs.localhost', 'cs-issues/issues-blue'],
       ['prod', 'issues.cs.localhost', 'cs-issues/issues-green'], ['service', 'issues.svc.cs.internal', 'cs-issues/issues-green'],
     ]);
-    // 补投影：台账接上之前就有的路由（这里清空假台账来模拟）照网关自己存的路由表投影，不重新 apply。
+    expect(records.get(`${issuesId}/internal-api`)?.spec).toMatchObject({ priority: 100, middlewares: [
+      { name: 'drop-identity-headers', namespace: 'crewstation-system' }, { name: 'forward-auth-service', namespace: 'crewstation-system' }, { name: 'strip-api-issues' },
+    ] });
+    // gateway 只建路由引用的前缀剥离中间件；IngressRoute 由调和器照记录应用。
+    expect(k8s.applied.slice(applied).map((o) => `${o.kind}/${o.metadata.name}`)).toEqual(['Middleware/strip-api-issues']);
+    // 补投影：台账接上之前就有的路由（这里清空假台账来模拟）照网关自己存的路由表声明，不碰集群。
     records.clear();
-    const applied = k8s.applied.length;
+    const before = k8s.applied.length;
     expect(await withLedger.api.resyncRouteLedger()).toBeGreaterThanOrEqual(1);
     expect([...records.keys()].filter((ref) => ref.startsWith(issuesId))).toHaveLength(4);
-    expect(k8s.applied.length).toBe(applied);
-    // 归档：路由删掉，记录标「不要了」。
+    expect(k8s.applied.length).toBe(before);
+    // 归档：记录标「不要了」（IngressRoute 由调和器删），gateway 不直接删。
+    const deletedBefore = k8s.deleted.length;
     await withLedger.api.removeService(issuesId);
     expect([...records.entries()].filter(([ref]) => ref.startsWith(issuesId)).every(([, r]) => r.desired === 'absent')).toBe(true);
     expect(releases).toHaveLength(4);
+    expect(k8s.deleted.length).toBe(deletedBefore);
     // 摘掉之后又出现（这里是同一服务再次计划路由）：已释放的记录不能重新声明，顺延到 ~2 各建一条新记录。
     await withLedger.api.reconcileService(issuesId);
     expect([...records.entries()].filter(([ref, r]) => ref.startsWith(issuesId) && r.desired === 'present').map(([ref]) => ref.split('/')[1]).sort())
       .toEqual(['internal-api~2', 'preview~2', 'prod~2', 'service~2']);
     await withLedger.api.reconcileService(issuesId);
     expect([...records.keys()].filter((ref) => ref.startsWith(issuesId))).toHaveLength(8);
+    // 台账写失败：重算报错（事件会重投），补投影逐个服务告警、不中断。
     failing = true;
-    await withLedger.api.reconcileService(demoId);
+    await expect(withLedger.api.reconcileService(demoId)).rejects.toThrow('台账暂时不可用');
+    // 归档服务的空计划不必写台账，照常算成功；其余的逐个告警。
+    expect(await withLedger.api.resyncRouteLedger()).toBeLessThan((await withLedger.api.listRoutes()).length);
     expect(warnings).toContain('resource ledger route projection failed');
   });
 });

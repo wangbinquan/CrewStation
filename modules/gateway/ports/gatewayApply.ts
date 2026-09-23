@@ -4,6 +4,8 @@ import type { RouteEntry } from '@crewstation/contracts';
 export interface GatewayApplier {
   applyRoutes(serviceName: string, namespace: string, routes: RouteEntry[]): Promise<void>;
   removeRoutes(serviceName: string, namespace: string): Promise<void>;
+  /** 配了资源台账时（RFC-025 第三期后半）：IngressRoute 由调和器照路由记录应用，这里只建路由引用的前缀剥离中间件。 */
+  applyMiddlewares(namespace: string, routes: RouteEntry[]): Promise<void>;
 }
 
 export interface GatewaySettings {

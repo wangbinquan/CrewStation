@@ -197,12 +197,15 @@ export function crashLoopingOf(pods: readonly ObservedObject[], now: Date): { re
   };
 }
 
-/** Pod、PVC 以外的子对象（Runner Secret、预览 Service 与路由）：在即就绪；删除中的记 Terminating、不算就绪。 */
+/**
+ * Pod、PVC 以外的子对象（Runner Secret、预览 Service 与路由）：在即就绪；删除中的记 Terminating、不算就绪。
+ * 带上 `generation`：对象被人改了 spec，观测就变了，调和器随即按期望核对（路由由调和器应用，第三期后半）。
+ */
 export function presentChild(obj: ObservedObject, observedAt: string): ResourceChild {
   const deleting = Boolean(obj.metadata.deletionTimestamp);
   return {
     kind: obj.kind, ...(obj.metadata.namespace ? { namespace: obj.metadata.namespace } : {}), name: obj.metadata.name, ...(obj.metadata.uid ? { uid: obj.metadata.uid } : {}),
-    phase: deleting ? 'Terminating' : 'Present', ready: !deleting, observedAt,
+    phase: deleting ? 'Terminating' : 'Present', ready: !deleting, ...(obj.metadata.generation !== undefined ? { generation: obj.metadata.generation } : {}), observedAt,
   };
 }
 

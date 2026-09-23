@@ -1,5 +1,5 @@
 import type { RouteEntry, ServiceId } from '@crewstation/contracts';
-import type { RoutedService } from '../domain/routeProjection';
+import type { RoutedService, SystemMiddlewares } from '../domain/routeProjection';
 import { projectRoute, routeRef, SERVICE_ROUTE_KINDS } from '../domain/routeProjection';
 import { planServiceRoutes } from '../domain/routePlan';
 import type { RouteLedger } from '../ports/ledger';
@@ -20,21 +20,15 @@ async function currentRoute(ledger: RouteLedger, serviceId: string, kind: RouteE
 }
 
 /**
- * 路由投影进资源台账（RFC-025 第三期后半）：计划里的每条声明到它眼下那条记录（同样的期望台账不写库），不在计划里的几种标「不要了」。
- * 台账写失败只告警，不挡路由生效；漏掉的由补投影追上。
+ * 路由写进资源台账（RFC-025 第三期后半）：计划里的每条声明到它眼下那条记录（同样的期望台账不写库），不在计划里的几种标「不要了」；
+ * 调和器照记录应用与删除 IngressRoute。写失败向上抛：事件会重投，补投影也会追上。
  */
-export async function syncRouteLedger(deps: Pick<GatewayUseCaseDeps, 'ledger' | 'logger'>, service: RoutedService, routes: readonly RouteEntry[]): Promise<void> {
-  const ledger = deps.ledger;
-  if (!ledger) return;
-  try {
-    for (const route of routes) await ledger.declare(projectRoute(service, route, (await currentRoute(ledger, service.serviceId, route.kind)).ref));
-    const planned = new Set(routes.map((route) => route.kind));
-    for (const kind of SERVICE_ROUTE_KINDS.filter((entry) => !planned.has(entry))) {
-      const { record } = await currentRoute(ledger, service.serviceId, kind);
-      if (record) await ledger.requestRelease(record.id, RETIRED);
-    }
-  } catch (error) {
-    deps.logger.warn('resource ledger route projection failed', { serviceId: service.serviceId, error: error instanceof Error ? error.message : String(error) });
+export async function declareRoutes(ledger: RouteLedger, system: SystemMiddlewares, service: RoutedService, routes: readonly RouteEntry[]): Promise<void> {
+  for (const route of routes) await ledger.declare(projectRoute(service, route, (await currentRoute(ledger, service.serviceId, route.kind)).ref, system));
+  const planned = new Set(routes.map((route) => route.kind));
+  for (const kind of SERVICE_ROUTE_KINDS.filter((entry) => !planned.has(entry))) {
+    const { record } = await currentRoute(ledger, service.serviceId, kind);
+    if (record) await ledger.requestRelease(record.id, RETIRED);
   }
 }
 
@@ -46,6 +40,7 @@ export function routeUseCases(deps: GatewayUseCaseDeps) {
     serviceAuthMiddleware: deps.settings.serviceAuthMiddleware,
     dropIdentityHeadersMiddleware: deps.settings.dropIdentityHeadersMiddleware,
   };
+  const system: SystemMiddlewares = { names: new Set([names.userAuthMiddleware, names.serviceAuthMiddleware, names.dropIdentityHeadersMiddleware]), namespace: names.systemNamespace };
   const reconcileService = async (serviceId: ServiceId): Promise<RouteEntry[]> => {
     const svc = await deps.services.getService(serviceId);
     // 已归档的服务解析得到、但不再生成路由：解析范围放宽是为了删得掉它，不是为了让它复活。
@@ -58,9 +53,11 @@ export function routeUseCases(deps: GatewayUseCaseDeps) {
       hosts: { prod: deps.hosts.prodHost(svc.projectSlug), preview: deps.hosts.previewHost(svc.projectSlug), service: deps.hosts.serviceHost(svc.serviceName) },
       ...(proxyName ? { proxyName } : {}), platformApiHost: deps.hosts.platformApiHost(),
     }, names);
-    await deps.applier.applyRoutes(svc.serviceName, svc.namespace, routes);
+    // RFC-025 第三期后半：配了资源台账时 IngressRoute 由调和器照路由记录应用，这里只写期望（和它们引用的前缀剥离中间件）。
+    if (deps.ledger) await deps.applier.applyMiddlewares(svc.namespace, routes);
+    else await deps.applier.applyRoutes(svc.serviceName, svc.namespace, routes);
     await deps.routes.saveForService(svc.serviceId, svc.serviceName, routes);
-    await syncRouteLedger(deps, svc, routes);
+    if (deps.ledger) await declareRoutes(deps.ledger, system, svc, routes);
     deps.logger.info('routes reconciled', { service: svc.identity, routes: routes.length });
     return routes;
   };
@@ -74,22 +71,27 @@ export function routeUseCases(deps: GatewayUseCaseDeps) {
     removeService: async (serviceId: ServiceId): Promise<void> => {
       const svc = await deps.services.getService(serviceId);
       if (!svc) return;
-      await deps.applier.removeRoutes(svc.serviceName, svc.namespace);
+      if (!deps.ledger) await deps.applier.removeRoutes(svc.serviceName, svc.namespace);
       await deps.routes.saveForService(svc.serviceId, svc.serviceName, []);
-      await syncRouteLedger(deps, svc, []);
+      if (deps.ledger) await declareRoutes(deps.ledger, system, svc, []);
     },
     /**
-     * 路由的台账补投影（RFC-025 第三期后半）：按网关自己存的路由表逐个服务再投影一次，部署时已有的路由由它第一次写进台账。
-     * 不重新 apply IngressRoute；归档的服务照空计划投影（它的记录标「不要了」）。
+     * 路由的台账补投影（RFC-025 第三期后半）：按网关自己存的路由表逐个服务再声明一次，漏写的（台账暂时不可用）由它追上；
+     * 归档的服务照空计划声明（它的记录标「不要了」）。一个服务失败只告警，不挡其余。
      */
     resyncRouteLedger: async (): Promise<number> => {
-      if (!deps.ledger) return 0;
+      const ledger = deps.ledger;
+      if (!ledger) return 0;
       let synced = 0;
       for (const entry of await deps.routes.listAll()) {
         const svc = await deps.services.getService(entry.serviceId as ServiceId);
         if (!svc) continue;
-        await syncRouteLedger(deps, svc, svc.archived ? [] : entry.routes);
-        synced += 1;
+        try {
+          await declareRoutes(ledger, system, svc, svc.archived ? [] : entry.routes);
+          synced += 1;
+        } catch (error) {
+          deps.logger.warn('resource ledger route projection failed', { serviceId: svc.serviceId, error: error instanceof Error ? error.message : String(error) });
+        }
       }
       return synced;
     },

@@ -86,6 +86,8 @@ describe('Pod 与 PVC 的观测映射（RFC-025 设计 §6.2）', () => {
   test('Runner Secret、预览 Service 与路由：在即就绪，删除中记 Terminating', () => {
     const route: ObservedObject = { kind: 'IngressRoute', metadata: { name: 'task-1', namespace: 'cs-demo', uid: 'u-route' } };
     expect(presentChild(route, '2026-09-23T12:00:00.000Z')).toEqual({ kind: 'IngressRoute', namespace: 'cs-demo', name: 'task-1', uid: 'u-route', phase: 'Present', ready: true, observedAt: '2026-09-23T12:00:00.000Z' });
+    // 路由被人改了 spec：generation 进观测，调和器随即核对。
+    expect(presentChild({ ...route, metadata: { ...route.metadata, generation: 4 } }, '2026-09-23T12:00:00.000Z')).toMatchObject({ phase: 'Present', generation: 4 });
     expect(presentChild({ ...route, metadata: { ...route.metadata, deletionTimestamp: '2026-09-23T12:00:00Z' } }, '2026-09-23T12:00:01.000Z')).toMatchObject({ phase: 'Terminating', ready: false });
   });
 

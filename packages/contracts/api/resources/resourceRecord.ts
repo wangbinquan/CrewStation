@@ -51,6 +51,8 @@ export const ResourceChildSchema = z.object({
   /** Deployment 的期望副本数与就绪副本数（服务槽，旧健康接口据此推导）。 */
   replicas: z.number().int().nonnegative().optional(),
   readyReplicas: z.number().int().nonnegative().optional(),
+  /** 对象的 `metadata.generation`（spec 一改就加一）：调和器照期望渲染的对象（路由）被人改动时，观测随之变化、调和器随即核对。 */
+  generation: z.number().int().nonnegative().optional(),
   observedAt: z.iso.datetime().optional(),
 }).strict();
 

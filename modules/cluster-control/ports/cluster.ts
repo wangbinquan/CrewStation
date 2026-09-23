@@ -1,4 +1,5 @@
 import type { ObservedObject } from '../domain/observation';
+import type { RouteRender } from '../domain/routeRender';
 
 /** 观测与调和的种类：任务类容器的子对象（Pod、PVC、Runner Secret、预览 Service 与路由），服务槽的 Deployment，构建与迁移的 Job；后续各期加入 Middleware…… */
 export type ObservedKind = 'Pod' | 'PersistentVolumeClaim' | 'Secret' | 'Service' | 'IngressRoute' | 'Deployment' | 'Job';
@@ -26,7 +27,12 @@ export interface ManagedObjectReader {
   list(kind: ObservedKind): Promise<ObservedObject[]>;
 }
 
-/** 调和器对集群的写（第二期只有删除）：一律带 UID 前置条件，同名的新对象不会被误删；建与改随凭据的裁定（I25）再移交。 */
+/**
+ * 调和器对集群的写：删除一律带 UID 前置条件，同名的新对象不会被误删。建与改先接路由（不含凭据，第三期后半）；
+ * 任务容器与服务槽随凭据的裁定（I25）再移交。
+ */
 export interface ClusterWriter {
   remove(target: { readonly kind: ObservedKind; readonly namespace?: string; readonly name: string; readonly uid: string }): Promise<void>;
+  /** 按路由期望渲染 IngressRoute，与观测缓存里的对象（current）比对：缺了或不一致才 apply。 */
+  applyRoute(route: RouteRender, current: ObservedObject | undefined): Promise<'applied' | 'unchanged'>;
 }

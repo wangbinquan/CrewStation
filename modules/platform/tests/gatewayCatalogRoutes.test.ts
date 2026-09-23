@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import type { Actor, Manifest, ProjectId, ReleaseId, ServiceId, WorkloadIdentity } from '@crewstation/contracts';
 import { DomainTopic, ManifestSchema } from '@crewstation/contracts';
 import { publishDomainEvent } from '@crewstation/eventbus';
-import { createFakeK8sClient, Resources } from '@crewstation/k8s';
+import { createFakeK8sClient } from '@crewstation/k8s';
 import { newId, noopLogger } from '@crewstation/kernel';
 import { runMigrations } from '@crewstation/persistence';
 import { loadPlatformSettings } from '@crewstation/settings';
@@ -55,6 +55,16 @@ async function register(manifest: Manifest) {
   await platform.modules.apiCatalog.subscriptions[0]!.runOnce();
 }
 
+/**
+ * 这个服务这一种路由眼下的记录（RFC-025 第三期后半：网关写路由记录，调和器照记录应用 IngressRoute；这里不起调和器，看期望）。
+ * 摘掉又出现的顺延 `~2`，取还在用的那条。
+ */
+async function routeOf(serviceId: ServiceId, kind: string) {
+  const records = await platform.modules.resources.api.list({ kind: 'route', includeStopped: true });
+  return records.find((record) => record.owner.module === 'gateway' && record.desired === 'present' && (record.owner.ref === `${serviceId}/${kind}` || record.owner.ref.startsWith(`${serviceId}/${kind}~`)));
+}
+const internalPrefix = async () => (await routeOf(target.serviceId, 'internal-api'))?.spec['pathPrefix'];
+
 describe.skipIf(!available)('平台装配的目录与网关路由', () => {
   test('退役的模板代理名不遮蔽当前 spec.proxy，路由与 OpenAPI 使用同一个名字', async () => {
     const { gateway, apiCatalog } = platform.modules;
@@ -73,15 +83,15 @@ describe.skipIf(!available)('平台装配的目录与网关路由', () => {
       target: { service: 'reference-proxy-blue', namespace: 'cs-reference-proxy' },
     });
     expect((await apiCatalog.api.prunedOpenApi(actor, target.serviceId, before.id)).servers).toEqual([{ url: 'http://api.svc.cs.internal/api/test-gitlab' }]);
-    const ingress = k8s.applied.filter((item) => item.kind === 'IngressRoute' && item.metadata.name === 'reference-proxy-internal-api').at(-1)!;
-    expect(ingress.spec).toMatchObject({ routes: [{ match: 'Host(`api.svc.cs.internal`) && PathPrefix(`/api/test-gitlab`)' }] });
+    expect((await routeOf(target.serviceId, 'internal-api'))?.spec).toMatchObject({ host: 'api.svc.cs.internal', pathPrefix: '/api/test-gitlab', children: [{ kind: 'IngressRoute', namespace: 'cs-reference-proxy', name: 'reference-proxy-internal-api' }] });
   });
 
   test('当前服务撤下 exposes 后不再规划内部 API；未知服务也不借用其他服务的代理', async () => {
     await register(worker(false));
     const routes = await platform.modules.gateway.api.reconcileService(target.serviceId);
     expect(routes.map((route) => route.kind)).toEqual(['prod', 'preview', 'service']);
-    expect(await k8s.get(Resources.IngressRoute!, 'reference-proxy-internal-api', 'cs-reference-proxy')).toBeUndefined();
+    // 内部 API 的路由记录标「不要了」（IngressRoute 由调和器删）。
+    expect(await routeOf(target.serviceId, 'internal-api')).toBeUndefined();
     expect((await platform.modules.apiCatalog.api.listProxies(actor)).every((item) => item.state === 'removed')).toBe(true);
     expect(await platform.modules.gateway.api.reconcileService('01a0bf5d-8f4b-7430-8195-be2419fb2d35' as ServiceId)).toEqual([]);
   });
@@ -95,8 +105,7 @@ describe.skipIf(!available)('平台装配的目录与网关路由', () => {
     await apiCatalog.subscriptions[0]!.runOnce();
     expect((await apiCatalog.api.listProxies(actor)).find((item) => item.proxy === 'test-gitlab')?.state).toBe('active');
     // 两个消费者没有先后保证；目录落库前已推进的网关游标不会自动再处理同一事件。
-    const ingress = await k8s.get(Resources.IngressRoute!, 'reference-proxy-internal-api', 'cs-reference-proxy');
-    expect(ingress?.spec).toMatchObject({ routes: [{ match: 'Host(`api.svc.cs.internal`) && PathPrefix(`/api/test-gitlab`)' }] });
+    expect(await internalPrefix()).toBe('/api/test-gitlab');
   });
 
   test('目录更新后，较早开始而迟到的发布消费者不能把旧代理路由写回来', async () => {
@@ -123,8 +132,7 @@ describe.skipIf(!available)('平台装配的目录与网关路由', () => {
       await apiCatalog.subscriptions[0]!.runOnce();
       resume();
       await earlier;
-      const ingress = await k8s.get(Resources.IngressRoute!, 'reference-proxy-internal-api', 'cs-reference-proxy');
-      expect(ingress?.spec).toMatchObject({ routes: [{ match: 'Host(`api.svc.cs.internal`) && PathPrefix(`/api/test-gitlab`)' }] });
+      expect(await internalPrefix()).toBe('/api/test-gitlab');
     } finally {
       resume();
       await earlier;
@@ -148,7 +156,7 @@ describe.skipIf(!available)('平台装配的目录与网关路由', () => {
     const created = await project.api.createProject(actor, { slug: 'newbie-worker', name: 'Newbie worker', kind: 'DigitalWorker', ownerUserId: actor.userId, template: '01a0bf5d-8f4b-7002-9560-94caf593fb19' });
     const devContainer: WorkloadIdentity = { identity: 'newbie-worker/newbie-worker', project: 'newbie-worker', service: 'newbie-worker', kind: 'dev-session' };
     const toMcp = () => gateway.api.evaluate(devContainer, { host: 'mcp-capabilities.svc.cs.internal', method: 'POST', path: '/mcp' });
-    const serviceRoute = () => k8s.get(Resources.IngressRoute!, 'newbie-worker-service', 'cs-newbie-worker');
+    const serviceRoute = () => routeOf(created.serviceId!, 'service');
     expect((await toMcp()).reason).toBe('newbie-worker/newbie-worker 不能调用平台端点 mcp-capabilities.svc.cs.internal');
 
     expect(await gateway.subscriptions.runOnce()).toBe(1);
@@ -168,8 +176,9 @@ describe.skipIf(!available)('平台装配的目录与网关路由', () => {
     await gateway.subscriptions.runOnce();
     const apply = k8s.apply;
     let fail = true;
+    // 网关自己还在建的是路由引用的前缀剥离中间件（IngressRoute 由调和器照记录应用）：让它失败一次。
     k8s.apply = async (object) => {
-      if (fail && object.metadata.name === 'reference-proxy-internal-api') {
+      if (fail && object.metadata.name === 'strip-api-test-gitlab') {
         fail = false;
         throw new Error('Kubernetes 暂时不可用');
       }
@@ -179,12 +188,10 @@ describe.skipIf(!available)('平台装配的目录与网关路由', () => {
       await publishRelease(proxy);
       expect(await apiCatalog.subscriptions[0]!.runOnce()).toBe(0);
       expect(await apiCatalog.api.activeProxyNameOf(target.serviceId)).toBe('test-gitlab');
-      const beforeRetry = await k8s.get(Resources.IngressRoute!, 'reference-proxy-internal-api', 'cs-reference-proxy');
-      expect(beforeRetry?.spec).toMatchObject({ routes: [{ match: 'Host(`api.svc.cs.internal`) && PathPrefix(`/api/reference-proxy`)' }] });
+      expect(await internalPrefix()).toBe('/api/reference-proxy');
       // 目录事务已经提交，派生路由失败不能推进事件游标；恢复后重放同一事件即可补齐。
       expect(await apiCatalog.subscriptions[0]!.runOnce()).toBe(1);
-      const recovered = await k8s.get(Resources.IngressRoute!, 'reference-proxy-internal-api', 'cs-reference-proxy');
-      expect(recovered?.spec).toMatchObject({ routes: [{ match: 'Host(`api.svc.cs.internal`) && PathPrefix(`/api/test-gitlab`)' }] });
+      expect(await internalPrefix()).toBe('/api/test-gitlab');
       expect((await apiCatalog.api.listOperations(actor)).map((item) => `${item.proxy}:${item.method}:${item.path}`)).toEqual(['test-gitlab:GET:/items']);
     } finally {
       k8s.apply = apply;
