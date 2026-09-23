@@ -131,6 +131,8 @@
 | `25bf918e` 槽的副本由槽记录认领、崩溃重启汇总成条件，健康接口、告警巡检与健康卡照槽记录；视图列出稳定记录；压缩只限终态 | check:static 通过；unit 573、module 1283、console 869；改动行 119／120（99.2%） | [35899013397](https://github.com/wangbinquan/CrewStation/actions/runs/35899013397) 六项成功 | 18:04:06 cs-controller、18:04:08 cs-api 换到 `cs-control-plane:rc025-p3d-20260924`，18:05:18 console 换到 `cs-console:rc025-p3d-20260924` |
 | `2b61586f` 槽记录带上保留计时，就绪之后槽 DTO 的副本数照台账；发布页槽卡随推送流原位重读 | check:static 通过；unit 575、module 1284、console 870；改动行 53／53 | [35901463457](https://github.com/wangbinquan/CrewStation/actions/runs/35901463457) 六项成功 | 18:25:34 cs-controller、18:25:36 cs-api 换到 `cs-control-plane:rc025-p3e-20260924`，18:26:12 console 换到 `cs-console:rc025-p3e-20260924` |
 | `b2e19fdc` 统一预检接到发布侧：标准原因、集群 dry-run、预检查询，受理之后的失败记进发布记录 | check:static 通过；unit 575、module 1289、console 871；改动行 149／152（98.0%） | [35904861577](https://github.com/wangbinquan/CrewStation/actions/runs/35904861577) 六项成功 | 18:57:03 cs-controller、18:57:05 cs-api 换到 `cs-control-plane:rc025-p3f-20260924`，18:57:37 console 换到 `cs-console:rc025-p3f-20260924` |
+| `c2be2128` 发布受理时就按那次提交的 Manifest 预检 | check:static 通过；unit 575、module 1290、console 871；改动行 46／47（97.9%） | [35906164790](https://github.com/wangbinquan/CrewStation/actions/runs/35906164790) 六项成功 | 19:06:57 cs-controller、19:06:59 cs-api 换到 `cs-control-plane:rc025-p3g-20260924` |
+| `3c5315e0` 构建与迁移 Job 进台账，结束时记下结果 | check:static 通过；unit 577、module 1292、console 873；改动行 73／73 | [35908456352](https://github.com/wangbinquan/CrewStation/actions/runs/35908456352) 六项成功 | 19:27:10 cs-controller、19:27:11 cs-api 换到 `cs-control-plane:rc025-p3h-20260924`，19:27:43 console 换到 `cs-console:rc025-p3h-20260924` |
 
 镜像都由 `git archive <提交>` 构建，只含已提交内容；无迁移，各一次就绪、0 重启。
 
@@ -142,4 +144,5 @@
 - 健康接口的返回值与工作台健康卡由模块用例与组件用例核对（接口在网关登录之后，没有替作者登录）。
 - **2b61586f 部署后**：补投影 14 个服务后，10 个在计时的待命槽记录都带上 `RetentionDeadline`，到期时刻与按平台策略（回退目标 72 小时、无人访问 14 天、提前 24 小时提醒）手算的一致——4 个回退目标到 09-26 05:14:23Z（09-23 05:14 切流起 72 小时），1 个推迟过一次的回退目标到 09-27 07:41:20Z，5 个待验证版本按就绪或最近一次访问起 14 天（其中一个按 09-23 10:22:25Z 的访问推后到 10-07 10:22:25Z）；4 个空的待命槽条件为假、没有到期字段。都还没到提醒时刻，没有提醒字段。发布页槽卡的推送重读由组件用例核对（浏览器登录已过期）。
 - **统一预检（RC-07）**：四种情形由模块用例逐一核对——旧写法 Manifest（`manifest-outdated`，重新部署）、档位被删（`profile-missing`，发布受理与流水线部署）、套餐被收回（`plan-unavailable`，重新部署与发布受理；project 模块直接拒绝时同样归为它）、额度已满（任务类入口，`quota_exceeded`，随 T6 的额度经台账受理再核对一次）；每种都返回 412、原因码与出路，发布与槽不变、台账没有新记录。实机上这些接口在网关登录之后，没有替作者登录去点；集群 dry-run 与现在的部署用同一个动词与身份（cs-api 的服务账号对 Deployment 与 Service 做服务端 apply）。
+- **3c5315e0 部署后**：观测缓存加上 Job 之后照常同步（首轮 `recorded 19、unchanged 51、unowned 102`，本机眼下没有受管的 Job），cs-controller 的服务账号 `crewstation-control` 可在全集群 list／watch Job（部署前 `kubectl auth can-i` 核对）。真正跑一次构建与迁移要在共享集群上发布（会在 GitLab 打标签），没有得到许可不做；Job 记录的认领、阶段与 TTL 之后的结果由模块用例核对。
 

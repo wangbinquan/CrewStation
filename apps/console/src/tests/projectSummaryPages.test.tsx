@@ -4,11 +4,11 @@ import { act } from 'react';
 import type { ReleaseId, ResourceRecord, TaskId } from '@crewstation/contracts';
 import { renderApp } from './renderApp';
 import { summaryFixture, summaryUserId } from './projectSummaryFixture';
-import { resourceRecord } from './resourceRecordFixture';
+import { FakeEventSource, resourceRecord } from './resourceRecordFixture';
 
 const originalFetch = globalThis.fetch;
 let page: Awaited<ReturnType<typeof renderApp>> | undefined;
-afterEach(() => { page?.unmount(); page = undefined; globalThis.fetch = originalFetch; });
+afterEach(() => { page?.unmount(); page = undefined; globalThis.fetch = originalFetch; delete (globalThis as { EventSource?: unknown }).EventSource; FakeEventSource.reset(); });
 async function enter(label: string, value: string) {
   const node = document.querySelector(`[aria-label="${label}"]`) as HTMLInputElement | HTMLSelectElement;
   if (!node) throw new Error(`missing field ${label}`);
@@ -136,6 +136,24 @@ test('概览开发卡的会话徽标照资源台账的阶段，没有记录时�
   f.records = [];
   await page.reread();
   expect(page.text()).toContain('会话运行中');
+});
+
+// RFC-025：概览摘要随推送流立即重读——槽、会话、构建与迁移记录一变就静默重读一次，不等 30 秒；别的记录变化不重读。
+test('概览摘要随资源推送流重读：服务槽记录变了重读一次摘要，别的种类不重读', async () => {
+  const f = summaryFixture(), slot = resourceRecord({ id: '01a0bf5d-8f4b-7e52-8b45-4a547fd11001', kind: 'service-slot', display: { physical: 'blue', role: 'prod' } });
+  const volume = resourceRecord({ id: '01a0bf5d-8f4b-7e52-8b45-4a547fd11002', kind: 'volume' });
+  f.records = [slot, volume];
+  (globalThis as { EventSource?: unknown }).EventSource = FakeEventSource;
+  page = await renderApp(`/projects/${f.item.project.id}`);
+  const summaryReads = () => f.calls.filter((url) => url === `/v1/workbench/project-summaries/${f.item.project.id}`).length;
+  const before = summaryReads();
+  const stream = FakeEventSource.opened.find((source) => source.url.startsWith(`/v1/projects/${f.item.project.id}/resources/stream`))!;
+  await act(async () => { stream.emit({ type: 'upsert', record: { ...volume, version: 2 }, counts: {}, cursor: 2 }); await Bun.sleep(20); });
+  await page.settle();
+  expect(summaryReads()).toBe(before);
+  await act(async () => { stream.emit({ type: 'upsert', record: { ...slot, phase: 'degraded', version: 2 }, counts: {}, cursor: 3 }); await Bun.sleep(20); });
+  await page.settle();
+  expect(summaryReads()).toBe(before + 1);
 });
 
 test.each(['列表', '概览'])('%s 的会话分支明确标为创建时记录，缺失保持未知且不额外查询工作树', async (view) => {

@@ -3,6 +3,7 @@ import { api } from '../../../shared/api/client';
 import { queryKeys } from '../../../shared/api/queryKeys';
 import { useApiQuery } from '../../../shared/api/useApi';
 import { usePollingRefetch } from '../../../shared/lib/usePollingRefetch';
+import { useRecordRefresh } from '../../../shared/resources/useRecordRefresh';
 import { useT } from '../../../shared/lib/useT';
 import type { ProjectListSearch } from './projectListSearch';
 import { useCallback } from 'react';
@@ -28,6 +29,9 @@ export function useProjectSummaries(search: ProjectListSearch) {
   return { me, query };
 }
 
+/** 概览摘要随推送流立即重读的记录种类：槽（部署、副本、保留计时）、开发会话、构建与迁移（发布进度）。 */
+const SUMMARY_KINDS = ['service-slot', 'dev-workspace', 'build-job', 'migration-job'] as const;
+
 export function useProjectSummary(projectId: string) {
   const t = useT(), me = useApiQuery(queryKeys.me(), () => api.me.get());
   const query = useApiQuery(queryKeys.projectSummary(projectId, me.data?.id ?? ''), async () => {
@@ -35,5 +39,8 @@ export function useProjectSummary(projectId: string) {
     if (!response.success || response.data.project.id !== projectId) throw new Error(t('projects.summary.invalid')); return response.data;
   }, { enabled: me.isSuccess && !me.error, staleTimeMs: 0 });
   useSummaryPolling(me.data?.id, me.refetch, query.refetch, me.isSuccess && !me.error);
+  // RFC-025：这几种记录一变就静默重读摘要，不等 30 秒；30 秒的身份核对与重读照旧（成员与角色的变化靠它）。测试者读不到资源视图，不开。
+  const { refetch } = query, reread = useCallback(() => refetch({ cancelRefetch: false }), [refetch]);
+  useRecordRefresh(projectId, SUMMARY_KINDS, reread, { enabled: !!query.data && query.data.role !== 'tester' });
   return { me, query };
 }
