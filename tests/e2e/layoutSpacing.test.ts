@@ -136,6 +136,13 @@ describe.skipIf(!session?.project)('项目操作区的真实布局间距', () =>
     // 2026-09-23 起「添加订阅」在订阅卡片头（装列表的卡片，新增动作放标题行右侧）。
     const add = await headerSpacing(page, '添加订阅');
     expect(add.titleGap).toBeGreaterThanOrEqual(8); expect(add.bodyGap).toBeGreaterThanOrEqual(8); expect(add.width).toBeLessThan(add.containerWidth);
+    // 2026-09-23 状态筛选改成分段控件后曾紧贴下方的记录或空态（0px）：量它与下一个元素的真实间距。
+    const filterGap = await page.eval<number>(`(() => {
+      const group = document.querySelector('main [role="group"][aria-label="状态"]'), next = group?.nextElementSibling;
+      if (!group || !next) throw new Error('Missing alert state filter or the content below it');
+      return next.getBoundingClientRect().top - group.getBoundingClientRect().bottom;
+    })()`);
+    expect(filterGap).toBeGreaterThanOrEqual(8);
     await open(page, `/projects/${session!.project!.id}/operations?tab=trace`);
     const query = await spacing(page, '查询调用链');
     expect(query.before!).toBeGreaterThanOrEqual(8);

@@ -28,7 +28,7 @@ export function AlertsPage({ projectId, search, change, onLogs }: { readonly pro
   const rows = !alerts.error ? alerts.data?.items ?? [] : [], filter = search.alertState ?? 'all';
   const shown = rows.filter((row) => filter === 'all' || row.state === filter), selected = rows.find((row) => row.id === search.alertId);
   return <div className={styles.stack}>
-    <Card compact title={t('logs.alerts.title')} footer={t('logs.alerts.recent')}>
+    <Card compact stacked title={t('logs.alerts.title')} footer={t('logs.alerts.recent')}>
       <Segmented label={t('logs.alerts.state')} value={filter} items={(['all', 'firing', 'resolved'] as const).map((state) => ({ value: state, label: t(`logs.alerts.state.${state}`) }))}
         onChange={(state) => change({ ...search, tab: 'alerts', alertState: state as 'all' | 'firing' | 'resolved' })} />
       <QueryStatus isPending={alerts.isPending} error={alerts.error} />
