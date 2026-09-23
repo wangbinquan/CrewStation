@@ -7,6 +7,57 @@
 
 基线三件套（v0.3.3）的第一轮实现已在本机 kind 集群上跑通并推上 main；**RFC-001（算力归平台）与 RFC-002（管理空间与租户空间分离）已实现、实跑确认并推上 main；RFC-004 已被 RFC-006 取代（Superseded）；RFC-006（算力档位合并运行环境、每个 Agent 一个 Pod）已实现、实机验收完毕并推上 main，已 Done（P1–P8、ADR-0005 与 I17–I19 待作者复核）；RFC-003 工作台已按设计附件完成并整体部署到本机，52／52 项 UX-AT 全部实机通过、本地 gate 与精确 SHA CI 通过，已 Done；RFC-005（OIDC／OAuth 2.0 公司登录）代码、测试与 OA-01…OA-31 实机验收全部完成，已 Done；RFC-007（开发环境 OAuth 2.0 一键换角色）代码、四角色 Chrome 实机验收、本地 gate 与精确 SHA CI 全部完成，已 Done**。
 
+## 本机集群的网络插件换成 Calico：Runner 反复掉线的根因（2026-09-23）
+
+crewstation-51 报来一个现象：演示项目的两个旧 CLI 执行 Pod 和 rfc003 工作台会话的 Runner，每隔几分钟就 90 秒空闲断线，之后约 5 分钟连不上。
+作者说「好」，交我接手；查明根因后，作者裁定「换成 Calico」「现在一起重建」「现在做」，删 Pod 被权限拦下时又说「你自己跑」。
+
+- **根因**：Docker Desktop 自带的 kindnet 用 kube-network-policies 在用户态（NFQUEUE 101）执行 NetworkPolicy。
+  - 「已放行」的 conntrack 标签 28 打不上：日志持续报 `failed to set verdict with label … netlink send: i/o timeout`，至少从 09-22 起每小时 30 到 100 次。
+  - 于是任务 Pod 的每个包都进队列：同一条保持连接发 50 个请求，队列编号涨 108。
+  - 每次 nftables 规则同步（一次 33 秒）还会丢掉队列里的包（kube-network-policies#402，修复 #403 未合并）。
+  - 表现为：两个不同命名空间的 Runner 同时断、同时恢复，而 cs-session 一直健康。上游 kindnet 仓库已归档，升级大概率解决不了。
+- **迁移**（09:13–09:44Z，事先通知了 crewstation-51／-db／-49、按钮统一会话等，各方确认暂停）：
+  - 装 Calico v3.32.2：地址池 `10.244.128.0/17`，不封装，出站做地址转换；
+  - 删 kindnet：DaemonSet、授权、节点上的 CNI 配置与策略表；
+  - 44 个有控制器的 Pod 按依赖分四批重建：系统组件 → postgres／prometheus／镜像仓库 → 网关与平台服务 → 各项目服务槽；
+  - 6 个无控制器的任务 Pod 直接删除：演示项目两个 CLI 与开发会话、rfc003 工作台开发会话、rfc022 两个失败任务；
+  - 最后删掉 kindnet 的 `KIND-MASQ-AGENT`。
+  - rfc006-verify 的僵尸任务 Pod `task-01a0bc96ee15`（3 天前起就是 Unknown、没有 IP）原样留着。
+- **验证**：
+  - `verify.sh` A–E 全过：C 项确认网关仍看到真实的源 Pod IP；新增的 E 项确认 kindnet 不在、Calico 挡住了禁止出站策略下的 Pod。
+  - 演示服务槽实测能连 crewstation-system，连不上外网。
+  - 网关 Pod 身份索引 26 条全是新地址。
+  - 演示项目的开发会话用「重建开发环境」恢复（09:44:54Z 受理，工作卷保留，CLI 要自己重开）。
+  - Runner 从 09:45:27Z 起观察 35 分钟：空闲断线 0 次、连不上 0 次，只有开头那一次连接；节点上没有 NFQUEUE 规则。迁移前同样的 Runner 每十几分钟断一次。
+- **仓库**：
+  - `439b61e`：
+    - `deploy/local/calico-cni.sh`：幂等，bootstrap.sh 第一步调用，在迁移后的集群上完整重跑过一遍；
+    - `deploy/local/calico-manifest.ts`：钉住版本与校验和，三处本机定制，附四条用例；
+    - `verify.sh` 的 E 项和 `deploy/k8s/verify/30-deny-egress.yaml`；
+    - dev-gotchas「本机集群的网络插件是 Calico」，并给「ClusterIP 不通」补注。
+  - `cf5f325`：calico-cni.sh 第一次跑总会停在「还有旧网段的 Pod」，因为刚删掉、正在终止的系统 Pod 也被算进去了。现在跳过这些 Pod；命名空间过滤原来是子串匹配，改为整名匹配。附三条打桩用例，其中两条在旧脚本上失败。
+    CI 每次新建集群都会撞上这个问题：ea9ef8d 那轮停在两个正在终止的 coredns 上，没删地址转换链；437bffe 那轮带上了修复，同一次运行里就删掉了。
+  - `e334544`：CI 的 e2e 诊断补上 cs-controller／cs-session／cs-events 的日志（含被探针重启前那一轮）和系统命名空间事件。
+- **CI**：
+  - 439b61e 用临时文件改写 bootstrap.sh 与 verify.sh，丢了可执行位。此后五次 CI 的 e2e 都在 bootstrap 报 Permission denied（exit 126）。ea9ef8d 修回，dev-gotchas 记了「临时文件会丢掉可执行位」。
+  - Calico 上的前五次 CI：f4fb68c、d70964b、1a43ee9 全绿。ea9ef8d、55f5cbd 的 e2e 挂在集群指标（CPU 60 秒内没到 fresh）和拓扑（cs-api 显示「没达到最低可用」）上，两次都是 cs-controller 启动约两分钟后被重启一次。
+  - 判断是 I16（Bun SQL 连接池错位，RFC-023 要换掉的就是它），不是 Calico，依据有三：
+    - 本机 Calico 下指标每 15–20 秒一条，都是 fresh；
+    - 同样的 CI 集群有三次全绿；
+    - Calico 之前的 e73d98e 也挂过同一条拓扑用例，当时 cs-controller 是 0/1。
+  - 原来的诊断步骤不打印 cs-controller，所以两次失败都看不到报错特征，e334544 补上了。
+  - 437bffe（含 cf5f325）与 e334544 两轮 CI 六项全绿。
+- **事故**：查 kindnetd 的参数时，我在 kindnet 容器里跑了 `kindnetd --help`。它不认这个参数，直接又起了一个完整实例，并行跑了几分钟；我去结束它时被自动模式拦下，最后它因输出管道断开自行退出。这一条已写进 dev-gotchas。
+- **下一个 session 注意**：
+  - Docker Desktop 重置 Kubernetes 集群后 kindnet 会回来，届时重跑 `bootstrap.sh`（verify.sh E 会报出来）。
+    Docker Desktop 重启或升级会不会把 kindnet 装回来，还没验证过。
+  - 只跑 `install-platform.sh` 的升级不会动网络插件。别的机器上还在用 kindnet 的集群，要重跑一次 `bootstrap.sh`，再把脚本列出的旧网段 Pod 逐个重建。
+    重建之前，这些 Pod 上的 NetworkPolicy 没有人执行：kindnet 已经删了，Calico 只给经它接入网络的 Pod 执行策略。
+  - rfc003 工作台等验收项目的开发会话还没重建，要用时各自在工作台里「重建开发环境」。
+  - dev-gotchas 里那条「ClusterIP 不通」很可能同源，换成 Calico 之后还没复现过。
+  - CI 的 e2e 再挂在集群指标或拓扑上时，先看诊断里 cs-controller 上一轮的日志有没有 I16 的报错特征（`JSON Parse error`、`ERR_POSTGRES_INVALID_MESSAGE` 等）。
+
 ## 页内展开的表单与确认改为弹窗（2026-09-23）
 
 作者反馈「现在有些功能点击配置之后，都是会在本页面扩展一个区域来渲染表单内容的，体验很差，统一都改成弹窗……并且把弹窗做成公共组件」。问答裁定：范围 A＋B＋C（点了才出现的表单；带核对材料或输入的确认面板；放弃／换对象／离开提示，含 `UnsavedChangesGuard`），一行式 `InlineConfirm` 与「释放会话」工作区干净时的确认留在页内，接口「试调」保持原样；关窗静默保留草稿，弹窗操作条最右「清空」，离开页面才丢、离开确认写明哪些草稿；每个弹窗标题栏有 ✕；流程「直接改＋回填，提交并部署本机」。
