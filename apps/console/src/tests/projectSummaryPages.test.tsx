@@ -72,6 +72,15 @@ describe('项目列表的真实分页与独立状态', () => {
     await page.click('下一页'); expect(page.text()).toContain('数字助手 2'); expect(page.text()).not.toContain('数字助手 1');
     expect(page.search().cursor).toBe('next-page'); await page.back(); expect(page.text()).toContain('数字助手 1');
   });
+  // 2026-09-23 实撞：RFC-020 把这两个入口的文案挪到 slot.open.* 后，列表还在用已删掉的旧键，页面上直接显示键名。
+  test('列表里的访问入口是按钮样式的外部链接，文案来自槽位共用的 slot.open.*', async () => {
+    const f = summaryFixture();
+    f.item.slots = { status: 'ready', checkedAt: f.item.checkedAt, value: [{ name: 'prod', active: true, tag: 'v1.0.0', commitSha: 'a'.repeat(40), releaseId: '01a0bf5d-8f4b-7574-87e3-e3a9645702f6' as ReleaseId, host: 'formal.test', state: 'ready', replicas: 1, readyReplicas: 1 }] };
+    page = await renderApp('/projects');
+    const open = document.querySelector('table a[href="//formal.test"]');
+    expect(open?.textContent).toBe('打开正式应用'); expect(open?.getAttribute('target')).toBe('_blank'); expect(open?.hasAttribute('data-button')).toBe(true);
+    expect(page.text()).not.toContain('projects.summary.');
+  });
   test('名称／标识、状态和负责人筛选进入 URL，切条件清游标，浏览器返回恢复实际范围', async () => {
     const f = summaryFixture(); page = await renderApp('/projects?cursor=next-page');
     await enter('搜索名称或标识', '报表'); await enter('开通状态', 'failed'); await enter('负责人', summaryUserId);

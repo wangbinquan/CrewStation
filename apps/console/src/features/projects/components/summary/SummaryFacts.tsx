@@ -42,7 +42,7 @@ function DeploymentSlotFact({ slot, name, canOpen }: { readonly slot: SlotDto | 
   const ready = slot.state === 'ready' && slot.readyReplicas > 0 && slot.releaseId && slot.tag && slot.commitSha;
   return <div className={styles.fact}><span><strong>{slot.tag}</strong> <code title={slot.commitSha}>{shortSha(slot.commitSha)}</code></span>
     <div className={styles.actions}><Badge tone={slotStateTone(slot.state)}>{t(`projects.slotState.${slot.state}`)}</Badge>
-    {canOpen && ready && validHost(slot) ? <ExternalButtonLink size="small" href={`//${slot.host}`}>{t(name === 'prod' ? 'projects.summary.openProduction' : 'projects.summary.openPreview')}</ExternalButtonLink> : null}</div>
+    {canOpen && ready && validHost(slot) ? <ExternalButtonLink size="small" href={`//${slot.host}`}>{t(`slot.open.${name}`)}</ExternalButtonLink> : null}</div>
   </div>;
 }
 function validHost(slot: SlotDto) { return /^[a-z0-9][a-z0-9.-]*(?::\d+)?$/i.test(slot.host); }
