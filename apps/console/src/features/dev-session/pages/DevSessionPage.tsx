@@ -61,7 +61,7 @@ export function DevSessionPage({ reference, sessionLogs }: DevSessionPageProps =
           reference={reference} sessionLogs={sessionLogs}
           {...(context.canDevelop ? { onRestart: () => session.open.mutate({ branch: session.session!.branch, restartOf: session.session!.taskId }) } : {})}
           recovery={context.canDevelop && (session.session.state === 'failed' || session.session.connectionIssue || session.session.rebuild) ? <RebuildSessionControl projectId={projectId} session={session.session}
-            newSession={<OpenSessionForm branches={branches} open={session.open} previousTaskId={session.session.taskId} />} /> : null}
+            newSession={<OpenSessionForm embedded branches={branches} open={session.open} previousTaskId={session.session.taskId} />} /> : null}
         />
       )}
       {/* 没有会话：主区是开会话表单（无开发权限时是说明），旁边随时可打开参考面板——目录与事件对项目成员都可读。 */}

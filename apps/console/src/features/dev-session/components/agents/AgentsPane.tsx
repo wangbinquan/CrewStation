@@ -55,40 +55,36 @@ export function AgentsPane({ projectId, agents, transcripts, onActivity, selecti
       className={styles.pane}
       flush
       extra={
-        <Button onClick={() => creation.setOpen(!creation.open)}>{creation.open ? t('devSession.agents.startCancel') : t('devSession.agents.start')}</Button>
+        <Button onClick={() => creation.setOpen(true)}>{t('devSession.agents.start')}</Button>
       }
     >
       <div className={styles.layout}>
         {messages.busy ? <PaneNotice tone="info">{t('devSession.agents.sendingHint')}</PaneNotice> : null}
         {creation.busy ? <PaneNotice tone="info">{t('devSession.agents.startingHint')}</PaneNotice> : null}
-        {creation.error ? <PaneNotice tone="warning">{creation.error}</PaneNotice> : null}
-        {creation.open ? (
-          <StartAgentForm projectId={projectId} creation={creation} />
-        ) : (
-          <>
-            <AgentRoster agents={agents.agents} selected={selected?.agentId} onSelect={setPicked} />
-            {agents.agents.length === 0 ? <PaneNotice tone="muted">{t('devSession.agents.empty')}</PaneNotice> : null}
-            {agents.loadError !== null ? <PaneNotice tone="warning">{errorMessage(agents.loadError)}</PaneNotice> : null}
-            {!agents.isPending && picked !== undefined && selected === undefined ? <PaneNotice tone="warning">{t('devSession.agents.missingTarget')}</PaneNotice> : null}
-            <ExecutionNotice agent={selected} />
-            <AgentTranscriptView lines={lines} />
-            <AgentComposer
-              disabled={selected === undefined || !agentAcceptsInput(selected.state)}
-              sending={draft?.sending ?? false}
-              draft={draft?.text ?? ''}
-              error={draft?.error}
-              onDraftChange={(text) => { if (selected !== undefined) messages.edit(selected.agentId, text); }}
-              canCancel={selected !== undefined && agentAcceptsInput(selected.state)}
-              onCancel={() => {
-                if (selected !== undefined) agents.cancel.mutate(selected.agentId);
-              }}
-              onSend={() => {
-                if (selected === undefined) return;
-                if (messages.send(selected.agentId)) onActivity();
-              }}
-            />
-          </>
-        )}
+        {creation.error && !creation.open ? <PaneNotice tone="warning">{creation.error}</PaneNotice> : null}
+        {/* 新建 Agent 是弹窗（2026-09-23 起）：名册与对话常驻，草稿关窗保留。 */}
+        {creation.open ? <StartAgentForm projectId={projectId} creation={creation} /> : null}
+        <AgentRoster agents={agents.agents} selected={selected?.agentId} onSelect={setPicked} />
+        {agents.agents.length === 0 ? <PaneNotice tone="muted">{t('devSession.agents.empty')}</PaneNotice> : null}
+        {agents.loadError !== null ? <PaneNotice tone="warning">{errorMessage(agents.loadError)}</PaneNotice> : null}
+        {!agents.isPending && picked !== undefined && selected === undefined ? <PaneNotice tone="warning">{t('devSession.agents.missingTarget')}</PaneNotice> : null}
+        <ExecutionNotice agent={selected} />
+        <AgentTranscriptView lines={lines} />
+        <AgentComposer
+          disabled={selected === undefined || !agentAcceptsInput(selected.state)}
+          sending={draft?.sending ?? false}
+          draft={draft?.text ?? ''}
+          error={draft?.error}
+          onDraftChange={(text) => { if (selected !== undefined) messages.edit(selected.agentId, text); }}
+          canCancel={selected !== undefined && agentAcceptsInput(selected.state)}
+          onCancel={() => {
+            if (selected !== undefined) agents.cancel.mutate(selected.agentId);
+          }}
+          onSend={() => {
+            if (selected === undefined) return;
+            if (messages.send(selected.agentId)) onActivity();
+          }}
+        />
       </div>
     </Pane></>
   );

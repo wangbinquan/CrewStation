@@ -80,8 +80,9 @@ test('负责人审批看到真实期限，意见取消与失败保留，确认�
   const f = setup([record('request-ro')]); page = await renderElement(<Harness />, messages); await openDetails();
   expect(page.text()).toContain('有效时长（分钟）30'); await page.click('批准');
   await input(field('审批意见')!, '字'.repeat(501)); await page.click('确认批准'); expect(f.requests).toHaveLength(0); expect(field('审批意见')!.getAttribute('aria-invalid')).toBe('true');
-  await input(field('审批意见')!, '  仅用于排错  '); await page.click('取消'); expect(page.text()).toContain('未提交的审批意见');
-  await page.click('拒绝'); expect(field('审批意见')!.value).toBe('  仅用于排错  '); f.state.failWrite = true; await page.click('确认拒绝');
+  // 2026-09-23 起确认在弹窗里：取消只关窗、页面上不再提示，意见留着，再点拒绝时恢复。
+  await input(field('审批意见')!, '  仅用于排错  '); await page.click('取消'); expect(document.querySelectorAll('dialog[open]').length).toBe(0); expect(field('审批意见') === undefined || field('审批意见') === null).toBe(true);
+  await page.click('拒绝'); expect(document.querySelector('dialog[open]')?.getAttribute('role')).toBe('alertdialog'); expect(field('审批意见')!.value).toBe('  仅用于排错  '); f.state.failWrite = true; await page.click('确认拒绝');
   expect(page.text()).toContain('数据服务暂不可用'); expect(field('审批意见')!.value).toBe('  仅用于排错  ');
   await page.click('取消'); f.state.failWrite = false; await page.click('批准'); await page.click('确认批准');
   expect(f.requests.at(-1)).toEqual({ path: '/v1/data-bindings/request-ro/decision', body: { approve: true, decision: '仅用于排错' } });

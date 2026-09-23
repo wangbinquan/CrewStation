@@ -3,7 +3,7 @@ import { useId, useRef, useState } from 'react';
 import type { ReactElement, ReactNode } from 'react';
 import type { ActivityTask } from '../../../../shared/activity/agentActivityStore';
 import { useT } from '../../../../shared/lib/useT';
-import { ConfirmationPanel } from '../../../../shared/ui/ConfirmationPanel';
+import { ConfirmationDialog } from '../../../../shared/ui/dialog/ConfirmationDialog';
 import { DockDropZone } from '../../../../shared/ui/dock/DockLayout';
 import type { DockTab } from '../../../../shared/ui/dock/DockTabs';
 import { DockTabs } from '../../../../shared/ui/dock/DockTabs';
@@ -86,7 +86,8 @@ export function TerminalGroup(props: TerminalGroupProps): ReactElement {
       onActivate={actions.activate} onClose={actions.requestClose} onDoubleClick={actions.toggleMaximize} onMenu={actions.openMenu} onRename={actions.startRename} />
     <div className={styles.body} data-dock-body={group.id} id={panelId} role="tabpanel" aria-label={activeName}
       onFocusCapture={() => actions.focusGroup(group.id)} onPointerDownCapture={() => actions.focusGroup(group.id)}>
-      {closingTerminal ? <ConfirmationPanel question={t('devSession.native.stopQuestion', { id: closingName })} busy={props.stopping}
+      {/* 结束进程不可撤销：确认弹窗，确认键红底（2026-09-23 起不在标签组里展开）。 */}
+      {closingTerminal ? <ConfirmationDialog danger question={t('devSession.native.stopQuestion', { id: closingName })} busy={props.stopping}
         hint={closingTerminal.createdBy !== viewerId ? t('devSession.native.stopOtherHint', { name: creatorName(closingTerminal.createdBy) }) : t('devSession.native.stopHint')}
         confirmLabel={t('devSession.native.stop')} cancelLabel={t('devSession.release.cancel')} onConfirm={() => actions.confirmClose(closingTerminal)} onCancel={actions.cancelClose} /> : null}
       {props.children}

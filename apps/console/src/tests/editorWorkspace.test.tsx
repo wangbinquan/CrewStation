@@ -46,7 +46,8 @@ test('真实工作台的 CodeMirror 草稿跨预览／CLI 保留；离开确认�
 test('文件树换文件和工具栏关闭均明确放弃；在途保存锁住换文件与释放确认', async () => {
   fixture = editorWorkspaceFixture(); page = await renderApp(path);
   await page.click('代码'); await page.click('a.ts'); await edit('尚未写入');
-  await page.click('b.ts'); expect(page.text()).toContain('放弃并打开「b.ts」');
+  await page.click('b.ts'); expect(page.text()).toContain('放弃并打开「b.ts」'); expect(document.querySelector('dialog[open][role="alertdialog"]')?.textContent).toContain('放弃并打开「b.ts」');
+  expect(document.activeElement?.textContent).toBe('继续编辑');
   await page.click('继续编辑'); expect(content().textContent).toBe('尚未写入');
   await page.click('关闭'); expect(page.text()).toContain('关闭编辑器'); await page.click('继续编辑');
   const button = (text: string) => [...document.querySelectorAll<HTMLButtonElement>('button')].find((node) => node.textContent?.trim() === text)!;

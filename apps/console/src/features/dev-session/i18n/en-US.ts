@@ -236,7 +236,6 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
 
   'devSession.agents.title': 'Agents',
   'devSession.agents.start': 'New agent',
-  'devSession.agents.startCancel': 'Back',
   'devSession.agents.startSubmit': 'Start',
   'devSession.agents.starting': 'Starting…',
   'devSession.agents.startingHint': 'The Agent is starting with the submitted first instruction. You can view existing conversations; wait for the result before leaving.',
@@ -400,7 +399,6 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   'devSession.data.requestedBy': 'Requested by',
   'devSession.data.expiresLabel': 'Expires at',
   'devSession.data.opinion': 'Decision note',
-  'devSession.data.opinionDraft': 'This record has an unsent decision note. Edit or clear it below; it will not be sent automatically.',
   'devSession.data.action.approve': 'Approve',
   'devSession.data.action.reject': 'Reject',
   'devSession.data.action.revoke': 'Revoke binding',

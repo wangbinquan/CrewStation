@@ -1,12 +1,12 @@
 import type { DevSessionDto, OpenDevSessionRequest } from '@crewstation/contracts';
 import type { UseMutationResult } from '@tanstack/react-query';
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import type { ReactElement } from 'react';
 import type { ApiClientError } from '../../../shared/api/useApi';
 import { errorMessage, retryableReadError } from '../../../shared/api/useApi';
 import { useT } from '../../../shared/lib/useT';
 import { Button } from '../../../shared/ui/Button';
-import { ConfirmationPanel } from '../../../shared/ui/ConfirmationPanel';
+import { ConfirmationDialog } from '../../../shared/ui/dialog/ConfirmationDialog';
 import { defaultBranchName } from '../model/branchChoice';
 import type { BranchesHandle } from '../hooks/useBranches';
 import { BranchSelect } from './BranchSelect';
@@ -19,19 +19,22 @@ export interface OpenSessionFormProps {
   /** 与页面共用一个开会话请求（表单只传分支；失败后「重试」另带 restartOf）。 */
   readonly open: UseMutationResult<DevSessionDto, ApiClientError, string | OpenDevSessionRequest>;
   readonly previousTaskId?: string;
+  /** 放在「从远端另建工作树」弹窗里：不画面板外框与标题，弹窗标题已经说明。 */
+  readonly embedded?: boolean;
 }
 
-/** 还没有会话时的入口：选分支开一个开发容器。一个项目同时只能有一个。 */
-export function OpenSessionForm({ branches, open, previousTaskId }: OpenSessionFormProps): ReactElement {
+/**
+ * 还没有会话时的入口：选分支开一个开发容器。一个项目同时只能有一个。
+ * 会话失败后从远端另建时先确认离开失败会话（确认弹窗，2026-09-23 起），默认聚焦「保留当前工作区」。
+ */
+export function OpenSessionForm({ branches, open, previousTaskId, embedded = false }: OpenSessionFormProps): ReactElement {
   const t = useT();
   const [picked, setPicked] = useState('');
   const [confirmedBranch, setConfirmedBranch] = useState<string>();
-  const confirmation = useRef<HTMLDivElement>(null);
-  useEffect(() => { if (confirmedBranch !== undefined) confirmation.current?.querySelector<HTMLButtonElement>('button:last-child')?.focus(); }, [confirmedBranch]);
   // 分支还在加载时 picked 为空，用缺省分支兜底；用户选过之后以选择为准。
   const branch = picked === '' ? defaultBranchName(branches.branches) : picked;
-  return (
-    <Pane title={t('devSession.open.title')}>
+  const content = (
+    <>
       <p className={styles.hint}>{t('devSession.open.hint')}</p>
       <div className={styles.row}>
         <label className={styles.label} htmlFor="dev-session-branch">
@@ -42,13 +45,14 @@ export function OpenSessionForm({ branches, open, previousTaskId }: OpenSessionF
           {open.isPending ? t('devSession.open.pending') : t(previousTaskId ? 'devSession.failed.open' : 'devSession.open.submit')}
         </Button>
       </div>
-      {confirmedBranch !== undefined ? <div ref={confirmation}><ConfirmationPanel question={t('devSession.failed.question', { taskId: previousTaskId ?? '', branch: confirmedBranch })}
-        hint={t('devSession.failed.newWorkspace')} confirmLabel={t('devSession.failed.confirm')} cancelLabel={t('devSession.failed.cancel')}
+      {confirmedBranch !== undefined ? <ConfirmationDialog question={t('devSession.failed.question', { taskId: previousTaskId ?? '', branch: confirmedBranch })}
+        hint={t('devSession.failed.newWorkspace')} confirmLabel={t('devSession.failed.confirm')} cancelLabel={t('devSession.failed.cancel')} focus="cancel"
         busy={open.isPending} confirmDisabled={branches.loadError !== null || branches.isPending}
-        onConfirm={() => { open.mutate(confirmedBranch); setConfirmedBranch(undefined); }} onCancel={() => setConfirmedBranch(undefined)} /></div> : null}
+        onConfirm={() => { open.mutate(confirmedBranch); setConfirmedBranch(undefined); }} onCancel={() => setConfirmedBranch(undefined)} /> : null}
       {branches.loadError !== null ? <PaneNotice tone="warning">{errorMessage(branches.loadError)}{retryableReadError(branches.loadError) ? ` ${t('ui.status.autoRetry')}` : ''}</PaneNotice> : null}
       {!branches.isPending && !branches.loadError && branches.branches.length === 0 ? <PaneNotice tone="info">{t('devSession.open.noBranches')}</PaneNotice> : null}
       {open.error !== null ? <PaneNotice tone="warning">{errorMessage(open.error)}</PaneNotice> : null}
-    </Pane>
+    </>
   );
+  return embedded ? content : <Pane title={t('devSession.open.title')}>{content}</Pane>;
 }

@@ -76,6 +76,9 @@ describe('CLI 标签组', () => {
     expect(groups()).toEqual([[mine.terminalId, other.terminalId]]); expect(f.stops).toEqual([]);
     await fire(tab(mine.terminalId).querySelector('button[aria-label="结束 CLI 00mine"]')!, new MouseEvent('click', { bubbles: true }));
     expect(page.text()).toContain('结束「CLI 00mine」？'); expect(page.text()).toContain('该 Agent 当前的工作会中止'); expect(f.stops).toEqual([]);
+    // 2026-09-23 起是确认弹窗：结束进程不可撤销，确认键红底。
+    const stopDialog = document.querySelector('dialog[open][role="alertdialog"]')!;
+    expect([...stopDialog.querySelectorAll('button')].find((node) => node.textContent === '结束进程')!.className.split(' ')).toContain('dangerPrimary');
     await page.click('取消'); expect(page.text()).not.toContain('结束「CLI 00mine」？'); expect(groups()).toEqual([[mine.terminalId, other.terminalId]]);
     await fire(tab(mine.terminalId).querySelector('button')!, new MouseEvent('click', { bubbles: true }));
     await page.click('结束进程');

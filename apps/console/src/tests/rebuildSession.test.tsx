@@ -52,13 +52,26 @@ test('重复确认只发一次，超时重试保持原请求与套餐，202 后�
   state.blocked = true; state.loseResponse = true;
   const confirm = [...document.querySelectorAll('button')].find((node) => node.textContent === '确认保留工作树重建')!;
   await act(async () => { confirm.click(); confirm.click(); }); await page.settle(); expect(sent).toHaveLength(1);
-  await act(async () => finish()); await page.settle(); expect(page.text()).toContain('暂未收到恢复回执'); expect(select.disabled).toBe(true);
+  // 确认后核对弹窗关闭，回执与重试留在卡片上，卡片写明这次用的套餐。
+  await act(async () => finish()); await page.settle(); expect(page.text()).toContain('暂未收到恢复回执');
+  expect(document.querySelectorAll('dialog[open]').length).toBe(0); expect(select.isConnected).toBe(false); expect(page.text()).toContain('large');
   state.blocked = false; state.loseResponse = false; await page.click('重试同一恢复请求');
   expect(sent).toHaveLength(2); expect(sent[1]).toEqual(sent[0]); expect(sent[0]?.profile).toEqual({ id: '01a0bf5d-8f4b-7d35-8c41-6a85b807e9b5', name: 'large', cpu: '2', memory: '4Gi', storage: '20Gi' });
   expect(page.text()).toContain('恢复已排队'); expect(page.text()).not.toContain('原工作树已恢复');
   expect(document.querySelector('.cm-content')).toBe(editor); expect(editor.textContent).toBe('恢复前的未保存草稿');
   expect(f.commands.some((command) => ['startAgentTerminal', 'closeTerminal', 'stopAgent'].includes(command.type))).toBe(false);
   expect(f.writes.some((write) => write.method === 'DELETE')).toBe(false);
+});
+
+// 2026-09-23 起核对与确认在弹窗里：取消只关窗，选过的套餐下次核对仍在；「清空」回到当前套餐。
+test('恢复核对弹窗：取消后再核对沿用选过的套餐，清空回到当前套餐', async () => {
+  const { sent } = setup(); page = await renderApp(`/projects/${activityProjectId}/dev-session`);
+  const select = () => document.querySelector<HTMLSelectElement>('dialog[open] select[aria-label="环境资源套餐"]')!;
+  await page.click('会话与环境'); await page.click('检查并恢复原工作树'); expect(document.querySelector('dialog[open]')?.getAttribute('role')).toBe('alertdialog');
+  await act(async () => { select().value = '01a0bf5d-8f4b-7d35-8c41-6a85b807e9b5'; select().dispatchEvent(new Event('change', { bubbles: true })); });
+  await page.click('保留当前工作区'); expect(document.querySelectorAll('dialog[open]').length).toBe(0);
+  await page.click('检查并恢复原工作树'); expect(select().value).toBe('01a0bf5d-8f4b-7d35-8c41-6a85b807e9b5');
+  await page.click('清空'); expect(select().value).toBe('01a0bf5d-8f4b-7c08-8245-6a7766e23a18'); expect(sent).toHaveLength(0);
 });
 
 test('套餐变化或任务修订冲突必须重新检查，不能重发旧确认', async () => {

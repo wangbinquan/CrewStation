@@ -3,7 +3,7 @@ import { api } from '../../../../shared/api/client';
 import { queryKeys } from '../../../../shared/api/queryKeys';
 import { useApiQuery } from '../../../../shared/api/useApi';
 import { useT } from '../../../../shared/lib/useT';
-import { Button } from '../../../../shared/ui/Button';
+import { FormDialog } from '../../../../shared/ui/dialog/FormDialog';
 import type { HistoricalStartHandle } from '../../hooks/useHistoricalStart';
 import { choiceBlocked, choicesFor, resolveChoice } from '../../model/computeChoices';
 import { PaneNotice } from '../PaneNotice';
@@ -19,6 +19,7 @@ export interface StartAgentFormProps {
  * 启动一个流式交互 Agent。算力由平台统一提供（RFC-001）：这里只选管理员定义的档位名，
  * 厂商、模型与驱动都不出现在租户面——它们是平台的采购信息，业务也无从判断该填什么。
  * RFC-006：通用终端协议的档位只能用于「＋ CLI」，这里不列。权限不分档，一律完全权限（D59）。
+ * 2026-09-23 起是弹窗：草稿在 useHistoricalStart 里，取消、✕、Esc 只关窗；启动进行中也能关窗回到对话，已发出的启动照常完成。
  */
 export function StartAgentForm({ projectId, creation }: StartAgentFormProps): ReactElement {
   const t = useT();
@@ -30,7 +31,8 @@ export function StartAgentForm({ projectId, creation }: StartAgentFormProps): Re
   const blockText = computeBlockText(t, block, resolveChoice(options, compute));
   const ready = profiles.data !== undefined && block === undefined && prompt.trim() !== '';
   return (
-    <div className={styles.form}>
+    <FormDialog title={t('devSession.agents.start')} submitLabel={busy ? t('devSession.agents.starting') : t('devSession.agents.startSubmit')} submitDisabled={!ready || busy}
+      error={creation.error} dirty={creation.dirty && !busy} onClear={() => edit({ compute: '', prompt: '' })} onClose={() => creation.setOpen(false)} onSubmit={start}>
       <div className={styles.row}>
         <label htmlFor="agent-compute">{t('devSession.agents.compute')}</label>
         <select id="agent-compute" className={styles.select} value={compute} disabled={busy} onChange={(event) => edit({ compute: event.target.value })}>
@@ -49,12 +51,6 @@ export function StartAgentForm({ projectId, creation }: StartAgentFormProps): Re
         aria-label={t('devSession.agents.prompt')}
         onChange={(event) => edit({ prompt: event.target.value })}
       />
-      <div className={styles.actions}>
-        <Button variant="primary" disabled={!ready || busy} onClick={start}>
-          {busy ? t('devSession.agents.starting') : t('devSession.agents.startSubmit')}
-        </Button>
-        <Button onClick={() => creation.setOpen(false)}>{t('devSession.agents.startCancel')}</Button>
-      </div>
-    </div>
+    </FormDialog>
   );
 }

@@ -235,7 +235,6 @@ export const messages = {
 
   'devSession.agents.title': 'Agent',
   'devSession.agents.start': '新建 Agent',
-  'devSession.agents.startCancel': '返回',
   'devSession.agents.startSubmit': '启动',
   'devSession.agents.starting': '启动中…',
   'devSession.agents.startingHint': 'Agent 正在启动，首条指令已固定。可继续查看已有对话，收到结果后才可离开。',
@@ -397,7 +396,6 @@ export const messages = {
   'devSession.data.requestedBy': '申请用户',
   'devSession.data.expiresLabel': '到期时间',
   'devSession.data.opinion': '审批意见',
-  'devSession.data.opinionDraft': '这条记录有未提交的审批意见，下方可继续编辑或清空；不会自动发送。',
   'devSession.data.action.approve': '批准',
   'devSession.data.action.reject': '拒绝',
   'devSession.data.action.revoke': '撤销绑定',

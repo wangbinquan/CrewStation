@@ -30,7 +30,7 @@ test('历史 Agent 草稿按对象保留，切换、新建取消与发送失败�
   await edit('仅给 A 的草稿'); await select(historyAgentB);
   // 原输入框跨 Agent 复用同一 draft，选择 B 会把 A 的未发送内容带过去。
   expect(input().value).toBe(''); await edit('仅给 B 的草稿'); await select(historyAgentA); expect(input().value).toBe('仅给 A 的草稿');
-  await page.click('新建 Agent'); await act(async () => button('返回').click()); await page.settle(); expect(input().value).toBe('仅给 A 的草稿');
+  await page.click('新建 Agent'); await page.click('取消'); expect(input().value).toBe('仅给 A 的草稿');
   await page.click('发送'); expect(fixture.sends).toHaveLength(1); expect(fixture.sends[0]).toMatchObject({ agentId: historyAgentA, content: '仅给 A 的草稿' });
   await finish(0, true); expect(input().value).toBe('仅给 A 的草稿'); expect(page.text()).toContain('上游未确认发送结果');
   await select(historyAgentB); expect(input().value).toBe('仅给 B 的草稿'); expect(page.text()).not.toContain('上游未确认发送结果');

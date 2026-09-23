@@ -7,6 +7,7 @@ import { Dialog } from '../shared/ui/dialog/Dialog';
 import { DialogHost, DialogVisibility } from '../shared/ui/dialog/DialogHost';
 import { FormDialog } from '../shared/ui/dialog/FormDialog';
 import { ConfirmationDialog } from '../shared/ui/dialog/ConfirmationDialog';
+import { ButtonSizeContext } from '../shared/ui/Button';
 import { openDialog } from './confirmDialogDriver';
 import { renderElement } from './renderElement';
 
@@ -275,4 +276,12 @@ test('所在的一片藏起时弹窗不画、重新显示时回来；离开确�
   expect(titles()).toBe('草稿、离开确认');
   await toggle(); expect(titles()).toBe('离开确认'); expect(document.querySelectorAll('dialog').length).toBe(1);
   await toggle(); expect(titles()).toBe('草稿、离开确认');
+});
+
+// 开发页整片包在紧凑档里（ButtonSizeContext 沿组件树穿过 portal）：弹窗底部的按钮仍是标准档，✕ 是紧凑档。
+test('紧凑档区域里打开的弹窗：操作条按钮仍是标准档', async () => {
+  rendered = await renderElement(<ButtonSizeContext.Provider value="small"><FormDialog title="新建 Agent" submitLabel="启动" onSubmit={() => undefined} onClose={() => undefined}><input /></FormDialog></ButtonSizeContext.Provider>, messages);
+  const classes = (label: string) => [...openDialog().querySelectorAll('button')].find((node) => node.textContent === label)!.className.split(' ');
+  expect(classes('启动')).toEqual(['button', 'primary']); expect(classes('取消')).toEqual(['button', 'ghost']);
+  expect(classes('✕')).toContain('small');
 });

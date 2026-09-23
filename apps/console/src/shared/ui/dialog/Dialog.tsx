@@ -3,7 +3,7 @@ import type { FormEvent, KeyboardEvent, MouseEvent, ReactElement, ReactNode, Ref
 import { createPortal } from 'react-dom';
 import { currentOpener, returnFocus } from '../../lib/focusReturn';
 import { useT } from '../../lib/useT';
-import { Button } from '../Button';
+import { Button, ButtonSizeContext } from '../Button';
 import { useDialogHost, useDialogsHidden } from './DialogHost';
 import styles from './Dialog.module.css';
 
@@ -76,14 +76,15 @@ function DialogFrame({ title, children, footer, onClose, busy = false, size = 'm
   const cancel = (event: SyntheticEvent): void => { event.preventDefault(); if (!busy) onClose(); };
   const keyDown = (event: KeyboardEvent): void => { event.stopPropagation(); };
   const submit = (event: FormEvent): void => { event.preventDefault(); event.stopPropagation(); if (!busy) onSubmit?.(); };
-  const content = <>
+  // 区域缺省档位（开发页整片是紧凑档）沿组件树穿过 portal 传进来；弹窗自己的按钮一律标准档，在这里复位。
+  const content = <ButtonSizeContext.Provider value={undefined}>
     <header className={styles.header}>
       <h2 id={titleId} className={styles.title}>{title}</h2>
       <Button variant="ghost" size="small" className={styles.close} aria-label={t('ui.dialog.close')} title={t('ui.dialog.close')} disabled={busy} onClick={onClose}>✕</Button>
     </header>
     {children !== undefined && children !== null && children !== false ? <div ref={body} className={styles.body}>{children}</div> : null}
     {footer !== undefined && footer !== null && footer !== false ? <div className={styles.footer}>{footer}</div> : null}
-  </>;
+  </ButtonSizeContext.Provider>;
   const element = (
     <dialog ref={dialog} className={[styles.dialog, size === 'medium' ? undefined : styles[size]].filter(Boolean).join(' ')} role={role} aria-labelledby={titleId} aria-describedby={describedBy} aria-busy={busy} tabIndex={-1} data-cs-dialog=""
       {...ISOLATE} onKeyDown={keyDown} onCancel={cancel} onClose={onClose}>

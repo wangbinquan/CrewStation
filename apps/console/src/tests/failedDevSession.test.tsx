@@ -34,10 +34,12 @@ test('失败会话在首屏显示真实对象和原因，新建需明确确认�
   const status = [...document.querySelectorAll('header')].find((node) => node.querySelector('h1')?.textContent === '开发会话')!.querySelector('span')!;
   expect(status.textContent).toBe('失败');
   await page.click('会话与环境'); await page.click('从远端另建工作树');
+  // 2026-09-23 起另建工作树在弹窗里（不画面板标题），离开失败会话的确认叠在上面。
+  expect(document.querySelector('dialog[open] h2')?.textContent).toBe('从远端另建工作树'); expect(document.querySelector('dialog[open] section') === null).toBe(true);
   await page.click('从远端分支新建');
-  expect(document.querySelector('[role="alertdialog"]')?.textContent).toContain('main');
+  expect(document.querySelectorAll('dialog[open]').length).toBe(2); expect(document.querySelector('[role="alertdialog"]')?.textContent).toContain('main');
   expect(page.text()).toContain('页面中的未保存输入'); expect(starts).toHaveLength(0);
-  await page.click('保留当前工作区'); expect(starts).toHaveLength(0);
+  await page.click('保留当前工作区'); expect(starts).toHaveLength(0); expect(document.querySelectorAll('dialog[open]').length).toBe(1);
   expect(f.writes.some((write) => write.method === 'DELETE')).toBe(false);
   expect(f.commands.some((command) => ['startAgentTerminal', 'closeTerminal', 'stopAgent'].includes(command.type))).toBe(false);
 });
