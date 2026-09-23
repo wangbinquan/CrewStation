@@ -1,0 +1,52 @@
+/* 居中弹窗：窄屏两侧各留 16px；内容超高时在弹窗内部滚动，不让整页滚。 */
+.dialog {
+  width: min(480px, calc(100vw - 32px));
+  max-width: none;
+  max-height: calc(100dvh - 32px);
+  padding: 0;
+  border: 1px solid var(--cs-color-border);
+  border-radius: var(--cs-radius-md);
+  background: var(--cs-color-surface);
+  color: var(--cs-color-text);
+  box-shadow: var(--cs-shadow-popover);
+  overflow: auto;
+  overflow-wrap: anywhere;
+}
+
+.dialog::backdrop {
+  background: var(--cs-color-backdrop);
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--cs-space-3);
+  padding: var(--cs-space-4) var(--cs-space-5) var(--cs-space-5);
+}
+
+.title {
+  font-size: var(--cs-font-size-lg);
+  font-weight: 600;
+}
+
+.question {
+  font-weight: 600;
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--cs-space-2);
+  min-width: 0;
+}
+
+.body ul {
+  margin: 0;
+  padding-left: 1.2em;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--cs-space-2);
+}

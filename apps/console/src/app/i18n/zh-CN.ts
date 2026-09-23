@@ -92,6 +92,7 @@ export const messages = {
   'ui.connection.notSent': '操作时处于离线状态，本次操作未发送。联网后请重新检查并操作。',
   'ui.confirm.yes': '确认',
   'ui.confirm.no': '取消',
+  'ui.dialog.typeToConfirm': '输入 {word} 以确认',
   'app.brand': 'CrewStation',
   'activity.title': "Agent 动态",
   'activity.pendingCount': "待处理 {count}",

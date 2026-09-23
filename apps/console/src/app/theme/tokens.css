@@ -28,6 +28,8 @@
   --cs-color-danger-solid: #b02f39;
   --cs-color-danger-solid-hover: #952630;
   --cs-color-on-danger: #ffffff;
+  /* 模态弹窗后面的遮罩。 */
+  --cs-color-backdrop: rgba(24, 36, 56, 0.45);
 
   --cs-tone-neutral-fg: #59677c;
   --cs-tone-neutral-bg: #edf1f7;
@@ -92,6 +94,7 @@
     --cs-color-danger: #ffa4ad;
     --cs-color-danger-solid: #c93d48;
     --cs-color-danger-solid-hover: #d9525c;
+    --cs-color-backdrop: rgba(0, 0, 0, 0.6);
 
     --cs-tone-neutral-fg: #adbacd;
     --cs-tone-neutral-bg: #222b39;

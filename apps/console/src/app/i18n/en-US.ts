@@ -90,6 +90,7 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   'ui.connection.notSent': 'This action was not sent because you were offline. Once connected, check the current state and try again.',
   'ui.confirm.yes': 'Confirm',
   'ui.confirm.no': 'Cancel',
+  'ui.dialog.typeToConfirm': 'Type {word} to confirm',
   'app.brand': 'CrewStation',
   'activity.title': "Agent activity",
   'activity.pendingCount': "{count} needs attention",
