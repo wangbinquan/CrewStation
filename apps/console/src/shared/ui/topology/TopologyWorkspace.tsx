@@ -1,4 +1,4 @@
-// 形态图的页面骨架：观测行、筛选、图或窄屏列表、图例，右侧详情插槽（作者裁定放右侧）；Esc 关闭详情。
+// 形态图的页面骨架：来源失败警示、筛选、图框右上角的观测时间标签、图或窄屏列表、图例，右侧详情插槽（作者裁定放右侧）；Esc 关闭详情。
 import { useEffect, useState } from 'react';
 import type { ReactElement, ReactNode } from 'react';
 import type { LayoutMetrics } from './topologyLayout';
@@ -7,7 +7,7 @@ import { TopologyDiagram } from './TopologyDiagram';
 import { TopologyFilters } from './TopologyFilters';
 import { TopologyLegend } from './TopologyLegend';
 import { TopologyList } from './TopologyList';
-import { TopologyObserved } from './TopologyObserved';
+import { TopologyObserved, TopologyStamp } from './TopologyObserved';
 import styles from './Topology.module.css';
 
 export function useNarrow(maxWidth = 640): boolean {
@@ -49,7 +49,10 @@ export function TopologyWorkspace({ topology, label, selectedId, onSelect, metri
     {filters ? <TopologyFilters topology={topology} filter={filter} onChange={setFilter} /> : null}
     <div className={`${styles.workspace}${selectedId && detail ? ` ${styles.hasDetail}` : ''}`}>
       <div className={styles.main}>
-        {narrow ? <TopologyList topology={topology} selectedId={selectedId} onSelect={onSelect} filter={filter} /> : <TopologyDiagram key={topology.id} topology={topology} label={label} selectedId={selectedId} onSelect={onSelect} filter={filter} metrics={metrics} />}
+        <div className={styles.stage}>
+          {narrow ? <TopologyList topology={topology} selectedId={selectedId} onSelect={onSelect} filter={filter} /> : <TopologyDiagram key={topology.id} topology={topology} label={label} selectedId={selectedId} onSelect={onSelect} filter={filter} metrics={metrics} />}
+          <TopologyStamp topology={topology} />
+        </div>
         {legend ? <TopologyLegend topology={topology} /> : null}
       </div>
       {selectedId && detail ? <div className={styles.detail}>{detail}</div> : null}

@@ -19,6 +19,9 @@ const inventory = { snapshotId: 'snap-1', observedAt: time, complete: true, sour
   resource({ name: 'subtask-9', kind: 'Pod', purpose: 'business-subtask', phase: 'Pending', ready: false, abnormal: true, reason: 'Insufficient cpu', taskId: 'sub-9' }),
 ] };
 const nodes = () => [...document.querySelectorAll('[role="button"][data-node-id]')].map((n) => n.getAttribute('data-node-id'));
+const byText = (selector: string, text: string) => [...document.querySelectorAll(selector)].find((n) => n.textContent?.trim() === text) ?? null;
+// 详情栏的操作按钮在事实与表格之前：详情很长时不必滚到底才够得着。
+const precedes = (a: Element | null, b: Element | null) => !!a && !!b && (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
 const clickNode = async (id: string) => { await act(async () => { document.querySelector(`[data-node-id="${id}"]`)!.dispatchEvent(new MouseEvent('click', { bubbles: true })); }); await page!.settle(); };
 
 function memberFixture(refused = false) {
@@ -41,12 +44,13 @@ function memberFixture(refused = false) {
 test('operations tab assembles the member inventory with slots and data into the diagram; detail is read-only and leads to logs', async () => {
   const calls = memberFixture(); page = await renderApp(`/projects/${projectId}/operations?tab=topology`);
   expect(calls.some((path) => path === `/v1/projects/${projectId}/cluster-resources`)).toBe(true);
-  expect(page.text()).toContain('快照完整'); expect(page.text()).toContain('线上槽 prod · blue'); expect(page.text()).toContain('业务任务');
+  expect(page.text()).toContain('观测于'); expect(page.text()).toContain('线上槽 prod · blue'); expect(page.text()).toContain('业务任务');
   expect(nodes().sort()).toEqual(['db:production', 'route:prod', 'uid-subtask-9', 'uid-team-knowledge-blue', 'uid-team-knowledge-blue-1'].sort());
   expect(document.querySelector('[data-node-id="uid-subtask-9"]')?.getAttribute('aria-label')).toContain('Insufficient cpu');
   await clickNode('uid-team-knowledge-blue-1');
   expect(page.text()).toContain('knowledge:v1'); expect(page.text()).toContain('管理动作（重启、扩缩、删除）仍在集群管理的资源详情里');
   expect(page.text()).not.toContain('调整副本');
+  expect(precedes(byText('button', '查看日志'), document.querySelector('dl'))).toBe(true);
   await page.click('查看日志'); expect(page.search()).toMatchObject({ tab: 'logs', source: 'slot', slot: 'prod' });
 });
 
@@ -74,9 +78,11 @@ test('cluster topology tab walks system → projects → pod layer and reuses th
   await clickNode('cs-api'); expect(page.text()).toContain('uid-cs-api');
   await page.click('项目层 · 1'); expect(page.search()).toMatchObject({ layer: 'projects' });
   expect(page.text()).toContain('正常 · 1 个项目'); expect(nodes()).toEqual([`project:${f.projectId}`]);
-  await clickNode(`project:${f.projectId}`); await page.click('展开该项目的 Pod 层');
+  await clickNode(`project:${f.projectId}`); expect(precedes(byText('button', '展开该项目的 Pod 层'), document.querySelector('dl'))).toBe(true);
+  await page.click('展开该项目的 Pod 层');
   expect(page.search()).toMatchObject({ layer: 'project', projectId: f.projectId });
   expect(page.text()).toContain('项目层 › 集群验收'); expect(nodes()).toContain('uid-original'); expect(nodes()).toContain('route:preview');
   await clickNode('uid-original'); expect(page.text()).toContain('工作卷仍被引用');
+  expect(precedes(byText('button', '重启'), document.querySelector('section[aria-label="资源详情"] [role="tablist"]'))).toBe(true);
   await page.click('返回项目层'); expect(page.search()).toMatchObject({ layer: 'projects' });
 });

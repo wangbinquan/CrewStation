@@ -203,7 +203,7 @@ export const messages = {
   "cluster.count.services": "Services",
   "cluster.count.pvcs": "Volumes (PVC)",
   "cluster.count.abnormal": "Unhealthy pods",
-  "cluster.detail.overview": "Overview & actions",
+  "cluster.detail.overview": "Overview",
   "cluster.detail.related": "Related resources",
   "cluster.detail.containers": "Containers",
   "cluster.detail.events": "Events",
@@ -260,9 +260,6 @@ export const messages = {
   'cluster.topology.breadcrumb': 'Project layer › {name}',
   'cluster.topology.back': 'Back to project layer',
   'cluster.topology.expand': "Expand this project's Pod layer",
-  'cluster.topology.systemHint': 'Node states come from the cluster inventory; dashed call relations are static architecture notes, not measured traffic.',
-  'cluster.topology.projectsHint': 'Projects needing attention come first; beyond 60 healthy projects the rest fold, click "N more" to expand. Select a project card to expand its Pod layer from the detail.',
-  'cluster.topology.projectHint': "Same component and snapshot as the project's Operations topology; select a node to open the resource detail with events, logs and actions.",
   // Page structure (ruled 2026-09-23: metrics strip + "Topology | Resource inventory" tabs)
   'cluster.overview': 'Cluster overview',
   'cluster.views': 'Cluster views',

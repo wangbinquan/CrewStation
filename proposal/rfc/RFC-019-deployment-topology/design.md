@@ -110,10 +110,12 @@ ClusterSummarySchema.projects[i] += { workloads?, pods?, readyPods?, abnormal?, 
 筛选（语义、状态、只看需要关注）只压暗不移除，保持位置稳定。颜色全部走 `--cs-topo-*` 与既有 `--cs-tone-*`，不写裸色值；`prefers-reduced-motion` 下无过渡。
 `TopologyList`：≤640px 的替代渲染，按横带分组，行内同样的状态点与语义色左边。
 
+2026-09-23 修订说明（作者实机反馈，直接改＋回填）：图上方的观测说明行与集群拓扑三层的提示行删除；观测时间改为叠在图框右上角的标签（`TopologyStamp`，完整度与「每 15 秒换一份快照」放在悬停提示），只有 `complete=false` 时仍在图上方留一条写明失败来源的警示。右侧详情栏（≥1100px）限高到视口并独立滚动，壳层 `main` 在有详情时放开 `overflow` 使 sticky 生效；详情里的操作按钮一律放在顶部——`ClusterDetail` 的管理动作移到页签之上（各页签都可用），项目节点卡的「展开 Pod 层」与 `TopologyDetail` 的「查看日志」移到事实列表之前，接口目录 `OperationDetail` 的申请／试调同样上移。
+
 ## 6. 权限、刷新与失败模式
 
 - 项目侧查询用 `useApiQuery` 的 15 秒轮询与 `keepPrevious`（RFC-010 §8 修订）：换快照只换数据，不卸载图；详情按 `resourceId` 固定，对象消失时提示已被替换。
-- 部分来源失败：`complete=false` 时观测行写明失败来源，受影响 kind 的节点标 `unknown`，计数显示占位；不把残缺集合当完整总量。
+- 部分来源失败：`complete=false` 时图上方警示条写明失败来源，受影响 kind 的节点标 `unknown`，计数显示占位；不把残缺集合当完整总量。
 - 快照 410：与现有页面一致，提示刷新并重新读取最新快照。
 - 项目侧不显示事件、日志与管理动作；管理员在 Pod 层点节点走 `ClusterDetail`（事件、日志、动作照旧）。
 - 成员权限变化后现有查询按既有规则重新校验（角色变化 → 403 → 页面按现有 403 处理）。

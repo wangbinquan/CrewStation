@@ -42,6 +42,8 @@ test('申请失败保留打开的表单与理由，重试成功才收起并显�
   await page.click('申请定向开放');
   // RFC-020 §7：表里的按钮选中该行，申请表单在右侧详情栏展开。
   expect(document.querySelector('tr[aria-current="true"]')?.textContent).toContain('/invoices'); expect(document.querySelector('aside[aria-label="操作详情"] textarea')).not.toBeNull();
+  // 详情栏的操作（申请表单）在事实之前，不压在底部。
+  expect(document.querySelector('aside[aria-label="操作详情"] textarea')!.compareDocumentPosition(document.querySelector('aside[aria-label="操作详情"] dl')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   await reason('查询账单'); await page.click('提交申请');
   // 旧实现提交即卸载行内表单，服务失败后理由消失；这里只在成功后收起。
   expect(document.querySelector<HTMLTextAreaElement>('textarea')?.value).toBe('查询账单');

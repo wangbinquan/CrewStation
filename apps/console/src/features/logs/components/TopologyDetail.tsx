@@ -30,10 +30,10 @@ export function TopologyDetail({ topology, nodeId, resources, onSelect, onClose,
   const logs = logsSearchFor(resource);
   return <Card title={node.title} extra={<Button onClick={onClose}>{t('logs.topology.close')}</Button>} stacked>
     <p className={styles.line}><Badge tone={statusTone(node.status)}>{node.statusText ?? t(`topology.status.${node.status}`)}</Badge>{node.abnormal ? <Badge tone="warning">{t('logs.topology.attention')}</Badge> : null}<span>{t(`topology.semantic.${node.semantic}`)}{node.subtitle ? ` · ${node.subtitle}` : ''}</span></p>
+    {logs ? <div className={styles.actions}><Button onClick={() => onLogs(logs)}>{t('logs.topology.viewLogs')}</Button></div> : null}
     <DefinitionList items={(node.facts ?? []).map(([label, value]) => ({ label, value }))} />
     {related.length > 0 ? <div><h3 className={styles.heading}>{t('logs.topology.related', { count: related.length })}</h3><ul className={styles.related}>{related.map(({ edge, other, outgoing }) => <li key={`${edge.from}-${edge.to}`}><button type="button" className={styles.row} onClick={() => onSelect(other!.id)}><strong>{other!.title}</strong><small>{outgoing ? '→ ' : '← '}{t(`topology.edge.${edge.kind}`)}{edge.label ? ` · ${edge.label}` : ''}</small></button></li>)}</ul></div> : null}
     {resource && resource.containers.length > 0 ? <div><h3 className={styles.heading}>{t('logs.topology.containers')}</h3><table className={styles.table}><thead><tr><th>{t('logs.topology.container')}</th><th>{t('logs.topology.image')}</th><th>{t('logs.topology.ready')}</th><th>{t('logs.topology.restarts')}</th><th>{t('logs.topology.state')}</th></tr></thead><tbody>{resource.containers.map((c) => <tr key={c.name}><td>{c.init ? `init · ${c.name}` : c.name}</td><td><code>{c.image}</code></td><td>{c.ready ? t('logs.topology.yes') : t('logs.topology.no')}</td><td>{c.restarts}</td><td>{c.reason ? `${c.state} · ${c.reason}` : c.state}</td></tr>)}</tbody></table></div> : null}
-    <div className={styles.actions}>{logs ? <Button onClick={() => onLogs(logs)}>{t('logs.topology.viewLogs')}</Button> : null}</div>
     <p className={styles.muted}>{t('logs.topology.readOnly')}</p>
   </Card>;
 }

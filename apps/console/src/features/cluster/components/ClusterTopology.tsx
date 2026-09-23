@@ -69,14 +69,13 @@ export function ClusterTopology({ search, change, go, summary, snapshotId }: Pro
   const detail = node ? (node.resourceId ? <ClusterDetail key={node.resourceId} resourceId={node.resourceId} snapshotId={snapshotId} close={() => setSelected(undefined)} onOperation={(id) => go({ ...search, operationId: id })}
       select={(row) => { const target = topology?.nodes.find((n) => n.resourceId === row.resourceId); if (target) setSelected(target.id); else go({ ...search, tab: 'pods', resourceId: row.resourceId }); }} />
     : <Card title={node.title} extra={<Button onClick={() => setSelected(undefined)}>{t('cluster.close')}</Button>} stacked>
-      <DefinitionList items={(node.facts ?? []).map(([label, value]) => ({ label, value }))} />
       {node.id.startsWith('project:') ? <div className={styles.actions}><Button variant="primary" onClick={() => openProject(node.id.slice('project:'.length))}>{t('cluster.topology.expand')}</Button></div> : null}
+      <DefinitionList items={(node.facts ?? []).map(([label, value]) => ({ label, value }))} />
     </Card>) : undefined;
   return <div ref={main} className={styles.stack}>
     <Segmented label={t('cluster.topology.layers')} value={layer} onChange={(value) => { if (value === 'system') change({ layer: 'system' }); else if (value === 'projects') change({ layer: 'projects' }); else if (projectId) change({ layer: 'project', projectId }); }}
       items={[{ value: 'system', label: t('cluster.topology.system') }, { value: 'projects', label: t('cluster.topology.projects', { count: summary?.projects.length ?? '—' }) }, { value: 'project', label: projectId ? t('cluster.topology.project', { name: projectName(projectId) ?? projectId }) : t('cluster.topology.projectNone'), disabled: !projectId }]}
       extra={layer === 'project' && projectId ? <>{t('cluster.topology.breadcrumb', { name: projectName(projectId) ?? projectId })} <Button variant="ghost" onClick={() => change({ layer: 'projects', projectId: undefined, scope: 'all' })}>{t('cluster.topology.back')}</Button></> : undefined} />
-    <p className={styles.muted}>{layer === 'system' ? t('cluster.topology.systemHint') : layer === 'projects' ? t('cluster.topology.projectsHint') : t('cluster.topology.projectHint')}</p>
     <QueryStatus isPending={!error && !topology && (layer !== 'projects' || !summary)} error={error} isEmpty={topology !== undefined && topology.nodes.length === 0} emptyTitle={t('cluster.empty')} />
     {topology && topology.nodes.length > 0 ? <TopologyWorkspace key={topology.id} topology={topology} label={topology.title} selectedId={selected} onSelect={select} metrics={layer === 'projects' ? SUMMARY_METRICS : undefined} filters={layer !== 'projects'} legend={layer !== 'projects'} detail={detail} /> : null}
   </div>;

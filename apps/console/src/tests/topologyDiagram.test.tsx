@@ -43,7 +43,15 @@ test('filters dim without removing, the attention chip counts abnormal nodes, an
   const legend = document.querySelector('[aria-label="图例"]')!.textContent ?? '';
   for (const part of ['网关入口1', '服务槽2', '开发会话2', '等待中1', '运行中1', '就绪3', '实线为观测到的关系', '虚线为静态架构标注，不是实测']) expect(legend).toContain(part);
   expect(document.querySelectorAll('[data-evidence="static"]')).toHaveLength(2);
-  expect(rendered.text()).toContain('快照完整');
+  // 快照完整时不占说明行：只有图框右上角的观测时间标签，说明放在悬停提示里。
+  const stamp = [...document.querySelectorAll('span[title]')].find((n) => n.textContent?.startsWith('观测于'));
+  expect(stamp?.getAttribute('title')).toContain('快照完整'); expect(stamp?.parentElement?.contains(document.querySelector('svg[role="group"]'))).toBe(true);
+  expect(rendered.text()).not.toContain('快照完整');
+});
+
+test('a partial snapshot still gets a warning line naming the failed sources', async () => {
+  rendered = await renderElement(<TopologyWorkspace topology={{ ...layoutFixture, complete: false, incompleteReason: 'Pod（超时）' }} label="夹具形态图" onSelect={() => undefined} />, {});
+  expect(rendered.text()).toContain('部分来源失败：Pod（超时）'); expect(rendered.text()).toContain('观测于');
 });
 
 test('edge labels are drawn only when the longest horizontal run has room for them', async () => {

@@ -28,15 +28,15 @@ export function OperationDetail({ operation, pendingRequest, actions, requesting
   if (!operation) return <Card compact title={t('catalog.detail.title')}>{missingId ? <ActionNote tone="error">{t('catalog.detail.missing', { id: missingId })}</ActionNote> : null}<p className={styles.muted}>{t('catalog.detail.empty')}</p>{missingId && onClear ? <Button variant="ghost" onClick={onClear}>{t('catalog.detail.clear')}</Button> : null}</Card>;
   const granted = operation.granted === true;
   return <Card compact title={operation.summary ?? operation.id} extra={<><Badge tone={granted ? 'success' : 'neutral'}>{granted ? t('catalog.granted.yes') : t('catalog.granted.no')}</Badge>{onClear ? <Button variant="ghost" onClick={onClear}>{t('catalog.detail.clear')}</Button> : null}</>}>
+    <div className={styles.detailActions}>
+      <OperationActions key={`${operation.id}:${requesting}`} operation={operation} pendingRequest={pendingRequest} actions={actions} initiallyRequesting={requesting} />
+      {onInvoke && granted ? <Button onClick={() => onInvoke(operation)}>{t('catalog.invoke.open')}</Button> : null}
+    </div>
     <DefinitionList items={[
       { label: t('catalog.operations.key'), value: <code>{operation.id}</code> },
       { label: t('catalog.operations.proxy'), value: operation.proxy },
       { label: t('catalog.detail.endpoint'), value: <code>{operation.method} {operation.path}</code> },
       { label: t('catalog.operations.policy'), value: <Badge tone={operation.openPolicy === 'default' ? 'success' : 'warning'}>{t(`catalog.policy.${operation.openPolicy}`)}</Badge> },
     ]} />
-    <div className={styles.detailActions}>
-      <OperationActions key={`${operation.id}:${requesting}`} operation={operation} pendingRequest={pendingRequest} actions={actions} initiallyRequesting={requesting} />
-      {onInvoke && granted ? <Button onClick={() => onInvoke(operation)}>{t('catalog.invoke.open')}</Button> : null}
-    </div>
   </Card>;
 }

@@ -25,9 +25,10 @@ describe.skipIf(!session)('deployed deployment topology (RFC-019)', () => {
     if (summary.complete) expect(summary.projects.every((p) => typeof p.pods === 'number' && typeof p.workloads === 'number')).toBe(true);
     const count = summary.projects.length;
     await clickButton(page, `项目层 · ${count}`);
-    await page.waitUntil(`document.body.innerText.includes('异常项目置顶')`, 30_000, 300);
+    // 2026-09-23 起各层不再有提示行，按地址确认已进入项目层。
+    await page.waitUntil(`new URLSearchParams(location.search).get('layer') === 'projects'`, 30_000, 300);
     if (count > 0) {
-      // 有项目的部署（本机）：每个项目一张卡；CI 的空平台没有项目，项目层只剩提示与空态。
+      // 有项目的部署（本机）：每个项目一张卡；CI 的空平台没有项目，项目层只剩空态。
       await page.waitUntil(`document.querySelectorAll('[data-node-id^="project:"]').length > 0`, 30_000, 300);
       expect(await page.bodyText()).toContain('个项目');
     }

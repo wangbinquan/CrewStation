@@ -203,7 +203,7 @@ export const messages = {
   "cluster.count.services": "Service",
   "cluster.count.pvcs": "工作卷 PVC",
   "cluster.count.abnormal": "异常 Pod",
-  "cluster.detail.overview": "概览与操作",
+  "cluster.detail.overview": "概览",
   "cluster.detail.related": "关联资源",
   "cluster.detail.containers": "容器",
   "cluster.detail.events": "事件",
@@ -260,9 +260,6 @@ export const messages = {
   'cluster.topology.breadcrumb': '项目层 › {name}',
   'cluster.topology.back': '返回项目层',
   'cluster.topology.expand': '展开该项目的 Pod 层',
-  'cluster.topology.systemHint': '节点状态来自集群盘点；虚线调用关系是静态架构标注，不是实测流量。',
-  'cluster.topology.projectsHint': '异常项目置顶；正常项目超过 60 个时折叠，点击「还有 N 个」展开。点选项目卡片后可在详情里展开它的 Pod 层。',
-  'cluster.topology.projectHint': '与项目运行与诊断的形态图同一组件、同一份快照；点节点打开资源详情，事件、日志与管理动作都在那里。',
   // 页面结构（2026-09-23 裁定：指标条＋「拓扑｜资源清单」两级页签）
   'cluster.overview': '集群总览',
   'cluster.views': '集群视图',
