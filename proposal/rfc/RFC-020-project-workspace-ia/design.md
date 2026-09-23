@@ -138,11 +138,15 @@ tool: z.object({ name: z.enum(['preview', 'code', 'changes', 'data', 'reference'
 - `ReleaseTimeline`：一行一条；发布条目显示标签、状态角标、槽角色、SHA 7 位、分支、时间、「详情」（选中即现有 `SelectedRelease`）；失败条目显示原因与「日志」（`operations?tab=logs&source=build&releaseId=`）；切流条目显示「{人} 把 {标签} 切为正式版本／回退到 {标签}」与原因。镜像地址移到详情。
 - 标签折叠段不变。
 
+> **2026-09-23 修订（作者当面裁定，直接修改，不另立 RFC）。** 标签段不再折叠：`ReleasePage` 直接渲染 `TagCard`，仍在页面最下方（`releaseTimelinePage` 用例断言它是最后一张卡、不在 `<details>` 里）。
+
 ## 7. 运行与诊断、开发资源、项目设置
 
 - 运行与诊断保留 `Tabs`，五个页签。`status` 页签：`HealthCards` 在上（保留「查看此版本日志」）、`TopologyPage` 在下；两者各自的查询与轮询不变。`TracePage` 空态文案改为说明 trace_id 的来源并给事件投递链接。
 - 参考面板的三段内容见 §5.3；`CatalogPage` 的「表在前、详情在旁」（`OperationsTable` → 选中行右侧 `OperationDetail`：文档、授权状态、申请表单、试调；`SwaggerPanel` 折叠；管理员链接改页脚一行）只在放大形态渲染；事件段顶部一行「最近投递 n 条 · 死信 m 条 →」来自 `api.events.listDeliveries` 的一页计数。
 - 项目设置 `info` 组：`ProjectInfoSection` 用 `DefinitionList`：仓库（路径、默认分支、状态、打开）、地址（两槽域名、开发预览域名）、服务身份（服务名、命名空间）、配额与套餐（`CapabilityQuota` 的数据）、折叠技术详情（项目 ID、服务 ID、命名空间，可复制）。只读，不画输入框。
+
+> **2026-09-23 修订（作者当面裁定，直接修改，不另立 RFC）。** 技术详情就是项目信息：`ProjectInfoCard`（`features/projects/components`）作为 `info` 组第一张卡直接展示项目 ID、服务 ID、命名空间，不再折叠；三个标签改走 `projects.info.*` 文案（原为写死的英文）。其后的仓库卡与 `CapabilitiesPage section="project"` 不变（`projectResources` 用例断言卡片顺序与内容）。
 
 ## 8. 名称、ID 与状态文案
 

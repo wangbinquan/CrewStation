@@ -49,3 +49,13 @@ test('切流或成员读取失败时只列能读到的一类并说明；负责�
   expect([...versions.querySelectorAll('button')].map((node) => node.textContent)).toContain('上线 v1.1.0'); expect(page.search()).toMatchObject({ switch: true });
   expect(page.text()).not.toContain(targetId.slice(0, 8) + '…');
 });
+
+test('标签表在发布页最下方直接展开，列出仓库里的全部标签', async () => {
+  withTimeline(); page = await renderApp(`/projects/${projectId}/release`); await untilRows(5); await page.settle();
+  // 2026-09-23 作者裁定标签表不再折叠（RFC-020 design §6 修订）：不用先点开，也不能再包进 <details>。
+  const titles = [...document.querySelectorAll('main section > header > h2')];
+  expect(titles.at(-1)?.textContent).toBe('标签');
+  const card = titles.at(-1)!.closest('section')!;
+  expect(card.closest('details') === null).toBe(true);
+  expect([...card.querySelectorAll('tbody tr')].map((row) => row.querySelector('code')?.textContent)).toEqual(['v1.0.0', 'v1.1.0', 'v0.9.0']);
+});

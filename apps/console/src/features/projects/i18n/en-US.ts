@@ -202,6 +202,11 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   'projects.quota.loading': 'Loading the quota…',
   'projects.quota.error': 'Failed to load the quota: {message}',
 
+  'projects.info.title': 'Project info',
+  'projects.info.projectId': 'Project ID',
+  'projects.info.serviceId': 'Service ID',
+  'projects.info.namespace': 'Namespace',
+
   'projects.repository.title': 'Source repository',
   'projects.repository.path': 'Path',
   'projects.repository.defaultBranch': 'Default branch',

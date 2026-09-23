@@ -48,7 +48,7 @@ function ReleaseWorkspace(): ReactElement {
           {search.source ? <PublishForm serviceId={serviceId} projectId={projectId} source={search.source} canPublish={canPublish && !error} actions={actions} onSource={(source) => updateSearch({ ...search, source })} onClose={() => updateSearch({ release: search.release })} onAccepted={(release) => updateSearch({ release: release.id })} /> : null}
           {search.release ? <SelectedRelease key={search.release} releaseId={search.release} serviceId={serviceId} /> : null}
           <ReleaseTimeline projectId={projectId} serviceId={serviceId} onSelect={(release) => updateSearch({ ...search, release })} />
-          <details><summary>{t('release.tags.title')}</summary><TagCard serviceId={serviceId} /></details>
+          <TagCard serviceId={serviceId} />
         </div>
       ) : null}
     </>

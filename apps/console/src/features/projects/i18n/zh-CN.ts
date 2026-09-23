@@ -200,6 +200,11 @@ export const messages = {
   'projects.quota.loading': '读取配额…',
   'projects.quota.error': '读取配额失败：{message}',
 
+  'projects.info.title': '项目信息',
+  'projects.info.projectId': '项目 ID',
+  'projects.info.serviceId': '服务 ID',
+  'projects.info.namespace': '命名空间',
+
   'projects.repository.title': '源码仓库',
   'projects.repository.path': '路径',
   'projects.repository.defaultBranch': '默认分支',

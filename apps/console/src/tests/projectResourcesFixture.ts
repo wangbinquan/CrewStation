@@ -1,7 +1,7 @@
 export const resourcesProjectId = '01a0bf5d-8f4b-7e1e-8dde-c9c2ae13ed34', resourcesServiceId = '01a0bf5d-8f4b-760b-86b6-0bb9f08a9eaa';
 const createdAt = '2026-09-20T01:00:00.000Z';
 export function projectResourcesFixture(admin = false) {
-  const state = { kind: admin ? 'APIProxy' : 'DigitalWorker', fail: '', invalid: false };
+  const state = { kind: admin ? 'APIProxy' : 'DigitalWorker', fail: '', invalid: false, noService: false };
   const calls: string[] = [];
   const subscription = { id: '01a0bf5d-8f4b-7b9c-8c07-a2ef94c840cd', eventTypeId: '01a0bf5d-8f4b-780c-85dd-95f81e0fec71', serviceId: resourcesServiceId, eventType: 'source.changed', handlerPath: '/on-source', state: 'active' };
   const capability = {
@@ -18,7 +18,7 @@ export function projectResourcesFixture(admin = false) {
     const path = new URL(String(raw), 'http://localhost').pathname; calls.push(path);
     if (state.fail && path.endsWith(`/${state.fail}`)) return Response.json({ error: 'unavailable', message: '本主题暂不可用' }, { status: 503 });
     if (path === '/v1/me') return Response.json({ id: 'user', name: '开发者', platformRole: (admin) ? 'admin' : 'developer', isAdmin: admin, memberships: [{ projectId: resourcesProjectId, role: 'developer' }] });
-    if (path === `/v1/projects/${resourcesProjectId}`) return Response.json({ id: resourcesProjectId, serviceId: resourcesServiceId, name: '示例项目', slug: 'demo', namespace: 'cs-demo', kind: state.kind, state: 'active' });
+    if (path === `/v1/projects/${resourcesProjectId}`) return Response.json({ id: resourcesProjectId, ...(state.noService ? { state: 'provisioning' } : { serviceId: resourcesServiceId, state: 'active' }), name: '示例项目', slug: 'demo', namespace: 'cs-demo', kind: state.kind });
     if (path.endsWith('/capabilities')) return Response.json(state.invalid ? {} : capability);
     if (path.endsWith('/repository')) return Response.json({ serviceId: resourcesServiceId, pathWithNamespace: 'crew/demo', defaultBranch: 'main', state: 'ready', httpUrl: 'https://repo.test/crew/demo' });
     if (path.endsWith('/subscriptions')) return Response.json({ items: [subscription] });

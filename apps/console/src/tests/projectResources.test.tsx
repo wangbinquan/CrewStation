@@ -3,7 +3,7 @@ import { afterEach, expect, test } from 'bun:test';
 import { act } from 'react';
 import { parseResourceSearch } from '../shared/project/resourceSearch';
 import { renderApp } from './renderApp';
-import { projectResourcesFixture, resourcesProjectId as id } from './projectResourcesFixture';
+import { projectResourcesFixture, resourcesProjectId as id, resourcesServiceId } from './projectResourcesFixture';
 const originalFetch = globalThis.fetch;
 let page: Awaited<ReturnType<typeof renderApp>> | undefined;
 afterEach(() => { page?.unmount(); page = undefined; globalThis.fetch = originalFetch; });
@@ -31,14 +31,28 @@ for (const admin of [false, true]) {
   });
 }
 
-test('项目信息只读：仓库有真实链接，地址与服务身份直接可见，配额未知不冒充零，不混入接入参数', async () => {
+test('项目信息只读：最上面是直接展开的项目信息卡，仓库有真实链接，地址与服务身份直接可见，配额未知不冒充零，不混入接入参数', async () => {
   projectResourcesFixture(); page = await renderApp(`/projects/${id}/settings?tab=info`);
   expect(page.text()).toContain('尚未设置配额'); expect(page.text()).toContain('尚未选择服务套餐'); expect(page.text()).toContain('demo/demo'); expect(page.text()).toContain('https://preview.demo.test');
   expect(page.text()).not.toContain('X-User-Id'); expect(page.text()).not.toContain('CS_DATABASE_URL');
   expect(document.querySelector('a[href="https://repo.test/crew/demo"]')).not.toBeNull();
-  // 只读组不画输入框；ID 在折叠的技术详情里。
+  // 只读组不画输入框。
   expect(document.querySelector('main form')).toBeNull();
-  expect([...document.querySelectorAll('main details summary')].some((node) => node.textContent === '技术详情')).toBe(true);
+  // 2026-09-23 作者裁定：原先折叠的「技术详情」就是项目信息，作为这一组最上面的卡片直接展开（RFC-020 design §7 修订）。
+  const titles = [...document.querySelectorAll('main section > header > h2')];
+  expect(titles.slice(0, 2).map((node) => node.textContent)).toEqual(['项目信息', '源码仓库']);
+  const card = titles[0]!.closest('section')!;
+  expect(card.closest('details') === null).toBe(true);
+  expect([...card.querySelectorAll('dt')].map((node) => node.textContent)).toEqual(['项目 ID', '服务 ID', '命名空间']);
+  expect([...card.querySelectorAll('dd')].map((node) => node.textContent)).toEqual([id, resourcesServiceId, 'cs-demo']);
+});
+
+test('开通未完成时项目信息卡照样在最上面，服务 ID 用「—」占位，没有仓库卡并说明原因', async () => {
+  const f = projectResourcesFixture(); f.state.noService = true; page = await renderApp(`/projects/${id}/settings?tab=info`);
+  const titles = [...document.querySelectorAll('main section > header > h2')];
+  expect(titles[0]?.textContent).toBe('项目信息'); expect(titles.map((node) => node.textContent)).not.toContain('源码仓库');
+  expect([...titles[0]!.closest('section')!.querySelectorAll('dd')].map((node) => node.textContent)).toEqual([id, '—', 'cs-demo']);
+  expect(page.text()).toContain('项目尚未开通服务'); expect(f.calls.some((path) => path.endsWith('/repository'))).toBe(false);
 });
 
 test('订阅来自代码，保留订阅 ID 与投递路径，并指向当前项目 Manifest', async () => {

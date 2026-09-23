@@ -58,7 +58,7 @@ function CapabilitySections({ description: d, section, topic }: { readonly descr
     <details open={topic === 'tasks'} key={`tasks:${topic}`}><summary>{t('capabilities.businessTaskApi.title')}</summary><CapabilityBusinessTaskApi endpoints={d.businessTaskApi} /></details>
   </div>;
   return <div className={styles.stack}>
-    {/* 项目信息（RFC-020 D6）：地址与服务身份直接可见，配额与套餐在后；ID 一类技术详情由设置页自己折叠。 */}
+    {/* 项目信息（RFC-020 D6）：地址与服务身份直接可见，配额与套餐在后；项目 ID 一类标识在设置页自己最上面的项目信息卡里。 */}
     {!section || section === 'project' ? <><CapabilityIdentity service={d.service} hosts={d.hosts} /><CapabilityQuota quota={d.quota} plan={d.plan} /></> : null}
     {!section ? <><CapabilityConventions conventions={d.conventions} forwarding={d.identityForwarding} /><CapabilityConfigKeys config={d.config} /><CapabilityMcp mcp={d.mcp} /><CapabilityBusinessTaskApi endpoints={d.businessTaskApi} /></> : null}
     {!section || section === 'data' ? <CapabilityData data={d.data} /> : null}
