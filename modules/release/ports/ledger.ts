@@ -5,6 +5,8 @@ export interface SlotRecordRef {
   readonly id: string;
   readonly phase: 'pending' | 'provisioning' | 'starting' | 'ready' | 'degraded' | 'stopping' | 'stopped' | 'failed';
   readonly reason?: { readonly code: string; readonly message: string };
+  /** 子对象的观测：Deployment 的期望与就绪副本数（就绪之后的槽 DTO 照它）。 */
+  readonly children?: readonly { readonly kind: string; readonly phase: string; readonly replicas?: number; readonly readyReplicas?: number }[];
 }
 
 export interface SlotDeclaration {

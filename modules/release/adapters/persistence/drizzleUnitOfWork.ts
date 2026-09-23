@@ -8,18 +8,19 @@ import { findSlotRecord, ledgerSlotRepository, syncSlotLedger } from './ledgerPr
 
 /** 可选的资源台账投影（RFC-025 第三期）：给了就在每次槽保存的同一事务里同步台账。 */
 export function scopeOver(executor: Executor, lockSlots = false, projection?: SlotProjectionDeps): RepositoryScope {
-  const releases = drizzleReleaseRepository(executor), slots = drizzleSlotRepository(executor, lockSlots);
+  const releases = drizzleReleaseRepository(executor), slots = drizzleSlotRepository(executor, lockSlots), offlinePolicy = drizzleOfflinePolicyRepository(executor);
+  const sources = { releases, offlinePolicy };
   return {
     maintenance: drizzleMaintenance(executor),
     releases,
-    slots: projection ? ledgerSlotRepository(slots, (value) => syncSlotLedger(executor, projection, releases, value)) : slots,
+    slots: projection ? ledgerSlotRepository(slots, (value) => syncSlotLedger(executor, projection, sources, value)) : slots,
     ...(projection ? { ledger: {
-      sync: (value: Parameters<typeof syncSlotLedger>[3]) => syncSlotLedger(executor, projection, releases, value),
+      sync: (value: Parameters<typeof syncSlotLedger>[3]) => syncSlotLedger(executor, projection, sources, value),
       slot: (serviceId: Parameters<typeof findSlotRecord>[2], physical: Parameters<typeof findSlotRecord>[3]) => findSlotRecord(executor, projection, serviceId, physical),
     } } : {}),
     switches: drizzleTrafficSwitchRepository(executor),
     slotEvents: drizzleSlotEventRepository(executor),
-    offlinePolicy: drizzleOfflinePolicyRepository(executor),
+    offlinePolicy,
     events: { publish: async (topic, payload) => { await publishDomainEvent(executor, topic, payload); } },
   };
 }

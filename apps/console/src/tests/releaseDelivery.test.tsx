@@ -9,10 +9,11 @@ import { useReleaseActions } from '../features/release/model/useReleaseActions';
 import { useApiQuery } from '../shared/api/useApi';
 import { queryKeys } from '../shared/api/queryKeys';
 import { historyId, prodId, projectId, releaseDeliveryFixture, serviceId, targetId } from './releaseDeliveryFixture';
+import { FakeEventSource, resourceRecord } from './resourceRecordFixture';
 
 const originalFetch = globalThis.fetch;
 let page: Awaited<ReturnType<typeof renderApp>> | undefined;
-afterEach(() => { page?.unmount(); page = undefined; globalThis.fetch = originalFetch; });
+afterEach(() => { page?.unmount(); page = undefined; globalThis.fetch = originalFetch; delete (globalThis as { EventSource?: unknown }).EventSource; FakeEventSource.reset(); });
 const button = (label: string) => [...document.querySelectorAll<HTMLButtonElement>('button')].find((node) => node.textContent === label);
 async function click(label: string) { expect(button(label)).toBeDefined(); await act(async () => button(label)!.click()); await page!.settle(); }
 async function input(name: string, value: string) {
@@ -127,3 +128,27 @@ test('其他发布进行中保留当前部署信息并阻止切换，可精确�
   expect(page.text()).toContain('发布 v0.9.0 正在进行'); expect(action()?.disabled).toBe(true);
   await click('查看进行中的发布'); expect(page.search().release).toBe(historyId); expect(f.writes).toHaveLength(0);
 });
+
+// RFC-025 第三期：槽卡不再每 5 秒轮询，服务槽记录随推送流一变就在原位重读槽的 DTO。
+test('槽卡随资源推送流更新：服务槽记录变了重读一次部署记录，别的记录变化不重读', async () => {
+  const f = releaseDeliveryFixture();
+  const slotRecord = resourceRecord({ id: '01a0bf5d-8f4b-7e1e-8dde-c9c2ae13ef31', kind: 'service-slot', owner: { module: 'release', ref: `${serviceId}/green` }, display: { physical: 'green', role: 'preview', tag: 'v1.1.0' } });
+  const workspace = resourceRecord({ id: '01a0bf5d-8f4b-7e1e-8dde-c9c2ae13ef32' });
+  f.state.records = [slotRecord, workspace];
+  (globalThis as { EventSource?: unknown }).EventSource = FakeEventSource;
+  page = await renderApp(`/projects/${projectId}/release`);
+  const slotReads = () => f.reads.filter((path) => path === `/v1/services/${serviceId}/slots`).length;
+  const before = slotReads();
+  expect(before).toBeGreaterThan(0); expect(page.text()).toContain('b'.repeat(40));
+  const stream = FakeEventSource.opened.find((source) => source.url.startsWith(`/v1/projects/${projectId}/resources/stream`))!;
+  await act(async () => { stream.emit({ type: 'upsert', record: { ...workspace, version: 2 }, counts: {}, cursor: 2 }); await Bun.sleep(20); });
+  await page.settle();
+  expect(slotReads()).toBe(before);
+  // 待验证槽副本崩溃：记录变了，槽的 DTO 重读一次，卡片照新读的写。
+  f.state.slots[1] = { ...f.state.slots[1]!, state: 'degraded', readyReplicas: 0 };
+  await act(async () => { stream.emit({ type: 'upsert', record: { ...slotRecord, phase: 'degraded', version: 2 }, counts: {}, cursor: 3 }); await Bun.sleep(20); });
+  await page.settle();
+  expect(slotReads()).toBe(before + 1);
+  expect(page.text()).toContain('副本不足'); expect(page.text()).toContain('0／1 副本就绪');
+});
+

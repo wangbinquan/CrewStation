@@ -11,6 +11,7 @@ import type { DeployedVersions } from '../model/deployedVersions';
 import { useMaintenanceEditor } from '../model/useMaintenanceEditor';
 import type { ReleaseActions } from '../model/useReleaseActions';
 import { useSlotLifecycle } from '../model/useSlotLifecycle';
+import { useSlotRecordRefresh } from '../model/useSlotRecordRefresh';
 import { useTrafficConfirmation } from '../model/useTrafficConfirmation';
 import { isInFlight } from '../model/releaseStatus';
 import { DeployedVersionCard } from '../../../shared/project/DeployedVersionCard';
@@ -40,8 +41,9 @@ interface DeploymentVersionsProps {
  */
 export function DeploymentVersions({ projectId, serviceId, canSwitch, actions, onSelect, autoCheck = false, redeployId, onRedeploy, onRedeployClose }: DeploymentVersionsProps) {
   const t = useT();
-  // 部署记录每 5 秒在原位重读，回到前台补读；页面不提供刷新按钮（2026-09-23 裁定）。
-  const slots = useApiQuery(queryKeys.slots(serviceId), () => api.services.listSlots(serviceId), { refetchIntervalMs: 5_000, refetchOnWindowFocus: true });
+  // 部署记录在原位更新：服务槽记录随资源推送流一变就重读（RFC-025 第三期，取代每 5 秒一次的轮询），回到前台补读；页面不提供刷新按钮（2026-09-23 裁定）。
+  const slots = useApiQuery(queryKeys.slots(serviceId), () => api.services.listSlots(serviceId), { refetchOnWindowFocus: true });
+  useSlotRecordRefresh(projectId, slots.refetch);
   const releases = useApiQuery(queryKeys.releases(serviceId), () => api.services.listReleases(serviceId));
   const maintenance = useServiceMaintenance(serviceId), lifecycle = useSlotLifecycle(projectId, serviceId, actions);
   const maintenanceEditor = useMaintenanceEditor(maintenance.current, actions);

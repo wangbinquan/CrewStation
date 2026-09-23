@@ -1,5 +1,6 @@
-import type { ReleaseDto, SlotDto } from '@crewstation/contracts';
+import type { ReleaseDto, ResourceRecord, SlotDto } from '@crewstation/contracts';
 import { testerSummaryFixture, trialMarketFixture } from './projectSummaryFixture';
+import { resourceView } from './resourceRecordFixture';
 
 export const projectId = '01a0bf5d-8f4b-7e1e-8dde-c9c2ae13ed34', serviceId = '01a0bf5d-8f4b-760b-86b6-0bb9f08a9eaa', userId = '01a0bf5d-8f4b-7ed2-8386-a4b2e1a36efb';
 export const prodId = '01a0bf5d-8f4b-762d-81e1-f95f4dd57c2d', targetId = '01a0bf5d-8f4b-7dda-8ca7-d5d5f8a92b44', historyId = '01a0bf5d-8f4b-7fd8-80e1-98a6fb83510b';
@@ -10,7 +11,7 @@ export function releaseDeliveryFixture() {
   const prod = makeRelease(prodId, 'v1.0.0', sha, time), candidate = makeRelease(targetId, 'v1.1.0', 'b'.repeat(40), '2026-09-13T02:00:00.000Z');
   const releases = [prod, candidate, makeRelease(historyId, 'v0.9.0', 'c'.repeat(40), '2026-09-12T01:00:00.000Z')];
   const slot = (name: 'prod' | 'preview', release: ReleaseDto): SlotDto => ({ name, active: name === 'prod', releaseId: release.id, tag: release.tag, commitSha: release.commitSha, replicas: 1, readyReplicas: 1, state: 'ready', host: name === 'prod' ? 'demo.cs.localhost' : 'preview.demo.cs.localhost' });
-  const state = { role: 'owner', admin: false, failSlots: false, failSwitch: false, mismatch: false, badRelease: false, hold: undefined as Promise<void> | undefined, slots: [slot('prod', prod), slot('preview', candidate)] };
+  const state = { role: 'owner', admin: false, failSlots: false, failSwitch: false, mismatch: false, badRelease: false, hold: undefined as Promise<void> | undefined, slots: [slot('prod', prod), slot('preview', candidate)], records: [] as ResourceRecord[] };
   const writes: Array<{ path: string; body: Record<string, unknown> }> = [], reads: string[] = [];
   globalThis.fetch = (async (raw, init) => {
     const path = new URL(String(raw), 'http://localhost').pathname, method = init?.method ?? 'GET'; let body: unknown = { items: [] }, status = 200;
@@ -36,6 +37,7 @@ export function releaseDeliveryFixture() {
       else if (path.endsWith('/branches')) body = { items: [{ name: 'main', headSha: sha, isDefault: true, behindPreview: null, behindProd: null }] };
       else if (path.endsWith('/tags')) body = { items: releases.map((release) => ({ name: release.tag, commitSha: release.commitSha, protected: true, createdAt: release.createdAt })) };
       else if (path.endsWith('/dev-session')) { status = 404; body = { error: 'not_found', message: '没有开发会话' }; }
+      else if (path === `/v1/projects/${projectId}/resources`) body = resourceView(state.records);
     }
     return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
   }) as typeof fetch;

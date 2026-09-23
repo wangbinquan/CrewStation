@@ -8,11 +8,11 @@ import type { HostNaming } from '../ports/platform';
 import type { RepositoryScope } from '../ports/unitOfWork';
 import type { ReleaseUseCaseDeps } from './dependencies';
 import { releaseToDto, slotToDto, switchToDto } from './toDto';
-import { slotStateFromLedger } from '../domain/ledgerProjection';
+import { slotCountsFromLedger, slotStateFromLedger } from '../domain/ledgerProjection';
 
 /**
  * 两个槽的 DTO（正式在前）：读槽上与已下线记录里的版本，按当前平台策略算到期时间；配了资源台账时，
- * 就绪之后的状态照台账的观测（副本后来没全就绪是降级，RFC-025 设计 §11.2）。
+ * 就绪之后的状态与副本数照台账的观测（副本后来没全就绪是降级，RFC-025 设计 §11.2）。
  */
 export async function loadSlotDtos(read: RepositoryScope, slots: ServiceSlots, projectSlug: string, hosts: HostNaming, only?: PhysicalSlot): Promise<SlotDto[]> {
   const physicals: PhysicalSlot[] = only ? [only] : [slots.active, standbyOf(slots.active)];
@@ -22,10 +22,10 @@ export async function loadSlotDtos(read: RepositoryScope, slots: ServiceSlots, p
     if (release) releases.set(release.id, release);
   }
   const policy = (await read.offlinePolicy.get()) ?? DEFAULT_OFFLINE_POLICY;
-  const phases = await Promise.all(physicals.map(async (p) => (await read.ledger?.slot(slots.serviceId, p))?.phase));
+  const records = await Promise.all(physicals.map((p) => read.ledger?.slot(slots.serviceId, p)));
   return physicals.map((p, index) => {
-    const dto = slotToDto(slots, p, releases, projectSlug, hosts, policy);
-    return { ...dto, state: slotStateFromLedger(dto.state, phases[index]) };
+    const dto = slotToDto(slots, p, releases, projectSlug, hosts, policy), record = records[index];
+    return { ...dto, state: slotStateFromLedger(dto.state, record?.phase), ...slotCountsFromLedger(dto.state, record) };
   });
 }
 

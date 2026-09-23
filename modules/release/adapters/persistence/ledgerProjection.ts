@@ -5,7 +5,8 @@ import { projectSlots } from '../../domain/ledgerProjection';
 import type { PhysicalSlot, ServiceSlots } from '../../domain/slots';
 import type { SlotLedger, SlotRecordRef } from '../../ports/ledger';
 import type { ServiceResolver } from '../../ports/platform';
-import type { ReleaseRepository, SlotRepository } from '../../ports/repositories';
+import type { OfflinePolicyRepository, ReleaseRepository, SlotRepository } from '../../ports/repositories';
+import { DEFAULT_OFFLINE_POLICY } from '../../domain/slotLifecycle';
 
 export interface SlotProjectionDeps {
   readonly ledger: SlotLedger;
@@ -17,10 +18,12 @@ export interface SlotProjectionDeps {
  * 在当前事务里把一个服务的两个槽投影进资源台账（RFC-025 第三期）。包在保存点里：台账写失败只回滚保存点、记一条告警，
  * 槽的状态照常提交——迁移期间台账的问题不能挡住发布、切流与下线；漏掉的由补投影追上。
  */
-export async function syncSlotLedger(executor: Executor, deps: SlotProjectionDeps, releases: ReleaseRepository, slots: ServiceSlots): Promise<void> {
+export async function syncSlotLedger(executor: Executor, deps: SlotProjectionDeps, sources: { readonly releases: ReleaseRepository; readonly offlinePolicy: OfflinePolicyRepository }, slots: ServiceSlots): Promise<void> {
+  const { releases } = sources;
   try {
     const service = await deps.services.resolveServiceById(slots.serviceId);
     if (!service) return;
+    const policy = (await sources.offlinePolicy.get()) ?? DEFAULT_OFFLINE_POLICY;
     const tags = new Map<string, string>();
     for (const releaseId of [slots.blue, slots.green].map((slot) => slot.releaseId ?? slot.offline?.releaseId).filter((id): id is ReleaseId => !!id)) {
       const release = await releases.getById(releaseId);
@@ -28,7 +31,7 @@ export async function syncSlotLedger(executor: Executor, deps: SlotProjectionDep
     }
     await executor.transaction(async (savepoint) => {
       const writer = deps.ledger.within(savepoint);
-      for (const slot of projectSlots(slots, service, (id) => tags.get(id))) {
+      for (const slot of projectSlots(slots, service, (id) => tags.get(id), policy)) {
         await writer.declare({ kind: 'service-slot', ref: slot.ref, projectId: slot.projectId, spec: { children: slot.children }, display: slot.display, conditions: slot.conditions });
       }
     });

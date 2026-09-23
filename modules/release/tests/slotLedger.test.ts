@@ -86,12 +86,32 @@ describe.skipIf(!available)('服务槽投影进资源台账（RFC-025 第三期�
       await scope.slots.save(withSlot(slots, { physical: 'green', releaseId, state: 'ready', replicas: 1, readyReplicas: 1, updatedAt: now }, now));
     });
     const green = (await slotRecord(serviceId, 'green'))!;
-    await resources.api.observe({ child: { kind: 'Deployment', namespace: 'cs-demo', name: 'demo-green', uid: 'uid-demo-green-2', phase: 'Unready', ready: false, reason: '副本 0／1 就绪' } });
+    await resources.api.observe({ child: { kind: 'Deployment', namespace: 'cs-demo', name: 'demo-green', uid: 'uid-demo-green-2', phase: 'Unready', ready: false, reason: '副本 0／1 就绪', replicas: 1, readyReplicas: 0 } });
     expect((await resources.api.get(green.id))?.phase).toBe('degraded');
     const slots = (await uow.read.slots.get(serviceId))!;
     const [, standby] = await loadSlotDtos(uow.read, slots, 'demo', { prodHost: () => 'demo.cs.localhost', previewHost: () => 'preview.demo.cs.localhost' });
-    expect(standby).toMatchObject({ name: 'preview', state: 'degraded' });
-    expect((await loadSlotDtos(drizzleUnitOfWork(database.db).read, slots, 'demo', { prodHost: () => 'd', previewHost: () => 'p' }))[1]?.state).toBe('ready');
+    // 副本数同样照台账：流水线记的是 1／1，Deployment 眼下 0／1。
+    expect(standby).toMatchObject({ name: 'preview', state: 'degraded', replicas: 1, readyReplicas: 0 });
+    expect((await loadSlotDtos(drizzleUnitOfWork(database.db).read, slots, 'demo', { prodHost: () => 'd', previewHost: () => 'p' }))[1]).toMatchObject({ state: 'ready', readyReplicas: 1 });
+  });
+
+  test('待命槽的保留计时随槽的保存进记录：到期时刻按平台策略算，推迟后记录随之变化（页面据此随推送流重读）', async () => {
+    const uow = drizzleUnitOfWork(database.db, { ledger, services, logger });
+    const retention = { kind: 'rollback-target' as const, since: now, postponements: 0 };
+    await uow.run(async (scope) => {
+      const slots = (await scope.slots.get(serviceId))!;
+      await scope.slots.save(withSlot(slots, { ...slots.green, retention }, now));
+    });
+    const green = (await slotRecord(serviceId, 'green'))!;
+    expect(green.display).toMatchObject({ role: 'preview', retentionDeadline: '2026-09-26T12:00:00.000Z', retentionPeriodHours: '72', retentionPostponements: '0' });
+    expect(green.conditions.find((entry) => entry.type === 'RetentionDeadline')).toMatchObject({ status: 'true', reason: 'rollback-target' });
+    await uow.run(async (scope) => {
+      const slots = (await scope.slots.get(serviceId))!;
+      await scope.slots.save(withSlot(slots, { ...slots.green, retention: { ...retention, postponedUntil: new Date('2026-09-29T12:00:00.000Z'), postponements: 1 } }, now));
+    });
+    const postponed = (await slotRecord(serviceId, 'green'))!;
+    expect(postponed.version).toBeGreaterThan(green.version);
+    expect(postponed.display).toMatchObject({ retentionDeadline: '2026-09-29T12:00:00.000Z', retentionPostponements: '1' });
   });
 
   test('补投影工作器：启动即跑一次、此后按周期；失败只记告警；停止时等本轮跑完', async () => {
