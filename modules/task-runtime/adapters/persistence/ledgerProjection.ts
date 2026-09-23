@@ -45,6 +45,19 @@ export async function syncEnvironmentLedger(executor: Executor, ledger: Environm
 }
 
 /**
+ * 经台账受理一个环境（RFC-025 设计 §3）：它的工作负载记录在项目锁下按台账数额度，够才声明。不包保存点——额度不够必须挡住
+ * 所属模块的这次写入（同一事务一起回滚）；此后同一事务里的投影照常补上工作卷与启动进度。
+ */
+export async function admitEnvironment(executor: Executor, ledger: EnvironmentLedger, env: TaskEnvironment): Promise<void> {
+  const { workload } = projectEnvironment(env);
+  await ledger.within(executor).admit({
+    ...(workload.id ? { id: workload.id } : {}), kind: workload.kind, ref: workload.ref, projectId: workload.projectId,
+    ...(workload.parentId ? { parentId: workload.parentId } : {}), ...(workload.purpose ? { purpose: workload.purpose } : {}),
+    spec: { children: workload.children }, display: workload.display, conditions: workload.conditions,
+  });
+}
+
+/**
  * 在当前事务里读这个环境的工作负载记录（资源中心可能已替它改了期望：失败保留期满）。包在保存点里：
  * 台账读不到（暂时不可用）当作没有，不让所属模块的事务因此中止。
  */

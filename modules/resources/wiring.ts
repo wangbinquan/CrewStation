@@ -12,7 +12,7 @@ import type { ResourceActionHandler, ViewerAccess } from './api/types';
 import { performAction } from './application/actions';
 import { maintainLedger } from './application/maintenance';
 import { observationWriter } from './application/observe';
-import { ownerWriter } from './application/ownerWrites';
+import { occupancyIn, ownerWriter } from './application/ownerWrites';
 import type { StreamOptions } from './application/streamHub';
 import { createStreamHub, DEFAULT_STREAM_OPTIONS } from './application/streamHub';
 import { readView } from './application/views';
@@ -71,6 +71,7 @@ export function createResourcesModule(deps: ResourcesModuleDeps): ResourcesModul
     list: (filter) => uow.read.records.list(filter),
     resolveAlias: (alias) => uow.read.records.resolveAlias(alias),
     claimOf: (child) => uow.read.records.findByChild(child),
+    occupancy: (projectId) => occupancyIn(uow.read, projectId),
     changesSince: async (cursor, limit) => (await uow.read.changes.since(cursor, limit)).map((entry) => ({ seq: entry.seq, resourceId: entry.resourceId })),
     latestChange: () => uow.read.changes.latest(),
     view: async (actor, projectId, query) => {

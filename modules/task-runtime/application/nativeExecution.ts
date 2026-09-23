@@ -1,6 +1,6 @@
 import type { TaskId } from '@crewstation/contracts';
 import { DomainTopic } from '@crewstation/contracts';
-import { conflict, notFound, precondition, quotaExceeded } from '@crewstation/kernel';
+import { conflict, notFound, precondition } from '@crewstation/kernel';
 import type { CreateNativeExecutionInput, ReleaseReason } from '../api/moduleApi';
 import { cancelStartup, completeStage, failStartup, initialStartup } from '../domain/podStartup';
 import { hashRunnerToken, newRunnerToken } from '../domain/runnerToken';
@@ -47,8 +47,8 @@ export function createNativeExecutionUseCase(deps: NativeExecutionDeps) {
       if (!profile) throw precondition(`算力档位指定的资源套餐 ${input.profile ?? deps.settings.defaultProfile} 不存在，请联系管理员调整算力档位`);
       const workspace = await deps.nativeCluster.inspectWorkspace(parent);
       const limit = (await deps.quotas.quotaLimit(parent.projectId)) ?? 0;
-      if (!await scope.admissions.tryAcquire(parent.projectId, limit)) throw quotaExceeded(rule.quota);
       const env = executionEnvironment(deps, input, parent, workspace, profile);
+      await scope.quota.acquire(env, limit, rule.quota);
       await scope.environments.insert(env);
       await scope.nativeQueue.enqueue(env.id);
       return env;
@@ -136,7 +136,7 @@ export async function cleanupNativeExecution(deps: NativeExecutionDeps, scope: R
   const n = env.native!, now = deps.clock.now();
   await scope.environments.update({ ...env, state: n.failureReason ? 'failed' : 'released', connected: false, updatedAt: now,
     native: { ...n, state: 'finished' }, message: n.failureReason ?? `此${EXECUTION_NOUN[purposeOf(n)]}的执行环境已回收，工作树保持` });
-  if (occupiesQuota(env.state)) await scope.admissions.release(env.projectId);
+  if (occupiesQuota(env.state)) await scope.quota.release(env);
 }
 
 /** 父会话先等待所有引用结束，再删除其 Pod／工作卷；失败由同一持久作业接续。 */
@@ -153,7 +153,7 @@ export async function cleanupWorkspace(deps: NativeExecutionDeps, scope: Reposit
   await requireExecutionLease(heartbeat);
   const now = deps.clock.now(), reason = env.release!.reason;
   await scope.environments.update(transition(env, 'released', now, { release: undefined, message: `released: ${reason}` }));
-  if (env.release!.occupied) await scope.admissions.release(env.projectId);
+  if (env.release!.occupied) await scope.quota.release(env);
   await scope.events.publish(DomainTopic.taskReleased, { occurredAt: now.toISOString(), traceId: env.traceId, projectId: env.projectId, taskId: env.id, kind: env.kind, reason });
 }
 

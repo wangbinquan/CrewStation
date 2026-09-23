@@ -49,7 +49,7 @@ describe.skipIf(!available)('任务环境投影进资源台账（RFC-025 第二�
     tdb = await createTestDatabase([eventbusMigrations, queueMigrations, resourcesMigrations, taskRuntimeMigrations]);
     resources = createResourcesModule({ db: tdb.db, quotas: { limitFor: async () => 4 }, authorizer: { projectAccess: async () => ({ operate: true }) }, isAdmin: async () => true });
     const owner = resources.api.owner('task-runtime');
-    ledger = { within: (tx) => owner.within(tx as object), live: async () => (await resources.api.list({})).filter((record) => record.owner.module === 'task-runtime') };
+    ledger = { within: (tx) => owner.within(tx as object), live: async () => (await resources.api.list({})).filter((record) => record.owner.module === 'task-runtime'), occupancy: resources.api.occupancy };
   });
   afterAll(async () => { await tdb.drop(); });
 
@@ -77,13 +77,18 @@ describe.skipIf(!available)('任务环境投影进资源台账（RFC-025 第二�
     expect(warnings).toEqual([]);
   });
 
-  test('台账写失败不挡住环境操作：只回滚保存点、记一条告警', async () => {
-    const broken: EnvironmentLedger = { within: () => ({ declare: async () => { throw new Error('台账暂时不可用'); }, requestRelease: async () => { throw new Error('x'); }, report: async () => { throw new Error('x'); }, find: async () => undefined }), live: async () => [] };
+  test('受理之后的投影写失败不挡住环境操作：只回滚保存点、记一条告警；受理本身（额度）以台账为准，台账出错就不受理', async () => {
+    const admitted = { id: 'x', desired: 'present' as const, owner: { module: 'task-runtime', ref: 'x' }, conditions: [] };
+    const writer = (admit: () => Promise<typeof admitted>) => ({ declare: async () => { throw new Error('台账暂时不可用'); }, admit, requestRelease: async () => { throw new Error('x'); }, report: async () => { throw new Error('x'); }, find: async () => undefined });
+    const broken: EnvironmentLedger = { within: () => writer(async () => admitted), live: async () => [], occupancy: async () => 0 };
     const runtime = createTaskRuntimeModule(runtimeDeps(tdb.db, createFakeK8sClient(), broken, logger));
     const created = await runtime.api.createEnvironment({ serviceId, kind: 'business', volumeMode: 'persistent' });
     expect((await runtime.api.getEnvironment(created.id))?.state).toBe('creating');
     expect(await resources.api.get(created.id)).toBeUndefined();
     expect(warnings.some((line) => line.startsWith('resource ledger projection failed') && line.includes('台账暂时不可用'))).toBe(true);
+    const down: EnvironmentLedger = { within: () => writer(async () => { throw new Error('台账暂时不可用'); }), live: async () => [], occupancy: async () => 0 };
+    const refused = createTaskRuntimeModule(runtimeDeps(tdb.db, createFakeK8sClient(), down, logger));
+    await expect(refused.api.createEnvironment({ serviceId, kind: 'business', volumeMode: 'persistent' })).rejects.toThrow('台账暂时不可用');
   });
 
   test('补投影：部署前就存在的环境、投影失败漏掉的环境，由补投影写进台账；已释放的跟着「不要了」', async () => {

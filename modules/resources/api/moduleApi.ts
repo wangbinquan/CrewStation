@@ -23,6 +23,8 @@ export interface ResourcesModuleApi {
   resolveAlias(alias: ResourceAlias): Promise<string | undefined>;
   /** 只读：认领这个集群对象的记录（先按 UID，再按种类＋命名空间＋名字）。 */
   claimOf(child: ExpectedChild & { readonly uid?: string }): Promise<string | undefined>;
+  /** 只读：项目眼下占用的并发额度单位（占额度的种类里在运行或结束中的记录，D31）。 */
+  occupancy(projectId: ProjectId): Promise<number>;
   /** 调和器用：某个游标之后已提交的变更（按提交顺序），只给资源 ID；台账一有变化调和器就把它排进队列。 */
   changesSince(cursor: number, limit: number): Promise<readonly { readonly seq: number; readonly resourceId: string }[]>;
   /** 已提交的最新游标；调和器启动时从这里开始尾随。 */

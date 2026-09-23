@@ -46,7 +46,7 @@ export function failEnvironment(deps: TaskRuntimeUseCaseDeps) {
         return;
       }
       await scope.environments.update(transition(env, 'failed', now, { message, connected: false }));
-      if (occupiesQuota(env.state)) await scope.admissions.release(env.projectId);
+      if (occupiesQuota(env.state)) await scope.quota.release(env);
     });
   };
 }

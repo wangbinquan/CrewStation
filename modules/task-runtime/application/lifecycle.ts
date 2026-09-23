@@ -48,7 +48,7 @@ export function lifecycleUseCases(deps: TaskRuntimeUseCaseDeps) {
     const released = transition(releasing, 'released', now, { message: `released: ${reason}` });
     await uow.run(async (scope) => {
       await scope.environments.update(released);
-      if (occupied) await scope.admissions.release(env.projectId);
+      if (occupied) await scope.quota.release(released);
       await scope.events.publish(DomainTopic.taskReleased, { occurredAt: now.toISOString(), traceId: env.traceId, projectId: env.projectId, taskId: env.id, kind: env.kind, reason });
     });
     logger.info('task released', { taskId, reason });
@@ -83,7 +83,7 @@ export function lifecycleUseCases(deps: TaskRuntimeUseCaseDeps) {
       // 业务任务恢复即重新启动一次（RFC-022：只有数据，本 RFC 不做业务任务的界面）。
       const resumed = transition(env, 'creating', now, { runnerTokenHash: hashRunnerToken(token), connected: false, podUid: undefined, startup: initialStartup(now) });
       await uow.run(async (scope) => {
-        if (!(await scope.admissions.tryAcquire(env.projectId, limit))) throw precondition(`并发任务已达配额上限 ${limit}`);
+        await scope.quota.acquire(resumed, limit, `并发任务已达配额上限 ${limit}`);
         await scope.environments.update(resumed);
       });
       const podUid = await cluster.createPod({
@@ -111,7 +111,7 @@ function pauseEnvironmentUseCase(deps: TaskRuntimeUseCaseDeps, load: (taskId: Ta
     });
     await cluster.deletePod(env);
     const paused = transition(env, 'paused', clock.now(), { connected: false });
-    await uow.run(async (scope) => { await scope.environments.update(paused); await scope.admissions.release(env.projectId); });
+    await uow.run(async (scope) => { await scope.environments.update(paused); await scope.quota.release(paused); });
     return paused;
   };
 }

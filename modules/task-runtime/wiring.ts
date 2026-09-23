@@ -122,7 +122,7 @@ export function createTaskRuntimeModule(deps: TaskRuntimeModuleDeps): TaskRuntim
     listEnvironments: queries.listEnvironments,
     findDevSession: async (projectId, options) => { const env = await queries.findDevSession(projectId, options); return env ? environmentToDto(env) : undefined; },
     listRunningDevSessions: async () => (await queries.listRunningDevSessions()).map(environmentToDto),
-    runningTaskCount: (projectId) => useCaseDeps.uow.read.admissions.running(projectId),
+    runningTaskCount: (projectId) => useCaseDeps.uow.read.quota.running(projectId),
     traceKeys: (projectId, page) => useCaseDeps.uow.read.environments.traceKeys(projectId, page),
     activeTraceIds: (projectId, since) => useCaseDeps.uow.read.environments.activeTraceIds(projectId, since),
     listTraceEnvironments: async (projectId, traceIds) => (await useCaseDeps.uow.read.environments.listByProjectTraces(projectId, traceIds)).map((env) => ({ ...environmentToDto(env), updatedAt: env.updatedAt.toISOString() })),

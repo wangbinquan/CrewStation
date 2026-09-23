@@ -65,7 +65,7 @@ export async function compensateRebuild(deps: RebuildExecutionDeps, scope: Repos
   const message = record.failureReason ?? '重建未完成，原工作卷已保留，请重新检查后重试';
   await scope.rebuilds.update({ ...record, state: 'failed', updatedAt: now, message });
   await scope.environments.update(transition(env, 'failed', now, { connected: false, message, runnerTokenHash: hashRunnerToken(newRunnerToken()) }));
-  await scope.admissions.release(env.projectId);
+  await scope.quota.release(env);
 }
 
 export function rebuildFailureMessage(error: unknown): string {

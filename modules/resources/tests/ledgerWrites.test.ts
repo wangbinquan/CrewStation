@@ -158,6 +158,25 @@ describe.skipIf(!available)('受理与额度（设计 §3、D31）', () => {
     expect((await ledger.admit(execution('q1-cli2', first.id))).version).toBeGreaterThan(0);
   });
 
+  test('受理已有的记录：此刻占着额度的（同一次受理重来、期望更新）不再数；此刻不占的（暂停后恢复、失败后重建）照新受理数，占用数照台账', async () => {
+    const ledger = h.module.api.owner('task-runtime');
+    h.quota.limit = 2;
+    const running = await ledger.admit(workspace('r1', { projectId: OTHER_PROJECT }));
+    const paused = await ledger.admit(workspace('r2', { projectId: OTHER_PROJECT }));
+    expect(await h.module.api.occupancy(OTHER_PROJECT)).toBe(2);
+    // 到了上限，占着额度的那条再受理（期望更新）照常通过。
+    expect((await ledger.admit(workspace('r1', { projectId: OTHER_PROJECT, display: { branch: 'dev' } }))).display).toEqual({ branch: 'dev' });
+    await ledger.report(paused.id, { conditions: [{ type: 'Paused', status: 'true' }] });
+    expect(await h.module.api.occupancy(OTHER_PROJECT)).toBe(1);
+    await ledger.admit(workspace('r3', { projectId: OTHER_PROJECT }));
+    // 暂停的那条要恢复：它此刻不占额度，照新受理数，额度已被 r3 占满就拒绝。
+    expect(await rejected(ledger.admit(workspace('r2', { projectId: OTHER_PROJECT, conditions: [{ type: 'Paused', status: 'false' }] })))).toMatchObject({ kind: 'quota_exceeded', details: { limit: 2, used: 2 } });
+    await ledger.requestRelease(running.id, { code: 'user', message: '释放' });
+    expect(await h.module.api.occupancy(OTHER_PROJECT)).toBe(1);
+    expect((await ledger.admit(workspace('r2', { projectId: OTHER_PROJECT, conditions: [{ type: 'Paused', status: 'false' }] }))).phase).toBe('provisioning');
+    expect(await h.module.api.occupancy(OTHER_PROJECT)).toBe(2);
+  });
+
   test('两个事务同时抢最后一个额度：项目行锁串行，恰好一个成功', async () => {
     const ledger = h.module.api.owner('business-task');
     h.quota.limit = 4;

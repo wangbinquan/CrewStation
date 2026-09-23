@@ -60,17 +60,26 @@ function mergeAliases(existing: readonly ResourceAlias[], added: readonly Resour
   return fresh.length ? [...existing, ...fresh] : existing;
 }
 
+/** 项目眼下占用的额度单位：占额度的种类里阶段在运行或结束中的记录（设计 §3，D31）。 */
+export async function occupancyIn(scope: LedgerScope, projectId: NonNullable<ResourceDeclaration['projectId']>): Promise<number> {
+  const quotaKinds = (Object.keys(KIND_RULES) as ResourceKind[]).filter((kind) => kindRule(kind).quotaUnits > 0);
+  const counts = await scope.records.countByKind(projectId, quotaKinds, QUOTA_PHASES);
+  return quotaKinds.reduce((sum, kind) => sum + (counts[kind] ?? 0) * kindRule(kind).quotaUnits, 0);
+}
+
+/**
+ * 受理：占额度的种类在项目锁下按台账数额度，够才声明。已有且此刻占着额度的记录（同一次受理重来、期望更新）不再数；
+ * 已有但此刻不占的（暂停后恢复、失败后重建）照新受理数——否则恢复会绕过额度。
+ */
 async function admitIn(scope: LedgerScope, module: string, input: ResourceDeclaration, limits: QuotaLimits, now: Date): Promise<LedgerRecord> {
   const units = kindRule(input.kind).quotaUnits;
   if (!units || !input.projectId) return declareIn(scope, module, input, now);
   const existing = await scope.records.getByOwner({ module, ref: input.ref }, input.kind);
-  if (existing) return declareIn(scope, module, input, now);
+  if (existing && QUOTA_PHASES.includes(existing.phase)) return declareIn(scope, module, input, now);
   await scope.locks.lock(input.projectId);
   const limit = await limits.limitFor(input.projectId);
   if (limit === undefined) throw validation('项目尚未配置并发任务配额');
-  const quotaKinds = (Object.keys(KIND_RULES) as ResourceKind[]).filter((kind) => kindRule(kind).quotaUnits > 0);
-  const counts = await scope.records.countByKind(input.projectId, quotaKinds, QUOTA_PHASES);
-  const used = quotaKinds.reduce((sum, kind) => sum + (counts[kind] ?? 0) * kindRule(kind).quotaUnits, 0);
+  const used = await occupancyIn(scope, input.projectId);
   if (used + units > limit) throw quotaExceeded(`并发任务已达配额上限 ${limit}`, { projectId: input.projectId, limit, used });
   return declareIn(scope, module, input, now);
 }

@@ -1,6 +1,6 @@
 import type { ProjectId, ServiceId, TaskId, TaskKind, TraceId, UserId, VolumeMode } from '@crewstation/contracts';
 import { DomainTopic } from '@crewstation/contracts';
-import { conflict, newId, newTraceId, notFound, quotaExceeded, validation } from '@crewstation/kernel';
+import { conflict, newId, newTraceId, notFound, validation } from '@crewstation/kernel';
 import { completeStage, failStartup, initialStartup } from '../domain/podStartup';
 import { hashRunnerToken, newRunnerToken } from '../domain/runnerToken';
 import type { TaskEnvironment } from '../domain/taskEnvironment';
@@ -68,7 +68,7 @@ export function createEnvironmentUseCase(deps: TaskRuntimeUseCaseDeps) {
     await uow.run(async (scope) => {
       await scope.admissions.lock(svc.projectId);
       if (input.kind === 'dev-session' && (await scope.environments.findDevSession(svc.projectId))) throw conflict('该项目已有一个开发会话在运行', { projectId: svc.projectId });
-      if (!(await scope.admissions.tryAcquire(svc.projectId, limit))) throw quotaExceeded(`并发任务已达配额上限 ${limit}`, { projectId: svc.projectId, limit });
+      await scope.quota.acquire(env, limit, `并发任务已达配额上限 ${limit}`);
       await scope.environments.insert(env);
       await scope.events.publish(DomainTopic.taskCreated, { occurredAt: now.toISOString(), traceId: env.traceId, projectId: env.projectId, serviceId: env.serviceId, taskId: env.id, kind: env.kind });
     });
@@ -85,7 +85,7 @@ export function createEnvironmentUseCase(deps: TaskRuntimeUseCaseDeps) {
       const failedAt = clock.now();
       await uow.run(async (scope) => {
         await scope.environments.update(transition(env, 'failed', failedAt, { message, startup: failStartup(env.startup!, failedAt.toISOString(), { code: 'pod-create-failed', message }) }));
-        await scope.admissions.release(svc.projectId);
+        await scope.quota.release(env);
       });
       throw error;
     }
