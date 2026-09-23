@@ -111,7 +111,19 @@
   - 部署后 e2e：dev-admin 下 `shellScroll`＋`clusterLayout`＋`traceChains`＋`topology`＋`layoutSpacing` 28 pass／1 skip／0 fail；dev-developer 下 `projectWorkspaceIa` 11 pass／0 fail。开发页用 dev-developer 跑，没动作者（dev-admin）的个人布局。
   - 线上复测 32 个页面：1440／1280／1920 下文档溢出全为 0，滚动内容区时左栏位移全为 0（网关页内容区自己滚 4089px）；390 宽下内容区都不自成滚动区。
   - 保存栏宽屏贴住内容区顶边 52px，窄屏吸在窗口顶 0px。点左栏换页后内容区回 0，返回恢复到 1500，前进恢复到 200。无控制台错误。
-- **已知取舍（待作者定）**：页面刚打开、焦点还在 `body` 上时，PageDown 与空格交给已不能滚的根，内容区不动；在内容区点一下或 Tab 进去之后正常（实测点击后 PageDown 滚 808px）。改前这两个键直接滚整页。可选做法：切页后把焦点放到内容区（`main` 可聚焦、不显示焦点框），代价是 Tab 从内容区里的第一个控件开始。
+- **键盘翻页（作者裁定「改」，8406d9a6）**：
+  - 问题：焦点停在 `body` 或左栏上时，PageDown 与空格交给已经不能滚的根，内容区不动（实测 0px），要先在内容区点一下（之后 808px）。
+  - 做法：`main` 可聚焦（`tabIndex=-1`），`.main:focus` 不画框。页面打开时，以及每次换了路径渲染完成后（`onRendered` 的 `pathChanged`），焦点不在内容区或弹窗里就放到内容区。只改地址参数（页签、筛选、选中）时不动，页面自己聚焦的控件不抢。
+  - 取舍：Tab 从内容区里的第一个控件开始，Shift+Tab 回到顶栏与左栏。
+  - 用例：`shellScroll.test.tsx` 新增一条，改前红。e2e `shellScroll` 新增一条，用真实按键与鼠标：打开后 PageDown、点左栏换页后 PageDown、回车换页不画框。线上旧包红、换包后绿。
+  - 门禁：「c2be2128＋本批」干净导出上用例 2741 pass／98 skip／0 fail。
+  - 部署：由 crewstation-90 的 `cs-console:rc025-p3h-20260924`（3c5315e0，含 8406d9a6）带上线。线上外壳 e2e 5/5；打开网关页后焦点就在内容区，PageDown 与空格各滚 808px、Shift+空格回 0、End 到底 4089px，无控制台错误。
+- **顺带修的竞态（9413aa8f，[CI 35909903306](https://github.com/wangbinquan/CrewStation/actions/runs/35909903306) 六项绿）**：
+  - 现象：8406d9a6 的 [CI 35907697639](https://github.com/wangbinquan/CrewStation/actions/runs/35907697639) module 层红在 `business-task`（与工作台改动无关）：子任务已是 succeeded，读输出却是空串。
+  - 根因：命令子任务有两条收尾路径。`settleCommand` 等 exec(wait) 的结果，带着输出收尾；`refreshCommand` 读子任务时见到 `execExited` 就收尾，但拿不到输出。退出事件先落下的那段窗口里有人读子任务（业务轮询，或每 5 秒一次的清扫），后者就抢先结成终态，前者随后放弃，输出永久为空。
+  - 修复：本进程还在等结果的 exec 让 `refreshCommand` 让开；另一副本已按事件收尾时，`settleCommand` 在同一退出码下补上输出。
+  - 用例：新增两条，修复前都红；原用例的固定 `Bun.sleep(50)` 改为按条件轮询。
+  - 部署：修在 cs-api，已告知 crewstation-90，随其下一次控制面滚动上线。
 
 ## 集群管理只剩「拓扑｜资源清单」、宽屏一屏不滚；状态条挪到管理总览最上面（2026-09-23）
 
