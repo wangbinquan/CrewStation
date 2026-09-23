@@ -400,12 +400,15 @@ function composeLedger(deps: CompositionDeps, core: ReturnType<typeof composeCor
 
 function composeControl(deps: CompositionDeps, core: ReturnType<typeof composeCore>, ledger: ReturnType<typeof composeLedger>, runtime: ReturnType<typeof composeRuntime>) {
   return createClusterControlModule({
-    k8s: deps.k8s, logger: deps.logger, isAdmin: core.identity.api.isAdmin,
+    k8s: deps.k8s, logger: deps.logger, isAdmin: core.identity.api.isAdmin, systemNamespace: deps.settings.systemNamespace,
     ledger: { observe: (input) => ledger.api.observe(input), claimOf: (child) => ledger.api.claimOf(child) },
-    legacy: { task: async (taskId) => {
-      const env = await runtime.taskRuntime.api.getEnvironment(taskId as TaskId);
-      return env ? { kind: env.kind, state: env.state, execution: Boolean(env.native) } : undefined;
-    } },
+    legacy: {
+      resolveTaskId: (legacyId) => deps.identities.resolve('task', [legacyId]),
+      task: async (taskId) => {
+        const env = await runtime.taskRuntime.api.getEnvironment(taskId as TaskId);
+        return env ? { kind: env.kind, state: env.state, execution: Boolean(env.native), lastActivityAt: env.lastActivityAt } : undefined;
+      },
+    },
   });
 }
 

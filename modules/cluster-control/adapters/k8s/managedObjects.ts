@@ -51,6 +51,7 @@ export function managedObjectFeed(k8s: K8sClient, options: FeedOptions): Managed
       await Promise.all(informers.map((informer) => informer.stop()));
       await queue.stop();
     },
-    synced: async () => { await Promise.all(informers.map((informer) => informer.synced())); },
+    // 全量完成之后，还要等全量带进来的变化都处理完，汇总才反映真实的首轮结果。
+    synced: async () => { await Promise.all(informers.map((informer) => informer.synced())); await queue.drained(); },
   };
 }

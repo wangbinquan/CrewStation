@@ -2,12 +2,17 @@ import type { AdoptionItem, AdoptionVerdict, ResourceKind } from '@crewstation/c
 import type { ObservedObject } from './observation';
 import { RESOURCE_ID_LABEL } from './observation';
 
-/** 旧的所属对象：按 Pod／PVC 上的 `crewstation.io/task` 标签从 task-runtime 查到的任务环境。 */
+/**
+ * 旧的所属对象：按 Pod／PVC 上的 `crewstation.io/task` 标签从 task-runtime 查到的任务环境
+ * （标签上是 RFC-013 之前的 `tsk_…` 时，先经身份目录换成现在的 ID 再查）。
+ */
 export interface LegacyTask {
   readonly kind: 'dev-session' | 'business' | 'profile-test';
   readonly state: 'creating' | 'running' | 'paused' | 'releasing' | 'released' | 'failed';
   /** 是 Agent 执行环境（「＋ CLI」、headless Agent、业务子任务），不是工作区本身。 */
   readonly execution: boolean;
+  /** 最后活动时间：失败的开发会话按它算 72 小时保留（旧记录没有失败时刻）。 */
+  readonly lastActivityAt?: string;
 }
 
 export interface AdoptionInput {
@@ -16,7 +21,15 @@ export interface AdoptionInput {
   readonly claimedBy?: string;
   /** 按任务标签查到的任务环境；标签在但查不到时是 'missing'。 */
   readonly legacyTask?: LegacyTask | 'missing';
+  /** 标签上的旧 ID 经身份目录换成的现 ID（与标签不同时才有）。 */
+  readonly legacyTaskId?: string;
+  /** 平台组件所在的系统命名空间（设计 §6.4：不在回收范围）。 */
+  readonly systemNamespace?: string;
+  readonly now?: Date;
 }
+
+/** 失败的开发会话保留 72 小时（D9）。 */
+const FAILED_RETENTION_MS = 72 * 3_600_000;
 
 const TASK_LABEL = 'crewstation.io/task';
 const LIVE_TASK_STATES: readonly LegacyTask['state'][] = ['creating', 'running', 'paused', 'releasing'];
@@ -27,11 +40,15 @@ function taskCandidate(object: ObservedObject, task: LegacyTask): ResourceKind {
   return task.kind === 'dev-session' ? 'dev-workspace' : 'business-workspace';
 }
 
-function byTask(object: ObservedObject, taskId: string, task: LegacyTask | 'missing' | undefined): Omit<AdoptionItem, 'kind' | 'name'> {
+function byTask(object: ObservedObject, taskId: string, task: LegacyTask | 'missing' | undefined, now: Date): Omit<AdoptionItem, 'kind' | 'name'> {
   const volumeNote = object.kind === 'PersistentVolumeClaim' ? '；工作卷只进入待回收，由管理员确认后删除' : '';
   if (!task || task === 'missing') return { verdict: 'orphan', owner: 'task-runtime', ownerRef: taskId, reason: `任务环境 ${taskId} 的记录已不存在${volumeNote}` };
   if (LIVE_TASK_STATES.includes(task.state)) return { verdict: 'adoptable', candidateKind: taskCandidate(object, task), owner: 'task-runtime', ownerRef: taskId, reason: `任务环境 ${taskId} 仍在（${task.state}），收编时生成记录并认领` };
-  if (task.state === 'failed' && task.kind === 'dev-session' && !task.execution) return { verdict: 'retained', candidateKind: taskCandidate(object, task), owner: 'task-runtime', ownerRef: taskId, reason: '失败的开发会话按 72 小时保留供诊断，到期后回收' };
+  if (task.state === 'failed' && task.kind === 'dev-session' && !task.execution) {
+    const since = task.lastActivityAt ? Date.parse(task.lastActivityAt) : Number.NaN;
+    if (Number.isNaN(since) || now.getTime() - since < FAILED_RETENTION_MS) return { verdict: 'retained', candidateKind: taskCandidate(object, task), owner: 'task-runtime', ownerRef: taskId, reason: '失败的开发会话按 72 小时保留供诊断，到期后回收' };
+    return { verdict: 'orphan', owner: 'task-runtime', ownerRef: taskId, reason: `失败的开发会话已过 72 小时保留期（按最后活动时间算），对象仍在${volumeNote}` };
+  }
   return { verdict: 'orphan', owner: 'task-runtime', ownerRef: taskId, reason: `任务环境 ${taskId} 已${task.state === 'failed' ? '失败' : '释放'}，对象仍在${volumeNote}` };
 }
 
@@ -52,14 +69,15 @@ export function classifyObject(input: AdoptionInput): AdoptionItem {
   const labels = object.metadata.labels ?? {};
   const identity = { kind: object.kind, ...(object.metadata.namespace ? { namespace: object.metadata.namespace } : {}), name: object.metadata.name, ...(object.metadata.uid ? { uid: object.metadata.uid } : {}) };
   if (input.claimedBy) return { ...identity, verdict: 'owned', resourceId: input.claimedBy, reason: '已由资源记录认领' };
+  if (input.systemNamespace && object.metadata.namespace === input.systemNamespace) return { ...identity, verdict: 'platform', reason: '平台组件（安装器管理），不在收编与回收范围' };
   if (labels[RESOURCE_ID_LABEL]) return { ...identity, verdict: 'orphan', resourceId: labels[RESOURCE_ID_LABEL], reason: '带资源标签，但台账里没有记录认领它' };
   const taskId = labels[TASK_LABEL];
-  if (taskId) return { ...identity, ...byTask(object, taskId, input.legacyTask) };
+  if (taskId) return { ...identity, ...byTask(object, input.legacyTaskId ?? taskId, input.legacyTask, input.now ?? new Date()) };
   return { ...identity, ...(byRelease(labels) ?? { verdict: 'unclassified', reason: '没有可识别的归属标签' }) };
 }
 
 export function countVerdicts(items: readonly AdoptionItem[]): Record<AdoptionVerdict, number> {
-  const counts: Record<AdoptionVerdict, number> = { owned: 0, adoptable: 0, orphan: 0, retained: 0, unclassified: 0 };
+  const counts: Record<AdoptionVerdict, number> = { owned: 0, adoptable: 0, orphan: 0, retained: 0, platform: 0, unclassified: 0 };
   for (const item of items) counts[item.verdict] += 1;
   return counts;
 }

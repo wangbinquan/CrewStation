@@ -839,3 +839,10 @@ git reset -q HEAD -- <自己的路径>                     # 共享暂存区里�
 （查询键变了，`isPending`）时禁用入口或不挂载；写操作之后的重读由 `useApiMutation` 在 `onSuccess` 里等 invalidate 完成，这期间
 `isPending` 仍为真，不需要另看 `isFetching`。`useAdminPage` 为此提供 `loading`。用例的锁法：扣住重读的回执，断言入口仍可用、
 子树还是同一个节点（`adminRequestPages`、`catalogCallerPicker`、`clusterMetrics` 的趋势前移）。
+
+### 本机不要用 `bun run test:cover` 预检改动行覆盖：它会连共用集群跑 e2e
+
+2026-09-23 实撞：`test:cover` 跑的是全部用例文件，包括 `tests/e2e/`；本机调试 Chrome（CDP）与部署好的平台都在，e2e 的能力闸门判定「环境可用」，于是真的去连共用集群跑了一半（多数因浏览器会话没登录在第一步失败）。
+e2e 用例本身按「共享集群只发只读请求或必然被拒的写请求」写，这次没有留下改动，但它不该在预检时跑。
+预检改用三层各自带覆盖率：`bun run test:unit --cover && bun run test:module --cover && bun run test:console --cover`，再 `bun run test:patch --base origin/main --tiers unit,module,console`。
+

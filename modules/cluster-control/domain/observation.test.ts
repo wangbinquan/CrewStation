@@ -58,17 +58,27 @@ describe('收编空跑的判定（设计 §6.5）', () => {
     expect(classifyObject({ object: labeled(task), legacyTask: { kind: 'profile-test', state: 'running', execution: false } }).candidateKind).toBe('agent-execution');
     expect(classifyObject({ object: labeled(task, 'PersistentVolumeClaim'), legacyTask: { kind: 'dev-session', state: 'running', execution: false } }).candidateKind).toBe('volume');
     expect(classifyObject({ object: labeled(task), legacyTask: { kind: 'dev-session', state: 'failed', execution: false } }).verdict).toBe('retained');
+    const now = new Date('2026-09-23T12:00:00Z');
+    expect(classifyObject({ object: labeled(task), now, legacyTask: { kind: 'dev-session', state: 'failed', execution: false, lastActivityAt: '2026-09-22T12:00:00Z' } }).verdict).toBe('retained');
+    expect(classifyObject({ object: labeled(task), now, legacyTask: { kind: 'dev-session', state: 'failed', execution: false, lastActivityAt: '2026-09-19T12:00:00Z' } }))
+      .toMatchObject({ verdict: 'orphan', reason: '失败的开发会话已过 72 小时保留期（按最后活动时间算），对象仍在' });
     expect(classifyObject({ object: labeled(task), legacyTask: { kind: 'dev-session', state: 'failed', execution: true } })).toMatchObject({ verdict: 'orphan', reason: '任务环境 t1 已失败，对象仍在' });
     expect(classifyObject({ object: labeled(task), legacyTask: { kind: 'business', state: 'released', execution: false } }).reason).toBe('任务环境 t1 已释放，对象仍在');
     expect(classifyObject({ object: labeled(task, 'PersistentVolumeClaim'), legacyTask: 'missing' }).reason).toBe('任务环境 t1 的记录已不存在；工作卷只进入待回收，由管理员确认后删除');
   });
 
-  test('服务槽、构建与迁移的 Pod 留给第三期；计数覆盖五种结论', () => {
+  test('系统命名空间里的平台组件单列，不在收编与回收范围（即便带着别的标签）', () => {
+    const platform = { ...labeled({ 'crewstation.io/task': 't9' }), metadata: { name: 'cs-api-1', namespace: 'crewstation-system', labels: { 'crewstation.io/task': 't9' } } };
+    expect(classifyObject({ object: platform, systemNamespace: 'crewstation-system', legacyTask: 'missing' })).toMatchObject({ verdict: 'platform', reason: '平台组件（安装器管理），不在收编与回收范围' });
+    expect(classifyObject({ object: platform, systemNamespace: 'crewstation-system', claimedBy: 'r1' }).verdict).toBe('owned');
+  });
+
+  test('服务槽、构建与迁移的 Pod 留给第三期；计数覆盖六种结论', () => {
     expect(classifyObject({ object: labeled({ 'crewstation.io/workload': 'service', 'crewstation.io/release': 'rel-1' }) })).toMatchObject({ verdict: 'adoptable', candidateKind: 'service-slot', owner: 'release', ownerRef: 'rel-1' });
     expect(classifyObject({ object: labeled({ 'crewstation.io/workload': 'service' }) }).ownerRef).toBeUndefined();
     expect(classifyObject({ object: labeled({ 'app.kubernetes.io/component': 'build' }) }).candidateKind).toBe('build-job');
     expect(classifyObject({ object: labeled({ 'app.kubernetes.io/component': 'migration' }) }).candidateKind).toBe('migration-job');
     const items = [classifyObject({ object: labeled({}), claimedBy: 'r' }), classifyObject({ object: labeled({}) }), classifyObject({ object: labeled({}) })];
-    expect(countVerdicts(items)).toEqual({ owned: 1, adoptable: 0, orphan: 0, retained: 0, unclassified: 2 });
+    expect(countVerdicts(items)).toEqual({ owned: 1, adoptable: 0, orphan: 0, retained: 0, platform: 0, unclassified: 2 });
   });
 });

@@ -10,7 +10,9 @@ export interface LedgerObservations {
   claimOf(child: { readonly kind: string; readonly namespace?: string; readonly name: string; readonly uid?: string }): Promise<string | undefined>;
 }
 
-/** 旧形状的所属对象（收编空跑用）：按任务标签查任务环境，由组合根从 task-runtime 取。 */
+/** 旧形状的所属对象（收编空跑用）：按任务标签查任务环境，由组合根从身份目录与 task-runtime 取。 */
 export interface LegacyOwners {
+  /** RFC-013 之前的旧 ID（`tsk_…`）换成现在的 ID；身份目录里没有就返回 undefined。 */
+  resolveTaskId(legacyId: string): Promise<string | undefined>;
   task(taskId: string): Promise<LegacyTask | undefined>;
 }

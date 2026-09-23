@@ -13,7 +13,7 @@ export interface ObjectChange {
 export interface ManagedObjectFeed {
   start(handle: (change: ObjectChange) => Promise<void>): void;
   stop(): Promise<void>;
-  /** 各种类都完成第一次全量。 */
+  /** 各种类都完成第一次全量，且全量带进来的变化都已交给处理者处理完。 */
   synced(): Promise<void>;
 }
 

@@ -11,9 +11,10 @@ export interface AdoptionDeps {
   readonly ledger: LedgerObservations;
   readonly legacy: LegacyOwners;
   readonly clock: Clock;
+  readonly systemNamespace: string;
 }
 
-const ORDER: readonly AdoptionVerdict[] = ['orphan', 'retained', 'adoptable', 'unclassified', 'owned'];
+const ORDER: readonly AdoptionVerdict[] = ['orphan', 'retained', 'adoptable', 'unclassified', 'owned', 'platform'];
 const MAX_ITEMS = 500;
 
 function sortItems(items: AdoptionItem[]): AdoptionItem[] {
@@ -26,18 +27,27 @@ function sortItems(items: AdoptionItem[]): AdoptionItem[] {
  */
 export async function adoptionReport(deps: AdoptionDeps): Promise<AdoptionReport> {
   const objects: ObservedObject[] = [...(await deps.reader.list('Pod')), ...(await deps.reader.list('PersistentVolumeClaim'))];
-  const tasks = new Map<string, Promise<LegacyTask | 'missing'>>();
-  const taskOf = (taskId: string) => {
-    if (!tasks.has(taskId)) tasks.set(taskId, deps.legacy.task(taskId).then((task) => task ?? 'missing'));
-    return tasks.get(taskId)!;
+  const tasks = new Map<string, Promise<{ readonly id: string; readonly task: LegacyTask | 'missing' }>>();
+  // 旧对象上的任务标签可能还是 RFC-013 之前的 tsk_…：先经身份目录换成现在的 ID，否则活着的会话会被判成孤儿。
+  const lookup = async (label: string) => {
+    const id = label.startsWith('tsk_') ? (await deps.legacy.resolveTaskId(label)) ?? label : label;
+    return { id, task: (await deps.legacy.task(id)) ?? ('missing' as const) };
+  };
+  const taskOf = (label: string) => {
+    if (!tasks.has(label)) tasks.set(label, lookup(label));
+    return tasks.get(label)!;
   };
   const items: AdoptionItem[] = [];
+  const now = deps.clock.now();
   for (const object of objects) {
     const identity = { kind: object.kind, ...(object.metadata.namespace ? { namespace: object.metadata.namespace } : {}), name: object.metadata.name, ...(object.metadata.uid ? { uid: object.metadata.uid } : {}) };
     const claimedBy = await deps.ledger.claimOf(identity);
-    const taskId = object.metadata.labels?.['crewstation.io/task'];
-    const legacyTask = !claimedBy && taskId ? await taskOf(taskId) : undefined;
-    items.push(classifyObject({ object, ...(claimedBy ? { claimedBy } : {}), ...(legacyTask ? { legacyTask } : {}) }));
+    const label = object.metadata.labels?.['crewstation.io/task'];
+    const legacy = !claimedBy && label ? await taskOf(label) : undefined;
+    items.push(classifyObject({
+      object, systemNamespace: deps.systemNamespace, now, ...(claimedBy ? { claimedBy } : {}),
+      ...(legacy ? { legacyTask: legacy.task, ...(legacy.id !== label ? { legacyTaskId: legacy.id } : {}) } : {}),
+    }));
   }
   return { generatedAt: deps.clock.now().toISOString(), dryRun: true, counts: countVerdicts(items), items: sortItems(items).slice(0, MAX_ITEMS) };
 }

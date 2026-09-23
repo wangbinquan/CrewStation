@@ -19,6 +19,8 @@ export interface ClusterControlModuleDeps {
   readonly k8s: K8sClient;
   readonly ledger: LedgerObservations;
   readonly legacy: LegacyOwners;
+  /** 平台组件所在的系统命名空间：不在收编与回收范围。 */
+  readonly systemNamespace: string;
   isAdmin(id: UserId): Promise<boolean>;
   readonly logger?: Logger;
   readonly clock?: Clock;
@@ -45,9 +47,9 @@ export function createClusterControlModule(deps: ClusterControlModuleDeps): Clus
     name: 'cluster-control',
     adoptionReport: async (actor) => {
       if (!actor.isAdmin) throw forbidden('只有管理员可以查看收编报告');
-      return adoptionReport({ reader, ledger: deps.ledger, legacy: deps.legacy, clock });
+      return adoptionReport({ reader, ledger: deps.ledger, legacy: deps.legacy, clock, systemNamespace: deps.systemNamespace });
     },
   };
-  const observer = observationWorker(feed, (change) => observeChange(deps.ledger, clock, stats, change), () => ({ ...stats }), logger, deps.summaryMs);
+  const observer = observationWorker(feed, (change) => observeChange(deps.ledger, clock, deps.systemNamespace, stats, change), () => ({ ...stats }), logger, deps.summaryMs);
   return { api, http: [adoptionRoutes(api, (id) => deps.isAdmin(id as UserId))], observer, stats: () => ({ ...stats }) };
 }

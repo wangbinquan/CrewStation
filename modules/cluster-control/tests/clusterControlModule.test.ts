@@ -44,13 +44,15 @@ describe.skipIf(!available)('cluster-control：观测写回台账与收编空跑
   beforeAll(async () => {
     database = await createTestDatabase([resourcesMigrations]);
     resources = createResourcesModule({ db: database.db, quotas: { limitFor: async () => 4 }, authorizer: { projectAccess: async () => ({ operate: true }) }, isAdmin: async (id) => id === ADMIN.userId });
+    const system: K8sObject = { ...pod('cs-api-1'), metadata: { ...pod('cs-api-1').metadata, namespace: 'crewstation-system' } };
     const objects = [pod('task-owned'), pod('task-live', { 'crewstation.io/task': 't-live' }), pod('task-failed', { 'crewstation.io/task': 't-failed' }), pod('task-gone', { 'crewstation.io/task': 't-missing' }),
-      pvc('work-released', { 'crewstation.io/task': 't-released' }), pod('svc-prod', { 'crewstation.io/workload': 'service', 'crewstation.io/release': 'rel-1' }), pod('loose')];
+      pvc('work-released', { 'crewstation.io/task': 't-released' }), pod('svc-prod', { 'crewstation.io/workload': 'service', 'crewstation.io/release': 'rel-1' }), pod('loose'), system,
+      pvc('work-legacy', { 'crewstation.io/task': 'tsk_01a0954107447000b7936485fb80d15d' }), pvc('work-legacy-gone', { 'crewstation.io/task': 'tsk_unknown' })];
     control = createClusterControlModule({
-      k8s, feed, isAdmin: async (id) => id === ADMIN.userId,
+      k8s, feed, isAdmin: async (id) => id === ADMIN.userId, systemNamespace: 'crewstation-system',
       reader: { list: async (kind) => objects.filter((o) => o.kind === kind) },
       ledger: { observe: (input) => resources.api.observe(input), claimOf: (child) => resources.api.claimOf(child) },
-      legacy: { task: async (taskId) => tasks.get(taskId) },
+      legacy: { resolveTaskId: async (legacyId) => (legacyId === 'tsk_01a0954107447000b7936485fb80d15d' ? 't-live' : undefined), task: async (taskId) => tasks.get(taskId) },
     });
     control.observer.start();
   });
@@ -64,17 +66,22 @@ describe.skipIf(!available)('cluster-control：观测写回台账与收编空跑
     expect(observed?.conditions.find((c) => c.type === 'CrashLooping')?.status).toBe('false');
     expect(observed?.phase).toBe('starting');
     await feed.emit({ kind: 'Pod', object: pod('loose'), gone: false });
+    await feed.emit({ kind: 'Pod', object: { ...pod('cs-api-1'), metadata: { ...pod('cs-api-1').metadata, namespace: 'crewstation-system' } }, gone: false });
     await feed.emit({ kind: 'Pod', object: pod('task-owned'), gone: true });
     expect((await resources.api.get(record.id))?.children[0]?.phase).toBe('absent');
-    expect(control.stats()).toEqual({ recorded: 2, unchanged: 0, unowned: 1 });
+    expect(control.stats()).toEqual({ recorded: 2, unchanged: 0, unowned: 1, platform: 1 });
   });
 
   test('收编空跑：逐个判定归属，孤儿排在前面，计数覆盖全部；只读，不写台账', async () => {
     const before = (await resources.api.list({ includeStopped: true })).length;
     const report = AdoptionReportSchema.parse(await control.api.adoptionReport(ADMIN));
     expect(report.dryRun).toBe(true);
-    expect(report.counts).toEqual({ owned: 1, adoptable: 2, orphan: 2, retained: 1, unclassified: 1 });
-    expect(report.items.slice(0, 2).map((i) => i.name).sort()).toEqual(['task-gone', 'work-released']);
+    expect(report.counts).toEqual({ owned: 1, adoptable: 3, orphan: 3, retained: 1, platform: 1, unclassified: 1 });
+    expect(report.items.at(-1)).toMatchObject({ name: 'cs-api-1', verdict: 'platform' });
+    expect(report.items.slice(0, 3).map((i) => i.name).sort()).toEqual(['task-gone', 'work-legacy-gone', 'work-released']);
+    // RFC-013 之前的旧 ID 经身份目录换成现 ID：它的会话还在，工作卷是可收编，不是孤儿
+    expect(report.items.find((i) => i.name === 'work-legacy')).toMatchObject({ verdict: 'adoptable', candidateKind: 'volume', ownerRef: 't-live' });
+    expect(report.items.find((i) => i.name === 'work-legacy-gone')).toMatchObject({ verdict: 'orphan', ownerRef: 'tsk_unknown' });
     expect(report.items.find((i) => i.name === 'task-live')).toMatchObject({ verdict: 'adoptable', candidateKind: 'dev-workspace', ownerRef: 't-live' });
     expect(report.items.find((i) => i.name === 'task-owned')?.verdict).toBe('owned');
     expect((await resources.api.list({ includeStopped: true })).length).toBe(before);

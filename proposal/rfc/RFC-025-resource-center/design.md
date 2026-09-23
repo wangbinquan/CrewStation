@@ -194,7 +194,9 @@ ResourceActionSchema = z.object({ id: ResourceActionIdSchema, enabled: z.boolean
 2. 可改的标签改成新标签（Pod、Deployment、Service、IngressRoute、PVC 的标签都可改）；名字不可改的保留别名。
 3. 认领不到的受管对象按 §6.4 的孤儿规则处理——今天实查到的遗留对象（audit §1）在这一步收掉；PVC 只进「待回收」。
 
-> **实施补记（2026-09-23，第一期空跑）**：空跑报告在 cs-api 按需计算，只读：一次性列出受管 Pod 与 PVC；按资源标签或期望子对象认领的是「已认领」；按 `crewstation.io/task` 查任务环境，仍在的是「可收编」（给出候选种类），失败的开发会话是「保留中」，已释放、已失败或查不到的是「孤儿」（PVC 只进待回收）；服务槽、构建与迁移的 Pod 是「可收编」（第三期由对应记录认领）；其余「未归类」。cs-controller 里的观测工作器照常把 Pod、PVC 的变化写回台账（第一期台账为空，绝大多数是 unowned），首次全量完成与此后每 10 分钟记一行汇总。
+> **实施补记（2026-09-23，第一期空跑）**：空跑报告在 cs-api 按需计算，只读：一次性列出受管 Pod 与 PVC；按资源标签或期望子对象认领的是「已认领」；系统命名空间里的是「平台组件」（安装器管理，不在收编与回收范围）；按 `crewstation.io/task` 查任务环境，仍在的是「可收编」（给出候选种类），失败未满 72 小时（按最后活动时间算）的开发会话是「保留中」，已释放、已失败或查不到的是「孤儿」（PVC 只进待回收）；服务槽、构建与迁移的 Pod 是「可收编」（第三期由对应记录认领）；其余「未归类」。cs-controller 里的观测工作器照常把 Pod、PVC 的变化写回台账（第一期台账为空，绝大多数是 unowned；系统命名空间的对象不查不写），首轮全量处理完与此后每 10 分钟记一行汇总。
+>
+> **收编必须先解析旧 ID**：RFC-013 之前建的 PVC、Pod 标签上还是 `tsk_…`。本机第一次空跑按标签原值查任务环境，把 demo 正在运行的开发会话的工作卷判成了孤儿（`tsk_01a09541…` 经身份目录对应 `01a0c12a-de2a-705a-…`，状态 running）。现在先经身份目录（`task_runtime.resource_identity_aliases`）换成现 ID 再查；第六期正式收编与孤儿回收沿用同一条规则。
 
 ### 6.6 `data-control`
 
@@ -224,6 +226,14 @@ ResourceActionSchema = z.object({ id: ResourceActionIdSchema, enabled: z.boolean
   - 服务域：按来源服务（cs-auth 在服务域认出来源后注入的来源服务头）与按目标合计。
 - 超额：Traefik 返回 429；是否带 `Retry-After` 与多副本网关的全局计数（Traefik 的分布式后端）在 T2 实测（B9）。不带时由网关的错误页中间件补上；分布式后端不可用时，默认值按网关副本数折算并在平台设置里写明。
 - 工作台：`packages/api-client` 把 429 解析成错误种类 `rate_limited`（带 `retryAfter`）；`useApiQuery` 对它按 `retryAfter` 自动重读并显示「请求过于频繁，N 秒后自动重试」；变更请求不自动重发。命令行照同一规则提示。能力说明 MCP 写明数字人会收到 429 与 `Retry-After`。
+
+> **T2 实测（2026-09-23，本机 Traefik v3.7.13，临时探针路由测完已删）**：
+>
+> - `rateLimit` 超额：429，带 `Retry-After`（向上取整的秒数，2 次／秒时为 `1`）与 `X-Retry-In`（毫秒精度），正文是纯文本 `Too Many Requests`、不是平台错误体——`packages/api-client` 据此把它认作 `rate_limited`（平台额度不足的 429 带 `quota_exceeded` 错误体，不混淆）。
+> - `inFlightReq` 超额：429，正文 `max connections reached: N`，**不带** `Retry-After`：要么由网关的错误页中间件补上，要么客户端按缺省间隔重试（T10 定）。不同键互不影响，前一个请求结束即放行。
+> - **计数按路由各一份**：同一个 Middleware 挂在两条 IngressRoute 上，两条路由各有自己的桶，互不相加。「按主机合计」天然是每条路由一份；要跨路由合计只能靠分布式后端。
+> - 按请求头分桶时，**缺这个头的请求全部落进同一个空键桶**：限流中间件必须链在 ForwardAuth 之后（此时一定有网关注入的身份头）；登录之前的路由改用客户端 IP（`ipStrategy`）分桶，不能用身份头。
+> - 分布式后端：`rateLimit.redis`（CRD 字段在，v3.7 支持）；平台没有 Redis，本机未测，按上文的折算方案走；`inFlightReq` 没有分布式选项，始终按网关副本各计。
 
 ### 7.4 身份索引与放行表
 
@@ -255,7 +265,8 @@ ResourceActionSchema = z.object({ id: ResourceActionIdSchema, enabled: z.boolean
 
 > **实施补记（2026-09-23，第一期）**：
 >
-> - 推送流的请求关掉 Bun 默认 10 秒的空闲断开（`server.timeout(req, 0)`），靠 15 秒心跳维持；经 Traefik 的缓冲与空闲超时在 T2 实测后补记于此。
+> - 推送流的请求关掉 Bun 默认 10 秒的空闲断开（`server.timeout(req, 0)`），靠 15 秒心跳维持。
+> - **T2 实测（2026-09-23，本机 Traefik v3.7.13）**：经网关不缓冲——探针流首帧在响应头后 1 毫秒到达，15 秒一帧逐帧准时到达；静默 70 秒与 200 秒的流都没有被网关断开（入口的 60 秒读超时、180 秒空闲超时都不作用于进行中的响应）。静默断流只来自上游进程自己的空闲超时：探针的 Bun 服务设了 120 秒，流在 118 秒被它断开——这正是 cs-api 要逐个请求关掉 Bun 空闲断开的原因。部署后经网关读 cs-api 的推送流：快照在响应头后 3 毫秒到达，心跳在 +15.0、+30.0 秒到达。
 > - 失权断开的机制与上文不同：平台里没有成员或角色变化的领域事件，第一期沿用 cs-session 会话流的先例（`modules/session/application/authorizedSink.ts`）——发出带资源内容的事件前复核授权（至多每 5 秒一次），不通过只发一个 `reset`（`forbidden`）后断开，事件不会发给失权的人；空闲的流每 60 秒复核一次。待作者裁定（`docs/engineering/implementation-open-questions.md` I24）。
 > - 每个连接的缓冲 256 条，溢出只发 `reset` 后断开；同一批里同一资源只推最后一次（中间态可能合并，顺序不倒退）。每人同时打开的流上限第一期是模块默认值 8，平台设置项随 T10（限流设置）一并加入。
 
