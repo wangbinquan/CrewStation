@@ -1,13 +1,10 @@
-/* 成员弹窗的正文：左边选人，右边选角色；说明占满一行。 */
-.form {
-  display: grid;
-  min-width: 0;
-  grid-template-columns: minmax(0, 1.5fr) minmax(200px, 1fr);
-  gap: var(--cs-space-3);
-  align-items: end;
-}
-.picker { display: grid; gap: var(--cs-space-2); min-width: 0; }
-.actions, .target { display: flex; gap: var(--cs-space-2); align-items: center; flex-wrap: wrap; }
-.target p { min-width: 0; overflow-wrap: anywhere; }
-.form > p { grid-column: 1 / -1; }
-@media (max-width: 640px) { .form { grid-template-columns: minmax(0, 1fr); } }
+/*
+ * 成员弹窗的正文（2026-09-23 重排）：一栏，先选人、分隔线下再选角色。
+ * 原先左右两栏挤在 600px 里：查找方式折成两行、「查找账号」被挤到提示下面、角色一栏沉底对不齐。
+ */
+.form { display: grid; gap: var(--cs-space-4); min-width: 0; }
+.picker { display: grid; gap: var(--cs-space-3); min-width: 0; }
+.selected { display: grid; gap: var(--cs-space-1); min-width: 0; }
+.caption { color: var(--cs-color-text-muted); }
+.role { display: grid; gap: var(--cs-space-3); min-width: 0; padding-top: var(--cs-space-4); border-top: 1px solid var(--cs-color-border); }
+.rule { font-size: var(--cs-font-size-sm); color: var(--cs-color-text-muted); }

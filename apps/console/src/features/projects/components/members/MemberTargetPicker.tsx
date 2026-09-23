@@ -7,8 +7,10 @@ import { useT } from '../../../../shared/lib/useT';
 import { Button } from '../../../../shared/ui/Button';
 import { FormField } from '../../../../shared/ui/FormField';
 import { QueryStatus } from '../../../../shared/ui/QueryStatus';
+import { Segmented } from '../../../../shared/ui/Segmented';
 import type { MemberTargetMode } from '../../model/useMemberEditor';
 import { MemberLookup } from '../../../../shared/project/MemberLookup';
+import { PersonCard } from '../../../../shared/project/PersonCard';
 import styles from '../MemberForm.module.css';
 
 interface PickerProps {
@@ -26,17 +28,18 @@ interface PickerProps {
   readonly projectId: string;
 }
 
+/** 选人：三种方式在一行里切换（`Segmented`）；选中后只剩这个人的卡片与「更换成员」。 */
 export function MemberTargetPicker(props: PickerProps) {
   const { user, rawId, disabled, error, onSelect, onRawId, isAdmin, projectId, identity, onMode, onIdentity } = props;
   const t = useT(), id = useId(), mode = props.mode === 'directory' && !isAdmin ? 'lookup' : props.mode;
-  if (user) return <div className={styles.target}>
-    <p>{t('projects.members.selected', { name: user.name, email: user.email })}</p>
-    <Button variant="ghost" disabled={disabled} onClick={() => onSelect(undefined)}>{t('projects.members.changeTarget')}</Button>
+  if (user) return <div className={styles.selected}>
+    <span className={styles.caption}>{t('projects.members.selectedLabel')}</span>
+    <PersonCard name={user.name} email={user.email} action={<Button disabled={disabled} onClick={() => onSelect(undefined)}>{t('projects.members.changeTarget')}</Button>} />
   </div>;
+  const modes: readonly MemberTargetMode[] = isAdmin ? ['lookup', 'id', 'directory'] : ['lookup', 'id'];
   return <div className={styles.picker}>
-    <div className={styles.actions}>
-      {(['lookup', 'id', ...(isAdmin ? ['directory'] as const : [])] as const).map((value) => <Button key={value} variant={mode === value ? 'secondary' : 'ghost'} aria-pressed={mode === value} disabled={disabled} onClick={() => onMode(value)}>{t(`projects.members.mode.${value}`)}</Button>)}
-    </div>
+    <Segmented label={t('projects.members.modeLabel')} value={mode} items={modes.map((value) => ({ value, label: t(`projects.members.mode.${value}`), disabled }))}
+      onChange={(value) => { const next = modes.find((item) => item === value); if (next) onMode(next); }} />
     <div hidden={mode !== 'lookup'}><MemberLookup projectId={projectId} inputState={{ value: identity, onChange: onIdentity }} onSelect={onSelect} actionKey="projects.members.select" disabled={disabled || mode !== 'lookup'} selectionError={error} /></div>
     {mode === 'id' ? <FormField label={t('projects.members.rawId')} hint={t('projects.members.userIdHint')} error={error} hintId={`${id}-hint`} errorId={`${id}-error`}>
       <input value={rawId} disabled={disabled} aria-invalid={Boolean(error)} aria-describedby={`${id}-hint${error ? ` ${id}-error` : ''}`} onChange={(event) => onRawId(event.target.value)} />

@@ -1,4 +1,4 @@
-import type { ProjectComputePolicyDto, SaveProjectComputePolicy, AppPresentationDto, AppVisibilityCheckDto, AppVisibilityDto, ManifestKind, MemberCandidateDto, MemberDto, ProjectDto, QuotaDto, SetAppPresentationRequest, SetAppVisibilityRequest, SetMemberRequest, SetQuotaRequest } from '@crewstation/contracts';
+import type { ProjectComputePolicyDto, SaveProjectComputePolicy, AppPresentationDto, AppVisibilityDto, ManifestKind, MemberCandidateDto, MemberDto, ProjectDto, QuotaDto, SetAppPresentationRequest, SetAppVisibilityRequest, SetMemberRequest, SetQuotaRequest } from '@crewstation/contracts';
 import type { ProjectPage, ProjectPageQuery, ProjectServicePolicyDto, SaveProjectServicePolicy } from '@crewstation/contracts';
 import type { Transport } from '../httpTransport';
 import type { ItemsPage } from '../itemsPage';
@@ -36,7 +36,6 @@ export interface ProjectsResource {
   memberCandidates(projectId: string, identity: string): Promise<ItemsPage<MemberCandidateDto>>;
   getAppVisibility(projectId: string): Promise<AppVisibilityDto>;
   setAppVisibility(projectId: string, input: SetAppVisibilityRequest): Promise<AppVisibilityDto>;
-  checkAppVisibility(projectId: string, userId: string): Promise<AppVisibilityCheckDto>;
   getAppPresentation(projectId: string): Promise<AppPresentationDto>;
   setAppPresentation(projectId: string, input: SetAppPresentationRequest): Promise<AppPresentationDto>;
 }
@@ -61,7 +60,6 @@ export function projectsResource(transport: Transport): ProjectsResource {
     memberCandidates: (id, identity) => transport.request('GET', `${base(id)}/member-candidates`, { query: { identity } }),
     getAppVisibility: (id) => transport.request('GET', `${base(id)}/app-visibility`),
     setAppVisibility: (id, input) => transport.request('PUT', `${base(id)}/app-visibility`, { body: input }),
-    checkAppVisibility: (id, userId) => transport.request('GET', `${base(id)}/app-visibility/check`, { query: { userId } }),
     getAppPresentation: (id) => transport.request('GET', `${base(id)}/app-presentation`),
     setAppPresentation: (id, input) => transport.request('PUT', `${base(id)}/app-presentation`, { body: input }),
   };

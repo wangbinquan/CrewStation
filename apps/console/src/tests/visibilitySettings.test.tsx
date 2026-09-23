@@ -108,14 +108,14 @@ test('返回浏览器历史前可保留草稿，确认离开后才导航；指�
   expect(browser.beforeUnload()).toBe(false); await page.back(); await clickSetting(page, '放弃输入并离开'); expect(page.path()).toBe('/projects'); expect(f.writes).toHaveLength(0);
 });
 
-test('「检查保存后的效果」直接展示为一张卡，首屏仍不出现编辑表单；只读用户没有这张卡', async () => {
-  const f = visibilitySettingsFixture(); page = await renderApp(visibilitySettingsRoute);
-  // 2026-09-23 作者裁定不再折叠（RFC-009 proposal §3.4 修订）。
-  const title = [...document.querySelectorAll('main section > header > h2')].find((node) => node.textContent === '检查保存后的效果');
-  expect(title !== undefined).toBe(true); expect(title!.closest('details') === null).toBe(true);
-  expect(title!.closest('section')!.textContent).toContain('按服务器上已保存的范围检查'); expect(document.querySelector('form')).toBeNull();
-  page.unmount(); page = undefined; f.state.role = 'developer'; f.state.visibility = { ...f.state.visibility, canConfigure: false };
-  page = await renderApp(visibilitySettingsRoute); expect(page.text()).toContain('整理团队知识'); expect(page.text()).not.toContain('检查保存后的效果');
+test('应用展示只有展示资料与可见范围两张卡：「检查保存后的效果」已删除，页面上没有查找框，也不请求检查接口', async () => {
+  visibilitySettingsFixture(); const paths: string[] = [], served = globalThis.fetch;
+  globalThis.fetch = ((raw: Parameters<typeof fetch>[0], init?: RequestInit) => { paths.push(new URL(String(raw), 'http://localhost').pathname); return served(raw, init); }) as typeof fetch;
+  page = await renderApp(visibilitySettingsRoute);
+  // 2026-09-23 作者裁定删除这张卡与后端检查接口（RFC-009 proposal §3.4 同日再修订）。
+  expect([...document.querySelectorAll('main section > header > h2')].map((node) => node.textContent)).toEqual(['应用展示资料', '市场可见范围']);
+  expect(page.text()).not.toContain('检查保存后的效果'); expect(page.text()).not.toContain('查找账号'); expect(document.querySelector('form')).toBeNull();
+  expect(paths.some((path) => path.includes('/app-visibility/check'))).toBe(false);
 });
 
 test('应用设置首屏只显示摘要，两个编辑入口各开一个弹窗，焦点进第一个输入，取消后回到入口', async () => {

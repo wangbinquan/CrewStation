@@ -57,9 +57,8 @@ describe.skipIf(!available)('市场范围与展示资料（真实 PostgreSQL）'
     expect((await module.api.listMarketListings(visitor, query())).items.map((x) => x.projectId)).toContain(p.id);
     await expect(module.api.getProject(visitor, p.id)).rejects.toMatchObject({ kind: 'not_found' });
     await expect(module.api.getAppVisibility(visitor, p.id)).rejects.toMatchObject({ kind: 'not_found' });
-    await expect(module.api.checkAppVisibility(dev, p.id, visitor.userId)).rejects.toMatchObject({ kind: 'forbidden' });
   });
-  test('指定名单去重、真实账号匹配、无效／空名单字段错误与保存效果检查', async () => {
+  test('指定名单去重、真实账号匹配、无效／空名单字段错误', async () => {
     const p = await app();
     expect(await module.api.memberCandidates(owner, p.id, 'VISITOR@example.com')).toEqual([{ userId: visitor.userId, name: 'visitor', email: 'visitor@example.com', platformRole: 'developer' }]);
     expect(await module.api.memberCandidates(owner, p.id, visitor.userId)).toHaveLength(1);
@@ -67,9 +66,6 @@ describe.skipIf(!available)('市场范围与展示资料（真实 PostgreSQL）'
     const setting = { mode: 'selected' as const, expectedRevision: 0, userIds: [visitor.userId, visitor.userId] };
     const saved = await module.api.setAppVisibility(owner, p.id, setting);
     expect(saved.userIds).toEqual([visitor.userId]); expect(saved.revision).toBe(1);
-    expect(await module.api.checkAppVisibility(owner, p.id, visitor.userId)).toMatchObject({ visible: true, basis: 'selected', revision: 1 });
-    expect(await module.api.checkAppVisibility(owner, p.id, other.userId)).toMatchObject({ visible: false, basis: 'hidden', revision: 1 });
-    expect(await module.api.checkAppVisibility(owner, p.id, admin.userId)).toMatchObject({ visible: true, basis: 'admin' });
     await expect(module.api.setAppVisibility(owner, p.id, { ...setting, expectedRevision: 1, userIds: [] })).rejects.toMatchObject({ kind: 'validation', details: { issues: [{ path: ['userIds'] }] } });
     await expect(module.api.setAppVisibility(owner, p.id, { ...setting, expectedRevision: 1, userIds: ['01a0bf5d-8f4b-7622-8c1a-d607ceefa8df' as UserId] })).rejects.toMatchObject({ kind: 'validation', details: { field: 'userIds' } });
     expect((await module.api.getAppVisibility(owner, p.id)).revision).toBe(1);
@@ -113,7 +109,9 @@ describe.skipIf(!available)('市场范围与展示资料（真实 PostgreSQL）'
     const request = (path: string, actor = owner, body?: unknown) => http.request(`/v1/projects/${p.id}/${path}`, { headers: { [IDENTITY_HEADERS.userId]: actor.userId, 'content-type': 'application/json' }, ...(body ? { method: 'PUT', body: JSON.stringify(body) } : {}) });
     expect((await request('app-visibility', owner, { mode: 'selected', userIds: [], expectedRevision: 0 })).status).toBe(400);
     expect((await request('app-visibility', owner, { mode: 'members', userIds: [], expectedRevision: 1 })).status).toBe(409);
-    expect((await request(`app-visibility/check?userId=${owner.userId}`, visitor)).status).toBe(404);
+    // 「检查保存后的效果」连同检查接口已删除（2026-09-23 作者裁定）：负责人与管理员请求也是 404，不再按已保存范围代查某人。
+    for (const actor of [owner, admin]) expect((await request(`app-visibility/check?userId=${visitor.userId}`, actor)).status).toBe(404);
+    expect('checkAppVisibility' in module.api).toBe(false);
     expect((await request('member-candidates?identity=visitor%40example.com', visitor)).status).toBe(404);
     expect((await request('app-visibility', admin)).status).toBe(200);
     expect((await request('app-visibility', owner, { mode: 'authenticated', userIds: [], expectedRevision: 0 })).status).toBe(200);

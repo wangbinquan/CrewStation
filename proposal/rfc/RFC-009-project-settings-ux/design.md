@@ -90,6 +90,8 @@ API 目录仍从项目解析 serviceId，再查询授权和当前会话。资源
 环境组独立数据和草稿；版本历史／生产快照按需展示，但生产“是否有未采用配置”的摘要保留未知和错误态。
 
 > **2026-09-23 修订（作者当面裁定，直接修改，不另立 RFC）。** 版本历史与生产快照对照改为直接展示：`ConfigEnvPanel` 页脚恢复 `h3` 标题，`ProductionConfigImpact` 去掉折叠段；两者原本就在渲染时读取，查询、未知与错误态不变（`configImpact` 用例断言两处不在 `<details>` 里）。
+
+> **2026-09-23 再修订（作者当面裁定，直接修改，不另立 RFC）。** `ProductionConfigImpact` 删除，配置页不再读服务的两个槽与各槽当前 Release；上面「生产“是否有未采用配置”的摘要」作废（proposal §3.3 同日再修订）。应用展示删掉 `VisibilityCheck` 卡，检查接口整条删除：project 模块的 `checkAppVisibility`、路由 `GET /v1/projects/:projectId/app-visibility/check` 与 `appVisibilityBasis`，契约的 `AppVisibilityCheckDto`，api-client 的对应方法（proposal §3.4 同日再修订；市场与详情的可见性裁定不受影响）。用例：`configImpact` 断言对照卡不在、不读槽与发布记录；`visibilitySettings` 断言应用展示只有两张卡；`modules/project/tests/appVisibility` 断言负责人与管理员请求检查接口都是 404。成员弹窗同日重排：`MemberTargetPicker` 用 `Segmented` 切换查找方式，候选与已选中的人共用新的 `shared/project/PersonCard`；`MemberForm` 按 `current` 决定提交键文案。
 资源五主题共享已有 queryKey 和缓存，但每次只呈现当前主题；目录 API 不依赖能力聚合成功。
 聚合来源失败时，项目与仓库中的独立仓库查询仍可展示；不得把旧数据当作新鲜成功结果。
 

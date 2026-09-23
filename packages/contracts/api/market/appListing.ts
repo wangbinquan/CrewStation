@@ -20,10 +20,6 @@ export const AppVisibilityDtoSchema = z.object({
   mode: AppVisibilityModeSchema, userIds: z.array(UserIdSchema), users: z.array(MemberCandidateDtoSchema),
   revision: z.number().int().min(0), updatedAt: z.iso.datetime().nullable(), canConfigure: z.boolean(),
 });
-export const AppVisibilityCheckDtoSchema = z.object({
-  userId: UserIdSchema, visible: z.boolean(), revision: z.number().int().min(0), checkedAt: z.iso.datetime(),
-  basis: z.enum(['admin', 'member', 'authenticated', 'selected', 'hidden']),
-});
 export const SetAppPresentationRequestSchema = z.object({
   description: z.string().trim().max(400), icon: AppIconSchema, expectedRevision: z.number().int().min(0),
 }).strict();
@@ -60,7 +56,6 @@ export type AppIcon = z.infer<typeof AppIconSchema>;
 export type MemberCandidateDto = z.infer<typeof MemberCandidateDtoSchema>;
 export type SetAppVisibilityRequest = z.infer<typeof SetAppVisibilityRequestSchema>;
 export type AppVisibilityDto = z.infer<typeof AppVisibilityDtoSchema>;
-export type AppVisibilityCheckDto = z.infer<typeof AppVisibilityCheckDtoSchema>;
 export type SetAppPresentationRequest = z.infer<typeof SetAppPresentationRequestSchema>;
 export type AppPresentationDto = z.infer<typeof AppPresentationDtoSchema>;
 export type MarketAppsQuery = z.infer<typeof MarketAppsQuerySchema>;

@@ -1,0 +1,15 @@
+.card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--cs-space-3);
+  min-width: 0;
+  padding: var(--cs-space-2) var(--cs-space-3);
+  border: 1px solid var(--cs-color-border);
+  border-radius: var(--cs-radius-md);
+  background: var(--cs-color-surface-muted);
+}
+.identity { display: grid; min-width: 0; }
+.name { font-weight: 600; overflow-wrap: anywhere; }
+.email { font-size: var(--cs-font-size-sm); color: var(--cs-color-text-muted); overflow-wrap: anywhere; }
+.action { flex: none; }

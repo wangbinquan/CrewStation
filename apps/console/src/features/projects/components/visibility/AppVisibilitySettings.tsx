@@ -9,7 +9,6 @@ import { usePresentationEditor } from '../../model/usePresentationEditor';
 import { useVisibilityEditor } from '../../model/useVisibilityEditor';
 import { AppPresentationDialog, AppPresentationSummary } from './AppPresentationDialog';
 import { AppVisibilityDialog, AppVisibilitySummary } from './AppVisibilityDialog';
-import { VisibilityCheck } from './VisibilityCheck';
 import styles from './Visibility.module.css';
 
 interface SettingsProps {
@@ -25,6 +24,7 @@ interface SettingsProps {
 
 /**
  * 应用展示：卡片只显示已保存的一版，「修改展示资料」「修改可见范围」各开一个弹窗（2026-09-23 起）。
+ * 原第三张卡「检查保存后的效果」连同后端检查接口已删除（2026-09-23 作者裁定）：可见范围只有三种，谁能看到由范围卡与成员页直接读出。
  * 两份草稿都在这一层：关窗不丢、再打开恢复，成功保存只清除所属草稿；离开页面共用一次确认，写明哪几份会丢。读取失败保留草稿。
  */
 export function AppVisibilitySettings({ projectId, visibility, presentation, canConfigure, unavailable, refreshing = false, reload }: SettingsProps) {
@@ -51,7 +51,6 @@ export function AppVisibilitySettings({ projectId, visibility, presentation, can
       <AppVisibilitySummary saved={visibility} canConfigure={canConfigure} />
       {open !== 'scope' && scopeEditor.save.isSuccess ? <ActionNote tone="success">{t('projects.visibility.saved')}</ActionNote> : null}
     </Card>
-    {canConfigure && !unavailable ? <Card stacked compact title={t('projects.visibility.check')}><VisibilityCheck projectId={projectId} revision={visibility.revision} /></Card> : null}
     {open === 'presentation' && available('presentation') ? <AppPresentationDialog saved={presentation} editor={presentationEditor} onClose={() => setOpen(undefined)} /> : null}
     {open === 'scope' && available('scope') ? <AppVisibilityDialog projectId={projectId} saved={visibility} editor={scopeEditor} onClose={() => setOpen(undefined)} /> : null}
   </div>;

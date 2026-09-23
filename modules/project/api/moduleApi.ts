@@ -3,7 +3,7 @@ import type {
   CreateServicePlan, CreateTaskProfile,  ProjectCreationCatalog, ProjectPage, ProjectPageEntry, ProjectPageQuery,
   Actor, CreateProjectRequest, ListProjectsQuery, ManifestKind, MemberDto, ProjectDto, ProjectId, ProjectState, QuotaDto, ServiceDto,
   ServiceId, ServicePlanDto, ServicePlanWrite, TaskProfileWrite, SetMemberRequest, SetQuotaRequest, TaskProfileDto, UserId,
-  AppVisibilityDto, AppVisibilityCheckDto, SetAppVisibilityRequest, AppPresentationDto, SetAppPresentationRequest, MemberCandidateDto, MarketAppsQuery, MarketAppDto,
+  AppVisibilityDto, SetAppVisibilityRequest, AppPresentationDto, SetAppPresentationRequest, MemberCandidateDto, MarketAppsQuery, MarketAppDto,
 } from '@crewstation/contracts';
 
 export type ProjectAction =
@@ -65,7 +65,6 @@ export interface ProjectModuleApi {
   getMarketListing(actor: Actor, projectId: ProjectId): Promise<MarketListing>;
   getAppVisibility(actor: Actor, projectId: ProjectId): Promise<AppVisibilityDto>;
   setAppVisibility(actor: Actor, projectId: ProjectId, input: SetAppVisibilityRequest): Promise<AppVisibilityDto>;
-  checkAppVisibility(actor: Actor, projectId: ProjectId, userId: UserId): Promise<AppVisibilityCheckDto>;
   getAppPresentation(actor: Actor, projectId: ProjectId): Promise<AppPresentationDto>;
   setAppPresentation(actor: Actor, projectId: ProjectId, input: SetAppPresentationRequest): Promise<AppPresentationDto>;
   memberCandidates(actor: Actor, projectId: ProjectId, identity: string): Promise<MemberCandidateDto[]>;

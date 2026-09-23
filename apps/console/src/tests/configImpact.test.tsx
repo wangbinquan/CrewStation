@@ -3,83 +3,37 @@ import { afterEach, expect, test } from 'bun:test';
 import { renderApp } from './renderApp';
 
 const originalFetch = globalThis.fetch, projectId = '01a0bf5d-8f4b-7e1e-8dde-c9c2ae13ed34', serviceId = '01a0bf5d-8f4b-760b-86b6-0bb9f08a9eaa', userId = '01a0bf5d-8f4b-7ed2-8386-a4b2e1a36efb';
-const prodId = '01a0bf5d-8f4b-762d-81e1-f95f4dd57c2d', previewId = '01a0bf5d-8f4b-7dda-8ca7-d5d5f8a92b44', sha = 'f'.repeat(40);
 let page: Awaited<ReturnType<typeof renderApp>> | undefined;
 afterEach(() => { page?.unmount(); page = undefined; globalThis.fetch = originalFetch; });
 
 function fixture() {
-  const state = { slotsFailure: false, historyFailure: false, releaseFailure: false, mismatch: false, noService: false, emptyProd: false, missingSlot: false, prodVersion: 3 as number | undefined, history: [7, 3, 5] };
-  const calls: Array<{ path: string; method: string }> = [];
-  globalThis.fetch = (async (raw, init) => {
-    const path = new URL(String(raw), 'http://localhost').pathname, method = init?.method ?? 'GET'; calls.push({ path, method });
+  const calls: string[] = [];
+  globalThis.fetch = (async (raw) => {
+    const path = new URL(String(raw), 'http://localhost').pathname; calls.push(path);
     let body: unknown = { items: [] }, status = 200;
     if (path === '/v1/me') body = { id: userId, name: '负责人', platformRole: 'developer', isAdmin: false, memberships: [{ projectId, role: 'owner' }] };
-    else if (path === `/v1/projects/${projectId}`) body = { id: projectId, serviceId: state.noService ? undefined : serviceId, name: '示例', slug: 'demo', kind: 'DigitalWorker', state: 'active' };
-    else if (path.endsWith('/slots')) {
-      if (state.slotsFailure) { status = 503; body = { error: 'unavailable', message: '部署槽读取失败' }; }
-      else body = { items: state.missingSlot ? [] : [
-        { name: 'prod', active: true, releaseId: state.emptyProd ? undefined : prodId, state: state.emptyProd ? 'empty' : 'ready', commitSha: state.emptyProd ? undefined : sha },
-        { name: 'preview', active: false, releaseId: previewId, state: 'deploying', commitSha: sha },
-      ] };
-    } else if (path.endsWith('/config/production/versions')) {
-      if (state.historyFailure) { status = 503; body = { error: 'unavailable', message: '配置历史读取失败' }; }
-      else body = { items: state.history.map((version) => ({ env: 'production', version, keys: [], createdAt: '2026-09-13T01:00:00.000Z' })) };
-    } else if (path.startsWith('/v1/releases/')) {
-      const id = path.split('/').at(-1)!;
-      if (state.releaseFailure && id === prodId) { status = 503; body = { error: 'unavailable', message: '正式发布读取失败' }; }
-      else body = { id, serviceId: state.mismatch && id === prodId ? 'another-service' : serviceId, commitSha: sha, tag: id === prodId ? 'v1.0.0' : 'v1.1.0', configVersion: id === prodId ? state.prodVersion : 7 };
-    } else if (path.endsWith('/dev-session')) { status = 404; body = { error: 'not_found', message: '无会话' }; }
+    else if (path === `/v1/projects/${projectId}`) body = { id: projectId, serviceId, name: '示例', slug: 'demo', kind: 'DigitalWorker', state: 'active' };
+    else if (path.endsWith('/config/production/versions')) body = { items: [7, 3, 5].map((version) => ({ env: 'production', version, keys: [], createdAt: '2026-09-13T01:00:00.000Z' })) };
+    else if (path.endsWith('/dev-session')) { status = 404; body = { error: 'not_found', message: '无会话' }; }
     return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
   }) as typeof fetch;
-  return { state, calls };
+  return { calls };
 }
-const row = (label: string) => [...document.querySelectorAll('tr')].find((element) => element.querySelector('td')?.textContent?.startsWith(label))!;
+const visibleCardTitles = () => [...document.querySelectorAll('main section > header > h2')].filter((node) => !node.closest('[hidden]')).map((node) => node.textContent);
 
-test('生产配置对照读取两槽精确 Release，使用全组历史版本并区分实际部署状态', async () => {
-  const f = fixture(); page = await renderApp(`/projects/${projectId}/settings?tab=config`);
-  expect(f.calls.some((call) => call.path.endsWith('/slots'))).toBe(false);
-  await page.click('生产'); expect(page.text()).toContain('当前已保存的生产配置：第 7 版');
-  expect(row('正式版本').textContent).toContain('v1.0.0'); expect(row('正式版本').textContent).toContain('记录为第 3 版'); expect(row('正式版本').textContent).toContain('已有更新的配置');
-  expect(row('待验证版本').textContent).toContain('部署中'); expect(row('待验证版本').textContent).toContain('与当前保存版本一致');
-  expect(page.text()).toContain('实际注入键由各版本的 Manifest 决定');
-  expect(new Set(f.calls.filter((call) => call.path.startsWith('/v1/releases/')).map((call) => call.path))).toEqual(new Set([`/v1/releases/${prodId}`, `/v1/releases/${previewId}`]));
-  expect(f.calls.some((call) => call.path === `/v1/services/${serviceId}/releases`)).toBe(false);
-  expect(f.calls.every((call) => call.method === 'GET')).toBe(true);
+// 2026-09-23 作者裁定：「生产配置与部署版本」卡整张删除（RFC-009 proposal §3.3、design §3.1 同日再修订）。
+test('生产组不再有「生产配置与部署版本」卡，也不为它读部署槽与发布记录；生效条件仍写在变量卡上', async () => {
+  const f = fixture(); page = await renderApp(`/projects/${projectId}/settings?tab=config&env=production`);
+  expect(visibleCardTitles()).toContain('生产变量'); expect(visibleCardTitles()).not.toContain('生产配置与部署版本');
+  expect(page.text()).not.toContain('记录为第'); expect(page.text()).not.toContain('查看发布与上线');
+  expect(f.calls.some((path) => path.endsWith('/slots') || path.startsWith('/v1/releases/'))).toBe(false);
+  expect(page.text()).toContain('保存不会自动改变现有进程，下一次发布按新配置注入');
 });
 
-test('生产变量卡的版本历史与部署版本对照直接展示，不用先点开', async () => {
+test('生产变量卡的版本历史直接展示，不用先点开', async () => {
   fixture(); page = await renderApp(`/projects/${projectId}/settings?tab=config&env=production`);
-  // 2026-09-23 作者裁定两处都不再折叠（RFC-009 design §3.1 修订）。
+  // 2026-09-23 作者裁定不再折叠（RFC-009 design §3.1 修订）。
   const history = [...document.querySelectorAll('h3')].find((node) => node.textContent === '版本历史' && !node.closest('[hidden]'));
   expect(history !== undefined).toBe(true); expect(history!.closest('details') === null).toBe(true);
   expect([...history!.closest('footer')!.querySelectorAll('li')].map((node) => node.firstElementChild?.textContent)).toEqual(['版本 7', '版本 3', '版本 5']);
-  expect(row('正式版本').closest('details') === null).toBe(true); expect(row('待验证版本').closest('details') === null).toBe(true);
-  expect(page.text()).not.toContain('展开部署版本对照');
-});
-
-test('刷新失败不保留旧的一致结论；发布快照缺失与不一致分别保留未知并可恢复', async () => {
-  const f = fixture(); page = await renderApp(`/projects/${projectId}/settings?tab=config&env=production`);
-  f.state.historyFailure = true; f.state.releaseFailure = true; await page.reread();
-  expect(page.text()).toContain('当前保存版本尚未确认'); expect(row('正式版本').textContent).toContain('正式发布读取失败'); expect(row('正式版本').textContent).not.toContain('第 3 版');
-  expect(row('待验证版本').textContent).not.toContain('与当前保存版本一致');
-  f.state.historyFailure = false; f.state.releaseFailure = false; f.state.prodVersion = undefined; await page.reread();
-  expect(row('正式版本').textContent).toContain('配置快照版本未确认'); expect(row('正式版本').textContent).not.toContain('与当前保存版本一致');
-  f.state.prodVersion = 3; f.state.mismatch = true; await page.reread(); expect(row('正式版本').textContent).toContain('发布记录不一致');
-  f.state.mismatch = false; await page.reread(); expect(row('正式版本').textContent).toContain('记录为第 3 版');
-});
-
-test('空槽、缺少槽、未开通服务与全组空版本各自显示真实状态', async () => {
-  const f = fixture(); f.state.emptyProd = true; page = await renderApp(`/projects/${projectId}/settings?tab=config&env=production`);
-  expect(row('正式版本').textContent).toContain('尚未部署'); expect(f.calls.some((call) => call.path === `/v1/releases/${prodId}`)).toBe(false);
-  f.state.missingSlot = true; await page.reread(); expect(row('正式版本').textContent).toContain('部署记录未确认'); expect(row('正式版本').textContent).not.toContain('尚未部署');
-  page.unmount(); f.state.noService = true; f.calls.length = 0; f.state.history = []; page = await renderApp(`/projects/${projectId}/settings?tab=config&env=production`);
-  expect(page.text()).toContain('项目尚未开通服务'); expect(page.text()).toContain('当前已保存的生产配置：第 0 版');
-  expect(f.calls.some((call) => call.path.endsWith('/slots') || call.path.startsWith('/v1/releases/'))).toBe(false);
-});
-
-test('槽读取失败不冒充未部署，保存历史滞后不把已部署配置说成更新尚未采用', async () => {
-  const f = fixture(); f.state.history = [1]; page = await renderApp(`/projects/${projectId}/settings?tab=config&env=production`);
-  expect(row('正式版本').textContent).toContain('保存历史早于部署记录'); expect(row('正式版本').textContent).not.toContain('已有更新的配置');
-  f.state.slotsFailure = true; await page.reread(); expect(page.text()).toContain('部署槽读取失败');
-  expect(page.text()).not.toContain('v1.0.0'); expect(page.text()).not.toContain('尚未部署');
 });

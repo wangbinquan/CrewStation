@@ -33,6 +33,8 @@
 
 表单初始显示范围及作用，选择与保存分离；取消恢复已保存内容，保存成功刷新该应用详情与市场查询。提供按已保存设置检查指定用户是否可见的负责人查询；不以未保存草稿声称生效。并发编辑保留本地选择并提示最新设置，不能覆盖另一位负责人的更新。
 
+> **2026-09-23 修订（作者当面裁定，直接修改，不另立 RFC）。** 「按已保存设置检查指定用户是否可见的负责人查询」删除：工作台的「检查保存后的效果」卡与后端检查接口（§5 表中已标删除的一行）一并去掉。三种范围的含义由范围摘要与成员清单直接读出；市场列表与详情的可见性裁定不变。见 RFC-009 proposal §3.4 同日再修订。
+
 ## 4. 已核验的实现缺口
 
 | 当前源码 | 含义 |
@@ -54,7 +56,7 @@
 | GET `/v1/market/apps/:projectId` | 同一可见性规则的详情；缺失或不可见不返回应用元数据；不能调用完整项目详情绕过市场投影 |
 | GET `/v1/projects/:projectId/app-visibility` | 有项目 view 的成员读取当前 mode、指定用户及 revision；非项目市场访客不取得名单 |
 | PUT `/v1/projects/:projectId/app-visibility` | 负责人提交 `{mode, userIds, expectedRevision}`，成功返回保存结果；冲突 409，普通开发者／测试者 403 |
-| GET `/v1/projects/:projectId/app-visibility/check?userId=` | 仅有配置权者检查指定注册用户；返回基于已保存 revision 的 visible 和依据，不扩成普通用户任意查询 |
+| GET `/v1/projects/:projectId/app-visibility/check?userId=`（**已删除**，2026-09-23 作者裁定） | 原契约：仅有配置权者检查指定注册用户；返回基于已保存 revision 的 visible 和依据，不扩成普通用户任意查询。现在任何人请求都是 404 |
 | GET／PUT `/v1/projects/:projectId/app-presentation` | GET 供成员读取用途与图标；PUT 由负责人提交 `{description, icon, expectedRevision}`，和可见范围共用 listing revision，冲突不覆盖其他字段 |
 
 展示元数据与可见性查询在 project L2 公开 API 内完成。正式版本和运行摘要由 capabilities L6 调用 project、release 等公开读接口聚合，不能让 project 反向依赖 release；每个状态标记 freshness 和 unknown。列表有界，缓存含当前用户及范围修订；变更范围／成员／登录身份后重新校验，后台旧响应不能覆盖新范围。打开详情和后续请求均再次裁定，不能只靠前端隐藏卡片。

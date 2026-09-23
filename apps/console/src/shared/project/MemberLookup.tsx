@@ -7,6 +7,7 @@ import { ActionNote } from '../ui/ActionNote';
 import { Button } from '../ui/Button';
 import { FormField } from '../ui/FormField';
 import styles from './MemberLookup.module.css';
+import { PersonCard } from './PersonCard';
 
 interface MemberLookupProps {
   readonly projectId: string;
@@ -36,7 +37,7 @@ export function MemberLookup({ projectId, onSelect, actionKey = 'projects.visibi
       <Button disabled={disabled || lookup.isPending} onClick={search}>{t('projects.visibility.findUser')}</Button>
     </div>
     {lookup.isError ? <ActionNote tone="error">{errorMessage(lookup.error)}</ActionNote> : null}
-    {lookup.data?.items.map((user) => <div className={styles.person} key={user.userId}><span>{user.name} · {user.email}</span><Button disabled={disabled} onClick={() => onSelect(user)}>{t(actionKey)}</Button></div>)}
+    {lookup.data?.items.map((user) => <PersonCard key={user.userId} name={user.name} email={user.email} action={<Button disabled={disabled} onClick={() => onSelect(user)}>{t(actionKey)}</Button>} />)}
     {lookup.isSuccess && lookup.data.items.length === 0 ? <ActionNote tone="neutral">{t('projects.visibility.noUser')}</ActionNote> : null}
   </div>;
 }

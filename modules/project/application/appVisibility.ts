@@ -1,8 +1,7 @@
-import type { Actor, AppPresentationDto, AppVisibilityDto, ProjectId, SetAppPresentationRequest, SetAppVisibilityRequest, UserId } from '@crewstation/contracts';
+import type { Actor, AppPresentationDto, AppVisibilityDto, ProjectId, SetAppPresentationRequest, SetAppVisibilityRequest } from '@crewstation/contracts';
 import { SetAppPresentationRequestSchema, SetAppVisibilityRequestSchema, UserIdSchema } from '@crewstation/contracts';
 import { conflict, notFound, validation } from '@crewstation/kernel';
 import type { AppListing } from '../domain/appListing';
-import { appVisibilityBasis } from '../domain/appListing';
 import { authorizationUseCases } from './authorization';
 import type { ProjectUseCaseDeps } from './dependencies';
 
@@ -37,14 +36,6 @@ export function appVisibilityUseCases(deps: ProjectUseCaseDeps) {
       if (!input.success) throw validation('请检查可见范围与指定用户', { issues: input.error.issues });
       for (const userId of input.data.userIds) if (!await users.getUser(userId)) throw validation('指定用户不存在，请重新查找', { field: 'userIds', userId });
       return visibility(actor, await save(actor, projectId, input.data.expectedRevision, { mode: input.data.mode, userIds: input.data.userIds }));
-    },
-    checkAppVisibility: async (actor: Actor, projectId: ProjectId, userId: UserId) => {
-      await authorize(actor, projectId, 'manage-members');
-      const listing = await read(actor, projectId), user = await users.getUser(userId);
-      if (!user) throw validation('用户不存在');
-      const role = (await uow.read.memberships.get(projectId, userId))?.role;
-      const basis = appVisibilityBasis({ userId, isAdmin: await users.isAdmin(userId) }, role, listing);
-      return { userId, revision: listing.revision, visible: basis !== 'hidden', basis, checkedAt: clock.now().toISOString() };
     },
     getAppPresentation: async (actor: Actor, projectId: ProjectId) => presentation(await read(actor, projectId)),
     setAppPresentation: async (actor: Actor, projectId: ProjectId, raw: SetAppPresentationRequest) => {

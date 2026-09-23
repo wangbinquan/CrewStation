@@ -17,6 +17,39 @@
 - **第二批实机**：滚动后 14 个仓库绑定 `web_url` 全为空；dev-developer 打开演示数字人「项目设置 → 项目信息」后，项目信息卡「crewstation/demo ↗」与源码仓库卡「在 GitLab 中打开」都指向 `http://127.0.0.1:8929/crewstation/demo`（新窗口），接口 `httpUrl` 仍是克隆地址、`webUrl` 为网页地址，库里演示仓库的 `web_url` 已补上（其余 13 个等被读到时补）；页面只读一次仓库、无控制台错误；本机 `curl` 该地址 302 到 GitLab 登录页（私有仓库，未登录 GitLab 时的正常表现），cs-api 五分钟内无 warn／error、重启 0 次。另在工作树对本机 GitLab 跑 `gitlabIntegration`（5 pass，临时仓库已永久清除），并补一条断言：建仓记下的 `webUrl` 等于 GitLab 自报的网页地址（随本节一起提交）。
 - **提交方式**：两批都用私有索引只放本批文件；共享文件只放自己的部分——`projectSummaryPages.test.tsx` 第 138 行留给 crewstation-90（运行与诊断拆页签），RFC-020 design 里 crewstation-90 的 D3 修订与 `migrations.lock.json` 里 crewstation-f7 的 observability 0004 都由对方自己提交。
 
+## 项目设置三处减法：删「生产配置与部署版本」卡、删「检查保存后的效果」卡连同检查接口，成员弹窗重排（2026-09-23）
+
+作者先后问：生产变量页的「生产配置与部署版本」卡、应用展示页的「检查保存后的效果」卡有什么用，没用就删；又说「添加成员的那个弹窗排版也太丑了，你自己看看，优化一下」。逐项说明用途后，作者裁定：部署版本卡「整张删掉」；检查卡「删卡片，接口一起删」；成员弹窗由实现者直接优化；直接改＋回填，提交、推送并部署本机。
+
+- **删掉的东西**：
+  - 生产组的「生产配置与部署版本」卡（`ProductionConfigImpact`）。配置页不再读服务的两个槽和各槽当前的发布记录。
+    - 代价：工作台从此不显示某个版本部署时用的是第几版生产配置；发布记录的 `configVersion` 照旧写入。
+    - 生效条件仍写在生产变量卡的说明和保存提示里。
+  - 应用展示的「检查保存后的效果」卡（`VisibilityCheck`），连同后端 `GET /v1/projects/:projectId/app-visibility/check`：`checkAppVisibility`、`appVisibilityBasis`、`AppVisibilityCheckDto` 和 api-client 方法一起删。
+    - 控制台是这个接口唯一的调用方。
+    - 业务契约面金样不含市场接口，不需要 `contracts:lock --breaking`。
+- **成员弹窗**：
+  - 布局：一栏，先选人，分隔线下选角色；三种查找方式用 `Segmented` 在一行里切换。
+  - 账号卡片：查到的人与已选中的人共用新的 `shared/project/PersonCard`，名字、邮箱各一行，动作靠右。可见范围弹窗和正式版本维护弹窗的查找结果也跟着变。
+  - 负责人转移规则：降为角色下方的说明，挂到角色选择的 `aria-describedby`。
+  - 提交键：目标已是成员时叫「保存角色」，否则叫「添加成员」（原来是「添加或改角色」）。
+  - 对齐：`MemberLookup` 的「查找账号」原来 `margin-top: 21px`，比输入框高 6px；改为按标签行高算的居中偏移，实量上下各差 2px。
+- **回填**：
+  - RFC-009：proposal §3.3／§3.4、design §3.1，plan 与 acceptance 里的 PS-06。
+  - RFC-003：design §2.7；market-visibility.md 的说明段，§5 接口表那一行标「已删除」。
+- **用例**：
+  - `configImpact` 改为断言对照卡不在、不读槽与发布记录。
+  - `visibilitySettings` 断言只有两张卡、不请求检查接口。
+  - `projectMembers` 新增一条排版与提交键用例，其余改用新文案和 `selectedPerson()`。
+  - 模块 `appVisibility` 断言负责人与管理员请求检查接口都是 404；真实 PostgreSQL 上 5 pass。
+- **部署前的实机核对**：从 `git archive HEAD`＋本批文件构建工作台包，dev-admin 身份的无头 Chrome 里只换 `/assets/*`。
+  - 成员弹窗：查找、候选、选中、用户 ID、管理员目录、修改角色都核对了；可见范围弹窗的查找也核对了。深浅两色、390 宽下都没有横向溢出、没有控制台错误。
+  - 应用展示只剩两张卡；生产变量页只有「生产变量」一张卡，资源计时里没有 `/slots` 与 `/v1/releases/` 请求。
+  - 全程只开弹窗、查账号，没有保存任何东西。
+- **环境变量都不是实时生效**（作者同时问到，结论来自源码）：
+  - 开发组在新建容器时注入（`modules/task-runtime/application/containerEnv.ts`）。新开的 CLI／Agent 执行 Pod 继承父环境的 kind（`nativeExecution.ts:67`），会拿到新值；开发容器本身和其中的预览进程要「重建开发环境」才拿到。
+  - 生产组在部署时写进 Deployment 的 env（`modules/release/adapters/k8s/slotDeployer.ts:19`）。只有发布新版本或从发布记录重新部署才采用，重启 Pod 也不会。
+
 ## 升级时自动迁到 Calico；安装与升级预检实测 NetworkPolicy（2026-09-23，Design D60）
 
 作者问「新部署集群或者升级，会不会自动升到目标网络架构」。
