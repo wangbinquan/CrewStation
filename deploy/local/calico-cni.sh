@@ -26,14 +26,17 @@ old_prefix() {
   esac
 }
 
-# 仍在旧网段上的非 hostNetwork Pod，输出「命名空间 名字」；可按命名空间过滤。
+# 仍在旧网段上的非 hostNetwork Pod，输出「命名空间 名字」；可按命名空间过滤（整名相等）。
+# 正在终止的不算：recreate_system_pods 刚删掉的 Pod 还挂着旧地址，但替身已经在新网段上了；
+# 算上它们的话，第一次跑总会停在「还有旧网段的 Pod」，地址转换链要等重跑才删。
 old_pods() {
   local prefix="$1"; shift
   kc get pods -A -o json | jq -r --arg p "${prefix}" --arg only "$*" '
     .items[]
+    | select(.metadata.deletionTimestamp == null)
     | select((.spec.hostNetwork // false) | not)
     | select((.status.podIP // "") | startswith($p))
-    | select($only == "" or ([.metadata.namespace] | inside($only | split(" "))))
+    | select($only == "" or (.metadata.namespace | IN($only | split(" ")[])))
     | "\(.metadata.namespace) \(.metadata.name)"'
 }
 
