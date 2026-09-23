@@ -24,6 +24,10 @@ export interface StreamState {
   /** 首次打开按 tail 回放时的起点；有值表示更早历史没有回放，只有最近一页。 */
   readonly replayFromSeq?: number;
   readonly error?: string;
+  /** 页面通道这一次打开的时刻（本机时钟），没打开时没有；进开发页的步骤清单据此计时。 */
+  readonly openedAt?: number;
+  /** 开发环境（TaskRunner）这一次连上的时刻，没连上时没有。 */
+  readonly runnerAt?: number;
 }
 
 export type StreamEventListener = (event: RunnerEvent, seq: number) => void;
@@ -194,7 +198,11 @@ export class TaskStreamSocket {
   }
 
   private patch(change: Partial<StreamState>): void {
-    this.state = { ...this.state, ...change };
+    const previous = this.state, next = { ...previous, ...change }, now = Date.now();
+    // 两个时刻只在翻转时记：打开／连上的那一刻记下，之后沿用；断开就清掉，下次连上重新记。
+    const openedAt = next.status !== 'open' ? undefined : previous.status === 'open' ? previous.openedAt : now;
+    const runnerAt = !next.runnerConnected ? undefined : previous.runnerConnected ? previous.runnerAt : now;
+    this.state = { ...next, openedAt, runnerAt };
     for (const listener of this.stateListeners) listener();
   }
 }

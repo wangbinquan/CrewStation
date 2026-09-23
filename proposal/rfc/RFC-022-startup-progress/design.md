@@ -266,6 +266,8 @@ task-runtime 的适配器（`adapters/k8s/taskCluster.ts`）增加 `observeStart
 - `startup` 存在且未就绪时，CLI 区域中间显示 `StageProgress`；`ConnectionGuide`（`components/session/ConnectionGuide.tsx`）在启动中与重建中不再显示「正在准备／正在恢复」那一句，保留「检查状态」「查看日志」按钮；页头芯片显示「启动中 x/5 · 段名」。
 - 失败时按钮「重试」（提案 Q1）、「查看容器日志」。
 
+> **2026-09-23 修订（提案 D3 同日修订）：** 工作区揭开之前，`NativeWorkspace` 的 `gate` 只渲染 `components/session/SessionCover.tsx`：`startup` 在进行或失败时是这张 `StageProgress`（`SessionEntryFrame` 居中、整页长满），失败时 `recovery`（`RebuildSessionControl`）排在它下面；`ConnectionGuide` 与页头芯片都在揭开后才出现。`SessionStartup` 在整页形态下不传 `onRecover`（没有面板可开），恢复卡始终是加载层的第二个子节点，状态卡、步骤清单与步骤条来回切换时不重挂，已提交的恢复请求与回执保留。揭开后同一次进页不再盖回，本节原有的「CLI 区域中间」只用于揭开后发起的重建。
+
 ### 8.4 档位测试
 
 `ProfileTestPanel`（`features/admin/components/compute/ProfileTestPanel.tsx:68-86`）的 `<ol>` 换成 `StageProgress`，`label` 用段自带的 `name`（旧种类 `image`、`runner`、`launch` 各有文案），`renderExtra` 放原来的定位按钮、退出码、输出尾部；阶段状态徽章改用组件自己的图标。

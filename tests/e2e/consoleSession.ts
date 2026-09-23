@@ -145,7 +145,8 @@ export async function settle(page: Page, timeoutMs = 15000): Promise<void> {
   await page.waitUntil(`!!document.querySelector('main h1, form')`, timeoutMs).catch(() => undefined);
   const started = Date.now();
   while (Date.now() - started < timeoutMs) {
-    const busy = await page.eval<boolean>(`/载入中|读取中|连接中/.test(document.querySelector('main')?.innerText ?? '')`).catch(() => false);
+    // 开发页连接就绪前整页是加载层（带 data-page-loading，2026-09-23）：等它撤掉，后面量的才是工作区。
+    const busy = await page.eval<boolean>(`!!document.querySelector('main [data-page-loading]') || /载入中|读取中|连接中/.test(document.querySelector('main')?.innerText ?? '')`).catch(() => false);
     if (!busy) break;
     await Bun.sleep(200);
   }

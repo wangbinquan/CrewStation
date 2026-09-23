@@ -15,8 +15,9 @@ export const MIN_RATIO = 0.3, MAX_RATIO = 0.6;
 /**
  * 面板的打开／形态以地址为准（显式地址优先于其他浏览器页保存的个人布局，RFC-008）；没有地址指令时用个人布局。
  * 选择／放大／收起只改地址，`useWorkspaceLocation` 再把地址同步进布局；分隔线拖动只写比例。窄屏强制放大只影响显示。
+ * `root` 指向的元素会换时（开发页揭开前量的是整页加载层，揭开后是主区），`rootKey` 随之变化，宽度监听跟着换到新元素上。
  */
-export function useToolPanel(layout: WorkspaceLayout, store: WorkspaceLayoutStore, location: WorkspaceLocation | undefined, root: RefObject<HTMLDivElement | null>) {
+export function useToolPanel(layout: WorkspaceLayout, store: WorkspaceLayoutStore, location: WorkspaceLocation | undefined, root: RefObject<HTMLDivElement | null>, rootKey?: unknown) {
   const saved = layoutTool(layout), instruction = location ? locationTool(location.search) : undefined;
   const savedKey = saved ? `${saved.name}:${saved.mode}:${saved.ratio}` : '', instructionKey = instruction === undefined ? 'none' : instruction === null ? 'closed' : `${instruction.name}:${instruction.mode}`;
   const [narrow, setNarrow] = useState(false);
@@ -32,7 +33,7 @@ export function useToolPanel(layout: WorkspaceLayout, store: WorkspaceLayoutStor
     const element = root.current; if (!element || typeof ResizeObserver === 'undefined') return;
     const observer = new ResizeObserver(([entry]) => { if (entry) { const width = entry.contentRect.width; setNarrow((current) => width > 0 && width < (current ? NARROW_LEAVE_WIDTH : NARROW_WIDTH)); } });
     observer.observe(element); return () => observer.disconnect();
-  }, [root]);
+  }, [root, rootKey]);
   const apply = useCallback((next: WorkspaceTool | undefined) => {
     if (location) location.selectTool(next ? { name: next.name, mode: next.mode } : null);
     else store.update((current) => withTool(current, next));

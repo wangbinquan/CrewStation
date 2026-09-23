@@ -605,6 +605,11 @@ happy-dom 不排版，渲染用例照绿。
 每个暂停的请求必须恰好应答一次，所以只注册一个监听。要改响应（例如把工作区检查回执改成「有未提交文件」），就在请求阶段 `continueRequest({ interceptResponse: true })`，
 再在响应阶段（`responseStatusCode` 有值）先 `getResponseBody`、再 `fulfillRequest`。同一请求挂两个监听、各自应答，请求会卡住，页面停在「检查中」。
 事后直接查库，核对被试删的对象都还在。这层拦截是真用得上的：那次核对集群「删除／结束」时，挑中的可删资源是 demo 会话的一个 CLI Pod。
+**urlPattern 会连页面文档一起命中**（2026-09-23 实撞）：核对开发页整页加载层时用 `*/dev-session` 改写会话回执，它也拦到了页面本身的导航
+`/projects/…/dev-session`，按 JSON 解析 HTML 抛错、那个请求又没人应答，页面一直停在导航中，脚本看起来像卡死。拦接口要带 `/v1/` 前缀再比路径，
+监听里的 `catch` 也要补一次 `continueRequest`（每个暂停请求必须恰好应答一次）。另外 `Network.setBlockedURLs` 挡不住页面的 WebSocket，
+模拟「页面通道连不上」要换别的办法（那次改由用例覆盖）。脚本被外部结束时 `finally` 不会执行：给脚本挂一个 `unref()` 的看门狗先关页，
+万一还是留下了，用 `curl 127.0.0.1:9333/json/close/<id>` 只关自己开的那一页。
 
 ### 面板里会自动长高的区域会让按坐标的点击落空：用键盘激活
 

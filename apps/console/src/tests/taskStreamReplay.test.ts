@@ -1,4 +1,4 @@
-import { afterEach, expect, test } from 'bun:test';
+import { afterEach, expect, spyOn, test } from 'bun:test';
 import { TaskStreamSocket } from '../features/dev-session/model/taskStreamSocket';
 
 class Socket {
@@ -25,6 +25,24 @@ function start(commandTimeoutMs?: number) {
   return { stream, socket: Socket.instances[0]! };
 }
 const event = (seq: number) => ({ type: 'event', seq, at: '2026-09-13T00:00:00.000Z', event: { kind: 'runnerState', state: 'ready' } });
+
+test('页面通道打开与开发环境连上的时刻只在翻转时记下，断开就清掉（进开发页的步骤清单据此计时）', () => {
+  const clock = spyOn(Date, 'now');
+  try {
+    const { stream, socket } = start();
+    expect(stream.getState().openedAt).toBeUndefined(); expect(stream.getState().runnerAt).toBeUndefined();
+    clock.mockReturnValue(1_000); socket.receive({ type: 'streamReady', connected: false, replayed: 0 });
+    expect(stream.getState()).toMatchObject({ status: 'open', openedAt: 1_000, runnerAt: undefined });
+    clock.mockReturnValue(2_000); socket.receive(event(1));
+    expect(stream.getState().openedAt).toBe(1_000);
+    clock.mockReturnValue(3_000); socket.receive({ type: 'runnerReconnected' });
+    expect(stream.getState()).toMatchObject({ openedAt: 1_000, runnerAt: 3_000 });
+    clock.mockReturnValue(4_000); socket.receive(event(2)); expect(stream.getState().runnerAt).toBe(3_000);
+    socket.receive({ type: 'runnerDisconnected' }); expect(stream.getState()).toMatchObject({ openedAt: 1_000, runnerAt: undefined });
+    clock.mockReturnValue(5_000); socket.receive({ type: 'runnerReconnected' }); expect(stream.getState().runnerAt).toBe(5_000);
+    socket.close(); expect(stream.getState()).toMatchObject({ status: 'reconnecting', openedAt: undefined, runnerAt: undefined });
+  } finally { clock.mockRestore(); }
+});
 
 test('手动重连保留游标与订阅，拒绝未完成写入，不重放命令或接受旧连接事件', async () => {
   const { stream, socket } = start(); const seqs: number[] = [];

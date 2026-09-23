@@ -1,8 +1,10 @@
 import type { DevSessionDto } from '@crewstation/contracts';
 import type { StreamState } from '../taskStreamSocket';
 
+export type SessionHealth = 'recovering' | 'failed' | 'releasing' | 'protocol' | 'starting' | 'browser' | 'unknown' | 'stopping' | 'ready';
+
 /** 生命周期与握手拒绝优先；页面通道可回放，不等于工作容器可接受命令。 */
-export function sessionConnection(session: DevSessionDto, stream: StreamState) {
+export function sessionConnection(session: DevSessionDto, stream: StreamState): SessionHealth {
   if (session.rebuild && ['queued', 'replacing', 'starting'].includes(session.rebuild.state)) return 'recovering';
   if (session.state === 'failed') return 'failed';
   if (session.state === 'releasing' || session.state === 'released') return 'releasing';

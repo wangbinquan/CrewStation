@@ -30,10 +30,10 @@ test('失败会话在首屏显示真实对象和原因，新建需明确确认�
   const notice = [...document.querySelectorAll('[role="alert"]')].find((node) => node.textContent?.includes(activityTaskId) && node.textContent.includes('OOMKilled'));
   expect(notice).toBeDefined(); expect(notice!.closest('details')).toBeNull();
   expect(page.text()).toContain('不会自动恢复原 CLI'); expect(page.text()).toContain('未推送');
-  // 实机 OOM 后 WebSocket 仍可回放历史；顶栏不能因此把失败会话标成绿色已连接。
-  const status = [...document.querySelectorAll('header')].find((node) => node.querySelector('h1')?.textContent === '开发会话')!.querySelector('span')!;
-  expect(status.textContent).toBe('失败');
-  await page.click('会话与环境'); await page.click('从远端另建工作树');
+  // 实机 OOM 后 WebSocket 仍可回放历史；页面不能因此把失败会话当成已连接。进来时就失败：整页是状态卡，工作区不渲染（2026-09-23）。
+  expect(notice!.closest('section[data-state="failed"]')?.querySelector('h2')?.textContent).toContain('开发环境已停止');
+  expect(page.text()).not.toContain('已连接'); expect(document.querySelector('[role="region"][aria-label="CLI 区"]')).toBeNull();
+  await page.click('从远端另建工作树');
   // 2026-09-23 起另建工作树在弹窗里（不画面板标题），离开失败会话的确认叠在上面。
   expect(document.querySelector('dialog[open] h2')?.textContent).toBe('从远端另建工作树'); expect(document.querySelector('dialog[open] section') === null).toBe(true);
   await page.click('从远端分支新建');

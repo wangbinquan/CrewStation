@@ -1,0 +1,18 @@
+/* 开发页连接就绪前的整页（2026-09-23）：长满内容区剩余高度（内容区是纵向弹性列，见 AppShell .compact），状态块上下左右居中。 */
+.frame { display: flex; flex: 1 0 auto; min-width: 0; min-height: 360px; }
+.body { display: flex; flex-direction: column; gap: var(--cs-space-3); width: 100%; max-width: 592px; box-sizing: border-box; margin: auto; padding: var(--cs-space-4); }
+.hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+/* 失败／要处理的状态卡：与启动步骤条同一套外框。 */
+.status { display: flex; flex-direction: column; gap: var(--cs-space-3); width: 100%; box-sizing: border-box; padding: var(--cs-space-4); border: 1px solid var(--cs-color-border); border-radius: var(--cs-radius-md); background: var(--cs-color-surface); color: var(--cs-color-text); }
+.message { display: flex; flex-direction: column; gap: var(--cs-space-2); }
+.statusTitle { display: flex; align-items: baseline; gap: var(--cs-space-2); margin: 0; font-size: 16px; font-weight: 600; overflow-wrap: anywhere; }
+.icon { flex-shrink: 0; }
+.status[data-state='failed'] .icon { color: var(--cs-tone-danger-fg); }
+.status[data-state='protocol'] .icon { color: var(--cs-tone-warning-fg); }
+.status[data-state='releasing'] .icon { color: var(--cs-color-primary); }
+.reason { margin: 0; overflow-wrap: anywhere; }
+.hint { margin: 0; color: var(--cs-color-text-muted); font-size: var(--cs-font-size-sm); overflow-wrap: anywhere; }
+.actions { display: flex; flex-wrap: wrap; gap: var(--cs-space-2); }
+@media (prefers-reduced-motion: no-preference) { .status[data-state='releasing'] .icon { animation: pulse 1.6s ease-in-out infinite; } }
+@keyframes pulse { 50% { opacity: 0.35; } }
+@media (max-width: 480px) { .body { padding: var(--cs-space-2) 0; } .status { padding: var(--cs-space-3); } }
