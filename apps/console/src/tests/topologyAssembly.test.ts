@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import type { ClusterProjectCounts, ClusterResource, ClusterSummary } from '@crewstation/contracts';
+import type { ClusterProjectCounts, ClusterResource, ClusterSummary, ResourceRecord } from '@crewstation/contracts';
 import { messages as appMessages } from '../app/i18n/zh-CN';
 import { messages as clusterMessages } from '../features/cluster/i18n/zh-CN';
 import { translate } from '../shared/lib/i18n';
@@ -165,6 +165,19 @@ describe('record-based task bands', () => {
     expect(edge(topology(), 'ws-1', 'db:development')).toMatchObject({ kind: 'uses' }); expect(edge(topology(), 'ws-0', 'db:development')).toBeUndefined();
     expect(byId('cli-1')?.facts).toContainEqual(['终端', 'term-1']);
   });
+  test('slot bands take the route and Deployment status from the service-slot records when given; pods stay from the inventory', () => {
+    const slotRecord = (role: string, name: string, phase: ResourceRecord['phase'], reason?: string) => resourceRecord({ id: `slot-${role}`, kind: 'service-slot', phase, display: { role }, ...(reason ? { reason: { code: 'x', message: reason } } : {}),
+      children: [{ kind: 'Deployment', namespace: 'cs-demo', name, phase: 'Unready', ready: false }] });
+    const withSlots = buildProjectTopology({ ...input, devSession: session, records: [...records, slotRecord('prod', 'demo-blue', 'degraded', '副本 0／1 就绪'), slotRecord('preview', 'demo-green', 'starting', '副本 0／1 就绪')] }, t);
+    const node = (id: string) => withSlots.nodes.find((n) => n.id === id)!;
+    expect(node('uid-demo-blue')).toMatchObject({ status: 'pending', statusText: '降级 · 副本 0／1 就绪' });
+    expect(node('route:prod')).toMatchObject({ status: 'pending', statusText: '降级 · 副本 0／1 就绪' });
+    expect(node('uid-demo-green')).toMatchObject({ status: 'pending', statusText: '启动中 · 副本 0／1 就绪' });
+    expect(node('uid-demo-blue-1').status).toBe('ready');
+    // 没有槽记录时照旧按发布的槽与盘点。
+    expect(topology().nodes.find((n) => n.id === 'uid-demo-blue')).toMatchObject({ status: 'ready', statusText: '副本 1／1' });
+  });
+
   test('an execution whose workspace is no longer drawn is still shown; no records means no task bands', () => {
     const orphan = buildProjectTopology({ ...input, records: [cliReady] }, t);
     expect(orphan.nodes.find((n) => n.id === 'cli-1')?.band).toBe('dev'); expect(orphan.bands.find((b) => b.id === 'dev')?.note).toBe('没有运行中的会话');

@@ -3,7 +3,7 @@
 import type { ClusterResource, DataResourceDto, DevSessionDto, ResourceRecord, SlotDto } from '@crewstation/contracts';
 import type { Translate } from '../lib/useT';
 import type { Topology, TopologyBand, TopologyEdge, TopologyNode } from '../ui/topology/topologyModel';
-import { recordBands } from './recordBands';
+import { recordBands, recordStatus } from './recordBands';
 import { databaseNode, durationText, factText, podFacts, podStatus, purposeSemantic, workloadStatus } from './topologyText';
 
 /** 概览只有开发摘要（没有预览主机），完整页有整个会话；两者都够组装。 */
@@ -57,15 +57,17 @@ function slotBands(a: Assembly): void {
   const orderedSlots = [...input.slots].sort((x, y) => Number(y.active) - Number(x.active));
   for (const slot of orderedSlots) {
     const role = slot.active ? 'prod' : 'preview', deployments = a.workloads.filter((r) => r.slotRole === role), slotPods = a.pods.filter((r) => r.slotRole === role);
+    // RFC-025 第三期：给了台账记录时，槽的入口与 Deployment 的状态照服务槽记录的阶段（随推送流变化）；Pod 仍按盘点补详情。
+    const record = input.records?.find((r) => r.kind === 'service-slot' && r.display?.role === role), recorded = record ? recordStatus(record, t) : undefined;
     const physical = deployments[0]?.physicalSlot ?? slotPods[0]?.physicalSlot ?? slot.name;
     const band = `slot:${role}`;
     a.bands.push({ id: band, title: t(slot.active ? 'topology.band.prod' : 'topology.band.preview', { slot: physical }), semantic: 'service', note: slot.tag ? t(`topology.slot.state.${slot.state}`, { tag: slot.tag }) : t('topology.slot.empty') });
     if (slot.host) {
-      a.nodes.push({ id: `route:${role}`, kind: 'route', semantic: 'gateway', title: slot.host, subtitle: input.project.kind === 'DigitalWorker' ? t('topology.route.userDomain') : t('topology.route.serviceDomain'), status: slot.state === 'ready' ? 'ready' : slot.state === 'empty' ? 'idle' : slot.state === 'failed' ? 'failed' : 'pending', statusText: t(`topology.slot.short.${slot.state}`), lane: LANE.entry, band, meta: [t('topology.route.pointsTo', { slot: physical })], facts: [[t('topology.fact.host'), slot.host], [t('topology.fact.slot'), `${physical} · ${role}`], ...(slot.tag ? [[t('topology.fact.version'), `${slot.tag}${slot.commitSha ? ` · ${slot.commitSha.slice(0, 8)}` : ''}`] as const] : [])] });
+      a.nodes.push({ id: `route:${role}`, kind: 'route', semantic: 'gateway', title: slot.host, subtitle: input.project.kind === 'DigitalWorker' ? t('topology.route.userDomain') : t('topology.route.serviceDomain'), status: recorded?.status ?? (slot.state === 'ready' ? 'ready' : slot.state === 'empty' ? 'idle' : slot.state === 'failed' ? 'failed' : 'pending'), statusText: recorded?.statusText ?? t(`topology.slot.short.${slot.state}`), lane: LANE.entry, band, meta: [t('topology.route.pointsTo', { slot: physical })], facts: [[t('topology.fact.host'), slot.host], [t('topology.fact.slot'), `${physical} · ${role}`], ...(slot.tag ? [[t('topology.fact.version'), `${slot.tag}${slot.commitSha ? ` · ${slot.commitSha.slice(0, 8)}` : ''}`] as const] : [])] });
       for (const d of deployments) a.edges.push({ from: `route:${role}`, to: d.uid, kind: 'routes', label: t(slot.active ? 'topology.edge.label.live' : 'topology.edge.label.standby'), evidence: 'observed' });
     }
     for (const d of deployments) {
-      const { status, statusText } = workloadStatus(d, t);
+      const { status, statusText } = recorded && record?.children.some((child) => child.kind === 'Deployment' && child.name === d.name) ? recorded : workloadStatus(d, t);
       a.nodes.push({ id: d.uid, kind: 'workload', semantic: 'service', title: d.name, subtitle: `${d.kind}${slot.tag ? ` · ${slot.tag}` : ''}`, status, statusText, lane: LANE.workload, band, box: band, abnormal: d.abnormal, resourceId: d.resourceId, purpose: d.purpose, meta: [t('topology.workload.replicas', { ready: d.readyReplicas ?? 0, desired: d.desired ?? 0 }), ...(d.releaseId ? [`${t('topology.fact.releaseId')} ${d.releaseId.slice(0, 8)}…`] : [])], facts: [[t('topology.fact.kind'), d.kind], [t('topology.fact.slot'), `${physical} · ${role}`], ...(slot.tag ? [[t('topology.fact.version'), slot.tag] as const] : []), [t('topology.workload.replicasLabel'), `${d.readyReplicas ?? 0}／${d.desired ?? 0}`], ...(d.releaseId ? [[t('topology.fact.releaseId'), d.releaseId] as const] : [])] });
       for (const p of slotPods) a.edges.push({ from: d.uid, to: p.uid, kind: 'owns', evidence: 'observed' });
     }
