@@ -132,6 +132,8 @@ describe.skipIf(!available)('scm × 本机 GitLab', () => {
     expect(RepositoryBindingDtoSchema.parse(dto)).toMatchObject({ state: 'ready', pathWithNamespace: path, httpUrl: `${gitlabEnv?.url}/${path}.git`, defaultBranch: 'main' });
     const remote = await client.getProject(path);
     expect(String(remote.id)).toBe(remoteProjectId);
+    // 浏览器打开用 GitLab 自报的网页地址（按它的 external_url），与平台拼出的克隆地址分开（2026-09-23）。
+    expect(dto.webUrl).toBe(remote.webUrl);
     expect(remote.defaultBranch).toBe('main');
     expect(remote.visibility).toBe('private');
     const tree = await client.getRepositoryTree(remote.id, '', { recursive: true });
