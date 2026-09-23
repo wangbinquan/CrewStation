@@ -1,4 +1,4 @@
-import type { DevSessionDto } from '@crewstation/contracts';
+import type { DevSessionDto, OpenDevSessionRequest } from '@crewstation/contracts';
 import type { UseMutationResult } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 import type { ReactElement } from 'react';
@@ -16,7 +16,8 @@ import styles from './OpenSessionForm.module.css';
 
 export interface OpenSessionFormProps {
   readonly branches: BranchesHandle;
-  readonly open: UseMutationResult<DevSessionDto, ApiClientError, string>;
+  /** 与页面共用一个开会话请求（表单只传分支；失败后「重试」另带 restartOf）。 */
+  readonly open: UseMutationResult<DevSessionDto, ApiClientError, string | OpenDevSessionRequest>;
   readonly previousTaskId?: string;
 }
 

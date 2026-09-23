@@ -59,7 +59,7 @@ export function DevSessionPage({ reference, sessionLogs }: DevSessionPageProps =
           activityTarget={activityTarget}
           isAdmin={context.isAdmin}
           reference={reference} sessionLogs={sessionLogs}
-          {...(context.canDevelop ? { onRestart: () => session.open.mutate(session.session!.branch) } : {})}
+          {...(context.canDevelop ? { onRestart: () => session.open.mutate({ branch: session.session!.branch, restartOf: session.session!.taskId }) } : {})}
           recovery={context.canDevelop && (session.session.state === 'failed' || session.session.connectionIssue || session.session.rebuild) ? <RebuildSessionControl projectId={projectId} session={session.session}
             newSession={<OpenSessionForm branches={branches} open={session.open} previousTaskId={session.session.taskId} />} /> : null}
         />

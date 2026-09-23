@@ -34,7 +34,8 @@ export interface Environments {
   requestRebuild(projectId: ProjectId, input: RebuildDevSessionRequest): Promise<DevSessionRebuildDto>;
   getRebuild(taskId: TaskId): Promise<DevSessionRebuildDto | undefined>;
   createEnvironment(input: { serviceId: ServiceId; kind: 'dev-session'; branch: string; createdBy: UserId; traceId?: TraceId; preview?: { command: string[]; port: number; healthPath: string }; labels?: Record<string, string> }): Promise<EnvironmentView>;
-  releaseEnvironment(taskId: TaskId, reason: 'user' | 'owner-force'): Promise<EnvironmentView>;
+  /** failed：按原分支重新开始时回收失败在检出代码或更早的会话（RFC-022 2026-09-23 修订）。 */
+  releaseEnvironment(taskId: TaskId, reason: 'user' | 'owner-force' | 'failed'): Promise<EnvironmentView>;
   getEnvironment(taskId: TaskId): Promise<EnvironmentView | undefined>;
   findDevSession(projectId: ProjectId, options?: { includeLatestFailure?: boolean }): Promise<EnvironmentView | undefined>;
   listRunningDevSessions(): Promise<EnvironmentView[]>;

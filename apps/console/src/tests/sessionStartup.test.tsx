@@ -1,7 +1,7 @@
 import './domSetup';
 import { afterEach, expect, test } from 'bun:test';
 import type { DevSessionDto, StartupStage } from '@crewstation/contracts';
-import { activityProjectId } from './agentActivityFixture';
+import { activityProjectId, activityTaskId } from './agentActivityFixture';
 import { editorWorkspaceFixture } from './editorWorkspaceFixture';
 import { renderApp } from './renderApp';
 import { consoleStyles, sourceAt } from './sourceScan';
@@ -40,7 +40,7 @@ test('开始开发中：CLI 区域中间是五段步骤条，检出代码带分�
   expect([...stepper.querySelectorAll('button')].map((button) => button.textContent)).toEqual([]);
 });
 
-test('检出代码失败：停在检出代码并写出原因，「重试」按原分支重新开始开发', async () => {
+test('检出代码失败：停在检出代码并写出原因，「重试」按原分支重新开始开发，并带上失败的那个会话供平台回收', async () => {
   const { starts } = setup('failed', { state: 'failed', startedAt: at(0), endedAt: at(9), observedAt: at(10), stages: [done('queue', 0, 0.1), done('container', 0.1, 3),
     { kind: 'checkout', state: 'failed', startedAt: at(3), endedAt: at(9), durationMs: 6000, subject: 'gone', error: { code: 'checkout-failed', message: '容器运行失败：checkout：Error，退出码 128' }, logTail: "fatal: Remote branch gone not found" },
     { kind: 'connect', state: 'pending' }, { kind: 'ready', state: 'pending' }] });
@@ -51,7 +51,8 @@ test('检出代码失败：停在检出代码并写出原因，「重试」按�
   await page.click('查看容器日志');
   expect(stepper.querySelector('pre')!.textContent).toBe('fatal: Remote branch gone not found');
   await page.click('重试');
-  expect(starts).toEqual([JSON.stringify({ branch: 'main' })]);
+  // RFC-022 2026-09-23 修订：带上失败会话的任务号，平台核对它失败在检出或更早后回收容器与工作卷。
+  expect(starts).toEqual([JSON.stringify({ branch: 'main', restartOf: activityTaskId })]);
 });
 
 test('等待连接失败（握手被拒）：「重试」打开会话面板里现有的恢复，不另开会话', async () => {

@@ -31,6 +31,9 @@ const issued: Array<{ taskId: TaskId; projectId: ProjectId; serviceId: ServiceId
 let dirty = '';
 /** 模拟 Runner 收到预览查询却一直不回（cs-session 卡住）。 */
 let previewHangs = false;
+/** 释放调用（任务号、原因）；releaseFails 模拟集群一时删不掉。 */
+const releases: Array<[string, string]> = [];
+let releaseFails = false;
 const published: unknown[] = [];
 const manifest = 'apiVersion: crewstation/v2\nkind: DigitalWorker\nspec:\n  service: { command: [bun, run, src/main.ts], port: 3000, healthPath: /healthz, servicePlanId: 01a0bf5d-8f4b-7000-9e4b-b54e91ee9d10 }\n  development: { command: [bun, run, --watch, src/main.ts], port: 3000 }\n';
 /** RFC-001 之前的写法：老仓库里还有一大堆。 */
@@ -55,7 +58,7 @@ beforeAll(async () => {
       inspectRebuild: async () => { throw new Error("恢复预检未设置"); },
       requestRebuild: async () => { throw new Error("恢复请求未设置"); },
       createEnvironment: async (input) => { const env = { id: Bun.randomUUIDv7() as TaskId, projectId, serviceId: input.serviceId, state: 'running' as const, podName: 'task-x', connected: true, branch: input.branch, traceId: 'trace', createdAt: new Date().toISOString(), lastActivityAt: new Date('2026-09-11T00:00:00Z').toISOString(), createdBy: input.createdBy, preview: input.preview }; envs.set(env.id, env); return env; },
-      releaseEnvironment: async (taskId) => { const env = envs.get(taskId)!; envs.delete(taskId); return { ...env, state: 'released' }; },
+      releaseEnvironment: async (taskId, reason) => { releases.push([taskId, reason]); if (releaseFails) throw new Error('cluster unavailable'); const env = envs.get(taskId)!; envs.delete(taskId); return { ...env, state: 'released' }; },
       getEnvironment: async (taskId) => envs.get(taskId) ?? executions.get(taskId),
       findDevSession: async (_projectId, options) => [...envs.values()].find((env) => ['creating', 'running', 'releasing'].includes(env.state)) ?? (options?.includeLatestFailure ? [...envs.values()].at(-1) : undefined),
       listRunningDevSessions: async () => [...envs.values()],
@@ -258,5 +261,39 @@ describe.skipIf(!available)('dev-session module', () => {
       agentEvents = undefined;
       envs.clear();
     }
+  });
+  test('按原分支重新开始（RFC-022 2026-09-23 修订）：失败在检出或更早的会话在新会话开好后回收；等待连接失败、不是最近一次失败的不回收；回收失败不影响新会话', async () => {
+    const startup = (failedAt: 'checkout' | 'connect') => ({ state: 'failed' as const, startedAt: '2026-09-11T00:59:00.000Z', endedAt: '2026-09-11T00:59:09.000Z', stages: [
+      { kind: 'queue' as const, state: 'succeeded' as const }, { kind: 'container' as const, state: 'succeeded' as const },
+      { kind: 'checkout' as const, state: failedAt === 'checkout' ? 'failed' as const : 'succeeded' as const },
+      { kind: 'connect' as const, state: failedAt === 'connect' ? 'failed' as const : 'pending' as const }, { kind: 'ready' as const, state: 'pending' as const }] });
+    const fail = (taskId: string, at: 'checkout' | 'connect') => { Object.assign(envs.get(taskId)!, { state: 'failed', connected: false, startup: startup(at) }); return taskId; };
+    const failedSession = async (at: 'checkout' | 'connect') => fail((await dev.api.openSession(developer, projectId, { branch: 'main' })).taskId, at);
+    envs.clear(); releases.length = 0;
+    const checkoutFailed = await failedSession('checkout');
+    const restarted = await dev.api.openSession(developer, projectId, { branch: 'main', restartOf: checkoutFailed as TaskId });
+    expect(restarted).toMatchObject({ state: 'running', branch: 'main' });
+    expect(releases).toEqual([[checkoutFailed, 'failed']]);
+    expect(envs.has(checkoutFailed)).toBe(false);
+    // 等待连接失败：工作卷里已有工作树，要走恢复，不回收。
+    envs.clear(); releases.length = 0;
+    const connectFailed = await failedSession('connect');
+    await dev.api.openSession(developer, projectId, { branch: 'main', restartOf: connectFailed as TaskId });
+    expect(releases).toEqual([]);
+    expect(envs.get(connectFailed)?.state).toBe('failed');
+    // 带的不是本项目最近一次失败（页面停留期间又失败过一次）：不回收。
+    envs.clear();
+    const older = await failedSession('checkout');
+    await failedSession('checkout');
+    await dev.api.openSession(developer, projectId, { branch: 'main', restartOf: older as TaskId });
+    expect(releases).toEqual([]);
+    // 回收失败只记下来，新会话照样开好。
+    envs.clear();
+    const flaky = await failedSession('checkout');
+    releaseFails = true;
+    try { expect(await dev.api.openSession(developer, projectId, { branch: 'main', restartOf: flaky as TaskId })).toMatchObject({ state: 'running' }); }
+    finally { releaseFails = false; }
+    expect(releases).toEqual([[flaky, 'failed']]);
+    envs.clear();
   });
 });

@@ -71,7 +71,11 @@ export type PreviewAction = z.infer<typeof PreviewActionSchema>;
 export type PreviewLogsQuery = z.infer<typeof PreviewLogsQuerySchema>;
 export type PreviewLogsDto = z.infer<typeof PreviewLogsDtoSchema>;
 
-export const OpenDevSessionRequestSchema = z.object({ branch: z.string().min(1) });
+export const OpenDevSessionRequestSchema = z.object({
+  branch: z.string().min(1),
+  /** 按原分支重新开始时，失败的那个会话（RFC-022 2026-09-23 修订）：平台核对它失败在检出代码或更早后，回收它的容器与工作卷。 */
+  restartOf: TaskIdSchema.optional(),
+});
 export const PublishDevSessionRequestSchema = PublishRequestSchema.extend({ expectedTaskId: TaskIdSchema.optional() });
 export type PublishDevSessionRequest = z.infer<typeof PublishDevSessionRequestSchema>;
 

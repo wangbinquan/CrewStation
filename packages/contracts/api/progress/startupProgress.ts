@@ -55,3 +55,12 @@ export type StartupRecord = Omit<StartupProgress, 'observedAt'>;
 export function currentStage<S extends { readonly state: StartupStageState }>(stages: readonly S[]): S | undefined {
   return stages.find((stage) => stage.state === 'failed') ?? stages.find((stage) => stage.state === 'running') ?? stages.find((stage) => stage.state === 'pending') ?? stages.at(-1);
 }
+
+/**
+ * 开发会话失败在检出代码或更早、且不是重建：工作卷里还没有可用的仓库，也没有任何人的改动。
+ * 工作台据此按原分支重新开始（RFC-022 Q1）；重新开始时平台把失败的那个会话连同容器与工作卷一并回收（2026-09-23 修订）。
+ */
+export function restartsFromScratch(startup: { readonly stages: readonly { readonly kind: string; readonly state: StartupStageState }[] } | undefined): boolean {
+  const stages = startup?.stages ?? [], failed = stages.find((stage) => stage.state === 'failed');
+  return !!failed && !stages.some((stage) => stage.kind === 'replace') && ['queue', 'container', 'checkout'].includes(failed.kind);
+}

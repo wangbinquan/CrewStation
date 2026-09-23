@@ -1,4 +1,5 @@
 import type { Actor, BranchDto, DevSessionDto, Manifest, OpenDevSessionRequest, PreviewState, ProjectId, RebuildDevSessionRequest, TaskId, WorkspaceStatusDto } from '@crewstation/contracts';
+import { restartsFromScratch } from '@crewstation/contracts';
 import { forbidden, conflict, isPlatformError, notFound, precondition } from '@crewstation/kernel';
 import { inspectWorkspace } from './workspaceStatus';
 import type { DevSessionUseCaseDeps } from './dependencies';
@@ -19,6 +20,16 @@ async function peekPreview(runner: DevSessionUseCaseDeps['runner'], env: Environ
     const reply = await Promise.race([runner.sendCommand(env.id, { id: `p-${Date.now()}`, type: 'previewStatus' }), deadline]) as { state: PreviewState } | undefined;
     return reply?.state ?? 'stopped';
   } catch { return 'stopped'; } finally { clearTimeout(timer); }
+}
+
+/**
+ * RFC-022 2026-09-23 修订：按原分支重新开始时带上失败的那个会话。只认本项目最近一次失败、且失败在检出代码或更早的：
+ * 它的工作卷里还没有仓库，也没有任何人的改动，开新会话之后连同容器一并回收；其余情况照旧保留，供恢复。
+ */
+async function restartTarget(environments: DevSessionUseCaseDeps['environments'], projectId: ProjectId, restartOf: TaskId | undefined): Promise<EnvironmentView | undefined> {
+  if (!restartOf) return undefined;
+  const latest = await environments.findDevSession(projectId, { includeLatestFailure: true });
+  return latest?.id === restartOf && latest.state === 'failed' && restartsFromScratch(latest.startup) ? latest : undefined;
 }
 
 /** 一项目一会话（D46）：开会话选分支，容器就绪后 TaskRunner 按 Manifest 自动起预览；释放即回收。 */
@@ -60,6 +71,7 @@ export function sessionLifecycleUseCases(deps: DevSessionUseCaseDeps) {
       await authorizer.authorize(actor, projectId, 'develop');
       const svc = await svcOf(projectId);
       if (await environments.findDevSession(projectId)) throw conflict('该项目已有一个开发会话，请先释放');
+      const reclaim = await restartTarget(environments, projectId, input.restartOf);
       const manifestText = await scm.readFile(svc.serviceId, input.branch, 'crewstation.yaml');
       // Manifest 坏了照样把会话开起来，只是没有预览：开发容器正是改这个文件的地方，
       // 在这里硬失败会把唯一的修复路径也一起关掉（RFC-001 让所有老仓库的 Manifest 一次性失效，实撞）。
@@ -71,6 +83,8 @@ export function sessionLifecycleUseCases(deps: DevSessionUseCaseDeps) {
         : manifest ? { command: manifest.spec.service.command, port: manifest.spec.service.port, healthPath: manifest.spec.service.healthPath } : undefined;
       const env = await environments.createEnvironment({ serviceId: svc.serviceId, kind: 'dev-session', branch: input.branch, createdBy: actor.userId, ...(preview ? { preview } : {}), labels: { 'crewstation.io/project': svc.slug, 'crewstation.io/service': svc.name } });
       const dto = await toDto(env, svc.slug, 'starting');
+      // 回收是顺带的：失败只记下来，不影响已经开好的新会话。
+      if (reclaim) await environments.releaseEnvironment(reclaim.id, 'failed').catch((error: unknown) => deps.logger.warn('failed dev session not reclaimed', { taskId: reclaim.id, error: String(error) }));
       return loaded.problem === undefined ? dto : { ...dto, message: `${loaded.problem}；会话已开启但没有预览，改好 crewstation.yaml 后释放会话再开一次即可` };
     },
     getSession: async (actor: Actor, projectId: ProjectId): Promise<DevSessionDto | undefined> => {
