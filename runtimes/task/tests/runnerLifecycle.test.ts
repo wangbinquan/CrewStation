@@ -90,7 +90,8 @@ describe('预览监督', () => {
 
   test('previewLogs 取预览自己的输出，跨重启保留并按 attempt 分辨', async () => {
     const port = freePort();
-    const serve = `console.log('boot'); console.error('warming'); Bun.serve({ port: ${port}, fetch: () => new Response('ok') });`;
+    // stderr 直接写字节：`console.error` 在带 FORCE_COLOR 的终端（Claude Code 的 shell 是 3）里会给整行上红色。
+    const serve = `console.log('boot'); process.stderr.write('warming\\n'); Bun.serve({ port: ${port}, fetch: () => new Response('ok') });`;
     const { session } = await boot({ preview: { command: ['bun', '-e', serve], port, healthPath: '/' } });
     let call = 0;
     const readLogs = (extra: Record<string, unknown> = {}) => session.call({ id: `l${(call += 1)}`, type: 'previewLogs', limit: 50, ...extra })
