@@ -119,6 +119,25 @@ describe.skipIf(!available)('RFC-021 待命槽生命周期', () => {
     expect((await f.deployment(physical))?.metadata.labels?.[LABELS.release]).toBe('rel_someone_else');
   });
 
+  // 2026-09-23 实机：demo 的 v0.1.2 发于 RFC-001 之前，发布记录里的 Manifest 还写着 driver／model，重新部署在预检里读 compute 时 500。
+  // 作者裁定：这类版本照常列出，确认时预检拒绝并写明原因。
+  test('发布记录里是平台已不接受的旧写法：照常可选，确认时预检 412 并写明原因与出路，槽与记录都不变', async () => {
+    const f = await fixture();
+    const v1 = await f.publish(), physical = await f.standby();
+    await f.release.api.takeOffline(owner, serviceId, { expectedReleaseId: v1.id });
+    const legacy = { id: '01a0bf5d-8f4b-7c2a-9d1e-5a4b3c2d1e0f', name: 'chat-v1', driver: 'stub', model: 'stub/echo', permission: 'read-only' };
+    const tasks = { taskProfileId: '01a0bf5d-8f4b-7c2a-9d1e-5a4b3c2d1e10', defaultVolumeMode: 'follow-container', agentProfiles: [legacy], outputContracts: [] };
+    await database!.db.execute(sql`UPDATE release.releases SET manifest = jsonb_set(manifest, '{spec,tasks}', ${JSON.stringify(tasks)}::jsonb) WHERE id = ${v1.id}`);
+    expect(await f.release.api.getRelease(owner, v1.id)).toMatchObject({ status: 'offline', redeployable: true });
+    await expect(f.release.api.redeploy(owner, v1.id, { expectedStandbyReleaseId: null })).rejects.toMatchObject({
+      kind: 'precondition', message: expect.stringMatching(new RegExp(`^${v1.tag} 的 Manifest 不符合当前平台的写法，不能部署：.*driver.*compute: \\{ kind: default \\}.*请改好仓库里的 crewstation\\.yaml 后发布新版本$`, 's')),
+    });
+    expect(await f.deployment(physical)).toBeUndefined();
+    expect(await f.release.api.getRelease(owner, v1.id)).toMatchObject({ status: 'offline', redeployable: true });
+    expect(await f.preview()).toMatchObject({ state: 'empty', offline: { releaseId: v1.id } });
+    expect((await f.release.api.listSlotEvents(owner, serviceId))[0]).toMatchObject({ kind: 'offline' });
+  });
+
   test('待验证版本连续 14 天无人访问才下线：访问 preview 推后到期，5 分钟内的重复访问只记一次', async () => {
     const f = await fixture();
     await f.publish();

@@ -139,6 +139,8 @@ pending:         deadline = max(since + I, lastAccessAt + I, postponedUntil)
 
 不产生构建 Job，也不产生迁移 Job（SM-03）。
 
+> **2026-09-23 修订（作者实机报「部署待验证版本报内部错误」，当面裁定处理方式）。** 预检的第一项改为「发布记录里的 Manifest 仍符合当前平台的写法」（`prepareSlotDeploy` 按当前 `ManifestSchema` 校验）。平台之后收紧了写法的旧版本——本机是 RFC-001 之前的 `agentProfiles` 只写 `driver`／`model`、没有 `compute`（demo v0.1.2／v0.1.3 等 4 个）——照常算作可重新部署、出现在版本下拉里；确认时预检拒绝（412），原因写明哪里不合法、该怎么改（`describeManifestFailure`），并说明发布记录里的 Manifest 随标签固定，要改好仓库里的 `crewstation.yaml` 后发布新版本。此前这类版本在 `computeProblem` 读 `compute` 时抛错，接口返回 500。
+
 ## 5. 正式版本维护
 
 gateway 新表 `gateway.service_maintenance`（每个服务最多一行，行存在就表示在维护中）与 `gateway.maintenance_events`（进入、调整、退出的记录）。

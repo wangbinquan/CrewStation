@@ -1,6 +1,6 @@
 import type { Manifest, ProjectId, ServicePlanDto } from '@crewstation/contracts';
 import { isPlatformError } from '@crewstation/kernel';
-import { DomainTopic } from '@crewstation/contracts';
+import { DomainTopic, ManifestSchema, describeManifestFailure } from '@crewstation/contracts';
 import type { Release } from '../domain/release';
 import { advance } from '../domain/release';
 import { startRetention } from '../domain/slotLifecycle';
@@ -46,6 +46,10 @@ export interface SlotDeployPlan { readonly plan: ServicePlanDto; readonly replic
  * 有问题返回原因，不写任何东西；发布流水线据此把发布记为失败，重新部署据此直接拒绝（RFC-021 §4）。
  */
 export async function prepareSlotDeploy(deps: ReleaseUseCaseDeps, release: Release, svc: ResolvedService, manifest: Manifest, physical: PhysicalSlot): Promise<SlotDeployPlan | { problem: string }> {
+  // 发布记录里的 Manifest 是当时校验过的；平台之后收紧了写法的旧版本（如 RFC-001 之前的 driver／model）按当前写法说清原因，
+  // 不带进后面的检查（2026-09-23 实机：demo 重新部署 v0.1.2 在读 compute 时 500）。
+  const current = ManifestSchema.safeParse(manifest);
+  if (!current.success) return { problem: `${release.tag} 的 Manifest 不符合当前平台的写法，不能部署：${describeManifestFailure(current.error)}。发布记录里的 Manifest 随标签固定，请改好仓库里的 crewstation.yaml 后发布新版本` };
   const plan = await deps.plans.getServicePlan(manifest.spec.service.servicePlanId, release.projectId);
   if (!plan) return { problem: `服务套餐 ${manifest.spec.service.servicePlanId} 不存在` };
   if (manifest.spec.service.replicas > plan.maxReplicas) return { problem: `副本数 ${manifest.spec.service.replicas} 超过套餐上限 ${plan.maxReplicas}` };
