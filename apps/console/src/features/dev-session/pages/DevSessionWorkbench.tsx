@@ -24,6 +24,7 @@ import { useTaskStream } from '../hooks/useTaskStream';
 import { useWorkspaceTree } from '../hooks/useWorkspaceTree';
 import { useDevelopmentLocation } from '../hooks/layout/useDevelopmentLocation';
 import type { SessionAccess } from '../model/sessionAccess';
+import { canReleaseSession } from '../model/sessionAccess';
 import type { ActivityTarget } from '../../../shared/activity/agentActivityView';
 import { ConnectionGuide } from '../components/session/ConnectionGuide';
 import { SessionStartup, sessionStartupShown } from '../components/session/SessionStartup';
@@ -33,6 +34,7 @@ import { Badge } from '../../../shared/ui/Badge';
 import { StageSummary } from '../../../shared/ui/progress/StageProgress';
 import { sessionConnection } from '../model/connection/sessionConnection';
 import { Stack } from '../../../shared/ui/Stack';
+import { Button } from '../../../shared/ui/Button';
 import { Card } from '../../../shared/ui/Card';
 import { previewUrl } from '../model/previewSnapshot';
 import styles from './DevSessionWorkbench.module.css';
@@ -78,6 +80,10 @@ export function DevSessionWorkbench({ projectId, session, access, canDevelop, se
   const preview = usePreviewStatus(channel, projectId, state.generation, state.runnerConnected);
   const data = useDataBindings(projectId, taskId, serviceId, { canDevelop, canManage: access.isOwner });
   const [dataDirty, setDataDirty] = useState(false);
+  // 页头「释放会话」（2026-09-23 作者裁定）：记下点击并打开会话面板；面板可见时把还没处理的那次交给「当前会话」卡展开确认，
+  // 卡片回报后清掉。计数放在这一层：面板从收起到打开时内容整块重挂，放在卡片里会丢，也会重复展开。
+  const [releaseAsks, setReleaseAsks] = useState(0), [releaseHandled, setReleaseHandled] = useState(0), sessionPanelOpen = location.search.view === 'session';
+  const requestRelease = () => { setReleaseAsks((count) => count + 1); if (!sessionPanelOpen) location.selectTool({ name: 'session', mode: 'side' }); };
   const draftScope = [editor.dirty ? t('devSession.editor.draftScope', { path: editor.file?.path ?? '' }) : '', dataDirty ? t('devSession.data.title') : ''].filter(Boolean).join(' / ');
   const health = sessionConnection(session, state);
   const logs = <ButtonLink size="small" to={PROJECT_PATHS[space].operations} params={{ projectId }} search={{ tab: 'logs', source: 'dev-session', taskId }}>{t('devSession.preview.logs')}</ButtonLink>;
@@ -106,6 +112,8 @@ export function DevSessionWorkbench({ projectId, session, access, canDevelop, se
             {newCli}
             {previewLink ? <ExternalButtonLink size="small" href={previewLink}>{t('devSession.native.openPreview')}</ExternalButtonLink> : null}
             <ButtonLink variant="primary" size="small" to={PROJECT_PATHS[space].release} params={{ projectId }} search={{ source: 'session' }}>{t('devSession.native.prepareRelease')}</ButtonLink>
+            {/* 危险动作排最后、红字红框；只给会话创建者与负责人。 */}
+            {canReleaseSession(access, session) ? <Button variant="danger" size="small" disabled={release.isPending} onClick={requestRelease}>{release.isPending ? t('devSession.release.pending') : t('devSession.release.action')}</Button> : null}
           </div>
         </header>
         {/* 启动中与启动失败由 CLI 区的步骤条说明（RFC-022），不再叠一条连接说明。 */}
@@ -116,10 +124,12 @@ export function DevSessionWorkbench({ projectId, session, access, canDevelop, se
         data={<Stack fill><DataResourcesTable projectId={projectId} /><DataBindingPane data={data} onDirtyChange={setDataDirty} /></Stack>}
         reference={reference}
         environment={<Stack fill>
+          {/* 「当前会话」在最上面、最近日志在最下面（2026-09-23 作者裁定）；日志是最后一项，面板内容短时由它长到底边。 */}
+          <SessionCard session={session} stream={state} access={access} release={release} unsavedFile={editor.dirty ? editor.file?.path : undefined} editorBusy={editor.busy} dataAccessDirty={dataDirty} dataAccessBusy={data.busy} onOpenFile={location.openFile}
+            releaseRequest={sessionPanelOpen && releaseAsks > releaseHandled ? releaseAsks : 0} onReleaseRequestHandled={setReleaseHandled} />
           <Card compact stacked title={t('devSession.connection.title')} extra={logs}><StreamStatus state={state} sessionState={session.state} /><p>{t('devSession.connection.automatic')}</p>{recovery}</Card>
-          {sessionLogs ? sessionLogs(taskId) : null}
           <ButtonLink size="small" to={PROJECT_PATHS[space].conversations} params={{ projectId }}>{t('devSession.native.history')}</ButtonLink>
-          <SessionCard session={session} stream={state} access={access} release={release} unsavedFile={editor.dirty ? editor.file?.path : undefined} editorBusy={editor.busy} dataAccessDirty={dataDirty} dataAccessBusy={data.busy} onOpenFile={location.openFile} />
+          {sessionLogs ? sessionLogs(taskId) : null}
         </Stack>}
         preview={<DevelopmentPreview preview={preview} previewHost={session.previewHost} connected={state.runnerConnected} logs={<ButtonLink size="small" to={PROJECT_PATHS[space].operations} params={{ projectId }} search={{ tab: 'logs', source: 'dev-session', taskId }}>{t('devSession.preview.logs')}</ButtonLink>} />}
         editor={<EditorPane tree={tree} editor={{ ...editor, openFile: location.openFile }} serviceId={serviceId} connected={state.runnerConnected} />}

@@ -131,6 +131,8 @@ tool: z.object({ name: z.enum(['preview', 'code', 'changes', 'data', 'reference'
 | 参考 | 三段，由 `topic` 选中：**侧栏形态**——API（已授权操作列表＋「试调」，`ApiInvocationWorkspace`）、事件（本项目订阅＋事件类型）、平台接入（身份头与环境变量，可复制）；**放大形态**——API 段是原目录页的完整内容（操作全表带筛选、选中行详情栏：文档／授权／申请／试调，`RequestsPanel`，折叠的 `SwaggerPanel`，管理员页脚链接）、事件段全表＋投递摘要、平台接入四段。侧栏里每段末尾一个「放大查看全部」。没有会话时可打开，只有试调禁用并说明 | catalog、events、capabilities 各自导出的紧凑与完整公开组件 |
 | 会话 | 连接与恢复（`ConnectionGuide` 详情、`StreamStatus`）、内嵌最近 200 行会话日志（`LogList` 复用，`source=dev-session&taskId`，带「完整日志 →」）、历史对话链接、`SessionCard`（技术详情折叠，释放在末尾） | 已有＋ logs feature 公开 `LogList` |
 
+> 2026-09-23 修订（作者当面裁定，直接改＋回填）：「会话」面板的顺序改为 `SessionCard`（当前会话；释放按按钮统一放卡片底部操作条、靠左，灰色说明区不放按钮）在最前，其后连接与恢复、历史对话链接，内嵌会话日志在最后、由它长到面板底边。页头操作区最后另加「释放会话」：打开本面板，在 `SessionCard` 里直接展开确认。见 [RFC-003 development-workspace.md §2](../RFC-003-workbench-ux-redesign/development-workspace.md#2-布局与独立预览) 同日修订。
+
 面板页签用现有 `Tabs`；标签后缀沿用现在的「· 未保存」「· n 待处理」。放大按钮 `aria-pressed`，收起按钮有可见文字标签（窄屏显示图标＋`aria-label`）。
 草稿保护：编辑器与数据表单的 `UnsavedChangesGuard` 不变；切换面板页签不卸载已挂载的代码／数据面板（继续用 `hidden`）。
 

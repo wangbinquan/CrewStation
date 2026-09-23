@@ -63,7 +63,7 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   "devSession.session.details": "Current session",
   "devSession.session.created": "Created",
   "devSession.session.pod": "Development container",
-  "devSession.session.releaseTitle": "Finish development and release the environment",
+  "devSession.session.releaseNote": "Finish development and release the environment: this destroys the container and work volume, including uncommitted or unpushed code.",
   "devSession.editor.disconnected": "The environment is disconnected, so the file list is unavailable. Open drafts are retained. See Session & environment for details.",
   "devSession.editor.waitConnection": "The file list will reload automatically when the connection returns.",
   'devSession.rebuild.title': 'Recover original worktree',

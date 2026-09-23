@@ -62,7 +62,7 @@ export const messages = {
   "devSession.session.details": "当前会话",
   "devSession.session.created": "创建时间",
   "devSession.session.pod": "开发容器",
-  "devSession.session.releaseTitle": "结束开发并释放环境",
+  "devSession.session.releaseNote": "结束开发并释放环境：确认后销毁容器与工作卷，未提交或未推送的代码会丢失。",
 
   "devSession.editor.disconnected": "开发环境未连接，文件列表暂不可读。已打开文件的草稿仍保留；前往“会话与环境”查看原因。",
   "devSession.editor.waitConnection": "连接恢复后会自动重新读取文件列表。",

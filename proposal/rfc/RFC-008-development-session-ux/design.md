@@ -96,6 +96,8 @@
 
 数据访问表单不再处于浮层，按说明、现有记录、申请／审批顺序排列。会话详情分为连接与恢复、环境资料、历史记录、释放区域。
 
+> 2026-09-23 修订：会话详情的顺序改为「当前会话」（释放在卡片底部操作条）在最前，其后连接与恢复、历史记录，最近日志在最后；页头另有「释放会话」，打开本页签并直接展开确认。见 [RFC-003 development-workspace.md §2](../RFC-003-workbench-ux-redesign/development-workspace.md#2-布局与独立预览) 同日修订。
+
 复用 Tabs、Card、Stack、ActionRow、Button、FormField、DefinitionList、ConfirmationPanel、QueryStatus；颜色取主题令牌。
 健康态减少重复状态、回放计数和空工具栏；回放细节保留在环境页。排布工具在存在窗口后显示。
 窄屏只有标签条和终端内容各自滚动，页面与表单不得横向溢出；桌面正常四窗保留 RFC-003 的可用面积要求。

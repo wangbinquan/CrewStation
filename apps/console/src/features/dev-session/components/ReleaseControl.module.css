@@ -1,7 +1,14 @@
+/* 放在「当前会话」卡的底部操作条里：按钮靠左（2026-09-23 按钮统一），出错说明跟在下面。 */
 .control {
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
+  align-items: flex-start;
   gap: var(--cs-space-2);
-  max-width: 420px;
+  min-width: 0;
+}
+
+/* 展开的确认占满操作条整行：问题、检查结果与两个按钮都从左边排起。 */
+.confirming {
+  flex: 1 1 100%;
+  min-width: 0;
 }

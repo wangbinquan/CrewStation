@@ -17,6 +17,11 @@ function ownsProject(me: CurrentUserDto, project: ProjectDto | undefined): boole
   return me.memberships?.some((membership) => membership.projectId === project?.id && membership.role === 'owner') ?? false;
 }
 
+/** 页头与「当前会话」卡的释放入口共用这一条：自己开的或负责人，失败的会话不在这里释放。 */
+export function canReleaseSession(access: SessionAccess, session: DevSessionDto): boolean {
+  return access.canRelease && session.state !== 'failed';
+}
+
 export function sessionAccess(me: CurrentUserDto | undefined, project: ProjectDto | undefined, session: DevSessionDto | undefined): SessionAccess {
   if (me === undefined) return { isOwner: false, isMine: false, canRelease: false, needsForce: false };
   const isOwner = ownsProject(me, project);

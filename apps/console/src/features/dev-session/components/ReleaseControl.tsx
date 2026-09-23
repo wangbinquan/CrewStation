@@ -1,7 +1,7 @@
 import type { ReleaseDevSessionResult } from '@crewstation/api-client';
 import type { WorkspaceStatusDto } from '@crewstation/contracts';
 import type { UseMutationResult } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ReactElement } from 'react';
 import type { ApiClientError } from '../../../shared/api/useApi';
 import { errorMessage, useApiMutation } from '../../../shared/api/useApi';
@@ -26,6 +26,12 @@ export interface ReleaseControlProps {
   readonly dataAccessDirty?: boolean;
   readonly dataAccessBusy?: boolean;
   readonly onOpenFile?: (path: string) => void;
+  /**
+   * 页头「释放会话」还没处理的那次点击的序号（2026-09-23 作者裁定），0 表示没有。开发页只在会话面板可见时传入，
+   * 确认面板因此挂在看得见的地方、焦点落得进去；展开并发出检查后用 `onRequestHandled` 回报这个序号，开发页据此清掉。
+   */
+  readonly request?: number;
+  readonly onRequestHandled?: (request: number) => void;
 }
 
 /**
@@ -41,11 +47,19 @@ function needsDiscard(workspace: WorkspaceStatusDto | undefined, failed: boolean
  * 释放会话：先就地确认，负责人释放他人会话要额外说明这会带 force；工作区不干净时再弹窗，输入 discard 才释放。
  * 释放结果（未推送的提交）由页面渲染：会话没了之后本组件已经不在树上。
  */
-export function ReleaseControl({ projectId, taskId, access, release, unsavedFile, editorBusy = false, dataAccessDirty, dataAccessBusy = false, onOpenFile }: ReleaseControlProps): ReactElement | null {
+export function ReleaseControl({ projectId, taskId, access, release, unsavedFile, editorBusy = false, dataAccessDirty, dataAccessBusy = false, onOpenFile, request = 0, onRequestHandled }: ReleaseControlProps): ReactElement | null {
   const t = useT();
   const [asking, setAsking] = useState(false), [discarding, setDiscarding] = useState(false);
   const inspection = useApiMutation(() => api.devSession.workspaceStatus(projectId));
-  const inspect = (): void => { inspection.reset(); inspection.mutate(undefined); };
+  const { mutate: runCheck, reset: resetCheck } = inspection;
+  const inspect = useCallback((): void => { resetCheck(); runCheck(undefined); }, [resetCheck, runCheck]);
+  // 页头的请求在渲染时并入本地状态（随 props 调整 state），检查与回报在提交之后。round 也是确认面板的 key：
+  // 确认已展开时再点页头，面板重挂，焦点回到问题上。
+  const [seen, setSeen] = useState(0), [round, setRound] = useState(0);
+  if (request > 0 && request !== seen) { setSeen(request); setRound(round + 1); setAsking(true); }
+  const reportHandled = useRef(onRequestHandled);
+  useEffect(() => { reportHandled.current = onRequestHandled; });
+  useEffect(() => { if (round === 0) return; inspect(); reportHandled.current?.(seen); }, [round, seen, inspect]);
   if (!access.canRelease) return null;
   const blocked = editorBusy || dataAccessBusy || inspection.isPending || (inspection.data !== undefined && inspection.data.taskId !== taskId);
   const question = access.needsForce ? t('devSession.release.confirmForce') : t('devSession.release.confirm');
@@ -57,8 +71,9 @@ export function ReleaseControl({ projectId, taskId, access, release, unsavedFile
   };
   if (asking) {
     return (
-      <>
+      <div className={styles.confirming}>
       <ConfirmationPanel
+        key={round}
         danger
         question={question}
         hint={t('devSession.release.hint')}
@@ -87,12 +102,12 @@ export function ReleaseControl({ projectId, taskId, access, release, unsavedFile
         {inspection.error ? <PaneNotice tone="warning">{t('devSession.release.unknown')}</PaneNotice> : null}
         {inspection.data ? <WorkspaceInspection workspace={inspection.data} /> : null}
       </ConfirmDialog> : null}
-      </>
+      </div>
     );
   }
   return (
     <div className={styles.control}>
-      {/* 释放会话收回容器与工作卷，是危险动作：红字红框，最终确认红底（2026-09-23 裁定）；尺寸由开发页的紧凑区域给出。 */}
+      {/* 释放会话收回容器与工作卷，是危险动作：红字红框，最终确认红底（2026-09-23 裁定）；在卡片底部操作条里靠左，标准尺寸。 */}
       <Button variant="danger" onClick={() => { setAsking(true); inspect(); }} disabled={release.isPending}>
         {release.isPending ? t('devSession.release.pending') : t('devSession.release.action')}
       </Button>
