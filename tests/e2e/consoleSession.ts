@@ -64,11 +64,23 @@ export function connectBrowser(): Promise<Browser> {
  */
 export async function signIn(browser: Browser, username: string, password?: string): Promise<Page> {
   const page = await browser.newPage(await browser.newContext());
+  try {
+    await signInOn(page, username, password);
+    return page;
+  } catch (error) {
+    // 没登成就关掉这一页：否则它停在登录页、留在共用的调试浏览器里一直轮询。2026-09-23 实机：没有 .local 口令的
+    // 导出树里跑一次门禁就留下 10 个登录页，几天累积上百个，cs-api 重启时一起涌入，连接池卡死循环（dev-gotchas）。
+    await page.close().catch(() => undefined);
+    throw error;
+  }
+}
+
+async function signInOn(page: Page, username: string, password?: string): Promise<void> {
   await page.goto(`${CONSOLE_URL}/`);
   if (process.env.CS_E2E_AUTH === 'dev-oidc') {
     await signInDevOidc(page, username);
     await settle(page);
-    return page;
+    return;
   }
   const secret = password ?? e2ePassword();
   const onLogin = await page.eval<boolean>(`!!document.querySelector('form input[name="password"]')`);
@@ -83,7 +95,6 @@ export async function signIn(browser: Browser, username: string, password?: stri
     await loaded;
   }
   await settle(page);
-  return page;
 }
 
 /** 显式选择本机已有开发身份；只走 OIDC 登录，不调用登录器的角色同步／授予接口。 */

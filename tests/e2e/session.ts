@@ -32,27 +32,29 @@ interface ProjectRow {
  * 例外：`CS_TEST_REQUIRE=e2e`（CI 的 e2e 作业）时出错原样抛出。登录页改坏、管理员没建出来，
  * 在那里表现成「整套跳过、作业照绿」，等于实机验收被悄悄关掉。
  */
-export async function openAdminSession(): Promise<AdminSession | undefined> {
-  let browser: Browser | undefined;
+export async function openAdminSession(connect: () => Promise<Browser> = connectBrowser): Promise<AdminSession | undefined> {
+  let browser: Browser | undefined, admin: Page | undefined;
   try {
-    browser = await connectBrowser();
-    const admin = await signIn(browser, e2eAdminUsername());
+    browser = await connect();
+    admin = await signIn(browser, e2eAdminUsername());
     const page = await apiGet<{ items?: ProjectRow[] }>(admin, '/v1/projects?limit=50');
     // 必须是已开通且有服务的数字人项目：开通失败或半截的项目页面构成不同，拿它断言只会得出假结论。
     const usable = (page.items ?? []).find(
       (row) => row.state === 'active' && typeof row.serviceId === 'string' && row.kind === 'DigitalWorker',
     );
-    const owned = browser;
+    const owned = browser, signedIn = admin;
     return {
       browser: owned,
-      admin,
+      admin: signedIn,
       project: usable ? { id: usable.id, name: usable.name } : undefined,
       close: async () => {
-        await admin.close().catch(() => undefined);
+        await signedIn.close().catch(() => undefined);
         owned.close();
       },
     };
   } catch (error) {
+    // 登录之后的一步失败也要关掉那一页，只断开连接会把它留在共用的调试浏览器里（见 consoleSession.signIn）。
+    await admin?.close().catch(() => undefined);
     browser?.close();
     if (e2eRequired()) throw new Error(`CS_TEST_REQUIRE 要求实机验收，但管理员会话没有建立：${String(error)}`, { cause: error });
     return undefined;

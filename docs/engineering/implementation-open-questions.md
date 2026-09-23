@@ -200,6 +200,13 @@
 
 **现状**：2026-09-16 本机 kind 集群上 cs-api 三次在数小时内进入“进程活着、数据库空闲、所有要用数据库的请求全部挂起”的状态（第八十四批 06:13Z、第八十五批 07:14Z 短暂、第八十六批 07:25Z）。第一次 `pg_stat_activity` 显示一条连接带着未结束的事务被池子复用、其余九条排在它持有的咨询锁后面；第三次十条连接全部 `idle`、没有锁，容器 CPU 与内存都很低，容器内 `/healthz` 与无身份的 `/v1/me` 都 4ms 返回，但任何要查库的请求都在 Bun 服务器 10s `idleTimeout` 后被网关 502。都发生在多个浏览器上下文同时打开开发页（动态轮询、名册、版本比较、布局写入）时。当前运行时是 Dockerfile 与 CI 锁定的 Bun 1.3.13，驱动是 `drizzle-orm/bun-sql` 直接使用 Bun 内建 `SQL`（`max: 10`）。
 
+**2026-09-23 第四次（05:35–05:51Z）**：RFC-022 滚动部署 cs-api 后，新旧两版镜像都在进程启动后几秒内错位，16 分钟内重启 7 次。
+- 客户端：`JSON Parse error: Unrecognized token`，以及 `ERR_POSTGRES_INVALID_MESSAGE Failed to read data`。
+- 服务端：参数里出现 0x00，`SET TRANSACTION ISOLATION LEVEL must be called before any query`，多条 `unexpected EOF on client connection with an open transaction`。
+- 当时的浏览器上下文：共用调试 Chrome 108 个（110 页，全都没有脚本连着），另一个会话的 Chrome 26 页；每分钟请求约 450–550。
+- 关掉孤儿页面后，请求降到每分钟约 60，cs-api 稳定；随后重新部署也没有再出现。
+触发条件与前三次一致，都是多个开发页同时轮询。新的线索是：进程刚启动、积压的请求同时到达时最容易错位。孤儿页面的来源与防范见 dev-gotchas「共用调试浏览器里的页面用完要关」。
+
 **为什么是问题**：工作台所有页面同时停在“载入中”，开发者无法判断是自己的会话还是平台出了问题；探针在第八十六批之前看不到这种故障，只能等人 `rollout restart`。本机 `cs-dev-pg` 上 10 连接／40 并发的八种事务形态压测都复现不出来，说明触发条件不在我们已知的事务写法里。
 
 **已做的工程处理（不需要裁定）**：写锁改 try 锁轮询、读取改只读快照、连接串带 `idle_in_transaction_session_timeout=60s`（第八十四批）；`/healthz` 走同一连接池做 `select 1` 并以 3s 为界，探针 `timeoutSeconds: 5`，同类卡死约 45s 内由 Kubernetes 重启（第八十六批）。

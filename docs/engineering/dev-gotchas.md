@@ -409,6 +409,20 @@ ForwardAuth 带到登录页后填用户名密码并 `form.requestSubmit()`（口
 先滚动、`sleep` 一下、再量一次坐标，并用 `document.elementFromPoint()` 确认那个点确实落在目标上，落不上就报错而不是空点。
 另外，浏览器里换过前端代码要 `Network.setCacheDisabled`：镜像换了而 index.html 还在缓存里时，核对的是上一版界面。
 
+### 共用调试浏览器里的页面用完要关：孤儿页面会把 cs-api 的一次重启变成循环
+
+2026-09-23 05:35Z 起，cs-api 在 16 分钟里被存活探针重启了 7 次，新旧两版镜像都一样。每次都是启动后几秒内先出现 Bun SQL 的错位：
+客户端报 `JSON Parse error`、`Failed to read data`；PG 日志里参数带 0x00，`SET TRANSACTION` 跑在查询之后。然后 `/healthz` 返回 503，也就是 I16。
+放大它的是共用的无头 Chrome（CDP 9333）：上面开着 110 个页面、108 个浏览器上下文，全都没有脚本连着（`Target.getTargets` 的 `attached`
+为 false），停在首页、登录页、开发页上一直轮询；另一个会话自己的 Chrome 上还有 26 个。进程在稳态时扛得住这些轮询，一次滚动重启让它们同时重试，
+新进程的连接池当场错位，探针重启后又来一遍，形成循环。关掉孤儿页面后五分钟内就稳定了，随后重新部署也没再出现。
+孤儿页面有两个来源：
+- 验收脚本 `signIn` 之后只断开连接、不关页。
+- e2e 在没有 `.local/admin.env` 的导出树里跑门禁：`signIn` 在页面已经打开之后才发现缺口令并抛错，`openAdminSession` 的 catch 只断开连接，
+  每跑一次门禁就留下 10 个登录页。这一处已修：两者失败时都会关页，见 `tests/e2e/pageCleanup.test.ts`。
+**脚本结束前（包括异常时）逐个 `Target.closeTarget` 关掉自己开的页面。** 排查 cs-api 反复重启时，先数 `curl -s 127.0.0.1:9333/json/list` 里的页面；
+只关 `attached=false` 的，正被脚本连着的别动。
+
 ### Chrome 扩展量窄屏：窗口压不到 500px 以下，用同源 iframe 模拟视口
 
 Claude in Chrome 的 `resize_window` 到 390／320 会被 macOS Chrome 的最小窗口宽度吞掉（`innerWidth` 不变），全屏窗口更是完全不响应。
