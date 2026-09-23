@@ -20,7 +20,7 @@ function fixture() {
   const deps: SessionUseCaseDeps = {
     clock: fixedClock(at), logger: noopLogger,
     settings: { commandTimeoutMs: 1000, runnerStaleMs: 30000, replayLimit: 100, selfAddress: 'http://session' },
-    events: { append: async (e) => { durable.push(e.event); records.push(e); }, maxSeq: async () => 0, listSince: async (_taskId, since, options) => records.filter((event) => event.seq > since).slice(0, options.limit) },
+    events: { append: async (e) => { durable.push(e.event); records.push(e); }, maxSeq: async () => 0, listSince: async (_taskId, since, options) => records.filter((event) => event.seq > since).slice(0, options.limit), summarize: async () => [] },
     registry: { claim: async () => {}, release: async () => {}, heartbeat: async () => {}, lookup: async () => undefined },
     runnerAuth: { verifyRunnerToken: async () => ({ ok: true, projectId: 'p' }) },
     taskAccess: { canOpenStream: async () => true, onRunnerConnected: async () => {}, onRunnerDisconnected: async () => {} },

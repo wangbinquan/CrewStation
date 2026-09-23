@@ -10,7 +10,7 @@ test('旧握手通过初检但已失效时，不接管连接、不清空当前�
   const deps: SessionUseCaseDeps = {
     clock: fixedClock('2026-09-15T10:00:00Z'), logger: noopLogger,
     settings: { commandTimeoutMs: 1000, runnerStaleMs: 30000, replayLimit: 100, selfAddress: 'http://session' },
-    events: { append: async () => {}, maxSeq: async () => 0, listSince: async () => [] },
+    events: { append: async () => {}, maxSeq: async () => 0, listSince: async () => [], summarize: async () => [] },
     registry: { claim: async () => { callbacks.push('claim'); }, release: async () => {}, heartbeat: async () => {}, lookup: async () => undefined },
     runnerAuth: { verifyRunnerToken: async () => ({ ok: true, projectId: 'project' }) },
     taskAccess: { canOpenStream: async () => true, onRunnerConnected: async (_id, token) => token === accepted,

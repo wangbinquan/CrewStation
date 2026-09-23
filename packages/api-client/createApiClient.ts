@@ -32,6 +32,8 @@ import type { ServicesResource } from './resources/services';
 import { servicesResource } from './resources/services';
 import type { TasksResource } from './resources/tasks';
 import { tasksResource } from './resources/tasks';
+import type { TracesResource } from './resources/traces';
+import { tracesResource } from './resources/traces';
 import type { UsersResource } from './resources/users';
 import { usersResource } from './resources/users';
 import { taskStreamUrl } from './stream';
@@ -61,6 +63,8 @@ export interface ApiClient {
   readonly gateway: GatewayResource;
   readonly cluster: ClusterResourceClient;
   readonly observability: ObservabilityResource;
+  /** 调用链：本项目的链列表、分层回放与执行事件（Design §14）。 */
+  readonly traces: TracesResource;
   readonly capabilities: CapabilitiesResource;
   /** RFC-006：算力档位管理（仅管理员）。 */
   readonly computeProfiles: ComputeProfilesResource;
@@ -87,6 +91,7 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
     events: eventsResource(transport),
     gateway: gatewayResource(transport),
     observability: observabilityResource(transport),
+    traces: tracesResource(transport),
     cluster: clusterResource(transport),
     capabilities: capabilitiesResource(transport),
     computeProfiles: computeProfilesResource(transport),

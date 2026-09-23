@@ -20,6 +20,7 @@ import type { BusinessTaskUseCaseDeps } from './application/dependencies';
 import { registerContractsUseCase } from './application/registerContracts';
 import { subtaskUseCases } from './application/subtasks';
 import { taskLifecycleUseCases } from './application/taskLifecycle';
+import { traceTaskQueries } from './application/traceTasks';
 import { serviceRoutes } from './http/serviceRoutes';
 import { userRoutes } from './http/userRoutes';
 import type { ComputeCatalog, BusinessTaskSettings, Environments, ProjectAuthorizer, Runner, ServiceDirectory } from './ports/runtime';
@@ -67,6 +68,7 @@ export function createBusinessTaskModule(deps: BusinessTaskModuleDeps): Business
     ...businessClusterUseCases(useCaseDeps, drizzleClusterCommands(deps.db)),
     createTask: lifecycle.createTask, getTask: lifecycle.getTask, closeTask: lifecycle.closeTask, pauseTask: lifecycle.pauseTask, resumeTask: lifecycle.resumeTask, listProjectTasks: lifecycle.listProjectTasks,
     ...subtasks,
+    ...traceTaskQueries(useCaseDeps),
     registerContracts,
   };
   const subscriptions = createEventConsumer({ db: deps.db, consumer: deps.settings.consumerName, logger })

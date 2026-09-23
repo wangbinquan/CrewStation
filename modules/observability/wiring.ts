@@ -13,9 +13,10 @@ import type { ObservabilityModuleApi } from './api/moduleApi';
 import { alertingUseCases } from './application/alerting';
 import type { ObservabilityUseCaseDeps } from './application/dependencies';
 import { logsAndHealthUseCases } from './application/logsAndHealth';
-import { traceReplayUseCase } from './application/traceReplay';
+import { traceChainUseCases } from './application/traceChains';
 import { observabilityRoutes } from './http/observabilityRoutes';
-import type { ClusterObserver, ProjectAuthorizer, ServiceResolver, SlotRoles, TraceSources } from './ports/sources';
+import type { ClusterObserver, ProjectAuthorizer, ServiceResolver, SlotRoles } from './ports/sources';
+import type { TraceChainSources } from './ports/traceSources';
 
 export interface ObservabilityModuleDeps {
   db: Database;
@@ -23,7 +24,8 @@ export interface ObservabilityModuleDeps {
   authorizer: ProjectAuthorizer;
   services: ServiceResolver;
   slots: SlotRoles;
-  traces: TraceSources;
+  /** 调用链的数据来源（Design §14），由组合根接到 task-runtime、events、business-task 与 session。 */
+  traces: TraceChainSources;
   isAdmin: (userId: UserId) => Promise<boolean>;
   /** 巡检的项目来源；缺省不巡检。 */
   listProjectIds?: () => Promise<ProjectId[]>;
@@ -49,10 +51,13 @@ export function createObservabilityModule(deps: ObservabilityModuleDeps): Observ
   const logger = deps.logger ?? noopLogger;
   const useCaseDeps: ObservabilityUseCaseDeps = {
     alerts: drizzleAlertRepository(deps.db), cluster: deps.cluster ?? kubernetesClusterObserver(deps.k8s),
-    authorizer: deps.authorizer, services: deps.services, slots: deps.slots, traces: deps.traces, clock: deps.clock ?? systemClock, logger,
+    authorizer: deps.authorizer, services: deps.services, slots: deps.slots, clock: deps.clock ?? systemClock, logger,
   };
   const alerting = alertingUseCases(useCaseDeps);
-  const api: ObservabilityModuleApi = { name: 'observability', ...logsAndHealthUseCases(useCaseDeps), ...alerting, replayTrace: traceReplayUseCase(useCaseDeps) };
+  const api: ObservabilityModuleApi = {
+    name: 'observability', ...logsAndHealthUseCases(useCaseDeps), ...alerting,
+    ...traceChainUseCases({ authorizer: deps.authorizer, chains: deps.traces, clock: useCaseDeps.clock }),
+  };
   let timer: ReturnType<typeof setInterval> | undefined;
   const sweepAll = async (): Promise<void> => { for (const projectId of await (deps.listProjectIds?.() ?? Promise.resolve([]))) await alerting.sweepProject(projectId).catch((e: unknown) => logger.warn('alert sweep failed', { projectId, error: String(e) })); };
   return {

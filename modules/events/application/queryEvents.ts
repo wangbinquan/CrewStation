@@ -1,5 +1,5 @@
 import type { Actor, DeliveryDto, EventTypeDto, ProjectId, SubscriptionDto } from '@crewstation/contracts';
-import type { DeliveryFilter } from '../api/moduleApi';
+import type { DeliveryFilter, TraceDeliveryDto, TraceKeyDto, TraceKeyPage } from '../api/moduleApi';
 import type { EventsUseCaseDeps } from './dependencies';
 import { deliveryToDto, eventTypeToDto, subscriptionToDto } from './toDto';
 
@@ -17,5 +17,10 @@ export function eventQueryUseCases({ uow, projects }: EventsUseCaseDeps) {
       await projects.authorize(actor, projectId, 'view');
       return (await uow.read.deliveries.listByProject(projectId, filter.state, filter.limit ?? DEFAULT_LIMIT)).map(deliveryToDto);
     },
+    // 调用链（Design §14）的内部读取：observability 已按项目校验过可见性。
+    traceKeys: (projectId: ProjectId, page: TraceKeyPage): Promise<TraceKeyDto[]> => uow.read.deliveries.traceKeys(projectId, page),
+    activeTraceIds: (projectId: ProjectId, since: string): Promise<string[]> => uow.read.deliveries.activeTraceIds(projectId, since),
+    listTraceDeliveries: async (projectId: ProjectId, traceIds: readonly string[]): Promise<TraceDeliveryDto[]> =>
+      (await uow.read.deliveries.listByProjectTraces(projectId, traceIds)).map((d) => ({ ...deliveryToDto(d), createdAt: d.createdAt.toISOString(), updatedAt: d.updatedAt.toISOString() })),
   };
 }

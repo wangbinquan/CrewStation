@@ -2,6 +2,12 @@ import type {
   Actor, DeliveryDto, DeliveryState, EventTypeDto, LegacyProducedEvent, ProducedEvent, ProduceResultDto, ProjectId, ServiceActor, ServiceId, SubscriptionDto, UserId,
 } from '@crewstation/contracts';
 
+/** 调用链的时间键：firstAt 为毫秒精度的开始时间；before 取上一页最后一条的 (firstAt, traceId)。 */
+export interface TraceKeyDto { traceId: string; firstAt: string; lastAt: string; active: boolean }
+export interface TraceKeyPage { before?: { at: string; traceId: string }; limit: number }
+/** 调用链回放用的投递：比 DeliveryDto 多创建与最后变化的时间。 */
+export type TraceDeliveryDto = DeliveryDto & { createdAt: string; updatedAt: string };
+
 export interface DeliveryFilter {
   readonly state?: DeliveryState;
   /** 缺省 50。 */
@@ -30,4 +36,10 @@ export interface EventsModuleApi {
   deliver(deliveryId: string): Promise<DeliverOutcome>;
   /** 补发维护暂存的投递（RFC-021）：给了服务只补它的；返回补发条数。 */
   releaseHeld(serviceId?: ServiceId): Promise<number>;
+  /** 调用链列表（Design §14）的内部读取，调用方已校验项目可见：本项目投递按 traceId 分组的时间键，按开始时间倒序翻页。 */
+  traceKeys(projectId: ProjectId, page: TraceKeyPage): Promise<TraceKeyDto[]>;
+  /** since（ISO 时间）之后有变化、或仍在投递中的链。 */
+  activeTraceIds(projectId: ProjectId, since: string): Promise<string[]>;
+  /** 这些链在本项目里的投递；同一事件投给别的项目的那几条不在内。 */
+  listTraceDeliveries(projectId: ProjectId, traceIds: readonly string[]): Promise<TraceDeliveryDto[]>;
 }

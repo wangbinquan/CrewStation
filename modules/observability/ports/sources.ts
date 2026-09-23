@@ -1,4 +1,4 @@
-import type { TaskKind, Actor, LogEntryDto, ProjectId, ServiceId, SubtaskDto, TaskId } from '@crewstation/contracts';
+import type { Actor, LogEntryDto, ProjectId, ServiceId } from '@crewstation/contracts';
 
 export interface ProjectAuthorizer {
   authorize(actor: Actor, projectId: ProjectId, action: 'view'): Promise<unknown>;
@@ -25,11 +25,4 @@ export interface WorkloadObservation {
 export interface ClusterObserver {
   observeDeployment(namespace: string, name: string): Promise<WorkloadObservation | undefined>;
   tailLogs(namespace: string, selector: string, options: { tailLines: number; sinceSeconds?: number }): Promise<LogEntryDto[]>;
-}
-
-/** 追溯来源：任务与子任务按 traceId 关联；Agent 会话由 session 事件提供。 */
-export interface TraceSources {
-  tasksByTrace(traceId: string): Promise<Array<{ taskId: TaskId; kind: TaskKind; createdAt: string }>>;
-  subtasksOfTask(taskId: TaskId): Promise<SubtaskDto[]>;
-  sessionEvents(taskId: TaskId): Promise<Array<{ seq: number; at: string; event: { kind: string; event?: { agentId?: string; sessionId?: string; type?: string; text?: string } } }>>;
 }

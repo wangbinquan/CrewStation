@@ -320,10 +320,15 @@ function composeAggregates(deps: PlatformModuleDeps, core: ReturnType<typeof com
   const serviceOfProject = project.api.resolveServiceOfProject;
   const observability = createObservabilityModule({
     db, k8s, logger, isAdmin: (id) => isAdmin(id), authorizer: project.api, services: { resolveServiceOfProject: serviceOfProject }, slots: delivery.release.api,
+    // 调用链（Design §14）：每个来源都按项目取数——同一个事件投给多个订阅项目时共用 traceId，别的项目的记录不能带出来。
     traces: {
-      tasksByTrace: async (traceId) => (await runtime.taskRuntime.api.listByTrace(traceId)).map((e) => ({ taskId: e.id, kind: e.kind, createdAt: e.createdAt })),
-      subtasksOfTask: (taskId) => runtime.businessTask.api.listProjectSubtasksInternal(taskId),
-      sessionEvents: (taskId) => runtime.sessionClient.listEvents(taskId, { kinds: ['agent', 'execExited', 'previewState'], limit: 2000 }),
+      environments: { traceKeys: runtime.taskRuntime.api.traceKeys, activeTraceIds: runtime.taskRuntime.api.activeTraceIds, list: runtime.taskRuntime.api.listTraceEnvironments },
+      deliveries: { traceKeys: runtime.events.api.traceKeys, activeTraceIds: runtime.events.api.activeTraceIds, list: runtime.events.api.listTraceDeliveries },
+      businessTasks: { list: runtime.businessTask.api.listTraceTasks },
+      sessions: {
+        summarize: runtime.session.api.summarizeEvents,
+        events: (taskId, page) => runtime.session.api.listEvents(taskId, { sinceSeq: page.afterSeq, limit: page.limit, kinds: page.kinds }),
+      },
     },
     listProjectIds: async () => (await project.api.listServices()).map((s) => s.projectId),
   });

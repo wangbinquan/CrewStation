@@ -1,0 +1,9 @@
+/* 列表在前、详情在旁（2026-09-23 作者裁定）；按页签内容的宽度（不是窗口宽度），窄于 760px 时详情落到列表下面。 */
+.host { container-type: inline-size; min-width: 0; }
+.columns { display: grid; grid-template-columns: minmax(280px, 2fr) minmax(0, 3fr); gap: var(--cs-space-3); align-items: start; min-width: 0; }
+/* 详情跟着列表滚动时停在上方，自己在可视高度内滚动；列表很长时选中靠后的一条也不用回到顶上看详情。 */
+.aside { position: sticky; top: 0; max-height: calc(100vh - 140px); overflow-y: auto; min-width: 0; }
+@container (max-width: 760px) {
+  .columns { grid-template-columns: minmax(0, 1fr); }
+  .aside { position: static; max-height: none; overflow: visible; }
+}

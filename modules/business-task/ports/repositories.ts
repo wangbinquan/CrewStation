@@ -8,6 +8,8 @@ export interface TaskRepository {
   update(task: BusinessTask): Promise<void>;
   getById(id: TaskId): Promise<BusinessTask | undefined>;
   listByProject(projectId: ProjectId, limit: number): Promise<BusinessTask[]>;
+  /** 调用链回放（Design §14）：这些 traceId 在本项目里的业务任务，按创建时间正序。 */
+  listByProjectTraces(projectId: ProjectId, traceIds: readonly string[]): Promise<BusinessTask[]>;
 }
 
 export interface SubtaskRepository {
@@ -17,6 +19,8 @@ export interface SubtaskRepository {
   update(run: SubtaskRun): Promise<void>;
   getById(id: SubtaskId): Promise<SubtaskRun | undefined>;
   listByTask(taskId: TaskId): Promise<SubtaskRun[]>;
+  /** 一批任务的全部子任务（含每次重试），按创建时间正序。 */
+  listByTasks(taskIds: readonly TaskId[]): Promise<SubtaskRun[]>;
   listActive(limit: number): Promise<SubtaskRun[]>;
   /** RFC-006：按子任务执行环境的 taskId 找子任务（子 Runner 连上时派发）。 */
   findByExecution(executionTaskId: TaskId): Promise<SubtaskRun | undefined>;

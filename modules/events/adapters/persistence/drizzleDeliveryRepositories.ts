@@ -4,6 +4,7 @@ import { and, asc, desc, eq } from 'drizzle-orm';
 import type { Delivery } from '../../domain/delivery';
 import type { InboxEvent } from '../../domain/inboxEvent';
 import type { DeliveryRepository, InboxRepository } from '../../ports/repositories';
+import { deliveryTraceQueries } from './deliveryTraceQueries';
 import { deliveries, inbox } from './tables';
 
 export function drizzleInboxRepository(db: Executor): InboxRepository {
@@ -40,6 +41,7 @@ export function drizzleDeliveryRepository(db: Executor, lockForUpdate = false): 
       const where = serviceId === undefined ? eq(deliveries.state, 'held') : and(eq(deliveries.serviceId, serviceId), eq(deliveries.state, 'held'));
       return (await db.select().from(deliveries).where(where).orderBy(asc(deliveries.createdAt), asc(deliveries.id)).limit(limit)).map(toDelivery);
     },
+    ...deliveryTraceQueries(db, toDelivery),
   };
 }
 

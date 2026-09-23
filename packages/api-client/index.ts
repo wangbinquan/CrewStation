@@ -26,6 +26,7 @@ export type { ApiCatalogResource } from './resources/apiCatalog';
 export type { EventsResource } from './resources/events';
 export type { GatewayAllowlistDto, GatewayReconcileResult, GatewayResource, GatewayServiceRoutes } from './resources/gateway';
 export type { ObservabilityResource } from './resources/observability';
+export type { TraceListInput, TracesResource } from './resources/traces';
 export type { CapabilitiesResource } from './resources/capabilities';
 export type { ComputeProfilesResource } from './resources/computeProfiles';
 export type { ClusterResourceClient } from './resources/cluster';

@@ -10,6 +10,13 @@ import { contracts, subtasks, tasks } from './tables';
 
 const json = <T>(v: unknown): T => (typeof v === 'string' ? JSON.parse(v) : v) as T;
 
+/** IN 列表按 500 个一批查，远低于 PostgreSQL 的参数个数上限；空列表不查库。 */
+async function inChunks<T>(values: readonly string[], query: (chunk: string[]) => Promise<T[]>): Promise<T[]> {
+  const out: T[] = [];
+  for (let i = 0; i < values.length; i += 500) out.push(...await query(values.slice(i, i + 500)));
+  return out;
+}
+
 export function drizzleTaskRepository(db: Executor): TaskRepository {
   const toTask = (r: typeof tasks.$inferSelect): BusinessTask => ({
     id: r.id as TaskId, serviceId: r.serviceId as ServiceId, projectId: r.projectId as ProjectId, callerIdentity: r.callerIdentity, state: r.state as BusinessTaskState, traceId: r.traceId as TraceId,
@@ -21,6 +28,8 @@ export function drizzleTaskRepository(db: Executor): TaskRepository {
     update: async (t) => { await db.update(tasks).set(toRow(t)).where(eq(tasks.id, t.id)); },
     getById: async (id) => { const row = (await db.select().from(tasks).where(eq(tasks.id, id)))[0]; return row ? toTask(row) : undefined; },
     listByProject: async (projectId, limit) => (await db.select().from(tasks).where(eq(tasks.projectId, projectId)).orderBy(desc(tasks.createdAt)).limit(limit)).map(toTask),
+    listByProjectTraces: async (projectId, traceIds) => (await inChunks(traceIds, (chunk) => db.select().from(tasks).where(and(eq(tasks.projectId, projectId), inArray(tasks.traceId, chunk))))).map(toTask)
+      .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime() || a.id.localeCompare(b.id)),
   };
 }
 
@@ -61,6 +70,8 @@ export function drizzleSubtaskRepository(db: Executor): SubtaskRepository {
     update: async (s) => { await db.update(subtasks).set(toRow(s)).where(eq(subtasks.id, s.id)); },
     getById: async (id) => { const row = (await db.select().from(subtasks).where(eq(subtasks.id, id)))[0]; return row ? toRun(row) : undefined; },
     listByTask: async (taskId) => (await db.select().from(subtasks).where(eq(subtasks.taskId, taskId)).orderBy(subtasks.createdAt)).map(toRun),
+    listByTasks: async (taskIds) => (await inChunks(taskIds, (chunk) => db.select().from(subtasks).where(inArray(subtasks.taskId, chunk)))).map(toRun)
+      .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime() || a.id.localeCompare(b.id)),
     listActive: async (limit) => (await db.select().from(subtasks).where(inArray(subtasks.state, ['running', 'awaiting-input'])).orderBy(subtasks.createdAt).limit(limit)).map(toRun),
     findByExecution: async (executionTaskId) => { const row = (await db.select().from(subtasks).where(sql`${subtasks.spec}->'execution'->>'taskId' = ${executionTaskId}`))[0]; return row ? toRun(row) : undefined; },
     listPendingExecutions: async (limit) => (await db.select().from(subtasks).where(and(eq(subtasks.state, 'pending'), sql`${subtasks.spec}->'execution' IS NOT NULL`)).orderBy(subtasks.createdAt).limit(limit)).map(toRun),

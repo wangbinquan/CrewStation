@@ -39,6 +39,12 @@ export interface EnvironmentDto {
   lastActivityAt: string;
 }
 
+/** 调用链的时间键：firstAt 为毫秒精度的开始时间；before 取上一页最后一条的 (firstAt, traceId)。 */
+export interface TraceKeyDto { traceId: string; firstAt: string; lastAt: string; active: boolean }
+export interface TraceKeyPage { before?: { at: string; traceId: string }; limit: number }
+/** 调用链回放用的环境：比 EnvironmentDto 多最后一次状态变化的时间，已释放或失败时即结束时间。 */
+export type TraceEnvironmentDto = EnvironmentDto & { updatedAt: string };
+
 export interface CreateEnvironmentInput {
   serviceId: ServiceId;
   kind: TaskKind;
@@ -96,7 +102,12 @@ export interface TaskRuntimeModuleApi {
   listRunningDevSessions(): Promise<EnvironmentDto[]>;
   /** 已占用的并发任务数（准入计数器的当前值）；配额展示读它。 */
   runningTaskCount(projectId: ProjectId): Promise<number>;
-  listByTrace(traceId: string): Promise<EnvironmentDto[]>;
+  /** 调用链列表（Design §14）：本项目开发会话与业务任务按 traceId 分组的时间键，按开始时间倒序翻页。 */
+  traceKeys(projectId: ProjectId, page: TraceKeyPage): Promise<TraceKeyDto[]>;
+  /** since（ISO 时间）之后有活动、或仍在进行的链。 */
+  activeTraceIds(projectId: ProjectId, since: string): Promise<string[]>;
+  /** 这些链在本项目里的全部环境（含各个 Agent 执行），按创建时间正序；不跨项目。 */
+  listTraceEnvironments(projectId: ProjectId, traceIds: readonly string[]): Promise<TraceEnvironmentDto[]>;
   verifyRunnerToken(taskId: TaskId, token: string): Promise<{ ok: true; projectId: string } | { ok: false; reason: string }>;
   canOpenStream(actor: Actor, taskId: TaskId): Promise<boolean>;
   reconcile(): Promise<number>;

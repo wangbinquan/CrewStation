@@ -1,6 +1,7 @@
 import { useNavigate, useSearch } from '@tanstack/react-router';
 import { DeliveriesCard } from '../../features/events';
-import { AlertsPage, HealthCards, LogsPage, TopologyPage, TracePage } from '../../features/logs';
+import { AlertsPage, HealthCards, LogsPage, TopologyPage } from '../../features/logs';
+import { TracesPage } from '../../features/traces';
 import { useT } from '../../shared/lib/useT';
 import { PROJECT_PATHS } from '../../shared/project/projectPaths';
 import { useProjectScope } from '../../shared/project/ProjectScope';
@@ -24,7 +25,7 @@ export function ProjectOperationsPage() {
       {tab === 'health' ? <HealthCards key={projectId} projectId={projectId} onLogs={logs} /> : null}
       {tab === 'logs' ? <LogsPage key={projectId} filters={search} changeFilters={(next) => change({ ...next, tab: 'logs' }, true)} /> : null}
       {tab === 'alerts' ? <AlertsPage key={projectId} projectId={projectId} search={search} change={change} onLogs={logs} /> : null}
-      {tab === 'trace' ? <TracePage key={`${projectId}:${search.traceId ?? ''}`} projectId={projectId} traceId={search.traceId} onTrace={(traceId) => change({ tab: 'trace', traceId })} /> : null}
+      {tab === 'trace' ? <TracesPage key={projectId} projectId={projectId} search={search} onChange={(next, replace) => change({ ...next, tab: 'trace' }, replace)} /> : null}
       {tab === 'deliveries' ? <>
         <div className={styles.actions}><ButtonLink to={PROJECT_PATHS[space].development} params={{ projectId }} search={{ view: 'reference', panel: 'full', topic: 'events', subscription: search.subscription }}>{t('operations.viewSubscriptions')}</ButtonLink></div>
         <DeliveriesCard key={`${projectId}:${search.subscription ?? ''}`} projectId={projectId} subscription={search.subscription} onClearSubscription={() => change({ tab })} onTrace={(traceId) => change({ tab: 'trace', traceId })} />

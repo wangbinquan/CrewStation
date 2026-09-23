@@ -1,5 +1,5 @@
-import { LogQuerySchema, LogSourceSchema, ReleaseIdSchema, TaskIdSchema, TraceIdSchema } from '@crewstation/contracts';
-import type { LogSource, SlotName } from '@crewstation/contracts';
+import { LogQuerySchema, LogSourceSchema, ReleaseIdSchema, TaskIdSchema, TraceIdSchema, TraceSourceSchema, TraceStatusSchema, TraceWindowSchema } from '@crewstation/contracts';
+import type { LogSource, SlotName, TraceSource, TraceStatus, TraceWindow } from '@crewstation/contracts';
 import { searchText } from './settingsSearch';
 
 /**
@@ -20,6 +20,10 @@ export interface OperationsSearch {
   readonly limit?: number;
   readonly subscription?: string;
   readonly traceId?: string;
+  /** 调用链列表的筛选（2026-09-23）：来源、状态、按有活动算的时间范围；缺省即「全部」。 */
+  readonly traceSource?: TraceSource;
+  readonly traceStatus?: TraceStatus;
+  readonly traceWindow?: TraceWindow;
   readonly alertId?: string;
   readonly alertState?: 'all' | 'firing' | 'resolved';
 }
@@ -27,7 +31,11 @@ export interface OperationsSearch {
 export function parseOperationsSearch(raw: Record<string, unknown>): OperationsSearch {
   const tab = OPERATIONS_TABS.find((value) => value === raw.tab) ?? LEGACY_TABS[String(raw.tab)] ?? 'topology';
   if (tab === 'alerts') return { tab, alertId: searchText(raw.alertId, 128), alertState: raw.alertState === 'firing' || raw.alertState === 'resolved' ? raw.alertState : 'all' };
-  if (tab === 'trace') return { tab, traceId: TraceIdSchema.safeParse(raw.traceId).data };
+  if (tab === 'trace') {
+    const window = TraceWindowSchema.safeParse(raw.traceWindow).data;
+    return { tab, traceId: TraceIdSchema.safeParse(raw.traceId).data, traceSource: TraceSourceSchema.safeParse(raw.traceSource).data, traceStatus: TraceStatusSchema.safeParse(raw.traceStatus).data,
+      traceWindow: window === 'all' ? undefined : window };
+  }
   if (tab === 'deliveries') return { tab, subscription: searchText(raw.subscription) };
   if (tab !== 'logs') return { tab };
   const source = LogSourceSchema.safeParse(raw.source).data ?? 'slot';

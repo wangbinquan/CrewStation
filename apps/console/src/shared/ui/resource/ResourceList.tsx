@@ -29,12 +29,14 @@ export interface ResourceRowProps {
   readonly onActivate?: () => void;
   readonly activateLabel?: string;
   readonly expanded?: boolean;
+  /** 首行不是代码里用的值（例如调用链的起点描述）时用正文字体，不用等宽。 */
+  readonly plain?: boolean;
   /** 行下原地展开的内容。 */
   readonly children?: ReactNode;
 }
 
-export function ResourceRow({ lead, title, meta, trailing, current, onActivate, activateLabel, expanded, children }: ResourceRowProps): ReactElement {
-  const head = <>{lead}<span className={styles.title}>{title}</span></>;
+export function ResourceRow({ lead, title, meta, trailing, current, onActivate, activateLabel, expanded, plain = false, children }: ResourceRowProps): ReactElement {
+  const head = <>{lead}<span className={plain ? `${styles.title} ${styles.plainTitle}` : styles.title}>{title}</span></>;
   return <li className={styles.row} aria-current={current ? true : undefined}>
     <div className={styles.line}>
       <div className={styles.main}>

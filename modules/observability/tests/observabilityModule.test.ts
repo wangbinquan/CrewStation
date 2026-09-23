@@ -1,11 +1,13 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import type { Actor, ProjectId, ServiceId, TaskId, TraceId, UserId } from '@crewstation/contracts';
+import { TraceListQuerySchema } from '@crewstation/contracts';
 import { createApp } from '@crewstation/http';
 import { createFakeK8sClient } from '@crewstation/k8s';
 import type { TestDatabase } from '@crewstation/testkit';
 import { createTestDatabase, testDatabaseAvailable } from '@crewstation/testkit';
 import { healthOf } from '../domain/health';
 import { slotOfAlert } from '../domain/alertRules';
+import type { TraceEnvironmentPart } from '../domain/traceParts';
 import type { ObservabilityModule } from '../wiring';
 import { createObservabilityModule, observabilityMigrations } from '../wiring';
 
@@ -14,6 +16,10 @@ let tdb: TestDatabase;
 let obs: ObservabilityModule;
 const projectId = '01a0bf5d-8f4b-7178-82e1-9a99060b1192' as ProjectId;
 const actor: Actor = { userId: '01a0bf5d-8f4b-7793-867c-efd7527b386b' as UserId, isAdmin: false };
+const TRACE = '0123456789abcdef0123456789abcdef' as TraceId;
+const task: TraceEnvironmentPart = { id: '01a0bf5d-8f4b-7418-8a3f-7cbb4a1fd751' as TaskId, traceId: TRACE, kind: 'dev-session', state: 'released', createdAt: '2026-09-11T00:00:00.000Z', updatedAt: '2026-09-11T00:05:00.000Z', lastActivityAt: '2026-09-11T00:04:00.000Z' };
+const execution: TraceEnvironmentPart = { ...task, id: '01a0bf5d-8f4b-7419-8a3f-7cbb4a1fd751' as TaskId, createdAt: '2026-09-11T00:01:00.000Z',
+  native: { purpose: 'agent', parentTaskId: task.id, agentId: 'a', state: 'finished', profile: { name: 'coding-medium' } } };
 let ready = 0;
 const logSelectors: string[] = [];
 
@@ -33,9 +39,13 @@ beforeAll(async () => {
       },
     },
     traces: {
-      tasksByTrace: async () => [{ taskId: '01a0bf5d-8f4b-7418-8a3f-7cbb4a1fd751' as TaskId, kind: 'business', createdAt: '2026-09-11T00:00:00Z' }],
-      subtasksOfTask: async () => [{ id: 'sub_0123456789abcdef0123456789abcdef', taskId: '01a0bf5d-8f4b-7418-8a3f-7cbb4a1fd751', name: 'analysis', kind: 'agent', state: 'succeeded', attempt: 1, sessionId: 'sess-1' } as never],
-      sessionEvents: async () => [{ seq: 1, at: '2026-09-11T00:00:01Z', event: { kind: 'agent', event: { agentId: 'a', sessionId: 'sess-1', type: 'text', text: 'hi' } } }],
+      environments: { traceKeys: async () => [{ traceId: TRACE, firstAt: '2026-09-11T00:00:00.000Z', lastAt: '2026-09-11T00:05:00.000Z', active: false }], activeTraceIds: async () => [], list: async () => [task, execution] },
+      deliveries: { traceKeys: async () => [], activeTraceIds: async () => [], list: async () => [] },
+      businessTasks: { list: async () => [] },
+      sessions: {
+        summarize: async (ids) => ids.map((taskId) => ({ taskId, events: 1, sessionIds: ['sess-1'], protocol: 'opencode' })),
+        events: async () => [{ seq: 1, at: '2026-09-11T00:00:01.000Z', event: { kind: 'agent', event: { agentId: 'a', seq: 1, at: '2026-09-11T00:00:01.000Z', sessionId: 'sess-1', type: 'text', text: 'hi' } } }],
+      },
     },
   });
 });
@@ -81,9 +91,11 @@ describe.skipIf(!available)('observability module', () => {
     ready = 1;
     expect(await obs.api.sweepProject(projectId)).toBe(1);
     expect((await obs.api.listAlerts(actor, projectId))[0]?.state).toBe('resolved');
-    const replay = await obs.api.replayTrace(actor, projectId, '0123456789abcdef0123456789abcdef' as TraceId);
-    expect(replay.sessionIds).toEqual(['sess-1']);
-    expect(replay.events[0]?.type).toBe('agent.text');
+    // 调用链经组合进模块的端口读取：列表一行、分层回放里执行的会话，以及执行的事件。
+    expect((await obs.api.listTraces(actor, projectId, TraceListQuerySchema.parse({}))).items.map((row) => row.traceId)).toEqual([TRACE]);
+    const chain = await obs.api.getTraceChain(actor, projectId, TRACE);
+    expect(chain.tasks[0]?.executions[0]).toMatchObject({ sessionIds: ['sess-1'], events: 1, protocol: 'opencode' });
+    expect((await obs.api.listTraceEvents(actor, projectId, TRACE, execution.id, { limit: 10 })).items[0]).toMatchObject({ type: 'text', text: 'hi' });
   });
 
   // 基线 v0.3.13（D61）删除了项目级告警订阅：迁移删掉订阅表，三条订阅接口不再挂载；告警列表接口不受影响。

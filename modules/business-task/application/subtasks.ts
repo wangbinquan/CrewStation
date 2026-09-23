@@ -90,7 +90,6 @@ export function subtaskUseCases(deps: BusinessTaskUseCaseDeps) {
       await deps.authorizer.authorize(actor, projectId, 'view');
       return (await uow.read.subtasks.listByTask(taskId)).map(subtaskToDto);
     },
-    listProjectSubtasksInternal: async (taskId: TaskId): Promise<SubtaskDto[]> => (await uow.read.subtasks.listByTask(taskId)).map(subtaskToDto),
     sweepActive: subtaskSweep(deps, { refresh, launch, releaseExecution }),
   };
 }

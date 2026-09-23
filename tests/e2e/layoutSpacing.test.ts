@@ -129,7 +129,7 @@ describe.skipIf(!session?.project)('项目操作区的真实布局间距', () =>
     await click(page, '取消');
   }, 45_000);
 
-  test('告警状态筛选与调用链查询的操作有独立间隔', async () => {
+  test('告警状态筛选与调用链「按 trace_id 打开」的操作有独立间隔', async () => {
     const page = session!.admin;
     await viewport(page, 390);
     await open(page, `/projects/${session!.project!.id}/operations?tab=alerts`);
@@ -143,8 +143,16 @@ describe.skipIf(!session?.project)('项目操作区的真实布局间距', () =>
     })()`);
     expect(filterGap).toBeGreaterThanOrEqual(8);
     await open(page, `/projects/${session!.project!.id}/operations?tab=trace`);
-    const query = await spacing(page, '查询调用链');
-    expect(query.before!).toBeGreaterThanOrEqual(8);
+    // 2026-09-23 调用链改成列表＋详情：「打开」按钮与左边的输入框在同一行，量它与输入框之间的横向留白。
+    const gap = await page.eval<number>(`(() => {
+      const button = [...document.querySelectorAll('button')].find((node) => node.textContent.trim() === '打开');
+      const field = button?.previousElementSibling;
+      if (!button || !field) throw new Error('Missing open-by-trace_id form');
+      const a = field.getBoundingClientRect(), b = button.getBoundingClientRect();
+      return Math.abs(a.bottom - b.bottom) < 2 ? b.left - a.right : b.top - a.bottom;
+    })()`);
+    expect(gap).toBeGreaterThanOrEqual(8);
+    const query = await spacing(page, '打开');
     expect(query.overflow).toBeLessThanOrEqual(1);
     expect(page.takeErrors()).toEqual([]);
   }, 45_000);

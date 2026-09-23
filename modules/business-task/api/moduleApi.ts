@@ -1,4 +1,10 @@
-import type { ClusterOperation, ClusterResource, ClusterInspectRequest, Actor, BusinessTaskDto, CreateBusinessTaskRequest, DomainPayload, ProjectId, ServiceActor, SubmitSubtaskRequest, SubtaskDto, SubtaskId, SubtaskMessageRequest, TaskId } from '@crewstation/contracts';
+import type { ClusterOperation, ClusterResource, ClusterInspectRequest, Actor, BusinessTaskDto, BusinessTaskState, CreateBusinessTaskRequest, DomainPayload, ProjectId, ServiceActor, SubmitSubtaskRequest, SubtaskDto, SubtaskId, SubtaskMessageRequest, TaskId } from '@crewstation/contracts';
+
+/** 调用链回放用的业务任务：子任务含每次尝试，带创建时间、上一次尝试与执行环境。 */
+export interface TraceBusinessTaskDto {
+  id: TaskId; traceId: string; state: BusinessTaskState; callerIdentity: string; createdAt: string; updatedAt: string; closedAt?: string;
+  subtasks: Array<SubtaskDto & { createdAt: string; retryOf?: SubtaskId; executionTaskId?: TaskId }>;
+}
 
 /** business-task 对外能力：业务服务以自身身份创建任务并提交契约化子任务；用户只读查看。 */
 export interface BusinessTaskModuleApi {
@@ -23,7 +29,8 @@ export interface BusinessTaskModuleApi {
   listProjectTasks(actor: Actor, projectId: ProjectId): Promise<BusinessTaskDto[]>;
   listProjectSubtasks(actor: Actor, projectId: ProjectId, taskId: TaskId): Promise<SubtaskDto[]>;
   /** 内部（无 actor）：追溯聚合使用。 */
-  listProjectSubtasksInternal(taskId: TaskId): Promise<SubtaskDto[]>;
+  /** 调用链回放（Design §14）的内部读取，调用方已校验项目可见：这些 traceId 在本项目里的业务任务与子任务。 */
+  listTraceTasks(projectId: ProjectId, traceIds: readonly string[]): Promise<TraceBusinessTaskDto[]>;
   registerContracts(payload: DomainPayload<'release.registered'>): Promise<void>;
   sweepActive(): Promise<number>;
 }

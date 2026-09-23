@@ -144,7 +144,7 @@ describe.skipIf(!session?.project)('项目工作台信息架构（RFC-020）', (
     const page = session!.admin, id = session!.project!.id;
     await viewport(page, 1280); await open(page, `/projects/${id}/operations?tab=status`);
     expect(await page.eval<string>('location.search')).toContain('tab=topology');
-    expect(await texts(page, '[role="tablist"][aria-label="运行与诊断"] [role="tab"]')).toEqual(['部署与运行形态', '健康状态', '日志', '告警', '事件投递', '调用链回放']);
+    expect(await texts(page, '[role="tablist"][aria-label="运行与诊断"] [role="tab"]')).toEqual(['部署与运行形态', '健康状态', '日志', '告警', '事件投递', '调用链']);
     await open(page, `/projects/${id}/settings`);
     const groups = await texts(page, 'nav[aria-label="设置分组"] button');
     // 分组按钮带一行说明（RFC-009），只比对标题。

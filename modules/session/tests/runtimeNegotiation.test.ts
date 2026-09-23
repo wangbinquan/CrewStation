@@ -29,7 +29,7 @@ test('旧底座 Runner（协议 1）的 hello：令牌有效才回写原因，�
   const deps: SessionUseCaseDeps = {
     clock: fixedClock('2026-09-18T10:00:00Z'), logger: noopLogger,
     settings: { commandTimeoutMs: 1000, runnerStaleMs: 30000, replayLimit: 100, selfAddress: 'http://session' },
-    events: { append: async () => {}, maxSeq: async () => 0, listSince: async () => [] },
+    events: { append: async () => {}, maxSeq: async () => 0, listSince: async () => [], summarize: async () => [] },
     registry: { claim: async () => {}, release: async () => {}, heartbeat: async () => {}, lookup: async () => undefined },
     runnerAuth: { verifyRunnerToken: async (_id, token) => (token === 'good' ? { ok: true, projectId: 'project' } : { ok: false, reason: '令牌无效' }) },
     taskAccess: { canOpenStream: async () => true, onRunnerConnected: async () => true, onRunnerDisconnected: async () => {}, onRunnerRejected: async (id, token, rejection) => { rejections.push({ id, token, ...rejection }); } },

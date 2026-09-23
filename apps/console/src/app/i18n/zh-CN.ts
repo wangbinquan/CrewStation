@@ -82,7 +82,7 @@ export const messages = {
   "operations.tab.alerts": "告警",
   "operations.tab.logs": "日志",
   "operations.tab.deliveries": "事件投递",
-  "operations.tab.trace": "调用链回放",
+  "operations.tab.trace": "调用链",
   "operations.viewSubscriptions": "查看订阅",
 
   'ui.status.loading': '载入中…',

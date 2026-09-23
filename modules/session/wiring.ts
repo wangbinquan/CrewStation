@@ -71,6 +71,7 @@ export function createSessionModule(deps: SessionModuleDeps): SessionModule {
     sendCommand: dispatch.sendCommand,
     connectionStatus: dispatch.connectionStatus,
     listEvents: async (taskId, options) => (await useCaseDeps.events.listSince(taskId, options.sinceSeq ?? 0, { limit: options.limit ?? 500, ...(options.kinds ? { kinds: options.kinds } : {}), ...(options.agentId ? { agentId: options.agentId } : {}) })).map((e) => ({ seq: e.seq, at: e.at.toISOString(), event: e.event })),
+    summarizeEvents: (taskIds, kinds) => useCaseDeps.events.summarize(taskIds, kinds),
   };
   let timer: ReturnType<typeof setInterval> | undefined;
   return {

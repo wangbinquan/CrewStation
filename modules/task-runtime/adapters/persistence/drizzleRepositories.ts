@@ -3,6 +3,7 @@ import type { Executor } from '@crewstation/persistence';
 import { and, desc, eq, gt, inArray, isNull, sql } from 'drizzle-orm';
 import type { EnvironmentState, TaskEnvironment } from '../../domain/taskEnvironment';
 import type { AdmissionRepository, EnvironmentRepository } from '../../ports/repositories';
+import { environmentTraceQueries } from './environmentTraceQueries';
 import { admissions, environments } from './tables';
 
 const json = <T>(v: unknown): T => (typeof v === 'string' ? JSON.parse(v) : v) as T;
@@ -25,7 +26,7 @@ export function drizzleEnvironmentRepository(db: Executor): EnvironmentRepositor
     getById: async (id) => { const row = (await db.select().from(environments).where(eq(environments.id, id)))[0]; return row ? toEnv(row) : undefined; },
     listByProject: async (projectId, states) => (await db.select().from(environments).where(states?.length ? and(eq(environments.projectId, projectId), inArray(environments.state, states)) : eq(environments.projectId, projectId)).orderBy(environments.createdAt)).map(toEnv),
     listByStates: async (states, page) => (await db.select().from(environments).where(and(inArray(environments.state, states), page?.after ? gt(environments.id, page.after) : undefined)).orderBy(environments.id).limit(page ? Math.min(500, Math.max(1, page.limit)) : 2_147_483_647)).map(toEnv),
-    listByTrace: async (traceId) => (await db.select().from(environments).where(eq(environments.traceId, traceId)).orderBy(environments.createdAt)).map(toEnv),
+    ...environmentTraceQueries(db, toEnv),
     listChildren: async (parentTaskId) => (await db.select().from(environments).where(sql`${environments.native}->>'parentTaskId' = ${parentTaskId}`).orderBy(environments.createdAt)).map(toEnv),
     // 部分索引 environments_starting 只覆盖启动中的行；按 id 翻页，观测用例轮流看完所有启动中的环境。
     listStarting: async (page) => (await db.select().from(environments).where(and(sql`${environments.startup}->>'state' = 'running'`, inArray(environments.state, ['creating', 'running']), page.after ? gt(environments.id, page.after) : undefined))

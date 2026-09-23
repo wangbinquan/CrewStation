@@ -80,7 +80,7 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   "operations.tab.alerts": "Alerts",
   "operations.tab.logs": "Logs",
   "operations.tab.deliveries": "Event deliveries",
-  "operations.tab.trace": "Trace replay",
+  "operations.tab.trace": "Traces",
   "operations.viewSubscriptions": "View subscriptions",
 
   'ui.status.loading': 'Loading…',

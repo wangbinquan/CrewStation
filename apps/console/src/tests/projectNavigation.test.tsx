@@ -37,7 +37,11 @@ function fixture(logItems?: unknown[], admin = false) {
       { id: 'delivery-b', eventId: 'event-b', subscriptionId: 'sub-b', eventType: 'git.issue', state: 'delivered', attempts: 1, traceId },
     ] };
     else if (url.pathname.endsWith('/subscriptions')) body = { items: [{ id: 'sub-a', serviceId, eventType: 'git.push', handlerPath: '/events', state: 'active' }] };
-    else if (url.pathname.endsWith(`/traces/${traceId}`)) body = { traceId, tasks: [{ taskId, kind: 'dev-session', createdAt: '2026-09-13T01:00:00.000Z' }], subtasks: [], sessionIds: [], events: [{ at: '2026-09-13T01:01:00.000Z', type: 'runner.connected', taskId }] };
+    else if (url.pathname.endsWith('/traces')) body = { items: [{ traceId, status: 'ended', startedAt: '2026-09-13T01:00:00.000Z', lastActivityAt: '2026-09-13T01:01:00.000Z', sources: ['event'], event: { eventType: 'git.push', state: 'delivered', attempts: 1 } }] };
+    else if (url.pathname.endsWith(`/traces/${traceId}`)) body = { traceId, status: 'ended', startedAt: '2026-09-13T01:00:00.000Z', lastActivityAt: '2026-09-13T01:01:00.000Z', sources: ['event', 'dev-session'],
+      event: { deliveryId: '01a0bf5d-8f4b-7a41-8b45-4a547fd10e4f', eventId: '01a0bf5d-8f4b-7a42-8b45-4a547fd10e4f', eventType: 'git.push', state: 'delivered', attempts: 1, createdAt: '2026-09-13T01:00:00.000Z' },
+      tasks: [{ taskId, kind: 'dev-session', state: 'released', status: 'ended', createdAt: '2026-09-13T01:00:00.000Z', lastActivityAt: '2026-09-13T01:01:00.000Z', endedAt: '2026-09-13T01:01:00.000Z', branch: 'fixture-branch', executions: [], subtasks: [] }] };
+    else if (url.pathname.includes('/traces/')) { status = 404; body = { error: 'not_found', message: '本项目的调用链不存在' }; }
     return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
   }) as typeof fetch;
   return { calls, failLogs: () => { logFailure = true; } };
@@ -214,7 +218,7 @@ describe('诊断、订阅与配置的上下文', () => {
     await page.click('查看订阅'); expect(page.search()).toMatchObject({ view: 'reference', topic: 'events', subscription: 'sub-a' });
     expect(document.querySelector('li[aria-current="true"]')?.textContent).toContain('git.push');
     await page.back(); await page.click(traceId);
-    expect(page.search()).toEqual({ tab: 'trace', traceId }); expect(page.text()).toContain('runner.connected');
+    expect(page.search()).toEqual({ tab: 'trace', traceId }); expect(page.text()).toContain('分支 fixture-branch');
     expect(f.calls.some((call) => call.url.pathname === `/v1/projects/${projectId}/traces/${traceId}`)).toBe(true);
     expect(f.calls.some((call) => call.method !== 'GET')).toBe(false);
   });
@@ -234,20 +238,22 @@ describe('诊断、订阅与配置的上下文', () => {
     expect(f.calls.some((call) => call.method !== 'GET')).toBe(false);
   });
 
-  test('调用链格式约束首屏出现，错误输入不查询；用户确认有效 ID 才查', async () => {
+  test('粘贴 trace_id 打开：格式不对时不查询、焦点回到输入框并写明格式；有效 ID 才打开', async () => {
     const f = fixture(); page = await renderApp(`/projects/${projectId}/operations?tab=trace&traceId=invalid`);
-    expect(page.text()).toContain('32 位十六进制');
-    await input(document.querySelector<HTMLInputElement>('input[aria-invalid]')!, 'invalid-trace');
+    // 地址里无效的 traceId 被丢掉，详情栏停在「选一条」的提示上。
+    expect(page.search().traceId).toBeUndefined(); expect(page.text()).toContain('在左侧选一条调用链');
+    const field = () => document.querySelector<HTMLInputElement>('input[placeholder="粘贴 32 位 trace_id"]')!;
+    await input(field(), 'invalid-trace');
     await act(async () => document.querySelector<HTMLButtonElement>('button[type="submit"]')!.focus());
-    await page.click('查询调用链');
+    await page.click('打开');
     const invalidField = document.querySelector<HTMLInputElement>('input[aria-invalid="true"]')!;
     expect(invalidField).not.toBeNull(); expect(invalidField.value).toBe('invalid-trace');
     // 实机点击提交后焦点仍留在按钮上，错误字段虽然标红却不能直接继续更正。
     expect(document.activeElement === invalidField).toBe(true);
     expect(document.getElementById(invalidField.getAttribute('aria-errormessage')!)?.textContent).toContain('32 位小写十六进制');
     expect(f.calls.some((call) => call.url.pathname.includes('/traces/'))).toBe(false);
-    await input(document.querySelector<HTMLInputElement>('input[aria-invalid]')!, traceId); await page.click('查询调用链');
-    expect(page.text()).toContain('runner.connected'); expect(page.search().traceId).toBe(traceId);
+    await input(field(), traceId.toUpperCase()); await page.click('打开');
+    expect(page.search().traceId).toBe(traceId); expect(page.text()).toContain('分支 fixture-branch');
   });
 });
 
@@ -255,7 +261,7 @@ describe('诊断、订阅与配置的上下文', () => {
 test('运行与诊断六个页签：部署与运行形态在最前并默认打开，健康卡只在健康状态页签；旧的 tab=status 换成形态', async () => {
   fixture(); page = await renderApp(`/projects/${projectId}/operations`);
   const tabs = () => [...document.querySelectorAll('[role="tablist"][aria-label="运行与诊断"] [role="tab"]')];
-  expect(tabs().map((tab) => tab.textContent)).toEqual(['部署与运行形态', '健康状态', '日志', '告警', '事件投递', '调用链回放']);
+  expect(tabs().map((tab) => tab.textContent)).toEqual(['部署与运行形态', '健康状态', '日志', '告警', '事件投递', '调用链']);
   expect(tabs()[0]?.getAttribute('aria-selected')).toBe('true'); expect(page.text()).not.toContain('查看此版本日志');
   await page.click('健康状态'); expect(page.search()).toEqual({ tab: 'health' }); expect(page.text()).toContain('查看此版本日志');
   page.unmount(); page = await renderApp(`/projects/${projectId}/operations?tab=status`);
@@ -263,7 +269,7 @@ test('运行与诊断六个页签：部署与运行形态在最前并默认打�
 });
 
 test.each([
-  // 2026-09-23 修订 RFC-020 D3：健康与形态重新分开，六个页签：部署与运行形态、健康状态、日志、告警（基线 D61 删除告警订阅后由「告警与通知」改名）、事件投递、调用链回放。
+  // 2026-09-23 修订 RFC-020 D3：健康与形态重新分开，六个页签：部署与运行形态、健康状态、日志、告警（基线 D61 删除告警订阅后由「告警与通知」改名）、事件投递、调用链（RFC-020 §4.5 去掉「回放」）。
   { from: 'logs', to: 'alerts', start: 2, end: 3, key: 'ArrowRight', before: 0, after: 98 },
   { from: 'topology', to: 'trace', start: 0, end: 5, key: 'ArrowLeft', before: 0, after: 300 },
   { from: 'trace', to: 'topology', start: 5, end: 0, key: 'Home', before: 300, after: 0 },

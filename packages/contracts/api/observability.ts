@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { SlotNameSchema, TaskKindSchema } from '../events/topics';
-import { ProjectIdSchema, SubtaskIdSchema, TaskIdSchema, TraceIdSchema } from '../ids';
+import { SlotNameSchema } from '../events/topics';
+import { ProjectIdSchema, TaskIdSchema } from '../ids';
 
 export const LogSourceSchema = z.enum(['slot', 'dev-session', 'business-task', 'build', 'migration']);
 
@@ -32,15 +32,6 @@ export const HealthDtoSchema = z.object({ slot: SlotNameSchema, state: HealthSta
 export const AlertTypeSchema = z.enum(['crash-loop', 'health-failing']);
 export const AlertDtoSchema = z.object({ id: z.string(), projectId: ProjectIdSchema, type: AlertTypeSchema, state: z.enum(['firing', 'resolved']), detail: z.string(), firedAt: z.iso.datetime(), resolvedAt: z.iso.datetime().optional(), slot: SlotNameSchema.optional() });
 
-/** 按 traceId 回放：任务、子任务、Agent 会话、命令、产物与日志引用。 */
-export const TraceReplayDtoSchema = z.object({
-  traceId: TraceIdSchema,
-  tasks: z.array(z.object({ taskId: TaskIdSchema, kind: TaskKindSchema, createdAt: z.iso.datetime() })),
-  subtasks: z.array(z.object({ subtaskId: SubtaskIdSchema, taskId: TaskIdSchema, name: z.string(), state: z.string(), sessionId: z.string().optional() })),
-  sessionIds: z.array(z.string()),
-  events: z.array(z.object({ at: z.iso.datetime(), type: z.string(), taskId: TaskIdSchema.optional(), subtaskId: SubtaskIdSchema.optional(), sessionId: z.string().optional(), otelTraceId: z.string().optional(), summary: z.string().optional() })),
-});
-
 export type LogSource = z.infer<typeof LogSourceSchema>;
 export type HealthState = z.infer<typeof HealthStateSchema>;
 export type AlertType = z.infer<typeof AlertTypeSchema>;
@@ -48,4 +39,3 @@ export type LogQuery = z.infer<typeof LogQuerySchema>;
 export type LogEntryDto = z.infer<typeof LogEntryDtoSchema>;
 export type HealthDto = z.infer<typeof HealthDtoSchema>;
 export type AlertDto = z.infer<typeof AlertDtoSchema>;
-export type TraceReplayDto = z.infer<typeof TraceReplayDtoSchema>;

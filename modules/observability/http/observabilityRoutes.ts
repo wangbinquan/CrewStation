@@ -1,5 +1,5 @@
-import type { ProjectId, TraceId, UserId } from '@crewstation/contracts';
-import { LogQuerySchema, ProjectIdSchema, TraceIdSchema } from '@crewstation/contracts';
+import type { ProjectId, TaskId, TraceId, UserId } from '@crewstation/contracts';
+import { LogQuerySchema, ProjectIdSchema, TaskIdSchema, TraceEventsQuerySchema, TraceIdSchema, TraceListQuerySchema } from '@crewstation/contracts';
 import type { AppEnv } from '@crewstation/http';
 import { actorFrom, parseParams, parseQuery } from '@crewstation/http';
 import type { Context } from 'hono';
@@ -18,6 +18,13 @@ export function observabilityRoutes(api: ObservabilityModuleApi, isAdmin: (userI
   r.get('/v1/projects/:projectId/logs', async (c) => c.json({ items: await api.queryLogs(await actor(c), pid(c), parseQuery(c, LogQuerySchema)) }));
   r.get('/v1/projects/:projectId/health', async (c) => c.json({ items: await api.health(await actor(c), pid(c)) }));
   r.get('/v1/projects/:projectId/alerts', async (c) => c.json({ items: await api.listAlerts(await actor(c), pid(c)) }));
-  r.get('/v1/projects/:projectId/traces/:traceId', async (c) => { const p = parseParams(c, projectParams.extend({ traceId: TraceIdSchema })); return c.json(await api.replayTrace(await actor(c), p.projectId as ProjectId, p.traceId as TraceId)); });
+  // 调用链（Design §14）：列表、分层回放、执行事件，都只含本项目的记录。
+  const traceParams = projectParams.extend({ traceId: TraceIdSchema });
+  r.get('/v1/projects/:projectId/traces', async (c) => c.json(await api.listTraces(await actor(c), pid(c), parseQuery(c, TraceListQuerySchema))));
+  r.get('/v1/projects/:projectId/traces/:traceId', async (c) => { const p = parseParams(c, traceParams); return c.json(await api.getTraceChain(await actor(c), p.projectId as ProjectId, p.traceId as TraceId)); });
+  r.get('/v1/projects/:projectId/traces/:traceId/executions/:taskId/events', async (c) => {
+    const p = parseParams(c, traceParams.extend({ taskId: TaskIdSchema }));
+    return c.json(await api.listTraceEvents(await actor(c), p.projectId as ProjectId, p.traceId as TraceId, p.taskId as TaskId, parseQuery(c, TraceEventsQuerySchema)));
+  });
   return r;
 }

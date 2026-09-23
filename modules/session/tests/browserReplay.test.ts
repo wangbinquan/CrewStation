@@ -16,7 +16,7 @@ function fixture(listSince: SessionUseCaseDeps['events']['listSince'], replayLim
   const deps: SessionUseCaseDeps = {
     clock: fixedClock(at), logger: noopLogger,
     settings: { commandTimeoutMs: 1000, runnerStaleMs: 30000, replayLimit, selfAddress: 'http://session' },
-    events: { append: async () => {}, maxSeq: async () => maxSeq, listSince },
+    events: { append: async () => {}, maxSeq: async () => maxSeq, listSince, summarize: async () => [] },
     registry: { claim: async () => {}, release: async () => {}, heartbeat: async () => {}, lookup: async () => undefined },
     runnerAuth: { verifyRunnerToken: async () => ({ ok: true, projectId: 'p' }) },
     taskAccess: { canOpenStream, onRunnerConnected: async () => {}, onRunnerDisconnected: async () => {} },
