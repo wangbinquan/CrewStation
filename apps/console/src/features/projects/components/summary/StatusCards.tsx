@@ -5,6 +5,7 @@ import { api } from '../../../../shared/api/client';
 import { queryKeys } from '../../../../shared/api/queryKeys';
 import { useApiQuery } from '../../../../shared/api/useApi';
 import { PROJECT_PATHS } from '../../../../shared/project/projectPaths';
+import { resourcePhaseTone } from '../../../../shared/resources/resourcePhaseTone';
 import { useProjectResources } from '../../../../shared/resources/useProjectResources';
 import type { ProjectSpace } from '../../../../shared/project/projectPaths';
 import { DeployedVersionCard } from '../../../../shared/project/DeployedVersionCard';
@@ -53,10 +54,13 @@ function DevelopmentCard({ item, space, available }: { readonly item: ProjectSum
   const commits = comparison.data?.commits, workspace = comparison.data?.workspace;
   // 只数在运行的 CLI（RFC-025：来自资源台账的 Agent 执行记录；结束中、已结束、失败的都不算。2026-09-23 盘点：demo 一个都不在跑，卡上却写「14 个 CLI」）。
   const openClis = records.data?.items.filter((record) => record.kind === 'agent-execution' && record.purpose === 'development-cli' && record.parentId === session?.taskId && isLiveResourcePhase(record.phase)).length ?? 0;
+  // 会话徽标照台账里这个工作区记录的阶段（RFC-025）；还没进台账的（台账接上之前的会话、刚开的一瞬）按摘要。
+  const workspaceRecord = records.data?.items.find((record) => record.kind === 'dev-workspace' && record.id === session?.taskId);
   const open = available && item.project.state === 'active', known = part.status === 'ready' && summaryIsFresh(part);
   // 开发会话是一个对象：开始／继续开发放在卡片底部操作条（2026-09-23 裁定）。
   const enter = open && known ? <ButtonLink variant="primary" to={PROJECT_PATHS[space].development} params={{ projectId }}>{t(session ? 'projects.summary.continue' : 'projects.summary.start')}</ButtonLink> : undefined;
-  return <Card compact title={t('projects.summary.developmentCard')} extra={session ? <Badge tone={SESSION_TONE[session.state] ?? 'neutral'}>{t(`projects.summary.session.${session.state}`)}</Badge> : undefined} actions={enter}>
+  return <Card compact title={t('projects.summary.developmentCard')} extra={session ? workspaceRecord ? <Badge tone={resourcePhaseTone(workspaceRecord.phase)}>{t('projects.summary.sessionPhase', { phase: t(`resources.phase.${workspaceRecord.phase}`) })}</Badge>
+    : <Badge tone={SESSION_TONE[session.state] ?? 'neutral'}>{t(`projects.summary.session.${session.state}`)}</Badge> : undefined} actions={enter}>
     {!known ? <SummaryUnavailable part={part} /> : !session ? <div className={styles.fact}><span className={styles.muted}>{t('projects.summary.noSession')}</span></div>
       : <div className={styles.fact}>
         <span className={styles.sessionLine}><code>{session.branch ?? t('projects.summary.branchUnknown')}</code>{records.data && !records.error ? ` · ${t('projects.summary.cliCount', { count: openClis })}` : ''}</span>

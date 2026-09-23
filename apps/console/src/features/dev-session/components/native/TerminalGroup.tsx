@@ -9,6 +9,8 @@ import type { DockTab } from '../../../../shared/ui/dock/DockTabs';
 import { DockTabs } from '../../../../shared/ui/dock/DockTabs';
 import { customName, isLiveTerminal } from '../../model/layout/terminalGroups';
 import { nativeTerminalStatus, statusTone } from '../../model/native/nativeTerminalStatus';
+import type { RosterTerminal } from '../../model/native/terminalPhase';
+import { isStoppingTerminal } from '../../model/native/terminalPhase';
 import styles from './TerminalGroup.module.css';
 
 /** 标签上的名字：自己起的名字，否则默认名「CLI 」加 Agent ID 末六位。 */
@@ -37,7 +39,7 @@ export interface TerminalGroupProps {
   readonly terminalIds: readonly string[];
   readonly active?: string;
   readonly layout: WorkspaceLayout;
-  readonly roster?: readonly NativeTerminalDto[];
+  readonly roster?: readonly RosterTerminal[];
   readonly activity?: ActivityTask;
   readonly activitySync?: 'ready' | 'catching-up' | 'unavailable';
   readonly viewerId: string;
@@ -63,18 +65,20 @@ export function TerminalGroup(props: TerminalGroupProps): ReactElement {
   const { group, terminalIds, layout, roster, activity, activitySync, viewerId, creatorName, canDevelop, closing, renaming, actions } = props;
   const tabs = terminalIds.map((terminalId): DockTab => {
     const terminal = roster?.find((item) => item.terminalId === terminalId), name = terminalLabel(layout, terminalId, terminal);
-    const status = nativeTerminalStatus(terminal, terminalId, activity, activitySync, false), statusText = t(`activity.status.${status}`);
+    // 结束中（RFC-025）：标签写台账的阶段，× 收起——已受理结束，不能再结束一次，也不能先关掉。
+    const stopping = isStoppingTerminal(terminal), status = nativeTerminalStatus(terminal, terminalId, activity, activitySync, false);
+    const statusText = stopping ? t('resources.phase.stopping') : t(`activity.status.${status}`);
     const creator = terminal && terminal.createdBy !== viewerId ? creatorName(terminal.createdBy) : undefined;
     const live = isLiveTerminal(terminal), editing = renaming === terminalId;
     return {
       id: terminalId, name, editing,
       title: `${name}${creator ? ` · ${t('devSession.native.openedBy', { name: creator })}` : ''} · ${statusText}\n${t('devSession.native.tabHint')}`,
-      closeLabel: live ? canDevelop ? t('devSession.native.stopTab', { name }) : undefined : t('devSession.native.closeTab', { name }),
+      closeLabel: stopping ? undefined : live ? canDevelop ? t('devSession.native.stopTab', { name }) : undefined : t('devSession.native.closeTab', { name }),
       label: <>
-        <span className={styles.dot} data-tone={statusTone(status)} aria-hidden="true" />
+        <span className={styles.dot} data-tone={stopping ? 'neutral' : statusTone(status)} aria-hidden="true" />
         {editing ? <RenameInput initial={name} onCommit={(value) => actions.commitRename(terminalId, value.trim() === defaultLabel(terminalId, terminal) ? '' : value)} onCancel={actions.cancelRename} /> : <span className={styles.name}>{name}</span>}
         {creator ? <span className={styles.creator}>{creator}</span> : null}
-        <span className={styles.hidden}>{statusText}</span>
+        {stopping ? <span className={styles.creator}>{statusText}</span> : <span className={styles.hidden}>{statusText}</span>}
       </>,
     };
   });

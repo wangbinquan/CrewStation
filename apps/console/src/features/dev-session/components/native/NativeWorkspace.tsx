@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactElement, ReactNode } from 'react';
 import type { NativeTerminalDto, WorkspaceToolName } from '@crewstation/contracts';
 import { errorMessage, retryableReadError } from '../../../../shared/api/useApi';
@@ -12,6 +12,8 @@ import { useNativeTerminals } from '../../hooks/native/useNativeTerminals';
 import type { TaskStreamChannel } from '../../hooks/useTaskStream';
 import type { StreamState } from '../../model/taskStreamSocket';
 import { openTerminal, reconcileTerminals, replaceTerminal } from '../../model/layout/terminalGroups';
+import { withRecordPhases } from '../../model/native/terminalPhase';
+import { useProjectResources } from '../../../../shared/resources/useProjectResources';
 import { layoutTool } from '../../model/layout/workspaceLayout';
 import { CliDock } from './CliDock';
 import { NewCliButton, NewCliNotice } from './NewCliButton';
@@ -71,7 +73,9 @@ export function NativeWorkspace(props: NativeWorkspaceProps): ReactElement {
     onActivity();
   }, [store, onActivity]);
   const native = useNativeTerminals(taskId, channel, stream, onStarted);
-  const roster = native.query.data?.items;
+  // CLI 结束与失败以资源台账为准（RFC-025）：推送流一到，每个窗口的标签同时变「结束中」「已结束」，关掉的不会被对账放回。
+  const records = useProjectResources(projectId), items = native.query.data?.items;
+  const roster = useMemo(() => withRecordPhases(items, records.data?.items), [items, records.data]);
   const activity = useAgentActivity(), task = activity.snapshot.tasks.find((item) => item.taskId === taskId);
   const savedTool = layoutTool(layout);
   const locationError = useWorkspaceLocation(taskId, location, roster, store, state.loaded, !!activityTarget, `${savedTool?.name ?? ''}:${savedTool?.mode ?? ''}`, panel.narrow);

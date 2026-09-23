@@ -1,5 +1,6 @@
 import { newDraftResourceId } from '@crewstation/api-client';
-import type { NativeTerminalDto, WorkspaceLayout, WorkspaceTab } from '@crewstation/contracts';
+import type { NativeTerminalDto, ResourcePhase, WorkspaceLayout, WorkspaceTab } from '@crewstation/contracts';
+import { isLiveResourcePhase } from '@crewstation/contracts';
 import type { DockDrop } from '../../../../shared/ui/dock/dockDrop';
 import type { DockNode, DockPath, DockSide } from '../../../../shared/ui/dock/dockTree';
 import { alignGroups, dockGroups, equalizeSizes, removeGroup, setSizes, splitGroup, tidy } from '../../../../shared/ui/dock/dockTree';
@@ -12,8 +13,13 @@ import { alignGroups, dockGroups, equalizeSizes, removeGroup, setSizes, splitGro
 export const GROUP_LIMIT = 16, TABS_PER_GROUP = 32, LAYOUT_TERMINALS = 256;
 const LIVE: ReadonlySet<NativeTerminalDto['lifecycle']> = new Set(['starting', 'running', 'unknown']);
 
-export function isLiveTerminal(terminal: Pick<NativeTerminalDto, 'lifecycle'> | undefined): boolean {
-  return !terminal || LIVE.has(terminal.lifecycle);
+/**
+ * 在运行：有台账阶段的按阶段（RFC-025：受理到降级；结束中、已结束、失败都不算），没有的按名册 lifecycle。
+ * 名册里还没有的（刚创建、名册没跟上）按在运行处理。
+ */
+export function isLiveTerminal(terminal: (Pick<NativeTerminalDto, 'lifecycle'> & { readonly phase?: ResourcePhase }) | undefined): boolean {
+  if (!terminal) return true;
+  return terminal.phase ? isLiveResourcePhase(terminal.phase) : LIVE.has(terminal.lifecycle);
 }
 
 export function newGroup(id: string, name: string, paneOrder: readonly string[] = []): WorkspaceTab {
@@ -116,7 +122,7 @@ function arrange(leaves: DockNode[], mode: WorkspaceTab['layout'], ratios: Works
  * 平台随即回收它的执行环境，所以名册没跟上、仍报运行中时也不放回——页面重进或刷新之后同样以布局为准
  * （2026-09-23 实机：关掉的 CLI 切出开发页再切回，以「不可用」回到原处，还能再结束一次）。布局从不启动或结束进程。
  */
-export function reconcileTerminals(layout: WorkspaceLayout, roster: readonly Pick<NativeTerminalDto, 'terminalId' | 'lifecycle'>[]): WorkspaceLayout {
+export function reconcileTerminals(layout: WorkspaceLayout, roster: readonly (Pick<NativeTerminalDto, 'terminalId' | 'lifecycle'> & { readonly phase?: ResourcePhase })[]): WorkspaceLayout {
   let next = layout;
   for (const terminal of roster) {
     if (groupOf(next, terminal.terminalId) || next.hiddenTerminalIds.includes(terminal.terminalId)) continue;

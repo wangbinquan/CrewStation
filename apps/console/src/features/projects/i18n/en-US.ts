@@ -70,6 +70,7 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   "projects.summary.session.releasing": "Session releasing",
   "projects.summary.session.released": "Session ended",
   "projects.summary.session.failed": "Session failed",
+  "projects.summary.sessionPhase": "Session: {phase}",
   "projects.summary.start": "Start development",
   "projects.summary.continue": "Continue development",
   "projects.summary.openDevelopment": "Open development",

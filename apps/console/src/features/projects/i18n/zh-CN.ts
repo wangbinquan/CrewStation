@@ -68,6 +68,7 @@ export const messages = {
   "projects.summary.session.releasing": "会话释放中",
   "projects.summary.session.released": "会话已结束",
   "projects.summary.session.failed": "会话失败",
+  "projects.summary.sessionPhase": "会话{phase}",
   "projects.summary.start": "开始开发",
   "projects.summary.continue": "继续开发",
   "projects.summary.openDevelopment": "进入开发",

@@ -8,6 +8,7 @@ import { INITIAL_STREAM_STATE } from '../features/dev-session/model/taskStreamSo
 import { newGroup } from '../features/dev-session/model/layout/terminalGroups';
 import { activityFixture, activityProjectId, activityUserId } from './agentActivityFixture';
 import { renderElement } from './renderElement';
+import { FakeEventSource, resourceRecord, resourceView } from './resourceRecordFixture';
 
 /**
  * CLI 区（2026-09-23 裁定：Xshell 式标签组）的交互：每个 CLI 一个标签，× 结束进程并关闭，拖动与右键菜单分屏，
@@ -18,6 +19,7 @@ let page: Awaited<ReturnType<typeof renderElement>> | undefined;
 afterEach(async () => {
   page?.unmount(); page = undefined; await new Promise((resolve) => setTimeout(resolve, 0));
   globalThis.fetch = originalFetch; globalThis.ResizeObserver = originalObserver; document.querySelectorAll('[role="menu"]').forEach((node) => node.remove());
+  delete (globalThis as { EventSource?: unknown }).EventSource; FakeEventSource.reset();
 });
 
 const G1 = '01a0bf5d-8f4b-7001-8abc-000000000001';
@@ -121,6 +123,31 @@ describe('CLI 标签组', () => {
     expect(tab(stranger.terminalId).textContent).not.toContain('76540b');
   });
 
+});
+
+// RFC-025 RC-02：别的窗口（或另一名成员）结束了 CLI，推送流带来台账的「结束中」「已结束」——
+// 标签立即写「结束中」、没有 ×、右键「结束进程」不可用；结束后标签可直接关掉，全程不再发结束请求，名册仍报运行中也不影响。
+describe('CLI 标签随资源台账的推送流', () => {
+  test('结束中不能再结束也不能先关；已结束后直接关掉', async () => {
+    const f = setup(), stubbed = globalThis.fetch;
+    const record = resourceRecord({ id: '01a0bf5d-8f4b-7e1e-8dde-c9c2ae13ee01', kind: 'agent-execution', purpose: 'development-cli', parentId: base.taskId, display: { terminal: mine.terminalId } });
+    globalThis.fetch = (async (raw: RequestInfo | URL, init?: RequestInit) => new URL(String(raw), 'http://localhost').pathname === `/v1/projects/${activityProjectId}/resources`
+      ? Response.json(resourceView([record])) : stubbed(raw, init)) as typeof fetch;
+    (globalThis as { EventSource?: unknown }).EventSource = FakeEventSource;
+    page = await renderElement(element(), messages);
+    expect(tab(mine.terminalId).querySelector('button[aria-label="结束 CLI 00mine"]')).not.toBeNull();
+    await act(async () => { FakeEventSource.opened[0]!.emit({ type: 'upsert', record: { ...record, phase: 'stopping', version: 2 }, counts: {}, cursor: 2 }); });
+    await page.settle();
+    expect(tab(mine.terminalId).textContent).toContain('结束中'); expect(tab(mine.terminalId).querySelector('button')).toBeNull();
+    await fire(tab(mine.terminalId), new MouseEvent('contextmenu', { bubbles: true, clientX: 50, clientY: 40 }));
+    expect(menuItem('结束进程').disabled).toBe(true); expect(menuItem('关闭')).toBeUndefined();
+    await fire(document.querySelector('[role="menu"]')!, new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    await act(async () => { FakeEventSource.opened[0]!.emit({ type: 'upsert', record: { ...record, phase: 'stopped', version: 3 }, counts: {}, cursor: 3 }); });
+    await page.settle();
+    expect(tab(mine.terminalId).textContent).not.toContain('结束中');
+    await fire(tab(mine.terminalId).querySelector('button[aria-label="关闭 CLI 00mine"]')!, new MouseEvent('click', { bubbles: true }));
+    expect(groups()).toEqual([[ended.terminalId, other.terminalId]]); expect(f.stops).toEqual([]);
+  });
 });
 
 describe('菜单、放大、分隔线、改名与新开', () => {

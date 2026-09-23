@@ -513,6 +513,7 @@ export const messages = {
   'devSession.native.openedBy': '{name} 开的',
   'devSession.native.stopTab': '结束 {name}',
   'devSession.native.close': '关闭',
+  'devSession.native.stoppingHint': '这个 CLI 正在结束，结束后可以关闭标签',
   'devSession.native.stopOtherHint': '这是 {name} 开的 CLI，对方正在用的 Agent 会中止；其他 CLI 不受影响。',
   'devSession.native.tabMenu': '{name} 的操作',
   'devSession.native.maximize': '放大',

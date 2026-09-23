@@ -126,6 +126,18 @@ test('概览开发卡的 CLI 数只数在运行的：来自资源台账，结束
   expect([...document.querySelectorAll('code')].find((node) => node.textContent === 'main')?.parentElement?.textContent).toBe('main · 3 个 CLI');
 });
 
+// RFC-025：概览开发卡的会话徽标照台账里工作区记录的阶段（Runner 断开是「降级」，受理释放即「结束中」）；没有记录时按摘要。
+test('概览开发卡的会话徽标照资源台账的阶段，没有记录时按摘要', async () => {
+  const f = summaryFixture(), time = new Date().toISOString(), taskId = '01a0bf5d-8f4b-7e52-8b45-4a547fd10e4f';
+  f.item.development = { status: 'ready', checkedAt: time, value: { taskId: taskId as TaskId, state: 'running', connected: true, branch: 'main', createdAt: time, lastActivityAt: time } };
+  f.records = [resourceRecord({ id: taskId, kind: 'dev-workspace', phase: 'degraded', reason: { code: 'RunnerConnected-false', message: 'Runner 已断开' } })];
+  page = await renderApp(`/projects/${f.item.project.id}`);
+  expect(page.text()).toContain('会话降级'); expect(page.text()).not.toContain('会话运行中');
+  f.records = [];
+  await page.reread();
+  expect(page.text()).toContain('会话运行中');
+});
+
 test.each(['列表', '概览'])('%s 的会话分支明确标为创建时记录，缺失保持未知且不额外查询工作树', async (view) => {
   const f = summaryFixture(), time = new Date().toISOString();
   const session = { taskId: '01a0bf5d-8f4b-7e52-8b45-4a547fd10e4f' as TaskId, state: 'running' as const, connected: true, branch: 'main', createdAt: time, lastActivityAt: time };

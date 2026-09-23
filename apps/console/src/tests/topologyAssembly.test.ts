@@ -151,7 +151,9 @@ describe('record-based task bands', () => {
     expect(topology().bands.find((b) => b.id === 'dev')?.note).toBe('分支 feature/x · 2 个 Agent');
   });
   test('status and reason are the record phase in the standard words; the running workspace carries the preview route and the development database', () => {
-    expect(byId('ws-1')).toMatchObject({ status: 'ready', statusText: '运行中', title: 'task-1', meta: ['重启 2', '存活 1 小时 30 分'], resourceId: 'r-task-1' });
+    // 存活按盘点里同一 Pod 的创建时刻（11:00 → 12:40），不按记录进台账的时刻；盘点里没有这个 Pod 时不写存活。
+    expect(byId('ws-1')).toMatchObject({ status: 'ready', statusText: '运行中', title: 'task-1', meta: ['重启 2', '存活 1 小时 40 分'], resourceId: 'r-task-1' });
+    expect(byId('cli-2')?.meta).toEqual(['重启 0']);
     expect(byId('ws-0')).toMatchObject({ status: 'failed', statusText: '失败 · 检出失败', abnormal: true });
     expect(byId('cli-2')).toMatchObject({ status: 'terminating', statusText: '结束中 · 执行已结束' });
     expect(byId('sub-1')).toMatchObject({ status: 'pending', statusText: '启动中 · Insufficient cpu', abnormal: true, band: 'business', resourceId: 'r-subtask-1' });

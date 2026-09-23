@@ -515,6 +515,7 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   'devSession.native.openedBy': 'opened by {name}',
   'devSession.native.stopTab': 'End {name}',
   'devSession.native.close': 'Close',
+  'devSession.native.stoppingHint': 'This CLI is stopping; you can close the tab once it has stopped',
   'devSession.native.stopOtherHint': '{name} opened this CLI; the agent they are using will stop. Other CLIs are unaffected.',
   'devSession.native.tabMenu': 'Actions for {name}',
   'devSession.native.maximize': 'Maximize',

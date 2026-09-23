@@ -45,7 +45,8 @@ const abnormal = (record: ResourceRecord, inventory: ClusterResource | undefined
 
 function workloadNode(record: ResourceRecord, band: string, input: RecordBandInput, t: Translate): TopologyNode {
   const pod = childOf(record, 'Pod'), inventory = observed(input.resources, pod), purpose = record.purpose ?? 'unknown';
-  const { status, statusText } = recordStatus(record, t), age = durationText(record.createdAt, input.observedAt, t);
+  // 存活时长只按盘点里 Pod 自己的创建时刻算：记录的创建时刻是它进台账的时刻（补投影时可能晚于 Pod），不代表 Pod 活了多久。
+  const { status, statusText } = recordStatus(record, t), age = inventory ? durationText(inventory.createdAt, input.observedAt, t) : undefined;
   const image = inventory?.containers.find((c) => !c.init)?.image;
   const facts: (readonly [string, string])[] = [
     [t('topology.fact.purpose'), t(`cluster.purpose.${purpose}`)], [t('topology.fact.phase'), statusText],

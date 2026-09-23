@@ -14,6 +14,8 @@ import { useMemberNames } from '../../hooks/native/useMemberNames';
 import type { useNativeTerminals } from '../../hooks/native/useNativeTerminals';
 import type { TaskStreamChannel } from '../../hooks/useTaskStream';
 import type { WorkspaceLayoutStore } from '../../model/layout/workspaceLayoutStore';
+import type { RosterTerminal } from '../../model/native/terminalPhase';
+import { isStoppingTerminal } from '../../model/native/terminalPhase';
 import type { StreamState } from '../../model/taskStreamSocket';
 import {
   acceptsDrop, activateTerminal, closeTerminal, dropTerminal, equalizeGroups, focusGroup, groupOf, isLiveTerminal, layoutDock, maximizedGroup, orderedTerminals,
@@ -25,7 +27,7 @@ import { TerminalGroup, terminalLabel } from './TerminalGroup';
 import styles from './NativeWorkspace.module.css';
 
 export interface CliDockProps {
-  readonly projectId: string; readonly layout: WorkspaceLayout; readonly store: WorkspaceLayoutStore; readonly roster?: NativeTerminalDto[];
+  readonly projectId: string; readonly layout: WorkspaceLayout; readonly store: WorkspaceLayoutStore; readonly roster?: RosterTerminal[];
   readonly native: ReturnType<typeof useNativeTerminals>; readonly launcher: CliLauncher;
   readonly channel: TaskStreamChannel; readonly stream: StreamState; readonly activity?: ActivityTask;
   readonly canDevelop: boolean; readonly viewerId: string; readonly onActivity: () => void; readonly blockedReason?: string;
@@ -49,6 +51,8 @@ export function CliDock(props: CliDockProps): ReactElement {
   const actions: TerminalGroupActions = {
     activate: (id) => store.update((value) => activateTerminal(value, id)),
     requestClose: (id) => {
+      // 结束中（RFC-025）：已受理结束、进程在收尾，不能再结束一次，也不能先关掉标签。
+      if (isStoppingTerminal(find(id))) return;
       if (!isLiveTerminal(find(id))) { store.update((value) => closeTerminal(value, id)); return; }
       if (!canDevelop) return;
       store.update((value) => activateTerminal(value, id)); setClosing(id);
@@ -92,7 +96,7 @@ function refocus(terminalId: string): void {
 }
 
 function menuItems({ layout, terminalId, terminal, merged, canDevelop, t, actions, onRetry, split }: {
-  readonly layout: WorkspaceLayout; readonly terminalId: string; readonly terminal?: NativeTerminalDto; readonly merged: boolean; readonly canDevelop: boolean;
+  readonly layout: WorkspaceLayout; readonly terminalId: string; readonly terminal?: RosterTerminal; readonly merged: boolean; readonly canDevelop: boolean;
   readonly t: Translate; readonly actions: TerminalGroupActions; readonly onRetry?: (terminal: NativeTerminalDto) => void; readonly split: (side: 'left' | 'right' | 'top' | 'bottom') => void;
 }): ContextMenuItem[] {
   const group = groupOf(layout, terminalId), live = isLiveTerminal(terminal), maximized = !!group && maximizedGroup(layout)?.id === group.id;
@@ -106,7 +110,8 @@ function menuItems({ layout, terminalId, terminal, merged, canDevelop, t, action
     { key: 'maximize', label: t(maximized ? 'devSession.native.restoreSize' : 'devSession.native.maximize'), disabled: !maximized && layout.tabs.length < 2, hint: t('devSession.native.maximizeSingle'), onSelect: () => actions.toggleMaximize(terminalId) },
     ...sides,
     ...(terminal?.lifecycle === 'failed' && onRetry ? [{ key: 'retry', label: t('devSession.native.retryExecution'), separated: true, onSelect: () => onRetry(terminal) }] : []),
-    live ? { key: 'stop', label: t('devSession.native.stop'), danger: true, separated: true, disabled: !canDevelop, hint: t('devSession.connection.noPermission'), onSelect: () => actions.requestClose(terminalId) }
+    isStoppingTerminal(terminal) ? { key: 'stop', label: t('devSession.native.stop'), danger: true, separated: true, disabled: true, hint: t('devSession.native.stoppingHint'), onSelect: () => undefined }
+      : live ? { key: 'stop', label: t('devSession.native.stop'), danger: true, separated: true, disabled: !canDevelop, hint: t('devSession.connection.noPermission'), onSelect: () => actions.requestClose(terminalId) }
       : { key: 'close', label: t('devSession.native.close'), separated: true, onSelect: () => actions.requestClose(terminalId) },
   ];
 }
