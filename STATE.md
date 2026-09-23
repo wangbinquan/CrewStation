@@ -7,6 +7,16 @@
 
 基线三件套（v0.3.3）的第一轮实现已在本机 kind 集群上跑通并推上 main；**RFC-001（算力归平台）与 RFC-002（管理空间与租户空间分离）已实现、实跑确认并推上 main；RFC-004 已被 RFC-006 取代（Superseded）；RFC-006（算力档位合并运行环境、每个 Agent 一个 Pod）已实现、实机验收完毕并推上 main，已 Done（P1–P8、ADR-0005 与 I17–I19 待作者复核）；RFC-003 工作台已按设计附件完成并整体部署到本机，52／52 项 UX-AT 全部实机通过、本地 gate 与精确 SHA CI 通过，已 Done；RFC-005（OIDC／OAuth 2.0 公司登录）代码、测试与 OA-01…OA-31 实机验收全部完成，已 Done；RFC-007（开发环境 OAuth 2.0 一键换角色）代码、四角色 Chrome 实机验收、本地 gate 与精确 SHA CI 全部完成，已 Done**。
 
+## 拓扑详情栏独立滚动、侧栏操作按钮移到顶部、图上方说明行改为时间标签（2026-09-23）
+
+作者反馈集群拓扑 Pod 层点业务 Pod 后右侧详情很长、整页被拉长，底部四个操作按钮够不着；并要求排查其他侧栏的底部按钮、去掉图上方两行说明。提交 `da0b1f7`：
+
+- **根因**：`AppShell` 的 `main` 带 `overflow: auto` 却不限高，是 sticky 的滚动容器却从不滚动，详情栏的 `position: sticky` 一直没生效（算力档位编辑页早就为此单独放开过）。现在 ≥1100px 时详情栏限高 `100dvh - 32px`、自己滚动，有详情时 `:global(main):has(.workspace.hasDetail)` 放开 overflow。
+- **操作上移**：`ClusterDetail` 管理动作移到页签之上（页签「概览与操作」改名「概览」，资源清单里的详情同样生效）；集群项目层节点卡「展开 Pod 层」、项目侧 `TopologyDetail`「查看日志」、接口目录 `OperationDetail` 申请／试调都移到事实列表之前。算力档位编辑器的保存栏本来就在顶部，没动。
+- **说明行**：集群拓扑三层提示与「快照完整 · 观测于 · 每 15 秒…」删除；观测时间做成图框右上角标签 `TopologyStamp`（完整度与刷新说明在悬停提示），`complete=false` 仍留失败来源警示条。RFC-019 design 已回填修订说明。
+- **部署与实机**：从 `git archive` 的提交内容（不含工作树里并行会话的开发页在制品）构建 `cs-console:detail-top-20260923b` 并滚动 console。CDP 1440×900 演示项目 Pod 层点 `demo-blue-…`：详情栏 868px 高、内容 1361px 在栏内滚动，「重启」在 281px、页签条在 434px，图框右上「观测于 …」，无提示行；e2e `topology`＋`clusterLayout`＋`capabilityDepth` 17 pass／1 skip。本机 `check:static` 绿，unit 351／module 1106（7 skip）／console 652 全过；不带 `CS_E2E_AUTH=dev-oidc` 的整套 `bun run check` 在 e2e 层失败并以 bun trap 5 退出，与本改动无关。
+- 中间镜像 `cs-console:detail-top-20260923`（无「概览」改名）仍在 docker 与节点里，可删。
+
 ## 「＋ 创建开发Agent会话」的展开箭头与主键一起置灰（2026-09-23）
 
 作者实机：判断开发环境是否就绪的这段时间，主键是灰的，右侧展开箭头却是亮的。缺陷修复，RFC-020 没写禁用态，不涉及修订。
