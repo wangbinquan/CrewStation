@@ -31,6 +31,7 @@ export const messages = {
   'ui.progress.stage.prepare': '准备环境（启动前步骤 {done}/{total}）',
   'ui.progress.stage.prepareUncounted': '准备环境（启动前步骤）',
   'ui.progress.stage.agent': 'Agent 启动中',
+  'ui.progress.stage.interface': 'CLI 初始化（等待界面）',
   'ui.progress.stage.ready': '已就绪',
 
   'development.suspended': '开发权限已变化。当前输入仍保留，权限恢复后可继续；你也可以返回应用首页。',

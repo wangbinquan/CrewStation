@@ -3,7 +3,7 @@ import type { StartupProgress, StartupStage, StartupStageKind } from '@crewstati
 /** RFC-022 启动过程的段名（作者裁定的原话；命令行只有中文）。工作台按段种类取自己的文案，两边同名。 */
 const STAGE_NAME: Record<StartupStageKind, string> = {
   queue: '排队分配容器', replace: '替换旧容器', container: '容器启动中（调度、拉取镜像）', checkout: '检出代码', connect: '容器已启动，等待连接',
-  prepare: '准备环境（启动前步骤）', agent: 'Agent 启动中', ready: '已就绪',
+  prepare: '准备环境（启动前步骤）', agent: 'Agent 启动中', interface: 'CLI 初始化（等待界面）', ready: '已就绪',
 };
 const ICON: Record<StartupStage['state'], string> = { succeeded: '✓', running: '●', pending: '○', failed: '✕', skipped: '–' };
 const OVERALL: Record<StartupProgress['state'], string> = { running: '启动中', ready: '已就绪', failed: '启动失败', cancelled: '已取消' };

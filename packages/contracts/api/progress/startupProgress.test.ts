@@ -69,3 +69,10 @@ test('重新开始（而不是恢复）：失败在排队、容器或检出且�
   expect(restartsFromScratch(cli)).toBe(false);
   expect(restartsFromScratch(undefined)).toBe(false);
 });
+
+test('RFC-024：七段 CLI 进度（含 CLI 初始化）可解析，之前冻结的六段照常可读', () => {
+  const seven = { ...cli, stages: [...cli.stages.slice(0, 4), stage('agent', 'succeeded', { startedAt: at(5), endedAt: at(6), durationMs: 1000 }),
+    stage('interface', 'running', { startedAt: at(6), detail: '进程已拉起，等待 CLI 画出界面' }), stage('ready', 'pending')] };
+  expect(StartupProgressSchema.safeParse(seven).success).toBe(true);
+  expect(StartupProgressSchema.safeParse(cli).success).toBe(true);
+});

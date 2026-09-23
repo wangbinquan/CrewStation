@@ -19,27 +19,28 @@ const compose = (input: Partial<CliStartupInput>) => composeCliStartup({ accepte
 test('执行环境还没受理：排队分配容器从 CLI 受理算起，其余未开始；升级前受理的 CLI 没有进度', () => {
   const queued = composeCliStartup({ accepted: at(0.3), environment: { exists: false }, record: starting() })!;
   expect(queued).toEqual({ state: 'running', startedAt: at(0.3), stages: [{ kind: 'queue', state: 'running', startedAt: at(0.3) }, { kind: 'container', state: 'pending' }, { kind: 'connect', state: 'pending' },
-    { kind: 'prepare', state: 'pending' }, { kind: 'agent', state: 'pending' }, { kind: 'ready', state: 'pending' }] });
+    { kind: 'prepare', state: 'pending' }, { kind: 'agent', state: 'pending' }, { kind: 'interface', state: 'pending' }, { kind: 'ready', state: 'pending' }] });
   expect(composeCliStartup({ accepted: at(0.3), environment: { exists: true }, record: starting() })).toBeUndefined();
 });
 
 test('连上之后：准备环境从连上起算，显示 x/y 与当前步骤；排队段从 CLI 受理算起并重算用时', () => {
   const waiting = compose({})!;
-  expect(kinds(waiting)).toEqual(['queue:succeeded', 'container:succeeded', 'connect:succeeded', 'prepare:running', 'agent:pending', 'ready:pending']);
+  expect(kinds(waiting)).toEqual(['queue:succeeded', 'container:succeeded', 'connect:succeeded', 'prepare:running', 'agent:pending', 'interface:pending', 'ready:pending']);
   expect(waiting.stages[0]).toEqual({ kind: 'queue', state: 'succeeded', startedAt: at(0.3), endedAt: at(1.5), durationMs: 1200 });
   expect(waiting.stages[3]).toEqual({ kind: 'prepare', state: 'running', startedAt: at(5.2) });
   const second = compose({ beforeStart: steps('running', [['安装依赖', 'succeeded'], ['写入 settings.json', 'running']], { currentStepId: 's1' }) })!;
   expect(second.stages[3]).toEqual({ kind: 'prepare', state: 'running', startedAt: at(5.2), count: { done: 1, total: 2 }, detail: '写入 settings.json' });
   const connecting = compose({ environment: { exists: true, startup: { state: 'running', startedAt: at(1), stages: [done('queue', 1, 1.5), done('container', 1.5, 4.6), { kind: 'connect', state: 'running', startedAt: at(4.6) }, { kind: 'ready', state: 'pending' }] } } })!;
-  expect(kinds(connecting)).toEqual(['queue:succeeded', 'container:succeeded', 'connect:running', 'prepare:pending', 'agent:pending', 'ready:pending']);
+  expect(kinds(connecting)).toEqual(['queue:succeeded', 'container:succeeded', 'connect:running', 'prepare:pending', 'agent:pending', 'interface:pending', 'ready:pending']);
 });
 
-test('进程拉起即就绪；没有启动前步骤时准备环境为「跳过」，Agent 启动中从连上起算', () => {
+test('旧 Runner（不报界面状态）：进程拉起即就绪，CLI 初始化跳过；没有启动前步骤时准备环境为「跳过」，Agent 启动中从连上起算', () => {
   const ready = compose({ beforeStart: steps('succeeded', [['安装依赖', 'succeeded']]), runningAt: at(10.5), record: starting({ lifecycle: 'running' }) })!;
   expect(ready.state).toBe('ready'); expect(ready.endedAt).toBe(at(10.5));
   expect(ready.stages.slice(3)).toEqual([
     { kind: 'prepare', state: 'succeeded', startedAt: at(5.2), endedAt: at(5.7), durationMs: 500, count: { done: 1, total: 1 } },
     { kind: 'agent', state: 'succeeded', startedAt: at(5.7), endedAt: at(10.5), durationMs: 4800 },
+    { kind: 'interface', state: 'skipped', startedAt: at(10.5), endedAt: at(10.5), durationMs: 0 },
     { kind: 'ready', state: 'succeeded', startedAt: at(10.5), endedAt: at(10.5), durationMs: 0 },
   ]);
   const none = compose({ beforeStart: steps('succeeded', []) })!;
@@ -51,7 +52,7 @@ test('失败停在出错的那一段：执行环境的段、启动前步骤、�
   const env: StartupRecord = { state: 'failed', startedAt: at(1), endedAt: at(9), stages: [done('queue', 1, 1.5), { kind: 'container', state: 'failed', startedAt: at(1.5), endedAt: at(9), durationMs: 7500, error: { code: 'image-pull-failed', message: '镜像拉取失败' } }, { kind: 'connect', state: 'pending' }, { kind: 'ready', state: 'pending' }] };
   const pull = compose({ environment: { exists: true, startup: env }, record: starting({ lifecycle: 'failed', reason: 'environment-failed', endedAt: at(9.5) }) })!;
   expect(pull.state).toBe('failed'); expect(pull.endedAt).toBe(at(9));
-  expect(kinds(pull)).toEqual(['queue:succeeded', 'container:failed', 'connect:pending', 'prepare:pending', 'agent:pending', 'ready:pending']);
+  expect(kinds(pull)).toEqual(['queue:succeeded', 'container:failed', 'connect:pending', 'prepare:pending', 'agent:pending', 'interface:pending', 'ready:pending']);
   const script = compose({ beforeStart: steps('failed', [['安装依赖', 'failed']], { error: { message: '退出码 1' } as BeforeStartExecution['error'] }), record: starting({ lifecycle: 'failed', reason: 'before-start-failed' }) })!;
   expect(script.stages[3]).toMatchObject({ state: 'failed', error: { code: 'before-start-failed', message: '启动前步骤「安装依赖」失败：退出码 1' } });
   const binary = compose({ beforeStart: steps('succeeded', []), record: starting({ lifecycle: 'failed', reason: 'start-failed', error: 'spawn /opt/bin/nope ENOENT', endedAt: at(6) }) })!;
@@ -63,7 +64,7 @@ test('失败停在出错的那一段：执行环境的段、启动前步骤、�
 test('就绪前结束：被关闭算取消（进行中的段记为跳过），Runner 重启算失败并按段归类', () => {
   const stopped = compose({ beforeStart: steps('cancelled', [['安装依赖', 'running']]), record: starting({ lifecycle: 'ended', reason: 'stopped', endedAt: at(6) }) })!;
   expect(stopped.state).toBe('cancelled');
-  expect(kinds(stopped)).toEqual(['queue:succeeded', 'container:succeeded', 'connect:succeeded', 'prepare:skipped', 'agent:pending', 'ready:pending']);
+  expect(kinds(stopped)).toEqual(['queue:succeeded', 'container:succeeded', 'connect:succeeded', 'prepare:skipped', 'agent:pending', 'interface:pending', 'ready:pending']);
   const early = composeCliStartup({ accepted: at(0.3), environment: { exists: false }, record: starting({ lifecycle: 'ended', reason: 'stopped', endedAt: at(0.9) }) })!;
   expect(early.state).toBe('cancelled'); expect(early.stages[0]).toMatchObject({ state: 'skipped', endedAt: at(0.9) });
   const cleaned = compose({ environment: { exists: true, startup: { ...connected, state: 'cancelled', stages: [done('queue', 1, 1.5), { kind: 'container', state: 'skipped', startedAt: at(1.5), endedAt: at(2), durationMs: 500 }, { kind: 'connect', state: 'pending' }, { kind: 'ready', state: 'pending' }] } } })!;
@@ -71,4 +72,37 @@ test('就绪前结束：被关闭算取消（进行中的段记为跳过），Ru
   const restarted = compose({ beforeStart: steps('running', [['安装依赖', 'running']]), record: starting({ lifecycle: 'ended', reason: 'runner-restarted', endedAt: at(7) }) })!;
   expect(restarted.state).toBe('failed');
   expect(restarted.stages[3]).toMatchObject({ state: 'failed', endedAt: at(7), error: { code: 'before-start-failed', message: '启动没有完成' } });
+});
+
+// RFC-024：「已就绪」曾在进程拉起那一刻成立，CLI 还没画出界面、终端黑屏十来秒。新 Runner 报界面状态后，就绪推迟到界面画出。
+const launched = (ui: CliStartupInput['interface'], record: Partial<CliStartupInput['record']> = { lifecycle: 'running' }) =>
+  compose({ beforeStart: steps('succeeded', []), runningAt: at(10.5), interface: ui, record: starting(record) })!;
+
+test('RFC-024：新 Runner 进程已拉起、界面还没画出——CLI 初始化进行中，整体仍在启动', () => {
+  const waiting = launched({ reports: true });
+  expect(waiting.state).toBe('running');
+  expect(kinds(waiting)?.slice(4)).toEqual(['agent:succeeded', 'interface:running', 'ready:pending']);
+  expect(waiting.stages[5]).toEqual({ kind: 'interface', state: 'running', startedAt: at(10.5), detail: '进程已拉起，等待 CLI 画出界面' });
+});
+
+test('RFC-024：界面画出后就绪，七段首尾相接；超时放行时写明', () => {
+  const ready = launched({ reports: true, at: at(21), by: 'screen' });
+  expect(ready.state).toBe('ready'); expect(ready.endedAt).toBe(at(21));
+  expect(ready.stages.slice(5)).toEqual([
+    { kind: 'interface', state: 'succeeded', startedAt: at(10.5), endedAt: at(21), durationMs: 10500 },
+    { kind: 'ready', state: 'succeeded', startedAt: at(21), endedAt: at(21), durationMs: 0 },
+  ]);
+  for (let i = 1; i < ready.stages.length; i++) expect(ready.stages[i]!.startedAt).toBe(ready.stages[i - 1]!.endedAt!);
+  const timeout = launched({ reports: true, at: at(55.5), by: 'timeout' });
+  expect(timeout.state).toBe('ready');
+  expect(timeout.stages[5]).toMatchObject({ state: 'succeeded', durationMs: 45000, detail: '未检测到界面，已超时放行' });
+});
+
+test('RFC-024：界面画出之前 CLI 退出记为 CLI 初始化失败；被关闭记为取消', () => {
+  const exited = launched({ reports: true }, { lifecycle: 'ended', reason: 'exited', error: '进程退出（退出码 1）', endedAt: at(14) });
+  expect(exited.state).toBe('failed');
+  expect(exited.stages[5]).toEqual({ kind: 'interface', state: 'failed', startedAt: at(10.5), endedAt: at(14), durationMs: 3500, detail: '进程已拉起，等待 CLI 画出界面', error: { code: 'agent-start-failed', message: '进程退出（退出码 1）' } });
+  const stopped = launched({ reports: true }, { lifecycle: 'ended', reason: 'stopped', endedAt: at(12) });
+  expect(stopped.state).toBe('cancelled');
+  expect(stopped.stages[5]).toMatchObject({ kind: 'interface', state: 'skipped', endedAt: at(12) });
 });

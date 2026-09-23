@@ -19,7 +19,7 @@ export const NativeTerminalDtoSchema = NativeTerminalRecordSchema.extend({
   execution: z.object({ taskId: TaskIdSchema, state: z.enum(['queued', 'starting', 'running', 'cleaning', 'finished']), message: z.string().optional(),
     profile: z.object({ name: z.string(), cpu: z.string(), memory: z.string(), storage: z.string() }).optional() }).optional(),
   finalScreen: z.enum(['pending', 'available', 'unavailable']).optional(),
-  /** RFC-022：六段启动进度；升级前受理的 CLI 没有。 */
+  /** RFC-022：启动进度（RFC-024 起七段，之前冻结的六段照常可读）；升级前受理的 CLI 没有。 */
   startup: StartupProgressSchema.optional(),
 });
 export const NativeTerminalSnapshotDtoSchema = z.object({ status: z.enum(['pending', 'available', 'unavailable']), snapshot: TerminalSnapshotSchema.optional() });

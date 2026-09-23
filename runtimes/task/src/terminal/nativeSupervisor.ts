@@ -15,6 +15,8 @@ import type { ProcessLauncher } from '../process/launcher';
 import type { PtyBackend, PtySession } from './ptyBackend';
 import { createTerminalControl } from './terminalControl';
 import { createTerminalScreen } from './terminalScreen';
+import type { ReadinessInput, ReadinessLimits, ReadinessState } from './interfaceReadiness';
+import { DEFAULT_READINESS_LIMITS, startReadiness, stepReadiness } from './interfaceReadiness';
 
 export interface NativeSupervisorDeps {
   runnerId?: string;
@@ -27,6 +29,8 @@ export interface NativeSupervisorDeps {
   logger: Logger;
   prepare?: typeof prepareNativeTerminal;
   activityFactory?: typeof createOpencodeActivityChannel;
+  /** RFC-024 界面判据；用例调小，生产用默认值。 */
+  readinessLimits?: ReadinessLimits;
 }
 
 interface NativeEntry {
@@ -42,6 +46,9 @@ interface NativeEntry {
   prepared?: PreparedNativeTerminal;
   activity?: NativeActivityObserver;
   stopped: boolean;
+  /** RFC-024：界面判定；判定完成或进程结束后清掉。 */
+  readiness?: ReadinessState;
+  readinessTimer?: ReturnType<typeof setTimeout>;
 }
 
 const MAX_NATIVE_TERMINALS = 256;
@@ -122,8 +129,9 @@ export class NativeTerminalSupervisor {
       if (prepared.activityUnavailable) entry.activity?.unavailable(prepared.activityUnavailable);
       const session = this.deps.backend!.open({ ...prepared.plan, cols: command.cols, rows: command.rows, onData: (data) => this.output(entry, data) });
       entry.session = session;
-      entry.record = { ...entry.record, lifecycle: 'running', ...(prepared.nativeSessionId ? { nativeSessionId: prepared.nativeSessionId } : {}) };
+      entry.record = { ...entry.record, lifecycle: 'running', ...(prepared.nativeSessionId ? { nativeSessionId: prepared.nativeSessionId } : {}), ui: { state: 'waiting' } };
       this.emit(entry);
+      this.watchInterface(entry);
       void session.exited.then((code) => this.exited(entry, code));
     } catch (error) {
       entry.activity?.close();
@@ -149,10 +157,41 @@ export class NativeTerminalSupervisor {
 
   private output(entry: NativeEntry, data: string): void {
     const terminalSeq = ++entry.outputSeq;
-    void entry.screen.write(data, terminalSeq).then(() => {
+    void entry.screen.write(data, terminalSeq).then(async () => {
       this.deps.emit({ kind: 'terminalOutput', terminalId: entry.record.terminalId, runnerId: this.runnerId, terminalSeq, data });
+      if (entry.readiness && !entry.readiness.done) this.stepInterface(entry, { kind: 'output', at: Date.now(), visibleChars: await entry.screen.visibleChars() });
     }).catch((error: unknown) => this.deps.logger.error('native terminal screen write failed', { agentId: entry.record.agentId, error: String(error) }));
   }
+
+  /** RFC-024：进程拉起后按屏幕判定界面是否画出；到点 tick，判定后发一次 ui.ready。 */
+  private watchInterface(entry: NativeEntry): void {
+    const start = startReadiness(Date.now(), this.limits);
+    entry.readiness = start.state;
+    this.scheduleInterface(entry, start.nextTickAt);
+  }
+
+  private stepInterface(entry: NativeEntry, input: ReadinessInput): void {
+    if (!entry.readiness || entry.readiness.done || entry.record.lifecycle !== 'running') return;
+    const step = stepReadiness(entry.readiness, input, this.limits);
+    entry.readiness = step.state;
+    if (!step.state.done) { this.scheduleInterface(entry, step.nextTickAt); return; }
+    this.stopInterface(entry);
+    entry.record = { ...entry.record, ui: { state: 'ready', readyAt: new Date(input.at).toISOString(), by: step.state.done } };
+    this.deps.logger.info('native terminal interface ready', { agentId: entry.record.agentId, by: step.state.done, afterMs: input.at - step.state.spawnedAt });
+    this.emit(entry);
+  }
+
+  private scheduleInterface(entry: NativeEntry, at: number | undefined): void {
+    if (entry.readinessTimer) clearTimeout(entry.readinessTimer);
+    entry.readinessTimer = at === undefined ? undefined : setTimeout(() => this.stepInterface(entry, { kind: 'tick', at: Date.now() }), Math.max(0, at - Date.now()));
+  }
+
+  private stopInterface(entry: NativeEntry): void {
+    if (entry.readinessTimer) clearTimeout(entry.readinessTimer);
+    entry.readinessTimer = undefined;
+  }
+
+  private get limits(): ReadinessLimits { return this.deps.readinessLimits ?? DEFAULT_READINESS_LIMITS; }
 
   private observe(entry: NativeEntry, protocol: KnownAgentProtocol): NativeActivityObserver | undefined {
     try { return (this.deps.activityFactory ?? (protocol === 'claude-code' ? createClaudeActivityChannel : createOpencodeActivityChannel))({ ...entry.record, emit: (activity) => this.deps.emit({ kind: 'nativeActivity', activity }) }); }
@@ -168,6 +207,7 @@ export class NativeTerminalSupervisor {
 
   private exited(entry: NativeEntry, exitCode: number | null): void {
     entry.record = { ...entry.record, lifecycle: 'ended', exitCode, endedAt: new Date().toISOString(), reason: entry.stopped ? 'stopped' : 'exited' };
+    this.stopInterface(entry);
     entry.prepared?.dispose();
     entry.control.dispose();
     this.deps.beforeStart.release(entry.record.agentId);

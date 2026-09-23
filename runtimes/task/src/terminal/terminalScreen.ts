@@ -38,6 +38,14 @@ export function createTerminalScreen(cols: number, rows: number) {
       if (Buffer.byteLength(data) > MAX_SNAPSHOT_BYTES) { data = serialize.serialize({ scrollback: 0 }); clipped = true; }
       return { data: data + mouseEncoding.serialize(), throughSeq, cols: terminal.cols, rows: terminal.rows, truncated: clipped, scrollbackLimit: TERMINAL_SCROLLBACK_LIMIT };
     },
+    /** RFC-024：当前活动缓冲区（普通或备用屏）视口里的非空白字符数，判定 CLI 界面是否画出用。 */
+    async visibleChars(): Promise<number> {
+      await tail;
+      const buffer = terminal.buffer.active;
+      let count = 0;
+      for (let row = buffer.viewportY; row < buffer.viewportY + terminal.rows; row++) count += buffer.getLine(row)?.translateToString(true).replace(/\s/g, '').length ?? 0;
+      return count;
+    },
     async dispose(): Promise<void> { await tail; mouseEncoding.dispose(); terminal.dispose(); },
   };
 }

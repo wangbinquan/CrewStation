@@ -31,6 +31,7 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   'ui.progress.stage.prepare': 'Preparing the environment (before-start steps {done}/{total})',
   'ui.progress.stage.prepareUncounted': 'Preparing the environment (before-start steps)',
   'ui.progress.stage.agent': 'Starting the agent',
+  'ui.progress.stage.interface': 'Initializing the CLI (waiting for its screen)',
   'ui.progress.stage.ready': 'Ready',
   'development.suspended': 'Development access has changed. Your current input is retained until access is restored, or you can return to applications.',
   "nav.market": "Applications",

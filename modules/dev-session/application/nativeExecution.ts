@@ -79,7 +79,7 @@ export class NativeExecutionLifecycle {
       ...(nativeEnded(record) ? { finalScreen: start.execution!.screen ?? 'pending' } : {}) };
   }
   /**
-   * RFC-022 六段启动进度：执行环境的前三段＋执行任务的 beforeStart／nativeTerminal 事件（执行任务里只有这一个 CLI）。
+   * RFC-022 启动进度（RFC-024 起七段）：执行环境的前三段＋执行任务的 beforeStart／nativeTerminal 事件（执行任务里只有这一个 CLI）。
    * 就绪、失败或取消后冻结进受理记录，之后不再读事件；读事件失败时照常返回但不冻结，下次再算。
    */
   private async startupOf(start: NativeTerminalStart, env: EnvironmentView | undefined, record: NativeTerminalRecord): Promise<StartupRecord | undefined> {
@@ -88,20 +88,29 @@ export class NativeExecutionLifecycle {
     const connected = env?.startup?.stages.some((stage) => stage.kind === 'connect' && stage.state === 'succeeded');
     const events = connected ? await this.deps.runner.listEvents(env!.id, { kinds: ['beforeStart', 'nativeTerminal'], limit: 500 }).catch(() => undefined) : [];
     let beforeStart: BeforeStartExecution | undefined, runningAt: string | undefined;
+    // RFC-024：新 Runner 在 running 事件里就带 ui；第一条 ui.ready 的收到时刻是界面画出的时刻。
+    const ui: { reports: boolean; at?: string; by?: 'screen' | 'timeout' } = { reports: false };
     for (const stored of events ?? []) {
       if (stored.event.kind === 'beforeStart' && stored.event.execution.agentId === record.agentId) beforeStart = stored.event.execution;
-      if (stored.event.kind === 'nativeTerminal' && stored.event.terminal.agentId === record.agentId && stored.event.terminal.lifecycle === 'running') runningAt ??= stored.at;
+      if (stored.event.kind !== 'nativeTerminal' || stored.event.terminal.agentId !== record.agentId) continue;
+      const terminal = stored.event.terminal;
+      if (terminal.lifecycle === 'running') runningAt ??= stored.at;
+      if (terminal.ui) ui.reports = true;
+      if (terminal.ui?.state === 'ready' && !ui.at) Object.assign(ui, { at: stored.at, ...(terminal.ui.by ? { by: terminal.ui.by } : {}) });
     }
-    // 进程已拉起而事件还没读到（或事件表读不到）：以这次看到的时刻为准。
-    if (!runningAt && record.lifecycle === 'running') runningAt = this.deps.clock.now().toISOString();
-    const startup = composeCliStartup({ accepted: start.execution?.acceptedAt ?? start.record.startedAt, environment: { exists: !!env, ...(env?.startup ? { startup: env.startup } : {}) }, ...(beforeStart ? { beforeStart } : {}), ...(runningAt ? { runningAt } : {}), record });
+    const now = this.deps.clock.now().toISOString();
+    // 进程已拉起（或界面已画出）而事件还没读到（或事件表读不到）：以这次看到的时刻为准。
+    if (!runningAt && record.lifecycle === 'running') runningAt = now;
+    if (record.ui) ui.reports = true;
+    if (!ui.at && record.ui?.state === 'ready') Object.assign(ui, { at: now, ...(record.ui.by ? { by: record.ui.by } : {}) });
+    const startup = composeCliStartup({ accepted: start.execution?.acceptedAt ?? start.record.startedAt, environment: { exists: !!env, ...(env?.startup ? { startup: env.startup } : {}) }, ...(beforeStart ? { beforeStart } : {}), ...(runningAt ? { runningAt } : {}), interface: ui, record });
     if (startup && startup.state !== 'running' && events) await this.repo.saveStartup(start.taskId, start.record.agentId, startup);
     return startup;
   }
-  /** 准备环境或 Agent 启动中失败：回收执行环境之前留下主容器日志的尾部（B8）。 */
+  /** 准备环境、Agent 启动中或 CLI 初始化失败：回收执行环境之前留下主容器日志的尾部（B8）。 */
   private async keepFailureLog(start: NativeTerminalStart, env: EnvironmentView) {
     const startup = start.execution?.startup, failed = startup?.stages.find((stage) => stage.state === 'failed');
-    if (!startup || !failed || failed.logTail || (failed.kind !== 'prepare' && failed.kind !== 'agent')) return;
+    if (!startup || !failed || failed.logTail || !['prepare', 'agent', 'interface'].includes(failed.kind)) return;
     const logTail = await this.deps.environments.captureStartupLog(env.id).catch(() => undefined);
     if (logTail) await this.repo.saveStartup(start.taskId, start.record.agentId, { ...startup, stages: startup.stages.map((stage) => (stage === failed ? { ...stage, logTail } : stage)) });
   }

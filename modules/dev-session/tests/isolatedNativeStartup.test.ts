@@ -25,13 +25,13 @@ async function startingCli() {
   return { f, terminal, executionTaskId, record, events, reads };
 }
 
-test('名册带六段启动进度：执行环境的前三段加上 Runner 的启动前步骤与进程拉起；就绪即冻结，之后不再读事件', async () => {
+test('名册带七段启动进度：执行环境的前三段加上 Runner 的启动前步骤与进程拉起；旧 Runner 不报界面状态，拉起即就绪并冻结，之后不再读事件', async () => {
   const { f, terminal, executionTaskId, record, events, reads } = await startingCli();
   events.push({ seq: 1, at: at(5.3), event: { kind: 'beforeStart', execution: execution(terminal.agentId, 'running', 'running') } });
   let item = NativeTerminalDtoSchema.parse((await f.api.listNativeTerminals(actor, taskId)).items[0]);
   expect(item.startup?.state).toBe('running');
   expect(item.startup?.observedAt).toBe(f.deps.clock.now().toISOString());
-  expect(item.startup?.stages.map((stage) => `${stage.kind}:${stage.state}`)).toEqual(['queue:succeeded', 'container:succeeded', 'connect:succeeded', 'prepare:running', 'agent:pending', 'ready:pending']);
+  expect(item.startup?.stages.map((stage) => `${stage.kind}:${stage.state}`)).toEqual(['queue:succeeded', 'container:succeeded', 'connect:succeeded', 'prepare:running', 'agent:pending', 'interface:pending', 'ready:pending']);
   expect(item.startup?.stages[3]).toMatchObject({ count: { done: 0, total: 1 }, detail: '安装依赖' });
   expect(reads).toEqual([`${executionTaskId}:beforeStart,nativeTerminal`]);
   expect((await f.repository.findExecution(executionTaskId))!.execution!.startup).toBeUndefined();
@@ -42,7 +42,8 @@ test('名册带六段启动进度：执行环境的前三段加上 Runner 的启
   record.lifecycle = 'running';
   item = NativeTerminalDtoSchema.parse((await f.api.listNativeTerminals(actor, taskId)).items[0]);
   expect(item.startup).toMatchObject({ state: 'ready', endedAt: at(10.5) });
-  expect(item.startup?.stages.at(-2)).toEqual({ kind: 'agent', state: 'succeeded', startedAt: at(5.7), endedAt: at(10.5), durationMs: 4800 });
+  expect(item.startup?.stages.at(-3)).toEqual({ kind: 'agent', state: 'succeeded', startedAt: at(5.7), endedAt: at(10.5), durationMs: 4800 });
+  expect(item.startup?.stages.at(-2)).toEqual({ kind: 'interface', state: 'skipped', startedAt: at(10.5), endedAt: at(10.5), durationMs: 0 });
   const frozen = (await f.repository.findExecution(executionTaskId))!.execution!.startup!;
   expect(frozen.state).toBe('ready');
   await f.api.listNativeTerminals(actor, taskId);
@@ -89,7 +90,7 @@ test('启动中 Runner 回名册慢：名册不等它（约 1 秒即返回、按
   for (const list of [first, second]) {
     const item = NativeTerminalDtoSchema.parse(list.items[0]);
     expect(item).toMatchObject({ lifecycle: 'starting', connection: 'connected' });
-    expect(item.startup?.stages.map((stage) => `${stage.kind}:${stage.state}`)).toEqual(['queue:succeeded', 'container:succeeded', 'connect:succeeded', 'prepare:running', 'agent:pending', 'ready:pending']);
+    expect(item.startup?.stages.map((stage) => `${stage.kind}:${stage.state}`)).toEqual(['queue:succeeded', 'container:succeeded', 'connect:succeeded', 'prepare:running', 'agent:pending', 'interface:pending', 'ready:pending']);
   }
   // Runner 终于回话：之后的读照常用它的名册；已拉起的 CLI 不受这个上限影响。
   answer!();
@@ -146,4 +147,49 @@ test('开发会话 DTO 带 task-runtime 产出的五段与读出时刻；升级�
   expect(dto.startup).toEqual({ ...checkout, observedAt: f.deps.clock.now().toISOString() });
   f.deps.environments.findDevSession = original;
   expect((await session.getSession(actor, workspaceProject))!.startup).toBeUndefined();
+});
+
+// RFC-024：新 Runner 报界面状态后，「已就绪」推迟到界面画出，冻结也随之推迟；界面画出之前退出的 CLI 在「CLI 初始化」留日志。
+test('RFC-024：新 Runner 进程拉起后 CLI 初始化进行中、不冻结；ui.ready 的收到时刻即就绪并冻结', async () => {
+  const { f, terminal, executionTaskId, record, events } = await startingCli();
+  const running = (seq: number, second: number, ui: NativeTerminalRecord['ui']) => ({ seq, at: at(second), event: { kind: 'nativeTerminal', terminal: { ...(record as NativeTerminalRecord), lifecycle: 'running', revision: seq, ui } } } as const);
+  events.push({ seq: 1, at: at(5.7), event: { kind: 'beforeStart', execution: execution(terminal.agentId, 'succeeded', 'succeeded') } }, running(2, 10.5, { state: 'waiting' }));
+  Object.assign(record, { lifecycle: 'running', ui: { state: 'waiting' } });
+  let item = NativeTerminalDtoSchema.parse((await f.api.listNativeTerminals(actor, taskId)).items[0]);
+  expect(item.startup?.state).toBe('running');
+  expect(item.startup?.stages.slice(-3).map((stage) => `${stage.kind}:${stage.state}`)).toEqual(['agent:succeeded', 'interface:running', 'ready:pending']);
+  expect((await f.repository.findExecution(executionTaskId))!.execution!.startup).toBeUndefined();
+
+  events.push(running(3, 21, { state: 'ready', readyAt: at(20.9), by: 'screen' }), running(4, 22, { state: 'ready', readyAt: at(20.9), by: 'screen' }));
+  Object.assign(record, { ui: { state: 'ready', readyAt: at(20.9), by: 'screen' } });
+  item = NativeTerminalDtoSchema.parse((await f.api.listNativeTerminals(actor, taskId)).items[0]);
+  expect(item.startup).toMatchObject({ state: 'ready', endedAt: at(21) });
+  expect(item.startup?.stages.at(-2)).toEqual({ kind: 'interface', state: 'succeeded', startedAt: at(10.5), endedAt: at(21), durationMs: 10500 });
+  expect((await f.repository.findExecution(executionTaskId))!.execution!.startup!.state).toBe('ready');
+});
+
+test('RFC-024：事件还没读到 ui.ready 而名册已是 ready，以这次看到的时刻为准', async () => {
+  const { f, terminal, record, events } = await startingCli();
+  events.push({ seq: 1, at: at(5.7), event: { kind: 'beforeStart', execution: execution(terminal.agentId, 'succeeded', 'succeeded') } });
+  Object.assign(record, { lifecycle: 'running', ui: { state: 'ready', readyAt: at(9), by: 'timeout' } });
+  const item = NativeTerminalDtoSchema.parse((await f.api.listNativeTerminals(actor, taskId)).items[0]);
+  expect(item.startup?.state).toBe('ready');
+  // 时刻取本次读名册的时刻（夹具时钟早于事件时，按段首尾相接不倒退）。
+  expect(item.startup?.stages.at(-2)).toMatchObject({ kind: 'interface', state: 'succeeded', detail: '未检测到界面，已超时放行' });
+  expect(item.startup?.endedAt).toBe(item.startup?.stages.at(-2)?.endedAt);
+});
+
+test('RFC-024：界面画出之前 CLI 退出——CLI 初始化失败，回收前留下主容器日志', async () => {
+  const { f, terminal, executionTaskId, record, events } = await startingCli();
+  events.push({ seq: 1, at: at(5.7), event: { kind: 'beforeStart', execution: execution(terminal.agentId, 'succeeded', 'succeeded') } },
+    { seq: 2, at: at(10.5), event: { kind: 'nativeTerminal', terminal: { ...(record as NativeTerminalRecord), lifecycle: 'running', revision: 2, ui: { state: 'waiting' } } } });
+  Object.assign(record, { lifecycle: 'ended', reason: 'exited', exitCode: 1, error: '进程退出（退出码 1）', endedAt: at(13), ui: { state: 'waiting' }, revision: record.revision + 1 });
+  const captured: string[] = [];
+  f.deps.environments.captureStartupLog = async (id) => { captured.push(id); return 'Error: config invalid'; };
+  await f.run(terminal);
+  await f.run(terminal);
+  const saved = (await f.repository.findExecution(executionTaskId))!.execution!.startup!;
+  expect(saved.state).toBe('failed');
+  expect(saved.stages.find((stage) => stage.state === 'failed')).toMatchObject({ kind: 'interface', logTail: 'Error: config invalid', error: { code: 'agent-start-failed' } });
+  expect(captured).toEqual([executionTaskId]);
 });

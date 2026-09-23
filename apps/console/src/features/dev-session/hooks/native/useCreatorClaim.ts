@@ -1,5 +1,5 @@
 import type { NativeTerminalDto } from '@crewstation/contracts';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { RefObject } from 'react';
 import type { NativeTerminalAttachment } from '../../model/native/nativeTerminalAttachment';
 import type { NativeTerminalSurface } from '../../model/native/nativeTerminalSurface';
@@ -10,6 +10,16 @@ export function busyElsewhere(host: HTMLElement | null): boolean {
   const current = document.activeElement as HTMLElement | null;
   if (!current || current === document.body || host?.contains(current)) return false;
   return current.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(current.tagName);
+}
+
+/**
+ * RFC-024：启动期间（含进程已拉起、界面还没画出的「CLI 初始化」）把创建者的窗口当作「在用」：焦点不在终端也续约，
+ * 控制不会在界面画出前被 30 秒空闲释放——OpenCode 要等持有控制的窗口回答终端查询才画界面。
+ * `createdHere` 是「这个窗口创建过它」：进程拉起后取得成功会作废登记，所以由调用方记住。
+ */
+export function holdsDuringStartup(createdHere: boolean, terminal: Pick<NativeTerminalDto, 'lifecycle' | 'startup'>): boolean {
+  if (!createdHere) return false;
+  return terminal.lifecycle === 'starting' || (terminal.lifecycle === 'running' && terminal.startup?.state === 'running');
 }
 
 /**
@@ -25,6 +35,9 @@ export function useCreatorClaim(options: {
   const created = canDevelop && creatorClaims.has(terminal.clientRequestId);
   const starting = terminal.lifecycle === 'starting', running = terminal.lifecycle === 'running';
   const early = useRef(false);
+  // 取得成功后登记被作废，这里记住「这个窗口创建过它」（渲染中按上一次的值调整 state，React 允许的写法）。
+  const [createdHere, setCreatedHere] = useState(created);
+  if (created && !createdHere) setCreatedHere(true);
   useEffect(() => {
     if (!created || phase !== 'ready' || (!starting && !running) || (starting && early.current)) return undefined;
     if (starting) early.current = true;
@@ -37,6 +50,5 @@ export function useCreatorClaim(options: {
     });
     return () => { cancelled = true; };
   }, [created, phase, starting, running, attachment, surface, host, terminal.clientRequestId]);
-  // 启动期间把创建者的窗口当作「在用」：焦点不在终端也续约，控制不会在进程拉起前被 30 秒释放掉。
-  return created && starting;
+  return holdsDuringStartup(createdHere, terminal);
 }

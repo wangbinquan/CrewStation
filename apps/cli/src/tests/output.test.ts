@@ -3,6 +3,7 @@ import { createEmitter } from '../output/emit';
 import { dash, shortSha, shortTime, yesNo } from '../output/formatValue';
 import { colourEnabled, createStylist } from '../output/stylize';
 import { displayWidth, padRight, renderTable } from '../output/textTable';
+import { startupLines } from '../output/startupLines';
 
 function collect(colour: boolean): { lines: string[]; emit: ReturnType<typeof createEmitter> } {
   const lines: string[] = [];
@@ -97,4 +98,13 @@ describe('取值格式化', () => {
     expect(shortSha(undefined)).toBe('-');
     expect(yesNo(true)).toBe('是');
   });
+});
+
+test('RFC-024：CLI 启动过程的「CLI 初始化」段有中文名，进行中带说明', () => {
+  const lines = startupLines({ state: 'running', startedAt: '2026-09-23T03:00:00.000Z', observedAt: '2026-09-23T03:00:12.000Z', stages: [
+    { kind: 'agent', state: 'succeeded', startedAt: '2026-09-23T03:00:00.000Z', endedAt: '2026-09-23T03:00:02.000Z', durationMs: 2000 },
+    { kind: 'interface', state: 'running', startedAt: '2026-09-23T03:00:02.000Z', detail: '进程已拉起，等待 CLI 画出界面' },
+    { kind: 'ready', state: 'pending' },
+  ] });
+  expect(lines.slice(1)).toEqual(['  ✓ Agent 启动中  2.0 秒', '  ● CLI 初始化（等待界面）  进程已拉起，等待 CLI 画出界面', '  ○ 已就绪']);
 });

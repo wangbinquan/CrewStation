@@ -10,7 +10,7 @@ export interface NativeTerminalStart {
   profile?: ProfileRevisionRef;
   record: NativeTerminalRecord;
   /** image：受理时档位修订按摘要固定的镜像（RFC-006）；之前受理的 CLI 没有，按平台任务镜像起。 */
-  /** startup：RFC-022 的六段启动进度，就绪、失败或取消后冻结在这里，之后不再读事件。 */
+  /** startup：RFC-022 的启动进度（RFC-024 起七段），就绪、失败或取消后冻结在这里，之后不再读事件。 */
   /** acceptedAt：受理时刻，排队分配容器从这一刻算起；record.startedAt 之后会被 Runner 回报的记录改成进程启动时间（RFC-022 实机）。 */
   execution?: { previousTaskId?: TaskId; taskId: TaskId; taskProfile?: string; image?: string; stopRequested?: boolean; finalized?: boolean; screen?: 'available' | 'unavailable'; startup?: StartupRecord; acceptedAt?: string };
 }

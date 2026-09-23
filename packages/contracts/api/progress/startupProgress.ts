@@ -4,7 +4,8 @@ import { z } from 'zod';
  * RFC-022 启动进度：一个容器从受理到可用经过的阶段，由后端按阶段产出并存库，刷新不丢、所有人看到同一份。
  * 开发会话、「＋ CLI」与档位测试共用；段名不进契约，工作台按 kind 取文案，命令行有自己的中文名。
  */
-export const StartupStageKindSchema = z.enum(['queue', 'replace', 'container', 'checkout', 'connect', 'prepare', 'agent', 'ready']);
+/** RFC-024：`interface` 在 `agent`（进程拉起）与 `ready` 之间，到 CLI 画出界面为止；只有新开 CLI 有这一段。 */
+export const StartupStageKindSchema = z.enum(['queue', 'replace', 'container', 'checkout', 'connect', 'prepare', 'agent', 'interface', 'ready']);
 export const StartupStageStateSchema = z.enum(['pending', 'running', 'succeeded', 'failed', 'skipped']);
 export const StartupStateSchema = z.enum(['running', 'ready', 'failed', 'cancelled']);
 

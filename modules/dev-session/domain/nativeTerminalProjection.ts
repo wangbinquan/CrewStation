@@ -11,7 +11,7 @@ export function projectNativeTerminal(start: StoredIdentity, roster: NativeTermi
   return { ...record, ...identity, lifecycle: 'unknown' };
 }
 
-/** RFC-022：组合 CLI 六段所需的输入，全部来自持久数据，所以刷新、换人看都是同一份。 */
+/** RFC-022：组合 CLI 启动进度（RFC-024 起七段）所需的输入，全部来自持久数据，所以刷新、换人看都是同一份。 */
 export interface CliStartupInput {
   /** CLI 受理时刻（dev-session 登记）：「排队分配容器」从这里算起，早于执行环境受理。 */
   readonly accepted: string;
@@ -20,20 +20,25 @@ export interface CliStartupInput {
   readonly beforeStart?: BeforeStartExecution;
   /** CLI 进程拉起的时刻：第一条 running 的 nativeTerminal 事件被平台收到的时间。 */
   readonly runningAt?: string;
+  /**
+   * RFC-024：CLI 画出界面的时刻（第一条 ui.ready 的 nativeTerminal 事件被平台收到的时间）与判定方式。
+   * `reportsInterface` 为假是旧 Runner：不报界面状态，进程拉起即就绪，与之前一致。
+   */
+  readonly interface?: { readonly reports: boolean; readonly at?: string; readonly by?: 'screen' | 'timeout' };
   readonly record: Pick<NativeTerminalRecord, 'lifecycle' | 'reason' | 'error' | 'endedAt'>;
 }
 
 /** CLI 结束而没有哪一段写明失败时（Runner 重启、环境失败），按当时进行中的段归类。 */
 const FAILURE_AT: Record<StartupStageKind, StartupErrorCode> = {
   queue: 'admission-rejected', replace: 'replace-failed', container: 'container-start-failed', checkout: 'checkout-failed', connect: 'pod-exited',
-  prepare: 'before-start-failed', agent: 'agent-start-failed', ready: 'agent-start-failed',
+  prepare: 'before-start-failed', agent: 'agent-start-failed', interface: 'agent-start-failed', ready: 'agent-start-failed',
 };
 
 const later = (start: string, end: string): string => (Date.parse(end) < Date.parse(start) ? start : end);
 const span = (start: string, end: string) => { const endedAt = later(start, end); return { startedAt: start, endedAt, durationMs: Date.parse(endedAt) - Date.parse(start) }; };
 
 /**
- * 六段：执行环境的排队分配容器／容器启动中／等待连接（task-runtime 产出）＋准备环境／Agent 启动中／已就绪（Runner 事件）。
+ * 七段：执行环境的排队分配容器／容器启动中／等待连接（task-runtime 产出）＋准备环境／Agent 启动中／CLI 初始化／已就绪（Runner 事件）。
  * 各段首尾相接；升级前受理的 CLI 返回 undefined，页面照旧显示结论。
  */
 export function composeCliStartup(input: CliStartupInput): StartupRecord | undefined {
@@ -47,8 +52,10 @@ export function composeCliStartup(input: CliStartupInput): StartupRecord | undef
   const prepare = prepareStage(connect?.state === 'succeeded' ? connect.endedAt : undefined, input.beforeStart);
   // 启动前步骤被取消只在 CLI 被关闭时发生：Agent 不再启动，整体按已取消收尾。
   const agent: StartupStage = input.beforeStart?.state === 'cancelled' ? { kind: 'agent', state: 'pending' } : agentStage(prepare, input.runningAt, record);
-  const ready: StartupStage = agent.state === 'succeeded' ? { kind: 'ready', state: 'succeeded', startedAt: agent.endedAt!, endedAt: agent.endedAt!, durationMs: 0 } : { kind: 'ready', state: 'pending' };
-  return settle([...container, prepare, agent, ready], accepted, record, env);
+  const shown = interfaceStage(agent, input.interface);
+  const done = shown.state === 'succeeded' || shown.state === 'skipped';
+  const ready: StartupStage = done ? { kind: 'ready', state: 'succeeded', startedAt: shown.endedAt!, endedAt: shown.endedAt!, durationMs: 0 } : { kind: 'ready', state: 'pending' };
+  return settle([...container, prepare, agent, shown, ready], accepted, record, env);
 }
 
 function prepareStage(start: string | undefined, execution: BeforeStartExecution | undefined): StartupStage {
@@ -74,6 +81,15 @@ function agentStage(prepare: StartupStage, runningAt: string | undefined, record
   if (runningAt) return { kind: 'agent', state: 'succeeded', ...span(start, runningAt) };
   if (record.lifecycle === 'failed' && record.reason === 'start-failed') return { kind: 'agent', state: 'failed', ...span(start, record.endedAt ?? start), error: { code: 'agent-start-failed', message: record.error ?? 'CLI 进程没有起来' } };
   return { kind: 'agent', state: 'running', startedAt: start, detail: '准备 CLI 配置并拉起进程' };
+}
+
+/** RFC-024：进程拉起到 CLI 画出界面。旧 Runner 不报界面状态，这一段跳过、时长 0。 */
+function interfaceStage(agent: StartupStage, ui: CliStartupInput['interface']): StartupStage {
+  if (agent.state !== 'succeeded' || !agent.endedAt) return { kind: 'interface', state: 'pending' };
+  const start = agent.endedAt;
+  if (!ui?.reports) return { kind: 'interface', state: 'skipped', startedAt: start, endedAt: start, durationMs: 0 };
+  if (ui.at) return { kind: 'interface', state: 'succeeded', ...span(start, ui.at), ...(ui.by === 'timeout' ? { detail: '未检测到界面，已超时放行' } : {}) };
+  return { kind: 'interface', state: 'running', startedAt: start, detail: '进程已拉起，等待 CLI 画出界面' };
 }
 
 /** 整体状态：有失败即失败，已就绪即就绪；CLI 在就绪前结束时，被关闭算取消，其余把进行中的段记为失败。 */

@@ -17,7 +17,7 @@ import { launchSpec, material } from './profileFixtures';
 const cleanups: Array<() => Promise<void>> = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
 
-interface FixtureOptions { activityFactory?: NativeSupervisorDeps['activityFactory']; runnerId?: string; realPrepare?: boolean; logger?: NativeSupervisorDeps['logger'] }
+interface FixtureOptions { activityFactory?: NativeSupervisorDeps['activityFactory']; runnerId?: string; realPrepare?: boolean; logger?: NativeSupervisorDeps['logger']; readinessLimits?: NativeSupervisorDeps['readinessLimits']; cmd?: string[] }
 
 async function fixture(options: FixtureOptions = {}) {
   const root = await mkdtemp(join(tmpdir(), 'cs-native-pty-'));
@@ -35,9 +35,10 @@ async function fixture(options: FixtureOptions = {}) {
   const native = new NativeTerminalSupervisor({
     backend: createNativePtyBackend(launcher), launcher, paths, beforeStart, logger: options.logger ?? noopLogger, runnerId: options.runnerId, emit,
     ...(options.activityFactory ? { activityFactory: options.activityFactory } : {}),
+    ...(options.readinessLimits ? { readinessLimits: options.readinessLimits } : {}),
     ...(options.realPrepare ? {} : { prepare: async (_spec, context) => {
       launches++;
-      return { plan: { cmd: ['bash', '--noprofile', '--norc'], cwd: context.cwd, env: { ...context.env, PS1: 'test-ready> ' } }, dispose: () => { disposed++; } };
+      return { plan: { cmd: options.cmd ?? ['bash', '--noprofile', '--norc'], cwd: context.cwd, env: { ...context.env, PS1: 'test-ready> ' } }, dispose: () => { disposed++; } };
     } }),
   });
   cleanups.push(() => native.closeAll());
@@ -242,4 +243,49 @@ test('通用终端协议（RFC-006 C6、C16）：原样拉起档位二进制，C
   expect(f.events.some((event) => event.kind === 'nativeActivity')).toBe(false);
   await f.native.stop('term', f.native.runnerId);
   expect(await stat(f.beforeStart.runDirFor('term')).then(() => true, () => false)).toBe(false);
+});
+
+// RFC-024：步骤条曾在进程拉起那一刻撤掉，CLI 还没画出界面，用户看到十来秒黑屏。Runner 按屏幕判定界面画出后才上报 ui.ready。
+const uiStates = (f: Fixture, agentId: string) => f.events.flatMap((e) => (e.kind === 'nativeTerminal' && e.terminal.agentId === agentId && e.terminal.ui ? [{ lifecycle: e.terminal.lifecycle, ...e.terminal.ui }] : []));
+
+async function uiReady(f: Fixture, agentId: string) {
+  const deadline = Date.now() + 3000;
+  while (Date.now() < deadline) {
+    const ready = uiStates(f, agentId).find((ui) => ui.state === 'ready');
+    if (ready) return ready;
+    await Bun.sleep(10);
+  }
+  throw new Error(`${agentId} 没有上报界面就绪`);
+}
+
+test('RFC-024：进程拉起时记录带 ui.waiting；屏幕出现可见文字并静止后上报一次 ui.ready（screen）', async () => {
+  const f = await fixture({ readinessLimits: { quietMs: 50, timeoutMs: 10_000, minVisible: 1 } });
+  await f.native.start(f.command('ui-screen'));
+  await settled(f, 'ui-screen');
+  expect(uiStates(f, 'ui-screen')[0]).toEqual({ lifecycle: 'running', state: 'waiting' });
+  const ready = await uiReady(f, 'ui-screen');
+  expect(ready.by).toBe('screen');
+  expect(Date.parse(ready.readyAt!)).not.toBeNaN();
+  expect(f.native.list().terminals.find((r) => r.agentId === 'ui-screen')?.ui).toMatchObject({ state: 'ready', by: 'screen' });
+  // 之后的输出不再改界面状态：只判一次。
+  f.native.claim('terminal-ui-screen', 'view-1', f.native.runnerId);
+  f.native.input('terminal-ui-screen', 'echo later\r', 'view-1');
+  await outputContains(f, 'terminal-ui-screen', 'later');
+  await Bun.sleep(120);
+  expect(uiStates(f, 'ui-screen').filter((ui) => ui.state === 'ready')).toHaveLength(1);
+});
+
+test('RFC-024：CLI 一直不画可见文字，到超时按 timeout 放行', async () => {
+  const f = await fixture({ readinessLimits: { quietMs: 50, timeoutMs: 200, minVisible: 1 }, cmd: ['sleep', '5'] });
+  await f.native.start(f.command('ui-timeout'));
+  await settled(f, 'ui-timeout');
+  expect((await uiReady(f, 'ui-timeout')).by).toBe('timeout');
+});
+
+test('RFC-024：判定前进程就退出，不再上报 ui.ready（计时器已清）', async () => {
+  const f = await fixture({ readinessLimits: { quietMs: 50, timeoutMs: 300, minVisible: 1 }, cmd: ['true'] });
+  await f.native.start(f.command('ui-exit'));
+  await settled(f, 'ui-exit', 'ended');
+  await Bun.sleep(450);
+  expect(uiStates(f, 'ui-exit').some((ui) => ui.state === 'ready')).toBe(false);
 });

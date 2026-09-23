@@ -52,8 +52,8 @@ test('视图模型：时钟偏差、各段用时、总用时、当前段位置�
   expect(stageLabel(t, running)).toBe('准备环境（启动前步骤 1/2）');
   expect(stageLabel(t, { kind: 'prepare', state: 'pending' })).toBe('准备环境（启动前步骤）');
   expect(stageLabel(t, { kind: 'checkout', state: 'running', subject: 'feature/x' })).toBe('检出代码（分支 feature/x）');
-  expect(['queue', 'replace', 'container', 'connect', 'agent', 'ready'].map((kind) => stageLabel(t, { kind, state: 'pending' })))
-    .toEqual(['排队分配容器', '替换旧容器', '容器启动中（调度、拉取镜像）', '容器已启动，等待连接', 'Agent 启动中', '已就绪']);
+  expect(['queue', 'replace', 'container', 'connect', 'agent', 'interface', 'ready'].map((kind) => stageLabel(t, { kind, state: 'pending' })))
+    .toEqual(['排队分配容器', '替换旧容器', '容器启动中（调度、拉取镜像）', '容器已启动，等待连接', 'Agent 启动中', 'CLI 初始化（等待界面）', '已就绪']);
 });
 
 test('步骤条：完成的打勾带用时与细节，当前段带细节与按服务器时间的计时，未开始的空心；标题带已用时间', async () => {

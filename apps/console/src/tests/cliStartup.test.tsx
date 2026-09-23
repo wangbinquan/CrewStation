@@ -6,6 +6,7 @@ import type { NativeTerminalDto, StartupProgress } from '@crewstation/contracts'
 import { TaskIdSchema } from '@crewstation/contracts';
 import { NativeTerminalView } from '../features/dev-session/components/native/NativeTerminalView';
 import type { TaskStreamChannel } from '../features/dev-session/hooks/useTaskStream';
+import { holdsDuringStartup } from '../features/dev-session/hooks/native/useCreatorClaim';
 import { creatorClaims } from '../features/dev-session/model/native/creatorClaims';
 import { INITIAL_STREAM_STATE } from '../features/dev-session/model/taskStreamSocket';
 import { messages } from '../features/dev-session/i18n/zh-CN';
@@ -128,4 +129,28 @@ test('启动失败：停在出错的那一段，写出原因，给「重试」�
   expect(page.text()).toContain('正在收集容器日志…');
   await act(async () => update({ ...terminal, startup: { ...withoutLog, observedAt: at(30) } })); await page.settle();
   expect(page.text()).toContain('执行容器没有留下日志（容器没有启动，或者日志为空），原因见上。');
+});
+
+// RFC-024：「已就绪」推迟到 CLI 画出界面后，进程拉起到界面画出之间创建者的窗口仍算「在用」，
+// 否则焦点在别处时 30 秒空闲释放掉控制，OpenCode 等不到终端查询的应答、界面一直画不出来。
+test('RFC-024：创建者窗口在「CLI 初始化」期间仍算在用；就绪、结束或不是本窗口创建的都不算', () => {
+  const initializing = { lifecycle: 'running' as const, startup: { ...running, state: 'running' as const } };
+  expect(holdsDuringStartup(true, { lifecycle: 'starting', startup: running })).toBe(true);
+  expect(holdsDuringStartup(true, initializing)).toBe(true);
+  expect(holdsDuringStartup(true, { lifecycle: 'running', startup: { ...running, state: 'ready' } })).toBe(false);
+  expect(holdsDuringStartup(true, { lifecycle: 'running' })).toBe(false);
+  expect(holdsDuringStartup(true, { lifecycle: 'ended', startup: { ...running, state: 'running' } })).toBe(false);
+  expect(holdsDuringStartup(false, initializing)).toBe(false);
+});
+
+test('RFC-024：七段步骤条——进程已拉起、界面还没画出时步骤条仍盖着终端，状态条显示「CLI 初始化」', async () => {
+  const f = fakeChannel(), terminal = base();
+  const initializing: StartupProgress = { ...running, stages: [...running.stages.slice(0, 3),
+    { kind: 'prepare', state: 'skipped', startedAt: at(4.5), endedAt: at(4.5), durationMs: 0 },
+    { kind: 'agent', state: 'succeeded', startedAt: at(4.5), endedAt: at(6), durationMs: 1500 },
+    { kind: 'interface', state: 'running', startedAt: at(6), detail: '进程已拉起，等待 CLI 画出界面' }, { kind: 'ready', state: 'pending' }] };
+  page = await renderElement(<Harness initial={{ ...terminal, lifecycle: 'running', startup: initializing }} channel={f.channel} />, messages);
+  expect(page.host.querySelector('section[data-state="running"]')).not.toBeNull();
+  expect([...page.host.querySelectorAll('li')]).toHaveLength(7);
+  expect(page.host.querySelector('[role="status"]')!.textContent).toContain('启动中 6/7 · CLI 初始化（等待界面） · 进程已拉起，等待 CLI 画出界面');
 });
