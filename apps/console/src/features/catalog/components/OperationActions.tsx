@@ -17,12 +17,15 @@ export interface OperationActionsProps {
   /** 给了就不在这里展开表单，而是交给调用方（放大形态里表单在详情栏）。 */
   readonly onRequest?: (operation: ApiOperationDto) => void;
   readonly initiallyRequesting?: boolean;
+  /** 给了就只渲染申请表单：取消或受理后交还调用方收起（列表行下原地展开时用）。 */
+  readonly onClose?: () => void;
 }
 
 /** 项目只消费能力；失败保留理由，成功受理后才收起申请。 */
-export function OperationActions({ operation, pendingRequest, actions, onRequest, initiallyRequesting = false }: OperationActionsProps): ReactElement {
+export function OperationActions({ operation, pendingRequest, actions, onRequest, initiallyRequesting = false, onClose }: OperationActionsProps): ReactElement | null {
   const t = useT();
-  const [requesting, setRequesting] = useState(initiallyRequesting && !onRequest);
+  const [requesting, setRequesting] = useState((initiallyRequesting || !!onClose) && !onRequest);
+  const stop = (): void => { if (onClose) onClose(); else setRequesting(false); };
   const submitting = useRef(false);
   const needsRequest = operation.openPolicy === 'targeted' && operation.granted !== true;
   if (requesting) {
@@ -30,15 +33,16 @@ export function OperationActions({ operation, pendingRequest, actions, onRequest
       <AccessRequestForm
         pending={actions.requestAccess.isPending}
         error={actions.requestAccess.variables?.operationId === operation.id && actions.requestAccess.error ? errorMessage(actions.requestAccess.error) : undefined}
-        onCancel={() => setRequesting(false)}
+        onCancel={stop}
         onSubmit={(reason) => {
           if (submitting.current) return;
           submitting.current = true;
-          actions.requestAccess.mutate({ operationId: operation.id, reason: reason.length > 0 ? reason : undefined }, { onSuccess: () => setRequesting(false), onSettled: () => { submitting.current = false; } });
+          actions.requestAccess.mutate({ operationId: operation.id, reason: reason.length > 0 ? reason : undefined }, { onSuccess: stop, onSettled: () => { submitting.current = false; } });
         }}
       />
     );
   }
+  if (onClose) return null;
   return (
     <div className={styles.rowActions}>
       {pendingRequest !== undefined ? <Badge tone="info">{t('catalog.request.pending')}</Badge> : null}

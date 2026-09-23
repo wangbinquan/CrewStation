@@ -3,7 +3,7 @@ import { afterEach, expect, test } from 'bun:test';
 import { act } from 'react';
 import { TaskIdSchema } from '@crewstation/contracts';
 import { renderApp } from './renderApp';
-import { apiInvocationFixture, invocationClick, invocationField, invocationInput, invocationOperation, invocationResponse, invocationRoute, invocationTaskId, refreshInvocationQueries } from './apiInvocationFixture';
+import { apiInvocationFixture, invocationClick, invocationField, invocationInput, invocationOperation, invocationProjectId, invocationResponse, invocationRoute, invocationTaskId, refreshInvocationQueries } from './apiInvocationFixture';
 
 const originalFetch = globalThis.fetch, originalSocket = globalThis.WebSocket, originalUrl = window.location.href;
 let page: Awaited<ReturnType<typeof renderApp>> | undefined;
@@ -31,7 +31,7 @@ test('失败、收起、取消切操作均保留输入；确认切换只丢弃�
   f.pending.handle = async () => Response.json({ error: 'unavailable', message: '容器响应丢失，请先核对业务状态' }, { status: 503 });
   await invocationClick(page, '发送请求'); expect(page.text()).toContain('容器响应丢失'); expect(invocationField('路径参数 id').value).toBe('draft');
   await invocationClick(page, '收起输入'); await invocationClick(page, '继续编辑试调输入'); expect(invocationField('路径参数 id').value).toBe('draft');
-  const next = () => [...document.querySelectorAll('tr')].find((row) => row.textContent?.includes('/ping'))!;
+  const next = () => [...document.querySelectorAll('li')].find((row) => row.textContent?.includes('/ping'))!;
   await invocationClick(page, '试调', next()); expect(page.text()).toContain('丢弃当前操作的输入'); await invocationClick(page, '保留当前输入'); expect(invocationField('路径参数 id').value).toBe('draft');
   await invocationClick(page, '试调', next()); await invocationClick(page, '丢弃当前输入并切换'); expect(document.querySelector('input[aria-invalid]')).toBeNull(); expect(page.text()).toContain('GET／HEAD 不发送请求体');
   expect(f.calls).toHaveLength(1);
@@ -73,4 +73,21 @@ test('测试者深链接回到版本试用；开发者无会话时明确说明�
   page.unmount(); page = undefined; f.state.role = 'developer'; f.state.malformedSession = true; page = await renderApp(invocationRoute); await invocationClick(page, '试调');
   // 数据访问面板收起时仍挂在树上（带草稿），它的申请理由框不算试调表单：只看可见的输入框。
   expect(page.text()).toContain('没有已确认'); expect([...document.querySelectorAll('textarea')].filter((node) => !node.closest('[hidden]'))).toHaveLength(0); expect(f.calls).toHaveLength(0);
+});
+
+test('2026-09-23 侧栏里试调在该行下原地展开：会话绑定压成一行、会话 ID 只进悬停提示，收起后可继续编辑，发送走同一把锁', async () => {
+  const f = apiInvocationFixture(); page = await renderApp(`/projects/${invocationProjectId}/dev-session?view=reference`);
+  const row = () => [...document.querySelectorAll('li')].find((node) => node.textContent?.includes('/items/{id}'))!;
+  // 没开试调时列表上方没有会话绑定卡。
+  expect(page.text()).not.toContain('重新检查并绑定当前会话');
+  await invocationClick(page, '试调', row());
+  expect(row().textContent).toContain('真实调用'); expect(row().textContent).toContain('已绑定当前开发会话'); expect(row().textContent).toContain('${CS_INTERNAL_API_BASE}crm/items/{id}');
+  expect(row().textContent).not.toContain(invocationTaskId); expect(row().querySelector(`[title="${invocationTaskId}"]`)).not.toBeNull();
+  expect(row().querySelector('input')).not.toBeNull();
+  await invocationInput(page, invocationField('路径参数 id'), 'inline');
+  await invocationClick(page, '收起输入', row()); await invocationClick(page, '继续编辑试调输入', row()); expect(invocationField('路径参数 id').value).toBe('inline');
+  await invocationClick(page, '发送请求', row()); expect(f.calls).toHaveLength(1); expect(f.calls[0]!.input).toMatchObject({ operationId: invocationOperation.id, pathParameters: { id: 'inline' } });
+  // 结果写的是「方法 路径」；操作 ID 只留在折起来的「本次发送的请求」原文里。
+  const visible = row().cloneNode(true) as HTMLElement; visible.querySelectorAll('details').forEach((node) => node.remove());
+  expect(visible.textContent).toContain('POST /items/{id}'); expect(visible.textContent).not.toContain(invocationOperation.id);
 });

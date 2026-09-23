@@ -23,12 +23,14 @@ export interface RequestsPanelProps {
   readonly title?: string;
   readonly empty?: string;
   readonly renderService?: (serviceId: string) => ReactNode;
+  /** 把操作 ID 换成人读得懂的「代理 方法 路径」；没给或查不到时显示 ID。 */
+  readonly describeOperation?: (operationId: string) => string | undefined;
   readonly management?: { readonly busy: boolean; readonly onDecide: (id: string, approve: boolean, decision?: string) => void;
     readonly decisionFor: (id: string) => string; readonly onDecisionChange: (id: string, value: string) => void };
 }
 
 /** 申请事实供项目和管理页复用；只有管理入口注入审批动作。 */
-export function RequestsPanel({ requests, loading, loadError, title, empty, renderService, management }: RequestsPanelProps): ReactElement {
+export function RequestsPanel({ requests, loading, loadError, title, empty, renderService, describeOperation, management }: RequestsPanelProps): ReactElement {
   const t = useT();
   return (
     <Card compact={!!management} title={title ?? t('catalog.requests.title')}>
@@ -38,7 +40,7 @@ export function RequestsPanel({ requests, loading, loadError, title, empty, rend
         <ul className={styles.list}>
           {requests.map((request) => (
             <li key={request.id} className={styles.item}>
-              <div className={styles.summary}>{renderService?.(request.serviceId)}<RequestSummary request={request} /></div>
+              <div className={styles.summary}>{renderService?.(request.serviceId)}<RequestSummary request={request} label={describeOperation?.(request.operationId)} /></div>
               {management && request.state === 'pending' ? (
                 <RequestDecisionForm
                   pending={management.busy}
@@ -55,13 +57,13 @@ export function RequestsPanel({ requests, loading, loadError, title, empty, rend
 }
 
 /** 一条申请的全部事实：谁申请、理由、状态、谁在什么时候给了什么意见。 */
-function RequestSummary({ request }: { readonly request: ApiRequestDto }): ReactElement {
+function RequestSummary({ request, label }: { readonly request: ApiRequestDto; readonly label?: string }): ReactElement {
   const t = useT();
   const dateText = useDateText();
   return (
     <div className={styles.summary}>
       <div className={styles.head}>
-        <code className={styles.key}>{request.operationId}</code>
+        <code className={styles.key} title={label ? request.operationId : undefined}>{label ?? request.operationId}</code>
         <Badge tone={STATE_TONE[request.state]}>{t(STATE_KEY[request.state])}</Badge>
       </div>
       <dl className={styles.facts}>

@@ -161,8 +161,9 @@ test('从指定 API 文档进入管理再返回，恢复原分类与接口而不
   // 实机只记 pathname，回程把 settings 的分类和操作丢掉，误落到默认成员页。
   expect(page.path()).toBe(`/projects/${projectId}/dev-session`);
   expect(page.search()).toEqual({ view: 'reference', panel: 'full', topic: 'api', proxy: '01a0bf5d-8f4b-7274-8cd7-e347cbc132cf', operation: key });
-  expect(document.querySelector('[role="tablist"][aria-label="资源主题"] [aria-selected="true"]')?.textContent).toContain('API 接口');
-  expect(page.text()).toContain(key); expect(f.writes()).toHaveLength(0);
+  expect(document.querySelector('[role="tablist"][aria-label="资源主题"] [aria-selected="true"]')?.textContent).toContain('调用接口');
+  // 2026-09-23：定位到的操作是选中的那一行，界面上不再显示操作 ID。
+  expect(document.querySelector('li[aria-current="true"]')?.textContent).toContain('/invoices'); expect(page.text()).not.toContain(`${key}`); expect(f.writes()).toHaveLength(0);
   await page.back(); expect(page.path()).toBe('/admin/capabilities');
   await page.back(); expect(page.search()).toMatchObject({ topic: 'api', operation: key });
 });

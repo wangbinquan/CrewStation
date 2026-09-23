@@ -39,9 +39,9 @@ async function reason(value: string) {
 
 test('申请失败保留打开的表单与理由，重试成功才收起并显示真实待审状态', async () => {
   const f = fixture(); page = await renderApp(`/projects/${projectId}/settings?tab=resources&resource=api`);
-  await page.click('申请定向开放');
-  // RFC-020 §7：表里的按钮选中该行，申请表单在右侧详情栏展开。
-  expect(document.querySelector('tr[aria-current="true"]')?.textContent).toContain('/invoices'); expect(document.querySelector('aside[aria-label="操作详情"] textarea')).not.toBeNull();
+  await page.click('申请');
+  // RFC-020 §7：列表里的按钮选中该行，申请表单在右侧详情栏展开。
+  expect(document.querySelector('li[aria-current="true"]')?.textContent).toContain('/invoices'); expect(document.querySelector('aside[aria-label="操作详情"] textarea')).not.toBeNull();
   // 详情栏的操作（申请表单）在事实之前，不压在底部。
   expect(document.querySelector('aside[aria-label="操作详情"] textarea')!.compareDocumentPosition(document.querySelector('aside[aria-label="操作详情"] dl')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   await reason('查询账单'); await page.click('提交申请');
@@ -66,7 +66,7 @@ test('当前用户缺少成员列表时 API 页面不崩溃，重新读取恢复
   globalThis.fetch = (async (raw, init) => incomplete && String(raw).endsWith('/v1/me')
     ? Response.json({ id: '01a0bf5d-8f4b-7fae-8c2f-e82b0fa04985', name: '开发者', platformRole: 'developer', isAdmin: false }) : fallback(raw, init)) as typeof fetch;
   page = await renderApp(`/projects/${projectId}/settings?tab=resources&resource=api`);
-  expect(page.text()).toContain('当前用户资料不完整'); expect(page.text()).toContain('可调用的操作');
+  expect(page.text()).toContain('当前用户资料不完整'); expect(page.text()).toContain('/invoices');
   expect(page.text()).not.toContain('Something went wrong'); expect(f.writes).toEqual([]);
   incomplete = false; await page.click('重新读取用户资料');
   expect(page.text()).not.toContain('当前用户资料不完整'); expect(f.writes).toEqual([]);
@@ -74,7 +74,7 @@ test('当前用户缺少成员列表时 API 页面不崩溃，重新读取恢复
 
 test('理由格式首屏提示，超过上限明确报错且不发送申请', async () => {
   const f = fixture(); page = await renderApp(`/projects/${projectId}/settings?tab=resources&resource=api`);
-  await page.click('申请定向开放'); expect(page.text()).toContain('最多 500 字');
+  await page.click('申请'); expect(page.text()).toContain('最多 500 字');
   await reason('字'.repeat(501)); await page.click('提交申请');
   expect(document.querySelector('textarea[aria-invalid="true"]')).not.toBeNull(); expect(f.writes).toHaveLength(0);
 });

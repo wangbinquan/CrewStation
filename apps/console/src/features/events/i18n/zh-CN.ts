@@ -58,4 +58,15 @@ export const messages = {
   'events.deliveryState.retrying': '重试中',
   'events.deliveryState.dead': '死信',
   'events.deliveryState.held': '维护暂存',
+  // 开发页「可使用资源 → 接收事件」的两行列表（2026-09-23）。
+  'events.list.label': '事件',
+  'events.list.subscribed': '已订阅',
+  'events.list.subscribedNote': '发布登记后生效；只推送到承接生产流量的槽。',
+  'events.list.subscribedEmpty': '还没有订阅。在下面点一个事件类型复制订阅片段，粘进 crewstation.yaml。',
+  'events.list.producer': '{producer} 产生的事件',
+  'events.list.producerNote': '点类型复制订阅片段（按 ID 绑定，注释写明类型），粘进 crewstation.yaml 的 subscriptions 下；处理路径可改。',
+  'events.list.copy': '复制 {type} 的订阅片段',
+  'events.list.copied': '已复制 {type} 的订阅片段',
+  'events.list.copyFailed': '复制失败：浏览器不允许写剪贴板（{type}）',
+  'events.list.alreadySubscribed': '已订阅',
 } satisfies Messages;

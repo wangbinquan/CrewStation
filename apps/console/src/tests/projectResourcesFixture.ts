@@ -1,4 +1,17 @@
 export const resourcesProjectId = '01a0bf5d-8f4b-7e1e-8dde-c9c2ae13ed34', resourcesServiceId = '01a0bf5d-8f4b-760b-86b6-0bb9f08a9eaa';
+/** 一条已可调（默认开放）、一条需申请（定向开放）；ID 故意不出现在界面上。 */
+export const resourceOperations = [
+  { id: '01a0bf5d-8f4b-7a11-8000-00000000c0de', proxyId: '01a0bf5d-8f4b-7a11-8000-0000000000c1', proxy: 'crm', method: 'POST', path: '/customers/{id}', summary: '更新客户', openPolicy: 'default', granted: true },
+  { id: '01a0bf5d-8f4b-7a11-8000-00000000b111', proxyId: '01a0bf5d-8f4b-7a11-8000-0000000000b1', proxy: 'billing', method: 'GET', path: '/invoices', summary: '列出账单', openPolicy: 'targeted', granted: false },
+] as const;
+/** gitlab 生产的三种类型：一个族（issue.open／issue.close）与一个单独的 push；source.changed 是已订阅的那条。 */
+export const resourceEventTypes = [
+  { id: '01a0bf5d-8f4b-780c-85dd-95f81e0fec71', name: 'source.changed', producerId: '01a0bf5d-8f4b-780c-85dd-00000000e0e0', state: 'active', eventType: 'source.changed', producer: 'source', producerProject: 'source-producer' },
+  { id: '01a0bf5d-8f4b-780c-85dd-000000000001', name: 'gitlab.issue.open', producerId: '01a0bf5d-8f4b-780c-85dd-00000000e0e1', state: 'active', eventType: 'gitlab.issue.open', producer: 'gitlab', producerProject: 'gitlab-event-producer' },
+  { id: '01a0bf5d-8f4b-780c-85dd-000000000002', name: 'gitlab.issue.close', producerId: '01a0bf5d-8f4b-780c-85dd-00000000e0e1', state: 'active', eventType: 'gitlab.issue.close', producer: 'gitlab', producerProject: 'gitlab-event-producer' },
+  { id: '01a0bf5d-8f4b-780c-85dd-000000000003', name: 'gitlab.push', producerId: '01a0bf5d-8f4b-780c-85dd-00000000e0e1', state: 'active', eventType: 'gitlab.push', producer: 'gitlab', producerProject: 'gitlab-event-producer', schemaRef: 'schemas/push.json' },
+  { id: '01a0bf5d-8f4b-780c-85dd-000000000004', name: 'gitlab.tag', producerId: '01a0bf5d-8f4b-780c-85dd-00000000e0e1', state: 'removed', eventType: 'gitlab.tag', producer: 'gitlab', producerProject: 'gitlab-event-producer' },
+] as const;
 const createdAt = '2026-09-20T01:00:00.000Z';
 export function projectResourcesFixture(admin = false) {
   const state = { kind: admin ? 'APIProxy' : 'DigitalWorker', fail: '', invalid: false, noService: false };
@@ -22,6 +35,8 @@ export function projectResourcesFixture(admin = false) {
     if (path.endsWith('/capabilities')) return Response.json(state.invalid ? {} : capability);
     if (path.endsWith('/repository')) return Response.json({ serviceId: resourcesServiceId, pathWithNamespace: 'crew/demo', defaultBranch: 'main', state: 'ready', httpUrl: 'https://repo.test/crew/demo' });
     if (path.endsWith('/subscriptions')) return Response.json({ items: [subscription] });
+    if (path === '/v1/catalog/operations') return Response.json({ items: resourceOperations });
+    if (path === '/v1/catalog/event-types') return Response.json({ items: resourceEventTypes });
     if (path.endsWith('/dev-session')) return Response.json({ error: 'not_found', message: '请先创建开发会话' }, { status: 404 });
     return Response.json({ items: [] });
   }) as typeof fetch;

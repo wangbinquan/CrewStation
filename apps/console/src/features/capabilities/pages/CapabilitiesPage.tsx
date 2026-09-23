@@ -1,11 +1,9 @@
 import type { CapabilityDescriptionDto } from '@crewstation/contracts';
-import { CapabilityDescriptionDtoSchema } from '@crewstation/contracts';
-import type { ResourceSection, GuideTopic } from '../../../shared/project/resourceSearch';
+import type { ResourceSection } from '../../../shared/project/resourceSearch';
 import type { ReactElement } from 'react';
 import { useProjectScope } from '../../../shared/project/ProjectScope';
-import { api } from '../../../shared/api/client';
-import { queryKeys } from '../../../shared/api/queryKeys';
-import { errorMessage, useApiQuery } from '../../../shared/api/useApi';
+import { errorMessage } from '../../../shared/api/useApi';
+import { useCapabilityDescription } from '../model/useCapabilityDescription';
 import { formatDateTime } from '../../../shared/lib/dateFormat';
 import { useI18n } from '../../../shared/lib/useI18n';
 import { useT } from '../../../shared/lib/useT';
@@ -21,15 +19,11 @@ import { CapabilityBusinessTaskApi, CapabilityMcp, CapabilityQuota } from '../co
 import styles from './CapabilitiesPage.module.css';
 
 /** 能力说明：一次取回聚合描述，按它实际包含的段落逐段呈现，值都可复制。 */
-export function CapabilitiesPage({ embedded = false, section, topic }: { readonly embedded?: boolean; readonly section?: ResourceSection; readonly topic?: GuideTopic }): ReactElement {
+export function CapabilitiesPage({ embedded = false, section }: { readonly embedded?: boolean; readonly section?: ResourceSection }): ReactElement {
   const t = useT();
   const { locale } = useI18n();
   const { projectId } = useProjectScope();
-  const description = useApiQuery(queryKeys.capabilities(projectId), async () => {
-    const parsed = CapabilityDescriptionDtoSchema.safeParse(await api.capabilities.describe(projectId));
-    if (!parsed.success) throw new Error(t('capabilities.invalidResponse'));
-    return parsed.data;
-  });
+  const description = useCapabilityDescription(projectId);
   return (
     <>
       {!embedded ? <PageHeader
@@ -43,20 +37,13 @@ export function CapabilitiesPage({ embedded = false, section, topic }: { readonl
       /> : null}
       {description.isPending ? <p className={styles.muted}>{t('capabilities.loading')}</p> : null}
       {description.error ? <><EmptyState title={t('capabilities.error', { message: errorMessage(description.error) })} /><Button onClick={() => { void description.refetch(); }}>{t('capabilities.retry')}</Button></> : null}
-      {description.data !== undefined ? <CapabilitySections description={description.data} section={section} topic={topic} /> : null}
+      {description.data !== undefined ? <CapabilitySections description={description.data} section={section} /> : null}
     </>
   );
 }
 
-/** 旧聚合契约按使用目的拆开，全部字段仍保留在对应主题。 */
-function CapabilitySections({ description: d, section, topic }: { readonly description: CapabilityDescriptionDto; readonly section?: ResourceSection; readonly topic?: GuideTopic }): ReactElement {
-  const t = useT();
-  if (section === 'guide') return <div className={styles.stack}>
-    <details open={topic === 'identity'} key={`identity:${topic}`}><summary>{t('resources.guide.identity')}</summary><CapabilityConventions conventions={d.conventions} forwarding={d.identityForwarding} groups={['identityHeaders']} /></details>
-    <details open={topic === 'environment'} key={`environment:${topic}`}><summary>{t('resources.guide.environment')}</summary><CapabilityConventions conventions={d.conventions} forwarding={d.identityForwarding} groups={['env', 'paths', 'eventHeaders']} showForwarding={false} /><CapabilityConfigKeys config={d.config} /></details>
-    <details open={topic === 'mcp'} key={`mcp:${topic}`}><summary>{t('capabilities.mcp.title')}</summary><CapabilityMcp mcp={d.mcp} /></details>
-    <details open={topic === 'tasks'} key={`tasks:${topic}`}><summary>{t('capabilities.businessTaskApi.title')}</summary><CapabilityBusinessTaskApi endpoints={d.businessTaskApi} /></details>
-  </div>;
+/** 旧聚合契约按使用目的拆开；开发页「可使用资源」的四个主题由 `components/reference` 呈现。 */
+function CapabilitySections({ description: d, section }: { readonly description: CapabilityDescriptionDto; readonly section?: ResourceSection }): ReactElement {
   return <div className={styles.stack}>
     {/* 项目信息（RFC-020 D6）：地址与服务身份直接可见，配额与套餐在后；项目 ID 一类标识在设置页自己最上面的项目信息卡里。 */}
     {!section || section === 'project' ? <><CapabilityIdentity service={d.service} hosts={d.hosts} /><CapabilityQuota quota={d.quota} plan={d.plan} /></> : null}

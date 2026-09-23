@@ -7,6 +7,10 @@ import { projectResourcesFixture, resourcesProjectId as id, resourcesServiceId }
 const originalFetch = globalThis.fetch;
 let page: Awaited<ReturnType<typeof renderApp>> | undefined;
 afterEach(() => { page?.unmount(); page = undefined; globalThis.fetch = originalFetch; });
+const topicTab = () => document.querySelector('[role="tablist"][aria-label="资源主题"] [aria-selected="true"]')?.textContent;
+async function chooseTopic(label: string) {
+  await act(async () => [...document.querySelectorAll<HTMLButtonElement>('[role="tablist"][aria-label="资源主题"] [role="tab"]')].find((node) => node.textContent === label)!.click()); await page!.settle();
+}
 
 for (const admin of [false, true]) {
   const prefix = admin ? '/admin/integrations' : '/projects';
@@ -57,7 +61,9 @@ test('开通未完成时项目信息卡照样在最上面，服务 ID 用「—�
 
 test('订阅来自代码，保留订阅 ID 与投递路径，并指向当前项目 Manifest', async () => {
   projectResourcesFixture(); page = await renderApp(`/projects/${id}/resources?section=events&subscription=01a0bf5d-8f4b-7b9c-8c07-a2ef94c840cd`);
-  expect(document.querySelector('tr[aria-current="true"]')?.textContent).toContain('source.changed');
+  // 2026-09-23：订阅是两行列表的一行（类型 → 处理路径），地址里的订阅标为当前行。
+  expect(document.querySelector('li[aria-current="true"]')?.textContent).toContain('source.changed');
+  expect(document.querySelector('li[aria-current="true"]')?.textContent).toContain('/on-source');
   const links = [...document.querySelectorAll('a')];
   expect(links.find((link) => link.textContent?.includes('打开订阅声明'))?.getAttribute('href')).toContain('file=crewstation.yaml');
   // RFC-020 §7：事件段顶部一行投递摘要即投递页入口，带着当前订阅。
@@ -66,19 +72,30 @@ test('订阅来自代码，保留订阅 ID 与投递路径，并指向当前项�
   await page.click('查看订阅'); expect(page.search()).toMatchObject({ view: 'reference', topic: 'events', subscription: '01a0bf5d-8f4b-7b9c-8c07-a2ef94c840cd' });
 });
 
-test('平台接入按主题展开，正确说明转发来源且保留环境名、路径、MCP、业务任务接口', async () => {
+test('平台约定按代码怎么用它分到四类：运行环境、接收事件、Agent 工具、调用接口，各自保留原来的全部字段', async () => {
   projectResourcesFixture(true); page = await renderApp(`/admin/integrations/${id}/resources?section=guide&topic=environment`);
-  expect([...document.querySelectorAll('details[open]')].some((node) => node.textContent?.includes('CS_API_BASE'))).toBe(true);
-  for (const value of ['本项目覆盖', 'X-User-Id', 'CS_API_BASE', '/healthz', 'X-Trace-Id', 'APP_TOKEN', 'https://mcp.test', '/business-tasks']) expect(page.text()).toContain(value);
-  await page.click('管理应用环境变量'); expect(page.path()).toBe(`/admin/integrations/${id}/settings`); expect(page.search()).toMatchObject({ tab: 'config', env: 'development' });
+  expect(page.search()).toMatchObject({ topic: 'guide', guide: 'environment' }); expect(topicTab()).toBe('运行环境');
+  for (const value of ['本项目覆盖', 'X-User-Id', 'CS_API_BASE', '/healthz', 'APP_GREETING', 'APP_TOKEN']) expect(page.text()).toContain(value);
+  // 旧的「平台接入」折叠块没有了：没有 <details>，也不再用代码内部键名当标签。
+  expect(document.querySelector('[role="tabpanel"] details')).toBeNull(); expect(page.text()).not.toContain('identityHeaders');
+  await chooseTopic('接收事件'); expect(page.text()).toContain('X-Trace-Id');
+  await chooseTopic('Agent 工具'); expect(page.text()).toContain('https://mcp.test'); expect(page.text()).toContain('x-cs-dev-session-token');
+  await chooseTopic('调用接口'); expect(page.text()).toContain('/business-tasks'); expect(page.text()).toContain('Start a business task');
+  await chooseTopic('运行环境'); await page.click('管理应用环境变量'); expect(page.path()).toBe(`/admin/integrations/${id}/settings`); expect(page.search()).toMatchObject({ tab: 'config', env: 'development' });
   expect(page.text()).not.toContain('应用展示');
+});
+
+test('旧链接里「平台接入」的 MCP 与业务任务小节落到它们现在的家', async () => {
+  projectResourcesFixture(); page = await renderApp(`/projects/${id}/resources?section=guide&topic=mcp`);
+  expect(topicTab()).toBe('Agent 工具'); expect(page.text()).toContain('https://mcp.test');
+  page.unmount(); page = await renderApp(`/projects/${id}/resources?section=guide&topic=tasks`);
+  expect(topicTab()).toBe('调用接口'); expect(page.text()).toContain('/business-tasks');
 });
 
 test('参考面板主题切换使用同一参数与权限路径，错误留在当前主题可重试', async () => {
   const f = projectResourcesFixture(); f.state.fail = 'capabilities'; page = await renderApp(`/projects/${id}/resources?section=guide&topic=environment`);
   expect(page.text()).toContain('本主题暂不可用'); f.state.fail = ''; await page.click('重新读取资源'); expect(page.text()).toContain('CS_API_BASE');
-  const tab = [...document.querySelectorAll<HTMLButtonElement>('[role="tablist"][aria-label="资源主题"] [role="tab"]')].find((node) => node.textContent === '事件')!;
-  await act(async () => tab.click()); await page.settle();
+  await chooseTopic('接收事件');
   // 换主题只留主题本身：上一主题的小节与定位参数不带过去。
   expect(page.search()).toEqual({ view: 'reference', panel: 'full', topic: 'events' }); expect(page.text()).toContain('source.changed');
 });

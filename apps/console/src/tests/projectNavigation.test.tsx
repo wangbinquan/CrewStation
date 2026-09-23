@@ -158,7 +158,7 @@ describe('五个项目入口与旧链接兼容', () => {
     // RFC-020 D2：接口目录住在开发页的参考面板里，旧链接落到放大的参考面板。
     expect(page.path()).toBe(`/projects/${projectId}/dev-session`); expect(page.search()).toMatchObject({ view: 'reference', panel: 'full', topic: 'api', proxy: '01a0bf5d-8f4b-7e4c-802d-e2023d65b4fe', operation: '01a0bf5d-8f4b-7735-8981-22e6031d8202' });
     expect(page.text()).toContain('/invoices/{id}'); expect(page.text()).not.toContain('/articles/{id}');
-    expect(document.querySelector('tr[aria-current="true"]')?.textContent).toContain('/invoices/{id}'); expect(document.querySelector('aside[aria-label="操作详情"]')?.textContent).toContain('GET /invoices/{id}');
+    expect(document.querySelector('li[aria-current="true"]')?.textContent).toContain('/invoices/{id}'); expect(document.querySelector('aside[aria-label="操作详情"]')?.textContent).toContain('GET /invoices/{id}');
     expect(page.text()).not.toContain('管理员模式');
     await page.click('查看全部接口'); expect(page.search().operation).toBeUndefined(); expect(page.text()).toContain('/articles/{id}');
     expect(f.calls.some((call) => call.method !== 'GET')).toBe(false);
@@ -210,7 +210,7 @@ describe('诊断、订阅与配置的上下文', () => {
     expect(page.search()).toMatchObject({ tab: 'deliveries', subscription: 'sub-a' });
     expect(page.text()).toContain('最近 50 条'); expect(page.text()).toContain('git.push'); expect(page.text()).not.toContain('git.issue');
     await page.click('查看订阅'); expect(page.search()).toMatchObject({ view: 'reference', topic: 'events', subscription: 'sub-a' });
-    expect(document.querySelector('tr[aria-current="true"]')?.textContent).toContain('git.push');
+    expect(document.querySelector('li[aria-current="true"]')?.textContent).toContain('git.push');
     await page.back(); await page.click(traceId);
     expect(page.search()).toEqual({ tab: 'trace', traceId }); expect(page.text()).toContain('runner.connected');
     expect(f.calls.some((call) => call.url.pathname === `/v1/projects/${projectId}/traces/${traceId}`)).toBe(true);

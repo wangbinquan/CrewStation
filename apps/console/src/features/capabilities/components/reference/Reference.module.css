@@ -1,0 +1,25 @@
+.stack { display: flex; flex-direction: column; gap: var(--cs-space-3); min-width: 0; container-type: inline-size; }
+.muted { margin: 0; color: var(--cs-color-text-muted); font-size: var(--cs-font-size-sm); }
+.facts { display: flex; flex-wrap: wrap; align-items: center; gap: 4px var(--cs-space-3); margin: 0 0 var(--cs-space-1); color: var(--cs-color-text-muted); font-size: 12px; }
+.facts code { color: var(--cs-color-text); }
+.keys { display: grid; grid-template-columns: minmax(0, max-content) minmax(0, 1fr); margin: 0; min-width: 0; }
+.key { display: contents; }
+.key > dt, .key > dd { margin: 0; padding: 4px var(--cs-space-1); border-bottom: 1px solid var(--cs-color-border); min-width: 0; }
+.key > dt { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.key > dd { color: var(--cs-color-text-muted); font-size: 12px; overflow-wrap: anywhere; align-self: stretch; display: flex; align-items: center; }
+.key:last-child > dt, .key:last-child > dd { border-bottom: 0; }
+.name {
+  padding: 0; border: 0; background: none; color: var(--cs-color-text); cursor: copy;
+  font-family: var(--cs-font-mono); font-size: 13px; text-align: left; overflow-wrap: anywhere;
+}
+.name:hover { color: var(--cs-color-primary); }
+.name:focus-visible { outline: 2px solid var(--cs-color-focus); outline-offset: 2px; border-radius: var(--cs-radius-sm); }
+.copied { color: var(--cs-tone-success-fg); font-size: 12px; }
+.inactive .name, .inactive > dd { color: var(--cs-color-text-muted); }
+.columns { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: var(--cs-space-2) var(--cs-space-4); }
+.subtitle { margin: 0 0 var(--cs-space-1); font-size: 12px; color: var(--cs-color-text-muted); font-weight: 600; }
+/* 面板窄（而不是窗口窄）时名字与用途上下排。 */
+@container (max-width: 420px) {
+  .keys { grid-template-columns: minmax(0, 1fr); }
+  .key > dt { border-bottom: 0; padding-bottom: 0; }
+}

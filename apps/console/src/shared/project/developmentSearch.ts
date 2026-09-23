@@ -1,6 +1,9 @@
 export type DevelopmentView = 'cli' | 'preview' | 'split' | 'code' | 'diff' | 'changes' | 'conversation' | 'data' | 'reference' | 'session';
-/** 参考面板的三段（原开发资源的 API 接口、事件、平台接入，RFC-020 D2）。 */
-export const REFERENCE_TOPICS = ['api', 'events', 'guide'] as const;
+/**
+ * 「可使用资源」面板的四类（RFC-020 D2；2026-09-23 作者裁定按代码怎么用它分类）：调用接口、接收事件、
+ * 运行环境（地址里仍叫 `guide`，旧链接不失效）、Agent 工具。
+ */
+export const REFERENCE_TOPICS = ['api', 'events', 'guide', 'agent'] as const;
 export type ReferenceTopic = typeof REFERENCE_TOPICS[number];
 export const GUIDE_SECTIONS = ['identity', 'environment', 'mcp', 'tasks'] as const;
 export type GuideSection = typeof GUIDE_SECTIONS[number];
@@ -10,7 +13,7 @@ export interface DevelopmentSearch {
   panel?: 'side' | 'full';
   /** 参考面板的当前段与它保留的定位参数。 */
   topic?: ReferenceTopic; proxy?: string; operation?: string; subscription?: string;
-  /** 平台接入段里默认展开的小节（原 resources?section=guide&topic=…）。 */
+  /** 旧链接里「平台接入」的小节（原 resources?section=guide&topic=…）：mcp 落到 Agent 工具、tasks 落到调用接口，其余就是运行环境。 */
   guide?: GuideSection;
 }
 

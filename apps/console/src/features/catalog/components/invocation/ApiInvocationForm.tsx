@@ -10,7 +10,8 @@ import type { ApiInvocationDraft } from '../../hooks/apiInvocationDraft';
 import formStyles from '../OperationsPanel.module.css';
 import styles from './ApiInvocation.module.css';
 
-export function ApiInvocationForm({ operation, controller, onClose }: { readonly operation: ApiOperationDto; readonly controller: ApiInvocationController; readonly onClose: () => void }) {
+/** `inline`：在列表行下展开，行本身已写着方法、路径与说明，这里不再重复。 */
+export function ApiInvocationForm({ operation, controller, onClose, inline = false }: { readonly operation: ApiOperationDto; readonly controller: ApiInvocationController; readonly onClose: () => void; readonly inline?: boolean }) {
   const t = useT(), id = useId(), form = useRef<HTMLFormElement>(null);
   const [draft, setDraft] = useState(() => emptyApiInvocationDraft(operation)), [submitted, setSubmitted] = useState(false);
   const validated = validateApiInvocationDraft(operation, controller.taskId, draft), errors = submitted ? validated.errors : {};
@@ -20,9 +21,9 @@ export function ApiInvocationForm({ operation, controller, onClose }: { readonly
     if (!validated.input) { queueMicrotask(() => form.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus()); return; }
     void controller.send('detail', validated.input).catch(controller.reportError);
   };
-  return <Card compact title={<>{t('catalog.invoke.detail')} <code>{operation.method} {operation.path}</code></>} extra={<Button onClick={onClose}>{t('catalog.invoke.hide')}</Button>}>
+  return <Card compact title={inline ? t('catalog.invoke.detail') : <>{t('catalog.invoke.detail')} <code>{operation.method} {operation.path}</code></>} extra={<Button onClick={onClose}>{t('catalog.invoke.hide')}</Button>}>
     <form ref={form} className={styles.form} noValidate onSubmit={(event) => { event.preventDefault(); send(); }}>
-      <p className={styles.note}>{operation.summary ?? operation.id}</p>
+      {operation.summary && !inline ? <p className={styles.note}>{operation.summary}</p> : null}
       <div className={styles.parameters}>
         {apiPathParameterNames(operation.path).map((name, index) => <FormField key={name} label={t('catalog.invoke.pathLabel', { name })} hint={t('catalog.invoke.pathHint')} error={errors[`path:${name}`] ? t(errors[`path:${name}`]!) : undefined} hintId={`${id}-path-hint-${index}`} errorId={`${id}-path-error-${index}`}>
           <input className={formStyles.textarea} value={draft.pathParameters[name] ?? ''} disabled={controller.pending} aria-invalid={!!errors[`path:${name}`]} aria-describedby={`${id}-path-hint-${index}`} aria-errormessage={errors[`path:${name}`] ? `${id}-path-error-${index}` : undefined} onChange={(event) => change({ pathParameters: { ...draft.pathParameters, [name]: event.target.value } })} />

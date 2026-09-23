@@ -8,6 +8,8 @@ import { Card } from '../../../shared/ui/Card';
 import { DefinitionList } from '../../../shared/ui/DefinitionList';
 import type { CatalogActions } from '../hooks/useCatalogActions';
 import { OperationActions } from './OperationActions';
+import { CallAddress } from './list/OperationRow';
+import { internalCallUrl } from './list/operationSections';
 import styles from './CatalogContent.module.css';
 
 export interface OperationDetailProps {
@@ -27,16 +29,16 @@ export function OperationDetail({ operation, pendingRequest, actions, requesting
   const t = useT();
   if (!operation) return <Card compact title={t('catalog.detail.title')}>{missingId ? <ActionNote tone="error">{t('catalog.detail.missing', { id: missingId })}</ActionNote> : null}<p className={styles.muted}>{t('catalog.detail.empty')}</p>{missingId && onClear ? <Button variant="ghost" onClick={onClear}>{t('catalog.detail.clear')}</Button> : null}</Card>;
   const granted = operation.granted === true;
-  return <Card compact title={operation.summary ?? operation.id} extra={<><Badge tone={granted ? 'success' : 'neutral'}>{granted ? t('catalog.granted.yes') : t('catalog.granted.no')}</Badge>{onClear ? <Button variant="ghost" onClick={onClear}>{t('catalog.detail.clear')}</Button> : null}</>}>
+  return <Card compact title={operation.summary ?? `${operation.method} ${operation.path}`} extra={<><Badge tone={granted ? 'success' : 'neutral'}>{granted ? t('catalog.granted.yes') : t('catalog.granted.no')}</Badge>{onClear ? <Button variant="ghost" onClick={onClear}>{t('catalog.detail.clear')}</Button> : null}</>}>
     <div className={styles.detailActions}>
       <OperationActions key={`${operation.id}:${requesting}`} operation={operation} pendingRequest={pendingRequest} actions={actions} initiallyRequesting={requesting} />
       {onInvoke && granted ? <Button onClick={() => onInvoke(operation)}>{t('catalog.invoke.open')}</Button> : null}
     </div>
     <DefinitionList items={[
-      { label: t('catalog.operations.key'), value: <code>{operation.id}</code> },
-      { label: t('catalog.operations.proxy'), value: operation.proxy },
+      { label: t('catalog.list.provider'), value: operation.proxy },
       { label: t('catalog.detail.endpoint'), value: <code>{operation.method} {operation.path}</code> },
       { label: t('catalog.operations.policy'), value: <Badge tone={operation.openPolicy === 'default' ? 'success' : 'warning'}>{t(`catalog.policy.${operation.openPolicy}`)}</Badge> },
     ]} />
+    <CallAddress url={internalCallUrl(operation)} note={t(granted ? 'catalog.list.noCredential' : 'catalog.list.afterGrant')} />
   </Card>;
 }

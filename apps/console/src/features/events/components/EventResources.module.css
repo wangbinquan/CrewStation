@@ -1,0 +1,13 @@
+.note { margin: 0; color: var(--cs-color-text-muted); font-size: var(--cs-font-size-sm); }
+.status { margin: 0; min-height: 0; color: var(--cs-tone-success-fg); font-size: var(--cs-font-size-sm); }
+.status:empty { display: none; }
+.leaves { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px; }
+.leaf {
+  padding: 0 6px; border: 1px solid var(--cs-color-border); border-radius: var(--cs-radius-sm); background: var(--cs-color-surface);
+  color: var(--cs-color-text); font-family: var(--cs-font-mono); font-size: 12px; line-height: 1.6; cursor: pointer;
+}
+.leaf:hover { border-color: var(--cs-color-primary); color: var(--cs-color-primary); }
+.leaf:focus-visible { outline: 2px solid var(--cs-color-focus); outline-offset: 1px; }
+.subscribed { border-color: var(--cs-tone-success-fg); color: var(--cs-tone-success-fg); background: var(--cs-tone-success-bg); }
+.subscribed::before { content: '● '; }
+.dot { color: var(--cs-tone-success-fg); }

@@ -5,8 +5,8 @@ import { openAdminSession } from './session';
 
 const session = await e2eAvailable() ? await openAdminSession() : undefined;
 afterAll(async () => { await session?.close(); }, 30_000);
-// RFC-020：项目设置五组；原开发资源三个主题住在开发页放大的参考面板里，数据与项目信息各归其家。
-const routes = ['settings', 'settings?tab=visibility', 'settings?tab=members', 'settings?tab=advanced', 'settings?tab=info', 'dev-session?view=reference&panel=full&topic=api', 'dev-session?view=reference&panel=full&topic=events', 'dev-session?view=reference&panel=full&topic=guide'];
+// RFC-020：项目设置五组；「可使用资源」四类（2026-09-23）住在开发页放大的面板里，数据与项目信息各归其家。
+const routes = ['settings', 'settings?tab=visibility', 'settings?tab=members', 'settings?tab=advanced', 'settings?tab=info', 'dev-session?view=reference&panel=full&topic=api', 'dev-session?view=reference&panel=full&topic=events', 'dev-session?view=reference&panel=full&topic=guide', 'dev-session?view=reference&panel=full&topic=agent'];
 
 async function openLocalized(page: Page, path: string, locale: string) {
   await open(page, path);
@@ -18,7 +18,7 @@ async function openLocalized(page: Page, path: string, locale: string) {
 describe.skipIf(!session?.project)('项目设置与资源的真实布局', () => {
   test.each([
     [1280, 'zh-CN', 'light'], [390, 'zh-CN', 'light'], [320, 'zh-CN', 'light'], [390, 'en-US', 'dark'],
-  ] as const)('%dpx / %s / %s：八个地址无整页溢出，编辑器按需打开', async (width, locale, scheme) => {
+  ] as const)('%dpx / %s / %s：九个地址无整页溢出，编辑器按需打开', async (width, locale, scheme) => {
     const page = session!.admin, id = session!.project!.id;
     await page.cmd('Emulation.setDeviceMetricsOverride', { width, height: 844, deviceScaleFactor: 1, mobile: false });
     await page.cmd('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: scheme }] });

@@ -4,10 +4,11 @@ import { Card } from '../../../../shared/ui/Card';
 import type { ApiInvocationOutcome } from '../../hooks/useApiInvocation';
 import styles from './ApiInvocation.module.css';
 
-export function ApiInvocationResult({ outcome }: { readonly outcome: ApiInvocationOutcome }) {
+/** `label` 是人读得懂的「方法 路径」；目录里找不到该操作时才退回操作 ID。 */
+export function ApiInvocationResult({ outcome, label }: { readonly outcome: ApiInvocationOutcome; readonly label?: string }) {
   const t = useT(), { result } = outcome.response;
   return <Card compact title={t('catalog.invoke.result')}>
-    <div className={styles.summary}><Badge tone={result.status >= 400 ? 'warning' : 'info'}>HTTP {result.status}</Badge><span>{t('catalog.invoke.duration', { ms: result.durationMs })}</span><code>{outcome.request.operationId}</code></div>
+    <div className={styles.summary}><Badge tone={result.status >= 400 ? 'warning' : 'info'}>HTTP {result.status}</Badge><span>{t('catalog.invoke.duration', { ms: result.durationMs })}</span><code>{label ?? outcome.request.operationId}</code></div>
     <p className={styles.note}>{t('catalog.invoke.resultTask')} <code>{outcome.response.taskId}</code></p>
     {result.bodyTruncated || result.headersTruncated ? <p role="status">{t('catalog.invoke.truncated', { parts: [result.bodyTruncated ? t('catalog.invoke.responseBody') : '', result.headersTruncated ? t('catalog.invoke.responseHeaders') : ''].filter(Boolean).join(' / ') })}</p> : null}
     <p className={styles.note}>{t('catalog.invoke.textView')}</p>

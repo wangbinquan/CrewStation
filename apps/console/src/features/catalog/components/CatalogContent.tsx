@@ -6,10 +6,11 @@ import { useT } from '../../../shared/lib/useT';
 import { useCatalogActions } from '../hooks/useCatalogActions';
 import { useCatalogData } from '../hooks/useCatalogData';
 import { OperationDetail } from './OperationDetail';
-import { OperationsPanel } from './OperationsPanel';
 import { RequestsPanel } from './RequestsPanel';
 import { SwaggerPanel } from './SwaggerPanel';
 import { ApiInvocationWorkspace } from './invocation/ApiInvocationWorkspace';
+import { OperationList } from './list/OperationList';
+import type { PlatformEndpoint } from './list/operationSections';
 import styles from './CatalogContent.module.css';
 
 export interface CatalogContentProps {
@@ -27,10 +28,12 @@ export interface CatalogContentProps {
   readonly onClearContext?: () => void;
   /** 放大形态选中一行时写回地址；没给就只在本页记住。 */
   readonly onSelect?: (operation: ApiOperationDto | undefined) => void;
+  /** 平台自己的接口（业务子任务），列在「可调用」里。 */
+  readonly platform?: readonly PlatformEndpoint[];
 }
 
-/** 目录页正文：放大形态「表在前、详情在旁」（RFC-020 design §7），Swagger 折叠；紧凑形态只有表与试调。 */
-export function CatalogContent({ projectId, serviceId, canDevelop = false, compact = false, fill = false, proxy, operation, onClearContext, onSelect }: CatalogContentProps): ReactElement {
+/** 目录页正文：放大形态「列表在前、详情在旁」（RFC-020 design §7）；侧栏形态只有列表，试调在该行下原地展开。 */
+export function CatalogContent({ projectId, serviceId, canDevelop = false, compact = false, fill = false, proxy, operation, onClearContext, onSelect, platform }: CatalogContentProps): ReactElement {
   const t = useT();
   const { operations, requests, proxies } = useCatalogData(projectId, serviceId);
   const actions = useCatalogActions(serviceId);
@@ -43,20 +46,19 @@ export function CatalogContent({ projectId, serviceId, canDevelop = false, compa
   const missingId = selectedId && operations.data && !operations.data.items.some((item) => item.id === selectedId) ? selectedId : undefined;
   const selected = (operations.data?.items ?? []).find((item) => item.id === selectedId);
   const pending = (requests.data?.items ?? []).find((item) => item.state === 'pending' && item.operationId === selectedId);
+  const list = { operations: operations.data?.items ?? [], requests: requests.data?.items ?? [], loading: operations.isPending, loadError: operations.error, actions, platform };
   if (compact) return (
     <div className={fill ? `${styles.stack} ${styles.fill}` : styles.stack}>
-      <ApiInvocationWorkspace context={context}>{(_controller, open, panel) => <>
-        {panel}
-        <OperationsPanel operations={operations.data?.items ?? []} requests={requests.data?.items ?? []} loading={operations.isPending} loadError={operations.error} actions={actions} proxy={proxy} operation={operation} onClearContext={onClearContext} onInvoke={canDevelop ? open : undefined} grantedOnly />
-      </>}</ApiInvocationWorkspace>
+      <ApiInvocationWorkspace inline context={context}>{({ open, panel, active }) =>
+        <OperationList {...list} proxy={proxy} operation={operation} onClearContext={onClearContext} onInvoke={canDevelop ? open : undefined} active={active?.id} activePanel={active ? panel : undefined} notice={active ? undefined : panel} />}
+      </ApiInvocationWorkspace>
     </div>
   );
   return (
-    <ApiInvocationWorkspace context={context}>{(controller, open, panel) => <div className={styles.columns}>
+    <ApiInvocationWorkspace context={context}>{({ controller, open, panel }) => <div className={styles.host}><div className={styles.columns}>
       <div className={styles.stack}>
-        <OperationsPanel operations={operations.data?.items ?? []} requests={requests.data?.items ?? []} loading={operations.isPending} loadError={operations.error} actions={actions}
-          proxy={proxy} operation={selectedId} onClearContext={() => { setLocal({ request: false }); onClearContext?.(); }} onInvoke={canDevelop ? (item) => { select(item); open(item); } : undefined} onSelect={select} />
-        <RequestsPanel requests={requests.data?.items ?? []} loading={requests.isPending} loadError={requests.error} />
+        <OperationList {...list} proxy={proxy} operation={selectedId} onClearContext={() => { setLocal({ request: false }); onClearContext?.(); }} onInvoke={canDevelop ? (item) => { select(item); open(item); } : undefined} onSelect={select} />
+        <RequestsPanel requests={requests.data?.items ?? []} loading={requests.isPending} loadError={requests.error} describeOperation={(id) => { const item = list.operations.find((entry) => entry.id === id); return item ? `${item.proxy} ${item.method} ${item.path}` : undefined; }} />
         <SwaggerPanel serviceId={serviceId} proxies={proxies.data?.items ?? []} initialProxy={proxy} invocation={{ controller, operations: context.operations, canDevelop }} />
       </div>
       {/* 详情栏：选中操作的文档与申请在上，试调面板（会话绑定、表单、结果）在下——没选中时会话绑定也要能看、能重绑。 */}
@@ -64,6 +66,6 @@ export function CatalogContent({ projectId, serviceId, canDevelop = false, compa
         <OperationDetail operation={selected} missingId={missingId} onClear={clear} pendingRequest={pending} actions={actions} requesting={local.request && local.id === selectedId} onInvoke={canDevelop ? open : undefined} />
         {panel}
       </aside>
-    </div>}</ApiInvocationWorkspace>
+    </div></div>}</ApiInvocationWorkspace>
   );
 }

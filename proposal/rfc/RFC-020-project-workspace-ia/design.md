@@ -154,6 +154,13 @@ tool: z.object({ name: z.enum(['preview', 'code', 'changes', 'data', 'reference'
 - 参考面板的三段内容见 §5.3；`CatalogPage` 的「表在前、详情在旁」（`OperationsTable` → 选中行右侧 `OperationDetail`：文档、授权状态、申请表单、试调；`SwaggerPanel` 折叠；管理员链接改页脚一行）只在放大形态渲染；事件段顶部一行「最近投递 n 条 · 死信 m 条 →」来自 `api.events.listDeliveries` 的一页计数。
 
 > **2026-09-23 修订（作者当面裁定，直接修改，不另立 RFC）。** `SwaggerPanel` 不再包 `<details>`，直接渲染在 `RequestsPanel` 之下；`proxy` 参数只作为它的初始代理（`catalogDetail` 用例相应改写）。§5.3 表中「折叠的 `SwaggerPanel`」同此。
+
+> **2026-09-23 修订二（作者反馈「信息无法理解、表格超出页面有横向滚动条、UUID 有什么用」，两轮问答裁定，直接修改＋回填，不另立 RFC）。** 「可使用资源」面板重做：
+> - **按代码怎么用它分四类**（地址参数 `topic` 只增不改）：`api`「调用接口」（代理、其他数字人与平台业务子任务接口）、`events`「接收事件」（已订阅、可订阅类型、推送请求头）、`guide`「运行环境」（环境变量、用户请求头、服务与链路头、约定路径、应用配置键）、新增 `agent`「Agent 工具」（两个平台 MCP 与开发会话令牌头）。旧链接 `guide=mcp` 落到 `agent`、`guide=tasks` 落到 `api`；原「平台接入」的 `<details>` 折叠块与 `devSessionToken` 这类代码内部键名去掉，每项写中文用途（`capabilities.meaning.*`，没有说明的只显示名字）。
+> - **统一的两行列表**（`shared/ui/resource/ResourceList`）取代宽表格：首行是写代码要用的值（方法＋路径、事件类型、变量名），次行是来源与说明，右侧是动作；只在 `/`、`.`、`-` 后折行，任何宽度面板内都没有横向滚动（主题页签条除外）。
+> - **接口**：不再显示操作 ID；侧栏与放大都列全部，可调用的（含平台接口）置顶、需申请的在分割线下；搜索＋提供方＋状态筛选；点路径在行下展开调用地址（`${CS_INTERNAL_API_BASE}<代理><路径>`、平台接口为 `${CS_PLATFORM_API_URL}<路径>`，可复制）；侧栏里「试调」「申请」在该行下原地展开，会话绑定压成一行、会话 ID 只进悬停提示；放大形态仍是列表在前、`OperationDetail` 在旁（ID 行换成调用地址），申请记录用「代理 方法 路径」代替操作 ID，列表与详情按面板宽度（容器查询 680px）而非窗口宽度排布。`OperationsPanel` 删除，`OperationsTable` 只留给管理空间。
+> - **事件**：已订阅一行一条（类型 → 处理路径、状态）；可订阅的按生产方分组、按「生产方.族.子类型」归族，子类型是按钮，点一下复制可粘进 `crewstation.yaml` 的订阅片段（按 ID 绑定、注释写类型，UUID 只出现在片段里）；下线的类型不列；推送请求头放在最后。
+> 用例：`referencePanel`（四条新增）、`resourceListModel`（新增）、`projectResources`、`catalogConsumption`、`catalogDetail`、`apiInvocationForm`、`adminCapabilities`、`projectNavigation` 相应改写；e2e 新增 `referenceResources`（三个宽度、四类、无横向滚动、接口与事件里无 UUID），`capabilityDepth`、`projectSettingsUx` 改为四类。
 - 项目设置 `info` 组：`ProjectInfoSection` 用 `DefinitionList`：仓库（路径、默认分支、状态、打开）、地址（两槽域名、开发预览域名）、服务身份（服务名、命名空间）、配额与套餐（`CapabilityQuota` 的数据）、折叠技术详情（项目 ID、服务 ID、命名空间，可复制）。只读，不画输入框。
 
 > **2026-09-23 修订（作者当面裁定，直接修改，不另立 RFC）。** 技术详情就是项目信息：`ProjectInfoCard`（`features/projects/components`）作为 `info` 组第一张卡直接展示项目 ID、服务 ID、命名空间，不再折叠；三个标签改走 `projects.info.*` 文案（原为写死的英文）。其后的仓库卡与 `CapabilitiesPage section="project"` 不变（`projectResources` 用例断言卡片顺序与内容）。
