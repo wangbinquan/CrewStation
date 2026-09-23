@@ -487,7 +487,7 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   'devSession.native.finalScreen.unavailable': 'The final screen could not be saved before the environment exited',
   'devSession.native.screenMismatch': 'The saved screen does not match this CLI. Please retry.',
   "devSession.native.developmentPreview": "Development preview",
-  "devSession.native.openPreview": "Open separately",
+  "devSession.native.openPreview": "Open preview in new tab",
   "devSession.native.previewHint": "Shows saved files in this worktree. Hot reload depends on the development server; the application configuration selects its data connection.",
   "devSession.native.productionAccess": "Production access binding",
   "devSession.native.sessionMenu": "Session",

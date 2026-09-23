@@ -484,7 +484,7 @@ export const messages = {
   'devSession.native.finalScreen.unavailable': '运行环境退出前未能保存末屏',
   'devSession.native.screenMismatch': '末屏与当前 CLI 不匹配，请重试',
   'devSession.native.developmentPreview': '开发预览',
-  'devSession.native.openPreview': '独立打开',
+  'devSession.native.openPreview': '新窗口打开预览',
   'devSession.native.previewHint': '显示当前工作树的已保存内容；热更新取决于项目开发服务，使用的数据连接由应用配置决定。',
   'devSession.native.productionAccess': '有生产访问绑定',
   'devSession.native.sessionMenu': '会话',
