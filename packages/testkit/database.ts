@@ -1,4 +1,4 @@
-import { SQL } from 'bun';
+import postgres from 'postgres';
 import type { Database, DatabaseHandle, MigrationSet } from '@crewstation/persistence';
 import { connectDatabase, runMigrations, withDatabaseName } from '@crewstation/persistence';
 import { resolveCapability } from './capability';
@@ -26,21 +26,21 @@ export function testDatabaseAvailable(): Promise<boolean> {
 
 /** 连得上返回 undefined，连不上返回原因。 */
 async function probeDatabase(): Promise<string | undefined> {
-  const admin = new SQL(baseUrl(), { max: 1 });
+  const admin = adminConnection();
   try {
     await admin`SELECT 1`;
     return undefined;
   } catch (error) {
     return String(error);
   } finally {
-    await admin.close();
+    await admin.end();
   }
 }
 
 /** 每次调用新建一个独立数据库并执行给定迁移；用完 drop()。 */
 export async function createTestDatabase(migrations: MigrationSet[] = []): Promise<TestDatabase> {
   const name = `cs_test_${Bun.randomUUIDv7().replace(/-/g, '').slice(0, 20)}`;
-  const admin = new SQL(baseUrl(), { max: 1 });
+  const admin = adminConnection();
   await admin.unsafe(`CREATE DATABASE ${name}`);
   const url = withDatabaseName(baseUrl(), name);
   const handle = connectDatabase(url, { max: 4 });
@@ -52,9 +52,14 @@ export async function createTestDatabase(migrations: MigrationSet[] = []): Promi
     drop: async () => {
       await handle.close();
       await admin.unsafe(`DROP DATABASE IF EXISTS ${name} WITH (FORCE)`);
-      await admin.close();
+      await admin.end();
     },
   };
+}
+
+/** 建库、删库用的管理员连接：一条就够；服务端提示（NOTICE）不打印，与 Bun 内置驱动时一样。 */
+function adminConnection(): postgres.Sql {
+  return postgres(baseUrl(), { max: 1, connect_timeout: 5, onnotice: () => undefined });
 }
 
 function baseUrl(): string {

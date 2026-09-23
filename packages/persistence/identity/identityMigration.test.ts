@@ -54,7 +54,7 @@ describe.skipIf(!available)('资源身份事务升级', () => {
       expect(rows[0]!.normalized).toEqual({ ...original, projectId: rows[0]!.project_id });
       expect(await runMigrations(tdb.db, sets)).toEqual([]);
       const aliases = await tdb.db.execute(sql`SELECT id FROM owner.resource_identity_aliases`);
-      expect(aliases).toEqual([{ id: rows[0]!.project_id }]);
+      expect([...aliases]).toEqual([{ id: rows[0]!.project_id }]);
       await expect(runMigrations(tdb.db, upgrade({ ...consumer, finalize: ['SELECT 1'] }))).rejects.toThrow('不可修改');
     } finally { await tdb.drop(); }
   });
@@ -64,12 +64,12 @@ describe.skipIf(!available)('资源身份事务升级', () => {
     try {
       await tdb.db.execute(sql`INSERT INTO consumer.tasks VALUES ('tsk_old', ${oldId}, ${JSON.stringify(original)}::text::jsonb, NULL)`);
       await expect(runMigrations(tdb.db, upgrade())).rejects.toThrow('Unresolved resource identity');
-      expect(await tdb.db.execute(sql`SELECT id, project_id, normalized FROM consumer.tasks`)).toEqual([{ id: 'tsk_old', project_id: oldId, normalized: null }]);
-      expect(await tdb.db.execute(sql`SELECT to_regclass('owner.resource_identity_aliases') AS table_name`)).toEqual([{ table_name: null }]);
+      expect([...(await tdb.db.execute(sql`SELECT id, project_id, normalized FROM consumer.tasks`))]).toEqual([{ id: 'tsk_old', project_id: oldId, normalized: null }]);
+      expect([...(await tdb.db.execute(sql`SELECT to_regclass('owner.resource_identity_aliases') AS table_name`))]).toEqual([{ table_name: null }]);
       await tdb.db.execute(sql`INSERT INTO owner.projects VALUES (${oldId}, 'old name')`);
       await expect(runMigrations(tdb.db, upgrade({ ...consumer, finalize: ['SELECT 1/0'] }))).rejects.toThrow();
-      expect(await tdb.db.execute(sql`SELECT id FROM owner.projects`)).toEqual([{ id: oldId }]);
-      expect(await tdb.db.execute(sql`SELECT count(*)::int AS n FROM platform_infra.migrations`)).toEqual([{ n: 2 }]);
+      expect([...(await tdb.db.execute(sql`SELECT id FROM owner.projects`))]).toEqual([{ id: oldId }]);
+      expect([...(await tdb.db.execute(sql`SELECT count(*)::int AS n FROM platform_infra.migrations`))]).toEqual([{ n: 2 }]);
       expect(await runMigrations(tdb.db, upgrade())).toHaveLength(2);
     } finally { await tdb.drop(); }
   });
@@ -85,7 +85,7 @@ describe.skipIf(!available)('资源身份事务升级', () => {
         inlineEntities: [{ table: 'tasks', column: 'snapshot', path: 'steps.*.stepId', kind: 'step', keys: ['$row.id', '$value'] }],
         documents: [{ table: 'tasks', column: 'snapshot', targetColumn: 'normalized', references: [{ path: 'steps.*.stepId', kind: 'step', keys: ['$row.id', '$value'] }] }],
       }));
-      expect(await tdb.db.execute(sql`SELECT id FROM owner.projects`)).toEqual([{ id }]);
+      expect([...(await tdb.db.execute(sql`SELECT id FROM owner.projects`))]).toEqual([{ id }]);
       const rows = await tdb.db.execute(sql`SELECT normalized FROM consumer.tasks`) as unknown as { normalized: { steps: { stepId: string }[] } }[];
       expect(rows[0]!.normalized.steps).toHaveLength(2);
       expect(new Set(rows[0]!.normalized.steps.map((step) => step.stepId)).size).toBe(2);

@@ -78,6 +78,14 @@ fromDriver: (value) => (typeof value === 'string' ? JSON.parse(value) : value),
 sql`kind = ANY(ARRAY[${sql.join(kinds.map((k) => sql`${k}`), sql`, `)}]::text[])`
 ```
 
+### 原生 SQL 的参数先转成字符串：drizzle＋postgres.js 不替你序列化时间与 json
+
+RFC-023 换成 postgres.js 后撞上（2026-09-23，182 个用例一起红）：drizzle 的 postgres-js 驱动把时间类（timestamptz 等）和 json／jsonb 的序列化器换成原样透传，交给自己的列映射处理。走列映射的查询不受影响，但原生 `sql` 模板里直接传 `Date` 或对象，驱动会报 `The "string" argument must be of type string … Received an instance of Date／Object`。
+
+- 时间：`${date.toISOString()}::timestamptz`。
+- 对象：`${JSON.stringify(value)}::text::jsonb`，与 `jsonDocument` 的写法一致。
+- 反过来，原生 SQL 读出的时间列是字符串（不再是 `Date`），要用就 `new Date(x)`；int8 读出是字符串，计数写 `count(*)::int`。
+
 ### 删角色前要先处理它拥有的对象
 
 `DROP ROLE` 遇到该角色拥有的对象会报 `cannot be dropped because some objects depend on it`。

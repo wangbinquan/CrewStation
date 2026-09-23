@@ -8,8 +8,8 @@ import { readMigrationDir } from '@crewstation/persistence';
 import type { Hono } from 'hono';
 import { secretboxCipher } from './adapters/crypto/secretboxCipher';
 import { drizzleDataResourceRepository, drizzleTaskBindingRepository } from './adapters/persistence/drizzleRepositories';
-import type { PostgresProviderSettings } from './adapters/postgres/bunSqlProvider';
-import { bunSqlPostgresProvider } from './adapters/postgres/bunSqlProvider';
+import type { PostgresProviderSettings } from './adapters/postgres/postgresProvider';
+import { postgresJsProvider } from './adapters/postgres/postgresProvider';
 import type { DataModuleApi } from './api/moduleApi';
 import type { DataUseCaseDeps } from './application/dependencies';
 import { serviceDataUseCases } from './application/serviceData';
@@ -48,7 +48,7 @@ export function createDataModule(deps: DataModuleDeps): DataModule {
   const useCaseDeps: DataUseCaseDeps = {
     resources: drizzleDataResourceRepository(deps.db),
     bindings: drizzleTaskBindingRepository(deps.db),
-    postgres: deps.provider ?? bunSqlPostgresProvider(deps.settings.postgres),
+    postgres: deps.provider ?? postgresJsProvider(deps.settings.postgres),
     cipher: secretboxCipher(deps.settings.secretKeyBase64),
     authorizer: deps.authorizer,
     services: deps.services,

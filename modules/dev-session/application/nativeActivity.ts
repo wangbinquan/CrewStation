@@ -14,8 +14,9 @@ export async function boundedNativeRead<T>(promise: Promise<T>, timeoutMs = 2500
 }
 /**
  * 名册顺带的原生活动页：同一任务、同一人在 ttl 内复用上一次，进行中的也共用；拒绝（权限错误）不留。RFC-022 让启动中的
- * 名册每秒读一次，而原生活动要逐个 CLI 问 Runner、同步事件、开快照读事务，超时放弃后仍在后台跑；跟着每秒做，会把 Bun SQL
- * 连接池拖进 I16 那种错位（2026-09-23 实机三次）。已读状态按人区分，所以按人缓存；页面上的活动以单独的活动查询为准，名册里的只是兜底。
+ * 名册每秒读一次，而原生活动要逐个 CLI 问 Runner、同步事件、开快照读事务，超时放弃后仍在后台跑；跟着每秒做，Runner 慢时
+ * 放弃的查询会在后台叠起来。这只是减负：2026-09-23 曾以为它是 I16（连接池错位）的诱因，上线后照样复发，I16 由 RFC-023 换驱动处理。
+ * 已读状态按人区分，所以按人缓存；页面上的活动以单独的活动查询为准，名册里的只是兜底。
  */
 export function rosterActivity(read: (actor: Actor, taskId: TaskId) => Promise<AgentActivityPage | undefined>, clock: { now(): Date }, ttlMs = 5000) {
   const cache = new Map<string, { at: number; page: Promise<AgentActivityPage | undefined> }>();

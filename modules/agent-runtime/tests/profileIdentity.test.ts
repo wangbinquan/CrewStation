@@ -67,7 +67,7 @@ describe.skipIf(!available)('算力档位 UUIDv7', () => {
       expect(ResourceIdSchema.safeParse(normalized.secrets[0]!.id).success).toBe(true);
       expect(ResourceIdSchema.safeParse(normalized.steps[0]!.stepId).success).toBe(true);
       expect(normalized.steps[1]!.contentTemplate).toBe(`{{steps.${normalized.steps[0]!.stepId}.env.TOKEN}} original prepare`);
-      expect(await tdb.db.execute(sql`SELECT id, name, cipher_text FROM agent_runtime.profile_credentials`)).toEqual([{ id: normalized.secrets[0]!.id, name: 'TOKEN', cipher_text: null }]);
+      expect([...(await tdb.db.execute(sql`SELECT id, name, cipher_text FROM agent_runtime.profile_credentials`))]).toEqual([{ id: normalized.secrets[0]!.id, name: 'TOKEN', cipher_text: null }]);
       expect(await runMigrations(tdb.db, [identityMigrations, agentRuntimeMigrations])).toEqual([]);
     } finally { await tdb.drop(); }
   });

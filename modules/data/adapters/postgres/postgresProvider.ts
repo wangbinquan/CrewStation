@@ -1,4 +1,4 @@
-import { SQL } from 'bun';
+import postgres from 'postgres';
 import type { PostgresProvider } from '../../ports/providers';
 
 export interface PostgresProviderSettings {
@@ -18,9 +18,10 @@ const password = (): string => Buffer.from(crypto.getRandomValues(new Uint8Array
 /**
  * 每服务一库一角色；新库撤销 PUBLIC 的 CONNECT，保证跨项目不可连（AT-12）。
  * 临时角色用 VALID UNTIL 让数据库自己执行到期；只读经 pg_read_all_data，但只对该库有 CONNECT。
+ * 连接用 postgres.js（RFC-023，替换 Bun 内置 SQL）；服务端提示不打印。
  */
-export function bunSqlPostgresProvider(settings: PostgresProviderSettings): PostgresProvider {
-  const admin = new SQL(settings.adminUrl, { max: 2 });
+export function postgresJsProvider(settings: PostgresProviderSettings): PostgresProvider {
+  const admin = postgres(settings.adminUrl, { max: 2, onnotice: () => undefined });
   const dsn = (role: string, pass: string, db: string): string => `postgres://${encodeURIComponent(role)}:${encodeURIComponent(pass)}@${settings.visibleHost}:${settings.visiblePort}/${db}`;
   const roleExists = async (role: string): Promise<boolean> => (await admin`SELECT 1 FROM pg_roles WHERE rolname = ${role}`).length > 0;
   return {
@@ -49,12 +50,12 @@ export function bunSqlPostgresProvider(settings: PostgresProviderSettings): Post
       if (databaseName) {
         const target = new URL(settings.adminUrl);
         target.pathname = `/${databaseName}`;
-        const inDb = new SQL(target.toString(), { max: 1 });
+        const inDb = postgres(target.toString(), { max: 1, onnotice: () => undefined });
         try {
           if (reassignTo) await inDb.unsafe(`REASSIGN OWNED BY ${ident(roleName)} TO ${ident(reassignTo)}`);
           await inDb.unsafe(`DROP OWNED BY ${ident(roleName)}`);
         } finally {
-          await inDb.close();
+          await inDb.end();
         }
       }
       await admin.unsafe(`DROP OWNED BY ${ident(roleName)}`);

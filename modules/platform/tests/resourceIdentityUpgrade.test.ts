@@ -43,7 +43,7 @@ describe.skipIf(!available)('RFC-013 atomic resource upgrade', () => {
       expect(snapshotRow!.legacy_body).toEqual(cluster);
       expect(snapshotRow!.body.resources.every((resource) => ResourceIdSchema.safeParse(resource.profile).success)).toBe(true);
       expect(snapshotRow!.body.resources[0]!.profile).not.toBe(snapshotRow!.body.resources[1]!.profile);
-      expect(await tdb.db.execute(sql`SELECT count(*)::int AS n FROM agent_runtime.retired_profile_identities WHERE name = 'retired-cluster-cli'`)).toEqual([{ n: 1 }]);
+      expect([...(await tdb.db.execute(sql`SELECT count(*)::int AS n FROM agent_runtime.retired_profile_identities WHERE name = 'retired-cluster-cli'`))]).toEqual([{ n: 1 }]);
       expect(applied.length).toBeGreaterThan(20);
       const [row] = await tdb.db.execute(sql`SELECT id, project_id, service_id, created_by, profile, pod_name, pvc_name, runner_token_hash FROM task_runtime.environments`) as unknown as Record<string, string>[];
       for (const key of ['id', 'project_id', 'service_id', 'created_by', 'profile']) expect(ResourceIdSchema.safeParse(row![key]).success).toBe(true);
@@ -55,7 +55,7 @@ describe.skipIf(!available)('RFC-013 atomic resource upgrade', () => {
       expect(ResourceIdSchema.safeParse(snapshot!.manifest.spec.env[0]!.configDefinitionId).success).toBe(true);
       expect(snapshot!.manifest.spec.tasks.agentProfiles[0]!.compute).toEqual({ kind: 'default' });
       expect(snapshot!.identity_provenance.originalHash).not.toBe(snapshot!.identity_provenance.normalizedHash);
-      expect(await tdb.db.execute(sql`SELECT payload->>'taskId' AS task, dedup_key FROM platform_infra.jobs`)).toEqual([{ task: row!.id, dedup_key: row!.id }]);
+      expect([...(await tdb.db.execute(sql`SELECT payload->>'taskId' AS task, dedup_key FROM platform_infra.jobs`))]).toEqual([{ task: row!.id, dedup_key: row!.id }]);
       const [workspace] = await tdb.db.execute(sql`SELECT layout, legacy_layout FROM dev_session.workspace_layouts`) as unknown as { layout: unknown; legacy_layout: unknown }[];
       const upgraded = WorkspaceLayoutSchema.parse(workspace!.layout);
       expect(workspace!.legacy_layout).toEqual(layout);

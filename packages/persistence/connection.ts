@@ -1,6 +1,6 @@
-import { SQL } from 'bun';
 import { sql } from 'drizzle-orm';
-import { drizzle } from 'drizzle-orm/bun-sql';
+import { drizzle } from 'drizzle-orm/postgres-js';
+import postgres from 'postgres';
 
 export type Database = ReturnType<typeof drizzle>;
 export type Transaction = Parameters<Parameters<Database['transaction']>[0]>[0];
@@ -9,7 +9,7 @@ export type Executor = Database | Transaction;
 
 export interface DatabaseHandle {
   readonly db: Database;
-  readonly client: SQL;
+  readonly client: postgres.Sql;
   close(): Promise<void>;
 }
 
@@ -29,10 +29,18 @@ export function withSessionDefaults(url: string): string {
   return parsed.toString();
 }
 
+/**
+ * 连接池（RFC-023，替换 Bun 内置 SQL，I16）：上限 10、连接超时 10 秒；空闲 60 秒的连接回收，每条连接最长用 30 分钟
+ * （到期时等进行中的查询结束再换新）。连接串里的 options 由 postgres.js 作为启动参数发给服务端，会话默认值照旧生效。
+ * 服务端提示（NOTICE，例如迁移里的「已存在，跳过」）不打印，与 Bun 内置驱动时一样。
+ */
+export const POOL_OPTIONS = { connect_timeout: 10, idle_timeout: 60, max_lifetime: 30 * 60, onnotice: () => undefined } as const;
+
 export function connectDatabase(url: string, options: { max?: number } = {}): DatabaseHandle {
-  const client = new SQL(withSessionDefaults(url), { max: options.max ?? 10 });
+  const client = postgres(withSessionDefaults(url), { max: options.max ?? 10, ...POOL_OPTIONS });
   const db = drizzle({ client });
-  return { db, client, close: () => client.close() };
+  // 关闭时等进行中的查询最多 5 秒，再强制断开，落在终止宽限期之内。
+  return { db, client, close: () => client.end({ timeout: 5 }) };
 }
 
 /** 就绪探针用：走同一连接池的最小查询；池被占满或连接失步时它会和业务请求一起卡住，正是探针要发现的。 */

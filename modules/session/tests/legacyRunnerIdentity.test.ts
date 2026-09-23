@@ -65,7 +65,7 @@ describe.skipIf(!available)('protocol 2 UUID compatibility', () => {
       expect([terminal.terminal.agentId, terminal.terminal.terminalId, terminal.terminal.runnerId].every((id) => ResourceIdSchema.safeParse(id).success)).toBe(true);
       expect(terminal.terminal).toMatchObject({ compute: profileId, nativeSessionId: 'balanced', error: 'agt-old is protocol text' });
       expect(events[1]!.event).toMatchObject({ event: { agentId: terminal.terminal.agentId, text: 'agt-old balanced', raw: { agentId: 'do-not-rewrite' } } });
-      expect(await tdb.db.execute('SELECT legacy_event FROM session.runner_events WHERE seq = 1')).toEqual([{ legacy_event: original }]);
+      expect([...(await tdb.db.execute('SELECT legacy_event FROM session.runner_events WHERE seq = 1'))]).toEqual([{ legacy_event: original }]);
       expect((await tdb.db.execute('SELECT identity_provenance FROM session.runner_events WHERE seq = 1'))[0]).toEqual({ identity_provenance: { originalHash: jsonHash(original), normalizedHash: jsonHash(events[0]!.event), protocol: 2 } });
       const pending = dispatch.sendCommand(taskId, { id: 'stop-original', type: 'stopAgentTerminal', agentId: terminal.terminal.agentId, runnerId: terminal.terminal.runnerId });
       expect(await wireCommand).toMatchObject({ agentId: 'agt-old', runnerId: oldRunner });

@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
-import { SQL } from 'bun';
+import postgres from 'postgres';
 import type { Actor, ProjectId, ServiceId, TaskId, UserId } from '@crewstation/contracts';
 import { generateSecretKey } from '@crewstation/secretbox';
 import type { TestDatabase } from '@crewstation/testkit';
@@ -34,17 +34,17 @@ beforeAll(async () => {
 });
 afterAll(async () => {
   if (!available) return;
-  const admin = new SQL(adminUrl, { max: 1 });
+  const admin = postgres(adminUrl, { max: 1, onnotice: () => undefined });
   for (const db of [`cs_${slug}`, `cs_${slug}_dev`]) await admin.unsafe(`DROP DATABASE IF EXISTS "${db}" WITH (FORCE)`);
   const roles = (await admin`SELECT rolname FROM pg_roles WHERE rolname LIKE ${`cs_${slug}%`}`) as Array<{ rolname: string }>;
   for (const r of roles) await admin.unsafe(`DROP ROLE "${r.rolname}"`);
-  await admin.close();
+  await admin.end();
   await tdb?.drop();
 });
 
 const canQuery = async (dsn: string, sql: string): Promise<boolean> => {
-  const client = new SQL(dsn, { max: 1 });
-  try { await client.unsafe(sql); return true; } catch { return false; } finally { await client.close(); }
+  const client = postgres(dsn, { max: 1, onnotice: () => undefined });
+  try { await client.unsafe(sql); return true; } catch { return false; } finally { await client.end(); }
 };
 
 describe.skipIf(!available)('data module', () => {

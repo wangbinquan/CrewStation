@@ -72,7 +72,7 @@ export function drizzleOidcFlowRepository(db: Executor): OidcFlowRepository {
     },
     sweepExpired: async (now, limit) => {
       const rows = await db.delete(oidcFlows)
-        .where(sql`${oidcFlows.state} IN (SELECT state FROM identity.oidc_flows WHERE expires_at < ${now} LIMIT ${limit})`)
+        .where(sql`${oidcFlows.state} IN (SELECT state FROM identity.oidc_flows WHERE expires_at < ${now.toISOString()}::timestamptz LIMIT ${limit})`)
         .returning({ state: oidcFlows.state });
       return rows.length;
     },

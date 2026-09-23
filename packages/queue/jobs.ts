@@ -28,7 +28,7 @@ export interface ClaimedJob {
 export async function enqueueJob(executor: Executor, kind: string, payload: unknown, options: EnqueueOptions = {}): Promise<{ id: number | null; deduplicated: boolean }> {
   const rows = rowsOf<{ id: number }>(await executor.execute(sql`
     INSERT INTO platform_infra.jobs (kind, payload, run_at, max_attempts, dedup_key)
-    VALUES (${kind}, ${payload as Record<string, unknown>}, ${options.runAt ?? sql`now()`}, ${options.maxAttempts ?? 5}, ${options.dedupKey ?? null})
+    VALUES (${kind}, ${JSON.stringify(payload ?? null)}::text::jsonb, ${options.runAt ? sql`${options.runAt.toISOString()}::timestamptz` : sql`now()`}, ${options.maxAttempts ?? 5}, ${options.dedupKey ?? null})
     ON CONFLICT (kind, dedup_key) WHERE dedup_key IS NOT NULL AND state IN ('pending', 'running') DO NOTHING
     RETURNING id`));
   const id = rows[0]?.id;

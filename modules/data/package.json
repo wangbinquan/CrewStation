@@ -19,6 +19,7 @@
     "@crewstation/secretbox": "workspace:*",
     "drizzle-orm": "0.45.2",
     "hono": "4.13.7",
+    "postgres": "3.4.9",
     "zod": "4.6.2"
   },
   "devDependencies": {

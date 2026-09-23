@@ -47,7 +47,7 @@ describe.skipIf(!available)('套餐 UUIDv7 身份', () => {
       expect(rows).toHaveLength(1);
       expect(ResourceIdSchema.safeParse(rows[0]!.id).success).toBe(true);
       expect(rows[0]).toMatchObject({ name: 'custom', cpu: '250m', description: 'preserved' });
-      expect(await tdb.db.execute("SELECT id FROM project.resource_identity_aliases WHERE kind = 'service-plan' AND key = '[\"custom\"]'")).toEqual([{ id: rows[0]!.id }]);
+      expect([...(await tdb.db.execute("SELECT id FROM project.resource_identity_aliases WHERE kind = 'service-plan' AND key = '[\"custom\"]'"))]).toEqual([{ id: rows[0]!.id }]);
       expect(await runMigrations(tdb.db, [projectMigrations])).toEqual([]);
     } finally { await tdb.drop(); }
   });

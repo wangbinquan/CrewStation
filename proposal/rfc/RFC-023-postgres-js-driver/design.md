@@ -1,6 +1,6 @@
 # RFC-023｜设计
 
-状态：Draft · 2026-09-23 · 配套[提案](./proposal.md)与[计划](./plan.md)。
+状态：In Progress · 2026-09-23 · 配套[提案](./proposal.md)与[计划](./plan.md)。连接池参数按提案 Q3 的裁定显式设置（§2）。
 
 ## 目录
 
@@ -39,7 +39,7 @@ import postgres from 'postgres';
 import { drizzle } from 'drizzle-orm/postgres-js';
 
 export function connectDatabase(url: string, options: { max?: number } = {}): DatabaseHandle {
-  const client = postgres(url, { max: options.max ?? 10, connect_timeout: 10, connection: sessionParameters(url) });
+  const client = postgres(url, { max: options.max ?? 10, connect_timeout: 10, idle_timeout: 60, max_lifetime: 30 * 60, connection: sessionParameters(url) });
   const db = drizzle({ client });
   return { db, client, close: () => client.end({ timeout: 5 }) };
 }
@@ -48,6 +48,7 @@ export function connectDatabase(url: string, options: { max?: number } = {}): Da
 - **会话默认值**：现在的写法是往连接串补 `options=-c idle_in_transaction_session_timeout=60000`。postgres.js 通过 `connection` 把参数放进启动消息。
   - 改成 `sessionParameters(url)`：连接串已带 `options` 时原样沿用运维的值，否则给出 `{ idle_in_transaction_session_timeout: 60000 }`。
   - postgres.js 对连接串里 `options` 的处理，在 T2 用真实 PostgreSQL 核对（已有用例 `connection.test.ts` 读 `current_setting`），再定是否保留 `withSessionDefaults`。
+- **连接池**（Q3 裁定）：上限 10、连接超时 10 秒；空闲 60 秒的连接回收，每条连接最长用 30 分钟。postgres.js 等连接上进行中的查询结束后再换新，不中断查询。
 - **类型**：
   - `Database` 改为 `ReturnType<typeof drizzle>`（postgres-js 版），`Transaction` 与 `Executor` 的推导方式不变。
   - `DatabaseHandle.client` 的类型由 Bun 的 `SQL` 换成 postgres.js 的 `Sql`；标签模板与 `unsafe()` 的用法两者一致。

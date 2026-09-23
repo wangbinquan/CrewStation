@@ -133,7 +133,7 @@ describe.skipIf(!available)('项目算力分配与档位可见性（RFC-012）',
     try {
       await old.db.execute(sql`INSERT INTO agent_runtime.profiles (name, protocol, description, enabled, is_default, current_revision, created_by, updated_by, created_at, updated_at) VALUES ('old-default', 'opencode', '', true, true, 1, 'admin', 'admin', now(), now())`);
       await runMigrations(old.db, [{ ...agentRuntimeMigrations, files: agentRuntimeMigrations.files.filter((f) => f.name < '0005') }]);
-      expect(await old.db.execute(sql`SELECT default_visible FROM agent_runtime.profiles`)).toEqual([expect.objectContaining({ default_visible: true })]);
+      expect([...(await old.db.execute(sql`SELECT default_visible FROM agent_runtime.profiles`))]).toEqual([expect.objectContaining({ default_visible: true })]);
       await expect(Promise.resolve(old.db.execute(sql`UPDATE agent_runtime.profiles SET default_visible = false WHERE name = 'old-default'`))).rejects.toBeDefined();
     } finally { await old.drop(); }
   });
