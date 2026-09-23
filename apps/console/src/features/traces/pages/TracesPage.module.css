@@ -8,3 +8,6 @@
   .list { display: flex; flex-direction: column; min-height: 0; }
   .aside { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 }
+@container (max-width: 760px) {
+  .columns { grid-template-columns: minmax(0, 1fr); }
+}
