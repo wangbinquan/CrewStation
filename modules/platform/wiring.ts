@@ -268,6 +268,8 @@ function composeRuntime(deps: CompositionDeps, core: ReturnType<typeof composeCo
   const computeCatalog = computeCatalogFor(core.agentRuntime.api);
   const devSession = createDevSessionModule({
     identities: deps.identities,
+    // RFC-025 §11.2：名册的结束与失败照台账里执行记录的阶段（记录沿用执行环境的任务 ID，上级是工作区）。
+    executions: { phases: async (workspaceTaskId) => new Map((await resources.api.list({ parentId: workspaceTaskId, kind: 'agent-execution', includeStopped: true })).map((record) => [record.id, record.phase])) },
     apiCatalog: core.apiCatalog.api,
     db, logger, isAdmin: (id) => isAdmin(id), environments: taskRuntime.api, runner, releases: release.api,
     scm: {

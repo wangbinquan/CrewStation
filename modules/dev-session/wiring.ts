@@ -32,9 +32,13 @@ import { devSessionRoutes } from './http/devSessionRoutes';
 import { nativeTerminalRoutes } from './http/nativeTerminalRoutes';
 import type { ApiInvocationCatalog, ComputeCatalog, DevSessionSettings, McpCredentials, Notifier, ProjectAuthorizer, Releases, ServiceResolver, SourceControl } from './ports/platform';
 import type { Environments, Runner } from './ports/runtime';
+import type { ExecutionRecords } from './ports/executionRecords';
+import { withExecutionPhase } from './domain/terminalPhase';
 
 export interface DevSessionModuleDeps {
   identities?: ResourceIdentityDirectory;
+  /** 资源台账里 CLI／Agent 执行记录的阶段（RFC-025 §11.2）；缺省时名册照 Runner 的说法给出。 */
+  executions?: ExecutionRecords;
   apiCatalog: ApiInvocationCatalog;
   /** 算力档位解析（RFC-001），由组合根接到 project。 */
   compute: ComputeCatalog;
@@ -99,8 +103,9 @@ export function createDevSessionModule(deps: DevSessionModuleDeps): DevSessionMo
     ...versionComparisonUseCases(useCaseDeps), workspaceStatus: workspaceStatusUseCase(useCaseDeps), publish: publishFromSessionUseCase(useCaseDeps), sendIdleReminders: remind,
     async listNativeTerminals(actor, taskId) {
       const pageQuery = activityPage(actor, taskId);
-      const [roster, page] = await Promise.all([native.listNativeTerminals(actor, taskId), pageQuery]);
-      return { ...roster, activitySync: page?.sync ?? 'unavailable', items: roster.items.map((item) => ({ ...item, activity: page?.states.find((state) => state.agentId === item.agentId && state.terminalId === item.terminalId && state.runnerId === item.runnerId) })) };
+      const phasesQuery = deps.executions?.phases(taskId).catch(() => new Map()) ?? Promise.resolve(new Map());
+      const [roster, page, phases] = await Promise.all([native.listNativeTerminals(actor, taskId), pageQuery, phasesQuery]);
+      return { ...roster, activitySync: page?.sync ?? 'unavailable', items: roster.items.map((item) => withExecutionPhase({ ...item, activity: page?.states.find((state) => state.agentId === item.agentId && state.terminalId === item.terminalId && state.runnerId === item.runnerId) }, item.execution ? phases.get(item.execution.taskId) : undefined)) };
     },
   };
   let timer: ReturnType<typeof setInterval> | undefined;

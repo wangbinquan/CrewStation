@@ -4,6 +4,7 @@ import { TaskIdSchema, UserIdSchema } from '../ids';
 import { NativeTerminalRecordSchema, TerminalSizeSchema, TerminalSnapshotSchema } from '../taskrunner/nativeTerminal';
 import { AgentActivityStateSchema } from './activity/nativeActivity';
 import { StartupProgressSchema } from './progress/startupProgress';
+import { ResourcePhaseSchema } from './resources/resourceRecord';
 
 export const StartNativeTerminalRequestSchema = TerminalSizeSchema.extend({
   // 没有权限字段：开发会话的 CLI 一律完全权限（D59）。
@@ -21,6 +22,8 @@ export const NativeTerminalDtoSchema = NativeTerminalRecordSchema.extend({
   finalScreen: z.enum(['pending', 'available', 'unavailable']).optional(),
   /** RFC-022：启动进度（RFC-024 起七段，之前冻结的六段照常可读）；升级前受理的 CLI 没有。 */
   startup: StartupProgressSchema.optional(),
+  /** RFC-025 §11.2：资源台账里这个 CLI 执行记录的阶段；结束与失败以它为准（lifecycle 随之给出 ended／failed），结束中仍报 running。 */
+  phase: ResourcePhaseSchema.optional(),
 });
 export const NativeTerminalSnapshotDtoSchema = z.object({ status: z.enum(['pending', 'available', 'unavailable']), snapshot: TerminalSnapshotSchema.optional() });
 export const NativeTerminalListSchema = z.object({
