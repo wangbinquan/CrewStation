@@ -413,9 +413,11 @@ function composeLedger(deps: CompositionDeps, core: ReturnType<typeof composeCor
   });
 }
 
-function composeControl(deps: CompositionDeps, core: ReturnType<typeof composeCore>, ledger: ReturnType<typeof composeLedger>, runtime: ReturnType<typeof composeRuntime>) {
+function composeControl(deps: CompositionDeps, core: ReturnType<typeof composeCore>, ledger: ReturnType<typeof composeLedger>, runtime: ReturnType<typeof composeRuntime>, gateway: ReturnType<typeof composeDelivery>['gateway']) {
   return createClusterControlModule({
     k8s: deps.k8s, logger: deps.logger, isAdmin: core.identity.api.isAdmin, systemNamespace: deps.settings.systemNamespace,
+    // RFC-025 设计 §7.4：身份索引改读观测缓存的 Pod，全平台只剩这一条 Pod watch。
+    pods: { changed: (pod, gone) => gateway.api.syncObservedPod(pod, gone), synced: async (pods) => { await gateway.api.relistObservedPods(pods); } },
     ledger: {
       observe: (input) => ledger.api.observe(input), claimOf: (child) => ledger.api.claimOf(child), get: (id) => ledger.api.get(id),
       listLive: () => ledger.api.list({}), changesSince: ledger.api.changesSince, latestChange: ledger.api.latestChange,
@@ -444,7 +446,7 @@ function composeModules(deps: CompositionDeps) {
   const runtime = composeRuntime(deps, core, delivery, late, resources);
   const aggregates = composeAggregates(deps, core, delivery, runtime, resources);
   const cluster = composeCluster(deps, core, delivery, runtime);
-  const clusterControl = composeControl(deps, core, resources, runtime);
+  const clusterControl = composeControl(deps, core, resources, runtime, delivery.gateway);
   return { cluster, resources, clusterControl, identity: core.identity, project: core.project, config: core.config, data: core.data, scm: core.scm, apiCatalog: core.apiCatalog, agentRuntime: core.agentRuntime, ...delivery, ...runtime, ...aggregates };
 }
 

@@ -1,4 +1,5 @@
 import type { WorkloadIdentity } from '@crewstation/contracts';
+import type { ObservedPodObject } from '../api/moduleApi';
 import type { PodLabels } from '../domain/podIdentity';
 import { identityFromLabels, TOMBSTONE_RETENTION_MS, toWorkloadIdentity } from '../domain/podIdentity';
 import type { GatewayUseCaseDeps } from './dependencies';
@@ -12,7 +13,19 @@ export interface ObservedPod {
   phase?: string;
 }
 
-/** Pod 身份索引：watch 增量维护，cs-auth 按源 IP 反查（G1）。 */
+/**
+ * cluster-control 转交的 Pod → 身份索引的输入。删除中的 Pod 照旧在册（优雅退出期间它的 IP 仍是它的，要等对象消失才标删除）；
+ * 已结束（Succeeded、Failed）或没有 IP 的由 syncPod 标删除。
+ */
+export function observedPodOf(pod: ObservedPodObject, gone: boolean): ObservedPod {
+  const status = (pod.status ?? {}) as { podIP?: string; phase?: string };
+  return {
+    name: pod.metadata.name, namespace: pod.metadata.namespace ?? 'default', labels: (pod.metadata.labels ?? {}) as PodLabels, deleted: gone,
+    ...(status.podIP ? { ip: status.podIP } : {}), ...(status.phase ? { phase: status.phase } : {}),
+  };
+}
+
+/** Pod 身份索引：按 cluster-control 的观测增量维护，cs-auth 按源 IP 反查（G1）。 */
 export function podIdentityUseCases(deps: GatewayUseCaseDeps) {
   const syncPod = async (pod: ObservedPod): Promise<void> => {
     const identity = identityFromLabels(pod.labels);
@@ -39,7 +52,9 @@ export function podIdentityUseCases(deps: GatewayUseCaseDeps) {
     relistPods: async (pods: readonly ObservedPod[]): Promise<number> => {
       const listedAt = deps.clock.now();
       for (const pod of pods) await syncPod(pod);
-      return deps.pods.pruneStale(listedAt, deps.clock.now());
+      const pruned = await deps.pods.pruneStale(listedAt, deps.clock.now());
+      if (pruned > 0) deps.logger.info('pod identities pruned after relist', { pruned });
+      return pruned;
     },
     lookupByIp: async (ip: string): Promise<WorkloadIdentity | undefined> => {
       const record = await deps.pods.byIp(ip);

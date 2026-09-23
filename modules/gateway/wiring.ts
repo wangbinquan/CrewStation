@@ -17,14 +17,12 @@ import type { GatewayModuleApi } from './api/moduleApi';
 import { allowlistUseCases } from './application/allowlist';
 import type { GatewayUseCaseDeps } from './application/dependencies';
 import { maintenanceUseCases } from './application/maintenance';
-import { podIdentityUseCases } from './application/podIdentities';
+import { observedPodOf, podIdentityUseCases } from './application/podIdentities';
 import { routeUseCases } from './application/reconcileRoutes';
 import { gatewayRoutes } from './http/gatewayRoutes';
 import { maintenanceRoutes } from './http/maintenanceRoutes';
 import type { GrantSource, HostNaming, ProjectAccess, ServiceDirectory, SlotRoles, UserDirectory } from './ports/directories';
 import type { GatewayApplier, GatewaySettings } from './ports/gatewayApply';
-import type { PodWatcher } from './workers/podWatcher';
-import { podWatcher } from './workers/podWatcher';
 import { identityTombstoneWorker } from './workers/identityTombstones';
 import { routeLedgerResyncWorker } from './workers/routeLedgerResync';
 import type { RouteLedger } from './ports/ledger';
@@ -52,8 +50,8 @@ export interface GatewayModuleDeps {
 export interface GatewayModule {
   readonly api: GatewayModuleApi;
   readonly http: Hono<AppEnv>[];
-  /** 第一个是身份索引的 Pod watch，之后是墓碑清理；配了资源台账时另有路由补投影。 */
-  readonly workers: readonly [PodWatcher, ...Array<{ start(): void; stop(): Promise<void> }>];
+  /** 身份索引的墓碑清理；配了资源台账时另有路由补投影。身份索引本身由 cluster-control 的 Pod 观测驱动（RFC-025 设计 §7.4）。 */
+  readonly workers: readonly { start(): void; stop(): Promise<void> }[];
   readonly subscriptions: EventConsumer;
   readonly migrations: MigrationSet;
 }
@@ -88,7 +86,11 @@ export function createGatewayModule(deps: GatewayModuleDeps): GatewayModule {
   const maintenance = maintenanceUseCases(useCaseDeps);
   const allowlist = allowlistUseCases(useCaseDeps, maintenance.serviceCallBlock);
   const pods = podIdentityUseCases(useCaseDeps);
-  const api: GatewayModuleApi = { name: 'gateway', ...routes, ...allowlist, evaluate: allowlist.evaluate, lookupByIp: pods.lookupByIp, purgeIdentityTombstones: pods.purgeTombstones, ...maintenance };
+  const api: GatewayModuleApi = {
+    name: 'gateway', ...routes, ...allowlist, evaluate: allowlist.evaluate, lookupByIp: pods.lookupByIp, purgeIdentityTombstones: pods.purgeTombstones, ...maintenance,
+    syncObservedPod: (pod, gone) => pods.syncPod(observedPodOf(pod, gone)),
+    relistObservedPods: (list) => pods.relistPods(list.map((pod) => observedPodOf(pod, false))),
+  };
   // 发布登记的投影由目录提交后的组合根回调刷新；再独立消费同一发布会让迟到的旧计划覆盖新路由。
   // 放行表是「当前已登记服务」的投影，这个集合一变就得重算：建项目原先只重算路由，新服务于是
   // 根本不在表里，它的开发容器连内置 MCP 与平台 API 全是 403「不能调用平台端点」，要等某次无关的
@@ -110,10 +112,7 @@ export function createGatewayModule(deps: GatewayModuleDeps): GatewayModule {
   return {
     api,
     http: [gatewayRoutes(api, deps.isAdmin), maintenanceRoutes(api, deps.isAdmin)],
-    workers: [
-      podWatcher(deps.k8s, pods.syncPod, logger, pods.relistPods), identityTombstoneWorker(pods.purgeTombstones, logger),
-      ...(deps.ledger ? [routeLedgerResyncWorker(routes.resyncRouteLedger, logger)] : []),
-    ],
+    workers: [identityTombstoneWorker(pods.purgeTombstones, logger), ...(deps.ledger ? [routeLedgerResyncWorker(routes.resyncRouteLedger, logger)] : [])],
     subscriptions,
     migrations: gatewayMigrations,
   };

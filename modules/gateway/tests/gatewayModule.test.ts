@@ -210,10 +210,25 @@ describe.skipIf(!available)('gateway module', () => {
     await repo.upsert({ ip: '10.244.0.30', podName: 'mcp-capabilities-gone', namespace: 'crewstation-system', project: 'platform', service: 'mcp-capabilities', workload: 'platform', updatedAt: new Date(Date.now() - 3_600_000) });
     expect(await gateway.api.lookupByIp('10.244.0.30')).toMatchObject({ kind: 'platform' });
     const labels = { 'app.kubernetes.io/managed-by': 'crewstation', 'crewstation.io/project': 'demo', 'crewstation.io/service': 'demo', 'crewstation.io/workload': 'service', 'crewstation.io/slot': 'blue' };
-    await k8s.create({ apiVersion: 'v1', kind: 'Pod', metadata: { name: 'demo-blue-new', namespace: 'cs-demo', labels }, status: { podIP: '10.244.0.30', phase: 'Running' } } as never);
-    expect(await gateway.workers[0]!.runOnce()).toBe(1);
+    // 观测缓存第一次全量同步后交来的全部受管 Pod（RFC-025 设计 §7.4：身份索引由 cluster-control 的 Pod 观测驱动）。
+    expect(await gateway.api.relistObservedPods([{ metadata: { name: 'demo-blue-new', namespace: 'cs-demo', labels }, status: { podIP: '10.244.0.30', phase: 'Running' } }])).toBeGreaterThanOrEqual(1);
     expect(await gateway.api.lookupByIp('10.244.0.30')).toMatchObject({ identity: 'demo/demo', kind: 'service' });
     expect((await repo.listActive()).map((p) => p.podName)).toEqual(['demo-blue-new']);
+  });
+
+  test('观测转交的 Pod：有 IP 即在册；删除中照旧在册（优雅退出期间 IP 仍是它的）；消失或已结束标删除；不带平台标签的不收', async () => {
+    const labels = { 'app.kubernetes.io/managed-by': 'crewstation', 'crewstation.io/project': 'demo', 'crewstation.io/service': 'demo', 'crewstation.io/workload': 'service', 'crewstation.io/slot': 'green' };
+    const pod = (ip: string, phase: string, deleting = false) => ({ metadata: { name: `demo-green-${ip.split('.').at(-1)}`, namespace: 'cs-demo', labels, ...(deleting ? { deletionTimestamp: '2026-09-24T01:00:00Z' } : {}) }, status: { podIP: ip, phase } });
+    await gateway.api.syncObservedPod(pod('10.244.7.1', 'Running'), false);
+    expect(await gateway.api.lookupByIp('10.244.7.1')).toMatchObject({ identity: 'demo/demo', kind: 'service' });
+    await gateway.api.syncObservedPod(pod('10.244.7.1', 'Running', true), false);
+    expect(await gateway.api.lookupByIp('10.244.7.1')).toMatchObject({ identity: 'demo/demo' });
+    await gateway.api.syncObservedPod(pod('10.244.7.1', 'Running', true), true);
+    expect(await gateway.api.lookupByIp('10.244.7.1')).toBeUndefined();
+    await gateway.api.syncObservedPod(pod('10.244.7.2', 'Succeeded'), false);
+    expect(await gateway.api.lookupByIp('10.244.7.2')).toBeUndefined();
+    await gateway.api.syncObservedPod({ metadata: { name: 'stray', namespace: 'cs-demo' }, status: { podIP: '10.244.7.3', phase: 'Running' } }, false);
+    expect(await gateway.api.lookupByIp('10.244.7.3')).toBeUndefined();
   });
 
   // RFC-025 第三期后半：服务的路由写成 route 记录，IngressRoute 由调和器照记录应用（gateway 只建前缀剥离中间件）；补投影按网关自己存的路由表；归档的标「不要了」。

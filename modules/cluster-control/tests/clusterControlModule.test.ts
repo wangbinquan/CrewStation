@@ -57,6 +57,8 @@ describe.skipIf(!available)('cluster-control：观测写回台账与收编空跑
   const feed = manualFeed();
   // 调和器的删除：按 UID 删假集群里的对象，并像真实观测缓存那样随即报一次消失。路由的应用用真实适配器落到假集群，写了就报一次变化。
   const removals: string[] = [], routeApplies: string[] = [];
+  // 身份索引（gateway）收到的 Pod：变化逐条、首次全量同步后一份全量；名字是 pod-identity-broken 的模拟身份索引出错。
+  const podEvents: string[] = [], relisted: number[] = [];
   const writer = kubernetesClusterWriter(k8s);
   const cluster: ClusterWriter = {
     remove: async ({ kind, namespace, name, uid }) => {
@@ -99,6 +101,13 @@ describe.skipIf(!available)('cluster-control：观测写回台账与收编空跑
       // 孤儿回收单独在 orphanSweep.test.ts 里核对；这里关掉，免得它的定时轮次与本文件的用例交错。
       orphanSweep: false,
       reconciler: { pollMs: 20 },
+      pods: {
+        changed: async (object, gone) => {
+          if (object.metadata.name === 'pod-identity-broken') throw new Error('身份索引暂时不可用');
+          podEvents.push(`${object.metadata.namespace}/${object.metadata.name}:${gone ? 'gone' : 'present'}`);
+        },
+        synced: async (list) => { relisted.push(list.length); },
+      },
       legacy: { resolveTaskId: async (legacyId) => (legacyId === 'tsk_01a0954107447000b7936485fb80d15d' ? 't-live' : undefined), task: async (taskId) => tasks.get(taskId) },
     });
     control.observer.start();
@@ -299,6 +308,20 @@ describe.skipIf(!available)('cluster-control：观测写回台账与收编空跑
     await until('路由删掉', async () => (await resources.api.get(record.id))?.phase === 'stopped');
     expect(removals).toContain('IngressRoute/shop-prod');
     expect(routeApplies).toHaveLength(2);
+  });
+
+  // RFC-025 设计 §7.4：身份索引改读观测缓存，全平台只剩这一条 Pod watch。
+  test('观测到的 Pod 交给身份索引：平台组件也在内、消失照报；首次全量同步后交一次全部 Pod；身份索引失败不耽误台账观测', async () => {
+    await until('首次全量交过', () => relisted.length === 1);
+    const before = podEvents.length;
+    const platformPod = pod('cs-mcp-1');
+    await feed.emit({ kind: 'Pod', object: { ...platformPod, metadata: { ...platformPod.metadata, namespace: 'crewstation-system' } }, gone: false });
+    await feed.emit({ kind: 'Pod', object: pod('task-identity'), gone: true });
+    expect(podEvents.slice(before)).toEqual(['crewstation-system/cs-mcp-1:present', 'cs-demo/task-identity:gone']);
+    const record = await resources.api.owner('task-runtime').declare({ kind: 'dev-workspace', ref: 'identity-broken', projectId: PROJECT, spec: { children: [{ kind: 'Pod', namespace: 'cs-demo', name: 'pod-identity-broken' }] } });
+    await feed.emit({ kind: 'Pod', object: pod('pod-identity-broken'), gone: false });
+    expect((await resources.api.get(record.id))?.children[0]).toMatchObject({ name: 'pod-identity-broken', phase: 'Running' });
+    expect(relisted).toHaveLength(1);
   });
 
   test('崩溃重启的到期复核：成立时按最近一次退出满 10 分钟约下一次核对，到时不再重启就撤掉', async () => {

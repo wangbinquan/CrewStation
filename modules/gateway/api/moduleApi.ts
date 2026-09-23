@@ -13,6 +13,12 @@ export type EntryVerdict =
 /** 维护中的服务（供市场卡片）：开关、原因、预计恢复时间与临时指定的人。 */
 export interface MaintenanceSnapshot { switches: { users: boolean; services: boolean; events: boolean }; allowUserIds: readonly UserId[]; reason: string; expectedEndAt?: Date }
 
+/** 观测到的 Pod（cluster-control 的观测缓存转交，结构上是 Kubernetes 对象的子集）。 */
+export interface ObservedPodObject {
+  readonly metadata: { readonly name: string; readonly namespace?: string; readonly labels?: Readonly<Record<string, string>> };
+  readonly status?: unknown;
+}
+
 /** gateway 模块对外能力：路由与放行表生成、Pod 身份反查与服务域放行评估（cs-auth 用后两者）。 */
 export interface GatewayModuleApi {
   readonly name: 'gateway';
@@ -28,6 +34,10 @@ export interface GatewayModuleApi {
   lookupByIp(ip: string): Promise<WorkloadIdentity | undefined>;
   /** 身份索引的墓碑清理（RFC-025 提案 Q5）：标为删除超过 7 天的行删掉；返回条数。cs-controller 每小时跑一次。 */
   purgeIdentityTombstones(): Promise<number>;
+  /** 身份索引（RFC-025 设计 §7.4）：cluster-control 观测到的 Pod 变化，全平台只剩这一条 Pod watch。gone 是对象已消失。 */
+  syncObservedPod(pod: ObservedPodObject, gone: boolean): Promise<void>;
+  /** 观测缓存全量同步之后：这一份是全部受管 Pod，逐个同步并把这次没列到的在册行标为删除；返回标掉的条数。 */
+  relistObservedPods(pods: readonly ObservedPodObject[]): Promise<number>;
 
   // —— RFC-021：正式版本维护 ——
   getMaintenance(actor: Actor, serviceId: ServiceId): Promise<ServiceMaintenanceView>;

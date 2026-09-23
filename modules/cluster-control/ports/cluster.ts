@@ -22,6 +22,16 @@ export interface ManagedObjectFeed {
   list(kind: ObservedKind): readonly ObservedObject[];
 }
 
+/**
+ * 观测到的 Pod 交给身份索引（gateway，RFC-025 设计 §7.4）：全平台只剩观测缓存这一条 Pod watch。
+ * 系统命名空间里的平台组件也在内（它们不进台账，但要进身份索引）。
+ */
+export interface PodSubscriber {
+  changed(pod: ObservedObject, gone: boolean): Promise<void>;
+  /** 观测缓存第一次全量同步完成：这一份是全部受管 Pod，身份索引据此清掉这次没列到的旧行。此后重列时消失的照常以 changed(…, true) 报来。 */
+  synced(pods: readonly ObservedObject[]): Promise<void>;
+}
+
 /** 一次性列出受管对象（收编空跑报告在 cs-api 里按需算，不开 watch）。 */
 export interface ManagedObjectReader {
   list(kind: ObservedKind): Promise<ObservedObject[]>;
