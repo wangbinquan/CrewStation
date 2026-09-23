@@ -122,7 +122,7 @@
 - **证据**：同一套突发脚本打一个隔离的 cs-api 副本。旧驱动 6 轮每轮都被探针重启，共 102 行 I16 特征报错；新驱动 6 轮 0 报错、0 重启，50,579 个请求全部 2xx。CI 35851282033 六项成功，e2e 用新驱动全新安装。
 - **本机部署**：11:14Z 其余六个部署、11:15:56Z cs-api 换成 `cs-control-plane:pgjs-20260923`；迁移 Job 没有待应用的迁移。验收项目 `rfc023-verify` 保留。
 - **顺手修**：数据模块的 `expireBindings` 一直没接后台任务，到期的只读／可写绑定显示生效中、临时角色不删。7d12f70 改为 cs-controller 每分钟收一次；11:30Z cs-controller 换成 `pgjs-20260923b`，实机核对 5 分钟绑定到期后 30 秒内收掉。
-- **等作者裁定**：开发会话释放时，要不要立即收回它的数据绑定（现在要等到期）。
+- **释放即收回**：作者裁定开发会话释放时直接收回它的数据绑定（「已经有了弹窗提示了」）。60ef91b2：数据模块订阅「任务已释放」事件，申请中、已批准、生效中的一律记为已收回并删掉临时角色；Design §9.8 补了一句。
 - **下一个 session 注意**：
   - 09-26 11:16Z 之后，核对 cs-api、cs-session、cs-controller、cs-events 的重启次数与日志里的 I16 特征行（`ERR_POSTGRES`、`JSON Parse error`、`Failed to read data`、`INVALID_MESSAGE`、`UNSUPPORTED_INTEGER`）。都为 0 才能把 DB-08 记为通过。
   - 然后做 T8 回填：Design §3、tech-evaluation E04。基线版本与决策号取 T8 当时的下一个号：v0.3.13／D61 已由 crewstation-f7 用于删除告警订阅，v0.3.12／D60 是 crewstation-9c 的网络插件预检。I16 关闭，RFC 置 Done。
