@@ -118,7 +118,9 @@ describe.skipIf(!session?.project)('项目工作台信息架构（RFC-020）', (
         const pane = [...body.children].find((node) => !node.hidden), sections = [...pane.querySelectorAll('section')];
         const bordered = (node) => parseFloat(getComputedStyle(node).borderBottomWidth) > 0 && node.getBoundingClientRect().height > 0;
         const cards = sections.filter((node) => bordered(node) && !sections.some((other) => other !== node && other.contains(node) && bordered(other)));
-        return Math.round(body.getBoundingClientRect().bottom - Math.max(...cards.map((node) => node.getBoundingClientRect().bottom)));
+        // 可使用资源（2026-09-23 起）是两行列表而不是卡片：量长满的主题正文。
+        const blocks = cards.length > 0 ? cards : [...pane.querySelectorAll('[role="tabpanel"]')].filter((node) => !node.hidden).slice(-1);
+        return Math.round(body.getBoundingClientRect().bottom - Math.max(...blocks.map((node) => node.getBoundingClientRect().bottom)));
       })()`);
       // 最后一张卡离面板正文底边只剩内边距（8px）；内容比一屏长时为负，超出部分由面板正文滚动。
       expect([view, reach <= 12]).toEqual([view, true]);

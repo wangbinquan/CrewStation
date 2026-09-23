@@ -28,6 +28,21 @@
   - 时间线把非成员管理员显示成「成员 01a0c12a…」，这是 RFC-020 既有的写法。
 - **下一个 session 注意**：09-25 与 09-26 是自动下线第一次按真实时间触发，看一眼 cs-controller 日志里的 `slot offline notice` 与各槽的记录是否按期出现。不要为了测试调短平台设置的时长，那会作用于所有项目；要测就像本批一样只改验收项目自己那一行。
 
+## 开发页「可使用资源」页签重做（2026-09-23）
+
+作者反馈「可使用资源页签里的信息无法理解，表格超出页面还有横向滚动条，无效信息太多，比如那个 uuid 有什么用」，要求全面设计：分类合理、直观、信息密度高。两轮问答（含 ASCII 预览）裁定，流程取「直接改＋回填，提交并部署本机」：
+
+- **四类**（按代码怎么用它）：调用接口（代理、其他数字人、平台业务子任务接口）／接收事件（已订阅、可订阅类型、推送请求头）／运行环境（环境变量、用户请求头、服务与链路头、约定路径、应用配置键）／Agent 工具（两个平台 MCP 与开发会话令牌头）。地址 `topic` 只增 `agent`，`guide` 仍是运行环境；旧链接 `guide=mcp`／`tasks` 落到 Agent 工具／调用接口。
+- **接口**：平铺两行列表（首行方法＋路径，次行提供方·说明，右侧试调／申请），默认列全部，可调用的置顶、需申请的在分割线下；搜索＋提供方＋状态筛选；点路径展开可复制的调用地址 `${CS_INTERNAL_API_BASE}<代理><路径>`；侧栏里试调与申请在该行下原地展开（会话绑定压成一行，会话 ID 只进悬停提示）；放大形态同一套列表＋右侧详情栏。界面上不再出现操作 ID（申请记录与试调结果写「方法 路径」）。
+- **事件**：与接口同一种两行样式；可订阅的按生产方分组、按族归并（`gitlab.issue` ▸ open close …），点子类型复制可粘进 `crewstation.yaml` 的订阅片段（按 ID 绑定、注释写类型——UUID 只出现在这里）。
+- **运行环境／Agent 工具**：每项「名字＋中文用途」，点名字复制；原「平台接入」折叠块与 `devSessionToken` 这类内部键名去掉。
+
+**实现**：通用部件 `shared/ui/resource/ResourceList`（`ResourceGroup`／`ResourceRow`／`MethodTag`／`BreakableText`，只在 `/ . -` 后折行）；`features/catalog/components/list/`（`OperationList`／`OperationRow`／`OperationToolbar`／纯函数 `operationSections`），`invocation/InlineBinding`，`OperationsPanel` 删除（`OperationsTable` 只留管理空间）；`features/events/components/eventFamilies`；`features/capabilities/components/reference/`（`RuntimeReference`／`AgentTools`／`EventHeaders`／`KeyMeaningList`／`ReferenceTopics`）与 `model/useCapabilityDescription`；放大形态列表／详情按面板宽度（容器查询）排布。回填 RFC-020 design §7「修订二」、plan §4。
+**用例**：`referencePanel` 四条新增、`resourceListModel` 新增、`apiInvocationForm` 新增侧栏行内试调一条；`projectResources`、`catalogConsumption`、`catalogDetail`、`adminCapabilities`、`projectNavigation` 改写；e2e 新增 `referenceResources`（1440／1024／390，四类、面板内除页签条外无横向滚动、接口与事件无 UUID），`capabilityDepth`、`projectSettingsUx` 改为四类，`projectWorkspaceIa` WS-07 文档式面板在没有卡片时量长满的主题正文。
+**提交与门禁**：`1b16607`。工作树里混着并行会话未提交的 `app/i18n` hunk（`ui.refresh` 等），第一次「HEAD＋本批」导出时被一起带进去，概览用例因「刷新」键缺失红了 12 条——改为从 HEAD 取这两个文件、只放自己的 hunk，临时索引提交；干净树 `bun run check` 仅 3 条红，均为 `templates/`、`integrations/` 独立项目在导出树里没有 `node_modules`（与本批无关）。
+**部署与实机**：`cs-console:resources-20260923`（`git archive 1b16607`）导入节点并只滚 console（首个带上 `2fa59ec`、`fff4325` 的包）。部署前用 CDP 换 `/assets/*` 在 dev-developer 下核对 1440／1024／390：无横向溢出、无控制台错误。部署后 e2e（dev-admin）`referenceResources`＋`capabilityDepth`＋`projectSettingsUx` 14 pass，`projectWorkspaceIa`＋`apiInvocation` 仅 WS-07「预览、代码与变更」的操作条贴顶检查红——那几个面板不是本批改的，已告知按钮统一会话（疑为 `2fa59ec` 按钮高度）。期间 cs-api 因 crewstation-51 滚控制面发生 I16 连接错位重启两次，e2e 等它稳定后重跑。
+**下一个 session 注意**：作者尚未亲手看新页签。crewstation-db 正按作者裁定把「申请开放」改成弹窗（行内展开的 `requesting` 分支在 `list/OperationRow.tsx`），试调保持行内展开。
+
 ## 开发页 CLI 区改为 Xshell 式标签组（2026-09-23）
 
 作者反馈「开发界面的开发 cli 区的可操作性太差了，包括 cli 窗的排列，分 tab 页，那些按钮简直反直觉，能不能直接做成 xshell 那种窗口，然后拖动排列就行了，实际上就只有新开、排列两个功能」。两轮问答（含 ASCII 预览）裁定，流程取「直接改＋回填，提交并部署本机」：
