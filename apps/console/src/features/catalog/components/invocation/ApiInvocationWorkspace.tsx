@@ -6,7 +6,7 @@ import { UnsavedChangesGuard } from '../../../../shared/navigation/UnsavedChange
 import { ActionNote } from '../../../../shared/ui/ActionNote';
 import { Button } from '../../../../shared/ui/Button';
 import { Card } from '../../../../shared/ui/Card';
-import { ConfirmationPanel } from '../../../../shared/ui/ConfirmationPanel';
+import { ConfirmationDialog } from '../../../../shared/ui/dialog/ConfirmationDialog';
 import { useApiInvocation } from '../../hooks/useApiInvocation';
 import type { ApiInvocationContext, ApiInvocationController } from '../../hooks/useApiInvocation';
 import { ApiInvocationForm } from './ApiInvocationForm';
@@ -17,7 +17,7 @@ import styles from './ApiInvocation.module.css';
 export interface ApiInvocationSlots {
   readonly controller: ApiInvocationController;
   readonly open: (operation: ApiOperationDto) => void;
-  /** 会话绑定、切换确认、表单与结果。 */
+  /** 会话绑定、表单与结果（切换确认是弹窗，不在这里）。 */
   readonly panel: ReactNode;
   /** 正在试调的操作；侧栏形态把 `panel` 展开在它那一行下面。 */
   readonly active?: ApiOperationDto;
@@ -50,13 +50,14 @@ export function ApiInvocationWorkspace({ context, inline = false, children }: { 
       {controller.pending ? <p role="status">{t('catalog.invoke.pendingHint')}</p> : null}
       {selected && !visible ? <Button onClick={() => setVisible(true)}>{t('catalog.invoke.restoreDraft')}</Button> : null}
     </Card> : null}
-    {replacement ? <ConfirmationPanel question={t('catalog.invoke.replaceQuestion', { operation: `${replacement.method} ${replacement.path}` })} hint={t('catalog.invoke.replaceHint')} confirmLabel={t('catalog.invoke.replace')} cancelLabel={t('catalog.invoke.keep')} busy={controller.pending || controller.checking} onConfirm={() => choose(replacement)} onCancel={() => setReplacement(undefined)} /> : null}
     {selected ? <div ref={formHost} hidden={!visible}><ApiInvocationForm key={selected.id} inline={inline} operation={selected} controller={controller} onClose={() => setVisible(false)} /></div> : null}
     {controller.outcome ? <ApiInvocationResult outcome={controller.outcome} label={describe(context.operations, controller.outcome.request.operationId)} /> : null}
   </>;
+  // 切换操作的确认是弹窗（2026-09-23），不跟着 panel 摆：行被筛掉、panel 没摆出来时也要能回答。
   return <>
     <UnsavedChangesGuard dirty={controller.dirty || controller.pending} scope={t('catalog.invoke.draftScope')} />
     {children({ controller, open, panel, active: selected })}
+    {replacement ? <ConfirmationDialog question={t('catalog.invoke.replaceQuestion', { operation: `${replacement.method} ${replacement.path}` })} hint={t('catalog.invoke.replaceHint')} confirmLabel={t('catalog.invoke.replace')} cancelLabel={t('catalog.invoke.keep')} focus="cancel" busy={controller.pending || controller.checking} onConfirm={() => choose(replacement)} onCancel={() => setReplacement(undefined)} /> : null}
   </>;
 }
 

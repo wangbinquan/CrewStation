@@ -47,10 +47,13 @@ test('具名移除可取消；确认时记录变化阻止删除，重新检查�
   expect(f.writes).toEqual([{ method: 'DELETE', path: `/v1/projects/${projectId}/alert-subscriptions/${ownerId}`, body: {} }]); expect(page.text()).toContain('告警记录仍保留'); expect(page.text()).toContain('preview 健康未通过');
 });
 
-test('收起、筛选与取消切换保留草稿；切诊断页签先确认，替换编辑对象也需确认', async () => {
+test('取消只关窗、草稿留着，筛选后再点「添加订阅」恢复；换编辑别人先确认、「继续编辑当前配置」回到草稿；切诊断页签先确认', async () => {
   const f = alertsFixture(); page = await renderApp(route); await click('添加订阅'); await input('alertMember', memberId); await input('alertChannel', 'webhook'); await input('alertTarget', 'https://draft.example.test');
-  await click('收起订阅配置'); expect(page.text()).toContain('有未保存的订阅配置'); await click('已恢复'); await click('继续编辑订阅'); expect(document.querySelector<HTMLInputElement>('[name="alertTarget"]')?.value).toBe('https://draft.example.test');
-  await click('编辑 王负责人 · owner@test.invalid'); await click('继续编辑当前配置'); expect(document.querySelector<HTMLInputElement>('[name="alertUserId"]')?.value).toBe(memberId);
+  // 2026-09-23 起订阅配置是弹窗：取消只关窗，草稿静默留着，再点同一个入口恢复。
+  await click('取消'); expect(document.querySelectorAll('dialog').length).toBe(0); await click('已恢复'); await click('添加订阅');
+  expect(document.querySelector<HTMLInputElement>('[name="alertTarget"]')?.value).toBe('https://draft.example.test');
+  await click('取消'); await click('编辑 王负责人 · owner@test.invalid'); await click('继续编辑当前配置');
+  expect(document.querySelectorAll('dialog[open]').length).toBe(1); expect(document.querySelector<HTMLInputElement>('[name="alertUserId"]')?.value).toBe(memberId); await click('取消');
   await click('日志'); expect(page.text()).toContain('未保存'); await click('继续编辑'); expect(page.search().tab).toBe('alerts');
   await click('日志'); await click('放弃输入并离开'); expect(page.search().tab).toBe('logs'); expect(f.writes).toHaveLength(0);
 });

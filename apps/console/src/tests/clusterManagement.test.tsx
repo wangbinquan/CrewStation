@@ -48,6 +48,18 @@ test('scale validates every bound, inspects without writing, confirms once and e
   const write = f.calls.find((c) => c.path.endsWith('/operations') && c.method === 'POST')!; expect(write.body.params).toEqual({ action: 'scale', replicas: 2 });
   expect(page.text()).toContain('operation-stable'); expect(page.text()).toContain('trace-original'); expect(page.text()).toContain('202'); expect(page.text()).toContain('1.2 s'); expect(page.search().operationId).toBe('operation-stable');
 });
+// 2026-09-23 作者裁定页内展开的表单改弹窗：调整副本在弹窗里；取消只关窗、目标副本数留着，再打开恢复；「清空」回到当前副本数。
+test('调整副本在弹窗里：取消只关窗、目标副本数留着再打开恢复；清空回到当前副本数；改了数目要重新检查', async () => {
+  const f = clusterFixture(); page = await renderApp('/admin/cluster?resourceId=resource-uid'); await page.click('调整副本');
+  const replicas = () => document.querySelector<HTMLInputElement>('dialog[open] input[inputmode="numeric"]')!;
+  const initial = replicas().value; await input('dialog[open] input[inputmode="numeric"]', '2'); await page.click('检查影响');
+  expect(document.querySelector('dialog[open]')?.getAttribute('role')).toBe('alertdialog'); expect(page.text()).toContain('确认执行');
+  await input('dialog[open] input[inputmode="numeric"]', '3'); expect(document.querySelector('dialog[open]')?.getAttribute('role')).toBe('dialog');
+  await page.click('取消'); expect(document.querySelectorAll('dialog').length).toBe(0);
+  await page.click('调整副本'); expect(replicas().value).toBe('3');
+  await page.click('清空'); expect(replicas().value).toBe(initial); expect(document.querySelectorAll('dialog[open]').length).toBe(1);
+  expect(f.calls.filter((c) => c.path.endsWith('/operations') && c.method === 'POST')).toHaveLength(0);
+});
 test('删除／结束不可撤销：点下去就弹窗并自动检查影响，输入 delete 才受理，受理后弹窗关闭、结果在页内', async () => {
   const f = clusterFixture();
   f.row.availableActions = f.row.availableActions.map((a) => a.action === 'delete' ? { ...a, enabled: true, reason: '', impactSummary: ['按 UID 删除无活动引用的受管资源，无法撤销'] } : a);

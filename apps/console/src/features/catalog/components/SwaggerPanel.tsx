@@ -7,7 +7,7 @@ import { useApiQuery } from '../../../shared/api/useApi';
 import { useT } from '../../../shared/lib/useT';
 import { Button } from '../../../shared/ui/Button';
 import { Card } from '../../../shared/ui/Card';
-import { ConfirmationPanel } from '../../../shared/ui/ConfirmationPanel';
+import { ConfirmationDialog } from '../../../shared/ui/dialog/ConfirmationDialog';
 import { QueryStatus } from '../../../shared/ui/QueryStatus';
 import { SwaggerDocument } from './SwaggerDocument';
 import type { SwaggerInvocationContext } from './invocation/swaggerInvocationPlugin';
@@ -48,7 +48,7 @@ export function SwaggerPanel({ serviceId, proxies, initialProxy, invocation }: S
         </label>
       )}
       {proxy ? <div className={styles.controls}><Button disabled={spec.isFetching} onClick={() => { void spec.refetch(); }}>{t('catalog.swagger.checkDocument')}</Button><Button disabled={!spec.data || !!spec.error || spec.isFetching || invocation.controller.pending || invocation.controller.checking} onClick={() => requestChange(proxy)}>{t('catalog.swagger.reloadDocument')}</Button></div> : null}
-      {replacement !== undefined ? <ConfirmationPanel question={t('catalog.swagger.replaceQuestion', { proxy: proxies.find((entry) => entry.id === proxy)?.name ?? proxy })} hint={t('catalog.swagger.replaceHint')} confirmLabel={t('catalog.invoke.replace')} cancelLabel={t('catalog.invoke.keep')} busy={invocation.controller.pending || invocation.controller.checking} onConfirm={() => choose(replacement)} onCancel={() => setReplacement(undefined)} /> : null}
+      {replacement !== undefined ? <ConfirmationDialog question={t('catalog.swagger.replaceQuestion', { proxy: proxies.find((entry) => entry.id === proxy)?.name ?? proxy })} hint={t('catalog.swagger.replaceHint')} confirmLabel={t('catalog.invoke.replace')} cancelLabel={t('catalog.invoke.keep')} focus="cancel" busy={invocation.controller.pending || invocation.controller.checking} onConfirm={() => choose(replacement)} onCancel={() => setReplacement(undefined)} /> : null}
       {/* 没选代理时查询是禁用的，isPending 会一直为真，所以先看有没有选中。 */}
       <QueryStatus isPending={proxy.length > 0 && spec.isPending} error={spec.error} loadingKey="catalog.swagger.loading" errorKey="catalog.error.load" />
       {spec.data !== undefined ? <SwaggerDocument key={`${proxy}:${revision}`} spec={spec.data} proxy={proxy} invocation={invocation} readFailed={!!spec.error} /> : null}

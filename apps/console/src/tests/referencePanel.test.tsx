@@ -76,14 +76,15 @@ test('点路径在行下展开调用地址（代码里就写这个），平台�
   await type(provider!, 'platform'); expect(list().textContent).toContain('/business-tasks'); expect(list().textContent).not.toContain('/customers');
 });
 
-test('侧栏里「申请」在该行下原地展开申请表单，取消收起；不跳到放大形态', async () => {
+test('侧栏里「申请」打开申请弹窗、不在行下展开，取消关窗；不跳到放大形态', async () => {
   projectResourcesFixture(); page = await renderApp(`/projects/${id}/dev-session?view=reference`);
   const request = [...rowOf('/invoices').querySelectorAll('button')].find((node) => node.textContent === '申请')!;
   expect(request.getAttribute('aria-label')).toBe('申请定向开放 GET /invoices');
   await act(async () => request.click()); await page.settle();
-  expect(rowOf('/invoices').querySelector('textarea')).not.toBeNull(); expect(panel().dataset.mode).toBe('side');
-  await act(async () => [...rowOf('/invoices').querySelectorAll('button')].find((node) => node.textContent === '取消')!.click()); await page.settle();
-  expect(rowOf('/invoices').querySelector('textarea')).toBeNull();
+  // 2026-09-23 起申请表单在弹窗里：行下不再展开表单，弹窗写清申请的是哪个操作。
+  expect(rowOf('/invoices').querySelectorAll('textarea').length).toBe(0);
+  expect(document.querySelector('dialog[open]')?.textContent).toContain('GET /invoices'); expect(panel().dataset.mode).toBe('side');
+  await page.click('取消'); expect(document.querySelectorAll('dialog').length).toBe(0);
 });
 
 test('接收事件：已订阅在上；可订阅的按生产方、事件族归并，点一个类型复制可直接粘进 crewstation.yaml 的订阅片段', async () => {

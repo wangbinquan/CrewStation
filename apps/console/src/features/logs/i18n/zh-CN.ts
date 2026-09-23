@@ -1,9 +1,6 @@
 import type { Messages } from '../../../shared/lib/i18n';
 
 export const messages = {
-  'logs.alerts.subscription.close': '收起订阅配置',
-  'logs.alerts.subscription.resume': '继续编辑订阅',
-  'logs.alerts.subscription.unsaved': '有未保存的订阅配置；收起保留，刷新或关闭页面会丢失。',
   "logs.alerts.title": "告警记录",
   "logs.alerts.recent": "只显示最近 100 条记录；筛选仅作用于这些记录，不代表完整告警历史。",
   "logs.alerts.state.all": "全部",
@@ -146,7 +143,7 @@ export const messages = {
   'logs.topology.viewLogs': '查看日志',
   'logs.topology.readOnly': '管理动作（重启、扩缩、删除）仍在集群管理的资源详情里，这里只读。',
   'logs.topology.emptyTitle': '这个项目还没有受管资源',
-  'logs.topology.invalidResponse': '形态盘点返回不完整，稍后会自动重新读取。',
+  'logs.topology.invalidResponse': '形态盘点返回不完整。',
   'logs.tail.title': '最近日志',
   'logs.tail.hint': '当前开发会话最近 200 行，每 5 秒刷新；筛选与其他来源在运行与诊断的日志页。',
   'logs.topology.emptyDescription': '发布一个版本或开启开发会话后，形态图会出现在这里。',

@@ -140,7 +140,6 @@ export const messages = {
   'catalog.request.reasonPlaceholder': '说明业务用途与调用范围，管理员据此批准或拒绝',
   'catalog.request.submit': '提交申请',
   'catalog.request.submitting': '提交中…',
-  'catalog.request.cancel': '取消',
   'catalog.request.pending': '待审批',
 
   'catalog.requests.title': '本服务的定向开放申请',

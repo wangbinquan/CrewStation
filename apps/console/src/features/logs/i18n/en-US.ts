@@ -2,9 +2,6 @@ import type { MessagesShapedLike } from '../../../shared/lib/i18n';
 import type { messages as zhCN } from './zh-CN';
 
 export const messages: MessagesShapedLike<typeof zhCN> = {
-  'logs.alerts.subscription.close': 'Collapse subscription form',
-  'logs.alerts.subscription.resume': 'Continue editing subscription',
-  'logs.alerts.subscription.unsaved': 'An unsaved subscription draft is retained while collapsed, but lost on reload or close.',
   "logs.alerts.title": "Alert records",
   "logs.alerts.recent": "Shows the latest 100 records. Filters apply only to these records, not the complete alert history.",
   "logs.alerts.state.all": "All",
@@ -147,7 +144,7 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   'logs.topology.viewLogs': 'View logs',
   'logs.topology.readOnly': 'Management actions (restart, scale, delete) stay in the cluster resource detail; this view is read-only.',
   'logs.topology.emptyTitle': 'No managed resources in this project yet',
-  'logs.topology.invalidResponse': 'The inventory response was incomplete; it is read again automatically.',
+  'logs.topology.invalidResponse': 'The inventory response was incomplete.',
   'logs.tail.title': 'Recent logs',
   'logs.tail.hint': 'Last 200 lines of this development session, refreshed every 5 seconds; filters and other sources are under Operations → Logs.',
   'logs.topology.emptyDescription': 'The topology appears here once a release is deployed or a development session is opened.',

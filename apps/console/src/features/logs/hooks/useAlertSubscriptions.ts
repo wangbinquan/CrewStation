@@ -23,7 +23,9 @@ export function useAlertSubscriptions(projectId: string, canManage: boolean) {
   const [errors, setErrors] = useState<{ userId?: string; target?: string }>({});
   const dirty = !sameSubscription(draft, baseline), unavailable = query.isPending || !!query.error;
   const apply = (record?: AlertSubscriptionDto) => { if (lock.current) return; const next = record ? subscriptionDraft(record) : emptyAlertSubscription(); setDraft(next); setBaseline(next); setOpen(true); setEditing(!!record); setReplacement(undefined); setReview(undefined); setErrors({}); setError(undefined); setSuccess(undefined); };
-  const start = (record?: AlertSubscriptionDto) => { if (lock.current || !canManage) return; if (dirty) setReplacement({ record }); else apply(record); };
+  // 再点同一个入口（「添加订阅」或同一人的「编辑」）回到留着的草稿；换成别的配置时有未保存输入要先确认。
+  const sameTarget = (record?: AlertSubscriptionDto) => (record ? editing && draft.userId === record.userId : !editing);
+  const start = (record?: AlertSubscriptionDto) => { if (lock.current || !canManage) return; if (dirty && sameTarget(record)) setOpen(true); else if (dirty) setReplacement({ record }); else apply(record); };
   const currentRecord = (userId: string) => query.data?.items.find((row) => row.userId === userId);
   const current = review ? currentRecord(review.kind === 'save' ? review.input.userId : review.before.userId) : undefined;
   const stale = !!review && (unavailable || !sameSubscription(current ? subscriptionDraft(current) : undefined, review.before));
@@ -51,6 +53,8 @@ export function useAlertSubscriptions(projectId: string, canManage: boolean) {
   };
   return { query, members, draft, setDraft, open, editing, replacement, setReplacement, apply, review, setReview, busy, error, success, errors, setErrors, dirty, unavailable, stale, start, prepare, confirm, canManage,
     close: () => { if (!lock.current && !review) setOpen(false); }, resume: () => setOpen(true),
+    /** 清空：回到打开时的那一份（添加是空白，编辑是服务器上的原配置）。 */
+    clear: () => { if (!lock.current && !review) { setDraft(baseline); setErrors({}); setError(undefined); } },
     name: (userId: string) => { const user = members.data?.items.find((member) => member.userId === userId); return !members.error && user ? `${user.name} · ${user.email}` : userId; } };
 }
 export type AlertSubscriptions = ReturnType<typeof useAlertSubscriptions>;

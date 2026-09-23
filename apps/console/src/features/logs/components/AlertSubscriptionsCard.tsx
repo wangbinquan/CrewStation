@@ -5,12 +5,16 @@ import { ActionRow } from '../../../shared/ui/ActionRow';
 import { DataTable } from '../../../shared/ui/DataTable';
 import { QueryStatus } from '../../../shared/ui/QueryStatus';
 import { ActionNote } from '../../../shared/ui/ActionNote';
-import { ConfirmationPanel } from '../../../shared/ui/ConfirmationPanel';
+import { ConfirmationDialog } from '../../../shared/ui/dialog/ConfirmationDialog';
 import { DefinitionList } from '../../../shared/ui/DefinitionList';
 import { UnsavedChangesGuard } from '../../../shared/navigation/UnsavedChangesGuard';
 import { useAlertSubscriptions } from '../hooks/useAlertSubscriptions';
-import { AlertSubscriptionForm } from './AlertSubscriptionForm';
+import { AlertSubscriptionDialog } from './AlertSubscriptionDialog';
 
+/**
+ * 通知订阅：列表在卡片里；添加与编辑是弹窗，提交前的重读核对、移除确认与「换一份配置」的确认也是弹窗（2026-09-23）。
+ * 草稿关窗不丢，再点同一个入口恢复；离开本页才进离开确认。
+ */
 export function AlertSubscriptionsCard({ projectId, canManage }: { readonly projectId: string; readonly canManage: boolean }) {
   const t = useT(), p = useAlertSubscriptions(projectId, canManage), review = p.review;
   const target = review?.kind === 'save' ? review.input : review?.before;
@@ -26,14 +30,13 @@ export function AlertSubscriptionsCard({ projectId, canManage }: { readonly proj
       </ActionRow> : '—'}</td></tr>)}
     </DataTable> : null}
     {canManage ? null : <p>{t('logs.alerts.subscription.noPermission')}</p>}
-    {p.open ? <AlertSubscriptionForm p={p} /> : null}
-    {!p.open && p.dirty ? <ActionNote tone="neutral">{t('logs.alerts.subscription.unsaved')} <Button onClick={p.resume}>{t('logs.alerts.subscription.resume')}</Button></ActionNote> : null}
-    {review && target ? <ConfirmationPanel question={t(review.kind === 'save' ? 'logs.alerts.subscription.saveQuestion' : 'logs.alerts.subscription.removeQuestion', { name: p.name(target.userId) })} hint={t('logs.alerts.subscription.replaceHint')} confirmLabel={t(review.kind === 'save' ? 'logs.alerts.subscription.save' : 'logs.alerts.subscription.confirmRemove')} cancelLabel={t('logs.alerts.cancel')} busy={p.busy} confirmDisabled={p.stale || !canManage} onConfirm={() => void p.confirm()} onCancel={() => p.setReview(undefined)}>
+    {p.open ? <AlertSubscriptionDialog p={p} /> : null}
+    {review && target ? <ConfirmationDialog size="medium" question={t(review.kind === 'save' ? 'logs.alerts.subscription.saveQuestion' : 'logs.alerts.subscription.removeQuestion', { name: p.name(target.userId) })} hint={t('logs.alerts.subscription.replaceHint')} confirmLabel={t(review.kind === 'save' ? 'logs.alerts.subscription.save' : 'logs.alerts.subscription.confirmRemove')} cancelLabel={t('logs.alerts.cancel')} busy={p.busy} confirmDisabled={p.stale || !canManage} danger={review.kind === 'remove'} onConfirm={() => void p.confirm()} onCancel={() => p.setReview(undefined)}>
       <DefinitionList items={[{ label: t('logs.alerts.subscription.userId'), value: <code>{target.userId}</code> }, { label: t('logs.alerts.subscription.channel'), value: t(`logs.alerts.channel.${target.channel}`) }, { label: t('logs.alerts.subscription.target'), value: target.target ?? '—' }, ...(review.kind === 'save' && review.before ? [{ label: t('logs.alerts.subscription.before'), value: `${t(`logs.alerts.channel.${review.before.channel}`)} · ${review.before.target || '—'}` }] : [])]} />
       {p.stale ? <ActionNote tone="error">{t('logs.alerts.subscription.changed')}</ActionNote> : null}
-    </ConfirmationPanel> : null}
-    {p.replacement ? <ConfirmationPanel question={t('logs.alerts.subscription.replaceDraft')} confirmLabel={t('logs.alerts.subscription.discard')} cancelLabel={t('logs.alerts.subscription.keep')} onConfirm={() => p.apply(p.replacement?.record)} onCancel={() => p.setReplacement(undefined)} /> : null}
-    {p.error ? <ActionNote tone="error">{p.error} {t('logs.alerts.subscription.retryHint')}</ActionNote> : null}
+    </ConfirmationDialog> : null}
+    {p.replacement ? <ConfirmationDialog question={t('logs.alerts.subscription.replaceDraft')} confirmLabel={t('logs.alerts.subscription.discard')} cancelLabel={t('logs.alerts.subscription.keep')} focus="cancel" onConfirm={() => p.apply(p.replacement?.record)} onCancel={() => { p.setReplacement(undefined); p.resume(); }} /> : null}
+    {p.error && !p.open ? <ActionNote tone="error">{p.error} {t('logs.alerts.subscription.retryHint')}</ActionNote> : null}
     {p.success ? <ActionNote tone="success">{p.success}</ActionNote> : null}
   </Card>;
 }

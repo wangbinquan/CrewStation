@@ -15,3 +15,5 @@
 .muted { margin: 0; color: var(--cs-color-text-muted); font-size: var(--cs-font-size-sm); }
 .detailActions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--cs-space-2); margin: var(--cs-space-2) 0; }
 @container (max-width: 680px) { .columns { grid-template-columns: minmax(0, 1fr); } .aside { position: static; } }
+/* 申请弹窗里被申请的操作：方法路径、代理与说明。 */
+.requestTarget { margin: 0; color: var(--cs-color-text-muted); overflow-wrap: anywhere; }

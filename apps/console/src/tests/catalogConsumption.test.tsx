@@ -37,20 +37,23 @@ async function reason(value: string) {
   await page!.settle();
 }
 
-test('申请失败保留打开的表单与理由，重试成功才收起并显示真实待审状态', async () => {
+test('申请在弹窗里：失败保留弹窗与理由，重试成功才关窗并显示真实待审状态；关窗后理由留着', async () => {
   const f = fixture(); page = await renderApp(`/projects/${projectId}/settings?tab=resources&resource=api`);
   await page.click('申请');
-  // RFC-020 §7：列表里的按钮选中该行，申请表单在右侧详情栏展开。
-  expect(document.querySelector('li[aria-current="true"]')?.textContent).toContain('/invoices'); expect(document.querySelector('aside[aria-label="操作详情"] textarea')).not.toBeNull();
-  // 详情栏的操作（申请表单）在事实之前，不压在底部。
-  expect(document.querySelector('aside[aria-label="操作详情"] textarea')!.compareDocumentPosition(document.querySelector('aside[aria-label="操作详情"] dl')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  // RFC-020 §7：列表里的按钮选中该行（详情在旁）；2026-09-23 起申请表单在弹窗里，不再在详情栏展开。
+  expect(document.querySelector('li[aria-current="true"]')?.textContent).toContain('/invoices');
+  expect(document.querySelectorAll('aside[aria-label="操作详情"] textarea').length).toBe(0);
+  const dialog = document.querySelector('dialog[open]')!; expect(dialog.textContent).toContain('申请定向开放'); expect(dialog.textContent).toContain('GET /invoices');
   await reason('查询账单'); await page.click('提交申请');
-  // 旧实现提交即卸载行内表单，服务失败后理由消失；这里只在成功后收起。
-  expect(document.querySelector<HTMLTextAreaElement>('textarea')?.value).toBe('查询账单');
+  // 旧实现提交即卸载行内表单，服务失败后理由消失；这里只在成功后关窗。
+  expect(document.querySelector<HTMLTextAreaElement>('dialog[open] textarea')?.value).toBe('查询账单');
   expect(page.text()).toContain('申请服务暂不可用'); expect(f.writes).toHaveLength(1);
+  // 取消只关窗，理由是这个操作的草稿；从详情栏再打开时还在。
+  await page.click('取消'); expect(document.querySelectorAll('dialog').length).toBe(0);
+  await page.click('申请定向开放'); expect(document.querySelector<HTMLTextAreaElement>('dialog[open] textarea')?.value).toBe('查询账单');
   f.state.failure = false; await page.click('提交申请');
   expect(f.writes).toHaveLength(2); expect(f.writes[1]!.body).toEqual({ operationId: '01a0bf5d-8f4b-76a3-876b-499013b49883', reason: '查询账单' });
-  expect(document.querySelector('textarea')).toBeNull(); expect(page.text()).toContain('待审批');
+  expect(document.querySelectorAll('dialog').length).toBe(0); expect(page.text()).toContain('待审批');
   // 申请人显示可辨识名字而不是原始用户 ID（ID 保留在 title 里）。
   expect(page.text()).toContain('开发者小李'); expect(page.html()).toContain('title="01a0bf5d-8f4b-7fae-8c2f-e82b0fa04985"');
 });

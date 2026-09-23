@@ -45,25 +45,6 @@
   gap: var(--cs-space-1);
 }
 
-.inlineForm {
-  display: flex;
-  flex-direction: column;
-  gap: var(--cs-space-2);
-  min-width: 260px;
-}
-
-.inlineField {
-  display: flex;
-  flex-direction: column;
-  gap: var(--cs-space-1);
-}
-
-.inlineButtons {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--cs-space-2);
-}
-
 .operationsTable { min-width: 760px; }
 .operationsTable .methodCell { white-space: nowrap; }
 .proxyCell { min-width: 90px; }

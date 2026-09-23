@@ -141,7 +141,6 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   'catalog.request.reasonPlaceholder': 'Describe the business use and the call scope; the administrator decides on it',
   'catalog.request.submit': 'Submit request',
   'catalog.request.submitting': 'Submitting…',
-  'catalog.request.cancel': 'Cancel',
   'catalog.request.pending': 'Pending',
 
   'catalog.requests.title': 'Access requests from this service',

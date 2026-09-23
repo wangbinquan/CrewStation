@@ -27,8 +27,10 @@ export interface OperationListProps {
   readonly operation?: string;
   readonly onClearContext?: () => void;
   readonly onInvoke?: (operation: ApiOperationDto) => void;
-  /** 放大形态：点行选中，详情、申请与试调在右侧详情栏。 */
-  readonly onSelect?: (operation: ApiOperationDto, options?: { readonly request?: boolean }) => void;
+  /** 放大形态：点行选中，详情与试调在右侧详情栏。 */
+  readonly onSelect?: (operation: ApiOperationDto) => void;
+  /** 打开「申请定向开放」弹窗（两种形态共用）。 */
+  readonly onRequest: (operation: ApiOperationDto) => void;
   /** 侧栏形态：正在试调的操作，它的试调面板在该行下原地展开。 */
   readonly active?: string;
   readonly activePanel?: ReactNode;
@@ -41,7 +43,7 @@ export function OperationList(props: OperationListProps): ReactElement {
   const { operations, requests, loading, loadError, actions, platform = [], proxy, operation, onClearContext, onSelect, notice } = props;
   const t = useT();
   const [filter, setFilter] = useState<OperationListFilter>(INITIAL_OPERATION_FILTER);
-  const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set()), [requesting, setRequesting] = useState<string>();
+  const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
   const pending = useMemo(() => indexPending(requests), [requests]);
   const focused = !onSelect && operation ? operations.find((item) => item.id === operation) : undefined;
   const scoped = useMemo(() => operations.filter((item) => (!proxy || item.proxyId === proxy) && (onSelect || !operation || item.id === operation)), [operations, proxy, operation, onSelect]);
@@ -52,9 +54,10 @@ export function OperationList(props: OperationListProps): ReactElement {
   // 定位只写人读得懂的「方法 路径」或代理名；找不到才原样给出地址里的值。
   const context = !onSelect && operation ? { key: 'catalog.list.focusOperation', value: focused ? `${focused.method} ${focused.path}` : operation }
     : proxy ? { key: 'catalog.list.focusProvider', value: providers.find((item) => item.id === proxy)?.name ?? proxy } : undefined;
-  const row = (item: ApiOperationDto) => <OperationRow key={item.id} operation={item} pending={pending} actions={actions} full={!!onSelect}
+  // 放大形态点「申请」同时选中这一行，详情栏跟着换；申请表单本身在弹窗里。
+  const row = (item: ApiOperationDto) => <OperationRow key={item.id} operation={item} pending={pending} full={!!onSelect}
     current={onSelect ? operation === item.id : undefined} expanded={expanded.has(item.id)} onToggle={() => toggle(item.id)}
-    requesting={requesting === item.id} onRequest={() => (onSelect ? onSelect(item, { request: true }) : setRequesting(item.id))} onRequestClose={() => setRequesting(undefined)}
+    onRequest={() => { onSelect?.(item); props.onRequest(item); }}
     onInvoke={props.onInvoke} onSelect={onSelect} activePanel={props.active === item.id ? props.activePanel : undefined} />;
   return <div className={styles.list}>
     {context ? <p className={styles.context}>{t(context.key)} <code>{context.value}</code> <Button size="small" variant="ghost" onClick={onClearContext}>{t('catalog.clearContext')}</Button></p> : null}

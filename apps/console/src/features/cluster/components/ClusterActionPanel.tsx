@@ -4,18 +4,21 @@ import { useT } from '../../../shared/lib/useT';
 import { api } from '../../../shared/api/client';
 import { queryKeys } from '../../../shared/api/queryKeys';
 import { useApiMutation, useApiQuery } from '../../../shared/api/useApi';
+import { ActionRow } from '../../../shared/ui/ActionRow';
 import { Button } from '../../../shared/ui/Button';
-import { ConfirmationPanel } from '../../../shared/ui/ConfirmationPanel';
 import { ConfirmDialog } from '../../../shared/ui/dialog/ConfirmDialog';
+import { Dialog, DialogClearButton } from '../../../shared/ui/dialog/Dialog';
 import { QueryStatus } from '../../../shared/ui/QueryStatus';
 import { OperationResult } from './ClusterOperations';
 import styles from './Cluster.module.css';
 /**
- * 资源的管理动作：重启与调整副本先检查影响、再在页内确认；删除／结束不可撤销，点下去就弹窗并自动检查影响，
- * 输入 delete 才能确认（2026-09-23 作者裁定）。受理后弹窗关闭，操作进度与结果在页内显示。
+ * 资源的管理动作（2026-09-23 作者裁定都在弹窗里）：重启、调整副本、恢复发布配置在弹窗里先检查影响、再确认；
+ * 删除／结束不可撤销，点下去就弹窗并自动检查影响，输入 delete 才能确认。受理后弹窗关闭，操作进度与结果在页内显示。
  */
 export function ClusterActionPanel({ row, onOperation }: { row: ClusterResource; onOperation: (id: string) => void }) {
-  const t = useT(), [action, setAction] = useState<ClusterAction>(), [replicas, setReplicas] = useState(String(row.desired ?? 1)), [inspection, setInspection] = useState<ClusterInspection>();
+  // 目标副本数是调整副本弹窗的草稿：关窗留着、再打开恢复，「清空」回到当前副本数。
+  const initialReplicas = String(row.desired ?? 1);
+  const t = useT(), [action, setAction] = useState<ClusterAction>(), [replicas, setReplicas] = useState(initialReplicas), [inspection, setInspection] = useState<ClusterInspection>();
   const storageKey = `cluster-operation:${row.resourceId}`;
   const [pending, setPending] = useState(() => readPending(storageKey));
   const [operationId, setOperationId] = useState<string | undefined>(pending?.operationId), [idempotencyKey, setIdempotencyKey] = useState(() => pending?.key ?? crypto.randomUUID());
@@ -34,12 +37,19 @@ export function ClusterActionPanel({ row, onOperation }: { row: ClusterResource;
   const close = () => { setAction(undefined); setInspection(undefined); inspect.reset(); };
   return <div className={styles.stack}>
     <div className={styles.actions}>{row.availableActions.map((c) => <div className={styles.action} key={c.action}><Button onClick={() => open(c.action)} disabled={!c.enabled || submit.isPending || !!id}>{t(`cluster.action.${c.action}`)}</Button>{!c.enabled ? <small className={styles.muted}>{c.reason}</small> : null}</div>)}</div>
-    {action && !id && !deleting ? <div className={styles.stack}><p>{t(`cluster.action.${action}`)} · <strong>{row.name}</strong></p>{action === 'scale' ? <label>{t('cluster.replicas')}<input className={styles.input} inputMode="numeric" value={replicas} onChange={(e) => { setReplicas(e.target.value); setInspection(undefined); }} aria-invalid={invalid} aria-describedby="cluster-replica-constraint" /><small id="cluster-replica-constraint" className={invalid ? styles.error : styles.muted}>{t('cluster.replicaConstraint', { min: capability?.minReplicas ?? 1, max: capability?.maxReplicas ?? 1 })}</small></label> : null}
-      {!current ? <Button onClick={() => runInspect(action)} disabled={invalid || inspect.isPending}>{inspect.isPending ? t('cluster.inspecting') : t('cluster.inspect')}</Button> : <ConfirmationPanel question={t('cluster.confirmAction', { action: t(`cluster.action.${action}`), name: row.name })} hint={t('cluster.expires', { time: new Date(current.expiresAt).toLocaleTimeString() })} confirmLabel={t('cluster.confirm')} cancelLabel={t('cluster.cancel')} busy={submit.isPending} confirmDisabled={!current.capability.enabled || !!submit.error} onConfirm={() => submit.mutate(undefined)} onCancel={close}>
-        <InspectionDetails inspection={current} />
-      </ConfirmationPanel>}
+    {action && !id && !deleting ? <Dialog size="medium" role={current ? 'alertdialog' : 'dialog'} title={t(`cluster.action.${action}`)} busy={submit.isPending} onClose={close}
+      onSubmit={() => { if (!current && !invalid && !inspect.isPending) runInspect(action); }}
+      footer={<ActionRow>
+        {!current ? <Button type="submit" variant="primary" disabled={invalid || inspect.isPending}>{inspect.isPending ? t('cluster.inspecting') : t('cluster.inspect')}</Button>
+          : <Button variant="primary" disabled={submit.isPending || !current.capability.enabled || !!submit.error} onClick={() => submit.mutate(undefined)}>{t('cluster.confirm')}</Button>}
+        <Button variant="ghost" disabled={submit.isPending} onClick={close}>{t('cluster.cancel')}</Button>
+        {action === 'scale' ? <DialogClearButton busy={submit.isPending} dirty={replicas !== initialReplicas} onClear={() => { setReplicas(initialReplicas); setInspection(undefined); }} /> : null}
+      </ActionRow>}>
+      <p>{current ? t('cluster.confirmAction', { action: t(`cluster.action.${action}`), name: row.name }) : <>{t(`cluster.action.${action}`)} · <strong>{row.name}</strong></>}</p>
+      {action === 'scale' ? <label className={styles.stack}>{t('cluster.replicas')}<input className={styles.input} inputMode="numeric" value={replicas} disabled={submit.isPending} onChange={(e) => { setReplicas(e.target.value); setInspection(undefined); }} aria-invalid={invalid} aria-describedby="cluster-replica-constraint" /><small id="cluster-replica-constraint" className={invalid ? styles.error : styles.muted}>{t('cluster.replicaConstraint', { min: capability?.minReplicas ?? 1, max: capability?.maxReplicas ?? 1 })}</small></label> : null}
+      {current ? <><p className={styles.muted}>{t('cluster.expires', { time: new Date(current.expiresAt).toLocaleTimeString() })}</p><InspectionDetails inspection={current} /></> : null}
       <QueryStatus isPending={false} error={inspect.error ?? submit.error} />{submit.error ? <p>{t('cluster.recovering')} · HTTP {submit.error.status} · {idempotencyKey}</p> : null}
-    </div> : null}
+    </Dialog> : null}
     {deleting && !id ? <ConfirmDialog title={t('cluster.action.delete')} question={t('cluster.confirmAction', { action: t('cluster.action.delete'), name: row.name })} confirmWord="delete" confirmLabel={t('cluster.confirm')} cancelLabel={t('cluster.cancel')}
       busy={submit.isPending} confirmDisabled={!current?.capability.enabled || !!submit.error} onConfirm={() => submit.mutate(undefined)} onCancel={close}>
       {current ? <><p className={styles.muted}>{t('cluster.expires', { time: new Date(current.expiresAt).toLocaleTimeString() })}</p><InspectionDetails inspection={current} /></> : inspect.isPending ? <p>{t('cluster.inspecting')}</p> : null}
