@@ -113,6 +113,5 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   "config.platformGuide": "Platform variables and integration guide →",
   "config.draft.cancel": "Discard unsaved input for {env}?",
   "config.draft.confirmCancel": "Discard input and close",
-  "config.impact.snapshots": "Compare deployed snapshots",
 
 };

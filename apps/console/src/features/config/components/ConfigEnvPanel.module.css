@@ -4,7 +4,6 @@
 }
 
 .versionsTitle {
-  margin-bottom: var(--cs-space-2);
   color: var(--cs-color-text);
   font-size: 14px;
   font-weight: 600;

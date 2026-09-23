@@ -51,11 +51,12 @@ export function ConfigEnvPanel({ projectId, env, onDirtyChange }: ConfigEnvPanel
       title={t(`config.variables.${env}`)}
       extra={<>{editable ? <Button variant="primary" disabled={disabled || busy} onClick={(event) => editor.select({ name: '', isSecret: false }, event.currentTarget)}>{t('config.add')}</Button> : null}<Badge tone={env === 'production' ? 'warning' : 'info'}>{t(`config.env.${env}Role`)}</Badge><Button disabled={busy || me.isFetching || items.isFetching || versions.isFetching} onClick={() => { void me.refetch(); void items.refetch(); void versions.refetch(); }}>{t('config.refresh')}</Button></>}
       footer={
-        <details><summary>{t('config.versions.title')}</summary><Stack>
+        <Stack>
+          <h3 className={styles.versionsTitle}>{t('config.versions.title')}</h3>
           <p className={styles.versionsNote}>{t('config.versions.note')}</p>
           <QueryStatus isPending={versions.isPending} error={versions.error} errorKey="config.error.versions" />
           {!versions.error ? <ConfigVersionList versions={versions.data?.items ?? []} pending={versions.isPending} /> : null}
-        </Stack></details>
+        </Stack>
       }
     >
       <p className={styles.note}>{t(`config.env.${env}Note`)}</p>

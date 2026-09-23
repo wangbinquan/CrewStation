@@ -47,6 +47,16 @@ test('生产配置对照读取两槽精确 Release，使用全组历史版本并
   expect(f.calls.every((call) => call.method === 'GET')).toBe(true);
 });
 
+test('生产变量卡的版本历史与部署版本对照直接展示，不用先点开', async () => {
+  fixture(); page = await renderApp(`/projects/${projectId}/settings?tab=config&env=production`);
+  // 2026-09-23 作者裁定两处都不再折叠（RFC-009 design §3.1 修订）。
+  const history = [...document.querySelectorAll('h3')].find((node) => node.textContent === '版本历史' && !node.closest('[hidden]'));
+  expect(history !== undefined).toBe(true); expect(history!.closest('details') === null).toBe(true);
+  expect([...history!.closest('footer')!.querySelectorAll('li')].map((node) => node.firstElementChild?.textContent)).toEqual(['版本 7', '版本 3', '版本 5']);
+  expect(row('正式版本').closest('details') === null).toBe(true); expect(row('待验证版本').closest('details') === null).toBe(true);
+  expect(page.text()).not.toContain('展开部署版本对照');
+});
+
 test('刷新失败不保留旧的一致结论；发布快照缺失与不一致分别保留未知并可恢复', async () => {
   const f = fixture(); page = await renderApp(`/projects/${projectId}/settings?tab=config&env=production`);
   f.state.historyFailure = true; f.state.releaseFailure = true; await page.click('刷新版本对照');

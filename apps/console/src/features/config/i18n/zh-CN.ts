@@ -113,6 +113,5 @@ export const messages = {
   "config.platformGuide": "查看平台自动注入的变量与接入说明 →",
   "config.draft.cancel": "放弃{env}未保存的输入？",
   "config.draft.confirmCancel": "放弃输入并关闭",
-  "config.impact.snapshots": "展开部署版本对照",
 
 } satisfies Messages;

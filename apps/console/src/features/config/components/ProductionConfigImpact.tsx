@@ -37,12 +37,10 @@ export function ProductionConfigImpact() {
     <QueryStatus isPending={versions.isPending} error={versions.error} errorKey="config.error.versions" />
     <p>{currentVersion === undefined ? t('config.impact.currentUnknown') : t('config.impact.current', { version: currentVersion })}</p>
     {!project.isPending && !project.error && !serviceId ? <p>{t('config.impact.noService')}</p> : null}
-    <details><summary>{t('config.impact.snapshots')}</summary>
     <p>{t('config.impact.note')}</p>
     {serviceId && slots.isSuccess && !project.error ? <DataTable columns={[t('config.impact.slot'), t('config.impact.release'), t('config.impact.snapshot')]}>
       {(['prod', 'preview'] as const).map((name) => <ConfigSlotRow key={name} name={name} serviceId={serviceId} slot={slots.data.items.find((item) => item.name === name)} currentVersion={currentVersion} />)}
     </DataTable> : null}
-    </details>
     <Link to={PROJECT_PATHS[space].release} params={{ projectId }}>{t('config.impact.releases')}</Link>
   </Card>;
 }

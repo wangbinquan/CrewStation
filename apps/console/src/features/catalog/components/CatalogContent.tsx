@@ -55,9 +55,7 @@ export function CatalogContent({ projectId, serviceId, canDevelop = false, compa
         <OperationsPanel operations={operations.data?.items ?? []} requests={requests.data?.items ?? []} loading={operations.isPending} loadError={operations.error} actions={actions}
           proxy={proxy} operation={selectedId} onClearContext={() => { setLocal({ request: false }); onClearContext?.(); }} onInvoke={canDevelop ? (item) => { select(item); open(item); } : undefined} onSelect={select} />
         <RequestsPanel requests={requests.data?.items ?? []} loading={requests.isPending} loadError={requests.error} />
-        <details className={styles.fold} open={!!proxy}><summary>{t('catalog.swagger.title')}</summary>
-          <SwaggerPanel serviceId={serviceId} proxies={proxies.data?.items ?? []} initialProxy={proxy} invocation={{ controller, operations: context.operations, canDevelop }} />
-        </details>
+        <SwaggerPanel serviceId={serviceId} proxies={proxies.data?.items ?? []} initialProxy={proxy} invocation={{ controller, operations: context.operations, canDevelop }} />
       </div>
       {/* 详情栏：选中操作的文档与申请在上，试调面板（会话绑定、表单、结果）在下——没选中时会话绑定也要能看、能重绑。 */}
       <aside className={styles.aside} aria-label={t('catalog.detail.title')}>
