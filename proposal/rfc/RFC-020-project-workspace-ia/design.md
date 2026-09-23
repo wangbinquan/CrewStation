@@ -150,6 +150,8 @@ tool: z.object({ name: z.enum(['preview', 'code', 'changes', 'data', 'reference'
 
 > **2026-09-23 修订（作者当面裁定，直接修改，不另立 RFC）。** 标签段不再折叠：`ReleasePage` 直接渲染 `TagCard`，仍在页面最下方（`releaseTimelinePage` 用例断言它是最后一张卡、不在 `<details>` 里）。
 
+> **2026-09-23 修订（作者裁定，直接修改＋回填，不另立 RFC；表单与确认改弹窗）。** 上线／回退的核对（检查 → 快照 → 原因 → 确认）改为确认弹窗 `TrafficSwitchDialog`，不再挂在卡下方；切换说明是草稿，关窗保留、「清空」清掉，「重新核对」在弹窗里。「准备发布」改为 `PublishDialog`（来源 → 检查 → 版本三步在同一个弹窗里，关窗保留各步输入），进入／调整维护改为 `MaintenanceDialog`，重新部署改为 `RedeployDialog`。离开确认列出会丢的草稿（发布准备、切换说明、维护设置）。通用规则见 RFC-003 design §6 同日一条。
+
 ## 7. 运行与诊断、开发资源、项目设置
 
 - 运行与诊断保留 `Tabs`，五个页签。`status` 页签：`HealthCards` 在上（保留「查看此版本日志」）、`TopologyPage` 在下；两者各自的查询与轮询不变。`TracePage` 空态文案改为说明 trace_id 的来源并给事件投递链接。
@@ -163,6 +165,8 @@ tool: z.object({ name: z.enum(['preview', 'code', 'changes', 'data', 'reference'
 > - **接口**：不再显示操作 ID；侧栏与放大都列全部，可调用的（含平台接口）置顶、需申请的在分割线下；搜索＋提供方＋状态筛选；点路径在行下展开调用地址（`${CS_INTERNAL_API_BASE}<代理><路径>`、平台接口为 `${CS_PLATFORM_API_URL}<路径>`，可复制）；侧栏里「试调」「申请」在该行下原地展开，会话绑定压成一行、会话 ID 只进悬停提示；放大形态仍是列表在前、`OperationDetail` 在旁（ID 行换成调用地址），申请记录用「代理 方法 路径」代替操作 ID，列表与详情按面板宽度（容器查询 680px）而非窗口宽度排布。`OperationsPanel` 删除，`OperationsTable` 只留给管理空间。
 > - **事件**：已订阅一行一条（类型 → 处理路径、状态）；可订阅的按生产方分组、按「生产方.族.子类型」归族，子类型是按钮，点一下复制可粘进 `crewstation.yaml` 的订阅片段（按 ID 绑定、注释写类型，UUID 只出现在片段里）；下线的类型不列；推送请求头放在最后。
 > 用例：`referencePanel`（四条新增）、`resourceListModel`（新增）、`projectResources`、`catalogConsumption`、`catalogDetail`、`apiInvocationForm`、`adminCapabilities`、`projectNavigation` 相应改写；e2e 新增 `referenceResources`（三个宽度、四类、无横向滚动、接口与事件里无 UUID），`capabilityDepth`、`projectSettingsUx` 改为四类。
+
+> **2026-09-23 修订三（作者裁定，直接修改＋回填，不另立 RFC；表单与确认改弹窗）。** 「申请定向开放」不再在行下或详情栏展开：侧栏行按钮与放大形态详情栏都打开同一个 `AccessRequestDialog`，写清申请的是哪个操作；理由按操作各留一份草稿，关窗保留，受理成功才丢。「试调」仍在行下原地展开（作者裁定保持原样），它的「切换操作并丢弃输入」确认与 Swagger 的「切换或重新加载文档」确认改为确认弹窗。项目设置里成员、应用展示与可见范围、环境变量的新增与修改同日改为弹窗，见 RFC-009 design 同日修订。
 - 项目设置 `info` 组：`ProjectInfoSection` 用 `DefinitionList`：仓库（路径、默认分支、状态、打开）、地址（两槽域名、开发预览域名）、服务身份（服务名、命名空间）、配额与套餐（`CapabilityQuota` 的数据）、折叠技术详情（项目 ID、服务 ID、命名空间，可复制）。只读，不画输入框。
 
 > **2026-09-23 修订（作者当面裁定，直接修改，不另立 RFC）。** 技术详情就是项目信息：`ProjectInfoCard`（`features/projects/components`）作为 `info` 组第一张卡直接展示项目 ID、服务 ID、命名空间，不再折叠；三个标签改走 `projects.info.*` 文案（原为写死的英文）。其后的仓库卡与 `CapabilitiesPage section="project"` 不变（`projectResources` 用例断言卡片顺序与内容）。

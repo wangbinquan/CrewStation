@@ -500,6 +500,8 @@ TanStack Router 只给声明了 `errorComponent`（或路由器上有 `defaultEr
 只在 `keyup`／`keydown`／`selectionchange` 时比对该元素的值跟踪器。判据：不 focus 直接 keyup，触发的是**上一次聚焦过的**那个输入框的 onChange，
 而 `event.target` 却是当前元素——`apps/console/src/tests/resourceCatalog.test.tsx` 的 `input()` 助手就是这样写的，新测试照抄它，不要自己简化。
 
+2026-09-23 再撞一次：经 `DialogHost`（portal）渲染的弹窗关闭时，`Dialog` 在提交阶段把焦点还给打开它的控件；用例里的程序化点击不移动焦点，打开者就成了之前聚焦的输入框。焦点还回去的那次 `focusin` React 收不到，之后再 `focus()` 它又因为已经聚焦而不派发事件——写值、`keyup` 都触发不了 onChange，下一次重渲染把值改回去。助手里已经聚焦的控件先 `blur()` 再 `focus()`（`historicalAgentCreation.test.tsx` 的 `edit`）。浏览器走原生 input 事件，不受影响。
+
 ### `bun test` 要在仓库根运行，`apps/console` 目录下没有 CSS Module 预加载
 
 根 `bunfig.toml` 的 `[test] preload` 把 `*.module.css` 换成“键即类名”的代理。在 `apps/console` 里跑 `bun test`，
