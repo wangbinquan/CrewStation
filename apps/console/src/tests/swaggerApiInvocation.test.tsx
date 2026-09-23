@@ -84,9 +84,9 @@ test('切换代理或重新加载文档前确认，取消保留；文档更新�
   const picker = [...document.querySelectorAll('select')].find((node) => node.options[0]?.text === '选择一个代理')!;
   await act(async () => { picker.value = '01a0bf5d-8f4b-744d-8cd0-5317e6c8590f'; picker.dispatchEvent(new Event('change', { bubbles: true })); }); await page.settle();
   expect(page.text()).toContain('丢弃 crm 的 Swagger 输入'); await invocationClick(page, '保留当前输入'); expect(picker.value).toBe(invocationOperation.proxyId); expect(field().value).toBe('kept');
-  f.state.documentFailure = true; await invocationClick(page, '检查文档更新'); await invocationClick(page, 'Execute', document.querySelector('.opblock-post')!);
+  f.state.documentFailure = true; await page.reread(); await invocationClick(page, 'Execute', document.querySelector('.opblock-post')!);
   expect(f.calls).toHaveLength(0); expect(field().value).toBe('kept'); expect(page.text()).toContain('文档读取失败');
-  f.state.documentFailure = false; f.state.documentVersion = '2.0.0'; await invocationClick(page, '检查文档更新');
+  f.state.documentFailure = false; f.state.documentVersion = '2.0.0'; await page.reread();
   expect(page.text()).toContain('文档已更新'); expect(field().value).toBe('kept'); await invocationClick(page, 'Execute', document.querySelector('.opblock-post')!); expect(f.calls).toHaveLength(0);
   await invocationClick(page, '重新加载文档'); await invocationClick(page, '保留当前输入'); expect(field().value).toBe('kept');
   await invocationClick(page, '重新加载文档'); await invocationClick(page, '丢弃当前输入并切换'); await expand(); expect(field().value).toBe(''); expect(page.text()).toContain('2.0.0');

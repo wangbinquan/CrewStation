@@ -21,7 +21,7 @@ export function ApiInvocationForm({ operation, controller, onClose, inline = fal
     if (!validated.input) { queueMicrotask(() => form.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus()); return; }
     void controller.send('detail', validated.input).catch(controller.reportError);
   };
-  return <Card compact title={inline ? t('catalog.invoke.detail') : <>{t('catalog.invoke.detail')} <code>{operation.method} {operation.path}</code></>} extra={<Button onClick={onClose}>{t('catalog.invoke.hide')}</Button>}>
+  return <Card compact title={inline ? t('catalog.invoke.detail') : <>{t('catalog.invoke.detail')} <code>{operation.method} {operation.path}</code></>} extra={<Button variant="ghost" onClick={onClose}>{t('catalog.invoke.hide')}</Button>}>
     <form ref={form} className={styles.form} noValidate onSubmit={(event) => { event.preventDefault(); send(); }}>
       {operation.summary && !inline ? <p className={styles.note}>{operation.summary}</p> : null}
       <div className={styles.parameters}>

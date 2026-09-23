@@ -7,7 +7,6 @@ import { RequestDraftNotice } from '../../../shared/admin/RequestDraftNotice';
 import { RequestPageControls } from '../../../shared/admin/RequestPageControls';
 import { useT } from '../../../shared/lib/useT';
 import { ActionNote } from '../../../shared/ui/ActionNote';
-import { Button } from '../../../shared/ui/Button';
 import { RequestsPanel } from '../components/RequestsPanel';
 import { useCatalogRequestReview } from '../hooks/useCatalogRequestReview';
 import { ButtonLink } from '../../../shared/ui/navigation/ButtonLink';
@@ -25,7 +24,6 @@ export function CatalogRequestsPage({ projectId, state, cursor, active, onPage, 
     decide.mutate({ request, approve, decision }, { onSuccess: () => drafts.discard(id, sentValue), onSettled: () => { busy.current = false; } });
   };
   return <>
-    <p><Button disabled={review.busy || decide.isPending} onClick={() => void requests.refetch({ cancelRefetch: false })}>{t('catalog.admin.refreshRequests')}</Button></p>
     <RequestPageControls scope={t('admin.requests.api')} cursor={cursor} nextCursor={requests.data?.nextCursor} busy={review.busy || decide.isPending}
       count={requests.isPending || requests.error ? undefined : items.length} updatedAt={requests.dataUpdatedAt} onPage={onPage} />
     {decide.error ? <ActionNote tone="error">{t('ui.requestPage.decisionError', { message: errorMessage(decide.error) })}</ActionNote> : null}

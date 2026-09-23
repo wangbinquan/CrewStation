@@ -6,7 +6,6 @@ import { queryKeys } from '../../../shared/api/queryKeys';
 import { errorMessage, useApiQuery } from '../../../shared/api/useApi';
 import { useT } from '../../../shared/lib/useT';
 import { EmptyState } from '../../../shared/ui/EmptyState';
-import { Button } from '../../../shared/ui/Button';
 import { PageHeader } from '../../../shared/ui/PageHeader';
 import { CatalogContent } from '../components/CatalogContent';
 import type { PlatformEndpoint } from '../components/list/operationSections';
@@ -18,14 +17,15 @@ export function CatalogPage({ embedded = false, compact = false, fill = false, p
   const t = useT();
   const { projectId } = useProjectScope();
   const project = useApiQuery(queryKeys.project(projectId), () => api.projects.get(projectId));
-  const me = useApiQuery(queryKeys.me(), () => api.me.get());
+  // 用户资料不完整时每 15 秒自己再读；读取失败按 useApiQuery 自动重试。不提供「重新读取用户资料」（2026-09-23 裁定）。
+  const me = useApiQuery(queryKeys.me(), () => api.me.get(), { refetchIntervalMs: (data) => data !== undefined && !Array.isArray(data.memberships) && data.isAdmin !== true ? 15_000 : undefined });
   const serviceId = project.data?.serviceId;
   const identityIncomplete = me.data !== undefined && !Array.isArray(me.data.memberships) && me.data.isAdmin !== true;
   const canDevelop = !me.error && !identityIncomplete && (me.data?.isAdmin === true || me.data?.memberships?.some((item) => item.projectId === projectId && (item.role === 'owner' || item.role === 'developer')) === true);
   return (
     <>
       {!embedded ? <PageHeader title={t('catalog.title')} description={[t('catalog.line1'), t('catalog.line2'), t('catalog.line3')]} /> : null}
-      {me.error || identityIncomplete ? <p role="alert">{t('catalog.identityUnavailable')} <Button onClick={() => { void me.refetch(); }}>{t('catalog.reloadIdentity')}</Button></p> : null}
+      {me.error || identityIncomplete ? <p role="alert">{t('catalog.identityUnavailable')}</p> : null}
       {project.isPending ? <p>{t('catalog.service.loading')}</p> : null}
       {project.error ? <EmptyState title={t('catalog.error.load', { message: errorMessage(project.error) })} /> : null}
       {!project.isPending && project.error === null && serviceId === undefined ? (

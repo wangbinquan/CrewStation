@@ -3,7 +3,7 @@ import { useState } from 'react';
 import type { ReactElement } from 'react';
 import { api } from '../../../shared/api/client';
 import { queryKeys } from '../../../shared/api/queryKeys';
-import { useApiQuery } from '../../../shared/api/useApi';
+import { AUTO_REFRESH, useApiQuery } from '../../../shared/api/useApi';
 import { useT } from '../../../shared/lib/useT';
 import { Button } from '../../../shared/ui/Button';
 import { Card } from '../../../shared/ui/Card';
@@ -24,7 +24,9 @@ export interface SwaggerPanelProps {
 export function SwaggerPanel({ serviceId, proxies, initialProxy, invocation }: SwaggerPanelProps): ReactElement {
   const t = useT();
   const [proxy, setProxy] = useState(initialProxy ?? ''), [revision, setRevision] = useState(0), [replacement, setReplacement] = useState<string>();
-  const spec = useApiQuery(queryKeys.openapiSpec(serviceId, proxy), () => api.apiCatalog.openapi(proxy, { serviceId }), { enabled: proxy.length > 0 });
+  // 文档每 30 秒在原位重读（内容没变时结构共享保持同一对象，不会误报「文档已更新」）；不再有「检查文档更新」（2026-09-23 裁定）。
+  // 新文档只在点「重新加载文档」后才装入：装入会丢掉 Swagger 里的输入，所以不自动替换（SwaggerDocument）。
+  const spec = useApiQuery(queryKeys.openapiSpec(serviceId, proxy), () => api.apiCatalog.openapi(proxy, { serviceId }), { enabled: proxy.length > 0, ...AUTO_REFRESH });
   const dirtySources = invocation.controller.dirtySources.filter((source) => source.startsWith(`swagger:${proxy}:`));
   const choose = (next: string) => { for (const source of dirtySources) invocation.controller.clearDirty(source); setProxy(next); setRevision((value) => value + 1); setReplacement(undefined); };
   const requestChange = (next: string) => { if (dirtySources.length > 0) setReplacement(next); else choose(next); };
@@ -47,7 +49,7 @@ export function SwaggerPanel({ serviceId, proxies, initialProxy, invocation }: S
           </select>
         </label>
       )}
-      {proxy ? <div className={styles.controls}><Button disabled={spec.isFetching} onClick={() => { void spec.refetch(); }}>{t('catalog.swagger.checkDocument')}</Button><Button disabled={!spec.data || !!spec.error || spec.isFetching || invocation.controller.pending || invocation.controller.checking} onClick={() => requestChange(proxy)}>{t('catalog.swagger.reloadDocument')}</Button></div> : null}
+      {proxy ? <div className={styles.controls}><Button disabled={!spec.data || !!spec.error || invocation.controller.pending || invocation.controller.checking} onClick={() => requestChange(proxy)}>{t('catalog.swagger.reloadDocument')}</Button></div> : null}
       {replacement !== undefined ? <ConfirmationDialog question={t('catalog.swagger.replaceQuestion', { proxy: proxies.find((entry) => entry.id === proxy)?.name ?? proxy })} hint={t('catalog.swagger.replaceHint')} confirmLabel={t('catalog.invoke.replace')} cancelLabel={t('catalog.invoke.keep')} focus="cancel" busy={invocation.controller.pending || invocation.controller.checking} onConfirm={() => choose(replacement)} onCancel={() => setReplacement(undefined)} /> : null}
       {/* 没选代理时查询是禁用的，isPending 会一直为真，所以先看有没有选中。 */}
       <QueryStatus isPending={proxy.length > 0 && spec.isPending} error={spec.error} loadingKey="catalog.swagger.loading" errorKey="catalog.error.load" />

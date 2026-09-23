@@ -71,7 +71,8 @@ test('当前用户缺少成员列表时 API 页面不崩溃，重新读取恢复
   page = await renderApp(`/projects/${projectId}/settings?tab=resources&resource=api`);
   expect(page.text()).toContain('当前用户资料不完整'); expect(page.text()).toContain('/invoices');
   expect(page.text()).not.toContain('Something went wrong'); expect(f.writes).toEqual([]);
-  incomplete = false; await page.click('重新读取用户资料');
+  // 没有「重新读取用户资料」（2026-09-23 裁定）：资料不完整时每 15 秒自己再读；reread 模拟一次。
+  incomplete = false; await page.reread();
   expect(page.text()).not.toContain('当前用户资料不完整'); expect(f.writes).toEqual([]);
 });
 

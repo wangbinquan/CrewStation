@@ -107,7 +107,7 @@ describe('管理员能力与审批入口', () => {
     const f = fixture(); f.state.projectsFailure = true; page = await renderApp(`/admin/capabilities?tab=api&projectId=${projectId}`);
     expect(page.text()).toContain('项目目录失败'); expect(page.text()).not.toContain('改为默认开放');
     expect(f.calls.some((call) => call.url.pathname === '/v1/catalog/operations')).toBe(false);
-    f.state.projectsFailure = false; await page.click('重新读取项目目录'); expect(page.text()).toContain('改为默认开放');
+    f.state.projectsFailure = false; await page.reread(); expect(page.text()).toContain('改为默认开放');
     await page.navigate(`/admin/capabilities?tab=api&projectId=01a0bf5d-8f4b-7927-8d04-a341edee681a`);
     expect(page.text()).toContain('未找到指定项目'); expect(page.text()).not.toContain('改为默认开放');
   });
@@ -145,9 +145,9 @@ describe('管理员能力与审批入口', () => {
   test('刷新失败保留意见草稿但不能按旧申请审批；恢复后可继续', async () => {
     const f = fixture(); page = await renderApp('/admin/requests');
     await input(visible<HTMLTextAreaElement>('textarea'), '保留 API 意见'); f.state.apiFailure = true;
-    await page.click('刷新 API 申请'); expect(visible<HTMLTextAreaElement>('textarea').value).toBe('保留 API 意见');
+    await page.reread(); expect(visible<HTMLTextAreaElement>('textarea').value).toBe('保留 API 意见');
     expect(page.text()).toContain('请刷新成功后再审批'); await page.click('批准'); expect(f.writes()).toHaveLength(0);
-    f.state.apiFailure = false; await page.click('刷新 API 申请'); expect(visible<HTMLTextAreaElement>('textarea').disabled).toBe(false);
+    f.state.apiFailure = false; await page.reread(); expect(visible<HTMLTextAreaElement>('textarea').disabled).toBe(false);
     expect(visible<HTMLTextAreaElement>('textarea').value).toBe('保留 API 意见'); expect(f.writes()).toHaveLength(0);
   });
 });

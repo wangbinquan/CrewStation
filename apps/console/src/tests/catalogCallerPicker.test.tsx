@@ -34,8 +34,11 @@ test('目录故障不混淆已确认调用方，资料读取失败或未知项�
   expect(page.text()).toContain('管理项目目录离线'); expect(page.text()).toContain(selected.serviceId!);
   expect(f.calls.some((c) => c.url.pathname === '/v1/catalog/operations' && c.url.searchParams.get('serviceId') === selected.serviceId)).toBe(true);
   f.state.detailError = true; const before = f.calls.filter((c) => c.url.pathname === '/v1/catalog/operations').length;
-  await page.click('重新读取项目目录'); expect(page.text()).toContain('调用方资料离线'); expect(f.calls.filter((c) => c.url.pathname === '/v1/catalog/operations')).toHaveLength(before);
-  f.state.detailError = false; f.state.projectError = false; await page.click('重新读取项目目录'); expect(page.text()).toContain(selected.serviceId!);
+  // 2026-09-23 裁定：目录与已选调用方每 30 秒自动重读，没有「重新读取项目目录」；reread 模拟一次自动重读。
+  // 已选调用方读不到时撤下接口列表，重读过程中也不向全局目录退：之后没有不带 serviceId 的接口读取。
+  await page.reread(); expect(page.text()).toContain('调用方资料离线'); expect(page.text()).not.toContain('重新读取项目目录');
+  expect(f.calls.filter((c) => c.url.pathname === '/v1/catalog/operations').slice(before).every((c) => c.url.searchParams.get('serviceId') === selected.serviceId)).toBe(true);
+  f.state.detailError = false; f.state.projectError = false; await page.reread(); expect(page.text()).toContain(selected.serviceId!);
   await page.navigate(`/admin/capabilities?tab=api&projectId=01a0bf5d-8f4b-7927-8d04-a341edee681a`); expect(page.text()).toContain('未找到指定项目');
   expect(f.calls.filter((c) => c.url.pathname === '/v1/catalog/operations').every((c) => c.url.searchParams.has('serviceId'))).toBe(true);
   await page.click('清除调用方'); expect(page.search().projectId).toBeUndefined();
@@ -45,11 +48,28 @@ test('目录故障不混淆已确认调用方，资料读取失败或未知项�
 test('重读与翻页保留未应用的搜索，清空搜索在原条件为空时也清掉输入', async () => {
   const f = adminDirectoryFixture(); page = await renderApp('/admin/capabilities?tab=api');
   const input = () => document.querySelector<HTMLInputElement>('input[aria-label="搜索调用方"]')!;
-  await typeSearch('尚未查询'); await page.click('重新读取项目目录'); expect(input().value).toBe('尚未查询');
+  await typeSearch('尚未查询'); await page.reread(); expect(input().value).toBe('尚未查询');
   await page.click('下一批调用方'); expect(input().value).toBe('尚未查询'); expect(page.search().q ?? '').toBe('');
   await page.click('清除搜索'); expect(input().value).toBe(''); expect(page.search().cursor).toBeUndefined();
   await typeSearch('再次输入'); await page.click('清除搜索'); expect(input().value).toBe('');
   await search('无匹配调用方'); expect(page.text()).toContain('没有匹配的项目');
   await page.click('清除搜索'); expect(input().value).toBe(''); expect(document.querySelector<HTMLSelectElement>('select[aria-label="调用方项目"]')!.options.length).toBe(21);
   expect(f.writes()).toHaveLength(0);
+});
+
+// 2026-09-23 裁定：目录与已选调用方自动重读。重读在途时下方的接口列表不能被卸载重建（ready 不看例行重读），
+// 搜索与翻页入口也不变灰。
+test('已选调用方自动重读在途时，接口列表保留、入口不变灰', async () => {
+  const f = adminDirectoryFixture(), selected = f.projects[10]!.project; page = await renderApp(`/admin/capabilities?tab=api&projectId=${selected.id}`);
+  const card = () => [...document.querySelectorAll('section')].find((node) => node.querySelector('h2')?.textContent === '接口开放策略');
+  const operations = () => f.calls.filter((c) => c.url.pathname === '/v1/catalog/operations').length, list = card();
+  expect(list).toBeDefined(); const before = operations(), fixture = globalThis.fetch; let release = () => {};
+  const held = new Promise<void>((resolve) => { release = resolve; });
+  globalThis.fetch = (async (raw, init) => { const path = new URL(String(raw), 'http://localhost').pathname; if (path === `/v1/projects/${selected.id}` || path === '/v1/projects/page') await held; return fixture(raw, init); }) as typeof fetch;
+  await act(async () => { document.dispatchEvent(new Event('visibilitychange')); }); await page.settle();
+  expect(card()).toBe(list);
+  expect(document.querySelector<HTMLButtonElement>('button[type="submit"]')?.disabled).toBe(false);
+  expect(document.querySelector<HTMLSelectElement>('select[aria-label="调用方项目"]')?.disabled).toBe(false);
+  await act(async () => release()); await page.settle();
+  expect(card()).toBe(list); expect(operations()).toBe(before); expect(f.writes()).toHaveLength(0);
 });
