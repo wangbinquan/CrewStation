@@ -7,6 +7,14 @@
 
 基线三件套（v0.3.3）的第一轮实现已在本机 kind 集群上跑通并推上 main；**RFC-001（算力归平台）与 RFC-002（管理空间与租户空间分离）已实现、实跑确认并推上 main；RFC-004 已被 RFC-006 取代（Superseded）；RFC-006（算力档位合并运行环境、每个 Agent 一个 Pod）已实现、实机验收完毕并推上 main，已 Done（P1–P8、ADR-0005 与 I17–I19 待作者复核）；RFC-003 工作台已按设计附件完成并整体部署到本机，52／52 项 UX-AT 全部实机通过、本地 gate 与精确 SHA CI 通过，已 Done；RFC-005（OIDC／OAuth 2.0 公司登录）代码、测试与 OA-01…OA-31 实机验收全部完成，已 Done；RFC-007（开发环境 OAuth 2.0 一键换角色）代码、四角色 Chrome 实机验收、本地 gate 与精确 SHA CI 全部完成，已 Done**。
 
+## 项目 slug 保留名补上平台占用的主机前缀；用户域划分登记为 I30（2026-09-24）
+
+作者问：「现在每个项目的域名分配怎么做的，管理员能不能配置」。答复：项目地址不经过分配或登记，是用安装时的两个后缀（`CS_USER_DOMAIN`、`CS_SERVICE_DOMAIN`）、契约 `HOST_PATTERNS` 和项目 slug 拼出来的；工作台里没有任何域名设置，slug 建好后也不能改。
+
+- **顺手修**：`RESERVED_SLUGS`（`modules/project/domain/project.ts`）漏了四个平台自己占用的主机前缀：服务域的 `events`、`mcp-capabilities`、`mcp-operations`，用户域的 `registry`。自建一个 slug 为 `events` 的项目，会生成 `Host(events.svc.cs.internal)` 的路由，和平台事件入口（`deploy/k8s/platform/40-gateway.yaml` 的 `platform-events`）同 Host，两条都没有显式优先级；网关的放行判定也会把它当成平台端点。修法：服务域部分改为直接取 contracts 的 `PLATFORM_SERVICE_HOSTS`，再补上 `registry`；建项目向导的中英文提示同步更新；加了就近用例和模块用例（`events` 被拒）。线上 14 个项目命名空间都没撞上这几个名字。**未部署**：当时工作树里有并行会话未提交的 release、gateway 与工作台改动，这一修复随下次 cs-api 滚动生效。
+- **门禁**：arch、lint、两个 typecheck 都通过；unit 634／0、module 1324 pass／7 skip／0 fail、console 889／0。console 第一轮在 `releaseMaintenance.test.tsx` 偶发失败一次，单独重跑和整层重跑都通过。全量 `bun test` 里的 e2e 因浏览器登录过期逐条超时，中途停掉了，与本改动无关。
+- **登记 I30，待作者裁定**：用户域只有一个后缀，工作台和全部应用在同一注册域下，会话 Cookie 在 `.<用户域>` 上共享，平台接口也不校验请求来源。这与 Design §5.7／§7.1／§13.1 和 §11.3 的三个用户域参数都不一致。按代码推断，管理员打开恶意应用的页面就可能被借身份做写操作（未实测）。
+
 ## RFC-025 统一资源管理中心：第二期完成（创建移交除外）、第三期服务槽、路由与限流进行中、第四期命名空间与网络策略上线、数据资源进行中（2026-09-24）
 
 接 09-23「第一期（基础）上线」一节。逐步的门禁、CI、部署与实机记录见 `proposal/rfc/RFC-025-resource-center/acceptance.md` §3–§10。本机控制面眼下是 `cs-control-plane:rc025-t16a-20260924`（bddf3d39，cs-controller 1 个副本），工作台是 `cs-console:rc025-t10d-20260924`（5fb115ba），平台路由清单已按 de9dcb5b 应用。

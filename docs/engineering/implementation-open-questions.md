@@ -38,6 +38,7 @@
 - [I27. 项目归档后，命名空间记录与命名空间怎样收尾](#i27-项目归档后命名空间记录与命名空间怎样收尾)
 - [I28. 数据面的调和器建角色时，口令与连接串放在哪](#i28-数据面的调和器建角色时口令与连接串放在哪)
 - [I29. 集群管理改读台账：清单的来源、台账维护的对象还给不给「删除」、「待回收的工作卷」放在哪](#i29-集群管理改读台账清单的来源台账维护的对象还给不给删除待回收的工作卷放在哪)
+- [I30. 用户域只有一个后缀：工作台与全部应用同一注册域，会话 Cookie 跨主机共享](#i30-用户域只有一个后缀工作台与全部应用同一注册域会话-cookie-跨主机共享)
 
 ## I1. 操作 MCP 的「以本服务身份调用内部 API」用的是谁的身份
 
@@ -419,3 +420,23 @@ spec.env.0.configDefinitionId / spec.env.1.configDefinitionId: expected string, 
 
 **实施（2026-09-24）**：后端先做——`delete-volume` 由资源中心自己受理（只给管理员、只对待回收的卷），期望改为「不要了」（原因 `volume-deleted`），调和器删 PVC；权限不足一律 403。界面与 (1)(2) 等本条裁定。
 
+## I30. 用户域只有一个后缀：工作台与全部应用同一注册域，会话 Cookie 跨主机共享
+
+**现状**：运行时只认两个后缀：`CS_USER_DOMAIN`（本机 `cs.localhost`）与 `CS_SERVICE_DOMAIN`（`svc.cs.internal`），取自安装配置 ConfigMap（`deploy/k8s/platform/10-config.yaml:8-9`，`packages/settings/platformSettings.ts:43,49`）。所有主机都按 contracts 的 `HOST_PATTERNS`（`packages/contracts/convention.ts:83`）由它们和项目 slug 拼出（组合根 `modules/platform/wiring.ts:88-91`）：工作台 `console.<用户域>`、正式 `<slug>.<用户域>`、试用 `preview.<slug>.<用户域>`、开发预览 `dev.<slug>.<用户域>`、服务 `<slug>.<服务域>`。平台会话 Cookie 下发在 `.<用户域>` 上（`modules/platform/wiring.ts:102`；HttpOnly、`SameSite=Lax`，`modules/identity/domain/session.ts:55`），工作台和每个应用主机共用一次登录。ForwardAuth 放行时会把平台会话 Cookie 从转给业务的请求里去掉（`modules/identity/http/forwardAuthRoutes.ts:60`）。平台接口不校验请求来源：代码里没有 Origin／`Sec-Fetch-Site` 判定，也没有 CSRF 令牌；`parseBody` 不看 Content-Type，直接按 JSON 解析（`packages/http/validate.ts:8`）。
+
+管理员在工作台里没有任何域名设置：「平台设置」只有自动下线和限流两项，「网关」页只读路由表，项目信息页的「域名与地址」也只读；项目 slug 创建后不能改。CLI 的 `install.yaml` 会解析 `network.consoleHost`／`appsDomain`／`previewDomain`／`serviceDomain`（`apps/cli/src/cluster/installConfig.ts:47-50`），但除 `consoleHost` 用在 verify 以外，这几项没有接到任何进程。平台自身的路由清单把 `console.cs.localhost`、`api.svc.cs.internal` 等主机写死（`deploy/k8s/platform/40-gateway.yaml`）。
+
+**为什么是问题**：Design §5.7、§7.1、§13.1 要求「开发预览与管理控制台使用不同的注册域；会话 Cookie 按 Host 下发；网关对用户域的非安全方法校验请求来源」。为此，§11.3 的 `install.yaml` 把用户域拆成 `consoleHost`（控制台注册域）、`appsDomain`（prod）和 `previewDomain`（preview 与开发预览）三项。现在的实现三条都不满足，后果有三：
+- (1) 开发者可以自建项目，在 `<slug>.<用户域>` 上放自己的页面。这个页面和工作台同站，`SameSite=Lax` 不拦同站请求。页面向 `console.<用户域>/v1/…` 发一个不触发预检的 `text/plain` POST，浏览器会带上平台会话 Cookie，cs-api 照常解析执行。管理员只要打开这样一个页面，就可能被借身份做写操作（代码推断，未实测）。这个页面还能在 `.<用户域>` 上写同名 Cookie，把会话覆盖掉。
+- (2) 试用地址和开发预览地址是两级子域。上 HTTPS 时，一张 `*.<用户域>` 通配证书覆盖不到它们（通配符只匹配一级），每个项目都要另签证书。现在生成的路由只挂 `web`（HTTP）入口（`packages/k8s/objects/traefik.ts:15`），所以这个问题还没暴露。设计里 Q06（域名、证书……）也还待决。
+- (3) 换后缀要同时改 ConfigMap、平台路由清单和 CoreDNS 改写，改完后所有项目的地址一起变。
+
+**可选做法**：
+- 域名结构：
+  - (a) 照 §11.3 拆成三个域名：控制台用独立注册域，正式地址在 `appsDomain` 下，试用和开发预览在 `previewDomain` 下，而且都改成一级子域。这样改会动业务接入契约 `HOST_PATTERNS`，是破坏性变更（要走 `contracts:lock --breaking`）。
+  - (b) 只把控制台换到独立注册域，应用仍在一个用户域后缀下。这样能解决同站和 Cookie 的问题，但两级子域的证书问题还在。
+  - (c) 域名结构不动，只补防护：会话 Cookie 只发给控制台主机；应用主机由 cs-auth 经一次跳转换发该主机自己的 Cookie；网关或 cs-api 对非安全方法校验 `Origin`／`Sec-Fetch-Site`，并要求 `Content-Type: application/json`。
+- 管理员能配置的范围：
+  - (i) 只在安装配置里设，改后缀等同重装；
+  - (ii) 后缀放进「平台设置」，保存后重算全部路由；
+  - (iii) 在此之上再加按项目的自定义域名（别名），证书由管理员提供或自动签发。
