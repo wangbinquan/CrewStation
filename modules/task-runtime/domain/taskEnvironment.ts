@@ -50,7 +50,11 @@ export interface WorkloadRender {
   readonly workerUid: number;
   readonly resources: { readonly cpu: string; readonly memory: string; readonly storage: string };
   readonly start: number;
-  readonly checkout?: { readonly repoUrl: string; readonly branch: string; readonly credentialSecretName: string };
+  /**
+   * 检出：没有 credentialSecretName 时凭据 Secret 由资源中心按这一次启动建（`<Pod 名>-checkout-<第几次启动>`，令牌建的时候向本模块要）；
+   * 有的是旧形状——受理时本模块写好的按服务共用的 Secret。
+   */
+  readonly checkout?: { readonly repoUrl: string; readonly branch: string; readonly credentialSecretName?: string };
   readonly previewRoute?: { readonly host: string; readonly middlewares: readonly { readonly name: string; readonly namespace?: string }[] };
   /**
    * 执行环境（I25 第二步）：父工作区受理那一刻的 Pod 名（重建过的工作区 Pod 换了名）。节点与父 Pod、工作卷的 UID 取自 `native`，
@@ -180,6 +184,12 @@ export function reconcilerCreates(env: TaskEnvironment): env is TaskEnvironment 
  */
 export function runnerSecretOf(env: TaskEnvironment & { readonly render: WorkloadRender }): string {
   return env.native ? `${env.podName}-runner` : `${env.podName}-runner-${env.render.start}`;
+}
+
+/** 这一次启动检出用的 Git 凭据 Secret（I25）：`<Pod 名>-checkout-<第几次启动>`；旧形状沿用受理时写好的按服务 Secret；不检出没有。 */
+export function checkoutSecretOf(env: TaskEnvironment & { readonly render: WorkloadRender }): string | undefined {
+  const checkout = env.render.checkout;
+  return checkout ? checkout.credentialSecretName ?? `${env.podName}-checkout-${env.render.start}` : undefined;
 }
 
 /** 所属模块要资源中心建出容器（领域条件 Provisioning）：工作区在创建中、还没绑定 Pod 实例；执行环境还在排队（准备好之前）。 */

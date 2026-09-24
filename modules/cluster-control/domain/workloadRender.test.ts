@@ -15,12 +15,15 @@ describe('工作区记录 → 渲染输入', () => {
     });
     expect(workloadRenderOf('rec-1', { children, pod, preview: { port: 3000, kind: 'business' } })?.preview).toEqual({ name: 'task-1', namespace: 'cs-demo', taskId: 'rec-1', kind: 'business', targetPort: 3000 });
     expect(workloadRenderOf('rec-1', { children, pod })).toEqual({ pod: { name: 'task-1', namespace: 'cs-demo', taskId: 'rec-1', ...pod } });
+    // I25：凭据 Secret 由资源中心按这一次启动建的，照写 ownedCredential；为假与没写一样。
+    expect(workloadRenderOf('rec-1', { children, pod: { ...pod, checkout: { ...checkout, ownedCredential: true } } })?.pod.checkout).toEqual({ ...checkout, ownedCredential: true });
+    expect(workloadRenderOf('rec-1', { children, pod: { ...pod, checkout: { ...checkout, ownedCredential: false } } })?.pod.checkout).toEqual(checkout);
   });
 
   test('记录是数据：没有 pod（旧形状）、字段不全或类型不对、子对象缺命名空间、预览不完整，都不渲染', () => {
     for (const broken of [
       {}, { pod: { ...pod, image: '' } }, { pod: { ...pod, workerUid: '10001' } }, { pod: { ...pod, project: 7 } }, { pod: { ...pod, resources: { cpu: '1' } } },
-      { pod: { ...pod, checkout: { repoUrl: 'x' } } }, { pod, preview: { kind: 'dev-session' } }, { pod, preview: { port: 3000, kind: 'dev-session', route: { host: 'h', middlewares: [{ namespace: 'x' }] } } },
+      { pod: { ...pod, checkout: { repoUrl: 'x' } } }, { pod: { ...pod, checkout: { repoUrl: 'x', branch: 'main', credentialSecretName: 'c', ownedCredential: 'yes' } } }, { pod, preview: { kind: 'dev-session' } }, { pod, preview: { port: 3000, kind: 'dev-session', route: { host: 'h', middlewares: [{ namespace: 'x' }] } } },
       { pod, preview: { port: 3000, kind: 'dev-session', route: { middlewares: [] } } },
     ]) expect(workloadRenderOf('rec-1', { children, ...broken })).toBeUndefined();
     expect(workloadRenderOf('rec-1', { children: [{ kind: 'Pod', name: 'task-1' }], pod })).toBeUndefined();

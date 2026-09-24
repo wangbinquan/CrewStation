@@ -8,7 +8,7 @@ import { objectCovered } from './coverage';
 import { middlewareObject } from './middlewareObjects';
 import { namespaceObjectOf, networkPolicyObjectOf, quotaObjectOf } from './namespaceObjects';
 import { routeObject } from './routeObjects';
-import { runnerSecretObject, volumeObject, workloadPodObject, workloadPreviewObjects } from './workloadObjects';
+import { checkoutSecretObject, runnerSecretObject, volumeObject, workloadPodObject, workloadPreviewObjects } from './workloadObjects';
 
 const SELECTOR = `${LABELS.managedBy}=${MANAGED_BY}`;
 const KINDS: readonly ObservedKind[] = ['Pod', 'PersistentVolumeClaim', 'Secret', 'Service', 'IngressRoute', 'Deployment', 'Job', 'Middleware', 'Namespace', 'ResourceQuota', 'NetworkPolicy'];
@@ -66,6 +66,7 @@ export function kubernetesClusterWriter(k8s: K8sClient): ClusterWriter {
     applyNetworkPolicy: (policy, current) => apply(networkPolicyObjectOf(policy), current),
     ensurePod: (pod) => ensureNamed(k8s, 'Pod', pod, () => workloadPodObject(pod)),
     ensureRunnerSecret: (pod, values) => ensureNamed(k8s, 'Secret', { namespace: pod.namespace, name: pod.secret }, async () => runnerSecretObject(pod, await values())),
+    ensureCheckoutSecret: (pod, values) => ensureNamed(k8s, 'Secret', { namespace: pod.namespace, name: pod.checkout!.credentialSecretName }, async () => checkoutSecretObject(pod, await values())),
     ensureVolume: (volume) => ensureNamed(k8s, 'PersistentVolumeClaim', volume, () => volumeObject(volume)),
     applyPreview: async (preview, current) => {
       const [service, route] = workloadPreviewObjects(preview);

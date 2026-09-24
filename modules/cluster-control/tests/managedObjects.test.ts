@@ -94,6 +94,14 @@ describe('工作区容器的建出', () => {
     expect(await writer.ensureRunnerSecret(pod, values)).toEqual({ uid: 'uid-task-1-runner-1', created: true });
     expect(await writer.ensureRunnerSecret(pod, values)).toEqual({ uid: 'uid-task-1-runner-1', created: false });
     expect(asked).toBe(1);
+    // 检出用的 Git 凭据（I25）：同样只在不在时才要令牌，建成不可变、键为 token。
+    const checkout = { ...pod, checkout: { repoUrl: 'http://git/demo.git', branch: 'main', credentialSecretName: 'task-1-checkout-1', ownedCredential: true } };
+    let tokens = 0;
+    const token = async () => { tokens += 1; return { token: 'git-t' }; };
+    expect((await writer.ensureCheckoutSecret(checkout, token)).created).toBe(true);
+    expect((await writer.ensureCheckoutSecret(checkout, token)).created).toBe(false);
+    expect(tokens).toBe(1);
+    expect(await k8s.get(Resources.Secret!, 'task-1-checkout-1', 'cs-demo')).toMatchObject({ immutable: true, stringData: { token: 'git-t' } });
     expect((await writer.ensurePod(pod)).created).toBe(true);
     expect((await writer.ensurePod(pod)).created).toBe(false);
     expect((await writer.ensureVolume({ name: 'task-1-work', namespace: 'cs-demo', size: '10Gi', labels: {} })).created).toBe(true);

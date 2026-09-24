@@ -1,7 +1,7 @@
 import type { ClusterPurpose, ResourceConditionStatus, ResourceKind, StartupRecord } from '@crewstation/contracts';
 import type { ExecutionPurpose, TaskEnvironment } from './taskEnvironment';
 import { canonicalNativeIntent, EXECUTION_INTENT_ANNOTATION, WORKSPACE_TASK_LABEL } from './physicalIdentity';
-import { podNameFor, purposeOf, reconcilerCreates, runnerSecretOf, WORKLOAD_LABELS, wantsProvisioning } from './taskEnvironment';
+import { checkoutSecretOf, podNameFor, purposeOf, reconcilerCreates, runnerSecretOf, WORKLOAD_LABELS, wantsProvisioning } from './taskEnvironment';
 
 /**
  * 任务环境投影到资源台账（RFC-025 第二期）：每个环境一条工作负载记录（开发工作区、业务任务工作区、Agent 执行），
@@ -112,7 +112,9 @@ function workloadRender(env: TaskEnvironment): ProjectedRecord['render'] {
   const { image, workerUid, resources, checkout, previewRoute } = env.render;
   const pod = {
     image, workerUid, resources, workload: WORKLOAD_LABELS[env.kind], project: env.labels['crewstation.io/project'] ?? '', service: env.labels['crewstation.io/service'] ?? '',
-    pvc: env.pvcName, secret: runnerSecretOf(env), ...(checkout ? { checkout } : {}), ...executionRender(env),
+    pvc: env.pvcName, secret: runnerSecretOf(env), ...executionRender(env),
+    // 检出（I25）：没带 Secret 名的，凭据 Secret 由资源中心按这一次启动建（ownedCredential），令牌建的时候向本模块要。
+    ...(checkout ? { checkout: { repoUrl: checkout.repoUrl, branch: checkout.branch, credentialSecretName: checkoutSecretOf(env)!, ...(checkout.credentialSecretName ? {} : { ownedCredential: true }) } } : {}),
   };
   return { pod, ...(env.preview ? { preview: { port: env.preview.port, kind: env.kind, ...(previewRoute ? { route: previewRoute } : {}) } } : {}) };
 }
@@ -141,8 +143,11 @@ function workloadDisplay(env: TaskEnvironment): Record<string, string> {
  */
 function workloadChildren(env: TaskEnvironment): ProjectedRecord['children'] {
   const at = (kind: string, name: string) => ({ kind, namespace: env.namespace, name });
-  // 资源中心建出的环境（I25）：每次启动一个 Runner Secret，预览与 Pod 同名。
-  if (reconcilerCreates(env)) return [at('Pod', env.podName), at('Secret', runnerSecretOf(env)), ...(env.preview ? [at('Service', env.podName), at('IngressRoute', env.podName)] : [])];
+  // 资源中心建出的环境（I25）：每次启动一个 Runner Secret（检出用的 Git 凭据由资源中心建的也归这一次启动），预览与 Pod 同名。
+  if (reconcilerCreates(env)) {
+    const checkout = env.render.checkout && !env.render.checkout.credentialSecretName ? [at('Secret', checkoutSecretOf(env)!)] : [];
+    return [at('Pod', env.podName), at('Secret', runnerSecretOf(env)), ...checkout, ...(env.preview ? [at('Service', env.podName), at('IngressRoute', env.podName)] : [])];
+  }
   const route = env.rebuildId ? podNameFor(env.id) : env.podName;
   return [
     at('Pod', env.podName), ...(env.native || env.rebuildId ? [at('Secret', `${env.podName}-runner`)] : []),

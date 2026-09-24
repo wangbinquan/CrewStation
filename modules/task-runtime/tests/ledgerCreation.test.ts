@@ -24,12 +24,14 @@ describe.skipIf(!available)('工作区容器由资源中心建出（RFC-025 I25�
   let resources: ResourcesModule;
   let ledger: EnvironmentLedger;
   const k8s = createFakeK8sClient();
-  const runtime = () => createTaskRuntimeModule({
+  let tokensIssued = 0;
+  const ownedCheckout = { checkoutFor: async () => { throw new Error('不该再写按服务的 Secret'); }, repositoryFor: async () => ({ repoUrl: 'http://git/lc.git' }), credentialFor: async () => ({ token: `git-${++tokensIssued}` }) };
+  const runtime = (checkout: Parameters<typeof createTaskRuntimeModule>[0]['checkout'] = { checkoutFor: async () => ({ repoUrl: 'http://git/lc.git', credentialSecretName: 'git-checkout-lc' }) }, project = projectId) => createTaskRuntimeModule({
     db: tdb.db, k8s, authorizer: { authorize: async () => {} }, isAdmin: async () => true, quotas: { quotaLimit: async () => 4 }, ledger, creation: 'ledger',
     profiles: { devSessionProfile: async () => undefined, listTaskProfiles: async () => profiles, getTaskProfile: async (name) => profiles.find((p) => p.id === name) },
-    services: { resolveServiceById: async () => ({ projectId, namespace: 'cs-lc', slug: 'lc', name: 'lc' }) },
+    services: { resolveServiceById: async () => ({ projectId: project, namespace: 'cs-lc', slug: 'lc', name: 'lc' }) },
     sources: { configEnv: async () => ({ GREETING: 'hi' }), dataEnv: async () => ({}), taskDataEnv: async () => ({}) },
-    checkout: { checkoutFor: async () => ({ repoUrl: 'http://git/lc.git', credentialSecretName: 'git-checkout-lc' }) },
+    checkout,
     settings: { taskImage: 'task:current', sessionUrl: 'ws://session/runner', systemNamespace: 'cs-system', userDomain: 'localhost', serviceDomain: 'svc.localhost', workerUid: 10001, defaultProfile: profiles[0]!.id, userAuthMiddleware: 'auth', dropIdentityHeadersMiddleware: 'drop' },
   });
 
@@ -56,6 +58,25 @@ describe.skipIf(!available)('工作区容器由资源中心建出（RFC-025 I25�
     const volume = (await resources.api.list({ parentId: created.id, kind: 'volume' }))[0]!;
     expect(volume.spec['pvc']).toEqual({ size: '10Gi', labels: { 'crewstation.io/task': created.id, 'crewstation.io/project': 'lc' } });
     expect(await provisioning(volume.id)).toBe('true');
+  });
+
+  test('检出凭据归这一次启动：受理只要仓库地址（不签令牌、不写按服务的 Secret），凭据 Secret 是记录的子对象，令牌建的时候才签', async () => {
+    // 一个项目只能有一个开发会话：这条用另一个项目。
+    const tasks = runtime(ownedCheckout, '01a0bf5d-8f4b-7fc7-8b88-183626175a09' as ProjectId);
+    const created = await tasks.api.createEnvironment({ serviceId, kind: 'dev-session', branch: 'feature', labels: { 'crewstation.io/project': 'lc', 'crewstation.io/service': 'lc' } });
+    expect(tokensIssued).toBe(0);
+    const env = (await drizzleUnitOfWork(tdb.db).read.environments.getById(created.id as TaskId))!;
+    expect(env.render?.checkout).toEqual({ repoUrl: 'http://git/lc.git', branch: 'feature' });
+    const workspace = (await resources.api.get(created.id))!;
+    expect(workspace.spec.children.map((child) => child.name)).toEqual([created.podName, `${created.podName}-runner-1`, `${created.podName}-checkout-1`]);
+    expect(workspace.spec['pod']).toMatchObject({ checkout: { repoUrl: 'http://git/lc.git', branch: 'feature', credentialSecretName: `${created.podName}-checkout-1`, ownedCredential: true } });
+    expect(await tasks.api.checkoutValues(created.id as TaskId)).toEqual({ token: 'git-1' });
+    await tasks.api.bindWorkload(created.id as TaskId, 'uid-dev-pod');
+    await expect(tasks.api.checkoutValues(created.id as TaskId)).rejects.toMatchObject({ kind: 'precondition' });
+    // 旧形状（受理时写好按服务的 Secret）与不检出的，都不向这里要令牌。
+    const legacy = await runtime().api.createEnvironment({ serviceId, kind: 'business', labels: {} });
+    await expect(runtime().api.checkoutValues(legacy.id as TaskId)).rejects.toMatchObject({ kind: 'precondition' });
+    expect(tokensIssued).toBe(1);
   });
 
   test('建 Secret 时要值：给出配置与新签发的令牌（只存哈希）；Pod 交回后不再要建、再要值被拒', async () => {

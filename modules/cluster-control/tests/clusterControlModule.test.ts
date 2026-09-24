@@ -76,6 +76,7 @@ describe.skipIf(!available)('cluster-control：观测写回台账与收编空跑
   const boundSecrets = new Map<string, string | undefined>();
   const owners = {
     failValues: false, runnerValues: async (id: string) => { valuesAsked.push(id); if (owners.failValues) throw new Error('额度不够'); return { CS_RUNNER_TOKEN: `token-${id}` }; },
+    checkoutValues: async (id: string) => ({ token: `git-${id}` }),
     bindWorkload: async (id: string, uid: string, secretUid?: string) => { bound.push(`${id}:${uid}`); boundSecrets.set(id, secretUid); },
     workloadUnavailable: async (id: string, code: string) => { unavailable.push(`${id}:${code}`); },
   };
@@ -114,6 +115,7 @@ describe.skipIf(!available)('cluster-control：观测写回台账与收编空跑
     applyNetworkPolicy: async (policy, current) => settled(await writer.applyNetworkPolicy(policy, current), current, 'NetworkPolicy', policy.name, policy.namespace),
     ensurePod: async (pod) => placed(await writer.ensurePod(pod), 'Pod', pod.name, pod.namespace),
     ensureRunnerSecret: async (pod, values) => placed(await writer.ensureRunnerSecret(pod, values), 'Secret', pod.secret, pod.namespace),
+    ensureCheckoutSecret: async (pod, values) => placed(await writer.ensureCheckoutSecret(pod, values), 'Secret', pod.checkout!.credentialSecretName, pod.namespace),
     ensureVolume: async (volume) => placed(await writer.ensureVolume(volume), 'PersistentVolumeClaim', volume.name, volume.namespace),
     applyPreview: async (preview, current) => {
       const outcome = await writer.applyPreview(preview, current);
@@ -419,8 +421,9 @@ describe.skipIf(!available)('cluster-control：观测写回台账与收编空跑
     type Pod = K8sObject & { spec: { containers: Array<{ envFrom?: unknown; env: unknown[] }>; volumes: unknown[] } };
     const runtime = resources.api.owner('task-runtime');
     const provisioning = (status: 'true' | 'false') => [{ type: 'Provisioning', status }] as const;
-    const pod = (name: string) => ({ image: 'task:1', workerUid: 10001, resources: { cpu: '1', memory: '2Gi', storage: '10Gi' }, workload: 'dev-session', project: 'demo', service: 'demo', pvc: `${name}-work`, secret: `${name}-runner-1` });
-    const children = (name: string) => [{ kind: 'Pod', namespace: 'cs-demo', name }, { kind: 'Secret', namespace: 'cs-demo', name: `${name}-runner-1` }, { kind: 'Service', namespace: 'cs-demo', name }, { kind: 'IngressRoute', namespace: 'cs-demo', name }];
+    const pod = (name: string) => ({ image: 'task:1', workerUid: 10001, resources: { cpu: '1', memory: '2Gi', storage: '10Gi' }, workload: 'dev-session', project: 'demo', service: 'demo', pvc: `${name}-work`, secret: `${name}-runner-1`,
+      checkout: { repoUrl: 'http://git/demo.git', branch: 'main', credentialSecretName: `${name}-checkout-1`, ownedCredential: true } });
+    const children = (name: string) => [{ kind: 'Pod', namespace: 'cs-demo', name }, { kind: 'Secret', namespace: 'cs-demo', name: `${name}-runner-1` }, { kind: 'Secret', namespace: 'cs-demo', name: `${name}-checkout-1` }, { kind: 'Service', namespace: 'cs-demo', name }, { kind: 'IngressRoute', namespace: 'cs-demo', name }];
     const preview = { port: 3000, kind: 'dev-session', route: { host: 'dev.demo.cs.localhost', middlewares: [{ name: 'forward-auth-user', namespace: 'crewstation-system' }] } };
     const declare = (name: string, status: 'true' | 'false') => Promise.all([
       runtime.declare({ kind: 'volume', ref: `${name}/work`, projectId: PROJECT, spec: { children: [{ kind: 'PersistentVolumeClaim', namespace: 'cs-demo', name: `${name}-work` }], pvc: { size: '10Gi', labels: { 'crewstation.io/task': name } } }, conditions: provisioning(status) }),
@@ -434,7 +437,9 @@ describe.skipIf(!available)('cluster-control：观测写回台账与收编空跑
     try {
     const [volume, workspace] = await declare('task-w1', 'true');
     await until('建出并交回实例', () => bound.some((entry) => entry.startsWith(`${workspace.id}:`)));
-    expect(workloadApplies).toEqual(['PersistentVolumeClaim/task-w1-work', 'Secret/task-w1-runner-1', 'Pod/task-w1', 'preview/task-w1']);
+    expect(workloadApplies).toEqual(['PersistentVolumeClaim/task-w1-work', 'Secret/task-w1-runner-1', 'Secret/task-w1-checkout-1', 'Pod/task-w1', 'preview/task-w1']);
+    // 检出用的 Git 凭据归这一次启动（I25）：令牌建的时候向所属模块要，只进 init 容器引用的 Secret。
+    expect(await k8s.get<K8sObject & { stringData?: Record<string, string> }>(Resources.Secret!, 'task-w1-checkout-1', 'cs-demo')).toMatchObject({ immutable: true, stringData: { token: `git-${workspace.id}` } });
     expect(valuesAsked).toEqual([workspace.id]);
     const secret = await k8s.get<K8sObject & { immutable?: boolean; stringData?: Record<string, string> }>(Resources.Secret!, 'task-w1-runner-1', 'cs-demo');
     expect(secret).toMatchObject({ immutable: true, stringData: { CS_RUNNER_TOKEN: `token-${workspace.id}` }, metadata: { labels: { 'crewstation.io/task': workspace.id } } });

@@ -36,7 +36,7 @@ import type { ReleaseModuleApi } from '@crewstation/module-release';
 import { createScmModule } from '@crewstation/module-scm';
 import { createSessionModule } from '@crewstation/module-session';
 import { createTaskRuntimeModule } from '@crewstation/module-task-runtime';
-import type { TaskRuntimeModuleApi } from '@crewstation/module-task-runtime';
+import type { TaskRuntimeModuleApi, TaskRuntimeModuleDeps } from '@crewstation/module-task-runtime';
 import type { Database } from '@crewstation/persistence';
 import { eventbusMigrations } from '@crewstation/eventbus';
 import { queueMigrations } from '@crewstation/queue';
@@ -247,6 +247,25 @@ function computeCatalogFor(agentRuntime: AgentRuntimeModuleApi) {
   return { resolve: (name: ComputeProfileSelector | undefined, usage: ComputeUsage, projectId: ProjectId) => agentRuntime.resolveForProject(projectId, name, usage), launchMaterial: agentRuntime.launchMaterial };
 }
 
+/**
+ * 开发容器的工作卷要先有源码（task-runtime 的检出端口）。旧形状：签一个只读的会话级 Git 令牌，写进项目命名空间按服务共用的 Secret，
+ * 只挂给 checkout init 容器——推送由平台在发布时完成，长驻容器里不需要写权限。由资源中心建出时（RFC-025 I25）：受理只要仓库地址，
+ * 令牌在调和器建这一次启动的凭据 Secret 时才签。
+ */
+function taskCheckout(core: ReturnType<typeof composeCore>, k8s: K8sClient, resolveById: (serviceId: ServiceId) => ReturnType<ProjectModuleApi['resolveServiceById']>): NonNullable<TaskRuntimeModuleDeps['checkout']> {
+  return {
+    checkoutFor: async (serviceId) => {
+      const [binding, svc, credential] = await Promise.all([core.scm.api.getBinding(SYSTEM_ACTOR, serviceId), resolveById(serviceId), core.scm.api.issueSessionCredential(serviceId, 30)]);
+      if (!svc) return undefined;
+      const name = `git-checkout-${serviceId.replaceAll('-', '')}`;
+      await k8s.apply(secretObject({ name, namespace: svc.namespace, stringData: { token: credential.token }, labels: { 'crewstation.io/service': svc.name } }));
+      return { repoUrl: binding.httpUrl, credentialSecretName: name };
+    },
+    repositoryFor: async (serviceId) => ({ repoUrl: (await core.scm.api.getBinding(SYSTEM_ACTOR, serviceId)).httpUrl }),
+    credentialFor: async (serviceId) => ({ token: (await core.scm.api.issueSessionCredential(serviceId, 30)).token }),
+  };
+}
+
 function composeRuntime(deps: CompositionDeps, core: ReturnType<typeof composeCore>, delivery: ReturnType<typeof composeDelivery>, late: Late, resources: ReturnType<typeof composeLedger>) {
   const { db, k8s, settings, logger } = deps;
   const { project, config, data, scm, isAdmin, resolveById } = core;
@@ -263,17 +282,7 @@ function composeRuntime(deps: CompositionDeps, core: ReturnType<typeof composeCo
     ...(settings.workloadCreation === 'ledger' ? { creation: 'ledger' as const } : {}),
     profiles: { devSessionProfile: core.agentRuntime.api.projectDevTaskProfile, listTaskProfiles: project.api.listTaskProfiles, getTaskProfile: async (name) => (await project.api.listTaskProfiles()).find((p) => p.id === name) },
     services: { resolveServiceById: resolveById },
-    checkout: {
-      // 开发容器的工作卷要先有源码：签一个只读的会话级 Git 令牌，写进项目命名空间的 Secret，
-      // 只挂给 checkout init 容器。推送由平台在发布时完成，长驻容器里不需要写权限。
-      checkoutFor: async (serviceId) => {
-        const [binding, svc, credential] = await Promise.all([core.scm.api.getBinding(SYSTEM_ACTOR, serviceId), resolveById(serviceId), core.scm.api.issueSessionCredential(serviceId, 30)]);
-        if (!svc) return undefined;
-        const name = `git-checkout-${serviceId.replaceAll('-', '')}`;
-        await k8s.apply(secretObject({ name, namespace: svc.namespace, stringData: { token: credential.token }, labels: { 'crewstation.io/service': svc.name } }));
-        return { repoUrl: binding.httpUrl, credentialSecretName: name };
-      },
-    },
+    checkout: taskCheckout(core, k8s, resolveById),
     sources: { configEnv: (projectId, env) => config.api.renderEnv(projectId, env), dataEnv: data.api.envFor, taskDataEnv: data.api.envForTask },
     settings: { taskImage: settings.taskImage, systemNamespace: settings.systemNamespace, sessionUrl: settings.sessionRunnerUrl, userDomain: settings.userDomain, serviceDomain: settings.serviceDomain, workerUid: 10001, defaultProfile: settings.defaultTaskProfile, userAuthMiddleware: 'forward-auth-user', dropIdentityHeadersMiddleware: 'drop-identity-headers' },
   });
@@ -429,7 +438,7 @@ function composeControl(deps: CompositionDeps, core: ReturnType<typeof composeCo
     // D13：槽「已结束」时待验证与正式主机改指 cs-api 的说明页（Service 与端口同平台路由清单 deploy/k8s/platform/30-cs-api.yaml）。
     explainer: { namespace: deps.settings.systemNamespace, service: 'cs-api', port: 8080, path: UNAVAILABLE_PATH },
     // RFC-025 I25：建工作区与执行环境的 Runner Secret 时回头向 task-runtime 要内容（值不落台账），Pod 建出后交回实例；执行环境的父工作区变了交它判失败。
-    workloads: { runnerValues: (id) => runtime.taskRuntime.api.runnerValues(id as TaskId), bindWorkload: (id, podUid, secretUid) => runtime.taskRuntime.api.bindWorkload(id as TaskId, podUid, secretUid),
+    workloads: { runnerValues: (id) => runtime.taskRuntime.api.runnerValues(id as TaskId), checkoutValues: (id) => runtime.taskRuntime.api.checkoutValues(id as TaskId), bindWorkload: (id, podUid, secretUid) => runtime.taskRuntime.api.bindWorkload(id as TaskId, podUid, secretUid),
       workloadUnavailable: (id, code) => runtime.taskRuntime.api.workloadUnavailable(id as TaskId, code) },
     ledger: {
       observe: (input) => ledger.api.observe(input), claimOf: (child) => ledger.api.claimOf(child), get: (id) => ledger.api.get(id),

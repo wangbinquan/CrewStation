@@ -20,6 +20,11 @@ export function runnerSecretObject(pod: WorkloadPodRender, values: Readonly<Reco
   return secret;
 }
 
+/** 这一次启动检出用的 Git 凭据（键 `token`，只挂给 checkout init 容器）：不可变，令牌是建的时候向所属模块要来的。 */
+export function checkoutSecretObject(pod: WorkloadPodRender, values: { readonly token: string }): K8sObject {
+  return { ...secretObject({ name: pod.checkout!.credentialSecretName, namespace: pod.namespace, stringData: { token: values.token }, labels: { [LABELS.task]: pod.taskId } }), immutable: true } as K8sObject;
+}
+
 export function workloadPreviewObjects(preview: WorkloadPreviewRender): K8sObject[] {
   return taskPreviewObjects({ name: preview.name, namespace: preview.namespace, taskId: preview.taskId, kind: preview.kind, targetPort: preview.targetPort, ...(preview.route ? { route: preview.route } : {}) });
 }

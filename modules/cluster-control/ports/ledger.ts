@@ -50,6 +50,8 @@ export interface LedgerObservations {
  */
 export interface WorkloadOwners {
   runnerValues(recordId: string): Promise<Readonly<Record<string, string>>>;
+  /** 建这一次启动检出用的 Git 凭据 Secret 之前要令牌（只读、短时，I25）；值只写进 Secret，不落台账。 */
+  checkoutValues(recordId: string): Promise<{ readonly token: string }>;
   /** Pod 建出后交回实例；执行环境另交回它的 Runner Secret 实例（清理时按 UID 认领）。 */
   bindWorkload(recordId: string, podUid: string, secretUid?: string): Promise<void>;
   /** 执行环境建出之前父工作区换了实例或不在运行（workspace-changed）：交所属模块判这个执行环境失败，文案由它写。 */

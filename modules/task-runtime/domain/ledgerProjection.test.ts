@@ -112,6 +112,10 @@ describe('任务环境投影到资源台账（RFC-025 第二期）', () => {
     expect(bound.workload.conditions).toContainEqual({ type: 'Provisioning', status: 'false' });
     expect(bound.volume?.conditions).toEqual([{ type: 'Provisioning', status: 'false' }]);
     expect(bound.workload.render).toEqual({ pod: expect.objectContaining({ secret: 'task-100-runner-2', project: '', service: '' }) });
+    // 检出凭据归这一次启动（I25）：没带 Secret 名的由资源中心建，是记录的子对象；Secret 名随第几次启动变。
+    const owned = projectEnvironment(env({ state: 'creating', connected: false, render: { ...render, checkout: { repoUrl: 'http://git/demo.git', branch: 'main' } } }));
+    expect(owned.workload.children.map((child) => child.name)).toEqual(['task-100', 'task-100-runner-2', 'task-100-checkout-2']);
+    expect(owned.workload.render?.['pod']).toMatchObject({ checkout: { repoUrl: 'http://git/demo.git', branch: 'main', credentialSecretName: 'task-100-checkout-2', ownedCredential: true } });
     // 重建中的由 task-runtime 自己建：照旧的子对象形状，不写渲染期望。
     const rebuilt = projectEnvironment(env({ state: 'creating', render, rebuildId: 'rb-1', podName: 'task-100-r1' }));
     expect(rebuilt.workload.render).toBeUndefined();

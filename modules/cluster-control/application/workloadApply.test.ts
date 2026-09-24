@@ -19,13 +19,14 @@ function harness(cached: readonly string[] = [], objects: Readonly<Record<string
   const cluster = {
     ensureVolume: async () => { calls.push('volume'); return { uid: 'u-v', created: true }; },
     ensureRunnerSecret: async () => { calls.push('secret'); return { uid: 'u-s', created: false }; },
+    ensureCheckoutSecret: async (_pod: unknown, values: () => Promise<{ token: string }>) => { calls.push(`checkout:${(await values()).token}`); return { uid: 'u-c', created: true }; },
     ensurePod: async () => { calls.push('pod'); return { uid: 'u-p', created: true }; },
     applyPreview: async () => 'unchanged' as const,
   } as unknown as ClusterWriter;
   const ledger = { observeConditions: async (_id: string, conditions: readonly { type: string; status: string }[]) => { calls.push(`condition:${conditions[0]!.type}=${conditions[0]!.status}`); return { status: 'recorded' as const }; } } as unknown as LedgerObservations;
   const deps = { ledger, feed, cluster, stats: newObservationStats(), logger: { ...noopLogger, warn: (msg: string) => { warns.push(msg); } }, retryMs: 10,
     workloads: {
-      runnerValues: async () => ({}), bindWorkload: async (id: string, uid: string, secretUid?: string) => { calls.push(`bind:${id}:${uid}:${secretUid}`); },
+      runnerValues: async () => ({}), checkoutValues: async () => ({ token: 'git-t' }), bindWorkload: async (id: string, uid: string, secretUid?: string) => { calls.push(`bind:${id}:${uid}:${secretUid}`); },
       workloadUnavailable: async (id: string, code: string) => { calls.push(`unavailable:${id}:${code}`); },
     } };
   return { deps, calls, warns, queued, enqueue: (id: string, afterMs?: number) => { queued.push([id, afterMs]); } };
@@ -41,6 +42,17 @@ test('建：卷在了才建 Secret 与 Pod，交回实例、写 Created；卷还
   await applyWorkload(waiting.deps, record({}), waiting.enqueue);
   expect(waiting.calls).toEqual([]);
   expect(waiting.queued).toEqual([['rec-1', 10]]);
+});
+
+test('检出凭据归这一次启动的（I25）：Runner Secret 之后、Pod 之前建，令牌此刻向所属模块要；旧形状（按服务共用的 Secret）不建', async () => {
+  const checkout = { repoUrl: 'http://git/demo.git', branch: 'main', credentialSecretName: 'task-1-checkout-1' };
+  const owned = harness(['PersistentVolumeClaim/cs-demo/task-1-work']);
+  await applyWorkload(owned.deps, record({ spec: { children: record({}).spec.children, pod: { ...pod, checkout: { ...checkout, ownedCredential: true } } } }), owned.enqueue);
+  expect(owned.calls).toEqual(['secret', 'checkout:git-t', 'pod', 'bind:rec-1:u-p:u-s', 'condition:Created=true']);
+  expect(owned.deps.stats.applied).toBe(2);
+  const shared = harness(['PersistentVolumeClaim/cs-demo/task-1-work']);
+  await applyWorkload(shared.deps, record({ spec: { children: record({}).spec.children, pod: { ...pod, checkout } } }), shared.enqueue);
+  expect(shared.calls).toEqual(['secret', 'pod', 'bind:rec-1:u-p:u-s', 'condition:Created=true']);
 });
 
 test('不建：所属模块不要（Provisioning 为假或已失败）、没接所属模块、期望不完整（只告警）', async () => {

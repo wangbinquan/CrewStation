@@ -15,7 +15,11 @@ export interface WorkloadPodRender {
   readonly service: string;
   readonly pvc: string;
   readonly secret: string;
-  readonly checkout?: { readonly repoUrl: string; readonly branch: string; readonly credentialSecretName: string };
+  /**
+   * 检出：ownedCredential 为真时凭据 Secret（键 `token`）也由调和器按这一次启动建，内容建的时候向所属模块要；否则是所属模块写好的
+   * 按服务共用的 Secret（旧形状）。
+   */
+  readonly checkout?: { readonly repoUrl: string; readonly branch: string; readonly credentialSecretName: string; readonly ownedCredential?: boolean };
   /** 执行环境（I25 第二步）：钉在这个节点，挂父工作区的卷；建之前核对父工作区的 Pod 与卷还是受理时那一个（workspace）。 */
   readonly nodeName?: string;
   readonly workspace?: { readonly pod: string; readonly podUid: string; readonly pvcUid: string };
@@ -76,17 +80,21 @@ function middlewaresOf(value: unknown): Middlewares | undefined {
   return value.map((entry: Fields) => ({ name: entry['name'] as string, ...(text(entry['namespace']) ? { namespace: entry['namespace'] } : {}) }));
 }
 
+function checkoutOf(checkout: Fields): NonNullable<WorkloadPodRender['checkout']> {
+  return { repoUrl: checkout['repoUrl'] as string, branch: checkout['branch'] as string, credentialSecretName: checkout['credentialSecretName'] as string, ...(checkout['ownedCredential'] === true ? { ownedCredential: true } : {}) };
+}
+
 function podOf(recordId: string, pod: unknown, child: { readonly namespace?: string; readonly name: string } | undefined): WorkloadPodRender | undefined {
   if (!child?.namespace || !texts(pod, ['image', 'workload', 'pvc', 'secret']) || typeof pod['workerUid'] !== 'number' || typeof pod['project'] !== 'string' || typeof pod['service'] !== 'string') return undefined;
   if (!texts(pod['resources'], ['cpu', 'memory', 'storage'])) return undefined;
   const checkout = pod['checkout'], extras = extrasOf(pod);
-  if ((checkout !== undefined && !texts(checkout, ['repoUrl', 'branch', 'credentialSecretName'])) || !extras) return undefined;
+  if ((checkout !== undefined && (!texts(checkout, ['repoUrl', 'branch', 'credentialSecretName']) || (checkout['ownedCredential'] !== undefined && typeof checkout['ownedCredential'] !== 'boolean'))) || !extras) return undefined;
   const resources = pod['resources'];
   return {
     name: child.name, namespace: child.namespace, taskId: recordId, image: pod['image'] as string, workerUid: pod['workerUid'],
     resources: { cpu: resources['cpu'] as string, memory: resources['memory'] as string, storage: resources['storage'] as string },
     workload: pod['workload'] as string, project: pod['project'], service: pod['service'], pvc: pod['pvc'] as string, secret: pod['secret'] as string,
-    ...(checkout ? { checkout: { repoUrl: checkout['repoUrl'] as string, branch: checkout['branch'] as string, credentialSecretName: checkout['credentialSecretName'] as string } } : {}),
+    ...(checkout ? { checkout: checkoutOf(checkout) } : {}),
     ...extras,
   };
 }

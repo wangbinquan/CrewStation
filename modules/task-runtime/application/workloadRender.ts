@@ -16,6 +16,7 @@ export type WorkloadUnavailableCode = 'workspace-changed';
  * - runnerValues：建 Runner Secret 之前要它的内容——平台约定变量、配置与数据的连接串、新签发的 Runner 令牌；令牌只存哈希。
  *   只在环境要资源中心建出容器（工作区创建中、还没绑定 Pod；执行环境还在排队）时给，其余一律拒绝（调和器不该在这时建）。
  *   执行环境要值时父工作区得还在运行、连着，否则判这个执行环境失败（与本模块自己建时同一条前提）。
+ * - checkoutValues：建这一次启动检出用的 Git 凭据 Secret 之前要令牌（只读、短时，经检出端口向 scm 签）；只给由资源中心建凭据 Secret 的环境。
  * - bindWorkload：Pod 建出后记下实例（podUid；执行环境另记 Runner Secret 的 UID），「排队分配容器」这一段结束（RFC-022）；
  *   Provisioning 随之变假，调和器不再建。
  * - workloadUnavailable：调和器发现执行环境的父工作区已经换了实例，判这个执行环境失败，文案照本模块自己建时的说法。
@@ -43,6 +44,12 @@ export function workloadRenderUseCases(deps: TaskRuntimeUseCaseDeps) {
         await scope.environments.update({ ...latest, runnerTokenHash: hashRunnerToken(token) });
       });
       return values;
+    },
+    checkoutValues: async (taskId: TaskId): Promise<{ token: string }> => {
+      const env = await current(taskId);
+      const credential = deps.checkout?.credentialFor;
+      if (!wantsProvisioning(env) || !env.render?.checkout || env.render.checkout.credentialSecretName || !credential) throw precondition('这个环境眼下不需要检出凭据', { taskId, state: env.state });
+      return credential(env.serviceId);
     },
     bindWorkload: async (taskId: TaskId, podUid: string, secretUid?: string): Promise<void> => {
       const env = await current(taskId);

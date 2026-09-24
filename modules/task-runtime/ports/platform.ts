@@ -24,7 +24,11 @@ export interface ServiceResolver {
  * 只签只读凭据——推送由平台在发布时完成，容器内不需要写权限。
  */
 export interface SourceCheckoutSource {
+  /** 本模块自己建时（旧形状）：签一个只读的会话级令牌、写进按服务共用的 Secret，返回仓库地址与 Secret 名。 */
   checkoutFor(serviceId: ServiceId, branch: string): Promise<{ repoUrl: string; credentialSecretName: string } | undefined>;
+  /** 资源中心建出时（RFC-025 I25）：受理只要仓库地址；令牌在调和器建这一次启动的凭据 Secret 时才签（credentialFor）。两项都给才走这条路。 */
+  repositoryFor?(serviceId: ServiceId): Promise<{ repoUrl: string } | undefined>;
+  credentialFor?(serviceId: ServiceId): Promise<{ token: string }>;
 }
 
 /** 由 config 与 data 模块提供：开发组配置与开发库／任务级数据访问的环境变量。 */

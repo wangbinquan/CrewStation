@@ -63,6 +63,8 @@ export interface ClusterWriter {
    */
   ensurePod(pod: WorkloadPodRender): Promise<Ensured>;
   ensureRunnerSecret(pod: WorkloadPodRender, values: () => Promise<Readonly<Record<string, string>>>): Promise<Ensured>;
+  /** 这一次启动检出用的 Git 凭据 Secret：同样先确认不在，才向所属模块要令牌再建（不可变）。 */
+  ensureCheckoutSecret(pod: WorkloadPodRender, values: () => Promise<{ readonly token: string }>): Promise<Ensured>;
   ensureVolume(volume: VolumeRender): Promise<Ensured>;
   /** 开发预览的 Service 与路由：各自缺了或不一致才服务端 apply。 */
   applyPreview(preview: WorkloadPreviewRender, current: { readonly service?: ObservedObject; readonly route?: ObservedObject }): Promise<'applied' | 'unchanged'>;

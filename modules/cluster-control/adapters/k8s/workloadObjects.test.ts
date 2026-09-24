@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { runnerSecretObject, volumeObject, workloadPodObject, workloadPreviewObjects } from './workloadObjects';
+import { checkoutSecretObject, runnerSecretObject, volumeObject, workloadPodObject, workloadPreviewObjects } from './workloadObjects';
 
 const pod = { name: 'task-1', namespace: 'cs-demo', taskId: 'rec-1', image: 'task:1', workerUid: 10001, resources: { cpu: '1', memory: '2Gi', storage: '10Gi' }, workload: 'business-task', project: 'demo', service: 'demo', pvc: 'task-1-work', secret: 'task-1-runner-2' };
 
@@ -23,6 +23,13 @@ describe('调和器渲染的工作区对象', () => {
     expect(secret.metadata).toMatchObject({ name: 'cli-1-runner', labels: { 'crewstation.io/workspace-task': 'p', 'crewstation.io/task': 'rec-1' }, annotations: { 'crewstation.io/cli-intent': 'digest' } });
     expect(workloadPodObject(pod).metadata.annotations).toBeUndefined();
     expect(runnerSecretObject(pod, {}).metadata.annotations).toBeUndefined();
+  });
+
+  test('检出用的 Git 凭据（I25）：名字取自检出期望，键为 token、不可变、带任务标签——只给 checkout init 容器引用', () => {
+    const checkout = { ...pod, checkout: { repoUrl: 'http://git/demo.git', branch: 'main', credentialSecretName: 'task-1-checkout-2', ownedCredential: true } };
+    expect(checkoutSecretObject(checkout, { token: 'git-t' })).toMatchObject({ kind: 'Secret', immutable: true, stringData: { token: 'git-t' }, metadata: { name: 'task-1-checkout-2', namespace: 'cs-demo', labels: { 'crewstation.io/task': 'rec-1' } } });
+    const init = (workloadPodObject(checkout).spec as { initContainers: Array<{ env: Array<{ name: string; valueFrom?: unknown }> }> }).initContainers[0]!;
+    expect(init.env.find((entry) => entry.name === 'CS_GIT_TOKEN')?.valueFrom).toEqual({ secretKeyRef: { name: 'task-1-checkout-2', key: 'token' } });
   });
 
   test('Runner Secret 不可变、带任务标签；工作卷与预览照渲染输入', () => {

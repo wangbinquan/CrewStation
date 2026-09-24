@@ -47,8 +47,8 @@ export async function applyVolume(deps: WorkloadApplyDeps, record: LedgerRecordV
 }
 
 /**
- * 工作区的容器（RFC-025 I25）：所属模块要建出时，等工作卷在了，先建这一次启动的 Runner Secret（内容此刻向 task-runtime 要，
- * 值不落库），再建 Pod（环境只从 Secret 引用）与开发预览，最后把 Pod 实例交回 task-runtime。已在的对象不动；
+ * 工作区的容器（RFC-025 I25）：所属模块要建出时，等工作卷在了，先建这一次启动的 Runner Secret 与检出用的 Git 凭据（内容此刻向 task-runtime
+ * 要，值不落库），再建 Pod（环境只从 Secret 引用）与开发预览，最后把 Pod 实例交回 task-runtime。已在的对象不动；
  * 建不成的抛出，工作队列按退避重试，原因写进记录（Created 为假），页面照标准记录显示。
  */
 export async function applyWorkload(deps: WorkloadApplyDeps, record: LedgerRecordView, enqueue: (id: string, afterMs?: number) => void): Promise<void> {
@@ -73,6 +73,8 @@ export async function applyWorkload(deps: WorkloadApplyDeps, record: LedgerRecor
   try {
     const secret = await deps.cluster.ensureRunnerSecret(pod, () => owners.runnerValues(record.id));
     applied(deps, record, 'Secret', { namespace: pod.namespace, name: pod.secret }, secret);
+    // 检出用的 Git 凭据归这一次启动（I25）：Pod 的 init 容器引用它，先于 Pod 建出。
+    if (pod.checkout?.ownedCredential) applied(deps, record, 'Secret', { namespace: pod.namespace, name: pod.checkout.credentialSecretName }, await deps.cluster.ensureCheckoutSecret(pod, () => owners.checkoutValues(record.id)));
     const created = await deps.cluster.ensurePod(pod);
     applied(deps, record, 'Pod', pod, created);
     if (preview) applied(deps, record, 'Service', preview, await deps.cluster.applyPreview(preview, { ...optional('service', deps.feed.cached('Service', preview.namespace, preview.name)), ...optional('route', deps.feed.cached('IngressRoute', preview.namespace, preview.name)) }));

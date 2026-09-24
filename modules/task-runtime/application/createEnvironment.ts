@@ -43,12 +43,26 @@ export async function sourceOf(deps: TaskRuntimeUseCaseDeps, serviceId: ServiceI
 }
 
 /** 资源中心建出容器时的期望（RFC-025 I25）：镜像、资源、检出与开发预览路由；凭据不在这里。 */
-function workloadRenderOf(settings: TaskRuntimeSettings, profile: { cpu: string; memory: string; storage: string }, source: TaskSourceCheckout | undefined, previewRoute: TaskPodSpec['previewRoute']): WorkloadRender {
+function workloadRenderOf(settings: TaskRuntimeSettings, profile: { cpu: string; memory: string; storage: string }, checkout: WorkloadRender['checkout'], previewRoute: TaskPodSpec['previewRoute']): WorkloadRender {
   return {
     image: settings.taskImage, workerUid: settings.workerUid, resources: { cpu: profile.cpu, memory: profile.memory, storage: profile.storage }, start: 1,
-    ...(source ? { checkout: { repoUrl: source.repoUrl, branch: source.branch, credentialSecretName: source.credentialSecretName } } : {}),
+    ...(checkout ? { checkout } : {}),
     ...(previewRoute ? { previewRoute: { host: previewRoute.host, middlewares: [{ name: previewRoute.dropIdentityHeadersMiddleware, namespace: previewRoute.systemNamespace }, { name: previewRoute.userAuthMiddleware, namespace: previewRoute.systemNamespace }] } } : {}),
   };
+}
+
+/**
+ * 资源中心建出时的检出（I25）：端口能单独给仓库地址时只要地址，凭据 Secret 由调和器按这一次启动建、令牌那时才签；否则照旧
+ * （受理时本模块签令牌、写好按服务共用的 Secret）。
+ */
+async function renderedCheckoutOf(deps: TaskRuntimeUseCaseDeps, serviceId: ServiceId, branch: string | undefined): Promise<WorkloadRender['checkout']> {
+  if (!branch || !deps.checkout) return undefined;
+  if (deps.checkout.repositoryFor && deps.checkout.credentialFor) {
+    const repository = await deps.checkout.repositoryFor(serviceId);
+    return repository ? { repoUrl: repository.repoUrl, branch } : undefined;
+  }
+  const source = (await sourceOf(deps, serviceId, branch)).source;
+  return source ? { repoUrl: source.repoUrl, branch: source.branch, credentialSecretName: source.credentialSecretName } : undefined;
 }
 
 /**
@@ -78,7 +92,7 @@ export function createEnvironmentUseCase(deps: TaskRuntimeUseCaseDeps) {
       startup: initialStartup(now, input.branch && deps.checkout ? { checkout: input.branch } : {}),
     };
     // 由资源中心建出（I25）：只到登记为止，期望随记录进台账，卷、Runner Secret、Pod 与预览由调和器照它建。
-    const rendered = deps.creation === 'ledger' ? { ...env, render: workloadRenderOf(settings, profile, (await sourceOf(deps, input.serviceId, input.branch)).source, previewRouteOf(settings, env, svc.slug).previewRoute) } : undefined;
+    const rendered = deps.creation === 'ledger' ? { ...env, render: workloadRenderOf(settings, profile, await renderedCheckoutOf(deps, input.serviceId, input.branch), previewRouteOf(settings, env, svc.slug).previewRoute) } : undefined;
     await admit(deps, rendered ?? env, limit);
     if (rendered) return rendered;
     try {
