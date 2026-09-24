@@ -10,6 +10,7 @@
 - [4. 第三期：服务槽（T8）](#4-第三期服务槽t8)
 - [5. 第三期后半：路由（T9）](#5-第三期后半路由t9)
 - [6. 第三期：限流（T10）](#6-第三期限流t10)
+- [7. 第四期：命名空间、额度与网络策略（T11）](#7-第四期命名空间额度与网络策略t11)
 
 ## 1. 第一期：基础（T2–T5）
 
@@ -84,6 +85,7 @@
 | RC-11 | 额度推导与并发抢占：模块用例覆盖（两个事务抢最后一个单位，恰好一个成功）；实机在第二期额度计数器退役后核对 |
 | RC-13 | 租约抢占、续约、过期接手：模块用例覆盖；两个 cs-controller 副本的实机核对在 T16 |
 | RC-16 | 本期两笔提交的门禁、改动行防护与 CI 见 §1.1 |
+| RC-12 | 第四期：命名空间（Namespace＋额度）与网络策略有标准记录；实机把额度改大后被改回、删掉一条网络策略后被补回（§7）。数据库与数据访问绑定随 T12 |
 
 ## 3. 第二期：任务类容器（T6、T7）
 
@@ -192,11 +194,29 @@
 | `cef5b880` 限流策略的存取与管理接口（平台默认与项目覆盖） | check:static 通过；unit 595、module 1312、console 874；改动行 126／126 | [35927939112](https://github.com/wangbinquan/CrewStation/actions/runs/35927939112) 六项成功 | 随 989e07f7 上线 |
 | `989e07f7` 策略写成 `rate-limit-policy` 记录，调和器照记录渲染 Traefik Middleware | check:static 通过；unit 602、module 1315、console 874；改动行 134／134 | [35929308762](https://github.com/wangbinquan/CrewStation/actions/runs/35929308762) 六项成功 | 22:45:19 迁移 Job 应用 `gateway/0006_rate_limits.sql`；22:45:32 cs-controller、22:45:38 cs-api、22:46:10 cs-session 换到 `cs-control-plane:rc025-t10b-20260924` |
 | `de9dcb5b` 用户域、服务域与平台接口的路由挂上限流，工作台读请求按 `Retry-After` 自动重读 | check:static 通过；unit 604、module 1315、console 875；改动行 37／37 | [35930651526](https://github.com/wangbinquan/CrewStation/actions/runs/35930651526) 六项成功 | 23:01:35 cs-controller、23:01:37 cs-api、23:02:09 cs-session 换到 `cs-control-plane:rc025-t10c-20260924`；23:02 `kubectl apply -f deploy/k8s/platform/40-gateway.yaml`；23:03:31 console 换到 `cs-console:rc025-t10c-20260924` |
+| `5fb115ba` 管理端的网关限流：平台设置里的平台默认，项目管理页里的单独设置与撤销 | check:static 通过；unit 604、module 1315、console 880；改动行 292／292 | [35932937164](https://github.com/wangbinquan/CrewStation/actions/runs/35932937164) 六项成功 | 23:26:51 console 换到 `cs-console:rc025-t10d-20260924`（只换工作台） |
 
 镜像由 `git archive <提交>` 构建；这次有一个迁移，先用新镜像跑一次 `cs-api migrate` 的 Job（`deploy/k8s/platform/20-migrate-job.yaml` 换镜像）再滚动服务；各一次就绪、0 重启，三个服务上线后没有告警或错误日志。
 
 - **策略进台账、中间件建出（989e07f7 部署后）**：上线 3 秒内调和器建出 58 个限流中间件（`resource child applied` 58 条）——系统命名空间里的 `rate-limit-platform-api`（`rateLimit` 平均 20、突发 40、周期 1 秒，按 `x-cs-user-id`）与 `in-flight-platform-api`（`inFlightReq` 16），14 个项目命名空间各 4 个（`rate-limit-user`、`rate-limit-host`、`rate-limit-source`、`rate-limit-target`）；15 条 `rate-limit-policy` 记录（平台 1 条、项目 14 条）全部运行中，平台那条的展示字段是 `20/s·40`、`16`。渲染出的中间件都带平台标签、组件标签 `rate-limit` 与所属记录的资源 ID。22:45 这一分钟台账变更 73 条（一次性声明与观测），之后空闲时为 0。这一步还没有路由引用这些中间件，放行不变。
 - 管理接口（平台默认与项目覆盖的读写、409、403、404）由模块用例经 HTTP 核对；实机上这些接口在网关登录之后，没有替作者登录去调。
 - **挂上限流（de9dcb5b 部署后）**：上线 4 秒内补投影按新计划重算 14 个服务，调和器改写 55 条服务路由（`resource child applied` 55 条）；逐条核对线上对象，正式与待验证路由的链是 `drop-identity-headers → forward-auth-user → rate-limit-user → rate-limit-host`，服务域与内部 API 是 `… → forward-auth-service → rate-limit-source → rate-limit-target（→ strip-api-<proxy>）`，55／55。Traefik 没有「中间件不存在」一类的错误（日志里只有部署前就有的 7 个从没部署过的物理槽的 `service not found`）。系统路由清单应用后，`console-api` 的链末尾是 `rate-limit-platform-api → in-flight-platform-api`，新路由 `console-resource-streams`（两条资源推送流）只挂令牌桶；两个平台中间件的取值与资源 ID 标签在 `kubectl apply` 之后保留。未登录的请求照旧在 ForwardAuth 被拒（`/v1/me`、资源推送流、工作台首页、demo 正式主机都是 401）。
+- **管理端界面（5fb115ba 部署后）**：两张卡的读、改、撤销与 409 由工作台组件用例驱动假接口核对（`adminRateLimits.test.tsx`，含服务端返回不合形状的响应时不崩溃）；实机上这两个页面在登录之后，没有替作者登录去点。
 - **服务域突发实测**：从 cs-api 的 Pod 同时向 `demo.svc.cs.internal/healthz` 发 130 个请求——100 个 200、30 个 429 且带 `Retry-After: 1`，正是「每个来源服务对每个目标」那只桶的突发 100；停 3 秒后再发 60 个全是 200（按每秒 50 补回）。平台接口与用户域的突发要登录后才能打到限流（在 ForwardAuth 之后），没有替作者登录；留给 T15 校准时与作者一起测。
+
+## 7. 第四期：命名空间、额度与网络策略（T11）
+
+| 提交 | 门禁（干净导出树） | CI | 部署（UTC） |
+|---|---|---|---|
+| `6db2d958` 命名空间、额度与网络策略写成台账记录，调和器照记录建出、被改或被删就补回 | check:static 通过；unit 615、module 1319、console 880；改动行 173／175（98.9%） | [35936041472](https://github.com/wangbinquan/CrewStation/actions/runs/35936041472) 六项成功 | 23:57:25 cs-controller、23:58:14 cs-api、23:58:16 cs-session 换到 `cs-control-plane:rc025-t11a-20260924`（没有迁移） |
+
+镜像由 `git archive 6db2d958` 构建；三个服务各一次就绪、0 重启，上线后没有告警或错误日志。
+
+- **切换前比对**：按新渲染（provisioning 的期望 → cluster-control 的渲染输入 → 与原来同一组构造函数）逐个比对本机 14 个项目的 73 个对象——14 个命名空间、14 个额度、45 条网络策略（11 个数字人项目各 3 条，3 个接入项目各 4 条）——用调和器的比对函数判定，全部一致；项目命名空间里也没有期望之外的受管网络策略。
+- **上线**：23:57:30 启动重下发写完 14 个项目（`namespace reapply done`，14／14），28 条记录（`namespace`、`network-policy-set` 各 14 条）全部运行中，73 个子对象都观测到了；调和器没有 apply 任何对象（`resource child applied` 0 条）。部署前后逐个对照线上对象——命名空间与网络策略的 `resourceVersion`、额度上 `crewstation` 这个字段管理者的 Apply 时间——73／73 不变。23:57 这一分钟台账变更 101 条（一次性声明与首轮观测），之后空闲时每分钟 0 条。
+- **被改动时改回（RC-12）**：把验证项目 `cs-rfc023-verify` 的额度上限 `pods` 从 30 改成 31（字段管理者 `rc12-drill`），23:59:34.820 调和器改回（`resource child applied`，原因 `drift`），额度上的字段归属回到 `crewstation`。额度不带 `generation`，这一次走的是「观测到变化就核对」那条路径。
+- **被删除时补回（RC-12）**：删掉 `cs-rfc023-verify` 的 `crewstation-build-egress`（23:59:50；当时没有构建在跑，选的是放行方向的那条，删掉期间只会更严），23:59:50.910 调和器按期望建回（原因 `missing`），台账记下新 UID，记录回到运行中。
+- 新建项目时「写期望后等两条记录运行中再建仓」只有模块用例（`namespaceRecords.test.ts`：等到；等不到时写明还缺哪个对象）：本机新建项目要登录管理端，没有替作者登录去建；CI 的 e2e 在全新集群里也不建项目。
+- 命名空间标签被改后改回、网络策略等命名空间、命名空间删除中不动（记录降级）、期望不完整不渲染：模块用例（`clusterControlModule.test.ts`、`phase.test.ts`）；实机没有去改共享集群的命名空间标签。
+- 项目归档后两条记录不释放；怎样收尾待 [I27](../../../docs/engineering/implementation-open-questions.md#i27-项目归档后命名空间记录与命名空间怎样收尾) 裁定。
 
