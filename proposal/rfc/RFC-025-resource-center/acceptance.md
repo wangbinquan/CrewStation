@@ -153,6 +153,16 @@
   - 子任务的执行 Pod（这一步仍由 task-runtime 建）调度不上：`0/1 nodes are available: 1 Insufficient cpu`——节点可分配 10 核、已请求 8.855 核，加上工作区的 1 核与执行 Pod 的 150m，超出 5m。`/chat` 120 秒后按超时返回 502，样例随即释放业务任务：05:06:55.22–.27 调和器删掉执行 Pod、它的 Secret、工作区 Pod、`-runner-1` 与 PVC，记录停在「已结束」（原因 business）。Agent 输出这一段要等本机空出 CPU 再走一遍。
 - 没有实机走过的：开发会话（检出 init 容器、开发预览的 Service 与路由）——开会话要在网关登录之后，没有替作者登录，由 task-runtime 的 `ledgerCreation.test.ts` 与 cluster-control 的模块用例核对；建不成时的 `Created` 为假与重试、恢复暂停的业务任务（换成 `-runner-2`）也只有用例。
 
+### 3.8 第六步：执行环境的创建移交调和器（0cfa6cba，I25 第二步）
+
+- 门禁（干净导出树）：check:static 通过；unit 672、module 1354、console 893；改动行 127／127。CI [35961051411](https://github.com/wangbinquan/CrewStation/actions/runs/35961051411)：六项成功。
+- 部署（UTC）：05:42:51 前 cs-api、cs-auth、cs-controller、cs-session 换到 `cs-control-plane:rc025-i25b-20260924`（`git archive 0cfa6cba`），无迁移；三个在跑的开发会话的 Runner 随即重连，cs-controller 没有告警或错误日志。
+- 实机（rfc006-verify：在正式 Pod 里以服务身份照样例的调用顺序建业务任务、提交子任务，没有登录）。业务任务指定 150m 的 `rfc006-agent` 套餐——默认套餐的 1 核在本机放不下（§3.7）；子任务用这个服务发布时登记的 `chat-v1` 档案：
+  - 05:45:45.971 调和器照卷记录建出 PVC；05:45:46.037 建出 Runner Secret `-runner-1`（卷进缓存后 66 毫秒，第一步里要等 2 秒）、05:45:46.054 建出 Pod；05:45:52.613 工作区的 Runner 连上。
+  - 子任务随即受理：05:45:52.997 调和器建出执行环境的 Runner Secret `sub-…-runner`、05:45:53.007 建出执行 Pod；05:45:55.903 它的 Runner 连上，05:45:55.983 派发子任务。执行 Pod 钉在父工作区的节点、挂父工作区的卷、带所属工作区标签与受理意图注解，只 `envFrom` 那个不可变 Secret，镜像按摘要；Secret 带同样的标签与注解。
+  - 子任务 11.6 秒进入运行、46.2 秒成功，输出「收到」。关闭后 05:46:32 调和器删掉工作卷、执行环境的 Secret、工作区 Pod 与 `-runner-1`；执行 Pod 由 task-runtime 的清理作业按意图注解认领后删掉（新摘要认得出），05:46:44 执行环境记为已结束，05:47:08 工作区记为已释放。
+- 没有实机走过的：「＋ CLI」与 headless Agent（在开发会话里，要在网关登录之后）；父工作区变了、要值时父工作区已断开、过了宽限仍在排队——由 task-runtime 的 `ledgerExecutions.test.ts` 与 cluster-control 的模块用例核对。
+
 ## 4. 第三期：服务槽（T8）
 
 | 提交 | 门禁（干净导出树） | CI | 部署（UTC） |
