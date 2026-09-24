@@ -33,8 +33,8 @@ test('生产库、开发库缺省由 data-control 建，只有显式 data 才回
   expect(loadPlatformSettings({ ...base, CS_DATA_PROVISIONING: 'Data' }).dataProvisioning).toBe('data-control');
 });
 
-test('服务槽缺省由资源中心建，只有显式 owner 才回退为 release 自己部署（RFC-025 T8）', () => {
-  expect(loadPlatformSettings(base).slotCreation).toBe('ledger');
-  expect(loadPlatformSettings({ ...base, CS_SLOT_CREATION: 'owner' }).slotCreation).toBe('owner');
-  expect(loadPlatformSettings({ ...base, CS_SLOT_CREATION: 'Owner' }).slotCreation).toBe('ledger');
+test('服务槽与构建、迁移 Job 缺省由资源中心建，只有显式 owner 才回退为 release 自己建（RFC-025 T8）', () => {
+  expect(loadPlatformSettings(base).releaseCreation).toBe('ledger');
+  expect(loadPlatformSettings({ ...base, CS_RELEASE_CREATION: 'owner' }).releaseCreation).toBe('owner');
+  expect(loadPlatformSettings({ ...base, CS_RELEASE_CREATION: 'Owner' }).releaseCreation).toBe('ledger');
 });

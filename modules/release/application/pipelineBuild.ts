@@ -7,6 +7,7 @@ import type { ReleaseUseCaseDeps } from './dependencies';
 import type { PipelineContext, ResolvedService, StepResult } from './pipelineContext';
 import { WAIT } from './pipelineContext';
 import { renderSlotEnv } from './pipelineEnv';
+import { ledgerJobSteps } from './ledgerJobs';
 
 export interface BuildSteps {
   startBuild(release: Release, svc: ResolvedService): Promise<StepResult>;
@@ -18,6 +19,8 @@ export function buildSteps(deps: ReleaseUseCaseDeps, ctx: PipelineContext, start
   // 构建、迁移 Job 进资源台账（RFC-025 第三期）：Job 与它的 Pod 由资源中心观测，结束时记下结果，Job 被 TTL 删掉之后结果仍在。
   const projectJob = (release: Release, svc: ResolvedService, kind: 'build-job' | 'migration-job', jobName: string) =>
     deps.uow.run(async (scope) => { await scope.ledger?.job({ kind, releaseId: release.id, tag: release.tag, projectId: release.projectId, namespace: svc.namespace, jobName }); });
+  // RFC-025 T8：由资源中心建 Job 时流水线只写期望、照记录判结果；已按旧形状启动的发布照旧读 Job。
+  const ledgerJobs = ledgerJobSteps(deps, ctx);
   const loadManifest = async (release: Release): Promise<Manifest> => {
     const text = await deps.repo.readFile(release.serviceId, release.tag, 'crewstation.yaml');
     if (!text) throw new Error('仓库中没有 crewstation.yaml');
@@ -46,6 +49,8 @@ export function buildSteps(deps: ReleaseUseCaseDeps, ctx: PipelineContext, start
     } catch (error) {
       return ctx.fail(release, isPlatformError(error) ? error.message : String(error));
     }
+    // 由资源中心建：这里的渲染只核对生产组配置齐全，环境在调和器建凭据 Secret 时再要一次。
+    if (release.pipeline.jobs === 'ledger') return ledgerJobs.startMigration(release, svc, manifest, env.configVersion);
     const { migrationRef } = await deps.migrator.start({ legacyResourceId: release.legacyResourceId, releaseId: release.id, namespace: svc.namespace, image: release.image ?? '', command, env: env.values });
     await projectJob(release, svc, 'migration-job', migrationRef);
     await ctx.save(release, 'migrating', { manifest, configVersion: env.configVersion, pipeline: { ...release.pipeline, migrationRef } });
@@ -54,6 +59,7 @@ export function buildSteps(deps: ReleaseUseCaseDeps, ctx: PipelineContext, start
 
   return {
     startBuild: async (release, svc) => {
+      if (ledgerJobs.enabled) return ledgerJobs.startBuild(release, svc);
       const image = `${deps.settings.registryBase}/${svc.slug}:${release.tag}`;
       const { httpUrl, credentialSecretName } = await deps.repo.repositoryUrl(release.serviceId);
       const { buildRef } = await deps.builder.start({ legacyResourceId: release.legacyResourceId, releaseId: release.id, namespace: svc.namespace, repoHttpUrl: httpUrl, credentialSecretName, ref: release.tag, image });
@@ -62,6 +68,7 @@ export function buildSteps(deps: ReleaseUseCaseDeps, ctx: PipelineContext, start
       return WAIT;
     },
     pollBuild: async (release, svc) => {
+      if (release.pipeline.jobs === 'ledger') return ledgerJobs.poll(release, svc, 'build', () => afterBuild(release, svc));
       const status = await deps.builder.status(release.pipeline.buildRef ?? '', svc.namespace);
       if (status.state === 'running') { await ctx.bump(release); return WAIT; }
       if (status.state === 'failed') return ctx.fail(release, `构建失败：${status.message}`);

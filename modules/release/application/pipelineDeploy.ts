@@ -11,6 +11,7 @@ import type { ReleaseUseCaseDeps } from './dependencies';
 import type { PipelineContext, ResolvedService, StepResult } from './pipelineContext';
 import { DONE, WAIT } from './pipelineContext';
 import { prepareSlotDeploy } from './deployPrecheck';
+import { ledgerJobSteps } from './ledgerJobs';
 
 export interface DeploySteps {
   startDeploy(release: Release, svc: ResolvedService, manifest: Manifest): Promise<StepResult>;
@@ -21,6 +22,7 @@ export interface DeploySteps {
 /** 部署阶段：待命槽换上新发布并标记旧发布 superseded；就绪后登记 Manifest 与 OpenAPI。 */
 export function deploySteps(deps: ReleaseUseCaseDeps, ctx: PipelineContext): DeploySteps {
   const { uow, clock } = deps;
+  const ledgerJobs = ledgerJobSteps(deps, ctx);
 
   const startDeploy: DeploySteps['startDeploy'] = async (release, svc, manifest) => {
     const prepared = await prepareSlotDeploy(deps, release, svc, manifest, release.targetSlot);
@@ -71,10 +73,12 @@ export function deploySteps(deps: ReleaseUseCaseDeps, ctx: PipelineContext): Dep
   return {
     startDeploy,
     pollMigration: async (release, svc) => {
+      const next = () => (release.manifest ? startDeploy(release, svc, release.manifest) : ctx.fail(release, 'Manifest 丢失'));
+      if (release.pipeline.jobs === 'ledger') return ledgerJobs.poll(release, svc, 'migration', next);
       const status = await deps.migrator.status(release.pipeline.migrationRef ?? '', svc.namespace);
       if (status.state === 'running') { await ctx.bump(release); return WAIT; }
       if (status.state === 'failed') return ctx.fail(release, `迁移失败，未切流：${status.message}`);
-      return release.manifest ? startDeploy(release, svc, release.manifest) : ctx.fail(release, 'Manifest 丢失');
+      return next();
     },
     pollDeploy: async (release, svc) => {
       const slot = (await uow.read.slots.get(release.serviceId))?.[release.targetSlot];

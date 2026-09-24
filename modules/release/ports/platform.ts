@@ -57,4 +57,7 @@ export interface ReleaseSettings {
   readonly registryBase: string;
   readonly buildTimeoutSeconds: number;
   readonly deployTimeoutSeconds: number;
+  /** 构建 Job 的镜像与 buildkitd 地址（资源中心建构建 Job 时写进期望，T8）。 */
+  readonly builderImage: string;
+  readonly buildkitAddress: string;
 }

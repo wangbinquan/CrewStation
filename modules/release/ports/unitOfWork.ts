@@ -1,5 +1,5 @@
 import type { PhysicalSlot, ServiceSlots } from '../domain/slots';
-import type { JobProjection, SlotRecordRef } from './ledger';
+import type { JobProjection, JobRecordRef, SlotRecordRef } from './ledger';
 import type { MaintenanceRepository } from './repositories';
 import type { DomainPayload, DomainTopicName, ServiceId } from '@crewstation/contracts';
 import type { OfflinePolicyRepository, ReleaseRepository, SlotEventRepository, SlotRepository, TrafficSwitchRepository } from './repositories';
@@ -25,6 +25,9 @@ export interface RepositoryScope {
     slot(serviceId: ServiceId, physical: PhysicalSlot): Promise<SlotRecordRef | undefined>;
     /** 构建、迁移 Job 投影进台账（包在保存点里，写失败只告警）。 */
     job(job: JobProjection): Promise<void>;
+    /** 读一次发布的构建或迁移 Job 记录（读不到当作没有）；放弃资源中心建的 Job 时报 Failed（T8）。 */
+    jobRecord(releaseId: string, kind: JobProjection['kind']): Promise<JobRecordRef | undefined>;
+    failJob(releaseId: string, kind: JobProjection['kind'], message: string): Promise<void>;
   };
 }
 

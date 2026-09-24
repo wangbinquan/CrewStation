@@ -15,7 +15,7 @@ import type { Explainer } from './application/routeExplainer';
 import { routeTargets } from './application/routeExplainer';
 import { adoptionRoutes } from './http/adoptionRoutes';
 import type { ClusterWriter, ManagedObjectFeed, ManagedObjectReader, ObjectChange, ObservedKind, PodSubscriber } from './ports/cluster';
-import type { LedgerObservations, LegacyOwners, SlotOwners, WorkloadOwners } from './ports/ledger';
+import type { JobOwners, LedgerObservations, LegacyOwners, SlotOwners, WorkloadOwners } from './ports/ledger';
 import { slotRenderOf } from './domain/slotRender';
 import type { LedgerReconcilerOptions, ReplicaLeases } from './workers/ledgerReconciler';
 import { ledgerReconciler } from './workers/ledgerReconciler';
@@ -59,6 +59,8 @@ export interface ClusterControlModuleDeps {
   readonly workloads?: WorkloadOwners;
   /** 服务槽的所属模块（release，T8）：给了就照槽记录建出 Deployment、Service 与环境 Secret。 */
   readonly slots?: SlotOwners;
+  /** 构建、迁移 Job 的所属模块（release，T8）：给了就照 Job 记录建出凭据 Secret 与 Job。 */
+  readonly jobs?: JobOwners;
 }
 
 export interface ClusterControlModule {
@@ -92,7 +94,7 @@ export function createClusterControlModule(deps: ClusterControlModuleDeps): Clus
   const reconcileDeps = {
     ledger: deps.ledger, feed, cluster, clock, systemNamespace: deps.systemNamespace, stats, logger, routeTargets: routeTargets(),
     ...(deps.reconciler?.retryMs ? { retryMs: deps.reconciler.retryMs } : {}), ...(deps.explainer ? { explainer: deps.explainer } : {}), ...(deps.workloads ? { workloads: deps.workloads } : {}),
-    ...(deps.slots ? { slots: deps.slots } : {}),
+    ...(deps.slots ? { slots: deps.slots } : {}), ...(deps.jobs ? { jobs: deps.jobs } : {}),
   };
   const reconciler = ledgerReconciler(deps.ledger, feed, (id, enqueue) => reconcileRecord(reconcileDeps, id, enqueue), logger, { ...deps.reconciler, ...(deps.leases ? { leases: deps.leases } : {}) });
   // Pod 先交给身份索引（来源 IP 认人，越早越好），再写台账观测；两边失败互不耽误。调和器渲染的对象一有变化就把认领它的记录排进去核对。

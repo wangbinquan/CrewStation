@@ -24,7 +24,7 @@ test.skipIf(!available)('两个发布在打标时并行，首次部署也只登�
       plans: { getServicePlan: async () => ({ id: '01a0bf5d-8f4b-781d-8b8e-bbbbc69c6c6a', name: 'small', cpu: '1', memory: '1Gi', maxReplicas: 3, description: '' }), lookupComputeProfile: async () => undefined, listComputeProfiles: async () => [] },
       maintenance: { open: async () => false },
       config: { render: async () => ({ values: {}, version: 1 }), validate: async () => ({ missing: [] }) }, data: { envFor: async () => ({}) },
-      settings: { registryBase: 'registry', buildTimeoutSeconds: 10, deployTimeoutSeconds: 600, serviceDomain: 'svc.internal', userDomain: 'cs.localhost' },
+      settings: { registryBase: 'registry', buildTimeoutSeconds: 10, deployTimeoutSeconds: 600, serviceDomain: 'svc.internal', userDomain: 'cs.localhost', builderImage: 'builder', buildkitAddress: 'buildkit' },
     });
     const results = await Promise.allSettled(['v1.0.0', 'v1.1.0'].map((version) => publish(actor, serviceId, { branch: 'main', version })));
     expect(tags).toHaveLength(2); expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);

@@ -43,10 +43,10 @@ export interface PlatformSettings {
    */
   dataProvisioning: 'data-control' | 'data';
   /**
-   * 服务槽（Deployment、Service 与环境）由谁建（RFC-025 T8）：`ledger` 由资源中心照槽记录建出，环境在建 Secret 时向 release 要（缺省）；
-   * `CS_SLOT_CREATION=owner` 回退为 release 部署时自己建。已由资源中心建出的槽之后的下线、运维仍走资源中心。
+   * 发布的集群对象——服务槽（Deployment、Service 与环境）、构建与迁移 Job——由谁建（RFC-025 T8）：`ledger` 由资源中心照记录建出，
+   * 凭据在建 Secret 时向 release 要（缺省）；`CS_RELEASE_CREATION=owner` 回退为 release 自己建。已由资源中心建出的槽之后的下线、运维仍走资源中心。
    */
-  slotCreation: 'ledger' | 'owner';
+  releaseCreation: 'ledger' | 'owner';
 }
 
 const num = (v: string | undefined, fallback: number): number => (v === undefined || v === '' ? fallback : Number(v));
@@ -89,7 +89,7 @@ export function loadPlatformSettings(env: Record<string, string | undefined> = p
     sessionTtlSeconds: num(env.CS_SESSION_TTL_SECONDS, 28800),
     workloadCreation: env.CS_WORKLOAD_CREATION === 'owner' ? 'owner' : 'ledger',
     dataProvisioning: env.CS_DATA_PROVISIONING === 'data' ? 'data' : 'data-control',
-    slotCreation: env.CS_SLOT_CREATION === 'owner' ? 'owner' : 'ledger',
+    releaseCreation: env.CS_RELEASE_CREATION === 'owner' ? 'owner' : 'ledger',
   };
 }
 

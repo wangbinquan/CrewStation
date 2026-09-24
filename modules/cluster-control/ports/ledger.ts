@@ -79,6 +79,21 @@ export interface SlotOwners {
   slotFailed(ref: SlotDeployRef, message: string): Promise<void>;
 }
 
+/** 要建的是哪一次发布的构建或迁移 Job（Job 记录期望里的）。 */
+export interface JobRef {
+  readonly recordId: string;
+  readonly releaseId: string;
+  readonly purpose: 'build' | 'migration';
+}
+
+/**
+ * 构建、迁移 Job 的所属模块（release，T8，同一裁定）：建这一次的凭据 Secret 之前要内容——构建是只读的 Git 令牌，迁移是槽的环境
+ * （生产组配置与数据连接串）。值只在调和器的内存里过一下、写进 Secret，不落台账；发布已不在这一步时拒绝。由组合根接上。
+ */
+export interface JobOwners {
+  jobEnvValues(ref: JobRef): Promise<Readonly<Record<string, string>>>;
+}
+
 /** 旧形状的所属对象（收编空跑用）：按任务标签查任务环境，由组合根从身份目录与 task-runtime 取。 */
 export interface LegacyOwners {
   /** RFC-013 之前的旧 ID（`tsk_…`）换成现在的 ID；身份目录里没有就返回 undefined。 */

@@ -74,7 +74,7 @@ describe.skipIf(!available)('服务槽投影进资源台账（RFC-025 第三期�
     const uow = drizzleUnitOfWork(database.db, { ledger, services, logger });
     expect(await resyncSlotLedger(uow, logger)).toBeGreaterThanOrEqual(1);
     expect(await slotRecord(later, 'blue')).toMatchObject({ phase: 'stopped', display: { role: 'prod' } });
-    const broken = drizzleUnitOfWork(database.db, { ledger: { within: () => ({ declare: async () => { throw new Error('台账暂时不可用'); }, find: async () => { throw new Error('台账暂时不可用'); } }) }, services, logger });
+    const broken = drizzleUnitOfWork(database.db, { ledger: { within: () => ({ declare: async () => { throw new Error('台账暂时不可用'); }, find: async () => { throw new Error('台账暂时不可用'); }, report: async () => { throw new Error('台账暂时不可用'); } }) }, services, logger });
     await broken.run(async (scope) => { await scope.slots.save({ ...(await scope.slots.get(later))!, updatedAt: now }); });
     expect(warnings).toContain('resource ledger slot projection failed');
     // 读台账失败当作没有记录：槽的旧接口照流水线的状态给出，不报错。
@@ -124,7 +124,7 @@ describe.skipIf(!available)('服务槽投影进资源台账（RFC-025 第三期�
     expect(jobs.map((record) => [record.kind, record.owner.ref, record.phase, record.children[0]?.name, record.display['tag']]).sort()).toEqual([
       ['build-job', `${releaseId}/build`, 'provisioning', 'build-01a0bf5d', 'v0.1.0'], ['migration-job', `${releaseId}/migration`, 'provisioning', 'migrate-01a0bf5d', 'v0.1.0'],
     ]);
-    const broken = drizzleUnitOfWork(database.db, { ledger: { within: () => ({ declare: async () => { throw new Error('台账暂时不可用'); }, find: async () => undefined }) }, services, logger });
+    const broken = drizzleUnitOfWork(database.db, { ledger: { within: () => ({ declare: async () => { throw new Error('台账暂时不可用'); }, find: async () => undefined, report: async () => undefined }) }, services, logger });
     await broken.run(async (scope) => { await scope.ledger?.job({ kind: 'build-job', releaseId, tag: 'v0.1.1', projectId, namespace: 'cs-demo', jobName: 'build-x' }); });
     expect(warnings).toContain('resource ledger job projection failed');
   });

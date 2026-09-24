@@ -12,6 +12,13 @@ export interface SlotDeployRef {
   readonly revision: number;
 }
 
+/** 调和器要建的是哪一次发布的构建或迁移 Job（T8）。 */
+export interface JobRef {
+  readonly recordId: string;
+  readonly releaseId: string;
+  readonly purpose: 'build' | 'migration';
+}
+
 export interface ActiveEndpoint {
   physical: PhysicalSlot;
   namespace: string;
@@ -63,4 +70,6 @@ export interface ReleaseModuleApi {
   slotEnvValues(ref: SlotDeployRef): Promise<Readonly<Record<string, string>>>;
   /** 这一次部署建不成：槽记为失败并记下原因，流水线下一步据此判发布失败；已不是这一次部署时忽略。 */
   slotFailed(ref: SlotDeployRef, message: string): Promise<void>;
+  /** 建构建、迁移 Job 的凭据 Secret 之前要内容（构建的 Git 令牌、迁移的槽环境）；发布已不在这一步时拒绝。 */
+  jobEnvValues(ref: JobRef): Promise<Readonly<Record<string, string>>>;
 }

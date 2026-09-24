@@ -1,3 +1,4 @@
+import type { JobRender } from '../domain/jobRender';
 import type { MiddlewareRender } from '../domain/middlewareRender';
 import type { NamespaceRender, NetworkPolicyRender } from '../domain/namespaceRender';
 import type { ObservedObject } from '../domain/observation';
@@ -78,6 +79,9 @@ export interface ClusterWriter {
   applySlotDeployment(slot: SlotRender, generation: number, current: ObservedObject | undefined): Promise<'applied' | 'unchanged'>;
   /** 统一预检的集群一步（设计 §5）：同样的三个对象以服务端 dry-run 提交一次，不改集群；API Server 拒绝时抛出它给的原因。 */
   dryRunSlot(slot: SlotRender, generation: number, values: Readonly<Record<string, string>>): Promise<void>;
+  /** 构建、迁移 Job（T8）：凭据 Secret 先确认不在，才调 values 向 release 要内容再建（不可变）；Job 按名字建，已在就不动。 */
+  ensureJobSecret(job: JobRender, values: () => Promise<Readonly<Record<string, string>>>): Promise<Ensured>;
+  ensureJob(job: JobRender): Promise<Ensured>;
 }
 
 /** 按名字建出的对象：实例 UID，与是不是这次建的（已在就不动）。 */

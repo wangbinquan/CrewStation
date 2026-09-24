@@ -87,7 +87,9 @@ describe.skipIf(!available)('cluster-control：观测写回台账与收编空跑
     slotEnvValues: async (ref: { recordId: string; revision: number }) => { slotAsked.push(`${ref.recordId}:${ref.revision}`); if (slotOwners.fail) throw new Error('生产组配置缺少 API_KEY'); return { CS_DATABASE_URL: `postgres://r${ref.revision}` }; },
     slotFailed: async (ref: { revision: number }, message: string) => { slotFailures.push(`${ref.revision}:${message}`); },
   };
-  const slotPlaced = async (outcome: 'applied' | 'unchanged' | { created: boolean }, kind: 'Deployment' | 'Service' | 'Secret', name: string) => {
+  const jobAsked: string[] = [];
+  const jobOwners = { jobEnvValues: async (ref: { releaseId: string; purpose: string }): Promise<Record<string, string>> => { jobAsked.push(`${ref.releaseId}:${ref.purpose}`); return ref.purpose === 'build' ? { GIT_TOKEN: 'git-token' } : { CS_DATABASE_URL: 'postgres://prod' }; } };
+  const slotPlaced = async (outcome: 'applied' | 'unchanged' | { created: boolean }, kind: 'Deployment' | 'Service' | 'Secret' | 'Job', name: string) => {
     if (outcome === 'unchanged' || (typeof outcome !== 'string' && !outcome.created)) return outcome;
     slotApplies.push(`${kind}/${name}`);
     const stored = await k8s.get<K8sObject>(Resources[kind]!, name, 'cs-demo');
@@ -145,6 +147,8 @@ describe.skipIf(!available)('cluster-control：观测写回台账与收编空跑
     applySlotService: async (slot, current) => (await slotPlaced(await writer.applySlotService(slot, current), 'Service', slot.name)) as 'applied' | 'unchanged',
     applySlotDeployment: async (slot, generation, current) => (await slotPlaced(await writer.applySlotDeployment(slot, generation, current), 'Deployment', slot.name)) as 'applied' | 'unchanged',
     dryRunSlot: (slot, generation, values) => writer.dryRunSlot(slot, generation, values),
+    ensureJobSecret: async (job, values) => (await slotPlaced(await writer.ensureJobSecret(job, values), 'Secret', job.secret)) as { uid: string; created: boolean },
+    ensureJob: async (job) => (await slotPlaced(await writer.ensureJob(job), 'Job', job.name)) as { uid: string; created: boolean },
   };
   let control: ReturnType<typeof createClusterControlModule>;
   let ledger: LedgerObservations;
@@ -175,6 +179,7 @@ describe.skipIf(!available)('cluster-control：观测写回台账与收编空跑
       explainer: { namespace: 'crewstation-system', service: 'cs-api', port: 8080, path: '/_crewstation/unavailable' },
       workloads: owners,
       slots: slotOwners,
+      jobs: jobOwners,
       pods: {
         changed: async (object, gone) => {
           if (object.metadata.name === 'pod-identity-broken') throw new Error('身份索引暂时不可用');
@@ -403,6 +408,33 @@ describe.skipIf(!available)('cluster-control：观测写回台账与收编空跑
     expect(await k8s.get(Resources.Secret!, 'mall-green-env-4', 'cs-demo')).toBeUndefined();
     const invalid = await control.api.dryRunSlot({ ...specOf(4, 'x'), slot: { ...specOf(4, 'x').slot, port: 0 } }, {}).then(() => 'accepted', (error: unknown) => (isPlatformError(error) ? error.kind : 'other'));
     expect(invalid).toBe('validation');
+  });
+
+  // RFC-025 T8：迁移 Job 由调和器建出——凭据 Secret 建的时候向 release 要；Job 结束后删凭据，Job 交给 TTL，之后不补建。
+  test('迁移 Job 建出：凭据 Secret（建时要值）与只从它引用凭据的 Job；结束后删凭据、Job 留给 TTL；TTL 删掉之后不补建', async () => {
+    const children = [{ kind: 'Job', namespace: 'cs-demo', name: 'migrate-rel12' }, { kind: 'Secret', namespace: 'cs-demo', name: 'migrate-rel12-env' }];
+    const job = { releaseId: 'rel-12', purpose: 'migration', image: 'registry/demo:v1.2.0', command: ['bun', 'run', 'migrate'], env: {}, resources: { cpu: '500m', memory: '512Mi' }, activeDeadlineSeconds: 1800, ttlSecondsAfterFinished: 3600, envSecret: 'migrate-rel12-env' };
+    const record = await resources.api.owner('release').declare({ kind: 'migration-job', ref: 'rel-12/migration', projectId: PROJECT, spec: { children, job }, display: { releaseId: 'rel-12', tag: 'v1.2.0' } });
+    await until('建出 Job', () => slotApplies.includes('Job/migrate-rel12'));
+    await control.reconciled();
+    expect(jobAsked).toEqual(['rel-12:migration']);
+    expect(slotApplies.filter((entry) => entry.includes('migrate-rel12'))).toEqual(['Secret/migrate-rel12-env', 'Job/migrate-rel12']);
+    const created = (await k8s.get<K8sObject & { spec: { template: { spec: { containers: Array<Record<string, unknown>> } } } }>(Resources.Job!, 'migrate-rel12', 'cs-demo'))!;
+    expect(created.spec.template.spec.containers[0]).toMatchObject({ image: 'registry/demo:v1.2.0', envFrom: [{ secretRef: { name: 'migrate-rel12-env' } }] });
+    expect((await resources.api.get(record.id))?.conditions.find((entry) => entry.type === 'Created')?.status).toBe('true');
+    // Job 跑完：资源中心记下结果，凭据 Secret 随即删掉；Job 留给 TTL。
+    const removedFrom = removals.length;
+    await k8s.mergePatch(Resources.Job!, 'migrate-rel12', 'cs-demo', { status: { succeeded: 1, conditions: [{ type: 'Complete', status: 'True' }] } });
+    await feed.emit({ kind: 'Job', object: (await k8s.get<K8sObject>(Resources.Job!, 'migrate-rel12', 'cs-demo'))!, gone: false });
+    await until('凭据删掉', () => removals.slice(removedFrom).includes('Secret/migrate-rel12-env'));
+    expect(removals.slice(removedFrom)).toEqual(['Secret/migrate-rel12-env']);
+    expect((await resources.api.get(record.id))?.phase).toBe('stopped');
+    // TTL 删掉 Job：不补建，结果照旧。
+    await k8s.delete(Resources.Job!, 'migrate-rel12', 'cs-demo');
+    await feed.emit({ kind: 'Job', object: created, gone: true });
+    await control.reconciled();
+    expect(slotApplies.filter((entry) => entry === 'Job/migrate-rel12')).toHaveLength(1);
+    expect(await resources.api.get(record.id)).toMatchObject({ phase: 'stopped', reason: { code: 'completed' } });
   });
 
   test('构建 Job：它的 Pod 由记录认领，跑起来是运行中；结束时资源中心记下结果，Job 被 TTL 删掉之后仍是已结束', async () => {

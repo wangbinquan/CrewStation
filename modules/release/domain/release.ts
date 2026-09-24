@@ -20,8 +20,9 @@ export interface Release {
   /**
    * 流水线的外部引用（构建 Job、迁移 Job）与步骤计数，供工作器续接。
    * `readyAt`：首次就绪的时刻；只有就绪过的版本才能从发布记录重新部署（RFC-021 §4）。
+   * `jobs: 'ledger'`：这次发布的构建、迁移 Job 由资源中心建（RFC-025 T8），流水线照 Job 记录判结果；两个起始时刻给它们兜底的时限。
    */
-  readonly pipeline: { buildRef?: string; migrationRef?: string; step: number; deployStartedAt?: string; readyAt?: string };
+  readonly pipeline: { buildRef?: string; migrationRef?: string; step: number; deployStartedAt?: string; readyAt?: string; jobs?: 'ledger'; buildStartedAt?: string; migrationStartedAt?: string };
   readonly message?: string;
   readonly createdBy: UserId;
   readonly createdAt: Date;

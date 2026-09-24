@@ -187,10 +187,10 @@ function composeDelivery(deps: CompositionDeps, core: ReturnType<typeof composeC
   const { db, k8s, settings, logger } = deps;
   const { project, config, data, scm, apiCatalog, hosts, isAdmin, resolveById } = core;
   const release = createReleaseModule({
-    // 服务槽投影进资源台账（RFC-025 第三期）：在 release 自己的事务里写期望与领域条件。T8：槽由资源中心建出（CS_SLOT_CREATION=owner 回退为自己部署），
-    // 重新部署前的集群预检经 cluster-control 按同一份期望渲染（它装配在后，惰性取）。
+    // 服务槽投影进资源台账（RFC-025 第三期）：在 release 自己的事务里写期望与领域条件。T8：槽与构建、迁移 Job 由资源中心建出（CS_RELEASE_CREATION=owner
+    // 回退为自己建），重新部署前的集群预检经 cluster-control 按同一份期望渲染（它装配在后，惰性取）。
     ledger: { within: (tx) => resources.api.owner('release').within(tx as object) },
-    ...(settings.slotCreation === 'ledger' ? { creation: 'ledger' as const, renderer: { dryRun: (spec: SlotSpec, env: Readonly<Record<string, string>>) => { if (!late.clusterControl) throw new Error('cluster-control 尚未装配'); return late.clusterControl.dryRunSlot(spec, env); } } } : {}),
+    ...(settings.releaseCreation === 'ledger' ? { creation: 'ledger' as const, renderer: { dryRun: (spec: SlotSpec, env: Readonly<Record<string, string>>) => { if (!late.clusterControl) throw new Error('cluster-control 尚未装配'); return late.clusterControl.dryRunSlot(spec, env); } } } : {}),
     physicalOperationId: async (id) => (await deps.identities.aliases('cluster-operation', id)).find((keys) => keys.length === 1 && keys[0] !== id)?.[0] ?? id,
     db, k8s, hosts, logger, isAdmin: (id) => isAdmin(id), authorizer: project.api, services: { resolveServiceById: resolveById },
     tagger: { createReleaseTag: (serviceId, { branch, version, expectedCommitSha }) => scm.api.createReleaseTag(serviceId, { branch, ...(expectedCommitSha ? { expectedCommitSha } : {}), ...(version.startsWith('v') ? { tag: version } : { bump: version as 'major' | 'minor' | 'patch' }) }) },
@@ -203,6 +203,9 @@ function composeDelivery(deps: CompositionDeps, core: ReturnType<typeof composeC
         await k8s.apply(secretObject({ name, namespace: svc.namespace, stringData: { token: credential.token }, labels: { 'crewstation.io/service': svc.name } }));
         return { httpUrl: binding.httpUrl, credentialSecretName: name };
       },
+      // T8：资源中心建的构建 Job——地址写进期望，令牌在调和器建凭据 Secret 时才签（时长同上），不再写按服务共用的 Secret。
+      buildSource: async (serviceId) => ({ httpUrl: (await scm.api.getBinding(SYSTEM_ACTOR, serviceId)).httpUrl }),
+      buildToken: async (serviceId) => ({ token: (await scm.api.issueSessionCredential(serviceId, 180)).token }),
     },
     plans: {
       getServicePlan: async (name, projectId) => projectId ? project.api.resolveProjectServicePlan(projectId, name) : (await project.api.listServicePlans()).find((p) => p.id === name),
@@ -451,8 +454,8 @@ function composeControl(deps: CompositionDeps, core: ReturnType<typeof composeCo
     // RFC-025 I25：建工作区与执行环境的 Runner Secret 时回头向 task-runtime 要内容（值不落台账），Pod 建出后交回实例；执行环境的父工作区变了交它判失败。
     workloads: { runnerValues: (id) => runtime.taskRuntime.api.runnerValues(id as TaskId), checkoutValues: (id) => runtime.taskRuntime.api.checkoutValues(id as TaskId), bindWorkload: (id, podUid, secretUid) => runtime.taskRuntime.api.bindWorkload(id as TaskId, podUid, secretUid),
       workloadUnavailable: (id, code) => runtime.taskRuntime.api.workloadUnavailable(id as TaskId, code) },
-    // T8：建服务槽的环境 Secret 时同样回头向 release 要内容；建不成交它判这一次部署失败。
-    slots: { slotEnvValues: (ref) => release.api.slotEnvValues(ref), slotFailed: (ref, message) => release.api.slotFailed(ref, message) },
+    // T8：建服务槽的环境 Secret、构建与迁移 Job 的凭据 Secret 时同样回头向 release 要内容；槽建不成交它判这一次部署失败。
+    slots: { slotEnvValues: (ref) => release.api.slotEnvValues(ref), slotFailed: (ref, message) => release.api.slotFailed(ref, message) }, jobs: { jobEnvValues: (ref) => release.api.jobEnvValues(ref) },
     ledger: {
       observe: (input) => ledger.api.observe(input), claimOf: (child) => ledger.api.claimOf(child), get: (id) => ledger.api.get(id),
       listLive: () => ledger.api.list({}), changesSince: ledger.api.changesSince, latestChange: ledger.api.latestChange,

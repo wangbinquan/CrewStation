@@ -3,7 +3,7 @@ import type { Logger } from '@crewstation/kernel';
 import type { Executor } from '@crewstation/persistence';
 import { projectSlots } from '../../domain/ledgerProjection';
 import type { PhysicalSlot, ServiceSlots } from '../../domain/slots';
-import type { JobProjection, SlotLedger, SlotRecordRef } from '../../ports/ledger';
+import type { JobProjection, JobRecordRef, SlotLedger, SlotRecordRef } from '../../ports/ledger';
 import type { ServiceResolver } from '../../ports/platform';
 import type { OfflinePolicyRepository, ReleaseRepository, SlotRepository } from '../../ports/repositories';
 import { DEFAULT_OFFLINE_POLICY } from '../../domain/slotLifecycle';
@@ -45,15 +45,39 @@ export async function syncSlotLedger(executor: Executor, deps: SlotProjectionDep
  * 结束时资源中心记下结果。包在保存点里，写失败只告警——台账的问题不挡发布流水线。
  */
 export async function projectJob(executor: Executor, deps: SlotProjectionDeps, job: JobProjection): Promise<void> {
+  // 资源中心建的 Job（T8）另有这一次的凭据 Secret，期望带渲染输入。
+  const children = [{ kind: 'Job', namespace: job.namespace, name: job.jobName }, ...(job.job ? [{ kind: 'Secret', namespace: job.namespace, name: job.job.envSecret }] : [])];
   try {
     await executor.transaction(async (savepoint) => {
       await deps.ledger.within(savepoint).declare({
-        kind: job.kind, ref: `${job.releaseId}/${job.kind === 'build-job' ? 'build' : 'migration'}`, projectId: job.projectId,
-        spec: { children: [{ kind: 'Job', namespace: job.namespace, name: job.jobName }] }, display: { releaseId: job.releaseId, tag: job.tag },
+        kind: job.kind, ref: jobRef(job.releaseId, job.kind), projectId: job.projectId,
+        spec: { children, ...(job.job ? { job: job.job } : {}) }, display: { releaseId: job.releaseId, tag: job.tag },
       });
     });
   } catch (error) {
     deps.logger.warn('resource ledger job projection failed', { releaseId: job.releaseId, kind: job.kind, error: error instanceof Error ? error.message : String(error) });
+  }
+}
+
+const jobRef = (releaseId: string, kind: JobProjection['kind']): string => `${releaseId}/${kind === 'build-job' ? 'build' : 'migration'}`;
+
+/** 读一次发布的构建或迁移 Job 记录：包在保存点里，读不到当作没有。 */
+export async function findJobRecord(executor: Executor, deps: SlotProjectionDeps, releaseId: string, kind: JobProjection['kind']): Promise<JobRecordRef | undefined> {
+  try { return await executor.transaction((savepoint) => deps.ledger.within(savepoint).find(jobRef(releaseId, kind), kind)); } catch { return undefined; }
+}
+
+/**
+ * 流水线放弃了一次资源中心建的 Job（T8：没建成、超时）：给记录报 Failed，调和器随即不再建、删掉凭据 Secret。包在保存点里，写失败只告警——
+ * 发布照样判失败，凭据 Secret 由 Job 的记录之后的核对再删。
+ */
+export async function failJobRecord(executor: Executor, deps: SlotProjectionDeps, releaseId: string, kind: JobProjection['kind'], message: string): Promise<void> {
+  try {
+    await executor.transaction(async (savepoint) => {
+      const writer = deps.ledger.within(savepoint), record = await writer.find(jobRef(releaseId, kind), kind);
+      if (record) await writer.report(record.id, { conditions: [{ type: 'Failed', status: 'true', reason: 'pipeline-failed', message: message.slice(0, 2000) }] });
+    });
+  } catch (error) {
+    deps.logger.warn('resource ledger job failure report failed', { releaseId, kind, error: error instanceof Error ? error.message : String(error) });
   }
 }
 

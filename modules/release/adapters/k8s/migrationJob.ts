@@ -1,5 +1,7 @@
 import type { K8sClient } from '@crewstation/k8s';
 import { LABELS, jobObject } from '@crewstation/k8s';
+import type { Release } from '../../domain/release';
+import { MIGRATION_RESOURCES, releaseJobName } from '../../domain/releaseJobs';
 import type { MigrationRunner } from '../../ports/delivery';
 import { readJobState } from './jobStatus';
 
@@ -7,12 +9,12 @@ import { readJobState } from './jobStatus';
 export function migrationJobRunner(k8s: K8sClient, settings: { timeoutSeconds: number }): MigrationRunner {
   return {
     start: async (spec) => {
-      const name = `migrate-${spec.legacyResourceId ? spec.legacyResourceId.slice(-12) : spec.releaseId.replaceAll('-', '')}`;
+      const name = releaseJobName({ id: spec.releaseId as Release['id'], ...(spec.legacyResourceId ? { legacyResourceId: spec.legacyResourceId } : {}) }, 'migration');
       await k8s.apply(jobObject({
         name, namespace: spec.namespace, image: spec.image, command: spec.command,
         labels: { [LABELS.component]: 'migration', [LABELS.release]: spec.releaseId },
         env: Object.entries(spec.env).map(([k, v]) => ({ name: k, value: v })),
-        resources: { cpu: '500m', memory: '512Mi' },
+        resources: { ...MIGRATION_RESOURCES },
         activeDeadlineSeconds: settings.timeoutSeconds,
       }));
       return { migrationRef: name };

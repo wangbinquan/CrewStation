@@ -5,6 +5,7 @@ import { isPlatformError } from '@crewstation/kernel';
 import { createInformer, createWorkQueue } from '@crewstation/resource-runtime';
 import type { ClusterWriter, Ensured, ManagedObjectFeed, ManagedObjectReader, ObjectChange, ObservedKind } from '../../ports/cluster';
 import { objectCovered } from './coverage';
+import { jobSecretObject, releaseJobObject } from './jobObjects';
 import { middlewareObject } from './middlewareObjects';
 import { namespaceObjectOf, networkPolicyObjectOf, quotaObjectOf } from './namespaceObjects';
 import { routeObject } from './routeObjects';
@@ -80,6 +81,8 @@ export function kubernetesClusterWriter(k8s: K8sClient): ClusterWriter {
     dryRunSlot: async (slot, generation, values) => {
       for (const object of [slotSecretObject(slot, values), ...slotWorkloadObjects(slot, generation)]) await k8s.apply(object, { dryRun: true });
     },
+    ensureJobSecret: (job, values) => ensureNamed(k8s, 'Secret', { namespace: job.namespace, name: job.secret }, async () => jobSecretObject(job, await values())),
+    ensureJob: (job) => ensureNamed(k8s, 'Job', job, () => releaseJobObject(job)),
   };
 }
 
