@@ -1,4 +1,5 @@
 import type { ManifestKind, ProjectId, ProjectState, UserId } from '@crewstation/contracts';
+import { PLATFORM_SERVICE_HOSTS } from '@crewstation/contracts';
 import { precondition } from '@crewstation/kernel';
 
 export interface Project {
@@ -18,8 +19,12 @@ export interface Project {
   readonly updatedAt: Date;
 }
 
-/** 与网关主机模式冲突的保留名（console.<域>、preview.<项目>.<域>、api.<服务域> 等）。 */
-export const RESERVED_SLUGS: readonly string[] = ['console', 'preview', 'dev', 'api', 'www', 'auth', 'crewstation'];
+/**
+ * 与平台自己占用的主机冲突的保留名：项目的正式主机是 `<slug>.<用户域>`、服务主机是 `<slug>.<服务域>`。
+ * 用户域上是 console、registry（管理员推送档位镜像的入口）以及 preview／dev 两级主机的前缀；
+ * 服务域上是 contracts 的 PLATFORM_SERVICE_HOSTS（api、events、两个 mcp-*），平台新增服务域主机时这里随之保留。
+ */
+export const RESERVED_SLUGS: readonly string[] = ['console', 'preview', 'dev', 'registry', 'www', 'auth', 'crewstation', ...Object.values(PLATFORM_SERVICE_HOSTS)];
 
 /** 每项目一个命名空间（G18）；前缀固定，便于集群侧按前缀识别平台资源。 */
 export function namespaceFor(slug: string): string {

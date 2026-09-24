@@ -275,7 +275,7 @@ export const messages = {
   "projects.wizard.catalogLoading": "读取模板与套餐目录…",
   "projects.wizard.catalogError": "目录暂不可用：{message}。输入已保留，请重新读取目录。",
   "projects.wizard.nameHint": "必填，1–80 字；用于页面中显示的名称。",
-  "projects.wizard.slugHint": "必填，3–40 位；小写字母开头、字母或数字结尾，可含数字与连字符。不可使用 console、preview、dev、api、www、auth、crewstation。创建后不可改。",
+  "projects.wizard.slugHint": "必填，3–40 位；小写字母开头、字母或数字结尾，可含数字与连字符。不可使用平台占用的 console、preview、dev、registry、api、events、mcp-capabilities、mcp-operations、www、auth、crewstation。创建后不可改。",
   "projects.wizard.kindHint": "API 代理接入公司接口；事件生产者把外部事件送入平台。",
   "projects.wizard.templateHint": "必填，只列当前类型的可用模板。",
   "projects.wizard.noTemplates": "当前类型暂无可用模板；请确认控制面的模板目录后重新读取。",

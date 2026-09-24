@@ -277,7 +277,7 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   'projects.wizard.catalogLoading': 'Loading templates and plans…',
   'projects.wizard.catalogError': 'Catalog unavailable: {message}. Your input is retained; reload to continue.',
   'projects.wizard.nameHint': 'Required, 1–80 characters. The name shown throughout the UI.',
-  'projects.wizard.slugHint': 'Required, 3–40 lowercase letters, digits or hyphens; start with a letter and end with a letter or digit. Reserved: console, preview, dev, api, www, auth, crewstation. Cannot be changed after creation.',
+  'projects.wizard.slugHint': 'Required, 3–40 lowercase letters, digits or hyphens; start with a letter and end with a letter or digit. Reserved for the platform: console, preview, dev, registry, api, events, mcp-capabilities, mcp-operations, www, auth, crewstation. Cannot be changed after creation.',
   'projects.wizard.kindHint': 'API proxies integrate company APIs; event producers forward external events to the platform.',
   'projects.wizard.templateHint': 'Required. Only available templates of this kind are shown.',
   'projects.wizard.noTemplates': 'No template is available for this kind. Check the control-plane template catalog and reload.',

@@ -58,10 +58,11 @@ describe.skipIf(!available)('project module', () => {
     expect(await project.api.resolveServiceIdentity('demo/demo')).toMatchObject({ projectId, namespace: 'cs-demo' });
   });
 
-  test('开发者不能覆盖资源；重复 slug 冲突；不存在的套餐被拒', async () => {
+  test('开发者不能覆盖资源；重复 slug 冲突；平台主机前缀是保留名；不存在的套餐被拒', async () => {
     const input = { slug: 'other', name: 'x', kind: 'DigitalWorker' as const, ownerUserId: owner.userId, template: '01a0bf5d-8f4b-7002-9560-94caf593fb19' };
     await expect(project.api.createProject(owner, { ...input, plan: '01a0bf5d-8f4b-7000-9e4b-b54e91ee9d10' })).rejects.toMatchObject({ kind: 'validation' });
     await expect(project.api.createProject(admin, { ...input, slug: 'demo' })).rejects.toMatchObject({ kind: 'conflict' });
+    await expect(project.api.createProject(admin, { ...input, slug: 'events' })).rejects.toMatchObject({ kind: 'validation', details: { field: 'slug' } });
     await expect(project.api.createProject(admin, { ...input, plan: '01a0bf5d-8f4b-7ca3-8704-aa0b06f5954c' })).rejects.toMatchObject({ kind: 'validation' });
   });
 
