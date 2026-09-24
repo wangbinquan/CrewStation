@@ -11,7 +11,7 @@ const ident = (name: string): string => {
 };
 
 /**
- * 数据面：用与 data 供给同一个管理连接。快照是只读查询（pg_database、pg_roles）；写目前只有删访问绑定的临时角色。
+ * 数据面：用与 data 供给同一个管理连接。快照是只读查询（pg_database、pg_roles）；写有删访问绑定的临时角色与建库建角色（I28）。
  * 连接用 postgres.js（RFC-023），服务端提示不打印。
  */
 export function postgresDataPlane(adminUrl: string, clock: { now(): Date } = { now: () => new Date() }): DataPlaneReader & DataPlaneWriter {
@@ -49,6 +49,15 @@ export function postgresDataPlane(adminUrl: string, clock: { now(): Date } = { n
       await admin.unsafe(`DROP OWNED BY ${quoted}`);
       await admin.unsafe(`DROP ROLE ${quoted}`);
       return 'dropped';
+    },
+    ensureDatabase: async ({ database, role, password }) => {
+      // 口令直接写进语句（CREATE ROLE 不收参数）：只收平台生成的 base64url，别的字符一律拒绝。
+      if (!/^[A-Za-z0-9_-]{16,128}$/.test(password)) throw new Error('口令格式不对，拒绝写进数据面');
+      const exists = (await admin`SELECT 1 FROM pg_roles WHERE rolname = ${role}`).length > 0;
+      await admin.unsafe(`${exists ? 'ALTER' : 'CREATE'} ROLE ${ident(role)} WITH LOGIN PASSWORD '${password}'`);
+      if (!(await admin`SELECT 1 FROM pg_database WHERE datname = ${database}`).length) await admin.unsafe(`CREATE DATABASE ${ident(database)} OWNER ${ident(role)}`);
+      await admin.unsafe(`REVOKE CONNECT ON DATABASE ${ident(database)} FROM PUBLIC`);
+      await admin.unsafe(`GRANT CONNECT ON DATABASE ${ident(database)} TO ${ident(role)}`);
     },
     close: async () => { await admin.end(); },
   };

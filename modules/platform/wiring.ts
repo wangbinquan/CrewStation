@@ -20,6 +20,7 @@ import { createCapabilitiesModule } from '@crewstation/module-capabilities';
 import { createConfigModule } from '@crewstation/module-config';
 import { createDataModule } from '@crewstation/module-data';
 import { createDataControlModule } from '@crewstation/module-data-control';
+import type { DataControlModuleApi } from '@crewstation/module-data-control';
 import { createDevSessionModule } from '@crewstation/module-dev-session';
 import type { EventsModuleApi } from '@crewstation/module-events';
 import { createEventsModule } from '@crewstation/module-events';
@@ -79,7 +80,7 @@ export const SYSTEM_ACTOR: Actor = { userId: BUILTIN_RESOURCES.systemActor as Us
 
 const consumerLifecycle = (consumer: EventConsumer): Lifecycle => ({ start: () => consumer.start(), stop: () => consumer.stop() });
 
-interface Late { events?: EventsModuleApi; project?: ProjectModuleApi; gateway?: GatewayModuleApi; taskRuntime?: TaskRuntimeModuleApi; release?: ReleaseModuleApi; resources?: ResourcesModuleApi }
+interface Late { events?: EventsModuleApi; project?: ProjectModuleApi; gateway?: GatewayModuleApi; taskRuntime?: TaskRuntimeModuleApi; release?: ReleaseModuleApi; resources?: ResourcesModuleApi; dataControl?: DataControlModuleApi }
 
 type CompositionDeps = PlatformModuleDeps & { identities: ResourceIdentityDirectory };
 
@@ -95,6 +96,19 @@ function projectHostAccess(projectApi: () => ProjectModuleApi): Pick<IdentityRun
       return role !== undefined && role !== 'user';
     } },
     appAccess: { check: (user, slug) => projectApi().appAccessBySlug(user, slug) },
+  };
+}
+
+/** data 的晚绑定端口：台账写入口（RFC-025 第四期）与 data-control 存的口令（I28，可回退为 data 自己建）；两者都装在 core 之后，经 late 取。 */
+function dataPorts(settings: PlatformSettings, late: Late): Pick<Parameters<typeof createDataModule>[0], 'ledger' | 'credentials'> {
+  const ledger = () => { if (!late.resources) throw new Error('resources 尚未装配'); return late.resources; };
+  const dataControl = () => { if (!late.dataControl) throw new Error('data-control 尚未装配'); return late.dataControl; };
+  return {
+    ledger: {
+      declare: (input) => ledger().owner('data').declare(input), get: (id) => ledger().get(id), requestRelease: (id, reason) => ledger().owner('data').requestRelease(id, reason),
+      presentBindings: async () => (await ledger().list({ kind: 'data-binding' })).filter((record) => record.owner.module === 'data' && record.desired === 'present'),
+    },
+    ...(settings.dataProvisioning === 'data-control' ? { credentials: { credentialOf: (id: string) => dataControl().credentialOf(id) } } : {}),
   };
 }
 
@@ -157,16 +171,11 @@ function composeCore(deps: CompositionDeps, late: Late) {
     taskProfiles: { exists: async (name) => (await project.api.listTaskProfiles()).some((p) => p.id === name) },
     settings: { defaultTaskProfile: settings.defaultTaskProfile, secretKeyBase64: settings.secretKeyBase64, registry: { pullBase: settings.registryBase, pushHost: settings.registryPushHost, baseRepository: settings.baseImage.repository, runtimePrefix: 'runtime/', scheme: settings.registryScheme, baseTag: settings.baseImage.tag } },
   });
-  // 台账（L1）装在 core 之后（它要 project 的额度与授权），data 在这里就要建：写入口经 late 在运行时取（RFC-025 第四期）。
-  const ledger = () => { if (!late.resources) throw new Error('resources 尚未装配'); return late.resources; };
   const data = createDataModule({
     db, logger, isAdmin: (id) => isAdmin(id), authorizer: project.api, users: userDirectory,
     services: { resolveServiceById: async (id) => { const r = await resolveById(id); return r ? { projectId: r.projectId, slug: r.slug } : undefined; } },
     settings: { defaultPlan: 'db-small', secretKeyBase64: settings.secretKeyBase64, postgres: settings.dataPostgres },
-    ledger: {
-      declare: (input) => ledger().owner('data').declare(input), get: (id) => ledger().get(id), requestRelease: (id, reason) => ledger().owner('data').requestRelease(id, reason),
-      presentBindings: async () => (await ledger().list({ kind: 'data-binding' })).filter((record) => record.owner.module === 'data' && record.desired === 'present'),
-    },
+    ...dataPorts(settings, late),
   });
   const scm = createScmModule({ db, project: project.api, identities: deps.identities, templateResources: {
     allocate: (kind, context, templateId, slotId) => deps.identities.bind('scm', kind, ['template', context.serviceId, templateId, slotId]),
@@ -265,9 +274,8 @@ function computeCatalogFor(agentRuntime: AgentRuntimeModuleApi) {
 }
 
 /**
- * 开发容器的工作卷要先有源码（task-runtime 的检出端口）。旧形状：签一个只读的会话级 Git 令牌，写进项目命名空间按服务共用的 Secret，
- * 只挂给 checkout init 容器——推送由平台在发布时完成，长驻容器里不需要写权限。由资源中心建出时（RFC-025 I25）：受理只要仓库地址，
- * 令牌在调和器建这一次启动的凭据 Secret 时才签。
+ * 开发容器的工作卷要先有源码：只读的会话级 Git 令牌只挂给 checkout init 容器（推送由平台在发布时完成）。旧形状受理时签好、写进按服务
+ * 共用的 Secret；由资源中心建出时（RFC-025 I25）受理只要仓库地址，令牌在调和器建这一次启动的凭据 Secret 时才签。
  */
 function taskCheckout(core: ReturnType<typeof composeCore>, k8s: K8sClient, resolveById: (serviceId: ServiceId) => ReturnType<ProjectModuleApi['resolveServiceById']>): NonNullable<TaskRuntimeModuleDeps['checkout']> {
   return {
@@ -481,7 +489,8 @@ function composeControl(deps: CompositionDeps, core: ReturnType<typeof composeCo
 function composeDataControl(deps: CompositionDeps, ledger: ReturnType<typeof composeLedger>) {
   const resources = ledger.api;
   return createDataControlModule({
-    adminUrl: deps.settings.dataPostgres.adminUrl, logger: deps.logger,
+    // I28：口令表在平台库里，用平台密钥加密。
+    adminUrl: deps.settings.dataPostgres.adminUrl, logger: deps.logger, db: deps.db, secretKeyBase64: deps.settings.secretKeyBase64,
     observer: { leases: { port: resources.leases, holder: `${deps.instance}.data-control` } },
     ledger: {
       get: (id) => resources.get(id), changesSince: resources.changesSince, latestChange: resources.latestChange, observe: (input) => resources.observe(input),
@@ -501,6 +510,7 @@ function composeModules(deps: CompositionDeps) {
   const cluster = composeCluster(deps, core, delivery, runtime, resources);
   const clusterControl = composeControl(deps, core, resources, runtime, delivery.gateway);
   const dataControl = composeDataControl(deps, resources);
+  late.dataControl = dataControl.api;
   return { cluster, resources, clusterControl, dataControl, identity: core.identity, project: core.project, config: core.config, data: core.data, scm: core.scm, apiCatalog: core.apiCatalog, agentRuntime: core.agentRuntime, ...delivery, ...runtime, ...aggregates };
 }
 
@@ -528,7 +538,7 @@ export function createPlatformModule(deps: PlatformModuleDeps): PlatformModule {
       events: [...m.events.workers, ...m.events.subscriptions.map(consumerLifecycle)],
     },
     websocket: m.session.websocket,
-    migrations: [queueMigrations, eventbusMigrations, m.resources.migrations, m.identity.migrations, m.project.migrations, m.config.migrations, m.agentRuntime.migrations, m.data.migrations, m.scm.migrations, m.apiCatalog.migrations, m.events.migrations, m.release.migrations, m.taskRuntime.migrations, m.devSession.migrations, m.businessTask.migrations, m.session.migrations, m.gateway.migrations, m.observability.migrations, m.cluster.migrations],
+    migrations: [queueMigrations, eventbusMigrations, m.resources.migrations, m.identity.migrations, m.project.migrations, m.config.migrations, m.agentRuntime.migrations, m.data.migrations, m.scm.migrations, m.apiCatalog.migrations, m.events.migrations, m.release.migrations, m.taskRuntime.migrations, m.devSession.migrations, m.businessTask.migrations, m.session.migrations, m.gateway.migrations, m.observability.migrations, m.cluster.migrations, m.dataControl.migrations],
   };
   migrations = api.migrations;
   return { api, modules: m };

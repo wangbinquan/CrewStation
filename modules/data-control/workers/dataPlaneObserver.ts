@@ -4,7 +4,7 @@ import { periodicJob, withLease } from '@crewstation/resource-runtime';
 import type { DataObservationStats } from '../application/observeDataPlane';
 import { changedDataRecords, observeDataRecord, removeReleasedRoles } from '../application/observeDataPlane';
 import type { DataPlaneReader, DataPlaneWriter } from '../ports/dataPlane';
-import type { DataLedgerObservations } from '../ports/ledger';
+import type { DataLedgerObservations, DataRecordView } from '../ports/ledger';
 
 export interface DataPlaneObserverOptions {
   /** 尾随台账变更的间隔；缺省 1 秒。 */
@@ -23,12 +23,19 @@ const LEASE_TTL_MS = 30_000;
  * 数据面观测（RFC-025 设计 §6.6，第四期第一步）：数据面没有 watch，所以两条节奏——尾随台账变更（新声明、改期望、受理释放的记录随即核对一次），
  * 与定期全量（启动时先跑一轮，此后每 30 秒）。每次核对取一份新快照（两条只读查询）；「不要了」的访问绑定还在的临时角色随即删掉。
  */
-export function dataPlaneObserver(ledger: DataLedgerObservations, plane: DataPlaneReader & DataPlaneWriter, stats: DataObservationStats, logger: Logger, options: DataPlaneObserverOptions = {}): PeriodicJob {
+type DataPlaneSnapshot = Awaited<ReturnType<DataPlaneReader['snapshot']>>;
+
+/** 按一条记录在快照上做的事之外的写（I28：建库）；返回之后的快照。 */
+export type DataRecordApply = (snapshot: DataPlaneSnapshot, record: DataRecordView) => Promise<DataPlaneSnapshot>;
+
+export function dataPlaneObserver(ledger: DataLedgerObservations, plane: DataPlaneReader & DataPlaneWriter, stats: DataObservationStats, logger: Logger, options: DataPlaneObserverOptions = {}, apply?: DataRecordApply): PeriodicJob {
   let cursor: number | undefined;
   const leases = options.leases;
-  const reconcile = async (snapshot: Awaited<ReturnType<DataPlaneReader['snapshot']>>, record: Parameters<typeof observeDataRecord>[3]): Promise<number> => {
+  const reconcile = async (snapshot: DataPlaneSnapshot, record: DataRecordView): Promise<number> => {
     const recorded = await observeDataRecord(ledger, snapshot, stats, record);
     await removeReleasedRoles(ledger, plane, snapshot, stats, logger, record);
+    // 建库（I28）：缺了才建，建完当场补观测；同一轮后面的记录用建完之后的快照。
+    if (apply) snapshot = await apply(snapshot, record).catch((error: unknown) => { logger.warn('data record apply failed', { resourceId: record.id, error: String(error) }); return snapshot; });
     return recorded;
   };
   // 多副本：抢到租约的那个副本处理；抢不到就跳过——另一副本正在处理它，漏掉的变化由下一轮全量（至多 30 秒）补上。

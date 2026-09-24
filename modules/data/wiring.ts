@@ -12,13 +12,14 @@ import type { Hono } from 'hono';
 import { secretboxCipher } from './adapters/crypto/secretboxCipher';
 import { drizzleDataResourceRepository, drizzleTaskBindingRepository } from './adapters/persistence/drizzleRepositories';
 import type { PostgresProviderSettings } from './adapters/postgres/postgresProvider';
-import { postgresJsProvider } from './adapters/postgres/postgresProvider';
+import { postgresDsn, postgresJsProvider } from './adapters/postgres/postgresProvider';
 import type { DataModuleApi } from './api/moduleApi';
 import type { DataUseCaseDeps } from './application/dependencies';
 import { dataLedgerProjection } from './application/ledgerProjection';
 import { revokeBindingsOfReleasedTask } from './application/releasedTask';
 import { serviceDataUseCases } from './application/serviceData';
 import { taskBindingUseCases } from './application/taskBindings';
+import type { DataCredentials } from './ports/credentials';
 import type { UserDirectory } from './ports/userDirectory';
 import { dataRoutes } from './http/dataRoutes';
 import type { DataLedger } from './ports/ledger';
@@ -41,6 +42,12 @@ export interface DataModuleDeps {
   expiryIntervalMs?: number;
   /** 资源台账（RFC-025 第四期）：给了就把数据资源与访问绑定投影成 `database`／`data-binding` 记录，并每 5 分钟补投影。 */
   ledger?: DataLedger;
+  /**
+   * RFC-025 I28：生产库、开发库由 data-control 建，运行角色的口令经这个端口要（组合根接上 data-control）；要配台账。
+   * 不给就照旧由本模块建。provisioningTiming 调短等待（用例）。
+   */
+  credentials?: DataCredentials;
+  provisioningTiming?: { waitMs?: number; pollMs?: number };
 }
 
 /** 到期绑定每分钟收一次。 */
@@ -67,7 +74,8 @@ export const dataMigrations: MigrationSet = {
 
 export function createDataModule(deps: DataModuleDeps): DataModule {
   const logger = deps.logger ?? noopLogger;
-  const projection = deps.ledger ? dataLedgerProjection(deps.ledger, logger) : undefined;
+  const byDataControl = Boolean(deps.ledger && deps.credentials);
+  const projection = deps.ledger ? dataLedgerProjection(deps.ledger, logger, byDataControl) : undefined;
   const stored = { resources: drizzleDataResourceRepository(deps.db), bindings: drizzleTaskBindingRepository(deps.db) };
   const useCaseDeps: DataUseCaseDeps = {
     resources: projection ? projection.resources(stored.resources) : stored.resources,
@@ -80,6 +88,7 @@ export function createDataModule(deps: DataModuleDeps): DataModule {
     clock: deps.clock ?? systemClock,
     logger,
     ...(deps.users ? { users: deps.users } : {}),
+    ...(deps.ledger && deps.credentials ? { provisioning: { credentials: deps.credentials, ledger: deps.ledger, dsnOf: (role: string, password: string, database: string) => postgresDsn(deps.settings.postgres, role, password, database), ...deps.provisioningTiming } } : {}),
   };
   const service = serviceDataUseCases(useCaseDeps);
   const bindings = taskBindingUseCases(useCaseDeps);

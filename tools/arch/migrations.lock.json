@@ -28,6 +28,7 @@
     "modules/config/adapters/persistence/migrations/0002_config_tables.sql": "01f6e1c32458bd380f3766b40bce8626a9234d725ff7fb3278eeaee0f745e60b",
     "modules/config/adapters/persistence/migrations/0003_resource_identity.sql": "3f3bd87718e4f07e40f7eb2138676e02a3e13d2efdd564674717fc8351e96b5b",
     "modules/config/adapters/persistence/migrations/0004_resource_identity.identity.json": "ed2100272499bc8a2746d22c0367261d23287478007380f0f82d73f0761c9c53",
+    "modules/data-control/adapters/persistence/migrations/0001_credentials.sql": "6eab70e440bdb494c792ff0be6b84b97dc9feb8ea657473bce57077427c802d8",
     "modules/data/adapters/persistence/migrations/0001_create_schema.sql": "87065494bbec2f3bd8915fe24775f0ca02e493279243f74d4264dcc25c20cabd",
     "modules/data/adapters/persistence/migrations/0002_data_tables.sql": "9ab5855f04513620a62f0fdfcaa2c4d886de8a1420f49d948fe73ca80674a429",
     "modules/data/adapters/persistence/migrations/0003_resource_identity.sql": "918dc451c39a3187c1d614386507ba5b93422dede7fc9141ec05b2c99a928348",

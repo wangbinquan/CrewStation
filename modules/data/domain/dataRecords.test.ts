@@ -32,6 +32,10 @@ describe('数据资源与访问绑定的期望（RFC-025 第四期）', () => {
     expect(databaseProjection(resource({ state: 'failed', message: 'CREATE DATABASE 被拒' }))!.declaration.conditions).toEqual([{ type: 'Failed', status: 'true', reason: 'provisioning-failed', message: 'CREATE DATABASE 被拒' }]);
     expect(databaseProjection(resource({ state: 'failed' }))!.declaration.conditions[0]?.message).toBe('数据库供给失败');
     expect(databaseProjection(resource({ state: 'released' }))!.release).toEqual({ code: 'released', message: '数据资源已释放' });
+    // RFC-025 I28：由 data-control 建时期望里标明；旧库（data 存着连接串）与没开这条路的不标。
+    expect(databaseProjection(resource({ state: 'provisioning', secretBox: undefined }), true)!.declaration.spec.provision).toBe('data-control');
+    expect(databaseProjection(resource({ state: 'ready', secretBox: 'boxed' }), true)!.declaration.spec).not.toHaveProperty('provision');
+    expect(databaseProjection(resource({ state: 'provisioning', secretBox: undefined }))!.declaration.spec).not.toHaveProperty('provision');
     expect(databaseProjection(resource({ state: 'releasing' }))!.release?.code).toBe('released');
     expect(databaseProjection(resource({ kind: 's3' }))).toBeUndefined();
   });

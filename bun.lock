@@ -281,6 +281,7 @@
         "zod": "4.6.2",
       },
       "devDependencies": {
+        "@crewstation/module-data-control": "workspace:*",
         "@crewstation/module-resources": "workspace:*",
         "@crewstation/testkit": "workspace:*",
       },
@@ -291,7 +292,10 @@
       "dependencies": {
         "@crewstation/contracts": "workspace:*",
         "@crewstation/kernel": "workspace:*",
+        "@crewstation/persistence": "workspace:*",
         "@crewstation/resource-runtime": "workspace:*",
+        "@crewstation/secretbox": "workspace:*",
+        "drizzle-orm": "0.45.2",
         "postgres": "3.4.9",
       },
       "devDependencies": {

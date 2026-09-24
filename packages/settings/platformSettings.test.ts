@@ -26,3 +26,9 @@ test('工作区容器缺省由资源中心建出，只有显式 owner 才回退�
   // 拼错的值不悄悄回退：仍由资源中心建。
   expect(loadPlatformSettings({ ...base, CS_WORKLOAD_CREATION: 'Owner' }).workloadCreation).toBe('ledger');
 });
+
+test('生产库、开发库缺省由 data-control 建，只有显式 data 才回退（RFC-025 I28）', () => {
+  expect(loadPlatformSettings(base).dataProvisioning).toBe('data-control');
+  expect(loadPlatformSettings({ ...base, CS_DATA_PROVISIONING: 'data' }).dataProvisioning).toBe('data');
+  expect(loadPlatformSettings({ ...base, CS_DATA_PROVISIONING: 'Data' }).dataProvisioning).toBe('data-control');
+});

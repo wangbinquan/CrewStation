@@ -37,6 +37,11 @@ export interface PlatformSettings {
    * `CS_WORKLOAD_CREATION=owner` 回退为 task-runtime 受理时自己建——迁移期的回退手段。已由资源中心建出的环境恢复时仍走资源中心。
    */
   workloadCreation: 'ledger' | 'owner';
+  /**
+   * 生产库、开发库由谁建（RFC-025 I28）：`data-control` 由资源中心的数据面调和器建、口令它存（缺省）；
+   * `CS_DATA_PROVISIONING=data` 回退为 data 受理时自己建。已建好的库各按当时的方式取连接串。
+   */
+  dataProvisioning: 'data-control' | 'data';
 }
 
 const num = (v: string | undefined, fallback: number): number => (v === undefined || v === '' ? fallback : Number(v));
@@ -78,6 +83,7 @@ export function loadPlatformSettings(env: Record<string, string | undefined> = p
     passwordLoginForcedOn: env.CS_PASSWORD_LOGIN === 'force-on',
     sessionTtlSeconds: num(env.CS_SESSION_TTL_SECONDS, 28800),
     workloadCreation: env.CS_WORKLOAD_CREATION === 'owner' ? 'owner' : 'ledger',
+    dataProvisioning: env.CS_DATA_PROVISIONING === 'data' ? 'data' : 'data-control',
   };
 }
 

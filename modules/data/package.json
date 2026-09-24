@@ -25,6 +25,7 @@
     "zod": "4.6.2"
   },
   "devDependencies": {
+    "@crewstation/module-data-control": "workspace:*",
     "@crewstation/module-resources": "workspace:*",
     "@crewstation/testkit": "workspace:*"
   }

@@ -1,13 +1,14 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import type { ProjectId } from '@crewstation/contracts';
 import { noopLogger } from '@crewstation/kernel';
+import { generateSecretKey } from '@crewstation/secretbox';
 import type { ResourcesModule } from '@crewstation/module-resources';
 import { createResourcesModule, resourcesMigrations } from '@crewstation/module-resources';
 import type { TestDatabase } from '@crewstation/testkit';
 import { createTestDatabase, testDatabaseAvailable } from '@crewstation/testkit';
 import type { DataPlaneObject } from '../domain/dataPlane';
 import type { DataPlaneReader, DataPlaneWriter } from '../ports/dataPlane';
-import { createDataControlModule } from '../wiring';
+import { createDataControlModule, dataControlMigrations } from '../wiring';
 
 const available = await testDatabaseAvailable();
 const PROJECT = '01a0bf5d-8f4b-7c01-8e19-e226732a75e1' as ProjectId;
@@ -15,8 +16,8 @@ const PROJECT = '01a0bf5d-8f4b-7c01-8e19-e226732a75e1' as ProjectId;
 /** 手动拨的数据面：用例决定库与角色在不在；调和器删角色时照 OID 从表里拿掉并记下。 */
 function manualDataPlane() {
   const databases = new Map<string, DataPlaneObject>(), roles = new Map<string, DataPlaneObject>();
-  const drops: string[] = [];
-  let snapshots = 0, closed = false;
+  const drops: string[] = [], ensured: string[] = [];
+  let snapshots = 0, closed = false, oid = 18000;
   const plane: DataPlaneReader & DataPlaneWriter = {
     snapshot: async () => { snapshots += 1; return { databases: new Map(databases), roles: new Map(roles), observedAt: new Date().toISOString() }; },
     dropRole: async ({ role, oid, database, reassignTo }) => {
@@ -27,9 +28,15 @@ function manualDataPlane() {
       roles.delete(role);
       return 'dropped';
     },
+    // 建库（I28）：记下口令，角色与库不在才放进表（OID 递增）。
+    ensureDatabase: async ({ database, role, password }) => {
+      ensured.push(`${database}:${role}:${password}`);
+      if (!roles.has(role)) roles.set(role, { name: role, oid: String(oid += 1) });
+      if (!databases.has(database)) databases.set(database, { name: database, oid: String(oid += 1) });
+    },
     close: async () => { closed = true; },
   };
-  return { plane, databases, roles, drops, snapshots: () => snapshots, closed: () => closed };
+  return { plane, databases, roles, drops, ensured, snapshots: () => snapshots, closed: () => closed };
 }
 
 async function until(label: string, check: () => Promise<boolean> | boolean, timeoutMs = 5_000): Promise<void> {
@@ -48,10 +55,10 @@ describe.skipIf(!available)('data-control：数据面观测写回台账（RFC-02
   let control: ReturnType<typeof createDataControlModule>;
 
   beforeAll(async () => {
-    database = await createTestDatabase([resourcesMigrations]);
+    database = await createTestDatabase([resourcesMigrations, dataControlMigrations]);
     resources = createResourcesModule({ db: database.db, quotas: { limitFor: async () => 4 }, authorizer: { projectAccess: async () => ({ operate: true }) }, isAdmin: async () => false });
     control = createDataControlModule({
-      plane: plane.plane, logger: { ...noopLogger, warn: (msg: string) => { warnings.push(msg); } }, observer: { pollMs: 20, resyncMs: 60 },
+      plane: plane.plane, logger: { ...noopLogger, warn: (msg: string) => { warnings.push(msg); } }, observer: { pollMs: 20, resyncMs: 60 }, db: database.db, secretKeyBase64: generateSecretKey(),
       ledger: {
         get: (id) => resources.api.get(id), changesSince: resources.api.changesSince, latestChange: resources.api.latestChange,
         listLive: async () => [...await resources.api.list({ kind: 'database' }), ...await resources.api.list({ kind: 'data-binding' })],
@@ -108,11 +115,41 @@ describe.skipIf(!available)('data-control：数据面观测写回台账（RFC-02
     await until('data 删掉后已结束', async () => (await resources.api.get(legacy.id))?.phase === 'stopped');
   });
 
+  // RFC-025 I28：标明由 data-control 建的库，它生成口令、加密存自己的表，再建运行角色与库；台账里没有口令。
+  test('由 data-control 建的库：口令先存再建，当场补观测、记录运行中；credentialOf 给明文，表里只有密文；已在的不再建、不换口令；旧库不建', async () => {
+    const data = resources.api.owner('data');
+    const spec = (name: string, provision?: string) => ({ children: [{ kind: 'PostgresDatabase', name }, { kind: 'PostgresRole', name }], engine: 'postgres', ...(provision ? { provision } : {}) });
+    const record = await data.declare({ kind: 'database', ref: 'db-new', projectId: PROJECT, spec: spec('cs_new', 'data-control') });
+    await until('建出并运行中', async () => (await resources.api.get(record.id))?.phase === 'ready');
+    const credential = (await control.api.credentialOf(record.id))!, password = credential.password;
+    expect(credential.role).toBe('cs_new');
+    expect(password).toMatch(/^[A-Za-z0-9_-]{32}$/);
+    // 尾随与全量两条节奏可能各建一次：都用存下的同一个口令（重复执行结果不变）。
+    expect(new Set(plane.ensured)).toEqual(new Set([`cs_new:cs_new:${password}`]));
+    expect(JSON.stringify(await resources.api.get(record.id))).not.toContain(password);
+    const [row] = await database.db.execute(`SELECT secret_box FROM data_control.credentials WHERE resource_id = '${record.id}'`) as unknown as Array<{ secret_box: string }>;
+    expect(row!.secret_box).not.toContain(password);
+    expect(control.stats().provisioned).toBeGreaterThanOrEqual(1);
+    // 库被人删了：再建一次，用的还是存着的那个口令。
+    const before = plane.ensured.length;
+    plane.databases.delete('cs_new');
+    await until('重建库', () => plane.ensured.length > before && plane.databases.has('cs_new'));
+    expect(new Set(plane.ensured)).toEqual(new Set([`cs_new:cs_new:${password}`]));
+    // 没标明由 data-control 建的旧库：不在也不建；没存过口令的记录 credentialOf 给 undefined。
+    const legacy = await data.declare({ kind: 'database', ref: 'db-legacy', projectId: PROJECT, spec: spec('cs_legacy') });
+    await until('旧库核对过', async () => (await resources.api.get(legacy.id))?.phase === 'provisioning');
+    await Bun.sleep(100);
+    expect(plane.ensured.some((entry) => entry.startsWith('cs_legacy'))).toBe(false);
+    expect(await control.api.credentialOf(legacy.id)).toBeUndefined();
+  });
+
   test('装配：没有管理连接也没有 reader 时拒绝；停下时关掉数据面连接', async () => {
     expect(() => createDataControlModule({ ledger: { get: async () => undefined, listLive: async () => [], changesSince: async () => [], latestChange: async () => 0, observe: async () => ({ status: 'unowned' as const }) } })).toThrow('adminUrl');
     const other = manualDataPlane();
     const idle = createDataControlModule({ plane: other.plane, ledger: { get: async () => undefined, listLive: async () => [], changesSince: async () => [], latestChange: async () => 0, observe: async () => ({ status: 'unowned' as const }) } });
     expect(idle.api.name).toBe('data-control');
+    // 没给平台库与密钥：只观测、不建库，credentialOf 一律没有。
+    expect(await idle.api.credentialOf('any')).toBeUndefined();
     idle.observer.start();
     await idle.observer.stop();
     expect(other.closed()).toBe(true);

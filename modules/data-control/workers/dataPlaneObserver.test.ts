@@ -10,6 +10,7 @@ const reader = (): DataPlaneReader & DataPlaneWriter & { closed: boolean } => {
   const self = {
     closed: false,
     dropRole: async () => 'absent' as const,
+    ensureDatabase: async () => undefined,
     snapshot: async () => ({ databases: new Map([['cs_demo', { name: 'cs_demo', oid: '1' }]]), roles: new Map(), observedAt: '2026-09-24T00:00:00.000Z' }),
     close: async () => { self.closed = true; },
   };
@@ -56,7 +57,7 @@ describe('数据面观测的节奏（RFC-025 第四期）', () => {
       observe: async ({ resourceId, child }) => { observed.push(`${resourceId}:${child.name}`); return { status: 'recorded' }; },
     };
     const plane = reader();
-    const counting: DataPlaneReader & DataPlaneWriter = { snapshot: async () => { snapshots += 1; return plane.snapshot(); }, dropRole: plane.dropRole, close: plane.close };
+    const counting: DataPlaneReader & DataPlaneWriter = { snapshot: async () => { snapshots += 1; return plane.snapshot(); }, dropRole: plane.dropRole, ensureDatabase: plane.ensureDatabase, close: plane.close };
     const observer = dataPlaneObserver(ledger, counting, newDataObservationStats(), { ...noopLogger, warn: (msg: string) => { warnings.push(msg); } }, { pollMs: 5, resyncMs: 1_000_000 });
     observer.start();
     await until(() => observed.includes('db-1:cs_demo') && warnings.includes('data plane tail failed'));

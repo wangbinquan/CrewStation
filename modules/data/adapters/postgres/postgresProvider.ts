@@ -15,6 +15,11 @@ const ident = (name: string): string => {
 };
 const password = (): string => Buffer.from(crypto.getRandomValues(new Uint8Array(24))).toString('base64url');
 
+/** 业务容器用的连接串：角色、口令、库，主机与端口是容器看得到的那一组（data-control 建的库也用它拼，RFC-025 I28）。 */
+export function postgresDsn(settings: Pick<PostgresProviderSettings, 'visibleHost' | 'visiblePort'>, role: string, pass: string, db: string): string {
+  return `postgres://${encodeURIComponent(role)}:${encodeURIComponent(pass)}@${settings.visibleHost}:${settings.visiblePort}/${db}`;
+}
+
 /**
  * 每服务一库一角色；新库撤销 PUBLIC 的 CONNECT，保证跨项目不可连（AT-12）。
  * 临时角色用 VALID UNTIL 让数据库自己执行到期；只读经 pg_read_all_data，但只对该库有 CONNECT。
@@ -22,7 +27,7 @@ const password = (): string => Buffer.from(crypto.getRandomValues(new Uint8Array
  */
 export function postgresJsProvider(settings: PostgresProviderSettings): PostgresProvider {
   const admin = postgres(settings.adminUrl, { max: 2, onnotice: () => undefined });
-  const dsn = (role: string, pass: string, db: string): string => `postgres://${encodeURIComponent(role)}:${encodeURIComponent(pass)}@${settings.visibleHost}:${settings.visiblePort}/${db}`;
+  const dsn = (role: string, pass: string, db: string): string => postgresDsn(settings, role, pass, db);
   const roleExists = async (role: string): Promise<boolean> => (await admin`SELECT 1 FROM pg_roles WHERE rolname = ${role}`).length > 0;
   return {
     provisionDatabase: async ({ databaseName, roleName }) => {

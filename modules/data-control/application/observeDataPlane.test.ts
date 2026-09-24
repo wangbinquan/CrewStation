@@ -30,6 +30,6 @@ describe('数据面观测的用例（RFC-025 第四期）', () => {
     expect(fake.observed).toEqual(['a:cs_a:Present']);
     const unchanged = fakeLedger([], 'unchanged');
     expect(await observeDataRecord(unchanged.ledger, snapshot, stats, view('a', 'data-binding'))).toBe(0);
-    expect(stats).toEqual({ recorded: 1, unchanged: 1, unowned: 0, removed: 0 });
+    expect(stats).toEqual({ recorded: 1, unchanged: 1, unowned: 0, removed: 0, provisioned: 0 });
   });
 });

@@ -6,7 +6,7 @@ import { postgresDataPlane } from '../adapters/postgres/postgresDataPlane';
 const available = await testDatabaseAvailable();
 const adminUrl = process.env.CS_TEST_DATABASE_URL ?? DEFAULT_TEST_DATABASE_URL;
 const suffix = Bun.randomUUIDv7().replace(/-/g, '').slice(-10);
-const names = { db: `cs_dcp_${suffix}`, role: `cs_dcp_${suffix}`, temp: `cs_t_dcp_${suffix}`, forever: `cs_dcp_inf_${suffix}`, foreign: `dcp_${suffix}`, owning: `cs_t_own${suffix}` };
+const names = { db: `cs_dcp_${suffix}`, role: `cs_dcp_${suffix}`, temp: `cs_t_dcp_${suffix}`, forever: `cs_dcp_inf_${suffix}`, foreign: `dcp_${suffix}`, owning: `cs_t_own${suffix}`, built: `cs_dcpnew_${suffix}` };
 
 describe.skipIf(!available)('数据面快照：平台数据库集群上带平台前缀的库与角色（RFC-025 第四期）', () => {
   let admin: ReturnType<typeof postgres>;
@@ -19,8 +19,8 @@ describe.skipIf(!available)('数据面快照：平台数据库集群上带平台
     await admin.unsafe(`CREATE ROLE "${names.foreign}" WITH LOGIN PASSWORD 'x'`);
   });
   afterAll(async () => {
-    await admin.unsafe(`DROP DATABASE IF EXISTS "${names.db}" WITH (FORCE)`);
-    for (const role of [names.owning, names.role, names.temp, names.forever, names.foreign]) await admin.unsafe(`DROP ROLE IF EXISTS "${role}"`);
+    for (const db of [names.db, names.built]) await admin.unsafe(`DROP DATABASE IF EXISTS "${db}" WITH (FORCE)`);
+    for (const role of [names.owning, names.role, names.temp, names.forever, names.foreign, names.built]) await admin.unsafe(`DROP ROLE IF EXISTS "${role}"`);
     await admin.end();
   });
 
@@ -58,5 +58,30 @@ describe.skipIf(!available)('数据面快照：平台数据库集群上带平台
       expect(await plane.dropRole({ role: names.owning, database: names.db, reassignTo: names.role })).toBe('absent');
       await expect(plane.dropRole({ role: 'postgres' })).rejects.toThrow('非法的数据面标识符');
     } finally { await inDb.end(); await plane.close(); }
+  });
+
+  // RFC-025 I28：data-control 建库与运行角色（口令由调用方先存下再给）。
+  test('建库：角色不在就建、在就改口令，库不在才建（属主是这个角色），只有这个角色能连；重复执行不变；口令格式不对拒绝', async () => {
+    const plane = postgresDataPlane(adminUrl);
+    const as = (role: string, password: string) => { const url = new URL(adminUrl); url.username = role; url.password = password; url.pathname = `/${names.built}`; return url.toString(); };
+    const connects = async (url: string): Promise<boolean> => { const client = postgres(url, { max: 1, onnotice: () => undefined, connect_timeout: 5 }); try { await client`SELECT 1`; return true; } catch { return false; } finally { await client.end(); } };
+    try {
+      const first = 'Aa0_-bcdefghijklmnopqrstuv', second = 'Zz9-_yxwvutsrqponmlkjihgf';
+      await plane.ensureDatabase({ database: names.built, role: names.built, password: first });
+      const snapshot = await plane.snapshot();
+      expect(snapshot.databases.has(names.built) && snapshot.roles.has(names.built)).toBe(true);
+      expect((await admin<{ owner: string }[]>`SELECT pg_get_userbyid(datdba) AS owner FROM pg_database WHERE datname = ${names.built}`)[0]?.owner).toBe(names.built);
+      expect(await connects(as(names.built, first))).toBe(true);
+      // 同一个库，换一个口令再执行：角色改口令，库不重建（OID 不变）。
+      const oid = snapshot.databases.get(names.built)!.oid;
+      await plane.ensureDatabase({ database: names.built, role: names.built, password: second });
+      expect((await plane.snapshot()).databases.get(names.built)?.oid).toBe(oid);
+      expect(await connects(as(names.built, first))).toBe(false);
+      expect(await connects(as(names.built, second))).toBe(true);
+      // PUBLIC 的 CONNECT 已撤销：别的有登录权的角色连不上这个库。
+      expect((await admin<{ ok: boolean }[]>`SELECT has_database_privilege(${names.foreign}, ${names.built}, 'CONNECT') AS ok`)[0]?.ok).toBe(false);
+      await expect(plane.ensureDatabase({ database: names.built, role: names.built, password: "x' OR '1'='1" })).rejects.toThrow('口令格式不对');
+      await expect(plane.ensureDatabase({ database: 'postgres', role: names.built, password: first })).rejects.toThrow('非法的数据面标识符');
+    } finally { await plane.close(); }
   });
 });

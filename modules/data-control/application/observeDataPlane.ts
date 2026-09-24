@@ -5,16 +5,17 @@ import { roleRemovals } from '../domain/roleRemoval';
 import type { DataPlaneWriter } from '../ports/dataPlane';
 import type { DataLedgerObservations, DataRecordView } from '../ports/ledger';
 
-/** 观测的累计结果：写了的、与上次一样没写的、台账里没有这条记录的；调和器删掉的临时角色。 */
+/** 观测的累计结果：写了的、与上次一样没写的、台账里没有这条记录的；调和器删掉的临时角色、建出的库（I28）。 */
 export interface DataObservationStats {
   recorded: number;
   unchanged: number;
   unowned: number;
   removed: number;
+  provisioned: number;
 }
 
 export function newDataObservationStats(): DataObservationStats {
-  return { recorded: 0, unchanged: 0, unowned: 0, removed: 0 };
+  return { recorded: 0, unchanged: 0, unowned: 0, removed: 0, provisioned: 0 };
 }
 
 /** 按一条记录核对数据面：每个子对象的观测写回台账（同样的观测台账不写库）。返回这一条写了几次。 */

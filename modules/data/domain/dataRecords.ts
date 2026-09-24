@@ -13,7 +13,8 @@ export interface DatabaseDeclaration {
   readonly kind: 'database';
   readonly ref: string;
   readonly projectId: ProjectId;
-  readonly spec: { readonly children: readonly Child[]; readonly engine: 'postgres'; readonly env: DataEnv; readonly plan: string };
+  /** provision：由 data-control 建（RFC-025 I28）；没有的是 data 自己建的旧库。 */
+  readonly spec: { readonly children: readonly Child[]; readonly engine: 'postgres'; readonly env: DataEnv; readonly plan: string; readonly provision?: 'data-control' };
   readonly display: Readonly<Record<string, string>>;
   readonly conditions: readonly Condition[];
 }
@@ -47,8 +48,11 @@ const RELEASED: Partial<Record<DataResource['state'], ReleaseReason>> = {
   released: { code: 'released', message: '数据资源已释放' },
 };
 
-/** 只投影 PostgreSQL（s3、pvc 两种今天不供给）。供给失败是 Failed，重试成功后撤掉。 */
-export function databaseProjection(resource: DataResource): Projection<DatabaseDeclaration> | undefined {
+/**
+ * 只投影 PostgreSQL（s3、pvc 两种今天不供给）。供给失败是 Failed，重试成功后撤掉。由 data-control 建时（I28，没有存连接串的都算——
+ * 旧库都存着），期望里标明，调和器照它建库与运行角色。
+ */
+export function databaseProjection(resource: DataResource, byDataControl = false): Projection<DatabaseDeclaration> | undefined {
   if (resource.kind !== 'postgres') return undefined;
   const failed: Condition = resource.state === 'failed'
     ? { type: 'Failed', status: 'true', reason: 'provisioning-failed', message: resource.message ?? '数据库供给失败' }
@@ -57,7 +61,10 @@ export function databaseProjection(resource: DataResource): Projection<DatabaseD
   return {
     declaration: {
       id: resource.id, kind: 'database', ref: resource.id, projectId: resource.projectId,
-      spec: { children: [{ kind: 'PostgresDatabase', name: resource.objectName }, { kind: 'PostgresRole', name: resource.objectName }], engine: 'postgres', env: resource.env, plan: resource.plan },
+      spec: {
+        children: [{ kind: 'PostgresDatabase', name: resource.objectName }, { kind: 'PostgresRole', name: resource.objectName }], engine: 'postgres', env: resource.env, plan: resource.plan,
+        ...(byDataControl && !resource.secretBox ? { provision: 'data-control' as const } : {}),
+      },
       display: { env: resource.env, database: resource.objectName, plan: resource.plan, envVar: resource.envVar },
       conditions: [failed],
     },
