@@ -379,6 +379,8 @@ spec.env.0.configDefinitionId / spec.env.1.configDefinitionId: expected string, 
 
 **可选做法**：(a) 期望里放密文：所属模块用平台密钥（`packages/secretbox`，身份、算力档位、数据模块已在用）加密后写进期望，调和器渲染 Secret 时解密；台账里只有密文。(b) 渲染时回调：调和器建 Secret 之前经端口向所属模块要值（组合根接上 task-runtime 的用例），值不落库；Runner 令牌在这一步签发、只存哈希。(c) Secret 仍由所属模块自己建（设计 §9「领域模块不再直接调 Kubernetes」的唯一例外），期望只写 Secret 名，调和器只建 Pod、Service、路由等不含凭据的对象。
 
+**裁定后的实施（2026-09-24）**：分步移交。第一步是工作区（开发会话、业务任务）：task-runtime 受理时只把不含凭据的期望写进记录（镜像、资源、检出与 Git 凭据 Secret 的名字、开发预览的主机与中间件、工作卷大小），领域条件 `Provisioning` 为真时调和器建 PVC、Runner Secret（`<Pod 名>-runner-<第几次启动>`，不可变）、Pod（只 `envFrom` 这个 Secret）与开发预览；建 Secret 之前经端口 `runnerValues` 向 task-runtime 要内容（Runner 令牌在这一刻签发、只存哈希），Pod 建出后 `bindWorkload` 交回实例；值不落库（a30d1846，已部署；RFC-025 设计 §9 补记、验收 §3.7）。运维开关 `CS_WORKLOAD_CREATION=owner` 回退为 task-runtime 自己建。后续：执行环境（CLI、headless、子任务）、失败后的重建、档位测试；检出用的 Git 凭据 Secret 改为渲染时向 scm 要；服务槽与 Job 随 RFC-025 T8。
+
 ## I26. 说明页：错误体与 RFC-021 不一致，去掉 `allowEmptyServices` 会让「暂时没有端点」变成裸 404
 
 **作者已裁定（2026-09-24）**：选 (a)——错误体沿用 RFC-021 的 `not-deployed`＋`details`（`details.reason` 放下线原因），说明页由 cs-api 按台账渲染、ForwardAuth 的未部署分支退役；`allowEmptyServices` 保留作兜底。

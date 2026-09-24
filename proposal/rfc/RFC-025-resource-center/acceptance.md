@@ -143,6 +143,16 @@
 - 门禁（干净导出树）：check:static 通过；unit 578、module 1296、console 874；改动行 11／11。CI [35914868755](https://github.com/wangbinquan/CrewStation/actions/runs/35914868755) 六项成功。
 - 部署：随 3ddccf23 的镜像一起上线（§5）。名册接口在网关登录之后，没有替作者登录去调；执行记录已结束即 `ended`（Runner 报的 `failed` 照旧）、失败即 `failed`、结束中仍报 `running`、读不到台账时照 Runner 的说法，由 `terminalPhase.test.ts` 逐条核对。上线后 cs-api 没有这个接口的告警或错误日志。
 
+### 3.7 第五步：工作区的创建移交调和器（a30d1846，I25 第一步）
+
+- 门禁（干净导出树）：check:static 通过；unit 663、module 1348、console 892；改动行 242／242。CI [35958096926](https://github.com/wangbinquan/CrewStation/actions/runs/35958096926)：static、unit、module、console、gate 成功；e2e 第一次在「启动调试浏览器」一步失败（CI 上的无头 Chrome 60 秒内没起来，前面的平台安装一步成功），重跑后六项成功。
+- 部署（UTC）：05:02:53 用新镜像跑一次迁移 Job（只有 `task_runtime/0010_environment_render.sql`：`environments` 加 `render` 列），05:03:44 前 cs-api、cs-auth、cs-controller、cs-session 换到 `cs-control-plane:rc025-i25a-20260924`（`git archive a30d1846`；951f4159 的孤儿卷修复随之上线）。三个在跑的开发会话（旧形状，Pod 由 task-runtime 建）的 Runner 在 cs-session 换版后 2 秒内重连；cs-controller 没有告警或错误日志。
+- 实机（rfc006-verify：在正式 Pod 里以服务身份调样例的 `/chat` 建业务任务，没有登录）：
+  - 05:04:48.912 受理（启动记录的起点）；05:04:49.618 调和器照卷记录建出 PVC；卷进了观测缓存后，05:04:51.638 建出 Runner Secret `task-…-runner-1`、05:04:51.645 建出 Pod，05:04:51.651 交回实例，`Created` 为真——「排队分配容器」2.7 秒，其中约 2 秒是等卷进缓存的重试间隔；05:04:55.451 Runner 连上（容器 3.3 秒、连接 0.45 秒）。
+  - Pod 规格里没有明文环境变量，只有 `envFrom` 引用那个 Secret；标签与旧路径一致（`workload: business-task`、项目与服务）。记录的期望里只有镜像、运行 UID、资源、PVC 与 Secret 的名字，查不到令牌、口令或连接串。
+  - 子任务的执行 Pod（这一步仍由 task-runtime 建）调度不上：`0/1 nodes are available: 1 Insufficient cpu`——节点可分配 10 核、已请求 8.855 核，加上工作区的 1 核与执行 Pod 的 150m，超出 5m。`/chat` 120 秒后按超时返回 502，样例随即释放业务任务：05:06:55.22–.27 调和器删掉执行 Pod、它的 Secret、工作区 Pod、`-runner-1` 与 PVC，记录停在「已结束」（原因 business）。Agent 输出这一段要等本机空出 CPU 再走一遍。
+- 没有实机走过的：开发会话（检出 init 容器、开发预览的 Service 与路由）——开会话要在网关登录之后，没有替作者登录，由 task-runtime 的 `ledgerCreation.test.ts` 与 cluster-control 的模块用例核对；建不成时的 `Created` 为假与重试、恢复暂停的业务任务（换成 `-runner-2`）也只有用例。
+
 ## 4. 第三期：服务槽（T8）
 
 | 提交 | 门禁（干净导出树） | CI | 部署（UTC） |
