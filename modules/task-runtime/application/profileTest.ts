@@ -8,6 +8,7 @@ import { profileTestMcp } from '../domain/profileTestEnvironment';
 import type { ProtocolProbe } from '../domain/profileTestStages';
 import { TEST_STAGE, absorbAgentEvent, commandVerdict, containerStagesForTest, launchStage, modelVerdict, stagesFromBeforeStart } from '../domain/profileTestStages';
 import type { TaskEnvironment } from '../domain/taskEnvironment';
+import { awaitingPodCreation } from '../domain/taskEnvironment';
 import type { TestRunner } from '../ports/platform';
 import type { TaskRuntimeUseCaseDeps } from './dependencies';
 import type { TestEnvironmentInput } from './testEnvironment';
@@ -80,7 +81,9 @@ async function waitForRunner(s: Session): Promise<ProfileTestRunResult | undefin
     const pod = await cluster.podPhase(live);
     const note = pod.message ? `：${pod.message}` : '';
     if (pod.waitingReason && IMAGE_PULL_FAILURES.has(pod.waitingReason)) return fail('image-pull-failed', `镜像拉取失败（${pod.waitingReason}）${note}`);
-    if (live.state === 'failed' || pod.phase === 'Failed' || pod.phase === 'Succeeded' || pod.phase === 'Missing' || (pod.waitingReason && CONTAINER_START_FAILURES.has(pod.waitingReason))) {
+    // 由资源中心建出（I25 第四步）：记下 Pod 实例之前、建出宽限之内的「不存在」是还没建出来，不是没起来。
+    const missing = pod.phase === 'Missing' && !awaitingPodCreation(live, s.deps.clock.now());
+    if (live.state === 'failed' || pod.phase === 'Failed' || pod.phase === 'Succeeded' || missing || (pod.waitingReason && CONTAINER_START_FAILURES.has(pod.waitingReason))) {
       return fail('runner-unavailable', `测试容器没有起来：${RUNNER_UNAVAILABLE_HINT}${note || (live.message ? `：${live.message}` : '')}`);
     }
     if (pod.imageId) context.imageDigest = pod.imageId;

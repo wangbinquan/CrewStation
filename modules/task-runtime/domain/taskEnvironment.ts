@@ -56,6 +56,8 @@ export interface WorkloadRender {
    */
   readonly checkout?: { readonly repoUrl: string; readonly branch: string; readonly credentialSecretName?: string };
   readonly previewRoute?: { readonly host: string; readonly middlewares: readonly { readonly name: string; readonly namespace?: string }[] };
+  /** 档位测试（I25 第四步）用 Pod 内的临时目录，没有工作卷。 */
+  readonly workVolume?: 'emptyDir';
   /**
    * 执行环境（I25 第二步）：父工作区受理那一刻的 Pod 名（重建过的工作区 Pod 换了名）。节点与父 Pod、工作卷的 UID 取自 `native`，
    * 调和器建之前照它们核对父工作区还是受理时那一个。

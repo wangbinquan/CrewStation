@@ -55,6 +55,14 @@ test('检出凭据归这一次启动的（I25）：Runner Secret 之后、Pod �
   expect(shared.calls).toEqual(['secret', 'pod', 'bind:rec-1:u-p:u-s', 'condition:Created=true']);
 });
 
+test('档位测试用临时目录（I25 第四步）：没有卷可等，照样建 Secret 与 Pod', async () => {
+  const { pvc: _pvc, ...scratch } = pod;
+  const h = harness();
+  await applyWorkload(h.deps, record({ kind: 'agent-execution', spec: { children: record({}).spec.children, pod: { ...scratch, emptyDir: true } } }), h.enqueue);
+  expect(h.calls).toEqual(['secret', 'pod', 'bind:rec-1:u-p:u-s', 'condition:Created=true']);
+  expect(h.queued).toEqual([]);
+});
+
 test('不建：所属模块不要（Provisioning 为假或已失败）、没接所属模块、期望不完整（只告警）', async () => {
   const h = harness(['PersistentVolumeClaim/cs-demo/task-1-work']);
   await applyWorkload(h.deps, record({ conditions: [{ type: 'Provisioning', status: 'false' }] }), h.enqueue);

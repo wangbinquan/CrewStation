@@ -112,7 +112,8 @@ function workloadRender(env: TaskEnvironment): ProjectedRecord['render'] {
   const { image, workerUid, resources, checkout, previewRoute } = env.render;
   const pod = {
     image, workerUid, resources, workload: WORKLOAD_LABELS[env.kind], project: env.labels['crewstation.io/project'] ?? '', service: env.labels['crewstation.io/service'] ?? '',
-    pvc: env.pvcName, secret: runnerSecretOf(env), ...executionRender(env),
+    // 档位测试（I25 第四步）用 Pod 内的临时目录，没有工作卷。
+    ...(env.render.workVolume === 'emptyDir' ? { emptyDir: true } : { pvc: env.pvcName }), secret: runnerSecretOf(env), ...executionRender(env),
     // 检出（I25）：没带 Secret 名的，凭据 Secret 由资源中心按这一次启动建（ownedCredential），令牌建的时候向本模块要。
     ...(checkout ? { checkout: { repoUrl: checkout.repoUrl, branch: checkout.branch, credentialSecretName: checkoutSecretOf(env)!, ...(checkout.credentialSecretName ? {} : { ownedCredential: true }) } } : {}),
   };

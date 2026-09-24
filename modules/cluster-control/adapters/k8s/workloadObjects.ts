@@ -6,7 +6,7 @@ import type { VolumeRender, WorkloadPodRender, WorkloadPreviewRender } from '../
 export function workloadPodObject(pod: WorkloadPodRender): K8sObject {
   const object = taskPodObject({
     name: pod.name, namespace: pod.namespace, taskId: pod.taskId, workload: pod.workload, project: pod.project, service: pod.service, image: pod.image,
-    workerUid: pod.workerUid, resources: pod.resources, workVolume: { pvc: pod.pvc }, envFromSecret: pod.secret, ...(pod.checkout ? { checkout: pod.checkout } : {}),
+    workerUid: pod.workerUid, resources: pod.resources, workVolume: pod.pvc ? { pvc: pod.pvc } : { emptyDir: true }, envFromSecret: pod.secret, ...(pod.checkout ? { checkout: pod.checkout } : {}),
     ...(pod.nodeName ? { nodeName: pod.nodeName } : {}), ...(pod.labels ? { labels: pod.labels } : {}),
   });
   if (pod.annotations) object.metadata.annotations = { ...object.metadata.annotations, ...pod.annotations };

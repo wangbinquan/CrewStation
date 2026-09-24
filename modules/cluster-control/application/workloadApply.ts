@@ -58,14 +58,15 @@ export async function applyWorkload(deps: WorkloadApplyDeps, record: LedgerRecor
     deps.logger.warn('resource workload spec incomplete', { resourceId: record.id });
     return;
   }
-  const { pod, preview } = render, owners = deps.workloads, volume = deps.feed.cached('PersistentVolumeClaim', pod.namespace, pod.pvc);
+  const { pod, preview } = render, owners = deps.workloads, volume = pod.pvc ? deps.feed.cached('PersistentVolumeClaim', pod.namespace, pod.pvc) : undefined;
   // 执行环境（I25 第二步）：父工作区的 Pod 与卷要还是受理时那两个实例；没了或换了，交所属模块判失败、不建。
   if (pod.workspace && !workspaceUnchanged(pod, deps.feed.cached('Pod', pod.namespace, pod.workspace.pod), volume)) {
     deps.logger.warn('resource workload workspace changed', { resourceId: record.id, workspacePod: pod.workspace.pod });
     await owners.workloadUnavailable(record.id, 'workspace-changed');
     return;
   }
-  if (!volume) {
+  // 档位测试（I25 第四步）用临时目录，不等卷。
+  if (pod.pvc && !volume) {
     deps.logger.debug('resource workload waiting for volume', { resourceId: record.id, pvc: pod.pvc });
     enqueue(record.id, deps.retryMs ?? WAIT_MS);
     return;

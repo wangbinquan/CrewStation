@@ -2,6 +2,7 @@ import type { TaskId } from '@crewstation/contracts';
 import { notFound, precondition } from '@crewstation/kernel';
 import { completeStage } from '../domain/podStartup';
 import { hashRunnerToken, newRunnerToken } from '../domain/runnerToken';
+import { PROFILE_TEST_SERVICE } from '../domain/profileTestEnvironment';
 import { EXECUTION_NOUN, purposeOf, wantsProvisioning } from '../domain/taskEnvironment';
 import type { TaskEnvironment } from '../domain/taskEnvironment';
 import { containerEnv } from './containerEnv';
@@ -32,7 +33,8 @@ export function workloadRenderUseCases(deps: TaskRuntimeUseCaseDeps) {
       const env = await current(taskId);
       if (!wantsProvisioning(env)) throw precondition('这个环境眼下不需要建出容器', { taskId, state: env.state });
       if (env.native) await requireRunningWorkspace(deps, env);
-      const svc = await deps.services.resolveServiceById(env.serviceId);
+      // 档位测试（I25 第四步）是平台任务，不属于任何服务。
+      const svc = env.kind === 'profile-test' ? PROFILE_TEST_SERVICE : await deps.services.resolveServiceById(env.serviceId);
       if (!svc) throw precondition('环境所属的服务已不存在', { taskId });
       const token = newRunnerToken();
       const values = await containerEnv(deps, env, svc, token);

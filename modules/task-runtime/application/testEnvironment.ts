@@ -2,7 +2,7 @@ import type { TaskId, TraceId } from '@crewstation/contracts';
 import { newId, newTraceId, quotaExceeded, validation } from '@crewstation/kernel';
 import { failStartup, initialStartup } from '../domain/podStartup';
 import { hashRunnerToken, newRunnerToken } from '../domain/runnerToken';
-import { PROFILE_TEST_LABELS, PROFILE_TEST_MAX_CONCURRENT, PROFILE_TEST_PROJECT_ID, PROFILE_TEST_SERVICE_ID } from '../domain/profileTestEnvironment';
+import { PROFILE_TEST_MAX_CONCURRENT, PROFILE_TEST_PROJECT_ID, PROFILE_TEST_SERVICE, PROFILE_TEST_SERVICE_ID } from '../domain/profileTestEnvironment';
 import type { TaskEnvironment } from '../domain/taskEnvironment';
 import { podNameFor, pvcNameFor, transition } from '../domain/taskEnvironment';
 import { recordPodInstance } from './createEnvironment';
@@ -36,13 +36,16 @@ export function createTestEnvironmentUseCase(deps: TaskRuntimeUseCaseDeps) {
       namespace: settings.systemNamespace, podName: podNameFor(id), pvcName: pvcNameFor(id), traceId: newTraceId() as TraceId, runnerTokenHash: hashRunnerToken(token), connected: false,
       labels: input.labels ?? {}, createdAt: now, updatedAt: now, lastActivityAt: now, startup: initialStartup(now),
     };
+    // 由资源中心建出（RFC-025 I25 第四步）：只到登记为止，Runner Secret 与 Pod 由调和器照记录建，凭据不再以明文环境变量写进 Pod 规格。
+    const rendered = deps.creation === 'ledger' ? { ...env, render: { image: input.image, workerUid: settings.workerUid, resources: { cpu: profile.cpu, memory: profile.memory, storage: profile.storage }, start: 1, workVolume: 'emptyDir' as const } } : undefined;
     await uow.run(async (scope) => {
       await scope.admissions.lock(PROFILE_TEST_PROJECT_ID);
       if (!(await scope.admissions.tryAcquire(PROFILE_TEST_PROJECT_ID, PROFILE_TEST_MAX_CONCURRENT))) throw quotaExceeded(`同时进行的档位测试已达 ${PROFILE_TEST_MAX_CONCURRENT} 个，请稍后重测`);
-      await scope.environments.insert(env);
+      await scope.environments.insert(rendered ?? env);
     });
+    if (rendered) return rendered;
     try {
-      const envVars = await containerEnv(deps, env, { slug: PROFILE_TEST_LABELS.project, name: PROFILE_TEST_LABELS.service }, token);
+      const envVars = await containerEnv(deps, env, PROFILE_TEST_SERVICE, token);
       const podUid = await cluster.createPod({ env, image: input.image, envVars, resources: { cpu: profile.cpu, memory: profile.memory, storage: profile.storage }, workVolume: 'emptyDir' });
       await recordPodInstance(deps, env, podUid);
     } catch (error) {

@@ -10,6 +10,8 @@ export const PROFILE_TEST_PROJECT_ID = BUILTIN_RESOURCES.profileTestProject as P
 export const PROFILE_TEST_SERVICE_ID = BUILTIN_RESOURCES.profileTestService as ServiceId;
 export const PROFILE_TEST_MAX_CONCURRENT = 4;
 export const PROFILE_TEST_LABELS = { project: 'platform', service: 'profile-test' } as const;
+/** 档位测试不属于任何服务：Runner 的平台约定变量里的服务就是这一个（哨兵服务查不到真实服务）。 */
+export const PROFILE_TEST_SERVICE = { slug: PROFILE_TEST_LABELS.project, name: PROFILE_TEST_LABELS.service } as const;
 
 /**
  * 档位测试里 `{{mcp.*}}` 的取值（RFC-006 C16）：启动前步骤的内容模板引用了 mcp.* 时，给平台两个 MCP 的真实地址，

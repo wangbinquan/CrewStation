@@ -11,6 +11,9 @@ describe('调和器渲染的工作区对象', () => {
     expect(spec.containers[0]).toMatchObject({ env: [], envFrom: [{ secretRef: { name: 'task-1-runner-2' } }] });
     expect(spec.volumes).toEqual([{ name: 'work', persistentVolumeClaim: { claimName: 'task-1-work' } }]);
     expect(object.metadata.labels).toMatchObject({ 'crewstation.io/workload': 'business-task', 'crewstation.io/task': 'rec-1' });
+    // 档位测试（I25 第四步）：Pod 内的临时目录，没有 PVC。
+    const { pvc: _pvc, ...scratch } = pod;
+    expect((workloadPodObject({ ...scratch, emptyDir: true }).spec as { volumes: unknown[] }).volumes).toEqual([{ name: 'work', emptyDir: {} }]);
   });
 
   test('执行环境（I25 第二步）：Pod 钉在父工作区的节点；附加标签与注解 Pod 和 Runner Secret 都带，平台标签照旧', () => {

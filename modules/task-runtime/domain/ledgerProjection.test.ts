@@ -124,6 +124,15 @@ describe('任务环境投影到资源台账（RFC-025 第二期）', () => {
     expect(rebuilt.volume).not.toHaveProperty('render');
   });
 
+  test('资源中心建出的档位测试（I25 第四步）：Pod 用临时目录、没有工作卷记录，Runner Secret 归这一次启动', () => {
+    const render = { image: 'img', workerUid: 10001, resources: { cpu: '1', memory: '2Gi', storage: '10Gi' }, start: 1, workVolume: 'emptyDir' as const };
+    const test = projectEnvironment(env({ kind: 'profile-test', state: 'creating', connected: false, namespace: 'crewstation-system', render, labels: { 'crewstation.io/project': 'platform', 'crewstation.io/service': 'profile-test' } }));
+    expect(test.workload).toMatchObject({ kind: 'agent-execution', purpose: 'profile-test', children: [{ kind: 'Pod', name: 'task-100' }, { kind: 'Secret', name: 'task-100-runner-1' }] });
+    expect(test.workload.render).toEqual({ pod: { image: 'img', workerUid: 10001, resources: render.resources, workload: 'profile-test', project: 'platform', service: 'profile-test', emptyDir: true, secret: 'task-100-runner-1' } });
+    expect(test.workload.conditions).toContainEqual({ type: 'Provisioning', status: 'true' });
+    expect(test.volume).toBeUndefined();
+  });
+
   test('资源中心建出的执行环境（I25 第二步）：排队中要建，期望带节点、父工作区、所属工作区标签与意图注解；Secret 沿用 `<Pod 名>-runner`；准备好后不再要建', () => {
     const render = { image: 'img', workerUid: 10001, resources: { cpu: '1', memory: '2Gi', storage: '10Gi' }, start: 1, execution: { workspacePod: 'task-100' } };
     const queued = projectEnvironment(env({ id: '01a0bf5d-8f4b-7c01-8e19-e226732a7102' as TaskId, state: 'creating', podName: 'cli-102', native: native({ state: 'queued' }), connected: false, render, labels: { 'crewstation.io/project': 'demo', 'crewstation.io/service': 'demo' } }));

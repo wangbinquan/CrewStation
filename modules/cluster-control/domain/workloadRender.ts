@@ -13,7 +13,9 @@ export interface WorkloadPodRender {
   readonly workload: string;
   readonly project: string;
   readonly service: string;
-  readonly pvc: string;
+  /** 工作卷的 PVC；档位测试（I25 第四步）没有，用 Pod 内的临时目录（emptyDir），两者正好有一个。 */
+  readonly pvc?: string;
+  readonly emptyDir?: true;
   readonly secret: string;
   /**
    * 检出：ownedCredential 为真时凭据 Secret（键 `token`）也由调和器按这一次启动建，内容建的时候向所属模块要；否则是所属模块写好的
@@ -68,7 +70,7 @@ function extrasOf(pod: Fields): Extras | undefined {
   const nodeName = pod['nodeName'], workspace = pod['workspace'];
   const labels = pod['labels'] === undefined ? {} : labelsOf(pod['labels']), annotations = pod['annotations'] === undefined ? {} : labelsOf(pod['annotations']);
   if ((nodeName !== undefined && !text(nodeName)) || !labels || !annotations || Object.keys(labels).some((key) => RESERVED_LABELS.has(key))) return undefined;
-  if (workspace !== undefined && (!texts(workspace, ['pod', 'podUid', 'pvcUid']) || !text(nodeName))) return undefined;
+  if (workspace !== undefined && (!texts(workspace, ['pod', 'podUid', 'pvcUid']) || !text(nodeName) || !text(pod['pvc']))) return undefined;
   return {
     ...(text(nodeName) ? { nodeName } : {}), ...(Object.keys(labels).length ? { labels } : {}), ...(Object.keys(annotations).length ? { annotations } : {}),
     ...(isFields(workspace) ? { workspace: { pod: workspace['pod'] as string, podUid: workspace['podUid'] as string, pvcUid: workspace['pvcUid'] as string } } : {}),
@@ -85,7 +87,9 @@ function checkoutOf(checkout: Fields): NonNullable<WorkloadPodRender['checkout']
 }
 
 function podOf(recordId: string, pod: unknown, child: { readonly namespace?: string; readonly name: string } | undefined): WorkloadPodRender | undefined {
-  if (!child?.namespace || !texts(pod, ['image', 'workload', 'pvc', 'secret']) || typeof pod['workerUid'] !== 'number' || typeof pod['project'] !== 'string' || typeof pod['service'] !== 'string') return undefined;
+  if (!child?.namespace || !texts(pod, ['image', 'workload', 'secret']) || typeof pod['workerUid'] !== 'number' || typeof pod['project'] !== 'string' || typeof pod['service'] !== 'string') return undefined;
+  // 工作目录：自己的 PVC 或 Pod 内的临时目录，正好一个。
+  if (text(pod['pvc']) === (pod['emptyDir'] === true)) return undefined;
   if (!texts(pod['resources'], ['cpu', 'memory', 'storage'])) return undefined;
   const checkout = pod['checkout'], extras = extrasOf(pod);
   if ((checkout !== undefined && (!texts(checkout, ['repoUrl', 'branch', 'credentialSecretName']) || (checkout['ownedCredential'] !== undefined && typeof checkout['ownedCredential'] !== 'boolean'))) || !extras) return undefined;
@@ -93,7 +97,7 @@ function podOf(recordId: string, pod: unknown, child: { readonly namespace?: str
   return {
     name: child.name, namespace: child.namespace, taskId: recordId, image: pod['image'] as string, workerUid: pod['workerUid'],
     resources: { cpu: resources['cpu'] as string, memory: resources['memory'] as string, storage: resources['storage'] as string },
-    workload: pod['workload'] as string, project: pod['project'], service: pod['service'], pvc: pod['pvc'] as string, secret: pod['secret'] as string,
+    workload: pod['workload'] as string, project: pod['project'], service: pod['service'], ...(text(pod['pvc']) ? { pvc: pod['pvc'] } : { emptyDir: true as const }), secret: pod['secret'] as string,
     ...(checkout ? { checkout: checkoutOf(checkout) } : {}),
     ...extras,
   };

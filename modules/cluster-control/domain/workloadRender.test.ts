@@ -27,6 +27,11 @@ describe('工作区记录 → 渲染输入', () => {
       { pod, preview: { port: 3000, kind: 'dev-session', route: { middlewares: [] } } },
     ]) expect(workloadRenderOf('rec-1', { children, ...broken })).toBeUndefined();
     expect(workloadRenderOf('rec-1', { children: [{ kind: 'Pod', name: 'task-1' }], pod })).toBeUndefined();
+    // 工作目录：自己的 PVC 或 Pod 内的临时目录（档位测试，I25 第四步），正好一个。
+    const { pvc: _pvc, ...scratch } = pod;
+    expect(workloadRenderOf('rec-1', { children, pod: { ...scratch, emptyDir: true } })?.pod).toEqual({ name: 'task-1', namespace: 'cs-demo', taskId: 'rec-1', ...scratch, emptyDir: true });
+    expect(workloadRenderOf('rec-1', { children, pod: { ...pod, emptyDir: true } })).toBeUndefined();
+    expect(workloadRenderOf('rec-1', { children, pod: scratch })).toBeUndefined();
     expect(workloadRenderOf('rec-1', { children: [children[0]!], pod, preview: { port: 3000, kind: 'dev-session' } })).toBeUndefined();
   });
 });
@@ -45,6 +50,9 @@ describe('执行环境记录 → 渲染输入', () => {
       { labels: { 'crewstation.io/task': 'other' } }, { labels: { 'crewstation.io/workload': 'x' } }, { labels: { a: 1 } }, { annotations: 'x' }, { nodeName: '' },
       { workspace: extras.workspace }, { nodeName: 'node-a', workspace: { pod: 'task-p', podUid: 'u-parent' } },
     ]) expect(workloadRenderOf('exe-1', { children, pod: { ...pod, ...broken } })).toBeUndefined();
+    // 执行环境挂父工作区的卷：没有 PVC 的不渲染。
+    const { pvc: _pvc, ...scratch } = pod;
+    expect(workloadRenderOf('exe-1', { children, pod: { ...scratch, emptyDir: true, ...extras } })).toBeUndefined();
   });
 
   test('父工作区核对：没有要核对的一律没变；缓存里缺一样，或实例、节点、运行、绑定、删除中任一不对，都算变了', () => {
