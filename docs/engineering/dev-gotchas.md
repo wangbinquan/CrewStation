@@ -293,7 +293,7 @@ D64 之前默认策略的出向只到 DNS 与 `crewstation-system`，所以同�
 
 **后三条不起作用却还在。** 资源中心的调和器对网络策略只建、只改回、从不删（RFC-025 第四期），孤儿回收也不扫 NetworkPolicy。从 `NETWORK_POLICIES` 里去掉一个名字，线上对象不会消失；真要撤掉，得先给调和器补删除。
 
-**策略形状变了，存量命名空间由调和器改回。** cs-controller 启动后调和器把全部台账记录排一遍、之后每 10 分钟再排一遍，比对时数组按长度逐个比，形状不同就服务端 apply（`egress` 是 atomic 列表，整张替换）。所以改了 `packages/k8s/objects/cluster.ts` 里的策略，只需换 cs-controller 的镜像。换过版没见到新形状，先看调和器的日志和这个项目的 `network-policy-set` 记录。RFC-025 之前靠的是启动时的命名空间重下发（`modules/provisioning/workers/namespaceReapply.ts`），它现在只写台账期望。
+**策略形状变了，存量命名空间由调和器改回。** cs-controller 启动后调和器把全部台账记录排一遍、之后每 10 分钟再排一遍；线上被人改了，观测事件会让它当场核对。网络策略的 spec 逐字段比，不一致就服务端 apply（`egress` 是 atomic 列表，整张替换）。其他种类按子集比，期望里的空对象 `{}` 会被任何对象当成已覆盖；网络策略的 `podSelector: {}`、出向规则 `{}` 都是这种空对象，所以 e4f15449 起单独改成了逐字段比。所以改了 `packages/k8s/objects/cluster.ts` 里的策略，只需换 cs-controller 的镜像。换过版没见到新形状，先看调和器的日志和这个项目的 `network-policy-set` 记录。RFC-025 之前靠的是启动时的命名空间重下发（`modules/provisioning/workers/namespaceReapply.ts`），它现在只写台账期望。
 
 **测出站别用 `example.com`。** 本机集群里解析 `example.com` 稳定超时（`DNS_ETIMEOUT`，主机上正常，原因没查），拿它测会把 DNS 失败误当成被策略挡住。要拆开测：先解析一个域名（如 `opencode.ai`），再按 IP 连 `https://1.1.1.1`，最后按域名连。被策略挡住的样子是 DNS 成功、连接 8 秒超时。
 

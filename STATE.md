@@ -26,6 +26,12 @@
   - 入向隔离仍在：cs-demo 服务槽连 rfc006-verify 服务槽的 Pod IP，8 秒超时；对照组 cs-api（系统命名空间）连同一地址得 200。
   - 迁移 Job 没有实跑发布。它和服务槽同受默认策略（`podSelector: {}`）约束，出向随之放开。
 - **注意**：本机集群里解析 `example.com` 稳定超时（`DNS_ETIMEOUT`；主机上正常，原因没查），测出站别用它，已写进 dev-gotchas。
+- **顺手修：调和器不改回被改窄的网络策略**（e4f15449，与 crewstation-90 约定由本会话修）：
+  - 原因：`covers` 按子集比，期望里的空对象 `{}` 被任何对象当成已覆盖。默认策略的 `podSelector: {}` 被改成只选部分 Pod（其余 Pod 失去入向隔离），或全放行的出向 `[{}]` 被改窄成一条，调和器都判「未变」。任务、构建、接入三条策略的 `[{}]` 也一样。D64 换版能收敛，是因为旧形状有两条规则、长度不同。
+  - 修法：`objectCovered` 对 NetworkPolicy 的 spec 做深比较，其他种类照旧。改前核对过：本机 45 条受管网络策略与渲染出的期望逐字段相同。
+  - 用例：`coverage.test.ts` 新增一条，在旧代码下红。门禁在 `git archive 6e56d5f2` 干净导出树上叠本批 2 个文件：unit 685／0，module 1362 pass／12 skip／0 fail，console 900／0。CI [35972874095](https://github.com/wangbinquan/CrewStation/actions/runs/35972874095) 六项全部成功。
+  - 实机复现：08:02:24Z 在 cs-rfc010-cluster-qa（只有一个空闲服务槽）把 `crewstation-default` 的出向改成单条规则（仍放行 DNS 与系统命名空间），旧代码 25 秒不改回、日志里没有这个命名空间。
+  - 修复上线：08:03:40Z 只把 cs-controller 滚到 `cs-control-plane:np-exact-20260924`（`git archive e4f15449`，与线上 rc025-i28b 只差这一处），2 秒后改回。之后 60 秒内网络策略的写入只有这一条，另外 44 条没被误判。08:05:04Z 再改窄一次，同一秒内即被改回。该服务槽出公网恢复 301，14 条默认策略都是新形状。
 
 ## 应用可见范围在网关拦截，项目角色新增「用户」（2026-09-24）
 
