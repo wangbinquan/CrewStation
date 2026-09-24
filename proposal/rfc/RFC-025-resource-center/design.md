@@ -240,6 +240,8 @@ ResourceActionSchema = z.object({ id: ResourceActionIdSchema, enabled: z.boolean
 
 > **实施补记（2026-09-24，I28 裁定后第一步：生产库、开发库的建移交）**：按 [I28](../../../docs/engineering/implementation-open-questions.md#i28-数据面的调和器建角色时口令与连接串放在哪) 的 (b)，库与运行角色改由 `data-control` 建。`data` 开通时只写期望——`database` 记录的期望里标明 `provision: data-control`（没存连接串的资源才标，旧库都存着、照旧由 data 管）——然后有限时地等（缺省 60 秒）：记录就绪（库与角色都观测到了）且口令已存下才算建好，超时记失败，期望留着，调和器会接着建，下次开通重试。`data-control` 在调和循环里发现这样的记录库或角色不在：口令取已存的（没有才生成——24 字节随机数的 base64url——先加密存进自己的表 `data_control.credentials`，按记录 ID），再建或改运行角色、库不在才建（属主是这个角色）、撤销 PUBLIC 的 CONNECT，建完当场补一次观测；重试与两条节奏并发时用的都是存下的同一个口令，重复执行结果不变。`data` 不再存这类库的连接串：渲染容器环境时经端口 `credentialOf` 向 `data-control` 要口令，用容器看得到的主机与端口拼成连接串，值不落 data 的库、不进台账。运维开关 `CS_DATA_PROVISIONING=data` 回退为 data 自己建。访问绑定的临时角色、口令轮换是后续步骤。
 
+> **实施补记（2026-09-24，I28 第二步：访问绑定的临时角色）**：诊断只读、生产变更的临时角色同样由 `data-control` 建。`data` 批准时只记下角色名、把绑定置为生效，期望里标明 `provision: data-control`（生效、知道所在的生产库、data 没存连接串的才标），然后等它建好再答复负责人（过了时限照样答复，调和器会接着建）；`data-control` 取已存口令（没有才生成、先存再建）建角色——在就改口令与到期、不在就建（LOGIN、VALID UNTIL，数据库自己执行到期），只给所在的生产库 CONNECT，只读的授 `pg_read_all_data`，可写的继承运行角色——建完当场补观测。渲染任务的数据环境时，这类绑定经端口要口令、用生产库名拼连接串；开发模式的绑定不再在绑定里存一份开发库连接串，照开发库现取。收回、到期后的删除照旧（data 与 data-control 都删，重复删除无害）；已存着连接串的旧绑定照旧。口令轮换仍是后续步骤。
+
 ## 7. 流量：路由、说明页、限流、身份索引
 
 ### 7.1 路由
