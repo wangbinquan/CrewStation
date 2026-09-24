@@ -12,6 +12,8 @@ export { deploymentObject, jobObject, podObject, podTemplate } from './objects/w
 export { buildEgressNetworkPolicy, configMapObject, integrationEgressNetworkPolicy, namespaceObject, projectNetworkPolicy, pvcObject, resourceQuotaObject, secretObject, serviceObject, taskEgressNetworkPolicy } from './objects/cluster';
 export type { MiddlewareRef, RouteTarget } from './objects/traefik';
 export { dropIdentityHeadersMiddleware, forwardAuthMiddleware, ingressRouteObject, stripPrefixMiddleware } from './objects/traefik';
+export type { TaskCheckout, TaskPodInput, TaskPreviewInput } from './objects/task';
+export { TASK_RUNNER_COMMAND, taskPodObject, taskPreviewObjects } from './objects/task';
 
 export { boundedMetricsText, parseMetricsJson } from './metrics';
 export type { PodEventLike, PodImagePull, PodStartupContainer, PodStartupObservation } from './podStartup';
