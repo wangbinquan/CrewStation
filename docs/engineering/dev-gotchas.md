@@ -568,6 +568,12 @@ TanStack Router 只给声明了 `errorComponent`（或路由器上有 `defaultEr
 **做法**：按地址自动导航（`replace` 写回）或改持久状态的效应，只认本页路径上的地址——见 `useDevelopmentLocation` 的 `usePageLocation`：
 路径不是本页时沿用本页最后一次的地址，并且不发 `replace`。只做显示的读取（导航高亮、记住位置）不受影响。
 
+### TanStack Router 的 `Link` 自己判定为当前时强行写 `aria-current`：要自定当前项，先把它的判定收窄到路径完全相同
+
+`useLinkProps` 最后展开 `STATIC_ACTIVE_PROPS`（`data-status="active"`、`aria-current="page"`），调用方传的 `aria-current` 盖不掉；`activeProps` 只能加样式，拦不住这两个属性。
+2026-09-24 实撞：新建接入容器、接入项目的开通页与资源配置页的路径在 `/admin/projects/...` 下，默认的前缀匹配总把左栏「项目管理」标成当前项，而作者裁定它们归「能力接入」。
+**做法**：当前项由一处纯函数算出（`shared/admin/adminNavigation.ts` 的 `currentAdminPage`）。左栏链接一律传 `activeOptions={{ exact: true, includeSearch: false }}` 和 `activeProps={{}}`，`className` 与 `aria-current` 由调用方自己写。这样路由只在路径完全相同时自己标当前，此时与算出的当前项一致；其余情况由算出的结果补上。
+
 ### 源码层断言要先去掉注释
 
 「代码里不许出现 localStorage」这类断言，会被解释「为什么不用 localStorage」的注释绊倒。
