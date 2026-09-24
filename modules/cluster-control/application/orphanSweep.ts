@@ -85,6 +85,13 @@ async function sweepMiddlewares(deps: SweepDeps, result: SweepResult): Promise<v
   }
 }
 
+/** 命名空间属于哪个项目：认领 Namespace 对象的命名空间记录（provisioning 写的）上的项目；查不到就不归项目。 */
+async function projectOfNamespace(ledger: LedgerObservations, namespace: string | undefined): Promise<string | undefined> {
+  const id = namespace ? await ledger.claimOf({ kind: 'Namespace', name: namespace }) : undefined;
+  const record = id ? await ledger.get(id) : undefined;
+  return record?.kind === 'namespace' ? record.projectId : undefined;
+}
+
 /**
  * 一轮孤儿回收：Pod、Secret、Service、路由按 UID 删；PVC 可能有数据，不删，建一条归资源中心的工作卷记录并写「待回收」，
  * 等管理员确认。每删一个、每登记一个都记一行日志（谁、哪个对象、归属的任务）。
@@ -105,7 +112,8 @@ export async function sweepOrphans(deps: SweepDeps): Promise<SweepResult> {
       if (!(await isOrphan(deps, object, taskOf))) continue;
       const identity = identityOf(object), taskId = object.metadata.labels?.[TASK_LABEL];
       if (kind === 'PersistentVolumeClaim') {
-        await deps.ledger.adoptOrphanVolume({ ...identity, uid: object.metadata.uid! });
+        const projectId = await projectOfNamespace(deps.ledger, identity.namespace);
+        await deps.ledger.adoptOrphanVolume({ ...identity, uid: object.metadata.uid!, ...(projectId ? { projectId } : {}) });
         result.volumes += 1;
         deps.logger.info('resource orphan volume registered', { namespace: identity.namespace, name: identity.name, taskId });
         continue;

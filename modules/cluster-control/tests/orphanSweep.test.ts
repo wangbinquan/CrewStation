@@ -39,10 +39,12 @@ describe.skipIf(!available)('孤儿回收（RFC-025 设计 §6.4、D8）', () =>
       changesSince: resources.api.changesSince, latestChange: resources.api.latestChange, observeConditions: (id, conditions) => resources.api.observeConditions(id, conditions),
       children: (parentId) => resources.api.list({ parentId, includeStopped: true }),
       adoptOrphanVolume: async (child) => {
-        const record = await resources.api.owner('cluster-control').declare({ kind: 'volume', ref: `orphan:${child.namespace ?? ''}/${child.name}`, spec: { children: [{ kind: child.kind, ...(child.namespace ? { namespace: child.namespace } : {}), name: child.name }] } });
+        const record = await resources.api.owner('cluster-control').declare({ kind: 'volume', ref: `orphan:${child.namespace ?? ''}/${child.name}`, ...(child.projectId ? { projectId: child.projectId as ProjectId } : {}), spec: { children: [{ kind: child.kind, ...(child.namespace ? { namespace: child.namespace } : {}), name: child.name }] } });
         await resources.api.observeConditions(record.id, [{ type: 'PendingReclaim', status: 'true', reason: 'orphaned', message: '孤儿工作卷' }]);
       },
     };
+    // 项目的命名空间记录（provisioning 写的）：孤儿卷据此归到项目下。
+    await resources.api.owner('provisioning').declare({ kind: 'namespace', ref: PROJECT, projectId: PROJECT, spec: { children: [{ kind: 'Namespace', name: 'cs-demo' }] } });
     // 在运行的会话：台账里有它的记录，列着当前的 Pod 与 Runner Secret。
     await resources.api.owner('task-runtime').declare({ id: LIVE, kind: 'dev-workspace', ref: LIVE, projectId: PROJECT, spec: { children: [{ kind: 'Pod', namespace: 'cs-demo', name: 'task-r-new' }, { kind: 'Secret', namespace: 'cs-demo', name: 'task-r-new-runner' }] } });
     objects.push(
@@ -66,7 +68,7 @@ describe.skipIf(!available)('孤儿回收（RFC-025 设计 §6.4、D8）', () =>
     expect(removed.sort()).toEqual(['IngressRoute/task-legacy', 'Pod/task-gone', 'Secret/task-missing-runner', 'Secret/task-r-old-runner']);
     expect(result).toEqual({ removed: 4, volumes: 1 });
     const volume = (await resources.api.list({ kind: 'volume', includeStopped: true })).find((record) => record.owner.module === 'cluster-control');
-    expect(volume).toMatchObject({ owner: { ref: 'orphan:cs-demo/task-gone-work' }, phase: 'stopped', reason: { code: 'orphaned' } });
+    expect(volume).toMatchObject({ owner: { ref: 'orphan:cs-demo/task-gone-work' }, projectId: PROJECT, phase: 'stopped', reason: { code: 'orphaned' } });
   });
 
   test('不动的：台账认领的、建出不满 10 分钟的、删除中的、没有任务标签的、任务还在而台账没跟上的；登记过的孤儿卷下一轮不重复', async () => {

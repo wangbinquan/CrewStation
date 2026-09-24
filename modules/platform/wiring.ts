@@ -432,7 +432,7 @@ function composeControl(deps: CompositionDeps, core: ReturnType<typeof composeCo
       observeConditions: (id, conditions) => ledger.api.observeConditions(id, conditions), children: (parentId) => ledger.api.list({ parentId, includeStopped: true }),
       // 孤儿 PVC 由资源中心自己认领：工作卷记录归 cluster-control，写「待回收」等管理员确认（设计 §6.4）。
       adoptOrphanVolume: async (child) => {
-        const record = await ledger.api.owner('cluster-control').declare({ kind: 'volume', ref: `orphan:${child.namespace ?? ''}/${child.name}`, spec: { children: [{ kind: child.kind, ...(child.namespace ? { namespace: child.namespace } : {}), name: child.name }] }, display: { mode: 'orphaned' } });
+        const record = await ledger.api.owner('cluster-control').declare({ kind: 'volume', ref: `orphan:${child.namespace ?? ''}/${child.name}`, ...(child.projectId ? { projectId: child.projectId as ProjectId } : {}), spec: { children: [{ kind: child.kind, ...(child.namespace ? { namespace: child.namespace } : {}), name: child.name }] }, display: { mode: 'orphaned' } });
         await ledger.api.observeConditions(record.id, [{ type: 'PendingReclaim', status: 'true', reason: 'orphaned', message: '集群里有、台账里没有的工作卷：留作待回收，由管理员确认后删除' }]);
       },
     },
