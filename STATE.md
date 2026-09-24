@@ -24,10 +24,12 @@
   - 05:01:51Z 只滚本机 console 到 `cs-console:cluster-actions-20260924`（同一笔提交的 git archive 构建，imageID `sha256:2523d217b8c2…`，generation 171，1／1），控制面没动。
   - 线上以 dev-admin 核对（无头 Chrome，只读，没点任何动作按钮）：平台组件 Deployment、项目服务槽、开发会话 Pod、待回收工作卷、Service、命名空间六类详情，同一行按钮的顶边一致；1000px 宽一行四个、390px 宽两两一行也一致；英文不再重叠。
   - `clusterLayout` e2e 7／7 通过。
-- **注意**：
-  - 英文第二行两个按钮宽 184／154，右边那个比上一行右移 15px（不再重叠）。要完全对齐，可以把英文标签缩成「Restore replicas」，等作者定。
-  - 只有一个记录操作时（待回收工作卷的「删除工作卷」），按钮仍占满整行。原来就这样，改成红框后更显眼。
-  - 无头 Chrome（CDP 9333）上有两个没有脚本连着、停在登录页的孤儿页，已关掉。
+- **作者追加裁定（同日）**：
+  - 改英文描述：格子不窄于按钮之后，英文第二行是 184／154，右边的按钮比上一行右移 15px。英文标签缩成「Restore replicas」（d93c06ba），两行都是 169／169。
+  - e2e 加一条各列上下对齐：旧标签下差 15px，失败。
+  - 门禁（干净导出树）2908 pass／99 skip／0 fail；CI [35959672999](https://github.com/wangbinquan/CrewStation/actions/runs/35959672999) 六项成功；05:23:43Z 再滚 console 到 `cs-console:cluster-actions-2-20260924`（generation 172）；`clusterLayout` e2e 7／7。
+  - 只有一个记录操作时（待回收工作卷的「删除工作卷」），按钮占满整行：作者接受，不改。
+- **注意**：无头 Chrome（CDP 9333）上有两个没有脚本连着、停在登录页的孤儿页，已关掉。
 
 ## 项目 slug 保留名补上平台占用的主机前缀；用户域划分登记为 I30（2026-09-24）
 
