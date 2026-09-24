@@ -409,4 +409,4 @@ bun run scaffold:module <name> <layer> [--deps a,b] [--desc "职责"] [--no-pers
 
 ## 10. 许可证
 
-[Apache License 2.0](LICENSE)，与 agent-workflow 相同。
+本项目以 [Apache License 2.0](LICENSE) 授权。
