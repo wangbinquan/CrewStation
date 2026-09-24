@@ -56,6 +56,12 @@ describe('数据资源与访问绑定的期望（RFC-025 第四期）', () => {
     expect(JSON.stringify(active)).not.toContain('boxed');
     expect(bindingProjection(binding({ state: 'approved' })).declaration.conditions).toContainEqual({ type: 'Granted', status: 'false' });
     expect(bindingProjection(binding({ mode: 'development', state: 'active', roleName: 'development' }), { database: 'cs_demo', ownerRole: 'cs_demo' }).declaration.spec).toEqual({ children: [], mode: 'development', ttlMinutes: 30 });
+    // RFC-025 I28 第二步：临时角色由 data-control 建时（生效、知道所在的库、data 没存连接串）期望里标明；旧形状、等批准、开发模式不标。
+    const target = { database: 'cs_demo', ownerRole: 'cs_demo' }, owned = binding({ state: 'active', roleName: 'cs_t_abc', expiresAt });
+    expect(bindingProjection(owned, target, true).declaration.spec.provision).toBe('data-control');
+    for (const spec of [bindingProjection(owned, target).declaration.spec, bindingProjection({ ...owned, secretBox: 'boxed' }, target, true).declaration.spec,
+      bindingProjection(owned, undefined, true).declaration.spec, bindingProjection(binding(), target, true).declaration.spec,
+      bindingProjection(binding({ mode: 'development', state: 'active', roleName: 'development' }), target, true).declaration.spec]) expect(spec).not.toHaveProperty('provision');
   });
 
   test('绑定：拒绝、收回、到期都受理释放，原因照结束的方式', () => {

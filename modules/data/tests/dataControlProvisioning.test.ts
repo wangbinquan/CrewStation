@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import postgres from 'postgres';
-import type { ProjectId, ServiceId } from '@crewstation/contracts';
+import type { Actor, ProjectId, ServiceId, TaskId, UserId } from '@crewstation/contracts';
 import { eventbusMigrations } from '@crewstation/eventbus';
 import { noopLogger } from '@crewstation/kernel';
 import type { DataControlModule } from '@crewstation/module-data-control';
@@ -21,6 +21,8 @@ const suffix = Bun.randomUUIDv7().replace(/-/g, '').slice(-8);
 const slug = `dcp${suffix}`;
 const serviceId = '01a0bf5d-8f4b-76c5-866c-f1feda3d6401' as ServiceId;
 const projectId = '01a0bf5d-8f4b-7178-82e1-9a99060b1402' as ProjectId;
+const taskId = '01a0bf5d-8f4b-7418-8a3f-7cbb4a1fd403' as TaskId;
+const member: Actor = { userId: '01a0bf5d-8f4b-7793-867c-efd7527b3404' as UserId, isAdmin: false };
 
 describe.skipIf(!available)('data：生产库、开发库由 data-control 建（RFC-025 I28）', () => {
   let tdb: TestDatabase;
@@ -30,6 +32,11 @@ describe.skipIf(!available)('data：生产库、开发库由 data-control 建（
   const settings = (url: URL) => ({ defaultPlan: 'db-small', secretKeyBase64: key, postgres: { adminUrl, visibleHost: url.hostname, visiblePort: Number(url.port) } });
   const services = { resolveServiceById: async () => ({ projectId, slug }) };
   let ledger: DataLedger;
+  const temporaryRoles: string[] = [];
+  const dataModule = () => createDataModule({
+    db: tdb.db, ledger, credentials: control.api, provisioningTiming: { waitMs: 15_000, pollMs: 50 }, authorizer: { authorize: async () => undefined },
+    services, isAdmin: async () => false, settings: settings(new URL(adminUrl)), logger: noopLogger,
+  });
 
   beforeAll(async () => {
     tdb = await createTestDatabase([eventbusMigrations, dataMigrations, resourcesMigrations, dataControlMigrations]);
@@ -54,7 +61,7 @@ describe.skipIf(!available)('data：生产库、开发库由 data-control 建（
     // 第二条用例的期望也会被 data-control 接着建出来：一并清掉。
     const names = [`cs_${slug}`, `cs_${slug}_dev`, `cs_x${suffix}`, `cs_x${suffix}_dev`];
     for (const db of names) await admin.unsafe(`DROP DATABASE IF EXISTS "${db}" WITH (FORCE)`);
-    for (const role of names) await admin.unsafe(`DROP ROLE IF EXISTS "${role}"`);
+    for (const role of [...names, ...temporaryRoles]) await admin.unsafe(`DROP ROLE IF EXISTS "${role}"`);
     await admin.end();
     await tdb?.drop();
   });
@@ -79,6 +86,31 @@ describe.skipIf(!available)('data：生产库、开发库由 data-control 建（
     expect(JSON.stringify(record)).not.toContain(credential.password);
     expect((await data.api.envFor(serviceId, 'development'))['CS_DATABASE_URL']).toContain(`/cs_${slug}_dev`);
   });
+
+  // I28 第二步：访问绑定的临时角色也由 data-control 建，口令它存；开发模式的绑定不再存一份开发库连接串。
+  test('访问绑定：批准后等 data-control 建好临时角色才答复；渲染的只读连接串能读不能写；data 不存连接串；开发模式照开发库现取', async () => {
+    const data = dataModule();
+    const prodUrl = (await data.api.envFor(serviceId, 'production'))['CS_DATABASE_URL']!;
+    const owner = postgres(prodUrl, { max: 1, onnotice: () => undefined });
+    try { await owner`CREATE TABLE IF NOT EXISTS orders (id int)`; await owner`INSERT INTO orders VALUES (1)`; } finally { await owner.end(); }
+    const requested = await data.api.requestTaskBinding(member, { taskId, serviceId }, { mode: 'diagnostic-readonly', ttlMinutes: 30, reason: '查一下订单' });
+    const decided = await data.api.decideTaskBinding(member, requested.id, { approve: true });
+    expect(decided.state).toBe('active');
+    temporaryRoles.push(`cs_t_${requested.id.replaceAll('-', '')}`);
+    expect((await resources.api.get(requested.id))?.phase).toBe('ready');
+    const readonly = (await data.api.envForTask(taskId))['CS_PROD_READONLY_DATABASE_URL']!;
+    expect(new URL(readonly).username).toBe(temporaryRoles[0]!);
+    const client = postgres(readonly, { max: 1, onnotice: () => undefined, connect_timeout: 5 });
+    try {
+      expect((await client<{ n: number }[]>`SELECT count(*)::int AS n FROM orders`)[0]?.n).toBe(1);
+      // postgres.js 的查询是惰性的：显式 then 才执行。只读角色写不进去。
+      expect(await client`INSERT INTO orders VALUES (2)`.then(() => 'written', () => 'denied')).toBe('denied');
+    } finally { await client.end(); }
+    await data.api.requestTaskBinding(member, { taskId, serviceId }, { mode: 'development', ttlMinutes: 30 });
+    expect((await data.api.envForTask(taskId))['CS_DATABASE_URL']).toBe((await data.api.envFor(serviceId, 'development'))['CS_DATABASE_URL']);
+    const stored = await tdb.db.execute(`SELECT mode, secret_box FROM data.task_bindings WHERE task_id = '${taskId}' ORDER BY mode`) as unknown as Array<{ mode: string; secret_box: string | null }>;
+    expect(stored.map((row) => [row.mode, row.secret_box])).toEqual([['development', null], ['diagnostic-readonly', null]]);
+  }, 20_000);
 
   test('过了等待时限还没建好：记失败（期望留着，调和器会接着建），下次开通重试；这时 data 不自己建、连接串没有', async () => {
     const other = '01a0bf5d-8f4b-76c5-866c-f1feda3d6409' as ServiceId;

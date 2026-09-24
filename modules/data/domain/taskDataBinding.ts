@@ -37,9 +37,10 @@ export function reject(binding: TaskDataBinding, decidedBy: UserId, now: Date, d
   return { ...binding, state: 'rejected', decidedBy, ...(decision ? { decision } : {}), updatedAt: now };
 }
 
-export function activate(binding: TaskDataBinding, roleName: string, secretBox: string, now: Date): TaskDataBinding {
+/** 生效：记下临时角色；连接串由 data 存（旧形状），或临时角色由 data-control 建、口令它存（RFC-025 I28），这时没有 secretBox。 */
+export function activate(binding: TaskDataBinding, roleName: string, secretBox: string | undefined, now: Date): TaskDataBinding {
   if (binding.state !== 'approved') throw precondition(`绑定处于 ${binding.state}，不能生效`);
-  return { ...binding, state: 'active', roleName, secretBox, updatedAt: now };
+  return { ...binding, state: 'active', roleName, ...(secretBox ? { secretBox } : {}), updatedAt: now };
 }
 
 export function isUsable(binding: TaskDataBinding, now: Date): boolean {

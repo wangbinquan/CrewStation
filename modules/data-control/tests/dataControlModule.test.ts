@@ -34,6 +34,11 @@ function manualDataPlane() {
       if (!roles.has(role)) roles.set(role, { name: role, oid: String(oid += 1) });
       if (!databases.has(database)) databases.set(database, { name: database, oid: String(oid += 1) });
     },
+    // 临时角色（I28 第二步）：记下口令、到期与只读与否，不在才放进表。
+    ensureTemporaryRole: async ({ role, database, ownerRole, readOnly, validUntil, password }) => {
+      ensured.push(`${role}@${database}:${readOnly ? 'read' : ownerRole}:${validUntil}:${password}`);
+      if (!roles.has(role)) roles.set(role, { name: role, oid: String(oid += 1), validUntil });
+    },
     close: async () => { closed = true; },
   };
   return { plane, databases, roles, drops, ensured, snapshots: () => snapshots, closed: () => closed };
@@ -141,6 +146,28 @@ describe.skipIf(!available)('data-control：数据面观测写回台账（RFC-02
     await Bun.sleep(100);
     expect(plane.ensured.some((entry) => entry.startsWith('cs_legacy'))).toBe(false);
     expect(await control.api.credentialOf(legacy.id)).toBeUndefined();
+  });
+
+  // I28 第二步：访问绑定的临时角色同一套——口令先存再建，到期时间与只读与否照期望。
+  test('由 data-control 建的临时角色：标明由它建的生效绑定，角色不在就建（只读／继承运行角色、带到期时间）；期望不全或没标明的不建', async () => {
+    const data = resources.api.owner('data');
+    const expiresAt = new Date(Date.now() + 3_600_000).toISOString();
+    const binding = (ref: string, role: string, extra: Record<string, unknown>) => data.declare({
+      kind: 'data-binding', ref, projectId: PROJECT, conditions: [{ type: 'Prepared', status: 'true' }, { type: 'Granted', status: 'true' }],
+      spec: { children: [{ kind: 'PostgresRole', name: role }], database: 'cs_shop', ownerRole: 'cs_shop', expiresAt, ...extra },
+    });
+    const readOnly = await binding('b-read', 'cs_t_read0001', { mode: 'diagnostic-readonly', provision: 'data-control' });
+    const writer = await binding('b-write', 'cs_t_write0001', { mode: 'production-change', provision: 'data-control' });
+    await until('两条都运行中', async () => (await resources.api.get(readOnly.id))?.phase === 'ready' && (await resources.api.get(writer.id))?.phase === 'ready');
+    const readPassword = (await control.api.credentialOf(readOnly.id))!.password, writePassword = (await control.api.credentialOf(writer.id))!.password;
+    expect(plane.ensured).toContain(`cs_t_read0001@cs_shop:read:${expiresAt}:${readPassword}`);
+    expect(plane.ensured).toContain(`cs_t_write0001@cs_shop:cs_shop:${expiresAt}:${writePassword}`);
+    expect(plane.roles.get('cs_t_read0001')?.validUntil).toBe(expiresAt);
+    // 没标明（旧形状，data 自己建）、开发模式、期望里缺所在的库：都不建。
+    const skipped = [await binding('b-legacy', 'cs_t_legacy0002', { mode: 'diagnostic-readonly' }), await binding('b-dev', 'cs_t_dev0002', { mode: 'development', provision: 'data-control' })];
+    await Bun.sleep(150);
+    for (const record of skipped) expect(await control.api.credentialOf(record.id)).toBeUndefined();
+    expect(plane.ensured.some((entry) => entry.includes('0002'))).toBe(false);
   });
 
   test('装配：没有管理连接也没有 reader 时拒绝；停下时关掉数据面连接', async () => {

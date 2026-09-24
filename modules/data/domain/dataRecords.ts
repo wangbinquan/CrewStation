@@ -31,7 +31,7 @@ export interface BindingDeclaration {
   readonly parentId: string;
   readonly spec: {
     readonly children: readonly Child[]; readonly mode: TaskDataMode; readonly ttlMinutes: number; readonly expiresAt?: string;
-    readonly database?: string; readonly ownerRole?: string;
+    readonly database?: string; readonly ownerRole?: string; readonly provision?: 'data-control';
   };
   readonly display: Readonly<Record<string, string>>;
   readonly conditions: readonly Condition[];
@@ -90,11 +90,16 @@ export interface RoleTarget {
   readonly ownerRole: string;
 }
 
-export function bindingProjection(binding: TaskDataBinding, target?: RoleTarget): Projection<BindingDeclaration> {
+/**
+ * 由 data-control 建临时角色时（RFC-025 I28 第二步，生效、有所在的库、data 没存连接串的都算），期望里标明，调和器照它建角色；
+ * 旧形状（data 建、存着连接串）不标。
+ */
+export function bindingProjection(binding: TaskDataBinding, target?: RoleTarget, byDataControl = false): Projection<BindingDeclaration> {
   const role = binding.roleName && binding.roleName !== 'development' ? [{ kind: 'PostgresRole' as const, name: binding.roleName }] : [];
   const expiresAt = binding.expiresAt?.toISOString();
   const release = ENDED[binding.state];
-  const where = role.length && target ? { database: target.database, ownerRole: target.ownerRole } : {};
+  const provision = byDataControl && binding.state === 'active' && role.length && target && !binding.secretBox ? { provision: 'data-control' as const } : {};
+  const where = role.length && target ? { database: target.database, ownerRole: target.ownerRole, ...provision } : {};
   return {
     declaration: {
       id: binding.id, kind: 'data-binding', ref: binding.id, projectId: binding.projectId as ProjectId, parentId: binding.taskId,

@@ -11,7 +11,7 @@ const GONE: ReleaseReason = { code: 'binding-missing', message: '访问绑定已
 
 /**
  * 数据资源与访问绑定投影进资源台账（RFC-025 第四期第一步）：台账记期望与领域条件，data-control 观测数据面写实况；
- * 按 I28 裁定，byDataControl 时生产库、开发库由 data-control 建（期望里标明），旧库与临时角色仍由 data 建。投影跟在仓储写入之后；台账写失败只告警——
+ * 按 I28 裁定，byDataControl 时生产库、开发库与访问绑定的临时角色由 data-control 建（期望里标明），旧形状仍由 data 建。投影跟在仓储写入之后；台账写失败只告警——
  * 数据资源的操作照常完成，每 5 分钟的补投影会追上。
  */
 export function dataLedgerProjection(ledger: DataLedger, logger: Logger, byDataControl = false) {
@@ -30,7 +30,7 @@ export function dataLedgerProjection(ledger: DataLedger, logger: Logger, byDataC
   const projectBinding = async (binding: TaskDataBinding, resources: Pick<DataResourceRepository, 'find'>) => {
     const prod = await resources.find(binding.serviceId as ServiceId, 'production', 'postgres');
     const target = prod?.state === 'ready' ? { database: prod.objectName, ownerRole: prod.objectName } : undefined;
-    await apply(bindingProjection(binding, target), ledger.declare);
+    await apply(bindingProjection(binding, target, byDataControl), ledger.declare);
   };
   const safely = async (id: string, project: () => Promise<void>): Promise<boolean> => {
     try { await project(); return true; }

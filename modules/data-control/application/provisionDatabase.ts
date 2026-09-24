@@ -1,6 +1,6 @@
 import type { Logger } from '@crewstation/kernel';
 import type { DataPlaneSnapshot } from '../domain/dataPlane';
-import { databaseToProvision } from '../domain/provisioning';
+import { databaseToProvision, temporaryRoleToProvision } from '../domain/provisioning';
 import type { CredentialStore, SecretCipher } from '../ports/credentials';
 import type { DataPlaneReader, DataPlaneWriter } from '../ports/dataPlane';
 import type { DataLedgerObservations, DataRecordView } from '../ports/ledger';
@@ -22,16 +22,20 @@ export function newPassword(): string {
 }
 
 /**
- * 建库（RFC-025 I28 裁定：data-control 生成口令）：先把口令加密存下（按记录 ID，已存的就用存的——重试时角色的口令与存下的一致），
- * 再建运行角色与库，当场补一次观测（不等下一轮全量，data 正等它就绪）。返回之后的快照（没建就原样返回）。
+ * 建库与临时角色（RFC-025 I28 裁定：data-control 生成口令）：先把口令加密存下（按记录 ID，已存的就用存的——重试时角色的口令与存下的一致），
+ * 再建运行角色与库（或访问绑定的临时角色），当场补一次观测（不等下一轮全量，data 正等它就绪）。返回之后的快照（没建就原样返回）。
  */
 export async function provisionDatabase(deps: ProvisionDeps, snapshot: DataPlaneSnapshot, record: DataRecordView): Promise<DataPlaneSnapshot> {
-  const target = databaseToProvision(record, snapshot);
-  if (!target) return snapshot;
-  const stored = await deps.store.get(record.id) ?? await deps.store.putIfAbsent({ resourceId: record.id, role: target.role, secretBox: await deps.cipher.encrypt(newPassword()) });
-  await deps.plane.ensureDatabase({ ...target, password: await deps.cipher.decrypt(stored.secretBox) });
+  const database = databaseToProvision(record, snapshot), temporary = database ? undefined : temporaryRoleToProvision(record, snapshot);
+  const role = database?.role ?? temporary?.role;
+  if (!role) return snapshot;
+  const stored = await deps.store.get(record.id) ?? await deps.store.putIfAbsent({ resourceId: record.id, role, secretBox: await deps.cipher.encrypt(newPassword()) });
+  const password = await deps.cipher.decrypt(stored.secretBox);
+  // 临时角色（第二步）同一套：口令先存再建，到期时间由数据库自己执行。
+  if (database) await deps.plane.ensureDatabase({ ...database, password });
+  else await deps.plane.ensureTemporaryRole({ ...temporary!, password });
   deps.stats.provisioned += 1;
-  deps.logger.info('data database provisioned', { resourceId: record.id, database: target.database });
+  deps.logger.info('data role provisioned', { resourceId: record.id, role, ...(database ? { database: database.database } : { temporary: true }) });
   const fresh = await deps.plane.snapshot();
   await observeDataRecord(deps.ledger, fresh, deps.stats, record);
   return fresh;

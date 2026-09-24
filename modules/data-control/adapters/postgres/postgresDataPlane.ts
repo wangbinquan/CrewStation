@@ -5,6 +5,11 @@ import type { DataPlaneReader, DataPlaneWriter } from '../../ports/dataPlane';
 /** 平台建的库与角色都以 `cs_` 开头（生产库 cs_<slug>、开发库 cs_<slug>_dev、临时角色 cs_t_…）；平台自己的库与角色不在内。 */
 const PREFIX = 'cs\\_%';
 
+/** 口令直接写进语句（CREATE ROLE 不收参数）：只收平台生成的 base64url，别的字符一律拒绝。 */
+function checkPassword(password: string): void {
+  if (!/^[A-Za-z0-9_-]{16,128}$/.test(password)) throw new Error('口令格式不对，拒绝写进数据面');
+}
+
 const ident = (name: string): string => {
   if (!/^cs_[a-z0-9_]{1,60}$/.test(name)) throw new Error(`非法的数据面标识符：${name}`);
   return `"${name}"`;
@@ -51,13 +56,21 @@ export function postgresDataPlane(adminUrl: string, clock: { now(): Date } = { n
       return 'dropped';
     },
     ensureDatabase: async ({ database, role, password }) => {
-      // 口令直接写进语句（CREATE ROLE 不收参数）：只收平台生成的 base64url，别的字符一律拒绝。
-      if (!/^[A-Za-z0-9_-]{16,128}$/.test(password)) throw new Error('口令格式不对，拒绝写进数据面');
+      checkPassword(password);
       const exists = (await admin`SELECT 1 FROM pg_roles WHERE rolname = ${role}`).length > 0;
       await admin.unsafe(`${exists ? 'ALTER' : 'CREATE'} ROLE ${ident(role)} WITH LOGIN PASSWORD '${password}'`);
       if (!(await admin`SELECT 1 FROM pg_database WHERE datname = ${database}`).length) await admin.unsafe(`CREATE DATABASE ${ident(database)} OWNER ${ident(role)}`);
       await admin.unsafe(`REVOKE CONNECT ON DATABASE ${ident(database)} FROM PUBLIC`);
       await admin.unsafe(`GRANT CONNECT ON DATABASE ${ident(database)} TO ${ident(role)}`);
+    },
+    ensureTemporaryRole: async ({ role, database, ownerRole, readOnly, validUntil, password }) => {
+      checkPassword(password);
+      const until = new Date(validUntil);
+      if (!Number.isFinite(until.getTime())) throw new Error('到期时间不对，拒绝写进数据面');
+      const exists = (await admin`SELECT 1 FROM pg_roles WHERE rolname = ${role}`).length > 0;
+      await admin.unsafe(`${exists ? 'ALTER' : 'CREATE'} ROLE ${ident(role)} WITH LOGIN PASSWORD '${password}' VALID UNTIL '${until.toISOString()}'`);
+      await admin.unsafe(`GRANT CONNECT ON DATABASE ${ident(database)} TO ${ident(role)}`);
+      await admin.unsafe(readOnly ? `GRANT pg_read_all_data TO ${ident(role)}` : `GRANT ${ident(ownerRole)} TO ${ident(role)}`);
     },
     close: async () => { await admin.end(); },
   };

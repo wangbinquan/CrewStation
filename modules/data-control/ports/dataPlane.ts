@@ -18,4 +18,9 @@ export interface DataPlaneWriter {
    * 只给这个角色——跨项目不可连（AT-12）。重复执行结果不变。
    */
   ensureDatabase(target: { readonly database: string; readonly role: string; readonly password: string }): Promise<void>;
+  /**
+   * 建出访问绑定的临时角色（I28 第二步）：在就改成这个口令与到期时间，不在就建（LOGIN、VALID UNTIL，数据库自己执行到期）；
+   * 只给所在的生产库 CONNECT；只读的授 pg_read_all_data，可写的继承运行角色。重复执行结果不变。
+   */
+  ensureTemporaryRole(target: { readonly role: string; readonly database: string; readonly ownerRole: string; readonly readOnly: boolean; readonly validUntil: string; readonly password: string }): Promise<void>;
 }
