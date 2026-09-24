@@ -21,7 +21,13 @@ function sinceOf(previous: ResourceCondition | undefined, update: ConditionUpdat
 }
 
 /**
- * 合并条件：同类型的状态变了才换起始时间（报告方给了发生时刻就用它），只改说明不换；新类型追加。
+ * 终态条件：Job 的结果（Finished）一旦为真不再改回——观测的先后不保证，按记录核对时读到的旧版本对象（还在跑）不能把已记下的结果
+ * 覆盖掉；Job 之后被 TTL 删掉，结果也就留在这里（提案 §5.1）。
+ */
+const TERMINAL_CONDITIONS: ReadonlySet<string> = new Set(['Finished']);
+
+/**
+ * 合并条件：同类型的状态变了才换起始时间（报告方给了发生时刻就用它），只改说明不换；新类型追加；终态条件为真之后不再改。
  * 返回原数组表示没有变化，调用方据此跳过写库（重复上报不产生变更日志）。
  */
 export function mergeConditions(existing: readonly ResourceCondition[], updates: readonly ConditionUpdate[], now: Date): readonly ResourceCondition[] {
@@ -30,6 +36,7 @@ export function mergeConditions(existing: readonly ResourceCondition[], updates:
   for (const update of updates) {
     const at = next.findIndex((entry) => entry.type === update.type);
     const previous = at >= 0 ? next[at] : undefined;
+    if (previous?.status === 'true' && TERMINAL_CONDITIONS.has(update.type)) continue;
     const since = sinceOf(previous, update, now);
     const merged: ResourceCondition = { type: update.type, status: update.status, ...(update.reason ? { reason: update.reason } : {}), ...(update.message ? { message: update.message } : {}), since };
     if (previous && jsonHash(previous) === jsonHash(merged)) continue;

@@ -86,6 +86,18 @@ describe('条件、子对象、计数与可做操作', () => {
     expect(mergeConditions(reworded, [{ type: 'RunnerConnected', status: 'false' }], t1)[0]?.since).toBe(t1.toISOString());
   });
 
+  test('终态条件：Job 的结果（Finished）一旦为真，读到的旧版本（还在跑）不能把它改回假，说明也不再改；为假时照常更新', () => {
+    const t1 = new Date(t0.getTime() + 1000);
+    const running = mergeConditions([], [{ type: 'Finished', status: 'false' }], t0);
+    const done = mergeConditions(running, [{ type: 'Finished', status: 'true', reason: 'succeeded', message: '已完成' }], t1);
+    expect(done[0]).toMatchObject({ status: 'true', reason: 'succeeded', since: t1.toISOString() });
+    expect(mergeConditions(done, [{ type: 'Finished', status: 'false' }], t1)).toBe(done);
+    expect(mergeConditions(done, [{ type: 'Finished', status: 'true', reason: 'failed', message: '另一个说法' }], t1)).toBe(done);
+    // 别的条件不受影响：连上之后可以断开。
+    const connected = mergeConditions([], [{ type: 'RunnerConnected', status: 'true' }], t0);
+    expect(mergeConditions(connected, [{ type: 'RunnerConnected', status: 'false' }], t1)[0]?.status).toBe('false');
+  });
+
   test('报告方给了发生时刻：状态变化时用它；同一状态只往早改；晚于现在的不认', () => {
     const t1 = new Date(t0.getTime() + 60_000), earlier = new Date(t0.getTime() - 3_600_000), future = new Date(t1.getTime() + 60_000);
     const first = mergeConditions([], [{ type: 'Failed', status: 'true', since: t0 }], t1);
