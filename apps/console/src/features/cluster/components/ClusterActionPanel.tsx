@@ -36,7 +36,7 @@ export function ClusterActionPanel({ row, onOperation }: { row: ClusterResource;
   const open = (next: ClusterAction) => { setAction(next); setInspection(undefined); inspect.reset(); submit.reset(); setIdempotencyKey(crypto.randomUUID()); setPending(undefined); sessionStorage.removeItem(storageKey); if (next === 'delete') runInspect(next); };
   const close = () => { setAction(undefined); setInspection(undefined); inspect.reset(); };
   return <div className={styles.stack}>
-    <div className={styles.actions}>{row.availableActions.map((c) => <div className={styles.action} key={c.action}><Button onClick={() => open(c.action)} disabled={!c.enabled || submit.isPending || !!id}>{t(`cluster.action.${c.action}`)}</Button>{!c.enabled ? <small className={styles.muted}>{c.reason}</small> : null}</div>)}</div>
+    <div className={styles.actions} data-cluster-actions="">{row.availableActions.map((c) => <div className={styles.action} key={c.action}><Button variant={c.action === 'delete' ? 'danger' : 'secondary'} onClick={() => open(c.action)} disabled={!c.enabled || submit.isPending || !!id}>{t(`cluster.action.${c.action}`)}</Button>{!c.enabled ? <small className={styles.muted}>{c.reason}</small> : null}</div>)}</div>
     {action && !id && !deleting ? <Dialog size="medium" role={current ? 'alertdialog' : 'dialog'} title={t(`cluster.action.${action}`)} busy={submit.isPending} onClose={close}
       onSubmit={() => { if (!current && !invalid && !inspect.isPending) runInspect(action); }}
       footer={<ActionRow>

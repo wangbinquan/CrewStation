@@ -75,6 +75,34 @@ describe.skipIf(!session)('deployed cluster management layout', () => {
     } finally { await page.cmd('Emulation.clearDeviceMetricsOverride'); }
   }, 120_000);
 
+  // 2026-09-24 作者裁定：详情顶部的管理动作两两一行、不可用原因写在各自按钮下，同一行的按钮顶端对齐。改前按格子居中：buildkitd 的「重启」
+  // 比「调整副本」低 11px；英文的「Restore release replicas」比格子宽 15px，压到右边的「Delete / stop」上。
+  test('the detail action buttons line up: buttons in one row share their top edge whatever reasons sit under them, and none is wider than its cell, in both languages', async () => {
+    const page = session!.admin;
+    await viewport(page, 1440, 900);
+    try {
+      await open(page, '/admin/cluster?tab=workloads'); await loaded(page);
+      await page.waitUntil(`document.body.innerText.includes('符合筛选的资源')`, 60_000, 300);
+      // 平台组件的工作负载：重启可做，其余不可用、原因长短不一，正是会错开的情形。
+      await page.eval(`(() => { const rows = [...document.querySelectorAll('[data-cluster-resource]')]; (rows.find((b) => b.closest('tr').innerText.includes('平台内置')) ?? rows[0]).click(); })()`);
+      await page.waitUntil(`${detailLoaded} && !!document.querySelector('[data-cluster-actions] button')`, 30_000, 200);
+      for (const locale of ['zh-CN', 'en-US']) {
+        await page.eval(`document.querySelector('button[lang="${locale}"]').click()`); await Bun.sleep(300);
+        const cells = await page.eval<{ top: number; left: number; right: number; cellRight: number }[]>(`[...document.querySelectorAll('[data-cluster-actions] > div')].map((cell) => { const b = cell.querySelector('button').getBoundingClientRect(), c = cell.getBoundingClientRect(); return { top: Math.round(b.top), left: Math.round(b.left), right: Math.round(b.right), cellRight: Math.round(c.right) }; })`);
+        expect(cells).toHaveLength(4);
+        // 按行分组：左边界没有继续右移就是新的一行。
+        const rows: (typeof cells)[] = [];
+        for (const cell of cells) { const row = rows.at(-1); if (row && cell.left > row.at(-1)!.left) row.push(cell); else rows.push([cell]); }
+        for (const row of rows) expect(Math.max(...row.map((c) => c.top)) - Math.min(...row.map((c) => c.top))).toBeLessThanOrEqual(1);
+        for (const cell of cells) expect(cell.right).toBeLessThanOrEqual(cell.cellRight + 1);
+      }
+      expect(page.takeErrors()).toEqual([]);
+    } finally {
+      await page.eval(`document.querySelector('button[lang="zh-CN"]')?.click()`).catch(() => undefined);
+      await page.cmd('Emulation.clearDeviceMetricsOverride');
+    }
+  }, 120_000);
+
   test('below 1100px the inventory flows with the page and switching views keeps the scroll position: the panel holds its height until the new list arrives', async () => {
     const page = session!.admin;
     await viewport(page, 1024, 800);

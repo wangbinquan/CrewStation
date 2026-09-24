@@ -53,7 +53,9 @@ a.tile:focus-visible { outline: 2px solid var(--cs-color-focus); outline-offset:
 .warning { padding: 10px 12px; border: 1px solid var(--cs-color-border); border-left: 3px solid var(--cs-color-warning, #b7791f); border-radius: 6px; overflow-wrap: anywhere; }
 .error { color: var(--cs-color-danger, #bf3434); overflow-wrap: anywhere; }
 .muted { color: var(--cs-color-text-muted); font-size: 12px; }
-.actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-.action { display: grid; gap: 4px; flex: 1 1 150px; min-width: 0; }
+/* 管理动作两两一行，不可用的原因写在各自按钮下，格子高矮不一：同一行的按钮顶端对齐，不按格子居中错开（2026-09-24 作者裁定）。 */
+.actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-start; }
+/* 不写 min-width: 0：格子不窄于按钮本身，英文的长标签（Restore release replicas）不会压到旁边的按钮上。 */
+.action { display: grid; gap: 4px; flex: 1 1 150px; }
 .operation { border-top: 1px solid var(--cs-color-border); padding-top: 12px; overflow-wrap: anywhere; }
 @media (max-width: 640px) { .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } .filters { grid-template-columns: minmax(0, 1fr); } .facts { grid-template-columns: minmax(0, 1fr); gap: 4px; } .facts dd { margin-bottom: 8px; } }

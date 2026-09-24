@@ -55,6 +55,8 @@ test('台账认领的行显示标准阶段与原因，集群观测退为小字�
   await page.click('cluster-demo-green');
   const panel = document.querySelector('[data-ledger-record]')!;
   for (const part of ['资源中心记录', '服务槽', '降级', '容器反复重启', '只有失败的才可以重试']) expect(panel.textContent).toContain(part);
+  // 不可撤销的记录操作（释放、删除工作卷）按全站按钮规范用红框，其余是描边按钮（2026-09-24）。
+  expect([...panel.querySelectorAll('button')].map((b) => [b.textContent, b.className.split(' ').includes('danger')])).toEqual([['释放', true], ['重试', false]]);
   await act(async () => { [...panel.querySelectorAll('button')].find((b) => b.textContent === '释放')!.click(); }); await page.settle();
   expect(openDialog().textContent).toContain('确认释放“cluster-demo-green”？');
   await typeConfirmWord('delete'); await act(async () => { dialogConfirmButton().click(); }); await page.settle();

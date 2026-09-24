@@ -5,6 +5,7 @@ import { focusManager } from '@tanstack/react-query';
 import { dialogConfirmButton, openDialog, typeConfirmWord } from './confirmDialogDriver';
 import { renderApp } from './renderApp';
 import { clusterFixture } from './clusterManagementFixture';
+import { consoleStyles, sourceAt } from './sourceScan';
 const originalFetch = globalThis.fetch;
 let page: Awaited<ReturnType<typeof renderApp>> | undefined;
 afterEach(() => { page?.unmount(); page = undefined; globalThis.fetch = originalFetch; sessionStorage.clear(); });
@@ -49,6 +50,20 @@ test('scale validates every bound, inspects without writing, confirms once and e
   expect(page.text()).toContain('pod-original'); await page.click('确认执行');
   const write = f.calls.find((c) => c.path.endsWith('/operations') && c.method === 'POST')!; expect(write.body.params).toEqual({ action: 'scale', replicas: 2 });
   expect(page.text()).toContain('operation-stable'); expect(page.text()).toContain('trace-original'); expect(page.text()).toContain('202'); expect(page.text()).toContain('1.2 s'); expect(page.search().operationId).toBe('operation-stable');
+});
+// 2026-09-24 作者裁定：详情顶部的管理动作保持两两一行、不可用的原因写在各自按钮下，只让同一行的按钮顶端对齐（此前按格子居中，
+// 有原因的格子更高，同一行的按钮上下错开）；删除／结束按全站按钮规范用红框。happy-dom 不排版，对齐锁在样式上，实际位置由 e2e clusterLayout 量。
+test('详情顶部的管理动作：同一行顶端对齐、格子不窄于按钮；删除／结束是红框按钮，原因仍写在它自己的按钮下', async () => {
+  const css = sourceAt(consoleStyles(), 'features/cluster/components/Cluster.module.css').code;
+  const rule = (selector: string) => new RegExp(`^${selector.replace('.', '\\.')}\\s*\\{([^}]*)\\}`, 'm').exec(css)?.[1] ?? '';
+  expect(rule('.actions')).toMatch(/align-items:\s*flex-start/);
+  // 英文「Restore release replicas」比半栏宽：格子若允许窄于按钮（min-width: 0），按钮就压到右边的按钮上。
+  expect(rule('.action')).toMatch(/flex:\s*1 1 150px/); expect(rule('.action')).not.toMatch(/min-width/);
+  clusterFixture(); page = await renderApp('/admin/cluster?resourceId=resource-uid');
+  const buttons = [...document.querySelectorAll<HTMLButtonElement>('[data-cluster-actions] > div > button')];
+  const variant = (b: HTMLButtonElement) => ['danger', 'secondary'].find((name) => b.className.split(' ').includes(name));
+  expect(buttons.map((b) => [b.textContent, variant(b)])).toEqual([['重启', 'secondary'], ['调整副本', 'secondary'], ['恢复发布配置', 'secondary'], ['删除／结束', 'danger']]);
+  expect(buttons[3]!.disabled).toBe(true); expect(buttons[3]!.nextElementSibling?.textContent).toBe('工作卷仍被引用');
 });
 // 2026-09-23 作者裁定页内展开的表单改弹窗：调整副本在弹窗里；取消只关窗、目标副本数留着，再打开恢复；「清空」回到当前副本数。
 test('调整副本在弹窗里：取消只关窗、目标副本数留着再打开恢复；清空回到当前副本数；改了数目要重新检查', async () => {
