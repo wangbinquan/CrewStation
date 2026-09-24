@@ -1,5 +1,5 @@
 import type { ProjectId, RouteEntry } from '@crewstation/contracts';
-import { routeObjectName } from './routePlan';
+import { routeObjectName, STRIP_MIDDLEWARE_PREFIX } from './routePlan';
 
 /** gateway 按服务写的几种路由；换了计划（例如不再是 APIProxy）时，不在新计划里的那几种记录标「不要了」。 */
 export const SERVICE_ROUTE_KINDS: readonly RouteEntry['kind'][] = ['prod', 'preview', 'service', 'internal-api'];
@@ -12,7 +12,8 @@ export interface RoutedService {
 }
 
 /**
- * 一条路由的期望（RFC-025 第三期后半）：Host、可选的路径前缀、目标 Service、中间件链；子对象是它的 IngressRoute。
+ * 一条路由的期望（RFC-025 第三期后半）：Host、可选的路径前缀、目标 Service、中间件链；子对象是它的 IngressRoute，
+ * 内部 API 前缀路由另有它独用的前缀剥离中间件（T14 入账：gateway 照旧建它，路由记录「不要了」时调和器随之删掉）。
  * 调和器照它渲染 IngressRoute（cluster-control 的 routeRender），所以写全：所属服务名、前缀路由的优先级、中间件的命名空间。
  */
 export interface RouteDeclaration {
@@ -20,7 +21,7 @@ export interface RouteDeclaration {
   readonly ref: string;
   readonly projectId: ProjectId;
   readonly spec: {
-    readonly children: readonly { readonly kind: 'IngressRoute'; readonly namespace: string; readonly name: string }[];
+    readonly children: readonly { readonly kind: 'IngressRoute' | 'Middleware'; readonly namespace: string; readonly name: string }[];
     /** 所属服务名（IngressRoute 的服务标签）。 */
     readonly service: string;
     readonly host: string;
@@ -56,7 +57,10 @@ export function projectRoute(service: RoutedService, route: RouteEntry, ref: str
   return {
     kind: 'route', ref, projectId: service.projectId,
     spec: {
-      children: [{ kind: 'IngressRoute', namespace: service.namespace, name: routeObjectName(service.serviceName, route.kind) }],
+      children: [
+        { kind: 'IngressRoute', namespace: service.namespace, name: routeObjectName(service.serviceName, route.kind) },
+        ...route.middlewares.filter((name) => name.startsWith(STRIP_MIDDLEWARE_PREFIX)).map((name) => ({ kind: 'Middleware' as const, namespace: service.namespace, name })),
+      ],
       service: service.serviceName, host: route.host, ...(route.pathPrefix ? { pathPrefix: route.pathPrefix, priority: PREFIX_ROUTE_PRIORITY } : {}), target: route.target,
       middlewares: route.middlewares.map((name) => (system.names.has(name) ? { name, namespace: system.namespace } : { name })),
     },

@@ -2,7 +2,7 @@ import type { RouteEntry } from '@crewstation/contracts';
 import type { K8sClient } from '@crewstation/k8s';
 import { LABELS, Resources, ingressRouteObject, stripPrefixMiddleware } from '@crewstation/k8s';
 import { PREFIX_ROUTE_PRIORITY } from '../../domain/routeProjection';
-import { routeObjectName } from '../../domain/routePlan';
+import { routeObjectName, STRIP_MIDDLEWARE_PREFIX } from '../../domain/routePlan';
 import type { GatewayApplier, GatewaySettings } from '../../ports/gatewayApply';
 
 /** 路由条目 → Traefik IngressRoute；系统中间件跨命名空间引用，前缀剥离中间件随路由建在项目命名空间。 */
@@ -10,7 +10,7 @@ export function traefikApplier(k8s: K8sClient, settings: Pick<GatewaySettings, '
   const systemMiddlewares = new Set([settings.userAuthMiddleware, settings.serviceAuthMiddleware, settings.dropIdentityHeadersMiddleware]);
   const applyMiddlewares = async (namespace: string, entries: RouteEntry[]) => {
     for (const route of entries) {
-      for (const mw of route.middlewares.filter((m) => m.startsWith('strip-api-'))) {
+      for (const mw of route.middlewares.filter((m) => m.startsWith(STRIP_MIDDLEWARE_PREFIX))) {
         await k8s.apply(stripPrefixMiddleware({ name: mw, namespace, prefixes: [route.pathPrefix ?? '/'] }));
       }
     }

@@ -42,7 +42,9 @@ export function computePhase(record: PhaseInput): PhaseResult {
   const serving = condition(record, 'Serving');
   if (serving?.status === 'false') {
     const reason = reasonOf(serving.reason ?? 'not-serving', serving.message ?? '当前没有运行的工作负载');
-    return present.length ? { phase: 'stopping', reason } : { phase: 'stopped', reason };
+    // 下线时照旧保留的（槽的 Service）不算：只要工作负载没了就是已结束。
+    const workload = present.filter((child) => !rule.retainedWhenIdle?.includes(child.kind));
+    return workload.length ? { phase: 'stopping', reason } : { phase: 'stopped', reason };
   }
   if (rule.allChildren) return allChildrenPhase(record, rule, present);
   if (!rule.primaryChild) return byConditions(record, rule);

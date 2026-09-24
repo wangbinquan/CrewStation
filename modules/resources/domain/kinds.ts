@@ -11,6 +11,8 @@ export interface KindRule {
   readonly primaryChild?: 'Pod' | 'PersistentVolumeClaim' | 'Deployment' | 'Job' | 'IngressRoute';
   /** 期望里的子对象都在即运行中（限流策略的中间件、命名空间与额度、网络策略、数据面的库与角色），缺哪个就还在分配中。 */
   readonly allChildren?: true;
+  /** 此刻不该有工作负载时（Serving 为假：下线、尚未部署）照旧保留的子对象种类，不算「结束中」：服务槽的 Service（RFC-021 下线保留）。 */
+  readonly retainedWhenIdle?: readonly string[];
   /** 就绪还要这些领域条件为真（所属模块上报）。 */
   readonly readyConditions: readonly string[];
   /** 失败后保留多久供诊断（D9：开发会话 72 小时）；没有就不保留。 */
@@ -37,7 +39,7 @@ export const KIND_RULES: Readonly<Record<ResourceKind, KindRule>> = {
   namespace: { quotaUnits: 0, allChildren: true, readyConditions: [], releasable: false, stable: true },
   'network-policy-set': { quotaUnits: 0, allChildren: true, readyConditions: [], releasable: false, stable: true },
   // 服务槽（第三期）：Deployment 就绪即运行中；领域条件 Serving 为假（已下线、尚未部署）时按已结束算。不占任务额度。
-  'service-slot': { quotaUnits: 0, primaryChild: 'Deployment', readyConditions: [], releasable: false, stable: true },
+  'service-slot': { quotaUnits: 0, primaryChild: 'Deployment', readyConditions: [], releasable: false, stable: true, retainedWhenIdle: ['Service'] },
   // 构建与迁移 Job（第三期）：Job 在跑是运行中，结束后照资源中心记下的 Finished 是已结束或失败——Kubernetes 的 TTL 删掉 Job 之后结果仍在（提案 §5.1）。
   'build-job': JOB,
   'migration-job': JOB,

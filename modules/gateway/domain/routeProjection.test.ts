@@ -7,7 +7,7 @@ const target = { namespace: 'cs-demo', service: 'demo-blue', port: 80 };
 const system = { names: new Set(['drop', 'auth', 'svc']), namespace: 'crewstation-system' };
 
 describe('路由投影进资源台账（RFC-025 第三期后半）', () => {
-  test('每条路由一条 route 记录：子对象是它的 IngressRoute，期望写全调和器渲染要用的（所属服务、前缀与优先级、目标、带命名空间的中间件链），展示字段写种类、Host、前缀与目标', () => {
+  test('每条路由一条 route 记录：子对象是它的 IngressRoute（内部 API 另有它独用的前缀剥离中间件），期望写全调和器渲染要用的（所属服务、前缀与优先级、目标、带命名空间的中间件链），展示字段写种类、Host、前缀与目标', () => {
     const routes: RouteEntry[] = [
       { host: 'demo.cs.localhost', domain: 'user', kind: 'prod', target, middlewares: ['drop', 'auth'] },
       { host: 'api.svc.cs.internal', pathPrefix: '/api/demo', domain: 'service', kind: 'internal-api', target, middlewares: ['drop', 'svc', 'strip-api-demo'] },
@@ -18,7 +18,7 @@ describe('路由投影进资源台账（RFC-025 第三期后半）', () => {
           middlewares: [{ name: 'drop', namespace: 'crewstation-system' }, { name: 'auth', namespace: 'crewstation-system' }] },
         display: { role: 'prod', host: 'demo.cs.localhost', target: 'cs-demo/demo-blue' } },
       { kind: 'route', ref: 'svc-1/internal-api', projectId: service.projectId,
-        spec: { children: [{ kind: 'IngressRoute', namespace: 'cs-demo', name: 'demo-internal-api' }], service: 'demo', host: 'api.svc.cs.internal', pathPrefix: '/api/demo', priority: PREFIX_ROUTE_PRIORITY, target,
+        spec: { children: [{ kind: 'IngressRoute', namespace: 'cs-demo', name: 'demo-internal-api' }, { kind: 'Middleware', namespace: 'cs-demo', name: 'strip-api-demo' }], service: 'demo', host: 'api.svc.cs.internal', pathPrefix: '/api/demo', priority: PREFIX_ROUTE_PRIORITY, target,
           middlewares: [{ name: 'drop', namespace: 'crewstation-system' }, { name: 'svc', namespace: 'crewstation-system' }, { name: 'strip-api-demo' }] },
         display: { role: 'internal-api', host: 'api.svc.cs.internal', pathPrefix: '/api/demo', target: 'cs-demo/demo-blue' } },
     ]);

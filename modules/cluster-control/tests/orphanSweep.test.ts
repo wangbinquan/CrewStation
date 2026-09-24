@@ -77,6 +77,23 @@ describe.skipIf(!available)('孤儿回收（RFC-025 设计 §6.4、D8）', () =>
     for (const kept of ['task-r-new', 'task-r-new-runner', 'task-young', 'task-ending', 'demo-green', 'task-late']) expect(removed.some((entry) => entry.endsWith(`/${kept}`))).toBe(false);
   });
 
+  // 设计 §6.4 的孤儿不限任务标签：前缀剥离与限流中间件都由记录认领之后，没人认领也没人引用的中间件是改名或下线后留下的。
+  test('中间件：项目命名空间里没人认领、没有路由引用、建出满 10 分钟的按 UID 删；被引用的（含跨命名空间）、有记录的、太新的、系统命名空间的不动', async () => {
+    const mw = (name: string, namespace = 'cs-demo', extra: Partial<K8sObject['metadata']> = {}): K8sObject => ({ ...object('Middleware', name, undefined, extra), apiVersion: 'traefik.io/v1alpha1', metadata: { ...object('Middleware', name, undefined, extra).metadata, namespace } });
+    const route = (name: string, namespace: string, chain: { name: string; namespace?: string }[]): K8sObject => ({ ...object('IngressRoute', name, undefined), metadata: { ...object('IngressRoute', name, undefined).metadata, namespace }, spec: { routes: [{ middlewares: chain }] } });
+    await resources.api.owner('gateway').declare({ kind: 'rate-limit-policy', ref: 'project:mw', projectId: PROJECT, spec: { children: [{ kind: 'Middleware', namespace: 'cs-demo', name: 'rate-limit-user' }] } });
+    objects.push(
+      mw('strip-api-old'), mw('strip-api-used'), mw('shared-mw'), mw('rate-limit-user'), mw('strip-api-young', 'cs-demo', { creationTimestamp: '2026-09-23T11:58:00Z' }),
+      mw('rate-limit-platform-api', 'crewstation-system'), mw('strip-api-ending', 'cs-demo', { deletionTimestamp: '2026-09-23T11:59:00Z' }),
+      route('demo-internal-api', 'cs-demo', [{ name: 'drop-identity-headers', namespace: 'crewstation-system' }, { name: 'strip-api-used' }]),
+      route('other-internal-api', 'cs-other', [{ name: 'shared-mw', namespace: 'cs-demo' }]),
+    );
+    removed.length = 0;
+    const result = await sweepOrphans({ ...deps(), systemNamespace: 'crewstation-system' });
+    expect(removed.filter((entry) => entry.startsWith('Middleware/'))).toEqual(['Middleware/strip-api-old']);
+    expect(result.removed).toBe(removed.length);
+  });
+
   test('节奏：同步后先等一阵再做第一轮，此后按周期；失败只记告警；停止时等本轮跑完', async () => {
     let calls = 0;
     const seen: string[] = [];

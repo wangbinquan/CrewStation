@@ -83,7 +83,7 @@ export function createClusterControlModule(deps: ClusterControlModuleDeps): Clus
     if (owner && RENDERED_KINDS.has(change.kind)) reconciler.enqueue(owner.id);
   };
   const watcher = observationWorker(feed, handle, () => ({ ...stats }), logger, deps.summaryMs);
-  const sweep = deps.orphanSweep === false ? undefined : orphanSweeper(feed, () => sweepOrphans({ feed, ledger: deps.ledger, legacy: deps.legacy, cluster, clock, logger, stats, minAgeMs: (deps.orphanSweep || {}).minAgeMs ?? 600_000 }), logger, { ...(deps.orphanSweep || {}), ...(deps.leases ? { leases: deps.leases } : {}) });
+  const sweep = deps.orphanSweep === false ? undefined : orphanSweeper(feed, () => sweepOrphans({ feed, ledger: deps.ledger, legacy: deps.legacy, cluster, clock, logger, stats, systemNamespace: deps.systemNamespace, minAgeMs: (deps.orphanSweep || {}).minAgeMs ?? 600_000 }), logger, { ...(deps.orphanSweep || {}), ...(deps.leases ? { leases: deps.leases } : {}) });
   // 先开观测缓存，再开按记录核对的队列与孤儿回收（它们都等缓存同步完成才开始）；同步完成后身份索引按全量清一次旧行。
   const observer = {
     start: () => {

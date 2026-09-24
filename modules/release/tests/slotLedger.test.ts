@@ -49,7 +49,9 @@ describe.skipIf(!available)('服务槽投影进资源台账（RFC-025 第三期�
       await scope.slots.save(withSlot(slots, { physical: 'green', releaseId, state: 'deploying', replicas: 1, readyReplicas: 0, updatedAt: now }, now));
     });
     const green = (await slotRecord(serviceId, 'green'))!;
-    expect(green).toMatchObject({ phase: 'provisioning', display: { releaseId, tag: 'v0.1.0' }, children: [{ kind: 'Deployment', namespace: 'cs-demo', name: 'demo-green', phase: 'absent' }] });
+    expect(green).toMatchObject({ phase: 'provisioning', display: { releaseId, tag: 'v0.1.0' }, children: [{ kind: 'Deployment', namespace: 'cs-demo', name: 'demo-green', phase: 'absent' }, { kind: 'Service', namespace: 'cs-demo', name: 'demo-green', phase: 'absent' }] });
+    // 槽的 Service 由记录认领（RFC-025 T14）；下线时它照旧保留，不影响「已结束」的判定。
+    await resources.api.observe({ child: { kind: 'Service', namespace: 'cs-demo', name: 'demo-green', uid: 'uid-svc-green', phase: 'Present', ready: true } });
     const deployment = (phase: string) => ({ child: { kind: 'Deployment', namespace: 'cs-demo', name: 'demo-green', uid: 'uid-demo-green', phase, ready: phase === 'Available', reason: '副本 0／1 就绪' } });
     await resources.api.observe(deployment('Progressing'));
     expect((await resources.api.get(green.id))?.phase).toBe('starting');

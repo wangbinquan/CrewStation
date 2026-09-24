@@ -20,7 +20,7 @@ export interface SlotCondition {
 export interface ProjectedSlot {
   readonly ref: string;
   readonly projectId: ProjectId;
-  readonly children: readonly { readonly kind: 'Deployment'; readonly namespace: string; readonly name: string }[];
+  readonly children: readonly { readonly kind: 'Deployment' | 'Service'; readonly namespace: string; readonly name: string }[];
   readonly display: Readonly<Record<string, string>>;
   readonly conditions: readonly SlotCondition[];
 }
@@ -72,7 +72,8 @@ export function projectSlot(slots: ServiceSlots, physical: PhysicalSlot, service
   const retention = retentionOf(slots, physical, policy);
   return {
     ref: `${slots.serviceId}/${physical}`, projectId: service.projectId,
-    children: [{ kind: 'Deployment', namespace: service.namespace, name: `${service.name}-${physical}` }],
+    // 槽的工作负载与它的 Service 同名（slotDeployer）；Service 是槽对外的稳定入口，下线时保留（RFC-021）。
+    children: [{ kind: 'Deployment', namespace: service.namespace, name: `${service.name}-${physical}` }, { kind: 'Service', namespace: service.namespace, name: `${service.name}-${physical}` }],
     display: { physical, role: roleOf(slots, physical), ...(releaseId ? { releaseId } : {}), ...(tag ? { tag } : {}), ...retention.display },
     conditions: [servingOf(slot), failedOf(slot), retention.condition],
   };

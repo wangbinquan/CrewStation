@@ -27,6 +27,9 @@ export interface GatewayNames {
 
 const slotService = (input: ServiceRoutingInput, physical: string): RouteEntry['target'] => ({ namespace: input.namespace, service: `${input.serviceName}-${physical}`, port: 80 });
 
+/** 内部 API 前缀路由的前缀剥离中间件：`strip-api-<代理名>`，建在服务自己的命名空间，只有这一条路由引用。 */
+export const STRIP_MIDDLEWARE_PREFIX = 'strip-api-';
+
 /** 一个服务的全部路由：用户域的 prod／preview 主机、服务域的服务主机、可选的内部 API 前缀。切流只改 prod／preview 指向的物理槽。 */
 export function planServiceRoutes(input: ServiceRoutingInput, names: GatewayNames): RouteEntry[] {
   const userLimits = names.rateLimits ? [PROJECT_MIDDLEWARES.user, PROJECT_MIDDLEWARES.host] : [];
@@ -39,7 +42,7 @@ export function planServiceRoutes(input: ServiceRoutingInput, names: GatewayName
     { host: input.hosts.service, domain: 'service', kind: 'service', target: slotService(input, input.prodPhysical), middlewares: serviceMw },
   ];
   if (input.proxyName) {
-    routes.push({ host: input.platformApiHost, pathPrefix: `/api/${input.proxyName}`, domain: 'service', kind: 'internal-api', target: slotService(input, input.prodPhysical), middlewares: [...serviceMw, `strip-api-${input.proxyName}`] });
+    routes.push({ host: input.platformApiHost, pathPrefix: `/api/${input.proxyName}`, domain: 'service', kind: 'internal-api', target: slotService(input, input.prodPhysical), middlewares: [...serviceMw, `${STRIP_MIDDLEWARE_PREFIX}${input.proxyName}`] });
   }
   return routes;
 }

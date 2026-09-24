@@ -101,6 +101,10 @@ describe('条件、子对象、计数与可做操作', () => {
     expect(computePhase(slot(undefined, [offline]))).toEqual({ phase: 'stopped', reason: { code: 'offline-idle', message: '待验证版本无人访问，已自动下线' } });
     expect(computePhase(slot({}, [offline])).phase).toBe('stopping');
     // 资源中心判定槽的 Pod 在崩溃重启：副本眼下都就绪也是降级，原因照条件写；条件撤掉就回到运行中。
+    // 槽的 Service 下线也保留（RFC-021）：工作负载没了就是已结束，不因 Service 还在停在结束中。
+    const idle = record({ kind: 'service-slot', spec: { children: [{ kind: 'Deployment', namespace: 'cs-demo', name: 'demo-green' }, { kind: 'Service', namespace: 'cs-demo', name: 'demo-green' }] },
+      children: [{ kind: 'Deployment', namespace: 'cs-demo', name: 'demo-green', phase: 'absent', ready: false }, { kind: 'Service', namespace: 'cs-demo', name: 'demo-green', phase: 'Present', ready: true }], conditions: [offline] });
+    expect(computePhase(idle)).toEqual({ phase: 'stopped', reason: { code: 'offline-idle', message: '待验证版本无人访问，已自动下线' } });
     const looping = cond('CrashLooping', 'true', { reason: 'restarting', message: '容器反复重启：累计重启 4 次，10 分钟内仍有重启' });
     expect(computePhase(slot({}, [looping]))).toEqual({ phase: 'degraded', reason: { code: 'crash-looping', message: '容器反复重启：累计重启 4 次，10 分钟内仍有重启' } });
     expect(computePhase(slot({}, [{ ...looping, status: 'false' }])).phase).toBe('ready');

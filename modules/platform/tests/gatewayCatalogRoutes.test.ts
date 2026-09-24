@@ -83,7 +83,8 @@ describe.skipIf(!available)('平台装配的目录与网关路由', () => {
       target: { service: 'reference-proxy-blue', namespace: 'cs-reference-proxy' },
     });
     expect((await apiCatalog.api.prunedOpenApi(actor, target.serviceId, before.id)).servers).toEqual([{ url: 'http://api.svc.cs.internal/api/test-gitlab' }]);
-    expect((await routeOf(target.serviceId, 'internal-api'))?.spec).toMatchObject({ host: 'api.svc.cs.internal', pathPrefix: '/api/test-gitlab', children: [{ kind: 'IngressRoute', namespace: 'cs-reference-proxy', name: 'reference-proxy-internal-api' }] });
+    // 内部 API 路由记录也认领它独用的前缀剥离中间件（RFC-025 T14）：名字跟着当前的代理名。
+    expect((await routeOf(target.serviceId, 'internal-api'))?.spec).toMatchObject({ host: 'api.svc.cs.internal', pathPrefix: '/api/test-gitlab', children: [{ kind: 'IngressRoute', namespace: 'cs-reference-proxy', name: 'reference-proxy-internal-api' }, { kind: 'Middleware', namespace: 'cs-reference-proxy', name: 'strip-api-test-gitlab' }] });
   });
 
   test('当前服务撤下 exposes 后不再规划内部 API；未知服务也不借用其他服务的代理', async () => {
