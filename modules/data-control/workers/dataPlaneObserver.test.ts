@@ -3,7 +3,7 @@ import { noopLogger } from '@crewstation/kernel';
 import { newDataObservationStats } from '../application/observeDataPlane';
 import type { DataPlaneReader, DataPlaneWriter } from '../ports/dataPlane';
 import type { DataLedgerObservations, DataRecordView } from '../ports/ledger';
-import { dataPlaneObserver } from './dataPlaneObserver';
+import { DATA_PLANE_RESYNC_LEASE, dataPlaneObserver } from './dataPlaneObserver';
 
 const record: DataRecordView = { id: 'db-1', kind: 'database', spec: { children: [{ kind: 'PostgresDatabase', name: 'cs_demo' }] }, children: [] };
 const reader = (): DataPlaneReader & DataPlaneWriter & { closed: boolean } => {
@@ -65,5 +65,30 @@ describe('数据面观测的节奏（RFC-025 第四期）', () => {
     // 全量那一拍在启动时跑过一次（台账里没有在册记录，也取了一份快照），尾随的那批只取一份。
     expect(snapshots).toBe(2);
     expect(observed.filter((entry) => entry.startsWith('np-1'))).toEqual([]);
+  });
+
+  test('多副本（设计 §6.3）：全量一轮持作业租约、尾随逐条持记录租约；另一副本持有时跳过，处理完释放', async () => {
+    const held = new Set<string>([DATA_PLANE_RESYNC_LEASE, record.id]);
+    const log: string[] = [];
+    const leases = {
+      acquire: async (id: string) => { log.push(`acquire:${id}`); return !held.has(id); },
+      renew: async () => true,
+      release: async (id: string) => { log.push(`release:${id}`); },
+    };
+    const observed: string[] = [];
+    let batches = 0;
+    const ledger: DataLedgerObservations = {
+      get: async () => record, listLive: async () => [record], latestChange: async () => 1,
+      changesSince: async (cursor) => { batches += 1; return cursor === 1 && batches <= 3 ? [{ seq: 1, resourceId: record.id }] : []; },
+      observe: async ({ resourceId }) => { observed.push(resourceId); return { status: 'unchanged' }; },
+    };
+    const observer = dataPlaneObserver(ledger, reader(), newDataObservationStats(), noopLogger, { pollMs: 5, resyncMs: 10, leases: { port: leases, holder: 'replica-a' } });
+    observer.start();
+    await until(() => log.filter((entry) => entry === `acquire:${DATA_PLANE_RESYNC_LEASE}`).length >= 2 && log.includes(`acquire:${record.id}`));
+    expect(observed).toEqual([]);
+    held.clear();
+    await until(() => observed.length > 0);
+    await observer.stop();
+    expect(log).toContain(`release:${DATA_PLANE_RESYNC_LEASE}`);
   });
 });

@@ -418,6 +418,8 @@ function composeLedger(deps: CompositionDeps, core: ReturnType<typeof composeCor
 function composeControl(deps: CompositionDeps, core: ReturnType<typeof composeCore>, ledger: ReturnType<typeof composeLedger>, runtime: ReturnType<typeof composeRuntime>, gateway: ReturnType<typeof composeDelivery>['gateway']) {
   return createClusterControlModule({
     k8s: deps.k8s, logger: deps.logger, isAdmin: core.identity.api.isAdmin, systemNamespace: deps.settings.systemNamespace,
+    // 多副本分工（RFC-025 设计 §6.3）：逐条调和与孤儿回收在资源中心的租约下进行，持有者是这个副本。
+    leases: { port: ledger.api.leases, holder: `${deps.instance}.cluster-control` },
     // RFC-025 设计 §7.4：身份索引改读观测缓存的 Pod，全平台只剩这一条 Pod watch。
     pods: { changed: (pod, gone) => gateway.api.syncObservedPod(pod, gone), synced: async (pods) => { await gateway.api.relistObservedPods(pods); } },
     ledger: {
@@ -445,6 +447,7 @@ function composeDataControl(deps: CompositionDeps, ledger: ReturnType<typeof com
   const resources = ledger.api;
   return createDataControlModule({
     adminUrl: deps.settings.dataPostgres.adminUrl, logger: deps.logger,
+    observer: { leases: { port: resources.leases, holder: `${deps.instance}.data-control` } },
     ledger: {
       get: (id) => resources.get(id), changesSince: resources.changesSince, latestChange: resources.latestChange, observe: (input) => resources.observe(input),
       listLive: async () => [...await resources.list({ kind: 'database' }), ...await resources.list({ kind: 'data-binding' })],

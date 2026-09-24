@@ -14,7 +14,7 @@ import { reconcileRecord } from './application/reconcileObservations';
 import { adoptionRoutes } from './http/adoptionRoutes';
 import type { ClusterWriter, ManagedObjectFeed, ManagedObjectReader, ObjectChange, ObservedKind, PodSubscriber } from './ports/cluster';
 import type { LedgerObservations, LegacyOwners } from './ports/ledger';
-import type { LedgerReconcilerOptions } from './workers/ledgerReconciler';
+import type { LedgerReconcilerOptions, ReplicaLeases } from './workers/ledgerReconciler';
 import { ledgerReconciler } from './workers/ledgerReconciler';
 import { observationWorker } from './workers/observationWorker';
 import type { OrphanSweeperOptions } from './workers/orphanSweeper';
@@ -45,6 +45,8 @@ export interface ClusterControlModuleDeps {
   readonly pods?: PodSubscriber;
   readonly summaryMs?: number;
   readonly reconciler?: LedgerReconcilerOptions;
+  /** 多副本分工（设计 §6.3）：逐条调和与孤儿回收在租约下进行；不给就不分工。 */
+  readonly leases?: ReplicaLeases;
   /** 孤儿回收（设计 §6.4）：false 关掉；缺省建出满 10 分钟才判孤儿，同步后 10 分钟起每 10 分钟一轮。 */
   readonly orphanSweep?: false | (OrphanSweeperOptions & { readonly minAgeMs?: number });
 }
@@ -73,7 +75,7 @@ export function createClusterControlModule(deps: ClusterControlModuleDeps): Clus
   };
   const cluster = deps.cluster ?? kubernetesClusterWriter(deps.k8s);
   const reconcileDeps = { ledger: deps.ledger, feed, cluster, clock, systemNamespace: deps.systemNamespace, stats, logger, ...(deps.reconciler?.retryMs ? { retryMs: deps.reconciler.retryMs } : {}) };
-  const reconciler = ledgerReconciler(deps.ledger, feed, (id, enqueue) => reconcileRecord(reconcileDeps, id, enqueue), logger, deps.reconciler);
+  const reconciler = ledgerReconciler(deps.ledger, feed, (id, enqueue) => reconcileRecord(reconcileDeps, id, enqueue), logger, { ...deps.reconciler, ...(deps.leases ? { leases: deps.leases } : {}) });
   // Pod 先交给身份索引（来源 IP 认人，越早越好），再写台账观测；两边失败互不耽误。调和器渲染的对象一有变化就把认领它的记录排进去核对。
   const handle = async (change: ObjectChange) => {
     if (change.kind === 'Pod' && deps.pods) await deps.pods.changed(change.object, change.gone).catch((error: unknown) => logger.warn('pod identity sync failed', { name: change.object.metadata.name, error: String(error) }));
@@ -81,7 +83,7 @@ export function createClusterControlModule(deps: ClusterControlModuleDeps): Clus
     if (owner && RENDERED_KINDS.has(change.kind)) reconciler.enqueue(owner.id);
   };
   const watcher = observationWorker(feed, handle, () => ({ ...stats }), logger, deps.summaryMs);
-  const sweep = deps.orphanSweep === false ? undefined : orphanSweeper(feed, () => sweepOrphans({ feed, ledger: deps.ledger, legacy: deps.legacy, cluster, clock, logger, stats, minAgeMs: (deps.orphanSweep || {}).minAgeMs ?? 600_000 }), logger, deps.orphanSweep || {});
+  const sweep = deps.orphanSweep === false ? undefined : orphanSweeper(feed, () => sweepOrphans({ feed, ledger: deps.ledger, legacy: deps.legacy, cluster, clock, logger, stats, minAgeMs: (deps.orphanSweep || {}).minAgeMs ?? 600_000 }), logger, { ...(deps.orphanSweep || {}), ...(deps.leases ? { leases: deps.leases } : {}) });
   // 先开观测缓存，再开按记录核对的队列与孤儿回收（它们都等缓存同步完成才开始）；同步完成后身份索引按全量清一次旧行。
   const observer = {
     start: () => {
