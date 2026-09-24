@@ -7,6 +7,26 @@
 
 基线三件套（v0.3.3）的第一轮实现已在本机 kind 集群上跑通并推上 main；**RFC-001（算力归平台）与 RFC-002（管理空间与租户空间分离）已实现、实跑确认并推上 main；RFC-004 已被 RFC-006 取代（Superseded）；RFC-006（算力档位合并运行环境、每个 Agent 一个 Pod）已实现、实机验收完毕并推上 main，已 Done（P1–P8、ADR-0005 与 I17–I19 待作者复核）；RFC-003 工作台已按设计附件完成并整体部署到本机，52／52 项 UX-AT 全部实机通过、本地 gate 与精确 SHA CI 通过，已 Done；RFC-005（OIDC／OAuth 2.0 公司登录）代码、测试与 OA-01…OA-31 实机验收全部完成，已 Done；RFC-007（开发环境 OAuth 2.0 一键换角色）代码、四角色 Chrome 实机验收、本地 gate 与精确 SHA CI 全部完成，已 Done**。
 
+## 项目命名空间出站全放开，数字人服务槽也能直连外部（D64，2026-09-24）
+
+作者问：「现在业务服务、业务执行容器都🈲外网访问吗」。按代码与实测答复：只有数字人服务槽（以及发布时的迁移 Job）出不去——默认策略 `crewstation-default` 的出向只到 DNS 与 `crewstation-system`；业务任务 Pod 和它的 Agent 执行 Pod 带 `workload=business-task`（执行环境沿用父任务的 kind），被 `crewstation-task-egress` 全放行。作者随即裁定「都放开外网」。
+
+- **问答裁定**：三种做法里选了「全放开，只改默认策略」；另两种是「全放开并删掉多余策略」（要给调和器补删除）和「只放公网」（私网段仍挡，要加安装配置）。流程直接改＋回填，不另立 RFC。
+- **改了什么**（dcb60115）：
+  - `projectNetworkPolicy` 的出向改为显式 `[{}]`，入向不变。服务端 apply 整体替换 `egress` 这个 atomic 列表，旧的两条规则随之消失。
+  - 任务、构建、接入三条按标签放行的策略保留，但已不再起作用：调和器对网络策略只建、只改回、从不删。
+  - 基线三件套升到 v0.3.16：新增 D64，D54 的两句作废，R15 改写，AT-07 第一句作废，§13.4 登记作者接受的风险（数字人服务可以不经接口目录直连公司系统）。
+  - RFC-018 记修订（E5、T10、EG-09）；dev-gotchas 网络策略条目、I9、参考代理 README、CLAUDE.md 同步。
+- **用例**：`packages/k8s/projectPolicies.test.ts` 锁住新形状；`namespaceObjects.test.ts` 新增一条：旧形状的默认策略判为不一致、新形状判为一致。
+- **门禁**：在 `git archive 7468438a` 干净导出树上叠本批 16 个文件。arch、lint、两个 typecheck 通过；unit 682／0，module 1355 pass／12 skip／0 fail，console 900／0。CI [35966050987](https://github.com/wangbinquan/CrewStation/actions/runs/35966050987) 六项全部成功（含 e2e）。
+- **部署与实机**：
+  - 06:47:38Z 只滚了 cs-controller，镜像 `cs-control-plane:egress-open-20260924`（`git archive dcb60115`，与线上 66c76d8b 只差本改动），1／1、重启 0 次。cs-api、cs-auth、cs-session 和 console 都没动。
+  - 06:47:41Z 调和器把 14 个项目命名空间的 `crewstation-default` 改成新形状。日志里有 14 条 `resource child applied`，都是这一条策略，没有 warn／error；另外三条策略原样未动。
+  - 出站实测用同一个探针：DNS 解析 `opencode.ai` → 按 IP 连 `https://1.1.1.1` → 按域名连 `https://opencode.ai`。数字人服务槽 cs-demo、cs-rfc006-verify、cs-rfc023-verify 从改前的「解析成功、两次都 8 秒超时」变为 301／200。cs-demo 的服务槽直连本机测试 GitLab（`host.docker.internal:8929`）得 200。
+  - 入向隔离仍在：cs-demo 服务槽连 rfc006-verify 服务槽的 Pod IP，8 秒超时；对照组 cs-api（系统命名空间）连同一地址得 200。
+  - 迁移 Job 没有实跑发布。它和服务槽同受默认策略（`podSelector: {}`）约束，出向随之放开。
+- **注意**：本机集群里解析 `example.com` 稳定超时（`DNS_ETIMEOUT`；主机上正常，原因没查），测出站别用它，已写进 dev-gotchas。
+
 ## 应用可见范围在网关拦截，项目角色新增「用户」（2026-09-24）
 
 作者先问「直接打开应用链接是不是会跳转登录再回到应用内」（是，实测见下），再问「登录之后发现没有这个应用权限会怎么样」。当时的答复是：正式地址任何登录用户都能进，可见范围只管市场。作者随即裁定：「应用的可见范围还是在网关拦截一层吧，如果没应用权限要显示平台统一的没有项目权限，然后有个申请权限按钮。待命版和开发预览保持现状。……业务可以自己再拦截一层，这种一般会出现在业务开了全员可见的情况下」。

@@ -43,7 +43,7 @@
 | EG-06 | 通过 | 完整 `bun run check`（带本机测试库与 e2e 参数）**2069 pass／8 skip／0 fail**，13034 断言、347 文件；改动行防护 **100／100（100%）**；`arch:check` 53 个单元零违规，`migrationCoverage` 与锁文件一致 |
 | EG-07 | 通过 | 基线三件套 v0.3.7、tech-evaluation E23 作废、仓库结构 v0.5＋ADR-0008、I9 关闭、`dev-gotchas` 网络策略条目改写、三份 CONTRIBUTING 与参考代理 README、e2e 页面清单、CLAUDE.md 全部更新 |
 | EG-08 | 通过 | 先升级平台代码，再取整库一致性备份（Pod 内 `pg_restore -l` 校验 469 个对象、含 egress 四张表与数据，本机副本 `cs-rfc018-verified.dump` 31,304,900 字节），随后一个事务内 `DROP SCHEMA egress CASCADE`（4 张表：entries／requests／blocked／resource_identity_aliases，共 5 行）＋删除 4 行迁移记录。复查：`egress` schema 0 个、该模块迁移记录 0 行、`egress-blocked` 告警 0 行、总 schema 20、总迁移 103。重启 cs-api／cs-controller 后迁移数仍 103、schema 未被重建 |
-| EG-09 | 待实机 | 修订前的对照（2026-09-24，同一探针：DNS 解析 `opencode.ai`、按 IP 连 `https://1.1.1.1`、连 `https://opencode.ai`）：数字人服务槽 `cs-demo`、`cs-rfc006-verify` 解析成功、两次 HTTPS 都 8 秒超时；接入项目服务槽 `cs-reference-api-proxy` 与开发会话 Pod 为 301／200。换版后的结果待补 |
+| EG-09 | 通过 | 修订前的对照（2026-09-24，同一探针：DNS 解析 `opencode.ai`、按 IP 连 `https://1.1.1.1`、连 `https://opencode.ai`）：数字人服务槽 `cs-demo`、`cs-rfc006-verify` 解析成功、两次 HTTPS 都 8 秒超时；接入项目服务槽 `cs-reference-api-proxy` 与开发会话 Pod 为 301／200。06:47:38Z 只把 cs-controller 换到 `cs-control-plane:egress-open-20260924`（`git archive dcb60115`），06:47:41Z 调和器把 14 个项目命名空间的 `crewstation-default` 改成 `egress: [{}]`（日志 14 条 `resource child applied`，只有这一条策略，无 warn／error），入向与另外三条策略不变。换版后数字人服务槽 `cs-demo`、`cs-rfc006-verify`、`cs-rfc023-verify` 同一探针为 301／200，`cs-demo` 服务槽直连本机测试 GitLab `host.docker.internal:8929` 得 200；`cs-demo` 服务槽连 `rfc006-verify` 服务槽的 Pod IP 8 秒超时，对照 cs-api（系统命名空间）连同一地址 200 |
 
 **EG-04 的闭合路径**：阻塞它的 I23 已按作者裁定的方案 a 解决（manifest 迁 v2，提交 `1d88a7d2`、`f24e880f`），
 两个项目各发 `v0.1.4` 并 `ready`；作者授权后切流成功（`POST …/traffic-switch`，两个服务均 HTTP 200，
