@@ -63,7 +63,7 @@ CrewStation 是面向全公司各团队的数字人构建、发布与运行平�
 | 状态 | RFC |
 |---|---|
 | Done（21） | 001 算力归平台 · 002 管理空间与租户空间 · 003 工作台 UX · 005 OIDC 公司登录 · 006 算力档位与每个 Agent 一个 Pod · 007 开发环境一键换角色 · 008 开发会话 UX · 009 项目设置 UX · 010 集群资源管理 · 012 项目算力授权 · 013 资源 ID 统一为 UUIDv7 · 014 用户与认证 UX · 015 集群容量与用量 · 017 项目资源配置 · 018 下线出站白名单 · 019 部署与运行形态图 · 020 项目工作台信息架构 · 021 待验证版本下线与正式版本维护 · 022 启动进度 · 024 CLI 界面就绪 · 026 终端查询由 Runner 应答 |
-| In Progress（4） | **025 统一资源管理中心**（当前主线，分六期：各模块写期望、中心存实况的声明式台账，加上按种类回收的调和器；任务类容器已接入，服务槽与构建、路由、网关限流在做）· 011 三类平台角色与使用者首页（剩具体测试账号改权的实机验收）· 016 开发会话预览进程（实机验收未执行）· 023 数据库驱动换成 postgres.js（已上线，观察期中） |
+| In Progress（4） | **025 统一资源管理中心**（当前主线，分六期：各模块写期望、中心存实况的声明式台账，加上按种类回收的调和器；逐期接入任务容器、服务槽与构建、路由与限流、命名空间与网络策略、数据资源，进展以 RFC 索引为准）· 011 三类平台角色与使用者首页（剩具体测试账号改权的实机验收）· 016 开发会话预览进程（实机验收未执行）· 023 数据库驱动换成 postgres.js（已上线，观察期中） |
 | Superseded（1） | 004 管理员定义 Agent 启动前 Hook（被 RFC-006 取代） |
 
 **还没有的与已知限制**
@@ -133,7 +133,7 @@ flowchart LR
 |---|---|---|
 | `cs-api` | 平台 API | 全部模块的 HTTP 路由，能力说明、观测与集群管理的查询，资源推送流 |
 | `cs-auth` | 网关处的公司登录与身份注入、ForwardAuth（用户域与服务域）、JWKS、按需下发上游凭据 | `identity` 运行面，`gateway` 的放行表评估 |
-| `cs-controller` | 任务容器、构建、发布、路由、数据供给、GitLab 管理操作 | `release`、`task-runtime`、`data`、`scm`、`gateway`、`project`、`provisioning`、`cluster-management` 的后台工作器，`cluster-control` 的观测与调和，`resources` 的维护 |
+| `cs-controller` | 任务容器、构建、发布、路由、数据供给、GitLab 管理操作 | `release`、`task-runtime`、`data`、`scm`、`gateway`、`project`、`provisioning`、`cluster-management` 的后台工作器，`cluster-control` 的观测与调和，`data-control` 的数据面观测，`resources` 的维护 |
 | `cs-session` | TaskRunner 出向连接与浏览器终端／事件流的中枢 | `session` |
 | `cs-events` | 事件中心：inbox 去重、持久化、投递、死信 | `events` |
 | `mcp-capabilities`、`mcp-operations` | 能力说明 MCP（只读）与操作 MCP（发布、调内部 API 等动作），供开发容器里的 Agent 使用 | 不挂模块，经 `api-client` 调 `cs-api` |
@@ -145,7 +145,7 @@ flowchart LR
 - **发布与切流**：只有平台创建的 `v<major>.<minor>.<patch>` 标签触发发布——检查未提交改动 → 代推当前分支 → 打标签 → 按固定提交构建 → 对生产库跑必须与在服务槽兼容的迁移 → 部署到待命（preview）槽。负责人切流晋级，回退就是切回。preview 与 prod 是同一个生产服务的两个蓝绿槽，共用生产数据；隔离在开发会话（默认连开发库）与生产之间。
 - **事件**：公司 Webhook 经服务域进入事件生产者项目，cs-events 去重、持久化，再经服务域带来源令牌与 trace_id 推到订阅方 prod 活动槽声明的处理路径。
 - **追溯**：每个任务创建时生成 traceId（或继承触发它的事件投递），一条 taskId 对应一条执行链，每次 Agent 执行以 sessionId 记录、可由 traceId 索引。
-- **资源中心（RFC-025，进行中）**：各模块把期望写进 `resources` 台账，`cluster-control` 调和器观测集群、写回实况，并逐期接管 Kubernetes 对象的写入；工作台读「快照＋推送」。
+- **资源中心（RFC-025，进行中）**：各模块把期望写进 `resources` 台账，`cluster-control` 调和器观测集群、写回实况，并逐期接管 Kubernetes 对象的写入；数据面由 `data-control` 观测平台数据库集群上的库与角色；工作台读「快照＋推送」。
 
 **技术栈**（选型依据见 [`tech-evaluation.md`](proposal/tech-evaluation.md)）：
 
@@ -166,7 +166,7 @@ apps/            可部署单元：一个进程一个目录，只做装配与启
   console                                                  工作台 SPA
   cli                                                      crewstation 命令行
   cs-storage-probe                                         节点卷用量只读探针（RFC-015）
-modules/         21 个领域模块，按层依赖；platform 是组合根
+modules/         22 个领域模块，按层依赖；platform 是组合根
 packages/        19 个与领域无关的技术库
 runtimes/task/   任务容器镜像与 TaskRunner
 integrations/    两个内置接入容器项目：gitlab-event-producer、reference-api-proxy
@@ -188,6 +188,7 @@ proposal/        基线三件套、技术评估、检视记录与 RFC
 | L1 | `resources` | 资源中心台账：期望与实况、种类与阶段规则、按台账推导的额度、保留期、标准视图与推送流（RFC-025） |
 | L1 | `identity` | 用户、登录适配、用户令牌与 JWKS、源 Pod IP → 服务身份、来源令牌、上游凭据 |
 | L2 | `cluster-control` | 调和器：观测受管 Kubernetes 对象写回台账、逐期接管对象写入、孤儿回收 |
+| L2 | `data-control` | 数据面的调和：观测平台数据库集群上的库与角色，写回 `database`／`data-binding` 记录；建、改、删分步从 `data` 迁入（建角色与轮换等 I28 裁定） |
 | L2 | `project` | 项目、服务、成员三级角色、测试者、命名空间登记、并发额度、套餐 |
 | L3 | `scm` | 仓库绑定、建仓、代推、标签与保护标签、会话级短期 Git 凭据 |
 | L3 | `config` | 配置项与 Secret、开发／生产两组值、版本快照、注入渲染 |

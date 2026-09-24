@@ -22,6 +22,7 @@ export function drizzleDataResourceRepository(db: Executor): DataResourceReposit
     find: async (serviceId, env, kind) => { const row = (await db.select().from(resources).where(and(eq(resources.serviceId, serviceId), eq(resources.env, env), eq(resources.kind, kind))))[0]; return row ? toResource(row) : undefined; },
     listByService: async (serviceId) => (await db.select().from(resources).where(eq(resources.serviceId, serviceId))).map(toResource),
     listByProject: async (projectId) => (await db.select().from(resources).where(eq(resources.projectId, projectId))).map(toResource),
+    listAll: async () => (await db.select().from(resources).orderBy(resources.createdAt)).map(toResource),
   };
 }
 
@@ -43,6 +44,7 @@ export function drizzleTaskBindingRepository(db: Executor): TaskDataBindingRepos
     listByTask: async (taskId) => (await db.select().from(taskBindings).where(eq(taskBindings.taskId, taskId)).orderBy(taskBindings.createdAt)).map(toBinding),
     listByProject: async (projectId, states) => (await db.select().from(taskBindings).where(states?.length ? and(eq(taskBindings.projectId, projectId), inArray(taskBindings.state, states)) : eq(taskBindings.projectId, projectId)).orderBy(taskBindings.createdAt)).map(toBinding),
     listExpired: async (now) => (await db.select().from(taskBindings).where(and(eq(taskBindings.state, 'active'), lt(taskBindings.expiresAt, now)))).map(toBinding),
+    listOpen: async () => (await db.select().from(taskBindings).where(inArray(taskBindings.state, ['requested', 'approved', 'active'])).orderBy(taskBindings.createdAt)).map(toBinding),
   };
 }
 

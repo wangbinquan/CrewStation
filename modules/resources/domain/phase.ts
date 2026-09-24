@@ -44,7 +44,7 @@ export function computePhase(record: PhaseInput): PhaseResult {
     const reason = reasonOf(serving.reason ?? 'not-serving', serving.message ?? '当前没有运行的工作负载');
     return present.length ? { phase: 'stopping', reason } : { phase: 'stopped', reason };
   }
-  if (rule.allChildren) return allChildrenPhase(record, present);
+  if (rule.allChildren) return allChildrenPhase(record, rule, present);
   if (!rule.primaryChild) return byConditions(record, rule);
   const primary = expectedChildren(record).find((child) => child.kind === rule.primaryChild);
   if (rule.primaryChild === 'Job') return jobPhase(record, primary);
@@ -56,15 +56,19 @@ export function computePhase(record: PhaseInput): PhaseResult {
 }
 
 /**
- * 限流策略、命名空间与额度、网络策略：期望里的子对象都观测到了即运行中，缺哪个就还在分配中；有一个正在删除（有人删了命名空间或策略）是降级——
+ * 限流策略、命名空间与额度、网络策略、数据库与数据访问绑定：所属模块说还不能分配（Prepared 为假，例如等负责人批准）是排队；
+ * 期望里的子对象都观测到了、要求的领域条件都成立即运行中，缺哪个就还在分配中；有一个正在删除（有人删了命名空间或策略）是降级——
  * 它还在、却要没了，删完之后调和器按期望补回。
  */
-function allChildrenPhase(record: PhaseInput, present: readonly ResourceChild[]): PhaseResult {
+function allChildrenPhase(record: PhaseInput, rule: KindRule, present: readonly ResourceChild[]): PhaseResult {
+  const prepared = condition(record, 'Prepared');
+  if (prepared?.status === 'false') return { phase: 'pending', reason: prepared.message ? reasonOf(prepared.reason ?? QUEUED.code, prepared.message) : QUEUED };
   const observed = new Map(present.map((child) => [childKey(child), child]));
   const expected = record.spec.children.map((child) => observed.get(childKey(child)));
   if (expected.some((child) => child === undefined)) return { phase: 'provisioning' };
   const leaving = expected.find((child) => child?.phase === 'Terminating');
-  return leaving ? { phase: 'degraded', reason: reasonOf('child-terminating', `${leaving.kind} ${leaving.name} 正在删除，删完后按期望补回`) } : { phase: 'ready' };
+  if (leaving) return { phase: 'degraded', reason: reasonOf('child-terminating', `${leaving.kind} ${leaving.name} 正在删除，删完后按期望补回`) };
+  return byConditions(record, rule);
 }
 
 /**

@@ -129,6 +129,28 @@ describe('条件、子对象、计数与可做操作', () => {
     expect(computePhase(deleting)).toEqual({ phase: 'degraded', reason: { code: 'child-terminating', message: 'Namespace cs-demo 正在删除，删完后按期望补回' } });
   });
 
+  test('数据库与数据访问绑定（第四期，T12）：库与角色都观测到了才运行中；绑定等批准时排队，生效且角色在才运行中', () => {
+    const children = [{ kind: 'PostgresDatabase', name: 'cs_demo' }, { kind: 'PostgresRole', name: 'cs_demo' }];
+    const seen = (names: readonly string[]) => children.map((child) => ({ ...child, phase: names.includes(child.kind) ? 'Present' : 'absent', ready: names.includes(child.kind) }));
+    expect(computePhase(record({ kind: 'database', spec: { children }, children: seen(['PostgresDatabase', 'PostgresRole']) }))).toEqual({ phase: 'ready' });
+    expect(computePhase(record({ kind: 'database', spec: { children }, children: seen(['PostgresDatabase']) })).phase).toBe('provisioning');
+    expect(computePhase(record({ kind: 'database', spec: { children }, children: seen([]), conditions: [cond('Failed', 'true', { message: '建库失败' })] }))).toEqual({ phase: 'failed', reason: { code: 'failed', message: '建库失败' } });
+    expect(STABLE_KINDS).toContain('database');
+    expect(STABLE_KINDS).not.toContain('data-binding');
+    const role = [{ kind: 'PostgresRole', name: 'cs_t_1' }];
+    const binding = (over: Partial<Parameters<typeof record>[0]>) => record({ kind: 'data-binding', spec: { children: role }, children: [], ...over });
+    // 等负责人批准：排队，原因照所属模块的说法；没给说法时是缺省的排队说明。
+    expect(computePhase(binding({ conditions: [cond('Prepared', 'false', { reason: 'awaiting-approval', message: '等负责人批准' })] }))).toEqual({ phase: 'pending', reason: { code: 'awaiting-approval', message: '等负责人批准' } });
+    expect(computePhase(binding({ conditions: [cond('Prepared', 'false')] })).reason?.code).toBe('queued');
+    // 批准了、角色还没观测到：分配中；角色在但还没报生效：分配中；都齐：运行中。
+    expect(computePhase(binding({ conditions: [cond('Granted', 'true')] })).phase).toBe('provisioning');
+    const present = [{ ...role[0]!, phase: 'Present', ready: true }];
+    expect(computePhase(binding({ children: present })).phase).toBe('provisioning');
+    expect(computePhase(binding({ children: present, conditions: [cond('Granted', 'true')] }))).toEqual({ phase: 'ready' });
+    // 开发模式的绑定没有数据面对象：报了生效即运行中。
+    expect(computePhase(record({ kind: 'data-binding', spec: { children: [] }, children: [], conditions: [cond('Granted', 'true')] }))).toEqual({ phase: 'ready' });
+  });
+
   test('路由：IngressRoute 还没观测到是分配中，在即运行中，删除中按启动中算；稳定记录', () => {
     const route = (child?: Partial<ResourceChild>) => record({ kind: 'route', spec: { children: [{ kind: 'IngressRoute', namespace: 'cs-demo', name: 'demo-prod' }] },
       children: child ? [{ kind: 'IngressRoute', namespace: 'cs-demo', name: 'demo-prod', phase: 'Present', ready: true, ...child }] : [] });

@@ -9,6 +9,8 @@ export interface DataResourceRepository {
   find(serviceId: ServiceId, env: DataEnv, kind: DataResource['kind']): Promise<DataResource | undefined>;
   listByService(serviceId: ServiceId): Promise<DataResource[]>;
   listByProject(projectId: ProjectId): Promise<DataResource[]>;
+  /** 全部数据资源（台账补投影用）。 */
+  listAll(): Promise<DataResource[]>;
 }
 
 export interface TaskDataBindingRepository {
@@ -18,4 +20,6 @@ export interface TaskDataBindingRepository {
   listByTask(taskId: TaskId): Promise<TaskDataBinding[]>;
   listByProject(projectId: ProjectId, states?: TaskDataBinding['state'][]): Promise<TaskDataBinding[]>;
   listExpired(now: Date): Promise<TaskDataBinding[]>;
+  /** 还没结束的绑定：申请中、已批准、生效中（台账补投影用）。 */
+  listOpen(): Promise<TaskDataBinding[]>;
 }

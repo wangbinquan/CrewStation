@@ -1,0 +1,87 @@
+import type { DataEnv, ProjectId, TaskDataMode } from '@crewstation/contracts';
+import type { DataResource } from './dataResource';
+import type { TaskDataBinding } from './taskDataBinding';
+
+/** 数据面上的对象（RFC-025 第四期）：库与角色，由 data-control 观测。 */
+type Child = { readonly kind: 'PostgresDatabase' | 'PostgresRole'; readonly name: string };
+type Condition = { readonly type: string; readonly status: 'true' | 'false'; readonly reason?: string; readonly message?: string };
+export interface ReleaseReason { readonly code: string; readonly message: string }
+
+/** 生产库、开发库各一条：子对象是库与同名的运行角色；记录 ID 沿用数据资源的 ID，稳定记录。 */
+export interface DatabaseDeclaration {
+  readonly id: string;
+  readonly kind: 'database';
+  readonly ref: string;
+  readonly projectId: ProjectId;
+  readonly spec: { readonly children: readonly Child[]; readonly engine: 'postgres'; readonly env: DataEnv; readonly plan: string };
+  readonly display: Readonly<Record<string, string>>;
+  readonly conditions: readonly Condition[];
+}
+
+/** 开发会话的一条数据访问绑定：挂在会话的工作区记录下；诊断只读、生产变更有临时角色，开发模式没有数据面对象。 */
+export interface BindingDeclaration {
+  readonly id: string;
+  readonly kind: 'data-binding';
+  readonly ref: string;
+  readonly projectId: ProjectId;
+  readonly parentId: string;
+  readonly spec: { readonly children: readonly Child[]; readonly mode: TaskDataMode; readonly ttlMinutes: number; readonly expiresAt?: string };
+  readonly display: Readonly<Record<string, string>>;
+  readonly conditions: readonly Condition[];
+}
+
+/** 一次投影：期望在就声明；已结束就受理释放（原因照结束的方式）。 */
+export interface Projection<D> {
+  readonly declaration: D;
+  readonly release?: ReleaseReason;
+}
+
+const RELEASED: Partial<Record<DataResource['state'], ReleaseReason>> = {
+  releasing: { code: 'released', message: '数据资源已释放' },
+  released: { code: 'released', message: '数据资源已释放' },
+};
+
+/** 只投影 PostgreSQL（s3、pvc 两种今天不供给）。供给失败是 Failed，重试成功后撤掉。 */
+export function databaseProjection(resource: DataResource): Projection<DatabaseDeclaration> | undefined {
+  if (resource.kind !== 'postgres') return undefined;
+  const failed: Condition = resource.state === 'failed'
+    ? { type: 'Failed', status: 'true', reason: 'provisioning-failed', message: resource.message ?? '数据库供给失败' }
+    : { type: 'Failed', status: 'false' };
+  const release = RELEASED[resource.state];
+  return {
+    declaration: {
+      id: resource.id, kind: 'database', ref: resource.id, projectId: resource.projectId,
+      spec: { children: [{ kind: 'PostgresDatabase', name: resource.objectName }, { kind: 'PostgresRole', name: resource.objectName }], engine: 'postgres', env: resource.env, plan: resource.plan },
+      display: { env: resource.env, database: resource.objectName, plan: resource.plan, envVar: resource.envVar },
+      conditions: [failed],
+    },
+    ...(release ? { release } : {}),
+  };
+}
+
+const ENDED: Partial<Record<TaskDataBinding['state'], ReleaseReason>> = {
+  rejected: { code: 'rejected', message: '负责人已拒绝' },
+  revoked: { code: 'revoked', message: '已收回' },
+  expired: { code: 'expired', message: '已到期' },
+};
+
+/** 等批准时 Prepared 为假（排队）；批准后 Prepared 为真，建好临时角色、生效时 Granted 为真。 */
+function bindingConditions(binding: TaskDataBinding): Condition[] {
+  if (binding.state === 'requested') return [{ type: 'Prepared', status: 'false', reason: 'awaiting-approval', message: '等负责人批准' }];
+  return [{ type: 'Prepared', status: 'true' }, binding.state === 'active' ? { type: 'Granted', status: 'true' } : { type: 'Granted', status: 'false' }];
+}
+
+export function bindingProjection(binding: TaskDataBinding): Projection<BindingDeclaration> {
+  const role = binding.roleName && binding.roleName !== 'development' ? [{ kind: 'PostgresRole' as const, name: binding.roleName }] : [];
+  const expiresAt = binding.expiresAt?.toISOString();
+  const release = ENDED[binding.state];
+  return {
+    declaration: {
+      id: binding.id, kind: 'data-binding', ref: binding.id, projectId: binding.projectId as ProjectId, parentId: binding.taskId,
+      spec: { children: role, mode: binding.mode, ttlMinutes: binding.ttlMinutes, ...(expiresAt ? { expiresAt } : {}) },
+      display: { mode: binding.mode, ...(expiresAt ? { expiresAt } : {}) },
+      conditions: bindingConditions(binding),
+    },
+    ...(release ? { release } : {}),
+  };
+}

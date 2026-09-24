@@ -3,6 +3,7 @@ import { resourceIdentityDirectory, type ResourceIdentityDirectory } from '@crew
 import { createClusterManagementModule } from '@crewstation/module-cluster-management';
 import { createClusterControlModule } from '@crewstation/module-cluster-control';
 import { createResourcesModule } from '@crewstation/module-resources';
+import type { ResourcesModuleApi } from '@crewstation/module-resources';
 import { installedSystemComponents } from './domain/systemComponents';
 import type { ClusterResource, ClusterInspectRequest, ClusterOperation, ClusterInspection, TaskId, ProfileTestId, RebuildDevSessionRequest } from '@crewstation/contracts';
 import type { Actor, ComputeProfileSelector, ComputeUsage, ProjectId, ServiceId, UserDto, UserId } from '@crewstation/contracts';
@@ -18,6 +19,7 @@ import { createBusinessTaskModule } from '@crewstation/module-business-task';
 import { createCapabilitiesModule } from '@crewstation/module-capabilities';
 import { createConfigModule } from '@crewstation/module-config';
 import { createDataModule } from '@crewstation/module-data';
+import { createDataControlModule } from '@crewstation/module-data-control';
 import { createDevSessionModule } from '@crewstation/module-dev-session';
 import type { EventsModuleApi } from '@crewstation/module-events';
 import { createEventsModule } from '@crewstation/module-events';
@@ -76,7 +78,7 @@ export const SYSTEM_ACTOR: Actor = { userId: BUILTIN_RESOURCES.systemActor as Us
 
 const consumerLifecycle = (consumer: EventConsumer): Lifecycle => ({ start: () => consumer.start(), stop: () => consumer.stop() });
 
-interface Late { events?: EventsModuleApi; project?: ProjectModuleApi; gateway?: GatewayModuleApi; taskRuntime?: TaskRuntimeModuleApi; release?: ReleaseModuleApi }
+interface Late { events?: EventsModuleApi; project?: ProjectModuleApi; gateway?: GatewayModuleApi; taskRuntime?: TaskRuntimeModuleApi; release?: ReleaseModuleApi; resources?: ResourcesModuleApi }
 
 type CompositionDeps = PlatformModuleDeps & { identities: ResourceIdentityDirectory };
 
@@ -139,10 +141,16 @@ function composeCore(deps: CompositionDeps, late: Late) {
     taskProfiles: { exists: async (name) => (await project.api.listTaskProfiles()).some((p) => p.id === name) },
     settings: { defaultTaskProfile: settings.defaultTaskProfile, secretKeyBase64: settings.secretKeyBase64, registry: { pullBase: settings.registryBase, pushHost: settings.registryPushHost, baseRepository: settings.baseImage.repository, runtimePrefix: 'runtime/', scheme: settings.registryScheme, baseTag: settings.baseImage.tag } },
   });
+  // 台账（L1）装在 core 之后（它要 project 的额度与授权），data 在这里就要建：写入口经 late 在运行时取（RFC-025 第四期）。
+  const ledger = () => { if (!late.resources) throw new Error('resources 尚未装配'); return late.resources; };
   const data = createDataModule({
-    db, isAdmin: (id) => isAdmin(id), authorizer: project.api, users: userDirectory,
+    db, logger, isAdmin: (id) => isAdmin(id), authorizer: project.api, users: userDirectory,
     services: { resolveServiceById: async (id) => { const r = await resolveById(id); return r ? { projectId: r.projectId, slug: r.slug } : undefined; } },
     settings: { defaultPlan: 'db-small', secretKeyBase64: settings.secretKeyBase64, postgres: settings.dataPostgres },
+    ledger: {
+      declare: (input) => ledger().owner('data').declare(input), get: (id) => ledger().get(id), requestRelease: (id, reason) => ledger().owner('data').requestRelease(id, reason),
+      presentBindings: async () => (await ledger().list({ kind: 'data-binding' })).filter((record) => record.owner.module === 'data' && record.desired === 'present'),
+    },
   });
   const scm = createScmModule({ db, project: project.api, identities: deps.identities, templateResources: {
     allocate: (kind, context, templateId, slotId) => deps.identities.bind('scm', kind, ['template', context.serviceId, templateId, slotId]),
@@ -432,16 +440,30 @@ function composeControl(deps: CompositionDeps, core: ReturnType<typeof composeCo
   });
 }
 
+/** RFC-025 第四期：数据面的调和（L2）——观测平台数据库集群上的库与角色，写回 data 的 `database`／`data-binding` 记录。 */
+function composeDataControl(deps: CompositionDeps, ledger: ReturnType<typeof composeLedger>) {
+  const resources = ledger.api;
+  return createDataControlModule({
+    adminUrl: deps.settings.dataPostgres.adminUrl, logger: deps.logger,
+    ledger: {
+      get: (id) => resources.get(id), changesSince: resources.changesSince, latestChange: resources.latestChange, observe: (input) => resources.observe(input),
+      listLive: async () => [...await resources.list({ kind: 'database' }), ...await resources.list({ kind: 'data-binding' })],
+    },
+  });
+}
+
 function composeModules(deps: CompositionDeps) {
   const late: Late = {};
   const core = composeCore(deps, late);
   const resources = composeLedger(deps, core);
+  late.resources = resources.api;
   const delivery = composeDelivery(deps, core, late, resources);
   const runtime = composeRuntime(deps, core, delivery, late, resources);
   const aggregates = composeAggregates(deps, core, delivery, runtime, resources);
   const cluster = composeCluster(deps, core, delivery, runtime);
   const clusterControl = composeControl(deps, core, resources, runtime, delivery.gateway);
-  return { cluster, resources, clusterControl, identity: core.identity, project: core.project, config: core.config, data: core.data, scm: core.scm, apiCatalog: core.apiCatalog, agentRuntime: core.agentRuntime, ...delivery, ...runtime, ...aggregates };
+  const dataControl = composeDataControl(deps, resources);
+  return { cluster, resources, clusterControl, dataControl, identity: core.identity, project: core.project, config: core.config, data: core.data, scm: core.scm, apiCatalog: core.apiCatalog, agentRuntime: core.agentRuntime, ...delivery, ...runtime, ...aggregates };
 }
 
 export function createPlatformModule(deps: PlatformModuleDeps): PlatformModule {
@@ -461,7 +483,7 @@ export function createPlatformModule(deps: PlatformModuleDeps): PlatformModule {
       events: [...m.events.http.ingress],
     },
     background: {
-      controller: [...m.cluster.workers, ...m.data.workers, ...m.release.workers, ...m.gateway.workers, consumerLifecycle(m.gateway.subscriptions), ...m.taskRuntime.workers, ...m.agentRuntime.workers, ...m.devSession.workers, ...m.businessTask.workers, consumerLifecycle(m.businessTask.subscriptions), ...m.apiCatalog.subscriptions.map(consumerLifecycle), ...m.data.subscriptions.map(consumerLifecycle), ...m.observability.workers, ...m.provisioning.workers, ...m.provisioning.startupTasks, consumerLifecycle(m.provisioning.subscriptions), m.resources.maintenanceWorker, m.clusterControl.observer],
+      controller: [...m.cluster.workers, ...m.data.workers, ...m.release.workers, ...m.gateway.workers, consumerLifecycle(m.gateway.subscriptions), ...m.taskRuntime.workers, ...m.agentRuntime.workers, ...m.devSession.workers, ...m.businessTask.workers, consumerLifecycle(m.businessTask.subscriptions), ...m.apiCatalog.subscriptions.map(consumerLifecycle), ...m.data.subscriptions.map(consumerLifecycle), ...m.observability.workers, ...m.provisioning.workers, ...m.provisioning.startupTasks, consumerLifecycle(m.provisioning.subscriptions), m.resources.maintenanceWorker, m.clusterControl.observer, m.dataControl.observer],
       // 资源推送流的尾随器（RFC-025 设计 §8.2）：每个 cs-api 副本一个。
       api: [m.resources.streamWorker],
       session: [...m.session.workers],

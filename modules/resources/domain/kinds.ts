@@ -9,7 +9,7 @@ export interface KindRule {
   readonly quotaUnits: number;
   /** 就绪看哪一种子对象；没有就只看条件。 */
   readonly primaryChild?: 'Pod' | 'PersistentVolumeClaim' | 'Deployment' | 'Job' | 'IngressRoute';
-  /** 期望里的子对象都在即运行中（限流策略的中间件、命名空间与额度、网络策略），缺哪个就还在分配中。 */
+  /** 期望里的子对象都在即运行中（限流策略的中间件、命名空间与额度、网络策略、数据面的库与角色），缺哪个就还在分配中。 */
   readonly allChildren?: true;
   /** 就绪还要这些领域条件为真（所属模块上报）。 */
   readonly readyConditions: readonly string[];
@@ -26,7 +26,6 @@ export interface KindRule {
 
 const HOUR = 3_600_000;
 const WORKLOAD: KindRule = { quotaUnits: 1, primaryChild: 'Pod', readyConditions: ['RunnerConnected'], releasable: true };
-const GENERIC: KindRule = { quotaUnits: 0, readyConditions: ['Applied'], releasable: false };
 const JOB: KindRule = { quotaUnits: 0, primaryChild: 'Job', readyConditions: [], releasable: false };
 
 export const KIND_RULES: Readonly<Record<ResourceKind, KindRule>> = {
@@ -46,8 +45,10 @@ export const KIND_RULES: Readonly<Record<ResourceKind, KindRule>> = {
   route: { quotaUnits: 0, primaryChild: 'IngressRoute', readyConditions: [], releasable: false, stable: true },
   // 限流策略（第三期后半，T10）：gateway 写的平台一条、每个项目一条，子对象是它们的 Traefik Middleware；中间件都在即运行中。稳定记录。
   'rate-limit-policy': { quotaUnits: 0, allChildren: true, readyConditions: [], releasable: false, stable: true },
-  database: GENERIC,
-  'data-binding': GENERIC,
+  // 数据库（第四期，T12）：data 写的生产库、开发库各一条，子对象是数据面上的库与角色，data-control 观测；稳定记录。
+  database: { quotaUnits: 0, allChildren: true, readyConditions: [], releasable: false, stable: true },
+  // 数据访问绑定：等负责人批准时是排队（Prepared 为假），生效（Granted）且临时角色在即运行中；收回、到期、拒绝即「不要了」。一次性记录。
+  'data-binding': { quotaUnits: 0, allChildren: true, readyConditions: ['Granted'], releasable: false },
 };
 
 export function kindRule(kind: ResourceKind): KindRule {

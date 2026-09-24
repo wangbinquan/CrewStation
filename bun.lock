@@ -273,6 +273,7 @@
         "@crewstation/kernel": "workspace:*",
         "@crewstation/module-project": "workspace:*",
         "@crewstation/persistence": "workspace:*",
+        "@crewstation/resource-runtime": "workspace:*",
         "@crewstation/secretbox": "workspace:*",
         "drizzle-orm": "0.45.2",
         "hono": "4.13.7",
@@ -280,6 +281,21 @@
         "zod": "4.6.2",
       },
       "devDependencies": {
+        "@crewstation/module-resources": "workspace:*",
+        "@crewstation/testkit": "workspace:*",
+      },
+    },
+    "modules/data-control": {
+      "name": "@crewstation/module-data-control",
+      "version": "0.0.0",
+      "dependencies": {
+        "@crewstation/contracts": "workspace:*",
+        "@crewstation/kernel": "workspace:*",
+        "@crewstation/resource-runtime": "workspace:*",
+        "postgres": "3.4.9",
+      },
+      "devDependencies": {
+        "@crewstation/module-resources": "workspace:*",
         "@crewstation/testkit": "workspace:*",
       },
     },
@@ -401,6 +417,7 @@
         "@crewstation/module-cluster-management": "workspace:*",
         "@crewstation/module-config": "workspace:*",
         "@crewstation/module-data": "workspace:*",
+        "@crewstation/module-data-control": "workspace:*",
         "@crewstation/module-dev-session": "workspace:*",
         "@crewstation/module-events": "workspace:*",
         "@crewstation/module-gateway": "workspace:*",
@@ -864,6 +881,8 @@
     "@crewstation/module-config": ["@crewstation/module-config@workspace:modules/config"],
 
     "@crewstation/module-data": ["@crewstation/module-data@workspace:modules/data"],
+
+    "@crewstation/module-data-control": ["@crewstation/module-data-control@workspace:modules/data-control"],
 
     "@crewstation/module-dev-session": ["@crewstation/module-dev-session@workspace:modules/dev-session"],
 

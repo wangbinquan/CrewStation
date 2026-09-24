@@ -1,7 +1,7 @@
 # 仓库结构、模块划分与依赖原则
 
 > 状态：已确认（2026-09-11 作者裁定第 13 节四项），作为 Design §15.1 的展开并进入 Plan T0.2  
-> 版本：0.6 · 日期：2026-09-23（0.6：按 ADR-0009 新增 `resources`（L1）、`cluster-control`（L2）与包 `resource-runtime`，模块数 19→21，`data-control`（L2）随 RFC-025 第四期再建；0.5：按 ADR-0008 退役 `egress` 模块，模块数 20→19；0.4：按 ADR-0007 补用例落位与两条新规则、`tools/testguard`，§10 指向用例防护体系；0.3：根目录补 RFC／根级说明文件，模块清单补 ADR-0003 的两个模块，§11 指向开发规则）  
+> 版本：0.7 · 日期：2026-09-24（0.7：按 ADR-0009 新建 `data-control`（L2），模块数 21→22；0.6：按 ADR-0009 新增 `resources`（L1）、`cluster-control`（L2）与包 `resource-runtime`，模块数 19→21，`data-control`（L2）随 RFC-025 第四期再建；0.5：按 ADR-0008 退役 `egress` 模块，模块数 20→19；0.4：按 ADR-0007 补用例落位与两条新规则、`tools/testguard`，§10 指向用例防护体系；0.3：根目录补 RFC／根级说明文件，模块清单补 ADR-0003 的两个模块，§11 指向开发规则）  
 > 适用范围：CrewStation 代码仓（Bun workspaces monorepo）的全部代码，包括控制面、任务容器、工作台、CLI、部署与测试
 
 ## 目录
@@ -56,7 +56,7 @@ crewstation/
 │  ├─ console/                   # 工作台 SPA（React）
 │  └─ cli/                       # crewstation 命令行
 ├─ modules/                      # 领域模块：按限界上下文划分；不知道自己跑在哪个进程里
-│  ├─ resources/  identity/  project/  cluster-control/  scm/  config/  data/  api-catalog/  events/  agent-runtime/
+│  ├─ resources/  identity/  project/  cluster-control/  data-control/  scm/  config/  data/  api-catalog/  events/  agent-runtime/
 │  ├─ release/  task-runtime/  dev-session/  business-task/  session/  gateway/
 │  └─ observability/  cluster-management/  capabilities/  provisioning/  platform/
 ├─ packages/                     # 技术库：与领域无关，删掉所有业务概念后仍然成立
@@ -193,6 +193,7 @@ modules/<name>/
 | L1 | `resources` | RFC-025 资源中心台账：期望（所属模块写）与实况（资源中心写）、子对象、变更日志、租约、别名；种类注册表与阶段规则、受理与按台账推导的额度、保留期、可做操作、标准视图与 SSE 推送流（ADR-0009） | —（与 `identity` 同层、互不依赖） |
 | L1 | `identity` | User、登录适配器、用户令牌与 JWKS、服务身份解析（源 Pod IP → 身份）、来源令牌、上游凭据下发 | — |
 | L2 | `cluster-control` | 受管 Kubernetes 对象的调和：观测映射写回台账、孤儿回收、旧对象收编（第一期只观测与空跑报告；写集群的代码按 RFC-025 分期从各模块迁入） | resources |
+| L2 | `data-control` | 数据面的调和：观测平台数据库集群上的库与角色，写回 `database`／`data-binding` 记录（建、改、删按 I28 的裁定分步从 `data` 迁入） | resources |
 | L2 | `project` | Project、Service、成员三级角色、preview 测试者、命名空间登记、TaskQuota、ServicePlan、TaskProfile（算力档位已按 ADR-0005 移出） | identity |
 | L3 | `scm` | SourceRepositoryBinding、建仓、代推、标签与保护标签、会话级短期 Git 凭据 | project |
 | L3 | `config` | ConfigItem、SecretValue、开发与生产两组值、版本快照、注入渲染 | project |
@@ -228,8 +229,8 @@ flowchart BT
   agent-runtime --> platform
   release & task-runtime & dev-session & business-task --> cluster-management
   observability & cluster-management & capabilities & provisioning --> platform
-  resources --> cluster-control
-  resources & cluster-control --> platform
+  resources --> cluster-control & data-control
+  resources & cluster-control & data-control --> platform
 ```
 
 RFC-025 各期推进时，写期望、读实况的领域模块（`data`、`release`、`task-runtime`、`dev-session`、`business-task`、`gateway`、`provisioning`、`cluster-management`）改为依赖 `resources`；它们不依赖 `cluster-control`（ADR-0009）。
@@ -244,7 +245,7 @@ RFC-025 各期推进时，写期望、读实况的领域模块（`data`、`relea
 |---|---|
 | `cs-api` | 全部模块的 `http`（identity 仅管理面）、`capabilities`、`observability`、`cluster-management` 查询与运维受理；`resources` 推送流的尾随器 |
 | `cs-auth` | `identity` 运行面（登录、ForwardAuth 用户域与服务域、JWKS、凭据服务）、`gateway` 的查表评估 |
-| `cs-controller` | `release`、`task-runtime`、`data`、`scm`、`gateway`、`project`（命名空间）、`provisioning`、`cluster-management` 的 `workers` 与启动任务；`cluster-control` 的观测与调和、`resources` 的维护（保留期、压缩、清理） |
+| `cs-controller` | `release`、`task-runtime`、`data`、`scm`、`gateway`、`project`（命名空间）、`provisioning`、`cluster-management` 的 `workers` 与启动任务；`cluster-control` 的观测与调和、`data-control` 的数据面观测、`resources` 的维护（保留期、压缩、清理） |
 | `cs-session` | `session` 的 WS 入口与 `workers` |
 | `cs-events` | `events` 的 ingress `http` 与投递 `workers` |
 | `mcp-capabilities`、`mcp-operations` | 不挂模块，只经 `api-client` 调 `cs-api` |
@@ -352,5 +353,6 @@ apps/console/src/
 | 工程文档位置 | `docs/engineering/` 与 `docs/adr/`，与 `proposal/` 分开（规划者选定，未提出异议） |
 | 模块退役（2026-09-22，ADR-0008） | 删模块要同时删依赖边并重跑 `bun install` 提交锁文件、手工退出迁移锁条目并在提交说明写明原因、按 RFC 处理数据库 schema；模块数 20→19 |
 | 资源中心（2026-09-23，ADR-0009） | 新增 `resources`（L1）、`cluster-control`（L2）与包 `resource-runtime`；`data-control`（L2）随 RFC-025 第四期再建；模块数 19→21 |
+| 资源中心第四期（2026-09-24，ADR-0009） | 新建 `data-control`（L2）；模块数 21→22 |
 
 后续对本文的修改走 ADR：新增模块、**删除模块**、调整 layer、调整尺寸上限、任何例外。

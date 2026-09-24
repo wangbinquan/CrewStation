@@ -1,0 +1,23 @@
+{
+  "name": "@crewstation/module-data-control",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "RFC-025 数据面的调和：观测平台数据库集群上的库与角色写回台账（建、改、删随 I28 裁定分步迁入）",
+  "exports": {
+    ".": "./index.ts"
+  },
+  "crewstation": {
+    "layer": 2
+  },
+  "dependencies": {
+    "@crewstation/contracts": "workspace:*",
+    "@crewstation/kernel": "workspace:*",
+    "@crewstation/resource-runtime": "workspace:*",
+    "postgres": "3.4.9"
+  },
+  "devDependencies": {
+    "@crewstation/module-resources": "workspace:*",
+    "@crewstation/testkit": "workspace:*"
+  }
+}

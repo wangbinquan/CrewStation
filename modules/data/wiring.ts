@@ -15,11 +15,14 @@ import type { PostgresProviderSettings } from './adapters/postgres/postgresProvi
 import { postgresJsProvider } from './adapters/postgres/postgresProvider';
 import type { DataModuleApi } from './api/moduleApi';
 import type { DataUseCaseDeps } from './application/dependencies';
+import { dataLedgerProjection } from './application/ledgerProjection';
 import { revokeBindingsOfReleasedTask } from './application/releasedTask';
 import { serviceDataUseCases } from './application/serviceData';
 import { taskBindingUseCases } from './application/taskBindings';
 import type { UserDirectory } from './ports/userDirectory';
 import { dataRoutes } from './http/dataRoutes';
+import type { DataLedger } from './ports/ledger';
+import { dataLedgerResyncWorker } from './workers/dataLedgerResync';
 import type { DataSettings, ProjectAuthorizer, ServiceResolver } from './ports/platform';
 import type { PostgresProvider } from './ports/providers';
 
@@ -36,6 +39,8 @@ export interface DataModuleDeps {
   logger?: Logger;
   /** 收到期绑定的间隔，缺省 BINDING_EXPIRY_INTERVAL_MS；用例里调短。 */
   expiryIntervalMs?: number;
+  /** 资源台账（RFC-025 第四期）：给了就把数据资源与访问绑定投影成 `database`／`data-binding` 记录，并每 5 分钟补投影。 */
+  ledger?: DataLedger;
 }
 
 /** 到期绑定每分钟收一次。 */
@@ -46,7 +51,7 @@ export interface DataModule {
   readonly http: Hono<AppEnv>[];
   /**
    * 收到期绑定：标成已过期、删掉临时角色。2026-09-23 之前 expireBindings 没有接到任何后台任务，
-   * 到期的绑定一直显示生效中，临时角色留在库里（数据库按 VALID UNTIL 拒绝它登录）。
+   * 到期的绑定一直显示生效中，临时角色留在库里（数据库按 VALID UNTIL 拒绝它登录）。配了台账时还有每 5 分钟的补投影。
    */
   readonly workers: Array<{ start(): void; stop(): Promise<void> }>;
   /** 任务已释放 → 收回它名下还没结束的绑定（2026-09-23 作者裁定：释放已有弹窗确认，直接收回）。 */
@@ -61,16 +66,19 @@ export const dataMigrations: MigrationSet = {
 };
 
 export function createDataModule(deps: DataModuleDeps): DataModule {
+  const logger = deps.logger ?? noopLogger;
+  const projection = deps.ledger ? dataLedgerProjection(deps.ledger, logger) : undefined;
+  const stored = { resources: drizzleDataResourceRepository(deps.db), bindings: drizzleTaskBindingRepository(deps.db) };
   const useCaseDeps: DataUseCaseDeps = {
-    resources: drizzleDataResourceRepository(deps.db),
-    bindings: drizzleTaskBindingRepository(deps.db),
+    resources: projection ? projection.resources(stored.resources) : stored.resources,
+    bindings: projection ? projection.bindings(stored.bindings) : stored.bindings,
     postgres: deps.provider ?? postgresJsProvider(deps.settings.postgres),
     cipher: secretboxCipher(deps.settings.secretKeyBase64),
     authorizer: deps.authorizer,
     services: deps.services,
     settings: deps.settings,
     clock: deps.clock ?? systemClock,
-    logger: deps.logger ?? noopLogger,
+    logger,
     ...(deps.users ? { users: deps.users } : {}),
   };
   const service = serviceDataUseCases(useCaseDeps);
@@ -89,5 +97,6 @@ export function createDataModule(deps: DataModuleDeps): DataModule {
   const revokeReleased = revokeBindingsOfReleasedTask(useCaseDeps);
   const consumer = createEventConsumer({ db: deps.db, consumer: 'data', ...(deps.logger ? { logger: deps.logger } : {}) })
     .on(DomainTopic.taskReleased, async (event) => { await revokeReleased(event.payload.taskId); });
-  return { api, http: [dataRoutes(api, deps.isAdmin)], workers: [expiry], subscriptions: [consumer], migrations: dataMigrations };
+  const resync = projection ? [dataLedgerResyncWorker(() => projection.resync(stored.resources, stored.bindings), logger)] : [];
+  return { api, http: [dataRoutes(api, deps.isAdmin)], workers: [expiry, ...resync], subscriptions: [consumer], migrations: dataMigrations };
 }
