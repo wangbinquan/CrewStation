@@ -4,7 +4,9 @@ import type { ResourceChild } from '@crewstation/contracts';
 export interface DataRecordView {
   readonly id: string;
   readonly kind: string;
-  readonly spec: { readonly children: readonly { readonly kind: string; readonly namespace?: string; readonly name: string }[] };
+  readonly desired?: 'present' | 'absent';
+  /** 子对象清单是公共部分；访问绑定另有临时角色所在的库与运行角色（`database`、`ownerRole`）。 */
+  readonly spec: { readonly children: readonly { readonly kind: string; readonly namespace?: string; readonly name: string }[]; readonly [field: string]: unknown };
   readonly children: readonly ResourceChild[];
 }
 

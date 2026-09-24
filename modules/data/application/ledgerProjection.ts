@@ -1,3 +1,4 @@
+import type { ServiceId } from '@crewstation/contracts';
 import type { Logger } from '@crewstation/kernel';
 import type { DataResource } from '../domain/dataResource';
 import type { Projection, ReleaseReason } from '../domain/dataRecords';
@@ -25,7 +26,12 @@ export function dataLedgerProjection(ledger: DataLedger, logger: Logger) {
     if (record?.desired === 'present') await ledger.requestRelease(record.id, projection.release);
   };
   const projectResource = (resource: DataResource) => apply(databaseProjection(resource), ledger.declare);
-  const projectBinding = (binding: TaskDataBinding) => apply(bindingProjection(binding), ledger.declare);
+  // 临时角色建在生产库上：期望里带上库名与运行角色（同名），data-control 删角色时据此转交它拥有的对象。
+  const projectBinding = async (binding: TaskDataBinding, resources: Pick<DataResourceRepository, 'find'>) => {
+    const prod = await resources.find(binding.serviceId as ServiceId, 'production', 'postgres');
+    const target = prod?.state === 'ready' ? { database: prod.objectName, ownerRole: prod.objectName } : undefined;
+    await apply(bindingProjection(binding, target), ledger.declare);
+  };
   const safely = async (id: string, project: () => Promise<void>): Promise<boolean> => {
     try { await project(); return true; }
     catch (error) { logger.warn('data ledger projection failed', { id, error: error instanceof Error ? error.message : String(error) }); return false; }
@@ -37,10 +43,10 @@ export function dataLedgerProjection(ledger: DataLedger, logger: Logger) {
       insert: async (resource) => { await repo.insert(resource); await safely(resource.id, () => projectResource(resource)); },
       update: async (resource) => { await repo.update(resource); await safely(resource.id, () => projectResource(resource)); },
     }),
-    bindings: (repo: TaskDataBindingRepository): TaskDataBindingRepository => ({
+    bindings: (repo: TaskDataBindingRepository, resources: Pick<DataResourceRepository, 'find'>): TaskDataBindingRepository => ({
       ...repo,
-      insert: async (binding) => { await repo.insert(binding); await safely(binding.id, () => projectBinding(binding)); },
-      update: async (binding) => { await repo.update(binding); await safely(binding.id, () => projectBinding(binding)); },
+      insert: async (binding) => { await repo.insert(binding); await safely(binding.id, () => projectBinding(binding, resources)); },
+      update: async (binding) => { await repo.update(binding); await safely(binding.id, () => projectBinding(binding, resources)); },
     }),
     /**
      * 补投影：全部数据资源；还没结束的绑定；以及台账里还「要」、绑定却已结束或已不在的记录（释放那一步写失败的）。返回处理的条数。
@@ -49,12 +55,12 @@ export function dataLedgerProjection(ledger: DataLedger, logger: Logger) {
       let synced = 0;
       for (const resource of await resources.listAll()) if (await safely(resource.id, () => projectResource(resource))) synced += 1;
       const open = await bindings.listOpen();
-      for (const binding of open) if (await safely(binding.id, () => projectBinding(binding))) synced += 1;
+      for (const binding of open) if (await safely(binding.id, () => projectBinding(binding, resources))) synced += 1;
       const known = new Set(open.map((binding) => binding.id));
       for (const record of await ledger.presentBindings()) {
         if (known.has(record.id)) continue;
         const binding = await bindings.getById(record.id);
-        if (await safely(record.id, () => (binding ? projectBinding(binding) : ledger.requestRelease(record.id, GONE).then(() => undefined)))) synced += 1;
+        if (await safely(record.id, () => (binding ? projectBinding(binding, resources) : ledger.requestRelease(record.id, GONE).then(() => undefined)))) synced += 1;
       }
       return synced;
     },

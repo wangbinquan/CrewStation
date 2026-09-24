@@ -42,13 +42,16 @@ describe('数据资源与访问绑定的期望（RFC-025 第四期）', () => {
     expect(requested.spec.children).toEqual([]);
     expect(requested.conditions).toEqual([{ type: 'Prepared', status: 'false', reason: 'awaiting-approval', message: '等负责人批准' }]);
     const expiresAt = new Date('2026-09-24T00:30:00Z');
-    const active = bindingProjection(binding({ state: 'active', roleName: 'cs_t_abc', secretBox: 'boxed', expiresAt })).declaration;
-    expect(active.spec).toEqual({ children: [{ kind: 'PostgresRole', name: 'cs_t_abc' }], mode: 'diagnostic-readonly', ttlMinutes: 30, expiresAt: '2026-09-24T00:30:00.000Z' });
+    const active = bindingProjection(binding({ state: 'active', roleName: 'cs_t_abc', secretBox: 'boxed', expiresAt }), { database: 'cs_demo', ownerRole: 'cs_demo' }).declaration;
+    expect(active.spec).toEqual({ children: [{ kind: 'PostgresRole', name: 'cs_t_abc' }], mode: 'diagnostic-readonly', ttlMinutes: 30, expiresAt: '2026-09-24T00:30:00.000Z', database: 'cs_demo', ownerRole: 'cs_demo' });
+    // 还没有临时角色（等批准）或不知道生产库时，期望里不写库名。
+    expect(bindingProjection(binding(), { database: 'cs_demo', ownerRole: 'cs_demo' }).declaration.spec).not.toHaveProperty('database');
+    expect(bindingProjection(binding({ state: 'active', roleName: 'cs_t_abc' })).declaration.spec).not.toHaveProperty('database');
     expect(active.conditions).toEqual([{ type: 'Prepared', status: 'true' }, { type: 'Granted', status: 'true' }]);
     expect(active.display).toEqual({ mode: 'diagnostic-readonly', expiresAt: '2026-09-24T00:30:00.000Z' });
     expect(JSON.stringify(active)).not.toContain('boxed');
     expect(bindingProjection(binding({ state: 'approved' })).declaration.conditions).toContainEqual({ type: 'Granted', status: 'false' });
-    expect(bindingProjection(binding({ mode: 'development', state: 'active', roleName: 'development' })).declaration.spec.children).toEqual([]);
+    expect(bindingProjection(binding({ mode: 'development', state: 'active', roleName: 'development' }), { database: 'cs_demo', ownerRole: 'cs_demo' }).declaration.spec).toEqual({ children: [], mode: 'development', ttlMinutes: 30 });
   });
 
   test('绑定：拒绝、收回、到期都受理释放，原因照结束的方式', () => {

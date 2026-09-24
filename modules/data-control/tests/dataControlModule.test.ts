@@ -6,21 +6,30 @@ import { createResourcesModule, resourcesMigrations } from '@crewstation/module-
 import type { TestDatabase } from '@crewstation/testkit';
 import { createTestDatabase, testDatabaseAvailable } from '@crewstation/testkit';
 import type { DataPlaneObject } from '../domain/dataPlane';
-import type { DataPlaneReader } from '../ports/dataPlane';
+import type { DataPlaneReader, DataPlaneWriter } from '../ports/dataPlane';
 import { createDataControlModule } from '../wiring';
 
 const available = await testDatabaseAvailable();
 const PROJECT = '01a0bf5d-8f4b-7c01-8e19-e226732a75e1' as ProjectId;
 
-/** 手动拨的数据面：用例决定库与角色在不在。 */
+/** 手动拨的数据面：用例决定库与角色在不在；调和器删角色时照 OID 从表里拿掉并记下。 */
 function manualDataPlane() {
   const databases = new Map<string, DataPlaneObject>(), roles = new Map<string, DataPlaneObject>();
+  const drops: string[] = [];
   let snapshots = 0, closed = false;
-  const reader: DataPlaneReader = {
+  const plane: DataPlaneReader & DataPlaneWriter = {
     snapshot: async () => { snapshots += 1; return { databases: new Map(databases), roles: new Map(roles), observedAt: new Date().toISOString() }; },
+    dropRole: async ({ role, oid, database, reassignTo }) => {
+      const live = roles.get(role);
+      if (!live) return 'absent';
+      if (oid && live.oid !== oid) return 'replaced';
+      drops.push(`${role}@${database}→${reassignTo}`);
+      roles.delete(role);
+      return 'dropped';
+    },
     close: async () => { closed = true; },
   };
-  return { reader, databases, roles, snapshots: () => snapshots, closed: () => closed };
+  return { plane, databases, roles, drops, snapshots: () => snapshots, closed: () => closed };
 }
 
 async function until(label: string, check: () => Promise<boolean> | boolean, timeoutMs = 5_000): Promise<void> {
@@ -35,13 +44,14 @@ describe.skipIf(!available)('data-control：数据面观测写回台账（RFC-02
   let database: TestDatabase;
   let resources: ResourcesModule;
   const plane = manualDataPlane();
+  const warnings: string[] = [];
   let control: ReturnType<typeof createDataControlModule>;
 
   beforeAll(async () => {
     database = await createTestDatabase([resourcesMigrations]);
     resources = createResourcesModule({ db: database.db, quotas: { limitFor: async () => 4 }, authorizer: { projectAccess: async () => ({ operate: true }) }, isAdmin: async () => false });
     control = createDataControlModule({
-      reader: plane.reader, logger: noopLogger, observer: { pollMs: 20, resyncMs: 60 },
+      plane: plane.plane, logger: { ...noopLogger, warn: (msg: string) => { warnings.push(msg); } }, observer: { pollMs: 20, resyncMs: 60 },
       ledger: {
         get: (id) => resources.api.get(id), changesSince: resources.api.changesSince, latestChange: resources.api.latestChange,
         listLive: async () => [...await resources.api.list({ kind: 'database' }), ...await resources.api.list({ kind: 'data-binding' })],
@@ -67,27 +77,41 @@ describe.skipIf(!available)('data-control：数据面观测写回台账（RFC-02
     expect((await resources.api.get(record.id))?.children.find((child) => child.kind === 'PostgresDatabase')?.uid).toBe('16500');
   });
 
-  test('访问绑定：批准生效、临时角色在即运行中；角色过了 VALID UNTIL 记 Expired；受理释放后角色删掉即已结束', async () => {
+  test('访问绑定：批准生效、临时角色在即运行中；角色过了 VALID UNTIL 记 Expired；受理释放后调和器删掉角色（对象转给运行角色），记录已结束', async () => {
     const role = 'cs_t_0123456789abcdef';
     const data = resources.api.owner('data');
-    const binding = await data.declare({ kind: 'data-binding', ref: 'binding-1', projectId: PROJECT, spec: { children: [{ kind: 'PostgresRole', name: role }], mode: 'diagnostic-readonly' }, conditions: [{ type: 'Prepared', status: 'true' }, { type: 'Granted', status: 'true' }] });
+    const spec = { children: [{ kind: 'PostgresRole', name: role }], mode: 'diagnostic-readonly', database: 'cs_shop', ownerRole: 'cs_shop' };
+    const binding = await data.declare({ kind: 'data-binding', ref: 'binding-1', projectId: PROJECT, spec, conditions: [{ type: 'Prepared', status: 'true' }, { type: 'Granted', status: 'true' }] });
     await until('角色还没建出来：分配中', async () => (await resources.api.get(binding.id))?.phase === 'provisioning');
     plane.roles.set(role, { name: role, oid: '17001', validUntil: new Date(Date.now() + 3_600_000).toISOString() });
     await until('绑定运行中', async () => (await resources.api.get(binding.id))?.phase === 'ready');
     plane.roles.set(role, { name: role, oid: '17001', validUntil: new Date(Date.now() - 1_000).toISOString() });
     await until('角色记 Expired', async () => (await resources.api.get(binding.id))?.children[0]?.phase === 'Expired');
     await data.requestRelease(binding.id, { code: 'expired', message: '已到期' });
-    await until('角色还在：结束中', async () => (await resources.api.get(binding.id))?.phase === 'stopping');
-    plane.roles.delete(role);
-    await until('角色删掉：已结束', async () => (await resources.api.get(binding.id))?.phase === 'stopped');
-    expect(control.stats().recorded).toBeGreaterThan(0);
+    await until('调和器删掉角色：已结束', async () => (await resources.api.get(binding.id))?.phase === 'stopped');
+    expect(plane.drops).toEqual([`${role}@cs_shop→cs_shop`]);
+    expect(plane.roles.has(role)).toBe(false);
+    expect(control.stats()).toMatchObject({ removed: 1 });
     expect(plane.snapshots()).toBeGreaterThan(0);
+  });
+
+  test('第一步投影的旧绑定（期望里没写所在的库）：不删，记一条告警，等 data 自己删；运行角色的名字一律不删', async () => {
+    const data = resources.api.owner('data');
+    plane.roles.set('cs_t_legacy01', { name: 'cs_t_legacy01', oid: '17101' });
+    const legacy = await data.declare({ kind: 'data-binding', ref: 'binding-legacy', projectId: PROJECT, spec: { children: [{ kind: 'PostgresRole', name: 'cs_t_legacy01' }], mode: 'production-change' }, conditions: [{ type: 'Granted', status: 'true' }] });
+    await until('旧绑定运行中', async () => (await resources.api.get(legacy.id))?.phase === 'ready');
+    await data.requestRelease(legacy.id, { code: 'revoked', message: '已收回' });
+    await until('跳过删除并告警', () => warnings.includes('data role removal skipped'));
+    expect((await resources.api.get(legacy.id))?.phase).toBe('stopping');
+    expect(plane.drops.some((entry) => entry.startsWith('cs_t_legacy01'))).toBe(false);
+    plane.roles.delete('cs_t_legacy01');
+    await until('data 删掉后已结束', async () => (await resources.api.get(legacy.id))?.phase === 'stopped');
   });
 
   test('装配：没有管理连接也没有 reader 时拒绝；停下时关掉数据面连接', async () => {
     expect(() => createDataControlModule({ ledger: { get: async () => undefined, listLive: async () => [], changesSince: async () => [], latestChange: async () => 0, observe: async () => ({ status: 'unowned' as const }) } })).toThrow('adminUrl');
     const other = manualDataPlane();
-    const idle = createDataControlModule({ reader: other.reader, ledger: { get: async () => undefined, listLive: async () => [], changesSince: async () => [], latestChange: async () => 0, observe: async () => ({ status: 'unowned' as const }) } });
+    const idle = createDataControlModule({ plane: other.plane, ledger: { get: async () => undefined, listLive: async () => [], changesSince: async () => [], latestChange: async () => 0, observe: async () => ({ status: 'unowned' as const }) } });
     expect(idle.api.name).toBe('data-control');
     idle.observer.start();
     await idle.observer.stop();

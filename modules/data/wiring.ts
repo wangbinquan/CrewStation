@@ -71,7 +71,7 @@ export function createDataModule(deps: DataModuleDeps): DataModule {
   const stored = { resources: drizzleDataResourceRepository(deps.db), bindings: drizzleTaskBindingRepository(deps.db) };
   const useCaseDeps: DataUseCaseDeps = {
     resources: projection ? projection.resources(stored.resources) : stored.resources,
-    bindings: projection ? projection.bindings(stored.bindings) : stored.bindings,
+    bindings: projection ? projection.bindings(stored.bindings, stored.resources) : stored.bindings,
     postgres: deps.provider ?? postgresJsProvider(deps.settings.postgres),
     cipher: secretboxCipher(deps.settings.secretKeyBase64),
     authorizer: deps.authorizer,

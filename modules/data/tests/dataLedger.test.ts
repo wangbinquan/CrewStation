@@ -79,6 +79,8 @@ describe.skipIf(!available)('data：数据资源与访问绑定投影进资源�
     const granted = await record(ro.id);
     const role = `cs_t_${ro.id.replaceAll('-', '')}`;
     expect(granted?.spec.children).toEqual([{ kind: 'PostgresRole', name: role }]);
+    // 临时角色建在生产库上：期望里带库名与运行角色，data-control 删角色时据此转交它拥有的对象。
+    expect(granted?.spec).toMatchObject({ database: 'cs_shop', ownerRole: 'cs_shop' });
     expect(granted?.conditions.find((entry) => entry.type === 'Granted')?.status).toBe('true');
     expect(granted?.phase).toBe('provisioning');
     await data.api.revokeTaskBinding(owner, ro.id);

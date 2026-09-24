@@ -18,14 +18,20 @@ export interface DatabaseDeclaration {
   readonly conditions: readonly Condition[];
 }
 
-/** 开发会话的一条数据访问绑定：挂在会话的工作区记录下；诊断只读、生产变更有临时角色，开发模式没有数据面对象。 */
+/**
+ * 开发会话的一条数据访问绑定：挂在会话的工作区记录下；诊断只读、生产变更有临时角色，开发模式没有数据面对象。
+ * 临时角色建在生产库上：期望里写库名与运行角色，data-control 删角色前把它拥有的对象转给运行角色。
+ */
 export interface BindingDeclaration {
   readonly id: string;
   readonly kind: 'data-binding';
   readonly ref: string;
   readonly projectId: ProjectId;
   readonly parentId: string;
-  readonly spec: { readonly children: readonly Child[]; readonly mode: TaskDataMode; readonly ttlMinutes: number; readonly expiresAt?: string };
+  readonly spec: {
+    readonly children: readonly Child[]; readonly mode: TaskDataMode; readonly ttlMinutes: number; readonly expiresAt?: string;
+    readonly database?: string; readonly ownerRole?: string;
+  };
   readonly display: Readonly<Record<string, string>>;
   readonly conditions: readonly Condition[];
 }
@@ -71,14 +77,21 @@ function bindingConditions(binding: TaskDataBinding): Condition[] {
   return [{ type: 'Prepared', status: 'true' }, binding.state === 'active' ? { type: 'Granted', status: 'true' } : { type: 'Granted', status: 'false' }];
 }
 
-export function bindingProjection(binding: TaskDataBinding): Projection<BindingDeclaration> {
+/** 临时角色所在的生产库：库名与同名的运行角色（生产库尚未供给时没有）。 */
+export interface RoleTarget {
+  readonly database: string;
+  readonly ownerRole: string;
+}
+
+export function bindingProjection(binding: TaskDataBinding, target?: RoleTarget): Projection<BindingDeclaration> {
   const role = binding.roleName && binding.roleName !== 'development' ? [{ kind: 'PostgresRole' as const, name: binding.roleName }] : [];
   const expiresAt = binding.expiresAt?.toISOString();
   const release = ENDED[binding.state];
+  const where = role.length && target ? { database: target.database, ownerRole: target.ownerRole } : {};
   return {
     declaration: {
       id: binding.id, kind: 'data-binding', ref: binding.id, projectId: binding.projectId as ProjectId, parentId: binding.taskId,
-      spec: { children: role, mode: binding.mode, ttlMinutes: binding.ttlMinutes, ...(expiresAt ? { expiresAt } : {}) },
+      spec: { children: role, mode: binding.mode, ttlMinutes: binding.ttlMinutes, ...(expiresAt ? { expiresAt } : {}), ...where },
       display: { mode: binding.mode, ...(expiresAt ? { expiresAt } : {}) },
       conditions: bindingConditions(binding),
     },
