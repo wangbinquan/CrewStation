@@ -111,8 +111,9 @@ async function runCommand(launcher: ProcessLauncher, command: ProbeTerminalComma
     clearTimeout(timer);
     context.signal.removeEventListener('abort', onAbort);
   }
+  // 超时是整个进程组被终止：退出码一律为空。进程组收到 SIGTERM 时 shell 可能先看到子进程被杀、自己以 143 退出，负载下时有时无（与启动前脚本一致，超时优先）。
   return {
-    exitCode: proc.exitCode, timedOut, matched: context.expectation.test(output.head()),
+    exitCode: timedOut ? null : proc.exitCode, timedOut, matched: context.expectation.test(output.head()),
     outputTail: redactSecrets(output.tail(), context.sensitive).slice(-PROBE_TAIL_CHARS), durationMs: Date.now() - startedAt,
   };
 }
