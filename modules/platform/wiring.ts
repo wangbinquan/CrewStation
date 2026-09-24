@@ -1,51 +1,35 @@
 import { BUILTIN_RESOURCES } from '@crewstation/contracts';
-import { resourceIdentityDirectory, type ResourceIdentityDirectory } from '@crewstation/persistence';
+import { resourceIdentityDirectory, type Database, type MigrationSet, type ResourceIdentityDirectory } from '@crewstation/persistence';
 import { createClusterManagementModule } from '@crewstation/module-cluster-management';
-import { createClusterControlModule } from '@crewstation/module-cluster-control';
-import { createResourcesModule } from '@crewstation/module-resources';
-import type { ResourcesModuleApi } from '@crewstation/module-resources';
+import { createClusterControlModule, type ClusterControlModuleApi, type SlotSpec } from '@crewstation/module-cluster-control';
+import { createResourcesModule, type ResourcesModuleApi } from '@crewstation/module-resources';
 import { installedSystemComponents } from './domain/systemComponents';
-import type { ClusterResource, ClusterInspectRequest, ClusterOperation, ClusterInspection, TaskId, ProfileTestId, RebuildDevSessionRequest } from '@crewstation/contracts';
-import type { Actor, ComputeProfileSelector, ComputeUsage, ProjectId, ServiceId, UserDto, UserId } from '@crewstation/contracts';
-import type { EventConsumer } from '@crewstation/eventbus';
-import type { K8sClient } from '@crewstation/k8s';
-import { secretObject } from '@crewstation/k8s';
-import type { Logger } from '@crewstation/kernel';
-import { forbidden, precondition } from '@crewstation/kernel';
-import { createAgentRuntimeModule } from '@crewstation/module-agent-runtime';
-import type { AgentRuntimeModuleApi } from '@crewstation/module-agent-runtime';
+import type { Actor, ClusterResource, ClusterInspectRequest, ClusterOperation, ClusterInspection, ComputeProfileSelector, ComputeUsage, ProfileTestId, ProjectId, RebuildDevSessionRequest, ServiceId, TaskId, UserDto, UserId } from '@crewstation/contracts';
+import { eventbusMigrations, type EventConsumer } from '@crewstation/eventbus';
+import { secretObject, type K8sClient } from '@crewstation/k8s';
+import { forbidden, precondition, type Logger } from '@crewstation/kernel';
+import { createAgentRuntimeModule, type AgentRuntimeModuleApi } from '@crewstation/module-agent-runtime';
 import { createApiCatalogModule } from '@crewstation/module-api-catalog';
 import { createBusinessTaskModule } from '@crewstation/module-business-task';
 import { createCapabilitiesModule } from '@crewstation/module-capabilities';
 import { createConfigModule } from '@crewstation/module-config';
 import { createDataModule } from '@crewstation/module-data';
-import { createDataControlModule } from '@crewstation/module-data-control';
-import type { DataControlModuleApi } from '@crewstation/module-data-control';
+import { createDataControlModule, type DataControlModuleApi } from '@crewstation/module-data-control';
 import { createDevSessionModule } from '@crewstation/module-dev-session';
-import type { EventsModuleApi } from '@crewstation/module-events';
-import { createEventsModule } from '@crewstation/module-events';
-import { createGatewayModule, UNAVAILABLE_PATH } from '@crewstation/module-gateway';
-import type { GatewayModuleApi } from '@crewstation/module-gateway';
-import { createIdentityModule } from '@crewstation/module-identity';
-import type { IdentityRuntimeDeps } from '@crewstation/module-identity';
+import { createEventsModule, type EventsModuleApi } from '@crewstation/module-events';
+import { createGatewayModule, UNAVAILABLE_PATH, type GatewayModuleApi } from '@crewstation/module-gateway';
+import { createIdentityModule, type IdentityRuntimeDeps } from '@crewstation/module-identity';
 import { createObservabilityModule } from '@crewstation/module-observability';
-import { createProjectModule } from '@crewstation/module-project';
-import { createProvisioningModule } from '@crewstation/module-provisioning';
-import type { ProjectFacts } from '@crewstation/module-provisioning';
-import type { ProjectModuleApi, ResolvedService } from '@crewstation/module-project';
-import { createReleaseModule } from '@crewstation/module-release';
-import type { ReleaseModuleApi } from '@crewstation/module-release';
+import { createProvisioningModule, type ProjectFacts } from '@crewstation/module-provisioning';
+import { createProjectModule, type ProjectModuleApi, type ResolvedService } from '@crewstation/module-project';
+import { createReleaseModule, type ReleaseModuleApi } from '@crewstation/module-release';
 import { createScmModule } from '@crewstation/module-scm';
 import { createSessionModule } from '@crewstation/module-session';
-import { createTaskRuntimeModule } from '@crewstation/module-task-runtime';
-import type { TaskRuntimeModuleApi, TaskRuntimeModuleDeps } from '@crewstation/module-task-runtime';
-import type { Database } from '@crewstation/persistence';
-import { eventbusMigrations } from '@crewstation/eventbus';
+import { createTaskRuntimeModule, type TaskRuntimeModuleApi, type TaskRuntimeModuleDeps } from '@crewstation/module-task-runtime';
 import { queueMigrations } from '@crewstation/queue';
 import { createSessionClient } from '@crewstation/session-client';
 import type { PlatformSettings } from '@crewstation/settings';
 import type { AppEnv } from '@crewstation/http';
-import type { MigrationSet } from '@crewstation/persistence';
 import type { Hono } from 'hono';
 import type { Lifecycle } from './api/moduleApi';
 
@@ -80,7 +64,7 @@ export const SYSTEM_ACTOR: Actor = { userId: BUILTIN_RESOURCES.systemActor as Us
 
 const consumerLifecycle = (consumer: EventConsumer): Lifecycle => ({ start: () => consumer.start(), stop: () => consumer.stop() });
 
-interface Late { events?: EventsModuleApi; project?: ProjectModuleApi; gateway?: GatewayModuleApi; taskRuntime?: TaskRuntimeModuleApi; release?: ReleaseModuleApi; resources?: ResourcesModuleApi; dataControl?: DataControlModuleApi }
+interface Late { events?: EventsModuleApi; project?: ProjectModuleApi; gateway?: GatewayModuleApi; taskRuntime?: TaskRuntimeModuleApi; release?: ReleaseModuleApi; resources?: ResourcesModuleApi; dataControl?: DataControlModuleApi; clusterControl?: ClusterControlModuleApi }
 
 type CompositionDeps = PlatformModuleDeps & { identities: ResourceIdentityDirectory };
 
@@ -203,8 +187,10 @@ function composeDelivery(deps: CompositionDeps, core: ReturnType<typeof composeC
   const { db, k8s, settings, logger } = deps;
   const { project, config, data, scm, apiCatalog, hosts, isAdmin, resolveById } = core;
   const release = createReleaseModule({
-    // 服务槽投影进资源台账（RFC-025 第三期）：在 release 自己的事务里写期望与领域条件。
+    // 服务槽投影进资源台账（RFC-025 第三期）：在 release 自己的事务里写期望与领域条件。T8：槽由资源中心建出（CS_SLOT_CREATION=owner 回退为自己部署），
+    // 重新部署前的集群预检经 cluster-control 按同一份期望渲染（它装配在后，惰性取）。
     ledger: { within: (tx) => resources.api.owner('release').within(tx as object) },
+    ...(settings.slotCreation === 'ledger' ? { creation: 'ledger' as const, renderer: { dryRun: (spec: SlotSpec, env: Readonly<Record<string, string>>) => { if (!late.clusterControl) throw new Error('cluster-control 尚未装配'); return late.clusterControl.dryRunSlot(spec, env); } } } : {}),
     physicalOperationId: async (id) => (await deps.identities.aliases('cluster-operation', id)).find((keys) => keys.length === 1 && keys[0] !== id)?.[0] ?? id,
     db, k8s, hosts, logger, isAdmin: (id) => isAdmin(id), authorizer: project.api, services: { resolveServiceById: resolveById },
     tagger: { createReleaseTag: (serviceId, { branch, version, expectedCommitSha }) => scm.api.createReleaseTag(serviceId, { branch, ...(expectedCommitSha ? { expectedCommitSha } : {}), ...(version.startsWith('v') ? { tag: version } : { bump: version as 'major' | 'minor' | 'patch' }) }) },
@@ -453,7 +439,7 @@ function composeLedger(deps: CompositionDeps, core: ReturnType<typeof composeCor
   });
 }
 
-function composeControl(deps: CompositionDeps, core: ReturnType<typeof composeCore>, ledger: ReturnType<typeof composeLedger>, runtime: ReturnType<typeof composeRuntime>, gateway: ReturnType<typeof composeDelivery>['gateway']) {
+function composeControl(deps: CompositionDeps, core: ReturnType<typeof composeCore>, ledger: ReturnType<typeof composeLedger>, runtime: ReturnType<typeof composeRuntime>, { gateway, release }: ReturnType<typeof composeDelivery>) {
   return createClusterControlModule({
     k8s: deps.k8s, logger: deps.logger, isAdmin: core.identity.api.isAdmin, systemNamespace: deps.settings.systemNamespace,
     // 多副本分工（RFC-025 设计 §6.3）：逐条调和与孤儿回收在资源中心的租约下进行，持有者是这个副本。
@@ -465,6 +451,8 @@ function composeControl(deps: CompositionDeps, core: ReturnType<typeof composeCo
     // RFC-025 I25：建工作区与执行环境的 Runner Secret 时回头向 task-runtime 要内容（值不落台账），Pod 建出后交回实例；执行环境的父工作区变了交它判失败。
     workloads: { runnerValues: (id) => runtime.taskRuntime.api.runnerValues(id as TaskId), checkoutValues: (id) => runtime.taskRuntime.api.checkoutValues(id as TaskId), bindWorkload: (id, podUid, secretUid) => runtime.taskRuntime.api.bindWorkload(id as TaskId, podUid, secretUid),
       workloadUnavailable: (id, code) => runtime.taskRuntime.api.workloadUnavailable(id as TaskId, code) },
+    // T8：建服务槽的环境 Secret 时同样回头向 release 要内容；建不成交它判这一次部署失败。
+    slots: { slotEnvValues: (ref) => release.api.slotEnvValues(ref), slotFailed: (ref, message) => release.api.slotFailed(ref, message) },
     ledger: {
       observe: (input) => ledger.api.observe(input), claimOf: (child) => ledger.api.claimOf(child), get: (id) => ledger.api.get(id),
       listLive: () => ledger.api.list({}), changesSince: ledger.api.changesSince, latestChange: ledger.api.latestChange,
@@ -508,9 +496,10 @@ function composeModules(deps: CompositionDeps) {
   const runtime = composeRuntime(deps, core, delivery, late, resources);
   const aggregates = composeAggregates(deps, core, delivery, runtime, resources);
   const cluster = composeCluster(deps, core, delivery, runtime, resources);
-  const clusterControl = composeControl(deps, core, resources, runtime, delivery.gateway);
+  const clusterControl = composeControl(deps, core, resources, runtime, delivery);
   const dataControl = composeDataControl(deps, resources);
   late.dataControl = dataControl.api;
+  late.clusterControl = clusterControl.api;
   return { cluster, resources, clusterControl, dataControl, identity: core.identity, project: core.project, config: core.config, data: core.data, scm: core.scm, apiCatalog: core.apiCatalog, agentRuntime: core.agentRuntime, ...delivery, ...runtime, ...aggregates };
 }
 

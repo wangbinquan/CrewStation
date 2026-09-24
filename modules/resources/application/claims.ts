@@ -12,6 +12,6 @@ export async function readClaims(read: LedgerScope, now: Date, access: (record: 
   const records = new Map((await read.records.getMany([...new Set(pairs.map((pair) => pair.resourceId))])).map((record) => [record.id, record]));
   return Promise.all(pairs.flatMap((pair) => {
     const record = records.get(pair.resourceId), viewer = record && access(record);
-    return record && viewer ? [viewer.then((granted) => ({ child: pair.child, ledger: toClusterLedger(record, now, granted) }))] : [];
+    return record && viewer ? [viewer.then((granted) => ({ child: pair.child, ledger: toClusterLedger(record, now, granted, pair.child.kind) }))] : [];
   }));
 }

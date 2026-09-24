@@ -2,7 +2,7 @@ import type { UserId } from '@crewstation/contracts';
 import type { AppEnv } from '@crewstation/http';
 import type { K8sClient } from '@crewstation/k8s';
 import type { Clock, Logger } from '@crewstation/kernel';
-import { forbidden, noopLogger, systemClock } from '@crewstation/kernel';
+import { forbidden, noopLogger, systemClock, validation } from '@crewstation/kernel';
 import type { Hono } from 'hono';
 import type { ClusterControlModuleApi } from './api/moduleApi';
 import { kubernetesClusterWriter, managedObjectFeed, managedObjectReader } from './adapters/k8s/managedObjects';
@@ -15,7 +15,8 @@ import type { Explainer } from './application/routeExplainer';
 import { routeTargets } from './application/routeExplainer';
 import { adoptionRoutes } from './http/adoptionRoutes';
 import type { ClusterWriter, ManagedObjectFeed, ManagedObjectReader, ObjectChange, ObservedKind, PodSubscriber } from './ports/cluster';
-import type { LedgerObservations, LegacyOwners, WorkloadOwners } from './ports/ledger';
+import type { LedgerObservations, LegacyOwners, SlotOwners, WorkloadOwners } from './ports/ledger';
+import { slotRenderOf } from './domain/slotRender';
 import type { LedgerReconcilerOptions, ReplicaLeases } from './workers/ledgerReconciler';
 import { ledgerReconciler } from './workers/ledgerReconciler';
 import { observationWorker } from './workers/observationWorker';
@@ -25,8 +26,9 @@ import { orphanSweeper } from './workers/orphanSweeper';
 /**
  * 调和器按期望渲染的种类：有人改了它们（标签、命名空间的额度上限）时 generation 不一定变、台账不记变更，
  * 所以观测到变化就直接核对认领它的记录，缺了或被改就改回。工作卷（I25）观测到了，认领它的卷记录随即唤醒等着它的工作区。
+ * 服务槽的 Deployment 与 Service（T8）同样：被人改了标签、副本或镜像，随即按期望改回。
  */
-const RENDERED_KINDS: ReadonlySet<ObservedKind> = new Set(['IngressRoute', 'Middleware', 'Namespace', 'ResourceQuota', 'NetworkPolicy', 'PersistentVolumeClaim']);
+const RENDERED_KINDS: ReadonlySet<ObservedKind> = new Set(['IngressRoute', 'Middleware', 'Namespace', 'ResourceQuota', 'NetworkPolicy', 'PersistentVolumeClaim', 'Deployment', 'Service']);
 
 /** 装配期注入：台账入口与旧所属对象由组合根从 resources／task-runtime 接上。 */
 export interface ClusterControlModuleDeps {
@@ -55,6 +57,8 @@ export interface ClusterControlModuleDeps {
   readonly explainer?: Explainer;
   /** 工作区容器的所属模块（task-runtime，RFC-025 I25）：给了就照工作区与工作卷记录建出容器。 */
   readonly workloads?: WorkloadOwners;
+  /** 服务槽的所属模块（release，T8）：给了就照槽记录建出 Deployment、Service 与环境 Secret。 */
+  readonly slots?: SlotOwners;
 }
 
 export interface ClusterControlModule {
@@ -72,17 +76,23 @@ export function createClusterControlModule(deps: ClusterControlModuleDeps): Clus
   const reader = deps.reader ?? managedObjectReader(deps.k8s);
   const feed = deps.feed ?? managedObjectFeed(deps.k8s, { logger });
   const stats = newObservationStats();
+  const cluster = deps.cluster ?? kubernetesClusterWriter(deps.k8s);
   const api: ClusterControlModuleApi = {
     name: 'cluster-control',
     adoptionReport: async (actor) => {
       if (!actor.isAdmin) throw forbidden('只有管理员可以查看收编报告');
       return adoptionReport({ reader, ledger: deps.ledger, legacy: deps.legacy, clock, systemNamespace: deps.systemNamespace });
     },
+    dryRunSlot: async (spec, values) => {
+      const slot = slotRenderOf(spec);
+      if (!slot) throw validation('服务槽的期望不完整，无法预检');
+      await cluster.dryRunSlot(slot, 0, values);
+    },
   };
-  const cluster = deps.cluster ?? kubernetesClusterWriter(deps.k8s);
   const reconcileDeps = {
     ledger: deps.ledger, feed, cluster, clock, systemNamespace: deps.systemNamespace, stats, logger, routeTargets: routeTargets(),
     ...(deps.reconciler?.retryMs ? { retryMs: deps.reconciler.retryMs } : {}), ...(deps.explainer ? { explainer: deps.explainer } : {}), ...(deps.workloads ? { workloads: deps.workloads } : {}),
+    ...(deps.slots ? { slots: deps.slots } : {}),
   };
   const reconciler = ledgerReconciler(deps.ledger, feed, (id, enqueue) => reconcileRecord(reconcileDeps, id, enqueue), logger, { ...deps.reconciler, ...(deps.leases ? { leases: deps.leases } : {}) });
   // Pod 先交给身份索引（来源 IP 认人，越早越好），再写台账观测；两边失败互不耽误。调和器渲染的对象一有变化就把认领它的记录排进去核对。

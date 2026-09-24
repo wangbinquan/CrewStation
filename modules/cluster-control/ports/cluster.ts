@@ -2,6 +2,7 @@ import type { MiddlewareRender } from '../domain/middlewareRender';
 import type { NamespaceRender, NetworkPolicyRender } from '../domain/namespaceRender';
 import type { ObservedObject } from '../domain/observation';
 import type { RouteRender } from '../domain/routeRender';
+import type { SlotRender } from '../domain/slotRender';
 import type { VolumeRender, WorkloadPodRender, WorkloadPreviewRender } from '../domain/workloadRender';
 
 /**
@@ -68,6 +69,15 @@ export interface ClusterWriter {
   ensureVolume(volume: VolumeRender): Promise<Ensured>;
   /** 开发预览的 Service 与路由：各自缺了或不一致才服务端 apply。 */
   applyPreview(preview: WorkloadPreviewRender, current: { readonly service?: ObservedObject; readonly route?: ObservedObject }): Promise<'applied' | 'unchanged'>;
+  /**
+   * 服务槽（T8）：这一次部署的环境 Secret 先确认不在，才调 values 向 release 要内容再建（不可变）；Service 与 Deployment 按期望渲染，
+   * 缺了或不一致才 apply——Deployment 带上渲染它的期望版本（generation）。
+   */
+  ensureSlotSecret(slot: SlotRender, values: () => Promise<Readonly<Record<string, string>>>): Promise<Ensured>;
+  applySlotService(slot: SlotRender, current: ObservedObject | undefined): Promise<'applied' | 'unchanged'>;
+  applySlotDeployment(slot: SlotRender, generation: number, current: ObservedObject | undefined): Promise<'applied' | 'unchanged'>;
+  /** 统一预检的集群一步（设计 §5）：同样的三个对象以服务端 dry-run 提交一次，不改集群；API Server 拒绝时抛出它给的原因。 */
+  dryRunSlot(slot: SlotRender, generation: number, values: Readonly<Record<string, string>>): Promise<void>;
 }
 
 /** 按名字建出的对象：实例 UID，与是不是这次建的（已在就不动）。 */

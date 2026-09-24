@@ -18,6 +18,7 @@ export function drizzleReleaseRepository(db: Executor): ReleaseRepository {
     getByTag: (serviceId, tag) => db.select().from(releases).where(and(eq(releases.serviceId, serviceId), eq(releases.tag, tag))).then(first),
     listByService: async (serviceId, limit) => (await db.select().from(releases).where(eq(releases.serviceId, serviceId)).orderBy(desc(releases.createdAt)).limit(limit)).map(toRelease),
     findInProgress: (serviceId) => db.select().from(releases).where(and(eq(releases.serviceId, serviceId), inArray(releases.status, [...IN_PROGRESS]))).then(first),
+    recordConfigVersion: async (id, configVersion) => { await db.update(releases).set({ configVersion }).where(eq(releases.id, id)); },
   };
 }
 

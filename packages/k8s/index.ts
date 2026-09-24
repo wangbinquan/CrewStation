@@ -14,6 +14,8 @@ export type { MiddlewareRef, RouteTarget } from './objects/traefik';
 export { dropIdentityHeadersMiddleware, forwardAuthMiddleware, ingressRouteObject, stripPrefixMiddleware } from './objects/traefik';
 export type { TaskCheckout, TaskPodInput, TaskPreviewInput } from './objects/task';
 export { TASK_RUNNER_COMMAND, taskPodObject, taskPreviewObjects } from './objects/task';
+export type { ServiceSlotInput } from './objects/slot';
+export { serviceSlotObjects, serviceSlotSecret, slotObjectName } from './objects/slot';
 
 export { boundedMetricsText, parseMetricsJson } from './metrics';
 export type { PodEventLike, PodImagePull, PodStartupContainer, PodStartupObservation } from './podStartup';

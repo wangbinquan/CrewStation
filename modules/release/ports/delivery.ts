@@ -50,6 +50,14 @@ export interface SlotDeployer {
   removeWorkload(namespace: string, serviceName: string, physical: PhysicalSlot, releaseIds: readonly string[]): Promise<boolean>;
 }
 
+/**
+ * 资源中心建的槽（RFC-025 T8）的集群预检：cluster-control 按槽记录的期望渲染出与调和器相同的环境 Secret、Service 与 Deployment，
+ * 以服务端 dry-run 提交一次（设计 §5「渲染移交资源中心后改经 cluster-control 的端口」）。env 只在内存里用。由组合根接上。
+ */
+export interface SlotRenderer {
+  dryRun(spec: { readonly children: readonly { readonly kind: string; readonly namespace?: string; readonly name: string }[]; readonly slot: Readonly<Record<string, unknown>> }, env: Readonly<Record<string, string>>): Promise<void>;
+}
+
 export interface ReleaseJobs {
   /** 流水线推进任务；dedupKey 防止同一步骤重复入队。 */
   enqueuePipelineStep(releaseId: string, step: number, delaySeconds: number): Promise<void>;

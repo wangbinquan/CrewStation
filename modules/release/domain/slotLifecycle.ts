@@ -106,8 +106,9 @@ export function takeSlotOffline(slots: ServiceSlots, physical: PhysicalSlot, now
   if (physical === slots.active) throw precondition('正式槽正在承接流量，不能下线');
   const slot = slots[physical];
   if (!hasWorkload(slot)) throw precondition('待验证槽上没有运行中的版本');
-  const offline = { releaseId: slot.releaseId!, at: now, reason: input.reason, ...(input.actorUserId ? { actorUserId: input.actorUserId } : {}), workloadRemoved: input.workloadRemoved ?? false };
-  return withSlot(slots, { physical, state: 'empty', replicas: 0, readyReplicas: 0, updatedAt: now, offline }, now);
+  // 资源中心建的槽（T8）：工作负载由调和器照「不该有工作负载」删，这里不留待重试；期望留着，调和器据此知道删哪些。
+  const offline = { releaseId: slot.releaseId!, at: now, reason: input.reason, ...(input.actorUserId ? { actorUserId: input.actorUserId } : {}), workloadRemoved: input.workloadRemoved ?? slot.workload !== undefined };
+  return withSlot(slots, { physical, state: 'empty', replicas: 0, readyReplicas: 0, updatedAt: now, offline, ...(slot.workload ? { workload: slot.workload } : {}) }, now);
 }
 
 export function markWorkloadRemoved(slot: SlotState): SlotState {

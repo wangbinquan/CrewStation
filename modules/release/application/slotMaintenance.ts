@@ -3,7 +3,9 @@ import { conflict, forbidden, isPlatformError, precondition } from '@crewstation
 import type { RepositoryScope } from '../ports/unitOfWork';
 import type { SlotControl } from '../ports/slotControl';
 import type { SlotMaintenance } from '../domain/slotMaintenance';
+import { slotRolloutOf } from '../domain/ledgerProjection';
 import { hasWorkload } from '../domain/slotLifecycle';
+import type { PhysicalSlot, ServiceSlots } from '../domain/slots';
 import { withSlot } from '../domain/slots';
 import type { ReleaseUseCaseDeps } from './dependencies';
 import { offlineInScope } from './slotLifecycle';
@@ -27,6 +29,33 @@ async function check(deps: Deps, scope: RepositoryScope, actor: Actor, target: C
   if (request.action === 'scale' || request.action === 'restore-replicas') await deps.slotControl.inspect(target);
   return { projection, replicas, maxReplicas: plan?.maxReplicas ?? 1 };
 }
+/**
+ * 资源中心建的槽（RFC-025 T8，C6「执行改为写期望」）：执行即在同一事务里改槽的期望——扩缩与恢复写副本数，重启写重启标记，删除即下线
+ * （与项目侧下线同一个结果，RFC-021 B7）；调和器照期望应用，结果随观测回到槽记录。
+ */
+async function applyToWorkload(scope: RepositoryScope, slots: ServiceSlots, physical: PhysicalSlot, operation: ClusterOperation, replicas: number | undefined, now: Date): Promise<void> {
+  const slot = slots[physical], workload = slot.workload!;
+  if (operation.action === 'delete') {
+    if (hasWorkload(slot)) await offlineInScope(scope, slots, physical, now, { reason: 'cluster', actorUserId: operation.actorId as UserId, workloadRemoved: true });
+    return;
+  }
+  const next = operation.action === 'restart' ? { ...workload, restartedAt: now.toISOString() } : { ...workload, replicas: replicas ?? workload.replicas };
+  await scope.slots.save(withSlot(slots, { ...slot, workload: next, updatedAt: now }, now));
+}
+
+/** 资源中心建的槽的运维进度：照槽记录判——删除看 Deployment 没了，其余看新期望铺完、副本数对上；推进超时算失败。 */
+async function observeViaLedger(deps: Deps, operation: ClusterOperation, replicas: number | undefined): Promise<{ done: boolean; failed?: boolean; reason: string; replicas: number; readyReplicas: number }> {
+  const found = await deps.uow.read.ledger?.slot(operation.target.serviceId as ServiceId, operation.target.physicalSlot!);
+  if (operation.action === 'delete') {
+    const gone = !found?.children?.some((child) => child.kind === 'Deployment' && child.phase !== 'absent');
+    return { done: gone, reason: gone ? '发布槽已删除' : '等待原发布槽删除', replicas: 0, readyReplicas: 0 };
+  }
+  const rollout = slotRolloutOf(found), counts = { replicas: rollout.replicas, readyReplicas: rollout.readyReplicas };
+  if (rollout.state === 'failed') return { done: true, failed: true, reason: rollout.message ?? '部署停止推进', ...counts };
+  const done = rollout.state === 'ready' && (replicas === undefined || rollout.replicas === replicas);
+  return { done, reason: done ? '发布槽已就绪' : rollout.message ?? `等待发布槽就绪：${rollout.readyReplicas}/${rollout.replicas}`, ...counts };
+}
+
 export function slotMaintenanceUseCases(deps: Deps) {
   return {
     listClusterSlots: () => deps.uow.read.maintenance.projection(),
@@ -37,10 +66,16 @@ export function slotMaintenanceUseCases(deps: Deps) {
     },
     executeSlotOperation: async (actor: Actor, operation: ClusterOperation, inspection: ClusterInspection) => {
       const record = await deps.uow.run(async (scope): Promise<SlotMaintenance> => {
-        await scope.slots.get(operation.target.serviceId as ServiceId);
+        const slots = await scope.slots.get(operation.target.serviceId as ServiceId);
         const old = await scope.maintenance.get(operation.operationId); if (old) return old;
         const result = await check(deps, scope, actor, operation.target, operation.params, operation.operationId);
         const next: SlotMaintenance = { operation, inspection, state: 'prepared', ...(result.replicas === undefined ? {} : { replicas: result.replicas }) };
+        const physical = operation.target.physicalSlot!;
+        if (slots?.[physical].workload) {
+          await applyToWorkload(scope, slots, physical, operation, result.replicas, deps.clock.now());
+          const applied: SlotMaintenance = { ...next, state: 'applied' };
+          await scope.maintenance.save(applied); return applied;
+        }
         await scope.maintenance.save(next); return next;
       });
       if (record.state === 'prepared') {
@@ -54,7 +89,8 @@ export function slotMaintenanceUseCases(deps: Deps) {
     },
     observeSlotOperation: async (operation: ClusterOperation) => {
       const record = await deps.uow.read.maintenance.get(operation.operationId); if (!record) throw precondition('发布槽操作意图不存在');
-      const status = await deps.slotControl.observe(record.operation, record.replicas);
+      const ledgerShaped = !!(await deps.uow.read.slots.get(operation.target.serviceId as ServiceId))?.[operation.target.physicalSlot!].workload;
+      const status = ledgerShaped ? await observeViaLedger(deps, record.operation, record.replicas) : await deps.slotControl.observe(record.operation, record.replicas);
       if (status.done && record.state !== 'done') await deps.uow.run(async (scope) => {
         const id = operation.target.serviceId as ServiceId, physical = operation.target.physicalSlot!;
         const slots = await scope.slots.get(id); if (!slots) throw precondition('部署槽记录不存在');

@@ -32,7 +32,7 @@ export async function syncSlotLedger(executor: Executor, deps: SlotProjectionDep
     await executor.transaction(async (savepoint) => {
       const writer = deps.ledger.within(savepoint);
       for (const slot of projectSlots(slots, service, (id) => tags.get(id), policy)) {
-        await writer.declare({ kind: 'service-slot', ref: slot.ref, projectId: slot.projectId, spec: { children: slot.children }, display: slot.display, conditions: slot.conditions });
+        await writer.declare({ kind: 'service-slot', ref: slot.ref, projectId: slot.projectId, spec: { children: slot.children, ...(slot.slot ? { slot: slot.slot } : {}) }, display: slot.display, conditions: slot.conditions });
       }
     });
   } catch (error) {

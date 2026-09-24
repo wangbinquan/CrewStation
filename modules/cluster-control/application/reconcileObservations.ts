@@ -6,11 +6,12 @@ import { namespaceRenderOf, networkPolicyRendersOf } from '../domain/namespaceRe
 import { controllerOf, crashLoopingOf, RESOURCE_ID_LABEL } from '../domain/observation';
 import { routeRenderOf } from '../domain/routeRender';
 import type { ClusterWriter, ManagedObjectFeed, ObservedKind } from '../ports/cluster';
-import type { LedgerObservations, LedgerRecordView, WorkloadOwners } from '../ports/ledger';
+import type { LedgerObservations, LedgerRecordView, SlotOwners, WorkloadOwners } from '../ports/ledger';
 import type { ObservationStats } from './observeChange';
 import { observeChange } from './observeChange';
 import type { Explainer, RouteTargets } from './routeExplainer';
 import { enqueueRoutesOfSlot, explainerFor, targetKey } from './routeExplainer';
+import { applySlot } from './slotApply';
 import { applyVolume, applyWorkload } from './workloadApply';
 
 /** 删的顺序（设计 §6.2）：先工作负载（Deployment、Job、Pod），再 Secret、Service、路由与它引用的中间件；PVC 只随工作卷记录删。 */
@@ -42,6 +43,8 @@ export interface ReconcileDeps {
   readonly routeTargets?: RouteTargets;
   /** 工作区容器的所属模块（RFC-025 I25）：不给就不建工作区容器。 */
   readonly workloads?: WorkloadOwners;
+  /** 服务槽的所属模块（release，T8）：不给就不建服务槽。 */
+  readonly slots?: SlotOwners;
 }
 
 /** 期望里的与观测到的子对象（期望里已经没有、但还在集群里的旧对象也在内，例如重建换下的 Pod）。 */
@@ -240,11 +243,12 @@ async function applyNetworkPolicies(deps: ReconcileDeps, record: LedgerRecordVie
 
 /**
  * 按期望应用子对象的种类：写期望的模块只写记录，对象由调和器建出、改回。工作区、执行环境与工作卷（RFC-025 I25）只在所属模块要建出容器时
- * 建一次，之后不改、丢了不补建（种类注册表不把它们算作「维护中」）。
+ * 建一次，之后不改、丢了不补建（种类注册表不把它们算作「维护中」）。服务槽（T8）在该有工作负载时照期望维护，下线时删工作负载；
+ * 它的删除仍是 release 的领域操作（下线），所以也不算「维护中」。
  */
 const APPLIERS: Readonly<Record<string, (deps: ReconcileDeps, record: LedgerRecordView, enqueue: Enqueue) => Promise<void>>> = {
   route: applyRoute, 'rate-limit-policy': applyMiddlewares, namespace: applyNamespace, 'network-policy-set': applyNetworkPolicies,
-  'dev-workspace': applyWorkload, 'business-workspace': applyWorkload, 'agent-execution': applyWorkload, volume: applyVolume,
+  'dev-workspace': applyWorkload, 'business-workspace': applyWorkload, 'agent-execution': applyWorkload, volume: applyVolume, 'service-slot': (deps, record) => applySlot(deps, record),
 };
 
 /**

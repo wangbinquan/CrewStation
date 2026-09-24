@@ -64,6 +64,16 @@ describe.skipIf(!available)('资源台账：声明、观测、释放（RFC-025 �
     expect((await h.module.api.get(record.id))?.children[0]).toMatchObject({ generation: 4 });
   });
 
+  // RFC-025 T8：服务槽的 Deployment 带上渲染它的那一版期望；存下去读回来一样，重复观测不写库，换了才写。
+  test('观测带上渲染对象的期望版本（appliedGeneration）：存下去读回来一样，变了才写', async () => {
+    const record = await h.module.api.owner('release').declare({ kind: 'service-slot', ref: 'svc-a/blue', projectId: PROJECT, spec: { children: [{ kind: 'Deployment', namespace: 'cs-demo', name: 'demo-a-blue' }] } });
+    const deployment = (appliedGeneration: number) => ({ kind: 'Deployment', namespace: 'cs-demo', name: 'demo-a-blue', uid: 'uid-a-dep', phase: 'Available', ready: true, replicas: 1, readyReplicas: 1, appliedGeneration });
+    expect((await h.module.api.observe({ child: deployment(1) })).status).toBe('recorded');
+    expect((await h.module.api.observe({ child: deployment(1) })).status).toBe('unchanged');
+    expect((await h.module.api.observe({ child: deployment(2) })).status).toBe('recorded');
+    expect((await h.module.api.get(record.id))?.children[0]).toMatchObject({ appliedGeneration: 2, replicas: 1 });
+  });
+
   test('观测：Pod 就绪还要 Runner 连上才是运行中；Pod 消失回到分配中；重复观测不写库', async () => {
     const ledger = h.module.api.owner('task-runtime');
     const record = await ledger.declare(workspace('b1'));

@@ -24,7 +24,8 @@ import { publishUseCase } from './application/publish';
 import { releaseQueries } from './application/queries';
 import { switchTrafficUseCase } from './application/switchTraffic';
 import { releaseRoutes } from './http/releaseRoutes';
-import type { ImageBuilder, MigrationRunner, SlotDeployer } from './ports/delivery';
+import type { ImageBuilder, MigrationRunner, SlotDeployer, SlotRenderer } from './ports/delivery';
+import { slotOwnerUseCases } from './application/slotOwners';
 import type { ConfigSource, DataSource, HostNaming, MaintenanceWindow, PlanCatalog, ProjectAuthorizer, ProjectOwners, ReleaseSettings, ServiceResolver, SlotNotifier } from './ports/platform';
 import type { ReleaseTagger, RepoReader } from './ports/sourceControl';
 import { PIPELINE_JOB_KIND, pipelineJobHandler } from './workers/pipelineHandler';
@@ -54,6 +55,12 @@ export interface ReleaseModuleDeps {
   delivery?: { builder?: ImageBuilder; migrator?: MigrationRunner; deployer?: SlotDeployer };
   /** 资源台账（RFC-025 第三期）：给了就把服务槽投影进台账（保存槽的同一事务），并定期补投影。 */
   ledger?: SlotLedger;
+  /**
+   * RFC-025 T8：'ledger' 时服务槽由资源中心建出（部署只写期望，环境在调和器建 Secret 时向本模块要），renderer 是这时的集群预检；
+   * 要配了 ledger 才生效。不给就照旧由本模块部署（用例、回退）。
+   */
+  creation?: 'ledger';
+  renderer?: SlotRenderer;
   clock?: Clock;
   logger?: Logger;
 }
@@ -100,6 +107,7 @@ export function createReleaseModule(deps: ReleaseModuleDeps): ReleaseModule {
     settings: deps.settings,
     clock: deps.clock ?? systemClock,
     logger,
+    ...(deps.ledger && deps.creation === 'ledger' ? { creation: 'ledger' as const } : {}), ...(deps.renderer ? { renderer: deps.renderer } : {}),
   };
   const api: ReleaseModuleApi = {
     name: 'release',
@@ -109,6 +117,7 @@ export function createReleaseModule(deps: ReleaseModuleDeps): ReleaseModule {
     ...releaseQueries(useCaseDeps),
     runPipelineStep: pipelineStepUseCase(useCaseDeps),
     ...slotLifecycleUseCases({ ...useCaseDeps, isAdmin: deps.isAdmin }),
+    ...slotOwnerUseCases(useCaseDeps),
   };
   let timer: ReturnType<typeof setInterval> | undefined;
   const sweep: ReleaseTimer = {

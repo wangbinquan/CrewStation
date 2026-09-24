@@ -29,6 +29,11 @@ export interface KindRule {
    * 集群管理据此禁用这些对象的「删除」（I29 裁定）；与调和器按种类应用的清单（reconcileObservations 的 APPLIERS）保持一致。
    */
   readonly rendered?: true;
+  /**
+   * 整条记录不算「维护中」、其中几种子对象却由调和器照期望维护（删了会被补回，集群管理里同样禁用它们的删除）：
+   * 服务槽的 Service 与环境 Secret（T8）。服务槽的 Deployment 不在其中——删除它是 release 的下线（RFC-021 B7）。
+   */
+  readonly renderedChildren?: readonly string[];
 }
 
 const HOUR = 3_600_000;
@@ -44,7 +49,7 @@ export const KIND_RULES: Readonly<Record<ResourceKind, KindRule>> = {
   namespace: { quotaUnits: 0, allChildren: true, readyConditions: [], releasable: false, stable: true, rendered: true },
   'network-policy-set': { quotaUnits: 0, allChildren: true, readyConditions: [], releasable: false, stable: true, rendered: true },
   // 服务槽（第三期）：Deployment 就绪即运行中；领域条件 Serving 为假（已下线、尚未部署）时按已结束算。不占任务额度。
-  'service-slot': { quotaUnits: 0, primaryChild: 'Deployment', readyConditions: [], releasable: false, stable: true, retainedWhenIdle: ['Service'] },
+  'service-slot': { quotaUnits: 0, primaryChild: 'Deployment', readyConditions: [], releasable: false, stable: true, retainedWhenIdle: ['Service'], renderedChildren: ['Service', 'Secret'] },
   // 构建与迁移 Job（第三期）：Job 在跑是运行中，结束后照资源中心记下的 Finished 是已结束或失败——Kubernetes 的 TTL 删掉 Job 之后结果仍在（提案 §5.1）。
   'build-job': JOB,
   'migration-job': JOB,

@@ -9,6 +9,7 @@ export interface ObservedObject {
     readonly uid?: string;
     readonly generation?: number;
     readonly labels?: Readonly<Record<string, string>>;
+    readonly annotations?: Readonly<Record<string, string>>;
     readonly deletionTimestamp?: string;
     readonly creationTimestamp?: string;
     readonly ownerReferences?: readonly { readonly kind: string; readonly name: string; readonly controller?: boolean }[];
@@ -19,6 +20,15 @@ export interface ObservedObject {
 
 /** 资源中心写在子对象上的归属标签（设计 §6.2）；第一期还没有对象带它，收编（第六期）后都带上。 */
 export const RESOURCE_ID_LABEL = 'crewstation.io/resource-id';
+/** 调和器照期望渲染对象时写上的期望版本（记录的 generation，服务槽的 Deployment，T8）；观测照抄成子对象的 appliedGeneration。 */
+export const RESOURCE_GENERATION_ANNOTATION = 'crewstation.io/resource-generation';
+
+/** 对象上写着的期望版本；没有或不是非负整数就是 undefined（release 自己部署的旧形状没有它）。 */
+export function appliedGenerationOf(obj: ObservedObject): number | undefined {
+  const raw = obj.metadata.annotations?.[RESOURCE_GENERATION_ANNOTATION];
+  const value = raw !== undefined && /^\d+$/.test(raw) ? Number(raw) : Number.NaN;
+  return Number.isSafeInteger(value) ? value : undefined;
+}
 
 /** 资源中心据观测得出的条件（只由资源中心写的那一类）。 */
 export interface ObservedCondition {
@@ -106,7 +116,8 @@ interface DeploymentStatus {
 /**
  * Deployment → 子对象观测（服务槽，第三期）：副本都更新到新版本、都就绪、控制器已看过最新期望，才是 Available；
  * 推进超时（Progressing=False）是 Stalled；期望副本为 0 是 ScaledDown；新版本已铺完（NewReplicaSetAvailable）而副本又没全就绪
- * （崩溃重启、就绪探针失败）是 Unready；其余（还在铺新版本）Progressing。原因写就绪副本数。
+ * （崩溃重启、就绪探针失败）是 Unready；其余（还在铺新版本）Progressing。原因写就绪副本数。资源中心建的槽（T8）另带渲染它的期望版本：
+ * 期望刚改、调和器还没应用时，旧版本的「都就绪」不能当成新期望的。
  */
 export function deploymentChild(deployment: ObservedObject, observedAt: string): ResourceChild {
   const status = (deployment.status ?? {}) as DeploymentStatus;
@@ -118,9 +129,10 @@ export function deploymentChild(deployment: ObservedObject, observedAt: string):
   const current = (status.observedGeneration ?? 0) >= generation && (status.updatedReplicas ?? 0) === desired && (status.replicas ?? 0) === desired;
   const phase = deleting ? 'Terminating' : desired === 0 ? 'ScaledDown' : current && ready === desired ? 'Available' : stalled ? 'Stalled' : current && rolledOut ? 'Unready' : 'Progressing';
   const reason = deleting ? 'Terminating' : stalled && phase === 'Stalled' ? clip(stalled.message ?? stalled.reason ?? 'ProgressDeadlineExceeded') : `副本 ${ready}／${desired} 就绪`;
+  const applied = appliedGenerationOf(deployment);
   return {
     kind: 'Deployment', ...(deployment.metadata.namespace ? { namespace: deployment.metadata.namespace } : {}), name: deployment.metadata.name, ...(deployment.metadata.uid ? { uid: deployment.metadata.uid } : {}),
-    phase, ready: phase === 'Available', reason, replicas: desired, readyReplicas: ready, observedAt,
+    phase, ready: phase === 'Available', reason, replicas: desired, readyReplicas: ready, ...(applied !== undefined ? { appliedGeneration: applied } : {}), observedAt,
   };
 }
 

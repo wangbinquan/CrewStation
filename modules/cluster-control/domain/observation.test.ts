@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { classifyObject, countVerdicts } from './adoption';
 import type { ObservedObject } from './observation';
-import { CRASH_LOOP_WINDOW_MS, controllerOf, crashLoopingOf, deploymentChild, goneChild, jobChild, jobConditions, podChild, podConditions, presentChild, pvcChild } from './observation';
+import { CRASH_LOOP_WINDOW_MS, appliedGenerationOf, controllerOf, crashLoopingOf, deploymentChild, goneChild, jobChild, jobConditions, podChild, podConditions, presentChild, pvcChild } from './observation';
 
 const at = '2026-09-23T12:00:00.000Z';
 const pod = (status: unknown, patch: Partial<ObservedObject['metadata']> = {}, spec: unknown = { nodeName: 'desktop-worker' }): ObservedObject => ({
@@ -45,6 +45,13 @@ describe('Pod 与 PVC 的观测映射（RFC-025 设计 §6.2）', () => {
     expect(deploymentChild(deployment(1, { observedGeneration: 3, replicas: 1, updatedReplicas: 1, readyReplicas: 0, conditions: [{ type: 'Progressing', status: 'True', reason: 'NewReplicaSetAvailable' }] }), at)).toMatchObject({ phase: 'Unready', ready: false, reason: '副本 0／1 就绪' });
     expect(deploymentChild(deployment(1, { observedGeneration: 3, replicas: 1, updatedReplicas: 1, readyReplicas: 0, conditions: [{ type: 'Progressing', status: 'True', reason: 'ReplicaSetUpdated' }] }), at).phase).toBe('Progressing');
     expect(deploymentChild({ ...deployment(1, {}), metadata: { name: 'demo-green', namespace: 'cs-demo', deletionTimestamp: at } }, at)).toMatchObject({ phase: 'Terminating', ready: false });
+  });
+
+  test('资源中心建的槽（T8）：Deployment 注解上的期望版本照抄成 appliedGeneration；没有、不是整数的不写', () => {
+    const annotated = (value?: string): ObservedObject => ({ kind: 'Deployment', metadata: { name: 'demo-green', namespace: 'cs-demo', generation: 3, ...(value === undefined ? {} : { annotations: { 'crewstation.io/resource-generation': value } }) }, spec: { replicas: 1 }, status: { observedGeneration: 3, replicas: 1, updatedReplicas: 1, readyReplicas: 1 } });
+    expect(appliedGenerationOf(annotated('7'))).toBe(7);
+    expect(deploymentChild(annotated('7'), at)).toMatchObject({ phase: 'Available', appliedGeneration: 7 });
+    for (const value of [undefined, '', '-1', '7.5', 'abc', '99999999999999999999']) expect(deploymentChild(annotated(value), at)).not.toHaveProperty('appliedGeneration');
   });
 
   test('Pod 的控制者：ReplicaSet 管的属于名字去掉 pod-template-hash 的 Deployment；Job 管的就是那个 Job；裸 Pod 与认不出的没有', () => {

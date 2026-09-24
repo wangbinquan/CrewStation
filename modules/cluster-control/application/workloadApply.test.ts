@@ -9,7 +9,7 @@ import { applyVolume, applyWorkload } from './workloadApply';
 const pvc = { kind: 'PersistentVolumeClaim', namespace: 'cs-demo', name: 'task-1-work' };
 const pod = { image: 'task:1', workerUid: 10001, resources: { cpu: '1', memory: '2Gi', storage: '10Gi' }, workload: 'dev-session', project: 'demo', service: 'demo', pvc: 'task-1-work', secret: 'task-1-runner-1' };
 const record = (patch: Partial<LedgerRecordView>): LedgerRecordView => ({
-  id: 'rec-1', kind: 'dev-workspace', desired: 'present', phase: 'provisioning', children: [], conditions: [{ type: 'Provisioning', status: 'true' }],
+  id: 'rec-1', kind: 'dev-workspace', desired: 'present', generation: 1, phase: 'provisioning', children: [], conditions: [{ type: 'Provisioning', status: 'true' }],
   spec: { children: [{ kind: 'Pod', namespace: 'cs-demo', name: 'task-1' }, { kind: 'Secret', namespace: 'cs-demo', name: 'task-1-runner-1' }], pod }, ...patch,
 });
 

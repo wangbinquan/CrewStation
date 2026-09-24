@@ -54,9 +54,10 @@ export function toResourceRecord(record: LedgerRecord, now: Date, access: Viewer
  * 集群清单一行的叠加（RFC-025 T13，I29 裁定）：标准记录的阶段、原因与可做操作，外加对象是否由资源中心按期望维护——
  * 期望在、种类由调和器渲染的，删掉会被补回。
  */
-export function toClusterLedger(record: LedgerRecord, now: Date, access: ViewerAccess): ClusterLedger {
+export function toClusterLedger(record: LedgerRecord, now: Date, access: ViewerAccess, childKind?: string): ClusterLedger {
   const { id, kind, phase, phaseSince, reason, actions, version } = toResourceRecord(record, now, access);
-  return { id, kind, phase, phaseSince, ...(reason ? { reason } : {}), actions, version, maintained: record.desired === 'present' && kindRule(record.kind).rendered === true };
+  const rule = kindRule(record.kind), rendered = rule.rendered === true || (childKind !== undefined && rule.renderedChildren?.includes(childKind) === true);
+  return { id, kind, phase, phaseSince, ...(reason ? { reason } : {}), actions, version, maintained: record.desired === 'present' && rendered };
 }
 
 /**

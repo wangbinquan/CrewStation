@@ -11,8 +11,9 @@ import {
   DEFAULT_OFFLINE_POLICY, assertOfflinePolicy, autoOfflineReason, canPostpone, hasWorkload, markReminded, markWorkloadRemoved, noteRetentionAccess,
   offlineDeadline, postponeRetention, retentionForExisting, retentionStep, takeSlotOffline,
 } from '../domain/slotLifecycle';
-import type { PhysicalSlot, ServiceSlots } from '../domain/slots';
-import { standbyOf, withSlot } from '../domain/slots';
+import { slotSpecOf } from '../domain/ledgerProjection';
+import type { PhysicalSlot, ServiceSlots, SlotWorkload } from '../domain/slots';
+import { nextWorkload, standbyOf, withSlot } from '../domain/slots';
 import type { SlotDeploySpec } from '../ports/delivery';
 import type { OfflinePolicyRecord, SlotEventRecord } from '../ports/repositories';
 import type { RepositoryScope } from '../ports/unitOfWork';
@@ -111,6 +112,8 @@ function lifecycleTools(deps: Deps): LifecycleTools {
      */
     removeWorkload: async (serviceId, svc, physical, releaseId) => {
       try {
+        // 资源中心建的槽（T8）：调和器照「不该有工作负载」删，这里不动集群。
+        if ((await uow.read.slots.get(serviceId))?.[physical].workload) return true;
         const legacy = (await uow.read.releases.getById(releaseId))?.legacyResourceId;
         if (!(await deps.deployer.removeWorkload(svc.namespace, svc.name, physical, legacy ? [releaseId, legacy] : [releaseId]))) return false;
         await uow.run(async (scope) => {
@@ -232,7 +235,7 @@ export function slotLifecycleUseCases(deps: Deps) {
   };
 }
 
-interface RedeployTarget { readonly physical: PhysicalSlot; readonly prepared: SlotDeployPlan; readonly spec: SlotDeploySpec }
+interface RedeployTarget { readonly physical: PhysicalSlot; readonly prepared: SlotDeployPlan; readonly spec: SlotDeploySpec; readonly workload?: SlotWorkload }
 
 /**
  * 重新部署的统一预检（RFC-025 设计 §5）：领域部分——服务有部署、不是当前正式版本、可重新部署、与正式版本的迁移规则相容、
@@ -253,8 +256,11 @@ async function checkRedeploy(deps: Deps, release: Release, svc: ResolvedService)
   const prepared = await prepareSlotDeploy(deps, release, svc, release.manifest!, physical);
   if ('reason' in prepared) return { reason: prepared.reason };
   const spec: SlotDeploySpec = { namespace: svc.namespace, projectSlug: svc.slug, serviceName: svc.name, physical, releaseId: release.id, image: release.image ?? '', manifest: release.manifest!, replicas: prepared.replicas, env: prepared.env.values, plan: prepared.plan };
-  const rejected = await dryRunReason(deps, spec);
-  return rejected ? { reason: rejected } : { physical, prepared, spec };
+  // 由资源中心建出（T8）：预检的是这一次部署要写进台账的期望（接着这个槽上一次的 revision 数）。
+  const service = release.manifest!.spec.service;
+  const workload = deps.creation === 'ledger' ? nextWorkload(seen[physical], { releaseId: release.id, image: release.image ?? '', command: service.command, port: service.port, healthPath: service.healthPath, replicas: prepared.replicas, resources: { cpu: prepared.plan.cpu, memory: prepared.plan.memory } }) : undefined;
+  const rejected = await dryRunReason(deps, spec, workload ? slotSpecOf(release.serviceId, svc, physical, workload) : undefined);
+  return rejected ? { reason: rejected } : { physical, prepared, spec, ...(workload ? { workload } : {}) };
 }
 
 /** 重新部署弹窗选中一个版本时先问一次（RFC-025 提案 §8：槽卡的「部署版本…」预检不通过时直接写明原因）；只读。 */
@@ -279,7 +285,7 @@ function redeployUseCase(deps: Deps, ctx: ReturnType<typeof createPipelineContex
     await authorizer.authorize(actor, release.projectId, 'manage-slots');
     const checked = await checkRedeploy(deps, release, svc);
     if ('reason' in checked) throw precheckFailed(checked.reason, checked.extra);
-    const { physical, prepared, spec } = checked;
+    const { physical, prepared, spec, workload } = checked;
     const now = clock.now();
     const { started, slots } = await uow.run(async (scope) => {
       const slots = await scope.slots.get(release.serviceId);
@@ -295,14 +301,16 @@ function redeployUseCase(deps: Deps, ctx: ReturnType<typeof createPipelineContex
       if (old?.status === 'ready') await scope.releases.update(advance(old, 'superseded', now));
       const started = advance(fresh, 'deploying', now, { targetSlot: physical, configVersion: prepared.env.configVersion, pipeline: { ...fresh.pipeline, step: fresh.pipeline.step + 1, deployStartedAt: now.toISOString() } });
       await scope.releases.update(started);
-      const next = withSlot(slots, { physical, releaseId: fresh.id, state: 'deploying', replicas: prepared.replicas, readyReplicas: 0, updatedAt: now }, now);
+      // 期望在锁住槽之后按此刻的 revision 重算（预检时读的可能已旧），随槽状态进台账，调和器建对象。
+      const rendered = workload ? { workload: nextWorkload(slots[physical], workload) } : {};
+      const next = withSlot(slots, { physical, releaseId: fresh.id, state: 'deploying', replicas: prepared.replicas, readyReplicas: 0, updatedAt: now, ...rendered }, now);
       await scope.slots.save(next);
       await scope.slotEvents.insert({ id: newId('sev'), serviceId: release.serviceId, kind: 'redeploy', releaseId: fresh.id, tag: fresh.tag, actorUserId: actor.userId, at: now });
       await scope.events.publish(DomainTopic.releaseStatusChanged, { occurredAt: now.toISOString(), serviceId: release.serviceId, releaseId: fresh.id, status: 'deploying', message: '从发布记录重新部署到待验证槽' });
       return { started, slots: next };
     });
     try {
-      await deps.deployer.deploy({ ...spec, releaseId: started.id, image: started.image ?? '', manifest: started.manifest! });
+      if (!workload) await deps.deployer.deploy({ ...spec, releaseId: started.id, image: started.image ?? '', manifest: started.manifest! });
     } catch (error) {
       // 受理之后的失败不再抛成 500（RFC-025 设计 §5）：发布记为失败、槽记为失败，原因写进发布记录，返回失败的发布。
       await ctx.fail(started, reasonText(precheckReason('deploy-failed', `重新部署失败：${error instanceof Error ? error.message : String(error)}`, '看发布记录与槽的日志，处理后重新部署')));

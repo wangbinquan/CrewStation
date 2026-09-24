@@ -3,6 +3,15 @@ import type { Actor, AutoOfflinePolicyDto, PostponeOfflineRequest, PublishReques
 
 export type PhysicalSlot = 'blue' | 'green';
 
+/** 调和器要建的是哪个槽的哪一次部署（RFC-025 T8，槽记录期望里的）。 */
+export interface SlotDeployRef {
+  readonly recordId: string;
+  readonly serviceId: string;
+  readonly physical: PhysicalSlot;
+  readonly releaseId: string;
+  readonly revision: number;
+}
+
 export interface ActiveEndpoint {
   physical: PhysicalSlot;
   namespace: string;
@@ -48,4 +57,10 @@ export interface ReleaseModuleApi {
   notePreviewAccess(serviceId: ServiceId): Promise<void>;
   getAutoOfflinePolicy(actor: Actor): Promise<AutoOfflinePolicyDto>;
   setAutoOfflinePolicy(actor: Actor, input: SetAutoOfflinePolicyRequest): Promise<AutoOfflinePolicyDto>;
+
+  // —— RFC-025 T8：服务槽由资源中心建出，调和器回头要环境、报建不成 ——
+  /** 建这一次部署的环境 Secret 之前要内容（平台约定变量、生产组配置与数据连接串）；槽上已不是这一次部署时拒绝。 */
+  slotEnvValues(ref: SlotDeployRef): Promise<Readonly<Record<string, string>>>;
+  /** 这一次部署建不成：槽记为失败并记下原因，流水线下一步据此判发布失败；已不是这一次部署时忽略。 */
+  slotFailed(ref: SlotDeployRef, message: string): Promise<void>;
 }

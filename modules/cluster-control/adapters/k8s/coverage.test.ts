@@ -18,6 +18,21 @@ describe('调和器的比对：观测到的对象是不是已经是期望的样�
     expect(covers({ a: 1 }, { a: 1, b: 2 })).toBe(false);
     expect(covers(undefined, { a: 1 })).toBe(false);
     expect(covers('x', 'x')).toBe(true);
+    // Kubernetes 输出对象时省略空列表：期望的空数组对观测里没有的字段算一致；观测有内容仍算不一致。
+    expect(covers({ env: undefined }, { env: [] })).toBe(true);
+    expect(covers({}, { volumes: [] })).toBe(true);
+    expect(covers({ env: [{ name: 'A' }] }, { env: [] })).toBe(false);
+    expect(covers({ env: null }, { env: [] })).toBe(false);
+  });
+
+  test('期望带注解的对象（服务槽的 Deployment 写期望版本，T8）：注解也要覆盖；期望没有注解的不比', () => {
+    const base = routeObject(route);
+    const desired: typeof base = { ...base, metadata: { ...base.metadata, annotations: { 'crewstation.io/resource-generation': '3' } } };
+    const live: ObservedObject = { kind: 'IngressRoute', metadata: { name: route.name, namespace: route.namespace, uid: 'u1', labels: desired.metadata.labels!, annotations: { 'crewstation.io/resource-generation': '3', other: 'kept' } }, spec: desired['spec'] };
+    expect(objectCovered(live, desired)).toBe(true);
+    expect(objectCovered({ ...live, metadata: { ...live.metadata, annotations: { 'crewstation.io/resource-generation': '2' } } }, desired)).toBe(false);
+    expect(objectCovered({ ...live, metadata: { ...live.metadata, annotations: undefined } }, desired)).toBe(false);
+    expect(objectCovered({ ...live, metadata: { ...live.metadata, annotations: undefined } }, routeObject(route))).toBe(true);
   });
 
   test('有 spec 的对象：标签与 spec 都覆盖期望才一致', () => {

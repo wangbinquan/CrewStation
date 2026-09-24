@@ -9,6 +9,8 @@ export interface LedgerRecordView {
   readonly projectId?: string;
   readonly parentId?: string;
   readonly desired: 'present' | 'absent';
+  /** 期望的版本：spec 一改就加一（调和器渲染服务槽时写在 Deployment 上，T8）。 */
+  readonly generation: number;
   readonly phase: string;
   readonly releaseReason?: { readonly code: string; readonly message: string };
   readonly spec: { readonly children: readonly { readonly kind: string; readonly namespace?: string; readonly name: string }[]; readonly [field: string]: unknown };
@@ -56,6 +58,25 @@ export interface WorkloadOwners {
   bindWorkload(recordId: string, podUid: string, secretUid?: string): Promise<void>;
   /** 执行环境建出之前父工作区换了实例或不在运行（workspace-changed）：交所属模块判这个执行环境失败，文案由它写。 */
   workloadUnavailable(recordId: string, code: 'workspace-changed'): Promise<void>;
+}
+
+/** 要建的是哪个槽的哪一次部署（槽记录期望里的，release 据此核对这次部署还要不要）。 */
+export interface SlotDeployRef {
+  readonly recordId: string;
+  readonly serviceId: string;
+  readonly physical: 'blue' | 'green';
+  readonly releaseId: string;
+  readonly revision: number;
+}
+
+/**
+ * 服务槽的所属模块（release，RFC-025 T8，与 I25 同一裁定：渲染时回调）：建这一次部署的环境 Secret 之前要内容——平台约定变量、
+ * 生产组配置与数据连接串。值只在调和器的内存里过一下、写进 Secret，不落台账。这次部署已不再需要（换了版本、已下线）时拒绝。由组合根接上。
+ */
+export interface SlotOwners {
+  slotEnvValues(ref: SlotDeployRef): Promise<Readonly<Record<string, string>>>;
+  /** 这一次部署建不成（环境要不来、API Server 拒绝）：交 release 判失败——还在部署这一次时才算数，文案由它写。 */
+  slotFailed(ref: SlotDeployRef, message: string): Promise<void>;
 }
 
 /** 旧形状的所属对象（收编空跑用）：按任务标签查任务环境，由组合根从身份目录与 task-runtime 取。 */

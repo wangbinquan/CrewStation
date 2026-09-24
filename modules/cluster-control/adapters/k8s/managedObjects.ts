@@ -8,6 +8,7 @@ import { objectCovered } from './coverage';
 import { middlewareObject } from './middlewareObjects';
 import { namespaceObjectOf, networkPolicyObjectOf, quotaObjectOf } from './namespaceObjects';
 import { routeObject } from './routeObjects';
+import { slotSecretObject, slotWorkloadObjects } from './slotObjects';
 import { checkoutSecretObject, runnerSecretObject, volumeObject, workloadPodObject, workloadPreviewObjects } from './workloadObjects';
 
 const SELECTOR = `${LABELS.managedBy}=${MANAGED_BY}`;
@@ -72,6 +73,12 @@ export function kubernetesClusterWriter(k8s: K8sClient): ClusterWriter {
       const [service, route] = workloadPreviewObjects(preview);
       const outcomes = [await apply(service!, current.service), ...(route ? [await apply(route, current.route)] : [])];
       return outcomes.includes('applied') ? 'applied' : 'unchanged';
+    },
+    ensureSlotSecret: (slot, values) => ensureNamed(k8s, 'Secret', { namespace: slot.namespace, name: slot.secret }, async () => slotSecretObject(slot, await values())),
+    applySlotService: (slot, current) => apply(slotWorkloadObjects(slot, 0)[1], current),
+    applySlotDeployment: (slot, generation, current) => apply(slotWorkloadObjects(slot, generation)[0], current),
+    dryRunSlot: async (slot, generation, values) => {
+      for (const object of [slotSecretObject(slot, values), ...slotWorkloadObjects(slot, generation)]) await k8s.apply(object, { dryRun: true });
     },
   };
 }

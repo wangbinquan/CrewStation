@@ -80,6 +80,20 @@ describe.skipIf(!available)('cluster-control：观测写回台账与收编空跑
     bindWorkload: async (id: string, uid: string, secretUid?: string) => { bound.push(`${id}:${uid}`); boundSecrets.set(id, secretUid); },
     workloadUnavailable: async (id: string, code: string) => { unavailable.push(`${id}:${code}`); },
   };
+  // 服务槽（T8）：release 的两个回调记下来；建出与应用的对象同样落到假集群并随即报一次变化。
+  const slotApplies: string[] = [], slotAsked: string[] = [], slotFailures: string[] = [];
+  const slotOwners = {
+    fail: false,
+    slotEnvValues: async (ref: { recordId: string; revision: number }) => { slotAsked.push(`${ref.recordId}:${ref.revision}`); if (slotOwners.fail) throw new Error('生产组配置缺少 API_KEY'); return { CS_DATABASE_URL: `postgres://r${ref.revision}` }; },
+    slotFailed: async (ref: { revision: number }, message: string) => { slotFailures.push(`${ref.revision}:${message}`); },
+  };
+  const slotPlaced = async (outcome: 'applied' | 'unchanged' | { created: boolean }, kind: 'Deployment' | 'Service' | 'Secret', name: string) => {
+    if (outcome === 'unchanged' || (typeof outcome !== 'string' && !outcome.created)) return outcome;
+    slotApplies.push(`${kind}/${name}`);
+    const stored = await k8s.get<K8sObject>(Resources[kind]!, name, 'cs-demo');
+    if (stored) await feed.emit({ kind, object: stored, gone: false });
+    return outcome;
+  };
   const placed = async <T extends { created: boolean }>(outcome: T, kind: 'Pod' | 'Secret' | 'PersistentVolumeClaim', name: string, namespace: string): Promise<T> => {
     if (!outcome.created) return outcome;
     workloadApplies.push(`${kind}/${name}`);
@@ -127,6 +141,10 @@ describe.skipIf(!available)('cluster-control：观测写回台账与收编空跑
       }
       return outcome;
     },
+    ensureSlotSecret: async (slot, values) => (await slotPlaced(await writer.ensureSlotSecret(slot, values), 'Secret', slot.secret)) as { uid: string; created: boolean },
+    applySlotService: async (slot, current) => (await slotPlaced(await writer.applySlotService(slot, current), 'Service', slot.name)) as 'applied' | 'unchanged',
+    applySlotDeployment: async (slot, generation, current) => (await slotPlaced(await writer.applySlotDeployment(slot, generation, current), 'Deployment', slot.name)) as 'applied' | 'unchanged',
+    dryRunSlot: (slot, generation, values) => writer.dryRunSlot(slot, generation, values),
   };
   let control: ReturnType<typeof createClusterControlModule>;
   let ledger: LedgerObservations;
@@ -156,6 +174,7 @@ describe.skipIf(!available)('cluster-control：观测写回台账与收编空跑
       reconciler: { pollMs: 20, retryMs: 50 },
       explainer: { namespace: 'crewstation-system', service: 'cs-api', port: 8080, path: '/_crewstation/unavailable' },
       workloads: owners,
+      slots: slotOwners,
       pods: {
         changed: async (object, gone) => {
           if (object.metadata.name === 'pod-identity-broken') throw new Error('身份索引暂时不可用');
@@ -314,6 +333,76 @@ describe.skipIf(!available)('cluster-control：观测写回台账与收编空跑
     await feed.emit({ kind: 'Pod', object: replica('other-blue-5d8f7c-z', 0, undefined, 'other-blue-5d8f7c'), gone: false });
     await control.reconciled();
     expect(await pods()).toEqual(['shop-blue-5d8f7c-early']);
+  });
+
+  // RFC-025 T8：服务槽由调和器建出——release 写期望（不含配置与密钥），环境 Secret 建的时候向 release 要。
+  test('服务槽建出：环境 Secret（建时要值）、Service、带期望版本的 Deployment 依次建出；新版本铺完才删旧环境；被改了改回；下线先删 Deployment 再删环境、Service 保留；建不成交 release 判失败', async () => {
+    const owner = resources.api.owner('release');
+    const specOf = (revision: number, image: string) => ({
+      children: [{ kind: 'Deployment', namespace: 'cs-demo', name: 'mall-green' }, { kind: 'Service', namespace: 'cs-demo', name: 'mall-green' }, { kind: 'Secret', namespace: 'cs-demo', name: `mall-green-env-${revision}` }],
+      slot: { serviceId: 'svc-mall', project: 'demo', service: 'mall', physical: 'green', releaseId: `rel-${revision}`, revision, image, command: ['bun', 'run', 'main.ts'], port: 3000, healthPath: '/healthz', replicas: 1, resources: { cpu: '250m', memory: '256Mi' }, envSecret: `mall-green-env-${revision}` },
+    });
+    const declare = (revision: number, image: string, state: { serving?: boolean; failed?: boolean } = {}) => owner.declare({
+      kind: 'service-slot', ref: 'svc-mall/green', projectId: PROJECT, spec: specOf(revision, image), display: { physical: 'green', role: 'preview' },
+      conditions: [state.serving === false ? { type: 'Serving', status: 'false', reason: 'offline-manual', message: '已由成员手动下线' } : { type: 'Serving', status: 'true' }, { type: 'Failed', status: state.failed ? 'true' : 'false' }],
+    });
+    const live = async () => (await k8s.get<K8sObject & { spec: { replicas: number; template: { spec: { containers: Array<Record<string, unknown>> } } } }>(Resources.Deployment!, 'mall-green', 'cs-demo'))!;
+    // 模拟 Deployment 控制器：新版本的副本都更新、都就绪。
+    const rollOut = async () => {
+      await k8s.mergePatch(Resources.Deployment!, 'mall-green', 'cs-demo', { status: { observedGeneration: 0, replicas: 1, updatedReplicas: 1, readyReplicas: 1, conditions: [{ type: 'Progressing', status: 'True', reason: 'NewReplicaSetAvailable' }] } });
+      await feed.emit({ kind: 'Deployment', object: await live(), gone: false });
+    };
+    const removedFrom = removals.length;
+    const first = await declare(1, 'registry.local:5000/mall:v1');
+    await until('建出三个对象', () => slotApplies.length >= 3);
+    await control.reconciled();
+    expect(slotApplies).toEqual(['Secret/mall-green-env-1', 'Service/mall-green', 'Deployment/mall-green']);
+    expect(slotAsked).toEqual([`${first.id}:1`]);
+    const deployed = await live();
+    expect(deployed.metadata.annotations).toEqual({ 'crewstation.io/resource-generation': String(first.generation) });
+    expect(deployed.spec.template.spec.containers[0]).toMatchObject({ image: 'registry.local:5000/mall:v1', env: [], envFrom: [{ secretRef: { name: 'mall-green-env-1' } }] });
+    expect(await k8s.get<K8sObject & { immutable?: boolean; stringData?: unknown }>(Resources.Secret!, 'mall-green-env-1', 'cs-demo')).toMatchObject({ immutable: true, stringData: { CS_DATABASE_URL: 'postgres://r1' } });
+    expect((await resources.api.get(first.id))?.phase).toBe('starting');
+    await rollOut();
+    await until('运行中', async () => (await resources.api.get(first.id))?.phase === 'ready');
+    expect((await resources.api.get(first.id))?.children.find((entry) => entry.kind === 'Deployment')).toMatchObject({ appliedGeneration: first.generation, phase: 'Available' });
+    // 换版本：新环境、新镜像、新的期望版本；旧环境等新版本铺完才删。
+    const second = await declare(2, 'registry.local:5000/mall:v2');
+    await until('新版本应用', async () => (await live()).metadata.annotations?.['crewstation.io/resource-generation'] === String(second.generation));
+    await control.reconciled();
+    expect(slotAsked).toEqual([`${first.id}:1`, `${first.id}:2`]);
+    expect(removals.slice(removedFrom)).toEqual([]);
+    await rollOut();
+    await until('旧环境删掉', () => removals.slice(removedFrom).includes('Secret/mall-green-env-1'));
+    // 被人改了副本：观测到就按期望改回。
+    await k8s.mergePatch(Resources.Deployment!, 'mall-green', 'cs-demo', { spec: { replicas: 3 } });
+    await feed.emit({ kind: 'Deployment', object: await live(), gone: false });
+    await until('副本改回', async () => (await live()).spec.replicas === 1);
+    // 下线：先按 UID 删 Deployment，它消失之后再删环境 Secret；Service 保留。
+    await declare(2, 'registry.local:5000/mall:v2', { serving: false });
+    await until('环境删掉', () => removals.slice(removedFrom).includes('Secret/mall-green-env-2'));
+    expect(removals.slice(removedFrom)).toEqual(['Secret/mall-green-env-1', 'Deployment/mall-green', 'Secret/mall-green-env-2']);
+    expect(await k8s.get(Resources.Service!, 'mall-green', 'cs-demo')).toBeDefined();
+    await until('已结束', async () => (await resources.api.get(first.id))?.phase === 'stopped');
+    // 再部署时环境要不来：记下没建成，交 release 判这一次失败；release 判了失败之后不再尝试。
+    slotOwners.fail = true;
+    await declare(3, 'registry.local:5000/mall:v3');
+    await until('交 release 判失败', () => slotFailures.length > 0);
+    expect(slotFailures[0]).toBe('3:生产组配置缺少 API_KEY');
+    expect((await resources.api.get(first.id))?.conditions.find((entry) => entry.type === 'Created')).toMatchObject({ status: 'false', reason: 'create-failed', message: '服务槽没有建成：生产组配置缺少 API_KEY' });
+    await declare(3, 'registry.local:5000/mall:v3', { failed: true });
+    await control.reconciled();
+    const asked = slotAsked.length;
+    await Bun.sleep(300);
+    expect(slotAsked.length).toBe(asked);
+    slotOwners.fail = false;
+    // 预检：同样的三个对象以 dry-run 提交，不落到集群；期望不完整直接拒绝。
+    const dryRuns = k8s.applied.length;
+    await control.api.dryRunSlot(specOf(4, 'registry.local:5000/mall:v4'), { A: '1' });
+    expect(k8s.applied.length).toBe(dryRuns);
+    expect(await k8s.get(Resources.Secret!, 'mall-green-env-4', 'cs-demo')).toBeUndefined();
+    const invalid = await control.api.dryRunSlot({ ...specOf(4, 'x'), slot: { ...specOf(4, 'x').slot, port: 0 } }, {}).then(() => 'accepted', (error: unknown) => (isPlatformError(error) ? error.kind : 'other'));
+    expect(invalid).toBe('validation');
   });
 
   test('构建 Job：它的 Pod 由记录认领，跑起来是运行中；结束时资源中心记下结果，Job 被 TTL 删掉之后仍是已结束', async () => {

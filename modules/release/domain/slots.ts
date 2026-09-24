@@ -31,6 +31,23 @@ export interface SlotOffline {
   readonly workloadRemoved: boolean;
 }
 
+/**
+ * 由资源中心建出的槽（RFC-025 T8）：建出工作负载要用的期望，随槽状态保存、投影进槽记录，不含配置与密钥——环境在调和器建 Secret 时向
+ * release 要。revision 是这个物理槽的第几次部署（环境 Secret 名的后缀，每次部署、重新部署加一）；replicas 已含运维覆盖；
+ * restartedAt 是运维重启的标记（C6，一变就重新铺开）。下线后留着：调和器据此删工作负载与环境，下次部署接着数 revision。
+ */
+export interface SlotWorkload {
+  readonly releaseId: ReleaseId;
+  readonly revision: number;
+  readonly image: string;
+  readonly command: readonly string[];
+  readonly port: number;
+  readonly healthPath: string;
+  readonly replicas: number;
+  readonly resources: { readonly cpu: string; readonly memory: string };
+  readonly restartedAt?: string;
+}
+
 export interface SlotState {
   readonly physical: PhysicalSlot;
   readonly releaseId?: ReleaseId;
@@ -40,6 +57,14 @@ export interface SlotState {
   readonly updatedAt: Date;
   readonly retention?: SlotRetention;
   readonly offline?: SlotOffline;
+  readonly workload?: SlotWorkload;
+  /** 资源中心报来的这一次部署建不成的原因（T8）；流水线据此判发布失败，文案进发布记录与槽记录。 */
+  readonly failure?: string;
+}
+
+/** 这一次部署的期望：接着这个物理槽上一次的 revision 数。 */
+export function nextWorkload(previous: SlotState, input: Omit<SlotWorkload, 'revision'>): SlotWorkload {
+  return { ...input, command: [...input.command], revision: (previous.workload?.revision ?? 0) + 1 };
 }
 
 export interface ServiceSlots {

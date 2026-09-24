@@ -3,10 +3,12 @@ import type { ProjectId, ResourceConditionStatus } from '@crewstation/contracts'
 /** 台账的服务槽记录里 release 关心的部分（结构上是 resources 模块 LedgerRecord 的子集）。 */
 export interface SlotRecordRef {
   readonly id: string;
+  /** 期望的版本：spec 一改就加一；资源中心建的槽（T8）观测到的 Deployment 带着渲染它的那一版（appliedGeneration）。 */
+  readonly generation: number;
   readonly phase: 'pending' | 'provisioning' | 'starting' | 'ready' | 'degraded' | 'stopping' | 'stopped' | 'failed';
   readonly reason?: { readonly code: string; readonly message: string };
   /** 子对象的观测：Deployment 的期望与就绪副本数（就绪之后的槽 DTO 照它）。 */
-  readonly children?: readonly { readonly kind: string; readonly phase: string; readonly replicas?: number; readonly readyReplicas?: number }[];
+  readonly children?: readonly { readonly kind: string; readonly phase: string; readonly replicas?: number; readonly readyReplicas?: number; readonly appliedGeneration?: number }[];
 }
 
 export interface SlotDeclaration {
@@ -14,7 +16,8 @@ export interface SlotDeclaration {
   readonly kind: 'service-slot' | 'build-job' | 'migration-job';
   readonly ref: string;
   readonly projectId?: ProjectId;
-  readonly spec: { readonly children: readonly { readonly kind: string; readonly namespace?: string; readonly name: string }[] };
+  /** slot：资源中心建的槽（T8）调和器渲染工作负载要用的输入。 */
+  readonly spec: { readonly children: readonly { readonly kind: string; readonly namespace?: string; readonly name: string }[]; readonly slot?: Readonly<Record<string, unknown>> };
   readonly display?: Readonly<Record<string, string>>;
   readonly conditions?: readonly { readonly type: string; readonly status: ResourceConditionStatus; readonly reason?: string; readonly message?: string; readonly since?: Date }[];
 }

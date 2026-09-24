@@ -82,11 +82,13 @@ export async function deployChecks(deps: DeployCheckDeps, target: DeployTarget, 
 
 /**
  * 平台预检的集群一步（RFC-025 设计 §5）：把要部署的 Deployment 与 Service 以服务端 dry-run 提交一次——资源规格、准入策略、命名空间配额
- * 这类只有 API Server 才判得了的问题在受理之前就说清，不在部署途中抛错。槽的渲染还在 release，这一步随它；渲染移交资源中心后改经它的端口。
+ * 这类只有 API Server 才判得了的问题在受理之前就说清，不在部署途中抛错。由资源中心建出的槽（T8）经 cluster-control 的端口，按槽记录的期望
+ * 渲染出与调和器相同的对象（含环境 Secret）；旧形状照旧走本模块的部署适配器。
  */
-export async function dryRunReason(deps: Pick<ReleaseUseCaseDeps, 'deployer'>, spec: SlotDeploySpec): Promise<PrecheckReason | undefined> {
+export async function dryRunReason(deps: Pick<ReleaseUseCaseDeps, 'deployer' | 'renderer'>, spec: SlotDeploySpec, ledgerSpec?: Parameters<NonNullable<ReleaseUseCaseDeps['renderer']>['dryRun']>[0]): Promise<PrecheckReason | undefined> {
   try {
-    await deps.deployer.dryRun(spec);
+    if (ledgerSpec && deps.renderer) await deps.renderer.dryRun(ledgerSpec, spec.env);
+    else await deps.deployer.dryRun(spec);
     return undefined;
   } catch (error) {
     return precheckReason('cluster-rejected', `集群拒绝了这次部署：${error instanceof Error ? error.message : String(error)}`, '检查套餐的资源规格与项目命名空间的配额，或联系管理员');

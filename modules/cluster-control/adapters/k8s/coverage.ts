@@ -2,8 +2,12 @@ import { isDeepStrictEqual } from 'node:util';
 import type { K8sObject } from '@crewstation/k8s';
 import type { ObservedObject } from '../../domain/observation';
 
-/** 期望里的每个字段在观测到的对象里都相同；API Server 补上的缺省字段不算不一致，数组按位置逐个比、长度要相等。 */
+/**
+ * 期望里的每个字段在观测到的对象里都相同；API Server 补上的缺省字段不算不一致，数组按位置逐个比、长度要相等。
+ * 期望是空数组、观测里没有这个字段也算相同：Kubernetes 输出对象时把空列表省略（Deployment 的 env、volumes）。
+ */
 export function covers(live: unknown, desired: unknown): boolean {
+  if (Array.isArray(desired) && desired.length === 0 && live === undefined) return true;
   if (Array.isArray(desired)) return Array.isArray(live) && live.length === desired.length && desired.every((item, index) => covers(live[index], item));
   if (typeof desired === 'object' && desired !== null) {
     return typeof live === 'object' && live !== null && Object.entries(desired).every(([field, value]) => covers((live as Record<string, unknown>)[field], value));
@@ -18,12 +22,13 @@ export function covers(live: unknown, desired: unknown): boolean {
 const EXACT_SPEC_KINDS: ReadonlySet<string> = new Set(['NetworkPolicy']);
 
 /**
- * 观测到的对象已经是期望的样子：标签与 spec 都覆盖期望。期望没有 spec 的（Namespace）只比标签——
- * API Server 给命名空间补的 finalizers 不算不一致。网络策略的 spec 逐字段比（见上）。
+ * 观测到的对象已经是期望的样子：标签与 spec 都覆盖期望，期望带注解的（服务槽的 Deployment 写渲染它的期望版本，T8）注解也要覆盖。
+ * 期望没有 spec 的（Namespace）只比标签——API Server 给命名空间补的 finalizers 不算不一致。网络策略的 spec 逐字段比（见上）。
  */
 export function objectCovered(current: ObservedObject | undefined, desired: K8sObject): boolean {
   const spec = (desired as { spec?: unknown }).spec;
   if (current === undefined || !covers(current.metadata.labels ?? {}, desired.metadata.labels ?? {})) return false;
+  if (desired.metadata.annotations && !covers(current.metadata.annotations ?? {}, desired.metadata.annotations)) return false;
   if (spec === undefined) return true;
   return EXACT_SPEC_KINDS.has(desired.kind) ? isDeepStrictEqual(current.spec, spec) : covers(current.spec, spec);
 }

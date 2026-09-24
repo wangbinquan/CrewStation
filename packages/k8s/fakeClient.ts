@@ -18,7 +18,12 @@ export function createFakeK8sClient(): FakeK8sClient {
   const applied: K8sObject[] = [];
   const deleted: string[] = [];
   let version = 1;
-  const stamp = <T extends K8sObject>(obj: T): T => ({ ...obj, metadata: { ...obj.metadata, resourceVersion: String(version++), uid: obj.metadata.uid ?? `uid-${obj.metadata.name}` } });
+  // 与 API Server 一致：已在的对象再 apply 时 UID 不变；新对象的 UID 不与别的对象重复（同名的 Deployment 与 Service 各有各的）。
+  const freshUid = (obj: K8sObject): string => {
+    const plain = `uid-${obj.metadata.name}`;
+    return [...objects.values()].some((other) => other.metadata.uid === plain) ? `uid-${obj.kind.toLowerCase()}-${obj.metadata.name}` : plain;
+  };
+  const stamp = <T extends K8sObject>(obj: T, existing?: K8sObject): T => ({ ...obj, metadata: { ...obj.metadata, resourceVersion: String(version++), uid: obj.metadata.uid ?? existing?.metadata.uid ?? freshUid(obj) } });
   const keyFor = (ref: ResourceRef, name: string, namespace?: string): string => keyOf(ref.apiVersion, ref.kind, ref.namespaced ? namespace : undefined, name);
   const select = (ref: ResourceRef, namespace?: string, labelSelector = '') => {
     const selector = Object.fromEntries(labelSelector.split(',').filter(Boolean).map((pair) => pair.split('=') as [string, string]));
@@ -53,9 +58,10 @@ export function createFakeK8sClient(): FakeK8sClient {
       return stored;
     },
     apply: async (obj, options) => {
-      const stored = stamp(obj);
+      const key = keyFor(refOf(obj), obj.metadata.name, obj.metadata.namespace);
+      const stored = stamp(obj, objects.get(key));
       if (options?.dryRun) return stored;
-      objects.set(keyFor(refOf(obj), obj.metadata.name, obj.metadata.namespace), stored);
+      objects.set(key, stored);
       applied.push(stored);
       return stored;
     },

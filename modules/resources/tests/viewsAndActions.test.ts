@@ -143,6 +143,14 @@ describe.skipIf(!available)('集群清单的认领叠加', () => {
     expect(await h.module.api.claimsOf(ADMIN, [])).toEqual([]);
   });
 
+  // RFC-025 T8：资源中心建的槽，Service 与环境 Secret 由调和器照期望维护（删了会补回）；Deployment 的删除是 release 的下线，不禁用。
+  test('服务槽：Service 与环境 Secret 是「维护中」，Deployment 不是', async () => {
+    const children = [{ kind: 'Deployment', namespace: 'cs-demo', name: 'demo-blue' }, { kind: 'Service', namespace: 'cs-demo', name: 'demo-blue' }, { kind: 'Secret', namespace: 'cs-demo', name: 'demo-blue-env-1' }];
+    await h.module.api.owner('release').declare({ kind: 'service-slot', ref: 'svc-demo/blue', projectId: PROJECT, spec: { children } });
+    const byKind = new Map((await h.module.api.claimsOf(ADMIN, children)).map((claim) => [claim.child.kind, claim.ledger.maintained]));
+    expect(Object.fromEntries(byKind)).toEqual({ Deployment: false, Service: true, Secret: true });
+  });
+
   test('期望已是「不要了」的不再算维护中；项目成员只拿到本项目的记录，操作按自己的权限裁剪', async () => {
     const route = await h.module.api.owner('gateway').declare({ kind: 'route', ref: 'demo/preview', projectId: PROJECT, spec: { children: [{ ...ingress, name: 'demo-preview' }] } });
     await h.module.api.observe({ child: { ...ingress, name: 'demo-preview', uid: 'uid-preview', phase: 'Present', ready: true } });

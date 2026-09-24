@@ -1,12 +1,12 @@
 import { describe, expect, test } from 'bun:test';
 import type { ProjectId, ReleaseId, ServiceId } from '@crewstation/contracts';
-import { projectSlots, slotCountsFromLedger, slotStateFromLedger } from './ledgerProjection';
+import { projectSlots, slotCountsFromLedger, slotRolloutOf, slotSpecOf, slotStateFromLedger } from './ledgerProjection';
 import { DEFAULT_OFFLINE_POLICY, markReminded, offlineDeadline, startRetention } from './slotLifecycle';
-import { initialSlots, withSlot } from './slots';
+import { initialSlots, nextWorkload, withSlot } from './slots';
 
 const now = new Date('2026-09-23T12:00:00.000Z');
 const serviceId = '01a0bf5d-8f4b-7aea-8983-7b41e8b30564' as ServiceId, projectId = '01a0bf5d-8f4b-7710-89f8-83b88c835ea7' as ProjectId;
-const service = { projectId, name: 'demo', namespace: 'cs-demo' };
+const service = { projectId, name: 'demo', namespace: 'cs-demo', slug: 'demo' };
 const r1 = '01a0bf5d-8f4b-7aea-8983-7b41e8b30001' as ReleaseId, r2 = '01a0bf5d-8f4b-7aea-8983-7b41e8b30002' as ReleaseId;
 const tags = new Map<string, string>([[r1, 'v0.1.0'], [r2, 'v0.1.1']]);
 
@@ -70,5 +70,30 @@ describe('服务槽投影到资源台账（RFC-025 第三期）', () => {
     expect(slotStateFromLedger('ready', 'failed')).toBe('failed');
     expect(slotStateFromLedger('ready', 'starting')).toBe('deploying');
     expect(slotStateFromLedger('ready', 'stopping')).toBe('ready');
+  });
+
+  // RFC-025 T8：资源中心建的槽——期望带渲染输入与这一次部署的环境 Secret；流水线照记录判铺开。
+  test('资源中心建的槽：子对象加这一次部署的环境 Secret，期望带渲染输入（不含配置与密钥）；失败的原因进 Failed 条件', () => {
+    const workload = nextWorkload(initialSlots(serviceId, now).green, { releaseId: r2, image: 'registry/demo:v0.1.1', command: ['bun', 'run', 'main.ts'], port: 3000, healthPath: '/healthz', replicas: 2, resources: { cpu: '1', memory: '1Gi' } });
+    expect(workload.revision).toBe(1);
+    expect(nextWorkload({ ...initialSlots(serviceId, now).green, workload }, workload).revision).toBe(2);
+    const spec = slotSpecOf(serviceId, service, 'green', { ...workload, restartedAt: '2026-09-24T08:00:00.000Z' });
+    expect(spec.children).toEqual([{ kind: 'Deployment', namespace: 'cs-demo', name: 'demo-green' }, { kind: 'Service', namespace: 'cs-demo', name: 'demo-green' }, { kind: 'Secret', namespace: 'cs-demo', name: 'demo-green-env-1' }]);
+    expect(spec.slot).toEqual({ serviceId, project: 'demo', service: 'demo', physical: 'green', releaseId: r2, revision: 1, image: 'registry/demo:v0.1.1', command: ['bun', 'run', 'main.ts'], port: 3000, healthPath: '/healthz', replicas: 2, resources: { cpu: '1', memory: '1Gi' }, envSecret: 'demo-green-env-1', restartedAt: '2026-09-24T08:00:00.000Z' });
+    const slots = withSlot(initialSlots(serviceId, now), { physical: 'green', releaseId: r2, state: 'failed', replicas: 2, readyReplicas: 0, updatedAt: now, workload, failure: 'admission webhook denied' }, now);
+    const [, green] = projectSlots(slots, service, (id) => tags.get(id));
+    expect(green).toMatchObject({ children: spec.children, slot: { envSecret: 'demo-green-env-1' } });
+    expect(green!.conditions[1]).toEqual({ type: 'Failed', status: 'true', reason: 'deploy-failed', message: '部署未能就绪：admission webhook denied', since: now });
+  });
+
+  test('照记录判铺开：观测到的 Deployment 得是渲染最新期望的那个；运行中就绪、推进超时失败，其余（含没有记录）还在部署', () => {
+    const deployment = (appliedGeneration: number | undefined, phase = 'Available') => ({ kind: 'Deployment', phase, replicas: 2, readyReplicas: 1, ...(appliedGeneration === undefined ? {} : { appliedGeneration }) });
+    expect(slotRolloutOf(undefined)).toEqual({ state: 'deploying', replicas: 0, readyReplicas: 0 });
+    expect(slotRolloutOf({ generation: 3, phase: 'ready', children: [deployment(2)] }).state).toBe('deploying');
+    expect(slotRolloutOf({ generation: 3, phase: 'ready', children: [deployment(undefined)] }).state).toBe('deploying');
+    expect(slotRolloutOf({ generation: 3, phase: 'ready', children: [deployment(3, 'absent')] }).state).toBe('deploying');
+    expect(slotRolloutOf({ generation: 3, phase: 'ready', children: [deployment(3)] })).toEqual({ state: 'ready', replicas: 2, readyReplicas: 1 });
+    expect(slotRolloutOf({ generation: 3, phase: 'degraded', reason: { code: 'rollout-stalled', message: 'ProgressDeadlineExceeded' }, children: [deployment(3, 'Stalled')] })).toEqual({ state: 'failed', replicas: 2, readyReplicas: 1, message: 'ProgressDeadlineExceeded' });
+    expect(slotRolloutOf({ generation: 3, phase: 'degraded', reason: { code: 'crash-looping', message: '容器反复重启' }, children: [deployment(3)] })).toEqual({ state: 'deploying', replicas: 2, readyReplicas: 1, message: '容器反复重启' });
   });
 });

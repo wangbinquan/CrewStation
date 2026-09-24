@@ -26,6 +26,8 @@ interface ObservedChild {
   readonly readyReplicas?: number;
   /** 对象的 metadata.generation（调和器照期望渲染的对象被人改动时，观测随之变化）。 */
   readonly generation?: number;
+  /** 渲染这个对象的那一版期望（记录的 generation，服务槽的 Deployment，T8）。 */
+  readonly appliedGeneration?: number;
 }
 
 type RecordRow = typeof records.$inferSelect;
@@ -40,7 +42,7 @@ function toChild(row: ChildRow): ResourceChild {
     phase: observed?.phase ?? 'absent', ready: observed?.ready ?? false,
     ...optional('reason', observed?.reason), ...optional('node', observed?.node), ...optional('restarts', observed?.restarts),
     ...optional('replicas', observed?.replicas), ...optional('readyReplicas', observed?.readyReplicas), ...optional('generation', observed?.generation),
-    ...optional('observedAt', row.observedAt?.toISOString()),
+    ...optional('appliedGeneration', observed?.appliedGeneration), ...optional('observedAt', row.observedAt?.toISOString()),
   };
 }
 
@@ -72,6 +74,7 @@ function childRow(resourceId: string, stored: StoredChild): typeof children.$inf
   const observed: ObservedChild | null = child.phase === 'absent' && !child.uid ? null : {
     phase: child.phase, ready: child.ready, ...optional('reason', child.reason), ...optional('node', child.node), ...optional('restarts', child.restarts),
     ...optional('replicas', child.replicas), ...optional('readyReplicas', child.readyReplicas), ...optional('generation', child.generation),
+    ...optional('appliedGeneration', child.appliedGeneration),
   };
   return {
     resourceId, kind: child.kind, namespace: child.namespace ?? '', name: child.name, uid: child.uid ?? null, expected: stored.expected,

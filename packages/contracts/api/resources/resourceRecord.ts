@@ -53,6 +53,11 @@ export const ResourceChildSchema = z.object({
   readyReplicas: z.number().int().nonnegative().optional(),
   /** 对象的 `metadata.generation`（spec 一改就加一）：调和器照期望渲染的对象（路由）被人改动时，观测随之变化、调和器随即核对。 */
   generation: z.number().int().nonnegative().optional(),
+  /**
+   * 渲染这个对象的那一版期望（记录的 generation，调和器写在注解 `crewstation.io/resource-generation` 上，观测照抄）：
+   * 所属模块据此判断观测到的是不是它最新的期望（服务槽换版本、扩缩、重启之后，还在用旧期望的观测不算数）。
+   */
+  appliedGeneration: z.number().int().nonnegative().optional(),
   observedAt: z.iso.datetime().optional(),
 }).strict();
 

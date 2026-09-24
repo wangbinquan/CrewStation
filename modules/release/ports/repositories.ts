@@ -11,6 +11,8 @@ export interface ReleaseRepository {
   getByTag(serviceId: ServiceId, tag: string): Promise<Release | undefined>;
   listByService(serviceId: ServiceId, limit: number): Promise<Release[]>;
   findInProgress(serviceId: ServiceId): Promise<Release | undefined>;
+  /** 只改这一次部署实际用上的生产配置版本（T8：环境在建 Secret 时才渲染），不动发布的其他字段——流水线同时在写它的状态。 */
+  recordConfigVersion(id: ReleaseId, configVersion: number): Promise<void>;
 }
 
 export interface SlotRepository {

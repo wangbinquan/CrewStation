@@ -42,6 +42,11 @@ export interface PlatformSettings {
    * `CS_DATA_PROVISIONING=data` 回退为 data 受理时自己建。已建好的库各按当时的方式取连接串。
    */
   dataProvisioning: 'data-control' | 'data';
+  /**
+   * 服务槽（Deployment、Service 与环境）由谁建（RFC-025 T8）：`ledger` 由资源中心照槽记录建出，环境在建 Secret 时向 release 要（缺省）；
+   * `CS_SLOT_CREATION=owner` 回退为 release 部署时自己建。已由资源中心建出的槽之后的下线、运维仍走资源中心。
+   */
+  slotCreation: 'ledger' | 'owner';
 }
 
 const num = (v: string | undefined, fallback: number): number => (v === undefined || v === '' ? fallback : Number(v));
@@ -84,6 +89,7 @@ export function loadPlatformSettings(env: Record<string, string | undefined> = p
     sessionTtlSeconds: num(env.CS_SESSION_TTL_SECONDS, 28800),
     workloadCreation: env.CS_WORKLOAD_CREATION === 'owner' ? 'owner' : 'ledger',
     dataProvisioning: env.CS_DATA_PROVISIONING === 'data' ? 'data' : 'data-control',
+    slotCreation: env.CS_SLOT_CREATION === 'owner' ? 'owner' : 'ledger',
   };
 }
 
