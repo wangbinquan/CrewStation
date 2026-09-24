@@ -32,6 +32,9 @@ describe('阶段规则（RFC-025 设计 §2.3）', () => {
     expect(computePhase(record({ conditions: [cond('Created', 'false', { reason: 'create-failed', message: '容器没有建成：exceeded quota' })] }))).toEqual({ phase: 'provisioning', reason: { code: 'create-failed', message: '容器没有建成：exceeded quota' } });
     expect(computePhase(record({ conditions: [cond('Created', 'false', { message: '没建成' })] })).reason?.code).toBe('create-failed');
     expect(computePhase(record({ conditions: [cond('Created', 'false')] }))).toEqual({ phase: 'provisioning' });
+    // 执行环境（I25 第二步）排队时 Prepared 为假：建不成的原因比「排队」有用；没有说明的照旧是排队。
+    expect(computePhase(record({ kind: 'agent-execution', conditions: [cond('Prepared', 'false'), cond('Created', 'false', { reason: 'create-failed', message: '容器没有建成：forbidden' })] }))).toEqual({ phase: 'provisioning', reason: { code: 'create-failed', message: '容器没有建成：forbidden' } });
+    expect(computePhase(record({ kind: 'agent-execution', conditions: [cond('Prepared', 'false'), cond('Created', 'false')] })).phase).toBe('pending');
   });
 
   test('Pod 就绪还要 Runner 连上才是运行中；从没连上是启动中，连上后又断开是降级，重建中按重新启动算', () => {

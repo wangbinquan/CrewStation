@@ -1,5 +1,6 @@
 import type { ClusterPurpose, ResourceConditionStatus, ResourceKind, StartupRecord } from '@crewstation/contracts';
 import type { ExecutionPurpose, TaskEnvironment } from './taskEnvironment';
+import { canonicalNativeIntent, EXECUTION_INTENT_ANNOTATION, WORKSPACE_TASK_LABEL } from './physicalIdentity';
 import { podNameFor, purposeOf, reconcilerCreates, runnerSecretOf, WORKLOAD_LABELS, wantsProvisioning } from './taskEnvironment';
 
 /**
@@ -111,9 +112,22 @@ function workloadRender(env: TaskEnvironment): ProjectedRecord['render'] {
   const { image, workerUid, resources, checkout, previewRoute } = env.render;
   const pod = {
     image, workerUid, resources, workload: WORKLOAD_LABELS[env.kind], project: env.labels['crewstation.io/project'] ?? '', service: env.labels['crewstation.io/service'] ?? '',
-    pvc: env.pvcName, secret: runnerSecretOf(env), ...(checkout ? { checkout } : {}),
+    pvc: env.pvcName, secret: runnerSecretOf(env), ...(checkout ? { checkout } : {}), ...executionRender(env),
   };
   return { pod, ...(env.preview ? { preview: { port: env.preview.port, kind: env.kind, ...(previewRoute ? { route: previewRoute } : {}) } } : {}) };
+}
+
+/**
+ * 执行环境（I25 第二步）：钉在父工作区的节点、挂它的工作卷；Pod 与 Runner Secret 带所属工作区标签和受理意图注解（清理时照它们认领）；
+ * 调和器建之前照 workspace 核对父工作区的 Pod 与卷还是受理时那一个。
+ */
+function executionRender(env: TaskEnvironment): Record<string, unknown> {
+  const n = env.native, workspacePod = env.render?.execution?.workspacePod;
+  if (!n || !workspacePod) return {};
+  return {
+    nodeName: n.nodeName, labels: { [WORKSPACE_TASK_LABEL]: n.parentTaskId }, annotations: { [EXECUTION_INTENT_ANNOTATION]: canonicalNativeIntent(env.id, n) },
+    workspace: { pod: workspacePod, podUid: n.parentPodUid, pvcUid: n.pvcUid },
+  };
 }
 
 function workloadDisplay(env: TaskEnvironment): Record<string, string> {

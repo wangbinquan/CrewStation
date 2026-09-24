@@ -24,9 +24,9 @@ import { orphanSweeper } from './workers/orphanSweeper';
 
 /**
  * 调和器按期望渲染的种类：有人改了它们（标签、命名空间的额度上限）时 generation 不一定变、台账不记变更，
- * 所以观测到变化就直接核对认领它的记录，缺了或被改就改回。
+ * 所以观测到变化就直接核对认领它的记录，缺了或被改就改回。工作卷（I25）观测到了，认领它的卷记录随即唤醒等着它的工作区。
  */
-const RENDERED_KINDS: ReadonlySet<ObservedKind> = new Set(['IngressRoute', 'Middleware', 'Namespace', 'ResourceQuota', 'NetworkPolicy']);
+const RENDERED_KINDS: ReadonlySet<ObservedKind> = new Set(['IngressRoute', 'Middleware', 'Namespace', 'ResourceQuota', 'NetworkPolicy', 'PersistentVolumeClaim']);
 
 /** 装配期注入：台账入口与旧所属对象由组合根从 resources／task-runtime 接上。 */
 export interface ClusterControlModuleDeps {

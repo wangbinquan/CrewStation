@@ -1,5 +1,6 @@
 import type { K8sClient, K8sObject } from '@crewstation/k8s';
 import { LABELS, taskPodObject as renderTaskPod, taskPreviewObjects } from '@crewstation/k8s';
+import { WORKSPACE_TASK_LABEL } from '../../domain/physicalIdentity';
 import { WORKLOAD_LABELS } from '../../domain/taskEnvironment';
 import type { TaskPodSpec } from '../../ports/cluster';
 
@@ -9,7 +10,7 @@ export function taskPodObject({ env, image, envVars, resources, source, envSecre
     name: env.podName, namespace: env.namespace, taskId: env.id, workload: WORKLOAD_LABELS[env.kind], project: env.labels[LABELS.project] ?? '', service: env.labels[LABELS.service] ?? '',
     image, workerUid, resources, workVolume: workVolume === 'emptyDir' ? { emptyDir: true } : { pvc: env.pvcName }, env: envVars,
     ...(envSecretName ? { envFromSecret: envSecretName } : {}), ...(source ? { checkout: source } : {}), ...(nodeName ? { nodeName } : {}),
-    labels: { ...(env.rebuildId ? { 'crewstation.io/rebuild': env.rebuildId } : {}), ...(env.native ? { 'crewstation.io/workspace-task': env.native.parentTaskId } : {}) },
+    labels: { ...(env.rebuildId ? { 'crewstation.io/rebuild': env.rebuildId } : {}), ...(env.native ? { [WORKSPACE_TASK_LABEL]: env.native.parentTaskId } : {}) },
   });
 }
 

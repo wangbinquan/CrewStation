@@ -239,12 +239,12 @@ async function applyNetworkPolicies(deps: ReconcileDeps, record: LedgerRecordVie
 }
 
 /**
- * 按期望应用子对象的种类：写期望的模块只写记录，对象由调和器建出、改回。工作区与工作卷（RFC-025 I25）只在所属模块要建出容器时建一次，
- * 之后不改、丢了不补建（种类注册表不把它们算作「维护中」）。
+ * 按期望应用子对象的种类：写期望的模块只写记录，对象由调和器建出、改回。工作区、执行环境与工作卷（RFC-025 I25）只在所属模块要建出容器时
+ * 建一次，之后不改、丢了不补建（种类注册表不把它们算作「维护中」）。
  */
 const APPLIERS: Readonly<Record<string, (deps: ReconcileDeps, record: LedgerRecordView, enqueue: Enqueue) => Promise<void>>> = {
   route: applyRoute, 'rate-limit-policy': applyMiddlewares, namespace: applyNamespace, 'network-policy-set': applyNetworkPolicies,
-  'dev-workspace': applyWorkload, 'business-workspace': applyWorkload, volume: (deps, record) => applyVolume(deps, record),
+  'dev-workspace': applyWorkload, 'business-workspace': applyWorkload, 'agent-execution': applyWorkload, volume: applyVolume,
 };
 
 /**

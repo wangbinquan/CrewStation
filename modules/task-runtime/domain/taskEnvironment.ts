@@ -52,6 +52,11 @@ export interface WorkloadRender {
   readonly start: number;
   readonly checkout?: { readonly repoUrl: string; readonly branch: string; readonly credentialSecretName: string };
   readonly previewRoute?: { readonly host: string; readonly middlewares: readonly { readonly name: string; readonly namespace?: string }[] };
+  /**
+   * 执行环境（I25 第二步）：父工作区受理那一刻的 Pod 名（重建过的工作区 Pod 换了名）。节点与父 Pod、工作卷的 UID 取自 `native`，
+   * 调和器建之前照它们核对父工作区还是受理时那一个。
+   */
+  readonly execution?: { readonly workspacePod: string };
 }
 
 export interface RunnerRejection {
@@ -143,9 +148,16 @@ export const POD_CREATE_GRACE_MS = 2 * 60_000;
  * 这时的 Missing 不算失败；超过宽限仍没有 Pod（建 Pod 的进程中途没了），照旧判容器不存在。执行环境与重建各自在建好 Pod 后才进入可判定状态。
  */
 export function awaitingPodCreation(env: TaskEnvironment, now: Date, graceMs = POD_CREATE_GRACE_MS): boolean {
-  // 从最近一次启动算：资源中心建出的环境恢复时同样要等调和器建 Pod（RFC-025 I25），受理时刻早已过了宽限。
+  return env.state === 'creating' && !env.native && !env.rebuildId && !env.podUid && !graceElapsed(env, now, graceMs);
+}
+
+/**
+ * 建容器的宽限过了没有：从最近一次启动算——资源中心建出的环境恢复时同样要等调和器建 Pod（RFC-025 I25），受理时刻早已过了宽限。
+ * 资源中心建的执行环境过了宽限仍在排队，照「准备反复失败」收尾。
+ */
+export function graceElapsed(env: TaskEnvironment, now: Date, graceMs = POD_CREATE_GRACE_MS): boolean {
   const since = env.startup ? Date.parse(env.startup.startedAt) : env.createdAt.getTime();
-  return env.state === 'creating' && !env.native && !env.rebuildId && !env.podUid && now.getTime() - since < graceMs;
+  return now.getTime() - since >= graceMs;
 }
 
 /**
@@ -154,19 +166,25 @@ export function awaitingPodCreation(env: TaskEnvironment, now: Date, graceMs = P
  */
 export const WORKLOAD_LABELS: Readonly<Record<TaskKind, string>> = { 'dev-session': 'dev-session', business: 'business-task', 'profile-test': 'profile-test' };
 
-/** 由资源中心建出的环境（RFC-025 I25）：有渲染期望、不是执行环境、不在重建（执行环境与重建仍由 task-runtime 自己建）。 */
+/**
+ * 由资源中心建出的环境（RFC-025 I25）：有渲染期望、不在重建（重建与档位测试仍由 task-runtime 自己建）。执行环境要带父工作区的 Pod 名，
+ * 没有的照旧由本模块建。
+ */
 export function reconcilerCreates(env: TaskEnvironment): env is TaskEnvironment & { readonly render: WorkloadRender } {
-  return !!env.render && !env.native && !env.rebuildId;
+  return !!env.render && !env.rebuildId && (!env.native || !!env.render.execution);
 }
 
-/** 这一次启动的 Runner Secret：`<Pod 名>-runner-<第几次启动>`；恢复换新名，Pod 只认它。 */
+/**
+ * 这一次启动的 Runner Secret：工作区是 `<Pod 名>-runner-<第几次启动>`，恢复换新名，Pod 只认它；执行环境不会再启动，
+ * 沿用 `<Pod 名>-runner`（清理与孤儿判定认这个名字）。
+ */
 export function runnerSecretOf(env: TaskEnvironment & { readonly render: WorkloadRender }): string {
-  return `${env.podName}-runner-${env.render.start}`;
+  return env.native ? `${env.podName}-runner` : `${env.podName}-runner-${env.render.start}`;
 }
 
-/** 所属模块要资源中心建出容器（领域条件 Provisioning）：创建中、还没绑定 Pod 实例。 */
+/** 所属模块要资源中心建出容器（领域条件 Provisioning）：工作区在创建中、还没绑定 Pod 实例；执行环境还在排队（准备好之前）。 */
 export function wantsProvisioning(env: TaskEnvironment): boolean {
-  return reconcilerCreates(env) && env.state === 'creating' && !env.podUid;
+  return reconcilerCreates(env) && env.state === 'creating' && (env.native ? env.native.state === 'queued' : !env.podUid);
 }
 
 export function podNameFor(taskId: TaskId): string {

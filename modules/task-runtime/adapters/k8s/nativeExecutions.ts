@@ -3,15 +3,15 @@ import type { K8sClient, K8sObject, ResourceRef } from '@crewstation/k8s';
 import { LABELS, Resources, secretObject } from '@crewstation/k8s';
 import { isPlatformError, precondition } from '@crewstation/kernel';
 import type { TaskEnvironment } from '../../domain/taskEnvironment';
-import { nativeIntent, nativeIntentMatches, taskLabelMatches } from '../../domain/physicalIdentity';
+import { EXECUTION_INTENT_ANNOTATION, nativeIntent, nativeIntentMatches, taskLabelMatches, WORKSPACE_TASK_LABEL } from '../../domain/physicalIdentity';
 import type { NativeExecutionCluster } from '../../ports/cluster';
 import { taskPodObject } from './taskObjects';
 
 type Pod = K8sObject & { status?: { phase?: string } };
 type Volume = K8sObject & { status?: { phase?: string } };
 type Secret = K8sObject & { data?: Record<string, string>; stringData?: Record<string, string>; immutable?: boolean };
-const intentKey = 'crewstation.io/cli-intent';
-const workspaceKey = 'crewstation.io/workspace-task';
+const intentKey = EXECUTION_INTENT_ANNOTATION;
+const workspaceKey = WORKSPACE_TASK_LABEL;
 const secretName = (env: TaskEnvironment) => `${env.podName}-runner`;
 function quantity(value: string): [bigint, bigint] | undefined {
   const match = /^(\d+(?:\.\d+)?|\.\d+)([numkKMGTPE]|[KMGTPE]i|[eE][+-]?\d+)?$/.exec(value);

@@ -1,5 +1,5 @@
 import type { Logger } from '@crewstation/kernel';
-import { volumeRenderOf, workloadRenderOf } from '../domain/workloadRender';
+import { volumeRenderOf, workloadRenderOf, workspaceUnchanged } from '../domain/workloadRender';
 import type { ClusterWriter, Ensured, ManagedObjectFeed } from '../ports/cluster';
 import type { LedgerObservations, LedgerRecordView, WorkloadOwners } from '../ports/ledger';
 import type { ObservationStats } from './observeChange';
@@ -30,10 +30,15 @@ function applied(deps: WorkloadApplyDeps, record: LedgerRecordView, kind: string
  * 工作卷（RFC-025 I25）：所属模块要建出容器时，PVC 不在就照期望建。观测到过的卷没了不补建——换成一个空卷会让数据悄悄消失，
  * 等工作区自己因卷不在而起不来、被判失败。
  */
-export async function applyVolume(deps: WorkloadApplyDeps, record: LedgerRecordView): Promise<void> {
+export async function applyVolume(deps: WorkloadApplyDeps, record: LedgerRecordView, enqueue: (id: string, afterMs?: number) => void): Promise<void> {
   if (!provisioning(record)) return;
   const volume = volumeRenderOf(record.spec);
-  if (!volume || deps.feed.cached('PersistentVolumeClaim', volume.namespace, volume.name)) return;
+  if (!volume) return;
+  if (deps.feed.cached('PersistentVolumeClaim', volume.namespace, volume.name)) {
+    // 卷进了观测缓存：上级工作区此刻就能建，不必等它的重试间隔。
+    if (record.parentId) enqueue(record.parentId);
+    return;
+  }
   if (record.children.some((child) => child.kind === 'PersistentVolumeClaim' && child.name === volume.name && child.uid)) {
     deps.logger.warn('resource volume lost, not recreated', { resourceId: record.id, namespace: volume.namespace, name: volume.name });
     return;
@@ -53,18 +58,25 @@ export async function applyWorkload(deps: WorkloadApplyDeps, record: LedgerRecor
     deps.logger.warn('resource workload spec incomplete', { resourceId: record.id });
     return;
   }
-  const { pod, preview } = render, owners = deps.workloads;
-  if (!deps.feed.cached('PersistentVolumeClaim', pod.namespace, pod.pvc)) {
+  const { pod, preview } = render, owners = deps.workloads, volume = deps.feed.cached('PersistentVolumeClaim', pod.namespace, pod.pvc);
+  // 执行环境（I25 第二步）：父工作区的 Pod 与卷要还是受理时那两个实例；没了或换了，交所属模块判失败、不建。
+  if (pod.workspace && !workspaceUnchanged(pod, deps.feed.cached('Pod', pod.namespace, pod.workspace.pod), volume)) {
+    deps.logger.warn('resource workload workspace changed', { resourceId: record.id, workspacePod: pod.workspace.pod });
+    await owners.workloadUnavailable(record.id, 'workspace-changed');
+    return;
+  }
+  if (!volume) {
     deps.logger.debug('resource workload waiting for volume', { resourceId: record.id, pvc: pod.pvc });
     enqueue(record.id, deps.retryMs ?? WAIT_MS);
     return;
   }
   try {
-    applied(deps, record, 'Secret', { namespace: pod.namespace, name: pod.secret }, await deps.cluster.ensureRunnerSecret(pod, () => owners.runnerValues(record.id)));
+    const secret = await deps.cluster.ensureRunnerSecret(pod, () => owners.runnerValues(record.id));
+    applied(deps, record, 'Secret', { namespace: pod.namespace, name: pod.secret }, secret);
     const created = await deps.cluster.ensurePod(pod);
     applied(deps, record, 'Pod', pod, created);
     if (preview) applied(deps, record, 'Service', preview, await deps.cluster.applyPreview(preview, { ...optional('service', deps.feed.cached('Service', preview.namespace, preview.name)), ...optional('route', deps.feed.cached('IngressRoute', preview.namespace, preview.name)) }));
-    await owners.bindWorkload(record.id, created.uid);
+    await owners.bindWorkload(record.id, created.uid, secret.uid);
     await deps.ledger.observeConditions(record.id, [{ type: 'Created', status: 'true' }]);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

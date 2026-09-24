@@ -103,13 +103,13 @@ function jobPhase(record: PhaseInput, job: ResourceChild | undefined): PhaseResu
 }
 
 /**
- * 主子对象还不在：所属模块说还不能分配（Prepared 为假）是排队；资源中心建过却没建成（Created 为假，RFC-025 I25：
- * 例如被额度拒绝）照原因写，其余是分配中。
+ * 主子对象还不在：资源中心建过却没建成（Created 为假，RFC-025 I25：例如被额度拒绝）是分配中、照原因写——执行环境这时 Prepared
+ * 也为假，建不成的原因比「排队」有用；所属模块说还不能分配（Prepared 为假）是排队；其余是分配中。
  */
 function missingPrimaryPhase(record: PhaseInput): PhaseResult {
-  if (condition(record, 'Prepared')?.status === 'false') return { phase: 'pending', reason: QUEUED };
   const created = condition(record, 'Created');
-  return created?.status === 'false' && created.message ? { phase: 'provisioning', reason: reasonOf(created.reason ?? 'create-failed', created.message) } : { phase: 'provisioning' };
+  if (created?.status === 'false' && created.message) return { phase: 'provisioning', reason: reasonOf(created.reason ?? 'create-failed', created.message) };
+  return condition(record, 'Prepared')?.status === 'false' ? { phase: 'pending', reason: QUEUED } : { phase: 'provisioning' };
 }
 
 function workloadPhase(record: PhaseInput, rule: KindRule, pod: ResourceChild): PhaseResult {

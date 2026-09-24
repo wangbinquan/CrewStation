@@ -428,8 +428,9 @@ function composeControl(deps: CompositionDeps, core: ReturnType<typeof composeCo
     pods: { changed: (pod, gone) => gateway.api.syncObservedPod(pod, gone), synced: async (pods) => { await gateway.api.relistObservedPods(pods); } },
     // D13：槽「已结束」时待验证与正式主机改指 cs-api 的说明页（Service 与端口同平台路由清单 deploy/k8s/platform/30-cs-api.yaml）。
     explainer: { namespace: deps.settings.systemNamespace, service: 'cs-api', port: 8080, path: UNAVAILABLE_PATH },
-    // RFC-025 I25：建工作区的 Runner Secret 时回头向 task-runtime 要内容（值不落台账），Pod 建出后交回实例。
-    workloads: { runnerValues: (id) => runtime.taskRuntime.api.runnerValues(id as TaskId), bindWorkload: (id, podUid) => runtime.taskRuntime.api.bindWorkload(id as TaskId, podUid) },
+    // RFC-025 I25：建工作区与执行环境的 Runner Secret 时回头向 task-runtime 要内容（值不落台账），Pod 建出后交回实例；执行环境的父工作区变了交它判失败。
+    workloads: { runnerValues: (id) => runtime.taskRuntime.api.runnerValues(id as TaskId), bindWorkload: (id, podUid, secretUid) => runtime.taskRuntime.api.bindWorkload(id as TaskId, podUid, secretUid),
+      workloadUnavailable: (id, code) => runtime.taskRuntime.api.workloadUnavailable(id as TaskId, code) },
     ledger: {
       observe: (input) => ledger.api.observe(input), claimOf: (child) => ledger.api.claimOf(child), get: (id) => ledger.api.get(id),
       listLive: () => ledger.api.list({}), changesSince: ledger.api.changesSince, latestChange: ledger.api.latestChange,

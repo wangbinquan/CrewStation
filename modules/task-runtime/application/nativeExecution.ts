@@ -5,7 +5,7 @@ import type { CreateNativeExecutionInput, ReleaseReason } from '../api/moduleApi
 import { cancelStartup, completeStage, failStartup, initialStartup } from '../domain/podStartup';
 import { hashRunnerToken, newRunnerToken } from '../domain/runnerToken';
 import type { ExecutionPurpose, NativeExecution, TaskEnvironment } from '../domain/taskEnvironment';
-import { EXECUTION_NOUN, occupiesQuota, purposeOf, transition } from '../domain/taskEnvironment';
+import { EXECUTION_NOUN, graceElapsed, occupiesQuota, purposeOf, reconcilerCreates, transition, wantsProvisioning } from '../domain/taskEnvironment';
 import type { NativeExecutionCluster } from '../ports/cluster';
 import type { RepositoryScope } from '../ports/unitOfWork';
 import type { TaskRuntimeUseCaseDeps } from './dependencies';
@@ -50,7 +50,8 @@ export function createNativeExecutionUseCase(deps: NativeExecutionDeps) {
       const env = executionEnvironment(deps, input, parent, workspace, profile);
       await scope.quota.acquire(env, limit, rule.quota);
       await scope.environments.insert(env);
-      await scope.nativeQueue.enqueue(env.id);
+      // 由资源中心建出（I25 第二步）：期望随记录进台账，调和器照它建 Runner Secret 与 Pod；只有本模块自己建的才进准备队列。
+      if (!reconcilerCreates(env)) await scope.nativeQueue.enqueue(env.id);
       return env;
     });
   };
@@ -67,7 +68,9 @@ function executionEnvironment(deps: NativeExecutionDeps, input: CreateNativeExec
   return { id: input.id, projectId: parent.projectId, serviceId: parent.serviceId, kind: parent.kind, state: 'creating',
     volumeMode: 'persistent', profile: profile.id, namespace: parent.namespace, podName: `${ADMISSION[purpose].podPrefix}-${input.id.replaceAll('-', '')}`, pvcName: parent.pvcName,
     traceId: parent.traceId, runnerTokenHash: hashRunnerToken(newRunnerToken()), connected: false, labels: parent.labels, ...(input.createdBy ? { createdBy: input.createdBy } : {}),
-    native, message: `已受理，正在准备此${EXECUTION_NOUN[purpose]}的独立执行环境`, createdAt: now, updatedAt: now, lastActivityAt: now, startup: initialStartup(now) };
+    native, message: `已受理，正在准备此${EXECUTION_NOUN[purpose]}的独立执行环境`, createdAt: now, updatedAt: now, lastActivityAt: now, startup: initialStartup(now),
+    // 资源中心建出时的期望（I25 第二步，不含凭据）：镜像与资源取自受理时固定的档位；节点、父 Pod 与卷的 UID 在 native 里。
+    ...(deps.creation === 'ledger' ? { render: { image: native.image, workerUid: deps.settings.workerUid, resources: { cpu: profile.cpu, memory: profile.memory, storage: profile.storage }, start: 1, execution: { workspacePod: parent.podName } } } : {}) };
 }
 
 /** 准备执行环境反复失败时给用户的话：只说这一个 Agent，不牵连其他 Agent、窗口与工作树。 */
@@ -164,10 +167,31 @@ export async function runNativeExecution(deps: NativeExecutionDeps, taskId: Task
     await scope.admissions.lock(original.projectId);
     await requireExecutionLease(heartbeat);
     const env = await scope.environments.getById(taskId);
-    if (env?.native?.state === 'queued') await prepareNativeExecution(deps, scope, env, heartbeat);
+    // 由资源中心建出的执行环境（I25 第二步）不在这里准备：补投的作业到这里什么也不做。
+    if (env?.native?.state === 'queued' && !reconcilerCreates(env)) await prepareNativeExecution(deps, scope, env, heartbeat);
     else if (env?.native?.state === 'cleaning') await cleanupNativeExecution(deps, scope, env, heartbeat);
     else if (env?.release && env.state === 'releasing') await cleanupWorkspace(deps, scope, env, heartbeat);
   });
+}
+
+/**
+ * 资源中心建的执行环境没能建出（I25 第二步）：父工作区变了、断开了，或过了建出宽限仍在排队——照「准备失败」收尾，只结束这一个 Agent，
+ * 其他 Agent、窗口与工作树保持。已经不在排队（建出了、清理了）就什么也不做。
+ */
+export async function failQueuedExecution(deps: TaskRuntimeUseCaseDeps, env: TaskEnvironment, reason: string, workspaceLost: boolean): Promise<boolean> {
+  return deps.uow.run(async (scope) => {
+    await scope.admissions.lock(env.projectId);
+    const current = await scope.environments.getById(env.id);
+    if (!current?.native || !wantsProvisioning(current)) return false;
+    await failPreparation(scope, current, deps.clock.now(), reason, workspaceLost);
+    return true;
+  });
+}
+
+/** 过了建出宽限仍在排队的执行环境（调和器一直没建出来，原因在资源中心的记录上）：判准备失败。 */
+export async function expireExecutionProvisioning(deps: TaskRuntimeUseCaseDeps, env: TaskEnvironment): Promise<boolean> {
+  if (!env.native || !wantsProvisioning(env) || !graceElapsed(env, deps.clock.now())) return false;
+  return failQueuedExecution(deps, env, preparationFailureReason(env), false);
 }
 
 export async function describeNativeScheduling(deps: TaskRuntimeUseCaseDeps, env: TaskEnvironment, message: string): Promise<void> {

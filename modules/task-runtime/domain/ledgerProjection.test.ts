@@ -119,4 +119,21 @@ describe('任务环境投影到资源台账（RFC-025 第二期）', () => {
     expect(rebuilt.workload.conditions).toContainEqual({ type: 'Provisioning', status: 'false' });
     expect(rebuilt.volume).not.toHaveProperty('render');
   });
+
+  test('资源中心建出的执行环境（I25 第二步）：排队中要建，期望带节点、父工作区、所属工作区标签与意图注解；Secret 沿用 `<Pod 名>-runner`；准备好后不再要建', () => {
+    const render = { image: 'img', workerUid: 10001, resources: { cpu: '1', memory: '2Gi', storage: '10Gi' }, start: 1, execution: { workspacePod: 'task-100' } };
+    const queued = projectEnvironment(env({ id: '01a0bf5d-8f4b-7c01-8e19-e226732a7102' as TaskId, state: 'creating', podName: 'cli-102', native: native({ state: 'queued' }), connected: false, render, labels: { 'crewstation.io/project': 'demo', 'crewstation.io/service': 'demo' } }));
+    expect(queued.workload.children).toEqual([{ kind: 'Pod', namespace: 'cs-demo', name: 'cli-102' }, { kind: 'Secret', namespace: 'cs-demo', name: 'cli-102-runner' }]);
+    expect(queued.workload.render).toEqual({ pod: {
+      image: 'img', workerUid: 10001, resources: render.resources, workload: 'dev-session', project: 'demo', service: 'demo', pvc: 'task-100-work', secret: 'cli-102-runner',
+      nodeName: 'n', labels: { 'crewstation.io/workspace-task': env().id }, annotations: { 'crewstation.io/cli-intent': expect.stringMatching(/^[0-9a-f]{64}$/) }, workspace: { pod: 'task-100', podUid: 'p', pvcUid: 'v' },
+    } });
+    expect(queued.workload.conditions.slice(-2)).toEqual([{ type: 'Prepared', status: 'false' }, { type: 'Provisioning', status: 'true' }]);
+    const starting = projectEnvironment(env({ state: 'creating', podName: 'cli-102', native: native({ state: 'starting', podUid: 'uid-p' }), connected: false, render }));
+    expect(starting.workload.conditions.slice(-2)).toEqual([{ type: 'Prepared', status: 'true' }, { type: 'Provisioning', status: 'false' }]);
+    // 没带父工作区 Pod 名的执行环境由本模块自己建：照旧的子对象与没有渲染期望。
+    const owned = projectEnvironment(env({ state: 'creating', podName: 'cli-103', native: native({ state: 'queued' }), render: { ...render, execution: undefined } }));
+    expect(owned.workload.render).toBeUndefined();
+    expect(owned.workload.children).toEqual([{ kind: 'Pod', namespace: 'cs-demo', name: 'cli-103' }, { kind: 'Secret', namespace: 'cs-demo', name: 'cli-103-runner' }]);
+  });
 });

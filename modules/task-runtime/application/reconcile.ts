@@ -5,7 +5,7 @@ import { EXECUTION_NOUN, awaitingPodCreation, purposeOf } from '../domain/taskEn
 import type { PodPhaseReading } from '../ports/cluster';
 import type { TaskRuntimeUseCaseDeps } from './dependencies';
 import type { lifecycleUseCases } from './lifecycle';
-import { describeNativeScheduling } from './nativeExecution';
+import { describeNativeScheduling, expireExecutionProvisioning } from './nativeExecution';
 
 type Lifecycle = ReturnType<typeof lifecycleUseCases>;
 
@@ -17,6 +17,7 @@ export function reconcileUseCase(deps: TaskRuntimeUseCaseDeps, lifecycle: Lifecy
     for (const record of await deps.uow.read.rebuilds.pending()) await deps.uow.read.rebuildQueue.enqueue(record.id);
     for (const env of await deps.uow.read.environments.pendingExecutions()) await deps.uow.read.nativeQueue.enqueue(env.id);
     for (const env of await deps.uow.read.environments.listByStates(['creating', 'running'])) {
+      if (await expireExecutionProvisioning(deps, env)) { changed += 1; continue; }
       const target = await judgeable(deps, env);
       if (target && await judgeEnvironment(deps, lifecycle, env, target.rebuild, await deps.cluster.podPhase(env))) changed += 1;
     }

@@ -123,8 +123,10 @@ export interface TaskRuntimeModuleApi {
    * 环境眼下不需要建出容器时拒绝。值只交给调和器，不落库。
    */
   runnerValues(taskId: TaskId): Promise<Record<string, string>>;
-  /** RFC-025 I25：资源中心建出 Pod 后记下实例；环境已不在创建中时忽略。 */
-  bindWorkload(taskId: TaskId, podUid: string): Promise<void>;
+  /** RFC-025 I25：资源中心建出 Pod 后记下实例（执行环境另记 Runner Secret 的实例）；环境已不需要建出时忽略。 */
+  bindWorkload(taskId: TaskId, podUid: string, secretUid?: string): Promise<void>;
+  /** RFC-025 I25 第二步：执行环境的父工作区在建出之前换了实例，判这个执行环境失败；已不在排队时忽略。 */
+  workloadUnavailable(taskId: TaskId, code: 'workspace-changed'): Promise<void>;
   /** RFC-004：在平台专属检查任务里执行完整 Hook 与一次最小模型调用，结束后清理任务；供 agent-runtime 的执行器端口。 */
   runProfileTest(input: ProfileTestRunInput, report: (progress: ProfileTestRunProgress) => Promise<void>, heartbeat: () => Promise<boolean>): Promise<ProfileTestRunResult>;
 }

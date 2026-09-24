@@ -72,8 +72,13 @@ describe.skipIf(!available)('cluster-control：观测写回台账与收编空跑
     return outcome;
   };
   // 工作区容器（RFC-025 I25）：建出的对象落到假集群并随即报一次变化；所属模块（task-runtime）的两个回调记下来。
-  const workloadApplies: string[] = [], valuesAsked: string[] = [], bound: string[] = [];
-  const owners = { failValues: false, runnerValues: async (id: string) => { valuesAsked.push(id); if (owners.failValues) throw new Error('额度不够'); return { CS_RUNNER_TOKEN: `token-${id}` }; }, bindWorkload: async (id: string, uid: string) => { bound.push(`${id}:${uid}`); } };
+  const workloadApplies: string[] = [], valuesAsked: string[] = [], bound: string[] = [], unavailable: string[] = [];
+  const boundSecrets = new Map<string, string | undefined>();
+  const owners = {
+    failValues: false, runnerValues: async (id: string) => { valuesAsked.push(id); if (owners.failValues) throw new Error('额度不够'); return { CS_RUNNER_TOKEN: `token-${id}` }; },
+    bindWorkload: async (id: string, uid: string, secretUid?: string) => { bound.push(`${id}:${uid}`); boundSecrets.set(id, secretUid); },
+    workloadUnavailable: async (id: string, code: string) => { unavailable.push(`${id}:${code}`); },
+  };
   const placed = async <T extends { created: boolean }>(outcome: T, kind: 'Pod' | 'Secret' | 'PersistentVolumeClaim', name: string, namespace: string): Promise<T> => {
     if (!outcome.created) return outcome;
     workloadApplies.push(`${kind}/${name}`);
@@ -458,6 +463,34 @@ describe.skipIf(!available)('cluster-control：观测写回台账与收编空跑
     await until('重试后建出', () => bound.some((entry) => entry.startsWith(`${blocked.id}:`)), 5_000);
     expect(await k8s.get(Resources.Secret!, 'task-w2-runner-1', 'cs-demo')).toBeDefined();
     } finally { k8s.create = create; k8s.apply = apply; }
+  });
+
+  // I25 第二步：执行环境挂父工作区的卷、钉在它的节点；建之前照观测缓存核对父工作区还是受理时那一个，换了就交所属模块判失败、不建。
+  test('执行环境：父工作区的 Pod 与卷还是受理时那两个才建——钉在节点、带所属工作区标签与意图注解，交回 Pod 与 Secret 的实例；换了实例不建', async () => {
+    const runtime = resources.api.owner('task-runtime');
+    await feed.emit({ kind: 'Pod', object: pod('task-p1', { 'crewstation.io/task': 'p1' }), gone: false });
+    await feed.emit({ kind: 'PersistentVolumeClaim', object: pvc('task-p1-work', { 'crewstation.io/task': 'p1' }), gone: false });
+    const execution = (name: string, podUid: string) => ({
+      image: 'task:1', workerUid: 10001, resources: { cpu: '150m', memory: '1Gi', storage: '2Gi' }, workload: 'dev-session', project: 'demo', service: 'demo', pvc: 'task-p1-work', secret: `${name}-runner`,
+      nodeName: 'desktop-worker', labels: { 'crewstation.io/workspace-task': 'p1' }, annotations: { 'crewstation.io/cli-intent': `intent-${name}` }, workspace: { pod: 'task-p1', podUid, pvcUid: 'uid-task-p1-work' },
+    });
+    const declare = (name: string, podUid: string) => runtime.declare({
+      kind: 'agent-execution', ref: name, projectId: PROJECT, spec: { children: [{ kind: 'Pod', namespace: 'cs-demo', name }, { kind: 'Secret', namespace: 'cs-demo', name: `${name}-runner` }], pod: execution(name, podUid) },
+      conditions: [{ type: 'Prepared', status: 'false' }, { type: 'Provisioning', status: 'true' }],
+    });
+    const cli = await declare('cli-e1', 'uid-task-p1');
+    await until('建出执行环境并交回实例', () => bound.some((entry) => entry.startsWith(`${cli.id}:`)));
+    const created = await k8s.get<K8sObject & { spec: { affinity?: unknown } }>(Resources.Pod!, 'cli-e1', 'cs-demo');
+    expect(created?.metadata).toMatchObject({ labels: { 'crewstation.io/workspace-task': 'p1', 'crewstation.io/task': cli.id }, annotations: { 'crewstation.io/cli-intent': 'intent-cli-e1' } });
+    expect(JSON.stringify(created?.spec.affinity)).toContain('"values":["desktop-worker"]');
+    const secret = await k8s.get<K8sObject>(Resources.Secret!, 'cli-e1-runner', 'cs-demo');
+    expect(secret?.metadata).toMatchObject({ labels: { 'crewstation.io/workspace-task': 'p1' }, annotations: { 'crewstation.io/cli-intent': 'intent-cli-e1' } });
+    expect(boundSecrets.get(cli.id)).toBe(secret!.metadata.uid);
+    // 父工作区已经换了实例（受理时记的 UID 对不上）：不建，交所属模块判失败。
+    const stale = await declare('cli-e2', 'uid-old-parent');
+    await until('交所属模块判失败', () => unavailable.includes(`${stale.id}:workspace-changed`));
+    expect(await k8s.get(Resources.Pod!, 'cli-e2', 'cs-demo')).toBeUndefined();
+    expect(await k8s.get(Resources.Secret!, 'cli-e2-runner', 'cs-demo')).toBeUndefined();
   });
 
   // RFC-025 T10：限流策略的 Middleware 由调和器照记录渲染；系统命名空间里的（平台接口）带资源 ID 标签，照常观测与回收。

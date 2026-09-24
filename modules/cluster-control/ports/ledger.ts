@@ -50,7 +50,10 @@ export interface LedgerObservations {
  */
 export interface WorkloadOwners {
   runnerValues(recordId: string): Promise<Readonly<Record<string, string>>>;
-  bindWorkload(recordId: string, podUid: string): Promise<void>;
+  /** Pod 建出后交回实例；执行环境另交回它的 Runner Secret 实例（清理时按 UID 认领）。 */
+  bindWorkload(recordId: string, podUid: string, secretUid?: string): Promise<void>;
+  /** 执行环境建出之前父工作区换了实例或不在运行（workspace-changed）：交所属模块判这个执行环境失败，文案由它写。 */
+  workloadUnavailable(recordId: string, code: 'workspace-changed'): Promise<void>;
 }
 
 /** 旧形状的所属对象（收编空跑用）：按任务标签查任务环境，由组合根从身份目录与 task-runtime 取。 */
