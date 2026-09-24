@@ -17,7 +17,7 @@
 
 ## RFC-025 统一资源管理中心：第二期完成（创建移交除外）、第三期服务槽、路由与限流进行中、第四期命名空间与网络策略上线、数据资源进行中（2026-09-24）
 
-接 09-23「第一期（基础）上线」一节。逐步的门禁、CI、部署与实机记录见 `proposal/rfc/RFC-025-resource-center/acceptance.md` §3–§11。本机控制面（cs-api、cs-controller、cs-session）眼下是 `cs-control-plane:rc025-t13-20260924`（a89589ab，cs-controller 1 个副本），工作台是 `cs-console:rc025-t13-20260924`（同一笔），平台路由清单已按 de9dcb5b 应用。
+接 09-23「第一期（基础）上线」一节。逐步的门禁、CI、部署与实机记录见 `proposal/rfc/RFC-025-resource-center/acceptance.md` §3–§11。本机控制面（cs-api、cs-auth、cs-controller、cs-session）眼下是 `cs-control-plane:rc025-i26-20260924`（b35ea86d，cs-controller 1 个副本；cs-auth 此前停在 `iface-20260923`，cs-events 与两个 MCP 仍是它），工作台是 `cs-console:rc025-t13-20260924`（a89589ab），平台路由清单已按 de9dcb5b 应用。
 
 - **第二期（T6、T7，任务类容器）**：
   - 8df032a0、99e93569、4d492e70：期望与领域条件投影进台账；回收移交调和器（按 UID 删子对象，失败保留期从失败时刻起算、到期回收、工作卷写「待回收」）；孤儿回收。
@@ -32,7 +32,8 @@
   - 0c97dfb5：服务路由的 IngressRoute 改由调和器照记录建、改、删；gateway 只建前缀剥离中间件。线上 55 条逐条比对一致，换写入者不改动线上对象。
   - 5a5591f2：身份索引改由 cluster-control 的观测缓存驱动，gateway 的 Pod watch 去掉。
   - 3de12b3a：放行表每 10 分钟全量核对，不一致就重算并在服务域路由记录上写 `AllowlistDrift`（上线时一致，第 61 版未动）。
-  - 还没做：说明页与去掉 `allowEmptyServices`（等 I26）、同 Host 唯一、开发预览路由进 `route`（要把子对象从工作区记录「转」到路由记录，台账目前没有这种转移；打算新会话用新形状、在跑的照旧到结束）。
+  - b35ea86d（I26 裁定）：槽「已结束」时待验证与正式主机改指 cs-api 的说明页——gateway 在这两种路由的期望里写说明页中间件名，调和器先建 replacePath 中间件（路径带路由记录 ID）再改指，槽记录一变就重新核对指向它的路由；页面与维护页同源（正式主机写「尚未上线」），接口 503＋`not-deployed`＋`details`；ForwardAuth 不再判待命槽（release 的 `standbyEntry` 退役），`allowEmptyServices` 保留兜底。上线 1.2 秒内本机 8 个没有运行版本的主机改指完毕，服务域与内部 API 路由不动；重新部署后指回只有模块用例。
+  - 还没做：同 Host 唯一、开发预览路由进 `route`（要把子对象从工作区记录「转」到路由记录，台账目前没有这种转移；打算新会话用新形状、在跑的照旧到结束）。
 - **第三期（T10，限流）**：
   - cef5b880：策略的存取与管理接口（`GET/PUT /v1/admin/settings/rate-limits`、`/v1/admin/projects/:projectId/rate-limits`，按版本号乐观并发，只给管理员；迁移 `gateway/0006_rate_limits.sql`）。
   - 989e07f7：策略写成 `rate-limit-policy` 记录，调和器照记录渲染 58 个 Traefik Middleware（平台 2 个、每个项目 4 个）。
@@ -53,7 +54,7 @@
 - **多副本分工（T16）**：bddf3d39——cluster-control 逐条调和在记录租约下（抢不到 5 秒后再排），孤儿回收与数据面全量各持一把作业租约。实机扩到 2 个副本：作业租约轮流持有，同一次额度改动只被改回一次；「已崩溃副本」的租约过期 82 毫秒后被另一副本接手；已缩回 1 个副本。
 - **空写循环（已修，cb13edb7）**：台账比较子对象时看了数组先后（库里按种类与名字读回、合并按期望顺序排），09-23 16:22 起开发工作区记录每秒被空写 4–8 次，台账变更一小时约 11 万行；0c97dfb5 的 `generation` 没存进观测列又让路由记录转圈（上线两分钟回滚）。修复上线后空闲时台账变更为 0。判据与做法记在 dev-gotchas。
 - **新增代码防护的误报（已修，5cb1060b）**：同一文件既有就近用例又有模块级用例时，注释行曾被判成未执行的改动行（Bun 对没调用过的函数整段记 0）。
-- **作者已裁定（09-24）**：I25＋I28 渲染时向所属模块要凭据（台账与库备份里没有凭据；data-control 生成口令、加密存自己的表）；I26 沿用 RFC-021 的错误体 `not-deployed`＋`details`，说明页由 cs-api 按台账渲染、ForwardAuth 的未部署分支退役、`allowEmptyServices` 保留兜底；I29 三个 (a)（已做，a89589ab）。I25、I26、I28 待实施。
+- **作者已裁定（09-24）**：I25＋I28 渲染时向所属模块要凭据（台账与库备份里没有凭据；data-control 生成口令、加密存自己的表）；I26 沿用 RFC-021 的错误体 `not-deployed`＋`details`，说明页由 cs-api 按台账渲染、ForwardAuth 的未部署分支退役、`allowEmptyServices` 保留兜底；I29 三个 (a)（已做，a89589ab）。I26 已做（b35ea86d）；I25、I28 待实施。
 - **待作者裁定**：I24（推送流的复核授权）、I27（项目归档后命名空间记录与命名空间怎样收尾；本期归档不释放、不删）。
 - **到点要看**：09-24 04:18:35Z 三个旧失败会话（rfc006-verify、rfc003-verify-delivery、rfc003-verify-files）保留期满，应由维护作业改「不要了」、调和器删容器与路由、工作卷写「待回收」、task-runtime 记为已释放；rfc022-verify 的两个到 09-26 06:35Z。结果补进 acceptance.md §3.3。
 - **注意**：

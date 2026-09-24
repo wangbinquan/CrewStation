@@ -191,6 +191,17 @@
 - **放行表核对（3de12b3a 部署后）**：启动时的第一轮核对没有告警——库里最新一版（第 61 版，09-23 11:19 生成）与按当前在册服务和授权推导的内容一致，没有重算；14 条服务域路由记录各写了一次 `AllowlistDrift` 为假（22:08 这一分钟台账正好 14 条变更），之后台账无变更。不一致时重算与写真由模块用例核对（在共享集群上改授权没有做）。
 - **墓碑清理（aed62f71 部署后）**：部署前 `gateway.pod_identities` 在册 30 行、墓碑 727 行（最早 09-11 14:54），其中 189 行标为删除已超过 7 天；上线 2 秒后 `pod identity tombstones purged`（189），之后墓碑 541 行、最早 09-18 05:18，没有超过 7 天的，在册 30 行不变。这次首轮观测汇总 `recorded 19、unchanged 106、unowned 47`——上一轮的 99 里有 55 个是服务路由，这次已被路由记录认领。三个补投影作业改用 `periodicJob` 后日志照旧（槽 14、任务环境 21、路由 14）。
 
+
+说明页（I26 裁定之后）：
+
+| 提交 | 门禁（干净导出树） | CI | 部署（UTC） |
+|---|---|---|---|
+| `b35ea86d` 槽「已结束」时待验证与正式主机改指 cs-api 的说明页，ForwardAuth 的未部署分支退役 | check:static 通过；unit 650、module 1342、console 892；改动的可执行行 126／126 | [35954487460](https://github.com/wangbinquan/CrewStation/actions/runs/35954487460) 六项成功 | 04:10 cs-api、cs-auth（此前是 `iface-20260923`），04:11 cs-controller、cs-session，都换 `cs-control-plane:rc025-i26-20260924` |
+
+- **改指**：部署前台账里有 8 个「已结束」的槽——demo 的待验证槽（v0.1.2，09-23 手动下线），rfc003-ux、rfc003-verify-files、rfc010-cluster-qa 的待验证槽与 rfc006-verify、rfc011-role-home、rfc022-verify、rfc023-verify 的正式槽（都尚未部署）。cs-controller 起来后 1.2 秒内（04:11:00.7–01.9）建出 8 个说明页中间件（replacePath 的路径带各自路由记录的 ID，组件标签是路由），8 条 IngressRoute 随之改指 `crewstation-system/cs-api:8080`，中间件链是原来的去身份头、ForwardAuth、两个限流，末尾接说明页中间件；目标是这几个槽的服务域与内部 API 路由（8 条）不动，有工作负载的槽的路由不动。
+- **登录照旧先过**：不带会话访问 `preview.demo.cs.localhost` 与 `rfc006-verify.cs.localhost`，接口请求 401、浏览器 302 到登录页。
+- **页面与错误体**（作者已登录的 dev-admin 会话，只读查看）：待验证主机给「未部署待验证版本」页——「demo 当前没有待验证版本」「v0.1.2 已于 … 下线：负责人手动下线」；在同一主机上发一个 POST 接口请求，得到 503、`Cache-Control: no-store`、`{ error: 'not-deployed', message: 'demo 当前没有待验证版本', details: { at: '2026-09-23T07:55:51.915Z', reason: 'manual', tag: 'v0.1.2' } }`；正式主机 `rfc006-verify.cs.localhost` 给「尚未上线」页。Traefik 的访问日志里这几次请求的上游都是 cs-api 的 Pod。有版本的 `demo.cs.localhost` 照常是样例应用（身份头照常注入）。
+- **没有实机走过的**：重新部署后指回槽与「正在切换」（要在共享集群上重新部署一个项目；由模块用例核对：`clusterControlModule.test.ts` 的说明页用例、`unavailableRoutes.test.ts`）。
 ## 6. 第三期：限流（T10）
 
 | 提交 | 门禁（干净导出树） | CI | 部署（UTC） |
