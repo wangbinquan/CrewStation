@@ -17,6 +17,7 @@ CrewStation 是面向全公司各团队的数字人构建、发布与运行平�
 - [7. 参与开发](#7-参与开发)
 - [8. 文档地图](#8-文档地图)
 - [9. 术语](#9-术语)
+- [10. 许可证](#10-许可证)
 
 ## 1. 平台提供什么
 
@@ -404,3 +405,7 @@ bun run scaffold:module <name> <layer> [--deps a,b] [--desc "职责"] [--no-pers
 | 能力说明 | 工作台的能力页与能力说明 MCP：实时列出本服务已获授权的接口、数据绑定、订阅、额度与环境 |
 
 已作废、不要再引入的概念（主 Agent、Agent 角色、Checkpoint、ZIP 导入、出站白名单等）列在 [`CLAUDE.md`](CLAUDE.md) 的「Terminology」一节。
+
+## 10. 许可证
+
+[Apache License 2.0](LICENSE)，与 agent-workflow 相同。
