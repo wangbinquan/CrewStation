@@ -22,6 +22,7 @@ async function syncRecord(writer: LedgerWriter, record: ProjectedRecord, connect
     ...(record.id ? { id: record.id } : {}), kind: record.kind, ref: record.ref, projectId: record.projectId,
     ...(record.parentId ? { parentId: record.parentId } : {}), ...(record.purpose ? { purpose: record.purpose } : {}),
     spec: { children: record.children, ...(record.reclaim ? { reclaim: record.reclaim } : {}) }, display: record.display, conditions: [...record.conditions, ...runner],
+    ...(record.aliases ? { aliases: record.aliases } : {}),
   });
   if (record.startup) await writer.report(saved.id, { startup: record.startup });
   if (record.release) await writer.requestRelease(saved.id, record.release);

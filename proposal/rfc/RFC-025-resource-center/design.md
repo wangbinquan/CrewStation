@@ -221,6 +221,8 @@ ResourceActionSchema = z.object({ id: ResourceActionIdSchema, enabled: z.boolean
 > **收编必须先解析旧 ID**：RFC-013 之前建的 PVC、Pod 标签上还是 `tsk_…`。本机第一次空跑按标签原值查任务环境，把 demo 正在运行的开发会话的工作卷判成了孤儿（`tsk_01a09541…` 经身份目录对应 `01a0c12a-de2a-705a-…`，状态 running）。现在先经身份目录（`task_runtime.resource_identity_aliases`）换成现 ID 再查；第六期正式收编与孤儿回收沿用同一条规则。
 
 > **实施补记（2026-09-24，第六期第一步：还没有记录认领的受管对象入账）**：只读核对本机，带受管标签却没有任何记录认领的，除系统组件外还有三类：服务槽的 Service、内部 API 的前缀剥离中间件、服务的 Git 凭据 Secret。前两类挂到已有记录下——槽记录的子对象加上与 Deployment 同名的 Service（槽对外的稳定入口；种类规则 `retainedWhenIdle`：下线、尚未部署时它照旧保留，不算「结束中」，否则下线的槽会一直停在结束中）；内部 API 路由记录加上它独用的前缀剥离中间件（gateway 照旧建它，路由「不要了」时调和器随之删掉）。Git 凭据 Secret 带凭据、按服务共用、设计里没有对应种类，不动（与 [I25](../../../docs/engineering/implementation-open-questions.md#i25-调和器接手建任务容器时凭据放在哪) 一起定）。孤儿回收随之按 §6.4 扩到中间件（不限任务标签）：项目命名空间里建出满 10 分钟、没有记录认领、也没有任何 IngressRoute 引用（含跨命名空间引用）的受管中间件按 UID 删；系统命名空间不碰。本机按这条规则预测只有两个：代理改名、不再暴露内部 API 后留下的 `cs-reference-api-proxy/strip-api-reference-api-proxy` 与 `cs-gitlab-event-producer/strip-api-gitlab-event-producer`。
+>
+> **别名入账（第六期第二步）**：台账的别名表此前是空的。task-runtime 把 RFC-013 之前的旧身份（`tsk_…`）写成工作负载记录的别名（来源 `tsk`），按旧 ID 可以找回记录；投影与补投影都带上，同样的别名不重复写。本机有 15 个没释放的环境带旧身份。旧标签（对象上的 `crewstation.io/task: tsk_…`）不改写：认领按名字，孤儿判定先经身份目录换成现 ID，改写只是改标签、没有行为差别，其中多数对象（09-21 失败的三个旧会话）还会随保留期满被回收。
 
 ### 6.6 `data-control`
 

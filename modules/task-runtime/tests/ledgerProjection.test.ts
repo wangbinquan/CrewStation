@@ -104,6 +104,21 @@ describe.skipIf(!available)('任务环境投影进资源台账（RFC-025 第二�
     expect(await resources.api.get(before.id)).toMatchObject({ desired: 'absent', releaseReason: { code: 'business', message: '业务释放' } });
   });
 
+  // 设计 §6.5：RFC-013 之前的 tsk_… 写进台账的别名，按旧 ID 也能找回记录（收编与旧标签的对象都靠它）。
+  test('带旧身份的环境：补投影把 tsk_… 写成记录的别名，按别名找回同一条记录；重复补投影不重复写', async () => {
+    const plain = createTaskRuntimeModule(runtimeDeps(tdb.db, createFakeK8sClient()));
+    const legacy = await plain.api.createEnvironment({ serviceId, kind: 'business', volumeMode: 'persistent' });
+    const alias = 'tsk_01a0954107447000b7936485fb80d1aa';
+    await tdb.db.execute(`UPDATE task_runtime.environments SET legacy_cluster = '{"taskId": "${alias}"}'::jsonb WHERE id = '${legacy.id}'`);
+    const uow = drizzleUnitOfWork(tdb.db, { ledger, logger });
+    await resyncLedger(uow, ledger, logger);
+    expect(await resources.api.resolveAlias({ source: 'tsk', alias })).toBe(legacy.id);
+    expect((await resources.api.get(legacy.id))?.aliases).toEqual([{ source: 'tsk', alias }]);
+    const version = (await resources.api.get(legacy.id))?.version;
+    await resyncLedger(uow, ledger, logger);
+    expect((await resources.api.get(legacy.id))?.version).toBe(version);
+  });
+
   test('失败保留期满（资源中心把记录改成「不要了」）：补投影把环境记为已释放，不删卷、不能再恢复；保留期从失败时刻算', async () => {
     const k8s = createFakeK8sClient();
     const runtime = createTaskRuntimeModule(runtimeDeps(tdb.db, k8s, ledger, logger));

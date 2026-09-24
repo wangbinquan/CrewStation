@@ -29,6 +29,8 @@ export interface LedgerDeclaration {
   readonly spec: { readonly children: readonly { readonly kind: string; readonly namespace?: string; readonly name: string }[]; readonly reclaim?: 'delete' | 'retain' };
   readonly display?: Readonly<Record<string, string>>;
   readonly conditions?: readonly LedgerConditionUpdate[];
+  /** 旧身份（RFC-013 之前的 `tsk_…`）：台账按它也能找回记录。 */
+  readonly aliases?: readonly { readonly source: 'tsk'; readonly alias: string }[];
 }
 
 /** 资源中心（RFC-025）的写入口：task-runtime 写期望与领域条件，实况由资源中心写。 */

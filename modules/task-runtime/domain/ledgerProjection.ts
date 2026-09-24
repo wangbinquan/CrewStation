@@ -32,6 +32,8 @@ export interface ProjectedRecord {
   readonly startup?: StartupRecord;
   /** 期望「不要了」及其原因；没有就是「要」。 */
   readonly release?: { readonly code: string; readonly message: string };
+  /** 旧身份（设计 §6.5）：RFC-013 之前的 `tsk_…`，写进台账的别名，按旧 ID 也能找回这条记录。 */
+  readonly aliases?: readonly { readonly source: 'tsk'; readonly alias: string }[];
 }
 
 export interface EnvironmentProjection {
@@ -117,6 +119,7 @@ export function projectEnvironment(env: TaskEnvironment): EnvironmentProjection 
     ...(env.native ? { parentId: env.native.parentTaskId } : {}),
     purpose: workloadPurpose(env), children: workloadChildren(env),
     display: workloadDisplay(env), conditions: conditionsOf(env), ...(env.startup ? { startup: env.startup } : {}), ...(release ? { release } : {}),
+    ...(env.legacyCluster?.taskId ? { aliases: [{ source: 'tsk' as const, alias: env.legacyCluster.taskId }] } : {}),
   };
   // Agent 执行挂父工作区的卷；档位测试用一次性的空目录。只有工作区自己有工作卷。保留期满回收的会话，卷不随之删除（D8、D9）。
   const ownsVolume = !env.native && env.kind !== 'profile-test';

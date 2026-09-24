@@ -24,6 +24,11 @@ describe('任务环境投影到资源台账（RFC-025 第二期）', () => {
     });
     expect(volume).toEqual({ kind: 'volume', ref: `${env().id}/work`, projectId: env().projectId, parentId: env().id, children: [{ kind: 'PersistentVolumeClaim', namespace: 'cs-demo', name: 'task-100-work' }], reclaim: 'delete', display: { mode: 'follow-container' }, conditions: [] });
     expect(connected).toBe(true);
+    // 旧身份（RFC-013 之前的 tsk_…）写进台账的别名（设计 §6.5）；工作卷不带。没有旧身份的不写。
+    const legacy = projectEnvironment(env({ legacyCluster: { taskId: 'tsk_01a0954107447000b7936485fb80d15d' } }));
+    expect(legacy.workload.aliases).toEqual([{ source: 'tsk', alias: 'tsk_01a0954107447000b7936485fb80d15d' }]);
+    expect(legacy.volume).not.toHaveProperty('aliases');
+    expect(workload).not.toHaveProperty('aliases');
   });
 
   test('「＋ CLI」：Agent 执行挂在父工作区下，没有自己的工作卷；排队中是「未准备好」，清理中即「不要了」', () => {
