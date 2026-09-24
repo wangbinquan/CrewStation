@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { namespaceObject } from '@crewstation/k8s';
+import { namespaceObject, projectNetworkPolicy, taskEgressNetworkPolicy } from '@crewstation/k8s';
 import type { ObservedObject } from '../../domain/observation';
 import { covers, objectCovered } from './coverage';
 import { routeObject } from './routeObjects';
@@ -34,5 +34,26 @@ describe('调和器的比对：观测到的对象是不是已经是期望的样�
     const live: ObservedObject = { kind: 'Namespace', metadata: { name: 'cs-demo', uid: 'n1', labels: { ...desired.metadata.labels, 'kubernetes.io/metadata.name': 'cs-demo' } }, spec: { finalizers: ['kubernetes'] } };
     expect(objectCovered(live, desired)).toBe(true);
     expect(objectCovered({ ...live, metadata: { ...live.metadata, labels: { 'app.kubernetes.io/managed-by': 'crewstation', 'crewstation.io/project': 'other' } } }, desired)).toBe(false);
+  });
+
+  // 锁住 2026-09-24 实跑发现的两处漏判：网络策略里的空对象有含义（`podSelector: {}` 全选、出向规则 `{}` 全放行），
+  // 按子集比会被任何对象当成已覆盖。于是默认策略被改成只选部分 Pod（其余 Pod 失去入向隔离）、全放行的出向被改窄成一条，
+  // 调和器都判「未变」、不改回。网络策略的 spec 整个由平台写，要逐字段相同；标签仍只比期望里的那些。
+  test('网络策略的 spec 逐字段相同才算一致：选择器或出向被改窄、规则里多了字段都算被改；标签多出来的不算', () => {
+    const desired = projectNetworkPolicy({ namespace: 'cs-demo', systemNamespace: 'crewstation-system' });
+    const spec = desired['spec'] as Record<string, unknown>;
+    const live = (patch: Record<string, unknown>, from: typeof desired = desired): ObservedObject => ({
+      kind: 'NetworkPolicy', metadata: { name: from.metadata.name, namespace: 'cs-demo', uid: 'np-1', labels: { ...from.metadata.labels, extra: 'kept' } },
+      spec: { ...(from['spec'] as Record<string, unknown>), ...patch },
+    });
+    const dnsOnly = [{ to: [{ namespaceSelector: { matchLabels: { 'kubernetes.io/metadata.name': 'kube-system' } } }], ports: [{ protocol: 'UDP', port: 53 }] }];
+    expect(objectCovered(live({}), desired)).toBe(true);
+    expect(objectCovered(live({ podSelector: { matchLabels: { tier: 'some' } } }), desired)).toBe(false);
+    expect(objectCovered(live({ egress: dnsOnly }), desired)).toBe(false);
+    expect(objectCovered(live({ ingress: [{ ...(spec['ingress'] as object[])[0], ports: [{ protocol: 'TCP', port: 80 }] }] }), desired)).toBe(false);
+    // 任务容器那几条按标签放行的策略是同一种 `[{}]`，同样要能改回。
+    const task = taskEgressNetworkPolicy({ namespace: 'cs-demo' });
+    expect(objectCovered(live({}, task), task)).toBe(true);
+    expect(objectCovered(live({ egress: dnsOnly }, task), task)).toBe(false);
   });
 });
