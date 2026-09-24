@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "管理员运行环境：Agent 启动前 Hook 步骤、不可变版本、凭据引用、检查记录与启动材料解析（RFC-004）",
+  "description": "算力档位（RFC-006）：协议、按摘要固定的镜像、二进制、启动前步骤、凭据、修订与保存即测、默认档位与引用确认、平台仓库推送凭据、项目算力授权（RFC-012）与启动材料解析",
   "exports": {
     ".": "./index.ts"
   },

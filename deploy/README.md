@@ -1,52 +1,67 @@
 # deploy/ · local Kubernetes infrastructure for CrewStation
 
-Status: **local development profile only** (Plan M0 prototyping). Everything here targets the
-Docker Desktop kind-style cluster on this machine: `kubectl` context `docker-desktop`, one arm64
-node `desktop-control-plane`. It is not the production installer of Design §11–12; that installer
-will grow out of these manifests. All figures below are observed outputs from the run of
-2026-09-11 on this machine, not targets.
+Status: **local development profile only**. Everything here targets the Docker Desktop kind-style
+cluster on this machine: `kubectl` context `docker-desktop`, one arm64 node `desktop-control-plane`
+(CI's `e2e` job runs the same scripts on a fresh kind cluster by overriding both names). It installs
+the whole platform locally, but it is not the production installer of Design §11–12 (milestone M6,
+not started); that installer will grow out of these manifests. Figures below are observed outputs
+from the run of 2026-09-11 on this machine unless dated otherwise, not targets. Since 2026-09-23 the
+CNI is Calico, not the kindnet of that run (see [Network plugin](#network-plugin-calico-since-2026-09-23)).
 
 ## Contents
 
 | Path | Purpose |
 |---|---|
 | `k8s/system/*.yaml` | One component per file, namespace `crewstation-system`: namespace, PostgreSQL, registry, Traefik (CRDs, RBAC, deployment), BuildKit |
+| `k8s/platform/*.yaml` | The platform in `crewstation-system`: RBAC, configuration, the migration Job, the five resident services, the console, both MCP servers, the RFC-015 metrics stack, gateway routes and middlewares, the `registry.cs.localhost` push entry for administrators' profile images (RFC-006); applied by `local/install-platform.sh` |
 | `k8s/verify/*.yaml` | Throw-away checks in namespace `crewstation-verify`; applied and deleted by `local/verify.sh` |
-| `local/bootstrap.sh` | Idempotent installer: applies everything in order, creates the PostgreSQL Secret once, patches CoreDNS, configures the node's containerd, runs the verifications, prints a summary |
+| `docker/*.Dockerfile` | Images built by `local/install-platform.sh`: `cs-control-plane` (every backend process), `cs-console`, and `cs-builder` for release builds; the task image comes from `runtimes/task/Dockerfile` |
+| `local/bootstrap.sh` | Idempotent installer: switches the CNI to Calico first, then applies everything in order, creates the PostgreSQL Secret once, patches CoreDNS, configures the node's containerd, runs the verifications, prints a summary |
+| `local/calico-cni.sh` | Replaces Docker Desktop's kindnet with Calico and rebuilds every Pod still on a kindnet address; `--check` only reports. Called by `bootstrap.sh`; `install-platform.sh` runs `--check` first |
+| `local/calico-manifest.ts` | Pins the Calico manifest (v3.32.2, by checksum) and applies three local edits: node address from the Kubernetes InternalIP, no IPIP, pool `10.244.128.0/17` |
+| `local/rebuild-old-range-pods.ts`, `local/platform-admin-session.ts` | Used by `calico-cni.sh`: rebuild the Pods left on kindnet addresses; task Pods go through the cluster-management operations as a platform administrator |
 | `local/coredns-rewrite.sh` | Idempotent CoreDNS patch for `*.svc.cs.internal` |
 | `local/node-registry-hosts.sh` | Writes containerd's `hosts.toml` on the node for the in-cluster registry |
-| `local/verify.sh` | Re-runnable verifications A–D |
-| `local/lib.sh` | Shared helpers, including the guard that ties the context to the node container |
-| `local/install-platform.sh` | Builds and imports images, writes the platform Secret, applies `k8s/platform/*`, migrates and waits for rollout. A fresh install prints the administrator setup link; it does not create an account or password. Set `SKIP_BUILD=1` to skip builds, `SKIP_TASK_RUNTIME_BUILD=1` to keep the task image, or explicitly use `CS_BOOTSTRAP_ADMIN=1` for unattended setup |
-| `local/install-dev-auth.sh` | Local-only OAuth 2.0/OIDC role switcher at `http://dev-auth.cs.localhost/`: seeds four fixed users through the real login flow and converges their admin/project roles. Called by `install-platform.sh`; set `CS_SKIP_DEV_AUTH=1` to omit it |
+| `local/verify.sh` | Re-runnable verifications A–E |
+| `local/lib.sh` | Shared helpers, including the guard that ties the context to the node container (`CREWSTATION_KUBE_CONTEXT` and `CREWSTATION_NODE_CONTAINER` override the two names) |
+| `local/install-platform.sh` | Checks the CNI (migrating to Calico when needed), builds and imports images, writes the platform Secret, applies `k8s/platform/*`, migrates and waits for rollout. A fresh install prints the administrator setup link; it does not create an account or password. Set `SKIP_BUILD=1` to skip builds, `SKIP_TASK_RUNTIME_BUILD=1` to keep the task image, `CS_SKIP_TASK_RUNTIME=1` to skip the task image entirely (no dev sessions then), or explicitly use `CS_BOOTSTRAP_ADMIN=1` for unattended setup |
+| `local/initial-admin.sh`, `local/admin-credentials.sh` | Sourced helpers: the first-administrator step of `install-platform.sh`, and the one place scripts resolve administrator credentials (`CS_ADMIN_USERNAME`/`CS_ADMIN_PASSWORD`, else the `.local/admin.env` of an explicit unattended install) |
+| `local/configure-metrics.ts` | Generates the RFC-015 metrics credentials on the first install and keeps them on reruns (see the last section) |
+| `local/install-dev-auth.sh`, `local/dev-auth.yaml` | Local-only OAuth 2.0/OIDC role switcher at `http://dev-auth.cs.localhost/`: seeds four fixed users through the real login flow and converges their admin/project roles. Called by `install-platform.sh`; set `CS_SKIP_DEV_AUTH=1` to omit it |
 | `local/seed-catalog.sh` | Seeds one service plan and one task-container profile using the administrator account. Called after installation only when setup is complete and credentials are available. Compute profiles are created and tested by an administrator in the console (RFC-006) |
 | `local/publish-base-image.sh` | Tags the imported task image as the platform base `crewstation/task-runtime:<tag>` and pushes it into the in-cluster registry through the node, so administrators can build profile images `FROM` it (RFC-006 §7.1). Called by `install-platform.sh` unless `CS_SKIP_TASK_RUNTIME=1` |
 | `local/bootstrap-integrations.sh` | Creates the two built-in integration-container projects, pushes `integrations/*` into their repositories and releases them to the preview slot |
+| `local/*.test.ts`, `k8s/*/*.test.ts` | Tests for the scripts, helpers and manifests here (stubbed `kubectl` and fake clusters where needed); they run in the root `bun test` |
 
 ## Prerequisites (verified 2026-09-11)
 
 - Docker Desktop with its Kubernetes backend: context `docker-desktop`, node `desktop-control-plane`
   (`kindest/node:v1.36.1`, Kubernetes v1.36.1, containerd 2.3.1, arm64, Debian 13), StorageClass
   `standard` (rancher.io/local-path) as default. Pod CIDR `10.244.0.0/16`, Service CIDR `10.96.0.0/16`,
-  kube-proxy in iptables mode, kindnet CNI.
+  kube-proxy in iptables mode, and Docker Desktop's own kindnet CNI, which `bootstrap.sh` replaces with
+  Calico (see [Network plugin](#network-plugin-calico-since-2026-09-23)).
 - Docker Desktop's helper containers `kind-cloud-provider` (`docker/desktop-cloud-provider-kind:v0.7.0`)
   and `kind-registry-mirror` running; the first one gives `type: LoadBalancer` Services a host-published address.
-- `kubectl`, `docker`, `jq`, `curl`, bash (macOS bash 3.2 is enough). No helm, no kind CLI.
+- `kubectl`, `docker`, `jq`, `curl`, `openssl`, Bun 1.3.13 and bash (macOS bash 3.2 is enough);
+  `bootstrap-integrations.sh` also needs `git` and `tar`. No helm, no kind CLI.
 - Host ports 80 and 443 free (Docker Desktop publishes Traefik there). Port 5000 on the Mac is taken by
   macOS ControlCenter; nothing here needs it.
-- Docker Hub reachable for the first pull of the images listed below.
+- Docker Hub reachable for the first pull of the images listed below; for Calico also
+  `raw.githubusercontent.com` (the pinned manifest) and `quay.io` (its images).
 
 The scripts refuse to run unless the `docker-desktop` context contains node `desktop-control-plane`,
-so they cannot hit another cluster. The only container they `docker exec` into is `desktop-control-plane`;
+so they cannot hit another cluster (CI names its own kind cluster through `CREWSTATION_KUBE_CONTEXT=kind-crewstation`
+and `CREWSTATION_NODE_CONTAINER=crewstation-control-plane`). The only container they `docker exec` into is `desktop-control-plane`;
 the `aw-*` containers of agent-workflow are never touched.
 
 ## Run
 
 ```bash
-deploy/local/bootstrap.sh                # install and verify (a warm run with verification took under 2 min here; a cold run also pulls ~370 MB of images)
+deploy/local/bootstrap.sh                # install and verify (on 2026-09-11, before Calico, a warm run with verification took under 2 min here; a cold run also pulled ~370 MB of images)
 deploy/local/bootstrap.sh --skip-verify  # install only
-deploy/local/verify.sh [--keep]          # re-run checks A–D any time; --keep leaves crewstation-verify in place
-deploy/local/coredns-rewrite.sh          # individual steps, each idempotent
+deploy/local/verify.sh [--keep]          # re-run checks A–E any time; --keep leaves crewstation-verify in place
+deploy/local/calico-cni.sh [--check]     # individual steps, each idempotent
+deploy/local/coredns-rewrite.sh
 deploy/local/node-registry-hosts.sh
 
 deploy/local/install-platform.sh         # then the platform; open its setup link to create your administrator
@@ -93,16 +108,36 @@ CoreDNS and containerd steps report `unchanged`. The Traefik CRDs are applied wi
 | BuildKit, rootless | `docker.io/moby/buildkit:v0.33.0-rootless` | ConfigMap `buildkitd-config` (`buildkitd.toml`), PVC `buildkitd-cache` 20Gi, Deployment `buildkitd`, Service `buildkitd` | `tcp://buildkitd.crewstation-system.svc.cluster.local:1234` |
 | CoreDNS patch | the cluster's `registry.k8s.io/coredns/coredns:v1.14.2` | `rewrite` block inserted into the kube-system `coredns` ConfigMap | — |
 | Node containerd | — | `/etc/containerd/certs.d/registry.crewstation-system.svc.cluster.local:5000/hosts.toml` on `desktop-control-plane` | — |
+| Calico v3.32.2 (since 2026-09-23) | `quay.io/calico/node:v3.32.2`, `quay.io/calico/cni:v3.32.2`, `quay.io/calico/kube-controllers:v3.32.2` | kube-system DaemonSet `calico-node`, Deployment `calico-kube-controllers`, IPPool `default-ipv4-ippool` `10.244.128.0/17` (no IPIP, NAT outgoing) | — |
 
 Images used only by `verify.sh`: `docker.io/traefik/whoami:v1.12.0`, `docker.io/hashicorp/http-echo:1.0.0`,
 `docker.io/curlimages/curl:8.22.0`, `docker.io/library/busybox:1.38.0` (all arm64, all pulled).
 
-Traefik runs with `--providers.kubernetescrd` (`allowCrossNamespace=true`), `--providers.kubernetesingress`,
+Traefik runs with `--providers.kubernetescrd` (`allowCrossNamespace=true`; since 2026-09-23 also
+`allowEmptyServices=true`, so a route whose Service has no endpoints, such as an offline standby slot, still
+goes through ForwardAuth to the platform's explanation page instead of a bare 404), `--providers.kubernetesingress`,
 `--api.dashboard=false`, `--log.level=INFO`, `--accesslog=true`, entrypoints `web` (Service port 80 →
 container 8000) and `websecure` (443 → 8443), as uid 65532 with a read-only root filesystem.
 `forwardedHeaders.trustedIPs` is deliberately **not** set: Traefik drops incoming `X-Forwarded-*` headers
 and writes `X-Forwarded-For` / `X-Real-Ip` from the real TCP peer, which is what the source-Pod-IP identity
 lookup of Design Q21 needs.
+
+## Network plugin: Calico since 2026-09-23
+
+Docker Desktop creates the cluster with kindnet, which enforces NetworkPolicy in user space through NFQUEUE.
+On this machine its "allowed" conntrack label could not be set, so every packet of a policy-covered task Pod
+went through the queue, and each rule sync dropped queued packets: Runners lost their cs-session connection
+every ten-odd minutes. `calico-cni.sh` (the first step of `bootstrap.sh`) therefore installs Calico v3.32.2
+from a manifest pinned by checksum in `calico-manifest.ts`, deletes kindnet, rebuilds every Pod still on a
+kindnet address, and finally removes kindnet's `KIND-MASQ-AGENT` NAT chain. The pool `10.244.128.0/17` sits
+inside kube-proxy's cluster CIDR `10.244.0.0/16`, so traffic inside the cluster is not source-NATed and the
+gateway can still identify callers by source Pod IP (check C), and it avoids the node podCIDR `10.244.0.0/24`
+that kindnet had handed out, so old and new Pods never collide during an in-place migration.
+
+`install-platform.sh` runs `calico-cni.sh --check` first and migrates when kindnet is back, `calico-node` is not
+ready, or a running Pod still holds a kindnet address. A Docker Desktop "Reset Kubernetes cluster" brings
+kindnet back; re-run `bootstrap.sh`. Design D60 makes the same point for real installs: preflight must prove the
+CNI actually enforces NetworkPolicy. Background and diagnosis: `docs/engineering/dev-gotchas.md`, 「本机集群的网络插件是 Calico」.
 
 ## How the Mac reaches Traefik
 
@@ -188,6 +223,12 @@ pushing from BuildKit needs `--output type=image,name=...,push=true,registry.ins
 | C | Source IP (Design Q21): pod `verify-curl` calls `http://whoami.svc.cs.internal/` through the CoreDNS rewrite and Traefik | **works: Pod IP preserved end to end** | caller pod IP `10.244.0.23`; whoami received `X-Forwarded-For: 10.244.0.23`, `X-Real-Ip: 10.244.0.23`, `RemoteAddr: 10.244.0.7:34266` (Traefik's pod). Pod → ClusterIP → Traefik keeps the source address with kube-proxy iptables + kindnet; Traefik forwards it |
 | D | ForwardAuth: Middleware to a stand-in answering 200 (`traefik/whoami`) and to one answering 401 (`http-echo -status-code=401`) | **works** | `protected-ok.cs.localhost → HTTP 200` with the whoami body; `protected-deny.cs.localhost → HTTP 401`, body `denied by auth-deny stand-in`; the auth-ok stand-in logged `10.244.0.7:56042 … "GET /verify-auth HTTP/1.1"` from Traefik |
 
+Check E was added on 2026-09-23 together with the switch to Calico: Calico is the CNI and kindnet is gone, and a
+Pod under a deny-egress NetworkPolicy (`k8s/verify/30-deny-egress.yaml`) cannot reach whoami while the same image
+without the policy label can. After that migration `verify.sh` passed A–E on this machine: C still saw the real
+source Pod IP, and E confirmed that the policy is enforced. The table above is the original kindnet-era run of
+A–D, so its addresses (`10.244.0.1`, `10.244.0.x`) come from kindnet's range, not from the Calico pool.
+
 Also observed during bootstrap: containerd honoured the new `hosts.toml` without a restart (the probe pull of a
 non-existent tag was answered `not found` by `127.0.0.1:30500`), and the second bootstrap run reported
 `unchanged` for the namespace, Secret, CoreDNS block and `hosts.toml`.
@@ -202,10 +243,14 @@ the registry (`REGISTRY_STORAGE_DELETE_ENABLED=true` allows removing it through 
   performance reference.
 - **HTTP only.** `websecure` (443) is wired through but no certificates are configured yet.
 - **Registry without TLS or authentication**, reachable only inside the cluster and from the node. Anything
-  pulling it needs the insecure/HTTP declarations shown above.
-- **Host requests do not carry the client IP**: the envoy → NodePort hop makes Traefik see `10.244.0.1`.
-  Only in-cluster callers keep their Pod IP (verification C). This is a property of the Docker Desktop LB, not
-  of Traefik.
+  pulling it needs the insecure/HTTP declarations shown above. Administrators push profile images from their
+  machine through `registry.cs.localhost`, where the gateway checks platform-issued push credentials (RFC-006).
+- **Host requests do not carry the client IP**: the envoy → NodePort hop makes Traefik see a node-side address
+  (`10.244.0.1` in the 2026-09-11 run). Only in-cluster callers keep their Pod IP (verification C). This is a
+  property of the Docker Desktop LB, not of Traefik.
+- **A Docker Desktop cluster reset brings kindnet back.** Re-run `bootstrap.sh`; `install-platform.sh`
+  (`calico-cni.sh --check`) and `verify.sh` E both report it. Whether a Docker Desktop restart or upgrade does the
+  same has not been verified.
 - **The CoreDNS patch restarts CoreDNS once** (a few seconds of DNS churn) the first time it is applied, and it
   edits a kubeadm-managed ConfigMap; a Docker Desktop cluster reset drops it, `bootstrap.sh` puts it back.
 - **`hosts.toml` is node-local state**, also lost on a cluster reset and restored by `bootstrap.sh`.
