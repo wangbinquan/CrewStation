@@ -5,6 +5,7 @@ import { api } from '../../shared/api/client';
 import { queryKeys } from '../../shared/api/queryKeys';
 import { useApiQuery } from '../../shared/api/useApi';
 import { useProjectIdentity } from '../../shared/project/useProjectIdentity';
+import { useIntegrationPage } from '../../shared/admin/useIntegrationPage';
 import { Brand } from '../../shared/ui/Brand';
 import { CurrentUserChip } from './CurrentUserChip';
 import { LocaleSwitch } from './LocaleSwitch';
@@ -15,7 +16,9 @@ import styles from './TopBar.module.css';
 export function TopBar() {
   const t = useT(), { pathname: path, href } = useLocation(), navigate = useNavigate();
   const { projectId: currentProjectId } = useParams({ strict: false });
-  const adminTarget = currentProjectId && (path.startsWith('/projects/') || path.startsWith('/admin/')) ? '/admin/projects' : '/admin';
+  // 在项目里点「平台管理」回它所在的目录：接入项目回「能力接入」的接入容器页签，数字人回项目管理（2026-09-24 裁定：项目管理只列数字人）。
+  const inProject = !!currentProjectId && (path.startsWith('/projects/') || path.startsWith('/admin/'));
+  const integrationProject = useIntegrationPage() === true && inProject, adminTarget = inProject ? '/admin/projects' : '/admin';
   const me = useApiQuery(queryKeys.me(), () => api.me.get());
   const role = !me.error && !me.isPending ? me.data?.platformRole : undefined;
   const projectId = /^\/projects\/([0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:\/|$)/.exec(path)?.[1];
@@ -39,7 +42,8 @@ export function TopBar() {
       <nav className={styles.globalNav} aria-label={t('nav.global')}>
         <Link to="/market" className={pill(path === '/' || path.startsWith('/market'))}>{t('nav.market')}</Link>
         {role === 'developer' || role === 'admin' ? <Link to="/projects" onClick={(event) => { event.preventDefault(); void development(); }} className={pill(path.startsWith('/projects'))}>{t('nav.projects')}</Link> : null}
-        {role === 'admin' ? <Link to={adminTarget} className={pill(path.startsWith('/admin'))}>{t('app.adminSpace')}</Link> : null}
+        {role === 'admin' ? integrationProject ? <Link to="/admin/capabilities" search={{ tab: 'integrations' }} className={pill(path.startsWith('/admin'))}>{t('app.adminSpace')}</Link>
+          : <Link to={adminTarget} className={pill(path.startsWith('/admin'))}>{t('app.adminSpace')}</Link> : null}
       </nav>
     </div>
     <div className={styles.right}><LocaleSwitch /><CurrentUserChip /></div>

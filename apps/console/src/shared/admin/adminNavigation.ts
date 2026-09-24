@@ -62,3 +62,18 @@ export const ADMIN_ENTRY_GROUPS: readonly AdminEntryGroup[] = [
     { to: '/admin/settings', labelKey: 'nav.admin.settings', hintKey: 'admin.settings.hint' },
   ] },
 ];
+
+const ADMIN_PAGES: readonly AdminNavPage[] = [...ADMIN_PENDING_PAGES, ...ADMIN_ENTRY_GROUPS.flatMap((group) => group.pages)];
+
+/**
+ * 左栏的当前项。接入容器相关的页面归「能力接入」，哪怕路径在 /admin/projects 下：新建接入容器、接入项目的开通页与资源配置页
+ * （2026-09-24 裁定）。其余取路径最长的前缀项，`exact` 的项只在路径完全相同时算。
+ * `integration` 为 undefined 表示还没读到项目种类：这时不标当前项，免得先亮「项目管理」再跳走。
+ */
+export function currentAdminPage(pathname: string, integration: boolean | undefined): AdminPagePath | undefined {
+  if (integration) return '/admin/capabilities';
+  if (integration === undefined) return undefined;
+  const path = pathname.replace(/\/+$/, '') || '/';
+  return ADMIN_PAGES.filter((page) => path === page.to || !page.exact && path.startsWith(`${page.to}/`))
+    .sort((a, b) => b.to.length - a.to.length)[0]?.to;
+}

@@ -11,14 +11,15 @@ import { ActionNote } from '../../../../shared/ui/ActionNote';
 import { Button } from '../../../../shared/ui/Button';
 import { ProjectDirectoryFilters } from './ProjectDirectoryFilters';
 import { ProjectDirectoryTable } from './ProjectDirectoryTable';
-import { INTEGRATION_KINDS } from '../../model/integrationKinds';
+import { INTEGRATION_KINDS } from '../../../../shared/admin/integrationKinds';
 import styles from './ProjectDirectory.module.css';
 import { ButtonLink } from '../../../../shared/ui/navigation/ButtonLink';
 
+/** 项目管理只列数字人，接入容器只在「能力接入」里列（2026-09-24 裁定），各自只有自己那一种新建入口。 */
 export function ProjectDirectory({ search, apply, integration = false }: {
   readonly search: ProjectDirectorySearch; readonly apply: (search: ProjectDirectorySearch) => void; readonly integration?: boolean;
 }) {
-  const t = useT(), kinds: ManifestKind[] = integration ? [...INTEGRATION_KINDS] : ['DigitalWorker', ...INTEGRATION_KINDS];
+  const t = useT(), kinds: ManifestKind[] = integration ? [...INTEGRATION_KINDS] : ['DigitalWorker'], scope = integration ? 'integration' : 'digital-worker';
   const kind = search.kind && kinds.includes(search.kind) ? [search.kind] : kinds;
   const request = { ...search, ownerUserId: UserIdSchema.safeParse(search.ownerUserId).data, kind, limit: 20 };
   const { query, userId } = useAdminRead(queryKeys.adminProjectPage(request), async () => {
@@ -28,13 +29,11 @@ export function ProjectDirectory({ search, apply, integration = false }: {
   });
   const items = [401, 403, 404].includes(query.error?.status ?? 0) ? [] : query.data?.items ?? [], settled = !query.error && !query.isPending;
   return <Card compact title={t(integration ? 'admin.integrations.title' : 'admin.directory.title')} footer={t('admin.directory.hint')}
-    extra={<div className={styles.actions}>
-      {!integration ? <ButtonLink variant="primary" to="/admin/projects/new" search={{ scope: 'digital-worker' }}>{t('projects.wizard.title.digital-worker')}</ButtonLink> : null}
-      <ButtonLink variant={integration ? 'primary' : 'secondary'} to="/admin/projects/new" search={{ scope: 'integration' }}>{t('projects.wizard.title.integration')}</ButtonLink></div>}>
+    extra={<ButtonLink variant="primary" to="/admin/projects/new" search={{ scope }}>{t(`projects.wizard.title.${scope}`)}</ButtonLink>}>
     <ProjectDirectoryFilters key={JSON.stringify(search)} search={search} items={items} userId={userId} integration={integration} apply={apply} />
     <QueryStatus isPending={query.isPending} error={query.error} isEmpty={items.length === 0} emptyTitle={t('admin.directory.empty')} emptyDescription={t('admin.directory.emptyHint')} />
     {query.error && items.length ? <ActionNote tone="neutral">{t('admin.directory.lastRead')}</ActionNote> : null}
-    {items.length ? <ProjectDirectoryTable items={items} available={settled} /> : null}
+    {items.length ? <ProjectDirectoryTable items={items} available={settled} integration={integration} /> : null}
     <div className={styles.toolbar}><span className={styles.muted}>{settled ? t('admin.directory.count', { count: items.length }) : t('admin.directory.countUnknown')}</span>
       <div className={styles.actions}>{search.cursor ? <Button onClick={() => apply({ ...search, cursor: undefined })}>{t('admin.directory.first')}</Button> : null}
         <Button disabled={!!query.error || !query.data?.nextCursor} onClick={() => apply({ ...search, cursor: query.data?.nextCursor })}>{t('admin.directory.next')}</Button></div></div>

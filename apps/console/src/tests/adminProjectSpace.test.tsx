@@ -32,12 +32,15 @@ function fixture(options: { admin?: boolean; pendingMe?: boolean; meFailure?: bo
   return { calls, state };
 }
 
+const currentNav = () => document.querySelector('nav[aria-label="主导航"] a[aria-current="page"]')?.textContent;
+
 describe('管理接入容器复用业务页面', () => {
-  test.each(['/admin/projects', '/admin/integrations'])('%s 打开项目后，子页面返回项目管理并高亮正确菜单', async (entry) => {
+  // 2026-09-24 裁定：项目管理只列数字人，接入项目归「能力接入」，项目里的返回也回那里（此前回项目管理，那里已经找不到它）。
+  test.each(['/admin/capabilities?tab=integrations', '/admin/integrations'])('%s 打开接入项目后，子页面返回接入容器并高亮能力接入', async (entry) => {
     fixture(); page = await renderApp(entry);
     await page.click('公司接口接入'); expect(page.path()).toBe(`/admin/integrations/${projectId}`);
     expect(document.querySelector('[aria-label="项目页面"]')?.textContent).toContain('发布与上线');
-    expect(page.text()).toContain('返回项目管理');
+    expect(page.text()).toContain('返回接入容器'); expect(page.text()).not.toContain('返回项目管理');
     expect(document.querySelector('nav details')).toBeNull();
     await page.click('发布与上线'); expect(page.path()).toBe(`/admin/integrations/${projectId}/release`);
     await page.click('项目设置'); expect(page.path()).toBe(`/admin/integrations/${projectId}/settings`);
@@ -45,20 +48,20 @@ describe('管理接入容器复用业务页面', () => {
     await page.click('环境变量'); await page.click('生产');
     expect(page.search()).toMatchObject({ tab: 'config', env: 'production' });
     expect(page.path()).toBe(`/admin/integrations/${projectId}/settings`);
-    // 从项目管理进入后，旧返回链接却写死到了能力接入。
-    await page.click('返回项目管理'); expect(page.path()).toBe('/admin/projects');
-    expect(document.querySelector('nav[aria-label="主导航"] a[aria-current="page"]')?.textContent).toBe('项目管理');
+    await page.click('返回接入容器'); expect([page.path(), page.search().tab]).toEqual(['/admin/capabilities', 'integrations']);
+    expect(currentNav()).toBe('能力接入'); expect(page.text()).toContain('公司接口接入');
   });
 
-  test('项目深链接的顶栏返回平台管理也落在项目目录', async () => {
+  test('接入项目深链接的顶栏「平台管理」落在能力接入的接入容器页签', async () => {
     fixture(); page = await renderApp(`/admin/integrations/${projectId}/release`);
-    await page.click('平台管理'); expect(page.path()).toBe('/admin/projects');
-    expect(document.querySelector('nav[aria-label="主导航"] a[aria-current="page"]')?.textContent).toBe('项目管理');
+    await page.click('平台管理'); expect([page.path(), page.search().tab]).toEqual(['/admin/capabilities', 'integrations']);
+    expect(currentNav()).toBe('能力接入');
   });
 
-  test('缺失项目正文中的返回链接也回项目管理', async () => {
+  test('缺失项目正文中的返回链接回能力接入的接入容器页签', async () => {
     fixture({ projectMissing: true }); page = await renderApp(`/admin/integrations/${projectId}`);
-    expect(document.querySelector('main a[href="/admin/projects"]')?.textContent).toBe('返回项目管理');
+    expect(document.querySelector('main a[href="/admin/capabilities?tab=integrations"]')?.textContent).toBe('返回接入容器');
+    expect(document.querySelector('main a[href="/admin/projects"]')).toBeNull();
   });
 
   test('旧租户日志链接逐级 replace 到管理诊断，任务条件和返回栈保持', async () => {

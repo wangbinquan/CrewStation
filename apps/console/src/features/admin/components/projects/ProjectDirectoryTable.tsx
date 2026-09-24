@@ -7,13 +7,15 @@ import { Badge } from '../../../../shared/ui/Badge';
 import styles from './ProjectDirectory.module.css';
 import { ButtonLink } from '../../../../shared/ui/navigation/ButtonLink';
 
-export function ProjectDirectoryTable({ items, available }: { readonly items: readonly ProjectPageEntry[]; readonly available: boolean }) {
+/** 「类型」列只在接入容器目录里有：项目管理只列数字人（2026-09-24 裁定）。 */
+export function ProjectDirectoryTable({ items, available, integration }: { readonly items: readonly ProjectPageEntry[]; readonly available: boolean; readonly integration: boolean }) {
   const t = useT(), date = useDateText();
-  return <DataTable className={styles.table} columns={['project', 'kind', 'owner', 'state', 'actions'].map((key) => t(`admin.directory.${key}`))}>
+  const columns = integration ? ['project', 'kind', 'owner', 'state', 'actions'] : ['project', 'owner', 'state', 'actions'];
+  return <DataTable className={styles.table} columns={columns.map((key) => t(`admin.directory.${key}`))}>
     {items.map(({ project: p, ownerName }) => <tr key={p.id}>
       <td><Link to={p.kind === 'DigitalWorker' ? '/projects/$projectId' : '/admin/integrations/$projectId'} params={{ projectId: p.id }}><strong>{p.name}</strong></Link><div className={styles.muted}><code>{p.slug}</code></div>
         <details><summary>{t('admin.directory.details')}</summary><div><code>{p.id}</code></div><div><code>{p.namespace}</code></div><div>{date(p.createdAt)}</div></details></td>
-      <td>{t(`projects.kind.${p.kind}`)}</td><td>{ownerName ?? p.ownerUserId}</td>
+      {integration ? <td>{t(`projects.kind.${p.kind}`)}</td> : null}<td>{ownerName ?? p.ownerUserId}</td>
       <td><Badge tone={p.state === 'failed' ? 'danger' : p.state === 'provisioning' ? 'warning' : 'neutral'}>{t(`projects.state.${p.state}`)}</Badge>{p.message ? <p className={styles.message}>{p.message}</p> : null}</td>
       <td>{available ? <div className={styles.actions}>{p.state === 'failed' || p.state === 'provisioning' ? <ButtonLink size="small" to="/admin/projects/$projectId/provisioning" params={{ projectId: p.id }}>{t('admin.directory.provision')}</ButtonLink> : null}
         <ButtonLink size="small" to="/admin/projects/$projectId/resources" params={{ projectId: p.id }}>{t('admin.resources.title')}</ButtonLink>

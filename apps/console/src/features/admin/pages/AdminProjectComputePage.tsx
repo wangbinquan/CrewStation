@@ -10,6 +10,7 @@ import { ProjectQuotaCard } from '../components/projects/ProjectQuotaCard';
 import { ProjectRateLimitCard } from '../components/projects/ProjectRateLimitCard';
 import { AdminSection } from './AdminSection';
 import { ButtonLink } from '../../../shared/ui/navigation/ButtonLink';
+import { isIntegrationKind } from '../../../shared/admin/integrationKinds';
 
 export function AdminProjectComputePage() {
   const { projectId } = useParams({ strict: false }), t = useT();
@@ -18,8 +19,12 @@ export function AdminProjectComputePage() {
     if (project.id !== projectId) throw new Error(t('admin.directory.invalid'));
     return project;
   }, !!projectId);
+  // 接入项目的资源配置从「能力接入」进来，也回那里；项目管理只列数字人（2026-09-24 裁定）。项目还在读时不给返回，免得先显示错的去向。
+  const reading = allowed && !!projectId && query.isPending;
+  const back = reading ? null : isIntegrationKind(query.data?.kind) ? <ButtonLink to="/admin/capabilities" search={{ tab: 'integrations' }}>{t('nav.admin.backToIntegrations')}</ButtonLink>
+    : <ButtonLink to="/admin/projects">{t('nav.admin.backToProjects')}</ButtonLink>;
   return <AdminSection title={query.data ? `${query.data.name} · ${t('admin.resources.title')}` : t('admin.resources.title')} description={t('admin.resources.description')}
-    actions={<ButtonLink to="/admin/projects">{t('nav.admin.backToProjects')}</ButtonLink>}>
+    actions={back}>
     <QueryStatus isPending={query.isPending} error={query.error ?? me.error} />
     {allowed && query.data && !query.error ? <Stack key={`${projectId}:${me.data!.id}`}>
       <ProjectServiceCard projectId={projectId!} viewerId={me.data!.id} />

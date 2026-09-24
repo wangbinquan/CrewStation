@@ -1,11 +1,12 @@
 import type { ApiRequestPage, ProjectId, ProjectPageEntry, ServiceId, UserId } from '@crewstation/contracts';
 
 const userId = '01a0bf5d-8f4b-7f8b-8136-e631380738b0' as UserId, now = '2026-09-14T00:00:00.000Z';
-export function adminDirectoryFixture() {
+/** 项目按下标轮流是数字人、APIProxy、EventProducer，前 12 个开通失败；`count` 调大可让只列数字人的目录也翻得了页。 */
+export function adminDirectoryFixture({ count = 48 }: { readonly count?: number } = {}) {
   const calls: Array<{ url: URL; method: string }> = [];
   const state = { admin: true, identityError: false, projectError: false, detailError: false, apiError: false, invalidProject: false,
     holdApi: undefined as Promise<void> | undefined };
-  const projects: ProjectPageEntry[] = Array.from({ length: 48 }, (_, i) => ({ role: 'admin', ownerName: '负责人甲', project: {
+  const projects: ProjectPageEntry[] = Array.from({ length: count }, (_, i) => ({ role: 'admin', ownerName: '负责人甲', project: {
     id: `01a0bf5d-8f4b-7a01-8000-${i.toString(16).padStart(12, '0')}` as ProjectId, serviceId: `01a0bf5d-8f4b-7a02-8000-${i.toString(16).padStart(12, '0')}` as ServiceId, ownerUserId: userId,
     name: `管理项目 ${i}`, slug: `managed-${i}`, kind: i % 3 === 0 ? 'DigitalWorker' : i % 3 === 1 ? 'APIProxy' : 'EventProducer',
     namespace: `cs-managed-${i}`, state: i < 12 ? 'failed' : 'active', message: i < 12 ? '生产配置尚未补齐' : undefined, createdAt: now,

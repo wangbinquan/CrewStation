@@ -79,7 +79,9 @@ describe('管理空间的分组树（2026-09-21 修订 RFC-003 §4）', () => {
     expect(nav.querySelector('details') === null).toBe(true);
     expect(nav.querySelectorAll('ul')).toHaveLength(1);
     expect(nav.querySelector('[aria-label="项目页面"]')).not.toBeNull();
-    expect(nav.querySelector('a[href="/admin/projects"]')?.textContent).toContain('返回项目管理');
+    // 2026-09-24 起项目管理只列数字人：接入项目的侧栏回能力接入的接入容器页签。
+    expect(nav.querySelector('a[href="/admin/capabilities?tab=integrations"]')?.textContent).toContain('返回接入容器');
+    expect(nav.querySelector('a[href="/admin/projects"]')).toBeNull();
     expect(nav.textContent).not.toContain('能力接入');
   });
 

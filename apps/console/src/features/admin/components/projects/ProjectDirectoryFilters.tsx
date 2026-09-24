@@ -3,7 +3,7 @@ import type { ProjectPageEntry } from '@crewstation/contracts';
 import type { ProjectDirectorySearch } from '../../../../shared/admin/projectDirectorySearch';
 import { useT } from '../../../../shared/lib/useT';
 import { Button } from '../../../../shared/ui/Button';
-import { INTEGRATION_KINDS } from '../../model/integrationKinds';
+import { INTEGRATION_KINDS } from '../../../../shared/admin/integrationKinds';
 import styles from './ProjectDirectory.module.css';
 
 export function ProjectDirectoryFilters({ search, items, integration, userId, apply }: {
@@ -14,12 +14,12 @@ export function ProjectDirectoryFilters({ search, items, integration, userId, ap
   const owners = new Map<string, string>(items.map((row) => [row.project.ownerUserId, row.ownerName ?? row.project.ownerUserId]));
   if (userId && !owners.has(userId)) owners.set(userId, t('admin.directory.mine'));
   if (draft.ownerUserId && !owners.has(draft.ownerUserId)) owners.set(draft.ownerUserId, draft.ownerUserId);
-  const kinds = integration ? INTEGRATION_KINDS : ['DigitalWorker', ...INTEGRATION_KINDS];
   return <form role="search" aria-label={t('admin.directory.search')} className={styles.filters} onSubmit={(event) => { event.preventDefault(); apply({ ...draft, cursor: undefined }); }}>
     <label>{t('admin.directory.search')}<input aria-label={t('admin.directory.search')} value={draft.q ?? ''} maxLength={120} onChange={(e) => setDraft({ ...draft, q: e.target.value })} /></label>
-    <label>{t('admin.directory.kind')}<select aria-label={t('admin.directory.kind')} value={draft.kind ?? ''} onChange={(e) => setDraft({ ...draft, kind: e.target.value as ProjectDirectorySearch['kind'] || undefined })}>
-      <option value="">{t('admin.directory.allKinds')}</option>{kinds.map((kind) => <option key={kind} value={kind}>{t(`projects.kind.${kind}`)}</option>)}
-    </select></label>
+    {/* 项目管理只有数字人一种，类型筛选只在接入容器目录里有（2026-09-24 裁定）。 */}
+    {integration ? <label>{t('admin.directory.kind')}<select aria-label={t('admin.directory.kind')} value={draft.kind ?? ''} onChange={(e) => setDraft({ ...draft, kind: e.target.value as ProjectDirectorySearch['kind'] || undefined })}>
+      <option value="">{t('admin.directory.allKinds')}</option>{INTEGRATION_KINDS.map((kind) => <option key={kind} value={kind}>{t(`projects.kind.${kind}`)}</option>)}
+    </select></label> : null}
     <label>{t('admin.directory.state')}<select aria-label={t('admin.directory.state')} value={draft.state ?? ''} onChange={(e) => setDraft({ ...draft, state: e.target.value as ProjectDirectorySearch['state'] || undefined })}>
       <option value="">{t('admin.directory.allStates')}</option>{['provisioning', 'active', 'archived', 'failed'].map((state) => <option key={state} value={state}>{t(`projects.state.${state}`)}</option>)}
     </select></label>
