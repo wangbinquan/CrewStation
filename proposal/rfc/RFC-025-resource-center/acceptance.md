@@ -170,6 +170,13 @@
 - 回归：rfc006-verify 以服务身份再跑一次子任务（同 §3.8 的小套餐），13.8 秒进入运行、53.9 秒输出「收到」，工作区与执行环境照常建出、收尾。
 - 没有实机走过的：开发会话本身（检出只有开发会话有，开会话要在网关登录之后）。受理只要仓库地址、记录多一个 `-checkout-1` 子对象、调和器在 Pod 之前建它（键 `token`、不可变）、init 容器按它取令牌，由 task-runtime 的 `ledgerCreation.test.ts`、cluster-control 的模块用例与对象用例核对；下一次有人在本机开开发会话时应看到这个 Secret，建不出来可设 `CS_WORKLOAD_CREATION=owner` 回退。
 
+### 3.10 第八步：档位测试的 Pod 由调和器建（66c76d8b，I25 第四步）
+
+- 门禁（干净导出树）：check:static 通过；unit 676、module 1356、console 893；改动行 19／19。提交前 HEAD 前进到并行会话的 3a7f4cb5（与本批不重叠），在「3a7f4cb5＋本批」上复核 check:static 与 task-runtime、cluster-control、platform、resources 的用例（284 条）。CI [35964244559](https://github.com/wangbinquan/CrewStation/actions/runs/35964244559)：六项成功。
+- 部署（UTC）：06:25:25 前 cs-api、cs-auth、cs-controller、cs-session 换到 `cs-control-plane:rc025-i25c-20260924`（`git archive 66c76d8b`，含并行会话已上线的 3a7f4cb5，它的迁移 project/0012 由那边先跑过）；三个在跑的开发会话照常连着，cs-controller 没有告警或错误日志。
+- 回归：rfc006-verify 以服务身份再跑一次子任务（同 §3.8），11.6 秒进入运行、45.3 秒输出「收到」。
+- 没有实机走过的：档位测试本身（管理员在工作台里触发，要登录）。台账模式下跑一次档位测试（模拟调和器晚 150 毫秒建出 Pod，等 Runner 的轮询不判失败，测完释放）由 task-runtime 的 `ledgerProfileTest.test.ts` 核对；临时目录的渲染与不等卷由 cluster-control 的用例核对。
+
 ## 4. 第三期：服务槽（T8）
 
 | 提交 | 门禁（干净导出树） | CI | 部署（UTC） |
