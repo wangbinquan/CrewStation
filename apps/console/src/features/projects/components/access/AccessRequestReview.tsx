@@ -40,15 +40,16 @@ export function AccessRequestReview({ scope, title, empty, hint, onPage }: Acces
   const reject = useDraftTarget<AppAccessRequestDto>((current, next) => current.id === next.id), target = reject.target;
   const items = requests.data?.items ?? [], busy = decide.isPending, nameOf = (r: AppAccessRequestDto) => r.requestedByName ?? r.requestedBy;
   const rejecting = decide.variables?.approve === false;
-  return <Card stacked compact title={title}>
+  // 全局清单的翻页条放在卡片外，与同页的 API 申请一栏同一种排法。
+  return <>{onPage ? <RequestPageControls scope={title} cursor={scope.cursor} nextCursor={requests.data?.nextCursor} busy={requests.isFetching || busy}
+    count={requests.isPending || requests.error ? undefined : items.length} updatedAt={requests.dataUpdatedAt} onPage={onPage} /> : null}
+  <Card stacked compact title={title}>
     <UnsavedChangesGuard dirty={reject.dirty || busy} scope={t('projects.access.title')} />
     {hint ? <p className={styles.muted}>{hint}</p> : null}
-    {onPage ? <RequestPageControls scope={title} cursor={scope.cursor} nextCursor={requests.data?.nextCursor} busy={requests.isFetching || busy}
-      count={requests.isPending || requests.error ? undefined : items.length} updatedAt={requests.dataUpdatedAt} onPage={onPage} /> : null}
-    <QueryStatus isPending={requests.isPending} error={requests.error} />
-    {!requests.isPending && !requests.error && items.length === 0 ? <p className={styles.muted}>{empty}</p> : null}
     {decide.isSuccess ? <ActionNote tone="success">{t(decide.data.state === 'approved' ? 'projects.access.approvedNote' : 'projects.access.rejectedNote', { name: nameOf(decide.data) })}</ActionNote> : null}
     {decide.isError && !(rejecting && reject.open) ? <ActionNote tone="error">{t('projects.access.error', { message: errorMessage(decide.error) })}</ActionNote> : null}
+    <QueryStatus isPending={requests.isPending} error={requests.error} />
+    {!requests.isPending && !requests.error && items.length === 0 ? <p className={styles.muted}>{empty}</p> : null}
     {items.length > 0 ? <ul className={styles.list}>{items.map((request) => <AccessRequestRow key={request.id} request={request} showApp={!!onPage} busy={busy}
       onApprove={() => decide.mutate({ request, approve: true })} onReject={() => reject.select(request)} />)}</ul> : null}
     {!onPage && requests.data?.nextCursor ? <p className={styles.muted}>{t('projects.access.more')}</p> : null}
@@ -57,7 +58,7 @@ export function AccessRequestReview({ scope, title, empty, hint, onPage }: Acces
     {reject.hasDraft && target ? <RejectAccessForm key={reject.sequence} request={target} open={reject.open} busy={busy} {...(decide.isError && rejecting ? { error: errorMessage(decide.error) } : {})}
       onDirtyChange={reject.dirtyChanged} onClose={reject.hide} onClear={reject.clear}
       onSubmit={(decision) => decide.mutate({ request: target, approve: false, ...(decision ? { decision } : {}) }, { onSuccess: reject.close })} /> : null}
-  </Card>;
+  </Card></>;
 }
 
 interface RowProps {

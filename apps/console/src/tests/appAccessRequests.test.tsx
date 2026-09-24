@@ -99,7 +99,8 @@ describe('使用申请的审批', () => {
     await page.click('拒绝'); expect(document.querySelector<HTMLTextAreaElement>('dialog[open] textarea')!.value).toBe('请走部门流程');
     await act(async () => { document.querySelector<HTMLFormElement>('dialog[open] form')!.requestSubmit(); }); await page.settle();
     expect(f.writes[1]).toEqual({ path: `/v1/app-access-requests/${request(2).id}/decision`, body: { approve: false, decision: '请走部门流程' } });
-    expect(page.text()).toContain('当前没有待处理的使用申请');
+    // 处理结果的提示排在空状态之前（2026-09-24 实机）。
+    expect(page.text().indexOf('已拒绝 小周 的申请')).toBeLessThan(page.text().indexOf('当前没有待处理的使用申请'));
   });
 
   test('开发者看不到「使用申请」卡；概览给负责人提醒待处理的条数，入口指向应用展示', async () => {
@@ -120,6 +121,9 @@ describe('使用申请的审批', () => {
     expect(page.text()).toContain('应用使用申请');
     expect(document.querySelector<HTMLAnchorElement>(`a[href="/projects/${projectId}/settings?tab=visibility"]`)?.textContent).toBe('周报助手');
     expect(page.text()).toContain('意见：重复申请'); expect(page.text()).toContain('已拒绝');
+    // 翻页条在卡片外、与上面 API 申请一栏同一种排法（2026-09-24 实机：原先放在卡片里，两张卡还贴在一起）。
+    const card = [...document.querySelectorAll('main section')].find((node) => node.querySelector('h2')?.textContent === '应用使用申请')!;
+    expect(card.textContent).not.toContain('本页'); expect(card.previousElementSibling?.textContent).toContain('本页 2 项');
   });
 });
 
