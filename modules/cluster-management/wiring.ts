@@ -6,7 +6,7 @@ import { noopLogger, systemClock } from '@crewstation/kernel';
 import type { Database, MigrationSet } from '@crewstation/persistence';
 import { readMigrationDir } from '@crewstation/persistence';
 import { createWorker } from '@crewstation/queue';
-import type { ClusterMetadata, DomainOperations } from './ports/cluster';
+import type { ClusterMetadata, DomainOperations, LedgerClaims } from './ports/cluster';
 import type { SystemComponent } from './domain/inventory';
 import { kubernetesClusterReader } from './adapters/k8s/clusterReader';
 import { drizzleClusterRepository, CLUSTER_OPERATION, CLUSTER_REFRESH } from './adapters/persistence/drizzleRepository';
@@ -22,7 +22,7 @@ import { metricsExporter, metricsRoutes } from './http/metricsRoutes';
 import { measureStorageTargets } from './adapters/http/storageProbe';
 import { metricsWorkers } from './workers/metricsWorker';
 import type { MetricsOptions } from './ports/metrics';
-export interface ClusterManagementModuleDeps { metrics?: MetricsOptions; resolveReleaseId?: (legacy: string) => Promise<string | undefined>; physicalOperationId?: (id: string) => Promise<string>; db: Database; k8s: K8sClient; metadata: ClusterMetadata; domains: DomainOperations; isAdmin(id: UserId): Promise<boolean>; authorizeProject(actor: Actor, projectId: string): Promise<void>; systemNamespace: string; catalog: SystemComponent[]; instance: string; logger?: Logger; clock?: Clock; wait?: (ms: number) => Promise<void>; observationMs?: number }
+export interface ClusterManagementModuleDeps { metrics?: MetricsOptions; resolveReleaseId?: (legacy: string) => Promise<string | undefined>; physicalOperationId?: (id: string) => Promise<string>; db: Database; k8s: K8sClient; metadata: ClusterMetadata; domains: DomainOperations; isAdmin(id: UserId): Promise<boolean>; authorizeProject(actor: Actor, projectId: string): Promise<void>; systemNamespace: string; catalog: SystemComponent[]; instance: string; logger?: Logger; clock?: Clock; wait?: (ms: number) => Promise<void>; observationMs?: number; /** 资源中心的认领叠加（RFC-025 T13）：清单行换上标准记录，台账维护的对象不给直接删。 */ ledger?: LedgerClaims }
 export const clusterManagementMigrations: MigrationSet = { module: 'cluster-management', layer: 6, files: readMigrationDir(join(import.meta.dir, 'adapters/persistence/migrations')) };
 export function createClusterManagementModule(input: ClusterManagementModuleDeps) {
   const repository = drizzleClusterRepository(input.db), logger = input.logger ?? noopLogger;

@@ -24,6 +24,11 @@ export interface KindRule {
    * 页面才能画出已下线的槽；已结束的一次性记录（会话、执行）缺省不列。
    */
   readonly stable?: boolean;
+  /**
+   * 子对象由资源中心按期望建出、改回（cluster-control 的调和器渲染它们，所属模块只写期望）：期望在时有人删掉，调和器随即补回。
+   * 集群管理据此禁用这些对象的「删除」（I29 裁定）；与调和器按种类应用的清单（reconcileObservations 的 APPLIERS）保持一致。
+   */
+  readonly rendered?: true;
 }
 
 const HOUR = 3_600_000;
@@ -36,17 +41,17 @@ export const KIND_RULES: Readonly<Record<ResourceKind, KindRule>> = {
   'business-workspace': WORKLOAD,
   volume: { quotaUnits: 0, primaryChild: 'PersistentVolumeClaim', readyConditions: [], releasable: false },
   // 命名空间（第四期，T11）：provisioning 写的每个项目一条，子对象是 Namespace 与 ResourceQuota；网络策略一组一条。都是稳定记录，归档不释放。
-  namespace: { quotaUnits: 0, allChildren: true, readyConditions: [], releasable: false, stable: true },
-  'network-policy-set': { quotaUnits: 0, allChildren: true, readyConditions: [], releasable: false, stable: true },
+  namespace: { quotaUnits: 0, allChildren: true, readyConditions: [], releasable: false, stable: true, rendered: true },
+  'network-policy-set': { quotaUnits: 0, allChildren: true, readyConditions: [], releasable: false, stable: true, rendered: true },
   // 服务槽（第三期）：Deployment 就绪即运行中；领域条件 Serving 为假（已下线、尚未部署）时按已结束算。不占任务额度。
   'service-slot': { quotaUnits: 0, primaryChild: 'Deployment', readyConditions: [], releasable: false, stable: true, retainedWhenIdle: ['Service'] },
   // 构建与迁移 Job（第三期）：Job 在跑是运行中，结束后照资源中心记下的 Finished 是已结束或失败——Kubernetes 的 TTL 删掉 Job 之后结果仍在（提案 §5.1）。
   'build-job': JOB,
   'migration-job': JOB,
   // 路由（第三期后半）：gateway 按服务写的正式、待验证、服务域与内部 API 路由；IngressRoute 在即运行中。每个服务几条、长期存在，是稳定记录。
-  route: { quotaUnits: 0, primaryChild: 'IngressRoute', readyConditions: [], releasable: false, stable: true },
+  route: { quotaUnits: 0, primaryChild: 'IngressRoute', readyConditions: [], releasable: false, stable: true, rendered: true },
   // 限流策略（第三期后半，T10）：gateway 写的平台一条、每个项目一条，子对象是它们的 Traefik Middleware；中间件都在即运行中。稳定记录。
-  'rate-limit-policy': { quotaUnits: 0, allChildren: true, readyConditions: [], releasable: false, stable: true },
+  'rate-limit-policy': { quotaUnits: 0, allChildren: true, readyConditions: [], releasable: false, stable: true, rendered: true },
   // 数据库（第四期，T12）：data 写的生产库、开发库各一条，子对象是数据面上的库与角色，data-control 观测；稳定记录。
   database: { quotaUnits: 0, allChildren: true, readyConditions: [], releasable: false, stable: true },
   // 数据访问绑定：等负责人批准时是排队（Prepared 为假），生效（Granted）且临时角色在即运行中；收回、到期、拒绝即「不要了」。一次性记录。

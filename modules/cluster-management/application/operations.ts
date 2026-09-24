@@ -7,6 +7,7 @@ import { collectedKinds } from '../domain/inventory';
 import { digest, projectResources } from '../domain/projection';
 import type { ClusterDeps } from './dependencies';
 import { readSnapshot, requireAdmin, resourceIn, relatedResources } from './queries';
+import { inspectionOverlay } from './ledgerOverlay';
 
 export async function liveInspection(deps: ClusterDeps, actor: Actor, target: ClusterResource, request: ClusterInspectRequest): Promise<ClusterInspection> {
   await requireAdmin(deps, actor);
@@ -18,8 +19,10 @@ export async function liveInspection(deps: ClusterDeps, actor: Actor, target: Cl
   const jobs = collectedKinds.filter((k) => k !== 'Namespace');
   await Promise.all(Array.from({ length: 4 }, async () => { for (;;) { const kind = jobs.shift(); if (!kind) break; try { objects.push(...(await deps.cluster.collect(kind, target.namespace, undefined, AbortSignal.timeout(30_000))).objects); } catch (e) { if (!e || typeof e !== 'object' || !('kind' in e) || e.kind !== 'not_found') throw precondition(`无法完成资源引用检查：${String(e)}`); } } }));
   const resources = await resourceReferences(deps, projectResources(objects, facts, deps.systemNamespace, deps.catalog, deps.clock.now().toISOString(), await deps.repository.resourceIds(objects.map((object) => object.metadata.uid!))));
-  const row = resources.find((r) => r.uid === target.uid);
-  if (!row) { if (resources.some((r) => r.kind === target.kind && r.name === target.name)) throw conflict('原实例已被同名新资源替换'); throw notFound('受管资源', target.name); }
+  const found = resources.find((r) => r.uid === target.uid);
+  if (!found) { if (resources.some((r) => r.kind === target.kind && r.name === target.name)) throw conflict('原实例已被同名新资源替换'); throw notFound('受管资源', target.name); }
+  // 台账维护的对象与工作卷不给直接删（I29 裁定 (2)）：按实时对象再核对一次所属记录。
+  const row = await inspectionOverlay(deps, actor, found);
   let capability = row.availableActions.find((a) => a.action === request.action)!;
   let domain;
   if (capability.enabled && capability.executionRoute !== 'kubernetes') { const result = await deps.domains.inspect(actor, row, request); capability = result.capability; domain = result.domain; }

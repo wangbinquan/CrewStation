@@ -101,6 +101,24 @@ function filterOf(filter: RecordFilter) {
   );
 }
 
+/** 集群对象归哪条记录（调和器的认领、集群管理清单的叠加）：单个先按 UID 再按种类＋命名空间＋名字，成批只按后者。 */
+function childLookups(db: Executor): Pick<RecordRepository, 'findByChild' | 'claimed'> {
+  return {
+    findByChild: async (child) => {
+      const byUid = child.uid ? (await db.select({ id: children.resourceId }).from(children).where(eq(children.uid, child.uid)).limit(1))[0] : undefined;
+      if (byUid) return byUid.id;
+      const row = (await db.select({ id: children.resourceId }).from(children).where(and(eq(children.kind, child.kind), eq(children.namespace, child.namespace ?? ''), eq(children.name, child.name))).limit(1))[0];
+      return row?.id;
+    },
+    claimed: async (list) => {
+      if (!list.length) return [];
+      const rows = await db.select({ kind: children.kind, namespace: children.namespace, name: children.name, id: children.resourceId }).from(children)
+        .where(or(...list.map((child) => and(eq(children.kind, child.kind), eq(children.namespace, child.namespace ?? ''), eq(children.name, child.name)))));
+      return rows.map((row) => ({ child: { kind: row.kind, ...(row.namespace ? { namespace: row.namespace } : {}), name: row.name }, resourceId: row.id }));
+    },
+  };
+}
+
 export function drizzleRecordRepository(db: Executor): RecordRepository {
   const hydrate = async (rows: readonly RecordRow[]): Promise<LedgerRecord[]> => {
     if (!rows.length) return [];
@@ -151,12 +169,7 @@ export function drizzleRecordRepository(db: Executor): RecordRepository {
         }
       }
     },
-    findByChild: async (child) => {
-      const byUid = child.uid ? (await db.select({ id: children.resourceId }).from(children).where(eq(children.uid, child.uid)).limit(1))[0] : undefined;
-      if (byUid) return byUid.id;
-      const row = (await db.select({ id: children.resourceId }).from(children).where(and(eq(children.kind, child.kind), eq(children.namespace, child.namespace ?? ''), eq(children.name, child.name))).limit(1))[0];
-      return row?.id;
-    },
+    ...childLookups(db),
     addAliases: async (resourceId, list) => {
       for (const alias of list) {
         const inserted = await db.insert(aliases).values({ resourceId, source: alias.source, alias: alias.alias }).onConflictDoNothing().returning({ id: aliases.resourceId });

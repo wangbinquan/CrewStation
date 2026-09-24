@@ -369,6 +369,8 @@ spec.env.0.configDefinitionId / spec.env.1.configDefinitionId: expected string, 
 
 ## I25. 调和器接手建任务容器时，凭据放在哪
 
+**作者已裁定（2026-09-24）**：选 (b) 渲染时回调——台账只放不含凭据的期望；调和器建 Pod／Secret 之前经端口向所属模块（task-runtime）要值，值不落库。与 I28 同一原则：台账与库备份里没有凭据。
+
 **现状**：RFC-025 设计 §9 让 task-runtime 交出 Pod、PVC、Secret、预览 Service 的建删（保留 Runner 令牌与领域规则），§6.2 让 cluster-control 按期望渲染子对象。今天的开发工作区把 Runner 令牌与配置、数据凭据（`containerEnv`：配置值、生产或开发库的连接串）以明文环境变量写进 Pod 规格；CLI 执行环境与重建把它们写进一个不可变的 Runner Secret（`<Pod 名>-runner`），Pod 以 `envFrom` 引用；检出用的会话级 Git 令牌另在按服务的 Secret 里。设计没有写这些值怎样从所属模块到调和器。
 
 **为什么是问题**：调和器要建出同样的 Pod 与 Secret，渲染时就得拿到这些值。把它们放进期望（`resources.records.spec`，jsonb）就是把凭据明文写进资源台账：数据库备份、按需读取记录的调试都会带出来，管理员视图虽不显示期望，库里仍是明文。
@@ -378,6 +380,8 @@ spec.env.0.configDefinitionId / spec.env.1.configDefinitionId: expected string, 
 **可选做法**：(a) 期望里放密文：所属模块用平台密钥（`packages/secretbox`，身份、算力档位、数据模块已在用）加密后写进期望，调和器渲染 Secret 时解密；台账里只有密文。(b) 渲染时回调：调和器建 Secret 之前经端口向所属模块要值（组合根接上 task-runtime 的用例），值不落库；Runner 令牌在这一步签发、只存哈希。(c) Secret 仍由所属模块自己建（设计 §9「领域模块不再直接调 Kubernetes」的唯一例外），期望只写 Secret 名，调和器只建 Pod、Service、路由等不含凭据的对象。
 
 ## I26. 说明页：错误体与 RFC-021 不一致，去掉 `allowEmptyServices` 会让「暂时没有端点」变成裸 404
+
+**作者已裁定（2026-09-24）**：选 (a)——错误体沿用 RFC-021 的 `not-deployed`＋`details`（`details.reason` 放下线原因），说明页由 cs-api 按台账渲染、ForwardAuth 的未部署分支退役；`allowEmptyServices` 保留作兜底。
 
 **现状**：RFC-025 设计 §7.1–§7.2 让槽「已结束」时路由改指 cs-api 的说明页（`GET /_crewstation/unavailable/:routeId`），接口请求得到 503 与 `{ error: 'not_deployed', message, reason }`，并去掉 Traefik 的 `allowEmptyServices`。今天 RFC-021 已经在 ForwardAuth 里给待验证主机渲染「未部署」页：cs-auth 按 `standbyEntry` 判定待命槽为空时返回 503，浏览器得到页面，接口得到 `{ error: 'not-deployed', message, details }`（`modules/identity/http/forwardAuthRoutes.ts`）；这要求没有端点的路由仍保留，所以才开了 `allowEmptyServices`。
 
@@ -399,6 +403,8 @@ spec.env.0.configDefinitionId / spec.env.1.configDefinitionId: expected string, 
 
 ## I28. 数据面的调和器建角色时，口令与连接串放在哪
 
+**作者已裁定（2026-09-24）**：选 (b)——`data-control` 生成口令，加密后存在自己的表里（按记录 ID），`data` 渲染环境变量时经端口向它要；台账里没有任何凭据（与 I25 同一原则）。
+
 **现状**：RFC-025 设计 §6.6 让新的 `data-control`（L2）「按期望在数据面建库与角色、轮换凭据、释放时删除」，执行代码自 `data` 模块的供给适配器迁入。今天 `data` 模块建角色时当场生成随机口令（`postgresProvider.ts`），拼成连接串后用平台密钥加密存进 `data.resources.secret_box`（生产库、开发库）与 `data.task_bindings.secret_box`（诊断只读、生产变更的临时角色）；渲染容器环境变量时再解密。设计没有写口令由谁生成、连接串怎样回到 `data`。
 
 **为什么是问题**：与 [I25](#i25-调和器接手建任务容器时凭据放在哪) 同一类，方向相反——那里凭据由所属模块持有、要交给调和器；这里凭据由执行者当场生成、要交回所属模块。把口令写进期望或观测，就是把凭据写进资源台账（库备份、按需读取记录都会带出来）；轮换也要有人在改角色口令的同时换掉注入容器的连接串。
@@ -408,6 +414,8 @@ spec.env.0.configDefinitionId / spec.env.1.configDefinitionId: expected string, 
 **实施（2026-09-24）**：先做与本条无关的部分——生产库、开发库与数据访问绑定投影成 `database`／`data-binding` 记录，`data-control` 观测数据面（库与角色在不在、临时角色的到期时间）写回台账；删除不需要口令，随后移交。建库建角色与轮换等本条裁定。
 
 ## I29. 集群管理改读台账：清单的来源、台账维护的对象还给不给「删除」、「待回收的工作卷」放在哪
+
+**作者已裁定（2026-09-24）**：(1) 选 (a)——清单与历史仍以采集快照为底，台账认领的对象在同一行显示标准记录的阶段、原因与可做操作；(2) 选 (a)——台账维护对象的「删除」禁用并写明「由资源中心按期望维护，删除后会被补回」；(3) 选 (a)——资源清单在「存储」之后新增一类「待回收的工作卷」，每行给「删除工作卷」（确认弹窗输入 `delete`）。
 
 **现状**：RFC-025 提案 §6 写「集群管理：清单与拓扑读全平台视图；新增『待回收的工作卷』筛选，删除要输入确认词；运维操作（重启、扩缩、删除）经台账执行」，设计 §9 让 `cluster-management` 交出「自有的采集快照作为唯一来源」。今天集群管理（RFC-010）的清单来自它每 30 秒一次的采集快照，列出全部受管对象与系统组件（ConfigMap、ServiceAccount、HPA、系统命名空间里的平台组件都在内），历史用量（RFC-015）也按快照；台账只有资源中心认领的那些种类。另外，第三、四期起路由、限流中间件、命名空间的额度与网络策略由调和器按期望维护，集群管理对其中没被引用的（网络策略、额度、路由）仍给「删除」，删完调和器随即补回。
 
@@ -419,6 +427,8 @@ spec.env.0.configDefinitionId / spec.env.1.configDefinitionId: expected string, 
 - (3) 待回收的工作卷：(a) 资源清单里新增一类「待回收的工作卷」，排在「存储」之后，每行给「删除工作卷」（确认弹窗输入 `delete`）；(b) 「存储」清单顶部加一节，有待回收的卷时才出现；(c) 「状态」筛选加「待回收」，只在存储清单里生效。
 
 **实施（2026-09-24）**：后端先做——`delete-volume` 由资源中心自己受理（只给管理员、只对待回收的卷），期望改为「不要了」（原因 `volume-deleted`），调和器删 PVC；权限不足一律 403。界面与 (1)(2) 等本条裁定。
+
+裁定后按三个 (a) 做完：资源中心按页给认领叠加（`claimsOf`：标准记录的阶段、原因、看的人能做的操作，外加 `maintained`——期望在、种类由调和器渲染：路由、限流策略、命名空间、网络策略）；集群管理在清单、详情与项目盘点三处叠加（项目盘点不给记录操作），台账维护的对象与工作卷的「删除」禁用并写明去处，删除前的检查按实时对象再核对一次——台账读不到时清单照快照给，检查则不给做。工作台清单的状态格显示标准阶段、集群观测退为小字，详情加「资源中心记录」一节（记录的操作带版本号经资源中心受理，不可撤销的要输入 `delete`）；「待回收的工作卷」排在「存储与配置」之后，列出「待回收」为真、PVC 还在的卷。顺带修正标准输出：没有执行者的操作（所属模块没登记、资源中心自己也不做）如实写「这类资源暂不支持在这里操作」——此前工作区的释放、重试在视图里显示可做，受理时才 412。
 
 ## I30. 用户域只有一个后缀：工作台与全部应用同一注册域，会话 Cookie 跨主机共享
 

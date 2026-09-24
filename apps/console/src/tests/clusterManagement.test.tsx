@@ -24,7 +24,7 @@ test('cluster route enforces admin guard, opens on the topology with only the tw
   expect(page.text()).not.toContain('符合筛选的资源'); expect(page.text()).not.toContain('筛选清单');
   await tab('资源清单'); expect(page.search()).toMatchObject({ tab: 'workloads' });
   const views = () => [...document.querySelectorAll<HTMLElement>('[role="group"][aria-label="资源清单"] button')];
-  expect(views().map((n) => n.textContent)).toEqual(['工作负载', 'Pod', '网络', '存储与配置', '命名空间', '节点', '最近 7 天趋势', '操作记录']);
+  expect(views().map((n) => n.textContent)).toEqual(['工作负载', 'Pod', '网络', '存储与配置', '待回收的工作卷', '命名空间', '节点', '最近 7 天趋势', '操作记录']);
   await act(async () => { views().find((n) => n.textContent === 'Pod')!.click(); }); await page.settle();
   expect(page.search()).toMatchObject({ tab: 'pods' }); expect(views().find((n) => n.getAttribute('aria-pressed') === 'true')?.textContent).toBe('Pod');
   expect(page.text()).toContain('筛选清单'); expect(page.text()).toContain('符合筛选的资源：205');

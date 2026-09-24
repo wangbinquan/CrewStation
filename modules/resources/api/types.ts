@@ -145,6 +145,8 @@ export interface RecordFilter {
 export interface ViewerAccess {
   readonly operate: boolean;
   readonly admin: boolean;
+  /** 这个操作眼下有没有执行者（资源中心自己的，或所属模块登记的）；没有的在标准记录里如实显示为不可做。缺省视为都有。 */
+  readonly executable?: (owner: string, action: ResourceActionId) => boolean;
 }
 
 /** 推送流的一个订阅（设计 §8）：一个 SSE 连接。 */

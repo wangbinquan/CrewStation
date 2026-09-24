@@ -1,14 +1,14 @@
 import { join } from 'node:path';
-import type { Actor, ProjectId, UserId } from '@crewstation/contracts';
+import type { UserId } from '@crewstation/contracts';
 import { AdminResourceViewQuerySchema, ResourceViewQuerySchema } from '@crewstation/contracts';
 import type { Clock, Logger } from '@crewstation/kernel';
-import { forbidden, noopLogger, systemClock } from '@crewstation/kernel';
+import { noopLogger, systemClock } from '@crewstation/kernel';
 import type { Database, Executor, MigrationSet } from '@crewstation/persistence';
 import { readMigrationDir } from '@crewstation/persistence';
 import type { Hono } from 'hono';
 import type { AppEnv } from '@crewstation/http';
 import type { OwnerLedger, ResourcesModuleApi } from './api/moduleApi';
-import type { ResourceActionHandler, ViewerAccess } from './api/types';
+import type { ResourceActionHandler } from './api/types';
 import { performAction } from './application/actions';
 import { maintainLedger } from './application/maintenance';
 import { observationWriter } from './application/observe';
@@ -16,6 +16,8 @@ import { occupancyIn, ownerWriter } from './application/ownerWrites';
 import type { StreamOptions } from './application/streamHub';
 import { createStreamHub, DEFAULT_STREAM_OPTIONS } from './application/streamHub';
 import { readView } from './application/views';
+import { viewerAccess } from './application/access';
+import { readClaims } from './application/claims';
 import { drizzleLedgerUnitOfWork } from './adapters/persistence/drizzleLedger';
 import type { QuotaLimits, ResourceAuthorizer } from './ports/platform';
 import { resourceRoutes } from './http/resourceRoutes';
@@ -52,11 +54,8 @@ export function createResourcesModule(deps: ResourcesModuleDeps): ResourcesModul
   const hub = createStreamHub(uow.read, clock, logger, { ...DEFAULT_STREAM_OPTIONS, ...deps.stream });
   const handlers = new Map<string, ResourceActionHandler>();
   const observer = observationWriter(uow, clock);
-  const projectAccess = async (actor: Actor, projectId: ProjectId): Promise<ViewerAccess> => ({ operate: (await deps.authorizer.projectAccess(actor, projectId)).operate, admin: actor.isAdmin });
-  const adminAccess = async (actor: Actor): Promise<ViewerAccess> => {
-    if (!actor.isAdmin) throw forbidden('只有管理员可以查看全平台的资源');
-    return { operate: true, admin: true };
-  };
+  // 执行者在装配后才登记（registerActionHandler），每次按当时的登记判定。
+  const { projectAccess, adminAccess, accessFor } = viewerAccess({ authorizer: deps.authorizer, executable: (owner, action) => action in centerActions || handlers.has(owner) });
   const owner = (module: string): OwnerLedger => ({
     ...ownerWriter(module, uow.run, deps.quotas, clock),
     within: (tx) => ownerWriter(module, (fn) => fn(uow.within(tx as Executor)), deps.quotas, clock),
@@ -78,6 +77,7 @@ export function createResourcesModule(deps: ResourcesModuleDeps): ResourcesModul
     list: (filter) => uow.read.records.list(filter),
     resolveAlias: (alias) => uow.read.records.resolveAlias(alias),
     claimOf: (child) => uow.read.records.findByChild(child),
+    claimsOf: (actor, list) => readClaims(uow.read, clock.now(), accessFor(actor), list),
     occupancy: (projectId) => occupancyIn(uow.read, projectId),
     changesSince: async (cursor, limit) => (await uow.read.changes.since(cursor, limit)).map((entry) => ({ seq: entry.seq, resourceId: entry.resourceId })),
     latestChange: () => uow.read.changes.latest(),

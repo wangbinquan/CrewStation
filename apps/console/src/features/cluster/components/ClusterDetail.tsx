@@ -11,6 +11,7 @@ import { QueryStatus } from '../../../shared/ui/QueryStatus';
 import { ClusterTable, Ownership } from './ClusterTable';
 import { ClusterResourceMetrics } from './ClusterResourceMetrics';
 import { ClusterActionPanel } from './ClusterActionPanel';
+import { LedgerRecordPanel } from './ClusterLedger';
 import { sameApartFromSnapshot } from '../model/clusterReads';
 import styles from './Cluster.module.css';
 export function ClusterDetail({ resourceId, snapshotId, close, select, onOperation }: { resourceId: string; snapshotId?: string; close: () => void; select: (row: ClusterResource) => void; onOperation: (id: string) => void }) {
@@ -24,6 +25,8 @@ export function ClusterDetail({ resourceId, snapshotId, close, select, onOperati
     <p>{r.kind} · {r.namespace} · <Ownership row={r} /></p>
     {/* 操作放在详情顶部：概览很长，放在末尾要滚过整页才够得着；各页签都能直接操作。 */}
     <ClusterActionPanel row={r} onOperation={onOperation} />
+    {/* 台账认领的对象：所属标准记录的阶段、原因与可做操作（I29 裁定）。 */}
+    {r.ledger ? <LedgerRecordPanel ledger={r.ledger} name={r.name} onDone={() => void detail.refetch()} /> : null}
     <Tabs label={t('cluster.detail')} value={tab} onChange={setTab} items={['overview', 'related', 'containers', 'events', ...(r.kind === 'Pod' ? ['logs', 'history'] : r.kind === 'PersistentVolumeClaim' ? ['history'] : [])].map((value) => ({ value, label: t(`cluster.detail.${value}`) }))}>
       {tab === 'overview' ? <div className={styles.stack}><dl className={styles.facts}>{Object.entries({ UID: r.uid, [t('cluster.purpose')]: t(`cluster.purpose.${r.purpose}`), [t('cluster.status')]: r.phase, [t('cluster.ready')]: r.ready ? t('cluster.yes') : t('cluster.no'), [t('cluster.reason')]: r.reason || '—', ...r.facts, ...(r.taskId ? { taskId: r.taskId } : {}), ...(r.parentTaskId ? { parentTaskId: r.parentTaskId } : {}), ...(r.agentId ? { agentId: r.agentId } : {}), ...(r.releaseId ? { releaseId: r.releaseId } : {}), ...(r.profile ? { [t('cluster.profile')]: `${r.profile}${r.profileRevision === undefined ? '' : ` @${r.profileRevision}`}` } : {}), [t('cluster.observed')]: new Date(r.observedAt).toLocaleString() }).map(([key, value]) => <Pair key={key} label={key} value={value} />)}</dl><ClusterResourceMetrics resource={r} view="overview" /></div> : null}
       {tab === 'related' ? <><p>{r.owners.map((o) => `${o.kind}/${o.name} (${o.uid})`).join(', ') || t('cluster.noOwner')}</p><ClusterTable rows={detail.data!.related} select={select} /></> : null}

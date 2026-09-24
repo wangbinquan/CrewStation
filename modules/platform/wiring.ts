@@ -463,7 +463,7 @@ function composeModules(deps: CompositionDeps) {
   const delivery = composeDelivery(deps, core, late, resources);
   const runtime = composeRuntime(deps, core, delivery, late, resources);
   const aggregates = composeAggregates(deps, core, delivery, runtime, resources);
-  const cluster = composeCluster(deps, core, delivery, runtime);
+  const cluster = composeCluster(deps, core, delivery, runtime, resources);
   const clusterControl = composeControl(deps, core, resources, runtime, delivery.gateway);
   const dataControl = composeDataControl(deps, resources);
   return { cluster, resources, clusterControl, dataControl, identity: core.identity, project: core.project, config: core.config, data: core.data, scm: core.scm, apiCatalog: core.apiCatalog, agentRuntime: core.agentRuntime, ...delivery, ...runtime, ...aggregates };
@@ -499,7 +499,7 @@ export function createPlatformModule(deps: PlatformModuleDeps): PlatformModule {
   return { api, modules: m };
 }
 
-function composeCluster(deps: CompositionDeps, core: ReturnType<typeof composeCore>, delivery: ReturnType<typeof composeDelivery>, runtime: ReturnType<typeof composeRuntime>) {
+function composeCluster(deps: CompositionDeps, core: ReturnType<typeof composeCore>, delivery: ReturnType<typeof composeDelivery>, runtime: ReturnType<typeof composeRuntime>, resources: ReturnType<typeof composeLedger>) {
   const tasks = runtime.taskRuntime.api, dev = runtime.devSession.api, business = runtime.businessTask.api, release = delivery.release.api;
   const inspectTask = async (actor: Actor, target: ClusterResource, request: ClusterInspectRequest): Promise<Record<string, unknown>> => {
     if (target.purpose === 'development-cli') return dev.inspectClusterNative(actor, target.taskId as TaskId);
@@ -531,6 +531,7 @@ function composeCluster(deps: CompositionDeps, core: ReturnType<typeof composeCo
   };
   return createClusterManagementModule({ metrics: deps.settings.clusterMetrics, resolveReleaseId: (legacy) => deps.identities.resolve('release', [legacy]), physicalOperationId: async (id) => (await deps.identities.aliases('cluster-operation', id)).find((keys) => keys.length === 1 && keys[0] !== id)?.[0] ?? id, db: deps.db, k8s: deps.k8s, instance: deps.instance, logger: deps.logger, systemNamespace: deps.settings.systemNamespace, catalog: installedSystemComponents().map((c) => c.kind === 'Namespace' ? { ...c, name: deps.settings.systemNamespace } : c), isAdmin: core.identity.api.isAdmin,
     authorizeProject: async (actor, projectId) => { await core.project.api.authorize(actor, projectId as ProjectId, 'develop'); },
+    ledger: { claims: (actor, objects) => resources.api.claimsOf(actor, objects) },
     metadata: { read: async () => {
       const [projects, taskFacts, slots, plans] = await Promise.all([core.project.api.listClusterProjects(), tasks.listClusterTasks(), release.listClusterSlots(), core.project.api.listServicePlans()]);
       const releases = slots.flatMap((slot) => { const project = projects.find((p) => p.serviceId === slot.serviceId); return project ? [{ ...slot, namespace: project.namespace, serviceName: project.serviceName!, ...(slot.plan ? { maxReplicas: plans.find((p) => p.id === slot.plan)?.maxReplicas ?? 0 } : {}) }] : []; });

@@ -19,6 +19,8 @@ export interface RecordRepository {
   replaceChildren(resourceId: string, children: readonly StoredChild[]): Promise<void>;
   /** 集群对象归哪条记录：先按 UID，再按种类＋命名空间＋名字。 */
   findByChild(child: ExpectedChild & { readonly uid?: string }): Promise<string | undefined>;
+  /** 一批集群对象各自属于哪条记录（按种类＋命名空间＋名字）；没有记录认领的不在结果里。 */
+  claimed(list: readonly ExpectedChild[]): Promise<{ readonly child: ExpectedChild; readonly resourceId: string }[]>;
   addAliases(resourceId: string, aliases: readonly ResourceAlias[]): Promise<void>;
   resolveAlias(alias: ResourceAlias): Promise<string | undefined>;
   /** 保留期已到（按数据库时间）、还没被转成「不要了」的失败记录（保留期巡检用）。 */

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { ProjectIdSchema, ResourceIdSchema } from '../../ids';
-import { ClusterPurposeSchema } from '../cluster/resources';
+import { ClusterPurposeSchema } from '../cluster/purpose';
 import { StartupProgressSchema } from '../progress/startupProgress';
 
 /**

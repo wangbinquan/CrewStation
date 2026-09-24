@@ -1,10 +1,10 @@
 import { ClusterFilterSchema, ClusterOperationQuerySchema } from '@crewstation/contracts';
 import type { ClusterFilter, ClusterOperationQuery } from '@crewstation/contracts';
 
-/** 「资源清单」里的视图，按 2026-09-23 裁定的顺序：五类清单在前，节点、趋势、操作记录在后。 */
-export const INVENTORY_TABS = ['workloads', 'pods', 'network', 'storage', 'namespaces', 'nodes', 'history', 'operations'] as const;
+/** 「资源清单」里的视图，按 2026-09-23 裁定的顺序：五类清单在前，节点、趋势、操作记录在后；「待回收的工作卷」排在存储之后（I29 裁定）。 */
+export const INVENTORY_TABS = ['workloads', 'pods', 'network', 'storage', 'reclaim', 'namespaces', 'nodes', 'history', 'operations'] as const;
 export type InventoryTab = (typeof INVENTORY_TABS)[number];
-/** 走资源清单接口（`/resources`）的视图；节点、趋势、操作记录各自取数。 */
+/** 走资源清单接口（`/resources`）的视图；节点、趋势、操作记录各自取数，待回收的工作卷读资源中心。 */
 export const LIST_TABS: readonly InventoryTab[] = ['workloads', 'pods', 'network', 'storage', 'namespaces'];
 const TABS: readonly string[] = ['topology', ...INVENTORY_TABS];
 

@@ -20,6 +20,8 @@ describe.skipIf(!available)('标准资源视图（RFC-025 设计 §4）', () => 
   let stoppedId: string;
   beforeAll(async () => {
     h = await createHarness();
+    // 有执行者的操作才按阶段给「可做」（没有执行者的如实写不支持，见下面的受理用例）。
+    h.module.api.registerActionHandler('task-runtime', async () => undefined);
     const ledger = h.module.api.owner('task-runtime');
     const ws = await ledger.declare(workspace('v1'));
     workspaceId = ws.id;
@@ -111,6 +113,46 @@ describe.skipIf(!available)('可做操作的统一受理（设计 §4.2）', () 
     expect(await h.module.api.get(volume.id)).toMatchObject({ desired: 'absent', owner: { module: 'cluster-control' }, releaseReason: { code: 'volume-deleted', message: '管理员确认删除工作卷' } });
     expect(result.record?.actions).toEqual([{ id: 'delete-volume', enabled: false, disabledReason: '已受理删除，正在回收' }]);
     expect((await failure(h.module.api.performAction(ADMIN, volume.id, 'delete-volume', {}))).message).toBe('已受理删除，正在回收');
+  });
+});
+
+// RFC-025 T13（I29 裁定）：集群清单一行叠加所属标准记录——阶段、原因、看的人能做的操作，外加是否由资源中心按期望维护。
+describe.skipIf(!available)('集群清单的认领叠加', () => {
+  let h: Harness;
+  const ingress = { kind: 'IngressRoute', namespace: 'cs-demo', name: 'demo-prod' };
+  const pvc = { kind: 'PersistentVolumeClaim', namespace: 'cs-demo', name: 'task-c1-work' };
+  const platformMiddleware = { kind: 'Middleware', namespace: 'crewstation-system', name: 'platform-rate-limit' };
+  beforeAll(async () => {
+    h = await createHarness();
+    await h.module.api.owner('gateway').declare({ kind: 'route', ref: 'demo/prod', projectId: PROJECT, spec: { children: [ingress] } });
+    await h.module.api.owner('gateway').declare({ kind: 'rate-limit-policy', ref: 'platform', spec: { children: [platformMiddleware] } });
+    await h.module.api.owner('task-runtime').declare(workspace('c1'));
+    await h.module.api.owner('task-runtime').declare({ kind: 'volume', ref: 'c1/work', projectId: PROJECT, spec: { children: [pvc] } });
+  });
+  afterAll(async () => { await h.database.drop(); });
+
+  test('认领的给叠加、没认领的不在结果里；调和器渲染的种类期望在时是「维护中」，工作卷与工作区不是', async () => {
+    const claims = await h.module.api.claimsOf(ADMIN, [ingress, pvc, platformMiddleware, { kind: 'Pod', namespace: 'cs-demo', name: 'task-c1' }, { kind: 'ConfigMap', namespace: 'cs-demo', name: 'unclaimed' }]);
+    const byName = new Map(claims.map((claim) => [claim.child.name, claim.ledger]));
+    expect([...byName.keys()].sort()).toEqual(['demo-prod', 'platform-rate-limit', 'task-c1', 'task-c1-work']);
+    expect(byName.get('demo-prod')).toMatchObject({ kind: 'route', maintained: true, actions: [] });
+    expect(byName.get('platform-rate-limit')).toMatchObject({ kind: 'rate-limit-policy', maintained: true });
+    expect(byName.get('task-c1-work')).toMatchObject({ kind: 'volume', maintained: false, actions: [{ id: 'delete-volume', enabled: false, disabledReason: '只有待回收的工作卷可以删除' }] });
+    // 工作区的所属模块（task-runtime）在这个装配里没有登记执行者：释放如实写不支持，而不是给一个点了必然失败的按钮。
+    expect(byName.get('task-c1')).toMatchObject({ kind: 'dev-workspace', maintained: false, actions: [{ id: 'release', enabled: false, disabledReason: '这类资源暂不支持在这里操作' }, { id: 'retry', enabled: false }] });
+    expect(await h.module.api.claimsOf(ADMIN, [])).toEqual([]);
+  });
+
+  test('期望已是「不要了」的不再算维护中；项目成员只拿到本项目的记录，操作按自己的权限裁剪', async () => {
+    const route = await h.module.api.owner('gateway').declare({ kind: 'route', ref: 'demo/preview', projectId: PROJECT, spec: { children: [{ ...ingress, name: 'demo-preview' }] } });
+    await h.module.api.observe({ child: { ...ingress, name: 'demo-preview', uid: 'uid-preview', phase: 'Present', ready: true } });
+    await h.module.api.owner('gateway').requestRelease(route.id, { code: 'offline', message: '下线' });
+    const [released] = await h.module.api.claimsOf(ADMIN, [{ ...ingress, name: 'demo-preview' }]);
+    expect(released?.ledger).toMatchObject({ id: route.id, maintained: false });
+    const asTester = await h.module.api.claimsOf(TESTER, [ingress, pvc, platformMiddleware]);
+    expect(asTester.map((claim) => claim.child.name).sort()).toEqual(['demo-prod', 'task-c1-work']);
+    expect(asTester.find((claim) => claim.child.name === 'task-c1-work')?.ledger.actions).toEqual([{ id: 'delete-volume', enabled: false, disabledReason: '只有管理员可以删除工作卷' }]);
+    expect((await failure(h.module.api.claimsOf(OUTSIDER, [ingress]))).kind).toBe('forbidden');
   });
 });
 

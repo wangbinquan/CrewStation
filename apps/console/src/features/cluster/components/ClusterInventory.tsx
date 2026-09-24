@@ -25,6 +25,7 @@ import { ClusterFilters } from './ClusterFilters';
 import { ClusterHistoryBrowser } from './ClusterHistory';
 import { ClusterNodes } from './ClusterNodes';
 import { ClusterOperations } from './ClusterOperations';
+import { ClusterReclaimVolumes } from './ClusterReclaimVolumes';
 import { ClusterStorage } from './ClusterStorage';
 import { ClusterTable } from './ClusterTable';
 import { UsageSummary } from './ClusterCapacity';
@@ -56,10 +57,10 @@ export function ClusterInventory({ search, change, go, summary, filter, snapshot
   const select = (row: ClusterResource) => go({ ...search, resourceId: row.resourceId });
   return <div ref={host} className={styles.inventory}>
     <Segmented label={t('cluster.inventory')} value={tab} onChange={(value) => change({ tab: value as InventoryTab, kind: undefined, purpose: undefined, status: undefined })} items={INVENTORY_TABS.map((value) => ({ value, label: t(`cluster.tab.${value}`) }))} />
-    {tab !== 'nodes' ? <Card compact title={t('cluster.filters')}><ClusterFilters search={search} summary={summary} change={change} /></Card> : null}
+    {tab !== 'nodes' && tab !== 'reclaim' ? <Card compact title={t('cluster.filters')}><ClusterFilters search={search} summary={summary} change={change} /></Card> : null}
     <div className={search.resourceId ? `${styles.split} ${styles.hasDetail}` : styles.split}>
       <div ref={panel} style={panelStyle} className={styles.list}>
-        {tab === 'nodes' ? <ClusterNodes selectPod={(resourceId) => go({ ...search, resourceId })} /> : tab === 'history' ? <ClusterHistoryBrowser key={filter.projectId ?? 'all'} projectId={filter.projectId} /> : tab === 'operations' ? <ClusterOperations search={search} change={change} /> : <Card className={styles.listCard} title={t('cluster.resourceCount', { count: rows.data?.total === 0 && !rows.data.complete ? '—' : rows.data?.total ?? '—' })} compact stacked>
+        {tab === 'nodes' ? <ClusterNodes selectPod={(resourceId) => go({ ...search, resourceId })} /> : tab === 'history' ? <ClusterHistoryBrowser key={filter.projectId ?? 'all'} projectId={filter.projectId} /> : tab === 'operations' ? <ClusterOperations search={search} change={change} /> : tab === 'reclaim' ? <ClusterReclaimVolumes projects={summary?.projects ?? []} /> : <Card className={styles.listCard} title={t('cluster.resourceCount', { count: rows.data?.total === 0 && !rows.data.complete ? '—' : rows.data?.total ?? '—' })} compact stacked>
           <QueryStatus isPending={rows.isPending || expired} error={expired ? null : rows.error} isEmpty={rows.data?.complete === true && rows.data.total === 0} emptyTitle={t('cluster.empty')} />
           {tab === 'pods' || tab === 'storage' ? <><QueryStatus isPending={usage.isPending} error={usage.error} />{usage.data ? <UsageSummary title={t('cluster.metrics.selectedScope')} data={usage.data.summary} /> : null}</> : null}
           {rows.data ? <div className={styles.rows}>{tab === 'storage' ? <ClusterStorage rows={rows.data.items} usages={usage.data?.items ?? []} select={select} stickyHeader /> : <ClusterTable rows={rows.data.items} usages={usage.data?.items} select={select} stickyHeader />}</div> : null}

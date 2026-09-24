@@ -1,5 +1,5 @@
 import { ClusterResourceSchema, ClusterSummarySchema } from '@crewstation/contracts';
-import type { ClusterInspection, ClusterOperation, ClusterResource, ClusterSummary } from '@crewstation/contracts';
+import type { ClusterInspection, ClusterOperation, ClusterResource, ClusterSummary, ResourceRecord } from '@crewstation/contracts';
 export function clusterFixture(options: { admin?: boolean; loseReceipt?: boolean; partial?: boolean } = {}) {
   const calls: Array<{ path: string; method: string; body: Record<string, unknown>; query: URLSearchParams }> = [];
   const time = new Date().toISOString(), projectId = '01a0bf5d-8f4b-7e1e-8dde-c9c2ae13ed34';
@@ -7,6 +7,8 @@ export function clusterFixture(options: { admin?: boolean; loseReceipt?: boolean
   let summary: ClusterSummary = { snapshotId: 'snapshot-1', startedAt: time, finishedAt: time, complete: !options.partial, total: 250, workloads: 205, pods: 32, runningPods: 30, readyPods: 29, standalonePods: 6, services: 5, pvcs: 8, abnormal: 3, kinds: { Deployment: 205, Pod: 32 }, phases: { Running: 30 }, purposes: {}, projects: [{ id: projectId, name: '集群验收', ...(options.partial ? {} : { workloads: 1, pods: 1, readyPods: 1, abnormal: 0, devSessions: 0 }) }], sources: options.partial ? [{ key: 'cs-cluster-demo/Pod', kind: 'Pod', namespace: 'cs-cluster-demo', batchId: 'batch', resourceVersion: 'v1', state: 'stale', count: 32, observedAt: time, reason: '采集暂时不可达' }] : [] };
   ClusterResourceSchema.parse(row); ClusterSummarySchema.parse(summary);
   let inspection: ClusterInspection | undefined, operation: ClusterOperation | undefined;
+  // RFC-025 T13：「待回收的工作卷」读资源中心的全平台视图，记录操作经资源中心受理（202，受理后这项操作不再可做）；用例往 records 里放记录。
+  const records: ResourceRecord[] = [];
   // 过期（410）的快照：摘要与资源清单按它读取都得到 410。
   const expired = new Set(['expired']);
   // 保留回执不返回，用来断言换快照在途时页面上还剩什么。
@@ -15,6 +17,12 @@ export function clusterFixture(options: { admin?: boolean; loseReceipt?: boolean
     const url = new URL(String(raw), 'http://localhost'), method = init?.method ?? 'GET', body = init?.body ? JSON.parse(String(init.body)) as Record<string, unknown> : {};
     calls.push({ path: url.pathname, method, body, query: url.searchParams }); let data: unknown = { items: [] }, status = 200;
     if (url.pathname === '/v1/me') data = { id: 'admin', name: '管理员', platformRole: options.admin === false ? 'developer' : 'admin', isAdmin: options.admin !== false, memberships: [] };
+    else if (url.pathname === '/v1/admin/resources') data = { items: records, counts: {}, cursor: 1 };
+    else if (url.pathname.startsWith('/v1/resources/') && method === 'POST') {
+      const [, , , id, , action] = url.pathname.split('/'), at = records.findIndex((r) => r.id === id);
+      if (at >= 0) records[at] = { ...records[at]!, version: records[at]!.version + 1, actions: records[at]!.actions.map((a) => a.id === action ? { id: a.id, enabled: false, disabledReason: '已受理删除，正在回收' } : a) };
+      data = { accepted: true, ...(at >= 0 ? { record: records[at] } : {}) }; status = 202;
+    }
     else if (url.pathname.endsWith('/summary') || url.pathname.endsWith('/resources') && expired.has(url.searchParams.get('snapshotId') ?? '')) { if (expired.has(url.searchParams.get('snapshotId') ?? '')) { status = 410; data = { error: 'not_found', message: '快照已过期，请刷新列表' }; } else data = summary; }
     else if (url.pathname.endsWith('/resources') && url.searchParams.get('scope') === 'system') data = { snapshotId: summary.snapshotId, complete: summary.complete, items: [{ ...row, resourceId: 'system-api', uid: 'uid-cs-api', name: 'cs-api', namespace: 'crewstation-system', ownership: { scope: 'system', component: 'cs-api' }, purpose: 'platform-service', slotRole: undefined, physicalSlot: undefined }], total: 1 };
     else if (url.pathname.endsWith('/resources') && url.searchParams.get('scope') === 'project' && url.searchParams.get('limit') === '100') data = { snapshotId: summary.snapshotId, complete: summary.complete, items: [row], total: 1 };
@@ -41,7 +49,7 @@ export function clusterFixture(options: { admin?: boolean; loseReceipt?: boolean
     return Response.json(data, { status });
   }) as typeof fetch;
   // summary 是初始快照的取值；newSnapshot 之后由服务端回执反映新的 snapshotId。
-  return { calls, row, projectId, summary,
+  return { calls, row, projectId, summary, records,
     /** 后台采集换了一份快照：下一次摘要读取给出新的 snapshotId。 */
     newSnapshot: (snapshotId: string) => { summary = { ...summary, snapshotId }; },
     /** 快照过了保留期：之后按它读取摘要或资源清单都得到 410。 */

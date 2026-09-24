@@ -1,4 +1,4 @@
-import type { Actor, AdminResourceViewQuery, ProjectId, ResourceActionId, ResourceActionRequest, ResourceActionResult, ResourceView, ResourceViewQuery } from '@crewstation/contracts';
+import type { Actor, AdminResourceViewQuery, ClusterLedger, ProjectId, ResourceActionId, ResourceActionRequest, ResourceActionResult, ResourceView, ResourceViewQuery } from '@crewstation/contracts';
 import type {
   ChildObservation, ConditionUpdate, ExpectedChild, LedgerRecord, ObservationOutcome, OwnerTransaction, RecordFilter, ResourceActionHandler, ResourceAlias, ResourceLeases,
   ResourceWriter, StreamSubscription, ViewerAccess,
@@ -23,6 +23,11 @@ export interface ResourcesModuleApi {
   resolveAlias(alias: ResourceAlias): Promise<string | undefined>;
   /** 只读：认领这个集群对象的记录（先按 UID，再按种类＋命名空间＋名字）。 */
   claimOf(child: ExpectedChild & { readonly uid?: string }): Promise<string | undefined>;
+  /**
+   * 只读：一批集群对象各自由哪条记录认领，给出那条标准记录的叠加（阶段、原因、这个人能做的操作、是否由资源中心维护）——
+   * 集群管理的清单按页叠加（RFC-025 T13，I29 裁定）。没有记录认领的不在结果里；看的人对记录所在项目没有读权限时抛错。
+   */
+  claimsOf(actor: Actor, list: readonly ExpectedChild[]): Promise<{ readonly child: ExpectedChild; readonly ledger: ClusterLedger }[]>;
   /** 只读：项目眼下占用的并发额度单位（占额度的种类里在运行或结束中的记录，D31）。 */
   occupancy(projectId: ProjectId): Promise<number>;
   /** 调和器用：某个游标之后已提交的变更（按提交顺序），只给资源 ID；台账一有变化调和器就把它排进队列。 */

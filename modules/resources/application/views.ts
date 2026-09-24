@@ -1,6 +1,7 @@
-import type { ResourceAction, ResourceActionId, ResourceRecord, ResourceView } from '@crewstation/contracts';
+import type { ClusterLedger, ResourceAction, ResourceActionId, ResourceRecord, ResourceView } from '@crewstation/contracts';
 import { actionsFor } from '../domain/actions';
 import { countByKindPhase } from '../domain/conditions';
+import { kindRule } from '../domain/kinds';
 import type { LedgerRecord } from '../domain/record';
 import { aliasText } from '../domain/record';
 import type { ViewerAccess } from '../api/types';
@@ -14,11 +15,18 @@ export function permissionReason(action: ResourceActionId, access: ViewerAccess)
   return undefined;
 }
 
-/** 角色限制先于阶段前置条件：没有权限的人看到的原因是权限，而不是一个永远满足不了的阶段条件。 */
-function trimActions(actions: readonly ResourceAction[], access: ViewerAccess): ResourceAction[] {
+/** 所属模块没登记执行者、资源中心自己也不做的操作：受理时同样以这句拒绝。 */
+export const UNSUPPORTED_ACTION = '这类资源暂不支持在这里操作';
+
+/**
+ * 角色限制先于阶段前置条件：没有权限的人看到的原因是权限，而不是一个永远满足不了的阶段条件。
+ * 其次是执行者：阶段上可做、却没人执行的，如实写不支持，不让页面给出一个点了必然失败的按钮。
+ */
+function trimActions(actions: readonly ResourceAction[], access: ViewerAccess, owner: string): ResourceAction[] {
   return actions.map((action) => {
     const denied = permissionReason(action.id, access);
-    return denied ? { id: action.id, enabled: false, disabledReason: denied } : action;
+    if (denied) return { id: action.id, enabled: false, disabledReason: denied };
+    return action.enabled && access.executable && !access.executable(owner, action.id) ? { id: action.id, enabled: false, disabledReason: UNSUPPORTED_ACTION } : action;
   });
 }
 
@@ -36,10 +44,19 @@ export function toResourceRecord(record: LedgerRecord, now: Date, access: Viewer
     ...optional('display', Object.keys(record.display).length ? { ...record.display } : undefined),
     generation: record.generation, observedGeneration: record.observedGeneration,
     ...optional('idleSince', iso(record.idleSince)), ...optional('retainUntil', iso(record.retainUntil)),
-    actions: trimActions(actionsFor(record), access),
+    actions: trimActions(actionsFor(record), access, record.owner.module),
     ...optional('aliases', record.aliases.length ? record.aliases.map(aliasText) : undefined),
     version: record.version, createdAt: record.createdAt.toISOString(), updatedAt: record.updatedAt.toISOString(),
   };
+}
+
+/**
+ * 集群清单一行的叠加（RFC-025 T13，I29 裁定）：标准记录的阶段、原因与可做操作，外加对象是否由资源中心按期望维护——
+ * 期望在、种类由调和器渲染的，删掉会被补回。
+ */
+export function toClusterLedger(record: LedgerRecord, now: Date, access: ViewerAccess): ClusterLedger {
+  const { id, kind, phase, phaseSince, reason, actions, version } = toResourceRecord(record, now, access);
+  return { id, kind, phase, phaseSince, ...(reason ? { reason } : {}), actions, version, maintained: record.desired === 'present' && kindRule(record.kind).rendered === true };
 }
 
 /**
