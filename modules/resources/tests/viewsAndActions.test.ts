@@ -97,6 +97,21 @@ describe.skipIf(!available)('可做操作的统一受理（设计 §4.2）', () 
     expect((await h.module.api.view(ADMIN, PROJECT, { kind: 'volume' })).items[0]?.actions[0]?.disabledReason).toBe('只有待回收的工作卷可以删除');
     expect((await failure(h.module.api.performAction(ADMIN, volume.id, 'delete-volume', {}))).message).toBe('只有待回收的工作卷可以删除');
   });
+
+  // 设计 §6.4、D8：待回收的工作卷由管理员确认后删——资源中心自己受理（不交所属模块），期望改为「不要了」，调和器随之删 PVC。
+  test('待回收的工作卷：管理员删除即「不要了」（原因写明，以所属模块的名义），此后不能再删；非管理员与版本已变的拒绝', async () => {
+    const pvc = { kind: 'PersistentVolumeClaim', namespace: 'cs-demo', name: 'orphan-work' };
+    const volume = await h.module.api.owner('cluster-control').declare({ kind: 'volume', ref: 'orphan-work', projectId: PROJECT, spec: { children: [pvc] } });
+    await h.module.api.observeConditions(volume.id, [{ type: 'PendingReclaim', status: 'true', reason: 'orphaned', message: '孤儿工作卷，等管理员确认' }]);
+    const pending = await h.module.api.get(volume.id);
+    expect((await failure(h.module.api.performAction(DEVELOPER, volume.id, 'delete-volume', {}))).kind).toBe('forbidden');
+    expect((await failure(h.module.api.performAction(ADMIN, volume.id, 'delete-volume', { expectedVersion: pending!.version + 1 }))).kind).toBe('conflict');
+    const result = await h.module.api.performAction(ADMIN, volume.id, 'delete-volume', { expectedVersion: pending!.version });
+    expect(result.accepted).toBe(true);
+    expect(await h.module.api.get(volume.id)).toMatchObject({ desired: 'absent', owner: { module: 'cluster-control' }, releaseReason: { code: 'volume-deleted', message: '管理员确认删除工作卷' } });
+    expect(result.record?.actions).toEqual([{ id: 'delete-volume', enabled: false, disabledReason: '已受理删除，正在回收' }]);
+    expect((await failure(h.module.api.performAction(ADMIN, volume.id, 'delete-volume', {}))).message).toBe('已受理删除，正在回收');
+  });
 });
 
 describe.skipIf(!available)('HTTP 路由', () => {

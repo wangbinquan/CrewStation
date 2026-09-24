@@ -208,6 +208,12 @@ describe.skipIf(!available)('cluster-control：观测写回台账与收编空跑
     expect((await resources.api.get(follow))?.phase).toBe('ready');
     expect(removals.some((entry) => entry.endsWith('-work'))).toBe(false);
     expect(control.stats().reclaimable).toBe(2);
+    // 管理员确认删除（设计 §6.4）：资源中心把卷的期望改为「不要了」，调和器按 UID 删 PVC，记录随即已结束。
+    await resources.api.performAction(ADMIN, expired, 'delete-volume', {});
+    await until('PVC 删掉', () => removals.includes('PersistentVolumeClaim/task-exp-work'));
+    await until('卷记录已结束', async () => { const record = await resources.api.get(expired); return record?.desired === 'absent' && record.phase === 'stopped'; });
+    expect((await resources.api.get(expired))?.releaseReason?.code).toBe('volume-deleted');
+    expect(removals.includes('PersistentVolumeClaim/task-keep-work')).toBe(false);
   });
 
   test('收编空跑：逐个判定归属，孤儿排在前面，计数覆盖全部；只读，不写台账', async () => {

@@ -1,4 +1,4 @@
-import type { ResourceAction, ResourceRecord, ResourceView } from '@crewstation/contracts';
+import type { ResourceAction, ResourceActionId, ResourceRecord, ResourceView } from '@crewstation/contracts';
 import { actionsFor } from '../domain/actions';
 import { countByKindPhase } from '../domain/conditions';
 import type { LedgerRecord } from '../domain/record';
@@ -7,12 +7,18 @@ import type { ViewerAccess } from '../api/types';
 import type { RecordFilter } from '../domain/record';
 import type { LedgerScope } from '../ports/repositories';
 
+/** 这个人没有权限做这个操作的原因；有权限返回 undefined。展示与受理共用：受理时权限不足一律 403。 */
+export function permissionReason(action: ResourceActionId, access: ViewerAccess): string | undefined {
+  if (action === 'delete-volume' && !access.admin) return '只有管理员可以删除工作卷';
+  if (!access.operate && !access.admin) return '需要这个项目的开发权限';
+  return undefined;
+}
+
 /** 角色限制先于阶段前置条件：没有权限的人看到的原因是权限，而不是一个永远满足不了的阶段条件。 */
 function trimActions(actions: readonly ResourceAction[], access: ViewerAccess): ResourceAction[] {
   return actions.map((action) => {
-    if (action.id === 'delete-volume' && !access.admin) return { id: action.id, enabled: false, disabledReason: '只有管理员可以删除工作卷' };
-    if (!access.operate && !access.admin) return { id: action.id, enabled: false, disabledReason: '需要这个项目的开发权限' };
-    return action;
+    const denied = permissionReason(action.id, access);
+    return denied ? { id: action.id, enabled: false, disabledReason: denied } : action;
   });
 }
 

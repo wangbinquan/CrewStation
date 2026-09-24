@@ -200,6 +200,8 @@ ResourceActionSchema = z.object({ id: ResourceActionIdSchema, enabled: z.boolean
 - **孤儿**：观测缓存里带受管标签、但找不到对应子对象记录（或对应资源已 `stopped`／保留期满）的对象：Pod、Secret、Service、IngressRoute、Middleware、ConfigMap 按 UID 删除，并在台账写一条系统审计；PVC 不删，建一条 `volume` 记录（阶段 `stopped`，条件 `PendingReclaim`，原因 `orphaned`）。命名空间与 `crewstation-system` 不在回收范围。
 - **管理员删除工作卷**：集群管理对 `PendingReclaim` 的卷给出「删除工作卷」，确认弹窗要输入确认词（开发规则 §7）；受理后该卷期望改为「不要了」，由调和器删除。
 
+> **实施补记（2026-09-24，第五期第一步：删除待回收的工作卷，后端）**：`delete-volume` 由资源中心自己受理，不交所属模块（判定与执行都是 D8 的规则）：只给管理员、只对待回收的卷；受理即以所属模块的名义把期望改为「不要了」（原因 `volume-deleted`「管理员确认删除工作卷」），调和器按 UID 删 PVC，删完记录进入「已结束」；已受理的再点给出「已受理删除，正在回收」。权限不足一律 403（此前有项目开发权限、却不是管理员的人得到的是 412）。可带 `expectedVersion`，记录变了就 409。task-runtime 的投影遇到已受理释放的工作卷不再重新声明。集群管理里放在哪、怎样呈现，连同清单来源与台账维护对象的运维语义，待 [I29](../../../docs/engineering/implementation-open-questions.md#i29-集群管理改读台账清单的来源台账维护的对象还给不给删除待回收的工作卷放在哪) 裁定。
+
 ### 6.5 收编（B11、RC-06、RC-15）
 
 一次性的收编作业（每期迁移时运行，幂等）：

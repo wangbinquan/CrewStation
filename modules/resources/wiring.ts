@@ -61,6 +61,13 @@ export function createResourcesModule(deps: ResourcesModuleDeps): ResourcesModul
     ...ownerWriter(module, uow.run, deps.quotas, clock),
     within: (tx) => ownerWriter(module, (fn) => fn(uow.within(tx as Executor)), deps.quotas, clock),
   });
+  // 删除待回收的工作卷（设计 §6.4、D8）：管理员确认后由资源中心把卷的期望改为「不要了」（以所属模块的名义），调和器按 UID 删 PVC。
+  const centerActions = {
+    'delete-volume': async ({ actor, record }: Parameters<ResourceActionHandler>[0]) => {
+      await owner(record.owner.module).requestRelease(record.id, { code: 'volume-deleted', message: '管理员确认删除工作卷' });
+      logger.info('resource volume deletion accepted', { resourceId: record.id, by: actor.userId, pvc: record.spec.children[0]?.name, namespace: record.spec.children[0]?.namespace });
+    },
+  };
   const api: ResourcesModuleApi = {
     name: 'resources',
     owner,
@@ -89,7 +96,7 @@ export function createResourcesModule(deps: ResourcesModuleDeps): ResourcesModul
     checkStreamCapacity: hub.checkCapacity,
     subscribe: hub.subscribe,
     performAction: (actor, id, action, request) => performAction({
-      read: uow.read, clock, handlers,
+      read: uow.read, clock, handlers, centerActions,
       access: (who, record) => (record.projectId ? projectAccess(who, record.projectId) : adminAccess(who)),
     }, actor, id, action, request),
     registerActionHandler: (module, handler) => { handlers.set(module, handler); },
