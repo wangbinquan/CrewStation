@@ -391,6 +391,8 @@ spec.env.0.configDefinitionId / spec.env.1.configDefinitionId: expected string, 
 
 **实施（2026-09-24）**：先做与本条无关的部分（路由的建与改移交调和器、同 Host 唯一、开发预览路由、身份索引）；说明页与开关等本条裁定。
 
+裁定后按 (a) 做完：gateway 给正式与待验证路由的期望加上说明页中间件名（`unavailable-<IngressRoute 名>`，也是记录的子对象）；调和器发现目标 Service 所属的槽记录「已结束」且期望在，就先建这条路由独用的 replacePath 中间件（路径是 `/_crewstation/unavailable/<路由记录 ID>`），它进了观测缓存再把 IngressRoute 改指 cs-api（原中间件链照旧在前）；槽的记录一变，指向它的路由随之核对，重新有工作负载就指回槽，中间件留着。cs-api 的说明页按路由记录与槽记录的 Serving 条件渲染（主机对不上的一律 404）：浏览器得到页面（与维护页同源，正式主机写「尚未上线」），接口得到 503＋`not-deployed`＋`details`（下线的时间、原因与版本），一律不缓存；路由还没改回来的那一瞬回「正在切换」并带 `Retry-After`。ForwardAuth 不再判待命槽（gateway 的入口判定只剩维护，release 的 `standbyEntry` 退役），preview 访问照记。服务域与内部 API 路由不改指；`allowEmptyServices` 保留，兜底部署中、部署失败与改指前的那几秒。
+
 ## I27. 项目归档后，命名空间记录与命名空间怎样收尾
 
 **现状**：RFC-025 第四期起，provisioning 给每个项目写 `namespace`（Namespace＋额度）与 `network-policy-set` 两条记录，调和器建出、被改或被删就补回。提案 §4 的种类表把命名空间的生命周期写成「项目归档才删」；设计 §6.4 写「命名空间与 `crewstation-system` 不在回收范围」。今天归档一个项目：网关摘掉路由、限流策略记录标「不要了」，命名空间和里面的额度、网络策略、待回收的工作卷原样留着，启动重下发也跳过已归档的项目——没有任何路径删命名空间（cs-controller 的 RBAC 对 namespaces 也没有 delete）。

@@ -29,7 +29,6 @@ type Deps = ReleaseUseCaseDeps & { isAdmin(userId: UserId): Promise<boolean> };
 /** preview 访问最多每 5 分钟写一次库：计时以天为单位，ForwardAuth 却每个请求都会来（RFC-021 B2）。 */
 const ACCESS_NOTE_INTERVAL_MS = 5 * 60_000;
 
-export interface StandbyEntry { readonly empty: boolean; readonly offline?: { readonly at: string; readonly reason: OfflineReason; readonly tag?: string } }
 export interface SweepOutcome { readonly initialized: number; readonly reminded: number; readonly offline: number; readonly repaired: number }
 
 export async function policyOf(scope: Pick<RepositoryScope, 'offlinePolicy'>): Promise<OfflinePolicyRecord> {
@@ -193,16 +192,6 @@ function entryUseCases(deps: Deps, tools: LifecycleTools) {
         const retention = noteRetentionAccess(slot.retention, now);
         if (retention !== slot.retention) await scope.slots.save(withSlot(slots, { ...slot, retention }, now));
       });
-    },
-    /** 由 gateway 给 preview 入口判定：待命槽上有没有工作负载；没有时带上何时因何下线（B6）。 */
-    standbyEntry: async (serviceId: ServiceId): Promise<StandbyEntry> => {
-      const slots = await uow.read.slots.get(serviceId);
-      const slot = slots ? slots[standbyOf(slots.active)] : undefined;
-      if (slot && hasWorkload(slot)) return { empty: false };
-      const offline = slot?.offline;
-      if (!offline) return { empty: true };
-      const tag = (await uow.read.releases.getById(offline.releaseId))?.tag;
-      return { empty: true, offline: { at: offline.at.toISOString(), reason: offline.reason, ...(tag ? { tag } : {}) } };
     },
   };
 }

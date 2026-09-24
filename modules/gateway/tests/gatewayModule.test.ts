@@ -35,7 +35,7 @@ function newGateway(extra: Partial<Pick<Parameters<typeof createGatewayModule>[0
       getService: async (id) => services.find((s) => s.serviceId === id),
       serviceIdOfProject: async (projectId) => services.find((s) => s.projectId === projectId)?.serviceId,
     },
-    slots: { slotRoles: async () => ({ prod: prodPhysical, preview: prodPhysical === 'blue' ? 'green' : 'blue' }), standbyEntry: async () => ({ empty: false }), notePreviewAccess: async () => {} },
+    slots: { slotRoles: async () => ({ prod: prodPhysical, preview: prodPhysical === 'blue' ? 'green' : 'blue' }), notePreviewAccess: async () => {} },
     access: { authorize: async () => 'admin', isMemberOrAdmin: async () => true },
     users: { describe: async () => undefined },
     grants: {

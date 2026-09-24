@@ -11,7 +11,6 @@ import type { GatewayUseCaseDeps } from './dependencies';
 /** 放行判定每个请求都用：进程内缓存「当前所有维护中的服务」3 秒，改动后最多 3 秒生效（design §5）。 */
 const ACTIVE_CACHE_MS = 3_000;
 const DIRECTORY_CACHE_MS = 30_000;
-const STANDBY_CACHE_MS = 3_000;
 
 /** 服务域调用被维护拦下：给 503 的说明与 `Retry-After`。 */
 export interface ServiceBlock { readonly message: string; readonly retryAfterSeconds?: number }
@@ -26,11 +25,10 @@ function snapshotOf(m: Maintenance): Pick<MaintenanceEventRecord, 'switches' | '
   return { switches: m.switches, reason: m.reason, ...(m.expectedEndAt ? { expectedEndAt: m.expectedEndAt } : {}), allowUserIds: m.allowUserIds };
 }
 
-/** 进程内缓存：维护中的服务、slug 到服务的目录、待命槽状态。 */
+/** 进程内缓存：维护中的服务、slug 到服务的目录。 */
 function maintenanceCache(deps: GatewayUseCaseDeps) {
   let active: { at: number; entries: ActiveEntry[] } | undefined;
   let directory: { at: number; bySlug: Map<string, DirectoryService> } | undefined;
-  const standby = new Map<string, { at: number; entry: Awaited<ReturnType<GatewayUseCaseDeps['slots']['standbyEntry']>> }>();
   return {
     invalidate: () => { active = undefined; },
     active: async (): Promise<ActiveEntry[]> => {
@@ -50,13 +48,6 @@ function maintenanceCache(deps: GatewayUseCaseDeps) {
       const stale = !directory || Date.now() - directory.at > DIRECTORY_CACHE_MS || (!directory.bySlug.has(slug) && Date.now() - directory.at > 1_000);
       if (stale) directory = { at: Date.now(), bySlug: new Map((await deps.services.listServices()).map((s) => [s.projectSlug, s])) };
       return directory?.bySlug.get(slug);
-    },
-    standby: async (serviceId: ServiceId) => {
-      const hit = standby.get(serviceId);
-      if (hit && Date.now() - hit.at < STANDBY_CACHE_MS) return hit.entry;
-      const entry = await deps.slots.standbyEntry(serviceId);
-      standby.set(serviceId, { at: Date.now(), entry });
-      return entry;
     },
   };
 }
@@ -132,11 +123,9 @@ function maintenanceQueries(deps: GatewayUseCaseDeps, cache: Cache) {
         const retry = retryAfterSeconds(m, deps.clock.now());
         return { kind: 'maintenance', projectSlug, reason: m.reason, ...(m.expectedEndAt ? { expectedEndAt: m.expectedEndAt.toISOString() } : {}), ...(retry ? { retryAfterSeconds: retry } : {}) };
       }
+      // 待命槽上没有版本不在这里判：槽「已结束」时路由改指说明页（RFC-025 D13、I26 裁定）。访问照记，自动下线的空闲计时靠它（没有工作负载时 release 不记）。
       const svc = await cache.serviceBySlug(projectSlug);
-      if (!svc) return { kind: 'open' };
-      const standby = await cache.standby(svc.serviceId);
-      if (standby.empty) return { kind: 'not-deployed', projectSlug, ...(standby.offline ? { offline: standby.offline } : {}) };
-      void deps.slots.notePreviewAccess(svc.serviceId).catch((error: unknown) => deps.logger.warn('preview access note failed', { service: svc.identity, error: String(error) }));
+      if (svc) void deps.slots.notePreviewAccess(svc.serviceId).catch((error: unknown) => deps.logger.warn('preview access note failed', { service: svc.identity, error: String(error) }));
       return { kind: 'open' };
     },
     /** 服务域：目标（`service:<名>` 或 `proxy:<名>`）维护中且开关打开、调用方不是它自己（M25）时拦下。 */

@@ -1,5 +1,6 @@
 import type { Clock, Logger } from '@crewstation/kernel';
 import type { ObservedObject } from '../domain/observation';
+import type { MiddlewareRender } from '../domain/middlewareRender';
 import { middlewareRendersOf } from '../domain/middlewareRender';
 import { namespaceRenderOf, networkPolicyRendersOf } from '../domain/namespaceRender';
 import { controllerOf, crashLoopingOf, RESOURCE_ID_LABEL } from '../domain/observation';
@@ -8,6 +9,8 @@ import type { ClusterWriter, ManagedObjectFeed, ObservedKind } from '../ports/cl
 import type { LedgerObservations, LedgerRecordView } from '../ports/ledger';
 import type { ObservationStats } from './observeChange';
 import { observeChange } from './observeChange';
+import type { Explainer, RouteTargets } from './routeExplainer';
+import { enqueueRoutesOfSlot, explainerFor, targetKey } from './routeExplainer';
 
 /** 删的顺序（设计 §6.2）：先工作负载（Deployment、Job、Pod），再 Secret、Service、路由与它引用的中间件；PVC 只随工作卷记录删。 */
 const REMOVAL_ORDER: readonly ObservedKind[] = ['Deployment', 'Job', 'Pod', 'Secret', 'Service', 'IngressRoute', 'Middleware', 'PersistentVolumeClaim'];
@@ -32,6 +35,10 @@ export interface ReconcileDeps {
   readonly logger: Logger;
   /** 等依赖对象时的复核间隔（用例调短）；缺省 2 秒。 */
   readonly retryMs?: number;
+  /** 说明页（D13）：槽「已结束」时待验证与正式主机改指它；不给就不改指（路由照期望指向槽的 Service）。 */
+  readonly explainer?: Explainer;
+  /** 槽的 Service → 指向它的路由；槽变了阶段时据此把路由排进队列。 */
+  readonly routeTargets?: RouteTargets;
 }
 
 /** 期望里的与观测到的子对象（期望里已经没有、但还在集群里的旧对象也在内，例如重建换下的 Pod）。 */
@@ -128,17 +135,34 @@ async function applyChild(deps: ReconcileDeps, record: LedgerRecordView, child: 
 }
 
 /**
+ * 说明页的中间件（D13）：缺了或被改就按期望 apply；它进了观测缓存才返回 true——路由引用一个 Traefik 还没见到的中间件会整条失效，
+ * 所以建出来之后过一会儿再改路由。删除中的等它消失再建。
+ */
+async function explainerMiddlewareReady(deps: ReconcileDeps, record: LedgerRecordView, middleware: MiddlewareRender, enqueue: Enqueue): Promise<boolean> {
+  const current = deps.feed.cached('Middleware', middleware.namespace, middleware.name);
+  if (!current?.metadata.deletionTimestamp) await applyChild(deps, record, { kind: 'Middleware', namespace: middleware.namespace, name: middleware.name }, current, () => deps.cluster.applyMiddleware(middleware, record.id, current));
+  if (current && !current.metadata.deletionTimestamp) return true;
+  deps.logger.debug('resource route waiting for explainer middleware', { resourceId: record.id, middleware: middleware.name });
+  enqueue(record.id, deps.retryMs ?? WAIT_MS);
+  return false;
+}
+
+/**
  * 路由（第三期后半，设计 §7.1）：期望在、IngressRoute 缺了或与期望不一致时按期望 apply——网关写期望，调和器应用。
  * 删除中的等它消失再建；系统命名空间不碰；期望不完整的不渲染，只告警。引用的项目中间件（前缀剥离、限流）还没建出来时先不动：
- * Traefik 遇到不存在的中间件会让整条路由失效，线上那一版照旧服务，过一会儿再核对。
+ * Traefik 遇到不存在的中间件会让整条路由失效，线上那一版照旧服务，过一会儿再核对。目标槽「已结束」的待验证与正式主机改指说明页（D13）。
  */
 async function applyRoute(deps: ReconcileDeps, record: LedgerRecordView, enqueue: Enqueue): Promise<void> {
-  const route = routeRenderOf(record.spec);
-  if (!route) {
+  const planned = routeRenderOf(record.spec);
+  if (!planned) {
     deps.logger.warn('resource route spec incomplete', { resourceId: record.id });
     return;
   }
-  if (route.namespace === deps.systemNamespace) return;
+  if (planned.namespace === deps.systemNamespace) return;
+  deps.routeTargets?.note(record.id, targetKey(planned.target.namespace, planned.target.service));
+  const explained = await explainerFor(deps, record, planned);
+  if (explained && !(await explainerMiddlewareReady(deps, record, explained.middleware, enqueue))) return;
+  const route = explained?.route ?? planned;
   const waiting = route.middlewares.find((entry) => (!entry.namespace || entry.namespace === route.namespace) && !deps.feed.cached('Middleware', route.namespace, entry.name));
   if (waiting) {
     deps.logger.debug('resource route waiting for middleware', { resourceId: record.id, middleware: waiting.name });
@@ -225,6 +249,8 @@ export async function reconcileRecord(deps: ReconcileDeps, id: string, enqueue: 
   if (!record) return;
   await observeRecord(deps, record);
   await observeControlledPods(deps, record, enqueue);
+  // 槽变了（上线、下线、部署就绪）：指向它的路由重新核对该指槽还是指说明页（D13）。
+  enqueueRoutesOfSlot(record, deps.routeTargets, enqueue);
   if (record.desired === 'present') await APPLIERS[record.kind]?.(deps, record, enqueue);
   if (record.desired === 'absent') await removeChildren(deps, record);
   await settleVolume(deps, record);

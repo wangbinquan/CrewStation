@@ -73,14 +73,14 @@ function userResponse(c: Context<AppEnv>, decision: UserAuthDecision, api: Ident
   }
 }
 
-/** RFC-021：维护页与未部署页都是 503；有预计恢复时间时带 Retry-After。 */
+/**
+ * RFC-021：正式版本维护中是 503，有预计恢复时间时带 Retry-After。待命槽上没有版本的未部署页已退役（RFC-025 I26 裁定）：
+ * 槽「已结束」时路由改指 cs-api 的说明页，错误体仍是 `not-deployed`＋`details`。
+ */
 function unavailableResponse(c: Context<AppEnv>, entry: Extract<UserAuthDecision, { kind: 'unavailable' }>['entry'], api: IdentityModuleApi): Response {
-  if (entry.kind === 'maintenance' && entry.retryAfterSeconds) c.header('retry-after', String(entry.retryAfterSeconds));
+  if (entry.retryAfterSeconds) c.header('retry-after', String(entry.retryAfterSeconds));
   if ((c.req.header('accept') ?? '').includes('text/html')) return c.html(api.unavailablePage(entry, { scheme: c.req.header('x-forwarded-proto') }), 503);
-  if (entry.kind === 'maintenance') {
-    return c.json({ error: 'maintenance', message: `${entry.projectSlug} 正在维护：${entry.reason}`, details: { reason: entry.reason, ...(entry.expectedEndAt ? { expectedEndAt: entry.expectedEndAt } : {}) } }, 503);
-  }
-  return c.json({ error: 'not-deployed', message: `${entry.projectSlug} 当前没有待验证版本`, details: entry.offline ? { ...entry.offline } : {} }, 503);
+  return c.json({ error: 'maintenance', message: `${entry.projectSlug} 正在维护：${entry.reason}`, details: { reason: entry.reason, ...(entry.expectedEndAt ? { expectedEndAt: entry.expectedEndAt } : {}) } }, 503);
 }
 
 function serviceResponse(c: Context<AppEnv>, decision: ServiceAuthDecision): Response {

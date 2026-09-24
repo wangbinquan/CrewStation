@@ -250,7 +250,6 @@ describe.skipIf(!available)('RFC-021 待命槽生命周期', () => {
     expect(await f.k8s.get(Resources.Service!, 'lifecycle-green', ns)).toBeDefined();
     expect(await f.release.api.getRelease(owner, v1.id)).toMatchObject({ status: 'offline', redeployable: true });
     expect((await f.release.api.listSlotEvents(owner, serviceId))[0]).toMatchObject({ kind: 'offline', reason: 'manual', actorUserId: owner.userId, tag: v1.tag });
-    expect(await f.release.api.standbyEntry(serviceId)).toMatchObject({ empty: true, offline: { reason: 'manual', tag: v1.tag } });
     await expect(f.release.api.takeOffline(owner, serviceId, { expectedReleaseId: v1.id })).rejects.toMatchObject({ kind: 'precondition', message: expect.stringContaining('没有运行中的版本') });
 
     const jobs = await f.jobs();

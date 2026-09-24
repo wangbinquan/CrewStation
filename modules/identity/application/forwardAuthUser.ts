@@ -38,7 +38,7 @@ export function forwardAuthUserUseCase(deps: Deps, forwarding: Pick<ReturnType<t
     if (target.kind === 'service-user' && target.slot !== 'prod' && !(await deps.previewAccess.canView(user.id, target.projectSlug, target.slot))) {
       return { kind: 'forbidden', message: `没有项目 ${target.projectSlug} 的 ${target.slot} 访问权限：需要项目成员或 preview 测试者` };
     }
-    // RFC-021：正式版本维护中只放行成员、管理员与临时指定的人；待命槽上没有版本时给说明页。都是 503。
+    // RFC-021：正式版本维护中只放行成员、管理员与临时指定的人，其余 503。待命槽上没有版本不在这里判：槽「已结束」时路由改指说明页（RFC-025 D13）。
     if (target.kind === 'service-user' && target.slot !== 'dev') {
       const entry = await deps.serviceEntry.check(user.id, target.projectSlug, target.slot);
       if (entry.kind !== 'open') return { kind: 'unavailable', entry };

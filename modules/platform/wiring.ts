@@ -23,7 +23,7 @@ import { createDataControlModule } from '@crewstation/module-data-control';
 import { createDevSessionModule } from '@crewstation/module-dev-session';
 import type { EventsModuleApi } from '@crewstation/module-events';
 import { createEventsModule } from '@crewstation/module-events';
-import { createGatewayModule } from '@crewstation/module-gateway';
+import { createGatewayModule, UNAVAILABLE_PATH } from '@crewstation/module-gateway';
 import type { GatewayModuleApi } from '@crewstation/module-gateway';
 import { createIdentityModule } from '@crewstation/module-identity';
 import { createObservabilityModule } from '@crewstation/module-observability';
@@ -223,7 +223,9 @@ function composeDelivery(deps: CompositionDeps, core: ReturnType<typeof composeC
       getService: async (id) => { const s = await resolveById(id); return s ? directoryService(s) : undefined; },
       serviceIdOfProject: async (projectId) => (await project.api.resolveServiceOfProject(projectId))?.serviceId,
     },
-    slots: { slotRoles: release.api.slotRoles, standbyEntry: release.api.standbyEntry, notePreviewAccess: release.api.notePreviewAccess },
+    slots: { slotRoles: release.api.slotRoles, notePreviewAccess: release.api.notePreviewAccess },
+    // RFC-025 D13、I26 裁定：说明页由 cs-api 按台账渲染（路由记录与目标槽记录），页面与维护页同源。
+    explainer: { reader: { get: (id) => resources.api.get(id), claimOf: (child) => resources.api.claimOf(child) }, page: (entry, context) => core.identity.api.unavailablePage(entry, context) },
     grants: { grantedOperations: apiCatalog.api.grantedOperations, listCallers: async () => [], proxyNameOf: apiCatalog.api.activeProxyNameOf },
     access: {
       authorize: project.api.authorize,
@@ -422,6 +424,8 @@ function composeControl(deps: CompositionDeps, core: ReturnType<typeof composeCo
     leases: { port: ledger.api.leases, holder: `${deps.instance}.cluster-control` },
     // RFC-025 设计 §7.4：身份索引改读观测缓存的 Pod，全平台只剩这一条 Pod watch。
     pods: { changed: (pod, gone) => gateway.api.syncObservedPod(pod, gone), synced: async (pods) => { await gateway.api.relistObservedPods(pods); } },
+    // D13：槽「已结束」时待验证与正式主机改指 cs-api 的说明页（Service 与端口同平台路由清单 deploy/k8s/platform/30-cs-api.yaml）。
+    explainer: { namespace: deps.settings.systemNamespace, service: 'cs-api', port: 8080, path: UNAVAILABLE_PATH },
     ledger: {
       observe: (input) => ledger.api.observe(input), claimOf: (child) => ledger.api.claimOf(child), get: (id) => ledger.api.get(id),
       listLive: () => ledger.api.list({}), changesSince: ledger.api.changesSince, latestChange: ledger.api.latestChange,

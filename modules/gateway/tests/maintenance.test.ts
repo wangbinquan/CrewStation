@@ -25,14 +25,13 @@ const user = (n: number) => `01a0bf5d-8f4b-7210-80c1-302ae945b0${String(n).padSt
 const owner: Actor = { userId: user(1), isAdmin: false }, developer: Actor = { userId: user(2), isAdmin: false }, tester: Actor = { userId: user(3), isAdmin: false };
 const admin: Actor = { userId: user(4), isAdmin: true }, stranger: Actor = { userId: user(5), isAdmin: false }, guest: Actor = { userId: user(6), isAdmin: false };
 const members = new Map<UserId, string>([[owner.userId, 'owner'], [developer.userId, 'developer'], [tester.userId, 'tester']]);
-const standby = new Map<ServiceId, { empty: boolean; offline?: { at: string; reason: 'idle'; tag: string } }>();
 const noted: ServiceId[] = [];
 
 function newGateway(): GatewayModule {
   return createGatewayModule({
     db: tdb.db, k8s: createFakeK8sClient(),
     services: { listServices: async () => services, getService: async (id) => services.find((s) => s.serviceId === id), serviceIdOfProject: async (p) => services.find((s) => s.projectId === p)?.serviceId },
-    slots: { slotRoles: async () => ({ prod: 'blue', preview: 'green' }), standbyEntry: async (id) => standby.get(id) ?? { empty: false }, notePreviewAccess: async (id) => { noted.push(id); } },
+    slots: { slotRoles: async () => ({ prod: 'blue', preview: 'green' }), notePreviewAccess: async (id) => { noted.push(id); } },
     grants: {
       grantedOperations: async (caller) => ({
         operations: caller === 'demo/demo' ? ['01a0bf5d-8f4b-7155-8e96-d9844e02dfa1'] : [],
@@ -109,13 +108,14 @@ describe.skipIf(!available)('RFC-021 正式版本维护', () => {
     await gateway.api.exitMaintenance(owner, demoId, { expectedRevision: revision + 1 });
   });
 
-  test('preview 入口：待命槽没有版本时是未部署页（带下线记录），有版本时放行并记一次访问', async () => {
-    standby.set(demoId, { empty: true, offline: { at: '2026-09-23T01:00:00.000Z', reason: 'idle', tag: 'v0.1.2' } });
-    expect(await gateway.api.userEntry(tester.userId, 'demo', 'preview')).toEqual({ kind: 'not-deployed', projectSlug: 'demo', offline: { at: '2026-09-23T01:00:00.000Z', reason: 'idle', tag: 'v0.1.2' } });
+  // RFC-025 D13、I26 裁定：待命槽上没有版本不再由入口判定（槽「已结束」时路由改指说明页），preview 入口一律放行并记访问。
+  test('preview 入口：放行并记一次访问（有没有版本由路由决定，不在这里判）；不存在的项目也放行', async () => {
+    noted.length = 0;
+    expect(await gateway.api.userEntry(tester.userId, 'demo', 'preview')).toEqual({ kind: 'open' });
     expect(await gateway.api.userEntry(tester.userId, 'issues', 'preview')).toEqual({ kind: 'open' });
-    expect(noted).toEqual([issuesId]);
+    expect(noted).toEqual([demoId, issuesId]);
     expect(await gateway.api.userEntry(tester.userId, 'no-such-project', 'preview')).toEqual({ kind: 'open' });
-    standby.delete(demoId);
+    expect(noted).toEqual([demoId, issuesId]);
   });
 
   test('服务域：其他服务调用维护中的服务 503，项目自己的负载与平台组件照常；proxy 前缀同样生效；开关关着时照常', async () => {

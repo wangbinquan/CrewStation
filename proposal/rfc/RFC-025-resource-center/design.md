@@ -257,6 +257,8 @@ ResourceActionSchema = z.object({ id: ResourceActionIdSchema, enabled: z.boolean
 - `Accept` 含 `text/html` 给页面；其余给 503 与 `{ error: 'not_deployed', message, reason }`（B8、提案 Q6）。
 - 页面是服务端渲染的静态 HTML（不加载工作台包），颜色走与工作台一致的令牌。
 
+> **实施补记（2026-09-24，第三期后半：说明页，I26 裁定）**：错误体沿用 RFC-021 的 `{ error: 'not-deployed', message, details }`（details 是下线的时间、原因与版本），不用上面写的 `not_deployed`＋`reason`；`allowEmptyServices` 保留作兜底（部署中、部署失败、改指之前的那几秒仍是 Traefik 的 503），ForwardAuth 的未部署分支退役。只有用户域的正式与待验证路由改指说明页（提案 §8.1），服务域与内部 API 路由照旧指向槽。改指由调和器做：gateway 在这两种路由的期望里写说明页中间件名（`unavailable-<IngressRoute 名>`，同命名空间，也是记录的子对象）；目标 Service 所属的槽记录「已结束」且期望在时，调和器先建出 replacePath 中间件（`/_crewstation/unavailable/<路由记录 ID>`），它进了观测缓存再把 IngressRoute 改指 cs-api 的 Service（端口 8080，中间件链在原链之后追加它），槽重新有工作负载就指回、中间件留着；槽记录一变，调和器按「目标 Service → 路由」的索引把指向它的路由排进队列。cs-api 的处理按路由记录（须是 gateway 的正式或待验证路由，请求的主机与记录的主机一致，否则 404）读目标槽记录的 Serving 条件：下线（`offline-<原因>`）写何时因何下线、下线的版本，没有下线原因是尚未部署（正式主机写「尚未上线」），已为真则是刚部署好、路由还没改回来——回「正在切换」并带 `Retry-After: 2`；一律 `Cache-Control: no-store`。页面沿用 identity 渲染维护页的同一套（RFC-021），没有另写。
+
 ### 7.3 限流（D10–D12）
 
 - `rate-limit-policy` 的期望：平台默认一条（平台设置里由管理员改）、项目覆盖若干条（管理员改）；`gateway` 负责校验与写期望。

@@ -13,6 +13,8 @@ export interface RouteRender {
   readonly target: { readonly namespace: string; readonly service: string; readonly port: number };
   /** 中间件链（按顺序）；跨命名空间引用的带命名空间。 */
   readonly middlewares: readonly { readonly name: string; readonly namespace?: string }[];
+  /** 待验证与正式主机（D13）：槽「已结束」时改指说明页用的中间件（同命名空间，调和器渲染）。 */
+  readonly unavailable?: { readonly middleware: string };
 }
 
 type Fields = Readonly<Record<string, unknown>>;
@@ -28,14 +30,15 @@ function middlewareOf(value: unknown): RouteRender['middlewares'][number] | unde
 /** 从路由记录的期望取出渲染输入；缺字段或类型不对返回 undefined。 */
 export function routeRenderOf(spec: { readonly children: readonly { readonly kind: string; readonly namespace?: string; readonly name: string }[]; readonly [field: string]: unknown }): RouteRender | undefined {
   const object = spec.children.find((child) => child.kind === 'IngressRoute');
-  const { host, pathPrefix, priority, target, middlewares, service } = spec;
+  const { host, pathPrefix, priority, target, middlewares, service, unavailableMiddleware } = spec;
   if (!object?.namespace || !text(host) || !text(service) || !isFields(target) || !Array.isArray(middlewares)) return undefined;
   if (!text(target['namespace']) || !text(target['service']) || typeof target['port'] !== 'number') return undefined;
-  if ((pathPrefix !== undefined && !text(pathPrefix)) || (priority !== undefined && typeof priority !== 'number')) return undefined;
+  if ((pathPrefix !== undefined && !text(pathPrefix)) || (priority !== undefined && typeof priority !== 'number') || (unavailableMiddleware !== undefined && !text(unavailableMiddleware))) return undefined;
   const chain = middlewares.map(middlewareOf);
   if (chain.some((entry) => entry === undefined)) return undefined;
   return {
     namespace: object.namespace, name: object.name, service, host, ...(text(pathPrefix) ? { pathPrefix } : {}), ...(typeof priority === 'number' ? { priority } : {}),
     target: { namespace: target['namespace'], service: target['service'], port: target['port'] }, middlewares: chain as RouteRender['middlewares'],
+    ...(text(unavailableMiddleware) ? { unavailable: { middleware: unavailableMiddleware } } : {}),
   };
 }

@@ -20,7 +20,13 @@ describe('路由记录的期望 → 渲染输入（RFC-025 第三期后半）', 
     for (const broken of [
       { children: [{ kind: 'Service', namespace: 'cs-demo', name: 'x' }] }, { children: [{ kind: 'IngressRoute', name: 'no-namespace' }] },
       { host: '' }, { service: 7 }, { target: { namespace: 'cs-demo', service: 'demo-blue' } }, { target: 'demo-blue' },
-      { middlewares: 'drop' }, { middlewares: [{ namespace: 'x' }] }, { middlewares: [{ name: 'x', namespace: 3 }] }, { pathPrefix: 5 }, { priority: '100' },
+      { middlewares: 'drop' }, { middlewares: [{ namespace: 'x' }] }, { middlewares: [{ name: 'x', namespace: 3 }] }, { pathPrefix: 5 }, { priority: '100' }, { unavailableMiddleware: 7 },
     ]) expect(routeRenderOf(spec(broken))).toBeUndefined();
+  });
+
+  // D13：待验证与正式主机的期望带说明页的中间件名；没有的（服务域、内部 API）不改指。
+  test('说明页的中间件名照写；没有就没有', () => {
+    expect(routeRenderOf(spec({ unavailableMiddleware: 'unavailable-demo-preview' }))?.unavailable).toEqual({ middleware: 'unavailable-demo-preview' });
+    expect(routeRenderOf(spec())).not.toHaveProperty('unavailable');
   });
 });

@@ -1,21 +1,21 @@
 import { describe, expect, test } from 'bun:test';
 import type { ProjectId, RouteEntry } from '@crewstation/contracts';
-import { PREFIX_ROUTE_PRIORITY, projectRoute, routeRef, SERVICE_ROUTE_KINDS } from './routeProjection';
+import { PREFIX_ROUTE_PRIORITY, projectRoute, routeRef, SERVICE_ROUTE_KINDS, unavailableMiddlewareName } from './routeProjection';
 
 const service = { serviceId: 'svc-1', projectId: '01a0bf5d-8f4b-7b10-9a12-5e7d8c4b3a66' as ProjectId, serviceName: 'demo', namespace: 'cs-demo' };
 const target = { namespace: 'cs-demo', service: 'demo-blue', port: 80 };
 const system = { names: new Set(['drop', 'auth', 'svc']), namespace: 'crewstation-system' };
 
 describe('路由投影进资源台账（RFC-025 第三期后半）', () => {
-  test('每条路由一条 route 记录：子对象是它的 IngressRoute（内部 API 另有它独用的前缀剥离中间件），期望写全调和器渲染要用的（所属服务、前缀与优先级、目标、带命名空间的中间件链），展示字段写种类、Host、前缀与目标', () => {
+  test('每条路由一条 route 记录：子对象是它的 IngressRoute（内部 API 另有它独用的前缀剥离中间件，正式与待验证另有说明页的中间件），期望写全调和器渲染要用的（所属服务、前缀与优先级、目标、带命名空间的中间件链、说明页中间件），展示字段写种类、Host、前缀与目标', () => {
     const routes: RouteEntry[] = [
       { host: 'demo.cs.localhost', domain: 'user', kind: 'prod', target, middlewares: ['drop', 'auth'] },
       { host: 'api.svc.cs.internal', pathPrefix: '/api/demo', domain: 'service', kind: 'internal-api', target, middlewares: ['drop', 'svc', 'strip-api-demo'] },
     ];
     expect(routes.map((route) => projectRoute(service, route, routeRef(service.serviceId, route.kind), system))).toEqual([
       { kind: 'route', ref: 'svc-1/prod', projectId: service.projectId,
-        spec: { children: [{ kind: 'IngressRoute', namespace: 'cs-demo', name: 'demo-prod' }], service: 'demo', host: 'demo.cs.localhost', target,
-          middlewares: [{ name: 'drop', namespace: 'crewstation-system' }, { name: 'auth', namespace: 'crewstation-system' }] },
+        spec: { children: [{ kind: 'IngressRoute', namespace: 'cs-demo', name: 'demo-prod' }, { kind: 'Middleware', namespace: 'cs-demo', name: 'unavailable-demo-prod' }], service: 'demo', host: 'demo.cs.localhost', target,
+          middlewares: [{ name: 'drop', namespace: 'crewstation-system' }, { name: 'auth', namespace: 'crewstation-system' }], unavailableMiddleware: 'unavailable-demo-prod' },
         display: { role: 'prod', host: 'demo.cs.localhost', target: 'cs-demo/demo-blue' } },
       { kind: 'route', ref: 'svc-1/internal-api', projectId: service.projectId,
         spec: { children: [{ kind: 'IngressRoute', namespace: 'cs-demo', name: 'demo-internal-api' }, { kind: 'Middleware', namespace: 'cs-demo', name: 'strip-api-demo' }], service: 'demo', host: 'api.svc.cs.internal', pathPrefix: '/api/demo', priority: PREFIX_ROUTE_PRIORITY, target,
@@ -30,5 +30,14 @@ describe('路由投影进资源台账（RFC-025 第三期后半）', () => {
     expect(routeRef('svc-1', 'internal-api', 2)).toBe('svc-1/internal-api~2');
     const route: RouteEntry = { host: 'api.svc.cs.internal', pathPrefix: '/api/demo', domain: 'service', kind: 'internal-api', target, middlewares: [] };
     expect(projectRoute(service, route, 'svc-1/internal-api~2', system).ref).toBe('svc-1/internal-api~2');
+  });
+
+  // D13：只有用户域的正式与待验证主机给说明页；服务域与内部 API 路由照旧指向槽（Traefik 的 allowEmptyServices 兜底，I26 裁定）。
+  test('说明页的中间件只给正式与待验证路由，名字跟随 IngressRoute', () => {
+    const preview: RouteEntry = { host: 'preview.demo.cs.localhost', domain: 'user', kind: 'preview', target, middlewares: ['drop', 'auth'] };
+    expect(projectRoute(service, preview, 'svc-1/preview', system).spec).toMatchObject({ unavailableMiddleware: 'unavailable-demo-preview', children: [{ kind: 'IngressRoute', name: 'demo-preview' }, { kind: 'Middleware', name: 'unavailable-demo-preview' }] });
+    const internal: RouteEntry = { host: 'demo.svc.cs.internal', domain: 'service', kind: 'service', target, middlewares: ['drop', 'svc'] };
+    expect(projectRoute(service, internal, 'svc-1/service', system).spec.unavailableMiddleware).toBeUndefined();
+    expect(unavailableMiddlewareName('demo', 'prod')).toBe('unavailable-demo-prod');
   });
 });

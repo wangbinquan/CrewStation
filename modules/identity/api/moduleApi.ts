@@ -4,13 +4,20 @@ import type {
 } from '@crewstation/contracts';
 
 /**
- * prod／preview 主机在放行前的入口状态（RFC-021）；与 `ports/serviceEntry.ts` 同形——api 层只能引用自己与契约，
- * 端口层不能引用 api 层，所以两处各写一份（gateway 的 `Evaluation` 也是这么处理的）。
+ * prod／preview 主机在放行前的入口状态（RFC-021）：只剩正式版本维护——待命槽上没有版本改由路由指向说明页（RFC-025 D13、I26 裁定）。
+ * 与 `ports/serviceEntry.ts` 同形——api 层只能引用自己与契约，端口层不能引用 api 层，所以两处各写一份（gateway 的 `Evaluation` 也是这么处理的）。
  */
 export type ServiceEntryVerdict =
   | { readonly kind: 'open' }
-  | { readonly kind: 'maintenance'; readonly projectSlug: string; readonly reason: string; readonly expectedEndAt?: string; readonly retryAfterSeconds?: number }
-  | { readonly kind: 'not-deployed'; readonly projectSlug: string; readonly offline?: { readonly at: string; readonly reason: OfflineReason; readonly tag?: string } };
+  | { readonly kind: 'maintenance'; readonly projectSlug: string; readonly reason: string; readonly expectedEndAt?: string; readonly retryAfterSeconds?: number };
+
+/**
+ * 两张 503 页：维护页（ForwardAuth 给），说明页（cs-api 按台账给：待验证或正式主机此刻没有在运行的版本；正式主机即尚未上线，
+ * recovering 是刚部署好、路由还没改回来）。
+ */
+export type UnavailablePageEntry =
+  | Extract<ServiceEntryVerdict, { kind: 'maintenance' }>
+  | { readonly kind: 'not-deployed'; readonly projectSlug: string; readonly slot?: 'prod' | 'preview'; readonly recovering?: true; readonly offline?: { readonly at: string; readonly reason: OfflineReason; readonly tag?: string } };
 
 /** 登录提交的原始字段（表单或 JSON），由用例按契约 Schema 校验。 */
 export type LoginInput = Record<string, unknown>;
@@ -80,8 +87,8 @@ export type UserAuthDecision =
   | { kind: 'login-redirect'; location: string }
   | { kind: 'unauthenticated'; message: string }
   | { kind: 'forbidden'; message: string }
-  /** RFC-021：正式版本维护中（维护页）或待命槽上没有版本（未部署页），一律 503。 */
-  | { kind: 'unavailable'; entry: Exclude<ServiceEntryVerdict, { kind: 'open' }> };
+  /** RFC-021：正式版本维护中（维护页），503；待命槽上没有版本改由路由指向说明页（RFC-025 D13）。 */
+  | { kind: 'unavailable'; entry: Extract<ServiceEntryVerdict, { kind: 'maintenance' }> };
 
 export interface ServiceAuthRequest {
   /** X-Forwarded-For；第一跳即源 Pod IP。 */
@@ -172,7 +179,7 @@ export interface IdentityModuleApi {
   /** 用户域上被拒绝的浏览器导航要显示的页面：原因原话＋返回工作台。 */
   forbiddenPage(message: string, context?: LoginContext): string;
   /** RFC-021：维护页与未部署待验证版本的说明页。 */
-  unavailablePage(entry: Exclude<ServiceEntryVerdict, { kind: 'open' }>, context?: LoginContext): string;
+  unavailablePage(entry: UnavailablePageEntry, context?: LoginContext): string;
 
   /** 会话令牌 → 用户；无效、过期或用户不存在返回 undefined。 */
   resolveSession(token: string): Promise<UserDto | undefined>;

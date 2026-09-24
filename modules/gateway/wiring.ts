@@ -25,13 +25,16 @@ import { routeUseCases } from './application/reconcileRoutes';
 import { gatewayRoutes } from './http/gatewayRoutes';
 import { maintenanceRoutes } from './http/maintenanceRoutes';
 import { rateLimitRoutes } from './http/rateLimitRoutes';
+import type { UnavailablePage } from './http/unavailableRoutes';
+import { unavailableRoutes } from './http/unavailableRoutes';
+import { explainUnavailable } from './application/unavailable';
 import type { GrantSource, HostNaming, ProjectAccess, ServiceDirectory, SlotRoles, UserDirectory } from './ports/directories';
 import type { GatewayApplier, GatewaySettings } from './ports/gatewayApply';
 import { allowlistCheckWorker } from './workers/allowlistCheck';
 import { identityTombstoneWorker } from './workers/identityTombstones';
 import { rateLimitLedgerResyncWorker } from './workers/rateLimitLedgerResync';
 import { routeLedgerResyncWorker } from './workers/routeLedgerResync';
-import type { RouteLedger } from './ports/ledger';
+import type { LedgerReader, RouteLedger } from './ports/ledger';
 
 export interface GatewayModuleDeps {
   identities?: ResourceIdentityDirectory;
@@ -49,6 +52,8 @@ export interface GatewayModuleDeps {
   applier?: GatewayApplier;
   /** 资源台账（RFC-025 第三期后半）：路由投影成 route 记录；缺省不投影。 */
   ledger?: RouteLedger;
+  /** 说明页（RFC-025 设计 §7.2，D13）：读台账里的路由与槽记录，用 identity 的页面渲染；两样都给才挂说明页的路由。 */
+  explainer?: { readonly reader: LedgerReader; readonly page: UnavailablePage };
   clock?: Clock;
   logger?: Logger;
 }
@@ -120,7 +125,10 @@ export function createGatewayModule(deps: GatewayModuleDeps): GatewayModule {
     .on(DomainTopic.openPolicyChanged, async () => { await allowlist.rebuildAllowlist(); });
   return {
     api,
-    http: [gatewayRoutes(api, deps.isAdmin), maintenanceRoutes(api, deps.isAdmin), rateLimitRoutes(api, deps.isAdmin)],
+    http: [
+      gatewayRoutes(api, deps.isAdmin), maintenanceRoutes(api, deps.isAdmin), rateLimitRoutes(api, deps.isAdmin),
+      ...(deps.explainer ? [unavailableRoutes(explainUnavailable({ ledgerReader: deps.explainer.reader, services: deps.services }), deps.explainer.page)] : []),
+    ],
     workers: [
       identityTombstoneWorker(pods.purgeTombstones, logger), allowlistCheckWorker(api.checkAllowlist, logger),
       ...(deps.ledger ? [routeLedgerResyncWorker(routes.resyncRouteLedger, logger), rateLimitLedgerResyncWorker(limits.resyncRateLimitLedger, logger)] : []),

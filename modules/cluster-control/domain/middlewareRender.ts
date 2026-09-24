@@ -10,6 +10,8 @@ export interface MiddlewareRender {
   readonly name: string;
   readonly rateLimit?: { readonly average: number; readonly burst: number; readonly key: MiddlewareKey };
   readonly inFlight?: { readonly amount: number; readonly key: MiddlewareKey };
+  /** 说明页（D13）：把路径整个换掉（路由记录 ID 在路径里）；只由路由的调和渲染，不出现在限流策略的期望里。 */
+  readonly replacePath?: { readonly path: string };
 }
 
 type Fields = Readonly<Record<string, unknown>>;

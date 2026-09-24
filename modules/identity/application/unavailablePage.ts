@@ -1,9 +1,9 @@
 import type { OfflineReason } from '@crewstation/contracts';
 import { brandMarkDataUrl } from '../domain/brandMark';
-import type { ServiceEntryVerdict } from '../ports/serviceEntry';
+import type { UnavailablePageEntry } from '../ports/serviceEntry';
 
 export interface UnavailablePageInput {
-  readonly entry: Exclude<ServiceEntryVerdict, { kind: 'open' }>;
+  readonly entry: UnavailablePageEntry;
   /** 工作台首页，作为始终可用的返回路径。 */
   readonly consoleUrl: string;
   readonly now: Date;
@@ -16,9 +16,17 @@ const OFFLINE_REASON: Record<OfflineReason, string> = {
   cluster: '平台管理员在集群管理中下线',
 };
 
+/** 页面标题：维护中、刚部署好正在切换、尚未上线、没有待验证版本。 */
+function titleOf(entry: UnavailablePageEntry): string {
+  if (entry.kind === 'maintenance') return '正在维护';
+  if (entry.recovering) return '正在切换版本';
+  return entry.slot === 'prod' ? '尚未上线' : '未部署待验证版本';
+}
+
 /**
- * RFC-021 的两张 503 页：正式版本维护中（原因、预计恢复时间，M13），待命槽上没有版本（何时因何下线，B6）。
- * 配色、结构与无权访问页同源，跟随系统明暗；时间先以 UTC 写出，页面脚本再换成浏览器本地时间。
+ * 两张 503 页：正式版本维护中（RFC-021，原因、预计恢复时间，M13）；说明页（RFC-025 D13，cs-api 按台账给）——待命槽上没有版本
+ * （何时因何下线，B6），正式主机尚未上线，或刚部署好、路由还没改回来。配色、结构与无权访问页同源，跟随系统明暗；
+ * 时间先以 UTC 写出，页面脚本再换成浏览器本地时间。
  */
 export function renderUnavailablePage({ entry, consoleUrl, now }: UnavailablePageInput): string {
   const body = entry.kind === 'maintenance' ? maintenanceBody(entry, now) : notDeployedBody(entry);
@@ -27,7 +35,7 @@ export function renderUnavailablePage({ entry, consoleUrl, now }: UnavailablePag
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${entry.kind === 'maintenance' ? '正在维护' : '未部署待验证版本'} · CrewStation</title>
+<title>${titleOf(entry)} · CrewStation</title>
 <link rel="icon" type="image/svg+xml" href="${brandMarkDataUrl}">
 <style>
   :root { color-scheme: light dark; }
@@ -67,7 +75,7 @@ for (const node of document.querySelectorAll('time[datetime]')) {
 `;
 }
 
-function maintenanceBody(entry: Extract<ServiceEntryVerdict, { kind: 'maintenance' }>, now: Date): string {
+function maintenanceBody(entry: Extract<UnavailablePageEntry, { kind: 'maintenance' }>, now: Date): string {
   const end = entry.expectedEndAt;
   const eta = !end
     ? '<p>负责人没有给出预计恢复时间。</p>'
@@ -78,12 +86,18 @@ function maintenanceBody(entry: Extract<ServiceEntryVerdict, { kind: 'maintenanc
   <p>维护期间只有项目成员、平台管理员和负责人临时指定的人可以访问。维护结束后刷新即可。</p>`;
 }
 
-function notDeployedBody(entry: Extract<ServiceEntryVerdict, { kind: 'not-deployed' }>): string {
+function notDeployedBody(entry: Extract<UnavailablePageEntry, { kind: 'not-deployed' }>): string {
+  const slug = escapeHtml(entry.projectSlug);
+  if (entry.recovering) return `  <h2>${slug} 刚部署好新版本</h2>
+  <p class="reason">访问地址正在切换到新版本，几秒后刷新即可。</p>`;
+  if (entry.slot === 'prod') return `  <h2>${slug} 还没有上线的版本</h2>
+  <p class="reason">这个项目还没有切流上线过任何版本。</p>
+  <p>项目负责人在工作台的「发布与上线」页发布版本、验证后切流上线，这个地址就能访问。</p>`;
   const offline = entry.offline;
   const what = offline
     ? `<p class="reason">${escapeHtml(offline.tag ?? '待验证版本')} 已于 ${timeTag(offline.at)} 下线：${OFFLINE_REASON[offline.reason]}。</p>`
     : '<p class="reason">这个项目的待命槽上还没有部署任何版本。</p>';
-  return `  <h2>${escapeHtml(entry.projectSlug)} 当前没有待验证版本</h2>
+  return `  <h2>${slug} 当前没有待验证版本</h2>
   ${what}
   <p>项目负责人可以在工作台的「发布与上线」页从发布记录重新部署这个版本，或者发布一个新版本。</p>`;
 }

@@ -64,19 +64,6 @@ describe.skipIf(!available)('RFC-021 用户域入口：维护页与未部署页'
     expect(await json.json()).toEqual({ error: 'maintenance', message: 'demo 正在维护：迁移 <数据>', details: { reason: '迁移 <数据>', expectedEndAt: '2026-09-23T10:00:00.000Z' } });
   });
 
-  test('待命槽上没有版本：说明页写明何时因何下线；从未部署时也有说明；接口得到 503 JSON', async () => {
-    verdict = { kind: 'not-deployed', projectSlug: 'demo', offline: { at: '2026-09-23T01:00:00.000Z', reason: 'rollback-expired', tag: 'v0.1.2' } };
-    const page = await forward('preview.demo.cs.localhost', 'text/html');
-    expect(page.status).toBe(503);
-    expect(page.headers.get('retry-after')).toBeNull();
-    const html = await page.text();
-    expect(html).toContain('demo 当前没有待验证版本');
-    expect(html).toContain('v0.1.2');
-    expect(html).toContain('切流后的回退保留期已满');
-    expect(await (await forward('preview.demo.cs.localhost', 'application/json')).json()).toMatchObject({ error: 'not-deployed', details: { reason: 'rollback-expired', tag: 'v0.1.2' } });
-    verdict = { kind: 'not-deployed', projectSlug: 'demo' };
-    expect(await (await forward('preview.demo.cs.localhost', 'text/html')).text()).toContain('还没有部署任何版本');
-  });
 
   test('服务域：目标正式版本维护中时 503 JSON 与 Retry-After，不签来源令牌', async () => {
     const res = await app.request('/forward-auth/service', { headers: { 'x-forwarded-proto': 'http', 'x-forwarded-method': 'GET', 'x-forwarded-uri': '/v1/things', 'x-forwarded-for': '10.244.0.50', 'x-forwarded-host': 'demo.svc.cs.internal' } });

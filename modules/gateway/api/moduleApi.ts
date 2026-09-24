@@ -4,11 +4,28 @@ export interface EvaluationTarget { host: string; method: string; path: string }
 /** `unavailable`：目标正式版本维护中（RFC-021），ForwardAuth 回 503 而不是 403。 */
 export interface Evaluation { allowed: boolean; targetIdentity: string; reason?: string; unavailable?: { message: string; retryAfterSeconds?: number } }
 
-/** 用户域入口（prod／preview 主机）在放行前的判定（RFC-021 design §6）。 */
+/**
+ * 用户域入口（prod／preview 主机）在放行前的判定（RFC-021 design §6）：只剩正式版本维护。待命槽上没有版本不再由 ForwardAuth 判——
+ * 槽「已结束」时路由改指说明页（RFC-025 D13、I26 裁定）。
+ */
 export type EntryVerdict =
   | { readonly kind: 'open' }
-  | { readonly kind: 'maintenance'; readonly projectSlug: string; readonly reason: string; readonly expectedEndAt?: string; readonly retryAfterSeconds?: number }
-  | { readonly kind: 'not-deployed'; readonly projectSlug: string; readonly offline?: { readonly at: string; readonly reason: OfflineReason; readonly tag?: string } };
+  | { readonly kind: 'maintenance'; readonly projectSlug: string; readonly reason: string; readonly expectedEndAt?: string; readonly retryAfterSeconds?: number };
+
+/**
+ * 说明页的内容（RFC-025 设计 §7.2，D13）：待验证或正式主机此刻没有在运行的版本——何时因何下线，或尚未部署、尚未上线；
+ * 路由还没改回来的那一瞬（刚部署好）是 recovering。错误体沿用 RFC-021 的 `not-deployed`＋`details`（I26 裁定）。
+ */
+export interface NotDeployedEntry {
+  readonly kind: 'not-deployed';
+  readonly projectSlug: string;
+  readonly slot: 'prod' | 'preview';
+  readonly recovering?: true;
+  readonly offline?: { readonly at: string; readonly reason: OfflineReason; readonly tag?: string };
+}
+
+/** 说明页在 cs-api 上的路径前缀，后面接路由记录 ID；调和器渲染的 replacePath 中间件把请求换到这里。 */
+export const UNAVAILABLE_PATH = '/_crewstation/unavailable';
 
 /** 维护中的服务（供市场卡片）：开关、原因、预计恢复时间与临时指定的人。 */
 export interface MaintenanceSnapshot { switches: { users: boolean; services: boolean; events: boolean }; allowUserIds: readonly UserId[]; reason: string; expectedEndAt?: Date }
@@ -48,7 +65,7 @@ export interface GatewayModuleApi {
   getMaintenance(actor: Actor, serviceId: ServiceId): Promise<ServiceMaintenanceView>;
   setMaintenance(actor: Actor, serviceId: ServiceId, input: SetMaintenanceRequest): Promise<MaintenanceDto>;
   exitMaintenance(actor: Actor, serviceId: ServiceId, input: ExitMaintenanceRequest): Promise<ServiceMaintenanceView>;
-  /** cs-auth 用户域 ForwardAuth：prod 主机的维护放行、preview 主机的未部署页。 */
+  /** cs-auth 用户域 ForwardAuth：prod 主机的维护放行；preview 主机记一次访问（没有版本改由路由指向说明页，RFC-025 D13）。 */
   userEntry(userId: UserId, projectSlug: string, slot: 'prod' | 'preview'): Promise<EntryVerdict>;
   /** cs-events：订阅方的事件开关是否打开（暂存）。 */
   holdsEvents(serviceId: ServiceId): Promise<boolean>;

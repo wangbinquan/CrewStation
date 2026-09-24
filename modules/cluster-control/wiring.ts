@@ -11,6 +11,8 @@ import type { ObservationStats } from './application/observeChange';
 import { newObservationStats, observeChange } from './application/observeChange';
 import { sweepOrphans } from './application/orphanSweep';
 import { reconcileRecord } from './application/reconcileObservations';
+import type { Explainer } from './application/routeExplainer';
+import { routeTargets } from './application/routeExplainer';
 import { adoptionRoutes } from './http/adoptionRoutes';
 import type { ClusterWriter, ManagedObjectFeed, ManagedObjectReader, ObjectChange, ObservedKind, PodSubscriber } from './ports/cluster';
 import type { LedgerObservations, LegacyOwners } from './ports/ledger';
@@ -49,6 +51,8 @@ export interface ClusterControlModuleDeps {
   readonly leases?: ReplicaLeases;
   /** 孤儿回收（设计 §6.4）：false 关掉；缺省建出满 10 分钟才判孤儿，同步后 10 分钟起每 10 分钟一轮。 */
   readonly orphanSweep?: false | (OrphanSweeperOptions & { readonly minAgeMs?: number });
+  /** 说明页（RFC-025 设计 §7.2，D13）：槽「已结束」时待验证与正式主机改指 cs-api 的这个路径；不给就不改指。 */
+  readonly explainer?: Explainer;
 }
 
 export interface ClusterControlModule {
@@ -74,7 +78,10 @@ export function createClusterControlModule(deps: ClusterControlModuleDeps): Clus
     },
   };
   const cluster = deps.cluster ?? kubernetesClusterWriter(deps.k8s);
-  const reconcileDeps = { ledger: deps.ledger, feed, cluster, clock, systemNamespace: deps.systemNamespace, stats, logger, ...(deps.reconciler?.retryMs ? { retryMs: deps.reconciler.retryMs } : {}) };
+  const reconcileDeps = {
+    ledger: deps.ledger, feed, cluster, clock, systemNamespace: deps.systemNamespace, stats, logger, routeTargets: routeTargets(),
+    ...(deps.reconciler?.retryMs ? { retryMs: deps.reconciler.retryMs } : {}), ...(deps.explainer ? { explainer: deps.explainer } : {}),
+  };
   const reconciler = ledgerReconciler(deps.ledger, feed, (id, enqueue) => reconcileRecord(reconcileDeps, id, enqueue), logger, { ...deps.reconciler, ...(deps.leases ? { leases: deps.leases } : {}) });
   // Pod 先交给身份索引（来源 IP 认人，越早越好），再写台账观测；两边失败互不耽误。调和器渲染的对象一有变化就把认领它的记录排进去核对。
   const handle = async (change: ObjectChange) => {

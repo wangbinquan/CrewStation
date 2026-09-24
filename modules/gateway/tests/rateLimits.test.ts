@@ -28,7 +28,7 @@ async function rejected(promise: Promise<unknown>): Promise<string> {
 const gatewayDeps = (): Parameters<typeof createGatewayModule>[0] => ({
     db: tdb.db, k8s: createFakeK8sClient(),
     services: { listServices: async () => services, getService: async (id) => services.find((s) => s.serviceId === id), serviceIdOfProject: async (p) => services.find((s) => s.projectId === p)?.serviceId },
-    slots: { slotRoles: async () => ({ prod: 'blue', preview: 'green' }), standbyEntry: async () => ({ empty: false }), notePreviewAccess: async () => {} },
+    slots: { slotRoles: async () => ({ prod: 'blue', preview: 'green' }), notePreviewAccess: async () => {} },
     grants: { grantedOperations: async () => ({ operations: [], defaultOpen: [], operationRoutes: [] }), listCallers: async () => [], proxyNameOf: async () => undefined },
     hosts: { prodHost: (s) => `${s}.cs.localhost`, previewHost: (s) => `preview.${s}.cs.localhost`, serviceHost: (s) => `${s}.svc.cs.internal`, platformApiHost: () => 'api.svc.cs.internal' },
     access: { authorize: async () => 'admin', isMemberOrAdmin: async () => true },

@@ -1,4 +1,4 @@
-import type { Actor, OfflineReason, OperationRoute, ProjectId, UserId } from '@crewstation/contracts';
+import type { Actor, OperationRoute, ProjectId, UserId } from '@crewstation/contracts';
 import type { ServiceId } from '@crewstation/contracts';
 
 /** 网关眼里的一个服务；`archived` 决定它还该不该有路由与放行表条目。 */
@@ -24,10 +24,9 @@ export interface ServiceDirectory {
   getService(serviceId: ServiceId): Promise<DirectoryService | undefined>;
 }
 
-/** 由 release 模块提供：两个物理槽的当前角色；preview 入口判定用的待命槽状态与访问记录（RFC-021）。 */
+/** 由 release 模块提供：两个物理槽的当前角色；preview 访问记录（RFC-021 的空闲自动下线计时）。 */
 export interface SlotRoles {
   slotRoles(serviceId: ServiceId): Promise<{ prod: 'blue' | 'green'; preview: 'blue' | 'green' } | undefined>;
-  standbyEntry(serviceId: ServiceId): Promise<{ empty: boolean; offline?: { at: string; reason: OfflineReason; tag?: string } }>;
   notePreviewAccess(serviceId: ServiceId): Promise<void>;
 }
 

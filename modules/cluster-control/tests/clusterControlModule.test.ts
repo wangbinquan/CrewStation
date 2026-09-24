@@ -124,6 +124,7 @@ describe.skipIf(!available)('cluster-control：观测写回台账与收编空跑
       // 孤儿回收单独在 orphanSweep.test.ts 里核对；这里关掉，免得它的定时轮次与本文件的用例交错。
       orphanSweep: false,
       reconciler: { pollMs: 20, retryMs: 50 },
+      explainer: { namespace: 'crewstation-system', service: 'cs-api', port: 8080, path: '/_crewstation/unavailable' },
       pods: {
         changed: async (object, gone) => {
           if (object.metadata.name === 'pod-identity-broken') throw new Error('身份索引暂时不可用');
@@ -346,10 +347,49 @@ describe.skipIf(!available)('cluster-control：观测写回台账与收编空跑
     expect(routeApplies).toHaveLength(3);
   });
 
+  // RFC-025 D13、I26：目标槽「已结束」（已下线、尚未部署）的待验证与正式路由改指 cs-api 的说明页——先建出这条路由独用的 replacePath
+  // 中间件（路径带路由记录 ID），它进了观测缓存再改路由；槽重新有工作负载时照期望指回槽的 Service，中间件留着备下次用。
+  test('说明页：槽已结束时路由改指 cs-api（中间件先建出）；槽重新运行后指回槽的 Service；服务域路由不改指', async () => {
+    type Route = K8sObject & { spec: { routes: Array<{ services?: Array<{ name: string; port: number; namespace?: string }>; middlewares?: unknown[] }> } };
+    const release = resources.api.owner('release'), gateway = resources.api.owner('gateway');
+    const chain = [{ name: 'drop-identity-headers', namespace: 'crewstation-system' }, { name: 'forward-auth-user', namespace: 'crewstation-system' }];
+    const slotSpec = { children: [{ kind: 'Deployment', namespace: 'cs-demo', name: 'cafe-green' }, { kind: 'Service', namespace: 'cs-demo', name: 'cafe-green' }] };
+    const slot = await release.declare({ kind: 'service-slot', ref: 'svc-cafe/green', projectId: PROJECT, spec: slotSpec, conditions: [{ type: 'Serving', status: 'false', reason: 'offline-manual', message: '已由成员手动下线' }] });
+    await place(child('Service', 'cafe-green'));
+    await until('槽已结束', async () => (await resources.api.get(slot.id))?.phase === 'stopped');
+    const routeSpec = (kind: string, extra: Record<string, unknown> = {}) => ({
+      children: [{ kind: 'IngressRoute', namespace: 'cs-demo', name: `cafe-${kind}` }, ...(kind === 'preview' ? [{ kind: 'Middleware', namespace: 'cs-demo', name: 'unavailable-cafe-preview' }] : [])],
+      service: 'cafe', host: `${kind}.cafe.cs.localhost`, target: { namespace: 'cs-demo', service: 'cafe-green', port: 80 }, middlewares: chain, ...extra,
+    });
+    const preview = await gateway.declare({ kind: 'route', ref: 'svc-cafe/preview', projectId: PROJECT, spec: routeSpec('preview', { unavailableMiddleware: 'unavailable-cafe-preview' }), display: { role: 'preview' } });
+    const service = await gateway.declare({ kind: 'route', ref: 'svc-cafe/service', projectId: PROJECT, spec: routeSpec('service'), display: { role: 'service' } });
+    const ingress = async (name: string) => (await k8s.get<Route>(Resources.IngressRoute!, name, 'cs-demo'))?.spec.routes[0];
+    await until('待验证路由指向说明页', async () => (await ingress('cafe-preview'))?.services?.[0]?.name === 'cs-api');
+    expect(debugs).toContain('resource route waiting for explainer middleware');
+    const middleware = await k8s.get<K8sObject & { spec: unknown }>(Resources.Middleware!, 'unavailable-cafe-preview', 'cs-demo');
+    expect(middleware?.spec).toEqual({ replacePath: { path: `/_crewstation/unavailable/${preview.id}` } });
+    expect(middleware?.metadata.labels).toMatchObject({ 'app.kubernetes.io/component': 'route', 'crewstation.io/resource-id': preview.id });
+    expect(await ingress('cafe-preview')).toMatchObject({ services: [{ name: 'cs-api', port: 8080, namespace: 'crewstation-system' }], middlewares: [...chain, { name: 'unavailable-cafe-preview' }] });
+    // 服务域路由（期望里没有说明页中间件）照期望指向槽，由 Traefik 的 allowEmptyServices 兜底。
+    await until('服务域路由建出', async () => (await resources.api.get(service.id))?.phase === 'ready');
+    expect((await ingress('cafe-service'))?.services).toEqual([{ name: 'cafe-green', port: 80, namespace: 'cs-demo' }]);
+    // 重新部署：Serving 为真、Deployment 就绪 → 槽运行中 → 指向它的路由随之核对，指回槽的 Service；说明页中间件留着。
+    await release.declare({ kind: 'service-slot', ref: 'svc-cafe/green', projectId: PROJECT, spec: slotSpec, conditions: [{ type: 'Serving', status: 'true' }] });
+    const cafe = child('Deployment', 'cafe-green', 'uid-cafe-green-deploy');
+    const ready: K8sObject = { ...cafe, apiVersion: 'apps/v1', metadata: { ...cafe.metadata, generation: 1 }, spec: { replicas: 1 }, status: { observedGeneration: 1, replicas: 1, updatedReplicas: 1, readyReplicas: 1, conditions: [{ type: 'Progressing', status: 'True', reason: 'NewReplicaSetAvailable' }] } };
+    await feed.emit({ kind: 'Deployment', object: ready, gone: false });
+    await until('槽运行中', async () => (await resources.api.get(slot.id))?.phase === 'ready');
+    await until('待验证路由指回槽', async () => (await ingress('cafe-preview'))?.services?.[0]?.name === 'cafe-green');
+    expect((await ingress('cafe-preview'))?.middlewares).toEqual(chain);
+    expect(await k8s.get(Resources.Middleware!, 'unavailable-cafe-preview', 'cs-demo')).toBeDefined();
+  });
+
   // RFC-025 T10：限流策略的 Middleware 由调和器照记录渲染；系统命名空间里的（平台接口）带资源 ID 标签，照常观测与回收。
   test('限流策略：中间件缺了按期望建出（含系统命名空间里的），都在即运行中；被人改了改回；与期望一致不写；不要了的删掉', async () => {
     type Middleware = K8sObject & { spec: Record<string, unknown> };
     const gateway = resources.api.owner('gateway');
+    // 只数这条用例里的中间件写入（前面的用例也建过中间件，例如说明页的）。
+    const before = routeApplies.length, middlewareApplies = () => routeApplies.slice(before).filter((entry) => entry.includes('/'));
     const middlewares = [
       { namespace: 'cs-demo', name: 'rate-limit-user', rateLimit: { average: 30, burst: 60, key: { header: 'x-cs-user-id' } } },
       { namespace: 'crewstation-system', name: 'in-flight-platform-api', inFlight: { amount: 16, key: { header: 'x-cs-user-id' } } },
@@ -361,23 +401,22 @@ describe.skipIf(!available)('cluster-control：观测写回台账与收编空跑
     expect(user?.spec).toEqual({ rateLimit: { average: 30, burst: 60, period: '1s', sourceCriterion: { requestHeaderName: 'x-cs-user-id' } } });
     expect(user?.metadata.labels?.['crewstation.io/resource-id']).toBe(record.id);
     expect((await k8s.get<Middleware>(Resources.Middleware!, 'in-flight-platform-api', 'crewstation-system'))?.spec).toEqual({ inFlightReq: { amount: 16, sourceCriterion: { requestHeaderName: 'x-cs-user-id' } } });
-    const applies = routeApplies.filter((entry) => entry.includes('/')).length;
-    expect(applies).toBe(2);
+    expect(middlewareApplies()).toHaveLength(2);
     // 与期望一致：再核对也不写。
     await gateway.declare({ kind: 'rate-limit-policy', ref: 'policy-test', projectId: PROJECT, spec, display: { scope: 'project' } });
     await control.reconciled();
-    expect(routeApplies.filter((entry) => entry.includes('/'))).toHaveLength(2);
+    expect(middlewareApplies()).toHaveLength(2);
     // 被人把平均改大了（generation 加一）：改回。
     const drifted: Middleware = { ...user!, metadata: { ...user!.metadata, generation: 2 }, spec: { rateLimit: { average: 9999, burst: 9999, period: '1s', sourceCriterion: { requestHeaderName: 'x-cs-user-id' } } } };
     await k8s.apply(drifted);
     await feed.emit({ kind: 'Middleware', object: drifted, gone: false });
-    await until('改回', () => routeApplies.filter((entry) => entry.includes('/')).length === 3);
+    await until('改回', () => middlewareApplies().length === 3);
     expect((await k8s.get<Middleware>(Resources.Middleware!, 'rate-limit-user', 'cs-demo'))?.spec).toMatchObject({ rateLimit: { average: 30 } });
     // 期望不完整（缺桶的取值）：整条不渲染。
     await gateway.declare({ kind: 'rate-limit-policy', ref: 'policy-broken', projectId: PROJECT, spec: { children: [{ kind: 'Middleware', namespace: 'cs-demo', name: 'rate-limit-broken' }], middlewares: [{ namespace: 'cs-demo', name: 'rate-limit-broken' }] } });
     await control.reconciled();
     expect(await k8s.get(Resources.Middleware!, 'rate-limit-broken', 'cs-demo')).toBeUndefined();
-    expect(routeApplies.filter((entry) => entry.includes('/'))).toHaveLength(3);
+    expect(middlewareApplies()).toHaveLength(3);
     // 不要了：两个中间件都删掉（系统命名空间里的也删，它带资源 ID 标签），记录进入已结束。
     await gateway.requestRelease(record.id, { code: 'project-archived', message: '项目已归档' });
     await until('中间件删掉', async () => (await resources.api.get(record.id))?.phase === 'stopped');

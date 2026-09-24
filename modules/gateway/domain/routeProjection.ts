@@ -30,9 +30,17 @@ export interface RouteDeclaration {
     readonly target: { readonly namespace: string; readonly service: string; readonly port: number };
     /** 中间件链（按顺序）；平台的系统中间件带系统命名空间，跨命名空间引用。 */
     readonly middlewares: readonly { readonly name: string; readonly namespace?: string }[];
+    /** 待验证与正式主机（D13）：槽「已结束」时调和器改指说明页用的中间件名（同命名空间，它也是这条记录的子对象）。 */
+    readonly unavailableMiddleware?: string;
   };
   readonly display: Readonly<Record<string, string>>;
 }
+
+/** 给说明页的路由种类（D13）：待验证主机与首次上线前的正式主机；服务域与内部 API 路由照旧指向槽。 */
+const EXPLAINED_KINDS: ReadonlySet<RouteEntry['kind']> = new Set(['prod', 'preview']);
+
+/** 说明页的中间件：`unavailable-<IngressRoute 名>`，建在服务自己的命名空间，只有这一条路由引用。 */
+export const unavailableMiddlewareName = (serviceName: string, kind: RouteEntry['kind']): string => `unavailable-${routeObjectName(serviceName, kind)}`;
 
 /** 带路径前缀的路由（`/api/<proxy>`）排在同 Host 的整站路由之前。 */
 export const PREFIX_ROUTE_PRIORITY = 100;
@@ -54,15 +62,18 @@ export const routeRef = (serviceId: string, kind: RouteEntry['kind'], nth = 1): 
  * 期望里带 Host、路径前缀、目标与中间件链，展示字段是种类、Host、路径前缀与目标。调和器照期望应用 IngressRoute。
  */
 export function projectRoute(service: RoutedService, route: RouteEntry, ref: string, system: SystemMiddlewares): RouteDeclaration {
+  const unavailable = EXPLAINED_KINDS.has(route.kind) ? unavailableMiddlewareName(service.serviceName, route.kind) : undefined;
   return {
     kind: 'route', ref, projectId: service.projectId,
     spec: {
       children: [
         { kind: 'IngressRoute', namespace: service.namespace, name: routeObjectName(service.serviceName, route.kind) },
         ...route.middlewares.filter((name) => name.startsWith(STRIP_MIDDLEWARE_PREFIX)).map((name) => ({ kind: 'Middleware' as const, namespace: service.namespace, name })),
+        ...(unavailable ? [{ kind: 'Middleware' as const, namespace: service.namespace, name: unavailable }] : []),
       ],
       service: service.serviceName, host: route.host, ...(route.pathPrefix ? { pathPrefix: route.pathPrefix, priority: PREFIX_ROUTE_PRIORITY } : {}), target: route.target,
       middlewares: route.middlewares.map((name) => (system.names.has(name) ? { name, namespace: system.namespace } : { name })),
+      ...(unavailable ? { unavailableMiddleware: unavailable } : {}),
     },
     display: { role: route.kind, host: route.host, ...(route.pathPrefix ? { pathPrefix: route.pathPrefix } : {}), target: `${route.target.namespace}/${route.target.service}` },
   };

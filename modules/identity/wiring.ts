@@ -87,7 +87,7 @@ export interface IdentityRuntimeDeps {
   /** 缺省按 contracts HOST_PATTERNS 与 settings.userDomain 推导。 */
   hostResolver?: HostResolver;
   previewAccess?: PreviewAccess;
-  /** RFC-021：prod 主机的维护放行与 preview 主机的未部署页；缺省一律放行（不改变旧行为）。 */
+  /** RFC-021：prod 主机的维护放行（preview 主机没有版本改由路由指向说明页，RFC-025 D13）；缺省一律放行（不改变旧行为）。 */
   serviceEntry?: ServiceEntry;
   /** 项目 slug → ID，供身份转发按项目取覆盖；缺省一律按全局默认。 */
   projectDirectory?: ProjectDirectory;
