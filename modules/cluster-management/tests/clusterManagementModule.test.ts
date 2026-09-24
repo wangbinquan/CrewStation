@@ -68,6 +68,17 @@ describe.skipIf(!available)('cluster-management durable module', () => {
     await expect(module.api.accept(admin, { inspectionId: checked.inspectionId, idempotencyKey: crypto.randomUUID(), params: { action: 'delete' } })).rejects.toMatchObject({ kind: 'conflict' });
     expect((await k8s.get(Resources.ConfigMap!, 'replacement', 'cs-demo'))?.metadata.uid).toBe('another-uid');
   });
+  // 观察期限已过（负载高、期限短）也至少观察一次：CI 上观察期限 100 毫秒时，曾一次都没看就判「观察期限内尚未收敛」。
+  test('observation window already elapsed: the operation is still observed once and converges', async () => {
+    const quick = createClusterManagementModule({ db: tdb.db, k8s, metadata: { read: async () => structuredClone(facts) }, domains: { inspect: async () => { throw new Error('unexpected domain'); }, execute: async () => { throw new Error('unexpected domain'); }, observe: async () => { throw new Error('unexpected domain'); } }, authorizeProject: async () => { throw new Error('unexpected project authorization'); }, isAdmin: async (id) => id === admin.userId, systemNamespace: 'crewstation-system', catalog, instance: 'test-quick', observationMs: 0, wait: async () => undefined });
+    await k8s.create(object('ConfigMap', 'short-window')); await quick.collect();
+    const row = (await quick.api.resources(admin, { ...query, kind: 'ConfigMap' })).items.find((item) => item.name === 'short-window')!;
+    const inspected = await quick.api.inspect(admin, row.resourceId, { action: 'delete' });
+    const accepted = await quick.api.accept(admin, { inspectionId: inspected.inspectionId, idempotencyKey: crypto.randomUUID(), params: { action: 'delete' } });
+    await quick.runOnce();
+    expect((await quick.api.operation(admin, accepted.operationId)).phase).toBe('succeeded');
+    expect(await k8s.get(Resources.ConfigMap!, 'short-window', 'cs-demo')).toBeUndefined();
+  });
   test('admin HTTP read path, missing identity and malformed query fail visibly', async () => {
     const app = createApp({ name: 'cluster-test' }); for (const r of module.http) app.route('/', r);
     const denied = await app.request('/v1/admin/cluster/summary'); expect(denied.status).toBe(401);

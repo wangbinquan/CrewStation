@@ -27,10 +27,12 @@ export async function executeOperation(deps: ClusterDeps, id: string, fence: num
       }
       await save({ phase: 'observing', observationStartedAt: deps.clock.now().toISOString(), reason: '已提交，等待实际状态收敛' });
     }
-    while (deps.clock.now().getTime() - Date.parse(op.observationStartedAt ?? op.createdAt) < deps.observationMs) {
+    // 至少观察一次再看期限：从记下「开始观察」到这里若已过了期限（负载高、期限短），不能一次都没看就判未收敛。
+    for (;;) {
       if (!await heartbeat()) return;
       const state: { done: boolean; failed?: boolean; reason: string; after?: ClusterResource } = domain ? await deps.domains.observe(op) : await observeNative(deps, op);
       if (state.done) { await save({ phase: state.failed ? 'failed' : 'succeeded', reason: state.reason, httpStatus: state.failed ? 412 : 200, ...('after' in state && state.after ? { after: state.after } : {}) }); await deps.repository.requestRefresh(); return; }
+      if (deps.clock.now().getTime() - Date.parse(op.observationStartedAt ?? op.createdAt) >= deps.observationMs) break;
       await save({ reason: state.reason }); await deps.wait(2000);
     }
     await save({ phase: 'needs-attention', resumePhase: 'observing', httpStatus: 504, reason: `观察期限内尚未收敛：${op.reason}。请核对资源实际状态，已受理的变更不会自动回滚。` });
