@@ -9,7 +9,7 @@ export interface RequestReviewPageProps extends RequestPageScope {
 
 /** 草稿绑定在查询范围上：改项目、状态或翻页才换范围，其余导航保留输入。 */
 export function requestScopeKey(search: RequestSearch) {
-  return JSON.stringify([search.projectId, search.state, search.apiCursor]);
+  return JSON.stringify([search.projectId, search.state, search.apiCursor, search.accessCursor]);
 }
 export function keepRequestDrafts(current: { pathname: string; search: object }, next: { pathname: string; search: object }) {
   return current.pathname === '/admin/requests' && next.pathname === current.pathname &&

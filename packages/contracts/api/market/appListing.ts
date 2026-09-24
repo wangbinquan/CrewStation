@@ -4,20 +4,20 @@ import { pageOf } from '../envelope';
 import { PlatformRoleSchema } from '../identity';
 import { ProjectStateSchema } from '../project';
 
-export const AppVisibilityModeSchema = z.enum(['members', 'authenticated', 'selected']);
+/**
+ * 应用可见范围（RFC-003 §3，2026-09-24 修订）：同时决定市场里谁看得到、网关放谁打开正式地址。
+ * 「项目成员与指定用户」一档取消，原名单迁成「用户」角色成员（project/0012）。
+ */
+export const AppVisibilityModeSchema = z.enum(['members', 'authenticated']);
 export const AppIconSchema = z.enum(['station', 'assistant', 'workflow', 'book', 'chart', 'spark']);
 export const MemberCandidateDtoSchema = z.object({ userId: UserIdSchema, name: z.string(), email: z.string(), platformRole: PlatformRoleSchema.optional() });
 export const MemberCandidatesQuerySchema = z.object({ identity: z.string().trim().min(1).max(254) });
+/** `allowRequests`：没有使用权的人打开正式地址时，页面给「申请访问权限」（true）还是只写「请联系项目负责人」（false）。 */
 export const SetAppVisibilityRequestSchema = z.object({
-  mode: AppVisibilityModeSchema,
-  userIds: z.array(UserIdSchema).max(200).transform((ids) => [...new Set(ids)].sort()),
-  expectedRevision: z.number().int().min(0),
-}).strict().superRefine((value, context) => {
-  if (value.mode === 'selected' && value.userIds.length === 0) context.addIssue({ code: 'custom', path: ['userIds'], message: '请至少选择一位已注册用户' });
-  if (value.mode !== 'selected' && value.userIds.length > 0) context.addIssue({ code: 'custom', path: ['userIds'], message: '仅指定用户范围接受用户清单' });
-});
+  mode: AppVisibilityModeSchema, allowRequests: z.boolean(), expectedRevision: z.number().int().min(0),
+}).strict();
 export const AppVisibilityDtoSchema = z.object({
-  mode: AppVisibilityModeSchema, userIds: z.array(UserIdSchema), users: z.array(MemberCandidateDtoSchema),
+  mode: AppVisibilityModeSchema, allowRequests: z.boolean(),
   revision: z.number().int().min(0), updatedAt: z.iso.datetime().nullable(), canConfigure: z.boolean(),
 });
 export const SetAppPresentationRequestSchema = z.object({

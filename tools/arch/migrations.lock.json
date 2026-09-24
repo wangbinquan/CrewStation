@@ -81,6 +81,7 @@
     "modules/project/adapters/persistence/migrations/0009_resource_identity.sql": "9a6ecaaabd15630a442ca413a40e169449cea0289b2d66f1a96469c43dd626ed",
     "modules/project/adapters/persistence/migrations/0010_resource_identity.identity.json": "8d20150b843ea2c5a4fd3e33c06abb5df38fed611c8befe03f4384014b17173b",
     "modules/project/adapters/persistence/migrations/0011_service_plan_policies.sql": "24e2001b35f02869f63eefd4fba5af065a274f003b4e57cb8855563f430d8b71",
+    "modules/project/adapters/persistence/migrations/0012_app_access.sql": "6f05e0e975195f9e3d888522a6831b0494b75640fed65e9b494b9a088ab6616e",
     "modules/release/adapters/persistence/migrations/0001_create_schema.sql": "6f470ab4cfc16eecbcd191f5e69317dcaaeb701bde96f4d2fcc854aad7c921b0",
     "modules/release/adapters/persistence/migrations/0002_releases.sql": "02d9ea5c04aa1a3a138a5b812f95069531cd668c4ea2b509cb8d427474da85cc",
     "modules/release/adapters/persistence/migrations/0003_traffic_switch_previous_release.sql": "2c3ddc7cffe002714c50a92d3dcc1b5b01ea30bfdb33215b801350626a152047",

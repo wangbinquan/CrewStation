@@ -20,7 +20,10 @@ import { queryProjectUseCases } from './application/queryProjects';
 import { catalogRoutes } from './http/catalogRoutes';
 import { projectRoutes } from './http/projectRoutes';
 import { appListingRoutes } from './http/appListingRoutes';
+import { appAccessRoutes } from './http/appAccessRoutes';
 import { appVisibilityUseCases } from './application/appVisibility';
+import { appAccessUseCases } from './application/appAccess';
+import { accessRequestReviewUseCases } from './application/accessRequestReview';
 import { marketListingUseCases } from './application/marketListings';
 import { projectPageUseCases } from './application/projectPages';
 import { creationCatalogUseCase } from './application/creation/eligibility';
@@ -76,8 +79,10 @@ export function createProjectModule(deps: ProjectModuleDeps): ProjectModule {
     ...quotaAndPlanUseCases(useCaseDeps),
     ...servicePolicyUseCases(useCaseDeps),
     ...appVisibilityUseCases(useCaseDeps),
+    ...appAccessUseCases(useCaseDeps),
+    ...accessRequestReviewUseCases(useCaseDeps),
     ...marketListingUseCases(useCaseDeps),
     ...projectPageUseCases(useCaseDeps),
   };
-  return { api, http: [projectRoutes(api), catalogRoutes(api), appListingRoutes(api), servicePolicyRoutes(api)], migrations: projectMigrations };
+  return { api, http: [projectRoutes(api), catalogRoutes(api), appListingRoutes(api), appAccessRoutes(api), servicePolicyRoutes(api)], migrations: projectMigrations };
 }

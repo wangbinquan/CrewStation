@@ -82,11 +82,25 @@ export interface InjectedUserIdentity {
   attributes: Record<string, string>;
 }
 
+/**
+ * 正式地址按应用可见范围拦下时，「没有项目权限」页要写的事实（2026-09-24 裁定）。
+ * 与 `ports/appAccess.ts` 的 AppAccessDenial 同形——api 层不能引用端口层，两处各写一份。
+ */
+export interface AppAccessDenial {
+  readonly projectId: ProjectId;
+  readonly appName: string;
+  readonly ownerName: string;
+  /** 负责人允许申请：页面给「申请访问权限」；否则只写「请联系项目负责人」。 */
+  readonly requestable: boolean;
+}
+
 export type UserAuthDecision =
   | { kind: 'allow'; user: UserDto; audience: string; authMethod: AuthMethod; injected: InjectedUserIdentity }
   | { kind: 'login-redirect'; location: string }
   | { kind: 'unauthenticated'; message: string }
   | { kind: 'forbidden'; message: string }
+  /** 2026-09-24：正式地址按应用可见范围拦下，403＋平台统一的「没有项目权限」页。 */
+  | { kind: 'no-app-access'; denial: AppAccessDenial }
   /** RFC-021：正式版本维护中（维护页），503；待命槽上没有版本改由路由指向说明页（RFC-025 D13）。 */
   | { kind: 'unavailable'; entry: Extract<ServiceEntryVerdict, { kind: 'maintenance' }> };
 
@@ -178,6 +192,8 @@ export interface IdentityModuleApi {
   logoutRedirect(returnTo: string | undefined, context?: LoginContext): string;
   /** 用户域上被拒绝的浏览器导航要显示的页面：原因原话＋返回工作台。 */
   forbiddenPage(message: string, context?: LoginContext): string;
+  /** 正式地址按可见范围拦下时的「没有项目权限」页：允许申请时给「申请访问权限」（新开工作台申请页），否则写负责人名字。 */
+  noAppAccessPage(denial: AppAccessDenial, context?: LoginContext): string;
   /** RFC-021：维护页与未部署待验证版本的说明页。 */
   unavailablePage(entry: UnavailablePageEntry, context?: LoginContext): string;
 

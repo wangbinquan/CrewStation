@@ -1,5 +1,6 @@
 export { selfProjectCreateRoute, selfProjectProvisioningRoute, projectListRoute, projectOverviewRoute } from './routes';
 export { AppVisibilityPage } from './pages/AppVisibilityPage';
+export { AccessRequestReview } from './components/access/AccessRequestReview';
 export { ProjectSettingsSection } from './pages/ProjectSettingsSection';
 export { ProjectOverviewPage } from './pages/ProjectOverviewPage';
 export { TesterProjectPage } from './pages/TesterProjectPage';

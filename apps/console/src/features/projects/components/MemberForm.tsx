@@ -42,7 +42,7 @@ export function MemberForm(props: MemberFormProps) {
         <div className={styles.role}>
           <FormField label={t('projects.members.columnRole')} hint={t(`projects.members.roleHint.${role}`)} hintId={`${id}-role-hint`}>
             <select aria-label={t('projects.members.roleLabel')} aria-describedby={`${id}-role-hint ${id}-owner-rule`} value={role} disabled={locked || (current?.role === 'owner' && !isAdmin)} onChange={(event) => editor.setRole(event.target.value as MemberRole)}>
-              {(['owner', 'developer', 'tester'] as const).map((value) => <option value={value} key={value} disabled={value === 'owner' && !isAdmin || value !== 'tester' && user?.platformRole === 'user'}>{t(`projects.role.${value}`)}</option>)}
+              {(['owner', 'developer', 'tester', 'user'] as const).map((value) => <option value={value} key={value} disabled={value === 'owner' && !isAdmin || (value === 'owner' || value === 'developer') && user?.platformRole === 'user'}>{t(`projects.role.${value}`)}</option>)}
             </select>
           </FormField>
           {current ? <ActionNote tone="neutral">{t('projects.members.changeRole', { name: current.name, from: t(`projects.role.${current.role}`), to: t(`projects.role.${role}`) })}</ActionNote> : null}

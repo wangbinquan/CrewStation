@@ -5,7 +5,7 @@ import {
   adminAuthenticationRoute, adminComputeRoute, adminGatewayRoute, adminProjectsRoute,
   adminProjectComputeRoute, adminProjectResourcesRoute, adminResourceTemplatesRoute, adminRoute, adminServicePlansRoute, adminSettingsRoute, adminTaskProfilesRoute, adminUsersRoute,
 } from '../../features/admin';
-import { capabilitiesRoute, marketHomeRoute, marketRoute, marketLegacyRoute } from '../../features/capabilities';
+import { appAccessRoute, capabilitiesRoute, marketHomeRoute, marketRoute, marketLegacyRoute } from '../../features/capabilities';
 import { catalogRoute } from '../../features/catalog';
 import { configRoute } from '../../features/config';
 import { historicalConversationsRoute } from '../../features/dev-session';
@@ -27,6 +27,7 @@ export const routeTree = rootRoute.addChildren([
     marketHomeRoute,
     marketRoute,
     marketLegacyRoute,
+    appAccessRoute,
     projectRoute.addChildren([
       projectOverviewRoute,
       selfProjectProvisioningRoute,

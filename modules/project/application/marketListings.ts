@@ -20,7 +20,8 @@ export function marketListingUseCases(deps: ProjectUseCaseDeps) {
   const toListing = async ({ project, service, listing, role }: VisibleApplication, actor: Actor): Promise<MarketListing> => ({
     projectId: project.id, name: project.name, description: listing.description, icon: listing.icon,
     owner: { userId: project.ownerUserId, name: (await users.getUser(project.ownerUserId))?.name ?? project.ownerUserId },
-    projectState: project.state, canPreview: actor.isAdmin || role !== undefined || project.ownerUserId === actor.userId,
+    // 「用户」只用正式版：不试用待命版（2026-09-24 裁定）。
+    projectState: project.state, canPreview: actor.isAdmin || (role !== undefined && role !== 'user') || project.ownerUserId === actor.userId,
     canDevelop: actor.isAdmin || actor.platformRole === 'developer' && (project.ownerUserId === actor.userId || role === 'owner' || role === 'developer'),
     canConfigure: actor.isAdmin || actor.platformRole === 'developer' && (project.ownerUserId === actor.userId || role === 'owner'),
     visibilityRevision: listing.revision, checkedAt: clock.now().toISOString(), ...(service ? { serviceId: service.id } : {}),

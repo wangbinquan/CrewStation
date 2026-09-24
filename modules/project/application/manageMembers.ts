@@ -5,7 +5,7 @@ import { authorizationUseCases } from './authorization';
 import type { ProjectUseCaseDeps } from './dependencies';
 import { memberToDto } from './toDto';
 
-/** 负责人管理成员与 preview 测试者；负责人本人的角色只能由管理员转移。 */
+/** 负责人管理成员、preview 测试者与「用户」；负责人本人的角色只能由管理员转移。 */
 export function memberUseCases(deps: ProjectUseCaseDeps) {
   const { uow, users, roleLock } = deps;
   const { authorize } = authorizationUseCases(deps);
@@ -21,7 +21,7 @@ export function memberUseCases(deps: ProjectUseCaseDeps) {
       if (input.role === 'owner' && !(await currentActor(deps, actor)).isAdmin) throw forbidden('负责人只能由管理员转移');
       const user = await users.getUser(input.userId);
       if (!user) throw validation(`用户 ${input.userId} 不存在`);
-      if (input.role !== 'tester' && user.platformRole === 'user') throw validation('开发成员和负责人必须是开发者或管理员', { field: 'userId' });
+      if ((input.role === 'owner' || input.role === 'developer') && user.platformRole === 'user') throw validation('开发成员和负责人必须是开发者或管理员', { field: 'userId' });
       return uow.run(async (scope) => {
         const project = await scope.projects.getById(projectId);
         if (project && project.ownerUserId === input.userId && input.role !== 'owner') throw precondition('不能降级当前负责人，请先转移负责人');

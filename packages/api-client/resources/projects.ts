@@ -1,5 +1,6 @@
 import type { ProjectComputePolicyDto, SaveProjectComputePolicy, AppPresentationDto, AppVisibilityDto, ManifestKind, MemberCandidateDto, MemberDto, ProjectDto, QuotaDto, SetAppPresentationRequest, SetAppVisibilityRequest, SetMemberRequest, SetQuotaRequest } from '@crewstation/contracts';
 import type { ProjectPage, ProjectPageQuery, ProjectServicePolicyDto, SaveProjectServicePolicy } from '@crewstation/contracts';
+import type { AppAccessRequestDto, AppAccessRequestPage, AppAccessStatusDto, CreateAppAccessRequest, DecideAppAccessRequest, RequestPageQuery } from '@crewstation/contracts';
 import type { Transport } from '../httpTransport';
 import type { ItemsPage } from '../itemsPage';
 import type { CreateProjectInput } from '../requestInputs';
@@ -38,6 +39,14 @@ export interface ProjectsResource {
   setAppVisibility(projectId: string, input: SetAppVisibilityRequest): Promise<AppVisibilityDto>;
   getAppPresentation(projectId: string): Promise<AppPresentationDto>;
   setAppPresentation(projectId: string, input: SetAppPresentationRequest): Promise<AppPresentationDto>;
+  /** GET /v1/apps/:projectId/access：申请页读自己对该应用的使用权与最近一条申请（2026-09-24）；任何登录用户可读。 */
+  getAppAccess(projectId: string): Promise<AppAccessStatusDto>;
+  /** POST /v1/apps/:projectId/access-requests（201） */
+  requestAppAccess(projectId: string, input: CreateAppAccessRequest): Promise<AppAccessRequestDto>;
+  /** GET /v1/app-access-requests：带 projectId 时负责人与管理员可读，不带时只有管理员。 */
+  listAppAccessRequests(query?: Partial<RequestPageQuery>): Promise<AppAccessRequestPage>;
+  /** POST /v1/app-access-requests/:id/decision：批准即加为「用户」。 */
+  decideAppAccessRequest(id: string, input: DecideAppAccessRequest): Promise<AppAccessRequestDto>;
 }
 
 export function projectsResource(transport: Transport): ProjectsResource {
@@ -62,5 +71,9 @@ export function projectsResource(transport: Transport): ProjectsResource {
     setAppVisibility: (id, input) => transport.request('PUT', `${base(id)}/app-visibility`, { body: input }),
     getAppPresentation: (id) => transport.request('GET', `${base(id)}/app-presentation`),
     setAppPresentation: (id, input) => transport.request('PUT', `${base(id)}/app-presentation`, { body: input }),
+    getAppAccess: (id) => transport.request('GET', `/v1/apps/${segment(id)}/access`),
+    requestAppAccess: (id, input) => transport.request('POST', `/v1/apps/${segment(id)}/access-requests`, { body: input }),
+    listAppAccessRequests: (query) => transport.request('GET', '/v1/app-access-requests', { query }),
+    decideAppAccessRequest: (id, input) => transport.request('POST', `/v1/app-access-requests/${segment(id)}/decision`, { body: input }),
   };
 }

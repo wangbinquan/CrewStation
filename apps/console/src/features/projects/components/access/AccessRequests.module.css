@@ -1,0 +1,7 @@
+.list { display: grid; gap: var(--cs-space-3); margin: 0; padding: 0; list-style: none; }
+.item { display: flex; flex-wrap: wrap; gap: var(--cs-space-3); align-items: flex-start; justify-content: space-between; padding-bottom: var(--cs-space-3); border-bottom: 1px solid var(--cs-color-border); }
+.item:last-child { padding-bottom: 0; border-bottom: none; }
+.summary { display: grid; gap: var(--cs-space-1); flex: 1 1 320px; min-width: 0; }
+.summary p { margin: 0; overflow-wrap: anywhere; }
+.head { display: flex; flex-wrap: wrap; gap: var(--cs-space-2); align-items: center; }
+.muted { color: var(--cs-color-text-muted); font-size: var(--cs-font-size-sm); }

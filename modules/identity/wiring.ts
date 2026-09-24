@@ -19,7 +19,7 @@ import type { IdentityModuleApi } from './api/moduleApi';
 import { bootstrapAdminUseCases } from './application/bootstrapAdmin';
 import { renderBootstrapPage } from './application/bootstrapPage';
 import { currentUserUseCase } from './application/currentUser';
-import { renderForbiddenPage } from './application/forbiddenPage';
+import { renderForbiddenPage, renderNoAppAccessPage } from './application/forbiddenPage';
 import { renderUnavailablePage } from './application/unavailablePage';
 import type { IdentityUseCaseDeps } from './application/dependencies';
 import { devSessionTokenUseCases } from './application/devSessionTokens';
@@ -57,6 +57,7 @@ import type { OidcUnitOfWork } from './ports/oidcUnitOfWork';
 import type { PasswordHasher } from './ports/passwordHasher';
 import type { SecretCipher } from './ports/secretCipher';
 import type { PreviewAccess } from './ports/previewAccess';
+import type { AppAccess } from './ports/appAccess';
 import type { ProjectDirectory } from './ports/projectDirectory';
 import type { ServiceEntry } from './ports/serviceEntry';
 import type { WorkloadLookup } from './ports/workloadLookup';
@@ -74,6 +75,7 @@ export type { OidcRepositoryScope, OidcUnitOfWork } from './ports/oidcUnitOfWork
 export type { PasswordHasher } from './ports/passwordHasher';
 export type { SecretCipher } from './ports/secretCipher';
 export type { PreviewAccess } from './ports/previewAccess';
+export type { AppAccess, AppAccessVerdict } from './ports/appAccess';
 export type { ProjectDirectory } from './ports/projectDirectory';
 export type { ServiceEntry } from './ports/serviceEntry';
 export type { WorkloadLookup } from './ports/workloadLookup';
@@ -87,6 +89,8 @@ export interface IdentityRuntimeDeps {
   /** 缺省按 contracts HOST_PATTERNS 与 settings.userDomain 推导。 */
   hostResolver?: HostResolver;
   previewAccess?: PreviewAccess;
+  /** 正式地址的使用权（2026-09-24 裁定）；缺省一律 unknown，即不配置时正式地址全部拒绝。 */
+  appAccess?: AppAccess;
   /** RFC-021：prod 主机的维护放行（preview 主机没有版本改由路由指向说明页，RFC-025 D13）；缺省一律放行（不改变旧行为）。 */
   serviceEntry?: ServiceEntry;
   /** 项目 slug → ID，供身份转发按项目取覆盖；缺省一律按全局默认。 */
@@ -174,6 +178,10 @@ export function createIdentityModule(deps: IdentityModuleDeps): IdentityModule {
     loginErrorPageHtml: (code) => renderLoginErrorPage(code),
     logoutRedirect: logoutUseCase(useCaseDeps),
     forbiddenPage: (message, context = {}) => renderForbiddenPage({ message, consoleUrl: `${consoleOrigin(session, context.scheme)}/` }),
+    noAppAccessPage: (denial, context = {}) => renderNoAppAccessPage({
+      appName: denial.appName, ownerName: denial.ownerName, consoleUrl: `${consoleOrigin(session, context.scheme)}/`,
+      ...(denial.requestable ? { applyUrl: `${consoleOrigin(session, context.scheme)}/apps/${encodeURIComponent(denial.projectId)}/access` } : {}),
+    }),
     unavailablePage: (entry, context = {}) => renderUnavailablePage({ entry, consoleUrl: `${consoleOrigin(session, context.scheme)}/`, now: clock.now() }),
     resolveSession: sessionTokenUseCases(useCaseDeps).resolveSession,
     authorizeUserRequest: forwardAuthUserUseCase(useCaseDeps, forwarding),
@@ -193,10 +201,11 @@ export function createIdentityModule(deps: IdentityModuleDeps): IdentityModule {
   };
 }
 
-function runtimePorts(deps: IdentityRuntimeDeps, session: SessionSettings): Pick<IdentityUseCaseDeps, 'hosts' | 'previewAccess' | 'serviceEntry' | 'projects' | 'workloads' | 'allowlist' | 'memberships' | 'devSessions'> {
+function runtimePorts(deps: IdentityRuntimeDeps, session: SessionSettings): Pick<IdentityUseCaseDeps, 'hosts' | 'previewAccess' | 'appAccess' | 'serviceEntry' | 'projects' | 'workloads' | 'allowlist' | 'memberships' | 'devSessions'> {
   return {
     hosts: deps.hostResolver ?? { resolveHost: async (host) => resolveHostByPattern(host, session.userDomain) },
     previewAccess: deps.previewAccess ?? { canView: async () => false },
+    appAccess: deps.appAccess ?? { check: async () => ({ kind: 'unknown' }) },
     serviceEntry: deps.serviceEntry ?? { check: async () => ({ kind: 'open' }) },
     projects: deps.projectDirectory ?? { idBySlug: async () => undefined },
     workloads: deps.workloadLookup ?? { byIp: async () => undefined },

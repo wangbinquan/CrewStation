@@ -9,7 +9,7 @@ interface SettingsWrite { readonly path: string; readonly input: Record<string, 
 /** 真实路由与 query/mutation，只替换 HTTP 边界；两份设置有独立服务器修订。 */
 export function visibilitySettingsFixture() {
   const state = {
-    visibility: { mode: 'members', userIds: [], users: [], revision: 0, updatedAt: null, canConfigure: true } as AppVisibilityDto,
+    visibility: { mode: 'members', allowRequests: true, revision: 0, updatedAt: null, canConfigure: true } as AppVisibilityDto,
     presentation: { description: '整理团队知识', icon: 'book', revision: 0, updatedAt: null } as AppPresentationDto,
     failure: '' as '' | 'me' | 'app-visibility' | 'app-presentation',
     role: 'owner', failWrite: false, hold: undefined as Promise<void> | undefined,
@@ -49,7 +49,7 @@ export const settingsButton = (label: string, root?: ParentNode) => {
 };
 export const settingsForm = (label: string) => settingsField(label).closest('form')!;
 /** 字段属于哪个弹窗：弹窗标题就是打开它的按钮文案。 */
-const DIALOG_OF: Record<string, string> = { 市场可见范围: '修改可见范围', '完整邮箱或用户 ID': '修改可见范围', 应用用途: '修改展示资料', 应用图标: '修改展示资料' };
+const DIALOG_OF: Record<string, string> = { 可见范围: '修改可见范围', 申请: '修改可见范围', 应用用途: '修改展示资料', 应用图标: '修改展示资料' };
 /** 关掉开着的设置弹窗：「取消」只关窗，草稿留着。 */
 export async function closeSetting(page: RenderedApp) {
   const dialog = openSettingDialog();

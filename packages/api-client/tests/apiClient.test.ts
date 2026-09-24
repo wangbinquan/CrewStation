@@ -43,6 +43,20 @@ async function caught(call: () => Promise<unknown>): Promise<ApiClientError> {
 }
 
 describe('createApiClient：请求形状', () => {
+  test('应用使用申请：申请人一侧走 /v1/apps/:id，审批一侧走 /v1/app-access-requests，分页参数原样传递（2026-09-24）', async () => {
+    const f = fakeFetch(() => json(200, { items: [] })), client = createApiClient({ baseUrl: 'https://console.test', fetch: f.fetchImpl });
+    const id = '01a0bf5d-8f4b-7fc7-8b88-18362617594b';
+    await client.projects.getAppAccess(id);
+    await client.projects.requestAppAccess(id, { reason: '看周报' });
+    await client.projects.listAppAccessRequests({ projectId: id as ProjectId, state: 'pending', limit: 20, cursor: 'a/b' });
+    await client.projects.decideAppAccessRequest('req/1', { approve: false, decision: '走流程' });
+    expect(f.calls.map((c) => `${c.method} ${new URL(c.url).pathname}`)).toEqual([
+      `GET /v1/apps/${id}/access`, `POST /v1/apps/${id}/access-requests`, 'GET /v1/app-access-requests', 'POST /v1/app-access-requests/req%2F1/decision',
+    ]);
+    expect(JSON.parse(f.calls[1]!.body!)).toEqual({ reason: '看周报' });
+    expect(Object.fromEntries(new URL(f.calls[2]!.url).searchParams)).toEqual({ projectId: id, state: 'pending', limit: '20', cursor: 'a/b' });
+    expect(JSON.parse(f.calls[3]!.body!)).toEqual({ approve: false, decision: '走流程' });
+  });
   test('申请分页保留真实服务端游标、项目和状态，不改旧全量调用', async () => {
     const f = fakeFetch(() => json(200, { items: [], nextCursor: 'cursor-next' })), client = createApiClient({ baseUrl: 'https://console.test', fetch: f.fetchImpl });
     const query = { projectId: '01a0bf5d-8f4b-7fc7-8b88-18362617594b' as ProjectId, state: 'pending' as const, limit: 5, cursor: 'opaque/value?x=1' };

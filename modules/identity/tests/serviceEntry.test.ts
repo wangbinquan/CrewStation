@@ -25,6 +25,8 @@ beforeAll(async () => {
   const identity = identityModuleFor(tdb.db, {
     settings: BASE_SETTINGS,
     previewAccess: { canView: async () => true },
+    // 使用权另有用例（forwardAuth.test.ts）；这里只看维护入口，一律放行。
+    appAccess: { check: async () => ({ kind: 'allowed' }) },
     serviceEntry: { check: async (_user, slug, slot) => { asked.push([slug, slot]); return verdict; } },
     workloadLookup: { byIp: async (ip) => (ip === '10.244.0.50' ? caller : undefined) },
     allowlistEvaluator: { evaluate: async () => ({ allowed: false, targetIdentity: 'service:demo', reason: 'demo 的正式版本维护中：换库', unavailable: { message: 'demo 的正式版本维护中：换库', retryAfterSeconds: 120 } }) },

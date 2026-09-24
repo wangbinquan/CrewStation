@@ -13,3 +13,10 @@ test('RFC-021 两个新动作只给负责人与平台管理员：下线／推迟
   expect(isAllowed('developer', 'publish')).toBe(true);
   expect(isAllowed('tester', 'view')).toBe(false);
 });
+
+test('「用户」角色在项目里一个动作都没有：不看项目、不试用待命版、不管成员（2026-09-24 裁定）', () => {
+  for (const action of ['view', 'view-preview', 'develop', 'publish', 'manage-members', 'manage-testers', 'manage-slots'] as const) {
+    expect(isAllowed('user', action)).toBe(false);
+  }
+  expect(isAllowed('tester', 'view-preview')).toBe(true);
+});

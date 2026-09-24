@@ -26,6 +26,7 @@ import { createEventsModule } from '@crewstation/module-events';
 import { createGatewayModule, UNAVAILABLE_PATH } from '@crewstation/module-gateway';
 import type { GatewayModuleApi } from '@crewstation/module-gateway';
 import { createIdentityModule } from '@crewstation/module-identity';
+import type { IdentityRuntimeDeps } from '@crewstation/module-identity';
 import { createObservabilityModule } from '@crewstation/module-observability';
 import { createProjectModule } from '@crewstation/module-project';
 import { createProvisioningModule } from '@crewstation/module-provisioning';
@@ -82,6 +83,21 @@ interface Late { events?: EventsModuleApi; project?: ProjectModuleApi; gateway?:
 
 type CompositionDeps = PlatformModuleDeps & { identities: ResourceIdentityDirectory };
 
+/**
+ * identity 在用户域要的两个项目访问判定（2026-09-24 裁定）：待命版与开发预览要项目成员或测试者，「用户」角色不算；
+ * 正式地址按应用可见范围放行。判定都在 project（L2），它装配在 identity 之后，故经 projectApi 惰性取。
+ */
+function projectHostAccess(projectApi: () => ProjectModuleApi): Pick<IdentityRuntimeDeps, 'previewAccess' | 'appAccess'> {
+  return {
+    previewAccess: { canView: async (userId, slug) => {
+      const resolved = await projectApi().resolveServiceIdentity(`${slug}/${slug}`);
+      const role = resolved ? await projectApi().roleOf({ userId, isAdmin: await projectApi().isAdmin(userId) }, resolved.projectId) : undefined;
+      return role !== undefined && role !== 'user';
+    } },
+    appAccess: { check: (user, slug) => projectApi().appAccessBySlug(user, slug) },
+  };
+}
+
 function composeCore(deps: CompositionDeps, late: Late) {
   const { db, settings, logger } = deps;
   const hosts = {
@@ -106,7 +122,7 @@ function composeCore(deps: CompositionDeps, late: Late) {
     },
     // 身份转发按项目覆盖时要把主机里的 slug 换成项目 ID；project 装配在 identity 之后，故经端口惰性取。
     projectDirectory: { idBySlug: async (slug) => (await projectApi().resolveServiceIdentity(`${slug}/${slug}`))?.projectId },
-    previewAccess: { canView: async (userId, slug) => { const r = await projectApi().resolveServiceIdentity(`${slug}/${slug}`); return r ? (await projectApi().roleOf({ userId, isAdmin: await projectApi().isAdmin(userId) }, r.projectId)) !== undefined : false; } },
+    ...projectHostAccess(projectApi),
     // RFC-021：prod 主机的维护放行与 preview 主机的未部署页，判定在 gateway（L5），此处只接线。
     serviceEntry: { check: (userId, slug, slot) => gatewayApi().userEntry(userId, slug, slot) },
     membershipLookup: { membershipsOf: (userId) => projectApi().listUserMemberships(userId) },
@@ -229,7 +245,8 @@ function composeDelivery(deps: CompositionDeps, core: ReturnType<typeof composeC
     grants: { grantedOperations: apiCatalog.api.grantedOperations, listCallers: async () => [], proxyNameOf: apiCatalog.api.activeProxyNameOf },
     access: {
       authorize: project.api.authorize,
-      isMemberOrAdmin: async (userId, projectId) => (await project.api.roleOf({ userId, isAdmin: await project.api.isAdmin(userId) }, projectId)) !== undefined,
+      // 维护中放行的是来验证的成员；「用户」角色和其他人一样看维护页（2026-09-24）。
+      isMemberOrAdmin: async (userId, projectId) => { const role = await project.api.roleOf({ userId, isAdmin: await project.api.isAdmin(userId) }, projectId); return role !== undefined && role !== 'user'; },
     },
     users: { describe: async (userId) => { const user = await core.identity.api.getUser(userId); return user ? { name: user.name, email: user.email } : undefined; } },
     settings: { systemNamespace: settings.systemNamespace, serviceDomain: settings.serviceDomain, userAuthMiddleware: 'forward-auth-user', serviceAuthMiddleware: 'forward-auth-service', dropIdentityHeadersMiddleware: 'drop-identity-headers', allowlistMaxStaleSeconds: 300, consumerName: 'gateway' },

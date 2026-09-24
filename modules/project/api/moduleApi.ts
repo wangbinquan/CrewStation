@@ -4,6 +4,7 @@ import type {
   Actor, CreateProjectRequest, ListProjectsQuery, ManifestKind, MemberDto, ProjectDto, ProjectId, ProjectState, QuotaDto, ServiceDto,
   ServiceId, ServicePlanDto, ServicePlanWrite, TaskProfileWrite, SetMemberRequest, SetQuotaRequest, TaskProfileDto, UserId,
   AppVisibilityDto, SetAppVisibilityRequest, AppPresentationDto, SetAppPresentationRequest, MemberCandidateDto, MarketAppsQuery, MarketAppDto,
+  AppAccessRequestDto, AppAccessRequestPage, AppAccessStatusDto, CreateAppAccessRequest, DecideAppAccessRequest, RequestPageQuery,
 } from '@crewstation/contracts';
 
 export type ProjectAction =
@@ -13,7 +14,7 @@ export type ProjectAction =
   // RFC-021：下线／推迟／重新部署待验证版本、开关正式版本维护（负责人与管理员）。
   | 'manage-slots' | 'manage-maintenance';
 
-export type EffectiveRole = 'admin' | 'owner' | 'developer' | 'tester';
+export type EffectiveRole = 'admin' | 'owner' | 'developer' | 'tester' | 'user';
 
 export interface ResolvedService {
   projectId: ProjectId;
@@ -39,6 +40,15 @@ export interface ProvisioningProject {
   template: string;
   initialPlan?: string;
 }
+
+/**
+ * 正式地址放不放这个人（2026-09-24 裁定，网关的 ForwardAuth 每个请求都问）：`denied` 带无权限页要写的事实；
+ * `unknown` 是查不到项目或已归档。identity 的 AppAccess 端口与它同形，由组合根转接。
+ */
+export type AppAccessVerdict =
+  | { readonly kind: 'allowed' }
+  | { readonly kind: 'denied'; readonly projectId: ProjectId; readonly appName: string; readonly ownerName: string; readonly requestable: boolean }
+  | { readonly kind: 'unknown' };
 
 /** 供 L6 聚合正式状态；serviceId 仅供模块间定位，HTTP 市场响应显式投影。 */
 export type MarketListing = Omit<MarketAppDto, 'production' | 'entry'> & { serviceId?: ServiceId };
@@ -68,6 +78,15 @@ export interface ProjectModuleApi {
   getAppPresentation(actor: Actor, projectId: ProjectId): Promise<AppPresentationDto>;
   setAppPresentation(actor: Actor, projectId: ProjectId, input: SetAppPresentationRequest): Promise<AppPresentationDto>;
   memberCandidates(actor: Actor, projectId: ProjectId, identity: string): Promise<MemberCandidateDto[]>;
+  /** 无 actor 的受信路径：只给网关判定正式地址用，`user` 是会话里刚读出的账号。 */
+  appAccessBySlug(user: { readonly id: UserId; readonly isAdmin: boolean }, projectSlug: string): Promise<AppAccessVerdict>;
+  /** 申请页：任何登录用户都能读自己对某应用的使用权与最近一条申请。 */
+  getAppAccessStatus(actor: Actor, projectId: ProjectId): Promise<AppAccessStatusDto>;
+  requestAppAccess(actor: Actor, projectId: ProjectId, input: CreateAppAccessRequest): Promise<AppAccessRequestDto>;
+  /** 带 projectId 时负责人与管理员可读；不带时只给管理员（管理空间「申请审批」）。 */
+  listAppAccessRequests(actor: Actor, query: RequestPageQuery): Promise<AppAccessRequestPage>;
+  /** 批准即加为「用户」角色成员（已是成员的保留原角色）。 */
+  decideAppAccessRequest(actor: Actor, requestId: string, input: DecideAppAccessRequest): Promise<AppAccessRequestDto>;
   archiveProject(actor: Actor, projectId: ProjectId): Promise<ProjectDto>;
   setProjectState(projectId: ProjectId, state: ProjectState, message?: string): Promise<ProjectDto>;
   getService(actor: Actor, serviceId: ServiceId): Promise<ServiceDto>;

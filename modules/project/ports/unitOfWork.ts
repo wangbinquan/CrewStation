@@ -1,6 +1,7 @@
 import type { DomainPayload, DomainTopicName } from '@crewstation/contracts';
 import type { CatalogRepository, MembershipRepository, ProjectRepository, QuotaRepository, ServiceRepository } from './repositories';
 import type { AppListingRepository } from './appListings';
+import type { AccessRequestRepository } from './accessRequests';
 import type { ProjectPageRepository } from './projectPages';
 import type { ServicePolicyRepository } from './servicePolicies';
 
@@ -16,6 +17,7 @@ export interface RepositoryScope {
   readonly quotas: QuotaRepository;
   readonly catalog: CatalogRepository;
   readonly appListings: AppListingRepository;
+  readonly accessRequests: AccessRequestRepository;
   readonly projectPages: ProjectPageRepository;
   readonly servicePolicies: ServicePolicyRepository;
   readonly events: DomainEventPublisher;

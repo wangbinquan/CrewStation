@@ -45,7 +45,8 @@ export function useMemberEditor({ isAdmin, canManage, members, pending, disabled
     const parsed = UserIdSchema.safeParse(targetId);
     if (!parsed.success) { setError(t('projects.members.targetRequired')); root?.querySelector<HTMLElement>('input:not(:disabled), select:not(:disabled)')?.focus(); return; }
     if ((role === 'owner' && !isAdmin) || (current?.role === 'owner' && role !== 'owner')) return;
-    if (role !== 'tester' && user?.platformRole === 'user') { setError(t('projects.members.developerRequired')); return; }
+    // 平台普通用户只能是测试者或「用户」（2026-09-24 起多了「用户」：只用正式版）。
+    if ((role === 'owner' || role === 'developer') && user?.platformRole === 'user') { setError(t('projects.members.developerRequired')); return; }
     setError(undefined); const input = { userId: parsed.data, role };
     if (role === 'owner' && current?.role !== 'owner') setConfirmedInput(input);
     else void save(input);

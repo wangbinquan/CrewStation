@@ -14,9 +14,8 @@ export function appVisibilityUseCases(deps: ProjectUseCaseDeps) {
     return uow.read.appListings.get(projectId);
   };
   const visibility = async (actor: Actor, listing: AppListing): Promise<AppVisibilityDto> => ({
-    mode: listing.mode, userIds: listing.userIds, revision: listing.revision, updatedAt: listing.updatedAt?.toISOString() ?? null,
+    mode: listing.mode, allowRequests: listing.allowRequests, revision: listing.revision, updatedAt: listing.updatedAt?.toISOString() ?? null,
     canConfigure: ['admin', 'owner'].includes(await roleOf(actor, listing.projectId) ?? ''),
-    users: (await Promise.all(listing.userIds.map((id) => users.getUser(id)))).flatMap((user) => user ? [{ userId: user.id, name: user.name, email: user.email }] : []),
   });
   const save = async (actor: Actor, projectId: ProjectId, expectedRevision: number, delta: Partial<AppListing>) => {
     await authorize(actor, projectId, 'manage-members');
@@ -33,9 +32,8 @@ export function appVisibilityUseCases(deps: ProjectUseCaseDeps) {
     setAppVisibility: async (actor: Actor, projectId: ProjectId, raw: SetAppVisibilityRequest) => {
       await authorize(actor, projectId, 'manage-members');
       const input = SetAppVisibilityRequestSchema.safeParse(raw);
-      if (!input.success) throw validation('请检查可见范围与指定用户', { issues: input.error.issues });
-      for (const userId of input.data.userIds) if (!await users.getUser(userId)) throw validation('指定用户不存在，请重新查找', { field: 'userIds', userId });
-      return visibility(actor, await save(actor, projectId, input.data.expectedRevision, { mode: input.data.mode, userIds: input.data.userIds }));
+      if (!input.success) throw validation('请检查可见范围与申请设置', { issues: input.error.issues });
+      return visibility(actor, await save(actor, projectId, input.data.expectedRevision, { mode: input.data.mode, allowRequests: input.data.allowRequests }));
     },
     getAppPresentation: async (actor: Actor, projectId: ProjectId) => presentation(await read(actor, projectId)),
     setAppPresentation: async (actor: Actor, projectId: ProjectId, raw: SetAppPresentationRequest) => {

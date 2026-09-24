@@ -12,6 +12,8 @@ export function authorizationUseCases(deps: ProjectUseCaseDeps) {
     if (fresh.isAdmin) return 'admin';
     const membership = await uow.read.memberships.get(projectId, actor.userId);
     if (!membership) return undefined;
+    // 「用户」照原样；平台普通用户即使被设成开发者或负责人，项目里也只按测试者算。
+    if (membership.role === 'user') return 'user';
     return fresh.platformRole === 'user' ? 'tester' : membership.role;
   };
   /** 无权限时对非成员返回 404 而不是 403，避免暴露项目是否存在。 */

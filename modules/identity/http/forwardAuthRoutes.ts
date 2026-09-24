@@ -68,6 +68,12 @@ function userResponse(c: Context<AppEnv>, decision: UserAuthDecision, api: Ident
       // 浏览器导航给人看的页面（原因＋返回工作台）；程序调用仍是 JSON。
       if ((c.req.header('accept') ?? '').includes('text/html')) return c.html(api.forbiddenPage(decision.message, { scheme: c.req.header('x-forwarded-proto') }), 403);
       return c.json({ error: 'forbidden', message: decision.message, details: {} }, 403);
+    case 'no-app-access': {
+      // 2026-09-24：正式地址按应用可见范围拦下。浏览器导航给平台统一的「没有项目权限」页，程序调用是 JSON；会话不清，人仍是登录的。
+      const { denial } = decision, scheme = { scheme: c.req.header('x-forwarded-proto') };
+      if ((c.req.header('accept') ?? '').includes('text/html')) return c.html(api.noAppAccessPage(denial, scheme), 403);
+      return c.json({ error: 'forbidden', message: `没有应用「${denial.appName}」的使用权限`, details: { reason: 'app-access', projectId: denial.projectId, requestable: denial.requestable } }, 403);
+    }
     case 'unavailable':
       return unavailableResponse(c, decision.entry, api);
   }

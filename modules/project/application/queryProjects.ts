@@ -36,7 +36,7 @@ export function queryProjectUseCases(deps: ProjectUseCaseDeps) {
     listProjects: async (actor: Actor, query?: ListProjectsQuery): Promise<ProjectDto[]> => {
       actor = await developerActor(deps, actor);
       const memberships = await uow.read.memberships.listByUser(actor.userId);
-      const projects = actor.isAdmin ? await uow.read.projects.list() : (await uow.read.projects.listByIds(memberships.filter((m) => m.role !== 'tester').map((m) => m.projectId))).filter((p) => p.kind === 'DigitalWorker');
+      const projects = actor.isAdmin ? await uow.read.projects.list() : (await uow.read.projects.listByIds(memberships.filter((m) => m.role === 'owner' || m.role === 'developer').map((m) => m.projectId))).filter((p) => p.kind === 'DigitalWorker');
       const kinds = query?.kind;
       const dtos = await Promise.all(projects.map(async (p) => projectToDto(p, await uow.read.services.getByProject(p.id))));
       return kinds === undefined ? dtos : dtos.filter((dto) => kinds.includes(dto.kind));

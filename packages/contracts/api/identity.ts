@@ -2,7 +2,8 @@ import { z } from 'zod';
 import { ProjectIdSchema, UserIdSchema } from '../ids';
 import { AuthMethodSchema } from './auth/session';
 
-export const MemberRoleSchema = z.enum(['owner', 'developer', 'tester']);
+/** 项目成员角色；`user`（用户）只能打开正式地址、在市场里看到应用，不进项目、不试用待命版（2026-09-24 裁定）。 */
+export const MemberRoleSchema = z.enum(['owner', 'developer', 'tester', 'user']);
 export const PlatformRoleSchema = z.enum(['user', 'developer', 'admin']);
 export type PlatformRole = z.infer<typeof PlatformRoleSchema>;
 export const SetPlatformRoleRequestSchema = z.object({ platformRole: PlatformRoleSchema, expectedRole: PlatformRoleSchema }).strict();

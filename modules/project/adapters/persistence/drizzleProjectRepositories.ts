@@ -50,7 +50,7 @@ export function drizzleMembershipRepository(db: Executor): MembershipRepository 
   };
 }
 
-function toProject(row: typeof projects.$inferSelect): Project {
+export function toProject(row: typeof projects.$inferSelect): Project {
   return {
     id: row.id as ProjectId, slug: row.slug, name: row.name, kind: row.kind as ManifestKind, namespace: row.namespace,
     ownerUserId: row.ownerUserId as UserId, state: row.state as ProjectState, template: row.template,

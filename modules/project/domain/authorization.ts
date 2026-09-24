@@ -16,6 +16,8 @@ const OWNER_ACTIONS: readonly ProjectAction[] = [
   'manage-production-config', 'force-release-session', 'manage-slots', 'manage-maintenance',
 ];
 const TESTER_ACTIONS: readonly ProjectAction[] = ['view-preview'];
+/** 「用户」只使用应用：正式地址的放行由可见范围判定（domain/appAccess.ts），项目内一个动作都没有，连待命版也不试用。 */
+const USER_ACTIONS: readonly ProjectAction[] = [];
 
 export function isAllowed(role: EffectiveRole | undefined, action: ProjectAction): boolean {
   switch (role) {
@@ -23,6 +25,7 @@ export function isAllowed(role: EffectiveRole | undefined, action: ProjectAction
     case 'owner': return OWNER_ACTIONS.includes(action);
     case 'developer': return DEVELOPER_ACTIONS.includes(action);
     case 'tester': return TESTER_ACTIONS.includes(action);
+    case 'user': return USER_ACTIONS.includes(action);
     default: return false;
   }
 }

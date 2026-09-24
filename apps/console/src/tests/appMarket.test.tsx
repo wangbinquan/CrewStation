@@ -17,7 +17,7 @@ const app = (overrides: Partial<MarketAppDto> = {}): MarketAppDto => ({
 });
 let saved: AppVisibilityDto;
 function fixture(owner = false, application = app()) {
-  saved = { mode: 'members', userIds: [], users: [], revision: 0, updatedAt: null, canConfigure: owner };
+  saved = { mode: 'members', allowRequests: true, revision: 0, updatedAt: null, canConfigure: owner };
   const calls: Array<{ url: string; method: string; body?: Record<string, unknown> }> = [];
   let conflict = false, queryFailure = false, marketFailure = false, slowReload = false, holdMarket: Promise<void> | undefined;
   globalThis.fetch = (async (raw: RequestInfo | URL, init?: RequestInit) => {
@@ -30,7 +30,7 @@ function fixture(owner = false, application = app()) {
       if (marketFailure) { result = { error: 'not_found', message: '应用不存在或不可见' }; status = 404; }
       else result = url.includes(`/apps/${projectId}`) ? application : { items: [application] };
     } else if (url.endsWith('/app-visibility')) {
-      if (method === 'PUT' && conflict) { saved = { ...saved, mode: 'selected', userIds: [userId], users: [user], revision: 2 }; result = { error: 'conflict', message: '其他负责人已更新' }; status = 409; }
+      if (method === 'PUT' && conflict) { saved = { ...saved, allowRequests: false, revision: 2 }; result = { error: 'conflict', message: '其他负责人已更新' }; status = 409; }
       else if (method === 'GET' && queryFailure) { result = { error: 'unavailable', message: '暂时无法读取设置' }; status = 503; }
       else if (method === 'GET' && slowReload) { await new Promise((resolve) => setTimeout(resolve, 300)); result = saved; }
       else { if (body) saved = { ...saved, ...body, revision: Number(body.expectedRevision) + 1 }; result = saved; }
@@ -53,6 +53,7 @@ async function input(node: HTMLInputElement | HTMLSelectElement, value: string) 
   await page!.settle();
 }
 const scopeSelect = () => document.querySelector<HTMLSelectElement>('form select option[value="members"]')!.parentElement as HTMLSelectElement;
+const requestsSelect = () => document.querySelector<HTMLSelectElement>('form select option[value="open"]')!.parentElement as HTMLSelectElement;
 
 describe('能力市场与负责人设置真实路由', () => {
   test('首页是业务卡片，不可用应用没有详情或打开入口，不请求项目内部数据', async () => {
@@ -102,17 +103,18 @@ describe('能力市场与负责人设置真实路由', () => {
     expect(document.querySelector('main a')).toBeNull(); expect(page.text()).toContain('暂不可用');
     expect(page.text()).not.toContain('负责人尚未填写');
   });
-  test('指定名单约束首屏展示；空名单字段错误；精确查找去重；清空与取消都不保存', async () => {
-    const f = fixture(true); page = await renderApp(`/projects/${projectId}/settings?tab=visibility`); await page.click('修改可见范围');
-    await input(scopeSelect(), 'selected');
-    expect(page.text()).toContain('至少选择一位，最多 200 位'); await page.click('保存可见范围');
-    expect(page.text()).toContain('请至少选择一位已注册用户'); expect(f.calls.filter((call) => call.method === 'PUT')).toHaveLength(0);
-    await input(document.querySelector<HTMLInputElement>('input')!, 'lin@example.com'); await page.click('查找账号');
-    await page.click('加入指定名单'); await page.click('加入指定名单');
-    expect(document.querySelectorAll('ul.people li')).toHaveLength(1);
-    // 2026-09-23 起是弹窗：「清空」回到已保存的范围、弹窗不关；「取消」只关窗。
-    await page.click('清空'); expect(scopeSelect().value).toBe('members'); await page.click('取消');
-    expect(document.querySelectorAll('dialog').length).toBe(0); expect(page.text()).toContain('项目成员'); expect(f.calls.filter((call) => call.method === 'PUT')).toHaveLength(0);
+  test('可见范围只剩两档，另有「允许申请／只能授权」；清空回到已保存、取消只关窗都不保存，保存写入申请开关（2026-09-24）', async () => {
+    const f = fixture(true); page = await renderApp(`/projects/${projectId}/settings?tab=visibility`);
+    expect(page.text()).toContain('申请：允许申请'); await page.click('修改可见范围');
+    expect([...scopeSelect().options].map((option) => option.value)).toEqual(['members', 'authenticated']);
+    expect(page.text()).not.toContain('指定用户'); expect(page.text()).toContain('网关放谁打开正式地址');
+    await input(requestsSelect(), 'closed'); expect(page.text()).toContain('只看到「请联系项目负责人」');
+    // 2026-09-23 起是弹窗：「清空」回到已保存的设置、弹窗不关；「取消」只关窗。
+    await page.click('清空'); expect(requestsSelect().value).toBe('open'); await page.click('取消');
+    expect(document.querySelectorAll('dialog').length).toBe(0); expect(page.text()).toContain('项目成员（含用户）'); expect(f.calls.filter((call) => call.method === 'PUT')).toHaveLength(0);
+    await page.click('修改可见范围'); await input(requestsSelect(), 'closed'); await page.click('保存可见范围');
+    expect(f.calls.filter((call) => call.method === 'PUT').at(-1)?.body).toEqual({ mode: 'members', allowRequests: false, expectedRevision: 0 });
+    expect(page.text()).toContain('申请：只能授权');
   });
   test('并发保存保留草稿和最新范围，显式采用最新修订后再次保存', async () => {
     const f = fixture(true); page = await renderApp(`/projects/${projectId}/settings?tab=visibility`); await page.click('修改可见范围');
@@ -121,7 +123,7 @@ describe('能力市场与负责人设置真实路由', () => {
     f.conflict(false); await page.click('使用最新修订，保留本地草稿');
     expect(f.calls.filter((call) => call.method === 'PUT')).toHaveLength(1);
     await page.click('保存可见范围');
-    expect(f.calls.filter((call) => call.method === 'PUT').at(-1)?.body).toEqual({ mode: 'authenticated', userIds: [], expectedRevision: 2 });
+    expect(f.calls.filter((call) => call.method === 'PUT').at(-1)?.body).toEqual({ mode: 'authenticated', allowRequests: true, expectedRevision: 2 });
     expect(document.querySelector('form select option[value="members"]')).toBeNull(); expect(page.text()).toContain('全部登录用户');
   });
   test('最新设置读取失败时保留已经输入的草稿，不能把表单卸载清空', async () => {

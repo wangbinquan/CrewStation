@@ -23,7 +23,8 @@ export function TopBar() {
   const role = !me.error && !me.isPending ? me.data?.platformRole : undefined;
   const projectId = /^\/projects\/([0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:\/|$)/.exec(path)?.[1];
   const canRemember = role === 'admin' || role === 'developer';
-  const previewOnly = role !== 'admin' && me.data?.memberships?.some((member) => member.projectId === projectId && member.role === 'tester');
+  // 测试者只试用、「用户」只用正式版（2026-09-24）：都不读项目身份，也不记成开发工作台的回访地址。
+  const previewOnly = role !== 'admin' && me.data?.memberships?.some((member) => member.projectId === projectId && (member.role === 'tester' || member.role === 'user'));
   const project = useProjectIdentity(canRemember && !previewOnly ? projectId : undefined);
   useEffect(() => {
     if (canRemember && path.startsWith('/projects') && (!projectId || !project.error && project.data?.kind === 'DigitalWorker')) rememberWorkbenchPath(href);
@@ -32,7 +33,7 @@ export function TopBar() {
     const identity = await me.refetch();
     const saved = recallWorkbenchPath(), id = /^\/projects\/([0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:[/?]|$)/.exec(saved)?.[1];
     const eligible = identity.data?.platformRole === 'admin' || identity.data?.platformRole === 'developer';
-    const allowed = identity.data?.platformRole === 'admin' || !id || identity.data?.memberships?.some((m) => m.projectId === id && m.role !== 'tester');
+    const allowed = identity.data?.platformRole === 'admin' || !id || identity.data?.memberships?.some((m) => m.projectId === id && (m.role === 'owner' || m.role === 'developer'));
     if (!identity.error && eligible) void navigate({ href: allowed && saved.startsWith('/projects') ? saved : '/projects' });
   };
   const pill = (active: boolean) => [styles.pill, active && styles.pillActive].filter(Boolean).join(' ');

@@ -131,6 +131,13 @@ RFC-023 换成 postgres.js 后撞上（2026-09-23，182 个用例一起红）：
 触发条件未复现（本机八种事务形态压测阴性），运行时／驱动的取舍见 `implementation-open-questions.md` I16。
 **重启前先把 `kubectl logs` 存下来**：Recreate 会把旧 Pod 连日志一起删掉，第三次的现场就这样丢了。
 
+### 迁移 SQL 里别写「别名.列」：结构检查把它当成跨 schema 引用
+
+2026-09-24 实撞（project/0012，把可见范围的指定名单迁成成员）：`SELECT l.project_id, u.user_id FROM project.app_listings l CROSS JOIN LATERAL jsonb_array_elements_text(l.user_ids) AS u(user_id)`
+在本机库上跑得通、模块用例也绿，`bun run arch:check` 却报 4 条 `persistence-ownership`：「引用了其他 schema 的对象 l.project_id」。
+判据：`tools/arch` 按 `标识符.标识符` 认对象引用，前一段不是本模块的 schema 就算越界，它不区分表别名。
+写迁移时列名不加别名前缀（本例改成 `SELECT project_id, jsonb_array_elements_text(user_ids), 'user' FROM project.app_listings`，集合返回函数放在选择列表里照样一行一个元素），真要连表就用 `project.表名.列` 的全名。
+
 ## Kubernetes 与本机集群
 
 ### 反复导入镜像会把 docker-desktop 的 118G 磁盘填满，先崩的是 PostgreSQL

@@ -47,6 +47,7 @@ export * from './api/auth/session';
 export * from './api/auth/oidc';
 export * from './api/capabilities';
 export * from './api/market/appListing';
+export * from './api/market/appAccess';
 export * from './api/workbench/projectPage';
 export * from './api/workbench/projectSummary';
 export * from './api/requests/page';

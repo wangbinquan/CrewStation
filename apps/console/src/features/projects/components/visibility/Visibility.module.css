@@ -1,5 +1,4 @@
 .stack { display: grid; gap: var(--cs-space-3); min-width: 0; }
-.people { display: grid; gap: var(--cs-space-1); padding: 0; margin: 0; list-style: none; }
 .person { display: flex; gap: var(--cs-space-3); align-items: center; justify-content: space-between; }
 .person > span, .person > p { min-width: 0; overflow-wrap: anywhere; }
 .actions { display: flex; gap: var(--cs-space-2); align-items: center; flex-wrap: wrap; }

@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
-import type { UserId, WorkloadIdentity } from '@crewstation/contracts';
+import type { ProjectId, UserId, WorkloadIdentity } from '@crewstation/contracts';
 import { IDENTITY_HEADERS, TOKEN_CLAIMS } from '@crewstation/contracts';
 import type { AppEnv } from '@crewstation/http';
 import { verifyWithJwks } from '@crewstation/jwt';
@@ -16,6 +16,9 @@ const workloads: Record<string, WorkloadIdentity> = {
   '10.244.0.40': { identity: 'demo/demo', project: 'demo', service: 'demo', kind: 'dev-session' },
 };
 const testers = new Set<string>();
+/** `<userId>@<slug>` → 正式地址被拦下时负责人是否允许申请；不在表里即放行。slug `gone` 模拟查不到项目。 */
+const denied = new Map<string, boolean>();
+const DEMO_PROJECT = '01a0bf5d-8f4b-7000-8000-00000000d3e0' as ProjectId;
 let tdb: TestDatabase;
 let identity: IdentityModule;
 let app: Hono<AppEnv>;
@@ -26,6 +29,13 @@ function moduleOn(db: TestDatabase['db']): IdentityModule {
   return identityModuleFor(db, {
     settings: BASE_SETTINGS,
     previewAccess: { canView: async (userId, slug) => testers.has(`${userId}@${slug}`) },
+    appAccess: {
+      check: async (user, slug) => {
+        if (slug === 'gone') return { kind: 'unknown' };
+        const requestable = denied.get(`${user.id}@${slug}`);
+        return requestable === undefined ? { kind: 'allowed' } : { kind: 'denied', projectId: DEMO_PROJECT, appName: '演示应用', ownerName: '王五', requestable };
+      },
+    },
     workloadLookup: { byIp: async (ip) => workloads[ip] },
     allowlistEvaluator: {
       evaluate: async (caller, target) => {
@@ -114,6 +124,31 @@ describe.skipIf(!available)('forward-auth user domain', () => {
     const verified = await verifyWithJwks(preview.headers.get(IDENTITY_HEADERS.identityToken) ?? '', await identity.api.jwks(), { audience: 'service:demo/demo' });
     expect(verified.claims).toMatchObject({ cs_slot: 'preview' });
     expect((await forwardUser('dev.demo.cs.localhost', { cookie: `cs_session=${aliceCookie}` })).status).toBe(200);
+  });
+
+  test('正式地址按应用可见范围拦下：浏览器得到「没有项目权限」页（允许申请给申请入口，否则写负责人），程序调用 JSON，会话不清', async () => {
+    const { cookie, userId } = await login('bob');
+    denied.set(`${userId}@demo`, true);
+    const html = await forwardUser('demo.cs.localhost', { cookie: `cs_session=${cookie}`, accept: 'text/html,application/xhtml+xml' });
+    expect(html.status).toBe(403); expect(html.headers.get('content-type') ?? '').toContain('text/html');
+    expect(html.headers.get('set-cookie')).toBeNull();
+    expect(html.headers.get(IDENTITY_HEADERS.userId)).toBeNull();
+    const page = await html.text();
+    expect(page).toContain('没有项目权限'); expect(page).toContain('你没有应用「演示应用」的使用权限');
+    expect(page).toContain(`href="http://console.cs.localhost/apps/${DEMO_PROJECT}/access" target="_blank" rel="noopener">申请访问权限</a>`);
+    const json = await forwardUser('demo.cs.localhost', { cookie: `cs_session=${cookie}`, accept: 'application/json' });
+    expect(json.status).toBe(403);
+    expect(await json.json()).toEqual({ error: 'forbidden', message: '没有应用「演示应用」的使用权限', details: { reason: 'app-access', projectId: DEMO_PROJECT, requestable: true } });
+    denied.set(`${userId}@demo`, false);
+    const closed = await (await forwardUser('demo.cs.localhost', { cookie: `cs_session=${cookie}`, accept: 'text/html' })).text();
+    expect(closed).toContain('请联系项目负责人：<strong>王五</strong>'); expect(closed).not.toContain('申请访问权限');
+    // 待命版与开发预览的规则不变：仍是原来的 403 页，没有申请入口。
+    const preview = await (await forwardUser('preview.demo.cs.localhost', { cookie: `cs_session=${cookie}`, accept: 'text/html' })).text();
+    expect(preview).toContain('没有项目 demo 的 preview 访问权限'); expect(preview).not.toContain('申请访问权限');
+    const gone = await forwardUser('gone.cs.localhost', { cookie: `cs_session=${cookie}`, accept: 'application/json' });
+    expect(gone.status).toBe(403); expect(await gone.json()).toMatchObject({ error: 'forbidden', message: '未知的应用 gone' });
+    denied.delete(`${userId}@demo`);
+    expect((await forwardUser('demo.cs.localhost', { cookie: `cs_session=${cookie}` })).status).toBe(200);
   });
 
   test('非 ASCII 显示名：头按 RFC 8187 编码，令牌保留原文', async () => {

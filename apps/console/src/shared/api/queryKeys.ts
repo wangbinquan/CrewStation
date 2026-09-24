@@ -15,6 +15,10 @@ export const queryKeys = {
   adminProjects: () => ['projects', 'admin'] as const,
   adminProjectPage: (search: unknown) => ['projects', 'admin', 'page', search] as const,
   accessRequestPage: (search: unknown) => ['access-requests', 'page', search] as const,
+  /** 应用使用申请（2026-09-24）：项目内的待处理清单与管理空间的全局清单共用前缀，审批后一次失效。 */
+  appAccessRequests: (search?: unknown) => (search === undefined ? (['app-access-requests'] as const) : (['app-access-requests', search] as const)),
+  /** 申请页：本人对某应用的使用权与最近一条申请。 */
+  appAccess: (projectId: string, userId: string) => ['app-access', projectId, userId] as const,
   /** 按 kind 过滤的项目列表（RFC-002）：挂在 projects 前缀下，建项目后一次失效连带刷新。 */
   projectsByKind: (kinds: readonly string[]) => ['projects', 'kind', kinds.join(',')] as const,
   project: (projectId: string) => ['projects', projectId] as const,

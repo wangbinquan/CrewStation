@@ -68,6 +68,8 @@ beforeAll(async () => {
     idp,
     endpointResolver: directResolver(idp),
     projectDirectory: { idBySlug: async (slug) => (slug === 'demo' ? projectId : undefined) },
+    // 这里只看身份转发；正式地址的使用权另有用例（forwardAuth.test.ts），一律放行。
+    appAccess: { check: async () => ({ kind: 'allowed' }) },
   });
   app = mountRouters(identity, ['auth', 'forwardAuth', 'users']);
   await completeBootstrap(tdb.db);

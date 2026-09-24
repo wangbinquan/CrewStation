@@ -9,6 +9,7 @@ import { PageHeader } from '../../../shared/ui/PageHeader';
 import { Stack } from '../../../shared/ui/Stack';
 import { QueryStatus } from '../../../shared/ui/QueryStatus';
 import { AppVisibilitySettings } from '../components/visibility/AppVisibilitySettings';
+import { AccessRequestReview } from '../components/access/AccessRequestReview';
 
 export function AppVisibilityPage({ embedded = false }: { readonly embedded?: boolean }) {
   const t = useT(), { projectId } = useProjectScope();
@@ -27,5 +28,7 @@ export function AppVisibilityPage({ embedded = false }: { readonly embedded?: bo
     {!embedded ? <PageHeader title={t('projects.visibility.title')} description={[t('projects.visibility.intro')]} /> : null}
     <QueryStatus isPending={me.isPending || visibility.isPending || presentation.isPending} error={me.error ?? visibility.error ?? presentation.error} />
     {visibility.data && presentation.data ? <AppVisibilitySettings key={`${me.data?.id}:${projectId}`} projectId={projectId} visibility={visibility.data} presentation={presentation.data} canConfigure={canConfigure} unavailable={unavailable} refreshing={refreshing} reload={rereadAfterSave} /> : null}
+    {/* 使用申请只给负责人与管理员（2026-09-24 裁定）：同意即加为「用户」。 */}
+    {canConfigure ? <AccessRequestReview key={`${me.data?.id}:${projectId}:access`} scope={{ projectId, state: 'pending' }} title={t('projects.access.title')} empty={t('projects.access.empty')} hint={t('projects.access.hint')} /> : null}
   </Stack>;
 }
