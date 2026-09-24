@@ -1,5 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { NETWORK_POLICY_TEMPLATES } from '../../domain/namespaceRender';
+import type { ObservedObject } from '../../domain/observation';
+import { objectCovered } from './coverage';
 import { namespaceObjectOf, networkPolicyObjectOf, quotaObjectOf } from './namespaceObjects';
 
 const render = { name: 'cs-demo', labels: { 'crewstation.io/project': 'demo' }, quota: { name: 'crewstation-project', hard: { pods: '30', 'requests.cpu': '8', 'requests.memory': '16Gi', persistentvolumeclaims: '20' } } };
@@ -24,5 +26,24 @@ describe('调和器渲染的命名空间、额度与网络策略（RFC-025 第�
     expect(fallback.spec.ingress).toEqual([{ from: [{ namespaceSelector: { matchLabels: { 'kubernetes.io/metadata.name': 'cs-sys' } } }] }]);
     const integration = networkPolicyObjectOf({ namespace: 'cs-demo', name: 'crewstation-integration-egress', systemNamespace: 'cs-sys' }) as unknown as { spec: unknown };
     expect(integration.spec).toEqual({ podSelector: { matchLabels: { 'crewstation.io/workload': 'service' } }, policyTypes: ['Egress'], egress: [{}] });
+  });
+
+  // D64 换版：存量命名空间里的默认策略还是旧形状（出向只到 DNS 与系统命名空间），调和器要判为不一致、按新形状改回，
+  // 数字人服务槽才真的能出站；改回之后再核对不再写。数组按长度比，旧的两条规则不会被当成已覆盖 `[{}]`。
+  test('存量的旧形状默认策略判为不一致，观测到新形状后判为一致', () => {
+    const desired = networkPolicyObjectOf({ namespace: 'cs-demo', name: 'crewstation-default', systemNamespace: 'crewstation-system' });
+    const system = { namespaceSelector: { matchLabels: { 'kubernetes.io/metadata.name': 'crewstation-system' } } };
+    const legacy: ObservedObject = {
+      kind: 'NetworkPolicy', metadata: { name: 'crewstation-default', namespace: 'cs-demo', uid: 'np-1', labels: managed },
+      spec: {
+        podSelector: {}, policyTypes: ['Ingress', 'Egress'], ingress: [{ from: [system] }],
+        egress: [
+          { to: [{ namespaceSelector: { matchLabels: { 'kubernetes.io/metadata.name': 'kube-system' } } }], ports: [{ protocol: 'UDP', port: 53 }, { protocol: 'TCP', port: 53 }] },
+          { to: [system] },
+        ],
+      },
+    };
+    expect(objectCovered(legacy, desired)).toBe(false);
+    expect(objectCovered({ ...legacy, spec: desired['spec'] }, desired)).toBe(true);
   });
 });

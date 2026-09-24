@@ -278,23 +278,24 @@ verify.sh E 项确认 kindnet 不在、Calico 真的在挡流量。
 同日另一个教训：不要在 kindnet（或任何节点守护进程）的容器里跑 `<二进制> --help` 看参数。kindnetd 不认 `--help`，
 直接又起了一个完整实例，和原进程并行跑了几分钟，直到输出管道断开才退出。看参数去读上游源码或 README。
 
-### 项目命名空间的出站由标签决定，不同负载看到的网络不一样
+### 项目命名空间的出站：2026-09-24 起全放开，按标签放行的几条策略已不起作用
 
-一个项目命名空间里有三到四条 NetworkPolicy，取并集生效，所以「这个 Pod 能不能出站」要看它的标签：
+一个项目命名空间里有三到四条 NetworkPolicy，取并集生效：
 
 | 负载 | 策略 | 出向 |
 |---|---|---|
-| 默认（含数字人服务槽） | `crewstation-default` | 只到 DNS 与 `crewstation-system` |
-| `workload=dev-session`／`business-task` | `crewstation-task-egress` | 全放行 |
-| `component=build` | `crewstation-build-egress` | 全放行 |
-| `workload=service`，且项目是 `APIProxy`／`EventProducer` | `crewstation-integration-egress` | 全放行（RFC-018） |
+| 所有 Pod（含数字人服务槽、迁移 Job） | `crewstation-default` | 全放行（D64）；入向只收 `crewstation-system`，项目之间靠这一条互不可达 |
+| `workload=dev-session`／`business-task` | `crewstation-task-egress` | 全放行，已被默认策略覆盖 |
+| `component=build` | `crewstation-build-egress` | 同上 |
+| `workload=service`，且项目是 `APIProxy`／`EventProducer` | `crewstation-integration-egress` | 同上（RFC-018） |
 
-因此同一个命名空间里，开发容器连得上 `host.docker.internal:8929`，数字人服务槽连不上——这不是代理或业务代码的 bug。
-接入容器项目自 RFC-018 起有自己的放行策略；数字人服务槽访问公司系统要经接口目录与网关放行表。
+D64 之前默认策略的出向只到 DNS 与 `crewstation-system`，所以同一个命名空间里开发容器连得上 `host.docker.internal:8929`、数字人服务槽连不上。现在两者一样；某个服务槽还是出不去，先看它所在命名空间的 `crewstation-default` 是不是已经是 `egress: [{}]`。
 
-**策略形状变了，存量命名空间不会自己跟上。** 开通链只在建项目时跑过一次，所以 `packages/k8s/objects/cluster.ts` 里改了策略之后，
-要靠 cs-controller 启动时的命名空间重下发（`modules/provisioning/workers/namespaceReapply.ts`）把新形状铺到已有项目上。
-换过版没见到新策略，先看 cs-controller 日志里的 `namespace reapply done`。
+**后三条不起作用却还在。** 资源中心的调和器对网络策略只建、只改回、从不删（RFC-025 第四期），孤儿回收也不扫 NetworkPolicy。从 `NETWORK_POLICIES` 里去掉一个名字，线上对象不会消失；真要撤掉，得先给调和器补删除。
+
+**策略形状变了，存量命名空间由调和器改回。** cs-controller 启动后调和器把全部台账记录排一遍、之后每 10 分钟再排一遍，比对时数组按长度逐个比，形状不同就服务端 apply（`egress` 是 atomic 列表，整张替换）。所以改了 `packages/k8s/objects/cluster.ts` 里的策略，只需换 cs-controller 的镜像。换过版没见到新形状，先看调和器的日志和这个项目的 `network-policy-set` 记录。RFC-025 之前靠的是启动时的命名空间重下发（`modules/provisioning/workers/namespaceReapply.ts`），它现在只写台账期望。
+
+**测出站别用 `example.com`。** 本机集群里解析 `example.com` 稳定超时（`DNS_ETIMEOUT`，主机上正常，原因没查），拿它测会把 DNS 失败误当成被策略挡住。要拆开测：先解析一个域名（如 `opencode.ai`），再按 IP 连 `https://1.1.1.1`，最后按域名连。被策略挡住的样子是 DNS 成功、连接 8 秒超时。
 
 ### Traefik 默认丢掉没有 endpoint 的路由：服务缩到零后连 ForwardAuth 都不走
 

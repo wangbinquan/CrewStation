@@ -36,8 +36,9 @@ export function resourceQuotaObject(spec: { name: string; namespace: string; har
 }
 
 /**
- * 项目命名空间默认网络策略（T1.13）：只接受网关所在命名空间的入向；出向只允许 DNS 与平台系统命名空间。
- * 数字人服务槽到公司系统的流量走接口目录与网关放行表，因此这里不放行任意外网。
+ * 项目命名空间默认网络策略（T1.13）：入向只接受网关所在的平台系统命名空间，项目之间的隔离就靠这一条；
+ * 出向不限制（D64）：数字人服务槽、迁移 Job 与任务容器、构建一样直连公网与公司内网。
+ * 出向写成显式的全放行而不是去掉 Egress 类型：服务端 apply 整体替换这个列表，存量命名空间里旧的两条规则随之消失。
  */
 export function projectNetworkPolicy(spec: { namespace: string; systemNamespace: string }): K8sObject {
   return {
@@ -48,18 +49,15 @@ export function projectNetworkPolicy(spec: { namespace: string; systemNamespace:
       podSelector: {},
       policyTypes: ['Ingress', 'Egress'],
       ingress: [{ from: [{ namespaceSelector: { matchLabels: { 'kubernetes.io/metadata.name': spec.systemNamespace } } }] }],
-      egress: [
-        { to: [{ namespaceSelector: { matchLabels: { 'kubernetes.io/metadata.name': 'kube-system' } } }], ports: [{ protocol: 'UDP', port: 53 }, { protocol: 'TCP', port: 53 }] },
-        { to: [{ namespaceSelector: { matchLabels: { 'kubernetes.io/metadata.name': spec.systemNamespace } } }] },
-      ],
+      egress: [{}],
     },
   };
 }
 
 /**
  * 任务容器与构建 Job 的出站：这两类 Pod 直接访问源码托管、依赖源与模型 API。
- * RFC-018 下线出站白名单后这是最终形态，不再有按域名收窄的后续步骤。
- * NetworkPolicy 取并集，因此只对带对应标签的 Pod 生效；其余业务 Pod 仍受 projectNetworkPolicy 约束。
+ * 默认策略的出向放开（D64）之后，这条与下面两条按标签放行的策略都不再起作用；仍然下发，
+ * 是因为调和器对网络策略只建、只改回、从不删，撤掉它们要另给调和器补删除（作者 2026-09-24 选择保留）。
  */
 export function taskEgressNetworkPolicy(spec: { namespace: string }): K8sObject {
   return {
@@ -85,8 +83,8 @@ export function buildEgressNetworkPolicy(spec: { namespace: string }): K8sObject
 
 /**
  * 接入容器服务槽的出站（RFC-018，作者裁定 Q1＝C）：`APIProxy` 与 `EventProducer` 的职责就是代公司系统转发，
- * 因此它们的服务槽 Pod 直接访问上游，不再经平台转发通道。只对接入项目的命名空间下发；
- * 数字人项目不下发，其服务槽仍只到 DNS 与平台系统命名空间，访问公司系统必须经接口目录与网关放行表。
+ * 因此它们的服务槽 Pod 直接访问上游，不再经平台转发通道。只对接入项目的命名空间下发。
+ * D64 起默认策略已对所有 Pod 放开出向（数字人服务槽也在内），这条不再起作用，保留的原因同任务容器那条。
  */
 export function integrationEgressNetworkPolicy(spec: { namespace: string }): K8sObject {
   return {

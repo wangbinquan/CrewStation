@@ -1,6 +1,6 @@
 # RFC-018｜设计
 
-状态：Done · 2026-09-22。作者已确认能力影响清单并裁定 Q1＝C、Q2＝b。落位依据 `docs/engineering/repository-structure.md` v0.4。本 RFC 只删代码、改网络策略、加一处启动重下发、清理历史数据；不新增模块，不新增跨模块 import。
+状态：Done · 2026-09-22。作者已确认能力影响清单并裁定 Q1＝C、Q2＝b。落位依据 `docs/engineering/repository-structure.md` v0.4。本 RFC 只删代码、改网络策略、加一处启动重下发、清理历史数据；不新增模块，不新增跨模块 import。2026-09-24 修订（D64）见 §3 末。
 
 ## 目录
 
@@ -62,6 +62,13 @@
 
 - **启动重下发**：`modules/provisioning`（L6）新增一个启动工作器，遍历未归档项目、对每个项目调用现有 `ensureNamespace` 步骤（`k8s.apply` 幂等）；单个项目失败只记日志，不阻塞其他项目与进程启动。组合根把它挂在 `controller` 角色（provisioning 的 workers 已在 cs-controller）。这一步也补上「策略形状变化不能触达存量命名空间」的缺口。
 - 网关放行表、身份索引、路由不变。
+
+> **2026-09-24 修订（作者裁定「都放开外网」，基线 Design D64；提案 §4 末）：改取方案 A 的出向部分，不删策略。**
+>
+> - `projectNetworkPolicy`（`packages/k8s/objects/cluster.ts`）的 `egress` 改为 `[{}]`，`policyTypes` 仍是 `[Ingress, Egress]`、入向不变。出向写成显式的全放行而不是去掉 `Egress` 类型：客户端是服务端 apply（`fieldManager=crewstation`、`force=true`），集群 OpenAPI 里 `egress` 是 `x-kubernetes-list-type: atomic`，整张列表被替换，存量策略里旧的两条规则（DNS、系统命名空间）随之消失。
+> - 任务、构建、接入三条策略的内容与下发范围都不变，只改注释：它们在默认策略放开后不再起作用。不删的原因：RFC-025 第四期起网络策略由资源中心的调和器照 provisioning 的记录渲染，只建、只改回、从不删（`modules/cluster-control/application/reconcileObservations.ts` 的 `applyNetworkPolicies`），孤儿回收也不扫 NetworkPolicy；删它们要另给调和器补删除，作者选了不删。
+> - 存量命名空间不需要重下发：调和器启动后先把全部记录排进队列、之后每 10 分钟再排一次（`modules/cluster-control/workers/ledgerReconciler.ts`），比对时数组按长度逐个比（`modules/cluster-control/adapters/k8s/coverage.ts`），旧的两条规则与新的 `[{}]` 判为不一致，按新形状 apply。只需换 cs-controller 的镜像。
+> - 用例：`packages/k8s/projectPolicies.test.ts` 锁住新形状（出向 `[{}]`、入向只收系统命名空间）；`modules/cluster-control/adapters/k8s/namespaceObjects.test.ts` 新增一条，锁住旧形状的默认策略判为不一致、新形状判为一致（旧代码下前一句不成立）。
 
 ## 4. 数据
 
@@ -132,3 +139,4 @@
 | `proposal/rfc/RFC-003-workbench-ux-redesign/proxy-egress.md` | 文首加一行「2026-09-22 起由 RFC-018 取代」，其余不改 |
 | 集成与模板文档 | `integrations/reference-api-proxy/README.md`、两份接入容器 `CONTRIBUTING.md`、`templates/minimal-sample/CONTRIBUTING.md` 删「出站白名单与被阻请求」 |
 | `STATE.md` | 接力段 |
+| 2026-09-24 修订（D64） | 基线 v0.3.16：Proposal §0.2、R15、风险表；Design §2.4、§11.1、§13.1、§13.4、D54、D60、D64；Plan T1.13、AT-07、「本计划依据」一句；`dev-gotchas` 网络策略条目；I9 追记；参考代理 README；CLAUDE.md；STATE 接力段 |

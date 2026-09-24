@@ -93,7 +93,7 @@ docker run --rm -p 13002:3000 -e GITLAB_BASE_URL=http://host.docker.internal:892
 ## 已知边界
 
 - **上游凭据目前是平台注入的密钥，不是按需下发的短期凭据。** Design §8.1 的目标形态是“上游凭据由 cs-auth 的凭据服务按 `UpstreamConnection` 在调用时短期下发”；那条凭据服务接口还没有，所以本代理按 Manifest `spec.env` 的密钥取长期令牌。`spec.upstream.connection` 已按最终形态声明为 `test-gitlab`，凭据服务就绪后把 `GITLAB_TOKEN` 换成按需获取即可，转发逻辑不用动。
-- **本代理直接请求上游**（RFC-018）。接入容器项目的命名空间带一条 `crewstation-integration-egress` 网络策略，给 `workload=service` 的 Pod 放开出向；数字人项目没有这条策略，它们访问公司系统仍要经接口目录与网关放行表。平台不再按域名限制出站，也不再有平台转发通道与被阻请求记录。
+- **本代理直接请求上游**（RFC-018）。平台不再按域名限制出站，也不再有平台转发通道与被阻请求记录。2026-09-24 起（Design D64）项目命名空间的默认网络策略对所有 Pod 放开出向，数字人服务槽也能直连外部；接入容器项目另有的 `crewstation-integration-egress` 策略（给 `workload=service` 的 Pod 放开出向）照旧下发，但已不再起作用。数字人服务经接口目录调用本代理时，网关仍按放行表判定。
 - 早于 RFC-018 的版本经 `/internal/egress/http` 转发。那条路由已删除，旧镜像在新平台上会拿到 404，**必须重新发布一版**才能恢复上游调用。
 - 重定向按 `redirect: 'manual'` 原样回传，由调用方决定跟不跟——代理替调用方跟随重定向，等于替它决定去访问哪个地址。
 - 上游超时 30 秒后回 `504`，连不上回 `502`，都用平台错误信封，说明里不带令牌与上游地址细节。`Bun.serve` 的 `idleTimeout` 显式设成 45 秒：它默认 10 秒就掐连接，那样上游一慢，调用方拿到的是连接被重置而不是这条 504。

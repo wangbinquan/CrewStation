@@ -10,7 +10,7 @@ export interface NamespaceRender {
 
 /**
  * 项目命名空间的网络策略按名字取模板（策略的内容在 `packages/k8s`，平台换版改了形状时调和器发现不一致即按新形状改回，
- * 取代启动时的重下发）：默认策略（入向只接网关、出向只到 DNS 与系统命名空间）、任务与构建的出站、接入容器服务槽的出站。
+ * 取代启动时的重下发）：默认策略（入向只接网关、出向不限制，D64）、任务与构建的出站、接入容器服务槽的出站（后三条在 D64 之后不再起作用）。
  */
 export const NETWORK_POLICY_TEMPLATES = ['crewstation-default', 'crewstation-task-egress', 'crewstation-build-egress', 'crewstation-integration-egress'] as const;
 export type NetworkPolicyTemplate = (typeof NETWORK_POLICY_TEMPLATES)[number];

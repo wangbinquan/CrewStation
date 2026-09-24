@@ -12,8 +12,8 @@ export interface ProjectNamespace {
 export const PROJECT_QUOTA = { name: 'crewstation-project', hard: { pods: '30', 'requests.cpu': '8', 'requests.memory': '16Gi', persistentvolumeclaims: '20' } } as const;
 
 /**
- * 项目命名空间的网络策略（名字即模板，内容在 `packages/k8s`，由调和器渲染）：默认策略（入向只接网关、出向只到 DNS 与系统命名空间）、
- * 任务容器与构建的出站；接入容器（APIProxy、EventProducer）另有服务槽的出站。
+ * 项目命名空间的网络策略（名字即模板，内容在 `packages/k8s`，由调和器渲染）：默认策略（入向只接网关、出向不限制，D64）、
+ * 任务容器与构建的出站；接入容器（APIProxy、EventProducer）另有服务槽的出站。后三条在默认策略放开出向后不再起作用，照旧下发。
  */
 export const NETWORK_POLICIES = {
   default: 'crewstation-default', taskEgress: 'crewstation-task-egress', buildEgress: 'crewstation-build-egress', integrationEgress: 'crewstation-integration-egress',
@@ -49,7 +49,10 @@ export function namespaceDeclaration(facts: ProjectNamespace): NamespaceDeclarat
   };
 }
 
-/** 接入容器代公司系统转发，服务槽直接出站（RFC-018 Q1＝C）；数字人服务槽不放行，访问公司系统走接口目录与网关放行表。 */
+/**
+ * 接入容器代公司系统转发，服务槽直接出站（RFC-018 Q1＝C），所以多一条接入出站策略。D64 起默认策略对所有 Pod 放开出向，
+ * 数字人服务槽也能直连外部；策略集照旧，调和器对网络策略只建、只改回、从不删，缩掉某条也删不掉线上已有的对象。
+ */
 export function networkPolicyDeclaration(facts: ProjectNamespace, systemNamespace: string): NetworkPolicyDeclaration {
   const names: string[] = [NETWORK_POLICIES.default, NETWORK_POLICIES.taskEgress, NETWORK_POLICIES.buildEgress];
   if (facts.kind !== 'DigitalWorker') names.push(NETWORK_POLICIES.integrationEgress);

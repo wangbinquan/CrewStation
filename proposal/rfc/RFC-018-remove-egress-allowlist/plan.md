@@ -1,6 +1,6 @@
 # RFC-018｜实施与验证
 
-状态：Done · 2026-09-22 · T1–T9 与 EG-01…EG-08 全部完成。作者已批准 proposal §5 的八项能力影响清单，并裁定 Q1＝C（只给接入容器项目放开服务槽出向）、Q2＝b（本次即清理 `egress` schema 与四行迁移记录，先做停写备份）。
+状态：Done · 2026-09-22 · T1–T9 与 EG-01…EG-08 全部完成。作者已批准 proposal §5 的八项能力影响清单，并裁定 Q1＝C（只给接入容器项目放开服务槽出向）、Q2＝b（本次即清理 `egress` schema 与四行迁移记录，先做停写备份）。2026-09-24 修订（作者裁定「都放开外网」，基线 D64）：T10、EG-09。
 
 ## 任务
 
@@ -15,6 +15,7 @@
 | RFC-018-T7 | 参考代理直连上游；本机按标签发布新版 | T2 | EG-04 |
 | RFC-018-T8 | 文档回填：基线 v0.3.7、tech-evaluation、仓库结构 v0.5、I9、dev-gotchas、集成与模板文档、e2e 清单、RFC-003 附件标注 | T1–T7 | EG-07 |
 | RFC-018-T9 | 门禁、本机部署、历史数据清理、实机验收、精确 SHA CI、STATE | T1–T8 | EG-06、EG-08 |
+| RFC-018-T10 | 2026-09-24 修订（D64）：`crewstation-default` 的出向改为 `[{}]`，任务、构建、接入三条策略保留；用例；基线 v0.3.16 回填；本机换 cs-controller 镜像，调和器改回存量命名空间后实测 | — | EG-09 |
 
 ## 本机部署顺序
 
@@ -42,6 +43,7 @@
 | EG-06 | 通过 | 完整 `bun run check`（带本机测试库与 e2e 参数）**2069 pass／8 skip／0 fail**，13034 断言、347 文件；改动行防护 **100／100（100%）**；`arch:check` 53 个单元零违规，`migrationCoverage` 与锁文件一致 |
 | EG-07 | 通过 | 基线三件套 v0.3.7、tech-evaluation E23 作废、仓库结构 v0.5＋ADR-0008、I9 关闭、`dev-gotchas` 网络策略条目改写、三份 CONTRIBUTING 与参考代理 README、e2e 页面清单、CLAUDE.md 全部更新 |
 | EG-08 | 通过 | 先升级平台代码，再取整库一致性备份（Pod 内 `pg_restore -l` 校验 469 个对象、含 egress 四张表与数据，本机副本 `cs-rfc018-verified.dump` 31,304,900 字节），随后一个事务内 `DROP SCHEMA egress CASCADE`（4 张表：entries／requests／blocked／resource_identity_aliases，共 5 行）＋删除 4 行迁移记录。复查：`egress` schema 0 个、该模块迁移记录 0 行、`egress-blocked` 告警 0 行、总 schema 20、总迁移 103。重启 cs-api／cs-controller 后迁移数仍 103、schema 未被重建 |
+| EG-09 | 待实机 | 修订前的对照（2026-09-24，同一探针：DNS 解析 `opencode.ai`、按 IP 连 `https://1.1.1.1`、连 `https://opencode.ai`）：数字人服务槽 `cs-demo`、`cs-rfc006-verify` 解析成功、两次 HTTPS 都 8 秒超时；接入项目服务槽 `cs-reference-api-proxy` 与开发会话 Pod 为 301／200。换版后的结果待补 |
 
 **EG-04 的闭合路径**：阻塞它的 I23 已按作者裁定的方案 a 解决（manifest 迁 v2，提交 `1d88a7d2`、`f24e880f`），
 两个项目各发 `v0.1.4` 并 `ready`；作者授权后切流成功（`POST …/traffic-switch`，两个服务均 HTTP 200，
