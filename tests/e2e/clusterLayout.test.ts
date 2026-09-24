@@ -76,8 +76,9 @@ describe.skipIf(!session)('deployed cluster management layout', () => {
   }, 120_000);
 
   // 2026-09-24 作者裁定：详情顶部的管理动作两两一行、不可用原因写在各自按钮下，同一行的按钮顶端对齐。改前按格子居中：buildkitd 的「重启」
-  // 比「调整副本」低 11px；英文的「Restore release replicas」比格子宽 15px，压到右边的「Delete / stop」上。
-  test('the detail action buttons line up: buttons in one row share their top edge whatever reasons sit under them, and none is wider than its cell, in both languages', async () => {
+  // 比「调整副本」低 11px；英文的「Restore release replicas」比格子宽 15px，压到右边的「Delete / stop」上。格子改成不窄于按钮后，
+  // 英文第二行变成 184／154、右边的按钮比上一行右移 15px，作者同日裁定英文标签缩成「Restore replicas」，两种语言各列都上下对齐。
+  test('the detail action buttons line up: one row shares its top edge whatever reasons sit under it, columns line up across rows, and no button is wider than its cell, in both languages', async () => {
     const page = session!.admin;
     await viewport(page, 1440, 900);
     try {
@@ -94,6 +95,7 @@ describe.skipIf(!session)('deployed cluster management layout', () => {
         const rows: (typeof cells)[] = [];
         for (const cell of cells) { const row = rows.at(-1); if (row && cell.left > row.at(-1)!.left) row.push(cell); else rows.push([cell]); }
         for (const row of rows) expect(Math.max(...row.map((c) => c.top)) - Math.min(...row.map((c) => c.top))).toBeLessThanOrEqual(1);
+        for (const row of rows.slice(1)) row.forEach((cell, column) => expect(Math.abs(cell.left - rows[0]![column]!.left)).toBeLessThanOrEqual(1));
         for (const cell of cells) expect(cell.right).toBeLessThanOrEqual(cell.cellRight + 1);
       }
       expect(page.takeErrors()).toEqual([]);

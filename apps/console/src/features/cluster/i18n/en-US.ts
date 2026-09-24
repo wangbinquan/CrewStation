@@ -208,7 +208,7 @@ export const messages = {
   "cluster.detail.logs": "Logs",
   "cluster.action.restart": "Restart",
   "cluster.action.scale": "Scale",
-  "cluster.action.restore-replicas": "Restore release replicas",
+  "cluster.action.restore-replicas": "Restore replicas",
   "cluster.action.delete": "Delete / stop",
   "cluster.phase.queued": "Queued",
   "cluster.phase.executing": "Executing",

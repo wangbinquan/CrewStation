@@ -57,7 +57,7 @@ test('详情顶部的管理动作：同一行顶端对齐、格子不窄于按�
   const css = sourceAt(consoleStyles(), 'features/cluster/components/Cluster.module.css').code;
   const rule = (selector: string) => new RegExp(`^${selector.replace('.', '\\.')}\\s*\\{([^}]*)\\}`, 'm').exec(css)?.[1] ?? '';
   expect(rule('.actions')).toMatch(/align-items:\s*flex-start/);
-  // 英文「Restore release replicas」比半栏宽：格子若允许窄于按钮（min-width: 0），按钮就压到右边的按钮上。
+  // 标签比半栏宽时（英文原先的「Restore release replicas」184px，格子 169px），格子若允许窄于按钮（min-width: 0），按钮就压到右边的按钮上。
   expect(rule('.action')).toMatch(/flex:\s*1 1 150px/); expect(rule('.action')).not.toMatch(/min-width/);
   clusterFixture(); page = await renderApp('/admin/cluster?resourceId=resource-uid');
   const buttons = [...document.querySelectorAll<HTMLButtonElement>('[data-cluster-actions] > div > button')];
