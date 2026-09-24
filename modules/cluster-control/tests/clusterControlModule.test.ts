@@ -71,6 +71,16 @@ describe.skipIf(!available)('cluster-control：观测写回台账与收编空跑
     if (stored) await feed.emit({ kind, object: stored, gone: false });
     return outcome;
   };
+  // 工作区容器（RFC-025 I25）：建出的对象落到假集群并随即报一次变化；所属模块（task-runtime）的两个回调记下来。
+  const workloadApplies: string[] = [], valuesAsked: string[] = [], bound: string[] = [];
+  const owners = { failValues: false, runnerValues: async (id: string) => { valuesAsked.push(id); if (owners.failValues) throw new Error('额度不够'); return { CS_RUNNER_TOKEN: `token-${id}` }; }, bindWorkload: async (id: string, uid: string) => { bound.push(`${id}:${uid}`); } };
+  const placed = async <T extends { created: boolean }>(outcome: T, kind: 'Pod' | 'Secret' | 'PersistentVolumeClaim', name: string, namespace: string): Promise<T> => {
+    if (!outcome.created) return outcome;
+    workloadApplies.push(`${kind}/${name}`);
+    const stored = await k8s.get<K8sObject>(Resources[kind]!, name, namespace);
+    if (stored) await feed.emit({ kind, object: stored, gone: false });
+    return outcome;
+  };
   const cluster: ClusterWriter = {
     remove: async ({ kind, namespace, name, uid }) => {
       removals.push(`${kind}/${name}`);
@@ -97,6 +107,19 @@ describe.skipIf(!available)('cluster-control：观测写回台账与收编空跑
     applyNamespace: async (namespace, current) => settled(await writer.applyNamespace(namespace, current), current, 'Namespace', namespace.name),
     applyQuota: async (namespace, current) => settled(await writer.applyQuota(namespace, current), current, 'ResourceQuota', namespace.quota.name, namespace.name),
     applyNetworkPolicy: async (policy, current) => settled(await writer.applyNetworkPolicy(policy, current), current, 'NetworkPolicy', policy.name, policy.namespace),
+    ensurePod: async (pod) => placed(await writer.ensurePod(pod), 'Pod', pod.name, pod.namespace),
+    ensureRunnerSecret: async (pod, values) => placed(await writer.ensureRunnerSecret(pod, values), 'Secret', pod.secret, pod.namespace),
+    ensureVolume: async (volume) => placed(await writer.ensureVolume(volume), 'PersistentVolumeClaim', volume.name, volume.namespace),
+    applyPreview: async (preview, current) => {
+      const outcome = await writer.applyPreview(preview, current);
+      if (outcome !== 'applied') return outcome;
+      workloadApplies.push(`preview/${preview.name}`);
+      for (const kind of ['Service', 'IngressRoute'] as const) {
+        const stored = await k8s.get<K8sObject>(Resources[kind]!, preview.name, preview.namespace);
+        if (stored) await feed.emit({ kind, object: stored, gone: false });
+      }
+      return outcome;
+    },
   };
   let control: ReturnType<typeof createClusterControlModule>;
   let ledger: LedgerObservations;
@@ -125,6 +148,7 @@ describe.skipIf(!available)('cluster-control：观测写回台账与收编空跑
       orphanSweep: false,
       reconciler: { pollMs: 20, retryMs: 50 },
       explainer: { namespace: 'crewstation-system', service: 'cs-api', port: 8080, path: '/_crewstation/unavailable' },
+      workloads: owners,
       pods: {
         changed: async (object, gone) => {
           if (object.metadata.name === 'pod-identity-broken') throw new Error('身份索引暂时不可用');
@@ -382,6 +406,58 @@ describe.skipIf(!available)('cluster-control：观测写回台账与收编空跑
     await until('待验证路由指回槽', async () => (await ingress('cafe-preview'))?.services?.[0]?.name === 'cafe-green');
     expect((await ingress('cafe-preview'))?.middlewares).toEqual(chain);
     expect(await k8s.get(Resources.Middleware!, 'unavailable-cafe-preview', 'cs-demo')).toBeDefined();
+  });
+
+  // RFC-025 I25：工作区的容器由调和器照记录建出——所属模块要建时（Provisioning 为真）先建工作卷，卷在了再建这一次启动的 Runner Secret
+  // （内容此刻向所属模块要，不落台账）、Pod（环境只从 Secret 引用）与开发预览，最后把 Pod 实例交回；已在的不动，不要建时不建，Pod 丢了不补建。
+  test('工作区容器：卷、Runner Secret（建时要值）、Pod 与预览依次建出，实例交回所属模块；建不成写原因并按退避重试；不要建时不建', async () => {
+    type Pod = K8sObject & { spec: { containers: Array<{ envFrom?: unknown; env: unknown[] }>; volumes: unknown[] } };
+    const runtime = resources.api.owner('task-runtime');
+    const provisioning = (status: 'true' | 'false') => [{ type: 'Provisioning', status }] as const;
+    const pod = (name: string) => ({ image: 'task:1', workerUid: 10001, resources: { cpu: '1', memory: '2Gi', storage: '10Gi' }, workload: 'dev-session', project: 'demo', service: 'demo', pvc: `${name}-work`, secret: `${name}-runner-1` });
+    const children = (name: string) => [{ kind: 'Pod', namespace: 'cs-demo', name }, { kind: 'Secret', namespace: 'cs-demo', name: `${name}-runner-1` }, { kind: 'Service', namespace: 'cs-demo', name }, { kind: 'IngressRoute', namespace: 'cs-demo', name }];
+    const preview = { port: 3000, kind: 'dev-session', route: { host: 'dev.demo.cs.localhost', middlewares: [{ name: 'forward-auth-user', namespace: 'crewstation-system' }] } };
+    const declare = (name: string, status: 'true' | 'false') => Promise.all([
+      runtime.declare({ kind: 'volume', ref: `${name}/work`, projectId: PROJECT, spec: { children: [{ kind: 'PersistentVolumeClaim', namespace: 'cs-demo', name: `${name}-work` }], pvc: { size: '10Gi', labels: { 'crewstation.io/task': name } } }, conditions: provisioning(status) }),
+      runtime.declare({ kind: 'dev-workspace', ref: name, projectId: PROJECT, spec: { children: children(name), pod: pod(name), preview }, conditions: provisioning(status) }),
+    ]);
+    // 假集群按名字发 UID：同名的 Pod、Service 与路由会拿到同一个 UID（真集群里各不相同），这条用例里按种类＋名字发。
+    const { create, apply } = k8s;
+    const unique = <T extends K8sObject>(object: T): T => ({ ...object, metadata: { ...object.metadata, uid: object.metadata.uid ?? `uid-${object.kind}-${object.metadata.name}` } });
+    k8s.create = (object) => create(unique(object));
+    k8s.apply = (object, options) => apply(unique(object), options);
+    try {
+    const [volume, workspace] = await declare('task-w1', 'true');
+    await until('建出并交回实例', () => bound.some((entry) => entry.startsWith(`${workspace.id}:`)));
+    expect(workloadApplies).toEqual(['PersistentVolumeClaim/task-w1-work', 'Secret/task-w1-runner-1', 'Pod/task-w1', 'preview/task-w1']);
+    expect(valuesAsked).toEqual([workspace.id]);
+    const secret = await k8s.get<K8sObject & { immutable?: boolean; stringData?: Record<string, string> }>(Resources.Secret!, 'task-w1-runner-1', 'cs-demo');
+    expect(secret).toMatchObject({ immutable: true, stringData: { CS_RUNNER_TOKEN: `token-${workspace.id}` }, metadata: { labels: { 'crewstation.io/task': workspace.id } } });
+    const created = await k8s.get<Pod>(Resources.Pod!, 'task-w1', 'cs-demo');
+    expect(created?.spec.containers[0]).toMatchObject({ env: [], envFrom: [{ secretRef: { name: 'task-w1-runner-1' } }] });
+    expect(created?.spec.volumes).toEqual([{ name: 'work', persistentVolumeClaim: { claimName: 'task-w1-work' } }]);
+    expect(await k8s.get(Resources.IngressRoute!, 'task-w1', 'cs-demo')).toBeDefined();
+    expect(bound).toContain(`${workspace.id}:${created!.metadata.uid}`);
+    await until('建成写进记录', async () => (await resources.api.get(workspace.id))?.conditions.some((entry) => entry.type === 'Created' && entry.status === 'true') ?? false);
+    expect((await resources.api.get(volume.id))?.children[0]).toMatchObject({ name: 'task-w1-work' });
+    // 所属模块记下实例后不再要建（Provisioning 为假）：Pod 丢了不补建，也不再要值。
+    await declare('task-w1', 'false');
+    await control.reconciled();
+    await k8s.delete(Resources.Pod!, 'task-w1', 'cs-demo');
+    await feed.emit({ kind: 'Pod', object: created!, gone: true });
+    await control.reconciled();
+    expect(await k8s.get(Resources.Pod!, 'task-w1', 'cs-demo')).toBeUndefined();
+    expect(valuesAsked).toEqual([workspace.id]);
+    // 建不成（向所属模块要值被拒）：记录写 Created 为假与原因，阶段是分配中并照原因显示；过一会儿重试，建成后照常交回。
+    owners.failValues = true;
+    const [, blocked] = await declare('task-w2', 'true');
+    await until('写进原因', async () => (await resources.api.get(blocked.id))?.reason?.message?.includes('额度不够') ?? false);
+    expect(await resources.api.get(blocked.id)).toMatchObject({ phase: 'provisioning', reason: { code: 'create-failed' } });
+    expect(await k8s.get(Resources.Pod!, 'task-w2', 'cs-demo')).toBeUndefined();
+    owners.failValues = false;
+    await until('重试后建出', () => bound.some((entry) => entry.startsWith(`${blocked.id}:`)), 5_000);
+    expect(await k8s.get(Resources.Secret!, 'task-w2-runner-1', 'cs-demo')).toBeDefined();
+    } finally { k8s.create = create; k8s.apply = apply; }
   });
 
   // RFC-025 T10：限流策略的 Middleware 由调和器照记录渲染；系统命名空间里的（平台接口）带资源 ID 标签，照常观测与回收。

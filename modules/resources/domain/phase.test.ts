@@ -28,6 +28,10 @@ describe('阶段规则（RFC-025 设计 §2.3）', () => {
     expect(computePhase(record()).phase).toBe('provisioning');
     expect(computePhase(record({ children: [pod('Pending', false, { reason: '0/1 nodes are available' })] }))).toEqual({ phase: 'starting', reason: { code: 'waiting-container', message: '0/1 nodes are available' } });
     expect(computePhase(record({ children: [pod('Running', false)] })).phase).toBe('starting');
+    // RFC-025 I25：资源中心建过却没建成（例如被额度拒绝）照原因写；没有说明的不编原因。
+    expect(computePhase(record({ conditions: [cond('Created', 'false', { reason: 'create-failed', message: '容器没有建成：exceeded quota' })] }))).toEqual({ phase: 'provisioning', reason: { code: 'create-failed', message: '容器没有建成：exceeded quota' } });
+    expect(computePhase(record({ conditions: [cond('Created', 'false', { message: '没建成' })] })).reason?.code).toBe('create-failed');
+    expect(computePhase(record({ conditions: [cond('Created', 'false')] }))).toEqual({ phase: 'provisioning' });
   });
 
   test('Pod 就绪还要 Runner 连上才是运行中；从没连上是启动中，连上后又断开是降级，重建中按重新启动算', () => {

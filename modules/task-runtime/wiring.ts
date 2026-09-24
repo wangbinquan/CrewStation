@@ -26,6 +26,7 @@ import { rebuildWorker } from './workers/rebuildWorker';
 import { nativeExecutionWorker } from './workers/nativeExecutionWorker';
 import { createNativeExecutionUseCase } from './application/nativeExecution';
 import { createTestEnvironmentUseCase } from './application/testEnvironment';
+import { workloadRenderUseCases } from './application/workloadRender';
 import { PROFILE_TEST_LABELS } from './domain/profileTestEnvironment';
 import { runProfileTestUseCase } from './application/profileTest';
 import type { ProfileTestTiming } from './application/profileTest';
@@ -56,6 +57,8 @@ export interface TaskRuntimeModuleDeps {
   cluster?: TaskCluster;
   /** RFC-025 资源台账：给了就在每次环境落库时投影期望与领域条件，并定期补投影。 */
   ledger?: EnvironmentLedger;
+  /** RFC-025 I25：工作区的容器由资源中心照记录建出（要配台账）；不给就由本模块自己建。 */
+  creation?: 'ledger';
   clock?: Clock;
   logger?: Logger;
 }
@@ -85,6 +88,7 @@ export function createTaskRuntimeModule(deps: TaskRuntimeModuleDeps): TaskRuntim
     legacyRunnerTaskId: legacyRunnerTaskId(resourceIdentityDirectory(deps.db, () => [taskRuntimeMigrations])),
     ...(deps.checkout ? { checkout: deps.checkout } : {}),
     settings: deps.settings,
+    ...(deps.ledger && deps.creation ? { creation: deps.creation } : {}),
     clock: deps.clock ?? systemClock,
     logger: deps.logger ?? noopLogger,
   };
@@ -135,6 +139,7 @@ export function createTaskRuntimeModule(deps: TaskRuntimeModuleDeps): TaskRuntim
       return env ? startupLogTail(useCaseDeps, env, env.podName) : undefined;
     },
     runProfileTest,
+    ...workloadRenderUseCases(useCaseDeps),
   };
   const ledger = deps.ledger;
   return {

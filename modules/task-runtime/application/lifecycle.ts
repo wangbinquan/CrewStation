@@ -18,7 +18,7 @@ export type ReleaseReason = 'user' | 'owner-force' | 'business' | 'failed' | 'po
 
 /** 运行、释放、暂停、恢复与连接回调；释放即回收 Pod、跟随卷与配额（R14、R29）。 */
 export function lifecycleUseCases(deps: TaskRuntimeUseCaseDeps) {
-  const { uow, cluster, services, settings, clock, logger } = deps;
+  const { uow, cluster, clock, logger } = deps;
   const load = async (taskId: TaskId): Promise<TaskEnvironment> => {
     const env = await uow.read.environments.getById(taskId);
     if (!env) throw notFound('任务', taskId);
@@ -69,30 +69,48 @@ export function lifecycleUseCases(deps: TaskRuntimeUseCaseDeps) {
       });
     },
     pauseEnvironment: pauseEnvironmentUseCase(deps, load),
-    resumeEnvironment: async (taskId: TaskId): Promise<TaskEnvironment> => {
-      const env = await load(taskId);
-      if (env.state !== 'paused') throw precondition('只有暂停中的任务可以恢复');
-      const svc = await services.resolveServiceById(env.serviceId);
-      if (!svc) throw notFound('服务', env.serviceId);
-      const profile = await deps.profiles.getTaskProfile(env.profile);
-      if (!profile) throw precondition(`任务套餐 ${env.profile} 已不存在`);
-      await waitForPausedPodRemoval(cluster, env);
-      const limit = (await deps.quotas.quotaLimit(env.projectId)) ?? 0;
-      const token = newRunnerToken();
-      const now = clock.now();
-      // 业务任务恢复即重新启动一次（RFC-022：只有数据，本 RFC 不做业务任务的界面）。
-      const resumed = transition(env, 'creating', now, { runnerTokenHash: hashRunnerToken(token), connected: false, podUid: undefined, startup: initialStartup(now) });
+    resumeEnvironment: resumeEnvironmentUseCase(deps, load),
+  };
+}
+
+/**
+ * 恢复暂停的业务任务：即重新启动一次（RFC-022：只有数据，本 RFC 不做业务任务的界面）。等原 Pod 消失后受理额度；
+ * 由资源中心建出的环境（RFC-025 I25）只换一个 Runner Secret、写期望，Pod 由调和器建；其余由本模块自己建。
+ */
+function resumeEnvironmentUseCase(deps: TaskRuntimeUseCaseDeps, load: (taskId: TaskId) => Promise<TaskEnvironment>) {
+  const { uow, cluster, services, settings, clock } = deps;
+  return async (taskId: TaskId): Promise<TaskEnvironment> => {
+    const env = await load(taskId);
+    if (env.state !== 'paused') throw precondition('只有暂停中的任务可以恢复');
+    const svc = await services.resolveServiceById(env.serviceId);
+    if (!svc) throw notFound('服务', env.serviceId);
+    const profile = await deps.profiles.getTaskProfile(env.profile);
+    if (!profile) throw precondition(`任务套餐 ${env.profile} 已不存在`);
+    await waitForPausedPodRemoval(cluster, env);
+    const limit = (await deps.quotas.quotaLimit(env.projectId)) ?? 0;
+    const token = newRunnerToken();
+    const now = clock.now();
+    // 由资源中心建出的环境（RFC-025 I25）：恢复即再启动一次——换一个 Runner Secret（第几次启动加一），Pod 由调和器照记录建。
+    if (env.render) {
+      const restarted = transition(env, 'creating', now, { connected: false, podUid: undefined, startup: initialStartup(now), render: { ...env.render, start: env.render.start + 1 } });
       await uow.run(async (scope) => {
-        await scope.quota.acquire(resumed, limit, `并发任务已达配额上限 ${limit}`);
-        await scope.environments.update(resumed);
+        await scope.quota.acquire(restarted, limit, `并发任务已达配额上限 ${limit}`);
+        await scope.environments.update(restarted);
       });
-      const podUid = await cluster.createPod({
-        env: resumed, image: settings.taskImage, envVars: await containerEnv(deps, resumed, svc, token), resources: { cpu: profile.cpu, memory: profile.memory, storage: profile.storage },
-        ...(await sourceOf(deps, resumed.serviceId, resumed.branch)), ...previewRouteOf(settings, resumed, svc.slug),
-      });
-      await recordPodInstance(deps, resumed, podUid);
-      return resumed;
-    },
+      return restarted;
+    }
+    // 业务任务恢复即重新启动一次（RFC-022：只有数据，本 RFC 不做业务任务的界面）。
+    const resumed = transition(env, 'creating', now, { runnerTokenHash: hashRunnerToken(token), connected: false, podUid: undefined, startup: initialStartup(now) });
+    await uow.run(async (scope) => {
+      await scope.quota.acquire(resumed, limit, `并发任务已达配额上限 ${limit}`);
+      await scope.environments.update(resumed);
+    });
+    const podUid = await cluster.createPod({
+      env: resumed, image: settings.taskImage, envVars: await containerEnv(deps, resumed, svc, token), resources: { cpu: profile.cpu, memory: profile.memory, storage: profile.storage },
+      ...(await sourceOf(deps, resumed.serviceId, resumed.branch)), ...previewRouteOf(settings, resumed, svc.slug),
+    });
+    await recordPodInstance(deps, resumed, podUid);
+    return resumed;
   };
 }
 

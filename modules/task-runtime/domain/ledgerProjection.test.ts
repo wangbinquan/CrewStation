@@ -95,4 +95,28 @@ describe('任务环境投影到资源台账（RFC-025 第二期）', () => {
     expect(runnerCondition(false, [{ type: 'RunnerConnected', status: 'false' }])).toEqual([]);
     expect(runnerCondition(false, [])).toEqual([]);
   });
+
+  // RFC-025 I25：资源中心建出的环境——期望里写渲染要用的（不含凭据），创建中且还没绑定 Pod 时要资源中心建（Provisioning 为真）。
+  test('资源中心建出的工作区：子对象带这一次启动的 Runner Secret 与预览；期望写 Pod 与预览；卷写大小与标签；Provisioning 随创建与绑定变化', () => {
+    const render = { image: 'task:1', workerUid: 10001, resources: { cpu: '1', memory: '2Gi', storage: '10Gi' }, start: 2, checkout: { repoUrl: 'http://git/demo.git', branch: 'main', credentialSecretName: 'git-cred' }, previewRoute: { host: 'dev.demo.cs.localhost', middlewares: [{ name: 'auth', namespace: 'sys' }] } };
+    const creating = projectEnvironment(env({ state: 'creating', connected: false, render, preview: { command: ['bun', 'dev'], port: 3000, healthPath: '/' }, labels: { 'crewstation.io/project': 'demo', 'crewstation.io/service': 'demo' } }));
+    expect(creating.workload.children).toEqual([{ kind: 'Pod', namespace: 'cs-demo', name: 'task-100' }, { kind: 'Secret', namespace: 'cs-demo', name: 'task-100-runner-2' }, { kind: 'Service', namespace: 'cs-demo', name: 'task-100' }, { kind: 'IngressRoute', namespace: 'cs-demo', name: 'task-100' }]);
+    expect(creating.workload.render).toEqual({
+      pod: { image: 'task:1', workerUid: 10001, resources: render.resources, workload: 'dev-session', project: 'demo', service: 'demo', pvc: 'task-100-work', secret: 'task-100-runner-2', checkout: render.checkout },
+      preview: { port: 3000, kind: 'dev-session', route: render.previewRoute },
+    });
+    expect(creating.workload.conditions).toContainEqual({ type: 'Provisioning', status: 'true' });
+    expect(creating.volume).toMatchObject({ render: { pvc: { size: '10Gi', labels: { 'crewstation.io/task': env().id, 'crewstation.io/project': 'demo' } } }, conditions: [{ type: 'Provisioning', status: 'true' }] });
+    // 记下 Pod 实例之后不再要建；运行中同样不要（Pod 丢了不补建）。
+    const bound = projectEnvironment(env({ state: 'creating', podUid: 'uid-1', render }));
+    expect(bound.workload.conditions).toContainEqual({ type: 'Provisioning', status: 'false' });
+    expect(bound.volume?.conditions).toEqual([{ type: 'Provisioning', status: 'false' }]);
+    expect(bound.workload.render).toEqual({ pod: expect.objectContaining({ secret: 'task-100-runner-2', project: '', service: '' }) });
+    // 重建中的由 task-runtime 自己建：照旧的子对象形状，不写渲染期望。
+    const rebuilt = projectEnvironment(env({ state: 'creating', render, rebuildId: 'rb-1', podName: 'task-100-r1' }));
+    expect(rebuilt.workload.render).toBeUndefined();
+    expect(rebuilt.workload.children.some((child) => child.name.endsWith('-runner-2'))).toBe(false);
+    expect(rebuilt.workload.conditions).toContainEqual({ type: 'Provisioning', status: 'false' });
+    expect(rebuilt.volume).not.toHaveProperty('render');
+  });
 });

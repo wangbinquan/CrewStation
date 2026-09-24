@@ -259,6 +259,8 @@ function composeRuntime(deps: CompositionDeps, core: ReturnType<typeof composeCo
     // RFC-025 第二期：环境落库时在同一事务里投影进资源台账；live 给补投影列出台账里还挂着的 task-runtime 记录。
     // 额度经台账受理（D31：按阶段数，结束中仍占），occupancy 是项目眼下占用的额度单位。
     ledger: { within: (tx) => ledger.within(tx as object), live: async () => (await resources.api.list({})).filter((record) => record.owner.module === 'task-runtime'), occupancy: resources.api.occupancy },
+    // RFC-025 I25：工作区（开发会话、业务任务）的容器由资源中心照记录建出，受理只写期望（不含凭据）；运维开关可回退为本模块自己建。
+    ...(settings.workloadCreation === 'ledger' ? { creation: 'ledger' as const } : {}),
     profiles: { devSessionProfile: core.agentRuntime.api.projectDevTaskProfile, listTaskProfiles: project.api.listTaskProfiles, getTaskProfile: async (name) => (await project.api.listTaskProfiles()).find((p) => p.id === name) },
     services: { resolveServiceById: resolveById },
     checkout: {
@@ -426,6 +428,8 @@ function composeControl(deps: CompositionDeps, core: ReturnType<typeof composeCo
     pods: { changed: (pod, gone) => gateway.api.syncObservedPod(pod, gone), synced: async (pods) => { await gateway.api.relistObservedPods(pods); } },
     // D13：槽「已结束」时待验证与正式主机改指 cs-api 的说明页（Service 与端口同平台路由清单 deploy/k8s/platform/30-cs-api.yaml）。
     explainer: { namespace: deps.settings.systemNamespace, service: 'cs-api', port: 8080, path: UNAVAILABLE_PATH },
+    // RFC-025 I25：建工作区的 Runner Secret 时回头向 task-runtime 要内容（值不落台账），Pod 建出后交回实例。
+    workloads: { runnerValues: (id) => runtime.taskRuntime.api.runnerValues(id as TaskId), bindWorkload: (id, podUid) => runtime.taskRuntime.api.bindWorkload(id as TaskId, podUid) },
     ledger: {
       observe: (input) => ledger.api.observe(input), claimOf: (child) => ledger.api.claimOf(child), get: (id) => ledger.api.get(id),
       listLive: () => ledger.api.list({}), changesSince: ledger.api.changesSince, latestChange: ledger.api.latestChange,

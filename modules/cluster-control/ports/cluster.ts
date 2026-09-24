@@ -2,6 +2,7 @@ import type { MiddlewareRender } from '../domain/middlewareRender';
 import type { NamespaceRender, NetworkPolicyRender } from '../domain/namespaceRender';
 import type { ObservedObject } from '../domain/observation';
 import type { RouteRender } from '../domain/routeRender';
+import type { VolumeRender, WorkloadPodRender, WorkloadPreviewRender } from '../domain/workloadRender';
 
 /**
  * 观测与调和的种类：任务类容器的子对象（Pod、PVC、Runner Secret、预览 Service 与路由），服务槽的 Deployment，构建与迁移的 Job，限流的 Middleware，
@@ -56,4 +57,19 @@ export interface ClusterWriter {
   applyNamespace(namespace: NamespaceRender, current: ObservedObject | undefined): Promise<'applied' | 'unchanged'>;
   applyQuota(namespace: NamespaceRender, current: ObservedObject | undefined): Promise<'applied' | 'unchanged'>;
   applyNetworkPolicy(policy: NetworkPolicyRender, current: ObservedObject | undefined): Promise<'applied' | 'unchanged'>;
+  /**
+   * 工作区的容器（RFC-025 I25）：Pod、PVC 按名字建，已在就不动（建了不改），返回实例 UID 与是不是这次建的。
+   * Runner Secret 先向 API Server 确认不在，才调 values 向所属模块要内容再建（不可变）——已在的不读内容、不重签令牌。
+   */
+  ensurePod(pod: WorkloadPodRender): Promise<Ensured>;
+  ensureRunnerSecret(pod: WorkloadPodRender, values: () => Promise<Readonly<Record<string, string>>>): Promise<Ensured>;
+  ensureVolume(volume: VolumeRender): Promise<Ensured>;
+  /** 开发预览的 Service 与路由：各自缺了或不一致才服务端 apply。 */
+  applyPreview(preview: WorkloadPreviewRender, current: { readonly service?: ObservedObject; readonly route?: ObservedObject }): Promise<'applied' | 'unchanged'>;
+}
+
+/** 按名字建出的对象：实例 UID，与是不是这次建的（已在就不动）。 */
+export interface Ensured {
+  readonly uid: string;
+  readonly created: boolean;
 }

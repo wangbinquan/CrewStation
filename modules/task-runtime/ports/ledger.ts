@@ -26,7 +26,8 @@ export interface LedgerDeclaration {
   readonly projectId?: ProjectId;
   readonly parentId?: string;
   readonly purpose?: ClusterPurpose;
-  readonly spec: { readonly children: readonly { readonly kind: string; readonly namespace?: string; readonly name: string }[]; readonly reclaim?: 'delete' | 'retain' };
+  /** 子对象、工作卷的回收方式，以及资源中心建出子对象要用的期望（RFC-025 I25，不含凭据）。 */
+  readonly spec: { readonly children: readonly { readonly kind: string; readonly namespace?: string; readonly name: string }[]; readonly reclaim?: 'delete' | 'retain'; readonly [field: string]: unknown };
   readonly display?: Readonly<Record<string, string>>;
   readonly conditions?: readonly LedgerConditionUpdate[];
   /** 旧身份（RFC-013 之前的 `tsk_…`）：台账按它也能找回记录。 */

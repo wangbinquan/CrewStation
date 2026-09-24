@@ -82,3 +82,33 @@ describe('受管对象的列表与变化流（设计 §6.1）', () => {
     expect(seen.filter((c) => c.kind === 'Pod').at(-1)).toMatchObject({ gone: true, object: { metadata: { name: 'a' } } });
   });
 });
+
+// RFC-025 I25：工作区容器按名字建，已在就不动；Runner Secret 只在不在时才向所属模块要内容；建时撞上同名的（回执丢了）按已在处理。
+describe('工作区容器的建出', () => {
+  const pod = { name: 'task-1', namespace: 'cs-demo', taskId: 'rec-1', image: 'task:1', workerUid: 10001, resources: { cpu: '1', memory: '2Gi', storage: '10Gi' }, workload: 'dev-session', project: 'demo', service: 'demo', pvc: 'task-1-work', secret: 'task-1-runner-1' };
+
+  test('不在才建（内容这时才要），已在返回原实例；预览缺了或不一致才 apply', async () => {
+    const k8s = createFakeK8sClient(), writer = kubernetesClusterWriter(k8s);
+    let asked = 0;
+    const values = async () => { asked += 1; return { CS_RUNNER_TOKEN: 't' }; };
+    expect(await writer.ensureRunnerSecret(pod, values)).toEqual({ uid: 'uid-task-1-runner-1', created: true });
+    expect(await writer.ensureRunnerSecret(pod, values)).toEqual({ uid: 'uid-task-1-runner-1', created: false });
+    expect(asked).toBe(1);
+    expect((await writer.ensurePod(pod)).created).toBe(true);
+    expect((await writer.ensurePod(pod)).created).toBe(false);
+    expect((await writer.ensureVolume({ name: 'task-1-work', namespace: 'cs-demo', size: '10Gi', labels: {} })).created).toBe(true);
+    const preview = { name: 'task-1', namespace: 'cs-demo', taskId: 'rec-1', kind: 'dev-session', targetPort: 3000, route: { host: 'dev.demo.cs.localhost', middlewares: [] } };
+    expect(await writer.applyPreview(preview, {})).toBe('applied');
+    const service = await k8s.get(Resources.Service!, 'task-1', 'cs-demo'), route = await k8s.get(Resources.IngressRoute!, 'task-1', 'cs-demo');
+    expect(await writer.applyPreview(preview, { service: service!, route: route! })).toBe('unchanged');
+  });
+
+  test('建时撞上同名的：按已在处理，返回那个实例；其余错误照抛', async () => {
+    const k8s = createFakeK8sClient(), writer = kubernetesClusterWriter(k8s);
+    const create = k8s.create;
+    k8s.create = async (obj) => { await create(obj); return create(obj); };
+    expect(await writer.ensurePod(pod)).toEqual({ uid: 'uid-task-1', created: false });
+    k8s.create = async () => { throw new Error('API Server 不可用'); };
+    await expect(writer.ensureVolume({ name: 'task-2-work', namespace: 'cs-demo', size: '10Gi', labels: {} })).rejects.toThrow('API Server 不可用');
+  });
+});

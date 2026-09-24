@@ -17,7 +17,8 @@ const app = createApp({ name: 'cluster-platform-test' });
 beforeAll(async () => {
   if (!available) return;
   database = await createTestDatabase();
-  const settings = loadPlatformSettings({ CS_DATABASE_URL: database.url, CS_SECRET_KEY: Buffer.alloc(32, 3).toString('base64'), CS_GITLAB_URL: 'http://127.0.0.1:9' });
+  // 假集群没有 watch，资源中心的调和器在这里跑不起来：业务任务的容器按回退开关由 task-runtime 自己建（RFC-025 I25）。
+  const settings = loadPlatformSettings({ CS_DATABASE_URL: database.url, CS_SECRET_KEY: Buffer.alloc(32, 3).toString('base64'), CS_GITLAB_URL: 'http://127.0.0.1:9', CS_WORKLOAD_CREATION: 'owner' });
   platform = createPlatformModule({ db: database.db, settings, k8s, logger: noopLogger, instance: 'test.cluster-platform' }); await runMigrations(database.db, platform.api.migrations);
   const user = await platform.modules.identity.api.ensureUser({ externalId: 'cluster-admin', name: 'Cluster Admin', email: 'admin@cluster.test' });
   if (!user.isAdmin) await platform.modules.identity.api.setPlatformRole(user.id, { platformRole: 'admin', expectedRole: user.platformRole });

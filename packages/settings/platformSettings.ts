@@ -32,6 +32,11 @@ export interface PlatformSettings {
   /** `CS_PASSWORD_LOGIN=force-on`：IdP 全不可达时的破窗口，压过库内登录策略。 */
   passwordLoginForcedOn: boolean;
   sessionTtlSeconds: number;
+  /**
+   * 工作区（开发会话、业务任务）的容器由谁建（RFC-025 I25）：`ledger` 由资源中心照记录建出（缺省）；
+   * `CS_WORKLOAD_CREATION=owner` 回退为 task-runtime 受理时自己建——迁移期的回退手段。已由资源中心建出的环境恢复时仍走资源中心。
+   */
+  workloadCreation: 'ledger' | 'owner';
 }
 
 const num = (v: string | undefined, fallback: number): number => (v === undefined || v === '' ? fallback : Number(v));
@@ -72,6 +77,7 @@ export function loadPlatformSettings(env: Record<string, string | undefined> = p
     bootstrapToken: env.CS_BOOTSTRAP_TOKEN || undefined,
     passwordLoginForcedOn: env.CS_PASSWORD_LOGIN === 'force-on',
     sessionTtlSeconds: num(env.CS_SESSION_TTL_SECONDS, 28800),
+    workloadCreation: env.CS_WORKLOAD_CREATION === 'owner' ? 'owner' : 'ledger',
   };
 }
 

@@ -21,7 +21,7 @@ async function syncRecord(writer: LedgerWriter, record: ProjectedRecord, connect
   const saved = await writer.declare({
     ...(record.id ? { id: record.id } : {}), kind: record.kind, ref: record.ref, projectId: record.projectId,
     ...(record.parentId ? { parentId: record.parentId } : {}), ...(record.purpose ? { purpose: record.purpose } : {}),
-    spec: { children: record.children, ...(record.reclaim ? { reclaim: record.reclaim } : {}) }, display: record.display, conditions: [...record.conditions, ...runner],
+    spec: { children: record.children, ...(record.reclaim ? { reclaim: record.reclaim } : {}), ...record.render }, display: record.display, conditions: [...record.conditions, ...runner],
     ...(record.aliases ? { aliases: record.aliases } : {}),
   });
   if (record.startup) await writer.report(saved.id, { startup: record.startup });
@@ -54,7 +54,7 @@ export async function admitEnvironment(executor: Executor, ledger: EnvironmentLe
   await ledger.within(executor).admit({
     ...(workload.id ? { id: workload.id } : {}), kind: workload.kind, ref: workload.ref, projectId: workload.projectId,
     ...(workload.parentId ? { parentId: workload.parentId } : {}), ...(workload.purpose ? { purpose: workload.purpose } : {}),
-    spec: { children: workload.children }, display: workload.display, conditions: workload.conditions,
+    spec: { children: workload.children, ...workload.render }, display: workload.display, conditions: workload.conditions,
   });
 }
 

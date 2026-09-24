@@ -15,7 +15,7 @@ import type { Explainer } from './application/routeExplainer';
 import { routeTargets } from './application/routeExplainer';
 import { adoptionRoutes } from './http/adoptionRoutes';
 import type { ClusterWriter, ManagedObjectFeed, ManagedObjectReader, ObjectChange, ObservedKind, PodSubscriber } from './ports/cluster';
-import type { LedgerObservations, LegacyOwners } from './ports/ledger';
+import type { LedgerObservations, LegacyOwners, WorkloadOwners } from './ports/ledger';
 import type { LedgerReconcilerOptions, ReplicaLeases } from './workers/ledgerReconciler';
 import { ledgerReconciler } from './workers/ledgerReconciler';
 import { observationWorker } from './workers/observationWorker';
@@ -53,6 +53,8 @@ export interface ClusterControlModuleDeps {
   readonly orphanSweep?: false | (OrphanSweeperOptions & { readonly minAgeMs?: number });
   /** 说明页（RFC-025 设计 §7.2，D13）：槽「已结束」时待验证与正式主机改指 cs-api 的这个路径；不给就不改指。 */
   readonly explainer?: Explainer;
+  /** 工作区容器的所属模块（task-runtime，RFC-025 I25）：给了就照工作区与工作卷记录建出容器。 */
+  readonly workloads?: WorkloadOwners;
 }
 
 export interface ClusterControlModule {
@@ -80,7 +82,7 @@ export function createClusterControlModule(deps: ClusterControlModuleDeps): Clus
   const cluster = deps.cluster ?? kubernetesClusterWriter(deps.k8s);
   const reconcileDeps = {
     ledger: deps.ledger, feed, cluster, clock, systemNamespace: deps.systemNamespace, stats, logger, routeTargets: routeTargets(),
-    ...(deps.reconciler?.retryMs ? { retryMs: deps.reconciler.retryMs } : {}), ...(deps.explainer ? { explainer: deps.explainer } : {}),
+    ...(deps.reconciler?.retryMs ? { retryMs: deps.reconciler.retryMs } : {}), ...(deps.explainer ? { explainer: deps.explainer } : {}), ...(deps.workloads ? { workloads: deps.workloads } : {}),
   };
   const reconciler = ledgerReconciler(deps.ledger, feed, (id, enqueue) => reconcileRecord(reconcileDeps, id, enqueue), logger, { ...deps.reconciler, ...(deps.leases ? { leases: deps.leases } : {}) });
   // Pod 先交给身份索引（来源 IP 认人，越早越好），再写台账观测；两边失败互不耽误。调和器渲染的对象一有变化就把认领它的记录排进去核对。

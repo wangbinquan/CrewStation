@@ -16,6 +16,11 @@ export interface TaskRuntimeUseCaseDeps {
   /** 缺省不检出：业务任务容器不需要源码，单元测试也不需要集群。 */
   checkout?: SourceCheckoutSource;
   settings: TaskRuntimeSettings;
+  /**
+   * RFC-025 I25：工作区（开发会话、业务任务）的容器由资源中心建出——受理只写期望（不含凭据），调和器照记录建卷、Runner Secret、
+   * Pod 与开发预览，建 Secret 时回头要值。不给就由本模块自己建（用例、独立部署）。
+   */
+  creation?: 'ledger';
   clock: Clock;
   logger: Logger;
 }

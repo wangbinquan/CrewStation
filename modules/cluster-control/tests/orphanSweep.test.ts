@@ -59,7 +59,8 @@ describe.skipIf(!available)('孤儿回收（RFC-025 设计 §6.4、D8）', () =>
 
   const deps = () => ({
     feed, ledger, cluster: { remove: async (target: { kind: string; name: string }) => { removed.push(`${target.kind}/${target.name}`); }, applyRoute: async () => 'unchanged' as const, applyMiddleware: async () => 'unchanged' as const,
-      applyNamespace: async () => 'unchanged' as const, applyQuota: async () => 'unchanged' as const, applyNetworkPolicy: async () => 'unchanged' as const }, clock: { now: () => now }, logger: noopLogger, stats: newObservationStats(), minAgeMs: 600_000,
+      applyNamespace: async () => 'unchanged' as const, applyQuota: async () => 'unchanged' as const, applyNetworkPolicy: async () => 'unchanged' as const,
+      ensurePod: async () => ({ uid: 'x', created: false }), ensureRunnerSecret: async () => ({ uid: 'x', created: false }), ensureVolume: async () => ({ uid: 'x', created: false }), applyPreview: async () => 'unchanged' as const }, clock: { now: () => now }, logger: noopLogger, stats: newObservationStats(), minAgeMs: 600_000,
     legacy: { resolveTaskId: async (legacyId: string) => (legacyId === 'tsk_legacy_live' ? LIVE : undefined), task: async (taskId: string) => tasks.get(taskId) },
   });
 

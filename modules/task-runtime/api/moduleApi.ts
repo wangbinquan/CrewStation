@@ -118,6 +118,13 @@ export interface TaskRuntimeModuleApi {
    * dev-session 在请求回收之前调用它，给失败的那一段留证；读不到返回 undefined。
    */
   captureStartupLog(taskId: TaskId): Promise<string | undefined>;
+  /**
+   * RFC-025 I25：资源中心建工作区的 Runner Secret 之前要它的内容（配置、数据连接串与新签发的 Runner 令牌，令牌只存哈希）；
+   * 环境眼下不需要建出容器时拒绝。值只交给调和器，不落库。
+   */
+  runnerValues(taskId: TaskId): Promise<Record<string, string>>;
+  /** RFC-025 I25：资源中心建出 Pod 后记下实例；环境已不在创建中时忽略。 */
+  bindWorkload(taskId: TaskId, podUid: string): Promise<void>;
   /** RFC-004：在平台专属检查任务里执行完整 Hook 与一次最小模型调用，结束后清理任务；供 agent-runtime 的执行器端口。 */
   runProfileTest(input: ProfileTestRunInput, report: (progress: ProfileTestRunProgress) => Promise<void>, heartbeat: () => Promise<boolean>): Promise<ProfileTestRunResult>;
 }

@@ -19,3 +19,10 @@ test('cluster metrics is opt-in and uses independent installation credentials an
   expect(loadPlatformSettings(base).clusterMetrics).toMatchObject({ enabled: false, probePort: 8095, probeRoot: '' });
   expect(loadPlatformSettings({ ...base, CS_SYSTEM_NAMESPACE: 'platform', CS_CLUSTER_METRICS_ENABLED: 'true', CS_CLUSTER_METRICS_TOKEN: 'export', CS_PROMETHEUS_TOKEN: 'query', CS_STORAGE_PROBE_TOKEN: 'probe', CS_STORAGE_PROBE_HOST_ROOT: '/local', CS_STORAGE_PROBE_PORT: '9000' }).clusterMetrics).toEqual({ enabled: true, exporterToken: 'export', prometheusUrl: 'http://prometheus.platform.svc.cluster.local:9090', prometheusToken: 'query', probeToken: 'probe', probeRoot: '/local', probePort: 9000 });
 });
+
+test('工作区容器缺省由资源中心建出，只有显式 owner 才回退（RFC-025 I25）', () => {
+  expect(loadPlatformSettings(base).workloadCreation).toBe('ledger');
+  expect(loadPlatformSettings({ ...base, CS_WORKLOAD_CREATION: 'owner' }).workloadCreation).toBe('owner');
+  // 拼错的值不悄悄回退：仍由资源中心建。
+  expect(loadPlatformSettings({ ...base, CS_WORKLOAD_CREATION: 'Owner' }).workloadCreation).toBe('ledger');
+});

@@ -1,6 +1,6 @@
 import type { ClusterPurpose, ResourceConditionStatus, ResourceKind, StartupRecord } from '@crewstation/contracts';
 import type { ExecutionPurpose, TaskEnvironment } from './taskEnvironment';
-import { podNameFor, purposeOf } from './taskEnvironment';
+import { podNameFor, purposeOf, reconcilerCreates, runnerSecretOf, WORKLOAD_LABELS, wantsProvisioning } from './taskEnvironment';
 
 /**
  * 任务环境投影到资源台账（RFC-025 第二期）：每个环境一条工作负载记录（开发工作区、业务任务工作区、Agent 执行），
@@ -34,6 +34,8 @@ export interface ProjectedRecord {
   readonly release?: { readonly code: string; readonly message: string };
   /** 旧身份（设计 §6.5）：RFC-013 之前的 `tsk_…`，写进台账的别名，按旧 ID 也能找回这条记录。 */
   readonly aliases?: readonly { readonly source: 'tsk'; readonly alias: string }[];
+  /** 资源中心建出子对象要用的期望（RFC-025 I25，不含凭据）：并进记录的 spec；没有就是所属模块自己建。 */
+  readonly render?: Readonly<Record<string, unknown>>;
 }
 
 export interface EnvironmentProjection {
@@ -91,7 +93,27 @@ function conditionsOf(env: TaskEnvironment): ProjectedCondition[] {
     { type: 'Rebuilding', status: env.rebuildId && env.state === 'creating' ? 'true' : 'false' },
   ];
   if (env.native) conditions.push({ type: 'Prepared', status: env.native.state === 'queued' ? 'false' : 'true' });
+  if (env.render) conditions.push(provisioningOf(env));
   return conditions;
+}
+
+/** 要资源中心建出容器（RFC-025 I25）：创建中、还没绑定 Pod 实例时为真；调和器只在它为真时建，Pod 丢了不补建（照旧判容器不存在）。 */
+function provisioningOf(env: TaskEnvironment): ProjectedCondition {
+  return { type: 'Provisioning', status: wantsProvisioning(env) ? 'true' : 'false' };
+}
+
+/**
+ * 调和器建 Pod、Runner Secret 与开发预览要用的期望（RFC-025 I25）：镜像、资源、标签、工作卷、检出与 Secret 名；预览的端口与主机。
+ * 凭据不在这里：Secret 的内容建的时候向 task-runtime 要（runnerValues）。
+ */
+function workloadRender(env: TaskEnvironment): ProjectedRecord['render'] {
+  if (!reconcilerCreates(env)) return undefined;
+  const { image, workerUid, resources, checkout, previewRoute } = env.render;
+  const pod = {
+    image, workerUid, resources, workload: WORKLOAD_LABELS[env.kind], project: env.labels['crewstation.io/project'] ?? '', service: env.labels['crewstation.io/service'] ?? '',
+    pvc: env.pvcName, secret: runnerSecretOf(env), ...(checkout ? { checkout } : {}),
+  };
+  return { pod, ...(env.preview ? { preview: { port: env.preview.port, kind: env.kind, ...(previewRoute ? { route: previewRoute } : {}) } } : {}) };
 }
 
 function workloadDisplay(env: TaskEnvironment): Record<string, string> {
@@ -105,6 +127,8 @@ function workloadDisplay(env: TaskEnvironment): Record<string, string> {
  */
 function workloadChildren(env: TaskEnvironment): ProjectedRecord['children'] {
   const at = (kind: string, name: string) => ({ kind, namespace: env.namespace, name });
+  // 资源中心建出的环境（I25）：每次启动一个 Runner Secret，预览与 Pod 同名。
+  if (reconcilerCreates(env)) return [at('Pod', env.podName), at('Secret', runnerSecretOf(env)), ...(env.preview ? [at('Service', env.podName), at('IngressRoute', env.podName)] : [])];
   const route = env.rebuildId ? podNameFor(env.id) : env.podName;
   return [
     at('Pod', env.podName), ...(env.native || env.rebuildId ? [at('Secret', `${env.podName}-runner`)] : []),
@@ -120,6 +144,7 @@ export function projectEnvironment(env: TaskEnvironment): EnvironmentProjection 
     purpose: workloadPurpose(env), children: workloadChildren(env),
     display: workloadDisplay(env), conditions: conditionsOf(env), ...(env.startup ? { startup: env.startup } : {}), ...(release ? { release } : {}),
     ...(env.legacyCluster?.taskId ? { aliases: [{ source: 'tsk' as const, alias: env.legacyCluster.taskId }] } : {}),
+    ...(workloadRender(env) ? { render: workloadRender(env)! } : {}),
   };
   // Agent 执行挂父工作区的卷；档位测试用一次性的空目录。只有工作区自己有工作卷。保留期满回收的会话，卷不随之删除（D8、D9）。
   const ownsVolume = !env.native && env.kind !== 'profile-test';
@@ -127,7 +152,9 @@ export function projectEnvironment(env: TaskEnvironment): EnvironmentProjection 
   const volume: ProjectedRecord | undefined = ownsVolume ? {
     kind: 'volume', ref: `${env.id}/work`, projectId: env.projectId, parentId: env.id,
     children: [{ kind: 'PersistentVolumeClaim', namespace: env.namespace, name: env.pvcName }], reclaim: env.volumeMode === 'follow-container' ? 'delete' : 'retain',
-    display: { mode: env.volumeMode }, conditions: [], ...(volumeReleased ? { release: volumeReleased } : {}),
+    display: { mode: env.volumeMode }, conditions: env.render ? [provisioningOf(env)] : [], ...(volumeReleased ? { release: volumeReleased } : {}),
+    // 资源中心建出的环境（I25）：卷由调和器照这里建，只在要建出容器时建一次，卷丢了不补建（数据不能凭空换成空卷）。
+    ...(reconcilerCreates(env) ? { render: { pvc: { size: env.render.resources.storage, labels: { 'crewstation.io/task': env.id, 'crewstation.io/project': env.labels['crewstation.io/project'] ?? '' } } } } : {}),
   } : undefined;
   return { workload, ...(volume ? { volume } : {}), connected: env.connected };
 }

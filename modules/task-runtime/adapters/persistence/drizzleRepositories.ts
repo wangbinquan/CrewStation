@@ -17,9 +17,9 @@ export function drizzleEnvironmentRepository(db: Executor): EnvironmentRepositor
     labels: json<Record<string, string>>(r.labels), ...(r.createdBy ? { createdBy: r.createdBy as UserId } : {}), ...(r.message ? { message: r.message } : {}),
     createdAt: r.createdAt, updatedAt: r.updatedAt, lastActivityAt: r.lastActivityAt, ...(r.rebuildId ? { rebuildId: r.rebuildId } : {}),
     ...(r.native ? { native: json<TaskEnvironment['native']>(r.native) } : {}), ...(r.release ? { release: json<TaskEnvironment['release']>(r.release) } : {}), ...(r.runnerRejection ? { runnerRejection: json<TaskEnvironment['runnerRejection']>(r.runnerRejection) } : {}),
-    ...(r.startup ? { startup: json<TaskEnvironment['startup']>(r.startup) } : {}),
+    ...(r.startup ? { startup: json<TaskEnvironment['startup']>(r.startup) } : {}), ...(r.render ? { render: json<TaskEnvironment['render']>(r.render) } : {}),
   });
-  const toRow = (e: TaskEnvironment): typeof environments.$inferInsert => ({ ...e, podUid: e.podUid ?? null, branch: e.branch ?? null, preview: e.preview ?? null, createdBy: e.createdBy ?? null, message: e.message ?? null, rebuildId: e.rebuildId ?? null, native: e.native ?? null, release: e.release ?? null, runnerRejection: e.runnerRejection ?? null, startup: e.startup ?? null });
+  const toRow = (e: TaskEnvironment): typeof environments.$inferInsert => ({ ...e, podUid: e.podUid ?? null, branch: e.branch ?? null, preview: e.preview ?? null, createdBy: e.createdBy ?? null, message: e.message ?? null, rebuildId: e.rebuildId ?? null, native: e.native ?? null, release: e.release ?? null, runnerRejection: e.runnerRejection ?? null, startup: e.startup ?? null, render: e.render ?? null });
   return {
     insert: async (e) => { await db.insert(environments).values(toRow(e)); },
     update: async (e) => { await db.update(environments).set(toRow(e)).where(eq(environments.id, e.id)); },

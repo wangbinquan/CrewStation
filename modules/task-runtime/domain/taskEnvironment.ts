@@ -40,6 +40,20 @@ export interface NativeExecution {
   readonly preparedAt?: string;
 }
 
+/**
+ * 资源中心照它建出这个环境的容器（RFC-025 I25 裁定：期望里不放凭据）：Pod、Runner Secret、开发预览的 Service 与路由，工作卷另有一条记录。
+ * 凭据（Runner 令牌、配置与数据的连接串）在调和器建 Runner Secret 时由 task-runtime 当场给出，不落库。受理时定下；
+ * 每次（重新）启动是第几次（start）决定 Runner Secret 的名字，恢复换一个新的，旧的由孤儿回收删掉。之前受理的环境没有它，照旧由 task-runtime 自己建。
+ */
+export interface WorkloadRender {
+  readonly image: string;
+  readonly workerUid: number;
+  readonly resources: { readonly cpu: string; readonly memory: string; readonly storage: string };
+  readonly start: number;
+  readonly checkout?: { readonly repoUrl: string; readonly branch: string; readonly credentialSecretName: string };
+  readonly previewRoute?: { readonly host: string; readonly middlewares: readonly { readonly name: string; readonly namespace?: string }[] };
+}
+
 export interface RunnerRejection {
   readonly code: 'protocol_mismatch';
   readonly runnerProtocol: number | null;
@@ -78,6 +92,8 @@ export interface TaskEnvironment {
   readonly runnerRejection?: RunnerRejection;
   /** RFC-022：最近一次启动（受理、重建或恢复）的阶段进度；升级前创建的环境没有。 */
   readonly startup?: StartupRecord;
+  /** RFC-025 I25：由资源中心建出容器时的期望（不含凭据）；没有就是 task-runtime 自己建。 */
+  readonly render?: WorkloadRender;
   readonly createdAt: Date;
   readonly updatedAt: Date;
   readonly lastActivityAt: Date;
@@ -127,7 +143,30 @@ export const POD_CREATE_GRACE_MS = 2 * 60_000;
  * 这时的 Missing 不算失败；超过宽限仍没有 Pod（建 Pod 的进程中途没了），照旧判容器不存在。执行环境与重建各自在建好 Pod 后才进入可判定状态。
  */
 export function awaitingPodCreation(env: TaskEnvironment, now: Date, graceMs = POD_CREATE_GRACE_MS): boolean {
-  return env.state === 'creating' && !env.native && !env.rebuildId && !env.podUid && now.getTime() - env.createdAt.getTime() < graceMs;
+  // 从最近一次启动算：资源中心建出的环境恢复时同样要等调和器建 Pod（RFC-025 I25），受理时刻早已过了宽限。
+  const since = env.startup ? Date.parse(env.startup.startedAt) : env.createdAt.getTime();
+  return env.state === 'creating' && !env.native && !env.rebuildId && !env.podUid && now.getTime() - since < graceMs;
+}
+
+/**
+ * Pod 的工作负载标签用网关的 Pod 身份索引与项目网络策略认的名字：业务任务是 `business-task`（TaskKind 是 `business`）。
+ * 此前直接写 TaskKind，业务任务 Pod 既不在身份索引里、也拿不到任务出站策略（RFC-006 起业务 Agent 子任务的 Pod 要访问模型端点）。
+ */
+export const WORKLOAD_LABELS: Readonly<Record<TaskKind, string>> = { 'dev-session': 'dev-session', business: 'business-task', 'profile-test': 'profile-test' };
+
+/** 由资源中心建出的环境（RFC-025 I25）：有渲染期望、不是执行环境、不在重建（执行环境与重建仍由 task-runtime 自己建）。 */
+export function reconcilerCreates(env: TaskEnvironment): env is TaskEnvironment & { readonly render: WorkloadRender } {
+  return !!env.render && !env.native && !env.rebuildId;
+}
+
+/** 这一次启动的 Runner Secret：`<Pod 名>-runner-<第几次启动>`；恢复换新名，Pod 只认它。 */
+export function runnerSecretOf(env: TaskEnvironment & { readonly render: WorkloadRender }): string {
+  return `${env.podName}-runner-${env.render.start}`;
+}
+
+/** 所属模块要资源中心建出容器（领域条件 Provisioning）：创建中、还没绑定 Pod 实例。 */
+export function wantsProvisioning(env: TaskEnvironment): boolean {
+  return reconcilerCreates(env) && env.state === 'creating' && !env.podUid;
 }
 
 export function podNameFor(taskId: TaskId): string {

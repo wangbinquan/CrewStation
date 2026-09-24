@@ -44,6 +44,15 @@ export interface LedgerObservations {
   claimOf(child: { readonly kind: string; readonly namespace?: string; readonly name: string; readonly uid?: string }): Promise<string | undefined>;
 }
 
+/**
+ * 工作区容器的所属模块（task-runtime，RFC-025 I25 裁定：渲染时回调）：建 Runner Secret 之前要它的内容（配置、数据连接串、新签发的
+ * Runner 令牌），Pod 建出后把实例交回去。值只在调和器的内存里过一下、写进 Secret，不落台账。由组合根接上。
+ */
+export interface WorkloadOwners {
+  runnerValues(recordId: string): Promise<Readonly<Record<string, string>>>;
+  bindWorkload(recordId: string, podUid: string): Promise<void>;
+}
+
 /** 旧形状的所属对象（收编空跑用）：按任务标签查任务环境，由组合根从身份目录与 task-runtime 取。 */
 export interface LegacyOwners {
   /** RFC-013 之前的旧 ID（`tsk_…`）换成现在的 ID；身份目录里没有就返回 undefined。 */

@@ -6,11 +6,12 @@ import { namespaceRenderOf, networkPolicyRendersOf } from '../domain/namespaceRe
 import { controllerOf, crashLoopingOf, RESOURCE_ID_LABEL } from '../domain/observation';
 import { routeRenderOf } from '../domain/routeRender';
 import type { ClusterWriter, ManagedObjectFeed, ObservedKind } from '../ports/cluster';
-import type { LedgerObservations, LedgerRecordView } from '../ports/ledger';
+import type { LedgerObservations, LedgerRecordView, WorkloadOwners } from '../ports/ledger';
 import type { ObservationStats } from './observeChange';
 import { observeChange } from './observeChange';
 import type { Explainer, RouteTargets } from './routeExplainer';
 import { enqueueRoutesOfSlot, explainerFor, targetKey } from './routeExplainer';
+import { applyVolume, applyWorkload } from './workloadApply';
 
 /** 删的顺序（设计 §6.2）：先工作负载（Deployment、Job、Pod），再 Secret、Service、路由与它引用的中间件；PVC 只随工作卷记录删。 */
 const REMOVAL_ORDER: readonly ObservedKind[] = ['Deployment', 'Job', 'Pod', 'Secret', 'Service', 'IngressRoute', 'Middleware', 'PersistentVolumeClaim'];
@@ -39,6 +40,8 @@ export interface ReconcileDeps {
   readonly explainer?: Explainer;
   /** 槽的 Service → 指向它的路由；槽变了阶段时据此把路由排进队列。 */
   readonly routeTargets?: RouteTargets;
+  /** 工作区容器的所属模块（RFC-025 I25）：不给就不建工作区容器。 */
+  readonly workloads?: WorkloadOwners;
 }
 
 /** 期望里的与观测到的子对象（期望里已经没有、但还在集群里的旧对象也在内，例如重建换下的 Pod）。 */
@@ -235,9 +238,13 @@ async function applyNetworkPolicies(deps: ReconcileDeps, record: LedgerRecordVie
   }
 }
 
-/** 按期望应用子对象的种类：写期望的模块只写记录，对象由调和器建出、改回。 */
+/**
+ * 按期望应用子对象的种类：写期望的模块只写记录，对象由调和器建出、改回。工作区与工作卷（RFC-025 I25）只在所属模块要建出容器时建一次，
+ * 之后不改、丢了不补建（种类注册表不把它们算作「维护中」）。
+ */
 const APPLIERS: Readonly<Record<string, (deps: ReconcileDeps, record: LedgerRecordView, enqueue: Enqueue) => Promise<void>>> = {
   route: applyRoute, 'rate-limit-policy': applyMiddlewares, namespace: applyNamespace, 'network-policy-set': applyNetworkPolicies,
+  'dev-workspace': applyWorkload, 'business-workspace': applyWorkload, volume: (deps, record) => applyVolume(deps, record),
 };
 
 /**
