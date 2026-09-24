@@ -13,6 +13,7 @@ export interface ObservedObject {
     readonly deletionTimestamp?: string;
     readonly creationTimestamp?: string;
     readonly ownerReferences?: readonly { readonly kind: string; readonly name: string; readonly controller?: boolean }[];
+    readonly managedFields?: readonly { readonly time?: string }[];
   };
   readonly spec?: unknown;
   readonly status?: unknown;

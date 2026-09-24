@@ -27,6 +27,8 @@ export interface AdoptionInput {
   readonly taskRecorded?: boolean;
   /** 平台组件所在的系统命名空间（设计 §6.4：不在回收范围）。 */
   readonly systemNamespace?: string;
+  /** 不带任务标签的 Secret 有没有工作负载引用（T14）；不给就不按引用判定。 */
+  readonly referenced?: boolean;
   readonly now?: Date;
 }
 
@@ -78,6 +80,10 @@ export function classifyObject(input: AdoptionInput): AdoptionItem {
   if (labels[RESOURCE_ID_LABEL]) return { ...identity, verdict: 'orphan', resourceId: labels[RESOURCE_ID_LABEL], reason: '带资源标签，但台账里没有记录认领它' };
   const taskId = labels[TASK_LABEL];
   if (taskId) return { ...identity, ...byTask(object, input.legacyTaskId ?? taskId, input.legacyTask, input.now ?? new Date(), input.taskRecorded === true) };
+  // 没有记录认领、不带任务标签的 Secret（T14，与孤儿回收同一判定）：没有工作负载引用就是没人用了（按服务共用的旧 Git 凭据）。
+  if (object.kind === 'Secret' && input.referenced !== undefined) {
+    return { ...identity, ...(input.referenced ? { verdict: 'retained', reason: '仍被工作负载引用，引用它的工作负载结束后回收' } : { verdict: 'orphan', reason: '没有记录认领，也没有工作负载引用（例如按服务共用的旧 Git 凭据，平台已不再写）' }) };
+  }
   return { ...identity, ...(byRelease(labels) ?? { verdict: 'unclassified', reason: '没有可识别的归属标签' }) };
 }
 

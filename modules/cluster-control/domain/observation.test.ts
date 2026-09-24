@@ -116,6 +116,15 @@ describe('收编空跑的判定（设计 §6.5）', () => {
     expect(classifyObject({ object: labeled({}) })).toMatchObject({ verdict: 'unclassified', reason: '没有可识别的归属标签' });
   });
 
+  // T14：不带任务标签、没人认领的 Secret 按有没有工作负载引用判（与孤儿回收同一判定）；不给引用信息时照旧。
+  test('不带任务标签的 Secret：没人引用是孤儿，还被引用是保留中；认领的照旧是已认领', () => {
+    const secret = labeled({ 'crewstation.io/service': 'demo' }, 'Secret');
+    expect(classifyObject({ object: secret, referenced: false })).toMatchObject({ verdict: 'orphan', reason: '没有记录认领，也没有工作负载引用（例如按服务共用的旧 Git 凭据，平台已不再写）' });
+    expect(classifyObject({ object: secret, referenced: true })).toMatchObject({ verdict: 'retained' });
+    expect(classifyObject({ object: secret, referenced: false, claimedBy: 'slot-1' })).toMatchObject({ verdict: 'owned' });
+    expect(classifyObject({ object: secret }).verdict).toBe('unclassified');
+  });
+
   test('按任务标签：还在的可收编（候选种类按用途）；失败的开发会话保留；已释放、已失败、查不到的是孤儿；工作卷只进待回收', () => {
     const task = { 'crewstation.io/task': 't1' };
     expect(classifyObject({ object: labeled(task), legacyTask: { kind: 'dev-session', state: 'running', execution: false } })).toMatchObject({ verdict: 'adoptable', candidateKind: 'dev-workspace', owner: 'task-runtime', ownerRef: 't1' });

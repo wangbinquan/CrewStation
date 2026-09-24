@@ -99,6 +99,25 @@ describe.skipIf(!available)('孤儿回收（RFC-025 设计 §6.4、D8）', () =>
     expect(result.removed).toBe(removed.length);
   });
 
+  // T14：按服务共用的旧 Git 凭据——不带任务标签、没人认领、没有工作负载引用、最近一次写入满 10 分钟的 Secret——按 UID 删。
+  test('Secret：没人认领、没有工作负载引用、最近一次写入满 10 分钟的按 UID 删；被 Pod、Deployment 或 Job 引用的、有记录的、刚重写的、系统命名空间的不动', async () => {
+    const secret = (name: string, namespace = 'cs-demo', extra: Record<string, unknown> = {}): K8sObject => ({ ...object('Secret', name, undefined), metadata: { ...object('Secret', name, undefined).metadata, namespace, ...extra } });
+    const workload = (kind: 'Pod' | 'Deployment' | 'Job', name: string, secretName: string): K8sObject => {
+      const container = { name: 'main', env: [{ name: 'TOKEN', valueFrom: { secretKeyRef: { name: secretName, key: 'token' } } }] };
+      return { ...object(kind, name, undefined), ...(kind === 'Pod' ? { spec: { initContainers: [container], containers: [] } } : { spec: { template: { spec: { containers: [container] } } } }) };
+    };
+    await resources.api.owner('release').declare({ kind: 'service-slot', ref: 'svc-secrets/blue', projectId: PROJECT, spec: { children: [{ kind: 'Secret', namespace: 'cs-demo', name: 'demo-blue-env-1' }] } });
+    await resources.api.observe({ child: { kind: 'Secret', namespace: 'cs-demo', name: 'demo-blue-env-1', uid: 'uid-demo-blue-env-1', phase: 'Present', ready: true } });
+    objects.push(
+      secret('git-cred-old'), secret('git-checkout-by-pod'), secret('git-cred-by-job'), secret('env-by-deployment'), secret('demo-blue-env-1'),
+      secret('git-cred-rewritten', 'cs-demo', { managedFields: [{ time: '2026-09-23T11:58:00Z' }] }), secret('platform-secret', 'crewstation-system'),
+      workload('Pod', 'svc-pod', 'git-checkout-by-pod'), workload('Job', 'build-legacy', 'git-cred-by-job'), workload('Deployment', 'demo-green', 'env-by-deployment'),
+    );
+    removed.length = 0;
+    await sweepOrphans({ ...deps(), systemNamespace: 'crewstation-system' });
+    expect(removed.filter((entry) => entry.startsWith('Secret/') && !entry.includes('-runner'))).toEqual(['Secret/git-cred-old']);
+  });
+
   test('节奏：同步后先等一阵再做第一轮，此后按周期；失败只记告警；停止时等本轮跑完', async () => {
     let calls = 0;
     const seen: string[] = [];

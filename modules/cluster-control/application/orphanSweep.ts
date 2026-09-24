@@ -1,5 +1,6 @@
 import type { Clock, Logger } from '@crewstation/kernel';
 import type { ObservedObject } from '../domain/observation';
+import { lastWrittenAt, referencedSecrets } from '../domain/secretReferences';
 import type { ClusterWriter, ManagedObjectFeed, ObservedKind } from '../ports/cluster';
 import type { LedgerObservations, LegacyOwners } from '../ports/ledger';
 import type { ObservationStats } from './observeChange';
@@ -85,6 +86,24 @@ async function sweepMiddlewares(deps: SweepDeps, result: SweepResult): Promise<v
   }
 }
 
+/**
+ * 没有任务标签的 Secret（设计 §6.4 的孤儿不限任务标签，T14）：项目命名空间里既没有记录认领、又没有工作负载引用（Pod 的规格与 Deployment、Job 的
+ * Pod 模板）、最近一次写入满一阵子的，是不再使用的旧凭据——按服务共用的 Git 凭据（`git-checkout-*`、`git-cred-*`），I25 第三步与 T8 之后
+ * 平台不再写——按 UID 删。回退开关打开时旧路径会重写它们，看最近一次写入（而不只是创建时刻）避开「刚重写、Pod 还没建」的空档。
+ */
+async function sweepSecrets(deps: SweepDeps, result: SweepResult): Promise<void> {
+  const referenced = referencedSecrets([...deps.feed.list('Pod'), ...deps.feed.list('Deployment'), ...deps.feed.list('Job')]);
+  for (const object of deps.feed.list('Secret')) {
+    const namespace = object.metadata.namespace ?? '', written = lastWrittenAt(object);
+    if (!object.metadata.uid || object.metadata.deletionTimestamp || object.metadata.labels?.[TASK_LABEL] || namespace === deps.systemNamespace || !namespace) continue;
+    if (Number.isNaN(written) || deps.clock.now().getTime() - written < deps.minAgeMs || referenced.has(`${namespace}/${object.metadata.name}`) || (await deps.ledger.claimOf(identityOf(object)))) continue;
+    await deps.cluster.remove({ kind: 'Secret', namespace, name: object.metadata.name, uid: object.metadata.uid });
+    result.removed += 1;
+    deps.stats.removed += 1;
+    deps.logger.info('resource orphan removed', { kind: 'Secret', namespace, name: object.metadata.name, reason: 'unreferenced' });
+  }
+}
+
 /** 命名空间属于哪个项目：认领 Namespace 对象的命名空间记录（provisioning 写的）上的项目；查不到就不归项目。 */
 async function projectOfNamespace(ledger: LedgerObservations, namespace: string | undefined): Promise<string | undefined> {
   const id = namespace ? await ledger.claimOf({ kind: 'Namespace', name: namespace }) : undefined;
@@ -94,7 +113,7 @@ async function projectOfNamespace(ledger: LedgerObservations, namespace: string 
 
 /**
  * 一轮孤儿回收：Pod、Secret、Service、路由按 UID 删；PVC 可能有数据，不删，建一条归资源中心的工作卷记录并写「待回收」，
- * 等管理员确认。每删一个、每登记一个都记一行日志（谁、哪个对象、归属的任务）。
+ * 等管理员确认。每删一个、每登记一个都记一行日志（谁、哪个对象、归属的任务）。之后是没人引用的中间件与 Secret。
  */
 export async function sweepOrphans(deps: SweepDeps): Promise<SweepResult> {
   const result: SweepResult = { removed: 0, volumes: 0 };
@@ -125,5 +144,6 @@ export async function sweepOrphans(deps: SweepDeps): Promise<SweepResult> {
     }
   }
   await sweepMiddlewares(deps, result);
+  await sweepSecrets(deps, result);
   return result;
 }
