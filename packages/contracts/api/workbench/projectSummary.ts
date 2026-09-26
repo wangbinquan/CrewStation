@@ -4,6 +4,7 @@ import { HealthDtoSchema } from '../observability';
 import { ReleaseDtoSchema, SlotDtoSchema, TrafficSwitchDtoSchema } from '../release';
 import { ProjectPageEntrySchema } from './projectPage';
 import { FullCommitShaSchema } from '../scm';
+import { ResourcePhaseSchema } from '../resources/resourceRecord';
 
 /** 测试者仅获知待验证槽，不混入正式槽或内部发布记录。 */
 export const TesterPreviewSlotSchema = SlotDtoSchema.extend({ name: z.literal('preview'), active: z.literal(false) }).refine((slot) =>
@@ -16,6 +17,7 @@ export const summaryPart = <T extends z.ZodType>(value: T) => z.discriminatedUni
 ]);
 export const DevelopmentSummarySchema = z.object({
   taskId: TaskIdSchema, state: z.enum(['creating', 'running', 'paused', 'releasing', 'released', 'failed']),
+  phase: ResourcePhaseSchema.optional(),
   connected: z.boolean(), branch: z.string().optional(), createdBy: UserIdSchema.optional(),
   createdAt: z.iso.datetime(), lastActivityAt: z.iso.datetime(), message: z.string().optional(),
 });

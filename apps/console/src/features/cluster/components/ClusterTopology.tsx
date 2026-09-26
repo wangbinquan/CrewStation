@@ -6,6 +6,7 @@ import { api } from '../../../shared/api/client';
 import { queryKeys } from '../../../shared/api/queryKeys';
 import { useApiQuery } from '../../../shared/api/useApi';
 import { useT } from '../../../shared/lib/useT';
+import { useAdminResources } from '../../../shared/resources/useAdminResources';
 import { buildProjectTopology } from '../../../shared/topology/projectTopology';
 import { buildProjectsLayer, columnsFor, MORE_NODE_ID } from '../../../shared/topology/projectsLayer';
 import { buildSystemTopology } from '../../../shared/topology/systemTopology';
@@ -51,6 +52,7 @@ export function ClusterTopology({ search, change, go, summary, snapshotId }: Pro
   const projectResources = useApiQuery(queryKeys.cluster('topology-project', projectQuery), () => readProjectResources(projectId!, snapshotId!), { enabled: layer === 'project' && !!projectId && !!snapshotId, keepPrevious: (previous) => sameApartFromSnapshot(previous, projectQuery) });
   const project = useApiQuery(queryKeys.project(projectId ?? ''), () => api.projects.get(projectId!), { enabled: layer === 'project' && !!projectId });
   const serviceId = project.data?.serviceId;
+  const records = useAdminResources(layer !== 'system');
   const slots = useApiQuery(queryKeys.slots(serviceId ?? ''), () => api.services.listSlots(serviceId!), { enabled: layer === 'project' && !!serviceId });
   const devSession = useApiQuery(queryKeys.devSession(projectId ?? ''), () => api.devSession.get(projectId!), { enabled: layer === 'project' && !!projectId });
   const dataResources = useApiQuery(queryKeys.dataResources(projectId ?? ''), () => api.tasks.listDataResources(projectId!), { enabled: layer === 'project' && !!projectId });
@@ -58,14 +60,14 @@ export function ClusterTopology({ search, change, go, summary, snapshotId }: Pro
     if (!summary) return undefined;
     if (layer === 'system') return system.data ? buildSystemTopology({ resources: system.data.items, summary, snapshot }, t) : undefined;
     if (layer === 'projects') return buildProjectsLayer({ projects: summary.projects, columns: columnsFor(width), expanded, snapshot }, t);
-    if (!project.data || !projectResources.data) return undefined;
-    return buildProjectTopology({ project: { id: project.data.id, name: project.data.name, kind: project.data.kind, namespace: project.data.namespace }, resources: projectResources.data.items, slots: slots.data?.items ?? [], devSession: devSession.data && !devSession.error ? devSession.data : undefined, dataResources: dataResources.data?.items ?? [], snapshot: { ...snapshot, complete: snapshot.complete && projectResources.data.complete } }, t);
-  }, [layer, summary, snapshot, system.data, projectResources.data, project.data, slots.data, devSession.data, devSession.error, dataResources.data, width, expanded, t]);
+    if (!project.data || !projectResources.data || !records.data) return undefined;
+    return buildProjectTopology({ project: { id: project.data.id, name: project.data.name, kind: project.data.kind, namespace: project.data.namespace }, resources: projectResources.data.items, records: records.data.items.filter((record) => record.projectId === projectId), slots: slots.data?.items ?? [], devSession: devSession.data && !devSession.error ? devSession.data : undefined, dataResources: dataResources.data?.items ?? [], snapshot: { ...snapshot, complete: snapshot.complete && projectResources.data.complete && !records.error } }, t);
+  }, [layer, summary, snapshot, system.data, projectResources.data, project.data, projectId, records.data, records.error, slots.data, devSession.data, devSession.error, dataResources.data, width, expanded, t]);
   const projectName = (id: string | undefined): string | undefined => summary?.projects.find((p) => p.id === id)?.name;
   const select = (id: string | undefined) => { if (id === MORE_NODE_ID) { setExpanded(true); return; } setSelected(id); };
   const openProject = (id: string) => change({ layer: 'project', projectId: id, scope: 'project' });
   const node = topology?.nodes.find((n) => n.id === selected);
-  const error = system.error ?? projectResources.error ?? project.error ?? slots.error ?? dataResources.error ?? (devSession.error && devSession.error.status !== 404 ? devSession.error : null);
+  const error = (layer !== 'system' ? records.error : null) ?? system.error ?? projectResources.error ?? project.error ?? slots.error ?? dataResources.error ?? (devSession.error && devSession.error.status !== 404 ? devSession.error : null);
   const detail = node ? (node.resourceId ? <ClusterDetail key={node.resourceId} resourceId={node.resourceId} snapshotId={snapshotId} close={() => setSelected(undefined)} onOperation={(id) => go({ ...search, operationId: id })}
       select={(row) => { const target = topology?.nodes.find((n) => n.resourceId === row.resourceId); if (target) setSelected(target.id); else go({ ...search, tab: 'pods', resourceId: row.resourceId }); }} />
     : <Card title={node.title} extra={<Button variant="ghost" onClick={() => setSelected(undefined)}>{t('cluster.close')}</Button>} stacked>

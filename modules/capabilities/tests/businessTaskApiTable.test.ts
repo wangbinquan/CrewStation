@@ -13,7 +13,7 @@ async function describedBusinessTaskApi(): Promise<string[]> {
   const { api } = createCapabilitiesModule({
     isAdmin: async () => false,
     market: { list: async () => ({ items: [] }), get: unused, slots: async () => [] },
-    projects: { list: async () => ({ items: [] }), read: async () => [], get: unused, session: async () => undefined, slots: async () => [], preview: async () => null, health: async () => [], releases: async () => [], switches: async () => [] },
+    projects: { list: async () => ({ items: [] }), read: async () => [], get: unused, resources: async () => ({ items: [], counts: {}, cursor: 0 }), session: async () => undefined, slots: async () => [], preview: async () => null, health: async () => [], releases: async () => [], switches: async () => [] },
     clock: fixedClock('2026-09-20T00:00:00Z'),
     settings: { userDomain: 'cs.localhost', serviceDomain: 'svc.cs.internal', mcp: [], defaultServicePlan: '01a0bf5d-8f4b-7000-9e4b-b54e91ee9d10' },
     sources: {

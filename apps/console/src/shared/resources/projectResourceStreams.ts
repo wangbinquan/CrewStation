@@ -8,6 +8,8 @@ import { applyResourceEvent } from './resourceViewState';
 
 /** 取快照、推送流地址与打开连接的方式；没有 EventSource 的环境（用例、老浏览器）不给 open，只用快照。 */
 export interface ProjectResourceSource {
+  /** 全平台视图复用同一套续传机制，但与项目视图隔离缓存。 */
+  readonly queryKey?: readonly string[];
   view(projectId: string): Promise<ResourceView>;
   streamUrl(projectId: string, cursor: number): string;
   readonly open?: EventSourceFactory;
@@ -39,7 +41,7 @@ function projectsOf(client: QueryClient): Map<string, Entry> {
 }
 
 function createEntry(client: QueryClient, projectId: string, source: ProjectResourceSource & { readonly open: EventSourceFactory }): Entry {
-  const key = queryKeys.projectResources(projectId), entry: Entry = { count: 0, attempts: 0, restarting: false };
+  const key = source.queryKey ?? queryKeys.projectResources(projectId), entry: Entry = { count: 0, attempts: 0, restarting: false };
   const delays = source.restartDelaysMs ?? RESTART_DELAYS_MS;
   const restart = () => {
     const delay = delays[Math.min(entry.attempts, delays.length - 1)] ?? 0;
@@ -86,7 +88,7 @@ export function retainProjectResources(client: QueryClient, projectId: string, s
   const current = entry;
   current.count += 1;
   if (current.closeTimer) { clearTimeout(current.closeTimer); current.closeTimer = undefined; }
-  const cached = client.getQueryData<ResourceView>(queryKeys.projectResources(projectId));
+  const cached = client.getQueryData<ResourceView>(source.queryKey ?? queryKeys.projectResources(projectId));
   if (cached && !current.connection!.active && !current.restarting && !current.retryTimer) current.connection!.start(cached.cursor);
   let released = false;
   return () => {

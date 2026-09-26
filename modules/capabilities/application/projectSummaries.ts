@@ -5,6 +5,7 @@ import type { Clock } from '@crewstation/kernel';
 import { notFound, validation } from '@crewstation/kernel';
 import type { ProjectSummarySources } from '../ports/projectSummaries';
 import { readPart, runSummaryReads, SummaryHealthSchema, SummarySlotsSchema, unavailablePart } from './summaryReads';
+import { readDevelopmentSummary } from './developmentSummary';
 
 export function projectSummaryUseCases(sources: ProjectSummarySources, clock: Clock, budgetMs = 2500) {
   const initial = (entry: ProjectPageEntry): ProjectSummaryDetail => {
@@ -16,11 +17,7 @@ export function projectSummaryUseCases(sources: ProjectSummarySources, clock: Cl
     if (item.role === 'tester') return [async () => {
       item.preview = serviceId ? await readPart(TesterPreviewSlotSchema.nullable(), () => sources.preview(actor, serviceId), clock) : unavailablePart(clock, 'not-provided');
     }];
-    const jobs = [async () => { item.development = await readPart(DevelopmentSummarySchema.nullable(), async () => {
-      const env = await sources.session(id); if (!env) return null;
-      if (env.projectId !== id || env.serviceId !== serviceId || env.kind !== 'dev-session') return undefined;
-      return { ...env, taskId: env.id };
-    }, clock); }];
+    const jobs = [async () => { item.development = await readPart(DevelopmentSummarySchema.nullable(), () => readDevelopmentSummary(sources, actor, id, serviceId), clock); }];
     if (!serviceId) { item.slots = item.health = item.releases = item.switches = unavailablePart(clock, 'not-provided'); return jobs; }
     jobs.push(async () => { item.slots = await readPart(SummarySlotsSchema, () => sources.slots(actor, serviceId), clock); });
     jobs.push(async () => { item.health = await readPart(SummaryHealthSchema, () => sources.health(actor, id), clock); });

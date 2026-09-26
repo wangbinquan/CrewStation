@@ -2,6 +2,7 @@ import './domSetup';
 import { afterEach, expect, test } from 'bun:test';
 import { act } from 'react';
 import type { ClusterResource, ResourceRecord } from '@crewstation/contracts';
+import { ProjectIdSchema } from '@crewstation/contracts';
 import { renderApp } from './renderApp';
 import { clusterFixture } from './clusterManagementFixture';
 import { summaryFixture } from './projectSummaryFixture';
@@ -29,6 +30,25 @@ const byText = (selector: string, text: string) => [...document.querySelectorAll
 // 详情栏的操作按钮在事实与表格之前：详情很长时不必滚到底才够得着。
 const precedes = (a: Element | null, b: Element | null) => !!a && !!b && (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
 const clickNode = async (id: string) => { await act(async () => { document.querySelector(`[data-node-id="${id}"]`)!.dispatchEvent(new MouseEvent('click', { bubbles: true })); }); await page!.settle(); };
+
+test('集群项目拓扑使用全平台台账并随推送结束 CLI，不混入其他项目记录', async () => {
+  const f = clusterFixture();
+  const workspace = resourceRecord({ id: subtaskId, projectId: ProjectIdSchema.parse(f.projectId), purpose: 'development-workspace' });
+  const cli = resourceRecord({ id: '01a0bf5d-8f4b-7e1e-8dde-c9c2ae13ef10', projectId: ProjectIdSchema.parse(f.projectId), kind: 'agent-execution', parentId: workspace.id, purpose: 'development-cli' });
+  const foreign = resourceRecord({ id: '01a0bf5d-8f4b-7e1e-8dde-c9c2ae13ef11', projectId: ProjectIdSchema.parse('01a0bf5d-8f4b-7e1e-8dde-c9c2ae13ef12') });
+  f.records.push(workspace, cli, foreign);
+  (globalThis as { EventSource?: unknown }).EventSource = FakeEventSource;
+  page = await renderApp(`/admin/cluster?tab=topology&layer=project&projectId=${f.projectId}&scope=project`);
+  expect(nodes()).toContain(cli.id); expect(nodes()).not.toContain(foreign.id);
+  expect(FakeEventSource.opened.map((source) => source.url)).toEqual(['/v1/admin/resources/stream?cursor=1']);
+  await act(async () => { FakeEventSource.opened[0]!.emit({ type: 'upsert', record: { ...cli, phase: 'stopping', version: 2 }, counts: {}, cursor: 2 }); });
+  await page.settle();
+  expect(document.querySelector(`[data-node-id="${cli.id}"]`)?.getAttribute('aria-label')).toContain('结束中');
+  await act(async () => { FakeEventSource.opened[0]!.emit({ type: 'upsert', record: { ...cli, phase: 'stopped', version: 3 }, counts: {}, cursor: 3 }); });
+  await page.settle();
+  expect(nodes()).not.toContain(cli.id); expect(nodes()).toContain(workspace.id);
+  expect(f.calls.filter((call) => call.path === '/v1/admin/resources')).toHaveLength(1);
+});
 
 function memberFixture(refused = false) {
   const role = 'owner';

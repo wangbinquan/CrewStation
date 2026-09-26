@@ -1,10 +1,11 @@
-import type { TaskKind, Actor, DevelopmentSummary, HealthDto, ProjectId, ProjectPage, ProjectPageEntry, ProjectPageQuery, ReleaseDto, ServiceId, SlotDto, TrafficSwitchDto } from '@crewstation/contracts';
+import type { TaskKind, Actor, DevelopmentSummary, HealthDto, ProjectId, ProjectPage, ProjectPageEntry, ProjectPageQuery, ReleaseDto, ResourceView, ServiceId, SlotDto, TrafficSwitchDto } from '@crewstation/contracts';
 
 /** 只读公开接口，由 platform 装配；不读取其他模块的表，也不请求 Runner。 */
 export interface ProjectSummarySources {
   list(actor: Actor, query: ProjectPageQuery): Promise<ProjectPage>;
   read(actor: Actor, ids: readonly ProjectId[]): Promise<ProjectPageEntry[]>;
   get(actor: Actor, projectId: ProjectId): Promise<ProjectPageEntry>;
+  resources(actor: Actor, projectId: ProjectId): Promise<ResourceView>;
   session(projectId: ProjectId): Promise<(Omit<DevelopmentSummary, 'taskId' | 'createdBy'> & {
     id: string; projectId: ProjectId; serviceId: string; kind: TaskKind; createdBy?: string;
   }) | undefined>;

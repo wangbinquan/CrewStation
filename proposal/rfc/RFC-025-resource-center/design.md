@@ -467,3 +467,11 @@ ResourceActionSchema = z.object({ id: ResourceActionIdSchema, enabled: z.boolean
 - **RFC-010／RFC-015**：集群盘点不再自己采集 Pod、Deployment 等受管对象（改读观测缓存）；节点与用量（RFC-015 的 Prometheus 数据）仍由它自己采集。
 - **task-runtime 缩小**：交出大部分集群适配器后，模块内以 TaskRunner 协议与执行规则为主；缩小后的结构文档条目随实施更新。
 - 本 RFC 不处理：`crewstation-system` 里平台组件的生命周期（安装器负责，M6）。
+
+### 2026-09-27 T13 接续
+
+集群拓扑展开项目时以管理员全平台资源视图和 SSE 提供资源记录，按 projectId 过滤，不再让任务节点退回采集快照的生命周期；系统组件、容器详情与历史容量保留 I29 的快照来源。全平台与项目推送流共享续传机制，缓存与连接作用域隔离。
+
+`capabilities` 开发摘要的领域信息（会话 ID、分支、创建者和活动时间）仍来自 task-runtime；状态只来自该会话对应的 dev-workspace 标准记录。返回标准 phase，并为旧调用方映射 state；RunnerConnected 条件提供连接事实，台账缺失或读取失败时返回未知。服务槽和健康继续读取已有台账实现的公开接口。
+
+I27 已于本日由作者裁定为 (a)：归档保留命名空间、额度与网络策略；管理员删除必须等待工作卷和其他资源全部处理完。

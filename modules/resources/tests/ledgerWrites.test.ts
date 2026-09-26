@@ -233,7 +233,12 @@ describe.skipIf(!available)('受理与额度（设计 §3、D31）', () => {
 
 describe.skipIf(!available)('变更日志、租约、维护（设计 §6.3、§6.4、§8.3）', () => {
   let h: Harness;
-  beforeAll(async () => { h = await createHarness(); });
+  beforeAll(async () => {
+    h = await createHarness();
+    // 巡检和 SQL 夹具按数据库时间，不能沿用 09-23 的固定时钟：三天后「未到期」也会被回收，压缩门槛同样漂移。
+    const [row] = await h.database.db.execute(sql`SELECT now()::text AS at`);
+    h.clock.set(new Date(String(row!.at)));
+  });
   afterAll(async () => { await h.database.drop(); });
 
   test('变更日志的序号按提交顺序：先写后提交的事务拿到更大的序号', async () => {

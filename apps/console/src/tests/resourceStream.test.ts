@@ -67,6 +67,22 @@ describe('一条推送流连接', () => {
 });
 
 describe('项目的推送流登记（引用计数、缓存合并、重读后续传）', () => {
+  test('全平台流与项目流隔离缓存，共用连接，reset 仍从全平台新游标续传', async () => {
+    const client = new QueryClient(), adminKey = queryKeys.adminResources(), projectKey = queryKeys.projectResources(projectId);
+    client.setQueryData(adminKey, resourceView([ws], 10)); client.setQueryData(projectKey, resourceView([cli], 3));
+    const source: ProjectResourceSource = { queryKey: adminKey, view: async () => resourceView([ws, cli], 30), streamUrl: (_id, cursor) => `/admin/stream?cursor=${cursor}`, open: (url) => new FakeEventSource(url), releaseDelayMs: 0, restartDelaysMs: [0] };
+    const releaseA = retainProjectResources(client, 'admin', source), releaseB = retainProjectResources(client, 'admin', source);
+    const releaseProject = retainProjectResources(client, projectId, { ...source, queryKey: projectKey, streamUrl: (_id, cursor) => `/project/stream?cursor=${cursor}` });
+    expect(FakeEventSource.opened.map((s) => s.url)).toEqual(['/admin/stream?cursor=10', '/project/stream?cursor=3']);
+    FakeEventSource.opened[0]!.emit({ type: 'upsert', record: { ...ws, phase: 'stopping', version: 2 }, counts: {}, cursor: 11 });
+    expect(client.getQueryData<ResourceView>(projectKey)).toEqual(resourceView([cli], 3));
+    expect(client.getQueryData<ResourceView>(adminKey)?.items[0]?.phase).toBe('stopping');
+    FakeEventSource.opened[0]!.emit({ type: 'reset', reason: 'overflow' });
+    await wait(() => FakeEventSource.opened.length === 3);
+    expect(FakeEventSource.opened[2]!.url).toBe('/admin/stream?cursor=30');
+    expect(client.getQueryData<ResourceView>(adminKey)).toEqual(resourceView([ws, cli], 30));
+    releaseA(); releaseB(); releaseProject(); await wait(() => FakeEventSource.opened.every((s) => s.readyState === 2)); client.clear();
+  });
   const setup = (views: ResourceView[]) => {
     const client = new QueryClient(), reads: number[] = [];
     client.setQueryData(queryKeys.projectResources(projectId), resourceView([ws, cli], 10));

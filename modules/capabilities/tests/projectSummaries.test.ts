@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import type { Actor, HealthDto, ProjectId, ProjectPageEntry, ReleaseDto, ServiceId, SlotDto, UserId } from '@crewstation/contracts';
+import type { Actor, HealthDto, ProjectId, ProjectPageEntry, ReleaseDto, ResourceRecord, ServiceId, SlotDto, UserId } from '@crewstation/contracts';
 import { IDENTITY_HEADERS, ProjectPageQuerySchema, ProjectSummaryDetailSchema } from '@crewstation/contracts';
 import { createApp } from '@crewstation/http';
 import { fixedClock, notFound } from '@crewstation/kernel';
@@ -20,8 +20,11 @@ const health: HealthDto[] = [{ slot: 'prod', state: 'unknown', readyReplicas: 0,
   { slot: 'preview', state: 'healthy', readyReplicas: 1, replicas: 1, restarts: 0, lastTransitionAt: time }];
 const session = { id: '01a0bf5d-8f4b-7e52-8b45-4a547fd10e4f', projectId: first.project.id, serviceId: first.project.serviceId!, kind: 'dev-session' as const,
   state: 'running' as const, connected: false, branch: 'main', createdBy: actor.userId, createdAt: time, lastActivityAt: time };
+const record: ResourceRecord = { id: session.id, projectId: first.project.id, kind: 'dev-workspace', owner: { module: 'task-runtime', ref: session.id }, phase: 'ready', phaseSince: time,
+  conditions: [], children: [], actions: [], generation: 1, observedGeneration: 1, version: 1, createdAt: time, updatedAt: time };
 function setup(override: Partial<ProjectSummarySources> = {}, budgetMs = 2500) {
   const sources: ProjectSummarySources = { list: async () => ({ items: [first] }), read: async () => [first], get: async () => first,
+    resources: async () => ({ items: [record], counts: {}, cursor: 1 }),
     session: async () => session, slots: async () => slots, preview: async () => slots[1]!, health: async () => health, releases: async () => [], switches: async () => [], ...override };
   return projectSummaryUseCases(sources, clock, budgetMs);
 }
@@ -47,6 +50,22 @@ test('测试者仅聚合待验证槽；内部状态仍受限，读取失败和�
 });
 
 describe('当前页项目摘要聚合', () => {
+  test('开发摘要以台账阶段和连接条件为准，旧环境 running 不能盖掉停止和失败', async () => {
+    for (const [phase, state] of [['pending', 'creating'], ['provisioning', 'creating'], ['starting', 'creating'], ['ready', 'running'], ['degraded', 'running'], ['stopping', 'releasing'], ['stopped', 'released'], ['failed', 'failed']] as const) {
+      const api = setup({ session: async () => ({ ...session, connected: true }), resources: async () => ({ items: [{ ...record, phase, reason: { code: 'test', message: '台账原因' } }], counts: {}, cursor: 1 }) });
+      expect((await api.getProjectSummary(actor, first.project.id)).development).toMatchObject({ status: 'ready', value: { phase, state, connected: false, message: '台账原因' } });
+    }
+    const connected = setup({ resources: async () => ({ items: [{ ...record, conditions: [{ type: 'RunnerConnected', status: 'true', since: time }] }], counts: {}, cursor: 1 }) });
+    expect((await connected.getProjectSummary(actor, first.project.id)).development).toMatchObject({ status: 'ready', value: { connected: true } });
+  });
+  test('台账缺失、错项目或读取失败时摘要未知，不回退旧会话状态', async () => {
+    for (const items of [[], [{ ...record, projectId: entry(2).project.id }], [{ ...record, kind: 'business-workspace' as const }]]) {
+      const result = await setup({ resources: async () => ({ items, counts: {}, cursor: 1 }) }).getProjectSummary(actor, first.project.id);
+      expect(result.development).toMatchObject({ status: 'unknown', reason: 'invalid' }); expect(result.slots.status).toBe('ready');
+    }
+    const failed = await setup({ resources: async () => { throw new Error('ledger unavailable'); } }).getProjectSummary(actor, first.project.id);
+    expect(failed.development).toMatchObject({ status: 'unknown', reason: 'unavailable' });
+  });
   test('会话记录与连接分开、实际两槽与健康分开；列表不读取发布历史', async () => {
     let histories = 0;
     const api = setup({ releases: async () => { histories++; return []; }, switches: async () => { histories++; return []; } });

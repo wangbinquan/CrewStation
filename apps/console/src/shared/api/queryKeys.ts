@@ -54,6 +54,7 @@ export const queryKeys = {
    * 被失效重读的旧快照会盖掉流里更新的记录。
    */
   projectResources: (projectId: string) => ['resources', 'project', projectId] as const,
+  adminResources: () => ['resources', 'admin'] as const,
   /** 项目成员的只读盘点（RFC-019）：挂在项目前缀下，快照 id 不进键，靠轮询换数据。 */
   projectClusterResources: (projectId: string) => ['projects', projectId, 'cluster-resources'] as const,
   config: (projectId: string, env: string) => ['projects', projectId, 'config', env] as const,

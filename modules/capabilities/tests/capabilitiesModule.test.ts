@@ -14,7 +14,7 @@ describe('capabilities module', () => {
       isAdmin: async () => false,
       market: { list: async () => ({ items: [] }), get: async () => { throw new Error('unused'); }, slots: async () => [] },
       projects: { list: async () => ({ items: [] }), read: async () => [], get: async () => { throw new Error('unused'); },
-        session: async () => undefined, slots: async () => [], preview: async () => null, health: async () => [], releases: async () => [], switches: async () => [] },
+        resources: async () => ({ items: [], counts: {}, cursor: 0 }), session: async () => undefined, slots: async () => [], preview: async () => null, health: async () => [], releases: async () => [], switches: async () => [] },
       clock: fixedClock('2026-09-11T00:00:00Z'),
       settings: { userDomain: 'cs.localhost', serviceDomain: 'svc.cs.internal', mcp: [{ name: 'capabilities', url: 'http://mcp-capabilities.svc.cs.internal/mcp' }], defaultServicePlan: '01a0bf5d-8f4b-7000-9e4b-b54e91ee9d10' },
       sources: {
