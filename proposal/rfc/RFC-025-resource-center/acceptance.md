@@ -358,3 +358,31 @@ I29 裁定（三个 (a)）之后：
 - I27 作者选择 (a)：归档后保留命名空间、额度与网络策略，工作卷与其他资源清完后由管理员删除。裁定已记录；管理员删除命名空间入口尚未实现。
 
 边界：此批不代表 T13 或 RFC 全部完成。集群项目层的容量统计仍按采集快照；开发预览路由统一、失败会话重建移交、轮换、归档清理入口、限流校准和最终 RC 清单仍需后续实现或验收。
+
+
+### 12.1 已发布与本机验收
+
+- 提交 `ee032c95755294e0ebd654393f739d1f291a91c4` 已推 main，本地和 origin/main 完全一致；[精确 SHA CI](https://github.com/wangbinquan/CrewStation/actions/runs/36258625492) 六项均成功（含 gate 与 e2e，09-26 17:27Z 终态）。
+- 从 `git archive ee032c95` 构建，09-26 17:20Z 左右只更新 cs-api 与 console，均为 `rc025-t13b-ee032c95`、1/1；cs-api 启动日志无错误。其余控制面保持 `rc025-t14c-20260924`。
+- 09-26 17:21:50Z 正常开发角色登录取得管理员身份，经 `/v1/admin/resources` 读到 160 条记录、游标 602638。3 个开发工作区（demo、rfc003-ux、rfc003-verify-workbench）与 `/v1/workbench/project-summaries/:projectId` 逐项核对，均 `phase=ready`、`RunnerConnected=true`，摘要 `phase=ready`、`connected=true`；身份、分支与创建时间保留。
+- 重新加载已部署 Console，管理员集群拓扑展开 demo：工作区节点「运行中」，待验证入口为「已结束 · 已由成员手动下线」，与台账一致；项目开发列表的三条活跃会话均「会话运行中／已连接」，过期会话对应项目为「尚无开发会话」。此次只读验收未创建或结束真实 CLI，阶段切换与流 reset 由新增回归锁住，不将静态页面冒充 RC-02 双窗口结束验收。
+
+### 12.2 接手时补核 T14 遗留对象
+
+基线 `1fbbde8d` 已实现 Secret 孤儿回收，但旧计划未回填。本机现运行 `rc025-t14c-20260924`，09-27 只读核对（只读 Secret 元数据，不读内容）：全集群已没有 `git-cred-*` 或 `git-checkout-*`；任务 Runner Secret 仅剩 3 个，分别属于 demo、rfc003-ux、rfc003-verify-workbench 的当前工作区。不能从当前缺席反推每个历史 Secret 的准确删除时间。
+
+`cs-rfc006-verify` 的旧失败 Pod 与开发预览 Service／IngressRoute 已消失；旧工作卷 `task-01a0bc96ee15-work` 留在，资源记录为 stopped／retention-expired。`cs-rfc022-verify` 的两只旧卷也保留 Bound，记录均为 stopped／retention-expired。全平台 21 条工作卷记录中，5 条为失败到期后保留，3 条为 orphaned；8 个待回收现场均未执行删除。其余为当前在用或已释放且无子对象的记录。
+
+## 13. 2026-09-27 T15：三类流量的本机突发校准
+
+保持现有策略 revision=0，没有修改默认值或项目覆盖。按正常开发角色登录获取管理员会话（不输出 Cookie），平台和用户域经本机真实 Traefik；服务域从 cs-api Pod 经 Traefik 发出，Host 为 `demo.svc.cs.internal`。只用读取接口与演示服务健康接口，未修改业务数据。时间为 09-26 17:23Z（本地 09-27）。
+
+| 流量 | 突发结果 | 耗时／P95 | 等 3 秒后的恢复 |
+|---|---|---|---|
+| 平台 `/v1/me`，80 个并发请求 | 38×200；39×429 带 `Retry-After: 1`；3×429 不带此头（并发上限） | 101 ms／97 ms | 10/10 为 200 |
+| 用户域 `demo.cs.localhost/healthz`，100 个并发请求 | 60×200；40×429，均 `Retry-After: 1` | 145 ms／143 ms | 20/20 为 200 |
+| 服务域 `demo.svc.cs.internal/healthz`，130 个并发请求 | 105×200；25×429，均 `Retry-After: 1` | 125 ms／95 ms | 60/60 为 200 |
+
+服务域在请求窗口内有令牌补回，105 个成功不等于 burst 被改为 105。测试前打开一条管理员资源 SSE；整个突发与恢复期间连接保持 HTTP 200、未结束，收到 2 块数据（含后续心跳），约 180 KB；说明资源 SSE 没被平台 API 的同时处理上限占用或切断。尚未把 WebSocket 并发保持、匿名 IP、多个用户／来源叠加到项目／目标合计上限当作已实测。
+
+结论：现值的三种单身份突发限制、429 头与恢复均有本机证据；本轮结果不是吞吐容量上限或生产流量容量证明。按提案 Q4／T15，已把现值报作者最终确认；未登录 `/auth` 按 IP 的默认值另询问，裁定前不改变登录入口行为。Q4 未裁定前 T15 不标完成。

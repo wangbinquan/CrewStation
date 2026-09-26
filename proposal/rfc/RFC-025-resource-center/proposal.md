@@ -127,7 +127,7 @@
 
 | 种类 | 所属模块写期望 | 子对象 | 备注 |
 |---|---|---|---|
-| 命名空间 `namespace` | provisioning | Namespace、ResourceQuota | 项目归档才删；调和器补回被改动的额度 |
+| 命名空间 `namespace` | provisioning | Namespace、ResourceQuota | 归档保留，工作卷与其他资源处理完后由管理员删除（I27，2026-09-27）；调和器补回被改动的额度 |
 | 网络策略 `network-policy-set` | provisioning | 四条 NetworkPolicy（D54、D60） | 被删或被改时调和器补回 |
 | 开发会话工作区 `dev-workspace` | dev-session | Pod、Runner Secret、预览 Service、工作卷（`volume`）、开发预览路由（`route`） | 一项目至多一个非终态；失败保留 72 小时 |
 | Agent 执行 `agent-execution` | dev-session、business-task | Pod、Secret | 用途：CLI、headless Agent、业务子任务；上级是工作区或业务任务 |
@@ -157,7 +157,7 @@ Pod 身份索引与放行表仍是网关的领域数据；身份索引改为读�
 | 台账里有、集群里没有的子对象 | 资源进入「降级」或「失败」（按种类的规则），原因写明「子对象不在」 |
 | 命名空间、网络策略、额度被改动或删除 | 调和器按期望补回 |
 
-不自动删除的：命名空间（只随项目归档）、PVC（只经管理员确认）、`crewstation-system` 里的平台组件（不在本 RFC 范围）。
+不自动删除的：命名空间（归档后保留，待其他资源处理完由管理员删除，I27）、PVC（只经管理员确认）、`crewstation-system` 里的平台组件（不在本 RFC 范围）。
 
 ## 8. 流量：路由的生命周期与网关限流
 
