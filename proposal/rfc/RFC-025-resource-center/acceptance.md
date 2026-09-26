@@ -395,4 +395,18 @@ I29 裁定（三个 (a)）之后：
 - **路由仲裁**：Host 转小写并去末尾根域点，路径大小写与尾斜杠原样保留；按上级 ready、starting、其他排序，同级按 ID 升序。路由调和使用全局租约，在 API Server 确认败选入口消失后才应用胜者；被压下的记录留 `Superseded`。定向模块用例确认不同 `/api/one` 与 `/api/two` 共存，同键候补停用，胜出项释放后候补恢复。候选查询先在数据库按入口筛选，到达 2000 条上限时拒绝不完整仲裁。
 - **匿名桶**：安装清单与台账渲染同为 20/s、突发 40，登录链先清身份头再限流。JWKS 单独路由、健康检查不加入此桶。使用直接连接地址；`ipStrategy.depth=0` 不读取任意客户端 X-Forwarded-For（[Traefik 官方说明](https://doc.traefik.io/traefik/v3.5/reference/routing-configuration/http/middlewares/ratelimit/)）。解析、渲染和路由链定向回归通过。
 
-本地门禁：arch、lint、后端与 console typecheck 通过；unit 719/0、module 1385/7 skip/0 fail、console 904/0；新增可执行行覆盖 220/222（99.1%）。首轮门禁暴露两处测试等待问题并已修正：项目声明现串行，提交序号用例改为跨项目；Agent 名册用例改为等目标页签出现后断言，不依赖初始三轮渲染。仅重跑失败层，已通过层未重复执行。精确 SHA CI 与本机部署证据在本批发布后追加。本节不代表 RFC 整体完成；T6 失败重建、开发预览 route 拆分、I27 管理员命名空间清理与最终 RC/T17 仍在后续范围。
+本地门禁：arch、lint、后端与 console typecheck 通过；unit 719/0、module 1385/7 skip/0 fail、console 904/0；新增可执行行覆盖 220/222（99.1%）。首轮门禁暴露两处测试等待问题并已修正：项目声明现串行，提交序号用例改为跨项目；Agent 名册用例改为等目标页签出现后断言，不依赖初始三轮渲染。仅重跑失败层，已通过层未重复执行。精确 SHA CI 与本机部署证据见下。本节不代表 RFC 整体完成；T6 失败重建、开发预览 route 拆分、I27 管理员命名空间清理与最终 RC/T17 仍在后续范围。
+
+
+### 14.1 发布与本机复核
+
+- 提交 `9b7e340948b6b5e59190687259a02e9f3a9222b6` 已推 main；[精确 SHA CI 36279513879](https://github.com/wangbinquan/CrewStation/actions/runs/36279513879) 六项全部成功（含 gate 与 e2e，2026-09-26 23:35:22Z 结束）。提交后 fetch 核对 main 与 origin/main 一致，既有 `tests/e2e/referenceResources.test.ts` 未纳入提交。
+- 镜像从该 SHA 的 `git archive` 构建。控制面镜像 `cs-control-plane:rc025-decisions-9b7e3409`（镜像 ID `sha256:6b2839e3c48dead0b223dddf50d917a91d6e38355732bdef8e5cbddcf976484d`），console 镜像 `cs-console:rc025-decisions-9b7e3409`（`sha256:4cf1c7f4289bfe265c87a57118bbbf1464863731fd3f8b6167f7ceb7d0c77777`）。cs-api、cs-controller、cs-session 与 console 均滚动完成、1/1 就绪；cs-auth 保持原镜像。
+- 迁移 Job `rfc025-decisions-migrate-9b7e3409` 于 23:29:13Z 应用且仅应用 `data_control/0002_credential_rotation.sql`，没有初始化新的数据库角色。网关只更新匿名 IP 中间件、console-auth 与独立 console-jwks 三项。
+- 23:31:17Z 从同一客户端并发发出 80 个 `/auth/status` 请求，每个附不同的伪造 X-Forwarded-For：40×200、40×429，所有 429 均有 `Retry-After: 1`，81 ms 完成。随后同样并发读取 JWKS，80/80 为 200（30 ms）；等 3 秒后 `/auth/status` 10/10 为 200（47 ms）。证明本机直接连接地址桶有效、伪造转发头未绕过、JWKS 不占此桶且恢复正常；不据此声称多副本网关共享 IP 桶。
+- 23:31:33Z 管理员 API 快照：160 条资源；demo、rfc003-ux、rfc003-verify-workbench 三个开发工作区均 `ready`／`RunnerConnected=true`，摘要同为 ready／connected。平台限流 revision 仍为 0，三类现值逐字段与裁定相同。集群 72 个 IngressRoute 的原始 match 唯一性复核仅发现系统 registry 的 HTTP/TLS 两条同 match；项目路由没有重复。此为当前现场快照，碰撞切换与候补接替由模块用例验证。
+- 已部署控制台的管理员在 demo → 数据访问看到生产／开发库的「轮换口令」入口。生产库弹窗显示空闲约束、不自动重启、失败重试说明；确认词为空时提交禁用，取消后返回表格。未提交真实数据库轮换、未更改现有项目凭据；数据库连接与重试行为的正向证据来自本节真实 PostgreSQL 隔离用例。
+
+### 14.2 后续实现边界复核
+
+开发预览仍由工作区记录认领 Service／IngressRoute；`task-runtime/domain/ledgerProjection.ts` 与 `cluster-control/application/workloadApply.ts` 仍使用这一形状。台账会保留已经从期望移除但物理上尚在的子对象（`resources/application/commit.ts`、`resources/domain/record.ts`），因此不能仅从工作区 spec 删除 IngressRoute 再声明 route：旧记录仍持有唯一认领，且释放时仍会删除它。失败重建还会沿用原预览对象名并由 task-runtime 写入（`task-runtime/adapters/k8s/rebuildProvisioner.ts`）。下一批必须同时覆盖明确的子对象移交、旧调和快照的删除防护、重建写入者与保留期释放；本批未将 T6、T9 或整个 RFC 标为完成。
