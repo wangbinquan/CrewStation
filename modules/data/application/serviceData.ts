@@ -52,7 +52,7 @@ export function serviceDataUseCases(deps: DataUseCaseDeps) {
       for (const resource of await resources.listByService(serviceId)) {
         if (resource.env !== env || resource.state !== 'ready') continue;
         // 旧库的连接串 data 自己存着；data-control 建的（I28）经端口要口令，这里拼成连接串，不落库。
-        const dsn = resource.secretBox ? await cipher.decrypt(resource.secretBox) : await dataControlDsn(deps, resource.id, resource.objectName);
+        const dsn = await dataControlDsn(deps, resource.id, resource.objectName) ?? (resource.secretBox ? await cipher.decrypt(resource.secretBox) : undefined);
         if (dsn) values[resource.envVar] = dsn;
       }
       return values;

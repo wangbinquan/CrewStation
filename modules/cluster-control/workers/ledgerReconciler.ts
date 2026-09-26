@@ -32,12 +32,19 @@ const LEASE_RETRY_MS = 5_000;
  * 多副本时每条记录在租约下处理（设计 §6.3）：抢不到说明另一副本正在处理它——那一轮读到的可能是这次变化之前的版本，
  * 所以过几秒再排一次，而不是丢掉。持有者崩溃，租约 30 秒后过期，下一次核对由别的副本接手。
  */
-export function ledgerReconciler(ledger: LedgerObservations, feed: ManagedObjectFeed, reconcile: (id: string, enqueue: (id: string, afterMs?: number) => void) => Promise<void>, logger: Logger, options: LedgerReconcilerOptions = {}) {
+export function ledgerReconciler(ledger: LedgerObservations, feed: ManagedObjectFeed, reconcile: (id: string, enqueue: (id: string, afterMs?: number) => void, signal?: AbortSignal) => Promise<void>, logger: Logger, options: LedgerReconcilerOptions = {}) {
   const leases = options.leases;
+  let routeBusy = false;
   const process = async (id: string, enqueue: (id: string, afterMs?: number) => void): Promise<void> => {
-    if (!leases) return reconcile(id, enqueue);
-    const outcome = await withLease(leases.port, id, leases.holder, leases.ttlMs ?? LEASE_TTL_MS, () => reconcile(id, enqueue));
-    if (!outcome.acquired) enqueue(id, leases.retryMs ?? LEASE_RETRY_MS);
+    const route = (await ledger.get(id))?.kind === 'route';
+    // 路由仲裁会修改同入口的多条记录；统一租约同时防止跨入口改名与多副本并发。
+    if (route && routeBusy) { enqueue(id, options.retryMs ?? 2000); return; }
+    if (route) routeBusy = true;
+    try {
+      if (!leases) return await reconcile(id, enqueue);
+      const outcome = await withLease(leases.port, route ? 'route-arbitration' : id, route ? `${leases.holder}/${id}` : leases.holder, leases.ttlMs ?? LEASE_TTL_MS, (signal) => reconcile(id, enqueue, signal));
+      if (!outcome.acquired) enqueue(id, leases.retryMs ?? LEASE_RETRY_MS);
+    } finally { if (route) routeBusy = false; }
   };
   // 处理一条记录时可以把相关记录（例如上级结束后的工作卷）再排进同一个去重队列，或约一个到期复核（例如崩溃重启的窗口过去之后）。
   const queue: ReturnType<typeof createWorkQueue> = createWorkQueue((id) => process(id, (next, afterMs) => (afterMs ? queue.addAfter(next, afterMs) : queue.add(next))), { logger, concurrency: options.concurrency ?? 4 });

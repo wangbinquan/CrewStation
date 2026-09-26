@@ -1,4 +1,5 @@
 import postgres from 'postgres';
+import { conflict } from '@crewstation/kernel';
 import type { DataPlaneObject } from '../../domain/dataPlane';
 import type { DataPlaneReader, DataPlaneWriter } from '../../ports/dataPlane';
 
@@ -22,6 +23,11 @@ const ident = (name: string): string => {
 export function postgresDataPlane(adminUrl: string, clock: { now(): Date } = { now: () => new Date() }): DataPlaneReader & DataPlaneWriter {
   const admin = postgres(adminUrl, { max: 1, onnotice: () => undefined });
   return {
+    rotatePassword: async ({ role, password }) => {
+      checkPassword(password);
+      if ((await admin`SELECT 1 FROM pg_stat_activity WHERE usename = ${role} LIMIT 1`).length) throw conflict('数据库角色仍有连接，请结束使用者后重试轮换');
+      await admin.unsafe(`ALTER ROLE ${ident(role)} WITH PASSWORD '${password}'`);
+    },
     snapshot: async () => {
       const databases = await admin<{ oid: string; name: string }[]>`SELECT oid::text AS oid, datname AS name FROM pg_database WHERE datname LIKE ${PREFIX}`;
       const roles = await admin<{ oid: string; name: string; valid_until: Date | null }[]>`SELECT oid::text AS oid, rolname AS name, rolvaliduntil AS valid_until FROM pg_roles WHERE rolname LIKE ${PREFIX}`;

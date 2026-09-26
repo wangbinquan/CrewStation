@@ -44,6 +44,7 @@ export interface TasksResource {
   listBusinessSubtasks(projectId: string, taskId: string): Promise<ItemsPage<SubtaskDto>>;
   /** GET /v1/projects/:projectId/data/resources */
   listDataResources(projectId: string): Promise<ItemsPage<DataResourceDto>>;
+  rotateDataCredential(resourceId: string): Promise<DataResourceDto>;
   /** POST /v1/services/:serviceId/tasks/:taskId/data-bindings（201）：申请数据访问模式；后两种需负责人批准。 */
   requestDataBinding(serviceId: string, taskId: string, input: RequestTaskDataBindingInput): Promise<TaskDataBindingDto>;
   /** GET /v1/tasks/:taskId/data-bindings */
@@ -66,6 +67,7 @@ export function tasksResource(transport: Transport): TasksResource {
     listBusinessSubtasks: (projectId, taskId) =>
       transport.request<ItemsPage<SubtaskDto>>('GET', `${project(projectId)}/business-tasks/${segment(taskId)}/subtasks`),
     listDataResources: (projectId) => transport.request<ItemsPage<DataResourceDto>>('GET', `${project(projectId)}/data/resources`),
+    rotateDataCredential: (resourceId) => transport.request<DataResourceDto>('POST', `/v1/data/resources/${segment(resourceId)}/rotate-credential`, { body: { confirmation: 'rotate' } }),
     requestDataBinding: (serviceId, taskId, input) =>
       transport.request<TaskDataBindingDto>('POST', `/v1/services/${segment(serviceId)}/tasks/${segment(taskId)}/data-bindings`, { body: input }),
     listTaskDataBindings: (taskId) => transport.request<ItemsPage<TaskDataBindingDto>>('GET', `${task(taskId)}/data-bindings`),

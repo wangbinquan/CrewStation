@@ -1,3 +1,4 @@
+import { rotateDataCredential } from './application/credentialRotation';
 import { BUILTIN_RESOURCES } from '@crewstation/contracts';
 import { resourceIdentityDirectory, type Database, type MigrationSet, type ResourceIdentityDirectory } from '@crewstation/persistence';
 import { createClusterManagementModule } from '@crewstation/module-cluster-management';
@@ -92,7 +93,13 @@ function dataPorts(settings: PlatformSettings, late: Late): Pick<Parameters<type
       declare: (input) => ledger().owner('data').declare(input), get: (id) => ledger().get(id), requestRelease: (id, reason) => ledger().owner('data').requestRelease(id, reason),
       presentBindings: async () => (await ledger().list({ kind: 'data-binding' })).filter((record) => record.owner.module === 'data' && record.desired === 'present'),
     },
-    ...(settings.dataProvisioning === 'data-control' ? { credentials: { credentialOf: (id: string) => dataControl().credentialOf(id) } } : {}),
+    ...(settings.dataProvisioning === 'data-control' ? { credentials: {
+      credentialOf: (id: string) => dataControl().credentialOf(id),
+      rotateCredential: async (id: string, projectId: ProjectId) => {
+        if (settings.workloadCreation !== 'ledger' || settings.releaseCreation !== 'ledger') throw new Error('口令轮换需要工作负载与发布均由资源中心创建');
+        await rotateDataCredential(ledger(), dataControl(), id, projectId);
+      },
+    } } : {}),
   };
 }
 
@@ -459,6 +466,7 @@ function composeControl(deps: CompositionDeps, core: ReturnType<typeof composeCo
     slots: { slotEnvValues: (ref) => release.api.slotEnvValues(ref), slotFailed: (ref, message) => release.api.slotFailed(ref, message) }, jobs: { jobEnvValues: (ref) => release.api.jobEnvValues(ref) },
     ledger: {
       observe: (input) => ledger.api.observe(input), claimOf: (child) => ledger.api.claimOf(child), get: (id) => ledger.api.get(id),
+      routeCandidates: (host, pathPrefix) => ledger.api.list({ kind: 'route', includeStopped: true, routeMatch: { host, ...(pathPrefix ? { pathPrefix } : {}) } }),
       listLive: () => ledger.api.list({}), changesSince: ledger.api.changesSince, latestChange: ledger.api.latestChange,
       observeConditions: (id, conditions) => ledger.api.observeConditions(id, conditions), children: (parentId) => ledger.api.list({ parentId, includeStopped: true }),
       // 孤儿 PVC 由资源中心自己认领：工作卷记录归 cluster-control，写「待回收」等管理员确认（设计 §6.4）。

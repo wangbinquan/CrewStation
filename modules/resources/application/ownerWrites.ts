@@ -9,6 +9,7 @@ import { QUOTA_PHASES } from '../domain/quota';
 import type { QuotaLimits } from '../ports/platform';
 import type { LedgerScope } from '../ports/repositories';
 import { commitRecord } from './commit';
+import { guardCredentialRotation } from './projectQuiescence';
 
 const MAX_CHILDREN = 32;
 
@@ -28,6 +29,7 @@ async function loadOwned(scope: LedgerScope, module: string, id: string): Promis
 
 async function declareIn(scope: LedgerScope, module: string, input: ResourceDeclaration, now: Date): Promise<LedgerRecord> {
   checkDeclaration(input);
+  await guardCredentialRotation(scope, input.projectId, input.kind);
   const owner = { module, ref: input.ref };
   const existing = input.id ? await scope.records.get(input.id, { forUpdate: true }) : await scope.records.getByOwner(owner, input.kind, { forUpdate: true });
   if (existing) {

@@ -6,6 +6,7 @@ export interface DataModuleApi {
   ensureServiceData(serviceId: ServiceId): Promise<DataResourceDto[]>;
   envFor(serviceId: ServiceId, env: DataEnv): Promise<Record<string, string>>;
   listResources(actor: Actor, projectId: ProjectId): Promise<DataResourceDto[]>;
+  rotateCredential(actor: Actor, resourceId: string): Promise<DataResourceDto>;
   requestTaskBinding(actor: Actor, ids: { taskId: TaskId; serviceId: ServiceId }, input: RequestTaskDataBinding): Promise<TaskDataBindingDto>;
   decideTaskBinding(actor: Actor, bindingId: string, input: DecideTaskDataBinding): Promise<TaskDataBindingDto>;
   revokeTaskBinding(actor: Actor, bindingId: string): Promise<TaskDataBindingDto>;

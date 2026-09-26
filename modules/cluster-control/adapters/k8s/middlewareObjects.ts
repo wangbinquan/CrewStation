@@ -3,7 +3,7 @@ import { LABELS, platformLabels } from '@crewstation/k8s';
 import type { MiddlewareKey, MiddlewareRender } from '../../domain/middlewareRender';
 import { RESOURCE_ID_LABEL } from '../../domain/observation';
 
-const criterion = (key: MiddlewareKey) => ('header' in key ? { requestHeaderName: key.header } : { requestHost: true });
+const criterion = (key: MiddlewareKey) => ('header' in key ? { requestHeaderName: key.header } : 'host' in key ? { requestHost: true } : { ipStrategy: { depth: 0 } });
 
 function specOf(middleware: MiddlewareRender): Record<string, unknown> {
   if (middleware.replacePath) return { replacePath: { path: middleware.replacePath.path } };

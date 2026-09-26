@@ -58,3 +58,6 @@ export type RequestTaskDataBinding = z.infer<typeof RequestTaskDataBindingSchema
 export type DecideTaskDataBinding = z.infer<typeof DecideTaskDataBindingSchema>;
 export type TaskDataMode = z.infer<typeof TaskDataModeSchema>;
 export type TaskDataBindingDto = z.infer<typeof TaskDataBindingDtoSchema>;
+
+/** 管理员确认轮换；口令值不经过 HTTP。 */
+export const RotateDataCredentialSchema = z.object({ confirmation: z.literal('rotate') });

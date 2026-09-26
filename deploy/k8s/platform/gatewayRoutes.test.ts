@@ -15,7 +15,7 @@ describe('平台自身路由的限流（RFC-025 T10，设计 §7.3）', () => {
     expect(middleware('in-flight-platform-api').inFlightReq).toEqual({ amount: 16, sourceCriterion: { requestHeaderName: 'x-cs-user-id' } });
   });
 
-  test('长连接不挂并发上限：资源推送流单独一条、优先于平台接口；任务流照旧；登录不经限流', () => {
+  test('长连接不挂并发上限：资源推送流单独一条、优先于平台接口；任务流照旧；登录单独按 IP 限流', () => {
     const streams = route('console-resource-streams');
     expect(streams.priority).toBeGreaterThan(route('console-api').priority!);
     expect(chain('console-resource-streams')).toEqual(['drop-identity-headers', 'forward-auth-user', 'rate-limit-platform-api']);
@@ -23,6 +23,10 @@ describe('平台自身路由的限流（RFC-025 T10，设计 §7.3）', () => {
     for (const path of ['/v1/projects/01a0bf5d-8f4b-7b10-9a12-5e7d8c4b3a66/resources/stream', '/v1/admin/resources/stream']) expect(pattern.test(path)).toBe(true);
     for (const path of ['/v1/projects/p/resources', '/v1/projects/p/resources/stream/x', '/v1/tasks/t/stream']) expect(pattern.test(path)).toBe(false);
     expect(chain('console-stream')).not.toContain('in-flight-platform-api');
-    expect(chain('console-auth')).toEqual(['drop-identity-headers']);
+    expect(chain('console-auth')).toEqual(['drop-identity-headers', 'rate-limit-auth-ip']);
+    expect(route('console-auth').match).toBe('Host(`console.cs.localhost`) && (Path(`/auth`) || PathPrefix(`/auth/`))');
+    expect(chain('console-jwks')).toEqual(['drop-identity-headers']);
+    expect(route('console-jwks').match).toBe('Host(`console.cs.localhost`) && PathPrefix(`/.well-known`)');
+    expect(docs.find((doc) => doc.metadata.name === 'rate-limit-auth-ip')?.spec.rateLimit).toEqual({ average: 20, burst: 40, period: '1s', sourceCriterion: { ipStrategy: { depth: 0 } } });
   });
 });

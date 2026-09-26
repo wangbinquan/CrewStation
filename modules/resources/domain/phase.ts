@@ -35,6 +35,8 @@ export function computePhase(record: PhaseInput): PhaseResult {
   // 待回收（D8）：工作卷的上级已结束，卷留着等管理员确认删除——它已不在用，按已结束算，不占什么也不算失败。
   const reclaim = condition(record, 'PendingReclaim');
   if (reclaim?.status === 'true') return { phase: 'stopped', reason: reasonOf(reclaim.reason ?? 'pending-reclaim', reclaim.message ?? PENDING_RECLAIM) };
+  const superseded = condition(record, 'Superseded');
+  if (record.kind === 'route' && superseded?.status === 'true') return { phase: present.some((child) => child.kind === 'IngressRoute') ? 'stopping' : 'stopped', reason: reasonOf('route-superseded', superseded.message ?? '相同入口已有优先路由，当前路由已停用') };
   const failed = condition(record, 'Failed');
   if (failed?.status === 'true') return { phase: 'failed', reason: reasonOf(failed.reason ?? 'failed', failed.message ?? '平台判定失败') };
   if (condition(record, 'Paused')?.status === 'true') return present.length ? { phase: 'stopping', reason: PAUSING } : { phase: 'stopped', reason: PAUSED };

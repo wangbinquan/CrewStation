@@ -133,6 +133,7 @@ export type ObservationOutcome =
   | { readonly status: 'unowned' };
 
 export interface RecordFilter {
+  readonly routeMatch?: { readonly host: string; readonly pathPrefix?: string };
   readonly projectId?: ProjectId;
   readonly kind?: ResourceKind;
   readonly parentId?: string;

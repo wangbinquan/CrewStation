@@ -248,7 +248,7 @@ ResourceActionSchema = z.object({ id: ResourceActionIdSchema, enabled: z.boolean
 
 - `route` 的期望：Host、路径前缀、目标（服务槽、开发会话工作区、说明页）、中间件链（ForwardAuth、限流、去身份头、stripPrefix）。`gateway` 按服务写槽路由、服务域路由与 `/api/<proxy>` 路由；`dev-session` 写开发预览路由（今天由 `task-runtime` 自建、网关不知道，audit §1.8）。
 - 目标是服务槽时，调和器在槽「运行中」时指向槽的 Service；槽「已结束」时指向说明页（D13）。Traefik 的 `allowEmptyServices` 不再需要（RFC-021 80c4e1b 的权宜）。
-- **一个 Host 一条生效路由**：调和器按 Host 聚合，多于一条时按上级阶段的优先级（`ready` ＞ `starting` ＞ 其余）取一条，其余摘除并写条件 `Superseded`（原因写明被谁压下）。
+- **同一 Host＋路径前缀一条生效路由**（I32，2026-09-27 作者批准）：Host 大小写与末尾点归一，路径前缀按原始匹配语义；不同前缀保留，无前缀的开发预览仍按 Host 唯一。调和器按该匹配键聚合，多于一条时按上级阶段的优先级（`ready` ＞ `starting` ＞ 其余）取一条，其余摘除并写条件 `Superseded`（原因写明被谁压下）。
 - 切流：release 改槽的期望（哪个物理槽是正式）并发 `trafficSwitched`；网关改写两个 Host 的路由期望；调和器应用。
 
 > **实施补记（2026-09-24，第三期后半第一步）**：路由先投影、后移交。gateway 每次按服务重算路由（建项目、切流、发布登记、归档）之后，把每条路由写成一条 `route` 记录（`ref` 为 `<服务 ID>/<种类>`，种类是正式、待验证、服务域与内部 API 前缀），子对象是它的 IngressRoute，期望里带 Host、路径前缀、目标 Service 与中间件链，展示字段是种类、Host、前缀与目标；不在新计划里的几种（例如不再暴露内部 API、服务归档）标「不要了」；台账不重新声明已释放的记录，同一种路由摘掉之后再出现是一条新记录，`ref` 顺延为 `~2`、`~3`……路由是稳定记录（每个服务几条，视图缺省也列出）。阶段按 IngressRoute 的观测：在即运行中，删除中按启动中算。gateway 每 5 分钟按自己存的路由表补投影一次（不重新 apply）；台账写失败只告警。IngressRoute 的建删、说明页、同 Host 唯一与开发预览路由（今天挂在开发工作区记录下，由 task-runtime 建）在后面几步。
@@ -475,3 +475,12 @@ ResourceActionSchema = z.object({ id: ResourceActionIdSchema, enabled: z.boolean
 `capabilities` 开发摘要的领域信息（会话 ID、分支、创建者和活动时间）仍来自 task-runtime；状态只来自该会话对应的 dev-workspace 标准记录。返回标准 phase，并为旧调用方映射 state；RunnerConnected 条件提供连接事实，台账缺失或读取失败时返回未知。服务槽和健康继续读取已有台账实现的公开接口。
 
 I27 已于本日由作者裁定为 (a)：归档保留命名空间、额度与网络策略；管理员删除必须等待工作卷和其他资源全部处理完。
+
+
+### 2026-09-27 四项裁定后的实施
+
+作者批准 I31／I32／I33 与 Q4 的推荐项。既有三类认证限流保留现值（用户域合计按主机计）；登录入口 `/auth` 新增固定 20/s、突发 40 的 IP 桶，JWKS 和健康检查不挂此桶。平台限流记录增加 IP 中间件期望，`cluster-control` 渲染，安装清单提供同值初始对象；直接取 Traefik 的 RemoteAddr，不信任客户端自报 IP。实现落在 gateway/domain、cluster-control/domain 与 adapters、deploy/k8s；补解析、渲染及路由链回归。
+
+路由仲裁落在 cluster-control/domain 与 application，使用台账已声明的 route，不按物理对象猜归属；同键候选按上级 ready > starting > 其余择优，再以稳定 ID 打破平局。先摘除被压下的 IngressRoute，再激活胜者，记录 Superseded 条件；父记录变化、胜者释放与重新出现均重新调和。不同路径前缀不相互淘汰。
+
+口令轮换由 data 校验管理员和无运行中使用者，data-control 负责生成、加密持久化及数据面改口令；台账与 HTTP 返回均不得包含凭据。失败保留可重试意图，下次启动前必须完成轮换；启动与轮换共用受理互斥边界，不能用一次无锁快照作为无人使用的保证。管理员在开发页「数据资源」中输入 rotate 确认；HTTP 为 `POST /v1/data/resources/:id/rotate-credential`。项目级启动锁覆盖空闲检查和新工作负载声明；`data_control.credentials.pending_box` 与台账 CredentialRotating 条件先在同事务提交，再在第二段事务 ALTER ROLE 并推广密文、清除条件。失败后管理员重试沿用 pending_box；不自动重启、不踢数据库连接。旧数据库轮换后优先取 data-control 新口令，开发模式旧绑定也在下次启动现取，避免继续注入缓存的旧连接串。此入口只在工作负载和发布均由台账创建时启用。

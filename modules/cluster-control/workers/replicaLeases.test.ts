@@ -20,6 +20,7 @@ function fakeLeases(held: Set<string>) {
 
 const feed = { synced: async () => undefined } as unknown as ManagedObjectFeed;
 const ledger = (ids: readonly string[]): LedgerObservations => ({
+  get: async (id: string) => ({ id, kind: 'volume' }),
   listLive: async () => ids.map((id) => ({ id })), latestChange: async () => 0, changesSince: async () => [],
 } as unknown as LedgerObservations);
 

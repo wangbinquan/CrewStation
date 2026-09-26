@@ -1,5 +1,5 @@
 import type { ProjectId, ServiceId, TaskId, UserId } from '@crewstation/contracts';
-import { DecideTaskDataBindingSchema, ProjectIdSchema, RequestTaskDataBindingSchema, ServiceIdSchema, TaskDataBindingStateSchema, TaskIdSchema } from '@crewstation/contracts';
+import { DecideTaskDataBindingSchema, RotateDataCredentialSchema, ProjectIdSchema, RequestTaskDataBindingSchema, ServiceIdSchema, TaskDataBindingStateSchema, TaskIdSchema } from '@crewstation/contracts';
 import type { AppEnv } from '@crewstation/http';
 import { parseBody, parseParams, parseQuery, requireUser } from '@crewstation/http';
 import type { Context } from 'hono';
@@ -13,6 +13,10 @@ export function dataRoutes(api: DataModuleApi, isAdmin: (userId: UserId) => Prom
     const user = requireUser(c);
     return { userId: user.userId as UserId, isAdmin: await isAdmin(user.userId as UserId) };
   };
+  r.post('/v1/data/resources/:id/rotate-credential', async (c) => {
+    await parseBody(c, RotateDataCredentialSchema);
+    return c.json(await api.rotateCredential(await actor(c), c.req.param('id')));
+  });
   r.get('/v1/projects/:projectId/data/resources', async (c) => c.json({ items: await api.listResources(await actor(c), parseParams(c, z.object({ projectId: ProjectIdSchema })).projectId as ProjectId) }));
   r.get('/v1/projects/:projectId/data-bindings', async (c) => {
     const { projectId } = parseParams(c, z.object({ projectId: ProjectIdSchema }));

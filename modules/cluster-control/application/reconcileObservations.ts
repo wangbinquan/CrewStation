@@ -5,11 +5,12 @@ import { middlewareRendersOf } from '../domain/middlewareRender';
 import { namespaceRenderOf, networkPolicyRendersOf } from '../domain/namespaceRender';
 import { controllerOf, crashLoopingOf, RESOURCE_ID_LABEL } from '../domain/observation';
 import { routeRenderOf } from '../domain/routeRender';
-import type { ClusterWriter, ManagedObjectFeed, ObservedKind } from '../ports/cluster';
+import type { ClusterWriter, ManagedObjectFeed, ManagedObjectReader, ObservedKind } from '../ports/cluster';
 import type { JobOwners, LedgerObservations, LedgerRecordView, SlotOwners, WorkloadOwners } from '../ports/ledger';
 import type { ObservationStats } from './observeChange';
 import { observeChange } from './observeChange';
 import type { Explainer, RouteTargets } from './routeExplainer';
+import { arbitrateRoute } from './routeArbitration';
 import { applyJob } from './jobApply';
 import { enqueueRoutesOfSlot, explainerFor, targetKey } from './routeExplainer';
 import { applySlot } from './slotApply';
@@ -30,6 +31,8 @@ export type Enqueue = (id: string, afterMs?: number) => void;
 
 export interface ReconcileDeps {
   readonly ledger: LedgerObservations;
+  readonly reader?: ManagedObjectReader;
+  readonly signal?: AbortSignal;
   readonly feed: ManagedObjectFeed;
   readonly cluster: ClusterWriter;
   readonly clock: Clock;
@@ -167,7 +170,7 @@ async function applyRoute(deps: ReconcileDeps, record: LedgerRecordView, enqueue
     deps.logger.warn('resource route spec incomplete', { resourceId: record.id });
     return;
   }
-  if (planned.namespace === deps.systemNamespace) return;
+  if (planned.namespace === deps.systemNamespace || !(await arbitrateRoute(deps, record, enqueue))) return;
   deps.routeTargets?.note(record.id, targetKey(planned.target.namespace, planned.target.service));
   const explained = await explainerFor(deps, record, planned);
   if (explained && !(await explainerMiddlewareReady(deps, record, explained.middleware, enqueue))) return;
@@ -180,6 +183,7 @@ async function applyRoute(deps: ReconcileDeps, record: LedgerRecordView, enqueue
   }
   const current = deps.feed.cached('IngressRoute', route.namespace, route.name);
   if (current?.metadata.deletionTimestamp) return;
+  deps.signal?.throwIfAborted();
   await applyChild(deps, record, { kind: 'IngressRoute', namespace: route.namespace, name: route.name }, current, () => deps.cluster.applyRoute(route, current));
 }
 
@@ -267,7 +271,10 @@ export async function reconcileRecord(deps: ReconcileDeps, id: string, enqueue: 
   // 槽变了（上线、下线、部署就绪）：指向它的路由重新核对该指槽还是指说明页（D13）。
   enqueueRoutesOfSlot(record, deps.routeTargets, enqueue);
   if (record.desired === 'present') await APPLIERS[record.kind]?.(deps, record, enqueue);
-  if (record.desired === 'absent') await removeChildren(deps, record);
+  if (record.desired === 'absent') {
+    if (record.kind === 'route') await arbitrateRoute(deps, record, enqueue);
+    await removeChildren(deps, record);
+  }
   await settleVolume(deps, record);
   if (record.kind !== 'volume' && record.desired === 'absent' && record.phase === 'stopped') {
     for (const child of await deps.ledger.children(record.id)) enqueue(child.id);

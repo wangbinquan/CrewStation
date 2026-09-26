@@ -247,8 +247,8 @@ describe.skipIf(!available)('变更日志、租约、维护（设计 §6.3、§6
     const gate = new Promise<void>((resolve) => { release = resolve; });
     const slow = h.database.db.transaction(async (tx) => { const r = await ledger.within(tx).declare(workspace('s-slow')); await gate; return r; });
     await Bun.sleep(50);
-    const fast = await ledger.declare(workspace('s-fast'));
-    release();
+    // 同项目的工作负载声明现与口令轮换共享启动锁；跨项目仍可并行，继续验证日志按提交次序。
+    const fast = await ledger.declare(workspace('s-fast', { projectId: OTHER_PROJECT })).finally(release);
     const slowRecord = await slow;
     const rows = (await h.database.db.execute(sql`SELECT resource_id FROM resources.changes WHERE resource_id IN (${fast.id}, ${slowRecord.id}) ORDER BY seq`)) as unknown as { resource_id: string }[];
     expect(rows.map((row) => row.resource_id)).toEqual([fast.id, slowRecord.id]);

@@ -6,6 +6,7 @@ export const credentials = dataControlSchema.table('credentials', {
   resourceId: text('resource_id').primaryKey(),
   role: text('role').notNull(),
   secretBox: text('secret_box').notNull(),
+  pendingBox: text('pending_box'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });

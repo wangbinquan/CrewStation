@@ -91,8 +91,11 @@ test('执行环境准备中写明排队或调度原因；失败的 Agent 写明�
   fixture.agents.push(withExecution(agentB, 'starting', execB, { state: 'preparing', execution: { taskId: execB, state: 'starting', message: '等待此Agent的执行容器就绪：0/1 nodes are available' } }));
   fixture.agents.push(withExecution(agentC, 'finished', execC, { state: 'failed', endedAt: activityTime, execution: { taskId: execC, state: 'finished', message: '此Agent的镜像拉取失败（ImagePullBackOff）' } }));
   page = await renderApp(`${path}?agent=${agentB}`);
-  expect(page.text()).toContain('此 Agent 的独立执行环境尚未就绪：等待此Agent的执行容器就绪：0/1 nodes are available');
   const tab = (agentId: string) => [...document.querySelectorAll<HTMLButtonElement>('[role="tab"]')].find((node) => node.textContent?.startsWith(`L-${agentId.slice(-6)}`))!;
+  // 初始渲染结束不代表名册已加载；等待目标出现，仍验证 URL 指定的 Agent 自动成为当前项。
+  const readyBy = Date.now() + 2000;
+  while (!tab(agentB) && Date.now() < readyBy) await page.settle();
+  expect(page.text()).toContain('此 Agent 的独立执行环境尚未就绪：等待此Agent的执行容器就绪：0/1 nodes are available');
   expect(tab(agentB).textContent).toContain('执行环境准备中');
   expect(tab(agentC).textContent).toContain('执行环境失败');
   await select(agentC);

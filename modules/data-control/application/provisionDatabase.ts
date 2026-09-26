@@ -1,4 +1,5 @@
 import type { Logger } from '@crewstation/kernel';
+import { conflict } from '@crewstation/kernel';
 import type { DataPlaneSnapshot } from '../domain/dataPlane';
 import { databaseToProvision, temporaryRoleToProvision } from '../domain/provisioning';
 import type { CredentialStore, SecretCipher } from '../ports/credentials';
@@ -30,6 +31,7 @@ export async function provisionDatabase(deps: ProvisionDeps, snapshot: DataPlane
   const role = database?.role ?? temporary?.role;
   if (!role) return snapshot;
   const stored = await deps.store.get(record.id) ?? await deps.store.putIfAbsent({ resourceId: record.id, role, secretBox: await deps.cipher.encrypt(newPassword()) });
+  if (stored.pendingBox) return snapshot;
   const password = await deps.cipher.decrypt(stored.secretBox);
   // 临时角色（第二步）同一套：口令先存再建，到期时间由数据库自己执行。
   if (database) await deps.plane.ensureDatabase({ ...database, password });
@@ -44,5 +46,6 @@ export async function provisionDatabase(deps: ProvisionDeps, snapshot: DataPlane
 /** 解密后的口令：data 渲染容器的连接串时经端口要（I28）；没存过返回 undefined。 */
 export async function credentialOf(deps: Pick<ProvisionDeps, 'store' | 'cipher'>, resourceId: string): Promise<{ role: string; password: string } | undefined> {
   const stored = await deps.store.get(resourceId);
+  if (stored?.pendingBox) throw conflict('数据库口令正在轮换，请管理员完成或重试轮换后再启动');
   return stored ? { role: stored.role, password: await deps.cipher.decrypt(stored.secretBox) } : undefined;
 }

@@ -19,6 +19,7 @@ function manualDataPlane() {
   const drops: string[] = [], ensured: string[] = [];
   let snapshots = 0, closed = false, oid = 18000;
   const plane: DataPlaneReader & DataPlaneWriter = {
+    rotatePassword: async () => undefined,
     snapshot: async () => { snapshots += 1; return { databases: new Map(databases), roles: new Map(roles), observedAt: new Date().toISOString() }; },
     dropRole: async ({ role, oid, database, reassignTo }) => {
       const live = roles.get(role);

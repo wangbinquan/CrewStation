@@ -18,6 +18,7 @@ import type { DataUseCaseDeps } from './application/dependencies';
 import { dataLedgerProjection } from './application/ledgerProjection';
 import { revokeBindingsOfReleasedTask } from './application/releasedTask';
 import { serviceDataUseCases } from './application/serviceData';
+import { rotateCredentialUseCase } from './application/rotateCredential';
 import { taskBindingUseCases } from './application/taskBindings';
 import type { DataCredentials } from './ports/credentials';
 import type { UserDirectory } from './ports/userDirectory';
@@ -92,7 +93,7 @@ export function createDataModule(deps: DataModuleDeps): DataModule {
   };
   const service = serviceDataUseCases(useCaseDeps);
   const bindings = taskBindingUseCases(useCaseDeps);
-  const api: DataModuleApi = { name: 'data', ensureServiceData: service.ensureServiceData, envFor: service.envFor, listResources: service.listResources, ...bindings };
+  const api: DataModuleApi = { name: 'data', ensureServiceData: service.ensureServiceData, envFor: service.envFor, listResources: service.listResources, rotateCredential: rotateCredentialUseCase(useCaseDeps), ...bindings };
   let timer: ReturnType<typeof setInterval> | undefined, expiring = false;
   const expireTick = () => {
     if (expiring) return;

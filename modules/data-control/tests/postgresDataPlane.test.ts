@@ -93,6 +93,26 @@ describe.skipIf(!available)('数据面快照：平台数据库集群上带平台
     } finally { await plane.close(); }
   });
 
+  test('轮换只改口令：有连接时拒绝，不踢连接；空闲后旧口令失效、新口令能连，库 OID 不变', async () => {
+    const plane = postgresDataPlane(adminUrl), password = 'RotationNew_1234567890';
+    const target = new URL(adminUrl); target.pathname = `/${names.db}`; target.username = names.role; target.password = 'x';
+    const old = postgres(target.toString(), { max: 1, onnotice: () => undefined });
+    const oid = (await plane.snapshot()).databases.get(names.db)!.oid;
+    try {
+      await old`SELECT 1`;
+      await expect(plane.rotatePassword({ role: names.role, password })).rejects.toThrow('仍有连接');
+      expect((await old<{ one: number }[]>`SELECT 1 AS one`)[0]?.one).toBe(1);
+      await old.end();
+      await plane.rotatePassword({ role: names.role, password });
+      const rejected = postgres(target.toString(), { max: 1, onnotice: () => undefined, connect_timeout: 2 });
+      try { expect(await rejected`SELECT 1`.then(() => true, () => false)).toBe(false); } finally { await rejected.end(); }
+      target.password = password;
+      const current = postgres(target.toString(), { max: 1, onnotice: () => undefined });
+      try { expect((await current<{ one: number }[]>`SELECT 1 AS one`)[0]?.one).toBe(1); } finally { await current.end(); }
+      expect((await plane.snapshot()).databases.get(names.db)?.oid).toBe(oid);
+    } finally { await old.end(); await plane.close(); }
+  });
+
   // I28 第二步：访问绑定的临时角色。
   test('临时角色：只连得上所在的库，到期时间照写；诊断只读的能读不能写，生产变更的继承运行角色能写；重复执行改口令不重建', async () => {
     const plane = postgresDataPlane(adminUrl);

@@ -96,6 +96,7 @@ const STOPPED_PHASES = ['stopped'];
 
 function filterOf(filter: RecordFilter) {
   return and(
+    filter.routeMatch ? sql`lower(regexp_replace(${records.spec}->>'host', '\\.$', '')) = ${filter.routeMatch.host} AND coalesce(${records.spec}->>'pathPrefix', '') = ${filter.routeMatch.pathPrefix ?? ''}` : undefined,
     filter.projectId ? eq(records.projectId, filter.projectId) : undefined,
     filter.kind ? eq(records.kind, filter.kind) : undefined,
     filter.parentId ? eq(records.parentId, filter.parentId) : undefined,
@@ -139,6 +140,11 @@ export function drizzleRecordRepository(db: Executor): RecordRepository {
   };
   return {
     get: (id, options) => one(eq(records.id, id), options?.forUpdate),
+    countConsumers: async (projectId, kinds) => {
+      const [row] = await db.select({ count: sql<number>`count(*)::int` }).from(records).where(and(eq(records.projectId, projectId), inArray(records.kind, [...kinds]),
+        or(notInArray(records.phase, ['stopped', 'failed']), sql`exists (select 1 from ${children} where ${children.resourceId} = ${records.id} and ${children.kind} in ('Pod', 'Job', 'Deployment') and coalesce(${children.observed}->>'phase', 'absent') not in ('absent', 'Succeeded', 'Failed', 'Complete', 'ScaledDown'))`)));
+      return Number(row?.count ?? 0);
+    },
     getByOwner: (owner: ResourceOwner, kind, options) => one(and(eq(records.ownerModule, owner.module), eq(records.ownerRef, owner.ref), eq(records.kind, kind))!, options?.forUpdate),
     getMany: async (ids) => (ids.length ? hydrate(await db.select().from(records).where(inArray(records.id, [...ids]))) : []),
     list: async (filter: RecordFilter) => hydrate(await db.select().from(records).where(filterOf(filter))

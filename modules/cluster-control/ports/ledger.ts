@@ -22,6 +22,8 @@ export interface LedgerRecordView {
 export interface LedgerObservations {
   get(id: string): Promise<LedgerRecordView | undefined>;
   /** 在册的记录（不含已结束的）：调和器启动与定期全量核对时逐条排进队列。 */
+  /** 同 Host＋精确 PathPrefix 的候选（含释放中的记录），先在数据库筛选再限量。 */
+  routeCandidates?(host: string, pathPrefix?: string): Promise<readonly LedgerRecordView[]>;
   listLive(): Promise<readonly LedgerRecordView[]>;
   changesSince(cursor: number, limit: number): Promise<readonly { readonly seq: number; readonly resourceId: string }[]>;
   latestChange(): Promise<number>;

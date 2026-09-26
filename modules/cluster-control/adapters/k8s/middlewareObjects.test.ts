@@ -11,6 +11,10 @@ describe('调和器渲染的限流 Middleware（RFC-025 设计 §7.3）', () => 
     expect(middlewareObject({ namespace: 'cs-demo', name: 'rate-limit-host', rateLimit: { average: 300, burst: 600, key: { host: true } } }, 'rec-1')['spec']).toEqual({ rateLimit: { average: 300, burst: 600, period: '1s', sourceCriterion: { requestHost: true } } });
   });
 
+  test('登录按连接地址分桶，不从任意客户端头取 IP', () => {
+    expect(middlewareObject({ namespace: 'crewstation-system', name: 'rate-limit-auth-ip', rateLimit: { average: 20, burst: 40, key: { ip: true } } }, 'rec-p')['spec']).toEqual({ rateLimit: { average: 20, burst: 40, period: '1s', sourceCriterion: { ipStrategy: { depth: 0 } } } });
+  });
+
   test('并发上限：inFlightReq 按请求头分桶', () => {
     expect(middlewareObject({ namespace: 'crewstation-system', name: 'in-flight-platform-api', inFlight: { amount: 16, key: { header: 'x-cs-user-id' } } }, 'rec-p')['spec']).toEqual({ inFlightReq: { amount: 16, sourceCriterion: { requestHeaderName: 'x-cs-user-id' } } });
   });

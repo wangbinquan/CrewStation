@@ -223,3 +223,11 @@ describe('条件、子对象、计数与可做操作', () => {
     expect(actionsFor(record({ kind: 'business-workspace' }))).toEqual([]);
   });
 });
+
+
+test('被替代路由保留中间件，IngressRoute 移除后是已结束，取消 Superseded 后重新分配', () => {
+  const route = record({ kind: 'route', spec: { children: [{ kind: 'IngressRoute', name: 'r' }] }, conditions: [cond('Superseded', 'true')], children: [{ kind: 'Middleware', name: 'strip', phase: 'Present', ready: true }] });
+  expect(computePhase(route)).toMatchObject({ phase: 'stopped', reason: { code: 'route-superseded' } });
+  expect(computePhase({ ...route, children: [...route.children, { kind: 'IngressRoute', name: 'r', phase: 'Present', ready: true }] }).phase).toBe('stopping');
+  expect(computePhase({ ...route, conditions: [cond('Superseded', 'false')] }).phase).toBe('provisioning');
+});

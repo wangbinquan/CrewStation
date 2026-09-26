@@ -11,6 +11,8 @@ export type RoleRemoval = 'dropped' | 'absent' | 'replaced';
 
 /** 数据面的写：删访问绑定的临时角色（第四期第三步）；建库与运行角色（I28，口令由调用方先存下再给）。 */
 export interface DataPlaneWriter {
+  /** 只改现有角色口令；仍有连接时拒绝，不断开使用者、不重启容器。 */
+  rotatePassword(target: { readonly role: string; readonly password: string }): Promise<void>;
   /** 先断开它的连接，在所在库里把它拥有的对象转给运行角色、撤销授权，再删角色；给了 OID 就先核对。 */
   dropRole(target: { readonly role: string; readonly oid?: string; readonly database?: string; readonly reassignTo?: string }): Promise<RoleRemoval>;
   /**

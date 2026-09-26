@@ -4,6 +4,7 @@ import { middlewareRendersOf } from './middlewareRender';
 describe('限流策略记录的期望 → 中间件渲染输入（RFC-025 设计 §7.3）', () => {
   test('令牌桶按请求头或主机分桶，并发上限按请求头；照写', () => {
     const middlewares = [
+      { namespace: 'crewstation-system', name: 'rate-limit-auth-ip', rateLimit: { average: 20, burst: 40, key: { ip: true } } },
       { namespace: 'cs-demo', name: 'rate-limit-user', rateLimit: { average: 30, burst: 60, key: { header: 'x-cs-user-id' } } },
       { namespace: 'cs-demo', name: 'rate-limit-host', rateLimit: { average: 300, burst: 600, key: { host: true } } },
       { namespace: 'crewstation-system', name: 'inflight-platform-api', inFlight: { amount: 16, key: { header: 'x-cs-user-id' } } },

@@ -13,6 +13,8 @@ export interface OwnerLedger extends ResourceWriter {
 export interface ResourcesModuleApi {
   readonly name: 'resources';
   owner(module: string): OwnerLedger;
+  /** 内部组合入口：在项目启动锁下确认没有使用者，回调的数据库写与检查同一事务。 */
+  withIdleProject<T>(projectId: ProjectId, fn: (tx: OwnerTransaction) => Promise<T>): Promise<T>;
   /** cluster-control 的观测入口；返回 unowned 表示台账里没有记录认领这个对象。 */
   observe(observation: ChildObservation): Promise<ObservationOutcome>;
   /** cluster-control 写只归资源中心的条件（不附带子对象观测），例如工作卷的「待回收」。 */

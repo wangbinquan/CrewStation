@@ -4,14 +4,15 @@ import { DEFAULT_RATE_LIMITS } from './rateLimits';
 import { platformRateLimitPolicy, projectRateLimitPolicy } from './rateLimitProjection';
 
 describe('限流策略投影进资源台账（RFC-025 设计 §7.3）', () => {
-  test('平台一条：系统命名空间里两个中间件，平台接口按用户一只桶、每人并发上限；展示字段写明取值', () => {
+  test('平台一条：系统命名空间里三个中间件，平台接口按用户一只桶、每人并发上限；展示字段写明取值', () => {
     expect(platformRateLimitPolicy(DEFAULT_RATE_LIMITS.platformApi, 'crewstation-system')).toEqual({
       kind: 'rate-limit-policy', ref: 'platform',
       spec: {
-        children: [{ kind: 'Middleware', namespace: 'crewstation-system', name: 'rate-limit-platform-api' }, { kind: 'Middleware', namespace: 'crewstation-system', name: 'in-flight-platform-api' }],
+        children: [{ kind: 'Middleware', namespace: 'crewstation-system', name: 'rate-limit-platform-api' }, { kind: 'Middleware', namespace: 'crewstation-system', name: 'in-flight-platform-api' }, { kind: 'Middleware', namespace: 'crewstation-system', name: 'rate-limit-auth-ip' }],
         middlewares: [
           { namespace: 'crewstation-system', name: 'rate-limit-platform-api', rateLimit: { average: 20, burst: 40, key: { header: 'x-cs-user-id' } } },
           { namespace: 'crewstation-system', name: 'in-flight-platform-api', inFlight: { amount: 16, key: { header: 'x-cs-user-id' } } },
+          { namespace: 'crewstation-system', name: 'rate-limit-auth-ip', rateLimit: { average: 20, burst: 40, key: { ip: true } } },
         ],
       },
       display: { scope: 'platform', perUser: '20/s·40', inFlightPerUser: '16' },

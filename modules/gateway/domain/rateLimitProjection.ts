@@ -1,14 +1,14 @@
 import type { ProjectId, RateLimits } from '@crewstation/contracts';
 import { IDENTITY_HEADERS } from '@crewstation/contracts';
 
-/** 平台接口限流的两个中间件（系统命名空间，控制台 `/v1` 的路由引用）。 */
-export const PLATFORM_API_MIDDLEWARES = { rate: 'rate-limit-platform-api', inFlight: 'in-flight-platform-api' } as const;
+/** 平台接口与匿名登录限流的三个中间件（系统命名空间，分别由 `/v1` 与 `/auth` 引用）。 */
+export const PLATFORM_API_MIDDLEWARES = { rate: 'rate-limit-platform-api', inFlight: 'in-flight-platform-api', auth: 'rate-limit-auth-ip' } as const;
 /** 每个项目命名空间里的四个：用户域按用户、按主机合计；服务域按来源服务、按目标合计。 */
 export const PROJECT_MIDDLEWARES = { user: 'rate-limit-user', host: 'rate-limit-host', source: 'rate-limit-source', target: 'rate-limit-target' } as const;
 export const PLATFORM_POLICY_REF = 'platform';
 export const projectPolicyRef = (projectId: string): string => `project:${projectId}`;
 
-type Key = { readonly header: string } | { readonly host: true };
+type Key = { readonly header: string } | { readonly host: true } | { readonly ip: true };
 interface MiddlewareSpec {
   readonly namespace: string;
   readonly name: string;
@@ -37,6 +37,7 @@ export function platformRateLimitPolicy(limits: RateLimits['platformApi'], syste
   return declaration(PLATFORM_POLICY_REF, [
     { namespace: systemNamespace, name: PLATFORM_API_MIDDLEWARES.rate, rateLimit: { ...limits.perUser, key: byUser } },
     { namespace: systemNamespace, name: PLATFORM_API_MIDDLEWARES.inFlight, inFlight: { amount: limits.inFlightPerUser, key: byUser } },
+    { namespace: systemNamespace, name: PLATFORM_API_MIDDLEWARES.auth, rateLimit: { average: 20, burst: 40, key: { ip: true } } },
   ], { scope: 'platform', perUser: bucket(limits.perUser), inFlightPerUser: String(limits.inFlightPerUser) });
 }
 

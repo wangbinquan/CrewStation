@@ -164,6 +164,7 @@ describe.skipIf(!available)('cluster-control：观测写回台账与收编空跑
       { ...pvc('task-rel-runner', { 'crewstation.io/task': 't-released' }), kind: 'Secret' }, { ...pvc('demo-green', { 'crewstation.io/workload': 'service' }), kind: 'Service' }];
     ledger = {
       observe: (input) => resources.api.observe(input), claimOf: (child) => resources.api.claimOf(child), get: (id) => resources.api.get(id),
+      routeCandidates: (host, pathPrefix) => resources.api.list({ kind: 'route', includeStopped: true, routeMatch: { host, ...(pathPrefix ? { pathPrefix } : {}) } }),
       listLive: () => resources.api.list({}), changesSince: resources.api.changesSince, latestChange: resources.api.latestChange,
       observeConditions: (id, conditions) => resources.api.observeConditions(id, conditions), children: (parentId) => resources.api.list({ parentId, includeStopped: true }),
       adoptOrphanVolume: async () => undefined,
@@ -171,7 +172,7 @@ describe.skipIf(!available)('cluster-control：观测写回台账与收编空跑
     control = createClusterControlModule({
       k8s, feed, cluster, isAdmin: async (id) => id === ADMIN.userId, systemNamespace: 'crewstation-system',
       logger: { ...noopLogger, debug: (msg: string) => { debugs.push(msg); } },
-      reader: { list: async (kind) => objects.filter((o) => o.kind === kind) },
+      reader: { list: async (kind) => kind === 'IngressRoute' ? k8s.list<K8sObject>(Resources.IngressRoute!) : objects.filter((o) => o.kind === kind) },
       ledger,
       // 孤儿回收单独在 orphanSweep.test.ts 里核对；这里关掉，免得它的定时轮次与本文件的用例交错。
       orphanSweep: false,
@@ -497,6 +498,26 @@ describe.skipIf(!available)('cluster-control：观测写回台账与收编空跑
     await until('路由删掉', async () => (await resources.api.get(record.id))?.phase === 'stopped');
     expect(removals).toContain('IngressRoute/shop-prod');
     expect(routeApplies).toHaveLength(3);
+  });
+
+  test('入口仲裁：规范化 Host＋路径择一，其他 API 前缀保留，胜出项释放后候补恢复', async () => {
+    const gateway = resources.api.owner('gateway');
+    const declare = (name: string, host: string, pathPrefix: string) => gateway.declare({ kind: 'route', ref: name, projectId: PROJECT, spec: {
+      children: [{ kind: 'IngressRoute', namespace: 'cs-demo', name }], service: 'shop', host, pathPrefix,
+      target: { namespace: 'cs-demo', service: 'shop-blue', port: 80 }, middlewares: [],
+    } });
+    const first = await declare('arb-first', 'api.svc.cs.internal', '/api/one');
+    await until('第一个入口建出', async () => (await resources.api.get(first.id))?.phase === 'ready');
+    const second = await declare('arb-second', 'API.SVC.CS.INTERNAL.', '/api/one');
+    const other = await declare('arb-other', 'api.svc.cs.internal', '/api/two');
+    await until('候补停用', async () => (await resources.api.get(second.id))?.reason?.code === 'route-superseded');
+    await until('其他前缀仍生效', async () => (await resources.api.get(other.id))?.phase === 'ready');
+    expect((await resources.api.list({ kind: 'route', routeMatch: { host: 'api.svc.cs.internal', pathPrefix: '/api/one' } })).map((entry) => entry.id)).toEqual([first.id, second.id]);
+    expect(await k8s.get(Resources.IngressRoute!, 'arb-second', 'cs-demo')).toBeUndefined();
+    await gateway.requestRelease(first.id, { code: 'retired', message: '释放胜出路由' });
+    await until('候补恢复', async () => (await resources.api.get(second.id))?.phase === 'ready');
+    expect(await k8s.get(Resources.IngressRoute!, 'arb-first', 'cs-demo')).toBeUndefined();
+    expect(await k8s.get(Resources.IngressRoute!, 'arb-other', 'cs-demo')).toBeDefined();
   });
 
   // RFC-025 D13、I26：目标槽「已结束」（已下线、尚未部署）的待验证与正式路由改指 cs-api 的说明页——先建出这条路由独用的 replacePath

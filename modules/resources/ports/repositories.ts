@@ -33,6 +33,8 @@ export interface RecordRepository {
   compact(id: string, at: Date): Promise<LedgerRecord | undefined>;
   /** 项目里这些种类、处于这些阶段的记录数，按种类分开（额度推导用）。 */
   countByKind(projectId: ProjectId, kinds: readonly ResourceKind[], phases: readonly string[]): Promise<Partial<Record<ResourceKind, number>>>;
+  /** 空闲互斥：活动阶段，或虽失败但仍有未结束的容器；不受列表上限影响。 */
+  countConsumers(projectId: ProjectId, kinds: readonly ResourceKind[]): Promise<number>;
 }
 
 export interface ChangeEntry {

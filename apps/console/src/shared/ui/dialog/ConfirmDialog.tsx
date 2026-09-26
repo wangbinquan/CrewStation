@@ -8,7 +8,7 @@ import { Dialog } from './Dialog';
 import styles from './Dialog.module.css';
 
 /** 不可撤销动作要求输入的确认词：中英文界面一律输英文（2026-09-23 作者裁定）。 */
-export type ConfirmWord = 'archive' | 'delete' | 'discard';
+export type ConfirmWord = 'archive' | 'delete' | 'discard' | 'rotate';
 
 /** 输入与确认词一致：不分大小写，忽略首尾空格。 */
 export function matchesConfirmWord(input: string, word: ConfirmWord): boolean {

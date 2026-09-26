@@ -13,6 +13,7 @@ import { performAction } from './application/actions';
 import { maintainLedger } from './application/maintenance';
 import { observationWriter } from './application/observe';
 import { occupancyIn, ownerWriter } from './application/ownerWrites';
+import { lockIdleProject } from './application/projectQuiescence';
 import type { StreamOptions } from './application/streamHub';
 import { createStreamHub, DEFAULT_STREAM_OPTIONS } from './application/streamHub';
 import { readView } from './application/views';
@@ -70,6 +71,7 @@ export function createResourcesModule(deps: ResourcesModuleDeps): ResourcesModul
   const api: ResourcesModuleApi = {
     name: 'resources',
     owner,
+    withIdleProject: (projectId, fn) => deps.db.transaction(async (tx) => { await lockIdleProject(uow.within(tx), projectId); return fn(tx); }),
     observe: observer.observe,
     observeConditions: observer.observeConditions,
     leases: { acquire: uow.read.leases.acquire, renew: uow.read.leases.renew, release: uow.read.leases.release },

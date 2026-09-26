@@ -2,6 +2,7 @@ import type { ClusterPurpose, ProjectId, ResourceChild, ResourceCondition, Resou
 
 /** 列记录的条件（视图、推送流、调和器共用）。 */
 export interface RecordFilter {
+  readonly routeMatch?: { readonly host: string; readonly pathPrefix?: string };
   readonly projectId?: ProjectId;
   readonly kind?: ResourceKind;
   readonly parentId?: string;

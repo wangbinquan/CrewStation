@@ -67,6 +67,21 @@ spec:
     sourceCriterion:
       requestHeaderName: x-cs-user-id
 ---
+# 登录入口按实际连接地址限流；depth=0 不从客户端 X-Forwarded-For 取值（I33）。
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: rate-limit-auth-ip
+  namespace: crewstation-system
+spec:
+  rateLimit:
+    average: 20
+    burst: 40
+    period: 1s
+    sourceCriterion:
+      ipStrategy:
+        depth: 0
+---
 # 用户域：控制台主机。登录与 JWKS 不鉴权；平台 API 与工作台页面经用户 ForwardAuth。
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
@@ -76,7 +91,21 @@ metadata:
 spec:
   entryPoints: [web]
   routes:
-    - match: Host(`console.cs.localhost`) && (PathPrefix(`/auth`) || PathPrefix(`/.well-known`))
+    - match: Host(`console.cs.localhost`) && (Path(`/auth`) || PathPrefix(`/auth/`))
+      kind: Rule
+      priority: 100
+      middlewares: [{ name: drop-identity-headers }, { name: rate-limit-auth-ip }]
+      services: [{ name: cs-auth, port: 8081 }]
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: console-jwks
+  namespace: crewstation-system
+spec:
+  entryPoints: [web]
+  routes:
+    - match: Host(`console.cs.localhost`) && PathPrefix(`/.well-known`)
       kind: Rule
       priority: 100
       middlewares: [{ name: drop-identity-headers }]

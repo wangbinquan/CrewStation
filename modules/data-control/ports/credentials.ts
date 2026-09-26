@@ -3,12 +3,15 @@ export interface StoredCredential {
   readonly resourceId: string;
   readonly role: string;
   readonly secretBox: string;
+  readonly pendingBox?: string;
 }
 
 export interface CredentialStore {
   get(resourceId: string): Promise<StoredCredential | undefined>;
   /** 不在才存，返回存着的那一条——并发时后到的拿到先到的口令，建角色用的与存下的一定是同一个。 */
   putIfAbsent(credential: StoredCredential): Promise<StoredCredential>;
+  stageRotation(resourceId: string, role: string, boxed: string): Promise<void>;
+  finishRotation(resourceId: string, boxed: string): Promise<void>;
 }
 
 export interface SecretCipher {

@@ -1,5 +1,5 @@
 /** 限流中间件按什么分桶：请求头（网关注入的身份头）或主机（每个主机一只桶）。 */
-export type MiddlewareKey = { readonly header: string } | { readonly host: true };
+export type MiddlewareKey = { readonly header: string } | { readonly host: true } | { readonly ip: true };
 
 /**
  * 限流策略记录里调和器渲染 Traefik Middleware 要用的期望（RFC-025 设计 §7.3，gateway 写）：一个中间件要么是令牌桶（rateLimit），
@@ -22,7 +22,7 @@ const count = (value: unknown): value is number => typeof value === 'number' && 
 function keyOf(value: unknown): MiddlewareKey | undefined {
   if (!isFields(value)) return undefined;
   if (text(value['header'])) return { header: value['header'] };
-  return value['host'] === true ? { host: true } : undefined;
+  return value['host'] === true ? { host: true } : value['ip'] === true ? { ip: true } : undefined;
 }
 
 function renderOf(value: unknown): MiddlewareRender | undefined {

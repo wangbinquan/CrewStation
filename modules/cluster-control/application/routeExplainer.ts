@@ -18,8 +18,15 @@ export const targetKey = (namespace: string, service: string): string => `${name
  * 不必等路由记录自己变化。切流换了目标的路由从旧键上摘下。
  */
 export function routeTargets() {
+  const byParent = new Map<string, Set<string>>();
   const byTarget = new Map<string, Set<string>>(), byRoute = new Map<string, string>();
   return {
+    noteParent(routeId: string, parentId: string): void {
+      const routes = byParent.get(parentId) ?? new Set<string>();
+      routes.add(routeId);
+      byParent.set(parentId, routes);
+    },
+    childrenOf: (parentId: string): readonly string[] => [...(byParent.get(parentId) ?? [])],
     note(routeId: string, target: string): void {
       const old = byRoute.get(routeId);
       if (old === target) return;
@@ -36,7 +43,9 @@ export type RouteTargets = ReturnType<typeof routeTargets>;
 
 /** 槽的 Service 变了阶段：把指向它的路由排进队列。 */
 export function enqueueRoutesOfSlot(record: LedgerRecordView, targets: RouteTargets | undefined, enqueue: (id: string) => void): void {
-  if (record.kind !== 'service-slot' || !targets) return;
+  if (!targets) return;
+  for (const id of targets.childrenOf(record.id)) enqueue(id);
+  if (record.kind !== 'service-slot' && record.kind !== 'dev-workspace') return;
   for (const child of record.spec.children) if (child.kind === 'Service' && child.namespace) for (const id of targets.routesOf(targetKey(child.namespace, child.name))) enqueue(id);
 }
 

@@ -37,7 +37,7 @@ export function routeRenderOf(spec: { readonly children: readonly { readonly kin
   const chain = middlewares.map(middlewareOf);
   if (chain.some((entry) => entry === undefined)) return undefined;
   return {
-    namespace: object.namespace, name: object.name, service, host, ...(text(pathPrefix) ? { pathPrefix } : {}), ...(typeof priority === 'number' ? { priority } : {}),
+    namespace: object.namespace, name: object.name, service, host: host.toLowerCase().replace(/\.$/, ''), ...(text(pathPrefix) ? { pathPrefix } : {}), ...(typeof priority === 'number' ? { priority } : {}),
     target: { namespace: target['namespace'], service: target['service'], port: target['port'] }, middlewares: chain as RouteRender['middlewares'],
     ...(text(unavailableMiddleware) ? { unavailable: { middleware: unavailableMiddleware } } : {}),
   };
