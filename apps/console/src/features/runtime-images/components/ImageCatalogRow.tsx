@@ -31,6 +31,6 @@ export function ImageCatalogRow({ projectId, image, editable, onOpen, onEdit, pr
     </> : null}
     <td><div className={styles.rowActions}>
       {onEdit ? <Button size="small" aria-haspopup="dialog" onClick={onEdit}>{t('images.edit')}</Button> : null}
-      <Button size="small" aria-haspopup="dialog" onClick={onOpen}>{t(onEdit ? 'images.moreActions' : 'images.open')}</Button>
+      <Button size="small" aria-haspopup={projectId === undefined ? undefined : 'dialog'} onClick={onOpen}>{t(projectId === undefined ? 'images.moreActions' : 'images.open')}</Button>
     </div></td></tr>;
 }

@@ -14,7 +14,7 @@ import { ImageCatalogRow } from '../components/ImageCatalogRow';
 import { ImageDetail } from '../components/ImageDetail';
 import catalogStyles from '../../../shared/ui/CapabilityCatalog.module.css';
 
-export function AdminRuntimeImagesPage({ filter: controlled, onChange }: { readonly filter?: { readonly q?: string; readonly before?: string }; readonly onChange?: (q: string, before?: string) => void }) {
+export function AdminRuntimeImagesPage({ filter: controlled, onChange, onManage }: { readonly onManage?: (id: string) => void; readonly filter?: { readonly q?: string; readonly before?: string }; readonly onChange?: (q: string, before?: string) => void }) {
   const t = useT(), [local, setLocal] = useState<{ q?: string; before?: string }>({});
   const filter = controlled ?? local, before = filter.before, search = filter.q ?? '';
   const change = onChange ?? ((q: string, before?: string) => setLocal({ q, before }));
@@ -28,12 +28,12 @@ export function AdminRuntimeImagesPage({ filter: controlled, onChange }: { reado
         <CatalogSearch key={search} value={search} label={t('images.search')} onSearch={(q) => change(q)} actions={<Button variant="primary" onClick={() => setAdding(true)}>{t('images.add')}</Button>} />
         <QueryStatus isPending={query.isPending} error={query.error} isEmpty={items.length === 0} emptyTitle={t(search ? 'images.noMatches' : 'images.empty')} />
         {items.length ? <DataTable className={catalogStyles.profileTable} columns={[t('images.name'), t('images.latestVersion'), t('images.latestBuild'), t('images.validationStatus'), t('images.actions')]}>
-          {items.map((image) => <ImageCatalogRow key={image.id} image={image} projectId={undefined} editable onOpen={() => setSelected({ id: image.id, tab: 'versions' })} onEdit={() => setSelected({ id: image.id, tab: 'settings' })} />)}
+          {items.map((image) => <ImageCatalogRow key={image.id} image={image} projectId={undefined} editable onOpen={() => onManage ? onManage(image.id) : setSelected({ id: image.id, tab: 'versions' })} />)}
         </DataTable> : null}
         <CatalogPagination scope="admin-images" userId={me.data?.id} filter={[search, 30]} cursor={before} next={items.length === 30 ? items.at(-1)?.id : undefined} count={query.error || query.isPending ? undefined : items.length} disabled={query.isPending || !!query.error} onChange={(cursor) => change(search, cursor)} />
       </Card>
       {selected ? <ImageDetail key={`${selected.id}:${selected.tab}`} projectId={undefined} imageId={selected.id} initialTab={selected.tab} editable admin manageable onClose={() => setSelected(undefined)} /> : null}
-      <CreateImageDialog projectId={undefined} open={adding} onClose={() => setAdding(false)} onCreated={(id) => { setSelected({ id, tab: 'versions' }); setAdding(false); }} />
+      <CreateImageDialog projectId={undefined} open={adding} onClose={() => setAdding(false)} onCreated={(id) => { if (onManage) onManage(id); else setSelected({ id, tab: 'versions' }); setAdding(false); }} />
     </>}
   </CatalogPage>;
 }

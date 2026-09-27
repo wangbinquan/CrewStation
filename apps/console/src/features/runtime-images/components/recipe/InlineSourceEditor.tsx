@@ -1,11 +1,11 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { RuntimeImageSourceSchema } from '@crewstation/contracts';
-import { useT } from '../../../shared/lib/useT';
-import { FormField } from '../../../shared/ui/FormField';
-import { Button } from '../../../shared/ui/Button';
-import { buildFileSize, encodeBuildFile } from '../model/inlineDraft';
+import { useT } from '../../../../shared/lib/useT';
+import { FormField } from '../../../../shared/ui/FormField';
+import { Button } from '../../../../shared/ui/Button';
+import { buildFileSize, encodeBuildFile } from '../../model/inlineDraft';
 import { RecipeGuide } from './RecipeGuide';
-import styles from './RuntimeImages.module.css';
+import styles from '../RuntimeImages.module.css';
 
 interface FileValue { path: string; contentBase64: string; executable: boolean }
 export function InlineSourceEditor({ source, onChange, onPendingChange }: { readonly source: Record<string, unknown>; readonly onChange: (change: Record<string, unknown>) => void; readonly onPendingChange?: (pending: boolean) => void }) {

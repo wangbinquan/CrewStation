@@ -11,7 +11,7 @@ export function runtimeImageConsoleFixture(admin = false, role = 'owner') {
   const build = RuntimeImageBuildDtoSchema.parse({ id: riId(15), imageId: riImage, projectId: riProject, revisionId: revision.id, state: 'building', stage: 'build', createdBy: riId(1), createdAt: at, updatedAt: at, deadline: at, attempt: 1 });
   const version = RuntimeImageVersionDtoSchema.parse({ id: riVersion, imageId: riImage, projectId: riProject, revisionId: revision.id, buildId: build.id, repository: 'registry.test/tools', digest, architecture: 'linux/amd64', state: 'available', createdAt: at, initializerDigest: digest, toolsDigest: digest });
   const policy = { projectId: riProject, revision: 7, developmentTask: { runtimeImageVersionId: riVersion }, developmentAgents: [{ profileId: riProfile, selection: { allowedRuntimeImageVersionIds: [riId(16)] } }] };
-  const state = { conflict: false, references: 0, buildFailure: false, setupFailure: false };
+  const state = { conflict: false, references: 0, buildFailure: false, setupFailure: false, cancelFailure: false, validationState: 'passed' };
   globalThis.fetch = (async (raw, init) => {
     const url = new URL(String(raw), 'http://test'), path = url.pathname, method = init?.method ?? 'GET';
     if (method !== 'GET') {
@@ -23,6 +23,7 @@ export function runtimeImageConsoleFixture(admin = false, role = 'owner') {
         if (body.expectedRevision !== image.revision) return Response.json({ error: 'conflict', message: '镜像已修改' }, { status: 409 });
         Object.assign(image, body, { revision: image.revision + 1 }); return Response.json(image);
       }
+      if (path.endsWith('/cancel') && state.cancelFailure) return Response.json({ error: 'unavailable', message: 'cannot cancel now' }, { status: 503 });
       if (path.endsWith('/cancel')) return Response.json({ ...build, state: 'cancelling' });
       if (path.endsWith('/revisions')) return Response.json({ ...revision, ...body, id: riId(17), revision: 2 }, { status: 201 });
       if (path.endsWith('/validations')) return Response.json({ id: riId(18), versionId: riVersion, projectId: riProject, target: body.target, state: 'queued', checks: [], contractDigest: digest, createdBy: riId(1), createdAt: at, updatedAt: at }, { status: 202 });
@@ -46,11 +47,11 @@ export function runtimeImageConsoleFixture(admin = false, role = 'owner') {
     if (path.endsWith('/revisions')) { const start = url.searchParams.has('before') ? revisions.findIndex((item) => item.id === url.searchParams.get('before')) + 1 : 0; return Response.json({ items: revisions.slice(start, start + Number(url.searchParams.get('limit') ?? 20)) }); }
     if (path.endsWith('/builds')) return Response.json({ items: [build] });
     if (path.endsWith('/versions')) return Response.json({ items: [version] });
-    if (path.endsWith('/validations')) return Response.json({ items: [{ id: riId(18), versionId: riVersion, projectId: riProject, target: { usage: 'service', command: ['start'], port: 3000, healthPath: '/health' }, state: 'passed', verification: 'service-contract', checks: [], contractDigest: digest, createdBy: riId(1), createdAt: at, updatedAt: at }] });
+    if (path.endsWith('/validations')) return Response.json({ items: [{ id: riId(18), versionId: riVersion, projectId: riProject, target: { usage: 'service', command: ['start'], port: 3000, healthPath: '/health' }, state: state.validationState, verification: 'service-contract', checks: [], contractDigest: digest, createdBy: riId(1), createdAt: at, updatedAt: at }] });
     if (path.endsWith('/logs')) return Response.json({ expired: false, items: url.searchParams.get('after') === '0' ? [{ sequence: 1, stage: 'build', text: 'install complete', createdAt: at }] : [], next: 1, truncated: false, expiresAt: '2026-10-01T00:00:00.000Z' });
     if (path.endsWith(`/${riImage}`)) return Response.json(image);
     if (path.endsWith(`/versions/${riVersion}`)) return Response.json(version);
     return Response.json({ error: 'not_found', message: `未配置测试读取：${path}`, details: {} }, { status: 404 });
   }) as typeof fetch;
-  return { writes, reads, revision, revisions, policy, state, restore: () => { globalThis.fetch = original; } };
+  return { writes, reads, image, revision, revisions, policy, state, restore: () => { globalThis.fetch = original; } };
 }

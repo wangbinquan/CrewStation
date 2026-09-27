@@ -1,3 +1,5 @@
+import { Dialog } from '../../../shared/ui/dialog/Dialog';
+import { ImageActionConfirmation } from './ImageActionConfirmation';
 import { VersionIdentity } from './VersionIdentity';
 import { FormField } from '../../../shared/ui/FormField';
 import { SaveDevelopmentRuntimeImagesSchema } from '@crewstation/contracts';
@@ -19,8 +21,9 @@ export function DevelopmentImages({ projectId, editable }: { readonly projectId:
   const query = useApiQuery(key, () => api.runtimeImages.development(projectId), AUTO_REFRESH);
   const profiles = useApiQuery(['runtime-images', projectId, 'profiles'], () => api.catalog.listComputeProfiles(projectId), AUTO_REFRESH);
   const [draft, setDraft] = useState<SaveDevelopmentRuntimeImages>(), [open, setOpen] = useState(false);
-  const save = useApiMutation(() => api.runtimeImages.saveDevelopment(projectId, SaveDevelopmentRuntimeImagesSchema.parse(draft)), { invalidate: [key], onSuccess: () => { setOpen(false); setDraft(undefined); } });
-  const reload = useApiMutation(() => api.runtimeImages.development(projectId), { onSuccess: (latest) => { setDraft({ expectedRevision: latest.revision, developmentTask: latest.developmentTask, developmentAgents: latest.developmentAgents }); save.reset(); } });
+  const [confirm, setConfirm] = useState<'save' | 'reload'>();
+  const save = useApiMutation(() => api.runtimeImages.saveDevelopment(projectId, SaveDevelopmentRuntimeImagesSchema.parse(draft)), { invalidate: [key], onSuccess: () => { setOpen(false); setDraft(undefined); setConfirm(undefined); } });
+  const reload = useApiMutation(() => api.runtimeImages.development(projectId), { onSuccess: (latest) => { setDraft({ expectedRevision: latest.revision, developmentTask: latest.developmentTask, developmentAgents: latest.developmentAgents }); save.reset(); setConfirm(undefined); } });
   const name = (id: string) => profiles.data?.items.find((p) => p.id === id)?.name ?? id;
   const edit = () => { if (!draft && query.data) setDraft({ expectedRevision: query.data.revision, developmentTask: query.data.developmentTask, developmentAgents: query.data.developmentAgents }); setOpen(true); };
   return <Card title={t('images.development')} stacked actions={editable ? <Button disabled={!query.data || !!query.error} onClick={edit}>{t('images.configure')}</Button> : null}>
@@ -28,10 +31,10 @@ export function DevelopmentImages({ projectId, editable }: { readonly projectId:
     <p>{t('images.usage.task')} · {query.data?.developmentTask.runtimeImageVersionId ? <VersionIdentity projectId={projectId} versionId={query.data.developmentTask.runtimeImageVersionId} /> : query.data ? t('runtimeImages.picker.platform') : '—'}</p>
     {query.data?.developmentAgents.map((agent) => <p key={agent.profileId} className={styles.identity}>{name(agent.profileId)} · {agent.selection.runtimeImageVersionId ? <VersionIdentity projectId={projectId} versionId={agent.selection.runtimeImageVersionId} /> : t('runtimeImages.picker.platform')}</p>)}
     {save.isSuccess ? <ActionNote tone="success">{t('images.policySaved')}</ActionNote> : null}
-    {open && draft ? <FormDialog title={t('images.configure')} submitLabel={t('images.save')} busy={save.isPending} onClose={() => setOpen(false)} onSubmit={() => save.mutate()} error={save.error ? errorMessage(save.error) : undefined}>
+    {open && draft ? <FormDialog title={t('images.configure')} submitLabel={t('images.save')} busy={save.isPending} onClose={() => setOpen(false)} onSubmit={() => setConfirm('save')} error={save.error ? errorMessage(save.error) : undefined}>
       <div className={styles.stack}>
         <p>{t('images.policyEditorHint')}</p>
-        {save.error ? <Button disabled={reload.isPending} onClick={() => reload.mutate()}>{t('images.replaceDraft')}</Button> : null}
+        {save.error ? <Button disabled={reload.isPending} onClick={() => setConfirm('reload')}>{t('images.replaceDraft')}</Button> : null}
         {reload.error ? <ActionNote tone="error">{errorMessage(reload.error)}</ActionNote> : null}
         <SelectionFields projectId={projectId} key={`task:${draft.expectedRevision}`} label={t('images.usage.task')} value={draft.developmentTask} onChange={(developmentTask) => setDraft({ ...draft, developmentTask })} />
         {draft.developmentAgents.map((agent) => <div key={`${agent.profileId}:${draft.expectedRevision}`} className={styles.stack}>
@@ -43,11 +46,13 @@ export function DevelopmentImages({ projectId, editable }: { readonly projectId:
         </select></FormField><QueryStatus isPending={profiles.isPending} error={profiles.error} />
       </div>
     </FormDialog> : null}
+    {confirm ? <ImageActionConfirmation title={t(confirm === 'save' ? 'images.save' : 'images.replaceDraft')} target={t('images.development')} hint={t(confirm === 'save' ? 'images.confirmDevelopment' : 'images.confirmDiscardDraft')} danger={confirm === 'reload'} busy={save.isPending || reload.isPending} error={confirm === 'save' ? save.error : reload.error} onCancel={() => setConfirm(undefined)} onConfirm={() => confirm === 'save' ? save.mutate() : reload.mutate()} /> : null}
   </Card>;
 }
 
 function SelectionFields({ projectId, label, value, onChange }: { readonly projectId: string; readonly label: string; readonly value: RuntimeImageSelection; readonly onChange: (value: RuntimeImageSelection) => void }) {
   const t = useT();
+  const [advanced, setAdvanced] = useState(false);
   const [choosing, setChoosing] = useState<'default' | 'allowed'>();
   const [allowed, setAllowed] = useState(value.allowedRuntimeImageVersionIds?.join('\n') ?? '');
   const select = (id: string) => {
@@ -57,12 +62,13 @@ function SelectionFields({ projectId, label, value, onChange }: { readonly proje
   };
   return <fieldset className={styles.stack}><legend>{label}</legend>
     <div className={styles.row}><Button onClick={() => setChoosing('default')}>{t('images.pickDefault')}</Button><Button onClick={() => setChoosing('allowed')}>{t('images.pickAllowed')}</Button></div>
-    {choosing ? <VersionBrowser projectId={projectId} onSelect={select} /> : null}
+    {choosing ? <Dialog title={t(choosing === 'default' ? 'images.pickDefault' : 'images.pickAllowed')} onClose={() => setChoosing(undefined)}><p>{t('images.pickerHint')}</p><VersionBrowser projectId={projectId} onSelect={select} /></Dialog> : null}
     <p>{t('images.defaultVersion')} · {value.runtimeImageVersionId ? <VersionIdentity projectId={projectId} versionId={value.runtimeImageVersionId} /> : t('runtimeImages.picker.platform')}</p>
     <Button onClick={() => onChange({ ...value, runtimeImageVersionId: undefined })}>{t('images.usePlatformDefault')}</Button>
     {value.allowedRuntimeImageVersionIds?.map((id) => <div key={id} className={styles.row}><VersionIdentity projectId={projectId} versionId={id} /><Button size="small" onClick={() => { const ids = value.allowedRuntimeImageVersionIds!.filter((v) => v !== id); setAllowed(ids.join('\n')); onChange({ ...value, allowedRuntimeImageVersionIds: ids }); }}>{t('images.removeSelection')}</Button></div>)}
-    <details><summary>{t('images.advancedSelection')}</summary><FormField label={t('images.defaultVersion')}><input value={value.runtimeImageVersionId ?? ''} placeholder={t('runtimeImages.picker.platform')} onChange={(event) => onChange({ ...value, runtimeImageVersionId: event.target.value || undefined })} /></FormField>
+    <div><Button onClick={() => setAdvanced(true)}>{t('images.advancedSelection')}</Button></div>
+    {advanced ? <FormDialog title={t('images.advancedSelection')} submitLabel={t('images.applyDraft')} onClose={() => setAdvanced(false)} onSubmit={() => setAdvanced(false)}><FormField label={t('images.defaultVersion')}><input value={value.runtimeImageVersionId ?? ''} placeholder={t('runtimeImages.picker.platform')} onChange={(event) => onChange({ ...value, runtimeImageVersionId: event.target.value || undefined })} /></FormField>
     <FormField label={t('images.allowedVersions')}><textarea rows={3} value={allowed} onChange={(event) => { setAllowed(event.target.value); onChange({ ...value, allowedRuntimeImageVersionIds: event.target.value.split(/\s+/).filter(Boolean) }); }} /></FormField>
-    </details>
+    </FormDialog> : null}
   </fieldset>;
 }

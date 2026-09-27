@@ -31,7 +31,7 @@ test('新增默认直接编写，不请求业务仓库；上传二进制、编�
   const executable = [...dialog().querySelectorAll<HTMLInputElement>('input[type=checkbox]')][0]!;
   await act(async () => executable.click()); await page!.settle();
   expect(draft().source.files).toEqual([{ path: 'bin/check', contentBase64: 'AP+A', executable: true }]);
-  await page!.click('保存并开始构建');
+  await page!.click('创建并生成版本');
   expect(fixture!.writes[0]!.body.recipe).not.toHaveProperty('sourceProjectId');
   expect(fixture!.writes[0]!.body.recipe).toMatchObject({ source: { kind: 'inline', files: [{ path: 'bin/check', contentBase64: 'AP+A', executable: true }] } });
   expect(fixture!.writes[1]!.url).toContain('/builds');
@@ -41,11 +41,11 @@ test('上传期间不能提交，晚到文件保留最新 Dockerfile；切换来
   await open(); await input(dialog().querySelector('input')!, 'Draft');
   let finish!: (value: ArrayBuffer) => void;
   const file = new File(['slow'], 'slow.txt'); Object.defineProperty(file, 'arrayBuffer', { value: () => new Promise<ArrayBuffer>((resolve) => { finish = resolve; }) });
-  await files([file]); expect(page!.button('保存并开始构建').disabled).toBe(true);
+  await files([file]); expect(page!.button('创建并生成版本').disabled).toBe(true);
   await input(dialog().querySelector('textarea')!, 'FROM scratch\n# updated during upload');
   await act(async () => finish(new TextEncoder().encode('slow').buffer)); await page!.settle();
   expect(draft().source.dockerfileContent).toContain('updated during upload'); expect(draft().source.files).toHaveLength(1);
-  expect(page!.button('保存并开始构建').disabled).toBe(false);
+  expect(page!.button('创建并生成版本').disabled).toBe(false);
   await kind('existing'); await kind('inline'); expect(draft().source.dockerfileContent).toContain('updated during upload');
   await page!.click('移除文件'); expect(draft().source.files).toEqual([]);
   expect(fixture!.writes).toHaveLength(0);

@@ -1,5 +1,5 @@
 import { businessRecoveryRoute } from './businessRecoveryRoute';
-import { runtimeImagesRoute } from './runtimeImagesRoute';
+import { runtimeImagesRoute, runtimeImageDetailRoute } from './runtimeImagesRoute';
 import { clusterRoute } from './clusterRoute';
 // 路由树装配：app/ 只负责骨架，页面路由由各 feature 的 index.ts 导出。
 // 两棵子树（RFC-002）：workbenchRoute 是租户空间，adminRoute 是平台管理空间。
@@ -49,6 +49,7 @@ export const routeTree = rootRoute.addChildren([
   adminRoute.addChildren([
     clusterRoute,
     runtimeImagesRoute,
+    runtimeImageDetailRoute,
     businessRecoveryRoute,
     adminOverviewRoute,
     adminProjectsRoute,

@@ -15,35 +15,40 @@ async function text(node: HTMLInputElement | HTMLTextAreaElement, value: string)
   await act(async () => { node.focus(); Object.getOwnPropertyDescriptor(node instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype, 'value')!.set!.call(node, value); node.dispatchEvent(new Event('input', { bubbles: true })); node.dispatchEvent(new KeyboardEvent('keyup', { key: 'a', bubbles: true })); }); await page!.settle();
 }
 
+async function advancedSelection(index = 0) {
+  const button = [...dialog().querySelectorAll<HTMLButtonElement>('button')].filter((item) => item.textContent === '高级：直接填写版本编号')[index]!;
+  await act(async () => { button.focus(); button.click(); }); await page!.settle();
+}
+
 test('目录展示真实版本，构建带幂等键，日志按游标续读，取消交给后端确认', async () => {
-  await open(); await page!.click('更多操作'); await page!.click('构建／登记版本');
+  await open(); await page!.click('管理镜像'); await page!.click('构建配置'); await page!.click('生成镜像版本');
   const accepted = fixture!.writes.find((write) => write.url.endsWith('/builds'))!;
   expect(accepted.body.revisionId).toBe(fixture!.revision.id); expect(typeof accepted.body.requestKey).toBe('string');
   await page!.click('构建日志'); await page!.reread();
   expect(page!.text()).toContain('install complete'); expect(fixture!.reads.some((url) => url.endsWith('/logs?after=1'))).toBe(true);
   expect(document.querySelectorAll('dialog[open]')).toHaveLength(2);
   await act(async () => { dialog().dispatchEvent(new Event('cancel', { cancelable: true })); }); await page!.settle();
-  await page!.click('取消构建'); expect(fixture!.writes.at(-1)!.url).toContain('/cancel');
+  await page!.click('取消构建'); expect(dialog().getAttribute('role')).toBe('alertdialog'); await page!.click('取消构建'); expect(fixture!.writes.at(-1)!.url).toContain('/cancel');
   await page!.click('镜像版本'); await page!.click('用途验证'); expect(page!.text()).toContain('尚未在此验证中启动服务');
 });
 
 test('新增修订校验 JSON，关闭保留草稿；配方支持 existing 且不自动构建', async () => {
-  await open(); await page!.click('更多操作'); await page!.click('新增构建修订');
+  await open(); await page!.click('管理镜像'); await page!.click('构建配置'); await page!.click('修改构建配置');
   const recipe = () => dialog().querySelector<HTMLTextAreaElement>('textarea')!;
-  await text(recipe(), '{broken'); await page!.click('保存修订');
+  await text(recipe(), '{broken'); await page!.click('保存为新配置');
   expect(fixture!.writes).toHaveLength(0);
   const draft = JSON.stringify({ source: fixture!.revision.source, initializer: { steps: [], env: {}, secrets: [] }, tools: [] });
-  await text(recipe(), draft); await page!.click('取消'); await page!.click('新增构建修订'); expect(recipe().value).toBe(draft);
-  await page!.click('保存修订'); expect(fixture!.writes).toHaveLength(1); expect(fixture!.writes[0]!.url).toContain('/revisions'); expect(fixture!.writes[0]!.body.source).toEqual(fixture!.revision.source);
+  await text(recipe(), draft); await page!.click('取消'); await page!.click('修改构建配置'); expect(recipe().value).toBe(draft);
+  await page!.click('保存为新配置'); expect(fixture!.writes).toHaveLength(1); expect(fixture!.writes[0]!.url).toContain('/revisions'); expect(fixture!.writes[0]!.body.source).toEqual(fixture!.revision.source);
 });
 
 test('开发配置逐个保存任务与 Agent，版本并发锁保留读取时修订', async () => {
   await open(false); await page!.click('配置默认与允许镜像');
   const fields = [...dialog().querySelectorAll('fieldset')]; expect(fields).toHaveLength(2);
-  await text(fields[0]!.querySelector<HTMLInputElement>('input')!, riId(19));
-  await text(fields[1]!.querySelector<HTMLTextAreaElement>('textarea')!, `${riId(16)}\n${riVersion}\n`);
-  expect(fields[1]!.querySelector('textarea')!.value.endsWith('\n')).toBe(true);
-  await page!.click('保存'); expect(fixture!.writes[0]!.body).toEqual({ expectedRevision: 7, developmentTask: { runtimeImageVersionId: riId(19) }, developmentAgents: [{ profileId: riProfile, selection: { allowedRuntimeImageVersionIds: [riId(16), riVersion] } }] });
+  await advancedSelection(); await text(dialog().querySelector<HTMLInputElement>('input')!, riId(19)); await page!.click('应用到草稿');
+  await advancedSelection(1); await text(dialog().querySelector<HTMLTextAreaElement>('textarea')!, `${riId(16)}\n${riVersion}\n`);
+  expect(dialog().querySelector('textarea')!.value.endsWith('\n')).toBe(true); await page!.click('应用到草稿');
+  await page!.click('保存'); await page!.click('保存'); expect(fixture!.writes[0]!.body).toEqual({ expectedRevision: 7, developmentTask: { runtimeImageVersionId: riId(19) }, developmentAgents: [{ profileId: riProfile, selection: { allowedRuntimeImageVersionIds: [riId(16), riVersion] } }] });
 });
 
 test('平台目录仅管理员读取；项目目录不替代管理员跨项目入口', async () => {
@@ -51,27 +56,27 @@ test('平台目录仅管理员读取；项目目录不替代管理员跨项目�
   expect(fixture.reads.some((url) => url.includes('/runtime-image-catalog'))).toBe(false);
   page.unmount(); fixture.restore(); fixture = runtimeImageConsoleFixture(true); page = await renderElement(<AdminRuntimeImagesPage />, messages);
   await page.settle(); expect(fixture.reads.some((url) => url.includes('/runtime-image-catalog'))).toBe(true); expect(page.text()).toContain('Python tools');
-  await page.click('更多操作'); expect(dialog().textContent).toContain('镜像版本');
+  await page.click('管理镜像'); expect(dialog().textContent).toContain('镜像版本');
   expect(document.querySelectorAll('dialog[open]')).toHaveLength(1);
 });
 
 test('配置冲突保留草稿，只在明确丢弃后读取最新修订与字段', async () => {
   await open(false); await page!.click('配置默认与允许镜像');
-  await text(dialog().querySelector<HTMLInputElement>('input')!, riId(19));
+  await advancedSelection(); await text(dialog().querySelector<HTMLInputElement>('input')!, riId(19)); await page!.click('应用到草稿');
   fixture!.state.conflict = true; fixture!.policy.revision = 8;
-  await page!.click('保存'); expect(dialog().querySelector<HTMLInputElement>('input')!.value).toBe(riId(19));
-  await page!.click('丢弃草稿，采用最新配置');
-  expect(dialog().querySelector<HTMLInputElement>('input')!.value).toBe(riVersion);
-  fixture!.state.conflict = false; await page!.click('保存');
+  await page!.click('保存'); await page!.click('保存'); await page!.click('取消'); await advancedSelection(); expect(dialog().querySelector<HTMLInputElement>('input')!.value).toBe(riId(19)); await page!.click('应用到草稿');
+  await page!.click('丢弃草稿，采用最新配置'); expect(dialog().getAttribute('role')).toBe('alertdialog'); await page!.click('丢弃草稿，采用最新配置');
+  await advancedSelection(); expect(dialog().querySelector<HTMLInputElement>('input')!.value).toBe(riVersion); await page!.click('应用到草稿');
+  fixture!.state.conflict = false; await page!.click('保存'); await page!.click('保存');
   expect(fixture!.writes.at(-1)!.body.expectedRevision).toBe(8);
 });
 
 test('目录删除先停用并检查引用，开发者无管理操作；停用后详情不再允许验证', async () => {
   fixture = runtimeImageConsoleFixture(false, 'developer');
   page = await renderElement(<ProjectScopeProvider value={{ projectId: riProject, space: 'workbench' }}><RuntimeImagesPage /></ProjectScopeProvider>, messages);
-  await page.click('查看'); expect(page.text()).not.toContain('停用新选择');
+  await page.click('查看'); expect(page.text()).not.toContain('停用此版本');
   page.unmount(); fixture.restore(); await open();
-  await page!.click('更多操作'); await page!.click('停用新选择'); await page!.click('用途验证'); expect(page!.text()).not.toContain('发起验证');
+  await page!.click('管理镜像'); await page!.click('停用此版本'); expect(dialog().getAttribute('role')).toBe('alertdialog'); await page!.click('停用此版本'); await page!.click('用途验证'); expect(page!.text()).not.toContain('发起验证');
   fixture!.state.references = 1; await page!.reread();
   const remove = () => [...page!.host.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent === '删除版本')!;
   expect(remove().disabled).toBe(true);
@@ -84,18 +89,18 @@ test('目录删除先停用并检查引用，开发者无管理操作；停用�
 });
 
 test('构建来源表单生成已有镜像配方，并保留高级初始化草稿', async () => {
-  await open(); await page!.click('更多操作'); await page!.click('新增构建修订');
+  await open(); await page!.click('管理镜像'); await page!.click('构建配置'); await page!.click('修改构建配置');
   const kind = dialog().querySelector<HTMLSelectElement>('select')!;
   await act(async () => { kind.value = 'existing'; kind.dispatchEvent(new Event('change', { bubbles: true })); });
   await text(dialog().querySelector<HTMLInputElement>('input')!, 'runtime/custom-tools:v2');
   const draft = JSON.parse(dialog().querySelector<HTMLTextAreaElement>('textarea')!.value);
   expect(draft.source).toEqual({ kind: 'existing', reference: 'runtime/custom-tools:v2', usage: 'task', architecture: 'linux/amd64' });
   expect(draft.initializer).toEqual({ steps: [], env: {}, secrets: [] });
-  await page!.click('保存修订'); expect(fixture!.writes.at(-1)!.body.source).toEqual(draft.source);
+  await page!.click('保存为新配置'); expect(fixture!.writes.at(-1)!.body.source).toEqual(draft.source);
 });
 
 test('源码构建从本项目仓库选择绑定，保存的是服务绑定身份而非展示名', async () => {
-  await open(); await page!.click('更多操作'); await page!.click('新增构建修订');
+  await open(); await page!.click('管理镜像'); await page!.click('构建配置'); await page!.click('修改构建配置');
   const kind = dialog().querySelector<HTMLSelectElement>('select')!;
   await act(async () => { kind.value = 'source'; kind.dispatchEvent(new Event('change', { bubbles: true })); }); await page!.settle();
   const sourceProject = [...dialog().querySelectorAll<HTMLSelectElement>('select')].find((select) => select.textContent?.includes('选择源码业务'))!;
@@ -103,24 +108,24 @@ test('源码构建从本项目仓库选择绑定，保存的是服务绑定身�
   const repository = [...dialog().querySelectorAll<HTMLSelectElement>('select')].find((select) => select.textContent?.includes('选择项目仓库'))!;
   expect(repository).toBeDefined();
   await act(async () => { repository.value = riId(22); repository.dispatchEvent(new Event('change', { bubbles: true })); });
-  await page!.click('保存修订');
+  await page!.click('保存为新配置');
   expect(fixture!.writes.at(-1)!.body.source).toMatchObject({ kind: 'source', repositoryBindingId: riId(22), ref: 'main' });
 });
 
 test('修订超过一页时可选择旧配方，构建不悄悄回到最新修订', async () => {
   await open();
   fixture!.revisions.splice(0, 1, ...Array.from({ length: 21 }, (_, index) => ({ ...fixture!.revision, id: riId(100 + index), revision: 21 - index })));
-  await page!.click('更多操作'); await page!.click('下一页');
+  await page!.click('管理镜像'); await page!.click('构建配置'); await page!.click('下一页');
   expect(fixture!.reads.some((url) => url.includes(`before=${riId(119)}`))).toBe(true);
-  await page!.click('构建／登记版本');
+  await page!.click('生成镜像版本');
   expect(fixture!.writes.at(-1)!.body.revisionId).toBe(riId(120));
-  await page!.click('回到第一页'); await page!.click('构建／登记版本');
+  await page!.click('构建配置'); await page!.click('回到第一页'); await page!.click('生成镜像版本');
   expect(fixture!.writes.at(-1)!.body.revisionId).toBe(riId(100));
 });
 
 test('开发配置从具名目录选择默认和允许版本，不修改其他 Agent 的配置', async () => {
   await open(false); await page!.click('配置默认与允许镜像');
-  await text(dialog().querySelector<HTMLInputElement>('input')!, '');
+  await page!.click('使用平台默认');
   const choose = async (label: string) => {
     await page!.click(label);
     const catalog = dialog().querySelector<HTMLSelectElement>('select')!;
@@ -131,7 +136,7 @@ test('开发配置从具名目录选择默认和允许版本，不修改其他 A
     await act(async () => { version.value = riVersion; version.dispatchEvent(new Event('change', { bubbles: true })); }); await page!.settle();
     await page!.click('使用此版本');
   };
-  await choose('选择默认镜像'); await choose('添加允许镜像'); await page!.click('保存');
+  await choose('选择默认镜像'); await choose('添加允许镜像'); await page!.click('保存'); await page!.click('保存');
   expect(fixture!.writes.at(-1)!.body).toMatchObject({ developmentTask: { runtimeImageVersionId: riVersion, allowedRuntimeImageVersionIds: [riVersion] }, developmentAgents: fixture!.policy.developmentAgents });
 });
 

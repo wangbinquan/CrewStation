@@ -1,6 +1,9 @@
-import { useT } from '../../../shared/lib/useT';
-import { CopyButton } from '../../../shared/ui/clipboard/CopyButton';
-import styles from './RuntimeImages.module.css';
+import { useState } from 'react';
+import { Button } from '../../../../shared/ui/Button';
+import { Dialog } from '../../../../shared/ui/dialog/Dialog';
+import { useT } from '../../../../shared/lib/useT';
+import { CopyButton } from '../../../../shared/ui/clipboard/CopyButton';
+import styles from '../RuntimeImages.module.css';
 
 const taskExample = `ARG CS_BASE_IMAGE
 FROM \${CS_BASE_IMAGE}
@@ -25,9 +28,10 @@ USER bun
 CMD ["bun", "run", "start"]
 `;
 export function RecipeGuide({ service, inline = false }: { readonly service: boolean; readonly inline?: boolean }) {
+  const [open, setOpen] = useState(false);
   const t = useT(), example = service ? serviceExample : taskExample;
-  return <details><summary>{t('images.installGuide')}</summary><p>{t(service ? 'images.serviceDockerHint' : 'images.toolDockerHint')}</p>
-    <ol><li>{t('images.guideFiles')}</li><li>{t(inline ? 'images.guideInline' : 'images.guideCommit')}</li><li>{t('images.guideValidate')}</li></ol>
-    <CopyButton value={example} /><pre className={styles.code}>{example}</pre><p>{t('images.installPathHint')}</p>
-  </details>;
+  return <><Button onClick={() => setOpen(true)}>{t('images.installGuide')}</Button>{open ? <Dialog size="large" title={t('images.installGuide')} onClose={() => setOpen(false)}><p>{t(service ? 'images.serviceDockerHint' : 'images.toolDockerHint')}</p>
+    <ol><li>{t(service ? 'images.serviceGuideFiles' : 'images.guideFiles')}</li><li>{t(inline ? 'images.guideInline' : 'images.guideCommit')}</li><li>{t('images.guideValidate')}</li></ol>
+    <CopyButton value={example} /><pre className={styles.code}>{example}</pre>{!service ? <p>{t('images.installPathHint')}</p> : null}
+  </Dialog> : null}</>;
 }

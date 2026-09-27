@@ -1,3 +1,6 @@
+import { useState } from 'react';
+import { Button } from '../../../shared/ui/Button';
+import { FormDialog } from '../../../shared/ui/dialog/FormDialog';
 import { api } from '../../../shared/api/client';
 import { AUTO_REFRESH, useApiQuery } from '../../../shared/api/useApi';
 import { useT } from '../../../shared/lib/useT';
@@ -14,6 +17,7 @@ function target(value: string): Record<string, unknown> | undefined {
 /** 表单只修改当前字段；高级 JSON 中的 probes 与暂时无效草稿不被静默丢弃。 */
 export function ValidationEditor({ projectId, value, onChange }: { readonly projectId: string; readonly value: string; readonly onChange: (value: string) => void }) {
   const t = useT(), parsed = target(value), profile = parsed?.profile && typeof parsed.profile === 'object' ? parsed.profile as Record<string, unknown> : {};
+  const [advanced, setAdvanced] = useState(false);
   const profiles = useApiQuery(['runtime-images', projectId, 'validation-profiles'], () => api.catalog.listComputeProfiles(projectId), { ...AUTO_REFRESH, enabled: parsed?.usage === 'agent' });
   const update = (fields: Record<string, unknown>) => onChange(JSON.stringify({ ...parsed, ...fields }, null, 2));
   return <div className={styles.stack}>
@@ -37,8 +41,10 @@ export function ValidationEditor({ projectId, value, onChange }: { readonly proj
         <FormField label={t('images.serviceHealth')}><input value={typeof parsed.healthPath === 'string' ? parsed.healthPath : ''} onChange={(event) => update({ healthPath: event.target.value })} /></FormField>
       </> : null}
     </> : null}
-    <details open={!parsed}><summary>{t('images.advancedValidation')}</summary>
+    <div><Button onClick={() => setAdvanced(true)}>{t('images.advancedValidation')}</Button></div>
+    {!parsed ? <p>{t('images.invalidRecipe')}</p> : null}
+    {advanced ? <FormDialog title={t('images.advancedValidation')} submitLabel={t('images.applyDraft')} onClose={() => setAdvanced(false)} onSubmit={() => setAdvanced(false)}>
       <FormField label={t('images.validationTarget')}><textarea rows={10} spellCheck={false} value={value} onChange={(event) => onChange(event.target.value)} /></FormField>
-    </details>
+    </FormDialog> : null}
   </div>;
 }
