@@ -40,3 +40,15 @@ test('镜像构建 render 必须匹配完整子对象，Secret 创建幂等不�
   expect((await writer.ensureImageBuildJob!(plan)).created).toBe(true);
   expect((await writer.ensureImageBuildJob!(plan)).created).toBe(false);
 });
+
+test('直接编写构建只向准备容器挂输入，不挂 Git token，也不把推送凭据放入上下文', () => {
+  const plan = { ...imageBuildPlan(), inlineFileCount: 2, secretIds: [] }, job = imageBuildJobObject(plan);
+  type Spec = { template: { spec: { volumes: Array<{ name: string; secret?: { items: Array<{ key: string; path: string }> } }>; initContainers: Array<{ volumeMounts: Array<{ name: string }> }>; containers: Array<{ volumeMounts: Array<{ name: string }> }> } } };
+  const spec = (job.spec as Spec).template.spec;
+  expect(spec.volumes.find((v) => v.name === 'git')).toBeUndefined();
+  expect(spec.volumes.find((v) => v.name === 'context-input')!.secret!.items).toEqual([{ key: 'context-dockerfile', path: 'dockerfile' }, { key: 'context-file-0', path: 'file-0' }, { key: 'context-file-1', path: 'file-1' }]);
+  expect(spec.initContainers[0]!.volumeMounts.map((m) => m.name)).toEqual(['workspace', 'context-input']);
+  expect(spec.containers.flatMap((c) => c.volumeMounts).some((m) => m.name === 'context-input')).toBe(false);
+  const empty = imageBuildJobObject({ ...plan, inlineFileCount: 0 });
+  expect((empty.spec as Spec).template.spec.volumes.find((v) => v.name === 'context-input')!.secret!.items).toHaveLength(1);
+});

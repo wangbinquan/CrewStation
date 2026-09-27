@@ -7,7 +7,7 @@ import { updateClaimedBuild } from './buildLeases';
 
 /** 成功、失败、取消都要先物理停止。故障或 unknown 时保留容量与 pendingOutcome，重启后继续清理。 */
 export async function completeBuild(deps: RuntimeImageDeps, executor: RuntimeImageBuildExecutor, build: ImageBuild, revision: ImageRevision): Promise<void> {
-  if (revision.source.kind === 'source') {
+  if (revision.source.kind !== 'existing') {
     const observed = await executor.reconcile(build, revision, 'stop');
     if (observed.state !== 'stopped' || observed.resourceId !== build.resourceId) return;
   }

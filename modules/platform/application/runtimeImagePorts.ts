@@ -60,10 +60,11 @@ export function runtimeImagePlatformPorts(ports: RuntimeImagePlatformPorts, sett
     } },
     buildContext: async (build: RuntimeBuildIdentity, revision: RuntimeBuildSource) => {
       const actor = await buildActor(build), sourceProjectId = revision.sourceProjectId ?? build.sourceProjectId ?? build.projectId;
-      if (!sourceProjectId) throw precondition('构建缺少固定来源业务');
       if (!build.projectId && !actor.isAdmin) throw forbidden('构建提交者已失去平台管理权限');
       const project = build.projectId ? await ports.project.getProject(actor, build.projectId as ProjectId) : { namespace: settings.systemNamespace, slug: 'platform' };
       if (!project.namespace) throw precondition('平台构建命名空间未配置');
+      if (revision.source.kind === 'inline') return { namespace: project.namespace, slug: project.slug, repositoryUrl: '' };
+      if (!sourceProjectId) throw precondition('构建缺少固定来源业务');
       const source = await ports.scm.resolveBuildSource(actor, sourceProjectId as ProjectId, binding(revision), revision.commitSha!);
       if (source.commitSha !== revision.commitSha) throw precondition('固定源码提交已不可用');
       return { namespace: project.namespace, slug: project.slug, repositoryUrl: source.httpUrl };
@@ -88,6 +89,7 @@ function imageBuildCredentials(ports: RuntimeImagePlatformPorts, settings: Runti
     },
     revokeGit: (revision: RuntimeBuildSource, id: string) => ports.scm.revokeBuildCredential(binding(revision), id),
     push: async (build: RuntimeBuildIdentity, revision: RuntimeBuildSource) => {
+      if (!build.projectId && !(await actorOf(build)).isAdmin) throw forbidden('构建提交者已失去平台管理权限');
       const repositories = revision.baseImage ? [revision.baseImage.slice(settings.registryBase.length + 1).split('@')[0]!] : [];
       if (revision.baseImage && !revision.baseImage.startsWith(`${settings.registryBase}/`)) throw precondition('底座仓库不合法');
       const issued = await ports.compute.issueBuildPushCredential({ projectId: build.projectId, buildId: build.id, expiresAt: build.deadline, pullRepositories: repositories });

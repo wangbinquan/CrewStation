@@ -20,13 +20,14 @@ import { BuildHistory } from './BuildHistory';
 import { ImageVersions } from './ImageVersions';
 import styles from './RuntimeImages.module.css';
 
-export function ImageDetail({ projectId, imageId, editable, admin, manageable, onClose }: { readonly projectId: string | undefined; readonly imageId: string; readonly editable: boolean; readonly admin: boolean; readonly manageable: boolean; readonly onClose: () => void }) {
+export function ImageDetail({ projectId, imageId, editable, admin, manageable, initialTab = 'versions', onClose }: { readonly projectId: string | undefined; readonly imageId: string; readonly editable: boolean; readonly admin: boolean; readonly manageable: boolean; readonly initialTab?: 'versions' | 'settings'; readonly onClose: () => void }) {
   const t = useT(), key = ['runtime-images', projectId, imageId];
   const image = useApiQuery([...key, 'detail'], () => api.runtimeImages.get(projectId, imageId), AUTO_REFRESH);
   const owned = admin && projectId === undefined;
-  const [before, setBefore] = useState<string>(), [tab, setTab] = useState('versions');
+  const [before, setBefore] = useState<string>(), [tab, setTab] = useState<string>(initialTab);
   const revisions = useApiQuery([...key, 'revisions', before], () => api.runtimeImages.revisions(projectId, imageId, { before, limit: 20 }), { ...AUTO_REFRESH, enabled: owned && editable });
   const [editing, setEditing] = useState(false), [draft, setDraft] = useState(revisionDraft), [revisionId, setRevisionId] = useState('');
+  const [uploading, setUploading] = useState(false);
   const buildKey = useRef<{ revision: string; key: string } | undefined>(undefined);
   const save = useApiMutation(async () => api.runtimeImages.createRevision(projectId, imageId, CreateRuntimeImageRevisionSchema.parse(JSON.parse(draft))), { invalidate: [key], onSuccess: (revision) => { setBefore(undefined); setRevisionId(revision.id); setEditing(false); } });
   const build = useApiMutation(() => {
@@ -42,7 +43,7 @@ export function ImageDetail({ projectId, imageId, editable, admin, manageable, o
     {owned && editable ? <div className={styles.row}>
       <FormField label={t('images.revision')}><select value={revisionId || revisions.data?.items[0]?.id || ''} onChange={(event) => setRevisionId(event.target.value)}>
         {revisionId && !revisions.data?.items.some((revision) => revision.id === revisionId) ? <option value={revisionId}>{revisionId}</option> : null}
-        {revisions.data?.items.map((revision) => <option key={revision.id} value={revision.id}>{revision.revision} · {t(`images.usage.${revision.source.usage}`)} · {revision.commitSha?.slice(0, 12) ?? t('images.sourceExisting')}</option>)}
+        {revisions.data?.items.map((revision) => <option key={revision.id} value={revision.id}>{revision.revision} · {t(`images.usage.${revision.source.usage}`)} · {revision.commitSha?.slice(0, 12) ?? t(revision.source.kind === 'inline' ? 'images.sourceInline' : 'images.sourceExisting')}</option>)}
       </select></FormField>
       {before ? <Button onClick={() => { setBefore(undefined); setRevisionId(''); }}>{t('images.first')}</Button> : null}
       {revisions.data?.items.length === 20 ? <Button onClick={() => { setBefore(revisions.data!.items.at(-1)!.id); setRevisionId(''); }}>{t('images.next')}</Button> : null}
@@ -59,8 +60,8 @@ export function ImageDetail({ projectId, imageId, editable, admin, manageable, o
       {tab === 'grants' && owned ? <ImageGrants imageId={imageId} /> : null}
       {tab === 'settings' && image.data ? <div className={styles.stack}><ImageMetadata projectId={projectId} image={image.data} editable={editable && owned} manageable={manageable && owned} />{revisions.data?.items[0] ? <RecipeSummary revision={revisions.data.items.find((r) => r.id === revisionId) ?? revisions.data.items[0]} /> : null}</div> : null}
     </Tabs>
-    {editing ? <FormDialog title={t('images.editRecipe')} submitLabel={t('images.saveRevision')} busy={save.isPending} onClose={() => setEditing(false)} onSubmit={() => save.mutate()} error={save.error ? errorMessage(save.error) : undefined} dirty={draft !== revisionDraft()} onClear={() => setDraft(revisionDraft())}>
-      <RecipeEditor projectId={projectId} value={draft} onChange={setDraft} />
+    {editing ? <FormDialog title={t('images.editRecipe')} submitLabel={t('images.saveRevision')} busy={save.isPending} submitDisabled={uploading} onClose={() => setEditing(false)} onSubmit={() => save.mutate()} error={save.error ? errorMessage(save.error) : undefined} dirty={draft !== revisionDraft()} onClear={() => setDraft(revisionDraft())}>
+      <RecipeEditor projectId={projectId} value={draft} onChange={setDraft} onPendingChange={setUploading} />
     </FormDialog> : null}
   </div></Dialog>;
 }

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { ResourceIdSchema } from '../../ids';
+import { RuntimeImageDockerfileContentSchema, RuntimeImageInlineFilesSchema } from './inlineFiles';
 import {
   RuntimeImageArchitectureSchema, RuntimeImageInitializerSchema, RuntimeImageRelativePathSchema, RuntimeImageRequestKeySchema,
   RuntimeImageSecretRefSchema, RuntimeImageSelectionSchema, RuntimeImageToolCheckSchema, RuntimeImageUsageSchema, RuntimeImageValidationTargetSchema,
@@ -20,6 +21,13 @@ export const RuntimeImageSourceSchema = z.discriminatedUnion('kind', [
     secrets: z.array(RuntimeImageSecretRefSchema).max(32).default([]),
   }).strict().refine((v) => new Set(v.secrets.map((s) => s.id)).size === v.secrets.length, '构建 Secret ID 重复'),
   z.object({ kind: z.literal('existing'), reference: z.string().trim().min(1).max(512), architecture: RuntimeImageArchitectureSchema, usage: RuntimeImageUsageSchema }).strict(),
+  z.object({
+    kind: z.literal('inline'), dockerfileContent: RuntimeImageDockerfileContentSchema, files: RuntimeImageInlineFilesSchema.default([]),
+    architecture: RuntimeImageArchitectureSchema, usage: RuntimeImageUsageSchema,
+    target: z.string().regex(/^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$/).optional(),
+    baseProfile: z.object({ profileId: ResourceIdSchema, revision: z.number().int().positive() }).strict().optional(),
+    buildArgs: BuildArgsSchema.default({}),
+  }).strict(),
 ]);
 
 export const CreateRuntimeImageRequestSchema = z.object({ name: z.string().trim().min(1).max(80), description: z.string().max(1000).default(''), defaultVisible: z.boolean().optional() }).strict();

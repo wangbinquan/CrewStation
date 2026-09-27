@@ -24,7 +24,7 @@ export async function recordBuildObservation(deps: RuntimeImageDeps, build: Imag
 }
 
 export async function inspectBuildResult(executor: RuntimeImageBuildExecutor, build: ImageBuild, revision: ImageRevision, observation?: BuildObservation) {
-  if (revision.source.kind === 'source') {
+  if (revision.source.kind !== 'existing') {
     const receipt = observation?.receipt;
     if (!receipt || receipt.buildId !== build.id || receipt.executionEpoch !== build.executionEpoch || !build.podUid || receipt.podUid !== build.podUid) throw precondition('镜像构建结果未绑定原 build、epoch 与 Pod UID');
   }

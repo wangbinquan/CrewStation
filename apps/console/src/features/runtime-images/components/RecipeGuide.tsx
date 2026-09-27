@@ -24,10 +24,10 @@ COPY . .
 USER bun
 CMD ["bun", "run", "start"]
 `;
-export function RecipeGuide({ service }: { readonly service: boolean }) {
+export function RecipeGuide({ service, inline = false }: { readonly service: boolean; readonly inline?: boolean }) {
   const t = useT(), example = service ? serviceExample : taskExample;
   return <details><summary>{t('images.installGuide')}</summary><p>{t(service ? 'images.serviceDockerHint' : 'images.toolDockerHint')}</p>
-    <ol><li>{t('images.guideFiles')}</li><li>{t('images.guideCommit')}</li><li>{t('images.guideValidate')}</li></ol>
+    <ol><li>{t('images.guideFiles')}</li><li>{t(inline ? 'images.guideInline' : 'images.guideCommit')}</li><li>{t('images.guideValidate')}</li></ol>
     <CopyButton value={example} /><pre className={styles.code}>{example}</pre><p>{t('images.installPathHint')}</p>
   </details>;
 }

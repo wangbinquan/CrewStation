@@ -14,6 +14,8 @@ export const RuntimeImageBuildRenderSchema = z.object({
   /** 固定到本 build 专属仓库的产物地址；不能覆盖平台底座或其他构建。 */
   repository: z.string().min(1), destination: z.string().min(1),
   checkoutCommand: BuildCommandSchema, clientCommand: BuildCommandSchema, daemonCommand: BuildCommandSchema,
+  /** 存在即为直接编写构建；内容从不可变修订读取，仅挂入上下文准备容器。 */
+  inlineFileCount: z.number().int().min(0).max(32).optional(),
   secretIds: z.array(z.string().regex(/^[a-z][a-z0-9_-]{0,63}$/)).max(32),
   builderResources: ResourcesSchema, clientResources: ResourcesSchema, workspaceSize: z.string().min(1), cacheSize: z.string().min(1),
   activeDeadlineSeconds: z.number().int().positive(), ttlSecondsAfterFinished: z.number().int().positive(),

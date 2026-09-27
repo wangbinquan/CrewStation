@@ -11,7 +11,7 @@ export function RecipeSummary({ revision }: { readonly revision: RuntimeImageRev
       <dt>{t('images.fixedCommit')}</dt><dd className={styles.identity}>{revision.commitSha}</dd>
       <dt>{t('images.context')}</dt><dd>{source.context}</dd>
       <dt>{t('images.dockerfile')}</dt><dd>{source.dockerfile}</dd>
-    </dl> : <p className={styles.identity}>{source.reference}</p>}
+    </dl> : source.kind === 'inline' ? <><p>{t('images.sourceInline')} · {t('images.buildFileCount', { count: source.files.length })}</p><details><summary>{t('images.dockerfileContent')}</summary><pre className={styles.code}>{source.dockerfileContent}</pre>{source.files.map((file) => <p key={file.path} className={styles.identity}>{file.path}{file.executable ? ` · ${t('images.fileExecutable')}` : ''}</p>)}</details></> : <p className={styles.identity}>{source.reference}</p>}
     {source.usage !== 'service' ? <p>{t('images.recipeChecks', { steps: revision.initializer.steps.length, tools: revision.tools.length })}</p> : null}
   </div>;
 }

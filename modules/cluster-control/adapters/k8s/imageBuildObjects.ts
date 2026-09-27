@@ -10,6 +10,8 @@ const mount = (name: string, mountPath: string, readOnly = false) => ({ name, mo
 export function imageBuildJobObject(plan: RuntimeImageBuildRender): K8sObject {
   const secretVolume = (name: string, items: { key: string; path: string }[]) => ({ name, secret: { secretName: plan.secret, defaultMode: 0o440, items } });
   const clientSecurity = { runAsNonRoot: true, runAsUser: 1000, runAsGroup: 1000, allowPrivilegeEscalation: false, capabilities: { drop: ['ALL'] }, seccompProfile: { type: 'RuntimeDefault' } };
+  const inline = plan.inlineFileCount !== undefined;
+  const sourceVolume = inline ? secretVolume('context-input', [{ key: 'context-dockerfile', path: 'dockerfile' }, ...Array.from({ length: plan.inlineFileCount! }, (_, index) => ({ key: `context-file-${index}`, path: `file-${index}` }))]) : secretVolume('git', [{ key: 'git-token', path: 'token' }]);
   return { apiVersion: 'batch/v1', kind: 'Job', metadata: { name: plan.name, namespace: plan.namespace, labels: labels(plan) }, spec: {
     backoffLimit: 0, activeDeadlineSeconds: plan.activeDeadlineSeconds, ttlSecondsAfterFinished: plan.ttlSecondsAfterFinished,
     template: { metadata: { labels: labels(plan) }, spec: {
@@ -17,10 +19,10 @@ export function imageBuildJobObject(plan: RuntimeImageBuildRender): K8sObject {
       nodeSelector: { 'kubernetes.io/arch': plan.architecture.split('/')[1] }, securityContext: { fsGroup: 1000 },
       volumes: [
         { name: 'workspace', emptyDir: { sizeLimit: plan.workspaceSize } }, { name: 'cache', emptyDir: { sizeLimit: plan.cacheSize } }, { name: 'socket', emptyDir: { medium: 'Memory', sizeLimit: '16Mi' } },
-        secretVolume('git', [{ key: 'git-token', path: 'token' }]), secretVolume('push', [{ key: 'docker-config', path: 'config.json' }]),
+        sourceVolume, secretVolume('push', [{ key: 'docker-config', path: 'config.json' }]),
         ...(plan.secretIds.length ? [secretVolume('packages', plan.secretIds.map((id) => ({ key: `package-${id}`, path: id })))] : []),
       ],
-      initContainers: [{ name: 'checkout', image: plan.clientImage, command: plan.checkoutCommand, securityContext: clientSecurity, resources: limits(plan.clientResources), env: [{ name: 'HOME', value: '/tmp' }], volumeMounts: [mount('workspace', '/workspace'), mount('git', '/git-auth', true)] }],
+      initContainers: [{ name: 'checkout', image: plan.clientImage, command: plan.checkoutCommand, securityContext: clientSecurity, resources: limits(plan.clientResources), env: [{ name: 'HOME', value: '/tmp' }], volumeMounts: [mount('workspace', '/workspace'), inline ? mount('context-input', '/context-input', true) : mount('git', '/git-auth', true)] }],
       containers: [
         { name: 'buildkitd', image: plan.builderImage, command: plan.daemonCommand,
           securityContext: { runAsNonRoot: true, runAsUser: 1000, runAsGroup: 1000, privileged: false, seccompProfile: { type: 'Unconfined' }, appArmorProfile: { type: 'Unconfined' } },

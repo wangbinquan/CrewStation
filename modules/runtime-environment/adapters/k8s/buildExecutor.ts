@@ -70,7 +70,7 @@ async function inspect(deps: KubernetesImageBuildDeps, build: ImageBuild, revisi
 export function kubernetesRuntimeImageBuildExecutor(deps: KubernetesImageBuildDeps): RuntimeImageBuildExecutor {
   return {
     reconcile: async (build, revision, desired) => {
-      if (revision.source.kind !== 'source' || !build.resourceId) throw precondition('源码构建资源身份缺失');
+      if (revision.source.kind === 'existing' || !build.resourceId) throw precondition('构建资源身份缺失');
       if (desired === 'stop') return stop(deps, build, revision);
       const plan = build.resourcePlan ?? await deps.plan(build, revision);
       if (plan.buildId !== build.id || plan.resourceId !== build.resourceId || plan.executionEpoch !== build.executionEpoch) throw precondition('构建计划身份不匹配');

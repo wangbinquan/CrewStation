@@ -21,7 +21,7 @@ export function runtimeImageBuildController(deps: RuntimeImageDeps, executor: Ru
       }
       if (claimed.state === 'queued') claimed = await patch(claimed, { state: 'preparing', stage: 'preparing' });
       if (!claimed) return;
-      const observation = revision.source.kind === 'source' ? await executor.reconcile(claimed, revision, 'run') : undefined;
+      const observation = revision.source.kind !== 'existing' ? await executor.reconcile(claimed, revision, 'run') : undefined;
       if (observation) claimed = await recordBuildObservation(deps, claimed, observation);
       if (!claimed) return;
       if (observation?.state === 'unknown') return;

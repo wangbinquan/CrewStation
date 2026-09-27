@@ -30,7 +30,7 @@ export async function runtimeImageFixture(executor?: RuntimeImageBuildExecutor, 
     } },
     sources: { prepare: async (_a, _p, source: RuntimeImageSource) => {
       prepares++;
-      return source.kind === 'existing' ? { source: { ...source, reference: `registry.test/project/tool@${digest}` } } : { source, commitSha: 'b'.repeat(40), baseImage: `registry.test/platform/task@${digest}` };
+      return source.kind === 'existing' ? { source: { ...source, reference: `registry.test/project/tool@${digest}` } } : { source, ...(source.kind === 'source' ? { commitSha: 'b'.repeat(40) } : {}), baseImage: `registry.test/platform/task@${digest}` };
     } },
     validationContracts: { fingerprint: async () => contractFingerprint, ...(secrets ? { secretVersions: secrets.versions } : {}) },
     ...(secrets ? { initializationSecrets: secrets.values } : {}),

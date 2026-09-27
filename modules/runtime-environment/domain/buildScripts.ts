@@ -42,13 +42,13 @@ rm -rf /tmp/repository /tmp/source.tar
 
 /** 用户参数始终是一个 shell 参数；包 Secret 只经 BuildKit session mount，绝不写入 ARG/ENV。 */
 export function imageClientScript(revision: ImageRevision, destination: string, insecure: boolean): string {
-  if (revision.source.kind !== 'source') throw validation('已有镜像不应创建构建客户端');
-  const source = revision.source, context = `/workspace/context/${source.context}`;
-  const args = ['buildctl', '--addr', 'unix:///run/cs-build/buildkitd.sock', 'build', '--frontend', 'dockerfile.v0', '--local', `context=${context}`, '--local', `dockerfile=${context}`, '--opt', `filename=${source.dockerfile}`, '--opt', `platform=${source.architecture}`];
+  if (revision.source.kind === 'existing') throw validation('已有镜像不应创建构建客户端');
+  const source = revision.source, context = source.kind === 'source' ? `/workspace/context/${source.context}` : '/workspace/context';
+  const args = ['buildctl', '--addr', 'unix:///run/cs-build/buildkitd.sock', 'build', '--frontend', 'dockerfile.v0', '--local', `context=${context}`, '--local', `dockerfile=${context}`, '--opt', `filename=${source.kind === 'source' ? source.dockerfile : 'Dockerfile'}`, '--opt', `platform=${source.architecture}`];
   if (source.target) args.push('--opt', `target=${source.target}`);
   if (revision.baseImage) args.push('--opt', `build-arg:CS_BASE_IMAGE=${revision.baseImage}`);
   for (const [key, value] of Object.entries(source.buildArgs)) args.push('--opt', `build-arg:${key}=${value}`);
-  for (const secret of source.secrets) args.push('--secret', `id=${secret.id},src=/build-secrets/${secret.id}`);
+  for (const secret of source.kind === 'source' ? source.secrets : []) args.push('--secret', `id=${secret.id},src=/build-secrets/${secret.id}`);
   args.push('--output', `type=image,name=${destination},push=true${insecure ? ',registry.insecure=true' : ''}`, '--metadata-file', '/tmp/build-metadata.json');
   return `set -eu
 trap 'touch /run/cs-build/client.done' EXIT

@@ -1,4 +1,8 @@
 import { RecipeGuide } from './RecipeGuide';
+import { useRef } from 'react';
+import type { RuntimeImageUsage } from '@crewstation/contracts';
+import { InlineSourceEditor } from './InlineSourceEditor';
+import { inlineSource } from '../model/inlineDraft';
 import { FormField } from '../../../shared/ui/FormField';
 import { QueryStatus } from '../../../shared/ui/QueryStatus';
 import { api } from '../../../shared/api/client';
@@ -12,8 +16,10 @@ function object(value: unknown): ObjectValue | undefined { return value && typeo
 function recipe(value: string): ObjectValue | undefined { try { return object(JSON.parse(value)); } catch { return undefined; } }
 
 /** 常用来源字段直接编辑；高级 JSON 保留完整配方与暂时无效的草稿，不静默丢弃未知字段。 */
-export function RecipeEditor({ projectId, value, onChange }: { readonly projectId: string | undefined; readonly value: string; readonly onChange: (value: string) => void }) {
+export function RecipeEditor({ projectId, value, onChange, onPendingChange }: { readonly projectId: string | undefined; readonly value: string; readonly onChange: (value: string) => void; readonly onPendingChange?: (pending: boolean) => void }) {
   const t = useT(), parsed = recipe(value), source = object(parsed?.source), profile = object(source?.baseProfile);
+  const drafts = useRef<Record<string, ObjectValue>>({});
+  const repositoryProject = useRef<string | undefined>(undefined);
   const sourceProjectId = typeof parsed?.sourceProjectId === 'string' ? parsed.sourceProjectId : projectId;
   const projects = useApiQuery(['runtime-images', 'source-projects'], () => api.projects.list(), { ...AUTO_REFRESH, enabled: projectId === undefined && source?.kind === 'source' });
   const project = useApiQuery(['runtime-images', sourceProjectId, 'source-project'], () => api.projects.get(sourceProjectId!), { ...AUTO_REFRESH, enabled: source?.kind === 'source' && !!sourceProjectId });
@@ -23,11 +29,14 @@ export function RecipeEditor({ projectId, value, onChange }: { readonly projectI
   return <div className={styles.stack}>
     {source ? <>
       <FormField label={t('images.sourceKind')}><select value={String(source.kind ?? 'source')} onChange={(event) => {
-        const next = event.target.value === 'existing' ? { kind: 'existing', reference: '', usage: source.usage, architecture: source.architecture } : { ...object(recipe(revisionDraft())?.source), usage: source.usage, architecture: source.architecture };
-        onChange(JSON.stringify({ ...parsed, source: next }, null, 2));
-      }}><option value="source">{t('images.sourceBuild')}</option><option value="existing">{t('images.sourceExisting')}</option></select></FormField>
+        drafts.current[String(source.kind)] = source;
+        if (source.kind === 'source') repositoryProject.current = sourceProjectId;
+        const kind = event.target.value, usage = source.usage as RuntimeImageUsage;
+        const next = drafts.current[kind] ?? (kind === 'existing' ? { kind, reference: '', usage, architecture: source.architecture } : kind === 'inline' ? inlineSource(usage, String(source.architecture)) : { ...object(recipe(revisionDraft())?.source), usage, architecture: source.architecture });
+        onChange(JSON.stringify({ ...parsed, sourceProjectId: kind === 'source' ? repositoryProject.current : undefined, source: next }, null, 2));
+      }}><option value="inline">{t('images.sourceInline')}</option><option value="source">{t('images.sourceBuild')}</option><option value="existing">{t('images.sourceExisting')}</option></select></FormField>
       <div className={styles.row}>
-        <FormField label={t('images.purpose')}><select value={String(source.usage ?? 'task')} onChange={(event) => update({ usage: event.target.value, ...(event.target.value !== 'agent' ? { baseProfile: undefined } : {}) })}>
+        <FormField label={t('images.purpose')}><select value={String(source.usage ?? 'task')} onChange={(event) => update({ usage: event.target.value, ...(event.target.value !== 'agent' ? { baseProfile: undefined } : {}), ...(source.kind === 'inline' && source.dockerfileContent === inlineSource(source.usage as RuntimeImageUsage).dockerfileContent ? { dockerfileContent: inlineSource(event.target.value as RuntimeImageUsage).dockerfileContent } : {}) })}>
           {(['task', 'agent', 'service'] as const).map((usage) => <option key={usage} value={usage}>{t(`images.usage.${usage}`)}</option>)}
         </select></FormField>
         <FormField label={t('images.architecture')}><select value={String(source.architecture ?? 'linux/amd64')} onChange={(event) => update({ architecture: event.target.value })}><option>linux/amd64</option><option>linux/arm64</option></select></FormField>
@@ -43,13 +52,13 @@ export function RecipeEditor({ projectId, value, onChange }: { readonly projectI
         </select></FormField>{sourceProjectId ? <QueryStatus isPending={project.isPending} error={project.error} /> : null}
         {field('ref', 'images.gitRef', 'main')}
         {field('context', 'images.context', '.')}{field('dockerfile', 'images.dockerfile', 'Dockerfile')}<p className={styles.note}>{t('images.contextHint')}</p><RecipeGuide service={source.usage === 'service'} />
-        {source.usage === 'agent' ? <div className={styles.row}>
+      </> : source.kind === 'inline' ? <InlineSourceEditor source={source} onChange={update} onPendingChange={onPendingChange} /> : field('reference', 'images.existingReference', 'runtime/tools:1.0')}
+        {source.usage === 'agent' && source.kind !== 'existing' ? <div className={styles.row}>
           <FormField label={t('images.agentProfile')}><select value={String(profile?.profileId ?? '')} onChange={(event) => { const selected = profiles.data?.items.find((item) => item.id === event.target.value); update({ baseProfile: { profileId: event.target.value, revision: selected?.revision ?? 1 } }); }}>
             <option value="">{t('images.selectProfile')}</option>{profiles.data?.items.map((item) => <option key={item.id} value={item.id} disabled={!item.available}>{item.name} · {t('images.profileVersion', { revision: item.revision ?? '?' })}</option>)}
           </select></FormField><QueryStatus isPending={profiles.isPending} error={profiles.error} />
           {profile?.profileId ? <p>{t('images.profileVersion', { revision: Number(profile.revision ?? 1) })}</p> : null}
         </div> : null}
-      </> : field('reference', 'images.existingReference', 'runtime/tools:1.0')}
     </> : null}
     <details open={!source}><summary>{t('images.advancedRecipe')}</summary>
       <p>{t('images.recipeHint')}</p><FormField label={t('images.recipe')}><textarea rows={20} spellCheck={false} value={value} onChange={(event) => onChange(event.target.value)} /></FormField>

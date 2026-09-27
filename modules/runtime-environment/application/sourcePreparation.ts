@@ -15,6 +15,14 @@ export function runtimeImageSourcePreparation(repository: ImageSourceRepository,
         if (source.usage !== 'service' && (!baseImage || !/@sha256:[0-9a-f]{64}$/.test(baseImage))) throw precondition('平台任务或 Agent 底座未固定摘要');
         return { source: { ...source, reference }, ...(baseImage ? { baseImage } : {}) };
       }
+      if (source.kind === 'inline') {
+        inspectRuntimeDockerfile(source.dockerfileContent, source);
+        if (source.baseProfile && source.usage !== 'agent') throw validation('只有 Agent 用途可指定算力档位底座');
+        if (source.usage === 'agent' && !source.baseProfile) throw validation('Agent 镜像构建必须指定固定算力档位修订');
+        const baseImage = await bases.resolve(actor, projectId, source);
+        if (source.usage !== 'service' && (!baseImage || !/@sha256:[0-9a-f]{64}$/.test(baseImage))) throw precondition('平台任务或 Agent 底座未固定摘要');
+        return { source, ...(baseImage ? { baseImage } : {}) };
+      }
       if (!projectId) throw precondition('源码构建需要指定来源业务');
       const { commitSha, tree } = await repository.resolve(actor, projectId, source.repositoryBindingId, source.ref);
       if (!/^[0-9a-f]{40,64}$/.test(commitSha)) throw precondition('源码未解析到固定提交');

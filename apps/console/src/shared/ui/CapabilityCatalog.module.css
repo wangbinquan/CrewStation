@@ -1,4 +1,5 @@
 /* 平台能力目录：算力档位与运行镜像共用列表密度、状态区域和窄屏布局。 */
+.catalogSections { display: grid; gap: var(--cs-space-4); min-width: 0; }
 .listToolbar {
   display: flex;
   align-items: end;

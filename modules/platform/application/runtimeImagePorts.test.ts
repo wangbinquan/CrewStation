@@ -91,3 +91,16 @@ test('验证摘要随 beforeStart 配置变化，任务验证无需读取 Agent 
   f.state.beforeStart = { ...f.state.beforeStart, secrets: { NEW_TOKEN: 'rotated' } };
   expect(await fingerprint('task')).toBe(task); expect(await fingerprint('agent')).not.toBe(agent);
 });
+
+test('直接编写构建不借用业务仓库，撤销管理员后不能继续取得推送凭据', async () => {
+  const f = fixture(), build = { ...f.build, projectId: undefined }, revision = RuntimeImageRevisionDtoSchema.parse({ ...f.revision, source: { kind: 'inline', dockerfileContent: 'FROM alpine', usage: 'service', architecture: 'linux/arm64' }, commitSha: undefined });
+  f.state.admin = true;
+  expect(await f.api.buildContext(build, revision)).toEqual({ namespace: 'cs-system', slug: 'platform', repositoryUrl: '' });
+  expect(await f.api.credentials.packages(build, revision)).toEqual({});
+  expect(f.calls).toEqual([]);
+  await f.api.credentials.push(build, revision);
+  expect(f.calls.map((c) => c.key)).toEqual(['push']);
+  f.state.admin = false;
+  await expect(f.api.buildContext(build, revision)).rejects.toMatchObject({ kind: 'forbidden' });
+  await expect(f.api.credentials.push(build, revision)).rejects.toMatchObject({ kind: 'forbidden' });
+});

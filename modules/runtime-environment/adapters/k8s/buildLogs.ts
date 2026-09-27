@@ -17,7 +17,9 @@ function secretPatterns(secret: BuildSecret): readonly string[] {
       if (key === 'auth' && typeof child === 'string') { const text = Buffer.from(child, 'base64').toString(); add(text); add(text.slice(text.indexOf(':') + 1)); }
     }
   };
-  for (const encoded of Object.values(secret.data ?? {})) {
+  for (const [key, encoded] of Object.entries(secret.data ?? {})) {
+    // 直接编写的公开构建输入复用挂载载体，不是凭据；不能拿普通源码遮盖构建日志。
+    if (key === 'context-dockerfile' || /^context-file-\d+$/.test(key)) continue;
     const value = Buffer.from(encoded, 'base64').toString(); add(value);
     try { visit(JSON.parse(value)); } catch { /* 普通文本 token */ }
   }

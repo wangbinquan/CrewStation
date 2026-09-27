@@ -32,7 +32,7 @@ export function runtimeImageBuilds(deps: RuntimeImageDeps) {
         if (deps.limits.platformBuilds < 1) throw precondition('平台未配置镜像构建容量', { code: 'image_build_unavailable' });
         if (await s.builds.activeCount() >= deps.limits.platformBuilds) throw quotaExceeded('镜像构建容量已满，请稍后重试', { code: 'image_build_capacity', retryAfter: 5 });
         const at = deps.clock.now(), last = (await s.builds.list(imageId, { limit: 1 }))[0];
-        const build: ImageBuild = { id: newResourceId(), imageId, ...(revision.sourceProjectId ? { sourceProjectId: revision.sourceProjectId } : {}), revisionId: revision.id, state: 'queued', stage: 'queued', requestKey: parsed.requestKey, inputDigest, epoch: 0, executionEpoch: 1, ...(revision.source.kind === 'source' ? { resourceId: newResourceId() } : {}),
+        const build: ImageBuild = { id: newResourceId(), imageId, ...(revision.sourceProjectId ? { sourceProjectId: revision.sourceProjectId } : {}), revisionId: revision.id, state: 'queued', stage: 'queued', requestKey: parsed.requestKey, inputDigest, epoch: 0, executionEpoch: 1, ...(revision.source.kind !== 'existing' ? { resourceId: newResourceId() } : {}),
           createdBy: actor.userId, createdAt: at.toISOString(), updatedAt: at.toISOString(), deadline: new Date(at.getTime() + deps.limits.buildTimeoutSeconds * 1000).toISOString(), attempt: (last?.attempt ?? 0) + 1, unknown: false };
         await s.builds.insert(build); return RuntimeImageBuildDtoSchema.parse(build);
       });
