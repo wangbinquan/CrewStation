@@ -6,9 +6,11 @@ import type { Database, Executor } from '@crewstation/persistence';
 import type { TaskId } from '@crewstation/contracts';
 import type { ExecutionSubtask } from '../../../domain/executionSubtask';
 import type { ExecutionSubtasks, SubtaskCandidate } from '../../../ports/executionSubtasks';
-import { liveControl } from '../../../domain/executionControl';
+import { liveControl, type ExecutionAuthorization } from '../../../domain/executionControl';
+import { ownedRecovery } from '../recovery/ownership';
 import { authorizeExecution, executionTransaction, readExecutionControl } from '../executionTransaction';
 import { executionSubtasks as tasks } from './subtaskTables';
+import { authorizeRecoveryMutation, bindRecoveryMutation } from '../recovery/mutations';
 
 const scope = (serviceId: string, taskId: TaskId) => and(eq(tasks.serviceId, serviceId), eq(tasks.taskId, taskId));
 const rowView = (row: typeof tasks.$inferSelect): ExecutionSubtask => ({ ...row, taskId: row.taskId as TaskId, requestKind: row.requestKind as ExecutionSubtask['requestKind'], dispatch: row.dispatch as ExecutionSubtask['dispatch'], leaseUntil: row.leaseUntil?.toISOString() ?? null });
@@ -26,9 +28,11 @@ export function drizzleExecutionSubtasks(db: Database): ExecutionSubtasks {
     get: async (serviceId, taskId, id) => { const row = (await db.select().from(tasks).where(and(scope(serviceId, taskId), eq(tasks.id, id))))[0]; return row && rowView(row); },
     list: async (serviceId, taskId) => (await db.select().from(tasks).where(scope(serviceId, taskId)).orderBy(asc(tasks.id))).map(rowView),
     reserve: (candidate, authorization) => executionTransaction(db, candidate.serviceId, async (tx, now) => {
+      const recovery = await recoveryForRetry(tx, now, candidate, authorization);
       const old = (await tx.select().from(tasks).where(and(scope(candidate.serviceId, candidate.taskId), eq(tasks.requestKey, candidate.requestKey), eq(tasks.requestKind, candidate.requestKind), eq(tasks.requestParent, candidate.requestParent))))[0];
       if (old) {
         if (old.requestDigest !== candidate.requestDigest) throw conflict('同一 requestKey 已用于不同子任务参数', { code: 'idempotency_conflict' });
+        await bindRecoveryMutation(tx, now, recovery, { resultSubtaskId: old.id });
         return { subtask: rowView(old), created: false };
       }
       await assertTaskAcceptsExecution(tx, candidate.taskId);
@@ -36,11 +40,14 @@ export function drizzleExecutionSubtasks(db: Database): ExecutionSubtasks {
       const epoch = await authorizeExecution(tx, candidate.serviceId, candidate.fenced, authorization, now);
       await reserveSessionHome(tx, candidate);
       const row = (await tx.insert(tasks).values({ ...candidate, id: candidate.view.id, epoch, dispatch: 'pending', updatedAt: now }).returning())[0]!;
+      await bindRecoveryMutation(tx, now, recovery, { resultSubtaskId: row.id });
       return { subtask: rowView(row), created: true };
     }),
     adoptPending: (subtask, authorization) => executionTransaction(db, subtask.serviceId, async (tx, now) => {
+      const recovery = await recoveryForRetry(tx, now, subtask, authorization);
       const row = (await tx.select().from(tasks).where(and(scope(subtask.serviceId, subtask.taskId), eq(tasks.id, subtask.view.id))).for('update'))[0];
       if (!row) throw notFound('业务子任务', subtask.view.id);
+      await bindRecoveryMutation(tx, now, recovery, { resultSubtaskId: row.id });
       if (!['pending', 'retryable-rejected'].includes(row.dispatch) || row.incarnation || row.view.cancelRequestedAt) return rowView(row);
       const epoch = await authorizeExecution(tx, row.serviceId, row.fenced, authorization, now);
       const updated = (await tx.update(tasks).set({ epoch, dispatch: 'pending', updatedAt: now }).where(eq(tasks.id, row.id)).returning())[0]!;
@@ -59,6 +66,15 @@ export function drizzleExecutionSubtasks(db: Database): ExecutionSubtasks {
       ...(update.receipt ? { receipt: sql`CASE WHEN ${tasks.view} ? 'result' THEN ${tasks.receipt} ELSE ${JSON.stringify(update.receipt)}::jsonb END` } : {}),
       owner: null, leaseUntil: null, updatedAt: sql`clock_timestamp()` }).where(leased(claim)).returning()).length === 1,
   };
+}
+
+async function recoveryForRetry(tx: Executor, now: Date, candidate: SubtaskCandidate, authorization: ExecutionAuthorization) {
+  if (!authorization.recovery) return undefined;
+  if (candidate.requestKind !== 'retry') throw conflict('恢复请求不能用于首次提交');
+  // The application already checks fresh/resume; repeat the exact action check against the durable request here.
+  const row = await ownedRecovery(tx, now, candidate.serviceId, authorization.recovery.recoveryRequestId, { claimId: authorization.recovery.claimId, authorization }, true);
+  return authorizeRecoveryMutation(tx, now, candidate.serviceId, { taskId: candidate.taskId, subtaskId: candidate.requestParent, requestKey: candidate.requestKey,
+    action: row.target.action, expectedAttempt: candidate.view.attempt - 1, ...(row.target.action === 'resume-subtask' ? { resumeSessionId: row.target.resumeSessionId } : {}) }, authorization);
 }
 async function claimSubtask(db: Database, owner: string, id?: string): Promise<ExecutionSubtask | undefined> {
   const candidates = await db.select({ id: tasks.id, serviceId: tasks.serviceId }).from(tasks).where(and(ready(), id ? eq(tasks.id, id) : undefined)).orderBy(asc(tasks.updatedAt), asc(tasks.id)).limit(100);

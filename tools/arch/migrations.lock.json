@@ -40,6 +40,7 @@
     "modules/business-task/adapters/persistence/migrations/0025_task_observation.sql": "1212fd44fbfda0ec4f665a9c184944a9dc0d1e858483a81acc5b3c4ae1278941",
     "modules/business-task/adapters/persistence/migrations/0026_legacy_recovery.sql": "dfe11bec5ec786f97a4e718d049dc17db85028d799af39948eb64fbaa00cc5ec",
     "modules/business-task/adapters/persistence/migrations/0027_stopped_projection.sql": "69cacacc2010375b09a8ad30ae4a69748d815045f5404657cb4a05313edc3c3f",
+    "modules/business-task/adapters/persistence/migrations/0028_task_recovery.sql": "bec717b270f183a79be0facdedc756739bd7c08739f1b76f22d46aa5fc23479b",
     "modules/cluster-management/adapters/persistence/migrations/0001_create_schema.sql": "d48761a3bca9fc384d3d4e74679de0d99090f142e3eaabb374029efcf7de6121",
     "modules/cluster-management/adapters/persistence/migrations/0002_inventory_operations.sql": "9a29b237e57dad98b85f10b74f04232590b64bd9711546fbde5edf9e624d0569",
     "modules/cluster-management/adapters/persistence/migrations/0003_snapshot_sequence.sql": "2349c5cb8f0186ff9a8a365b957a53118e4b6176bc5d8eda48f1da669395c079",

@@ -12,8 +12,10 @@ import type { BusinessTaskUseCaseDeps } from '../dependencies';
 import type { ExecutionOperations } from '../../ports/executionOperations';
 import type { ExecutionControls } from '../../ports/executionControl';
 import type { BusinessExecutionSourceResolver } from '../../ports/executionSource';
+import type { TaskRecoveryRequests } from '../../ports/taskRecovery';
 
 export interface BusinessExecutionDeps extends Pick<BusinessTaskUseCaseDeps, 'uow' | 'environments' | 'directory' | 'clock' | 'logger' | 'runner' | 'compute' | 'settings'> {
+  recoveryRequests?: TaskRecoveryRequests;
   agentSecrets?: ExecutionAgentSecrets;
   sessions: ExecutionSessions;
   messages: ExecutionMessages;

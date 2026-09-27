@@ -1,10 +1,10 @@
-import type { BusinessControlDto, BusinessControlLeaseRequest, BusinessExecutionFence, ReleaseId } from '@crewstation/contracts';
+import type { BusinessControlDto, BusinessControlLeaseRequest, BusinessExecutionFence, BusinessRecoveryExecution, ReleaseId } from '@crewstation/contracts';
 import { conflict, forbidden, precondition } from '@crewstation/kernel';
 
 export interface ExecutionAuthority {
   releaseId: ReleaseId; physicalSlot: 'blue' | 'green'; podUid: string; ready: boolean; role: 'prod' | 'preview';
 }
-export interface ExecutionAuthorization { source: ExecutionAuthority; fence?: BusinessExecutionFence; stopAuthority?: { operationId: string; epoch: number } }
+export interface ExecutionAuthorization { source: ExecutionAuthority; fence?: BusinessExecutionFence; stopAuthority?: { operationId: string; epoch: number }; recovery?: BusinessRecoveryExecution }
 export interface ExecutionHandoff {
   operationId: string; expectedActiveReleaseId: ReleaseId | null; targetReleaseId: ReleaseId; targetSlot: 'blue' | 'green';
   stage: 'frozen' | 'prepared' | 'routed' | 'complete'; acceptedTaskContractVersions?: string[];

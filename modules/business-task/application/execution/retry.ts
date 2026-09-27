@@ -21,17 +21,22 @@ export function executionRetryUseCases(deps: BusinessExecutionDeps): Pick<Busine
       const context = await source(caller);
       const parent = await deps.operations.forTask(context.serviceId, taskId);
       if (!parent) throw notFound('业务任务', taskId);
-      const { requestKey, fence, ...parameters } = input, digest = jsonHash(parameters);
+      const { requestKey, fence, recovery, ...parameters } = input, digest = jsonHash(parameters);
+      const authorization = { source: context.authority, ...(fence ? { fence } : {}), ...(recovery ? { recovery } : {}) };
+      if (recovery) {
+        if (!deps.recoveryRequests) throw precondition('恢复请求服务不可用');
+        await deps.recoveryRequests.authorize(context.serviceId, { taskId, subtaskId, action: input.resumePolicy === 'fresh' ? 'retry-subtask' : 'resume-subtask', requestKey, expectedAttempt: input.expectedAttempt, ...(input.resumePolicy === 'resume' ? { resumeSessionId: input.resumeSessionId } : {}) }, authorization);
+      }
       const accepted = await deps.subtasks.find(context.serviceId, taskId, requestKey, 'retry', subtaskId);
       if (accepted) {
         if (accepted.requestDigest !== digest) throw conflict('重试幂等键参数不同', { code: 'idempotency_conflict' });
-        const replay = fence || accepted.dispatch === 'retryable-rejected' ? await deps.subtasks.adoptPending(accepted, { source: context.authority, fence }) : accepted;
+        const replay = fence || accepted.dispatch === 'retryable-rejected' ? await deps.subtasks.adoptPending(accepted, authorization) : accepted;
         if (accepted.dispatch === 'retryable-rejected') { const claim = await deps.subtasks.claim(newResourceId(), replay.view.id); if (claim) await dispatchBusinessAgent(deps, claim); }
         return subtaskResponse((await deps.subtasks.get(context.serviceId, taskId, replay.view.id))!, false);
       }
       const previous = await deps.subtasks.get(context.serviceId, taskId, subtaskId);
       if (!previous) throw notFound('业务子任务', subtaskId);
-      const authorization = { source: context.authority, ...(fence ? { fence } : {}) }, control = await deps.controls.read(context.serviceId);
+      const control = await deps.controls.read(context.serviceId);
       if (previous.fenced || control.control) assertExecutionFence(control.control, authorization, control.now);
       if (previous.view.attempt !== input.expectedAttempt || !['succeeded', 'failed', 'cancelled'].includes(previous.view.state)) throw conflict('只能重试已终结且 attempt 匹配的子任务', { code: 'stale_generation' });
       if (previous.view.kind === 'command' && input.resumePolicy !== 'fresh') throw precondition('当前执行不支持该续跑策略', { code: 'capability_unsupported' });

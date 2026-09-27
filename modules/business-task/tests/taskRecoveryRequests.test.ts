@@ -1,0 +1,115 @@
+import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
+import { and, eq, sql } from 'drizzle-orm';
+import { newResourceId, jsonHash } from '@crewstation/kernel';
+import { BusinessRecoveryRequestSchema, BusinessSubtaskV3DtoSchema } from '@crewstation/contracts';
+import { createTestDatabase, testDatabaseAvailable, type TestDatabase } from '@crewstation/testkit';
+import { businessTaskMigrations } from '../wiring';
+import { taskRecoveryFixture } from './taskRecoveryFixture';
+import { recoveryAudit, recoveryRequests } from '../adapters/persistence/recovery/tables';
+import { executionControls } from '../adapters/persistence/executionTables';
+import { executionTaskStates } from '../adapters/persistence/execution/lifecycleTables';
+import { executionLogs, subtaskProjections } from '../adapters/persistence/execution/projectionTables';
+import { executionSubtasks } from '../adapters/persistence/execution/subtaskTables';
+import { contracts } from '../adapters/persistence/tables';
+import { drizzleTaskRecoveryRequests } from '../adapters/persistence/recovery/repository';
+
+const available = await testDatabaseAvailable();
+describe.skipIf(!available)('RFC029 持久恢复请求与 fenced 应用认领', () => {
+  let tdb: TestDatabase;
+  beforeAll(async () => { tdb = await createTestDatabase([businessTaskMigrations]); });
+  afterAll(async () => { await tdb?.drop(); });
+  test('并发重复点击只产生一条请求和一条审计；重启后读取相同请求，改变目标同键409', async () => {
+    const f = await taskRecoveryFixture(tdb.db);
+    const requests = await Promise.all(Array.from({ length: 5 }, () => f.repository.request(f.admission)));
+    expect(new Set(requests.map((r) => r.id)).size).toBe(1);
+    const saved = requests[0]!; expect(BusinessRecoveryRequestSchema.parse(saved)).toMatchObject({ state: 'pending', requestedBy: f.admission.requestedBy, target: f.admission.request.target });
+    expect(await drizzleTaskRecoveryRequests(tdb.db).get(f.serviceId, saved.id)).toEqual(saved);
+    expect(await f.repository.get(newResourceId(), saved.id)).toBeUndefined();
+    expect(await f.repository.list(f.serviceId, f.task.id, 1000)).toEqual([saved]);
+    expect(await f.repository.list(f.serviceId, newResourceId(), 0)).toEqual([]);
+    const audit = await tdb.db.select().from(recoveryAudit).where(eq(recoveryAudit.requestId, saved.id));
+    expect(audit).toHaveLength(1); expect(audit[0]).toMatchObject({ event: 'requested', actor: f.admission.requestedBy, epoch: null });
+    await expect(f.repository.request({ ...f.admission, request: { ...f.admission.request, target: { ...f.admission.request.target, expectedGeneration: 3 } } })).rejects.toMatchObject({ kind: 'conflict', details: { code: 'idempotency_conflict' } });
+    await expect(f.repository.request({ ...f.admission, request: { ...f.admission.request, requestKey: 'double-click-different-key' } })).rejects.toMatchObject({ kind: 'conflict', details: { code: 'recovery_in_progress' } });
+    // A lost HTTP response must remain replayable even after the environment/control changes.
+    await tdb.db.delete(executionControls).where(eq(executionControls.serviceId, f.serviceId));
+    expect(await f.repository.request(f.admission)).toEqual(saved);
+  });
+  test('受理在同一事务重查 generation、材料、项目、当前应用能力和在线控制器', async () => {
+    const f = await taskRecoveryFixture(tdb.db);
+    for (const delta of [{ assessmentDigest: 'b'.repeat(64) }, { controlEpoch: f.fence.epoch + 1 }]) await expect(f.repository.request({ ...f.admission, ...delta })).rejects.toMatchObject({ kind: 'precondition' });
+    await expect(f.repository.request({ ...f.admission, projectId: newResourceId() })).rejects.toMatchObject({ kind: 'not_found' });
+    for (const delta of [{ expectedGeneration: 3 }, { materialDigest: 'c'.repeat(64) }]) await expect(f.repository.request({ ...f.admission, request: { ...f.admission.request, target: { ...f.admission.request.target, ...delta } } })).rejects.toMatchObject({ kind: 'precondition' });
+    await tdb.db.update(executionTaskStates).set({ operationId: newResourceId() }).where(eq(executionTaskStates.taskId, f.task.id));
+    await expect(f.repository.request(f.admission)).rejects.toMatchObject({ kind: 'precondition' });
+    await tdb.db.update(executionTaskStates).set({ operationId: null }).where(eq(executionTaskStates.taskId, f.task.id));
+    await tdb.db.update(contracts).set({ tasksSpec: sql`tasks_spec - 'recovery'` }).where(eq(contracts.releaseId, f.releaseId));
+    await expect(f.repository.request(f.admission)).rejects.toMatchObject({ details: { code: 'application_recovery_unsupported' } });
+    await tdb.db.update(executionControls).set({ body: sql`body || '{"leaseExpiresAt":"2020-01-01T00:00:00.000Z"}'::jsonb` }).where(eq(executionControls.serviceId, f.serviceId));
+    await expect(f.repository.request(f.admission)).rejects.toMatchObject({ details: { code: 'application_controller_offline' } });
+    expect(await f.repository.list(f.serviceId, f.task.id, 10)).toEqual([]);
+  });
+  test('当前 holder 原子认领；租约到期可接续原请求，旧 claim 和错误 Pod 无权拒绝', async () => {
+    const f = await taskRecoveryFixture(tdb.db), saved = await f.repository.request(f.admission);
+    const claims = await Promise.all(Array.from({ length: 5 }, () => f.repository.claim(f.serviceId, f.authorization)));
+    expect(claims.filter(Boolean)).toHaveLength(1); const first = claims.find(Boolean)!;
+    expect(first.request.id).toBe(saved.id); expect(first.request.state).toBe('claimed');
+    expect(await f.repository.claim(f.serviceId, f.authorization, saved.id)).toBeUndefined();
+    await expect(f.repository.claim(f.serviceId, { ...f.authorization, fence: { ...f.fence, instanceId: newResourceId() } })).rejects.toMatchObject({ kind: 'conflict' });
+    await expect(f.repository.claim(f.serviceId, { ...f.authorization, source: { ...f.source, podUid: 'impostor' } })).rejects.toMatchObject({ kind: 'conflict' });
+    await tdb.db.update(recoveryRequests).set({ leaseUntil: new Date(0) }).where(eq(recoveryRequests.id, saved.id));
+    const second = (await f.repository.claim(f.serviceId, f.authorization, saved.id))!;
+    expect(second.request.id).toBe(saved.id); expect(second.claimId).not.toBe(first.claimId);
+    await expect(f.repository.reject(f.serviceId, saved.id, { claimId: first.claimId, authorization: f.authorization }, 'late')).rejects.toMatchObject({ details: { code: 'recovery_claim_stale' } });
+    await expect(f.repository.reject(f.serviceId, saved.id, { claimId: second.claimId, authorization: f.authorization }, '')).rejects.toMatchObject({ kind: 'precondition' });
+    const rejected = await f.repository.reject(f.serviceId, saved.id, { claimId: second.claimId, authorization: f.authorization }, 'business_record_not_recoverable');
+    expect(rejected).toMatchObject({ state: 'rejected', reason: 'business_record_not_recoverable' });
+    expect(await f.repository.claim(f.serviceId, f.authorization)).toBeUndefined();
+    expect((await tdb.db.select().from(recoveryAudit).where(eq(recoveryAudit.requestId, saved.id))).map((r) => r.event)).toEqual(['requested', 'claimed', 'claimed', 'rejected']);
+  });
+  test('发布切流后新 epoch 接续同一请求，旧 epoch 的迟到写入被拒绝', async () => {
+    const f = await taskRecoveryFixture(tdb.db), saved = await f.repository.request(f.admission), first = (await f.repository.claim(f.serviceId, f.authorization))!;
+    const nextFence = { ...f.fence, epoch: f.fence.epoch + 1, instanceId: newResourceId(), leaseId: newResourceId() };
+    await tdb.db.update(executionControls).set({ body: sql`body || ${JSON.stringify({ epoch: nextFence.epoch, leaseOwner: nextFence.instanceId, leaseId: nextFence.leaseId, leasePodUid: 'pod-two' })}::jsonb` }).where(eq(executionControls.serviceId, f.serviceId));
+    const authorization = { source: { ...f.source, podUid: 'pod-two' }, fence: nextFence };
+    const second = (await f.repository.claim(f.serviceId, authorization))!; expect(second.request.id).toBe(saved.id);
+    await expect(f.repository.reject(f.serviceId, saved.id, { claimId: first.claimId, authorization: f.authorization }, 'old')).rejects.toMatchObject({ kind: 'conflict' });
+    expect(await f.repository.reject(f.serviceId, saved.id, { claimId: second.claimId, authorization }, 'new holder refused')).toMatchObject({ state: 'rejected' });
+    await expect(f.repository.reject(f.serviceId, newResourceId(), { claimId: second.claimId, authorization }, 'missing')).rejects.toMatchObject({ kind: 'not_found' });
+  });
+  test('能力撤销后不认领旧动作；重新开放后接续原请求，不产生另一个请求', async () => {
+    const f = await taskRecoveryFixture(tdb.db), saved = await f.repository.request(f.admission);
+    await tdb.db.update(contracts).set({ tasksSpec: sql`tasks_spec || '{"recovery":{"actions":["retry-subtask"]}}'::jsonb` }).where(eq(contracts.releaseId, f.releaseId));
+    expect(await f.repository.claim(f.serviceId, f.authorization)).toBeUndefined();
+    await expect(f.repository.claim(f.serviceId, f.authorization, saved.id)).rejects.toMatchObject({ details: { code: 'application_recovery_unsupported' } });
+    await tdb.db.update(contracts).set({ tasksSpec: sql`tasks_spec - 'recovery'` }).where(eq(contracts.releaseId, f.releaseId));
+    await expect(f.repository.claim(f.serviceId, f.authorization)).rejects.toMatchObject({ details: { code: 'application_recovery_unsupported' } });
+    await tdb.db.update(contracts).set({ tasksSpec: sql`tasks_spec || '{"recovery":{"actions":["resume-task"]}}'::jsonb` }).where(eq(contracts.releaseId, f.releaseId));
+    expect((await f.repository.claim(f.serviceId, f.authorization))?.request.id).toBe(saved.id);
+    expect(await f.repository.list(f.serviceId, f.task.id, 1)).toHaveLength(1);
+  });
+  test('父任务有 unknown 子执行时，即使客户端传入旧评估摘要也不受理恢复', async () => {
+    const f = await taskRecoveryFixture(tdb.db), id = newResourceId();
+    const view = BusinessSubtaskV3DtoSchema.parse({ id, taskId: f.task.id, name: 'unknown-step', kind: 'command', state: 'failed', process: 'unknown', executionId: newResourceId(), attempt: 1, createdAt: new Date().toISOString() });
+    await tdb.db.insert(executionSubtasks).values({ id, taskId: f.task.id, serviceId: f.serviceId, requestKey: 'unknown-child', requestDigest: 'a', payloadDigest: 'b', sealedPayload: 'not-for-admin', fenced: true, view, dispatch: 'unknown', updatedAt: new Date() });
+    await expect(f.repository.request(f.admission)).rejects.toMatchObject({ details: { code: 'original_execution_not_stopped' } });
+    expect(await f.repository.list(f.serviceId, f.task.id, 10)).toEqual([]);
+  });
+  test('失败子任务需要持久停止证明，未知执行、材料变化和已有后继均拒绝', async () => {
+    const f = await taskRecoveryFixture(tdb.db), id = newResourceId();
+    await tdb.db.update(executionTaskStates).set({ state: 'running' }).where(eq(executionTaskStates.taskId, f.task.id));
+    await tdb.db.update(executionLogs).set({ taskState: 'running' }).where(eq(executionLogs.taskId, f.task.id));
+    const view = BusinessSubtaskV3DtoSchema.parse({ id, taskId: f.task.id, name: 'failed-step', kind: 'agent', attempt: 1, state: 'failed', process: 'exited', executionId: newResourceId(), sessionId: 'native', createdAt: new Date().toISOString() });
+    await tdb.db.insert(executionSubtasks).values({ id, serviceId: f.serviceId, taskId: f.task.id, requestKey: 'child', requestDigest: 'a'.repeat(64), payloadDigest: 'b'.repeat(64), sealedPayload: 'must-not-leak', fenced: true, dispatch: 'accepted', view, updatedAt: new Date() });
+    const input = { ...f.admission, request: { ...f.admission.request, target: { taskId: f.task.id, action: 'retry-subtask' as const, expectedGeneration: 2, subtaskId: view.id, expectedAttempt: 1, materialDigest: jsonHash({ parent: f.admission.request.target.materialDigest, child: 'b'.repeat(64) }) } } };
+    await expect(f.repository.request(input)).rejects.toMatchObject({ details: { code: 'original_execution_not_stopped' } });
+    await tdb.db.insert(subtaskProjections).values({ subtaskId: id, sourceStopped: true });
+    await expect(f.repository.request({ ...input, request: { ...input.request, target: { ...input.request.target, action: 'resume-subtask', resumeSessionId: 'different-session' } } })).rejects.toMatchObject({ details: { code: 'recovery_assessment_stale' } });
+    const result = await f.repository.request(input); expect(result.target.action).toBe('retry-subtask'); expect(JSON.stringify(result)).not.toContain('must-not-leak');
+    const claim = (await f.repository.claim(f.serviceId, f.authorization))!;
+    await f.repository.reject(f.serviceId, result.id, { claimId: claim.claimId, authorization: f.authorization }, 'fixture-complete');
+    await tdb.db.insert(executionSubtasks).values({ id: newResourceId(), serviceId: f.serviceId, taskId: f.task.id, requestKind: 'retry', requestParent: id, requestKey: 'already-retried', requestDigest: 'd', payloadDigest: 'b', sealedPayload: 'hidden', fenced: true, dispatch: 'pending', view: { ...view, executionId: newResourceId(), attempt: 2 }, updatedAt: new Date() });
+    await expect(f.repository.request({ ...input, request: { ...input.request, requestKey: 'later' } })).rejects.toMatchObject({ details: { code: 'recovery_assessment_stale' } });
+    expect((await tdb.db.select().from(recoveryRequests).where(and(eq(recoveryRequests.serviceId, f.serviceId), eq(recoveryRequests.taskId, f.task.id))))).toHaveLength(1);
+  });
+});

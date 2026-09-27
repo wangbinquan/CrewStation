@@ -383,3 +383,17 @@ Agent 负向选择现在返回400 `runtime_image_not_allowed`；A镜像子任务
 - 主验收业务保留新增镜像授权和v0.3.1供查看；第二业务临时授权已恢复、空闲preview保持下线以释放容量。没有修改其他业务的镜像授权、任务或Agent容器。构建与验证临时资源已回收。
 
 完整证据：`/tmp/cs-rfc028-owned-inline-{live-final,validation-primary,validation-secondary,business-proof,business-pod,business-task-closed,revoke-proof-final,final-history,ci-final}.json`。本批代码a12c7d13六项CI成功、8组件已部署就绪、部署页6组及真实401／400已通过；非管理员403由真实PG＋HTTP路由测试验证。T19–T21闭合，不据此将整个RFC028或RFC029标Done。
+
+
+### Agent A／B 实际工具调用闭环（2026-09-28）
+
+在原专用父任务 `01a0e30e-e096-7000-be22-db3c8ecd4171` 下顺序新建两条 Agent 子执行。A `01a0e396-b094-7000-afab-eefa0b89679d`、B `01a0e39a-1a89-7000-97cd-65a5a18f806e` 均 `succeeded / exited / exitCode=0`。本次提示允许先核对指定工具再执行，不再使用之前模型拒绝的“不要检查、只执行”表述；旧拒绝记录保留。
+
+- A 实际 Pod `sub-01a0e396b0947002b20fd7d81d4ccc19`，UID `1a36211d-4a6a-4e68-aef0-51fbee88af8f`，imageID 摘要 `77ffe8bfa44f95d5874f168f8a3aeeb265831c3f29ecfca8c6da7de5b980bd5f`。
+- B 实际 Pod `sub-01a0e39a1a897002bd9dfafb44ed65f0`，UID `c8d4c146-7239-4488-b680-7d51ed8c595d`，imageID 摘要 `4eea778bfe121e8a58b991f5690fa5237a534610bd2114501cec1f0c58a18934`。
+- 两者均实际调用 bash 执行 UID、role、PyYAML、Node CommonJS／ESM、脚本、原生动态链接工具七项；依次得到 `10001`、`agent-a` 或 `agent-b`、三个 `ready`、`script-ready`、`worker:10001`。通过业务 `/events` 读取到每条命令的持久 tool-start，再回读各自写入的 `/work/agent-a-tools-v2.txt`／`agent-b-tools-v2.txt`，不是仅依据模型最终文字或镜像验证脚本。
+- A 32 条持久事件含指定 bash 调用、写文件与回读；B 也包含七次 bash、写文件与回读。事件本身没有 tool-end 记录，不将其表述为每条独立工具结束事件；子执行终态、实际文件与原镜像工具验证共同证明本项结果。
+- 原 service／迁移 imageID 为 `ad0b08d0…977bfbf`，父任务为 `b8b7ea38…848575b`，A／B 为上述另外两个摘要，完成 RI-01 的四种独立镜像实际执行。结合此前显式复用 A 镜像的父任务 `01a0e311-9ea9-7000-864f-4be0fe16c1b3` 与工具输出，RI-02 的同镜像父任务／Agent 工具复用也完成。RI-03 的父命令和 Agent 真实工具调用缺口已补；其他 RI 条件继续按矩阵核对。
+- 两个 Agent Pod 均已物理消失；原父任务 Pod UID `f748cdc5-645f-4982-96bf-835e648f38e1` 与两个服务 Pod UID `c16c7158-9923-439a-a81a-ef8589a6224c`／`f14b69c2-5fc8-4706-9651-d55128c5103b` 保持。父任务与原卷保留供后续恢复验收，没有结束或替换其他会话资源。
+
+证据 `/tmp/cs-rfc028-owned-agent-{a,b}-tools-v2-observed.json`、`...-events-v2.json`、`...-pods-v2.json`，最终回收清单 `/tmp/cs-rfc028-owned-agents-final-pods-v2.json`。此次实机运行使用已部署的 inline-a12c7d13 控制面；并行开发的 RFC029 事务候选尚未部署，不混淆两者。

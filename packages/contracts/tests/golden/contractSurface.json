@@ -381,6 +381,24 @@
                   ],
                   "type": "object"
                 },
+                "recovery": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "claimId": {
+                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                      "type": "string"
+                    },
+                    "recoveryRequestId": {
+                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "claimId",
+                    "recoveryRequestId"
+                  ],
+                  "type": "object"
+                },
                 "requestKey": {
                   "maxLength": 128,
                   "minLength": 1,
@@ -428,6 +446,24 @@
                     "epoch",
                     "instanceId",
                     "leaseId"
+                  ],
+                  "type": "object"
+                },
+                "recovery": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "claimId": {
+                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                      "type": "string"
+                    },
+                    "recoveryRequestId": {
+                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "claimId",
+                    "recoveryRequestId"
                   ],
                   "type": "object"
                 },
@@ -490,6 +526,24 @@
                 "epoch",
                 "instanceId",
                 "leaseId"
+              ],
+              "type": "object"
+            },
+            "recovery": {
+              "additionalProperties": false,
+              "properties": {
+                "claimId": {
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                  "type": "string"
+                },
+                "recoveryRequestId": {
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "claimId",
+                "recoveryRequestId"
               ],
               "type": "object"
             },
@@ -3902,6 +3956,30 @@
                             "type": "object"
                           },
                           "type": "array"
+                        },
+                        "recovery": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "actions": {
+                              "items": {
+                                "enum": [
+                                  "rebuild-workspace",
+                                  "restart-task",
+                                  "resume-subtask",
+                                  "resume-task",
+                                  "retry-subtask"
+                                ],
+                                "type": "string"
+                              },
+                              "maxItems": 5,
+                              "minItems": 1,
+                              "type": "array"
+                            }
+                          },
+                          "required": [
+                            "actions"
+                          ],
+                          "type": "object"
                         },
                         "runtimeImageVersionId": {
                           "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",

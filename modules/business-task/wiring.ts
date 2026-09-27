@@ -1,3 +1,4 @@
+import { drizzleTaskRecoveryRequests } from './adapters/persistence/recovery/repository';
 import { drizzleBusinessTaskList } from './adapters/persistence/task-list/repository';
 import { taskListUseCases } from './application/taskList';
 import type { ExecutionAgentSecrets } from './ports/executionAgentSecrets';
@@ -103,14 +104,15 @@ export function createBusinessTaskModule(deps: BusinessTaskModuleDeps): Business
   const lifecycle = taskLifecycleUseCases(legacyDeps);
   const subtasks = subtaskUseCases(legacyDeps);
   const registerContracts = registerContractsUseCase(useCaseDeps);
-  const executionDeps = { ...useCaseDeps, sessions: drizzleExecutionSessions(deps.db), messages: drizzleExecutionMessages(deps.db), agentSecrets: deps.agentSecrets, materials: drizzleExecutionMaterials(deps.db), lifecycles: drizzleExecutionLifecycles(deps.db), runtimeImages: deps.runtimeImages, cancellations: drizzleExecutionCancellations(deps.db), projection: drizzleExecutionProjection(deps.db), subtasks: drizzleExecutionSubtasks(deps.db), cipher: executionCipher(deps.settings.secretKeyBase64), operations: drizzleExecutionOperations(deps.db), controls: drizzleExecutionControls(deps.db), sources: deps.executionSources ?? { resolve: async () => undefined } };
+  const recoveryRequests = drizzleTaskRecoveryRequests(deps.db);
+  const executionDeps = { ...useCaseDeps, recoveryRequests, sessions: drizzleExecutionSessions(deps.db), messages: drizzleExecutionMessages(deps.db), agentSecrets: deps.agentSecrets, materials: drizzleExecutionMaterials(deps.db), lifecycles: drizzleExecutionLifecycles(deps.db), runtimeImages: deps.runtimeImages, cancellations: drizzleExecutionCancellations(deps.db), projection: drizzleExecutionProjection(deps.db), subtasks: drizzleExecutionSubtasks(deps.db), cipher: executionCipher(deps.settings.secretKeyBase64), operations: drizzleExecutionOperations(deps.db), controls: drizzleExecutionControls(deps.db), sources: deps.executionSources ?? { resolve: async () => undefined } };
   const tasksV3 = executionTaskUseCases(executionDeps), { progressSubtask, ...subtasksV3 } = executionSubtaskUseCases(executionDeps);
   const { progressProjection, ...projectionV3 } = executionProjectionUseCases(executionDeps);
   const { progressCancellation, ...cancellationV3 } = executionCancellationUseCases(executionDeps);
   const { progressLifecycle, ...lifecycleV3 } = executionLifecycleUseCases(executionDeps);
   const { progressMessage, ...messagesV3 } = executionMessageUseCases(executionDeps);
   const v3 = { ...executionCapabilities(executionDeps), ...messagesV3, ...executionMaterialUseCases(executionDeps), ...lifecycleV3, ...executionRetryUseCases(executionDeps), ...cancellationV3, ...tasksV3, ...subtasksV3, ...projectionV3, ...executionControlUseCases(executionDeps), ...executionFileUseCases(executionDeps), ...executionOperationQueries(executionDeps),
-    runOnce: async () => (await tasksV3.runOnce()) + (await progressSubtask()) + (await progressProjection()) + (await progressCancellation()) + (await progressLifecycle()) + (await progressMessage()),
+    runOnce: async () => (await tasksV3.runOnce()) + (await progressSubtask()) + (await progressProjection()) + (await progressCancellation()) + (await progressLifecycle()) + (await progressMessage()) + (await recoveryRequests.reconcile()),
   };
   const api: BusinessTaskModuleApi = {
     ...taskListUseCases(drizzleBusinessTaskList(deps.db)),

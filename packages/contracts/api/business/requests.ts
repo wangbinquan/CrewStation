@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { ResourceIdSchema, TraceIdSchema } from '../../ids';
 import { VolumeModeSchema } from '../../manifest/tasks';
 import { BusinessExecutionFenceSchema } from './control';
+import { BusinessRecoveryExecutionSchema } from './recovery';
 import { BusinessCwdSchema, BusinessEnvironmentNameSchema, BusinessGenerationSchema, BusinessRequestKeySchema, BusinessTaskContractVersionSchema } from './executionValues';
 
 const mutation = { requestKey: BusinessRequestKeySchema, fence: BusinessExecutionFenceSchema.optional() };
@@ -27,7 +28,7 @@ export const SubmitBusinessSubtaskV3Schema = z.discriminatedUnion('kind', [
   }).refine((value) => (value.argv[0]?.length ?? 0) > 0, '命令名不能为空'),
 ]);
 
-const retry = { ...mutation, expectedAttempt: BusinessGenerationSchema };
+const retry = { ...mutation, expectedAttempt: BusinessGenerationSchema, recovery: BusinessRecoveryExecutionSchema.optional() };
 export const RetryBusinessSubtaskV3Schema = z.discriminatedUnion('resumePolicy', [
   z.strictObject({ ...retry, resumePolicy: z.literal('fresh') }),
   z.strictObject({ ...retry, resumePolicy: z.literal('resume'), resumeSessionId: z.string().min(1).max(512) }),
@@ -35,7 +36,7 @@ export const RetryBusinessSubtaskV3Schema = z.discriminatedUnion('resumePolicy',
 export const BusinessStopAuthoritySchema = z.strictObject({ operationId: ResourceIdSchema, epoch: BusinessGenerationSchema });
 export const BusinessSubtaskMutationSchema = z.strictObject({ ...mutation, stopAuthority: BusinessStopAuthoritySchema.optional(), expectedAttempt: BusinessGenerationSchema });
 export const BusinessSubtaskMessageV3Schema = BusinessSubtaskMutationSchema.omit({ stopAuthority: true }).extend({ content: z.string().min(1).max(1024 * 1024) });
-export const BusinessTaskMutationSchema = z.strictObject({ ...mutation, stopAuthority: BusinessStopAuthoritySchema.optional(), expectedGeneration: BusinessGenerationSchema });
+export const BusinessTaskMutationSchema = z.strictObject({ ...mutation, stopAuthority: BusinessStopAuthoritySchema.optional(), expectedGeneration: BusinessGenerationSchema, recovery: BusinessRecoveryExecutionSchema.optional() });
 
 export type CreateBusinessTaskV3 = z.infer<typeof CreateBusinessTaskV3Schema>;
 export type SubmitBusinessSubtaskV3 = z.infer<typeof SubmitBusinessSubtaskV3Schema>;

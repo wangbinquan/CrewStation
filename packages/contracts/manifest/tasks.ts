@@ -4,6 +4,7 @@ import { BusinessConfigSchema } from './businessConfig';
 import { BusinessTaskContractVersionSchema } from '../api/business/executionValues';
 import { RuntimeImageSelectionSchema } from '../api/runtimeImages/values';
 import { ResourceIdSchema } from '../ids';
+import { BusinessRecoveryCapabilitySchema } from '../api/business/recovery';
 
 /**
  * Agent 权限三档，驱动层映射为各 CLI 的标志。平台自 2026-09-23 起只派发 `full`（见 {@link PLATFORM_AGENT_PERMISSION}）：
@@ -45,13 +46,15 @@ export const TasksSpecSchema = z.object({
   /** 管理员定义的任务容器套餐。 */
   taskProfileId: ResourceIdSchema,
   executionControl: z.enum(['legacy', 'fenced']).optional(),
+  recovery: BusinessRecoveryCapabilitySchema.optional(),
   acceptedTaskContractVersions: z.array(BusinessTaskContractVersionSchema).min(1).max(128).optional(),
   defaultVolumeMode: VolumeModeSchema.default('follow-container'),
   agentProfiles: z.array(AgentProfileSchema).default([]),
   outputContracts: z.array(OutputContractSchema).default([]),
 }).refine((t) => new Set(t.agentProfiles.map((p) => p.id)).size === t.agentProfiles.length, 'agentProfiles ID 重复')
   .refine((t) => new Set(t.outputContracts.map((c) => c.id)).size === t.outputContracts.length, 'outputContracts ID 重复')
-  .refine((t) => t.executionControl !== 'fenced' || (t.acceptedTaskContractVersions?.length ?? 0) > 0, 'fenced 执行必须声明支持的任务契约版本');
+  .refine((t) => t.executionControl !== 'fenced' || (t.acceptedTaskContractVersions?.length ?? 0) > 0, 'fenced 执行必须声明支持的任务契约版本')
+  .refine((t) => !t.recovery || t.executionControl === 'fenced', '恢复能力要求 fenced 执行控制');
 
 export type AgentPermission = z.infer<typeof AgentPermissionSchema>;
 

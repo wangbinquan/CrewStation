@@ -46,12 +46,12 @@ T2 已于 2026-09-27 获批。每批实现自带测试，不把所有测试留�
 
 ## 3. 验收清单
 
-所有 RI 均**尚未完整通过**。独立 builder／网络已完成实机预检，acceptance.md 分别记录自动化与实机证据，不以预检或历史服务发布测试代替本功能验收。
+RI-01／RI-02 已有完整实际执行证据（2026-09-28），其余 RI 按 acceptance.md 的分项证据继续核对，**尚未整体通过**。独立 builder／网络已完成实机预检，acceptance.md 分别记录自动化与实机证据，不以预检或历史服务发布测试代替本功能验收。
 
 | 编号 | 场景与判据 | 证据 |
 |---|---|---|
-| RI-01 | service、parent、Agent A、Agent B 分别指定不同镜像，实际按各自 digest 运行 | 真实发布／父子任务／四个 imageID |
-| RI-02 | 同一兼容镜像可显式复用到父任务与 Agent，工具清单一致 | 实际工具输出与用途／组合验证 |
+| RI-01 | service、parent、Agent A、Agent B 分别指定不同镜像，实际按各自 digest 运行 | 已通过：2026-09-28 service／parent／A／B 四个实际 imageID，见 acceptance 同日节 |
+| RI-02 | 同一兼容镜像可显式复用到父任务与 Agent，工具清单一致 | 已通过：原显式复用父任务与 Agent A 实际工具输出、task／agent 用途验证，见 acceptance 同日节 |
 | RI-03 | Python 包、Node CJS/ESM、本地脚本、动态链接二进制、模板真实可用 | 实际 worker UID 下父 command 与 Agent 工具调用 |
 | RI-04 | 多阶段 Dockerfile、安装脚本、COPY、带校验下载成功；错误校验和失败 | 构建日志与不可用版本证明 |
 | RI-05 | source/existing 都可选；非法前缀／路径／符号链接／frontend／任务底座拒绝 | 正反向解析、真实 registry／builder 检查 |

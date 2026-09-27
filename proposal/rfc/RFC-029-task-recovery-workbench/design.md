@@ -39,3 +39,11 @@ business-task L5拥有任务列表投影，合并 legacy tasks 和 v3 execution_
 ## 落位与迁移
 
 contracts/api/business 增加恢复DTO；business-task/domain/application/ports/adapters 管理评估、请求表与事务；api-client公开工作台与服务端接口；v3示例客户端和controller接入；console的任务列表、详情与恢复交互位于业务任务feature。无跨模块表写入。新增迁移与契约金样按仓库门禁更新；保留既有接口与旧应用行为。
+
+## 实现细节（2026-09-27）
+
+- 能力声明为 `tasks.recovery.actions`，动作分别为 `resume-task`、`rebuild-workspace`、`retry-subtask`、`resume-subtask`、`restart-task`；必须配合 fenced 执行控制。缺少声明不会自动开放。
+- 请求以 `(serviceId, requestKey)` 唯一；同一父任务或子执行的未结束恢复互斥。恢复任务变更携带 `recovery: { recoveryRequestId, claimId }`，实际操作固定幂等键 `recovery:<requestId>`。认领 token 更新不改变真实 retry 参数摘要。
+- 请求关联 operation／新 attempt 与实际准入使用同一服务级事务；在持久派发前完成关联。终态重放只读取已绑定结果，不重置请求为 running。
+- `recovery_requests` 保存非敏感目标、操作者与审计关联；`recovery_audit` 逐项追加请求、认领、运行与结果。评估／列表不改变执行权。内部结果投影使用独立 `observed_at` 排队，长期未结束请求不会挡住后面的结果，也不伪造用户看到的更新时间。
+- 资源停止、原卷身份、原镜像／会话兼容等事实须从所属模块取得。纯评估函数只接受这些事实；未知值不得作为可恢复证明。新 HTTP 入口接通前，持久仓储不是面向用户的恢复入口。

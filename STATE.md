@@ -1,5 +1,15 @@
 # 当前执行状态
 
+## RFC-028 Agent A／B 实机工具补证（2026-09-28）
+
+原专用父任务下新Agent A `01a0e396-b094-7000-afab-eefa0b89679d`、B `01a0e39a-1a89-7000-97cd-65a5a18f806e` 均succeeded/exit0。各自实际Pod imageID为77ffe8…和4eea77…；七项UID／role／Python／Node CJS与ESM／脚本／原生二进制实际bash调用已从业务events读取，证明文件从共享工作区回读。两Agent Pod已物理回收，父任务和服务UID保持。RI-01四种独立镜像、RI-02显式复用闭合，RI-03工具执行缺口补齐；其余RI继续，不能标整个RFC Done。实际控制面仍inline-a12c7d13，不使用尚未部署RFC029候选。详见RFC028 acceptance末节。
+
+## RFC-029 恢复请求事务基础（2026-09-27，在制）
+
+继续完整 RFC028／029 目标。本批新增显式恢复动作／能力声明、纯评估、持久请求和审计、幂等／目标互斥、当前 holder／epoch／Pod 认领与租约；与既有 v3 resume／retry 同事务绑定，完成后同键不重派，结果只按平台持久操作观测推进。真实 PG／HTTP 定向21/0、213断言，改动行294/295=99.661%、零未加载；架构／lint／类型通过。唯一完整check已自然结束3651/11skip/7fail/3errors、23086断言、800.95秒：6项既有实机页失败与3错误，另90秒命令时长为89986ms边界断言失败；新增恢复全过，不记全绿。日志 `/tmp/cs-rfc029-recovery-full-check.log`，冻结26源码／锁路径见 `/tmp/cs-rfc029-recovery-candidate.json`，运行前后源码相同。准备精确提交32路径（含RFC028 A/B补证），尚未发布／部署。
+
+管理员评估／请求端点、服务收件与示例应用循环、失败持久工作区重建、Agent resume证明及UI确认／进度仍待接通；不能把这一批基础事务当作按钮已可用。新迁移0028只在隔离测试DB执行，未修改部署数据库；此前运行镜像和RFC033部署保持。保留第三方referenceResources改动，无跨session消息。详见RFC029 acceptance逐项清单，RFC028未完成RI继续。
+
 ## RFC-033 代码托管事件补齐（2026-09-27，Done）
 
 用户已批准实施、上库远端、部署本机。GitLab MR／Issue 评论、独立 GitHub producer 和外部签名 webhook 网关精确入口已实现并上线；aw未改。实现c072aef6与网关修复493bd47a均已推送，精确SHA CI见RFC033 acceptance。producer／真实PG链路57/0、364断言；网关完整装配19/0、127断言；新增生产行分别147/147、35/35，静态与模板检查通过。本机GitLab v0.1.6、GitHub v0.1.1 Ready，cs-auth为rfc033-493bd47a，其余控制面保留并行发布inline-a12c7d13。三类评论通过真实网关至持久消费者，均delivered且重复无新增、payload一致、错误签名401、非入口403、旧类型UUID保持。实际公网GitHub回调未配置；本机人工签名协议验收不冒充公网回调。旧GitLab待命槽已下线，独立验收消费者保留50m／256Mi用于复核，未绕过正式槽删除保护；详见RFC033 acceptance与local-acceptance.json。并发RFC028记录及referenceResources在制源码完整保留。
