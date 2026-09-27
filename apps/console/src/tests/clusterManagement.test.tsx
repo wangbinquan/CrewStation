@@ -28,7 +28,7 @@ test('cluster route enforces admin guard, opens on the topology with only the tw
   expect(views().map((n) => n.textContent)).toEqual(['工作负载', 'Pod', '网络', '存储与配置', '待回收的工作卷', '命名空间', '节点', '最近 7 天趋势', '操作记录']);
   await act(async () => { views().find((n) => n.textContent === 'Pod')!.click(); }); await page.settle();
   expect(page.search()).toMatchObject({ tab: 'pods' }); expect(views().find((n) => n.getAttribute('aria-pressed') === 'true')?.textContent).toBe('Pod');
-  expect(page.text()).toContain('筛选清单'); expect(page.text()).toContain('符合筛选的资源：205');
+  expect(document.querySelectorAll('[role="group"][aria-label="筛选清单"] select')).toHaveLength(5); expect(page.text()).toContain('符合筛选的资源：205');
   await act(async () => { views().find((n) => n.textContent === '工作负载')!.click(); }); await page.settle(); expect(page.search()).toMatchObject({ tab: 'workloads' });
   await page.click('下一页');
   expect(page.search()).toMatchObject({ snapshotId: 'snapshot-1', cursor: 'cursor-2' }); expect(f.calls.at(-1)?.query.get('cursor')).toBe('cursor-2');
@@ -36,8 +36,8 @@ test('cluster route enforces admin guard, opens on the topology with only the tw
   expect(page.search().resourceId).toBe('resource-uid'); expect(page.text()).toContain('uid-original'); expect(page.text()).toContain('工作卷仍被引用');
   await page.click('关闭详情'); expect(document.activeElement?.textContent).toBe('cluster-demo-green');
   // 顶层切回拓扑再切回清单：回到上次看的那类清单，筛选条只在清单里出现；操作记录只留项目筛选。
-  await tab('拓扑'); expect(page.search()).toMatchObject({ tab: 'topology' }); expect(page.text()).not.toContain('筛选清单');
-  await tab('资源清单'); expect(page.search()).toMatchObject({ tab: 'workloads' }); expect(page.text()).toContain('筛选清单');
+  await tab('拓扑'); expect(page.search()).toMatchObject({ tab: 'topology' }); expect(document.querySelectorAll('[role="group"][aria-label="筛选清单"]')).toHaveLength(0);
+  await tab('资源清单'); expect(page.search()).toMatchObject({ tab: 'workloads' }); expect(document.querySelectorAll('[role="group"][aria-label="筛选清单"]')).toHaveLength(1);
   await act(async () => { views().find((n) => n.textContent === '操作记录')!.click(); }); await page.settle();
   expect([...document.querySelectorAll('label')].map((l) => l.firstChild?.textContent)).toEqual(['项目', '目标资源 UID', '操作阶段']);
   page.unmount(); page = undefined; clusterFixture({ admin: false }); page = await renderApp('/admin/cluster'); expect(page.text()).toContain('仅平台管理员可见'); expect(page.text()).not.toContain('符合筛选');

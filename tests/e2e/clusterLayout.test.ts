@@ -113,7 +113,8 @@ describe.skipIf(!session)('deployed cluster management layout', () => {
       await page.waitUntil(`document.body.innerText.includes('符合筛选的资源')`, 60_000, 300);
       await page.eval(`document.querySelector(${JSON.stringify(views)}).scrollIntoView({ block: 'start' })`);
       const before = await scrolled(page);
-      expect(before).toBeGreaterThan(100);
+      // 紧凑页头后切换条已上移；锁住真实发生滚动及切换后不跳动，不依赖旧页头占用 100px。
+      expect(before).toBeGreaterThan(0);
       await clickText(page, `${views} button`, 'Pod');
       await page.waitUntil(`document.querySelector('${views} button[aria-pressed="true"]').textContent === 'Pod' && !/载入中/.test(document.querySelector('main').innerText)`, 60_000, 200);
       // 2026-09-22 实机：面板塌成一行时浏览器把滚动位置钳到新的最大值（979 → 262）。

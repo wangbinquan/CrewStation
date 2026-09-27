@@ -39,6 +39,17 @@ test('PVC rows distinguish request/bound/used, show non-quota ratios over 100 pe
   for (const text of ['workspace-volume', '存储申请', '已绑定声明容量', '实际存储占用', '200%', '非硬配额', '数据已过期', 'Probe unavailable', 'configuration', 'ReadWriteOnce']) expect(page.text()).toContain(text);
   await page.click('workspace-volume'); expect(page.text()).toContain('pv-work'); expect(page.text()).toContain('local-path-probe');
 });
+test('范围汇总默认收为一行，按需展开仍保留部分覆盖与存储数据，收起不重建表格', async () => {
+  clusterMetricsFixture(); page = await renderApp('/admin/cluster?tab=pods');
+  const summary = [...document.querySelectorAll('summary')].find((node) => node.textContent?.includes('当前项目／归属范围合计'))!;
+  const details = summary.parentElement as HTMLDetailsElement, table = document.querySelector('table');
+  // 2026-09-27：竖排汇总吞掉了清单的大半高度；默认只保留范围与数量，全部指标仍可展开读取。
+  expect(details.open).toBe(false); expect(summary.textContent).toContain('1 Pod · 1 PVC');
+  await act(async () => summary.click()); expect(details.open).toBe(true);
+  expect(details.textContent).toContain('已观测 1/2，部分合计'); expect(details.textContent).toContain('实际存储占用');
+  await act(async () => summary.click()); expect(details.open).toBe(false); expect(document.querySelector('table') === table).toBe(true);
+  expect(document.querySelector('table')!.parentElement!.parentElement!.nextElementSibling).toBeNull();
+});
 test('node detail gives extended capacity, filesystem aliases, interfaces and per-device disk IO trends', async () => {
   const f = clusterMetricsFixture(); page = await renderApp('/admin/cluster?tab=nodes'); await page.click('worker-node-a');
   for (const text of ['example.com/gpu', '已禁止调度', 'DiskPressure', 'inode 总数', 'eth0', '/dev/vda', '磁盘读取', '整盘、分区和映射设备']) expect(page.text()).toContain(text);

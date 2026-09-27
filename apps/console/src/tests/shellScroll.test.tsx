@@ -59,8 +59,8 @@ test('页面样式不改写内容区的滚动：除外壳外没有 :global(main)
 test('吸顶元素贴住内容区顶边：外壳按各形态的上内边距给出 --cs-main-sticky-top，算力档位的保存栏用它', () => {
   // 2026-09-23 实机：宽屏滚动区成了 main，保存栏 top: 0 停在 main 上内边距以下 24px，上方露出一条滚过去的内容；窄屏是窗口在滚，偏移为 0。
   const shell = split(SHELL);
-  expect(declarations(shell.wide, '.main')).toMatch(/padding:\s*var\(--cs-space-5\)/);
-  expect(declarations(shell.wide, '.main')).toMatch(/--cs-main-sticky-top:\s*calc\(-1 \* var\(--cs-space-5\)\)/);
+  expect(declarations(shell.wide, '.main')).toMatch(/padding:\s*var\(--cs-space-3\) var\(--cs-space-5\)/);
+  expect(declarations(shell.wide, '.main')).toMatch(/--cs-main-sticky-top:\s*calc\(-1 \* var\(--cs-space-3\)\)/);
   expect(declarations(shell.wide, '.compact')).toMatch(/padding:\s*8px 12px/);
   expect(declarations(shell.wide, '.compact')).toMatch(/--cs-main-sticky-top:\s*-8px/);
   expect(declarations(shell.narrow, '.main')).toMatch(/--cs-main-sticky-top:\s*0px/);

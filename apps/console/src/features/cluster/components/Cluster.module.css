@@ -2,10 +2,12 @@
 /* 资源清单（2026-09-23 作者裁定）：宽屏（≥1100px，详情放得下右侧）视图切换与筛选在上，下面清单与右侧详情长满到窗口底边
    （useViewportFill 量出 --viewport-fill），各自滚动，整页不出纵向滚动条；清单卡只让表格区滚动，表头停在表格区顶上、翻页钮在卡底；
    节点、趋势、操作记录在清单栏里整体滚动。窄屏详情排在清单下面，照常随内容长。 */
-.inventory { display: flex; flex-direction: column; gap: var(--cs-space-3); min-width: 0; }
+.inventory { display: flex; flex-direction: column; gap: var(--cs-space-2); min-width: 0; }
 .split { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; min-width: 0; }
 .list, .aside { min-width: 0; }
-.rows { min-height: 0; overflow: auto; overscroll-behavior: contain; }
+.rows { flex: 1 1 auto; min-height: 0; overflow: auto; overscroll-behavior: contain; }
+.listCard > header:first-child { padding-block: var(--cs-space-1); }
+.listCard > div:last-child { padding-block: var(--cs-space-1); gap: var(--cs-space-2); }
 @media (min-width: 1100px) {
   .inventory { height: var(--viewport-fill, auto); }
   .split { flex: 1 1 0; min-height: 0; grid-template-rows: minmax(0, 1fr); }
@@ -38,9 +40,9 @@ a.tile:focus-visible { outline: 2px solid var(--cs-color-focus); outline-offset:
 .status { display: grid; gap: 4px; font-size: 12px; }
 .status p { margin: 0; }
 .status h3 { margin: 10px 0 4px; font-size: 12px; }
-/* 七个筛选项在 1280 宽下排成一行（2026-09-23）：清单整块长满一屏后，筛选卡多折一行，表格区就少两行。 */
-.filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 130px), 1fr)); gap: 12px; }
-.filters label { display: grid; gap: 6px; min-width: 0; font-size: 12px; color: var(--cs-color-text-muted); }
+/* 七个筛选项在桌面清单宽度内排成一行；下拉内容保留原生展开宽度，窄屏改为两列。 */
+.filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 108px), 1fr)); gap: 8px; }
+.filters label { display: grid; gap: 2px; min-width: 0; font-size: 12px; color: var(--cs-color-text-muted); }
 .filters input, .filters select, .input { box-sizing: border-box; width: 100%; min-width: 0; border: 1px solid var(--cs-color-border); border-radius: 6px; padding: 8px; background: var(--cs-color-surface); color: var(--cs-color-text); }
 .table { min-width: 850px; }
 .table small { display: block; font-size: 12px; color: var(--cs-color-text-muted); margin-top: 4px; }
@@ -58,4 +60,4 @@ a.tile:focus-visible { outline: 2px solid var(--cs-color-focus); outline-offset:
 /* 不写 min-width: 0：格子不窄于按钮本身，英文的长标签（Restore release replicas）不会压到旁边的按钮上。 */
 .action { display: grid; gap: 4px; flex: 1 1 150px; }
 .operation { border-top: 1px solid var(--cs-color-border); padding-top: 12px; overflow-wrap: anywhere; }
-@media (max-width: 640px) { .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } .filters { grid-template-columns: minmax(0, 1fr); } .facts { grid-template-columns: minmax(0, 1fr); gap: 4px; } .facts dd { margin-bottom: 8px; } }
+@media (max-width: 640px) { .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } .filters { grid-template-columns: repeat(2, minmax(0, 1fr)); } .filters label:last-child:nth-child(odd) { grid-column: 1 / -1; } .facts { grid-template-columns: minmax(0, 1fr); gap: 4px; } .facts dd { margin-bottom: 8px; } }

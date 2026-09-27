@@ -7,7 +7,11 @@
 .budgetTable small, .table small { display: block; color: var(--cs-color-text-muted); font-size: 11px; }
 .table { min-width: 840px; }
 .split { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr)); gap: 12px; margin-top: 12px; }
-.summary { display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px solid var(--cs-color-border); border-radius: 8px; }
+.summary { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px; padding: 8px; border: 1px solid var(--cs-color-border); border-radius: 8px; font-size: var(--cs-font-size-sm); }
+.summary > span { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 4px; min-width: 0; }
+.compactSummary { min-width: 0; font-size: var(--cs-font-size-sm); }
+.compactSummary > summary { cursor: pointer; overflow-wrap: anywhere; }
+.compactSummary[open] > summary { margin-bottom: 8px; }
 .controls { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; }
 .controls label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; max-width: 100%; }
 .controls select, .controls input { max-width: 100%; min-height: 34px; }

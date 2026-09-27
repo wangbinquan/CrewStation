@@ -31,7 +31,8 @@ export function CapacityDetails({ data: d }: { data: Capacity }) {
   </>;
 }
 
-export function UsageSummary({ title, data }: { title: string; data: ClusterUsageSummary }) {
+export function UsageSummary({ title, data, compact = false }: { title: string; data: ClusterUsageSummary; compact?: boolean }) {
   const t = useT();
-  return <article className={metricStyles.summary}><strong>{title}</strong><span>{data.pods} Pod · {data.pvcs} PVC</span><span>CPU <MetricValue metric={data.metrics.cpu} coverage={data.coverage.cpu} compact /></span><span>{t('cluster.metrics.memory')} <MetricValue metric={data.metrics.memory} coverage={data.coverage.memory} compact /></span><span>{t('cluster.metrics.storageRequested')} {amount(data.storageRequested)}</span><span>{t('cluster.metrics.storageCapacity')} {amount(data.storageCapacity)}</span><span>{t('cluster.metrics.storageUsed')} <MetricValue metric={data.metrics.volumeUsed} coverage={data.coverage.volumeUsed} compact /></span></article>;
+  const metrics = <article className={metricStyles.summary}>{!compact ? <><strong>{title}</strong><span>{data.pods} Pod · {data.pvcs} PVC</span></> : null}<span>CPU <MetricValue metric={data.metrics.cpu} coverage={data.coverage.cpu} compact /></span><span>{t('cluster.metrics.memory')} <MetricValue metric={data.metrics.memory} coverage={data.coverage.memory} compact /></span><span>{t('cluster.metrics.storageRequested')} {amount(data.storageRequested)}</span><span>{t('cluster.metrics.storageCapacity')} {amount(data.storageCapacity)}</span><span>{t('cluster.metrics.storageUsed')} <MetricValue metric={data.metrics.volumeUsed} coverage={data.coverage.volumeUsed} compact /></span></article>;
+  return compact ? <details className={metricStyles.compactSummary}><summary>{title} · {data.pods} Pod · {data.pvcs} PVC</summary>{metrics}</details> : metrics;
 }
