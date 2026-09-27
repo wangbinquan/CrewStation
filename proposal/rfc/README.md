@@ -65,6 +65,6 @@ proposal/rfc/RFC-NNN-{slug}/
 | [RFC-027](./RFC-027-business-execution-contract/proposal.md) | 业务执行契约与 aw 平台接入：异步幂等子任务、文件与持久事件、动态 Agent 材料、会话恢复、release 固定与执行权交接 | Done · 2026-09-27 · CS 实现与隔离集群验收完成，0c8be5fd 精确 SHA 六项 CI 通过并本地部署；aw 外部接入未实施，详见验收记录。 |
 | [RFC-028](./RFC-028-runtime-environment-builds/proposal.md) | 运行镜像构建与独立绑定：Dockerfile／脚本／二进制预置，服务、业务与开发任务及各 Agent 独立选镜像，用途验证、摘要固定与恢复 | In Progress · 2026-09-27 · 作者批准完整 RFC／ADR 实现、提交上库与本地部署；独立运行镜像模块开始实施，验收未完成。 |
 | [RFC-029](./RFC-029-task-recovery-workbench/proposal.md) | 任务恢复工作台：任务列表与失败置顶、恢复评估、持久恢复请求、由所属业务应用安全执行并展示实际结果 | In Progress · 2026-09-27 · 作者已批准平台记录恢复请求、所属应用执行的推荐方案；任务列表与恢复契约实施中，原RFC027／028验收继续。 |
-| [RFC-030](./RFC-030-market-discovery/proposal.md) | 能力市场紧凑目录：负责人可见与过滤、名称／用途多关键词检索、URL 查询状态与统一详情弹窗 | In Progress · 2026-09-27 · 本地实现完成，定向72/0、PG7/0、16组浏览器通过；整层剩并行运行镜像接口面阻断，未提交／部署，见验收记录。 |
-| [RFC-031](./RFC-031-console-catalog-ux/proposal.md) | 工作台目录统一显示与交互：项目、接入、运行镜像、算力和资源套餐的紧凑信息层级、主次操作与上下文恢复 | In Progress · 2026-09-27 · 作者已批准；七类目录实现与浏览器矩阵通过，完整门禁／发布状态见 acceptance。 |
-| [RFC-032](./RFC-032-app-icons/proposal.md) | 应用图标：业务约定 /favicon.ico、上传图片与自定义 URL，统一尺寸、受保护读取与失败回退 | In Progress · 2026-09-27 · 作者已批准；三种来源、受保护上传读取与回退已实现，验收／发布状态见 acceptance。 |
+| [RFC-030](./RFC-030-market-discovery/proposal.md) | 能力市场紧凑目录：负责人可见与过滤、名称／用途多关键词检索、URL 查询状态与统一详情弹窗 | Done · 2026-09-27 · 功能6c5605c2已发布，最终d2852b32精确SHA六项CI全绿并部署本机；真实列表/搜索/弹窗与图标设置验收通过，见acceptance。 |
+| [RFC-031](./RFC-031-console-catalog-ux/proposal.md) | 工作台目录统一显示与交互：项目、接入、运行镜像、算力和资源套餐的紧凑信息层级、主次操作与上下文恢复 | Done · 2026-09-27 · 功能6c5605c2已发布，最终d2852b32精确SHA六项CI全绿并部署本机；真实列表/搜索/弹窗与图标设置验收通过，见acceptance。 |
+| [RFC-032](./RFC-032-app-icons/proposal.md) | 应用图标：业务约定 /favicon.ico、上传图片与自定义 URL，统一尺寸、受保护读取与失败回退 | Done · 2026-09-27 · 功能6c5605c2已发布，最终d2852b32精确SHA六项CI全绿并部署本机；真实列表/搜索/弹窗与图标设置验收通过，见acceptance。 |
