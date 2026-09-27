@@ -7,7 +7,7 @@
 
 最新结果：CLI InterfaceReady 修复 a6da5868917e72fc2db658adf193a28d64e5ee3c 已发布，CI 36286527002 六项成功；API／controller／session 已部署 rc025-interface-a6da5868（1/1），console 沿用 bb1bfc09。静态、unit 725/0、module 1412/7 skip/0 fail、console 905/0、生产构建和新增行防护 21/21 全通过。真实 CLI 从 waiting-interface 到 ready 由后台独立推进，未发送模型任务，验证后已停止并删除 Pod。I27 空孤儿 Secret 自动回收、原 PVC 待回收及管理员显式删除、归档 Namespace 删除全过程已完成，两份数据库和仓库保留；控制器重启未复活命名空间。六处页面／API／UID 对照已保存，详见 acceptance §17.1、§18.5–18.7。
 
-RFC 仍 In Progress：成员失权／并发额度的临时测试授权被自动审批拒绝，待作者具体答复；缺少 plan-unavailable 与 quota_exceeded 的完整 HTTP 拒绝证明、跨身份合计桶、浏览器限流提示和临时修改平台默认值的实机证明。rfc025-rebuild-verify 工作区和 preview 保留供续验，两条测试 CLI 均已停止；rfc025-retire-verify 已归档且 Namespace 删除。八个历史业务卷未动。接手前的 tests/e2e/referenceResources.test.ts 仍原样未提交。
+作者已明确批准并完成临时成员／额度／套餐与平台默认限流验收：两身份最后一份额度只受理一个，停止退额后另一身份可受理；成员移除后真实 SSE forbidden 并断流；plan-unavailable 412、quota_exceeded 429 及无新增台账通过。多用户 Host 与多来源服务目标各 20 请求，均 4 成功／16 限流；平台默认 688 ms 生效并恢复。浏览器提示采用只读本机 429 注入，自动重读／恢复通过，没有扩大共享负载。全部临时配置已恢复。测试项目 v0.1.0 经正常切流成为 prod ready，preview empty，工作区保留；所有验收 CLI 停止。最终管理页中英文旧文案已修正，static、unit 725/0、module 1412/7 skip/0 fail、console 905/0、构建与改动行防护通过，准备发布，详见 acceptance §19；最终状态随发布收口。
 
 接手基线 `1fbbde8d` 与 origin/main 一致，基线 CI 35978999719 成功；本机控制面实为 `rc025-t14c-20260924`、console 为 `app-access-2-20260924`，均就绪，以下旧段落的部署标签是历史记录。
 

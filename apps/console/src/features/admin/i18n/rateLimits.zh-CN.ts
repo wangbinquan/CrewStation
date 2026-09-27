@@ -1,9 +1,9 @@
 /** 网关限流（RFC-025 T10，设计 §7.3）：平台设置里的平台默认，项目管理页里的项目单独设置。 */
 export const rateLimitMessages = {
   'admin.settings.rateLimits.title': '网关限流',
-  'admin.settings.rateLimits.description': '网关对工作台与命令行的平台接口、访问数字人的用户域、数字人之间的服务域调用限流；超额的请求得到 429 与 Retry-After。保存后几秒内生效，不需要重启。开发预览不限流。',
+  'admin.settings.rateLimits.description': '网关对工作台与命令行的平台接口、访问数字人的用户域、数字人之间的服务域调用限流；超额的请求得到 429；频率超限时附带 Retry-After。保存后几秒内生效，不需要重启。开发预览按项目用户域规则限流。',
   'admin.settings.rateLimits.group.platformApi': '平台接口（工作台与命令行）',
-  'admin.settings.rateLimits.group.userDomain': '用户域（数字人的正式与待验证主机）',
+  'admin.settings.rateLimits.group.userDomain': '用户域（正式、待验证与开发预览）',
   'admin.settings.rateLimits.group.serviceDomain': '服务域（内部 API、数字人互调、事件推送）',
   'admin.settings.rateLimits.field.platformApi.perUser.average': '每个用户 · 平均',
   'admin.settings.rateLimits.field.platformApi.perUser.burst': '每个用户 · 突发',

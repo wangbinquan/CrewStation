@@ -3,9 +3,9 @@ import type { rateLimitMessages as zhCN } from './rateLimits.zh-CN';
 
 export const rateLimitMessages: MessagesShapedLike<typeof zhCN> = {
   'admin.settings.rateLimits.title': 'Gateway rate limits',
-  'admin.settings.rateLimits.description': 'The gateway limits the platform API used by the console and CLI, user-domain visits to digital workers, and service-domain calls between them. Requests over the limit get 429 with Retry-After. Saved values take effect within seconds, no restart needed. Dev previews are not limited.',
+  'admin.settings.rateLimits.description': 'The gateway limits the platform API used by the console and CLI, user-domain visits to digital workers, and service-domain calls between them. Requests over the limit get 429; rate limits include Retry-After. Saved values take effect within seconds, no restart needed. Dev previews use the project user-domain limits.',
   'admin.settings.rateLimits.group.platformApi': 'Platform API (console and CLI)',
-  'admin.settings.rateLimits.group.userDomain': 'User domain (production and preview hosts of digital workers)',
+  'admin.settings.rateLimits.group.userDomain': 'User domain (production, preview, and dev preview)',
   'admin.settings.rateLimits.group.serviceDomain': 'Service domain (internal APIs, calls between digital workers, event pushes)',
   'admin.settings.rateLimits.field.platformApi.perUser.average': 'Per user · average',
   'admin.settings.rateLimits.field.platformApi.perUser.burst': 'Per user · burst',

@@ -67,6 +67,8 @@ async function choose(label: string, value: string) {
 test('网关限流（平台默认）：展示三组、校验突发不能小于平均、保存带版本号；409 说明原因不重发', async () => {
   const f = rateLimitFixture(); page = await renderApp('/admin/settings');
   const limits = card('网关限流');
+  // T9 已将开发预览接入项目限流，管理页不能继续误称它不限流。
+  expect(limits.textContent).toContain('开发预览按项目用户域规则限流。');
   for (const text of ['平台接口（工作台与命令行）', '平均 20 次／秒 · 突发 40', '同时 16 个', '每个目标合计', '平均 500 次／秒 · 突发 1000', '使用平台内置的默认值，尚未修改过。']) expect(limits.textContent).toContain(text);
   await clickIn(limits, '修改');
   expect((field('每个用户 · 平均') as HTMLInputElement).value).toBe('20');
@@ -85,17 +87,17 @@ test('网关限流（平台默认）：展示三组、校验突发不能小于�
 test('项目的限流：标出平台默认或单独设置；只单独设置用户域时只提交那一组；撤销单独设置回到平台默认', async () => {
   const f = rateLimitFixture(); page = await renderApp(resourcePagePath);
   const limits = card('限流');
-  expect(limits.textContent).toContain('用户域（数字人的正式与待验证主机） · 平台默认'); expect(limits.textContent).toContain('服务域（内部 API、数字人互调、事件推送） · 平台默认');
+  expect(limits.textContent).toContain('用户域（正式、待验证与开发预览） · 平台默认'); expect(limits.textContent).toContain('服务域（内部 API、数字人互调、事件推送） · 平台默认');
   expect([...limits.querySelectorAll('button')].some((node) => node.textContent === '撤销单独设置')).toBe(false);
   await clickIn(limits, '修改');
-  await choose('用户域（数字人的正式与待验证主机）', 'override');
+  await choose('用户域（正式、待验证与开发预览）', 'override');
   await type('每个用户在每个主机 · 平均', '5'); await type('每个用户在每个主机 · 突发', '10'); await clickIn(dialog(), '保存');
   expect(f.writes).toEqual([{ path: projectPath, body: { override: { userDomain: { perUser: bucket(5, 10), perHost: bucket(300, 600) } }, expectedRevision: 0 } }]);
   const after = card('限流');
-  expect(after.textContent).toContain('用户域（数字人的正式与待验证主机） · 单独设置'); expect(after.textContent).toContain('平均 5 次／秒 · 突发 10'); expect(after.textContent).toContain('已保存，几秒内网关按新值限流。');
+  expect(after.textContent).toContain('用户域（正式、待验证与开发预览） · 单独设置'); expect(after.textContent).toContain('平均 5 次／秒 · 突发 10'); expect(after.textContent).toContain('已保存，几秒内网关按新值限流。');
   await clickIn(after, '撤销单独设置'); await clickIn(card('限流'), '确认');
   expect(f.writes.at(-1)).toEqual({ path: projectPath, body: { override: null, expectedRevision: 1 } });
-  expect(card('限流').textContent).toContain('已撤销，这个项目回到平台默认。'); expect(card('限流').textContent).toContain('用户域（数字人的正式与待验证主机） · 平台默认');
+  expect(card('限流').textContent).toContain('已撤销，这个项目回到平台默认。'); expect(card('限流').textContent).toContain('用户域（正式、待验证与开发预览） · 平台默认');
 });
 
 // 其他页面的用例的假服务端对没登记的接口回 `{ items: [] }`：限流卡不能拿它当设置渲染、把整页带崩。
