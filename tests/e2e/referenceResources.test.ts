@@ -15,7 +15,8 @@ describe.skipIf(!session?.project)('开发页「可使用资源」的真实布�
     await page.cmd('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: false });
     for (const topic of ['api', 'events', 'guide', 'agent']) {
       await open(page, `/projects/${id}/dev-session?view=reference&topic=${topic}`);
-      await page.waitUntil(`!!document.querySelector('[role="tablist"][aria-label="资源主题"]') && !document.querySelector('aside[aria-label="工具面板"]')?.innerText.includes('读取中')`, 20_000);
+      // 只看主题正文里的读取状态：面板别处（如会话信息）可能还在读，不影响这里量的东西。
+      await page.waitUntil(`(() => { const bar = document.querySelector('[role="tablist"][aria-label="资源主题"]'); const body = bar?.parentElement?.parentElement; return !!body && body.innerText.length > 200 && !body.innerText.includes('读取中'); })()`, 30_000);
       const measured = await page.eval<{ tabs: string[]; scrollers: string[]; overflow: number; uuids: string[] }>(`(() => {
         const panel = document.querySelector('aside[aria-label="工具面板"]');
         const body = panel.querySelector('[role="tablist"][aria-label="资源主题"]').parentElement.parentElement;
