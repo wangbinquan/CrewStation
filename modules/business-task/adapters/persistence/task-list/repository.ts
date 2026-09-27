@@ -7,20 +7,21 @@ import { z } from 'zod';
 import type { BusinessTaskList } from '../../../ports/taskList';
 import { taskListRows } from './rows';
 
-const Cursor = z.strictObject({ version: z.literal(1), projectId: z.string().nullable(), rank: z.number().int().min(0).max(2), updatedAt: z.iso.datetime(), protocol: z.enum(['legacy', 'v3']), id: z.uuid() });
-function readCursor(value: string | undefined, projectId: string | undefined) {
+const Cursor = z.strictObject({ version: z.literal(2), projectId: z.string().nullable(), state: BusinessExecutionTaskQuerySchema.shape.state.nullable(), rank: z.number().int().min(0).max(2), updatedAt: z.iso.datetime(), protocol: z.enum(['legacy', 'v3']), id: z.uuid() });
+function readCursor(value: string | undefined, projectId: string | undefined, state: BusinessExecutionTaskQuery['state']) {
   if (!value) return undefined;
-  try { const cursor = Cursor.parse(JSON.parse(Buffer.from(value, 'base64url').toString())); if (cursor.projectId !== (projectId ?? null)) throw new Error('scope'); return cursor; }
+  try { const cursor = Cursor.parse(JSON.parse(Buffer.from(value, 'base64url').toString())); if (cursor.projectId !== (projectId ?? null) || cursor.state !== (state ?? null)) throw new Error('scope'); return cursor; }
   catch { throw validation('任务列表游标无效或筛选范围已改变'); }
 }
 /** Filter, attention ordering and keyset pagination happen in SQL over both protocols, before the bound. */
 export function drizzleBusinessTaskList(db: Database): BusinessTaskList {
   return { list: async (input: BusinessExecutionTaskQuery) => {
-    const query = BusinessExecutionTaskQuerySchema.parse(input), cursor = readCursor(query.cursor, query.projectId);
+    const query = BusinessExecutionTaskQuerySchema.parse(input), cursor = readCursor(query.cursor, query.projectId, query.state);
+    const state = query.state === 'failed' ? sql`rank = 0` : query.state === 'unknown' ? sql`rank = 1` : query.state ? sql`state = ${query.state}` : sql`true`;
     const rows = await db.execute(sql`${taskListRows(query.projectId)}
       SELECT *, to_char(created_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS created,
         to_char(updated_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS updated
-      FROM ranked WHERE ${cursor ? sql`(rank > ${cursor.rank} OR (rank = ${cursor.rank} AND
+      FROM ranked WHERE ${state} AND ${cursor ? sql`(rank > ${cursor.rank} OR (rank = ${cursor.rank} AND
         (updated_at < ${cursor.updatedAt}::timestamptz OR (updated_at = ${cursor.updatedAt}::timestamptz AND
         (protocol > ${cursor.protocol} OR (protocol = ${cursor.protocol} AND id > ${cursor.id}))))))` : sql`true`}
       ORDER BY rank, updated_at DESC, protocol, id LIMIT ${query.limit + 1}`);
@@ -34,6 +35,6 @@ export function drizzleBusinessTaskList(db: Database): BusinessTaskList {
       ...(r['latest_failure'] ? { latestFailure: r['latest_failure'] as BusinessExecutionTaskItem['latestFailure'] } : {}),
     }));
     const last = selected.at(-1);
-    return BusinessExecutionTaskPageSchema.parse({ items, ...(rows.length > query.limit && last ? { next: Buffer.from(JSON.stringify({ version: 1, projectId: query.projectId ?? null, rank: Number(last['rank']), updatedAt: String(last['updated']), protocol: last['protocol'], id: last['id'] })).toString('base64url') } : {}) });
+    return BusinessExecutionTaskPageSchema.parse({ items, ...(rows.length > query.limit && last ? { next: Buffer.from(JSON.stringify({ version: 2, projectId: query.projectId ?? null, state: query.state ?? null, rank: Number(last['rank']), updatedAt: String(last['updated']), protocol: last['protocol'], id: last['id'] })).toString('base64url') } : {}) });
   } };
 }

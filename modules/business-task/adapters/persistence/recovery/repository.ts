@@ -17,14 +17,18 @@ import { recoveryRequests as requests, recoveryView } from './tables';
 const active = ['pending', 'claimed', 'running'] as const;
 export function drizzleTaskRecoveryRequests(db: Database): TaskRecoveryRequests {
   return {
+    forOperation: async (serviceId, operationId) => { const row = (await db.select().from(requests).where(and(eq(requests.serviceId, serviceId), eq(requests.operationId, operationId))).limit(1))[0]; return row && recoveryView(row); },
+    hasActive: async (serviceId, taskId, subtaskId) => (await db.select({ id: requests.id }).from(requests).where(and(eq(requests.serviceId, serviceId), eq(requests.taskId, taskId), inArray(requests.state, [...active]), subtaskId ? or(eq(requests.targetKey, ''), eq(requests.targetKey, subtaskId)) : undefined)).limit(1)).length > 0,
+    find: async (serviceId, requestKey) => { const row = (await db.select().from(requests).where(and(eq(requests.serviceId, serviceId), eq(requests.requestKey, requestKey))))[0]; return row && recoveryView(row); },
     request: (input) => requestRecovery(db, input),
     authorize: (serviceId, mutation, authorization) => executionTransaction(db, serviceId, async (tx, now) => { await authorizeRecoveryMutation(tx, now, serviceId, mutation, authorization); }),
     reconcile: () => reconcileRecoveryRequests(db),
     get: async (serviceId, id) => { const row = (await db.select().from(requests).where(and(eq(requests.serviceId, serviceId), eq(requests.id, id))))[0]; return row && recoveryView(row); },
-    list: async (serviceId, taskId, limit) => (await db.select().from(requests).where(and(eq(requests.serviceId, serviceId), eq(requests.taskId, taskId))).orderBy(desc(requests.createdAt), desc(requests.id)).limit(Math.max(1, Math.min(100, Math.trunc(limit) || 30)))).map(recoveryView),
+    list: async (serviceId, taskId, limit) => (await db.select().from(requests).where(and(eq(requests.serviceId, serviceId), eq(requests.taskId, taskId))).orderBy(asc(sql`CASE WHEN ${requests.state} IN ('pending','claimed','running') THEN 0 ELSE 1 END`), desc(requests.createdAt), desc(requests.id)).limit(Math.max(1, Math.min(100, Math.trunc(limit) || 30)))).map(recoveryView),
     claim: (serviceId, authorization, id) => claimRecovery(db, serviceId, authorization, id),
     reject: (serviceId, id, ownership, reason) => executionTransaction(db, serviceId, async (tx, now) => {
       const row = await ownedRecovery(tx, now, serviceId, id, ownership);
+      await recoveryCapability(tx, serviceId, row.target.action, now);
       if (row.state !== 'claimed') throw conflict('已开始执行的恢复请求不能由应用改写结果');
       if (!reason.trim() || reason.length > 1024) throw precondition('拒绝恢复必须提供有界原因');
       const updated = (await tx.update(requests).set({ state: 'rejected', reason, claimId: null, leaseUntil: null, updatedAt: now }).where(eq(requests.id, id)).returning())[0]!;
@@ -55,7 +59,7 @@ async function claimRecovery(db: Database, serviceId: string, authorization: Exe
     const actions = await recoveryCapabilities(tx, serviceId, now);
     if (!actions.length) throw precondition('当前应用版本未声明恢复能力', { code: 'application_recovery_unsupported' });
     const available = or(eq(requests.state, 'pending'), and(inArray(requests.state, ['claimed', 'running']), or(lte(requests.leaseUntil, now), sql`${requests.claimEpoch} <> ${epoch}`)));
-    const row = (await tx.select().from(requests).where(and(eq(requests.serviceId, serviceId), available, id ? eq(requests.id, id) : inArray(sql`${requests.target}->>'action'`, actions))).orderBy(asc(requests.createdAt), asc(requests.id)).limit(1).for('update', { skipLocked: true }))[0];
+    const row = (await tx.select().from(requests).where(and(eq(requests.serviceId, serviceId), available, id ? eq(requests.id, id) : inArray(sql`${requests.target}->>'action'`, actions))).orderBy(asc(requests.updatedAt), asc(requests.createdAt), asc(requests.id)).limit(1).for('update', { skipLocked: true }))[0];
     if (!row) return undefined;
     await recoveryCapability(tx, serviceId, row.target.action, now);
     const claimId = newResourceId(), expires = new Date(Math.min(now.getTime() + 30_000, Date.parse(control!.leaseExpiresAt!)));

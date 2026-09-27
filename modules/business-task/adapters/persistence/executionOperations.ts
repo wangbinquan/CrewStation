@@ -5,6 +5,8 @@ import type { ExecutionOperations } from '../../ports/executionOperations';
 import { executionOperations as ops } from './executionTables';
 import { authorizeExecution, executionTransaction } from './executionTransaction';
 import { claimExecutionOperation } from './executionOperationClaims';
+import { authorizeRestart } from './recovery/restartAdmission';
+import { bindRecoveryMutation } from './recovery/mutations';
 import { leaseSeconds as seconds, operationKeyed as keyed, operationLeased as leased, toOperation, verifyOperationDigest as verifyDigest } from './operationRows';
 
 /** 同一表承载幂等回执与 outbox；数据库时钟和 CAS 拒绝过期 worker 的迟到回执。 */
@@ -16,12 +18,14 @@ export function drizzleExecutionOperations(db: Database): ExecutionOperations {
     reserve: (candidate, authorization) => executionTransaction(db, candidate.serviceId, async (tx, now) => {
       const old = (await tx.select().from(ops).where(keyed(candidate)))[0];
       if (old) { const operation = toOperation(old); verifyDigest(operation, candidate.requestDigest); return { operation, created: false }; }
+      const recovery = await authorizeRestart(tx, now, candidate, authorization);
       const epoch = await authorizeExecution(tx, candidate.serviceId, candidate.intent.tasksSpec.executionControl === 'fenced', authorization, now);
       const rows = await tx.insert(ops).values({ ...candidate, epoch, state: 'pending', createdAt: sql`clock_timestamp()`, updatedAt: sql`clock_timestamp()` })
         .onConflictDoNothing({ target: [ops.serviceId, ops.kind, ops.parentId, ops.requestKey] }).returning();
       const row = rows[0] ?? (await tx.select().from(ops).where(keyed(candidate)))[0]!;
       const operation = toOperation(row);
       verifyDigest(operation, candidate.requestDigest);
+      await bindRecoveryMutation(tx, now, recovery, { operationId: operation.id, resultTaskId: operation.intent.task.id });
       return { operation, created: rows.length === 1 };
     }),
     claim: (input) => claimExecutionOperation(db, input),
@@ -32,8 +36,10 @@ export function drizzleExecutionOperations(db: Database): ExecutionOperations {
       if (!row) throw notFound('业务执行操作');
       const operation = toOperation(row); verifyDigest(operation, digest);
       if (operation.state !== 'retryable-rejected') return operation;
+      const recovery = await authorizeRestart(tx, now, operation, authorization);
       const epoch = await authorizeExecution(tx, key.serviceId, operation.intent.tasksSpec.executionControl === 'fenced', authorization, now);
       const resumed = (await tx.update(ops).set({ state: 'pending', epoch, errorCode: null, updatedAt: sql`clock_timestamp()` }).where(eq(ops.id, row.id)).returning())[0]!;
+      await bindRecoveryMutation(tx, now, recovery, { operationId: operation.id, resultTaskId: operation.intent.task.id });
       return toOperation(resumed);
     }),
     adoptPending: (key, digest, authorization) => executionTransaction(db, key.serviceId, async (tx, now) => {
@@ -41,8 +47,10 @@ export function drizzleExecutionOperations(db: Database): ExecutionOperations {
       if (!row) throw notFound('业务执行操作');
       const operation = toOperation(row); verifyDigest(operation, digest);
       if (operation.state !== 'pending' || operation.errorCode === 'admission_unknown') return operation;
+      const recovery = await authorizeRestart(tx, now, operation, authorization);
       const epoch = await authorizeExecution(tx, key.serviceId, operation.intent.tasksSpec.executionControl === 'fenced', authorization, now);
       const adopted = (await tx.update(ops).set({ epoch, updatedAt: now }).where(eq(ops.id, row.id)).returning())[0]!;
+      await bindRecoveryMutation(tx, now, recovery, { operationId: operation.id, resultTaskId: operation.intent.task.id });
       return toOperation(adopted);
     }),
   };

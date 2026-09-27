@@ -58,3 +58,25 @@ test('quota backpressure is returned to the caller without automatic resubmissio
   await expect(client.create({ requestKey: 'original', taskContractVersion: 'app/1' })).rejects.toBeInstanceOf(ApiClientError);
   expect(calls).toBe(1);
 });
+
+test('recovery intake keeps fence and claim in bodies, preserves empty queue and never reports success itself', async () => {
+  const calls: Array<{ url: string; method: string; body: unknown }> = [];
+  const client = createBusinessExecutionClient({ fetch: async (url, options) => {
+    calls.push({ url: String(url), method: options!.method!, body: JSON.parse(String(options!.body)) });
+    return Response.json(null);
+  } });
+  const fence = { epoch: 3, leaseId: 'lease', instanceId: 'instance' };
+  expect(await client.claimRecovery({ fence })).toBeNull();
+  await client.readRecovery('request/1', { fence });
+  await client.rejectRecovery('request/1', { fence, claimId: 'claim', reason: 'application archived task' });
+  const recovery = { recoveryRequestId: '01900000-0000-7000-8000-000000000001', claimId: '01900000-0000-7000-8000-000000000002' };
+  await client.rebuild('task/1', { requestKey: 'rebuild-once', expectedGeneration: 2, fence, recovery });
+  await client.restart('task/1', { requestKey: 'restart-once', expectedGeneration: 2, fence, recovery });
+  expect(calls).toEqual([
+    { url: '/v3/business-execution/recovery/claim', method: 'POST', body: { fence } },
+    { url: '/v3/business-execution/recovery/request%2F1/read', method: 'POST', body: { fence } },
+    { url: '/v3/business-execution/recovery/request%2F1/reject', method: 'POST', body: { fence, claimId: 'claim', reason: 'application archived task' } },
+    { url: '/v3/business-tasks/task%2F1/rebuild', method: 'POST', body: { requestKey: 'rebuild-once', expectedGeneration: 2, fence, recovery } },
+    { url: '/v3/business-tasks/task%2F1/restart', method: 'POST', body: { requestKey: 'restart-once', expectedGeneration: 2, fence, recovery } },
+  ]);
+});

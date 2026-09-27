@@ -10,8 +10,8 @@ import { executionLogs } from '../adapters/persistence/execution/projectionTable
 import { contracts } from '../adapters/persistence/tables';
 import type { RecoveryAdmission } from '../ports/taskRecovery';
 
-export async function taskRecoveryFixture(db: Database) {
-  const f = await executionCommandFixture(db), repository = drizzleTaskRecoveryRequests(db);
+export async function taskRecoveryFixture(db: Database, images?: Parameters<typeof executionCommandFixture>[2]) {
+  const f = await executionCommandFixture(db, undefined, images), repository = drizzleTaskRecoveryRequests(db);
   // Fixture models a deployed application declaring recovery; public manifest parsing is covered separately.
   await db.update(contracts).set({ tasksSpec: sql`tasks_spec || '{"recovery":{"actions":["resume-task","rebuild-workspace","retry-subtask","resume-subtask","restart-task"]}}'::jsonb` }).where(eq(contracts.releaseId, f.releaseId));
   const operation = (await db.select().from(executionOperations).where(eq(executionOperations.serviceId, f.serviceId)))[0]!;

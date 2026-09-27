@@ -4,8 +4,8 @@ import type { BusinessControlDto, BusinessTaskV3Dto, RunnerBusinessReceipt, Runn
 import { newResourceId, PlatformError } from '@crewstation/kernel';
 import { executionHttpFixture } from './executionHttpFixture';
 
-export async function executionCommandFixture(db: Database, options?: Parameters<typeof executionHttpFixture>[2]) {
-    const f = await executionHttpFixture(db, undefined, options), instanceId = newResourceId(), root = '/v3/business-execution/control';
+export async function executionCommandFixture(db: Database, options?: Parameters<typeof executionHttpFixture>[2], images?: Parameters<typeof executionHttpFixture>[1]) {
+    const f = await executionHttpFixture(db, images, options), instanceId = newResourceId(), root = '/v3/business-execution/control';
     const lease = await (await f.request(`${root}/claim`, { instanceId })).json() as BusinessControlDto;
     const fence = { epoch: lease.epoch, leaseId: lease.leaseId!, instanceId };
     expect((await f.request(`${root}/activate`, { expectedEpoch: fence.epoch, leaseId: fence.leaseId, instanceId, preparationDigest: 'a'.repeat(64) })).status).toBe(200);

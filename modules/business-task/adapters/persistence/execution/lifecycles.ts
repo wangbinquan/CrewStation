@@ -19,7 +19,7 @@ export function drizzleExecutionLifecycles(db: Database): ExecutionLifecycles {
       const updated = await tx.update(ops).set({ state, owner: null, leaseUntil: null, updatedAt: now, errorCode: errorCode ?? null }).where(and(eq(ops.id, operation.id), eq(ops.revision, operation.revision), eq(ops.owner, operation.owner!), eq(ops.state, 'running'), sql`${ops.leaseUntil} > clock_timestamp()`)).returning();
       if (!updated.length) return false;
       if (state !== 'pending') {
-        const taskState = state === 'succeeded' ? ({ pause: 'paused', resume: 'running', close: 'closed' } as const)[operation.action] : operation.priorState;
+        const taskState = state === 'succeeded' ? ({ pause: 'paused', resume: 'running', rebuild: 'running', close: 'closed' } as const)[operation.action] : operation.priorState;
         await appendTaskState(tx, operation.serviceId, operation.taskId, taskState, operation.generation, `lifecycle:${operation.id}:settled:${operation.revision}`, now);
         await tx.update(tasks).set({ state: taskState, operationId: null }).where(and(eq(tasks.taskId, operation.taskId), eq(tasks.operationId, operation.id)));
       }
@@ -35,7 +35,7 @@ async function claimLifecycle(db: Database, owner: string, id?: string) {
       if (!row) return undefined;
       if (!row.dispatched) {
         const control = await readExecutionControl(tx, row.serviceId);
-        const draining = row.action !== 'resume' && control?.migration && control.phase === 'frozen' && control.epoch === row.epoch;
+        const draining = ['pause', 'close'].includes(row.action) && control?.migration && control.phase === 'frozen' && control.epoch === row.epoch;
         if (!draining && (control || row.epoch !== null) && (!control || control.phase !== 'active' || !liveControl(control, now) || control.epoch !== row.epoch || (control.handoff && control.handoff.stage !== 'complete'))) return undefined;
       }
       const updated = (await tx.update(ops).set({ state: 'running', dispatched: true, owner, revision: row.revision + 1, leaseUntil: new Date(now.getTime() + 30_000), updatedAt: now }).where(eq(ops.id, row.id)).returning())[0]!;

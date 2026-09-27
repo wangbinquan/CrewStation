@@ -13,6 +13,7 @@ import { messages as releaseZh } from '../features/release/i18n/zh-CN';
 import { messages as devSessionZh } from '../features/dev-session/i18n/zh-CN';
 import { messages as capabilitiesZh } from '../features/capabilities/i18n/zh-CN';
 import { messages as catalogZh } from '../features/catalog/i18n/zh-CN';
+import { messages as businessRecoveryZh } from '../features/business-recovery/i18n/zh-CN';
 import { messages as runtimeImagesZh } from '../features/runtime-images/i18n/zh-CN';
 import { messages as configZh } from '../features/config/i18n/zh-CN';
 import { messages as logsZh } from '../features/logs/i18n/zh-CN';
@@ -30,6 +31,7 @@ import { interactiveScope } from './interactiveScope';
  */
 const zh = mergeMessages([
   { source: 'app', messages: appZh },
+  { source: 'business-recovery', messages: businessRecoveryZh },
   { source: 'admin', messages: adminZh },
   { source: 'projects', messages: projectsZh },
   { source: 'release', messages: releaseZh },

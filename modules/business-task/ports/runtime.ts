@@ -26,6 +26,12 @@ export interface CreateSubtaskExecutionInput {
 
 /** 由 task-runtime 提供。 */
 export interface Environments {
+  restartBusinessWorkspace?(input: { projectId: ProjectId; serviceId: ServiceId; taskId: TaskId; newTaskId: TaskId; fingerprint: string; traceId: TraceId }): Promise<EnvironmentView>;
+  rebuildBusinessWorkspace?(input: { projectId: ProjectId; serviceId: ServiceId; taskId: TaskId; operationId: string; generation: number; volumeUid: string }): Promise<EnvironmentView>;
+  inspectBusinessRecovery?(scope: { projectId: ProjectId; serviceId: ServiceId; taskId: TaskId }): Promise<{
+    state: string; persistent: boolean; stopped: boolean; activeChildren: boolean;
+    volumeUid: string | null; volumeVerified: boolean; image?: string; runtimeImage?: RuntimeImageExecutionSnapshot;
+  } | undefined>;
   blockBusinessAdmission?(serviceId: ServiceId, taskId: TaskId): Promise<boolean>;
   createEnvironment(input: { runtimeImage?: RuntimeImageExecutionSnapshot; serviceId: ServiceId; kind: 'business'; admission?: { id: TaskId; fingerprint: string }; businessStorage?: 'isolated-v1'; volumeMode?: VolumeMode; profile?: string; traceId?: TraceId; labels?: Record<string, string> }): Promise<EnvironmentView>;
   createNativeExecution(input: CreateSubtaskExecutionInput): Promise<EnvironmentView>;

@@ -3,6 +3,7 @@ import type { BusinessTaskV3Dto, ProjectId, TasksSpec } from '@crewstation/contr
 
 /** 受理前固定的非敏感材料；恢复不能重新读 latest release 或默认套餐。 */
 export interface TaskAdmissionIntent {
+  readonly restartOf?: { readonly taskId: BusinessTaskV3Dto['id']; readonly expectedGeneration: number };
   readonly kind: 'create-task';
   readonly projectId: ProjectId;
   readonly callerIdentity: string;

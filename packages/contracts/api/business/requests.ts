@@ -37,6 +37,8 @@ export const BusinessStopAuthoritySchema = z.strictObject({ operationId: Resourc
 export const BusinessSubtaskMutationSchema = z.strictObject({ ...mutation, stopAuthority: BusinessStopAuthoritySchema.optional(), expectedAttempt: BusinessGenerationSchema });
 export const BusinessSubtaskMessageV3Schema = BusinessSubtaskMutationSchema.omit({ stopAuthority: true }).extend({ content: z.string().min(1).max(1024 * 1024) });
 export const BusinessTaskMutationSchema = z.strictObject({ ...mutation, stopAuthority: BusinessStopAuthoritySchema.optional(), expectedGeneration: BusinessGenerationSchema, recovery: BusinessRecoveryExecutionSchema.optional() });
+export const RebuildBusinessTaskSchema = BusinessTaskMutationSchema.extend({ recovery: BusinessRecoveryExecutionSchema });
+export const RestartBusinessTaskSchema = BusinessTaskMutationSchema.omit({ stopAuthority: true }).extend({ recovery: BusinessRecoveryExecutionSchema, fence: BusinessExecutionFenceSchema });
 
 export type CreateBusinessTaskV3 = z.infer<typeof CreateBusinessTaskV3Schema>;
 export type SubmitBusinessSubtaskV3 = z.infer<typeof SubmitBusinessSubtaskV3Schema>;
@@ -44,6 +46,9 @@ export type RetryBusinessSubtaskV3 = z.infer<typeof RetryBusinessSubtaskV3Schema
 export type BusinessSubtaskMutation = z.infer<typeof BusinessSubtaskMutationSchema>;
 export type BusinessSubtaskMessageV3 = z.infer<typeof BusinessSubtaskMessageV3Schema>;
 export type BusinessTaskMutation = z.infer<typeof BusinessTaskMutationSchema>;
+export type RebuildBusinessTaskInput = z.input<typeof RebuildBusinessTaskSchema>;
+export type RestartBusinessTask = z.infer<typeof RestartBusinessTaskSchema>;
+export type RestartBusinessTaskInput = z.input<typeof RestartBusinessTaskSchema>;
 
 export type CreateBusinessTaskV3Input = z.input<typeof CreateBusinessTaskV3Schema>;
 export type SubmitBusinessSubtaskV3Input = z.input<typeof SubmitBusinessSubtaskV3Schema>;

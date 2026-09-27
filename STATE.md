@@ -1,5 +1,49 @@
 # 当前执行状态
 
+## RFC-029 完整门禁已绿，精确发布准备（2026-09-28）
+
+新候选完整check自然退出0：3706 pass／11 skip／0 fail、23517断言、710文件、629.95秒；81源码冻结前后相同。日志`/tmp/cs-rfc029-workbench-v2-full-check.log`，改动行745/746=99.866%、零违规。实机认证明确采用原dev-admin OIDC及独立CDP9368，旧导航、弹窗、六组设置、台账节点和恢复接口锁失败均已定位修复；历史红记录保留。
+
+main/origin再次fetch为0/0、index空，准备按授权精确提交88路径（5测试驱动／断言＋83恢复实现及文档），排除第三方referenceResources的2增1删。不重复fullgate。随后精确SHA CI、控制面本机部署、专用业务消费者升级与真实恢复按钮验收继续。专用业务三文件升级只在`/tmp/cs-rfc029-owned-app-upgrade-prepared.json`准备，尚未远程写入；原服务/父任务与其他资源保持。RFC028剩余RI与整个目标仍active。
+
+
+## RFC-029 候选门禁与旧实机用例修复（2026-09-28，在制）
+
+上一完整check已自然结束3609/54skip/49fail，1421.92秒；原76源码未变。48项是未配置OIDC，另1项是恢复路由变量拼接未被接口面扫描识别。显式路由修正后接口锁与真实PG/HTTP8/0。新增CDP导航总超时／停止旧预览加载／DOM就绪与监听清理，纯回归5/0；真实慢iframe先红后绿，连续1280/1024导航解除超时。成员portal断言、设置页含运行镜像六组、拓扑台账ID与真实Pod/PVC UID映射均有实机先红后绿；拓扑7/0/1skip，设置新增项1/0。详见RFC029 acceptance首节。
+
+当前88路径／81源码已重新冻结：`/tmp/cs-rfc029-workbench-v2-{paths,candidate}.json`。确认无重复fullgate后以dev-admin OIDC、独立CDP9368、明确要求database/e2e启动新完整check，日志`/tmp/cs-rfc029-workbench-v2-full-check.log`；正在运行。未提交／推送／部署。第三方referenceResources保持2增1删且排除，无跨session交互。整个RFC目标仍active，余下精确发布、部署及实际恢复／RI验收继续。
+
+
+## RFC-029 恢复工作台完整交互（2026-09-28，在制）
+
+已接通管理员完整任务／子任务DTO与状态筛选、失败优先分页；详情和恢复确认复用共享Dialog，不在列表末尾append。显示真实持久进度、不可用原因和失败详情，丢回执沿原键，关联新任务在同一弹窗打开。API最终12/0，前后端联合96/0，最后失败文案更新另验console25/0；当前改动行745/746=99.866%、零违规。长列表夹具浏览器中英／明暗／三宽12组通过、0写请求、键盘逐层Esc及焦点滚动恢复通过。不是已部署的真实恢复验收。
+
+83路径清单`/tmp/cs-rfc029-workbench-paths.json`，76源码指纹`/tmp/cs-rfc029-workbench-candidate.json`。唯一完整check运行中（句柄12067，日志`/tmp/cs-rfc029-workbench-full-check.log`），静态通过；已发现实机用例停在公司身份登录页，不取消或重启，先记录终态再修正登录验收配置。未提交／推送／部署，第三方referenceResources完整保留。fetch后main/origin 0/0，无跨session交互。无仓库镜像构建已经交付，不重复实现；RFC028剩余RI、RFC029实机／发布／部署目标继续。 本轮RI-22新增实机：专用父镜像定义停用时原任务仍running、完整快照／版本保留，随后CAS恢复启用；Pod UID／imageID未变、0重启。证据见RFC028 acceptance。
+
+
+## RFC-029 原卷重建与关联新任务（2026-09-28，在制）
+
+已补失败持久工作区显式rebuild：原PVC／原镜像固定，旧Pod必须消失，持久操作与世代阻止重复启动，新Runner连接后才完成；迁移冻结不派发重建。新增restart专用HTTP／原子关联：复制原契约、发布材料、镜像引用和资源，独立新任务／新卷，旧任务保持失败；额度拒绝与丢回执沿原键接续，资源准入不冒充恢复成功。模板与api-client覆盖五种动作。
+
+当前定向67 pass／0 fail、554断言、15文件；生产改动行433/434=99.77%、零违规。日志 `/tmp/cs-rfc029-restart-covered.log`，防护 `/tmp/cs-rfc029-restart-patch.json`。测试枚举拼写被类型检查发现后修正，单文件6/0、68断言；架构／lint／后端与console类型最终通过，回执 `/tmp/cs-rfc029-restart-static-receipt.json`。清单72路径 `/tmp/cs-rfc029-restart-paths.json`，源码指纹 `/tmp/cs-rfc029-restart-candidate.json`。本候选没有新完整门禁、未提交／推送／部署；旧全量失败记录保留。开工fetch为main/origin 0/0，保留第三方referenceResources，无跨session交互。
+
+下一步是管理员完整任务／子任务详情与状态筛选、统一Dialog确认与恢复进度，完整门禁问题与精确SHA CI／本地部署、独立任务实机验收；RFC028剩余RI矩阵保留。无仓库镜像构建已交付，不重复实施；整个RFC目标仍active。
+
+
+## RFC-029 管理员恢复与原资源证明（2026-09-28，在制）
+
+上一轮是证据进展：旧完整门禁已确认退出1并落档，无重复全量。当前接通管理员评估／提交／原请求读取及api-client、task-runtime原Pod/卷/子环境只读检查、runtime-environment原镜像引用检查、Agent固定材料与原生会话评估。重复点击跨评估提交窗口的假412、长终态历史遗漏未结束恢复均先红后绿。最终PG／HTTP／应用／客户端50 pass/0 fail、396断言，13文件，改动行226/226=100%、零缺失加载。日志 `/tmp/cs-rfc029-admin-covered.log`，覆盖 `/tmp/cs-rfc029-admin-patch.json`，架构／lint／后端及console类型检查通过，回执 `/tmp/cs-rfc029-admin-static-receipt.json`。契约金样无变化，无平台新迁移。
+
+代码清单 `/tmp/cs-rfc029-admin-paths.json`（51路径，含design补充），全部仍未提交／推送／部署；index空。旧全量3659/11skip/7fail/3errors不覆盖或冒充当前候选全绿。main与origin/main开工时0/0，保留第三方referenceResources WIP。下一步：失败持久工作区明确重建／关联新任务、示例其余恢复动作、管理员完整详情与筛选、shared Dialog确认／进度及真实浏览器／本地部署验证；尚不能标RFC029或完整目标完成。RFC028未完RI矩阵继续保留，inline镜像构建交付不受影响。本轮无跨session交互。
+
+## RFC-029 应用恢复收件与 RFC-028 校验和反例（2026-09-28，在制）
+
+恢复事务基础8ed094d3已推送，精确CI36332276173第二次六项成功；首次data-control credential读取用例失败，定向6/0后复跑失败作业，未改无关文件。基础尚未部署。当前新增服务Pod/fence读取、认领、拒绝HTTP与客户端；v3示例持久保存恢复意图，按原键恢复暂停任务或fresh retry，丢回执／切换实例不重派。首个冻结check3658/11skip/6fail/3errors已结束，源码不变，失败在既有实机页；补原键接续与队列公平性先红后绿，最终定向27/0、228断言，改动行71/71。修正17路径冻结后完整check已自然结束3659 pass／11 skip／7 fail／3 errors、23145断言、704文件、950.29秒；冻结源码前后相同。失败包括6项既有实机页和releaseDelivery加载中断言，不记全绿；日志 `/tmp/cs-rfc029-intake-v2-full-check.log`。本批未提交／推送／部署，按本地门禁规则保留待处理。管理员请求／评估、原资源证明、失败卷重建和UI链路继续，不标RFC完成。
+
+真实无仓库反向构建01a0e3b1-aa54-7000-b530-0357389118c3因上传文件SHA256错误失败，实际日志FAILED／checksum did NOT match／exit1，无版本产物，临时Job／Pod／PVC已回收；专用隐藏定义已停用，原业务与任务不变。详见RFC028／029 acceptance。保留第三方referenceResources修改，无跨session交互。
+
+RI-10实机三次非法跨位置镜像均400/runtime_image_not_allowed，未新增执行。RI-21父同键200／改镜像409，Agent A新attempt2 fresh及attempt3原生resume均succeeded/exit0，实际imageID、完整runtimeImage和档位修订3保持；fresh换session，resume沿同session，重放各只一个后继。首次resume应用写屏障409后原键成功，失败记录保留。两个新Pod均自动回收，原三Pod UID不变。此为已部署v3业务入口验证，非RFC029按钮已可用。
+
 ## RFC-028 Agent A／B 实机工具补证（2026-09-28）
 
 原专用父任务下新Agent A `01a0e396-b094-7000-afab-eefa0b89679d`、B `01a0e39a-1a89-7000-97cd-65a5a18f806e` 均succeeded/exit0。各自实际Pod imageID为77ffe8…和4eea77…；七项UID／role／Python／Node CJS与ESM／脚本／原生二进制实际bash调用已从业务events读取，证明文件从共享工作区回读。两Agent Pod已物理回收，父任务和服务UID保持。RI-01四种独立镜像、RI-02显式复用闭合，RI-03工具执行缺口补齐；其余RI继续，不能标整个RFC Done。实际控制面仍inline-a12c7d13，不使用尚未部署RFC029候选。详见RFC028 acceptance末节。

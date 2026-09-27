@@ -13,33 +13,36 @@ import { authorizeRecoveryMutation, bindRecoveryMutation } from '../recovery/mut
 export const lifecycleRow = (row: typeof ops.$inferSelect): ExecutionLifecycle => ({ ...row, taskId: row.taskId as ExecutionLifecycle['taskId'], action: row.action as ExecutionLifecycle['action'], priorState: row.priorState as ExecutionLifecycle['priorState'], state: row.state as ExecutionLifecycle['state'] });
 export function requestLifecycle(db: Database): ExecutionLifecycles['request'] {
   return (serviceId, taskId, action, input, observed, authorization) => executionTransaction(db, serviceId, async (tx, now) => {
-    if (input.recovery && action !== 'resume') throw precondition('恢复请求只能用于恢复动作');
-    const recovery = await authorizeRecoveryMutation(tx, now, serviceId, { taskId, action: 'resume-task', requestKey: input.requestKey, expectedGeneration: input.expectedGeneration }, { ...authorization, recovery: input.recovery });
+    const starting = action === 'resume' || action === 'rebuild';
+    if (input.recovery && !starting) throw precondition('恢复请求只能用于恢复动作');
+    if (action === 'rebuild' && !input.recovery) throw precondition('重建必须关联明确的恢复请求');
+    const recovery = await authorizeRecoveryMutation(tx, now, serviceId, { taskId, action: action === 'rebuild' ? 'rebuild-workspace' : 'resume-task', requestKey: input.requestKey, expectedGeneration: input.expectedGeneration }, { ...authorization, recovery: input.recovery });
     const prior = (await tx.select().from(ops).where(and(eq(ops.serviceId, serviceId), eq(ops.taskId, taskId), eq(ops.action, action), eq(ops.requestKey, input.requestKey))))[0];
     if (prior && prior.expectedGeneration !== input.expectedGeneration) throw conflict('生命周期幂等键参数不同', { code: 'idempotency_conflict' });
     if (prior && prior.state !== 'retryable-rejected' && !(prior.state === 'pending' && !prior.dispatched && (input.fence || input.stopAuthority))) { await bindRecoveryMutation(tx, now, recovery, { operationId: prior.id }); return lifecycleRow(prior); }
     const parent = (await tx.select().from(parents).where(and(eq(parents.serviceId, serviceId), sql`${parents.intent}->'task'->>'id' = ${taskId}`)))[0];
     if (!parent) throw notFound('业务任务', taskId);
-    if (action === 'resume' && authorization.stopAuthority) throw precondition('迁移停止权限不能恢复或新建执行');
-    const epoch = await (action === 'resume' ? authorizeExecution : authorizeStoppingExecution)(tx, serviceId, parent.intent.tasksSpec.executionControl === 'fenced', authorization, now);
+    if (starting && authorization.stopAuthority) throw precondition('迁移停止权限不能恢复或新建执行');
+    const epoch = await (starting ? authorizeExecution : authorizeStoppingExecution)(tx, serviceId, parent.intent.tasksSpec.executionControl === 'fenced', authorization, now);
     if (prior?.state === 'pending' && !prior.dispatched) {
       const adopted = (await tx.update(ops).set({ epoch, updatedAt: now }).where(eq(ops.id, prior.id)).returning())[0]!;
       await bindRecoveryMutation(tx, now, recovery, { operationId: adopted.id });
       return lifecycleRow(adopted);
     }
     const current = (await tx.select().from(tasks).where(eq(tasks.taskId, taskId)))[0];
-    const generation = current?.generation ?? parent.intent.task.generation, state = current?.state ?? observed;
+    const generation = current?.generation ?? parent.intent.task.generation, state = action === 'rebuild' && !current?.operationId ? observed : current?.state ?? observed;
     if (generation !== (prior?.generation ?? input.expectedGeneration) || current?.operationId) throw conflict('任务世代已变化或正在变更', { code: 'stale_generation' });
     if (parent.state !== 'succeeded') throw precondition('任务尚未完成准入', { code: 'task_not_running' });
     if (state === 'closed') throw conflict('任务已关闭', { code: 'task_closed' });
     if (action === 'pause' && !['running', 'paused'].includes(state)) throw conflict('当前任务不能暂停', { code: 'task_not_running' });
     if (action === 'resume' && state !== 'paused') throw conflict('当前任务不能恢复', { code: 'task_not_paused' });
+    if (action === 'rebuild' && state !== 'failed') throw conflict('只有明确失败的工作区可以重建', { code: 'task_not_failed' });
     if (action !== 'resume') await assertNoActiveChildren(tx, serviceId, taskId);
     if (action === 'pause' && parent.intent.task.volumeMode !== 'persistent') throw precondition('暂停要求持久卷', { code: 'persistent_volume_required' });
     const id = prior?.id ?? newResourceId(), next = prior?.generation ?? generation + 1;
     const values = { serviceId, taskId, action, requestKey: input.requestKey, expectedGeneration: input.expectedGeneration, generation: next, priorState: state, epoch, state: 'pending', dispatched: false, errorCode: null, updatedAt: now };
     const row = (await tx.insert(ops).values({ id, ...values }).onConflictDoUpdate({ target: ops.id, set: values }).returning())[0]!;
-    const task = { serviceId, generation: next, state: action === 'pause' ? 'pausing' : action === 'resume' ? 'creating' : 'closing', operationId: id };
+    const task = { serviceId, generation: next, state: action === 'pause' ? 'pausing' : starting ? 'creating' : 'closing', operationId: id };
     await tx.insert(tasks).values({ taskId, ...task }).onConflictDoUpdate({ target: tasks.taskId, set: task });
     await appendTaskState(tx, serviceId, taskId, task.state as ExecutionLifecycle['priorState'], next, `lifecycle:${id}:accepted:${now.toISOString()}`, now);
     await bindRecoveryMutation(tx, now, recovery, { operationId: id });

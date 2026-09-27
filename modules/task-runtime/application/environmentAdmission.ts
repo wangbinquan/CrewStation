@@ -25,11 +25,16 @@ export function matchAdmission(current: TaskEnvironment | undefined, fingerprint
 }
 
 /** 项目锁内先检查持久回执，再扣额度、登记和发布事件；重试不重复扣额或投影。 */
-export async function admitEnvironment(deps: TaskRuntimeUseCaseDeps, env: TaskEnvironment, limit: number): Promise<TaskEnvironment> {
+export async function admitEnvironment(deps: TaskRuntimeUseCaseDeps, env: TaskEnvironment, limit: number, restartSource?: TaskEnvironment): Promise<TaskEnvironment> {
   return deps.uow.run(async (scope) => {
     await scope.admissions.lock(env.projectId);
     const replay = matchAdmission(await scope.environments.getById(env.id), env.admissionFingerprint);
     if (replay) return replay;
+    if (restartSource) {
+      const current = await scope.environments.getById(restartSource.id);
+      if (!current || jsonHash(current) !== jsonHash(restartSource)) throw conflict('检查后原工作区已变化', { code: 'workspace_changed' });
+      if ((await scope.environments.listChildren(current.id)).some((child) => child.native?.state !== 'finished')) throw conflict('检查后新增了活动子执行', { code: 'active_subtasks' });
+    }
     if (await scope.admissions.blocked(env.id)) throw conflict('业务执行准入已取消', { code: 'admission_cancelled' });
     if (env.kind === 'dev-session' && (await scope.environments.findDevSession(env.projectId))) throw conflict('该项目已有一个开发会话在运行', { projectId: env.projectId });
     await scope.quota.acquire(env, limit, `并发任务已达配额上限 ${limit}`);

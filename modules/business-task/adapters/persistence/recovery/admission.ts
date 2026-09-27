@@ -8,6 +8,7 @@ import { executionLogs, subtaskProjections } from '../execution/projectionTables
 import { executionSubtasks } from '../execution/subtaskTables';
 import { readExecutionControl } from '../executionTransaction';
 import { liveControl } from '../../../domain/executionControl';
+import { recoveryChildStopped } from '../../../domain/taskRecovery';
 import { contracts } from '../tables';
 
 export async function recoveryCapability(tx: Executor, serviceId: string, action: BusinessRecoveryTarget['action'], now: Date, epoch?: number): Promise<void> {
@@ -43,8 +44,7 @@ async function assertRecoveryChild(tx: Executor, serviceId: string, target: Extr
   const child = (await tx.select().from(executionSubtasks).where(and(eq(executionSubtasks.serviceId, serviceId), eq(executionSubtasks.taskId, target.taskId), eq(executionSubtasks.id, target.subtaskId))))[0];
   if (!child || child.view.attempt !== target.expectedAttempt || !['failed', 'cancelled'].includes(child.view.state) || target.materialDigest !== jsonHash({ parent: parentDigest, child: child.payloadDigest })) stale();
   const projection = (await tx.select().from(subtaskProjections).where(eq(subtaskProjections.subtaskId, child.id)))[0];
-  const neverStarted = child.view.process === 'not-started' && !child.incarnation && ((!child.runtimeDispatched && child.dispatch === 'failed') || (child.view.result?.reason === 'cancelled-before-start' && projection?.complete && projection.sourceConsumed));
-  if (!['exited', 'not-started'].includes(child.view.process) || !(projection?.sourceStopped || neverStarted)) throw precondition('旧执行尚未确认停止', { code: 'original_execution_not_stopped' });
+  if (!recoveryChildStopped(child, projection)) throw precondition('旧执行尚未确认停止', { code: 'original_execution_not_stopped' });
   if (target.action === 'resume-subtask' && (child.view.kind !== 'agent' || child.view.sessionId !== target.resumeSessionId)) stale();
   if ((await tx.select({ id: executionSubtasks.id }).from(executionSubtasks).where(and(eq(executionSubtasks.serviceId, serviceId), eq(executionSubtasks.taskId, target.taskId), eq(executionSubtasks.requestKind, 'retry'), eq(executionSubtasks.requestParent, target.subtaskId))).limit(1)).length) stale();
 }

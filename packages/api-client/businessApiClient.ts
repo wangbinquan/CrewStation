@@ -4,6 +4,8 @@ import type {
   BusinessMigrationReady, BusinessHandoffReady, BusinessMaterialDto, BusinessMaterialRequestInput, BusinessOperationDto, BusinessOutputDto,
   BusinessSubtaskMessageV3Input, BusinessSubtaskMutationInput, BusinessSubtaskV3Dto, BusinessTaskMutationInput, BusinessTaskV3Dto,
   CreateBusinessTaskV3Input, RetryBusinessSubtaskV3Input, SubmitBusinessSubtaskV3Input,
+  BusinessRecoveryClaim, BusinessRecoveryClaimReceipt, BusinessRecoveryRead, BusinessRecoveryReject, BusinessRecoveryRequest,
+  RebuildBusinessTaskInput, RestartBusinessTaskInput,
 } from '@crewstation/contracts';
 import { IDENTITY_HEADERS } from '@crewstation/contracts';
 import type { RequestOptions, TransportOptions } from './httpTransport';
@@ -12,6 +14,9 @@ import { buildUrl } from './requestUrl';
 
 /** Service-domain client. Aborting HTTP observation never cancels an accepted execution. */
 export interface BusinessExecutionClient {
+  readRecovery(id: string, input: BusinessRecoveryRead): Promise<BusinessRecoveryRequest>;
+  claimRecovery(input: BusinessRecoveryClaim): Promise<BusinessRecoveryClaimReceipt | null>;
+  rejectRecovery(id: string, input: BusinessRecoveryReject): Promise<BusinessRecoveryRequest>;
   capabilities(): Promise<BusinessCapabilitiesDto>;
   create(input: CreateBusinessTaskV3Input): Promise<BusinessTaskV3Dto>;
   operation(taskId: string, operationId: string): Promise<BusinessOperationDto>;
@@ -25,6 +30,8 @@ export interface BusinessExecutionClient {
   message(taskId: string, subtaskId: string, input: BusinessSubtaskMessageV3Input): Promise<BusinessOperationDto>;
   pause(taskId: string, input: BusinessTaskMutationInput): Promise<BusinessOperationDto>;
   resume(taskId: string, input: BusinessTaskMutationInput): Promise<BusinessOperationDto>;
+  rebuild(taskId: string, input: RebuildBusinessTaskInput): Promise<BusinessOperationDto>;
+  restart(taskId: string, input: RestartBusinessTaskInput): Promise<BusinessTaskV3Dto>;
   close(taskId: string, input: BusinessTaskMutationInput): Promise<BusinessOperationDto>;
   material(taskId: string, input: BusinessMaterialRequestInput): Promise<BusinessMaterialDto>;
   events(taskId: string, query?: BusinessEventQueryInput): Promise<BusinessEventPage>;
@@ -48,6 +55,9 @@ export function createBusinessExecutionClient(options: TransportOptions): Busine
   const get = <T>(path: string, query?: RequestOptions['query']) => transport.request<T>('GET', path, { query });
   const post = <T>(path: string, body: unknown) => transport.request<T>('POST', path, { body });
   return {
+    readRecovery: (id, input) => post(`/v3/business-execution/recovery/${encodeURIComponent(id)}/read`, input),
+    claimRecovery: (input) => post('/v3/business-execution/recovery/claim', input),
+    rejectRecovery: (id, input) => post(`/v3/business-execution/recovery/${encodeURIComponent(id)}/reject`, input),
     operation: (id, op) => get(`${task(id)}/operations/${encodeURIComponent(op)}`),
     capabilities: () => get('/v3/business-execution/capabilities'),
     create: (input) => transport.request('POST', root, { body: input, ...(input.traceId ? { headers: { [IDENTITY_HEADERS.traceId]: input.traceId } } : {}) }), get: (id) => get(task(id)),
@@ -58,6 +68,8 @@ export function createBusinessExecutionClient(options: TransportOptions): Busine
     cancel: (id, sub, input) => post(`${subtask(id, sub)}/cancel`, input),
     message: (id, sub, input) => post(`${subtask(id, sub)}/messages`, input),
     pause: (id, input) => post(`${task(id)}/pause`, input), resume: (id, input) => post(`${task(id)}/resume`, input), close: (id, input) => post(`${task(id)}/close`, input),
+    rebuild: (id, input) => post(`${task(id)}/rebuild`, input),
+    restart: (id, input) => post(`${task(id)}/restart`, input),
     material: (id, input) => post(`${task(id)}/materials`, input), events: (id, query) => get(`${task(id)}/events`, query),
     eventStreamUrl: (id, query) => buildUrl(transport.baseUrl, `${task(id)}/events/stream`, query),
     file: (id, query) => get(`${task(id)}/file`, query), files: (id, query) => get(`${task(id)}/files`, query),

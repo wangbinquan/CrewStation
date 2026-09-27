@@ -1,6 +1,6 @@
 import type { BusinessOperationDto, BusinessTaskStateV3, TaskId } from '@crewstation/contracts';
 
-export type LifecycleAction = 'pause' | 'resume' | 'close';
+export type LifecycleAction = 'pause' | 'resume' | 'close' | 'rebuild';
 export interface ExecutionLifecycle {
   id: string; serviceId: string; taskId: TaskId; action: LifecycleAction; requestKey: string;
   expectedGeneration: number; generation: number; priorState: BusinessTaskStateV3;

@@ -10,6 +10,14 @@ import { compatibilityEvidence, requireAvailable, versionAccess, versionLock } f
 
 export function runtimeImageReferences(deps: RuntimeImageDeps) {
   return {
+    inspectReference: async (projectId: string, owner: ImageReferenceOwner, snapshot: RuntimeImageExecutionSnapshot): Promise<boolean> => {
+      const reference = await deps.uow.read.references.get(snapshot.versionId, owner.type, owner.id);
+      if (reference?.projectId !== projectId || !reference.snapshot || imageContentDigest(reference.snapshot) !== imageContentDigest(snapshot)) return false;
+      const version = await deps.uow.read.versions.get(snapshot.versionId), validation = await deps.uow.read.validations.get(snapshot.validationId);
+      // Disablement prevents new selection; retained original executions keep their exact validated snapshot.
+      return Boolean(version && version.state !== 'retired' && `${version.repository}@${version.digest}` === snapshot.image && version.digest === snapshot.digest && version.architecture === snapshot.architecture
+        && validation?.state === 'passed' && validation.versionId === version.id && validation.projectId === projectId);
+    },
     renderInitializationSecrets: renderInitializationSecrets(deps),
     reserveImage: async (actor: Actor, projectId: string, input: ImageReservationInput): Promise<RuntimeImageExecutionSnapshot | undefined> => {
       const selected = selectRuntimeImage(input.requestedVersionId, RuntimeImageSelectionSchema.parse(input.selection));

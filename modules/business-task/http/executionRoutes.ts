@@ -1,6 +1,6 @@
 import { executionBody as body } from './executionBody';
 import { BusinessSubtaskMessageV3Schema, BusinessMaterialRequestSchema } from '@crewstation/contracts';
-import { BusinessTaskMutationSchema, ResourceIdSchema } from '@crewstation/contracts';
+import { BusinessTaskMutationSchema, RebuildBusinessTaskSchema, RestartBusinessTaskSchema, ResourceIdSchema } from '@crewstation/contracts';
 import { executionStream } from './executionStream';
 import { BusinessMigrationReadySchema, BusinessControlActivateSchema, BusinessControlClaimSchema, BusinessControlLeaseRequestSchema, BusinessHandoffReadySchema, CreateBusinessTaskV3Schema, TaskIdSchema } from '@crewstation/contracts';
 import { BusinessDirectoryQuerySchema, BusinessFileQuerySchema, SubmitBusinessSubtaskV3Schema, SubtaskIdSchema, BusinessEventQuerySchema, BusinessSubtaskMutationSchema, RetryBusinessSubtaskV3Schema } from '@crewstation/contracts';
@@ -26,6 +26,8 @@ export function executionRoutes(api: BusinessExecutionApi): Hono<AppEnv> {
   const taskParams = z.object({ taskId: TaskIdSchema }), subtaskParams = taskParams.extend({ subtaskId: SubtaskIdSchema });
   router.post('/v3/business-tasks/:taskId/materials', async (c) => c.json(await api.createMaterial(caller(c), parseParams(c, taskParams).taskId, await body(c, BusinessMaterialRequestSchema)), 201));
   for (const action of ['pause', 'resume', 'close'] as const) router.post(`/v3/business-tasks/:taskId/${action}`, async (c) => c.json(await api.mutateTask(caller(c), parseParams(c, taskParams).taskId, action, await body(c, BusinessTaskMutationSchema)), 202));
+  router.post('/v3/business-tasks/:taskId/rebuild', async (c) => c.json(await api.mutateTask(caller(c), parseParams(c, taskParams).taskId, 'rebuild', await body(c, RebuildBusinessTaskSchema)), 202));
+  router.post('/v3/business-tasks/:taskId/restart', async (c) => { const result = await api.restartTask(caller(c), parseParams(c, taskParams).taskId, await body(c, RestartBusinessTaskSchema)); return c.json(result.task, result.status); });
   router.get('/v3/business-tasks/:taskId/operations/:operationId', async (c) => { const p = parseParams(c, taskParams.extend({ operationId: ResourceIdSchema })); return c.json(await api.getOperation(caller(c), p.taskId, p.operationId)); });
   router.post('/v3/business-tasks/:taskId/subtasks', async (c) => { const result = await api.submitSubtask(caller(c), parseParams(c, taskParams).taskId, await body(c, SubmitBusinessSubtaskV3Schema)); return c.json(result.subtask, result.status); });
   router.get('/v3/business-tasks/:taskId/subtasks', async (c) => c.json({ items: await api.listSubtasks(caller(c), parseParams(c, taskParams).taskId) }));

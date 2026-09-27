@@ -75,4 +75,17 @@ describe.skipIf(!available)('管理员任务列表跨协议排序、分页与恢
     expect(response.status).toBe(200); expect(BusinessExecutionTaskPageSchema.parse(await response.json()).items).toHaveLength(1);
   });
 
+  test('状态筛选在分页前生效，失败含子步骤失败；换筛选不能复用旧游标', async () => {
+    const f = await setup();
+    const failed = await f.insert('failed'), paused = await f.insert('paused'), running = await f.insert();
+    await tdb.db.insert(subtasks).values({ id: newResourceId(), taskId: running, name: '失败步骤', kind: 'command', state: 'failed', attempt: 1, spec: {}, createdAt: new Date() });
+    const first = await f.list.list({ state: 'failed', limit: 1 }); expect(first.items).toHaveLength(1); expect(first.next).toBeDefined();
+    const second = await f.list.list({ state: 'failed', limit: 1, cursor: first.next });
+    expect(new Set([...first.items, ...second.items].map((i) => i.id))).toEqual(new Set([failed, running]));
+    expect((await f.list.list({ state: 'paused' })).items.map((i) => i.id)).toEqual([paused]);
+    expect((await f.list.list({ state: 'running' })).items.map((i) => i.id)).toEqual([running]);
+    expect((await f.list.list({ state: 'unknown' })).items).toHaveLength(0);
+    expect((await f.list.list({ state: 'closed' })).items).toHaveLength(0);
+    await expect(f.list.list({ state: 'paused', cursor: first.next })).rejects.toMatchObject({ kind: 'validation' });
+  });
 });

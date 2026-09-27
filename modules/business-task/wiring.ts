@@ -1,4 +1,8 @@
 import { drizzleTaskRecoveryRequests } from './adapters/persistence/recovery/repository';
+import { recoveryQueries } from './adapters/persistence/recovery/queries';
+import { recoveryAdminUseCases } from './application/recovery/admin';
+import { recoveryIntakeUseCases } from './application/recovery/intake';
+import { recoveryIntakeRoutes } from './http/recoveryIntakeRoutes';
 import { drizzleBusinessTaskList } from './adapters/persistence/task-list/repository';
 import { taskListUseCases } from './application/taskList';
 import type { ExecutionAgentSecrets } from './ports/executionAgentSecrets';
@@ -55,6 +59,7 @@ import { drizzleExecutionControls } from './adapters/persistence/executionContro
 import { drizzleExecutionOperations } from './adapters/persistence/executionOperations';
 import { executionControlUseCases } from './application/execution/control';
 import { executionTaskUseCases } from './application/execution/tasks';
+import { restartExecutionUseCase } from './application/recovery/restartExecution';
 import { executionRoutes } from './http/executionRoutes';
 import { executionWorker } from './workers/executionWorker';
 import { executionFileUseCases } from './application/execution/files';
@@ -112,9 +117,11 @@ export function createBusinessTaskModule(deps: BusinessTaskModuleDeps): Business
   const { progressLifecycle, ...lifecycleV3 } = executionLifecycleUseCases(executionDeps);
   const { progressMessage, ...messagesV3 } = executionMessageUseCases(executionDeps);
   const v3 = { ...executionCapabilities(executionDeps), ...messagesV3, ...executionMaterialUseCases(executionDeps), ...lifecycleV3, ...executionRetryUseCases(executionDeps), ...cancellationV3, ...tasksV3, ...subtasksV3, ...projectionV3, ...executionControlUseCases(executionDeps), ...executionFileUseCases(executionDeps), ...executionOperationQueries(executionDeps),
+    ...recoveryIntakeUseCases(executionDeps), ...restartExecutionUseCase(executionDeps),
     runOnce: async () => (await tasksV3.runOnce()) + (await progressSubtask()) + (await progressProjection()) + (await progressCancellation()) + (await progressLifecycle()) + (await progressMessage()) + (await recoveryRequests.reconcile()),
   };
   const api: BusinessTaskModuleApi = {
+    ...recoveryAdminUseCases(executionDeps, recoveryQueries(deps.db)),
     ...taskListUseCases(drizzleBusinessTaskList(deps.db)),
     ...legacyRecoveryUseCases(useCaseDeps, legacyBarrier, deps.legacyRecoveryProof),
     imageReferenceState: drizzleImageReferenceState(deps.db),
@@ -131,6 +138,7 @@ export function createBusinessTaskModule(deps: BusinessTaskModuleDeps): Business
     .on(DomainTopic.releaseRegistered, async (e) => { await registerContracts(e.payload); });
   const service = serviceRoutes(api);
   service.route('/', executionRoutes(v3));
+  service.route('/', recoveryIntakeRoutes(v3));
   if (deps.identities) service.route('/', legacyServiceRoutes(api, legacyBusinessIdentity(deps.identities)));
   let timer: ReturnType<typeof setInterval> | undefined;
   return {

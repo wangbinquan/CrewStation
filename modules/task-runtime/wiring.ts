@@ -1,3 +1,6 @@
+import { inspectBusinessRecovery } from './application/business/recoveryInspection';
+import { rebuildBusinessWorkspace } from './application/business/rebuild';
+import { restartBusinessWorkspace } from './application/business/restart';
 import { environmentImageHistory } from './adapters/persistence/imageHistory';
 import { blockBusinessAdmission } from './application/business/blockAdmission';
 import type { LeasePort } from '@crewstation/resource-runtime';
@@ -133,6 +136,7 @@ export function createTaskRuntimeModule(deps: TaskRuntimeModuleDeps): TaskRuntim
     ...(deps.testRunner ? { runner: deps.testRunner } : {}), ...(deps.testTiming ? { timing: deps.testTiming } : {}), ...(deps.testMcp ? { mcp: deps.testMcp } : {}),
   });
   const api: TaskRuntimeModuleApi = {
+    ...businessRecoveryApi(useCaseDeps),
     name: 'task-runtime',
     imageHistory: environmentImageHistory(deps.db),
     blockBusinessAdmission: blockBusinessAdmission(useCaseDeps),
@@ -177,6 +181,11 @@ export function createTaskRuntimeModule(deps: TaskRuntimeModuleDeps): TaskRuntim
       ...(ledger ? [ledgerResyncWorker(() => resyncLedger(useCaseDeps.uow, ledger, useCaseDeps.logger, useCaseDeps.clock), useCaseDeps.logger)] : [])],
     migrations: taskRuntimeMigrations,
   };
+}
+
+function businessRecoveryApi(deps: TaskRuntimeUseCaseDeps): Pick<TaskRuntimeModuleApi, 'inspectBusinessRecovery' | 'rebuildBusinessWorkspace' | 'restartBusinessWorkspace'> {
+  const rebuild = rebuildBusinessWorkspace(deps), restart = restartBusinessWorkspace(deps);
+  return { inspectBusinessRecovery: inspectBusinessRecovery(deps), rebuildBusinessWorkspace: async (input) => environmentToDto(await rebuild(input)), restartBusinessWorkspace: async (input) => environmentToDto(await restart(input)) };
 }
 
 async function captureStartupLog(deps: TaskRuntimeUseCaseDeps, taskId: TaskId) {

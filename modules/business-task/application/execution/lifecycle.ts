@@ -7,6 +7,7 @@ import { isPlatformError, newResourceId, notFound, quotaExceeded } from '@crewst
 import { executionSource } from './source';
 import { admissionTaskView } from './taskView';
 import { releaseClosedTaskImages } from '../taskRuntimeImage';
+import { rebuildRecoveryWorkspace } from '../recovery/rebuildExecution';
 
 export function executionLifecycleUseCases(deps: BusinessExecutionDeps): Pick<BusinessExecutionApi, 'mutateTask' | 'getOperation'> & { progressLifecycle(): Promise<number> } {
   const source = executionSource(deps);
@@ -38,6 +39,7 @@ async function dispatchLifecycle(deps: BusinessExecutionDeps, operation: Executi
   try {
     let env = await deps.environments.getEnvironment(operation.taskId);
     if (!env) {
+      if (operation.action === 'rebuild') { await deps.lifecycles.settle(operation, 'failed', 'original_workspace_unavailable'); return; }
       const stopped = operation.action === 'close' && await deps.environments.blockBusinessAdmission?.(operation.serviceId as ServiceId, operation.taskId);
       if (stopped && await releaseClosedTaskImages(deps, operation)) await deps.lifecycles.settle(operation, 'succeeded');
       else await deps.lifecycles.settle(operation, 'pending', 'resource_observation_unavailable');
@@ -45,9 +47,10 @@ async function dispatchLifecycle(deps: BusinessExecutionDeps, operation: Executi
     }
     if (operation.action === 'pause' && env.state !== 'paused') env = await deps.environments.pauseEnvironment(operation.taskId);
     if (operation.action === 'resume' && env.state === 'paused') env = await deps.environments.resumeEnvironment(operation.taskId);
+    if (operation.action === 'rebuild') env = await rebuildRecoveryWorkspace(deps, operation);
     if (operation.action === 'close' && !['released', 'releasing'].includes(env.state)) env = await deps.environments.releaseEnvironment(operation.taskId, 'business');
     const done = operation.action === 'pause' ? env.state === 'paused' : operation.action === 'close' ? env.state === 'released' : env.state === 'running' && env.connected;
-    if (operation.action === 'resume' && env.state === 'failed') { await deps.lifecycles.settle(operation, 'failed', 'resume_failed'); return; }
+    if (['resume', 'rebuild'].includes(operation.action) && env.state === 'failed') { await deps.lifecycles.settle(operation, 'failed', `${operation.action}_failed`); return; }
     if (done && operation.action === 'close') {
       try {
         if (!await releaseClosedTaskImages(deps, operation)) { await deps.lifecycles.settle(operation, 'pending', 'image_runtime_cleanup_pending'); return; }

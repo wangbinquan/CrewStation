@@ -1,5 +1,6 @@
 import { SQL } from 'bun';
 import type { Fence } from './client';
+import type { RecoveryRequest } from './recovery';
 
 export class Store {
   readonly db: SQL;
@@ -7,6 +8,7 @@ export class Store {
   async migrate(): Promise<void> {
     await this.db`CREATE TABLE IF NOT EXISTS execution_sample_control (id integer PRIMARY KEY CHECK(id=1), epoch bigint NOT NULL, owner text, phase text NOT NULL, expires_at timestamptz)`;
     await this.db`CREATE TABLE IF NOT EXISTS execution_sample_requests (request_key text PRIMARY KEY, digest text NOT NULL, response jsonb)`;
+    await this.db`CREATE TABLE IF NOT EXISTS execution_sample_recovery (request_id text PRIMARY KEY, request jsonb NOT NULL, response jsonb)`;
   }
   async ready(): Promise<boolean> { try { await this.db`SELECT epoch FROM execution_sample_control LIMIT 1`; return true; } catch { return false; } }
   async prepare(epoch: number, owner: string | null, phase: 'preparing' | 'active' | 'frozen', expiresAt: string | null): Promise<void> {
@@ -35,5 +37,16 @@ export class Store {
   }
   async record(key: string, response: unknown, fence: Fence): Promise<void> {
     await this.guard(fence, async (tx) => { await tx`UPDATE execution_sample_requests SET response=${response}::jsonb WHERE request_key=${key}`; });
+  }
+  async admitRecovery(request: RecoveryRequest, fence: Fence): Promise<unknown> {
+    return this.guard(fence, async (tx) => {
+      await tx`INSERT INTO execution_sample_recovery(request_id,request) VALUES(${request.id},${request}::jsonb) ON CONFLICT DO NOTHING`;
+      const row = (await tx`SELECT response, request->'target' = ${request.target}::jsonb AS matches FROM execution_sample_recovery WHERE request_id=${request.id}`)[0]!;
+      if (!row.matches) throw new Error('恢复请求内容已变化');
+      return row.response;
+    });
+  }
+  async recordRecovery(id: string, response: unknown, fence: Fence): Promise<void> {
+    await this.guard(fence, async (tx) => { await tx`UPDATE execution_sample_recovery SET response=${response}::jsonb WHERE request_id=${id}`; });
   }
 }

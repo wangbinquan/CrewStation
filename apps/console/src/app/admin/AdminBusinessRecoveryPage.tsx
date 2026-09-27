@@ -1,4 +1,5 @@
-import type { BusinessExecutionTaskItem } from '@crewstation/contracts';
+import type { BusinessExecutionTaskItem, BusinessExecutionTaskQuery } from '@crewstation/contracts';
+import { TaskRecoveryPanel } from '../../features/business-recovery/components/TaskRecoveryPanel';
 import { QueryStatus } from '../../shared/ui/QueryStatus';
 import { useAdminPage } from '../../shared/admin/useAdminRead';
 import { useState } from 'react';
@@ -19,7 +20,8 @@ import { Dialog } from '../../shared/ui/dialog/Dialog';
 
 export function AdminBusinessRecoveryPage() {
   const t = useT(), [projectId, setProjectId] = useState(''), [cursor, setCursor] = useState<string>(), [selected, setSelected] = useState<BusinessExecutionTaskItem>();
-  const { query, me, allowed } = useAdminPage(['business-execution-tasks', projectId, cursor], () => api.tasks.listExecutionTasks({ projectId: projectId || undefined, cursor, limit: 30 }), true, true);
+  const [state, setState] = useState<BusinessExecutionTaskQuery['state']>();
+  const { query, me, allowed } = useAdminPage(['business-execution-tasks', projectId, state, cursor], () => api.tasks.listExecutionTasks({ projectId: projectId || undefined, state, cursor, limit: 30 }), true, true);
   const projects = useApiQuery(['business-execution-projects'], () => api.projects.list(), { ...AUTO_REFRESH, enabled: allowed });
   const projectName = (id: string) => projects.data?.items.find((p) => p.id === id)?.name ?? t('executionRecovery.projectNumber', { id: id.slice(-12) });
   const taskName = (item: BusinessExecutionTaskItem) => item.labels.name || item.labels.title || t('executionRecovery.taskNumber', { id: item.id.slice(-12) });
@@ -31,6 +33,8 @@ export function AdminBusinessRecoveryPage() {
       <Card title={t('executionRecovery.tasks')}><Stack>
         <FormField label={t('executionRecovery.project')}><select value={projectId} onChange={(e) => { setProjectId(e.target.value); setCursor(undefined); setSelected(undefined); }}>
           <option value="">{t('executionRecovery.allProjects')}</option>{projects.data?.items.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+        </select></FormField><FormField label={t('recovery.filter')}><select value={state ?? ''} onChange={(e) => { setState((e.target.value || undefined) as BusinessExecutionTaskQuery['state']); setCursor(undefined); setSelected(undefined); }}>
+          <option value="">{t('recovery.allStates')}</option>{(['failed', 'unknown', 'paused', 'running', 'closed'] as const).map((value) => <option key={value} value={value}>{t(`recovery.filter.${value}`)}</option>)}
         </select></FormField><QueryStatus isPending={projects.isPending} error={projects.error} />
         <QueryStatus isPending={query.isPending} error={query.error} isEmpty={query.data?.items.length === 0} emptyTitle={t('executionRecovery.noTasks')} />
         {query.data?.items.length ? <DataTable columns={[t('executionRecovery.task'), t('executionRecovery.project'), t('executionRecovery.state'), t('executionRecovery.reason'), t('executionRecovery.updated'), t('executionRecovery.actions')]}>
@@ -41,10 +45,12 @@ export function AdminBusinessRecoveryPage() {
       </Stack></Card>
       {current ? <Dialog title={`${projectName(current.projectId)} · ${taskName(current)}`} size="large" initialFocus="dialog" onClose={() => setSelected(undefined)}
         footer={<ActionRow><Button variant="ghost" onClick={() => setSelected(undefined)}>{t('ui.dialog.close')}</Button></ActionRow>}><Stack>
-        <p>{t('executionRecovery.state')}：{t(`executionRecovery.state.${current.state}`)} · {t('executionRecovery.updated')}：{new Date(current.updatedAt).toLocaleString()}</p>
-        <p>{current.message || current.latestFailure?.message}</p>
-        {current.latestFailure ? <p>{current.latestFailure.name} · {current.latestFailure.state}</p> : null}
-        <ActionNote tone="neutral">{t('executionRecovery.recoveryPending')}</ActionNote>
+        {current.protocol === 'v3' ? <TaskRecoveryPanel key={current.id} taskId={current.id} name={taskName(current)} onOpenTask={(id) => setSelected({ ...current, id, state: 'unknown', message: undefined, latestFailure: undefined, labels: {} })} /> : <>
+          <p>{t('executionRecovery.state')}：{t(`executionRecovery.state.${current.state}`)} · {t('executionRecovery.updated')}：{new Date(current.updatedAt).toLocaleString()}</p>
+          <p>{current.message || current.latestFailure?.message}</p>
+          {current.latestFailure ? <p>{current.latestFailure.name} · {current.latestFailure.state}</p> : null}
+          <ActionNote tone="neutral">{t('recovery.legacyHint')}</ActionNote>
+        </>}
         <details><summary>{t('executionRecovery.identityDetails')}</summary><p>{current.id}</p><p>{current.callerIdentity}</p><p>{current.protocol}</p></details>
         {current.protocol === 'legacy' ? <RecoveryTickets key={`${current.callerIdentity}:${current.id}`} identity={current.callerIdentity} taskId={current.id} /> : null}
       </Stack></Dialog> : null}

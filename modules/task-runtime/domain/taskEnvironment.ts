@@ -47,6 +47,8 @@ export interface NativeExecution {
  * 每次（重新）启动是第几次（start）决定 Runner Secret 的名字，恢复换一个新的，旧的由孤儿回收删掉。之前受理的环境没有它，照旧由 task-runtime 自己建。
  */
 export interface WorkloadRender {
+  /** Durable operation marker: an old worker cannot restart a later failed recovery. */
+  readonly businessRecovery?: { readonly operationId: string; readonly generation: number; readonly volumeUid: string };
   readonly runtimeConnectionDeadline?: { readonly generation: number; readonly at: string };
   readonly runtimeInitializationDeadline?: { readonly generation: number; readonly at: string };
   readonly runtimeValidation?: { readonly projectId: string; readonly usage: 'task' | 'agent'; readonly quotaHeld: boolean };

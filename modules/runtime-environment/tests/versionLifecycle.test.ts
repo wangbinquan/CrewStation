@@ -77,6 +77,22 @@ describe.skipIf(!available)('用途验证与持久镜像引用', () => {
     await expect(f.api.copyReference(f.project, newResourceId(), from, to)).rejects.toMatchObject({ kind: 'not_found' });
   });
 
+  test('恢复只读验证原镜像快照，停用不漂移；跨项目、篡改和释放的引用不可恢复', async () => {
+    const version = await builtVersion(f); await passedValidation(f, version.id);
+    const owner = { type: 'task' as const, id: newResourceId() };
+    const snapshot = (await f.api.reserveImage(f.developer, f.project, { selection: { runtimeImageVersionId: version.id }, target: { usage: 'task' }, owner }))!;
+    await f.api.confirmReference(version.id, owner);
+    await f.api.disableVersion(f.admin, f.project, version.id);
+    const before = await f.uow.read.references.list(version.id);
+    expect(await f.api.inspectReference(f.project, owner, snapshot)).toBe(true);
+    expect(await f.api.inspectReference(f.otherProject, owner, snapshot)).toBe(false);
+    expect(await f.api.inspectReference(f.project, { ...owner, id: newResourceId() }, snapshot)).toBe(false);
+    expect(await f.api.inspectReference(f.project, owner, { ...snapshot, initializerDigest: 'd'.repeat(64) })).toBe(false);
+    expect(await f.uow.read.references.list(version.id)).toEqual(before);
+    await f.api.releaseReference(version.id, owner);
+    expect(await f.api.inspectReference(f.project, owner, snapshot)).toBe(false);
+  });
+
   test('停用、删除与新引用串行化；未停用不可删，普通开发者不可停用', async () => {
     const version = await builtVersion(f);
     await passedValidation(f, version.id);

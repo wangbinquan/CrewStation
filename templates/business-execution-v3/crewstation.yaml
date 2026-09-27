@@ -14,6 +14,7 @@ spec:
     taskProfileId: 01a0bf5d-8f4b-7001-8458-107366e7de39
     defaultVolumeMode: persistent
     executionControl: fenced
+    recovery: { actions: [resume-task, rebuild-workspace, retry-subtask, resume-subtask, restart-task] }
     acceptedTaskContractVersions: [sample-v1]
     agentProfiles: []
     outputContracts: []

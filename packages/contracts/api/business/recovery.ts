@@ -24,6 +24,8 @@ export const BusinessRecoveryRequestSchema = z.strictObject({
   operationId: ResourceIdSchema.optional(), resultTaskId: TaskIdSchema.optional(), resultSubtaskId: SubtaskIdSchema.optional(), reason: z.string().max(1024).optional(),
 });
 export const BusinessRecoveryClaimSchema = z.strictObject({ fence: BusinessExecutionFenceSchema, requestId: ResourceIdSchema.optional() });
+export const BusinessRecoveryReadSchema = z.strictObject({ fence: BusinessExecutionFenceSchema });
+export const BusinessRecoveryRejectSchema = BusinessRecoveryReadSchema.extend({ claimId: ResourceIdSchema, reason: z.string().trim().min(1).max(1024) });
 export const BusinessRecoveryClaimReceiptSchema = z.strictObject({ request: BusinessRecoveryRequestSchema, claimId: ResourceIdSchema, expiresAt: z.iso.datetime() });
 export const BusinessRecoveryExecutionSchema = z.strictObject({ recoveryRequestId: ResourceIdSchema, claimId: ResourceIdSchema });
 export const BusinessRecoveryAssessmentSchema = z.strictObject({
@@ -37,3 +39,6 @@ export type BusinessRecoveryRequest = z.infer<typeof BusinessRecoveryRequestSche
 export type BusinessRecoveryClaimReceipt = z.infer<typeof BusinessRecoveryClaimReceiptSchema>;
 export type BusinessRecoveryAssessment = z.infer<typeof BusinessRecoveryAssessmentSchema>;
 export type BusinessRecoveryExecution = z.infer<typeof BusinessRecoveryExecutionSchema>;
+export type BusinessRecoveryClaim = z.infer<typeof BusinessRecoveryClaimSchema>;
+export type BusinessRecoveryRead = z.infer<typeof BusinessRecoveryReadSchema>;
+export type BusinessRecoveryReject = z.infer<typeof BusinessRecoveryRejectSchema>;

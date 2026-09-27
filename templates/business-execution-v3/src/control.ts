@@ -1,5 +1,6 @@
 import { Platform, type Control, type Fence } from './client';
 import { Store } from './store';
+import { consumeRecovery } from './recovery';
 
 const root = '/v3/business-execution/control';
 /** Each instance competes through the platform. A preview's physical slot name never grants authority. */
@@ -21,7 +22,7 @@ export class Controller {
   async tick(): Promise<void> {
     if (this.running || !await this.store.ready()) return;
     this.running = true;
-    try { await this.reconcile(); }
+    try { await this.reconcile(); if (this.current?.phase === 'active') await consumeRecovery(this.platform, this.store, this.fence); }
     catch { this.current = undefined; /* No orphan recovery or shutdown writes on authority loss. */ }
     finally { this.running = false; }
   }

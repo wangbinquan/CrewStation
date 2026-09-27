@@ -1,5 +1,11 @@
 import type { BusinessRecoveryAction, BusinessRecoveryAssessment, BusinessRecoveryTarget, TaskId, SubtaskId } from '@crewstation/contracts';
 import { jsonHash } from '@crewstation/kernel';
+import type { BusinessSubtaskV3Dto } from '@crewstation/contracts';
+
+export function recoveryChildStopped(child: { view: BusinessSubtaskV3Dto; incarnation: string | null; runtimeDispatched?: boolean; dispatch: string }, projection?: { sourceStopped: boolean; complete: boolean; sourceConsumed: boolean } | null): boolean {
+  const neverStarted = child.view.process === 'not-started' && !child.incarnation && ((!child.runtimeDispatched && child.dispatch === 'failed') || (child.view.result?.reason === 'cancelled-before-start' && projection?.complete && projection.sourceConsumed));
+  return ['exited', 'not-started'].includes(child.view.process) && Boolean(projection?.sourceStopped || neverStarted);
+}
 
 /** Facts only: callers obtain resource/compatibility proofs from their owning modules. Unknown never means stopped. */
 export interface RecoveryFacts {

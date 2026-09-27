@@ -22,6 +22,13 @@ test('业务任务和 Agent 使用各自 owner、允许集合与固定档位验�
   const resumed = newResourceId() as TaskId;
   await ports.restoreAgent(project, selected, child, resumed);
   expect(copies).toEqual([[project, selected.versionId, { type: 'agent', id: child }, { type: 'agent', id: resumed }]]);
+  await ports.restoreTask(project, selected, parent, resumed);
+  expect(copies[1]).toEqual([project, selected.versionId, { type: 'task', id: parent }, { type: 'task', id: resumed }]);
   await ports.release(selected, { type: 'agent', id: resumed }); await ports.release(selected, { type: 'task', id: parent });
   expect(releases).toEqual([[selected.versionId, { type: 'agent', id: resumed }], [selected.versionId, { type: 'task', id: parent }]]);
+  expect(await ports.inspectReference(project, { type: 'agent', id: child }, selected)).toBe(false);
+  const inspections: unknown[] = [];
+  const readonly = businessImagePorts({ inspectReference: async (...args) => { inspections.push(args); return true; }, reserveImage: async () => { throw new Error('read must not reserve'); }, confirmReference: async () => {}, releaseReference: async () => {}, copyReference: async () => {} }, actor);
+  expect(await readonly.inspectReference(project, { type: 'agent', id: child }, selected)).toBe(true);
+  expect(inspections).toEqual([[project, { type: 'agent', id: child }, selected]]);
 });

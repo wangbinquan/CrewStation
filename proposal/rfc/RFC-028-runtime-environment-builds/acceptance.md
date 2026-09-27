@@ -2,6 +2,34 @@
 
 2026-09-27。作者已批准完整实现、提交上库与本地部署；仍为 In Progress。此文区分源码用例与实机产品验收，RI-01～RI-28 尚未完成。
 
+## 2026-09-28：停用定义保留已有任务及版本
+
+专用镜像 `01a0e233-bd86-7000-936f-2f9a9ec692a1` 暂时enabled=false后，既有父任务 `01a0e30e-e096-7000-be22-db3c8ecd4171` 仍running，完整runtimeImage快照相同；原版本 `01a0e27f-4ef9-7000-bd34-538122dfbb26` 仍可读且摘要不变，历史接口200。随后用停用回执的expectedRevision恢复enabled=true，返回200，未改业务默认／允许集合。
+
+实际Pod前后UID均 `f748cdc5-645f-4982-96bf-835e648f38e1`、imageID相同、Running、restartCount=0。证据 `/tmp/cs-rfc028-owned-disable-retain.json`、`/tmp/cs-rfc028-owned-disable-pod-{before,after}.json`。最初脚本假设快照含imageId而失败，无写操作；改为按原构建回执解析定义，再验证versionId／digest一致后才执行。补RI-22停用定义不影响原引用执行子项，未执行版本删除／服务回退，不代替这些剩余条件。
+
+## 2026-09-28：错误校验和真实构建反例
+
+平台无仓库构建 `01a0e3b1-aa54-7000-b530-0357389118c3` 上传payload.txt并执行故意错误的SHA256校验。实际BuildKit日志包含 `/tmp/payload.txt: FAILED`、`1 computed checksum did NOT match` 与该RUN步骤exit1；平台最终failed、unknown=false，版本列表为空。专用定义 `01a0e3b1-aa47-7000-b349-0a9e1ebed3d1` 创建时defaultVisible=false，验收后已停用；没有授权或修改现有业务绑定。
+
+本轮Job／Pod／PVC清单中已无该buildId和resourceId `01a0e3b1-aa54-7001-b08f-2005d84e429f` 对应资源，实际失败不会发布可用版本。证据 `/tmp/cs-rfc028-owned-checksum-{setup,build,final,disabled,resources}.json`；补齐RI-04错误校验和反例，不替代其他构建／权限／初始化验收。
+
+## 2026-09-28：父任务／Agent 镜像允许集合实机
+
+实际业务v0.3.1入口分别尝试父任务显式选Agent B专用镜像、Agent A选B镜像、Agent B选A镜像；三个请求全部HTTP400、`runtime_image_not_allowed`，明确拒绝而非回退默认。原父任务仍running，子任务列表结构比较完全一致；blue／green／父Pod UID分别仍为c16c7158…、f14b69c2…、f748cdc5…。没有新增执行容器。结合既有权限与无副作用模块回归，RI-10闭合。
+
+证据 `/tmp/cs-rfc028-owned-image-boundaries.json`、`/tmp/cs-rfc028-owned-image-boundaries-pods.json`；三次稳定请求键分别negative-parent-agent-b、negative-agent-a-image-b、negative-agent-b-image-a（均带rfc028前缀和20260928后缀）。请求经所属应用真实fence处理，未冒用服务身份。
+
+## 2026-09-28：同键及 fresh／原生 resume 的实际镜像快照
+
+专用业务父任务原键重放返回原taskId；同键改为另一个允许的镜像返回409（应用持久写屏障）。Agent A原attempt1为 `01a0e396-b094-7000-afab-eefa0b89679d`，fresh retry产生attempt2 `01a0e3c4-f29f-7000-b69c-9603aa89afcb`，其原生续跑产生attempt3 `01a0e3c7-7c7d-7000-a5e1-568cd2d03321`。两次均succeeded／exited／exit0，同键重放分别只返回已有attempt，各原执行只有一个后继。
+
+fresh会话由 `ses_f1c68aa1cffera84chsszm2eP5` 换为 `ses_f1c3a6296ffeYsLtFaGWa9aaIL`；resume保持后者。三次image、完整runtimeImage（含初始化和工具）、computeProfileId、profileRevision=3、agentProfileId结构比较完全一致。实际Pod imageID均为原 `sha256:77ffe8bfa44f95d5874f168f8a3aeeb265831c3f29ecfca8c6da7de5b980bd5f`。新Pod UID分别0d7d36af…与10c28649…，均已自动回收；原blue／green／父Pod UID保持。
+
+首次resume收到应用写屏障／租约409，未创建新意图；原键重试成功，首次失败保存在 `owned-agent-a-resume-first.json`。fresh及resume结果文件均已通过业务文件入口回读，七项工具结果成功。这里用的是已部署业务的原v3 retry入口，不是尚未部署的RFC029管理员按钮。结合此前真实PG幂等与原镜像回归，RI-21闭合；RI-22服务回退／停用引用等其余子项仍继续。
+
+证据 `/tmp/cs-rfc028-owned-idempotency-retry.json`、`/tmp/cs-rfc028-owned-agent-a-{retry,resume}-{pods,final}.json`、相应cleanup.log和 `/tmp/cs-rfc028-owned-retry-resume-final-pods.json`。
+
 ## 基础与定向验证
 
 - runtime-environment：标准脚手架 L4，images／revisions／builds／versions／validations／references／build_logs／development_policies；0001、0002 精确入迁移锁，未部署迁移。

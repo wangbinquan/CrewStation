@@ -1,11 +1,11 @@
 import type { BusinessRuntimeImages } from '../ports/runtimeImages';
 import type { ServiceId, TaskId, TraceId } from '@crewstation/contracts';
-import { isPlatformError } from '@crewstation/kernel';
+import { isPlatformError, precondition } from '@crewstation/kernel';
 import type { ExecutionOperation, OperationLease } from '../domain/taskAdmission';
 import type { ExecutionOperations } from '../ports/executionOperations';
 import type { Environments } from '../ports/runtime';
 
-export interface TaskAdmissionDispatchDeps { runtimeImages?: BusinessRuntimeImages; operations: ExecutionOperations; environments: Pick<Environments, 'createEnvironment' | 'getEnvironment'> }
+export interface TaskAdmissionDispatchDeps { runtimeImages?: BusinessRuntimeImages; operations: ExecutionOperations; environments: Pick<Environments, 'createEnvironment' | 'getEnvironment' | 'restartBusinessWorkspace'> }
 
 /** 固定 taskId 贯穿意图和资源准入；丢回执后先对账，不能把已建资源改成容量拒绝。 */
 export async function dispatchTaskAdmission(deps: TaskAdmissionDispatchDeps, operation: ExecutionOperation): Promise<void> {
@@ -17,7 +17,11 @@ export async function dispatchTaskAdmission(deps: TaskAdmissionDispatchDeps, ope
       if (!deps.runtimeImages) throw new Error('任务镜像确认端口尚未配置');
       await deps.runtimeImages.confirmTask(task.runtimeImage, task.id);
     }
-    await deps.environments.createEnvironment({
+    if (operation.intent.restartOf) {
+      if (!deps.environments.restartBusinessWorkspace) throw precondition('重新执行能力未配置', { code: 'unsupported_capability' });
+      await deps.environments.restartBusinessWorkspace({ projectId: operation.intent.projectId, serviceId: task.serviceId, taskId: operation.intent.restartOf.taskId,
+        newTaskId: task.id, fingerprint: operation.effectiveDigest, traceId: task.traceId });
+    } else await deps.environments.createEnvironment({
       admission: { id: task.id as TaskId, fingerprint: operation.effectiveDigest }, serviceId: task.serviceId as ServiceId, kind: 'business',
       businessStorage: 'isolated-v1', ...(task.runtimeImage ? { runtimeImage: task.runtimeImage } : {}),
       volumeMode: task.volumeMode, profile: task.taskProfileId, traceId: task.traceId as TraceId, labels: operation.intent.environmentLabels,
@@ -45,7 +49,7 @@ async function reconcileAdmission(deps: TaskAdmissionDispatchDeps, operation: Ex
   } else if (isPlatformError(error) && error.kind === 'quota_exceeded') {
     await deps.operations.settle(lease, 'retryable-rejected', 'quota_exceeded');
   } else if (isPlatformError(error) && ['validation', 'forbidden', 'not_found', 'precondition', 'conflict'].includes(error.kind)) {
-    await deps.operations.settle(lease, 'failed', error.kind);
+    await deps.operations.settle(lease, 'failed', operation.intent.restartOf ? String(error.details?.['code'] ?? error.kind) : error.kind);
   } else {
     await deps.operations.settle(lease, 'pending', 'admission_unknown');
   }

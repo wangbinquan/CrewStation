@@ -1,0 +1,34 @@
+import { afterAll,beforeAll,describe,expect,test } from 'bun:test';
+import { eq,sql } from 'drizzle-orm';
+import { newResourceId,quotaExceeded } from '@crewstation/kernel';
+import { createTestDatabase,testDatabaseAvailable,type TestDatabase } from '@crewstation/testkit';
+import { businessTaskMigrations } from '../wiring';
+import { taskRecoveryFixture } from './taskRecoveryFixture';
+import { recoveryRequests } from '../adapters/persistence/recovery/tables';
+import { executionControls } from '../adapters/persistence/executionTables';
+import { executionLifecycles } from '../adapters/persistence/execution/lifecycleTables';
+const available=await testDatabaseAvailable();
+describe.skipIf(!available)('额度拒绝后的持久恢复接续',()=>{
+ let tdb:TestDatabase;
+ beforeAll(async()=>{tdb=await createTestDatabase([businessTaskMigrations]);});
+ afterAll(async()=>{await tdb?.drop();});
+ test('已有operationId仍须同键重放，新epoch接续同一操作而非新任务',async()=>{
+ const f=await taskRecoveryFixture(tdb.db);f.env.state='paused';f.env.connected=false;
+ let full=true, starts=0;
+ f.environmentPort.resumeEnvironment=async()=>{if(full)throw quotaExceeded('full');starts++;f.env.state='creating';return f.env;};
+ const saved=await f.repository.request(f.admission),claim=(await f.repository.claim(f.serviceId,f.authorization))!;
+ const input={requestKey:`recovery:${saved.id}`,expectedGeneration:2,fence:f.fence,recovery:{recoveryRequestId:saved.id,claimId:claim.claimId}},path=`/v3/business-tasks/${f.task.id}/resume`;
+ expect((await f.request(path,input)).status).toBe(429);expect(starts).toBe(0);
+ const pending=(await f.repository.get(f.serviceId,saved.id))!;expect(pending.state).toBe('running');expect(pending.operationId).toBeDefined();expect(await f.repository.reconcile()).toBe(0);
+ const fence={...f.fence,epoch:f.fence.epoch+1,instanceId:newResourceId(),leaseId:newResourceId()};
+ await tdb.db.update(executionControls).set({body:sql`body || ${JSON.stringify({epoch:fence.epoch,leaseOwner:fence.instanceId,leaseId:fence.leaseId,leasePodUid:'pod-two'})}::jsonb`}).where(eq(executionControls.serviceId,f.serviceId));
+ const workload=f.sources.get('trusted')!;f.sources.set('trusted',{...workload,source:{...workload.source,podUid:'pod-two'}});
+ const next=await (await f.request('/v3/business-execution/recovery/claim',{fence,requestId:saved.id})).json();expect(next.request.operationId).toBe(pending.operationId);
+ expect((await f.request(path,input)).status).toBe(409);
+ full=false;
+ const response=await f.request(path,{...input,fence,recovery:{...input.recovery,claimId:next.claimId}});expect(response.status).toBe(202);expect((await response.json()).operationId).toBe(pending.operationId);expect(starts).toBe(1);
+ expect(await tdb.db.select().from(executionLifecycles).where(eq(executionLifecycles.serviceId,f.serviceId))).toHaveLength(1);
+ f.env.state='running';f.env.connected=true;for(let i=0;i<3;i++)await f.module.api.v3.runOnce();expect(await f.repository.get(f.serviceId,saved.id)).toMatchObject({state:'succeeded',operationId:pending.operationId});
+ expect(await tdb.db.select().from(recoveryRequests).where(eq(recoveryRequests.serviceId,f.serviceId))).toHaveLength(1);
+ });
+});

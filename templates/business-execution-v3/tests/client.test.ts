@@ -21,6 +21,7 @@ describe.skipIf(!available)('RFC-027 standalone fenced service customer', () => 
       const path = new URL(String(url)).pathname, body = JSON.parse(String(options?.body ?? '{}')) as Record<string, unknown>;
       calls.push({ path, body });
       if (behavior.unavailable) return Response.json({ error: 'capacity' }, { status: 429 });
+      if (path.endsWith('/recovery/claim')) return Response.json(null);
       if (path.endsWith('/capabilities')) return Response.json({ error: 'profile_unavailable' }, { status: 412 });
       if (path.endsWith('/control')) return Response.json(control);
       if (path.endsWith('/claim')) {
@@ -57,6 +58,7 @@ describe.skipIf(!available)('RFC-027 standalone fenced service customer', () => 
     const f = await fixture(); await store.migrate(); await f.controller.tick();
     // A profile can be testing while command scheduling and release handoff remain available.
     expect(f.controller.fence.epoch).toBe(1);
+    expect(f.calls.find((call) => call.path.endsWith('/recovery/claim'))?.body).toEqual({ fence: f.controller.fence });
     expect(f.calls.some((call) => call.path.endsWith('/capabilities'))).toBe(false);
     const input = { action: 'command', requestKey: 'run-1' };
     const first = await (await f.request('/actions', input)).json(); expect(first.task.id).toBe(f.taskId);

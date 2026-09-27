@@ -14,6 +14,7 @@ export interface ImageReferenceView {
 }
 /** 只给组合根接线，不暴露为可由浏览器任意释放引用的 HTTP 端点。 */
 export interface RuntimeImageBindings {
+  inspectReference(projectId: string, owner: ImageReferenceOwner, snapshot: RuntimeImageExecutionSnapshot): Promise<boolean>;
   renderInitializationSecrets(projectId: string, owner: ImageReferenceOwner, snapshot: RuntimeImageExecutionSnapshot): Promise<Record<string, string>>;
   copyReference(projectId: string, versionId: string, from: ImageReferenceOwner, to: ImageReferenceOwner): Promise<void>;
   reserveImage(actor: Actor, projectId: string, input: ImageReservationInput): Promise<RuntimeImageExecutionSnapshot | undefined>;
