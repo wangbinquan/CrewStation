@@ -1,6 +1,11 @@
 # RFC-029 恢复工作台验收记录
 
 
+## 2026-09-28：非管理员真实入口拒绝
+
+已存在dev-tester／dev-member／dev-developer使用各自一次性OIDC浏览器上下文，真实管理员任务详情、恢复评估、恢复记录读取及有效恢复请求提交全部403（恢复相关共12项）。没有修改任何账号角色／业务授权，验收后释放这些浏览器上下文。使用本轮已关闭专用任务作为目标，原在运行业务不受影响。`/tmp/cs-rfc028-live-role-boundaries.{json,log}`；结合原真实PG／HTTP的跨服务、目标材料、租约／epoch和动态撤权用例，补TR-08身份入口实机层。
+
+
 ## 2026-09-28：1004e68f部署后的真实恢复闭环
 
 修复提交 `1004e68f33a515cfb6d616047bedb951808da3d9` 的 [CI 36345641340](https://github.com/wangbinquan/CrewStation/actions/runs/36345641340) 六项全部success；本地六控制面及console由该SHA构建并升级，cs-auth仍为独立rfc033-493bd47a。首次部署脚本在CI仍有e2e运行时被前置断言阻止、没有修改部署；观察进程成功结束并重新取得六项绿色后才实际升级。精确发布／部署回执 `/tmp/cs-rfc029-live-fixes-{publication,ci-final}.json`、`/tmp/cs-rfc029-1004-{deploy-after,platform-pods,owned-resources}.json`。

@@ -1,6 +1,13 @@
 # RFC-028 实施证据
 
 
+## 2026-09-28：真实期限与身份边界补证
+
+- 独立 `cs-rfc028-deadline-probe` 使用真实临时PG、资源台账、Kubernetes observer／构建worker及BuildKit；35秒构建期限对应120秒步骤。实际buildctl已running，Pod UID `5f313f58-8418-41ae-8863-3fb1574d96cd`，builder 500m/1Gi/4Gi、client 100m/256Mi/1Gi限制实存；全局额度1时第二次准入被拒。构建 `01a0e488-8729-7000-9335-5aa48e7f9ae1` 最终failed／镜像构建超过截止时间，无版本，资源desired=absent、Job/Secret均0、1份临时凭据已撤销，物理回收后activeCount=0。namespace及本机转发已清理，临时数据库已drop。`/tmp/cs-rfc028-deadline-probe-{proof,cleanup}.json`、同前缀log。该夹具的鉴权／SCM凭据端口为测试替身；不冒充平台身份验证。首次脚本仍按旧项目额度断言，第二个构建被新全局额度允许而退出；无Job/Secret留下，修正夹具全局上限1后通过，首轮回执保留。
+- 已有dev-tester、dev-member、dev-developer三身份各自独立浏览器上下文：11个管理目录／新增镜像／项目旧写入口／配方／构建／历史／业务扩权／恢复详情／评估／记录／提交端点，共33次403。使用当前有效恢复请求体，不用参数错误替代鉴权。管理员目录前后完全相同，无授予角色、无新身份。`/tmp/cs-rfc028-live-role-boundaries.{json,log}`。初轮空恢复体返回400参数错误，脚本改为有效体后验证403；不将400报为产品权限缺陷。
+- 另一个一次性dev-admin会话先读构建日志200并取得游标，再通过正常登出路径退出；首次页及原游标续传均401。仅退出本次临时上下文，原管理员上下文仍保留。`/tmp/cs-rfc028-live-log-auth-revocation.json`。实际注销证明认证失效；管理员角色撤销的403由既有真实PG/HTTP动态授权回归证明，不声称本轮改过任何全局角色。日志当前为游标分页，无需虚构SSE持久连接。
+
+
 ## 2026-09-28：用途隔离、初始化失败与重连实机
 
 - RI-06：非默认开放的无仓库镜像 `01a0e470-2949-7000-a798-8479666144b6` 构建成功，版本 `01a0e470-8e8e-7000-8355-1a0a9dd7d73e` 只移除 Agent CLI，保留 Runner。实际 digest `a6421995c2a965feacf22850fe1083a6a0439f2909bea9d3c614b51e68015614` 的 task 验证 passed、Agent 原档位修订3验证 failed；版本仍 available。开发 Agent 绑定412／image_usage_unvalidated，任务绑定200；配置随即恢复（开发配置revision5、镜像授权revision3）。两次验证与builder的Pod/PVC均已回收。证据 `/tmp/cs-rfc028-owned-bad-agent-{build,validations,observed,binding}.json`、`/tmp/cs-rfc028-bad-agent-resources.json`。
