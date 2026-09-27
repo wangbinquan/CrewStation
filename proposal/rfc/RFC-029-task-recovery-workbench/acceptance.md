@@ -1,5 +1,30 @@
 # RFC-029 恢复工作台验收记录
 
+## 最终验收结论（2026-09-28）
+
+RFC-029实现、发布、本地部署及TR-01～11的分层验收完成。最新实现1004e68f精确CI36345641340六项success，完整候选3711 pass／11 skip／0 fail；六控制面与console实际镜像来自该SHA，cs-auth独立版本保留。最新已确认文档3752be63精确CI36348422890亦六项success。后续收口只改文档，不再启动同候选全量检查。下文阶段性的“未完成”保留为历史，不覆盖本结论。
+
+### 最后补证
+
+- 实际只读任务列表38条，包含legacy与v3；失败／unknown／其余顺序核对通过。24条legacy均已closed，没有为了验收停止旧任务。`/tmp/cs-rfc029-live-list-audit.json`。
+- 390px旧协议详情在shared Dialog中显示“以下操作用于核对停止状态和解除阻塞，不表示业务任务已经恢复”；只有一个弹窗、无横溢出，Esc关闭焦点返回原行，0写请求／0浏览器错误。`/tmp/cs-rfc029-legacy-readonly.{json,png}`。未对他人旧票据触发reconcile或stop；真正停止证明及解除阻塞逻辑由原真实PG用例覆盖。
+- 本轮专用业务active Deployment短暂离线时，真实评估actions为空且application_controller_offline，390px弹窗显示控制器不在线。恢复阶段发现平台已自动将replicas恢复1；核对同Deployment UID和完整Pod模板一致、Ready后不再覆盖它。原请求重放在离线及重新active（epoch14）后都返回同一已完成请求，未新增attempt。`/tmp/cs-rfc029-live-offline.{json,png}`、`/tmp/cs-rfc029-owned-offline-{before,after}.json`、`/tmp/cs-rfc029-offline-return.json`。此实机覆盖离线原因、已有请求持久性及实例恢复；运行中的待恢复请求交接由PG／HTTP接续用例证明，不能把已完成请求读取当成pending恢复实机。
+
+| 项 | 验收依据 |
+|---|---|
+| TR-01 | 实际38条新旧协议／失败优先；`taskList.test.ts`真实PG覆盖超过100条排序、分页、状态和项目过滤、无写副作用；已部署完整任务详情。 |
+| TR-02 | 实际弹窗双击、服务器受理后断线、重开详情及同键重放只有一个新attempt；PG重建模块／并发与模板持久消费者回归补重启边界。 |
+| TR-03 | 实际暂停父任务按钮恢复同PVC／原镜像；默认变化不重新选择由原快照PG及开发重建实机共同证明。 |
+| TR-04 | 实际旧Pod仍在拒绝、原Pod删除后同卷重建、新Pod就绪才完成；原卷缺失仅显式关联新任务。UID变化与unknown拒绝有真实PG／runtime回归。 |
+| TR-05 | 实际Agent按钮继续原sessionId；fresh与resume的真实业务执行／完整快照已有RFC028回执；AgentProof回归覆盖不兼容拒绝、不自动改fresh。 |
+| TR-06 | 实际未声明能力／离线页面原因、实例恢复后同请求可读；撤销能力、重新开放、同一操作接续的PG/HTTP和模板持久意图回归。 |
+| TR-07 | 实际专用服务v0.4.0→v0.3.1→v0.4.0交接及随后实例离线恢复；`taskRecoveryRequests.test.ts`、`taskRecoveryContinuation.test.ts`、`taskRecoveryIntake.test.ts`覆盖租约到期、旧epoch／Pod迟到、429后新holder沿原operationId接续且只派发一次。 |
+| TR-08 | 三种现有非管理员实际读取／有效提交全部403；管理员接口、跨服务身份、目标／材料、撤权和执行fence PG／HTTP用例均通过。 |
+| TR-09 | 实际旧协议Dialog准确解释停止／解除阻塞；`legacyRecovery.test.ts`证明unknown不能凭TTL或缺记录解除、原控制器UID及每个子效果必须已停止、晚到提交不能复活。 |
+| TR-10 | 长列表夹具确认与Esc逐层关闭、焦点／滚动恢复；实际关联新任务三宽×中英×主题12组，真实离线／旧协议／成功进度与无能力页面；空／错误／等待状态由console回归覆盖。 |
+| TR-11 | 实现同SHA六项CI与本机部署，本地完整门禁、验收资源关闭／配置恢复及最终49项非验收命名空间Pod/PVC UID相同；原父任务UID保持。 |
+
+上述是实际集群、真实数据库／HTTP与浏览器组件三层的组合结论，不声称每一种竞态均在共享集群杀进程。四个本轮新任务已正式closed、quotaHeld=false，三个持久卷按正常关闭策略保留；原父任务和其他业务不在故障／清理范围。最终资源证据 `/tmp/cs-rfc028-029-final-resources.json`。
 
 ## 2026-09-28：非管理员真实入口拒绝
 

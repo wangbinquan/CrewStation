@@ -583,3 +583,11 @@ agent-workflow 现有栈为 Bun、TypeScript、Hono、Drizzle、SQLite 默认并
 ## RFC-033 补充：代码托管事件接入（2026-09-27，已批准）
 
 内置 GitLab EventProducer 支持 MR／Issue 评论新增及编辑，保留原始 payload。新增按需创建的 GitHub EventProducer 模板，覆盖 push／tag、PR 生命周期、PR 普通／行评论、Issue 评论／标签、workflow run 成功／失败／超时。类型矩阵及边界以 [RFC-033](rfc/RFC-033-code-host-event-producers/proposal.md) 为准。业务规则归消费者所有；不改变平台代码托管后端。
+
+## RFC-028／029：运行镜像与业务恢复（2026-09-28）
+
+运行镜像由平台统一管理，像算力档位一样按业务开放；构建来源可选仓库Dockerfile、直接编写Dockerfile并上传脚本／配置／二进制，或登记已有镜像。服务、业务与开发任务父容器、各Agent／CLI保持独立容器并分别选镜像，可显式复用同一兼容版本；普通终端使用父容器。版本、用途验证、构建日志及实际使用历史可追溯，目录不归属于来源项目。
+
+管理员在业务执行恢复页直接看任务列表、失败优先与项目／状态筛选，通过统一详情／确认弹窗选择暂停恢复、同卷重建、关联新任务、fresh重试或原生会话继续。平台记录持久请求及进度，由声明能力且持有当前执行权的业务应用执行；旧执行未停、原材料不兼容或应用离线时显示原因。未接入应用不能被平台代为承诺恢复。旧票据的停止／解除阻塞与业务恢复分开说明。
+
+实现、边界与证据分别见[RFC-028](rfc/RFC-028-runtime-environment-builds/acceptance.md)、[RFC-029](rfc/RFC-029-task-recovery-workbench/acceptance.md)。两项已本机部署验收；不改变其他RFC的外部接入范围。

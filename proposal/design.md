@@ -1284,3 +1284,13 @@ Kubernetes 原生动作使用 UID/resourceVersion 条件；开发工作区经保
 GitLab 新增 `gitlab.merge-request.comment` 与 `gitlab.issue.comment`；旧事件与订阅保持兼容。GitHub 独立模板使用 `/hooks/github`、原始字节 HMAC-SHA256 和 `GITHUB_WEBHOOK_SECRET`，以 delivery ID 优先去重。两个容器保留 payload，仅在 cs-events 有效持久回执后确认 accepted。复用现有目录登记、inbox、投递、死信与切槽，无新 DTO／迁移。封闭矩阵、失败响应和无 delivery 头的退化语义见 [RFC-033 design](rfc/RFC-033-code-host-event-producers/design.md)。
 
 外部 webhook 网关补充：仅当前就绪正式 EventProducer 的服务域、精确 ingress.path 与 POST 可无平台工作负载身份到达签名处理器；verification=none不开放。网关不签发来源身份，服务维护仍返回503；业务容器负责token／原始字节签名验证。其他路径、方法、待命或下线版本沿用平台来源鉴权。
+
+## RFC-028／029：镜像快照与持久恢复（2026-09-28）
+
+runtime-environment L4拥有平台镜像定义、不可变配方／版本、用途及Agent档位组合验证、业务授权、构建日志和执行引用。构建通过资源台账及独立rootless BuildKit，固定源码SHA或inline文件摘要，临时凭据不进产物；取消／deadline确认物理回收后退额。源码来源与消费业务分离；授权撤销阻止新准入，原执行引用、停用版本与恢复快照按原语义保留。安装脚本在构建期运行；每容器初始化有持久去重／unknown保护，重连不重跑，新Pod按固定配方初始化。
+
+业务v3 Manifest与开发v2入口分别固定service／task／Agent镜像；请求覆盖、当前位置默认、平台默认依次解析，不从父任务推断Agent镜像。fresh／resume及保卷重建固定原镜像、档位、材料与凭据版本。service-contract验证只检查镜像和启动合同，真实命令／迁移／就绪仍由发布链路确认。
+
+business-task L5拥有只读新旧任务投影、恢复评估、请求幂等、审计、claim租约及关联执行；所属业务消费者以当前epoch／Pod／lease执行，旧实例迟到拒绝。任务、原卷UID、原材料与旧执行停止证明在服务端重查；请求完成以实际执行状态为依据。UI详情、管理和确认复用shared Dialog或独立路由，禁止表后append，关闭恢复列表上下文。
+
+完整字段、锁、权限和升级合同见[RFC-028设计及修订](rfc/RFC-028-runtime-environment-builds/design.md)与[RFC-029设计](rfc/RFC-029-task-recovery-workbench/design.md)。

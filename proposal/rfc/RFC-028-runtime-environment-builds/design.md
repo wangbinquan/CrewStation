@@ -2,9 +2,9 @@
 
 > 2026-09-27 仓库无关构建补充已获作者批准：新增直接编写 Dockerfile 和上传构建文件，配方归平台、无需来源业务或仓库；见 [补充方案](./repository-free-build-amendment.md)。本条扩展原 source/existing 范围，实施与验收状态见 acceptance。
 
-> 2026-09-27 最新裁定：运行镜像是平台级资源，按业务授权。本文件旧项目所有权／shared 描述由 [平台目录修订](./platform-catalog-amendment.md) 覆盖；实现与迁移尚待完成。
+> 2026-09-27 最新裁定：运行镜像是平台级资源，按业务授权。本文件旧项目所有权／shared 描述由 [平台目录修订](./platform-catalog-amendment.md) 覆盖；实现与迁移均已完成，证据见acceptance。
 
-> In Progress · 2026-09-27。服务、业务任务与每个 Agent 独立选镜像为已确认方向。以下接口和字段是目标设计，完整稿已获批，以下接口仍是实现目标，不能视为已部署 API。
+> Done · 2026-09-28。服务、业务任务与每个 Agent 独立选镜像及两项补充修订已经实现部署；现行契约以源码与contracts lock为准，验收见acceptance首节。
 
 ## 目录
 

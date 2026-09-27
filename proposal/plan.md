@@ -548,3 +548,9 @@ evidence/<release-or-commit>/
 实施与 CE-01～CE-09 验收由 [RFC-033 plan](rfc/RFC-033-code-host-event-producers/plan.md) 跟踪，补充 T4.6／内置 EventProducer 范围。要求 producer 单测、模板 UUID 物化、真实 PG 去重／失败重试／死信重放／切槽测试，以及隔离本机集群协议验证。人工签名请求与真实上游回调分别记录，源码／CI／部署不互相替代。
 
 RFC-033 于2026-09-27完成：生产代码c072aef6、493bd47a远端精确CI六项全绿，本机GitLab／GitHub producer与网关已部署，三类评论持久投递／去重／验签通过；完整回执和保留资源边界见RFC验收。
+
+## RFC-028／029交付回填（2026-09-28）
+
+RFC-028 T1～T21与RI-01～28、RFC-029 T1～T6与TR-01～11已完成分层验收。最后生产修复1004e68f精确CI36345641340六项成功，本机六控制面及console使用同SHA构建产物；独立cs-auth仍493bd47a。完整本地候选3711 pass／11 skip／0 fail；无源码变化不重复全量。真实仓库无关构建、跨业务授权、父／Agent工具、开发独立镜像及保卷恢复、五种恢复按钮、丢回执防重和统一弹窗已验证。
+
+每个矩阵项分别标注实际集群、真实PG／HTTP、组件浏览器的依据，不把夹具声称为全链路实机，也不将可选专项skip计作通过。本轮临时运行资源已清理、策略恢复；持久工作卷与先前保留的验收父任务／服务遵循既有保留边界。精确发布和资源回执见[RFC-028验收](rfc/RFC-028-runtime-environment-builds/acceptance.md)与[RFC-029验收](rfc/RFC-029-task-recovery-workbench/acceptance.md)。

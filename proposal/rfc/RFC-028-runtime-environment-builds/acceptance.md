@@ -1,5 +1,39 @@
 # RFC-028 实施证据
 
+## 最终验收结论（2026-09-28）
+
+RFC-028 及平台目录、仓库无关构建两项已批准修订完成。RI-01～28 按下列分层证据与 plan 收口；下文“待实现／未部署／未闭合”是各轮当时状态，不覆盖本节。通过不表示每个竞态都在共享集群故障注入：确定性并发／撤权／伪造回执用真实 PostgreSQL 与 HTTP 回归，执行、镜像摘要、平台构建及关键恢复操作有独立实机证明。
+
+最终生产实现为1004e68f，精确CI36345641340六项success，六控制面及console实际部署同SHA构建镜像；独立cs-auth保持rfc033-493bd47a。完整本地候选3711 pass／11 skip／0 fail、23561断言、711文件。文档3752be63精确CI36348422890六项success；其后只有验收／基线文档收口，未改源码或部署，不重复全量门禁。11个可选能力跳过不计作通过，两个真实registry专项及Linux初始化等已有独立回执。
+
+### 最后补证
+
+- 固定校验下载：平台inline构建 `01a0e49e-36e7-7000-9373-200f42d2e1ee` succeeded，版本 `01a0e49e-92a7-7000-bde7-8d101d16784b`，digest `sha256:1c4b6f9c637876558eb003e64fa9c30ac60ef9162e137c304a276c87c0a9361d`。上传安装脚本下载yaml-2.8.1.tgz（111596字节），以配方固定SHA256 `195759b97d3f2e6085474549c069397ad7af6160be6d7c87442b8c47cb724063` 校验；实际日志有 `yaml.tgz: OK`、`CHECKED_DOWNLOAD_READY` 和多阶段COPY后非root最终镜像的 `FINAL_IMAGE_DOWNLOAD_READY`。该SHA由验收前独立下载固定，证明下载完整性，不额外声称软件供应商签名验证。首次验收脚本只读默认首100条日志漏掉后续输出；分页读取后确认成功，无重新构建。证据 `/tmp/cs-rfc028-checksum-positive.json`。
+- 最后隐藏验收定义已停用；其Job／Pod／PVC／Secret全无残留。最终只读对照中，验收命名空间和控制面以外49个Pod/PVC UID保持，原父Pod UID仍 `f748cdc5-645f-4982-96bf-835e648f38e1`。`/tmp/cs-rfc028-029-final-resources.json`。本轮恢复任务已closed，持久卷按正常策略保留；既有验收父任务与服务继续保留，未擅自删除。
+
+### 剩余矩阵的证据归并
+
+此前已单项闭合RI-01/02/03/06/07/08/10/14/15/21/22/27/28。本次核对最终完整门禁确实加载并通过以下用例，组合已有实机证据闭合其他项，未重复执行同候选测试。
+
+| 项 | 通过依据与边界 |
+|---|---|
+| RI-04 | 上述真实平台多阶段、安装脚本、COPY及固定校验下载成功；既有错误校验和真实构建failed、无版本，日志及资源回收已有记录。 |
+| RI-05 | 实际GitLab源码、inline与已有镜像登记均成功；真实registry非法前缀／架构拒绝；`sourcePreparation.test.ts`、`dockerfilePolicy.test.ts`、契约测试拒绝路径、链接、LFS、frontend和不继承平台底座。 |
+| RI-09 | `business-task/tests/runtimeImages.test.ts`、`agentRuntimeImages.test.ts`覆盖三层优先级及不跨位置继承；实机父默认／请求覆盖、Agent A/B与开发默认变更逐容器摘要已核对。 |
+| RI-11 | 已部署三个现有非管理员身份33次403，跨业务授予／撤销与直传ID拒绝已有实机；`runtimeEnvironmentModule.test.ts`、`platformCatalog.test.ts`、`projectImagePolicy.test.ts`补服务身份、历史／源码／日志范围和并发，未创建或改授角色。 |
+| RI-12 | 实际日志初页及游标续传在临时管理员会话注销后均401；`buildAdmission.test.ts`逐次重新授权并覆盖日志过期410。当前实现是分页轮询，不声称存在SSE日志流；角色动态撤权来自模块证据。 |
+| RI-13 | 独立真实rootless构建的临时package mount、镜像逐层canary检查与清理；实际registry挂载来源鉴权；`k8sBuildExecutor.test.ts`、`k8sBuildLogs.test.ts`、inline构建用例证明Secret范围、遮盖、撤销且不携带模型／生产运行凭据。 |
+| RI-16 | `k8sBuildExecutor.test.ts`、`buildController.test.ts`拒绝伪造registry、epoch、替换Pod UID和迟到成功；实际产物由受管仓库字节复核，四类执行均按digest运行。 |
+| RI-17 | 独立真实Git夹具移动main后仍checkout受理SHA、最终marker正确；实际GitLab构建与版本记录固定来源SHA／digest；`sourcePreparation.test.ts`、`runtimeEnvironmentModule.test.ts`保证修订追加而非覆盖。 |
+| RI-18 | 真实已有服务镜像发布跳过构建，迁移exit0、服务Ready且二者同选定digest；`release/tests/runtimeImages.test.ts`验证固定Manifest与不兼容无副作用，`ledgerSlots.test.ts`及`trafficConfirmation.test.ts`覆盖失败／进行中发布不得切流。服务用途验证明确只做service-contract，实际命令和就绪由发布探针裁定；本轮未破坏在运服务来注入缺命令。 |
+| RI-19 | `contracts/manifest/runtimeImages.test.ts`覆盖三种kind，release共用同一绑定／迁移路径；DigitalWorker为实际运行代表，不声称另发布了APIProxy及EventProducer。 |
+| RI-20 | 档位固定修订／default准入、Agent组合验证与原快照retry/resume回归；实际Agent固定修订3、开发默认改变仅影响新执行、原执行恢复不漂移。没有改变共享平台全局默认档位。 |
+| RI-23 | `versionLifecycle.test.ts`、`referenceReconciliation.test.ts`与准入竞争回归保护并发引用；真实已有镜像副本退休返回retained、同repository/digest兄弟版本available；独立真实registry测试确认退休不删blob。 |
+| RI-24 | 无新字段的Manifest与旧业务API回归保持；v2显式拒绝v3镜像字段并给升级提示；旧推送信息路由独立保留。既有业务UID及任务继续运行，不将旧协议静默升级。 |
+| RI-25 | 镜像／算力共用目录、绑定与来源文案、日志续传／取消／过期的console回归，真实目录／授权／上传配方／使用历史检查；中英／明暗／三宽的组件与部署浏览器证据分别列于历史记录，不将HTTP夹具声称为真实业务。 |
+| RI-26 | 上述同SHA实现部署／门禁／CI和最终资源UID复核；本轮运行资源已回收、配置恢复，持久业务卷与既有验收父任务按保留边界处理。 |
+
+平台目录T18同时完成：0005真实迁移保留原ID/digest/引用、无项目新增、跨业务授权／撤销与本业务历史实机，配合权限／并发／隔离PG测试；仓库来源不再等于镜像所有者。完整证据见本页平台迁移、仓库无关构建完成、真实身份与最终资源章节。
 
 ## 2026-09-28：真实期限与身份边界补证
 
