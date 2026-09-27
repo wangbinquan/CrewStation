@@ -119,9 +119,27 @@ export class Page {
   }
 
   async goto(url: string, timeoutMs = 20000): Promise<void> {
-    const loaded = this.browser.waitFor(this.sessionId, 'Page.loadEventFired', timeoutMs);
-    await this.cmd('Page.navigate', { url });
-    await loaded;
+    // A preview iframe can keep loading after the workbench is usable. Wait for the main DOM;
+    // page-specific queries below still wait for their actual data and controls.
+    await new Promise<void>((resolve, reject) => {
+      let navigated = false, ready = false, finished = false;
+      const finish = (error?: Error) => { if (finished) return; finished = true; clearTimeout(timer); off(); if (error) reject(error); else resolve(); };
+      const complete = () => { if (navigated && ready) finish(); };
+      const off = this.browser.on(this.sessionId, 'Page.domContentEventFired', () => { ready = true; complete(); });
+      const timer = setTimeout(() => finish(new Error('timeout waiting for navigation')), timeoutMs);
+      // Pending preview loads can also delay Page.navigate itself. Stop only the page we own.
+      void this.cmd('Page.stopLoading').then(() => {
+        if (finished) return undefined;
+        ready = false;
+        return this.cmd('Page.navigate', { url });
+      }).then((result) => {
+        if (finished || !result) return;
+        if (result.errorText) { finish(new Error(String(result.errorText))); return; }
+        navigated = true;
+        if (!result.loaderId) ready = true; // Same-document navigation has no DOM/load event.
+        complete();
+      }, (error: Error) => finish(error));
+    });
   }
 
   async waitForLoad(timeoutMs = 20000): Promise<void> {

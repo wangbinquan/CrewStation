@@ -1,5 +1,6 @@
 import { afterAll, describe, expect, test } from 'bun:test';
-import { ClusterSummarySchema, ProjectClusterResourcesSchema } from '../../packages/contracts';
+import { ClusterSummarySchema, ProjectClusterResourcesSchema, ResourceViewSchema } from '../../packages/contracts';
+import type { ResourceRecord } from '../../packages/contracts';
 import type { Page } from './cdp';
 import { apiGet, e2eAvailable, e2eVisitor, open, signIn } from './consoleSession';
 import { openAdminSession } from './session';
@@ -12,6 +13,11 @@ const clickButton = (page: Page, text: string) => page.eval<boolean>(`(() => { c
 const waitForNodes = (page: Page) => page.waitUntil(`document.querySelectorAll('[data-node-id]').length > 0`, 60_000, 500);
 const pressKey = async (page: Page, key: string, windowsVirtualKeyCode: number) => { await page.cmd('Input.dispatchKeyEvent', { type: 'keyDown', key, windowsVirtualKeyCode }); await page.cmd('Input.dispatchKeyEvent', { type: 'keyUp', key, windowsVirtualKeyCode }); };
 const colourScheme = (page: Page, value: 'light' | 'dark') => page.cmd('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value }] });
+// RFC-025 makes task/volume records the stable nodes. Still require the actual Pod/PVC UID
+// in the record's children; unrelated service and job Pods retain their inventory UID.
+const nodeIdFor = (records: readonly ResourceRecord[], uid: string) => records.find((record) =>
+  ['dev-workspace', 'business-workspace', 'agent-execution', 'volume'].includes(record.kind)
+  && record.children.some((child) => child.uid === uid))?.id ?? uid;
 
 describe.skipIf(!session)('deployed deployment topology (RFC-019)', () => {
   test('cluster topology: the system layer shows observed platform components with static edges and the project layer lists every project with counts', async () => {
@@ -39,20 +45,21 @@ describe.skipIf(!session)('deployed deployment topology (RFC-019)', () => {
   test.skipIf(!session?.project)('the Pod layer and the project operations tab draw every Pod the inventory reports; the member detail is read-only', async () => {
     const page = session!.admin, id = session!.project!.id;
     const inventory = ProjectClusterResourcesSchema.parse(await apiGet(page, `/v1/projects/${id}/cluster-resources`));
+    const records = ResourceViewSchema.parse(await apiGet(page, `/v1/projects/${id}/resources`)).items;
     expect(inventory.items.every((item) => item.availableActions.length === 0)).toBe(true);
     const pods = inventory.items.filter((item) => item.kind === 'Pod');
     await open(page, `/admin/cluster?tab=topology&layer=project&projectId=${id}&scope=project`); await waitForNodes(page);
-    let ids = await nodeIds(page); for (const pod of pods) expect(ids).toContain(pod.uid);
+    let ids = await nodeIds(page); for (const pod of pods) expect(ids).toContain(nodeIdFor(records, pod.uid));
     expect(await page.bodyText()).toContain('项目层 ›');
     // 2026-09-23 修订 RFC-020 D3：拓扑重新是自己的页签（在最前）。
     await open(page, `/projects/${id}/operations?tab=topology`); await waitForNodes(page);
-    ids = await nodeIds(page); for (const pod of pods) expect(ids).toContain(pod.uid);
+    ids = await nodeIds(page); for (const pod of pods) expect(ids).toContain(nodeIdFor(records, pod.uid));
     // 盘点里 PVC 的 facts 值是 JSON（如 capacity {"storage":"10Gi"}），卡片上要显示成量，不能原样上图。
     const pvc = inventory.items.find((item) => item.kind === 'PersistentVolumeClaim' && Object.values(item.facts).some((value) => value.startsWith('{')));
-    if (pvc) expect(await page.eval<string>(`document.querySelector('[data-node-id="${pvc.uid}"]').textContent`)).not.toContain('{"');
+    if (pvc) expect(await page.eval<string>(`document.querySelector('[data-node-id="${nodeIdFor(records, pvc.uid)}"]').textContent`)).not.toContain('{"');
     const first = pods[0];
     if (first) {
-      await page.eval(`document.querySelector('[data-node-id="${first.uid}"]').dispatchEvent(new MouseEvent('click', { bubbles: true }))`);
+      await page.eval(`document.querySelector('[data-node-id="${nodeIdFor(records, first.uid)}"]').dispatchEvent(new MouseEvent('click', { bubbles: true }))`);
       await page.waitUntil(`document.body.innerText.includes('这里只读')`, 10_000, 200);
       const text = await page.bodyText(); expect(text).toContain(first.name); expect(text).not.toContain('调整副本');
     }
@@ -89,13 +96,14 @@ describe.skipIf(!session)('deployed deployment topology (RFC-019)', () => {
       await colourScheme(page, 'dark'); expect(await stroke()).not.toBe(light); await colourScheme(page, 'light');
       const pod = ProjectClusterResourcesSchema.parse(await apiGet(page, `/v1/projects/${id}/cluster-resources`)).items.find((item) => item.kind === 'Pod');
       if (pod) {
-        await page.eval(`document.querySelector('[data-node-id="${pod.uid}"]').focus()`);
+        const records = ResourceViewSchema.parse(await apiGet(page, `/v1/projects/${id}/resources`)).items, nodeId = nodeIdFor(records, pod.uid);
+        await page.eval(`document.querySelector('[data-node-id="${nodeId}"]').focus()`);
         await pressKey(page, 'Enter', 13);
         await page.waitUntil(`document.body.innerText.includes('这里只读')`, 10_000, 200);
-        expect(await page.eval<string>(`document.querySelector('[data-node-id="${pod.uid}"]').getAttribute('aria-pressed')`)).toBe('true');
+        expect(await page.eval<string>(`document.querySelector('[data-node-id="${nodeId}"]').getAttribute('aria-pressed')`)).toBe('true');
         await pressKey(page, 'Escape', 27);
         await page.waitUntil(`!document.body.innerText.includes('这里只读')`, 10_000, 200);
-        expect(await page.eval<string | null>(`document.querySelector('[data-node-id="${pod.uid}"]').getAttribute('aria-pressed')`)).not.toBe('true');
+        expect(await page.eval<string | null>(`document.querySelector('[data-node-id="${nodeId}"]').getAttribute('aria-pressed')`)).not.toBe('true');
         // 键盘焦点仍在节点上，邻域高亮（压暗其他节点）随焦点保留，这是设计；焦点移走后才全部恢复。
         await page.eval(`document.activeElement.blur()`);
         expect(await page.eval<number>(`document.querySelectorAll('[data-dim="true"]').length`)).toBe(0);

@@ -4,8 +4,8 @@ import { e2eAvailable, open, settle } from './consoleSession';
 import { openAdminSession } from './session';
 
 /**
- * RFC-020 项目工作台信息架构：左栏五项生命周期顺序、概览一屏、开发页终端旁的工具面板、运行与诊断五页签、
- * 发布页时间线、项目设置五组、旧地址重定向。只量结构与形态，不断言会变的业务数据。
+ * RFC-020 项目工作台信息架构：左栏五项生命周期顺序、概览一屏、开发页终端旁的工具面板、运行与诊断六页签、
+ * 发布页时间线、项目设置六组（含 RFC-028 运行镜像）、旧地址重定向。只量结构与形态，不断言会变的业务数据。
  */
 const session = await e2eAvailable() ? await openAdminSession() : undefined;
 afterAll(async () => { await session?.close(); }, 30_000);
@@ -143,15 +143,15 @@ describe.skipIf(!session?.project)('项目工作台信息架构（RFC-020）', (
   }, 45_000);
 
   // 2026-09-23 修订 RFC-020 D3：健康与形态重新分成两个页签，部署与运行形态在最前；合并期间的 tab=status 由路由改写。
-  test('WS-15／WS-17／WS-16：运行与诊断六页签且旧页签改写；项目设置五组；开发资源旧地址落到参考面板', async () => {
+  test('WS-15／WS-17／WS-16：运行与诊断六页签且旧页签改写；项目设置六组；开发资源旧地址落到参考面板', async () => {
     const page = session!.admin, id = session!.project!.id;
     await viewport(page, 1280); await open(page, `/projects/${id}/operations?tab=status`);
     expect(await page.eval<string>('location.search')).toContain('tab=topology');
     expect(await texts(page, '[role="tablist"][aria-label="运行与诊断"] [role="tab"]')).toEqual(['部署与运行形态', '健康状态', '日志', '告警', '事件投递', '调用链']);
     await open(page, `/projects/${id}/settings`);
     const groups = await texts(page, 'nav[aria-label="设置分组"] button');
-    // 分组按钮带一行说明（RFC-009），只比对标题。
-    expect(groups).toHaveLength(5); for (const group of ['环境变量', '应用展示', '成员与角色', '项目信息', '高级']) expect(groups.some((label) => label.startsWith(group))).toBe(true);
+    // RFC-028 加入运行镜像；分组带说明，仍逐一验证全部入口而非仅放宽数量。
+    expect(groups).toHaveLength(6); for (const group of ['环境变量', '运行镜像', '应用展示', '成员与角色', '项目信息', '高级']) expect(groups.some((label) => label.startsWith(group))).toBe(true);
     await open(page, `/projects/${id}/resources?section=events`);
     expect(await page.eval<string>('location.pathname')).toBe(`/projects/${id}/dev-session`);
     expect(await page.eval<string>('location.search')).toContain('view=reference');

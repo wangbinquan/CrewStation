@@ -83,7 +83,9 @@ describe.skipIf(!project)('数字人项目的能力构成没有退化', () => {
     async (_capability, suffix, parts) => {
       await open(session!.admin, `/projects/${project!.id}${suffix}`);
       if (suffix.endsWith('tab=members')) { await session!.admin.eval(`Array.from(document.querySelectorAll('button')).find(button => button.textContent === '添加成员').click()`); await session!.admin.waitUntil(`!!document.querySelector('form select[aria-label="成员角色"]')`); }
-      const text = await session!.admin.text();
+      // Member roles and the transfer rule now live in the shared dialog portal outside main.
+      const text = await session!.admin.text() + (suffix.endsWith('tab=members')
+        ? await session!.admin.eval<string>(`document.querySelector('dialog[open]')?.innerText ?? ''`) : '');
       for (const part of parts) expect(text).toContain(part);
       expect(session!.admin.takeErrors()).toEqual([]);
     },
