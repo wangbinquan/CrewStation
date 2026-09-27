@@ -1,4 +1,5 @@
 import { executionWriterObserver, migrationWriterObserver, legacyOwnerObserver } from './adapters/executionWriters';
+import { webhookAwareAllowlist } from './application/webhookIngress';
 import { releaseImagePorts } from './application/releaseImagePorts';
 import { imageValidationPorts } from './application/imageValidationPorts';
 import { businessExecutionPorts, executionHandoffPorts } from './application/businessExecutionPorts';
@@ -62,7 +63,6 @@ export interface PlatformModuleDeps {
   /** 工作器租约与事件消费者名的前缀，进程名加主机名。 */
   instance: string;
 }
-
 export interface PlatformModule {
   readonly api: PlatformModuleApi;
   readonly modules: ReturnType<typeof composeModules>;
@@ -124,7 +124,7 @@ function composeCore(deps: CompositionDeps, late: Late) {
     serviceEntry: { check: (userId, slug, slot) => gatewayApi().userEntry(userId, slug, slot) },
     membershipLookup: { membershipsOf: (userId) => projectApi().listUserMemberships(userId) },
     workloadLookup: { byIp: (ip) => gatewayApi().lookupByIp(ip) },
-    allowlistEvaluator: { evaluate: (caller, target) => gatewayApi().evaluate(caller, target) },
+    allowlistEvaluator: webhookAwareAllowlist({ domain: settings.serviceDomain, services: () => projectApi().listServices(), release: () => late.release, maintenance: (id) => gatewayApi().maintenanceOf(id) }, (caller, target) => gatewayApi().evaluate(caller, target)),
     // 开发会话令牌的即时吊销点：每次校验现查环境，释放（releasing／released）即查不到，令牌当场失效。
     // 与 runningTasks 同理，task-runtime 装配前返回 undefined，也就是一律拒绝。
     devSessionState: { activeSession: async (taskId) => {

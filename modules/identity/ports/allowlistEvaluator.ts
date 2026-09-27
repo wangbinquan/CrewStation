@@ -18,5 +18,7 @@ export interface AllowlistVerdict {
 
 /** 服务域放行表评估（Design §8.3）；由 gateway 模块经装配提供。 */
 export interface AllowlistEvaluator {
+  /** Exact signed external producer ingress; grants no source identity. */
+  externalWebhook?(target: AllowlistTarget): Promise<{ kind: 'webhook' } | { kind: 'unavailable'; message: string } | undefined>;
   evaluate(caller: WorkloadIdentity, target: AllowlistTarget): Promise<AllowlistVerdict>;
 }

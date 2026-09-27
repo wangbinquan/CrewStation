@@ -90,6 +90,11 @@ function unavailableResponse(c: Context<AppEnv>, entry: Extract<UserAuthDecision
 }
 
 function serviceResponse(c: Context<AppEnv>, decision: ServiceAuthDecision): Response {
+  if (decision.kind === 'webhook') {
+    c.header(IDENTITY_HEADERS.traceId, decision.traceId);
+    c.header(IDENTITY_HEADERS.requestId, requestId(c));
+    return c.body(null, 200);
+  }
   if (decision.kind === 'unavailable') {
     if (decision.retryAfterSeconds) c.header('retry-after', String(decision.retryAfterSeconds));
     return c.json({ error: 'maintenance', message: decision.message, details: {} }, 503);

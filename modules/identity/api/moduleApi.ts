@@ -122,6 +122,7 @@ export interface InjectedServiceIdentity {
 }
 
 export type ServiceAuthDecision =
+  | { kind: 'webhook'; traceId: string }
   | { kind: 'allow'; caller: WorkloadIdentity; audience: string; traceId: string; injected: InjectedServiceIdentity }
   | { kind: 'forbidden'; message: string; reason?: string }
   /** RFC-021：目标正式版本维护中且服务域开关打开。 */

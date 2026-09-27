@@ -47,6 +47,8 @@ export interface ReleaseModuleApi {
   /** 既有测试角色的只读试用入口；不授予项目 view。 */
   getPreviewSlot(actor: Actor, serviceId: ServiceId): Promise<SlotDto | null>;
   listTrafficSwitches(actor: Actor, serviceId: ServiceId): Promise<TrafficSwitchDto[]>;
+  /** Signed webhook path of the ready active EventProducer; internal gateway query. */
+  activeWebhookIngress(serviceId: ServiceId): Promise<string | undefined>;
   activeEndpoint(serviceId: ServiceId): Promise<ActiveEndpoint | undefined>;
   slotRoles(serviceId: ServiceId): Promise<{ prod: PhysicalSlot; preview: PhysicalSlot } | undefined>;
   /** 两个槽当前版本的 Manifest 按名称引用的算力档位（RFC-006 P8）。 */

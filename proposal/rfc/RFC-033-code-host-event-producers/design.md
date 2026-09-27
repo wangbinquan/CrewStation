@@ -86,3 +86,9 @@ Manifest 的 produces 与运行时 allEventTypes 双向对拍；类型在平台�
 - [GitHub webhook events and payloads](https://docs.github.com/en/webhooks/webhook-events-and-payloads)：事件族、delivery headers、PR／Issue 评论区分。
 
 aw 只读参考：`packages/backend/src/services/webhook/{gitlabAdapter,githubAdapter}.ts`；不复制其整个调度／权限／归一化层到 CS。
+
+## 8. 实机发现的基线缺口修复
+
+外部协议验收实际返回 `403 unknown-workload`：服务域 ForwardAuth 在 producer 验签前一律要求源 Pod，违背基线 §8.5 的“公司系统 → 网关 → EventProducer”。本 RFC 的端到端接入范围包含修复此缺口。
+
+保留现有网关路由和身份头清理链，在 ForwardAuth 增加独立的 webhook 判定：仅 POST、在册 EventProducer 的服务域、当前已就绪正式发布 Manifest 的精确 ingress.path、gitlab-token／hmac-sha256 验证方式可到达容器。未上线、待命、归档、verification=none、其他路径／方法不能借此入口。来源不获平台调用方身份或来源令牌，只分配追踪ID；producer 继续验证真实原始 token／签名。正式服务维护的 services 开关仍返回503。release 模块只暴露当前正式入口的内部只读查询；platform 组合端口，identity 负责 ForwardAuth 响应，不新增数据表／路由合同或伪造平台工作负载。

@@ -40,6 +40,7 @@ function moduleOn(db: TestDatabase['db']): IdentityModule {
     },
     workloadLookup: { byIp: async (ip) => workloads[ip] },
     allowlistEvaluator: {
+      externalWebhook: async (target) => target.host === 'producer.svc.cs.internal' && target.method === 'POST' && target.path === '/hooks/github' ? { kind: 'webhook' } : undefined,
       evaluate: async (caller, target) => {
         if (target.host === 'api.svc.cs.internal') return { allowed: true, targetIdentity: 'platform-api' };
         if (target.host === 'other.svc.cs.internal' && target.method === 'GET') return { allowed: true, targetIdentity: 'other/other' };
@@ -257,5 +258,16 @@ describe.skipIf(!available)('signing keys', () => {
     // 另一副本尚未感知轮换：遇到未知 kid 时重读密钥环后验签成功。
     expect((await second.api.resolveSession(cookie))?.id).toBe(aliceId);
     expect((await second.api.jwks()).keys.length).toBe(2);
+  });
+});
+
+describe.skipIf(!available)('external signed webhook boundary', () => {
+  test('unknown workload reaches only the declared POST handler and never receives a platform identity', async () => {
+    const headers = { 'x-forwarded-host': 'producer.svc.cs.internal', 'x-forwarded-for': '192.0.2.8', 'x-forwarded-method': 'POST', 'x-forwarded-uri': '/hooks/github?delivery=1' };
+    const response = await forwardService({ ...headers, 'x-cs-source-service': 'platform/events', 'x-cs-source-token': 'forged' });
+    expect(response.status).toBe(200);
+    expect(response.headers.get(IDENTITY_HEADERS.traceId)).toMatch(/^[0-9a-f]{32}$/);
+    for (const key of [IDENTITY_HEADERS.sourceService, IDENTITY_HEADERS.sourceToken, IDENTITY_HEADERS.sourceSlot, IDENTITY_HEADERS.userId, IDENTITY_HEADERS.identityToken]) expect(response.headers.get(key)).toBeNull();
+    for (const change of [{ 'x-forwarded-method': 'GET' }, { 'x-forwarded-uri': '/hooks/github/extra' }, { 'x-forwarded-uri': '/v1/events/produce' }, { 'x-forwarded-host': 'api.svc.cs.internal' }]) expect((await forwardService({ ...headers, ...change })).status).toBe(403);
   });
 });

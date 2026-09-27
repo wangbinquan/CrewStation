@@ -11,15 +11,18 @@ type Deps = Pick<IdentityUseCaseDeps, 'tokens' | 'workloads' | 'allowlist'>;
 
 /**
  * 服务域 ForwardAuth（Design §7.2、§8.3）：源 Pod IP → 调用方身份 → 放行表 → 绑定目标 aud 的来源令牌与 trace_id。
- * 业务代码不携带任何凭据；未登记的来源与未放行的调用都是 403。
+ * 已发布的签名 webhook 精确入口交给生产者验签，不授予平台身份；其余未登记／未放行调用都是 403。
  */
 export function forwardAuthServiceUseCase(deps: Deps) {
   return async (request: ServiceAuthRequest): Promise<ServiceAuthDecision> => {
+    const target = { host: firstHost(request.host), method: request.method.toUpperCase(), path: pathOf(request.uri) };
+    const webhook = await deps.allowlist.externalWebhook?.(target);
+    if (webhook?.kind === 'webhook') return { kind: 'webhook', traceId: newTraceId() };
+    if (webhook) return webhook;
     const ip = firstForwardedIp(request.forwardedFor);
     if (!ip) return deny('缺少来源地址：网关未传 X-Forwarded-For', 'missing-source-ip');
     const caller = await deps.workloads.byIp(ip);
     if (!caller) return deny(`来源 ${ip} 不是已登记的平台工作负载`, 'unknown-workload');
-    const target = { host: firstHost(request.host), method: request.method.toUpperCase(), path: pathOf(request.uri) };
     const verdict = await deps.allowlist.evaluate(caller, target);
     // 目标正式版本维护中（RFC-021）：503 而不是 403，调用方可以按 Retry-After 稍后重试。
     if (!verdict.allowed && verdict.unavailable) return { kind: 'unavailable', message: verdict.unavailable.message, ...(verdict.unavailable.retryAfterSeconds ? { retryAfterSeconds: verdict.unavailable.retryAfterSeconds } : {}) };
