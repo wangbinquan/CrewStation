@@ -9,7 +9,7 @@ import { riProject, riImage, riVersion, riProfile, riId, runtimeImageConsoleFixt
 
 let page: Awaited<ReturnType<typeof renderElement>> | undefined, fixture: ReturnType<typeof runtimeImageConsoleFixture> | undefined;
 afterEach(() => { page?.unmount(); page = undefined; fixture?.restore(); fixture = undefined; });
-async function open() { fixture = runtimeImageConsoleFixture(); page = await renderElement(<ProjectScopeProvider value={{ projectId: riProject, space: 'workbench' }}><RuntimeImagesPage /></ProjectScopeProvider>, messages); }
+async function open(admin = true) { fixture = runtimeImageConsoleFixture(admin); page = await renderElement(admin ? <AdminRuntimeImagesPage /> : <ProjectScopeProvider value={{ projectId: riProject, space: 'workbench' }}><RuntimeImagesPage /></ProjectScopeProvider>, messages); }
 const dialog = () => [...document.querySelectorAll('dialog[open]')].at(-1)!;
 async function text(node: HTMLInputElement | HTMLTextAreaElement, value: string) {
   await act(async () => { node.focus(); Object.getOwnPropertyDescriptor(node instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype, 'value')!.set!.call(node, value); node.dispatchEvent(new Event('input', { bubbles: true })); node.dispatchEvent(new KeyboardEvent('keyup', { key: 'a', bubbles: true })); }); await page!.settle();
@@ -21,6 +21,8 @@ test('目录展示真实版本，构建带幂等键，日志按游标续读，�
   expect(accepted.body.revisionId).toBe(fixture!.revision.id); expect(typeof accepted.body.requestKey).toBe('string');
   await page!.click('构建日志'); await page!.reread();
   expect(page!.text()).toContain('install complete'); expect(fixture!.reads.some((url) => url.endsWith('/logs?after=1'))).toBe(true);
+  expect(document.querySelectorAll('dialog[open]')).toHaveLength(2);
+  await act(async () => { dialog().dispatchEvent(new Event('cancel', { cancelable: true })); }); await page!.settle();
   await page!.click('取消构建'); expect(fixture!.writes.at(-1)!.url).toContain('/cancel');
   await page!.click('镜像版本'); await page!.click('用途验证'); expect(page!.text()).toContain('尚未在此验证中启动服务');
 });
@@ -36,7 +38,7 @@ test('新增修订校验 JSON，关闭保留草稿；配方支持 existing 且�
 });
 
 test('开发配置逐个保存任务与 Agent，版本并发锁保留读取时修订', async () => {
-  await open(); await page!.click('配置默认与允许镜像');
+  await open(false); await page!.click('配置默认与允许镜像');
   const fields = [...dialog().querySelectorAll('fieldset')]; expect(fields).toHaveLength(2);
   await text(fields[0]!.querySelector<HTMLInputElement>('input')!, riId(19));
   await text(fields[1]!.querySelector<HTMLTextAreaElement>('textarea')!, `${riId(16)}\n${riVersion}\n`);
@@ -54,7 +56,7 @@ test('平台目录仅管理员读取；项目目录不替代管理员跨项目�
 });
 
 test('配置冲突保留草稿，只在明确丢弃后读取最新修订与字段', async () => {
-  await open(); await page!.click('配置默认与允许镜像');
+  await open(false); await page!.click('配置默认与允许镜像');
   await text(dialog().querySelector<HTMLInputElement>('input')!, riId(19));
   fixture!.state.conflict = true; fixture!.policy.revision = 8;
   await page!.click('保存'); expect(dialog().querySelector<HTMLInputElement>('input')!.value).toBe(riId(19));
@@ -69,8 +71,7 @@ test('目录删除先停用并检查引用，开发者无管理操作；停用�
   page = await renderElement(<ProjectScopeProvider value={{ projectId: riProject, space: 'workbench' }}><RuntimeImagesPage /></ProjectScopeProvider>, messages);
   await page.click('查看'); expect(page.text()).not.toContain('停用新选择');
   page.unmount(); fixture.restore(); await open();
-  await page!.click('查看'); await page!.click('用途验证');
-  await page!.click('停用新选择'); expect(page!.text()).not.toContain('发起验证');
+  await page!.click('查看'); await page!.click('停用新选择'); await page!.click('用途验证'); expect(page!.text()).not.toContain('发起验证');
   fixture!.state.references = 1; await page!.reread();
   const remove = () => [...page!.host.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent === '删除版本')!;
   expect(remove().disabled).toBe(true);
@@ -97,7 +98,9 @@ test('源码构建从本项目仓库选择绑定，保存的是服务绑定身�
   await open(); await page!.click('查看'); await page!.click('新增构建修订');
   const kind = dialog().querySelector<HTMLSelectElement>('select')!;
   await act(async () => { kind.value = 'source'; kind.dispatchEvent(new Event('change', { bubbles: true })); }); await page!.settle();
-  const repository = [...dialog().querySelectorAll<HTMLSelectElement>('select')].find((select) => [...select.options].some((option) => option.textContent === 'Tools project'))!;
+  const sourceProject = [...dialog().querySelectorAll<HTMLSelectElement>('select')].find((select) => select.textContent?.includes('选择源码业务'))!;
+  await act(async () => { sourceProject.value = riProject; sourceProject.dispatchEvent(new Event('change', { bubbles: true })); }); await page!.settle();
+  const repository = [...dialog().querySelectorAll<HTMLSelectElement>('select')].find((select) => select.textContent?.includes('选择项目仓库'))!;
   expect(repository).toBeDefined();
   await act(async () => { repository.value = riId(22); repository.dispatchEvent(new Event('change', { bubbles: true })); });
   await page!.click('保存修订');
@@ -116,7 +119,7 @@ test('修订超过一页时可选择旧配方，构建不悄悄回到最新修�
 });
 
 test('开发配置从具名目录选择默认和允许版本，不修改其他 Agent 的配置', async () => {
-  await open(); await page!.click('配置默认与允许镜像');
+  await open(false); await page!.click('配置默认与允许镜像');
   await text(dialog().querySelector<HTMLInputElement>('input')!, '');
   const choose = async (label: string) => {
     await page!.click(label);
@@ -133,7 +136,7 @@ test('开发配置从具名目录选择默认和允许版本，不修改其他 A
 });
 
 test('服务用途验证表单按 argv 保存参数，明确契约检查范围', async () => {
-  await open(); await page!.click('查看'); await page!.click('用途验证'); await page!.click('发起验证');
+  await open(false); await page!.click('查看'); await page!.click('用途验证'); await page!.click('发起验证');
   const usage = dialog().querySelector<HTMLSelectElement>('select')!;
   await act(async () => { usage.value = 'service'; usage.dispatchEvent(new Event('change', { bubbles: true })); }); await page!.settle();
   expect(dialog().textContent).toContain('本次检查镜像元数据与服务启动契约');
@@ -147,7 +150,7 @@ test('服务用途验证表单按 argv 保存参数，明确契约检查范围',
 });
 
 test('Agent 用途验证按项目档位名称选择，自动固定当前修订', async () => {
-  await open(); await page!.click('查看'); await page!.click('用途验证'); await page!.click('发起验证');
+  await open(false); await page!.click('查看'); await page!.click('用途验证'); await page!.click('发起验证');
   const usage = dialog().querySelector<HTMLSelectElement>('select')!;
   await act(async () => { usage.value = 'agent'; usage.dispatchEvent(new Event('change', { bubbles: true })); }); await page!.settle();
   const profile = dialog().querySelectorAll<HTMLSelectElement>('select')[1]!;

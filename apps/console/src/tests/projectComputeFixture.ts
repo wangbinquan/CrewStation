@@ -25,6 +25,7 @@ export function projectComputeFixture() {
       return Response.json(state.policy);
     }
     if (path === `/v1/projects/${computeProjectId}/service-policy`) return Response.json({ projectId: computeProjectId, revision: 0, policy: { mode: 'inherit', allowedPlanIds: [] }, updatedAt: null });
+    if (path === `/v1/projects/${computeProjectId}/runtime-image-policy`) return Response.json({ projectId: computeProjectId, revision: 0, policy: { mode: 'inherit', allowedImageIds: [] }, updatedAt: null });
     if (path === `/v1/projects/${computeProjectId}/quota`) return Response.json({ maxConcurrentTasks: 3, running: 2 });
     if (path === '/v1/catalog/service-plans') return Response.json({ items: [] });
     if (path === `/v1/projects/${computeProjectId}`) return Response.json(project);

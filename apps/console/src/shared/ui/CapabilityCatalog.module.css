@@ -1,3 +1,4 @@
+/* 平台能力目录：算力档位与运行镜像共用列表密度、状态区域和窄屏布局。 */
 .listToolbar {
   display: flex;
   align-items: end;
@@ -63,4 +64,41 @@
 @media (max-width: 480px) {
   .profileTable .profileRow, .profileTable .expandedRow { grid-template-columns: minmax(0, 1fr); }
   .listToolbar > label { flex-basis: 100%; max-width: none; }
+}
+
+/* RFC-031: common catalog geometry; field meaning remains with each feature. */
+.catalogTable, .profileTable { width: 100%; min-width: 0; table-layout: fixed; }
+.catalogTable th, .profileTable th { background: var(--cs-color-surface-muted); font-size: var(--cs-font-size-sm); white-space: normal; }
+.catalogTable th, .catalogTable td, .profileTable th, .profileTable td { min-width: 0; padding: 9px 12px; vertical-align: middle; }
+.catalogTable th:first-child, .profileTable th:first-child { width: 30%; }
+.profileTable th:nth-child(2) { width: auto; }
+.profileTable th:nth-child(4) { width: auto; }
+.catalogTable th:last-child, .profileTable th:last-child { width: 160px; }
+.catalogTable code, .profileTable code { background: transparent; padding: 0; font-size: var(--cs-font-size-sm); }
+.catalogTable tbody tr:hover > td { background: var(--cs-color-bg); }
+.listToolbar { margin-bottom: var(--cs-space-3); --cs-select-height: 32px; --cs-select-padding-block: 4px; }
+.listToolbar > label { flex: 1 1 180px; max-width: 32rem; }
+.toolbarActions { margin-inline-start: auto; }
+.cellLabel { display: none; }
+.identity { display: grid; gap: 3px; }
+.description { margin: 0; color: var(--cs-color-text-muted); font-size: var(--cs-font-size-sm); display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; }
+.pagination { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: var(--cs-space-2); margin-top: var(--cs-space-3); }
+.owner { display: inline-flex; max-width: 100%; }
+.owner > button { white-space: normal; text-align: start; }
+.rowActions { flex-wrap: wrap; justify-content: flex-start; }
+@media (max-width: 1000px) and (min-width: 741px) {
+  .profileTable thead { display: table-header-group; }
+  .profileTable tbody { display: table-row-group; }
+  .profileTable .profileRow, .profileTable .expandedRow { display: table-row; padding: 0; }
+  .profileTable td { display: table-cell; padding: 9px 12px; border-bottom: 1px solid var(--cs-color-border); }
+}
+@media (max-width: 740px) {
+  .catalogTable thead, .profileTable thead { display: table-header-group; position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .catalogTable tbody, .profileTable tbody { display: block; }
+  .catalogTable tbody > tr, .profileTable .profileRow, .profileTable .expandedRow { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 16px; padding: 12px; border-bottom: 1px solid var(--cs-color-border); }
+  .catalogTable tbody > tr:last-child, .profileTable tbody > tr:last-child { border-bottom: 0; }
+  .catalogTable td, .profileTable td { display: block; min-width: 0; padding: 0; border: 0; }
+  .catalogTable td:first-child, .catalogTable td:last-child, .profileTable td:first-child, .profileTable td:last-child { grid-column: 1 / -1; }
+  .cellLabel { display: block; font-size: var(--cs-font-size-sm); color: var(--cs-color-text-muted); margin-bottom: 3px; }
+  .rowActions { justify-content: flex-start; }
 }

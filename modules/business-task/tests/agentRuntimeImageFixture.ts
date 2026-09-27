@@ -1,6 +1,6 @@
 import { BUSINESS_AGENT_CAPABILITIES } from '../domain/executionAgent';
 import { expect } from 'bun:test';
-import { AgentProfileSchema, LaunchSpecSchema } from '@crewstation/contracts';
+import { AgentProfileSchema, LaunchSpecSchema, RuntimeImageSelectionSchema } from '@crewstation/contracts';
 import type { BusinessControlDto, BusinessTaskV3Dto, RuntimeImageExecutionSnapshot } from '@crewstation/contracts';
 import type { Database } from '@crewstation/persistence';
 import { newResourceId, precondition, quotaExceeded } from '@crewstation/kernel';
@@ -22,7 +22,9 @@ export async function agentRuntimeImageFixture(db: Database) {
   const port: BusinessRuntimeImages = {
     reserveTask: async () => snapshot(parentVersion), confirmTask: async () => {},
     reserveAgent: async (...args) => {
-      reservations.push(args); const [, , selection, , requested] = args;
+      reservations.push(args); const [, , input, , requested] = args;
+      // Match the real runtime-environment boundary: an Agent profile is not an image selection.
+      const selection = RuntimeImageSelectionSchema.parse(input);
       if (requested && requested !== selection.runtimeImageVersionId && !selection.allowedRuntimeImageVersionIds?.includes(requested)) throw precondition('镜像不在此 Agent 允许集合');
       return { ...snapshot(requested ?? selection.runtimeImageVersionId!), selectionSource: requested ? 'request' : 'configuration' };
     },

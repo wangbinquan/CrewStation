@@ -1,6 +1,6 @@
 import type { Actor, ProjectId, RuntimeImageSecretVersion, RuntimeImageRevisionDto, RuntimeImageSource, RuntimeImageValidationTarget, RuntimeImageVersionDto, ServiceId, UserId } from '@crewstation/contracts';
 import { TASKRUNNER_PROTOCOL_VERSION } from '@crewstation/contracts';
-import { precondition } from '@crewstation/kernel';
+import { forbidden, precondition } from '@crewstation/kernel';
 import type { RuntimeBuildIdentity, RuntimeBuildSource, RuntimeImagePlatformPorts, RuntimeImagePlatformSettings } from '../ports/runtimeImages';
 
 const binding = (revision: RuntimeBuildSource): ServiceId => {
@@ -24,14 +24,15 @@ export function runtimeImagePlatformPorts(ports: RuntimeImagePlatformPorts, sett
       resolve: (actor: Actor, projectId: string, id: string, ref: string) => ports.scm.resolveBuildSource(actor, projectId as ProjectId, id as ServiceId, ref),
       readFile: (id: string, sha: string, path: string) => ports.scm.readFile(id as ServiceId, sha, path),
     },
-    bases: { resolve: async (actor: Actor, projectId: string, source: RuntimeImageSource) => {
-      await authorize(actor, projectId, 'develop');
+    bases: { resolve: async (actor: Actor, projectId: string | undefined, source: RuntimeImageSource) => {
+      if (!actor.isAdmin) throw forbidden('只有平台管理员可以构建运行镜像');
+      if (projectId) await authorize(actor, projectId, 'develop');
       if (source.usage === 'service') return undefined;
       if (source.usage === 'task' || source.kind === 'existing') return `${settings.registryBase}/${settings.baseImage.repository}:${settings.baseImage.tag}`;
       if (!source.baseProfile) throw precondition('Agent 镜像必须指定精确算力档位修订');
-      return (await profile(projectId, source.baseProfile)).image;
+      return (await ports.compute.launchMaterial(source.baseProfile)).image;
     } },
-    existingImageAccess: async (actor: Actor, projectId: string) => { await authorize(actor, projectId, 'develop'); return { prefixes: actor.isAdmin ? ['runtime'] : [`runtime/projects/${projectId}`], exact: [settings.baseImage.repository] }; },
+    existingImageAccess: async (actor: Actor, projectId: string | undefined) => { if (!actor.isAdmin) throw forbidden('只有平台管理员可以登记运行镜像'); if (projectId) await authorize(actor, projectId, 'develop'); return { prefixes: ['runtime'], exact: [settings.baseImage.repository] }; },
     initializationSecrets: { render: async (projectId: string, stamps: readonly RuntimeImageSecretVersion[]) => {
       const values: Record<string, string> = {};
       for (const environment of ['development', 'production'] as const) {
@@ -58,8 +59,12 @@ export function runtimeImagePlatformPorts(ports: RuntimeImagePlatformPorts, sett
       return digest(target.usage === 'agent' ? { ...base, profile: digest((await profile(projectId, target.profile)).beforeStart) } : base);
     } },
     buildContext: async (build: RuntimeBuildIdentity, revision: RuntimeBuildSource) => {
-      const actor = await buildActor(build), project = await ports.project.getProject(actor, build.projectId as ProjectId);
-      const source = await ports.scm.resolveBuildSource(actor, build.projectId as ProjectId, binding(revision), revision.commitSha!);
+      const actor = await buildActor(build), sourceProjectId = revision.sourceProjectId ?? build.sourceProjectId ?? build.projectId;
+      if (!sourceProjectId) throw precondition('构建缺少固定来源业务');
+      if (!build.projectId && !actor.isAdmin) throw forbidden('构建提交者已失去平台管理权限');
+      const project = build.projectId ? await ports.project.getProject(actor, build.projectId as ProjectId) : { namespace: settings.systemNamespace, slug: 'platform' };
+      if (!project.namespace) throw precondition('平台构建命名空间未配置');
+      const source = await ports.scm.resolveBuildSource(actor, sourceProjectId as ProjectId, binding(revision), revision.commitSha!);
       if (source.commitSha !== revision.commitSha) throw precondition('固定源码提交已不可用');
       return { namespace: project.namespace, slug: project.slug, repositoryUrl: source.httpUrl };
     },
@@ -74,7 +79,11 @@ export function runtimeImagePlatformPorts(ports: RuntimeImagePlatformPorts, sett
 function imageBuildCredentials(ports: RuntimeImagePlatformPorts, settings: RuntimeImagePlatformSettings, actorOf: (build: RuntimeBuildIdentity) => Promise<Actor>, pushHost: string) {
   return {
     issueGit: async (build: RuntimeBuildIdentity, revision: RuntimeBuildSource) => {
-      await ports.project.authorize(await actorOf(build), build.projectId as ProjectId, 'develop');
+      const sourceProjectId = revision.sourceProjectId ?? build.sourceProjectId ?? build.projectId;
+      if (!sourceProjectId) throw precondition('构建缺少固定来源业务');
+      const actor = await actorOf(build);
+      if (!build.projectId && !actor.isAdmin) throw forbidden('构建提交者已失去平台管理权限');
+      await ports.project.authorize(actor, sourceProjectId as ProjectId, 'develop');
       return ports.scm.issueBuildCredential(binding(revision), Math.min(120, Math.max(1, Math.ceil((Date.parse(build.deadline) - Date.now()) / 60000))));
     },
     revokeGit: (revision: RuntimeBuildSource, id: string) => ports.scm.revokeBuildCredential(binding(revision), id),
@@ -86,10 +95,12 @@ function imageBuildCredentials(ports: RuntimeImagePlatformPorts, settings: Runti
     },
     packages: async (build: RuntimeBuildIdentity, revision: RuntimeBuildSource) => {
       if (revision.source.kind !== 'source') return {};
+      const sourceProjectId = revision.sourceProjectId ?? build.sourceProjectId ?? build.projectId;
+      if (!sourceProjectId) throw precondition('构建缺少固定来源业务');
       const actor = await actorOf(build), values: Record<string, string> = {};
       for (const env of ['development', 'production'] as const) {
         const refs = revision.source.secrets.filter((s) => s.environment === env); if (!refs.length) continue;
-        const selected = await ports.config.renderSecretDefinitions(actor, build.projectId as ProjectId, env, [...new Set(refs.map((s) => s.configDefinitionId))]);
+        const selected = await ports.config.renderSecretDefinitions(actor, sourceProjectId as ProjectId, env, [...new Set(refs.map((s) => s.configDefinitionId))]);
         for (const ref of refs) values[ref.id] = selected[ref.configDefinitionId]!;
       }
       return values;

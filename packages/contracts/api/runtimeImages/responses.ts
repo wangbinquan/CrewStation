@@ -7,22 +7,25 @@ import {
 } from './values';
 
 export const RuntimeImageDtoSchema = z.object({
-  id: ResourceIdSchema, projectId: ResourceIdSchema, name: z.string(), description: z.string(), scope: z.enum(['project', 'shared']), enabled: z.boolean(),
+  id: ResourceIdSchema, name: z.string(), description: z.string(), defaultVisible: z.boolean().default(false), enabled: z.boolean(),
   revision: z.number().int().positive(), createdBy: ResourceIdSchema, createdAt: z.iso.datetime(), updatedAt: z.iso.datetime(),
 });
 export const RuntimeImageRevisionDtoSchema = z.object({
   id: ResourceIdSchema, imageId: ResourceIdSchema, revision: z.number().int().positive(), source: RuntimeImageSourceSchema,
+  sourceProjectId: ResourceIdSchema.optional(), initializerProjectId: ResourceIdSchema.optional(),
   commitSha: z.string().regex(/^[0-9a-f]{40,64}$/).optional(), baseImage: z.string().optional(), recipeDigest: RuntimeImageDigestSchema,
   initializer: RuntimeImageInitializerSchema, tools: z.array(RuntimeImageToolCheckSchema), createdBy: ResourceIdSchema, createdAt: z.iso.datetime(),
 });
 export const RuntimeImageBuildDtoSchema = z.object({
-  id: ResourceIdSchema, imageId: ResourceIdSchema, projectId: ResourceIdSchema, revisionId: ResourceIdSchema,
+  id: ResourceIdSchema, imageId: ResourceIdSchema, sourceProjectId: ResourceIdSchema.optional(), revisionId: ResourceIdSchema,
+  /** 仅旧构建保留原资源归属，新平台构建不设置。 */
+  projectId: ResourceIdSchema.optional(),
   state: RuntimeImageBuildStateSchema, stage: z.string(), createdBy: ResourceIdSchema, createdAt: z.iso.datetime(), updatedAt: z.iso.datetime(),
   deadline: z.iso.datetime(), attempt: z.number().int().positive(), versionId: ResourceIdSchema.optional(),
   resourceId: ResourceIdSchema.optional(), error: z.string().optional(), unknown: z.boolean().default(false),
 });
 export const RuntimeImageVersionDtoSchema = z.object({
-  id: ResourceIdSchema, imageId: ResourceIdSchema, projectId: ResourceIdSchema, revisionId: ResourceIdSchema, buildId: ResourceIdSchema,
+  id: ResourceIdSchema, imageId: ResourceIdSchema, revisionId: ResourceIdSchema, buildId: ResourceIdSchema,
   repository: z.string(), digest: RuntimeImageDigestSchema, architecture: RuntimeImageArchitectureSchema,
   state: z.enum(['available', 'disabled', 'retiring', 'retired']), createdAt: z.iso.datetime(),
   initializerDigest: RuntimeImageDigestSchema, toolsDigest: RuntimeImageDigestSchema,

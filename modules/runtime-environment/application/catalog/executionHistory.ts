@@ -5,7 +5,7 @@ import type { RuntimeImageDeps } from '../dependencies';
 import { imageAccess } from '../access';
 
 export function runtimeImageExecutionHistory(deps: RuntimeImageDeps) {
-  return async (actor: Actor, projectId: string, imageId: string, query: RuntimeImageHistoryQuery): Promise<RuntimeImageHistoryPage> => {
+  return async (actor: Actor, projectId: string | undefined, imageId: string, query: RuntimeImageHistoryQuery): Promise<RuntimeImageHistoryPage> => {
     await imageAccess(deps, actor, projectId, imageId, 'view');
     const page = RuntimeImageHistoryQuerySchema.parse(query);
     const ids = await deps.uow.read.versions.ids(imageId);

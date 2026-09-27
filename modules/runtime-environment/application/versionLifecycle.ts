@@ -7,8 +7,8 @@ import { versionAccess, versionLock } from './compatibility';
 
 export function runtimeImageVersionLifecycle(deps: RuntimeImageDeps) {
   return {
-    getVersion: async (actor: Actor, projectId: string, versionId: string) => (await versionAccess(deps, actor, projectId, versionId)).version,
-    disableVersion: async (actor: Actor, projectId: string, versionId: string) => {
+    getVersion: async (actor: Actor, projectId: string | undefined, versionId: string) => (await versionAccess(deps, actor, projectId, versionId)).version,
+    disableVersion: async (actor: Actor, projectId: string | undefined, versionId: string) => {
       const { version } = await versionAccess(deps, actor, projectId, versionId);
       await imageAccess(deps, actor, projectId, version.imageId, 'manage');
       return deps.uow.run(async (s) => {
@@ -19,14 +19,14 @@ export function runtimeImageVersionLifecycle(deps: RuntimeImageDeps) {
         await s.versions.update(next); return next;
       });
     },
-    versionReferences: async (actor: Actor, projectId: string, versionId: string) => {
+    versionReferences: async (actor: Actor, projectId: string | undefined, versionId: string) => {
       await versionAccess(deps, actor, projectId, versionId);
-      await deps.authorizer.authorize(actor, projectId, 'develop');
+      if (projectId) await deps.authorizer.authorize(actor, projectId, 'develop');
       const refs = await deps.uow.read.references.list(versionId);
-      const visible: ImageReferenceView[] = refs.filter((ref) => actor.isAdmin || ref.projectId === projectId).map(({ snapshot: _snapshot, snapshotInputDigest: _input, ...ref }) => ref);
+      const visible: ImageReferenceView[] = refs.filter((ref) => projectId === undefined || ref.projectId === projectId).map(({ snapshot: _snapshot, snapshotInputDigest: _input, ...ref }) => ref);
       return { items: visible, total: refs.length };
     },
-    retireVersion: async (actor: Actor, projectId: string, versionId: string) => {
+    retireVersion: async (actor: Actor, projectId: string | undefined, versionId: string) => {
       const { version } = await versionAccess(deps, actor, projectId, versionId);
       await imageAccess(deps, actor, projectId, version.imageId, 'manage');
       return deps.uow.run(async (s) => {

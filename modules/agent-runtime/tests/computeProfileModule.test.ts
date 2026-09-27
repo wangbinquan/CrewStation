@@ -264,6 +264,19 @@ describe.skipIf(!available)('算力档位模块（RFC-006）', () => {
     await expect(mod.api.issueBuildPushCredential({ ...input, expiresAt: new Date(Date.now() + 8000000).toISOString() })).rejects.toMatchObject({ kind: 'validation' });
   });
 
+  test('平台构建凭据使用独立产物前缀，不获得任何业务或其他构建的写权限', async () => {
+    const buildId = newResourceId();
+    const token = await mod.api.issueBuildPushCredential({ buildId, expiresAt: new Date(Date.now() + 600000).toISOString(), pullRepositories: ['crewstation/task-runtime'] });
+    const authorization = `Basic ${Buffer.from(`${token.username}:${token.password}`).toString('base64')}`;
+    const verdict = (method: string, repository: string) => mod.api.authorizeRegistryRequest({ authorization, method, uri: `/v2/${repository}/manifests/artifact` }).status;
+    expect(token.pushPrefixes).toEqual([`runtime/platform/${buildId}/`]);
+    expect(verdict('PUT', `runtime/platform/${buildId}/image`)).toBe(200);
+    expect(verdict('PUT', `runtime/platform/${newResourceId()}/image`)).toBe(403);
+    expect(verdict('PUT', `runtime/projects/${newResourceId()}/${buildId}/image`)).toBe(403);
+    expect(verdict('GET', 'crewstation/task-runtime')).toBe(200);
+    expect(verdict('PUT', 'crewstation/task-runtime')).toBe(403);
+  });
+
   test('集群停止测试后，迟到的 passed 回执不能覆盖已停止终态', async () => {
     const created = await createProfile(admin, claude({ name: 'cluster-stop' }));
     const id = created.latestTest!.testId as ProfileTestId;

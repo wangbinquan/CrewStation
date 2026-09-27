@@ -58,7 +58,7 @@ export interface AgentRuntimeModuleApi {
   /** 签发有期限的推送凭据；口令只在这次响应里出现（C18）。 */
   issuePushCredential(actor: Actor): Promise<RegistryPushCredential>;
   /** 仅组合根的镜像构建路径使用；固定项目／build 前缀，不开放 HTTP。 */
-  issueBuildPushCredential(input: { projectId: string; buildId: string; expiresAt: string; pullRepositories: readonly string[] }): Promise<RegistryPushCredential>;
+  issueBuildPushCredential(input: { projectId?: string; buildId: string; expiresAt: string; pullRepositories: readonly string[] }): Promise<RegistryPushCredential>;
   /** 网关对仓库主机每个请求的裁定（ForwardAuth）。 */
   authorizeRegistryRequest(input: { authorization?: string; method: string; uri: string }): RegistryVerdict;
   /** 租户面投影（无 actor：任何登录用户都能看下拉）。 */

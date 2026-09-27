@@ -6,8 +6,8 @@ export interface ImageSourceRepository {
   readFile(bindingId: string, commitSha: string, path: string): Promise<string | undefined>;
 }
 export interface ImageBuildBase {
-  resolve(actor: Actor, projectId: string, source: RuntimeImageSource): Promise<string | undefined>;
+  resolve(actor: Actor, projectId: string | undefined, source: RuntimeImageSource): Promise<string | undefined>;
 }
 export interface ExistingImageResolver {
-  resolve(actor: Actor, projectId: string, reference: string, architecture: RuntimeImageSource['architecture']): Promise<string>;
+  resolve(actor: Actor, projectId: string | undefined, reference: string, architecture: RuntimeImageSource['architecture']): Promise<string>;
 }

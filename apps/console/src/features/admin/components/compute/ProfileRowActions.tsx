@@ -1,6 +1,9 @@
+import { DefinitionList } from '../../../../shared/ui/DefinitionList';
+import { useDateText } from '../../../../shared/lib/useDateText';
+import { Dialog } from '../../../../shared/ui/dialog/Dialog';
 import type { ComputeProfileListItem } from '@crewstation/contracts';
 import { ComputeProfileNameSchema, ComputeProfileReferencesSchema } from '@crewstation/contracts';
-import { useId, useRef, useState } from 'react';
+import { useState } from 'react';
 import type { ReactElement } from 'react';
 import { api } from '../../../../shared/api/client';
 import { queryKeys } from '../../../../shared/api/queryKeys';
@@ -12,7 +15,7 @@ import { InlineConfirm } from '../../../../shared/ui/InlineConfirm';
 import { ConfirmDialog } from '../../../../shared/ui/dialog/ConfirmDialog';
 import { FormDialog } from '../../../../shared/ui/dialog/FormDialog';
 import { AdminField } from '../AdminField';
-import styles from './ComputeList.module.css';
+import styles from '../../../../shared/ui/CapabilityCatalog.module.css';
 
 const INVALIDATE = [queryKeys.computeProfiles()];
 
@@ -25,8 +28,9 @@ function referencedProjects(error: unknown): string[] | undefined {
 
 export interface ProfileRowActionsProps {
   readonly profile: ComputeProfileListItem;
+  readonly updatedBy: string;
   readonly onOpen: (name: string) => void;
-  /** 主行与展开行共享操作状态，等待请求时主行仍能禁用编辑；展开内容不挤进主行的操作单元格。 */
+  /** 主行和管理弹窗共享操作状态，等待请求时禁用编辑。 */
   readonly children: (controls: ReactElement, expanded: boolean) => ReactElement;
 }
 
@@ -36,9 +40,8 @@ export interface ProfileRowActionsProps {
  * 删除与「仍然删除」都不可撤销，走弹窗并输入 delete（2026-09-23 作者裁定）；请求结束后弹窗关闭，结果显示在面板里。
  * 复制的新名称也在弹窗里（2026-09-23 起）：关窗与收起面板都保留输入，「清空」回到「原名-copy」，成功才丢。
  */
-export function ProfileRowActions({ profile, onOpen, children }: ProfileRowActionsProps): ReactElement {
-  const t = useT();
-  const panelId = useId(), trigger = useRef<HTMLButtonElement>(null);
+export function ProfileRowActions({ profile, updatedBy, onOpen, children }: ProfileRowActionsProps): ReactElement {
+  const t = useT(), dateText = useDateText();
   const [expanded, setExpanded] = useState(false);
   // 没改过名称时为 undefined，默认名跟着档位当前的名字走。
   const [copying, setCopying] = useState(false), [copyName, setCopyName] = useState<string>();
@@ -57,21 +60,24 @@ export function ProfileRowActions({ profile, onOpen, children }: ProfileRowActio
     <>
       {children(<div className={styles.rowActions}>
         <Button size="small" disabled={busy} onClick={() => onOpen(profile.id)}>{t('admin.profile.edit')}</Button>
-        <Button ref={trigger} variant="ghost" size="small" className={styles.moreButton} aria-expanded={expanded} aria-controls={panelId} onClick={() => setExpanded(!expanded)}>{t('admin.profile.moreActions')}</Button>
+        <Button size="small" aria-haspopup="dialog" onClick={() => setExpanded(!expanded)}>{t('admin.profile.moreActions')}</Button>
       </div>, expanded)}
-      {expanded ? <tr className={styles.actionRow}><td colSpan={4}>
-      <div id={panelId} className={styles.actionPanel} role="region" aria-label={t('admin.profile.actionsFor', { name: profile.name })}
-        onKeyDown={(event) => { if (event.key === 'Escape') { event.stopPropagation(); setExpanded(false); trigger.current?.focus(); } }}>
+      {expanded ? <Dialog title={t('admin.profile.actionsFor', { name: profile.name })} busy={busy} onClose={() => setExpanded(false)}>
+        <DefinitionList items={[
+          { label: t('admin.profile.column.image'), value: <code>{profile.image}<br />{profile.imageDigest}</code> },
+          { label: t('admin.profile.column.binary'), value: <code>{profile.binaryPath}</code> },
+          { label: t('admin.profile.column.updated'), value: `${updatedBy} · ${dateText(profile.updatedAt)}` },
+        ]} />
         <div className={styles.secondaryActions}>
-        <Button size="small" disabled={busy} onClick={() => setCopying(true)}>{t('admin.profile.copy')}</Button>
-        {profile.isDefault ? null : defaultBlocked ? <Button size="small" disabled title={defaultBlocked}>{t('admin.profile.setDefault')}</Button>
-          : <InlineConfirm size="small" label={t('admin.profile.setDefault')} question={t('admin.profile.setDefaultQuestion', { name: profile.name })} busy={setDefault.isPending} busyLabel={t('admin.profile.working')} onConfirm={() => setDefault.mutate(undefined)} />}
-        {profile.isDefault && profile.enabled ? <Button size="small" disabled title={t('admin.profile.defaultLocked')}>{t('admin.profile.disable')}</Button>
-          : <InlineConfirm size="small" label={profile.enabled ? t('admin.profile.disable') : t('admin.profile.enable')} question={profile.enabled ? t('admin.profile.disableQuestion', { name: profile.name }) : t('admin.profile.enableQuestion', { name: profile.name })}
+        <Button disabled={busy} onClick={() => setCopying(true)}>{t('admin.profile.copy')}</Button>
+        {profile.isDefault ? null : defaultBlocked ? <Button disabled title={defaultBlocked}>{t('admin.profile.setDefault')}</Button>
+          : <InlineConfirm label={t('admin.profile.setDefault')} question={t('admin.profile.setDefaultQuestion', { name: profile.name })} busy={setDefault.isPending} busyLabel={t('admin.profile.working')} onConfirm={() => setDefault.mutate(undefined)} />}
+        {profile.isDefault && profile.enabled ? <Button disabled title={t('admin.profile.defaultLocked')}>{t('admin.profile.disable')}</Button>
+          : <InlineConfirm label={profile.enabled ? t('admin.profile.disable') : t('admin.profile.enable')} question={profile.enabled ? t('admin.profile.disableQuestion', { name: profile.name }) : t('admin.profile.enableQuestion', { name: profile.name })}
               busy={toggle.isPending} busyLabel={t('admin.profile.working')} onConfirm={() => toggle.mutate(!profile.enabled)} />}
-        {profile.isDefault ? <Button size="small" disabled title={t('admin.profile.visibilityLocked')}>{t('admin.profile.defaultVisible')}</Button> : <InlineConfirm size="small" label={t(profile.defaultVisible === false ? 'admin.profile.defaultVisible' : 'admin.profile.defaultHidden')} question={t('admin.profile.visibilityQuestion', { name: profile.name })} busy={visibility.isPending} onConfirm={() => visibility.mutate(profile.defaultVisible === false)} />}
-        <span className={styles.destructive}>{profile.isDefault ? <Button variant="danger" size="small" disabled title={t('admin.profile.defaultLocked')}>{t('admin.profile.remove')}</Button>
-          : <Button variant="danger" size="small" disabled={busy} onClick={() => { remove.reset(); setRemoving({}); }}>{remove.isPending ? t('admin.profile.removing') : t('admin.profile.remove')}</Button>}</span>
+        {profile.isDefault ? <Button disabled title={t('admin.profile.visibilityLocked')}>{t('admin.profile.defaultVisible')}</Button> : <InlineConfirm label={t(profile.defaultVisible === false ? 'admin.profile.defaultVisible' : 'admin.profile.defaultHidden')} question={t('admin.profile.visibilityQuestion', { name: profile.name })} busy={visibility.isPending} onConfirm={() => visibility.mutate(profile.defaultVisible === false)} />}
+        <span className={styles.destructive}>{profile.isDefault ? <Button variant="danger" disabled title={t('admin.profile.defaultLocked')}>{t('admin.profile.remove')}</Button>
+          : <Button variant="danger" disabled={busy} onClick={() => { remove.reset(); setRemoving({}); }}>{remove.isPending ? t('admin.profile.removing') : t('admin.profile.remove')}</Button>}</span>
         </div>
       {profile.isDefault ? <p className={styles.hint}>{t('admin.profile.defaultLocked')}</p> : null}
       {copying ? <FormDialog title={t('admin.profile.copyTitle', { name: profile.name })} submitLabel={t('admin.profile.copyConfirm')} busyLabel={t('admin.profile.working')} busy={copy.isPending} submitDisabled={!copyValid}
@@ -85,7 +91,7 @@ export function ProfileRowActions({ profile, onOpen, children }: ProfileRowActio
       {references ? (
         <ActionNote tone="error">
           {t('admin.profile.referencedBy', { projects: references.join('、') })}{' '}
-          <Button variant="danger" size="small" disabled={busy} onClick={() => setRemoving({ references })}>{t('admin.profile.removeAnyway')}</Button>
+          <Button variant="danger" disabled={busy} onClick={() => setRemoving({ references })}>{t('admin.profile.removeAnyway')}</Button>
         </ActionNote>
       ) : remove.error ? <ActionNote tone="error">{t('admin.profile.removeError', { message: errorMessage(remove.error) })}</ActionNote> : null}
       {removing ? <ConfirmDialog title={t(removing.references ? 'admin.profile.removeAnyway' : 'admin.profile.removeTitle')} confirmWord="delete"
@@ -94,7 +100,7 @@ export function ProfileRowActions({ profile, onOpen, children }: ProfileRowActio
         onConfirm={() => remove.mutate(!!removing.references, { onSettled: () => setRemoving(undefined) })} onCancel={() => setRemoving(undefined)}>
         <p>{removing.references ? t('admin.profile.referencedBy', { projects: removing.references.join('、') }) : t('admin.profile.removeHint')}</p>
       </ConfirmDialog> : null}
-      </div></td></tr> : null}
+      </Dialog> : null}
     </>
   );
 }

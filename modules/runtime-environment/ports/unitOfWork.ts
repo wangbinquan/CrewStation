@@ -1,6 +1,11 @@
+import type { ProjectRuntimeImagePolicyDto } from '@crewstation/contracts';
 import type { BuildRepository, DevelopmentPolicyRepository, ImageRepository, LogRepository, ReferenceRepository, RevisionRepository, ValidationRepository, VersionRepository } from './repositories';
 
 export interface RepositoryScope {
+  readonly projectImagePolicies: {
+    get(projectId: string): Promise<ProjectRuntimeImagePolicyDto | undefined>;
+    save(policy: ProjectRuntimeImagePolicyDto): Promise<void>;
+  };
   readonly creations: {
     get(projectId: string, actorId: string, requestKey: string): Promise<{ fingerprint: string; imageId: string; revisionId: string } | undefined>;
     insert(input: { projectId: string; actorId: string; requestKey: string; fingerprint: string; imageId: string; revisionId: string }): Promise<void>;

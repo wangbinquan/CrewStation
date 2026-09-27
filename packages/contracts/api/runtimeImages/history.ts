@@ -11,6 +11,6 @@ export const RuntimeImageHistoryItemSchema = z.object({
 });
 export type RuntimeImageHistoryItem = z.infer<typeof RuntimeImageHistoryItemSchema>;
 export type RuntimeImageHistoryQuery = z.infer<typeof RuntimeImageHistoryQuerySchema>;
-/** Internal read port. Project filtering is mandatory even for shared images. */
-export interface RuntimeImageHistoryRead { projectId: string; versionIds: string[]; before?: string; limit: number }
+/** Internal read port. Omitted project scope is reserved for the authenticated platform catalog. */
+export interface RuntimeImageHistoryRead { projectId?: string; versionIds: string[]; before?: string; limit: number }
 export interface RuntimeImageHistoryPage { items: RuntimeImageHistoryItem[]; next?: string }

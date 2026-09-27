@@ -1,12 +1,16 @@
+import type { ProjectRuntimeImagePolicy, RuntimeImageGrants } from '@crewstation/contracts';
 import type { ImageBuild, ImageRevision, ImageValidation, ImageVersion, RuntimeImage, ImageReference, ImageLogChunk, DevelopmentImagePolicy } from '../domain/records';
 
-export interface Page { readonly before?: string; readonly limit: number }
+export interface Page { readonly before?: string; readonly limit: number; readonly search?: string }
 export interface ImageRepository {
   listAll(page: Page): Promise<RuntimeImage[]>;
   get(id: string, lock?: boolean): Promise<RuntimeImage | undefined>;
-  list(projectId: string, page: Page, includeShared?: boolean): Promise<RuntimeImage[]>;
+  list(projectId: string, page: Page, includeShared?: boolean, policy?: ProjectRuntimeImagePolicy): Promise<RuntimeImage[]>;
   insert(image: RuntimeImage): Promise<void>;
   update(image: RuntimeImage): Promise<void>;
+  grant(imageId: string, projectId: string): Promise<void>;
+  granted(imageId: string, projectId: string): Promise<boolean>;
+  grants(imageId: string): Promise<Omit<RuntimeImageGrants, 'defaultVisible'>>;
 }
 export interface RevisionRepository {
   get(id: string): Promise<ImageRevision | undefined>;

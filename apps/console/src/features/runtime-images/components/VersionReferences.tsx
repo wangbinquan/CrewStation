@@ -10,7 +10,7 @@ import { ConfirmDialog } from '../../../shared/ui/dialog/ConfirmDialog';
 import styles from './RuntimeImages.module.css';
 
 export function VersionReferences({ projectId, imageId, version, manageable }: {
-  readonly projectId: string; readonly imageId: string; readonly version: RuntimeImageVersionDto; readonly manageable: boolean;
+  readonly projectId: string | undefined; readonly imageId: string; readonly version: RuntimeImageVersionDto; readonly manageable: boolean;
 }) {
   const t = useT(), [confirming, setConfirming] = useState(false);
   const references = useApiQuery(['runtime-images', projectId, imageId, 'references', version.id], () => api.runtimeImages.references(projectId, imageId, version.id), AUTO_REFRESH);

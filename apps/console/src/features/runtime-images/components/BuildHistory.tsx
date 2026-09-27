@@ -6,9 +6,10 @@ import { Button } from '../../../shared/ui/Button';
 import { DataTable } from '../../../shared/ui/DataTable';
 import { QueryStatus } from '../../../shared/ui/QueryStatus';
 import { ActionNote } from '../../../shared/ui/ActionNote';
+import { Dialog } from '../../../shared/ui/dialog/Dialog';
 import styles from './RuntimeImages.module.css';
 
-export function BuildHistory({ projectId, imageId, editable }: { readonly projectId: string; readonly imageId: string; readonly editable: boolean }) {
+export function BuildHistory({ projectId, imageId, editable }: { readonly projectId: string | undefined; readonly imageId: string; readonly editable: boolean }) {
   const t = useT(), key = ['runtime-images', projectId, imageId, 'builds'];
   const [before, setBefore] = useState<string>(), [selected, setSelected] = useState<string>();
   const builds = useApiQuery([...key, before], () => api.runtimeImages.builds(projectId, imageId, { before, limit: 20 }), { refetchIntervalMs: 3_000 });
@@ -23,11 +24,11 @@ export function BuildHistory({ projectId, imageId, editable }: { readonly projec
     </DataTable> : null}
     {cancel.error ? <ActionNote tone="error">{errorMessage(cancel.error)}</ActionNote> : null}
     <div className={styles.row}>{before ? <Button onClick={() => setBefore(undefined)}>{t('images.first')}</Button> : null}{builds.data?.items.length === 20 ? <Button onClick={() => setBefore(builds.data!.items.at(-1)!.id)}>{t('images.next')}</Button> : null}</div>
-    {selected ? <BuildLog key={selected} projectId={projectId} imageId={imageId} buildId={selected} /> : null}
+    {selected ? <Dialog title={t('images.logs')} size="large" onClose={() => setSelected(undefined)}><BuildLog key={selected} projectId={projectId} imageId={imageId} buildId={selected} /></Dialog> : null}
   </div>;
 }
 
-function BuildLog({ projectId, imageId, buildId }: { readonly projectId: string; readonly imageId: string; readonly buildId: string }) {
+function BuildLog({ projectId, imageId, buildId }: { readonly projectId: string | undefined; readonly imageId: string; readonly buildId: string }) {
   const t = useT();
   const buffer = useRef({ after: 0, lines: [] as string[], truncated: false });
   const logs = useApiQuery(['runtime-images', projectId, imageId, 'logs', buildId], async () => {

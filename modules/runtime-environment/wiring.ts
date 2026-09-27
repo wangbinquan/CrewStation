@@ -1,4 +1,8 @@
 import { createRuntimeImageSetup } from './application/catalog/createSetup';
+import { projectImagePolicy } from './application/projectImagePolicy';
+import { projectImagePolicyRoutes } from './http/projectImagePolicyRoutes';
+import { adminRuntimeImageCatalogRoutes } from './http/adminCatalogRoutes';
+import { adminRuntimeImageVersionRoutes } from './http/adminVersionRoutes';
 import { runtimeImageExecutionHistory } from './application/catalog/executionHistory';
 import type { RuntimeImageExecutionHistory } from './ports/executionHistory';
 import { join } from 'node:path';
@@ -70,15 +74,15 @@ export interface RuntimeEnvironmentModule {
 
 export function createRuntimeEnvironmentModule(deps: RuntimeEnvironmentModuleDeps): RuntimeEnvironmentModule {
   const useCases = { ...deps, uow: runtimeImageUnitOfWork(deps.db), clock: deps.clock ?? systemClock, logger: deps.logger ?? noopLogger };
-  const api: RuntimeEnvironmentModuleApi = { name: 'runtime-environment', createSetup: createRuntimeImageSetup(useCases), imageHistory: runtimeImageExecutionHistory(useCases), reconcileReferences: runtimeImageReferenceReconciliation(useCases), ...developmentImagePolicy(useCases), ...runtimeImageValidationController(useCases, deps.validationExecutor), ...runtimeImageCatalog(useCases), ...runtimeImageBuilds(useCases), ...runtimeImageValidations(useCases), ...runtimeImageReferences(useCases), ...runtimeImageVersionLifecycle(useCases), ...runtimeImageBuildController(useCases, deps.buildExecutor) };
-  return { api, http: [developmentImageRoutes(api, deps.isAdmin), runtimeImageRoutes(api, deps.isAdmin), runtimeImageVersionRoutes(api, deps.isAdmin)], migrations: runtimeEnvironmentMigrations };
+  const api: RuntimeEnvironmentModuleApi = { name: 'runtime-environment', ...projectImagePolicy(useCases), createSetup: createRuntimeImageSetup(useCases), imageHistory: runtimeImageExecutionHistory(useCases), reconcileReferences: runtimeImageReferenceReconciliation(useCases), ...developmentImagePolicy(useCases), ...runtimeImageValidationController(useCases, deps.validationExecutor), ...runtimeImageCatalog(useCases), ...runtimeImageBuilds(useCases), ...runtimeImageValidations(useCases), ...runtimeImageReferences(useCases), ...runtimeImageVersionLifecycle(useCases), ...runtimeImageBuildController(useCases, deps.buildExecutor) };
+  return { api, http: [adminRuntimeImageCatalogRoutes(api, deps.isAdmin), adminRuntimeImageVersionRoutes(api, deps.isAdmin), projectImagePolicyRoutes(api, deps.isAdmin), developmentImageRoutes(api, deps.isAdmin), runtimeImageRoutes(api, deps.isAdmin), runtimeImageVersionRoutes(api, deps.isAdmin)], migrations: runtimeEnvironmentMigrations };
 }
 
 export interface ManagedRuntimeEnvironmentDeps extends Omit<RuntimeEnvironmentModuleDeps, 'sources' | 'buildExecutor'> {
   readonly k8s: K8sClient; readonly ledger: RuntimeBuildLedger; readonly leases: LeasePort; readonly instance: string;
   readonly credentials: RuntimeBuildCredentials; readonly sourceRepository: ImageSourceRepository; readonly bases: ImageBuildBase;
   readonly registry: RuntimeRegistryLayout; readonly builder: RuntimeImageBuilderSettings;
-  existingImageAccess(actor: Actor, projectId: string): Promise<RegistryRepositoryAccess>;
+  existingImageAccess(actor: Actor, projectId: string | undefined): Promise<RegistryRepositoryAccess>;
   buildContext(build: ImageBuild, revision: ImageRevision): Promise<{ namespace: string; slug: string; repositoryUrl: string }>;
   /** 由平台确认 builder 无法绕过仓库鉴权入口；失败时不能创建构建。 */
   assertBuildIsolation(): Promise<void>;

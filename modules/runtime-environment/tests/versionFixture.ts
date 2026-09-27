@@ -6,8 +6,8 @@ import { digest, type RuntimeImageFixture } from './runtimeImageFixture';
 /** 用途与引用用例从一个已登记版本开始；真实 builder 的验证在独立测试中进行。 */
 export async function builtVersion(f: RuntimeImageFixture): Promise<RuntimeImageVersionDto> {
   const image = await f.image(), revision = await f.revision(image.id);
-  const build = await f.api.startBuild(f.developer, f.project, image.id, { requestKey: newResourceId(), revisionId: revision.id });
-  const version: RuntimeImageVersionDto = { id: newResourceId(), projectId: f.project, imageId: image.id, revisionId: revision.id, buildId: build.id, repository: 'registry.test/project/tools', digest, architecture: 'linux/amd64', state: 'available', createdAt: build.createdAt, initializerDigest: imageContentDigest(revision.initializer), toolsDigest: imageContentDigest(revision.tools) };
+  const build = await f.api.startBuild(f.admin, f.project, image.id, { requestKey: newResourceId(), revisionId: revision.id });
+  const version: RuntimeImageVersionDto = { id: newResourceId(), imageId: image.id, revisionId: revision.id, buildId: build.id, repository: 'registry.test/project/tools', digest, architecture: 'linux/amd64', state: 'available', createdAt: build.createdAt, initializerDigest: imageContentDigest(revision.initializer), toolsDigest: imageContentDigest(revision.tools) };
   await f.uow.run(async (s) => { await s.versions.insert(version); await s.builds.update({ ...(await s.builds.get(build.id))!, state: 'succeeded', versionId: version.id }); });
   return version;
 }

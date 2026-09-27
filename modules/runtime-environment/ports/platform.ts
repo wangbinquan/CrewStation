@@ -6,7 +6,7 @@ export interface RuntimeImageAuthorizer {
 export interface PreparedImageSource { readonly source: RuntimeImageSource; readonly commitSha?: string; readonly baseImage?: string }
 /** 核对 SCM／registry 归属并固定 SHA／digest；不接收用户传来的任意 URL 或凭据值。 */
 export interface RuntimeImageSourceResolver {
-  prepare(actor: Actor, projectId: string, source: RuntimeImageSource): Promise<PreparedImageSource>;
+  prepare(actor: Actor, projectId: string | undefined, source: RuntimeImageSource): Promise<PreparedImageSource>;
 }
 /** 包含平台 Runner／协议版本以及精确档位内容和凭据戳；只返回摘要，不存模型凭据。 */
 export interface RuntimeImageValidationContracts {

@@ -10,8 +10,8 @@ afterEach(async () => { for (const f of fixtures.splice(0)) await f.tdb.drop(); 
 async function setup() {
   const driver = buildExecutorFixture(), f = await runtimeImageFixture(driver.executor); fixtures.push(f);
   const image = await f.image(), revision = await f.revision(image.id);
-  const build = await f.api.startBuild(f.developer, f.project, image.id, { revisionId: revision.id, requestKey: 'build' });
-  return { f, driver, image, build, read: () => f.api.getBuild(f.developer, f.project, image.id, build.id) };
+  const build = await f.api.startBuild(f.admin, f.project, image.id, { revisionId: revision.id, requestKey: 'build' });
+  return { f, driver, image, build, read: () => f.api.getBuild(f.admin, f.project, image.id, build.id) };
 }
 async function untilCalled(calls: string[], length: number) {
   for (let attempt = 0; attempt < 100 && calls.length < length; attempt++) await Bun.sleep(1);
@@ -44,7 +44,7 @@ describe.skipIf(!available)('构建控制器恢复、物理停止与可信产物
     driver.state('succeeded'); driver.block();
     const oldWorker = f.api.runBuild(build.id);
     await untilCalled(driver.calls, 1);
-    await f.api.cancelBuild(f.developer, f.project, image.id, build.id, 'cancel');
+    await f.api.cancelBuild(f.admin, f.project, image.id, build.id, 'cancel');
     driver.unblock(); await oldWorker;
     expect(driver.calls).not.toContain('inspect');
     await f.api.runBuild(build.id);
@@ -92,11 +92,11 @@ describe.skipIf(!available)('构建控制器恢复、物理停止与可信产物
 
   test('登记已有镜像只检查固定产物，不创建虚假构建资源', async () => {
     const driver = buildExecutorFixture(), f = await runtimeImageFixture(driver.executor); fixtures.push(f);
-    const image = await f.image(), revision = await f.api.createRevision(f.developer, f.project, image.id, CreateRuntimeImageRevisionSchema.parse({ source: { kind: 'existing', reference: 'registry.test/project/tools:v1', architecture: 'linux/amd64', usage: 'service' } }));
-    const build = await f.api.startBuild(f.developer, f.project, image.id, { revisionId: revision.id, requestKey: 'import' });
+    const image = await f.image(), revision = await f.api.createRevision(f.admin, f.project, image.id, CreateRuntimeImageRevisionSchema.parse({ source: { kind: 'existing', reference: 'registry.test/project/tools:v1', architecture: 'linux/amd64', usage: 'service' } }));
+    const build = await f.api.startBuild(f.admin, f.project, image.id, { revisionId: revision.id, requestKey: 'import' });
     await f.api.runBuild(build.id);
     expect(driver.calls).toEqual(['inspect']);
-    expect(await f.api.getBuild(f.developer, f.project, image.id, build.id)).toMatchObject({ state: 'succeeded' });
+    expect(await f.api.getBuild(f.admin, f.project, image.id, build.id)).toMatchObject({ state: 'succeeded' });
     expect(await f.api.listVersions(f.developer, f.project, image.id, { limit: 10 })).toHaveLength(1);
   });
 });

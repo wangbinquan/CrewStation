@@ -39,6 +39,5 @@ export function runtimeImageRoutes(api: RuntimeEnvironmentModuleApi, isAdmin: (i
     const p = parseParams(c, buildParams), result = await api.buildLogs(await actor(c), p.projectId, p.id, p.buildId, parseQuery(c, RuntimeImageLogQuerySchema));
     return result.expired ? c.json({ error: 'logs_expired', message: '构建日志已过保留期', expiresAt: result.expiresAt }, 410) : c.json(result);
   });
-  r.get('/v1/admin/runtime-image-catalog', async (c) => { c.header('Cache-Control', 'no-store'); return c.json({ items: await api.adminCatalog(await actor(c), parseQuery(c, RuntimeImagePageQuerySchema)) }); });
   return r;
 }

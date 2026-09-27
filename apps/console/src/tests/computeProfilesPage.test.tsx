@@ -30,10 +30,17 @@ async function clickIn(scope: ParentNode, label: string) {
   if (!target) throw new Error(`「${label}」不在：${(scope as HTMLElement).textContent}`);
   await act(async () => target.click()); await page!.settle();
 }
+async function closeTop() {
+  await act(async () => openDialog().dispatchEvent(new Event('cancel', { cancelable: true })));
+  await page!.settle();
+}
 async function actions(name: string) {
+  const current = [...document.querySelectorAll('dialog[open]')].at(-1);
+  if (current?.querySelector('h2')?.textContent === `${name} 的更多操作`) return current;
+  if (current) await closeTop();
   const trigger = buttonIn(row(name), '更多操作')!;
-  if (trigger.getAttribute('aria-expanded') !== 'true') await clickIn(row(name), '更多操作');
-  return document.getElementById(trigger.getAttribute('aria-controls')!)!;
+  trigger.focus(); await clickIn(row(name), '更多操作');
+  return openDialog();
 }
 /** happy-dom 下 React 走 input 事件 polyfill：绕过值跟踪器写值，再以 keyup 触发 onChange。 */
 async function type(input: HTMLInputElement, value: string) {
@@ -42,14 +49,17 @@ async function type(input: HTMLInputElement, value: string) {
 }
 
 describe('算力档位列表（RFC-006）', () => {
-  test('一张表就是全部：没有运行环境页签，四列保留关键状态，详细配置可以展开', async () => {
+  test('一张表就是全部：没有运行环境页签，五列保留关键状态，详细配置进入弹窗', async () => {
     await open();
     const text = page!.text();
     expect(document.querySelectorAll('[role="tab"]')).toHaveLength(0);
     expect(text).not.toContain('运行环境');
     for (const header of ['档位', '执行配置', '状态', '操作']) expect([...document.querySelectorAll('th')].map((th) => th.textContent)).toContain(header);
     const claude = row('claude-daily').textContent!;
-    for (const part of ['默认', 'Claude Code 协议', 'registry.cs.local/runtimes/claude:2.1', '@ab12cd34ef56', '/usr/local/bin/claude', 'anthropic/claude-sonnet-5', '平台默认任务套餐', '可用', '测试通过', '修订 1', '王管理']) expect(claude).toContain(part);
+    for (const part of ['默认', 'Claude Code 协议', 'anthropic/claude-sonnet-5', '平台默认任务套餐', '可用', '测试通过', '修订 1']) expect(claude).toContain(part);
+    const detail = await actions('claude-daily');
+    for (const part of ['registry.cs.local/runtimes/claude:2.1', 'ab12cd34ef56', '/usr/local/bin/claude', '王管理']) expect(detail.textContent).toContain(part);
+    await closeTop();
     const opencode = row('opencode-lite').textContent!;
     for (const part of ['OpenCode 协议', '二进制自带默认', 'cli-large', '测试失败', '最近一次测试失败：缺少鉴权', '缺少鉴权', '修订 3']) expect(opencode).toContain(part);
     const terminal = row('aider-shell').textContent!;
@@ -81,7 +91,7 @@ describe('算力档位列表（RFC-006）', () => {
     expect(dialogConfirmButton().disabled).toBe(true); expect(backend!.writes).toEqual([]);
     await typeConfirmWord('delete'); await clickIn(openDialog(), '确认删除');
     expect(backend!.writes).toEqual([{ method: 'DELETE', path: `/v1/admin/compute-profiles/${profileIdOf('opencode-lite')}`, query: '', body: {} }]);
-    expect(document.querySelectorAll('dialog').length).toBe(0);
+    expect(document.querySelectorAll('dialog[open]').length).toBe(1);
     expect((await actions('opencode-lite')).textContent).toContain('这些项目的授权或当前上线版本引用了这个档位：crm-bot、hr-helper');
     await clickIn(await actions('opencode-lite'), '仍然删除');
     // 弹窗里仍列着引用的项目；请求发出后错误清空，这份清单不能跟着消失。
@@ -163,58 +173,56 @@ describe('复制档位与推送凭据（RFC-006）', () => {
   });
 });
 
-test('更多操作独立占整行；复制弹窗关窗与收起都保留草稿、清空回到默认名，Escape 返回触发按钮并撤销待确认操作', async () => {
+test('末行管理在统一弹窗中；复制草稿保留，嵌套 Escape 只关闭顶层并恢复焦点', async () => {
   await open();
-  const target = row('opencode-lite'), trigger = buttonIn(target, '更多操作')!;
-  expect(trigger.getAttribute('aria-expanded')).toBe('false');
-  expect(buttonIn(target, '复制')).toBeUndefined();
-  const panel = await actions('opencode-lite');
-  // 曾把展开内容与编辑按钮放在同一个 flex 行里，编辑被拉伸、确认和复制表单挤在窄操作列。
-  expect(panel.closest('tr')).not.toBe(target);
-  expect(panel.closest('td')?.colSpan).toBe(4);
-  expect(panel.getAttribute('aria-label')).toContain('opencode-lite');
-  expect(trigger.getAttribute('aria-expanded')).toBe('true');
-  // 表格行里的动作是紧凑档（2026-09-23 按钮统一）；删除红字红框。
-  for (const label of ['编辑', '更多操作']) expect(buttonIn(target, label)!.className.split(' ')).toContain('small');
-  for (const label of ['复制', '设为默认', '停用', '删除']) expect(buttonIn(panel, label)!.className.split(' ')).toContain('small');
-  expect(buttonIn(panel, '删除')!.className.split(' ')).toContain('danger');
+  const target = row('claude-paused'), trigger = buttonIn(target, '更多操作')!;
+  expect(trigger.getAttribute('aria-haspopup')).toBe('dialog');
+  const count = document.querySelectorAll('tbody tr').length;
+  const panel = await actions('claude-paused');
+  expect(panel.closest('table')).toBeNull();
+  expect(document.querySelectorAll('tbody tr').length).toBe(count);
   await clickIn(panel, '复制');
   await type(openDialog().querySelector<HTMLInputElement>('input')!, 'my-profile-copy');
   await clickIn(openDialog(), '取消');
-  expect(document.querySelectorAll('dialog').length).toBe(0);
-  await clickIn(target, '更多操作');
-  expect(document.getElementById(trigger.getAttribute('aria-controls')!)).toBeNull();
-  const reopened = await actions('opencode-lite');
+  expect(document.querySelectorAll('dialog[open]').length).toBe(1);
+  await closeTop(); expect(document.activeElement === trigger).toBe(true);
+  const reopened = await actions('claude-paused');
   await clickIn(reopened, '复制');
   expect(openDialog().querySelector<HTMLInputElement>('input')!.value).toBe('my-profile-copy');
   await clickIn(openDialog(), '清空');
-  expect(openDialog().querySelector<HTMLInputElement>('input')!.value).toBe('opencode-lite-copy');
+  expect(openDialog().querySelector<HTMLInputElement>('input')!.value).toBe('claude-paused-copy');
   await clickIn(openDialog(), '取消');
-  // 鼠标点按钮会先让它获得焦点；程序化 click 不会，所以先聚焦再点。
-  const remove = buttonIn(reopened, '删除')!; remove.focus(); await act(async () => remove.click()); await page!.settle();
-  // 弹窗里的 Esc 只关弹窗，不连带收起操作面板；焦点回到「删除」。
-  const dialog = openDialog();
-  await act(async () => { dialog.querySelector('input')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); dialog.dispatchEvent(new Event('cancel', { cancelable: true })); });
-  await page!.settle();
-  expect(document.querySelectorAll('dialog').length).toBe(0);
-  expect(trigger.getAttribute('aria-expanded')).toBe('true');
+  const remove = buttonIn(reopened, '删除')!; remove.focus(); await clickIn(reopened, '删除');
+  await closeTop();
+  expect(document.querySelectorAll('dialog[open]').length).toBe(1);
   expect(document.activeElement === remove).toBe(true);
-  await act(async () => reopened.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
-  expect(trigger.getAttribute('aria-expanded')).toBe('false');
-  expect(document.activeElement).toBe(trigger);
+  await closeTop();
+  expect(document.querySelectorAll('dialog[open]').length).toBe(0);
+  expect(document.activeElement === trigger).toBe(true);
   expect(backend!.writes).toEqual([]);
 });
 
-
 test('档位可按名称和模型搜索；无匹配可以清除，查询不修改档位', async () => {
   await open();
-  await type(document.querySelector<HTMLInputElement>('input[type="search"]')!, 'OPENCODE');
+  await type(document.querySelector<HTMLInputElement>('input[type="search"]')!, 'OPENCODE'); await page!.click('搜索');
   expect(row('opencode-lite')).toBeDefined(); expect(row('claude-daily')).toBeUndefined();
-  await type(document.querySelector<HTMLInputElement>('input[type="search"]')!, 'no-profile');
+  await type(document.querySelector<HTMLInputElement>('input[type="search"]')!, 'no-profile'); await page!.click('搜索');
   expect(page!.text()).toContain('没有匹配的档位');
   await page!.click('清除搜索'); expect(row('claude-daily')).toBeDefined();
-  const details = row('claude-daily').querySelector('details')!;
-  await act(async () => details.querySelector('summary')!.click());
-  expect(details.open).toBe(true); expect(details.textContent).toContain('/usr/local/bin/claude');
+  expect((await actions('claude-daily')).textContent).toContain('/usr/local/bin/claude');
+  expect(backend!.writes).toEqual([]);
+});
+
+test('从末行编辑返回保留列表查询、滚动位置和编辑按钮焦点', async () => {
+  await open(Array.from({ length: 30 }, (_,index) => profileDetail({ name: `claude-${index}` })));
+  await type(document.querySelector<HTMLInputElement>('input[type="search"]')!, 'claude'); await page!.click('搜索');
+  const main = document.querySelector('main')!; main.scrollTop = 740;
+  await clickIn(row('claude-29'), '编辑');
+  expect(page!.search().q).toBe('claude');
+  await page!.click('返回列表');
+  await act(async () => { await new Promise((resolve) => requestAnimationFrame(resolve)); });
+  expect(main.scrollTop).toBe(740);
+  expect(document.activeElement?.closest('tr')?.getAttribute('data-profile-id')).toBe(profileIdOf('claude-29'));
+  expect(page!.search()).toEqual({ q: 'claude' });
   expect(backend!.writes).toEqual([]);
 });

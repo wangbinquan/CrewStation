@@ -29,6 +29,7 @@ describe.skipIf(!available)('RFC-028 业务 Agent 独立镜像', () => {
     expect(view.runtimeImage).toMatchObject({ versionId: f.explicitVersion, selectionSource: 'request' });
     expect(f.inputs[0]!.runtimeImage).toEqual(view.runtimeImage);
     expect(view.image).toBe(f.inputs[0]!.image);
+    expect(f.reservations[0]![2]).toEqual({ runtimeImageVersionId: f.defaultVersion, allowedRuntimeImageVersionIds: [f.explicitVersion] });
     expect(f.reservations[0]!.slice(3)).toEqual([{ profileId: f.computeId, revision: 3 }, f.explicitVersion]);
     expect(f.order).toEqual([`confirm:${f.inputs[0]!.id}`, `create:${f.inputs[0]!.id}`]);
     expect((await f.make().request(f.path, body)).status).toBe(202); expect(f.reservations).toHaveLength(1);

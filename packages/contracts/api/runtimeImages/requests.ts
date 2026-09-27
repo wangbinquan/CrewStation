@@ -22,11 +22,13 @@ export const RuntimeImageSourceSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('existing'), reference: z.string().trim().min(1).max(512), architecture: RuntimeImageArchitectureSchema, usage: RuntimeImageUsageSchema }).strict(),
 ]);
 
-export const CreateRuntimeImageRequestSchema = z.object({ name: z.string().trim().min(1).max(80), description: z.string().max(1000).default('') }).strict();
+export const CreateRuntimeImageRequestSchema = z.object({ name: z.string().trim().min(1).max(80), description: z.string().max(1000).default(''), defaultVisible: z.boolean().optional() }).strict();
 export const UpdateRuntimeImageRequestSchema = z.object({
-  expectedRevision: z.number().int().positive(), name: z.string().trim().min(1).max(80).optional(), description: z.string().max(1000).optional(), enabled: z.boolean().optional(),
+  expectedRevision: z.number().int().positive(), name: z.string().trim().min(1).max(80).optional(), description: z.string().max(1000).optional(), enabled: z.boolean().optional(), defaultVisible: z.boolean().optional(),
 }).strict();
 export const CreateRuntimeImageRevisionSchema = z.object({
+  /** 构建源码／凭据的来源，不是镜像所有者。登记已有镜像时不必设置。 */
+  sourceProjectId: ResourceIdSchema.optional(),
   source: RuntimeImageSourceSchema,
   initializer: RuntimeImageInitializerSchema.default({ steps: [], env: {}, secrets: [] }),
   tools: z.array(RuntimeImageToolCheckSchema).max(64).default([]),
@@ -35,7 +37,7 @@ export const CreateRuntimeImageRevisionSchema = z.object({
 export const StartRuntimeImageBuildSchema = z.object({ revisionId: ResourceIdSchema, requestKey: RuntimeImageRequestKeySchema }).strict();
 export const CancelRuntimeImageOperationSchema = z.object({ requestKey: RuntimeImageRequestKeySchema }).strict();
 export const StartImageValidationSchema = z.object({ requestKey: RuntimeImageRequestKeySchema, target: RuntimeImageValidationTargetSchema }).strict();
-export const RuntimeImagePageQuerySchema = z.object({ before: ResourceIdSchema.optional(), limit: z.coerce.number().int().min(1).max(100).default(30) }).strict();
+export const RuntimeImagePageQuerySchema = z.object({ before: ResourceIdSchema.optional(), limit: z.coerce.number().int().min(1).max(100).default(30), search: z.string().trim().max(200).optional() }).strict();
 export const RuntimeImageLogQuerySchema = z.object({ after: z.coerce.number().int().min(0).default(0), limit: z.coerce.number().int().min(1).max(200).default(100) }).strict();
 export const SaveDevelopmentRuntimeImagesSchema = z.object({
   expectedRevision: z.number().int().min(0), developmentTask: RuntimeImageSelectionSchema,

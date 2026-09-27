@@ -5,6 +5,7 @@ import { imageContentDigest } from '../domain/contentDigest';
 import type { ImageValidation } from '../domain/records';
 import type { RuntimeImageDeps } from './dependencies';
 import { compatibilityEvidence, requireAvailable, versionAccess, versionLock } from './compatibility';
+import { catalogAdmin } from './access';
 
 export function runtimeImageValidations(deps: RuntimeImageDeps) {
   return {
@@ -34,30 +35,30 @@ export function runtimeImageValidations(deps: RuntimeImageDeps) {
         return RuntimeImageValidationDtoSchema.parse(record);
       });
     },
-    cancelValidation: async (actor: Actor, projectId: string, versionId: string, validationId: string, requestKey: string) => {
+    cancelValidation: async (actor: Actor, projectId: string | undefined, versionId: string, validationId: string, requestKey: string) => {
       CancelRuntimeImageOperationSchema.parse({ requestKey });
-      await deps.authorizer.authorize(actor, projectId, 'develop');
+      if (projectId) await deps.authorizer.authorize(actor, projectId, 'develop'); else catalogAdmin(actor);
       await versionAccess(deps, actor, projectId, versionId);
       return deps.uow.run(async (s) => {
         const record = await s.validations.get(validationId, true);
-        if (!record || record.versionId !== versionId || record.projectId !== projectId) throw notFound('镜像用途验证', validationId);
+        if (!record || record.versionId !== versionId || projectId !== undefined && record.projectId !== projectId) throw notFound('镜像用途验证', validationId);
         if (record.cancelRequestKey && record.cancelRequestKey !== requestKey) throw conflict('验证已由其他取消请求处理');
         if (!['queued', 'running', 'cancelling'].includes(record.state)) return RuntimeImageValidationDtoSchema.parse(record);
         const next = { ...record, state: 'cancelling' as const, cancelRequestKey: requestKey, updatedAt: deps.clock.now().toISOString() };
         await s.validations.update(next); return RuntimeImageValidationDtoSchema.parse(next);
       });
     },
-    getValidation: async (actor: Actor, projectId: string, versionId: string, validationId: string) => {
-      await deps.authorizer.authorize(actor, projectId, 'develop');
+    getValidation: async (actor: Actor, projectId: string | undefined, versionId: string, validationId: string) => {
+      if (projectId) await deps.authorizer.authorize(actor, projectId, 'develop'); else catalogAdmin(actor);
       await versionAccess(deps, actor, projectId, versionId);
       const result = await deps.uow.read.validations.get(validationId);
-      if (!result || result.versionId !== versionId || result.projectId !== projectId) throw notFound('镜像用途验证', validationId);
+      if (!result || result.versionId !== versionId || projectId !== undefined && result.projectId !== projectId) throw notFound('镜像用途验证', validationId);
       return RuntimeImageValidationDtoSchema.parse(result);
     },
-    listValidations: async (actor: Actor, projectId: string, versionId: string) => {
-      await deps.authorizer.authorize(actor, projectId, 'develop');
+    listValidations: async (actor: Actor, projectId: string | undefined, versionId: string) => {
+      if (projectId) await deps.authorizer.authorize(actor, projectId, 'develop'); else catalogAdmin(actor);
       await versionAccess(deps, actor, projectId, versionId);
-      return (await deps.uow.read.validations.list(versionId)).filter((v) => v.projectId === projectId).map((v) => RuntimeImageValidationDtoSchema.parse(v));
+      return (await deps.uow.read.validations.list(versionId)).filter((v) => projectId === undefined || v.projectId === projectId).map((v) => RuntimeImageValidationDtoSchema.parse(v));
     },
   };
 }

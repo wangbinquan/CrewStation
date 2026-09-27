@@ -12,7 +12,7 @@ export function environmentImageHistory(db: Executor) {
     const rows = await db.select({ id: environments.id, projectId: environments.projectId, serviceId: environments.serviceId,
       versionId: version, kind: environments.kind, state: environments.state, native: environments.native,
       traceId: environments.traceId, message: environments.message, createdAt: environments.createdAt, updatedAt: environments.updatedAt,
-    }).from(environments).where(and(eq(environments.projectId, input.projectId), inArray(version, input.versionIds),
+    }).from(environments).where(and(input.projectId ? eq(environments.projectId, input.projectId) : undefined, inArray(version, input.versionIds),
       sql`${environments.kind} <> 'profile-test'`, input.before ? lt(environments.id, input.before) : undefined,
     )).orderBy(desc(environments.id)).limit(input.limit);
     return rows.map((row) => ({ id: row.id, projectId: row.projectId, serviceId: row.serviceId, versionId: row.versionId,

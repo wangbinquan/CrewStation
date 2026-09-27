@@ -19,11 +19,11 @@ export function ProjectSettingsPage() {
   const search = parseSettingsSearch(useSearch({ strict: false }));
   const tabs = SETTINGS_TABS.filter((tab) => space !== 'admin' || tab !== 'visibility');
   const tab = tabs.find((value) => value === search.tab) ?? 'config';
-  const change = (next: SettingsSearch) => { void navigate({ to: PROJECT_PATHS[space].settings, params: { projectId }, search: next }); };
+  const change = (next: SettingsSearch) => { void navigate({ to: PROJECT_PATHS[space].settings, params: { projectId }, search: next, resetScroll: false }); };
   return <div className={styles.page}>
     <PageHeader title={t('nav.settings')} description={t('settings.description')} />
     <SectionNavigation label={t('settings.groups')} value={tab} items={tabs.map((value) => ({ value, label: t(`settings.tab.${value}`), description: t(`settings.hint.${value}`) }))} onChange={(value) => change({ tab: value as SettingsTab })}>
-      {tab === 'runtime-images' ? <RuntimeImagesPage key={projectId} selectedImage={search.image} onSelectImage={(image) => change({ tab: 'runtime-images', image })} /> : null}
+      {tab === 'runtime-images' ? <RuntimeImagesPage key={projectId} selectedImage={search.image} onSelectImage={(image) => change({ ...search, tab: 'runtime-images', image })} search={search.imageQuery} onSearch={(imageQuery) => change({ ...search, imageQuery, imageBefore: undefined })} cursor={search.imageBefore} onPage={(imageBefore) => change({ ...search, imageBefore })} /> : null}
       {tab === 'visibility' ? <AppVisibilityPage key={projectId} embedded /> : null}
       {tab === 'config' ? <ConfigPage key={projectId} env={search.env ?? 'development'} onEnvironmentChange={(env) => change({ tab, env })} /> : null}
       {tab === 'members' || tab === 'advanced' ? <ProjectSettingsSection key={`${projectId}:${tab}`} section={tab === 'advanced' ? 'lifecycle' : 'members'} /> : null}

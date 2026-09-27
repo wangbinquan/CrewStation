@@ -55,7 +55,8 @@ export async function prepareAgentPlan(deps: BusinessExecutionDeps, parent: Exec
   const command = await agentCommand(deps, plan, launch.beforeStart.secrets);
   if (input.runtimeImageVersionId || profile.runtimeImageVersionId) {
     if (!deps.runtimeImages?.reserveAgent) throw precondition('未启用业务 Agent 运行镜像选择', { code: 'unsupported_capability' });
-    plan.runtimeImage = await deps.runtimeImages.reserveAgent(projectId, runtimeTaskId, profile, { profileId: resolved.id, revision: resolved.revision }, input.runtimeImageVersionId);
+    const selection = { ...(profile.runtimeImageVersionId ? { runtimeImageVersionId: profile.runtimeImageVersionId } : {}), ...(profile.allowedRuntimeImageVersionIds ? { allowedRuntimeImageVersionIds: profile.allowedRuntimeImageVersionIds } : {}) };
+    plan.runtimeImage = await deps.runtimeImages.reserveAgent(projectId, runtimeTaskId, selection, { profileId: resolved.id, revision: resolved.revision }, input.runtimeImageVersionId);
     if (!plan.runtimeImage) throw precondition('业务 Agent 运行镜像选择未返回固定快照', { code: 'unsupported_capability' });
   }
   return { plan, payloadDigest: agentPayloadDigest(command, plan.nonce), view: { ...view, image: plan.runtimeImage?.image ?? resolved.image, agentProfileId: profile.id, computeProfileId: resolved.id, profileRevision: resolved.revision, ...(plan.runtimeImage ? { runtimeImage: plan.runtimeImage } : {}), ...(stored ? { materialDigest: stored.view.digest } : {}) } };

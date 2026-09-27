@@ -49,12 +49,12 @@ export function runtimeImageUseCases(deps: Pick<AgentRuntimeUseCaseDeps, 'regist
       deps.logger.info('registry push credential issued', { userId: actor.userId, expiresAt: new Date(exp * 1000).toISOString() });
       return { pushHost: layout.pushHost, username: actor.userId, password: signGrant(grant, settings.signingKey), expiresAt: new Date(exp * 1000).toISOString(), pushPrefixes, pullPrefixes };
     },
-    issueBuildPushCredential: async (input: { projectId: string; buildId: string; expiresAt: string; pullRepositories: readonly string[] }): Promise<RegistryPushCredential> => {
-      ResourceIdSchema.parse(input.projectId); ResourceIdSchema.parse(input.buildId);
+    issueBuildPushCredential: async (input: { projectId?: string; buildId: string; expiresAt: string; pullRepositories: readonly string[] }): Promise<RegistryPushCredential> => {
+      if (input.projectId !== undefined) ResourceIdSchema.parse(input.projectId); ResourceIdSchema.parse(input.buildId);
       const now = Math.floor(clock.now().getTime() / 1000), exp = Math.floor(Date.parse(input.expiresAt) / 1000);
       if (!Number.isSafeInteger(exp) || exp <= now || exp > now + 7200) throw validation('镜像构建推送凭据有效期必须在 2 小时内');
       if (input.pullRepositories.length > 32 || input.pullRepositories.some((path) => !/^[a-z0-9]+(?:[._-][a-z0-9]+)*(?:\/[a-z0-9]+(?:[._-][a-z0-9]+)*)*\/?$/.test(path))) throw validation('构建镜像拉取范围不合法');
-      const push = [`runtime/projects/${input.projectId}/${input.buildId}/`], pull = [...new Set(input.pullRepositories)];
+      const push = [input.projectId ? `runtime/projects/${input.projectId}/${input.buildId}/` : `runtime/platform/${input.buildId}/`], pull = [...new Set(input.pullRepositories)];
       const grant: PushGrant = { sub: input.buildId, exp, push, pull };
       deps.logger.info('image build push credential issued', { projectId: input.projectId, buildId: input.buildId, expiresAt: input.expiresAt });
       return { pushHost: layout.pushHost, username: input.buildId, password: signGrant(grant, settings.signingKey), expiresAt: new Date(exp * 1000).toISOString(), pushPrefixes: push, pullPrefixes: pull };

@@ -251,3 +251,80 @@ TLS修复后的整平台构建已成功：`01a0e245-2543-7000-baf3-84967051278a`
 - 实际 Chrome，实际组件＋HTTP 替身，30任务末行＋20诊断记录：中英文、明暗、320／390／1440，12组；另项目／平台镜像详情2页。弹窗在视口内、正文内部滚动、嵌套确认Esc只关顶层、关闭恢复末行焦点和原滚动位置，零控制台错误。证据 `/tmp/cs-detail-dialog-browser.json`，截图 `/tmp/cs-task-detail-{lang}-{theme}-{width}.png`。验收临时入口已删除，Vite已停止。尚非部署后的页面证据。
 - 持久约束写入 AGENTS.md、开发规则 §7、testing.md，包含长列表末行用例要求。
 - 运行镜像平台归属／业务授权按 `platform-catalog-amendment.md` 继续实施；本批弹窗修复不代表授权模型已完成。
+
+## 2026-09-27 弹窗最终部署与统一能力界面在制批
+
+弹窗18路径已经提交推送为 `33ec331399d87eacf7e36d1d4f1fed342474bba7`，精确SHA CI六作业全部成功（run `36315539477`）。console镜像`cs-console:dialogs-33ec3313`，实际imageID `sha256:1a61c2c11a7b26339eb6d02765f86547f78e56d2539734e64bf12fdf990ec951`，Ready1／restarts0。后续部署验收真实API任务详情12组及镜像嵌套Esc／焦点恢复成功，零业务写入、零浏览器错误。交付回执 `/tmp/cs-detail-dialog-delivery.json` 和 `/tmp/cs-detail-dialog-live.json`，覆盖上一节的“尚非部署证据”。
+
+新授权批尚未提交／部署：运行镜像列表与算力档位共同使用 `CapabilityCatalog.module.css`，列表密度、状态／操作区、窄屏卡片布局统一。业务资源页运行镜像授权与算力授权并列，用同一多选CSS和Card／Stack／ActionRow；明确继承／指定范围、空集合禁止、保存后修订更新、冲突保留草稿、统一丢弃确认。后端0004迁移保存业务镜像策略；直接版本读取和新准入均校验有效范围，分页前过滤；与策略写入同锁，已接受快照回执及原引用恢复保持。
+
+- 先红确认策略HTTP入口缺失、策略方法未接线；真实PG＋客户端最终20/0（128断言），包含非管理员拒绝、非法／重复ID、空集合、分页、直传版本绕过拒绝、并发CAS与撤销后新准入／原引用差别。
+- console定向组合28/0（127断言）；具名选择、空集合、身份变化、读取失败、冲突、取消丢弃及跨100条目录页选择均覆盖。
+- 真实Chrome，实际组件＋HTTP替身，目录／授权×中英文×明暗×320／390／1440共24组通过；样式类／字号相同、无文档横溢出、窄屏布局在视口内、丢弃弹窗Esc保留草稿，零浏览器错误。证据 `/tmp/cs-capability-browser.json`、`/tmp/cs-capability-{catalog,grants}-{lang}-{theme}-{width}.png`；临时预览入口和服务已清理。
+- 本批还保留原项目所有权与平台新增所属项目步骤，继承策略兼容旧可见范围；仅为平台归属迁移的先行授权基础，不代表作者最新目标完成。禁止将它单独描述为平台目录已整改。平台目录／版本归属、源码来源与构建资源分离、全局管理接口、业务只读入口、授权业务与全局历史仍需继续。
+
+本在制批最终全仓 `check:static` 与 console 生产构建通过（`/tmp/cs-capability-final-static.log`、`/tmp/cs-capability-final-build.log`）。这不替代后续平台归属迁移完成后的整体验证；当前未提交部署。
+
+## 2026-09-27 平台归属与统一目录候选
+
+本节替代上一节“仍保留项目所有权”的在制状态，尚未提交或部署。0005 移除 images／versions 项目归属；旧私有镜像只保留原业务授权，shared 转默认开放，旧 ID／digest／引用不变。配方保留源码业务及初始化凭据边界；旧构建保留原资源计划，新构建使用平台命名空间、独立 registry 前缀和平台额度。0005 尚未发布、仅在已清理的隔离测试库执行；为修正架构扫描对 SQL 别名的误判，将本次新迁移改成等价相关子查询，并手工更新其未发布锁摘要，旧迁移未改。
+
+平台管理路径扩展 `/v1/admin/runtime-image-catalog`；新增不要求所属项目，已有镜像登记无需来源业务，源码构建才选择具名来源业务。业务页没有新增／编辑入口；业务写 API 不能靠 develop 权限绕过平台管理。默认范围、业务受限策略、旧授权保留共同计算有效范围。详情显示授权业务与资源配置链接、全局实际执行历史；业务历史和引用详情强制本业务。验证依然明确选消费业务，使用其授权、凭据和额度。
+
+镜像与算力共用目录样式、搜索、新增位置及窄屏结构。版本用途／历史和构建日志统一使用嵌套 Dialog，不在列表后追加。管理表单可保留草稿，新增重试继续原请求，业务授权修改保持 OCC。
+
+- 镜像模块与关联 PG／API 客户端／算力凭据组 71 pass、1 skip、0 fail，482 assertions（21文件）；唯一 skip 为未配置真实 registry 地址的专项，不能作为真实构建证据。`/tmp/cs-platform-catalog-suite.log`。
+- 新平台 API／授权／迁移专项 7/0，68 assertions；升级用例核对旧私有与共享范围、初始化 Secret 来源、旧构建现场、创建请求命名空间、版本摘要和执行引用。`/tmp/cs-platform-catalog-newtests.log`。
+- console 原组合27/0、124 assertions，新增平台新增／业务只读／授权入口／三层验证弹窗后工作流10/0、51 assertions。`/tmp/cs-platform-console-tests.log`、`/tmp/cs-platform-workflow-newtests.log`。
+- 平台端口／持久执行历史／构建台账补测通过，`/tmp/cs-platform-image-ports.log`。首次全仓 static 通过；候选后续增加授权锁后二次校验和业务引用隔离，仍需最终门禁、行覆盖、浏览器验收与部署实测。
+- 最终实际Chrome组件＋HTTP替身12组（中英文／明暗／320、390、1440）全部通过，零浏览器错误；同目录样式、视口边界、不要求所属项目、业务授权资源入口、三层弹窗逐层Esc和焦点恢复均核对。证据 `/tmp/cs-platform-image-browser.json` 和 `/tmp/cs-platform-catalog-{lang}-{theme}-{width}.png`。前期脚本在异步详情加载时点击错位，改为等待真实数据与稳定布局后通过；临时预览及服务已清理。生产build通过，`/tmp/cs-platform-image-build.log`。完整本地门禁执行中，不能视为已经发布。
+- 最终候选定向覆盖组108 pass／1 skip／0 fail、676 assertions；算力与业务资源补充14/0、140 assertions，双语键对账通过。96路径候选，64个生产文件新增可执行行563/565＝99.646%，violations=[]。报告 `/tmp/cs-platform-image-patch.json`，代码快照 `/tmp/cs-platform-image-candidate.json`，路径 `/tmp/cs-platform-image-paths.txt`；包括本会话所有平台归属、授权、界面与迁移改动，不包含并发市场实现和共享Dialog修复。
+- 全仓静态与生产build已绿。一次完整 `CS_TEST_REQUIRE=database bun run check` 使用默认密码模式，当前本机只开放OIDC，实机用例落在登录页导致失败；原门禁继续至终态，不重跑整个门禁。用既有已授权dev-admin、`CS_E2E_AUTH=dev-oidc`、CDP9368定向重验两个失败文件为28 pass／2 skip／1 fail、107 assertions；剩余是当前部署拓扑清单未含查询所得Pod UID，与平台镜像候选无代码重合，不修改该用例或用户资源来制造绿。日志 `/tmp/cs-platform-image-full-check.log`、`/tmp/cs-platform-image-e2e-auth-recheck.log`。此证据是旧部署的环境排查，不是新镜像模型部署验收。
+- 正确OIDC登录补查6个布局文件为34 pass／1 fail、329 assertions（`/tmp/cs-platform-image-e2e-layout-recheck.log`）。算力相关布局、集群布局与紧凑表格、外壳滚动、平台设置均通过；剩余成员角色旧断言从main读取文字，而角色已在统一Dialog中，未改无关测试。已有本任务工具与服务镜像的验证状态仍为passed（只读复核），不将历史验证当作新平台模型的构建／部署证明。
+- 原完整门禁自然结束：2854 pass／54 skip／140 fail、90 errors，16447断言、680文件、1311.28秒，退出1；session81831已结束。50个明确失败为48项默认密码登录下的实机失败、并发0013_app_icons.sql未入锁、并发projects图标英文键尚未补齐；另90项为运行中新增图标契约但旧Bun模块缓存没有APP_ICON_MAX_BYTES／validAppIconUrl导出的加载错误。正确OIDC的最后metrics复验4/0、48断言。没有以定向绿改写全仓失败。门禁前后本候选生产只变化公共contracts/index.ts（并发appIcon导出），本任务实现未变；该导出依赖另一个会话的未提交文件，已做必要发布协调，不删除导出、不绕过共享文件提交。
+- 新进程加载当前契约后，镜像目录／工作流／业务授权／接口面锁4文件定向28 pass／0 fail、123断言，`/tmp/cs-platform-image-post-gate-targeted.log`。未重新运行全门禁；必要发布交接记录 `/tmp/cs-platform-image-publication-handoff.md` 已交既有授权窗口，当前等待共享契约依赖明确，未提交或部署。
+
+## 2026-09-27 预构建服务与父任务真实运行补证
+
+本节在已部署的旧项目归属 API 上完成，不是新平台目录／业务授权迁移的部署证明。共享候选发布仍等待图标契约与目录样式交接，未提交／部署本批。
+
+- 原失败发布 `01a0e284-2097-7000-8a63-40a98afec963` 确认为用途验证不匹配。重新验证原有工具版本 `01a0e27f-4ef9-7000-bd34-538122dfbb26`，验证 `01a0e2e7-b58f-7000-8bc7-b178d4afdebc` 通过：worker UID10001、Python YAML、Node CJS/ESM、脚本、二进制均成功；新task契约摘要与旧记录不同。服务版本 `01a0e280-fce1-7000-8d46-0be477b24995` 的新验证 `01a0e2e7-b5a0-7000-b278-8299fc64710c` 也通过，服务契约摘要保持。证据 `/tmp/cs-rfc028-refresh-validations-observed.json`。
+- 固定源码 `bf452e72d431aad7a750946db80fd3f6a8df5f4f` 发布为 v0.2.2，release `01a0e2e8-7ef2-7000-8b2c-a3ae9c29c684` 实际ready，message为“使用已有镜像”。迁移Job退出0，输出 `RI_SERVICE_MIGRATION_COMPLETED`；迁移与service Pod实际imageID均为选定 `sha256:8bc0d325f8da1ba95fb1a39337755c3378e3ae04011848612324d6cd19818e66`，service Ready1/1、零重启。证据 `/tmp/cs-rfc028-service-runtime-proof.json`、`/tmp/cs-rfc028-platform-bound-release-ready.json`。
+- 仅将本任务验收应用从空正式槽晋级，切换 `01a0e2ea-72a9-7000-a53a-88dfacb34c7d`，业务正常网关读取确认active、epoch3；未操作其他业务。首次浏览器新页误入空上下文返回401，改用原已登录隔离上下文后200，未复制Cookie、授予角色或伪造身份。
+- 由真实业务 `/actions` 创建父任务 `01a0e2eb-876e-7000-8a97-bf5d06a95d17`。首次尚未ready时子任务412，同一requestKey在容器ready后继续，只有同一父任务。命令 `01a0e2eb-ec0d-7000-b05f-e558c7f140f7` 连续90秒，返回first/last、退出0，proof.txt内容preserved。父Pod实际imageID为独立工具摘要 `sha256:b8b7ea382910b483608c41db9b55f189a1f66358a11c7e3628f963359848575b`，不同于service。
+- 暂停后原Pod物理消失；恢复后的Pod UID从 `0d522928-875d-4556-b11d-528dd6f9df95` 改为 `365c0fcd-9200-4d06-a921-e006b5a0c84a`，实际imageID不变、原卷UID `907826a7-edbe-44c0-acc0-d970e288f2ae` 不变、proof.txt内容及版本摘要不变。初始化记录从一行增加为两行，符合新Pod重执行、原卷保留；恢复后的generation3。证据 `/tmp/cs-rfc028-parent-{runtime-proof,resumed-runtime-proof,pause,resume,close}.json`。
+- 已通过业务自身入口关闭这个验收父任务，最终closed、generation4，容器已物理回收；持久事件仍保留唯一成功命令结果，关闭后工作区读取412符合契约。服务保留运行用于后续同一验收业务。`/tmp/cs-rfc028-parent-command-observed.json` 为最终关闭状态。
+
+本节补齐RI-18的真实成功发布／迁移／探针路径，以及RI-01的service与parent独立镜像、RI-08的新Pod初始化、RI-21同键重试、RI-22父任务原卷原镜像恢复子项。各RI的其他要求（不同Agent镜像、Agent实际工具调用、故障初始化、服务回退、权限变更等）仍须继续，不据此将完整RI或RFC标Done。
+
+发布候选追加边界：上述运行验收期间，RFC031继续修改共享算力／镜像目录组件、文案与样式，迁移锁也出现其他任务内容。先前12组浏览器和28项定向仅证明当时快照，不能自动覆盖后来并发改动；需等待稳定交接，对最终共同页面补定向和浏览器验证。原96路径 `git diff --check` 通过，清单外ProjectListPage的在制空白未改动。
+
+## 2026-09-27 独立 Agent 镜像与共享目录接续验证
+
+本轮只操作既有隔离验收业务 `rfc028-images-20260927`（GitLab332）；没有更新其他业务或替换现有开发容器。算力档位 `01a0e236-f6e4-7000-a430-4799233e7f2f` 升到修订3，沿用已有凭据，底座固定当前 `rfc027-final-0c8be5fd` 摘要；测试 `01a0e2f3-75b9-7000-9b9e-4cc782164717` 的 model/events/resume/systemPrompt/skills/mcp 全部通过。
+
+- Agent A 构建 `01a0e2f8-f969-7000-9a34-fd9952ef5cd1` 成功，版本 `01a0e2fc-4e15-7000-8737-7773cab4ef32`，摘要 `sha256:77ffe8bfa44f95d5874f168f8a3aeeb265831c3f29ecfca8c6da7de5b980bd5f`。Agent用途验证 `01a0e2fd-308d-7000-a45f-2d09be15b9a2` passed：UID10001、Agent协议和全部工具检查通过。该验证在Pod删除与控制面清理完成之间曾仍显示running，后续正常收敛passed，未重复创建。
+- 同一Agent A版本的任务用途验证 `01a0e302-0588-7000-b5ff-29797b3fbbbb` passed。开始因节点CPU不足Pending，构建资源释放后正常完成；不能将调度等待判为镜像不兼容。以上仅证明复用的用途兼容性，实际父任务／Agent共同使用仍待执行。
+- Agent B 首次构建 `01a0e2fc-bcb5-7000-af8f-9dba396fd3bd` 因 Debian node-webassemblyjs 下载503、apt退出100失败；一次显式重试 `01a0e301-924b-7000-bddf-56d3390ce8b3` 成功。版本 `01a0e304-bd22-7000-a856-da92d38a100e`，摘要 `sha256:4eea778bfe121e8a58b991f5690fa5237a534610bd2114501cec1f0c58a18934`。Agent验证 `01a0e307-f5ac-7000-9228-dde6437cba9d` 已受理且实际Pod imageID匹配，当前仍running，未宣称通过。
+- 隔离验收服务新增明确的父任务／Agent镜像覆盖、子任务读取、产物读取及retry/resume操作入口；仅写入本任务GitLab332。源码SHA `8f85b6ce598189d45aaa8989694b501900abdd96` 的服务构建 `01a0e300-c2f9-7000-9f02-053542a66fb6` 成功，Dockerfile内 `bun build` 语法检查成功；版本 `01a0e301-4109-7000-9867-e94d908bcf3e`、摘要 `sha256:ad0b08d0f741737e6c8ec9b4ccff520ec16980eab3bd6fa1d7cd0e492977bfbf`。服务契约验证 `01a0e301-f669-7000-9be9-41af74fa2210` passed，但本版本尚未发布，实际启动／就绪须由发布探针确认。当前线上仍v0.2.2。
+
+验证原始记录：`/tmp/cs-rfc028-agent-test-current-base-observed.json`、`/tmp/cs-rfc028-agent-a-validation-observed.json`、`/tmp/cs-rfc028-agent-a-task-validation-observed.json`、`/tmp/cs-rfc028-agent-b-image-observed.json`、`/tmp/cs-rfc028-complete-service-validation-observed.json`。Manifest候选已按契约解析通过，记录 `/tmp/cs-rfc028-agent-manifest-candidate.json`；未在Agent B验证通过前发布。
+
+共享目录发生RFC031后续修改后的定向回归：runtimeImageConsole／runtimeImageWorkflow／projectRuntimeImages／computeProfilesPage四文件 **36 pass／0 fail、225断言**，`/tmp/cs-platform-image-shared-final-targeted.log`。共享UI最新112组浏览器矩阵由RFC031验收记录提供（实际SPA＋HTTP夹具，非部署后数据），不把原12组结果套用于后改动。完整发布仍待共享依赖和统一Git窗口，RFC028 T16–T18和完整RI未完成。
+
+### 同轮后续：v0.3.0 发布、镜像复用与 Agent 准入修复
+
+Agent B 验证 `01a0e307-f5ac-7000-9228-dde6437cba9d` 最终 **passed**，UID／协议／全部工具通过，取代上段running状态。四类绑定清单已在本任务GitLab332提交 `24fdcfcc7e682f838860d35ae3bb400b15483c61`；v0.3.0 release `01a0e30d-f204-7000-810e-68d3de3fbd35` ready并切入本任务活动槽，保留v0.2.2回退槽。新service实际Pod UID `c16c7158-9923-439a-a81a-ef8589a6224c`、imageID为ad0b08d0摘要、Ready且重启0；迁移Pod同摘要、Succeeded、日志 `RI_SERVICE_MIGRATION_COMPLETED`。记录 `/tmp/cs-rfc028-agent-bound-release-observed.json`、`/tmp/cs-rfc028-four-images-pods-current.json`、`/tmp/cs-rfc028-v030-migration.log`。
+
+新父任务 `01a0e30e-e096-7000-be22-db3c8ecd4171` 默认采用b8b7ea38工具摘要，实际Pod UID `f748cdc5-645f-4982-96bf-835e648f38e1`，工具命令 `01a0e30f-3c89-7000-a6c2-2ee002e7bc7f` succeeded/exit0，输出UID10001、parent、三项ready、script-ready、worker:10001。真实产物读取返回对应57字节文件，记录 `/tmp/cs-rfc028-four-images-observed.json`。父任务选择B专属镜像返回400／runtime_image_not_allowed，不回退。
+
+显式复用Agent A镜像的新父任务 `01a0e311-9ea9-7000-864f-4be0fe16c1b3` selectionSource=request，实际Pod UID `6f6f64fc-9181-40c9-be18-3d47146451e3`、imageID为77ffe8bf摘要。命令 `01a0e311-ff87-7000-8058-11657dd81783` succeeded/exit0，输出UID10001、agent-a及同样完整工具结果。关闭动作平台已完成，但验收应用记录响应时遇写屏障409；后续权威读取已closed，未重复创建／关闭。最终读取 `/tmp/cs-rfc028-reuse-parent-observed.json`，命令持久结果保留；工作区关闭后读取不可用符合约定。原四镜像主父任务保留等待Agent验证。
+
+实际Agent提交与A选择B负例均暴露500：cs-api的ZodError是 `Unrecognized keys: "id", "name", "compute"`。根因为agentPlan将完整AgentProfile作为严格RuntimeImageSelection传给runtime-environment。仅修复 `modules/business-task/application/execution/agentPlan.ts`，向边界投影默认镜像和允许集合，不放宽schema。测试替身改为使用实际严格schema，先红复现500；修改后Agent选择／恢复／父任务三文件 **13 pass／0 fail、99断言**，定向lint与diff-check通过，日志 `/tmp/cs-agent-image-selection-red.log`、`/tmp/cs-agent-image-selection-green.log`。三路径已交唯一发布窗口，本地修复未部署；Agent A/B业务执行和A选择B拒绝实机仍待部署后同键复验，不把500当授权拒绝。当前子任务列表仅有已成功工具命令，失败Agent请求未产生子任务。
+
+
+## 精确发布闭包与补充回归（2026-09-27）
+
+原96路径补齐共享目录组件、根文案、路由／算力列表返回、对应测试、appIcon独立契约与测试、共享锁内0013迁移，以及Agent选择投影修复，形成118路径；保留完整并发输出，未扫入其余市场／图标实现。最新41/0、258断言；候选编译宿主按HEAD＋精确文件读取，后端与console均0诊断。两个完整check的非绿终态保留在STATE及原日志，不重跑或改写结果。
+
+发布复核发现业务镜像页传search但业务目录SQL未过滤；新增真实PG回归先红，补为授权范围内、分页前按名称／说明匹配，三文件8/0、80断言，lint通过。Agent准入把完整profile误传严格镜像选择契约的修复，按既有交接三路径纳入，真实PG13/0、99断言。当前仅提交候选，精确SHA CI、部署迁移与实机回执另记；RFC028整体RI及T16–T18仍未完成。

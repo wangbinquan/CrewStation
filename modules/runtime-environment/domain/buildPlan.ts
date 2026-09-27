@@ -12,7 +12,7 @@ export interface RuntimeImageBuilderSettings {
 }
 export function runtimeImageBuildPlan(build: ImageBuild, revision: ImageRevision, project: { namespace: string; slug: string; repositoryUrl: string }, settings: RuntimeImageBuilderSettings, now: Date) {
   if (revision.source.kind !== 'source' || !build.resourceId) throw precondition('只有源码构建需要 builder');
-  const path = `runtime/projects/${build.projectId}/${build.id}/image`, repository = `${settings.registryBase}/${path}`, destination = `${settings.pushHost}/${path}:artifact`;
+  const path = build.projectId ? `runtime/projects/${build.projectId}/${build.id}/image` : `runtime/platform/${build.id}/image`, repository = `${settings.registryBase}/${path}`, destination = `${settings.pushHost}/${path}:artifact`;
   const clientRevision = revision.baseImage?.startsWith(`${settings.registryBase}/`) ? { ...revision, baseImage: `${settings.pushHost}/${revision.baseImage.slice(settings.registryBase.length + 1)}` } : revision;
   return RuntimeImageBuildRenderSchema.parse({
     buildId: build.id, resourceId: build.resourceId, executionEpoch: build.executionEpoch, projectId: build.projectId, projectSlug: project.slug,

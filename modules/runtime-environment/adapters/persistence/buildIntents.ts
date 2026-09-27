@@ -15,7 +15,7 @@ export function databaseBuildIntents(db: Database, ledger: RuntimeBuildLedger, c
       const repo = buildRepository(tx), current = await repo.get(build.id, true);
       if (!claimedBy(current, build, clock) || current.state === 'cancelling' || current.pendingOutcome || ['succeeded', 'failed', 'cancelled'].includes(current.state)) return false;
       if (!current.resourcePlan) {
-        await ledger.within(tx).declare({ id: plan.resourceId, kind: 'build-job', ref: current.id, projectId: current.projectId as ProjectId,
+        await ledger.within(tx).declare({ id: plan.resourceId, kind: 'build-job', ref: current.id, ...(current.projectId ? { projectId: current.projectId as ProjectId } : {}),
           spec: { children: [{ kind: 'Job', namespace: plan.namespace, name: plan.name }, { kind: 'Secret', namespace: plan.namespace, name: plan.secret }], runtimeImageBuild: plan }, display: { buildId: current.id, imageId: current.imageId } });
         await repo.update({ ...current, resourcePlan: plan });
       }

@@ -12,6 +12,7 @@ describe.skipIf(!available)('环境镜像执行历史', () => {
     const rows = await f.tdb.db.execute(sql`UPDATE task_runtime.environments SET state='released', render=${JSON.stringify({ runtimeImage: { versionId } })}::jsonb RETURNING id,project_id`);
     const row = rows[0]!; const query = { projectId: String(row.project_id), versionIds: [versionId], limit: 20 };
     expect(await f.runtime.api.imageHistory(query)).toEqual([expect.objectContaining({ id: row.id, versionId, kind: 'development', state: 'released', message: 'OOMKilled' })]);
+    expect(await f.runtime.api.imageHistory({ versionIds: [versionId], limit: 20 })).toEqual([expect.objectContaining({ id: row.id, projectId: row.project_id, versionId })]);
     expect(await f.runtime.api.imageHistory({ ...query, before: String(row.id) })).toEqual([]);
     expect(await f.runtime.api.imageHistory({ ...query, projectId: newResourceId() })).toEqual([]);
     expect(await f.runtime.api.imageHistory({ ...query, versionIds: [newResourceId()] })).toEqual([]);

@@ -2,6 +2,28 @@ import type { MessagesShapedLike } from '../../shared/lib/i18n';
 import type { messages as zhCN } from './zh-CN';
 
 export const messages: MessagesShapedLike<typeof zhCN> = {
+  "catalog.resources": "Resources",
+  "catalog.search": "Search",
+  "catalog.clear": "Clear search",
+  "catalog.searchDescription": "Search name or purpose",
+  "catalog.countUnknown": "Count unavailable",
+  "catalog.pageCount": "{count} items on this page",
+  "catalog.resultCount": "{count} matching items",
+  "catalog.first": "First page",
+  "catalog.previous": "Previous",
+  "catalog.next": "Next",
+  "catalog.details": "Details",
+  "catalog.more": "More",
+  "catalog.ownerUnknown": "Owner unavailable",
+  "catalog.selectedOwner": "Selected owner",
+  "catalog.identifier": "Resource ID",
+  "catalog.namespace": "Namespace",
+  "catalog.created": "Created",
+  "catalog.reason": "Reason",
+  "catalog.openProject": 'Open',
+  "catalog.noMatches": "No matching results",
+  "catalog.noMatchesHint": "Try another search or clear your filters.",
+
   'executionRecovery.tasks': 'Tasks · failures and unknown states first',
   'executionRecovery.project': 'Project',
   'executionRecovery.allProjects': 'All projects',

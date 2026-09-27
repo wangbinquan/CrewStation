@@ -15,13 +15,14 @@ export interface RuntimeImagePlatformPorts {
   readonly compute: {
     resolveForProject(projectId: ProjectId, selector: ComputeProfileSelector, usage: ComputeUsage): Promise<{ id: string; revision: number; image: string }>;
     launchMaterial(ref: ProfileRevisionRef): Promise<{ beforeStart: BeforeStartMaterial; image: string }>;
-    issueBuildPushCredential(input: { projectId: string; buildId: string; expiresAt: string; pullRepositories: readonly string[] }): Promise<RegistryPushCredential>;
+    issueBuildPushCredential(input: { projectId?: string; buildId: string; expiresAt: string; pullRepositories: readonly string[] }): Promise<RegistryPushCredential>;
   };
   isAdmin(id: UserId): Promise<boolean>;
 }
-export interface RuntimeBuildIdentity { readonly id: string; readonly projectId: string; readonly createdBy: string; readonly deadline: string }
-export interface RuntimeBuildSource { readonly source: RuntimeImageSource; readonly commitSha?: string; readonly baseImage?: string }
+export interface RuntimeBuildIdentity { readonly id: string; readonly projectId?: string; readonly sourceProjectId?: string; readonly createdBy: string; readonly deadline: string }
+export interface RuntimeBuildSource { readonly source: RuntimeImageSource; readonly sourceProjectId?: string; readonly commitSha?: string; readonly baseImage?: string }
 export interface RuntimeImagePlatformSettings {
+  readonly systemNamespace?: string;
   readonly serviceDomain: string; readonly registryBase: string; readonly registryPushHost: string; readonly registryScheme: 'http' | 'https';
   readonly baseImage: { repository: string; tag: string }; readonly taskImage: string; readonly builderImage: string;
 }

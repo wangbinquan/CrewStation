@@ -9,7 +9,7 @@ import { ActionNote } from '../../../shared/ui/ActionNote';
 import { FormDialog } from '../../../shared/ui/dialog/FormDialog';
 import styles from './RuntimeImages.module.css';
 
-export function ImageMetadata({ projectId, image, editable, manageable }: { readonly projectId: string; readonly image: RuntimeImageDto; readonly editable: boolean; readonly manageable: boolean }) {
+export function ImageMetadata({ projectId, image, editable, manageable }: { readonly projectId: string | undefined; readonly image: RuntimeImageDto; readonly editable: boolean; readonly manageable: boolean }) {
   const t = useT(), [editing, setEditing] = useState(false), [draft, setDraft] = useState<Pick<RuntimeImageDto, 'name' | 'description' | 'revision'>>();
   const save = useApiMutation(() => api.runtimeImages.update(projectId, image.id, { name: draft!.name, description: draft!.description, expectedRevision: draft!.revision }), { invalidate: [['runtime-images', projectId]], onSuccess: () => { setEditing(false); setDraft(undefined); } });
   const toggle = useApiMutation(() => api.runtimeImages.update(projectId, image.id, { enabled: !image.enabled, expectedRevision: image.revision }), { invalidate: [['runtime-images', projectId]] });

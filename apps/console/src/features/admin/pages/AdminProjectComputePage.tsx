@@ -5,6 +5,7 @@ import { useT } from '../../../shared/lib/useT';
 import { QueryStatus } from '../../../shared/ui/QueryStatus';
 import { Stack } from '../../../shared/ui/Stack';
 import { ProjectComputeCard } from '../components/projects/ProjectComputeCard';
+import { ProjectRuntimeImageCard } from '../components/projects/ProjectRuntimeImageCard';
 import { ProjectServiceCard } from '../components/projects/ProjectServiceCard';
 import { ProjectQuotaCard } from '../components/projects/ProjectQuotaCard';
 import { ProjectRateLimitCard } from '../components/projects/ProjectRateLimitCard';
@@ -29,6 +30,7 @@ export function AdminProjectComputePage() {
     {allowed && query.data && !query.error ? <Stack key={`${projectId}:${me.data!.id}`}>
       <ProjectServiceCard projectId={projectId!} viewerId={me.data!.id} />
       <ProjectComputeCard projectId={projectId!} viewerId={me.data!.id} />
+      <ProjectRuntimeImageCard projectId={projectId!} viewerId={me.data!.id} />
       <ProjectQuotaCard projectId={projectId!} viewerId={me.data!.id} />
       <ProjectRateLimitCard projectId={projectId!} />
     </Stack> : null}

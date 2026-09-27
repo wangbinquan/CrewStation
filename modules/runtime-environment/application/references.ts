@@ -15,13 +15,14 @@ export function runtimeImageReferences(deps: RuntimeImageDeps) {
       const selected = selectRuntimeImage(input.requestedVersionId, RuntimeImageSelectionSchema.parse(input.selection));
       if (!selected) return undefined;
       const inputDigest = imageContentDigest({ selected, target: input.target });
-      const { version, revision } = await versionAccess(deps, actor, projectId, selected.versionId);
       // 已提交的快照不因停用／平台档位更新而漂移；重复准入仍需所属项目访问权。
-      const prior = await deps.uow.read.references.get(version.id, input.owner.type, input.owner.id);
+      await deps.authorizer.authorize(actor, projectId, 'view');
+      const prior = await deps.uow.read.references.get(selected.versionId, input.owner.type, input.owner.id);
       if (prior?.snapshot && prior.projectId === projectId) {
         if (prior.snapshotInputDigest !== inputDigest) throw conflict('同一引用不能改变镜像用途或选择来源');
         return prior.snapshot;
       }
+      const { version, revision } = await versionAccess(deps, actor, projectId, selected.versionId);
       const { contractDigest, initializerSecretVersions } = await compatibilityEvidence(deps, actor, projectId, version, revision, input.target);
       return deps.uow.run(async (s) => {
         await s.lock(versionLock(version));

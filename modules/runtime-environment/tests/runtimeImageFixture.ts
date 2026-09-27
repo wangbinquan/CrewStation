@@ -18,10 +18,12 @@ export async function runtimeImageFixture(executor?: RuntimeImageBuildExecutor, 
   const tdb = await createTestDatabase([runtimeEnvironmentMigrations]);
   const project = newResourceId(), otherProject = newResourceId(), repositoryBindingId = newResourceId();
   const developer = actor(), admin = actor(true), tester = actor(), outsider = actor();
+  const admins = new Set([admin.userId]);
+  const limits = { platformBuilds: 2, projectBuilds: 1, buildTimeoutSeconds: 600, logRetentionSeconds: 60, logMaxBytes: 1024 };
   const memberships = new Map([[developer.userId, new Set([project, otherProject])], [tester.userId, new Set([project])]]);
   let now = new Date('2026-09-27T00:00:00Z'), prepares = 0, contractFingerprint = digest;
   const mod = createRuntimeEnvironmentModule({
-    db: tdb.db, clock: { now: () => now }, isAdmin: async (id) => id === admin.userId, referenceOwners, executionHistory,
+    db: tdb.db, clock: { now: () => now }, isAdmin: async (id) => admins.has(id), referenceOwners, executionHistory,
     authorizer: { authorize: async (a, p, action) => {
       if (a.isAdmin) return;
       if (!memberships.get(a.userId)?.has(p) || action === 'manage' || (a.userId === tester.userId && action !== 'view')) throw forbidden();
@@ -34,16 +36,16 @@ export async function runtimeImageFixture(executor?: RuntimeImageBuildExecutor, 
     ...(secrets ? { initializationSecrets: secrets.values } : {}),
     ...(validationExecutor ? { validationExecutor } : {}),
     buildExecutor: executor ?? { reconcile: async () => { throw new Error('目录测试不能启动构建'); }, inspect: async () => { throw new Error('目录测试不能检查真实镜像'); } },
-    limits: { platformBuilds: 2, projectBuilds: 1, buildTimeoutSeconds: 600, logRetentionSeconds: 60, logMaxBytes: 1024 },
+    limits,
   });
   const app = createApp({ name: 'runtime-image-test' });
   for (const route of mod.http) app.route('/', route);
-  return { ...mod, tdb, app, project, otherProject, developer, admin, tester, outsider, memberships,
+  return { ...mod, tdb, app, project, otherProject, developer, admin, tester, outsider, memberships, admins, limits,
     changeContract: (value: string) => { contractFingerprint = value; },
     uow: runtimeImageUnitOfWork(tdb.db), advance: (ms: number) => { now = new Date(now.getTime() + ms); }, prepares: () => prepares,
     headers: (a: Actor) => ({ [IDENTITY_HEADERS.userId]: a.userId, 'Content-Type': 'application/json' }),
-    image: async (p = project) => mod.api.createImage(developer, p, { name: `tools-${newResourceId()}`, description: '' }),
-    revision: (imageId: string, p = project) => mod.api.createRevision(developer, p, imageId, CreateRuntimeImageRevisionSchema.parse({
+    image: async (p = project) => mod.api.createImage(admin, p, { name: `tools-${newResourceId()}`, description: '' }),
+    revision: (imageId: string, p = project) => mod.api.createRevision(admin, p, imageId, CreateRuntimeImageRevisionSchema.parse({
       source: { kind: 'source', repositoryBindingId, ref: 'main', architecture: 'linux/amd64', usage: 'task' },
     })),
   };

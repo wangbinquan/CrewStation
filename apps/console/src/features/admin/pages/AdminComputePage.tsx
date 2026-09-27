@@ -1,3 +1,4 @@
+import { useComputeListReturn } from '../hooks/useComputeListReturn';
 import { useNavigate, useSearch } from '@tanstack/react-router';
 import { useCallback } from 'react';
 import type { ReactElement } from 'react';
@@ -15,13 +16,13 @@ import { AdminSection } from './AdminSection';
  */
 export function AdminComputePage(): ReactElement {
   const t = useT(), navigate = useNavigate(), search = parseComputeSearch(useSearch({ strict: false }));
-  const go = useCallback((next: ComputeSearch) => void navigate({ to: '/admin/compute', search: next }), [navigate]);
-  const openProfile = useCallback((name: string) => go({ profile: name }), [go]);
-  const editing = search.profile !== undefined || search.create === true;
+  const go = useCallback((next: ComputeSearch) => void navigate({ to: '/admin/compute', search: { q: search.q, ...next }, resetScroll: false }), [navigate, search.q]);
+  const editing = search.profile !== undefined || search.create === true, remember = useComputeListReturn(editing);
+  const openProfile = (name: string) => { remember(name); go({ profile: name }); };
   return (
     <AdminSection title={t('nav.admin.compute')} description={t(editing ? 'admin.profile.editor.pageHint' : 'admin.profile.pageHint')}>
       {editing ? <ComputeProfileEditor {...(search.profile === undefined ? {} : { name: search.profile })} onClose={() => go({})} onCreated={openProfile} />
-        : <ComputeProfilesSection onOpen={openProfile} onCreate={() => go({ create: true })} />}
+        : <ComputeProfilesSection onOpen={openProfile} onCreate={() => { remember(); go({ create: true }); }} search={search.q ?? ''} onSearch={(q) => go({ q })} />}
       {/* 列表与编辑页同一位置：切换时卡片不重挂，刚签发的一次性凭据不会因为打开编辑页而消失。 */}
       <RuntimeImagesCard />
     </AdminSection>

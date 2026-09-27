@@ -8,13 +8,14 @@ import type { RuntimeImageSourceResolver } from '../ports/platform';
 
 export function runtimeImageSourcePreparation(repository: ImageSourceRepository, bases: ImageBuildBase, images: ExistingImageResolver): RuntimeImageSourceResolver {
   return {
-    prepare: async (actor: Actor, projectId: string, input: RuntimeImageSource) => {
+    prepare: async (actor: Actor, projectId: string | undefined, input: RuntimeImageSource) => {
       const source = RuntimeImageSourceSchema.parse(input);
       if (source.kind === 'existing') {
         const reference = await images.resolve(actor, projectId, source.reference, source.architecture), baseImage = await bases.resolve(actor, projectId, source);
         if (source.usage !== 'service' && (!baseImage || !/@sha256:[0-9a-f]{64}$/.test(baseImage))) throw precondition('平台任务或 Agent 底座未固定摘要');
         return { source: { ...source, reference }, ...(baseImage ? { baseImage } : {}) };
       }
+      if (!projectId) throw precondition('源码构建需要指定来源业务');
       const { commitSha, tree } = await repository.resolve(actor, projectId, source.repositoryBindingId, source.ref);
       if (!/^[0-9a-f]{40,64}$/.test(commitSha)) throw precondition('源码未解析到固定提交');
       const { dockerfilePath, links, attributes } = inspectSourceTree(tree, source.context, source.dockerfile);

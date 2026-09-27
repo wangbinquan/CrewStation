@@ -17,7 +17,7 @@ export async function completeBuild(deps: RuntimeImageDeps, executor: RuntimeIma
     if (current.state === 'cancelling') return { ...rest, state: 'cancelled', stage: 'cancelled', unknown: false, updatedAt: at };
     if (!outcome) return current;
     if (outcome.state === 'failed') return { ...rest, state: 'failed', stage: 'failed', error: outcome.error, unknown: false, updatedAt: at };
-    const version = { id: newResourceId(), imageId: current.imageId, projectId: current.projectId, revisionId: revision.id, buildId: current.id, repository: outcome.image.repository, digest: outcome.image.digest, architecture: outcome.image.architecture, state: 'available' as const, createdAt: at, initializerDigest: imageContentDigest(revision.initializer), toolsDigest: imageContentDigest(revision.tools) };
+    const version = { id: newResourceId(), imageId: current.imageId, revisionId: revision.id, buildId: current.id, repository: outcome.image.repository, digest: outcome.image.digest, architecture: outcome.image.architecture, state: 'available' as const, createdAt: at, initializerDigest: imageContentDigest(revision.initializer), toolsDigest: imageContentDigest(revision.tools) };
     // 同 digest 的新版本登记与删除共用锁；版本创建和成功状态在同一事务提交。
     await s.lock(`digest:${version.repository}@${version.digest}`);
     await s.versions.insert(version);

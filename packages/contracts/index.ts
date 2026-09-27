@@ -104,3 +104,7 @@ export * from './taskrunner/businessMessages';
 export * from './api/business/releaseMaterials';
 
 export * from './api/business/taskList';
+
+export * from './api/runtimeImages/projectPolicy';
+
+export * from './api/market/appIcon';

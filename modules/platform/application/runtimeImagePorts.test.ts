@@ -9,9 +9,9 @@ const actor: Actor = { userId: id(1) as UserId, isAdmin: false };
 function fixture() {
   const calls: Array<{ key: string; args: unknown[] }> = [];
   const record = (key: string, ...args: unknown[]) => { calls.push({ key, args }); };
-  const state = { revision: 2, commitSha: 'b'.repeat(40), beforeStart: BeforeStartMaterialSchema.parse({ profile: id(4), revision: 2, contentHash: digest, steps: [], configFile: { kind: 'none' } }) };
+  const state = { admin: false, revision: 2, commitSha: 'b'.repeat(40), beforeStart: BeforeStartMaterialSchema.parse({ profile: id(4), revision: 2, contentHash: digest, steps: [], configFile: { kind: 'none' } }) };
   const ports: RuntimeImagePlatformPorts = {
-    isAdmin: async () => false,
+    isAdmin: async () => state.admin,
     project: { authorize: async (...args) => record('authorize', ...args), getProject: async (...args) => { record('project', ...args); return { slug: 'tools', namespace: 'cs-tools' }; } },
     scm: {
       resolveBuildSource: async (...args) => { record('resolve', ...args); return { commitSha: state.commitSha, httpUrl: 'https://git.test/tools.git', tree: [] }; },
@@ -30,25 +30,40 @@ function fixture() {
       renderSecretDefinitions: async (...args) => { record('packages', ...args); return { [id(6)]: 'package-token' }; },
     },
   };
-  const api = runtimeImagePlatformPorts(ports, { serviceDomain: 'svc.test', registryBase: 'registry.test', registryPushHost: 'external.test', registryScheme: 'http', baseImage: { repository: 'platform/task', tag: 'v1' }, taskImage: 'task:v1', builderImage: 'builder:v1' });
+  const api = runtimeImagePlatformPorts(ports, { systemNamespace: 'cs-system', serviceDomain: 'svc.test', registryBase: 'registry.test', registryPushHost: 'external.test', registryScheme: 'http', baseImage: { repository: 'platform/task', tag: 'v1' }, taskImage: 'task:v1', builderImage: 'builder:v1' });
   const revision = RuntimeImageRevisionDtoSchema.parse({ id: id(10), imageId: id(11), revision: 1, source: { kind: 'source', usage: 'agent', repositoryBindingId: id(3), ref: 'main', architecture: 'linux/arm64', baseProfile: { profileId: id(4), revision: 2 }, secrets: [{ id: 'npm', configDefinitionId: id(6), environment: 'development' }] }, commitSha: state.commitSha, baseImage: `registry.test/platform/task@${digest}`, recipeDigest: digest, initializer: { steps: [], env: {}, secrets: [{ id: 'config', configDefinitionId: id(6), environment: 'production' }] }, tools: [], createdBy: actor.userId, createdAt: '2026-09-27T00:00:00Z' });
   return { api, calls, state, revision, build: { id: id(8), projectId: id(2), createdBy: actor.userId, deadline: new Date(Date.now() + 600000).toISOString() } };
 }
 
-test('项目镜像不能越过项目仓库前缀，Agent 底座与验证绑定当前授权修订', async () => {
+test('平台构建只允许管理员选底座，业务验证仍绑定当前授权修订', async () => {
   const f = fixture(), source = f.revision.source;
   if (source.kind !== 'source') throw new Error('fixture requires source recipe');
-  expect(await f.api.existingImageAccess(actor, id(2))).toEqual({ prefixes: [`runtime/projects/${id(2)}`], exact: ['platform/task'] });
+  await expect(f.api.existingImageAccess(actor, id(2))).rejects.toMatchObject({ kind: 'forbidden' });
   expect((await f.api.existingImageAccess({ ...actor, isAdmin: true }, id(2))).prefixes).toEqual(['runtime']);
   await f.api.authorizer.authorize(actor, id(2), 'manage');
   expect(f.calls.at(-1)?.args[2]).toBe('manage-production-config');
-  expect(await f.api.bases.resolve(actor, id(2), { ...source, usage: 'service' })).toBeUndefined();
-  expect(await f.api.bases.resolve(actor, id(2), { ...source, usage: 'task' })).toBe('registry.test/platform/task:v1');
-  expect(await f.api.bases.resolve(actor, id(2), source)).toBe(`registry.test/runtime/agent@${digest}`);
+  const admin = { ...actor, isAdmin: true };
+  await expect(f.api.bases.resolve(actor, id(2), source)).rejects.toMatchObject({ kind: 'forbidden' });
+  expect(await f.api.bases.resolve(admin, undefined, { ...source, usage: 'service' })).toBeUndefined();
+  expect(await f.api.bases.resolve(admin, undefined, { ...source, usage: 'task' })).toBe('registry.test/platform/task:v1');
+  expect(await f.api.bases.resolve(admin, undefined, source)).toBe(`registry.test/runtime/agent@${digest}`);
+  expect(f.calls.filter((c) => c.key === 'profile')).toEqual([]);
   expect(await f.api.validationContracts.profileRevision(actor, id(2), id(4))).toEqual({ profileId: id(4), revision: 2 });
   f.state.revision = 3;
-  await expect(f.api.bases.resolve(actor, id(2), source)).rejects.toThrow('修订已变化');
-  await expect(f.api.bases.resolve(actor, id(2), { ...source, baseProfile: undefined })).rejects.toThrow('精确算力档位');
+  await expect(f.api.bases.resolve(admin, undefined, { ...source, baseProfile: undefined })).rejects.toThrow('精确算力档位');
+});
+
+test('平台构建使用系统命名空间，源码业务只用于材料；提交者撤权后不能签发源码凭据', async () => {
+  const f = fixture(), build = { ...f.build, projectId: undefined, sourceProjectId: id(2) };
+  f.state.admin = true;
+  expect(await f.api.buildContext(build, f.revision)).toEqual({ namespace: 'cs-system', slug: 'platform', repositoryUrl: 'https://git.test/tools.git' });
+  expect(f.calls.some((call) => call.key === 'project')).toBe(false);
+  expect(f.calls.find((call) => call.key === 'resolve')?.args[1]).toBe(id(2));
+  await f.api.credentials.push(build, f.revision);
+  expect(f.calls.find((call) => call.key === 'push')?.args[0]).toMatchObject({ projectId: undefined, buildId: build.id });
+  f.state.admin = false;
+  await expect(f.api.buildContext(build, f.revision)).rejects.toMatchObject({ kind: 'forbidden' });
+  await expect(f.api.credentials.issueGit(build, f.revision)).rejects.toMatchObject({ kind: 'forbidden' });
 });
 
 test('构建凭据保持源码 SHA 和构建仓库范围，包 Secret 与初始化固定版本按环境分别取值', async () => {

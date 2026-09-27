@@ -8,7 +8,7 @@ export interface BuildResourceRecord {
   readonly conditions: readonly { type: string; status: string }[];
 }
 export interface BuildResourceWriter {
-  declare(input: { id: string; kind: 'build-job'; ref: string; projectId: ProjectId; spec: { children: readonly { kind: string; namespace?: string; name: string }[]; runtimeImageBuild: RuntimeImageBuildRender }; display: Record<string, string> }): Promise<BuildResourceRecord>;
+  declare(input: { id: string; kind: 'build-job'; ref: string; projectId?: ProjectId; spec: { children: readonly { kind: string; namespace?: string; name: string }[]; runtimeImageBuild: RuntimeImageBuildRender }; display: Record<string, string> }): Promise<BuildResourceRecord>;
   requestRelease(id: string, reason: { code: string; message: string }): Promise<BuildResourceRecord>;
 }
 export interface RuntimeBuildLedger {

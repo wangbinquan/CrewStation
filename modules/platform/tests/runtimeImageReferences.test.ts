@@ -22,25 +22,25 @@ afterAll(async () => { await db?.drop(); });
 // Seed a registered artifact, without contacting SCM or a registry. Ownership is queried through the real composition root.
 async function seedReferences(ownerType = 'task') {
   const projectId = newResourceId(), imageId = newResourceId(), buildId = newResourceId();
-  const version: RuntimeImageVersionDto = { id: newResourceId(), projectId, imageId, buildId, revisionId: newResourceId(), repository: 'registry.test/tools', digest: `sha256:${'a'.repeat(64)}`, architecture: 'linux/amd64', state: 'available', createdAt: new Date().toISOString(), initializerDigest: `sha256:${'b'.repeat(64)}`, toolsDigest: `sha256:${'c'.repeat(64)}` };
-  await db.db.execute(sql`INSERT INTO runtime_environment.images VALUES (${imageId}, ${projectId}, 'tools', 'project', true, '{}'::jsonb)`);
+  const version: RuntimeImageVersionDto = { id: newResourceId(), imageId, buildId, revisionId: newResourceId(), repository: 'registry.test/tools', digest: `sha256:${'a'.repeat(64)}`, architecture: 'linux/amd64', state: 'available', createdAt: new Date().toISOString(), initializerDigest: `sha256:${'b'.repeat(64)}`, toolsDigest: `sha256:${'c'.repeat(64)}` };
+  await db.db.execute(sql`INSERT INTO runtime_environment.images (id, name, default_visible, enabled, payload) VALUES (${imageId}, 'tools', false, true, '{}'::jsonb)`);
   await db.db.execute(sql`INSERT INTO runtime_environment.builds VALUES (${buildId}, ${imageId}, ${projectId}, ${newResourceId()}, 'seed', 'succeeded', NULL, '{}'::jsonb)`);
-  await db.db.execute(sql`INSERT INTO runtime_environment.versions VALUES (${version.id}, ${imageId}, ${projectId}, ${buildId}, ${version.repository}, ${version.digest}, 'available', ${JSON.stringify(version)}::jsonb)`);
+  await db.db.execute(sql`INSERT INTO runtime_environment.versions (id, image_id, build_id, repository, digest, state, payload) VALUES (${version.id}, ${imageId}, ${buildId}, ${version.repository}, ${version.digest}, 'available', ${JSON.stringify(version)}::jsonb)`);
   const owners = [newResourceId(), newResourceId()];
   for (const ownerId of owners) {
     const reference = { id: newResourceId(), versionId: version.id, projectId, ownerType, ownerId, state: 'confirmed', expiresAt: null, createdAt: version.createdAt };
     await db.db.execute(sql`INSERT INTO runtime_environment.references VALUES (${reference.id}, ${version.id}, ${projectId}, ${ownerType}, ${ownerId}, ${JSON.stringify(reference)}::jsonb)`);
   }
-  return { version, owners };
+  return { version, owners, projectId };
 }
 
 describe.skipIf(!available)('运行镜像引用所有者的实际平台装配', () => {
   test('缺失业务所有者保留；晚绑定端口给出终态才回收，端口失败保持引用', async () => {
-    const { version, owners } = await seedReferences();
+    const { version, owners, projectId } = await seedReferences();
     const images = platform.modules.runtimeEnvironment.api;
     expect(await images.reconcileReferences()).toBe(0);
     const owner = spyOn(platform.modules.businessTask.api, 'imageReferenceState').mockImplementation(async (input) => {
-      expect(input).toMatchObject({ projectId: version.projectId, versionId: version.id, ownerType: 'task' });
+      expect(input).toMatchObject({ projectId, versionId: version.id, ownerType: 'task' });
       if (input.ownerId === owners[0]) return 'released';
       throw new Error('owner unavailable');
     });

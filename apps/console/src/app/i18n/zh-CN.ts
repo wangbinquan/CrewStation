@@ -2,6 +2,28 @@ import type { Messages } from '../../shared/lib/i18n';
 
 /** app 级文案：导航、顶栏、语言、404，以及 shared/ui 里通用组件的缺省文案。页面文案在各 feature 的 i18n/ 中。 */
 export const messages = {
+  "catalog.resources": "资源配置",
+  "catalog.search": "搜索",
+  "catalog.clear": "清除搜索",
+  "catalog.searchDescription": "搜索名称或用途",
+  "catalog.countUnknown": "数量待确认",
+  "catalog.pageCount": "本页 {count} 项",
+  "catalog.resultCount": "{count} 项匹配",
+  "catalog.first": "第一页",
+  "catalog.previous": "上一页",
+  "catalog.next": "下一页",
+  "catalog.details": "详情",
+  "catalog.more": "更多",
+  "catalog.ownerUnknown": "负责人信息不可用",
+  "catalog.selectedOwner": "已选负责人",
+  "catalog.identifier": "资源 ID",
+  "catalog.namespace": "命名空间",
+  "catalog.created": "创建时间",
+  "catalog.reason": "原因",
+  "catalog.openProject": "进入项目",
+  "catalog.noMatches": "没有匹配结果",
+  "catalog.noMatchesHint": "尝试其他关键词或清除筛选。",
+
   'executionRecovery.tasks': '任务列表 · 失败与待核对任务优先',
   'executionRecovery.project': '所属项目',
   'executionRecovery.allProjects': '全部项目',

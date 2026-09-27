@@ -21,11 +21,11 @@ describe.skipIf(!available)('初始化凭据快照的授权与物化', () => {
     } } });
     cleanup.push(() => f.tdb.drop());
     const image = await f.image();
-    const revision = await f.api.createRevision(f.developer, f.project, image.id, CreateRuntimeImageRevisionSchema.parse({
+    const revision = await f.api.createRevision(f.admin, f.project, image.id, CreateRuntimeImageRevisionSchema.parse({
       source: { kind: 'existing', reference: `registry.test/project/tools@${digest}`, architecture: 'linux/amd64', usage: 'task' },
       initializer: { secrets: [{ id: 'token', environment: 'development', configDefinitionId: definitionId }] },
     }));
-    const build = await f.api.startBuild(f.developer, f.project, image.id, { requestKey: 'secret-build', revisionId: revision.id });
+    const build = await f.api.startBuild(f.admin, f.project, image.id, { requestKey: 'secret-build', revisionId: revision.id });
     const version = { id: newResourceId(), projectId: f.project, imageId: image.id, revisionId: revision.id, buildId: build.id, repository: 'registry.test/project/tools', digest, architecture: 'linux/amd64' as const, state: 'available' as const, createdAt: build.createdAt, initializerDigest: imageContentDigest(revision.initializer), toolsDigest: imageContentDigest(revision.tools) };
     await f.uow.run(async (s) => { await s.versions.insert(version); await s.builds.update({ ...(await s.builds.get(build.id))!, state: 'succeeded', versionId: version.id }); });
     await passedValidation(f, version.id);

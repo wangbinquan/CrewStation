@@ -1,4 +1,4 @@
-import type { CreateRuntimeImageSetup } from '@crewstation/contracts';
+import type { CreateRuntimeImageSetup, ProjectRuntimeImagePolicyDto, SaveProjectRuntimeImagePolicy, RuntimeImageGrants } from '@crewstation/contracts';
 import type { RuntimeImageHistoryQuery, RuntimeImageHistoryPage } from '@crewstation/contracts';
 import type { CreateRuntimeImageRequest, CreateRuntimeImageRevision, RuntimeImageBuildDto, RuntimeImageDto, RuntimeImageLogPage, RuntimeImagePageQuery, RuntimeImageRevisionDto, RuntimeImageVersionDto, RuntimeImageValidationDto, SaveDevelopmentRuntimeImages, StartImageValidation, StartRuntimeImageBuild, UpdateRuntimeImageRequest } from '@crewstation/contracts';
 import type { Transport } from '../httpTransport';
@@ -8,40 +8,47 @@ import { segment } from '../requestUrl';
 
 export type DevelopmentRuntimeImages = Omit<SaveDevelopmentRuntimeImages, 'expectedRevision'> & { projectId: string; revision: number };
 export interface RuntimeImagesResource {
-  createSetup(projectId: string, input: CreateRuntimeImageSetup): Promise<{ image: RuntimeImageDto; revision: RuntimeImageRevisionDto }>;
-  history(projectId: string, imageId: string, page?: Partial<RuntimeImageHistoryQuery>): Promise<RuntimeImageHistoryPage>;
+  grants(imageId: string): Promise<RuntimeImageGrants>;
+  projectPolicy(projectId: string): Promise<ProjectRuntimeImagePolicyDto>;
+  saveProjectPolicy(projectId: string, input: SaveProjectRuntimeImagePolicy): Promise<ProjectRuntimeImagePolicyDto>;
+  createSetup(projectId: string | undefined, input: CreateRuntimeImageSetup): Promise<{ image: RuntimeImageDto; revision: RuntimeImageRevisionDto }>;
+  history(projectId: string | undefined, imageId: string, page?: Partial<RuntimeImageHistoryQuery>): Promise<RuntimeImageHistoryPage>;
   adminCatalog(page?: Partial<RuntimeImagePageQuery>): Promise<ItemsPage<RuntimeImageDto>>;
   list(projectId: string, page?: Partial<RuntimeImagePageQuery>): Promise<ItemsPage<RuntimeImageDto>>;
-  create(projectId: string, input: CreateRuntimeImageRequest): Promise<RuntimeImageDto>;
-  get(projectId: string, imageId: string): Promise<RuntimeImageDto>;
-  update(projectId: string, imageId: string, input: UpdateRuntimeImageRequest): Promise<RuntimeImageDto>;
+  create(projectId: string | undefined, input: CreateRuntimeImageRequest): Promise<RuntimeImageDto>;
+  get(projectId: string | undefined, imageId: string): Promise<RuntimeImageDto>;
+  update(projectId: string | undefined, imageId: string, input: UpdateRuntimeImageRequest): Promise<RuntimeImageDto>;
   share(projectId: string, imageId: string, scope: 'project' | 'shared', expectedRevision: number): Promise<RuntimeImageDto>;
-  createRevision(projectId: string, imageId: string, input: CreateRuntimeImageRevision): Promise<RuntimeImageRevisionDto>;
-  revisions(projectId: string, imageId: string, page?: Partial<RuntimeImagePageQuery>): Promise<ItemsPage<RuntimeImageRevisionDto>>;
-  versions(projectId: string, imageId: string, page?: Partial<RuntimeImagePageQuery>): Promise<ItemsPage<RuntimeImageVersionDto>>;
-  startBuild(projectId: string, imageId: string, input: StartRuntimeImageBuild): Promise<RuntimeImageBuildDto>;
-  builds(projectId: string, imageId: string, page?: Partial<RuntimeImagePageQuery>): Promise<ItemsPage<RuntimeImageBuildDto>>;
-  build(projectId: string, imageId: string, buildId: string): Promise<RuntimeImageBuildDto>;
-  cancelBuild(projectId: string, imageId: string, buildId: string, requestKey: string): Promise<RuntimeImageBuildDto>;
-  logs(projectId: string, imageId: string, buildId: string, after?: number): Promise<{ expired: false } & RuntimeImageLogPage>;
-  validate(projectId: string, imageId: string, versionId: string, input: StartImageValidation): Promise<RuntimeImageValidationDto>;
-  validations(projectId: string, imageId: string, versionId: string): Promise<ItemsPage<RuntimeImageValidationDto>>;
-  cancelValidation(projectId: string, imageId: string, versionId: string, validationId: string, requestKey: string): Promise<RuntimeImageValidationDto>;
-  disable(projectId: string, imageId: string, versionId: string): Promise<RuntimeImageVersionDto>;
-  retire(projectId: string, imageId: string, versionId: string): Promise<{ version: RuntimeImageVersionDto; physicalDeletion: 'retained' | 'pending-maintenance' }>;
-  references(projectId: string, imageId: string, versionId: string): Promise<{ items: RuntimeImageReferenceDto[]; total: number }>;
+  createRevision(projectId: string | undefined, imageId: string, input: CreateRuntimeImageRevision): Promise<RuntimeImageRevisionDto>;
+  revisions(projectId: string | undefined, imageId: string, page?: Partial<RuntimeImagePageQuery>): Promise<ItemsPage<RuntimeImageRevisionDto>>;
+  versions(projectId: string | undefined, imageId: string, page?: Partial<RuntimeImagePageQuery>): Promise<ItemsPage<RuntimeImageVersionDto>>;
+  startBuild(projectId: string | undefined, imageId: string, input: StartRuntimeImageBuild): Promise<RuntimeImageBuildDto>;
+  builds(projectId: string | undefined, imageId: string, page?: Partial<RuntimeImagePageQuery>): Promise<ItemsPage<RuntimeImageBuildDto>>;
+  build(projectId: string | undefined, imageId: string, buildId: string): Promise<RuntimeImageBuildDto>;
+  cancelBuild(projectId: string | undefined, imageId: string, buildId: string, requestKey: string): Promise<RuntimeImageBuildDto>;
+  logs(projectId: string | undefined, imageId: string, buildId: string, after?: number): Promise<{ expired: false } & RuntimeImageLogPage>;
+  validate(projectId: string | undefined, imageId: string, versionId: string, input: StartImageValidation & { projectId?: string }): Promise<RuntimeImageValidationDto>;
+  validations(projectId: string | undefined, imageId: string, versionId: string): Promise<ItemsPage<RuntimeImageValidationDto>>;
+  cancelValidation(projectId: string | undefined, imageId: string, versionId: string, validationId: string, requestKey: string): Promise<RuntimeImageValidationDto>;
+  disable(projectId: string | undefined, imageId: string, versionId: string): Promise<RuntimeImageVersionDto>;
+  retire(projectId: string | undefined, imageId: string, versionId: string): Promise<{ version: RuntimeImageVersionDto; physicalDeletion: 'retained' | 'pending-maintenance' }>;
+  references(projectId: string | undefined, imageId: string, versionId: string): Promise<{ items: RuntimeImageReferenceDto[]; total: number }>;
   version(projectId: string, versionId: string): Promise<RuntimeImageOptionDto>;
+  adminVersion(imageId: string, versionId: string): Promise<RuntimeImageVersionDto>;
   development(projectId: string): Promise<DevelopmentRuntimeImages>;
   saveDevelopment(projectId: string, input: SaveDevelopmentRuntimeImages): Promise<DevelopmentRuntimeImages>;
 }
 
 export function runtimeImagesResource(t: Transport): RuntimeImagesResource {
-  const root = (project: string) => `/v1/projects/${segment(project)}/runtime-images`;
-  const image = (project: string, id: string) => `${root(project)}/${segment(id)}`;
-  const build = (project: string, id: string, buildId: string) => `${image(project, id)}/builds/${segment(buildId)}`;
-  const version = (project: string, id: string, versionId: string) => `${image(project, id)}/versions/${segment(versionId)}`;
+  const root = (project: string | undefined) => project === undefined ? '/v1/admin/runtime-image-catalog' : `/v1/projects/${segment(project)}/runtime-images`;
+  const image = (project: string | undefined, id: string) => `${root(project)}/${segment(id)}`;
+  const build = (project: string | undefined, id: string, buildId: string) => `${image(project, id)}/builds/${segment(buildId)}`;
+  const version = (project: string | undefined, id: string, versionId: string) => `${image(project, id)}/versions/${segment(versionId)}`;
   const development = (project: string) => `/v1/projects/${segment(project)}/development-runtime-images`;
   return {
+    grants: (id) => t.request('GET', `${image(undefined, id)}/grants`),
+    projectPolicy: (p) => t.request('GET', `/v1/projects/${segment(p)}/runtime-image-policy`),
+    saveProjectPolicy: (p, input) => t.request('PUT', `/v1/projects/${segment(p)}/runtime-image-policy`, { body: input }),
     createSetup: (p, input) => t.request('POST', `${root(p)}/setup`, { body: input }),
     history: (p, id, page) => t.request('GET', `${image(p, id)}/history`, { query: page }),
     adminCatalog: (page) => t.request('GET', '/v1/admin/runtime-image-catalog', { query: page }),
@@ -58,6 +65,7 @@ export function runtimeImagesResource(t: Transport): RuntimeImagesResource {
     disable: (p, id, v) => t.request('POST', `${version(p, id, v)}/disable`), retire: (p, id, v) => t.request('DELETE', version(p, id, v)),
     references: (p, id, v) => t.request('GET', `${version(p, id, v)}/references`),
     version: (p, v) => t.request('GET', `/v1/projects/${segment(p)}/runtime-image-versions/${segment(v)}`),
+    adminVersion: (id, v) => t.request('GET', version(undefined, id, v)),
     development: (p) => t.request('GET', development(p)), saveDevelopment: (p, input) => t.request('PUT', development(p), { body: input }),
   };
 }
