@@ -29,7 +29,7 @@ paths:
           in: header
           required: true
           schema: { type: string }
-          description: 钩子名，例如 `Push Hook`、`Tag Push Hook`、`Merge Request Hook`、`Pipeline Hook`、`Issue Hook`
+          description: 钩子名，例如 `Push Hook`、`Tag Push Hook`、`Merge Request Hook`、`Pipeline Hook`、`Issue Hook`、`Note Hook`
         - name: X-Gitlab-Event-UUID
           in: header
           required: false
@@ -68,7 +68,7 @@ paths:
                 ignored:
                   value: { accepted: false, ignored: true, reason: "本接入容器不产生 wiki page hook 的事件；已登记的钩子：push hook、tag push hook、merge request hook、pipeline hook、issue hook" }
         "400":
-          description: 请求体不是 JSON 对象
+          description: 请求体不是 JSON 对象，或 MR／Issue 评论缺少对象身份及正文
           content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
         "401":
           description: 缺少 `X-Gitlab-Token`，或与配置的密钥不一致

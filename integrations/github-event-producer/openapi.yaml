@@ -1,0 +1,49 @@
+openapi: 3.1.0
+info:
+  title: github-event-producer
+  version: 0.1.0
+  description: Webhook operational contract; EventProducer is not registered in the APIProxy catalog.
+paths:
+  /hooks/github:
+    post:
+      operationId: receiveGithubWebhook
+      summary: Verify exact body bytes, normalize event and persist through cs-events
+      parameters:
+        - { name: X-Hub-Signature-256, in: header, required: true, schema: { type: string }, description: HMAC-SHA256 of original body with GITHUB_WEBHOOK_SECRET }
+        - { name: X-GitHub-Event, in: header, required: true, schema: { type: string } }
+        - { name: X-GitHub-Delivery, in: header, required: false, schema: { type: string }, description: Stable delivery identity for redelivery; preserve this header }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        '200': { description: Verified ping, no event produced }
+        '202':
+          description: Durable receipt (accepted true), or unsupported action (accepted false and ignored true)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accepted: { type: boolean }
+                  ignored: { type: boolean }
+                  eventId: { type: string, format: uuid }
+                  eventType: { type: string }
+                  deduplicated: { type: boolean }
+                  deliveries: { type: integer, minimum: 0 }
+        '400': { description: Invalid JSON object or missing supported event identity }
+        '401': { description: Missing secret or invalid SHA-256 signature }
+        '415': { description: Configure GitHub to send application/json }
+        '502': { description: cs-events rejected the event }
+        '503': { description: No events endpoint, transport timeout or invalid persistence receipt; manual redelivery required }
+  /healthz:
+    get:
+      operationId: health
+      responses:
+        '200': { description: Process ready }
+  /:
+    get:
+      operationId: producerStatus
+      responses:
+        '200': { description: Deployment identity, event types and secret configured flag; no credentials }

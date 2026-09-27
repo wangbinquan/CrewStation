@@ -48,6 +48,11 @@ function clamp(eventType: string, source: DedupSource, suffix: string): DedupKey
 export function fingerprint(payload: unknown): string {
   const root = asRecord(payload);
   const attributes = asRecord(root?.object_attributes);
+  if (attributes?.noteable_type === 'MergeRequest' || attributes?.noteable_type === 'Issue') {
+    const target = asRecord(root?.[attributes.noteable_type === 'MergeRequest' ? 'merge_request' : 'issue']);
+    return sha256(JSON.stringify([asRecord(root?.project)?.id, attributes.noteable_type, target?.id,
+      attributes.id, attributes.action, attributes.created_at, attributes.updated_at, attributes.note]));
+  }
   const parts = [
     ...FINGERPRINT_FIELDS.map((field) => `${field}=${scalar(root?.[field])}`),
     ...ATTRIBUTE_FIELDS.map((field) => `oa.${field}=${scalar(attributes?.[field])}`),

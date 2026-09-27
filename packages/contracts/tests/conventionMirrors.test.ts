@@ -32,9 +32,9 @@ function literals(path: string, pattern: RegExp): Array<{ file: string; value: s
 const files = MIRROR_ROOTS.flatMap((top) => sourceFiles(join(ROOT, top)));
 
 describe('模板与接入容器里手抄的约定名', () => {
-  test('扫描确实覆盖到了四个独立项目', () => {
+  test('扫描确实覆盖到了五个独立项目', () => {
     const projects = new Set(files.map((path) => relative(ROOT, path).split('/').slice(0, 2).join('/')));
-    expect([...projects].sort()).toEqual(['integrations/gitlab-event-producer', 'integrations/reference-api-proxy', 'templates/business-execution-v3', 'templates/minimal-sample']);
+    expect([...projects].sort()).toEqual(['integrations/github-event-producer', 'integrations/gitlab-event-producer', 'integrations/reference-api-proxy', 'templates/business-execution-v3', 'templates/minimal-sample']);
   });
 
   test('每个 x-cs-* 头名都出自约定表', () => {

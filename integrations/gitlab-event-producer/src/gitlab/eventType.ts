@@ -38,7 +38,7 @@ const HOOK_RULES: Readonly<Record<string, HookRule>> = {
 
 export type EventTypeResult =
   | { ok: true; eventType: string; hook: string }
-  | { ok: false; reason: string };
+  | { ok: false; reason: string; invalid?: boolean };
 
 /** 归一化钩子名：GitLab 写作 `Push Hook`，容错大小写与多余空白。 */
 export function normalizeHookName(headerValue: string | null | undefined): string {
@@ -52,6 +52,7 @@ export function normalizeHookName(headerValue: string | null | undefined): strin
 export function mapEventType(headerValue: string | null | undefined, payload: unknown): EventTypeResult {
   const hook = normalizeHookName(headerValue);
   if (hook.length === 0) return { ok: false, reason: `缺少 ${GITLAB_EVENT_HEADER} 请求头，无法判断事件类型` };
+  if (hook === 'note hook') return mapComment(payload, hook);
   const rule = HOOK_RULES[hook];
   if (!rule) return { ok: false, reason: `本接入容器不产生 ${hook} 的事件；已登记的钩子：${Object.keys(HOOK_RULES).join('、')}` };
   return { ok: true, hook, eventType: refine(rule, payload) };
@@ -71,7 +72,7 @@ function refine(rule: HookRule, payload: unknown): string {
  * crewstation.yaml `spec.produces` 必须与它逐项一致——src/gitlab/eventType.test.ts 会比对，改一处就得改另一处。
  */
 export function allEventTypes(): string[] {
-  const out: string[] = [];
+  const out: string[] = ['gitlab.merge-request.comment', 'gitlab.issue.comment'];
   for (const rule of Object.values(HOOK_RULES)) {
     out.push(rule.base);
     for (const refinement of rule.refinements ?? []) out.push(`${rule.base}.${refinement}`);
@@ -81,4 +82,21 @@ export function allEventTypes(): string[] {
 
 export function readRecord(value: unknown): Record<string, unknown> | undefined {
   return typeof value === 'object' && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : undefined;
+}
+
+function mapComment(payload: unknown, hook: string): EventTypeResult {
+  const root = readRecord(payload);
+  const attributes = readRecord(root?.object_attributes);
+  const target = attributes?.noteable_type;
+  if (target !== 'MergeRequest' && target !== 'Issue') return { ok: false, reason: 'Unsupported note target' };
+  const object = readRecord(root?.[target === 'MergeRequest' ? 'merge_request' : 'issue']);
+  if (!validId(attributes?.id) || !validId(object?.id) || !validId(readRecord(root?.project)?.id)
+    || typeof attributes?.note !== 'string') {
+    return { ok: false, invalid: true, reason: 'Comment requires project, target, note IDs and note text' };
+  }
+  return { ok: true, hook, eventType: target === 'MergeRequest' ? 'gitlab.merge-request.comment' : 'gitlab.issue.comment' };
+}
+
+function validId(value: unknown): boolean {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value > 0;
 }

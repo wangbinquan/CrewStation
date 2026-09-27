@@ -1,0 +1,40 @@
+apiVersion: crewstation/v2
+kind: EventProducer
+spec:
+  service:
+    command: ["bun", "run", "src/main.ts"]
+    port: 3000
+    healthPath: /healthz
+    servicePlanId: 01a0bf5d-8f4b-7000-9e4b-b54e91ee9d10
+    replicas: 1
+  development:
+    command: ["bun", "run", "--watch", "src/main.ts"]
+    port: 3000
+  env:
+    - name: GITHUB_WEBHOOK_SECRET
+      configDefinitionId: 01a0bf5d-8f4b-7100-8000-000000000005
+      from: secret
+  producer: github
+  ingress:
+    path: /hooks/github
+    verification: hmac-sha256
+  produces:
+    - eventType: github.push
+    - eventType: github.tag-push
+    - eventType: github.pull-request.open
+    - eventType: github.pull-request.reopen
+    - eventType: github.pull-request.update
+    - eventType: github.pull-request.close
+    - eventType: github.pull-request.merge
+    - eventType: github.pull-request.comment
+    - eventType: github.issue.comment
+    - eventType: github.pull-request.review-comment
+    - eventType: github.issue.labeled
+    - eventType: github.workflow-run.success
+    - eventType: github.workflow-run.failure
+    - eventType: github.workflow-run.timed-out
+  release:
+    migration:
+      compatibility: none
+      destructive: false
+      rollback: switch-back

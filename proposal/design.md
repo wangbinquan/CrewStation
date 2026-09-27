@@ -1277,3 +1277,8 @@ Kubernetes 原生动作使用 UID/resourceVersion 条件；开发工作区经保
 应用 `icon` 保留为后备符号；可选 `iconSource` 为 app、url 或平台生成的 upload/revision。自动源为已授权入口 `/favicon.ico`（正式优先，仅 Beta 时取 Beta）；手动源失败后有限回退到自动源和后备图标。上传的 PNG/JPEG/WebP 由 project 适配器严格解码为 ≤128px／64KiB WebP，最多 2MiB／4096px 原图，和展示资料 revision 同一事务保存。图标读取逐次核对市场可见性，private/no-store；不新增后端远程抓取或匿名网关豁免。旧客户端省略来源不会清除已有上传。
 
 实现与验收分别见 [RFC-031](./rfc/RFC-031-console-catalog-ux/acceptance.md) 和 [RFC-032](./rfc/RFC-032-app-icons/acceptance.md)，最终已随d2852b32发布并部署本机，精确SHA六项CI与真实页面验收通过；历史本地证据不替代部署回执。
+
+
+## RFC-033 补充：代码托管 webhook producer（2026-09-27，已批准）
+
+GitLab 新增 `gitlab.merge-request.comment` 与 `gitlab.issue.comment`；旧事件与订阅保持兼容。GitHub 独立模板使用 `/hooks/github`、原始字节 HMAC-SHA256 和 `GITHUB_WEBHOOK_SECRET`，以 delivery ID 优先去重。两个容器保留 payload，仅在 cs-events 有效持久回执后确认 accepted。复用现有目录登记、inbox、投递、死信与切槽，无新 DTO／迁移。封闭矩阵、失败响应和无 delivery 头的退化语义见 [RFC-033 design](rfc/RFC-033-code-host-event-producers/design.md)。

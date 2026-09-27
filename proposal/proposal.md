@@ -578,3 +578,8 @@ agent-workflow 现有栈为 Bun、TypeScript、Hono、Drizzle、SQLite 默认并
 ## 工作台目录与业务应用标识（RFC-031／032，2026-09-27）
 
 项目、能力接入、运行镜像、算力、服务和任务资源模板采用紧凑目录，突出名称、负责人、配置、各自状态与下一步；搜索／筛选进入 URL，详情和表单使用统一弹窗或独立路由，返回保留列表上下文。应用保留统一 32px 图标，可由业务公开 `/favicon.ico` 自动提供，或由负责人上传图片／指定图片 URL；正式和 Beta 按当前授权入口选择，加载失败使用后备符号。细节与验收分别见 RFC-031、RFC-032。
+
+
+## RFC-033 补充：代码托管事件接入（2026-09-27，已批准）
+
+内置 GitLab EventProducer 支持 MR／Issue 评论新增及编辑，保留原始 payload。新增按需创建的 GitHub EventProducer 模板，覆盖 push／tag、PR 生命周期、PR 普通／行评论、Issue 评论／标签、workflow run 成功／失败／超时。类型矩阵及边界以 [RFC-033](rfc/RFC-033-code-host-event-producers/proposal.md) 为准。业务规则归消费者所有；不改变平台代码托管后端。

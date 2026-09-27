@@ -1,8 +1,8 @@
 name: setup workspace
-description: Bun 与工作区依赖；按需安装不在工作区里的三个独立项目
+description: Bun 与工作区依赖；按需安装不在工作区里的独立项目
 inputs:
   standalone:
-    description: 是否安装模板与两个接入容器自己的依赖。它们有意不在根 workspaces 里（生成出来的项目要能独立安装），但用例由根 bun test 收进方法级那一层；不装就是 Cannot find package 'hono'
+    description: 是否安装模板与接入容器自己的依赖。它们有意不在根 workspaces 里（生成出来的项目要能独立安装），但用例由根 bun test 收进方法级那一层；不装就是 Cannot find package 'hono'
     required: false
     default: 'false'
 runs:
@@ -16,6 +16,6 @@ runs:
     - if: inputs.standalone == 'true'
       shell: bash
       run: |
-        for dir in templates/minimal-sample integrations/gitlab-event-producer integrations/reference-api-proxy; do
+        for dir in templates/minimal-sample integrations/gitlab-event-producer integrations/github-event-producer integrations/reference-api-proxy; do
           (cd "$dir" && bun install --frozen-lockfile)
         done

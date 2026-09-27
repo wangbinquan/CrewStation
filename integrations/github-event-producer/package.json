@@ -1,0 +1,21 @@
+{
+  "name": "github-event-producer",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "CrewStation GitHub webhook EventProducer",
+  "scripts": {
+    "dev": "bun run --watch src/main.ts",
+    "start": "bun run src/main.ts",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "hono": "4.13.7"
+  },
+  "devDependencies": {
+    "@types/bun": "1.4.2"
+  },
+  "engines": {
+    "bun": ">=1.3.0"
+  }
+}

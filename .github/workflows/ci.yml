@@ -34,6 +34,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-workspace
+        with:
+          standalone: 'true'
       - run: bun run check:static
 
   unit:
@@ -79,6 +81,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-workspace
+        with:
+          standalone: 'true'
       - name: install pinned Prometheus for real TSDB regression
         run: |
           mkdir -p /tmp/prometheus-test

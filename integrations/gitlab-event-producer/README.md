@@ -119,3 +119,11 @@ docker run --rm -p 13001:3000 -e GITLAB_WEBHOOK_SECRET_TOKEN=local-secret -e CS_
 - 投递 `cs-events` 的超时是 8 秒，刻意小于 `Bun.serve` 默认的 10 秒空闲超时：卡住的投递要来得及收口成一条 5xx，否则 GitLab 看到的是连接被重置而不是可重试的失败。
 - 本服务不留任何状态：投递成功与否只进 stdout 日志（密钥与 webhook 正文都不进日志），排查靠工作台的日志页与投递记录页。
 - 平台能力的权威说明见 `CONTRIBUTING.md` 指向的入口，本文不复述。
+
+## RFC-033 评论事件与升级
+
+启用 GitLab webhook 的 Comments／Note events 后，`Note Hook` 的 `object_attributes.noteable_type` 为 `MergeRequest` 时产生 `gitlab.merge-request.comment`，为 `Issue` 时产生 `gitlab.issue.comment`。新增和编辑都保留整个 payload，包括评论 ID／正文、目标和作者；Commit／Snippet 评论仍 ignored。已知评论目标缺少 project.id、目标 id、note id 或正文时返回 400。
+
+优先去重头的次序保持不变。无去重头的评论指纹加入目标类型、目标 ID、note ID、action、创建／更新时间和正文，编辑不再被旧评论吞掉。接入应用先确认 cs-events 持久回执，才返回 accepted；5xx 后需按上游实际策略或手工重送，不代表上游一定自动重试。
+
+现有项目不会随平台模板自动升级：把本模板评论实现与新增两条 `spec.produces` 合入该项目，保留项目已物化的 servicePlanId、configDefinitionId 和已有配置，然后打新标签、预览验证、切换正式槽。发布登记后业务方才可从目录选择新增评论类型。不要覆盖现有项目的 UUID 配置身份。

@@ -29,6 +29,8 @@ spec:
   # 本接入容器可能产生的全部事件类型，逐条登记；未登记的类型 cs-events 一律拒收（404），
   # 所以 src/gitlab/eventType.ts 里的映射是封闭集合，两处由 src/gitlab/eventType.test.ts 比对。
   produces:
+    - eventType: gitlab.merge-request.comment
+    - eventType: gitlab.issue.comment
     - eventType: gitlab.push
     - eventType: gitlab.tag-push
     - eventType: gitlab.merge-request

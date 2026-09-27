@@ -1,5 +1,5 @@
 /**
- * 内置 GitLab 格式的 EventProducer 接入容器（Design §8.5）。
+ * 内置 GitHub 格式的 EventProducer 接入容器（Design §8.5）。
  * 只做四件事：验 webhook 密钥 → 归一化成平台事件类型 → 算稳定的去重键 → 以自身身份投给 cs-events。
  * 没有登录代码、没有凭据、不解析身份令牌：请求经服务域进来，投递也经服务域出去，调用方身份由网关按源 Pod IP 解析。
  */
@@ -7,16 +7,16 @@ import { Hono } from 'hono';
 import type { Context } from 'hono';
 import { ProduceFailed, produceEvent } from './events/eventsClient';
 import type { FetchLike } from './events/eventsClient';
-import { deriveDedupKey } from './gitlab/dedupKey';
-import { GITLAB_EVENT_HEADER, PRODUCER_NAME, allEventTypes, mapEventType } from './gitlab/eventType';
-import { deriveOccurredAt } from './gitlab/occurredAt';
-import { GITLAB_TOKEN_HEADER, verifyWebhookToken } from './gitlab/webhookToken';
+import { deriveDedupKey } from './github/dedupKey';
+import { GITHUB_EVENT_HEADER, PRODUCER_NAME, allEventTypes, mapEventType } from './github/eventType';
+import { deriveOccurredAt } from './github/occurredAt';
+import { verifySignature } from './github/signature';
 import { CONFIG_ENV, readDeploymentInfo } from './platform/environment';
 import type { DeploymentInfo } from './platform/environment';
 import { readTraceId } from './platform/identity';
 
-/** Manifest `spec.ingress.path`：GitLab webhook 指向的路径，两处必须一致。 */
-export const INGRESS_PATH = '/hooks/gitlab';
+/** Manifest `spec.ingress.path`：GitHub webhook 指向的路径，两处必须一致。 */
+export const INGRESS_PATH = '/hooks/github';
 
 export type LogFn = (msg: string, fields: Record<string, unknown>) => void;
 
@@ -48,7 +48,7 @@ export function createApp(options: AppOptions = {}): Hono {
     environment: deployment.environment,
     ingressPath: INGRESS_PATH,
     eventsBaseUrl: deployment.eventsBaseUrl,
-    webhookSecretConfigured: deployment.webhookSecretToken !== null,
+    webhookSecretConfigured: deployment.webhookSecret !== null,
     eventTypes: allEventTypes(),
   }));
 
@@ -58,22 +58,28 @@ export function createApp(options: AppOptions = {}): Hono {
 }
 
 /**
- * 回应 GitLab 的约定：
- * 401 密钥不符；400 请求体不是 JSON 对象；202 已受理或已去重；
- * 202＋ignored 不产生事件的钩子（让 GitLab 别再重投）；5xx cs-events 未受理，需要上游或运维重投（Design §8.5）。
+ * 回应 GitHub 的约定：
+ * 401 签名不符；400 请求体不是 JSON 对象；202 已受理或已去重；
+ * 202＋ignored 不产生事件的钩子（让 GitHub 别再重投）；5xx cs-events 未受理，需要上游或运维重投（Design §8.5）。
  */
 async function handleWebhook(c: Context, deployment: DeploymentInfo, options: AppOptions, log: LogFn): Promise<Response> {
   const headers = c.req.raw.headers;
-  const token = verifyWebhookToken(headers.get(GITLAB_TOKEN_HEADER), deployment.webhookSecretToken);
+  const raw = new Uint8Array(await c.req.arrayBuffer());
+  const token = verifySignature(raw, headers.get('x-hub-signature-256'), deployment.webhookSecret);
   if (!token.ok) {
-    log('webhook rejected', { reason: token.reason, hook: headers.get(GITLAB_EVENT_HEADER) });
+    log('webhook rejected', { reason: token.reason, hook: headers.get(GITHUB_EVENT_HEADER) });
     return c.json({ error: 'unauthenticated', message: token.reason }, 401);
   }
-  const payload: unknown = await c.req.json().catch(() => null);
-  if (typeof payload !== 'object' || payload === null || Array.isArray(payload)) {
-    return c.json({ error: 'validation', message: '请求体必须是 GitLab webhook 的 JSON 对象' }, 400);
+  if (headers.get('content-type')?.split(';')[0]?.trim().toLowerCase() !== 'application/json') {
+    return c.json({ error: 'validation', message: 'Configure the webhook with application/json' }, 415);
   }
-  const mapped = mapEventType(headers.get(GITLAB_EVENT_HEADER), payload);
+  let payload: unknown;
+  try { payload = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(raw)); } catch { payload = null; }
+  if (typeof payload !== 'object' || payload === null || Array.isArray(payload)) {
+    return c.json({ error: 'validation', message: '请求体必须是 GitHub webhook 的 JSON 对象' }, 400);
+  }
+  if (headers.get(GITHUB_EVENT_HEADER) === 'ping') return c.json({ accepted: false, pong: true }, 200);
+  const mapped = mapEventType(headers.get(GITHUB_EVENT_HEADER), payload);
   if (!mapped.ok) {
     if (mapped.invalid) return c.json({ error: 'validation', message: mapped.reason }, 400);
     log('webhook ignored', { reason: mapped.reason });
@@ -104,7 +110,7 @@ async function forward(
   } catch (err) {
     const failure = err instanceof ProduceFailed ? err : new ProduceFailed(`投递 cs-events 时发生未预期的错误：${String(err)}`, true);
     log('event produce failed', { eventType, reason: failure.reason, retryable: failure.retryable, status: failure.status });
-    // 一律 5xx：受理不了就让 GitLab 知道，别把事件悄悄丢掉。
+    // 一律 5xx：受理不了就让 GitHub 知道，别把事件悄悄丢掉。
     return c.json({ error: 'unavailable', message: failure.reason }, failure.retryable ? 503 : 502);
   }
 }
@@ -119,10 +125,10 @@ if (import.meta.main) {
   const server = Bun.serve({ port: deployment.port, fetch: createApp().fetch });
   logJsonLine('listening', {
     port: server.port, slot: deployment.slot, producer: PRODUCER_NAME, ingressPath: INGRESS_PATH,
-    eventsBaseUrl: deployment.eventsBaseUrl, webhookSecretConfigured: deployment.webhookSecretToken !== null,
+    eventsBaseUrl: deployment.eventsBaseUrl, webhookSecretConfigured: deployment.webhookSecret !== null,
   });
-  if (deployment.webhookSecretToken === null) {
-    logJsonLine('webhook secret missing', { env: CONFIG_ENV.webhookSecretToken, effect: '一切 webhook 请求都会被拒绝' });
+  if (deployment.webhookSecret === null) {
+    logJsonLine('webhook secret missing', { env: CONFIG_ENV.webhookSecret, effect: '一切 webhook 请求都会被拒绝' });
   }
   const shutdown = (): void => {
     logJsonLine('shutting down', {});

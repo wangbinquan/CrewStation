@@ -19,7 +19,7 @@ test('模板目录使用 UUID；项目副本分配独立且重试稳定的声明
   const source = directoryTemplateSource({ templatesRoot: join(import.meta.dir, '../../../templates'), integrationTemplatesRoot: join(import.meta.dir, '../../../integrations'), resources });
   try {
     const catalog = await source.list();
-    expect(catalog).toHaveLength(4);
+    expect(catalog).toHaveLength(5);
     expect(catalog.every((item) => ResourceIdSchema.safeParse(item.id).success)).toBe(true);
     const v3 = catalog.find((item) => item.name === 'business-execution-v3')!;
     expect(v3.kind).toBe('DigitalWorker');
@@ -39,6 +39,15 @@ test('模板目录使用 UUID；项目副本分配独立且重试稳定的声明
     expect(first.spec.subscriptions[0]!.eventTypeId).toBe(eventId);
     expect(first.spec.env[0]!.name).toBe('GREETING');
     expect(definitions.size).toBe(2);
+    const github = catalog.find((item) => item.name === 'github-event-producer')!;
+    await source.materialize(github.id, join(root, 'github-a'), undefined, a);
+    await source.materialize(github.id, join(root, 'github-b'), undefined, b);
+    const githubA = await manifest('github-a'), githubB = await manifest('github-b');
+    expect(githubA).toMatchObject({ kind: 'EventProducer', spec: { producer: 'github', ingress: { path: '/hooks/github', verification: 'hmac-sha256' } } });
+    expect(githubA.spec.env[0]!.configDefinitionId).not.toBe(githubB.spec.env[0]!.configDefinitionId);
+    expect(githubA.spec.env[0]!.name).toBe('GITHUB_WEBHOOK_SECRET');
+    expect(await readFile(join(root, 'github-a/src/main.ts'), 'utf8')).toContain('/hooks/github');
+
     const client = await readFile(join(root, 'a/src/platform/agentClient.ts'), 'utf8');
     expect(client).toContain(`CHAT_AGENT_PROFILE = '${first.spec.tasks!.agentProfiles[0]!.id}'`);
     expect(client).toContain('/v2/business-tasks');

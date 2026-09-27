@@ -52,13 +52,14 @@ export async function produceEvent(event: ProducedEvent, options: ProduceOptions
   const response = await send(event, options);
   if (!response.ok) throw await failureOf(response);
   const body: unknown = await response.json().catch(() => null);
-  if (!isRecord(body) || typeof body.eventId !== 'string') {
+  if (!isRecord(body) || typeof body.eventId !== 'string' || !body.eventId || typeof body.deduplicated !== 'boolean'
+    || typeof body.deliveries !== 'number' || !Number.isSafeInteger(body.deliveries) || body.deliveries < 0) {
     throw new ProduceFailed('cs-events 的回执不是预期的 ProduceResult', true, response.status);
   }
   return {
     eventId: body.eventId,
-    deduplicated: body.deduplicated === true,
-    deliveries: typeof body.deliveries === 'number' ? body.deliveries : 0,
+    deduplicated: body.deduplicated,
+    deliveries: body.deliveries,
   };
 }
 
