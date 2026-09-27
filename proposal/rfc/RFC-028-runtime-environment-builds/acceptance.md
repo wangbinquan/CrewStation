@@ -242,3 +242,12 @@ TLS修复后的整平台构建已成功：`01a0e245-2543-7000-baf3-84967051278a`
 最终候选核验：完整 `check:static`（架构、lint、后端类型、console类型）与 console 生产构建通过。unit **838/0，5105 assertions**；首次 module **1672 pass/9 skip/1 fail，9640 assertions**，唯一失败是租户档位摘要新增 revision 后的精确字段断言，保留敏感字段排除并补 revision 正整数断言，真实PG定向 **16/0，103 assertions**。没有重新运行整层 module，也不将首次失败报告写成全绿。首次 console 4 fail 涉及动作链接规范、运行中候选变更及并发集群布局断言；本批动作链接和权限查询已修正，集群用例由其所属会话更新。本批最终候选冻结后完整 console **934/0，6432 assertions，142文件**，本批代码哈希未变化。
 
 复核另补旧 native 执行未保存 purpose 的兼容：先红证明历史误标 Agent，改为复用领域 purposeOf 后真实PG **1/0，8 assertions**，旧记录显示 CLI。本批67条精确路径（含未跟踪新文件）新增代码防护 **563/567＝99.2945%，47生产文件，violations=[]**；更新过行号的历史适配器只采用修复后的定向覆盖。报告 `/tmp/cs-image-ux-patch.json`，最终代码快照 `/tmp/cs-image-ux-final-candidate.json`，日志 `/tmp/cs-image-ux-{unit,module,profile-repair,history-final,console-final,static-final,build-final}.log`。共享 contracts 导出等文件保留 RFC027 并发输出，第三方集群布局与 referenceResources 不纳入本批清单。尚待统一提交／精确SHA CI／部署，RFC028实机矩阵与RFC029真正恢复执行仍未完成。
+
+
+## 2026-09-27 详情弹窗与平台归属纠正
+
+- 作者重申点击详情必须为统一弹窗或新页面。业务恢复任务详情、项目／平台运行镜像详情复用 Dialog，不再追加于长表尾；关闭保持筛选、分页、滚动与焦点。嵌套确认 cancel/close 阻断 React portal 冒泡，避免一起关掉父详情。
+- 定向 console 46 pass／0 fail／233 assertions（6 文件）；5 个生产文件新增可执行行16/16覆盖；console 类型、定向 lint、生产 build 通过。日志 `/tmp/cs-detail-dialog-final-tests.log`、`/tmp/cs-detail-dialog-build.log`；覆盖 `/tmp/cs-detail-dialog-coverage/lcov.info`。
+- 实际 Chrome，实际组件＋HTTP 替身，30任务末行＋20诊断记录：中英文、明暗、320／390／1440，12组；另项目／平台镜像详情2页。弹窗在视口内、正文内部滚动、嵌套确认Esc只关顶层、关闭恢复末行焦点和原滚动位置，零控制台错误。证据 `/tmp/cs-detail-dialog-browser.json`，截图 `/tmp/cs-task-detail-{lang}-{theme}-{width}.png`。验收临时入口已删除，Vite已停止。尚非部署后的页面证据。
+- 持久约束写入 AGENTS.md、开发规则 §7、testing.md，包含长列表末行用例要求。
+- 运行镜像平台归属／业务授权按 `platform-catalog-amendment.md` 继续实施；本批弹窗修复不代表授权模型已完成。

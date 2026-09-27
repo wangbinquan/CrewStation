@@ -9,11 +9,22 @@ import { riProject, riImage, riProfile, runtimeImageConsoleFixture } from './run
 let page: Awaited<ReturnType<typeof renderElement>> | undefined, fixture: ReturnType<typeof runtimeImageConsoleFixture> | undefined;
 afterEach(() => { page?.unmount(); fixture?.restore(); page = undefined; fixture = undefined; });
 async function open() { fixture = runtimeImageConsoleFixture(); page = await renderElement(<ProjectScopeProvider value={{ projectId: riProject, space: 'workbench' }}><RuntimeImagesPage /></ProjectScopeProvider>, messages); }
-const dialog = () => document.querySelector('dialog[open]')!;
+const dialog = () => [...document.querySelectorAll('dialog[open]')].at(-1)!;
 async function text(node: HTMLInputElement | HTMLTextAreaElement, value: string) {
   await act(async () => { node.focus(); Object.getOwnPropertyDescriptor(node instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype, 'value')!.set!.call(node, value); node.dispatchEvent(new Event('input', { bubbles: true })); node.dispatchEvent(new KeyboardEvent('keyup', { key: 'a', bubbles: true })); }); await page!.settle();
 }
 async function select(node: HTMLSelectElement, value: string) { await act(async () => { node.value = value; node.dispatchEvent(new Event('change', { bubbles: true })); }); await page!.settle(); }
+
+test('镜像详情使用统一弹窗，关闭保留原目录和触发按钮焦点', async () => {
+  await open(); const table = page!.host.querySelector('table');
+  const opener = [...page!.host.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent === '查看')!;
+  await act(async () => { opener.focus(); opener.click(); }); await page!.settle();
+  expect(document.querySelectorAll('dialog[open]')).toHaveLength(1);
+  expect(dialog().textContent).toContain('Python tools'); expect(dialog().textContent).toContain('使用记录');
+  await act(async () => { dialog().dispatchEvent(new Event('cancel', { cancelable: true })); }); await page!.settle();
+  expect(document.querySelectorAll('dialog[open]')).toHaveLength(0);
+  expect(page!.host.querySelector('table') === table).toBe(true); expect(document.activeElement === opener).toBe(true);
+});
 
 test('一次填写名称用途来源并构建，受理失败重试只重发原构建请求，不重复创建镜像', async () => {
   await open(); await page!.click('新增镜像');
@@ -27,7 +38,7 @@ test('一次填写名称用途来源并构建，受理失败重试只重发原�
   fixture!.state.buildFailure = false; await page!.click('保存并开始构建');
   expect(fixture!.writes.filter((w) => w.url.endsWith('/setup'))).toHaveLength(1);
   expect(fixture!.writes.at(-1)!.body).toEqual(first.body);
-  expect(document.querySelector('dialog[open]') === null).toBe(true);
+  expect(document.querySelectorAll('dialog[open]')).toHaveLength(1);
   expect(page!.text()).toContain('构建与日志');
 });
 
@@ -50,7 +61,7 @@ test('使用记录展示已释放任务与已下线服务，详情链接定位�
   // A new edit after a successful save and toggle must capture the latest revision.
   await page!.click('修改名称与说明'); await text(dialog().querySelector('input')!, 'Renamed again'); await page!.click('保存');
   expect(fixture!.writes.at(-1)!.body).toMatchObject({ name: 'Renamed again', expectedRevision: 3 });
-  expect(document.querySelectorAll('dialog[open]')).toHaveLength(0);
+  expect(document.querySelectorAll('dialog[open]')).toHaveLength(1);
 });
 
 test('Agent 底座从具名档位选择当前修订，不要求输入内部 ID', async () => {

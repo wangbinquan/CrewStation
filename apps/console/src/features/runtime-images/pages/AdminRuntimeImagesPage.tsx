@@ -32,7 +32,7 @@ export function AdminRuntimeImagesPage() {
         </DataTable>
         <div className={styles.row}>{before ? <Button onClick={() => setBefore(undefined)}>{t('images.first')}</Button> : null}{query.data?.items.length === 30 ? <Button onClick={() => setBefore(query.data!.items.at(-1)!.id)}>{t('images.next')}</Button> : null}</div>
       </Card>
-      {selected ? <ImageDetail key={selected.id} projectId={selected.projectId} imageId={selected.id} editable admin manageable /> : null}
+      {selected ? <ImageDetail key={selected.id} projectId={selected.projectId} imageId={selected.id} editable admin manageable onClose={() => setSelected(undefined)} /> : null}
       {projectId ? <CreateImageDialog key={projectId} projectId={projectId} open={adding} onClose={() => setAdding(false)} onCreated={(id) => { setSelected({ id, projectId }); setAdding(false); }} /> : null}
     </>}
   </div>;

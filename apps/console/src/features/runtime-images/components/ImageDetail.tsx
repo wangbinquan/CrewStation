@@ -8,7 +8,7 @@ import { useRef, useState } from 'react';
 import { api } from '../../../shared/api/client';
 import { AUTO_REFRESH, errorMessage, useApiMutation, useApiQuery } from '../../../shared/api/useApi';
 import { useT } from '../../../shared/lib/useT';
-import { Card } from '../../../shared/ui/Card';
+import { Dialog } from '../../../shared/ui/dialog/Dialog';
 import { Button } from '../../../shared/ui/Button';
 import { QueryStatus } from '../../../shared/ui/QueryStatus';
 import { ActionNote } from '../../../shared/ui/ActionNote';
@@ -19,7 +19,7 @@ import { BuildHistory } from './BuildHistory';
 import { ImageVersions } from './ImageVersions';
 import styles from './RuntimeImages.module.css';
 
-export function ImageDetail({ projectId, imageId, editable, admin, manageable }: { readonly projectId: string; readonly imageId: string; readonly editable: boolean; readonly admin: boolean; readonly manageable: boolean }) {
+export function ImageDetail({ projectId, imageId, editable, admin, manageable, onClose }: { readonly projectId: string; readonly imageId: string; readonly editable: boolean; readonly admin: boolean; readonly manageable: boolean; readonly onClose: () => void }) {
   const t = useT(), key = ['runtime-images', projectId, imageId];
   const image = useApiQuery([...key, 'detail'], () => api.runtimeImages.get(projectId, imageId), AUTO_REFRESH);
   const owned = image.data?.projectId === projectId;
@@ -35,7 +35,7 @@ export function ImageDetail({ projectId, imageId, editable, admin, manageable }:
     return api.runtimeImages.startBuild(projectId, imageId, { revisionId: revision, requestKey: buildKey.current.key });
   }, { invalidate: [key], onSuccess: () => { buildKey.current = undefined; setTab('builds'); } });
   const share = useApiMutation(() => api.runtimeImages.share(projectId, imageId, image.data!.scope === 'shared' ? 'project' : 'shared', image.data!.revision), { invalidate: [['runtime-images', projectId]] });
-  return <Card title={image.data?.name ?? t('images.detail')} stacked>
+  return <Dialog title={image.data?.name ?? t('images.detail')} size="large" initialFocus="dialog" onClose={onClose}><div className={styles.stack}>
     <QueryStatus isPending={image.isPending} error={image.error} />
     <p className={styles.note}>{t('images.detailHint')}</p>
     {owned && editable ? <div className={styles.row}>
@@ -60,5 +60,5 @@ export function ImageDetail({ projectId, imageId, editable, admin, manageable }:
     {editing ? <FormDialog title={t('images.editRecipe')} submitLabel={t('images.saveRevision')} busy={save.isPending} onClose={() => setEditing(false)} onSubmit={() => save.mutate()} error={save.error ? errorMessage(save.error) : undefined} dirty={draft !== revisionDraft()} onClear={() => setDraft(revisionDraft())}>
       <RecipeEditor projectId={projectId} value={draft} onChange={setDraft} />
     </FormDialog> : null}
-  </Card>;
+  </div></Dialog>;
 }

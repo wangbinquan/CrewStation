@@ -257,6 +257,28 @@ test('弹窗之上再开确认弹窗：点击只落在最上层，取消后回�
   expect(document.querySelectorAll('dialog').length).toBe(0);
 });
 
+function NestedDetailProbe() {
+  const [detail, setDetail] = useState(false), [confirm, setConfirm] = useState(false);
+  return <DialogHost><button onClick={() => setDetail(true)}>查看任务</button>
+    {detail ? <Dialog title="任务详情" onClose={() => setDetail(false)}>
+      <button onClick={() => setConfirm(true)}>停止任务</button>
+      {confirm ? <ConfirmationDialog title="确认停止" question="停止当前任务？" confirmLabel="停止" onConfirm={() => setConfirm(false)} onCancel={() => setConfirm(false)} /> : null}
+    </Dialog> : null}
+  </DialogHost>;
+}
+
+test('详情内部打开的确认：cancel 与 close 不沿 React portal 冒泡关闭外层详情', async () => {
+  for (const event of ['cancel', 'close']) {
+    rendered = await renderElement(<NestedDetailProbe />, messages);
+    await openWith('查看任务'); const trigger = await openWith('停止任务');
+    expect(document.querySelectorAll('dialog[open]')).toHaveLength(2);
+    await act(async () => { document.querySelector('[role="alertdialog"]')!.dispatchEvent(new Event(event, { cancelable: true })); }); await rendered.settle();
+    expect(document.querySelectorAll('dialog[open]')).toHaveLength(1);
+    expect(openDialog().textContent).toContain('任务详情'); expect(document.activeElement === trigger).toBe(true);
+    rendered.unmount(); rendered = undefined;
+  }
+});
+
 /** 守卫停用页面、页签后面的另一组：容器 hidden 但仍挂载；外层可以再包一层（任一层藏起就藏起）。 */
 function VisibilityProbe() {
   const [hidden, setHidden] = useState(false);

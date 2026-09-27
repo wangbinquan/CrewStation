@@ -14,7 +14,7 @@ import { ImageDetail } from '../components/ImageDetail';
 import { DevelopmentImages } from '../components/DevelopmentImages';
 import styles from '../components/RuntimeImages.module.css';
 
-export function RuntimeImagesPage({ selectedImage, onSelectImage }: { readonly selectedImage?: string; readonly onSelectImage?: (id: string) => void } = {}) {
+export function RuntimeImagesPage({ selectedImage, onSelectImage }: { readonly selectedImage?: string; readonly onSelectImage?: (id: string | undefined) => void } = {}) {
   const { projectId } = useProjectScope(), t = useT();
   const [before, setBefore] = useState<string>(), [localSelected, setLocalSelected] = useState<string>();
   const selected = onSelectImage ? selectedImage : localSelected, setSelected = onSelectImage ?? setLocalSelected;
@@ -36,7 +36,7 @@ export function RuntimeImagesPage({ selectedImage, onSelectImage }: { readonly s
         {list.data?.items.length === 30 ? <Button onClick={() => setBefore(list.data!.items.at(-1)!.id)}>{t('images.next')}</Button> : null}
       </div>
     </Card>
-    {selected ? <ImageDetail key={selected} projectId={projectId} imageId={selected} editable={editable} admin={!!me.data?.isAdmin} manageable={!me.error && (me.data?.isAdmin === true || role === 'owner')} /> : null}
+    {selected ? <ImageDetail key={selected} projectId={projectId} imageId={selected} editable={editable} admin={!!me.data?.isAdmin} manageable={!me.error && (me.data?.isAdmin === true || role === 'owner')} onClose={() => setSelected(undefined)} /> : null}
     <DevelopmentImages projectId={projectId} editable={editable} />
     <CreateImageDialog projectId={projectId} open={adding} onClose={() => setAdding(false)} onCreated={(id) => { setSelected(id); setAdding(false); }} />
   </div>;

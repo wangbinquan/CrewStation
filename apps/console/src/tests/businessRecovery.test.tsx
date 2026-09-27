@@ -9,7 +9,7 @@ const ticketId = '01a0bf5d-8f4b-7111-8111-000000000001';
 let page: Awaited<ReturnType<typeof renderApp>> | undefined;
 afterEach(() => { page?.unmount(); page = undefined; globalThis.fetch = originalFetch; });
 
-function fixture(options: { empty?: boolean; serviceError?: boolean; blocked?: boolean; queryError?: boolean } = {}) {
+function fixture(options: { empty?: boolean; serviceError?: boolean; blocked?: boolean; queryError?: boolean; count?: number } = {}) {
   const requests: Array<{ method: string; identity: string | null; body?: Record<string, unknown> }> = [];
   const item = { id: ticketId, kind: 'command', state: 'unknown', taskId: '01a0bf5d-8f4b-7111-8111-000000000002', createdAt: '2026-09-27T00:00:00Z', blockedBy: ['runtime_stop_unconfirmed'], canStopRuntime: !options.blocked };
   globalThis.fetch = (async (raw: string | URL | Request, init?: RequestInit) => {
@@ -21,7 +21,7 @@ function fixture(options: { empty?: boolean; serviceError?: boolean; blocked?: b
       body = options.serviceError ? { error: 'forbidden', message: '服务信息不可读取' } : { id: serviceId, projectId, name: 'invoice-worker', identity: 'finance/canonical-service' };
       if (options.serviceError) status = 403;
     }
-    if (url.pathname.endsWith('/business-execution/tasks')) body = { items: options.empty ? [] : [{ id: item.taskId, projectId, serviceId, callerIdentity: 'finance/canonical-service', protocol: 'legacy', state: 'failed', attention: 'failed', failedSubtasks: 1, unknownSubtasks: 0, labels: { name: '生成月度报告' }, message: '工具执行失败', createdAt: item.createdAt, updatedAt: item.createdAt }] };
+    if (url.pathname.endsWith('/business-execution/tasks')) body = { items: options.empty ? [] : Array.from({ length: options.count ?? 1 }, (_, i) => ({ id: i === 0 ? item.taskId : `01a0bf5d-8f4b-7111-8111-${String(i + 10).padStart(12, '0')}`, projectId, serviceId, callerIdentity: 'finance/canonical-service', protocol: 'legacy', state: 'failed', attention: 'failed', failedSubtasks: 1, unknownSubtasks: 0, labels: { name: i === 0 ? '生成月度报告' : `报告任务 ${i + 1}` }, message: '工具执行失败', createdAt: item.createdAt, updatedAt: item.createdAt })) };
     if (url.pathname.endsWith('/legacy-recovery')) {
       const data = init?.body ? JSON.parse(String(init.body)) : undefined;
       requests.push({ method: init?.method ?? 'GET', identity: url.searchParams.get('identity'), ...(data ? { body: data } : {}) });
@@ -48,8 +48,27 @@ test('打开即显示真实任务列表，按项目筛选并选择任务，不�
   expect(f.requests).toHaveLength(0);
   expect(page.text()).toContain('生成月度报告'); expect(page.text()).toContain('工具执行失败');
   await chooseProject(); await page.click('查看任务');
+  // Task details must open at the viewport, never after a potentially long task table.
+  const dialog = document.querySelector<HTMLDialogElement>('dialog[open][role="dialog"]');
+  expect(dialog !== null).toBe(true);
+  expect(dialog?.textContent).toContain('财务助手 · 生成月度报告');
+  expect(dialog?.textContent).toContain('运行环境尚未确认停止');
   expect(f.requests[0]).toMatchObject({ method: 'GET', identity: 'finance/canonical-service' });
   expect(page.text()).toContain('运行环境尚未确认停止');
+});
+
+test('长列表末行详情也在弹窗中，Escape 关闭后保留筛选、列表和原按钮焦点', async () => {
+  fixture({ count: 30 }); page = await renderApp('/admin/business-execution'); await chooseProject();
+  const filter = document.querySelector<HTMLSelectElement>('main select')!, table = document.querySelector('main table');
+  const opener = [...document.querySelectorAll<HTMLButtonElement>('main button')].filter((button) => button.textContent === '查看任务').at(-1)!;
+  await act(async () => { opener.focus(); opener.click(); }); await page.settle();
+  const detail = document.querySelector<HTMLDialogElement>('dialog[open][role="dialog"]')!;
+  expect(detail?.textContent).toContain('报告任务 30'); expect(document.activeElement === detail).toBe(true);
+  expect(detail?.textContent).toContain('任务技术信息');
+  await act(async () => { detail.dispatchEvent(new Event('cancel', { cancelable: true })); }); await page.settle();
+  expect(document.querySelectorAll('dialog[open]')).toHaveLength(0);
+  expect(document.activeElement === opener).toBe(true); expect(filter.value).toBe(projectId);
+  expect(document.querySelector('main table') === table).toBe(true); expect(document.querySelectorAll('main tbody tr')).toHaveLength(30);
 });
 
 test('legacy recovery keeps unconfirmed stop visible, targets immutable identity and requires explicit stop confirmation', async () => {
@@ -69,6 +88,10 @@ test('legacy recovery keeps unconfirmed stop visible, targets immutable identity
   expect(page.text()).toContain('运行环境尚未确认停止'); expect(posts).toHaveLength(0);
   await page.click('停止关联环境'); expect(posts).toHaveLength(0);
   expect(document.querySelector('[role="alertdialog"]')?.textContent).toContain('所有命令和 Agent 都会停止');
+  expect(document.querySelectorAll('dialog[open]')).toHaveLength(2);
+  await act(async () => { document.querySelector('[role="alertdialog"]')!.dispatchEvent(new Event('cancel', { cancelable: true })); }); await page.settle();
+  expect(document.querySelectorAll('dialog[open]')).toHaveLength(1); expect(posts).toHaveLength(0);
+  await page.click('停止关联环境');
   await page.click('确认停止'); expect(posts).toEqual([{ identity: 'demo/service', action: 'stop', ticketId: ticket }]);
   expect(page.text()).toContain('运行环境尚未确认停止');
   gone = true; await page.click('核对停止证据');

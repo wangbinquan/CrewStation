@@ -15,6 +15,7 @@ import { Button } from '../../shared/ui/Button';
 import { DataTable } from '../../shared/ui/DataTable';
 import { FormField } from '../../shared/ui/FormField';
 import { ConfirmationDialog } from '../../shared/ui/dialog/ConfirmationDialog';
+import { Dialog } from '../../shared/ui/dialog/Dialog';
 
 export function AdminBusinessRecoveryPage() {
   const t = useT(), [projectId, setProjectId] = useState(''), [cursor, setCursor] = useState<string>(), [selected, setSelected] = useState<BusinessExecutionTaskItem>();
@@ -38,12 +39,15 @@ export function AdminBusinessRecoveryPage() {
         </DataTable> : null}
         <ActionRow>{cursor ? <Button onClick={() => { setCursor(undefined); setSelected(undefined); }}>{t('executionRecovery.first')}</Button> : null}{query.data?.next ? <Button onClick={() => { setCursor(query.data!.next); setSelected(undefined); }}>{t('executionRecovery.next')}</Button> : null}</ActionRow>
       </Stack></Card>
-      {current ? <Stack><Card title={`${projectName(current.projectId)} · ${taskName(current)}`}><Stack>
+      {current ? <Dialog title={`${projectName(current.projectId)} · ${taskName(current)}`} size="large" initialFocus="dialog" onClose={() => setSelected(undefined)}
+        footer={<ActionRow><Button variant="ghost" onClick={() => setSelected(undefined)}>{t('ui.dialog.close')}</Button></ActionRow>}><Stack>
+        <p>{t('executionRecovery.state')}：{t(`executionRecovery.state.${current.state}`)} · {t('executionRecovery.updated')}：{new Date(current.updatedAt).toLocaleString()}</p>
         <p>{current.message || current.latestFailure?.message}</p>
         {current.latestFailure ? <p>{current.latestFailure.name} · {current.latestFailure.state}</p> : null}
         <ActionNote tone="neutral">{t('executionRecovery.recoveryPending')}</ActionNote>
         <details><summary>{t('executionRecovery.identityDetails')}</summary><p>{current.id}</p><p>{current.callerIdentity}</p><p>{current.protocol}</p></details>
-      </Stack></Card>{current.protocol === 'legacy' ? <RecoveryTickets key={`${current.callerIdentity}:${current.id}`} identity={current.callerIdentity} taskId={current.id} /> : null}</Stack> : null}
+        {current.protocol === 'legacy' ? <RecoveryTickets key={`${current.callerIdentity}:${current.id}`} identity={current.callerIdentity} taskId={current.id} /> : null}
+      </Stack></Dialog> : null}
     </> : !me.isPending && !me.error ? <p>{t('admin.denied.title')}</p> : null}
   </Stack>;
 }

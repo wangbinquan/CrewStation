@@ -10,7 +10,7 @@ import { riProject, riImage, riVersion, riProfile, riId, runtimeImageConsoleFixt
 let page: Awaited<ReturnType<typeof renderElement>> | undefined, fixture: ReturnType<typeof runtimeImageConsoleFixture> | undefined;
 afterEach(() => { page?.unmount(); page = undefined; fixture?.restore(); fixture = undefined; });
 async function open() { fixture = runtimeImageConsoleFixture(); page = await renderElement(<ProjectScopeProvider value={{ projectId: riProject, space: 'workbench' }}><RuntimeImagesPage /></ProjectScopeProvider>, messages); }
-const dialog = () => document.querySelector('dialog[open]')!;
+const dialog = () => [...document.querySelectorAll('dialog[open]')].at(-1)!;
 async function text(node: HTMLInputElement | HTMLTextAreaElement, value: string) {
   await act(async () => { node.focus(); Object.getOwnPropertyDescriptor(node instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype, 'value')!.set!.call(node, value); node.dispatchEvent(new Event('input', { bubbles: true })); node.dispatchEvent(new KeyboardEvent('keyup', { key: 'a', bubbles: true })); }); await page!.settle();
 }
@@ -49,6 +49,8 @@ test('平台目录仅管理员读取；项目目录不替代管理员跨项目�
   expect(fixture.reads.some((url) => url.includes('/runtime-image-catalog'))).toBe(false);
   page.unmount(); fixture.restore(); fixture = runtimeImageConsoleFixture(true); page = await renderElement(<AdminRuntimeImagesPage />, messages);
   await page.settle(); expect(fixture.reads.some((url) => url.includes('/runtime-image-catalog'))).toBe(true); expect(page.text()).toContain('Python tools');
+  await page.click('查看'); expect(dialog().textContent).toContain('镜像版本');
+  expect(document.querySelectorAll('dialog[open]')).toHaveLength(1);
 });
 
 test('配置冲突保留草稿，只在明确丢弃后读取最新修订与字段', async () => {

@@ -73,7 +73,8 @@ function DialogFrame({ title, children, footer, onClose, busy = false, size = 'm
     return () => returnFocus(opener);
   }, [initialFocus]);
   // Esc：浏览器先派发 cancel，拦下后由调用方决定关闭；进行中不关。
-  const cancel = (event: SyntheticEvent): void => { event.preventDefault(); if (!busy) onClose(); };
+  const cancel = (event: SyntheticEvent): void => { event.stopPropagation(); event.preventDefault(); if (!busy) onClose(); };
+  const close = (event: SyntheticEvent): void => { event.stopPropagation(); onClose(); };
   const keyDown = (event: KeyboardEvent): void => { event.stopPropagation(); };
   const submit = (event: FormEvent): void => { event.preventDefault(); event.stopPropagation(); if (!busy) onSubmit?.(); };
   // 区域缺省档位（开发页整片是紧凑档）沿组件树穿过 portal 传进来；弹窗自己的按钮一律标准档，在这里复位。
@@ -87,7 +88,7 @@ function DialogFrame({ title, children, footer, onClose, busy = false, size = 'm
   </ButtonSizeContext.Provider>;
   const element = (
     <dialog ref={dialog} className={[styles.dialog, size === 'medium' ? undefined : styles[size]].filter(Boolean).join(' ')} role={role} aria-labelledby={titleId} aria-describedby={describedBy} aria-busy={busy} tabIndex={-1} data-cs-dialog=""
-      {...ISOLATE} onKeyDown={keyDown} onCancel={cancel} onClose={onClose}>
+      {...ISOLATE} onKeyDown={keyDown} onCancel={cancel} onClose={close}>
       {onSubmit ? <form className={styles.frame} noValidate onSubmit={submit}>{content}</form> : <div className={styles.frame}>{content}</div>}
     </dialog>
   );
