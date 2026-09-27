@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
-import type { TaskId, SubtaskId } from '@crewstation/contracts';
-import { recoveryAssessment, type RecoveryFacts } from './taskRecovery';
+import { BusinessSubtaskV3DtoSchema, type RunnerBusinessReceipt, type TaskId, type SubtaskId } from '@crewstation/contracts';
+import { recoveryAssessment, recoveryChildStopped, type RecoveryFacts } from './taskRecovery';
 
 const base: RecoveryFacts = {
   taskId: 'task' as TaskId, generation: 3, materialDigest: 'a'.repeat(64), state: 'paused', capability: ['resume-task', 'rebuild-workspace', 'retry-subtask', 'resume-subtask', 'restart-task'],
@@ -32,4 +32,18 @@ test('子任务 fresh 与 resume 均固定旧 attempt 和材料，unknown 与已
   expect(recoveryAssessment({ ...facts, child: { ...child, sessionCompatible: false } })).toMatchObject({ actions: [{ target: { action: 'retry-subtask' } }], reasons: ['original_session_incompatible'] });
   for (const delta of [{ stopped: false }, { process: 'unknown' }, { hasSuccessor: true }, { state: 'succeeded' }]) expect(recoveryAssessment({ ...facts, child: { ...child, ...delta } }).actions).toHaveLength(0);
   expect(recoveryAssessment({ ...facts, state: 'paused' }).reasons).toEqual(['workspace_not_running']);
+});
+test('完整消费的退出回执绑定原执行；未知状态、错误材料和未释放Agent仍拒绝', () => {
+  const executionId = '01900000-0000-7000-8000-000000000003', incarnation = '01900000-0000-7000-8000-000000000004', payloadDigest = 'a'.repeat(64);
+  const view = BusinessSubtaskV3DtoSchema.parse({ id: '01900000-0000-7000-8000-000000000001', taskId: '01900000-0000-7000-8000-000000000002', name: 'failure', kind: 'command', state: 'failed', process: 'exited', attempt: 1, executionId, createdAt: new Date().toISOString(), result: { exitCode: 1, reason: 'exited', stdout: '', stderr: '', truncated: false, files: [], finalCursor: 'terminal-cursor' } });
+  const receipt: RunnerBusinessReceipt = { executionId, incarnation, payloadDigest, attempt: 1, phase: 'finished', lastSequence: 2, acknowledgedSequence: 2, outputBytes: 0, result: { exitCode: 1, reason: 'exited', durationMs: 100 } };
+  const child = { view, receipt, incarnation, payloadDigest, dispatch: 'accepted' as const }, proof = { sourceStopped: false, complete: true, sourceConsumed: true };
+  expect(recoveryChildStopped(child, proof)).toBe(true);
+  for (const delta of [{ complete: false }, { sourceConsumed: false }]) expect(recoveryChildStopped(child, { ...proof, ...delta })).toBe(false);
+  expect(recoveryChildStopped(child)).toBe(false);
+  expect(recoveryChildStopped({ ...child, receipt: null }, proof)).toBe(false);
+  for (const delta of [{ phase: 'unknown' as const }, { executionId: incarnation }, { attempt: 2 }, { incarnation: executionId }, { payloadDigest: 'b'.repeat(64) }]) expect(recoveryChildStopped({ ...child, receipt: { ...receipt, ...delta } }, proof)).toBe(false);
+  expect(recoveryChildStopped({ ...child, view: { ...view, process: 'unknown' } }, proof)).toBe(false);
+  expect(recoveryChildStopped({ ...child, view: { ...view, kind: 'agent' } }, proof)).toBe(false);
+  expect(recoveryChildStopped({ ...child, view: { ...view, kind: 'agent' }, runtimeReleased: true }, proof)).toBe(true);
 });

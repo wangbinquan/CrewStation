@@ -1,5 +1,5 @@
 import type { BusinessRecoveryAssessment, BusinessRecoveryRequest, RequestBusinessRecovery, TaskId } from '@crewstation/contracts';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { api } from '../../../shared/api/client';
 import { AUTO_REFRESH, errorMessage, useApiMutation, useApiQuery } from '../../../shared/api/useApi';
@@ -17,8 +17,14 @@ type Option = BusinessRecoveryAssessment['actions'][number];
 const active = (r: BusinessRecoveryRequest) => ['pending', 'claimed', 'running'].includes(r.state);
 export function TaskRecoveryPanel({ taskId, name, onOpenTask }: { readonly taskId: string; readonly name: string; readonly onOpenTask: (taskId: TaskId) => void }) {
   const t = useT(), [childId, setChildId] = useState('');
+  const client = useQueryClient();
   const detail = useApiQuery(['recovery-detail', taskId], () => api.tasks.describeRecoveryTask(taskId), AUTO_REFRESH);
   const requests = useApiQuery(['recovery-requests', taskId], () => api.tasks.listRecoveries(taskId), { ...AUTO_REFRESH, refetchIntervalMs: (data) => data?.items.some(active) ? 2000 : 30_000 });
+  const progress = requests.data?.items.map((r) => `${r.id}:${r.state}`).join('|');
+  useEffect(() => {
+    if (!progress) return;
+    for (const key of [['recovery-detail', taskId], ['recovery-assessment', taskId], ['business-execution-tasks']]) void client.invalidateQueries({ queryKey: key });
+  }, [client, taskId, progress]);
   const task = detail.data?.task, child = detail.data?.subtasks.find((s) => s.id === childId);
   return <Stack>
     <QueryStatus isPending={detail.isPending} error={detail.error} />

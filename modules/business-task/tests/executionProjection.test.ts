@@ -7,13 +7,14 @@ import { businessTaskMigrations } from '../wiring';
 import { drizzleExecutionSubtasks } from '../adapters/persistence/execution/subtasks';
 import { drizzleExecutionProjection } from '../adapters/persistence/execution/projection';
 import { executionCommandFixture } from './executionCommandFixture';
+import { recoveryQueries } from '../adapters/persistence/recovery/queries';
 
 const available = await testDatabaseAvailable();
 describe.skipIf(!available)('RFC-027 durable command result projection', () => {
   let tdb: TestDatabase;
   beforeAll(async () => { tdb = await createTestDatabase([businessTaskMigrations]); });
   afterAll(async () => { await tdb?.drop(); });
-  const fixture = async () => {
+  const fixture = async (exitCode = 0) => {
     const f = await executionCommandFixture(tdb.db), submitted = await f.request(f.path, f.input);
     expect(submitted.status).toBe(201);
     const view = await submitted.json() as BusinessSubtaskV3Dto, receipt = f.receipts.get(view.executionId)!;
@@ -21,7 +22,7 @@ describe.skipIf(!available)('RFC-027 durable command result projection', () => {
     const subtask = (await store.get(f.serviceId, f.task.id, view.id))!;
     const state: RunnerBusinessEvent = { sequence: 1, occurredAt: new Date().toISOString(), frame: { type: 'state', state: 'running' } };
     const output: RunnerBusinessEvent = { sequence: 2, occurredAt: state.occurredAt, frame: { type: 'output', stream: 'stdout', text: 'hello' } };
-    const result: RunnerBusinessEvent = { sequence: 3, occurredAt: state.occurredAt, frame: { type: 'result', result: { exitCode: 0, reason: 'exited', durationMs: 91_000 } } };
+    const result: RunnerBusinessEvent = { sequence: 3, occurredAt: state.occurredAt, frame: { type: 'result', result: { exitCode, reason: 'exited', durationMs: 91_000 } } };
     const final: RunnerBusinessReceipt = { ...receipt, phase: 'finished', result: result.frame.type === 'result' ? result.frame.result : null, lastSequence: 3, outputBytes: 5 };
     const snapshot: StoredBusinessExecutionDto = { taskId: f.task.id, receipt: final, persistedThrough: 3, acknowledgedThrough: 3, complete: true };
     await projection.pending(20);
@@ -43,6 +44,16 @@ describe.skipIf(!available)('RFC-027 durable command result projection', () => {
     expect(await f.projection.output(f.serviceId, f.task.id, f.view.id)).toMatchObject({ stdout: 'hello', resultRef: final.result!.finalCursor });
     await expect(f.projection.append(f.subtask, f.snapshot, [{ ...f.output, frame: { type: 'output', stream: 'stdout', text: 'changed' } }])).rejects.toThrow('内容已变化');
     expect((await f.projection.events(f.serviceId, f.task.id, { limit: 200 })).items).toHaveLength(3);
+  });
+  test('a consumed terminal failure proves the original command stopped without forced cancellation', async () => {
+    const f = await fixture(1), query = recoveryQueries(tdb.db);
+    const stopped = () => query.childStopped(f.serviceId, f.task.id, f.view.id);
+    expect(await stopped()).toBe(false);
+    await f.projection.append(f.subtask, f.snapshot, [f.state, f.output, f.result]);
+    expect((await f.store.get(f.serviceId, f.task.id, f.view.id))?.view).toMatchObject({ state: 'failed', process: 'exited' });
+    expect(await stopped()).toBe(false);
+    await f.projection.consumed(f.view.id);
+    expect(await stopped()).toBe(true);
   });
 
   test('cursor belongs to task and filter; paging survives module reconstruction and never spawns', async () => {

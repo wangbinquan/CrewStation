@@ -94,3 +94,17 @@ test('恢复失败和应用拒绝说明可理解，原始错误可展开查看',
   f.state.requests[0]!.state = 'rejected'; f.state.requests[0]!.reason = '应用已归档该报告'; await page.reread();
   expect(page.text()).toContain('应用拒绝'); expect(page.text()).toContain('应用已归档该报告'); expect(f.posts).toHaveLength(0);
 });
+test('恢复进度轮询完成后立即同步工作区状态与可用动作', async () => {
+  const f = fixture();
+  f.state.requests = [{ id: 'running', target: f.target, state: 'running', updatedAt: f.task.createdAt }];
+  page = await renderApp('/admin/business-execution'); await page.click('查看任务');
+  expect(page.text()).toContain('工作区：已暂停');
+  f.task.state = 'running'; f.task.generation = 3;
+  f.assessment.actions = []; f.assessment.reasons = ['task_not_recoverable'];
+  f.state.requests[0]!.state = 'succeeded';
+  await act(async () => { await new Promise((resolve) => setTimeout(resolve, 2300)); }); await page.settle();
+  expect(page.text()).toContain('恢复操作已完成');
+  expect(page.text()).toContain('工作区：运行中');
+  expect(page.text()).not.toContain('工作区：已暂停');
+  expect(f.posts).toHaveLength(0);
+});

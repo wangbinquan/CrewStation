@@ -1,5 +1,18 @@
 # RFC-029 恢复工作台验收记录
 
+## 2026-09-28：发布部署、真实恢复及验收发现
+
+最终八文件候选新增v2网关补正后，完整门禁 **3711 pass／11 skip／0 fail、23561断言、711文件、632.58秒、exit0**，日志 `/tmp/cs-rfc029-live-fixes-final-full-check.log`；源码/配置指纹前后相同。此前5文件候选的完整门禁3708/11skip/1fail（既有缺二进制CLI测试5秒超时）保留；该文件定向11/0、126断言，缺二进制用例49ms，未修改驱动或放宽超时。最终完整候选包含网关新增行为，实际再次全绿；不将定向结果冒充旧全量成功。
+
+- 实现提交 `af689f354445cee8a71bfd1f1017c8ae792c6d24` 的 CI [36342352615](https://github.com/wangbinquan/CrewStation/actions/runs/36342352615) 六项成功，完整本地门禁3706 pass／11 skip／0 fail。控制面与console由该SHA归档构建，六控制面及console已更新 `rfc029-af689f35`，迁移0028成功。cs-auth保持独立 `rfc033-493bd47a`；部署前后46个业务Pod/PVC的UID不变。回执 `/tmp/cs-rfc029-{ci-final,deploy-after,platform-pods,workload-after-platform}.json`。
+- 真实管理员页面打开新任务详情进入共享Dialog，未接入业务显示 `application_recovery_unsupported` 对应清楚提示；无横向溢出。截图及回执 `/tmp/cs-rfc029-live-no-capability.{png,json}`。
+- 专用业务GitLab332仅升级三文件消费者，源码90b6f722；平台构建 `01a0e443-3b3d-7000-a555-72d3a6286ebf` succeeded，新服务版本 `01a0e443-b3e8-7000-8f8a-3032179339a5`，digest `d0849d28fa3e8a9f92e21f7f4b66dbf86ace32172cf4ab8c6e6fc90ed4d5a41a`，原探针验证passed。manifest提交72067c6f仅改服务版本和五种恢复声明；v0.4.0就绪后通过fenced切流接管，原父／Agent镜像绑定保留。
+- 本轮新任务 `01a0e443-d6e2-7000-884d-4d5d26a90143` 暂停后在真实工作台点击“恢复任务”并双击确认，仅产生请求 `01a0e447-a877-7000-9494-a9f987dd5286`，最终succeeded；工作区running，原PVC UID `a8fb089e-32d2-43cb-ab4b-3934cb481386`、完整runtimeImage快照相同。证据 `/tmp/cs-rfc029-live-resume.json`。首次验收脚本将实际“确认执行”误写为“确认恢复”，无写请求即失败；修正脚本后成功，不算产品故障。
+- 真实截图同时发现进度完成而任务详情仍暂停，原因是二者30秒／2秒刷新不同步。已补进度状态变化后立即重读任务详情、评估和列表；自动轮询回归先红后绿，6项工作台测试通过。原截图保留 `/tmp/cs-rfc029-live-resume.png`，不能当作此修复已部署的证据。
+- 独立命令任务 `01a0e448-13e1-7000-bc00-39f5197fe12c` 的子任务 `01a0e448-50d1-7000-804a-721bcbba8a43` 经精确停止本轮sh/sleep子进程而failed/exited，Runner保持。真实评估却返回 `original_execution_not_stopped`：旧判定只接受强制清理标记，漏掉正常终态投影。修复要求连续结果完整消费、finished回执与原执行／attempt／incarnation／材料相符；Agent另需runtimeReleased，unknown不提供正面证明。真实PG先红后绿，联合25 pass／0 fail／223断言，改动生产行13/13，零违规。证据 `/tmp/cs-rfc029-{command-failed,live-fixes-patch}.json`、`/tmp/cs-rfc029-live-fixes-final.log`。
+- 上述两个实机修复尚未发布部署；第一轮新增候选完整门禁在类型阶段发现持久层dispatch为string与领域字面量类型不匹配，退出2，未运行测试阶段。已收窄函数类型约束到实际持久层边界，静态与后续完整门禁继续。既有af689f35绿色CI保留原范围，不能代替修复候选验证。TR矩阵及RFC028剩余RI仍未整体完成。
+
+
 状态：In Progress。以下为分层证据，不将存储／HTTP 模块测试等同于已部署页面可点击恢复。
 
 ## 2026-09-28：最终候选完整门禁通过，准备发布

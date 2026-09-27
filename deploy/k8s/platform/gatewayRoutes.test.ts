@@ -8,6 +8,12 @@ const route = (name: string) => docs.find((doc) => doc.kind === 'IngressRoute' &
 const chain = (name: string) => route(name).middlewares?.map((entry) => entry.name);
 
 describe('平台自身路由的限流（RFC-025 T10，设计 §7.3）', () => {
+  test('v1与开发镜像v2共用平台API路由，版本边界不误放行业务服务v3', () => {
+    const api = route('console-api'), pattern = new RegExp(/PathRegexp\(`(.+)`\)/.exec(api.match)![1]!);
+    for (const path of ['/v1', '/v1/projects', '/v2/projects/p/dev-session', '/v2/tasks/t/agents', '/v2/tasks/t/agent-terminals']) expect(pattern.test(path)).toBe(true);
+    for (const path of ['/v3/business-tasks', '/v10/projects', '/v20/tasks', '/v2evil', '/projects']) expect(pattern.test(path)).toBe(false);
+    expect(chain('console-api')).toEqual(['drop-identity-headers', 'forward-auth-user', 'rate-limit-platform-api', 'in-flight-platform-api']);
+  });
   test('平台接口在用户 ForwardAuth 之后挂令牌桶与并发上限，都按网关注入的用户头分桶；取值是内置默认', () => {
     expect(chain('console-api')).toEqual(['drop-identity-headers', 'forward-auth-user', 'rate-limit-platform-api', 'in-flight-platform-api']);
     const middleware = (name: string) => docs.find((doc) => doc.kind === 'Middleware' && doc.metadata.name === name)!.spec;

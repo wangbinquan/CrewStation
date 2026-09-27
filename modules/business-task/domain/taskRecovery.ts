@@ -1,10 +1,15 @@
 import type { BusinessRecoveryAction, BusinessRecoveryAssessment, BusinessRecoveryTarget, TaskId, SubtaskId } from '@crewstation/contracts';
 import { jsonHash } from '@crewstation/kernel';
-import type { BusinessSubtaskV3Dto } from '@crewstation/contracts';
+import type { ExecutionSubtask } from './executionSubtask';
 
-export function recoveryChildStopped(child: { view: BusinessSubtaskV3Dto; incarnation: string | null; runtimeDispatched?: boolean; dispatch: string }, projection?: { sourceStopped: boolean; complete: boolean; sourceConsumed: boolean } | null): boolean {
+export function recoveryChildStopped(child: Pick<ExecutionSubtask, 'view' | 'incarnation' | 'runtimeDispatched' | 'runtimeReleased' | 'receipt' | 'payloadDigest'> & { dispatch: string }, projection?: { sourceStopped: boolean; complete: boolean; sourceConsumed: boolean } | null): boolean {
   const neverStarted = child.view.process === 'not-started' && !child.incarnation && ((!child.runtimeDispatched && child.dispatch === 'failed') || (child.view.result?.reason === 'cancelled-before-start' && projection?.complete && projection.sourceConsumed));
-  return ['exited', 'not-started'].includes(child.view.process) && Boolean(projection?.sourceStopped || neverStarted);
+  const receipt = child.receipt;
+  // Natural completion has a consumed, contiguous final result; sourceStopped is reserved for forced cleanup.
+  const finished = projection?.complete && projection.sourceConsumed && child.view.result && receipt?.phase === 'finished'
+    && receipt.executionId === child.view.executionId && receipt.attempt === child.view.attempt && receipt.incarnation === child.incarnation && receipt.payloadDigest === child.payloadDigest
+    && (child.view.kind === 'command' || child.runtimeReleased);
+  return ['exited', 'not-started'].includes(child.view.process) && Boolean(projection?.sourceStopped || neverStarted || finished);
 }
 
 /** Facts only: callers obtain resource/compatibility proofs from their owning modules. Unknown never means stopped. */

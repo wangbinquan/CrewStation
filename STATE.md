@@ -1,5 +1,42 @@
 # 当前执行状态
 
+## RFC028/029 实机修复最终门禁绿，准备精确发布（2026-09-28）
+
+最终8文件候选完整check已自然退出0：3711 pass／11 skip／0 fail、23561断言、711文件、632.58秒，`/tmp/cs-rfc029-live-fixes-final-full-check.log`；内容指纹相同，不重跑。13/13改动生产行已覆盖，v2网关配置单独实机先红后绿。准备发布12路径（8源码/配置＋STATE/RFC028验收及plan/RFC029验收），不含第三方referenceResources。
+
+开发RI27/28完成并清理：原镜像/原PVC/工作文件保留，新Pod第二次初始化，原空策略恢复revision3，所有本轮开发Pod/PVC已消失。服务回退RI22完成，专用应用已复原v0.4.0 active。仍待本批commit精确CI与恢复修复部署，再执行本轮失败命令/UI丢回执/Agent原生继续；原业务父任务未动。目标仍active。
+
+## RFC028/029 实机补正最终候选与开发重建（2026-09-28，在制）
+
+5文件修复候选完整门禁已结束3708 pass／11 skip／1 fail（既有runnerProtocol缺二进制用例5秒超时），641.75秒，源码指纹不变；该文件单独11/0、126断言、缺二进制49ms，不覆盖历史失败且未改驱动源码。之后发现并修复console-api网关漏/v2，单路由CAS已本机应用，原用户认证/限流链不变；三入口实机先200 HTML红、后400 JSON绿，无资源副作用。
+
+现最终8源码/配置文件冻结`/tmp/cs-rfc029-live-fixes-final-candidate.json`，完整门禁`/tmp/cs-rfc029-live-fixes-final-full-check.log`、句柄16311运行中，尚未提交/部署恢复修复。gateway YAML单独已应用，需纳入本次精确发布。第三方referenceResources保留。
+
+专用开发会话01a0e45b-b238-7000-9f35-8040a948e0bd实际运行parent镜像，Agent A与CLI B各独立Pod；普通终端真实WS输出parent/10001。开发策略从revision0空暂改rev1配置，再改rev2为父inline默认/Agent B默认；旧父与Agent A快照不变，新默认Agent B实际Pod摘要已核对。首次新Agent准入429额度6/6，旧两个正式停止后新建成功，未调额度。新B未写预期标记即已结束用于释放资源，不当作B工具执行证明。
+
+本轮3个开发Agent/CLI已正式停止。仅新开发Pod a2fe326c…的Runner PID10被精确故障注入，Pod Failed；原PVC de4c0e74-34d1-4d62-a7a4-0f5db842158d。正式rebuild请求9a5de5d0-0ab1-45bc-97bd-fc362d7e36ad已202，操作01a0e460-e462-7000-a441-da8d2d23e731，待核对重新ready、原image/PVC及初始化次数。开发策略最终必须CAS恢复原空配置，结束本轮开发会话；原业务父任务不动。当前所有回执前缀`/tmp/cs-rfc028-dev-`。
+
+## RFC-029 实机发现修复与第二候选门禁（2026-09-28，在制）
+
+真实页面恢复新父任务01a0e443-d6e2-7000-884d-4d5d26a90143成功：双击一条请求，原PVC／镜像保持。另一个新任务01a0e448-13e1-7000-bc00-39f5197fe12c命令失败后被误判未停止，已补正常终态完整消费证明；同时补恢复完成后任务详情／评估即时同步。25项定向通过、223断言，生产改动行13/13；静态最终通过。首次完整门禁类型阶段退出2，类型修正后新门禁日志`/tmp/cs-rfc029-live-fixes-v2-full-check.log`、句柄71573正在运行；5源码指纹`/tmp/cs-rfc029-live-fixes-candidate.json`。尚未提交／部署修复，不动第三方referenceResources。
+
+本轮Agent01a0e44d-e536-7000-8adf-bff458339f55已真实启动且持有原生session，专用开始文件确认后正式cancel，等待修复上线验证继续原会话。页面重试／丢回执脚本`/tmp/cs-rfc029-live-recover-child.ts`已准备，未执行写请求。全目标active，剩余RI/TR继续。详情见RFC029 acceptance首节。
+
+## RFC-029 精确CI通过并已部署（2026-09-28）
+
+af689f35精确CI36342352615六项success，最终回执`/tmp/cs-rfc029-ci-final.json`。迁移0028成功，六控制面＋console均更新rfc029-af689f35且Ready；cs-auth保持rfc033-493bd47a。部署前后46个业务Pod/PVC的UID全部不变，证据`/tmp/cs-rfc029-workload-after-platform.json`，镜像实际ID见`/tmp/cs-rfc029-platform-pods.json`。真实管理员页面已验证任务详情Dialog与application_recovery_unsupported提示，无横向溢出。
+
+已新建本轮任务01a0e443-d6e2-7000-884d-4d5d26a90143供恢复验收；旧任务不动。专用GitLab332分支rfc028-images仅三个消费者文件提交90b6f722，当前构建01a0e443-3b3d-7000-a555-72d3a6286ebf，尚未更新业务release。后续真实按钮验收与RFC028剩余RI继续，整个目标仍active。
+
+## RFC-029 已上库，CI与本机部署接续（2026-09-28）
+
+5个验收驱动／断言文件已提交31a7e970，83个恢复实现／文档已提交af689f354445cee8a71bfd1f1017c8ae792c6d24；精确路径／署名已核对，两笔已推送，fetch后main/origin 0/0。第三方referenceResources的2增1删完整保留。CI36342352615正在运行，watch句柄28244、日志`/tmp/cs-rfc029-ci-watch.log`；尚不能称CI完成。
+
+从精确Git归档`/tmp/cs-rfc029-build-af689f35`构建并导入本机节点：cs-control-plane:rfc029-af689f35（配置ID1f192d20…）、cs-console:rfc029-af689f35（4ac15c3c…），二者revision标签均为完整SHA。构建／导入均已退出0。尚未切换部署；cs-auth须保留独立rfc033-493bd47a。部署前8项记录`/tmp/cs-rfc029-deploy-before.json`，受管Pod/PVC共66项元数据`/tmp/cs-rfc029-workload-before.json`；完整发布回执`/tmp/cs-rfc029-publication.json`。
+
+下一步等待精确SHA CI成功，执行新增迁移0028与六个控制面／console部署，核对就绪与原业务UID；再升级专用业务三文件消费者并真实点击恢复。专用业务源码快照`/tmp/cs-rfc029-owned-app-source.json`，准备动作`/tmp/cs-rfc029-owned-app-upgrade-prepared.json`（仅本地准备，远端未写）。RFC028剩余RI继续，整个目标active。完整本地门禁3706/11skip/0fail及745/746覆盖不重复跑。
+
+
 ## RFC-029 完整门禁已绿，精确发布准备（2026-09-28）
 
 新候选完整check自然退出0：3706 pass／11 skip／0 fail、23517断言、710文件、629.95秒；81源码冻结前后相同。日志`/tmp/cs-rfc029-workbench-v2-full-check.log`，改动行745/746=99.866%、零违规。实机认证明确采用原dev-admin OIDC及独立CDP9368，旧导航、弹窗、六组设置、台账节点和恢复接口锁失败均已定位修复；历史红记录保留。

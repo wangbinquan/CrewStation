@@ -119,7 +119,7 @@ metadata:
 spec:
   entryPoints: [web]
   routes:
-    - match: Host(`console.cs.localhost`) && PathPrefix(`/v1`)
+    - match: Host(`console.cs.localhost`) && PathRegexp(`^/v[12](/|$)`)
       kind: Rule
       priority: 90
       middlewares: [{ name: drop-identity-headers }, { name: forward-auth-user }, { name: rate-limit-platform-api }, { name: in-flight-platform-api }]

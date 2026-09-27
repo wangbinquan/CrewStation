@@ -1,5 +1,28 @@
 # RFC-028 实施证据
 
+## 2026-09-28：服务回退保留镜像与任务
+
+专用服务经正式fenced切流由v0.4.0回退v0.3.1，旧应用实际取得active执行权，release返回原服务摘要ad0b08d0…而非新默认；原任务完整runtimeImage与PVC UID保持。随后正式切回v0.4.0，已确认active，两个版本原Pod继续使用各自摘要，没有重构镜像。证据 `/tmp/cs-rfc028-service-{rollback,rollback-active,return,return-active}.json`，配合本页已有暂停同卷、原生resume、停用定义保留引用证据，RI-22闭合。
+
+
+## 2026-09-28：RI-27／28开发镜像与原卷重建实机闭合
+
+网关v2缺口修复后，三个公开入口真实回归1 pass／0 fail／9断言；缺字段请求均400 JSON，不创建资源。专用开发会话 `01a0e45b-b238-7000-9f35-8040a948e0bd` 通过v2创建，无新release。父实际imageID为b8b7ea38…，headless Agent A实际77ffe8bf…，显式CLI B实际4eea778b…；三Pod都Ready并共享本轮PVC。真实工作台WS普通终端输出parent与10001，随后关闭。证据 `/tmp/cs-rfc028-dev-{created,children,pods-initial,shell}.json`。
+
+开发镜像默认临时改为父inline／Agent B后，旧父和旧A完整runtimeImage快照保持；新默认Agent `01a0e45f-0313-7000-84ac-483dc18c6c3c` 使用B，实际Pod `agt-01a0e45f03027000982c07127f70ad67` 摘要一致。第一次新准入429/quota_exceeded（6/6）没有启动；正式停止原A和CLI后才受理，不提高额度。新B仅证明实际镜像选择，未写工具标记即停止，不能算其工具运行证据。原A在共享卷写下dev-agent-a；无业务或仓库文件更改。
+
+子执行停止后，仅对本轮开发Pod `a2fe326c-4be0-41e0-bb80-7cdb23b887ae` 的已核对Runner PID10注入退出，Pod Failed。正式保卷重建请求 `9a5de5d0-0ab1-45bc-97bd-fc362d7e36ad` 最终ready，操作 `01a0e460-e462-7000-a441-da8d2d23e731`；新Pod `task-r-01a0e460e4627000a441da8d2d23e731` UID `c6cfdcc1-5cef-42e4-9744-88450dc5177f`。任务ID不变，完整原镜像快照及实际b8b7ea38…摘要保持，没有改为新默认inline镜像；PVC UID仍 `de4c0e74-34d1-4d62-a7a4-0f5db842158d`，原A文件保留。初始化记录从1条变为2条，证明新Pod执行初始化。回执 `/tmp/cs-rfc028-dev-{rebuild,rebuilt-observed,pod-rebuilt,volume-before,volume-after}.json` 与 `dev-work-{before,after}-rebuild.txt`。最初读取沿用旧Pod名称得到404，改为按重建回执的新名称核对，不将404当作产品失败。
+
+验收后开发镜像配置已CAS恢复原空配置（revision3），3个Agent/CLI均通过正式接口停止，开发会话以expectedTaskId精确释放；release回执显示没有unpushed提交，四个untracked仅为本轮标记文件。资源清理见 `/tmp/cs-rfc028-dev-cleanup{,-resources}.json`。其他业务父任务不动。RI-27、RI-28据此闭合；RI-08仅补新Pod初始化子项，unknown等其他要求仍保留。
+
+
+## 2026-09-28：开发镜像网关入口实机缺口（修复中）
+
+专用项目原无开发会话，开发镜像策略revision0为空；通过CAS保存revision1，父默认为已验证parent工具镜像、允许inline工具镜像，独立Agent档位默认A、允许B。现有业务release与运行中父任务不变。实际POST `/v2/projects/.../dev-session` 却返回HTTP200的console HTML，未创建开发会话。定位为部署的console-api仅匹配 `/v1`，v2落入SPA；前后端v2契约存在不能代替网关可达性。回执 `/tmp/cs-rfc028-dev-{preflight,policy,open}.json`、`/tmp/cs-rfc028-v2-gateway-before.json`。路由回归已先红，准备将v1/v2纳入相同用户认证／限流链，明确不开放服务身份v3；当前完整门禁自然完成前不改其候选源码。
+
+开发策略当前为本轮专用临时配置，后续完成RI27／28后按最新revision恢复原空配置；不能漏清理或将HTML回执当作创建成功。
+
+
 2026-09-27。作者已批准完整实现、提交上库与本地部署；仍为 In Progress。此文区分源码用例与实机产品验收，RI-01～RI-28 尚未完成。
 
 ## 2026-09-28：停用定义保留已有任务及版本
