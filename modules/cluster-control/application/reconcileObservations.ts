@@ -11,6 +11,7 @@ import type { ObservationStats } from './observeChange';
 import { observeChange } from './observeChange';
 import type { Explainer, RouteTargets } from './routeExplainer';
 import { arbitrateRoute } from './routeArbitration';
+import { retireNamespace } from './namespaceRetirement';
 import { applyJob } from './jobApply';
 import { enqueueRoutesOfSlot, explainerFor, targetKey } from './routeExplainer';
 import { applySlot } from './slotApply';
@@ -18,7 +19,7 @@ import { applyVolume, applyWorkload } from './workloadApply';
 
 /** 删的顺序（设计 §6.2）：先工作负载（Deployment、Job、Pod），再 Secret、Service、路由与它引用的中间件；PVC 只随工作卷记录删。 */
 const REMOVAL_ORDER: readonly ObservedKind[] = ['Deployment', 'Job', 'Pod', 'Secret', 'Service', 'IngressRoute', 'Middleware', 'PersistentVolumeClaim'];
-/** 按记录核对观测的种类：删除的那些，加上命名空间、额度与网络策略（第四期）——这三种调和器只建、只改回，从不删。 */
+/** 按记录核对观测的种类：删除的那些，加上命名空间、额度与网络策略（第四期）——这三种平时只建、只改回，只有归档命名空间的明确删除意图触发级联回收。 */
 const OBSERVED: readonly ObservedKind[] = [...REMOVAL_ORDER, 'Namespace', 'ResourceQuota', 'NetworkPolicy'];
 const isObserved = (kind: string): kind is ObservedKind => (OBSERVED as readonly string[]).includes(kind);
 const key = (child: { readonly kind: string; readonly namespace?: string; readonly name: string }) => `${child.kind}/${child.namespace ?? ''}/${child.name}`;
@@ -210,7 +211,7 @@ async function applyMiddlewares(deps: ReconcileDeps, record: LedgerRecordView): 
 /**
  * 命名空间与额度（第四期，设计 §6.2）：期望在、Namespace 或它的额度缺了或与期望不一致（标签、上限被改）时按期望 apply——provisioning 写期望，
  * 调和器应用。先命名空间后额度；命名空间删除中（有人删了它）两样都建不了，等它消失后按「缺了」再建。系统命名空间不碰；
- * 期望不完整的不渲染，只告警。命名空间、额度从不由调和器删除（设计 §6.4）。
+ * 期望不完整的不渲染，只告警。命名空间、额度的删除只走管理员归档清理意图（I27）。
  */
 async function applyNamespace(deps: ReconcileDeps, record: LedgerRecordView): Promise<void> {
   const render = namespaceRenderOf(record.spec);
@@ -229,7 +230,7 @@ async function applyNamespace(deps: ReconcileDeps, record: LedgerRecordView): Pr
 
 /**
  * 网络策略（第四期）：期望在、某条缺了或被改时按模板 apply。所在的命名空间还没建出来（或正在删除）时先不动，过一会儿再核对——
- * 命名空间由另一条记录建。只建、只改回，从不删。
+ * 命名空间由另一条记录建；策略只随管理员明确删除命名空间而回收。
  */
 async function applyNetworkPolicies(deps: ReconcileDeps, record: LedgerRecordView, enqueue: Enqueue): Promise<void> {
   const renders = networkPolicyRendersOf(record.spec);
@@ -275,6 +276,7 @@ export async function reconcileRecord(deps: ReconcileDeps, id: string, enqueue: 
   enqueueRoutesOfSlot(record, deps.routeTargets, enqueue);
   if (record.desired === 'present') await APPLIERS[record.kind]?.(deps, record, enqueue);
   if (record.desired === 'absent') {
+    if (record.kind === 'namespace') await retireNamespace(deps, record);
     if (record.kind === 'route') await arbitrateRoute(deps, record, enqueue);
     await removeChildren(deps, record);
   }

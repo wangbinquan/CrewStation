@@ -81,6 +81,10 @@ export function createClusterControlModule(deps: ClusterControlModuleDeps): Clus
   const cluster = deps.cluster ?? kubernetesClusterWriter(deps.k8s);
   const api: ClusterControlModuleApi = {
     name: 'cluster-control',
+    inspectNamespaceRetirement: async (name, intent) => {
+      if (!cluster.inspectNamespaceRetirement) throw validation('集群客户端不支持完整命名空间清理检查');
+      await cluster.inspectNamespaceRetirement(name, intent, deps.systemNamespace, AbortSignal.timeout(30_000));
+    },
     adoptionReport: async (actor) => {
       if (!actor.isAdmin) throw forbidden('只有管理员可以查看收编报告');
       return adoptionReport({ reader, ledger: deps.ledger, legacy: deps.legacy, clock, systemNamespace: deps.systemNamespace });

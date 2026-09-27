@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import type { Actor, ProjectId } from '@crewstation/contracts';
-import { createFakeK8sClient } from '@crewstation/k8s';
+import { createFakeK8sClient, Resources } from '@crewstation/k8s';
+import type { K8sClient } from '@crewstation/k8s';
 import { noopLogger } from '@crewstation/kernel';
 import { runMigrations } from '@crewstation/persistence';
 import { loadPlatformSettings } from '@crewstation/settings';
@@ -11,6 +12,8 @@ import { createPlatformModule } from '../wiring';
 
 const available = await testDatabaseAvailable();
 let db: TestDatabase, platform: PlatformModule;
+const k8s: K8sClient = createFakeK8sClient();
+k8s.namespacedResources = async () => Object.values(Resources).filter((ref) => ref.namespaced);
 
 const TEMPLATE = '01a0bf5d-8f4b-7002-9560-94caf593fb19';
 /** 台账里这个项目的一种记录（RFC-025 第四期：命名空间与网络策略写成记录，由调和器建出）。 */
@@ -20,7 +23,6 @@ const policyNames = async (projectId: string): Promise<string[]> => ((await reco
 beforeAll(async () => {
   if (!available) return;
   db = await createTestDatabase();
-  const k8s = createFakeK8sClient();
   const settings = loadPlatformSettings({ CS_DATABASE_URL: db.url, CS_SECRET_KEY: Buffer.alloc(32, 3).toString('base64'), CS_GITLAB_URL: 'http://127.0.0.1:9' });
   platform = createPlatformModule({ db: db.db, settings, k8s, logger: noopLogger, instance: 'test.namespace-provisioning' });
   await runMigrations(db.db, platform.api.migrations);
@@ -67,4 +69,29 @@ describe.skipIf(!available)('项目命名空间的网络策略下发（RFC-018�
     await platform.modules.provisioning.api.reapplyNamespaces();
     expect((await recordOf(proxy.id, 'namespace'))?.version).toBe(version);
   }, 30_000);
+  test('管理员经标准资源动作删除归档命名空间；受理前实际盘点，归档本身仍保留设施', async () => {
+    const { identity, project, provisioning, resources, clusterControl } = platform.modules;
+    const user = await identity.api.ensureUser({ externalId: 'cleanup-admin', name: 'Cleanup admin', email: 'cleanup@ns.test' });
+    await identity.api.setPlatformRole(user.id, { platformRole: 'admin', expectedRole: 'user' });
+    const admin: Actor = { userId: user.id, isAdmin: true };
+    const p = await project.api.createProject(admin, { name: '归档清理', slug: 'ns-cleanup', kind: 'DigitalWorker', template: TEMPLATE });
+    await provisioning.api.reapplyNamespaces();
+    const record = (await recordOf(p.id, 'namespace'))!;
+    const namespace = await k8s.create({ apiVersion: 'v1', kind: 'Namespace', metadata: { name: p.namespace, uid: 'cleanup-ns-uid', labels: { 'app.kubernetes.io/managed-by': 'crewstation' } } });
+    await resources.api.observe({ child: { kind: 'Namespace', name: p.namespace, uid: namespace.metadata.uid!, phase: 'Active', ready: true } });
+    await expect(resources.api.performAction(admin, record.id, 'delete-namespace', {})).rejects.toThrow('先归档');
+    await project.api.setProjectState(p.id, 'active'); await project.api.setProjectState(p.id, 'archived');
+    expect((await resources.api.get(record.id))?.desired).toBe('present');
+    await k8s.create({ apiVersion: 'v1', kind: 'PersistentVolumeClaim', metadata: { name: 'untracked-work', namespace: p.namespace } });
+    await expect(resources.api.performAction(admin, record.id, 'delete-namespace', {})).rejects.toThrow('untracked-work');
+    expect((await resources.api.get(record.id))?.desired).toBe('present');
+    await k8s.delete(Resources.PersistentVolumeClaim!, 'untracked-work', p.namespace);
+    expect((await resources.api.performAction(admin, record.id, 'delete-namespace', {})).accepted).toBe(true);
+    clusterControl.observer.start();
+    try {
+      const deadline = Date.now() + 5000;
+      while (await k8s.get(Resources.Namespace!, p.namespace)) { if (Date.now() > deadline) throw new Error('namespace reconciliation did not finish'); await Bun.sleep(20); }
+      expect((await resources.api.get(record.id))?.desired).toBe('absent');
+    } finally { await clusterControl.observer.stop(); }
+  }, 15000);
 });

@@ -9,6 +9,7 @@ import type { Hono } from 'hono';
 import type { AppEnv } from '@crewstation/http';
 import type { OwnerLedger, ResourcesModuleApi } from './api/moduleApi';
 import type { ResourceActionHandler } from './api/types';
+import { retireNamespaceIn } from './application/namespaceRetirement';
 import { performAction } from './application/actions';
 import { maintainLedger } from './application/maintenance';
 import { observationWriter } from './application/observe';
@@ -70,6 +71,7 @@ export function createResourcesModule(deps: ResourcesModuleDeps): ResourcesModul
   };
   const api: ResourcesModuleApi = {
     name: 'resources',
+    retireNamespace: (id, uid, inspect) => uow.run((scope) => retireNamespaceIn(scope, id, uid, inspect, clock.now())),
     owner,
     withIdleProject: (projectId, fn) => deps.db.transaction(async (tx) => { await lockIdleProject(uow.within(tx), projectId); return fn(tx); }),
     observe: observer.observe,

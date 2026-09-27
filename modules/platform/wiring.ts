@@ -1,3 +1,4 @@
+import { projectHostAccess } from './application/projectHostAccess';
 import { rotateDataCredential } from './application/credentialRotation';
 import { BUILTIN_RESOURCES } from '@crewstation/contracts';
 import { resourceIdentityDirectory, type Database, type MigrationSet, type ResourceIdentityDirectory } from '@crewstation/persistence';
@@ -19,7 +20,7 @@ import { createDataControlModule, type DataControlModuleApi } from '@crewstation
 import { createDevSessionModule } from '@crewstation/module-dev-session';
 import { createEventsModule, type EventsModuleApi } from '@crewstation/module-events';
 import { createGatewayModule, UNAVAILABLE_PATH, type GatewayModuleApi } from '@crewstation/module-gateway';
-import { createIdentityModule, type IdentityRuntimeDeps } from '@crewstation/module-identity';
+import { createIdentityModule } from '@crewstation/module-identity';
 import { createObservabilityModule } from '@crewstation/module-observability';
 import { createProvisioningModule, type ProjectFacts } from '@crewstation/module-provisioning';
 import { createProjectModule, type ProjectModuleApi, type ResolvedService } from '@crewstation/module-project';
@@ -68,21 +69,6 @@ const consumerLifecycle = (consumer: EventConsumer): Lifecycle => ({ start: () =
 interface Late { events?: EventsModuleApi; project?: ProjectModuleApi; gateway?: GatewayModuleApi; taskRuntime?: TaskRuntimeModuleApi; release?: ReleaseModuleApi; resources?: ResourcesModuleApi; dataControl?: DataControlModuleApi; clusterControl?: ClusterControlModuleApi }
 
 type CompositionDeps = PlatformModuleDeps & { identities: ResourceIdentityDirectory };
-
-/**
- * identity 在用户域要的两个项目访问判定（2026-09-24 裁定）：待命版与开发预览要项目成员或测试者，「用户」角色不算；
- * 正式地址按应用可见范围放行。判定都在 project（L2），它装配在 identity 之后，故经 projectApi 惰性取。
- */
-function projectHostAccess(projectApi: () => ProjectModuleApi): Pick<IdentityRuntimeDeps, 'previewAccess' | 'appAccess'> {
-  return {
-    previewAccess: { canView: async (userId, slug) => {
-      const resolved = await projectApi().resolveServiceIdentity(`${slug}/${slug}`);
-      const role = resolved ? await projectApi().roleOf({ userId, isAdmin: await projectApi().isAdmin(userId) }, resolved.projectId) : undefined;
-      return role !== undefined && role !== 'user';
-    } },
-    appAccess: { check: (user, slug) => projectApi().appAccessBySlug(user, slug) },
-  };
-}
 
 /** data 的晚绑定端口：台账写入口（RFC-025 第四期）与 data-control 存的口令（I28，可回退为 data 自己建）；两者都装在 core 之后，经 late 取。 */
 function dataPorts(settings: PlatformSettings, late: Late): Pick<Parameters<typeof createDataModule>[0], 'ledger' | 'credentials'> {
@@ -368,7 +354,7 @@ function composeRuntime(deps: CompositionDeps, core: ReturnType<typeof composeCo
   return { taskRuntime, devSession, businessTask, events, session, sessionClient: runner };
 }
 
-function composeAggregates(deps: PlatformModuleDeps, core: ReturnType<typeof composeCore>, delivery: ReturnType<typeof composeDelivery>, runtime: ReturnType<typeof composeRuntime>, resources: ReturnType<typeof composeLedger>) {
+function composeAggregates(deps: PlatformModuleDeps, late: Late, core: ReturnType<typeof composeCore>, delivery: ReturnType<typeof composeDelivery>, runtime: ReturnType<typeof composeRuntime>, resources: ReturnType<typeof composeLedger>) {
   const { db, k8s, settings, logger } = deps;
   const { project, config, data, apiCatalog, isAdmin } = core;
   const serviceOfProject = project.api.resolveServiceOfProject;
@@ -418,6 +404,8 @@ function composeAggregates(deps: PlatformModuleDeps, core: ReturnType<typeof com
     // 命名空间、额度与网络策略写成台账记录（RFC-025 第四期），由 cluster-control 的调和器建出、被改或被删就补回。
     ledger: { declare: (input) => resources.api.owner('provisioning').declare(input), get: (id) => resources.api.get(id) },
     namespaces: { systemNamespace: settings.systemNamespace },
+    cleanup: { project: (id) => project.api.getProject(SYSTEM_ACTOR, id), record: resources.api.get, retire: resources.api.retireNamespace,
+      inspect: (name, uid, children) => late.clusterControl!.inspectNamespaceRetirement(name, { uid, children }) },
     steps: {
       loadProject: project.api.getProvisioningProject,
       // 走与开通链同一个装载器：它自己会挡掉已归档和没有服务的项目，过滤规则只有这一份。
@@ -433,6 +421,10 @@ function composeAggregates(deps: PlatformModuleDeps, core: ReturnType<typeof com
       ensureFirstRelease: async (f) => { if ((await delivery.release.api.listReleases(SYSTEM_ACTOR, f.serviceId)).length === 0) await delivery.release.api.publish(SYSTEM_ACTOR, f.serviceId, { branch: 'main', version: 'v0.1.0' }); },
       setProjectState: async (projectId, state, message) => { await project.api.setProjectState(projectId, state, message); },
     },
+  });
+  resources.api.registerActionHandler('provisioning', async ({ actor, record, action }) => {
+    if (action !== 'delete-namespace') throw precondition('命名空间不支持此操作');
+    await provisioning.api.deleteNamespace(actor, record.id);
   });
   return { observability, capabilities, provisioning };
 }
@@ -506,7 +498,7 @@ function composeModules(deps: CompositionDeps) {
   late.resources = resources.api;
   const delivery = composeDelivery(deps, core, late, resources);
   const runtime = composeRuntime(deps, core, delivery, late, resources);
-  const aggregates = composeAggregates(deps, core, delivery, runtime, resources);
+  const aggregates = composeAggregates(deps, late, core, delivery, runtime, resources);
   const cluster = composeCluster(deps, core, delivery, runtime, resources);
   const clusterControl = composeControl(deps, core, resources, runtime, delivery);
   const dataControl = composeDataControl(deps, resources);

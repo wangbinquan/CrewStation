@@ -4,6 +4,7 @@ import type { Logger } from '@crewstation/kernel';
 import { isPlatformError } from '@crewstation/kernel';
 import { createInformer, createWorkQueue } from '@crewstation/resource-runtime';
 import type { ClusterWriter, Ensured, ManagedObjectFeed, ManagedObjectReader, ObjectChange, ObservedKind } from '../../ports/cluster';
+import { inspectNamespaceRetirement, removeRetiredNamespace } from './namespaceRetirement';
 import { rebuildObjects } from './rebuildObjects';
 import { objectCovered } from './coverage';
 import { jobSecretObject, releaseJobObject } from './jobObjects';
@@ -58,6 +59,8 @@ export function kubernetesClusterWriter(k8s: K8sClient): ClusterWriter {
     return 'applied';
   };
   return {
+    inspectNamespaceRetirement: async (name, intent, systemNamespace, signal) => { await inspectNamespaceRetirement(k8s, name, intent, systemNamespace, signal); },
+    removeRetiredNamespace: (name, intent, systemNamespace, signal) => removeRetiredNamespace(k8s, name, intent, systemNamespace, signal),
     rebuild: (render, intent, signal) => rebuildObjects(k8s, render, intent, signal),
     remove: async ({ kind, namespace, name, uid }) => {
       try { await k8s.delete(Resources[kind]!, name, namespace, { preconditions: { uid }, ...(kind === 'Pod' ? { gracePeriodSeconds: 30 } : {}) }); }

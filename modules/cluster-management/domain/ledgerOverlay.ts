@@ -16,5 +16,6 @@ export function withLedger(row: ClusterResource, ledger: ClusterLedger | undefin
   if (!ledger) return row;
   const reason = ledger.maintained ? MAINTAINED_REASON : ledger.kind === 'volume' ? VOLUME_REASON : undefined;
   const availableActions = reason ? row.availableActions.map((action) => (action.action === 'delete' ? { ...action, enabled: false, reason, executionRoute: 'none' as const, impactSummary: [] } : action)) : row.availableActions;
+  if (ledger.kind === 'namespace') ledger = { ...ledger, actions: ledger.actions.map((action) => action.id === 'delete-namespace' && (row.kind !== 'Namespace' || row.ownership.scope !== 'project' || !row.ownership.archived) ? { ...action, enabled: false, disabledReason: '只有已归档项目的命名空间可以删除' } : action) };
   return { ...row, availableActions, ledger: readOnly ? { ...ledger, actions: [] } : ledger };
 }

@@ -9,6 +9,7 @@ export type SlotSpec = {
 /** cluster-control 模块对外能力（RFC-025 第一期：观测与收编空跑报告；T8：服务槽的集群预检）。 */
 export interface ClusterControlModuleApi {
   readonly name: 'cluster-control';
+  inspectNamespaceRetirement(name: string, intent: { uid: string; children: readonly { kind: string; name: string; uid: string; namespace?: string }[] }): Promise<void>;
   /** 管理员：收编空跑报告，只读，不改集群也不写台账。 */
   adoptionReport(actor: Actor): Promise<AdoptionReport>;
   /**

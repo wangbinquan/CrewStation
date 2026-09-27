@@ -13,7 +13,7 @@ import { QueryStatus } from '../../../shared/ui/QueryStatus';
 import styles from './Cluster.module.css';
 
 /** 不可撤销的记录操作：结束工作区、删除工作卷，都要输入确认词。 */
-const DESTRUCTIVE: ReadonlySet<ResourceActionId> = new Set(['release', 'delete-volume']);
+const DESTRUCTIVE: ReadonlySet<ResourceActionId> = new Set(['release', 'delete-volume', 'delete-namespace']);
 
 /** 清单「状态」一格：标准阶段作徽标，集群观测到的状态短语退为小字；原因先用记录的，没有再用观测到的。 */
 export function LedgerStatus({ ledger, observed, reason }: { ledger: ClusterLedger; observed: string; reason: string }): ReactElement {
@@ -35,6 +35,7 @@ export function LedgerRecordPanel({ ledger, name, onDone }: { ledger: ClusterLed
     {ledger.actions.length ? <div className={styles.actions}>{ledger.actions.map((action) => <div className={styles.action} key={action.id}><Button variant={DESTRUCTIVE.has(action.id) ? 'danger' : 'secondary'} onClick={() => run(action.id)} disabled={!action.enabled || act.isPending}>{t(`cluster.ledger.action.${action.id}`)}</Button>{!action.enabled && action.disabledReason ? <small className={styles.muted}>{action.disabledReason}</small> : null}</div>)}</div> : null}
     {confirming ? <ConfirmDialog title={t(`cluster.ledger.action.${confirming}`)} question={t('cluster.ledger.confirm', { action: t(`cluster.ledger.action.${confirming}`), name })} confirmWord="delete" confirmLabel={t('cluster.confirm')} cancelLabel={t('cluster.cancel')}
       busy={act.isPending} onConfirm={() => act.mutate(confirming)} onCancel={() => { setConfirming(undefined); act.reset(); }}>
+      {confirming === 'delete-namespace' ? <p>{t('cluster.ledger.namespaceConsequence')}</p> : null}
       {confirming === 'delete-volume' ? <p>{t('cluster.reclaim.consequence')}</p> : null}
       <QueryStatus isPending={false} error={act.error} />
     </ConfirmDialog> : <QueryStatus isPending={false} error={act.error} />}

@@ -31,6 +31,8 @@ export function condition(record: Pick<LedgerRecord, 'conditions'>, type: string
 export function computePhase(record: PhaseInput): PhaseResult {
   const rule = kindRule(record.kind);
   const present = record.children.filter(isPresent);
+  const cleanup = condition(record, 'CleanupBlocked');
+  if (record.desired === 'absent' && cleanup?.status === 'true') return { phase: 'stopping', reason: reasonOf(cleanup.reason ?? 'cleanup-blocked', cleanup.message ?? '资源清理受阻，请处理后重试') };
   if (record.desired === 'absent') return present.length ? { phase: 'stopping', reason: record.releaseReason ?? STOPPING } : { phase: 'stopped', ...(record.releaseReason ? { reason: record.releaseReason } : {}) };
   // 待回收（D8）：工作卷的上级已结束，卷留着等管理员确认删除——它已不在用，按已结束算，不占什么也不算失败。
   const reclaim = condition(record, 'PendingReclaim');

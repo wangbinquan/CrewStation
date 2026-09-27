@@ -8,6 +8,7 @@ const KIND_ACTIONS: Readonly<Partial<Record<ResourceKind, readonly ResourceActio
   'dev-workspace': ['release', 'retry'],
   'agent-execution': ['release', 'retry'],
   volume: ['delete-volume'],
+  namespace: ['delete-namespace'],
 };
 
 type ActionInput = Pick<LedgerRecord, 'kind' | 'desired' | 'phase' | 'conditions'>;
@@ -25,6 +26,7 @@ function evaluate(id: ResourceActionId, record: ActionInput): ResourceAction {
     return { id, enabled: true };
   }
   if (id === 'retry') return record.phase === 'failed' && record.desired === 'present' ? { id, enabled: true } : disabled('只有失败的才可以重试');
+  if (id === 'delete-namespace') return record.desired === 'absent' ? disabled('已受理删除，正在回收') : { id, enabled: true };
   if (id === 'delete-volume') {
     if (condition(record, 'PendingReclaim')?.status !== 'true') return disabled('只有待回收的工作卷可以删除');
     return record.desired === 'absent' ? disabled('已受理删除，正在回收') : { id, enabled: true };

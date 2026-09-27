@@ -276,6 +276,8 @@ export const messages = {
   'cluster.ledger.action.release': 'Release',
   'cluster.ledger.action.retry': 'Retry',
   'cluster.ledger.action.restart': 'Restart',
+  'cluster.ledger.action.delete-namespace': 'Delete archived namespace',
+  'cluster.ledger.namespaceConsequence': 'After volumes and other resources are handled, remove this namespace and its remaining services, quota and network policies. This cannot be undone.',
   'cluster.ledger.action.delete-volume': 'Delete volume',
   'cluster.ledger.kind.namespace': 'Namespace',
   'cluster.ledger.kind.network-policy-set': 'Network policies',

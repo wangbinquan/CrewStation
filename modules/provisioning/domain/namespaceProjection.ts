@@ -21,7 +21,7 @@ export const NETWORK_POLICIES = {
 
 type Child = { readonly kind: string; readonly namespace?: string; readonly name: string };
 
-/** 命名空间记录的期望（RFC-025 第四期）：子对象是 Namespace 与它的额度；调和器照标签与上限渲染，被改就改回，从不删。 */
+/** 命名空间记录的期望（RFC-025 第四期）：子对象是 Namespace 与它的额度；调和器照标签与上限渲染，被改就改回；归档保留，管理员明确清理后才停止维护。 */
 export interface NamespaceDeclaration {
   readonly kind: 'namespace';
   readonly ref: string;
@@ -51,7 +51,7 @@ export function namespaceDeclaration(facts: ProjectNamespace): NamespaceDeclarat
 
 /**
  * 接入容器代公司系统转发，服务槽直接出站（RFC-018 Q1＝C），所以多一条接入出站策略。D64 起默认策略对所有 Pod 放开出向，
- * 数字人服务槽也能直连外部；策略集照旧，调和器对网络策略只建、只改回、从不删，缩掉某条也删不掉线上已有的对象。
+ * 数字人服务槽也能直连外部；策略集照旧，调和器对网络策略只建、只改回，缩掉某条不会删线上已有对象；只随管理员删除归档命名空间回收。
  */
 export function networkPolicyDeclaration(facts: ProjectNamespace, systemNamespace: string): NetworkPolicyDeclaration {
   const names: string[] = [NETWORK_POLICIES.default, NETWORK_POLICIES.taskEgress, NETWORK_POLICIES.buildEgress];

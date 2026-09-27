@@ -12,6 +12,8 @@ export interface OwnerLedger extends ResourceWriter {
 /** resources 模块对外能力（RFC-025）：期望由所属模块写，实况由资源中心写，所有页面读同一份标准记录。 */
 export interface ResourcesModuleApi {
   readonly name: 'resources';
+  /** 管理员归档命名空间清理：同项目锁与调和租约下核对并收尾已结束记录。 */
+  retireNamespace(id: string, uid: string, inspect: (name: string, children: readonly { kind: string; namespace?: string; name: string; uid: string }[]) => Promise<void>): Promise<void>;
   owner(module: string): OwnerLedger;
   /** 内部组合入口：在项目启动锁下确认没有使用者，回调的数据库写与检查同一事务。 */
   withIdleProject<T>(projectId: ProjectId, fn: (tx: OwnerTransaction) => Promise<T>): Promise<T>;

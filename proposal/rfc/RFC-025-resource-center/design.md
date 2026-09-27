@@ -498,3 +498,13 @@ I27 已于本日由作者裁定为 (a)：归档保留命名空间、额度与网
 沿用 I25 渲染时回调。新受理的重建在 `task-runtime` 持久记录 `creation=ledger` 与重试次数，环境投影包含本次重建 ID、确认卷 UID、Pod 规格与不可变意图；不携带凭据、不声明创建 PVC、不含检出。旧重建继续原队列。`cluster-control` 在逐记录租约中调用所属模块的重建入口：所属模块持项目锁核对请求、原 Pod/卷与子 CLI，沿用原有替换/补偿状态机；新 Secret、Pod、预览 Service 以及本次失败对象清理由调和器提供的操作执行。成功绑定后停止创建；启动失败可重新进入补偿。重试次数落库，前置条件失败或五次失败后清理本次对象并释放额度，原卷不动。
 
 落位：task-runtime 的 domain/ports/application 与 persistence 保存意图和领域状态；cluster-control 的 domain/ports/application 与 k8s adapter 解析、执行受理的物理计划；platform 仅连接公开接口。用例覆盖新请求不走旧创建队列、原卷和稳定预览名、响应丢失接续同一令牌、外来实例拒绝、持久重试/补偿、租约失效及旧记录兼容。
+
+### 2026-09-27 归档命名空间人工清理（I27、T13）
+
+集群管理的命名空间记录新增管理员「删除归档命名空间」，复用记录操作及输入 `delete` 的确认弹窗。provisioning 再读项目状态，只有已归档项目可以受理。resources 在项目锁和相关记录调和租约下检查：工作卷必须已处理，命名空间内的其他记录必须已结束；已停用服务槽遗留的 Service 属于结束后的附属设施，连同额度和网络策略列入此次确认的清理范围。数据库、仓库等命名空间外的资源不随此操作删除。
+
+受理前通过 API discovery 枚举所有可列举的 namespaced 资源（含自定义资源），逐页检查；PVC、未登记对象、活动资源、读取失败或截断均阻断。仅忽略 Kubernetes 自动生成的 default ServiceAccount、kube-root-ca.crt 和事件。持久保存原 Namespace UID 与允许清理对象的 UID，同事务释放结束后的记录及两条基础设施记录；项目的命名空间进入删除流程后，资源声明在同一项目锁下拒绝重新创建其中的对象。cluster-control 删除前再次完整检查，再按原 UID 删除 Namespace；不强制 finalizer，也不删除同名替换实例。归档本身仍不释放上述基础设施。
+
+落位：provisioning/application 承担归档前提；resources/application 承担记录收尾及声明互斥；cluster-control 的应用层与 K8s adapter 承担完整盘点、UID 删除与重试；packages/k8s 增加 discovery 只读能力；platform 仅接线。控制器增加 namespaces/delete 和各 API 资源只读 list 权限以完整检查 CRD，不增加其他资源的写权限。用例覆盖权限、活跃项目、PVC／自定义资源阻断、读取不完整、原 UID 替换、受理与并发声明互斥、重复调和及归档保留。
+
+盘点遍历全部已提供 API 版本，同一组的相同资源优先采用首选版本，避免漏掉仅在其他版本提供的种类。允许已确认闲置 Service 的控制器生成的空 Endpoints／EndpointSlice；带地址或外来归属的端点仍阻断。删除墓碑以释放原因保留，台账压缩后也禁止新的命名空间内声明。

@@ -10,6 +10,7 @@ import type { LedgerScope } from '../ports/repositories';
 
 /** 这个人没有权限做这个操作的原因；有权限返回 undefined。展示与受理共用：受理时权限不足一律 403。 */
 export function permissionReason(action: ResourceActionId, access: ViewerAccess): string | undefined {
+  if (action === 'delete-namespace' && !access.admin) return '只有管理员可以删除归档项目的命名空间';
   if (action === 'delete-volume' && !access.admin) return '只有管理员可以删除工作卷';
   if (!access.operate && !access.admin) return '需要这个项目的开发权限';
   return undefined;

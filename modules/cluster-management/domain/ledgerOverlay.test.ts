@@ -31,3 +31,14 @@ test('read-only views drop the record actions too, and claim keys match cluster-
   expect(claimKey(row('Namespace', 'cs-demo'))).toBe(claimKey({ kind: 'Namespace', name: 'cs-demo' }));
   expect(claimKey(row('NetworkPolicy', 'crewstation-default'))).toBe('NetworkPolicy/cs-demo/crewstation-default');
 });
+
+test('命名空间删除只显示在已归档项目的 Namespace，额度子对象和活动项目均禁用', () => {
+  const cleanup = ledger({ kind: 'namespace', actions: [{ id: 'delete-namespace', enabled: true }] });
+  const namespace = row('Namespace', 'cs-demo');
+  expect(withLedger(namespace, cleanup).ledger?.actions[0]).toMatchObject({ enabled: false, disabledReason: '只有已归档项目的命名空间可以删除' });
+  const archived = { ...namespace, ownership: { ...namespace.ownership, archived: true } };
+  expect(withLedger(archived, cleanup).ledger?.actions[0]?.enabled).toBe(true);
+  expect(withLedger({ ...archived, kind: 'ResourceQuota' }, cleanup).ledger?.actions[0]?.enabled).toBe(false);
+  expect(withLedger({ ...namespace, ownership: { scope: 'system', component: 'system' } }, cleanup).ledger?.actions[0]?.enabled).toBe(false);
+  expect(withLedger(archived, cleanup, true).ledger?.actions).toEqual([]);
+});

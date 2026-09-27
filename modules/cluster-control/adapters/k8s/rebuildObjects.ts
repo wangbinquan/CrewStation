@@ -19,9 +19,14 @@ function identity(object: K8sObject, render: WorkloadRender, rebuild: RebuildRen
 /** 保留规格核验，但接受 Kubernetes 对资源单位的等值规范化。 */
 function podMatches(found: K8sObject, render: WorkloadRender): boolean {
   const desired = workloadPodObject(render.pod);
+  // VolumeMount.readOnly=false 使用 omitempty；API Server 回读时省略它。
+  const desiredSpec = desired.spec as { containers: Array<{ volumeMounts: Array<{ readOnly?: boolean }> }> };
+  for (const mount of desiredSpec.containers[0]!.volumeMounts) if (mount.readOnly === false) delete mount.readOnly;
   const spec = found.spec as { containers?: Array<Record<string, unknown>>; initContainers?: unknown[] };
   const expected = desired.spec as { containers: Array<{ resources: { requests: Record<string, string> } }> };
   if (spec.initContainers?.length || spec.containers?.length !== 1 || !resourcesMatch(spec.containers[0]?.resources, expected.containers[0]!.resources.requests)) return false;
+  const mounts = spec.containers[0]?.volumeMounts as Array<{ readOnly?: boolean }> | undefined;
+  if (mounts?.some((mount) => mount.readOnly === true)) return false;
   return objectCovered({ ...found, spec: { ...spec, containers: [{ ...spec.containers[0], resources: expected.containers[0]!.resources }] } }, desired);
 }
 

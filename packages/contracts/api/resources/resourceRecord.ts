@@ -61,7 +61,7 @@ export const ResourceChildSchema = z.object({
   observedAt: z.iso.datetime().optional(),
 }).strict();
 
-export const ResourceActionIdSchema = z.enum(['release', 'retry', 'restart', 'delete-volume']);
+export const ResourceActionIdSchema = z.enum(['release', 'retry', 'restart', 'delete-volume', 'delete-namespace']);
 export const ResourceActionSchema = z.object({
   id: ResourceActionIdSchema,
   enabled: z.boolean(),

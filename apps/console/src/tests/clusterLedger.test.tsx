@@ -26,6 +26,22 @@ test('only pending volumes whose claim still exists are listed', () => {
   expect(reclaimableVolumes([kept, deleted, live, resourceRecord({ id: '01a0cf2b-22e3-7000-a175-bb5d15360004' })]).map((r) => r.id)).toEqual([kept.id]);
 });
 
+test('删除归档命名空间先说明设施回收边界，确认词匹配后才提交', async () => {
+  const f = clusterFixture();
+  f.row.kind = 'Namespace'; f.row.apiVersion = 'v1'; f.row.name = 'cs-cluster-demo';
+  f.row.ledger = { id: '01a0cf2b-22e3-7000-a175-bb5d15360031', kind: 'namespace', phase: 'ready', phaseSince: since, actions: [{ id: 'delete-namespace', enabled: true }], version: 9, maintained: true };
+  page = await renderApp('/admin/cluster?tab=namespaces');
+  await page.click('cs-cluster-demo');
+  const panel = document.querySelector('[data-ledger-record]')!;
+  await act(async () => { panel.querySelector<HTMLButtonElement>('button')!.click(); }); await page.settle();
+  expect(openDialog().textContent).toContain('工作卷和其他资源处理完');
+  expect(openDialog().textContent).toContain('额度与网络策略');
+  expect(dialogConfirmButton().disabled).toBe(true);
+  await typeConfirmWord('delete'); await act(async () => { dialogConfirmButton().click(); }); await page.settle();
+  const write = f.calls.find((c) => c.method === 'POST' && c.path.startsWith('/v1/resources/'))!;
+  expect(write.path).toEndWith('/actions/delete-namespace'); expect(write.body).toEqual({ expectedVersion: 9 });
+});
+
 test('「待回收的工作卷」列出待回收的卷，筛选条不出现；删除要输入 delete，受理后按钮写明正在回收', async () => {
   const f = clusterFixture();
   f.records.push(volume('01a0cf2b-22e3-7000-a175-bb5d15360011', 'orphan-work'), volume('01a0cf2b-22e3-7000-a175-bb5d15360012', 'retained-work', { actions: [{ id: 'delete-volume', enabled: false, disabledReason: '已受理删除，正在回收' }] }));

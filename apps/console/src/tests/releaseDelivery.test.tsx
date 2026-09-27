@@ -28,6 +28,8 @@ async function check() { expect(action()).toBeDefined(); await act(async () => a
 test('并列真实部署与完整 SHA，具名确认双版本；首次上线显式发送空正式版本', async () => {
   const f = releaseDeliveryFixture(); f.state.slots[0] = { ...f.state.slots[0]!, releaseId: undefined, tag: undefined, commitSha: undefined, state: 'empty', replicas: 0, readyReplicas: 0 };
   page = await renderApp(`/projects/${projectId}/release`);
+  // 路由首次懒加载后才发部署查询；等实际版本落地，不能把固定三轮调度当作读取完成。
+  for (let attempt = 0; attempt < 8 && !page.text().includes('b'.repeat(40)); attempt++) await page.settle();
   expect(page.text()).toContain('待验证版本'); expect(page.text()).toContain('b'.repeat(40)); expect(page.text()).toContain('试用也可能写入生产数据');
   expect(document.querySelector<HTMLAnchorElement>('a[href="//preview.demo.cs.localhost"]')?.textContent).toBe('打开试用');
   expect(document.querySelector('a[href="//demo.cs.localhost"]')).toBeNull();
@@ -151,4 +153,3 @@ test('槽卡随资源推送流更新：服务槽记录变了重读一次部署�
   expect(slotReads()).toBe(before + 1);
   expect(page.text()).toContain('副本不足'); expect(page.text()).toContain('0／1 副本就绪');
 });
-

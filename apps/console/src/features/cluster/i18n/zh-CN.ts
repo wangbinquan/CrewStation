@@ -276,6 +276,8 @@ export const messages = {
   'cluster.ledger.action.release': '释放',
   'cluster.ledger.action.retry': '重试',
   'cluster.ledger.action.restart': '重启',
+  'cluster.ledger.action.delete-namespace': '删除归档命名空间',
+  'cluster.ledger.namespaceConsequence': '仅在工作卷和其他资源处理完后删除，同时回收剩余的服务入口、额度与网络策略。此操作不可撤销。',
   'cluster.ledger.action.delete-volume': '删除工作卷',
   'cluster.ledger.kind.namespace': '命名空间',
   'cluster.ledger.kind.network-policy-set': '网络策略',

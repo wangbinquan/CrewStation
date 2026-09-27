@@ -33,6 +33,10 @@ describe('调和器保卷重建对象', () => {
     const containers = (original.spec as { containers: Array<Record<string, unknown>> }).containers;
     await k8s.mergePatch(Resources.Pod!, render.pod.name, render.pod.namespace, { spec: { containers: [{ ...containers[0], resources: { requests: { cpu: '1000m', memory: '1024Mi', 'ephemeral-storage': '10240Mi' }, limits: { cpu: '1000m', memory: '1024Mi', 'ephemeral-storage': '10240Mi' } } }] } });
     expect(await ops.ensurePod(uid)).toBe(uid);
+    await k8s.mergePatch(Resources.Pod!, render.pod.name, render.pod.namespace, { spec: { containers: [{ ...containers[0], volumeMounts: [{ name: 'work', mountPath: '/work' }] }] } });
+    expect(await ops.ensurePod(uid)).toBe(uid);
+    await k8s.mergePatch(Resources.Pod!, render.pod.name, render.pod.namespace, { spec: { containers: [{ ...containers[0], volumeMounts: [{ name: 'work', mountPath: '/work', readOnly: true }] }] } });
+    await expect(ops.ensurePod(uid)).rejects.toMatchObject({ kind: 'precondition' });
     await expect(ops.ensurePod('wrong')).rejects.toMatchObject({ kind: 'precondition' });
     await k8s.mergePatch(Resources.Pod!, render.pod.name, render.pod.namespace, { spec: { initContainers: [{ name: 'unexpected' }] } });
     await expect(ops.ensurePod()).rejects.toMatchObject({ kind: 'precondition' });

@@ -10,6 +10,8 @@ import type { Hono } from 'hono';
 import type { Worker } from '@crewstation/queue';
 import { createWorker, enqueueJob } from '@crewstation/queue';
 import type { ProvisioningModuleApi } from './api/moduleApi';
+import type { NamespaceCleanup } from './ports/namespaceCleanup';
+import { deleteNamespace } from './application/deleteNamespace';
 import { provisionProjectUseCase } from './application/provisionProject';
 import { reapplyNamespacesUseCase } from './application/reapplyNamespaces';
 import { provisioningRoutes } from './http/provisioningRoutes';
@@ -27,6 +29,7 @@ export interface ProvisioningModuleDeps {
   /** 资源中心的写入口（RFC-025 第四期）：命名空间与网络策略写成台账记录，由调和器建出。 */
   ledger: NamespaceLedger;
   namespaces: NamespaceSettings;
+  cleanup?: NamespaceCleanup;
   workerOwner: string;
   consumerName: string;
   isAdmin: (userId: UserId) => Promise<boolean>;
@@ -49,7 +52,7 @@ export function createProvisioningModule(deps: ProvisioningModuleDeps): Provisio
   const provision = provisionProjectUseCase({ ...deps.steps, ensureNamespace: namespaces.ensure }, logger);
   const reapply = reapplyNamespacesUseCase({ ...deps.steps, ensureNamespace: namespaces.declare }, logger);
   const enqueue = async (projectId: string): Promise<void> => { await enqueueJob(deps.db, PROVISION_JOB_KIND, { projectId }, { dedupKey: projectId, maxAttempts: 5 }); };
-  const api: ProvisioningModuleApi = { name: 'provisioning', provisionProject: provision, retry: enqueue, reapplyNamespaces: reapply };
+  const api: ProvisioningModuleApi = { name: 'provisioning', deleteNamespace: (actor, id) => deleteNamespace(deps.cleanup, deps.isAdmin, actor, id), provisionProject: provision, retry: enqueue, reapplyNamespaces: reapply };
   return {
     api,
     http: [provisioningRoutes(api, deps.isAdmin, deps.authorizeRetry)],

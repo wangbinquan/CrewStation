@@ -9,6 +9,10 @@ kind: ClusterRole
 metadata:
   name: crewstation-control
 rules:
+  # 归档命名空间清理前列全所有 namespaced kinds（含 CRD）；任何读失败都阻断删除。
+  - apiGroups: ["*"]
+    resources: ["*"]
+    verbs: [list]
   # nodes/proxy is not path-scoped by Kubernetes RBAC. The client only calls stats/summary and metrics/cadvisor.
   - apiGroups: [""]
     resources: [nodes, persistentvolumes]
@@ -18,7 +22,7 @@ rules:
     verbs: [get]
   - apiGroups: [""]
     resources: [namespaces]
-    verbs: [get, list, watch, create, patch, update]
+    verbs: [get, list, watch, create, patch, update, delete]
   - apiGroups: [""]
     resources: [pods, services, persistentvolumeclaims, secrets, configmaps, serviceaccounts, resourcequotas, events]
     verbs: [get, list, watch, create, delete, patch, update]

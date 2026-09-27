@@ -3,6 +3,7 @@ import type { ClusterConfig } from './config';
 import type { K8sObject, ResourceRef, WatchEventType } from './resources';
 import { refOf, resourcePath } from './resources';
 import { readWatchStream } from './watch';
+import { discoverNamespaced } from './discovery';
 import { boundedMetricsText } from './metrics';
 
 export interface ListOptions { labelSelector?: string; fieldSelector?: string; limit?: number; continue?: string; signal?: AbortSignal }
@@ -19,6 +20,8 @@ export interface LogOptions { container?: string; follow?: boolean; previous?: b
 
 /** 平台只需要的 API Server 操作；模块通过它而不是 kubectl 管理对象。 */
 export interface K8sClient {
+  /** 完整发现可列举的命名空间资源；不支持 discovery 的测试替身不能执行命名空间删除。 */
+  namespacedResources?(signal?: AbortSignal): Promise<ResourceRef[]>;
   nodeMetrics(node: string, endpoint: 'summary' | 'cadvisor', signal?: AbortSignal): Promise<string>;
   get<T extends K8sObject>(ref: ResourceRef, name: string, namespace?: string, signal?: AbortSignal): Promise<T | undefined>;
   list<T extends K8sObject>(ref: ResourceRef, namespace?: string, options?: ListOptions): Promise<T[]>;
@@ -58,6 +61,7 @@ export function createK8sClient(config: ClusterConfig, fetchImpl: typeof fetch =
     return { items: body.items.map((item) => ({ ...item, apiVersion: item.apiVersion ?? ref.apiVersion, kind: item.kind ?? ref.kind })), resourceVersion: body.metadata?.resourceVersion ?? '', continue: body.metadata?.continue ?? '' };
   };
   return {
+    namespacedResources: (signal) => discoverNamespaced(async (path) => json(await request('GET', path, { signal: signal ?? AbortSignal.timeout(30_000) }))),
     nodeMetrics: async (node, endpoint, signal) => {
       if (!/^[a-z0-9][a-z0-9.-]{0,252}$/.test(node) || !['summary', 'cadvisor'].includes(endpoint)) throw validation('Invalid node metrics target');
       const path = endpoint === 'summary' ? 'stats/summary' : 'metrics/cadvisor';
