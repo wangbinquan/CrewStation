@@ -1,4 +1,5 @@
 import type { Actor, MemberRole, ProjectId, ProjectState, ServiceId, UserId } from '@crewstation/contracts';
+import { jsonDocument } from '@crewstation/persistence';
 import type { Executor } from '@crewstation/persistence';
 import { and, eq, gt, or, sql } from 'drizzle-orm';
 import { boolean, integer, text, timestamp } from 'drizzle-orm/pg-core';
@@ -13,6 +14,7 @@ export const appListings = projectSchema.table('app_listings', {
   projectId: text('project_id').primaryKey(), description: text('description').notNull(), icon: text('icon').notNull(),
   mode: text('mode').notNull(), allowRequests: boolean('allow_requests').notNull(), revision: integer('revision').notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }),
+  iconSource: jsonDocument('icon_source').$type<NonNullable<AppListing['iconSource']>>().notNull(),
 });
 const asListing = (row: typeof appListings.$inferSelect): AppListing => ({ ...row, projectId: row.projectId as ProjectId, mode: row.mode as AppListing['mode'], icon: row.icon as AppListing['icon'] });
 
@@ -28,7 +30,7 @@ export function drizzleAppListings(db: Executor): AppListingRepository {
       return row ? asListing(row) : defaultAppListing(projectId);
     },
     save: async (listing, expectedRevision) => {
-      const value = { ...listing, revision: expectedRevision + 1 };
+      const value = { ...listing, iconSource: listing.iconSource ?? { kind: 'app' as const }, revision: expectedRevision + 1 };
       const rows = expectedRevision === 0
         ? await db.insert(appListings).values(value).onConflictDoUpdate({ target: appListings.projectId, set: value, setWhere: eq(appListings.revision, 0) }).returning()
         : await db.update(appListings).set(value).where(and(eq(appListings.projectId, listing.projectId), eq(appListings.revision, expectedRevision))).returning();
@@ -40,7 +42,8 @@ export function drizzleAppListings(db: Executor): AppListingRepository {
         .leftJoin(memberships, and(eq(memberships.projectId, projects.id), eq(memberships.userId, actor.userId)))
         .where(and(eq(projects.kind, 'DigitalWorker'), visibleTo(actor),
           query.projectId ? eq(projects.id, query.projectId) : undefined, query.after ? gt(projects.id, query.after) : undefined,
-          query.q ? sql`position(lower(${query.q}) in lower(${projects.name} || ' ' || coalesce(${appListings.description}, ''))) > 0` : undefined,
+          query.ownerId ? eq(projects.ownerUserId, query.ownerId) : undefined,
+          ...query.q.split(/\s+/u).filter(Boolean).map((word) => sql`position(lower(${word}) in lower(${projects.name} || ' ' || coalesce(${appListings.description}, ''))) > 0`),
         )).orderBy(projects.id).limit(query.limit);
       return rows.map(toVisibleApplication);
     },

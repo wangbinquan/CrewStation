@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { AppIconSelectionSchema, AppIconSourceSchema } from './appIcon';
 import { ProjectIdSchema, UserIdSchema } from '../../ids';
 import { pageOf } from '../envelope';
 import { PlatformRoleSchema } from '../identity';
@@ -21,17 +22,17 @@ export const AppVisibilityDtoSchema = z.object({
   revision: z.number().int().min(0), updatedAt: z.iso.datetime().nullable(), canConfigure: z.boolean(),
 });
 export const SetAppPresentationRequestSchema = z.object({
-  description: z.string().trim().max(400), icon: AppIconSchema, expectedRevision: z.number().int().min(0),
+  description: z.string().trim().max(400), icon: AppIconSchema, iconSource: AppIconSelectionSchema.optional(), expectedRevision: z.number().int().min(0),
 }).strict();
 export const AppPresentationDtoSchema = z.object({
-  description: z.string(), icon: AppIconSchema, revision: z.number().int().min(0), updatedAt: z.iso.datetime().nullable(),
+  description: z.string(), icon: AppIconSchema, iconSource: AppIconSourceSchema.optional(), revision: z.number().int().min(0), updatedAt: z.iso.datetime().nullable(),
 });
 export const MarketAppsQuerySchema = z.object({
-  q: z.string().trim().max(120).default(''), limit: z.coerce.number().int().min(1).max(50).default(20),
+  q: z.string().trim().max(120).transform((value) => value.split(/\s+/u).filter(Boolean).join(' ')).default(''), ownerId: UserIdSchema.optional(), limit: z.coerce.number().int().min(1).max(50).default(20),
   cursor: z.string().max(1024).optional(),
 });
 export const MarketAppDtoSchema = z.object({
-  projectId: ProjectIdSchema, name: z.string(), description: z.string(), icon: AppIconSchema,
+  projectId: ProjectIdSchema, name: z.string(), description: z.string(), icon: AppIconSchema, iconSource: AppIconSourceSchema.optional(),
   owner: z.object({ userId: UserIdSchema, name: z.string() }), projectState: ProjectStateSchema,
   canDevelop: z.boolean(), canConfigure: z.boolean(), canPreview: z.boolean(), visibilityRevision: z.number().int().min(0),
   entry: z.object({ kind: z.enum(['production', 'trial']), status: z.enum(['ready', 'unavailable', 'unknown']), host: z.string().optional() }),

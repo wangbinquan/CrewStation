@@ -10,7 +10,7 @@ function readCursor(actor: Actor, query: MarketAppsQuery): ProjectId | undefined
   if (!query.cursor) return undefined;
   try {
     const value = JSON.parse(Buffer.from(query.cursor, 'base64url').toString());
-    if (value.userId !== actor.userId || value.q !== query.q) throw new Error('scope changed');
+    if (value.userId !== actor.userId || value.q !== query.q || value.ownerId !== (query.ownerId ?? null) || value.limit !== query.limit) throw new Error('scope changed');
     return ProjectIdSchema.parse(value.after);
   } catch { throw validation('市场分页已失效，请从第一页重新查询'); }
 }
@@ -18,8 +18,8 @@ function readCursor(actor: Actor, query: MarketAppsQuery): ProjectId | undefined
 export function marketListingUseCases(deps: ProjectUseCaseDeps) {
   const { uow, users, clock } = deps;
   const toListing = async ({ project, service, listing, role }: VisibleApplication, actor: Actor): Promise<MarketListing> => ({
-    projectId: project.id, name: project.name, description: listing.description, icon: listing.icon,
-    owner: { userId: project.ownerUserId, name: (await users.getUser(project.ownerUserId))?.name ?? project.ownerUserId },
+    projectId: project.id, name: project.name, description: listing.description, icon: listing.icon, iconSource: listing.iconSource ?? { kind: 'app' },
+    owner: { userId: project.ownerUserId, name: (await users.getUser(project.ownerUserId))?.name ?? '' },
     // 「用户」只用正式版：不试用待命版（2026-09-24 裁定）。
     projectState: project.state, canPreview: actor.isAdmin || (role !== undefined && role !== 'user') || project.ownerUserId === actor.userId,
     canDevelop: actor.isAdmin || actor.platformRole === 'developer' && (project.ownerUserId === actor.userId || role === 'owner' || role === 'developer'),
@@ -32,11 +32,11 @@ export function marketListingUseCases(deps: ProjectUseCaseDeps) {
       const parsed = MarketAppsQuerySchema.safeParse(raw);
       if (!parsed.success) throw validation('市场查询参数无效');
       const query = parsed.data, after = readCursor(actor, query);
-      const rows = await uow.read.appListings.visible(actor, { q: query.q, ...(after ? { after } : {}), limit: query.limit + 1 });
+      const rows = await uow.read.appListings.visible(actor, { q: query.q, ...(query.ownerId ? { ownerId: query.ownerId } : {}), ...(after ? { after } : {}), limit: query.limit + 1 });
       const page = rows.slice(0, query.limit), last = page.at(-1);
       return {
         items: await Promise.all(page.map((row) => toListing(row, actor))),
-        ...(rows.length > query.limit && last ? { nextCursor: Buffer.from(JSON.stringify({ userId: actor.userId, q: query.q, after: last.project.id })).toString('base64url') } : {}),
+        ...(rows.length > query.limit && last ? { nextCursor: Buffer.from(JSON.stringify({ userId: actor.userId, q: query.q, ownerId: query.ownerId ?? null, limit: query.limit, after: last.project.id })).toString('base64url') } : {}),
       };
     },
     getMarketListing: async (actor: Actor, projectId: ProjectId) => {

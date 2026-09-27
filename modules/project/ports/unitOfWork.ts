@@ -1,3 +1,4 @@
+import type { AppIconImages } from './appIcons';
 import type { DomainPayload, DomainTopicName } from '@crewstation/contracts';
 import type { CatalogRepository, MembershipRepository, ProjectRepository, QuotaRepository, ServiceRepository } from './repositories';
 import type { AppListingRepository } from './appListings';
@@ -16,6 +17,7 @@ export interface RepositoryScope {
   readonly memberships: MembershipRepository;
   readonly quotas: QuotaRepository;
   readonly catalog: CatalogRepository;
+  readonly appIcons: AppIconImages;
   readonly appListings: AppListingRepository;
   readonly accessRequests: AccessRequestRepository;
   readonly projectPages: ProjectPageRepository;

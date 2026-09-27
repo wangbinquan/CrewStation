@@ -1,29 +1,34 @@
+import { useState } from 'react';
+import { Button } from '../../../../shared/ui/Button';
+import { CatalogCell } from '../../../../shared/ui/catalog/CatalogCell';
+import catalog from '../../../../shared/ui/CapabilityCatalog.module.css';
+import { ProjectSummaryDetails } from './ProjectSummaryDetails';
 import type { ProjectSummary } from '@crewstation/contracts';
 import { Link } from '@tanstack/react-router';
 import { useT } from '../../../../shared/lib/useT';
-import { useDateText } from '../../../../shared/lib/useDateText';
 import { DataTable } from '../../../../shared/ui/DataTable';
 import { ProjectStateBadge } from '../ProjectStateBadge';
-import { DeploymentFact, DevelopmentFact, HealthFact, SummaryChecked } from './SummaryFacts';
+import { DeploymentFact, DevelopmentFact } from './SummaryFacts';
 import { summaryIsFresh } from '../../model/projectSummaryState';
 import styles from './ProjectSummary.module.css';
 import { ButtonLink } from '../../../../shared/ui/navigation/ButtonLink';
 
-export function ProjectSummaryTable({ items, available }: { readonly items: readonly ProjectSummary[]; readonly available: boolean }) {
-  const t = useT(), date = useDateText();
-  const columns = ['identity', 'development', 'preview', 'prod', 'health', 'actions'].map((key) => t(`projects.summary.${key}`));
-  return <DataTable columns={columns} className={styles.table}>{items.map((item) => {
+export function ProjectSummaryTable({ items, available, onOwner }: { readonly items: readonly ProjectSummary[]; readonly available: boolean; readonly onOwner?: (item: ProjectSummary) => void }) {
+  const t = useT(), [selected, setSelected] = useState<string>();
+  const detail = items.find((item) => item.project.id === selected);
+  const columns = ['identity', 'owner', 'development', 'preview', 'prod', 'actions'].map((key) => t(`projects.summary.${key}`));
+  return <><DataTable columns={columns} className={catalog.catalogTable}>{items.map((item) => {
     const p = item.project, canDevelop = available && summaryIsFresh(item) && p.state === 'active' && item.role !== 'tester';
     return <tr key={p.id}>
       <td className={styles.identity}><div className={styles.actions}><Link to="/projects/$projectId" params={{ projectId: p.id }}><strong>{p.name}</strong></Link><ProjectStateBadge state={p.state} /></div>
-        <div className={styles.muted}><code>{p.slug}</code> · {item.ownerName ?? p.ownerUserId} · {t(`projects.role.${item.role}`)}</div>
+        <div className={styles.muted}><code>{p.slug}</code> · {t(`projects.role.${item.role}`)}</div>
         {p.message ? <small className={styles.failure}>{p.message}</small> : null}
-        <details><summary>{t('projects.summary.more')}</summary><div>{t(`projects.kind.${p.kind}`)}</div><code>{p.namespace}</code><div>{date(p.createdAt)}</div><code>{p.ownerUserId}</code><div><SummaryChecked checkedAt={item.checkedAt} /></div></details>
         {!summaryIsFresh(item) ? <p className={styles.muted}>{t('projects.summary.stale')}</p> : null}</td>
-      <td><DevelopmentFact item={item} /></td><td><DeploymentFact item={item} name="preview" canOpen={available && summaryIsFresh(item)} /></td>
-      <td><DeploymentFact item={item} name="prod" canOpen={available && summaryIsFresh(item)} /></td><td><HealthFact item={item} /></td>
-      <td><div className={styles.fact}>{canDevelop ? <ButtonLink size="small" to="/projects/$projectId/dev-session" params={{ projectId: p.id }}>{t(item.development.status === 'ready' && item.development.value ? 'projects.summary.continue' : 'projects.summary.openDevelopment')}</ButtonLink> : null}
-        {available && (item.role === 'admin' || item.role === 'owner') && (p.state === 'failed' || p.state === 'provisioning') ? <ButtonLink size="small" to={item.role === 'admin' ? '/admin/projects/$projectId/provisioning' : '/projects/$projectId/provisioning'} params={{ projectId: p.id }}>{t('projects.provision.title')}</ButtonLink> : null}</div></td>
+      <CatalogCell label={t('projects.summary.owner')}><span className={catalog.owner}>{item.ownerName ? <Button size="small" onClick={() => onOwner?.(item)}>{item.ownerName}</Button> : t('catalog.ownerUnknown')}</span></CatalogCell>
+      <CatalogCell label={t('projects.summary.development')}><DevelopmentFact item={item} compact /></CatalogCell><CatalogCell label={t('projects.summary.preview')}><DeploymentFact item={item} name="preview" compact canOpen={available && summaryIsFresh(item)} /></CatalogCell>
+      <CatalogCell label={t('projects.summary.prod')}><DeploymentFact item={item} name="prod" compact canOpen={available && summaryIsFresh(item)} /></CatalogCell>
+      <td><div className={catalog.rowActions}>{canDevelop ? <ButtonLink size="small" to="/projects/$projectId/dev-session" params={{ projectId: p.id }}>{t(item.development.status === 'ready' && item.development.value ? 'projects.summary.continue' : 'projects.summary.openDevelopment')}</ButtonLink> : null}
+        {available && (item.role === 'admin' || item.role === 'owner') && (p.state === 'failed' || p.state === 'provisioning') ? <ButtonLink size="small" to={item.role === 'admin' ? '/admin/projects/$projectId/provisioning' : '/projects/$projectId/provisioning'} params={{ projectId: p.id }}>{t('projects.provision.title')}</ButtonLink> : null}<Button size="small" onClick={() => setSelected(p.id)}>{t('catalog.details')}</Button></div></td>
     </tr>;
-  })}</DataTable>;
+  })}</DataTable>{detail ? <ProjectSummaryDetails item={detail} onClose={() => setSelected(undefined)} /> : null}</>;
 }

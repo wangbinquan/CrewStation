@@ -15,32 +15,32 @@ export function SummaryChecked({ checkedAt }: { readonly checkedAt: string }) {
   const t = useT(), date = useDateText();
   return <small className={styles.muted}>{t('projects.summary.checked', { time: date(checkedAt) })}</small>;
 }
-export function DevelopmentFact({ item }: { readonly item: ProjectSummary }) {
+export function DevelopmentFact({ item, compact = false }: { readonly item: ProjectSummary; readonly compact?: boolean }) {
   const t = useT(), part = item.development;
   if (part.status !== 'ready' || !summaryIsFresh(part)) return <SummaryUnavailable part={part} />;
   const session = part.value;
   return session ? <div className={styles.fact}><span>{t(`projects.summary.session.${session.state}`)}</span>
     <small>{t(session.connected ? 'projects.summary.connected' : 'projects.summary.disconnected')}</small>
-    <small>{t('projects.summary.createdBranch')}<code>{session.branch ?? t('projects.summary.branchUnknown')}</code></small>
+    {!compact ? <small>{t('projects.summary.createdBranch')}<code>{session.branch ?? t('projects.summary.branchUnknown')}</code></small> : null}
     {session.message ? <small>{session.message}</small> : null}</div> : <span className={styles.muted}>{t('projects.summary.noSession')}</span>;
 }
-export function DeploymentFact({ item, name, canOpen = true }: { readonly item: ProjectSummary; readonly name: 'prod' | 'preview'; readonly canOpen?: boolean }) {
+export function DeploymentFact({ item, name, canOpen = true, compact = false }: { readonly compact?: boolean; readonly item: ProjectSummary; readonly name: 'prod' | 'preview'; readonly canOpen?: boolean }) {
   const t = useT(), part = item.slots;
   if (name === 'preview' && item.role === 'tester') {
     const preview = item.preview;
     if (!preview) return <span className={styles.muted}>{t('projects.summary.unknown')}</span>;
     if (preview.status !== 'ready' || !summaryIsFresh(preview)) return <SummaryUnavailable part={preview} />;
-    return <DeploymentSlotFact slot={preview.value ?? undefined} name={name} canOpen={canOpen} />;
+    return <DeploymentSlotFact slot={preview.value ?? undefined} name={name} canOpen={canOpen} compact={compact} />;
   }
   if (part.status !== 'ready' || !summaryIsFresh(part)) return <SummaryUnavailable part={part} />;
   const slot = part.value.find((s) => s.name === name);
-  return <DeploymentSlotFact slot={slot} name={name} canOpen={canOpen} />;
+  return <div className={styles.fact}><DeploymentSlotFact slot={slot} name={name} canOpen={canOpen} compact={compact} />{compact ? <SlotHealth item={item} name={name} /> : null}</div>;
 }
-function DeploymentSlotFact({ slot, name, canOpen }: { readonly slot: SlotDto | undefined; readonly name: 'prod' | 'preview'; readonly canOpen: boolean }) {
+function DeploymentSlotFact({ slot, name, canOpen, compact = false }: { readonly compact?: boolean; readonly slot: SlotDto | undefined; readonly name: 'prod' | 'preview'; readonly canOpen: boolean }) {
   const t = useT();
   if (!slot || slot.state === 'empty') return <span className={styles.muted}>{t('projects.summary.notDeployed')}</span>;
   const ready = slot.state === 'ready' && slot.readyReplicas > 0 && slot.releaseId && slot.tag && slot.commitSha;
-  return <div className={styles.fact}><span><strong>{slot.tag}</strong> <code title={slot.commitSha}>{shortSha(slot.commitSha)}</code></span>
+  return <div className={styles.fact}><span><strong>{slot.tag}</strong> {!compact ? <code title={slot.commitSha}>{shortSha(slot.commitSha)}</code> : null}</span>
     <div className={styles.actions}><Badge tone={slotStateTone(slot.state)}>{t(`projects.slotState.${slot.state}`)}</Badge>
     {canOpen && ready && validHost(slot) ? <ExternalButtonLink size="small" href={`//${slot.host}`}>{t(`slot.open.${name}`)}</ExternalButtonLink> : null}</div>
   </div>;
@@ -50,4 +50,11 @@ export function HealthFact({ item }: { readonly item: ProjectSummary }) {
   const t = useT(), part = item.health;
   if (part.status !== 'ready' || !summaryIsFresh(part) || part.value.length === 0) return <SummaryUnavailable part={part} health />;
   return <div className={styles.fact}>{part.value.map((h) => <span key={h.slot}>{t(`projects.summary.${h.slot}`)} · {t(`projects.summary.health.${h.state}`)}</span>)}</div>;
+}
+
+function SlotHealth({ item, name }: { readonly item: ProjectSummary; readonly name: 'prod' | 'preview' }) {
+  const t = useT(), part = item.health;
+  if (part.status !== 'ready' || !summaryIsFresh(part)) return <SummaryUnavailable part={part} health />;
+  const health = part.value.find((value) => value.slot === name);
+  return health ? <small className={styles.muted}>{t(`projects.summary.health.${health.state}`)}</small> : null;
 }

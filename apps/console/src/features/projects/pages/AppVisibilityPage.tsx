@@ -1,3 +1,4 @@
+import { applicationOrigin } from '../../../shared/ui/icons/appIconSources';
 import { useCallback } from 'react';
 import { useProjectScope } from '../../../shared/project/ProjectScope';
 import { api } from '../../../shared/api/client';
@@ -17,6 +18,8 @@ export function AppVisibilityPage({ embedded = false }: { readonly embedded?: bo
   // 两份设置每 30 秒在原位重读；页面不提供刷新按钮（2026-09-23 裁定）。
   const visibility = useApiQuery(['app-visibility', me.data?.id, projectId], () => api.projects.getAppVisibility(projectId), { ...AUTO_REFRESH, enabled: Boolean(me.data) });
   const presentation = useApiQuery(['app-presentation', me.data?.id, projectId], () => api.projects.getAppPresentation(projectId), { ...AUTO_REFRESH, enabled: Boolean(me.data) });
+  const market = useApiQuery(['market', me.data?.id, projectId, 'icon-preview'], () => api.capabilities.marketApp(projectId), { ...AUTO_REFRESH, enabled: Boolean(me.data) });
+  const origin = market.data?.entry?.status === 'ready' && !market.data.maintenance?.blocked ? applicationOrigin(market.data.entry.host) : undefined;
   const { refetch: refetchVisibility } = visibility, { refetch: refetchPresentation } = presentation, { refetch: refetchMe } = me;
   const reload = useCallback(() => Promise.all([refetchMe(), refetchVisibility(), refetchPresentation()]), [refetchMe, refetchVisibility, refetchPresentation]);
   // 首次读取或读取失败才是“暂不能保存”；保存后的那次重读只暂停提交，不再闪出与“已保存”矛盾的提示（2026-09-16 实机）。
@@ -27,7 +30,7 @@ export function AppVisibilityPage({ embedded = false }: { readonly embedded?: bo
   return <Stack>
     {!embedded ? <PageHeader title={t('projects.visibility.title')} description={[t('projects.visibility.intro')]} /> : null}
     <QueryStatus isPending={me.isPending || visibility.isPending || presentation.isPending} error={me.error ?? visibility.error ?? presentation.error} />
-    {visibility.data && presentation.data ? <AppVisibilitySettings key={`${me.data?.id}:${projectId}`} projectId={projectId} visibility={visibility.data} presentation={presentation.data} canConfigure={canConfigure} unavailable={unavailable} refreshing={refreshing} reload={rereadAfterSave} /> : null}
+    {visibility.data && presentation.data ? <AppVisibilitySettings key={`${me.data?.id}:${projectId}`} projectId={projectId} origin={origin} visibility={visibility.data} presentation={presentation.data} canConfigure={canConfigure} unavailable={unavailable} refreshing={refreshing} reload={rereadAfterSave} /> : null}
     {/* 使用申请只给负责人与管理员（2026-09-24 裁定）：同意即加为「用户」。 */}
     {canConfigure ? <AccessRequestReview key={`${me.data?.id}:${projectId}:access`} scope={{ projectId, state: 'pending' }} title={t('projects.access.title')} empty={t('projects.access.empty')} hint={t('projects.access.hint')} /> : null}
   </Stack>;

@@ -61,7 +61,7 @@ test('项目管理只列数字人：只按 DigitalWorker 读、默认分页 20�
   // 66 个项目里下标是 3 的倍数的 22 个是数字人：第一页是 0、3 … 57，接入容器一个都不出现。
   expect(names()).toEqual(Array.from({ length: 20 }, (_, i) => `管理项目 ${i * 3}`));
   expect(document.querySelector('select[aria-label="项目类型"]')).toBeNull();
-  expect([...document.querySelectorAll('main th')].map((th) => th.textContent)).toEqual(['项目', '负责人', '开通状态', '管理操作']);
+  expect([...document.querySelectorAll('main th')].map((th) => th.textContent)).toEqual(['项目', '负责人', '开通状态', '创建时间', '管理操作']);
   expect(page.text()).toContain('新建数字人'); expect(page.text()).not.toContain('新建接入容器');
   await page.click('下一页'); expect(page.search().cursor).toBe('20'); expect(names()).toEqual(['管理项目 60', '管理项目 63']);
   await page.back(); expect(page.search().cursor).toBeUndefined(); expect(names()[0]).toBe('管理项目 0'); expect(f.writes()).toHaveLength(0);
@@ -116,9 +116,9 @@ test('管理目录读取失败保留材料但暂停管理动作，无效回执�
   expect(document.querySelectorAll('a[href$="/provisioning"]').length).toBe(0); expect(page.text()).not.toContain('本页 0 个项目');
   // 第一页只有数字人，其中开通失败的是 0、3、6、9。
   f.state.projectError = false; await page.reread(); expect(document.querySelectorAll('a[href$="/provisioning"]').length).toBe(4);
-  await page.click('管理成员'); expect(page.path()).toBe(`/projects/${f.projects[0]!.project.id}/settings`); expect(page.search().tab).toBe('members');
+  await page.click('更多'); await page.click('管理成员'); expect(page.path()).toBe(`/projects/${f.projects[0]!.project.id}/settings`); expect(page.search().tab).toBe('members');
   f.state.invalidProject = true; await page.navigate('/admin/projects?q=unknown'); expect(page.text()).toContain('管理项目目录或当前管理身份未确认');
-  expect(page.text()).not.toContain('此范围没有项目'); expect(page.text()).toContain('本页数量未确认'); expect(f.writes()).toHaveLength(0);
+  expect(page.text()).not.toContain('此范围没有项目'); expect(page.text()).toContain('数量待确认'); expect(f.writes()).toHaveLength(0);
 });
 
 test('空筛选可恢复；前台重读保留未提交搜索，卸载清理监听', async () => {
@@ -156,4 +156,19 @@ test('例行重读不改界面：在途也不把入口换成纯文本（2026-09-
   const reads = () => f.calls.filter((c) => c.url.pathname === '/v1/api-requests/page').length;
   expect(reads()).toBe(2); expect(entry().tagName).toBe('A');
   f.state.holdApi = undefined; await act(async () => release()); await page.settle(); expect(entry().tagName).toBe('A');
+});
+
+test.each(['/admin/projects', '/admin/integrations'])('%s 长目录末行详情及上一页保留查询、焦点和滚动', async (route) => {
+  const f = adminDirectoryFixture({ count: 120 }); page = await renderApp(`${route}?q=managed`);
+  await page.click('下一页'); expect(page.search().cursor).toBe('20');
+  const main = document.querySelector('main')!; main.scrollTop = 500;
+  const rows = document.querySelectorAll('tbody tr'), last = rows[rows.length - 1]!;
+  const button = [...last.querySelectorAll('button')].find((node) => node.textContent === '更多')!;
+  await act(async () => { button.focus(); button.click(); }); await page.settle();
+  const dialog = document.querySelector('dialog[open]')!;
+  expect(dialog.closest('table')).toBeNull(); expect(dialog.textContent).toContain('命名空间');
+  await act(async () => dialog.dispatchEvent(new Event('cancel', { cancelable: true }))); await page.settle();
+  expect(document.activeElement === button).toBe(true); expect(main.scrollTop).toBe(500);
+  expect(page.search()).toMatchObject({ q: 'managed', cursor: '20' }); expect(document.querySelectorAll('tbody tr')).toHaveLength(20);
+  await page.click('上一页'); expect(page.search().cursor).toBeUndefined(); expect(page.search().q).toBe('managed'); expect(f.writes()).toHaveLength(0);
 });

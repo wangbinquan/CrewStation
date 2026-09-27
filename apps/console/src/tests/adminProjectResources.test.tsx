@@ -71,9 +71,9 @@ test('配额冲突和不匹配回执保留草稿，重新读取需确认；身�
 test('两类旧模板地址进入项目管理，模板明确共享范围，切页签前保护草稿', async () => {
   projectResourcesFixture(); page = await renderApp('/admin/service-plans');
   expect(page.path()).toBe(serviceTemplatePath); expect(page.search().kind).toBe('service'); expect(page.text()).toContain('全平台共享模板');
-  await input('名称', '未保存模板'); await page.click('任务容器规格模板'); expect(page.search().kind).toBe('service'); expect(page.text()).toContain('未保存');
-  await page.click('继续编辑'); expect(field('名称').value).toBe('未保存模板');
-  await page.click('任务容器规格模板'); await page.click('放弃输入并离开'); expect(page.search().kind).toBe('task'); expect(page.text()).toContain('存储');
+  await page.click('新建服务套餐'); await input('名称', '未保存模板'); await page.click('取消'); await page.click('任务容器规格模板'); expect(page.search().kind).toBe('service'); expect(page.text()).toContain('未保存');
+  await page.click('继续编辑'); await page.click('新建服务套餐'); expect(field('名称').value).toBe('未保存模板');
+  await page.click('取消'); await page.click('任务容器规格模板'); await page.click('放弃输入并离开'); expect(page.search().kind).toBe('task'); expect(page.text()).toContain('存储');
   await page.navigate('/admin/task-profiles'); expect(page.path()).toBe(serviceTemplatePath); expect(page.search().kind).toBe('task');
 });
 

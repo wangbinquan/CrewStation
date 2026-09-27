@@ -32,5 +32,5 @@ export const adminProjectComputeRoute = createRoute({ getParentRoute: () => admi
 
 export const adminProjectResourcesRoute = createRoute({ getParentRoute: () => adminRoute, path: 'projects/$projectId/resources', component: AdminProjectComputePage });
 export const adminResourceTemplatesRoute = createRoute({ getParentRoute: () => adminRoute, path: 'projects/resource-templates', component: AdminResourceTemplatesPage,
-  validateSearch: (search: Record<string, unknown>): { kind: 'service' | 'task' } => ({ kind: search.kind === 'task' ? 'task' : 'service' }),
+  validateSearch: (search: Record<string, unknown>): { kind: 'service' | 'task'; q?: string } => ({ kind: search.kind === 'task' ? 'task' : 'service', ...(typeof search.q === 'string' && search.q.trim() ? { q: search.q.trim().slice(0, 120) } : {}) }),
 });

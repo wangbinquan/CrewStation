@@ -48,7 +48,7 @@ async function change(selector: string, value: string) {
 
 test.each(['user', 'developer', 'admin'] as const)('%s 默认首页只有应用内容与获准空间，Beta 直接打开且无技术请求', async (role) => {
   const f = fixture(role); page = await renderApp('/');
-  expect(page.text()).toContain('Beta'); expect(page.text()).toContain('试用应用'); expect(page.text()).toContain('共用业务数据');
+  expect(page.text()).toContain('Beta'); expect(page.text()).toContain('试用 Beta'); expect(page.text()).toContain('共用业务数据');
   expect(page.html()).toContain('href="http://preview.team.example.test"'); expect(page.text()).not.toContain('Agent 动态');
   expect(Boolean(document.querySelector('a[href="/projects"]'))).toBe(role !== 'user');
   expect(Boolean(document.querySelector('a[href="/admin"]'))).toBe(role === 'admin');
@@ -144,7 +144,7 @@ test('已上线应用卡片保留正式入口和独立 Beta 链接，自动更�
   page = await renderApp('/market'); expect(page.text()).not.toContain('v1');
   expect(document.querySelector('a[href="http://team.test"]')?.textContent).toBe('团队助理');
   const beta = document.querySelector<HTMLAnchorElement>('a[href="http://new.team.test"]')!;
-  expect(beta.textContent).toContain('试用新版本'); expect(beta.target).toBe('_blank');
+  expect(beta.textContent).toContain('试用 Beta'); expect(beta.target).toBe('_blank');
   expect(beta.parentElement?.closest('a')).toBeNull(); expect(page.text()).toContain('共用业务数据');
   expect(document.querySelector('h2')?.textContent).not.toContain('Beta');
   ready = false; await act(async () => { focusManager.setFocused(false); focusManager.setFocused(true); }); await page.settle();

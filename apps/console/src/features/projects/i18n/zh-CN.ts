@@ -1,6 +1,21 @@
 import type { Messages } from '../../../shared/lib/i18n';
 
 export const messages = {
+  "projects.summary.ownerId": "负责人 ID",
+  "projects.icon.loadFailed": "图片暂不可读取，当前显示后备图标。请检查地址或重新选择图片。",
+  "projects.icon.preview": "市场实际尺寸预览",
+  "projects.icon.source": "图标来源",
+  "projects.icon.sourceHint": "自动读取应用 /favicon.ico；手动配置优先，加载失败使用内置图标。",
+  "projects.icon.app": "应用约定地址 /favicon.ico",
+  "projects.icon.upload": "上传图片",
+  "projects.icon.url": "图标 URL",
+  "projects.icon.urlHint": "填写完整 HTTPS 地址或应用内路径，如 /assets/icon.png。",
+  "projects.icon.urlError": "请输入可用的图片地址；HTTPS 页面不能读取 HTTP 图片。",
+  "projects.icon.file": "业务图标图片",
+  "projects.icon.fileHint": "静态 PNG、JPEG、WebP；不超过 2 MiB，宽高不超过 4096px。",
+  "projects.icon.fileError": "请选择 2 MiB 以内的 PNG、JPEG 或 WebP 图片。",
+  "projects.icon.fallback": "备用内置图标",
+
   'projects.self.resources': '默认资源：{plan}，最多 {count} 个并发任务。',
   'projects.members.developerRequired': '开发成员和负责人必须先由管理员设为平台开发者；普通用户可以设为测试者或用户。',
   "projects.list.title": "项目开发",
@@ -44,7 +59,7 @@ export const messages = {
   "projects.summary.pageSize": "每页最多 20 项 · 本页 {count} 项",
   "projects.summary.firstPage": "回到第一页",
   "projects.summary.nextPage": "下一页",
-  "projects.summary.identity": "项目／负责人",
+  "projects.summary.identity": "项目",
   "projects.summary.development": "当前开发",
   "projects.summary.preview": "待验证版本",
   "projects.summary.prod": "正式版本",

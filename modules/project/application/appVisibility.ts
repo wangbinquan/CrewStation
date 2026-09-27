@@ -24,6 +24,7 @@ export function appVisibilityUseCases(deps: ProjectUseCaseDeps) {
       const current = await scope.appListings.get(projectId);
       const saved = await scope.appListings.save({ ...current, ...delta, updatedAt: clock.now() }, expectedRevision);
       if (!saved) throw conflict('应用设置已由其他人更新；请保留草稿并读取最新设置后重试');
+      if (delta.iconSource && delta.iconSource.kind !== 'upload') await scope.appIcons.remove(projectId);
       return saved;
     });
   };
@@ -40,7 +41,7 @@ export function appVisibilityUseCases(deps: ProjectUseCaseDeps) {
       await authorize(actor, projectId, 'manage-members');
       const input = SetAppPresentationRequestSchema.safeParse(raw);
       if (!input.success) throw validation('请检查应用介绍', { issues: input.error.issues });
-      return presentation(await save(actor, projectId, input.data.expectedRevision, { description: input.data.description, icon: input.data.icon }));
+      return presentation(await save(actor, projectId, input.data.expectedRevision, { description: input.data.description, icon: input.data.icon, ...(input.data.iconSource ? { iconSource: input.data.iconSource } : {}) }));
     },
     memberCandidates: async (actor: Actor, projectId: ProjectId, identity: string) => {
       await authorize(actor, projectId, 'manage-members');
@@ -52,5 +53,5 @@ export function appVisibilityUseCases(deps: ProjectUseCaseDeps) {
 }
 
 function presentation(listing: AppListing): AppPresentationDto {
-  return { description: listing.description, icon: listing.icon, revision: listing.revision, updatedAt: listing.updatedAt?.toISOString() ?? null };
+  return { description: listing.description, icon: listing.icon, iconSource: listing.iconSource ?? { kind: 'app' }, revision: listing.revision, updatedAt: listing.updatedAt?.toISOString() ?? null };
 }

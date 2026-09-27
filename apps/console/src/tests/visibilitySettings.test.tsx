@@ -23,7 +23,7 @@ test('可见范围与展示资料各一个弹窗：关窗草稿都留着，离�
   await clickSetting(page, '保存可见范围'); expect(f.writes).toHaveLength(1); expect(document.querySelectorAll('dialog').length).toBe(0);
   await page.click('高级'); expect(page.search().tab).toBe('visibility'); expect(page.text()).toContain('应用展示资料有未保存的输入'); await clickSetting(page, '继续编辑');
   await openSetting(page, '修改展示资料'); await clickSetting(page, '保存展示资料'); await page.click('高级'); expect(page.search().tab).toBe('advanced');
-  expect(f.writes[1]!.input).toEqual({ description: '尚未保存的用途', icon: 'book', expectedRevision: 0 });
+  expect(f.writes[1]!.input).toEqual({ description: '尚未保存的用途', icon: 'book', iconSource: { kind: 'app' }, expectedRevision: 0 });
 });
 
 test('身份或任一设置读取失败都会暂停写入，两份草稿都留着、打开弹窗可查看；恢复读取不自动保存', async () => {
@@ -63,13 +63,13 @@ test('展示资料字段错误、保存失败与修订冲突均保留用途和�
   const f = visibilitySettingsFixture(); page = await renderApp(visibilitySettingsRoute);
   await editSetting(page, '应用用途', '长'.repeat(401)); await clickSetting(page, '保存展示资料');
   expect(settingsField('应用用途').getAttribute('aria-invalid')).toBe('true'); expect(document.activeElement === settingsField('应用用途')).toBe(true); expect(f.writes).toHaveLength(0);
-  await editSetting(page, '应用用途', '本地说明'); await editSetting(page, '应用图标', 'chart');
-  f.state.failWrite = true; await clickSetting(page, '保存展示资料'); expect(page.text()).toContain('设置保存失败'); expect(settingsField('应用图标').value).toBe('chart');
+  await editSetting(page, '应用用途', '本地说明'); await editSetting(page, '备用内置图标', 'chart');
+  f.state.failWrite = true; await clickSetting(page, '保存展示资料'); expect(page.text()).toContain('设置保存失败'); expect(settingsField('备用内置图标').value).toBe('chart');
   f.state.failWrite = false; f.state.presentation = { ...f.state.presentation, description: '另一负责人说明', icon: 'spark', revision: 2 };
   await clickSetting(page, '保存展示资料'); expect(page.text()).toContain('另一负责人说明'); expect(settingsField('应用用途').value).toBe('本地说明');
   expect(settingsButton('保存展示资料').disabled).toBe(true);
   await clickSetting(page, '使用最新修订，保留本地草稿'); await clickSetting(page, '保存展示资料');
-  expect(f.writes.at(-1)!.input).toEqual({ description: '本地说明', icon: 'chart', expectedRevision: 2 });
+  expect(f.writes.at(-1)!.input).toEqual({ description: '本地说明', icon: 'chart', iconSource: { kind: 'app' }, expectedRevision: 2 });
   await page.click('高级'); expect(page.search().tab).toBe('advanced');
 });
 

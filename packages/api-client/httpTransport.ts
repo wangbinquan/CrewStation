@@ -16,6 +16,8 @@ export interface RequestOptions {
   readonly query?: Query;
   /** 以 JSON 发送的请求体。 */
   readonly body?: unknown;
+  /** Browser-generated multipart body; the browser owns its boundary header. */
+  readonly formData?: FormData;
   readonly signal?: AbortSignal;
   readonly keepalive?: boolean;
   readonly redirect?: RequestRedirect;
@@ -52,6 +54,7 @@ export function createTransport(options: TransportOptions = {}): Transport {
         headers.set('content-type', 'application/json');
         init.body = JSON.stringify(request.body);
       }
+      if (request.formData) { headers.delete('content-type'); init.body = request.formData; }
       let response: Response;
       try {
         response = await fetchImpl(buildUrl(baseUrl, path, request.query), init);

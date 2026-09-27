@@ -1,0 +1,9 @@
+.icon { position: relative; display: inline-grid; place-items: center; flex: none; width: 32px; height: 32px; overflow: hidden; border: 1px solid var(--cs-color-border); border-radius: 8px; background: var(--cs-color-surface); color: var(--cs-color-text-muted); }
+.icon img { position: absolute; inset: 0; box-sizing: border-box; width: 100%; height: 100%; padding: 3px; object-fit: contain; background: var(--cs-color-surface); }
+.loaded { visibility: visible; }
+.pending { visibility: hidden; }
+
+.preview { width: 96px; height: 96px; }
+.preview img { padding: 6px; }
+.preview > span { width: 48px; height: 48px; }
+.preview svg { width: 48px; height: 48px; }

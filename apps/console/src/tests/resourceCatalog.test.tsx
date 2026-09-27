@@ -42,8 +42,8 @@ async function edit(name: string) {
 }
 
 test('套餐字段约束与全部错误首屏可定位；空表单 submit 不能通过旧 disabled 按钮旁路写入', async () => {
-  const f = fixture(); page = await renderApp('/admin/service-plans');
-  await act(async () => { document.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); }); await page.settle();
+  const f = fixture(); page = await renderApp('/admin/service-plans'); await page.click('新建服务套餐');
+  await act(async () => { document.querySelector('dialog form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); }); await page.settle();
   // 旧 AdminForm 只禁用按钮，没有字段校验；表单提交仍把空资源写进目录。
   expect(f.writes).toHaveLength(0); expect(document.querySelectorAll('[aria-invalid="true"]')).toHaveLength(3);
   expect(page.text()).toContain('1–80'); expect(page.text()).toContain('500m'); expect(document.activeElement === field('名称')).toBe(true);
@@ -57,7 +57,7 @@ test('具名编辑与保存前对照当前值；取消不写入，覆盖后说�
   expect(page.text()).toContain('覆盖服务套餐 standard-small'); expect(page.text()).toContain('目录当前值'); expect(page.text()).toContain('本次保存值'); expect(f.writes).toHaveLength(0);
   // 2026-09-23 起核对材料在确认弹窗里，不在卡片里展开。
   const confirm = document.querySelector('dialog[open][role="alertdialog"]'); expect(confirm?.textContent).toContain('目录当前值'); expect(confirm?.querySelectorAll('tbody tr').length).toBe(5);
-  await page.click('继续编辑'); expect(document.querySelectorAll('dialog[open]').length).toBe(0); expect(field('CPU').value).toBe('2'); await page.click('检查并保存'); await page.click('确认覆盖');
+  await page.click('继续编辑'); expect(document.querySelectorAll('dialog[open]').length).toBe(1); expect(field('CPU').value).toBe('2'); await page.click('检查并保存'); await page.click('确认覆盖');
   expect(f.writes[0]?.input).toEqual({ name: 'standard-small', cpu: '2', memory: '512Mi', maxReplicas: 3, description: '原服务套餐' });
   expect(page.text()).toContain('已保存服务套餐 standard-small'); expect(page.text()).toContain('下次发布');
   await page.navigate('/admin'); expect(page.path()).toBe('/admin');
@@ -74,16 +74,16 @@ test('套餐读取失败保留输入并暂停保存；目录变化先更新确�
 
 test('套餐失败、换编辑对象和新建都保留草稿，放弃只替换表单且不会偷偷写入', async () => {
   const f = fixture(); page = await renderApp('/admin/service-plans'); await edit('standard-small'); await input('CPU', '3');
-  await edit('standard-small'); expect(field('CPU').value).toBe('3');
-  expect(document.querySelector('dialog[open][role="alertdialog"]')?.textContent).toContain('放弃当前输入并载入「standard-small」？'); await page.click('继续编辑');
-  await page.click('新建服务套餐'); expect(field('CPU').value).toBe('3'); await page.click('继续编辑');
+  await page.click('取消'); await edit('standard-small'); expect(field('CPU').value).toBe('3');
+  await page.click('取消'); await page.click('新建服务套餐'); await page.click('继续编辑');
+  expect(field('CPU').value).toBe('3');
   f.state.saveFailure = true; await page.click('检查并保存'); await page.click('确认覆盖'); expect(page.text()).toContain('套餐保存失败'); expect(field('CPU').value).toBe('3');
   await page.click('继续编辑'); await page.requestNavigate('/admin'); expect(page.path()).toBe('/admin/projects/resource-templates'); await page.click('继续编辑');
-  await page.click('新建服务套餐'); await page.click('放弃输入并载入'); expect(field('名称').value).toBe(''); expect(f.writes).toHaveLength(1);
+  await page.click('取消'); await page.click('新建服务套餐'); await page.click('放弃输入并离开'); expect(field('名称').value).toBe(''); expect(f.writes).toHaveLength(1);
 });
 
 test('任务套餐保留 CPU、内存和存储，明确新增与覆盖，保存后已有任务保持原规格', async () => {
-  const f = fixture(); page = await renderApp('/admin/task-profiles');
+  const f = fixture(); page = await renderApp('/admin/task-profiles'); await page.click('新建任务容器套餐');
   await input('名称', 'dev-large'); await input('CPU', '4'); await input('内存', '8Gi'); await input('存储', '40Gi'); await input('说明', '大任务');
   await page.click('检查并保存'); expect(page.text()).toContain('新增任务容器套餐 dev-large'); await page.click('确认新增');
   expect(f.writes[0]).toEqual({ path: '/v1/catalog/task-profiles', input: { name: 'dev-large', cpu: '4', memory: '8Gi', storage: '40Gi', description: '大任务' } });
@@ -117,4 +117,16 @@ test('确认前的目录读取仍在途时离开，迟到读取不再发起保�
   let finish!: () => void; f.state.holdRead = new Promise<void>((resolve) => { finish = resolve; }); await page.click('确认覆盖');
   await page.requestNavigate('/admin'); await page.click('放弃输入并离开');
   await act(async () => { finish(); }); await page.settle(); expect(f.writes).toHaveLength(0); expect(page.path()).toBe('/admin');
+});
+
+test('长目录末行编辑位于统一弹窗，关闭后保留搜索、行数、焦点和草稿', async () => {
+  const f = fixture();
+  f.state.readOverride = { items: Array.from({ length: 30 }, (_, index) => ({ ...f.state.service, id: Bun.randomUUIDv7(), name: `service-${index}` })) };
+  page = await renderApp('/admin/projects/resource-templates?kind=service&q=service');
+  const rows = document.querySelectorAll('tbody tr'), trigger = rows[29]!.querySelector<HTMLButtonElement>('button')!;
+  await act(async () => { trigger.focus(); trigger.click(); }); await page.settle();
+  expect(document.querySelector('dialog[open]')?.closest('table')).toBeNull(); expect(field('名称').value).toBe('service-29');
+  await input('CPU', '3'); await page.click('取消');
+  expect(document.activeElement === trigger).toBe(true); expect(document.querySelectorAll('tbody tr')).toHaveLength(30); expect(page.search().q).toBe('service');
+  await act(async () => trigger.click()); await page.settle(); expect(field('CPU').value).toBe('3'); expect(f.writes).toHaveLength(0);
 });

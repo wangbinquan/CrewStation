@@ -315,3 +315,17 @@ test('FormField 只让文字类控件铺满整行，复选框与单选框靠左'
   expect(css).toContain('.field input:not([type="checkbox"]):not([type="radio"]),');
   expect(css).toMatch(/\.field input\[type="checkbox"\],\s*\.field input\[type="radio"\] \{\s*align-self: flex-start;/);
 });
+
+test('StrictMode 重放弹窗布局副作用后，关闭仍回到原触发按钮', async () => {
+  const { StrictMode } = await import('react');
+  rendered = await renderElement(<StrictMode><DialogHost><Probe /></DialogHost></StrictMode>, messages);
+  const trigger = rendered.button('进入维护'), focus = trigger.focus.bind(trigger);
+  // happy-dom 不实现模态 inert；模拟 Chrome 拒绝把焦点移到仍被弹窗覆盖的按钮。
+  trigger.focus = () => { if (!document.querySelector('dialog[open]')) focus(); };
+  await openWith('进入维护');
+  await act(async () => { openDialog().dispatchEvent(new Event('cancel', { cancelable: true })); });
+  await rendered.settle();
+  // 开发浏览器原来把第二次 effect 的弹窗自身记成 opener，移除后焦点落在 body。
+  expect(document.querySelectorAll('dialog')).toHaveLength(0);
+  expect(document.activeElement === trigger).toBe(true);
+});

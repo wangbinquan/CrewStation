@@ -49,7 +49,7 @@ export const settingsButton = (label: string, root?: ParentNode) => {
 };
 export const settingsForm = (label: string) => settingsField(label).closest('form')!;
 /** 字段属于哪个弹窗：弹窗标题就是打开它的按钮文案。 */
-const DIALOG_OF: Record<string, string> = { 可见范围: '修改可见范围', 申请: '修改可见范围', 应用用途: '修改展示资料', 应用图标: '修改展示资料' };
+const DIALOG_OF: Record<string, string> = { 可见范围: '修改可见范围', 申请: '修改可见范围', 应用用途: '修改展示资料', 备用内置图标: '修改展示资料' };
 /** 关掉开着的设置弹窗：「取消」只关窗，草稿留着。 */
 export async function closeSetting(page: RenderedApp) {
   const dialog = openSettingDialog();

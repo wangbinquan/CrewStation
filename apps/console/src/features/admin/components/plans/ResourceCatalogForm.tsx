@@ -3,9 +3,13 @@ import { useT } from '../../../../shared/lib/useT';
 import type { useResourceCatalogDraft } from '../../hooks/useResourceCatalogDraft';
 import type { ResourceCatalogInput, ResourceCatalogField, ResourceCatalogKind } from '../../model/resourceCatalogDraft';
 import { AdminField } from '../AdminField';
-import { AdminForm } from '../AdminForm';
+import { FormDialog } from '../../../../shared/ui/dialog/FormDialog';
+import { Stack } from '../../../../shared/ui/Stack';
 
 interface ResourceFormProps {
+  readonly error?: string;
+  readonly onClose: () => void;
+  readonly onClear: () => void;
   readonly kind: ResourceCatalogKind;
   readonly editor: ReturnType<typeof useResourceCatalogDraft>;
   readonly busy: boolean;
@@ -15,14 +19,15 @@ interface ResourceFormProps {
   readonly onChange: () => void;
 }
 
-export function ResourceCatalogForm({ kind, editor, busy, frozen, unavailable, onPrepare, onChange }: ResourceFormProps) {
+export function ResourceCatalogForm({ kind, editor, busy, frozen, unavailable, onPrepare, onChange, error, onClose, onClear }: ResourceFormProps) {
   const t = useT(), root = useRef<HTMLDivElement>(null);
   useEffect(() => { root.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus(); }, [editor.errors]);
   const fields: readonly ResourceCatalogField[] = ['name', 'cpu', 'memory', kind === 'service' ? 'maxReplicas' : 'storage', 'description'];
-  return <div ref={root}><AdminForm submitLabel={t('admin.resource.prepare')} busyLabel={t('admin.resource.busy')} busy={busy} incomplete={frozen || unavailable} onSubmit={() => {
+  return <FormDialog title={editor.draft.name || t(`admin.resource.${kind}`)} onClose={onClose} onClear={onClear} dirty={editor.dirty} error={error} submitLabel={t('admin.resource.prepare')} busyLabel={t('admin.resource.busy')} busy={busy} submitDisabled={frozen || unavailable} onSubmit={() => {
     if (busy || frozen || unavailable) return;
     const input = editor.validate(); if (input) onPrepare(input);
-  }}>
+  }}><div ref={root}><Stack>
+    {editor.draft.id ? <p>{t('catalog.identifier')}：<code>{editor.draft.id}</code></p> : null}
     {fields.map((field) => <AdminField key={field} label={t(`admin.${kind === 'service' ? 'plans' : 'profiles'}.${field}`)} value={editor.draft[field]} disabled={busy || frozen} inputMode={field === 'maxReplicas' ? 'numeric' : undefined} hint={t(`admin.resource.hint.${field}`)} error={editor.errors[field] ? t(`admin.resource.${editor.errors[field]}`) : undefined} onChange={(value) => { editor.change(field, value); onChange(); }} />)}
-  </AdminForm></div>;
+  </Stack></div></FormDialog>;
 }

@@ -103,3 +103,15 @@ describe('RFC-021 市场卡片的维护标注', () => {
     expect(await setup(async () => [prod]).getMarketApp(actor, projectId)).not.toHaveProperty('maintenance');
   });
 });
+
+test('RFC-030 HTTP 将负责人和规范化关键词完整交给目录，不在当前页筛选', async () => {
+  const queries: unknown[] = [];
+  const api = marketAppUseCases({ slots: async () => [], get: async () => listing, list: async (_actor, query) => { queries.push(query); return { items: [], nextCursor: 'next' }; } }, clock);
+  const http = createApp({ name: 'market-discovery' }); http.route('/', marketRoutes(api, async () => false));
+  const headers = { [IDENTITY_HEADERS.userId]: actor.userId };
+  const response = await http.request(`/v1/market/apps?q=%20知识%20%20检索%20&ownerId=${actor.userId}&limit=50`, { headers });
+  expect(response.status).toBe(200);
+  expect(queries).toEqual([{ q: '知识 检索', ownerId: actor.userId, limit: 50 }]);
+  expect(await response.json()).toEqual({ items: [], nextCursor: 'next' });
+  expect((await http.request('/v1/market/apps?ownerId=not-a-user-id', { headers })).status).toBe(400);
+});

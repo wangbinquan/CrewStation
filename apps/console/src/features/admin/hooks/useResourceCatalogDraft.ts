@@ -2,8 +2,8 @@ import { useState } from 'react';
 import type { ResourceCatalogEntry, ResourceCatalogField, ResourceCatalogKind } from '../model/resourceCatalogDraft';
 import { resourceCatalogDraft, resourceCatalogErrors, resourceCatalogInput } from '../model/resourceCatalogDraft';
 
-export function useResourceCatalogDraft(kind: ResourceCatalogKind) {
-  const [draft, setDraft] = useState(resourceCatalogDraft), [base, setBase] = useState(resourceCatalogDraft);
+export function useResourceCatalogDraft(kind: ResourceCatalogKind, initial?: ResourceCatalogEntry) {
+  const [draft, setDraft] = useState(() => resourceCatalogDraft(initial)), [base, setBase] = useState(() => resourceCatalogDraft(initial));
   const [errors, setErrors] = useState<ReturnType<typeof resourceCatalogErrors>>({});
   const [replacement, setReplacement] = useState<ResourceCatalogEntry | null>();
   const dirty = JSON.stringify(draft) !== JSON.stringify(base);

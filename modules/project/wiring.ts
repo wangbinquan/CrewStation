@@ -1,3 +1,6 @@
+import { sharpAppIconDecoder } from './adapters/media/sharpAppIconDecoder';
+import { appIconUseCases } from './application/appIcons';
+import { appIconRoutes } from './http/appIconRoutes';
 import { join } from 'node:path';
 import type { AppEnv } from '@crewstation/http';
 import type { Clock } from '@crewstation/kernel';
@@ -58,6 +61,7 @@ export const projectMigrations: MigrationSet = {
 export function createProjectModule(deps: ProjectModuleDeps): ProjectModule {
   const useCaseDeps: ProjectUseCaseDeps = {
     uow: drizzleUnitOfWork(deps.db),
+    iconDecoder: sharpAppIconDecoder,
     // 与角色变更共用短协调锁，避免不同用户同时占满连接池而饿死各自的业务事务。
     roleLock: { run: (id, work) => keyedLock(deps.db)(['platform-roles', `user-role:${id}`], work) },
     creationTemplates: deps.creationTemplates ?? { list: async () => [] },
@@ -79,10 +83,11 @@ export function createProjectModule(deps: ProjectModuleDeps): ProjectModule {
     ...quotaAndPlanUseCases(useCaseDeps),
     ...servicePolicyUseCases(useCaseDeps),
     ...appVisibilityUseCases(useCaseDeps),
+    ...appIconUseCases(useCaseDeps),
     ...appAccessUseCases(useCaseDeps),
     ...accessRequestReviewUseCases(useCaseDeps),
     ...marketListingUseCases(useCaseDeps),
     ...projectPageUseCases(useCaseDeps),
   };
-  return { api, http: [projectRoutes(api), catalogRoutes(api), appListingRoutes(api), appAccessRoutes(api), servicePolicyRoutes(api)], migrations: projectMigrations };
+  return { api, http: [projectRoutes(api), catalogRoutes(api), appListingRoutes(api), appIconRoutes(api), appAccessRoutes(api), servicePolicyRoutes(api)], migrations: projectMigrations };
 }

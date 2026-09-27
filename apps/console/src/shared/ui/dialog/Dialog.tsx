@@ -64,13 +64,16 @@ export function Dialog(props: DialogProps): ReactElement | null {
 function DialogFrame({ title, children, footer, onClose, busy = false, size = 'medium', role = 'dialog', describedBy, onSubmit, initialFocus }: DialogProps): ReactElement {
   const t = useT(), titleId = useId(), host = useDialogHost();
   const dialog = useRef<HTMLDialogElement>(null), body = useRef<HTMLDivElement>(null);
+  const opener = useRef<HTMLElement | null | undefined>(undefined);
   useLayoutEffect(() => {
-    const opener = currentOpener(), node = dialog.current;
+    // StrictMode 会重放 effect；第二次的 activeElement 已是模态内部，不能覆盖原触发者。
+    if (opener.current === undefined) opener.current = currentOpener();
+    const node = dialog.current;
     if (node && !node.open) node.showModal();
     const target = initialFocus === 'dialog' ? node : initialFocus?.current ?? body.current?.querySelector<HTMLElement>(DIALOG_FIELD_SELECTOR) ?? node;
     target?.focus();
     // 卸载时元素随之移出顶层，不调用 close()，免得卸载后再派发 close 事件。
-    return () => returnFocus(opener);
+    return () => returnFocus(opener.current ?? null);
   }, [initialFocus]);
   // Esc：浏览器先派发 cancel，拦下后由调用方决定关闭；进行中不关。
   const cancel = (event: SyntheticEvent): void => { event.stopPropagation(); event.preventDefault(); if (!busy) onClose(); };

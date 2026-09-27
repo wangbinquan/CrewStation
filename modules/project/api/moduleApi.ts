@@ -77,6 +77,8 @@ export interface ProjectModuleApi {
   setAppVisibility(actor: Actor, projectId: ProjectId, input: SetAppVisibilityRequest): Promise<AppVisibilityDto>;
   getAppPresentation(actor: Actor, projectId: ProjectId): Promise<AppPresentationDto>;
   setAppPresentation(actor: Actor, projectId: ProjectId, input: SetAppPresentationRequest): Promise<AppPresentationDto>;
+  uploadAppIcon(actor: Actor, projectId: ProjectId, input: SetAppPresentationRequest, bytes: Uint8Array): Promise<AppPresentationDto>;
+  getAppIcon(actor: Actor, projectId: ProjectId): Promise<{ content: string; mime: 'image/webp' }>;
   memberCandidates(actor: Actor, projectId: ProjectId, identity: string): Promise<MemberCandidateDto[]>;
   /** 无 actor 的受信路径：只给网关判定正式地址用，`user` 是会话里刚读出的账号。 */
   appAccessBySlug(user: { readonly id: UserId; readonly isAdmin: boolean }, projectSlug: string): Promise<AppAccessVerdict>;

@@ -38,6 +38,7 @@ export interface ProjectsResource {
   getAppVisibility(projectId: string): Promise<AppVisibilityDto>;
   setAppVisibility(projectId: string, input: SetAppVisibilityRequest): Promise<AppVisibilityDto>;
   getAppPresentation(projectId: string): Promise<AppPresentationDto>;
+  uploadAppIcon(projectId: string, input: SetAppPresentationRequest, file: Blob): Promise<AppPresentationDto>;
   setAppPresentation(projectId: string, input: SetAppPresentationRequest): Promise<AppPresentationDto>;
   /** GET /v1/apps/:projectId/access：申请页读自己对该应用的使用权与最近一条申请（2026-09-24）；任何登录用户可读。 */
   getAppAccess(projectId: string): Promise<AppAccessStatusDto>;
@@ -71,6 +72,10 @@ export function projectsResource(transport: Transport): ProjectsResource {
     setAppVisibility: (id, input) => transport.request('PUT', `${base(id)}/app-visibility`, { body: input }),
     getAppPresentation: (id) => transport.request('GET', `${base(id)}/app-presentation`),
     setAppPresentation: (id, input) => transport.request('PUT', `${base(id)}/app-presentation`, { body: input }),
+    uploadAppIcon: (id, input, file) => {
+      const formData = new FormData(); formData.set('presentation', JSON.stringify(input)); formData.set('file', file, 'icon');
+      return transport.request('PUT', `${base(id)}/app-icon`, { formData });
+    },
     getAppAccess: (id) => transport.request('GET', `/v1/apps/${segment(id)}/access`),
     requestAppAccess: (id, input) => transport.request('POST', `/v1/apps/${segment(id)}/access-requests`, { body: input }),
     listAppAccessRequests: (query) => transport.request('GET', '/v1/app-access-requests', { query }),

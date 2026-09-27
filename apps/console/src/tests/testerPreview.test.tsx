@@ -45,6 +45,6 @@ test('试用读取失败与未就绪不保留旧链接，刷新恢复可用，�
   expect(document.querySelector('a[href="http://preview.demo.test"]')).not.toBeNull();
   f.state.app.entry = { kind: 'production', status: 'unknown' };
   f.state.app.production = { status: 'unknown', freshness: 'unknown', checkedAt: new Date().toISOString() };
-  await refresh(); expect(document.querySelector('main section')?.textContent).not.toContain('Beta');
+  await refresh(); expect(document.querySelector('main tbody')?.textContent).not.toContain('Beta');
   expect(document.querySelector('a[href="http://preview.demo.test"]')).toBeNull();
 });

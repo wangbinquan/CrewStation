@@ -12,6 +12,6 @@ const paths: Record<GlyphName, string> = {
 };
 
 /** 固定本地矢量符号，继承主题色；可用于应用卡片与选择器。 */
-export function GlyphIcon({ name, label }: { readonly name: GlyphName; readonly label?: string }): ReactElement {
-  return <span className={styles.icon}><svg viewBox="0 0 24 24" role={label ? 'img' : undefined} aria-label={label} aria-hidden={label ? undefined : true} fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d={paths[name]} /></svg></span>;
+export function GlyphIcon({ name, label, plain = false }: { readonly name: GlyphName; readonly label?: string; readonly plain?: boolean }): ReactElement {
+  return <span className={plain ? styles.plain : styles.icon}><svg viewBox="0 0 24 24" role={label ? 'img' : undefined} aria-label={label} aria-hidden={label ? undefined : true} fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d={paths[name]} /></svg></span>;
 }

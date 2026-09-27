@@ -3,7 +3,7 @@ import { afterEach, describe, expect, test } from 'bun:test';
 import { act } from 'react';
 import type { ReleaseId, ResourceRecord, TaskId } from '@crewstation/contracts';
 import { renderApp } from './renderApp';
-import { summaryFixture, summaryUserId } from './projectSummaryFixture';
+import { summaryFixture, summaryFixtureItem, summaryUserId } from './projectSummaryFixture';
 import { FakeEventSource, resourceRecord } from './resourceRecordFixture';
 
 const originalFetch = globalThis.fetch;
@@ -73,7 +73,10 @@ describe('项目列表的真实分页与独立状态', () => {
     const f = summaryFixture(); page = await renderApp('/projects');
     expect(page.text()).toContain('数字助手 1'); expect(page.text()).toContain('尚无开发会话'); expect(page.text()).toContain('健康状态暂不可用');
     expect(page.text()).toContain('已开通'); expect(page.text()).not.toContain('正常'); expect(page.text()).toContain('王负责人');
-    expect(document.querySelector('table details')?.textContent).toContain('cs-demo-1');
+    await page!.click('详情');
+    expect(document.querySelector('dialog[open]')?.textContent).toContain('cs-demo-1');
+    expect(document.querySelector('table dialog')).toBeNull();
+    await page!.click('✕');
     expect(f.calls.filter((url) => url.startsWith('/v1/workbench/project-summaries'))).toHaveLength(1);
     expect(f.calls.some((url) => url === '/v1/projects' || url.startsWith('/v1/projects?') || /\/services\/|\/dev-session|\/health/.test(url))).toBe(false);
     await page.click('下一页'); expect(page.text()).toContain('数字助手 2'); expect(page.text()).not.toContain('数字助手 1');
@@ -161,6 +164,7 @@ test.each(['列表', '概览'])('%s 的会话分支明确标为创建时记录�
   const session = { taskId: '01a0bf5d-8f4b-7e52-8b45-4a547fd10e4f' as TaskId, state: 'running' as const, connected: true, branch: 'main', createdAt: time, lastActivityAt: time };
   f.item.development = { status: 'ready', checkedAt: time, value: session };
   page = await renderApp(view === '列表' ? '/projects' : `/projects/${f.item.project.id}`);
+  if (view === '列表') await page.click('详情');
   const branch = [...document.querySelectorAll('code')].find((node) => node.textContent === 'main')!;
   // 实机已切到 codex/rfc003-files，摘要仍显示创建时 main；不能把元数据冒充当前工作树。列表写明「创建时分支」，概览的会话卡只放分支名。
   expect(branch.parentElement?.textContent).toBe(view === '列表' ? '创建时分支：main' : 'main · 0 个 CLI');
@@ -217,4 +221,19 @@ describe('概览按实际状态选择下一步', () => {
     f.error = true; await page.reread(); expect(page.text()).toContain('摘要读取失败'); expect(document.querySelector('[data-primary-project-action]')).toBeNull();
     expect(f.calls.some((url) => url.includes('/slots') || url.includes('/health'))).toBe(false);
   });
+});
+
+test('20行项目目录末行详情在弹窗，关闭保持查询、滚动和触发按钮焦点', async () => {
+  const f = summaryFixture(), baseFetch = globalThis.fetch;
+  globalThis.fetch = (async (url, init) => String(url).includes('/workbench/project-summaries') ? Response.json({ items: Array.from({ length: 20 }, (_, i) => summaryFixtureItem(i + 1)) }) : baseFetch(url, init)) as typeof fetch;
+  page = await renderApp('/projects?q=demo');
+  const main = document.querySelector('main')!; main.scrollTop = 600;
+  const last = [...document.querySelectorAll('tbody tr')].at(-1)!;
+  const trigger = [...last.querySelectorAll('button')].find((button) => button.textContent === '详情')!;
+  await act(async () => { trigger.focus(); trigger.click(); }); await page.settle();
+  const dialog = document.querySelector('dialog[open]')!;
+  expect(dialog.closest('table')).toBeNull(); expect(dialog.textContent).toContain('cs-demo-20');
+  await act(async () => dialog.dispatchEvent(new Event('cancel', { cancelable: true }))); await page.settle();
+  expect(document.activeElement === trigger).toBe(true); expect(main.scrollTop).toBe(600); expect(page.search().q).toBe('demo');
+  expect(document.querySelectorAll('tbody tr')).toHaveLength(20); expect(f.writes).toEqual([]);
 });

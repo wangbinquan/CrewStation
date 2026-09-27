@@ -1,3 +1,4 @@
+import sharp from 'sharp';
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import type { Actor, ProjectDto, ProjectId } from '@crewstation/contracts';
 import { IDENTITY_HEADERS } from '@crewstation/contracts';
@@ -127,5 +128,86 @@ describe.skipIf(!available)('市场范围与展示资料（真实 PostgreSQL）'
     expect((await request('app-visibility', admin)).status).toBe(200);
     expect((await request('app-visibility', owner, { mode: 'authenticated', allowRequests: false, expectedRevision: 0 })).status).toBe(200);
     await expect(module.api.getAppVisibility(visitor, '01a0bf5d-8f4b-7206-87a4-93e975cdc6ee' as ProjectId)).rejects.toMatchObject({ kind: 'not_found' });
+  });
+});
+
+describe.skipIf(!available)('RFC-030 市场发现查询', () => {
+  test('多词跨名称与用途、大小写和空白规范化；字面通配符不会扩大匹配', async () => {
+    const p = await app('发现检索 Knowledge');
+    await module.api.setAppVisibility(owner, p.id, { mode: 'authenticated', allowRequests: true, expectedRevision: 0 });
+    await module.api.setAppPresentation(owner, p.id, { description: '检索文档 50%_done', icon: 'book', expectedRevision: 1 });
+    for (const q of ['发现检索 文档', '文档 KNOWLEDGE', '  KNOWLEDGE\t文档  ', '50%_done']) {
+      expect((await module.api.listMarketListings(visitor, query(q))).items.map((item) => item.projectId)).toEqual([p.id]);
+    }
+    expect((await module.api.listMarketListings(visitor, query('发现检索 不存在'))).items).toEqual([]);
+    expect((await module.api.listMarketListings(visitor, query('50%_absent'))).items).toEqual([]);
+    await expect(module.api.listMarketListings(visitor, query('字'.repeat(121)))).rejects.toMatchObject({ kind: 'validation' });
+  });
+  test('负责人条件在分页前应用且不泄漏隐藏项目；游标绑定负责人、词和页大小', async () => {
+    const first = await app('负责人检索一'), second = await app('负责人检索二'), hidden = await app('负责人检索隐藏');
+    const another = await module.api.createProject(admin, { slug: `market-${++sequence}`, name: '负责人检索另一个', kind: 'DigitalWorker', ownerUserId: other.userId, template: '01a0bf5d-8f4b-7002-9560-94caf593fb19' });
+    for (const p of [first, second, another]) await module.api.setAppVisibility(admin, p.id, { mode: 'authenticated', allowRequests: true, expectedRevision: 0 });
+    const filter = { q: '负责人检索', ownerId: owner.userId, limit: 1 };
+    const page1 = await module.api.listMarketListings(visitor, filter);
+    expect(page1.items.map((item) => item.projectId)).toEqual([first.id]);
+    const page2 = await module.api.listMarketListings(visitor, { ...filter, cursor: page1.nextCursor });
+    expect(page2.items.map((item) => item.projectId)).toEqual([second.id]);
+    expect(page2.nextCursor).toBeUndefined();
+    expect((await module.api.listMarketListings(visitor, { ...filter, ownerId: other.userId })).items.map((item) => item.projectId)).toEqual([another.id]);
+    expect((await module.api.listMarketListings(visitor, { ...filter, q: '负责人检索二' })).items[0]?.projectId).toBe(second.id);
+    expect((await module.api.listMarketListings(visitor, { ...filter, q: '负责人检索隐藏' })).items).toEqual([]);
+    expect((await module.api.listMarketListings(admin, { ...filter, limit: 50 })).items.map((item) => item.projectId)).toContain(hidden.id);
+    for (const change of [{ ownerId: other.userId }, { ownerId: undefined }, { q: '另一个' }, { limit: 50 }]) {
+      await expect(module.api.listMarketListings(visitor, { ...filter, ...change, cursor: page1.nextCursor })).rejects.toMatchObject({ kind: 'validation' });
+    }
+    const old = Buffer.from(JSON.stringify({ userId: visitor.userId, q: filter.q, after: first.id })).toString('base64url');
+    await expect(module.api.listMarketListings(visitor, { ...filter, cursor: old })).rejects.toMatchObject({ kind: 'validation' });
+  });
+});
+
+const png = await sharp({ create: { width: 16, height: 16, channels: 4, background: '#4678ab' } }).png().toBuffer();
+describe.skipIf(!available)('RFC-032 application icon persistence and HTTP', () => {
+  test('upload atomically stores normalized bytes, preserves old-client writes and clears on explicit source change', async () => {
+    const p = await app('品牌应用');
+    const saved = await module.api.uploadAppIcon(owner, p.id, { description: '品牌说明', icon: 'book', expectedRevision: 0 }, png);
+    expect(saved).toMatchObject({ iconSource: { kind: 'upload', revision: 1 }, revision: 1 });
+    const icon = await module.api.getAppIcon(owner, p.id);
+    expect(icon.mime).toBe('image/webp'); expect(Buffer.from(icon.content, 'base64').subarray(0, 4).toString()).toBe('RIFF');
+    await module.api.setAppPresentation(owner, p.id, { description: '旧客户端更新', icon: 'chart', expectedRevision: 1 });
+    expect(await module.api.getAppIcon(owner, p.id)).toEqual(icon);
+    expect(await module.api.getMarketListing(owner, p.id)).toMatchObject({ iconSource: { kind: 'upload', revision: 1 } });
+    await expect(module.api.uploadAppIcon(owner, p.id, { description: 'stale', icon: 'book', expectedRevision: 0 }, png)).rejects.toMatchObject({ kind: 'conflict' });
+    expect(await module.api.getAppIcon(owner, p.id)).toEqual(icon);
+    await module.api.setAppPresentation(owner, p.id, { description: '', icon: 'book', iconSource: { kind: 'url', url: '/brand.png' }, expectedRevision: 2 });
+    await expect(module.api.getAppIcon(owner, p.id)).rejects.toMatchObject({ kind: 'not_found' });
+  });
+  test('only owner/admin write; market-visible app users can read without project development access; revocation is immediate', async () => {
+    const p = await app();
+    await module.api.setMember(owner, p.id, { userId: dev.userId, role: 'developer' });
+    await expect(module.api.uploadAppIcon(dev, p.id, { description: '', icon: 'book', expectedRevision: 0 }, png)).rejects.toMatchObject({ kind: 'forbidden' });
+    await module.api.uploadAppIcon(owner, p.id, { description: '', icon: 'book', expectedRevision: 0 }, png);
+    await expect(module.api.getAppIcon(plain, p.id)).rejects.toMatchObject({ kind: 'not_found' });
+    await module.api.setAppVisibility(owner, p.id, { mode: 'authenticated', allowRequests: true, expectedRevision: 1 });
+    expect((await module.api.getAppIcon(plain, p.id)).mime).toBe('image/webp');
+    await module.api.setAppVisibility(owner, p.id, { mode: 'members', allowRequests: true, expectedRevision: 2 });
+    await expect(module.api.getAppIcon(plain, p.id)).rejects.toMatchObject({ kind: 'not_found' });
+  });
+  test('HTTP multipart success, read headers, auth, malformed image and revision guards', async () => {
+    const p = await app(), http = createApp({ name: 'icon-test' }); for (const route of module.http) http.route('/', route);
+    const upload = (actor: Actor | undefined, revision: number, bytes: Uint8Array = png) => {
+      const data = new FormData(); data.set('file', new Blob([new Uint8Array(bytes)], { type: 'image/png' }), 'business.png'); data.set('presentation', JSON.stringify({ description: '', icon: 'book', expectedRevision: revision }));
+      return http.request(`/v1/projects/${p.id}/app-icon`, { method: 'PUT', body: data, headers: actor ? { [IDENTITY_HEADERS.userId]: actor.userId } : {} });
+    };
+    expect((await upload(undefined, 0)).status).toBe(401);
+    expect((await upload(visitor, 0)).status).toBe(404);
+    expect((await upload(owner, 0, new Uint8Array([1, 2, 3]))).status).toBe(400);
+    expect((await upload(owner, 0, new Uint8Array(2 * 1024 * 1024 + 1))).status).toBe(400);
+    expect((await upload(owner, 0)).status).toBe(200);
+    expect((await upload(owner, 0)).status).toBe(409);
+    const read = await http.request(`/v1/apps/${p.id}/icon`, { headers: { [IDENTITY_HEADERS.userId]: owner.userId } });
+    expect(read.status).toBe(200); expect(read.headers.get('content-type')).toBe('image/webp'); expect(read.headers.get('cache-control')).toBe('private, no-store'); expect(read.headers.get('x-content-type-options')).toBe('nosniff');
+    expect((await read.arrayBuffer()).byteLength).toBeGreaterThan(0);
+    expect((await http.request(`/v1/apps/${p.id}/icon`)).status).toBe(401);
+    expect((await http.request(`/v1/apps/${p.id}/icon`, { headers: { [IDENTITY_HEADERS.userId]: visitor.userId } })).status).toBe(404);
   });
 });

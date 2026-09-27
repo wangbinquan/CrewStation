@@ -56,7 +56,7 @@ const scopeSelect = () => document.querySelector<HTMLSelectElement>('form select
 const requestsSelect = () => document.querySelector<HTMLSelectElement>('form select option[value="open"]')!.parentElement as HTMLSelectElement;
 
 describe('能力市场与负责人设置真实路由', () => {
-  test('首页是业务卡片，不可用应用没有详情或打开入口，不请求项目内部数据', async () => {
+  test('首页是应用目录，不可用应用没有打开入口，不请求项目内部数据', async () => {
     const f = fixture(); page = await renderApp('/');
     expect(page.text()).toContain('知识助理'); expect(page.text()).toContain('暂不可用');
     expect(page.text()).not.toContain('进入项目'); expect(page.text()).not.toContain('打开正式应用');
@@ -81,7 +81,7 @@ describe('能力市场与负责人设置真实路由', () => {
     // 卡片标题曾跳到技术详情页；名称现在就是应用主页的原生链接。
     expect(link?.textContent).toBe('知识助理'); expect(link?.closest('h2')).not.toBeNull();
     expect(document.querySelector(`a[href="/market/${projectId}"]`)).toBeNull();
-    expect(page.text()).not.toContain('应用详情'); expect(page.text()).not.toContain('负责人：');
+    expect(page.text()).not.toContain('应用详情'); expect(page.text()).toContain('应用负责人');
     expect(page.text()).not.toContain('进入项目'); expect(page.text()).not.toContain('配置可见性');
     expect(page.html()).not.toContain(`/projects/${projectId}/settings`);
   });

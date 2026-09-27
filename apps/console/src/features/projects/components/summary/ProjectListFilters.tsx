@@ -10,10 +10,10 @@ export function ProjectListFilters({ search, items, userId, apply }: {
   readonly apply: (search: ProjectListSearch) => void;
 }) {
   const t = useT(), [q, setQ] = useState(search.q ?? ''), [state, setState] = useState(search.state), [owner, setOwner] = useState(search.ownerUserId);
-  const owners = new Map(items.map((item) => [item.project.ownerUserId as string, item.ownerName ?? item.project.ownerUserId]));
+  const owners = new Map<string, string>();
   if (userId) owners.set(userId, t('projects.summary.mine'));
-  if (owner && !owners.has(owner)) owners.set(owner, owner);
-  return <form className={styles.filters} onSubmit={(event) => { event.preventDefault(); apply({ q, state, ownerUserId: owner }); }}>
+  if (owner && !owners.has(owner)) owners.set(owner, search.ownerName || items.find((item) => item.project.ownerUserId === owner)?.ownerName || t('catalog.selectedOwner'));
+  return <form className={styles.filters} onSubmit={(event) => { event.preventDefault(); apply({ q, state, ownerUserId: owner, ownerName: owner === search.ownerUserId ? search.ownerName : undefined }); }}>
     <label>{t('projects.summary.search')}<input aria-label={t('projects.summary.search')} maxLength={120} value={q} onChange={(e) => setQ(e.target.value)} /></label>
     <label>{t('projects.summary.projectState')}<select aria-label={t('projects.summary.projectState')} value={state ?? ''} onChange={(e) => setState(e.target.value as ProjectListSearch['state'] || undefined)}>
       <option value="">{t('projects.summary.allStates')}</option>{(['provisioning', 'active', 'archived', 'failed'] as const).map((value) => <option key={value} value={value}>{t(`projects.state.${value}`)}</option>)}

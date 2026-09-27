@@ -15,7 +15,7 @@ export function useMarketQuery<T>(key: QueryKey, fetcher: () => Promise<T>) {
     enabled: Boolean(me.data) && !me.error, gcTime: 0, staleTime: 0, retry: false,
     refetchOnMount: 'always', refetchOnWindowFocus: 'always', refetchInterval: 15_000, refetchIntervalInBackground: false,
   });
-  return { ...query, isPending: me.isPending || query.isPending, error: me.error ?? query.error,
+  return { ...query, userId: me.data?.id, isPending: me.isPending || query.isPending, error: me.error ?? query.error,
     current: me.data && !me.error && !query.error ? query.data : undefined,
   };
 }

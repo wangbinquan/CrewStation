@@ -12,6 +12,7 @@ import { AppVisibilityDialog, AppVisibilitySummary } from './AppVisibilityDialog
 import styles from './Visibility.module.css';
 
 interface SettingsProps {
+  readonly origin?: string;
   readonly projectId: string;
   readonly visibility: AppVisibilityDto;
   readonly presentation: AppPresentationDto;
@@ -28,7 +29,7 @@ interface SettingsProps {
  * 2026-09-24 起可见范围只剩两档，同时决定网关放谁打开正式地址；负责人与管理员另有「使用申请」卡（AppVisibilityPage）。
  * 两份草稿都在这一层：关窗不丢、再打开恢复，成功保存只清除所属草稿；离开页面共用一次确认，写明哪几份会丢。读取失败保留草稿。
  */
-export function AppVisibilitySettings({ projectId, visibility, presentation, canConfigure, unavailable, refreshing = false, reload }: SettingsProps) {
+export function AppVisibilitySettings({ projectId, origin, visibility, presentation, canConfigure, unavailable, refreshing = false, reload }: SettingsProps) {
   const t = useT(), [open, setOpen] = useState<'scope' | 'presentation'>();
   const canSave = canConfigure && !unavailable && !refreshing;
   const scopeEditor = useVisibilityEditor(projectId, visibility, reload, canSave, () => setOpen(undefined));
@@ -45,14 +46,14 @@ export function AppVisibilitySettings({ projectId, visibility, presentation, can
     {unavailable ? <ActionNote tone="neutral">{t('projects.visibility.unavailable')}</ActionNote> : !canConfigure && dirty ? <ActionNote tone="neutral">{t('projects.visibility.roleChanged')}</ActionNote> : null}
     {pending ? <ActionNote tone="neutral">{t('projects.visibility.pendingNote')}</ActionNote> : null}
     <Card stacked compact title={t('projects.visibility.presentation')} actions={opener('presentation')}>
-      <AppPresentationSummary saved={presentation} />
+      <AppPresentationSummary projectId={projectId} origin={origin} saved={presentation} />
       {open !== 'presentation' && presentationEditor.save.isSuccess ? <ActionNote tone="success">{t('projects.visibility.saved')}</ActionNote> : null}
     </Card>
     <Card stacked compact title={t('projects.visibility.scope')} actions={opener('scope')}>
       <AppVisibilitySummary saved={visibility} canConfigure={canConfigure} />
       {open !== 'scope' && scopeEditor.save.isSuccess ? <ActionNote tone="success">{t('projects.visibility.saved')}</ActionNote> : null}
     </Card>
-    {open === 'presentation' && available('presentation') ? <AppPresentationDialog saved={presentation} editor={presentationEditor} onClose={() => setOpen(undefined)} /> : null}
+    {open === 'presentation' && available('presentation') ? <AppPresentationDialog origin={origin} saved={presentation} editor={presentationEditor} onClose={() => setOpen(undefined)} /> : null}
     {open === 'scope' && available('scope') ? <AppVisibilityDialog saved={visibility} editor={scopeEditor} onClose={() => setOpen(undefined)} /> : null}
   </div>;
 }

@@ -11,9 +11,9 @@ export function ProjectDirectoryFilters({ search, items, integration, userId, ap
   readonly userId?: string; readonly apply: (search: ProjectDirectorySearch) => void;
 }) {
   const t = useT(), [draft, setDraft] = useState(search);
-  const owners = new Map<string, string>(items.map((row) => [row.project.ownerUserId, row.ownerName ?? row.project.ownerUserId]));
-  if (userId && !owners.has(userId)) owners.set(userId, t('admin.directory.mine'));
-  if (draft.ownerUserId && !owners.has(draft.ownerUserId)) owners.set(draft.ownerUserId, draft.ownerUserId);
+  const owners = new Map<string, string>();
+  if (userId) owners.set(userId, t('admin.directory.mine'));
+  if (draft.ownerUserId && !owners.has(draft.ownerUserId)) owners.set(draft.ownerUserId, search.ownerName || items.find((item) => item.project.ownerUserId === draft.ownerUserId)?.ownerName || t('catalog.selectedOwner'));
   return <form role="search" aria-label={t('admin.directory.search')} className={styles.filters} onSubmit={(event) => { event.preventDefault(); apply({ ...draft, cursor: undefined }); }}>
     <label>{t('admin.directory.search')}<input aria-label={t('admin.directory.search')} value={draft.q ?? ''} maxLength={120} onChange={(e) => setDraft({ ...draft, q: e.target.value })} /></label>
     {/* 项目管理只有数字人一种，类型筛选只在接入容器目录里有（2026-09-24 裁定）。 */}
@@ -23,7 +23,7 @@ export function ProjectDirectoryFilters({ search, items, integration, userId, ap
     <label>{t('admin.directory.state')}<select aria-label={t('admin.directory.state')} value={draft.state ?? ''} onChange={(e) => setDraft({ ...draft, state: e.target.value as ProjectDirectorySearch['state'] || undefined })}>
       <option value="">{t('admin.directory.allStates')}</option>{['provisioning', 'active', 'archived', 'failed'].map((state) => <option key={state} value={state}>{t(`projects.state.${state}`)}</option>)}
     </select></label>
-    <label>{t('admin.directory.owner')}<select aria-label={t('admin.directory.owner')} value={draft.ownerUserId ?? ''} onChange={(e) => setDraft({ ...draft, ownerUserId: e.target.value || undefined })}>
+    <label>{t('admin.directory.owner')}<select aria-label={t('admin.directory.owner')} value={draft.ownerUserId ?? ''} onChange={(e) => setDraft({ ...draft, ownerUserId: e.target.value || undefined, ownerName: e.target.value === search.ownerUserId ? search.ownerName : undefined })}>
       <option value="">{t('admin.directory.allOwners')}</option>{[...owners].map(([id, name]) => <option key={id} value={id}>{name}</option>)}
     </select></label>
     <Button type="submit">{t('admin.directory.apply')}</Button><Button onClick={() => apply({ q: '' })}>{t('admin.directory.clear')}</Button>

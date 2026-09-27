@@ -2,6 +2,21 @@ import type { MessagesShapedLike } from '../../../shared/lib/i18n';
 import type { messages as zhCN } from './zh-CN';
 
 export const messages: MessagesShapedLike<typeof zhCN> = {
+  "projects.summary.ownerId": "Owner ID",
+  "projects.icon.loadFailed": "The image could not be loaded. A fallback is shown. Check the URL or choose another image.",
+  "projects.icon.preview": "Actual size in the market",
+  "projects.icon.source": "Icon source",
+  "projects.icon.sourceHint": "Reads the application /favicon.ico by default. Custom sources take priority, with a built-in fallback.",
+  "projects.icon.app": "Application /favicon.ico",
+  "projects.icon.upload": "Upload image",
+  "projects.icon.url": "Icon URL",
+  "projects.icon.urlHint": "Enter a full HTTPS URL or an application path such as /assets/icon.png.",
+  "projects.icon.urlError": "Enter a valid image URL. HTTPS pages cannot load HTTP images.",
+  "projects.icon.file": "Application image",
+  "projects.icon.fileHint": "Static PNG, JPEG or WebP, up to 2 MiB and 4096px per side.",
+  "projects.icon.fileError": "Choose a PNG, JPEG or WebP image no larger than 2 MiB.",
+  "projects.icon.fallback": "Built-in fallback",
+
   'projects.self.resources': 'Default resources: {plan}, up to {count} concurrent tasks.',
   'projects.members.developerRequired': 'Development members and owners must first receive the platform developer role from an administrator. Users can be testers or app users.',
   "projects.list.title": "Project development",
@@ -46,7 +61,7 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   "projects.summary.pageSize": "Up to 20 per page · {count} on this page",
   "projects.summary.firstPage": "First page",
   "projects.summary.nextPage": "Next page",
-  "projects.summary.identity": "Project / owner",
+  "projects.summary.identity": "Project",
   "projects.summary.development": "Development",
   "projects.summary.preview": "Version for validation",
   "projects.summary.prod": "Production version",

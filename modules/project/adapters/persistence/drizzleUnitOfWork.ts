@@ -1,3 +1,4 @@
+import { drizzleAppIcons } from './drizzleAppIcons';
 import { publishDomainEvent } from '@crewstation/eventbus';
 import type { Database, Executor } from '@crewstation/persistence';
 import type { RepositoryScope, UnitOfWork } from '../../ports/unitOfWork';
@@ -15,6 +16,7 @@ export function scopeOver(executor: Executor): RepositoryScope {
     memberships: drizzleMembershipRepository(executor),
     quotas: drizzleQuotaRepository(executor),
     catalog: drizzleCatalogRepository(executor),
+    appIcons: drizzleAppIcons(executor),
     appListings: drizzleAppListings(executor),
     accessRequests: drizzleAccessRequests(executor),
     projectPages: drizzleProjectPages(executor),
